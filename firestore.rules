@@ -1,0 +1,155 @@
+rules_version='2'
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+
+
+
+    // === 헬퍼 함수 ===
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSuperAdmin() {
+      return isSignedIn()
+        && (request.auth.token.email == 'ehsheh@gmail.com'
+            || (exists(/databases/$(database)/documents/users/$(request.auth.uid))
+                && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superAdmin'));
+    }
+
+    function isOrgMember(orgId) {
+      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.organizationId == orgId;
+    }
+
+    function isOrgAdmin(orgId) {
+      return isOrgMember(orgId) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function userOrgId() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.organizationId;
+    }
+
+    function belongsToMyOrg() {
+      return isSignedIn() && resource.data.organizationId == userOrgId();
+    }
+
+    function newBelongsToMyOrg() {
+      return isSignedIn() && request.resource.data.organizationId == userOrgId();
+    }
+
+    // === 사용자 ===
+    match /users/{userId} {
+      allow read: if isSignedIn() || isSuperAdmin();
+      allow create: if isOwner(userId)
+                    && request.auth.token.firebase.sign_in_provider != 'anonymous'
+                    && request.resource.data.keys().hasAll(['email'])
+                    && request.resource.data.email is string;
+      allow update: if isOwner(userId) || isSuperAdmin()
+                    || (isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+                        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.organizationId == resource.data.organizationId);
+      allow delete: if isSuperAdmin();
+    }
+
+    // === 기관 ===
+    match /organizations/{orgId} {
+      allow read: if isSignedIn() || isSuperAdmin();
+      allow create: if isSignedIn();
+      allow update: if isOrgAdmin(orgId) || isSuperAdmin()
+                    || (isSignedIn() && resource.data.status == 'pending' && resource.data.applicantUid == request.auth.uid);
+      allow delete: if isSuperAdmin();
+
+      // 커스텀 휴일 (서브컬렉션)
+      match /customHolidays/{holidayId} {
+        allow read: if isOrgMember(orgId);
+        allow write: if isOrgAdmin(orgId) || isSuperAdmin();
+      }
+    }
+
+    // === 차량 ===
+    match /vehicles/{vehicleId} {
+      allow read: if belongsToMyOrg() || isSuperAdmin();
+      allow create: if newBelongsToMyOrg() && isOrgAdmin(request.resource.data.organizationId);
+      allow update: if isOrgAdmin(resource.data.organizationId) || isSuperAdmin()
+                    // 소속 기관 멤버가 운행일지 저장 시 currentKm만 갱신 가능
+                    || (isOrgMember(resource.data.organizationId)
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['currentKm']));
+      allow delete: if isOrgAdmin(resource.data.organizationId) || isSuperAdmin();
+    }
+
+    // === 운행일지 ===
+    match /driveLogs/{logId} {
+      allow read: if belongsToMyOrg() || isSuperAdmin();
+      allow create: if newBelongsToMyOrg()
+                    && request.resource.data.keys().hasAll(['organizationId', 'vehicleId', 'driverUid']);
+      allow update: if isSuperAdmin()
+                    || (belongsToMyOrg() && (resource.data.driverUid == request.auth.uid
+                        || isOrgAdmin(resource.data.organizationId)));
+      allow delete: if isSuperAdmin();
+    }
+
+    // === 예약 ===
+    match /reservations/{reservationId} {
+      allow read: if belongsToMyOrg() || isSuperAdmin();
+      allow create: if newBelongsToMyOrg()
+                    && request.resource.data.keys().hasAll(['organizationId', 'vehicleId', 'reservedByUid']);
+      allow update: if isSuperAdmin()
+                    || (belongsToMyOrg() && (resource.data.reservedByUid == request.auth.uid
+                        || isOrgAdmin(resource.data.organizationId)));
+      allow delete: if isSuperAdmin();
+    }
+
+    // === 알림 ===
+    match /notifications/{notificationId} {
+      allow read: if resource.data.targetUid == request.auth.uid || isSuperAdmin();
+      allow create: if isSignedIn()
+                    && request.resource.data.keys().hasAll(['targetUid'])
+                    && request.resource.data.targetUid is string;
+      allow update: if resource.data.targetUid == request.auth.uid;
+      allow delete: if resource.data.targetUid == request.auth.uid || isSuperAdmin();
+    }
+
+    // === 즐겨찾기 ===
+    match /favorites/{favoriteId} {
+      allow read: if resource.data.userId == request.auth.uid;
+      allow create: if request.resource.data.userId == request.auth.uid;
+      allow update: if resource.data.userId == request.auth.uid;
+      allow delete: if resource.data.userId == request.auth.uid;
+    }
+
+    // === 정비 기록 ===
+    match /maintenanceRecords/{recordId} {
+      allow read: if belongsToMyOrg() || isSuperAdmin();
+      allow create: if newBelongsToMyOrg() && isOrgAdmin(request.resource.data.organizationId);
+      allow update: if isOrgAdmin(resource.data.organizationId) || isSuperAdmin();
+      allow delete: if isOrgAdmin(resource.data.organizationId) || isSuperAdmin();
+    }
+
+    // === 피드백 ===
+    match /feedbacks/{feedbackId} {
+      allow read: if isSuperAdmin();
+      allow create: if isSignedIn();
+      allow update: if isSuperAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    // === 기관 신청 ===
+    match /orgApplications/{appId} {
+      allow read: if isSuperAdmin()
+                  || (isSignedIn() && resource.data.applicantEmail == request.auth.token.email);
+      allow create: if isSignedIn();
+      allow update: if isSuperAdmin();
+      allow delete: if isSuperAdmin();
+    }
+
+    // === 시스템 ===
+    match /system/{document} {
+      allow read: if isSignedIn();
+      allow write: if false; // Cloud Functions에서만 쓰기
+    }
+  }
+}

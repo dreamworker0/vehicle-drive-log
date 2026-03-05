@@ -1,0 +1,363 @@
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+  }
+
+  body {
+    @apply font-sans antialiased text-surface-900 bg-surface-50 dark:text-surface-100 dark:bg-surface-950;
+    min-height: 100vh;
+    min-height: 100dvh;
+    overscroll-behavior: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* 모바일 입력 필드 줌 방지 */
+  input[type="text"],
+  input[type="email"],
+  input[type="tel"],
+  input[type="number"],
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+@layer components {
+
+  /* Glass morphism 카드 */
+  .glass-card {
+    @apply bg-white/80 backdrop-blur-md border border-white/20 rounded-2xl shadow-glass dark:bg-surface-800/80 dark:border-surface-700/50;
+  }
+
+  .glass-card-dark {
+    @apply bg-surface-800/80 backdrop-blur-md border border-surface-700/50 rounded-2xl shadow-glass;
+  }
+
+  /* 버튼 베이스 */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] dark:focus:ring-offset-surface-900;
+  }
+
+  .btn-primary {
+    @apply btn bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500 shadow-md hover:shadow-lg;
+  }
+
+  .btn-secondary {
+    @apply btn bg-surface-100 text-surface-700 hover:bg-surface-200 focus:ring-surface-400 border border-surface-200 dark:bg-surface-700 dark:text-surface-200 dark:hover:bg-surface-600 dark:border-surface-600;
+  }
+
+  .btn-danger {
+    @apply btn bg-red-500 text-white hover:bg-red-600 focus:ring-red-400 shadow-md hover:shadow-lg;
+  }
+
+  .btn-success {
+    @apply btn bg-accent-600 text-white hover:bg-accent-700 focus:ring-accent-500 shadow-md hover:shadow-lg;
+  }
+
+  .btn-ghost {
+    @apply btn text-surface-600 hover:bg-surface-100 hover:text-surface-900 dark:text-surface-400 dark:hover:bg-surface-800 dark:hover:text-surface-100;
+  }
+
+  /* Soft 버튼 — 다크 모드 자동 적용 */
+  .btn-soft-primary {
+    @apply btn bg-primary-50 text-primary-600 hover:bg-primary-100 dark:bg-primary-900/30 dark:text-primary-400 dark:hover:bg-primary-900/50;
+  }
+
+  .btn-soft-blue {
+    @apply btn bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-400 dark:hover:bg-blue-900/50;
+  }
+
+  .btn-soft-amber {
+    @apply btn bg-amber-50 text-amber-600 hover:bg-amber-100 dark:bg-amber-900/30 dark:text-amber-400 dark:hover:bg-amber-900/50;
+  }
+
+  .btn-soft-red {
+    @apply btn bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/30 dark:text-red-400 dark:hover:bg-red-900/50;
+  }
+
+  .btn-sm {
+    @apply text-sm px-3 py-1.5 rounded-lg;
+    min-height: 44px;
+    /* 모바일 접근성: 최소 터치 타겟 */
+  }
+
+  @media (min-width: 640px) {
+    .btn-sm {
+      min-height: auto;
+    }
+  }
+
+  .btn-lg {
+    @apply text-lg px-6 py-3 rounded-xl;
+  }
+
+  .btn-icon {
+    @apply btn p-2.5 rounded-xl;
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* 입력 필드 */
+  .input {
+    @apply w-full px-4 py-2.5 rounded-xl border border-surface-200 bg-white text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 focus:border-primary-500 transition-all duration-200 dark:bg-surface-800 dark:border-surface-600 dark:text-surface-100 dark:placeholder:text-surface-500;
+  }
+
+  .input-error {
+    @apply border-red-400 focus:ring-red-500/30 focus:border-red-500;
+  }
+
+  /* 다크 모드에서 date/time picker 아이콘 (캘린더, 시계) 흰색 처리 */
+  :is(.dark) input[type="date"]::-webkit-calendar-picker-indicator,
+  :is(.dark) input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+  }
+
+  .label {
+    @apply block text-sm font-medium text-surface-700 mb-1.5 dark:text-surface-300;
+  }
+
+  /* 뱃지 */
+  .badge {
+    @apply inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-primary {
+    @apply badge bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300;
+  }
+
+  .badge-success {
+    @apply badge bg-accent-100 text-accent-700 dark:bg-accent-900/40 dark:text-accent-300;
+  }
+
+  .badge-warning {
+    @apply badge bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300;
+  }
+
+  .badge-danger {
+    @apply badge bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300;
+  }
+
+  .badge-neutral {
+    @apply badge bg-surface-100 text-surface-600 dark:bg-surface-700 dark:text-surface-400;
+  }
+
+  /* 사이드바 */
+  .sidebar-link {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-surface-600 hover:bg-primary-50 hover:text-primary-700 transition-all duration-200 dark:text-surface-400 dark:hover:bg-primary-900/30 dark:hover:text-primary-300;
+  }
+
+  .sidebar-link-active {
+    @apply bg-primary-50 text-primary-700 shadow-sm dark:bg-primary-900/30 dark:text-primary-300;
+  }
+
+  /* 스피너 */
+  .spinner {
+    @apply animate-spin rounded-full border-2 border-surface-200 border-t-primary-600 dark:border-surface-700 dark:border-t-primary-400;
+  }
+
+  /* 알림 드롭다운 — 모바일 우선 */
+  .notification-dropdown {
+    position: fixed;
+    top: 56px;
+    left: 16px;
+    right: 16px;
+    max-height: 70vh;
+    overflow-y: auto;
+    @apply bg-white rounded-2xl shadow-glass-lg border border-surface-100 z-50 animate-slide-down dark:bg-surface-800 dark:border-surface-700;
+  }
+
+  @media (min-width: 480px) {
+    .notification-dropdown {
+      position: absolute;
+      top: 100%;
+      left: auto;
+      right: 0;
+      margin-top: 0.5rem;
+      width: 20rem;
+      /* w-80 */
+      max-height: 24rem;
+      /* max-h-96 */
+    }
+  }
+}
+
+@layer utilities {
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary-600 to-primary-400;
+  }
+
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+}
+
+/* ===== 운행 중 강조 디자인 ===== */
+
+/* 운행 중 카드 */
+.driving-card {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #fffbeb 0%, #fef9e7 100%);
+  border: 1px solid #fcd34d;
+  border-radius: 1rem;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.1);
+}
+
+:is(.dark .driving-card) {
+  background: linear-gradient(135deg, #422006 0%, #451a03 100%);
+  border-color: #b45309;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.2);
+}
+
+/* 상단 주행 진행바 */
+.driving-progress-bar {
+  height: 2px;
+  background: linear-gradient(90deg, transparent 0%, #fbbf24 40%, #f59e0b 60%, transparent 100%);
+  background-size: 200% 100%;
+  animation: driveProgress 2s linear infinite;
+}
+
+@keyframes driveProgress {
+  0% {
+    background-position: -200% 0;
+  }
+
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+/* 운행 중 뱃지 */
+.driving-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  background: #fef3c7;
+  color: #b45309;
+  font-size: 0.7rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+:is(.dark .driving-badge) {
+  background: #78350f;
+  color: #fbbf24;
+}
+
+/* 라이브 도트 */
+.driving-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f59e0b;
+  animation: liveDot 1.5s ease-in-out infinite;
+}
+
+@keyframes liveDot {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.3;
+  }
+}
+
+/* 운행 중 차 아이콘 위아래 흔들림 애니메이션 */
+@keyframes carDrive {
+
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  25% {
+    transform: translateY(-2px);
+  }
+
+  50% {
+    transform: translateY(0);
+  }
+
+  75% {
+    transform: translateY(-1px);
+  }
+}
+
+/* 운행 중 뱃지 펄스 */
+@keyframes drivePulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.6;
+  }
+}
+
+/* ===== 토스트 애니메이션 ===== */
+.animate-slide-in {
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+/* ===== 글자 크기 조절 (더보기 > 글자 크기) ===== */
+/* 보통: text-xs 13px, text-sm 15px (tailwind.config 기본값) */
+html.font-small .text-xs {
+  font-size: 0.625rem !important;
+  /* 10px */
+  line-height: 0.875rem !important;
+}
+
+html.font-small .text-sm {
+  font-size: 0.75rem !important;
+  /* 12px */
+  line-height: 1rem !important;
+}
+
+html.font-large .text-xs {
+  font-size: 0.9375rem !important;
+  /* 15px */
+  line-height: 1.25rem !important;
+}
+
+html.font-large .text-sm {
+  font-size: 1.0625rem !important;
+  /* 17px */
+  line-height: 1.5rem !important;
+}

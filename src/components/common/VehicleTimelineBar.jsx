@@ -1,0 +1,298 @@
+/**
+ * VehicleTimelineBar — 차량별 시간대 현황을 수평 바로 시각화
+ * 예약된 시간은 색상 블록, 빈 시간은 빈 영역으로 표현
+ * 빈 영역 드래그 시 시간 범위를 선택하여 예약 폼에 자동 반영
+ * 예약 블록 또는 차량명 클릭 시 해당 차량의 예약 상세를 아코디언으로 펼침
+ */
+import { useMemo, useState, useEffect } from 'react';
+import { getVehicleColor } from '../../lib/constants';
+import {
+    SNAP_MINUTES, RANGE_START, RANGE_END,
+    timeToMinutes, minutesToTime, snapMinutes,
+    getPercent, getGaps, getHourLabels,
+} from '../../lib/timelineUtils';
+import useTimelineDrag from '../../hooks/useTimelineDrag';
+
+const hourLabels = getHourLabels();
+
+export default function VehicleTimelineBar({
+    vehicles, reservations, onSlotClick, isPastDate, isToday,
+    onEdit, onCancel, user, isAdmin, setShowForm,
+}) {
+    // 드래그 훅
+    const {
+        dragState, barRefs,
+        handleDragStart, handleDragMove, handleDragEnd, getDragOverlay,
+    } = useTimelineDrag(onSlotClick);
+
+    // 아코디언 확장 상태
+    const [expandedVehicleId, setExpandedVehicleId] = useState(null);
+    const toggleExpand = (vehicleId) => {
+        setExpandedVehicleId(prev => prev === vehicleId ? null : vehicleId);
+    };
+
+    // 오늘 날짜일 때 현재 시각(분) — 1분마다 갱신
+    const [nowMinutes, setNowMinutes] = useState(() => {
+        const now = new Date();
+        return now.getHours() * 60 + now.getMinutes();
+    });
+    useEffect(() => {
+        if (!isToday) return;
+        const timer = setInterval(() => {
+            const now = new Date();
+            setNowMinutes(now.getHours() * 60 + now.getMinutes());
+        }, 60000);
+        return () => clearInterval(timer);
+    }, [isToday]);
+
+    // 차량별 예약 데이터 그룹핑
+    const vehicleData = useMemo(() => {
+        return vehicles.filter(v => !v.retired?.isRetired).map(v => {
+            const vRes = reservations
+                .filter(r => r.vehicleId === v.id && r.status !== 'completed' && r.status !== 'cancelled')
+                .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
+            return { vehicle: v, reservations: vRes };
+        });
+    }, [vehicles, reservations]);
+
+    // 오늘인 경우 현재 시각을 30분 단위로 올림
+    const nowSnapped = isToday ? snapMinutes(nowMinutes + SNAP_MINUTES - 1) : RANGE_START;
+    // 과거 시간 영역 퍼센트
+    const pastEndPercent = isToday ? getPercent(Math.min(nowSnapped, RANGE_END)) : 0;
+
+    if (vehicles.length === 0) return null;
+
+    const dragOverlay = getDragOverlay();
+
+    return (
+        <div
+            className="mb-4 animate-fade-in"
+            onMouseMove={handleDragMove}
+            onMouseUp={handleDragEnd}
+            onMouseLeave={handleDragEnd}
+            onTouchMove={handleDragMove}
+            onTouchEnd={handleDragEnd}
+            onTouchCancel={handleDragEnd}
+        >
+            <p className="text-[11px] font-medium text-surface-500 dark:text-surface-400 mb-2">
+                시간대 현황
+            </p>
+            <div className="rounded-xl bg-surface-50 dark:bg-surface-800/60 border border-surface-200 dark:border-surface-700 p-3 overflow-hidden">
+                {/* 시간 눈금 */}
+                <div className="relative h-4 mb-1 ml-[72px]">
+                    {hourLabels.map(h => (
+                        <span
+                            key={h}
+                            className="absolute text-[9px] text-surface-400 dark:text-surface-500 -translate-x-1/2 select-none"
+                            style={{ left: `${getPercent(h * 60)}%` }}
+                        >
+                            {h}
+                        </span>
+                    ))}
+                </div>
+
+                {/* 차량별 타임라인 행 */}
+                <div className="space-y-1.5">
+                    {vehicleData.map(({ vehicle, reservations: vRes }) => {
+                        const isBlocked = vehicle.maintenance?.isBlocked;
+                        const gaps = getGaps(vRes, isToday, nowSnapped);
+                        const isDraggingThis = dragState?.vehicleId === vehicle.id;
+                        const isExpanded = expandedVehicleId === vehicle.id;
+
+                        return (
+                            <div key={vehicle.id}>
+                                <div className="flex items-center gap-2">
+                                    {/* 차량명 라벨 */}
+                                    <button
+                                        type="button"
+                                        onClick={() => vRes.length > 0 && toggleExpand(vehicle.id)}
+                                        className={`w-[64px] text-[10px] font-medium truncate flex-shrink-0 text-right flex items-center justify-end gap-0.5 border-0 bg-transparent p-0 ${isBlocked
+                                            ? 'text-surface-400 line-through cursor-default'
+                                            : vRes.length > 0
+                                                ? 'text-surface-700 dark:text-surface-300 cursor-pointer hover:text-primary-500 dark:hover:text-primary-400'
+                                                : 'text-surface-700 dark:text-surface-300 cursor-default'
+                                            }`}
+                                        title={vehicle.displayName}
+                                    >
+                                        {isBlocked ? '🔧 ' : ''}{vehicle.displayName}
+                                        {vRes.length > 0 && (
+                                            <svg className={`w-2.5 h-2.5 flex-shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                                            </svg>
+                                        )}
+                                    </button>
+
+                                    {/* 타임라인 바 */}
+                                    <div
+                                        ref={el => { barRefs.current[vehicle.id] = el; }}
+                                        className="relative flex-1 h-6 rounded bg-surface-100 dark:bg-surface-700/50 overflow-hidden select-none"
+                                        style={{ touchAction: 'none' }}
+                                    >
+                                        {/* 과거 시간 영역 */}
+                                        {isToday && pastEndPercent > 0 && (
+                                            <>
+                                                <div
+                                                    className="absolute top-0 bottom-0 z-[1] pointer-events-none rounded-l-sm"
+                                                    style={{
+                                                        left: 0,
+                                                        width: `${pastEndPercent}%`,
+                                                        background: `
+                                                            linear-gradient(rgba(0,0,0,0.18), rgba(0,0,0,0.18)),
+                                                            repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(150,150,150,0.25) 3px, rgba(150,150,150,0.25) 5px)
+                                                        `.trim(),
+                                                    }}
+                                                    title="지난 시간"
+                                                />
+                                                {/* 현재 시각 경계선 */}
+                                                <div
+                                                    className="absolute top-0 bottom-0 z-[2] pointer-events-none"
+                                                    style={{
+                                                        left: `${pastEndPercent}%`,
+                                                        width: '2px',
+                                                        background: 'rgb(249, 115, 22)',
+                                                        boxShadow: '0 0 4px rgba(249,115,22,0.5)',
+                                                    }}
+                                                />
+                                            </>
+                                        )}
+
+                                        {/* 시간 눈금선 */}
+                                        {hourLabels.map(h => (
+                                            <div
+                                                key={h}
+                                                className="absolute top-0 bottom-0 w-px bg-surface-200/60 dark:bg-surface-600/40"
+                                                style={{ left: `${getPercent(h * 60)}%` }}
+                                            />
+                                        ))}
+
+                                        {/* 예약 블록 */}
+                                        {vRes.map(r => {
+                                            const left = getPercent(timeToMinutes(r.startTime));
+                                            const right = getPercent(timeToMinutes(r.endTime));
+                                            const width = right - left;
+                                            const colorClass = getVehicleColor(vehicle.id);
+                                            return (
+                                                <div
+                                                    key={r.id}
+                                                    className={`absolute top-0.5 bottom-0.5 rounded-sm ${colorClass} opacity-80 dark:opacity-60 border border-white/30 dark:border-surface-500/30 cursor-pointer hover:opacity-100 dark:hover:opacity-80 transition-opacity`}
+                                                    style={{ left: `${left}%`, width: `${width}%` }}
+                                                    title={`${r.reservedByName}: ${r.startTime}~${r.endTime} ${r.purpose || ''}`}
+                                                    onClick={() => toggleExpand(vehicle.id)}
+                                                />
+                                            );
+                                        })}
+
+                                        {/* 빈 시간 드래그 영역 */}
+                                        {!isPastDate && !isBlocked && gaps.map((gap, gi) => {
+                                            const left = getPercent(gap.start);
+                                            const right = getPercent(gap.end);
+                                            const width = right - left;
+                                            if (gap.end - gap.start < 5) return null;
+                                            return (
+                                                <div
+                                                    key={gi}
+                                                    className="absolute top-0 bottom-0 cursor-pointer"
+                                                    style={{ left: `${left}%`, width: `${width}%` }}
+                                                    title={`${minutesToTime(gap.start)}~${minutesToTime(gap.end)} 예약 가능 (드래그로 선택)`}
+                                                    onMouseDown={(e) => handleDragStart(e, vehicle.id, gap.start, gap.end)}
+                                                    onTouchStart={(e) => handleDragStart(e, vehicle.id, gap.start, gap.end)}
+                                                >
+                                                    {!isDraggingThis && (
+                                                        <div className="absolute inset-0 hover:bg-primary-200/40 dark:hover:bg-primary-500/20 transition-colors rounded-sm" />
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+
+                                        {/* 드래그 선택 오버레이 */}
+                                        {isDraggingThis && dragOverlay && (
+                                            <>
+                                                <div
+                                                    className="absolute top-0 bottom-0 bg-primary-400/40 dark:bg-primary-500/30 border border-primary-500/60 dark:border-primary-400/50 rounded-sm z-10 pointer-events-none transition-[left,width] duration-75"
+                                                    style={{
+                                                        left: `${dragOverlay.left}%`,
+                                                        width: `${Math.max(dragOverlay.width, 0.5)}%`,
+                                                    }}
+                                                />
+                                                {dragOverlay.width > 3 && (
+                                                    <div
+                                                        className="absolute -top-5 z-20 pointer-events-none text-[9px] font-bold text-primary-600 dark:text-primary-300 whitespace-nowrap bg-white/90 dark:bg-surface-800/90 px-1 rounded shadow-sm"
+                                                        style={{
+                                                            left: `${dragOverlay.left + dragOverlay.width / 2}%`,
+                                                            transform: 'translateX(-50%)',
+                                                        }}
+                                                    >
+                                                        {minutesToTime(dragOverlay.selStart)}~{minutesToTime(dragOverlay.selEnd)}
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {/* 아코디언: 해당 차량 예약 상세 */}
+                                {isExpanded && vRes.length > 0 && (
+                                    <div className="ml-[72px] pl-2 mt-1 mb-1 border-l-2 border-primary-300 dark:border-primary-700 animate-fade-in">
+                                        {vRes.map(r => {
+                                            const resEndDateTime = new Date(`${r.date}T${r.endTime || '23:59'}`);
+                                            const isPastReservation = resEndDateTime < new Date();
+                                            return (
+                                                <div key={r.id} className="py-1.5 first:pt-0.5 last:pb-0.5">
+                                                    <div className="flex items-center justify-between gap-1">
+                                                        <p className="text-[11px] text-surface-600 dark:text-surface-300 truncate">
+                                                            <span className="font-medium">{r.reservedByName}</span>
+                                                            <span className="mx-1 text-surface-300 dark:text-surface-600">|</span>
+                                                            {r.startTime} ~ {r.endTime}
+                                                            {r.destination && <span className="mx-1 text-surface-300 dark:text-surface-600">|</span>}
+                                                            {r.destination && <span>{r.destination}</span>}
+                                                            {r.purpose && <span>, {r.purpose}</span>}
+                                                        </p>
+                                                        <div className="flex items-center gap-1.5 flex-shrink-0">
+                                                            {r.syncSource === 'calendar' && (
+                                                                <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300 rounded-full font-medium">
+                                                                    📅
+                                                                </span>
+                                                            )}
+                                                            {(isAdmin || r.reservedByUid === user?.uid) && !isPastReservation && (
+                                                                <>
+                                                                    <button onClick={() => { onEdit?.(r); setShowForm?.(true); }} className="text-[11px] leading-none py-0.5 text-primary-500 hover:underline">수정</button>
+                                                                    <button onClick={() => onCancel?.(r.id)} className="text-[11px] leading-none py-0.5 text-red-500 hover:underline">취소</button>
+                                                                </>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    {r.routeDistance && (
+                                                        <p className="text-[11px] text-blue-500 mt-0.5 flex items-center gap-2">
+                                                            <span>🗺️ {Math.floor(r.routeDistance)}km</span>
+                                                            <span>⏱ 약 {r.routeDuration}분</span>
+                                                            {r.routeTollFee > 0 && <span>톨비 {r.routeTollFee.toLocaleString()}원</span>}
+                                                        </p>
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
+                        );
+                    })}
+                </div>
+
+                {/* 범례 */}
+                <div className="flex items-center gap-2 mt-2.5 flex-nowrap justify-end">
+                    <div className="flex items-center gap-1">
+                        <div className="w-3 h-2.5 rounded-sm bg-blue-200 dark:bg-blue-300/50 border border-white/30" />
+                        <span className="text-[9px] text-surface-400">예약됨</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <div className="w-3 h-2.5 rounded-sm bg-surface-100 dark:bg-surface-700/50 border border-surface-200 dark:border-surface-600" />
+                        <span className="text-[9px] text-surface-400">예약 가능</span>
+                    </div>
+                    <span className="text-[8px] text-surface-400 whitespace-nowrap">
+                        {!isPastDate && '드래그=예약 · '}터치=상세
+                    </span>
+                </div>
+            </div>
+        </div>
+    );
+}

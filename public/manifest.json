@@ -1,0 +1,58 @@
+{
+    "name": "차량운행일지",
+    "short_name": "운행일지",
+    "description": "기관 차량 운행일지 & 예약 관리 시스템",
+    "start_url": "/",
+    "id": "/",
+    "display": "standalone",
+    "background_color": "#f8fafc",
+    "theme_color": "#3b82f6",
+    "orientation": "portrait",
+    "categories": [
+        "business",
+        "productivity"
+    ],
+    "icons": [
+        {
+            "src": "/icons/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/icons/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/icons/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "maskable"
+        },
+        {
+            "src": "/icons/icon-512.svg",
+            "sizes": "any",
+            "type": "image/svg+xml",
+            "purpose": "any"
+        }
+    ],
+    "screenshots": [
+        {
+            "src": "/icons/screenshot-mobile.webp",
+            "sizes": "390x844",
+            "type": "image/webp",
+            "form_factor": "narrow",
+            "label": "직원 오늘 대시보드"
+        },
+        {
+            "src": "/icons/screenshot-desktop.webp",
+            "sizes": "1280x800",
+            "type": "image/webp",
+            "form_factor": "wide",
+            "label": "관리자 운행일지 조회"
+        }
+    ],
+    "prefer_related_applications": false
+}

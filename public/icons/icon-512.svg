@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#3b82f6"/>
+      <stop offset="100%" stop-color="#1d4ed8"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <!-- Car body -->
+  <path d="M130 310 L155 240 C160 225 175 210 200 210 L312 210 C337 210 352 225 357 240 L382 310" 
+        fill="none" stroke="white" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- Car base -->
+  <rect x="110" y="300" width="292" height="60" rx="20" fill="white" opacity="0.95"/>
+  <!-- Windows -->
+  <path d="M175 250 L190 220 C192 216 198 213 205 213 L248 213 L248 250 Z" fill="rgba(59,130,246,0.6)"/>
+  <path d="M264 250 L264 213 L307 213 C314 213 320 216 322 220 L337 250 Z" fill="rgba(59,130,246,0.6)"/>
+  <!-- Wheels -->
+  <circle cx="190" cy="345" r="32" fill="#1e40af"/>
+  <circle cx="190" cy="345" r="18" fill="white"/>
+  <circle cx="190" cy="345" r="8" fill="#1e40af"/>
+  <circle cx="322" cy="345" r="32" fill="#1e40af"/>
+  <circle cx="322" cy="345" r="18" fill="white"/>
+  <circle cx="322" cy="345" r="8" fill="#1e40af"/>
+  <!-- Headlights -->
+  <rect x="100" y="308" width="20" height="14" rx="4" fill="#fbbf24"/>
+  <rect x="392" y="308" width="20" height="14" rx="4" fill="#ef4444"/>
+  <!-- Notepad icon (small) -->
+  <rect x="326" y="100" width="80" height="100" rx="10" fill="white" opacity="0.9"/>
+  <line x1="346" y1="125" x2="386" y2="125" stroke="#3b82f6" stroke-width="4" stroke-linecap="round"/>
+  <line x1="346" y1="145" x2="380" y2="145" stroke="#93c5fd" stroke-width="4" stroke-linecap="round"/>
+  <line x1="346" y1="165" x2="374" y2="165" stroke="#93c5fd" stroke-width="4" stroke-linecap="round"/>
+</svg>
