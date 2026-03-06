@@ -8,13 +8,14 @@ import {
     cancelReservation,
     getFavorites,
     createFavorite,
-    getOrganizationMembers
+    getOrganizationMembers,
+    getOrganization
 } from '../lib/firestore';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
 import { getHolidays } from '../lib/holiday';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isBefore, startOfDay } from 'date-fns';
-import { getRouteInfo } from '../lib/tmap';
+import { getMultiRoute, isTmapAvailable, VEHICLE_TYPE_TO_CAR_TYPE } from '../lib/tmap';
 import { calcEndTime } from './utils/reservationUtils';
 import type { Vehicle } from '../types/vehicle';
 import type { Reservation, CalendarDay } from '../types/reservation';
@@ -50,6 +51,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
     const [favorites, setFavorites] = useState<Favorite[]>([]);
     const [holidays, setHolidays] = useState<CustomHoliday[]>([]);
     const [members, setMembers] = useState<UserDoc[]>([]);
+    const [orgAddress, setOrgAddress] = useState('');
 
     // 폼 상태
     const [form, setForm] = useState<ReservationForm>({
@@ -77,14 +79,19 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
         const fetchData = async () => {
             try {
                 setLoading(true);
-                const [vList, fList, hList] = await Promise.all([
+                const [vList, fList, hList, org] = await Promise.all([
                     getVehicles(userData.organizationId!),
                     getFavorites(user.uid),
-                    getHolidays()
+                    getHolidays(),
+                    getOrganization(userData.organizationId!)
                 ]);
                 setVehicles(vList as Vehicle[]);
                 setFavorites(fList as Favorite[]);
                 setHolidays(hList as CustomHoliday[]);
+                const orgData = org as unknown as { address?: string } | null;
+                if (orgData?.address) {
+                    setOrgAddress(orgData.address);
+                }
 
                 if (isAdmin) {
                     const mList = await getOrganizationMembers(userData.organizationId!);
@@ -122,22 +129,36 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
         }
     }, [searchParams]);
 
-    // 경로 정보 업데이트
+    // 경로 정보 업데이트 (기관 주소 → 목적지 경로 탐색)
     useEffect(() => {
-        if (!form.destination.trim()) {
+        if (!form.destination.trim() || !orgAddress || !isTmapAvailable()) {
             setRouteInfo(null);
             return;
         }
 
+        // 선택된 차량의 carType 결정
+        const selectedVehicle = vehicles.find(v => v.id === form.vehicleId);
+        const carType = selectedVehicle?.vehicleType
+            ? VEHICLE_TYPE_TO_CAR_TYPE[selectedVehicle.vehicleType] || '0'
+            : '0';
+
         const timer = setTimeout(async () => {
             setRouteLoading(true);
             try {
-                const info = await getRouteInfo(form.destination);
-                setRouteInfo(info);
-                // 경로 탐색 성공 시 자동 종료 시간 설정 (시작 시간이 있을 때만)
-                if (form.startTime && info?.duration) {
-                    const autoEnd = calcEndTime(form.startTime, info.duration);
-                    setForm(prev => ({ ...prev, endTime: autoEnd }));
+                const result = await getMultiRoute(orgAddress, form.destination.trim(), { carType });
+                if (result) {
+                    setRouteInfo({
+                        distance: result.distance,
+                        duration: result.duration,
+                        tollFee: result.tollFee,
+                    });
+                    // 경로 탐색 성공 시 자동 종료 시간 설정 (시작 시간이 있을 때만)
+                    if (form.startTime && result.duration) {
+                        const autoEnd = calcEndTime(form.startTime, result.duration);
+                        setForm(prev => ({ ...prev, endTime: autoEnd }));
+                    }
+                } else {
+                    setRouteInfo(null);
                 }
             } catch {
                 setRouteInfo(null);
@@ -147,7 +168,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
         }, 800);
 
         return () => clearTimeout(timer);
-    }, [form.destination, form.startTime]);
+    }, [form.destination, form.startTime, form.vehicleId, orgAddress, vehicles]);
 
     // 달력 데이터 생성
     const calendarDays = useMemo(() => {

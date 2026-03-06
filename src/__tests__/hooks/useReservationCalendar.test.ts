@@ -50,6 +50,7 @@ vi.mock('../../lib/firestore', () => ({
     getOrganizationMembers: (...args: any[]) => mockGetOrganizationMembers(...args),
     updateReservation: (...args: any[]) => mockUpdateReservation(...args),
     createNotification: (...args: any[]) => mockCreateNotification(...args),
+    getOrganization: vi.fn().mockResolvedValue({ id: 'org1', address: '서울시 용산구' }),
 }));
 
 vi.mock('../../lib/firebase', () => ({ db: {}, default: {} }));
