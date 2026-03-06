@@ -92,13 +92,14 @@ interface BuildLogContext {
     userData: { name?: string } | null | undefined;
     selectedVehicle: { vehicleType?: string } | undefined;
     selectedPassengers: Array<{ name?: string; email?: string }>;
+    externalPassengers?: string[];
     isRetroactive: boolean;
 }
 
 /**
  * 폼 데이터로 저장용 logData 객체를 구성한다.
  */
-export function buildLogData(form: DriveLogForm, { orgId, user, userData, selectedVehicle, selectedPassengers, isRetroactive }: BuildLogContext) {
+export function buildLogData(form: DriveLogForm, { orgId, user, userData, selectedVehicle, selectedPassengers, externalPassengers = [], isRetroactive }: BuildLogContext) {
     const startKm = parseInt(form.startKm);
     const endKm = parseInt(form.endKm);
     const driveTimestamp = buildDriveTimestamp(form.driveDate, form.endTime, form.startTime);
@@ -122,8 +123,11 @@ export function buildLogData(form: DriveLogForm, { orgId, user, userData, select
         batteryEnd: form.batteryEnd ? parseInt(form.batteryEnd) : null,
         notes: form.notes.trim(),
         timestamp: driveTimestamp,
-        passengerCount: selectedPassengers.length + 1,
-        passengerNames: selectedPassengers.map(p => p.name || p.email),
+        passengerCount: selectedPassengers.length + externalPassengers.length + 1,
+        passengerNames: [
+            ...selectedPassengers.map(p => p.name || p.email),
+            ...externalPassengers,
+        ],
         ...(isRetroactive && { isRetroactive: true }),
     };
 }

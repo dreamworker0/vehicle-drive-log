@@ -25,6 +25,7 @@ export default function DriveLogForm() {
         handleFavoriteSelect,
         handleSaveFavorite,
         togglePassenger,
+        externalPassengers, addExternalPassenger, removeExternalPassenger,
         handleOcrCapture,
         handleOcrReport,
         handleSubmit,
@@ -274,17 +275,18 @@ export default function DriveLogForm() {
                 />
 
                 {/* 동승자 선택 */}
-                {members.length > 0 && (
-                    <div className="glass-card p-4">
-                        <label className="label">
-                            동승자
-                            {selectedPassengers.length > 0 && (
-                                <span className="ml-2 text-primary-600 font-bold">
-                                    {selectedPassengers.length}명 선택
-                                </span>
-                            )}
-                        </label>
-                        <div className="flex flex-wrap gap-1.5">
+                <div className="glass-card p-4">
+                    <label className="label">
+                        동승자
+                        {(selectedPassengers.length + externalPassengers.length) > 0 && (
+                            <span className="ml-2 text-primary-600 font-bold">
+                                {selectedPassengers.length + externalPassengers.length}명 선택
+                            </span>
+                        )}
+                    </label>
+                    {/* 조직원 칩 */}
+                    {members.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 mb-3">
                             {members.map((m: any) => {
                                 const isSelected = selectedPassengers.some((p: any) => p.id === m.id);
                                 return (
@@ -302,8 +304,62 @@ export default function DriveLogForm() {
                                 );
                             })}
                         </div>
+                    )}
+
+                    {/* 외부 동승자 */}
+                    <div>
+                        <p className="text-xs text-surface-400 mb-1.5">외부 동승자</p>
+                        {externalPassengers.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mb-2">
+                                {externalPassengers.map(name => (
+                                    <span key={name} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 border border-amber-300 text-amber-700 dark:bg-amber-900/40 dark:border-amber-700 dark:text-amber-300">
+                                        {name}
+                                        <button
+                                            type="button"
+                                            onClick={() => removeExternalPassenger(name)}
+                                            className="ml-0.5 text-amber-500 hover:text-amber-700 dark:hover:text-amber-200 font-bold"
+                                        >
+                                            ✕
+                                        </button>
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                        <div className="flex items-center gap-1.5">
+                            <input
+                                type="text"
+                                placeholder="이름 입력..."
+                                className="input text-sm flex-1"
+                                onKeyDown={e => {
+                                    if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        const input = e.currentTarget;
+                                        addExternalPassenger(input.value);
+                                        input.value = '';
+                                    }
+                                }}
+                            />
+                            <button
+                                type="button"
+                                onClick={e => {
+                                    const input = (e.currentTarget.previousElementSibling as HTMLInputElement);
+                                    addExternalPassenger(input.value);
+                                    input.value = '';
+                                }}
+                                className="btn-primary btn-sm !py-1.5 !px-3 whitespace-nowrap"
+                            >
+                                + 추가
+                            </button>
+                        </div>
                     </div>
-                )}
+
+                    {/* 총 탑승 인원 */}
+                    {(selectedPassengers.length + externalPassengers.length) > 0 && (
+                        <div className="mt-3 pt-2.5 border-t border-surface-100 dark:border-surface-700 text-xs text-surface-500 dark:text-surface-400">
+                            👥 총 탑승 인원: <span className="font-bold text-surface-700 dark:text-surface-200">{selectedPassengers.length + externalPassengers.length + 1}명</span> (운전자 포함)
+                        </div>
+                    )}
+                </div>
 
                 {/* 연료/배터리 */}
                 {isElectric ? (
