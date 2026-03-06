@@ -1,0 +1,380 @@
+/**
+ * DriveLogForm — 운행일지 작성/수정 폼
+ * 로직은 useDriveLogForm 훅으로 분리, UI만 담당
+ */
+import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
+import useDriveLogForm from '../../hooks/useDriveLogForm';
+import VehicleSelector from './VehicleSelector';
+import MileageInput from './MileageInput';
+
+export default function DriveLogForm() {
+    const {
+        form, setForm,
+        vehicles, favorites, members,
+        loading, submitting, success,
+        selectedPassengers, selectedVehicle,
+        isElectric,
+        reservationData, continueFrom,
+        editLog, isEditMode, isRetroactive,
+        showFavSave, setShowFavSave,
+        favName, setFavName,
+        ocrLoading, ocrError, ocrSuccess,
+        ocrReportSending, ocrReportSent,
+        cameraInputRef, endKmInputRef,
+        handleVehicleSelect,
+        handleFavoriteSelect,
+        handleSaveFavorite,
+        togglePassenger,
+        handleOcrCapture,
+        handleOcrReport,
+        handleSubmit,
+    } = useDriveLogForm();
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center py-20">
+                <div className="w-8 h-8 spinner" />
+            </div>
+        );
+    }
+
+    // 제목 결정
+    const title = isEditMode
+        ? '운행일지 수정'
+        : continueFrom
+            ? '이어서 기록'
+            : '운행일지 작성';
+
+    const subtitle = isEditMode
+        ? `${(editLog as any).vehicleName || '차량'} · ${(editLog as any).destination || ''} 기록을 수정합니다`
+        : continueFrom
+            ? `이전 운행 (${continueFrom.destination || continueFrom.vehicleName || ''})에서 이어서 기록합니다`
+            : '차량 운행 기록을 입력하세요';
+
+    return (
+        <div className="max-w-lg mx-auto animate-fade-in">
+            <h1 className="text-lg font-bold text-surface-900 dark:text-surface-100 mb-2">
+                {title}
+            </h1>
+            <p className="text-sm text-surface-500 dark:text-surface-400 mb-6">
+                {subtitle}
+            </p>
+
+            {success && (
+                <div className="mb-4 p-4 rounded-xl bg-accent-50 border border-accent-200 text-accent-700 text-sm flex items-center gap-2 animate-fade-in">
+                    <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                    </svg>
+                    {isEditMode ? '운행일지가 수정되었습니다!' : '운행일지가 저장되었습니다!'}
+                </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-5">
+                {/* 이어서 기록 안내 */}
+                {continueFrom && (
+                    <div className="glass-card p-4 border-l-4 border-primary-400">
+                        <p className="text-xs text-surface-400 mb-1">이전 운행 연결</p>
+                        <div className="flex items-center gap-2 text-sm">
+                            <span className="font-medium text-surface-900 dark:text-surface-100">{continueFrom.vehicleName}</span>
+                            <span className="text-surface-300">·</span>
+                            <span className="text-surface-600 dark:text-surface-400">{continueFrom.destination || '-'}</span>
+                            <span className="text-surface-300">→</span>
+                            <span className="font-mono text-primary-600">{continueFrom.endKm?.toLocaleString()} km</span>
+                        </div>
+                    </div>
+                )}
+
+
+                {/* 차량 선택 */}
+                {reservationData?.vehicleId || continueFrom || isEditMode ? (
+                    <div className="glass-card p-4">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                <span className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl ${getVehicleColor(form.vehicleId)}`}>
+                                    {(selectedVehicle?.vehicleType ? VEHICLE_TYPE_ICONS[selectedVehicle.vehicleType] : undefined) || '🚗'}
+                                </span>
+                                <div>
+                                    <p className="font-semibold text-surface-900 dark:text-surface-100">{form.vehicleName}</p>
+                                    <p className="text-xs text-surface-400">
+                                        {isEditMode ? '수정 중인 차량' : continueFrom ? '이전 운행 차량' : '예약 배정 차량'}
+                                    </p>
+                                </div>
+                            </div>
+                            {form.startTime && (
+                                <div className="text-right">
+                                    <p className="text-lg font-bold text-primary-600">{form.startTime}</p>
+                                    <p className="text-xs text-surface-400">출발 시각</p>
+                                </div>
+                            )}
+                        </div>
+                        {reservationData && (form.purpose || form.destination) && (
+                            <div className="mt-3 pt-3 border-t border-surface-100 dark:border-surface-700 grid grid-cols-2 gap-4">
+                                {form.purpose && (
+                                    <div>
+                                        <p className="text-xs text-surface-400">운행 목적</p>
+                                        <p className="text-sm font-medium text-surface-800 dark:text-surface-200">{form.purpose}</p>
+                                    </div>
+                                )}
+                                {form.destination && (
+                                    <div>
+                                        <p className="text-xs text-surface-400">행선지</p>
+                                        <p className="text-sm font-medium text-surface-800 dark:text-surface-200">{form.destination}</p>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div>
+                        <label className="label">차량 선택 <span className="text-red-500">*</span></label>
+                        <VehicleSelector
+                            vehicles={vehicles}
+                            selectedVehicleId={form.vehicleId}
+                            onSelect={handleVehicleSelect}
+                        />
+                    </div>
+                )}
+
+                {/* 운행 날짜 선택 */}
+                <div className="glass-card p-4">
+                    <label className="label">
+                        운행 날짜
+                        {isRetroactive && (
+                            <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-600 dark:bg-orange-900/40 dark:text-orange-400">
+                                소급 입력
+                            </span>
+                        )}
+                    </label>
+                    <input
+                        type="date"
+                        value={form.driveDate}
+                        onChange={e => setForm({ ...form, driveDate: e.target.value })}
+                        max={new Date().toISOString().split('T')[0]}
+                        className="input"
+                    />
+                </div>
+
+                {/* 운행 시간 (수정 모드 시 출발/도착 시간 모두 편집 가능) */}
+                {isEditMode && (
+                    <div className="glass-card p-4">
+                        <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300 mb-3">🕐 운행 시간</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="label text-xs">출발 시각</label>
+                                <input
+                                    type="time"
+                                    value={form.startTime}
+                                    onChange={e => setForm({ ...form, startTime: e.target.value })}
+                                    className="input"
+                                />
+                            </div>
+                            <div>
+                                <label className="label text-xs">도착 시각</label>
+                                <input
+                                    type="time"
+                                    value={form.endTime}
+                                    onChange={e => setForm({ ...form, endTime: e.target.value })}
+                                    className="input"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* 운행 목적 & 행선지 - 예약 없이 직접 작성 시 또는 수정 모드 */}
+                {(!reservationData?.vehicleId || isEditMode) && (
+                    <div className="space-y-4">
+                        <div>
+                            <label className="label">운행 목적</label>
+                            <input
+                                type="text"
+                                value={form.purpose}
+                                onChange={e => setForm({ ...form, purpose: e.target.value })}
+                                className="input"
+                                placeholder="출장"
+                            />
+                        </div>
+                        <div>
+                            <div className="flex items-center justify-between mb-1">
+                                <label className="label !mb-0">행선지</label>
+                                {form.destination.trim() && !favorites.some((f: any) => f.address === form.destination.trim() || f.name === form.destination.trim()) && (
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowFavSave(!showFavSave)}
+                                        className="text-xs text-amber-500 hover:text-amber-600 font-medium flex items-center gap-0.5"
+                                    >
+                                        ⭐ 즐겨찾기 저장
+                                    </button>
+                                )}
+                            </div>
+                            <input
+                                type="text"
+                                value={form.destination}
+                                onChange={e => setForm({ ...form, destination: e.target.value })}
+                                className="input"
+                                placeholder="서울시청"
+                            />
+                            {/* 즐겨찾기 저장 폼 */}
+                            {showFavSave && (
+                                <div className="mt-2 p-3 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800 animate-fade-in">
+                                    <div className="flex items-center gap-2">
+                                        <input
+                                            type="text"
+                                            value={favName}
+                                            onChange={e => setFavName(e.target.value)}
+                                            className="input flex-1 text-sm py-1.5"
+                                            placeholder="별칭 (예: 김OO 어르신 댁)"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={handleSaveFavorite}
+                                            className="btn-primary btn-sm whitespace-nowrap"
+                                        >
+                                            저장
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                            {/* 즐겨찾기 칩 */}
+                            {favorites.length > 0 && (
+                                <div className="flex flex-wrap gap-1.5 mt-2">
+                                    {favorites.map((fav: any) => (
+                                        <button
+                                            key={fav.id}
+                                            type="button"
+                                            onClick={() => handleFavoriteSelect(fav)}
+                                            className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${form.destination === (fav.address || fav.name)
+                                                ? 'bg-amber-100 border-amber-300 text-amber-700'
+                                                : 'bg-surface-50 dark:bg-surface-800 border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400 hover:border-amber-300 hover:bg-amber-50'
+                                                }`}
+                                        >
+                                            ⭐ {fav.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {/* 주행 거리 */}
+                <MileageInput
+                    form={form}
+                    onEndKmChange={(value) => setForm({ ...form, endKm: value })}
+                    ocrLoading={ocrLoading}
+                    ocrError={ocrError}
+                    ocrSuccess={ocrSuccess}
+                    ocrReportSending={ocrReportSending}
+                    ocrReportSent={ocrReportSent}
+                    cameraInputRef={cameraInputRef}
+                    onOcrCapture={handleOcrCapture}
+                    onOcrReport={handleOcrReport}
+                    vehicleSelected={!!form.vehicleId}
+                    endKmRef={endKmInputRef}
+                />
+
+                {/* 동승자 선택 */}
+                {members.length > 0 && (
+                    <div className="glass-card p-4">
+                        <label className="label">
+                            동승자
+                            {selectedPassengers.length > 0 && (
+                                <span className="ml-2 text-primary-600 font-bold">
+                                    {selectedPassengers.length}명 선택
+                                </span>
+                            )}
+                        </label>
+                        <div className="flex flex-wrap gap-1.5">
+                            {members.map((m: any) => {
+                                const isSelected = selectedPassengers.some((p: any) => p.id === m.id);
+                                return (
+                                    <button
+                                        key={m.id}
+                                        type="button"
+                                        onClick={() => togglePassenger(m)}
+                                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${isSelected
+                                            ? 'bg-primary-100 border-primary-300 text-primary-700 ring-1 ring-primary-200'
+                                            : 'bg-surface-50 dark:bg-surface-800 border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400 hover:border-primary-300'
+                                            }`}
+                                    >
+                                        {isSelected && '✓ '}{m.name || m.email?.split('@')[0]}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
+
+                {/* 연료/배터리 */}
+                {isElectric ? (
+                    <div className="glass-card p-4">
+                        <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300 mb-3">🔋 배터리</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="label text-xs">출발 배터리 %</label>
+                                <input
+                                    type="number"
+                                    min="0" max="100"
+                                    value={form.batteryStart}
+                                    onChange={e => setForm({ ...form, batteryStart: e.target.value })}
+                                    className="input"
+                                    placeholder="80"
+                                />
+                            </div>
+                            <div>
+                                <label className="label text-xs">도착 배터리 %</label>
+                                <input
+                                    type="number"
+                                    min="0" max="100"
+                                    value={form.batteryEnd}
+                                    onChange={e => setForm({ ...form, batteryEnd: e.target.value })}
+                                    className="input"
+                                    placeholder="45"
+                                />
+                            </div>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="glass-card p-4">
+                        <label className="label">주유비 (₩)</label>
+                        <input
+                            type="number"
+                            min="0"
+                            step="1"
+                            value={form.fuelAmount}
+                            onChange={e => setForm({ ...form, fuelAmount: e.target.value })}
+                            className="input"
+                            placeholder="주유 시에만 입력"
+                        />
+                    </div>
+                )}
+
+                {/* 비고 */}
+                <div className="glass-card p-4">
+                    <label className="label">비고</label>
+                    <textarea
+                        value={form.notes}
+                        onChange={e => setForm({ ...form, notes: e.target.value })}
+                        className="input min-h-[80px] resize-none"
+                        placeholder="특이사항이 있으면 작성해주세요"
+                        rows={3}
+                    />
+                </div>
+
+                {/* 제출 */}
+                <button
+                    type="submit"
+                    disabled={submitting || !form.vehicleId || !form.startKm || !form.endKm}
+                    className="w-full btn-primary"
+                >
+                    {submitting ? (
+                        <>
+                            <div className="w-5 h-5 spinner" />
+                            {isEditMode ? '수정 중...' : '저장 중...'}
+                        </>
+                    ) : isEditMode ? '운행일지 수정' : '운행일지 저장'}
+                </button>
+            </form>
+        </div>
+    );
+}

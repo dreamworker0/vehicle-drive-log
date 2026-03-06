@@ -1,0 +1,547 @@
+﻿src/hooks/useAnalytics.ts(39,25): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useAnalytics.ts(40,29): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useAnalytics.ts(41,28): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useAnalytics.ts(41,44): error TS2339: Property 'role' does not exist on type '{ id: string; }'.
+src/hooks/useAnalytics.ts(42,39): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useAnalytics.ts(78,30): error TS2339: Property 'driverName' does not exist on type 'never'.
+src/hooks/useAnalytics.ts(82,51): error TS2339: Property 'endKm' does not exist on type 'never'.
+src/hooks/useAnalytics.ts(82,61): error TS2339: Property 'startKm' does not exist on type 'never'.
+src/hooks/useAnalytics.ts(84,45): error TS2339: Property 'endKm' does not exist on type 'never'.
+src/hooks/useAnalytics.ts(84,55): error TS2339: Property 'startKm' does not exist on type 'never'.
+src/hooks/useAnalytics.ts(88,29): error TS18046: 'b' is of type 'unknown'.
+src/hooks/useAnalytics.ts(88,44): error TS18046: 'a' is of type 'unknown'.
+src/hooks/useAnalytics.ts(90,23): error TS18046: 'd' is of type 'unknown'.
+src/hooks/useAnalytics.ts(91,29): error TS18046: 'd' is of type 'unknown'.
+src/hooks/useAnalytics.ts(92,32): error TS18046: 'd' is of type 'unknown'.
+src/hooks/useAnalytics.ts(95,45): error TS18046: 'd' is of type 'unknown'.
+src/hooks/useAnalytics.ts(96,48): error TS18046: 'd' is of type 'unknown'.
+src/hooks/useAnalytics.ts(114,26): error TS2339: Property 'vehicleDisplayName' does not exist on type 'never'.
+src/hooks/useAnalytics.ts(114,50): error TS2339: Property 'vehicleName' does not exist on type 'never'.
+src/hooks/useAnalytics.ts(120,28): error TS2339: Property 'displayName' does not exist on type 'never'.
+src/hooks/useAnalytics.ts(120,45): error TS2339: Property 'plateNumber' does not exist on type 'never'.
+src/hooks/useAnalytics.ts(138,28): error TS2339: Property 'vehicleDisplayName' does not exist on type 'never'.
+src/hooks/useAnalytics.ts(138,52): error TS2339: Property 'vehicleName' does not exist on type 'never'.
+src/hooks/useAnalytics.ts(139,29): error TS2339: Property 'endKm' does not exist on type 'never'.
+src/hooks/useAnalytics.ts(139,39): error TS2339: Property 'startKm' does not exist on type 'never'.
+src/hooks/useAnalytics.ts(140,28): error TS2339: Property 'fuelAmount' does not exist on type 'never'.
+src/hooks/useAnalytics.ts(140,44): error TS2339: Property 'energyCost' does not exist on type 'never'.
+src/hooks/useAnalytics.ts(148,32): error TS18046: 'v' is of type 'unknown'.
+src/hooks/useAnalytics.ts(148,51): error TS18046: 'v' is of type 'unknown'.
+src/hooks/useAnalytics.ts(151,28): error TS18046: 'v' is of type 'unknown'.
+src/hooks/useAnalytics.ts(152,28): error TS18046: 'v' is of type 'unknown'.
+src/hooks/useAnalytics.ts(153,40): error TS18046: 'v' is of type 'unknown'.
+src/hooks/useAnalytics.ts(153,54): error TS18046: 'v' is of type 'unknown'.
+src/hooks/useAnalytics.ts(168,28): error TS2339: Property 'vehicleName' does not exist on type 'never'.
+src/hooks/useAnalytics.ts(170,43): error TS2339: Property 'cost' does not exist on type 'never'.
+src/hooks/useAnalytics.ts(172,19): error TS2339: Property 'date' does not exist on type 'never'.
+src/hooks/useAnalytics.ts(172,79): error TS2339: Property 'date' does not exist on type 'never'.
+src/hooks/useAnalytics.ts(176,28): error TS2339: Property 'displayName' does not exist on type 'never'.
+src/hooks/useAnalytics.ts(176,45): error TS2339: Property 'plateNumber' does not exist on type 'never'.
+src/hooks/useAnalytics.ts(178,33): error TS2339: Property 'currentKm' does not exist on type 'never'.
+src/hooks/useAnalytics.ts(202,28): error TS2345: Argument of type '{ type: string; icon: string; priority: string; title: string; desc: string; }' is not assignable to parameter of type 'never'.
+src/hooks/useAnalytics.ts(224,32): error TS2345: Argument of type '{ type: string; icon: string; priority: string; title: string; desc: string; }' is not assignable to parameter of type 'never'.
+src/hooks/useAnalytics.ts(240,48): error TS2362: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+src/hooks/useAnalytics.ts(240,61): error TS2363: The right-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+src/hooks/useAnalytics.ts(242,28): error TS2345: Argument of type '{ type: string; icon: string; priority: string; title: string; desc: string; }' is not assignable to parameter of type 'never'.
+src/hooks/useAnalytics.ts(254,24): error TS2345: Argument of type '{ type: string; icon: string; priority: string; title: string; desc: string; }' is not assignable to parameter of type 'never'.
+src/hooks/useAnalytics.ts(266,28): error TS2345: Argument of type '{ type: string; icon: string; priority: string; title: string; desc: string; }' is not assignable to parameter of type 'never'.
+src/hooks/useAnalytics.ts(278,25): error TS2339: Property 'priority' does not exist on type 'never'.
+src/hooks/useAnalytics.ts(278,48): error TS2339: Property 'priority' does not exist on type 'never'.
+src/hooks/useAuth.tsx(96,68): error TS2339: Property 'toMillis' does not exist on type 'TimestampField'.
+  Property 'toMillis' does not exist on type 'Date'.
+src/hooks/useBackButton.ts(26,23): error TS2339: Property 'standalone' does not exist on type 'Navigator'.
+src/hooks/useBackButton.ts(45,30): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(timeout: string | number | Timeout | undefined): void', gave the following error.
+    Argument of type 'null' is not assignable to parameter of type 'string | number | Timeout | undefined'.
+  Overload 2 of 2, '(id: number | undefined): void', gave the following error.
+    Argument of type 'null' is not assignable to parameter of type 'number | undefined'.
+src/hooks/useBackButton.ts(56,13): error TS2322: Type 'Timeout' is not assignable to type 'null'.
+src/hooks/useBackButton.ts(64,26): error TS2769: No overload matches this call.
+  Overload 1 of 2, '(timeout: string | number | Timeout | undefined): void', gave the following error.
+    Argument of type 'null' is not assignable to parameter of type 'string | number | Timeout | undefined'.
+  Overload 2 of 2, '(id: number | undefined): void', gave the following error.
+    Argument of type 'null' is not assignable to parameter of type 'number | undefined'.
+src/hooks/useDriveLogForm.ts(73,50): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useDriveLogForm.ts(74,41): error TS2339: Property 'fuelType' does not exist on type 'never'.
+src/hooks/useDriveLogForm.ts(88,34): error TS18047: 'user' is possibly 'null'.
+src/hooks/useDriveLogForm.ts(91,29): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useDriveLogForm.ts(92,30): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useDriveLogForm.ts(93,64): error TS18047: 'user' is possibly 'null'.
+src/hooks/useDriveLogForm.ts(94,28): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useDriveLogForm.ts(99,59): error TS2339: Property 'name' does not exist on type '{ id: string; }'.
+src/hooks/useDriveLogForm.ts(99,69): error TS2339: Property 'email' does not exist on type '{ id: string; }'.
+src/hooks/useDriveLogForm.ts(101,43): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useDriveLogForm.ts(116,103): error TS2339: Property 'currentKm' does not exist on type '{ id: string; }'.
+src/hooks/useDriveLogForm.ts(120,70): error TS2339: Property 'displayName' does not exist on type '{ id: string; }'.
+src/hooks/useDriveLogForm.ts(128,84): error TS2339: Property 'currentKm' does not exist on type '{ id: string; }'.
+src/hooks/useDriveLogForm.ts(132,73): error TS2339: Property 'displayName' does not exist on type '{ id: string; }'.
+src/hooks/useDriveLogForm.ts(139,67): error TS2339: Property 'currentKm' does not exist on type '{ id: string; }'.
+src/hooks/useDriveLogForm.ts(140,87): error TS2339: Property 'displayName' does not exist on type '{ id: string; }'.
+src/hooks/useDriveLogForm.ts(162,56): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useDriveLogForm.ts(163,29): error TS2339: Property 'currentKm' does not exist on type 'never'.
+src/hooks/useDriveLogForm.ts(167,52): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useDriveLogForm.ts(168,38): error TS2339: Property 'currentKm' does not exist on type 'never'.
+src/hooks/useDriveLogForm.ts(177,44): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useDriveLogForm.ts(184,37): error TS2339: Property 'currentKm' does not exist on type 'never'.
+src/hooks/useDriveLogForm.ts(187,34): error TS2339: Property 'currentKm' does not exist on type 'never'.
+src/hooks/useDriveLogForm.ts(192,29): error TS2339: Property 'displayName' does not exist on type 'never'.
+src/hooks/useDriveLogForm.ts(205,25): error TS18047: 'user' is possibly 'null'.
+src/hooks/useDriveLogForm.ts(210,48): error TS18047: 'user' is possibly 'null'.
+src/hooks/useDriveLogForm.ts(211,26): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useDriveLogForm.ts(220,31): error TS2345: Argument of type '(prev: never[]) => any[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '(prev: never[]) => any[]' is not assignable to type '(prevState: never[]) => never[]'.
+    Type 'any[]' is not assignable to type 'never[]'.
+      Type 'any' is not assignable to type 'never'.
+src/hooks/useDriveLogForm.ts(221,45): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useDriveLogForm.ts(222,51): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useDriveLogForm.ts(286,17): error TS18046: 'err' is of type 'unknown'.
+src/hooks/useDriveLogForm.ts(287,27): error TS18046: 'err' is of type 'unknown'.
+src/hooks/useDriveLogForm.ts(290,51): error TS2554: Expected 2 arguments, but got 3.
+src/hooks/useDriveLogOcr.ts(44,21): error TS2531: Object is possibly 'null'.
+src/hooks/useDriveLogOcr.ts(54,13): error TS2322: Type '{ imageFile: any; recognizedKm: any; recognizedBattery: any; raw: any; isElectric: any; }' is not assignable to type 'null'.
+src/hooks/useDriveLogOcr.ts(56,31): error TS18046: 'result' is of type 'unknown'.
+src/hooks/useDriveLogOcr.ts(57,36): error TS18046: 'result' is of type 'unknown'.
+src/hooks/useDriveLogOcr.ts(58,22): error TS18046: 'result' is of type 'unknown'.
+src/hooks/useDriveLogOcr.ts(62,17): error TS18046: 'result' is of type 'unknown'.
+src/hooks/useDriveLogOcr.ts(65,28): error TS18046: 'result' is of type 'unknown'.
+src/hooks/useDriveLogOcr.ts(66,39): error TS18046: 'result' is of type 'unknown'.
+src/hooks/useDriveLogOcr.ts(66,78): error TS18046: 'result' is of type 'unknown'.
+src/hooks/useDriveLogOcr.ts(75,53): error TS2339: Property 'focus' does not exist on type 'never'.
+src/hooks/useDriveLogOcr.ts(79,64): error TS2339: Property 'value' does not exist on type 'never'.
+src/hooks/useDriveLogOcr.ts(92,25): error TS2339: Property 'imageFile' does not exist on type 'never'.
+src/hooks/useDriveLogOcr.ts(113,25): error TS18047: 'ctx' is possibly 'null'.
+src/hooks/useDriveLogOcr.ts(116,59): error TS2339: Property 'imageFile' does not exist on type 'never'.
+src/hooks/useDriveLogOcr.ts(119,47): error TS2345: Argument of type 'unknown' is not assignable to parameter of type 'ArrayBuffer | Blob | Uint8Array<ArrayBufferLike>'.
+src/hooks/useDriveLogOcr.ts(121,32): error TS2345: Argument of type 'string' is not assignable to parameter of type 'never'.
+src/hooks/useDriveLogOcr.ts(126,69): error TS2339: Property 'recognizedKm' does not exist on type 'never'.
+src/hooks/useDriveLogOcr.ts(126,115): error TS2339: Property 'isElectric' does not exist on type 'never'.
+src/hooks/useDriveLogOcr.ts(126,150): error TS2339: Property 'isElectric' does not exist on type 'never'.
+src/hooks/useDriveLogOcr.ts(126,187): error TS2339: Property 'recognizedBattery' does not exist on type 'never'.
+src/hooks/useDriveLogOcr.ts(126,276): error TS2339: Property 'raw' does not exist on type 'never'.
+src/hooks/useEmployeeManager.ts(37,17): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useEmployeeManager.ts(38,36): error TS2339: Property 'role' does not exist on type '{ id: string; }'.
+src/hooks/useEmployeeManager.ts(40,31): error TS2339: Property 'role' does not exist on type '{ id: string; }'.
+src/hooks/useEmployeeManager.ts(40,53): error TS2339: Property 'role' does not exist on type '{ id: string; }'.
+src/hooks/useEmployeeManager.ts(41,31): error TS2339: Property 'role' does not exist on type '{ id: string; }'.
+src/hooks/useEmployeeManager.ts(41,53): error TS2339: Property 'role' does not exist on type '{ id: string; }'.
+src/hooks/useEmployeeManager.ts(42,35): error TS2339: Property 'name' does not exist on type '{ id: string; }'.
+src/hooks/useEmployeeManager.ts(42,63): error TS2339: Property 'name' does not exist on type '{ id: string; }'.
+src/hooks/useEmployeeManager.ts(45,29): error TS2345: Argument of type '{ id: string; } | null' is not assignable to parameter of type 'SetStateAction<null>'.
+  Type '{ id: string; }' is not assignable to type 'SetStateAction<null>'.
+    Type '{ id: string; }' provides no match for the signature '(prevState: null): null'.
+src/hooks/useEmployeeManager.ts(61,26): error TS2769: No overload matches this call.
+  Overload 1 of 3, '(firestore: Firestore, path: string, ...pathSegments: string[]): CollectionReference<DocumentData, DocumentData>', gave the following error.
+    Argument of type 'string | null | undefined' is not assignable to parameter of type 'string'.
+      Type 'undefined' is not assignable to type 'string'.
+  Overload 2 of 3, '(reference: CollectionReference<unknown, DocumentData>, path: string, ...pathSegments: string[]): CollectionReference<DocumentData, DocumentData>', gave the following error.
+    Argument of type 'Firestore' is not assignable to parameter of type 'CollectionReference<unknown, DocumentData>'.
+      Type 'Firestore' is missing the following properties from type 'CollectionReference<unknown, DocumentData>': id, path, parent, withConverter, and 2 more.
+  Overload 3 of 3, '(reference: DocumentReference<unknown, DocumentData>, path: string, ...pathSegments: string[]): CollectionReference<DocumentData, DocumentData>', gave the following error.
+    Argument of type 'Firestore' is not assignable to parameter of type 'DocumentReference<unknown, DocumentData>'.
+      Type 'Firestore' is missing the following properties from type 'DocumentReference<unknown, DocumentData>': converter, firestore, id, path, and 2 more.
+src/hooks/useEmployeeManager.ts(75,28): error TS2339: Property 'inviteCode' does not exist on type 'never'.
+src/hooks/useEmployeeManager.ts(77,62): error TS2339: Property 'inviteCode' does not exist on type 'never'.
+src/hooks/useEmployeeManager.ts(82,43): error TS2339: Property 'inviteCode' does not exist on type 'never'.
+src/hooks/useEmployeeManager.ts(97,40): error TS2698: Spread types may only be created from object types.
+src/hooks/useEmployeeManager.ts(122,34): error TS2339: Property 'uid' does not exist on type 'User'.
+src/hooks/useEmployeeManager.ts(137,34): error TS2339: Property 'uid' does not exist on type 'User'.
+src/hooks/useEmployeeManager.ts(144,56): error TS2339: Property 'role' does not exist on type 'never'.
+src/hooks/useEmployeeManager.ts(162,20): error TS2339: Property 'name' does not exist on type 'never'.
+src/hooks/useEmployeeManager.ts(162,59): error TS2339: Property 'email' does not exist on type 'never'.
+src/hooks/useEmployeeManager.ts(165,44): error TS2339: Property 'role' does not exist on type 'never'.
+src/hooks/useEmployeeManager.ts(166,54): error TS2339: Property 'role' does not exist on type 'never'.
+src/hooks/useMaintenanceLog.ts(25,11): error TS2554: Expected 1 arguments, but got 0.
+src/hooks/useMaintenanceLog.ts(28,40): error TS2554: Expected 1 arguments, but got 0.
+src/hooks/useMaintenanceLog.ts(52,29): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useMaintenanceLog.ts(53,28): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useMaintenanceLog.ts(64,60): error TS2339: Property 'vehicleId' does not exist on type 'never'.
+src/hooks/useMaintenanceLog.ts(66,44): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useMaintenanceLog.ts(66,53): error TS2339: Property 'vehicleId' does not exist on type 'never'.
+src/hooks/useMaintenanceLog.ts(67,22): error TS2698: Spread types may only be created from object types.
+src/hooks/useMaintenanceLog.ts(67,44): error TS2339: Property 'vehicleType' does not exist on type 'never'.
+src/hooks/useMaintenanceLog.ts(101,29): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useMaintenanceLog.ts(104,24): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useMaintenanceLog.ts(125,51): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useMaintenanceLog.ts(129,29): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useMaintenanceLog.ts(141,25): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useMaintenanceLog.ts(152,40): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useMaintenanceLog.ts(153,55): error TS2339: Property 'displayName' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(68,25): error TS2345: Argument of type 'null' is not assignable to parameter of type 'SetStateAction<string>'.
+src/hooks/useMonthlyReport.ts(73,25): error TS2345: Argument of type 'null' is not assignable to parameter of type 'SetStateAction<string>'.
+src/hooks/useMonthlyReport.ts(82,25): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useMonthlyReport.ts(94,25): error TS2339: Property 'date' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(94,35): error TS2339: Property 'timestamp' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(105,37): error TS2362: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+src/hooks/useMonthlyReport.ts(105,41): error TS2363: The right-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+src/hooks/useMonthlyReport.ts(114,25): error TS2339: Property 'date' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(114,35): error TS2339: Property 'timestamp' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(122,69): error TS2339: Property 'endKm' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(122,79): error TS2339: Property 'startKm' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(123,64): error TS2339: Property 'fuelAmount' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(123,80): error TS2339: Property 'energyCost' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(125,60): error TS2339: Property 'isIncomplete' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(131,48): error TS2362: The left-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+src/hooks/useMonthlyReport.ts(131,52): error TS2363: The right-hand side of an arithmetic operation must be of type 'any', 'number', 'bigint' or an enum type.
+src/hooks/useMonthlyReport.ts(136,70): error TS2339: Property 'endKm' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(136,80): error TS2339: Property 'startKm' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(137,65): error TS2339: Property 'fuelAmount' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(137,81): error TS2339: Property 'energyCost' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(151,27): error TS2339: Property 'driverName' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(154,42): error TS2339: Property 'endKm' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(154,52): error TS2339: Property 'startKm' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(161,28): error TS2339: Property 'vehicleDisplayName' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(161,52): error TS2339: Property 'vehicleName' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(164,44): error TS2339: Property 'endKm' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(164,54): error TS2339: Property 'startKm' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(165,28): error TS2339: Property 'fuelAmount' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(165,44): error TS2339: Property 'energyCost' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(173,25): error TS2339: Property 'purpose' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(181,25): error TS2339: Property 'date' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(185,38): error TS2339: Property 'endKm' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(185,48): error TS2339: Property 'startKm' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(191,25): error TS2339: Property 'date' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(191,35): error TS2339: Property 'timestamp' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(195,48): error TS2339: Property 'endKm' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(195,58): error TS2339: Property 'startKm' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(201,25): error TS2339: Property 'startTime' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(220,29): error TS2571: Object is of type 'unknown'.
+src/hooks/useMonthlyReport.ts(220,45): error TS2571: Object is of type 'unknown'.
+src/hooks/useMonthlyReport.ts(223,27): error TS18046: 'data' is of type 'unknown'.
+src/hooks/useMonthlyReport.ts(224,24): error TS18046: 'data' is of type 'unknown'.
+src/hooks/useMonthlyReport.ts(225,30): error TS18046: 'data' is of type 'unknown'.
+src/hooks/useMonthlyReport.ts(225,58): error TS18046: 'data' is of type 'unknown'.
+src/hooks/useMonthlyReport.ts(225,74): error TS18046: 'data' is of type 'unknown'.
+src/hooks/useMonthlyReport.ts(231,29): error TS2571: Object is of type 'unknown'.
+src/hooks/useMonthlyReport.ts(231,45): error TS2571: Object is of type 'unknown'.
+src/hooks/useMonthlyReport.ts(234,27): error TS18046: 'data' is of type 'unknown'.
+src/hooks/useMonthlyReport.ts(235,24): error TS18046: 'data' is of type 'unknown'.
+src/hooks/useMonthlyReport.ts(242,29): error TS2571: Object is of type 'unknown'.
+src/hooks/useMonthlyReport.ts(242,36): error TS2571: Object is of type 'unknown'.
+src/hooks/useMonthlyReport.ts(248,32): error TS18046: 'v' is of type 'unknown'.
+src/hooks/useMonthlyReport.ts(249,29): error TS2571: Object is of type 'unknown'.
+src/hooks/useMonthlyReport.ts(249,36): error TS2571: Object is of type 'unknown'.
+src/hooks/useMonthlyReport.ts(256,67): error TS18046: 'data' is of type 'unknown'.
+src/hooks/useMonthlyReport.ts(256,89): error TS18046: 'data' is of type 'unknown'.
+src/hooks/useMonthlyReport.ts(280,15): error TS2339: Property 'date' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(280,25): error TS2339: Property 'timestamp' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(281,15): error TS2339: Property 'driverName' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(282,15): error TS2339: Property 'vehicleDisplayName' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(282,39): error TS2339: Property 'vehicleName' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(283,15): error TS2339: Property 'destination' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(284,15): error TS2339: Property 'startKm' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(285,15): error TS2339: Property 'endKm' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(286,16): error TS2339: Property 'endKm' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(286,26): error TS2339: Property 'startKm' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(287,15): error TS2339: Property 'purpose' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(288,15): error TS2339: Property 'startTime' does not exist on type 'never'.
+src/hooks/useMonthlyReport.ts(289,15): error TS2339: Property 'endTime' does not exist on type 'never'.
+src/hooks/useNotification.ts(54,22): error TS2345: Argument of type 'string' is not assignable to parameter of type 'SetStateAction<null>'.
+src/hooks/useNotification.ts(82,30): error TS2345: Argument of type 'string' is not assignable to parameter of type 'SetStateAction<null>'.
+src/hooks/useOrgApplication.ts(36,13): error TS18047: 'ctx' is possibly 'null'.
+src/hooks/useOrgApplication.ts(111,25): error TS2345: Argument of type 'string' is not assignable to parameter of type 'SetStateAction<null>'.
+src/hooks/useOrgApplication.ts(181,43): error TS2339: Property 'type' does not exist on type 'never'.
+src/hooks/useOrgApplication.ts(183,27): error TS2339: Property 'type' does not exist on type 'never'.
+src/hooks/useOrgApplication.ts(185,17): error TS2322: Type 'unknown' is not assignable to type 'never'.
+src/hooks/useOrientationLock.ts(12,30): error TS2339: Property 'lock' does not exist on type 'ScreenOrientation'.
+src/hooks/useOrientationLock.ts(14,12): error TS2339: Property 'lock' does not exist on type 'ScreenOrientation'.
+src/hooks/useQuickDriveStart.ts(46,34): error TS18047: 'user' is possibly 'null'.
+src/hooks/useQuickDriveStart.ts(49,29): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useQuickDriveStart.ts(50,30): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useQuickDriveStart.ts(51,26): error TS2339: Property 'address' does not exist on type '{ id: string; }'.
+src/hooks/useQuickDriveStart.ts(51,53): error TS2339: Property 'address' does not exist on type '{ id: string; }'.
+src/hooks/useQuickDriveStart.ts(54,64): error TS2339: Property 'maintenance' does not exist on type '{ id: string; }'.
+src/hooks/useQuickDriveStart.ts(54,95): error TS2339: Property 'retired' does not exist on type '{ id: string; }'.
+src/hooks/useQuickDriveStart.ts(63,45): error TS2339: Property 'displayName' does not exist on type '{ id: string; }'.
+src/hooks/useQuickDriveStart.ts(70,59): error TS2339: Property 'displayName' does not exist on type '{ id: string; }'.
+src/hooks/useQuickDriveStart.ts(89,9): error TS2322: Type 'Timeout' is not assignable to type 'null'.
+src/hooks/useQuickDriveStart.ts(92,56): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useQuickDriveStart.ts(93,69): error TS2339: Property 'vehicleType' does not exist on type 'never'.
+src/hooks/useQuickDriveStart.ts(95,30): error TS2345: Argument of type '{ isMulti: boolean; startCoord: { lat: number; lon: number; name: any; }; endCoord: { lat: number; lon: number; name: any; }; distance: number; duration: number; tollFee: any; fuelCost: any; segments?: undefined; } | { ...; } | null' is not assignable to parameter of type 'SetStateAction<null>'.
+  Type '{ isMulti: boolean; startCoord: { lat: number; lon: number; name: any; }; endCoord: { lat: number; lon: number; name: any; }; distance: number; duration: number; tollFee: any; fuelCost: any; segments?: undefined; }' is not assignable to type 'SetStateAction<null>'.
+    Type '{ isMulti: boolean; startCoord: { lat: number; lon: number; name: any; }; endCoord: { lat: number; lon: number; name: any; }; distance: number; duration: number; tollFee: any; fuelCost: any; segments?: undefined; }' provides no match for the signature '(prevState: null): null'.
+src/hooks/useQuickDriveStart.ts(108,50): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useQuickDriveStart.ts(111,44): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useQuickDriveStart.ts(115,29): error TS2339: Property 'displayName' does not exist on type 'never'.
+src/hooks/useQuickDriveStart.ts(137,30): error TS2554: Expected 1 arguments, but got 0.
+src/hooks/useQuickDriveStart.ts(144,32): error TS18047: 'user' is possibly 'null'.
+src/hooks/useQuickDriveStart.ts(145,51): error TS18047: 'user' is possibly 'null'.
+src/hooks/useQuickDriveStart.ts(145,71): error TS18047: 'user' is possibly 'null'.
+src/hooks/useQuickDriveStart.ts(148,66): error TS2339: Property 'duration' does not exist on type 'never'.
+src/hooks/useQuickDriveStart.ts(151,43): error TS2339: Property 'distance' does not exist on type 'never'.
+src/hooks/useQuickDriveStart.ts(152,43): error TS2339: Property 'duration' does not exist on type 'never'.
+src/hooks/useQuickDriveStart.ts(153,42): error TS2339: Property 'tollFee' does not exist on type 'never'.
+src/hooks/useQuickDriveStart.ts(165,22): error TS2339: Property 'code' does not exist on type '{}'.
+src/hooks/useQuickDriveStart.ts(165,66): error TS2339: Property 'message' does not exist on type '{}'.
+src/hooks/useQuickDriveStart.ts(166,31): error TS2339: Property 'message' does not exist on type '{}'.
+src/hooks/useReservationCalendar.ts(27,54): error TS2554: Expected 1 arguments, but got 0.
+src/hooks/useReservationCalendar.ts(65,29): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useReservationCalendar.ts(66,38): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useReservationCalendar.ts(67,55): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useReservationCalendar.ts(71,38): error TS18047: 'user' is possibly 'null'.
+src/hooks/useReservationCalendar.ts(74,34): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useReservationCalendar.ts(75,30): error TS2339: Property 'address' does not exist on type '{ id: string; }'.
+src/hooks/useReservationCalendar.ts(75,57): error TS2339: Property 'address' does not exist on type '{ id: string; }'.
+src/hooks/useReservationCalendar.ts(99,86): error TS2339: Property 'duration' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(117,9): error TS2322: Type 'Timeout' is not assignable to type 'null'.
+src/hooks/useReservationCalendar.ts(120,62): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(121,75): error TS2339: Property 'vehicleType' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(123,30): error TS2345: Argument of type '{ isMulti: boolean; startCoord: { lat: number; lon: number; name: any; }; endCoord: { lat: number; lon: number; name: any; }; distance: number; duration: number; tollFee: any; fuelCost: any; segments?: undefined; } | { ...; } | null' is not assignable to parameter of type 'SetStateAction<null>'.
+  Type '{ isMulti: boolean; startCoord: { lat: number; lon: number; name: any; }; endCoord: { lat: number; lon: number; name: any; }; distance: number; duration: number; tollFee: any; fuelCost: any; segments?: undefined; }' is not assignable to type 'SetStateAction<null>'.
+    Type '{ isMulti: boolean; startCoord: { lat: number; lon: number; name: any; }; endCoord: { lat: number; lon: number; name: any; }; distance: number; duration: number; tollFee: any; fuelCost: any; segments?: undefined; }' provides no match for the signature '(prevState: null): null'.
+src/hooks/useReservationCalendar.ts(157,19): error TS2339: Property 'date' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(157,37): error TS2339: Property 'date' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(158,26): error TS2339: Property 'date' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(158,36): error TS2339: Property 'name' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(177,57): error TS2345: Argument of type 'null' is not assignable to parameter of type 'never'.
+src/hooks/useReservationCalendar.ts(180,64): error TS2339: Property 'date' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(181,23): error TS2345: Argument of type '{ date: number; dateStr: string; reservations: never[]; holiday: any; }' is not assignable to parameter of type 'never'.
+src/hooks/useReservationCalendar.ts(191,38): error TS2339: Property 'date' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(197,73): error TS2339: Property 'duration' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(218,44): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(237,50): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(242,43): error TS2339: Property 'displayName' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(247,47): error TS2339: Property 'distance' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(248,47): error TS2339: Property 'duration' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(249,46): error TS2339: Property 'tollFee' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(252,37): error TS2339: Property 'reservedByUid' does not exist on type '{ vehicleId: string; startTime: string; endTime: string; purpose: string; destination: string; }'.
+src/hooks/useReservationCalendar.ts(253,32): error TS2339: Property 'reservedByUid' does not exist on type '{ vehicleId: string; vehicleName: any; startTime: string; endTime: string; purpose: string; destination: string; routeDistance: any; routeDuration: any; routeTollFee: any; }'.
+src/hooks/useReservationCalendar.ts(253,53): error TS2339: Property 'reservedByUid' does not exist on type '{ vehicleId: string; startTime: string; endTime: string; purpose: string; destination: string; }'.
+src/hooks/useReservationCalendar.ts(254,32): error TS2339: Property 'reservedByName' does not exist on type '{ vehicleId: string; vehicleName: any; startTime: string; endTime: string; purpose: string; destination: string; routeDistance: any; routeDuration: any; routeTollFee: any; }'.
+src/hooks/useReservationCalendar.ts(254,54): error TS2339: Property 'reservedByName' does not exist on type '{ vehicleId: string; startTime: string; endTime: string; purpose: string; destination: string; }'.
+src/hooks/useReservationCalendar.ts(256,60): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(258,51): error TS2339: Property 'reservedByUid' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(258,69): error TS18047: 'user' is possibly 'null'.
+src/hooks/useReservationCalendar.ts(264,102): error TS2339: Property 'displayName' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(266,59): error TS2339: Property 'reservedByUid' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(273,33): error TS2345: Argument of type '(prev: never[]) => any[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '(prev: never[]) => any[]' is not assignable to type '(prevState: never[]) => never[]'.
+    Type 'any[]' is not assignable to type 'never[]'.
+      Type 'any' is not assignable to type 'never'.
+src/hooks/useReservationCalendar.ts(274,23): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(274,49): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(274,56): error TS2698: Spread types may only be created from object types.
+src/hooks/useReservationCalendar.ts(281,43): error TS2339: Property 'displayName' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(282,36): error TS18047: 'user' is possibly 'null'.
+src/hooks/useReservationCalendar.ts(283,55): error TS18047: 'user' is possibly 'null'.
+src/hooks/useReservationCalendar.ts(283,75): error TS18047: 'user' is possibly 'null'.
+src/hooks/useReservationCalendar.ts(289,47): error TS2339: Property 'distance' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(290,47): error TS2339: Property 'duration' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(291,46): error TS2339: Property 'tollFee' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(295,60): error TS18047: 'user' is possibly 'null'.
+src/hooks/useReservationCalendar.ts(295,80): error TS18047: 'user' is possibly 'null'.
+src/hooks/useReservationCalendar.ts(296,51): error TS2339: Property 'displayName' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(303,36): error TS18047: 'user' is possibly 'null'.
+src/hooks/useReservationCalendar.ts(316,22): error TS2339: Property 'code' does not exist on type '{}'.
+src/hooks/useReservationCalendar.ts(316,66): error TS2339: Property 'message' does not exist on type '{}'.
+src/hooks/useReservationCalendar.ts(317,31): error TS2339: Property 'message' does not exist on type '{}'.
+src/hooks/useReservationCalendar.ts(320,41): error TS2554: Expected 2 arguments, but got 3.
+src/hooks/useReservationCalendar.ts(338,13): error TS2353: Object literal may only specify known properties, and 'reservedByUid' does not exist in type 'SetStateAction<{ vehicleId: string; startTime: string; endTime: string; purpose: string; destination: string; }>'.
+src/hooks/useReservationCalendar.ts(348,56): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(351,51): error TS2339: Property 'reservedByUid' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(351,69): error TS18047: 'user' is possibly 'null'.
+src/hooks/useReservationCalendar.ts(354,46): error TS2339: Property 'reservedByUid' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(356,52): error TS2339: Property 'date' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(356,70): error TS2339: Property 'vehicleName' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(361,56): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useReservationCalendar.ts(371,25): error TS18047: 'user' is possibly 'null'.
+src/hooks/useReservationCalendar.ts(376,48): error TS18047: 'user' is possibly 'null'.
+src/hooks/useReservationCalendar.ts(377,26): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useRetry.ts(51,22): error TS2339: Property 'onError' does not exist on type '{}'.
+src/hooks/useRetry.ts(51,36): error TS2339: Property 'onError' does not exist on type '{}'.
+src/hooks/useRetry.ts(60,26): error TS2339: Property 'errorMessage' does not exist on type '{}'.
+src/hooks/useRetry.ts(62,21): error TS2554: Expected 2 arguments, but got 3.
+src/hooks/useRetry.ts(65,57): error TS2349: This expression is not callable.
+  Type 'never' has no call signatures.
+src/hooks/useRetry.ts(72,26): error TS2339: Property 'errorMessage' does not exist on type '{}'.
+src/hooks/useRetry.ts(82,23): error TS2322: Type '(key: any, asyncFn: any, opts?: {}) => Promise<any>' is not assignable to type 'null'.
+src/hooks/useSettings.ts(40,28): error TS2345: Argument of type '{ id: string; }' is not assignable to parameter of type 'SetStateAction<null>'.
+  Type '{ id: string; }' provides no match for the signature '(prevState: null): null'.
+src/hooks/useSettings.ts(42,36): error TS2339: Property 'name' does not exist on type '{ id: string; }'.
+src/hooks/useSettings.ts(43,42): error TS2339: Property 'adminEmail' does not exist on type '{ id: string; }'.
+src/hooks/useSettings.ts(44,39): error TS2339: Property 'address' does not exist on type '{ id: string; }'.
+src/hooks/useSettings.ts(45,55): error TS2339: Property 'phone' does not exist on type '{ id: string; }'.
+src/hooks/useSettings.ts(46,44): error TS2339: Property 'approvalLine' does not exist on type '{ id: string; }'.
+src/hooks/useSettings.ts(47,36): error TS2339: Property 'approvalLine' does not exist on type '{ id: string; }'.
+src/hooks/useSettings.ts(51,35): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useSettings.ts(77,28): error TS2339: Property 'date' does not exist on type 'never'.
+src/hooks/useSettings.ts(78,31): error TS2339: Property 'date' does not exist on type 'never'.
+src/hooks/useSettings.ts(78,52): error TS2339: Property 'date' does not exist on type 'never'.
+src/hooks/useSettings.ts(113,31): error TS2698: Spread types may only be created from object types.
+src/hooks/useSettings.ts(128,31): error TS2345: Argument of type '(prev: never[]) => { id: string; date: string; name: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '(prev: never[]) => { id: string; date: string; name: string; }[]' is not assignable to type '(prevState: never[]) => never[]'.
+    Type '{ id: string; date: string; name: string; }[]' is not assignable to type 'never[]'.
+      Type '{ id: string; date: string; name: string; }' is not assignable to type 'never'.
+src/hooks/useSettings.ts(142,58): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useTimelineDrag.ts(37,13): error TS2353: Object literal may only specify known properties, and 'vehicleId' does not exist in type '(prevState: null) => null'.
+src/hooks/useTimelineDrag.ts(48,57): error TS2339: Property 'vehicleId' does not exist on type 'never'.
+src/hooks/useTimelineDrag.ts(49,47): error TS2339: Property 'gapStart' does not exist on type 'never'.
+src/hooks/useTimelineDrag.ts(49,76): error TS2339: Property 'gapEnd' does not exist on type 'never'.
+src/hooks/useTimelineDrag.ts(51,39): error TS2698: Spread types may only be created from object types.
+src/hooks/useTimelineDrag.ts(57,45): error TS2339: Property 'startMin' does not exist on type 'never'.
+src/hooks/useTimelineDrag.ts(57,65): error TS2339: Property 'currentMin' does not exist on type 'never'.
+src/hooks/useTimelineDrag.ts(58,43): error TS2339: Property 'startMin' does not exist on type 'never'.
+src/hooks/useTimelineDrag.ts(58,63): error TS2339: Property 'currentMin' does not exist on type 'never'.
+src/hooks/useTimelineDrag.ts(62,54): error TS2339: Property 'startMin' does not exist on type 'never'.
+src/hooks/useTimelineDrag.ts(63,66): error TS2339: Property 'gapEnd' does not exist on type 'never'.
+src/hooks/useTimelineDrag.ts(64,37): error TS2339: Property 'vehicleId' does not exist on type 'never'.
+src/hooks/useTimelineDrag.ts(66,37): error TS2339: Property 'vehicleId' does not exist on type 'never'.
+src/hooks/useTimelineDrag.ts(75,45): error TS2339: Property 'startMin' does not exist on type 'never'.
+src/hooks/useTimelineDrag.ts(75,65): error TS2339: Property 'currentMin' does not exist on type 'never'.
+src/hooks/useTimelineDrag.ts(76,43): error TS2339: Property 'startMin' does not exist on type 'never'.
+src/hooks/useTimelineDrag.ts(76,63): error TS2339: Property 'currentMin' does not exist on type 'never'.
+src/hooks/useToast.tsx(23,33): error TS2698: Spread types may only be created from object types.
+src/hooks/useToast.tsx(25,19): error TS2345: Argument of type '(prev: never[]) => { id: number; message: any; type: string; actionLabel: any; onAction: any; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '(prev: never[]) => { id: number; message: any; type: string; actionLabel: any; onAction: any; }[]' is not assignable to type '(prevState: never[]) => never[]'.
+    Type '{ id: number; message: any; type: string; actionLabel: any; onAction: any; }[]' is not assignable to type 'never[]'.
+      Type '{ id: number; message: any; type: string; actionLabel: any; onAction: any; }' is not assignable to type 'never'.
+src/hooks/useToast.tsx(32,50): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useToast.tsx(37,46): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useToast.tsx(46,32): error TS2322: Type '{ showToast: (message: any, type?: string, options?: number) => void; }' is not assignable to type 'null'.
+src/hooks/useToast.tsx(53,40): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useToast.tsx(57,41): error TS2339: Property 'type' does not exist on type 'never'.
+src/hooks/useToast.tsx(58,43): error TS2339: Property 'type' does not exist on type 'never'.
+src/hooks/useToast.tsx(59,47): error TS2339: Property 'type' does not exist on type 'never'.
+src/hooks/useToast.tsx(64,40): error TS2339: Property 'type' does not exist on type 'never'.
+src/hooks/useToast.tsx(65,43): error TS2339: Property 'type' does not exist on type 'never'.
+src/hooks/useToast.tsx(66,47): error TS2339: Property 'type' does not exist on type 'never'.
+src/hooks/useToast.tsx(68,102): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useToast.tsx(69,40): error TS2339: Property 'message' does not exist on type 'never'.
+src/hooks/useToast.tsx(71,36): error TS2339: Property 'actionLabel' does not exist on type 'never'.
+src/hooks/useToast.tsx(77,49): error TS2339: Property 'type' does not exist on type 'never'.
+src/hooks/useToast.tsx(82,44): error TS2339: Property 'actionLabel' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(25,22): error TS2554: Expected 1 arguments, but got 0.
+src/hooks/useTodayDashboard.ts(43,29): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useTodayDashboard.ts(44,38): error TS2345: Argument of type 'Record<string, any>[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type 'Record<string, any>[]' is not assignable to type 'never[]'.
+    Type 'Record<string, any>' is not assignable to type 'never'.
+src/hooks/useTodayDashboard.ts(45,37): error TS2345: Argument of type 'Record<string, any>[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type 'Record<string, any>[]' is not assignable to type 'never[]'.
+    Type 'Record<string, any>' is not assignable to type 'never'.
+src/hooks/useTodayDashboard.ts(48,72): error TS2339: Property 'reservationId' does not exist on type '{ id: string; }'.
+src/hooks/useTodayDashboard.ts(48,98): error TS2339: Property 'reservationId' does not exist on type '{ id: string; }'.
+src/hooks/useTodayDashboard.ts(61,21): error TS2345: Argument of type '{ type: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ type: string; }[]' is not assignable to type 'never[]'.
+    Type '{ type: string; }' is not assignable to type 'never'.
+src/hooks/useTodayDashboard.ts(74,28): error TS2339: Property 'reservedByUid' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(74,61): error TS2339: Property 'status' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(75,32): error TS2339: Property 'startTime' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(75,65): error TS2339: Property 'startTime' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(81,28): error TS2339: Property 'reservedByUid' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(81,61): error TS2339: Property 'date' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(81,84): error TS2339: Property 'status' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(82,32): error TS2339: Property 'date' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(82,41): error TS2339: Property 'startTime' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(82,68): error TS2339: Property 'date' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(82,77): error TS2339: Property 'startTime' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(85,28): error TS2339: Property 'date' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(85,45): error TS2339: Property 'date' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(86,23): error TS2339: Property 'date' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(96,19): error TS2339: Property 'status' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(96,47): error TS2339: Property 'startTime' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(97,30): error TS2339: Property 'startTime' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(106,36): error TS2339: Property 'status' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(116,52): error TS2339: Property 'maintenance' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(116,81): error TS2339: Property 'retired' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(119,32): error TS2339: Property 'vehicleId' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(119,48): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(119,56): error TS2339: Property 'status' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(119,84): error TS2339: Property 'status' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(121,41): error TS2339: Property 'startTime' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(122,41): error TS2339: Property 'endTime' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(139,22): error TS2698: Spread types may only be created from object types.
+src/hooks/useTodayDashboard.ts(152,34): error TS2345: Argument of type '(prev: never[]) => any[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '(prev: never[]) => any[]' is not assignable to type '(prevState: never[]) => never[]'.
+    Type 'any[]' is not assignable to type 'never[]'.
+      Type 'any' is not assignable to type 'never'.
+src/hooks/useTodayDashboard.ts(153,19): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(153,45): error TS2698: Spread types may only be created from object types.
+src/hooks/useTodayDashboard.ts(169,34): error TS2345: Argument of type '(prev: never[]) => any[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '(prev: never[]) => any[]' is not assignable to type '(prevState: never[]) => never[]'.
+    Type 'any[]' is not assignable to type 'never[]'.
+      Type 'any' is not assignable to type 'never'.
+src/hooks/useTodayDashboard.ts(170,19): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(170,45): error TS2698: Spread types may only be created from object types.
+src/hooks/useTodayDashboard.ts(188,60): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(198,46): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(206,37): error TS2339: Property 'currentKm' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(207,39): error TS2339: Property 'vehicleType' does not exist on type 'never'.
+src/hooks/useTodayDashboard.ts(208,36): error TS2339: Property 'fuelType' does not exist on type 'never'.
+src/hooks/useVehicleHistory.ts(31,61): error TS2339: Property 'contains' does not exist on type 'never'.
+src/hooks/useVehicleHistory.ts(44,29): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useVehicleHistory.ts(65,21): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useVehicleHistory.ts(67,38): error TS2339: Property 'timestamp' does not exist on type '{ id: string; }'.
+src/hooks/useVehicleHistory.ts(68,40): error TS2339: Property 'timestamp' does not exist on type '{ id: string; }'.
+src/hooks/useVehicleHistory.ts(71,42): error TS2339: Property 'timestamp' does not exist on type '{ id: string; }'.
+src/hooks/useVehicleHistory.ts(72,42): error TS2339: Property 'timestamp' does not exist on type '{ id: string; }'.
+src/hooks/useVehicleHistory.ts(85,50): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useVehicleHistory.ts(86,61): error TS2339: Property 'endKm' does not exist on type 'never'.
+src/hooks/useVehicleHistory.ts(86,71): error TS2339: Property 'startKm' does not exist on type 'never'.
+src/hooks/useVehicleManager.ts(73,25): error TS2345: Argument of type '{ id: string; }[]' is not assignable to parameter of type 'SetStateAction<never[]>'.
+  Type '{ id: string; }[]' is not assignable to type 'never[]'.
+    Type '{ id: string; }' is not assignable to type 'never'.
+src/hooks/useVehicleManager.ts(138,29): error TS2339: Property 'googleCalendarId' does not exist on type '{ displayName: string; modelName: string; plateNumber: string; vehicleType: string; fuelType: string; currentKm: number; organizationId: string | null | undefined; insurance: { company: string; phone: string; }; }'.
+src/hooks/useVehicleManager.ts(141,52): error TS2339: Property 'id' does not exist on type 'never'.
+src/hooks/useVehicleManager.ts(160,20): error TS2353: Object literal may only specify known properties, and 'type' does not exist in type '(prevState: null) => null'.
+src/hooks/useVehicleManager.ts(163,32): error TS2339: Property 'vehicle' does not exist on type 'never'.
+src/hooks/useVehicleManager.ts(177,20): error TS2353: Object literal may only specify known properties, and 'type' does not exist in type '(prevState: null) => null'.
+src/hooks/useVehicleManager.ts(180,32): error TS2339: Property 'vehicle' does not exist on type 'never'.
+src/hooks/useVehicleManager.ts(194,20): error TS2353: Object literal may only specify known properties, and 'type' does not exist in type '(prevState: null) => null'.
+src/hooks/useVehicleManager.ts(197,32): error TS2339: Property 'vehicle' does not exist on type 'never'.
+src/hooks/useVehicleManager.ts(214,20): error TS2353: Object literal may only specify known properties, and 'type' does not exist in type '(prevState: null) => null'.
+src/hooks/useVehicleManager.ts(217,32): error TS2339: Property 'vehicle' does not exist on type 'never'.
