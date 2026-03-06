@@ -239,8 +239,10 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
         const snapped = snapTo30(now.getHours(), now.getMinutes());
         const startH = snapped.h;
         const startM = snapped.m;
-        const endH = startH + 1;
-        const endM = startM;
+        let endH = startH + 1;
+        let endM = startM;
+        // 24:00 이상이면 23:59로 캡핑 (HTML time input은 24:00 미지원)
+        if (endH >= 24) { endH = 23; endM = 59; }
 
         const defaultStart = `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`;
         const defaultEnd = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
