@@ -70,7 +70,7 @@ export default function useDriveLogForm() {
     const [submitting, setSubmitting] = useState(false);
     const [success, setSuccess] = useState(false);
     const [selectedPassengers, setSelectedPassengers] = useState<UserDoc[]>([]);
-    const [externalPassengers, setExternalPassengers] = useState<string[]>([]);
+    const [externalPassengerCount, setExternalPassengerCount] = useState(0);
     const [showFavSave, setShowFavSave] = useState(false);
     const [favName, setFavName] = useState('');
 
@@ -136,10 +136,10 @@ export default function useDriveLogForm() {
                         editLog.passengerNames?.includes(m.name || m.email?.split('@')[0])
                     );
                     setSelectedPassengers(matched);
-                    // 조직원 이름에 매칭되지 않은 이름 = 외부 동승자
+                    // 조직원 이름에 매칭되지 않은 수 = 외부 동승자 수
                     const memberNames = otherMembers.map(m => m.name || m.email?.split('@')[0]);
                     const externals = editLog.passengerNames.filter(n => !memberNames.includes(n));
-                    if (externals.length > 0) setExternalPassengers(externals);
+                    if (externals.length > 0) setExternalPassengerCount(externals.length);
                 }
 
                 const resolveStartKm = async (vehicleId: string, fallbackKm: number | string | undefined) => {
@@ -267,7 +267,7 @@ export default function useDriveLogForm() {
         setSubmitting(true);
         try {
             const logData = buildLogData(form, {
-                orgId, user: user!, userData, selectedVehicle, selectedPassengers, externalPassengers, isRetroactive,
+                orgId, user: user!, userData, selectedVehicle, selectedPassengers, externalPassengerCount, isRetroactive,
             });
 
             if (isEditMode && editLog) {
@@ -306,7 +306,7 @@ export default function useDriveLogForm() {
                     driveDate: todayStr(),
                 });
                 setSelectedPassengers([]);
-                setExternalPassengers([]);
+                setExternalPassengerCount(0);
                 setTimeout(() => setSuccess(false), 3000);
             }
         } catch (err: unknown) {
@@ -345,16 +345,7 @@ export default function useDriveLogForm() {
         handleFavoriteSelect,
         handleSaveFavorite,
         togglePassenger,
-        externalPassengers,
-        addExternalPassenger: (name: string) => {
-            const trimmed = name.trim();
-            if (trimmed && !externalPassengers.includes(trimmed)) {
-                setExternalPassengers(prev => [...prev, trimmed]);
-            }
-        },
-        removeExternalPassenger: (name: string) => {
-            setExternalPassengers(prev => prev.filter(n => n !== name));
-        },
+        externalPassengerCount, setExternalPassengerCount,
         handleOcrCapture: ocr.handleOcrCapture,
         handleOcrReport: ocr.handleOcrReport,
         handleSubmit,

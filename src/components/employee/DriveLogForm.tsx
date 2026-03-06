@@ -25,7 +25,7 @@ export default function DriveLogForm() {
         handleFavoriteSelect,
         handleSaveFavorite,
         togglePassenger,
-        externalPassengers, addExternalPassenger, removeExternalPassenger,
+        externalPassengerCount, setExternalPassengerCount,
         handleOcrCapture,
         handleOcrReport,
         handleSubmit,
@@ -278,9 +278,9 @@ export default function DriveLogForm() {
                 <div className="glass-card p-4">
                     <label className="label">
                         동승자
-                        {(selectedPassengers.length + externalPassengers.length) > 0 && (
+                        {(selectedPassengers.length + externalPassengerCount) > 0 && (
                             <span className="ml-2 text-primary-600 font-bold">
-                                {selectedPassengers.length + externalPassengers.length}명 선택
+                                {selectedPassengers.length + externalPassengerCount}명
                             </span>
                         )}
                     </label>
@@ -306,57 +306,34 @@ export default function DriveLogForm() {
                         </div>
                     )}
 
-                    {/* 외부 동승자 */}
-                    <div>
-                        <p className="text-xs text-surface-400 mb-1.5">외부 동승자</p>
-                        {externalPassengers.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mb-2">
-                                {externalPassengers.map(name => (
-                                    <span key={name} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-amber-100 border border-amber-300 text-amber-700 dark:bg-amber-900/40 dark:border-amber-700 dark:text-amber-300">
-                                        {name}
-                                        <button
-                                            type="button"
-                                            onClick={() => removeExternalPassenger(name)}
-                                            className="ml-0.5 text-amber-500 hover:text-amber-700 dark:hover:text-amber-200 font-bold"
-                                        >
-                                            ✕
-                                        </button>
-                                    </span>
-                                ))}
-                            </div>
-                        )}
+                    {/* 외부 인원 */}
+                    <div className="flex items-center gap-3">
+                        <p className="text-xs text-surface-500 dark:text-surface-400 whitespace-nowrap">외부 인원</p>
                         <div className="flex items-center gap-1.5">
-                            <input
-                                type="text"
-                                placeholder="이름 입력..."
-                                className="input text-sm flex-1"
-                                onKeyDown={e => {
-                                    if (e.key === 'Enter') {
-                                        e.preventDefault();
-                                        const input = e.currentTarget;
-                                        addExternalPassenger(input.value);
-                                        input.value = '';
-                                    }
-                                }}
-                            />
                             <button
                                 type="button"
-                                onClick={e => {
-                                    const input = (e.currentTarget.previousElementSibling as HTMLInputElement);
-                                    addExternalPassenger(input.value);
-                                    input.value = '';
-                                }}
-                                className="btn-primary btn-sm !py-1.5 !px-3 whitespace-nowrap"
+                                onClick={() => setExternalPassengerCount(Math.max(0, externalPassengerCount - 1))}
+                                disabled={externalPassengerCount <= 0}
+                                className="w-8 h-8 rounded-lg border border-surface-200 dark:border-surface-600 flex items-center justify-center text-sm font-bold text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-700 disabled:opacity-30 transition-all"
                             >
-                                + 추가
+                                −
                             </button>
+                            <span className="w-8 text-center font-bold text-surface-800 dark:text-surface-200">{externalPassengerCount}</span>
+                            <button
+                                type="button"
+                                onClick={() => setExternalPassengerCount(externalPassengerCount + 1)}
+                                className="w-8 h-8 rounded-lg border border-surface-200 dark:border-surface-600 flex items-center justify-center text-sm font-bold text-surface-500 hover:bg-surface-100 dark:hover:bg-surface-700 transition-all"
+                            >
+                                +
+                            </button>
+                            <span className="text-xs text-surface-400">명</span>
                         </div>
                     </div>
 
                     {/* 총 탑승 인원 */}
-                    {(selectedPassengers.length + externalPassengers.length) > 0 && (
+                    {(selectedPassengers.length + externalPassengerCount) > 0 && (
                         <div className="mt-3 pt-2.5 border-t border-surface-100 dark:border-surface-700 text-xs text-surface-500 dark:text-surface-400">
-                            👥 총 탑승 인원: <span className="font-bold text-surface-700 dark:text-surface-200">{selectedPassengers.length + externalPassengers.length + 1}명</span> (운전자 포함)
+                            👥 총 탑승 인원: <span className="font-bold text-surface-700 dark:text-surface-200">{selectedPassengers.length + externalPassengerCount + 1}명</span> (운전자 포함)
                         </div>
                     )}
                 </div>
