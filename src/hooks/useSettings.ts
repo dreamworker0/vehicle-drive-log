@@ -45,7 +45,7 @@ export default function useSettings() {
     const [customHolidays, setCustomHolidays] = useState<CustomHoliday[]>([]);
     const [holidayForm, setHolidayForm] = useState<HolidayForm>({ date: '', name: '' });
     const [addingHoliday, setAddingHoliday] = useState(false);
-    const [publicHolidays, setPublicHolidays] = useState<Record<string, any>>({});
+    const [publicHolidays, setPublicHolidays] = useState<Record<string, { date: string; name: string }[]>>({});
 
     const orgId = userData?.organizationId;
 

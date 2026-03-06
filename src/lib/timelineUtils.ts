@@ -60,7 +60,12 @@ export const getPercent = (minutes: number) => {
  * @param {number} nowSnapped - 현재 시각(스냅된 분 값)
  * @returns {Array<{start: number, end: number}>} 빈 시간 슬롯 배열
  */
-export const getGaps = (vReservations: Record<string, any>[], isToday: boolean, nowSnapped: number) => {
+interface TimelineReservation {
+    startTime: string;
+    endTime: string;
+}
+
+export const getGaps = (vReservations: TimelineReservation[], isToday: boolean, nowSnapped: number) => {
     const gaps: { start: number; end: number }[] = [];
     const effectiveStart = isToday ? Math.max(RANGE_START, nowSnapped) : RANGE_START;
     let cursor = effectiveStart;

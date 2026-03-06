@@ -9,7 +9,29 @@
  * @param {Array} logs - 운행일지 배열
  * @param {string} filename - 파일명 (확장자 제외)
  */
-export async function downloadDriveLogsExcel(logs: Record<string, any>[], filename = '운행일지', { onError }: { onError?: (msg: string) => void } = {}) {
+interface ExcelDriveLog {
+    date?: string;
+    timestamp?: { toDate?: () => Date };
+    driverName?: string;
+    vehicleDisplayName?: string;
+    vehicleName?: string;
+    startTime?: string;
+    endTime?: string;
+    departureTime?: string;
+    arrivalTime?: string;
+    destination?: string;
+    purpose?: string;
+    departureKm?: number;
+    arrivalKm?: number;
+    startKm?: number;
+    endKm?: number;
+    passengerCount?: number;
+    energyCost?: number;
+    notes?: string;
+    [key: string]: unknown;
+}
+
+export async function downloadDriveLogsExcel(logs: ExcelDriveLog[], filename = '운행일지', { onError }: { onError?: (msg: string) => void } = {}) {
     if (!logs || logs.length === 0) {
         onError?.('다운로드할 데이터가 없습니다.');
         return false;
@@ -19,7 +41,7 @@ export async function downloadDriveLogsExcel(logs: Record<string, any>[], filena
     const XLSX = await import('xlsx');
 
     // 데이터 변환
-    const rows = logs.map((log: Record<string, any>) => {
+    const rows = logs.map((log: ExcelDriveLog) => {
         const distance = ((log.arrivalKm || log.endKm || 0) - (log.departureKm || log.startKm || 0));
         const dateStr = log.date || (log.timestamp?.toDate
             ? log.timestamp.toDate().toISOString().slice(0, 10)

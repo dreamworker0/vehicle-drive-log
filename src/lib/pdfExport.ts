@@ -154,7 +154,7 @@ function buildPageHtml(pageRows: PdfLogEntry[], pageIdx: number, totalPages: num
         return sum + (d > 0 ? d : 0);
     }, 0);
 
-    const rowsHtml = pageRows.map((log: Record<string, any>, idx: number) => buildLogRow(log, idx, pageIdx)).join('');
+    const rowsHtml = pageRows.map((log: PdfLogEntry, idx: number) => buildLogRow(log, idx, pageIdx)).join('');
     const emptyRowsHtml = buildEmptyRows(ROWS_PER_PAGE - pageRows.length);
     const approvalHtml = buildApprovalHtml(approvalLine);
 

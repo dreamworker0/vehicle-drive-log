@@ -17,7 +17,7 @@ describe('useOrientationLock', () => {
     it('마운트 시 screen.orientation.lock을 호출한다', () => {
         renderHook(() => useOrientationLock());
 
-        expect(screen.orientation.lock).toHaveBeenCalledWith('portrait-primary');
+        expect((screen.orientation as unknown as { lock: unknown }).lock).toHaveBeenCalledWith('portrait-primary');
     });
 
     it('lock이 실패해도 에러를 던지지 않는다', () => {

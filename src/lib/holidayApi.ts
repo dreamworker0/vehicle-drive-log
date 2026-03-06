@@ -31,9 +31,9 @@ export const fetchPublicHolidays = async (year: number) => {
         const docSnap = await getDoc(docRef);
 
         if (docSnap.exists()) {
-            const data = docSnap.data() as Record<string, any>;
+            const data = docSnap.data() as Record<string, unknown>;
             if (data[yearStr]) {
-                map = data[yearStr];
+                map = data[yearStr] as Record<string, string>;
                 cache[year] = map;
                 console.log(`Loaded holidays for ${year} from Firestore`);
                 return map;
