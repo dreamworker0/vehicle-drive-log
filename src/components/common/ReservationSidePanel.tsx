@@ -54,6 +54,7 @@ interface Props {
     favName: string;
     setFavName: (name: string) => void;
     onSaveFavorite: () => Promise<void>;
+    onOpenForm: () => void;
 }
 
 export default function ReservationSidePanel({
@@ -87,6 +88,7 @@ export default function ReservationSidePanel({
     favName,
     setFavName,
     onSaveFavorite,
+    onOpenForm,
 }: Props) {
     const destinationRef = useRef<HTMLInputElement>(null);
 
@@ -111,7 +113,7 @@ export default function ReservationSidePanel({
                 </h3>
                 {!isPastDate && (
                     <button
-                        onClick={() => setShowForm(!showForm)}
+                        onClick={onOpenForm}
                         className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-all ${showForm
                             ? 'bg-surface-200 text-surface-600 dark:bg-surface-600 dark:text-surface-300'
                             : 'bg-primary-500 text-white hover:bg-primary-600 shadow-sm'

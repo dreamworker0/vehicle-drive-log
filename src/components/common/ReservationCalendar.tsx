@@ -25,7 +25,7 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
         user, members,
         prevMonth, nextMonth,
         handleDateSelect,
-        handleSubmit, handleEdit, handleCancel, handleSaveFavorite,
+        handleSubmit, handleEdit, handleCancel, handleSaveFavorite, handleOpenForm,
         getCurrentTimeStr, getMinStartTime,
         getNavigationDeeplink,
     } = useReservationCalendar({ isAdmin });
@@ -89,6 +89,7 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
                         favName={favName}
                         setFavName={setFavName}
                         onSaveFavorite={handleSaveFavorite}
+                        onOpenForm={handleOpenForm}
                         onSlotClick={(vehicleId: string, startTime: string, endTime: string) => {
                             setForm(prev => ({ ...prev, vehicleId, startTime, endTime }));
                             setShowForm(true);

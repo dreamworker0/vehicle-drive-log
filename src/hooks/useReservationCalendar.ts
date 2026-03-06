@@ -221,6 +221,41 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
     // 최소 시작 시간 (오늘이면 현재 시간, 아니면 00:00)
     const getMinStartTime = () => isToday ? getCurrentTimeStr() : '00:00';
 
+    // 30분 단위 스냅 (올림)
+    const snapTo30 = (h: number, m: number) => {
+        if (m <= 0) return { h, m: 0 };
+        if (m <= 30) return { h, m: 30 };
+        return { h: h + 1, m: 0 };
+    };
+
+    // 예약 폼 열기 (기본 시간 자동 설정)
+    const handleOpenForm = () => {
+        if (showForm) {
+            setShowForm(false);
+            return;
+        }
+        // 현재 시간 기반 30분 단위 스냅
+        const now = new Date();
+        const snapped = snapTo30(now.getHours(), now.getMinutes());
+        const startH = snapped.h;
+        const startM = snapped.m;
+        const endH = startH + 1;
+        const endM = startM;
+
+        const defaultStart = `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`;
+        const defaultEnd = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+
+        // 과거 날짜는 폼을 열지 않음
+        if (!form.startTime && !form.endTime) {
+            setForm(prev => ({
+                ...prev,
+                startTime: isToday ? defaultStart : '09:00',
+                endTime: isToday ? defaultEnd : '10:00',
+            }));
+        }
+        setShowForm(true);
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!user || !userData?.organizationId) return;
@@ -328,7 +363,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
         user, members,
         prevMonth, nextMonth,
         handleDateSelect,
-        handleSubmit, handleEdit, handleCancel, handleSaveFavorite,
+        handleSubmit, handleEdit, handleCancel, handleSaveFavorite, handleOpenForm,
         getCurrentTimeStr, getMinStartTime,
         getNavigationDeeplink,
     };
