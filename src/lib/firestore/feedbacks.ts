@@ -2,7 +2,7 @@
  * Firestore — 피드백 (Feedbacks) 관련 함수
  */
 import {
-    doc, updateDoc,
+    doc, updateDoc, deleteDoc,
     collection, query, getDocs, addDoc,
     orderBy, limit, serverTimestamp, onSnapshot,
 } from 'firebase/firestore';
@@ -31,6 +31,11 @@ export const getAllFeedbacks = async (limitCount = 100) => {
 // 피드백 상태 수정
 export const updateFeedback = async (feedbackId: string, data: Record<string, any>) => {
     await updateDoc(doc(db, 'feedbacks', feedbackId), data);
+};
+
+// 피드백 삭제
+export const deleteFeedback = async (feedbackId: string) => {
+    await deleteDoc(doc(db, 'feedbacks', feedbackId));
 };
 
 // 피드백 실시간 구독 (사이드바 배지용)

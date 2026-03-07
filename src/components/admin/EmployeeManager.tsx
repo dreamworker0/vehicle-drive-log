@@ -8,7 +8,7 @@ import { SkeletonList, SkeletonBox } from '../common/Skeleton';
 
 export default function EmployeeManager() {
     const {
-        employees, organization, loading,
+        employees, disabledEmployees, preRegisteredEmployees, organization, loading,
         showAddForm, setShowAddForm,
         newEmployee, setNewEmployee,
         inviteCodeCopied, regenerating,
@@ -17,6 +17,7 @@ export default function EmployeeManager() {
         filteredEmployees, admins, regularEmployees,
         handleAddEmployee, handleCopyInviteCode, handleRegenerateCode,
         handleEditEmployee, handleSaveEdit, handleDeleteEmployee, handleChangeRole,
+        handleDeletePreRegistered, handleRestoreEmployee,
     } = useEmployeeManager();
     const { userData } = useAuth();
     const selfUid = userData?.uid;
@@ -195,6 +196,75 @@ export default function EmployeeManager() {
                             )}
                         </div>
                     ))}
+                </div>
+            )}
+
+            {/* 비활성 직원 목록 */}
+            {disabledEmployees.length > 0 && (
+                <div className="mt-6">
+                    <h3 className="text-sm font-semibold text-surface-500 dark:text-surface-400 mb-3">
+                        비활성 직원 ({disabledEmployees.length}명)
+                    </h3>
+                    <div className="space-y-2">
+                        {disabledEmployees.map((emp) => (
+                            <div key={emp.id} className="glass-card p-4 border-l-4 border-red-400 dark:border-red-500 opacity-80">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-10 h-10 rounded-full bg-red-50 dark:bg-red-900/30 flex items-center justify-center text-red-600 dark:text-red-400 font-bold flex-shrink-0">
+                                        {(emp.name || '?')[0]?.toUpperCase()}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <p className="font-medium text-surface-900 dark:text-surface-100 truncate">{emp.name}</p>
+                                            <span className="badge bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400 text-xs">비활성</span>
+                                        </div>
+                                        {emp.email && <p className="text-sm text-surface-400 truncate">{emp.email}</p>}
+                                    </div>
+                                    <button
+                                        onClick={() => handleRestoreEmployee(emp)}
+                                        className="btn-sm text-xs px-3 py-1.5 bg-accent-50 text-accent-700 hover:bg-accent-100 dark:bg-accent-900/30 dark:text-accent-400 dark:hover:bg-accent-900/50 rounded-lg font-medium transition-colors"
+                                    >
+                                        활성화
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* 사전 등록 직원 목록 */}
+            {preRegisteredEmployees.length > 0 && (
+                <div className="mt-6">
+                    <h3 className="text-sm font-semibold text-surface-500 dark:text-surface-400 mb-3">
+                        가입 대기 ({preRegisteredEmployees.length}명)
+                    </h3>
+                    <div className="space-y-2">
+                        {preRegisteredEmployees.map((pre) => (
+                            <div key={pre.id} className="glass-card p-4 border-l-4 border-amber-400 dark:border-amber-500 opacity-80">
+                                <div className="flex items-center gap-4">
+                                    <div className="w-10 h-10 rounded-full bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center text-amber-600 dark:text-amber-400 font-bold flex-shrink-0">
+                                        {(pre.name || '?')[0]?.toUpperCase()}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <p className="font-medium text-surface-900 dark:text-surface-100 truncate">{pre.name}</p>
+                                            <span className="badge bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400 text-xs">가입 대기</span>
+                                        </div>
+                                        {pre.email && <p className="text-sm text-surface-400 truncate">{pre.email}</p>}
+                                    </div>
+                                    <button
+                                        onClick={() => handleDeletePreRegistered(pre.id)}
+                                        className="btn-icon btn-sm text-surface-400 hover:text-red-500"
+                                        title="사전 등록 취소"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                        </svg>
+                                    </button>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             )}
         </div>

@@ -10,7 +10,8 @@ interface VehicleModal {
     type: 'delete' | 'clearMaintenance' | 'retire' | 'restore';
     vehicle: Vehicle;
 }
-import { getVehicles, createVehicle, updateVehicle, deleteVehicle, clearVehicleMaintenanceBlock, retireVehicle, restoreVehicle, cancelVehicleReservations } from '../lib/firestore';
+import { getVehicles, createVehicle, updateVehicle, deleteVehicle, hasVehicleDriveLogs, clearVehicleMaintenanceBlock, retireVehicle, restoreVehicle, cancelVehicleReservations } from '../lib/firestore';
+import { useToast } from './useToast';
 
 // 전기차 모델명 목록 (감지 시 fuelType을 electric으로 자동 설정)
 const ELECTRIC_MODELS = [
@@ -59,8 +60,10 @@ const INITIAL_FORM = {
 
 export default function useVehicleManager() {
     const { userData } = useAuth();
+    const { showToast } = useToast();
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
     const [loading, setLoading] = useState(true);
+    const [deletableIds, setDeletableIds] = useState<Set<string>>(new Set());
     const [showForm, setShowForm] = useState(false);
     const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
     const [formLoading, setFormLoading] = useState(false);
@@ -72,11 +75,19 @@ export default function useVehicleManager() {
     const orgId = userData?.organizationId;
 
     const fetchVehicles = async () => {
-        if (!orgId) return;
+        if (!orgId) { setLoading(false); return; }
         setLoading(true);
         try {
             const data = await getVehicles(orgId);
             setVehicles(data);
+            // 각 차량의 운행일지 존재 여부 병렬 체크
+            const checks = await Promise.all(
+                data.map(async (v) => {
+                    const has = await hasVehicleDriveLogs(v.id);
+                    return { id: v.id, has };
+                })
+            );
+            setDeletableIds(new Set(checks.filter(c => !c.has).map(c => c.id)));
         } catch (err) {
             console.error('차량 목록 로드 실패:', err);
         } finally {
@@ -167,6 +178,13 @@ export default function useVehicleManager() {
         const vehicle = modal?.vehicle;
         if (!vehicle) return;
         try {
+            // 운행일지가 있으면 삭제 차단
+            const hasLogs = await hasVehicleDriveLogs(vehicle.id);
+            if (hasLogs) {
+                showToast('운행일지가 존재하는 차량은 삭제할 수 없습니다. 폐차 처리를 이용하세요.', 'error');
+                setModal(null);
+                return;
+            }
             await deleteVehicle(vehicle.id);
             await fetchVehicles();
         } catch (err) {
@@ -233,7 +251,7 @@ export default function useVehicleManager() {
     return {
         vehicles, loading, showForm, setShowForm,
         editingVehicle, formLoading, form, setForm,
-        modal, closeModal,
+        modal, closeModal, deletableIds,
         resetForm, handleEdit, handleModelNameChange, handleSubmit,
         openDeleteModal, confirmDelete,
         openClearMaintenanceModal, confirmClearMaintenance,

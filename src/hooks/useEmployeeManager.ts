@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
 import { getOrganizationMembers, getOrganization, regenerateInviteCode, updateUser } from '../lib/firestore';
-import { collection, addDoc, doc, deleteDoc as firestoreDeleteDoc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import type { User } from '../types/user';
 import type { Organization } from '../types/organization';
@@ -15,6 +15,8 @@ export default function useEmployeeManager() {
     const { userData } = useAuth();
     const { showToast } = useToast();
     const [employees, setEmployees] = useState<User[]>([]);
+    const [disabledEmployees, setDisabledEmployees] = useState<User[]>([]);
+    const [preRegisteredEmployees, setPreRegisteredEmployees] = useState<{ id: string; name: string; email: string; createdAt: any }[]>([]);
     const [organization, setOrganization] = useState<Organization | null>(null);
     const [loading, setLoading] = useState(true);
     const [showAddForm, setShowAddForm] = useState(false);
@@ -31,18 +33,27 @@ export default function useEmployeeManager() {
         if (!orgId) return;
         setLoading(true);
         try {
-            const [members, org] = await Promise.all([
+            const [members, org, preRegSnap] = await Promise.all([
                 getOrganizationMembers(orgId),
                 getOrganization(orgId),
+                getDocs(collection(db, 'organizations', orgId, 'preRegistered')),
             ]);
+            const nonSuperAdmins = members.filter((m) => m.role !== 'superAdmin');
+            const activeMembers = nonSuperAdmins.filter((m) => m.status !== 'disabled');
+            const disabledMembers = nonSuperAdmins.filter((m) => m.status === 'disabled');
             setEmployees(
-                members
-                    .filter((m) => m.role !== 'superAdmin')
-                    .sort((a, b) => {
-                        if (a.role === 'admin' && b.role !== 'admin') return -1;
-                        if (a.role !== 'admin' && b.role === 'admin') return 1;
-                        return (a.name || '').localeCompare(b.name || '');
-                    }) as User[]
+                activeMembers.sort((a, b) => {
+                    if (a.role === 'admin' && b.role !== 'admin') return -1;
+                    if (a.role !== 'admin' && b.role === 'admin') return 1;
+                    return (a.name || '').localeCompare(b.name || '');
+                }) as User[]
+            );
+            setDisabledEmployees(
+                disabledMembers.sort((a, b) => (a.name || '').localeCompare(b.name || '')) as User[]
+            );
+            setPreRegisteredEmployees(
+                preRegSnap.docs.map(d => ({ id: d.id, ...d.data() } as any))
+                    .sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''))
             );
             setOrganization(org as Organization | null);
         } catch (err) {
@@ -122,15 +133,32 @@ export default function useEmployeeManager() {
     const handleDeleteEmployee = async (emp: User) => {
         // 자기 자신 삭제 금지
         if (emp.id === userData?.uid) {
-            showToast('자기 자신은 삭제할 수 없습니다.', 'warning');
+            showToast('자기 자신은 비활성화할 수 없습니다.', 'warning');
             return;
         }
-        if (!confirm(`${emp.name || emp.email} 직원을 삭제하시겠습니까?`)) return;
+        if (!confirm(`${emp.name || emp.email} 직원을 비활성화하시겠습니까?\n\n비활성 직원은 앱 이용이 차단됩니다.`)) return;
         try {
-            await firestoreDeleteDoc(doc(db, 'users', emp.id));
+            const { getFunctions, httpsCallable } = await import('firebase/functions');
+            const functions = getFunctions(undefined, 'asia-northeast3');
+            const callable = httpsCallable(functions, 'disableUser');
+            await callable({ uid: emp.id });
+            showToast('직원이 비활성화되었습니다.', 'success');
             await fetchData();
-        } catch (err) {
-            console.error('삭제 실패:', err);
+        } catch (err: any) {
+            console.error('비활성화 실패:', err);
+            showToast(err.message || '비활성화에 실패했습니다.', 'error');
+        }
+    };
+
+    const handleRestoreEmployee = async (emp: User) => {
+        if (!confirm(`${emp.name || emp.email} 직원을 다시 활성화하시겠습니까?`)) return;
+        try {
+            await updateDoc(doc(db, 'users', emp.id), { status: 'active', disabledAt: null });
+            showToast('직원이 활성화되었습니다.', 'success');
+            await fetchData();
+        } catch (err: any) {
+            console.error('활성화 실패:', err);
+            showToast(err.message || '활성화에 실패했습니다.', 'error');
         }
     };
 
@@ -158,6 +186,19 @@ export default function useEmployeeManager() {
         }
     };
 
+    const handleDeletePreRegistered = async (preRegId: string) => {
+        if (!orgId) return;
+        if (!confirm('사전 등록을 취소하시겠습니까?')) return;
+        try {
+            await deleteDoc(doc(db, 'organizations', orgId, 'preRegistered', preRegId));
+            showToast('사전 등록이 취소되었습니다.', 'success');
+            await fetchData();
+        } catch (err) {
+            console.error('사전 등록 삭제 실패:', err);
+            showToast('삭제에 실패했습니다.', 'error');
+        }
+    };
+
     const filteredEmployees = employees.filter(emp => {
         if (!searchQuery.trim()) return true;
         const q = searchQuery.toLowerCase();
@@ -168,7 +209,7 @@ export default function useEmployeeManager() {
     const regularEmployees = employees.filter(e => e.role === 'employee');
 
     return {
-        employees, organization, loading,
+        employees, disabledEmployees, preRegisteredEmployees, organization, loading,
         showAddForm, setShowAddForm,
         newEmployee, setNewEmployee,
         inviteCodeCopied, regenerating,
@@ -177,5 +218,6 @@ export default function useEmployeeManager() {
         filteredEmployees, admins, regularEmployees,
         handleAddEmployee, handleCopyInviteCode, handleRegenerateCode,
         handleEditEmployee, handleSaveEdit, handleDeleteEmployee, handleChangeRole,
+        handleDeletePreRegistered, handleRestoreEmployee,
     };
 }

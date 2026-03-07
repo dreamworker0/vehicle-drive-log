@@ -69,11 +69,6 @@ export default function CalendarGrid({
                             title={day.holiday || ''}
                         >
                             {day.date}
-                            {day.holiday && (
-                                <div className={`text-[8px] leading-tight truncate ${isSelected ? 'text-white/80' : 'text-red-400'}`}>
-                                    {day.holiday}
-                                </div>
-                            )}
                             {hasRes && (
                                 <div className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 flex gap-0.5`}>
                                     {day.reservations.slice(0, 3).map((_, idx) => (

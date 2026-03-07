@@ -19,7 +19,10 @@ service cloud.firestore {
     }
 
     function isOrgMember(orgId) {
-      return isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.organizationId == orgId;
+      let userData = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+      return isSignedIn()
+        && userData.organizationId == orgId
+        && (!('status' in userData) || userData.status != 'disabled');
     }
 
     function isOrgAdmin(orgId) {
@@ -66,6 +69,12 @@ service cloud.firestore {
       // 커스텀 휴일 (서브컬렉션)
       match /customHolidays/{holidayId} {
         allow read: if isOrgMember(orgId);
+        allow write: if isOrgAdmin(orgId) || isSuperAdmin();
+      }
+
+      // 직원 사전 등록 (서브컬렉션)
+      match /preRegistered/{preRegId} {
+        allow read: if isOrgMember(orgId) || isSuperAdmin();
         allow write: if isOrgAdmin(orgId) || isSuperAdmin();
       }
     }

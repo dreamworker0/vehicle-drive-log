@@ -4,6 +4,7 @@
  */
 import { useState, useEffect } from 'react';
 import { getApprovedOrganizations, deleteOrganization, getDeletedOrganizations, restoreOrganization, permanentDeleteOrganization, getOrganizationMembers, updateUser, leaveOrganization, updateOrganization } from '../../lib/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useToast } from '../../hooks/useToast';
 import OrgCard from './OrgCard';
 import DeletedOrgCard from './DeletedOrgCard';
@@ -144,6 +145,26 @@ export default function OrgManagement() {
         }
     };
 
+    const handleRestoreUser = async (email: string, orgId: string, name: string) => {
+        if (!confirm(`${email} 계정을 복원하시겠습니까?\n\n• Auth 계정이 다시 활성화됩니다.\n• 이 기관의 직원으로 복원됩니다.`)) return;
+        try {
+            const restoreUser = httpsCallable(getFunctions(undefined, 'asia-northeast3'), 'restoreUser');
+            const result = await restoreUser({ email, organizationId: orgId, name: name || undefined });
+            const data = result.data as any;
+            // 멤버 목록에 추가
+            setMembersMap(prev => ({
+                ...prev,
+                [orgId]: [...(prev[orgId] || []), { id: data.uid, name: data.name, email: data.email, role: 'employee' }]
+            }));
+            showToast(`${data.name || email} 계정이 복원되었습니다.`, 'success');
+        } catch (err: any) {
+            console.error('계정 복원 실패:', err);
+            const msg = err?.message || err?.code || '계정 복원에 실패했습니다.';
+            showToast(msg, 'error');
+            throw err;
+        }
+    };
+
     const toggleExpand = (orgId: string) => {
         setExpandedOrg(prev => prev === orgId ? null : orgId);
     };
@@ -242,6 +263,7 @@ export default function OrgManagement() {
                                 onEditOrg={handleEditOrg}
                                 onRoleChange={handleRoleChange}
                                 onRemoveMember={handleRemoveMember}
+                                onRestoreUser={handleRestoreUser}
                             />
                         ))}
                     </div>

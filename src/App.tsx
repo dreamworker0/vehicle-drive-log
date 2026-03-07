@@ -127,6 +127,60 @@ function AppContent() {
     );
   }
 
+  // 3-1. 비활성화된 사용자 (관리자가 삭제한 직원)
+  if (userData.status === 'disabled') {
+    const handleTransferOrg = async () => {
+      try {
+        const { doc, updateDoc } = await import('firebase/firestore');
+        const { db } = await import('./lib/firebase');
+        await updateDoc(doc(db, 'users', user.uid), {
+          status: 'active',
+          organizationId: null,
+          role: 'employee',
+          disabledAt: null,
+        });
+      } catch (err) {
+        console.error('기관 이동 실패:', err);
+      }
+    };
+    return (
+      <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex items-center justify-center p-4">
+        <div className="glass-card max-w-md w-full p-8 text-center">
+          <div className="text-5xl mb-4">🔒</div>
+          <h2 className="text-xl font-bold text-surface-900 dark:text-surface-100 mb-2">계정이 비활성화되었습니다</h2>
+          <p className="text-surface-500 dark:text-surface-400 text-sm mb-6">
+            기관 관리자에 의해 계정이 비활성화되었습니다.<br />
+            관리자가 다시 활성화하면 이용하실 수 있습니다.
+          </p>
+          <div className="space-y-3">
+            <button
+              onClick={handleTransferOrg}
+              className="btn-primary w-full"
+            >
+              다른 기관으로 가입
+            </button>
+            <button
+              onClick={() => { import('./lib/auth').then(m => m.logout()); }}
+              className="btn-ghost w-full text-surface-500"
+            >
+              로그아웃
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // 3-2. organizationId가 없는 사용자 (비정상 상태)
+  if (!userData.organizationId && userData.role !== 'superAdmin') {
+    return (
+      <AppRoutes fallbackPath="/invite">
+        <Route path="/invite" element={<InviteCodePage />} />
+        <Route path="/apply" element={<OrgApplicationPage />} />
+      </AppRoutes>
+    );
+  }
+
   // 4-1. 기관이 삭제된 경우 (soft delete → 안내 화면)
   if (orgDeleted) {
     return (

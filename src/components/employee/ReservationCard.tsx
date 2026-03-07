@@ -52,14 +52,14 @@ export default function ReservationCard({
                             </span>
                         </span>
                         <div className="min-w-0">
-                            <p className={`${isInProgress ? 'font-bold text-amber-900 dark:text-amber-200 text-base' : 'font-medium text-surface-800 dark:text-surface-200 text-sm'}`}>{(reservation as any).vehicleName}</p>
+                            <p className={`${isInProgress ? 'font-bold text-amber-900 dark:text-amber-200 text-base' : 'font-medium text-surface-800 dark:text-surface-200 text-sm'}`}>{reservation.vehicleName || vehicle?.displayName || vehicle?.name || ''}</p>
                             <p className={`text-xs ${isInProgress ? 'text-amber-700/70 dark:text-amber-300/80' : 'text-surface-500 dark:text-surface-300'}`}>
                                 {reservation.startTime} ~ {reservation.endTime}
                                 {reservation.destination && ` · ${reservation.destination}`}
                             </p>
                             {(reservation as any).routeDistance && (
                                 <p className="text-xs text-blue-500 flex items-center gap-2 mt-0.5">
-                                    <span>📍{Math.floor((reservation as any).routeDistance)}km</span>
+                                    <span>↔{Math.floor((reservation as any).routeDistance)}km</span>
                                     <span>⏱{(reservation as any).routeDuration}분</span>
                                     {(reservation as any).routeTollFee > 0 && <span>₩{(reservation as any).routeTollFee.toLocaleString()}</span>}
                                 </p>

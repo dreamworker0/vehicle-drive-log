@@ -41,7 +41,7 @@ export default function useQuickDriveStart() {
     const orgId = userData?.organizationId;
 
     useEffect(() => {
-        if (!orgId) return;
+        if (!orgId) { setLoading(false); return; }
         const fetch = async () => {
             try {
                 const [v, favs, org] = await Promise.all([

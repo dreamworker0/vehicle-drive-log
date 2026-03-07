@@ -55,7 +55,7 @@ export default function MonthlyReport() {
         activePeriod, setPeriod,
         filteredLogs, stats, driverData, vehicleData, purposeData,
         vehicleFuelData, dailyTrendData, dayOfWeekData, hourlyData,
-        exportCSV,
+        exportExcel,
     } = useMonthlyReport();
 
     const [activeTab, setActiveTab] = useState('charts');
@@ -74,11 +74,11 @@ export default function MonthlyReport() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
                 <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100">운행 통계 보고서</h1>
                 <button
-                    onClick={exportCSV}
+                    onClick={exportExcel}
                     disabled={filteredLogs.length === 0}
                     className="btn-secondary btn-sm text-xs"
                 >
-                    CSV 내보내기
+                    📥 엑셀 다운로드
                 </button>
             </div>
 

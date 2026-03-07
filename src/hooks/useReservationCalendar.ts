@@ -74,7 +74,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
 
     // 초기 데이터 로드
     useEffect(() => {
-        if (!user || !userData?.organizationId) return;
+        if (!user || !userData?.organizationId) { setLoading(false); return; }
 
         const fetchData = async () => {
             try {
@@ -268,15 +268,30 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
 
         setSubmitting(true);
         try {
+            // 선택된 차량 이름 조회
+            const selectedVehicle = vehicles.find(v => v.id === form.vehicleId);
+            const vehicleName = selectedVehicle?.displayName || selectedVehicle?.name || '';
+
+            // 경로 정보 (routeInfo가 있으면 포함)
+            const routeData = routeInfo ? {
+                routeDistance: routeInfo.distance,
+                routeDuration: routeInfo.duration,
+                routeTollFee: routeInfo.tollFee || 0,
+            } : {};
+
             if (editingReservation) {
                 await updateReservation(editingReservation.id, {
                     ...form,
+                    vehicleName,
+                    ...routeData,
                     organizationId: userData.organizationId,
                 });
                 showToast('예약이 수정되었습니다.');
             } else {
                 await createReservation({
                     ...form,
+                    vehicleName,
+                    ...routeData,
                     date: selectedDate,
                     reservedByUid: user.uid,
                     reservedByName: userData.name || user.email || '익명',

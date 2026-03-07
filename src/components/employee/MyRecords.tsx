@@ -17,7 +17,7 @@ export default function MyRecords() {
     const searchInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        if (!user?.uid || !userData?.organizationId) return;
+        if (!user?.uid || !userData?.organizationId) { setLoading(false); return; }
         const fetch = async () => {
             try {
                 const data = await getMyDriveLogs(userData.organizationId!, user.uid, 50);

@@ -5,8 +5,8 @@ import { logout } from '../../lib/auth';
 import { subscribePendingOrganizations, subscribeApprovedOrganizations, subscribeFeedbacks } from '../../lib/firestore';
 import { SA_TEST_ROLE_KEY } from '../../App';
 import { useTheme } from '../../contexts/ThemeContext';
-import useNotification from '../../hooks/useNotification';
-import { useToast } from '../../hooks/useToast';
+
+
 import { lazyWithRetry } from '../../lib/lazyWithRetry';
 
 const OrgApplicationList = lazyWithRetry(() => import('./OrgApplicationList'));
@@ -49,9 +49,7 @@ export default function SuperAdminLayout() {
     const [activeOrgCount, setActiveOrgCount] = useState(0);
     const [feedbackCount, setFeedbackCount] = useState(0);
     const { isDark, toggleTheme } = useTheme();
-    const { permission, requestPermission } = useNotification();
-    const { showToast } = useToast();
-    const notifApiAvailable = typeof window !== 'undefined' && 'Notification' in window;
+
 
     // 사이드바 배지 카운트 실시간 구독
     useEffect(() => {
@@ -170,41 +168,6 @@ export default function SuperAdminLayout() {
 
                 <div className="p-3 border-t border-surface-100 dark:border-surface-700 space-y-1">
 
-                    {/* 알림 설정 */}
-                    {notifApiAvailable && (
-                        <div
-                            className="flex items-center justify-between px-3 py-2 rounded-lg cursor-pointer hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors"
-                            onClick={() => {
-                                if (permission === 'default') {
-                                    requestPermission();
-                                } else {
-                                    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-                                    const isAndroid = /Android/.test(navigator.userAgent);
-                                    if (isIOS) {
-                                        showToast('설정 → 알림에서 이 앱의 알림을 변경할 수 있습니다.', 'info');
-                                    } else if (isAndroid) {
-                                        showToast('앱 아이콘을 길게 눌러 앱 정보 → 알림에서 변경할 수 있습니다.', 'info');
-                                    } else {
-                                        showToast('주소창 왼쪽 🔒 아이콘을 눌러 알림을 변경할 수 있습니다.', 'info');
-                                    }
-                                }
-                            }}
-                        >
-                            <div className="flex items-center gap-3">
-                                <svg className={`w-5 h-5 ${permission === 'granted' ? 'text-blue-500' : 'text-surface-400'}`} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
-                                </svg>
-                                <span className="text-sm text-surface-600 dark:text-surface-300">알림</span>
-                            </div>
-                            {permission === 'default' ? (
-                                <span className="text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 rounded-full">활성화</span>
-                            ) : permission === 'granted' ? (
-                                <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2.5 py-1 rounded-full">켜짐</span>
-                            ) : (
-                                <span className="text-xs font-medium text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/30 px-2.5 py-1 rounded-full">꺼짐</span>
-                            )}
-                        </div>
-                    )}
 
                     <div className="flex items-center justify-between px-3 py-2 rounded-lg">
                         <div className="flex items-center gap-3">

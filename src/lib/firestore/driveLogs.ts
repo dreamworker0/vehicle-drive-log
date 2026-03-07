@@ -187,6 +187,17 @@ export const getVehicleDriveLogs = async (vehicleId: string) => {
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
 };
 
+// 차량에 운행일지가 1건이라도 있는지 확인
+export const hasVehicleDriveLogs = async (vehicleId: string): Promise<boolean> => {
+    const q = query(
+        collection(db, 'driveLogs'),
+        where('vehicleId', '==', vehicleId),
+        limit(1)
+    );
+    const snap = await getDocs(q);
+    return !snap.empty;
+};
+
 // 운행일지 중복 정리 (Cloud Function 호출)
 export const cleanupDuplicateLogs = async (organizationId: string, { dryRun = true } = {}) => {
     const { getFunctions, httpsCallable } = await import('firebase/functions');

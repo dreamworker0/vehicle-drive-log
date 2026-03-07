@@ -38,7 +38,7 @@ export default function WeekReservationList({
                                                 {VEHICLE_TYPE_ICONS[vehicle?.vehicleType ?? ''] || '🚗'}
                                             </span>
                                             <div className="flex-1 min-w-0">
-                                                <p className="text-sm font-medium text-surface-800 dark:text-surface-200 truncate">{(res as any).vehicleName}</p>
+                                                <p className="text-sm font-medium text-surface-800 dark:text-surface-200 truncate">{res.vehicleName || vehicle?.displayName || vehicle?.name || ''}</p>
                                                 <p className="text-xs text-surface-400">
                                                     {res.startTime} ~ {res.endTime}
                                                     {res.destination && ` · ${res.destination}`}

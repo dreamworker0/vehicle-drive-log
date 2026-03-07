@@ -81,7 +81,7 @@ export default function SuperAdminManager() {
                         value={email}
                         onChange={e => setEmail(e.target.value)}
                         placeholder="이메일 주소 입력"
-                        className="flex-1 input-field text-sm"
+                        className="flex-1 input text-sm"
                         disabled={adding}
                         required
                     />

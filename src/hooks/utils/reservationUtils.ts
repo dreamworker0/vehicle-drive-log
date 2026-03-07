@@ -64,7 +64,10 @@ export function findOverlappingReservation(reservations: Record<string, any>[], 
  */
 export function calcEndTime(startTime: string, durationMin = 0) {
     const [h, m] = startTime.split(':').map(Number);
-    const totalMin = h * 60 + m + (durationMin * 2) + 60;
+    const addMin = (durationMin * 2) + 60;
+    // 10분 단위 올림
+    const roundedAdd = Math.ceil(addMin / 10) * 10;
+    const totalMin = h * 60 + m + roundedAdd;
     const cappedMin = Math.min(totalMin, 23 * 60 + 59);
     return `${String(Math.floor(cappedMin / 60)).padStart(2, '0')}:${String(cappedMin % 60).padStart(2, '0')}`;
 }

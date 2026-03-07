@@ -55,6 +55,7 @@ export {
     getMyDriveLogs,
     updateDriveLog,
     getVehicleDriveLogs,
+    hasVehicleDriveLogs,
     cleanupDuplicateLogs,
     syncNextLogStartKm,
 } from './driveLogs';
@@ -109,6 +110,7 @@ export {
     createFeedback,
     getAllFeedbacks,
     updateFeedback,
+    deleteFeedback,
     subscribeFeedbacks,
 } from './feedbacks';
 

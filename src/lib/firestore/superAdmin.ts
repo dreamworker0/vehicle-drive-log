@@ -36,7 +36,6 @@ export const addSuperAdmin = async (email: string) => {
     if ((user as Record<string, any>).role === 'superAdmin') throw new Error('이미 슈퍼관리자입니다.');
     await updateDoc(doc(db, 'users', user.id), {
         role: 'superAdmin',
-        organizationId: null,
         promotedAt: serverTimestamp(),
     });
     return user;
@@ -47,6 +46,5 @@ export const removeSuperAdmin = async (uid: string, currentAdminCount: number) =
     if (currentAdminCount <= 1) throw new Error('최소 1명의 슈퍼관리자가 필요합니다.');
     await updateDoc(doc(db, 'users', uid), {
         role: 'employee',
-        organizationId: null,
     });
 };

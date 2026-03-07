@@ -33,7 +33,10 @@ export default function useTodayDashboard() {
     }, []);
 
     useEffect(() => {
-        if (!orgId) return;
+        if (!orgId) {
+            setLoading(false);
+            return;
+        }
         const fetch = async () => {
             try {
                 const [v, r, wr, myLogs] = await Promise.all([

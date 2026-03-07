@@ -75,7 +75,7 @@ export default function useMonthlyReport() {
     }, []);
 
     useEffect(() => {
-        if (!orgId) return;
+        if (!orgId) { setLoading(false); return; }
         const fetch = async () => {
             setLoading(true);
             try {
@@ -272,9 +272,11 @@ export default function useMonthlyReport() {
         }));
     }, [stats.byHour]);
 
-    // CSV 내보내기
-    const exportCSV = useCallback(() => {
+    // 엑셀 내보내기
+    const exportExcel = useCallback(async () => {
         if (filteredLogs.length === 0) return;
+
+        const XLSX = await import('xlsx');
 
         const headers = ['날짜', '운전자', '차량', '도착지', '출발(km)', '도착(km)', '주행거리(km)', '목적', '출발시간', '도착시간'];
         const rows = filteredLogs.map(l => [
@@ -282,23 +284,34 @@ export default function useMonthlyReport() {
             l.driverName || '',
             l.vehicleDisplayName || l.vehicleName || '',
             l.destination || '',
-            l.startKm || '',
-            l.endKm || '',
+            l.startKm || 0,
+            l.endKm || 0,
             (l.endKm - l.startKm) || 0,
             l.purpose || '',
             l.startTime || '',
             l.endTime || '',
         ]);
 
-        const bom = '\uFEFF';
-        const csvContent = bom + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = `운행통계_${startDate}_${endDate}.csv`;
-        link.click();
-        URL.revokeObjectURL(url);
+        const wsData = [headers, ...rows];
+        const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+        // 컬럼 너비 자동 설정
+        ws['!cols'] = [
+            { wch: 12 }, // 날짜
+            { wch: 10 }, // 운전자
+            { wch: 14 }, // 차량
+            { wch: 16 }, // 도착지
+            { wch: 10 }, // 출발(km)
+            { wch: 10 }, // 도착(km)
+            { wch: 12 }, // 주행거리
+            { wch: 12 }, // 목적
+            { wch: 10 }, // 출발시간
+            { wch: 10 }, // 도착시간
+        ];
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, '운행일지');
+        XLSX.writeFile(wb, `운행통계_${startDate}_${endDate}.xlsx`);
     }, [filteredLogs, startDate, endDate]);
 
     return {
@@ -307,6 +320,6 @@ export default function useMonthlyReport() {
         activePeriod, setPeriod,
         filteredLogs, stats, driverData, vehicleData, purposeData,
         vehicleFuelData, dailyTrendData, dayOfWeekData, hourlyData,
-        exportCSV,
+        exportExcel,
     };
 }

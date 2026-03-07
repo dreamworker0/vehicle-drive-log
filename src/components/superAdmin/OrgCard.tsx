@@ -1,6 +1,6 @@
 /**
  * OrgCard — 활성 기관 카드 (OrgManagement에서 분리)
- * 기관명·주소 인라인 편집 지원
+ * 기관명·주소 인라인 편집 + 계정 복원 지원
  */
 import { useState } from 'react';
 import { formatTimestampFull } from '../../lib/dateUtils';
@@ -23,12 +23,13 @@ interface OrgCardProps {
     onEditOrg: (orgId: string, updates: { name: string; address: string }) => Promise<void>;
     onRoleChange: (member: OrgMember, orgId: string, newRole: string) => void;
     onRemoveMember: (member: OrgMember, orgId: string) => void;
+    onRestoreUser: (email: string, orgId: string, name: string) => Promise<void>;
 }
 
 
 export default function OrgCard({
     org, members, isExpanded, changingRole,
-    onToggle, onDelete, onEditOrg, onRoleChange, onRemoveMember,
+    onToggle, onDelete, onEditOrg, onRoleChange, onRemoveMember, onRestoreUser,
 }: OrgCardProps) {
     // 익명 계정 필터링 (이름이 없거나 '-'인 계정 제외)
     const visibleMembers = members.filter(m => m.name && m.name !== '-');
@@ -37,6 +38,11 @@ export default function OrgCard({
     const [editing, setEditing] = useState(false);
     const [editForm, setEditForm] = useState({ name: '', address: '' });
     const [saving, setSaving] = useState(false);
+
+    // 계정 복원 상태
+    const [showRestore, setShowRestore] = useState(false);
+    const [restoreForm, setRestoreForm] = useState({ email: '', name: '' });
+    const [restoring, setRestoring] = useState(false);
 
     const startEdit = (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -137,6 +143,17 @@ export default function OrgCard({
                                     </svg>
                                 </div>
                                 <div className="flex flex-wrap gap-3 text-sm text-surface-500 dark:text-surface-400">
+                                    <span
+                                        className="cursor-pointer hover:text-primary-500 transition-colors"
+                                        title="클릭하여 기관 ID 복사"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            navigator.clipboard.writeText(org.id);
+                                        }}
+                                    >
+                                        ID: <code className="bg-surface-100 dark:bg-surface-700 px-1 py-0.5 rounded text-xs font-mono">{org.id.slice(0, 8)}…</code>
+                                    </span>
+                                    <span>•</span>
                                     <span>고유번호: {org.uniqueNumber}</span>
                                     <span>•</span>
                                     <span>직원 {visibleMembers.length}명</span>
@@ -250,6 +267,74 @@ export default function OrgCard({
                             </table>
                         </div>
                     )}
+
+                    {/* 계정 복원 섹션 */}
+                    <div className="border-t border-surface-200 dark:border-surface-600 p-4">
+                        {!showRestore ? (
+                            <button
+                                onClick={() => setShowRestore(true)}
+                                className="flex items-center gap-2 text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
+                            >
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182M2.985 19.644l3.181-3.18" />
+                                </svg>
+                                삭제된 계정 복원
+                            </button>
+                        ) : (
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-sm font-medium text-surface-700 dark:text-surface-300 flex items-center gap-1.5">
+                                        <svg className="w-4 h-4 text-primary-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182M2.985 19.644l3.181-3.18" />
+                                        </svg>
+                                        계정 복원
+                                    </h4>
+                                    <button
+                                        onClick={() => { setShowRestore(false); setRestoreForm({ email: '', name: '' }); }}
+                                        className="text-xs text-surface-400 hover:text-surface-600 transition-colors"
+                                    >
+                                        닫기
+                                    </button>
+                                </div>
+                                <p className="text-xs text-surface-400 dark:text-surface-500">
+                                    삭제(비활성화)된 직원의 이메일을 입력하면 계정을 복원합니다.
+                                </p>
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={restoreForm.name}
+                                        onChange={e => setRestoreForm(prev => ({ ...prev, name: e.target.value }))}
+                                        className="input text-sm flex-[1]"
+                                        placeholder="이름"
+                                    />
+                                    <input
+                                        type="email"
+                                        value={restoreForm.email}
+                                        onChange={e => setRestoreForm(prev => ({ ...prev, email: e.target.value }))}
+                                        className="input text-sm flex-[2]"
+                                        placeholder="이메일"
+                                    />
+                                    <button
+                                        onClick={async () => {
+                                            if (!restoreForm.email.trim()) return;
+                                            setRestoring(true);
+                                            try {
+                                                await onRestoreUser(restoreForm.email.trim(), org.id, restoreForm.name.trim());
+                                                setRestoreForm({ email: '', name: '' });
+                                                setShowRestore(false);
+                                            } finally {
+                                                setRestoring(false);
+                                            }
+                                        }}
+                                        disabled={restoring || !restoreForm.email.trim()}
+                                        className="btn-primary btn-sm text-xs whitespace-nowrap"
+                                    >
+                                        {restoring ? <><div className="w-3 h-3 spinner" />복원 중...</> : '복원'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
         </div>

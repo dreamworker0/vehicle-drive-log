@@ -31,7 +31,7 @@ export default function useAnalytics() {
     const [rangeMonths, setRangeMonths] = useState(6); // 기본 6개월
 
     useEffect(() => {
-        if (!orgId) return;
+        if (!orgId) { setLoading(false); return; }
         const fetchAll = async () => {
             setLoading(true);
             try {
