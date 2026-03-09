@@ -4,7 +4,7 @@
 import { useState, useRef, useCallback } from 'react';
 import {
     snapMinutes, minutesToTime, getPercent,
-    RANGE_START, TOTAL_MINUTES, SNAP_MINUTES,
+    RANGE_START, RANGE_END, SNAP_MINUTES,
 } from '../lib/timelineUtils';
 
 interface DragState {
@@ -18,9 +18,12 @@ interface DragState {
 /**
  * 타임라인 바 드래그 선택 훅
  * @param {Function} onSlotClick - 슬롯 선택 콜백 (vehicleId, startTime, endTime)
+ * @param {number} [dynamicStart] - 동적 시작점(분). 오늘 모드에서 현재 시각 기준으로 사용
  * @returns {object} 드래그 관련 상태 및 핸들러
  */
-export default function useTimelineDrag(onSlotClick?: (vehicleId: string, startTime: string, endTime: string) => void) {
+export default function useTimelineDrag(onSlotClick?: (vehicleId: string, startTime: string, endTime: string) => void, dynamicStart?: number) {
+    const rangeStart = dynamicStart ?? RANGE_START;
+    const totalMinutes = RANGE_END - rangeStart;
     // 드래그 상태: { vehicleId, gapStart, gapEnd, startMin, currentMin }
     const [dragState, setDragState] = useState<DragState | null>(null);
     // 각 차량 바의 DOM 참조 (vehicleId -> ref)
@@ -29,11 +32,11 @@ export default function useTimelineDrag(onSlotClick?: (vehicleId: string, startT
     // 클라이언트 X 좌표를 분 단위로 변환 (바 DOM 기준)
     const clientXToMinutes = useCallback((clientX: number, vehicleId: string) => {
         const bar = (barRefs.current as Record<string, HTMLDivElement | null>)[vehicleId];
-        if (!bar) return RANGE_START;
+        if (!bar) return rangeStart;
         const rect = bar.getBoundingClientRect();
         const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-        return snapMinutes(RANGE_START + ratio * TOTAL_MINUTES);
-    }, []);
+        return snapMinutes(rangeStart + ratio * totalMinutes);
+    }, [rangeStart, totalMinutes]);
 
     const handleDragStart = useCallback((e: React.MouseEvent | React.TouchEvent, vehicleId: string, gapStart: number, gapEnd: number) => {
         e.preventDefault();
@@ -82,10 +85,10 @@ export default function useTimelineDrag(onSlotClick?: (vehicleId: string, startT
         if (!dragState) return null;
         const selStart = Math.min(dragState.startMin, dragState.currentMin);
         const selEnd = Math.max(dragState.startMin, dragState.currentMin);
-        const left = getPercent(selStart);
-        const width = getPercent(selEnd) - left;
+        const left = getPercent(selStart, rangeStart);
+        const width = getPercent(selEnd, rangeStart) - left;
         return { left, width, selStart, selEnd };
-    }, [dragState]);
+    }, [dragState, rangeStart]);
 
     return {
         dragState,

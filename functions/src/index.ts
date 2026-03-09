@@ -74,3 +74,6 @@ export { disableUser } from "./disableUser";
 
 // 계정 복원 (Auth 재활성화 + Firestore 재생성)
 export { restoreUser } from "./restoreUser";
+
+// Custom Claims 자동 동기화 (users 문서 변경 → Auth Claims 설정)
+export { setCustomClaims } from "./setCustomClaims";

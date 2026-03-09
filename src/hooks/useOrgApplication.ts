@@ -143,6 +143,14 @@ export default function useOrgApplication() {
             setError('필수 항목을 모두 입력해주세요.');
             return;
         }
+
+        // 종교단체 신청 차단
+        const BLOCKED_KEYWORDS = ['교회'];
+        if (BLOCKED_KEYWORDS.some(kw => form.orgName.includes(kw))) {
+            setError('죄송합니다. 종교단체는 현재 서비스 대상이 아닙니다.');
+            return;
+        }
+
         if (!imageFile) {
             setError('비영리 증빙서류를 업로드해주세요.');
             return;

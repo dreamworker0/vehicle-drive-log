@@ -12,24 +12,58 @@ interface Feature {
 
 const FEATURES: Feature[] = [
     {
+        icon: '🤖',
+        title: 'AI 계기판 인식',
+        desc: '계기판을 촬영하면 Gemini AI가 주행거리를 자동으로 읽어 입력합니다. 전기차 배터리 잔량도 한 번에 인식.',
+    },
+    {
         icon: '📝',
         title: '운행일지 자동화',
-        desc: '계기판 촬영 한 번이면 주행거리가 자동 입력됩니다. 출발·도착 Km, 목적지, 동승자까지 간편하게 기록하세요.',
+        desc: '즐겨찾기·빠른 출발로 반복 입력은 터치 한 번에. 예약 연동 시 차량·목적지·시간이 자동으로 채워집니다.',
     },
     {
         icon: '📅',
         title: '차량 예약 시스템',
-        desc: '달력에서 빈 시간을 골라 예약하면 끝. 중복 예약을 자동 차단하고, 예약 시간이 다가오면 알림을 보내드립니다.',
+        desc: '타임라인에서 빈 시간을 골라 예약하면 끝. 구글 캘린더와 양방향 동기화되어 일정 관리가 더 편리합니다.',
+    },
+    {
+        icon: '🗺️',
+        title: '길안내 앱 연동',
+        desc: '네이버맵·카카오맵·티맵 중 원하는 앱을 골라 길안내를 시작하세요. 예상 거리·시간·톨비도 미리 확인.',
     },
     {
         icon: '📊',
-        title: '통계 & 출력',
-        desc: '월별 운행 통계, 직원별·목적별 현황을 한눈에. 공식 양식 PDF와 Excel로 바로 다운로드할 수 있습니다.',
+        title: '통계·분석·출력',
+        desc: '월별 운행 통계, 비용 분석 리포트, 직원별·목적별 현황을 한눈에. PDF·Excel로 바로 다운로드하세요.',
     },
     {
-        icon: '📱',
-        title: '앱처럼 설치',
-        desc: 'iPhone, Android 모두 지원. 홈 화면에 추가하면 네이티브 앱처럼 바로 실행할 수 있습니다.',
+        icon: '🔧',
+        title: '정비 기록 관리',
+        desc: '정기 점검, 부품 교체, 수리 이력을 차량별로 체계적으로 관리합니다. 정비 중 차량 사용 자동 차단.',
+    },
+];
+
+interface Step {
+    num: string;
+    title: string;
+    desc: string;
+}
+
+const STEPS: Step[] = [
+    {
+        num: '1',
+        title: '기관 신청',
+        desc: '고유번호증 사진 한 장이면 AI가 자동 심사합니다. 빠르면 즉시 승인!',
+    },
+    {
+        num: '2',
+        title: '직원 초대',
+        desc: '6자리 초대 코드를 직원에게 공유하세요. 구글 로그인만으로 바로 합류.',
+    },
+    {
+        num: '3',
+        title: '바로 사용',
+        desc: '차량 등록 후 예약하고, 운행하고, 일지를 자동 작성하세요.',
     },
 ];
 
@@ -39,10 +73,16 @@ interface SubFeature {
 }
 
 const SUB_FEATURES: SubFeature[] = [
-    { icon: '🗺️', label: '티맵 내비 연동' },
-    { icon: '📴', label: '오프라인 지원' },
+    { icon: '⭐', label: '즐겨찾기·빠른 출발' },
+    { icon: '📆', label: '구글 캘린더 연동' },
     { icon: '🔔', label: '푸시 알림' },
+    { icon: '📴', label: '오프라인 지원' },
+    { icon: '🌙', label: '다크 모드' },
+    { icon: '🔠', label: '글꼴 크기 조절' },
     { icon: '🔒', label: '기관별 데이터 격리' },
+    { icon: '💾', label: '매일 자동 백업' },
+    { icon: '📖', label: '사용 매뉴얼·영상 가이드' },
+    { icon: '💬', label: '의견 보내기' },
 ];
 
 export default function LandingPage() {
@@ -68,11 +108,11 @@ export default function LandingPage() {
 
                 <h1 className="text-3xl sm:text-4xl font-bold mb-3 animate-fade-in">차량 운행일지</h1>
                 <p className="text-primary-200 text-base sm:text-lg max-w-md mb-2 animate-fade-in">
-                    사회복지기관·비영리단체 전용
+                    사회복지기관·비영리단체 전용 (종교단체 제외)
                 </p>
                 <p className="text-primary-300/80 text-sm max-w-sm mb-8 animate-fade-in">
-                    차량 운행 기록부터 예약, 통계, 출력까지.<br />
-                    복잡한 서류 업무를 스마트하게 해결합니다.
+                    AI 계기판 인식, 예약, 길안내, 정비, 통계, 출력까지.<br />
+                    차량 관리의 모든 것을 하나로 해결합니다.
                 </p>
 
                 <div className="flex flex-col sm:flex-row gap-3 w-full max-w-xs sm:max-w-md animate-fade-in">
@@ -93,11 +133,29 @@ export default function LandingPage() {
                 <p className="mt-4 text-primary-300/60 text-xs">✨ 완전 무료 · 광고 없음</p>
             </header>
 
+            {/* ─── 3단계로 시작하세요 ─── */}
+            <section className="relative bg-primary-800/50 backdrop-blur-sm px-4 py-12 sm:py-16">
+                <div className="max-w-3xl mx-auto">
+                    <h2 className="text-2xl font-bold text-center mb-10">3단계로 시작하세요</h2>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                        {STEPS.map((s) => (
+                            <div key={s.num} className="text-center">
+                                <div className="w-12 h-12 mx-auto mb-4 bg-white/10 rounded-full flex items-center justify-center text-xl font-bold border border-white/20">
+                                    {s.num}
+                                </div>
+                                <h3 className="text-lg font-semibold mb-2">{s.title}</h3>
+                                <p className="text-primary-200/80 text-sm leading-relaxed">{s.desc}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            </section>
+
             {/* ─── 주요 기능 ─── */}
             <section className="relative bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 px-4 py-16 sm:py-20">
                 <div className="max-w-4xl mx-auto">
                     <h2 className="text-2xl font-bold text-center mb-10">주요 기능</h2>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                         {FEATURES.map((f) => (
                             <div
                                 key={f.title}
@@ -130,11 +188,11 @@ export default function LandingPage() {
                     <h2 className="text-xl font-bold mb-4">누가 사용할 수 있나요?</h2>
                     <p className="text-surface-600 dark:text-surface-400 text-sm leading-relaxed mb-6">
                         사회복지법인, 사회복지시설, 비영리사단법인·재단법인 등<br />
-                        <strong>고유번호증 또는 사업자등록증을 보유한 비영리단체</strong>라면 누구나 신청할 수 있습니다.
+                        <strong>고유번호증 또는 사업자등록증을 보유한 비영리단체(종교단체 제외)</strong>라면 누구나 신청할 수 있습니다.
                     </p>
                     <div className="inline-flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-2 text-sm">
                         <span>⚠️</span>
-                        <span>영리 목적의 일반 기업은 이용 대상이 아닙니다</span>
+                        <span>영리 기업 및 종교단체(교회, 사찰, 성당 등)는 이용 대상이 아닙니다</span>
                     </div>
                 </div>
             </section>

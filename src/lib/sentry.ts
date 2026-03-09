@@ -28,6 +28,8 @@ export function initSentry() {
             /Object Not Found Matching Id/,
             // iOS 인앱 브라우저 IndexedDB 연결 끊김 (환경 제한, 앱 버그 아님)
             /Connection to Indexed Database server lost/,
+            // Facebook 인앱 브라우저 WebView 내부 에러 (앱 버그 아님)
+            /Java object is gone/,
         ],
         // 브라우저 확장 프로그램 에러 제외
         denyUrls: [

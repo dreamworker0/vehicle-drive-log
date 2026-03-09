@@ -5,6 +5,13 @@
 
 export const ADMIN_SECTIONS = [
     {
+        title: '🎬 영상으로 배우기',
+        content: [
+            { text: '사용법을 영상으로 쉽게 확인하세요.', type: 'tip' },
+            { text: '▶ 관리자 사용법 영상 보기', type: 'link', url: 'https://youtu.be/XdT5Wm_pd3s?t=286' },
+        ],
+    },
+    {
         title: '📊 대시보드',
         content: [
             { text: '기관 전체 현황을 한눈에 확인할 수 있습니다.' },
@@ -115,6 +122,13 @@ export const ADMIN_SECTIONS = [
 ];
 
 export const EMPLOYEE_SECTIONS = [
+    {
+        title: '🎬 영상으로 배우기',
+        content: [
+            { text: '사용법을 영상으로 쉽게 확인하세요.', type: 'tip' },
+            { text: '▶ 직원 사용법 영상 보기', type: 'link', url: 'https://youtu.be/XdT5Wm_pd3s?t=739' },
+        ],
+    },
     {
         title: '🏠 오늘',
         content: [

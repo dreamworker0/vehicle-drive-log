@@ -46,11 +46,14 @@ export const snapMinutes = (mins: number) => Math.round(mins / SNAP_MINUTES) * S
 /**
  * 분 단위 시각을 타임라인 퍼센트로 변환
  * @param {number} minutes - 분 단위 시각
+ * @param {number} [dynamicStart] - 동적 시작점(분). 오늘 모드에서 현재 시각 기준으로 사용
  * @returns {number} 0~100 퍼센트
  */
-export const getPercent = (minutes: number) => {
-    const clamped = Math.max(RANGE_START, Math.min(RANGE_END, minutes));
-    return ((clamped - RANGE_START) / TOTAL_MINUTES) * 100;
+export const getPercent = (minutes: number, dynamicStart?: number) => {
+    const start = dynamicStart ?? RANGE_START;
+    const total = RANGE_END - start;
+    const clamped = Math.max(start, Math.min(RANGE_END, minutes));
+    return total > 0 ? ((clamped - start) / total) * 100 : 0;
 };
 
 /**
@@ -87,11 +90,15 @@ export const getGaps = (vReservations: TimelineReservation[], isToday: boolean, 
 
 /**
  * 시간 눈금 라벨 배열 생성 (3시간 간격)
+ * @param {number} [dynamicStartHour] - 동적 시작 시간(시). 생략 시 TIMELINE_START 사용
  * @returns {number[]} 시간 배열
  */
-export const getHourLabels = () => {
+export const getHourLabels = (dynamicStartHour?: number) => {
+    const startHour = dynamicStartHour ?? TIMELINE_START;
     const labels: number[] = [];
-    for (let h = TIMELINE_START; h <= TIMELINE_END; h += 3) {
+    // 시작 시간을 3시간 간격으로 올림
+    const firstLabel = Math.ceil(startHour / 3) * 3;
+    for (let h = firstLabel; h <= TIMELINE_END; h += 3) {
         labels.push(h);
     }
     return labels;

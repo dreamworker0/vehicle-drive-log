@@ -33,7 +33,7 @@ describe('ADMIN_SECTIONS', () => {
     });
 
     it('type은 허용된 값만 사용', () => {
-        const allowedTypes = ['tip', 'warning', 'step', undefined];
+        const allowedTypes = ['tip', 'warning', 'step', 'link', undefined];
         ADMIN_SECTIONS.forEach(section => {
             section.content.forEach(item => {
                 expect(allowedTypes).toContain(item.type);

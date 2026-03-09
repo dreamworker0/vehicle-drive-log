@@ -29,6 +29,7 @@ export interface DriveLog extends FirestoreDoc {
     isRetroactive?: boolean;
     isIncomplete?: boolean;
     reservationId?: string;
+    inputMethod?: 'ocr' | 'manual';
     createdAt?: TimestampField;
     editedAt?: TimestampField;
 }

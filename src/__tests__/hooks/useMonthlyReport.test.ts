@@ -63,14 +63,14 @@ describe('useMonthlyReport', () => {
         expect(result.current.stats).toBeDefined();
     });
 
-    it('exportCSV 함수가 존재한다', async () => {
+    it('exportExcel 함수가 존재한다', async () => {
         const { result } = renderHook(() => useMonthlyReport());
 
         await waitFor(() => {
             expect(result.current.loading).toBe(false);
         });
 
-        expect(typeof result.current.exportCSV).toBe('function');
+        expect(typeof result.current.exportExcel).toBe('function');
     });
 
     it('activePeriod와 setPeriod가 존재한다', async () => {

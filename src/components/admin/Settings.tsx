@@ -66,7 +66,20 @@ export default function Settings() {
                     </div>
                     <div>
                         <label className="label">주소</label>
-                        <input type="text" value={form.address} className="input opacity-60 cursor-not-allowed" disabled placeholder="기관 주소" />
+                        {form.address ? (
+                            <input type="text" value={form.address} className="input opacity-60 cursor-not-allowed" disabled />
+                        ) : (
+                            <input
+                                type="text"
+                                value={form.address}
+                                onChange={e => setForm({ ...form, address: e.target.value })}
+                                className="input"
+                                placeholder="AI가 주소를 읽지 못한 경우 직접 입력해주세요"
+                            />
+                        )}
+                        <p className="text-xs text-surface-400 mt-1">
+                            💡 주소를 입력하면 예약 시 목적지까지의 소요 시간, 거리, 톨게이트비가 자동으로 계산됩니다.
+                        </p>
                     </div>
                     <div>
                         <label className="label">관리자 이메일</label>
@@ -84,7 +97,7 @@ export default function Settings() {
                         <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
                         </svg>
-                        기관명·주소 변경은 슈퍼관리자에게 요청하세요.
+                        기관명 변경은 슈퍼관리자에게 요청하세요.
                     </button>
                     <div className="flex justify-end">
                         <button type="submit" disabled={saving} className="btn-primary">

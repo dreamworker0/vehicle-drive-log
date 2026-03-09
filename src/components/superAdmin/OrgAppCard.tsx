@@ -12,6 +12,7 @@ interface OrgAppCardProps {
     onApprove: (app: Organization) => void;
     onReject: (app: Organization) => void;
     onDelete: (app: Organization) => void;
+    onMoveToPending: (app: Organization) => void;
     onAiReanalyze: (app: Organization) => void;
     onToggleImage: (id: string) => void;
 }
@@ -24,6 +25,7 @@ export default function OrgAppCard({
     onApprove,
     onReject,
     onDelete,
+    onMoveToPending,
     onAiReanalyze,
     onToggleImage,
 }: OrgAppCardProps) {
@@ -243,7 +245,16 @@ export default function OrgAppCard({
                 )}
 
                 {tab === 'rejected' && (
-                    <div>
+                    <div className="flex md:flex-col gap-2">
+                        <button
+                            onClick={() => onMoveToPending(app)}
+                            disabled={!!actionLoading[app.id]}
+                            className="btn-sm text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 border border-amber-200 dark:border-amber-700 hover:border-amber-300 dark:hover:border-amber-600 rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+                        >
+                            {actionLoading[app.id] === 'moveToPending' ? (
+                                <div className="w-4 h-4 spinner" />
+                            ) : '대기중으로'}
+                        </button>
                         <button
                             onClick={() => onDelete(app)}
                             disabled={!!actionLoading[app.id]}

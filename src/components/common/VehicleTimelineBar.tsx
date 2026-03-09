@@ -16,7 +16,7 @@ import type { Vehicle } from '../../types/vehicle';
 import type { Reservation } from '../../types/reservation';
 import type { User } from '../../types/user';
 
-const hourLabels = getHourLabels();
+// hourLabels는 동적 시작점에 따라 컴포넌트 내부에서 계산
 
 interface VehicleTimelineBarProps {
     vehicles: Vehicle[];
@@ -35,19 +35,7 @@ export default function VehicleTimelineBar({
     vehicles, reservations, onSlotClick, isPastDate, isToday,
     onEdit, onCancel, user, isAdmin, setShowForm,
 }: VehicleTimelineBarProps) {
-    // 드래그 훅
-    const {
-        dragState, barRefs,
-        handleDragStart, handleDragMove, handleDragEnd, getDragOverlay,
-    } = useTimelineDrag(onSlotClick);
-
-    // 아코디언 확장 상태
-    const [expandedVehicleId, setExpandedVehicleId] = useState<string | null>(null);
-    const toggleExpand = (vehicleId: string) => {
-        setExpandedVehicleId(prev => prev === vehicleId ? null : vehicleId);
-    };
-
-    // 오늘 날짜일 때 현재 시각(분) — 1분마다 갱신
+    // 오늘일 때 현재 시각(분) — 1분마다 갱신
     const [nowMinutes, setNowMinutes] = useState<number>(() => {
         const now = new Date();
         return now.getHours() * 60 + now.getMinutes();
@@ -61,6 +49,31 @@ export default function VehicleTimelineBar({
         return () => clearInterval(timer);
     }, [isToday]);
 
+    // 오늘이면 현재 시각(30분 스냅)을 동적 시작점으로 사용
+    const dynamicStart = useMemo(() => {
+        if (!isToday) return RANGE_START;
+        const snapped = snapMinutes(nowMinutes);
+        // 최소한 RANGE_START, 최대한 RANGE_END - 60 (1시간은 보이게)
+        return Math.max(RANGE_START, Math.min(snapped, RANGE_END - 60));
+    }, [isToday, nowMinutes]);
+
+    // 동적 시간 눈금
+    const hourLabels = useMemo(() => getHourLabels(Math.ceil(dynamicStart / 60)), [dynamicStart]);
+
+    // 드래그 훅 (동적 시작점 전달)
+    const {
+        dragState, barRefs,
+        handleDragStart, handleDragMove, handleDragEnd, getDragOverlay,
+    } = useTimelineDrag(onSlotClick, dynamicStart);
+
+    // 아코디언 확장 상태
+    const [expandedVehicleId, setExpandedVehicleId] = useState<string | null>(null);
+    const toggleExpand = (vehicleId: string) => {
+        setExpandedVehicleId(prev => prev === vehicleId ? null : vehicleId);
+    };
+
+
+
     // 차량별 예약 데이터 그룹핑
     const vehicleData = useMemo(() => {
         return vehicles.filter(v => !v.retired?.isRetired).map(v => {
@@ -71,10 +84,8 @@ export default function VehicleTimelineBar({
         });
     }, [vehicles, reservations]);
 
-    // 오늘인 경우 현재 시각을 30분 단위로 올림
+    // gap 계산을 위한 스냅 현재 시각
     const nowSnapped = isToday ? snapMinutes(nowMinutes + SNAP_MINUTES - 1) : RANGE_START;
-    // 과거 시간 영역 퍼센트
-    const pastEndPercent = isToday ? getPercent(Math.min(nowSnapped, RANGE_END)) : 0;
 
     if (vehicles.length === 0) return null;
 
@@ -100,7 +111,7 @@ export default function VehicleTimelineBar({
                         <span
                             key={h}
                             className="absolute text-[9px] text-surface-400 dark:text-surface-500 -translate-x-1/2 select-none"
-                            style={{ left: `${getPercent(h * 60)}%` }}
+                            style={{ left: `${getPercent(h * 60, dynamicStart)}%` }}
                         >
                             {h}
                         </span>
@@ -146,47 +157,23 @@ export default function VehicleTimelineBar({
                                         className="relative flex-1 h-6 rounded bg-surface-100 dark:bg-surface-700/50 overflow-hidden select-none"
                                         style={{ touchAction: 'none' }}
                                     >
-                                        {/* 과거 시간 영역 */}
-                                        {isToday && pastEndPercent > 0 && (
-                                            <>
-                                                <div
-                                                    className="absolute top-0 bottom-0 z-[1] pointer-events-none rounded-l-sm"
-                                                    style={{
-                                                        left: 0,
-                                                        width: `${pastEndPercent}%`,
-                                                        background: `
-                                                            linear-gradient(rgba(0,0,0,0.18), rgba(0,0,0,0.18)),
-                                                            repeating-linear-gradient(135deg, transparent, transparent 3px, rgba(150,150,150,0.25) 3px, rgba(150,150,150,0.25) 5px)
-                                                        `.trim(),
-                                                    }}
-                                                    title="지난 시간"
-                                                />
-                                                {/* 현재 시각 경계선 */}
-                                                <div
-                                                    className="absolute top-0 bottom-0 z-[2] pointer-events-none"
-                                                    style={{
-                                                        left: `${pastEndPercent}%`,
-                                                        width: '2px',
-                                                        background: 'rgb(249, 115, 22)',
-                                                        boxShadow: '0 0 4px rgba(249,115,22,0.5)',
-                                                    }}
-                                                />
-                                            </>
-                                        )}
-
                                         {/* 시간 눈금선 */}
                                         {hourLabels.map(h => (
                                             <div
                                                 key={h}
                                                 className="absolute top-0 bottom-0 w-px bg-surface-200/60 dark:bg-surface-600/40"
-                                                style={{ left: `${getPercent(h * 60)}%` }}
+                                                style={{ left: `${getPercent(h * 60, dynamicStart)}%` }}
                                             />
                                         ))}
 
-                                        {/* 예약 블록 */}
+                                        {/* 예약 블록 — dynamicStart 이후 부분만 표시 */}
                                         {vRes.map(r => {
-                                            const left = getPercent(timeToMinutes(r.startTime));
-                                            const right = getPercent(timeToMinutes(r.endTime));
+                                            const rStartMin = timeToMinutes(r.startTime);
+                                            const rEndMin = timeToMinutes(r.endTime);
+                                            // 동적 시작점 이전에 끝나는 예약은 표시 안 함
+                                            if (rEndMin <= dynamicStart) return null;
+                                            const left = getPercent(Math.max(rStartMin, dynamicStart), dynamicStart);
+                                            const right = getPercent(rEndMin, dynamicStart);
                                             const width = right - left;
                                             const colorClass = getVehicleColor(vehicle.id);
                                             return (
@@ -202,8 +189,8 @@ export default function VehicleTimelineBar({
 
                                         {/* 빈 시간 드래그 영역 */}
                                         {!isPastDate && !isBlocked && gaps.map((gap, gi) => {
-                                            const left = getPercent(gap.start);
-                                            const right = getPercent(gap.end);
+                                            const left = getPercent(gap.start, dynamicStart);
+                                            const right = getPercent(gap.end, dynamicStart);
                                             const width = right - left;
                                             if (gap.end - gap.start < 5) return null;
                                             return (

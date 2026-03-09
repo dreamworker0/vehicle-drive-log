@@ -5,7 +5,8 @@ import { auth, googleProvider } from './firebase';
 /**
  * PWA standalone 모드 또는 팝업 불가 환경 감지.
  * Android Chrome은 popup이 새 탭으로 정상 작동하므로 redirect 대상에서 제외.
- * (Chrome M115+ third-party storage 차단으로 signInWithRedirect 실패 방지)
+ * iOS Safari는 ITP로 인해 signInWithRedirect 후 세션이 유지되지 않으므로
+ * signInWithPopup을 우선 사용하고, 팝업 차단 시에만 redirect로 전환.
  */
 function shouldUseRedirect() {
     // PWA standalone 모드 — popup 창을 열 수 없음
@@ -14,10 +15,9 @@ function shouldUseRedirect() {
     if ((navigator as Navigator & { standalone?: boolean }).standalone) return true;
     // TWA (Trusted Web Activity)
     if (document.referrer?.includes('android-app://')) return true;
-    // iOS Safari — 팝업이 불안정하므로 redirect 사용
-    const ua = navigator.userAgent;
-    if (/iPhone|iPad|iPod/.test(ua)) return true;
-    // Android Chrome은 popup(새 탭) 방식이 안정적이므로 redirect에서 제외
+    // iOS Safari — ITP로 인해 signInWithRedirect 세션 유지가 불안정
+    // signInWithPopup을 우선 사용 (팝업 차단 시 catch에서 redirect로 자동 전환)
+    // Android Chrome도 popup(새 탭) 방식이 안정적
     return false;
 }
 

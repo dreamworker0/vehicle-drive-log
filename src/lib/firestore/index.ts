@@ -58,6 +58,7 @@ export {
     hasVehicleDriveLogs,
     cleanupDuplicateLogs,
     syncNextLogStartKm,
+    deleteDriveLog,
 } from './driveLogs';
 
 // 차량 예약 (Reservations)

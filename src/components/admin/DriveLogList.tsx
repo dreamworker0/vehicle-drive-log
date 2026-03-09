@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { getDriveLogs, getVehicles, getOrganizationMembers, getOrganization, cleanupDuplicateLogs } from '../../lib/firestore';
+import { getDriveLogs, getVehicles, getOrganizationMembers, getOrganization, cleanupDuplicateLogs, deleteDriveLog } from '../../lib/firestore';
 import { useToast } from '../../hooks/useToast';
 import { toLocalDateStr } from '../../lib/dateUtils';
 import { SkeletonBox, SkeletonTable } from '../common/Skeleton';
@@ -18,6 +18,7 @@ export default function DriveLogList() {
     const [org, setOrg] = useState<any>(null);
     const [dupState, setDupState] = useState<string>('idle'); // idle | scanning | result | cleaning
     const [dupResult, setDupResult] = useState<any>(null);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
     const now = new Date();
     const firstDay = toLocalDateStr(new Date(now.getFullYear(), now.getMonth(), 1));
     const lastDay = toLocalDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 0));
@@ -94,6 +95,21 @@ export default function DriveLogList() {
     });
 
     const totalDistance = filteredLogs.reduce((sum, l) => sum + ((l.endKm - l.startKm) || 0), 0);
+
+    const handleDelete = async (logId: string, driverName: string) => {
+        if (!window.confirm(`${driverName || '(이름 없음)'}님의 운행 기록을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+        setDeletingId(logId);
+        try {
+            await deleteDriveLog(logId);
+            setLogs(prev => prev.filter(l => l.id !== logId));
+            showToast('운행 기록이 삭제되었습니다.', 'success');
+        } catch (err) {
+            console.error('삭제 실패:', err);
+            showToast('삭제에 실패했습니다.', 'error');
+        } finally {
+            setDeletingId(null);
+        }
+    };
 
     if (loading) {
         return (
@@ -338,7 +354,7 @@ export default function DriveLogList() {
             ) : (
                 <div className="space-y-2">
                     {/* 헤더 (데스크탑) */}
-                    <div className="hidden sm:grid gap-2 px-4 py-2 text-xs font-medium text-surface-400" style={{ gridTemplateColumns: '80px 70px 100px 1fr 60px 60px 100px 40px 80px' }}>
+                    <div className="hidden sm:grid gap-2 px-4 py-2 text-xs font-medium text-surface-400" style={{ gridTemplateColumns: '80px 70px 100px 1fr 60px 60px 100px 40px 80px 40px' }}>
                         <div>날짜</div>
                         <div>운전자</div>
                         <div>차량</div>
@@ -348,6 +364,7 @@ export default function DriveLogList() {
                         <div>출발/도착Km</div>
                         <div className="text-center">인원</div>
                         <div className="text-right">주행거리</div>
+                        <div></div>
                     </div>
 
                     {filteredLogs.map(log => {
@@ -365,7 +382,23 @@ export default function DriveLogList() {
                                             <span className="font-medium text-sm text-surface-900 dark:text-surface-100">{log.driverName || '(이름 없음)'}</span>
                                             <span className="text-xs text-surface-400">{date}</span>
                                         </div>
-                                        <span className="font-bold text-primary-600">{distance.toLocaleString()} km</span>
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-bold text-primary-600">{distance.toLocaleString()} km</span>
+                                            <button
+                                                onClick={() => handleDelete(log.id, log.driverName)}
+                                                disabled={deletingId === log.id}
+                                                className="p-1.5 rounded-lg text-surface-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                                                title="삭제"
+                                            >
+                                                {deletingId === log.id ? (
+                                                    <span className="w-4 h-4 spinner block" />
+                                                ) : (
+                                                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                                    </svg>
+                                                )}
+                                            </button>
+                                        </div>
                                     </div>
                                     <div className="flex items-center gap-2 text-xs text-surface-500 dark:text-surface-400">
                                         <span>{log.vehicleName}</span>
@@ -381,7 +414,7 @@ export default function DriveLogList() {
                                 </div>
 
                                 {/* 데스크탑 */}
-                                <div className="hidden sm:grid gap-2 items-center" style={{ gridTemplateColumns: '80px 70px 100px 1fr 60px 60px 100px 40px 80px' }}>
+                                <div className="hidden sm:grid gap-2 items-center" style={{ gridTemplateColumns: '80px 70px 100px 1fr 60px 60px 100px 40px 80px 40px' }}>
                                     <div>
                                         <p className="text-sm text-surface-900 dark:text-surface-100">{date}</p>
                                     </div>
@@ -410,6 +443,22 @@ export default function DriveLogList() {
                                     </div>
                                     <div className="text-right">
                                         <span className="font-bold text-primary-600">{distance.toLocaleString()} km</span>
+                                    </div>
+                                    <div className="text-center">
+                                        <button
+                                            onClick={() => handleDelete(log.id, log.driverName)}
+                                            disabled={deletingId === log.id}
+                                            className="p-1.5 rounded-lg text-surface-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+                                            title="삭제"
+                                        >
+                                            {deletingId === log.id ? (
+                                                <span className="w-4 h-4 spinner block" />
+                                            ) : (
+                                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
+                                                </svg>
+                                            )}
+                                        </button>
                                     </div>
                                 </div>
                             </div>

@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { collection, getDocs, query, where, getCountFromServer } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 /**
  * 슈퍼관리자 운영 대시보드
@@ -10,9 +11,48 @@ export default function ServiceDashboard() {
     const [stats, setStats] = useState<any>(null);
     const [monthlyStats, setMonthlyStats] = useState<any>(null);
     const [topOrgs, setTopOrgs] = useState<any[]>([]);
+    const [inputMethodStats, setInputMethodStats] = useState<{ date: string; ocr: number; manual: number }[]>([]);
     const [orgPage, setOrgPage] = useState(0);
     const ORG_PAGE_SIZE = 10;
+    const [sortKey, setSortKey] = useState<'name' | 'users' | 'vehicles' | 'logs' | 'lastDriveDate'>('logs');
+    const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
     const [loading, setLoading] = useState(true);
+
+    type SortKey = 'name' | 'users' | 'vehicles' | 'logs' | 'lastDriveDate';
+
+    const sortedOrgs = useMemo(() => {
+        const list = [...topOrgs];
+        const dir = sortDir === 'asc' ? 1 : -1;
+        list.sort((a: any, b: any) => {
+            if (sortKey === 'name') {
+                return dir * (a.name || '').localeCompare(b.name || '', 'ko');
+            }
+            if (sortKey === 'lastDriveDate') {
+                const ta = a.lastDriveDate ? a.lastDriveDate.getTime() : 0;
+                const tb = b.lastDriveDate ? b.lastDriveDate.getTime() : 0;
+                return dir * (ta - tb);
+            }
+            return dir * ((a[sortKey] || 0) - (b[sortKey] || 0));
+        });
+        return list;
+    }, [topOrgs, sortKey, sortDir]);
+
+    const handleSort = useCallback((key: SortKey) => {
+        setSortKey(prev => {
+            if (prev === key) {
+                setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+            } else {
+                setSortDir('desc');
+            }
+            return key;
+        });
+        setOrgPage(0);
+    }, []);
+
+    const sortIndicator = (key: SortKey) => {
+        if (sortKey !== key) return null;
+        return <span className="ml-1 text-xs">{sortDir === 'asc' ? '▲' : '▼'}</span>;
+    };
 
     useEffect(() => {
         loadAllStats();
@@ -84,6 +124,36 @@ export default function ServiceDashboard() {
                 totalDistance: Math.round(totalDistance),
                 pendingApps,
             });
+
+            // 일별 입력 방식 집계 (최근 30일)
+            const now = new Date();
+            const thirtyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+            const dailyMap: Record<string, { ocr: number; manual: number }> = {};
+
+            // 30일치 날짜 초기화
+            for (let i = 0; i < 30; i++) {
+                const d = new Date(thirtyDaysAgo);
+                d.setDate(d.getDate() + i);
+                const key = `${d.getMonth() + 1}/${d.getDate()}`;
+                dailyMap[key] = { ocr: 0, manual: 0 };
+            }
+
+            logSnap.docs.forEach(doc => {
+                const data = doc.data();
+                const ts = data.timestamp?.toDate ? data.timestamp.toDate() : (data.timestamp ? new Date(data.timestamp) : null);
+                if (!ts || ts < thirtyDaysAgo) return;
+                const key = `${ts.getMonth() + 1}/${ts.getDate()}`;
+                if (!dailyMap[key]) return;
+                if (data.inputMethod === 'ocr') {
+                    dailyMap[key].ocr++;
+                } else {
+                    dailyMap[key].manual++;
+                }
+            });
+
+            setInputMethodStats(
+                Object.entries(dailyMap).map(([date, counts]) => ({ date, ...counts }))
+            );
         } catch (err) {
             console.error('서비스 통계 로드 실패:', err);
         }
@@ -183,10 +253,7 @@ export default function ServiceDashboard() {
                 }
             });
 
-            const sorted = Object.values(orgMap)
-                .sort((a: any, b: any) => b.logs - a.logs);
-
-            setTopOrgs(sorted);
+            setTopOrgs(Object.values(orgMap));
         } catch (err) {
             console.error('기관 활성도 로드 실패:', err);
         }
@@ -271,14 +338,88 @@ export default function ServiceDashboard() {
                 </div>
             )}
 
+            {/* 입력 방식 시계열 그래프 */}
+            {inputMethodStats.length > 0 && (
+                <div className="glass-card p-5">
+                    <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
+                        📊 입력 방식 추이 (최근 30일)
+                    </h2>
+                    <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">
+                        계기판 촬영(OCR)과 수동 입력의 일별 사용 현황
+                    </p>
+                    <div className="h-64">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={inputMethodStats} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                                <defs>
+                                    <linearGradient id="colorOcr" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                                    </linearGradient>
+                                    <linearGradient id="colorManual" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
+                                <XAxis
+                                    dataKey="date"
+                                    tick={{ fontSize: 11, fill: '#9ca3af' }}
+                                    tickLine={false}
+                                    axisLine={{ stroke: '#4b5563' }}
+                                    interval={Math.ceil(inputMethodStats.length / 8)}
+                                />
+                                <YAxis
+                                    tick={{ fontSize: 11, fill: '#9ca3af' }}
+                                    tickLine={false}
+                                    axisLine={false}
+                                    allowDecimals={false}
+                                />
+                                <Tooltip
+                                    contentStyle={{
+                                        backgroundColor: 'rgba(17, 24, 39, 0.9)',
+                                        border: '1px solid #374151',
+                                        borderRadius: '12px',
+                                        fontSize: '13px',
+                                        color: '#e5e7eb',
+                                    }}
+                                    labelStyle={{ color: '#9ca3af', marginBottom: '4px' }}
+                                    formatter={(value: any, name: any) => [
+                                        `${value}건`,
+                                        name === 'ocr' ? '📷 계기판 촬영' : '⌨️ 수동 입력',
+                                    ]}
+                                />
+                                <Legend
+                                    formatter={(value: string) => value === 'ocr' ? '📷 계기판 촬영' : '⌨️ 수동 입력'}
+                                    wrapperStyle={{ fontSize: '13px', color: '#9ca3af' }}
+                                />
+                                <Area
+                                    type="monotone"
+                                    dataKey="ocr"
+                                    stroke="#8b5cf6"
+                                    strokeWidth={2}
+                                    fill="url(#colorOcr)"
+                                />
+                                <Area
+                                    type="monotone"
+                                    dataKey="manual"
+                                    stroke="#06b6d4"
+                                    strokeWidth={2}
+                                    fill="url(#colorManual)"
+                                />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            )}
+
             {/* 기관별 활성도 */}
             {topOrgs.length > 0 && (() => {
-                const totalPages = Math.ceil(topOrgs.length / ORG_PAGE_SIZE);
-                const pagedOrgs = topOrgs.slice(orgPage * ORG_PAGE_SIZE, (orgPage + 1) * ORG_PAGE_SIZE);
+                const totalPages = Math.ceil(sortedOrgs.length / ORG_PAGE_SIZE);
+                const pagedOrgs = sortedOrgs.slice(orgPage * ORG_PAGE_SIZE, (orgPage + 1) * ORG_PAGE_SIZE);
                 return (
                     <div className="glass-card p-5">
                         <div className="flex items-center justify-between mb-4">
-                            <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200">🏆 활성도 ({topOrgs.length} 기관)</h2>
+                            <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200">🏆 활성도 ({sortedOrgs.length} 기관)</h2>
                             {totalPages > 1 && (
                                 <div className="flex items-center gap-2 text-sm">
                                     <button
@@ -306,11 +447,21 @@ export default function ServiceDashboard() {
                                 <thead>
                                     <tr className="border-b border-surface-100 dark:border-surface-700 text-surface-500 dark:text-surface-400">
                                         <th className="text-left py-2 px-1.5 sm:px-3 font-medium">#</th>
-                                        <th className="text-left py-2 px-1.5 sm:px-3 font-medium"><span className="hidden sm:inline">기관명</span><span className="sm:hidden">🏢</span></th>
-                                        <th className="text-right py-2 px-1.5 sm:px-3 font-medium"><span className="hidden sm:inline">사용자</span><span className="sm:hidden">👤</span></th>
-                                        <th className="text-right py-2 px-1.5 sm:px-3 font-medium"><span className="hidden sm:inline">차량</span><span className="sm:hidden">🚗</span></th>
-                                        <th className="text-right py-2 px-1.5 sm:px-3 font-medium"><span className="hidden sm:inline">운행 횟수</span><span className="sm:hidden">📊</span></th>
-                                        <th className="text-right py-2 px-1.5 sm:px-3 font-medium"><span className="hidden sm:inline">최근 운행</span><span className="sm:hidden">📅</span></th>
+                                        <th className="text-left py-2 px-1.5 sm:px-3 font-medium cursor-pointer select-none hover:text-surface-700 dark:hover:text-surface-200 transition-colors" onClick={() => handleSort('name')}>
+                                            <span className="hidden sm:inline">기관명</span><span className="sm:hidden">🏢</span>{sortIndicator('name')}
+                                        </th>
+                                        <th className="text-right py-2 px-1.5 sm:px-3 font-medium cursor-pointer select-none hover:text-surface-700 dark:hover:text-surface-200 transition-colors" onClick={() => handleSort('users')}>
+                                            <span className="hidden sm:inline">사용자</span><span className="sm:hidden">👤</span>{sortIndicator('users')}
+                                        </th>
+                                        <th className="text-right py-2 px-1.5 sm:px-3 font-medium cursor-pointer select-none hover:text-surface-700 dark:hover:text-surface-200 transition-colors" onClick={() => handleSort('vehicles')}>
+                                            <span className="hidden sm:inline">차량</span><span className="sm:hidden">🚗</span>{sortIndicator('vehicles')}
+                                        </th>
+                                        <th className="text-right py-2 px-1.5 sm:px-3 font-medium cursor-pointer select-none hover:text-surface-700 dark:hover:text-surface-200 transition-colors" onClick={() => handleSort('logs')}>
+                                            <span className="hidden sm:inline">운행 횟수</span><span className="sm:hidden">📊</span>{sortIndicator('logs')}
+                                        </th>
+                                        <th className="text-right py-2 px-1.5 sm:px-3 font-medium cursor-pointer select-none hover:text-surface-700 dark:hover:text-surface-200 transition-colors" onClick={() => handleSort('lastDriveDate')}>
+                                            <span className="hidden sm:inline">최근 운행</span><span className="sm:hidden">📅</span>{sortIndicator('lastDriveDate')}
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody>

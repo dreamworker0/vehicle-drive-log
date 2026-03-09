@@ -4,6 +4,28 @@
 
 ---
 
+## Phase 30 — 운영 개선 & 사용성 강화 & 컨텐츠 갱신 🛠️
+
+### Added
+- 시스템 관리자 대시보드에 OCR vs 수동 입력 시계열 그래프 (`ServiceDashboard.tsx`)
+- 거절된 신청 → 보류(pending) 되돌리기 버튼
+- 고유번호 "82" 포함 + "교회" 미포함 시 자동 보류 로직
+- 사용자 매뉴얼에 YouTube 영상 가이드 링크 (`manualSections.ts`)
+- 기관 대시보드 테이블 컬럼별 정렬 기능
+
+### Changed
+- 랜딩 페이지 경고 메시지 통합 (영리 기업 + 종교단체 → 단일 메시지)
+- 랜딩 페이지 부가 기능 칩 확대 (즐겨찾기, 글꼴 크기, 매뉴얼·영상, 의견 보내기)
+- 인앱 브라우저 첫 페이지 인앱 내 허용, 이후 외부 유도
+- README.md 전면 갱신 (TypeScript, Gemini 3.1, 용어 통일, Cloud Functions 보강)
+
+### Fixed
+- Sentry: Facebook 인앱 `Java object is gone` 에러 무시
+- E2E: 랜딩 페이지 스크롤 처리 추가 (`landing.spec.ts`)
+- 단위 테스트: `manualSections.test.ts` 허용 타입에 `link` 추가
+
+---
+
 ## Phase 24 — 다중 목적지 & 접근성 & 품질 강화 🎯
 
 ### Added

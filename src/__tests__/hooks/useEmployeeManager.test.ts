@@ -39,6 +39,16 @@ vi.mock('../../lib/firestore', () => ({
     removeUserFromOrganization: (...args: unknown[]) => mockRemoveUserFromOrganization(...args),
 }));
 
+// Firebase Firestore mock — getDocs (preRegistered 서브컬렉션 조회에 필요)
+vi.mock('firebase/firestore', async () => {
+    const actual = await vi.importActual('firebase/firestore');
+    return {
+        ...actual,
+        collection: vi.fn(),
+        getDocs: vi.fn().mockResolvedValue({ docs: [] }),
+    };
+});
+
 import useEmployeeManager from '../../hooks/useEmployeeManager';
 
 describe('useEmployeeManager', () => {
@@ -69,5 +79,26 @@ describe('useEmployeeManager', () => {
 
         // filteredEmployees는 searchQuery에 따라 필터됨
         expect(result.current.filteredEmployees.length).toBeGreaterThanOrEqual(0);
+    });
+
+    it('통합 목록(unifiedList)이 생성된다', async () => {
+        const { result } = renderHook(() => useEmployeeManager());
+
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        expect(result.current.unifiedList).toBeDefined();
+        expect(result.current.unifiedList.length).toBe(3); // 활성 3명, 사전등록 0명, 비활성 0명
+        expect(result.current.unifiedList[0].memberStatus).toBe('active');
+    });
+
+    it('stats 객체가 올바른 카운트를 반환한다', async () => {
+        const { result } = renderHook(() => useEmployeeManager());
+
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        expect(result.current.stats.total).toBe(3);
+        expect(result.current.stats.active).toBe(3);
+        expect(result.current.stats.pending).toBe(0);
+        expect(result.current.stats.disabled).toBe(0);
     });
 });

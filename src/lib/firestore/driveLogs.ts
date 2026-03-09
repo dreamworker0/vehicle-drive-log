@@ -2,7 +2,7 @@
  * Firestore — 운행일지 (Drive Logs) 관련 함수
  */
 import {
-    doc, updateDoc,
+    doc, updateDoc, deleteDoc,
     collection, query, where, getDocs, addDoc,
     orderBy, limit, serverTimestamp,
     type QueryConstraint,
@@ -196,6 +196,11 @@ export const hasVehicleDriveLogs = async (vehicleId: string): Promise<boolean> =
     );
     const snap = await getDocs(q);
     return !snap.empty;
+};
+
+// 운행일지 삭제
+export const deleteDriveLog = async (logId: string) => {
+    await deleteDoc(doc(db, 'driveLogs', logId));
 };
 
 // 운행일지 중복 정리 (Cloud Function 호출)

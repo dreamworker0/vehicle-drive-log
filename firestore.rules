@@ -5,28 +5,21 @@ service cloud.firestore {
 
 
 
-
-    // === 헬퍼 함수 ===
+    // === 헬퍼 함수 (Custom Claims 기반 — get() 호출 제거) ===
     function isSignedIn() {
       return request.auth != null;
     }
 
     function isSuperAdmin() {
-      return isSignedIn()
-        && (request.auth.token.email == 'ehsheh@gmail.com'
-            || (exists(/databases/$(database)/documents/users/$(request.auth.uid))
-                && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'superAdmin'));
+      return isSignedIn() && request.auth.token.role == 'superAdmin';
     }
 
     function isOrgMember(orgId) {
-      let userData = get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
-      return isSignedIn()
-        && userData.organizationId == orgId
-        && (!('status' in userData) || userData.status != 'disabled');
+      return isSignedIn() && request.auth.token.orgId == orgId;
     }
 
     function isOrgAdmin(orgId) {
-      return isOrgMember(orgId) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      return isOrgMember(orgId) && request.auth.token.role == 'admin';
     }
 
     function isOwner(uid) {
@@ -34,7 +27,7 @@ service cloud.firestore {
     }
 
     function userOrgId() {
-      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.organizationId;
+      return request.auth.token.orgId;
     }
 
     function belongsToMyOrg() {
@@ -47,20 +40,24 @@ service cloud.firestore {
 
     // === 사용자 ===
     match /users/{userId} {
-      allow read: if isSignedIn() || isSuperAdmin();
+      // 자기 자신 + superAdmin + 같은 기관 멤버만 읽기 가능
+      allow read: if isOwner(userId)
+                  || isSuperAdmin()
+                  || (isSignedIn() && resource.data.organizationId == userOrgId());
       allow create: if isOwner(userId)
                     && request.auth.token.firebase.sign_in_provider != 'anonymous'
                     && request.resource.data.keys().hasAll(['email'])
                     && request.resource.data.email is string;
       allow update: if isOwner(userId) || isSuperAdmin()
-                    || (isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
-                        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.organizationId == resource.data.organizationId);
+                    || (isSignedIn() && request.auth.token.role == 'admin'
+                        && request.auth.token.orgId == resource.data.organizationId);
       allow delete: if isSuperAdmin();
     }
 
     // === 기관 ===
     match /organizations/{orgId} {
-      allow read: if isSignedIn() || isSuperAdmin();
+      // 초대 코드 검증(findOrganizationByInviteCode)을 위해 isSignedIn() 유지
+      allow read: if isSignedIn();
       allow create: if isSignedIn();
       allow update: if isOrgAdmin(orgId) || isSuperAdmin()
                     || (isSignedIn() && resource.data.status == 'pending' && resource.data.applicantUid == request.auth.uid);
@@ -98,7 +95,7 @@ service cloud.firestore {
       allow update: if isSuperAdmin()
                     || (belongsToMyOrg() && (resource.data.driverUid == request.auth.uid
                         || isOrgAdmin(resource.data.organizationId)));
-      allow delete: if isSuperAdmin();
+      allow delete: if isOrgAdmin(resource.data.organizationId) || isSuperAdmin();
     }
 
     // === 예약 ===

@@ -201,7 +201,7 @@ export default function SuperAdminLayout() {
             {/* 메인 콘텐츠 */}
             <main className="flex-1 flex flex-col min-w-0">
                 {/* 상단 바 */}
-                <header className="sticky top-0 z-30 bg-white/80 dark:bg-surface-900/80 backdrop-blur-md border-b border-surface-100 dark:border-surface-700 px-4 lg:px-6 h-14 flex items-center justify-between">
+                <header className="sticky top-0 z-30 bg-white/80 dark:bg-surface-900/80 backdrop-blur-md border-b border-surface-100 dark:border-surface-700 px-4 lg:px-6 h-14 flex items-center justify-between safe-top">
                     <button
                         onClick={() => setSidebarOpen(true)}
                         className="btn-icon lg:hidden"

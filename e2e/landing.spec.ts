@@ -17,15 +17,29 @@ test.describe('랜딩 페이지', () => {
         await expect(page.getByText(/완전 무료/)).toBeVisible();
     });
 
-    test('주요 기능 카드 4개가 표시된다', async ({ page }) => {
-        const features = ['운행일지 자동화', '차량 예약 시스템', '통계 & 출력', '앱처럼 설치'];
+    test('3단계 시작 섹션이 표시된다', async ({ page }) => {
+        const heading = page.getByText('3단계로 시작하세요');
+        await heading.scrollIntoViewIfNeeded();
+        await expect(heading).toBeVisible({ timeout: 10000 });
+        const steps = ['기관 신청', '직원 초대', '바로 사용'];
+        for (const step of steps) {
+            const el = page.getByRole('heading', { name: step });
+            await el.scrollIntoViewIfNeeded();
+            await expect(el).toBeVisible();
+        }
+    });
+
+    test('주요 기능 카드 6개가 표시된다', async ({ page }) => {
+        const features = ['AI 계기판 인식', '운행일지 자동화', '차량 예약 시스템', '길안내 앱 연동', '통계·분석·출력', '정비 기록 관리'];
         for (const title of features) {
-            await expect(page.getByText(title)).toBeVisible({ timeout: 10000 });
+            const el = page.getByRole('heading', { name: title });
+            await el.scrollIntoViewIfNeeded();
+            await expect(el).toBeVisible({ timeout: 10000 });
         }
     });
 
     test('부가 기능 칩이 표시된다', async ({ page }) => {
-        const chips = ['티맵 내비 연동', '오프라인 지원', '푸시 알림', '기관별 데이터 격리'];
+        const chips = ['구글 캘린더 연동', '오프라인 지원', '푸시 알림', '기관별 데이터 격리', '다크 모드', '매일 자동 백업'];
         for (const label of chips) {
             await expect(page.getByText(label)).toBeVisible({ timeout: 10000 });
         }
@@ -36,7 +50,7 @@ test.describe('랜딩 페이지', () => {
         await heading.scrollIntoViewIfNeeded();
         await expect(heading).toBeVisible({ timeout: 10000 });
         await expect(page.getByText(/고유번호증 또는 사업자등록증/)).toBeVisible();
-        await expect(page.getByText(/영리 목적/)).toBeVisible();
+        await expect(page.getByText(/영리 기업/)).toBeVisible();
     });
 
     test('하단 CTA 섹션이 표시된다', async ({ page }) => {

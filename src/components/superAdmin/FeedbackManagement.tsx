@@ -7,7 +7,7 @@ export default function FeedbackManagement() {
     const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
-    const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('all');
+    const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('unread');
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<Feedback | null>(null);
     const [deleting, setDeleting] = useState(false);
@@ -94,9 +94,9 @@ export default function FeedbackManagement() {
             <div className="flex flex-col sm:flex-row gap-3 mb-4">
                 <div className="flex gap-1 bg-surface-100 dark:bg-surface-800 rounded-xl p-1">
                     {[
-                        { key: 'all', label: '전체' },
                         { key: 'unread', label: '미확인' },
                         { key: 'read', label: '확인됨' },
+                        { key: 'all', label: '전체' },
                     ].map(f => (
                         <button
                             key={f.key}

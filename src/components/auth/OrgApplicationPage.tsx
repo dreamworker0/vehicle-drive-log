@@ -84,7 +84,7 @@ export default function OrgApplicationPage() {
                             />
                         </div>
                         <div>
-                            <label className="label">이메일(구글 계정, 구글 워크스페이스 계정만 가능) <span className="text-red-500">*</span></label>
+                            <label className="label">이메일 <span className="text-red-500">*</span></label>
                             <input
                                 type="email" name="applicantEmail" value={form.applicantEmail}
                                 onChange={handleChange} className={`input ${currentUser?.email ? 'bg-surface-50 dark:bg-surface-800' : ''}`} readOnly={!!currentUser?.email}

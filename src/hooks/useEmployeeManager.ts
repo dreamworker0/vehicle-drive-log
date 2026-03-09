@@ -208,6 +208,64 @@ export default function useEmployeeManager() {
     const admins = employees.filter(e => e.role === 'admin');
     const regularEmployees = employees.filter(e => e.role === 'employee');
 
+    // ── 통합 목록: 활성 + 가입대기 + 비활성 ──
+    type MemberStatus = 'active' | 'pending' | 'disabled';
+    interface UnifiedMember {
+        id: string;
+        name: string;
+        email: string;
+        role?: string;
+        memberStatus: MemberStatus;
+        original: any; // 원본 데이터 참조
+    }
+
+    const unifiedList: UnifiedMember[] = [
+        // 1) 활성 직원 — 관리자 먼저, 이름순
+        ...employees.map(emp => ({
+            id: emp.id,
+            name: emp.name || '',
+            email: emp.email || '',
+            role: emp.role,
+            memberStatus: 'active' as MemberStatus,
+            original: emp,
+        })),
+        // 2) 가입 대기
+        ...preRegisteredEmployees.map(pre => ({
+            id: pre.id,
+            name: pre.name || '',
+            email: pre.email || '',
+            role: undefined,
+            memberStatus: 'pending' as MemberStatus,
+            original: pre,
+        })),
+        // 3) 비활성 직원
+        ...disabledEmployees.map(emp => ({
+            id: emp.id,
+            name: emp.name || '',
+            email: emp.email || '',
+            role: emp.role,
+            memberStatus: 'disabled' as MemberStatus,
+            original: emp,
+        })),
+    ];
+
+    // 통합 검색
+    const filteredUnifiedList = unifiedList.filter(m => {
+        if (!searchQuery.trim()) return true;
+        const q = searchQuery.toLowerCase();
+        return m.name.toLowerCase().includes(q) || m.email.toLowerCase().includes(q);
+    });
+
+    // 상태별 통계
+    const stats = {
+        total: employees.length + preRegisteredEmployees.length + disabledEmployees.length,
+        active: employees.length,
+        pending: preRegisteredEmployees.length,
+        disabled: disabledEmployees.length,
+        admins: admins.length,
+        regularEmployees: regularEmployees.length,
+    };
+
     return {
         employees, disabledEmployees, preRegisteredEmployees, organization, loading,
         showAddForm, setShowAddForm,
@@ -216,6 +274,7 @@ export default function useEmployeeManager() {
         editingId, setEditingId, editForm, setEditForm,
         searchQuery, setSearchQuery,
         filteredEmployees, admins, regularEmployees,
+        unifiedList, filteredUnifiedList, stats,
         handleAddEmployee, handleCopyInviteCode, handleRegenerateCode,
         handleEditEmployee, handleSaveEdit, handleDeleteEmployee, handleChangeRole,
         handleDeletePreRegistered, handleRestoreEmployee,

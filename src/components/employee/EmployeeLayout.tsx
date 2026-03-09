@@ -119,7 +119,7 @@ export default function EmployeeLayout() {
             <IOSInstallPrompt />
 
             {/* 메인 콘텐츠 */}
-            <main className="flex-1 p-4 pb-20 overflow-y-auto">
+            <main className="flex-1 p-4 overflow-y-auto" style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}>
                 <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-8 h-8 spinner" /></div>}>
                     <Routes>
                         <Route path="today" element={<TodayDashboard />} />

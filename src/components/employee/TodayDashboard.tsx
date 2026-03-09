@@ -172,9 +172,9 @@ export default function TodayDashboard() {
                             <div className="flex items-center gap-3 min-w-0 flex-1">
                                 <span className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-sm flex-shrink-0 group-hover:scale-110 transition-transform">🚗</span>
                                 <div className="min-w-0 text-left">
-                                    <p className="font-medium text-surface-800 dark:text-surface-200 text-sm">예약 없는 운행</p>
+                                    <p className="font-medium text-surface-800 dark:text-surface-200 text-sm">예약 없이 바로 운행할 수 있습니다</p>
                                     {recommendedVehicle ? (
-                                        <p className="text-xs text-surface-500 dark:text-surface-400 truncate">
+                                        <p className="text-xs text-surface-500 dark:text-surface-400">
                                             {recommendedVehicle.displayName} ·{' '}
                                             {recommendedVehicle.minutesUntilNext === Infinity
                                                 ? '오늘 남은 예약 없음'

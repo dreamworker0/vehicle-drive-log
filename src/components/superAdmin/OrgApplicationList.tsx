@@ -147,6 +147,25 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
         }
     };
 
+    // 거절된 신청을 대기중으로 되돌리기
+    const handleMoveToPending = async (app: any) => {
+        if (!confirm(`${app.name} 기관의 신청을 대기 중 상태로 되돌리시겠습니까?`)) return;
+
+        setActionLoading(prev => ({ ...prev, [app.id]: 'moveToPending' }));
+        try {
+            await updateOrganization(app.id, {
+                status: 'pending',
+                rejectedAt: null,
+            } as any);
+            showToast(`${app.name} 기관이 대기 중으로 이동되었습니다.`, 'success');
+        } catch (err) {
+            console.error('대기중 이동 실패:', err);
+            showToast('대기중으로 이동하는데 실패했습니다.', 'error');
+        } finally {
+            setActionLoading(prev => ({ ...prev, [app.id]: null }));
+        }
+    };
+
     // AI 재분석
     const handleAiReanalyze = async (app: any) => {
         if (!app.uniqueNumberImageUrl) {
@@ -278,6 +297,7 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
                             onApprove={handleApprove}
                             onReject={handleReject}
                             onDelete={handleDelete}
+                            onMoveToPending={handleMoveToPending}
                             onAiReanalyze={handleAiReanalyze}
                             onToggleImage={(id) => setSelectedApp(selectedApp === id ? null : id)}
                         />

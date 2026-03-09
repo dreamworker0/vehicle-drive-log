@@ -46,19 +46,11 @@ export default function useDriveLogForm() {
         destination?: string;
         actualStartTime?: string;
         currentKm?: number;
-        continueFrom?: {
-            id: string;
-            vehicleId: string;
-            vehicleName?: string;
-            endKm?: number;
-            destination?: string;
-        };
         editLog?: DriveLog & { passengerNames?: string[] };
     }
 
     const state = location.state as LocationState | null;
     const reservationData = state?.reservationId ? state : null;
-    const continueFrom = state?.continueFrom || null;
     const editLog = state?.editLog || null;
     const isEditMode = !!editLog;
     const isQuickDrive = false;
@@ -149,16 +141,6 @@ export default function useDriveLogForm() {
 
                 if (isEditMode) {
                     // 수정 모드 유지
-                } else if (continueFrom) {
-                    const cv = v.find(veh => veh.id === continueFrom.vehicleId);
-                    const km = await resolveStartKm(continueFrom.vehicleId, continueFrom.endKm || cv?.currentKm);
-                    setForm(prev => ({
-                        ...prev,
-                        vehicleId: continueFrom.vehicleId,
-                        vehicleName: continueFrom.vehicleName || cv?.displayName || '',
-                        startKm: km,
-                        startTime: nowTime(),
-                    }));
                 } else if (reservationData?.vehicleId) {
                     const rv = v.find(veh => veh.id === reservationData.vehicleId);
                     const km = await resolveStartKm(reservationData.vehicleId!, rv?.currentKm ?? reservationData.currentKm);
@@ -182,7 +164,7 @@ export default function useDriveLogForm() {
         };
         fetch();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [orgId, reservationData, continueFrom, user]);
+    }, [orgId, reservationData, user]);
 
     useEffect(() => {
         if (!orgId || !form.vehicleId || !form.driveDate) return;
@@ -267,7 +249,7 @@ export default function useDriveLogForm() {
         setSubmitting(true);
         try {
             const logData = buildLogData(form, {
-                orgId, user: user!, userData, selectedVehicle, selectedPassengers, externalPassengerCount, isRetroactive,
+                orgId, user: user!, userData, selectedVehicle, selectedPassengers, externalPassengerCount, isRetroactive, ocrUsed: ocr.ocrSuccess,
             });
 
             if (isEditMode && editLog) {
@@ -277,7 +259,7 @@ export default function useDriveLogForm() {
                     showToast(`다음 기록의 출발 km가 ${syncResult.oldStartKm?.toLocaleString()} → ${syncResult.newStartKm?.toLocaleString()}으로 자동 조정되었습니다.`, 'info');
                 }
             } else {
-                const extendedLogData = { ...logData, reservationId: reservationData?.reservationId || null, linkedLogId: continueFrom?.id || null };
+                const extendedLogData = { ...logData, reservationId: reservationData?.reservationId || null };
                 const result = await createDriveLog(extendedLogData as Parameters<typeof createDriveLog>[0]);
                 const syncResult = (result as Record<string, unknown>)?.syncResult as { updated?: boolean; oldStartKm?: number; newStartKm?: number } | undefined;
                 if (syncResult?.updated) {
@@ -330,7 +312,7 @@ export default function useDriveLogForm() {
         loading, submitting, success,
         selectedPassengers, selectedVehicle,
         isElectric,
-        reservationData, continueFrom, isQuickDrive,
+        reservationData, isQuickDrive,
         editLog, isEditMode, isRetroactive,
         showFavSave, setShowFavSave,
         favName, setFavName,

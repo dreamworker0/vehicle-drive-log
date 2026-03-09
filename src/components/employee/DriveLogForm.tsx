@@ -14,7 +14,7 @@ export default function DriveLogForm() {
         loading, submitting, success,
         selectedPassengers, selectedVehicle,
         isElectric,
-        reservationData, continueFrom,
+        reservationData,
         editLog, isEditMode, isRetroactive,
         showFavSave, setShowFavSave,
         favName, setFavName,
@@ -40,17 +40,11 @@ export default function DriveLogForm() {
     }
 
     // 제목 결정
-    const title = isEditMode
-        ? '운행일지 수정'
-        : continueFrom
-            ? '이어서 기록'
-            : '운행일지 작성';
+    const title = isEditMode ? '운행일지 수정' : '운행일지 작성';
 
     const subtitle = isEditMode
         ? `${(editLog as any).vehicleName || '차량'} · ${(editLog as any).destination || ''} 기록을 수정합니다`
-        : continueFrom
-            ? `이전 운행 (${continueFrom.destination || continueFrom.vehicleName || ''})에서 이어서 기록합니다`
-            : '차량 운행 기록을 입력하세요';
+        : '차량 운행 기록을 입력하세요';
 
     return (
         <div className="max-w-lg mx-auto animate-fade-in">
@@ -71,23 +65,11 @@ export default function DriveLogForm() {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-5">
-                {/* 이어서 기록 안내 */}
-                {continueFrom && (
-                    <div className="glass-card p-4 border-l-4 border-primary-400">
-                        <p className="text-xs text-surface-400 mb-1">이전 운행 연결</p>
-                        <div className="flex items-center gap-2 text-sm">
-                            <span className="font-medium text-surface-900 dark:text-surface-100">{continueFrom.vehicleName}</span>
-                            <span className="text-surface-300">·</span>
-                            <span className="text-surface-600 dark:text-surface-400">{continueFrom.destination || '-'}</span>
-                            <span className="text-surface-300">→</span>
-                            <span className="font-mono text-primary-600">{continueFrom.endKm?.toLocaleString()} km</span>
-                        </div>
-                    </div>
-                )}
+
 
 
                 {/* 차량 선택 */}
-                {reservationData?.vehicleId || continueFrom || isEditMode ? (
+                {reservationData?.vehicleId || isEditMode ? (
                     <div className="glass-card p-4">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
@@ -97,7 +79,7 @@ export default function DriveLogForm() {
                                 <div>
                                     <p className="font-semibold text-surface-900 dark:text-surface-100">{form.vehicleName}</p>
                                     <p className="text-xs text-surface-400">
-                                        {isEditMode ? '수정 중인 차량' : continueFrom ? '이전 운행 차량' : '예약 배정 차량'}
+                                        {isEditMode ? '수정 중인 차량' : '예약 배정 차량'}
                                     </p>
                                 </div>
                             </div>
@@ -196,25 +178,30 @@ export default function DriveLogForm() {
                             />
                         </div>
                         <div>
-                            <div className="flex items-center justify-between mb-1">
-                                <label className="label !mb-0">행선지</label>
+                            <label className="label">행선지</label>
+                            <div className="flex items-center gap-1.5">
+                                <input
+                                    type="text"
+                                    value={form.destination}
+                                    onChange={e => setForm({ ...form, destination: e.target.value })}
+                                    className="input flex-1"
+                                    placeholder="서울시청"
+                                />
+                                {/* 즐겨찾기 저장 아이콘 버튼 */}
                                 {form.destination.trim() && !favorites.some((f: any) => f.address === form.destination.trim() || f.name === form.destination.trim()) && (
                                     <button
                                         type="button"
                                         onClick={() => setShowFavSave(!showFavSave)}
-                                        className="text-xs text-amber-500 hover:text-amber-600 font-medium flex items-center gap-0.5"
+                                        className={`flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center transition-all ${showFavSave
+                                            ? 'bg-amber-100 text-amber-600 border border-amber-300 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-700'
+                                            : 'bg-surface-100 text-amber-500 border border-surface-200 hover:bg-amber-50 hover:border-amber-300 hover:text-amber-600 dark:bg-surface-700 dark:border-surface-600 dark:text-amber-400 dark:hover:bg-amber-900/30'
+                                            }`}
+                                        title="즐겨찾기에 저장"
                                     >
-                                        ⭐ 즐겨찾기 저장
+                                        {showFavSave ? '⭐' : '☆'}
                                     </button>
                                 )}
                             </div>
-                            <input
-                                type="text"
-                                value={form.destination}
-                                onChange={e => setForm({ ...form, destination: e.target.value })}
-                                className="input"
-                                placeholder="서울시청"
-                            />
                             {/* 즐겨찾기 저장 폼 */}
                             {showFavSave && (
                                 <div className="mt-2 p-3 rounded-lg bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800 animate-fade-in">

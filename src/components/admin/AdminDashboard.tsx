@@ -52,7 +52,7 @@ export default function AdminDashboard() {
 
                 setStats({
                     todayLogs,
-                    todayReservations: todayRes.filter(r => r.status === 'reserved').length,
+                    todayReservations: todayRes.filter(r => r.status === 'reserved' || r.status === 'in_progress').length,
                     vehicleCount: vehicles.length,
                     employeeCount: members.filter(m => m.role !== 'superAdmin').length,
                     monthLogs,

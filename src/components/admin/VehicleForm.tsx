@@ -125,6 +125,22 @@ export default function VehicleForm({
                         <p className="text-xs text-surface-400 mt-1">차량 등록 시점의 누적 주행거리</p>
                     </div>
                     <div>
+                        <label className="label">보험 정보</label>
+                        <div className="grid grid-cols-2 gap-3">
+                            <input
+                                type="text" value={form.insuranceCompany}
+                                onChange={e => setForm({ ...form, insuranceCompany: e.target.value })}
+                                className="input" placeholder="보험사명"
+                            />
+                            <input
+                                type="tel" value={form.insurancePhone}
+                                onChange={e => setForm({ ...form, insurancePhone: e.target.value })}
+                                className="input" placeholder="전화번호"
+                            />
+                        </div>
+                        <p className="text-xs text-surface-400 mt-1">사고 시 연락할 보험사 정보</p>
+                    </div>
+                    <div>
                         <label className="label">Google 캘린더 ID (선택)</label>
                         <input
                             type="text" value={form.googleCalendarId}
@@ -162,22 +178,6 @@ export default function VehicleForm({
                                 </p>
                             </div>
                         </details>
-                    </div>
-                    <div>
-                        <label className="label">보험 정보</label>
-                        <div className="grid grid-cols-2 gap-3">
-                            <input
-                                type="text" value={form.insuranceCompany}
-                                onChange={e => setForm({ ...form, insuranceCompany: e.target.value })}
-                                className="input" placeholder="보험사명"
-                            />
-                            <input
-                                type="tel" value={form.insurancePhone}
-                                onChange={e => setForm({ ...form, insurancePhone: e.target.value })}
-                                className="input" placeholder="전화번호"
-                            />
-                        </div>
-                        <p className="text-xs text-surface-400 mt-1">사고 시 연락할 보험사 정보</p>
                     </div>
                     <div className="flex gap-3 pt-2">
                         <button type="button" onClick={onCancel} className="btn-secondary flex-1">취소</button>
