@@ -235,28 +235,31 @@ export const autoVerifyDocument = onDocumentUpdated(
             return;
         }
 
-        // ── 종교단체 자동 거절 ──
-        const BLOCKED_KEYWORDS = ["교회"];
-        const isBlocked = BLOCKED_KEYWORDS.some((kw) => orgName.includes(kw));
-        if (isBlocked) {
-            console.log(`[AutoVerify] 🚫 종교단체 감지 → 자동 거절: ${orgName} (${orgId})`);
+        // ── 종교단체·학교·병원 자동 거절 ──
+        const BLOCKED_CATEGORIES = [
+            { category: "종교단체", keywords: ["교회", "사찰", "성당", "수도원", "선교"] },
+            { category: "학교", keywords: ["학교", "초등학교", "중학교", "고등학교", "대학교", "유치원", "어린이집"] },
+            { category: "병원", keywords: ["병원", "의원", "한의원", "치과", "클리닉"] },
+        ];
+        const blockedMatch = BLOCKED_CATEGORIES.find((cat) =>
+            cat.keywords.some((kw) => orgName.includes(kw))
+        );
+        if (blockedMatch) {
+            const reason = `${blockedMatch.category}는 현재 서비스 대상이 아닙니다.`;
+            console.log(`[AutoVerify] 🚫 ${blockedMatch.category} 감지 → 자동 거절: ${orgName} (${orgId})`);
             const db = getFirestore();
             await db.doc(`organizations/${orgId}`).update({
                 aiVerified: false,
                 aiVerifyDetail: {
                     rejected: true,
-                    reason: "종교단체는 현재 서비스 대상이 아닙니다.",
+                    reason,
                 },
                 status: "rejected",
                 rejectedAt: new Date(),
             });
 
             if (applicantEmail) {
-                await sendRejectionEmail(
-                    applicantEmail,
-                    orgName,
-                    "종교단체는 현재 서비스 대상이 아닙니다."
-                );
+                await sendRejectionEmail(applicantEmail, orgName, reason);
             }
             return;
         }
@@ -446,27 +449,17 @@ export const autoVerifyDocument = onDocumentUpdated(
 
             // AI 검증 통과 시 자동 승인
             if (aiVerified && updateData.status !== "rejected") {
-                // 82 포함 + 비종교단체 → 관리자 확인 필요 (대기 유지)
-                const has82 = (result.uniqueNumber || "").includes("82");
-                const isChurch = orgName.includes("교회");
+                const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+                updateData.status = "approved";
+                updateData.approvedAt = new Date();
+                updateData.inviteCode = inviteCode;
 
-                if (has82 && !isChurch) {
-                    console.log(`[AutoVerify] ⏸ 82 비영리 대기: ${orgName} (${orgId}) — 관리자 확인 필요`);
-                    (updateData.aiVerifyDetail as Record<string, unknown>).holdReason =
-                        "고유번호에 82 포함 — 관리자 확인 필요";
+                console.log(`[AutoVerify] 기관 ${orgName} (${orgId}) AI 자동 승인! 초대코드: ${inviteCode}`);
+
+                if (applicantEmail) {
+                    await sendApprovalEmailServer(applicantEmail, orgName, inviteCode);
                 } else {
-                    const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
-                    updateData.status = "approved";
-                    updateData.approvedAt = new Date();
-                    updateData.inviteCode = inviteCode;
-
-                    console.log(`[AutoVerify] 기관 ${orgName} (${orgId}) AI 자동 승인! 초대코드: ${inviteCode}`);
-
-                    if (applicantEmail) {
-                        await sendApprovalEmailServer(applicantEmail, orgName, inviteCode);
-                    } else {
-                        console.warn(`[AutoVerify] 신청자 이메일 없음, 이메일 발송 스킵`);
-                    }
+                    console.warn(`[AutoVerify] 신청자 이메일 없음, 이메일 발송 스킵`);
                 }
             }
 

@@ -58,6 +58,7 @@ export default defineConfig({
           'recharts': ['recharts'],
           'xlsx': ['xlsx'],
           'sentry': ['@sentry/react'],
+          'date-fns': ['date-fns'],
         },
       },
     },

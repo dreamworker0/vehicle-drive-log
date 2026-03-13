@@ -108,7 +108,7 @@ export default function LandingPage() {
 
                 <h1 className="text-3xl sm:text-4xl font-bold mb-3 animate-fade-in">차량 운행일지</h1>
                 <p className="text-primary-200 text-base sm:text-lg max-w-md mb-2 animate-fade-in">
-                    사회복지기관·비영리단체 전용 (종교단체 제외)
+                    사회복지기관·비영리단체 전용
                 </p>
                 <p className="text-primary-300/80 text-sm max-w-sm mb-8 animate-fade-in">
                     AI 계기판 인식, 예약, 길안내, 정비, 통계, 출력까지.<br />
@@ -151,6 +151,26 @@ export default function LandingPage() {
                 </div>
             </section>
 
+            {/* ─── 사용법 영상 ─── */}
+            <section className="relative bg-primary-700/50 backdrop-blur-sm px-4 py-12 sm:py-16">
+                <div className="max-w-2xl mx-auto text-center">
+                    <h2 className="text-2xl font-bold mb-2">📺 사용법 영상</h2>
+                    <p className="text-primary-200/80 text-sm mb-6">
+                        영상으로 사용법을 확인해보세요.
+                    </p>
+                    <div className="relative w-full overflow-hidden rounded-xl" style={{ paddingBottom: '56.25%' }}>
+                        <iframe
+                            className="absolute top-0 left-0 w-full h-full"
+                            src="https://www.youtube.com/embed/XdT5Wm_pd3s?rel=0&modestbranding=1"
+                            title="차량 운행일지 사용법"
+                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                            referrerPolicy="strict-origin-when-cross-origin"
+                            allowFullScreen
+                        />
+                    </div>
+                </div>
+            </section>
+
             {/* ─── 주요 기능 ─── */}
             <section className="relative bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 px-4 py-16 sm:py-20">
                 <div className="max-w-4xl mx-auto">
@@ -188,11 +208,11 @@ export default function LandingPage() {
                     <h2 className="text-xl font-bold mb-4">누가 사용할 수 있나요?</h2>
                     <p className="text-surface-600 dark:text-surface-400 text-sm leading-relaxed mb-6">
                         사회복지법인, 사회복지시설, 비영리사단법인·재단법인 등<br />
-                        <strong>고유번호증 또는 사업자등록증을 보유한 비영리단체(종교단체 제외)</strong>라면 누구나 신청할 수 있습니다.
+                        <strong>고유번호증 또는 사업자등록증을 보유한 비영리단체</strong>라면 누구나 신청할 수 있습니다.
                     </p>
                     <div className="inline-flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-2 text-sm">
                         <span>⚠️</span>
-                        <span>영리 기업 및 종교단체(교회, 사찰, 성당 등)는 이용 대상이 아닙니다</span>
+                        <span>영리 기업 및 종교단체, 학교, 병원은 이용 대상이 아닙니다</span>
                     </div>
                 </div>
             </section>
@@ -215,6 +235,10 @@ export default function LandingPage() {
                     <a href="/terms" className="hover:text-white underline underline-offset-2 transition-colors">이용약관</a>
                     <span className="text-primary-300/30" aria-hidden="true">|</span>
                     <a href="/privacy" className="hover:text-white underline underline-offset-2 transition-colors">개인정보 처리방침</a>
+                    <span className="text-primary-300/30" aria-hidden="true">|</span>
+                    <a href="/release-notes" className="hover:text-white underline underline-offset-2 transition-colors">업데이트 소식</a>
+                    <span className="text-primary-300/30" aria-hidden="true">|</span>
+                    <a href="/faq" className="hover:text-white underline underline-offset-2 transition-colors">자주 하는 질문</a>
                 </nav>
                 <p>© 2026 차량 운행일지. All rights reserved.</p>
             </footer>

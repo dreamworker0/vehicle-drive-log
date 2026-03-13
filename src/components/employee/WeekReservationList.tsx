@@ -48,6 +48,11 @@ export default function WeekReservationList({
                                                 <span className={`text-xs px-2 py-0.5 rounded-full ${res.status === 'in_progress' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400' : 'bg-surface-100 dark:bg-surface-700 text-surface-500 dark:text-surface-400'}`}>
                                                     {res.status === 'in_progress' ? '운행 중' : '예약됨'}
                                                 </span>
+                                                {res.groupId && (
+                                                    <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300 rounded-full font-medium">
+                                                        🔗
+                                                    </span>
+                                                )}
                                                 {res.status === 'reserved' && (
                                                     <button onClick={() => onCancelReservation(res)} disabled={cancellingId === res.id} className="text-xs text-surface-400 hover:text-red-500 transition-colors p-1" title="예약 취소">
                                                         {cancellingId === res.id ? (

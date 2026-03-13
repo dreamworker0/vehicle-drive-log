@@ -1,8 +1,8 @@
 /* eslint-disable react-refresh/only-export-components */
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, useRef, createContext, useContext, ReactNode } from 'react';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { doc, onSnapshot, Unsubscribe } from 'firebase/firestore';
-import { auth, db } from '../lib/firebase';
+import { auth, db, authReady } from '../lib/firebase';
 import { handleRedirectResult, logout } from '../lib/auth';
 import { setSentryUser } from '../lib/sentry';
 import type { User as UserDoc } from '../types/user';
@@ -24,8 +24,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [orgDeleted, setOrgDeleted] = useState(false);
     const [loading, setLoading] = useState(true);
 
+    // Custom Claims 토큰 갱신을 위한 이전 role/orgId 추적
+    const prevClaimsRef = useRef<{ role?: string; orgId?: string }>({});
+
     /* eslint-disable react-hooks/exhaustive-deps */
     useEffect(() => {
+        let cancelled = false;
+
         // 10초 안에 로딩이 끝나지 않으면 강제 해제
         const timeout = setTimeout(() => {
             if (loading) {
@@ -34,104 +39,123 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
         }, 10000);
 
-        // Redirect 로그인 복귀 시 에러 확인 (정상 인증은 onAuthStateChanged가 처리)
-        handleRedirectResult().catch((err) => {
-            console.error('Redirect 로그인 에러:', err);
-        });
-
+        let unsubscribeAuth: (() => void) | null = null;
         let unsubscribeUser: Unsubscribe | null = null;
         let unsubscribeOrg: Unsubscribe | null = null;
 
-        const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
-            // 이전 리스너 해제
-            if (unsubscribeUser) { unsubscribeUser(); unsubscribeUser = null; }
-            if (unsubscribeOrg) { unsubscribeOrg(); unsubscribeOrg = null; }
+        // persistence 설정 완료 후 onAuthStateChanged 구독 시작
+        // 이를 통해 새 탭에서도 localStorage의 기존 세션이 올바르게 복원된다.
+        authReady.then(() => {
+            if (cancelled) return;
 
-            // 익명 사용자는 OrgApplicationPage의 Storage 업로드 용도로만 사용되며,
-            // 앱 라우팅에서는 비로그인으로 취급한다.
-            if (firebaseUser && !firebaseUser.isAnonymous) {
-                setUser(firebaseUser);
+            // Redirect 로그인 복귀 시 에러 확인 (정상 인증은 onAuthStateChanged가 처리)
+            handleRedirectResult().catch((err) => {
+                console.error('Redirect 로그인 에러:', err);
+            });
 
-                // 사용자 문서를 실시간 감시 (삭제 시 즉시 감지)
-                unsubscribeUser = onSnapshot(
-                    doc(db, 'users', firebaseUser.uid),
-                    (docSnap) => {
-                        if (docSnap.exists()) {
-                            const data = { id: docSnap.id, ...docSnap.data() } as UserDoc;
-                            setUserData(data);
-                            // Sentry 사용자 컨텍스트 설정 (에러 추적 시 역할/기관 파악)
-                            setSentryUser({ uid: firebaseUser.uid, email: firebaseUser.email || '', role: data.role, organizationId: data.organizationId || '' });
+            unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+                // 이전 리스너 해제
+                if (unsubscribeUser) { unsubscribeUser(); unsubscribeUser = null; }
+                if (unsubscribeOrg) { unsubscribeOrg(); unsubscribeOrg = null; }
 
-                            // 기관 상태 실시간 감시 (soft delete 감지)
-                            if (data.organizationId && data.role !== 'superAdmin') {
-                                if (unsubscribeOrg) unsubscribeOrg();
+                // 익명 사용자는 OrgApplicationPage의 Storage 업로드 용도로만 사용되며,
+                // 앱 라우팅에서는 비로그인으로 취급한다.
+                if (firebaseUser && !firebaseUser.isAnonymous) {
+                    setUser(firebaseUser);
 
-                                const startOrgWatch = (retryCount = 0) => {
-                                    unsubscribeOrg = onSnapshot(
-                                        doc(db, 'organizations', data.organizationId!),
-                                        (orgSnap) => {
-                                            if (orgSnap.exists()) {
-                                                setOrgDeleted(orgSnap.data().status === 'deleted');
-                                            } else {
-                                                setOrgDeleted(true);
-                                            }
-                                        },
-                                        (err) => {
-                                            console.error('기관 상태 감시 실패:', err);
-                                            const errCode = (err as { code?: string })?.code;
-                                            if (errCode === 'permission-denied' && retryCount < 1) {
-                                                // 1회 재시도: 보안 규칙 캐시 미갱신으로 인한 일시적 에러 대응
-                                                if (unsubscribeOrg) { unsubscribeOrg(); unsubscribeOrg = null; }
-                                                setTimeout(() => {
-                                                    startOrgWatch(retryCount + 1);
-                                                }, 1000);
-                                            } else if (errCode === 'permission-denied') {
-                                                logout();
-                                            }
-                                        }
-                                    );
-                                };
+                    // 사용자 문서를 실시간 감시 (삭제 시 즉시 감지)
+                    unsubscribeUser = onSnapshot(
+                        doc(db, 'users', firebaseUser.uid),
+                        (docSnap) => {
+                            if (docSnap.exists()) {
+                                const data = { id: docSnap.id, ...docSnap.data() } as UserDoc;
+                                setUserData(data);
+                                // Sentry 사용자 컨텍스트 설정 (에러 추적 시 역할/기관 파악)
+                                setSentryUser({ uid: firebaseUser.uid, email: firebaseUser.email || '', role: data.role, organizationId: data.organizationId || '' });
 
-                                // 신규 가입 직후(문서가 방금 생성됨)인지 감지
-                                const createdAt = data.createdAt;
-                                const createdMillis = (createdAt && typeof createdAt === 'object' && 'toMillis' in createdAt)
-                                    ? (createdAt as { toMillis: () => number }).toMillis()
-                                    : (createdAt instanceof Date ? createdAt.getTime() : 0);
-
-                                const isNewlyCreated = createdMillis > 0 && (Date.now() - createdMillis) < 5000;
-
-                                if (isNewlyCreated) {
-                                    setTimeout(startOrgWatch, 500);
-                                } else {
-                                    startOrgWatch();
+                                // Custom Claims 토큰 갱신: 초기 로드 또는 role/orgId 변경 시 강제 갱신
+                                const prev = prevClaimsRef.current;
+                                const isInitialLoad = prev.role === undefined;
+                                const isClaimsChanged = !isInitialLoad && (prev.role !== data.role || prev.orgId !== data.organizationId);
+                                if (isInitialLoad || isClaimsChanged) {
+                                    firebaseUser.getIdToken(true).catch((err) => {
+                                        console.warn('Custom Claims 토큰 갱신 실패:', err);
+                                    });
                                 }
+                                prevClaimsRef.current = { role: data.role, orgId: data.organizationId || undefined };
+
+                                // 기관 상태 실시간 감시 (soft delete 감지)
+                                if (data.organizationId && data.role !== 'superAdmin') {
+                                    if (unsubscribeOrg) unsubscribeOrg();
+
+                                    const startOrgWatch = (retryCount = 0) => {
+                                        unsubscribeOrg = onSnapshot(
+                                            doc(db, 'organizations', data.organizationId!),
+                                            (orgSnap) => {
+                                                if (orgSnap.exists()) {
+                                                    setOrgDeleted(orgSnap.data().status === 'deleted');
+                                                } else {
+                                                    setOrgDeleted(true);
+                                                }
+                                            },
+                                            (err) => {
+                                                console.error('기관 상태 감시 실패:', err);
+                                                const errCode = (err as { code?: string })?.code;
+                                                if (errCode === 'permission-denied' && retryCount < 1) {
+                                                    // 1회 재시도: 보안 규칙 캐시 미갱신으로 인한 일시적 에러 대응
+                                                    if (unsubscribeOrg) { unsubscribeOrg(); unsubscribeOrg = null; }
+                                                    setTimeout(() => {
+                                                        startOrgWatch(retryCount + 1);
+                                                    }, 1000);
+                                                } else if (errCode === 'permission-denied') {
+                                                    logout();
+                                                }
+                                            }
+                                        );
+                                    };
+
+                                    // 신규 가입 직후(문서가 방금 생성됨)인지 감지
+                                    const createdAt = data.createdAt;
+                                    const createdMillis = (createdAt && typeof createdAt === 'object' && 'toMillis' in createdAt)
+                                        ? (createdAt as { toMillis: () => number }).toMillis()
+                                        : (createdAt instanceof Date ? createdAt.getTime() : 0);
+
+                                    const isNewlyCreated = createdMillis > 0 && (Date.now() - createdMillis) < 5000;
+
+                                    if (isNewlyCreated) {
+                                        setTimeout(startOrgWatch, 500);
+                                    } else {
+                                        startOrgWatch();
+                                    }
+                                }
+                            } else {
+                                // 사용자 문서가 없거나 삭제됨
+                                setUserData(null);
+                                setOrgDeleted(false);
                             }
-                        } else {
-                            // 사용자 문서가 없거나 삭제됨
+                            setLoading(false);
+                        },
+                        (err) => {
+                            console.error('사용자 데이터 실시간 감시 실패:', err);
                             setUserData(null);
-                            setOrgDeleted(false);
+                            setLoading(false);
+                            if (err?.code === 'permission-denied') logout();
                         }
-                        setLoading(false);
-                    },
-                    (err) => {
-                        console.error('사용자 데이터 실시간 감시 실패:', err);
-                        setUserData(null);
-                        setLoading(false);
-                        if (err?.code === 'permission-denied') logout();
-                    }
-                );
-            } else {
-                setUser(null);
-                setUserData(null);
-                setOrgDeleted(false);
-                setLoading(false);
-                setSentryUser(null); // 로그아웃 시 Sentry 컨텍스트 해제
-            }
+                    );
+                } else {
+                    setUser(null);
+                    setUserData(null);
+                    setOrgDeleted(false);
+                    setLoading(false);
+                    setSentryUser(null); // 로그아웃 시 Sentry 컨텍스트 해제
+                }
+            });
         });
 
         return () => {
+            cancelled = true;
             clearTimeout(timeout);
-            unsubscribeAuth();
+            if (unsubscribeAuth) unsubscribeAuth();
             if (unsubscribeUser) unsubscribeUser();
             if (unsubscribeOrg) unsubscribeOrg();
         };
@@ -143,8 +167,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // 호환성을 위해 빈 함수 유지
     };
 
-    const isSuperAdmin = user?.email === 'ehsheh@gmail.com' ||
-        userData?.role === 'superAdmin';
+    const isSuperAdmin = userData?.role === 'superAdmin';
 
 
     const value = {

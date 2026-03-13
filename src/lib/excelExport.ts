@@ -26,6 +26,7 @@ interface ExcelDriveLog {
     startKm?: number;
     endKm?: number;
     passengerCount?: number;
+    fuelAmount?: number;
     energyCost?: number;
     notes?: string;
     [key: string]: unknown;
@@ -59,7 +60,7 @@ export async function downloadDriveLogsExcel(logs: ExcelDriveLog[], filename = '
             '도착Km': log.arrivalKm ?? log.endKm ?? '',
             '주행거리(km)': distance > 0 ? distance : '',
             '탑승인원': log.passengerCount ?? '',
-            '주유/충전금액': log.energyCost ?? '',
+            '주유/충전금액': (log.fuelAmount || log.energyCost) ? Number(log.fuelAmount || log.energyCost) : '',
             '비고': log.notes || '',
         };
     });
@@ -90,3 +91,137 @@ export async function downloadDriveLogsExcel(logs: ExcelDriveLog[], filename = '
     XLSX.writeFile(wb, `${filename}.xlsx`);
 }
 
+/**
+ * 정비 기록 엑셀 다운로드용 인터페이스
+ */
+interface ExcelMaintenanceRecord {
+    date?: string;
+    vehicleName?: string;
+    type?: string;
+    cost?: number;
+    shop?: string;
+    km?: number;
+    nextDueKm?: number;
+    nextDueDate?: string;
+    description?: string;
+    blockVehicle?: boolean;
+    [key: string]: unknown;
+}
+
+/**
+ * 정비 기록 데이터를 엑셀 파일로 다운로드
+ * @param records - 정비 기록 배열
+ * @param filename - 파일명 (확장자 제외)
+ * @param typeLabels - type 값 → 한글 라벨 매핑 (예: { oil: '엔진오일' })
+ */
+export async function downloadMaintenanceExcel(
+    records: ExcelMaintenanceRecord[],
+    filename = '정비기록',
+    { onError, typeLabels = {} }: { onError?: (msg: string) => void; typeLabels?: Record<string, string> } = {},
+) {
+    if (!records || records.length === 0) {
+        onError?.('다운로드할 데이터가 없습니다.');
+        return false;
+    }
+
+    const XLSX = await import('xlsx');
+
+    const rows = records.map((rec) => ({
+        '날짜': rec.date || '',
+        '차량': rec.vehicleName || '',
+        '정비유형': typeLabels[rec.type || ''] || rec.type || '',
+        '비용(원)': rec.cost ? rec.cost : '',
+        '정비소': rec.shop || '',
+        '현재km': rec.km ? rec.km : '',
+        '다음정비km': rec.nextDueKm ? rec.nextDueKm : '',
+        '다음정비일': rec.nextDueDate || '',
+        '메모': rec.description || '',
+        '차량차단': rec.blockVehicle ? 'O' : '',
+    }));
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+
+    ws['!cols'] = [
+        { wch: 12 },  // 날짜
+        { wch: 14 },  // 차량
+        { wch: 12 },  // 정비유형
+        { wch: 12 },  // 비용
+        { wch: 16 },  // 정비소
+        { wch: 10 },  // 현재km
+        { wch: 12 },  // 다음정비km
+        { wch: 12 },  // 다음정비일
+        { wch: 24 },  // 메모
+        { wch: 8 },   // 차량차단
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '정비기록');
+    XLSX.writeFile(wb, `${filename}.xlsx`);
+}
+
+/**
+ * 주유 기록 엑셀 다운로드용 인터페이스
+ */
+interface ExcelFuelLog {
+    date?: string;
+    createdAt?: unknown;
+    vehicleName?: string;
+    driverName?: string;
+    meterReading?: number;
+    fuelAmount?: number;
+    fuelCost?: number;
+    notes?: string;
+    [key: string]: unknown;
+}
+
+/**
+ * 주유 기록 데이터를 엑셀 파일로 다운로드
+ */
+export async function downloadFuelLogsExcel(
+    records: ExcelFuelLog[],
+    filename = '주유기록',
+    { onError }: { onError?: (msg: string) => void } = {},
+) {
+    if (!records || records.length === 0) {
+        onError?.('다운로드할 데이터가 없습니다.');
+        return false;
+    }
+
+    const XLSX = await import('xlsx');
+
+    const rows = records.map((rec) => {
+        let timeStr = '';
+        if (rec.createdAt) {
+            const ca = rec.createdAt as any;
+            const d = ca instanceof Date ? ca : ca?.toDate?.() || null;
+            if (d) timeStr = d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+        }
+        return {
+            '날짜': rec.date || '',
+            '시각': timeStr,
+            '차량': rec.vehicleName || '',
+            '주유원': rec.driverName || '',
+            '주유미터(km)': rec.meterReading ? rec.meterReading : '',
+            '주유량(L)': rec.fuelAmount ? rec.fuelAmount : '',
+            '주유금액(원)': rec.fuelCost ? rec.fuelCost : '',
+            '비고': rec.notes || '',
+        };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+
+    ws['!cols'] = [
+        { wch: 12 },  // 날짜
+        { wch: 8 },   // 시각
+        { wch: 14 },  // 차량
+        { wch: 10 },  // 주유원
+        { wch: 12 },  // 주유미터
+        { wch: 10 },  // 주유량
+        { wch: 12 },  // 주유금액
+        { wch: 24 },  // 비고
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '주유기록');
+    XLSX.writeFile(wb, `${filename}.xlsx`);
+}

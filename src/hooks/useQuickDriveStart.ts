@@ -12,6 +12,7 @@ import type { Favorite } from '../types/favorite';
 import { calcEndTime } from './utils/reservationUtils';
 import { toLocalDateStr } from '../lib/dateUtils';
 import type { Vehicle } from '../types/vehicle';
+import { isVehicleBlocked } from '../lib/vehicleUtils';
 import type { Organization } from '../types/organization';
 
 export default function useQuickDriveStart() {
@@ -54,7 +55,7 @@ export default function useQuickDriveStart() {
                 if ((org as Organization | null)?.address) setOrgAddress((org as Organization).address ?? '');
 
                 // 정비 중 차량 제외한 목록
-                const availableVehicles = v.filter(veh => !veh.maintenance?.isBlocked && !veh.retired?.isRetired);
+                const availableVehicles = v.filter(veh => !isVehicleBlocked(veh.maintenance) && !veh.retired?.isRetired);
 
                 // 추천 차량 자동 선택 (정비 중이 아닌 차량만)
                 if (recommendedVehicleId) {

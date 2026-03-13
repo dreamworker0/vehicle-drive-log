@@ -15,3 +15,4 @@ export type { MaintenanceRecord, CreateMaintenanceData } from './maintenance';
 export type { Favorite } from './favorite';
 export type { CustomHoliday } from './holiday';
 export type { Feedback, FeedbackStatus } from './feedback';
+export type { FuelLog, CreateFuelLogData } from './fuelLog';

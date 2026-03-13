@@ -8,6 +8,7 @@ export const VEHICLE_TYPE_ICONS: Record<string, string> = {
     compact: '🚙',
     sedan: '🚗',
     van: '🚐',
+    truck: '🚚',
     bus: '🚌',
 };
 

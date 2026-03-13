@@ -33,8 +33,8 @@ npx -y depcheck --ignores="@types/*,autoprefixer,postcss,tailwindcss,@eslint/*,g
 특정 lib 파일의 export가 실제 import되는지 확인합니다:
 
 ```bash
-# 예: firestore.js의 특정 함수가 사용되는지 확인
-rg "함수명" --include "*.jsx" --include "*.js" src/
+# 브리필로 확인
+rg "함수명" --include "*.tsx" --include "*.ts" src/
 ```
 
 ## 4. ESLint 실행

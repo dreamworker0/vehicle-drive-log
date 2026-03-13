@@ -81,7 +81,7 @@ grep -rnE "border-(green|blue|red|amber|surface)-[12]00" src/components/ | grep 
 
 ### 점검 시 교체 패턴
 
-```jsx
+```tsx
 // ❌ 인라인 배지 — dark: 누락 위험
 <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-700">삭제됨</span>
 
@@ -116,7 +116,7 @@ grep -rnE "border-(green|blue|red|amber|surface)-[12]00" src/components/ | grep 
 
 ### 사용 예시
 
-```jsx
+```tsx
 // ✅ 올바른 사용법 — 다크 모드 자동 적용
 <button className="btn-soft-primary text-sm">이어서 기록</button>
 <button className="btn-soft-amber w-full mt-2 text-sm">결재 요청</button>

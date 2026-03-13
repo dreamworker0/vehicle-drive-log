@@ -3,19 +3,41 @@
  * 로직은 useMaintenanceLog 훅 사용
  */
 import useMaintenanceLog, { MAINTENANCE_TYPES } from '../../hooks/useMaintenanceLog';
+import { useAuth } from '../../hooks/useAuth';
+import { useToast } from '../../hooks/useToast';
+import { getOrganization } from '../../lib/firestore';
 import { VEHICLE_TYPE_ICONS } from '../../lib/constants';
+import { isVehicleBlocked } from '../../lib/vehicleUtils';
 import { SkeletonBox, SkeletonList } from '../common/Skeleton';
+import { useState, useEffect } from 'react';
+
+/** type 값 → 한글 라벨 매핑 */
+const TYPE_LABELS: Record<string, string> = Object.fromEntries(
+    MAINTENANCE_TYPES.map(t => [t.value, t.label]),
+);
 
 export default function MaintenanceLog() {
     const {
         vehicles, loading, showForm, setShowForm,
-        saving, filterVehicle, setFilterVehicle,
+        saving, filters, setFilters, resetFilters,
         form, setForm, filteredRecords,
         handleSubmit, handleDelete, getTypeInfo, handleVehicleSelect,
         handleClearBlock,
     } = useMaintenanceLog();
+    const { userData } = useAuth();
+    const { showToast } = useToast();
+    const [org, setOrg] = useState<any>(null);
+    const orgName = org?.name || '';
 
-    const blockedVehicles = vehicles.filter(v => v.maintenance?.isBlocked);
+    useEffect(() => {
+        if (!userData?.organizationId) return;
+        getOrganization(userData.organizationId).then((o: any) => {
+            if (o) setOrg(o);
+        });
+    }, [userData?.organizationId]);
+
+    const blockedVehicles = vehicles.filter(v => isVehicleBlocked(v.maintenance));
+    const totalCost = filteredRecords.reduce((sum, r) => sum + (r.cost || 0), 0);
 
     if (loading) {
         return (
@@ -29,11 +51,56 @@ export default function MaintenanceLog() {
 
     return (
         <div className="max-w-4xl mx-auto animate-fade-in">
-            <div className="flex items-center justify-between mb-6">
-                <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100">차량 정비 기록</h1>
-                <button onClick={() => setShowForm(!showForm)} className="btn-primary btn-sm flex items-center gap-1">
-                    {showForm ? '✕ 닫기' : '＋ 정비 기록 추가'}
-                </button>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+                <div>
+                    <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100">차량 정비 기록</h1>
+                    <p className="text-sm text-surface-500 dark:text-surface-400 mt-1">
+                        {filteredRecords.length}건{totalCost > 0 && ` · 총 ${totalCost.toLocaleString()}원`}
+                    </p>
+                </div>
+                <div className="flex items-center gap-2">
+                    <button onClick={() => setShowForm(!showForm)} className="btn-primary btn-sm flex items-center gap-1">
+                        {showForm ? '✕ 닫기' : '＋ 정비 기록 추가'}
+                    </button>
+                    <button
+                        onClick={async () => {
+                            const { downloadMaintenanceExcel } = await import('../../lib/excelExport');
+                            await downloadMaintenanceExcel(filteredRecords, `정비기록_${orgName || '전체'}`, {
+                                onError: (msg) => showToast(msg, 'warning'),
+                                typeLabels: TYPE_LABELS,
+                            });
+                        }}
+                        disabled={filteredRecords.length === 0}
+                        className="btn-secondary btn-sm flex items-center gap-2 disabled:opacity-50"
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                        </svg>
+                        엑셀
+                    </button>
+                    <button
+                        onClick={async () => {
+                            const { downloadMaintenancePdf } = await import('../../lib/maintenancePdfExport');
+                            const defaultApproval = [{ title: '담당' }, { title: '팀장' }];
+                            const useApproval = org?.hideApprovalLine
+                                ? []
+                                : (org?.approvalLine?.length > 0 ? org.approvalLine : defaultApproval);
+                            downloadMaintenancePdf(filteredRecords, {
+                                orgName,
+                                typeLabels: TYPE_LABELS,
+                                approvalLine: useApproval,
+                                onError: (msg) => showToast(msg, 'error'),
+                            });
+                        }}
+                        disabled={filteredRecords.length === 0}
+                        className="btn-primary btn-sm flex items-center gap-2 disabled:opacity-50"
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
+                        </svg>
+                        PDF
+                    </button>
+                </div>
             </div>
 
             {/* 등록 폼 */}
@@ -119,7 +186,7 @@ export default function MaintenanceLog() {
                                     className="input max-w-[200px]"
                                     min={form.date}
                                 />
-                                <p className="text-xs text-surface-400 mt-1">종료 예정일은 참고용이며, 관리자가 수동으로 해제해야 합니다</p>
+                                <p className="text-xs text-surface-400 mt-1">종료 예정일이 지나면 자동으로 차단이 해제됩니다</p>
                             </div>
                         )}
                     </div>
@@ -159,22 +226,62 @@ export default function MaintenanceLog() {
                 </div>
             )}
 
-            {/* 차량 필터 */}
-            <div className="flex flex-wrap gap-1.5 mb-4">
-                <button onClick={() => setFilterVehicle('')}
-                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${!filterVehicle
-                        ? 'bg-primary-100 border-primary-300 text-primary-700'
-                        : 'bg-surface-50 dark:bg-surface-800 border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400 hover:border-primary-300'}`}>
-                    전체
-                </button>
-                {vehicles.map(v => (
-                    <button key={v.id} onClick={() => setFilterVehicle(v.id)}
-                        className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${filterVehicle === v.id
-                            ? 'bg-primary-100 border-primary-300 text-primary-700'
-                            : 'bg-surface-50 dark:bg-surface-800 border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400 hover:border-primary-300'}`}>
-                        {VEHICLE_TYPE_ICONS[v.vehicleType ?? ''] || '🚗'} {v.displayName}
-                    </button>
-                ))}
+            {/* 검색/필터 바 */}
+            <div className="glass-card p-4 mb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <input
+                        type="text"
+                        value={filters.search}
+                        onChange={e => setFilters({ ...filters, search: e.target.value })}
+                        className="input"
+                        placeholder="🔍 검색 (차량, 정비소, 메모)"
+                    />
+                    <select
+                        value={filters.vehicleId}
+                        onChange={e => setFilters({ ...filters, vehicleId: e.target.value })}
+                        className="input"
+                    >
+                        <option value="">전체 차량</option>
+                        {vehicles.map(v => (
+                            <option key={v.id} value={v.id}>{v.displayName}</option>
+                        ))}
+                    </select>
+                    <select
+                        value={filters.type}
+                        onChange={e => setFilters({ ...filters, type: e.target.value })}
+                        className="input"
+                    >
+                        <option value="">전체 유형</option>
+                        {MAINTENANCE_TYPES.map(t => (
+                            <option key={t.value} value={t.value}>{t.icon} {t.label}</option>
+                        ))}
+                    </select>
+                </div>
+                {/* 기간 필터 */}
+                <div className="flex items-center gap-2 mt-3">
+                    <span className="text-xs text-surface-400 whitespace-nowrap">기간</span>
+                    <input
+                        type="date"
+                        value={filters.startDate}
+                        onChange={e => setFilters({ ...filters, startDate: e.target.value })}
+                        className="input text-sm flex-1"
+                    />
+                    <span className="text-surface-300">~</span>
+                    <input
+                        type="date"
+                        value={filters.endDate}
+                        onChange={e => setFilters({ ...filters, endDate: e.target.value })}
+                        className="input text-sm flex-1"
+                    />
+                    {(filters.search || filters.vehicleId || filters.type || filters.startDate || filters.endDate) && (
+                        <button
+                            onClick={resetFilters}
+                            className="text-xs text-surface-400 hover:text-red-500 whitespace-nowrap"
+                        >
+                            초기화
+                        </button>
+                    )}
+                </div>
             </div>
 
             {/* 기록 목록 */}

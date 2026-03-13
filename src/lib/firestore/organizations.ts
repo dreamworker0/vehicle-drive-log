@@ -65,11 +65,22 @@ export const updateOrganization = async (orgId: string, data: Record<string, any
 };
 
 // 기관 Soft delete (30일 내 복구 가능)
+// 소속 직원 문서도 함께 삭제 → 재로그인 시 초대 코드 화면으로 이동
 export const deleteOrganization = async (orgId: string) => {
-    await updateDoc(doc(db, 'organizations', orgId), {
+    const usersQuery = query(
+        collection(db, 'users'),
+        where('organizationId', '==', orgId)
+    );
+    const usersSnap = await getDocs(usersQuery);
+    const batch = writeBatch(db);
+    usersSnap.docs.forEach(userDoc => {
+        batch.delete(userDoc.ref);
+    });
+    batch.update(doc(db, 'organizations', orgId), {
         status: 'deleted',
         deletedAt: serverTimestamp(),
     });
+    await batch.commit();
 };
 
 // 영구 삭제 (소속 사용자 + 기관 문서 완전 제거)

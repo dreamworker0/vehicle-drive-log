@@ -13,6 +13,7 @@ interface VehicleFormData {
     vehicleType: string;
     fuelType: string;
     currentKm: string;
+    hipassCardNumber: string;
     googleCalendarId: string;
     insuranceCompany: string;
     insurancePhone: string;
@@ -32,6 +33,7 @@ const VEHICLE_TYPES = [
     { value: 'compact', label: '경차', icon: '🚙' },
     { value: 'sedan', label: '승용차', icon: '🚗' },
     { value: 'van', label: '승합차', icon: '🚐' },
+    { value: 'truck', label: '화물차', icon: '🚚' },
     { value: 'bus', label: '버스', icon: '🚌' },
 ];
 
@@ -47,11 +49,23 @@ export default function VehicleForm({
     onSubmit, onCancel, onModelNameChange,
 }: Props) {
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={onCancel}>
-            <div className="glass-card p-6 w-full max-w-md max-h-[90vh] overflow-y-auto animate-scale-in" onClick={e => e.stopPropagation()}>
-                <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4">
-                    {editingVehicle ? '차량 수정' : '차량 등록'}
-                </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+            <div className="glass-card p-6 w-full max-w-md max-h-[90vh] overflow-y-auto animate-scale-in">
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100">
+                        {editingVehicle ? '차량 수정' : '차량 등록'}
+                    </h3>
+                    <button
+                        type="button"
+                        onClick={onCancel}
+                        className="p-1.5 rounded-lg text-surface-400 hover:text-surface-600 hover:bg-surface-100 dark:hover:text-surface-300 dark:hover:bg-surface-700 transition-colors"
+                        aria-label="닫기"
+                    >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
                 <form onSubmit={onSubmit} className="space-y-4">
                     <div>
                         <label className="label">표시 이름 <span className="text-red-500">*</span></label>
@@ -82,7 +96,7 @@ export default function VehicleForm({
                     </div>
                     <div>
                         <label className="label">차종</label>
-                        <div className="grid grid-cols-4 gap-2">
+                        <div className="grid grid-cols-5 gap-2">
                             {VEHICLE_TYPES.map(vt => (
                                 <button
                                     key={vt.value} type="button"
@@ -141,6 +155,15 @@ export default function VehicleForm({
                         <p className="text-xs text-surface-400 mt-1">사고 시 연락할 보험사 정보</p>
                     </div>
                     <div>
+                        <label className="label">하이패스 카드번호 (선택)</label>
+                        <input
+                            type="text" value={form.hipassCardNumber}
+                            onChange={e => setForm({ ...form, hipassCardNumber: e.target.value })}
+                            className="input" placeholder="0000-0000-0000-0000"
+                        />
+                        <p className="text-xs text-surface-400 mt-1">하이패스 단말기에 등록된 카드번호</p>
+                    </div>
+                    <div>
                         <label className="label">Google 캘린더 ID (선택)</label>
                         <input
                             type="text" value={form.googleCalendarId}
@@ -155,7 +178,7 @@ export default function VehicleForm({
                                 <p className="font-medium text-surface-700 dark:text-surface-300">구글 캘린더 동기화 설정 방법:</p>
                                 <ol className="list-decimal list-inside space-y-1.5 text-surface-600 dark:text-surface-400">
                                     <li>구글 캘린더에서 공유할 캘린더의 <strong className="text-surface-700 dark:text-surface-300">설정 및 공유</strong>로 이동</li>
-                                    <li><strong className="text-surface-700 dark:text-surface-300">특정 사용자와 공유</strong> → 아래 이메일을 <strong className="text-surface-700 dark:text-surface-300">"일정 변경"</strong> 권한으로 추가</li>
+                                    <li><strong className="text-surface-700 dark:text-surface-300">공유 대상</strong>에서 <strong className="text-surface-700 dark:text-surface-300">+ 사용자 및 그룹 추가</strong>를 클릭하고, 아래 이메일을 <strong className="text-surface-700 dark:text-surface-300">"일정 변경"</strong> 권한으로 추가</li>
                                     <li><strong className="text-surface-700 dark:text-surface-300">캘린더 통합</strong> 섹션에서 캘린더 ID를 복사하여 위 입력란에 붙여넣기</li>
                                 </ol>
                                 <div className="mt-2 flex items-center gap-2">

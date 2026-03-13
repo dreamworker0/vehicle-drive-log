@@ -16,6 +16,7 @@ const DriveLogList = lazyWithRetry(() => import('./DriveLogList'));
 
 const MonthlyReport = lazyWithRetry(() => import('./MonthlyReport'));
 const MaintenanceLog = lazyWithRetry(() => import('./MaintenanceLog'));
+const FuelLogManager = lazyWithRetry(() => import('./FuelLogManager'));
 const ReservationCalendar = lazyWithRetry(() => import('../common/ReservationCalendar'));
 const Settings = lazyWithRetry(() => import('./Settings'));
 const AnalyticsDashboard = lazyWithRetry(() => import('./AnalyticsDashboard'));
@@ -69,7 +70,11 @@ export default function AdminLayout() {
             label: '운행일지',
             icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" /></svg>,
         },
-
+        {
+            to: '/admin/fuel-logs',
+            label: '주유일지',
+            icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15 11.25V4.875A2.625 2.625 0 0 0 12.375 2.25h-4.75A2.625 2.625 0 0 0 5 4.875V18.75a2.25 2.25 0 0 0 2.25 2.25h5.5A2.25 2.25 0 0 0 15 18.75v-3" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 8.25h1.5a2.25 2.25 0 0 1 2.25 2.25v3a1.5 1.5 0 0 0 3 0V7.5l-2.25-3" /><path strokeLinecap="round" strokeLinejoin="round" d="M5.25 9h9.5" /></svg>,
+        },
         {
             to: '/admin/reservations',
             label: '차량 예약',
@@ -209,6 +214,7 @@ export default function AdminLayout() {
                             <Route path="monthly-report" element={<MonthlyReport />} />
                             <Route path="analytics" element={<AnalyticsDashboard />} />
                             <Route path="maintenance" element={<MaintenanceLog />} />
+                            <Route path="fuel-logs" element={<FuelLogManager />} />
                             <Route path="reservations" element={<ReservationCalendar isAdmin />} />
                             <Route path="settings" element={<Settings />} />
                             <Route path="" element={<Navigate to="dashboard" replace />} />

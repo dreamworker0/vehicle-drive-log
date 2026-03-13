@@ -5,6 +5,7 @@ import { describe, it, expect } from 'vitest';
 vi.mock('../../lib/firebase', () => ({
     default: {},
     auth: { currentUser: null, onAuthStateChanged: vi.fn() },
+    authReady: Promise.resolve(),
 }));
 vi.mock('firebase/auth', () => ({
     getAuth: vi.fn(() => ({ currentUser: null })),

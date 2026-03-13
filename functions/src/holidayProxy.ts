@@ -4,12 +4,21 @@
 import { onRequest } from "firebase-functions/v2/https";
 import { defineString } from "firebase-functions/params";
 import { wrapHttps, log } from "./helpers";
+import { checkRateLimitByIp } from "./rateLimit";
 
 const HOLIDAY_API_KEY = defineString("HOLIDAY_API_KEY");
 
 export const holidayProxy = onRequest(
     { region: "asia-northeast3", cors: ["https://vehicle-drive-log.web.app", "https://vehicle-drive-log.firebaseapp.com"] as any },
     wrapHttps("holidayProxy", async (req, res) => {
+        // Rate Limiting: IP당 시간당 10회
+        const clientIp = req.ip || req.headers["x-forwarded-for"] as string || "unknown";
+        const exceeded = await checkRateLimitByIp("holidayProxy", clientIp, 10, 3600);
+        if (exceeded) {
+            res.status(429).json({ error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." });
+            return;
+        }
+
         const { solYear, numOfRows = 50 } = req.query;
 
         if (!solYear) {

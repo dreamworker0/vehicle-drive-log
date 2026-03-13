@@ -5,6 +5,7 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getStorage } from "firebase-admin/storage";
 import { defineString } from "firebase-functions/params";
 import { GoogleGenAI } from "@google/genai";
+import { checkRateLimitByUid } from "./rateLimit";
 
 const geminiApiKey = defineString("GEMINI_API_KEY");
 
@@ -72,6 +73,9 @@ export const ocrDocument = onCall(
         if (!request.auth) {
             throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
         }
+
+        // Rate Limiting: 사용자당 분당 3회
+        await checkRateLimitByUid("ocrDocument", request.auth.uid, 3, 60);
 
         const { storagePath, imageBase64, mimeType } = request.data;
 

@@ -34,10 +34,28 @@ export default function OrgCard({
     // 익명 계정 필터링 (이름이 없거나 '-'인 계정 제외)
     const visibleMembers = members.filter(m => m.name && m.name !== '-');
 
+    // 경과일 계산 (직원 0명일 때만)
+    const daysSinceApproval = (() => {
+        if (visibleMembers.length > 0 || !org.approvedAt) return null;
+        const approved = 'toDate' in org.approvedAt
+            ? (org.approvedAt as any).toDate()
+            : new Date(org.approvedAt as any);
+        return Math.floor((Date.now() - approved.getTime()) / (1000 * 60 * 60 * 24));
+    })();
+
+    const getDaysBadgeStyle = (days: number) => {
+        if (days >= 14) return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
+        if (days >= 7) return 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400';
+        return 'bg-surface-100 text-surface-500 dark:bg-surface-700 dark:text-surface-400';
+    };
+
     // 인라인 편집 상태
     const [editing, setEditing] = useState(false);
     const [editForm, setEditForm] = useState({ name: '', address: '' });
     const [saving, setSaving] = useState(false);
+
+    // 증빙서류 이미지 토글
+    const [showImage, setShowImage] = useState(false);
 
     // 계정 복원 상태
     const [showRestore, setShowRestore] = useState(false);
@@ -157,6 +175,14 @@ export default function OrgCard({
                                     <span>고유번호: {org.uniqueNumber}</span>
                                     <span>•</span>
                                     <span>직원 {visibleMembers.length}명</span>
+                                    {daysSinceApproval !== null && (
+                                        <>
+                                            <span>•</span>
+                                            <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-xs font-bold ${getDaysBadgeStyle(daysSinceApproval)}`}>
+                                                D+{daysSinceApproval}
+                                            </span>
+                                        </>
+                                    )}
                                     <span>•</span>
                                     <span>초대코드: <code className="bg-surface-100 dark:bg-surface-700 px-1.5 py-0.5 rounded text-primary-700 dark:text-primary-300 font-mono text-xs">{org.inviteCode}</code></span>
                                     {formatTimestampFull(org.approvedAt) && (
@@ -168,6 +194,42 @@ export default function OrgCard({
                                 </div>
                                 {org.address && (
                                     <p className="text-sm text-surface-400">{org.address}</p>
+                                )}
+                                {/* 증빙서류 보기 토글 */}
+                                {org.uniqueNumberImageUrl && (
+                                    <div className="mt-1">
+                                        <button
+                                            onClick={(e) => { e.stopPropagation(); setShowImage(v => !v); }}
+                                            className="text-xs text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium transition-colors"
+                                        >
+                                            {showImage ? '증빙서류 닫기 ▲' : '📋 증빙서류 보기 ▼'}
+                                        </button>
+                                        {showImage && (() => {
+                                            const url = org.uniqueNumberImageUrl || '';
+                                            const isPdf = /\.pdf($|\?)/i.test(url) || (url.includes('%2F') && url.toLowerCase().includes('.pdf'));
+                                            if (isPdf) {
+                                                return (
+                                                    <a
+                                                        href={url}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        className="mt-2 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-700 hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors text-sm font-medium animate-slide-down"
+                                                    >
+                                                        📄 PDF 증빙서류 보기 (새 창)
+                                                    </a>
+                                                );
+                                            }
+                                            return (
+                                                <img
+                                                    src={url}
+                                                    alt="증빙서류"
+                                                    className="mt-2 max-w-md rounded-lg border border-surface-200 dark:border-surface-600 animate-slide-down"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                />
+                                            );
+                                        })()}
+                                    </div>
                                 )}
                                 {(org.applicantName || org.applicantEmail || org.applicantPhone) && (
                                     <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-surface-500 dark:text-surface-400 mt-1 pt-1 border-t border-surface-100 dark:border-surface-700">

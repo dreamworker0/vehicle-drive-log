@@ -28,7 +28,7 @@ test.describe('기관 사용 신청 플로우', () => {
         const submitBtn = page.getByRole('button', { name: '신청하기' });
         await submitBtn.click();
         // 에러 메시지가 표시되어야 한다
-        await expect(page.getByText(/필수|업로드/)).toBeVisible({ timeout: 5000 });
+        await expect(page.getByText(/필수|업로드/).first()).toBeVisible({ timeout: 5000 });
     });
 
     test('전화번호 자동 포맷이 동작한다', async ({ page }) => {

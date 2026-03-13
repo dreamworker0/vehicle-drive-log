@@ -86,9 +86,21 @@ export default function EmployeeManager() {
 
             {/* 직원 사전 등록 폼 모달 */}
             {showAddForm && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={() => setShowAddForm(false)}>
-                    <div className="glass-card p-6 w-full max-w-md animate-scale-in" onClick={e => e.stopPropagation()}>
-                        <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4">직원 사전 등록</h3>
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
+                    <div className="glass-card p-6 w-full max-w-md animate-scale-in">
+                        <div className="flex items-center justify-between mb-4">
+                            <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100">직원 사전 등록</h3>
+                            <button
+                                type="button"
+                                onClick={() => setShowAddForm(false)}
+                                className="p-1.5 rounded-lg text-surface-400 hover:text-surface-600 hover:bg-surface-100 dark:hover:text-surface-300 dark:hover:bg-surface-700 transition-colors"
+                                aria-label="닫기"
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
                         <p className="text-sm text-surface-500 dark:text-surface-400 mb-4">
                             직원 이름과 이메일을 미리 등록하면, 초대 코드로 가입 시 자동으로 이름이 설정됩니다.
                         </p>

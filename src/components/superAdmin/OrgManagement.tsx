@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { getApprovedOrganizations, deleteOrganization, getDeletedOrganizations, restoreOrganization, permanentDeleteOrganization, getOrganizationMembers, updateUser, leaveOrganization, updateOrganization } from '../../lib/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import OrgCard from './OrgCard';
 import DeletedOrgCard from './DeletedOrgCard';
 import type { Organization } from '../../types';
@@ -18,9 +19,10 @@ export default function OrgManagement() {
     const [expandedOrg, setExpandedOrg] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [changingRole, setChangingRole] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<'active' | 'deleted'>('active');
+    const [activeTab, setActiveTab] = useState<'active' | 'inactive' | 'deleted'>('active');
     const [deletingOrgId, setDeletingOrgId] = useState<string | null>(null);
     const { showToast } = useToast();
+    const { confirm } = useConfirm();
 
     const fetchOrganizations = async () => {
         setLoading(true);
@@ -55,7 +57,7 @@ export default function OrgManagement() {
     }, []);
 
     const handleDelete = async (org: Organization) => {
-        if (!confirm(`${org.name} 기관을 삭제하시겠습니까?\n\n• 30일 내 복구 가능합니다.\n• 소속 직원은 기능 접근이 차단됩니다.`)) return;
+        if (!await confirm({ message: `${org.name} 기관을 삭제하시겠습니까?\n\n• 30일 내 복구 가능합니다.\n• 소속 직원은 기능 접근이 차단됩니다.`, confirmColor: 'danger' })) return;
         try {
             await deleteOrganization(org.id);
             showToast('기관이 삭제되었습니다. 30일 내 복구 가능합니다.', 'success');
@@ -67,7 +69,7 @@ export default function OrgManagement() {
     };
 
     const handleRestore = async (org: Organization) => {
-        if (!confirm(`${org.name} 기관을 복구하시겠습니까?`)) return;
+        if (!await confirm({ message: `${org.name} 기관을 복구하시겠습니까?` })) return;
         try {
             await restoreOrganization(org.id);
             showToast('기관이 복구되었습니다.', 'success');
@@ -79,8 +81,8 @@ export default function OrgManagement() {
     };
 
     const handlePermanentDelete = async (org: Organization) => {
-        if (!confirm(`⚠️ ${org.name} 기관을 영구 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.\n소속된 모든 사용자 계정도 함께 삭제됩니다.`)) return;
-        if (!confirm(`정말로 영구 삭제를 진행하시겠습니까? 마지막 확인입니다.`)) return;
+        if (!await confirm({ title: '⚠️ 영구 삭제', message: `${org.name} 기관을 영구 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.\n소속된 모든 사용자 계정도 함께 삭제됩니다.`, confirmText: '영구 삭제', confirmColor: 'danger' })) return;
+        if (!await confirm({ message: '정말로 영구 삭제를 진행하시겠습니까? 마지막 확인입니다.', confirmText: '확인', confirmColor: 'danger' })) return;
         setDeletingOrgId(org.id);
         try {
             await permanentDeleteOrganization(org.id);
@@ -97,7 +99,7 @@ export default function OrgManagement() {
     const handleRoleChange = async (member: any, orgId: string, newRole: string) => {
         if (member.role === newRole) return;
         const roleLabel = newRole === 'admin' ? '기관관리자' : '직원';
-        if (!confirm(`${member.name || member.email}의 역할을 "${roleLabel}"(으)로 변경하시겠습니까?`)) return;
+        if (!await confirm({ message: `${member.name || member.email}의 역할을 "${roleLabel}"(으)로 변경하시겠습니까?` })) return;
 
         setChangingRole(member.id);
         try {
@@ -117,7 +119,7 @@ export default function OrgManagement() {
     };
 
     const handleRemoveMember = async (member: any, orgId: string) => {
-        if (!confirm(`${member.name || member.email || '이 사용자'}를 기관에서 제거하시겠습니까?\n\n제거된 사용자는 초대 코드를 통해 다시 가입할 수 있습니다.`)) return;
+        if (!await confirm({ message: `${member.name || member.email || '이 사용자'}를 기관에서 제거하시겠습니까?\n\n제거된 사용자는 초대 코드를 통해 다시 가입할 수 있습니다.`, confirmColor: 'danger' })) return;
         try {
             await leaveOrganization(member.id);
             setMembersMap(prev => ({
@@ -146,7 +148,7 @@ export default function OrgManagement() {
     };
 
     const handleRestoreUser = async (email: string, orgId: string, name: string) => {
-        if (!confirm(`${email} 계정을 복원하시겠습니까?\n\n• Auth 계정이 다시 활성화됩니다.\n• 이 기관의 직원으로 복원됩니다.`)) return;
+        if (!await confirm({ message: `${email} 계정을 복원하시겠습니까?\n\n• Auth 계정이 다시 활성화됩니다.\n• 이 기관의 직원으로 복원됩니다.` })) return;
         try {
             const restoreUser = httpsCallable(getFunctions(undefined, 'asia-northeast3'), 'restoreUser');
             const result = await restoreUser({ email, organizationId: orgId, name: name || undefined });
@@ -177,8 +179,18 @@ export default function OrgManagement() {
         );
     }
 
+    // 직원 0명 기관 (익명 계정 제외)
+    const inactiveOrgs = organizations.filter(org => {
+        const members = membersMap[org.id] || [];
+        const visible = members.filter(m => m.name && m.name !== '-');
+        return visible.length === 0;
+    });
+
+    // 검색 기준 목록 결정
+    const baseOrgs = activeTab === 'inactive' ? inactiveOrgs : organizations;
+
     // 검색 필터
-    const filteredOrgs = organizations.filter(org => {
+    const filteredOrgs = baseOrgs.filter(org => {
         if (!searchQuery.trim()) return true;
         const q = searchQuery.toLowerCase();
         return (
@@ -209,6 +221,13 @@ export default function OrgManagement() {
                     활성 기관 ({organizations.length})
                 </button>
                 <button
+                    onClick={() => setActiveTab('inactive')}
+                    className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all
+                        ${activeTab === 'inactive' ? 'bg-white dark:bg-surface-700 text-amber-600 dark:text-amber-400 shadow-sm' : 'text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:text-surface-300'}`}
+                >
+                    미활성 기관 ({inactiveOrgs.length})
+                </button>
+                <button
                     onClick={() => setActiveTab('deleted')}
                     className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all
                         ${activeTab === 'deleted' ? 'bg-white dark:bg-surface-700 text-red-600 dark:text-red-400 shadow-sm' : 'text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:text-surface-300'}`}
@@ -218,7 +237,7 @@ export default function OrgManagement() {
             </div>
 
             {/* 검색 */}
-            {activeTab === 'active' && organizations.length > 0 && (
+            {(activeTab === 'active' || activeTab === 'inactive') && baseOrgs.length > 0 && (
                 <div className="mb-4">
                     <div className="relative">
                         <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -235,14 +254,23 @@ export default function OrgManagement() {
                 </div>
             )}
 
-            {/* 활성 기관 탭 */}
-            {activeTab === 'active' && (
-                organizations.length === 0 ? (
+            {/* 활성/미활성 기관 탭 */}
+            {(activeTab === 'active' || activeTab === 'inactive') && (
+                baseOrgs.length === 0 ? (
                     <div className="glass-card p-12 text-center">
-                        <svg className="w-16 h-16 mx-auto text-surface-200 mb-4" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5M3.75 3v18m16.5-18v18M5.25 3h13.5M5.25 21h13.5" />
-                        </svg>
-                        <p className="text-surface-400 text-lg font-medium">등록된 기관이 없습니다</p>
+                        {activeTab === 'inactive' ? (
+                            <>
+                                <div className="text-4xl mb-3">🎉</div>
+                                <p className="text-surface-400 text-lg font-medium">모든 기관에 직원이 등록되어 있습니다</p>
+                            </>
+                        ) : (
+                            <>
+                                <svg className="w-16 h-16 mx-auto text-surface-200 mb-4" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5M3.75 3v18m16.5-18v18M5.25 3h13.5M5.25 21h13.5" />
+                                </svg>
+                                <p className="text-surface-400 text-lg font-medium">등록된 기관이 없습니다</p>
+                            </>
+                        )}
                     </div>
                 ) : filteredOrgs.length === 0 ? (
                     <div className="glass-card p-12 text-center">

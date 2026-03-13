@@ -14,6 +14,10 @@ vi.mock('../../hooks/useToast', () => ({
     useToast: () => ({ showToast: mockShowToast }),
 }));
 
+vi.mock('../../contexts/ConfirmContext', () => ({
+    useConfirm: () => ({ confirm: vi.fn().mockResolvedValue(true) }),
+}));
+
 const mockMembers = [
     { id: 'u1', name: '김직원', email: 'kim@test.com', role: 'employee' },
     { id: 'u2', name: '이직원', email: 'lee@test.com', role: 'employee' },

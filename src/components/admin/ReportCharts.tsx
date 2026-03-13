@@ -89,7 +89,7 @@ export default function ReportCharts({
                 <div className="glass-card p-5">
                     <SectionTitle icon="👤" title="직원별 현황" />
                     <div className="w-full">
-                        <ResponsiveContainer width="100%" height={280}>
+                        <ResponsiveContainer width="100%" height={280} minWidth={1} minHeight={1}>
                             <BarChart data={driverData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                                 <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} />
@@ -106,7 +106,7 @@ export default function ReportCharts({
                 <div className="glass-card p-5">
                     <SectionTitle icon="🚗" title="차량별 주행거리" />
                     <div className="w-full">
-                        <ResponsiveContainer width="100%" height={280}>
+                        <ResponsiveContainer width="100%" height={280} minWidth={1} minHeight={1}>
                             <BarChart data={vehicleData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                                 <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} />
@@ -125,7 +125,7 @@ export default function ReportCharts({
             <div className="glass-card p-5">
                 <SectionTitle icon="📋" title="사용목적별 비율" />
                 <div className="w-full flex justify-center">
-                    <ResponsiveContainer width="100%" height={300}>
+                    <ResponsiveContainer width="100%" height={300} minWidth={1} minHeight={1}>
                         <PieChart>
                             <Pie
                                 data={purposeData} cx="50%" cy="50%"
@@ -149,7 +149,7 @@ export default function ReportCharts({
                 <div className="glass-card p-5">
                     <SectionTitle icon="📅" title="요일별 운행 패턴" />
                     <div className="w-full">
-                        <ResponsiveContainer width="100%" height={240}>
+                        <ResponsiveContainer width="100%" height={240} minWidth={1} minHeight={1}>
                             <BarChart data={dayOfWeekData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                                 <XAxis dataKey="name" tick={{ fontSize: 12, fill: '#64748b' }} />
@@ -172,7 +172,7 @@ export default function ReportCharts({
                 <div className="glass-card p-5">
                     <SectionTitle icon="🕐" title="시간대별 출발 빈도" />
                     <div className="w-full">
-                        <ResponsiveContainer width="100%" height={240}>
+                        <ResponsiveContainer width="100%" height={240} minWidth={1} minHeight={1}>
                             <BarChart data={hourlyData.filter((_, i) => i >= 6 && i <= 22)} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                                 <XAxis dataKey="hour" tick={{ fontSize: 10, fill: '#64748b' }} interval={0} />
@@ -198,7 +198,7 @@ export default function ReportCharts({
                 <div className="glass-card p-5">
                     <SectionTitle icon="⛽" title="차량별 주유/충전비" />
                     <div className="w-full">
-                        <ResponsiveContainer width="100%" height={280}>
+                        <ResponsiveContainer width="100%" height={280} minWidth={1} minHeight={1}>
                             <BarChart data={vehicleFuelData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
                                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
                                 <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`} />
@@ -216,7 +216,7 @@ export default function ReportCharts({
                 <div className="glass-card p-5">
                     <SectionTitle icon="📈" title="일별 운행 추이" />
                     <div className="w-full">
-                        <ResponsiveContainer width="100%" height={280}>
+                        <ResponsiveContainer width="100%" height={280} minWidth={1} minHeight={1}>
                             <LineChart data={dailyTrendData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                                 <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#64748b' }} />

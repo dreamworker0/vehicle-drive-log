@@ -5,6 +5,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
+import { useConfirm } from '../contexts/ConfirmContext';
 import { getOrganization, updateOrganization, regenerateInviteCode, getCustomHolidays, addCustomHoliday, deleteCustomHoliday } from '../lib/firestore';
 import { fetchPublicHolidays, groupHolidaysByMonth } from '../lib/holidayApi';
 import { formatDateKr } from '../lib/dateUtils';
@@ -18,6 +19,7 @@ interface SettingsForm {
     address: string;
     phone: string;
     approvalLine: { title: string }[];
+    hideApprovalLine: boolean;
 }
 
 interface HolidayForm {
@@ -28,6 +30,7 @@ interface HolidayForm {
 export default function useSettings() {
     const { userData } = useAuth();
     const { showToast } = useToast();
+    const { confirm } = useConfirm();
     const [org, setOrg] = useState<Organization | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -37,7 +40,8 @@ export default function useSettings() {
         adminEmail: '',
         address: '',
         phone: '',
-        approvalLine: [{ title: '담당' }, { title: '팀장' }]
+        approvalLine: [{ title: '담당' }, { title: '팀장' }],
+        hideApprovalLine: false,
     });
 
     // 공휴일 관리 상태
@@ -68,6 +72,7 @@ export default function useSettings() {
                         approvalLine: (orgData.approvalLine && orgData.approvalLine.length > 0)
                             ? orgData.approvalLine
                             : [{ title: '담당' }, { title: '팀장' }],
+                        hideApprovalLine: orgData.hideApprovalLine ?? false,
                     });
                 }
                 setCustomHolidays(holidays as CustomHoliday[]);
@@ -111,6 +116,7 @@ export default function useSettings() {
                 address: form.address.trim(),
                 phone: form.phone.trim(),
                 approvalLine: form.approvalLine.filter(a => a.title.trim()).map(a => ({ title: a.title.trim() })),
+                hideApprovalLine: form.hideApprovalLine,
             });
             setSuccess(true);
             setTimeout(() => setSuccess(false), 3000);
@@ -130,7 +136,7 @@ export default function useSettings() {
 
     const handleRegenCode = async () => {
         if (!orgId) return;
-        if (!confirm('초대 코드를 재발급하시겠습니까?\n기존 코드는 더 이상 사용할 수 없습니다.')) return;
+        if (!await confirm({ message: '초대 코드를 재발급하시겠습니까?\n기존 코드는 더 이상 사용할 수 없습니다.', confirmColor: 'warning' })) return;
         try {
             const newCode = await regenerateInviteCode(orgId);
             setOrg(prev => prev ? ({ ...prev, inviteCode: newCode }) : null);
@@ -160,7 +166,7 @@ export default function useSettings() {
 
     const handleDeleteHoliday = async (holidayId: string) => {
         if (!orgId) return;
-        if (!confirm('이 휴일을 삭제하시겠습니까?')) return;
+        if (!await confirm({ message: '이 휴일을 삭제하시겠습니까?', confirmColor: 'danger' })) return;
         try {
             await deleteCustomHoliday(orgId, holidayId);
             setCustomHolidays(prev => prev.filter(h => h.id !== holidayId));

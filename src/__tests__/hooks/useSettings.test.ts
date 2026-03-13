@@ -12,6 +12,10 @@ vi.mock('../../hooks/useToast', () => ({
     useToast: () => ({ showToast: mockShowToast }),
 }));
 
+vi.mock('../../contexts/ConfirmContext', () => ({
+    useConfirm: () => ({ confirm: vi.fn().mockResolvedValue(true) }),
+}));
+
 vi.mock('../../lib/firestore', () => ({
     getOrganization: vi.fn().mockResolvedValue({
         name: '테스트 기관',
@@ -31,6 +35,10 @@ vi.mock('../../lib/firestore', () => ({
 vi.mock('../../lib/holidayApi', () => ({
     fetchPublicHolidays: vi.fn().mockResolvedValue({}),
     groupHolidaysByMonth: vi.fn().mockReturnValue({}),
+}));
+
+vi.mock('../../lib/dateUtils', () => ({
+    formatDateKr: vi.fn((d: string) => d),
 }));
 
 vi.mock('../../hooks/useOrgApplication', () => ({

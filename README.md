@@ -171,7 +171,8 @@ d:\apps\차량운행일지\
 │   │   └── common/                   공통 (알림, 달력, 에러, 오프라인)
 │   ├── contexts/                     React 컨텍스트
 │   │   ├── ThemeContext.tsx           다크/라이트 모드 관리
-│   │   └── FontSizeContext.tsx        글꼴 크기 조절 (소/중/대)
+│   │   ├── FontSizeContext.tsx        글꼴 크기 조절 (소/중/대)
+│   │   └── ConfirmContext.tsx         Promise 기반 커스텀 confirm 모달
 │   ├── hooks/                        커스텀 훅 (비즈니스 로직 분리)
 │   ├── lib/                          유틸리티 (Firestore, 티맵, OCR, PDF/Excel)
 │   │   └── firestore/                Firestore CRUD (도메인별 분리)
@@ -196,6 +197,7 @@ d:\apps\차량운행일지\
 | `sendAdminNotice` | 관리자 공지 FCM 전송 |
 | `disableUser` | 사용자 비활성화 (Firebase Auth + Firestore) |
 | `restoreUser` | 비활성화된 사용자 복원 |
+| `joinOrganization` | 초대 코드로 기관 가입 (서버사이드 권한 처리) |
 
 ### Firestore 트리거
 
@@ -206,6 +208,7 @@ d:\apps\차량운행일지\
 | `onReservationCreated` | 예약 생성 → 구글 캘린더 동기화 + FCM 알림 |
 | `onReservationUpdated` | 예약 수정/취소 → 캘린더 업데이트 |
 | `onReservationDeleted` | 예약 삭제 → 캘린더 이벤트 삭제 |
+| `setCustomClaims` | 사용자 문서 변경 시 Firebase Auth Custom Claims 자동 동기화 |
 
 ### 스케줄 함수
 
@@ -216,6 +219,7 @@ d:\apps\차량운행일지\
 | `backupFirestore` | 매일 03:00 | Firestore 전체 → Cloud Storage 백업 |
 | `autoPurgeOrgs` | 매일 04:00 | soft delete 30일 경과 기관 영구 삭제 |
 | `archiveDriveLogs` | 매일 04:30 | 3년+ 운행 기록 GCS 아카이빙 |
+| `cleanupCertificateImages` | 매일 04:00 | 승인 30일 경과 기관 고유번호증 이미지 삭제 |
 | `syncHolidaysScheduled` | 매일 06:00 | 공공데이터포털 공휴일 캐시 |
 
 ### HTTP 함수
@@ -226,6 +230,7 @@ d:\apps\차량운행일지\
 | `tmapProxy` | 티맵 경로 탐색 프록시 |
 | `warmupOcr` | OCR 함수 콜드 스타트 방지 |
 | `cleanupDuplicateLogs` | 중복 운행 기록 탐지 및 정리 |
+| `migrateCustomClaims` | 기존 사용자 Custom Claims 일괄 설정 (1회성) |
 
 ---
 
@@ -235,7 +240,7 @@ d:\apps\차량운행일지\
 |------|------|------|
 | 훅 단위 테스트 | 17개 | Vitest |
 | 라이브러리 단위 테스트 | 14개 | Vitest |
-| Cloud Functions 테스트 | 4개 | Vitest |
+| Cloud Functions 테스트 | 5개 | Vitest |
 | E2E 테스트 | 8개 파일 | Playwright |
 
 ---

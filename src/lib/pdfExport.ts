@@ -22,6 +22,7 @@ interface PdfLogEntry {
     arrivalKm?: number;
     endKm?: number;
     passengerCount?: number;
+    fuelAmount?: number;
     energyCost?: number;
     notes?: string;
 }
@@ -49,11 +50,15 @@ export function downloadDriveLogsPdf(logs: PdfLogEntry[], options: { onError?: (
 
     const { orgName = '', period = '', approvalLine = [] } = options;
 
-    // 날짜순 정렬 (오래된 순)
+    // 날짜순 정렬 (오래된 순), 같은 날짜 내 출발 시간 오름차순
     const sorted = [...logs].sort((a, b) => {
         const dateA = a.date || (a.timestamp?.toDate ? a.timestamp.toDate().toISOString().slice(0, 10) : '');
         const dateB = b.date || (b.timestamp?.toDate ? b.timestamp.toDate().toISOString().slice(0, 10) : '');
-        return dateA.localeCompare(dateB);
+        const dateCmp = dateA.localeCompare(dateB);
+        if (dateCmp !== 0) return dateCmp;
+        const timeA = a.startTime || a.departureTime || '';
+        const timeB = b.startTime || b.departureTime || '';
+        return timeA.localeCompare(timeB);
     });
 
     // 페이지 분할
@@ -105,7 +110,7 @@ function buildLogRow(log: PdfLogEntry, idx: number, pageIdx: number) {
             <td class="right">${formatNumber(log.arrivalKm ?? log.endKm)}</td>
             <td class="right">${distance > 0 ? distance.toLocaleString() : ''}</td>
             <td class="center">${log.passengerCount || ''}</td>
-            <td class="right">${log.energyCost ? Number(log.energyCost).toLocaleString() : ''}</td>
+            <td class="right">${(log.fuelAmount || log.energyCost) ? Number(log.fuelAmount || log.energyCost).toLocaleString() : ''}</td>
             <td>${log.notes || ''}</td>
         </tr>
     `;
@@ -186,7 +191,7 @@ function buildPageHtml(pageRows: PdfLogEntry[], pageIdx: number, totalPages: num
                         <th rowspan="2" class="col-purpose">사용목적</th>
                         <th colspan="2">시각</th>
                         <th colspan="3">주행거리 (km)</th>
-                        <th rowspan="2" class="col-passenger">동반<br/>인원</th>
+                        <th rowspan="2" class="col-passenger">탑승<br/>인원</th>
                         <th rowspan="2" class="col-fuel">주유/<br/>충전(원)</th>
                         <th rowspan="2" class="col-note">비고</th>
                     </tr>

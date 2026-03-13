@@ -1,4 +1,4 @@
-﻿import { initializeApp } from 'firebase/app';
+import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, browserLocalPersistence, setPersistence } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
@@ -17,9 +17,10 @@ const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 // iOS Safari ITP 대응: 명시적으로 local persistence 설정하여 세션 유지 보장
-setPersistence(auth, browserLocalPersistence).catch((err) =>
-    console.warn('[Auth] persistence 설정 실패:', err)
-);
+// useAuth에서 await하여 persistence 설정 완료 후 onAuthStateChanged 구독을 시작한다.
+export const authReady = setPersistence(auth, browserLocalPersistence).catch((err) => {
+    console.warn('[Auth] persistence 설정 실패:', err);
+});
 
 // IndexedDB / Firestore 鍮꾨룞湲??먮윭 ?⑦꽩 (Sentry ?몄씠利?諛⑹?)
 function isFirestorePersistenceError(msg: string) {

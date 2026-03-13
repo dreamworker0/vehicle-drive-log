@@ -5,21 +5,24 @@ service cloud.firestore {
 
 
 
-    // === 헬퍼 함수 (Custom Claims 기반 — get() 호출 제거) ===
+    // === 헬퍼 함수 (Custom Claims 기반 — get() 호출 없이 빠른 검증) ===
     function isSignedIn() {
       return request.auth != null;
     }
 
     function isSuperAdmin() {
-      return isSignedIn() && request.auth.token.role == 'superAdmin';
+      return isSignedIn()
+        && request.auth.token.role == 'superAdmin';
     }
 
     function isOrgMember(orgId) {
-      return isSignedIn() && request.auth.token.orgId == orgId;
+      return isSignedIn()
+        && request.auth.token.orgId == orgId;
     }
 
     function isOrgAdmin(orgId) {
-      return isOrgMember(orgId) && request.auth.token.role == 'admin';
+      return isOrgMember(orgId)
+        && request.auth.token.role == 'admin';
     }
 
     function isOwner(uid) {
@@ -49,8 +52,7 @@ service cloud.firestore {
                     && request.resource.data.keys().hasAll(['email'])
                     && request.resource.data.email is string;
       allow update: if isOwner(userId) || isSuperAdmin()
-                    || (isSignedIn() && request.auth.token.role == 'admin'
-                        && request.auth.token.orgId == resource.data.organizationId);
+                    || isOrgAdmin(resource.data.organizationId);
       allow delete: if isSuperAdmin();
     }
 
@@ -127,10 +129,25 @@ service cloud.firestore {
       allow delete: if resource.data.userId == request.auth.uid;
     }
 
+    // === 주유 기록 ===
+    match /fuelLogs/{logId} {
+      allow read: if belongsToMyOrg() || isSuperAdmin();
+      allow create: if newBelongsToMyOrg();
+      allow update: if belongsToMyOrg()
+                    && (resource.data.driverUid == request.auth.uid
+                        || isOrgAdmin(resource.data.organizationId))
+                    || isSuperAdmin();
+      allow delete: if (belongsToMyOrg()
+                    && (resource.data.driverUid == request.auth.uid
+                        || isOrgAdmin(resource.data.organizationId)))
+                    || isSuperAdmin();
+    }
+
     // === 정비 기록 ===
     match /maintenanceRecords/{recordId} {
       allow read: if belongsToMyOrg() || isSuperAdmin();
-      allow create: if newBelongsToMyOrg() && isOrgAdmin(request.resource.data.organizationId);
+      allow create: if isSuperAdmin()
+                    || (newBelongsToMyOrg() && isOrgAdmin(request.resource.data.organizationId));
       allow update: if isOrgAdmin(resource.data.organizationId) || isSuperAdmin();
       allow delete: if isOrgAdmin(resource.data.organizationId) || isSuperAdmin();
     }

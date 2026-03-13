@@ -5,7 +5,7 @@ description: 설정 페이지의 디자인 패턴을 정의하여 새 설정 항
 
 # 설정 페이지 디자인 통일 스킬
 
-설정 페이지(`Settings.jsx`)에 새 섹션이나 항목을 추가할 때 반드시 따라야 하는 디자인 패턴.
+설정 페이지(`Settings.tsx`)에 새 섹션이나 항목을 추가할 때 반드시 따라야 하는 디자인 패턴.
 
 ---
 
@@ -32,7 +32,7 @@ Settings
 
 섹션 그룹을 구분하는 소제목. 첫 번째 그룹을 제외하고 `mt-8`로 상단 여백 추가.
 
-```jsx
+```tsx
 {/* 첫 번째 그룹 — mt 없음 */}
 <h2 className="text-sm font-semibold text-surface-400 dark:text-surface-500 uppercase tracking-wider mb-3 px-1">
     기관 관리
@@ -55,7 +55,7 @@ Settings
 
 모든 설정 카드는 `glass-card` 클래스를 사용한다.
 
-```jsx
+```tsx
 <div className="glass-card p-6 mb-6">
     <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4">카드 제목</h2>
     {/* 내용 */}
@@ -75,7 +75,7 @@ Settings
 
 기관 정보, 결재 라인처럼 값을 편집하고 저장하는 카드.
 
-```jsx
+```tsx
 <div className="glass-card p-6 mb-6">
     <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4">카드 제목</h2>
     <form onSubmit={handleSave} className="space-y-4">
@@ -97,7 +97,7 @@ Settings
 
 기관 식별 정보처럼 수정 불가능한 값을 나열하는 카드.
 
-```jsx
+```tsx
 <div className="glass-card p-6 mb-6">
     <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4">카드 제목</h2>
     <div className="space-y-3 text-sm">
@@ -120,7 +120,7 @@ Settings
 
 내 계정, 앱 정보처럼 클릭 가능한 항목을 나열하는 카드.
 
-```jsx
+```tsx
 <div className="glass-card p-6 mb-6">
     {/* 항목 하나 */}
     <button
@@ -229,8 +229,8 @@ Settings
 
 ## 8. 로직 분리 규칙
 
-- **상태/로직**: `useSettings` 훅에 추가 (`src/hooks/useSettings.js`)
-- **UI만**: `Settings.jsx`에 작성
+- **상태/로직**: `useSettings` 훅에 추가 (`src/hooks/useSettings.ts`)
+- **UI만**: `Settings.tsx`에 작성
 - **복잡한 서브 UI**: 별도 컴포넌트로 분리 (예: `HolidayManager`)
   - `admin/` 폴더에 배치, Settings에서 import하여 사용
 

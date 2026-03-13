@@ -126,7 +126,7 @@ export default function CostOptimization({
                 )}
                 {fuelItems.length > 0 ? (
                     <>
-                        <ResponsiveContainer width="100%" height={Math.max(180, fuelItems.length * 45)}>
+                        <ResponsiveContainer width="100%" height={Math.max(180, fuelItems.length * 45)} minWidth={1} minHeight={1}>
                             <BarChart data={fuelItems} layout="vertical" margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
                                 <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
                                 <XAxis type="number" tick={{ fontSize: 11 }} unit="원" />

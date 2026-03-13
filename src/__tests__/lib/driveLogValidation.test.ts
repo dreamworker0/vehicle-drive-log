@@ -100,13 +100,14 @@ describe('buildDriveTimestamp', () => {
         expect(ts.getMinutes()).toBe(30);
     });
 
-    it('오늘 날짜면 현재 시각 기준 타임스탬프를 생성한다', () => {
+    it('오늘 날짜면 입력된 시간 기준 타임스탬프를 생성한다', () => {
         const now = new Date();
         const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
         const ts = buildDriveTimestamp(todayStr, '17:30', '09:00');
-        // 오늘이면 new Date() 반환
-        const diff = Math.abs(ts.getTime() - Date.now());
-        expect(diff).toBeLessThan(1000); // 1초 이내
+        // 오늘이라도 endTime(17:30) 기반으로 생성
+        expect(ts.getHours()).toBe(17);
+        expect(ts.getMinutes()).toBe(30);
+        expect(ts.getDate()).toBe(now.getDate());
     });
 });
 
@@ -117,7 +118,7 @@ describe('buildLogData', () => {
             purpose: '출장', destination: '서울역',
             startKm: '1000', endKm: '1050',
             startTime: '09:00', endTime: '17:30',
-            fuelAmount: '30', batteryStart: '', batteryEnd: '',
+            batteryStart: '', batteryEnd: '',
             notes: '비고 없음', driveDate: '2026-01-15',
         };
         const context = {
@@ -135,7 +136,7 @@ describe('buildLogData', () => {
         expect(result.startKm).toBe(1000);
         expect(result.endKm).toBe(1050);
         expect(result.distance).toBe(50);
-        expect(result.fuelAmount).toBe(30);
+
         expect(result.passengerCount).toBe(2); // 기사 + 동승자 1명
         expect(result.passengerNames).toEqual(['김철수']);
         expect(result.isRetroactive).toBe(true);

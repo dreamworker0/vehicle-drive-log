@@ -144,10 +144,17 @@ export default function useOrgApplication() {
             return;
         }
 
-        // 종교단체 신청 차단
-        const BLOCKED_KEYWORDS = ['교회'];
-        if (BLOCKED_KEYWORDS.some(kw => form.orgName.includes(kw))) {
-            setError('죄송합니다. 종교단체는 현재 서비스 대상이 아닙니다.');
+        // 종교단체·학교·병원 신청 차단
+        const BLOCKED_CATEGORIES = [
+            { category: '종교단체', keywords: ['교회', '사찰', '성당', '수도원', '선교'] },
+            { category: '학교', keywords: ['학교', '초등학교', '중학교', '고등학교', '대학교', '유치원', '어린이집'] },
+            { category: '병원', keywords: ['병원', '의원', '한의원', '치과', '클리닉'] },
+        ];
+        const blockedMatch = BLOCKED_CATEGORIES.find(cat =>
+            cat.keywords.some(kw => form.orgName.includes(kw))
+        );
+        if (blockedMatch) {
+            setError(`죄송합니다. ${blockedMatch.category}는 현재 서비스 대상이 아닙니다.`);
             return;
         }
 

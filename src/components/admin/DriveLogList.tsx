@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { getDriveLogs, getVehicles, getOrganizationMembers, getOrganization, cleanupDuplicateLogs, deleteDriveLog } from '../../lib/firestore';
 import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { toLocalDateStr } from '../../lib/dateUtils';
 import { SkeletonBox, SkeletonTable } from '../common/Skeleton';
 
 export default function DriveLogList() {
     const { userData } = useAuth();
     const { showToast } = useToast();
+    const { confirm } = useConfirm();
     const [logs, setLogs] = useState<any[]>([]);
     const [vehicles, setVehicles] = useState<any[]>([]);
     const [members, setMembers] = useState<any[]>([]);
@@ -97,7 +99,7 @@ export default function DriveLogList() {
     const totalDistance = filteredLogs.reduce((sum, l) => sum + ((l.endKm - l.startKm) || 0), 0);
 
     const handleDelete = async (logId: string, driverName: string) => {
-        if (!window.confirm(`${driverName || '(이름 없음)'}님의 운행 기록을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`)) return;
+        if (!await confirm({ message: `${driverName || '(이름 없음)'}님의 운행 기록을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`, confirmColor: 'danger' })) return;
         setDeletingId(logId);
         try {
             await deleteDriveLog(logId);
@@ -205,10 +207,13 @@ export default function DriveLogList() {
                             const period = `${filters.startDate} ~ ${filters.endDate}`;
                             const { downloadDriveLogsPdf } = await import('../../lib/pdfExport');
                             const defaultApproval = [{ title: '담당' }, { title: '팀장' }];
+                            const useApproval = org?.hideApprovalLine
+                                ? []
+                                : (org?.approvalLine?.length > 0 ? org.approvalLine : defaultApproval);
                             downloadDriveLogsPdf(filteredLogs, {
                                 orgName: org?.name || '',
                                 period,
-                                approvalLine: org?.approvalLine?.length > 0 ? org.approvalLine : defaultApproval,
+                                approvalLine: useApproval,
                                 onError: (msg) => showToast(msg, 'error'),
                             });
                         }}
@@ -247,7 +252,7 @@ export default function DriveLogList() {
                             </button>
                             <button
                                 onClick={async () => {
-                                    if (!window.confirm(`정말 ${dupResult.deleteCount}건의 중복 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`)) return;
+                                    if (!await confirm({ message: `정말 ${dupResult.deleteCount}건의 중복 데이터를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.`, confirmColor: 'danger' })) return;
                                     setDupState('cleaning');
                                     try {
                                         const result = await cleanupDuplicateLogs(orgId!, { dryRun: false });

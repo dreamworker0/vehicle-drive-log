@@ -10,6 +10,7 @@ import { SkeletonCard, SkeletonBox } from '../common/Skeleton';
 import WelcomeGuide from './WelcomeGuide';
 import ReservationCard from './ReservationCard';
 import WeekReservationList from './WeekReservationList';
+import ConfirmModal from '../common/ConfirmModal';
 
 export default function TodayDashboard() {
     const {
@@ -17,12 +18,13 @@ export default function TodayDashboard() {
         myReservations, weekGrouped, todayLabel,
         upcomingAlerts, incompleteAlerts, hasActiveDrive,
         handleStartDrive, handleStartNavigation,
-        handleCancelWeekReservation,
+        handleCancelWeekReservation, handleCancelTodayReservation,
         navigateToArrival, navigateToReservations, navigateToQuickDrive,
         recommendedVehicle,
     } = useTodayDashboard();
     const navigate = useNavigate();
     const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
+    const [cancelTarget, setCancelTarget] = useState<{ reservation: any; type: 'today' | 'week' } | null>(null);
 
     // 웰컴 가이드 (첫 방문 시 1회 표시)
     const [showWelcome, setShowWelcome] = useState(() => {
@@ -138,9 +140,11 @@ export default function TodayDashboard() {
                                     isInProgress={res.status === 'in_progress'}
                                     disabled={hasActiveDrive && res.status !== 'in_progress'}
                                     startingId={startingId}
+                                    cancellingId={cancellingId}
                                     onStartDrive={handleStartDrive}
                                     onStartNavigation={handleStartNavigation}
                                     onArrival={navigateToArrival}
+                                    onCancel={(res) => setCancelTarget({ reservation: res, type: 'today' })}
                                 />
                             );
                         })}
@@ -155,7 +159,7 @@ export default function TodayDashboard() {
                         <div className="flex items-center gap-3 min-w-0 flex-1">
                             <span className="w-8 h-8 rounded-lg bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center text-sm flex-shrink-0">📋</span>
                             <div className="min-w-0">
-                                <p className="font-medium text-surface-800 dark:text-surface-200 text-sm">오늘 예약이 없습니다</p>
+                                <p className="font-medium text-surface-800 dark:text-surface-200 text-sm">오늘 예약 없음</p>
                                 <p className="text-xs text-surface-500 dark:text-surface-400">새 예약을 등록해보세요</p>
                             </div>
                         </div>
@@ -172,7 +176,7 @@ export default function TodayDashboard() {
                             <div className="flex items-center gap-3 min-w-0 flex-1">
                                 <span className="w-8 h-8 rounded-lg bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-sm flex-shrink-0 group-hover:scale-110 transition-transform">🚗</span>
                                 <div className="min-w-0 text-left">
-                                    <p className="font-medium text-surface-800 dark:text-surface-200 text-sm">예약 없이 바로 운행할 수 있습니다</p>
+                                    <p className="font-medium text-surface-800 dark:text-surface-200 text-sm">예약 없이 바로 운행</p>
                                     {recommendedVehicle ? (
                                         <p className="text-xs text-surface-500 dark:text-surface-400">
                                             {recommendedVehicle.displayName} ·{' '}
@@ -197,7 +201,26 @@ export default function TodayDashboard() {
                 weekGrouped={weekGrouped}
                 vehicles={vehicles}
                 cancellingId={cancellingId}
-                onCancelReservation={handleCancelWeekReservation}
+                onCancelReservation={(res) => setCancelTarget({ reservation: res, type: 'week' })}
+            />
+
+            {/* 예약 취소 확인 모달 */}
+            <ConfirmModal
+                open={!!cancelTarget}
+                title="예약 취소"
+                message={cancelTarget ? `${cancelTarget.reservation.vehicleName} 예약을 취소하시겠습니까?` : ''}
+                confirmText="취소하기"
+                confirmColor="danger"
+                onCancel={() => setCancelTarget(null)}
+                onConfirm={() => {
+                    if (!cancelTarget) return;
+                    if (cancelTarget.type === 'today') {
+                        handleCancelTodayReservation(cancelTarget.reservation);
+                    } else {
+                        handleCancelWeekReservation(cancelTarget.reservation);
+                    }
+                    setCancelTarget(null);
+                }}
             />
         </div>
     );

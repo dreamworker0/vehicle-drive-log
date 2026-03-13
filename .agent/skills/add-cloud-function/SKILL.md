@@ -1,48 +1,66 @@
 ---
 name: add-cloud-function
-description: functions/ 디렉터리에 새 Cloud Function을 추가하고 index.js에 등록하는 패턴 가이드
+description: functions/src/ 디렉터리에 새 Cloud Function을 추가하고 index.ts에 등록하는 패턴 가이드
 ---
 
 # Cloud Function 추가 스킬
 
-## functions/ 디렉터리 구조
+## functions/src/ 디렉터리 구조
 
 ```
 functions/
-├── index.js              ← 엔트리 (모든 함수를 require → exports)
-├── package.json          ← Node 22, firebase-functions v6
-├── .env                  ← 환경변수 (API 키 등)
-│
-├── ocrDashboard.js       ← onCall 함수 (계기판 OCR)
-├── ocrDocument.js        ← Firestore 트리거 (고유번호증 OCR, autoVerifyDocument에서 호출)
-├── createReservationSafe.js ← onCall 함수 (서버 측 중복 검증 예약 생성)
-├── sendAdminNotice.js    ← onCall 함수 (관리자 공지 발송)
-├── holidayProxy.js       ← HTTP 프록시 함수
-├── tmapProxy.js          ← HTTP 프록시 함수
-├── warmupOcr.js          ← 스케줄 로직 (콜드 스타트 방지)
-│
-├── calendarSync.js       ← 헬퍼 모듈 (Google Calendar 연동, 함수 등록 X)
-├── sendNotification.js   ← 헬퍼 모듈 (FCM 푸시 알림)
-│
-├── autoVerifyDocument.js ← Firestore 트리거 (기관 신청 AI 자동 검증)
-├── notifyNewApplication.js ← Firestore 트리거 (신규 신청 시 슈퍼관리자 푸시)
-│
-├── syncHolidays.js       ← 스케줄 함수 (공휴일 동기화)
-├── reservationReminder.js← 스케줄 로직 (예약 알림, index.js에서 onSchedule 래핑)
-├── backupFirestore.js    ← 스케줄 함수 (Firestore 백업)
-├── autoPurgeOrgs.js      ← 스케줄 함수 (삭제된 기관 자동 퍼지)
-└── archiveDriveLogs.js   ← 스케줄 함수 (운행기록 아카이빙)
+├── src/
+│   ├── index.ts                     ← 엔트리 (모든 함수를 re-export)
+│   ├── helpers.ts                   ← 공통 유틸 (구조화 로깅, 에러 래퍼)
+│   │
+│   ├── ocrDashboard.ts              ← onCall (계기판 OCR)
+│   ├── ocrDocument.ts               ← 헬퍼 (고유번호증 OCR, autoVerifyDocument에서 호출)
+│   ├── autoVerifyDocument.ts        ← Firestore 트리거 (기관 신청 AI 자동 검증)
+│   ├── createReservationSafe.ts     ← onCall (서버사이드 중복 검증 예약 생성)
+│   ├── sendAdminNotice.ts           ← onCall (관리자 공지 발송)
+│   ├── sendNotification.ts          ← 헬퍼 (FCM 푸시 알림)
+│   ├── notifyNewApplication.ts      ← Firestore 트리거 (신규 신청 시 슈퍼관리자 푸시)
+│   │
+│   ├── calendarSync.ts              ← 헬퍼 (Google Calendar 정방향 동기화)
+│   ├── calendarSchedule.ts          ← 스케줄 (Google Calendar 역동기화, 10분 주기)
+│   ├── reservationTriggers.ts       ← Firestore 트리거 (예약 생성/수정/삭제)
+│   ├── reservationReminder.ts       ← 스케줄 로직 (예약 알림, index.ts에서 onSchedule 래핑)
+│   │
+│   ├── holidayProxy.ts              ← HTTP 프록시 함수
+│   ├── tmapProxy.ts                 ← HTTP 프록시 함수
+│   ├── syncHolidays.ts              ← 스케줄 (공휴일 동기화)
+│   ├── warmupOcr.ts                 ← 스케줄 로직 (콜드 스타트 방지)
+│   │
+│   ├── backupFirestore.ts           ← 스케줄 (Firestore 백업)
+│   ├── autoPurgeOrgs.ts             ← 스케줄 (삭제 기관 자동 퍼지)
+│   ├── archiveDriveLogs.ts          ← 스케줄 (운행기록 아카이빙)
+│   ├── cleanupDuplicateLogs.ts      ← HTTP (중복 운행기록 정리)
+│   │
+│   ├── disableUser.ts               ← onCall (사용자 비활성화)
+│   ├── restoreUser.ts               ← onCall (사용자 복원)
+│   ├── setCustomClaims.ts           ← Firestore 트리거 (Custom Claims 자동 동기화)
+│   ├── migrateCustomClaims.ts       ← HTTP (기존 사용자 Custom Claims 일괄 마이그레이션)
+│   ├── joinOrganization.ts          ← onCall (기관 가입 서버사이드 검증)
+│   ├── rateLimit.ts                 ← 헬퍼 (Cloud Functions 레이트 리밋)
+│   ├── cleanupCertificateImages.ts  ← 스케줄 (인증서 이미지 정리)
+│   │
+│   └── __tests__/                   ← Cloud Functions 테스트
+├── package.json                     ← Node 22, firebase-functions v6, TypeScript
+└── tsconfig.json
 ```
 
 ## 함수 유형별 템플릿
 
 ### 1. onCall 함수
 
-```js
-// newFunction.js
-const { onCall, HttpsError } = require("firebase-functions/v2/https");
+```ts
+// newFunction.ts
+import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { getFirestore } from "firebase-admin/firestore";
 
-exports.myFunction = onCall(
+const db = getFirestore();
+
+export const myFunction = onCall(
     {
         region: "asia-northeast3",
         // 필요 시: memory: "512MiB", timeoutSeconds: 60
@@ -57,10 +75,10 @@ exports.myFunction = onCall(
 
         try {
             // 비즈니스 로직
-            return { success: true, data: result };
-        } catch (err) {
-            console.error("myFunction 실패:", err.message);
-            throw new HttpsError("internal", err.message);
+            return { success: true };
+        } catch (err: unknown) {
+            console.error("myFunction 실패:", (err as Error).message);
+            throw new HttpsError("internal", "처리에 실패했습니다.");
         }
     }
 );
@@ -68,86 +86,98 @@ exports.myFunction = onCall(
 
 ### 2. HTTP 함수 (onRequest)
 
-```js
-// newFunction.js
-const { onRequest } = require("firebase-functions/v2/https");
+```ts
+// newFunction.ts
+import { onRequest } from "firebase-functions/v2/https";
+import { wrapHttps } from "./helpers";
 
-exports.myFunction = onRequest(
+export const myFunction = onRequest(
     {
         region: "asia-northeast3",
         cors: true,
-        // 필요 시: memory: "512MiB", timeoutSeconds: 120
     },
-    async (req, res) => {
-        try {
-            // 비즈니스 로직
-            res.json({ success: true, data: result });
-        } catch (err) {
-            console.error("myFunction 실패:", err.message);
-            res.status(500).json({ error: err.message });
-        }
-    }
+    wrapHttps("myFunction", async (req, res) => {
+        // 비즈니스 로직
+        res.json({ success: true });
+    })
 );
 ```
 
 ### 3. 스케줄 함수 (onSchedule)
 
-```js
+```ts
 // 방법 A: 모듈에서 직접 onSchedule 래핑
-const { onSchedule } = require("firebase-functions/v2/scheduler");
+import { onSchedule } from "firebase-functions/v2/scheduler";
 
-exports.myScheduledFn = onSchedule(
+export const myScheduledFn = onSchedule(
     {
         schedule: "every 1 hours",
         timeZone: "Asia/Seoul",
         retryCount: 0,
     },
-    async function () {
+    async () => {
         // 비즈니스 로직
     }
 );
 
-// 방법 B: 로직 함수만 export, index.js에서 onSchedule 래핑
-exports.myScheduledLogic = async function () {
+// 방법 B: 로직 함수만 export, index.ts에서 onSchedule 래핑
+export async function myScheduledLogic(): Promise<void> {
     // 비즈니스 로직
-};
+}
 ```
 
 ### 4. Firestore 트리거
 
-```js
-const { onDocumentCreated } = require("firebase-functions/v2/firestore");
+```ts
+import { onDocumentCreated } from "firebase-functions/v2/firestore";
 
-exports.onItemCreated = onDocumentCreated(
+export const onItemCreated = onDocumentCreated(
     "collectionName/{docId}",
     async (event) => {
-        const data = event.data.data();
+        const data = event.data?.data();
         const docId = event.params.docId;
+
+        if (!data) return;
 
         try {
             // 비즈니스 로직
             console.log("처리 완료:", docId);
-        } catch (err) {
-            console.error("처리 실패:", docId, err.message);
+        } catch (err: unknown) {
+            console.error("처리 실패:", docId, (err as Error).message);
         }
     }
 );
 ```
 
-## index.js 등록 절차
+## index.ts 등록 절차
 
-새 파일을 만들었으면 `index.js`에 등록합니다:
+새 파일을 만들었으면 `index.ts`에서 re-export합니다:
 
-```js
+```ts
 // 섹션 주석으로 그룹핑
-// ========================
 // 새 기능 이름
-// ========================
-const { myFunction } = require("./newFunction");
-exports.myFunction = myFunction;
+export { myFunction } from "./newFunction";
 ```
 
-> ⚠️ `index.js`에서 `exports`에 등록하지 않으면 배포되지 않는다.
+> ⚠️ `index.ts`에서 export하지 않으면 배포되지 않는다.
+
+## helpers.ts 활용
+
+공통 유틸리티를 적극 활용한다:
+
+```ts
+import { log, wrapHttps, wrapHandler } from "./helpers";
+
+// 구조화 로깅 (Cloud Logging severity 기반 필터링)
+log("INFO", "myFunction", "처리 시작", { userId: "abc" });
+log("ERROR", "myFunction", "실패", { stack: error.stack });
+
+// HTTP 핸들러 에러 자동 래핑
+wrapHttps("myFunction", async (req, res) => { ... });
+
+// onCall/트리거 핸들러 에러 자동 래핑
+wrapHandler("myFunction", async (...args) => { ... });
+```
 
 ## 환경변수
 
@@ -159,17 +189,17 @@ MY_API_KEY=abcdef123456
 ```
 
 코드에서 사용:
-```js
+```ts
 const apiKey = process.env.MY_API_KEY;
 ```
 
 ## 주의사항
 
-1. **CommonJS 사용**: functions 디렉터리는 `"type": "module"`이 아니므로 `require/module.exports` 사용
+1. **TypeScript ESM**: `import/export` 사용 (CommonJS 아님)
 2. **리전**: `asia-northeast3` (서울) 고정
 3. **Node 버전**: 22 (package.json `engines.node`로 지정)
-4. **Firebase Admin**: `index.js`에서 한 번만 초기화. 개별 모듈에서는 `getFirestore()` 등만 호출
-5. **에러 로깅**: `console.error('한글 설명:', err.message)` 형식
+4. **Firebase Admin**: `index.ts`에서 한 번만 `initializeApp()`. 개별 모듈에서는 `getFirestore()`, `getAuth()` 등만 호출
+5. **에러 타입**: `catch (err: unknown)` → `(err as Error).message` 패턴
 6. **CORS**: HTTP 함수는 `cors: true` 옵션 사용
 
 ## 배포 및 검증

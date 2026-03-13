@@ -9,6 +9,7 @@ import {
     getTodayStr,
     getMinStartTime,
     findOverlappingReservation,
+    findUserOverlappingReservation,
     getAutoTimes,
     calcEndTime,
 } from '../../hooks/utils/reservationUtils';
@@ -182,6 +183,53 @@ describe('reservationUtils', () => {
             const result = getAutoTimes('2026-02-28', 30);
             expect(result.startTime).toBe('09:00');
             expect(result.endTime).toBe('11:00');
+        });
+    });
+
+    describe('findUserOverlappingReservation', () => {
+        const reservations = [
+            { id: 'r1', vehicleId: 'v1', date: '2026-02-27', startTime: '09:00', endTime: '11:00', status: 'reserved', reservedByUid: 'user1' },
+            { id: 'r2', vehicleId: 'v2', date: '2026-02-27', startTime: '14:00', endTime: '16:00', status: 'reserved', reservedByUid: 'user1' },
+            { id: 'r3', vehicleId: 'v1', date: '2026-02-27', startTime: '09:00', endTime: '12:00', status: 'reserved', reservedByUid: 'user2' },
+            { id: 'r4', vehicleId: 'v2', date: '2026-02-27', startTime: '18:00', endTime: '20:00', status: 'cancelled', reservedByUid: 'user1' },
+        ];
+
+        it('같은 사용자가 다른 차량에 겹치는 시간 예약이 있으면 반환한다', () => {
+            const result = findUserOverlappingReservation(reservations, {
+                reservedByUid: 'user1', date: '2026-02-27', startTime: '10:00', endTime: '12:00',
+            });
+            expect(result).not.toBeNull();
+            expect(result!.id).toBe('r1');
+        });
+
+        it('겹치지 않으면 null을 반환한다', () => {
+            const result = findUserOverlappingReservation(reservations, {
+                reservedByUid: 'user1', date: '2026-02-27', startTime: '11:00', endTime: '14:00',
+            });
+            expect(result).toBeNull();
+        });
+
+        it('다른 사용자의 예약과는 겹치지 않는다', () => {
+            const result = findUserOverlappingReservation(reservations, {
+                reservedByUid: 'user1', date: '2026-02-27', startTime: '09:00', endTime: '12:00',
+            });
+            // user1의 r1과 겹침 (user2의 r3과는 무관)
+            expect(result!.reservedByUid).toBe('user1');
+        });
+
+        it('취소된 예약은 무시한다', () => {
+            const result = findUserOverlappingReservation(reservations, {
+                reservedByUid: 'user1', date: '2026-02-27', startTime: '18:30', endTime: '19:30',
+            });
+            expect(result).toBeNull();
+        });
+
+        it('수정 모드에서 자기 자신은 제외한다', () => {
+            const result = findUserOverlappingReservation(reservations, {
+                reservedByUid: 'user1', date: '2026-02-27', startTime: '09:30', endTime: '10:30',
+                excludeId: 'r1',
+            });
+            expect(result).toBeNull();
         });
     });
 });

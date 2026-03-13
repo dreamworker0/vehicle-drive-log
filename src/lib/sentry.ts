@@ -23,6 +23,7 @@ export function initSentry() {
             'ChunkLoadError',
             /Loading chunk .* failed/,
             /Failed to fetch dynamically imported module/,
+            /Importing a module script failed/,
             // 브라우저/PWA 관련 무해한 에러
             'AbortError',
             /Object Not Found Matching Id/,
@@ -30,6 +31,23 @@ export function initSentry() {
             /Connection to Indexed Database server lost/,
             // Facebook 인앱 브라우저 WebView 내부 에러 (앱 버그 아님)
             /Java object is gone/,
+            // Facebook iOS 인앱 브라우저 IndexedDB 에러 (WebView 환경 제한)
+            /Object store cannot be found/,
+            // Firebase Auth 내부 assertion (iOS Safari ITP 환경에서 redirect 인증 시 발생, 앱 버그 아님)
+            /Pending promise was never set/,
+            // Service Worker 로드 실패 (배포 후 캐시 불일치, iOS 네트워크 제한 등 환경 이슈)
+            /Script .* load failed/,
+            // Service Worker 업데이트 경합 에러 (배포 후 SW 교체 시 환경 이슈, 앱 버그 아님)
+            /Failed to update a ServiceWorker/,
+            // Facebook 인앱 브라우저 네이티브 브릿지 에러 (WebView 내부 이슈, 앱 버그 아님)
+            /webkit\.messageHandlers/,
+            // Facebook 인앱 브라우저 DOMException (WebView 호환성 이슈, 앱 버그 아님)
+            /The object does not support the operation or argument/,
+            // iOS Safari IndexedDB 삭제 에러 (사용자 데이터 삭제 또는 iOS 저장공간 자동 정리, 앱 버그 아님)
+            /Database deleted by request of the user/,
+            // Firestore IndexedDB 내부 캐시 손상 (Firebase SDK 버그, 앱 버그 아님)
+            /INTERNAL ASSERTION FAILED/,
+            /Unexpected state/,
         ],
         // 브라우저 확장 프로그램 에러 제외
         denyUrls: [
@@ -41,6 +59,16 @@ export function initSentry() {
         beforeSend(event) {
             // 개발 환경에서는 전송하지 않음
             if (import.meta.env.DEV) return null;
+
+            // Firebase SDK 번들 내부 에러 필터링
+            const frames = event.exception?.values?.[0]?.stacktrace?.frames;
+            if (frames?.some(f =>
+                f.filename?.includes('firebase-auth') ||
+                f.filename?.includes('firebase-db')
+            )) {
+                return null;
+            }
+
             return event;
         },
     });

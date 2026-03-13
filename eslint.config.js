@@ -25,6 +25,11 @@ export default defineConfig([
     },
     rules: {
       'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      'no-restricted-globals': ['error',
+        { name: 'confirm', message: 'window.confirm 금지 → useConfirm() 훅을 사용하세요.' },
+        { name: 'alert', message: 'window.alert 금지 → useToast() 훅을 사용하세요.' },
+        { name: 'prompt', message: 'window.prompt 금지 → useConfirm() 또는 커스텀 입력 UI를 사용하세요.' },
+      ],
     },
   },
   {
@@ -50,6 +55,11 @@ export default defineConfig([
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-empty-object-type': 'off',
       'no-unused-vars': 'off',
+      'no-restricted-globals': ['error',
+        { name: 'confirm', message: 'window.confirm 금지 → useConfirm() 훅을 사용하세요.' },
+        { name: 'alert', message: 'window.alert 금지 → useToast() 훅을 사용하세요.' },
+        { name: 'prompt', message: 'window.prompt 금지 → useConfirm() 또는 커스텀 입력 UI를 사용하세요.' },
+      ],
     },
   },
   {

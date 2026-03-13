@@ -325,8 +325,8 @@ export default function DriveLogForm() {
                     )}
                 </div>
 
-                {/* 연료/배터리 */}
-                {isElectric ? (
+                {/* 배터리 (전기차만) */}
+                {isElectric && (
                     <div className="glass-card p-4">
                         <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300 mb-3">🔋 배터리</h3>
                         <div className="grid grid-cols-2 gap-4">
@@ -353,19 +353,6 @@ export default function DriveLogForm() {
                                 />
                             </div>
                         </div>
-                    </div>
-                ) : (
-                    <div className="glass-card p-4">
-                        <label className="label">주유비 (₩)</label>
-                        <input
-                            type="number"
-                            min="0"
-                            step="1"
-                            value={form.fuelAmount}
-                            onChange={e => setForm({ ...form, fuelAmount: e.target.value })}
-                            className="input"
-                            placeholder="주유 시에만 입력"
-                        />
                     </div>
                 )}
 

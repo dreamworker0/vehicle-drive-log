@@ -3,13 +3,13 @@
  * DriveLogForm에서 추출된 커스텀 훅
  */
 import { useState, useEffect } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
 import useRetry from './useRetry';
 import useDriveLogOcr from './useDriveLogOcr';
 import { nowTime, todayStr, validateDriveLogForm, buildLogData } from './utils/driveLogValidation';
-import { getVehicles, createDriveLog, updateDriveLog, updateReservationStatus, getFavorites, createFavorite, getOrganizationMembers, getLastVehicleEndKm, getVehicleEndKmBefore } from '../lib/firestore';
+import { getVehicles, createDriveLog, updateDriveLog, updateReservationStatus, getFavorites, createFavorite, getOrganizationMembers, getLastVehicleEndKm, getVehicleEndKmBefore, getReservationById } from '../lib/firestore';
 import type { Vehicle } from '../types/vehicle';
 import type { Favorite } from '../types/favorite';
 import type { User as UserDoc } from '../types/user';
@@ -24,7 +24,6 @@ export interface DriveLogForm {
     endTime: string;
     startKm: string;
     endKm: string;
-    fuelAmount: string;
     batteryStart: string;
     batteryEnd: string;
     notes: string;
@@ -50,7 +49,14 @@ export default function useDriveLogForm() {
     }
 
     const state = location.state as LocationState | null;
-    const reservationData = state?.reservationId ? state : null;
+    const [searchParams] = useSearchParams();
+    const queryReservationId = searchParams.get('reservationId');
+
+    // location.state 또는 URL 쿼리에서 예약 데이터 결정
+    const [resolvedReservationData, setResolvedReservationData] = useState<LocationState | null>(
+        state?.reservationId ? state : null
+    );
+    const reservationData = resolvedReservationData;
     const editLog = state?.editLog || null;
     const isEditMode = !!editLog;
     const isQuickDrive = false;
@@ -93,7 +99,6 @@ export default function useDriveLogForm() {
         endTime: editLog?.endTime as string || '',
         startKm: editLog?.startKm?.toString() || '',
         endKm: editLog?.endKm?.toString() || '',
-        fuelAmount: editLog?.fuelAmount?.toString() || '',
         batteryStart: editLog?.batteryStart?.toString() || '',
         batteryEnd: editLog?.batteryEnd?.toString() || '',
         notes: editLog?.notes || '',
@@ -166,11 +171,55 @@ export default function useDriveLogForm() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [orgId, reservationData, user]);
 
+    // URL 쿼리 파라미터에서 reservationId로 예약 데이터 로드 (알림 클릭 시)
     useEffect(() => {
+        if (!queryReservationId || resolvedReservationData || !orgId) return;
+        const loadReservation = async () => {
+            try {
+                const res = await getReservationById(queryReservationId);
+                if (res) {
+                    const data: LocationState = {
+                        reservationId: res.id,
+                        vehicleId: res.vehicleId,
+                        vehicleName: res.vehicleName || res.vehicleDisplayName,
+                        purpose: res.purpose || '',
+                        destination: res.destination || '',
+                        actualStartTime: res.actualStartTime || '',
+                        currentKm: res.currentKm || 0,
+                    };
+                    setResolvedReservationData(data);
+
+                    // 폼에 예약 정보 반영
+                    setForm(prev => ({
+                        ...prev,
+                        vehicleId: data.vehicleId || '',
+                        vehicleName: data.vehicleName || '',
+                        purpose: data.purpose || '',
+                        destination: data.destination || '',
+                        startTime: data.actualStartTime || prev.startTime,
+                    }));
+
+                    // startKm 조회
+                    const lastEndKm = await getLastVehicleEndKm(orgId, data.vehicleId!);
+                    const km = (lastEndKm ?? data.currentKm ?? '').toString();
+                    setForm(prev => ({ ...prev, startKm: km }));
+                }
+            } catch (err) {
+                console.error('예약 데이터 로드 실패:', err);
+            }
+        };
+        loadReservation();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [queryReservationId, orgId]);
+
+    useEffect(() => {
+        // 수정 모드에서는 기존 기록의 startKm을 유지 (최신 endKm으로 덮어쓰지 않음)
+        if (isEditMode) return;
         if (!orgId || !form.vehicleId || !form.driveDate) return;
         const refreshStartKm = async () => {
             let km: number | string;
             if (form.driveDate !== todayStr()) {
+                // 과거 날짜: 해당 날짜 이전의 마지막 endKm
                 const [y, m, d] = form.driveDate.split('-').map(Number);
                 const beforeDate = new Date(y, m - 1, d);
                 km = await getVehicleEndKmBefore(orgId, form.vehicleId, beforeDate) ?? '';
@@ -178,7 +227,18 @@ export default function useDriveLogForm() {
                     const v = vehicles.find(veh => veh.id === form.vehicleId);
                     km = v?.currentKm ?? '';
                 }
+            } else if (form.startTime) {
+                // 오늘 + 출발 시각: 해당 시각 이전의 마지막 endKm (같은 날 소급)
+                const [y, m, d] = form.driveDate.split('-').map(Number);
+                const [h, min] = form.startTime.split(':').map(Number);
+                const beforeTime = new Date(y, m - 1, d, h, min);
+                km = await getVehicleEndKmBefore(orgId, form.vehicleId, beforeTime) ?? '';
+                if (km === '') {
+                    const v = vehicles.find(veh => veh.id === form.vehicleId);
+                    km = v?.currentKm ?? '';
+                }
             } else {
+                // 오늘 + 출발 시각 없음: 기본 동작
                 const lastEndKm = await getLastVehicleEndKm(orgId, form.vehicleId);
                 const v = vehicles.find(veh => veh.id === form.vehicleId);
                 km = lastEndKm ?? v?.currentKm ?? '';
@@ -186,16 +246,26 @@ export default function useDriveLogForm() {
             setForm(prev => ({ ...prev, startKm: km.toString() }));
         };
         refreshStartKm();
-    }, [form.driveDate, form.vehicleId, orgId, vehicles]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [form.driveDate, form.vehicleId, form.startTime, orgId, vehicles]);
 
     const handleVehicleSelect = async (vehicleId: string) => {
         const v = vehicles.find(veh => veh.id === vehicleId);
         let km: number | string;
         if (form.driveDate && form.driveDate !== todayStr()) {
+            // 과거 날짜
             const [y, m, d] = form.driveDate.split('-').map(Number);
             const beforeDate = new Date(y, m - 1, d);
             km = await getVehicleEndKmBefore(orgId!, vehicleId, beforeDate) ?? v?.currentKm ?? '';
+        } else if (form.startTime) {
+            // 오늘 + 출발 시각: 해당 시각 이전의 마지막 endKm
+            const dateStr = form.driveDate || todayStr();
+            const [y, m, d] = dateStr.split('-').map(Number);
+            const [h, min] = form.startTime.split(':').map(Number);
+            const beforeTime = new Date(y, m - 1, d, h, min);
+            km = await getVehicleEndKmBefore(orgId!, vehicleId, beforeTime) ?? v?.currentKm ?? '';
         } else {
+            // 오늘 + 출발 시각 없음: 기본 동작
             const lastEndKm = await getLastVehicleEndKm(orgId!, vehicleId);
             km = lastEndKm ?? v?.currentKm ?? '';
         }
@@ -283,7 +353,7 @@ export default function useDriveLogForm() {
             } else {
                 setForm({
                     vehicleId: '', vehicleName: '', purpose: '', destination: '',
-                    startKm: '', endKm: '', fuelAmount: '', startTime: nowTime(),
+                    startKm: '', endKm: '', startTime: nowTime(),
                     endTime: '', batteryStart: '', batteryEnd: '', notes: '',
                     driveDate: todayStr(),
                 });

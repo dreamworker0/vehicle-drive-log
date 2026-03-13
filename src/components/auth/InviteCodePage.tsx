@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { findOrganizationByInviteCode, createUser, getOrganizationMembers } from '../../lib/firestore';
-import { collection, query, where, getDocs, deleteDoc, doc } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../../lib/auth';
+import { auth } from '../../lib/firebase';
 
 export default function InviteCodePage() {
-    const { user, refreshUserData } = useAuth();
+    const { user } = useAuth();
     const [code, setCode] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -30,68 +29,24 @@ export default function InviteCodePage() {
         setError('');
 
         try {
-            const org = await findOrganizationByInviteCode(code.toUpperCase());
-            if (!org) {
-                setError('유효하지 않은 초대 코드입니다.');
-                return;
-            }
+            const functions = getFunctions(undefined, 'asia-northeast3');
+            const joinOrg = httpsCallable(functions, 'joinOrganization');
+            await joinOrg({ code: code.toUpperCase() });
 
-            if (!user?.email || !user?.uid) {
-                setError('인증 정보가 부족합니다. 다시 로그인해주세요.');
-                return;
-            }
+            // Custom Claims 갱신을 위해 토큰 강제 리프레시
+            await auth.currentUser?.getIdToken(true);
 
-            // 기존 직원 목록에서 이메일 매칭 확인
-            const members = await getOrganizationMembers(org.id);
-            const matchedMember = members.find(m => m.email === user.email);
-
-            // preRegistered 서브컬렉션에서 이메일 매칭 확인
-            let preRegName = '';
-            let preRegDocId = '';
-            try {
-                const preRegQuery = query(
-                    collection(db, 'organizations', org.id, 'preRegistered'),
-                    where('email', '==', user.email!.toLowerCase())
-                );
-                const preRegSnap = await getDocs(preRegQuery);
-                if (!preRegSnap.empty) {
-                    const preRegDoc = preRegSnap.docs[0];
-                    preRegName = preRegDoc.data().name || '';
-                    preRegDocId = preRegDoc.id;
-                }
-            } catch {
-                // 보안 규칙 상 접근 불가(재가입 등) — 무시하고 진행
-            }
-
-            // 기관에 admin이 없으면 첫 등록자를 admin으로 설정
-            const hasAdmin = members.some(m => m.role === 'admin');
-            const role = hasAdmin ? 'employee' : 'admin';
-
-            await createUser(user.uid, {
-                email: user.email,
-                name: matchedMember?.name || preRegName || user.displayName || '',
-                role,
-                organizationId: org.id,
-                phone: '',
-            });
-
-            // 매칭된 preRegistered 문서 삭제 (가입 대기 목록에서 제거)
-            if (preRegDocId) {
-                try {
-                    await deleteDoc(doc(db, 'organizations', org.id, 'preRegistered', preRegDocId));
-                } catch (err) {
-                    console.warn('사전 등록 문서 삭제 실패:', err);
-                }
-            }
-
-            // Firestore 보안 규칙 캐시 갱신 대기
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            await refreshUserData();
+            // onSnapshot이 자동으로 userData를 업데이트하므로 잠시 대기
+            await new Promise(resolve => setTimeout(resolve, 1000));
         } catch (err: any) {
-            const errCode = err?.code || '';
-            if (errCode === 'permission-denied' || errCode === 'PERMISSION_DENIED') {
-                setError('권한이 만료되었습니다. 로그아웃 후 다시 로그인해 주세요.');
+            const message = err?.message || '';
+            // Cloud Function에서 반환한 에러 메시지 그대로 표시
+            if (message.includes('유효하지 않은') || message.includes('초대 코드')) {
+                setError('유효하지 않은 초대 코드입니다.');
+            } else if (message.includes('이미 기관에')) {
+                setError('이미 기관에 소속되어 있습니다. 로그아웃 후 다시 로그인해 주세요.');
+            } else if (message.includes('Google 계정')) {
+                setError('Google 계정으로 로그인 후 다시 시도해주세요.');
             } else {
                 setError('오류가 발생했습니다. 다시 시도해주세요.');
             }

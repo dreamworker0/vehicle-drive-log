@@ -12,7 +12,7 @@ const FUNCTIONS = [
     'backupFirestore', 'autoPurgeOrgs', 'archiveDriveLogs',
     'reservationReminder', 'warmupOcr',
     'onReservationCreated', 'onReservationUpdated', 'onReservationDeleted',
-    'syncCalendarToApp', 'sendAdminNotice',
+    'syncCalendarToApp', 'sendAdminNotice', 'cleanupRateLimits',
 ];
 
 console.log('📊 Cloud Functions 상태 리포트');

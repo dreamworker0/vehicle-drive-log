@@ -12,6 +12,7 @@ import {
     getPercent, getGaps, getHourLabels,
 } from '../../lib/timelineUtils';
 import useTimelineDrag from '../../hooks/useTimelineDrag';
+import { isVehicleBlocked } from '../../lib/vehicleUtils';
 import type { Vehicle } from '../../types/vehicle';
 import type { Reservation } from '../../types/reservation';
 import type { User } from '../../types/user';
@@ -121,7 +122,7 @@ export default function VehicleTimelineBar({
                 {/* 차량별 타임라인 행 */}
                 <div className="space-y-1.5">
                     {vehicleData.map(({ vehicle, reservations: vRes }) => {
-                        const isBlocked = vehicle.maintenance?.isBlocked;
+                        const isBlocked = isVehicleBlocked(vehicle.maintenance);
                         const gaps = getGaps(vRes, isToday, nowSnapped);
                         const isDraggingThis = dragState?.vehicleId === vehicle.id;
                         const isExpanded = expandedVehicleId === vehicle.id;
@@ -251,6 +252,7 @@ export default function VehicleTimelineBar({
                                                             {r.destination && <span className="mx-1 text-surface-300 dark:text-surface-600">|</span>}
                                                             {r.destination && <span>{r.destination}</span>}
                                                             {r.purpose && <span>, {r.purpose}</span>}
+                                                            {r.groupId && <span className="ml-1 text-blue-500" title="다일 예약">🔗</span>}
                                                         </div>
                                                         <div className="flex items-center gap-1.5 flex-shrink-0">
                                                             {(r as any).syncSource === 'calendar' && (

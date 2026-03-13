@@ -33,8 +33,9 @@ const MODEL_TYPE_MAP = {
         '테슬라', 'Model 3', 'Model Y', 'Model S', 'Model X',
         'e-트론', 'ID.4', '폴스타', '제로', 'i4', 'iX',
     ],
-    van: ['스타렉스', '스타랙스', '스타리아', '스타리야', '카니발', '카니벌', '콴라티', '보나식', '포터', '투산', '마스터', '보고', '싶온', '라바', '봉고', '봉구'],
-    bus: ['유니버스', '에어로', '카운티', '카운디', '레스타', '솔라티', '솔라디', '시티', '마이티', '그린시티'],
+    van: ['스타렉스', '스타랙스', '스타리아', '스타리야', '카니발', '카니벌', '콴라티', '보나식', '투산', '마스터', '보고', '싶온', '라바'],
+    bus: ['유니버스', '에어로', '카운티', '카운디', '레스타', '솔라티', '솔라디', '시티', '그린시티'],
+    truck: ['포터', '봉고', '봉구', '마이티', '메가트럭', '노부스', '파비스', '더카고', '그랜버드'],
 };
 
 // 모델명이 전기차인지 판별
@@ -54,12 +55,12 @@ const guessVehicleType = (modelName: string): string | null => {
 };
 
 // 차종별 기본 연료 유형
-export const DEFAULT_FUEL: Record<string, string> = { compact: 'gasoline', sedan: 'gasoline', van: 'diesel', bus: 'diesel' };
+export const DEFAULT_FUEL: Record<string, string> = { compact: 'gasoline', sedan: 'gasoline', van: 'diesel', bus: 'diesel', truck: 'diesel' };
 
 const INITIAL_FORM = {
     displayName: '', modelName: '', plateNumber: '',
     vehicleType: 'sedan', fuelType: 'gasoline',
-    currentKm: '', googleCalendarId: '',
+    currentKm: '', hipassCardNumber: '', googleCalendarId: '',
     insuranceCompany: '', insurancePhone: '',
 };
 
@@ -79,7 +80,7 @@ export default function useVehicleManager() {
 
     const orgId = userData?.organizationId;
 
-    const fetchVehicles = async () => {
+    const fetchVehicles = async (retryCount = 0) => {
         if (!orgId) { setLoading(false); return; }
         setLoading(true);
         try {
@@ -94,6 +95,19 @@ export default function useVehicleManager() {
             );
             setDeletableIds(new Set(checks.filter(c => !c.has).map(c => c.id)));
         } catch (err) {
+            const errCode = (err as { code?: string })?.code;
+            // Custom Claims가 아직 토큰에 반영되지 않아 권한 거부된 경우 1회 재시도
+            if (errCode === 'permission-denied' && retryCount < 1) {
+                console.debug('Custom Claims 미반영 — 토큰 갱신 후 재시도');
+                try {
+                    const { auth: firebaseAuth } = await import('../lib/firebase');
+                    if (firebaseAuth.currentUser) {
+                        await firebaseAuth.currentUser.getIdToken(true);
+                    }
+                } catch { /* ignore */ }
+                setTimeout(() => fetchVehicles(retryCount + 1), 800);
+                return;
+            }
             console.error('차량 목록 로드 실패:', err);
         } finally {
             setLoading(false);
@@ -118,6 +132,7 @@ export default function useVehicleManager() {
             vehicleType: vehicle.vehicleType || 'sedan',
             fuelType: vehicle.fuelType || 'gasoline',
             currentKm: vehicle.currentKm?.toString() || '',
+            hipassCardNumber: vehicle.hipassCardNumber || '',
             googleCalendarId: vehicle.googleCalendarId || '',
             insuranceCompany: vehicle.insurance?.company || '',
             insurancePhone: vehicle.insurance?.phone || '',
@@ -155,6 +170,7 @@ export default function useVehicleManager() {
                     company: form.insuranceCompany.trim(),
                     phone: form.insurancePhone.trim(),
                 },
+                ...(form.hipassCardNumber.trim() ? { hipassCardNumber: form.hipassCardNumber.trim() } : {}),
                 ...(form.googleCalendarId.trim() ? { googleCalendarId: form.googleCalendarId.trim() } : {}),
             };
             if (editingVehicle) {

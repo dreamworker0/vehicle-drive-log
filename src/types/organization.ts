@@ -16,6 +16,7 @@ export interface Organization extends FirestoreDoc {
     applicantName?: string;
     applicantPhone?: string;
     approvalLine?: { title: string }[];
+    hideApprovalLine?: boolean;
     status: OrgStatus;
     inviteCode?: string;
     uniqueNumber?: string;

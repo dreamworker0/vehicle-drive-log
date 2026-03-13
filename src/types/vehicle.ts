@@ -3,7 +3,7 @@
  */
 import type { FirestoreDoc, TimestampField } from './common';
 
-export type VehicleType = 'compact' | 'sedan' | 'van' | 'bus';
+export type VehicleType = 'compact' | 'sedan' | 'van' | 'bus' | 'truck';
 
 export interface VehicleRetired {
     isRetired: boolean;
@@ -33,6 +33,7 @@ export interface Vehicle extends FirestoreDoc {
         company: string;
         phone: string;
     };
+    hipassCardNumber?: string;
     googleCalendarId?: string;
     retired?: VehicleRetired | null;
     maintenance?: VehicleMaintenance | null;

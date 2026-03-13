@@ -6,6 +6,7 @@ import React, { useRef } from 'react';
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
 import { calcEndTime } from '../../hooks/utils/reservationUtils';
 import { parseDestinations } from '../../lib/tmap';
+import { isVehicleBlocked } from '../../lib/vehicleUtils';
 import VehicleTimelineBar from './VehicleTimelineBar';
 import type { Vehicle } from '../../types/vehicle';
 import type { Favorite } from '../../types/favorite';
@@ -18,6 +19,7 @@ interface ReservationForm {
     purpose: string;
     startTime: string;
     endTime: string;
+    endDate?: string;
     reservedByUid?: string;
     reservedByName?: string;
 }
@@ -37,6 +39,7 @@ interface Props {
     isToday: boolean;
     submitting: boolean;
     editingReservation: Reservation | null;
+    editingGroupId?: string | null;
     routeInfo: any;
     routeLoading: boolean;
     user: any; // User Doc or Auth User
@@ -72,6 +75,7 @@ export default function ReservationSidePanel({
     isToday,
     submitting,
     editingReservation,
+    editingGroupId,
     routeInfo,
     routeLoading,
     user,
@@ -101,7 +105,7 @@ export default function ReservationSidePanel({
         );
     }
 
-    const activeRes = selectedReservations.filter(r => r.status !== 'completed');
+    const activeRes = selectedReservations.filter(r => r.status !== 'completed' && r.status !== 'cancelled');
     const completedRes = selectedReservations.filter(r => r.status === 'completed');
 
     return (
@@ -132,7 +136,7 @@ export default function ReservationSidePanel({
                             <label className="label text-xs">차량</label>
                             <div className="grid grid-cols-3 gap-1.5">
                                 {vehicles.filter(v => !v.retired?.isRetired).map(v => {
-                                    const isBlocked = v.maintenance?.isBlocked;
+                                    const isBlocked = isVehicleBlocked(v.maintenance);
                                     return (
                                         <button
                                             key={v.id}
@@ -278,9 +282,63 @@ export default function ReservationSidePanel({
                                 placeholder="출장, 외근 등"
                             />
                         </div>
+                        {/* 다일 예약 체크박스 (독립 행) */}
+                        <label className="flex items-center gap-2 cursor-pointer select-none ml-auto">
+                            <input
+                                type="checkbox"
+                                checked={!!(form.endDate && form.endDate > selectedDate)}
+                                onChange={e => {
+                                    if (e.target.checked) {
+                                        const next = new Date(selectedDate + 'T00:00');
+                                        next.setDate(next.getDate() + 1);
+                                        const y = next.getFullYear();
+                                        const m = String(next.getMonth() + 1).padStart(2, '0');
+                                        const d = String(next.getDate()).padStart(2, '0');
+                                        setForm({ ...form, endDate: `${y}-${m}-${d}` });
+                                    } else {
+                                        setForm({ ...form, endDate: '' });
+                                    }
+                                }}
+                                className="w-3.5 h-3.5 rounded border-surface-300 dark:border-surface-600 text-primary-600 focus:ring-primary-500"
+                            />
+                            <span className="text-xs text-surface-500 dark:text-surface-400">
+                                다일 예약
+                                {form.endDate && form.endDate > selectedDate && (() => {
+                                    const start = new Date(selectedDate + 'T00:00');
+                                    const end = new Date(form.endDate + 'T00:00');
+                                    const diffDays = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+                                    return <span className="text-blue-600 dark:text-blue-400 font-medium"> · {diffDays}일간</span>;
+                                })()}
+                            </span>
+                        </label>
+                        {/* 시작일 / 종료일 (체크 시 표시, 나란히 한 줄) */}
+                        {form.endDate && form.endDate > selectedDate && (
+                            <div className="grid grid-cols-2 gap-2 animate-fade-in">
+                                <div>
+                                    <label className="label text-xs text-surface-400">시작일</label>
+                                    <p className="text-sm text-surface-600 dark:text-surface-300 px-2 py-1.5 bg-surface-100 dark:bg-surface-700/50 rounded-lg h-[38px] flex items-center">
+                                        {selectedDate}
+                                        <span className="text-surface-400 ml-1 text-xs">
+                                            ({['일','월','화','수','목','금','토'][new Date(selectedDate + 'T00:00').getDay()]})
+                                        </span>
+                                    </p>
+                                </div>
+                                <div>
+                                    <label className="label text-xs">종료일</label>
+                                        <input
+                                            type="date"
+                                            value={form.endDate}
+                                            min={selectedDate}
+                                            onChange={e => setForm({ ...form, endDate: e.target.value })}
+                                            className="input text-sm px-2 h-[38px]"
+                                        />
+                                </div>
+                            </div>
+                        )}
+                        {/* 시작/종료 시간 */}
                         <div className="grid grid-cols-2 gap-2">
                             <div>
-                                <label className="label text-xs">시작</label>
+                                <label className="label text-xs">시작 시간</label>
                                 <input
                                     type="time"
                                     value={form.startTime}
@@ -295,7 +353,7 @@ export default function ReservationSidePanel({
                                 />
                             </div>
                             <div>
-                                <label className="label text-xs">종료</label>
+                                <label className="label text-xs">종료 시간</label>
                                 <input
                                     type="time"
                                     value={form.endTime}
@@ -310,7 +368,9 @@ export default function ReservationSidePanel({
                             </div>
                         </div>
                         <button type="submit" disabled={submitting} className="btn-primary w-full btn-sm">
-                            {submitting ? (editingReservation ? '수정 중...' : '예약 중...') : (editingReservation ? '예약 수정' : '예약 확정')}
+                            {submitting
+                                ? (editingGroupId ? '다일 예약 수정 중...' : editingReservation ? '수정 중...' : '예약 중...')
+                                : (editingGroupId ? '다일 예약 수정' : editingReservation ? '예약 수정' : '예약 확정')}
                         </button>
                     </form>
                 </div>
@@ -418,7 +478,7 @@ export default function ReservationSidePanel({
                                             </span>
                                         )}
                                     </p>
-                                    <p className="text-xs text-surface-400">{res.reservedByName} · {res.purpose || '-'}{res.destination ? ` → ${res.destination}` : ''}</p>
+                                    <p className="text-xs text-surface-400">{res.reservedByName}{res.purpose ? ` · ${res.purpose}` : ''}{res.destination ? ` → ${res.destination}` : ''}</p>
                                 </div>
                             ))}
                         </div>

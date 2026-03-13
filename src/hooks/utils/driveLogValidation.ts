@@ -77,13 +77,11 @@ interface BuildTimestampParams {
  * 운행 날짜 기반 timestamp를 생성한다.
  */
 export function buildDriveTimestamp(driveDate: string, endTime: string, startTime: string) {
-    if (driveDate && driveDate !== todayStr()) {
-        const [y, m, d] = driveDate.split('-').map(Number);
-        const timeStr = endTime || startTime || nowTime();
-        const [h, min] = timeStr.split(':').map(Number);
-        return new Date(y, m - 1, d, h, min);
-    }
-    return new Date();
+    const dateStr = driveDate || todayStr();
+    const [y, m, d] = dateStr.split('-').map(Number);
+    const timeStr = endTime || startTime || nowTime();
+    const [h, min] = timeStr.split(':').map(Number);
+    return new Date(y, m - 1, d, h, min);
 }
 
 interface BuildLogContext {
@@ -119,7 +117,6 @@ export function buildLogData(form: DriveLogForm, { orgId, user, userData, select
         startKm,
         endKm,
         distance: (startKm !== null && endKm !== null) ? endKm - startKm : null,
-        fuelAmount: form.fuelAmount ? parseInt(form.fuelAmount) : null,
         batteryStart: form.batteryStart ? parseInt(form.batteryStart) : null,
         batteryEnd: form.batteryEnd ? parseInt(form.batteryEnd) : null,
         notes: form.notes.trim(),

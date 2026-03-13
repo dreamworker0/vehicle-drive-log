@@ -8,6 +8,7 @@ export const VEHICLE_TYPE_TO_CAR_TYPE: Record<string, string> = {
     sedan: '1',    // 승용차
     van: '2',      // 중형승합차
     bus: '3',      // 대형승합차
+    truck: '1',    // 화물차 (1톤급은 승용차 요금)
 };
 
 // API 실패 쿨다운 (3회 연속 실패 시 5분간 비활성화)

@@ -3,6 +3,7 @@
  * DriveLogForm에서 추출된 서브 컴포넌트
  */
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
+import { isVehicleBlocked } from '../../lib/vehicleUtils';
 import type { Vehicle } from '../../types/vehicle';
 
 interface VehicleSelectorProps {
@@ -22,7 +23,7 @@ export default function VehicleSelector({ vehicles, selectedVehicleId, onSelect 
     return (
         <div className="grid grid-cols-3 gap-1.5">
             {activeVehicles.map(v => {
-                const isBlocked = v.maintenance?.isBlocked;
+                const isBlocked = isVehicleBlocked(v.maintenance);
                 return (
                     <button
                         key={v.id}

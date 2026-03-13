@@ -20,20 +20,20 @@ describe('buildDriveTimestamp', () => {
         expect(result.getMinutes()).toBe(15);
     });
 
-    it('당일 입력 시 현재 시각의 Date를 반환해야 한다', () => {
+    it('당일 입력 시 입력된 시간 기반 Date를 반환해야 한다', () => {
         const today = todayStr();
-        const before = Date.now();
         const result = buildDriveTimestamp(today, '18:00', '09:00');
-        const after = Date.now();
-        // 당일이면 현재 시각 반환 (result.getTime()이 before~after 범위 내)
-        expect(result.getTime()).toBeGreaterThanOrEqual(before);
-        expect(result.getTime()).toBeLessThanOrEqual(after + 100);
+        // 당일이라도 endTime(18:00) 기반으로 생성
+        expect(result.getHours()).toBe(18);
+        expect(result.getMinutes()).toBe(0);
     });
 
-    it('driveDate가 빈 문자열이면 현재 시각을 반환해야 한다', () => {
-        const before = Date.now();
+    it('driveDate가 빈 문자열이면 오늘 날짜 + 입력 시간으로 반환해야 한다', () => {
         const result = buildDriveTimestamp('', '18:00', '09:00');
-        expect(result.getTime()).toBeGreaterThanOrEqual(before);
+        const now = new Date();
+        expect(result.getDate()).toBe(now.getDate());
+        expect(result.getHours()).toBe(18);
+        expect(result.getMinutes()).toBe(0);
     });
 });
 
@@ -47,7 +47,7 @@ describe('buildLogData', () => {
         endTime: '10:30',
         startKm: '1000',
         endKm: '1050',
-        fuelAmount: '50000',
+
         batteryStart: '',
         batteryEnd: '',
         notes: '  특이사항 없음  ',
@@ -94,10 +94,7 @@ describe('buildLogData', () => {
         expect(result).not.toHaveProperty('isRetroactive');
     });
 
-    it('주유금액이 문자열이면 정수로 변환해야 한다', () => {
-        const result = buildLogData(baseMockForm, baseContext);
-        expect(result.fuelAmount).toBe(50000);
-    });
+
 
     it('배터리 값이 빈 문자열이면 null이어야 한다', () => {
         const result = buildLogData(baseMockForm, baseContext);

@@ -159,6 +159,10 @@ export default function LoginPage() {
                     <a href="/terms" className="hover:text-white underline underline-offset-2 transition-colors">이용약관</a>
                     <span className="text-primary-300/40">|</span>
                     <a href="/privacy" className="hover:text-white underline underline-offset-2 transition-colors">개인정보 처리방침</a>
+                    <span className="text-primary-300/40">|</span>
+                    <a href="/release-notes" className="hover:text-white underline underline-offset-2 transition-colors">업데이트 소식</a>
+                    <span className="text-primary-300/40">|</span>
+                    <a href="/faq" className="hover:text-white underline underline-offset-2 transition-colors">자주 하는 질문</a>
                 </p>
 
                 <p className="text-center text-primary-300/60 text-xs mt-2">

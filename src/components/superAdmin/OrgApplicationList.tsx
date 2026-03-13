@@ -6,6 +6,7 @@ import { db } from '../../lib/firebase';
 import { ocrDocumentVerify } from '../../lib/ocr';
 import OrgAppCard from './OrgAppCard';
 import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import type { Organization } from '../../types';
 
 interface OrgApplicationListProps {
@@ -21,6 +22,7 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
     const [selectedApp, setSelectedApp] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const { showToast } = useToast();
+    const { confirm } = useConfirm();
 
     // Firestore 실시간 구독 — 신청이 들어오면 즉시 목록 갱신
     useEffect(() => {
@@ -103,7 +105,7 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
     };
 
     const handleReject = async (app: any) => {
-        if (!confirm(`${app.name} 기관의 신청을 거절하시겠습니까?`)) return;
+        if (!await confirm({ message: `${app.name} 기관의 신청을 거절하시겠습니까?`, confirmColor: 'danger' })) return;
 
         setActionLoading(prev => ({ ...prev, [app.id]: 'reject' }));
         try {
@@ -134,7 +136,7 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
     };
 
     const handleDelete = async (app: any) => {
-        if (!confirm(`${app.name} 기관의 신청 기록을 완전히 삭제하시겠습니까?`)) return;
+        if (!await confirm({ message: `${app.name} 기관의 신청 기록을 완전히 삭제하시겠습니까?`, confirmColor: 'danger' })) return;
 
         setActionLoading(prev => ({ ...prev, [app.id]: 'delete' }));
         try {
@@ -149,7 +151,7 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
 
     // 거절된 신청을 대기중으로 되돌리기
     const handleMoveToPending = async (app: any) => {
-        if (!confirm(`${app.name} 기관의 신청을 대기 중 상태로 되돌리시겠습니까?`)) return;
+        if (!await confirm({ message: `${app.name} 기관의 신청을 대기 중 상태로 되돌리시겠습니까?` })) return;
 
         setActionLoading(prev => ({ ...prev, [app.id]: 'moveToPending' }));
         try {

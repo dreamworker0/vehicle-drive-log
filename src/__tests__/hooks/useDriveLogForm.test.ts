@@ -6,6 +6,7 @@ const mockNavigate = vi.fn();
 vi.mock('react-router-dom', () => ({
     useNavigate: () => mockNavigate,
     useLocation: () => ({ state: null, pathname: '/employee/drive-log' }),
+    useSearchParams: () => [new URLSearchParams(), vi.fn()],
 }));
 
 const mockShowToast = vi.fn();
@@ -52,6 +53,7 @@ const mockGetOrganizationMembers = vi.fn().mockResolvedValue([]);
 const mockGetLastVehicleEndKm = vi.fn().mockResolvedValue(null);
 const mockGetVehicleEndKmBefore = vi.fn().mockResolvedValue(null);
 const mockUpdateReservationStatus = vi.fn().mockResolvedValue({});
+const mockGetReservationById = vi.fn().mockResolvedValue(null);
 
 vi.mock('../../lib/firestore', () => ({
     getVehicles: (...args: any[]) => mockGetVehicles(...args),
@@ -63,6 +65,7 @@ vi.mock('../../lib/firestore', () => ({
     getLastVehicleEndKm: (...args: any[]) => mockGetLastVehicleEndKm(...args),
     getVehicleEndKmBefore: (...args: any[]) => mockGetVehicleEndKmBefore(...args),
     updateReservationStatus: (...args: any[]) => mockUpdateReservationStatus(...args),
+    getReservationById: (...args: any[]) => mockGetReservationById(...args),
 }));
 
 vi.mock('../../lib/firebase', () => ({ db: {}, default: {} }));

@@ -86,7 +86,7 @@ export default function PrivacyPage() {
                                 <ul className="list-disc list-inside space-y-1 ml-2 text-amber-700 dark:text-amber-400 text-xs">
                                     <li>비영리 증빙서류(고유번호증 또는 사업자등록증)는 기관 신청 심사 목적으로 업로드됩니다.</li>
                                     <li>AI(Google Gemini API)가 문서 유형을 판별하고 기관 정보를 추출합니다.</li>
-                                    <li>업로드된 사본은 Firebase Storage에 암호화되어 저장됩니다.</li>
+                                    <li>업로드된 사본은 Firebase Storage에 암호화되어 저장되며, <strong>심사 완료(승인) 후 30일 경과 시 자동 삭제</strong>됩니다.</li>
                                 </ul>
                             </div>
                         </div>
@@ -146,6 +146,7 @@ export default function PrivacyPage() {
                             <ul className="list-disc list-inside space-y-1 ml-2">
                                 <li>기관 삭제 시 해당 기관의 모든 사용자 정보와 데이터가 완전히 삭제됩니다.</li>
                                 <li>계기판 사진은 AI 분석 직후 즉시 파기됩니다.</li>
+                                <li>비영리 증빙서류(고유번호증/사업자등록증) 사본은 <strong>승인 후 30일 경과 시 자동 파기</strong>됩니다.</li>
                             </ul>
                         </div>
                     </section>

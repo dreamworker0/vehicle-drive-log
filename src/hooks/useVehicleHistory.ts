@@ -61,19 +61,14 @@ export default function useVehicleHistory() {
             try {
                 const since = new Date();
                 since.setDate(since.getDate() - period);
-                const allLogs = await getVehicleDriveLogs(selectedVehicleId);
-                // 클라이언트 사이드 기간 필터링 + 정렬
+                // 서버 사이드 기간 필터링 (Firestore where 조건)
+                const allLogs = await getVehicleDriveLogs(selectedVehicleId, since);
                 setLogs(
-                    allLogs
-                        .filter(log => {
-                            if (!log.timestamp?.toDate) return false;
-                            return log.timestamp.toDate() >= since;
-                        })
-                        .sort((a, b) => {
-                            const ta = a.timestamp?.toDate?.() || 0;
-                            const tb = b.timestamp?.toDate?.() || 0;
-                            return tb - ta;
-                        })
+                    allLogs.sort((a, b) => {
+                        const ta = a.timestamp?.toDate?.() || 0;
+                        const tb = b.timestamp?.toDate?.() || 0;
+                        return tb - ta;
+                    })
                 );
             } catch (err) {
                 console.error('이용 내역 로드 실패:', err);

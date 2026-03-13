@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
+import { useConfirm } from '../contexts/ConfirmContext';
 import { getOrganizationMembers, getOrganization, regenerateInviteCode, updateUser } from '../lib/firestore';
 import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -14,6 +15,7 @@ import type { Organization } from '../types/organization';
 export default function useEmployeeManager() {
     const { userData } = useAuth();
     const { showToast } = useToast();
+    const { confirm } = useConfirm();
     const [employees, setEmployees] = useState<User[]>([]);
     const [disabledEmployees, setDisabledEmployees] = useState<User[]>([]);
     const [preRegisteredEmployees, setPreRegisteredEmployees] = useState<{ id: string; name: string; email: string; createdAt: any }[]>([]);
@@ -103,7 +105,7 @@ export default function useEmployeeManager() {
     };
 
     const handleRegenerateCode = async () => {
-        if (!confirm('초대 코드를 재발급하시겠습니까?\n기존 코드는 더 이상 사용할 수 없습니다.')) return;
+        if (!await confirm({ message: '초대 코드를 재발급하시겠습니까?\n기존 코드는 더 이상 사용할 수 없습니다.', confirmColor: 'warning' })) return;
         setRegenerating(true);
         try {
             const newCode = await regenerateInviteCode(orgId!);
@@ -136,7 +138,7 @@ export default function useEmployeeManager() {
             showToast('자기 자신은 비활성화할 수 없습니다.', 'warning');
             return;
         }
-        if (!confirm(`${emp.name || emp.email} 직원을 비활성화하시겠습니까?\n\n비활성 직원은 앱 이용이 차단됩니다.`)) return;
+        if (!await confirm({ message: `${emp.name || emp.email} 직원을 비활성화하시겠습니까?\n\n비활성 직원은 앱 이용이 차단됩니다.`, confirmColor: 'danger' })) return;
         try {
             const { getFunctions, httpsCallable } = await import('firebase/functions');
             const functions = getFunctions(undefined, 'asia-northeast3');
@@ -151,7 +153,7 @@ export default function useEmployeeManager() {
     };
 
     const handleRestoreEmployee = async (emp: User) => {
-        if (!confirm(`${emp.name || emp.email} 직원을 다시 활성화하시겠습니까?`)) return;
+        if (!await confirm({ message: `${emp.name || emp.email} 직원을 다시 활성화하시겠습니까?` })) return;
         try {
             await updateDoc(doc(db, 'users', emp.id), { status: 'active', disabledAt: null });
             showToast('직원이 활성화되었습니다.', 'success');
@@ -188,7 +190,7 @@ export default function useEmployeeManager() {
 
     const handleDeletePreRegistered = async (preRegId: string) => {
         if (!orgId) return;
-        if (!confirm('사전 등록을 취소하시겠습니까?')) return;
+        if (!await confirm({ message: '사전 등록을 취소하시겠습니까?', confirmColor: 'warning' })) return;
         try {
             await deleteDoc(doc(db, 'organizations', orgId, 'preRegistered', preRegId));
             showToast('사전 등록이 취소되었습니다.', 'success');

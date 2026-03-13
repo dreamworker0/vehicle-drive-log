@@ -6,6 +6,7 @@ import useVehicleManager from '../../hooks/useVehicleManager';
 import VehicleForm from './VehicleForm';
 import ConfirmModal from '../common/ConfirmModal';
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
+import { isVehicleBlocked } from '../../lib/vehicleUtils';
 import { SkeletonCard, SkeletonBox } from '../common/Skeleton';
 
 const FUEL_TYPE_LABELS: Record<string, string> = { gasoline: '휘발유', diesel: '경유', lpg: 'LPG', electric: '전기차' };
@@ -107,7 +108,7 @@ export default function VehicleManager() {
                 </div>
             )}
             {/* 정비 중 / 폐차 사유 표시 */}
-            {(vehicle.fuelType === 'electric' || vehicle.googleCalendarId || vehicle.maintenance?.isBlocked || isRetired) && (
+            {(vehicle.fuelType === 'electric' || vehicle.googleCalendarId || isVehicleBlocked(vehicle.maintenance) || isRetired) && (
                 <div className="mt-2 flex items-center gap-3 text-xs text-surface-400">
                     {vehicle.fuelType === 'electric' && (
                         <span className="flex items-center gap-1">🔋 {vehicle.currentBattery ?? '-'}%</span>
@@ -120,7 +121,7 @@ export default function VehicleManager() {
                             🚫 {vehicle.retired?.reason || '폐차'}
                         </span>
                     )}
-                    {!isRetired && vehicle.maintenance?.isBlocked && (
+                    {!isRetired && isVehicleBlocked(vehicle.maintenance) && (
                         <div className="flex items-center gap-2 ml-auto">
                             <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full font-medium">
                                 🔧 정비 중{vehicle.maintenance.endDate ? ` ~${vehicle.maintenance.endDate.slice(5)}` : ''}

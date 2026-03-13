@@ -17,6 +17,7 @@ const MyRecords = lazyWithRetry(() => import('./MyRecords'));
 const ReservationCalendar = lazyWithRetry(() => import('../common/ReservationCalendar'));
 const FavoritesManager = lazyWithRetry(() => import('./FavoritesManager'));
 const VehicleHistory = lazyWithRetry(() => import('./VehicleHistory'));
+const FuelLogTab = lazyWithRetry(() => import('./FuelLogTab'));
 const MorePage = lazyWithRetry(() => import('./MorePage'));
 
 interface NavItem {
@@ -28,10 +29,12 @@ interface NavItem {
 const navItems: NavItem[] = [
     {
         to: '/employee/today',
-        label: '오늘',
+        label: '운행',
         icon: (
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H5.24a2 2 0 0 0-1.8 1.1l-.8 1.63A6 6 0 0 0 2 12.42V16h2" />
+                <circle cx="6.5" cy="16.5" r="2.5" />
+                <circle cx="16.5" cy="16.5" r="2.5" />
             </svg>
         ),
     },
@@ -41,6 +44,17 @@ const navItems: NavItem[] = [
         icon: (
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 0 1 2.25-2.25h13.5A2.25 2.25 0 0 1 21 7.5v11.25m-18 0A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75m-18 0v-7.5A2.25 2.25 0 0 1 5.25 9h13.5A2.25 2.25 0 0 1 21 11.25v7.5" />
+            </svg>
+        ),
+    },
+    {
+        to: '/employee/fuel',
+        label: '주유',
+        icon: (
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 11.25V4.875A2.625 2.625 0 0 0 12.375 2.25h-4.75A2.625 2.625 0 0 0 5 4.875V18.75a2.25 2.25 0 0 0 2.25 2.25h5.5A2.25 2.25 0 0 0 15 18.75v-3" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 8.25h1.5a2.25 2.25 0 0 1 2.25 2.25v3a1.5 1.5 0 0 0 3 0V7.5l-2.25-3" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 9h9.5" />
             </svg>
         ),
     },
@@ -125,6 +139,7 @@ export default function EmployeeLayout() {
                         <Route path="today" element={<TodayDashboard />} />
                         <Route path="drive-log" element={<DriveLogForm />} />
                         <Route path="quick-drive" element={<QuickDriveStart />} />
+                        <Route path="fuel" element={<FuelLogTab />} />
                         <Route path="my-records" element={<MyRecords />} />
                         <Route path="reservations" element={<ReservationCalendar />} />
                         <Route path="favorites" element={<FavoritesManager />} />

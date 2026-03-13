@@ -1,11 +1,14 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useConfirm } from '../contexts/ConfirmContext';
 import {
     getVehicles,
     getReservationsByDateRange,
     createReservation,
     updateReservation,
     cancelReservation,
+    cancelReservationGroup,
+    deleteReservationGroup,
     getFavorites,
     createFavorite,
     getOrganizationMembers,
@@ -16,7 +19,7 @@ import { useToast } from './useToast';
 import { getHolidays } from '../lib/holiday';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isBefore, startOfDay } from 'date-fns';
 import { getMultiRoute, isTmapAvailable, VEHICLE_TYPE_TO_CAR_TYPE } from '../lib/tmap';
-import { calcEndTime } from './utils/reservationUtils';
+import { calcEndTime, findUserOverlappingReservation } from './utils/reservationUtils';
 import type { Vehicle } from '../types/vehicle';
 import type { Reservation, CalendarDay } from '../types/reservation';
 import type { CustomHoliday } from '../types/holiday';
@@ -29,6 +32,7 @@ interface ReservationForm {
     purpose: string;
     startTime: string;
     endTime: string;
+    endDate?: string;
     reservedByUid?: string;
     reservedByName?: string;
 }
@@ -37,6 +41,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
     const { user, userData } = useAuth();
     const [searchParams] = useSearchParams();
     const { showToast } = useToast();
+    const { confirm } = useConfirm();
 
     // 상태 관리
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -48,6 +53,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
     const [sideTab, setSideTab] = useState<'list' | 'completed'>('list');
     const [submitting, setSubmitting] = useState(false);
     const [editingReservation, setEditingReservation] = useState<Reservation | null>(null);
+    const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
     const [favorites, setFavorites] = useState<Favorite[]>([]);
     const [holidays, setHolidays] = useState<CustomHoliday[]>([]);
     const [members, setMembers] = useState<UserDoc[]>([]);
@@ -183,7 +189,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
             return {
                 date: d.getDate(),
                 dateStr: dStr,
-                reservations: reservations.filter(r => r.date === dStr),
+                reservations: reservations.filter(r => r.date === dStr && r.status !== 'cancelled'),
                 holiday: holidays.find(h => h.date === dStr)?.name || null
             };
         })] as (CalendarDay | null)[];
@@ -197,14 +203,17 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
     const handleDateSelect = (dateStr: string) => {
         setSelectedDate(dateStr);
         setEditingReservation(null);
-        setShowForm(false);
-        setForm({
-            vehicleId: '',
-            destination: '',
-            purpose: '',
-            startTime: '',
-            endTime: '',
-        });
+        // 폼이 열려 있으면 닫지 않고 날짜만 변경 (사용자가 날짜를 바꿔도 폼 유지)
+        if (!showForm) {
+            setForm({
+                vehicleId: '',
+                destination: '',
+                purpose: '',
+                startTime: '',
+                endTime: '',
+                endDate: '',
+            });
+        }
     };
 
     const isPastDate = isBefore(startOfDay(new Date(selectedDate)), startOfDay(new Date()));
@@ -232,6 +241,11 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
     const handleOpenForm = () => {
         if (showForm) {
             setShowForm(false);
+            setEditingReservation(null);
+            setForm({ vehicleId: '', destination: '', purpose: '', startTime: '', endTime: '', endDate: '' });
+            setRouteInfo(null);
+            setShowFavSave(false);
+            setFavName('');
             return;
         }
         // 현재 시간 기반 30분 단위 스냅
@@ -266,6 +280,24 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
             return;
         }
 
+        // 다일 예약 여부 판단
+        const effectiveEndDate = form.endDate || selectedDate;
+        const isMultiDay = effectiveEndDate > selectedDate;
+
+        // 같은 사용자가 같은 시간대에 다른 차량 예약이 있는지 검증 (첫째 날 기준)
+        const targetUid = form.reservedByUid || user.uid;
+        const userOverlap = findUserOverlappingReservation(reservations, {
+            reservedByUid: targetUid,
+            date: selectedDate,
+            startTime: form.startTime,
+            endTime: isMultiDay ? '23:59' : form.endTime,
+            excludeId: editingReservation?.id || null,
+        });
+        if (userOverlap) {
+            showToast('같은 시간대에 2대의 차량을 예약할 수 없습니다.', 'warning');
+            return;
+        }
+
         setSubmitting(true);
         try {
             // 선택된 차량 이름 조회
@@ -279,7 +311,43 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
                 routeTollFee: routeInfo.tollFee || 0,
             } : {};
 
-            if (editingReservation) {
+            if (editingReservation && editingGroupId) {
+                // ── 다일 예약 그룹 수정: 기존 그룹 삭제 → 새 그룹 재생성 ──
+                await deleteReservationGroup(editingGroupId);
+
+                const newGroupId = `grp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+                const effectiveEndDateForGroup = form.endDate || selectedDate;
+                const startD = new Date(selectedDate + 'T00:00');
+                const endD = new Date(effectiveEndDateForGroup + 'T00:00');
+                const days = eachDayOfInterval({ start: startD, end: endD });
+                const totalDays = days.length;
+
+                const baseData = {
+                    vehicleId: form.vehicleId,
+                    vehicleName,
+                    destination: form.destination,
+                    purpose: form.purpose,
+                    reservedByUid: form.reservedByUid || user.uid,
+                    reservedByName: form.reservedByName || userData.name || user.email || '익명',
+                    organizationId: userData.organizationId,
+                    groupId: newGroupId,
+                    ...routeData,
+                };
+
+                for (let i = 0; i < totalDays; i++) {
+                    const dayStr = format(days[i], 'yyyy-MM-dd');
+                    const dayStartTime = i === 0 ? form.startTime : '00:00';
+                    const dayEndTime = i === totalDays - 1 ? form.endTime : '23:59';
+                    await createReservation({
+                        ...baseData,
+                        date: dayStr,
+                        startTime: dayStartTime,
+                        endTime: dayEndTime,
+                        status: 'pending',
+                    } as unknown as Reservation);
+                }
+                showToast(`${totalDays}일간 다일 예약이 수정되었습니다.`);
+            } else if (editingReservation) {
                 await updateReservation(editingReservation.id, {
                     ...form,
                     vehicleName,
@@ -287,7 +355,41 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
                     organizationId: userData.organizationId,
                 });
                 showToast('예약이 수정되었습니다.');
+            } else if (isMultiDay) {
+                // ── 다일 연속 예약 생성 ──
+                const groupId = `grp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+                const startD = new Date(selectedDate + 'T00:00');
+                const endD = new Date(effectiveEndDate + 'T00:00');
+                const days = eachDayOfInterval({ start: startD, end: endD });
+                const totalDays = days.length;
+
+                const baseData = {
+                    vehicleId: form.vehicleId,
+                    vehicleName,
+                    destination: form.destination,
+                    purpose: form.purpose,
+                    reservedByUid: form.reservedByUid || user.uid,
+                    reservedByName: form.reservedByName || userData.name || user.email || '익명',
+                    organizationId: userData.organizationId,
+                    groupId,
+                    ...routeData,
+                };
+
+                for (let i = 0; i < totalDays; i++) {
+                    const dayStr = format(days[i], 'yyyy-MM-dd');
+                    const dayStartTime = i === 0 ? form.startTime : '00:00';
+                    const dayEndTime = i === totalDays - 1 ? form.endTime : '23:59';
+                    await createReservation({
+                        ...baseData,
+                        date: dayStr,
+                        startTime: dayStartTime,
+                        endTime: dayEndTime,
+                        status: 'pending',
+                    } as unknown as Reservation);
+                }
+                showToast(`${totalDays}일간 다일 예약이 완료되었습니다.`);
             } else {
+                // ── 단일 날짜 예약 (기존 로직) ──
                 await createReservation({
                     ...form,
                     vehicleName,
@@ -308,6 +410,9 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
 
             setShowForm(false);
             setEditingReservation(null);
+            setEditingGroupId(null);
+            setForm({ vehicleId: '', destination: '', purpose: '', startTime: '', endTime: '', endDate: '' });
+            setRouteInfo(null);
         } catch (error: unknown) {
             const errMsg = error instanceof Error ? error.message : '예약 처리에 실패했습니다.';
             showToast(errMsg, 'error');
@@ -317,7 +422,35 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
     };
 
     const handleEdit = (res: Reservation) => {
+        if (res.groupId) {
+            // 그룹의 전체 예약 찾기
+            const groupReservations = reservations
+                .filter(r => r.groupId === res.groupId && r.status !== 'cancelled')
+                .sort((a, b) => a.date.localeCompare(b.date));
+
+            if (groupReservations.length > 0) {
+                const first = groupReservations[0];
+                const last = groupReservations[groupReservations.length - 1];
+                setEditingReservation(res);
+                setEditingGroupId(res.groupId);
+                setSelectedDate(first.date);
+                setForm({
+                    vehicleId: first.vehicleId,
+                    destination: first.destination || '',
+                    purpose: first.purpose || '',
+                    startTime: first.startTime,
+                    endTime: last.endTime,
+                    endDate: last.date !== first.date ? last.date : '',
+                    reservedByUid: first.reservedByUid,
+                    reservedByName: first.reservedByName,
+                });
+                setShowForm(true);
+                return;
+            }
+        }
+        // 단건 수정
         setEditingReservation(res);
+        setEditingGroupId(null);
         setForm({
             vehicleId: res.vehicleId,
             destination: res.destination || '',
@@ -331,15 +464,43 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
     };
 
     const handleCancel = async (id: string) => {
-        if (!window.confirm('예약을 취소하시겠습니까?')) return;
+        // 연속 예약인지 확인
+        const target = reservations.find(r => r.id === id);
+        const groupId = target?.groupId;
 
-        try {
-            await cancelReservation(id);
-            showToast('예약이 취소되었습니다.');
-            setReservations(prev => prev.filter(r => r.id !== id));
-        } catch (error: unknown) {
-            const errMsg = error instanceof Error ? error.message : '취소에 실패했습니다.';
-            showToast(errMsg, 'error');
+        if (groupId) {
+            // 그룹 예약: 전체 취소 확인
+            const groupCount = reservations.filter(r => r.groupId === groupId && r.status !== 'cancelled' && r.status !== 'completed').length;
+            const choice = await confirm({
+                title: '다일 예약 취소',
+                message: `이 예약은 ${groupCount}일간 다일 예약의 일부입니다.\n\n전체 다일 예약을 취소하시겠습니까?`,
+                confirmText: '전체 취소',
+                cancelText: '돌아가기',
+                confirmColor: 'danger',
+            });
+
+            if (!choice) return;
+
+            try {
+                const cancelled = await cancelReservationGroup(groupId);
+                showToast(`다일 예약 ${cancelled}건이 취소되었습니다.`);
+                setReservations(prev => prev.map(r => r.groupId === groupId ? { ...r, status: 'cancelled' } : r));
+            } catch (error: unknown) {
+                const errMsg = error instanceof Error ? error.message : '취소에 실패했습니다.';
+                showToast(errMsg, 'error');
+            }
+        } else {
+            // 단일 예약: 기존 로직
+            if (!await confirm({ message: '예약을 취소하시겠습니까?', confirmColor: 'danger' })) return;
+
+            try {
+                await cancelReservation(id);
+                showToast('예약이 취소되었습니다.');
+                setReservations(prev => prev.filter(r => r.id !== id));
+            } catch (error: unknown) {
+                const errMsg = error instanceof Error ? error.message : '취소에 실패했습니다.';
+                showToast(errMsg, 'error');
+            }
         }
     };
 
@@ -371,7 +532,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
         vehicles, loading, form, setForm,
         selectedDate, showForm, setShowForm,
         sideTab, setSideTab,
-        submitting, editingReservation,
+        submitting, editingReservation, editingGroupId,
         favorites, routeInfo, routeLoading,
         showFavSave, setShowFavSave,
         favName, setFavName,

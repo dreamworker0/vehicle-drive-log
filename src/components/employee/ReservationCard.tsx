@@ -13,16 +13,18 @@ interface ReservationCardProps {
     isInProgress: boolean;
     disabled: boolean;
     startingId: string | null;
+    cancellingId?: string | null;
     onStartDrive: (reservation: Reservation) => void;
     onStartNavigation?: (reservation: Reservation, appId: string) => void;
     onArrival: (reservation: Reservation) => void;
+    onCancel?: (reservation: Reservation) => void;
     /** 하위 호환 */
     onStartWithTmap?: (reservation: Reservation) => void;
 }
 
 export default function ReservationCard({
     reservation, vehicle, isInProgress, disabled,
-    startingId, onStartDrive, onStartNavigation, onArrival,
+    startingId, cancellingId, onStartDrive, onStartNavigation, onArrival, onCancel,
     onStartWithTmap,
 }: ReservationCardProps) {
     const isButtonDisabled = disabled || startingId === reservation.id;
@@ -57,6 +59,11 @@ export default function ReservationCard({
                                 {reservation.startTime} ~ {reservation.endTime}
                                 {reservation.destination && ` · ${reservation.destination}`}
                             </p>
+                            {reservation.groupId && (
+                                <span className="inline-flex items-center gap-0.5 mt-0.5 text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300 rounded-full font-medium w-fit">
+                                    🔗 다일 예약
+                                </span>
+                            )}
                             {(reservation as any).routeDistance && (
                                 <p className="text-xs text-blue-500 flex items-center gap-2 mt-0.5">
                                     <span>↔{Math.floor((reservation as any).routeDistance)}km</span>
@@ -66,37 +73,55 @@ export default function ReservationCard({
                             )}
                         </div>
                     </div>
-                    <div className="flex flex-col gap-1.5 flex-shrink-0">
-                        {isInProgress ? (
-                            <>
-                                <span className="driving-badge">
-                                    <span className="driving-dot" />
-                                    운행 중
-                                </span>
-                                <button onClick={() => onArrival(reservation)} className="btn-sm bg-amber-600 text-white hover:bg-amber-700 text-xs whitespace-nowrap font-bold shadow-md hover:shadow-lg transition-all">
-                                    🏁 도착
-                                </button>
-                            </>
-                        ) : (
-                            <>
-                                {disabled ? (
-                                    <span className="text-[11px] text-surface-400 dark:text-surface-500 whitespace-nowrap">다른 운행 진행 중</span>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                        <div className="flex flex-col gap-1.5">
+                            {isInProgress ? (
+                                <>
+                                    <span className="driving-badge">
+                                        <span className="driving-dot" />
+                                        운행 중
+                                    </span>
+                                    <button onClick={() => onArrival(reservation)} className="btn-sm bg-amber-600 text-white hover:bg-amber-700 text-xs whitespace-nowrap font-bold shadow-md hover:shadow-lg transition-all">
+                                        🏁 도착
+                                    </button>
+                                </>
+                            ) : (
+                                <>
+                                    {disabled ? (
+                                        <span className="text-[11px] text-surface-400 dark:text-surface-500 whitespace-nowrap">다른 운행 진행 중</span>
+                                    ) : (
+                                        <>
+                                            <button
+                                                onClick={() => handleNavSelect(preferredApp)}
+                                                disabled={isButtonDisabled}
+                                                className="btn-sm !min-h-0 py-1.5 bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-500 text-xs whitespace-nowrap shadow-sm"
+                                                title={`${NAV_LABELS[preferredApp]} 길안내`}
+                                            >
+                                                🗺️ {NAV_LABELS[preferredApp]}
+                                            </button>
+                                            <button onClick={() => onStartDrive(reservation)} disabled={isButtonDisabled} className="btn-sm !min-h-0 py-1.5 btn-primary dark:bg-primary-500 dark:hover:bg-primary-400 text-xs whitespace-nowrap">
+                                                {startingId === reservation.id ? <div className="w-4 h-4 spinner" /> : '운행 시작'}
+                                            </button>
+                                        </>
+                                    )}
+                                </>
+                            )}
+                        </div>
+                        {onCancel && (
+                            <button
+                                onClick={() => onCancel(reservation)}
+                                disabled={cancellingId === reservation.id}
+                                className="text-surface-400 hover:text-red-500 transition-colors p-1"
+                                title="예약 취소"
+                            >
+                                {cancellingId === reservation.id ? (
+                                    <div className="w-3.5 h-3.5 spinner" />
                                 ) : (
-                                    <>
-                                        <button
-                                            onClick={() => handleNavSelect(preferredApp)}
-                                            disabled={isButtonDisabled}
-                                            className="btn-sm !min-h-0 py-1.5 bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-500 text-xs whitespace-nowrap shadow-sm"
-                                            title={`${NAV_LABELS[preferredApp]} 길안내`}
-                                        >
-                                            🗺️ {NAV_LABELS[preferredApp]}
-                                        </button>
-                                        <button onClick={() => onStartDrive(reservation)} disabled={isButtonDisabled} className="btn-sm !min-h-0 py-1.5 btn-primary dark:bg-primary-500 dark:hover:bg-primary-400 text-xs whitespace-nowrap">
-                                            {startingId === reservation.id ? <div className="w-4 h-4 spinner" /> : '운행 시작'}
-                                        </button>
-                                    </>
+                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                                    </svg>
                                 )}
-                            </>
+                            </button>
                         )}
                     </div>
                 </div>

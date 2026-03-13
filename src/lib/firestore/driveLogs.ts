@@ -9,6 +9,19 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
+/** 특정 시점 이후에 같은 차량의 운행기록이 존재하는지 확인 */
+const hasLaterDriveLog = async (orgId: string, vehicleId: string, afterTimestamp: Date) => {
+    const q = query(
+        collection(db, 'driveLogs'),
+        where('organizationId', '==', orgId),
+        where('vehicleId', '==', vehicleId),
+        where('timestamp', '>', afterTimestamp),
+        limit(1)
+    );
+    const snap = await getDocs(q);
+    return !snap.empty;
+};
+
 // 운행일지 생성 (중복 방지 체크 포함)
 export const createDriveLog = async (data: Record<string, any>) => {
     // 중복 체크: 같은 기관+차량+운전자+startKm+endKm 이 같은 날짜에 이미 존재하면 거부
@@ -40,16 +53,19 @@ export const createDriveLog = async (data: Record<string, any>) => {
         createdAt: serverTimestamp(),
     });
 
-    // 차량의 누적 Km 갱신 — 소급 입력이 아닐 때만
-    if (data.endKm && data.vehicleId && !data.isRetroactive) {
+    // 차량의 누적 Km 갱신 — 이 기록 이후에 같은 차량의 기록이 없을 때만
+    const isEffectivelyRetroactive = data.isRetroactive ||
+        (data.organizationId && data.vehicleId && data.timestamp &&
+            await hasLaterDriveLog(data.organizationId, data.vehicleId, data.timestamp));
+    if (data.endKm && data.vehicleId && !isEffectivelyRetroactive) {
         await updateDoc(doc(db, 'vehicles', data.vehicleId), {
             currentKm: data.endKm,
         });
     }
 
-    // 소급 입력 시 다음 기록의 startKm 자동 연동
+    // 다음 기록의 startKm 자동 연동 (소급이든 아니든 항상 시도)
     let syncResult: Awaited<ReturnType<typeof syncNextLogStartKm>> | null = null;
-    if (data.isRetroactive && data.endKm && data.vehicleId && data.organizationId && data.timestamp) {
+    if (data.endKm && data.vehicleId && data.organizationId && data.timestamp) {
         syncResult = await syncNextLogStartKm(data.organizationId, data.vehicleId, data.timestamp, data.endKm);
     }
 
@@ -177,12 +193,17 @@ export const updateDriveLog = async (logId: string, data: Record<string, any>) =
     return { syncResult };
 };
 
-// 차량별 운행일지 조회
-export const getVehicleDriveLogs = async (vehicleId: string) => {
-    const q = query(
-        collection(db, 'driveLogs'),
-        where('vehicleId', '==', vehicleId)
-    );
+// 차량별 운행일지 조회 (기간 필터 + limit 기본 200)
+export const getVehicleDriveLogs = async (vehicleId: string, since?: Date, limitCount = 200) => {
+    const constraints: QueryConstraint[] = [
+        where('vehicleId', '==', vehicleId),
+        orderBy('timestamp', 'desc'),
+        limit(limitCount),
+    ];
+    if (since) {
+        constraints.splice(1, 0, where('timestamp', '>=', since));
+    }
+    const q = query(collection(db, 'driveLogs'), ...constraints);
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
 };

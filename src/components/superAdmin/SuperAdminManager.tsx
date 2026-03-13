@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../contexts/ConfirmContext';
 import { getSuperAdmins, addSuperAdmin, removeSuperAdmin } from '../../lib/firestore';
 
 interface SuperAdmin {
@@ -12,6 +13,7 @@ interface SuperAdmin {
 export default function SuperAdminManager() {
     const { user } = useAuth();
     const { showToast } = useToast();
+    const { confirm } = useConfirm();
     const [admins, setAdmins] = useState<SuperAdmin[]>([]);
     const [loading, setLoading] = useState(true);
     const [email, setEmail] = useState('');
@@ -52,7 +54,7 @@ export default function SuperAdminManager() {
             showToast('본인은 제거할 수 없습니다.', 'error');
             return;
         }
-        if (!confirm(`${admin.name || admin.email} 을(를) 슈퍼관리자에서 제거하시겠습니까?`)) return;
+        if (!await confirm({ message: `${admin.name || admin.email} 을(를) 슈퍼관리자에서 제거하시겠습니까?`, confirmColor: 'danger' })) return;
         try {
             await removeSuperAdmin(admin.id, admins.length);
             showToast('슈퍼관리자에서 제거했습니다.', 'success');

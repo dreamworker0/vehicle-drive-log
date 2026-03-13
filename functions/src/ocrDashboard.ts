@@ -4,6 +4,7 @@
 import { onCall, HttpsError } from "firebase-functions/https";
 import { GoogleGenAI } from "@google/genai";
 import { defineString } from "firebase-functions/params";
+import { checkRateLimitByUid } from "./rateLimit";
 
 const geminiApiKey = defineString("GEMINI_API_KEY");
 
@@ -17,6 +18,9 @@ export const ocrDashboard = onCall(
         if (!request.auth) {
             throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
         }
+
+        // Rate Limiting: 사용자당 분당 5회
+        await checkRateLimitByUid("ocrDashboard", request.auth.uid, 5, 60);
 
         const { imageBase64, mimeType, isElectric } = request.data;
 

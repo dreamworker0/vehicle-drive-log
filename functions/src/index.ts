@@ -22,6 +22,7 @@ export { tmapProxy } from "./tmapProxy";
 export { backupFirestore } from "./backupFirestore";
 export { autoPurgeOrgs } from "./autoPurgeOrgs";
 export { archiveDriveLogs } from "./archiveDriveLogs";
+export { cleanupCertificateImages } from "./cleanupCertificateImages";
 
 // Admin Notice
 export { sendAdminNotice } from "./sendAdminNotice";
@@ -77,3 +78,20 @@ export { restoreUser } from "./restoreUser";
 
 // Custom Claims 자동 동기화 (users 문서 변경 → Auth Claims 설정)
 export { setCustomClaims } from "./setCustomClaims";
+
+// 초대 코드로 기관 가입 (신규 사용자 Custom Claims 미보유 대응)
+export { joinOrganization } from "./joinOrganization";
+
+// Rate Limit 문서 자동 정리 (매일 05:00 KST)
+import { cleanupExpiredRateLimits } from "./rateLimit";
+
+export const cleanupRateLimits = onSchedule(
+    {
+        schedule: "0 5 * * *",
+        timeZone: "Asia/Seoul",
+        retryCount: 0,
+    },
+    async function () {
+        await cleanupExpiredRateLimits();
+    }
+);

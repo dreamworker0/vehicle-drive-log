@@ -16,6 +16,10 @@ vi.mock('../../hooks/useToast', () => ({
     useToast: () => mockToastReturn,
 }));
 
+vi.mock('../../contexts/ConfirmContext', () => ({
+    useConfirm: () => ({ confirm: vi.fn().mockResolvedValue(true) }),
+}));
+
 vi.mock('../../hooks/useRetry', () => ({
     default: () => { },
 }));
@@ -44,6 +48,8 @@ vi.mock('../../lib/firestore', () => ({
     getVehicles: (...args: any[]) => mockGetVehicles(...args),
     createReservation: (...args: any[]) => mockCreateReservation(...args),
     cancelReservation: (...args: any[]) => mockCancelReservation(...args),
+    cancelReservationGroup: vi.fn().mockResolvedValue(0),
+    deleteReservationGroup: vi.fn().mockResolvedValue(0),
     getFavorites: (...args: any[]) => mockGetFavorites(...args),
     createFavorite: (...args: any[]) => mockCreateFavorite(...args),
     getReservationsByDateRange: (...args: any[]) => mockGetReservationsByDateRange(...args),

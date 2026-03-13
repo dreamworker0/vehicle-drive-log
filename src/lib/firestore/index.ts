@@ -66,6 +66,7 @@ export {
     createReservation,
     createReservationSafe,
     getReservations,
+    getReservationById,
     subscribeReservations,
     cancelReservation,
     updateReservation,
@@ -73,6 +74,9 @@ export {
     getTodayReservations,
     getWeekReservations,
     getReservationsByDateRange,
+    getReservationsByGroupId,
+    cancelReservationGroup,
+    deleteReservationGroup,
 } from './reservations';
 
 // 알림 (Notifications)
@@ -114,6 +118,14 @@ export {
     deleteFeedback,
     subscribeFeedbacks,
 } from './feedbacks';
+
+// 주유 기록 (Fuel Logs)
+export {
+    getFuelLogs,
+    createFuelLog,
+    deleteFuelLog,
+    updateFuelLog,
+} from './fuelLogs';
 
 // 슈퍼관리자 관리
 export {

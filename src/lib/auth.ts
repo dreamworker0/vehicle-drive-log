@@ -3,32 +3,13 @@ import type { AuthError } from 'firebase/auth';
 import { auth, googleProvider } from './firebase';
 
 /**
- * PWA standalone 모드 또는 팝업 불가 환경 감지.
- * Android Chrome은 popup이 새 탭으로 정상 작동하므로 redirect 대상에서 제외.
- * iOS Safari는 ITP로 인해 signInWithRedirect 후 세션이 유지되지 않으므로
- * signInWithPopup을 우선 사용하고, 팝업 차단 시에만 redirect로 전환.
+ * Google 로그인.
+ * PWA standalone 모드에서도 signInWithPopup을 우선 사용한다.
+ * signInWithRedirect는 PWA에서 서비스 워커 간섭, 리다이렉트 결과 손실 등으로
+ * 매우 불안정하므로 popup 실패(팝업 차단) 시에만 폴백으로 사용한다.
  */
-function shouldUseRedirect() {
-    // PWA standalone 모드 — popup 창을 열 수 없음
-    if (window.matchMedia?.('(display-mode: standalone)')?.matches) return true;
-    // iOS standalone (홈 화면에서 실행)
-    if ((navigator as Navigator & { standalone?: boolean }).standalone) return true;
-    // TWA (Trusted Web Activity)
-    if (document.referrer?.includes('android-app://')) return true;
-    // iOS Safari — ITP로 인해 signInWithRedirect 세션 유지가 불안정
-    // signInWithPopup을 우선 사용 (팝업 차단 시 catch에서 redirect로 자동 전환)
-    // Android Chrome도 popup(새 탭) 방식이 안정적
-    return false;
-}
-
 export const signInWithGoogle = async () => {
     try {
-        if (shouldUseRedirect()) {
-            // PWA standalone / 인앱 브라우저: redirect 사용
-            await signInWithRedirect(auth, googleProvider);
-            return; // 페이지 재로드됨
-        }
-        // 일반 브라우저: popup 사용
         const result = await signInWithPopup(auth, googleProvider);
         return result.user;
     } catch (error) {

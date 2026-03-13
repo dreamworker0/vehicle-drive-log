@@ -67,7 +67,7 @@ export function ToastProviderWrapper({ children }: { children: ReactNode }) {
             {children}
             {/* 토스트 렌더링 */}
             {toasts.length > 0 && (
-                <div className="fixed top-4 right-4 z-[9999] flex flex-col gap-2 max-w-sm">
+                <div className="fixed right-4 z-[9999] flex flex-col gap-2 max-w-sm" style={{ top: 'calc(1rem + env(safe-area-inset-top, 0px))' }}>
                     {toasts.map(toast => (
                         <div
                             key={toast.id}

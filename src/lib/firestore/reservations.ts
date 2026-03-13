@@ -2,7 +2,7 @@
  * Firestore — 차량 예약 (Reservations) 관련 함수
  */
 import {
-    doc, updateDoc,
+    doc, getDoc, updateDoc, deleteDoc,
     collection, query, where, getDocs, addDoc,
     serverTimestamp, onSnapshot,
 } from 'firebase/firestore';
@@ -11,6 +11,13 @@ import { db } from '../firebase';
 import app from '../firebase';
 
 const functions = getFunctions(app, 'asia-northeast3');
+
+// 예약 ID로 단일 조회
+export const getReservationById = async (reservationId: string) => {
+    const snap = await getDoc(doc(db, 'reservations', reservationId));
+    if (!snap.exists()) return null;
+    return { id: snap.id, ...snap.data() } as Record<string, any>;
+};
 
 // 예약 생성 (클라이언트 측)
 export const createReservation = async (data: Record<string, any>) => {
@@ -101,3 +108,35 @@ export const getWeekReservations = async (orgId: string, startDate: string, endD
 
 // 날짜 범위별 예약 조회 (getWeekReservations 별칭)
 export const getReservationsByDateRange = getWeekReservations;
+
+// groupId로 연속 예약 그룹 조회
+export const getReservationsByGroupId = async (groupId: string) => {
+    const q = query(
+        collection(db, 'reservations'),
+        where('groupId', '==', groupId),
+    );
+    const snap = await getDocs(q);
+    return snap.docs
+        .map(d => ({ id: d.id, ...d.data() } as Record<string, any>))
+        .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+};
+
+// 연속 예약 그룹 일괄 취소
+export const cancelReservationGroup = async (groupId: string) => {
+    const reservations = await getReservationsByGroupId(groupId);
+    const active = reservations.filter(r => r.status !== 'cancelled' && r.status !== 'completed');
+    await Promise.all(
+        active.map(r => updateDoc(doc(db, 'reservations', r.id), { status: 'cancelled' }))
+    );
+    return active.length;
+};
+
+// 연속 예약 그룹 삭제 (수정 전 기존 그룹 제거용)
+export const deleteReservationGroup = async (groupId: string) => {
+    const reservations = await getReservationsByGroupId(groupId);
+    const active = reservations.filter(r => r.status !== 'cancelled' && r.status !== 'completed');
+    await Promise.all(
+        active.map(r => deleteDoc(doc(db, 'reservations', r.id)))
+    );
+    return active.length;
+};

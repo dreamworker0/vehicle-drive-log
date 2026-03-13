@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { getFavorites, createFavorite, deleteFavorite } from '../../lib/firestore';
 import { useToast } from '../../hooks/useToast';
+import { useConfirm } from '../../contexts/ConfirmContext';
 
 interface Favorite {
     id: string;
@@ -20,6 +21,7 @@ export default function FavoritesManager() {
     const [adding, setAdding] = useState(false);
     const [showForm, setShowForm] = useState(false);
     const { showToast } = useToast();
+    const { confirm } = useConfirm();
 
     /* eslint-disable react-hooks/exhaustive-deps */
     useEffect(() => {
@@ -63,7 +65,7 @@ export default function FavoritesManager() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm('이 즐겨찾기를 삭제하시겠습니까?')) return;
+        if (!await confirm({ message: '이 즐겨찾기를 삭제하시겠습니까?', confirmColor: 'danger' })) return;
         try {
             await deleteFavorite(id);
             setFavorites(prev => prev.filter(f => f.id !== id));

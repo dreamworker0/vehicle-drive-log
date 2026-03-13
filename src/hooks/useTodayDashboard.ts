@@ -9,6 +9,7 @@ import { useToast } from './useToast';
 import { getVehicles, getTodayReservations, getWeekReservations, updateReservationStatus, cancelReservation, getMyDriveLogs } from '../lib/firestore';
 import { toLocalDateStr } from '../lib/dateUtils';
 import type { Vehicle } from '../types/vehicle';
+import { isVehicleBlocked } from '../lib/vehicleUtils';
 import type { Reservation } from '../types/reservation';
 
 export default function useTodayDashboard() {
@@ -118,7 +119,7 @@ export default function useTodayDashboard() {
         const nowMin = now.getHours() * 60 + now.getMinutes();
         const twoHoursLater = nowMin + 120;
 
-        const candidates = vehicles.filter(v => !v.maintenance?.isBlocked && !v.retired?.isRetired).map(v => {
+        const candidates = vehicles.filter(v => !isVehicleBlocked(v.maintenance) && !v.retired?.isRetired).map(v => {
             // 해당 차량의 오늘 예약 중 취소/완료 아닌 것
             const vReservations = todayReservations
                 .filter(r => r.vehicleId === v.id && r.status !== 'completed' && r.status !== 'cancelled')
@@ -148,6 +149,22 @@ export default function useTodayDashboard() {
         return candidates.sort((a, b) => (b?.minutesUntilNext ?? 0) - (a?.minutesUntilNext ?? 0))[0];
     }, [vehicles, todayReservations]);
 
+    // 클라이언트 로컬 알림 표시 (운행 시작 후 외부 앱에서 복귀 유도)
+    const showDrivingNotification = async (reservation: Reservation) => {
+        if (!('Notification' in window) || Notification.permission !== 'granted') return;
+        try {
+            const reg = await navigator.serviceWorker?.ready;
+            reg?.showNotification('🚗 운행 중', {
+                body: `${reservation.vehicleName || '차량'} 운행 중${reservation.destination ? ' · ' + reservation.destination : ''} — 탭하여 운행일지 작성`,
+                icon: '/icons/icon-192.png',
+                badge: '/icons/icon-192.png',
+                tag: `driving-${reservation.id}`,
+                data: { click_action: `${window.location.origin}/employee/drive-log?reservationId=${reservation.id}` },
+                requireInteraction: true,
+            } as NotificationOptions);
+        } catch { /* 알림 실패 무시 */ }
+    };
+
     const handleStartDrive = async (reservation: Reservation) => {
         setStartingId(reservation.id);
         try {
@@ -157,6 +174,9 @@ export default function useTodayDashboard() {
             setTodayReservations(prev => prev.map(r =>
                 r.id === reservation.id ? { ...r, status: 'in_progress', actualStartTime } : r
             ));
+
+            // 클라이언트 로컬 알림 (외부 앱 사용 후 복귀 유도)
+            showDrivingNotification(reservation);
         } catch (err) {
             console.error('운행 시작 실패:', err);
             showToast('운행 시작에 실패했습니다.', 'error');
@@ -174,6 +194,10 @@ export default function useTodayDashboard() {
             setTodayReservations(prev => prev.map(r =>
                 r.id === reservation.id ? { ...r, status: 'in_progress', actualStartTime } : r
             ));
+
+            // 클라이언트 로컬 알림 (외부 앱 사용 후 복귀 유도)
+            showDrivingNotification(reservation);
+
             const destination = reservation.destination || '';
             const navUrl = await (await import('../lib/tmap')).getNavigationDeeplink(app, destination);
             window.location.href = navUrl;
@@ -186,11 +210,23 @@ export default function useTodayDashboard() {
     };
 
     const handleCancelWeekReservation = async (reservation: Reservation) => {
-        if (!confirm(`${reservation.vehicleName} 예약을 취소하시겠습니까?`)) return;
         setCancellingId(reservation.id);
         try {
             await cancelReservation(reservation.id);
             setWeekReservations(prev => prev.filter(r => r.id !== reservation.id));
+        } catch (err) {
+            console.error('예약 취소 실패:', err);
+            showToast('예약 취소에 실패했습니다.', 'error');
+        } finally {
+            setCancellingId(null);
+        }
+    };
+
+    const handleCancelTodayReservation = async (reservation: Reservation) => {
+        setCancellingId(reservation.id);
+        try {
+            await cancelReservation(reservation.id);
+            setTodayReservations(prev => prev.filter(r => r.id !== reservation.id));
         } catch (err) {
             console.error('예약 취소 실패:', err);
             showToast('예약 취소에 실패했습니다.', 'error');
@@ -237,7 +273,7 @@ export default function useTodayDashboard() {
         myReservations, weekGrouped, todayLabel,
         upcomingAlerts, incompleteAlerts, hasActiveDrive,
         handleStartDrive, handleStartNavigation,
-        handleCancelWeekReservation,
+        handleCancelWeekReservation, handleCancelTodayReservation,
         navigateToArrival, navigateToReservations, navigateToQuickDrive,
         recommendedVehicle,
     };

@@ -24,9 +24,16 @@ npm run build
 ```
 Working directory: `.`
 
-4. Deploy all (Hosting + Functions + Firestore rules + Storage rules):
+4. Deploy Rules + Hosting:
 ```
-firebase deploy
+fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression; fnm use 22; firebase deploy --only "firestore,storage,hosting"
+```
+Working directory: `.`
+⚠️ exit code 1로 실패하면 최대 2회 재시도한다.
+
+5. Deploy Functions:
+```
+fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression; fnm use 22; firebase deploy --only functions
 ```
 Working directory: `.`
 ⚠️ exit code 1로 실패하면 최대 2회 재시도한다.

@@ -18,17 +18,19 @@ src/components/
 
 ## 이미 있는 컴포넌트 이름 패턴
 
-- **Layout**: `AdminLayout.jsx`, `EmployeeLayout.jsx`, `SuperAdminLayout.jsx`
+- **Layout**: `AdminLayout.tsx`, `EmployeeLayout.tsx`, `SuperAdminLayout.tsx`
   - 사이드바, 탭 네비게이션, 라우팅을 포함하는 최상위 레이아웃
-- **목록/관리**: `DriveLogList.jsx`, `VehicleManager.jsx`, `EmployeeManager.jsx`
-- **폼**: `DriveLogForm.jsx`
-- **대시보드**: `TodayDashboard.jsx`, `MonthlyReport.jsx`
-- **페이지**: `LoginPage.jsx`, `InviteCodePage.jsx`, `OrgApplicationPage.jsx`
+- **목록/관리**: `DriveLogList.tsx`, `VehicleManager.tsx`, `EmployeeManager.tsx`
+- **폼**: `DriveLogForm.tsx`
+- **대시보드**: `TodayDashboard.tsx`, `MonthlyReport.tsx`
+- **페이지**: `LoginPage.tsx`, `InviteCodePage.tsx`, `OrgApplicationPage.tsx`
 
 ### 공통 컴포넌트 (`common/`) — 새 컴포넌트 추가 전 재사용 여부 확인
 
 | 컴포넌트 | 역할 |
 |---------|------|
+| `HeatmapGrid` | 운행 밀도 히트맵 그리드 UI |
+| `CancelReservationHandler` | 예약 취소 작업 처리 (Cloud Function 호출 포함) |
 | `ConfirmModal` | 확인/취소 모달, 텍스트 입력 모달 (type: confirm/input) |
 | `CalendarGrid` | 달력 그리드 UI |
 | `ReservationCalendar` | 예약 달력 (관리자/직원 공용) |
@@ -47,9 +49,9 @@ src/components/
 
 ### 1. 파일 생성
 
-적절한 하위 폴더에 `PascalCase.jsx` 파일을 생성합니다.
+적절한 하위 폴더에 `PascalCase.tsx` 파일을 생성합니다.
 
-```jsx
+```tsx
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 
@@ -81,15 +83,15 @@ export default function NewComponent() {
   - `badge-neutral` — 회색 계열 (예약됨, 기본 상태 등)
   - 인라인으로 `bg-red-100 text-red-700` 같은 배지 색상을 직접 작성하지 말 것
 - **브라우저 팝업 사용 금지**: `alert()`, `confirm()`, `prompt()` 절대 사용 금지
-  - 확인/취소가 필요하면 `ConfirmModal` (type="confirm") 사용
-  - 텍스트 입력이 필요하면 `ConfirmModal` (type="input") 사용
-  - Import: `import ConfirmModal from '../common/ConfirmModal';`
+  - 확인/취소가 필요하면 `useConfirm` 훅 사용
+  - Import: `import { useConfirm } from '../../contexts/ConfirmContext';`
+  - 사용: `const { confirm } = useConfirm(); const ok = await confirm({ message: '메시지' });`
 
 ### 2-1. 탭 UI 패턴 (필수 준수)
 
 두 개 이상의 탭으로 콘텐츠를 전환하는 UI가 필요하면 아래 패턴을 그대로 사용합니다.
 
-```jsx
+```tsx
 {/* 탭 컨테이너 */}
 <div className="flex gap-1 mb-4 bg-surface-100 dark:bg-surface-800 rounded-xl p-1">
     <button
@@ -121,22 +123,21 @@ export default function NewComponent() {
 
 ### 3. Firestore 함수 연동
 
-Firestore 조회/수정 함수는 `src/lib/firestore.js`에서 import합니다:
+Firestore 조회/수정 함수는 `src/lib/firestore`에서 import합니다:
 
-```jsx
+```tsx
 import { getVehicles, createDriveLog } from '../../lib/firestore';
 ```
 
 ### 4. 라우트 등록
 
-해당 Layout 파일에서 라우트를 추가합니다:
+해당 Layout 파일에서 `lazyWithRetry`로 동적 import 후 라우트를 추가합니다:
 
-- `AdminLayout.jsx` → admin 컴포넌트
-- `EmployeeLayout.jsx` → employee 컴포넌트
-- `SuperAdminLayout.jsx` → superAdmin 컴포넌트
+```tsx
+// Layout 파일 상단
+const NewComponent = lazyWithRetry(() => import('./NewComponent'));
 
-```jsx
-// Layout 파일 내 Routes에 추가
+// Routes에 추가
 <Route path="new-feature" element={<NewComponent />} />
 ```
 

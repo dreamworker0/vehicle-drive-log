@@ -20,30 +20,30 @@ src/
 │   └── common/         ← 역할 공용 컴포넌트
 ├── hooks/              ← React 커스텀 훅 (아래 주요 훅 목록 참고)
 ├── lib/                ← 유틸리티 & 서비스
-│   ├── firebase.js     ← Firebase 초기화 (app, auth, db, storage)
-│   ├── firestore.js    ← Firestore CRUD 함수 집합
-│   ├── auth.js         ← 인증 유틸리티
-│   ├── constants.js    ← 공유 상수 (차량 아이콘, 색상 등)
-│   ├── dateUtils.js    ← 날짜 포맷·계산 헬퍼
-│   ├── tmap.js         ← Tmap API 연동
-│   ├── ocr.js          ← OCR Cloud Function 호출
-│   ├── pdfExport.js    ← PDF 내보내기
-│   ├── excelExport.js  ← Excel 내보내기
-│   ├── emailService.js ← EmailJS 연동
-│   ├── holidayApi.js   ← 공휴일 API
-│   ├── inAppBrowser.js ← 인앱 브라우저 감지·안내
-│   ├── sentry.js       ← Sentry 초기화
-│   └── lazyWithRetry.js← Lazy loading 재시도 유틸
-├── contexts/           ← React Context (AuthContext 등)
+│   ├── firebase.ts     ← Firebase 초기화 (app, auth, db, storage)
+│   ├── firestore/      ← Firestore CRUD 함수 (도메인별 분리)
+│   ├── auth.ts         ← 인증 유틸리티
+│   ├── constants.ts    ← 공유 상수 (차량 아이콘, 색상 등)
+│   ├── dateUtils.ts    ← 날짜 포맷·계산 헬퍼
+│   ├── tmap.ts         ← Tmap API 연동
+│   ├── ocr.ts          ← OCR Cloud Function 호출
+│   ├── pdfExport.ts    ← PDF 내보내기
+│   ├── excelExport.ts  ← Excel 내보내기
+│   ├── emailService.ts ← EmailJS 연동
+│   ├── holidayApi.ts   ← 공휴일 API
+│   ├── inAppBrowser.ts ← 인앱 브라우저 감지·안내
+│   ├── sentry.ts       ← Sentry 초기화
+│   └── lazyWithRetry.ts← Lazy loading 재시도 유틸
+├── contexts/           ← React Context (AuthContext, ConfirmContext, ThemeContext, FontSizeContext)
 ├── index.css           ← TailwindCSS + 커스텀 스타일
-├── App.jsx             ← 역할별 라우팅
-└── main.jsx            ← React 엔트리
+├── App.tsx             ← 역할별 라우팅
+└── main.tsx            ← React 엔트리
 ```
 
 ### 파일 위치 결정 기준
 - **역할 전용 화면** → `components/{role}/`에 생성
 - **2개 이상 역할에서 사용** → `components/common/`
-- **데이터 접근 함수** → `lib/firestore.js`에 추가
+- **데이터 접근 함수** → `lib/firestore/해당도메인.ts`에 추가
 - **새 커스텀 훅** → `hooks/`에 생성
 - **외부 API 연동** → `lib/`에 별도 파일
 
@@ -124,12 +124,18 @@ useEffect(() => {
 
 ## 3. Firestore 사용 패턴
 
-### 3.1 CRUD 함수는 `lib/firestore.js`에 집중
-```js
-// ✅ firestore.js에서 export
-export async function getVehicles(orgId) { ... }
-export async function createReservation(data) { ... }
-export async function updateReservation(id, data) { ... }
+### 3.1 CRUD 함수는 `lib/firestore/` 도메인별 파일에 집중
+```ts
+// ✅ 도메인 파일에서 export (e.g. firestore/vehicles.ts)
+export const getVehicles = async (orgId: string) => { ... };
+export const createReservation = async (data: Record<string, unknown>) => { ... };
+
+// ✅ index.ts에서 re-export
+export { getVehicles } from './vehicles';
+export { createReservation } from './reservations';
+
+// ✅ 컴포넌트에서 import
+import { getVehicles, createReservation } from '../../lib/firestore';
 
 // ❌ 컴포넌트에서 직접 Firestore 호출 (지양)
 // (단, 간단한 getDoc 1회 호출은 컴포넌트에서 허용)
@@ -217,41 +223,36 @@ if (loading) {
 </div>
 ```
 
-### 5.4 확인 다이얼로그 (ConfirmModal)
-```jsx
-import ConfirmModal from '../common/ConfirmModal';
+### 5.4 확인 다이얼로그 (useConfirm 훅)
+```tsx
+import { useConfirm } from '../../contexts/ConfirmContext';
 
-// 확인/취소 (type="confirm")
-<ConfirmModal
-    isOpen={showModal}
-    onClose={() => setShowModal(false)}
-    onConfirm={handleDelete}
-    title="삭제 확인"
-    message="정말 삭제하시겠습니까?"
-    type="confirm"
-/>
+const { confirm } = useConfirm();
 
-// 텍스트 입력 필요 시 (type="input")
-<ConfirmModal
-    isOpen={showModal}
-    onClose={() => setShowModal(false)}
-    onConfirm={(value) => handleAction(value)}
-    title="사유 입력"
-    message="퇴역 사유를 입력해주세요."
-    type="input"
-/>
+// 확인/취소
+const ok = await confirm({
+    message: '정말 삭제하시겠습니까?',
+    title: '삭제 확인',              // 선택
+    confirmText: '삭제',             // 선택 (기본: '확인')
+    confirmColor: 'danger',          // 'primary' | 'danger' | 'warning'
+});
+if (!ok) return;
+
+// ... 삭제 로직 실행
 ```
-- ⚠️ 브라우저 기본 `alert()`, `confirm()`, `prompt()` **절대 사용 금지**
-- 확인/취소가 필요하면 `ConfirmModal` (type="confirm") 사용
-- 텍스트 입력이 필요하면 `ConfirmModal` (type="input") 사용
+> ⛔ **`window.confirm()`, `window.alert()`, `window.prompt()` 절대 사용 금지**
+> - ESLint `no-restricted-globals` 규칙으로 자동 감지됨
+> - 확인/취소 → `useConfirm().confirm()` 훅 사용
+> - 알림 → `useToast().showToast()` 사용
+> - 텍스트 입력 → 별도 모달 또는 폼 UI 구성
 
 ### 5.5 알림/토스트
-```js
+```ts
 import { useToast } from '../../hooks/useToast';
 const { showToast } = useToast();
 showToast('저장되었습니다', 'success');  // type: 'success' | 'error' | 'info'
 ```
-- 커스텀 훅 `useToast`를 사용 (`hooks/useToast.jsx`)
+- 커스텀 훅 `useToast`를 사용 (`hooks/useToast.tsx`)
 - 브라우저 기본 `alert()` 대신 이 훅을 사용한다
 
 ---

@@ -23,6 +23,7 @@ export interface Reservation extends FirestoreDoc {
     routeDistance?: number | null;
     routeDuration?: number | null;
     routeTollFee?: number | null;
+    groupId?: string;            // 다일 연속 예약 그룹 식별자
     createdAt?: TimestampField;
 }
 

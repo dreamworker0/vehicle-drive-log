@@ -71,9 +71,15 @@ export default function CalendarGrid({
                             {day.date}
                             {hasRes && (
                                 <div className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 flex gap-0.5`}>
-                                    {day.reservations.slice(0, 3).map((_, idx) => (
-                                        <div key={idx} className={`w-1 h-1 rounded-full ${isSelected ? 'bg-white dark:bg-surface-800' : 'bg-primary-500'}`} />
-                                    ))}
+                                    {day.reservations.slice(0, 3).map((r, idx) => {
+                                        const isGroup = !!(r as any).groupId;
+                                        return (
+                                            <div key={idx} className={`w-1 h-1 rounded-full ${
+                                                isSelected ? 'bg-white dark:bg-surface-800' :
+                                                isGroup ? 'bg-blue-500' : 'bg-primary-500'
+                                            }`} />
+                                        );
+                                    })}
                                 </div>
                             )}
                         </button>

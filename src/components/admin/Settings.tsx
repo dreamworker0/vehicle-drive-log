@@ -97,7 +97,7 @@ export default function Settings() {
                         <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
                         </svg>
-                        기관명 변경은 슈퍼관리자에게 요청하세요.
+                        기관명과 주소 변경은 슈퍼관리자에게 요청하세요.
                     </button>
                     <div className="flex justify-end">
                         <button type="submit" disabled={saving} className="btn-primary">
@@ -109,10 +109,26 @@ export default function Settings() {
 
             {/* 결재 라인 설정 */}
             <div className="glass-card p-6 mb-6">
-                <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-1">결재 라인</h2>
+                <div className="flex items-center justify-between mb-1">
+                    <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100">결재 라인</h2>
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <span className={`text-xs font-medium ${form.hideApprovalLine ? 'text-surface-400' : 'text-primary-600 dark:text-primary-400'}`}>
+                            {form.hideApprovalLine ? 'PDF 결재란 숨김' : 'PDF 결재란 표시'}
+                        </span>
+                        <button
+                            type="button"
+                            role="switch"
+                            aria-checked={!form.hideApprovalLine}
+                            onClick={() => setForm({ ...form, hideApprovalLine: !form.hideApprovalLine })}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${!form.hideApprovalLine ? 'bg-primary-600' : 'bg-surface-300 dark:bg-surface-600'}`}
+                        >
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${!form.hideApprovalLine ? 'translate-x-6' : 'translate-x-1'}`} />
+                        </button>
+                    </label>
+                </div>
                 <p className="text-xs text-surface-400 mb-4">PDF 운행일지에 표시될 결재란을 설정합니다. (수동 결재용)</p>
 
-                <div className="space-y-2 mb-3">
+                <div className={`space-y-2 mb-3 transition-opacity ${form.hideApprovalLine ? 'opacity-40 pointer-events-none' : ''}`}>
                     {form.approvalLine.map((item, idx) => (
                         <div key={idx} className="flex items-center gap-2">
                             <input
@@ -143,7 +159,7 @@ export default function Settings() {
                     ))}
                 </div>
 
-                {form.approvalLine.length < 5 && (
+                {form.approvalLine.length < 5 && !form.hideApprovalLine && (
                     <button
                         type="button"
                         onClick={() => setForm({ ...form, approvalLine: [...form.approvalLine, { title: '', name: '' } as any] })}

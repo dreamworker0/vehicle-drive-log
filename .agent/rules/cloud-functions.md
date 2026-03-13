@@ -13,7 +13,7 @@ description: Cloud Functions 코딩 컨벤션. functions/ 디렉터리의 코드
 ## 1. 기술 스택
 
 - **런타임**: Node.js 22 (`engines.node: "22"`)
-- **모듈 시스템**: CommonJS (`require` / `module.exports`)
+- **모듈 시스템**: TypeScript ESM (`import` / `export`)
 - **Firebase**: `firebase-admin`, `firebase-functions` v6 (2nd gen)
 - **주요 라이브러리**: `googleapis`, `@google/genai`, `@emailjs/nodejs`
 
@@ -23,30 +23,29 @@ description: Cloud Functions 코딩 컨벤션. functions/ 디렉터리의 코드
 
 ### 2.1 모듈 분리 원칙
 
-- **1개 파일 = 1개 기능 영역**: 파일 이름이 기능을 대표 (예: `ocrDocument.js`, `tmapProxy.js`)
-- **index.js는 등록만**: 비즈니스 로직 없이 `require` + `exports` 만 작성
-- **헬퍼 모듈**: 여러 함수에서 공유하는 로직은 별도 파일로 분리 (예: `calendarSync.js`)
+- **1개 파일 = 1개 기능 영역**: 파일 이름이 기능을 대표 (예: `ocrDocument.ts`, `tmapProxy.ts`)
+- **index.ts는 등록만**: 비즈니스 로직 없이 `import` + `export` 만 작성
+- **헬퍼 모듈**: 여러 함수에서 공유하는 로직은 별도 파일로 분리 (예: `calendarSync.ts`, `helpers.ts`)
 
-### 2.2 index.js 등록 패턴
+### 2.2 index.ts 등록 패턴
 
-```js
+```ts
 // 섹션 주석으로 그룹핑
 // ========================
 // 기능 이름 (한글)
 // ========================
-const { functionName } = require("./fileName");
-exports.functionName = functionName;
+export { functionName } from "./fileName";
 ```
 
 ### 2.3 Firebase Admin 초기화
 
-```js
-// index.js에서 최초 1회만 호출
-const { initializeApp } = require("firebase-admin/app");
+```ts
+// index.ts에서 최초 1회만 호출
+import { initializeApp } from "firebase-admin/app";
 initializeApp();
 
 // 개별 모듈에서는 서비스만 가져옴
-const { getFirestore } = require("firebase-admin/firestore");
+import { getFirestore } from "firebase-admin/firestore";
 const db = getFirestore();
 ```
 
@@ -56,10 +55,10 @@ const db = getFirestore();
 
 ### 3.1 HTTP 함수
 
-```js
-const { onRequest } = require("firebase-functions/v2/https");
+```ts
+import { onRequest } from "firebase-functions/v2/https";
 
-exports.myFunction = onRequest(
+export const myFunction = onRequest(
     {
         region: "asia-northeast3",
         cors: true,
@@ -74,16 +73,16 @@ exports.myFunction = onRequest(
 
 ### 3.2 스케줄 함수
 
-```js
-const { onSchedule } = require("firebase-functions/v2/scheduler");
+```ts
+import { onSchedule } from "firebase-functions/v2/scheduler";
 
-exports.mySchedule = onSchedule(
+export const mySchedule = onSchedule(
     {
         schedule: "every 5 minutes",
         timeZone: "Asia/Seoul",
         retryCount: 0,
     },
-    async function () { ... }
+    async () => { ... }
 );
 ```
 
@@ -92,9 +91,9 @@ exports.mySchedule = onSchedule(
 
 ### 3.3 Firestore 트리거
 
-```js
-const { onDocumentCreated, onDocumentUpdated, onDocumentDeleted }
-    = require("firebase-functions/v2/firestore");
+```ts
+import { onDocumentCreated, onDocumentUpdated, onDocumentDeleted }
+    from "firebase-functions/v2/firestore";
 ```
 
 - **무한 루프 방지**: 트리거가 같은 문서를 수정하는 경우, `syncSource` 같은 플래그로 제어
@@ -104,13 +103,13 @@ const { onDocumentCreated, onDocumentUpdated, onDocumentDeleted }
 
 ## 4. 에러 처리
 
-```js
+```ts
 try {
     // 비즈니스 로직
     console.log("성공 메시지:", docId);
-} catch (err) {
-    console.error("실패 설명:", err.message);
-    // HTTP 함수: res.status(500).json({ error: err.message });
+} catch (err: unknown) {
+    console.error("실패 설명:", (err as Error).message);
+    // HTTP 함수: res.status(500).json({ error: (err as Error).message });
     // 트리거/스케줄: 에러를 로그만 남기고 throw 하지 않음 (재시도 방지)
 }
 ```
@@ -131,7 +130,7 @@ TMAP_API_KEY=...
 GOOGLE_GENAI_API_KEY=...
 ```
 
-```js
+```ts
 // 사용
 const apiKey = process.env.TMAP_API_KEY;
 ```
@@ -142,8 +141,8 @@ const apiKey = process.env.TMAP_API_KEY;
 
 ## 6. 푸시 알림 (sendNotification)
 
-```js
-const { sendPushToOrg } = require("./sendNotification");
+```ts
+import { sendPushToOrg } from "./sendNotification";
 
 // 특정 사용자 제외하고 기관 전체에 푸시
 await sendPushToOrg(

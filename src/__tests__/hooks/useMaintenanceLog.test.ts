@@ -12,6 +12,10 @@ vi.mock('../../hooks/useToast', () => ({
     useToast: () => ({ showToast: mockShowToast }),
 }));
 
+vi.mock('../../contexts/ConfirmContext', () => ({
+    useConfirm: () => ({ confirm: vi.fn().mockResolvedValue(true) }),
+}));
+
 vi.mock('../../lib/dateUtils', () => ({
     toLocalDateStr: () => '2026-03-06',
 }));
@@ -52,6 +56,9 @@ describe('useMaintenanceLog', () => {
 
         expect(result.current.vehicles).toHaveLength(2);
         expect(result.current.filteredRecords).toHaveLength(1);
+        expect(result.current.filters).toEqual({
+            search: '', vehicleId: '', type: '', startDate: '', endDate: '',
+        });
     });
 
     it('getTypeInfo가 올바른 정보를 반환한다', async () => {

@@ -5,6 +5,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
+import { useConfirm } from '../contexts/ConfirmContext';
 import type { Vehicle } from '../types/vehicle';
 import type { MaintenanceRecord } from '../types/maintenance';
 import { getVehicles, getMaintenanceRecords, createMaintenanceRecord, deleteMaintenanceRecord, clearVehicleMaintenanceBlock, cancelVehicleReservations } from '../lib/firestore';
@@ -33,12 +34,19 @@ const INITIAL_FORM = {
 export default function useMaintenanceLog() {
     const { userData } = useAuth();
     const { showToast } = useToast();
+    const { confirm } = useConfirm();
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
     const [records, setRecords] = useState<MaintenanceRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [filterVehicle, setFilterVehicle] = useState('');
+    const [filters, setFilters] = useState({
+        search: '',
+        vehicleId: '',
+        type: '',
+        startDate: '',
+        endDate: '',
+    });
     const [form, setForm] = useState(INITIAL_FORM);
 
     const orgId = userData?.organizationId;
@@ -63,12 +71,33 @@ export default function useMaintenanceLog() {
     }, [orgId]);
 
     const filteredRecords = useMemo(() => {
-        const base = filterVehicle ? records.filter(r => r.vehicleId === filterVehicle) : records;
-        return base.map(r => {
-            const v = vehicles.find(v => v.id === r.vehicleId);
-            return { ...r, vehicleType: v?.vehicleType || null };
-        });
-    }, [records, filterVehicle, vehicles]);
+        return records
+            .filter(r => {
+                // 차량 필터
+                if (filters.vehicleId && r.vehicleId !== filters.vehicleId) return false;
+                // 정비 유형 필터
+                if (filters.type && r.type !== filters.type) return false;
+                // 기간 필터
+                if (filters.startDate && r.date < filters.startDate) return false;
+                if (filters.endDate && r.date > filters.endDate) return false;
+                // 텍스트 검색 (차량명, 정비소, 메모)
+                if (filters.search) {
+                    const s = filters.search.toLowerCase();
+                    return (
+                        r.vehicleName?.toLowerCase().includes(s) ||
+                        r.shop?.toLowerCase().includes(s) ||
+                        r.description?.toLowerCase().includes(s)
+                    );
+                }
+                return true;
+            })
+            .map(r => {
+                const v = vehicles.find(v => v.id === r.vehicleId);
+                return { ...r, vehicleType: v?.vehicleType || null };
+            });
+    }, [records, filters, vehicles]);
+
+    const resetFilters = () => setFilters({ search: '', vehicleId: '', type: '', startDate: '', endDate: '' });
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -121,7 +150,7 @@ export default function useMaintenanceLog() {
     };
 
     const handleDelete = async (rec: MaintenanceRecord) => {
-        if (!confirm('이 정비 기록을 삭제하시겠습니까?')) return;
+        if (!await confirm({ message: '이 정비 기록을 삭제하시겠습니까?', confirmColor: 'danger' })) return;
         try {
             await deleteMaintenanceRecord(rec.id, rec.blockVehicle ? rec.vehicleId : null);
             setRecords(prev => prev.filter(r => r.id !== rec.id));
@@ -136,7 +165,7 @@ export default function useMaintenanceLog() {
     };
 
     const handleClearBlock = async (vehicleId: string) => {
-        if (!confirm('이 차량의 정비 차단을 해제하시겠습니까?')) return;
+        if (!await confirm({ message: '이 차량의 정비 차단을 해제하시겠습니까?', confirmColor: 'warning' })) return;
         try {
             await clearVehicleMaintenanceBlock(vehicleId);
             const v = await getVehicles(orgId!);
@@ -157,7 +186,7 @@ export default function useMaintenanceLog() {
 
     return {
         vehicles, loading, showForm, setShowForm,
-        saving, filterVehicle, setFilterVehicle,
+        saving, filters, setFilters, resetFilters,
         form, setForm, filteredRecords,
         handleSubmit, handleDelete, getTypeInfo, handleVehicleSelect,
         handleClearBlock,

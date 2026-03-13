@@ -159,6 +159,9 @@ export default function OrgApplicationPage() {
                                 onChange={handleImageChange}
                                 className="hidden"
                             />
+                            <p className="text-xs text-surface-400 dark:text-surface-500 mt-2">
+                                ※ 사회복지시설신고증은 증빙서류로 인정되지 않습니다. 고유번호증 또는 사업자등록증을 업로드해주세요.
+                            </p>
                         </div>
                     </div>
 

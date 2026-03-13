@@ -16,7 +16,7 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
         vehicles, loading, form, setForm,
         selectedDate, showForm, setShowForm,
         sideTab, setSideTab,
-        submitting, editingReservation,
+        submitting, editingReservation, editingGroupId,
         favorites, routeInfo, routeLoading,
         showFavSave, setShowFavSave,
         favName, setFavName,
@@ -73,6 +73,7 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
                         isToday={isToday}
                         submitting={submitting}
                         editingReservation={editingReservation}
+                        editingGroupId={editingGroupId}
                         routeInfo={routeInfo}
                         routeLoading={routeLoading}
                         user={user!}
