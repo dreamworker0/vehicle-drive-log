@@ -5,6 +5,34 @@
 
 ---
 
+## Phase 34 — 기능 추가 & 번들 최적화 & 운영 정비 🚀
+
+> 2026-03-13
+
+### Added
+- FAQ 페이지 (`FAQPage.tsx` + `faqData.ts` — 대시보드 우측 배치)
+- 업데이트 소식 페이지 (`ReleaseNotesPage.tsx` + `releaseNotes.ts`)
+- 주유 기록 관리 (`FuelLogManager.tsx`, `FuelLogTab.tsx`, `useFuelLog.ts`, `useFuelLogAdmin.ts`, `fuelLogs.ts`, `fuelLogPdfExport.ts`, `fuelLog.ts`)
+- 히트맵 그리드 공통 컴포넌트 (`HeatmapGrid.tsx`)
+- ConfirmContext 전역 확인 모달 (`ConfirmContext.tsx`)
+- 차량 유틸리티 분리 (`vehicleUtils.ts`)
+- 정비 기록 PDF 출력 (`maintenancePdfExport.ts`)
+- Cloud Functions: `joinOrganization.ts`, `migrateCustomClaims.ts`, `rateLimit.ts`
+
+### Changed
+- JS 번들 최적화: 2276KB → 예산 이내로 감소 (코드 스플리팅, 미사용 라이브러리 정리)
+- ESLint 정리 및 코딩 컨벤션 업데이트
+- Cloud Functions 규칙 및 스킬 문서 갱신
+
+### Removed
+- 푸시 알림 기능 일부 제거 (운행 시작 알림 취소)
+
+### Fixed
+- Google 로그인 안정성 개선
+- Sentry 에러 필터링 (ServiceWorker `InvalidStateError`, `SyntaxError: Unexpected end of input`)
+
+---
+
 ## Phase 33 — 운영 품질 강화 & 서비스 성장 기반 📊
 
 > 2026-03-12
