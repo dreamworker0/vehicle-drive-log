@@ -228,7 +228,14 @@ export default function OrgManagement() {
     }
 
     // 직원 1명 이상 = 활성 기관, 0명 = 미활성 기관 (페이지 로드 시 일괄 조회한 memberCountMap 기반)
-    const activeOrgs = organizations.filter(org => memberCountMap[org.id] > 0);
+    // 활성 기관은 생성일(createdAt) 최신순 정렬
+    const activeOrgs = organizations
+        .filter(org => memberCountMap[org.id] > 0)
+        .sort((a, b) => {
+            const aTime = (a as any).createdAt?.toDate?.()?.getTime?.() ?? (a as any).createdAt ?? 0;
+            const bTime = (b as any).createdAt?.toDate?.()?.getTime?.() ?? (b as any).createdAt ?? 0;
+            return bTime - aTime; // 최신순
+        });
     const inactiveOrgs = organizations.filter(org => !memberCountMap[org.id] || memberCountMap[org.id] === 0);
 
     // 검색 기준 목록 결정
