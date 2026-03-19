@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="google-site-verification" content="zBYvbruFkJzwSnDU87N57eEe6D62376vIsGFy6tyVAw" />
+  <!-- preconnect: DNS/TLS 사전 연결로 초기 로딩 성능 향상 -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link rel="preconnect" href="https://firestore.googleapis.com" />
+  <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com" />
+  <link rel="dns-prefetch" href="https://firebasestorage.googleapis.com" />
+  <link rel="icon"
+    href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚗</text></svg>" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="description" content="AI 계기판 인식, 예약, 길안내, 정비, 통계, 출력까지. 사회복지기관·비영리단체를 위한 무료 차량 관리 서비스." />
+  <meta name="theme-color" content="#f8fafc" />
+  <link rel="canonical" href="https://vehicle-drive-log.web.app/" />
+  <script>
+    // React 마운트 전 theme-color 초기화 (FOUC 방지)
+    (function(){
+      var s=localStorage.getItem('theme-preference');
+      var d=s==='dark'||(s!=='light'&&window.matchMedia('(prefers-color-scheme:dark)').matches);
+      document.querySelector('meta[name="theme-color"]').content=d?'#020617':'#f8fafc';
+    })();
+  </script>
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/icon-180.png" />
+  <link rel="apple-touch-icon" sizes="192x192" href="/icons/icon-192.png" />
+  <!-- iOS 스플래시 스크린 (주요 아이폰 해상도) -->
+  <link rel="apple-touch-startup-image"
+    media="(device-width: 430px) and (device-height: 932px) and (-webkit-device-pixel-ratio: 3)"
+    href="/icons/icon-512.png" />
+  <link rel="apple-touch-startup-image"
+    media="(device-width: 393px) and (device-height: 852px) and (-webkit-device-pixel-ratio: 3)"
+    href="/icons/icon-512.png" />
+  <link rel="apple-touch-startup-image"
+    media="(device-width: 390px) and (device-height: 844px) and (-webkit-device-pixel-ratio: 3)"
+    href="/icons/icon-512.png" />
+  <link rel="apple-touch-startup-image"
+    media="(device-width: 375px) and (device-height: 812px) and (-webkit-device-pixel-ratio: 3)"
+    href="/icons/icon-512.png" />
+  <link rel="apple-touch-startup-image"
+    media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 3)"
+    href="/icons/icon-512.png" />
+  <link rel="apple-touch-startup-image"
+    media="(device-width: 414px) and (device-height: 896px) and (-webkit-device-pixel-ratio: 2)"
+    href="/icons/icon-512.png" />
+  <link rel="apple-touch-startup-image"
+    media="(device-width: 375px) and (device-height: 667px) and (-webkit-device-pixel-ratio: 2)"
+    href="/icons/icon-512.png" />
+  <!-- Open Graph (카카오톡, 페이스북 등 링크 미리보기) -->
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="차량 운행일지" />
+  <meta property="og:description" content="AI 계기판 인식, 예약, 길안내, 정비, 통계, 출력까지. 사회복지기관·비영리단체를 위한 무료 차량 관리 서비스." />
+  <meta property="og:image" content="https://vehicle-drive-log.web.app/icons/icon-512.png" />
+  <meta property="og:url" content="https://vehicle-drive-log.web.app/" />
+  <title>차량 운행일지</title>
+  <!-- 서비스 워커 강제 퍼지 (외부 스크립트) -->
+  <script src="/sw-purge.js"></script>
+</head>
+
+<body>
+  <div id="root"></div>
+  <script type="module" src="/src/main.jsx"></script>
+</body>
+
+</html>

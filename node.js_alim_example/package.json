@@ -1,0 +1,31 @@
+{
+  "name": "aligoapi",
+  "version": "1.1.0",
+  "description": "To use aligo restful api in node js",
+  "main": "dist/index.js",
+  "keywords": [
+    "aligo",
+    "aligo sms",
+    "aligo lms",
+    "aligo mms",
+    "aligo restful",
+    "aligo kakao",
+    "aligo alim talk",
+    "aligo frind talk"
+  ],
+  "homepage": "https://smartsms.aligo.in/smsapi.html",
+  "bugs": {
+    "url": "https://smartsms.aligo.in/qna/help_quest.html",
+    "email": "ctkim@alipeople.kr"
+  },
+  "author": {
+    "name": "Kim Chan Tae",
+    "email": "ctkim@alipeople.kr"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^0.19.2",
+    "multiparty": "^4.2.1",
+    "form-data": "^3.0.0"
+  }
+}

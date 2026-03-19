@@ -1,0 +1,183 @@
+import { initializeApp } from "firebase-admin/app";
+import { onSchedule } from "firebase-functions/v2/scheduler";
+
+// Firebase Admin 초기화
+initializeApp();
+
+// OCR Functions
+export { ocrDashboard } from "./ocrDashboard";
+export { ocrDocument } from "./ocrDocument";
+export { autoVerifyDocument } from "./autoVerifyDocument";
+
+// Holiday Proxy
+export { holidayProxy } from "./holidayProxy";
+
+// Holiday Sync Scheduler (오전 6시마다 실행)
+export { syncHolidaysScheduled } from "./syncHolidays";
+
+// Tmap Proxy (프로덕션 CORS 해결)
+export { tmapProxy } from "./tmapProxy";
+
+// 데이터 백업 & 자동 퍼지 & 아카이빙
+export { backupFirestore } from "./backupFirestore";
+export { autoPurgeOrgs } from "./autoPurgeOrgs";
+export { archiveDriveLogs } from "./archiveDriveLogs";
+export { cleanupCertificateImages } from "./cleanupCertificateImages";
+
+// Admin Notice
+export { sendAdminNotice } from "./sendAdminNotice";
+
+// 예약 생성 (중복 방지 — Firestore Transaction)
+export { createReservationSafe } from "./createReservationSafe";
+
+// 기관 신청 이메일 알림
+export { notifyNewApplication } from "./notifyNewApplication";
+
+// 수동 승인 시 알림톡 발송
+export { sendManualApprovalAlimtalk } from "./sendManualApprovalAlimtalk";
+
+// Reservation Reminder (예약 알림 + 미작성 알림)
+import { checkReservationReminders } from "./reservationReminder";
+
+export const reservationReminder = onSchedule(
+    {
+        schedule: "every 5 minutes",
+        timeZone: "Asia/Seoul",
+        retryCount: 0,
+    },
+    async function () {
+        await checkReservationReminders();
+    }
+);
+
+// OCR 워밍업 스케줄러 (근무시간 콜드 스타트 방지)
+import { warmupOcrFunction } from "./warmupOcr";
+
+export const warmupOcr = onSchedule(
+    {
+        schedule: "every 5 minutes",
+        timeZone: "Asia/Seoul",
+        retryCount: 0,
+    },
+    async function () {
+        await warmupOcrFunction();
+    }
+);
+
+// 예약 트리거 (Google Calendar 연동 + 푸시 알림)
+export { onReservationCreated, onReservationUpdated, onReservationDeleted } from "./reservationTriggers";
+
+// Google Calendar -> App 역동기화 (10분마다)
+export { syncCalendarToApp } from "./calendarSchedule";
+
+// 운행일지 중복 정리 (관리자용)
+export { cleanupDuplicateLogs } from "./cleanupDuplicateLogs";
+
+// 직원 삭제 (Auth 비활성화 + Firestore 삭제)
+export { disableUser } from "./disableUser";
+
+// 계정 복원 (Auth 재활성화 + Firestore 재생성)
+export { restoreUser } from "./restoreUser";
+
+// Custom Claims 자동 동기화 (users 문서 변경 → Auth Claims 설정)
+export { setCustomClaims } from "./setCustomClaims";
+
+// 초대 코드로 기관 가입 (신규 사용자 Custom Claims 미보유 대응)
+export { joinOrganization } from "./joinOrganization";
+
+// 첫 직원 등록 시점 추적
+export { trackFirstEmployee } from "./trackFirstEmployee";
+
+// Rate Limit 문서 자동 정리 (매일 05:00 KST)
+import { cleanupExpiredRateLimits } from "./rateLimit";
+
+export const cleanupRateLimits = onSchedule(
+    {
+        schedule: "0 5 * * *",
+        timeZone: "Asia/Seoul",
+        retryCount: 0,
+    },
+    async function () {
+        await cleanupExpiredRateLimits();
+    }
+);
+
+// 미활성 기관 일괄 알림톡 발송
+import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { getFirestore } from "firebase-admin/firestore";
+import { sendReminderAlimtalk } from "./sendAlimtalk";
+
+export const sendBulkReminder = onCall(
+    { region: "asia-northeast3", timeoutSeconds: 120, enforceAppCheck: true },
+    async (request) => {
+        // 인증 확인
+        if (!request.auth) {
+            throw new HttpsError("unauthenticated", "인증이 필요합니다.");
+        }
+        // superAdmin 권한 확인
+        if (request.auth.token.role !== "superAdmin") {
+            throw new HttpsError("permission-denied", "시스템 관리자만 사용할 수 있습니다.");
+        }
+
+        const db = getFirestore();
+
+        // 승인된 기관 조회
+        const orgsSnap = await db.collection("organizations")
+            .where("status", "==", "approved")
+            .get();
+
+        const results: { orgName: string; phone: string; success: boolean; message?: string }[] = [];
+        let sentCount = 0;
+        let failCount = 0;
+        let noPhoneCount = 0;
+
+        for (const orgDoc of orgsSnap.docs) {
+            const org = orgDoc.data();
+
+            // 직원 수 확인 (0명 = 미활성)
+            const membersSnap = await db.collection("users")
+                .where("organizationId", "==", orgDoc.id)
+                .limit(1)
+                .get();
+
+            if (!membersSnap.empty) continue; // 직원이 있으면 건너뛰기
+
+            // 전화번호 확인
+            const phone = org.applicantPhone || org.phone;
+            if (!phone) {
+                noPhoneCount++;
+                results.push({ orgName: org.name, phone: "-", success: false, message: "전화번호 없음" });
+                continue;
+            }
+
+            // 알림톡 발송
+            const name = org.applicantName || org.name;
+            const inviteCode = org.inviteCode || "";
+
+            if (!inviteCode) {
+                results.push({ orgName: org.name, phone, success: false, message: "초대코드 없음" });
+                failCount++;
+                continue;
+            }
+
+            const result = await sendReminderAlimtalk(phone, name, org.name, inviteCode);
+
+            if (result.success) {
+                sentCount++;
+            } else {
+                failCount++;
+            }
+
+            results.push({
+                orgName: org.name,
+                phone,
+                success: result.success,
+                message: result.message,
+            });
+        }
+
+        console.log(`[BulkReminder] 완료: 성공 ${sentCount}, 실패 ${failCount}, 번호없음 ${noPhoneCount}`);
+
+        return { sentCount, failCount, noPhoneCount, results };
+    }
+);
