@@ -170,6 +170,7 @@ export default function LandingPage() {
                             className="absolute top-0 left-0 w-full h-full"
                             src="https://www.youtube.com/embed/XdT5Wm_pd3s?rel=0&modestbranding=1"
                             title="차량 운행일지 사용법"
+                            loading="lazy"
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                             referrerPolicy="strict-origin-when-cross-origin"
                             allowFullScreen
