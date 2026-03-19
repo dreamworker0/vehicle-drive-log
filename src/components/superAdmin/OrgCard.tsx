@@ -46,7 +46,6 @@ export default function OrgCard({
         return Math.floor((Date.now() - approved.getTime()) / (1000 * 60 * 60 * 24));
     })();
 
-    // 신청날짜 포맷
     const appliedDate = (() => {
         if (!org.createdAt) return null;
         const d = 'toDate' in org.createdAt
@@ -54,7 +53,9 @@ export default function OrgCard({
             : new Date(org.createdAt as any);
         const mm = String(d.getMonth() + 1).padStart(2, '0');
         const dd = String(d.getDate()).padStart(2, '0');
-        return `${d.getFullYear()}.${mm}.${dd}`;
+        const hh = String(d.getHours()).padStart(2, '0');
+        const mi = String(d.getMinutes()).padStart(2, '0');
+        return `${d.getFullYear()}.${mm}.${dd} ${hh}:${mi}`;
     })();
 
     const getDaysBadgeStyle = (days: number) => {
