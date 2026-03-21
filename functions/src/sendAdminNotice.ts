@@ -8,7 +8,7 @@ import { sendPushToOrg, createInAppNotificationForOrg } from "./sendNotification
 const db = getFirestore();
 
 export const sendAdminNotice = onCall(
-    { region: "asia-northeast3" },
+    { region: "asia-northeast3", enforceAppCheck: true },
     async (request) => {
         if (!request.auth) {
             throw new HttpsError("unauthenticated", "로그인이 필요합니다.");

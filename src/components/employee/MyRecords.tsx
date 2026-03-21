@@ -5,6 +5,7 @@ import { getMyDriveLogs } from '../../lib/firestore';
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
 import { formatTimestampShort } from '../../lib/dateUtils';
 import { SkeletonBox, SkeletonList } from '../common/Skeleton';
+import MyStatsSummary from './MyStatsSummary';
 
 export default function MyRecords() {
     const { user, userData } = useAuth();
@@ -92,6 +93,9 @@ export default function MyRecords() {
                 </div>
             )}
 
+            {/* 월간 통계 요약 */}
+            <MyStatsSummary logs={logs} />
+
             <p className="text-sm text-surface-500 dark:text-surface-400 mb-4">
                 {searchQuery ? `검색 결과 ${filteredLogs.length}건` : `총 ${logs.length}건`} · {totalDistance.toLocaleString()} km
             </p>
@@ -99,8 +103,16 @@ export default function MyRecords() {
             {filteredLogs.length === 0 ? (
                 <div className="glass-card p-12 text-center">
                     <div className="text-4xl mb-3">{searchQuery ? '🔍' : '📋'}</div>
-                    <p className="text-surface-400 font-medium">{searchQuery ? `"${searchQuery}" 검색 결과가 없습니다` : '운행 기록이 없습니다'}</p>
-                    <p className="text-xs text-surface-300 mt-1">{searchQuery ? '다른 키워드로 검색해보세요' : '운행일지를 작성해보세요'}</p>
+                    <p className="text-surface-400 font-medium">{searchQuery ? `"${searchQuery}" 검색 결과가 없습니다` : '아직 운행 기록이 없어요'}</p>
+                    <p className="text-xs text-surface-300 dark:text-surface-500 mt-1">{searchQuery ? '다른 키워드로 검색해보세요' : '예약 후 운행을 시작하면 여기에 기록이 쌓여요'}</p>
+                    {!searchQuery && (
+                        <button
+                            onClick={() => navigate('/employee/reservations')}
+                            className="mt-4 btn-primary btn-sm text-sm"
+                        >
+                            📅 예약하러 가기
+                        </button>
+                    )}
                 </div>
             ) : (
                 <div className="space-y-6">

@@ -1,5 +1,9 @@
 rules_version = '2';
 
+function isSuperAdmin() {
+  return request.auth != null && request.auth.token.role == 'superAdmin';
+}
+
 function isOrgMemberOrApplicant(orgId) {
   let userPath = /databases/(default)/documents/users/$(request.auth.uid);
   let org = firestore.get(/databases/(default)/documents/organizations/$(orgId));
@@ -12,7 +16,7 @@ service firebase.storage {
   match /b/{bucket}/o {
     // 기관 고유번호증 사본 업로드 (익명 인증 포함 인증 필수)
     match /organizations/{orgId}/{allPaths=**} {
-      allow read: if request.auth != null;
+      allow read: if isOrgMemberOrApplicant(orgId) || isSuperAdmin();
       allow write: if request.auth != null
                    && request.resource.size < 5 * 1024 * 1024
                    && (request.resource.contentType.matches('image/.*') || request.resource.contentType == 'application/pdf')
@@ -21,7 +25,7 @@ service firebase.storage {
 
     // OCR 인식 오류 신고 이미지 업로드 (본인 폴더만)
     match /feedbacks/ocr-report/{userId}/{fileName} {
-      allow read: if request.auth != null;
+      allow read: if (request.auth != null && request.auth.uid == userId) || isSuperAdmin();
       allow write: if request.auth != null
                    && request.auth.uid == userId
                    && request.resource.size < 5 * 1024 * 1024
@@ -30,7 +34,7 @@ service firebase.storage {
 
     // 일반 피드백 이미지 업로드 (본인 폴더만)
     match /feedbacks/{userId}/{fileName} {
-      allow read: if request.auth != null;
+      allow read: if (request.auth != null && request.auth.uid == userId) || isSuperAdmin();
       allow write: if request.auth != null
                    && request.auth.uid == userId
                    && request.resource.size < 5 * 1024 * 1024

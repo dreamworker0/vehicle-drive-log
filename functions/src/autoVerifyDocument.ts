@@ -8,6 +8,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import * as emailjs from "@emailjs/nodejs";
 import * as nodemailer from "nodemailer";
+import { sendApprovalAlimtalk } from "./sendAlimtalk";
 
 const geminiApiKey = defineString("GEMINI_API_KEY");
 const tmapApiKey = defineString("TMAP_API_KEY");
@@ -15,6 +16,31 @@ const tmapApiKey = defineString("TMAP_API_KEY");
 /**
  * 사업자번호 중간 2자리 + 키워드 기반 비영리 판별 보조 함수
  */
+/**
+ * 이름 마스킹 (가운데 글자 → *)
+ * 예: "김종원" → "김*원", "홍길동" → "홍*동", "김수" → "김*"
+ */
+function maskName(name: string | null | undefined): string {
+    if (!name || name.length === 0) return "알 수 없음";
+    if (name.length === 1) return name;
+    if (name.length === 2) return name[0] + "*";
+    const first = name[0];
+    const last = name[name.length - 1];
+    const middle = "*".repeat(name.length - 2);
+    return first + middle + last;
+}
+
+/**
+ * 이메일 마스킹 (앞 2글자만 표시, 나머지 ***)
+ * 예: "example@email.com" → "ex***@email.com"
+ */
+function maskEmail(email: string | null | undefined): string {
+    if (!email || !email.includes("@")) return "알 수 없음";
+    const [local, domain] = email.split("@");
+    if (local.length <= 2) return local + "***@" + domain;
+    return local.substring(0, 2) + "***@" + domain;
+}
+
 function classifyByBizNumber(bizNumber: string | null, orgName: string | null, documentType: string): { score: number; result?: string } {
     let score = 0;
 
@@ -65,9 +91,9 @@ async function downloadFileAsBase64(downloadUrl: string): Promise<{ base64: stri
 }
 
 /**
- * Tmap POI 검색으로 주소 찾기 (OCR 주소 추출 실패 시 폴백)
+ * Tmap POI 검색으로 주소 + 좌표 찾기 (OCR 주소 추출 실패 시 폴백)
  */
-async function searchAddressByTmap(keyword: string, apiKey: string): Promise<string | null> {
+async function searchAddressByTmap(keyword: string, apiKey: string): Promise<{ address: string; lat: number; lng: number } | null> {
     if (!keyword?.trim() || !apiKey) return null;
 
     const url = `https://apis.openapi.sk.com/tmap/pois?version=1&format=json&searchKeyword=${encodeURIComponent(keyword)}&resCoordType=WGS84GEO&reqCoordType=WGS84GEO&count=1`;
@@ -77,14 +103,56 @@ async function searchAddressByTmap(keyword: string, apiKey: string): Promise<str
     const poi = data?.searchPoiInfo?.pois?.poi?.[0];
     if (!poi) return null;
 
+    const lat = parseFloat(poi.noorLat);
+    const lng = parseFloat(poi.noorLon);
+
+    let address: string | null = null;
     const newAddr = poi.newAddressList?.newAddress?.[0];
     if (newAddr) {
         const parts = [newAddr.fullAddressRoad].filter(Boolean);
-        if (parts.length > 0) return parts.join(" ");
+        if (parts.length > 0) address = parts.join(" ");
+    }
+    if (!address) {
+        const parts = [poi.upperAddrName, poi.middleAddrName, poi.lowerAddrName, poi.detailAddrName].filter(Boolean);
+        if (parts.length > 0) address = parts.join(" ");
     }
 
-    const parts = [poi.upperAddrName, poi.middleAddrName, poi.lowerAddrName, poi.detailAddrName].filter(Boolean);
-    return parts.length > 0 ? parts.join(" ") : null;
+    if (!address) return null;
+    return { address, lat: lat || 0, lng: lng || 0 };
+}
+
+/**
+ * Tmap Geocoding — 주소 문자열 → 좌표 변환
+ */
+async function geocodeByTmap(address: string, apiKey: string): Promise<{ lat: number; lng: number } | null> {
+    if (!address?.trim() || !apiKey) return null;
+
+    try {
+        // 1차: POI 검색 (장소명에 더 정확)
+        const poiUrl = `https://apis.openapi.sk.com/tmap/pois?version=1&format=json&searchKeyword=${encodeURIComponent(address)}&resCoordType=WGS84GEO&reqCoordType=WGS84GEO&count=1`;
+        const poiRes = await fetch(poiUrl, { headers: { appKey: apiKey } });
+        const poiData: any = await poiRes.json();
+        const poi = poiData?.searchPoiInfo?.pois?.poi?.[0];
+        if (poi) {
+            const lat = parseFloat(poi.noorLat);
+            const lng = parseFloat(poi.noorLon);
+            if (lat && lng) return { lat, lng };
+        }
+
+        // 2차: 주소 API 폴백
+        const geoUrl = `https://apis.openapi.sk.com/tmap/geo/fullAddrGeo?version=1&format=json&coordType=WGS84GEO&fullAddr=${encodeURIComponent(address)}`;
+        const geoRes = await fetch(geoUrl, { headers: { appKey: apiKey } });
+        const geoData: any = await geoRes.json();
+        const item = geoData?.coordinateInfo?.coordinate?.[0];
+        if (item) {
+            const lat = parseFloat(item.newLat || item.lat);
+            const lng = parseFloat(item.newLon || item.lon);
+            if (lat && lng) return { lat, lng };
+        }
+    } catch (err: unknown) {
+        console.warn("[AutoVerify] Tmap geocoding 실패:", (err as Error).message);
+    }
+    return null;
 }
 
 // EmailJS 설정
@@ -97,18 +165,18 @@ const SERVICE_URL = "https://vehicle-drive-log.web.app";
 /**
  * 승인 이메일 발송 (서버 사이드)
  */
-async function sendApprovalEmailServer(recipientEmail: string, orgName: string, inviteCode: string): Promise<boolean> {
+async function sendApprovalEmailServer(recipientEmail: string, orgName: string, inviteCode: string, applicantName?: string): Promise<boolean> {
     try {
         const response = await emailjs.send(
             EMAILJS_SERVICE_ID,
             EMAILJS_TEMPLATE_ID,
             {
                 to_email: recipientEmail,
-                to_name: orgName,
-                name: orgName,
+                to_name: applicantName || orgName,
+                name: applicantName || orgName,
                 org_name: orgName,
                 invite_code: inviteCode,
-                service_url: SERVICE_URL,
+                service_url: `${SERVICE_URL}?code=${inviteCode}`,
             },
             {
                 publicKey: EMAILJS_PUBLIC_KEY,
@@ -200,6 +268,8 @@ export const autoVerifyDocument = onDocumentUpdated(
         const orgName = after.name as string;
         const imageUrl = after.uniqueNumberImageUrl as string;
         const applicantEmail = after.applicantEmail as string | undefined;
+        const applicantName = after.applicantName as string | undefined;
+        const applicantPhone = after.applicantPhone as string | undefined;
 
         // ── 화이트리스트 예외 처리 (테스트용) ──
         const WHITELIST = [
@@ -230,7 +300,10 @@ export const autoVerifyDocument = onDocumentUpdated(
             console.log(`[AutoVerify] 화이트리스트 자동 승인: ${orgName} (${orgId}), 초대코드: ${inviteCode}`);
 
             if (applicantEmail) {
-                await sendApprovalEmailServer(applicantEmail, orgName, inviteCode);
+                await sendApprovalEmailServer(applicantEmail, orgName, inviteCode, applicantName);
+            }
+            if (applicantPhone) {
+                await sendApprovalAlimtalk(applicantPhone, applicantName || orgName, orgName, inviteCode);
             }
             return;
         }
@@ -353,18 +426,38 @@ export const autoVerifyDocument = onDocumentUpdated(
                 console.warn("[AutoVerify] JSON 파싱 실패:", parseErr);
             }
 
+            // 좌표 저장용 변수
+            let geoLat = 0;
+            let geoLng = 0;
+
             // OCR이 주소를 추출하지 못한 경우 Tmap POI 검색으로 폴백
             if (!result.address && orgName) {
                 try {
-                    const tmapAddress = await searchAddressByTmap(orgName, tmapApiKey.value());
-                    if (tmapAddress) {
-                        result.address = tmapAddress;
-                        console.log(`[AutoVerify] Tmap 주소 폴백 성공: ${tmapAddress}`);
+                    const tmapResult = await searchAddressByTmap(orgName, tmapApiKey.value());
+                    if (tmapResult) {
+                        result.address = tmapResult.address;
+                        geoLat = tmapResult.lat;
+                        geoLng = tmapResult.lng;
+                        console.log(`[AutoVerify] Tmap 주소 폴백 성공: ${tmapResult.address} (${geoLat}, ${geoLng})`);
                     } else {
                         console.log(`[AutoVerify] Tmap 주소 폴백: 검색 결과 없음 (${orgName})`);
                     }
                 } catch (tmapErr: unknown) {
                     console.warn("[AutoVerify] Tmap 주소 폴백 실패:", (tmapErr as Error).message);
+                }
+            }
+
+            // OCR에서 주소를 추출했지만 좌표가 없는 경우 → Tmap Geocoding
+            if (result.address && !geoLat) {
+                try {
+                    const coords = await geocodeByTmap(result.address, tmapApiKey.value());
+                    if (coords) {
+                        geoLat = coords.lat;
+                        geoLng = coords.lng;
+                        console.log(`[AutoVerify] Tmap geocoding 성공: ${result.address} → (${geoLat}, ${geoLng})`);
+                    }
+                } catch (geoErr: unknown) {
+                    console.warn("[AutoVerify] Tmap geocoding 실패:", (geoErr as Error).message);
                 }
             }
 
@@ -396,6 +489,7 @@ export const autoVerifyDocument = onDocumentUpdated(
                 } as Record<string, unknown>,
                 uniqueNumber: result.uniqueNumber || "",
                 address: result.address || "",
+                ...(geoLat && geoLng ? { lat: geoLat, lng: geoLng } : {}),
             };
 
             // 영리 사업자등록증이면 자동 거부
@@ -426,12 +520,14 @@ export const autoVerifyDocument = onDocumentUpdated(
                 if (realDuplicates.length > 0) {
                     const existingOrg = realDuplicates[0].data();
                     const existingStatus = existingOrg.status === "approved" ? "승인된" : "대기 중인";
+                    const existingApplicant = maskName(existingOrg.applicantName as string);
+                    const existingEmail = maskEmail(existingOrg.applicantEmail as string);
                     updateData.status = "rejected";
                     updateData.rejectedAt = new Date();
                     updateData.aiVerified = false;
                     (updateData.aiVerifyDetail as Record<string, unknown>).rejected = true;
                     (updateData.aiVerifyDetail as Record<string, unknown>).reason =
-                        `동일한 고유번호(${result.uniqueNumber})로 이미 ${existingStatus} 기관이 있습니다.`;
+                        `동일한 고유번호(${result.uniqueNumber})로 이미 ${existingStatus} 기관이 있습니다. (신청자: ${existingApplicant}, 이메일: ${existingEmail})`;
 
                     console.log(
                         `[AutoVerify] 기관 ${orgName} (${orgId}) 중복 고유번호 거절: ${result.uniqueNumber} (기존 기관: ${existingOrg.name})`
@@ -457,9 +553,12 @@ export const autoVerifyDocument = onDocumentUpdated(
                 console.log(`[AutoVerify] 기관 ${orgName} (${orgId}) AI 자동 승인! 초대코드: ${inviteCode}`);
 
                 if (applicantEmail) {
-                    await sendApprovalEmailServer(applicantEmail, orgName, inviteCode);
+                    await sendApprovalEmailServer(applicantEmail, orgName, inviteCode, applicantName);
                 } else {
                     console.warn(`[AutoVerify] 신청자 이메일 없음, 이메일 발송 스킵`);
+                }
+                if (applicantPhone) {
+                    await sendApprovalAlimtalk(applicantPhone, applicantName || orgName, orgName, inviteCode);
                 }
             }
 

@@ -4,9 +4,11 @@
  */
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from './useAuth';
-import { getDriveLogs } from '../lib/firestore';
+import { getDriveLogs, getFuelLogs, getAllHipassCharges } from '../lib/firestore';
 import { toLocalDateStr } from '../lib/dateUtils';
 import type { DriveLog } from '../types/driveLog';
+import type { FuelLog } from '../types/fuelLog';
+import type { HipassCharge } from '../types/hipassCharge';
 
 
 
@@ -15,6 +17,8 @@ const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
 export default function useMonthlyReport() {
     const { userData } = useAuth();
     const [logs, setLogs] = useState<DriveLog[]>([]);
+    const [fuelLogs, setFuelLogs] = useState<FuelLog[]>([]);
+    const [hipassCharges, setHipassCharges] = useState<HipassCharge[]>([]);
     const [loading, setLoading] = useState(true);
     const [activePeriod, setActivePeriod] = useState<string | null>('thisMonth');
 
@@ -79,8 +83,14 @@ export default function useMonthlyReport() {
         const fetch = async () => {
             setLoading(true);
             try {
-                const result = await getDriveLogs(orgId, { limit: 500 });
-                setLogs(result.docs);
+                const [driveResult, fuelResult, hipassResult] = await Promise.all([
+                    getDriveLogs(orgId, { limit: 500 }),
+                    getFuelLogs(orgId).catch(() => []),
+                    getAllHipassCharges(orgId).catch(() => []),
+                ]);
+                setLogs(driveResult.docs);
+                setFuelLogs(fuelResult as FuelLog[]);
+                setHipassCharges(hipassResult as HipassCharge[]);
             } catch (err) {
                 console.error('데이터 로드 실패:', err);
             } finally {
@@ -257,6 +267,76 @@ export default function useMonthlyReport() {
             .map(([date, data]) => ({ date: date.slice(5), count: (data as { count: number; distance: number }).count, distance: (data as { count: number; distance: number }).distance }));
     }, [stats.byDate]);
 
+    /** 주유 통계 (기간 필터링) */
+    const fuelLogStats = useMemo(() => {
+        const filtered = fuelLogs.filter(l => l.date >= startDate && l.date <= endDate);
+        const totalCost = filtered.reduce((s, l) => s + (l.fuelCost || 0), 0);
+        const totalAmount = filtered.reduce((s, l) => s + (l.fuelAmount || 0), 0);
+
+        // 차량별 집계
+        const byVehicle: Record<string, { cost: number; amount: number; count: number }> = {};
+        filtered.forEach(l => {
+            const name = l.vehicleName || '(미지정)';
+            if (!byVehicle[name]) byVehicle[name] = { cost: 0, amount: 0, count: 0 };
+            byVehicle[name].cost += l.fuelCost || 0;
+            byVehicle[name].amount += l.fuelAmount || 0;
+            byVehicle[name].count++;
+        });
+
+        const vehicleData = Object.entries(byVehicle)
+            .sort((a, b) => b[1].cost - a[1].cost)
+            .map(([name, data]) => ({ name, ...data }));
+
+        return { totalCost, totalAmount, count: filtered.length, vehicleData };
+    }, [fuelLogs, startDate, endDate]);
+
+    /** 하이패스 충전 통계 (기간 필터링) */
+    const hipassChargeStats = useMemo(() => {
+        const filtered = hipassCharges.filter(l => l.date >= startDate && l.date <= endDate);
+        const totalAmount = filtered.reduce((s, l) => s + (l.chargeAmount || 0), 0);
+
+        // 차량별 집계
+        const byVehicle: Record<string, { amount: number; count: number }> = {};
+        filtered.forEach(l => {
+            const name = l.vehicleName || l.cardNumber || '(미지정)';
+            if (!byVehicle[name]) byVehicle[name] = { amount: 0, count: 0 };
+            byVehicle[name].amount += l.chargeAmount || 0;
+            byVehicle[name].count++;
+        });
+
+        const vehicleData = Object.entries(byVehicle)
+            .sort((a, b) => b[1].amount - a[1].amount)
+            .map(([name, data]) => ({ name, ...data }));
+
+        return { totalAmount, count: filtered.length, vehicleData };
+    }, [hipassCharges, startDate, endDate]);
+
+    /** 일별 비용 추이 (주유비 + 하이패스 누적) */
+    const costTrendData = useMemo(() => {
+        const byDate: Record<string, { fuel: number; hipass: number }> = {};
+
+        // 주유비
+        fuelLogs.filter(l => l.date >= startDate && l.date <= endDate).forEach(l => {
+            if (!byDate[l.date]) byDate[l.date] = { fuel: 0, hipass: 0 };
+            byDate[l.date].fuel += l.fuelCost || 0;
+        });
+
+        // 하이패스 충전비
+        hipassCharges.filter(l => l.date >= startDate && l.date <= endDate).forEach(l => {
+            if (!byDate[l.date]) byDate[l.date] = { fuel: 0, hipass: 0 };
+            byDate[l.date].hipass += l.chargeAmount || 0;
+        });
+
+        return Object.entries(byDate)
+            .sort((a, b) => a[0].localeCompare(b[0]))
+            .map(([date, data]) => ({
+                date: date.slice(5), // 'MM-DD'
+                fuel: data.fuel,
+                hipass: data.hipass,
+                total: data.fuel + data.hipass,
+            }));
+    }, [fuelLogs, hipassCharges, startDate, endDate]);
+
     const dayOfWeekData = useMemo(() => {
         return stats.byDayOfWeek.map((data, idx) => ({
             name: DAY_NAMES[idx],
@@ -314,12 +394,35 @@ export default function useMonthlyReport() {
         XLSX.writeFile(wb, `운행통계_${startDate}_${endDate}.xlsx`);
     }, [filteredLogs, startDate, endDate]);
 
+    // PDF 인쇄 (브라우저 인쇄 대화상자 → PDF 저장)
+    const exportPdf = useCallback(() => {
+        // 인쇄용 스타일 주입
+        const style = document.createElement('style');
+        style.id = 'print-style';
+        style.textContent = `
+            @media print {
+                body * { visibility: hidden; }
+                #monthly-report-print, #monthly-report-print * { visibility: visible; }
+                #monthly-report-print { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; }
+                .no-print { display: none !important; }
+                @page { size: A4 landscape; margin: 15mm; }
+            }
+        `;
+        document.head.appendChild(style);
+        window.print();
+        // 인쇄 후 스타일 제거
+        setTimeout(() => {
+            style.remove();
+        }, 1000);
+    }, []);
+
     return {
         loading, startDate, endDate,
         setStartDate: handleStartDate, setEndDate: handleEndDate,
         activePeriod, setPeriod,
         filteredLogs, stats, driverData, vehicleData, purposeData,
         vehicleFuelData, dailyTrendData, dayOfWeekData, hourlyData,
-        exportExcel,
+        fuelLogStats, hipassChargeStats, costTrendData,
+        exportExcel, exportPdf,
     };
 }

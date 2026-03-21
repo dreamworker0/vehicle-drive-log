@@ -81,7 +81,7 @@ export default function ReservationCard({
                                         <span className="driving-dot" />
                                         운행 중
                                     </span>
-                                    <button onClick={() => onArrival(reservation)} className="btn-sm bg-amber-600 text-white hover:bg-amber-700 text-xs whitespace-nowrap font-bold shadow-md hover:shadow-lg transition-all">
+                                    <button onClick={() => onArrival(reservation)} className="btn-sm bg-amber-600 dark:bg-amber-500 text-white hover:bg-amber-700 dark:hover:bg-amber-400 text-xs whitespace-nowrap font-bold shadow-md hover:shadow-lg transition-all">
                                         🏁 도착
                                     </button>
                                 </>

@@ -8,6 +8,8 @@ import { useAuth } from './useAuth';
 import { useToast } from './useToast';
 import { getVehicles, getTodayReservations, getWeekReservations, updateReservationStatus, cancelReservation, getMyDriveLogs } from '../lib/firestore';
 import { toLocalDateStr } from '../lib/dateUtils';
+import { auth as firebaseAuth } from '../lib/firebase';
+import { refreshTokenSilently } from '../lib/tokenRefresh';
 import type { Vehicle } from '../types/vehicle';
 import { isVehicleBlocked } from '../lib/vehicleUtils';
 import type { Reservation } from '../types/reservation';
@@ -23,6 +25,7 @@ export default function useTodayDashboard() {
     const [startingId, setStartingId] = useState<string | null>(null);
     const [cancellingId, setCancellingId] = useState<string | null>(null);
     const [incompleteAlerts, setIncompleteAlerts] = useState<(Reservation & { type: string })[]>([]);
+    const [vehicleUsageCounts, setVehicleUsageCounts] = useState<Map<string, number>>(new Map());
 
     const orgId = userData?.organizationId;
     const todayStr = toLocalDateStr();
@@ -38,7 +41,7 @@ export default function useTodayDashboard() {
             setLoading(false);
             return;
         }
-        const fetch = async () => {
+        const fetchData = async (retryCount = 0) => {
             try {
                 const [v, r, wr, myLogs] = await Promise.all([
                     getVehicles(orgId),
@@ -66,13 +69,31 @@ export default function useTodayDashboard() {
                 setIncompleteAlerts(
                     incomplete.map(res => ({ type: 'reservation' as const, ...res })) as (Reservation & { type: string })[]
                 );
+
+                // 차량별 사용 빈도 집계
+                const counts = new Map<string, number>();
+                for (const log of myLogs) {
+                    if (log.vehicleId) {
+                        counts.set(log.vehicleId, (counts.get(log.vehicleId) || 0) + 1);
+                    }
+                }
+                setVehicleUsageCounts(counts);
             } catch (err) {
+                const errCode = (err as { code?: string })?.code;
+                if (errCode === 'permission-denied' && retryCount < 1) {
+                    // Custom Claims 미반영 → 토큰 갱신 후 재시도
+                    console.debug('Claims 미반영 감지 — 토큰 갱신 후 재시도');
+                    if (firebaseAuth.currentUser) {
+                        await refreshTokenSilently(firebaseAuth.currentUser);
+                    }
+                    return fetchData(retryCount + 1);
+                }
                 console.error('로드 실패:', err);
             } finally {
                 setLoading(false);
             }
         };
-        fetch();
+        fetchData();
     }, [orgId, todayStr, weekEndDate, user?.uid]);
 
     const myReservations = useMemo(() =>
@@ -113,7 +134,7 @@ export default function useTodayDashboard() {
         [myReservations]
     );
 
-    // 추천 차량: 2시간 이내 예약이 없고 다음 예약까지 가장 여유 있는 차량
+    // 추천 차량: 자주 타는 차량 중 예약이 비어있는 차량 우선
     const recommendedVehicle = useMemo(() => {
         const now = new Date();
         const nowMin = now.getHours() * 60 + now.getMinutes();
@@ -142,12 +163,19 @@ export default function useTodayDashboard() {
                 ? nextReservation.startMin - nowMin
                 : Infinity;
 
-            return { ...v, minutesUntilNext };
+            const usageCount = vehicleUsageCounts.get(v.id) || 0;
+
+            return { ...v, minutesUntilNext, usageCount };
         }).filter(Boolean);
 
         if (candidates.length === 0) return null;
-        return candidates.sort((a, b) => (b?.minutesUntilNext ?? 0) - (a?.minutesUntilNext ?? 0))[0];
-    }, [vehicles, todayReservations]);
+        // 정렬: 사용 빈도 높은 순 → 동률이면 여유시간 긴 순
+        return candidates.sort((a, b) => {
+            const freqDiff = (b?.usageCount ?? 0) - (a?.usageCount ?? 0);
+            if (freqDiff !== 0) return freqDiff;
+            return (b?.minutesUntilNext ?? 0) - (a?.minutesUntilNext ?? 0);
+        })[0];
+    }, [vehicles, todayReservations, vehicleUsageCounts]);
 
     // 클라이언트 로컬 알림 표시 (운행 시작 후 외부 앱에서 복귀 유도)
     const showDrivingNotification = async (reservation: Reservation) => {

@@ -6,6 +6,7 @@ import { getStorage } from "firebase-admin/storage";
 import { defineString } from "firebase-functions/params";
 import { GoogleGenAI } from "@google/genai";
 import { checkRateLimitByUid } from "./rateLimit";
+import { RATE_LIMITS, MAX_BASE64_SIZE } from "./constants";
 
 const geminiApiKey = defineString("GEMINI_API_KEY");
 
@@ -68,6 +69,7 @@ export const ocrDocument = onCall(
         region: "asia-northeast3",
         timeoutSeconds: 120,
         memory: "512MiB",
+        enforceAppCheck: true,
     },
     async (request) => {
         if (!request.auth) {
@@ -75,12 +77,17 @@ export const ocrDocument = onCall(
         }
 
         // Rate Limiting: 사용자당 분당 3회
-        await checkRateLimitByUid("ocrDocument", request.auth.uid, 3, 60);
+        await checkRateLimitByUid("ocrDocument", request.auth.uid, RATE_LIMITS.ocrDocument.max, RATE_LIMITS.ocrDocument.windowSec);
 
         const { storagePath, imageBase64, mimeType } = request.data;
 
         if (!storagePath && !imageBase64) {
             throw new HttpsError("invalid-argument", "storagePath 또는 imageBase64가 필요합니다.");
+        }
+
+        // imageBase64 크기 제한 (~5MB 원본 = ~6.67MB base64)
+        if (imageBase64 && imageBase64.length > MAX_BASE64_SIZE) {
+            throw new HttpsError("invalid-argument", "이미지 크기가 너무 큽니다 (최대 5MB).");
         }
 
         try {

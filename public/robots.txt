@@ -1,0 +1,9 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /employee/
+Disallow: /super-admin/
+Disallow: /invite
+Disallow: /pending
+
+Sitemap: https://vehicle-drive-log.web.app/sitemap.xml

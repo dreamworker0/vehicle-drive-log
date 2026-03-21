@@ -1,5 +1,5 @@
 import { getFirestore } from "firebase-admin/firestore";
-import { sendPushToUser } from "./sendNotification";
+import { sendPushToUser, createInAppNotification } from "./sendNotification";
 
 const db = getFirestore();
 
@@ -39,11 +39,12 @@ export async function checkReservationReminders(): Promise<void> {
             const res = doc.data();
             if (res.reminderSent) continue;
 
-            if (res.userId) {
-                await sendPushToUser(res.userId, {
-                    title: "🚗 예약 임박",
-                    body: `${res.vehicleDisplayName || "차량"} 예약이 ${res.startTime}에 시작됩니다.`,
-                });
+            if (res.reservedByUid) {
+                const title = "🚗 예약 임박";
+                const body = `${res.vehicleDisplayName || "차량"} 예약이 ${res.startTime}에 시작됩니다.`;
+
+                await sendPushToUser(res.reservedByUid, { title, body });
+                await createInAppNotification(res.reservedByUid, "reservation_reminder", title, body, res.organizationId);
 
                 await db.collection("reservations").doc(doc.id).update({
                     reminderSent: true,
@@ -65,17 +66,18 @@ export async function checkReservationReminders(): Promise<void> {
             if (res.endTime && res.endTime > currentTime) continue;
             if (res.driveLogReminderSent) continue;
 
-            if (res.userId) {
+            if (res.reservedByUid) {
                 const logsSnap = await db.collection("driveLogs")
                     .where("reservationId", "==", doc.id)
                     .limit(1)
                     .get();
 
                 if (logsSnap.empty) {
-                    await sendPushToUser(res.userId, {
-                        title: "📝 운행일지 작성 알림",
-                        body: `${res.vehicleDisplayName || "차량"} 운행이 종료되었습니다. 운행일지를 작성해주세요.`,
-                    });
+                    const title = "📝 운행일지 작성 알림";
+                    const body = `${res.vehicleDisplayName || "차량"} 운행이 종료되었습니다. 운행일지를 작성해주세요.`;
+
+                    await sendPushToUser(res.reservedByUid, { title, body });
+                    await createInAppNotification(res.reservedByUid, "drive_log_reminder", title, body, res.organizationId);
 
                     await db.collection("reservations").doc(doc.id).update({
                         driveLogReminderSent: true,
@@ -103,17 +105,17 @@ export async function checkReservationReminders(): Promise<void> {
             const res = doc.data();
             if (res.noShowReminderSent) continue;
 
-            if (res.userId) {
+            if (res.reservedByUid) {
                 const cancelUrl = `https://vehicle-drive-log.web.app?cancelReservation=${doc.id}`;
+                const title = "🚨 예약 시작시간이 지났습니다";
+                const body = `${res.vehicleDisplayName || "차량"} 예약(${res.startTime})이 시작되었으나 운행이 시작되지 않았습니다. 탭하여 예약을 취소하거나 유지하세요.`;
 
-                await sendPushToUser(res.userId, {
-                    title: "🚨 예약 시작시간이 지났습니다",
-                    body: `${res.vehicleDisplayName || "차량"} 예약(${res.startTime})이 시작되었으나 운행이 시작되지 않았습니다. 탭하여 예약을 취소하거나 유지하세요.`,
-                }, {
+                await sendPushToUser(res.reservedByUid, { title, body }, {
                     link: cancelUrl,
                     reservationId: doc.id,
                     action: "cancel_prompt",
                 });
+                await createInAppNotification(res.reservedByUid, "no_show_reminder", title, body, res.organizationId);
 
                 await db.collection("reservations").doc(doc.id).update({
                     noShowReminderSent: true,

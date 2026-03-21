@@ -1,48 +1,35 @@
-import emailjs from '@emailjs/browser';
-
-// EmailJS 설정 (.env에서 로드)
-const EMAILJS_PUBLIC_KEY = import.meta.env.VITE_EMAILJS_PUBLIC_KEY;
-const EMAILJS_SERVICE_ID = import.meta.env.VITE_EMAILJS_SERVICE_ID;
-const EMAILJS_TEMPLATE_ID = import.meta.env.VITE_EMAILJS_TEMPLATE_ID;
-
-const SERVICE_URL = 'https://vehicle-drive-log.web.app';
-
-// EmailJS 초기화
-emailjs.init(EMAILJS_PUBLIC_KEY);
-
+/**
+ * emailService — 기관 승인 이메일 발송
+ *
+ * 보안을 위해 서버사이드(Cloud Function)에서 이메일을 발송한다.
+ * 프론트엔드에서 EmailJS 키를 노출하지 않는다.
+ */
+import { getFunctions, httpsCallable } from 'firebase/functions';
 
 /**
- * 기관 승인 이메일 발송
- * @param {string} recipientEmail - 수신자 이메일
- * @param {string} orgName - 기관명
- * @param {string} inviteCode - 기관관리자 초대 코드
- * @returns {Promise<boolean>} 발송 성공 여부
+ * 기관 승인 이메일 발송 (Cloud Function 호출)
+ * @param recipientEmail 수신자 이메일
+ * @param orgName 기관명
+ * @param inviteCode 초대 코드
+ * @param applicantName 신청자 이름
+ * @returns 발송 성공 여부
  */
-export const sendApprovalEmail = async (recipientEmail: string, orgName: string, inviteCode: string) => {
+export const sendApprovalEmail = async (recipientEmail: string, orgName: string, inviteCode: string, applicantName?: string) => {
     try {
-        const templateParams = {
-            to_email: recipientEmail,
-            to_name: orgName,
-            name: orgName,
-            org_name: orgName,
-            invite_code: inviteCode,
-            service_url: SERVICE_URL,
-        };
+        const functions = getFunctions(undefined, 'asia-northeast3');
+        const sendEmail = httpsCallable(functions, 'sendApprovalEmail');
 
-        console.log('📧 이메일 발송 시도:', JSON.stringify(templateParams));
-        console.log('📧 EmailJS 설정:', { serviceId: EMAILJS_SERVICE_ID, templateId: EMAILJS_TEMPLATE_ID });
+        const result = await sendEmail({
+            recipientEmail,
+            orgName,
+            inviteCode,
+            applicantName,
+        });
 
-        const response = await emailjs.send(
-            EMAILJS_SERVICE_ID,
-            EMAILJS_TEMPLATE_ID,
-            templateParams
-        );
-
-        console.log('✅ 승인 이메일 발송 성공:', response.status, response.text);
+        console.log('✅ 승인 이메일 발송 성공 (Cloud Function):', result.data);
         return true;
     } catch (err) {
         console.error('❌ 승인 이메일 발송 실패:', err);
-        console.error('❌ 에러 상세:', typeof err === 'object' ? JSON.stringify(err, Object.getOwnPropertyNames(err)) : err);
-        throw err; // 호출자에게 에러를 전파하여 디버깅 가능
+        throw err;
     }
 };

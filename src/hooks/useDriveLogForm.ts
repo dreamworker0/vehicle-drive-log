@@ -9,11 +9,13 @@ import { useToast } from './useToast';
 import useRetry from './useRetry';
 import useDriveLogOcr from './useDriveLogOcr';
 import { nowTime, todayStr, validateDriveLogForm, buildLogData } from './utils/driveLogValidation';
-import { getVehicles, createDriveLog, updateDriveLog, updateReservationStatus, getFavorites, createFavorite, getOrganizationMembers, getLastVehicleEndKm, getVehicleEndKmBefore, getReservationById } from '../lib/firestore';
+import { getVehicles, createDriveLog, updateDriveLog, updateReservationStatus, getFavorites, createFavorite, getOrganizationMembers, getLastVehicleEndKm, getLastVehicleEndBattery, getVehicleEndKmBefore, getReservationById, getHipassCards, updateHipassCard } from '../lib/firestore';
+import { enqueueLog } from '../lib/offlineQueue';
 import type { Vehicle } from '../types/vehicle';
 import type { Favorite } from '../types/favorite';
 import type { User as UserDoc } from '../types/user';
 import type { DriveLog } from '../types/driveLog';
+import type { HipassCard } from '../types/hipass';
 
 export interface DriveLogForm {
     vehicleId: string;
@@ -28,6 +30,7 @@ export interface DriveLogForm {
     batteryEnd: string;
     notes: string;
     driveDate: string;
+    hipassBalanceAfter: string;
 }
 
 export default function useDriveLogForm() {
@@ -71,6 +74,8 @@ export default function useDriveLogForm() {
     const [externalPassengerCount, setExternalPassengerCount] = useState(0);
     const [showFavSave, setShowFavSave] = useState(false);
     const [favName, setFavName] = useState('');
+    const [hipassCard, setHipassCard] = useState<HipassCard | null>(null);
+    const [lastEndBattery, setLastEndBattery] = useState<number | null>(null);
 
     // 수정 모드: 기존 기록의 날짜, 그 외: 오늘
     const editDriveDate = (() => {
@@ -103,6 +108,7 @@ export default function useDriveLogForm() {
         batteryEnd: editLog?.batteryEnd?.toString() || '',
         notes: editLog?.notes || '',
         driveDate: editDriveDate,
+        hipassBalanceAfter: '',
     });
 
     const orgId = userData?.organizationId;
@@ -249,6 +255,38 @@ export default function useDriveLogForm() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [form.driveDate, form.vehicleId, form.startTime, orgId, vehicles]);
 
+    // 전기차: 이전 운행일지의 도착 배터리 조회 (출발 배터리 placeholder 힌트)
+    useEffect(() => {
+        if (!orgId || !form.vehicleId || !isElectric) {
+            setLastEndBattery(null);
+            return;
+        }
+        getLastVehicleEndBattery(orgId, form.vehicleId)
+            .then(val => setLastEndBattery(val))
+            .catch(() => setLastEndBattery(null));
+    }, [orgId, form.vehicleId, isElectric]);
+
+    // 차량 변경 시 해당 차량에 연결된 하이패스 카드 조회
+    useEffect(() => {
+        if (!orgId || !form.vehicleId) {
+            setHipassCard(null);
+            return;
+        }
+        const loadHipass = async () => {
+            try {
+                const cards = await getHipassCards(orgId);
+                const card = cards.find((c: HipassCard) => c.vehicleId === form.vehicleId);
+                setHipassCard(card || null);
+                if (card) {
+                    setForm(prev => ({ ...prev, hipassBalanceAfter: '' }));
+                }
+            } catch {
+                setHipassCard(null);
+            }
+        };
+        loadHipass();
+    }, [orgId, form.vehicleId]);
+
     const handleVehicleSelect = async (vehicleId: string) => {
         const v = vehicles.find(veh => veh.id === vehicleId);
         let km: number | string;
@@ -322,7 +360,25 @@ export default function useDriveLogForm() {
                 orgId, user: user!, userData, selectedVehicle, selectedPassengers, externalPassengerCount, isRetroactive, ocrUsed: ocr.ocrSuccess,
             });
 
+            // 하이패스 정보를 운행일지에 저장
+            if (hipassCard && form.hipassBalanceAfter !== '') {
+                Object.assign(logData, {
+                    hipassCardNumber: hipassCard.cardNumber || '',
+                    hipassBalanceBefore: hipassCard.balance,
+                    hipassBalanceAfter: Number(form.hipassBalanceAfter),
+                });
+            }
+
             if (isEditMode && editLog) {
+                // 오프라인 감지: 수정도 큐잉
+                if (!navigator.onLine) {
+                    await enqueueLog(logData as Record<string, unknown>, 'update', editLog.id);
+                    setSuccess(true);
+                    showToast('오프라인에서 수정 저장됨 · 온라인 복귀 시 자동 반영', 'info');
+                    setTimeout(() => setSuccess(false), 3000);
+                    setSubmitting(false);
+                    return;
+                }
                 const result = await updateDriveLog(editLog.id, logData);
                 const syncResult = (result as Record<string, unknown>)?.syncResult as { updated?: boolean; oldStartKm?: number; newStartKm?: number } | undefined;
                 if (syncResult?.updated) {
@@ -330,6 +386,25 @@ export default function useDriveLogForm() {
                 }
             } else {
                 const extendedLogData = { ...logData, reservationId: reservationData?.reservationId || null };
+
+                // 오프라인 감지: IndexedDB 큐에 저장
+                if (!navigator.onLine) {
+                    await enqueueLog(extendedLogData as Record<string, unknown>);
+                    setSuccess(true);
+                    showToast('오프라인에서 저장됨 · 온라인 복귀 시 자동 전송', 'info');
+                    setForm({
+                        vehicleId: '', vehicleName: '', purpose: '', destination: '',
+                        startKm: '', endKm: '', startTime: nowTime(),
+                        endTime: '', batteryStart: '', batteryEnd: '', notes: '',
+                        driveDate: todayStr(), hipassBalanceAfter: '',
+                    });
+                    setSelectedPassengers([]);
+                    setExternalPassengerCount(0);
+                    setTimeout(() => setSuccess(false), 3000);
+                    setSubmitting(false);
+                    return;
+                }
+
                 const result = await createDriveLog(extendedLogData as Parameters<typeof createDriveLog>[0]);
                 const syncResult = (result as Record<string, unknown>)?.syncResult as { updated?: boolean; oldStartKm?: number; newStartKm?: number } | undefined;
                 if (syncResult?.updated) {
@@ -344,6 +419,14 @@ export default function useDriveLogForm() {
                 });
             }
 
+            // 하이패스 잔액 업데이트
+            if (hipassCard && form.hipassBalanceAfter !== '') {
+                await updateHipassCard(hipassCard.id, {
+                    balance: Number(form.hipassBalanceAfter),
+                    organizationId: orgId,
+                });
+            }
+
             setSuccess(true);
             if (isEditMode) {
                 showToast('운행일지가 수정되었습니다.', 'success');
@@ -355,7 +438,7 @@ export default function useDriveLogForm() {
                     vehicleId: '', vehicleName: '', purpose: '', destination: '',
                     startKm: '', endKm: '', startTime: nowTime(),
                     endTime: '', batteryStart: '', batteryEnd: '', notes: '',
-                    driveDate: todayStr(),
+                    driveDate: todayStr(), hipassBalanceAfter: '',
                 });
                 setSelectedPassengers([]);
                 setExternalPassengerCount(0);
@@ -386,6 +469,8 @@ export default function useDriveLogForm() {
         editLog, isEditMode, isRetroactive,
         showFavSave, setShowFavSave,
         favName, setFavName,
+        hipassCard,
+        lastEndBattery,
         ocrLoading: ocr.ocrLoading,
         ocrError: ocr.ocrError,
         ocrSuccess: ocr.ocrSuccess,

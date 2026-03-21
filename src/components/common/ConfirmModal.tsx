@@ -3,7 +3,7 @@
  * - type="confirm": 단순 확인/취소 (삭제, 복원 등)
  * - type="input": 텍스트 입력 + 확인/취소 (폐차 사유 등)
  */
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 interface Props {
     open: boolean;
@@ -36,19 +36,44 @@ export default function ConfirmModal({
 }: Props) {
     const [inputValue, setInputValue] = useState(inputDefault);
     const inputRef = useRef<HTMLInputElement>(null);
+    const confirmBtnRef = useRef<HTMLButtonElement>(null);
+    const dialogRef = useRef<HTMLDivElement>(null);
 
     // 모달 열릴 때 기본값 초기화 + 포커스
     /* eslint-disable react-hooks/set-state-in-effect -- 모달 open 시 초기값 동기화 의도적 패턴 */
     useEffect(() => {
         if (open) {
             setInputValue(inputDefault);
-            // input 타입이면 다음 렌더 후 포커스
-            if (type === 'input') {
-                setTimeout(() => inputRef.current?.focus(), 50);
-            }
+            // input 타입이면 다음 렌더 후 input 포커스, 아니면 확인 버튼 포커스
+            setTimeout(() => {
+                if (type === 'input') inputRef.current?.focus();
+                else confirmBtnRef.current?.focus();
+            }, 50);
         }
     }, [open, inputDefault, type]);
     /* eslint-enable react-hooks/set-state-in-effect */
+
+    // 포커스 트랩: Tab 키로 모달 내부에서만 순환
+    const handleTrapFocus = useCallback((e: KeyboardEvent) => {
+        if (e.key !== 'Tab' || !dialogRef.current) return;
+        const focusable = dialogRef.current.querySelectorAll<HTMLElement>(
+            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusable.length === 0) return;
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+            e.preventDefault(); last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+            e.preventDefault(); first.focus();
+        }
+    }, []);
+
+    useEffect(() => {
+        if (!open) return;
+        window.addEventListener('keydown', handleTrapFocus);
+        return () => window.removeEventListener('keydown', handleTrapFocus);
+    }, [open, handleTrapFocus]);
 
     // ESC 키로 닫기
     useEffect(() => {
@@ -82,7 +107,7 @@ export default function ConfirmModal({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={onCancel} role="presentation">
-            <div className="glass-card p-6 w-full max-w-sm animate-scale-in" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title" aria-describedby="confirm-modal-desc">
+            <div ref={dialogRef} className="glass-card p-6 w-full max-w-sm animate-scale-in" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title" aria-describedby="confirm-modal-desc">
                 {title && (
                     <h3 id="confirm-modal-title" className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-2">{title}</h3>
                 )}
@@ -106,6 +131,7 @@ export default function ConfirmModal({
                 <div className="flex gap-3">
                     <button type="button" onClick={onCancel} className="btn-secondary flex-1">{cancelText}</button>
                     <button
+                        ref={confirmBtnRef}
                         type="button"
                         onClick={handleConfirm}
                         className={`flex-1 px-4 py-2.5 rounded-xl font-medium transition-all ${btnColors[confirmColor] || btnColors.primary}`}

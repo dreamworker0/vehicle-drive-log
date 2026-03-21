@@ -1,14 +1,21 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
-import { collection, getDocs, query, where, getCountFromServer } from 'firebase/firestore';
+import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from 'react';
+import { collection, getDocs, query, where, getCountFromServer, getAggregateFromServer, sum, count, QuerySnapshot, DocumentData, Timestamp, doc, updateDoc } from 'firebase/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db } from '../../lib/firebase';
+import app from '../../lib/firebase';
 import {
     AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
     Tooltip, ResponsiveContainer, Legend, Cell,
+    PieChart, Pie,
 } from 'recharts';
 import HeatmapGrid from '../common/HeatmapGrid';
 
+const OrgMapView = lazy(() => import('./OrgMapView'));
+
 const FUEL_LABELS: Record<string, string> = { gasoline: '휘발유', diesel: '경유', lpg: 'LPG', electric: '전기차' };
 const FUEL_COLORS: Record<string, string> = { gasoline: '#f59e0b', diesel: '#6366f1', lpg: '#14b8a6', electric: '#3b82f6' };
+const VT_LABELS: Record<string, string> = { compact: '경형', sedan: '승용', van: '승합', truck: '트럭', bus: '버스' };
+const VT_COLORS: Record<string, string> = { compact: '#f59e0b', sedan: '#3b82f6', van: '#8b5cf6', truck: '#ef4444', bus: '#14b8a6' };
 
 /**
  * 슈퍼관리자 운영 대시보드
@@ -18,13 +25,19 @@ export default function ServiceDashboard() {
     const [stats, setStats] = useState<any>(null);
     const [monthlyStats, setMonthlyStats] = useState<any>(null);
     const [topOrgs, setTopOrgs] = useState<any[]>([]);
-    const [recentApprovals, setRecentApprovals] = useState<any[]>([]);
+
     const [inputMethodStats, setInputMethodStats] = useState<{ date: string; ocr: number; manual: number }[]>([]);
 
     // 고도화 state
-    const [dailyDriveStats, setDailyDriveStats] = useState<{ date: string; count: number }[]>([]);
+    const [_dailyDriveStats, setDailyDriveStats] = useState<{ date: string; count: number }[]>([]);
+    const [dailyActiveUserStats, setDailyActiveUserStats] = useState<{ date: string; users: number }[]>([]);
+    const [dailyActiveOrgStats, setDailyActiveOrgStats] = useState<{ date: string; active: number; inactive: number; rejected: number; deleted: number; dayActive: number; dayInactive: number; dayRejected: number; dayDeleted: number }[]>([]);
     const [hourlyStats, setHourlyStats] = useState<{ hour: string; count: number }[]>([]);
+    const [fuelTypeStats, setFuelTypeStats] = useState<{ type: string; label: string; count: number; color: string }[]>([]);
     const [vehicleTypeStats, setVehicleTypeStats] = useState<{ type: string; label: string; count: number; color: string }[]>([]);
+    const [vehicleModelStats, setVehicleModelStats] = useState<{ model: string; count: number }[]>([]);
+    const [hipassRatio, setHipassRatio] = useState<{ withHipass: number; withoutHipass: number }>({ withHipass: 0, withoutHipass: 0 });
+    const [hipassTopOrgs, setHipassTopOrgs] = useState<{ name: string; count: number }[]>([]);
     const [weeklyActiveRate, setWeeklyActiveRate] = useState<{ active: number; total: number }>({ active: 0, total: 0 });
     const [monthlyGrowth, setMonthlyGrowth] = useState<{ month: string; cumulative: number }[]>([]);
 
@@ -36,33 +49,32 @@ export default function ServiceDashboard() {
     const [hourlyAvgDuration, setHourlyAvgDuration] = useState<{ hour: string; avg: number }[]>([]);
     const [orgAvgDuration, setOrgAvgDuration] = useState<{ name: string; avg: number }[]>([]);
 
-    // 신규 승인 기관을 날짜별 갯수로 집계 (최근 30일)
-    const approvalChartData = useMemo(() => {
-        if (recentApprovals.length === 0) return [];
-        const now = new Date();
-        const thirtyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
-        const dateMap: Record<string, number> = {};
-        for (let i = 0; i < 30; i++) {
-            const d = new Date(thirtyDaysAgo);
-            d.setDate(d.getDate() + i);
-            const key = `${d.getMonth() + 1}/${d.getDate()}`;
-            dateMap[key] = 0;
-        }
-        recentApprovals.forEach(org => {
-            const d = org.approvedAt;
-            if (d < thirtyDaysAgo) return;
-            const key = `${d.getMonth() + 1}/${d.getDate()}`;
-            if (key in dateMap) dateMap[key]++;
-        });
-        return Object.entries(dateMap).map(([date, count]) => ({ date, count }));
-    }, [recentApprovals]);
+    // 주유 / 하이패스 통계
+    const [fuelStats, setFuelStats] = useState<{
+        totalCount: number; totalCost: number;
+        monthCount: number; monthCost: number; prevMonthCost: number;
+    } | null>(null);
+    const [hipassStats, setHipassStats] = useState<{
+        totalCount: number; totalAmount: number;
+        monthCount: number; monthAmount: number; prevMonthAmount: number;
+    } | null>(null);
+    const [dailyFuelCost, setDailyFuelCost] = useState<{ date: string; cost: number }[]>([]);
+    const [dailyHipassAmount, setDailyHipassAmount] = useState<{ date: string; amount: number }[]>([]);
 
-    // 비활성 기관 (최근 30일 운행 0건)
-    const inactiveOrgs = useMemo(() => {
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-        return topOrgs.filter(org => org.users > 0 && (!org.lastDriveDate || org.lastDriveDate < thirtyDaysAgo));
-    }, [topOrgs]);
+    // 알림 통계
+    const [notifSummary, setNotifSummary] = useState<{
+        total: number; read: number; unread: number; readRate: number;
+    } | null>(null);
+    const [dailyNotifStats, setDailyNotifStats] = useState<{ date: string; sent: number; read: number }[]>([]);
+    const [notifTypeStats, setNotifTypeStats] = useState<{ type: string; count: number; color: string }[]>([]);
+
+    // 첫 직원 등록 소요시간 통계
+    const [firstEmployeeStats, setFirstEmployeeStats] = useState<{
+        avg: number; median: number; sameDayRate: number; total: number;
+    } | null>(null);
+    const [firstEmployeeDist, setFirstEmployeeDist] = useState<{ label: string; count: number; color: string }[]>([]);
+    const [firstEmployeeTrend, setFirstEmployeeTrend] = useState<{ month: string; avg: number }[]>([]);
+
 
     // 기관 규모별 분포
     const orgSizeDistribution = useMemo(() => {
@@ -134,13 +146,35 @@ export default function ServiceDashboard() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // 공유 스냅샷 타입
+    type SharedSnaps = {
+        orgSnap: QuerySnapshot<DocumentData, DocumentData>;
+        userSnap: QuerySnapshot<DocumentData, DocumentData>;
+        logSnap: QuerySnapshot<DocumentData, DocumentData>;
+        vehicleSnap: QuerySnapshot<DocumentData, DocumentData>;
+        hipassCardSnap: QuerySnapshot<DocumentData, DocumentData>;
+    };
+
     const loadAllStats = async () => {
         setLoading(true);
         try {
+            // 공유 컬렉션을 1회만 조회
+            const [orgSnap, userSnap, logSnap, vehicleSnap, hipassCardSnap] = await Promise.all([
+                getDocs(collection(db, 'organizations')),
+                getDocs(collection(db, 'users')),
+                getDocs(collection(db, 'driveLogs')),
+                getDocs(collection(db, 'vehicles')),
+                getDocs(collection(db, 'hipassCards')),
+            ]);
+            const shared: SharedSnaps = { orgSnap, userSnap, logSnap, vehicleSnap, hipassCardSnap };
+
+            // 공유 데이터로 통계 계산 + 독립 컬렉션은 개별 로드
             await Promise.all([
-                loadServiceStats(),
-                loadMonthlyStats(),
-                loadTopOrganizations(),
+                processServiceStats(shared),
+                processMonthlyStats(shared),
+                processTopOrganizations(shared),
+                loadFuelHipassStats(),
+                loadNotificationStats(),
             ]);
         } finally {
             setLoading(false);
@@ -148,14 +182,8 @@ export default function ServiceDashboard() {
     };
 
     // 서비스 개요 통계 + 고도화 지표
-    const loadServiceStats = async () => {
+    const processServiceStats = async ({ orgSnap, userSnap, logSnap }: SharedSnaps) => {
         try {
-            const [orgSnap, userSnap, logSnap] = await Promise.all([
-                getDocs(collection(db, 'organizations')),
-                getDocs(collection(db, 'users')),
-                getDocs(collection(db, 'driveLogs')),
-            ]);
-
             const orgs = orgSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
             const users = userSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
 
@@ -172,6 +200,7 @@ export default function ServiceDashboard() {
             const sevenDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6);
             const dailyMap: Record<string, { ocr: number; manual: number }> = {};
             const dailyDriveMap: Record<string, number> = {};
+            const dailyActiveUserMap: Record<string, Set<string>> = {};
             const hourMap: Record<string, number> = {};
             const heatGrid = Array.from({ length: 7 }, () => Array(24).fill(0) as number[]);
             const wauSet = new Set<string>();
@@ -180,14 +209,56 @@ export default function ServiceDashboard() {
             const dailyDurMap: Record<string, number[]> = {};
             const hourDurMap: Record<string, number[]> = {};
 
-            // 30일치 날짜 + 24시간 초기화
+            // ── 일별 기관 추이 계산 (신청일 기준, 상태별 분류) ──
+            const allOrgList = orgs
+                .filter(o => o.createdAt)
+                .map(o => ({
+                    id: o.id,
+                    status: o.status as string,
+                    deletedAt: o.deletedAt || null,
+                    createdAt: o.createdAt?.toDate ? o.createdAt.toDate() : new Date(o.createdAt),
+                }));
+
+            // 기관별 직원 존재 여부 (현재 기준)
+            const orgHasEmployee = new Set<string>();
+            users.forEach(u => {
+                if (u.organizationId && u.role !== 'superAdmin') {
+                    orgHasEmployee.add(u.organizationId);
+                }
+            });
+
+            // 누적 그래프: 30일 전 이전에 신청된 기관을 초기값으로 세팅
+            let cumActive = 0, cumInactive = 0, cumRejected = 0, cumDeleted = 0;
+            allOrgList.forEach(o => {
+                if (o.createdAt >= thirtyDaysAgo) return;
+                if (o.status === 'rejected') cumRejected++;
+                else if (o.deletedAt) cumDeleted++;
+                else if (o.status === 'approved' && orgHasEmployee.has(o.id)) cumActive++;
+                else if (o.status === 'approved') cumInactive++;
+            });
+
+            // 30일치 날짜별: 누적 합산
+            const dailyOrgData: { date: string; active: number; inactive: number; rejected: number; deleted: number; dayActive: number; dayInactive: number; dayRejected: number; dayDeleted: number }[] = [];
             for (let i = 0; i < 30; i++) {
                 const d = new Date(thirtyDaysAgo);
                 d.setDate(d.getDate() + i);
+                const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+                const dayEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
                 const key = `${d.getMonth() + 1}/${d.getDate()}`;
                 dailyMap[key] = { ocr: 0, manual: 0 };
                 dailyDriveMap[key] = 0;
+                dailyActiveUserMap[key] = new Set();
                 dailyDurMap[key] = [];
+
+                let dayA = 0, dayI = 0, dayR = 0, dayD = 0;
+                allOrgList.filter(o => o.createdAt >= dayStart && o.createdAt <= dayEnd).forEach(o => {
+                    if (o.status === 'rejected') { cumRejected++; dayR++; }
+                    else if (o.deletedAt) { cumDeleted++; dayD++; }
+                    else if (o.status === 'approved' && orgHasEmployee.has(o.id)) { cumActive++; dayA++; }
+                    else if (o.status === 'approved') { cumInactive++; dayI++; }
+                });
+
+                dailyOrgData.push({ date: key, active: cumActive, inactive: cumInactive, rejected: cumRejected, deleted: cumDeleted, dayActive: dayA, dayInactive: dayI, dayRejected: dayR, dayDeleted: dayD });
             }
             for (let h = 0; h < 24; h++) {
                 const hKey = `${h.toString().padStart(2, '0')}시`;
@@ -197,7 +268,6 @@ export default function ServiceDashboard() {
 
             logSnap.docs.forEach(doc => {
                 const data = doc.data();
-                // 총 주행거리
                 if (data.distance != null && data.distance > 0) {
                     totalDistance += data.distance;
                 } else {
@@ -210,21 +280,21 @@ export default function ServiceDashboard() {
                 if (!ts || ts < thirtyDaysAgo) return;
                 const dateKey = `${ts.getMonth() + 1}/${ts.getDate()}`;
 
-                // 입력 방식 추이
                 if (dailyMap[dateKey]) {
                     if (data.inputMethod === 'ocr') dailyMap[dateKey].ocr++;
                     else dailyMap[dateKey].manual++;
                 }
 
-                // 일별 운행 건수
                 if (dailyDriveMap[dateKey] !== undefined) {
                     dailyDriveMap[dateKey]++;
                 }
 
-                // 주행시간 계산 (분 단위)
+                if (dailyActiveUserMap[dateKey] && data.driverUid) {
+                    dailyActiveUserMap[dateKey].add(data.driverUid);
+                }
+
                 const dur = computeDuration(data.startTime, data.endTime);
 
-                // 피크 시간대 (startTime = "HH:MM" 형식) + 히트맵
                 if (data.startTime && typeof data.startTime === 'string') {
                     const hourStr = data.startTime.split(':')[0];
                     const hourInt = parseInt(hourStr, 10);
@@ -232,18 +302,15 @@ export default function ServiceDashboard() {
                         const hKey = `${hourInt.toString().padStart(2, '0')}시`;
                         if (hourMap[hKey] !== undefined) hourMap[hKey]++;
                         if (dur > 0 && hourDurMap[hKey]) hourDurMap[hKey].push(dur);
-                        // 히트맵: 요일 × 시간대
                         const dayOfWeek = ts.getDay();
                         heatGrid[dayOfWeek][hourInt]++;
                     }
                 }
 
-                // 일별 평균 주행시간
                 if (dur > 0 && dailyDurMap[dateKey]) {
                     dailyDurMap[dateKey].push(dur);
                 }
 
-                // WAU (최근 7일 활성 사용자)
                 if (ts >= sevenDaysAgo && data.driverUid) {
                     wauSet.add(data.driverUid);
                 }
@@ -276,13 +343,18 @@ export default function ServiceDashboard() {
                 Object.entries(dailyDriveMap).map(([date, count]) => ({ date, count }))
             );
 
+            setDailyActiveUserStats(
+                Object.entries(dailyActiveUserMap).map(([date, uidSet]) => ({ date, users: uidSet.size }))
+            );
+
+            setDailyActiveOrgStats(dailyOrgData);
+
             setHourlyStats(
                 Object.entries(hourMap).map(([hour, count]) => ({ hour, count }))
             );
 
             setWeeklyActiveRate({ active: wauSet.size, total: totalUsers });
 
-            // 히트맵 데이터 설정
             const heatItems = heatGrid.flatMap((row, dayIdx) =>
                 row.map((count, hour) => ({ dayIdx, hour, count })).filter(c => c.count > 0)
             );
@@ -291,7 +363,6 @@ export default function ServiceDashboard() {
                 maxCount: Math.max(1, ...heatItems.map(i => i.count)),
             });
 
-            // 일별 평균 주행시간 설정
             setDailyAvgDuration(
                 Object.entries(dailyDurMap).map(([date, durations]) => ({
                     date,
@@ -299,7 +370,6 @@ export default function ServiceDashboard() {
                 }))
             );
 
-            // 시간대별 평균 주행시간 설정
             setHourlyAvgDuration(
                 Object.entries(hourDurMap).map(([hour, durations]) => ({
                     hour,
@@ -312,17 +382,15 @@ export default function ServiceDashboard() {
     };
 
     // 월간 운영 지표 (전월 대비 포함)
-    const loadMonthlyStats = async () => {
+    const processMonthlyStats = async ({ logSnap }: SharedSnaps) => {
         try {
             const now = new Date();
             const year = now.getFullYear();
             const month = now.getMonth();
 
-            // 전월 구하기
             const prevMonth = month === 0 ? 11 : month - 1;
             const prevYear = month === 0 ? year - 1 : year;
 
-            const logSnap = await getDocs(collection(db, 'driveLogs'));
             let monthLogs = 0, monthDistance = 0, prevLogs = 0, prevDistance = 0;
             const activeUserSet = new Set();
             const prevActiveUserSet = new Set();
@@ -360,21 +428,15 @@ export default function ServiceDashboard() {
     };
 
     // 기관별 활성도 + 차량 유형 + 월별 성장
-    const loadTopOrganizations = async () => {
+    const processTopOrganizations = async ({ orgSnap, logSnap, userSnap, vehicleSnap, hipassCardSnap }: SharedSnaps) => {
         try {
-            const [orgSnap, logSnap, userSnap, vehicleSnap] = await Promise.all([
-                getDocs(collection(db, 'organizations')),
-                getDocs(collection(db, 'driveLogs')),
-                getDocs(collection(db, 'users')),
-                getDocs(collection(db, 'vehicles')),
-            ]);
-
             const orgMap: Record<string, any> = {};
             const approvalList: any[] = [];
+            const firstEmpDaysList: { days: number; approvedAt: Date }[] = [];
             orgSnap.docs.forEach(doc => {
                 const data = doc.data();
                 if (data.deletedAt || data.status !== 'approved') return;
-                orgMap[doc.id] = { id: doc.id, name: data.name || '이름 없음', logs: 0, users: 0, vehicles: 0, distance: 0, lastDriveDate: null, totalDuration: 0, durationCount: 0 };
+                orgMap[doc.id] = { id: doc.id, name: data.name || '이름 없음', address: data.address || data.aiVerifyDetail?.address || '', lat: data.lat || 0, lng: data.lng || 0, logs: 0, users: 0, vehicles: 0, distance: 0, lastDriveDate: null, totalDuration: 0, durationCount: 0 };
                 if (data.approvedAt) {
                     const approvedDate = data.approvedAt?.toDate ? data.approvedAt.toDate() : new Date(data.approvedAt);
                     if (!isNaN(approvedDate.getTime())) {
@@ -385,6 +447,12 @@ export default function ServiceDashboard() {
                             applicantName: data.applicantName || null,
                             applicantEmail: data.applicantEmail || null,
                         });
+                    }
+                }
+                if (data.timeToFirstEmployeeDays != null && data.approvedAt) {
+                    const approvedDate = data.approvedAt?.toDate ? data.approvedAt.toDate() : new Date(data.approvedAt);
+                    if (!isNaN(approvedDate.getTime())) {
+                        firstEmpDaysList.push({ days: data.timeToFirstEmployeeDays, approvedAt: approvedDate });
                     }
                 }
             });
@@ -400,7 +468,6 @@ export default function ServiceDashboard() {
                         const prev = orgMap[data.organizationId].lastDriveDate;
                         if (!prev || ts > prev) orgMap[data.organizationId].lastDriveDate = ts;
                     }
-                    // 기관별 주행시간 집계
                     const dur = computeDuration(data.startTime, data.endTime);
                     if (dur > 0) {
                         orgMap[data.organizationId].totalDuration += dur;
@@ -416,8 +483,10 @@ export default function ServiceDashboard() {
                 }
             });
 
-            // 차량 유형 집계
+            // 연료 유형 + 차량 유형 + 모델 집계
             const fuelMap: Record<string, number> = {};
+            const vtMap: Record<string, number> = {};
+            const modelMap: Record<string, number> = {};
             vehicleSnap.docs.forEach(doc => {
                 const data = doc.data();
                 if (data.organizationId && orgMap[data.organizationId]) {
@@ -425,9 +494,38 @@ export default function ServiceDashboard() {
                 }
                 const ft = (data.fuelType as string) || 'gasoline';
                 fuelMap[ft] = (fuelMap[ft] || 0) + 1;
+                const vt = (data.vehicleType as string) || 'sedan';
+                vtMap[vt] = (vtMap[vt] || 0) + 1;
+                const model = (data.modelName as string) || (data.displayName as string) || (data.name as string) || '알 수 없음';
+                modelMap[model] = (modelMap[model] || 0) + 1;
             });
 
-            setVehicleTypeStats(
+            // 하이패스 집계 (hipassCards 컬렉션 기반)
+            const hipassVehicleSet = new Set<string>();
+            const orgHipassMap: Record<string, number> = {};
+            hipassCardSnap.docs.forEach(doc => {
+                const data = doc.data();
+                if (data.vehicleId) {
+                    hipassVehicleSet.add(data.vehicleId);
+                }
+                if (data.organizationId && orgMap[data.organizationId]) {
+                    const orgName = orgMap[data.organizationId].name;
+                    orgHipassMap[orgName] = (orgHipassMap[orgName] || 0) + 1;
+                }
+            });
+            const hipassWithCount = hipassVehicleSet.size;
+            const hipassTotalCount = vehicleSnap.size;
+
+            setHipassRatio({ withHipass: hipassWithCount, withoutHipass: hipassTotalCount - hipassWithCount });
+
+            setHipassTopOrgs(
+                Object.entries(orgHipassMap)
+                    .map(([name, count]) => ({ name, count }))
+                    .sort((a, b) => b.count - a.count)
+                    .slice(0, 5)
+            );
+
+            setFuelTypeStats(
                 Object.entries(fuelMap)
                     .map(([type, count]) => ({
                         type,
@@ -438,10 +536,27 @@ export default function ServiceDashboard() {
                     .sort((a, b) => b.count - a.count)
             );
 
+            setVehicleTypeStats(
+                Object.entries(vtMap)
+                    .map(([type, count]) => ({
+                        type,
+                        label: VT_LABELS[type] || type,
+                        count,
+                        color: VT_COLORS[type] || '#9ca3af',
+                    }))
+                    .sort((a, b) => b.count - a.count)
+            );
+
+            setVehicleModelStats(
+                Object.entries(modelMap)
+                    .map(([model, count]) => ({ model, count }))
+                    .sort((a, b) => b.count - a.count)
+                    .slice(0, 15)
+            );
+
             const orgList = Object.values(orgMap);
             setTopOrgs(orgList);
 
-            // 기관별 평균 주행시간 (운행 10건 이상인 기관만, 상위 15개)
             const orgDurList = orgList
                 .filter((o: any) => o.durationCount >= 10)
                 .map((o: any) => ({ name: o.name, avg: Math.round(o.totalDuration / o.durationCount) }))
@@ -450,7 +565,6 @@ export default function ServiceDashboard() {
             setOrgAvgDuration(orgDurList);
 
             approvalList.sort((a, b) => b.approvedAt.getTime() - a.approvedAt.getTime());
-            setRecentApprovals(approvalList);
 
             // 월별 누적 기관 증가 추이
             if (approvalList.length > 0) {
@@ -468,8 +582,251 @@ export default function ServiceDashboard() {
                 });
                 setMonthlyGrowth(growth);
             }
+
+            // ── 첫 직원 등록 소요시간 통계 계산 ──
+            if (firstEmpDaysList.length > 0) {
+                const dayValues = firstEmpDaysList.map(d => d.days).sort((a, b) => a - b);
+                const total = dayValues.length;
+                const avg = Math.round(dayValues.reduce((s, v) => s + v, 0) / total * 10) / 10;
+                const median = total % 2 === 0
+                    ? (dayValues[total / 2 - 1] + dayValues[total / 2]) / 2
+                    : dayValues[Math.floor(total / 2)];
+                const sameDayCount = dayValues.filter(d => d === 0).length;
+                const sameDayRate = Math.round((sameDayCount / total) * 100);
+
+                setFirstEmployeeStats({ avg, median, sameDayRate, total });
+
+                const buckets = [
+                    { label: '당일', min: 0, max: 0, color: '#22c55e' },
+                    { label: '1일', min: 1, max: 1, color: '#3b82f6' },
+                    { label: '2~3일', min: 2, max: 3, color: '#6366f1' },
+                    { label: '4~7일', min: 4, max: 7, color: '#8b5cf6' },
+                    { label: '8~14일', min: 8, max: 14, color: '#f59e0b' },
+                    { label: '15~30일', min: 15, max: 30, color: '#f97316' },
+                    { label: '30일+', min: 31, max: Infinity, color: '#ef4444' },
+                ];
+                setFirstEmployeeDist(
+                    buckets.map(b => ({
+                        label: b.label,
+                        count: dayValues.filter(d => d >= b.min && d <= b.max).length,
+                        color: b.color,
+                    }))
+                );
+
+                const monthAvgMap: Record<string, number[]> = {};
+                firstEmpDaysList.forEach(({ days, approvedAt: aDate }) => {
+                    const key = `${aDate.getFullYear()}.${(aDate.getMonth() + 1).toString().padStart(2, '0')}`;
+                    if (!monthAvgMap[key]) monthAvgMap[key] = [];
+                    monthAvgMap[key].push(days);
+                });
+                const trendMonths = Object.keys(monthAvgMap).sort();
+                setFirstEmployeeTrend(
+                    trendMonths.map(m => ({
+                        month: m,
+                        avg: Math.round(monthAvgMap[m].reduce((s, v) => s + v, 0) / monthAvgMap[m].length * 10) / 10,
+                    }))
+                );
+            }
         } catch (err) {
             console.error('기관 활성도 로드 실패:', err);
+        }
+    };
+
+    // 주유/하이패스 통계 로드 (서버 집계 + 기간 필터 최적화)
+    const loadFuelHipassStats = async () => {
+        try {
+            const now = new Date();
+            const year = now.getFullYear();
+            const month = now.getMonth();
+            const prevMonth = month === 0 ? 11 : month - 1;
+            const prevYear = month === 0 ? year - 1 : year;
+            const thirtyDaysAgo = new Date(year, month, now.getDate() - 29);
+
+            // 이번 달, 지난 달 날짜 범위 (문자열 비교용)
+            const curMonthStart = `${year}-${String(month + 1).padStart(2, '0')}-01`;
+            const curMonthEnd = `${year}-${String(month + 1).padStart(2, '0')}-31`;
+            const prevMonthStart = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-01`;
+            const prevMonthEnd = `${prevYear}-${String(prevMonth + 1).padStart(2, '0')}-31`;
+            const recentDateStr = `${thirtyDaysAgo.getFullYear()}-${String(thirtyDaysAgo.getMonth() + 1).padStart(2, '0')}-${String(thirtyDaysAgo.getDate()).padStart(2, '0')}`;
+
+            // 30일치 날짜 초기화
+            const fuelDailyMap: Record<string, number> = {};
+            const hipassDailyMap: Record<string, number> = {};
+            for (let i = 0; i < 30; i++) {
+                const d = new Date(thirtyDaysAgo);
+                d.setDate(d.getDate() + i);
+                const key = `${d.getMonth() + 1}/${d.getDate()}`;
+                fuelDailyMap[key] = 0;
+                hipassDailyMap[key] = 0;
+            }
+
+            const fuelCol = collection(db, 'fuelLogs');
+            const hipassCol = collection(db, 'hipassCharges');
+
+            // 1) 서버 집계로 전체 합계/카운트 (문서 전송 없이 서버에서 계산)
+            const [fuelAgg, hipassAgg, fuelMonthAgg, hipassMonthAgg, fuelPrevMonthAgg, hipassPrevMonthAgg, fuelRecentSnap, hipassRecentSnap] = await Promise.all([
+                getAggregateFromServer(query(fuelCol), { totalCount: count(), totalCost: sum('fuelCost') }),
+                getAggregateFromServer(query(hipassCol), { totalCount: count(), totalAmount: sum('chargeAmount') }),
+                getAggregateFromServer(query(fuelCol, where('date', '>=', curMonthStart), where('date', '<=', curMonthEnd)), { monthCount: count(), monthCost: sum('fuelCost') }),
+                getAggregateFromServer(query(hipassCol, where('date', '>=', curMonthStart), where('date', '<=', curMonthEnd)), { monthCount: count(), monthAmount: sum('chargeAmount') }),
+                getAggregateFromServer(query(fuelCol, where('date', '>=', prevMonthStart), where('date', '<=', prevMonthEnd)), { prevCost: sum('fuelCost') }),
+                getAggregateFromServer(query(hipassCol, where('date', '>=', prevMonthStart), where('date', '<=', prevMonthEnd)), { prevAmount: sum('chargeAmount') }),
+                // 2) 최근 30일 문서만 가져와서 일별 차트 생성
+                getDocs(query(fuelCol, where('date', '>=', recentDateStr))),
+                getDocs(query(hipassCol, where('date', '>=', recentDateStr))),
+            ]);
+
+            // 주유 일별 집계 (최근 30일 문서만)
+            fuelRecentSnap.docs.forEach(doc => {
+                const data = doc.data();
+                const dateStr = data.date as string;
+                if (!dateStr) return;
+                const [y, m, dd] = dateStr.split('-').map(Number);
+                const parsed = new Date(y, m - 1, dd);
+                if (parsed >= thirtyDaysAgo) {
+                    const key = `${parsed.getMonth() + 1}/${parsed.getDate()}`;
+                    if (fuelDailyMap[key] !== undefined) fuelDailyMap[key] += (data.fuelCost || 0);
+                }
+            });
+
+            setFuelStats({
+                totalCount: fuelAgg.data().totalCount,
+                totalCost: fuelAgg.data().totalCost ?? 0,
+                monthCount: fuelMonthAgg.data().monthCount,
+                monthCost: fuelMonthAgg.data().monthCost ?? 0,
+                prevMonthCost: fuelPrevMonthAgg.data().prevCost ?? 0,
+            });
+            setDailyFuelCost(Object.entries(fuelDailyMap).map(([date, cost]) => ({ date, cost })));
+
+            // 하이패스 일별 집계 (최근 30일 문서만)
+            hipassRecentSnap.docs.forEach(doc => {
+                const data = doc.data();
+                const dateStr = data.date as string;
+                if (!dateStr) return;
+                const [y, m, dd] = dateStr.split('-').map(Number);
+                const parsed = new Date(y, m - 1, dd);
+                if (parsed >= thirtyDaysAgo) {
+                    const key = `${parsed.getMonth() + 1}/${parsed.getDate()}`;
+                    if (hipassDailyMap[key] !== undefined) hipassDailyMap[key] += (data.chargeAmount || 0);
+                }
+            });
+
+            setHipassStats({
+                totalCount: hipassAgg.data().totalCount,
+                totalAmount: hipassAgg.data().totalAmount ?? 0,
+                monthCount: hipassMonthAgg.data().monthCount,
+                monthAmount: hipassMonthAgg.data().monthAmount ?? 0,
+                prevMonthAmount: hipassPrevMonthAgg.data().prevAmount ?? 0,
+            });
+            setDailyHipassAmount(Object.entries(hipassDailyMap).map(([date, amount]) => ({ date, amount })));
+        } catch (err) {
+            console.error('주유/하이패스 통계 로드 실패:', err);
+        }
+    };
+
+    // 알림 통계 로드
+    const NOTIF_TYPE_LABELS: Record<string, string> = {
+        admin_notice: '관리자 공지',
+        notice: '공지사항',
+        reservation_confirmed: '예약 확정',
+        reservation_reminder: '예약 알림',
+        reservation_cancelled: '예약 취소',
+        reservation_changed: '예약 변경',
+        reservation_cancelled_maintenance: '정비 취소',
+        drive_log_reminder: '운행일지 알림',
+        no_show_reminder: '노쇼 알림',
+        approval: '승인',
+        rejection: '반려',
+        maintenance: '정비 알림',
+        drive: '운행 알림',
+        system: '시스템',
+    };
+    const NOTIF_TYPE_COLORS: Record<string, string> = {
+        admin_notice: '#8b5cf6',
+        notice: '#a78bfa',
+        reservation_confirmed: '#f59e0b',
+        reservation_reminder: '#fbbf24',
+        reservation_cancelled: '#ef4444',
+        reservation_changed: '#f97316',
+        reservation_cancelled_maintenance: '#dc2626',
+        drive_log_reminder: '#10b981',
+        no_show_reminder: '#3b82f6',
+        approval: '#6b7280',
+        rejection: '#9ca3af',
+        maintenance: '#eab308',
+        drive: '#22c55e',
+        system: '#64748b',
+    };
+    const loadNotificationStats = async () => {
+        try {
+            const now = new Date();
+            const thirtyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+            const notifCol = collection(db, 'notifications');
+
+            // 1) 서버 집계로 전체 카운트 + 읽음 카운트 (문서 전송 없이)
+            const [totalCountResult, readCountResult, notifRecentSnap] = await Promise.all([
+                getCountFromServer(query(notifCol)),
+                getCountFromServer(query(notifCol, where('read', '==', true))),
+                // 2) 최근 30일 알림만 가져와서 일별 차트 + 타입 분석
+                getDocs(query(notifCol, where('createdAt', '>=', Timestamp.fromDate(thirtyDaysAgo)))),
+            ]);
+
+            const total = totalCountResult.data().count;
+            const readCount = readCountResult.data().count;
+            const unreadCount = total - readCount;
+
+            const dailyMap: Record<string, { sent: number; read: number }> = {};
+            const typeMap: Record<string, number> = {};
+
+            // 30일치 날짜 초기화
+            for (let i = 0; i < 30; i++) {
+                const d = new Date(thirtyDaysAgo);
+                d.setDate(d.getDate() + i);
+                const key = `${d.getMonth() + 1}/${d.getDate()}`;
+                dailyMap[key] = { sent: 0, read: 0 };
+            }
+
+            notifRecentSnap.docs.forEach(doc => {
+                const data = doc.data();
+
+                // 타입별 집계 (최근 30일 기준)
+                const t = (data.type as string) || 'system';
+                typeMap[t] = (typeMap[t] || 0) + 1;
+
+                // 일별 집계
+                const ts = data.createdAt?.toDate ? data.createdAt.toDate() : (data.createdAt ? new Date(data.createdAt) : null);
+                if (ts && ts >= thirtyDaysAgo) {
+                    const dateKey = `${ts.getMonth() + 1}/${ts.getDate()}`;
+                    if (dailyMap[dateKey]) {
+                        dailyMap[dateKey].sent++;
+                        if (data.read) dailyMap[dateKey].read++;
+                    }
+                }
+            });
+
+            setNotifSummary({
+                total,
+                read: readCount,
+                unread: unreadCount,
+                readRate: total > 0 ? Math.round((readCount / total) * 100) : 0,
+            });
+
+            setDailyNotifStats(
+                Object.entries(dailyMap).map(([date, counts]) => ({ date, ...counts }))
+            );
+
+            const colorPalette = ['#8b5cf6', '#f59e0b', '#3b82f6', '#10b981', '#6b7280', '#ef4444', '#ec4899', '#06b6d4'];
+            setNotifTypeStats(
+                Object.entries(typeMap)
+                    .map(([type, cnt], idx) => ({
+                        type: NOTIF_TYPE_LABELS[type] || type,
+                        count: cnt,
+                        color: NOTIF_TYPE_COLORS[type] || colorPalette[idx % colorPalette.length],
+                    }))
+                    .sort((a, b) => b.count - a.count)
+            );
+        } catch (err) {
+            console.error('알림 통계 로드 실패:', err);
         }
     };
 
@@ -496,7 +853,7 @@ export default function ServiceDashboard() {
             {/* ── 서비스 개요 카드 ── */}
             {stats && (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <StatCard label="등록 기관" value={stats.approvedOrgs} unit="개" icon="🏢" color="blue"
+                    <StatCard label="신청 기관" value={stats.approvedOrgs} unit="개" icon="🏢" color="blue"
                         sub={stats.pendingApps > 0 ? `신청 대기 ${stats.pendingApps}건` : null} />
                     <StatCard label="전체 사용자" value={stats.totalUsers} unit="명" icon="👥" color="green"
                         sub={`관리자 ${stats.adminCount} · 직원 ${stats.employeeCount}`} />
@@ -536,56 +893,227 @@ export default function ServiceDashboard() {
                 </div>
             )}
 
-            {/* ── 일별 운행 추이 (30일) ── */}
-            {dailyDriveStats.length > 0 && (
+
+
+            {/* ── 일별 기관 추이 (30일) ── */}
+            {dailyActiveOrgStats.length > 0 && (
                 <div className="glass-card p-5">
                     <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
-                        📈 일별 운행 추이 (최근 30일)
+                        🏢 일별 기관 추이 (최근 30일)
                     </h2>
                     <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">
-                        서비스 전체 일별 운행 건수
+                        신청일 기준 일별 건수 — 거절 · 삭제 · 미활성(직원 미등록) · 활성(직원 등록)
                     </p>
                     <div>
-                        <ResponsiveContainer width="100%" height={256} minWidth={1}>
-                            <AreaChart data={dailyDriveStats} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                        <ResponsiveContainer width="100%" height={280} minWidth={1}>
+                            <AreaChart data={dailyActiveOrgStats} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                                 <defs>
-                                    <linearGradient id="colorDrive" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                                    <linearGradient id="colorRejectedOrg" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#6b7280" stopOpacity={0.4} />
+                                        <stop offset="95%" stopColor="#6b7280" stopOpacity={0.05} />
+                                    </linearGradient>
+                                    <linearGradient id="colorDeletedOrg" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
+                                        <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.05} />
+                                    </linearGradient>
+                                    <linearGradient id="colorInactiveOrg" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
+                                        <stop offset="95%" stopColor="#ef4444" stopOpacity={0.05} />
+                                    </linearGradient>
+                                    <linearGradient id="colorActiveOrg" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#22c55e" stopOpacity={0.4} />
+                                        <stop offset="95%" stopColor="#22c55e" stopOpacity={0.05} />
                                     </linearGradient>
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
                                 <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false}
-                                    axisLine={{ stroke: '#4b5563' }} interval={Math.ceil(dailyDriveStats.length / 8)} />
+                                    axisLine={{ stroke: '#4b5563' }} interval={Math.ceil(dailyActiveOrgStats.length / 8)} />
                                 <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} allowDecimals={false} />
-                                <Tooltip {...tooltipStyle} formatter={(value: any) => [`${value}건`, '운행 건수']} />
-                                <Area type="monotone" dataKey="count" stroke="#f97316" strokeWidth={2} fill="url(#colorDrive)" />
+                                <Tooltip {...tooltipStyle}
+                                    content={({ active, payload, label }: any) => {
+                                        if (!active || !payload?.length) return null;
+                                        const data = payload[0]?.payload;
+                                        if (!data) return null;
+                                        const total = data.dayRejected + data.dayDeleted + data.dayInactive + data.dayActive;
+                                        const items = [
+                                            { label: '거절', count: data.dayRejected, color: '#6b7280', icon: '⚫' },
+                                            { label: '삭제', count: data.dayDeleted, color: '#f59e0b', icon: '🟡' },
+                                            { label: '미활성', count: data.dayInactive, color: '#ef4444', icon: '🔴' },
+                                            { label: '활성', count: data.dayActive, color: '#22c55e', icon: '🟢' },
+                                        ];
+                                        return (
+                                            <div style={{ background: '#1f2937', border: '1px solid #374151', borderRadius: 8, padding: '10px 14px', fontSize: 13 }}>
+                                                <p style={{ color: '#e5e7eb', fontWeight: 600, marginBottom: 6 }}>{label} <span style={{ color: '#9ca3af', fontWeight: 400 }}>총 {total}건</span></p>
+                                                {items.map(it => (
+                                                    <p key={it.label} style={{ color: it.color, margin: '3px 0' }}>
+                                                        {it.icon} {it.label}: <b>{it.count}건</b>
+                                                    </p>
+                                                ))}
+                                            </div>
+                                        );
+                                    }} />
+                                <Legend formatter={(value: string) =>
+                                    value === 'dayRejected' ? '⚫ 거절' :
+                                    value === 'dayDeleted' ? '🟡 삭제된 기관' :
+                                    value === 'dayInactive' ? '🔴 미활성 (직원 미등록)' :
+                                    '🟢 활성 (직원 등록)'
+                                } wrapperStyle={{ fontSize: '13px', color: '#9ca3af' }} />
+                                <Area type="monotone" dataKey="dayRejected" stackId="org" stroke="#6b7280" strokeWidth={2} fill="url(#colorRejectedOrg)" />
+                                <Area type="monotone" dataKey="dayDeleted" stackId="org" stroke="#f59e0b" strokeWidth={2} fill="url(#colorDeletedOrg)" />
+                                <Area type="monotone" dataKey="dayInactive" stackId="org" stroke="#ef4444" strokeWidth={2} fill="url(#colorInactiveOrg)" />
+                                <Area type="monotone" dataKey="dayActive" stackId="org" stroke="#22c55e" strokeWidth={2} fill="url(#colorActiveOrg)" />
                             </AreaChart>
                         </ResponsiveContainer>
                     </div>
                 </div>
             )}
 
-            {/* ── 입력 방식 시계열 그래프 ── */}
+            {/* ── 일별 활성 사용자 추이 (30일) ── */}
+            {dailyActiveUserStats.length > 0 && (
+                <div className="glass-card p-5">
+                    <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
+                        👤 일별 활성 사용자 (최근 30일)
+                    </h2>
+                    <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">
+                        하루에 1회 이상 운행한 고유 사용자 수
+                    </p>
+                    <div>
+                        <ResponsiveContainer width="100%" height={280} minWidth={1}>
+                            <AreaChart data={dailyActiveUserStats} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                                <defs>
+                                    <linearGradient id="colorDau" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.4} />
+                                        <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.05} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
+                                <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false}
+                                    axisLine={{ stroke: '#4b5563' }} interval={Math.ceil(dailyActiveUserStats.length / 8)} />
+                                <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} allowDecimals={false} />
+                                <Tooltip {...tooltipStyle}
+                                    formatter={(value: any) => [`${value}명`, '활성 사용자']}
+                                />
+                                <Area type="monotone" dataKey="users" stroke="#06b6d4" strokeWidth={2.5}
+                                    fill="url(#colorDau)" dot={{ r: 2, fill: '#06b6d4' }} activeDot={{ r: 5, fill: '#06b6d4' }} />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            )}
+
+            {/* ── 첫 직원 등록 소요시간 분석 ── */}
+            {firstEmployeeStats && (
+                <div className="glass-card p-5">
+                    <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
+                        ⏱ 기관 승인 → 첫 직원 등록 소요시간
+                    </h2>
+                    <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">
+                        승인일부터 첫 번째 직원이 가입하기까지 걸린 일수 (총 {firstEmployeeStats.total}개 기관 기준)
+                    </p>
+
+                    {/* 요약 카드 */}
+                    <div className="grid grid-cols-3 gap-4 mb-6">
+                        <div className="text-center p-4 bg-surface-50 dark:bg-surface-800 rounded-xl">
+                            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                                {firstEmployeeStats.avg}<span className="text-sm font-normal ml-0.5">일</span>
+                            </p>
+                            <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">평균 소요일</p>
+                        </div>
+                        <div className="text-center p-4 bg-surface-50 dark:bg-surface-800 rounded-xl">
+                            <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                                {firstEmployeeStats.median}<span className="text-sm font-normal ml-0.5">일</span>
+                            </p>
+                            <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">중앙값</p>
+                        </div>
+                        <div className="text-center p-4 bg-surface-50 dark:bg-surface-800 rounded-xl">
+                            <p className="text-2xl font-bold text-violet-600 dark:text-violet-400">
+                                {firstEmployeeStats.sameDayRate}<span className="text-sm font-normal ml-0.5">%</span>
+                            </p>
+                            <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">당일 등록 비율</p>
+                        </div>
+                    </div>
+
+                    {/* 소요일 분포 히스토그램 + 월별 트렌드 (2열 그리드) */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* 소요일 분포 */}
+                        {firstEmployeeDist.length > 0 && (
+                            <div>
+                                <h3 className="text-sm font-medium text-surface-600 dark:text-surface-400 mb-3">📊 소요일 분포</h3>
+                                <ResponsiveContainer width="100%" height={220} minWidth={1}>
+                                    <BarChart data={firstEmployeeDist} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
+                                        <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false}
+                                            axisLine={{ stroke: '#4b5563' }} />
+                                        <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} allowDecimals={false} />
+                                        <Tooltip
+                                            contentStyle={{ background: '#1f2937', border: '1px solid #374151', borderRadius: 8, fontSize: 13 }}
+                                            labelStyle={{ color: '#e5e7eb', fontWeight: 600 }}
+                                            itemStyle={{ color: '#e5e7eb' }}
+                                            formatter={(value: any) => [`${value}개 기관`, '기관 수']}
+                                        />
+                                        <Bar dataKey="count" radius={[6, 6, 0, 0]}>
+                                            {firstEmployeeDist.map((entry, idx) => (
+                                                <Cell key={idx} fill={entry.color} />
+                                            ))}
+                                        </Bar>
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </div>
+                        )}
+
+                        {/* 월별 평균 소요일 트렌드 */}
+                        {firstEmployeeTrend.length > 1 && (
+                            <div>
+                                <h3 className="text-sm font-medium text-surface-600 dark:text-surface-400 mb-3">📈 월별 평균 소요일 추이</h3>
+                                <ResponsiveContainer width="100%" height={220} minWidth={1}>
+                                    <AreaChart data={firstEmployeeTrend} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                                        <defs>
+                                            <linearGradient id="colorFirstEmpTrend" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4} />
+                                                <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.05} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
+                                        <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false}
+                                            axisLine={{ stroke: '#4b5563' }} />
+                                        <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false}
+                                            label={{ value: '일', position: 'insideTopLeft', style: { fontSize: 11, fill: '#9ca3af' } }} />
+                                        <Tooltip
+                                            contentStyle={{ background: '#1f2937', border: '1px solid #374151', borderRadius: 8, fontSize: 13 }}
+                                            labelStyle={{ color: '#e5e7eb', fontWeight: 600 }}
+                                            itemStyle={{ color: '#e5e7eb' }}
+                                            formatter={(value: any) => [`${value}일`, '평균 소요일']}
+                                        />
+                                        <Area type="monotone" dataKey="avg" stroke="#8b5cf6" strokeWidth={2.5}
+                                            fill="url(#colorFirstEmpTrend)" dot={{ r: 3, fill: '#8b5cf6' }} />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* ── 입력 방식 스택 그래프 ── */}
             {inputMethodStats.length > 0 && (
                 <div className="glass-card p-5">
                     <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
                         📊 입력 방식 추이 (최근 30일)
                     </h2>
                     <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">
-                        계기판 촬영(OCR)과 수동 입력의 일별 사용 현황
+                        계기판 촬영(OCR)과 수동 입력의 일별 건수 (쌓기)
                     </p>
                     <div>
                         <ResponsiveContainer width="100%" height={256} minWidth={1}>
                             <AreaChart data={inputMethodStats} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                                 <defs>
                                     <linearGradient id="colorOcr" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
+                                        <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4} />
+                                        <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.05} />
                                     </linearGradient>
                                     <linearGradient id="colorManual" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
+                                        <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.4} />
+                                        <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.05} />
                                     </linearGradient>
                                 </defs>
                                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
@@ -593,14 +1121,27 @@ export default function ServiceDashboard() {
                                     axisLine={{ stroke: '#4b5563' }} interval={Math.ceil(inputMethodStats.length / 8)} />
                                 <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} allowDecimals={false} />
                                 <Tooltip {...tooltipStyle}
-                                    formatter={(value: any, name: any) => [
-                                        `${value}건`,
-                                        name === 'ocr' ? '📷 계기판 촬영' : '⌨️ 수동 입력',
-                                    ]} />
+                                    content={({ active, payload, label }: any) => {
+                                        if (!active || !payload?.length) return null;
+                                        const data = payload[0]?.payload;
+                                        if (!data) return null;
+                                        const total = data.ocr + data.manual;
+                                        return (
+                                            <div style={{ background: '#1f2937', border: '1px solid #374151', borderRadius: 8, padding: '10px 14px', fontSize: 13 }}>
+                                                <p style={{ color: '#e5e7eb', fontWeight: 600, marginBottom: 6 }}>{label} <span style={{ color: '#9ca3af', fontWeight: 400 }}>총 {total}건</span></p>
+                                                <p style={{ color: '#8b5cf6', margin: '3px 0' }}>
+                                                    📷 계기판 촬영: <b>{data.ocr}건</b>
+                                                </p>
+                                                <p style={{ color: '#06b6d4', margin: '3px 0' }}>
+                                                    ⌨️ 수동 입력: <b>{data.manual}건</b>
+                                                </p>
+                                            </div>
+                                        );
+                                    }} />
                                 <Legend formatter={(value: string) => value === 'ocr' ? '📷 계기판 촬영' : '⌨️ 수동 입력'}
                                     wrapperStyle={{ fontSize: '13px', color: '#9ca3af' }} />
-                                <Area type="monotone" dataKey="ocr" stroke="#8b5cf6" strokeWidth={2} fill="url(#colorOcr)" />
-                                <Area type="monotone" dataKey="manual" stroke="#06b6d4" strokeWidth={2} fill="url(#colorManual)" />
+                                <Area type="monotone" dataKey="manual" stackId="input" stroke="#06b6d4" strokeWidth={2} fill="url(#colorManual)" />
+                                <Area type="monotone" dataKey="ocr" stackId="input" stroke="#8b5cf6" strokeWidth={2} fill="url(#colorOcr)" />
                             </AreaChart>
                         </ResponsiveContainer>
                     </div>
@@ -635,15 +1176,15 @@ export default function ServiceDashboard() {
                     </div>
                 </div>
 
-                {/* 차량 유형별 분포 */}
+                {/* 연료 유형별 분포 */}
                 <div className="glass-card p-5">
                     <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-4">
-                        ⛽ 차량 유형별 분포
+                        ⛽ 연료 유형별 분포
                     </h2>
-                    {vehicleTypeStats.length > 0 ? (
+                    {fuelTypeStats.length > 0 ? (
                         <div className="space-y-3">
-                            {vehicleTypeStats.map(item => {
-                                const maxCount = Math.max(...vehicleTypeStats.map(d => d.count), 1);
+                            {fuelTypeStats.map(item => {
+                                const maxCount = Math.max(...fuelTypeStats.map(d => d.count), 1);
                                 return (
                                     <div key={item.type}>
                                         <div className="flex items-center justify-between mb-1">
@@ -665,6 +1206,271 @@ export default function ServiceDashboard() {
                     )}
                 </div>
             </div>
+
+            {/* ── 차량 유형별 분포 ── */}
+            <div className="glass-card p-5">
+                <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-4">
+                    🚗 차량 유형별 분포
+                </h2>
+                {vehicleTypeStats.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+                        {vehicleTypeStats.map(item => {
+                            const total = vehicleTypeStats.reduce((s, d) => s + d.count, 0);
+                            const pct = total > 0 ? Math.round((item.count / total) * 100) : 0;
+                            const ICONS: Record<string, string> = { compact: '🚙', sedan: '🚗', van: '🚐', truck: '🚚', bus: '🚌' };
+                            return (
+                                <div key={item.type} className="text-center p-4 bg-surface-50 dark:bg-surface-800 rounded-xl">
+                                    <div className="text-3xl mb-2">{ICONS[item.type] || '🚗'}</div>
+                                    <p className="text-sm font-medium text-surface-600 dark:text-surface-300">{item.label}</p>
+                                    <p className="text-2xl font-bold mt-1" style={{ color: item.color }}>
+                                        {item.count}<span className="text-sm font-normal ml-0.5">대</span>
+                                    </p>
+                                    <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">{pct}%</p>
+                                    <div className="mt-2 h-1.5 bg-surface-200 dark:bg-surface-700 rounded-full overflow-hidden">
+                                        <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: item.color }} />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                ) : (
+                    <p className="text-sm text-surface-400 dark:text-surface-500">차량 데이터 없음</p>
+                )}
+            </div>
+
+            {/* ── 차량 모델별 분포 ── */}
+            {vehicleModelStats.length > 0 && (
+                <div className="glass-card p-5">
+                    <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-4">
+                        🚘 차량 모델별 분포
+                    </h2>
+                    <div className="space-y-2">
+                        {vehicleModelStats.map((item, idx) => {
+                            const maxCount = vehicleModelStats[0]?.count || 1;
+                            const colors = ['#8b5cf6', '#6366f1', '#3b82f6', '#06b6d4', '#14b8a6', '#22c55e', '#84cc16', '#eab308', '#f59e0b', '#f97316', '#ef4444', '#ec4899', '#d946ef', '#a855f7', '#6d28d9'];
+                            const color = colors[idx % colors.length];
+                            return (
+                                <div key={item.model}>
+                                    <div className="flex items-center justify-between mb-1">
+                                        <span className="text-sm text-surface-600 dark:text-surface-300">{item.model}</span>
+                                        <span className="text-sm font-semibold text-surface-800 dark:text-surface-100">{item.count}대</span>
+                                    </div>
+                                    <div className="h-5 bg-surface-100 dark:bg-surface-700 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full rounded-full transition-all duration-500"
+                                            style={{ width: `${(item.count / maxCount) * 100}%`, backgroundColor: color }}
+                                        />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            )}
+
+            {/* ── 하이패스 연결 현황 ── */}
+            {(hipassRatio.withHipass > 0 || hipassRatio.withoutHipass > 0) && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* 하이패스 연결 비율 도넛 */}
+                    <div className="glass-card p-5">
+                        <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-4">
+                            🛣️ 하이패스 연결 비율
+                        </h2>
+                        {(() => {
+                            const total = hipassRatio.withHipass + hipassRatio.withoutHipass;
+                            const pct = total > 0 ? Math.round((hipassRatio.withHipass / total) * 100) : 0;
+                            const donutData = [
+                                { name: '연결됨', value: hipassRatio.withHipass, color: '#14b8a6' },
+                                { name: '미연결', value: hipassRatio.withoutHipass, color: '#374151' },
+                            ];
+                            return (
+                                <div className="flex items-center justify-center gap-8">
+                                    <div className="relative">
+                                        <ResponsiveContainer width={180} height={180}>
+                                            <PieChart>
+                                                <Pie
+                                                    data={donutData}
+                                                    dataKey="value"
+                                                    cx="50%" cy="50%"
+                                                    innerRadius={55} outerRadius={80}
+                                                    paddingAngle={3}
+                                                    startAngle={90} endAngle={-270}
+                                                    stroke="none"
+                                                >
+                                                    {donutData.map((entry, idx) => (
+                                                        <Cell key={idx} fill={entry.color} />
+                                                    ))}
+                                                </Pie>
+                                                <Tooltip
+                                                    {...tooltipStyle}
+                                                    formatter={(value: any, name: any) => [`${value}대`, name]}
+                                                />
+                                            </PieChart>
+                                        </ResponsiveContainer>
+                                        {/* 중앙 텍스트 */}
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                            <span className="text-3xl font-bold text-teal-500 dark:text-teal-400">{pct}%</span>
+                                            <span className="text-xs text-surface-400 dark:text-surface-500">연결율</span>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#14b8a6' }} />
+                                            <span className="text-sm text-surface-600 dark:text-surface-300">연결됨</span>
+                                            <span className="text-sm font-bold text-surface-800 dark:text-surface-100 ml-auto">{hipassRatio.withHipass}대</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#374151' }} />
+                                            <span className="text-sm text-surface-600 dark:text-surface-300">미연결</span>
+                                            <span className="text-sm font-bold text-surface-800 dark:text-surface-100 ml-auto">{hipassRatio.withoutHipass}대</span>
+                                        </div>
+                                        <div className="border-t border-surface-200 dark:border-surface-700 pt-2">
+                                            <span className="text-xs text-surface-400 dark:text-surface-500">전체 {total}대</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })()}
+                    </div>
+
+                    {/* 하이패스 사용 기관 TOP 5 */}
+                    <div className="glass-card p-5">
+                        <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-4">
+                            🏆 하이패스 사용 기관 TOP 5
+                        </h2>
+                        {hipassTopOrgs.length > 0 ? (
+                            <ResponsiveContainer width="100%" height={220} minWidth={1}>
+                                <BarChart data={hipassTopOrgs} layout="vertical" margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} horizontal={false} />
+                                    <XAxis type="number" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false}
+                                        axisLine={false} allowDecimals={false} />
+                                    <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: '#d1d5db' }} tickLine={false}
+                                        axisLine={false} width={100} />
+                                    <Tooltip {...tooltipStyle} formatter={(value: any) => [`${value}대`, '하이패스 차량']} />
+                                    <Bar dataKey="count" radius={[0, 6, 6, 0]}>
+                                        {hipassTopOrgs.map((_entry, idx) => (
+                                            <Cell key={idx} fill={`hsl(${170 - idx * 12}, 65%, ${45 + idx * 5}%)`} />
+                                        ))}
+                                    </Bar>
+                                </BarChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <p className="text-sm text-surface-400 dark:text-surface-500">하이패스 연결 차량이 없습니다</p>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* 주유 / 하이패스 월간 지표 */}
+                {(fuelStats || hipassStats) && (
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mt-4 lg:col-span-2">
+                        {fuelStats && (
+                            <>
+                                <div className="flex flex-col items-center justify-center p-4 bg-surface-50 dark:bg-surface-800 rounded-xl min-h-[100px]">
+                                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                                        {fuelStats.monthCount}<span className="text-sm font-normal ml-0.5">건</span>
+                                    </p>
+                                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">이번 달 주유</p>
+                                    <p className="text-xs text-surface-400 dark:text-surface-500">{fuelStats.monthCost.toLocaleString()}원</p>
+                                </div>
+                                <div className="flex flex-col items-center justify-center p-4 bg-surface-50 dark:bg-surface-800 rounded-xl min-h-[100px]">
+                                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                                        {fuelStats.totalCount}<span className="text-sm font-normal ml-0.5">건</span>
+                                    </p>
+                                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">총 주유 건수</p>
+                                    <p className="text-xs text-surface-400 dark:text-surface-500">{fuelStats.totalCost.toLocaleString()}원</p>
+                                </div>
+                            </>
+                        )}
+                        {hipassStats && (
+                            <>
+                                <div className="flex flex-col items-center justify-center p-4 bg-surface-50 dark:bg-surface-800 rounded-xl min-h-[100px]">
+                                    <p className="text-2xl font-bold text-teal-600 dark:text-teal-400">
+                                        {hipassStats.monthCount}<span className="text-sm font-normal ml-0.5">건</span>
+                                    </p>
+                                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">이번 달 하이패스</p>
+                                    <p className="text-xs text-surface-400 dark:text-surface-500">{hipassStats.monthAmount.toLocaleString()}원</p>
+                                </div>
+                                <div className="flex flex-col items-center justify-center p-4 bg-surface-50 dark:bg-surface-800 rounded-xl min-h-[100px]">
+                                    <p className="text-2xl font-bold text-teal-600 dark:text-teal-400">
+                                        {hipassStats.totalCount}<span className="text-sm font-normal ml-0.5">건</span>
+                                    </p>
+                                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">총 하이패스 충전</p>
+                                    <p className="text-xs text-surface-400 dark:text-surface-500">{hipassStats.totalAmount.toLocaleString()}원</p>
+                                </div>
+                            </>
+                        )}
+                    </div>
+                )}
+            </div>
+
+            {/* ── 주유/하이패스 일별 추이 (30일) ── */}
+            {(dailyFuelCost.length > 0 || dailyHipassAmount.length > 0) && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* 주유 비용 추이 */}
+                    {dailyFuelCost.length > 0 && (
+                        <div className="glass-card p-5">
+                            <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
+                                ⛽ 주유 비용 추이 (최근 30일)
+                            </h2>
+                            <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">
+                                서비스 전체 일별 주유 금액
+                            </p>
+                            <div>
+                                <ResponsiveContainer width="100%" height={220} minWidth={1}>
+                                    <AreaChart data={dailyFuelCost} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                                        <defs>
+                                            <linearGradient id="colorFuelCost" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
+                                        <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false}
+                                            axisLine={{ stroke: '#4b5563' }} interval={Math.ceil(dailyFuelCost.length / 8)} />
+                                        <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false}
+                                            tickFormatter={(v: number) => v >= 10000 ? `${Math.round(v / 10000)}만` : v.toLocaleString()} />
+                                        <Tooltip {...tooltipStyle} formatter={(value: any) => [`${Number(value).toLocaleString()}원`, '주유 금액']} />
+                                        <Area type="monotone" dataKey="cost" stroke="#3b82f6" strokeWidth={2} fill="url(#colorFuelCost)" />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* 하이패스 충전 추이 */}
+                    {dailyHipassAmount.length > 0 && (
+                        <div className="glass-card p-5">
+                            <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
+                                🛣️ 하이패스 충전 추이 (최근 30일)
+                            </h2>
+                            <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">
+                                서비스 전체 일별 하이패스 충전 금액
+                            </p>
+                            <div>
+                                <ResponsiveContainer width="100%" height={220} minWidth={1}>
+                                    <AreaChart data={dailyHipassAmount} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                                        <defs>
+                                            <linearGradient id="colorHipassAmt" x1="0" y1="0" x2="0" y2="1">
+                                                <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor="#14b8a6" stopOpacity={0} />
+                                            </linearGradient>
+                                        </defs>
+                                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
+                                        <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false}
+                                            axisLine={{ stroke: '#4b5563' }} interval={Math.ceil(dailyHipassAmount.length / 8)} />
+                                        <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false}
+                                            tickFormatter={(v: number) => v >= 10000 ? `${Math.round(v / 10000)}만` : v.toLocaleString()} />
+                                        <Tooltip {...tooltipStyle} formatter={(value: any) => [`${Number(value).toLocaleString()}원`, '충전 금액']} />
+                                        <Area type="monotone" dataKey="amount" stroke="#14b8a6" strokeWidth={2} fill="url(#colorHipassAmt)" />
+                                    </AreaChart>
+                                </ResponsiveContainer>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* ── 2열 그리드: 피크 시간대 | 기관 증가 추이 ── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -725,6 +1531,117 @@ export default function ServiceDashboard() {
                 )}
             </div>
 
+            {/* ── 알림 활용 현황 ── */}
+            {notifSummary && (
+                <div className="glass-card p-5">
+                    <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-4">
+                        🔔 알림 활용 현황
+                    </h2>
+
+                    {/* 요약 카드 */}
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                        <div className="text-center p-4 bg-surface-50 dark:bg-surface-800 rounded-xl">
+                            <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">
+                                {notifSummary.total.toLocaleString()}
+                                <span className="text-sm font-normal ml-0.5">건</span>
+                            </p>
+                            <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">총 알림 발송</p>
+                        </div>
+                        <div className="text-center p-4 bg-surface-50 dark:bg-surface-800 rounded-xl">
+                            <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                                {notifSummary.read.toLocaleString()}
+                                <span className="text-sm font-normal ml-0.5">건</span>
+                            </p>
+                            <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">읽음</p>
+                        </div>
+                        <div className="text-center p-4 bg-surface-50 dark:bg-surface-800 rounded-xl">
+                            <p className="text-2xl font-bold text-rose-600 dark:text-rose-400">
+                                {notifSummary.unread.toLocaleString()}
+                                <span className="text-sm font-normal ml-0.5">건</span>
+                            </p>
+                            <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">미읽음</p>
+                        </div>
+                        <div className="text-center p-4 bg-surface-50 dark:bg-surface-800 rounded-xl">
+                            <p className={`text-2xl font-bold ${notifSummary.readRate >= 70 ? 'text-emerald-600 dark:text-emerald-400' : notifSummary.readRate >= 40 ? 'text-amber-600 dark:text-amber-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                                {notifSummary.readRate}
+                                <span className="text-sm font-normal ml-0.5">%</span>
+                            </p>
+                            <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">읽음률</p>
+                        </div>
+                    </div>
+
+                    {/* 일별 알림 추이 */}
+                    {dailyNotifStats.length > 0 && (
+                        <div className="mb-6">
+                            <h3 className="text-sm font-medium text-surface-600 dark:text-surface-300 mb-2">📊 일별 알림 추이 (최근 30일)</h3>
+                            <ResponsiveContainer width="100%" height={220} minWidth={1}>
+                                <AreaChart data={dailyNotifStats} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                                    <defs>
+                                        <linearGradient id="colorNotifSent" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#818cf8" stopOpacity={0.4} />
+                                            <stop offset="95%" stopColor="#818cf8" stopOpacity={0.05} />
+                                        </linearGradient>
+                                        <linearGradient id="colorNotifRead" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="5%" stopColor="#34d399" stopOpacity={0.4} />
+                                            <stop offset="95%" stopColor="#34d399" stopOpacity={0.05} />
+                                        </linearGradient>
+                                    </defs>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
+                                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false}
+                                        axisLine={{ stroke: '#4b5563' }} interval={Math.ceil(dailyNotifStats.length / 8)} />
+                                    <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false} allowDecimals={false} />
+                                    <Tooltip {...tooltipStyle}
+                                        content={({ active, payload, label }: any) => {
+                                            if (!active || !payload?.length) return null;
+                                            const data = payload[0]?.payload;
+                                            if (!data) return null;
+                                            const rate = data.sent > 0 ? Math.round((data.read / data.sent) * 100) : 0;
+                                            return (
+                                                <div style={{ background: '#1f2937', border: '1px solid #374151', borderRadius: 8, padding: '10px 14px', fontSize: 13 }}>
+                                                    <p style={{ color: '#e5e7eb', fontWeight: 600, marginBottom: 6 }}>{label}</p>
+                                                    <p style={{ color: '#818cf8', margin: '3px 0' }}>📨 발송: <b>{data.sent}건</b></p>
+                                                    <p style={{ color: '#34d399', margin: '3px 0' }}>✅ 읽음: <b>{data.read}건</b></p>
+                                                    <p style={{ color: '#9ca3af', margin: '3px 0' }}>읽음률: <b>{rate}%</b></p>
+                                                </div>
+                                            );
+                                        }} />
+                                    <Legend formatter={(value: string) => value === 'sent' ? '📨 발송' : '✅ 읽음'}
+                                        wrapperStyle={{ fontSize: '13px', color: '#9ca3af' }} />
+                                    <Area type="monotone" dataKey="sent" stackId="notif" stroke="#818cf8" strokeWidth={2} fill="url(#colorNotifSent)" />
+                                    <Area type="monotone" dataKey="read" stackId="notif" stroke="#34d399" strokeWidth={2} fill="url(#colorNotifRead)" />
+                                </AreaChart>
+                            </ResponsiveContainer>
+                        </div>
+                    )}
+
+                    {/* 알림 타입별 분포 */}
+                    {notifTypeStats.length > 0 && (
+                        <div>
+                            <h3 className="text-sm font-medium text-surface-600 dark:text-surface-300 mb-3">📋 알림 타입별 분포</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                {notifTypeStats.map(item => {
+                                    const maxCount = Math.max(...notifTypeStats.map(d => d.count), 1);
+                                    return (
+                                        <div key={item.type}>
+                                            <div className="flex items-center justify-between mb-1">
+                                                <span className="text-sm text-surface-600 dark:text-surface-300">{item.type}</span>
+                                                <span className="text-sm font-semibold text-surface-800 dark:text-surface-100">{item.count}건</span>
+                                            </div>
+                                            <div className="h-4 bg-surface-100 dark:bg-surface-700 rounded-full overflow-hidden">
+                                                <div
+                                                    className="h-full rounded-full transition-all duration-500"
+                                                    style={{ width: `${(item.count / maxCount) * 100}%`, backgroundColor: item.color }}
+                                                />
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* ── 운행 밀도 히트맵 (요일 × 시간대) ── */}
             <div className="glass-card p-5">
                 <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
@@ -734,36 +1651,7 @@ export default function ServiceDashboard() {
                 <HeatmapGrid data={heatmapData} />
             </div>
 
-            {/* ── 신규 승인 기관 차트 (날짜별) ── */}
-            {approvalChartData.length > 0 && (
-                <div className="glass-card p-5">
-                    <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
-                        🆕 신규 승인 기관
-                    </h2>
-                    <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">
-                        날짜별 신규 승인된 기관 수 (최근 30일간)
-                    </p>
-                    <div>
-                        <ResponsiveContainer width="100%" height={256} minWidth={1}>
-                            <AreaChart data={approvalChartData} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                                <defs>
-                                    <linearGradient id="colorApproval" x1="0" y1="0" x2="0" y2="1">
-                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
-                                    </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-                                <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false}
-                                    axisLine={{ stroke: '#4b5563' }}
-                                    interval={approvalChartData.length > 15 ? Math.ceil(approvalChartData.length / 8) : 0} />
-                                <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} allowDecimals={false} />
-                                <Tooltip {...tooltipStyle} formatter={(value: any) => [`${value}개`, '승인 기관']} />
-                                <Area type="monotone" dataKey="count" stroke="#10b981" strokeWidth={2} fill="url(#colorApproval)" />
-                            </AreaChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-            )}
+
 
             {/* ── 3열 그리드: 평균 주행시간 차트 ── */}
             <div className="glass-card p-5">
@@ -845,34 +1733,6 @@ export default function ServiceDashboard() {
                 )}
             </div>
 
-            {/* ── 비활성 기관 경고 ── */}
-            {inactiveOrgs.length > 0 && (
-                <div className="glass-card p-5 border-l-4 border-l-amber-500 dark:border-l-amber-400">
-                    <h2 className="text-lg font-semibold text-amber-700 dark:text-amber-300 mb-1 flex items-center gap-2">
-                        ⚠️ 비활성 기관 ({inactiveOrgs.length}개)
-                    </h2>
-                    <p className="text-xs text-surface-400 dark:text-surface-500 mb-3">
-                        최근 30일간 운행 기록이 없는 기관 (사용자 1명 이상)
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                        {inactiveOrgs.slice(0, 20).map(org => (
-                            <span key={org.id}
-                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/50">
-                                <span className="w-2 h-2 rounded-full bg-amber-400" />
-                                {org.name}
-                                <span className="text-amber-400 dark:text-amber-500">
-                                    {org.lastDriveDate ? `${Math.floor((Date.now() - org.lastDriveDate.getTime()) / 86400000)}일 전` : '운행 없음'}
-                                </span>
-                            </span>
-                        ))}
-                        {inactiveOrgs.length > 20 && (
-                            <span className="text-xs text-surface-400 dark:text-surface-500 self-center">
-                                +{inactiveOrgs.length - 20}개 더
-                            </span>
-                        )}
-                    </div>
-                </div>
-            )}
 
             {/* ── 기관별 활성도 ── */}
             {topOrgs.length > 0 && (() => {
@@ -961,6 +1821,116 @@ export default function ServiceDashboard() {
                     </div>
                 );
             })()}
+
+            {/* ── 기관 위치 지도 ── */}
+            {topOrgs.filter(o => o.lat && o.lng).length > 0 && (
+                <Suspense fallback={
+                    <div className="glass-card p-5">
+                        <div className="flex items-center justify-center py-10 gap-2 text-sm text-surface-400">
+                            <div className="w-4 h-4 spinner" /> 지도 로딩 중...
+                        </div>
+                    </div>
+                }>
+                    <OrgMapView orgs={topOrgs.filter(o => o.lat && o.lng).map(o => ({ id: o.id, name: o.name, address: o.address, lat: o.lat, lng: o.lng }))} />
+                </Suspense>
+            )}
+
+            {/* 좌표 없는 기관 리스트 + 수동 입력 */}
+            {topOrgs.filter(o => o.address && (!o.lat || !o.lng)).length > 0 && (
+                <div className="glass-card p-5">
+                    <div className="flex items-center justify-between mb-4">
+                        <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200">
+                            📡 좌표 미등록 기관 ({topOrgs.filter(o => o.address && (!o.lat || !o.lng)).length}개)
+                        </h2>
+                        <button
+                            className="px-3 py-1.5 text-xs font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors disabled:opacity-50"
+                            onClick={async (e) => {
+                                const btn = e.currentTarget;
+                                btn.disabled = true;
+                                btn.textContent = '변환 중...';
+                                try {
+                                    const functions = getFunctions(app, 'asia-northeast3');
+                                    const backfill = httpsCallable(functions, 'backfillOrgCoords');
+                                    const result: any = await backfill();
+                                    btn.textContent = `✅ ${result.data.updated}개 완료`;
+                                    setTimeout(() => window.location.reload(), 2000);
+                                } catch (err: any) {
+                                    btn.textContent = '❌ 실패';
+                                    alert('자동 변환 실패: ' + err.message);
+                                    btn.disabled = false;
+                                }
+                            }}
+                        >
+                            전체 자동 변환
+                        </button>
+                    </div>
+                    <div className="space-y-3">
+                        {topOrgs.filter(o => o.address && (!o.lat || !o.lng)).map(org => (
+                            <div key={org.id} className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 bg-surface-50 dark:bg-surface-800 rounded-xl">
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-surface-800 dark:text-surface-200 truncate">{org.name}</p>
+                                    <p className="text-xs text-surface-400 truncate">{org.address}</p>
+                                </div>
+                                <form
+                                    className="flex items-center gap-2 shrink-0"
+                                    onSubmit={async (e) => {
+                                        e.preventDefault();
+                                        const form = e.currentTarget;
+                                        const latInput = form.querySelector<HTMLInputElement>('input[name="lat"]')!;
+                                        const lngInput = form.querySelector<HTMLInputElement>('input[name="lng"]')!;
+                                        const btn = form.querySelector<HTMLButtonElement>('button')!;
+                                        const lat = parseFloat(latInput.value);
+                                        const lng = parseFloat(lngInput.value);
+                                        if (!lat || !lng || lat < 33 || lat > 43 || lng < 124 || lng > 132) {
+                                            alert('올바른 한국 좌표를 입력하세요.\n위도: 33~43, 경도: 124~132');
+                                            return;
+                                        }
+                                        btn.disabled = true;
+                                        btn.textContent = '저장 중...';
+                                        try {
+                                            await updateDoc(doc(db, 'organizations', org.id), { lat, lng });
+                                            btn.textContent = '✅';
+                                            setTimeout(() => window.location.reload(), 1000);
+                                        } catch (err: any) {
+                                            btn.textContent = '❌';
+                                            alert('저장 실패: ' + err.message);
+                                            btn.disabled = false;
+                                        }
+                                    }}
+                                >
+                                    <input name="lat" type="number" step="any" placeholder="위도 (lat)" className="w-24 px-2 py-1.5 text-xs rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-700 text-surface-800 dark:text-surface-200" />
+                                    <input name="lng" type="number" step="any" placeholder="경도 (lng)" className="w-24 px-2 py-1.5 text-xs rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-700 text-surface-800 dark:text-surface-200" />
+                                    <button type="submit" className="px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:opacity-50">
+                                        저장
+                                    </button>
+                                </form>
+                            </div>
+                        ))}
+                    </div>
+                    <p className="text-xs text-surface-400 mt-3">
+                        💡 Google Maps에서 주소를 검색한 후 좌표를 복사하여 입력하세요
+                    </p>
+                </div>
+            )}
+
+            {/* 주소 없는 기관 표시 */}
+            {topOrgs.filter(o => !o.address).length > 0 && (
+                <div className="glass-card p-4">
+                    <p className="text-sm text-surface-500 dark:text-surface-400 mb-2">
+                        ⚠️ 주소 미등록 기관 ({topOrgs.filter(o => !o.address).length}개)
+                    </p>
+                    <div className="space-y-1">
+                        {topOrgs.filter(o => !o.address).map(org => (
+                            <p key={org.id} className="text-xs text-surface-400 pl-4">
+                                • {org.name}
+                            </p>
+                        ))}
+                    </div>
+                    <p className="text-xs text-surface-400 mt-2">
+                        기관 관리에서 해당 기관의 주소를 입력하면 좌표 변환이 가능합니다.
+                    </p>
+                </div>
+            )}
         </div>
     );
 }

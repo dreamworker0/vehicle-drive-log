@@ -21,6 +21,7 @@ export default function DriveLogList() {
     const [dupState, setDupState] = useState<string>('idle'); // idle | scanning | result | cleaning
     const [dupResult, setDupResult] = useState<any>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [includeHipass, setIncludeHipass] = useState(false);
     const now = new Date();
     const firstDay = toLocalDateStr(new Date(now.getFullYear(), now.getMonth(), 1));
     const lastDay = toLocalDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 0));
@@ -132,7 +133,16 @@ export default function DriveLogList() {
                         {filteredLogs.length}건 · 총 {totalDistance.toLocaleString()} km
                     </p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-wrap">
+                    <label className="flex items-center gap-1.5 text-xs text-surface-500 dark:text-surface-400 cursor-pointer select-none">
+                        <input
+                            type="checkbox"
+                            checked={includeHipass}
+                            onChange={e => setIncludeHipass(e.target.checked)}
+                            className="rounded border-surface-300 dark:border-surface-600 text-primary-600 focus:ring-primary-500 w-3.5 h-3.5"
+                        />
+                        하이패스 포함
+                    </label>
                     <button
                         onClick={async () => {
                             setDupState('scanning');
@@ -180,6 +190,7 @@ export default function DriveLogList() {
                             const { downloadDriveLogsExcel } = await import('../../lib/excelExport');
                             await downloadDriveLogsExcel(filteredLogs, `운행일지_${period}`, {
                                 onError: (msg) => showToast(msg, 'warning'),
+                                includeHipass,
                             });
                         }}
                         disabled={filteredLogs.length === 0}
@@ -214,6 +225,7 @@ export default function DriveLogList() {
                                 orgName: org?.name || '',
                                 period,
                                 approvalLine: useApproval,
+                                includeHipass,
                                 onError: (msg) => showToast(msg, 'error'),
                             });
                         }}
@@ -359,13 +371,13 @@ export default function DriveLogList() {
             ) : (
                 <div className="space-y-2">
                     {/* 헤더 (데스크탑) */}
-                    <div className="hidden sm:grid gap-2 px-4 py-2 text-xs font-medium text-surface-400" style={{ gridTemplateColumns: '80px 70px 100px 1fr 60px 60px 100px 40px 80px 40px' }}>
+                    <div className="hidden sm:grid gap-2 px-4 py-2 text-xs font-medium text-surface-400" style={{ gridTemplateColumns: '80px 60px 60px 70px 100px 1fr 100px 40px 80px 40px' }}>
                         <div>날짜</div>
+                        <div>출발</div>
+                        <div>도착</div>
                         <div>운전자</div>
                         <div>차량</div>
                         <div>목적지</div>
-                        <div>출발</div>
-                        <div>도착</div>
                         <div>출발/도착Km</div>
                         <div className="text-center">인원</div>
                         <div className="text-right">주행거리</div>
@@ -419,9 +431,15 @@ export default function DriveLogList() {
                                 </div>
 
                                 {/* 데스크탑 */}
-                                <div className="hidden sm:grid gap-2 items-center" style={{ gridTemplateColumns: '80px 70px 100px 1fr 60px 60px 100px 40px 80px 40px' }}>
+                                <div className="hidden sm:grid gap-2 items-center" style={{ gridTemplateColumns: '80px 60px 60px 70px 100px 1fr 100px 40px 80px 40px' }}>
                                     <div>
                                         <p className="text-sm text-surface-900 dark:text-surface-100">{date}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-mono text-surface-500 dark:text-surface-400">{log.startTime || '-'}</p>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-mono text-surface-500 dark:text-surface-400">{log.endTime || '-'}</p>
                                     </div>
                                     <div>
                                         <p className="text-sm text-surface-900 dark:text-surface-100 truncate">{log.driverName || '(이름 없음)'}</p>
@@ -431,12 +449,6 @@ export default function DriveLogList() {
                                     </div>
                                     <div>
                                         <p className="text-sm text-surface-600 dark:text-surface-400 truncate">{log.destination || '-'}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-mono text-surface-500 dark:text-surface-400">{log.startTime || '-'}</p>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-mono text-surface-500 dark:text-surface-400">{log.endTime || '-'}</p>
                                     </div>
                                     <div>
                                         <p className="text-xs font-mono text-surface-500 dark:text-surface-400">

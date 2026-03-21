@@ -1,10 +1,16 @@
 import { useNavigate } from 'react-router-dom';
+import SEOHead from '../common/SEOHead';
 
 export default function TermsPage() {
     const navigate = useNavigate();
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-surface-50 to-primary-50 py-8 px-4">
+            <SEOHead
+                title="이용약관"
+                description="차량 운행일지 서비스 이용약관입니다."
+                path="/terms"
+            />
             <div className="w-full max-w-2xl mx-auto animate-fade-in">
                 {/* 뒤로가기 */}
                 <button

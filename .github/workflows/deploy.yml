@@ -2,12 +2,15 @@ name: Deploy — 프로덕션 배포
 
 on:
   push:
-    branches: [main]
+    branches: [master]
+  workflow_dispatch:
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      TZ: "Asia/Seoul"
 
     steps:
       - uses: actions/checkout@v4
@@ -24,13 +27,18 @@ jobs:
       - name: Install functions dependencies
         run: cd functions && npm ci
 
+      - name: Create .env files
+        run: |
+          echo "${{ secrets.ENV_FILE }}" > .env
+          echo "${{ secrets.FUNCTIONS_ENV_FILE }}" > functions/.env
+
       - name: Build
         run: npm run build
 
       - name: Unit tests
         run: npx vitest run
 
-      - name: Deploy to Firebase
+      - name: Deploy Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
@@ -39,4 +47,7 @@ jobs:
           projectId: vehicle-drive-log
 
       - name: Deploy Functions & Rules
-        run: npx firebase-tools deploy --only functions,firestore:rules,storage --force --token "${{ secrets.FIREBASE_TOKEN }}"
+        run: |
+          export GOOGLE_APPLICATION_CREDENTIALS=$(mktemp)
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > $GOOGLE_APPLICATION_CREDENTIALS
+          npx firebase-tools deploy --only functions,firestore:rules --force --project vehicle-drive-log

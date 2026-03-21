@@ -85,7 +85,7 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
             try {
                 console.log('📋 승인된 기관 데이터:', JSON.stringify(app));
                 if (app.applicantEmail) {
-                    await sendApprovalEmail(app.applicantEmail, app.name, inviteCode);
+                    await sendApprovalEmail(app.applicantEmail, app.name, inviteCode, app.applicantName);
                     console.log('📧 수동 승인 이메일 발송 완료');
                 } else {
                     console.warn('⚠️ 신청자 이메일이 없어서 이메일을 보낼 수 없습니다');
@@ -96,6 +96,20 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
                 showToast(`승인은 완료되었지만, 이메일 발송에 실패했습니다.\n초대코드: ${inviteCode}`, 'warning');
             }
 
+            // 알림톡 발송 (실패해도 승인은 유지)
+            try {
+                if (app.applicantPhone) {
+                    const { getFunctions, httpsCallable } = await import('firebase/functions');
+                    const functions = getFunctions(undefined, 'asia-northeast3');
+                    const sendAlimtalk = httpsCallable(functions, 'sendManualApprovalAlimtalk');
+                    await sendAlimtalk({ orgId: app.id });
+                    console.log('📱 수동 승인 알림톡 발송 완료');
+                } else {
+                    console.warn('⚠️ 신청자 전화번호가 없어서 알림톡을 보낼 수 없습니다');
+                }
+            } catch (alimtalkErr) {
+                console.warn('알림톡 발송 실패 (승인은 완료됨):', alimtalkErr);
+            }
 
         } catch (err) {
             console.error('승인 실패:', err);

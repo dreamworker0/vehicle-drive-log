@@ -6,11 +6,13 @@
  */
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from './useAuth';
-import { getDriveLogs, getVehicles, getOrganizationMembers, getMaintenanceRecords } from '../lib/firestore';
+import { getDriveLogs, getVehicles, getOrganizationMembers, getMaintenanceRecords, getFuelLogs, getAllHipassCharges } from '../lib/firestore';
 import type { DriveLog } from '../types/driveLog';
 import type { Vehicle } from '../types/vehicle';
 import type { User } from '../types/user';
 import type { MaintenanceRecord } from '../types/maintenance';
+import type { FuelLog } from '../types/fuelLog';
+import type { HipassCharge } from '../types/hipassCharge';
 import {
     MONTH_LABELS, getLogDate, getRecentMonthKeys, getWorkdaysInMonth,
     calcMonthlyTrend, calcHeatmapData, detectAnomalies,
@@ -27,6 +29,8 @@ export default function useAnalytics() {
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
     const [members, setMembers] = useState<User[]>([]);
     const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>([]);
+    const [fuelLogs, setFuelLogs] = useState<FuelLog[]>([]);
+    const [hipassCharges, setHipassCharges] = useState<HipassCharge[]>([]);
     const [loading, setLoading] = useState(true);
     const [rangeMonths, setRangeMonths] = useState(6); // 기본 6개월
 
@@ -35,16 +39,25 @@ export default function useAnalytics() {
         const fetchAll = async () => {
             setLoading(true);
             try {
-                const [l, v, m, mr] = await Promise.all([
-                    getDriveLogs(orgId, { limit: 2000 }).then(r => r.docs),
+                // rangeMonths + 1개월 여유를 두고 서버 쿼리에 기간 필터 적용
+                const sinceDate = new Date();
+                sinceDate.setMonth(sinceDate.getMonth() - rangeMonths - 1);
+                sinceDate.setDate(1); // 해당 월의 1일부터
+
+                const [l, v, m, mr, fl, hc] = await Promise.all([
+                    getDriveLogs(orgId, { limit: 2000, since: sinceDate }).then(r => r.docs),
                     getVehicles(orgId),
                     getOrganizationMembers(orgId),
                     getMaintenanceRecords(orgId),
+                    getFuelLogs(orgId).catch(() => []),
+                    getAllHipassCharges(orgId).catch(() => []),
                 ]);
                 setLogs(l as DriveLog[]);
                 setVehicles(v as Vehicle[]);
                 setMembers((m as User[]).filter(u => u.role !== 'superAdmin'));
                 setMaintenanceRecords(mr as MaintenanceRecord[]);
+                setFuelLogs(fl as FuelLog[]);
+                setHipassCharges(hc as HipassCharge[]);
             } catch (err) {
                 console.error('분석 데이터 로드 실패:', err);
             } finally {
@@ -52,7 +65,7 @@ export default function useAnalytics() {
             }
         };
         fetchAll();
-    }, [orgId]);
+    }, [orgId, rangeMonths]);
 
     // 월별 키 목록
     const monthKeys = useMemo(() => getRecentMonthKeys(rangeMonths), [rangeMonths]);
@@ -199,6 +212,58 @@ export default function useAnalytics() {
     /** 비정상 운행 탐지 */
     const anomalies = useMemo(() => detectAnomalies(filteredLogs), [filteredLogs]);
 
+    /** 월별 주유비 + 하이패스 충전비 + 정비비 트렌드 */
+    const costTrend = useMemo(() => {
+        // 주유비 월별 집계
+        const fuelByMonth: Record<string, number> = {};
+        fuelLogs.forEach(l => {
+            if (!l.date) return;
+            const mk = l.date.slice(0, 7);
+            if (!monthKeys.includes(mk)) return;
+            if (!fuelByMonth[mk]) fuelByMonth[mk] = 0;
+            fuelByMonth[mk] += l.fuelCost || 0;
+        });
+
+        // 하이패스 충전비 월별 집계
+        const hipassByMonth: Record<string, number> = {};
+        hipassCharges.forEach(l => {
+            if (!l.date) return;
+            const mk = l.date.slice(0, 7);
+            if (!monthKeys.includes(mk)) return;
+            if (!hipassByMonth[mk]) hipassByMonth[mk] = 0;
+            hipassByMonth[mk] += l.chargeAmount || 0;
+        });
+
+        // 정비비 월별 집계
+        const maintByMonth: Record<string, number> = {};
+        maintenanceRecords.forEach(r => {
+            if (!r.date) return;
+            const mk = r.date.slice(0, 7);
+            if (!monthKeys.includes(mk)) return;
+            if (!maintByMonth[mk]) maintByMonth[mk] = 0;
+            maintByMonth[mk] += r.cost || 0;
+        });
+
+        return monthKeys.map(mk => {
+            const monthNum = parseInt(mk.split('-')[1], 10);
+            const fuel = fuelByMonth[mk] || 0;
+            const hipass = hipassByMonth[mk] || 0;
+            const maint = maintByMonth[mk] || 0;
+            return {
+                label: MONTH_LABELS[monthNum - 1],
+                fuelCost: fuel,
+                hipassCost: hipass,
+                maintenanceCost: maint,
+                totalCost: fuel + hipass + maint,
+            };
+        });
+    }, [fuelLogs, hipassCharges, maintenanceRecords, monthKeys]);
+
+    const totalFuelCost = useMemo(() => costTrend.reduce((s, c) => s + c.fuelCost, 0), [costTrend]);
+    const totalHipassCost = useMemo(() => costTrend.reduce((s, c) => s + c.hipassCost, 0), [costTrend]);
+    const totalMaintenanceCost = useMemo(() => costTrend.reduce((s, c) => s + c.maintenanceCost, 0), [costTrend]);
+    const totalOperatingCost = useMemo(() => totalFuelCost + totalHipassCost + totalMaintenanceCost, [totalFuelCost, totalHipassCost, totalMaintenanceCost]);
+
     /** 최적화 추천 카드 생성 */
     const recommendations = useMemo(() => {
         const items: Array<{ type: string; icon: string; priority: string; title: string; desc: string }> = [];
@@ -302,6 +367,12 @@ export default function useAnalytics() {
         maintenanceCostAnalysis,
         anomalies,
         recommendations,
+        // 주유/하이패스/정비 비용 트렌드
+        costTrend,
+        totalFuelCost,
+        totalHipassCost,
+        totalMaintenanceCost,
+        totalOperatingCost,
         // 원시 통계
         totalLogs: filteredLogs.length,
         totalVehicles: vehicles.length,

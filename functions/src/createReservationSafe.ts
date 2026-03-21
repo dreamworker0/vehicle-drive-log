@@ -7,7 +7,7 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 const db = getFirestore();
 
 export const createReservationSafe = onCall(
-    { region: "asia-northeast3" },
+    { region: "asia-northeast3", enforceAppCheck: true },
     async (request) => {
         if (!request.auth) {
             throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
@@ -27,6 +27,7 @@ export const createReservationSafe = onCall(
             routeDistance,
             routeDuration,
             routeTollFee,
+            groupId,
         } = request.data;
 
         if (!organizationId || !vehicleId || !date || !startTime || !endTime) {
@@ -81,6 +82,7 @@ export const createReservationSafe = onCall(
                     routeDistance: routeDistance || null,
                     routeDuration: routeDuration || null,
                     routeTollFee: routeTollFee || null,
+                    ...(groupId ? { groupId } : {}),
                     status: "reserved",
                     createdAt: FieldValue.serverTimestamp(),
                 });

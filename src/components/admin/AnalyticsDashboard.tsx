@@ -13,24 +13,47 @@ const RANGE_OPTIONS = [
     { value: 12, label: '1년' },
 ];
 
+/** 금액을 한국어 표기로 포맷 (원 → 만원 단위) */
+function formatCost(amount: number): string {
+    if (amount <= 0) return '-';
+    if (amount < 10000) return `${amount.toLocaleString()}원`;
+    const man = amount / 10000;
+    if (man < 100) {
+        // 1만~99만: 소수 1자리 (0이면 정수)
+        const formatted = man % 1 === 0 ? `${Math.round(man)}` : `${Math.round(man * 10) / 10}`;
+        return `${formatted}만`;
+    }
+    return `${Math.round(man)}만`;
+}
+
 interface StatMiniProps {
     icon: string;
     value: string | number;
     label: string;
+    sub?: string;
     color: string;
+    onClick?: () => void;
 }
 
-function StatMini({ icon, value, label, color }: StatMiniProps) {
+function StatMini({ icon, value, label, sub, color, onClick }: StatMiniProps) {
     return (
-        <div className="glass-card p-4 relative overflow-hidden group hover:shadow-lg transition-shadow duration-300">
+        <div
+            className={`glass-card p-4 relative overflow-hidden group hover:shadow-lg transition-shadow duration-300 ${onClick ? 'cursor-pointer hover:scale-[1.02] active:scale-[0.98]' : ''}`}
+            onClick={onClick}
+            role={onClick ? 'button' : undefined}
+            tabIndex={onClick ? 0 : undefined}
+            onKeyDown={onClick ? (e) => { if (e.key === 'Enter') onClick(); } : undefined}
+        >
             <div className={`absolute -top-4 -right-4 w-16 h-16 rounded-full opacity-10 ${color}`} />
             <div className="flex items-center gap-3">
                 <span className="text-2xl">{icon}</span>
                 <div>
                     <p className="text-xl font-bold text-surface-900 dark:text-surface-100">{value}</p>
                     <p className="text-xs text-surface-400">{label}</p>
+                    {sub && <p className="text-[10px] text-surface-500 dark:text-surface-500 mt-0.5">{sub}</p>}
                 </div>
             </div>
+            {onClick && <span className="absolute bottom-1 right-2 text-[9px] text-surface-400 opacity-0 group-hover:opacity-100 transition-opacity">클릭하여 보기 →</span>}
         </div>
     );
 }
@@ -40,10 +63,14 @@ export default function AnalyticsDashboard() {
         loading, rangeMonths, setRangeMonths,
         monthlyTrend, driverComparison, vehicleUtilization, heatmapData,
         fuelEfficiency, maintenanceCostAnalysis, anomalies, recommendations,
+        costTrend, totalFuelCost, totalHipassCost, totalMaintenanceCost, totalOperatingCost,
         totalLogs, totalVehicles, totalMembers,
     } = useAnalytics();
 
     const [activeTab, setActiveTab] = useState('trend');
+
+    // 총 운행 거리 계산
+    const totalDistance = monthlyTrend.reduce((s, m) => s + (m.distance || 0), 0);
 
     if (loading) {
         return (
@@ -78,11 +105,12 @@ export default function AnalyticsDashboard() {
             </div>
 
             {/* 요약 통계 */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-                <StatMini icon="📊" value={totalLogs} label="분석 기간 운행" color="bg-primary-400" />
-                <StatMini icon="🚗" value={totalVehicles} label="등록 차량" color="bg-accent-400" />
-                <StatMini icon="👤" value={totalMembers} label="등록 직원" color="bg-amber-400" />
-                <StatMini icon="💡" value={recommendations.length} label="최적화 추천" color="bg-purple-400" />
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+                <StatMini icon="📊" value={`${totalLogs}건`} label="분석 기간 운행" sub={totalDistance > 0 ? `총 ${totalDistance.toLocaleString()}km` : undefined} color="bg-primary-400" />
+                <StatMini icon="🚗" value={totalVehicles} label="등록 차량" sub={`직원 ${totalMembers}명`} color="bg-accent-400" />
+                <StatMini icon="⛽" value={formatCost(totalFuelCost)} label="총 주유비" sub={totalFuelCost > 0 ? `${totalFuelCost.toLocaleString()}원` : undefined} color="bg-amber-400" />
+                <StatMini icon="🛣️" value={formatCost(totalHipassCost)} label="하이패스 충전" sub={totalHipassCost > 0 ? `${totalHipassCost.toLocaleString()}원` : undefined} color="bg-purple-400" />
+                <StatMini icon="💡" value={recommendations.length} label="최적화 추천" sub="연료·정비·가동률 개선 제안" color="bg-rose-400" onClick={() => setActiveTab('cost')} />
             </div>
 
             {/* 탭 */}
@@ -111,6 +139,7 @@ export default function AnalyticsDashboard() {
                     driverComparison={driverComparison}
                     vehicleUtilization={vehicleUtilization}
                     heatmapData={heatmapData}
+                    costTrend={costTrend}
                 />
             ) : (
                 <CostOptimization
@@ -118,6 +147,11 @@ export default function AnalyticsDashboard() {
                     maintenanceCostAnalysis={maintenanceCostAnalysis}
                     anomalies={anomalies}
                     recommendations={recommendations}
+                    costTrend={costTrend}
+                    totalFuelCost={totalFuelCost}
+                    totalHipassCost={totalHipassCost}
+                    totalMaintenanceCost={totalMaintenanceCost}
+                    totalOperatingCost={totalOperatingCost}
                 />
             )}
         </div>

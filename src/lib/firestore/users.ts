@@ -41,3 +41,20 @@ export const getOrganizationMembers = async (orgId: string) => {
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
 };
+
+// 전체 기관별 유효 멤버 수 조회 (미활성 기관 판별용)
+export const getOrgMemberCounts = async (): Promise<Record<string, number>> => {
+    const snap = await getDocs(collection(db, 'users'));
+    const counts: Record<string, number> = {};
+    snap.docs.forEach(d => {
+        const data = d.data();
+        const orgId = data.organizationId;
+        if (!orgId) return;
+        if (!counts[orgId]) counts[orgId] = 0;
+        // 이름이 있고 '-'가 아닌 사용자만 유효 멤버로 카운트
+        if (data.name && data.name !== '-') {
+            counts[orgId]++;
+        }
+    });
+    return counts;
+};

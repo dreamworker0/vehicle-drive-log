@@ -1,3 +1,5 @@
+import { getAuthHeaders } from './authFetch';
+
 const TMAP_API_KEY = import.meta.env.VITE_TMAP_API_KEY;
 
 // 차종(vehicleType) → T-Map carType 매핑
@@ -53,7 +55,9 @@ export const geocode = async (address: string) => {
     try {
         let data;
         if (import.meta.env.PROD) {
-            const res = await fetch(`/api/tmap?action=geocode&address=${encodeURIComponent(address)}`);
+            const res = await fetch(`/api/tmap?action=geocode&address=${encodeURIComponent(address)}`, {
+                headers: await getAuthHeaders(),
+            });
             data = await res.json();
         } else {
             const res = await fetch(`/api/tmap/geo/fullAddrGeo?version=1&format=json&coordType=WGS84GEO&fullAddr=${encodeURIComponent(address)}`, {
@@ -86,7 +90,9 @@ const searchPOI = async (keyword: string) => {
     try {
         let data;
         if (import.meta.env.PROD) {
-            const res = await fetch(`/api/tmap?action=poi&keyword=${encodeURIComponent(keyword)}`);
+            const res = await fetch(`/api/tmap?action=poi&keyword=${encodeURIComponent(keyword)}`, {
+                headers: await getAuthHeaders(),
+            });
             data = await res.json();
         } else {
             const res = await fetch(`/api/tmap/pois?version=1&format=json&searchKeyword=${encodeURIComponent(keyword)}&resCoordType=WGS84GEO&reqCoordType=WGS84GEO&count=1`, {
@@ -116,7 +122,7 @@ const searchPOI = async (keyword: string) => {
  * @param {number} endLat - 도착지 위도
  * @returns {Promise<{distance: number, duration: number, tollFee: number, fuelCost: number} | null>}
  */
-export const getRoute = async (startLon: number, startLat: number, endLon: number, endLat: number, { carType = '0' } = {}) => {
+export const getRoute = async (startLon: number, startLat: number, endLon: number, endLat: number, { carType = '0', searchOption = '0' } = {}) => {
     if (isTmapCoolingDown()) return null;
     if (!import.meta.env.PROD && !TMAP_API_KEY) return null;
 
@@ -127,7 +133,7 @@ export const getRoute = async (startLon: number, startLat: number, endLon: numbe
         endY: endLat.toString(),
         reqCoordType: 'WGS84GEO',
         resCoordType: 'WGS84GEO',
-        searchOption: '0',
+        searchOption,
         carType,
     };
 
@@ -136,7 +142,7 @@ export const getRoute = async (startLon: number, startLat: number, endLon: numbe
         if (import.meta.env.PROD) {
             const res = await fetch('/api/tmap?action=route', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
                 body: JSON.stringify(routeBody),
             });
             data = await res.json();
@@ -185,7 +191,7 @@ export const parseDestinations = (text: string) => {
  * @param {string} endAddress - 도착지 주소
  * @returns {Promise<{distance: number, duration: number, tollFee: number, startCoord: object, endCoord: object} | null>}
  */
-export const getRouteByAddress = async (startAddress: string, endAddress: string, { carType = '0' } = {}) => {
+export const getRouteByAddress = async (startAddress: string, endAddress: string, { carType = '0', searchOption = '0' } = {}) => {
     if (!startAddress?.trim() || !endAddress?.trim()) return null;
 
     const [startCoord, endCoord] = await Promise.all([
@@ -195,7 +201,7 @@ export const getRouteByAddress = async (startAddress: string, endAddress: string
 
     if (!startCoord || !endCoord) return null;
 
-    const route = await getRoute(startCoord.lon, startCoord.lat, endCoord.lon, endCoord.lat, { carType });
+    const route = await getRoute(startCoord.lon, startCoord.lat, endCoord.lon, endCoord.lat, { carType, searchOption });
     if (!route) return null;
 
     return {
@@ -216,13 +222,13 @@ export const getRouteByAddress = async (startAddress: string, endAddress: string
  *   - duration: 편도 합산 분 (복귀 제외 → calcEndTime 호환)
  *   - tollFee: 전체 합산 톨비
  */
-export const getMultiRoute = async (origin: string, destinationText: string, { carType = '0' } = {}) => {
+export const getMultiRoute = async (origin: string, destinationText: string, { carType = '0', searchOption = '0' } = {}) => {
     const dests = parseDestinations(destinationText);
     if (dests.length === 0 || !origin?.trim()) return null;
 
     // 단일 목적지 → 기존과 동일
     if (dests.length === 1) {
-        const result = await getRouteByAddress(origin, dests[0], { carType });
+        const result = await getRouteByAddress(origin, dests[0], { carType, searchOption });
         if (!result) return null;
         return { ...result, isMulti: false };
     }
@@ -237,7 +243,7 @@ export const getMultiRoute = async (origin: string, destinationText: string, { c
     for (let i = 0; i < coords.length; i++) {
         const from = coords[i]!;
         const to = coords[(i + 1) % coords.length]!; // 마지막은 origin으로 복귀
-        const seg = await getRoute(from.lon, from.lat, to.lon, to.lat, { carType });
+        const seg = await getRoute(from.lon, from.lat, to.lon, to.lat, { carType, searchOption });
         if (!seg) return null;
         segments.push({
             from: allAddresses[i],
@@ -406,3 +412,34 @@ export const getRouteInfo = async (destination: string) => {
     }
 };
 
+/**
+ * 기존(추천) 경로와 무료도로 경로를 병렬 조회
+ * @returns 기존 결과 + freeRoadRoute (무료도로 결과가 다를 때만 포함)
+ */
+export const getMultiRouteWithFreeRoad = async (
+    origin: string,
+    destinationText: string,
+    { carType = '0' } = {},
+) => {
+    const [normal, freeRoad] = await Promise.all([
+        getMultiRoute(origin, destinationText, { carType, searchOption: '0' }),
+        getMultiRoute(origin, destinationText, { carType, searchOption: '1' }),
+    ]);
+
+    if (!normal) return null;
+
+    // 무료도로 결과가 있고, 거리 또는 톨비가 다르면 포함
+    const isDifferent = freeRoad && (
+        Math.floor(freeRoad.distance) !== Math.floor(normal.distance) ||
+        (freeRoad.tollFee || 0) !== (normal.tollFee || 0)
+    );
+
+    return {
+        ...normal,
+        freeRoadRoute: isDifferent ? {
+            distance: freeRoad!.distance,
+            duration: freeRoad!.duration,
+            tollFee: freeRoad!.tollFee || 0,
+        } : undefined,
+    };
+};

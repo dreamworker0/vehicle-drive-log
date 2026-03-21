@@ -51,10 +51,11 @@ interface TrendChartsProps {
     driverComparison: any[];
     vehicleUtilization: any[];
     heatmapData: { grid: Record<number, Record<number, number>>; maxCount: number };
+    costTrend: { label: string; fuelCost: number; hipassCost: number; totalCost: number }[];
 }
 
 export default function TrendCharts({
-    monthlyTrend, driverComparison, vehicleUtilization, heatmapData,
+    monthlyTrend, driverComparison, vehicleUtilization, heatmapData, costTrend,
 }: TrendChartsProps) {
     const recentDrivers = driverComparison.slice(0, 10); // 상위 10명
     const monthLabels = recentDrivers[0]?.monthLabels || [];
@@ -125,6 +126,29 @@ export default function TrendCharts({
                     <p className="text-surface-400 text-center py-8">차량 데이터가 없습니다</p>
                 )}
             </div>
+
+            {/* 월별 비용 추이 (주유비 + 하이패스) */}
+            {costTrend.some(c => c.totalCost > 0) && (
+                <div className="glass-card p-5">
+                    <SectionTitle icon="💰" title="월별 비용 추이 (주유비 + 하이패스)" />
+                    <ResponsiveContainer width="100%" height={280} minWidth={1} minHeight={1}>
+                        <BarChart data={costTrend} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                            <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+                            <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`} />
+                            <Tooltip
+                                formatter={(value: any, name: any) => [
+                                    `${Number(value).toLocaleString()}원`,
+                                    name === 'fuelCost' ? '주유비' : '하이패스',
+                                ]}
+                            />
+                            <Legend formatter={(v) => v === 'fuelCost' ? '주유비' : '하이패스 충전'} wrapperStyle={{ fontSize: 12 }} />
+                            <Bar dataKey="fuelCost" name="fuelCost" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                            <Bar dataKey="hipassCost" name="hipassCost" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                        </BarChart>
+                    </ResponsiveContainer>
+                </div>
+            )}
 
             {/* 운행 밀도 히트맵 */}
             <div className="glass-card p-5">

@@ -86,7 +86,7 @@ export default function FavoritesManager() {
         <div className="max-w-lg mx-auto animate-fade-in">
             <div className="flex items-center justify-between mb-4">
                 <div>
-                    <h1 className="text-lg font-bold text-surface-900 dark:text-surface-100">즐겨찾기 관리</h1>
+                    <h1 className="text-lg font-bold text-surface-900 dark:text-surface-100">목적지 즐겨찾기</h1>
                     <p className="text-sm text-surface-500 dark:text-surface-400">자주 가는 목적지를 관리합니다</p>
                 </div>
                 <button
@@ -141,7 +141,7 @@ export default function FavoritesManager() {
                 <div className="space-y-2">
                     {favorites.map(fav => (
                         <div key={fav.id} className="glass-card p-4 flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-amber-50 flex items-center justify-center text-lg flex-shrink-0">
+                            <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center text-lg flex-shrink-0">
                                 ⭐
                             </div>
                             <div className="flex-1 min-w-0">

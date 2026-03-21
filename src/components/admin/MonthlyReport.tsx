@@ -55,7 +55,8 @@ export default function MonthlyReport() {
         activePeriod, setPeriod,
         filteredLogs, stats, driverData, vehicleData, purposeData,
         vehicleFuelData, dailyTrendData, dayOfWeekData, hourlyData,
-        exportExcel,
+        fuelLogStats, hipassChargeStats, costTrendData,
+        exportExcel, exportPdf,
     } = useMonthlyReport();
 
     const [activeTab, setActiveTab] = useState('charts');
@@ -69,17 +70,26 @@ export default function MonthlyReport() {
     }
 
     return (
-        <div className="max-w-5xl mx-auto animate-fade-in">
+        <div id="monthly-report-print" className="max-w-5xl mx-auto animate-fade-in">
             {/* 헤더 */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
                 <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100">운행 통계 보고서</h1>
-                <button
-                    onClick={exportExcel}
-                    disabled={filteredLogs.length === 0}
-                    className="btn-secondary btn-sm text-xs"
-                >
-                    📥 엑셀 다운로드
-                </button>
+                <div className="flex gap-2">
+                    <button
+                        onClick={exportPdf}
+                        disabled={filteredLogs.length === 0}
+                        className="btn-secondary btn-sm text-xs"
+                    >
+                        🖨️ PDF 인쇄
+                    </button>
+                    <button
+                        onClick={exportExcel}
+                        disabled={filteredLogs.length === 0}
+                        className="btn-secondary btn-sm text-xs"
+                    >
+                        📥 엑셀 다운로드
+                    </button>
+                </div>
             </div>
 
             {/* 빠른 기간 선택 */}
@@ -114,7 +124,7 @@ export default function MonthlyReport() {
             </div>
 
             {/* 요약 카드 */}
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mb-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
                 <StatCard
                     icon="🚗" value={stats.totalRuns} label="총 운행 횟수"
                     change={stats.runsChange} sub={`일 평균 ${stats.avgDailyRuns}건`} color="bg-primary-400"
@@ -124,8 +134,12 @@ export default function MonthlyReport() {
                     change={stats.distanceChange} sub={`건당 평균 ${stats.avgDistance.toLocaleString()}km`} color="bg-accent-400"
                 />
                 <StatCard
-                    icon="⛽" value={stats.totalFuel ? stats.totalFuel.toLocaleString() : '-'}
-                    label="주유/충전비 (원)" change={stats.fuelChange} color="bg-amber-400"
+                    icon="⛽" value={fuelLogStats.totalCost ? fuelLogStats.totalCost.toLocaleString() : '-'}
+                    label="주유비 (원)" sub={fuelLogStats.count > 0 ? `${fuelLogStats.count}건 · ${fuelLogStats.totalAmount.toLocaleString()}L` : ''} color="bg-amber-400"
+                />
+                <StatCard
+                    icon="🛣️" value={hipassChargeStats.totalAmount ? hipassChargeStats.totalAmount.toLocaleString() : '-'}
+                    label="하이패스 충전 (원)" sub={hipassChargeStats.count > 0 ? `${hipassChargeStats.count}건` : ''} color="bg-purple-400"
                 />
             </div>
 
@@ -164,6 +178,9 @@ export default function MonthlyReport() {
                             hourlyData={hourlyData}
                             vehicleFuelData={vehicleFuelData}
                             dailyTrendData={dailyTrendData}
+                            fuelLogStats={fuelLogStats}
+                            hipassChargeStats={hipassChargeStats}
+                            costTrendData={costTrendData}
                         />
                     ) : (
                         <ReportTables

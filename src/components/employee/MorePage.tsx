@@ -31,6 +31,7 @@ export default function MorePage() {
     });
     const [showInsurance, setShowInsurance] = useState(false);
     const [insuranceVehicles, setInsuranceVehicles] = useState<Vehicle[]>([]);
+
     const notifApiAvailable = typeof window !== 'undefined' && 'Notification' in window;
 
     useEffect(() => {
@@ -62,7 +63,7 @@ export default function MorePage() {
             <div className="glass-card divide-y divide-surface-100 dark:divide-surface-700">
                 <button onClick={() => navigate('/employee/favorites')} className="w-full flex items-center gap-3 p-4 hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors text-left">
                     <svg className="w-5 h-5 text-surface-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" /></svg>
-                    <span className="text-sm text-surface-700 dark:text-surface-300">즐겨찾기 관리</span>
+                    <span className="text-sm text-surface-700 dark:text-surface-300">목적지 즐겨찾기</span>
                 </button>
                 <button onClick={() => navigate('/employee/vehicle-history')} className="w-full flex items-center gap-3 p-4 hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors text-left">
                     <svg className="w-5 h-5 text-surface-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 0 0-10.026 0 1.106 1.106 0 0 0-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" /></svg>
@@ -135,6 +136,7 @@ export default function MorePage() {
                         <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform duration-300 ${isDark ? 'translate-x-6' : 'translate-x-1'}`} />
                     </button>
                 </div>
+
                 {/* 내비게이션 앱 선택 */}
                 <div className="flex items-center justify-between p-4">
                     <div className="flex items-start gap-3">
@@ -168,7 +170,7 @@ export default function MorePage() {
             {/* 제작자 정보 */}
             <div className="mt-6 flex items-center justify-center gap-2 text-xs text-surface-400">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5" /></svg>
-                <span>제작자: 김종원</span><span>·</span>
+                <span>제작자: 소셜프리즘</span><span>·</span>
                 <a href="mailto:ehsheh@gmail.com" className="text-primary-500 hover:text-primary-700 transition-colors">ehsheh@gmail.com</a>
             </div>
 

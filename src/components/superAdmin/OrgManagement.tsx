@@ -1,9 +1,10 @@
 /**
  * OrgManagement — 기관 관리 페이지
  * 활성 기관 카드: OrgCard, 삭제된 기관 카드: DeletedOrgCard 서브 컴포넌트 사용
+ * 멤버 데이터는 기관 카드를 펼칠 때 레이지 로딩
  */
-import { useState, useEffect } from 'react';
-import { getApprovedOrganizations, deleteOrganization, getDeletedOrganizations, restoreOrganization, permanentDeleteOrganization, getOrganizationMembers, updateUser, leaveOrganization, updateOrganization } from '../../lib/firestore';
+import { useState, useEffect, useCallback } from 'react';
+import { getApprovedOrganizations, deleteOrganization, getDeletedOrganizations, restoreOrganization, permanentDeleteOrganization, getOrganizationMembers, updateUser, leaveOrganization, updateOrganization, getOrgMemberCounts } from '../../lib/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useToast } from '../../hooks/useToast';
 import { useConfirm } from '../../contexts/ConfirmContext';
@@ -16,35 +17,34 @@ export default function OrgManagement() {
     const [deletedOrgs, setDeletedOrgs] = useState<Organization[]>([]);
     const [loading, setLoading] = useState(true);
     const [membersMap, setMembersMap] = useState<Record<string, any[]>>({});
+    const [memberCountMap, setMemberCountMap] = useState<Record<string, number>>({});
+    const [loadingMembers, setLoadingMembers] = useState<Record<string, boolean>>({});
     const [expandedOrg, setExpandedOrg] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
     const [changingRole, setChangingRole] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'active' | 'inactive' | 'deleted'>('active');
     const [deletingOrgId, setDeletingOrgId] = useState<string | null>(null);
+    const [sendingReminder, setSendingReminder] = useState(false);
     const { showToast } = useToast();
     const { confirm } = useConfirm();
 
     const fetchOrganizations = async () => {
         setLoading(true);
         try {
-            const [orgs, deleted] = await Promise.all([
+            const [orgs, deleted, counts] = await Promise.all([
                 getApprovedOrganizations(),
                 getDeletedOrganizations().catch((err: any) => {
                     console.warn('삭제된 기관 목록 로드 실패 (인덱스 빌드 중일 수 있음):', err);
                     return [];
                 }),
+                getOrgMemberCounts().catch((err: any) => {
+                    console.warn('멤버 수 조회 실패:', err);
+                    return {};
+                }),
             ]);
             setOrganizations(orgs as Organization[]);
             setDeletedOrgs(deleted as Organization[]);
-
-            const mMap: Record<string, any[]> = {};
-            await Promise.all(
-                (orgs as Organization[]).map(async (org) => {
-                    const members = await getOrganizationMembers(org.id);
-                    mMap[org.id] = members as any[];
-                })
-            );
-            setMembersMap(mMap);
+            setMemberCountMap(counts);
         } catch (err) {
             console.error('기관 목록 로드 실패:', err);
         } finally {
@@ -52,9 +52,34 @@ export default function OrgManagement() {
         }
     };
 
+    // 특정 기관의 멤버를 레이지 로드
+    const loadMembers = useCallback(async (orgId: string) => {
+        if (membersMap[orgId] || loadingMembers[orgId]) return;
+        setLoadingMembers(prev => ({ ...prev, [orgId]: true }));
+        try {
+            const members = await getOrganizationMembers(orgId);
+            setMembersMap(prev => ({ ...prev, [orgId]: members as any[] }));
+        } catch (err) {
+            console.error('멤버 로드 실패:', err);
+        } finally {
+            setLoadingMembers(prev => ({ ...prev, [orgId]: false }));
+        }
+    }, [membersMap, loadingMembers]);
+
     useEffect(() => {
         fetchOrganizations();
     }, []);
+
+    // 기관 카드 토글 시 멤버 레이지 로드
+    const toggleExpand = useCallback((orgId: string) => {
+        setExpandedOrg(prev => {
+            const next = prev === orgId ? null : orgId;
+            if (next && !membersMap[orgId]) {
+                loadMembers(orgId);
+            }
+            return next;
+        });
+    }, [membersMap, loadMembers]);
 
     const handleDelete = async (org: Organization) => {
         if (!await confirm({ message: `${org.name} 기관을 삭제하시겠습니까?\n\n• 30일 내 복구 가능합니다.\n• 소속 직원은 기능 접근이 차단됩니다.`, confirmColor: 'danger' })) return;
@@ -167,8 +192,31 @@ export default function OrgManagement() {
         }
     };
 
-    const toggleExpand = (orgId: string) => {
-        setExpandedOrg(prev => prev === orgId ? null : orgId);
+    const handleSendBulkReminder = async () => {
+        if (!await confirm({
+            title: '📢 일괄 알림톡 발송',
+            message: `미활성 기관 ${inactiveOrgs.length}곳에 리마인드 알림톡을 발송하시겠습니까?\n\n각 기관의 신청자 연락처로 카카오 알림톡이 전송됩니다.`,
+            confirmText: '발송',
+        })) return;
+
+        setSendingReminder(true);
+        try {
+            const sendBulkReminder = httpsCallable(getFunctions(undefined, 'asia-northeast3'), 'sendBulkReminder');
+            const result = await sendBulkReminder();
+            const data = result.data as { sentCount: number; failCount: number; noPhoneCount: number };
+
+            const parts = [];
+            if (data.sentCount > 0) parts.push(`성공 ${data.sentCount}건`);
+            if (data.failCount > 0) parts.push(`실패 ${data.failCount}건`);
+            if (data.noPhoneCount > 0) parts.push(`번호없음 ${data.noPhoneCount}건`);
+
+            showToast(`알림톡 발송 완료: ${parts.join(', ')}`, data.failCount > 0 ? 'warning' : 'success');
+        } catch (err: any) {
+            console.error('일괄 알림톡 발송 실패:', err);
+            showToast(err?.message || '발송에 실패했습니다.', 'error');
+        } finally {
+            setSendingReminder(false);
+        }
     };
 
     if (loading) {
@@ -179,15 +227,19 @@ export default function OrgManagement() {
         );
     }
 
-    // 직원 0명 기관 (익명 계정 제외)
-    const inactiveOrgs = organizations.filter(org => {
-        const members = membersMap[org.id] || [];
-        const visible = members.filter(m => m.name && m.name !== '-');
-        return visible.length === 0;
-    });
+    // 직원 1명 이상 = 활성 기관, 0명 = 미활성 기관 (페이지 로드 시 일괄 조회한 memberCountMap 기반)
+    // 활성 기관은 생성일(createdAt) 최신순 정렬
+    const activeOrgs = organizations
+        .filter(org => memberCountMap[org.id] > 0)
+        .sort((a, b) => {
+            const aTime = (a as any).createdAt?.toDate?.()?.getTime?.() ?? (a as any).createdAt ?? 0;
+            const bTime = (b as any).createdAt?.toDate?.()?.getTime?.() ?? (b as any).createdAt ?? 0;
+            return bTime - aTime; // 최신순
+        });
+    const inactiveOrgs = organizations.filter(org => !memberCountMap[org.id] || memberCountMap[org.id] === 0);
 
     // 검색 기준 목록 결정
-    const baseOrgs = activeTab === 'inactive' ? inactiveOrgs : organizations;
+    const baseOrgs = activeTab === 'active' ? activeOrgs : activeTab === 'inactive' ? inactiveOrgs : organizations;
 
     // 검색 필터
     const filteredOrgs = baseOrgs.filter(org => {
@@ -218,7 +270,7 @@ export default function OrgManagement() {
                     className={`flex-1 py-2 px-4 rounded-lg text-sm font-medium transition-all
                         ${activeTab === 'active' ? 'bg-white dark:bg-surface-700 text-surface-900 dark:text-surface-100 shadow-sm' : 'text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:text-surface-300'}`}
                 >
-                    활성 기관 ({organizations.length})
+                    활성 기관 ({activeOrgs.length})
                 </button>
                 <button
                     onClick={() => setActiveTab('inactive')}
@@ -254,6 +306,31 @@ export default function OrgManagement() {
                 </div>
             )}
 
+            {/* 미활성 기관 일괄 알림톡 발송 버튼 */}
+            {activeTab === 'inactive' && inactiveOrgs.length > 0 && (
+                <div className="mb-4">
+                    <button
+                        onClick={handleSendBulkReminder}
+                        disabled={sendingReminder}
+                        className="w-full py-3 px-4 rounded-xl text-sm font-semibold transition-all
+                            bg-amber-500 hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-500 text-white
+                            disabled:opacity-50 disabled:cursor-not-allowed
+                            flex items-center justify-center gap-2"
+                    >
+                        {sendingReminder ? (
+                            <>
+                                <div className="w-4 h-4 spinner" />
+                                발송 중...
+                            </>
+                        ) : (
+                            <>
+                                📢 미활성 기관 일괄 알림톡 발송 ({inactiveOrgs.length}곳)
+                            </>
+                        )}
+                    </button>
+                </div>
+            )}
+
             {/* 활성/미활성 기관 탭 */}
             {(activeTab === 'active' || activeTab === 'inactive') && (
                 baseOrgs.length === 0 ? (
@@ -278,14 +355,16 @@ export default function OrgManagement() {
                         <p className="text-surface-400 font-medium">검색 결과가 없습니다</p>
                     </div>
                 ) : (
-                    <div className="grid gap-4">
+                    <div className="grid gap-2">
                         {filteredOrgs.map((org) => (
                             <OrgCard
                                 key={org.id}
                                 org={org}
                                 members={membersMap[org.id] || []}
+                                memberCount={memberCountMap[org.id] || 0}
                                 isExpanded={expandedOrg === org.id}
                                 changingRole={changingRole}
+                                loadingMembers={loadingMembers[org.id] || false}
                                 onToggle={toggleExpand}
                                 onDelete={handleDelete}
                                 onEditOrg={handleEditOrg}
@@ -306,7 +385,7 @@ export default function OrgManagement() {
                         <p className="text-surface-400 font-medium">삭제된 기관이 없습니다</p>
                     </div>
                 ) : (
-                    <div className="grid gap-4">
+                    <div className="grid gap-2">
                         {deletedOrgs.map((org) => (
                             <DeletedOrgCard
                                 key={org.id}

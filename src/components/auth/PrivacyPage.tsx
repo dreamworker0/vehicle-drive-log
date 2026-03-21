@@ -1,10 +1,16 @@
 import { useNavigate } from 'react-router-dom';
+import SEOHead from '../common/SEOHead';
 
 export default function PrivacyPage() {
     const navigate = useNavigate();
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-surface-50 to-primary-50 py-8 px-4">
+            <SEOHead
+                title="개인정보 처리방침"
+                description="차량 운행일지 서비스의 개인정보 수집·이용·보호에 관한 방침입니다."
+                path="/privacy"
+            />
             <div className="w-full max-w-2xl mx-auto animate-fade-in">
                 {/* 뒤로가기 */}
                 <button

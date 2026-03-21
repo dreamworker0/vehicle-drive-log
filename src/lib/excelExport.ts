@@ -26,13 +26,14 @@ interface ExcelDriveLog {
     startKm?: number;
     endKm?: number;
     passengerCount?: number;
-    fuelAmount?: number;
-    energyCost?: number;
+    hipassCardNumber?: string;
+    hipassBalanceBefore?: number;
+    hipassBalanceAfter?: number;
     notes?: string;
     [key: string]: unknown;
 }
 
-export async function downloadDriveLogsExcel(logs: ExcelDriveLog[], filename = '운행일지', { onError }: { onError?: (msg: string) => void } = {}) {
+export async function downloadDriveLogsExcel(logs: ExcelDriveLog[], filename = '운행일지', { onError, includeHipass = false }: { onError?: (msg: string) => void; includeHipass?: boolean } = {}) {
     if (!logs || logs.length === 0) {
         onError?.('다운로드할 데이터가 없습니다.');
         return false;
@@ -48,42 +49,54 @@ export async function downloadDriveLogsExcel(logs: ExcelDriveLog[], filename = '
             ? log.timestamp.toDate().toISOString().slice(0, 10)
             : '-');
 
-        return {
+        const row: Record<string, string | number> = {
             '날짜': dateStr,
-            '운전자': log.driverName || '',
-            '차량': log.vehicleDisplayName || log.vehicleName || '',
             '출발시각': log.startTime || log.departureTime || '',
             '도착시각': log.endTime || log.arrivalTime || '',
+            '운전자': log.driverName || '',
+            '차량': log.vehicleDisplayName || log.vehicleName || '',
             '목적지': log.destination || '',
             '사용목적': log.purpose || '',
             '출발Km': log.departureKm ?? log.startKm ?? '',
             '도착Km': log.arrivalKm ?? log.endKm ?? '',
             '주행거리(km)': distance > 0 ? distance : '',
             '탑승인원': log.passengerCount ?? '',
-            '주유/충전금액': (log.fuelAmount || log.energyCost) ? Number(log.fuelAmount || log.energyCost) : '',
-            '비고': log.notes || '',
         };
+
+        if (includeHipass) {
+            row['하이패스카드'] = log.hipassCardNumber || '';
+            row['사용전금액'] = log.hipassBalanceBefore != null ? log.hipassBalanceBefore : '';
+            row['사용후금액'] = log.hipassBalanceAfter != null ? log.hipassBalanceAfter : '';
+        }
+
+        row['비고'] = log.notes || '';
+        return row;
     });
 
     // 워크시트 생성
     const ws = XLSX.utils.json_to_sheet(rows);
 
     // 열 너비 설정
-    ws['!cols'] = [
+    const cols = [
         { wch: 12 },  // 날짜
-        { wch: 10 },  // 운전자
-        { wch: 14 },  // 차량
         { wch: 8 },   // 출발시각
         { wch: 8 },   // 도착시각
+        { wch: 10 },  // 운전자
+        { wch: 14 },  // 차량
         { wch: 20 },  // 목적지
         { wch: 14 },  // 사용목적
         { wch: 10 },  // 출발Km
         { wch: 10 },  // 도착Km
         { wch: 12 },  // 주행거리
         { wch: 8 },   // 탑승인원
-        { wch: 12 },  // 주유/충전금액
-        { wch: 20 },  // 비고
     ];
+    if (includeHipass) {
+        cols.push({ wch: 20 });  // 하이패스카드
+        cols.push({ wch: 12 });  // 사용전금액
+        cols.push({ wch: 12 });  // 사용후금액
+    }
+    cols.push({ wch: 20 });  // 비고
+    ws['!cols'] = cols;
 
     // 워크북 생성 및 다운로드
     const wb = XLSX.utils.book_new();
@@ -223,5 +236,71 @@ export async function downloadFuelLogsExcel(
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '주유기록');
+    XLSX.writeFile(wb, `${filename}.xlsx`);
+}
+
+/**
+ * 하이패스 충전 기록 엑셀 다운로드용 인터페이스
+ */
+interface ExcelHipassCharge {
+    date?: string;
+    createdAt?: unknown;
+    vehicleName?: string;
+    chargerName?: string;
+    cardNumber?: string;
+    chargeAmount?: number;
+    balanceBefore?: number;
+    balanceAfter?: number;
+}
+
+/**
+ * 하이패스 충전 기록 데이터를 엑셀 파일로 다운로드
+ */
+export async function downloadHipassChargesExcel(
+    records: ExcelHipassCharge[],
+    filename = '하이패스충전기록',
+    { onError }: { onError?: (msg: string) => void } = {},
+) {
+    if (!records || records.length === 0) {
+        onError?.('다운로드할 데이터가 없습니다.');
+        return false;
+    }
+
+    const XLSX = await import('xlsx');
+
+    const rows = records.map((rec) => {
+        let timeStr = '';
+        if (rec.createdAt) {
+            const ca = rec.createdAt as any;
+            const d = ca instanceof Date ? ca : ca?.toDate?.() || null;
+            if (d) timeStr = d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
+        }
+        return {
+            '날짜': rec.date || '',
+            '시각': timeStr,
+            '충전자': rec.chargerName || '',
+            '차량': rec.vehicleName || '',
+            '하이패스 카드': rec.cardNumber || '',
+            '충전금액(원)': rec.chargeAmount ? rec.chargeAmount : '',
+            '충전전잔액(원)': rec.balanceBefore != null ? rec.balanceBefore : '',
+            '충전후잔액(원)': rec.balanceAfter != null ? rec.balanceAfter : '',
+        };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(rows);
+
+    ws['!cols'] = [
+        { wch: 12 },  // 날짜
+        { wch: 8 },   // 시각
+        { wch: 10 },  // 충전자
+        { wch: 14 },  // 차량
+        { wch: 20 },  // 하이패스 카드
+        { wch: 12 },  // 충전금액
+        { wch: 14 },  // 충전전잔액
+        { wch: 14 },  // 충전후잔액
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '하이패스충전기록');
     XLSX.writeFile(wb, `${filename}.xlsx`);
 }

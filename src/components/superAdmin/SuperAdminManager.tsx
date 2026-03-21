@@ -111,7 +111,7 @@ export default function SuperAdminManager() {
                 ) : (
                     admins.map(admin => (
                         <div key={admin.id} className="px-4 py-4 flex items-center gap-3">
-                            <div className="w-9 h-9 bg-amber-100 rounded-full flex items-center justify-center flex-shrink-0">
+                            <div className="w-9 h-9 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center flex-shrink-0">
                                 <span className="text-amber-600 text-sm font-bold">⚡</span>
                             </div>
                             <div className="flex-1 min-w-0">
@@ -126,7 +126,7 @@ export default function SuperAdminManager() {
                             {admin.id !== user?.uid && (
                                 <button
                                     onClick={() => handleRemove(admin)}
-                                    className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 px-2 py-1 rounded-lg transition-colors flex-shrink-0"
+                                    className="text-xs text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 dark:hover:text-red-400 px-2 py-1 rounded-lg transition-colors flex-shrink-0"
                                 >
                                     제거
                                 </button>

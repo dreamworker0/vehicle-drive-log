@@ -110,8 +110,8 @@ export default function VehicleManager() {
             {/* 정비 중 / 폐차 사유 표시 */}
             {(vehicle.fuelType === 'electric' || vehicle.googleCalendarId || isVehicleBlocked(vehicle.maintenance) || isRetired) && (
                 <div className="mt-2 flex items-center gap-3 text-xs text-surface-400">
-                    {vehicle.fuelType === 'electric' && (
-                        <span className="flex items-center gap-1">🔋 {vehicle.currentBattery ?? '-'}%</span>
+                    {vehicle.fuelType === 'electric' && vehicle.currentBattery != null && (
+                        <span className="flex items-center gap-1">🔋 {vehicle.currentBattery}%</span>
                     )}
                     {vehicle.googleCalendarId && (
                         <span className="text-primary-500">📅 캘린더 연동</span>

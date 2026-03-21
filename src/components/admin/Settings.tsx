@@ -316,7 +316,7 @@ export default function Settings() {
                     </div>
                     <div className="flex-1">
                         <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">개발자에게 의견남기기</p>
-                        <p className="text-xs text-surface-400">김종원 · ehsheh@gmail.com</p>
+                        <p className="text-xs text-surface-400">소셜프리즘 · ehsheh@gmail.com</p>
                     </div>
                     <svg className="w-4 h-4 text-surface-300" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />

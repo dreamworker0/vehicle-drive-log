@@ -88,13 +88,14 @@ export default function useEmployeeManager() {
 
     const handleCopyInviteCode = async () => {
         if (!organization?.inviteCode) return;
+        const inviteLink = `https://vehicle-drive-log.web.app?code=${organization.inviteCode}`;
         try {
-            await navigator.clipboard.writeText(organization.inviteCode);
+            await navigator.clipboard.writeText(inviteLink);
             setInviteCodeCopied(true);
             setTimeout(() => setInviteCodeCopied(false), 2000);
         } catch {
             const textArea = document.createElement('textarea');
-            textArea.value = organization.inviteCode;
+            textArea.value = inviteLink;
             document.body.appendChild(textArea);
             textArea.select();
             document.execCommand('copy');

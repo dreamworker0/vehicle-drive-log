@@ -1,13 +1,17 @@
 name: CI — 린트 · 테스트 · 빌드
 
 on:
+  push:
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 jobs:
   ci:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      TZ: "Asia/Seoul"
 
     steps:
       - uses: actions/checkout@v4
@@ -23,6 +27,15 @@ jobs:
 
       - name: Install functions dependencies
         run: cd functions && npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Create .env file
+        run: echo "${{ secrets.ENV_FILE }}" > .env
 
       - name: Build
         run: npm run build

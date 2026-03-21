@@ -13,6 +13,8 @@ vi.mock('../../lib/firestore', () => ({
     getVehicles: vi.fn().mockResolvedValue([]),
     getOrganizationMembers: vi.fn().mockResolvedValue([]),
     getMaintenanceRecords: vi.fn().mockResolvedValue([]),
+    getFuelLogs: vi.fn().mockResolvedValue([]),
+    getAllHipassCharges: vi.fn().mockResolvedValue([]),
 }));
 
 import useAnalytics from '../../hooks/useAnalytics';

@@ -27,13 +27,26 @@ src/
 │   ├── dateUtils.ts    ← 날짜 포맷·계산 헬퍼
 │   ├── tmap.ts         ← Tmap API 연동
 │   ├── ocr.ts          ← OCR Cloud Function 호출
-│   ├── pdfExport.ts    ← PDF 내보내기
+│   ├── pdfExport.ts    ← 운행일지 PDF 내보내기
+│   ├── pdfStyles.ts    ← PDF 공통 스타일
+│   ├── dailyLogPdfExport.ts ← 일일 운행일지 PDF
+│   ├── fuelLogPdfExport.ts  ← 주유 기록 PDF
+│   ├── hipassChargePdfExport.ts ← 하이패스 충전 PDF
+│   ├── maintenancePdfExport.ts  ← 정비 기록 PDF
 │   ├── excelExport.ts  ← Excel 내보내기
 │   ├── emailService.ts ← EmailJS 연동
 │   ├── holidayApi.ts   ← 공휴일 API
+│   ├── holiday.ts      ← 공휴일 헬퍼
 │   ├── inAppBrowser.ts ← 인앱 브라우저 감지·안내
 │   ├── sentry.ts       ← Sentry 초기화
-│   └── lazyWithRetry.ts← Lazy loading 재시도 유틸
+│   ├── lazyWithRetry.ts← Lazy loading 재시도 유틸
+│   ├── offlineQueue.ts ← 오프라인 큐 (PWA 지원)
+│   ├── tokenRefresh.ts ← 토큰 갱신 유틸
+│   ├── vehicleUtils.ts ← 차량 유틸리티
+│   ├── timelineUtils.ts← 타임라인 유틸리티
+│   ├── faqData.ts      ← FAQ 데이터
+│   ├── manualSections.ts← 사용 설명서 섹션 데이터
+│   └── releaseNotes.ts ← 릴리스 노트 데이터
 ├── contexts/           ← React Context (AuthContext, ConfirmContext, ThemeContext, FontSizeContext)
 ├── index.css           ← TailwindCSS + 커스텀 스타일
 ├── App.tsx             ← 역할별 라우팅
@@ -65,6 +78,13 @@ src/
 | `useQuickDriveStart` | 예약 없이 바로 운행 시작 |
 | `useBackButton` | 모바일 뒤로가기 처리 |
 | `useForceLightMode` | 랜딩/인증 페이지 강제 라이트 모드 |
+| `useDailyLog` | 일일 운행일지 관리 |
+| `useFuelLog` | 주유 기록 관리 |
+| `useFuelLogAdmin` | 주유 기록 관리자 기능 |
+| `useHipassCharge` | 하이패스 충전 기록 관리 |
+| `useHipassChargeAdmin` | 하이패스 충전 관리자 기능 |
+| `useHipassManager` | 하이패스 단말기 관리 CRUD |
+| `useVehiclePriority` | 차량 우선순위 관리 |
 
 > ✅ 새 기능 추가 시 **기존 훅과 역할이 겹치지 않는지** 먼저 확인한다.
 

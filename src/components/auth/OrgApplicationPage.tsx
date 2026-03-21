@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import useForceLightMode from '../../hooks/useForceLightMode';
 import useOrgApplication from '../../hooks/useOrgApplication';
+import SEOHead from '../common/SEOHead';
 
 export default function OrgApplicationPage() {
     useForceLightMode();
@@ -29,7 +30,7 @@ export default function OrgApplicationPage() {
                     <h2 className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-2">신청이 접수되었습니다!</h2>
                     <p className="text-surface-500 dark:text-surface-400 mb-6">
                         AI가 서류를 검증 중입니다.
-                        <br />승인되면 <strong className="text-surface-700 dark:text-surface-300">{form.applicantEmail}</strong>로
+                        <br />승인되면 <strong className="text-surface-700 dark:text-surface-300">{form.applicantEmail}</strong>와 카톡으로
                         <br /><strong className="text-primary-600">앱 링크와 초대 코드</strong>가 발송됩니다.
                         <br /><br />
                         <span className="text-xs">보통 1분 이내에 처리되며, 보류 시 영업일 기준 1~2일 내에 처리됩니다.</span>
@@ -45,6 +46,11 @@ export default function OrgApplicationPage() {
     // ─── 신청 폼 ───
     return (
         <div className="min-h-screen bg-gradient-to-br from-surface-50 to-primary-50 dark:from-surface-950 dark:to-surface-900 py-8 px-4">
+            <SEOHead
+                title="기관 사용 신청"
+                description="사회복지기관·비영리단체라면 무료로 차량 운행일지 서비스를 신청하세요."
+                path="/apply"
+            />
             <div className="w-full max-w-lg mx-auto animate-fade-in">
                 {/* 뒤로가기 */}
                 <button
@@ -161,6 +167,22 @@ export default function OrgApplicationPage() {
                             />
                             <p className="text-xs text-surface-400 dark:text-surface-500 mt-2">
                                 ※ 사회복지시설신고증은 증빙서류로 인정되지 않습니다. 고유번호증 또는 사업자등록증을 업로드해주세요.
+                            </p>
+                        </div>
+
+                        <div>
+                            <label className="label">하고 싶은 말</label>
+                            <textarea
+                                name="message"
+                                value={form.message}
+                                onChange={handleChange}
+                                className="input min-h-[80px] resize-y"
+                                placeholder="전달하고 싶은 내용이 있으면 자유롭게 적어주세요."
+                                maxLength={500}
+                                rows={3}
+                            />
+                            <p className="text-xs text-surface-400 dark:text-surface-500 mt-1 text-right">
+                                {form.message.length}/500
                             </p>
                         </div>
                     </div>

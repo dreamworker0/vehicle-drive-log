@@ -18,6 +18,8 @@ functions/
 │   ├── autoVerifyDocument.ts        ← Firestore 트리거 (기관 신청 AI 자동 검증)
 │   ├── createReservationSafe.ts     ← onCall (서버사이드 중복 검증 예약 생성)
 │   ├── sendAdminNotice.ts           ← onCall (관리자 공지 발송)
+│   ├── sendAlimtalk.ts              ← 헬퍼 (카카오 알림톡 발송 — 승인/리마인드)
+│   ├── sendManualApprovalAlimtalk.ts← onCall (수동 승인 알림톡 발송)
 │   ├── sendNotification.ts          ← 헬퍼 (FCM 푸시 알림)
 │   ├── notifyNewApplication.ts      ← Firestore 트리거 (신규 신청 시 슈퍼관리자 푸시)
 │   │
@@ -39,10 +41,10 @@ functions/
 │   ├── disableUser.ts               ← onCall (사용자 비활성화)
 │   ├── restoreUser.ts               ← onCall (사용자 복원)
 │   ├── setCustomClaims.ts           ← Firestore 트리거 (Custom Claims 자동 동기화)
-│   ├── migrateCustomClaims.ts       ← HTTP (기존 사용자 Custom Claims 일괄 마이그레이션)
 │   ├── joinOrganization.ts          ← onCall (기관 가입 서버사이드 검증)
 │   ├── rateLimit.ts                 ← 헬퍼 (Cloud Functions 레이트 리밋)
 │   ├── cleanupCertificateImages.ts  ← 스케줄 (인증서 이미지 정리)
+│   ├── trackFirstEmployee.ts       ← Firestore 트리거 (첫 직원 가입 추적)
 │   │
 │   └── __tests__/                   ← Cloud Functions 테스트
 ├── package.json                     ← Node 22, firebase-functions v6, TypeScript

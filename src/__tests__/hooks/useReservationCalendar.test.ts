@@ -38,7 +38,7 @@ const mockGetVehicles = vi.fn().mockResolvedValue([
 const mockCancelReservation = vi.fn().mockResolvedValue({});
 const mockGetFavorites = vi.fn().mockResolvedValue([]);
 const mockCreateFavorite = vi.fn().mockResolvedValue({ id: 'fav1' });
-const mockCreateReservation = vi.fn().mockResolvedValue({ reservationId: 'res1' });
+const mockCreateReservationSafe = vi.fn().mockResolvedValue('res1');
 const mockGetReservationsByDateRange = vi.fn().mockResolvedValue([]);
 const mockGetOrganizationMembers = vi.fn().mockResolvedValue([]);
 const mockUpdateReservation = vi.fn().mockResolvedValue({});
@@ -46,7 +46,7 @@ const mockCreateNotification = vi.fn().mockResolvedValue({});
 
 vi.mock('../../lib/firestore', () => ({
     getVehicles: (...args: any[]) => mockGetVehicles(...args),
-    createReservation: (...args: any[]) => mockCreateReservation(...args),
+    createReservationSafe: (...args: any[]) => mockCreateReservationSafe(...args),
     cancelReservation: (...args: any[]) => mockCancelReservation(...args),
     cancelReservationGroup: vi.fn().mockResolvedValue(0),
     deleteReservationGroup: vi.fn().mockResolvedValue(0),
@@ -73,6 +73,8 @@ vi.mock('../../lib/tmap', () => ({
 }));
 vi.mock('../../hooks/utils/reservationUtils', () => ({
     calcEndTime: vi.fn((start: string) => start),
+    findOverlappingReservation: vi.fn().mockReturnValue(null),
+    findUserOverlappingReservation: vi.fn().mockReturnValue(null),
 }));
 
 import useReservationCalendar from '../../hooks/useReservationCalendar';

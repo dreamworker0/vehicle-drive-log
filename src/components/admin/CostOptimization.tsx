@@ -3,7 +3,7 @@
  * 연료 효율 순위, 정비비, 비정상 탐지, AI 추천
  */
 import {
-    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend,
 } from 'recharts';
 
 const PRIORITY_STYLES: Record<string, string> = {
@@ -74,20 +74,89 @@ interface Recommendation {
     priority: string;
 }
 
+interface CostTrendItem {
+    label: string;
+    fuelCost: number;
+    hipassCost: number;
+    maintenanceCost: number;
+    totalCost: number;
+}
+
 interface Props {
     fuelEfficiency: { items: FuelItem[]; avgCostPerKm: number };
     maintenanceCostAnalysis: MaintenanceCostItem[];
     anomalies: Anomaly[];
     recommendations: Recommendation[];
+    costTrend?: CostTrendItem[];
+    totalFuelCost?: number;
+    totalHipassCost?: number;
+    totalMaintenanceCost?: number;
+    totalOperatingCost?: number;
 }
 
 export default function CostOptimization({
     fuelEfficiency, maintenanceCostAnalysis, anomalies, recommendations,
+    costTrend, totalFuelCost = 0, totalHipassCost = 0, totalMaintenanceCost = 0, totalOperatingCost = 0,
 }: Props) {
     const { items: fuelItems, avgCostPerKm } = fuelEfficiency;
+    const fmt = (n: number) => n >= 10000 ? `${Math.round(n / 10000)}만` : n.toLocaleString();
 
     return (
         <div className="space-y-6">
+            {/* 종합 운영비 요약 */}
+            {totalOperatingCost > 0 && (
+                <div className="glass-card p-5">
+                    <SectionTitle icon="💰" title="종합 운영비 요약" />
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                        <div className="bg-primary-50 dark:bg-primary-900/20 rounded-xl p-3.5 text-center">
+                            <p className="text-[10px] text-primary-500 dark:text-primary-400 mb-1 font-medium">주유비</p>
+                            <p className="text-base font-bold text-primary-700 dark:text-primary-300 font-mono">{fmt(totalFuelCost)}원</p>
+                        </div>
+                        <div className="bg-emerald-50 dark:bg-emerald-900/20 rounded-xl p-3.5 text-center">
+                            <p className="text-[10px] text-emerald-500 dark:text-emerald-400 mb-1 font-medium">하이패스</p>
+                            <p className="text-base font-bold text-emerald-700 dark:text-emerald-300 font-mono">{fmt(totalHipassCost)}원</p>
+                        </div>
+                        <div className="bg-amber-50 dark:bg-amber-900/20 rounded-xl p-3.5 text-center">
+                            <p className="text-[10px] text-amber-500 dark:text-amber-400 mb-1 font-medium">정비비</p>
+                            <p className="text-base font-bold text-amber-700 dark:text-amber-300 font-mono">{fmt(totalMaintenanceCost)}원</p>
+                        </div>
+                        <div className="bg-surface-100 dark:bg-surface-800 rounded-xl p-3.5 text-center">
+                            <p className="text-[10px] text-surface-500 dark:text-surface-400 mb-1 font-medium">전체 합계</p>
+                            <p className="text-base font-bold text-surface-900 dark:text-surface-100 font-mono">{fmt(totalOperatingCost)}원</p>
+                        </div>
+                    </div>
+
+                    {/* 월별 비용 추세 차트 */}
+                    {costTrend && costTrend.length > 0 && (
+                        <>
+                            <p className="text-xs font-semibold text-surface-700 dark:text-surface-300 mb-2">월별 비용 추세</p>
+                            <ResponsiveContainer width="100%" height={220} minWidth={1} minHeight={1}>
+                                <BarChart data={costTrend} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                                    <XAxis dataKey="label" tick={{ fontSize: 11 }} />
+                                    <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => v >= 10000 ? `${v / 10000}만` : String(v)} />
+                                    <Tooltip
+                                        formatter={((value: number, name: string) => [
+                                            `${value.toLocaleString()}원`,
+                                            name === 'fuelCost' ? '주유비' : name === 'hipassCost' ? '하이패스' : '정비비',
+                                        ]) as any}
+                                        contentStyle={{ borderRadius: '8px', fontSize: '12px' }}
+                                    />
+                                    <Legend
+                                        formatter={(value: string) =>
+                                            value === 'fuelCost' ? '주유비' : value === 'hipassCost' ? '하이패스' : '정비비'
+                                        }
+                                        wrapperStyle={{ fontSize: '11px' }}
+                                    />
+                                    <Bar dataKey="fuelCost" stackId="cost" fill="#3b82f6" radius={[0, 0, 0, 0]} />
+                                    <Bar dataKey="hipassCost" stackId="cost" fill="#10b981" radius={[0, 0, 0, 0]} />
+                                    <Bar dataKey="maintenanceCost" stackId="cost" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </>
+                    )}
+                </div>
+            )}
             {/* 최적화 추천 카드 */}
             {recommendations.length > 0 && (
                 <div className="glass-card p-5">

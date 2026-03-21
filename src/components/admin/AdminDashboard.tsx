@@ -5,6 +5,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { auth } from '../../lib/firebase';
+import { refreshTokenSilently } from '../../lib/tokenRefresh';
 import { getVehicles, getOrganizationMembers, getDriveLogs, getOrganization, getTodayReservations } from '../../lib/firestore';
 import { toLocalDateStr, toLocalMonthStr } from '../../lib/dateUtils';
 import { SkeletonStatCard, SkeletonList } from '../common/Skeleton';
@@ -29,7 +31,7 @@ export default function AdminDashboard() {
         if (!userData?.organizationId) return;
         const orgId = userData.organizationId;
 
-        const fetchStats = async () => {
+        const fetchStats = async (retryCount = 0) => {
             try {
                 const todayStr = toLocalDateStr();
                 const [vehicles, members, logsResult, todayRes] = await Promise.all([
@@ -68,7 +70,29 @@ export default function AdminDashboard() {
                     } catch { /* noop */ }
                 }
             } catch (err) {
+                // Custom Claims 토큰이 아직 갱신되지 않은 경우 재시도 (최대 2회)
+                const firebaseErr = err as { code?: string; message?: string };
+                const isPermError = firebaseErr.code === 'permission-denied'
+                    || firebaseErr.message?.includes('Missing or insufficient permissions');
+
+                if (isPermError && retryCount < 2) {
+                    console.debug(`대시보드 권한 오류 — 토큰 갱신 후 재시도 (${retryCount + 1}/2)`);
+                    try { if (auth.currentUser) await refreshTokenSilently(auth.currentUser); } catch { /* noop */ }
+                    // 토큰 갱신 후 잠시 대기 (Claims 전파 시간 확보)
+                    await new Promise(r => setTimeout(r, 1500));
+                    return fetchStats(retryCount + 1);
+                }
                 console.error('대시보드 로드 실패:', err);
+
+                // 권한 오류로 데이터 로드에 실패해도 온보딩 위자드는 표시
+                // (차량/직원 0인 상태이므로 shouldShow = true)
+                if (isPermError) {
+                    setShowOnboarding(true);
+                    try {
+                        const org = await getOrganization(orgId);
+                        setInviteCode((org as any)?.inviteCode || '');
+                    } catch { /* noop */ }
+                }
             } finally {
                 setLoading(false);
             }
@@ -77,11 +101,11 @@ export default function AdminDashboard() {
     }, [userData?.organizationId]);
 
     const statCards = [
-        { label: '오늘 운행', value: `${stats.todayLogs}건`, icon: '🚗', color: 'bg-primary-50 text-primary-600' },
-        { label: '오늘 예약', value: `${stats.todayReservations}건`, icon: '📅', color: 'bg-teal-50 text-teal-600' },
-        { label: '등록 차량', value: `${stats.vehicleCount}대`, icon: '🅿️', color: 'bg-accent-50 text-accent-600' },
-        { label: '등록 직원', value: `${stats.employeeCount}명`, icon: '👤', color: 'bg-amber-50 text-amber-600' },
-        { label: '이번 달 운행', value: `${stats.monthLogs}건`, icon: '📊', color: 'bg-purple-50 text-purple-600' },
+        { label: '오늘 운행', value: `${stats.todayLogs}건`, icon: '🚗', color: 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400' },
+        { label: '오늘 예약', value: `${stats.todayReservations}건`, icon: '📅', color: 'bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400' },
+        { label: '등록 차량', value: `${stats.vehicleCount}대`, icon: '🅿️', color: 'bg-accent-50 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400' },
+        { label: '등록 직원', value: `${stats.employeeCount}명`, icon: '👤', color: 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
+        { label: '이번 달 운행', value: `${stats.monthLogs}건`, icon: '📊', color: 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' },
     ];
 
     return (

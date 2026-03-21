@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useNavigate } from 'react-router-dom';
 import { logout } from '../../lib/auth';
 import { auth } from '../../lib/firebase';
+import { refreshTokenSilently } from '../../lib/tokenRefresh';
 
 export default function InviteCodePage() {
     const { user } = useAuth();
@@ -11,6 +12,17 @@ export default function InviteCodePage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const navigate = useNavigate();
+    const autoSubmitDone = useRef(false);
+
+    // sessionStorage에서 초대 코드 자동 입력
+    useEffect(() => {
+        const savedCode = sessionStorage.getItem('pendingInviteCode');
+        if (savedCode && !autoSubmitDone.current) {
+            const cleaned = savedCode.replace(/\s/g, '').toUpperCase().slice(0, 6);
+            setCode(cleaned);
+            sessionStorage.removeItem('pendingInviteCode');
+        }
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -34,7 +46,7 @@ export default function InviteCodePage() {
             await joinOrg({ code: code.toUpperCase() });
 
             // Custom Claims 갱신을 위해 토큰 강제 리프레시
-            await auth.currentUser?.getIdToken(true);
+            if (auth.currentUser) await refreshTokenSilently(auth.currentUser);
 
             // onSnapshot이 자동으로 userData를 업데이트하므로 잠시 대기
             await new Promise(resolve => setTimeout(resolve, 1000));
@@ -50,7 +62,7 @@ export default function InviteCodePage() {
             } else {
                 setError('오류가 발생했습니다. 다시 시도해주세요.');
             }
-            console.error(err);
+            console.debug('[InviteCode] 가입 실패:', err?.message || err);
         } finally {
             setLoading(false);
         }
@@ -90,7 +102,7 @@ export default function InviteCodePage() {
                             <input
                                 type="text"
                                 value={code}
-                                onChange={(e) => setCode(e.target.value.toUpperCase().slice(0, 6))}
+                                onChange={(e) => setCode(e.target.value.replace(/\s/g, '').toUpperCase().slice(0, 6))}
                                 className="input text-center text-2xl tracking-[0.5em] font-mono uppercase"
                                 placeholder="______"
                                 maxLength={6}

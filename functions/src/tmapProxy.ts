@@ -3,17 +3,24 @@
  */
 import { onRequest } from "firebase-functions/v2/https";
 import { defineString } from "firebase-functions/params";
-import { wrapHttps, log } from "./helpers";
+import { wrapHttps, log, verifyAuthToken } from "./helpers";
 import { checkRateLimitByIp } from "./rateLimit";
+import { RATE_LIMITS } from "./constants";
 
 const TMAP_API_KEY = defineString("TMAP_API_KEY");
 
 export const tmapProxy = onRequest(
     { region: "asia-northeast3", cors: ["https://vehicle-drive-log.web.app", "https://vehicle-drive-log.firebaseapp.com"] as any },
     wrapHttps("tmapProxy", async (req, res) => {
+        // Firebase Auth 인증 검증
+        const uid = await verifyAuthToken(req);
+        if (!uid) {
+            res.status(401).json({ error: "인증이 필요합니다." });
+            return;
+        }
         // Rate Limiting: IP당 분당 30회
         const clientIp = req.ip || req.headers["x-forwarded-for"] as string || "unknown";
-        const exceeded = await checkRateLimitByIp("tmapProxy", clientIp, 30, 60);
+        const exceeded = await checkRateLimitByIp("tmapProxy", clientIp, RATE_LIMITS.tmapProxy.max, RATE_LIMITS.tmapProxy.windowSec);
         if (exceeded) {
             res.status(429).json({ error: "요청이 너무 많습니다. 잠시 후 다시 시도해주세요." });
             return;

@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react';
 import { signInWithGoogle } from '../../lib/auth';
 import { isInAppBrowser, openInExternalBrowser, copyUrlToClipboard } from '../../lib/inAppBrowser';
 import useForceLightMode from '../../hooks/useForceLightMode';
+import SEOHead from '../common/SEOHead';
 
 export default function LoginPage() {
     useForceLightMode();
@@ -46,6 +47,11 @@ export default function LoginPage() {
 
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900 px-4">
+            <SEOHead
+                title="로그인"
+                description="Google 계정으로 차량 운행일지에 로그인하세요."
+                path="/login"
+            />
             {/* 배경 장식 */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
                 <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary-400/20 rounded-full blur-3xl" />

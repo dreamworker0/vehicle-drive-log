@@ -25,6 +25,8 @@ vi.mock('../../lib/firestore', () => ({
             },
         ],
     }),
+    getFuelLogs: vi.fn().mockResolvedValue([]),
+    getAllHipassCharges: vi.fn().mockResolvedValue([]),
 }));
 
 import useMonthlyReport from '../../hooks/useMonthlyReport';

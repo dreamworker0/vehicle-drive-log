@@ -12,6 +12,7 @@ export {
     leaveOrganization,
     updateUser,
     getOrganizationMembers,
+    getOrgMemberCounts,
 } from './users';
 
 // 기관 (Organizations)
@@ -50,6 +51,7 @@ export {
 export {
     createDriveLog,
     getLastVehicleEndKm,
+    getLastVehicleEndBattery,
     getVehicleEndKmBefore,
     getDriveLogs,
     getMyDriveLogs,
@@ -134,3 +136,26 @@ export {
     addSuperAdmin,
     removeSuperAdmin,
 } from './superAdmin';
+
+// 일별일지 쿼리 (Daily Log Queries)
+export {
+    getDriveLogsByDate,
+    getFuelLogsByDate,
+    getPreviousDayEndKm,
+} from './dailyLogQueries';
+
+// 하이패스 카드 (Hipass Cards)
+export {
+    getHipassCards,
+    createHipassCard,
+    updateHipassCard,
+    deleteHipassCard,
+} from './hipass';
+
+// 하이패스 충전 기록 (Hipass Charges)
+export {
+    getAllHipassCharges,
+    getHipassCharges,
+    createHipassCharge,
+    deleteHipassCharge,
+} from './hipassCharges';

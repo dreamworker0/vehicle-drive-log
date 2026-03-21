@@ -2,7 +2,7 @@ import { useState, useEffect, Suspense, type ReactNode } from 'react';
 import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { logout } from '../../lib/auth';
-import { subscribePendingOrganizations, subscribeApprovedOrganizations, subscribeFeedbacks } from '../../lib/firestore';
+import { subscribePendingOrganizations, subscribeApprovedOrganizations, subscribeFeedbacks, getOrgMemberCounts, getSuperAdmins } from '../../lib/firestore';
 import { SA_TEST_ROLE_KEY } from '../../App';
 import { useTheme } from '../../contexts/ThemeContext';
 
@@ -47,7 +47,9 @@ export default function SuperAdminLayout() {
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [pendingCount, setPendingCount] = useState(0);
     const [activeOrgCount, setActiveOrgCount] = useState(0);
+    const [totalOrgCount, setTotalOrgCount] = useState(0);
     const [feedbackCount, setFeedbackCount] = useState(0);
+    const [adminCount, setAdminCount] = useState(0);
     const { isDark, toggleTheme } = useTheme();
 
 
@@ -56,8 +58,15 @@ export default function SuperAdminLayout() {
         const unsubPending = subscribePendingOrganizations((orgs) => {
             setPendingCount(orgs.length);
         });
-        const unsubApproved = subscribeApprovedOrganizations((orgs) => {
-            setActiveOrgCount(orgs.length);
+        const unsubApproved = subscribeApprovedOrganizations(async (orgs) => {
+            setTotalOrgCount(orgs.length);
+            try {
+                const counts = await getOrgMemberCounts();
+                const active = orgs.filter(o => counts[o.id] > 0).length;
+                setActiveOrgCount(active);
+            } catch {
+                setActiveOrgCount(orgs.length);
+            }
         });
         const unsubFeedback = subscribeFeedbacks((feedbacks) => {
             setFeedbackCount(feedbacks.filter(f => f.status !== 'read').length);
@@ -67,6 +76,11 @@ export default function SuperAdminLayout() {
             unsubApproved();
             unsubFeedback();
         };
+    }, []);
+
+    // 슈퍼관리자 수 조회
+    useEffect(() => {
+        getSuperAdmins().then(admins => setAdminCount(admins.length)).catch(() => {});
     }, []);
 
     return (
@@ -131,6 +145,7 @@ export default function SuperAdminLayout() {
                             </svg>
                         }
                         label="운영 대시보드"
+                        badge={totalOrgCount}
                     />
                     <NavItem
                         to="/super-admin/feedbacks"
@@ -150,6 +165,7 @@ export default function SuperAdminLayout() {
                             </svg>
                         }
                         label="관리자 관리"
+                        badge={adminCount}
                     />
 
                     <div className="my-2 border-t border-surface-100 dark:border-surface-700" />
@@ -189,7 +205,7 @@ export default function SuperAdminLayout() {
                             <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform duration-300 ${isDark ? 'translate-x-6' : 'translate-x-1'}`} />
                         </button>
                     </div>
-                    <button onClick={logout} className="sidebar-link w-full text-red-500 hover:bg-red-50 hover:text-red-600">
+                    <button onClick={logout} className="sidebar-link w-full text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-300">
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
                         </svg>
@@ -223,7 +239,7 @@ export default function SuperAdminLayout() {
                             onClick={() => { localStorage.setItem(SA_TEST_ROLE_KEY, 'employee'); window.location.href = '/employee'; }}
                             className="py-1 px-2.5 rounded-lg text-xs font-medium bg-surface-100 text-surface-700 active:bg-surface-200 dark:bg-surface-700 dark:text-surface-300 dark:active:bg-surface-600"
                         >
-                            👤 직원
+                            🙋 직원
                         </button>
                     </div>
 

@@ -9,6 +9,7 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 export const disableUser = onCall(
     {
         region: "asia-northeast3",
+        enforceAppCheck: true,
     },
     async (request) => {
         if (!request.auth) {

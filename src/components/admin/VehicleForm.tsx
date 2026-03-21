@@ -13,7 +13,6 @@ interface VehicleFormData {
     vehicleType: string;
     fuelType: string;
     currentKm: string;
-    hipassCardNumber: string;
     googleCalendarId: string;
     insuranceCompany: string;
     insurancePhone: string;
@@ -154,15 +153,7 @@ export default function VehicleForm({
                         </div>
                         <p className="text-xs text-surface-400 mt-1">사고 시 연락할 보험사 정보</p>
                     </div>
-                    <div>
-                        <label className="label">하이패스 카드번호 (선택)</label>
-                        <input
-                            type="text" value={form.hipassCardNumber}
-                            onChange={e => setForm({ ...form, hipassCardNumber: e.target.value })}
-                            className="input" placeholder="0000-0000-0000-0000"
-                        />
-                        <p className="text-xs text-surface-400 mt-1">하이패스 단말기에 등록된 카드번호</p>
-                    </div>
+
                     <div>
                         <label className="label">Google 캘린더 ID (선택)</label>
                         <input
@@ -181,6 +172,15 @@ export default function VehicleForm({
                                     <li><strong className="text-surface-700 dark:text-surface-300">공유 대상</strong>에서 <strong className="text-surface-700 dark:text-surface-300">+ 사용자 및 그룹 추가</strong>를 클릭하고, 아래 이메일을 <strong className="text-surface-700 dark:text-surface-300">"일정 변경"</strong> 권한으로 추가</li>
                                     <li><strong className="text-surface-700 dark:text-surface-300">캘린더 통합</strong> 섹션에서 캘린더 ID를 복사하여 위 입력란에 붙여넣기</li>
                                 </ol>
+                                <div className="mt-3 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                                    <p className="font-medium text-amber-700 dark:text-amber-400 mb-1.5">⚠️ Google Workspace(업무 계정) 사용 시</p>
+                                    <p className="text-surface-600 dark:text-surface-400 mb-1">관리 콘솔에서 캘린더 외부 공유를 허용해야 합니다:</p>
+                                    <ol className="list-decimal list-inside space-y-1 text-surface-600 dark:text-surface-400 ml-1">
+                                        <li><strong className="text-surface-700 dark:text-surface-300">Google 관리 콘솔</strong> → 앱 → Google Workspace → Calendar 설정 → <strong className="text-surface-700 dark:text-surface-300">일반 설정</strong></li>
+                                        <li><strong className="text-surface-700 dark:text-surface-300">보조 캘린더의 외부 공유 옵션</strong>에서 <strong className="text-surface-700 dark:text-surface-300">"모든 정보를 공유하며 외부 사용자도 캘린더를 변경할 수 있음"</strong> 선택</li>
+                                        <li>오른쪽 하단의 <strong className="text-surface-700 dark:text-surface-300">[저장]</strong> 클릭</li>
+                                    </ol>
+                                </div>
                                 <div className="mt-2 flex items-center gap-2">
                                     <code className="flex-1 px-2 py-1.5 rounded bg-surface-100 dark:bg-surface-900 text-[11px] font-mono text-surface-700 dark:text-surface-300 select-all break-all">
                                         1066541065552-compute@developer.gserviceaccount.com

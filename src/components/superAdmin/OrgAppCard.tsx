@@ -84,9 +84,18 @@ export default function OrgAppCard({
                             <span className="ml-2 text-surface-700 dark:text-surface-300">{app.applicantPhone || '-'}</span>
                         </div>
                         {app.address && (
-                            <div className="sm:col-span-2">
+                            <div className="sm:col-span-2 flex items-center gap-1.5">
                                 <span className="text-surface-400">주소:</span>
                                 <span className="ml-2 text-surface-700 dark:text-surface-300">{app.address}</span>
+                                <a
+                                    href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(app.address)}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-0.5 ml-1 px-1.5 py-0.5 rounded text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
+                                    title="구글 지도에서 보기"
+                                >
+                                    📍 지도
+                                </a>
                             </div>
                         )}
                         {tab === 'rejected' && app.rejectedAt && (
@@ -208,6 +217,15 @@ export default function OrgAppCard({
                                         <span className="w-2 h-2 rounded-full bg-green-500" />
                                         <span className="text-surface-400">주소:</span>
                                         <span className="text-surface-700 dark:text-surface-300">{app.aiVerifyDetail.address}</span>
+                                        <a
+                                            href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(app.aiVerifyDetail.address)}`}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="inline-flex items-center gap-0.5 ml-1 px-1.5 py-0.5 rounded text-xs font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
+                                            title="구글 지도에서 보기"
+                                        >
+                                            📍 지도
+                                        </a>
                                     </div>
                                 )}
                                 {app.aiVerifyDetail.rejected && app.aiVerifyDetail.reason && (

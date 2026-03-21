@@ -6,6 +6,7 @@
 |-----|------|------|
 | TMap API | 지오코딩, 경로 탐색, 거리 계산 | Kakao Map API, Naver Map API |
 | 공공데이터 포털 (한국천문연구원) | 공휴일 정보 | Firestore 수동 입력, 하드코딩 |
+| 알리고 API (카카오 알림톡) | 기관 승인·리마인드 알림톡 발송 | 직접 카카오 비즈메시지 연동, 이메일(EmailJS) 대체 |
 
 ---
 
@@ -45,9 +46,29 @@
 
 ---
 
+## 3. 알림톡 API (알리고) 장애 대응
+
+### 현재 방어 체계
+- **PHP 프록시 패턴**: Cafe24 호스팅의 PHP 프록시를 경유하여 알리고 API로 전송. API 키가 Cloud Functions에 직접 노출되지 않음
+- **환경변수 분리**: `ALIMTALK_PROXY_URL`, `ALIMTALK_PROXY_TOKEN`으로 프록시 URL과 인증 토큰 분리 관리
+- **에러 로깅**: 발송 실패 시 상세 에러 로그 기록, 일괄 발송 시 개별 실패 건만 카운트 (전체 실패 방지)
+
+### 장애 시 조치
+1. 알리고 관리자 페이지(https://smartsms.aligo.in)에서 API 상태 확인
+2. Cafe24 PHP 프록시 파일 정상 동작 여부 확인
+3. 알리고 API 인증키/발신 프로필 만료 여부 → 알리고 콘솔에서 갱신
+4. `functions/.env`의 `ALIMTALK_PROXY_URL`, `ALIMTALK_PROXY_TOKEN` 값 확인
+
+### 사용자 영향
+- 기관 승인/리마인드 알림톡이 발송되지 않음 → **이메일 알림은 별도 경로(EmailJS)로 정상 동작**
+- 서비스 핵심 기능(운행일지, 예약 등)에는 영향 없음
+
+---
+
 ## 비상 연락처
 
 | 서비스 | 문의 |
 |--------|------|
 | TMap API | https://openapi.sk.com → 고객센터 |
 | 공공데이터 포털 | https://www.data.go.kr → 문의하기 |
+| 알리고 (알림톡) | https://smartsms.aligo.in → 고객센터 |

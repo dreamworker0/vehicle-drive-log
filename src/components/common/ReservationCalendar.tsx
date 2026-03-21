@@ -3,6 +3,7 @@
  * 로직은 useReservationCalendar 훅으로 분리, UI는 CalendarGrid + ReservationSidePanel 사용
  */
 import useReservationCalendar from '../../hooks/useReservationCalendar';
+import useVehiclePriority from '../../hooks/useVehiclePriority';
 import CalendarGrid from './CalendarGrid';
 import ReservationSidePanel from './ReservationSidePanel';
 import type { Reservation } from '../../types/reservation';
@@ -29,6 +30,7 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
         getCurrentTimeStr, getMinStartTime,
         getNavigationDeeplink,
     } = useReservationCalendar({ isAdmin });
+    const { usageCounts } = useVehiclePriority();
 
     if (loading) {
         return (
@@ -91,6 +93,7 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
                         setFavName={setFavName}
                         onSaveFavorite={handleSaveFavorite}
                         onOpenForm={handleOpenForm}
+                        usageCounts={usageCounts}
                         onSlotClick={(vehicleId: string, startTime: string, endTime: string) => {
                             setForm(prev => ({ ...prev, vehicleId, startTime, endTime }));
                             setShowForm(true);

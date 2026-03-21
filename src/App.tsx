@@ -27,6 +27,49 @@ const FAQPage = lazyWithRetry(() => import('./components/auth/FAQPage'));
 // 슈퍼관리자 테스트 모드: 기관 관리자·직원 UI 체험
 export const SA_TEST_ROLE_KEY = 'sa-test-role';
 
+/** 비활성화/기관 삭제 등 차단 상태 공통 화면 */
+function BlockedScreen({ emoji, title, description, uid }: {
+  emoji: string;
+  title: string;
+  description: ReactNode;
+  uid: string;
+}) {
+  const handleTransferOrg = async () => {
+    try {
+      const { doc, updateDoc } = await import('firebase/firestore');
+      const { db } = await import('./lib/firebase');
+      await updateDoc(doc(db, 'users', uid), {
+        status: 'active',
+        organizationId: null,
+        role: 'employee',
+        disabledAt: null,
+      });
+    } catch (err) {
+      console.error('기관 이동 실패:', err);
+    }
+  };
+  return (
+    <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex items-center justify-center p-4">
+      <div className="glass-card max-w-md w-full p-8 text-center">
+        <div className="text-5xl mb-4">{emoji}</div>
+        <h2 className="text-xl font-bold text-surface-900 dark:text-surface-100 mb-2">{title}</h2>
+        <p className="text-surface-500 dark:text-surface-400 text-sm mb-6">{description}</p>
+        <div className="space-y-3">
+          <button onClick={handleTransferOrg} className="btn-primary w-full">
+            다른 기관으로 가입
+          </button>
+          <button
+            onClick={() => { import('./lib/auth').then(m => m.logout()); }}
+            className="btn-ghost w-full text-surface-500"
+          >
+            로그아웃
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function LoadingScreen() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-primary-100 dark:from-surface-950 dark:via-surface-900 dark:to-surface-950">
@@ -80,6 +123,22 @@ function AppContent() {
   const { user, userData, loading, isSuperAdmin, orgDeleted } = useAuth();
   const saTestRole = useMemo(() => (isSuperAdmin ? localStorage.getItem(SA_TEST_ROLE_KEY) : null), [isSuperAdmin]);
   useOrientationLock();
+
+  // 이메일 링크의 ?code= 파라미터를 sessionStorage에 저장
+  // (Google 로그인 리다이렉트 후에도 코드 유지)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    if (code) {
+      sessionStorage.setItem('pendingInviteCode', code.toUpperCase());
+      // URL에서 파라미터 제거 (깔끔한 URL)
+      params.delete('code');
+      const newUrl = params.toString()
+        ? `${window.location.pathname}?${params}`
+        : window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
+    }
+  }, []);
 
   // 서비스 워커의 알림 클릭 postMessage 수신 → 네비게이션
   // PWA 독립 실행 모드에서 client.navigate/openWindow가 동작하지 않아
@@ -149,45 +208,13 @@ function AppContent() {
 
   // 3-1. 비활성화된 사용자 (관리자가 삭제한 직원)
   if (userData.status === 'disabled') {
-    const handleTransferOrg = async () => {
-      try {
-        const { doc, updateDoc } = await import('firebase/firestore');
-        const { db } = await import('./lib/firebase');
-        await updateDoc(doc(db, 'users', user.uid), {
-          status: 'active',
-          organizationId: null,
-          role: 'employee',
-          disabledAt: null,
-        });
-      } catch (err) {
-        console.error('기관 이동 실패:', err);
-      }
-    };
     return (
-      <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex items-center justify-center p-4">
-        <div className="glass-card max-w-md w-full p-8 text-center">
-          <div className="text-5xl mb-4">🔒</div>
-          <h2 className="text-xl font-bold text-surface-900 dark:text-surface-100 mb-2">계정이 비활성화되었습니다</h2>
-          <p className="text-surface-500 dark:text-surface-400 text-sm mb-6">
-            기관 관리자에 의해 계정이 비활성화되었습니다.<br />
-            관리자가 다시 활성화하면 이용하실 수 있습니다.
-          </p>
-          <div className="space-y-3">
-            <button
-              onClick={handleTransferOrg}
-              className="btn-primary w-full"
-            >
-              다른 기관으로 가입
-            </button>
-            <button
-              onClick={() => { import('./lib/auth').then(m => m.logout()); }}
-              className="btn-ghost w-full text-surface-500"
-            >
-              로그아웃
-            </button>
-          </div>
-        </div>
-      </div>
+      <BlockedScreen
+        emoji="🔒"
+        title="계정이 비활성화되었습니다"
+        description={<>기관 관리자에 의해 계정이 비활성화되었습니다.<br />관리자가 다시 활성화하면 이용하실 수 있습니다.</>}
+        uid={user.uid}
+      />
     );
   }
 
@@ -203,45 +230,13 @@ function AppContent() {
 
   // 4-1. 기관이 삭제된 경우 (soft delete → 안내 화면)
   if (orgDeleted) {
-    const handleTransferOrg = async () => {
-      try {
-        const { doc, updateDoc } = await import('firebase/firestore');
-        const { db } = await import('./lib/firebase');
-        await updateDoc(doc(db, 'users', user.uid), {
-          status: 'active',
-          organizationId: null,
-          role: 'employee',
-          disabledAt: null,
-        });
-      } catch (err) {
-        console.error('기관 이동 실패:', err);
-      }
-    };
     return (
-      <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex items-center justify-center p-4">
-        <div className="glass-card max-w-md w-full p-8 text-center">
-          <div className="text-5xl mb-4">🏢</div>
-          <h2 className="text-xl font-bold text-surface-900 dark:text-surface-100 mb-2">기관이 삭제되었습니다</h2>
-          <p className="text-surface-500 dark:text-surface-400 text-sm mb-6">
-            소속 기관이 관리자에 의해 삭제되었습니다.<br />
-            다른 기관의 초대 코드로 새로 가입할 수 있습니다.
-          </p>
-          <div className="space-y-3">
-            <button
-              onClick={handleTransferOrg}
-              className="btn-primary w-full"
-            >
-              다른 기관으로 가입
-            </button>
-            <button
-              onClick={() => { import('./lib/auth').then(m => m.logout()); }}
-              className="btn-ghost w-full text-surface-500"
-            >
-              로그아웃
-            </button>
-          </div>
-        </div>
-      </div>
+      <BlockedScreen
+        emoji="🏢"
+        title="기관이 삭제되었습니다"
+        description={<>소속 기관이 관리자에 의해 삭제되었습니다.<br />다른 기관의 초대 코드로 새로 가입할 수 있습니다.</>}
+        uid={user.uid}
+      />
     );
   }
 

@@ -22,8 +22,9 @@ interface PdfLogEntry {
     arrivalKm?: number;
     endKm?: number;
     passengerCount?: number;
-    fuelAmount?: number;
-    energyCost?: number;
+    hipassCardNumber?: string;
+    hipassBalanceBefore?: number;
+    hipassBalanceAfter?: number;
     notes?: string;
 }
 
@@ -42,13 +43,13 @@ const ROWS_PER_PAGE = 19;
  * @param {string} options.orgName - 기관명
  * @param {string} options.period - 기간 문자열
  */
-export function downloadDriveLogsPdf(logs: PdfLogEntry[], options: { onError?: (msg: string) => void; orgName?: string; period?: string; approvalLine?: ApprovalEntry[] } = {}) {
+export function downloadDriveLogsPdf(logs: PdfLogEntry[], options: { onError?: (msg: string) => void; orgName?: string; period?: string; approvalLine?: ApprovalEntry[]; includeHipass?: boolean } = {}) {
     if (!logs || logs.length === 0) {
         options.onError?.('다운로드할 데이터가 없습니다.');
         return false;
     }
 
-    const { orgName = '', period = '', approvalLine = [] } = options;
+    const { orgName = '', period = '', approvalLine = [], includeHipass = false } = options;
 
     // 날짜순 정렬 (오래된 순), 같은 날짜 내 출발 시간 오름차순
     const sorted = [...logs].sort((a, b) => {
@@ -67,7 +68,7 @@ export function downloadDriveLogsPdf(logs: PdfLogEntry[], options: { onError?: (
         pages.push(sorted.slice(i, i + ROWS_PER_PAGE));
     }
 
-    const htmlContent = buildPdfHtml(pages, { orgName, period, approvalLine });
+    const htmlContent = buildPdfHtml(pages, { orgName, period, approvalLine, includeHipass });
 
     // 새 창에서 인쇄
     const printWindow = window.open('', '_blank', 'width=1100,height=800');
@@ -90,28 +91,34 @@ export function downloadDriveLogsPdf(logs: PdfLogEntry[], options: { onError?: (
 /**
  * 운행일지 데이터 행을 HTML TR로 변환
  */
-function buildLogRow(log: PdfLogEntry, idx: number, pageIdx: number) {
+function buildLogRow(log: PdfLogEntry, idx: number, pageIdx: number, includeHipass = false) {
     const date = log.date || (log.timestamp?.toDate
         ? log.timestamp.toDate().toISOString().slice(0, 10)
         : '-');
     const distance = ((log.arrivalKm || log.endKm || 0) - (log.departureKm || log.startKm || 0));
 
+    // 하이패스 정보를 비고에 합침
+    let noteText = log.notes || '';
+    if (includeHipass && log.hipassCardNumber) {
+        const hipassInfo = `[하이패스] ${log.hipassBalanceBefore?.toLocaleString() ?? ''}→${log.hipassBalanceAfter?.toLocaleString() ?? ''}원`;
+        noteText = noteText ? `${noteText} / ${hipassInfo}` : hipassInfo;
+    }
+
     return `
         <tr>
             <td class="center">${idx + 1 + (pageIdx * ROWS_PER_PAGE)}</td>
             <td class="center">${formatDate(date)}</td>
+            <td class="center">${log.startTime || log.departureTime || ''}</td>
+            <td class="center">${log.endTime || log.arrivalTime || ''}</td>
             <td class="center">${log.driverName || ''}</td>
             <td class="center">${log.vehicleDisplayName || log.vehicleName || ''}</td>
             <td>${log.destination || ''}</td>
             <td>${log.purpose || ''}</td>
-            <td class="center">${log.startTime || log.departureTime || ''}</td>
-            <td class="center">${log.endTime || log.arrivalTime || ''}</td>
             <td class="right">${formatNumber(log.departureKm ?? log.startKm)}</td>
             <td class="right">${formatNumber(log.arrivalKm ?? log.endKm)}</td>
             <td class="right">${distance > 0 ? distance.toLocaleString() : ''}</td>
             <td class="center">${log.passengerCount || ''}</td>
-            <td class="right">${(log.fuelAmount || log.energyCost) ? Number(log.fuelAmount || log.energyCost).toLocaleString() : ''}</td>
-            <td>${log.notes || ''}</td>
+            <td>${noteText}</td>
         </tr>
     `;
 }
@@ -125,7 +132,7 @@ function buildEmptyRows(count: number) {
             <td class="center">&nbsp;</td>
             <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
             <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
-            <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
+            <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
             <td>&nbsp;</td>
         </tr>
     `).join('');
@@ -152,14 +159,14 @@ function buildApprovalHtml(approvalLine: ApprovalEntry[]) {
 /**
  * 단일 페이지 HTML 생성
  */
-function buildPageHtml(pageRows: PdfLogEntry[], pageIdx: number, totalPages: number, { orgName, period, approvalLine }: { orgName: string; period: string; approvalLine: ApprovalEntry[] }) {
+function buildPageHtml(pageRows: PdfLogEntry[], pageIdx: number, totalPages: number, { orgName, period, approvalLine, includeHipass = false, totalAllDistance = 0 }: { orgName: string; period: string; approvalLine: ApprovalEntry[]; includeHipass?: boolean; totalAllDistance?: number }) {
     const pageNum = pageIdx + 1;
     const pageTotalDistance = pageRows.reduce((sum, log) => {
         const d = ((log.arrivalKm || log.endKm || 0) - (log.departureKm || log.startKm || 0));
         return sum + (d > 0 ? d : 0);
     }, 0);
 
-    const rowsHtml = pageRows.map((log: PdfLogEntry, idx: number) => buildLogRow(log, idx, pageIdx)).join('');
+    const rowsHtml = pageRows.map((log: PdfLogEntry, idx: number) => buildLogRow(log, idx, pageIdx, includeHipass)).join('');
     const emptyRowsHtml = buildEmptyRows(ROWS_PER_PAGE - pageRows.length);
     const approvalHtml = buildApprovalHtml(approvalLine);
 
@@ -185,14 +192,13 @@ function buildPageHtml(pageRows: PdfLogEntry[], pageIdx: number, totalPages: num
                     <tr>
                         <th rowspan="2" class="col-no">No.</th>
                         <th rowspan="2" class="col-date">날짜</th>
+                        <th colspan="2">시각</th>
                         <th rowspan="2" class="col-driver">운전자</th>
                         <th rowspan="2" class="col-vehicle">차량</th>
                         <th rowspan="2" class="col-dest">목적지</th>
                         <th rowspan="2" class="col-purpose">사용목적</th>
-                        <th colspan="2">시각</th>
                         <th colspan="3">주행거리 (km)</th>
                         <th rowspan="2" class="col-passenger">탑승<br/>인원</th>
-                        <th rowspan="2" class="col-fuel">주유/<br/>충전(원)</th>
                         <th rowspan="2" class="col-note">비고</th>
                     </tr>
                     <tr>
@@ -211,8 +217,14 @@ function buildPageHtml(pageRows: PdfLogEntry[], pageIdx: number, totalPages: num
                         <td class="right total-value">${pageTotalDistance > 0 ? pageTotalDistance.toLocaleString() : ''}</td>
                         <td></td>
                         <td></td>
-                        <td></td>
                     </tr>
+                    ${pageIdx === totalPages - 1 ? `
+                    <tr class="total-row" style="font-weight:bold; background:#e8f0fe;">
+                        <td colspan="10" class="center total-label">합 계</td>
+                        <td class="right total-value">${totalAllDistance > 0 ? totalAllDistance.toLocaleString() : ''}</td>
+                        <td></td>
+                        <td></td>
+                    </tr>` : ''}
                 </tbody>
             </table>
         </div>
@@ -222,10 +234,15 @@ function buildPageHtml(pageRows: PdfLogEntry[], pageIdx: number, totalPages: num
 /**
  * 전체 HTML 문서 생성
  */
-function buildPdfHtml(pages: PdfLogEntry[][], options: { orgName: string; period: string; approvalLine: ApprovalEntry[] }) {
+function buildPdfHtml(pages: PdfLogEntry[][], options: { orgName: string; period: string; approvalLine: ApprovalEntry[]; includeHipass?: boolean }) {
     const totalPages = pages.length;
+    // 전체 페이지에 걸친 총 주행거리 합계
+    const totalAllDistance = pages.flat().reduce((sum, log) => {
+        const d = ((log.arrivalKm || log.endKm || 0) - (log.departureKm || log.startKm || 0));
+        return sum + (d > 0 ? d : 0);
+    }, 0);
     const pagesHtml = pages.map((pageRows, pageIdx) =>
-        buildPageHtml(pageRows, pageIdx, totalPages, options)
+        buildPageHtml(pageRows, pageIdx, totalPages, { ...options, totalAllDistance })
     ).join('');
 
     return `

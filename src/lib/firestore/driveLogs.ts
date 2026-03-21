@@ -87,6 +87,21 @@ export const getLastVehicleEndKm = async (orgId: string, vehicleId: string) => {
     return lastLog.endKm || null;
 };
 
+/** 차량의 마지막 운행기록에서 도착 배터리(%) 조회 — 출발 배터리 힌트용 */
+export const getLastVehicleEndBattery = async (orgId: string, vehicleId: string): Promise<number | null> => {
+    const q = query(
+        collection(db, 'driveLogs'),
+        where('organizationId', '==', orgId),
+        where('vehicleId', '==', vehicleId),
+        orderBy('timestamp', 'desc'),
+        limit(1)
+    );
+    const snap = await getDocs(q);
+    if (snap.empty) return null;
+    const lastLog = snap.docs[0].data();
+    return lastLog.batteryEnd ?? null;
+};
+
 /** 특정 날짜 이전의 가장 최근 운행기록에서 endKm 조회 (소급 입력용) */
 export const getVehicleEndKmBefore = async (orgId: string, vehicleId: string, beforeDate: Date) => {
     const q = query(
@@ -103,38 +118,59 @@ export const getVehicleEndKmBefore = async (orgId: string, vehicleId: string, be
 };
 
 /**
- * 소급 입력/수정 시 같은 차량의 바로 다음 운행기록 startKm을 자동 업데이트
- * @returns {{ updated: boolean, logId?: string, oldStartKm?: number, newStartKm?: number }}
+ * 소급 입력/수정 시 같은 차량의 이후 모든 운행기록 startKm을 연쇄적으로 자동 업데이트
+ * - 직전 기록의 endKm → 다음 기록의 startKm 으로 순차 갱신
+ * - 최대 20개까지 연쇄 업데이트 (무한 루프 방지)
+ * @returns {{ updated: boolean, logId?: string, oldStartKm?: number, newStartKm?: number, chainCount?: number }}
  */
 export const syncNextLogStartKm = async (orgId: string, vehicleId: string, afterDate: Date, newStartKm: number) => {
-    const q = query(
-        collection(db, 'driveLogs'),
-        where('organizationId', '==', orgId),
-        where('vehicleId', '==', vehicleId),
-        where('timestamp', '>', afterDate),
-        orderBy('timestamp', 'asc'),
-        limit(1)
-    );
-    const snap = await getDocs(q);
-    if (snap.empty) return { updated: false };
+    let currentAfterDate = afterDate;
+    let carryKm = newStartKm; // 다음 기록에 전달할 startKm
+    let firstResult: { updated: boolean; logId?: string; oldStartKm?: number; newStartKm?: number } = { updated: false };
+    let chainCount = 0;
+    const MAX_CHAIN = 20;
 
-    const nextDoc = snap.docs[0];
-    const nextData = nextDoc.data();
-    const oldStartKm = nextData.startKm;
+    while (chainCount < MAX_CHAIN) {
+        const q = query(
+            collection(db, 'driveLogs'),
+            where('organizationId', '==', orgId),
+            where('vehicleId', '==', vehicleId),
+            where('timestamp', '>', currentAfterDate),
+            orderBy('timestamp', 'asc'),
+            limit(1)
+        );
+        const snap = await getDocs(q);
+        if (snap.empty) break;
 
-    // 이미 같으면 스킵
-    if (oldStartKm === newStartKm) return { updated: false };
+        const nextDoc = snap.docs[0];
+        const nextData = nextDoc.data();
+        const oldStartKm = nextData.startKm;
 
-    await updateDoc(doc(db, 'driveLogs', nextDoc.id), {
-        startKm: newStartKm,
-        editedAt: serverTimestamp(),
-    });
+        // startKm이 이미 맞으면 연쇄 중단 (이후 기록도 영향 없음)
+        if (oldStartKm === carryKm) break;
 
-    return { updated: true, logId: nextDoc.id, oldStartKm, newStartKm };
+        await updateDoc(doc(db, 'driveLogs', nextDoc.id), {
+            startKm: carryKm,
+            editedAt: serverTimestamp(),
+        });
+
+        if (chainCount === 0) {
+            firstResult = { updated: true, logId: nextDoc.id, oldStartKm, newStartKm: carryKm };
+        }
+
+        // 다음 연쇄: 현재 기록의 endKm → 그 다음 기록의 startKm
+        carryKm = nextData.endKm ?? carryKm;
+        currentAfterDate = nextData.timestamp instanceof Date
+            ? nextData.timestamp
+            : (nextData.timestamp?.toDate ? nextData.timestamp.toDate() : new Date(nextData.timestamp));
+        chainCount++;
+    }
+
+    return { ...firstResult, chainCount };
 };
 
 // 운행일지 목록 조회 (커서 기반 페이지네이션)
-export const getDriveLogs = async (orgId: string, filters: { limit?: number; startAfter?: unknown } = {}) => {
+export const getDriveLogs = async (orgId: string, filters: { limit?: number; startAfter?: unknown; since?: Date } = {}) => {
     const pageSize = filters.limit || 50;
     const constraints: QueryConstraint[] = [
         where('organizationId', '==', orgId),
@@ -142,10 +178,15 @@ export const getDriveLogs = async (orgId: string, filters: { limit?: number; sta
         limit(pageSize),
     ];
 
+    // 기간 필터: since 이후 데이터만 조회 (서버 쿼리 레벨)
+    if (filters.since) {
+        constraints.splice(1, 0, where('timestamp', '>=', filters.since));
+    }
+
     // 커서 기반 페이지네이션: 이전 마지막 문서 이후부터 조회
     if (filters.startAfter) {
         const { startAfter: startAfterFn } = await import('firebase/firestore');
-        constraints.splice(2, 0, startAfterFn(filters.startAfter as any));
+        constraints.splice(filters.since ? 3 : 2, 0, startAfterFn(filters.startAfter as any));
     }
 
     const q = query(collection(db, 'driveLogs'), ...constraints);

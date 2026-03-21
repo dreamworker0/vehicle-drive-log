@@ -4,6 +4,7 @@
  */
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
 import useDriveLogForm from '../../hooks/useDriveLogForm';
+import useVehiclePriority from '../../hooks/useVehiclePriority';
 import VehicleSelector from './VehicleSelector';
 import MileageInput from './MileageInput';
 
@@ -18,6 +19,8 @@ export default function DriveLogForm() {
         editLog, isEditMode, isRetroactive,
         showFavSave, setShowFavSave,
         favName, setFavName,
+        hipassCard,
+        lastEndBattery,
         ocrLoading, ocrError, ocrSuccess,
         ocrReportSending, ocrReportSent,
         cameraInputRef, endKmInputRef,
@@ -30,6 +33,7 @@ export default function DriveLogForm() {
         handleOcrReport,
         handleSubmit,
     } = useDriveLogForm();
+    const { usageCounts } = useVehiclePriority();
 
     if (loading) {
         return (
@@ -56,7 +60,7 @@ export default function DriveLogForm() {
             </p>
 
             {success && (
-                <div className="mb-4 p-4 rounded-xl bg-accent-50 border border-accent-200 text-accent-700 text-sm flex items-center gap-2 animate-fade-in">
+                <div className="mb-4 p-4 rounded-xl bg-accent-50 dark:bg-accent-900/20 border border-accent-200 dark:border-accent-800 text-accent-700 dark:text-accent-400 text-sm flex items-center gap-2 animate-fade-in">
                     <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                     </svg>
@@ -114,14 +118,15 @@ export default function DriveLogForm() {
                             vehicles={vehicles}
                             selectedVehicleId={form.vehicleId}
                             onSelect={handleVehicleSelect}
+                            usageCounts={usageCounts}
                         />
                     </div>
                 )}
 
                 {/* 운행 날짜 선택 */}
                 <div className="glass-card p-4">
-                    <label className="label">
-                        운행 날짜
+                    <label htmlFor="driveDate" className="label">
+                        📅 운행 날짜
                         {isRetroactive && (
                             <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-600 dark:bg-orange-900/40 dark:text-orange-400">
                                 소급 입력
@@ -129,6 +134,7 @@ export default function DriveLogForm() {
                         )}
                     </label>
                     <input
+                        id="driveDate"
                         type="date"
                         value={form.driveDate}
                         onChange={e => setForm({ ...form, driveDate: e.target.value })}
@@ -143,8 +149,9 @@ export default function DriveLogForm() {
                         <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300 mb-3">🕐 운행 시간</h3>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="label text-xs">출발 시각</label>
+                                <label htmlFor="startTime" className="label text-xs">출발 시각</label>
                                 <input
+                                    id="startTime"
                                     type="time"
                                     value={form.startTime}
                                     onChange={e => setForm({ ...form, startTime: e.target.value })}
@@ -152,8 +159,9 @@ export default function DriveLogForm() {
                                 />
                             </div>
                             <div>
-                                <label className="label text-xs">도착 시각</label>
+                                <label htmlFor="endTime" className="label text-xs">도착 시각</label>
                                 <input
+                                    id="endTime"
                                     type="time"
                                     value={form.endTime}
                                     onChange={e => setForm({ ...form, endTime: e.target.value })}
@@ -168,8 +176,9 @@ export default function DriveLogForm() {
                 {(!reservationData?.vehicleId || isEditMode) && (
                     <div className="space-y-4">
                         <div>
-                            <label className="label">운행 목적</label>
+                            <label htmlFor="purpose" className="label">운행 목적</label>
                             <input
+                                id="purpose"
                                 type="text"
                                 value={form.purpose}
                                 onChange={e => setForm({ ...form, purpose: e.target.value })}
@@ -178,9 +187,10 @@ export default function DriveLogForm() {
                             />
                         </div>
                         <div>
-                            <label className="label">행선지</label>
+                            <label htmlFor="destination" className="label">행선지</label>
                             <div className="flex items-center gap-1.5">
                                 <input
+                                    id="destination"
                                     type="text"
                                     value={form.destination}
                                     onChange={e => setForm({ ...form, destination: e.target.value })}
@@ -212,6 +222,7 @@ export default function DriveLogForm() {
                                             onChange={e => setFavName(e.target.value)}
                                             className="input flex-1 text-sm py-1.5"
                                             placeholder="별칭 (예: 김OO 어르신 댁)"
+                                            aria-label="즐겨찾기 별칭"
                                         />
                                         <button
                                             type="button"
@@ -232,7 +243,7 @@ export default function DriveLogForm() {
                                             type="button"
                                             onClick={() => handleFavoriteSelect(fav)}
                                             className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${form.destination === (fav.address || fav.name)
-                                                ? 'bg-amber-100 border-amber-300 text-amber-700'
+                                                ? 'bg-amber-100 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400'
                                                 : 'bg-surface-50 dark:bg-surface-800 border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400 hover:border-amber-300 hover:bg-amber-50'
                                                 }`}
                                         >
@@ -264,7 +275,7 @@ export default function DriveLogForm() {
                 {/* 동승자 선택 */}
                 <div className="glass-card p-4">
                     <label className="label">
-                        동승자
+                        🧑‍🤝‍🧑 동승자
                         {(selectedPassengers.length + externalPassengerCount) > 0 && (
                             <span className="ml-2 text-primary-600 font-bold">
                                 {selectedPassengers.length + externalPassengerCount}명
@@ -331,19 +342,21 @@ export default function DriveLogForm() {
                         <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300 mb-3">🔋 배터리</h3>
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <label className="label text-xs">출발 배터리 %</label>
+                                <label htmlFor="batteryStart" className="label text-xs">출발 배터리 %</label>
                                 <input
+                                    id="batteryStart"
                                     type="number"
                                     min="0" max="100"
                                     value={form.batteryStart}
                                     onChange={e => setForm({ ...form, batteryStart: e.target.value })}
                                     className="input"
-                                    placeholder="80"
+                                    placeholder={lastEndBattery != null ? `이전 도착: ${lastEndBattery}%` : '80'}
                                 />
                             </div>
                             <div>
-                                <label className="label text-xs">도착 배터리 %</label>
+                                <label htmlFor="batteryEnd" className="label text-xs">도착 배터리 %</label>
                                 <input
+                                    id="batteryEnd"
                                     type="number"
                                     min="0" max="100"
                                     value={form.batteryEnd}
@@ -356,10 +369,55 @@ export default function DriveLogForm() {
                     </div>
                 )}
 
+                {/* 하이패스 (등록된 차량만) */}
+                {hipassCard && (
+                    <div className="glass-card p-4">
+                        <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300 mb-3">💳 하이패스</h3>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div>
+                                <label className="label text-xs">사용전 금액</label>
+                                <div className="input bg-surface-100 dark:bg-surface-700 text-surface-500 dark:text-surface-400 cursor-not-allowed" aria-label="하이패스 사용전 금액">
+                                    {hipassCard.balance.toLocaleString()}원
+                                </div>
+                            </div>
+                            <div>
+                                <label htmlFor="hipassAfter" className="label text-xs">사용후 금액</label>
+                                <input
+                                    id="hipassAfter"
+                                    type="number"
+                                    value={form.hipassBalanceAfter}
+                                    onChange={e => setForm({ ...form, hipassBalanceAfter: e.target.value })}
+                                    className="input"
+                                    placeholder={hipassCard.balance.toLocaleString()}
+                                    min="0"
+                                />
+                            </div>
+                        </div>
+                        {form.hipassBalanceAfter !== '' && (
+                            <div className="mt-3 flex items-center justify-between px-1">
+                                <span className="text-xs text-surface-400">
+                                    사용 금액: <span className="font-bold text-red-500">-{(hipassCard.balance - Number(form.hipassBalanceAfter)).toLocaleString()}원</span>
+                                </span>
+                                <span className={`text-sm font-bold ${
+                                    Number(form.hipassBalanceAfter) <= 5000
+                                        ? 'text-red-500'
+                                        : Number(form.hipassBalanceAfter) <= 20000
+                                            ? 'text-amber-500'
+                                            : 'text-accent-600 dark:text-accent-400'
+                                }`}>
+                                    잔액: {Number(form.hipassBalanceAfter).toLocaleString()}원
+                                </span>
+                            </div>
+                        )}
+                        <p className="text-xs text-surface-400 mt-2">하이패스 사용 시 사용후 금액을 입력하면 잔액이 자동으로 업데이트됩니다</p>
+                    </div>
+                )}
+
                 {/* 비고 */}
                 <div className="glass-card p-4">
-                    <label className="label">비고</label>
+                    <label htmlFor="notes" className="label">📝 비고</label>
                     <textarea
+                        id="notes"
                         value={form.notes}
                         onChange={e => setForm({ ...form, notes: e.target.value })}
                         className="input min-h-[80px] resize-none"

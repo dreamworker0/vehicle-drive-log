@@ -3,7 +3,7 @@
  */
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-    PieChart, Pie, Cell, Legend, LineChart, Line
+    PieChart, Pie, Cell, Legend, LineChart, Line, AreaChart, Area
 } from 'recharts';
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#f97316'];
@@ -76,11 +76,15 @@ interface ReportChartsProps {
     hourlyData: any[];
     vehicleFuelData: any[];
     dailyTrendData: any[];
+    fuelLogStats: { totalCost: number; totalAmount: number; count: number; vehicleData: any[] };
+    hipassChargeStats: { totalAmount: number; count: number; vehicleData: any[] };
+    costTrendData: { date: string; fuel: number; hipass: number; total: number }[];
 }
 
 export default function ReportCharts({
     driverData, vehicleData, purposeData,
     dayOfWeekData, hourlyData, vehicleFuelData, dailyTrendData,
+    fuelLogStats, hipassChargeStats, costTrendData,
 }: ReportChartsProps) {
     return (
         <div className="space-y-6">
@@ -230,6 +234,74 @@ export default function ReportCharts({
                     </div>
                 </div>
             )}
+
+            {/* 비용 추이 (주유비 vs 하이패스) */}
+            {costTrendData.length > 1 && (
+                <div className="glass-card p-5">
+                    <SectionTitle icon="💰" title="일별 비용 추이 (주유비 vs 하이패스)" />
+                    <div className="w-full">
+                        <ResponsiveContainer width="100%" height={280} minWidth={1} minHeight={1}>
+                            <AreaChart data={costTrendData} margin={{ top: 5, right: 30, left: 0, bottom: 5 }}>
+                                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                                <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#64748b' }} />
+                                <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`} />
+                                <Tooltip
+                                    formatter={(value, name) => [
+                                        `${(value as number).toLocaleString()}원`,
+                                        name === 'fuel' ? '주유비' : name === 'hipass' ? '하이패스' : '합계'
+                                    ]}
+                                />
+                                <Legend formatter={(v) => v === 'fuel' ? '주유비' : v === 'hipass' ? '하이패스' : '합계'} />
+                                <Area type="monotone" dataKey="fuel" name="fuel" stackId="1" fill="#f59e0b" fillOpacity={0.4} stroke="#f59e0b" strokeWidth={2} />
+                                <Area type="monotone" dataKey="hipass" name="hipass" stackId="1" fill="#8b5cf6" fillOpacity={0.4} stroke="#8b5cf6" strokeWidth={2} />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+            )}
+
+            {/* 주유비 + 하이패스 충전 */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* 차량별 주유비 */}
+                <div className="glass-card p-5">
+                    <SectionTitle icon="⛽" title="차량별 주유비" />
+                    {fuelLogStats.vehicleData.length > 0 ? (
+                        <div className="w-full">
+                            <ResponsiveContainer width="100%" height={Math.max(200, fuelLogStats.vehicleData.length * 45)} minWidth={1} minHeight={1}>
+                                <BarChart data={fuelLogStats.vehicleData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                                    <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`} />
+                                    <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 11, fill: '#64748b' }} />
+                                    <Tooltip formatter={(value) => [`${(value as number).toLocaleString()}원`, '주유비']} />
+                                    <Bar dataKey="cost" fill="#f59e0b" radius={[0, 6, 6, 0]} barSize={20} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    ) : (
+                        <p className="text-surface-400 text-center py-8">주유 기록이 없습니다</p>
+                    )}
+                </div>
+
+                {/* 차량별 하이패스 충전 */}
+                <div className="glass-card p-5">
+                    <SectionTitle icon="🛣️" title="차량별 하이패스 충전" />
+                    {hipassChargeStats.vehicleData.length > 0 ? (
+                        <div className="w-full">
+                            <ResponsiveContainer width="100%" height={Math.max(200, hipassChargeStats.vehicleData.length * 45)} minWidth={1} minHeight={1}>
+                                <BarChart data={hipassChargeStats.vehicleData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
+                                    <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`} />
+                                    <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 11, fill: '#64748b' }} />
+                                    <Tooltip formatter={(value) => [`${(value as number).toLocaleString()}원`, '충전액']} />
+                                    <Bar dataKey="amount" fill="#8b5cf6" radius={[0, 6, 6, 0]} barSize={20} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </div>
+                    ) : (
+                        <p className="text-surface-400 text-center py-8">하이패스 충전 기록이 없습니다</p>
+                    )}
+                </div>
+            </div>
         </div>
     );
 }

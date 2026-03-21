@@ -154,7 +154,38 @@ await sendPushToOrg(
 
 ---
 
-## 7. 배포
+## 7. 알림톡 발송 (sendAlimtalk)
+
+카카오 알림톡은 Cafe24 PHP 프록시를 경유하여 알리고 API로 전송한다.
+
+```ts
+import { sendApprovalAlimtalk, sendReminderAlimtalk } from "./sendAlimtalk";
+
+// 기관 승인 시 알림톡
+await sendApprovalAlimtalk(phoneNumber, inviteCode);
+
+// 미활성 기관 리마인드 알림톡
+await sendReminderAlimtalk(phoneNumber, inviteCode);
+```
+
+### 환경변수
+
+```bash
+# functions/.env
+ALIMTALK_PROXY_URL=https://example.cafe24.com/send_alimtalk_vehicle_drive_log_proxy.php
+ALIMTALK_PROXY_TOKEN=your-api-token
+```
+
+### 주의사항
+
+1. PHP 프록시 호출 시 `X-API-Token` 헤더 필수
+2. 전화번호는 하이픈 제거 후 전송 (헬퍼 내부에서 자동 처리)
+3. 알리고 템플릿과 메시지 본문이 정확히 일치해야 함 (줄바꿈 LF 기준)
+4. `tpl_code` 파라미터로 템플릿 지정
+
+---
+
+## 8. 배포
 
 ```bash
 # Functions만 배포

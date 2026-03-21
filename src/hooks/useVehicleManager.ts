@@ -16,7 +16,7 @@ import { useToast } from './useToast';
 // 전기차 모델명 목록 (감지 시 fuelType을 electric으로 자동 설정)
 const ELECTRIC_MODELS = [
     '아이오닉', '아이오닉5', '아이오닉6', '아이오닉7',
-    'EV6', 'EV9', 'EV3', '니로EV', '니로 EV', '코나EV', '코나 EV', '코나 일렉트릭',
+    'EV3', 'EV5', 'EV6', 'EV9', '니로EV', '니로 EV', '코나EV', '코나 EV', '코나 일렉트릭',
     '볼트EV', '볼트 EV', '볼트EUV',
     '테슬라', 'Model 3', 'Model Y', 'Model S', 'Model X',
     'e-트론', 'ID.4', '폴스타', '제로', 'i4', 'iX',
@@ -29,7 +29,7 @@ const MODEL_TYPE_MAP = {
     compact: ['모닝', '캐스퍼', '마티즈', '레이', '스파크', '다마스', '티코', '트위즈', '피카퇠', 'ZOE', '트위지'],
     sedan: [
         '소나타', '아반떼', '그랜저', 'K5', 'K3', 'K7', 'K8', 'K9', '말리부', '셀토스', '제네시스', 'SM6', 'SM3', '투슨', 'i30', 'i40',
-        '아이오닉', 'EV6', 'EV9', 'EV3', '니로', '코나', '볼트',
+        '아이오닉', 'EV3', 'EV5', 'EV6', 'EV9', '니로', '코나', '볼트',
         '테슬라', 'Model 3', 'Model Y', 'Model S', 'Model X',
         'e-트론', 'ID.4', '폴스타', '제로', 'i4', 'iX',
     ],
@@ -60,7 +60,7 @@ export const DEFAULT_FUEL: Record<string, string> = { compact: 'gasoline', sedan
 const INITIAL_FORM = {
     displayName: '', modelName: '', plateNumber: '',
     vehicleType: 'sedan', fuelType: 'gasoline',
-    currentKm: '', hipassCardNumber: '', googleCalendarId: '',
+    currentKm: '', googleCalendarId: '',
     insuranceCompany: '', insurancePhone: '',
 };
 
@@ -101,8 +101,9 @@ export default function useVehicleManager() {
                 console.debug('Custom Claims 미반영 — 토큰 갱신 후 재시도');
                 try {
                     const { auth: firebaseAuth } = await import('../lib/firebase');
+                    const { refreshTokenSilently } = await import('../lib/tokenRefresh');
                     if (firebaseAuth.currentUser) {
-                        await firebaseAuth.currentUser.getIdToken(true);
+                        await refreshTokenSilently(firebaseAuth.currentUser);
                     }
                 } catch { /* ignore */ }
                 setTimeout(() => fetchVehicles(retryCount + 1), 800);
@@ -132,7 +133,6 @@ export default function useVehicleManager() {
             vehicleType: vehicle.vehicleType || 'sedan',
             fuelType: vehicle.fuelType || 'gasoline',
             currentKm: vehicle.currentKm?.toString() || '',
-            hipassCardNumber: vehicle.hipassCardNumber || '',
             googleCalendarId: vehicle.googleCalendarId || '',
             insuranceCompany: vehicle.insurance?.company || '',
             insurancePhone: vehicle.insurance?.phone || '',
@@ -170,7 +170,6 @@ export default function useVehicleManager() {
                     company: form.insuranceCompany.trim(),
                     phone: form.insurancePhone.trim(),
                 },
-                ...(form.hipassCardNumber.trim() ? { hipassCardNumber: form.hipassCardNumber.trim() } : {}),
                 ...(form.googleCalendarId.trim() ? { googleCalendarId: form.googleCalendarId.trim() } : {}),
             };
             if (editingVehicle) {

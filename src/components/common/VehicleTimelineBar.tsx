@@ -271,8 +271,8 @@ export default function VehicleTimelineBar({
                                                     {(r as any).routeDistance && (
                                                         <p className="text-[11px] text-blue-500 mt-0.5 flex items-center gap-2">
                                                             <span>🗺️ {Math.floor((r as any).routeDistance)}km</span>
-                                                            <span>⏱ 약 {(r as any).routeDuration}분</span>
-                                                            {(r as any).routeTollFee > 0 && <span>톨비 {(r as any).routeTollFee.toLocaleString()}원</span>}
+                                                            <span>⏱ {(r as any).routeDuration}분</span>
+                                                            {(r as any).routeTollFee > 0 && <span>₩{(r as any).routeTollFee.toLocaleString()}</span>}
                                                         </p>
                                                     )}
                                                 </div>

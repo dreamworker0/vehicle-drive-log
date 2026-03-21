@@ -1,9 +1,18 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+import { fileURLToPath } from 'url'
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url))
 
 // https://vite.dev/config/
 export default defineConfig({
+  resolve: {
+    alias: {
+      '@': __dirname + 'src',
+      'xlsx': 'xlsx/dist/xlsx.mini.min.js',
+    },
+  },
   plugins: [
     react(),
     VitePWA({
@@ -14,6 +23,7 @@ export default defineConfig({
         navigateFallback: '/index.html',
         navigateFallbackDenylist: [/^\/__\/auth\//],
         globPatterns: ['**/*.{js,css,html,svg,png,woff2,webp}'],
+        cleanupOutdatedCaches: true,
         runtimeCaching: [
           {
             // Google Fonts
@@ -22,6 +32,15 @@ export default defineConfig({
             options: {
               cacheName: 'google-fonts',
               expiration: { maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 },
+            },
+          },
+          {
+            // Firebase Storage 이미지 (차량 사진, OCR 결과 등)
+            urlPattern: /^https:\/\/firebasestorage\.googleapis\.com\/.*/i,
+            handler: 'StaleWhileRevalidate',
+            options: {
+              cacheName: 'firebase-storage',
+              expiration: { maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 7 },
             },
           },
         ],

@@ -120,6 +120,7 @@ describe('buildLogData', () => {
             startTime: '09:00', endTime: '17:30',
             batteryStart: '', batteryEnd: '',
             notes: '비고 없음', driveDate: '2026-01-15',
+            hipassBalanceAfter: '',
         };
         const context = {
             orgId: 'org1',

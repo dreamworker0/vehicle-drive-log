@@ -53,34 +53,40 @@ export default function EmployeeManager() {
                 </button>
             </div>
 
-            {/* 초대 코드 섹션 */}
+            {/* 초대 링크 섹션 */}
             <div className="glass-card p-5 mb-6">
-                <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                    <div className="flex-1">
-                        <h3 className="text-sm font-semibold text-surface-600 dark:text-surface-400 mb-1">기관 초대 코드</h3>
-                        <p className="text-xs text-surface-400">직원들에게 https://vehicle-drive-log.web.app 링크와 이 초대 코드를 공유하면 이 앱을 함께 사용할 수 있습니다</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <code className="text-2xl font-mono font-bold tracking-[0.3em] text-primary-700 bg-primary-50 px-4 py-2 rounded-xl">
-                            {organization?.inviteCode || '------'}
-                        </code>
-                        <button onClick={handleCopyInviteCode} className={`btn-icon ${inviteCodeCopied ? 'text-accent-600' : 'text-surface-400 hover:text-surface-600 dark:text-surface-400'}`} title="복사">
-                            {inviteCodeCopied ? (
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                <div className="flex flex-col gap-3">
+                    <div className="flex items-center justify-between">
+                        <h3 className="text-sm font-semibold text-surface-600 dark:text-surface-400">직원 초대 링크</h3>
+                        <div className="flex items-center gap-1">
+                            <button onClick={handleCopyInviteCode} className={`btn-sm flex items-center gap-1.5 ${inviteCodeCopied ? 'bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400' : 'btn-primary'}`}>
+                                {inviteCodeCopied ? (
+                                    <>
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                                        </svg>
+                                        복사됨
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" />
+                                        </svg>
+                                        링크 복사
+                                    </>
+                                )}
+                            </button>
+                            <button onClick={handleRegenerateCode} disabled={regenerating} className="btn-ghost btn-sm text-surface-400 hover:text-amber-600" title="초대 코드 재발급">
+                                <svg className={`w-4 h-4 ${regenerating ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
                                 </svg>
-                            ) : (
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.666 3.888A2.25 2.25 0 0 0 13.5 2.25h-3c-1.03 0-1.9.693-2.166 1.638m7.332 0c.055.194.084.4.084.612v0a.75.75 0 0 1-.75.75H9a.75.75 0 0 1-.75-.75v0c0-.212.03-.418.084-.612m7.332 0c.646.049 1.288.11 1.927.184 1.1.128 1.907 1.077 1.907 2.185V19.5a2.25 2.25 0 0 1-2.25 2.25H6.75A2.25 2.25 0 0 1 4.5 19.5V6.257c0-1.108.806-2.057 1.907-2.185a48.208 48.208 0 0 1 1.927-.184" />
-                                </svg>
-                            )}
-                        </button>
-                        <button onClick={handleRegenerateCode} disabled={regenerating} className="btn-ghost btn-sm text-surface-400 hover:text-amber-600" title="재발급">
-                            <svg className={`w-4 h-4 ${regenerating ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
-                            </svg>
-                        </button>
+                            </button>
+                        </div>
                     </div>
+                    <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg px-4 py-2.5 font-mono text-sm text-surface-600 dark:text-surface-400 break-all select-all">
+                        https://vehicle-drive-log.web.app?code={organization?.inviteCode || '------'}
+                    </div>
+                    <p className="text-xs text-surface-400">이 링크에는 기관 코드가 포함되어 있으므로, 반드시 소속 직원에게만 공유해 주세요</p>
                 </div>
             </div>
 
@@ -141,7 +147,7 @@ export default function EmployeeManager() {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
                     </svg>
                     <p className="text-surface-400 text-lg font-medium">등록된 직원이 없습니다</p>
-                    <p className="text-sm text-surface-300 mt-1">초대 코드를 직원들에게 공유하세요</p>
+                    <p className="text-sm text-surface-300 mt-1">초대 링크를 직원들에게 공유하세요</p>
                 </div>
             ) : filteredUnifiedList.length === 0 ? (
                 <div className="glass-card p-12 text-center">

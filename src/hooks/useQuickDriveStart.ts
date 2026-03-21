@@ -7,7 +7,7 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
 import { getVehicles, getFavorites, getOrganization, createReservationSafe, updateReservationStatus } from '../lib/firestore';
-import { getMultiRoute, isTmapAvailable, VEHICLE_TYPE_TO_CAR_TYPE } from '../lib/tmap';
+import { getMultiRouteWithFreeRoad, isTmapAvailable, VEHICLE_TYPE_TO_CAR_TYPE } from '../lib/tmap';
 import type { Favorite } from '../types/favorite';
 import { calcEndTime } from './utils/reservationUtils';
 import { toLocalDateStr } from '../lib/dateUtils';
@@ -27,7 +27,7 @@ export default function useQuickDriveStart() {
     const [favorites, setFavorites] = useState<Favorite[]>([]);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
-    const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number; tollFee?: number } | null>(null);
+    const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number; tollFee?: number; freeRoadRoute?: { distance: number; duration: number; tollFee: number } } | null>(null);
     const [routeLoading, setRouteLoading] = useState(false);
     const [orgAddress, setOrgAddress] = useState('');
     const routeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -96,7 +96,8 @@ export default function useQuickDriveStart() {
             try {
                 const selectedV = vehicles.find(v => v.id === form.vehicleId);
                 const carType = VEHICLE_TYPE_TO_CAR_TYPE[selectedV?.vehicleType ?? ''] || '0';
-                const result = await getMultiRoute(orgAddress, form.destination.trim(), { carType });
+
+                const result = await getMultiRouteWithFreeRoad(orgAddress, form.destination.trim(), { carType });
                 setRouteInfo(result);
             } catch (err) {
                 console.error('경로 탐색 실패:', err);

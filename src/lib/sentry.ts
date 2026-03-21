@@ -48,6 +48,16 @@ export function initSentry() {
             // Firestore IndexedDB 내부 캐시 손상 (Firebase SDK 버그, 앱 버그 아님)
             /INTERNAL ASSERTION FAILED/,
             /Unexpected state/,
+            // IndexedDB 용량 초과 (사용자 기기 저장공간 부족, 앱 버그 아님)
+            /QuotaExceededError/,
+            /Encountered full disk/,
+            /exceeded the quota/i,
+            // 브라우저 비밀번호 관리자/확장이 크로스오리진 프레임 접근 시 발생 (앱 버그 아님)
+            /Blocked a frame with origin/,
+            // App Check reCAPTCHA Enterprise 타임아웃 (구형 브라우저·느린 네트워크 환경 이슈, 앱 버그 아님)
+            /reCAPTCHA.*(Timeout|timeout)/,
+            // Whale 브라우저 비밀번호 관리자가 DOM 스캔 중 SecurityError 발생 (브라우저 내부 동작, 앱 버그 아님)
+            /hasPasswordField_/,
         ],
         // 브라우저 확장 프로그램 에러 제외
         denyUrls: [
@@ -64,9 +74,22 @@ export function initSentry() {
             const frames = event.exception?.values?.[0]?.stacktrace?.frames;
             if (frames?.some(f =>
                 f.filename?.includes('firebase-auth') ||
-                f.filename?.includes('firebase-db')
+                f.filename?.includes('firebase-db') ||
+                f.filename?.includes('recaptcha')
             )) {
                 return null;
+            }
+
+            // Samsung Internet 브라우저의 removeChild DOM 불일치 에러 필터링
+            // 삼성 브라우저 자체의 DOM 최적화(콘텐츠 차단, Samsung Pass 자동완성 등)가
+            // React virtual DOM과 충돌할 때 발생하는 환경적 노이즈 (앱 버그 아님)
+            const ua = navigator.userAgent;
+            const isSamsungBrowser = /SamsungBrowser/i.test(ua);
+            if (isSamsungBrowser) {
+                const errorMsg = event.exception?.values?.[0]?.value || '';
+                if (/removeChild|The node to be removed is not a child/i.test(errorMsg)) {
+                    return null;
+                }
             }
 
             return event;

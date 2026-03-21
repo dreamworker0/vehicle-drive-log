@@ -45,7 +45,7 @@ vi.mock('../../lib/firestore', () => ({
     getMyDriveLogs: (...args: any[]) => mockGetMyDriveLogs(...args),
 }));
 
-vi.mock('../../lib/firebase', () => ({ db: {}, default: {} }));
+vi.mock('../../lib/firebase', () => ({ db: {}, auth: { currentUser: null }, default: {} }));
 vi.mock('../../lib/dateUtils', () => ({
     toLocalDateStr: vi.fn((d) => {
         if (!d) return '2026-03-04';

@@ -8,6 +8,7 @@ export const cleanupDuplicateLogs = onCall(
     {
         region: "asia-northeast3",
         timeoutSeconds: 120,
+        enforceAppCheck: true,
     },
     async (request) => {
         if (!request.auth) {

@@ -3,6 +3,8 @@
  */
 import { useNavigate } from 'react-router-dom';
 import useForceLightMode from '../../hooks/useForceLightMode';
+import SEOHead from '../common/SEOHead';
+import PublicNav from '../common/PublicNav';
 
 interface Feature {
     icon: string;
@@ -91,12 +93,21 @@ export default function LandingPage() {
 
     return (
         <div className="min-h-screen flex flex-col bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900 text-white">
+            <SEOHead
+                title="차량 운행일지 - 사회복지기관·비영리단체 전용"
+                description="AI 계기판 인식, 예약, 길안내, 정비, 통계, 출력까지. 사회복지기관을 위한 무료 차량 관리 서비스."
+                path="/"
+                isHome
+            />
             {/* 배경 장식 */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
                 <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary-400/20 rounded-full blur-3xl" />
                 <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-primary-300/10 rounded-full blur-3xl" />
                 <div className="absolute top-1/3 left-1/4 w-64 h-64 bg-accent-400/10 rounded-full blur-3xl" />
             </div>
+
+            {/* ─── 상단 네비게이션 ─── */}
+            <PublicNav variant="overlay" />
 
             {/* ─── 히어로 ─── */}
             <header className="relative flex-1 flex flex-col items-center justify-center text-center px-4 py-16 sm:py-24">
@@ -163,6 +174,7 @@ export default function LandingPage() {
                             className="absolute top-0 left-0 w-full h-full"
                             src="https://www.youtube.com/embed/XdT5Wm_pd3s?rel=0&modestbranding=1"
                             title="차량 운행일지 사용법"
+                            loading="lazy"
                             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                             referrerPolicy="strict-origin-when-cross-origin"
                             allowFullScreen
@@ -235,10 +247,6 @@ export default function LandingPage() {
                     <a href="/terms" className="hover:text-white underline underline-offset-2 transition-colors">이용약관</a>
                     <span className="text-primary-300/30" aria-hidden="true">|</span>
                     <a href="/privacy" className="hover:text-white underline underline-offset-2 transition-colors">개인정보 처리방침</a>
-                    <span className="text-primary-300/30" aria-hidden="true">|</span>
-                    <a href="/release-notes" className="hover:text-white underline underline-offset-2 transition-colors">업데이트 소식</a>
-                    <span className="text-primary-300/30" aria-hidden="true">|</span>
-                    <a href="/faq" className="hover:text-white underline underline-offset-2 transition-colors">자주 하는 질문</a>
                 </nav>
                 <p>© 2026 차량 운행일지. All rights reserved.</p>
             </footer>

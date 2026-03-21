@@ -3,6 +3,7 @@ import { useState, useEffect, useRef, createContext, useContext, ReactNode } fro
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { doc, onSnapshot, Unsubscribe } from 'firebase/firestore';
 import { auth, db, authReady } from '../lib/firebase';
+import { refreshTokenSilently, refreshToken } from '../lib/tokenRefresh';
 import { handleRedirectResult, logout } from '../lib/auth';
 import { setSentryUser } from '../lib/sentry';
 import type { User as UserDoc } from '../types/user';
@@ -63,85 +64,120 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 if (firebaseUser && !firebaseUser.isAnonymous) {
                     setUser(firebaseUser);
 
-                    // 사용자 문서를 실시간 감시 (삭제 시 즉시 감지)
-                    unsubscribeUser = onSnapshot(
-                        doc(db, 'users', firebaseUser.uid),
-                        (docSnap) => {
-                            if (docSnap.exists()) {
-                                const data = { id: docSnap.id, ...docSnap.data() } as UserDoc;
-                                setUserData(data);
-                                // Sentry 사용자 컨텍스트 설정 (에러 추적 시 역할/기관 파악)
-                                setSentryUser({ uid: firebaseUser.uid, email: firebaseUser.email || '', role: data.role, organizationId: data.organizationId || '' });
+                    const startUserWatch = (retryCount = 0) => {
+                        unsubscribeUser = onSnapshot(
+                            doc(db, 'users', firebaseUser.uid),
+                            (docSnap) => {
+                                if (docSnap.exists()) {
+                                    const data = { id: docSnap.id, ...docSnap.data() } as UserDoc;
+                                    setUserData(data);
+                                    // Sentry 사용자 컨텍스트 설정 (에러 추적 시 역할/기관 파악)
+                                    setSentryUser({ uid: firebaseUser.uid, email: firebaseUser.email || '', role: data.role, organizationId: data.organizationId || '' });
 
-                                // Custom Claims 토큰 갱신: 초기 로드 또는 role/orgId 변경 시 강제 갱신
-                                const prev = prevClaimsRef.current;
-                                const isInitialLoad = prev.role === undefined;
-                                const isClaimsChanged = !isInitialLoad && (prev.role !== data.role || prev.orgId !== data.organizationId);
-                                if (isInitialLoad || isClaimsChanged) {
-                                    firebaseUser.getIdToken(true).catch((err) => {
-                                        console.warn('Custom Claims 토큰 갱신 실패:', err);
-                                    });
-                                }
-                                prevClaimsRef.current = { role: data.role, orgId: data.organizationId || undefined };
+                                    // Custom Claims 토큰 갱신: 초기 로드 또는 role/orgId 변경 시 강제 갱신
+                                    const prev = prevClaimsRef.current;
+                                    const isInitialLoad = prev.role === undefined;
+                                    const isClaimsChanged = !isInitialLoad && (prev.role !== data.role || prev.orgId !== data.organizationId);
+                                    prevClaimsRef.current = { role: data.role, orgId: data.organizationId || undefined };
 
-                                // 기관 상태 실시간 감시 (soft delete 감지)
-                                if (data.organizationId && data.role !== 'superAdmin') {
-                                    if (unsubscribeOrg) unsubscribeOrg();
+                                    // 초기 로드 시: 토큰 갱신 완료까지 loading 유지 (대시보드의 Claims 의존 쿼리 보호)
+                                    // 이후 변경 시: fire-and-forget (이미 화면 로드됨)
+                                    const finishLoading = () => {
+                                        // 기관 상태 실시간 감시 (soft delete 감지)
+                                        if (data.organizationId && data.role !== 'superAdmin') {
+                                            if (unsubscribeOrg) unsubscribeOrg();
 
-                                    const startOrgWatch = (retryCount = 0) => {
-                                        unsubscribeOrg = onSnapshot(
-                                            doc(db, 'organizations', data.organizationId!),
-                                            (orgSnap) => {
-                                                if (orgSnap.exists()) {
-                                                    setOrgDeleted(orgSnap.data().status === 'deleted');
-                                                } else {
-                                                    setOrgDeleted(true);
-                                                }
-                                            },
-                                            (err) => {
-                                                console.error('기관 상태 감시 실패:', err);
-                                                const errCode = (err as { code?: string })?.code;
-                                                if (errCode === 'permission-denied' && retryCount < 1) {
-                                                    // 1회 재시도: 보안 규칙 캐시 미갱신으로 인한 일시적 에러 대응
-                                                    if (unsubscribeOrg) { unsubscribeOrg(); unsubscribeOrg = null; }
-                                                    setTimeout(() => {
-                                                        startOrgWatch(retryCount + 1);
-                                                    }, 1000);
-                                                } else if (errCode === 'permission-denied') {
-                                                    logout();
-                                                }
+                                            const startOrgWatch = (orgRetryCount = 0) => {
+                                                unsubscribeOrg = onSnapshot(
+                                                    doc(db, 'organizations', data.organizationId!),
+                                                    (orgSnap) => {
+                                                        if (orgSnap.exists()) {
+                                                            setOrgDeleted(orgSnap.data().status === 'deleted');
+                                                        } else {
+                                                            setOrgDeleted(true);
+                                                        }
+                                                    },
+                                                    (err) => {
+                                                        console.error('기관 상태 감시 실패:', err);
+                                                        const errCode = (err as { code?: string })?.code;
+                                                        if (errCode === 'permission-denied' && orgRetryCount < 1) {
+                                                            if (unsubscribeOrg) { unsubscribeOrg(); unsubscribeOrg = null; }
+                                                            setTimeout(() => {
+                                                                startOrgWatch(orgRetryCount + 1);
+                                                            }, 1000);
+                                                        } else if (errCode === 'permission-denied') {
+                                                            logout();
+                                                        }
+                                                    }
+                                                );
+                                            };
+
+                                            const createdAt = data.createdAt;
+                                            const createdMillis = (createdAt && typeof createdAt === 'object' && 'toMillis' in createdAt)
+                                                ? (createdAt as { toMillis: () => number }).toMillis()
+                                                : (createdAt instanceof Date ? createdAt.getTime() : 0);
+
+                                            const isNewlyCreated = createdMillis > 0 && (Date.now() - createdMillis) < 5000;
+
+                                            if (isNewlyCreated) {
+                                                setTimeout(startOrgWatch, 500);
+                                            } else {
+                                                startOrgWatch();
                                             }
-                                        );
+                                        }
+                                        setLoading(false);
                                     };
 
-                                    // 신규 가입 직후(문서가 방금 생성됨)인지 감지
-                                    const createdAt = data.createdAt;
-                                    const createdMillis = (createdAt && typeof createdAt === 'object' && 'toMillis' in createdAt)
-                                        ? (createdAt as { toMillis: () => number }).toMillis()
-                                        : (createdAt instanceof Date ? createdAt.getTime() : 0);
-
-                                    const isNewlyCreated = createdMillis > 0 && (Date.now() - createdMillis) < 5000;
-
-                                    if (isNewlyCreated) {
-                                        setTimeout(startOrgWatch, 500);
+                                    if (isInitialLoad || isClaimsChanged) {
+                                        if (isInitialLoad) {
+                                            // 초기 로드: 토큰 갱신 완료 후 loading 해제 (재시도 포함)
+                                            refreshTokenSilently(firebaseUser)
+                                                .finally(() => { finishLoading(); });
+                                        } else {
+                                            // 이후 변경: fire-and-forget + 즉시 loading 해제
+                                            refreshTokenSilently(firebaseUser);
+                                            finishLoading();
+                                        }
                                     } else {
-                                        startOrgWatch();
+                                        finishLoading();
                                     }
+                                } else {
+                                    // 사용자 문서가 없거나 삭제됨
+                                    // orgWatch가 남아있으면 orgDeleted=true를 계속 세팅하므로 반드시 해제
+                                    if (unsubscribeOrg) { unsubscribeOrg(); unsubscribeOrg = null; }
+                                    setUserData(null);
+                                    setOrgDeleted(false);
+                                    setLoading(false);
                                 }
-                            } else {
-                                // 사용자 문서가 없거나 삭제됨
-                                setUserData(null);
-                                setOrgDeleted(false);
+                            },
+                            (err: { code?: string }) => {
+                                if (err?.code === 'permission-denied' && retryCount < 1) {
+                                    // 캐시된 세션의 낡은 토큰일 수 있음 → 토큰 갱신 후 재시도
+                                    console.debug('사용자 데이터 접근 권한 없음 — 토큰 갱신 후 재시도');
+                                    if (unsubscribeUser) { unsubscribeUser(); unsubscribeUser = null; }
+                                    refreshToken(firebaseUser)
+                                        .then(() => { startUserWatch(retryCount + 1); })
+                                        .catch(() => {
+                                            setUserData(null);
+                                            setLoading(false);
+                                            logout();
+                                        });
+                                } else if (err?.code === 'permission-denied') {
+                                    // 재시도에도 실패 → 로그아웃
+                                    console.debug('사용자 데이터 접근 권한 없음 — 로그아웃 처리');
+                                    setUserData(null);
+                                    setLoading(false);
+                                    logout();
+                                } else {
+                                    console.error('사용자 데이터 실시간 감시 실패:', err);
+                                    setUserData(null);
+                                    setLoading(false);
+                                }
                             }
-                            setLoading(false);
-                        },
-                        (err) => {
-                            console.error('사용자 데이터 실시간 감시 실패:', err);
-                            setUserData(null);
-                            setLoading(false);
-                            if (err?.code === 'permission-denied') logout();
-                        }
-                    );
+                        );
+                    };
+
+                    startUserWatch();
                 } else {
                     setUser(null);
                     setUserData(null);

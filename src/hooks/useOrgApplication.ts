@@ -74,6 +74,7 @@ export default function useOrgApplication() {
         orgName: '',
         applicantEmail: currentUser?.email || '',
         applicantPhone: '',
+        message: '',
     });
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -86,7 +87,7 @@ export default function useOrgApplication() {
     const [agreePrivacy, setAgreePrivacy] = useState(false);
 
     // 폼 입력 핸들러
-    const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
     }, []);
 
@@ -189,6 +190,7 @@ export default function useOrgApplication() {
                 applicantUid: firebaseAuth.currentUser?.uid || '',
                 aiVerified: false,
                 uniqueNumberImageUrl: '',
+                ...(form.message.trim() && { message: form.message.trim() }),
             });
 
             // 2. 파일 업로드

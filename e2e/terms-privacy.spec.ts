@@ -39,6 +39,7 @@ test.describe('랜딩 푸터에서 약관/개인정보로 이동', () => {
         const termsLink = page.getByRole('link', { name: '이용약관' }).first();
         await expect(termsLink).toBeVisible({ timeout: 10000 });
         await termsLink.click();
+        await page.waitForURL(/terms/, { timeout: 10000 });
         await expect(page).toHaveURL(/terms/);
     });
 
@@ -47,6 +48,7 @@ test.describe('랜딩 푸터에서 약관/개인정보로 이동', () => {
         const privacyLink = page.getByRole('link', { name: '개인정보 처리방침' }).first();
         await expect(privacyLink).toBeVisible({ timeout: 10000 });
         await privacyLink.click();
+        await page.waitForURL(/privacy/, { timeout: 10000 });
         await expect(page).toHaveURL(/privacy/);
     });
 });

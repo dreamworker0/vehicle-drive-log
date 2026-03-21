@@ -41,7 +41,7 @@ export default function MileageInput({
     return (
         <div className="glass-card p-4">
             <div className="flex items-center justify-between mb-3">
-                <h3 className="text-sm font-semibold text-surface-600 dark:text-surface-400">주행 거리</h3>
+                <h3 className="text-sm font-semibold text-surface-600 dark:text-surface-400">🛣️ 주행 거리</h3>
                 <button
                     type="button"
                     onClick={() => cameraInputRef.current?.click()}

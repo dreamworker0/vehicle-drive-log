@@ -36,6 +36,20 @@ lint_*.txt
 lint-result.*
 # Firebase
 .firebase/
+*-adminsdk-*.json
+
+# Functions
+functions/node_modules/
+functions/lib/
+
+# Test output
+test-results/
+playwright-report/
+coverage/
 
 # OS
 Thumbs.db
+Desktop.ini
+
+# Agent / AI
+.gemini/

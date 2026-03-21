@@ -52,6 +52,7 @@ describe('buildLogData', () => {
         batteryEnd: '',
         notes: '  특이사항 없음  ',
         driveDate: '',
+        hipassBalanceAfter: '',
     };
 
     const baseContext = {

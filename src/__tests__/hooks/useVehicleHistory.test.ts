@@ -30,7 +30,12 @@ const mockLogs = [
 ];
 
 const mockGetVehicles = vi.fn().mockResolvedValue(mockVehicles);
-const mockGetVehicleDriveLogs = vi.fn().mockResolvedValue(mockLogs);
+const mockGetVehicleDriveLogs = vi.fn().mockImplementation((_vehicleId: string, since?: Date) => {
+    if (since) {
+        return Promise.resolve(mockLogs.filter(log => log.timestamp.toDate() >= since));
+    }
+    return Promise.resolve(mockLogs);
+});
 
 vi.mock('../../lib/firestore', () => ({
     getVehicles: (...args: unknown[]) => mockGetVehicles(...args),

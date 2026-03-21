@@ -175,7 +175,18 @@ export default function UserManual({ role = 'employee', onClose }: UserManualPro
                 </div>
 
                 {/* 하단 팁 */}
-                <div className="p-4 border-t border-surface-100 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 rounded-b-2xl">
+                <div className="p-4 border-t border-surface-100 dark:border-surface-700 bg-surface-50 dark:bg-surface-800 rounded-b-2xl space-y-2">
+                    <a
+                        href="/faq"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center gap-1.5 text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
+                        </svg>
+                        자주 하는 질문 (FAQ) 보기
+                    </a>
                     <p className="text-xs text-surface-400 text-center">
                         💡 궁금한 점이 있으시면 <strong>의견남기기</strong>를 이용해 주세요
                     </p>

@@ -32,6 +32,13 @@ description: 프로젝트 컨벤션에 맞게 새 커스텀 훅을 추가하는 
 | `useOrientationLock` | 화면 회전 잠금 (PDF 출력 시 가로 모드) | `hooks/useOrientationLock.ts` |
 | `useRetry` | 재시도 로직 (에러 시 자동 재시도) | `hooks/useRetry.ts` |
 | `useTimelineDrag` | 타임라인 드래그 로직 | `hooks/useTimelineDrag.ts` |
+| `useDailyLog` | 일일 운행일지 관리 | `hooks/useDailyLog.ts` |
+| `useFuelLog` | 주유 기록 관리 | `hooks/useFuelLog.ts` |
+| `useFuelLogAdmin` | 주유 기록 관리자 기능 | `hooks/useFuelLogAdmin.ts` |
+| `useHipassCharge` | 하이패스 충전 기록 관리 | `hooks/useHipassCharge.ts` |
+| `useHipassChargeAdmin` | 하이패스 충전 관리자 기능 | `hooks/useHipassChargeAdmin.ts` |
+| `useHipassManager` | 하이패스 단말기 관리 CRUD | `hooks/useHipassManager.ts` |
+| `useVehiclePriority` | 차량 우선순위 관리 | `hooks/useVehiclePriority.ts` |
 
 ### 훅 유틸리티 (`hooks/utils/`)
 

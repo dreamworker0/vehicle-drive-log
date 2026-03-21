@@ -6,12 +6,15 @@
  */
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore } from "firebase-admin/firestore";
+import { checkRateLimitByUid } from "./rateLimit";
+import { RATE_LIMITS } from "./constants";
 
 const db = getFirestore();
 
 export const joinOrganization = onCall(
     {
         region: "asia-northeast3",
+        enforceAppCheck: true,
     },
     async (request) => {
         // 1. 인증 확인
@@ -21,6 +24,9 @@ export const joinOrganization = onCall(
 
         const uid = request.auth.uid;
         const email = request.auth.token.email;
+
+        // Rate Limiting: 사용자당 시간당 5회 (브루트포스 방지)
+        await checkRateLimitByUid("joinOrganization", uid, RATE_LIMITS.joinOrganization.max, RATE_LIMITS.joinOrganization.windowSec);
         const displayName = request.auth.token.name || "";
         const signInProvider =
             request.auth.token.firebase?.sign_in_provider || "";
@@ -127,6 +133,11 @@ export const joinOrganization = onCall(
                     phone: "",
                     createdAt: new Date(),
                 });
+
+            // Claims를 즉시 설정 (onDocumentWritten 트리거 대기 없이)
+            // → 클라이언트의 getIdToken(true)에서 최신 Claims를 받을 수 있도록
+            const { getAuth } = await import("firebase-admin/auth");
+            await getAuth().setCustomUserClaims(uid, { role, orgId });
 
             // 9. 매칭된 preRegistered 문서 삭제
             if (preRegDocId) {

@@ -18,7 +18,9 @@
 | 🗺️ 길안내 연동 | 네이버/카카오/티맵 딥링크, 다중 목적지 경로 탐색 (거리·시간·톨비) |
 | 📴 오프라인 지원 | Firestore 오프라인 캐시, 연결 복구 시 자동 동기화 |
 | 🔔 푸시 알림 | 예약 10분 전 알림, 운행일지 미작성 알림, 관리자 공지 (FCM) |
+| 📱 카카오 알림톡 | 기관 승인·리마인드 알림톡 자동 발송 (알리고 API) |
 | 🔧 차량 정비 관리 | 정비/수리 기록, 정비 중 차량 사용 차단 |
+| ⛽ 주유·하이패스 | 주유 기록, 하이패스 충전 관리, 통계 차트 |
 | 🌙 다크 모드 | 시스템/사용자 설정 기반 다크 모드, 글꼴 크기 3단계 조절 |
 
 ---
@@ -36,7 +38,7 @@
 | AI/OCR | Gemini 3.1 Flash Lite Preview (Cloud Functions 경유) |
 | 호스팅 | Firebase Hosting |
 | 모니터링 | Sentry (프론트엔드 에러 + Web Vitals) |
-| CI/CD | GitHub Actions (PR 검증 + 자동 배포 + Preview Channel) |
+| 알림톡 | 알리고 API + Cafe24 PHP 프록시 (카카오 알림톡) |
 
 ---
 
@@ -105,6 +107,8 @@ EMAILJS_TEMPLATE_ID=...
 EMAILJS_PUBLIC_KEY=...
 EMAILJS_PRIVATE_KEY=...
 HOLIDAY_API_KEY=...
+ALIMTALK_PROXY_URL=...
+ALIMTALK_PROXY_TOKEN=...
 ```
 
 ---
@@ -139,22 +143,14 @@ firebase deploy --only functions
 firebase deploy --only firestore:rules,storage
 ```
 
-### CI/CD (GitHub Actions)
-
-| 워크플로우 | 트리거 | 동작 |
-|-----------|--------|------|
-| `ci.yml` | PR 생성/업데이트 | 린트 → 단위 테스트 → 빌드 검증 |
-| `deploy.yml` | `main` 브랜치 push | 프로덕션 자동 배포 |
-| `preview.yml` | PR 라벨 `preview` | Firebase Preview Channel 임시 URL |
-
-> ⚠️ `FIREBASE_SERVICE_ACCOUNT` + `FIREBASE_TOKEN` GitHub Secrets 등록 필요
+> ⚠️ 배포 전 반드시 Node 22 확인: `fnm use 22 && node --version`
 
 ---
 
 ## 프로젝트 구조
 
 ```
-d:\apps\차량운행일지\
+차량운행일지/
 ├── public/
 │   ├── firebase-messaging-sw.js      FCM Service Worker
 │   ├── manifest.json                 PWA 매니페스트
@@ -195,6 +191,7 @@ d:\apps\차량운행일지\
 | `ocrDashboard` | 계기판 사진 → Gemini OCR → Km/배터리% 추출 |
 | `createReservationSafe` | 서버사이드 예약 생성 (Firestore 트랜잭션, 동시성 안전) |
 | `sendAdminNotice` | 관리자 공지 FCM 전송 |
+| `sendBulkReminder` | 미활성 기관 일괄 알림톡 발송 (superAdmin 전용) |
 | `disableUser` | 사용자 비활성화 (Firebase Auth + Firestore) |
 | `restoreUser` | 비활성화된 사용자 복원 |
 | `joinOrganization` | 초대 코드로 기관 가입 (서버사이드 권한 처리) |
@@ -236,12 +233,10 @@ d:\apps\차량운행일지\
 
 ## 테스트
 
-| 종류 | 개수 | 도구 |
+| 종류 | 규모 | 도구 |
 |------|------|------|
-| 훅 단위 테스트 | 17개 | Vitest |
-| 라이브러리 단위 테스트 | 14개 | Vitest |
-| Cloud Functions 테스트 | 5개 | Vitest |
-| E2E 테스트 | 8개 파일 | Playwright |
+| 단위 테스트 | 35파일, 266개 | Vitest |
+| E2E 테스트 | 8파일, 40개 | Playwright |
 
 ---
 

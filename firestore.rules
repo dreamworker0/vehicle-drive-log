@@ -51,16 +51,23 @@ service cloud.firestore {
                     && request.auth.token.firebase.sign_in_provider != 'anonymous'
                     && request.resource.data.keys().hasAll(['email'])
                     && request.resource.data.email is string;
-      allow update: if isOwner(userId) || isSuperAdmin()
+      allow update: if (isOwner(userId)
+                        && !request.resource.data.diff(resource.data).affectedKeys()
+                            .hasAny(['role', 'organizationId']))
+                    || isSuperAdmin()
                     || isOrgAdmin(resource.data.organizationId);
       allow delete: if isSuperAdmin();
     }
 
     // === 기관 ===
     match /organizations/{orgId} {
-      // 초대 코드 검증(findOrganizationByInviteCode)을 위해 isSignedIn() 유지
-      allow read: if isSignedIn();
-      allow create: if isSignedIn();
+      // 소속 멤버, 신청자 본인, superAdmin만 읽기 가능 (초대 코드 검증은 Cloud Function에서 처리)
+      allow read: if isSuperAdmin()
+                  || isOrgMember(orgId)
+                  || (isSignedIn() && resource.data.applicantUid == request.auth.uid);
+      allow create: if isSignedIn()
+                    && request.resource.data.keys().hasAll(['name', 'applicantUid'])
+                    && request.resource.data.applicantUid == request.auth.uid;
       allow update: if isOrgAdmin(orgId) || isSuperAdmin()
                     || (isSignedIn() && resource.data.status == 'pending' && resource.data.applicantUid == request.auth.uid);
       allow delete: if isSuperAdmin();
@@ -81,11 +88,26 @@ service cloud.firestore {
     // === 차량 ===
     match /vehicles/{vehicleId} {
       allow read: if belongsToMyOrg() || isSuperAdmin();
-      allow create: if newBelongsToMyOrg() && isOrgAdmin(request.resource.data.organizationId);
+      allow create: if (newBelongsToMyOrg() && isOrgAdmin(request.resource.data.organizationId))
+                    || isSuperAdmin();
       allow update: if isOrgAdmin(resource.data.organizationId) || isSuperAdmin()
-                    // 소속 기관 멤버가 운행일지 저장 시 currentKm만 갱신 가능
+                    // 소속 기관 멤버가 운행일지 저장 시 currentKm만 갱신 가능 (감소 방지)
                     || (isOrgMember(resource.data.organizationId)
-                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['currentKm']));
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['currentKm'])
+                        && request.resource.data.currentKm >= resource.data.currentKm);
+      allow delete: if isOrgAdmin(resource.data.organizationId) || isSuperAdmin();
+    }
+
+    // === 하이패스 카드 ===
+    match /hipassCards/{cardId} {
+      allow read: if belongsToMyOrg() || isSuperAdmin();
+      allow create: if (newBelongsToMyOrg() && isOrgAdmin(request.resource.data.organizationId))
+                    || isSuperAdmin();
+      allow update: if isOrgAdmin(resource.data.organizationId) || isSuperAdmin()
+                    // 소속 기관 멤버가 충전 시 balance만 갱신 가능 (음수 방지)
+                    || (isOrgMember(resource.data.organizationId)
+                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['balance', 'updatedAt'])
+                        && request.resource.data.balance >= 0);
       allow delete: if isOrgAdmin(resource.data.organizationId) || isSuperAdmin();
     }
 
@@ -93,7 +115,8 @@ service cloud.firestore {
     match /driveLogs/{logId} {
       allow read: if belongsToMyOrg() || isSuperAdmin();
       allow create: if newBelongsToMyOrg()
-                    && request.resource.data.keys().hasAll(['organizationId', 'vehicleId', 'driverUid']);
+                    && request.resource.data.keys().hasAll(['organizationId', 'vehicleId', 'driverUid'])
+                    && request.resource.data.driverUid == request.auth.uid;
       allow update: if isSuperAdmin()
                     || (belongsToMyOrg() && (resource.data.driverUid == request.auth.uid
                         || isOrgAdmin(resource.data.organizationId)));
@@ -104,7 +127,8 @@ service cloud.firestore {
     match /reservations/{reservationId} {
       allow read: if belongsToMyOrg() || isSuperAdmin();
       allow create: if newBelongsToMyOrg()
-                    && request.resource.data.keys().hasAll(['organizationId', 'vehicleId', 'reservedByUid']);
+                    && request.resource.data.keys().hasAll(['organizationId', 'vehicleId', 'reservedByUid'])
+                    && request.resource.data.reservedByUid == request.auth.uid;
       allow update: if isSuperAdmin()
                     || (belongsToMyOrg() && (resource.data.reservedByUid == request.auth.uid
                         || isOrgAdmin(resource.data.organizationId)));
@@ -114,9 +138,12 @@ service cloud.firestore {
     // === 알림 ===
     match /notifications/{notificationId} {
       allow read: if resource.data.targetUid == request.auth.uid || isSuperAdmin();
-      allow create: if isSignedIn()
-                    && request.resource.data.keys().hasAll(['targetUid'])
-                    && request.resource.data.targetUid is string;
+      // 같은 기관 멤버에게만 알림 생성 가능 (Cloud Functions는 admin SDK로 Rules 우회)
+      allow create: if isSuperAdmin()
+                    || (isSignedIn()
+                        && request.resource.data.keys().hasAll(['targetUid'])
+                        && request.resource.data.targetUid is string
+                        && request.resource.data.organizationId == userOrgId());
       allow update: if resource.data.targetUid == request.auth.uid;
       allow delete: if resource.data.targetUid == request.auth.uid || isSuperAdmin();
     }
@@ -132,13 +159,29 @@ service cloud.firestore {
     // === 주유 기록 ===
     match /fuelLogs/{logId} {
       allow read: if belongsToMyOrg() || isSuperAdmin();
-      allow create: if newBelongsToMyOrg();
+      allow create: if newBelongsToMyOrg()
+                    && request.resource.data.keys().hasAll(['organizationId', 'vehicleId', 'driverUid']);
       allow update: if belongsToMyOrg()
                     && (resource.data.driverUid == request.auth.uid
                         || isOrgAdmin(resource.data.organizationId))
                     || isSuperAdmin();
       allow delete: if (belongsToMyOrg()
                     && (resource.data.driverUid == request.auth.uid
+                        || isOrgAdmin(resource.data.organizationId)))
+                    || isSuperAdmin();
+    }
+
+    // === 하이패스 충전 기록 ===
+    match /hipassCharges/{chargeId} {
+      allow read: if belongsToMyOrg() || isSuperAdmin();
+      allow create: if newBelongsToMyOrg()
+                    && request.resource.data.keys().hasAll(['organizationId', 'cardId', 'chargerUid']);
+      allow update: if belongsToMyOrg()
+                    && (resource.data.chargerUid == request.auth.uid
+                        || isOrgAdmin(resource.data.organizationId))
+                    || isSuperAdmin();
+      allow delete: if (belongsToMyOrg()
+                    && (resource.data.chargerUid == request.auth.uid
                         || isOrgAdmin(resource.data.organizationId)))
                     || isSuperAdmin();
     }
@@ -164,7 +207,8 @@ service cloud.firestore {
     match /orgApplications/{appId} {
       allow read: if isSuperAdmin()
                   || (isSignedIn() && resource.data.applicantEmail == request.auth.token.email);
-      allow create: if isSignedIn();
+      allow create: if isSignedIn()
+                    && request.resource.data.applicantEmail == request.auth.token.email;
       allow update: if isSuperAdmin();
       allow delete: if isSuperAdmin();
     }

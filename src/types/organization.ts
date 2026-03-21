@@ -35,6 +35,8 @@ export interface Organization extends FirestoreDoc {
     approvedAt?: TimestampField;
     rejectedAt?: TimestampField;
     deletedAt?: TimestampField | null;
+    firstEmployeeRegisteredAt?: TimestampField;
+    timeToFirstEmployeeDays?: number;
 }
 
 /** createOrganization에 전달할 데이터 */

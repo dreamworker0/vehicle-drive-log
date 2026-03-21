@@ -2,7 +2,7 @@
  * ReservationSidePanel — 예약 사이드 패널 (예약 폼 + 예약 목록)
  * ReservationCalendar에서 추출된 서브 컴포넌트
  */
-import React, { useRef } from 'react';
+import React, { useRef, useMemo, useState } from 'react';
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
 import { calcEndTime } from '../../hooks/utils/reservationUtils';
 import { parseDestinations } from '../../lib/tmap';
@@ -58,6 +58,8 @@ interface Props {
     setFavName: (name: string) => void;
     onSaveFavorite: () => Promise<void>;
     onOpenForm: () => void;
+    /** 사용자별 차량 사용 횟수 (useVehiclePriority에서 제공) */
+    usageCounts?: Map<string, number>;
 }
 
 export default function ReservationSidePanel({
@@ -93,8 +95,17 @@ export default function ReservationSidePanel({
     setFavName,
     onSaveFavorite,
     onOpenForm,
+    usageCounts,
 }: Props) {
     const destinationRef = useRef<HTMLInputElement>(null);
+    const [showFreeRoad, setShowFreeRoad] = useState(false);
+
+    // 폐차 제외 + 사용 빈도순 정렬
+    const sortedActiveVehicles = useMemo(() => {
+        const filtered = vehicles.filter(v => !v.retired?.isRetired);
+        if (!usageCounts || usageCounts.size === 0) return filtered;
+        return [...filtered].sort((a, b) => (usageCounts.get(b.id) || 0) - (usageCounts.get(a.id) || 0));
+    }, [vehicles, usageCounts]);
 
     if (!selectedDate) {
         return (
@@ -133,23 +144,29 @@ export default function ReservationSidePanel({
                 <div className="mb-4 p-3 rounded-xl bg-primary-50/50 border border-primary-100 dark:bg-surface-700/50 dark:border-surface-600 animate-fade-in">
                     <form onSubmit={onSubmit} className="space-y-3">
                         <div>
-                            <label className="label text-xs">차량</label>
+                            <label className="label text-xs">🚘 차량 <span className="text-red-500">*</span></label>
                             <div className="grid grid-cols-3 gap-1.5">
-                                {vehicles.filter(v => !v.retired?.isRetired).map(v => {
+                                {sortedActiveVehicles.map(v => {
                                     const isBlocked = isVehicleBlocked(v.maintenance);
+                                    const count = usageCounts?.get(v.id) || 0;
                                     return (
                                         <button
                                             key={v.id}
                                             type="button"
                                             onClick={() => { if (!isBlocked) { setForm({ ...form, vehicleId: v.id }); setTimeout(() => destinationRef.current?.focus(), 50); } }}
                                             disabled={isBlocked}
-                                            className={`p-2 rounded-lg border text-left transition-all ${isBlocked
+                                            className={`p-2 rounded-lg border text-left transition-all relative ${isBlocked
                                                 ? 'border-surface-200 dark:border-surface-700 bg-surface-100 dark:bg-surface-800 opacity-50 cursor-not-allowed'
                                                 : form.vehicleId === v.id
                                                     ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 ring-2 ring-primary-500/30'
                                                     : 'border-surface-200 dark:border-surface-600 hover:border-surface-300 bg-white dark:bg-surface-800'
                                                 }`}
                                         >
+                                            {count > 0 && !isBlocked && (
+                                                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-primary-500 text-white text-[10px] font-bold flex items-center justify-center shadow-sm">
+                                                    {count}
+                                                </span>
+                                            )}
                                             <div className="flex flex-col items-center gap-1">
                                                 <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-base ${isBlocked ? 'bg-surface-200 dark:bg-surface-700' : getVehicleColor(v.id)}`}>
                                                     {isBlocked ? '🔧' : (VEHICLE_TYPE_ICONS[v.vehicleType as keyof typeof VEHICLE_TYPE_ICONS] || '🚗')}
@@ -185,7 +202,7 @@ export default function ReservationSidePanel({
                             </div>
                         )}
                         <div>
-                            <label className="label text-xs">목적지 <span className="text-red-500">*</span></label>
+                            <label className="label text-xs">📍 목적지 <span className="text-red-500">*</span></label>
                             <div className="flex items-center gap-1.5">
                                 <input
                                     ref={destinationRef}
@@ -259,21 +276,42 @@ export default function ReservationSidePanel({
                                             경로 탐색 중...
                                         </div>
                                     ) : routeInfo && (
-                                        <div className="p-2.5 rounded-lg bg-blue-50 border border-blue-200 dark:bg-blue-900/20 dark:border-blue-800/40 animate-fade-in">
+                                        <div className="p-2.5 rounded-lg bg-blue-50 border border-blue-200 dark:bg-blue-900/20 dark:border-blue-800/40 animate-fade-in space-y-1.5">
                                             <div className="flex items-center gap-3 text-xs">
+                                                {routeInfo.freeRoadRoute && <span className="text-[11px] font-semibold text-blue-500 dark:text-blue-400 bg-blue-100 dark:bg-blue-800/40 px-1.5 py-0.5 rounded">고속</span>}
                                                 <span className="font-bold text-blue-700 dark:text-blue-300">🗺️ {routeInfo.isMulti ? '총 ' : ''}{Math.floor(routeInfo.distance)}km</span>
-                                                <span className="font-bold text-blue-700 dark:text-blue-300">⏱ {routeInfo.isMulti ? '총 ' : ''}약 {routeInfo.duration}분</span>
-                                                {routeInfo.tollFee > 0 && (
-                                                    <span className="text-blue-600 dark:text-blue-400">톨비 {routeInfo.tollFee.toLocaleString()}원</span>
+                                                <span className="font-bold text-blue-700 dark:text-blue-300">⏱ {routeInfo.isMulti ? '총 ' : ''}{routeInfo.duration}분</span>
+                                                {(routeInfo.tollFee ?? 0) > 0 && (
+                                                    <span className="text-blue-600 dark:text-blue-400">₩{(routeInfo.tollFee ?? 0).toLocaleString()}</span>
+                                                )}
+                                                {routeInfo.freeRoadRoute && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => setShowFreeRoad(prev => !prev)}
+                                                        className="ml-auto flex-shrink-0 w-6 h-6 flex items-center justify-center rounded hover:bg-blue-100 dark:hover:bg-blue-800/40 transition-colors"
+                                                        title="무료도로 경로 보기"
+                                                    >
+                                                        <svg className={`w-3.5 h-3.5 text-blue-500 dark:text-blue-400 transition-transform duration-200 ${showFreeRoad ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+                                                    </button>
                                                 )}
                                             </div>
+                                            {showFreeRoad && routeInfo.freeRoadRoute && (
+                                                <div className="flex items-center gap-3 text-xs border-t border-blue-200/50 dark:border-blue-800/30 pt-1.5 animate-fade-in">
+                                                    <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-800/40 px-1.5 py-0.5 rounded">무료</span>
+                                                    <span className="font-bold text-emerald-700 dark:text-emerald-300">🗺️ {Math.floor(routeInfo.freeRoadRoute.distance)}km</span>
+                                                    <span className="font-bold text-emerald-700 dark:text-emerald-300">⏱ {routeInfo.freeRoadRoute.duration}분</span>
+                                                    {routeInfo.freeRoadRoute.tollFee > 0 && (
+                                                        <span className="text-emerald-600 dark:text-emerald-400">₩{routeInfo.freeRoadRoute.tollFee.toLocaleString()}</span>
+                                                    )}
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>
                             )}
                         </div>
                         <div>
-                            <label className="label text-xs">목적</label>
+                            <label className="label text-xs">📝 목적</label>
                             <input
                                 type="text"
                                 value={form.purpose}

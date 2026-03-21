@@ -67,6 +67,8 @@ export default function CalendarGrid({
                                                 'hover:bg-surface-100 dark:hover:bg-surface-700 text-surface-700 dark:text-surface-300'}
                     `}
                             title={day.holiday || ''}
+                            aria-label={`${day.dateStr.replace(/-/g, '년 ').replace(/ (\d{2})$/, '월 $1일')}${day.holiday ? ` ${day.holiday}` : ''}${hasRes ? `, 예약 ${day.reservations.length}건` : ''}`}
+                            aria-pressed={isSelected}
                         >
                             {day.date}
                             {hasRes && (

@@ -5,6 +5,25 @@
 
 ---
 
+## Phase 37 — 카카오 알림톡 연동 & 운영 개선 📱
+
+> 2026-03-16
+
+### Added
+- 카카오 알림톡 발송 시스템 (`sendAlimtalk.ts` — 알리고 API + Cafe24 PHP 프록시 경유)
+- 미활성 기관 일괄 알림톡 발송 (`sendBulkReminder` onCall, superAdmin 전용)
+- 기관 관리 UI에 미활성 기관 일괄 알림톡 발송 버튼 (`OrgManagement.tsx`)
+
+### Changed
+- 의견 관리 사람별 그룹핑 정렬로 변경 (`FeedbackManagement.tsx` — 이메일 기준 그룹, 아코디언 UI, 이메일 복사)
+- FAQ에 Google Workspace 캘린더 관리자 설정 가이드 추가 (`faqData.ts`)
+- 릴리즈 노트에서 시스템 관리자 전용 항목 제거 (`releaseNotes.ts`)
+
+### Fixed
+- 알림톡 템플릿 불일치 오류 해결 (CRLF→LF, 버튼 URL 고정, `tpl_code` 추가)
+
+---
+
 ## Phase 34 — 기능 추가 & 번들 최적화 & 운영 정비 🚀
 
 > 2026-03-13

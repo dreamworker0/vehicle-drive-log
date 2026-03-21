@@ -7,6 +7,7 @@
 
 import { db } from './firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import { getAuthHeaders } from './authFetch';
 
 const API_KEY = import.meta.env.VITE_HOLIDAY_API_KEY;
 
@@ -54,7 +55,9 @@ export const fetchPublicHolidays = async (year: number) => {
             // 프로덕션 환경: Cloud Function 프록시 사용
             url = `/api/holiday?solYear=${year}&numOfRows=50`;
         }
-        const res = await fetch(url);
+        const res = await fetch(url, {
+            headers: import.meta.env.PROD ? await getAuthHeaders() : {},
+        });
 
         if (!res.ok) {
             console.error('공휴일 API 응답 오류:', res.status);

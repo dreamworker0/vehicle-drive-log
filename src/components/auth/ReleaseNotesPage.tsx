@@ -1,6 +1,7 @@
-import { useNavigate } from 'react-router-dom';
 import { RELEASE_NOTES, type ReleaseItem } from '../../lib/releaseNotes';
 import useForceLightMode from '../../hooks/useForceLightMode';
+import SEOHead from '../common/SEOHead';
+import PublicNav from '../common/PublicNav';
 
 const TYPE_CONFIG: Record<ReleaseItem['type'], { emoji: string; label: string; color: string }> = {
     new: { emoji: '✨', label: '신규', color: 'bg-emerald-100 text-emerald-700' },
@@ -10,22 +11,17 @@ const TYPE_CONFIG: Record<ReleaseItem['type'], { emoji: string; label: string; c
 
 export default function ReleaseNotesPage() {
     useForceLightMode();
-    const navigate = useNavigate();
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-surface-50 to-primary-50 py-8 px-4">
+        <div className="min-h-screen bg-gradient-to-br from-surface-50 to-primary-50 flex flex-col">
+            <SEOHead
+                title="업데이트 소식"
+                description="차량 운행일지의 신규 기능, 개선 사항, 버그 수정 내역을 확인하세요."
+                path="/release-notes"
+            />
+            <PublicNav />
+            <div className="flex-1 py-8 px-4">
             <div className="w-full max-w-2xl mx-auto animate-fade-in">
-                {/* 뒤로가기 */}
-                <button
-                    onClick={() => navigate(-1)}
-                    className="flex items-center gap-1.5 text-sm text-surface-500 hover:text-surface-700 mb-6 transition-colors"
-                >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
-                    </svg>
-                    돌아가기
-                </button>
-
                 <div className="bg-white rounded-2xl shadow-soft p-6 md:p-8 space-y-8">
                     <div className="text-center border-b border-surface-100 pb-6">
                         <h1 className="text-2xl font-bold text-surface-900 mb-1">📋 업데이트 소식</h1>
@@ -78,6 +74,7 @@ export default function ReleaseNotesPage() {
                         </p>
                     </div>
                 </div>
+            </div>
             </div>
         </div>
     );

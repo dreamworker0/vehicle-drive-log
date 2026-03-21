@@ -4,7 +4,7 @@ import { useConfirm } from '../contexts/ConfirmContext';
 import {
     getVehicles,
     getReservationsByDateRange,
-    createReservation,
+    createReservationSafe,
     updateReservation,
     cancelReservation,
     cancelReservationGroup,
@@ -18,8 +18,8 @@ import { useAuth } from './useAuth';
 import { useToast } from './useToast';
 import { getHolidays } from '../lib/holiday';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isBefore, startOfDay } from 'date-fns';
-import { getMultiRoute, isTmapAvailable, VEHICLE_TYPE_TO_CAR_TYPE } from '../lib/tmap';
-import { calcEndTime, findUserOverlappingReservation } from './utils/reservationUtils';
+import { getMultiRouteWithFreeRoad, isTmapAvailable, VEHICLE_TYPE_TO_CAR_TYPE } from '../lib/tmap';
+import { calcEndTime, findOverlappingReservation, findUserOverlappingReservation } from './utils/reservationUtils';
 import type { Vehicle } from '../types/vehicle';
 import type { Reservation, CalendarDay } from '../types/reservation';
 import type { CustomHoliday } from '../types/holiday';
@@ -73,7 +73,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
     const [favName, setFavName] = useState('');
 
     // 경로 정보 상태
-    const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number; tollFee?: number } | null>(null);
+    const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number; tollFee?: number; freeRoadRoute?: { distance: number; duration: number; tollFee: number } } | null>(null);
     const [routeLoading, setRouteLoading] = useState(false);
 
     const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
@@ -151,14 +151,14 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
         const timer = setTimeout(async () => {
             setRouteLoading(true);
             try {
-                const result = await getMultiRoute(orgAddress, form.destination.trim(), { carType });
+                const result = await getMultiRouteWithFreeRoad(orgAddress, form.destination.trim(), { carType });
                 if (result) {
                     setRouteInfo({
                         distance: result.distance,
                         duration: result.duration,
                         tollFee: result.tollFee,
+                        freeRoadRoute: result.freeRoadRoute,
                     });
-                    // 경로 탐색 성공 시 자동 종료 시간 설정 (시작 시간이 있을 때만)
                     if (form.startTime && result.duration) {
                         const autoEnd = calcEndTime(form.startTime, result.duration);
                         setForm(prev => ({ ...prev, endTime: autoEnd }));
@@ -284,6 +284,19 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
         const effectiveEndDate = form.endDate || selectedDate;
         const isMultiDay = effectiveEndDate > selectedDate;
 
+        // 같은 차량이 같은 시간대에 이미 예약되어 있는지 검증 (클라이언트 사전 검사)
+        const vehicleOverlap = findOverlappingReservation(reservations, {
+            vehicleId: form.vehicleId,
+            date: selectedDate,
+            startTime: form.startTime,
+            endTime: isMultiDay ? '23:59' : form.endTime,
+            excludeId: editingReservation?.id || null,
+        });
+        if (vehicleOverlap) {
+            showToast(`해당 차량은 ${vehicleOverlap.startTime} ~ ${vehicleOverlap.endTime}에 이미 예약되어 있습니다.`, 'warning');
+            return;
+        }
+
         // 같은 사용자가 같은 시간대에 다른 차량 예약이 있는지 검증 (첫째 날 기준)
         const targetUid = form.reservedByUid || user.uid;
         const userOverlap = findUserOverlappingReservation(reservations, {
@@ -338,13 +351,12 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
                     const dayStr = format(days[i], 'yyyy-MM-dd');
                     const dayStartTime = i === 0 ? form.startTime : '00:00';
                     const dayEndTime = i === totalDays - 1 ? form.endTime : '23:59';
-                    await createReservation({
+                    await createReservationSafe({
                         ...baseData,
                         date: dayStr,
                         startTime: dayStartTime,
                         endTime: dayEndTime,
-                        status: 'pending',
-                    } as unknown as Reservation);
+                    });
                 }
                 showToast(`${totalDays}일간 다일 예약이 수정되었습니다.`);
             } else if (editingReservation) {
@@ -379,18 +391,17 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
                     const dayStr = format(days[i], 'yyyy-MM-dd');
                     const dayStartTime = i === 0 ? form.startTime : '00:00';
                     const dayEndTime = i === totalDays - 1 ? form.endTime : '23:59';
-                    await createReservation({
+                    await createReservationSafe({
                         ...baseData,
                         date: dayStr,
                         startTime: dayStartTime,
                         endTime: dayEndTime,
-                        status: 'pending',
-                    } as unknown as Reservation);
+                    });
                 }
                 showToast(`${totalDays}일간 다일 예약이 완료되었습니다.`);
             } else {
                 // ── 단일 날짜 예약 (기존 로직) ──
-                await createReservation({
+                await createReservationSafe({
                     ...form,
                     vehicleName,
                     ...routeData,
@@ -398,8 +409,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
                     reservedByUid: user.uid,
                     reservedByName: userData.name || user.email || '익명',
                     organizationId: userData.organizationId,
-                    status: 'pending'
-                } as unknown as Reservation);
+                });
                 showToast('예약이 완료되었습니다.');
             }
             // 목록 새로고침
@@ -413,8 +423,11 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
             setEditingGroupId(null);
             setForm({ vehicleId: '', destination: '', purpose: '', startTime: '', endTime: '', endDate: '' });
             setRouteInfo(null);
-        } catch (error: unknown) {
-            const errMsg = error instanceof Error ? error.message : '예약 처리에 실패했습니다.';
+        } catch (error: any) {
+            // Cloud Function already-exists 에러 처리
+            const errMsg = error?.code === 'functions/already-exists'
+                ? error.message
+                : error instanceof Error ? error.message : '예약 처리에 실패했습니다.';
             showToast(errMsg, 'error');
         } finally {
             setSubmitting(false);

@@ -7,7 +7,7 @@ export default function PendingApprovalPage() {
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-surface-50 to-amber-50 px-4">
             <div className="w-full max-w-sm text-center animate-scale-in">
-                <div className="w-20 h-20 mx-auto mb-6 bg-amber-100 rounded-full flex items-center justify-center">
+                <div className="w-20 h-20 mx-auto mb-6 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center">
                     <svg className="w-10 h-10 text-amber-600 animate-pulse-soft" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
                     </svg>
