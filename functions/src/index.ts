@@ -47,7 +47,7 @@ import { checkReservationReminders } from "./reservationReminder";
 
 export const reservationReminder = onSchedule(
     {
-        schedule: "every 5 minutes",
+        schedule: "every 10 minutes",
         timeZone: "Asia/Seoul",
         retryCount: 0,
     },
@@ -98,6 +98,8 @@ export { trackFirstEmployee } from "./trackFirstEmployee";
 export { backfillOrgCoords } from "./backfillOrgCoords";
 
 // Rate Limit 문서 자동 정리 (매일 05:00 KST)
+// TODO: GCP Console → Firestore → TTL 정책에서 _rateLimits 컬렉션의
+//       expiresAt 필드에 자동 삭제 TTL을 설정하면 이 스케줄러를 제거할 수 있음
 import { cleanupExpiredRateLimits } from "./rateLimit";
 
 export const cleanupRateLimits = onSchedule(

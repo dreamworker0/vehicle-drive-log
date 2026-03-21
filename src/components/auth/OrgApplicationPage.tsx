@@ -74,7 +74,7 @@ export default function OrgApplicationPage() {
                         <p className="font-semibold mb-1">📌 신청 전 확인해주세요</p>
                         <ul className="list-disc list-inside space-y-0.5">
                             <li>본 서비스는 <strong>사회복지기관, 비영리단체</strong>를 대상으로 <strong>무료</strong>로 제공됩니다.</li>
-                            <li>영리 목적의 일반 기업의 경우 신청이 <strong>반려</strong>될 수 있습니다.</li>
+                            <li>영리 기업 및 종교단체, 학교, 병원은 신청이 <strong>반려</strong>될 수 있습니다.</li>
                         </ul>
                     </div>
 

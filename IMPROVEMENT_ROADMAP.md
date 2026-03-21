@@ -19,33 +19,33 @@
 
 ---
 
-## Phase B — 이번 주 (3~5일)
+## Phase B — 이번 주 (3~5일) ✅ 완료
 
 - [x] **B-1. 에러 트래킹 도입 (Sentry)** (~반나절)
   - `@sentry/react` (프론트엔드, 이전 완료) + `@sentry/node` (Cloud Functions, 완료)
   - `helpers.ts`의 `log(ERROR)` + `wrapHttps/wrapHandler`에서 Sentry 자동 전송
   - Slack/이메일 알림은 Sentry 대시보드에서 Alert Rule 설정 필요 (콘솔 작업)
-- [ ] **B-2. Cloud Functions 에뮬레이터 통합 테스트** (~1~2일)
-  - 우선 대상: `joinOrganization`, `setCustomClaims`, `tmapProxy`
-  - Firebase 에뮬레이터 + Vitest로 실제 Firestore 읽기/쓰기 검증
+- [x] **B-2. Cloud Functions 에뮬레이터 통합 테스트** (~1~2일)
+  - 대상: `joinOrganization`, `setCustomClaims`, `tmapProxy`
+  - Firebase 에뮬레이터(Auth + Firestore) + Jest로 실제 읽기/쓰기 검증 (18개 케이스)
 - [x] **B-3. 배포 롤백 전략 문서화** (~2시간)
   - `ROLLBACK.md` 작성 완료 (Hosting/Functions/Rules 롤백 절차 + 장애 대응 순서)
   - `firebase hosting:rollback`, Functions 이전 버전 재배포 등
 
 ---
 
-## Phase C — 다음 주 (~2주)
+## Phase C — 다음 주 (~2주) ✅ 완료
 
-- [ ] **C-1. 프록시 공통 프레임워크** (~반나절)
-  - `createAuthenticatedProxy()` 팩토리 패턴
-  - `tmapProxy`, `holidayProxy`를 먼저 마이그레이션
-  - 향후 외부 API 추가 시 보일러플레이트 제거
-- [ ] **C-2. Firestore 비용 분석** (~반나절)
-  - GCP Console에서 실제 사용량 확인
-  - 월간 통계 쿼리 인덱스 최적화 필요 여부 판단
-- [ ] **C-3. 아카이빙 정책 점검** (~반나절)
-  - `archiveDriveLogs` 동작 확인 (기간 기준? 용량 기준?)
-  - 아카이브 데이터 조회 경로 문서화
+- [x] **C-1. 프록시 공통 프레임워크** (~반나절)
+  - `createAuthenticatedProxy()` 팩토리 패턴 구현
+  - `tmapProxy`, `holidayProxy` 마이그레이션 완료
+  - 향후 외부 API 추가 시 보일러플레이트 자동 제거
+- [x] **C-2. Firestore 비용 분석** (~반나절)
+  - 인덱스 22개 ↔ 실제 쿼리 코드 매핑 → `FIRESTORE_COST_ANALYSIS.md`
+  - 미사용 인덱스 2개 후보 식별, TTL 정책 적용 권장
+- [x] **C-3. 아카이빙 정책 점검** (~반나절)
+  - `archiveDriveLogs` 동작 분석 → `ARCHIVE_POLICY.md`
+  - 3년 기준, 500건 배치, GCS JSON 저장, 복원 절차 문서화
 
 ---
 
@@ -54,12 +54,12 @@
 - [ ] **D-1. 익명 인증 제거 검토** (기획 필요)
   - 기관 신청 UX에 영향 → 사용자 의견 수렴 필요
   - Google 로그인만으로 충분한지 판단
-- [ ] **D-2. Rate Limit 값 Remote Config 전환** (~반나절)
-  - A-2에서 상수 분리 완료 후 진행
-  - 재배포 없이 실시간 조정 가능
-- [ ] **D-3. CI/CD 파이프라인 구축** (~1~2일)
-  - GitHub Actions: `tsc → test → deploy` 자동화
-  - 수동 `/deploy` 의존 탈피, PR 머지 시 자동 배포
+- [x] **D-2. Rate Limit 값 Remote Config 전환** (~반나절)
+  - `getRateLimits()` 비동기 함수 + 5분 캐시 + 기본값 fallback 구현
+  - Firebase Console에서 재배포 없이 Rate Limit 실시간 조정 가능
+- [x] **D-3. CI/CD 파이프라인 구축** (~1~2일)
+  - GitHub Actions: `ci.yml` (Lint→Test→Build), `deploy.yml` (프로덕션 배포), `preview.yml` (PR 프리뷰)
+  - Dependabot 자동 의존성 업데이트 포함
 
 ---
 
