@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
-import { useConfirm } from '../../contexts/ConfirmContext';
+import { useConfirm } from '../../hooks/useConfirm';
 import { getSuperAdmins, addSuperAdmin, removeSuperAdmin } from '../../lib/firestore';
 
 interface SuperAdmin {

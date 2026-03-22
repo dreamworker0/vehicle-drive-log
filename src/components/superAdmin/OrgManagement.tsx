@@ -7,7 +7,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { getApprovedOrganizations, deleteOrganization, getDeletedOrganizations, restoreOrganization, permanentDeleteOrganization, getOrganizationMembers, updateUser, leaveOrganization, updateOrganization, getOrgMemberCounts } from '../../lib/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useToast } from '../../hooks/useToast';
-import { useConfirm } from '../../contexts/ConfirmContext';
+import { useConfirm } from '../../hooks/useConfirm';
 import OrgCard from './OrgCard';
 import DeletedOrgCard from './DeletedOrgCard';
 import type { Organization } from '../../types';

@@ -5,7 +5,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
-import { useConfirm } from '../contexts/ConfirmContext';
+import { useConfirm } from './useConfirm';
 import type { HipassCard } from '../types/hipass';
 import type { HipassCharge } from '../types/hipassCharge';
 import type { Vehicle } from '../types/vehicle';

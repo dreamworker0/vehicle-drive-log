@@ -5,7 +5,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
-import { useConfirm } from '../contexts/ConfirmContext';
+import { useConfirm } from './useConfirm';
 import { getOrganization, updateOrganization, regenerateInviteCode, getCustomHolidays, addCustomHoliday, deleteCustomHoliday } from '../lib/firestore';
 import { fetchPublicHolidays, groupHolidaysByMonth } from '../lib/holidayApi';
 import { formatDateKr } from '../lib/dateUtils';

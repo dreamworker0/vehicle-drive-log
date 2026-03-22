@@ -98,7 +98,9 @@ export default function OrgMapView({ orgs }: OrgMapViewProps) {
                 const lat = parseFloat(latInput.value);
                 const lng = parseFloat(lngInput.value);
                 if (!lat || !lng || lat < 33 || lat > 43 || lng < 124 || lng > 132) {
-                    alert('올바른 한국 좌표를 입력하세요.\n위도: 33~43, 경도: 124~132');
+                    saveBtn.textContent = '⚠️ 좌표 오류';
+                    saveBtn.style.background = '#dc2626';
+                    setTimeout(() => { saveBtn.textContent = '저장'; saveBtn.style.background = '#059669'; }, 2000);
                     return;
                 }
                 saveBtn.disabled = true;
@@ -107,9 +109,9 @@ export default function OrgMapView({ orgs }: OrgMapViewProps) {
                     await updateDoc(doc(db, 'organizations', org.id), { lat, lng });
                     saveBtn.textContent = '✅';
                     setTimeout(() => window.location.reload(), 1000);
-                } catch (err: any) {
-                    saveBtn.textContent = '❌';
-                    alert('저장 실패: ' + err.message);
+                } catch (err: unknown) {
+                    saveBtn.textContent = '❌ 실패';
+                    console.error('좌표 저장 실패:', err instanceof Error ? err.message : err);
                     saveBtn.disabled = false;
                 }
             });

@@ -14,7 +14,7 @@ vi.mock('../../hooks/useToast', () => ({
     useToast: () => ({ showToast: mockShowToast }),
 }));
 
-vi.mock('../../contexts/ConfirmContext', () => ({
+vi.mock('../../hooks/useConfirm', () => ({
     useConfirm: () => ({ confirm: vi.fn().mockResolvedValue(true) }),
 }));
 

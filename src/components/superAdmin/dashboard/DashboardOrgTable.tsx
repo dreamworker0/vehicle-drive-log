@@ -1,4 +1,5 @@
 import { lazy, Suspense } from 'react';
+import { useToast } from '../../../hooks/useToast';
 import { doc, updateDoc } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db } from '../../../lib/firebase';
@@ -24,11 +25,11 @@ export default function DashboardOrgTable({
     sortedOrgs,
     orgPage,
     setOrgPage,
-    sortKey,
-    sortDir,
     handleSort,
     sortIndicator,
 }: Props) {
+    const { showToast } = useToast();
+
     if (topOrgs.length === 0) return null;
 
     const totalPages = Math.ceil(sortedOrgs.length / ORG_PAGE_SIZE);
@@ -147,12 +148,12 @@ export default function DashboardOrgTable({
                                 try {
                                     const functions = getFunctions(app, 'asia-northeast3');
                                     const backfill = httpsCallable(functions, 'backfillOrgCoords');
-                                    const result: any = await backfill();
+                                    const result = await backfill() as { data: { updated: number } };
                                     btn.textContent = `✅ ${result.data.updated}개 완료`;
                                     setTimeout(() => window.location.reload(), 2000);
-                                } catch (err: any) {
+                                } catch (err: unknown) {
                                     btn.textContent = '❌ 실패';
-                                    alert('자동 변환 실패: ' + err.message);
+                                    showToast('자동 변환 실패: ' + (err instanceof Error ? err.message : '알 수 없는 오류'), 'error');
                                     btn.disabled = false;
                                 }
                             }}
@@ -178,7 +179,7 @@ export default function DashboardOrgTable({
                                         const lat = parseFloat(latInput.value);
                                         const lng = parseFloat(lngInput.value);
                                         if (!lat || !lng || lat < 33 || lat > 43 || lng < 124 || lng > 132) {
-                                            alert('올바른 한국 좌표를 입력하세요.\n위도: 33~43, 경도: 124~132');
+                                            showToast('올바른 한국 좌표를 입력하세요. 위도: 33~43, 경도: 124~132', 'error');
                                             return;
                                         }
                                         btn.disabled = true;
@@ -187,9 +188,9 @@ export default function DashboardOrgTable({
                                             await updateDoc(doc(db, 'organizations', org.id), { lat, lng });
                                             btn.textContent = '✅';
                                             setTimeout(() => window.location.reload(), 1000);
-                                        } catch (err: any) {
+                                        } catch (err: unknown) {
                                             btn.textContent = '❌';
-                                            alert('저장 실패: ' + err.message);
+                                            showToast('저장 실패: ' + (err instanceof Error ? err.message : '알 수 없는 오류'), 'error');
                                             btn.disabled = false;
                                         }
                                     }}

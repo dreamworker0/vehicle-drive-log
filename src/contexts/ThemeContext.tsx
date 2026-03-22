@@ -1,5 +1,5 @@
 import { useEffect, ReactNode } from 'react';
-import { useThemeStore, type Theme } from '../store/useThemeStore';
+import { useThemeStore } from '../store/useThemeStore';
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
     const theme = useThemeStore(state => state.theme);
@@ -36,15 +36,4 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }, [setTheme]);
 
     return <>{children}</>;
-}
-
-export function useTheme() {
-    const theme = useThemeStore(state => state.theme);
-    const toggleTheme = useThemeStore(state => state.toggleTheme);
-    
-    return {
-        theme,
-        toggleTheme,
-        isDark: theme === 'dark'
-    };
 }

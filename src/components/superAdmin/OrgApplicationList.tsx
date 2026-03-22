@@ -6,7 +6,7 @@ import { db } from '../../lib/firebase';
 import { ocrDocumentVerify } from '../../lib/ocr';
 import OrgAppCard from './OrgAppCard';
 import { useToast } from '../../hooks/useToast';
-import { useConfirm } from '../../contexts/ConfirmContext';
+import { useConfirm } from '../../hooks/useConfirm';
 import type { Organization } from '../../types';
 
 interface OrgApplicationListProps {

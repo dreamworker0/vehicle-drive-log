@@ -4,7 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { logout } from '../../lib/auth';
 import { subscribePendingOrganizations, subscribeApprovedOrganizations, subscribeFeedbacks, getOrgMemberCounts, getSuperAdmins } from '../../lib/firestore';
 import { SA_TEST_ROLE_KEY } from '../../App';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../hooks/useTheme';
 
 
 import { lazyWithRetry } from '../../lib/lazyWithRetry';

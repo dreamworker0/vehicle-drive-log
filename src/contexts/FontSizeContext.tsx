@@ -1,5 +1,5 @@
 import { useEffect, ReactNode } from 'react';
-import { useFontSizeStore, type FontSize } from '../store/useFontSizeStore';
+import { useFontSizeStore } from '../store/useFontSizeStore';
 
 export function FontSizeProvider({ children }: { children: ReactNode }) {
     const fontSize = useFontSizeStore(state => state.fontSize);
@@ -14,11 +14,4 @@ export function FontSizeProvider({ children }: { children: ReactNode }) {
     }, [fontSize]);
 
     return <>{children}</>;
-}
-
-export function useFontSize() {
-    const fontSize = useFontSizeStore(state => state.fontSize);
-    const setSize = useFontSizeStore(state => state.setSize);
-    
-    return { fontSize, setSize };
 }

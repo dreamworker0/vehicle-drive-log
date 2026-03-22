@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { getFavorites, createFavorite, deleteFavorite } from '../../lib/firestore';
 import { useToast } from '../../hooks/useToast';
-import { useConfirm } from '../../contexts/ConfirmContext';
+import { useConfirm } from '../../hooks/useConfirm';
 
 interface Favorite {
     id: string;

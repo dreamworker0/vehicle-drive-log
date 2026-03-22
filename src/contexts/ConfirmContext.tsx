@@ -1,6 +1,6 @@
 import { type ReactNode } from 'react';
 import ConfirmModal from '../components/common/ConfirmModal';
-import { useConfirmStore, type ConfirmOptions } from '../store/useConfirmStore';
+import { useConfirmStore } from '../store/useConfirmStore';
 
 export function ConfirmProvider({ children }: { children: ReactNode }) {
     const { open, options, handleConfirm, handleCancel } = useConfirmStore();
@@ -20,10 +20,5 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
             />
         </>
     );
-}
-
-export function useConfirm() {
-    const confirm = useConfirmStore(state => state.confirm);
-    return { confirm };
 }
 

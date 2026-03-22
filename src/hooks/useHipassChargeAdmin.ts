@@ -5,7 +5,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
-import { useConfirm } from '../contexts/ConfirmContext';
+import { useConfirm } from './useConfirm';
 import type { Vehicle } from '../types/vehicle';
 import type { HipassCharge } from '../types/hipassCharge';
 import { getVehicles, getAllHipassCharges, deleteHipassCharge } from '../lib/firestore';

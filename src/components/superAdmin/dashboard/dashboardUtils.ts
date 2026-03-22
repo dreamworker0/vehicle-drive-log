@@ -45,15 +45,15 @@ export const NOTIF_TYPE_COLORS: Record<string, string> = {
 
 /* ── 헬퍼 함수 ── */
 
-export function computeDistance(data: any): number {
+export function computeDistance(data: { distance?: number; startKm?: string; endKm?: string }): number {
     if (data.distance != null && data.distance > 0) return data.distance;
-    const start = parseFloat(data.startKm) || 0;
-    const end = parseFloat(data.endKm) || 0;
+    const start = parseFloat(data.startKm ?? '0') || 0;
+    const end = parseFloat(data.endKm ?? '0') || 0;
     return end > start ? end - start : 0;
 }
 
 /** startTime, endTime ("HH:MM" 형식)으로 주행시간(분) 계산. 비정상 시 0 반환 */
-export function computeDuration(startTime: any, endTime: any): number {
+export function computeDuration(startTime: unknown, endTime: unknown): number {
     if (!startTime || !endTime || typeof startTime !== 'string' || typeof endTime !== 'string') return 0;
     const [sh, sm] = startTime.split(':').map(Number);
     const [eh, em] = endTime.split(':').map(Number);

@@ -6,7 +6,7 @@ import { logout } from '../../lib/auth';
 import { SA_TEST_ROLE_KEY } from '../../App';
 import NotificationBell from '../common/NotificationBell';
 import AdminNotice from './AdminNotice';
-import { useTheme } from '../../contexts/ThemeContext';
+import { useTheme } from '../../hooks/useTheme';
 import useBackButton from '../../hooks/useBackButton';
 import useAdminBadges from '../../hooks/useAdminBadges';
 

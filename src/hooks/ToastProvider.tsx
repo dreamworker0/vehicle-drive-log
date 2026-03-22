@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { useToastStore, type ToastType, type ToastOptions, type ToastItem } from '../store/useToastStore';
+import { useToastStore, type ToastItem } from '../store/useToastStore';
 
 export function ToastProviderWrapper({ children }: { children: ReactNode }) {
     const toasts = useToastStore(state => state.toasts);
@@ -56,9 +56,4 @@ export function ToastProviderWrapper({ children }: { children: ReactNode }) {
             )}
         </>
     );
-}
-
-export function useToast() {
-    const showToast = useToastStore(state => state.showToast);
-    return { showToast };
 }

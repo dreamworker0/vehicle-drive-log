@@ -5,7 +5,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
-import { useConfirm } from '../contexts/ConfirmContext';
+import { useConfirm } from './useConfirm';
 import type { Vehicle } from '../types/vehicle';
 import type { MaintenanceRecord } from '../types/maintenance';
 import { getVehicles, getMaintenanceRecords, createMaintenanceRecord, deleteMaintenanceRecord, clearVehicleMaintenanceBlock, cancelVehicleReservations } from '../lib/firestore';

@@ -6,6 +6,8 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './useAuth';
 import { getVehicles, getOrganization } from '../lib/firestore';
 import { getDriveLogsByDate, getFuelLogsByDate, getPreviousDayEndKm } from '../lib/firestore/dailyLogQueries';
+import type { Vehicle } from '../types/vehicle';
+import type { Organization } from '../types/organization';
 import { toLocalDateStr } from '../lib/dateUtils';
 
 interface DailyLogSummary {
@@ -20,10 +22,10 @@ export default function useDailyLog() {
 
     const [selectedDate, setSelectedDate] = useState(toLocalDateStr(new Date()));
     const [selectedVehicleId, setSelectedVehicleId] = useState('');
-    const [vehicles, setVehicles] = useState<any[]>([]);
-    const [org, setOrg] = useState<any>(null);
-    const [driveLogs, setDriveLogs] = useState<any[]>([]);
-    const [fuelLogs, setFuelLogs] = useState<any[]>([]);
+    const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+    const [org, setOrg] = useState<Organization | null>(null);
+    const [driveLogs, setDriveLogs] = useState<Record<string, unknown>[]>([]);
+    const [fuelLogs, setFuelLogs] = useState<Record<string, unknown>[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingData, setLoadingData] = useState(false);
     const [previousEndKm, setPreviousEndKm] = useState<number | null>(null);
@@ -38,9 +40,9 @@ export default function useDailyLog() {
                     getOrganization(orgId),
                 ]);
                 // 퇴역하지 않은 차량만 표시
-                const active = v.filter((vh: any) => !vh.retired?.isRetired);
+                const active = (v as Vehicle[]).filter(vh => !vh.retired?.isRetired);
                 setVehicles(active);
-                setOrg(orgData);
+                setOrg(orgData as Organization | null);
                 if (active.length > 0 && !selectedVehicleId) {
                     setSelectedVehicleId(active[0].id);
                 }
@@ -80,12 +82,12 @@ export default function useDailyLog() {
     // 요약 계산
     const summary: DailyLogSummary = useMemo(() => {
         const todayDistance = driveLogs.reduce((sum, log) => {
-            const d = (log.endKm || 0) - (log.startKm || 0);
+            const d = ((log.endKm as number) || 0) - ((log.startKm as number) || 0);
             return sum + (d > 0 ? d : 0);
         }, 0);
 
         const todayEndKm = driveLogs.length > 0
-            ? Math.max(...driveLogs.map((log: any) => log.endKm || 0))
+            ? Math.max(...driveLogs.map((log) => (log.endKm as number) || 0))
             : null;
 
         return { todayDistance, previousEndKm, todayEndKm };

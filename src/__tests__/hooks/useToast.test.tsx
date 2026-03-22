@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, act } from '@testing-library/react';
-import { ToastProviderWrapper, useToast } from '../../hooks/useToast';
+import { ToastProviderWrapper } from '../../hooks/ToastProvider';
+import { useToast } from '../../hooks/useToast';
 
 // 테스트용 컴포넌트
 function TestComponent() {

@@ -5,7 +5,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
-import { useConfirm } from '../contexts/ConfirmContext';
+import { useConfirm } from './useConfirm';
 import type { Vehicle } from '../types/vehicle';
 import type { FuelLog } from '../types/fuelLog';
 import { getVehicles, getFuelLogs, createFuelLog, deleteFuelLog, updateFuelLog, getTodayReservations } from '../lib/firestore';
@@ -57,7 +57,7 @@ export default function useFuelLog() {
                 // 운행 중 차량 자동 선택
                 try {
                     const todayRes = await getTodayReservations(orgId, todayStr);
-                    const activeRes = (todayRes as any[]).find(
+                    const activeRes = (todayRes as { reservedByUid?: string; status?: string; vehicleId?: string }[]).find(
                         res => res.reservedByUid === user?.uid && res.status === 'in_progress'
                     );
                     if (activeRes) {

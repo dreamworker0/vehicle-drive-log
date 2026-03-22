@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
-import { useConfirm } from '../contexts/ConfirmContext';
+import { useConfirm } from './useConfirm';
 import { getOrganizationMembers, getOrganization, regenerateInviteCode, updateUser } from '../lib/firestore';
 import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -18,7 +18,7 @@ export default function useEmployeeManager() {
     const { confirm } = useConfirm();
     const [employees, setEmployees] = useState<User[]>([]);
     const [disabledEmployees, setDisabledEmployees] = useState<User[]>([]);
-    const [preRegisteredEmployees, setPreRegisteredEmployees] = useState<{ id: string; name: string; email: string; createdAt: any }[]>([]);
+    const [preRegisteredEmployees, setPreRegisteredEmployees] = useState<{ id: string; name: string; email: string; createdAt: unknown }[]>([]);
     const [organization, setOrganization] = useState<Organization | null>(null);
     const [loading, setLoading] = useState(true);
     const [showAddForm, setShowAddForm] = useState(false);
@@ -54,8 +54,8 @@ export default function useEmployeeManager() {
                 disabledMembers.sort((a, b) => (a.name || '').localeCompare(b.name || '')) as User[]
             );
             setPreRegisteredEmployees(
-                preRegSnap.docs.map(d => ({ id: d.id, ...d.data() } as any))
-                    .sort((a: any, b: any) => (a.name || '').localeCompare(b.name || ''))
+                preRegSnap.docs.map(d => ({ id: d.id, ...d.data() } as { id: string; name: string; email: string; createdAt: unknown }))
+                    .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
             );
             setOrganization(org as Organization | null);
         } catch (err) {
@@ -147,9 +147,9 @@ export default function useEmployeeManager() {
             await callable({ uid: emp.id });
             showToast('직원이 비활성화되었습니다.', 'success');
             await fetchData();
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('비활성화 실패:', err);
-            showToast(err.message || '비활성화에 실패했습니다.', 'error');
+            showToast(err instanceof Error ? err.message : '비활성화에 실패했습니다.', 'error');
         }
     };
 
@@ -159,9 +159,9 @@ export default function useEmployeeManager() {
             await updateDoc(doc(db, 'users', emp.id), { status: 'active', disabledAt: null });
             showToast('직원이 활성화되었습니다.', 'success');
             await fetchData();
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('활성화 실패:', err);
-            showToast(err.message || '활성화에 실패했습니다.', 'error');
+            showToast(err instanceof Error ? err.message : '활성화에 실패했습니다.', 'error');
         }
     };
 
@@ -219,7 +219,7 @@ export default function useEmployeeManager() {
         email: string;
         role?: string;
         memberStatus: MemberStatus;
-        original: any; // 원본 데이터 참조
+        original: User | { id: string; name: string; email: string; createdAt: unknown }; // 원본 데이터 참조
     }
 
     const unifiedList: UnifiedMember[] = [

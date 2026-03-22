@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useConfirm } from '../contexts/ConfirmContext';
+import { useConfirm } from './useConfirm';
 import {
     getVehicles,
     getReservationsByDateRange,
@@ -419,10 +419,11 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
             setEditingGroupId(null);
             setForm({ vehicleId: '', destination: '', purpose: '', startTime: '', endTime: '', endDate: '' });
             setRouteInfo(null);
-        } catch (error: any) {
+        } catch (error: unknown) {
             // Cloud Function already-exists 에러 처리
-            const errMsg = error?.code === 'functions/already-exists'
-                ? error.message
+            const firebaseErr = error as { code?: string; message?: string };
+            const errMsg = firebaseErr?.code === 'functions/already-exists'
+                ? firebaseErr.message || '예약 처리에 실패했습니다.'
                 : error instanceof Error ? error.message : '예약 처리에 실패했습니다.';
             showToast(errMsg, 'error');
         } finally {
