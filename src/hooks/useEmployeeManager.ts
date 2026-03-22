@@ -219,7 +219,7 @@ export default function useEmployeeManager() {
         email: string;
         role?: string;
         memberStatus: MemberStatus;
-        original: User | { id: string; name: string; email: string; createdAt: unknown }; // 원본 데이터 참조
+        original: User; // 원본 데이터 참조 (가입대기는 사용하지 않음)
     }
 
     const unifiedList: UnifiedMember[] = [
@@ -239,7 +239,7 @@ export default function useEmployeeManager() {
             email: pre.email || '',
             role: undefined,
             memberStatus: 'pending' as MemberStatus,
-            original: pre,
+            original: pre as User,
         })),
         // 3) 비활성 직원
         ...disabledEmployees.map(emp => ({

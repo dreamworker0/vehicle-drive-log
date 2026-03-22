@@ -22,7 +22,7 @@ export default function DailyLogView() {
         const defaultApproval = [{ title: '담당' }, { title: '팀장' }];
         const useApproval = org?.hideApprovalLine
             ? []
-            : (org?.approvalLine?.length > 0 ? org.approvalLine : defaultApproval);
+            : ((org?.approvalLine?.length ?? 0) > 0 ? org!.approvalLine : defaultApproval);
 
         downloadDailyLogPdf(driveLogs, fuelLogs, {
             orgName: org?.name || '',
