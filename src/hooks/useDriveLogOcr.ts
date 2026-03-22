@@ -36,6 +36,8 @@ export default function useDriveLogOcr({ isElectric, setForm, user, userData, ve
     const cameraInputRef = useRef<HTMLInputElement>(null);
     const endKmInputRef = useRef<HTMLInputElement>(null);
 
+    const [ocrImageUrl, setOcrImageUrl] = useState<string | null>(null);
+
     // 마지막 OCR 결과를 저장 (오류 신고 시 사용)
     const lastOcrRef = useRef<OcrResult | null>(null);
 
@@ -47,6 +49,7 @@ export default function useDriveLogOcr({ isElectric, setForm, user, userData, ve
         setOcrError('');
         setOcrSuccess(false);
         setOcrReportSent(false);
+        setOcrImageUrl(null);
 
         try {
             // 이미지를 Canvas로 리사이즈(최대 512px) + JPEG 압축 후 base64 변환
@@ -61,13 +64,17 @@ export default function useDriveLogOcr({ isElectric, setForm, user, userData, ve
                     canvas.width = Math.round(img.width * scale);
                     canvas.height = Math.round(img.height * scale);
                     canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    resolve(canvas.toDataURL('image/jpeg', 0.80).split(',')[1]);
+                    resolve(canvas.toDataURL('image/jpeg', 0.80));
                 };
                 img.onerror = reject;
                 img.src = objectUrl;
             });
 
-            const result = await ocrDashboard(base64 as string, 'image/jpeg', isElectric) as { km: number | null; battery: number | null; raw: string };
+            // "data:image/jpeg;base64," 접두사 처리
+            const base64Data = (base64 as string).split(',')[1];
+            setOcrImageUrl(base64 as string);
+
+            const result = await ocrDashboard(base64Data, 'image/jpeg', isElectric) as { km: number | null; battery: number | null; raw: string };
 
             // 신고용으로 원본 이미지 + 결과 저장
             lastOcrRef.current = {
@@ -160,7 +167,7 @@ export default function useDriveLogOcr({ isElectric, setForm, user, userData, ve
     }, [ocrReportSending, user, userData, vehicleName]);
 
     return {
-        ocrLoading, ocrError, ocrSuccess,
+        ocrLoading, ocrError, ocrSuccess, ocrImageUrl,
         ocrReportSending, ocrReportSent,
         cameraInputRef, endKmInputRef,
         handleOcrCapture,

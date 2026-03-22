@@ -15,6 +15,7 @@ interface MileageInputProps {
     ocrLoading: boolean;
     ocrError: string;
     ocrSuccess: boolean;
+    ocrImageUrl?: string | null;
     ocrReportSending: boolean;
     ocrReportSent: boolean;
     cameraInputRef: React.RefObject<HTMLInputElement | null>;
@@ -30,6 +31,7 @@ export default function MileageInput({
     ocrLoading,
     ocrError,
     ocrSuccess,
+    ocrImageUrl,
     ocrReportSending,
     ocrReportSent,
     cameraInputRef,
@@ -68,6 +70,14 @@ export default function MileageInput({
                     className="hidden"
                 />
             </div>
+            {ocrImageUrl && (
+                <div className="mb-3 animate-fade-in relative rounded-lg overflow-hidden border border-surface-200 dark:border-surface-700 bg-black max-h-48 flex items-center justify-center">
+                    <img src={`data:image/jpeg;base64,${ocrImageUrl}`} alt="계기판 캡처" className="max-w-full max-h-48 object-contain" />
+                    <div className="absolute top-0 right-0 left-0 p-2 bg-gradient-to-b from-black/60 to-transparent flex justify-between items-center text-white text-xs">
+                        <span className="font-medium drop-shadow-md">원본 촬영 이미지</span>
+                    </div>
+                </div>
+            )}
             {ocrError && (
                 <div className="mb-3 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 text-xs text-amber-700 dark:text-amber-300 animate-fade-in">
                     <div className="flex items-center gap-1.5">

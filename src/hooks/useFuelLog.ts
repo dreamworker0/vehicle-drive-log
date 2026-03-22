@@ -40,6 +40,7 @@ export default function useFuelLog() {
     const [ocrLoading, setOcrLoading] = useState(false);
     const [ocrError, setOcrError] = useState('');
     const [ocrSuccess, setOcrSuccess] = useState(false);
+    const [ocrImageUrl, setOcrImageUrl] = useState<string | null>(null);
     const cameraInputRef = useRef<HTMLInputElement>(null);
 
     const orgId = userData?.organizationId;
@@ -149,6 +150,7 @@ export default function useFuelLog() {
         setOcrLoading(true);
         setOcrError('');
         setOcrSuccess(false);
+        setOcrImageUrl(null);
 
         try {
             const base64 = await new Promise((resolve, reject) => {
@@ -162,7 +164,10 @@ export default function useFuelLog() {
                     canvas.width = Math.round(img.width * scale);
                     canvas.height = Math.round(img.height * scale);
                     canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    resolve(canvas.toDataURL('image/jpeg', 0.80).split(',')[1]);
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.80);
+                    const base64Data = dataUrl.split(',')[1];
+                    setOcrImageUrl(base64Data);
+                    resolve(base64Data);
                 };
                 img.onerror = reject;
                 img.src = objectUrl;
@@ -264,6 +269,6 @@ export default function useFuelLog() {
         handleSubmit, handleDelete, handleVehicleSelect,
         currentUid: user?.uid,
         // OCR
-        ocrLoading, ocrError, ocrSuccess, cameraInputRef, handleOcrCapture,
+        ocrLoading, ocrError, ocrSuccess, ocrImageUrl, cameraInputRef, handleOcrCapture,
     };
 }

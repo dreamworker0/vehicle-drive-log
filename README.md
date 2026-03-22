@@ -30,10 +30,11 @@
 | 영역 | 기술 |
 |------|------|
 | 프론트엔드 | Vite 7 + React 19 + TypeScript |
+| 상태 관리 | Zustand (글로벌 UI 상태) |
 | 스타일링 | TailwindCSS v3 (반응형, 다크 모드) |
 | 언어 | TypeScript (프론트엔드 + Cloud Functions + 테스트 + 스크립트) |
 | 인증 | Firebase Auth (Google 로그인 전용) |
-| 데이터베이스 | Cloud Firestore (실시간 구독 + 오프라인 캐시) |
+| 데이터베이스 | Cloud Firestore (실시간 구독 + 하이브리드 캐시) |
 | 서버리스 | Cloud Functions for Firebase (TypeScript ESM, Node.js 22) |
 | AI/OCR | Gemini 3.1 Flash Lite Preview (Cloud Functions 경유) |
 | 호스팅 | Firebase Hosting |
@@ -160,15 +161,13 @@ firebase deploy --only firestore:rules,storage
 │   ├── index.css                     TailwindCSS + 커스텀 스타일
 │   ├── main.tsx                      분할 진입점 (인증 상태에 따라 Full/Light 앱 로드)
 │   ├── components/
-│   │   ├── auth/                     인증 (로그인, 초대코드, 기관 신청, 랜딩)
+│   │   ├── auth/                     인증 및 라우터 가드 (AuthGuard, 로그인, 랜딩 등)
 │   │   ├── superAdmin/               시스템 관리자 화면 (기관 관리, 대시보드)
 │   │   ├── admin/                    기관관리자 화면 (운행일지, 통계, 분석)
 │   │   ├── employee/                 직원 화면 (모바일 최적화)
 │   │   └── common/                   공통 (알림, 달력, 에러, 오프라인)
-│   ├── contexts/                     React 컨텍스트
-│   │   ├── ThemeContext.tsx           다크/라이트 모드 관리
-│   │   ├── FontSizeContext.tsx        글꼴 크기 조절 (소/중/대)
-│   │   └── ConfirmContext.tsx         Promise 기반 커스텀 confirm 모달
+│   ├── store/                        Zustand 전역 상태 (테마, 폰트, Toast, 모달 등)
+│   ├── contexts/                     React 컨텍스트 (Zustand 래퍼 및 레거시 대응)
 │   ├── types/                        TypeScript 타입 정의
 │   ├── hooks/                        커스텀 훅 (비즈니스 로직 분리)
 │   │   └── utils/                    훅에서 추출된 순수 함수

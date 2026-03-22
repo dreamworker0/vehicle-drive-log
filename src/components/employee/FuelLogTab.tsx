@@ -22,7 +22,7 @@ export default function FuelLogTab() {
         editingId, handleEdit, handleCancelEdit,
         handleSubmit, handleDelete, handleVehicleSelect,
         currentUid,
-        ocrLoading, ocrError, ocrSuccess, cameraInputRef, handleOcrCapture,
+        ocrLoading, ocrError, ocrSuccess, ocrImageUrl, cameraInputRef, handleOcrCapture,
     } = useFuelLog();
     const { usageCounts } = useVehiclePriority();
 
@@ -173,6 +173,14 @@ export default function FuelLogTab() {
                                 )}
                                 {ocrSuccess && (
                                     <p className="text-xs text-emerald-500 mt-1">✅ 계기판 인식 완료</p>
+                                )}
+                                {ocrImageUrl && (
+                                    <div className="mt-3 mb-1 animate-fade-in relative rounded-lg overflow-hidden border border-surface-200 dark:border-surface-700 bg-black max-h-48 flex items-center justify-center">
+                                        <img src={`data:image/jpeg;base64,${ocrImageUrl}`} alt="계기판 캡처" className="max-w-full max-h-48 object-contain" />
+                                        <div className="absolute top-0 right-0 left-0 p-2 bg-gradient-to-b from-black/60 to-transparent flex justify-between items-center text-white text-xs">
+                                            <span className="font-medium drop-shadow-md">원본 촬영 이미지</span>
+                                        </div>
+                                    </div>
                                 )}
                                 {ocrError && (
                                     <p className="text-xs text-red-500 mt-1">{ocrError}</p>

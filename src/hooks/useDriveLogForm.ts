@@ -458,6 +458,7 @@ export default function useDriveLogForm() {
         ocrLoading: ocr.ocrLoading,
         ocrError: ocr.ocrError,
         ocrSuccess: ocr.ocrSuccess,
+        ocrImageUrl: ocr.ocrImageUrl,
         ocrReportSending: ocr.ocrReportSending,
         ocrReportSent: ocr.ocrReportSent,
         cameraInputRef: ocr.cameraInputRef,

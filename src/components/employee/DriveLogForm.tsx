@@ -21,7 +21,7 @@ export default function DriveLogForm() {
         favName, setFavName,
         hipassCard,
         lastEndBattery,
-        ocrLoading, ocrError, ocrSuccess,
+        ocrLoading, ocrError, ocrSuccess, ocrImageUrl,
         ocrReportSending, ocrReportSent,
         cameraInputRef, endKmInputRef,
         handleVehicleSelect,
@@ -263,6 +263,7 @@ export default function DriveLogForm() {
                     ocrLoading={ocrLoading}
                     ocrError={ocrError}
                     ocrSuccess={ocrSuccess}
+                    ocrImageUrl={ocrImageUrl}
                     ocrReportSending={ocrReportSending}
                     ocrReportSent={ocrReportSent}
                     cameraInputRef={cameraInputRef}
