@@ -1,26 +1,28 @@
 rules_version = '2';
 
+// === 헬퍼 함수 (Custom Claims 기반 — Firestore get() 호출 최소화) ===
 function isSuperAdmin() {
   return request.auth != null && request.auth.token.role == 'superAdmin';
 }
 
-function isOrgMemberOrApplicant(orgId) {
-  let userPath = /databases/(default)/documents/users/$(request.auth.uid);
-  let org = firestore.get(/databases/(default)/documents/organizations/$(orgId));
-  // 조직 소속 멤버이거나, 해당 조직의 신청자인 경우 허용
-  // (익명 인증 신청자는 users 문서가 없을 수 있으므로 exists 체크)
-  return (firestore.exists(userPath) && firestore.get(userPath).data.organizationId == orgId)
-      || org.data.applicantUid == request.auth.uid;
+function isOrgMember(orgId) {
+  return request.auth != null && request.auth.token.orgId == orgId;
 }
+
 service firebase.storage {
   match /b/{bucket}/o {
-    // 기관 고유번호증 사본 업로드 (익명 인증 포함 인증 필수)
+    // 기관 고유번호증 사본 업로드
+    // 신청자는 아직 Custom Claims가 없으므로 Firestore fallback 유지
     match /organizations/{orgId}/{allPaths=**} {
-      allow read: if isOrgMemberOrApplicant(orgId) || isSuperAdmin();
+      allow read: if isOrgMember(orgId)
+                  || isSuperAdmin()
+                  || (request.auth != null
+                      && firestore.get(/databases/(default)/documents/organizations/$(orgId)).data.applicantUid == request.auth.uid);
       allow write: if request.auth != null
                    && request.resource.size < 5 * 1024 * 1024
                    && (request.resource.contentType.matches('image/.*') || request.resource.contentType == 'application/pdf')
-                   && isOrgMemberOrApplicant(orgId);
+                   && (isOrgMember(orgId)
+                       || firestore.get(/databases/(default)/documents/organizations/$(orgId)).data.applicantUid == request.auth.uid);
     }
 
     // OCR 인식 오류 신고 이미지 업로드 (본인 폴더만)

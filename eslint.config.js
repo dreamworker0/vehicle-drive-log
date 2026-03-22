@@ -52,7 +52,7 @@ export default defineConfig([
     },
     rules: {
       '@typescript-eslint/no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
-      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-empty-object-type': 'off',
       'no-unused-vars': 'off',
       'no-restricted-globals': ['error',
@@ -63,7 +63,7 @@ export default defineConfig([
     },
   },
   {
-    files: ['scripts/**/*.js'],
+    files: ['scripts/**/*.js', '*.config.js', '*.config.ts'],
     languageOptions: {
       globals: globals.node,
     },

@@ -9,13 +9,20 @@ import {
 import { db } from '../firebase';
 
 /** 기관 전체 하이패스 충전 기록 조회 (최신순, 200건) */
-export const getAllHipassCharges = async (orgId: string) => {
-    const q = query(
-        collection(db, 'hipassCharges'),
+export const getAllHipassCharges = async (orgId: string, options?: { since?: Date; until?: Date }) => {
+    const constraints: import('firebase/firestore').QueryConstraint[] = [
         where('organizationId', '==', orgId),
-        orderBy('date', 'desc'),
-        limit(200),
-    );
+    ];
+    if (options?.since) {
+        constraints.push(where('date', '>=', options.since instanceof Date
+            ? options.since.toISOString().slice(0, 10) : options.since));
+    }
+    if (options?.until) {
+        constraints.push(where('date', '<=', options.until instanceof Date
+            ? options.until.toISOString().slice(0, 10) : options.until));
+    }
+    constraints.push(orderBy('date', 'desc'), limit(200));
+    const q = query(collection(db, 'hipassCharges'), ...constraints);
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, any>) }));
 };

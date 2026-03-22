@@ -35,7 +35,13 @@ export const restoreUser = onCall(
                 throw new HttpsError("permission-denied", "슈퍼관리자만 계정을 복원할 수 있습니다.");
             }
 
-            // 2. Firebase Auth에서 이메일로 사용자 검색
+            // 2. 대상 기관 존재 및 승인 상태 검증
+            const orgDoc = await db.collection("organizations").doc(organizationId).get();
+            if (!orgDoc.exists || orgDoc.data()?.status !== "approved") {
+                throw new HttpsError("not-found", "유효하지 않은 기관입니다. 승인된 기관만 복원 대상이 됩니다.");
+            }
+
+            // 3. Firebase Auth에서 이메일로 사용자 검색
             let authUser;
             try {
                 authUser = await auth.getUserByEmail(email);

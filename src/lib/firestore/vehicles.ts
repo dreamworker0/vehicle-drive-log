@@ -7,16 +7,19 @@ import {
     orderBy, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { cachedQuery, invalidateCache } from './cache';
 
-// 기관 소속 차량 목록 조회
+// 기관 소속 차량 목록 조회 (TTL 30초 캐시 적용)
 export const getVehicles = async (orgId: string) => {
-    const q = query(
-        collection(db, 'vehicles'),
-        where('organizationId', '==', orgId),
-        orderBy('createdAt', 'desc')
-    );
-    const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+    return cachedQuery(`vehicles:${orgId}`, async () => {
+        const q = query(
+            collection(db, 'vehicles'),
+            where('organizationId', '==', orgId),
+            orderBy('createdAt', 'desc')
+        );
+        const snap = await getDocs(q);
+        return snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+    });
 };
 
 // 차량 등록
@@ -26,17 +29,20 @@ export const createVehicle = async (data: Record<string, any>) => {
         currentKm: data.currentKm ?? 0,
         createdAt: serverTimestamp(),
     });
+    invalidateCache('vehicles');
     return docRef.id;
 };
 
 // 차량 정보 수정
 export const updateVehicle = async (vehicleId: string, data: Record<string, any>) => {
     await updateDoc(doc(db, 'vehicles', vehicleId), data);
+    invalidateCache('vehicles');
 };
 
 // 차량 삭제
 export const deleteVehicle = async (vehicleId: string) => {
     await deleteDoc(doc(db, 'vehicles', vehicleId));
+    invalidateCache('vehicles');
 };
 
 // 차량 폐차(퇴역) 처리
@@ -48,6 +54,7 @@ export const retireVehicle = async (vehicleId: string, reason = '') => {
             retiredAt: serverTimestamp(),
         },
     });
+    invalidateCache('vehicles');
 };
 
 // 폐차 차량 복원
@@ -55,4 +62,5 @@ export const restoreVehicle = async (vehicleId: string) => {
     await updateDoc(doc(db, 'vehicles', vehicleId), {
         retired: null,
     });
+    invalidateCache('vehicles');
 };

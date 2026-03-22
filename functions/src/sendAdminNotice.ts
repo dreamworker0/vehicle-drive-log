@@ -4,6 +4,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore } from "firebase-admin/firestore";
 import { sendPushToOrg, createInAppNotificationForOrg } from "./sendNotification";
+import { checkRateLimitByUid } from "./rateLimit";
 
 const db = getFirestore();
 
@@ -15,6 +16,10 @@ export const sendAdminNotice = onCall(
         }
 
         const uid = request.auth.uid;
+
+        // Rate Limiting: 사용자당 시간당 20회 (스팸 방지)
+        await checkRateLimitByUid("sendAdminNotice", uid, 20, 3600);
+
         const { orgId, title, message } = request.data;
 
         if (!orgId || !title || !message) {

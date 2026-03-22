@@ -1,17 +1,19 @@
 import { defineConfig } from '@playwright/test';
 
+const isCI = !!process.env.CI;
+
 export default defineConfig({
     testDir: './e2e',
     timeout: 30000,
-    retries: 1,
+    retries: isCI ? 2 : 1,
     use: {
-        baseURL: 'http://localhost:5173',
+        baseURL: isCI ? 'http://localhost:4173' : 'http://localhost:5173',
         headless: true,
         screenshot: 'only-on-failure',
     },
     webServer: {
-        command: 'npm run dev',
-        port: 5173,
-        reuseExistingServer: true,
+        command: isCI ? 'npx vite preview --port 4173' : 'npm run dev',
+        port: isCI ? 4173 : 5173,
+        reuseExistingServer: !isCI,
     },
 });

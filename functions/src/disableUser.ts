@@ -36,7 +36,16 @@ export const disableUser = onCall(
                 throw new HttpsError("permission-denied", "관리자만 직원을 비활성화할 수 있습니다.");
             }
 
-            // 2. users 문서의 status를 'disabled'로 변경 (soft delete)
+            // 2. 대상 사용자 존재 확인 + 교차 기관 검증
+            const targetDoc = await db.collection("users").doc(uid).get();
+            if (!targetDoc.exists) {
+                throw new HttpsError("not-found", "사용자를 찾을 수 없습니다.");
+            }
+            if (callerRole === "admin" && callerDoc.data()?.organizationId !== targetDoc.data()?.organizationId) {
+                throw new HttpsError("permission-denied", "다른 기관의 직원을 비활성화할 수 없습니다.");
+            }
+
+            // 3. users 문서의 status를 'disabled'로 변경 (soft delete)
             await db.collection("users").doc(uid).update({
                 status: "disabled",
                 disabledAt: FieldValue.serverTimestamp(),

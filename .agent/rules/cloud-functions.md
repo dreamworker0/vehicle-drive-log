@@ -15,7 +15,7 @@ description: Cloud Functions 코딩 컨벤션. functions/ 디렉터리의 코드
 - **런타임**: Node.js 22 (`engines.node: "22"`)
 - **모듈 시스템**: TypeScript ESM (`import` / `export`)
 - **Firebase**: `firebase-admin`, `firebase-functions` v6 (2nd gen)
-- **주요 라이브러리**: `googleapis`, `@google/genai`, `@emailjs/nodejs`
+- **주요 라이브러리**: `googleapis`, `@google/genai`, `@emailjs/nodejs`, `@sentry/node`
 
 ---
 

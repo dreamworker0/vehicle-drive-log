@@ -160,7 +160,8 @@ service cloud.firestore {
     match /fuelLogs/{logId} {
       allow read: if belongsToMyOrg() || isSuperAdmin();
       allow create: if newBelongsToMyOrg()
-                    && request.resource.data.keys().hasAll(['organizationId', 'vehicleId', 'driverUid']);
+                    && request.resource.data.keys().hasAll(['organizationId', 'vehicleId', 'driverUid'])
+                    && request.resource.data.driverUid == request.auth.uid;
       allow update: if belongsToMyOrg()
                     && (resource.data.driverUid == request.auth.uid
                         || isOrgAdmin(resource.data.organizationId))
@@ -175,7 +176,8 @@ service cloud.firestore {
     match /hipassCharges/{chargeId} {
       allow read: if belongsToMyOrg() || isSuperAdmin();
       allow create: if newBelongsToMyOrg()
-                    && request.resource.data.keys().hasAll(['organizationId', 'cardId', 'chargerUid']);
+                    && request.resource.data.keys().hasAll(['organizationId', 'cardId', 'chargerUid'])
+                    && request.resource.data.chargerUid == request.auth.uid;
       allow update: if belongsToMyOrg()
                     && (resource.data.chargerUid == request.auth.uid
                         || isOrgAdmin(resource.data.organizationId))

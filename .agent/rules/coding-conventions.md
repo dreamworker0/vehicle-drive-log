@@ -21,8 +21,10 @@ src/
 ├── hooks/              ← React 커스텀 훅 (아래 주요 훅 목록 참고)
 ├── lib/                ← 유틸리티 & 서비스
 │   ├── firebase.ts     ← Firebase 초기화 (app, auth, db, storage)
+│   ├── firebaseAuth.ts ← Firebase Auth 헬퍼 (토큰 재발급 등)
 │   ├── firestore/      ← Firestore CRUD 함수 (도메인별 분리)
 │   ├── auth.ts         ← 인증 유틸리티
+│   ├── authFetch.ts    ← 인증된 fetch 래퍼 (토큰 자동 첨부)
 │   ├── constants.ts    ← 공유 상수 (차량 아이콘, 색상 등)
 │   ├── dateUtils.ts    ← 날짜 포맷·계산 헬퍼
 │   ├── tmap.ts         ← Tmap API 연동
@@ -47,7 +49,7 @@ src/
 │   ├── faqData.ts      ← FAQ 데이터
 │   ├── manualSections.ts← 사용 설명서 섹션 데이터
 │   └── releaseNotes.ts ← 릴리스 노트 데이터
-├── contexts/           ← React Context (AuthContext, ConfirmContext, ThemeContext, FontSizeContext)
+├── contexts/           ← React Context (ConfirmContext, ThemeContext, FontSizeContext)
 ├── index.css           ← TailwindCSS + 커스텀 스타일
 ├── App.tsx             ← 역할별 라우팅
 └── main.tsx            ← React 엔트리
@@ -65,19 +67,26 @@ src/
 |---|---|
 | `useAuth` | 인증 상태 + 사용자 정보 (전역 Context) |
 | `useToast` | 토스트 알림 표시 (전역 Context) |
+| `useAdminBadges` | 관리자 사이드바 배지 실시간 구독 |
 | `useTodayDashboard` | 오늘 대시보드 데이터 (예약·운행 현황) |
 | `useReservationCalendar` | 예약 캘린더 로직 |
 | `useDriveLogForm` | 운행일지 작성 폼 로직 |
+| `useDriveLogOcr` | 운행일지 OCR 관련 로직 |
 | `useMonthlyReport` | 월간 보고서 데이터 |
 | `useAnalytics` | 분석 대시보드 데이터 |
 | `useVehicleManager` | 차량 관리 CRUD |
+| `useVehicleHistory` | 차량별 이용 내역 조회 |
 | `useEmployeeManager` | 직원 관리 CRUD |
 | `useMaintenanceLog` | 차량 정비 기록 |
 | `useSettings` | 기관 설정 관리 |
-| `useNotification` | 알림 구독·표시 |
+| `useNotification` | FCM 푸시 알림 토큰 관리 |
+| `useOrgApplication` | 기관 신청 폼 로직 |
 | `useQuickDriveStart` | 예약 없이 바로 운행 시작 |
 | `useBackButton` | 모바일 뒤로가기 처리 |
 | `useForceLightMode` | 랜딩/인증 페이지 강제 라이트 모드 |
+| `useOrientationLock` | 화면 회전 잠금 (PDF 출력 시 가로 모드) |
+| `useRetry` | 재시도 로직 (에러 시 자동 재시도) |
+| `useTimelineDrag` | 타임라인 드래그 로직 |
 | `useDailyLog` | 일일 운행일지 관리 |
 | `useFuelLog` | 주유 기록 관리 |
 | `useFuelLogAdmin` | 주유 기록 관리자 기능 |

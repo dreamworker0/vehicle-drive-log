@@ -43,8 +43,13 @@ functions/
 │   ├── setCustomClaims.ts           ← Firestore 트리거 (Custom Claims 자동 동기화)
 │   ├── joinOrganization.ts          ← onCall (기관 가입 서버사이드 검증)
 │   ├── rateLimit.ts                 ← 헬퍼 (Cloud Functions 레이트 리밋)
+│   ├── constants.ts                 ← 헬퍼 (Remote Config 레이트 리밋 상수)
+│   ├── createAuthenticatedProxy.ts  ← 헬퍼 (인증 프록시 팩토리)
+│   ├── sentry.ts                    ← 헬퍼 (Sentry 초기화)
 │   ├── cleanupCertificateImages.ts  ← 스케줄 (인증서 이미지 정리)
 │   ├── trackFirstEmployee.ts       ← Firestore 트리거 (첫 직원 가입 추적)
+│   ├── backfillOrgCoords.ts        ← HTTP (기관 좌표 백필)
+│   ├── sendApprovalEmail.ts        ← 헬퍼 (승인 이메일 발송)
 │   │
 │   └── __tests__/                   ← Cloud Functions 테스트
 ├── package.json                     ← Node 22, firebase-functions v6, TypeScript

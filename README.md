@@ -158,7 +158,7 @@ firebase deploy --only firestore:rules,storage
 ├── src/
 │   ├── App.tsx                       역할별 라우팅 + 랜딩 페이지
 │   ├── index.css                     TailwindCSS + 커스텀 스타일
-│   ├── main.tsx                      앱 진입점 (Sentry 초기화)
+│   ├── main.tsx                      분할 진입점 (인증 상태에 따라 Full/Light 앱 로드)
 │   ├── components/
 │   │   ├── auth/                     인증 (로그인, 초대코드, 기관 신청, 랜딩)
 │   │   ├── superAdmin/               시스템 관리자 화면 (기관 관리, 대시보드)
@@ -169,7 +169,9 @@ firebase deploy --only firestore:rules,storage
 │   │   ├── ThemeContext.tsx           다크/라이트 모드 관리
 │   │   ├── FontSizeContext.tsx        글꼴 크기 조절 (소/중/대)
 │   │   └── ConfirmContext.tsx         Promise 기반 커스텀 confirm 모달
+│   ├── types/                        TypeScript 타입 정의
 │   ├── hooks/                        커스텀 훅 (비즈니스 로직 분리)
+│   │   └── utils/                    훅에서 추출된 순수 함수
 │   ├── lib/                          유틸리티 (Firestore, 티맵, OCR, PDF/Excel)
 │   │   └── firestore/                Firestore CRUD (도메인별 분리)
 │   └── __tests__/                    단위 테스트 (Vitest)
@@ -189,8 +191,11 @@ firebase deploy --only firestore:rules,storage
 | 함수명 | 용도 |
 |--------|------|
 | `ocrDashboard` | 계기판 사진 → Gemini OCR → Km/배터리% 추출 |
+| `ocrDocument` | 고유번호증/사업자등록증 OCR 텍스트 추출 |
 | `createReservationSafe` | 서버사이드 예약 생성 (Firestore 트랜잭션, 동시성 안전) |
 | `sendAdminNotice` | 관리자 공지 FCM 전송 |
+| `sendApprovalEmail` | 기관 승인 이메일 발송 (서버사이드) |
+| `sendManualApprovalAlimtalk` | 수동 승인 시 알림톡 발송 |
 | `sendBulkReminder` | 미활성 기관 일괄 알림톡 발송 (superAdmin 전용) |
 | `disableUser` | 사용자 비활성화 (Firebase Auth + Firestore) |
 | `restoreUser` | 비활성화된 사용자 복원 |
@@ -206,17 +211,20 @@ firebase deploy --only firestore:rules,storage
 | `onReservationUpdated` | 예약 수정/취소 → 캘린더 업데이트 |
 | `onReservationDeleted` | 예약 삭제 → 캘린더 이벤트 삭제 |
 | `setCustomClaims` | 사용자 문서 변경 시 Firebase Auth Custom Claims 자동 동기화 |
+| `trackFirstEmployee` | 첫 직원 가입 시점 추적 |
 
 ### 스케줄 함수
 
 | 함수명 | 주기 | 용도 |
 |--------|------|------|
-| `reservationReminder` | 5분 | 예약 10분 전 FCM + 일지 미작성 FCM |
+| `reservationReminder` | 10분 | 예약 10분 전 FCM + 일지 미작성 FCM |
+| `warmupOcr` | 5분 | OCR 함수 콜드 스타트 방지 (근무 시간) |
 | `syncCalendarToApp` | 10분 | 구글 캘린더 → Firestore 역동기화 |
 | `backupFirestore` | 매일 03:00 | Firestore 전체 → Cloud Storage 백업 |
 | `autoPurgeOrgs` | 매일 04:00 | soft delete 30일 경과 기관 영구 삭제 |
 | `archiveDriveLogs` | 매일 04:30 | 3년+ 운행 기록 GCS 아카이빙 |
 | `cleanupCertificateImages` | 매일 04:00 | 승인 30일 경과 기관 고유번호증 이미지 삭제 |
+| `cleanupRateLimits` | 매일 05:00 | 만료된 Rate Limit 문서 정리 |
 | `syncHolidaysScheduled` | 매일 06:00 | 공공데이터포털 공휴일 캐시 |
 
 ### HTTP 함수
@@ -225,9 +233,8 @@ firebase deploy --only firestore:rules,storage
 |--------|------|
 | `holidayProxy` | 공휴일 API CORS 프록시 |
 | `tmapProxy` | 티맵 경로 탐색 프록시 |
-| `warmupOcr` | OCR 함수 콜드 스타트 방지 |
 | `cleanupDuplicateLogs` | 중복 운행 기록 탐지 및 정리 |
-| `migrateCustomClaims` | 기존 사용자 Custom Claims 일괄 설정 (1회성) |
+| `backfillOrgCoords` | 기존 기관 좌표 일괄 마이그레이션 (1회성) |
 
 ---
 
@@ -235,8 +242,8 @@ firebase deploy --only firestore:rules,storage
 
 | 종류 | 규모 | 도구 |
 |------|------|------|
-| 단위 테스트 | 35파일, 266개 | Vitest |
-| E2E 테스트 | 8파일, 40개 | Playwright |
+| 단위 테스트 | 49파일 (프론트 39 + Functions 10) | Vitest |
+| E2E 테스트 | 11파일 | Playwright |
 
 ---
 

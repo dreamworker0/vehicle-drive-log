@@ -103,3 +103,14 @@ export function getAutoTimes(selectedDate: string, durationMin = 0) {
     }
     return { startTime: '09:00', endTime: calcEndTime('09:00', durationMin) };
 }
+
+/**
+ * 시간을 30분 단위로 올림 스냅한다.
+ * 예: (14, 5) → { h: 14, m: 30 }, (14, 40) → { h: 15, m: 0 }
+ */
+export const snapTo30 = (h: number, m: number): { h: number; m: number } => {
+    if (m <= 0) return { h, m: 0 };
+    if (m <= 30) return { h, m: 30 };
+    return { h: h + 1, m: 0 };
+};
+

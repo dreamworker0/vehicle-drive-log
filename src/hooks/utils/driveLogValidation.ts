@@ -128,3 +128,24 @@ export function buildLogData(form: DriveLogForm, { orgId, user, userData, select
         ...(isRetroactive && { isRetroactive: true }),
     };
 }
+
+/**
+ * Firestore Timestamp / Date / number / string → YYYY-MM-DD 변환
+ * 파싱 실패 시 todayStr() 반환
+ */
+export function timestampToDateStr(ts: unknown): string {
+    if (!ts) return todayStr();
+    let d: Date;
+    if (typeof ts === 'object' && ts !== null && 'toDate' in ts && typeof (ts as { toDate: () => Date }).toDate === 'function') {
+        d = (ts as { toDate: () => Date }).toDate();
+    } else if (typeof ts === 'object' && ts !== null && 'seconds' in ts) {
+        d = new Date((ts as { seconds: number }).seconds * 1000);
+    } else if (ts instanceof Date) {
+        d = ts;
+    } else {
+        d = new Date(ts as string | number);
+    }
+    if (isNaN(d.getTime())) return todayStr();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+

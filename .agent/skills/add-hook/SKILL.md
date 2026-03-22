@@ -13,6 +13,7 @@ description: 프로젝트 컨벤션에 맞게 새 커스텀 훅을 추가하는 
 |---|---|---|
 | `useAuth` | 인증 상태 + 사용자 정보 (전역 Context) | `hooks/useAuth.tsx` |
 | `useToast` | 토스트 알림 표시 (전역 Context) | `hooks/useToast.tsx` |
+| `useAdminBadges` | 관리자 사이드바 배지 실시간 구독 | `hooks/useAdminBadges.ts` |
 | `useTodayDashboard` | 오늘 대시보드 (예약·운행 현황) | `hooks/useTodayDashboard.ts` |
 | `useReservationCalendar` | 예약 캘린더 로직 | `hooks/useReservationCalendar.ts` |
 | `useDriveLogForm` | 운행일지 작성 폼 로직 | `hooks/useDriveLogForm.ts` |

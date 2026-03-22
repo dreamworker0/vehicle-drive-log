@@ -23,7 +23,9 @@ import ReleaseNotesPage from './components/auth/ReleaseNotesPage';
 import FAQPage from './components/auth/FAQPage';
 
 export function renderLightApp() {
-    const root = document.getElementById('root')!;
+    const rootEl = document.getElementById('root')!;
+
+    const lightRoot = createRoot(rootEl);
 
     // 로그인 성공 감지 → 전체 앱으로 전환
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -31,14 +33,14 @@ export function renderLightApp() {
             unsubscribe();
             // 전체 앱으로 전환 (appEntry 로드)
             import('./appEntry').then(({ renderFullApp }) => {
-                // 기존 light DOM을 unmount하고 전체 앱으로 교체
-                root.innerHTML = '';
+                // React 공식 unmount로 안전하게 DOM 정리 (innerHTML 직접 조작 금지)
+                lightRoot.unmount();
                 renderFullApp();
             });
         }
     });
 
-    createRoot(root).render(
+    lightRoot.render(
         <StrictMode>
             <BrowserRouter>
                 <Routes>

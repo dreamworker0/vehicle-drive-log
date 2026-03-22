@@ -80,16 +80,14 @@ export function initSentry() {
                 return null;
             }
 
-            // Samsung Internet 브라우저의 removeChild DOM 불일치 에러 필터링
-            // 삼성 브라우저 자체의 DOM 최적화(콘텐츠 차단, Samsung Pass 자동완성 등)가
-            // React virtual DOM과 충돌할 때 발생하는 환경적 노이즈 (앱 버그 아님)
-            const ua = navigator.userAgent;
-            const isSamsungBrowser = /SamsungBrowser/i.test(ua);
-            if (isSamsungBrowser) {
-                const errorMsg = event.exception?.values?.[0]?.value || '';
-                if (/removeChild|The node to be removed is not a child/i.test(errorMsg)) {
-                    return null;
-                }
+            // 모든 브라우저의 DOM NotFoundError (DOMException code 8) 필터링
+            // React virtual DOM과 브라우저 내부 동작(확장 프로그램, 자동완성, 콘텐츠 차단 등)의
+            // 충돌로 발생하는 환경적 노이즈 (앱 버그 아님)
+            // - Chrome/Samsung: "The node to be removed is not a child of this node"
+            // - Safari/iOS:     "The object can not be found here"
+            const errorMsg = event.exception?.values?.[0]?.value || '';
+            if (/removeChild|The node to be removed is not a child|The object can not be found here/i.test(errorMsg)) {
+                return null;
             }
 
             return event;

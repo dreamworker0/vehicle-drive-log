@@ -44,6 +44,8 @@ src/components/
 | `UserManual` | 사용 설명서 |
 | `InstallPrompt` / `IOSInstallPrompt` | PWA 설치 안내 |
 | `UpdatePrompt` | 앱 업데이트 안내 |
+| `PublicNav` | 공개 페이지(랜딩/로그인) 네비게이션 바 |
+| `SEOHead` | SEO 메타 태그 (react-helmet-async) |
 
 ## 컴포넌트 추가 절차
 

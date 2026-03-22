@@ -1,0 +1,189 @@
+ts-jest[ts-jest-transformer] (WARN) Define `ts-jest` config under `globals` is deprecated. Please do
+transform: {
+    <transform_regex>: ['ts-jest', { /* ts-jest config goes here in Jest */ }],
+},
+See more at https://kulshekhar.github.io/ts-jest/docs/getting-started/presets#advanced
+ts-jest[ts-jest-transformer] (WARN) Define `ts-jest` config under `globals` is deprecated. Please do
+transform: {
+    <transform_regex>: ['ts-jest', { /* ts-jest config goes here in Jest */ }],
+},
+See more at https://kulshekhar.github.io/ts-jest/docs/getting-started/presets#advanced
+ts-jest[ts-jest-transformer] (WARN) Define `ts-jest` config under `globals` is deprecated. Please do
+transform: {
+    <transform_regex>: ['ts-jest', { /* ts-jest config goes here in Jest */ }],
+},
+See more at https://kulshekhar.github.io/ts-jest/docs/getting-started/presets#advanced
+ts-jest[ts-jest-transformer] (WARN) Define `ts-jest` config under `globals` is deprecated. Please do
+transform: {
+    <transform_regex>: ['ts-jest', { /* ts-jest config goes here in Jest */ }],
+},
+See more at https://kulshekhar.github.io/ts-jest/docs/getting-started/presets#advanced
+FAIL src/__tests__/emulator.setup.ts
+  ??Test suite failed to run
+
+    Your test suite must contain at least one test.
+
+      at onResult (node_modules/@jest/core/build/TestScheduler.js:133:18)
+      at node_modules/@jest/core/build/TestScheduler.js:254:19
+      at node_modules/emittery/index.js:363:13
+          at Array.map (<anonymous>)
+      at Emittery.emit (node_modules/emittery/index.js:361:23)
+
+PASS src/__tests__/setCustomClaims.emulator.test.ts (19.474 s)
+  setCustomClaims ???먮??덉씠???듯빀 ?뚯뒪??    ???ъ슜??臾몄꽌 ?앹꽦 ??Claims ?ㅼ젙 (role + orgId) (68 ms)
+    ??role 蹂寃???Claims ?낅뜲?댄듃 (employee ??admin) (24 ms)
+    ??臾몄꽌 ??젣 ??Claims 珥덇린??(22 ms)
+    ??role 蹂寃??놁쑝硫??ㅽ궢 (遺덊븘?뷀븳 API ?몄텧 諛⑹?) (22 ms)
+    ??Auth??議댁옱?섏? ?딅뒗 UID ???먮윭 ?놁씠 ?ㅽ궢 (14 ms)
+
+FAIL src/__tests__/tmapProxy.emulator.test.ts (19.572 s)
+  ??tmapProxy ???먮??덉씠???듯빀 ?뚯뒪?????몄쬆 ?놁씠 ?몄텧 ??401 諛섑솚
+
+    TypeError: Cannot read properties of undefined (reading 'ok')
+
+      36 |         { method: "DELETE" }
+      37 |     );
+    > 38 |     if (!response.ok) {
+         |                   ^
+      39 |         console.warn("Firestore ?곗씠???뺣━ ?ㅽ뙣:", response.statusText);
+      40 |     }
+      41 | }
+
+      at clearFirestoreData (src/__tests__/emulator.setup.ts:38:19)
+      at Object.<anonymous> (src/__tests__/tmapProxy.emulator.test.ts:129:9)
+
+  ??tmapProxy ???먮??덉씠???듯빀 ?뚯뒪?????좏슚?섏? ?딆? ?좏겙?쇰줈 ?몄텧 ??401 諛섑솚
+
+    TypeError: Cannot read properties of undefined (reading 'ok')
+
+      36 |         { method: "DELETE" }
+      37 |     );
+    > 38 |     if (!response.ok) {
+         |                   ^
+      39 |         console.warn("Firestore ?곗씠???뺣━ ?ㅽ뙣:", response.statusText);
+      40 |     }
+      41 | }
+
+      at clearFirestoreData (src/__tests__/emulator.setup.ts:38:19)
+      at Object.<anonymous> (src/__tests__/tmapProxy.emulator.test.ts:129:9)
+
+  ??tmapProxy ???먮??덉씠???듯빀 ?뚯뒪????geocode action ?뺤긽 ?몄텧
+
+    TypeError: Cannot read properties of undefined (reading 'ok')
+
+      36 |         { method: "DELETE" }
+      37 |     );
+    > 38 |     if (!response.ok) {
+         |                   ^
+      39 |         console.warn("Firestore ?곗씠???뺣━ ?ㅽ뙣:", response.statusText);
+      40 |     }
+      41 | }
+
+      at clearFirestoreData (src/__tests__/emulator.setup.ts:38:19)
+      at Object.<anonymous> (src/__tests__/tmapProxy.emulator.test.ts:129:9)
+
+  ??tmapProxy ???먮??덉씠???듯빀 ?뚯뒪????geocode action??address ?놁쑝硫?400
+
+    TypeError: Cannot read properties of undefined (reading 'ok')
+
+      36 |         { method: "DELETE" }
+      37 |     );
+    > 38 |     if (!response.ok) {
+         |                   ^
+      39 |         console.warn("Firestore ?곗씠???뺣━ ?ㅽ뙣:", response.statusText);
+      40 |     }
+      41 | }
+
+      at clearFirestoreData (src/__tests__/emulator.setup.ts:38:19)
+      at Object.<anonymous> (src/__tests__/tmapProxy.emulator.test.ts:129:9)
+
+  ??tmapProxy ???먮??덉씠???듯빀 ?뚯뒪????poi action ?뺤긽 ?몄텧
+
+    TypeError: Cannot read properties of undefined (reading 'ok')
+
+      36 |         { method: "DELETE" }
+      37 |     );
+    > 38 |     if (!response.ok) {
+         |                   ^
+      39 |         console.warn("Firestore ?곗씠???뺣━ ?ㅽ뙣:", response.statusText);
+      40 |     }
+      41 | }
+
+      at clearFirestoreData (src/__tests__/emulator.setup.ts:38:19)
+      at Object.<anonymous> (src/__tests__/tmapProxy.emulator.test.ts:129:9)
+
+  ??tmapProxy ???먮??덉씠???듯빀 ?뚯뒪????route action ?뺤긽 ?몄텧
+
+    TypeError: Cannot read properties of undefined (reading 'ok')
+
+      36 |         { method: "DELETE" }
+      37 |     );
+    > 38 |     if (!response.ok) {
+         |                   ^
+      39 |         console.warn("Firestore ?곗씠???뺣━ ?ㅽ뙣:", response.statusText);
+      40 |     }
+      41 | }
+
+      at clearFirestoreData (src/__tests__/emulator.setup.ts:38:19)
+      at Object.<anonymous> (src/__tests__/tmapProxy.emulator.test.ts:129:9)
+
+  ??tmapProxy ???먮??덉씠???듯빀 ?뚯뒪????吏?먰븯吏 ?딅뒗 action ??400 諛섑솚
+
+    TypeError: Cannot read properties of undefined (reading 'ok')
+
+      36 |         { method: "DELETE" }
+      37 |     );
+    > 38 |     if (!response.ok) {
+         |                   ^
+      39 |         console.warn("Firestore ?곗씠???뺣━ ?ㅽ뙣:", response.statusText);
+      40 |     }
+      41 | }
+
+      at clearFirestoreData (src/__tests__/emulator.setup.ts:38:19)
+      at Object.<anonymous> (src/__tests__/tmapProxy.emulator.test.ts:129:9)
+
+  ??tmapProxy ???먮??덉씠???듯빀 ?뚯뒪????Rate Limit 珥덇낵 ??429 諛섑솚
+
+    TypeError: Cannot read properties of undefined (reading 'ok')
+
+      36 |         { method: "DELETE" }
+      37 |     );
+    > 38 |     if (!response.ok) {
+         |                   ^
+      39 |         console.warn("Firestore ?곗씠???뺣━ ?ㅽ뙣:", response.statusText);
+      40 |     }
+      41 | }
+
+      at clearFirestoreData (src/__tests__/emulator.setup.ts:38:19)
+      at Object.<anonymous> (src/__tests__/tmapProxy.emulator.test.ts:129:9)
+
+
+  ??Test suite failed to run
+
+    TypeError: Cannot read properties of undefined (reading 'ok')
+
+      36 |         { method: "DELETE" }
+      37 |     );
+    > 38 |     if (!response.ok) {
+         |                   ^
+      39 |         console.warn("Firestore ?곗씠???뺣━ ?ㅽ뙣:", response.statusText);
+      40 |     }
+      41 | }
+
+      at clearFirestoreData (src/__tests__/emulator.setup.ts:38:19)
+      at Object.<anonymous> (src/__tests__/tmapProxy.emulator.test.ts:170:9)
+
+PASS src/__tests__/joinOrganization.emulator.test.ts (20.572 s)
+  joinOrganization ???먮??덉씠???듯빀 ?뚯뒪??    ???좏슚??珥덈? 肄붾뱶濡?媛???깃났 ??user 臾몄꽌 ?앹꽦 + Claims ?ㅼ젙 (839 ms)
+    ???좏슚?섏? ?딆? 珥덈? 肄붾뱶 ??not-found ?먮윭 (50 ms)
+    ???대? 湲곌? ?뚯냽???ъ슜????already-exists ?먮윭 (59 ms)
+    ??admin???대? ?덉쑝硫?role? employee濡??ㅼ젙 (111 ms)
+    ??preRegistered 留ㅼ묶 ???ъ쟾 ?깅줉???대쫫 諛섏쁺 + preRegistered 臾몄꽌 ??젣 (147 ms)
+
+A worker process has failed to exit gracefully and has been force exited. This is likely caused by tests leaking due to improper teardown. Try running with --detectOpenHandles to find leaks. Active timers can also cause this, ensure that .unref() was called on them.
+Test Suites: 2 failed, 2 passed, 4 total
+Tests:       8 failed, 10 passed, 18 total
+Snapshots:   0 total
+Time:        22.115 s
+Ran all test suites matching /emulator/i.
+Force exiting Jest: Have you considered using `--detectOpenHandles` to detect async operations that kept running after all tests finished?

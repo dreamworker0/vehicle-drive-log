@@ -8,7 +8,7 @@ import { useAuth } from './useAuth';
 import { useToast } from './useToast';
 import useRetry from './useRetry';
 import useDriveLogOcr from './useDriveLogOcr';
-import { nowTime, todayStr, validateDriveLogForm, buildLogData } from './utils/driveLogValidation';
+import { nowTime, todayStr, validateDriveLogForm, buildLogData, timestampToDateStr } from './utils/driveLogValidation';
 import { getVehicles, createDriveLog, updateDriveLog, updateReservationStatus, getFavorites, createFavorite, getOrganizationMembers, getLastVehicleEndKm, getLastVehicleEndBattery, getVehicleEndKmBefore, getReservationById, getHipassCards, updateHipassCard } from '../lib/firestore';
 import { enqueueLog } from '../lib/offlineQueue';
 import type { Vehicle } from '../types/vehicle';
@@ -77,23 +77,7 @@ export default function useDriveLogForm() {
     const [hipassCard, setHipassCard] = useState<HipassCard | null>(null);
     const [lastEndBattery, setLastEndBattery] = useState<number | null>(null);
 
-    // 수정 모드: 기존 기록의 날짜, 그 외: 오늘
-    const editDriveDate = (() => {
-        if (!editLog?.timestamp) return todayStr();
-        let d: Date;
-        const ts = editLog.timestamp as unknown;
-        if (ts && typeof ts === 'object' && 'toDate' in ts && typeof (ts as { toDate: () => Date }).toDate === 'function') {
-            d = (ts as { toDate: () => Date }).toDate();
-        } else if (ts && typeof ts === 'object' && 'seconds' in ts) {
-            d = new Date((ts as { seconds: number }).seconds * 1000);
-        } else if (ts instanceof Date) {
-            d = ts;
-        } else {
-            d = new Date(ts as string | number);
-        }
-        if (isNaN(d.getTime())) return todayStr();
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-    })();
+    const editDriveDate = editLog?.timestamp ? timestampToDateStr(editLog.timestamp) : todayStr();
 
     const [form, setForm] = useState<DriveLogForm>({
         vehicleId: editLog?.vehicleId || '',

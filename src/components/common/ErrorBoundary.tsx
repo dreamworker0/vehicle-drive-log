@@ -16,11 +16,25 @@ export default class ErrorBoundary extends Component<Props, State> {
         this.state = { hasError: false, error: null };
     }
 
+    /** DOM NotFoundError(code 8)인지 확인 — 브라우저별 메시지가 다르므로 이름+코드로 판별 */
+    private static isDomNotFoundError(error: Error): boolean {
+        return (
+            error.name === 'NotFoundError' ||
+            ('code' in error && (error as DOMException).code === 8)
+        );
+    }
+
     static getDerivedStateFromError(error: Error): State {
+        // DOM NotFoundError는 렌더링에 영향 없으므로 에러 페이지를 보여줄 필요 없음
+        if (ErrorBoundary.isDomNotFoundError(error)) {
+            return { hasError: false, error: null };
+        }
         return { hasError: true, error };
     }
 
     componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+        // DOM NotFoundError는 Sentry에도 보내지 않음 (sentry.ts에서도 필터링하지만 이중 방어)
+        if (ErrorBoundary.isDomNotFoundError(error)) return;
         captureError(error, { componentStack: errorInfo?.componentStack });
     }
 

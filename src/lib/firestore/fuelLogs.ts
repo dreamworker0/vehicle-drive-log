@@ -9,24 +9,23 @@ import {
 import { db } from '../firebase';
 
 /** 주유 기록 목록 조회 (기관 전체, 최신순) */
-export const getFuelLogs = async (orgId: string, vehicleId: string | null = null) => {
-    let q;
+export const getFuelLogs = async (orgId: string, vehicleId: string | null = null, options?: { since?: Date; until?: Date }) => {
+    const constraints: import('firebase/firestore').QueryConstraint[] = [
+        where('organizationId', '==', orgId),
+    ];
     if (vehicleId) {
-        q = query(
-            collection(db, 'fuelLogs'),
-            where('organizationId', '==', orgId),
-            where('vehicleId', '==', vehicleId),
-            orderBy('date', 'desc'),
-            limit(200)
-        );
-    } else {
-        q = query(
-            collection(db, 'fuelLogs'),
-            where('organizationId', '==', orgId),
-            orderBy('date', 'desc'),
-            limit(200)
-        );
+        constraints.push(where('vehicleId', '==', vehicleId));
     }
+    if (options?.since) {
+        constraints.push(where('date', '>=', options.since instanceof Date
+            ? options.since.toISOString().slice(0, 10) : options.since));
+    }
+    if (options?.until) {
+        constraints.push(where('date', '<=', options.until instanceof Date
+            ? options.until.toISOString().slice(0, 10) : options.until));
+    }
+    constraints.push(orderBy('date', 'desc'), limit(200));
+    const q = query(collection(db, 'fuelLogs'), ...constraints);
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, any>) }));
 };

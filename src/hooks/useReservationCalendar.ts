@@ -19,7 +19,7 @@ import { useToast } from './useToast';
 import { getHolidays } from '../lib/holiday';
 import { format, addMonths, subMonths, startOfMonth, endOfMonth, eachDayOfInterval, isBefore, startOfDay } from 'date-fns';
 import { getMultiRouteWithFreeRoad, isTmapAvailable, VEHICLE_TYPE_TO_CAR_TYPE } from '../lib/tmap';
-import { calcEndTime, findOverlappingReservation, findUserOverlappingReservation } from './utils/reservationUtils';
+import { calcEndTime, findOverlappingReservation, findUserOverlappingReservation, snapTo30 } from './utils/reservationUtils';
 import type { Vehicle } from '../types/vehicle';
 import type { Reservation, CalendarDay } from '../types/reservation';
 import type { CustomHoliday } from '../types/holiday';
@@ -230,12 +230,8 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
     // 최소 시작 시간 (오늘이면 현재 시간, 아니면 00:00)
     const getMinStartTime = () => isToday ? getCurrentTimeStr() : '00:00';
 
-    // 30분 단위 스냅 (올림)
-    const snapTo30 = (h: number, m: number) => {
-        if (m <= 0) return { h, m: 0 };
-        if (m <= 30) return { h, m: 30 };
-        return { h: h + 1, m: 0 };
-    };
+
+
 
     // 예약 폼 열기 (기본 시간 자동 설정)
     const handleOpenForm = () => {
