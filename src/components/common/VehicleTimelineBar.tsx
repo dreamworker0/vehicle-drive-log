@@ -255,7 +255,7 @@ export default function VehicleTimelineBar({
                                                             {r.groupId && <span className="ml-1 text-blue-500" title="다일 예약">🔗</span>}
                                                         </div>
                                                         <div className="flex items-center gap-1.5 flex-shrink-0">
-                                                            {(r as any).syncSource === 'calendar' && (
+                                                            {(r as unknown as { syncSource?: string }).syncSource === 'calendar' && (
                                                                 <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300 rounded-full font-medium">
                                                                     📅
                                                                 </span>
@@ -268,11 +268,11 @@ export default function VehicleTimelineBar({
                                                             )}
                                                         </div>
                                                     </div>
-                                                    {(r as any).routeDistance && (
+                                                    {(r as unknown as { routeDistance?: number }).routeDistance && (
                                                         <p className="text-[11px] text-blue-500 mt-0.5 flex items-center gap-2">
-                                                            <span>🗺️ {Math.floor((r as any).routeDistance)}km</span>
-                                                            <span>⏱ {(r as any).routeDuration}분</span>
-                                                            {(r as any).routeTollFee > 0 && <span>₩{(r as any).routeTollFee.toLocaleString()}</span>}
+                                                            <span>🗺️ {Math.floor((r as unknown as { routeDistance: number }).routeDistance)}km</span>
+                                                            <span>⏱ {(r as unknown as { routeDuration?: number }).routeDuration}분</span>
+                                                            {((r as unknown as { routeTollFee?: number }).routeTollFee ?? 0) > 0 && <span>₩{(r as unknown as { routeTollFee: number }).routeTollFee.toLocaleString()}</span>}
                                                         </p>
                                                     )}
                                                 </div>

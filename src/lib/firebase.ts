@@ -17,7 +17,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 // === Analytics 지연 초기화 (초기 번들에서 ~20KB 제외) ===
-let _analytics: any = null;
+let _analytics: ReturnType<typeof import('firebase/analytics').getAnalytics> | null = null;
 function initAnalyticsLazy() {
     import('firebase/analytics').then(({ getAnalytics }) => {
         _analytics = getAnalytics(app);
@@ -33,7 +33,7 @@ function initAppCheckLazy() {
     }
     // 개발 환경에서 디버그 토큰 사용 (Firebase Console → App Check → 디버그 토큰 등록 필요)
     if (import.meta.env.DEV) {
-        (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = import.meta.env.VITE_APPCHECK_DEBUG_TOKEN || true;
+        (self as unknown as Record<string, unknown>).FIREBASE_APPCHECK_DEBUG_TOKEN = import.meta.env.VITE_APPCHECK_DEBUG_TOKEN || true;
     }
     import('firebase/app-check').then(({ initializeAppCheck, ReCaptchaEnterpriseProvider }) => {
         initializeAppCheck(app, {
@@ -192,7 +192,7 @@ export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
 
 // FCM은 브라우저 지원 시에만 초기화 (동적 import로 번들 최적화)
-let _messaging: any = null;
+let _messaging: ReturnType<typeof import('firebase/messaging').getMessaging> | null = null;
 let _messagingInit = false;
 
 export async function getMessagingInstance() {

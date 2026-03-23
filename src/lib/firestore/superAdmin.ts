@@ -5,6 +5,7 @@ import {
     doc, updateDoc,
     collection, query, where, getDocs,
     limit, serverTimestamp,
+    type DocumentData,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -15,7 +16,7 @@ export const getSuperAdmins = async () => {
         where('role', '==', 'superAdmin')
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
 };
 
 /** 이메일로 사용자 찾기 */
@@ -33,7 +34,7 @@ export const getUserByEmail = async (email: string) => {
 export const addSuperAdmin = async (email: string) => {
     const user = await getUserByEmail(email);
     if (!user) throw new Error('해당 이메일로 가입된 사용자가 없습니다. 먼저 앱에 로그인해야 합니다.');
-    if ((user as Record<string, any>).role === 'superAdmin') throw new Error('이미 슈퍼관리자입니다.');
+    if ((user as Record<string, unknown>).role === 'superAdmin') throw new Error('이미 슈퍼관리자입니다.');
     await updateDoc(doc(db, 'users', user.id), {
         role: 'superAdmin',
         promotedAt: serverTimestamp(),

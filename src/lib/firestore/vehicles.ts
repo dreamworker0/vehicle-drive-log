@@ -8,22 +8,23 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { cachedQuery, invalidateCache } from './cache';
+import type { Vehicle } from '../../types/vehicle';
 
 // 기관 소속 차량 목록 조회 (TTL 30초 캐시 적용)
-export const getVehicles = async (orgId: string) => {
-    return cachedQuery(`vehicles:${orgId}`, async () => {
+export const getVehicles = async (orgId: string): Promise<Vehicle[]> => {
+    return cachedQuery<Vehicle[]>(`vehicles:${orgId}`, async () => {
         const q = query(
             collection(db, 'vehicles'),
             where('organizationId', '==', orgId),
             orderBy('createdAt', 'desc')
         );
         const snap = await getDocs(q);
-        return snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Vehicle);
     });
 };
 
 // 차량 등록
-export const createVehicle = async (data: Record<string, any>) => {
+export const createVehicle = async (data: Record<string, unknown>) => {
     const docRef = await addDoc(collection(db, 'vehicles'), {
         ...data,
         currentKm: data.currentKm ?? 0,
@@ -34,7 +35,7 @@ export const createVehicle = async (data: Record<string, any>) => {
 };
 
 // 차량 정보 수정
-export const updateVehicle = async (vehicleId: string, data: Record<string, any>) => {
+export const updateVehicle = async (vehicleId: string, data: Record<string, unknown>) => {
     await updateDoc(doc(db, 'vehicles', vehicleId), data);
     invalidateCache('vehicles');
 };

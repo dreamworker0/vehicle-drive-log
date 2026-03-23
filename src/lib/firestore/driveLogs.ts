@@ -6,8 +6,10 @@ import {
     collection, query, where, getDocs, addDoc,
     orderBy, limit, serverTimestamp,
     type QueryConstraint,
+    type DocumentData,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import type { DriveLog } from '../../types/driveLog';
 
 /** 특정 시점 이후에 같은 차량의 운행기록이 존재하는지 확인 */
 const hasLaterDriveLog = async (orgId: string, vehicleId: string, afterTimestamp: Date) => {
@@ -23,7 +25,7 @@ const hasLaterDriveLog = async (orgId: string, vehicleId: string, afterTimestamp
 };
 
 // 운행일지 생성 (중복 방지 체크 포함)
-export const createDriveLog = async (data: Record<string, any>) => {
+export const createDriveLog = async (data: Record<string, unknown>) => {
     // 중복 체크: 같은 기관+차량+운전자+startKm+endKm 이 같은 날짜에 이미 존재하면 거부
     if (data.organizationId && data.vehicleId && data.driverUid && data.startKm != null && data.endKm != null) {
         const logDate = data.timestamp instanceof Date ? data.timestamp : new Date();
@@ -56,9 +58,9 @@ export const createDriveLog = async (data: Record<string, any>) => {
     // 차량의 누적 Km 갱신 — 이 기록 이후에 같은 차량의 기록이 없을 때만
     const isEffectivelyRetroactive = data.isRetroactive ||
         (data.organizationId && data.vehicleId && data.timestamp &&
-            await hasLaterDriveLog(data.organizationId, data.vehicleId, data.timestamp));
+            await hasLaterDriveLog(data.organizationId as string, data.vehicleId as string, data.timestamp as Date));
     if (data.endKm && data.vehicleId && !isEffectivelyRetroactive) {
-        await updateDoc(doc(db, 'vehicles', data.vehicleId), {
+        await updateDoc(doc(db, 'vehicles', data.vehicleId as string), {
             currentKm: data.endKm,
         });
     }
@@ -66,7 +68,7 @@ export const createDriveLog = async (data: Record<string, any>) => {
     // 다음 기록의 startKm 자동 연동 (소급이든 아니든 항상 시도)
     let syncResult: Awaited<ReturnType<typeof syncNextLogStartKm>> | null = null;
     if (data.endKm && data.vehicleId && data.organizationId && data.timestamp) {
-        syncResult = await syncNextLogStartKm(data.organizationId, data.vehicleId, data.timestamp, data.endKm);
+        syncResult = await syncNextLogStartKm(data.organizationId as string, data.vehicleId as string, data.timestamp as Date, data.endKm as number);
     }
 
     return { id: docRef.id, syncResult };
@@ -186,12 +188,12 @@ export const getDriveLogs = async (orgId: string, filters: { limit?: number; sta
     // 커서 기반 페이지네이션: 이전 마지막 문서 이후부터 조회
     if (filters.startAfter) {
         const { startAfter: startAfterFn } = await import('firebase/firestore');
-        constraints.splice(filters.since ? 3 : 2, 0, startAfterFn(filters.startAfter as any));
+        constraints.splice(filters.since ? 3 : 2, 0, startAfterFn(filters.startAfter as DocumentData));
     }
 
     const q = query(collection(db, 'driveLogs'), ...constraints);
     const snap = await getDocs(q);
-    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }) as DriveLog);
 
     return {
         docs,
@@ -210,18 +212,18 @@ export const getMyDriveLogs = async (orgId: string, uid: string, limitCount = 30
         limit(limitCount)
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DriveLog);
 };
 
 // 운행일지 수정
-export const updateDriveLog = async (logId: string, data: Record<string, any>) => {
+export const updateDriveLog = async (logId: string, data: Record<string, unknown>) => {
     await updateDoc(doc(db, 'driveLogs', logId), {
         ...data,
         editedAt: serverTimestamp(),
     });
     // endKm이 변경되고 vehicleId가 있으면 차량 currentKm 갱신
     if (data.endKm && data.vehicleId) {
-        await updateDoc(doc(db, 'vehicles', data.vehicleId), {
+        await updateDoc(doc(db, 'vehicles', data.vehicleId as string), {
             currentKm: data.endKm,
         });
     }
@@ -229,7 +231,7 @@ export const updateDriveLog = async (logId: string, data: Record<string, any>) =
     // endKm 변경 시 다음 기록의 startKm 자동 연동
     let syncResult: Awaited<ReturnType<typeof syncNextLogStartKm>> | null = null;
     if (data.endKm && data.vehicleId && data.organizationId && data.timestamp) {
-        syncResult = await syncNextLogStartKm(data.organizationId, data.vehicleId, data.timestamp, data.endKm);
+        syncResult = await syncNextLogStartKm(data.organizationId as string, data.vehicleId as string, data.timestamp as Date, data.endKm as number);
     }
     return { syncResult };
 };
@@ -246,7 +248,7 @@ export const getVehicleDriveLogs = async (vehicleId: string, since?: Date, limit
     }
     const q = query(collection(db, 'driveLogs'), ...constraints);
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DriveLog);
 };
 
 // 차량에 운행일지가 1건이라도 있는지 확인

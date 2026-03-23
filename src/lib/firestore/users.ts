@@ -5,6 +5,7 @@ import {
     doc, getDoc, setDoc, updateDoc, deleteDoc,
     collection, query, where, getDocs,
     serverTimestamp,
+    type DocumentData,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -15,7 +16,7 @@ export const getUser = async (uid: string) => {
 };
 
 // 사용자 생성
-export const createUser = async (uid: string, data: Record<string, any>) => {
+export const createUser = async (uid: string, data: Record<string, unknown>) => {
     await setDoc(doc(db, 'users', uid), {
         ...data,
         createdAt: serverTimestamp(),
@@ -28,7 +29,7 @@ export const leaveOrganization = async (uid: string) => {
 };
 
 // 사용자 정보 수정
-export const updateUser = async (uid: string, data: Record<string, any>) => {
+export const updateUser = async (uid: string, data: Record<string, unknown>) => {
     await updateDoc(doc(db, 'users', uid), data);
 };
 
@@ -39,7 +40,7 @@ export const getOrganizationMembers = async (orgId: string) => {
         where('organizationId', '==', orgId)
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
 };
 
 // 전체 기관별 유효 멤버 수 조회 (미활성 기관 판별용)

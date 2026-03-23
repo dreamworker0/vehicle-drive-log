@@ -12,6 +12,7 @@ interface OrgMember {
     name?: string;
     email?: string;
     role?: string;
+    [key: string]: unknown;
 }
 
 interface OrgCardProps {
@@ -41,16 +42,16 @@ export default function OrgCard({
     const daysSinceApproval = (() => {
         if (memberCount > 0 || !org.approvedAt) return null;
         const approved = 'toDate' in org.approvedAt
-            ? (org.approvedAt as any).toDate()
-            : new Date(org.approvedAt as any);
+            ? (org.approvedAt as { toDate: () => Date }).toDate()
+            : new Date(org.approvedAt as unknown as string);
         return Math.floor((Date.now() - approved.getTime()) / (1000 * 60 * 60 * 24));
     })();
 
     const appliedDate = (() => {
         if (!org.createdAt) return null;
         const d = 'toDate' in org.createdAt
-            ? (org.createdAt as any).toDate()
-            : new Date(org.createdAt as any);
+            ? (org.createdAt as { toDate: () => Date }).toDate()
+            : new Date(org.createdAt as unknown as string);
         const mm = String(d.getMonth() + 1).padStart(2, '0');
         const dd = String(d.getDate()).padStart(2, '0');
         const hh = String(d.getHours()).padStart(2, '0');

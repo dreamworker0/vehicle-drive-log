@@ -8,6 +8,7 @@ import ConfirmModal from '../common/ConfirmModal';
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
 import { isVehicleBlocked } from '../../lib/vehicleUtils';
 import { SkeletonCard, SkeletonBox } from '../common/Skeleton';
+import type { Vehicle } from '../../types/vehicle';
 
 const FUEL_TYPE_LABELS: Record<string, string> = { gasoline: '휘발유', diesel: '경유', lpg: 'LPG', electric: '전기차' };
 const FUEL_TYPE_COLORS: Record<string, string> = { gasoline: 'badge-primary', diesel: 'badge-neutral', lpg: 'badge-warning', electric: 'badge-success' };
@@ -43,12 +44,12 @@ export default function VehicleManager() {
     }
 
     // 차량 카드 렌더링 함수
-    const renderVehicleCard = (vehicle: any, isRetired = false) => (
+    const renderVehicleCard = (vehicle: Vehicle, isRetired = false) => (
         <div key={vehicle.id} className={`glass-card p-5 transition-all group ${isRetired ? 'opacity-60' : 'hover:shadow-glass-lg'}`}>
             <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
                     <div className={`w-12 h-12 ${isRetired ? 'bg-surface-200 dark:bg-surface-700' : getVehicleColor(vehicle.id)} rounded-xl flex items-center justify-center text-2xl ${isRetired ? '' : 'group-hover:scale-110'} transition-transform`}>
-                        {isRetired ? '🚫' : (VEHICLE_TYPE_ICONS[vehicle.vehicleType] || '🚗')}
+                        {isRetired ? '🚫' : (VEHICLE_TYPE_ICONS[vehicle.vehicleType ?? ''] || '🚗')}
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
@@ -92,8 +93,8 @@ export default function VehicleManager() {
             </div>
             <div className="flex items-center gap-3 text-sm">
                 <span className="text-surface-500 dark:text-surface-400 font-mono">{vehicle.plateNumber}</span>
-                <span className={FUEL_TYPE_COLORS[vehicle.fuelType]}>
-                    {FUEL_TYPE_LABELS[vehicle.fuelType]}
+                <span className={FUEL_TYPE_COLORS[vehicle.fuelType ?? ''] || 'badge-neutral'}>
+                    {FUEL_TYPE_LABELS[vehicle.fuelType ?? ''] || vehicle.fuelType || '-'}
                 </span>
                 <span className="text-surface-400 text-xs ml-auto">
                     {(vehicle.currentKm || 0).toLocaleString()} km
@@ -110,8 +111,8 @@ export default function VehicleManager() {
             {/* 정비 중 / 폐차 사유 표시 */}
             {(vehicle.fuelType === 'electric' || vehicle.googleCalendarId || isVehicleBlocked(vehicle.maintenance) || isRetired) && (
                 <div className="mt-2 flex items-center gap-3 text-xs text-surface-400">
-                    {vehicle.fuelType === 'electric' && vehicle.currentBattery != null && (
-                        <span className="flex items-center gap-1">🔋 {vehicle.currentBattery}%</span>
+                    {vehicle.fuelType === 'electric' && (vehicle as unknown as { currentBattery?: number }).currentBattery != null && (
+                        <span className="flex items-center gap-1">🔋 {(vehicle as unknown as { currentBattery?: number }).currentBattery}%</span>
                     )}
                     {vehicle.googleCalendarId && (
                         <span className="text-primary-500">📅 캘린더 연동</span>
@@ -124,7 +125,7 @@ export default function VehicleManager() {
                     {!isRetired && isVehicleBlocked(vehicle.maintenance) && (
                         <div className="flex items-center gap-2 ml-auto">
                             <span className="px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full font-medium">
-                                🔧 정비 중{vehicle.maintenance.endDate ? ` ~${vehicle.maintenance.endDate.slice(5)}` : ''}
+                                🔧 정비 중{vehicle.maintenance?.endDate ? ` ~${vehicle.maintenance.endDate.slice(5)}` : ''}
                             </span>
                             <button
                                 onClick={(e) => { e.stopPropagation(); openClearMaintenanceModal(vehicle); }}
@@ -250,6 +251,7 @@ export default function VehicleManager() {
             )}
 
             {/* 통합 확인/입력 모달 */}
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
             <ConfirmModal {...getModalProps() as any} />
         </div>
     );

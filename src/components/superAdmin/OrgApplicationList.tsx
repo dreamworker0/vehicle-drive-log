@@ -33,14 +33,14 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
         };
 
         const unsubPending = subscribePendingOrganizations((pending) => {
-            setApplications(pending);
+            setApplications(pending as Organization[]);
             pendingReady = true;
             checkReady();
             onCountChange?.();
         });
 
         const unsubRejected = subscribeRejectedOrganizations((rejected) => {
-            setRejectedApps(rejected);
+            setRejectedApps(rejected as Organization[]);
             rejectedReady = true;
             checkReady();
         });
@@ -52,7 +52,7 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
         // eslint-disable-next-line react-hooks/exhaustive-deps -- onCountChange는 초기 마운트 시에만 바인딩
     }, []);
 
-    const handleApprove = async (app: any) => {
+    const handleApprove = async (app: Organization) => {
         setActionLoading(prev => ({ ...prev, [app.id]: 'approve' }));
         try {
             const inviteCode = generateInviteCode();
@@ -118,7 +118,7 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
         }
     };
 
-    const handleReject = async (app: any) => {
+    const handleReject = async (app: Organization) => {
         if (!await confirm({ message: `${app.name} 기관의 신청을 거절하시겠습니까?`, confirmColor: 'danger' })) return;
 
         setActionLoading(prev => ({ ...prev, [app.id]: 'reject' }));
@@ -149,7 +149,7 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
         }
     };
 
-    const handleDelete = async (app: any) => {
+    const handleDelete = async (app: Organization) => {
         if (!await confirm({ message: `${app.name} 기관의 신청 기록을 완전히 삭제하시겠습니까?`, confirmColor: 'danger' })) return;
 
         setActionLoading(prev => ({ ...prev, [app.id]: 'delete' }));
@@ -164,7 +164,7 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
     };
 
     // 거절된 신청을 대기중으로 되돌리기
-    const handleMoveToPending = async (app: any) => {
+    const handleMoveToPending = async (app: Organization) => {
         if (!await confirm({ message: `${app.name} 기관의 신청을 대기 중 상태로 되돌리시겠습니까?` })) return;
 
         setActionLoading(prev => ({ ...prev, [app.id]: 'moveToPending' }));
@@ -172,7 +172,7 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
             await updateOrganization(app.id, {
                 status: 'pending',
                 rejectedAt: null,
-            } as any);
+            } as Record<string, unknown>);
             showToast(`${app.name} 기관이 대기 중으로 이동되었습니다.`, 'success');
         } catch (err) {
             console.error('대기중 이동 실패:', err);
@@ -183,14 +183,14 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
     };
 
     // AI 재분석
-    const handleAiReanalyze = async (app: any) => {
+    const handleAiReanalyze = async (app: Organization) => {
         if (!app.uniqueNumberImageUrl) {
             showToast('고유번호증 사본이 없어 AI 분석을 할 수 없습니다.', 'warning');
             return;
         }
         setActionLoading(prev => ({ ...prev, [app.id]: 'ai' }));
         try {
-            const ocrResult = await ocrDocumentVerify(app.uniqueNumberImageUrl!, app.name) as any;
+            const ocrResult = await ocrDocumentVerify(app.uniqueNumberImageUrl!, app.name) as Record<string, unknown>;
             await updateOrganization(app.id, {
                 aiVerified: ocrResult.aiVerified || false,
                 aiVerifyDetail: {
@@ -202,7 +202,7 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
                 },
                 uniqueNumber: ocrResult.uniqueNumber || '',
                 address: ocrResult.address || '',
-            } as any);
+            } as Record<string, unknown>);
 
         } catch (err) {
             console.error('AI 재분석 실패:', err);

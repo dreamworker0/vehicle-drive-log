@@ -6,11 +6,12 @@ import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
 import { formatTimestampShort } from '../../lib/dateUtils';
 import { SkeletonBox, SkeletonList } from '../common/Skeleton';
 import MyStatsSummary from './MyStatsSummary';
+import type { DriveLog } from '../../types/driveLog';
 
 export default function MyRecords() {
     const { user, userData } = useAuth();
     const navigate = useNavigate();
-    const [logs, setLogs] = useState<any[]>([]);
+    const [logs, setLogs] = useState<DriveLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [expandedId, setExpandedId] = useState<string | null>(null);
     const [searchQuery, setSearchQuery] = useState('');
@@ -22,7 +23,7 @@ export default function MyRecords() {
         const fetch = async () => {
             try {
                 const data = await getMyDriveLogs(userData.organizationId!, user.uid, 50);
-                setLogs(data as any[]);
+                setLogs(data as DriveLog[]);
             } catch (err) {
                 console.error('기록 로드 실패:', err);
             } finally {
@@ -43,9 +44,10 @@ export default function MyRecords() {
         );
     }, [logs, searchQuery]);
 
-    const grouped = filteredLogs.reduce<Record<string, any[]>>((acc, log) => {
-        const key = log.timestamp?.toDate
-            ? log.timestamp.toDate().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' })
+    const grouped = filteredLogs.reduce<Record<string, DriveLog[]>>((acc, log) => {
+        const ts = log.timestamp;
+        const key = (ts && typeof ts === 'object' && 'toDate' in ts && typeof ts.toDate === 'function')
+            ? ts.toDate().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long' })
             : '기타';
         if (!acc[key]) acc[key] = [];
         acc[key].push(log);
@@ -94,7 +96,8 @@ export default function MyRecords() {
             )}
 
             {/* 월간 통계 요약 */}
-            <MyStatsSummary logs={logs} />
+            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+            <MyStatsSummary logs={logs as any} />
 
             <p className="text-sm text-surface-500 dark:text-surface-400 mb-4">
                 {searchQuery ? `검색 결과 ${filteredLogs.length}건` : `총 ${logs.length}건`} · {totalDistance.toLocaleString()} km
@@ -120,10 +123,10 @@ export default function MyRecords() {
                         <div key={month}>
                             <h2 className="text-sm font-semibold text-surface-500 dark:text-surface-400 mb-3 sticky top-0 bg-surface-50 dark:bg-surface-800 py-1 z-10">{month}</h2>
                             <div className="space-y-2">
-                                {monthLogs.map((log: any) => (
+                                {monthLogs.map((log: DriveLog) => (
                                     <div key={log.id} className="glass-card overflow-hidden transition-all duration-200">
                                         <button onClick={() => setExpandedId(expandedId === log.id ? null : log.id)} className="w-full p-4 text-left flex items-center gap-3">
-                                            <div className={`w-10 h-10 rounded-xl ${log.vehicleId ? getVehicleColor(log.vehicleId) : 'bg-primary-50'} flex items-center justify-center text-lg flex-shrink-0`}>{VEHICLE_TYPE_ICONS[log.vehicleType] || '🚗'}</div>
+                                            <div className={`w-10 h-10 rounded-xl ${log.vehicleId ? getVehicleColor(log.vehicleId) : 'bg-primary-50'} flex items-center justify-center text-lg flex-shrink-0`}>{VEHICLE_TYPE_ICONS[log.vehicleType ?? ''] || '🚗'}</div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-1.5 flex-wrap">
                                                     <p className="font-medium text-sm text-surface-900 dark:text-surface-100 truncate">{log.vehicleName || '차량'}</p>
@@ -150,7 +153,7 @@ export default function MyRecords() {
                                                     {log.destination && (<div><span className="text-xs text-surface-400">행선지</span><p className="text-surface-700 dark:text-surface-300">{log.destination}</p></div>)}
                                                     {log.fuelAmount && (<div><span className="text-xs text-surface-400">주유비</span><p className="text-surface-700 dark:text-surface-300">{Number(log.fuelAmount).toLocaleString()}원</p></div>)}
                                                     {log.batteryStart != null && (<div className="col-span-2"><span className="text-xs text-surface-400">배터리</span><p className="text-surface-700 dark:text-surface-300">🔋 {log.batteryStart}% → {log.batteryEnd}%</p></div>)}
-                                                    {log.passengerCount > 0 && (<div className="col-span-2"><span className="text-xs text-surface-400">탑승인원</span><p className="text-surface-700 dark:text-surface-300">👥 {log.passengerCount}명{log.passengerNames?.length > 0 && (<span className="text-xs text-surface-400 ml-1">({log.passengerNames.join(', ')})</span>)}</p></div>)}
+                                                    {(log.passengerCount ?? 0) > 0 && (<div className="col-span-2"><span className="text-xs text-surface-400">탑승인원</span><p className="text-surface-700 dark:text-surface-300">👥 {log.passengerCount}명{(log.passengerNames?.length ?? 0) > 0 && (<span className="text-xs text-surface-400 ml-1">({log.passengerNames!.join(', ')})</span>)}</p></div>)}
                                                     {log.notes && (<div className="col-span-2"><span className="text-xs text-surface-400">비고</span><p className="text-surface-700 dark:text-surface-300">{log.notes}</p></div>)}
                                                 </div>
                                                 <div className="flex gap-2 mt-3">

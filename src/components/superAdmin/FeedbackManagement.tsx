@@ -20,7 +20,7 @@ export default function FeedbackManagement() {
 
     useEffect(() => {
         const unsub = subscribeFeedbacks((data) => {
-            setFeedbacks(data);
+            setFeedbacks(data as Feedback[]);
             setLoading(false);
 
             // 고유 organizationId 수집 → 기관명 조회
@@ -29,7 +29,7 @@ export default function FeedbackManagement() {
             if (newIds.length > 0) {
                 Promise.all(newIds.map(async id => {
                     const org = await getOrganization(id);
-                    return [id, (org as any)?.name || id] as [string, string];
+                    return [id, (org as Record<string, unknown>)?.name as string || id] as [string, string];
                 })).then(entries => {
                     setOrgNames(prev => ({ ...prev, ...Object.fromEntries(entries) }));
                 });
@@ -88,8 +88,8 @@ export default function FeedbackManagement() {
     const getTime = (fb: Feedback) => {
         const t = fb.createdAt;
         if (!t) return 0;
-        if ('toMillis' in t) return (t as any).toMillis();
-        if ('seconds' in t) return (t as any).seconds * 1000;
+        if ('toMillis' in t) return (t as { toMillis: () => number }).toMillis();
+        if ('seconds' in t) return (t as { seconds: number }).seconds * 1000;
         return 0;
     };
 

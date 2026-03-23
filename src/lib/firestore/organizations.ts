@@ -6,6 +6,7 @@ import {
     collection, query, where, getDocs, addDoc,
     orderBy, limit, serverTimestamp, writeBatch,
     onSnapshot,
+    type DocumentData,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -44,7 +45,7 @@ export const regenerateInviteCode = async (orgId: string) => {
 // ========================
 
 // 기관 생성
-export const createOrganization = async (data: Record<string, any>) => {
+export const createOrganization = async (data: Record<string, unknown>) => {
     const docRef = await addDoc(collection(db, 'organizations'), {
         ...data,
         status: 'pending',
@@ -60,7 +61,7 @@ export const getOrganization = async (orgId: string) => {
 };
 
 // 기관 정보 수정
-export const updateOrganization = async (orgId: string, data: Record<string, any>) => {
+export const updateOrganization = async (orgId: string, data: Record<string, unknown>) => {
     await updateDoc(doc(db, 'organizations', orgId), data);
 };
 
@@ -118,44 +119,44 @@ export const getPendingOrganizations = async () => {
         orderBy('createdAt', 'desc')
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
 };
 
 // 대기 중 기관 실시간 구독 (사이드바 배지용)
-export const subscribePendingOrganizations = (callback: (orgs: any[]) => void) => {
+export const subscribePendingOrganizations = (callback: (orgs: (DocumentData & { id: string })[]) => void) => {
     const q = query(
         collection(db, 'organizations'),
         where('status', '==', 'pending'),
         orderBy('createdAt', 'desc')
     );
     return onSnapshot(q, (snap) => {
-        const orgs = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+        const orgs = snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
         callback(orgs);
     });
 };
 
 // 승인된 기관 실시간 구독
-export const subscribeApprovedOrganizations = (callback: (orgs: any[]) => void) => {
+export const subscribeApprovedOrganizations = (callback: (orgs: (DocumentData & { id: string })[]) => void) => {
     const q = query(
         collection(db, 'organizations'),
         where('status', '==', 'approved'),
         orderBy('createdAt', 'desc')
     );
     return onSnapshot(q, (snap) => {
-        const orgs = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+        const orgs = snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
         callback(orgs);
     });
 };
 
 // 거절된 기관 실시간 구독
-export const subscribeRejectedOrganizations = (callback: (orgs: any[]) => void) => {
+export const subscribeRejectedOrganizations = (callback: (orgs: (DocumentData & { id: string })[]) => void) => {
     const q = query(
         collection(db, 'organizations'),
         where('status', '==', 'rejected'),
         orderBy('createdAt', 'desc')
     );
     return onSnapshot(q, (snap) => {
-        const orgs = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+        const orgs = snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
         callback(orgs);
     });
 };
@@ -168,7 +169,7 @@ export const getRejectedOrganizations = async () => {
         orderBy('createdAt', 'desc')
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
 };
 
 // 삭제된 기관 목록 조회
@@ -179,7 +180,7 @@ export const getDeletedOrganizations = async () => {
         orderBy('deletedAt', 'desc')
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
 };
 
 // 승인된 기관 목록 조회
@@ -190,7 +191,7 @@ export const getApprovedOrganizations = async () => {
         orderBy('createdAt', 'desc')
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
 };
 
 // ========================

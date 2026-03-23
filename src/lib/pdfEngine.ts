@@ -170,8 +170,8 @@ export function printPdfReport<T>(config: PdfReportConfig<T>): boolean {
 
     // 정렬
     const defaultSorter = (a: T, b: T) => {
-        const dateA = (a as Record<string, any>).date || '';
-        const dateB = (b as Record<string, any>).date || '';
+        const dateA = (a as Record<string, unknown>).date as string || '';
+        const dateB = (b as Record<string, unknown>).date as string || '';
         return dateB.localeCompare(dateA);
     };
     const sorted = [...records].sort(sorter || defaultSorter);

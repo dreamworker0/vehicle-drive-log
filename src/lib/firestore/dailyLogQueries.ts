@@ -26,7 +26,7 @@ export const getDriveLogsByDate = async (orgId: string, vehicleId: string, dateS
         orderBy('timestamp', 'asc'),
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, any>) }));
+    return snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) }));
 };
 
 /**
@@ -43,7 +43,7 @@ export const getFuelLogsByDate = async (orgId: string, vehicleId: string, dateSt
         where('date', '==', dateStr),
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, any>) }));
+    return snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) }));
 };
 
 /**

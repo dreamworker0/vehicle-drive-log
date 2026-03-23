@@ -162,7 +162,7 @@ export default function Settings() {
                 {form.approvalLine.length < 5 && !form.hideApprovalLine && (
                     <button
                         type="button"
-                        onClick={() => setForm({ ...form, approvalLine: [...form.approvalLine, { title: '', name: '' } as any] })}
+                        onClick={() => setForm({ ...form, approvalLine: [...form.approvalLine, { title: '' }] })}
                         className="text-xs text-primary-500 hover:text-primary-700 dark:text-primary-400 font-medium transition-colors"
                     >
                         + 결재자 추가
@@ -204,7 +204,13 @@ export default function Settings() {
                     <div className="flex justify-between items-center p-3 bg-surface-50 dark:bg-surface-800 rounded-xl">
                         <span className="text-surface-500 dark:text-surface-400">등록일</span>
                         <span className="text-surface-600 dark:text-surface-300">
-                            {(org?.createdAt as any)?.toDate?.()?.toLocaleDateString('ko-KR') || '-'}
+                            {(() => {
+                                const ca = org?.createdAt;
+                                if (ca && typeof ca === 'object' && 'toDate' in ca && typeof (ca as { toDate?: unknown }).toDate === 'function') {
+                                    return (ca as { toDate: () => Date }).toDate().toLocaleDateString('ko-KR');
+                                }
+                                return '-';
+                            })()}
                         </span>
                     </div>
                 </div>

@@ -1,6 +1,7 @@
 /**
  * 예약 관련 유틸리티 — 순수 함수로 단위 테스트 가능
  */
+import type { Reservation } from '../../types/reservation';
 
 /**
  * 현재 시간을 HH:MM 포맷으로 반환
@@ -45,8 +46,8 @@ export const getMinStartTime = (isToday: boolean) => isToday ? getCurrentTimeStr
  * @param {Object} params - { vehicleId, date, startTime, endTime, excludeId? }
  * @returns {Object|null} 중복 예약이 있으면 해당 예약 반환, 없으면 null
  */
-export function findOverlappingReservation(reservations: Record<string, any>[], { vehicleId, date, startTime, endTime, excludeId = null }: { vehicleId: string; date: string; startTime: string; endTime: string; excludeId?: string | null }) {
-    return reservations.find((r: Record<string, any>) =>
+export function findOverlappingReservation(reservations: Reservation[], { vehicleId, date, startTime, endTime, excludeId = null }: { vehicleId: string; date: string; startTime: string; endTime: string; excludeId?: string | null }) {
+    return reservations.find((r) =>
         r.vehicleId === vehicleId &&
         r.date === date &&
         r.status !== 'cancelled' &&
@@ -62,8 +63,8 @@ export function findOverlappingReservation(reservations: Record<string, any>[], 
  * @param {Object} params - { reservedByUid, date, startTime, endTime, excludeId? }
  * @returns {Object|null} 중복 예약이 있으면 해당 예약 반환, 없으면 null
  */
-export function findUserOverlappingReservation(reservations: Record<string, any>[], { reservedByUid, date, startTime, endTime, excludeId = null }: { reservedByUid: string; date: string; startTime: string; endTime: string; excludeId?: string | null }) {
-    return reservations.find((r: Record<string, any>) =>
+export function findUserOverlappingReservation(reservations: Reservation[], { reservedByUid, date, startTime, endTime, excludeId = null }: { reservedByUid: string; date: string; startTime: string; endTime: string; excludeId?: string | null }) {
+    return reservations.find((r) =>
         r.reservedByUid === reservedByUid &&
         r.date === date &&
         r.status !== 'cancelled' &&

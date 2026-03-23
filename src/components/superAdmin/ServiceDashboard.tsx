@@ -17,14 +17,27 @@ import {
     DashboardOrgTable,
 } from './dashboard';
 
+interface OrgStat {
+    id: string; name: string; address: string; lat: number; lng: number;
+    logs: number; users: number; vehicles: number; distance: number;
+    lastDriveDate: Date | null; totalDuration: number; durationCount: number;
+    [key: string]: unknown;
+}
+
 /**
  * 슈퍼관리자 운영 대시보드
  * 서비스 전체 통계: 기관 수, 사용자 수, 운행 횟수, 총 주행거리 + 고도화 인사이트
  */
 export default function ServiceDashboard() {
-    const [stats, setStats] = useState<any>(null);
-    const [monthlyStats, setMonthlyStats] = useState<any>(null);
-    const [topOrgs, setTopOrgs] = useState<any[]>([]);
+    const [stats, setStats] = useState<{
+        approvedOrgs: number; totalUsers: number; adminCount: number; employeeCount: number;
+        totalLogs: number; totalDistance: number; pendingApps: number;
+    } | null>(null);
+    const [monthlyStats, setMonthlyStats] = useState<{
+        monthLabel: string; logs: number; distance: number; activeUsers: number;
+        prevLogs: number; prevDistance: number; prevActiveUsers: number;
+    } | null>(null);
+    const [topOrgs, setTopOrgs] = useState<OrgStat[]>([]);
 
     const [inputMethodStats, setInputMethodStats] = useState<{ date: string; ocr: number; manual: number }[]>([]);
 
@@ -132,7 +145,7 @@ export default function ServiceDashboard() {
     const sortedOrgs = useMemo(() => {
         const list = [...topOrgs];
         const dir = sortDir === 'asc' ? 1 : -1;
-        list.sort((a: any, b: any) => {
+        list.sort((a: OrgStat, b: OrgStat) => {
             if (sortKey === 'name') {
                 return dir * (a.name || '').localeCompare(b.name || '', 'ko');
             }
@@ -206,8 +219,8 @@ export default function ServiceDashboard() {
     // 서비스 개요 통계 + 고도화 지표
     const processServiceStats = async ({ orgSnap, userSnap, logSnap }: SharedSnaps) => {
         try {
-            const orgs = orgSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
-            const users = userSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+            const orgs = orgSnap.docs.map(d => ({ id: d.id, ...d.data() } as DocumentData & { id: string }));
+            const users = userSnap.docs.map(d => ({ id: d.id, ...d.data() } as DocumentData & { id: string }));
 
             const approvedOrgs = orgs.filter(o => o.status === 'approved').length;
             const totalUsers = users.filter(u => u.role !== 'superAdmin').length;
@@ -452,8 +465,8 @@ export default function ServiceDashboard() {
     // 기관별 활성도 + 차량 유형 + 월별 성장
     const processTopOrganizations = async ({ orgSnap, logSnap, userSnap, vehicleSnap, hipassCardSnap }: SharedSnaps) => {
         try {
-            const orgMap: Record<string, any> = {};
-            const approvalList: any[] = [];
+            const orgMap: Record<string, OrgStat> = {};
+            const approvalList: { id: string; name: string; approvedAt: Date; applicantName: string | null; applicantEmail: string | null }[] = [];
             const firstEmpDaysList: { days: number; approvedAt: Date }[] = [];
             orgSnap.docs.forEach(doc => {
                 const data = doc.data();
@@ -580,9 +593,9 @@ export default function ServiceDashboard() {
             setTopOrgs(orgList);
 
             const orgDurList = orgList
-                .filter((o: any) => o.durationCount >= 10)
-                .map((o: any) => ({ name: o.name, avg: Math.round(o.totalDuration / o.durationCount) }))
-                .sort((a: any, b: any) => b.avg - a.avg)
+                .filter((o) => o.durationCount >= 10)
+                .map((o) => ({ name: o.name, avg: Math.round(o.totalDuration / o.durationCount) }))
+                .sort((a, b) => b.avg - a.avg)
                 .slice(0, 15);
             setOrgAvgDuration(orgDurList);
 

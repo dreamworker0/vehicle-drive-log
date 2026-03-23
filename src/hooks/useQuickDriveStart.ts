@@ -64,14 +64,14 @@ export default function useQuickDriveStart() {
                         setForm(prev => ({
                             ...prev,
                             vehicleId: rv.id,
-                            vehicleName: rv.displayName,
+                            vehicleName: rv.displayName ?? '',
                         }));
                     }
                 } else if (availableVehicles.length === 1) {
                     setForm(prev => ({
                         ...prev,
                         vehicleId: availableVehicles[0].id,
-                        vehicleName: availableVehicles[0].displayName,
+                        vehicleName: availableVehicles[0].displayName ?? '',
                     }));
                 }
             } catch (err) {

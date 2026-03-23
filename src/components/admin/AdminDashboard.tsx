@@ -10,6 +10,8 @@ import { refreshTokenSilently } from '../../lib/tokenRefresh';
 import { getVehicles, getOrganizationMembers, getDriveLogs, getOrganization, getTodayReservations } from '../../lib/firestore';
 import { toLocalDateStr, toLocalMonthStr } from '../../lib/dateUtils';
 import { SkeletonStatCard, SkeletonList } from '../common/Skeleton';
+import type { DriveLog } from '../../types/driveLog';
+import type { Organization } from '../../types/organization';
 import AdminOnboardingWizard from './AdminOnboardingWizard';
 
 export default function AdminDashboard() {
@@ -22,7 +24,7 @@ export default function AdminDashboard() {
         employeeCount: 0,
         monthLogs: 0,
     });
-    const [recentLogs, setRecentLogs] = useState<any[]>([]);
+    const [recentLogs, setRecentLogs] = useState<DriveLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [showOnboarding, setShowOnboarding] = useState(false);
     const [inviteCode, setInviteCode] = useState('');
@@ -44,11 +46,11 @@ export default function AdminDashboard() {
                 const logs = logsResult.docs;
                 const monthStart = toLocalMonthStr();
                 const todayLogs = logs.filter(l => {
-                    const d = l.timestamp?.toDate?.();
+                    const d = (l.timestamp && typeof l.timestamp === 'object' && 'toDate' in l.timestamp && typeof (l.timestamp as { toDate?: unknown }).toDate === 'function') ? (l.timestamp as { toDate: () => Date }).toDate() : (l.timestamp instanceof Date ? l.timestamp : null);
                     return d ? toLocalDateStr(d) === todayStr : false;
                 }).length;
                 const monthLogs = logs.filter(l => {
-                    const d = l.timestamp?.toDate?.();
+                    const d = (l.timestamp && typeof l.timestamp === 'object' && 'toDate' in l.timestamp && typeof (l.timestamp as { toDate?: unknown }).toDate === 'function') ? (l.timestamp as { toDate: () => Date }).toDate() : (l.timestamp instanceof Date ? l.timestamp : null);
                     return d ? toLocalMonthStr(d) === monthStart : false;
                 }).length;
 
@@ -59,14 +61,14 @@ export default function AdminDashboard() {
                     employeeCount: members.filter(m => m.role !== 'superAdmin').length,
                     monthLogs,
                 });
-                setRecentLogs(logs.slice(0, 5));
+                setRecentLogs(logs.slice(0, 5) as DriveLog[]);
 
                 // 온보딩 위자드 표시 조건 확인
                 if (AdminOnboardingWizard.shouldShow(vehicles.length, members.length)) {
                     setShowOnboarding(true);
                     try {
                         const org = await getOrganization(orgId);
-                        setInviteCode((org as any)?.inviteCode || '');
+                        setInviteCode((org as Organization)?.inviteCode || '');
                     } catch { /* noop */ }
                 }
             } catch (err) {
@@ -90,7 +92,7 @@ export default function AdminDashboard() {
                     setShowOnboarding(true);
                     try {
                         const org = await getOrganization(orgId);
-                        setInviteCode((org as any)?.inviteCode || '');
+                        setInviteCode((org as Organization)?.inviteCode || '');
                     } catch { /* noop */ }
                 }
             } finally {
@@ -147,7 +149,7 @@ export default function AdminDashboard() {
                                 <div className="text-right">
                                     <p className="text-sm font-mono text-surface-600 dark:text-surface-400">{(log.endKm - log.startKm) || 0} km</p>
                                     <p className="text-xs text-surface-400">
-                                        {log.timestamp?.toDate?.()?.toLocaleDateString?.('ko-KR') || '-'}
+                                        {(() => { const ts = log.timestamp; return (ts && typeof ts === 'object' && 'toDate' in ts && typeof (ts as { toDate?: unknown }).toDate === 'function') ? (ts as { toDate: () => Date }).toDate().toLocaleDateString('ko-KR') : '-'; })()}
                                         {log.startTime && log.endTime && ` ${log.startTime}~${log.endTime}`}
                                     </p>
                                 </div>

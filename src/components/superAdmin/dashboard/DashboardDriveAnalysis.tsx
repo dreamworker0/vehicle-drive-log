@@ -41,7 +41,8 @@ export default function DashboardDriveAnalysis({
                                         axisLine={{ stroke: '#4b5563' }} interval={1}
                                         tickFormatter={(v: string) => v.replace('시', '')} />
                                     <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false} allowDecimals={false} />
-                                    <Tooltip {...tooltipStyle} formatter={(value: any) => [`${value}건`, '출발 건수']} />
+                                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                            <Tooltip {...tooltipStyle} formatter={(value: any) => [`${value}건`, '출발 건수']} />
                                     <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                                         {hourlyStats.map((entry, idx) => (
                                             <Cell key={idx} fill={entry.count > 0 ? '#8b5cf6' : '#374151'} opacity={entry.count > 0 ? 0.85 : 0.3} />
@@ -74,7 +75,8 @@ export default function DashboardDriveAnalysis({
                                         axisLine={{ stroke: '#4b5563' }}
                                         interval={monthlyGrowth.length > 8 ? Math.ceil(monthlyGrowth.length / 6) : 0} />
                                     <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false} allowDecimals={false} />
-                                    <Tooltip {...tooltipStyle} formatter={(value: any) => [`${value}개`, '누적 기관']} />
+                                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
+                            <Tooltip {...tooltipStyle} formatter={(value: any) => [`${value}개`, '누적 기관']} />
                                     <Area type="monotone" dataKey="cumulative" stroke="#10b981" strokeWidth={2} fill="url(#colorGrowth)" />
                                 </AreaChart>
                             </ResponsiveContainer>
@@ -118,6 +120,7 @@ export default function DashboardDriveAnalysis({
                                         axisLine={{ stroke: '#4b5563' }} interval={Math.ceil(dailyAvgDuration.length / 8)} />
                                     <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false}
                                         allowDecimals={false} unit="분" />
+                                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                                     <Tooltip {...tooltipStyle} formatter={(value: any) => [`${value}분`, '평균 주행시간']} />
                                     <Area type="monotone" dataKey="avg" stroke="#ec4899" strokeWidth={2} fill="url(#colorAvgDur)" />
                                 </AreaChart>
@@ -137,6 +140,7 @@ export default function DashboardDriveAnalysis({
                                         tickFormatter={(v: string) => v.replace('시', '')} />
                                     <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false}
                                         allowDecimals={false} unit="분" />
+                                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                                     <Tooltip {...tooltipStyle} formatter={(value: any) => [`${value}분`, '평균 주행시간']} />
                                     <Bar dataKey="avg" radius={[4, 4, 0, 0]}>
                                         {hourlyAvgDuration.map((entry, idx) => (

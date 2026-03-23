@@ -12,11 +12,19 @@ import OrgCard from './OrgCard';
 import DeletedOrgCard from './DeletedOrgCard';
 import type { Organization } from '../../types';
 
+interface OrgMember {
+    id: string;
+    name?: string;
+    email?: string;
+    role?: string;
+    [key: string]: unknown;
+}
+
 export default function OrgManagement() {
     const [organizations, setOrganizations] = useState<Organization[]>([]);
     const [deletedOrgs, setDeletedOrgs] = useState<Organization[]>([]);
     const [loading, setLoading] = useState(true);
-    const [membersMap, setMembersMap] = useState<Record<string, any[]>>({});
+    const [membersMap, setMembersMap] = useState<Record<string, OrgMember[]>>({});
     const [memberCountMap, setMemberCountMap] = useState<Record<string, number>>({});
     const [loadingMembers, setLoadingMembers] = useState<Record<string, boolean>>({});
     const [expandedOrg, setExpandedOrg] = useState<string | null>(null);
@@ -33,11 +41,11 @@ export default function OrgManagement() {
         try {
             const [orgs, deleted, counts] = await Promise.all([
                 getApprovedOrganizations(),
-                getDeletedOrganizations().catch((err: any) => {
+                getDeletedOrganizations().catch((err: unknown) => {
                     console.warn('삭제된 기관 목록 로드 실패 (인덱스 빌드 중일 수 있음):', err);
                     return [];
                 }),
-                getOrgMemberCounts().catch((err: any) => {
+                getOrgMemberCounts().catch((err: unknown) => {
                     console.warn('멤버 수 조회 실패:', err);
                     return {};
                 }),
@@ -58,7 +66,7 @@ export default function OrgManagement() {
         setLoadingMembers(prev => ({ ...prev, [orgId]: true }));
         try {
             const members = await getOrganizationMembers(orgId);
-            setMembersMap(prev => ({ ...prev, [orgId]: members as any[] }));
+            setMembersMap(prev => ({ ...prev, [orgId]: members as OrgMember[] }));
         } catch (err) {
             console.error('멤버 로드 실패:', err);
         } finally {
@@ -121,7 +129,7 @@ export default function OrgManagement() {
         }
     };
 
-    const handleRoleChange = async (member: any, orgId: string, newRole: string) => {
+    const handleRoleChange = async (member: OrgMember, orgId: string, newRole: string) => {
         if (member.role === newRole) return;
         const roleLabel = newRole === 'admin' ? '기관관리자' : '직원';
         if (!await confirm({ message: `${member.name || member.email}의 역할을 "${roleLabel}"(으)로 변경하시겠습니까?` })) return;
@@ -131,7 +139,7 @@ export default function OrgManagement() {
             await updateUser(member.id, { role: newRole });
             setMembersMap(prev => ({
                 ...prev,
-                [orgId]: prev[orgId].map((m: any) =>
+                [orgId]: prev[orgId].map((m) =>
                     m.id === member.id ? { ...m, role: newRole } : m
                 )
             }));
@@ -143,13 +151,13 @@ export default function OrgManagement() {
         }
     };
 
-    const handleRemoveMember = async (member: any, orgId: string) => {
+    const handleRemoveMember = async (member: OrgMember, orgId: string) => {
         if (!await confirm({ message: `${member.name || member.email || '이 사용자'}를 기관에서 제거하시겠습니까?\n\n제거된 사용자는 초대 코드를 통해 다시 가입할 수 있습니다.`, confirmColor: 'danger' })) return;
         try {
             await leaveOrganization(member.id);
             setMembersMap(prev => ({
                 ...prev,
-                [orgId]: prev[orgId].filter((m: any) => m.id !== member.id)
+                [orgId]: prev[orgId].filter((m) => m.id !== member.id)
             }));
             showToast('직원이 제거되었습니다.', 'success');
         } catch (err) {
@@ -160,7 +168,7 @@ export default function OrgManagement() {
 
     const handleEditOrg = async (orgId: string, updates: { name: string; address: string }) => {
         try {
-            await updateOrganization(orgId, updates as any);
+            await updateOrganization(orgId, updates as Record<string, unknown>);
             setOrganizations(prev => prev.map(o =>
                 o.id === orgId ? { ...o, ...updates } : o
             ));
@@ -177,16 +185,16 @@ export default function OrgManagement() {
         try {
             const restoreUser = httpsCallable(getFunctions(undefined, 'asia-northeast3'), 'restoreUser');
             const result = await restoreUser({ email, organizationId: orgId, name: name || undefined });
-            const data = result.data as any;
+            const data = result.data as { uid: string; name?: string; email?: string };
             // 멤버 목록에 추가
             setMembersMap(prev => ({
                 ...prev,
                 [orgId]: [...(prev[orgId] || []), { id: data.uid, name: data.name, email: data.email, role: 'employee' }]
             }));
             showToast(`${data.name || email} 계정이 복원되었습니다.`, 'success');
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('계정 복원 실패:', err);
-            const msg = err?.message || err?.code || '계정 복원에 실패했습니다.';
+            const msg = (err as Error)?.message || '계정 복원에 실패했습니다.';
             showToast(msg, 'error');
             throw err;
         }
@@ -211,9 +219,9 @@ export default function OrgManagement() {
             if (data.noPhoneCount > 0) parts.push(`번호없음 ${data.noPhoneCount}건`);
 
             showToast(`알림톡 발송 완료: ${parts.join(', ')}`, data.failCount > 0 ? 'warning' : 'success');
-        } catch (err: any) {
+        } catch (err: unknown) {
             console.error('일괄 알림톡 발송 실패:', err);
-            showToast(err?.message || '발송에 실패했습니다.', 'error');
+            showToast((err as Error)?.message || '발송에 실패했습니다.', 'error');
         } finally {
             setSendingReminder(false);
         }
@@ -232,8 +240,8 @@ export default function OrgManagement() {
     const activeOrgs = organizations
         .filter(org => memberCountMap[org.id] > 0)
         .sort((a, b) => {
-            const aTime = (a as any).createdAt?.toDate?.()?.getTime?.() ?? (a as any).createdAt ?? 0;
-            const bTime = (b as any).createdAt?.toDate?.()?.getTime?.() ?? (b as any).createdAt ?? 0;
+            const aTime = (a.createdAt as unknown as { toDate?: () => Date })?.toDate?.()?.getTime?.() ?? 0;
+            const bTime = (b.createdAt as unknown as { toDate?: () => Date })?.toDate?.()?.getTime?.() ?? 0;
             return bTime - aTime; // 최신순
         });
     const inactiveOrgs = organizations.filter(org => !memberCountMap[org.id] || memberCountMap[org.id] === 0);

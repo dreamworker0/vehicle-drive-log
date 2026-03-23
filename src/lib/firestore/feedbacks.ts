@@ -7,9 +7,10 @@ import {
     orderBy, limit, serverTimestamp, onSnapshot,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import type { Feedback, CreateFeedbackData } from '../../types/feedback';
 
 // 피드백 생성
-export const createFeedback = async (data: Record<string, any>) => {
+export const createFeedback = async (data: CreateFeedbackData) => {
     return await addDoc(collection(db, 'feedbacks'), {
         ...data,
         status: 'unread',
@@ -18,18 +19,18 @@ export const createFeedback = async (data: Record<string, any>) => {
 };
 
 // 전체 피드백 목록 조회
-export const getAllFeedbacks = async (limitCount = 100) => {
+export const getAllFeedbacks = async (limitCount = 100): Promise<Feedback[]> => {
     const q = query(
         collection(db, 'feedbacks'),
         orderBy('createdAt', 'desc'),
         limit(limitCount)
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Feedback);
 };
 
 // 피드백 상태 수정
-export const updateFeedback = async (feedbackId: string, data: Record<string, any>) => {
+export const updateFeedback = async (feedbackId: string, data: Record<string, unknown>) => {
     await updateDoc(doc(db, 'feedbacks', feedbackId), data);
 };
 
@@ -39,13 +40,13 @@ export const deleteFeedback = async (feedbackId: string) => {
 };
 
 // 피드백 실시간 구독 (사이드바 배지용)
-export const subscribeFeedbacks = (callback: (feedbacks: any[]) => void) => {
+export const subscribeFeedbacks = (callback: (feedbacks: Feedback[]) => void) => {
     const q = query(
         collection(db, 'feedbacks'),
         orderBy('createdAt', 'desc')
     );
     return onSnapshot(q, (snap) => {
-        const feedbacks = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+        const feedbacks = snap.docs.map(d => ({ id: d.id, ...d.data() }) as Feedback);
         callback(feedbacks);
     });
 };

@@ -27,11 +27,11 @@ export const getFuelLogs = async (orgId: string, vehicleId: string | null = null
     constraints.push(orderBy('date', 'desc'), limit(200));
     const q = query(collection(db, 'fuelLogs'), ...constraints);
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, any>) }));
+    return snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) }));
 };
 
 /** 주유 기록 생성 */
-export const createFuelLog = async (data: Record<string, any>) => {
+export const createFuelLog = async (data: Record<string, unknown>) => {
     const docRef = await addDoc(collection(db, 'fuelLogs'), {
         ...data,
         createdAt: serverTimestamp(),
@@ -45,7 +45,7 @@ export const deleteFuelLog = async (logId: string) => {
 };
 
 /** 주유 기록 수정 */
-export const updateFuelLog = async (logId: string, data: Record<string, any>) => {
+export const updateFuelLog = async (logId: string, data: Record<string, unknown>) => {
     await updateDoc(doc(db, 'fuelLogs', logId), {
         ...data,
         updatedAt: serverTimestamp(),

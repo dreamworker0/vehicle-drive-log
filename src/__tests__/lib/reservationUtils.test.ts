@@ -13,6 +13,7 @@ import {
     getAutoTimes,
     calcEndTime,
 } from '../../hooks/utils/reservationUtils';
+import type { Reservation } from '../../types/reservation';
 
 describe('reservationUtils', () => {
     // 시간 관련 테스트는 Date를 모킹
@@ -96,7 +97,7 @@ describe('reservationUtils', () => {
             { id: 'r2', vehicleId: 'v1', date: '2026-02-27', startTime: '14:00', endTime: '16:00', status: 'reserved' },
             { id: 'r3', vehicleId: 'v2', date: '2026-02-27', startTime: '09:00', endTime: '12:00', status: 'reserved' },
             { id: 'r4', vehicleId: 'v1', date: '2026-02-27', startTime: '18:00', endTime: '20:00', status: 'cancelled' },
-        ];
+        ] as Reservation[];
 
         it('시간이 겹치는 예약을 찾는다', () => {
             const result = findOverlappingReservation(reservations, {
@@ -192,7 +193,7 @@ describe('reservationUtils', () => {
             { id: 'r2', vehicleId: 'v2', date: '2026-02-27', startTime: '14:00', endTime: '16:00', status: 'reserved', reservedByUid: 'user1' },
             { id: 'r3', vehicleId: 'v1', date: '2026-02-27', startTime: '09:00', endTime: '12:00', status: 'reserved', reservedByUid: 'user2' },
             { id: 'r4', vehicleId: 'v2', date: '2026-02-27', startTime: '18:00', endTime: '20:00', status: 'cancelled', reservedByUid: 'user1' },
-        ];
+        ] as Reservation[];
 
         it('같은 사용자가 다른 차량에 겹치는 시간 예약이 있으면 반환한다', () => {
             const result = findUserOverlappingReservation(reservations, {

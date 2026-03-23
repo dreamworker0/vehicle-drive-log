@@ -5,11 +5,12 @@ import {
     doc, updateDoc,
     collection, query, where, getDocs, addDoc,
     orderBy, limit, serverTimestamp, onSnapshot,
+    type DocumentData,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
 // 알림 생성
-export const createNotification = async (data: Record<string, any>) => {
+export const createNotification = async (data: Record<string, unknown>) => {
     return await addDoc(collection(db, 'notifications'), {
         ...data,
         read: false,
@@ -26,7 +27,7 @@ export const getNotifications = async (uid: string, limitCount = 20) => {
         limit(limitCount)
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
 };
 
 // 알림 읽음 처리
@@ -37,7 +38,7 @@ export const markNotificationRead = async (notificationId: string) => {
 };
 
 // 미읽은 알림 실시간 구독
-export const subscribeNotifications = (uid: string, callback: (notifications: any[]) => void) => {
+export const subscribeNotifications = (uid: string, callback: (notifications: (DocumentData & { id: string })[]) => void) => {
     const q = query(
         collection(db, 'notifications'),
         where('targetUid', '==', uid),
@@ -46,7 +47,7 @@ export const subscribeNotifications = (uid: string, callback: (notifications: an
         limit(10)
     );
     return onSnapshot(q, (snap) => {
-        const notifications = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+        const notifications = snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
         callback(notifications);
     });
 };

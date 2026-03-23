@@ -7,21 +7,22 @@ import {
     serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import type { HipassCard } from '../../types/hipass';
 
 // 기관 소속 하이패스 카드 목록 조회
-export const getHipassCards = async (orgId: string) => {
+export const getHipassCards = async (orgId: string): Promise<HipassCard[]> => {
     const q = query(
         collection(db, 'hipassCards'),
         where('organizationId', '==', orgId),
     );
     const snap = await getDocs(q);
     return snap.docs
-        .map(d => ({ id: d.id, ...d.data() } as any))
-        .sort((a, b) => (b.createdAt?.seconds ?? 0) - (a.createdAt?.seconds ?? 0));
+        .map(d => ({ id: d.id, ...d.data() }) as HipassCard)
+        .sort((a, b) => ((b as HipassCard & { createdAt?: { seconds: number } }).createdAt?.seconds ?? 0) - ((a as HipassCard & { createdAt?: { seconds: number } }).createdAt?.seconds ?? 0));
 };
 
 // 하이패스 카드 등록
-export const createHipassCard = async (data: Record<string, any>) => {
+export const createHipassCard = async (data: Record<string, unknown>) => {
     const docRef = await addDoc(collection(db, 'hipassCards'), {
         ...data,
         balance: data.balance ?? 0,
@@ -31,7 +32,7 @@ export const createHipassCard = async (data: Record<string, any>) => {
 };
 
 // 하이패스 카드 수정
-export const updateHipassCard = async (cardId: string, data: Record<string, any>) => {
+export const updateHipassCard = async (cardId: string, data: Record<string, unknown>) => {
     await updateDoc(doc(db, 'hipassCards', cardId), {
         ...data,
         updatedAt: serverTimestamp(),

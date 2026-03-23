@@ -90,6 +90,7 @@ export default function DashboardChartSection({
                                     axisLine={{ stroke: '#4b5563' }} interval={Math.ceil(dailyActiveOrgStats.length / 8)} />
                                 <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} allowDecimals={false} />
                                 <Tooltip {...tooltipStyle}
+                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                     content={({ active, payload, label }: any) => {
                                         if (!active || !payload?.length) return null;
                                         const data = payload[0]?.payload;
@@ -139,6 +140,7 @@ export default function DashboardChartSection({
                                     axisLine={{ stroke: '#4b5563' }} interval={Math.ceil(dailyActiveUserStats.length / 8)} />
                                 <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} allowDecimals={false} />
                                 <Tooltip {...tooltipStyle}
+                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                     formatter={(value: any) => [`${value}명`, '활성 사용자']}
                                 />
                                 <Area type="monotone" dataKey="users" stroke="#06b6d4" strokeWidth={2.5}
@@ -197,6 +199,7 @@ export default function DashboardChartSection({
                                             contentStyle={{ background: '#1f2937', border: '1px solid #374151', borderRadius: 8, fontSize: 13 }}
                                             labelStyle={{ color: '#e5e7eb', fontWeight: 600 }}
                                             itemStyle={{ color: '#e5e7eb' }}
+                                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                             formatter={(value: any) => [`${value}개 기관`, '기관 수']}
                                         />
                                         <Bar dataKey="count" radius={[6, 6, 0, 0]}>
@@ -230,6 +233,7 @@ export default function DashboardChartSection({
                                             contentStyle={{ background: '#1f2937', border: '1px solid #374151', borderRadius: 8, fontSize: 13 }}
                                             labelStyle={{ color: '#e5e7eb', fontWeight: 600 }}
                                             itemStyle={{ color: '#e5e7eb' }}
+                                            // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                             formatter={(value: any) => [`${value}일`, '평균 소요일']}
                                         />
                                         <Area type="monotone" dataKey="avg" stroke="#8b5cf6" strokeWidth={2.5}
@@ -269,6 +273,7 @@ export default function DashboardChartSection({
                                     axisLine={{ stroke: '#4b5563' }} interval={Math.ceil(inputMethodStats.length / 8)} />
                                 <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} allowDecimals={false} />
                                 <Tooltip {...tooltipStyle}
+                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                     content={({ active, payload, label }: any) => {
                                         if (!active || !payload?.length) return null;
                                         const data = payload[0]?.payload;
@@ -451,6 +456,7 @@ export default function DashboardChartSection({
                                                 </Pie>
                                                 <Tooltip
                                                     {...tooltipStyle}
+                                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                                     formatter={(value: any, name: any) => [`${value}대`, name]}
                                                 />
                                             </PieChart>
@@ -494,6 +500,7 @@ export default function DashboardChartSection({
                                         axisLine={false} allowDecimals={false} />
                                     <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: '#d1d5db' }} tickLine={false}
                                         axisLine={false} width={100} />
+                                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                     <Tooltip {...tooltipStyle} formatter={(value: any) => [`${value}대`, '하이패스 차량']} />
                                     <Bar dataKey="count" radius={[0, 6, 6, 0]}>
                                         {hipassTopOrgs.map((_entry, idx) => (
@@ -579,6 +586,7 @@ export default function DashboardChartSection({
                                             axisLine={{ stroke: '#4b5563' }} interval={Math.ceil(dailyFuelCost.length / 8)} />
                                         <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false}
                                             tickFormatter={(v: number) => v >= 10000 ? `${Math.round(v / 10000)}만` : v.toLocaleString()} />
+                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                                         <Tooltip {...tooltipStyle} formatter={(value: any) => [`${Number(value).toLocaleString()}원`, '주유 금액']} />
                                         <Area type="monotone" dataKey="cost" stroke="#3b82f6" strokeWidth={2} fill="url(#colorFuelCost)" />
                                     </AreaChart>
@@ -610,6 +618,7 @@ export default function DashboardChartSection({
                                             axisLine={{ stroke: '#4b5563' }} interval={Math.ceil(dailyHipassAmount.length / 8)} />
                                         <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false}
                                             tickFormatter={(v: number) => v >= 10000 ? `${Math.round(v / 10000)}만` : v.toLocaleString()} />
+                                        {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
                                         <Tooltip {...tooltipStyle} formatter={(value: any) => [`${Number(value).toLocaleString()}원`, '충전 금액']} />
                                         <Area type="monotone" dataKey="amount" stroke="#14b8a6" strokeWidth={2} fill="url(#colorHipassAmt)" />
                                     </AreaChart>

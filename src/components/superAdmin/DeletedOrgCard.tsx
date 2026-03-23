@@ -12,7 +12,9 @@ interface DeletedOrgCardProps {
 
 function getDaysInfo(deletedAt: Organization['deletedAt']): { elapsed: number; remaining: number } {
     if (!deletedAt) return { elapsed: 0, remaining: 30 };
-    const deletedDate = (deletedAt as any).toDate ? (deletedAt as any).toDate() : new Date(deletedAt as any);
+    const deletedDate = (typeof (deletedAt as unknown as { toDate?: () => Date }).toDate === 'function')
+        ? (deletedAt as { toDate: () => Date }).toDate()
+        : new Date(deletedAt as string | Date);
     const elapsed = Math.floor((Date.now() - deletedDate.getTime()) / (1000 * 60 * 60 * 24));
     return { elapsed, remaining: Math.max(0, 30 - elapsed) };
 }

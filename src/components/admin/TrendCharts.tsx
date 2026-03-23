@@ -8,6 +8,14 @@ import {
 } from 'recharts';
 import HeatmapGrid from '../common/HeatmapGrid';
 
+interface ChartPayloadEntry {
+    value: number;
+    name: string;
+    color: string;
+    unit?: string;
+    payload?: Record<string, unknown>;
+}
+
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#f97316'];
 
 function SectionTitle({ title }: { title: string; icon?: string }) {
@@ -19,7 +27,7 @@ function SectionTitle({ title }: { title: string; icon?: string }) {
 }
 
 /* 월별 추이 라인 차트 툴팁 */
-function TrendTooltip({ active, payload, label }: { active?: boolean; payload?: any[]; label?: string }) {
+function TrendTooltip({ active, payload, label }: { active?: boolean; payload?: ChartPayloadEntry[]; label?: string }) {
     if (!active || !payload?.length) return null;
     return (
         <div className="bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-600 rounded-lg p-3 shadow-lg text-sm">
@@ -35,21 +43,21 @@ function TrendTooltip({ active, payload, label }: { active?: boolean; payload?: 
 }
 
 /* 가동률 바 차트 툴팁 */
-function UtilTooltip({ active, payload, label }: { active?: boolean; payload?: any[]; label?: string }) {
+function UtilTooltip({ active, payload, label }: { active?: boolean; payload?: ChartPayloadEntry[]; label?: string }) {
     if (!active || !payload?.length) return null;
     return (
         <div className="bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-600 rounded-lg p-3 shadow-lg text-sm">
             <p className="font-semibold text-surface-900 dark:text-surface-100 mb-1">{label}</p>
             <p className="text-primary-600">가동률: <span className="font-mono font-bold">{payload[0]?.value}%</span></p>
-            <p className="text-surface-400 text-xs mt-1">운행일 {payload[0]?.payload?.usedDays}일 / 근무일 {payload[0]?.payload?.totalWorkdays}일</p>
+            <p className="text-surface-400 text-xs mt-1">운행일 {String(payload[0]?.payload?.usedDays ?? '')}일 / 근무일 {String(payload[0]?.payload?.totalWorkdays ?? '')}일</p>
         </div>
     );
 }
 
 interface TrendChartsProps {
-    monthlyTrend: any[];
-    driverComparison: any[];
-    vehicleUtilization: any[];
+    monthlyTrend: { label: string; count: number; distance: number; [key: string]: unknown }[];
+    driverComparison: { name: string; monthLabels?: string[]; [key: string]: unknown }[];
+    vehicleUtilization: { name: string; rate: number; usedDays?: number; totalWorkdays?: number }[];
     heatmapData: { grid: Record<number, Record<number, number>>; maxCount: number };
     costTrend: { label: string; fuelCost: number; hipassCost: number; totalCost: number }[];
 }
@@ -58,7 +66,7 @@ export default function TrendCharts({
     monthlyTrend, driverComparison, vehicleUtilization, heatmapData, costTrend,
 }: TrendChartsProps) {
     const recentDrivers = driverComparison.slice(0, 10); // 상위 10명
-    const monthLabels = recentDrivers[0]?.monthLabels || [];
+    const monthLabels = (recentDrivers[0]?.monthLabels as string[]) || [];
 
     return (
         <div className="space-y-6">
@@ -137,6 +145,7 @@ export default function TrendCharts({
                             <XAxis dataKey="label" tick={{ fontSize: 12 }} />
                             <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`} />
                             <Tooltip
+                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                 formatter={(value: any, name: any) => [
                                     `${Number(value).toLocaleString()}원`,
                                     name === 'fuelCost' ? '주유비' : '하이패스',

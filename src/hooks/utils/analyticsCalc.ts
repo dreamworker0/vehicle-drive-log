@@ -20,6 +20,7 @@ export interface LogEntry {
 }
 
 interface TrendEntry {
+    [key: string]: unknown;
     month: string;
     count: number;
     distance: number;

@@ -64,11 +64,11 @@ export default function ReservationCard({
                                     🔗 다일 예약
                                 </span>
                             )}
-                            {(reservation as any).routeDistance && (
+                            {(reservation as unknown as { routeDistance?: number }).routeDistance && (
                                 <p className="text-xs text-blue-500 flex items-center gap-2 mt-0.5">
-                                    <span>↔{Math.floor((reservation as any).routeDistance)}km</span>
-                                    <span>⏱{(reservation as any).routeDuration}분</span>
-                                    {(reservation as any).routeTollFee > 0 && <span>₩{(reservation as any).routeTollFee.toLocaleString()}</span>}
+                                    <span>↔{Math.floor((reservation as unknown as { routeDistance: number }).routeDistance)}km</span>
+                                    <span>⏱{(reservation as unknown as { routeDuration?: number }).routeDuration}분</span>
+                                    {((reservation as unknown as { routeTollFee?: number }).routeTollFee ?? 0) > 0 && <span>₩{(reservation as unknown as { routeTollFee: number }).routeTollFee.toLocaleString()}</span>}
                                 </p>
                             )}
                         </div>

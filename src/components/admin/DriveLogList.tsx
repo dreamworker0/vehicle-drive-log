@@ -5,21 +5,67 @@ import { useToast } from '../../hooks/useToast';
 import { useConfirm } from '../../hooks/useConfirm';
 import { toLocalDateStr } from '../../lib/dateUtils';
 import { SkeletonBox, SkeletonTable } from '../common/Skeleton';
+import type { DocumentSnapshot } from 'firebase/firestore';
+
+interface DriveLogEntry {
+    id: string;
+    vehicleId?: string;
+    vehicleName?: string;
+    driverUid?: string;
+    driverName?: string;
+    date?: string;
+    startKm: number;
+    endKm: number;
+    startTime?: string;
+    endTime?: string;
+    destination?: string;
+    purpose?: string;
+    passengerCount?: number;
+    timestamp?: { toDate: () => Date };
+    [key: string]: unknown;
+}
+
+interface VehicleEntry {
+    id: string;
+    displayName?: string;
+    [key: string]: unknown;
+}
+
+interface MemberEntry {
+    id: string;
+    name?: string;
+    email?: string;
+    role?: string;
+    [key: string]: unknown;
+}
+
+interface DupResult {
+    deleteCount: number;
+    duplicateGroups: number;
+    totalLogs: number;
+}
+
+interface OrgInfo {
+    name?: string;
+    hideApprovalLine?: boolean;
+    approvalLine?: { title: string }[];
+    [key: string]: unknown;
+}
 
 export default function DriveLogList() {
     const { userData } = useAuth();
     const { showToast } = useToast();
     const { confirm } = useConfirm();
-    const [logs, setLogs] = useState<any[]>([]);
-    const [vehicles, setVehicles] = useState<any[]>([]);
-    const [members, setMembers] = useState<any[]>([]);
+    const [logs, setLogs] = useState<DriveLogEntry[]>([]);
+    const [vehicles, setVehicles] = useState<VehicleEntry[]>([]);
+    const [members, setMembers] = useState<MemberEntry[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
-    const [lastDoc, setLastDoc] = useState<any>(null);
+    const [lastDoc, setLastDoc] = useState<DocumentSnapshot | null>(null);
     const [hasMore, setHasMore] = useState(false);
-    const [org, setOrg] = useState<any>(null);
+    const [org, setOrg] = useState<OrgInfo | null>(null);
     const [dupState, setDupState] = useState<string>('idle'); // idle | scanning | result | cleaning
-    const [dupResult, setDupResult] = useState<any>(null);
+    const [dupResult, setDupResult] = useState<DupResult | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [includeHipass, setIncludeHipass] = useState(false);
     const now = new Date();
@@ -47,12 +93,12 @@ export default function DriveLogList() {
                     getOrganizationMembers(orgId),
                     getOrganization(orgId),
                 ]);
-                setLogs(result.docs);
-                setLastDoc(result.lastDoc);
+                setLogs(result.docs as unknown as DriveLogEntry[]);
+                setLastDoc(result.lastDoc as DocumentSnapshot | null);
                 setHasMore(result.hasMore);
-                setVehicles(v);
-                setMembers(m.filter(x => x.role !== 'superAdmin'));
-                setOrg(orgData);
+                setVehicles(v as unknown as VehicleEntry[]);
+                setMembers((m as MemberEntry[]).filter(x => x.role !== 'superAdmin'));
+                setOrg(orgData as OrgInfo | null);
             } catch (err) {
                 console.error('데이터 로드 실패:', err);
             } finally {
@@ -67,8 +113,8 @@ export default function DriveLogList() {
         setLoadingMore(true);
         try {
             const result = await getDriveLogs(orgId!, { limit: PAGE_SIZE, startAfter: lastDoc });
-            setLogs(prev => [...prev, ...result.docs]);
-            setLastDoc(result.lastDoc);
+            setLogs(prev => [...prev, ...result.docs as unknown as DriveLogEntry[]]);
+            setLastDoc(result.lastDoc as DocumentSnapshot | null);
             setHasMore(result.hasMore);
         } catch (err) {
             console.error('추가 로드 실패:', err);
@@ -149,9 +195,9 @@ export default function DriveLogList() {
                             setDupResult(null);
                             try {
                                 const result = await cleanupDuplicateLogs(orgId!, { dryRun: true });
-                                setDupResult(result);
-                                setDupState((result as any).deleteCount > 0 ? 'result' : 'idle');
-                                if ((result as any).deleteCount === 0) {
+                                setDupResult(result as DupResult);
+                                setDupState((result as DupResult).deleteCount > 0 ? 'result' : 'idle');
+                                if ((result as DupResult).deleteCount === 0) {
                                     showToast('중복 데이터가 없습니다.', 'success');
                                 }
                             } catch (err) {
@@ -220,7 +266,7 @@ export default function DriveLogList() {
                             const defaultApproval = [{ title: '담당' }, { title: '팀장' }];
                             const useApproval = org?.hideApprovalLine
                                 ? []
-                                : (org?.approvalLine?.length > 0 ? org.approvalLine : defaultApproval);
+                                : ((org?.approvalLine?.length ?? 0) > 0 ? org!.approvalLine! : defaultApproval);
                             downloadDriveLogsPdf(filteredLogs, {
                                 orgName: org?.name || '',
                                 period,
@@ -268,7 +314,7 @@ export default function DriveLogList() {
                                     setDupState('cleaning');
                                     try {
                                         const result = await cleanupDuplicateLogs(orgId!, { dryRun: false });
-                                        showToast(`${(result as any).deleteCount}건의 중복 데이터가 삭제되었습니다.`, 'success');
+                                        showToast(`${(result as DupResult).deleteCount}건의 중복 데이터가 삭제되었습니다.`, 'success');
                                         setDupState('idle');
                                         setDupResult(null);
                                         // 목록 새로고침
@@ -278,11 +324,11 @@ export default function DriveLogList() {
                                             getVehicles(orgId!),
                                             getOrganizationMembers(orgId!),
                                         ]);
-                                        setLogs(refreshed.docs);
-                                        setLastDoc(refreshed.lastDoc);
+                                        setLogs(refreshed.docs as unknown as DriveLogEntry[]);
+                                        setLastDoc(refreshed.lastDoc as DocumentSnapshot | null);
                                         setHasMore(refreshed.hasMore);
-                                        setVehicles(v);
-                                        setMembers(m.filter(x => x.role !== 'superAdmin'));
+                                        setVehicles(v as unknown as VehicleEntry[]);
+                                        setMembers((m as MemberEntry[]).filter(x => x.role !== 'superAdmin'));
                                         setLoading(false);
                                     } catch (err) {
                                         console.error('중복 정리 실패:', err);
@@ -402,7 +448,7 @@ export default function DriveLogList() {
                                         <div className="flex items-center gap-2">
                                             <span className="font-bold text-primary-600">{distance.toLocaleString()} km</span>
                                             <button
-                                                onClick={() => handleDelete(log.id, log.driverName)}
+                                                onClick={() => handleDelete(log.id, log.driverName || '')}
                                                 disabled={deletingId === log.id}
                                                 className="p-1.5 rounded-lg text-surface-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
                                                 title="삭제"
@@ -424,7 +470,7 @@ export default function DriveLogList() {
                                         {(log.startTime || log.endTime) && (
                                             <span className="text-surface-400">({log.startTime || '?'} ~ {log.endTime || '?'})</span>
                                         )}
-                                        {log.passengerCount > 1 && (
+                                        {(log.passengerCount ?? 0) > 1 && (
                                             <span className="text-primary-500">👥 {log.passengerCount}명</span>
                                         )}
                                     </div>
@@ -463,7 +509,7 @@ export default function DriveLogList() {
                                     </div>
                                     <div className="text-center">
                                         <button
-                                            onClick={() => handleDelete(log.id, log.driverName)}
+                                            onClick={() => handleDelete(log.id, log.driverName || '')}
                                             disabled={deletingId === log.id}
                                             className="p-1.5 rounded-lg text-surface-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
                                             title="삭제"

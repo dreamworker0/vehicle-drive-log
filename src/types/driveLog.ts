@@ -21,6 +21,9 @@ export interface DriveLog extends FirestoreDoc {
     destination?: string;
     startLocation?: string;
     passengers?: number;
+    vehicleType?: string;
+    passengerCount?: number;
+    passengerNames?: string[];
     notes?: string;
     fuelAmount?: number;
     energyCost?: number;

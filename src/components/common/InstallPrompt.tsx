@@ -34,6 +34,7 @@ export default function InstallPrompt() {
     useEffect(() => {
         // 이미 standalone 모드(설치됨)이면 표시 안 함
         if (window.matchMedia?.('(display-mode: standalone)')?.matches) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if ((navigator as any).standalone) return; // iOS standalone
 
         // 2주 이내에 닫기를 누른 적이 있으면 표시하지 않음
@@ -53,10 +54,12 @@ export default function InstallPrompt() {
             logPwaEvent('pwa_installed');
         };
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         window.addEventListener('beforeinstallprompt' as any, handleBeforeInstall as any);
         window.addEventListener('appinstalled', handleAppInstalled);
 
         return () => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             window.removeEventListener('beforeinstallprompt' as any, handleBeforeInstall as any);
             window.removeEventListener('appinstalled', handleAppInstalled);
         };

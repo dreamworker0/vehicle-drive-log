@@ -143,6 +143,8 @@ describe('Firestore 유틸리티 함수', () => {
                 message: '기능 개선 요청',
                 userEmail: 'test@test.com',
                 userName: '테스트',
+                imageUrls: [],
+                organizationId: 'org1',
             });
 
             expect(addDoc).toHaveBeenCalled();

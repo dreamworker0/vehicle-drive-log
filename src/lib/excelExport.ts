@@ -205,7 +205,7 @@ export async function downloadFuelLogsExcel(
     const rows = records.map((rec) => {
         let timeStr = '';
         if (rec.createdAt) {
-            const ca = rec.createdAt as any;
+            const ca = rec.createdAt as { seconds: number; toDate?: () => Date } | undefined;
             const d = ca instanceof Date ? ca : ca?.toDate?.() || null;
             if (d) timeStr = d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
         }
@@ -271,7 +271,7 @@ export async function downloadHipassChargesExcel(
     const rows = records.map((rec) => {
         let timeStr = '';
         if (rec.createdAt) {
-            const ca = rec.createdAt as any;
+            const ca = rec.createdAt as { seconds: number; toDate?: () => Date } | undefined;
             const d = ca instanceof Date ? ca : ca?.toDate?.() || null;
             if (d) timeStr = d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
         }

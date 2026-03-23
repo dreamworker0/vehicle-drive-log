@@ -65,9 +65,12 @@ export default function useVehicleHistory() {
                 const allLogs = await getVehicleDriveLogs(selectedVehicleId, since);
                 setLogs(
                     allLogs.sort((a, b) => {
-                        const ta = a.timestamp?.toDate?.() || 0;
-                        const tb = b.timestamp?.toDate?.() || 0;
-                        return tb - ta;
+                        const getTime = (ts: unknown): number => {
+                            if (ts && typeof ts === 'object' && 'toDate' in ts && typeof (ts as { toDate?: unknown }).toDate === 'function') return (ts as { toDate: () => Date }).toDate().getTime();
+                            if (ts instanceof Date) return ts.getTime();
+                            return 0;
+                        };
+                        return getTime(b.timestamp) - getTime(a.timestamp);
                     })
                 );
             } catch (err) {

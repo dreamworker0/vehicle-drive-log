@@ -62,7 +62,7 @@ export default function useTodayDashboard() {
                 const incomplete = wr
                     .filter(res => res.reservedByUid === user?.uid
                         && (res.status === 'in_progress' || res.status === 'completed')
-                        && res.date <= yesterdayStr
+                        && (res.date ?? '') <= yesterdayStr
                         && !logReservationIds.has(res.id)
                     );
 

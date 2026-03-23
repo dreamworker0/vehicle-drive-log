@@ -6,6 +6,7 @@ import useMaintenanceLog, { MAINTENANCE_TYPES } from '../../hooks/useMaintenance
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 import { getOrganization } from '../../lib/firestore';
+import type { Organization } from '../../types/organization';
 import { VEHICLE_TYPE_ICONS } from '../../lib/constants';
 import { isVehicleBlocked } from '../../lib/vehicleUtils';
 import { SkeletonBox, SkeletonList } from '../common/Skeleton';
@@ -26,13 +27,13 @@ export default function MaintenanceLog() {
     } = useMaintenanceLog();
     const { userData } = useAuth();
     const { showToast } = useToast();
-    const [org, setOrg] = useState<any>(null);
+    const [org, setOrg] = useState<Organization | null>(null);
     const orgName = org?.name || '';
 
     useEffect(() => {
         if (!userData?.organizationId) return;
-        getOrganization(userData.organizationId).then((o: any) => {
-            if (o) setOrg(o);
+        getOrganization(userData.organizationId).then((o) => {
+            if (o) setOrg(o as Organization);
         });
     }, [userData?.organizationId]);
 
@@ -84,7 +85,7 @@ export default function MaintenanceLog() {
                             const defaultApproval = [{ title: '담당' }, { title: '팀장' }];
                             const useApproval = org?.hideApprovalLine
                                 ? []
-                                : (org?.approvalLine?.length > 0 ? org.approvalLine : defaultApproval);
+                                : ((org?.approvalLine?.length ?? 0) > 0 ? org!.approvalLine! : defaultApproval);
                             downloadMaintenancePdf(filteredRecords, {
                                 orgName,
                                 typeLabels: TYPE_LABELS,

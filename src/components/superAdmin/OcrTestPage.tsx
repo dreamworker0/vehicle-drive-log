@@ -60,14 +60,14 @@ export default function OcrTestPage() {
         setLoading(true);
         const startTime = Date.now();
         try {
-            const result = await ocrDashboard(imageBase64, mimeType, isElectric) as any;
+            const result = await ocrDashboard(imageBase64, mimeType, isElectric) as Record<string, unknown>;
             const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
             setHistory(prev => [{
                 id: Date.now(),
                 thumbnail: imagePreview,
-                km: result.km,
-                battery: result.battery,
-                raw: result.raw,
+                km: result.km as number | null,
+                battery: result.battery as number | null,
+                raw: result.raw as string | null,
                 elapsed,
                 isElectric,
                 timestamp: new Date().toLocaleTimeString('ko-KR'),
@@ -80,7 +80,7 @@ export default function OcrTestPage() {
                 thumbnail: imagePreview,
                 km: null,
                 battery: null,
-                raw: (err as any).message,
+                raw: (err as Error).message,
                 elapsed,
                 isElectric,
                 timestamp: new Date().toLocaleTimeString('ko-KR'),

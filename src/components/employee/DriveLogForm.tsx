@@ -7,6 +7,9 @@ import useDriveLogForm from '../../hooks/useDriveLogForm';
 import useVehiclePriority from '../../hooks/useVehiclePriority';
 import VehicleSelector from './VehicleSelector';
 import MileageInput from './MileageInput';
+import type { DriveLog } from '../../types/driveLog';
+import type { Favorite } from '../../types/favorite';
+import type { User as UserDoc } from '../../types/user';
 
 export default function DriveLogForm() {
     const {
@@ -47,7 +50,7 @@ export default function DriveLogForm() {
     const title = isEditMode ? '운행일지 수정' : '운행일지 작성';
 
     const subtitle = isEditMode
-        ? `${(editLog as any).vehicleName || '차량'} · ${(editLog as any).destination || ''} 기록을 수정합니다`
+        ? `${(editLog as DriveLog).vehicleName || '차량'} · ${(editLog as DriveLog).destination || ''} 기록을 수정합니다`
         : '차량 운행 기록을 입력하세요';
 
     return (
@@ -198,7 +201,7 @@ export default function DriveLogForm() {
                                     placeholder="서울시청"
                                 />
                                 {/* 즐겨찾기 저장 아이콘 버튼 */}
-                                {form.destination.trim() && !favorites.some((f: any) => f.address === form.destination.trim() || f.name === form.destination.trim()) && (
+                                {form.destination.trim() && !favorites.some((f: Favorite) => f.address === form.destination.trim() || f.name === form.destination.trim()) && (
                                     <button
                                         type="button"
                                         onClick={() => setShowFavSave(!showFavSave)}
@@ -237,7 +240,7 @@ export default function DriveLogForm() {
                             {/* 즐겨찾기 칩 */}
                             {favorites.length > 0 && (
                                 <div className="flex flex-wrap gap-1.5 mt-2">
-                                    {favorites.map((fav: any) => (
+                                    {favorites.map((fav: Favorite) => (
                                         <button
                                             key={fav.id}
                                             type="button"
@@ -286,8 +289,8 @@ export default function DriveLogForm() {
                     {/* 조직원 칩 */}
                     {members.length > 0 && (
                         <div className="flex flex-wrap gap-1.5 mb-3">
-                            {members.map((m: any) => {
-                                const isSelected = selectedPassengers.some((p: any) => p.id === m.id);
+                            {members.map((m: UserDoc) => {
+                                const isSelected = selectedPassengers.some((p: UserDoc) => p.id === m.id);
                                 return (
                                     <button
                                         key={m.id}

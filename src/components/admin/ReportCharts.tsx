@@ -8,6 +8,15 @@ import {
 
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#f97316'];
 
+interface ChartPayloadEntry {
+    value: number;
+    name: string;
+    color: string;
+    dataKey?: string;
+    unit?: string;
+    payload?: Record<string, unknown>;
+}
+
 function SectionTitle({ title }: { title: string; icon?: string }) {
     return (
         <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4">
@@ -17,7 +26,7 @@ function SectionTitle({ title }: { title: string; icon?: string }) {
 }
 
 /** 거리/횟수 막대차트에서 공통으로 사용하는 툴팁 */
-function DistanceCountTooltip({ active, payload, label }: { active?: boolean; payload?: any[]; label?: string }) {
+function DistanceCountTooltip({ active, payload, label }: { active?: boolean; payload?: ChartPayloadEntry[]; label?: string }) {
     if (!active || !payload?.length) return null;
     return (
         <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-surface-100 dark:border-surface-700 px-4 py-3 text-sm">
@@ -36,7 +45,7 @@ function DistanceCountTooltip({ active, payload, label }: { active?: boolean; pa
 }
 
 /** 단순 카운트 툴팁 */
-function SimpleCountTooltip({ active, payload, label, suffix = '' }: { active?: boolean; payload?: any[]; label?: string; suffix?: string }) {
+function SimpleCountTooltip({ active, payload, label, suffix = '' }: { active?: boolean; payload?: ChartPayloadEntry[]; label?: string; suffix?: string }) {
     if (!active || !payload?.length) return null;
     return (
         <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-surface-100 dark:border-surface-700 px-4 py-3 text-sm">
@@ -50,7 +59,7 @@ function SimpleCountTooltip({ active, payload, label, suffix = '' }: { active?: 
 }
 
 /** 일별 추이 라인차트 툴팁 */
-function TrendTooltip({ active, payload, label }: { active?: boolean; payload?: any[]; label?: string }) {
+function TrendTooltip({ active, payload, label }: { active?: boolean; payload?: ChartPayloadEntry[]; label?: string }) {
     if (!active || !payload?.length) return null;
     return (
         <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-surface-100 dark:border-surface-700 px-4 py-3 text-sm">
@@ -69,15 +78,15 @@ function TrendTooltip({ active, payload, label }: { active?: boolean; payload?: 
 }
 
 interface ReportChartsProps {
-    driverData: any[];
-    vehicleData: any[];
-    purposeData: any[];
-    dayOfWeekData: any[];
-    hourlyData: any[];
-    vehicleFuelData: any[];
-    dailyTrendData: any[];
-    fuelLogStats: { totalCost: number; totalAmount: number; count: number; vehicleData: any[] };
-    hipassChargeStats: { totalAmount: number; count: number; vehicleData: any[] };
+    driverData: { name: string; distance: number; count: number }[];
+    vehicleData: { name: string; distance: number; count: number }[];
+    purposeData: { name: string; value: number }[];
+    dayOfWeekData: { name: string; count: number }[];
+    hourlyData: { hour: string; count: number }[];
+    vehicleFuelData: { name: string; amount: number }[];
+    dailyTrendData: { date: string; count: number; distance: number }[];
+    fuelLogStats: { totalCost: number; totalAmount: number; count: number; vehicleData: { name: string; cost: number }[] };
+    hipassChargeStats: { totalAmount: number; count: number; vehicleData: { name: string; amount: number }[] };
     costTrendData: { date: string; fuel: number; hipass: number; total: number }[];
 }
 

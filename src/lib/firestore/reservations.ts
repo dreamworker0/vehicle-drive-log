@@ -5,6 +5,7 @@ import {
     doc, getDoc, updateDoc, deleteDoc,
     collection, query, where, getDocs, addDoc,
     serverTimestamp, onSnapshot,
+    type DocumentData,
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { db } from '../firebase';
@@ -16,11 +17,11 @@ const functions = getFunctions(app, 'asia-northeast3');
 export const getReservationById = async (reservationId: string) => {
     const snap = await getDoc(doc(db, 'reservations', reservationId));
     if (!snap.exists()) return null;
-    return { id: snap.id, ...snap.data() } as Record<string, any>;
+    return { id: snap.id, ...snap.data() } as DocumentData & { id: string };
 };
 
 // 예약 생성 (클라이언트 측)
-export const createReservation = async (data: Record<string, any>) => {
+export const createReservation = async (data: Record<string, unknown>) => {
     const docRef = await addDoc(collection(db, 'reservations'), {
         ...data,
         status: 'reserved',
@@ -30,7 +31,7 @@ export const createReservation = async (data: Record<string, any>) => {
 };
 
 /** 서버 측 중복 검증 기반 예약 생성 (Cloud Function + Firestore Transaction) */
-export const createReservationSafe = async (data: Record<string, any>) => {
+export const createReservationSafe = async (data: Record<string, unknown>) => {
     const callable = httpsCallable(functions, 'createReservationSafe', { timeout: 15000 });
     const result = await callable(data);
     return (result.data as { reservationId: string }).reservationId;
@@ -46,17 +47,17 @@ export const getReservations = async (orgId: string, date?: string) => {
     }
     const q = query(collection(db, 'reservations'), ...constraints);
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
 };
 
 // 예약 실시간 구독
-export const subscribeReservations = (orgId: string, callback: (reservations: any[]) => void) => {
+export const subscribeReservations = (orgId: string, callback: (reservations: (DocumentData & { id: string })[]) => void) => {
     const q = query(
         collection(db, 'reservations'),
         where('organizationId', '==', orgId),
     );
     return onSnapshot(q, (snap) => {
-        const reservations = snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+        const reservations = snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
         callback(reservations);
     });
 };
@@ -69,12 +70,12 @@ export const cancelReservation = async (reservationId: string) => {
 };
 
 // 예약 정보 수정
-export const updateReservation = async (reservationId: string, data: Record<string, any>) => {
+export const updateReservation = async (reservationId: string, data: Record<string, unknown>) => {
     await updateDoc(doc(db, 'reservations', reservationId), data);
 };
 
 // 예약 상태 변경
-export const updateReservationStatus = async (reservationId: string, status: string, extraData: Record<string, any> = {}) => {
+export const updateReservationStatus = async (reservationId: string, status: string, extraData: Record<string, unknown> = {}) => {
     await updateDoc(doc(db, 'reservations', reservationId), {
         status,
         ...extraData,
@@ -90,7 +91,7 @@ export const getTodayReservations = async (orgId: string, date: string) => {
     );
     const snap = await getDocs(q);
     return snap.docs
-        .map(d => ({ id: d.id, ...d.data() } as Record<string, any>))
+        .map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string; status?: string; date?: string })
         .filter(r => r.status !== 'cancelled');
 };
 
@@ -102,8 +103,8 @@ export const getWeekReservations = async (orgId: string, startDate: string, endD
     );
     const snap = await getDocs(q);
     return snap.docs
-        .map(d => ({ id: d.id, ...d.data() } as Record<string, any>))
-        .filter(r => r.status !== 'cancelled' && r.date >= startDate && r.date <= endDate);
+        .map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string; status?: string; date?: string })
+        .filter(r => r.status !== 'cancelled' && (r.date ?? '') >= startDate && (r.date ?? '') <= endDate);
 };
 
 // 날짜 범위별 예약 조회 (getWeekReservations 별칭)
@@ -117,7 +118,7 @@ export const getReservationsByGroupId = async (groupId: string) => {
     );
     const snap = await getDocs(q);
     return snap.docs
-        .map(d => ({ id: d.id, ...d.data() } as Record<string, any>))
+        .map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string; status?: string; date?: string })
         .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
 };
 

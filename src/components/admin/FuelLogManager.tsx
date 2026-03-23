@@ -6,6 +6,7 @@ import useFuelLogAdmin from '../../hooks/useFuelLogAdmin';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 import { getOrganization } from '../../lib/firestore';
+import type { Organization } from '../../types/organization';
 import { SkeletonBox, SkeletonList } from '../common/Skeleton';
 import { useState, useEffect } from 'react';
 
@@ -18,13 +19,13 @@ export default function FuelLogManager() {
     } = useFuelLogAdmin();
     const { userData } = useAuth();
     const { showToast } = useToast();
-    const [org, setOrg] = useState<any>(null);
+    const [org, setOrg] = useState<Organization | null>(null);
     const orgName = org?.name || '';
 
     useEffect(() => {
         if (!userData?.organizationId) return;
-        getOrganization(userData.organizationId).then((o: any) => {
-            if (o) setOrg(o);
+        getOrganization(userData.organizationId).then((o) => {
+            if (o) setOrg(o as Organization);
         });
     }, [userData?.organizationId]);
 
@@ -72,7 +73,7 @@ export default function FuelLogManager() {
                             const defaultApproval = [{ title: '담당' }, { title: '팀장' }];
                             const useApproval = org?.hideApprovalLine
                                 ? []
-                                : (org?.approvalLine?.length > 0 ? org.approvalLine : defaultApproval);
+                                : ((org?.approvalLine?.length ?? 0) > 0 ? org!.approvalLine! : defaultApproval);
                             downloadFuelLogPdf(filteredRecords, {
                                 orgName,
                                 approvalLine: useApproval,
@@ -160,8 +161,10 @@ export default function FuelLogManager() {
 
                     {filteredRecords.map(rec => {
                         const dateStr = rec.date || '-';
-                        const ca = rec.createdAt as any;
-                        const timeDate = ca instanceof Date ? ca : ca?.toDate?.() || null;
+                        const ca = rec.createdAt;
+                        const timeDate = (ca && typeof ca === 'object' && 'toDate' in ca && typeof (ca as { toDate?: unknown }).toDate === 'function')
+                            ? (ca as { toDate: () => Date }).toDate()
+                            : (ca instanceof Date ? ca : null);
                         const timeStr = timeDate
                             ? timeDate.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
                             : '';

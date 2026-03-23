@@ -24,8 +24,8 @@ export default function SuperAdminManager() {
         try {
             const list = await getSuperAdmins() as SuperAdmin[];
             setAdmins(list);
-        } catch (e: any) {
-            showToast('목록을 불러오지 못했습니다: ' + e.message, 'error');
+        } catch (e: unknown) {
+            showToast('목록을 불러오지 못했습니다: ' + (e as Error).message, 'error');
         } finally {
             setLoading(false);
         }
@@ -42,8 +42,8 @@ export default function SuperAdminManager() {
             showToast(`${email} 을(를) 슈퍼관리자로 추가했습니다.`, 'success');
             setEmail('');
             await load();
-        } catch (err: any) {
-            showToast(err.message, 'error');
+        } catch (err: unknown) {
+            showToast((err as Error).message, 'error');
         } finally {
             setAdding(false);
         }
@@ -59,8 +59,8 @@ export default function SuperAdminManager() {
             await removeSuperAdmin(admin.id, admins.length);
             showToast('슈퍼관리자에서 제거했습니다.', 'success');
             await load();
-        } catch (err: any) {
-            showToast(err.message, 'error');
+        } catch (err: unknown) {
+            showToast((err as Error).message, 'error');
         }
     };
 

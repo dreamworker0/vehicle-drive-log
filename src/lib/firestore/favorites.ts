@@ -5,6 +5,7 @@ import {
     doc, deleteDoc,
     collection, query, where, getDocs, addDoc,
     orderBy, serverTimestamp,
+    type DocumentData,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -16,11 +17,11 @@ export const getFavorites = async (uid: string) => {
         orderBy('createdAt', 'desc')
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
 };
 
 // 즐겨찾기 추가
-export const createFavorite = async (data: Record<string, any>) => {
+export const createFavorite = async (data: Record<string, unknown>) => {
     return await addDoc(collection(db, 'favorites'), {
         ...data,
         createdAt: serverTimestamp(),

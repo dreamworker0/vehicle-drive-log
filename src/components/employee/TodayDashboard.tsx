@@ -11,6 +11,8 @@ import WelcomeGuide from './WelcomeGuide';
 import ReservationCard from './ReservationCard';
 import WeekReservationList from './WeekReservationList';
 import ConfirmModal from '../common/ConfirmModal';
+import type { Reservation } from '../../types/reservation';
+import type { Vehicle } from '../../types/vehicle';
 
 export default function TodayDashboard() {
     const {
@@ -24,7 +26,7 @@ export default function TodayDashboard() {
     } = useTodayDashboard();
     const navigate = useNavigate();
     const [dismissedAlerts, setDismissedAlerts] = useState<Set<string>>(new Set());
-    const [cancelTarget, setCancelTarget] = useState<{ reservation: any; type: 'today' | 'week' } | null>(null);
+    const [cancelTarget, setCancelTarget] = useState<{ reservation: Reservation; type: 'today' | 'week' } | null>(null);
 
     // 웰컴 가이드 (첫 방문 시 1회 표시)
     const [showWelcome, setShowWelcome] = useState(() => {
@@ -59,9 +61,9 @@ export default function TodayDashboard() {
             {showWelcome && <WelcomeGuide onDismiss={dismissWelcome} />}
 
             {/* 임박 예약 알림 배너 */}
-            {upcomingAlerts.filter((r: any) => !dismissedAlerts.has(r.id)).length > 0 && (
+            {upcomingAlerts.filter((r: Reservation) => !dismissedAlerts.has(r.id)).length > 0 && (
                 <div className="mb-4 space-y-2">
-                    {upcomingAlerts.filter((r: any) => !dismissedAlerts.has(r.id)).map((r: any) => (
+                    {upcomingAlerts.filter((r: Reservation) => !dismissedAlerts.has(r.id)).map((r: Reservation) => (
                         <div key={r.id} className="bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-700/50 rounded-xl p-3 flex items-center gap-3 animate-fade-in">
                             <span className="text-xl">⏰</span>
                             <div className="flex-1 min-w-0">
@@ -89,7 +91,7 @@ export default function TodayDashboard() {
             {/* 미작성 알림 */}
             {incompleteAlerts.length > 0 && (
                 <div className="mb-4 space-y-2">
-                    {incompleteAlerts.map((alert: any, idx: number) => (
+                    {incompleteAlerts.map((alert: Reservation & { type: string }, idx: number) => (
                         <div key={alert.id || idx} className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700/50 rounded-xl p-3 flex items-center gap-3 animate-fade-in">
                             <span className="text-xl">📝</span>
                             <div className="flex-1 min-w-0">
@@ -100,7 +102,7 @@ export default function TodayDashboard() {
                             </div>
                             <button
                                 onClick={() => {
-                                    const vehicle = vehicles.find((v: any) => v.id === alert.vehicleId);
+                                    const vehicle = vehicles.find((v: Vehicle) => v.id === alert.vehicleId);
                                     navigate('/employee/drive-log', {
                                         state: {
                                             reservationId: alert.id,
@@ -130,8 +132,8 @@ export default function TodayDashboard() {
                         내 예약
                     </h2>
                     <div className="space-y-2">
-                        {myReservations.map((res: any) => {
-                            const vehicle = vehicles.find((v: any) => v.id === res.vehicleId);
+                        {myReservations.map((res: Reservation) => {
+                            const vehicle = vehicles.find((v: Vehicle) => v.id === res.vehicleId);
                             return (
                                 <ReservationCard
                                     key={res.id}

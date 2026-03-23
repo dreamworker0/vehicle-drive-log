@@ -29,4 +29,5 @@ export interface CreateFeedbackData {
     userEmail: string;
     userName: string;
     organizationId: string;
+    type?: string;
 }

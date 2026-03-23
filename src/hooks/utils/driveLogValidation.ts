@@ -23,7 +23,7 @@ export const todayStr = () => {
  * 운행일지 폼 데이터를 검증한다.
  */
 export function validateDriveLogForm(
-    form: Partial<DriveLogForm> & Record<string, any>,
+    form: Partial<DriveLogForm>,
     { isElectric = false, isQuickDrive = false } = {}
 ) {
     if (!form.vehicleId) {

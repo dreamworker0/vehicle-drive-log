@@ -5,6 +5,7 @@ import {
     doc, deleteDoc,
     collection, query, getDocs, addDoc,
     orderBy, serverTimestamp,
+    type DocumentData,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -15,11 +16,11 @@ export const getCustomHolidays = async (orgId: string) => {
         orderBy('date', 'asc')
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
 };
 
 // 커스텀 휴일 추가
-export const addCustomHoliday = async (orgId: string, data: Record<string, any>) => {
+export const addCustomHoliday = async (orgId: string, data: Record<string, unknown>) => {
     const docRef = await addDoc(collection(db, 'organizations', orgId, 'customHolidays'), {
         ...data,
         createdAt: serverTimestamp(),

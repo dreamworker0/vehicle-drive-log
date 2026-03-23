@@ -5,6 +5,7 @@ import {
     doc, getDoc, updateDoc, deleteDoc,
     collection, query, where, getDocs, addDoc,
     orderBy, limit, serverTimestamp,
+    type DocumentData,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -28,14 +29,14 @@ export const getMaintenanceRecords = async (orgId: string, vehicleId: string | n
         );
     }
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, any>) }));
+    return snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) }));
 };
 
 // 정비 기록 생성 (차량 차단 플래그 지원)
-export const createMaintenanceRecord = async (data: Record<string, any>) => {
+export const createMaintenanceRecord = async (data: Record<string, unknown>) => {
     const { blockVehicle, blockEndDate, ...recordData } = data;
     const docRef = await addDoc(collection(db, 'maintenanceRecords'), {
-        ...(recordData as Record<string, any>),
+        ...(recordData as Record<string, unknown>),
         blockVehicle: blockVehicle || false,
         blockEndDate: blockEndDate || null,
         createdAt: serverTimestamp(),
@@ -43,7 +44,7 @@ export const createMaintenanceRecord = async (data: Record<string, any>) => {
 
     // 차량 차단 플래그가 켜져 있으면 차량 문서에 정비 차단 상태 기록
     if (blockVehicle && recordData.vehicleId) {
-        await updateDoc(doc(db, 'vehicles', recordData.vehicleId), {
+        await updateDoc(doc(db, 'vehicles', recordData.vehicleId as string), {
             maintenance: {
                 isBlocked: true,
                 reason: recordData.type,
@@ -92,8 +93,8 @@ export const cancelVehicleReservations = async (orgId: string, vehicleId: string
 
     // 날짜 범위 + 활성 상태 필터링
     const targets = snap.docs
-        .map(d => ({ id: d.id, ...d.data() } as Record<string, any>))
-        .filter(r => r.status === 'reserved' && r.date >= startDate && (!endDate || r.date <= endDate));
+        .map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string; status?: string; date?: string; reservedByUid?: string })
+        .filter(r => r.status === 'reserved' && (r.date ?? '') >= startDate && (!endDate || (r.date ?? '') <= endDate));
 
     // 일괄 취소 + 예약자에게 알림 발송
     for (const res of targets) {

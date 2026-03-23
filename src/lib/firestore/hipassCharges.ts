@@ -5,6 +5,7 @@ import {
     doc, deleteDoc,
     collection, query, where, orderBy, getDocs, addDoc,
     serverTimestamp, limit,
+    type DocumentData,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -24,7 +25,7 @@ export const getAllHipassCharges = async (orgId: string, options?: { since?: Dat
     constraints.push(orderBy('date', 'desc'), limit(200));
     const q = query(collection(db, 'hipassCharges'), ...constraints);
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, any>) }));
+    return snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) }));
 };
 
 // 카드별 충전 기록 조회 (최신순)
@@ -36,11 +37,11 @@ export const getHipassCharges = async (orgId: string, cardId: string) => {
         orderBy('createdAt', 'desc'),
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
 };
 
 // 충전 기록 생성
-export const createHipassCharge = async (data: Record<string, any>) => {
+export const createHipassCharge = async (data: Record<string, unknown>) => {
     const docRef = await addDoc(collection(db, 'hipassCharges'), {
         ...data,
         createdAt: serverTimestamp(),

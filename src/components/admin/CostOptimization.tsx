@@ -33,6 +33,7 @@ function SectionTitle({ title }: { title: string; icon?: string }) {
 }
 
 /* 연료 효율 바 차트 툴팁 */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function FuelTooltip({ active, payload }: { active?: boolean; payload?: any[] }) {
     if (!active || !payload?.length) return null;
     const d = payload[0]?.payload;
@@ -139,6 +140,7 @@ export default function CostOptimization({
                                         formatter={((value: number, name: string) => [
                                             `${value.toLocaleString()}원`,
                                             name === 'fuelCost' ? '주유비' : name === 'hipassCost' ? '하이패스' : '정비비',
+                                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
                                         ]) as any}
                                         contentStyle={{ borderRadius: '8px', fontSize: '12px' }}
                                     />

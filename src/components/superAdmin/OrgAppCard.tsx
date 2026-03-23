@@ -102,7 +102,7 @@ export default function OrgAppCard({
                             <div className="sm:col-span-2">
                                 <span className="text-surface-400">거절일:</span>
                                 <span className="ml-2 text-surface-700 dark:text-surface-300">
-                                    {(app.rejectedAt as any)?.toDate ? (app.rejectedAt as any).toDate().toLocaleDateString('ko-KR') : new Date(app.rejectedAt as any).toLocaleDateString('ko-KR')}
+                                    {typeof (app.rejectedAt as unknown as { toDate?: () => Date })?.toDate === 'function' ? (app.rejectedAt as unknown as { toDate: () => Date }).toDate().toLocaleDateString('ko-KR') : new Date(app.rejectedAt as unknown as string).toLocaleDateString('ko-KR')}
                                 </span>
                             </div>
                         )}
@@ -110,9 +110,9 @@ export default function OrgAppCard({
                             <div className="sm:col-span-2">
                                 <span className="text-surface-400">신청일시:</span>
                                 <span className="ml-2 text-surface-700 dark:text-surface-300">
-                                    {(app.createdAt as any)?.toDate
-                                        ? (app.createdAt as any).toDate().toLocaleString('ko-KR', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-                                        : new Date(app.createdAt as any).toLocaleString('ko-KR', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                    {typeof (app.createdAt as unknown as { toDate?: () => Date })?.toDate === 'function'
+                                        ? (app.createdAt as unknown as { toDate: () => Date }).toDate().toLocaleString('ko-KR', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+                                        : new Date(app.createdAt as unknown as string).toLocaleString('ko-KR', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                 </span>
                             </div>
                         )}
