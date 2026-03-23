@@ -19,11 +19,13 @@ test.describe('랜딩 페이지', () => {
 
     test('3단계 시작 섹션이 표시된다', async ({ page }) => {
         const heading = page.getByText('3단계로 시작하세요');
+        await expect(heading).toBeAttached({ timeout: 10000 });
         await heading.scrollIntoViewIfNeeded();
         await expect(heading).toBeVisible({ timeout: 10000 });
         const steps = ['기관 신청', '직원 초대', '바로 사용'];
         for (const step of steps) {
             const el = page.getByRole('heading', { name: step });
+            await expect(el).toBeAttached({ timeout: 5000 });
             await el.scrollIntoViewIfNeeded();
             await expect(el).toBeVisible();
         }
