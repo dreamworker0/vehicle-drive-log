@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, act } from '@testing-library/react';
+import { render, screen, act, cleanup } from '@testing-library/react';
 import { ToastProviderWrapper } from '../../hooks/ToastProvider';
 import { useToast } from '../../hooks/useToast';
 
@@ -21,6 +21,11 @@ describe('useToast', () => {
     });
 
     afterEach(() => {
+        // 남은 토스트 타이머를 모두 실행하여 이전 테스트의 토스트 정리
+        act(() => {
+            vi.runOnlyPendingTimers();
+        });
+        cleanup();
         vi.useRealTimers();
     });
 
