@@ -2,6 +2,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
 
 // ── Mocks ──
+// firebase/analytics mock — 테스트 환경에서 window 미정의로 인한 에러 방지
+vi.mock('firebase/analytics', () => ({
+    getAnalytics: vi.fn(),
+    logEvent: vi.fn(),
+    isSupported: vi.fn().mockResolvedValue(false),
+}));
+
+vi.mock('../../lib/firebase', () => ({
+    db: {},
+    auth: {},
+    default: {},
+}));
+
 vi.mock('../../hooks/useAuth', () => ({
     useAuth: () => ({
         user: { uid: 'admin1', displayName: '관리자' },
