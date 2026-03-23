@@ -27,8 +27,8 @@ describe('formatDate', () => {
 
     it('빈 값은 - 반환', () => {
         expect(formatDate('')).toBe('-');
-        expect(formatDate(null as any)).toBe('-');
-        expect(formatDate(undefined as any)).toBe('-');
+        expect(formatDate(null as unknown as string)).toBe('-');
+        expect(formatDate(undefined as unknown as string)).toBe('-');
     });
 
     it('- 문자는 그대로 반환', () => {

@@ -167,7 +167,7 @@ export default function UserManual({ role = 'employee', onClose }: UserManualPro
                         <AccordionItem
                             key={idx}
                             title={section.title}
-                            content={section.content as any}
+                            content={section.content as (string | ManualContent)[]}
                             isOpen={openIndex === idx}
                             onToggle={() => setOpenIndex(openIndex === idx ? -1 : idx)}
                         />

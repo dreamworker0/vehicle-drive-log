@@ -11,7 +11,7 @@ describe('tokenRefresh', () => {
 
     it('refreshToken 성공 시 에러 없이 완료', async () => {
         const { refreshToken } = await import('../../lib/tokenRefresh');
-        const mockUser = { getIdToken: vi.fn().mockResolvedValue('token') } as any;
+        const mockUser = { getIdToken: vi.fn().mockResolvedValue('token') } as unknown as Parameters<typeof refreshToken>[0];
 
         await expect(refreshToken(mockUser)).resolves.toBeUndefined();
         expect(mockUser.getIdToken).toHaveBeenCalledWith(true);
@@ -21,7 +21,7 @@ describe('tokenRefresh', () => {
         const { refreshTokenSilently } = await import('../../lib/tokenRefresh');
         const mockUser = {
             getIdToken: vi.fn().mockRejectedValue(new Error('auth/user-disabled')),
-        } as any;
+        } as unknown as Parameters<typeof refreshTokenSilently>[0];
 
         // 에러가 발생해도 throw 하지 않음
         await expect(refreshTokenSilently(mockUser)).resolves.toBeUndefined();
@@ -31,7 +31,7 @@ describe('tokenRefresh', () => {
         const { refreshToken } = await import('../../lib/tokenRefresh');
         const mockUser = {
             getIdToken: vi.fn().mockRejectedValue({ code: 'auth/user-disabled', message: 'disabled' }),
-        } as any;
+        } as unknown as Parameters<typeof refreshToken>[0];
 
         await expect(refreshToken(mockUser)).rejects.toEqual(
             expect.objectContaining({ code: 'auth/user-disabled' })

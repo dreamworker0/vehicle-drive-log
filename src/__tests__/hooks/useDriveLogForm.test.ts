@@ -56,16 +56,16 @@ const mockUpdateReservationStatus = vi.fn().mockResolvedValue({});
 const mockGetReservationById = vi.fn().mockResolvedValue(null);
 
 vi.mock('../../lib/firestore', () => ({
-    getVehicles: (...args: any[]) => mockGetVehicles(...args),
-    createDriveLog: (...args: any[]) => mockCreateDriveLog(...args),
-    updateDriveLog: (...args: any[]) => mockUpdateDriveLog(...args),
-    getFavorites: (...args: any[]) => mockGetFavorites(...args),
-    createFavorite: (...args: any[]) => mockCreateFavorite(...args),
-    getOrganizationMembers: (...args: any[]) => mockGetOrganizationMembers(...args),
-    getLastVehicleEndKm: (...args: any[]) => mockGetLastVehicleEndKm(...args),
-    getVehicleEndKmBefore: (...args: any[]) => mockGetVehicleEndKmBefore(...args),
-    updateReservationStatus: (...args: any[]) => mockUpdateReservationStatus(...args),
-    getReservationById: (...args: any[]) => mockGetReservationById(...args),
+    getVehicles: (...args: unknown[]) => mockGetVehicles(...args),
+    createDriveLog: (...args: unknown[]) => mockCreateDriveLog(...args),
+    updateDriveLog: (...args: unknown[]) => mockUpdateDriveLog(...args),
+    getFavorites: (...args: unknown[]) => mockGetFavorites(...args),
+    createFavorite: (...args: unknown[]) => mockCreateFavorite(...args),
+    getOrganizationMembers: (...args: unknown[]) => mockGetOrganizationMembers(...args),
+    getLastVehicleEndKm: (...args: unknown[]) => mockGetLastVehicleEndKm(...args),
+    getVehicleEndKmBefore: (...args: unknown[]) => mockGetVehicleEndKmBefore(...args),
+    updateReservationStatus: (...args: unknown[]) => mockUpdateReservationStatus(...args),
+    getReservationById: (...args: unknown[]) => mockGetReservationById(...args),
 }));
 
 vi.mock('../../lib/firebase', () => ({ db: {}, default: {} }));
@@ -120,7 +120,7 @@ describe('useDriveLogForm', () => {
         });
 
         act(() => {
-            result.current.handleFavoriteSelect({ name: '서울역', address: '서울특별시 용산구' } as any);
+            result.current.handleFavoriteSelect({ name: '서울역', address: '서울특별시 용산구' } as Parameters<typeof result.current.handleFavoriteSelect>[0]);
         });
 
         expect(result.current.form.destination).toBe('서울특별시 용산구');
@@ -140,13 +140,13 @@ describe('useDriveLogForm', () => {
 
         // 추가
         act(() => {
-            result.current.togglePassenger({ id: 'member1', name: '김철수' } as any);
+            result.current.togglePassenger({ id: 'member1', name: '김철수' } as Parameters<typeof result.current.togglePassenger>[0]);
         });
         expect(result.current.selectedPassengers).toHaveLength(1);
 
         // 제거
         act(() => {
-            result.current.togglePassenger({ id: 'member1', name: '김철수' } as any);
+            result.current.togglePassenger({ id: 'member1', name: '김철수' } as Parameters<typeof result.current.togglePassenger>[0]);
         });
         expect(result.current.selectedPassengers).toHaveLength(0);
     });
@@ -160,7 +160,7 @@ describe('useDriveLogForm', () => {
 
         // 차량 미선택 상태에서 제출
         await act(async () => {
-            await result.current.handleSubmit({ preventDefault: () => { } } as any);
+            await result.current.handleSubmit({ preventDefault: () => { } } as React.FormEvent);
         });
 
         expect(mockShowToast).toHaveBeenCalledWith(

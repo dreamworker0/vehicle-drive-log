@@ -15,7 +15,7 @@ import useTimelineDrag from '../../hooks/useTimelineDrag';
 import { isVehicleBlocked } from '../../lib/vehicleUtils';
 import type { Vehicle } from '../../types/vehicle';
 import type { Reservation } from '../../types/reservation';
-import type { User } from '../../types/user';
+
 
 // hourLabels는 동적 시작점에 따라 컴포넌트 내부에서 계산
 
@@ -27,7 +27,7 @@ interface VehicleTimelineBarProps {
     isToday: boolean;
     onEdit?: (res: Reservation) => void;
     onCancel?: (resId: string) => void;
-    user: User | null;
+    user: { uid?: string; id?: string } | null;
     isAdmin: boolean;
     setShowForm?: (show: boolean) => void;
 }

@@ -19,13 +19,14 @@ export default function LoginPage() {
         try {
             await signInWithGoogle();
             // App.jsx에서 역할에 따라 자동 라우팅됨
-        } catch (err: any) {
-            if (err?.code === 'auth/user-disabled') {
+        } catch (err: unknown) {
+            const firebaseErr = err as { code?: string; message?: string };
+            if (firebaseErr.code === 'auth/user-disabled') {
                 setError('계정이 비활성화되었습니다. 기관 관리자에게 문의하세요.');
             } else {
                 setError('로그인에 실패했습니다. 다시 시도해주세요.');
             }
-            console.error('Google 로그인 실패:', err.code, err.message, err);
+            console.error('Google 로그인 실패:', firebaseErr.code, firebaseErr.message, err);
         } finally {
             setLoading(false);
         }

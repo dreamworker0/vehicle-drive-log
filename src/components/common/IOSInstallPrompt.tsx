@@ -11,7 +11,7 @@ const DISMISS_DAYS = 7;
 function isIOSSafari() {
     const ua = navigator.userAgent;
     const isIOS = /iPhone|iPad|iPod/.test(ua);
-    const isStandalone = window.matchMedia?.('(display-mode: standalone)')?.matches || (navigator as any).standalone;
+    const isStandalone = window.matchMedia?.('(display-mode: standalone)')?.matches || (navigator as unknown as { standalone?: boolean }).standalone;
     // iOS Chrome, Firefox 등은 제외 (Safari만 홈화면 추가 지원)
     const isSafari = /Safari/.test(ua) && !/CriOS|FxiOS|OPiOS|EdgiOS/.test(ua);
     return isIOS && isSafari && !isStandalone;

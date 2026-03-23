@@ -5,6 +5,27 @@
 
 ---
 
+## Phase 38 — 코드 품질 강화 & 아키텍처 개선 🏗️
+
+> 2026-03-22~23
+
+### Changed
+- `any` 타입 전면 정리: recharts formatter/콜백, 테스트 파일 mock, Firestore 데이터 등 → 구체 타입으로 치환
+- ESLint `@typescript-eslint/no-explicit-any` 규칙 `warn`으로 활성화 + 잔존 경고 정리
+- 상태 관리 Zustand 마이그레이션: `ThemeContext` → `useThemeStore`, `FontSizeContext` → `useFontSizeStore`
+- CI에 E2E(Playwright) 테스트 통합 (`ci.yml` — Playwright 설치 + `npm run test:e2e`)
+- `README.md` 갱신: Cloud Functions 목록, 테스트 수치, 프로젝트 구조 최신화
+- `useReservationCalendar.ts` → `reservationUtils.ts` 순수 함수 추출 (`snapTo30`)
+- `ServiceDashboard.tsx` 리팩토링: 차트 7개 서브 컴포넌트 분리 + `useServiceDashboard.ts` 훅 추출
+- `FeedbackManagement.tsx` → `useFeedbackManagement.ts` 훅 추출
+
+### Fixed
+- TypeScript 컴파일 에러 전수 해결 (`any` 리팩토링 후속)
+- `useEmployeeManager` 테스트 `window is not defined` 에러 수정 (firebase/analytics mock 추가)
+- CI 파이프라인 안정화: E2E 테스트 CI 환경 분기 처리
+
+---
+
 ## Phase 37 — 카카오 알림톡 연동 & 운영 개선 📱
 
 > 2026-03-16

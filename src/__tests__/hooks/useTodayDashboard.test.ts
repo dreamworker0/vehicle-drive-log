@@ -37,12 +37,12 @@ const mockUpdateReservationStatus = vi.fn().mockResolvedValue({});
 const mockCancelReservation = vi.fn().mockResolvedValue({});
 
 vi.mock('../../lib/firestore', () => ({
-    getVehicles: (...args: any[]) => mockGetVehicles(...args),
-    getTodayReservations: (...args: any[]) => mockGetTodayReservations(...args),
-    getWeekReservations: (...args: any[]) => mockGetWeekReservations(...args),
-    updateReservationStatus: (...args: any[]) => mockUpdateReservationStatus(...args),
-    cancelReservation: (...args: any[]) => mockCancelReservation(...args),
-    getMyDriveLogs: (...args: any[]) => mockGetMyDriveLogs(...args),
+    getVehicles: (...args: unknown[]) => mockGetVehicles(...args),
+    getTodayReservations: (...args: unknown[]) => mockGetTodayReservations(...args),
+    getWeekReservations: (...args: unknown[]) => mockGetWeekReservations(...args),
+    updateReservationStatus: (...args: unknown[]) => mockUpdateReservationStatus(...args),
+    cancelReservation: (...args: unknown[]) => mockCancelReservation(...args),
+    getMyDriveLogs: (...args: unknown[]) => mockGetMyDriveLogs(...args),
 }));
 
 vi.mock('../../lib/firebase', () => ({ db: {}, auth: { currentUser: null }, default: {} }));

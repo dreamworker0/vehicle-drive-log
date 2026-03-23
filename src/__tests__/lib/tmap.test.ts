@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 vi.stubGlobal('import', { meta: { env: { VITE_TMAP_API_KEY: 'test-key', PROD: false } } });
 
 // 모듈 상태 초기화를 위해 동적 import
-let isTmapCoolingDown: any, isTmapAvailable: any, parseDestinations: any, MAX_DESTINATIONS: any;
+let isTmapCoolingDown: () => boolean, isTmapAvailable: () => boolean, parseDestinations: (s: string) => string[], MAX_DESTINATIONS: number;
 
 beforeEach(async () => {
     vi.resetModules();
@@ -47,7 +47,7 @@ describe('parseDestinations', () => {
     });
 
     it('null은 빈 배열을 반환한다', () => {
-        expect(parseDestinations(null)).toEqual([]);
+        expect(parseDestinations(null as unknown as string)).toEqual([]);
     });
 
     it('공백만 있으면 빈 배열을 반환한다', () => {

@@ -42,7 +42,7 @@ describe('Firestore 유틸리티 함수', () => {
                 { id: 'log1', data: () => ({ destination: '서울역', driverUid: 'user1' }) },
                 { id: 'log2', data: () => ({ destination: '강남역', driverUid: 'user2' }) },
             ];
-            (getDocs as any).mockResolvedValue({ docs: mockDocs });
+            vi.mocked(getDocs).mockResolvedValue({ docs: mockDocs } as ReturnType<typeof getDocs> extends Promise<infer R> ? R : never);
 
             const { getDriveLogs } = await import('../../lib/firestore');
             const result = await getDriveLogs('org1');
@@ -59,7 +59,7 @@ describe('Firestore 유틸리티 함수', () => {
             const mockDocs = [
                 { id: 'log1', data: () => ({ destination: '시청', driverUid: 'user1' }) },
             ];
-            (getDocs as any).mockResolvedValue({ docs: mockDocs });
+            vi.mocked(getDocs).mockResolvedValue({ docs: mockDocs } as ReturnType<typeof getDocs> extends Promise<infer R> ? R : never);
 
             const { getMyDriveLogs } = await import('../../lib/firestore');
             const result = await getMyDriveLogs('org1', 'user1', 10);
@@ -71,7 +71,7 @@ describe('Firestore 유틸리티 함수', () => {
 
     describe('createDriveLog', () => {
         it('운행일지를 생성한다', async () => {
-            (addDoc as any).mockResolvedValue({ id: 'newLog1' });
+            vi.mocked(addDoc).mockResolvedValue({ id: 'newLog1' } as ReturnType<typeof addDoc> extends Promise<infer R> ? R : never);
 
             const { createDriveLog } = await import('../../lib/firestore');
             const _result = await createDriveLog({
@@ -90,7 +90,7 @@ describe('Firestore 유틸리티 함수', () => {
                 { id: 'v1', data: () => ({ displayName: '소나타2744', plateNumber: '12가3456', fuelType: 'gasoline' }) },
                 { id: 'v2', data: () => ({ displayName: '아이오닉5', plateNumber: '78나9012', fuelType: 'electric' }) },
             ];
-            (getDocs as any).mockResolvedValue({ docs: mockDocs });
+            vi.mocked(getDocs).mockResolvedValue({ docs: mockDocs } as ReturnType<typeof getDocs> extends Promise<infer R> ? R : never);
 
             const { getVehicles } = await import('../../lib/firestore');
             const result = await getVehicles('org1');
@@ -103,7 +103,7 @@ describe('Firestore 유틸리티 함수', () => {
 
     describe('createReservation', () => {
         it('차량 예약을 생성한다', async () => {
-            (addDoc as any).mockResolvedValue({ id: 'res1' });
+            vi.mocked(addDoc).mockResolvedValue({ id: 'res1' } as ReturnType<typeof addDoc> extends Promise<infer R> ? R : never);
 
             const { createReservation } = await import('../../lib/firestore');
             await createReservation({
@@ -116,27 +116,27 @@ describe('Firestore 유틸리티 함수', () => {
             });
 
             expect(addDoc).toHaveBeenCalled();
-            const callArgs = (addDoc as any).mock.calls[0][1];
+            const callArgs = vi.mocked(addDoc).mock.calls[0][1] as unknown as Record<string, unknown>;
             expect(callArgs.status).toBe('reserved');
         });
     });
 
     describe('cancelReservation', () => {
         it('예약을 취소 처리한다', async () => {
-            (updateDoc as any).mockResolvedValue(undefined);
+            vi.mocked(updateDoc).mockResolvedValue(undefined);
 
             const { cancelReservation } = await import('../../lib/firestore');
             await cancelReservation('res1');
 
             expect(updateDoc).toHaveBeenCalled();
-            const callArgs = (updateDoc as any).mock.calls[0][1];
+            const callArgs = vi.mocked(updateDoc).mock.calls[0][1] as unknown as Record<string, unknown>;
             expect(callArgs.status).toBe('cancelled');
         });
     });
 
     describe('createFeedback', () => {
         it('피드백을 생성한다', async () => {
-            (addDoc as any).mockResolvedValue({ id: 'fb1' });
+            vi.mocked(addDoc).mockResolvedValue({ id: 'fb1' } as ReturnType<typeof addDoc> extends Promise<infer R> ? R : never);
 
             const { createFeedback } = await import('../../lib/firestore');
             await createFeedback({
@@ -148,7 +148,7 @@ describe('Firestore 유틸리티 함수', () => {
             });
 
             expect(addDoc).toHaveBeenCalled();
-            const callArgs = (addDoc as any).mock.calls[0][1];
+            const callArgs = vi.mocked(addDoc).mock.calls[0][1] as unknown as Record<string, unknown>;
             expect(callArgs.status).toBe('unread');
             expect(callArgs.message).toBe('기능 개선 요청');
         });
@@ -159,7 +159,7 @@ describe('Firestore 유틸리티 함수', () => {
             const mockDocs = [
                 { id: 'fav1', data: () => ({ name: '김OO 어르신 댁', address: '서울시 강남구', userId: 'user1' }) },
             ];
-            (getDocs as any).mockResolvedValue({ docs: mockDocs });
+            vi.mocked(getDocs).mockResolvedValue({ docs: mockDocs } as ReturnType<typeof getDocs> extends Promise<infer R> ? R : never);
 
             const { getFavorites } = await import('../../lib/firestore');
             const result = await getFavorites('user1');

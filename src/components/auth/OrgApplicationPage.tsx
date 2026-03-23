@@ -159,7 +159,7 @@ export default function OrgApplicationPage() {
                                 )}
                             </div>
                             <input
-                                ref={fileInputRef as any}
+                                ref={fileInputRef}
                                 type="file"
                                 accept="image/jpeg,image/png,application/pdf"
                                 onChange={handleImageChange}

@@ -2,7 +2,7 @@
  * CalendarGrid — 월별 달력 그리드
  * ReservationCalendar에서 추출된 서브 컴포넌트
  */
-import { CalendarDay } from '../../types/reservation';
+import type { CalendarDay, Reservation } from '../../types/reservation';
 
 interface Props {
     calendarDays: (CalendarDay | null)[];
@@ -74,7 +74,7 @@ export default function CalendarGrid({
                             {hasRes && (
                                 <div className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 flex gap-0.5`}>
                                     {day.reservations.slice(0, 3).map((r, idx) => {
-                                        const isGroup = !!(r as any).groupId;
+                                        const isGroup = !!r.groupId;
                                         return (
                                             <div key={idx} className={`w-1 h-1 rounded-full ${
                                                 isSelected ? 'bg-white dark:bg-surface-800' :

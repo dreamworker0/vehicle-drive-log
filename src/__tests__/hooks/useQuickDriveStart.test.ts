@@ -96,7 +96,7 @@ describe('useQuickDriveStart', () => {
         await waitFor(() => expect(result.current.loading).toBe(false));
 
         act(() => {
-            result.current.handleFavoriteSelect(mockFavorites[0] as any);
+            result.current.handleFavoriteSelect(mockFavorites[0] as Parameters<typeof result.current.handleFavoriteSelect>[0]);
         });
 
         expect(result.current.form.destination).toBe('서울시 강남구 역삼동 123');

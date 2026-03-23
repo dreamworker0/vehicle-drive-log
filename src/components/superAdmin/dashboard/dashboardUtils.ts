@@ -155,3 +155,20 @@ export interface FirstEmployeeStatsData {
 }
 
 export type SortKey = 'name' | 'users' | 'vehicles' | 'logs' | 'lastDriveDate';
+
+/**
+ * recharts Tooltip formatter 헬퍼.
+ * `Formatter<ValueType, NameType>` 시그니처(`value: ValueType | undefined`)와 호환되도록
+ * undefined 처리를 중앙화한다.
+ */
+export function tooltipFormatter(suffix: string, label: string) {
+    return (value: number | string | readonly (number | string)[] | undefined) =>
+        [`${value ?? ''}${suffix}`, label] as const;
+}
+
+/** 숫자 로케일 포맷 + suffix 형태 formatter */
+export function tooltipLocaleFormatter(suffix: string, label: string) {
+    return (value: number | string | readonly (number | string)[] | undefined) =>
+        [`${Number(value ?? 0).toLocaleString()}${suffix}`, label] as const;
+}
+

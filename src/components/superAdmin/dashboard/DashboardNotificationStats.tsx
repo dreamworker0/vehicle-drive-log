@@ -3,6 +3,8 @@ import {
     Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import { tooltipStyle } from './dashboardUtils';
+import type { ValueType, NameType } from 'recharts/types/component/DefaultTooltipContent';
+import type { TooltipContentProps } from 'recharts/types/component/Tooltip';
 import type { NotifSummaryData } from './dashboardUtils';
 
 interface Props {
@@ -71,7 +73,7 @@ export default function DashboardNotificationStats({ notifSummary, dailyNotifSta
                                 axisLine={{ stroke: '#4b5563' }} interval={Math.ceil(dailyNotifStats.length / 8)} />
                             <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false} allowDecimals={false} />
                             <Tooltip {...tooltipStyle}
-                                content={({ active, payload, label }: any) => {
+                                content={({ active, payload, label }: TooltipContentProps<ValueType, NameType>) => {
                                     if (!active || !payload?.length) return null;
                                     const data = payload[0]?.payload;
                                     if (!data) return null;

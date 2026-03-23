@@ -70,7 +70,7 @@ describe('inAppBrowser', () => {
     });
 
     describe('openInExternalBrowser', () => {
-        let locationSpy: any;
+        let locationSpy: ReturnType<typeof vi.fn> | undefined;
 
         afterEach(() => {
             if (locationSpy) locationSpy = undefined;
@@ -80,8 +80,8 @@ describe('inAppBrowser', () => {
             vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 KAKAOTALK 26.1.6 iPhone', vendor: '' });
             // window.location.href 세터를 감시
             const hrefSetter = vi.fn();
-            delete (window as any).location;
-            (window as any).location = { href: 'https://vehicle-drive-log.web.app/login' };
+            delete (window as unknown as Record<string, unknown>).location;
+            (window as unknown as Record<string, unknown>).location = { href: 'https://vehicle-drive-log.web.app/login' };
             Object.defineProperty(window.location, 'href', { set: hrefSetter, get: () => 'https://vehicle-drive-log.web.app/login' });
 
             const { openInExternalBrowser } = await import('../../lib/inAppBrowser');
@@ -95,8 +95,8 @@ describe('inAppBrowser', () => {
         it('네이버 UA에서 naversearchapp:// 딥링크를 사용해야 한다', async () => {
             vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 NAVER(inapp;) iPhone', vendor: '' });
             const hrefSetter = vi.fn();
-            delete (window as any).location;
-            (window as any).location = { href: 'https://vehicle-drive-log.web.app/login' };
+            delete (window as unknown as Record<string, unknown>).location;
+            (window as unknown as Record<string, unknown>).location = { href: 'https://vehicle-drive-log.web.app/login' };
             Object.defineProperty(window.location, 'href', { set: hrefSetter, get: () => 'https://vehicle-drive-log.web.app/login' });
 
             const { openInExternalBrowser } = await import('../../lib/inAppBrowser');

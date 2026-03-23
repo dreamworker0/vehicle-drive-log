@@ -99,14 +99,14 @@ describe('useFuelLog', () => {
 
         // 다른 사람의 기록 수정 시도 → 경고 토스트
         act(() => {
-            result.current.handleEdit(mockRecords[1] as any);
+            result.current.handleEdit(mockRecords[1] as Parameters<typeof result.current.handleEdit>[0]);
         });
 
         expect(mockShowToast).toHaveBeenCalledWith('본인의 주유 기록만 수정할 수 있습니다.', 'warning');
 
         // 본인 기록 수정 → 폼에 데이터 채움
         act(() => {
-            result.current.handleEdit(mockRecords[0] as any);
+            result.current.handleEdit(mockRecords[0] as Parameters<typeof result.current.handleEdit>[0]);
         });
 
         expect(result.current.editingId).toBe('f1');
@@ -119,7 +119,7 @@ describe('useFuelLog', () => {
         await waitFor(() => expect(result.current.loading).toBe(false));
 
         act(() => {
-            result.current.handleEdit(mockRecords[0] as any);
+            result.current.handleEdit(mockRecords[0] as Parameters<typeof result.current.handleEdit>[0]);
         });
         expect(result.current.editingId).toBe('f1');
 

@@ -158,23 +158,23 @@ export default function DailyLogView() {
                                 주유 정보
                             </h3>
                             <div className="space-y-2">
-                                {fuelLogs.map((fuel: any, idx: number) => (
+                                {fuelLogs.map((fuel, idx) => (
                                     <div key={idx} className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
                                         <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg px-3 py-2">
                                             <span className="text-xs text-surface-400">주유원</span>
-                                            <p className="font-medium text-surface-900 dark:text-surface-100">{fuel.driverName || '-'}</p>
+                                            <p className="font-medium text-surface-900 dark:text-surface-100">{String(fuel.driverName || '-')}</p>
                                         </div>
                                         <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg px-3 py-2">
                                             <span className="text-xs text-surface-400">주유미터</span>
-                                            <p className="font-medium text-surface-900 dark:text-surface-100">{fuel.meterReading?.toLocaleString() || '-'} km</p>
+                                            <p className="font-medium text-surface-900 dark:text-surface-100">{fuel.meterReading ? Number(fuel.meterReading).toLocaleString() : '-'} km</p>
                                         </div>
                                         <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg px-3 py-2">
                                             <span className="text-xs text-surface-400">주유량</span>
-                                            <p className="font-medium text-surface-900 dark:text-surface-100">{fuel.fuelAmount || '-'} ℓ</p>
+                                            <p className="font-medium text-surface-900 dark:text-surface-100">{String(fuel.fuelAmount || '-')} ℓ</p>
                                         </div>
                                         <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg px-3 py-2">
                                             <span className="text-xs text-surface-400">주유금액</span>
-                                            <p className="font-medium text-surface-900 dark:text-surface-100">{fuel.fuelCost?.toLocaleString() || '-'} 원</p>
+                                            <p className="font-medium text-surface-900 dark:text-surface-100">{fuel.fuelCost ? Number(fuel.fuelCost).toLocaleString() : '-'} 원</p>
                                         </div>
                                     </div>
                                 ))}

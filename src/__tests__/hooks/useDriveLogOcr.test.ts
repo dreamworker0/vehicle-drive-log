@@ -27,7 +27,7 @@ describe('useDriveLogOcr', () => {
     const defaultProps = {
         isElectric: false,
         setForm: mockSetForm,
-        user: { uid: 'emp1', email: 'emp@test.com', displayName: '김직원' } as any,
+        user: { uid: 'emp1', email: 'emp@test.com', displayName: '김직원' } as Parameters<typeof useDriveLogOcr>[0]['user'],
         userData: { name: '김직원', organizationId: 'org1' },
         vehicleName: '소나타',
     };

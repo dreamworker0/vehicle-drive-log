@@ -45,17 +45,17 @@ const mockUpdateReservation = vi.fn().mockResolvedValue({});
 const mockCreateNotification = vi.fn().mockResolvedValue({});
 
 vi.mock('../../lib/firestore', () => ({
-    getVehicles: (...args: any[]) => mockGetVehicles(...args),
-    createReservationSafe: (...args: any[]) => mockCreateReservationSafe(...args),
-    cancelReservation: (...args: any[]) => mockCancelReservation(...args),
+    getVehicles: (...args: unknown[]) => mockGetVehicles(...args),
+    createReservationSafe: (...args: unknown[]) => mockCreateReservationSafe(...args),
+    cancelReservation: (...args: unknown[]) => mockCancelReservation(...args),
     cancelReservationGroup: vi.fn().mockResolvedValue(0),
     deleteReservationGroup: vi.fn().mockResolvedValue(0),
-    getFavorites: (...args: any[]) => mockGetFavorites(...args),
-    createFavorite: (...args: any[]) => mockCreateFavorite(...args),
-    getReservationsByDateRange: (...args: any[]) => mockGetReservationsByDateRange(...args),
-    getOrganizationMembers: (...args: any[]) => mockGetOrganizationMembers(...args),
-    updateReservation: (...args: any[]) => mockUpdateReservation(...args),
-    createNotification: (...args: any[]) => mockCreateNotification(...args),
+    getFavorites: (...args: unknown[]) => mockGetFavorites(...args),
+    createFavorite: (...args: unknown[]) => mockCreateFavorite(...args),
+    getReservationsByDateRange: (...args: unknown[]) => mockGetReservationsByDateRange(...args),
+    getOrganizationMembers: (...args: unknown[]) => mockGetOrganizationMembers(...args),
+    updateReservation: (...args: unknown[]) => mockUpdateReservation(...args),
+    createNotification: (...args: unknown[]) => mockCreateNotification(...args),
     getOrganization: vi.fn().mockResolvedValue({ id: 'org1', address: '서울시 용산구' }),
 }));
 

@@ -21,7 +21,7 @@ describe('OCR 모듈', () => {
     it('ocrDashboard 호출 시 Cloud Function을 호출해야 한다', async () => {
         const { httpsCallable } = await import('firebase/functions');
         const mockCallable = vi.fn().mockResolvedValue({ data: { km: 12345, battery: null, raw: '12345' } });
-        (httpsCallable as any).mockReturnValue(mockCallable);
+        vi.mocked(httpsCallable).mockReturnValue(mockCallable as unknown as ReturnType<typeof httpsCallable>);
 
         const { ocrDashboard } = await import('../../lib/ocr.js');
         const result = await ocrDashboard('base64data', 'image/jpeg', false);

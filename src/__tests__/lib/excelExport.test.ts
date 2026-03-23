@@ -26,7 +26,7 @@ describe('downloadDriveLogsExcel', () => {
 
     it('null이면 onError를 호출하고 false를 반환해야 한다', async () => {
         const onError = vi.fn();
-        const result = await downloadDriveLogsExcel(null as any, '테스트', { onError });
+        const result = await downloadDriveLogsExcel(null as unknown as Parameters<typeof downloadDriveLogsExcel>[0], '테스트', { onError });
         expect(onError).toHaveBeenCalled();
         expect(result).toBe(false);
     });

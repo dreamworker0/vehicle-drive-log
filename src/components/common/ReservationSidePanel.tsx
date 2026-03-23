@@ -40,9 +40,9 @@ interface Props {
     submitting: boolean;
     editingReservation: Reservation | null;
     editingGroupId?: string | null;
-    routeInfo: any;
+    routeInfo: { distance: number; duration: number; tollFee?: number; isMulti?: boolean; freeRoadRoute?: { distance: number; duration: number; tollFee: number } } | null;
     routeLoading: boolean;
-    user: any; // User Doc or Auth User
+    user: { uid?: string; id?: string } | null;
     isAdmin?: boolean;
     members?: UserDoc[];
     getCurrentTimeStr: () => string;

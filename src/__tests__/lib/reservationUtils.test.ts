@@ -17,7 +17,7 @@ import type { Reservation } from '../../types/reservation';
 
 describe('reservationUtils', () => {
     // 시간 관련 테스트는 Date를 모킹
-    let originalDate: any;
+    let originalDate: DateConstructor;
 
     beforeEach(() => {
         originalDate = globalThis.Date;
@@ -29,11 +29,12 @@ describe('reservationUtils', () => {
 
     const mockDate = (isoString: string) => {
         const fixed = new originalDate(isoString);
-        (globalThis as any).Date = class extends (originalDate as any) {
-            constructor(...args: any[]) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (globalThis as unknown as Record<string, unknown>).Date = class extends (originalDate as unknown as { new(...args: unknown[]): Date }) {
+            constructor(...args: unknown[]) {
                 super(...args);
                 if (args.length === 0) return fixed;
-                return new originalDate(...args);
+                return new originalDate(...(args as [string]));
             }
             static now() { return fixed.getTime(); }
         };
@@ -132,7 +133,7 @@ describe('reservationUtils', () => {
         it('자기 자신은 제외한다 (수정 모드)', () => {
             const result = findOverlappingReservation(reservations, {
                 vehicleId: 'v1', date: '2026-02-27', startTime: '09:30', endTime: '10:30',
-                excludeId: 'r1' as any,
+                excludeId: 'r1' as Reservation['id'],
             });
             expect(result).toBeNull();
         });

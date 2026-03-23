@@ -50,8 +50,8 @@ export default function InviteCodePage() {
 
             // onSnapshot이 자동으로 userData를 업데이트하므로 잠시 대기
             await new Promise(resolve => setTimeout(resolve, 1000));
-        } catch (err: any) {
-            const message = err?.message || '';
+        } catch (err: unknown) {
+            const message = err instanceof Error ? err.message : '';
             // Cloud Function에서 반환한 에러 메시지 그대로 표시
             if (message.includes('유효하지 않은') || message.includes('초대 코드')) {
                 setError('유효하지 않은 초대 코드입니다.');
@@ -62,7 +62,7 @@ export default function InviteCodePage() {
             } else {
                 setError('오류가 발생했습니다. 다시 시도해주세요.');
             }
-            console.debug('[InviteCode] 가입 실패:', err?.message || err);
+            console.debug('[InviteCode] 가입 실패:', message || err);
         } finally {
             setLoading(false);
         }
