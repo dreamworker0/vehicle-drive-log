@@ -9,7 +9,7 @@ vi.mock('firebase/firestore', () => ({
     limit: vi.fn(),
     getDocs: vi.fn(),
     addDoc: vi.fn(),
-    doc: vi.fn(),
+    doc: vi.fn(() => ({ id: 'mock-doc-id' })),
     getDoc: vi.fn(),
     setDoc: vi.fn(),
     updateDoc: vi.fn(),

@@ -37,7 +37,7 @@ describe('useRetry', () => {
         });
 
         expect(mockShowToast).toHaveBeenCalledWith(
-            '네트워크 오류가 발생했습니다.',
+            '네트워크 통신 중입니다.',
             'error',
             expect.objectContaining({
                 actionLabel: expect.stringContaining('재시도'),

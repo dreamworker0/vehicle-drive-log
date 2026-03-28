@@ -123,7 +123,7 @@ describe('useTodayDashboard', () => {
 
         result.current.navigateToReservations();
 
-        expect(mockNavigate).toHaveBeenCalledWith('/employee/reservations', { state: { openForm: true } });
+        expect(mockNavigate).toHaveBeenCalledWith('/employee/reservations', { state: { defaultVehicleId: 'v1', openForm: true } });
     });
 
     it('todayLabel이 한국어 형식이다', async () => {
