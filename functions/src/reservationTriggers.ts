@@ -6,13 +6,12 @@ import { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } from "firebas
 import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent } from "./calendarSync";
 import { sendPushToOrg, sendPushToUser, createInAppNotification } from "./sendNotification";
 
-const db = getFirestore();
-
 /**
  * 차량의 googleCalendarId를 조회
  */
 async function getVehicleCalendarId(vehicleId: string): Promise<string | null> {
     if (!vehicleId) return null;
+    const db = getFirestore();
     const snap = await db.collection("vehicles").doc(vehicleId).get();
     if (!snap.exists) return null;
     const calendarId = (snap.data()?.googleCalendarId as string) || null;
@@ -44,7 +43,7 @@ export const onReservationCreated = onDocumentCreated("reservations/{reservation
         const eventId = await createCalendarEvent(calendarId, reservation as any);
 
         // 생성된 이벤트 ID를 예약 문서에 저장
-        await db.collection("reservations").doc(reservationId).update({
+        await getFirestore().collection("reservations").doc(reservationId).update({
             calendarEventId: eventId,
         });
 
