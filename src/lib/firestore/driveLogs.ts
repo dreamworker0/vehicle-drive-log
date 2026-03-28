@@ -4,7 +4,7 @@
 import {
     doc, updateDoc, deleteDoc,
     collection, query, where, getDocs, addDoc,
-    orderBy, limit, serverTimestamp,
+    orderBy, limit, serverTimestamp, getCountFromServer, Timestamp,
     type QueryConstraint,
     type DocumentData,
 } from 'firebase/firestore';
@@ -50,10 +50,17 @@ export const createDriveLog = async (data: Record<string, unknown>) => {
         }
     }
 
-    const docRef = await addDoc(collection(db, 'driveLogs'), {
-        ...data,
-        createdAt: serverTimestamp(),
-    });
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
+    // Use a deterministic generated ID for offline idempotency
+    const docRef = doc(collection(db, 'driveLogs'));
+    const finalData = { ...data, createdAt: serverTimestamp() };
+    const promise = addDoc(collection(db, 'driveLogs'), finalData);
+
+    if (isOffline) {
+        import('../offlineSync').then(({ queueOfflineAction }) => queueOfflineAction('CREATE_DRIVELOG', { ...data, id: docRef.id }));
+    }
+    await promise;
 
     // 차량의 누적 Km 갱신 — 이 기록 이후에 같은 차량의 기록이 없을 때만
     const isEffectivelyRetroactive = data.isRetroactive ||
@@ -171,24 +178,49 @@ export const syncNextLogStartKm = async (orgId: string, vehicleId: string, after
     return { ...firstResult, chainCount };
 };
 
-// 운행일지 목록 조회 (커서 기반 페이지네이션)
-export const getDriveLogs = async (orgId: string, filters: { limit?: number; startAfter?: unknown; since?: Date } = {}) => {
+// 운행일지 목록 조회 (커서 기반 페이지네이션 및 서버사이드 필터링 적용)
+export const getDriveLogs = async (
+    orgId: string, 
+    filters: { limit?: number; startAfter?: unknown; since?: Date; vehicleId?: string; driverUid?: string; startDate?: string; endDate?: string } = {}
+) => {
     const pageSize = filters.limit || 50;
-    const constraints: QueryConstraint[] = [
-        where('organizationId', '==', orgId),
-        orderBy('timestamp', 'desc'),
-        limit(pageSize),
-    ];
+    const constraints: QueryConstraint[] = [];
+    
+    // 조건: 운전자가 지정된 경우
+    if (filters.driverUid) {
+        constraints.push(where('driverUid', '==', filters.driverUid));
+    }
+    
+    // 조건: 소속
+    constraints.push(where('organizationId', '==', orgId));
 
-    // 기간 필터: since 이후 데이터만 조회 (서버 쿼리 레벨)
-    if (filters.since) {
-        constraints.splice(1, 0, where('timestamp', '>=', filters.since));
+    // 조건: 차량
+    if (filters.vehicleId) {
+        constraints.push(where('vehicleId', '==', filters.vehicleId));
     }
 
-    // 커서 기반 페이지네이션: 이전 마지막 문서 이후부터 조회
+    // 날짜 조건 (startDate, endDate 결합 => timestamp 범위)
+    if (filters.startDate || filters.endDate || filters.since) {
+        if (filters.since) {
+            constraints.push(where('timestamp', '>=', filters.since));
+        } else {
+            if (filters.startDate) {
+                constraints.push(where('timestamp', '>=', new Date(`${filters.startDate}T00:00:00`)));
+            }
+            if (filters.endDate) {
+                constraints.push(where('timestamp', '<=', new Date(`${filters.endDate}T23:59:59.999`)));
+            }
+        }
+    }
+
+    // 정렬과 Limit
+    constraints.push(orderBy('timestamp', 'desc'));
+    constraints.push(limit(pageSize));
+
+    // 커서
     if (filters.startAfter) {
         const { startAfter: startAfterFn } = await import('firebase/firestore');
-        constraints.splice(filters.since ? 3 : 2, 0, startAfterFn(filters.startAfter as DocumentData));
+        constraints.push(startAfterFn(filters.startAfter as DocumentData));
     }
 
     const q = query(collection(db, 'driveLogs'), ...constraints);
@@ -200,6 +232,47 @@ export const getDriveLogs = async (orgId: string, filters: { limit?: number; sta
         lastDoc: snap.docs[snap.docs.length - 1] || null,
         hasMore: snap.docs.length === pageSize,
     };
+};
+
+/** 특정 기간/조건의 모든 운행일지를 엑셀/PDF 다운로드 용도로 한 번에 가져오기 */
+export const getAllDriveLogsForExport = async (
+    orgId: string,
+    filters: { vehicleId?: string; driverUid?: string; startDate?: string; endDate?: string }
+) => {
+    const constraints: QueryConstraint[] = [];
+    if (filters.driverUid) constraints.push(where('driverUid', '==', filters.driverUid));
+    constraints.push(where('organizationId', '==', orgId));
+    if (filters.vehicleId) constraints.push(where('vehicleId', '==', filters.vehicleId));
+    
+    if (filters.startDate) constraints.push(where('timestamp', '>=', new Date(`${filters.startDate}T00:00:00`)));
+    if (filters.endDate) constraints.push(where('timestamp', '<=', new Date(`${filters.endDate}T23:59:59.999`)));
+    
+    constraints.push(orderBy('timestamp', 'desc'));
+
+    const q = query(collection(db, 'driveLogs'), ...constraints);
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DriveLog);
+};
+
+/**
+ * 대시보드 통계용: 서버 측 카운트 쿼리 수행
+ */
+export const getDriveLogCount = async (
+    orgId: string, 
+    period?: { startDate?: string; endDate?: string }
+): Promise<number> => {
+    const constraints: QueryConstraint[] = [where('organizationId', '==', orgId)];
+    
+    if (period?.startDate) {
+        constraints.push(where('timestamp', '>=', new Date(`${period.startDate}T00:00:00`)));
+    }
+    if (period?.endDate) {
+        constraints.push(where('timestamp', '<=', new Date(`${period.endDate}T23:59:59.999`)));
+    }
+    
+    const q = query(collection(db, 'driveLogs'), ...constraints);
+    const snapshot = await getCountFromServer(q);
+    return snapshot.data().count;
 };
 
 // 내 운행일지 목록 조회
@@ -217,10 +290,14 @@ export const getMyDriveLogs = async (orgId: string, uid: string, limitCount = 30
 
 // 운행일지 수정
 export const updateDriveLog = async (logId: string, data: Record<string, unknown>) => {
-    await updateDoc(doc(db, 'driveLogs', logId), {
-        ...data,
-        editedAt: serverTimestamp(),
-    });
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+    const finalData = { ...data, editedAt: serverTimestamp() };
+    const promise = updateDoc(doc(db, 'driveLogs', logId), finalData);
+
+    if (isOffline) {
+        import('../offlineSync').then(({ queueOfflineAction }) => queueOfflineAction('UPDATE_DRIVELOG', { ...data, id: logId }));
+    }
+    await promise;
     // endKm이 변경되고 vehicleId가 있으면 차량 currentKm 갱신
     if (data.endKm && data.vehicleId) {
         await updateDoc(doc(db, 'vehicles', data.vehicleId as string), {

@@ -19,6 +19,7 @@ const app = initializeApp(firebaseConfig);
 // === Analytics 지연 초기화 (초기 번들에서 ~20KB 제외) ===
 let _analytics: ReturnType<typeof import('firebase/analytics').getAnalytics> | null = null;
 function initAnalyticsLazy() {
+    if (typeof window === 'undefined') return;
     import('firebase/analytics').then(({ getAnalytics }) => {
         _analytics = getAnalytics(app);
     }).catch(() => { /* Analytics 로드 실패 무시 */ });
@@ -26,6 +27,7 @@ function initAnalyticsLazy() {
 
 // === App Check 지연 초기화 (초기 번들에서 ~30KB 제외) ===
 function initAppCheckLazy() {
+    if (typeof window === 'undefined') return;
     const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY;
     if (!recaptchaSiteKey) {
         console.warn('[AppCheck] VITE_RECAPTCHA_ENTERPRISE_SITE_KEY 미설정 — App Check 비활성화');
@@ -149,6 +151,9 @@ let db: ReturnType<typeof getFirestore>;
 
 function initFirestoreSync() {
     try {
+        if (typeof window === 'undefined') {
+            return initializeFirestore(app, { localCache: memoryLocalCache() });
+        }
         return initializeFirestore(app, {
             localCache: persistentLocalCache({
                 cacheSizeBytes: 25 * 1024 * 1024, // 25MB 제한 (저사양 기기 QuotaExceeded 예방)
@@ -176,7 +181,9 @@ db = initFirestoreSync()!;
 // 2단계: 비동기로 IndexedDB 검사 후 사용 불가 시 memoryLocalCache로 재초기화
 checkIndexedDBAvailability().then((available) => {
     if (!available && db) {
-        console.warn('[Firestore] IndexedDB 사용 불가 → memoryLocalCache로 재초기화');
+        if (typeof window !== 'undefined') {
+            console.warn('[Firestore] IndexedDB 사용 불가 → memoryLocalCache로 재초기화');
+        }
         try {
             db = initializeFirestore(app, { localCache: memoryLocalCache() });
         } catch {

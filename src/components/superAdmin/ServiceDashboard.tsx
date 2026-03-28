@@ -28,6 +28,8 @@ export default function ServiceDashboard() {
         firstEmployeeDist,
         firstEmployeeTrend,
         inputMethodStats,
+        quickDriveStats,
+        quickDriveRatio,
         orgSizeDistribution,
         fuelTypeStats,
         vehicleTypeStats,
@@ -101,6 +103,8 @@ export default function ServiceDashboard() {
                 firstEmployeeDist={firstEmployeeDist}
                 firstEmployeeTrend={firstEmployeeTrend}
                 inputMethodStats={inputMethodStats}
+                quickDriveStats={quickDriveStats}
+                quickDriveRatio={quickDriveRatio}
                 orgSizeDistribution={orgSizeDistribution}
                 fuelTypeStats={fuelTypeStats}
                 vehicleTypeStats={vehicleTypeStats}

@@ -8,36 +8,27 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage, auth as firebaseAuth } from '../lib/firebase';
 import { signInAnonymously } from 'firebase/auth';
 import { logout } from '../lib/auth';
+import imageCompression from 'browser-image-compression';
 
 // 허용 파일 타입
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 /**
- * 이미지 압축 (최대 1200px, JPEG 70%)
+ * 이미지 압축 (최대 1200px, JPEG)
  */
-function compressImage(file: File) {
-    return new Promise((resolve) => {
-        const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
-        const img = new Image();
-        img.onload = () => {
-            const maxSize = 1200;
-            let { width, height } = img;
-            if (width > height && width > maxSize) {
-                height = (height * maxSize) / width;
-                width = maxSize;
-            } else if (height > maxSize) {
-                width = (width * maxSize) / height;
-                height = maxSize;
-            }
-            canvas.width = width;
-            canvas.height = height;
-            ctx!.drawImage(img, 0, 0, width, height);
-            canvas.toBlob(resolve, 'image/jpeg', 0.7);
-        };
-        img.src = URL.createObjectURL(file);
-    });
+async function compressImage(file: File): Promise<File> {
+    try {
+        return await imageCompression(file, {
+            maxSizeMB: 1,
+            maxWidthOrHeight: 1200,
+            useWebWorker: true,
+            fileType: 'image/jpeg'
+        });
+    } catch (e) {
+        console.error('이미지 압축 실패, 원본 반환:', e);
+        return file;
+    }
 }
 
 /**

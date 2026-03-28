@@ -29,20 +29,34 @@ if (DSN && !IS_TEST) {
     }
 }
 
+import { sendDiscordAlert } from "./discord";
+
 /**
  * Sentry에 에러를 전송한다.
  * DSN이 설정되지 않거나 테스트 환경이면 아무것도 하지 않는다.
  */
 export function captureError(error: unknown, context: Record<string, unknown> = {}): void {
     if (!_sentry) return;
+    
+    let errorMessage = "Unknown Error";
+
     if (error instanceof Error) {
+        errorMessage = error.message;
         _sentry.captureException(error, { extra: context });
     } else {
-        _sentry.captureMessage(String(error), {
+        errorMessage = String(error);
+        _sentry.captureMessage(errorMessage, {
             level: "error",
             extra: context,
         });
     }
+
+    // 디스코드 웹훅 알림 병행 발송 (Fire-and-forget)
+    sendDiscordAlert({
+        title: "🚨 Cloud Functions Exception",
+        description: `**Error:** ${errorMessage}\n\n**Context:**\n\`\`\`json\n${JSON.stringify(context, null, 2)}\n\`\`\``.substring(0, 3999),
+        color: 16711680, // Red
+    }).catch(() => {});
 }
 
 /**

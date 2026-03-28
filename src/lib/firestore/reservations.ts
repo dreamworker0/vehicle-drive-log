@@ -141,3 +141,28 @@ export const deleteReservationGroup = async (groupId: string) => {
     );
     return active.length;
 };
+
+// 내 최근 예약 조회 (취소 제외, 최신 순 정렬하여 반환)
+// 복합 인덱스 생성을 피하기 위해 클라이언트 메모리에서 정렬 처리
+export const getMyRecentReservations = async (orgId: string, uid: string, limitCount = 50) => {
+    const q = query(
+        collection(db, 'reservations'),
+        where('organizationId', '==', orgId),
+        where('reservedByUid', '==', uid)
+    );
+    const snap = await getDocs(q);
+    return snap.docs
+        .map(d => ({ id: d.id, ...d.data() }) as DocumentData & { 
+            id: string; 
+            status?: string; 
+            date?: string; 
+            startTime?: string;
+            vehicleId?: string;
+            vehicleName?: string;
+            destination?: string;
+         })
+        .filter(r => r.status !== 'cancelled')
+        .sort((a, b) => ((b.date || '') + (b.startTime || '')).localeCompare((a.date || '') + (a.startTime || '')))
+        .slice(0, limitCount);
+};
+

@@ -145,6 +145,7 @@ describe('Firestore 유틸리티 함수', () => {
                 userName: '테스트',
                 imageUrls: [],
                 organizationId: 'org1',
+                authorUid: 'user1',
             });
 
             expect(addDoc).toHaveBeenCalled();

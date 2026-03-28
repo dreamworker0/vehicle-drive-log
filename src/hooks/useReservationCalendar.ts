@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import { useConfirm } from './useConfirm';
 import {
     getVehicles,
@@ -40,6 +40,7 @@ interface ReservationForm {
 export default function useReservationCalendar({ isAdmin = false } = {}) {
     const { user, userData } = useAuth();
     const [searchParams] = useSearchParams();
+    const location = useLocation();
     const { showToast } = useToast();
     const { confirm } = useConfirm();
 
@@ -126,14 +127,58 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
             .catch(err => console.error('Reservation fetch error:', err));
     }, [currentMonth, userData]);
 
-    // URL 파라미터 처리 (날짜 선택)
+    // URL 파라미터 처리 (날짜 선택) 및 라우트 state 처리 (패턴 prefill 등)
     useEffect(() => {
         const dateParam = searchParams.get('date');
         if (dateParam) {
             setSelectedDate(dateParam);
             setCurrentMonth(new Date(dateParam));
         }
-    }, [searchParams]);
+
+        const state = location.state as { openForm?: boolean; prefillPattern?: any; defaultVehicleId?: string } | null;
+        if (state?.prefillPattern && state.openForm) {
+            const p = state.prefillPattern;
+            setSelectedDate(p.date);
+            setCurrentMonth(new Date(p.date));
+            setForm({
+                vehicleId: p.vehicleId || '',
+                destination: p.destination || '',
+                purpose: '업무',
+                startTime: p.startTime || '',
+                endTime: p.endTime || '',
+            });
+            setShowForm(true);
+            window.history.replaceState({}, document.title);
+        } else if (state?.openForm) {
+            setShowForm(true);
+            setForm(prev => {
+                const newState = { ...prev };
+                if (!newState.vehicleId && state.defaultVehicleId) {
+                    newState.vehicleId = state.defaultVehicleId;
+                }
+                if (!newState.startTime && !newState.endTime) {
+                    const now = new Date();
+                    const snapped = snapTo30(now.getHours(), now.getMinutes());
+                    const startH = snapped.h;
+                    const startM = snapped.m;
+                    let endH = startH + 1;
+                    let endM = startM;
+                    if (endH >= 24) { endH = 23; endM = 59; }
+
+                    const defaultStart = `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`;
+                    const defaultEnd = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
+
+                    const targetDate = dateParam || format(new Date(), 'yyyy-MM-dd');
+                    const isTargetToday = targetDate === format(new Date(), 'yyyy-MM-dd');
+
+                    newState.startTime = isTargetToday ? defaultStart : '09:00';
+                    newState.endTime = isTargetToday ? defaultEnd : '10:00';
+                }
+                return newState;
+            });
+            window.history.replaceState({}, document.title);
+        }
+    }, [searchParams, location.state]);
 
     // 경로 정보 업데이트 (기관 주소 → 목적지 경로 탐색)
     useEffect(() => {
@@ -234,7 +279,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
 
 
     // 예약 폼 열기 (기본 시간 자동 설정)
-    const handleOpenForm = () => {
+    const handleOpenForm = (defaultVehicleId?: unknown) => {
         if (showForm) {
             setShowForm(false);
             setEditingReservation(null);
@@ -257,14 +302,14 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
         const defaultStart = `${String(startH).padStart(2, '0')}:${String(startM).padStart(2, '0')}`;
         const defaultEnd = `${String(endH).padStart(2, '0')}:${String(endM).padStart(2, '0')}`;
 
-        // 과거 날짜는 폼을 열지 않음
-        if (!form.startTime && !form.endTime) {
-            setForm(prev => ({
-                ...prev,
-                startTime: isToday ? defaultStart : '09:00',
-                endTime: isToday ? defaultEnd : '10:00',
-            }));
-        }
+        const vId = typeof defaultVehicleId === 'string' ? defaultVehicleId : '';
+
+        setForm(prev => ({
+            ...prev,
+            vehicleId: prev.vehicleId || vId,
+            startTime: prev.startTime || (isToday ? defaultStart : '09:00'),
+            endTime: prev.endTime || (isToday ? defaultEnd : '10:00'),
+        }));
         setShowForm(true);
     };
 
@@ -279,6 +324,20 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
         // 다일 예약 여부 판단
         const effectiveEndDate = form.endDate || selectedDate;
         const isMultiDay = effectiveEndDate > selectedDate;
+
+        // 업무 시간 외 (18:00 ~ 익일 08:59) 예약 확인
+        if (form.startTime >= '18:00' || form.startTime < '09:00') {
+            const isConfirmed = await confirm({
+                title: '예약 시간 확인',
+                message: '저녁 6시 이후나 아침 9시 이전 예약이 맞습니까?',
+                confirmText: '예',
+                cancelText: '아니요',
+                confirmColor: 'primary',
+            });
+            if (!isConfirmed) {
+                return;
+            }
+        }
 
         // 같은 차량이 같은 시간대에 이미 예약되어 있는지 검증 (클라이언트 사전 검사)
         const vehicleOverlap = findOverlappingReservation(reservations, {

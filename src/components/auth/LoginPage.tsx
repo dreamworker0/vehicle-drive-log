@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { signInWithGoogle } from '../../lib/auth';
 import { isInAppBrowser, openInExternalBrowser, copyUrlToClipboard } from '../../lib/inAppBrowser';
 import useForceLightMode from '../../hooks/useForceLightMode';
@@ -6,6 +7,7 @@ import SEOHead from '../common/SEOHead';
 
 export default function LoginPage() {
     useForceLightMode();
+    const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [copied, setCopied] = useState(false);
@@ -61,6 +63,17 @@ export default function LoginPage() {
             </div>
 
             <div className="relative w-full max-w-sm animate-scale-in">
+                {/* 첫 페이지로 돌아가기 */}
+                <button
+                    onClick={() => navigate('/')}
+                    className="flex items-center gap-1.5 text-primary-200/80 hover:text-white text-sm mb-4 transition-colors group"
+                >
+                    <svg className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                    </svg>
+                    첫 페이지로
+                </button>
+
                 {/* 로고 / 아이콘 영역 */}
                 <div className="text-center mb-8">
                     <div className="w-20 h-20 mx-auto mb-4 bg-white/10 dark:bg-surface-800/10 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/20">

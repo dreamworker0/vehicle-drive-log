@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { subscribePendingOrganizations, subscribeRejectedOrganizations, rejectOrganization, deleteOrganization, createNotification, updateOrganization, generateInviteCode } from '../../lib/firestore';
+import { getPendingOrganizations, getRejectedOrganizations, rejectOrganization, deleteOrganization, createNotification, updateOrganization, generateInviteCode } from '../../lib/firestore';
 import { sendApprovalEmail } from '../../lib/emailService';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
@@ -24,32 +24,26 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
     const { showToast } = useToast();
     const { confirm } = useConfirm();
 
-    // Firestore 실시간 구독 — 신청이 들어오면 즉시 목록 갱신
-    useEffect(() => {
-        let pendingReady = false;
-        let rejectedReady = false;
-        const checkReady = () => {
-            if (pendingReady && rejectedReady) setLoading(false);
-        };
-
-        const unsubPending = subscribePendingOrganizations((pending) => {
+    const fetchData = async () => {
+        try {
+            const [pending, rejected] = await Promise.all([
+                getPendingOrganizations(),
+                getRejectedOrganizations()
+            ]);
             setApplications(pending as Organization[]);
-            pendingReady = true;
-            checkReady();
-            onCountChange?.();
-        });
-
-        const unsubRejected = subscribeRejectedOrganizations((rejected) => {
             setRejectedApps(rejected as Organization[]);
-            rejectedReady = true;
-            checkReady();
-        });
+            onCountChange?.();
+        } catch (err) {
+            console.error('데이터 조회 실패:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
 
-        return () => {
-            unsubPending();
-            unsubRejected();
-        };
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- onCountChange는 초기 마운트 시에만 바인딩
+    // 최초 1회 데이터 조회
+    useEffect(() => {
+        fetchData();
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
     const handleApprove = async (app: Organization) => {
@@ -111,6 +105,10 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
                 console.warn('알림톡 발송 실패 (승인은 완료됨):', alimtalkErr);
             }
 
+            // 상태 업데이트
+            setApplications(prev => prev.filter(a => a.id !== app.id));
+            onCountChange?.();
+
         } catch (err) {
             console.error('승인 실패:', err);
         } finally {
@@ -142,6 +140,11 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
             }
 
 
+            // 로컬 상태 업데이트
+            setApplications(prev => prev.filter(a => a.id !== app.id));
+            setRejectedApps(prev => [{ ...app, status: 'rejected' }, ...prev]);
+            onCountChange?.();
+
         } catch (err) {
             console.error('거절 실패:', err);
         } finally {
@@ -156,6 +159,7 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
         try {
             await deleteOrganization(app.id);
 
+            setRejectedApps(prev => prev.filter(a => a.id !== app.id));
         } catch (err) {
             console.error('삭제 실패:', err);
         } finally {
@@ -174,6 +178,9 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
                 rejectedAt: null,
             } as Record<string, unknown>);
             showToast(`${app.name} 기관이 대기 중으로 이동되었습니다.`, 'success');
+            setRejectedApps(prev => prev.filter(a => a.id !== app.id));
+            setApplications(prev => [{ ...app, status: 'pending' }, ...prev]);
+            onCountChange?.();
         } catch (err) {
             console.error('대기중 이동 실패:', err);
             showToast('대기중으로 이동하는데 실패했습니다.', 'error');
@@ -203,6 +210,22 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
                 uniqueNumber: ocrResult.uniqueNumber || '',
                 address: ocrResult.address || '',
             } as Record<string, unknown>);
+
+            const updatedApp = {
+                ...app,
+                aiVerified: ocrResult.aiVerified as boolean || false,
+                aiVerifyDetail: {
+                    documentType: ocrResult.documentType as string,
+                    uniqueNumber: ocrResult.uniqueNumber as string,
+                    extractedName: ocrResult.extractedName as string,
+                    nameMatch: ocrResult.nameMatch as boolean,
+                    address: ocrResult.address as string,
+                },
+                uniqueNumber: (ocrResult.uniqueNumber as string) || '',
+                address: (ocrResult.address as string) || '',
+            };
+            setApplications(prev => prev.map(a => a.id === app.id ? updatedApp : a));
+            setRejectedApps(prev => prev.map(a => a.id === app.id ? updatedApp : a));
 
         } catch (err) {
             console.error('AI 재분석 실패:', err);

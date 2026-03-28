@@ -70,11 +70,10 @@ export function initSentry() {
             // 개발 환경에서는 전송하지 않음
             if (import.meta.env.DEV) return null;
 
-            // Firebase SDK 번들 내부 에러 필터링
+            // Firebase SDK 번들 내부 에러 필터링 (Vite 빌드: firebase-{hash}.js)
             const frames = event.exception?.values?.[0]?.stacktrace?.frames;
             if (frames?.some(f =>
-                f.filename?.includes('firebase-auth') ||
-                f.filename?.includes('firebase-db') ||
+                f.filename?.includes('/firebase-') ||
                 f.filename?.includes('recaptcha')
             )) {
                 return null;

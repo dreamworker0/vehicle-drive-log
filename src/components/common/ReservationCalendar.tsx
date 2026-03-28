@@ -4,9 +4,9 @@
  */
 import useReservationCalendar from '../../hooks/useReservationCalendar';
 import useVehiclePriority from '../../hooks/useVehiclePriority';
+import { useReservationPattern } from '../../hooks/useReservationPattern';
 import CalendarGrid from './CalendarGrid';
 import ReservationSidePanel from './ReservationSidePanel';
-import type { Reservation } from '../../types/reservation';
 
 interface Props {
     isAdmin?: boolean;
@@ -31,6 +31,7 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
         getNavigationDeeplink,
     } = useReservationCalendar({ isAdmin });
     const { usageCounts } = useVehiclePriority();
+    const { recentDestinations } = useReservationPattern();
 
     if (loading) {
         return (
@@ -94,6 +95,7 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
                         onSaveFavorite={handleSaveFavorite}
                         onOpenForm={handleOpenForm}
                         usageCounts={usageCounts}
+                        recentDestinations={recentDestinations}
                         onSlotClick={(vehicleId: string, startTime: string, endTime: string) => {
                             setForm(prev => ({ ...prev, vehicleId, startTime, endTime }));
                             setShowForm(true);

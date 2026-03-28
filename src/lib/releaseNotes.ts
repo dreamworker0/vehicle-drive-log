@@ -18,6 +18,26 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
     {
+        date: '2026-03-28',
+        title: '원클릭 예약 추천 & UI 개선',
+        items: [
+            { type: 'new', text: '과거 예약 기록을 바탕으로 다음 일정을 미리 알려주는 "원클릭 예약 추천(패턴 분석)" 기능이 홈 화면에 추가되었습니다.' },
+            { type: 'improved', text: '원클릭 예약 추천 화면이 단일 박스 내 목록(리스트) 형태로 개편되어 대시보드 하단에 깔끔하게 배치되었습니다.' },
+            { type: 'improved', text: '원래 타려던 차량이 예약 중이라면, 최대 10주까지 일정을 미루거나 즐겨 타는 다른 차선책 차량을 추천해 주도록 로직이 똑똑해졌습니다.' }
+        ],
+    },
+    {
+        date: '2026-03-26',
+        title: '예약 안정화 & 사용성 개선',
+        items: [
+            { type: 'fixed', text: '구글 캘린더 동기화 시 예약이 중복 생성되던 문제를 수정했습니다.' },
+            { type: 'improved', text: '시간대별 예약 현황에서 차량이 자주 사용하는 순서로 정렬됩니다.' },
+            { type: 'improved', text: '로그인 화면에서 첫 페이지로 돌아가는 버튼이 추가되었습니다.' },
+            { type: 'improved', text: '자주 묻는 질문(FAQ)이 최신 내용으로 갱신되었습니다.' },
+            { type: 'improved', text: '앱 안정성이 향상되었습니다.' },
+        ],
+    },
+    {
         date: '2026-03-21',
         title: '기관 위치 지도 & 배포 자동화',
         items: [

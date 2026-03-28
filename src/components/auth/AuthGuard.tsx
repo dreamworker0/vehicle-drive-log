@@ -84,6 +84,10 @@ export function AuthGuard({
 
   if (requireAuth && user && !userData) {
     // 유저 데이터 로딩을 아직 못한 것이 아니라 실제로 없는 경우 (신규가입)
+    // superAdmin은 기관 소속 없이도 접근 가능하므로 invite로 보내지 않음
+    if (isSuperAdmin) {
+      return <Navigate to="/super-admin" replace />;
+    }
     if (requireOrgSetup) {
       return <Navigate to="/invite" replace />;
     }

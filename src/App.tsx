@@ -57,7 +57,15 @@ const legalRoutes = [
   <Route key="faq" path="/faq" element={<FAQPage />} />,
 ];
 
+import { mountOfflineQueueProcessor } from './lib/offlineSyncProcessor';
+
 export default function App() {
+  useEffect(() => {
+    // 앱 전역 단위에서 마운트하여 네트워크가 연결될 때마다 오프라인 큐 처리
+    const cleanup = mountOfflineQueueProcessor();
+    return cleanup;
+  }, []);
+
   return (
     <ThemeProvider>
       <FontSizeProvider>

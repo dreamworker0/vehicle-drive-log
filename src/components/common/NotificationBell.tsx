@@ -3,9 +3,34 @@ import { useAuth } from '../../hooks/useAuth';
 import { subscribeNotifications, markNotificationRead, getNotifications } from '../../lib/firestore';
 import type { Notification } from '../../types/notification';
 
+const URL_REGEX = /(https?:\/\/[^\s]+)/g;
+
+function renderMessageWithLinks(text: string) {
+    if (!text) return null;
+    const parts = text.split(URL_REGEX);
+    return parts.map((part, i) => {
+        if (part.match(URL_REGEX)) {
+            return (
+                <a
+                    key={i}
+                    href={part}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary-500 hover:text-primary-600 dark:text-primary-400 dark:hover:text-primary-300 underline break-all"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {part}
+                </a>
+            );
+        }
+        return <span key={i}>{part}</span>;
+    });
+}
+
 /** 알림 유형별 아이콘 반환 */
 function getNotificationIcon(type?: string) {
     switch (type) {
+        case 'feedback_reply': return '💬';
         case 'approval': return '✅';
         case 'rejection': return '❌';
         case 'reservation_cancelled': return '🚫';
@@ -110,7 +135,9 @@ export default function NotificationBell() {
                                             <span className="text-base mt-0.5 flex-shrink-0">{icon}</span>
                                             <div className="min-w-0 flex-1">
                                                 <p className="text-sm font-medium text-surface-800 dark:text-surface-200">{n.title}</p>
-                                                <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5 break-words">{n.message}</p>
+                                                <p className="text-xs text-surface-500 dark:text-surface-400 mt-1 break-words whitespace-pre-wrap leading-relaxed">
+                                                    {renderMessageWithLinks(n.message)}
+                                                </p>
                                             </div>
                                         </div>
                                     </div>

@@ -79,7 +79,7 @@ export default function VehicleTimelineBar({
     const vehicleData = useMemo(() => {
         return vehicles.filter(v => !v.retired?.isRetired).map(v => {
             const vRes = reservations
-                .filter(r => r.vehicleId === v.id && r.status !== 'completed' && r.status !== 'cancelled')
+                .filter(r => r.vehicleId === v.id && r.status !== 'cancelled')
                 .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
             return { vehicle: v, reservations: vRes };
         });
@@ -102,16 +102,29 @@ export default function VehicleTimelineBar({
             onTouchEnd={handleDragEnd}
             onTouchCancel={handleDragEnd}
         >
-            <p className="text-[11px] font-medium text-surface-500 dark:text-surface-400 mb-2">
-                시간대 현황
-            </p>
-            <div className="rounded-xl bg-surface-50 dark:bg-surface-800/60 border border-surface-200 dark:border-surface-700 p-3 overflow-hidden">
+            <div className="flex items-center justify-between mb-2">
+                <p className="text-[12px] font-semibold text-surface-600 dark:text-surface-300">
+                    시간대 현황
+                </p>
+                {/* 범례 (상단 배치) */}
+                <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
+                        <div className="w-2.5 h-2.5 rounded-sm bg-blue-200 dark:bg-blue-300/50 border border-white/30" />
+                        <span className="text-[10px] text-surface-500 dark:text-surface-400">예약됨</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                        <div className="w-2.5 h-2.5 rounded-sm bg-surface-100 dark:bg-surface-700/50 border border-surface-200 dark:border-surface-600" />
+                        <span className="text-[10px] text-surface-500 dark:text-surface-400">예약 가능</span>
+                    </div>
+                </div>
+            </div>
+            <div className="rounded-xl bg-surface-50 dark:bg-surface-800/60 border border-surface-200 dark:border-surface-700 p-3 overflow-hidden shadow-sm">
                 {/* 시간 눈금 */}
                 <div className="relative h-4 mb-1 ml-[72px]">
                     {hourLabels.map(h => (
                         <span
                             key={h}
-                            className="absolute text-[9px] text-surface-400 dark:text-surface-500 -translate-x-1/2 select-none"
+                            className="absolute text-[10px] font-medium text-surface-500 dark:text-surface-400 -translate-x-1/2 select-none"
                             style={{ left: `${getPercent(h * 60, dynamicStart)}%` }}
                         >
                             {h}
@@ -167,22 +180,43 @@ export default function VehicleTimelineBar({
                                             />
                                         ))}
 
-                                        {/* 예약 블록 — dynamicStart 이후 부분만 표시 */}
+                                        {/* 예약 블록 — 타임라인 렌더 범위(06:00~23:00) 밖이더라도 최소한 클리핑해서 표시 */}
                                         {vRes.map(r => {
-                                            const rStartMin = timeToMinutes(r.startTime);
-                                            const rEndMin = timeToMinutes(r.endTime);
-                                            // 동적 시작점 이전에 끝나는 예약은 표시 안 함
-                                            if (rEndMin <= dynamicStart) return null;
-                                            const left = getPercent(Math.max(rStartMin, dynamicStart), dynamicStart);
-                                            const right = getPercent(rEndMin, dynamicStart);
-                                            const width = right - left;
+                                            const isCompleted = r.status === 'completed';
+                                            const effStart = (isCompleted && r.actualStartTime) ? r.actualStartTime : (r.startTime || '');
+                                            const effEnd = (isCompleted && r.actualEndTime) ? r.actualEndTime : (r.endTime || '');
+                                            const rStartMin = timeToMinutes(effStart);
+                                            const rEndMin = timeToMinutes(effEnd);
+                                            
+                                            const clampedStartMin = Math.max(rStartMin, dynamicStart);
+                                            const clampedEndMin = Math.max(rEndMin, dynamicStart);
+                                            
+                                            let left = getPercent(clampedStartMin, dynamicStart);
+                                            let right = getPercent(clampedEndMin, dynamicStart);
+                                            
+                                            if (left > right) {
+                                                const temp = left; left = right; right = temp;
+                                            }
+                                            
+                                            if (Number.isNaN(left)) left = 0;
+                                            if (Number.isNaN(right)) right = left + 1.5;
+                                            
+                                            let width = right - left;
+                                            
+                                            // 1% 미만의 아주 짧은 예약이거나 시야범위 밖 예약이더라도
+                                            // 사용자가 시각적으로 최소한의 블록을 클릭/인식할 수 있게 1.5% 보장
+                                            if (width < 1.5 || Number.isNaN(width)) {
+                                                width = 1.5;
+                                                if (left + width > 100) left = 100 - width;
+                                            }
+                                            
                                             const colorClass = getVehicleColor(vehicle.id);
                                             return (
                                                 <div
                                                     key={r.id}
-                                                    className={`absolute top-0.5 bottom-0.5 rounded-sm ${colorClass} opacity-80 dark:opacity-60 border border-white/30 dark:border-surface-500/30 cursor-pointer hover:opacity-100 dark:hover:opacity-80 transition-opacity`}
+                                                    className={`absolute top-0.5 bottom-0.5 rounded-sm ${colorClass} ${isCompleted ? 'opacity-60 dark:opacity-40' : 'opacity-80 dark:opacity-60'} border border-white/30 dark:border-surface-500/30 cursor-pointer hover:opacity-100 dark:hover:opacity-80 transition-opacity`}
                                                     style={{ left: `${left}%`, width: `${width}%` }}
-                                                    title={`${r.reservedByName}: ${r.startTime}~${r.endTime} ${r.purpose || ''}`}
+                                                    title={`${r.reservedByName}: ${r.startTime}~${r.endTime} ${r.purpose || ''}${isCompleted ? ' (운행완료)' : ''}`}
                                                     onClick={() => toggleExpand(vehicle.id)}
                                                 />
                                             );
@@ -285,18 +319,10 @@ export default function VehicleTimelineBar({
                     })}
                 </div>
 
-                {/* 범례 */}
-                <div className="flex items-center gap-2 mt-2.5 flex-nowrap justify-end">
-                    <div className="flex items-center gap-1">
-                        <div className="w-3 h-2.5 rounded-sm bg-blue-200 dark:bg-blue-300/50 border border-white/30" />
-                        <span className="text-[9px] text-surface-400">예약됨</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                        <div className="w-3 h-2.5 rounded-sm bg-surface-100 dark:bg-surface-700/50 border border-surface-200 dark:border-surface-600" />
-                        <span className="text-[9px] text-surface-400">예약 가능</span>
-                    </div>
-                    <span className="text-[8px] text-surface-400 whitespace-nowrap">
-                        {!isPastDate && '드래그=예약 · '}터치=상세
+                {/* 조작 안내 팁 */}
+                <div className="mt-2 text-right">
+                    <span className="text-[10px] text-surface-400 whitespace-nowrap">
+                        {!isPastDate && '시간을 드래그하여 예약 · '}차량을 터치하여 상세 확인
                     </span>
                 </div>
             </div>

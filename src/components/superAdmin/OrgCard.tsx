@@ -337,6 +337,14 @@ export default function OrgCard({
                                         )}
                                     </div>
                                 )}
+
+                                {/* 하고 싶은 말 */}
+                                {org.message && (
+                                    <div className="mt-2 px-3 py-2 rounded-lg bg-primary-50 dark:bg-primary-900/20 border border-primary-100 dark:border-primary-800 text-sm">
+                                        <span className="text-xs font-medium text-primary-500 dark:text-primary-400">💬 하고 싶은 말</span>
+                                        <p className="text-surface-700 dark:text-surface-300 mt-0.5 whitespace-pre-wrap">{org.message}</p>
+                                    </div>
+                                )}
                             </div>
                         )}
                     </div>

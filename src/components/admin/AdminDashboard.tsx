@@ -8,7 +8,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { auth } from '../../lib/firebase';
 import { refreshTokenSilently } from '../../lib/tokenRefresh';
 import { getVehicles, getOrganizationMembers, getDriveLogs, getOrganization, getTodayReservations } from '../../lib/firestore';
-import { toLocalDateStr, toLocalMonthStr } from '../../lib/dateUtils';
+import { toLocalDateStr } from '../../lib/dateUtils';
 import { SkeletonStatCard, SkeletonList } from '../common/Skeleton';
 import type { DriveLog } from '../../types/driveLog';
 import type { Organization } from '../../types/organization';
@@ -36,23 +36,23 @@ export default function AdminDashboard() {
         const fetchStats = async (retryCount = 0) => {
             try {
                 const todayStr = toLocalDateStr();
-                const [vehicles, members, logsResult, todayRes] = await Promise.all([
+                const d = new Date();
+                const y = d.getFullYear();
+                const m = d.getMonth() + 1;
+                const lastDay = new Date(y, m, 0).getDate();
+                const monthStartStr = `${y}-${String(m).padStart(2, '0')}-01`;
+                const monthEndStr = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+
+                const [vehicles, members, logsResult, todayRes, todayLogs, monthLogs] = await Promise.all([
                     getVehicles(orgId),
                     getOrganizationMembers(orgId),
-                    getDriveLogs(orgId, { limit: 50 }),
+                    getDriveLogs(orgId, { limit: 5 }),
                     getTodayReservations(orgId, todayStr),
+                    import('../../lib/firestore/driveLogs').then(m => m.getDriveLogCount(orgId, { startDate: todayStr, endDate: todayStr })),
+                    import('../../lib/firestore/driveLogs').then(m => m.getDriveLogCount(orgId, { startDate: monthStartStr, endDate: monthEndStr }))
                 ]);
 
                 const logs = logsResult.docs;
-                const monthStart = toLocalMonthStr();
-                const todayLogs = logs.filter(l => {
-                    const d = (l.timestamp && typeof l.timestamp === 'object' && 'toDate' in l.timestamp && typeof (l.timestamp as { toDate?: unknown }).toDate === 'function') ? (l.timestamp as { toDate: () => Date }).toDate() : (l.timestamp instanceof Date ? l.timestamp : null);
-                    return d ? toLocalDateStr(d) === todayStr : false;
-                }).length;
-                const monthLogs = logs.filter(l => {
-                    const d = (l.timestamp && typeof l.timestamp === 'object' && 'toDate' in l.timestamp && typeof (l.timestamp as { toDate?: unknown }).toDate === 'function') ? (l.timestamp as { toDate: () => Date }).toDate() : (l.timestamp instanceof Date ? l.timestamp : null);
-                    return d ? toLocalMonthStr(d) === monthStart : false;
-                }).length;
 
                 setStats({
                     todayLogs,
@@ -61,7 +61,7 @@ export default function AdminDashboard() {
                     employeeCount: members.filter(m => m.role !== 'superAdmin').length,
                     monthLogs,
                 });
-                setRecentLogs(logs.slice(0, 5) as DriveLog[]);
+                setRecentLogs(logs as DriveLog[]);
 
                 // 온보딩 위자드 표시 조건 확인
                 if (AdminOnboardingWizard.shouldShow(vehicles.length, members.length)) {
@@ -78,10 +78,11 @@ export default function AdminDashboard() {
                     || firebaseErr.message?.includes('Missing or insufficient permissions');
 
                 if (isPermError && retryCount < 2) {
-                    console.debug(`대시보드 권한 오류 — 토큰 갱신 후 재시도 (${retryCount + 1}/2)`);
+                    const delayMs = 1500 * Math.pow(2, retryCount); // 지수 백오프: 1차 1.5초, 2차 3초
+                    console.debug(`대시보드 권한 오류 — 토큰 갱신 후 재시도 (${retryCount + 1}/2, ${delayMs}ms 대기)`);
                     try { if (auth.currentUser) await refreshTokenSilently(auth.currentUser); } catch { /* noop */ }
-                    // 토큰 갱신 후 잠시 대기 (Claims 전파 시간 확보)
-                    await new Promise(r => setTimeout(r, 1500));
+                    // 토큰 갱신 후 잠시 대기 (Claims 전파 시간 확보 및 지수 백오프)
+                    await new Promise(r => setTimeout(r, delayMs));
                     return fetchStats(retryCount + 1);
                 }
                 console.error('대시보드 로드 실패:', err);

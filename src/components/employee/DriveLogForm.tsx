@@ -19,7 +19,7 @@ export default function DriveLogForm() {
         selectedPassengers, selectedVehicle,
         isElectric,
         reservationData,
-        editLog, isEditMode, isRetroactive,
+        editLog, isEditMode,
         showFavSave, setShowFavSave,
         favName, setFavName,
         hipassCard,
@@ -126,25 +126,7 @@ export default function DriveLogForm() {
                     </div>
                 )}
 
-                {/* 운행 날짜 선택 */}
-                <div className="glass-card p-4">
-                    <label htmlFor="driveDate" className="label">
-                        📅 운행 날짜
-                        {isRetroactive && (
-                            <span className="ml-2 px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-600 dark:bg-orange-900/40 dark:text-orange-400">
-                                소급 입력
-                            </span>
-                        )}
-                    </label>
-                    <input
-                        id="driveDate"
-                        type="date"
-                        value={form.driveDate}
-                        onChange={e => setForm({ ...form, driveDate: e.target.value })}
-                        max={new Date().toISOString().split('T')[0]}
-                        className="input"
-                    />
-                </div>
+
 
                 {/* 운행 시간 (수정 모드 시 출발/도착 시간 모두 편집 가능) */}
                 {isEditMode && (

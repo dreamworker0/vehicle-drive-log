@@ -46,8 +46,16 @@ export default function useRetry({ maxRetries = 2, retryLabel = '재시도' } = 
      * @param {Function} [opts.onError] - 에러 발생 시 추가 콜백
      * @returns {Promise<*>} asyncFn의 반환값 또는 에러 시 undefined
      */
-    const runWithRetry = useCallback(async (key: string, asyncFn: () => Promise<unknown>, opts: RetryRunOptions = {}) => {
+    const runWithRetry = useCallback(async (key: string, asyncFn: () => Promise<unknown>, opts: RetryRunOptions & { useBackoff?: boolean; baseDelayMs?: number } = {}) => {
         try {
+            const currentCount = retryCountRef.current.get(key) || 0;
+            // 백오프 옵션이 켜져있고 처음 시도가 아니면 지연
+            if (opts.useBackoff && currentCount > 0) {
+                const delayMs = (opts.baseDelayMs || 1000) * Math.pow(2, currentCount - 1);
+                console.debug(`[useRetry:${key}] ${delayMs}ms 대기 후 재시도 (${currentCount}/${maxRetries})`);
+                await new Promise(res => setTimeout(res, delayMs));
+            }
+
             const result = await asyncFn();
             // 성공 시 재시도 카운터 초기화
             retryCountRef.current.delete(key);
@@ -59,11 +67,17 @@ export default function useRetry({ maxRetries = 2, retryLabel = '재시도' } = 
             const currentCount = retryCountRef.current.get(key) || 0;
 
             if (isNetworkError(err) && currentCount < maxRetries) {
-                // 네트워크 에러 → 재시도 버튼 표시
+                // 네트워크 에러 → 재시도 버튼 표시 또는 자동 백오프 시도
                 retryCountRef.current.set(key, currentCount + 1);
                 const remaining = maxRetries - currentCount;
+                
+                // 자동 백오프 모드가 켜져있으면 Toast 대신 바로 재귀 호출 (안전 장치로 maxRetries 내에서만 돎)
+                if (opts.useBackoff) {
+                    return runWithRetryRef.current?.(key, asyncFn, opts);
+                }
+
                 showToast(
-                    opts.errorMessage || '네트워크 오류가 발생했습니다.',
+                    opts.errorMessage || '네트워크 통신 중입니다.',
                     'error',
                     {
                         duration: 8000,
@@ -72,10 +86,12 @@ export default function useRetry({ maxRetries = 2, retryLabel = '재시도' } = 
                     }
                 );
             } else {
-                // 비네트워크 에러 또는 재시도 초과
+                // 비네트워크 에러 또는 재시도 횟수 완전 초과 (포기)
                 retryCountRef.current.delete(key);
                 showToast(
-                    opts.errorMessage || '처리 중 오류가 발생했습니다.',
+                    opts.errorMessage || (currentCount >= maxRetries 
+                        ? '일시적인 네트워크 오류가 지속됩니다. 잠시 후 다시 시도해 주세요.' 
+                        : '처리 중 오류가 발생했습니다.'),
                     'error'
                 );
             }

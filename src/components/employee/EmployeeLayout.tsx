@@ -28,13 +28,13 @@ interface NavItem {
 
 const navItems: NavItem[] = [
     {
-        to: '/employee/today',
-        label: '운행',
+        to: '/employee/fuel',
+        label: '주유ㆍ충전',
         icon: (
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H5.24a2 2 0 0 0-1.8 1.1l-.8 1.63A6 6 0 0 0 2 12.42V16h2" />
-                <circle cx="6.5" cy="16.5" r="2.5" />
-                <circle cx="16.5" cy="16.5" r="2.5" />
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 11.25V4.875A2.625 2.625 0 0 0 12.375 2.25h-4.75A2.625 2.625 0 0 0 5 4.875V18.75a2.25 2.25 0 0 0 2.25 2.25h5.5A2.25 2.25 0 0 0 15 18.75v-3" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15 8.25h1.5a2.25 2.25 0 0 1 2.25 2.25v3a1.5 1.5 0 0 0 3 0V7.5l-2.25-3" />
+                <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 9h9.5" />
             </svg>
         ),
     },
@@ -48,13 +48,13 @@ const navItems: NavItem[] = [
         ),
     },
     {
-        to: '/employee/fuel',
-        label: '주유ㆍ충전',
+        to: '/employee/today',
+        label: '운행',
         icon: (
-            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 11.25V4.875A2.625 2.625 0 0 0 12.375 2.25h-4.75A2.625 2.625 0 0 0 5 4.875V18.75a2.25 2.25 0 0 0 2.25 2.25h5.5A2.25 2.25 0 0 0 15 18.75v-3" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15 8.25h1.5a2.25 2.25 0 0 1 2.25 2.25v3a1.5 1.5 0 0 0 3 0V7.5l-2.25-3" />
-                <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 9h9.5" />
+            <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M14 16H9m10 0h3v-3.15a1 1 0 0 0-.84-.99L16 11l-2.7-3.6a1 1 0 0 0-.8-.4H5.24a2 2 0 0 0-1.8 1.1l-.8 1.63A6 6 0 0 0 2 12.42V16h2" />
+                <circle cx="6.5" cy="16.5" r="2.5" />
+                <circle cx="16.5" cy="16.5" r="2.5" />
             </svg>
         ),
     },
@@ -151,23 +151,52 @@ export default function EmployeeLayout() {
             </main>
 
             {/* 하단 탭 바 (모바일 최적화) */}
-            <nav className="fixed bottom-0 left-0 right-0 bg-white/90 dark:bg-surface-900/90 backdrop-blur-md border-t border-surface-100 dark:border-surface-700 z-30 safe-bottom" aria-label="직원 메뉴">
-                <div className="flex items-center justify-around h-16 max-w-lg mx-auto">
-                    {navItems.map((item) => (
-                        <NavLink
-                            key={item.to}
-                            to={item.to}
-                            className={({ isActive }) =>
-                                `flex flex-col items-center gap-0.5 px-3 py-1.5 rounded-lg transition-all duration-200 ${isActive
-                                    ? 'text-primary-600'
-                                    : 'text-surface-400 hover:text-surface-600'
-                                }`
-                            }
-                        >
-                            {item.icon}
-                            <span className="text-[10px] font-medium">{item.label}</span>
-                        </NavLink>
-                    ))}
+            <nav className="fixed bottom-0 left-0 right-0 bg-white/85 dark:bg-surface-900/85 backdrop-blur-xl border-t border-surface-200/50 dark:border-surface-700/50 z-30 safe-bottom" aria-label="직원 메뉴">
+                <div className="flex items-center justify-between h-[68px] max-w-lg mx-auto px-4 relative">
+                    {navItems.map((item, idx) => {
+                        // 중앙의 Elevated FAB (주유/충전)
+                        if (idx === 2) {
+                            return (
+                                <NavLink
+                                    key={item.to}
+                                    to={item.to}
+                                    className={({ isActive }) =>
+                                        `absolute left-1/2 -translate-x-1/2 -top-5 flex flex-col items-center justify-center w-14 h-14 rounded-full shadow-lg transition-all duration-300 transform hover:scale-105 active:scale-95 ${isActive
+                                            ? 'bg-primary-600 text-white ring-4 ring-white/50 dark:ring-surface-900/50'
+                                            : 'bg-surface-800 text-surface-50 dark:bg-surface-200 dark:text-surface-900 ring-4 ring-surface-50 dark:ring-surface-900 shadow-surface-300/50 dark:shadow-black/50 hover:bg-surface-700 dark:hover:bg-surface-300'
+                                        }`
+                                    }
+                                >
+                                    <div className="scale-110">{item.icon}</div>
+                                </NavLink>
+                            );
+                        }
+
+                        // 일반 탭 아이템
+                        return (
+                            <NavLink
+                                key={item.to}
+                                to={item.to}
+                                className={({ isActive }) =>
+                                    `flex flex-col items-center gap-1 w-14 py-1.5 rounded-xl transition-all duration-200 ${
+                                        idx === 1 ? 'mr-14' : idx === 3 ? 'ml-14' : ''
+                                    } ${isActive
+                                        ? 'text-primary-600 font-bold'
+                                        : 'text-surface-400 hover:text-surface-600 hover:bg-surface-100/50 dark:hover:bg-surface-800/50 font-medium'
+                                    }`
+                                }
+                            >
+                                {({ isActive }) => (
+                                    <>
+                                        <div className={isActive ? 'scale-110 transition-transform' : 'transition-transform'}>
+                                            {item.icon}
+                                        </div>
+                                        <span className={`text-[10px] ${isActive ? 'tracking-tight' : ''}`}>{item.label}</span>
+                                    </>
+                                )}
+                            </NavLink>
+                        );
+                    })}
                 </div>
             </nav>
         </div>

@@ -1,5 +1,14 @@
 import { initializeApp } from "firebase-admin/app";
+import { setGlobalOptions } from "firebase-functions/v2";
 import { onSchedule } from "firebase-functions/v2/scheduler";
+
+// 시스템 전역 옵션 - 유휴 리소스 절감 및 불필요한 과금 방지
+setGlobalOptions({ 
+    maxInstances: 10, 
+    memory: "128MiB", 
+    timeoutSeconds: 60, 
+    region: "asia-northeast3" 
+});
 
 // Sentry 에러 모니터링 초기화 (모든 함수 실행 전에 활성화)
 import "./sentry";
@@ -97,6 +106,15 @@ export { trackFirstEmployee } from "./trackFirstEmployee";
 // 기존 기관 좌표 마이그레이션 (일회성)
 export { backfillOrgCoords } from "./backfillOrgCoords";
 
+// 피드백 AI 답변 초안 생성 (의견 등록 시 자동 실행)
+export { generateFeedbackDraft } from "./generateFeedbackDraft";
+
+// 피드백 AI 답변 수동 재생성 (관리자 호출)
+export { regenerateFeedbackDraft } from "./regenerateFeedbackDraft";
+
+// 피드백 답변 발송 (슈퍼관리자 → 사용자 알림)
+export { sendFeedbackReply } from "./sendFeedbackReply";
+
 // Rate Limit 문서 자동 정리 (매일 05:00 KST)
 // TODO: GCP Console → Firestore → TTL 정책에서 _rateLimits 컬렉션의
 //       expiresAt 필드에 자동 삭제 TTL을 설정하면 이 스케줄러를 제거할 수 있음
@@ -192,3 +210,12 @@ export const sendBulkReminder = onCall(
         return { sentCount, failCount, noPhoneCount, results };
     }
 );
+
+// 미활성 기관 발송 스케줄러 (매주 월~금 14시 점검, 주 1회 발송)
+export { sendInactiveOrgAlimtalkScheduled } from "./sendInactiveOrgAlimtalkScheduled";
+
+// 사용자 권한 변경 탐지 (보안 알림)
+export { notifyRoleChange } from "./notifyRoleChange";
+
+// 디스코드 정기 리포트 및 미활성 알림 스케줄러
+export { scheduledDiscordBriefing } from "./discordScheduler";

@@ -3,6 +3,7 @@ import ChartOrgTrend from './ChartOrgTrend';
 import ChartDAU from './ChartDAU';
 import ChartFirstEmployee from './ChartFirstEmployee';
 import ChartInputMethod from './ChartInputMethod';
+import ChartQuickDrive from './ChartQuickDrive';
 import ChartDistribution from './ChartDistribution';
 import ChartHipass from './ChartHipass';
 import ChartFuelHipass from './ChartFuelHipass';
@@ -16,8 +17,10 @@ interface Props {
     firstEmployeeStats: FirstEmployeeStatsData | null;
     firstEmployeeDist: { label: string; count: number; color: string }[];
     firstEmployeeTrend: { month: string; avg: number }[];
-    // 입력 방식 추이
     inputMethodStats: { date: string; ocr: number; manual: number }[];
+    // 바로 운행 vs 사전 예약
+    quickDriveStats: { date: string; regular: number; quick: number }[];
+    quickDriveRatio: { total: number; quick: number; regular: number; rate: number };
     // 기관/차량 분포
     orgSizeDistribution: { label: string; count: number; color: string }[];
     fuelTypeStats: { type: string; label: string; count: number; color: string }[];
@@ -44,6 +47,10 @@ export default function DashboardChartSection(props: Props) {
                 firstEmployeeTrend={props.firstEmployeeTrend}
             />
             <ChartInputMethod inputMethodStats={props.inputMethodStats} />
+            <ChartQuickDrive 
+                quickDriveStats={props.quickDriveStats} 
+                quickDriveRatio={props.quickDriveRatio} 
+            />
             <ChartDistribution
                 orgSizeDistribution={props.orgSizeDistribution}
                 fuelTypeStats={props.fuelTypeStats}

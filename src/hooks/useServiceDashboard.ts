@@ -35,6 +35,10 @@ export default function useServiceDashboard() {
     const [topOrgs, setTopOrgs] = useState<OrgStat[]>([]);
 
     const [inputMethodStats, setInputMethodStats] = useState<{ date: string; ocr: number; manual: number }[]>([]);
+    
+    // 바로 운행 vs 사전 예약 통계
+    const [quickDriveStats, setQuickDriveStats] = useState<{ date: string; regular: number; quick: number }[]>([]);
+    const [quickDriveRatio, setQuickDriveRatio] = useState<{ total: number; quick: number; regular: number; rate: number }>({ total: 0, quick: 0, regular: 0, rate: 0 });
 
     // 고도화 state
     const [_dailyDriveStats, setDailyDriveStats] = useState<{ date: string; count: number }[]>([]);
@@ -196,6 +200,7 @@ export default function useServiceDashboard() {
                 processTopOrganizations(shared),
                 loadFuelHipassStats(),
                 loadNotificationStats(),
+                loadQuickDriveStats(),
             ]);
         } finally {
             setLoading(false);
@@ -828,6 +833,53 @@ export default function useServiceDashboard() {
         }
     };
 
+    const loadQuickDriveStats = async () => {
+        try {
+            const now = new Date();
+            const thirtyDaysAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+            const thirtyDaysAgoStr = `${thirtyDaysAgo.getFullYear()}-${String(thirtyDaysAgo.getMonth() + 1).padStart(2, '0')}-${String(thirtyDaysAgo.getDate()).padStart(2, '0')}`;
+            
+            const q = query(collection(db, 'reservations'), where('date', '>=', thirtyDaysAgoStr));
+            const snap = await getDocs(q);
+
+            const dailyMap: Record<string, { regular: number; quick: number }> = {};
+            for (let i = 0; i < 30; i++) {
+                const d = new Date(thirtyDaysAgo);
+                d.setDate(d.getDate() + i);
+                const key = `${d.getMonth() + 1}/${d.getDate()}`;
+                dailyMap[key] = { regular: 0, quick: 0 };
+            }
+
+            let total = 0, quick = 0, regular = 0;
+
+            snap.docs.forEach(doc => {
+                const data = doc.data();
+                if (data.status === 'cancelled') return; // 취소된 예약은 제외
+                
+                const dStr = data.date as string;
+                if (!dStr) return;
+                const [y, m, dd] = dStr.split('-').map(Number);
+                const parsed = new Date(y, m - 1, dd);
+                if (parsed >= thirtyDaysAgo) {
+                    const key = `${parsed.getMonth() + 1}/${parsed.getDate()}`;
+                    total++;
+                    if (data.isQuickDrive) {
+                        quick++;
+                        if (dailyMap[key]) dailyMap[key].quick++;
+                    } else {
+                        regular++;
+                        if (dailyMap[key]) dailyMap[key].regular++;
+                    }
+                }
+            });
+
+            setQuickDriveRatio({ total, quick, regular, rate: total > 0 ? Math.round((quick / total) * 100) : 0 });
+            setQuickDriveStats(Object.entries(dailyMap).map(([date, counts]) => ({ date, ...counts })));
+        } catch (err) {
+            console.error('바로 운행 통계 로드 실패:', err);
+        }
+    };
+
     return {
         loading,
         stats,
@@ -841,6 +893,8 @@ export default function useServiceDashboard() {
         firstEmployeeDist,
         firstEmployeeTrend,
         inputMethodStats,
+        quickDriveStats,
+        quickDriveRatio,
         orgSizeDistribution,
         fuelTypeStats,
         vehicleTypeStats,

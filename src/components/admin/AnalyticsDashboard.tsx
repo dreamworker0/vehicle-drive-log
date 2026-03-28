@@ -2,10 +2,11 @@
  * AnalyticsDashboard — 고도화 분석 대시보드
  * 트렌드 분석 + 비용 최적화 탭 구성
  */
-import { useState } from 'react';
+import { useState, Suspense, lazy } from 'react';
 import useAnalytics from '../../hooks/useAnalytics';
-import TrendCharts from './TrendCharts';
-import CostOptimization from './CostOptimization';
+
+const TrendCharts = lazy(() => import('./TrendCharts'));
+const CostOptimization = lazy(() => import('./CostOptimization'));
 
 const RANGE_OPTIONS = [
     { value: 3, label: '3개월' },
@@ -133,27 +134,29 @@ export default function AnalyticsDashboard() {
             </div>
 
             {/* 콘텐츠 */}
-            {activeTab === 'trend' ? (
-                <TrendCharts
-                    monthlyTrend={monthlyTrend}
-                    driverComparison={driverComparison}
-                    vehicleUtilization={vehicleUtilization}
-                    heatmapData={heatmapData}
-                    costTrend={costTrend}
-                />
-            ) : (
-                <CostOptimization
-                    fuelEfficiency={fuelEfficiency}
-                    maintenanceCostAnalysis={maintenanceCostAnalysis}
-                    anomalies={anomalies}
-                    recommendations={recommendations}
-                    costTrend={costTrend}
-                    totalFuelCost={totalFuelCost}
-                    totalHipassCost={totalHipassCost}
-                    totalMaintenanceCost={totalMaintenanceCost}
-                    totalOperatingCost={totalOperatingCost}
-                />
-            )}
+            <Suspense fallback={<div className="p-10 text-center text-surface-400 spinner mx-auto">분석 차트를 불러오는 중...</div>}>
+                {activeTab === 'trend' ? (
+                    <TrendCharts
+                        monthlyTrend={monthlyTrend}
+                        driverComparison={driverComparison}
+                        vehicleUtilization={vehicleUtilization}
+                        heatmapData={heatmapData}
+                        costTrend={costTrend}
+                    />
+                ) : (
+                    <CostOptimization
+                        fuelEfficiency={fuelEfficiency}
+                        maintenanceCostAnalysis={maintenanceCostAnalysis}
+                        anomalies={anomalies}
+                        recommendations={recommendations}
+                        costTrend={costTrend}
+                        totalFuelCost={totalFuelCost}
+                        totalHipassCost={totalHipassCost}
+                        totalMaintenanceCost={totalMaintenanceCost}
+                        totalOperatingCost={totalOperatingCost}
+                    />
+                )}
+            </Suspense>
         </div>
     );
 }

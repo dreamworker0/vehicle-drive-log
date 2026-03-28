@@ -7,6 +7,7 @@ import { ocrDashboard } from '../lib/ocr';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../lib/firebase';
 import { createFeedback } from '../lib/firestore';
+import imageCompression from 'browser-image-compression';
 
 import type { DriveLogForm } from './useDriveLogForm';
 import type { User as FirebaseUser } from 'firebase/auth';
@@ -120,27 +121,17 @@ export default function useDriveLogOcr({ isElectric, setForm, user, userData, ve
                 const storageRef = ref(storage, `feedbacks/ocr-report/${user?.uid || 'unknown'}/${timestamp}.jpg`);
 
                 // 이미지 압축 (1200px)
-                const compressed = await new Promise((resolve) => {
-                    const canvas = document.createElement('canvas');
-                    const ctx = canvas.getContext('2d');
-                    const img = new Image();
-                    img.onload = () => {
-                        const maxSize = 1200;
-                        let { width, height } = img;
-                        if (width > height && width > maxSize) {
-                            height = (height * maxSize) / width;
-                            width = maxSize;
-                        } else if (height > maxSize) {
-                            width = (width * maxSize) / height;
-                            height = maxSize;
-                        }
-                        canvas.width = width;
-                        canvas.height = height;
-                        ctx!.drawImage(img, 0, 0, width, height);
-                        canvas.toBlob(resolve, 'image/jpeg', 0.7);
-                    };
-                    img.src = URL.createObjectURL(ocrData.imageFile);
-                });
+                let compressed: File | Blob = ocrData.imageFile;
+                try {
+                    compressed = await imageCompression(ocrData.imageFile, {
+                        maxSizeMB: 1,
+                        maxWidthOrHeight: 1200,
+                        useWebWorker: true,
+                        fileType: 'image/jpeg'
+                    });
+                } catch (err) {
+                    console.error('이미지 압축 실패, 원본 유지:', err);
+                }
 
                 await uploadBytes(storageRef, compressed as Blob);
                 const url = await getDownloadURL(storageRef);
@@ -155,6 +146,7 @@ export default function useDriveLogOcr({ isElectric, setForm, user, userData, ve
                 userName: user?.displayName || userData?.name || '',
                 organizationId: userData?.organizationId || '',
                 type: 'ocr-error',
+                authorUid: user?.uid || '',
             });
 
             setOcrReportSent(true);

@@ -2,7 +2,7 @@ import { useState, useEffect, Suspense, type ReactNode } from 'react';
 import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { logout } from '../../lib/auth';
-import { subscribePendingOrganizations, subscribeApprovedOrganizations, subscribeFeedbacks, getOrgMemberCounts, getSuperAdmins } from '../../lib/firestore';
+import { getPendingOrganizations, getApprovedOrganizations, getAllFeedbacks, getOrgMemberCounts, getSuperAdmins } from '../../lib/firestore';
 import { SA_TEST_ROLE_KEY } from '../../App';
 import { useTheme } from '../../hooks/useTheme';
 
@@ -53,29 +53,38 @@ export default function SuperAdminLayout() {
     const { isDark, toggleTheme } = useTheme();
 
 
-    // 사이드바 배지 카운트 실시간 구독
+    // 사이드바 배지 카운트 단발성 조회 (비용 절감)
     useEffect(() => {
-        const unsubPending = subscribePendingOrganizations((orgs) => {
-            setPendingCount(orgs.length);
-        });
-        const unsubApproved = subscribeApprovedOrganizations(async (orgs) => {
-            setTotalOrgCount(orgs.length);
+        let isMounted = true;
+        const fetchCounts = async () => {
             try {
-                const counts = await getOrgMemberCounts();
-                const active = orgs.filter(o => counts[o.id] > 0).length;
-                setActiveOrgCount(active);
-            } catch {
-                setActiveOrgCount(orgs.length);
+                const pendings = await getPendingOrganizations();
+                const approved = await getApprovedOrganizations();
+                const allFeedbacks = await getAllFeedbacks(200);
+
+                if (!isMounted) return;
+
+                setPendingCount(pendings.length);
+                setTotalOrgCount(approved.length);
+                setFeedbackCount(allFeedbacks.filter(f => f.status !== 'read' && f.status !== 'resolved').length);
+
+                try {
+                    const counts = await getOrgMemberCounts();
+                    if (isMounted) {
+                        const active = approved.filter(o => counts[o.id] > 0).length;
+                        setActiveOrgCount(active);
+                    }
+                } catch {
+                    if (isMounted) setActiveOrgCount(approved.length);
+                }
+            } catch(e) {
+                console.error("SuperAdmin 뱃지 카운트 조회 에러:", e);
             }
-        });
-        const unsubFeedback = subscribeFeedbacks((feedbacks) => {
-            setFeedbackCount(feedbacks.filter(f => f.status !== 'read').length);
-        });
-        return () => {
-            unsubPending();
-            unsubApproved();
-            unsubFeedback();
         };
+
+        fetchCounts();
+
+        return () => { isMounted = false; };
     }, []);
 
     // 슈퍼관리자 수 조회

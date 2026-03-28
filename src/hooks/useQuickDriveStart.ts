@@ -157,6 +157,7 @@ export default function useQuickDriveStart() {
                 routeDistance: routeInfo?.distance || null,
                 routeDuration: routeInfo?.duration || null,
                 routeTollFee: routeInfo?.tollFee || null,
+                isQuickDrive: true,
             });
             const reservationId = result;
 

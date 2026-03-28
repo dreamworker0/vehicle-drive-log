@@ -57,9 +57,10 @@ interface Props {
     favName: string;
     setFavName: (name: string) => void;
     onSaveFavorite: () => Promise<void>;
-    onOpenForm: () => void;
+    onOpenForm: (defaultVehicleId?: string) => void;
     /** 사용자별 차량 사용 횟수 (useVehiclePriority에서 제공) */
     usageCounts?: Map<string, number>;
+    recentDestinations?: string[];
 }
 
 export default function ReservationSidePanel({
@@ -96,6 +97,7 @@ export default function ReservationSidePanel({
     onSaveFavorite,
     onOpenForm,
     usageCounts,
+    recentDestinations = [],
 }: Props) {
     const destinationRef = useRef<HTMLInputElement>(null);
     const [showFreeRoad, setShowFreeRoad] = useState(false);
@@ -128,7 +130,7 @@ export default function ReservationSidePanel({
                 </h3>
                 {!isPastDate && (
                     <button
-                        onClick={onOpenForm}
+                        onClick={() => onOpenForm(showForm ? undefined : sortedActiveVehicles[0]?.id)}
                         className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-all ${showForm
                             ? 'bg-surface-200 text-surface-600 dark:bg-surface-600 dark:text-surface-300'
                             : 'bg-primary-500 text-white hover:bg-primary-600 shadow-sm'
@@ -142,10 +144,10 @@ export default function ReservationSidePanel({
             {/* 예약 폼 (슬라이드다운) */}
             {showForm && !isPastDate && (
                 <div className="mb-4 p-3 rounded-xl bg-primary-50/50 border border-primary-100 dark:bg-surface-700/50 dark:border-surface-600 animate-fade-in">
-                    <form onSubmit={onSubmit} className="space-y-3">
+                    <form onSubmit={onSubmit} className="space-y-4">
                         <div>
-                            <label className="label text-xs">🚘 차량 <span className="text-red-500">*</span></label>
-                            <div className="grid grid-cols-3 gap-1.5">
+                            <label className="label text-sm font-medium">🚘 차량 <span className="text-red-500">*</span></label>
+                            <div className="grid grid-cols-3 gap-2 mt-1.5">
                                 {sortedActiveVehicles.map(v => {
                                     const isBlocked = isVehicleBlocked(v.maintenance);
                                     const count = usageCounts?.get(v.id) || 0;
@@ -155,15 +157,15 @@ export default function ReservationSidePanel({
                                             type="button"
                                             onClick={() => { if (!isBlocked) { setForm({ ...form, vehicleId: v.id }); setTimeout(() => destinationRef.current?.focus(), 50); } }}
                                             disabled={isBlocked}
-                                            className={`p-2 rounded-lg border text-left transition-all relative ${isBlocked
+                                            className={`p-2.5 rounded-xl border text-left transition-all relative ${isBlocked
                                                 ? 'border-surface-200 dark:border-surface-700 bg-surface-100 dark:bg-surface-800 opacity-50 cursor-not-allowed'
                                                 : form.vehicleId === v.id
-                                                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 ring-2 ring-primary-500/30'
-                                                    : 'border-surface-200 dark:border-surface-600 hover:border-surface-300 bg-white dark:bg-surface-800'
+                                                    ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/40 ring-1 ring-primary-500/50 shadow-md transform -translate-y-0.5'
+                                                    : 'border-surface-200 dark:border-surface-600 hover:border-surface-300 hover:bg-surface-50 bg-white dark:bg-surface-800 shadow-sm'
                                                 }`}
                                         >
                                             {count > 0 && !isBlocked && (
-                                                <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-primary-500 text-white text-[10px] font-bold flex items-center justify-center shadow-sm">
+                                                <span title={`최근 사용: ${count}회`} className="absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] px-1 rounded-full bg-primary-500 text-white text-[10px] font-bold flex items-center justify-center shadow-md">
                                                     {count}
                                                 </span>
                                             )}
@@ -202,14 +204,14 @@ export default function ReservationSidePanel({
                             </div>
                         )}
                         <div>
-                            <label className="label text-xs">📍 목적지 <span className="text-red-500">*</span></label>
-                            <div className="flex items-center gap-1.5">
+                            <label className="label text-sm font-medium">📍 목적지 <span className="text-red-500">*</span></label>
+                            <div className="flex items-center gap-1.5 mt-1">
                                 <input
                                     ref={destinationRef}
                                     type="text"
                                     value={form.destination}
                                     onChange={e => setForm({ ...form, destination: e.target.value })}
-                                    className="input text-sm flex-1"
+                                    className="input flex-1 text-sm"
                                     placeholder="예: 강남역, 서울역 (여러 곳 운행은 쉼표로 구분)"
                                     required
                                 />
@@ -249,20 +251,41 @@ export default function ReservationSidePanel({
                                     </div>
                                 </div>
                             )}
-                            {/* 즐겨찾기 칩 */}
-                            {favorites.length > 0 && (
+                            {/* 퀵 선택 (즐겨찾기 + 최근 목적지) 칩 */}
+                            {(favorites.length > 0 || recentDestinations.length > 0) && (
                                 <div className="flex flex-wrap gap-1.5 mt-2">
+                                    {/* 즐겨찾기 */}
                                     {favorites.map(fav => (
                                         <button
-                                            key={fav.id}
+                                            key={`fav-${fav.id}`}
                                             type="button"
                                             onClick={() => setForm({ ...form, destination: fav.address || fav.name })}
-                                            className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${form.destination === (fav.address || fav.name)
+                                            className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all flex items-center gap-1 shrink-0 ${form.destination === (fav.address || fav.name)
                                                 ? 'bg-amber-100 border-amber-300 text-amber-700 dark:bg-amber-900/40 dark:border-amber-700 dark:text-amber-300'
-                                                : 'bg-surface-50 dark:bg-surface-800 border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400 hover:border-amber-300 hover:bg-amber-50'
+                                                : 'bg-surface-50 dark:bg-surface-800 border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400 hover:border-amber-300 hover:bg-amber-50 dark:hover:border-amber-700 dark:hover:bg-amber-900/20'
                                                 }`}
                                         >
-                                            ⭐ {fav.name}
+                                            <span className="text-[10px]">⭐</span>
+                                            {fav.name}
+                                        </button>
+                                    ))}
+                                    {/* 구분선 (둘 다 있을 경우) */}
+                                    {favorites.length > 0 && recentDestinations.length > 0 && (
+                                        <div className="w-[1px] h-5 bg-surface-200 dark:bg-surface-700 mx-1 self-center" />
+                                    )}
+                                    {/* 최근 목적지 */}
+                                    {recentDestinations.filter(dest => !favorites.some(f => (f.address || f.name) === dest)).map(dest => (
+                                        <button
+                                            key={`recent-${dest}`}
+                                            type="button"
+                                            onClick={() => setForm({ ...form, destination: dest })}
+                                            className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all flex items-center gap-1 shrink-0 ${form.destination === dest
+                                                ? 'bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-900/40 dark:border-blue-700 dark:text-blue-300'
+                                                : 'bg-surface-50 dark:bg-surface-800 border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400 hover:border-blue-300 hover:bg-blue-50 dark:hover:border-blue-700 dark:hover:bg-blue-900/20'
+                                                }`}
+                                        >
+                                            <span className="text-[10px] opacity-70">🕒</span>
+                                            {dest}
                                         </button>
                                     ))}
                                 </div>
@@ -311,23 +334,24 @@ export default function ReservationSidePanel({
                             )}
                         </div>
                         <div>
-                            <label className="label text-xs">📝 목적</label>
+                            <label className="label text-sm font-medium">📝 목적</label>
                             <input
                                 type="text"
                                 value={form.purpose}
                                 onChange={e => setForm({ ...form, purpose: e.target.value })}
-                                className="input text-sm"
+                                className="input w-full mt-1 text-sm"
                                 placeholder="출장, 외근 등"
                             />
                         </div>
                         {/* 다일 예약 체크박스 (독립 행) */}
-                        <label className="flex items-center gap-2 cursor-pointer select-none ml-auto">
-                            <input
-                                type="checkbox"
-                                checked={!!(form.endDate && form.endDate > selectedDate)}
-                                onChange={e => {
-                                    if (e.target.checked) {
-                                        const next = new Date(selectedDate + 'T00:00');
+                        <div className="flex justify-end pt-1">
+                            <label className="flex items-center gap-2 cursor-pointer select-none px-2 py-1.5 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors">
+                                <input
+                                    type="checkbox"
+                                    checked={!!(form.endDate && form.endDate > selectedDate)}
+                                    onChange={e => {
+                                        if (e.target.checked) {
+                                            const next = new Date(selectedDate + 'T00:00');
                                         next.setDate(next.getDate() + 1);
                                         const y = next.getFullYear();
                                         const m = String(next.getMonth() + 1).padStart(2, '0');
@@ -337,18 +361,19 @@ export default function ReservationSidePanel({
                                         setForm({ ...form, endDate: '' });
                                     }
                                 }}
-                                className="w-3.5 h-3.5 rounded border-surface-300 dark:border-surface-600 text-primary-600 focus:ring-primary-500"
+                                className="w-4 h-4 rounded border-surface-300 dark:border-surface-600 text-primary-600 focus:ring-primary-500"
                             />
-                            <span className="text-xs text-surface-500 dark:text-surface-400">
+                            <span className="text-sm font-medium text-surface-600 dark:text-surface-300">
                                 다일 예약
                                 {form.endDate && form.endDate > selectedDate && (() => {
                                     const start = new Date(selectedDate + 'T00:00');
                                     const end = new Date(form.endDate + 'T00:00');
                                     const diffDays = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-                                    return <span className="text-blue-600 dark:text-blue-400 font-medium"> · {diffDays}일간</span>;
+                                    return <span className="text-blue-600 dark:text-blue-400 font-bold ml-1">· {diffDays}일간</span>;
                                 })()}
                             </span>
-                        </label>
+                            </label>
+                        </div>
                         {/* 시작일 / 종료일 (체크 시 표시, 나란히 한 줄) */}
                         {form.endDate && form.endDate > selectedDate && (
                             <div className="grid grid-cols-2 gap-2 animate-fade-in">
@@ -374,9 +399,9 @@ export default function ReservationSidePanel({
                             </div>
                         )}
                         {/* 시작/종료 시간 */}
-                        <div className="grid grid-cols-2 gap-2">
-                            <div>
-                                <label className="label text-xs">시작 시간</label>
+                        <div>
+                            <label className="label text-sm font-medium mb-1">⏰ 운행 시간</label>
+                            <div className="flex items-center gap-2 mt-1">
                                 <input
                                     type="time"
                                     value={form.startTime}
@@ -387,11 +412,9 @@ export default function ReservationSidePanel({
                                         const autoEnd = calcEndTime(val, routeInfo?.duration || 0);
                                         setForm({ ...form, startTime: val, endTime: autoEnd });
                                     }}
-                                    className="input text-sm px-2"
+                                    className="input flex-1 text-base font-medium px-2 text-center"
                                 />
-                            </div>
-                            <div>
-                                <label className="label text-xs">종료 시간</label>
+                                <span className="text-surface-400 font-bold px-1 text-lg">~</span>
                                 <input
                                     type="time"
                                     value={form.endTime}
@@ -401,7 +424,7 @@ export default function ReservationSidePanel({
                                         if (val <= form.startTime) return;
                                         setForm({ ...form, endTime: val });
                                     }}
-                                    className="input text-sm px-2"
+                                    className="input flex-1 text-base font-medium px-2 text-center"
                                 />
                             </div>
                         </div>
@@ -450,10 +473,10 @@ export default function ReservationSidePanel({
             {sideTab === 'list' && (
                 <div className="animate-fade-in">
                     {/* 차량별 타임라인 바 */}
-                    {vehicles.length > 0 && (
+                    {sortedActiveVehicles.length > 0 && (
                         <VehicleTimelineBar
-                            vehicles={vehicles}
-                            reservations={activeRes}
+                            vehicles={sortedActiveVehicles}
+                            reservations={selectedReservations.filter(r => r.status !== 'cancelled')}
                             onSlotClick={onSlotClick}
                             isPastDate={isPastDate}
                             isToday={isToday}

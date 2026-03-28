@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { getDriveLogs, getVehicles, getOrganizationMembers, getOrganization, cleanupDuplicateLogs, deleteDriveLog } from '../../lib/firestore';
+import { getDriveLogs, getVehicles, getOrganizationMembers, getOrganization, cleanupDuplicateLogs, deleteDriveLog, getAllDriveLogsForExport } from '../../lib/firestore';
 import { useToast } from '../../hooks/useToast';
 import { useConfirm } from '../../hooks/useConfirm';
 import { toLocalDateStr } from '../../lib/dateUtils';
@@ -83,12 +83,77 @@ export default function DriveLogList() {
     const orgId = userData?.organizationId;
     const PAGE_SIZE = 50;
 
+    const handleServerExport = async (period: string, includeHipass: boolean, isPdf: boolean) => {
+        if (!orgId) return;
+        
+        showToast('전체 데이터를 불러오고 있습니다. 잠시만 기다려주세요.', 'info');
+        
+        try {
+            const allLogs = await getAllDriveLogsForExport(orgId, {
+                vehicleId: filters.vehicleId || undefined,
+                driverUid: filters.driverUid || undefined,
+                startDate: filters.startDate || undefined,
+                endDate: filters.endDate || undefined
+            });
+
+            // 클라이언트사이드 검색어 필터링 적용 (만약 검색어가 입력되었다면)
+            const finalLogs = (allLogs as unknown as DriveLogEntry[]).filter((log: DriveLogEntry) => {
+                if (filters.search) {
+                    const s = filters.search.toLowerCase();
+                    return (
+                        log.driverName?.toLowerCase().includes(s) ||
+                        log.vehicleName?.toLowerCase().includes(s) ||
+                        log.purpose?.toLowerCase().includes(s) ||
+                        log.destination?.toLowerCase().includes(s)
+                    );
+                }
+                return true;
+            });
+            
+            if (finalLogs.length === 0) {
+                showToast('추출할 데이터가 없습니다.', 'warning');
+                return;
+            }
+
+            if (isPdf) {
+                const { downloadDriveLogsPdf } = await import('../../lib/pdfExport');
+                const defaultApproval = [{ title: '담당' }, { title: '팀장' }];
+                const useApproval = org?.hideApprovalLine
+                    ? []
+                    : ((org?.approvalLine?.length ?? 0) > 0 ? org!.approvalLine! : defaultApproval);
+                downloadDriveLogsPdf(finalLogs, {
+                    orgName: org?.name || '',
+                    period,
+                    approvalLine: useApproval,
+                    includeHipass,
+                    onError: (msg) => showToast(msg, 'error'),
+                });
+            } else {
+                const { downloadDriveLogsExcel } = await import('../../lib/excelExport');
+                await downloadDriveLogsExcel(finalLogs, `운행일지_${period}`, {
+                    onError: (msg) => showToast(msg, 'warning'),
+                    includeHipass,
+                });
+            }
+        } catch (err) {
+            console.error('Export 데이터 로드 실패:', err);
+            showToast('데이터를 불러오는데 실패했습니다.', 'error');
+        }
+    };
+
     useEffect(() => {
         if (!orgId) return;
         const fetch = async () => {
+            setLoading(true);
             try {
                 const [result, v, m, orgData] = await Promise.all([
-                    getDriveLogs(orgId, { limit: PAGE_SIZE }),
+                    getDriveLogs(orgId, { 
+                        limit: PAGE_SIZE,
+                        vehicleId: filters.vehicleId || undefined,
+                        driverUid: filters.driverUid || undefined,
+                        startDate: filters.startDate || undefined,
+                        endDate: filters.endDate || undefined
+                    }),
                     getVehicles(orgId),
                     getOrganizationMembers(orgId),
                     getOrganization(orgId),
@@ -106,13 +171,20 @@ export default function DriveLogList() {
             }
         };
         fetch();
-    }, [orgId]);
+    }, [orgId, filters.vehicleId, filters.driverUid, filters.startDate, filters.endDate]);
 
     const loadMore = async () => {
         if (!lastDoc || !hasMore || loadingMore) return;
         setLoadingMore(true);
         try {
-            const result = await getDriveLogs(orgId!, { limit: PAGE_SIZE, startAfter: lastDoc });
+            const result = await getDriveLogs(orgId!, { 
+                limit: PAGE_SIZE, 
+                startAfter: lastDoc,
+                vehicleId: filters.vehicleId || undefined,
+                driverUid: filters.driverUid || undefined,
+                startDate: filters.startDate || undefined,
+                endDate: filters.endDate || undefined
+            });
             setLogs(prev => [...prev, ...result.docs as unknown as DriveLogEntry[]]);
             setLastDoc(result.lastDoc as DocumentSnapshot | null);
             setHasMore(result.hasMore);
@@ -125,12 +197,7 @@ export default function DriveLogList() {
     };
 
     const filteredLogs = logs.filter(log => {
-        if (filters.vehicleId && log.vehicleId !== filters.vehicleId) return false;
-        if (filters.driverUid && log.driverUid !== filters.driverUid) return false;
-        // 기간 필터
-        const logDate = log.date || (log.timestamp?.toDate ? toLocalDateStr(log.timestamp.toDate()) : '');
-        if (filters.startDate && logDate < filters.startDate) return false;
-        if (filters.endDate && logDate > filters.endDate) return false;
+        // 서버사이드로 이미 필터링 되었으므로 클라이언트에서는 search 텍스트만 처리
         if (filters.search) {
             const s = filters.search.toLowerCase();
             return (
@@ -233,11 +300,7 @@ export default function DriveLogList() {
                                 return;
                             }
                             const period = `${filters.startDate}~${filters.endDate}`;
-                            const { downloadDriveLogsExcel } = await import('../../lib/excelExport');
-                            await downloadDriveLogsExcel(filteredLogs, `운행일지_${period}`, {
-                                onError: (msg) => showToast(msg, 'warning'),
-                                includeHipass,
-                            });
+                            handleServerExport(period, includeHipass, false);
                         }}
                         disabled={filteredLogs.length === 0}
                         className="btn-secondary btn-sm flex items-center gap-2 disabled:opacity-50"
@@ -262,18 +325,7 @@ export default function DriveLogList() {
                                 return;
                             }
                             const period = `${filters.startDate} ~ ${filters.endDate}`;
-                            const { downloadDriveLogsPdf } = await import('../../lib/pdfExport');
-                            const defaultApproval = [{ title: '담당' }, { title: '팀장' }];
-                            const useApproval = org?.hideApprovalLine
-                                ? []
-                                : ((org?.approvalLine?.length ?? 0) > 0 ? org!.approvalLine! : defaultApproval);
-                            downloadDriveLogsPdf(filteredLogs, {
-                                orgName: org?.name || '',
-                                period,
-                                approvalLine: useApproval,
-                                includeHipass,
-                                onError: (msg) => showToast(msg, 'error'),
-                            });
+                            handleServerExport(period, includeHipass, true);
                         }}
                         disabled={filteredLogs.length === 0}
                         className="btn-primary btn-sm flex items-center gap-2 disabled:opacity-50"

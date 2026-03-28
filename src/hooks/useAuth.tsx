@@ -63,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 // 앱 라우팅에서는 비로그인으로 취급한다.
                 if (firebaseUser && !firebaseUser.isAnonymous) {
                     setUser(firebaseUser);
+                    setLoading(true); // Firestore 데이터를 가져오기 전까지 라우팅 판단을 대기시킴
 
                     const startUserWatch = (retryCount = 0) => {
                         unsubscribeUser = onSnapshot(

@@ -46,6 +46,10 @@ export const createReservationSafe = onCall(
 
         try {
             const reservationId = await db.runTransaction(async (transaction) => {
+                // 부모 차량 문서를 먼저 읽어 Lock 획득 (Phantom Read 방지)
+                const vehicleRef = db.collection("vehicles").doc(vehicleId);
+                await transaction.get(vehicleRef);
+
                 const existingSnap = await transaction.get(
                     db.collection("reservations")
                         .where("organizationId", "==", organizationId)
@@ -55,15 +59,21 @@ export const createReservationSafe = onCall(
 
                 const overlapping = existingSnap.docs.find((doc) => {
                     const r = doc.data();
-                    if (r.status === "cancelled" || r.status === "completed") return false;
-                    return startTime < r.endTime && endTime > r.startTime;
+                    if (r.status === "cancelled") return false;
+                    
+                    const effStart = (r.status === "completed" && r.actualStartTime) ? r.actualStartTime : r.startTime;
+                    const effEnd = (r.status === "completed" && r.actualEndTime) ? r.actualEndTime : r.endTime;
+
+                    return startTime < effEnd && endTime > effStart;
                 });
 
                 if (overlapping) {
                     const r = overlapping.data();
+                    const effStart = (r.status === "completed" && r.actualStartTime) ? r.actualStartTime : r.startTime;
+                    const effEnd = (r.status === "completed" && r.actualEndTime) ? r.actualEndTime : r.endTime;
                     throw new HttpsError(
                         "already-exists",
-                        `해당 차량은 ${r.startTime} ~ ${r.endTime}에 이미 예약되어 있습니다.`
+                        `해당 차량은 ${effStart} ~ ${effEnd}에 이미 예약되어 있습니다.`
                     );
                 }
 

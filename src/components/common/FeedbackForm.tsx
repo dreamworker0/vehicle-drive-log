@@ -7,6 +7,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../lib/firebase';
 import { createFeedback } from '../../lib/firestore/feedbacks';
 import { useAuth } from '../../hooks/useAuth';
+import imageCompression from 'browser-image-compression';
 import type { CreateFeedbackData } from '../../types/feedback';
 
 interface FeedbackFormProps {
@@ -34,30 +35,18 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState('');
 
-    const compressImage = (file: File): Promise<Blob> => {
-        return new Promise((resolve) => {
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            const img = new Image();
-            img.onload = () => {
-                const maxSize = 1200;
-                let { width, height } = img;
-                if (width > height && width > maxSize) {
-                    height = (height * maxSize) / width;
-                    width = maxSize;
-                } else if (height > maxSize) {
-                    width = (width * maxSize) / height;
-                    height = maxSize;
-                }
-                canvas.width = width;
-                canvas.height = height;
-                ctx?.drawImage(img, 0, 0, width, height);
-                canvas.toBlob((blob) => {
-                    if (blob) resolve(blob);
-                }, 'image/jpeg', 0.7);
-            };
-            img.src = URL.createObjectURL(file);
-        });
+    const compressImage = async (file: File): Promise<File> => {
+        try {
+            return await imageCompression(file, {
+                maxSizeMB: 1,
+                maxWidthOrHeight: 1200,
+                useWebWorker: true,
+                fileType: 'image/jpeg'
+            });
+        } catch (e) {
+            console.error('피드백 첨부 이미지 압축 실패:', e);
+            return file; // 실패 시 원본
+        }
     };
 
     const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -132,6 +121,7 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
                 userEmail: user.email || '',
                 userName: user.displayName || userData?.name || '',
                 organizationId: userData?.organizationId || '',
+                authorUid: user.uid,
             };
 
             await createFeedback(feedbackData);
@@ -195,6 +185,12 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
                         </svg>
                         <span>혹시 찾는 답이 있을지도? <strong className="underline">자주 하는 질문(FAQ)</strong> 확인하기</span>
                     </a>
+                </div>
+
+                {/* 답변 알림 안내 */}
+                <div className="mx-5 mt-2 flex items-center gap-1.5 text-xs text-surface-400 dark:text-surface-500">
+                    <span>💬</span>
+                    <span>보내신 의견에 대한 답변은 화면 우상단 알림으로 전달됩니다.</span>
                 </div>
 
                 {/* 폼 */}

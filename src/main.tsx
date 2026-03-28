@@ -26,6 +26,21 @@ root.innerHTML = `
   <style>@keyframes spin{to{transform:rotate(360deg)}}</style>
 `;
 
+// 기존 SW가 있으면 즉시 업데이트 체크 (구버전 캐시 방지)
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.ready.then((reg) => {
+    reg.update().catch(() => { /* 네트워크 에러 무시 */ });
+  });
+  // 새 SW가 활성화되면 자동 새로고침 (배포 후 즉시 반영)
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!refreshing) {
+      refreshing = true;
+      window.location.reload();
+    }
+  });
+}
+
 // persistence 설정 완료를 기다린 뒤 Auth 상태 확인
 authReady.then(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {

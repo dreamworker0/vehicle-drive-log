@@ -1,6 +1,8 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { subscribeFeedbacks, updateFeedback, deleteFeedback, getOrganization } from '../lib/firestore';
+import { getAllFeedbacks, updateFeedback, deleteFeedback, getOrganization } from '../lib/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import type { Feedback } from '../types';
+import { useToast } from './useToast';
 
 function getTime(fb: Feedback) {
     const t = fb.createdAt;
@@ -11,10 +13,11 @@ function getTime(fb: Feedback) {
 }
 
 export default function useFeedbackManagement() {
+    const { showToast } = useToast();
     const [feedbacks, setFeedbacks] = useState<Feedback[]>([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
-    const [filter, setFilter] = useState<'all' | 'unread' | 'read'>('unread');
+    const [filter, setFilter] = useState<'all' | 'unread' | 'resolved'>('unread');
     const [selectedImage, setSelectedImage] = useState<string | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<Feedback | null>(null);
     const [deleting, setDeleting] = useState(false);
@@ -24,9 +27,14 @@ export default function useFeedbackManagement() {
     const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
     const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
     const [copiedMessage, setCopiedMessage] = useState<string | null>(null);
+    const [sendingReply, setSendingReply] = useState<string | null>(null);
+    const [replyError, setReplyError] = useState<string | null>(null);
+    const [regeneratingDraftId, setRegeneratingDraftId] = useState<string | null>(null);
 
     useEffect(() => {
-        const unsub = subscribeFeedbacks((data) => {
+        let isMounted = true;
+        getAllFeedbacks(300).then((data) => {
+            if (!isMounted) return;
             setFeedbacks(data as Feedback[]);
             setLoading(false);
 
@@ -38,16 +46,22 @@ export default function useFeedbackManagement() {
                     const org = await getOrganization(id);
                     return [id, (org as Record<string, unknown>)?.name as string || id] as [string, string];
                 })).then(entries => {
-                    setOrgNames(prev => ({ ...prev, ...Object.fromEntries(entries) }));
+                    if (isMounted) {
+                        setOrgNames(prev => ({ ...prev, ...Object.fromEntries(entries) }));
+                    }
                 });
             }
+        }).catch(err => {
+            console.error(err);
+            if (isMounted) setLoading(false);
         });
-        return () => unsub();
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- 초기 마운트 시 1회만 구독, orgNames 변화로 재구독하면 안 됨
+
+        return () => { isMounted = false; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const handleToggleRead = useCallback(async (fb: Feedback) => {
-        const newStatus = fb.status === 'read' ? 'unread' : 'read';
+    const handleToggleResolve = useCallback(async (fb: Feedback) => {
+        const newStatus = (fb.status === 'read' || fb.status === 'resolved') ? 'unread' : 'resolved';
         try {
             await updateFeedback(fb.id, { status: newStatus });
             setFeedbacks(prev =>
@@ -74,8 +88,8 @@ export default function useFeedbackManagement() {
 
     // 필터링
     const filteredRaw = feedbacks.filter(fb => {
-        if (filter === 'unread' && fb.status === 'read') return false;
-        if (filter === 'read' && fb.status !== 'read') return false;
+        if (filter === 'unread' && (fb.status === 'read' || fb.status === 'resolved')) return false;
+        if (filter === 'resolved' && fb.status === 'unread') return false;
 
         if (searchQuery.trim()) {
             const q = searchQuery.toLowerCase();
@@ -90,21 +104,23 @@ export default function useFeedbackManagement() {
 
     // 정렬/그룹핑
     const groupedFeedbacks = useMemo(() => {
-        const groups = new Map<string, { key: string; name: string; email: string; items: Feedback[]; unreadCount: number }>();
+        const groups = new Map<string, { key: string; name: string; email: string; orgName: string; items: Feedback[]; unreadCount: number }>();
         for (const fb of filteredRaw) {
             const key = fb.userEmail || fb.userName || fb.id;
             if (!groups.has(key)) {
+                const orgId = fb.organizationId || '';
                 groups.set(key, {
                     key,
                     name: fb.userName || '이름 없음',
                     email: fb.userEmail || '',
+                    orgName: fb.organizationName || (orgId ? (orgNames[orgId] || '') : ''),
                     items: [],
                     unreadCount: 0,
                 });
             }
             const group = groups.get(key)!;
             group.items.push(fb);
-            if (fb.status !== 'read') group.unreadCount++;
+            if (fb.status !== 'read' && fb.status !== 'resolved') group.unreadCount++;
         }
 
         for (const group of groups.values()) {
@@ -114,7 +130,7 @@ export default function useFeedbackManagement() {
         return [...groups.values()].sort(
             (a, b) => getTime(b.items[0]) - getTime(a.items[0])
         );
-    }, [filteredRaw]);
+    }, [filteredRaw, orgNames]);
 
     const toggleGroup = useCallback((key: string) => {
         setExpandedGroups(prev => {
@@ -147,8 +163,48 @@ export default function useFeedbackManagement() {
         }
     }, []);
 
+    // AI 초안 강제 재생성
+    const handleRegenerateDraft = useCallback(async (feedbackId: string) => {
+        setRegeneratingDraftId(feedbackId);
+        try {
+            const fns = getFunctions(undefined, 'asia-northeast3');
+            const fn = httpsCallable(fns, 'regenerateFeedbackDraft');
+            await fn({ feedbackId });
+            // firestore 구독(subscribeFeedbacks)이 동작하여 화면(AI 초안 결과)이 자동 갱신됨
+        } catch (err) {
+            console.error('AI 초안 재생성 실패:', err);
+            showToast('초안을 새로 생성하지 못했습니다. 콘솔 로그를 확인해주세요.', 'error');
+        } finally {
+            setRegeneratingDraftId(null);
+        }
+    }, []);
+
+    // 답변 발송
+    const handleSendReply = useCallback(async (feedbackId: string, replyText: string) => {
+        setSendingReply(feedbackId);
+        setReplyError(null);
+        try {
+            const fns = getFunctions(undefined, 'asia-northeast3');
+            const fn = httpsCallable(fns, 'sendFeedbackReply');
+            await fn({ feedbackId, replyText });
+            // 로컬 상태 즉시 업데이트
+            setFeedbacks(prev =>
+                prev.map(f => f.id === feedbackId
+                    ? { ...f, reply: replyText, status: 'resolved' as const, repliedBy: 'superAdmin' as const }
+                    : f
+                )
+            );
+        } catch (err) {
+            console.error('답변 발송 실패:', err);
+            setReplyError('답변 발송에 실패했습니다. 다시 시도해주세요.');
+        } finally {
+            setSendingReply(null);
+        }
+    }, []);
+
     const totalFiltered = groupedFeedbacks.reduce((s, g) => s + g.items.length, 0);
-    const unreadCount = feedbacks.filter(f => f.status !== 'read').length;
+    const unreadCount = feedbacks.filter(f => f.status !== 'read' && f.status !== 'resolved').length;
+    const resolvedCount = feedbacks.filter(f => f.status === 'read' || f.status === 'resolved').length;
 
     return {
         loading,
@@ -168,13 +224,19 @@ export default function useFeedbackManagement() {
         expandedGroups,
         copiedEmail,
         copiedMessage,
-        handleToggleRead,
+        sendingReply,
+        replyError,
+        regeneratingDraftId,
+        handleToggleResolve,
         handleDelete,
+        handleSendReply,
+        handleRegenerateDraft,
         groupedFeedbacks,
         toggleGroup,
         handleCopyEmail,
         handleCopyMessage,
         totalFiltered,
         unreadCount,
+        resolvedCount,
     };
 }

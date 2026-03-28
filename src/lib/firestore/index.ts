@@ -24,9 +24,6 @@ export {
     permanentDeleteOrganization,
     restoreOrganization,
     getPendingOrganizations,
-    subscribePendingOrganizations,
-    subscribeApprovedOrganizations,
-    subscribeRejectedOrganizations,
     getRejectedOrganizations,
     getDeletedOrganizations,
     getApprovedOrganizations,
@@ -54,6 +51,8 @@ export {
     getLastVehicleEndBattery,
     getVehicleEndKmBefore,
     getDriveLogs,
+    getDriveLogCount,
+    getAllDriveLogsForExport,
     getMyDriveLogs,
     updateDriveLog,
     getVehicleDriveLogs,
@@ -118,7 +117,6 @@ export {
     getAllFeedbacks,
     updateFeedback,
     deleteFeedback,
-    subscribeFeedbacks,
 } from './feedbacks';
 
 // 주유 기록 (Fuel Logs)

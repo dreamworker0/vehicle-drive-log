@@ -47,14 +47,15 @@ export const getMinStartTime = (isToday: boolean) => isToday ? getCurrentTimeStr
  * @returns {Object|null} 중복 예약이 있으면 해당 예약 반환, 없으면 null
  */
 export function findOverlappingReservation(reservations: Reservation[], { vehicleId, date, startTime, endTime, excludeId = null }: { vehicleId: string; date: string; startTime: string; endTime: string; excludeId?: string | null }) {
-    return reservations.find((r) =>
-        r.vehicleId === vehicleId &&
-        r.date === date &&
-        r.status !== 'cancelled' &&
-        r.status !== 'completed' &&
-        (!excludeId || r.id !== excludeId) &&
-        startTime < r.endTime && endTime > r.startTime
-    ) || null;
+    return reservations.find((r) => {
+        if (r.vehicleId !== vehicleId || r.date !== date || r.status === 'cancelled') return false;
+        if (excludeId && r.id === excludeId) return false;
+        
+        const effStart = (r.status === 'completed' && r.actualStartTime) ? r.actualStartTime : r.startTime;
+        const effEnd = (r.status === 'completed' && r.actualEndTime) ? r.actualEndTime : r.endTime;
+        
+        return startTime < effEnd && endTime > effStart;
+    }) || null;
 }
 
 /**
@@ -64,14 +65,15 @@ export function findOverlappingReservation(reservations: Reservation[], { vehicl
  * @returns {Object|null} 중복 예약이 있으면 해당 예약 반환, 없으면 null
  */
 export function findUserOverlappingReservation(reservations: Reservation[], { reservedByUid, date, startTime, endTime, excludeId = null }: { reservedByUid: string; date: string; startTime: string; endTime: string; excludeId?: string | null }) {
-    return reservations.find((r) =>
-        r.reservedByUid === reservedByUid &&
-        r.date === date &&
-        r.status !== 'cancelled' &&
-        r.status !== 'completed' &&
-        (!excludeId || r.id !== excludeId) &&
-        startTime < r.endTime && endTime > r.startTime
-    ) || null;
+    return reservations.find((r) => {
+        if (r.reservedByUid !== reservedByUid || r.date !== date || r.status === 'cancelled') return false;
+        if (excludeId && r.id === excludeId) return false;
+        
+        const effStart = (r.status === 'completed' && r.actualStartTime) ? r.actualStartTime : r.startTime;
+        const effEnd = (r.status === 'completed' && r.actualEndTime) ? r.actualEndTime : r.endTime;
+        
+        return startTime < effEnd && endTime > effStart;
+    }) || null;
 }
 
 /**

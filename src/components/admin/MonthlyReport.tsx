@@ -3,9 +3,10 @@
  * 로직은 useMonthlyReport 훅 사용
  * 차트는 ReportCharts, 테이블은 ReportTables 서브 컴포넌트로 분리
  */
-import { useState } from 'react';
+import { useState, Suspense, lazy } from 'react';
 import useMonthlyReport from '../../hooks/useMonthlyReport';
-import ReportCharts from './ReportCharts';
+
+const ReportCharts = lazy(() => import('./ReportCharts'));
 import ReportTables from './ReportTables';
 
 const PERIOD_OPTIONS = [
@@ -170,18 +171,20 @@ export default function MonthlyReport() {
                     </div>
 
                     {activeTab === 'charts' ? (
-                        <ReportCharts
-                            driverData={driverData}
-                            vehicleData={vehicleData}
-                            purposeData={purposeData}
-                            dayOfWeekData={dayOfWeekData}
-                            hourlyData={hourlyData}
-                            vehicleFuelData={vehicleFuelData}
-                            dailyTrendData={dailyTrendData}
-                            fuelLogStats={fuelLogStats}
-                            hipassChargeStats={hipassChargeStats}
-                            costTrendData={costTrendData}
-                        />
+                        <Suspense fallback={<div className="p-10 text-center text-surface-400 spinner mx-auto">차트를 불러오는 중...</div>}>
+                            <ReportCharts
+                                driverData={driverData}
+                                vehicleData={vehicleData}
+                                purposeData={purposeData}
+                                dayOfWeekData={dayOfWeekData}
+                                hourlyData={hourlyData}
+                                vehicleFuelData={vehicleFuelData}
+                                dailyTrendData={dailyTrendData}
+                                fuelLogStats={fuelLogStats}
+                                hipassChargeStats={hipassChargeStats}
+                                costTrendData={costTrendData}
+                            />
+                        </Suspense>
                     ) : (
                         <ReportTables
                             driverData={driverData}

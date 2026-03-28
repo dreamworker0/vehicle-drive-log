@@ -29,6 +29,25 @@ export default function ReservationCard({
 }: ReservationCardProps) {
     const isButtonDisabled = disabled || startingId === reservation.id;
 
+    // 운행 시작 임박 여부 계산 (오늘 30분 전 ~ 15분 경과)
+    const isSoon = (() => {
+        if (isInProgress) return false;
+        try {
+            const now = new Date();
+            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            // reservation.date가 없을 수 있으나 대부분 존재
+            if ((reservation as any).date && (reservation as any).date !== todayStr) return false;
+
+            const [hours, minutes] = reservation.startTime.split(':').map(Number);
+            const resTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes);
+            const diffMin = (resTime.getTime() - now.getTime()) / (1000 * 60);
+
+            return diffMin >= -15 && diffMin <= 30;
+        } catch {
+            return false;
+        }
+    })();
+
     // 설정된 기본 앱 읽기
     const preferredApp = (() => {
         try { return localStorage.getItem('preferred-nav-app') || 'naver'; } catch { return 'naver'; }
@@ -43,18 +62,25 @@ export default function ReservationCard({
     };
 
     return (
-        <div className={isInProgress ? 'driving-card' : 'glass-card px-4 py-3 border-l-4 border-l-primary-400'}>
+        <div className={
+            isInProgress ? 'driving-card' : 
+            isSoon ? 'glass-card px-4 py-3 border-l-4 border-l-amber-500 shadow-md ring-1 ring-amber-500/50 bg-amber-50/10 dark:bg-amber-900/10' : 
+            'glass-card px-4 py-3 border-l-4 border-l-primary-400'
+        }>
             {isInProgress && <div className="driving-progress-bar" />}
             <div className={isInProgress ? 'p-4' : ''}>
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
-                        <span className={`${isInProgress ? 'w-12 h-12 text-xl' : 'w-8 h-8 text-sm'} rounded-lg flex items-center justify-center flex-shrink-0 ${vehicle ? getVehicleColor(vehicle.id) : 'bg-surface-100'} transition-all`}>
+                        <span className={`${isInProgress ? 'w-12 h-12 text-xl' : isSoon ? 'w-10 h-10 text-base shadow-sm ring-1 ring-amber-200 dark:ring-amber-700/50' : 'w-8 h-8 text-sm'} rounded-lg flex items-center justify-center flex-shrink-0 ${vehicle ? getVehicleColor(vehicle.id) : 'bg-surface-100'} transition-all`}>
                             <span style={isInProgress ? { display: 'inline-block', animation: 'carDrive 0.8s ease-in-out infinite' } : {}}>
                                 {VEHICLE_TYPE_ICONS[vehicle?.vehicleType ?? ''] || '🚗'}
                             </span>
                         </span>
                         <div className="min-w-0">
-                            <p className={`${isInProgress ? 'font-bold text-amber-900 dark:text-amber-200 text-base' : 'font-medium text-surface-800 dark:text-surface-200 text-sm'}`}>{reservation.vehicleName || vehicle?.displayName || vehicle?.name || ''}</p>
+                            {isSoon && (
+                                <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400 animate-pulse tracking-wide mb-0.5">🚀 운행 시작 임박</p>
+                            )}
+                            <p className={`${isInProgress ? 'font-bold text-amber-900 dark:text-amber-200 text-base' : isSoon ? 'font-bold text-surface-900 dark:text-surface-100 text-sm' : 'font-medium text-surface-800 dark:text-surface-200 text-sm'}`}>{reservation.vehicleName || vehicle?.displayName || vehicle?.name || ''}</p>
                             <p className={`text-xs ${isInProgress ? 'text-amber-700/70 dark:text-amber-300/80' : 'text-surface-500 dark:text-surface-300'}`}>
                                 {reservation.startTime} ~ {reservation.endTime}
                                 {reservation.destination && ` · ${reservation.destination}`}
@@ -74,14 +100,14 @@ export default function ReservationCard({
                         </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                        <div className="flex flex-col gap-1.5">
+                        <div className="flex flex-col gap-2">
                             {isInProgress ? (
                                 <>
                                     <span className="driving-badge">
                                         <span className="driving-dot" />
                                         운행 중
                                     </span>
-                                    <button onClick={() => onArrival(reservation)} className="btn-sm bg-amber-600 dark:bg-amber-500 text-white hover:bg-amber-700 dark:hover:bg-amber-400 text-xs whitespace-nowrap font-bold shadow-md hover:shadow-lg transition-all">
+                                    <button onClick={() => onArrival(reservation)} className="btn-sm py-2 px-3 bg-amber-600 dark:bg-amber-500 text-white hover:bg-amber-700 dark:hover:bg-amber-400 text-sm whitespace-nowrap font-bold shadow-md hover:shadow-lg transition-all rounded-lg">
                                         🏁 도착
                                     </button>
                                 </>
@@ -94,12 +120,17 @@ export default function ReservationCard({
                                             <button
                                                 onClick={() => handleNavSelect(preferredApp)}
                                                 disabled={isButtonDisabled}
-                                                className="btn-sm !min-h-0 py-1.5 bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-500 text-xs whitespace-nowrap shadow-sm"
+                                                className={`w-full rounded-xl py-2.5 px-4 font-semibold text-sm ${isSoon ? 'bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700' : 'bg-blue-500 dark:bg-blue-600 text-white hover:bg-blue-600 dark:hover:bg-blue-500'} whitespace-nowrap shadow-sm transition-colors inline-flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed`}
                                                 title={`${NAV_LABELS[preferredApp]} 길안내`}
                                             >
-                                                🗺️ {NAV_LABELS[preferredApp]}
+                                                <span>🗺️</span>
+                                                {NAV_LABELS[preferredApp]}
                                             </button>
-                                            <button onClick={() => onStartDrive(reservation)} disabled={isButtonDisabled} className="btn-sm !min-h-0 py-1.5 btn-primary dark:bg-primary-500 dark:hover:bg-primary-400 text-xs whitespace-nowrap">
+                                            <button 
+                                                onClick={() => onStartDrive(reservation)} 
+                                                disabled={isButtonDisabled} 
+                                                className={`w-full rounded-xl py-2.5 px-4 font-bold text-sm ${isSoon ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-md' : 'btn-primary dark:bg-primary-500 dark:hover:bg-primary-400'} whitespace-nowrap transition-colors inline-flex items-center justify-center flex-1 disabled:opacity-50 disabled:cursor-not-allowed`}
+                                            >
                                                 {startingId === reservation.id ? <div className="w-4 h-4 spinner" /> : '운행 시작'}
                                             </button>
                                         </>

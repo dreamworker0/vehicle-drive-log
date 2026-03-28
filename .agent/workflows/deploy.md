@@ -37,3 +37,6 @@ fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression; fnm use
 ```
 Working directory: `.`
 ⚠️ exit code 1로 실패하면 최대 2회 재시도한다.
+💡 `functions/` 디렉터리에 변경이 없으면 이 단계를 **건너뛴다**.
+   - 판단 기준: `src/`, `public/`, 타입 정의 등 프론트엔드 코드만 변경된 경우 → 스킵
+   - `functions/src/` 안의 파일이 변경된 경우 → 반드시 실행

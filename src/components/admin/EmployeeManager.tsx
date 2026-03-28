@@ -226,7 +226,7 @@ export default function EmployeeManager() {
                                             {isActive && (
                                                 <>
                                                     <select
-                                                        value={member.role}
+                                                        value={member.role || 'employee'}
                                                         onChange={(e) => handleChangeRole(member.original, e.target.value)}
                                                         disabled={isSelf}
                                                         title={isSelf ? '자신의 역할은 변경할 수 없습니다' : ''}

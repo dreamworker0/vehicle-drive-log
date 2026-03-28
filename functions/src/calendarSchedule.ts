@@ -56,6 +56,10 @@ export const syncCalendarToApp = onSchedule(
             let totalCreated = 0;
             let totalUpdated = 0;
             let totalCancelled = 0;
+            let totalSkippedDup = 0;
+
+            // 동일 calendarEventId가 여러 차량 캘린더에 존재할 때 중복 예약 방지
+            const globalProcessedEventIds = new Set<string>();
 
             for (let i = 0; i < vehiclesSnap.docs.length; i++) {
                 const vehicleDoc = vehiclesSnap.docs[i];
@@ -95,6 +99,10 @@ export const syncCalendarToApp = onSchedule(
                         existingReservations.push(data);
                         if (data.calendarEventId) {
                             existingByEventId[data.calendarEventId as string] = data;
+                            // 이미 존재하는 예약의 calendarEventId를 전역 Set에 등록
+                            if (data.status !== "cancelled") {
+                                globalProcessedEventIds.add(data.calendarEventId as string);
+                            }
                         }
                     });
 
@@ -109,6 +117,13 @@ export const syncCalendarToApp = onSchedule(
                         const existing = existingByEventId[calEvent.id];
 
                         if (!existing) {
+                            // 같은 calendarEventId가 다른 차량에서 이미 처리되었으면 건너뛰기
+                            if (globalProcessedEventIds.has(calEvent.id)) {
+                                totalSkippedDup++;
+                                console.log("[" + vehicleName + "] Skip duplicate calendarEventId: " + calEvent.id + " (" + calEvent.summary + ")");
+                                continue;
+                            }
+
                             // 새 이벤트 -> Firestore에 예약 생성
                             const reservationData = parseEventToReservation(
                                 calEvent, vehicleId, vehicleName, organizationId
@@ -132,6 +147,7 @@ export const syncCalendarToApp = onSchedule(
 
                             reservationData.createdAt = new Date();
                             await db.collection("reservations").add(reservationData);
+                            globalProcessedEventIds.add(calEvent.id);
                             totalCreated++;
                             console.log("[" + vehicleName + "] New reservation: " + calEvent.summary + " (" + calEvent.id + ")");
                         } else {
@@ -181,7 +197,7 @@ export const syncCalendarToApp = onSchedule(
                 }
             }
 
-            console.log("=== Reverse sync done: created " + totalCreated + ", updated " + totalUpdated + ", cancelled " + totalCancelled + " ===");
+            console.log("=== Reverse sync done: created " + totalCreated + ", updated " + totalUpdated + ", cancelled " + totalCancelled + ", skippedDup " + totalSkippedDup + " ===");
         } catch (err: unknown) {
             console.error("Reverse sync overall failed:", (err as Error).message);
         }

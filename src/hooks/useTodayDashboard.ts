@@ -263,6 +263,19 @@ export default function useTodayDashboard() {
         }
     };
 
+    // 자주 타는 차량 정렬 (첫 번째 차량 추출용)
+    const sortedActiveVehicles = useMemo(() => {
+        return vehicles
+            .filter(v => !v.retired?.isRetired)
+            .sort((a, b) => {
+                const countDiff = (vehicleUsageCounts.get(b.id) || 0) - (vehicleUsageCounts.get(a.id) || 0);
+                if (countDiff !== 0) return countDiff;
+                return (a.name || '').localeCompare(b.name || '');
+            });
+    }, [vehicles, vehicleUsageCounts]);
+
+    const firstVehicleId = sortedActiveVehicles.length > 0 ? sortedActiveVehicles[0].id : undefined;
+
     const navigateToArrival = (res: Reservation) => {
         const vehicle = vehicles.find(v => v.id === res.vehicleId);
         navigate('/employee/drive-log', {
@@ -281,13 +294,13 @@ export default function useTodayDashboard() {
     };
 
     const navigateToReservations = () => {
-        navigate('/employee/reservations', { state: { openForm: true } });
+        navigate('/employee/reservations', { state: { openForm: true, defaultVehicleId: firstVehicleId } });
     };
 
     const navigateToQuickDrive = () => {
         navigate('/employee/quick-drive', {
             state: {
-                recommendedVehicleId: recommendedVehicle?.id || null,
+                recommendedVehicleId: firstVehicleId || null,
             },
         });
     };

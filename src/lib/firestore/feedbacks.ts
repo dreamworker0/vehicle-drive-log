@@ -4,7 +4,7 @@
 import {
     doc, updateDoc, deleteDoc,
     collection, query, getDocs, addDoc,
-    orderBy, limit, serverTimestamp, onSnapshot,
+    orderBy, limit, serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { Feedback, CreateFeedbackData } from '../../types/feedback';
@@ -37,16 +37,4 @@ export const updateFeedback = async (feedbackId: string, data: Record<string, un
 // 피드백 삭제
 export const deleteFeedback = async (feedbackId: string) => {
     await deleteDoc(doc(db, 'feedbacks', feedbackId));
-};
-
-// 피드백 실시간 구독 (사이드바 배지용)
-export const subscribeFeedbacks = (callback: (feedbacks: Feedback[]) => void) => {
-    const q = query(
-        collection(db, 'feedbacks'),
-        orderBy('createdAt', 'desc')
-    );
-    return onSnapshot(q, (snap) => {
-        const feedbacks = snap.docs.map(d => ({ id: d.id, ...d.data() }) as Feedback);
-        callback(feedbacks);
-    });
 };

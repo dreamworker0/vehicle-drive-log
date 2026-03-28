@@ -5,7 +5,6 @@ import {
     doc, getDoc, updateDoc,
     collection, query, where, getDocs, addDoc,
     orderBy, limit, serverTimestamp, writeBatch,
-    onSnapshot,
     type DocumentData,
 } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -120,45 +119,6 @@ export const getPendingOrganizations = async () => {
     );
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
-};
-
-// 대기 중 기관 실시간 구독 (사이드바 배지용)
-export const subscribePendingOrganizations = (callback: (orgs: (DocumentData & { id: string })[]) => void) => {
-    const q = query(
-        collection(db, 'organizations'),
-        where('status', '==', 'pending'),
-        orderBy('createdAt', 'desc')
-    );
-    return onSnapshot(q, (snap) => {
-        const orgs = snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
-        callback(orgs);
-    });
-};
-
-// 승인된 기관 실시간 구독
-export const subscribeApprovedOrganizations = (callback: (orgs: (DocumentData & { id: string })[]) => void) => {
-    const q = query(
-        collection(db, 'organizations'),
-        where('status', '==', 'approved'),
-        orderBy('createdAt', 'desc')
-    );
-    return onSnapshot(q, (snap) => {
-        const orgs = snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
-        callback(orgs);
-    });
-};
-
-// 거절된 기관 실시간 구독
-export const subscribeRejectedOrganizations = (callback: (orgs: (DocumentData & { id: string })[]) => void) => {
-    const q = query(
-        collection(db, 'organizations'),
-        where('status', '==', 'rejected'),
-        orderBy('createdAt', 'desc')
-    );
-    return onSnapshot(q, (snap) => {
-        const orgs = snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
-        callback(orgs);
-    });
 };
 
 // 거절된 기관 목록 조회

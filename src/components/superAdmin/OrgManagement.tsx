@@ -32,7 +32,6 @@ export default function OrgManagement() {
     const [changingRole, setChangingRole] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'active' | 'inactive' | 'deleted'>('active');
     const [deletingOrgId, setDeletingOrgId] = useState<string | null>(null);
-    const [sendingReminder, setSendingReminder] = useState(false);
     const { showToast } = useToast();
     const { confirm } = useConfirm();
 
@@ -200,33 +199,6 @@ export default function OrgManagement() {
         }
     };
 
-    const handleSendBulkReminder = async () => {
-        if (!await confirm({
-            title: '📢 일괄 알림톡 발송',
-            message: `미활성 기관 ${inactiveOrgs.length}곳에 리마인드 알림톡을 발송하시겠습니까?\n\n각 기관의 신청자 연락처로 카카오 알림톡이 전송됩니다.`,
-            confirmText: '발송',
-        })) return;
-
-        setSendingReminder(true);
-        try {
-            const sendBulkReminder = httpsCallable(getFunctions(undefined, 'asia-northeast3'), 'sendBulkReminder');
-            const result = await sendBulkReminder();
-            const data = result.data as { sentCount: number; failCount: number; noPhoneCount: number };
-
-            const parts = [];
-            if (data.sentCount > 0) parts.push(`성공 ${data.sentCount}건`);
-            if (data.failCount > 0) parts.push(`실패 ${data.failCount}건`);
-            if (data.noPhoneCount > 0) parts.push(`번호없음 ${data.noPhoneCount}건`);
-
-            showToast(`알림톡 발송 완료: ${parts.join(', ')}`, data.failCount > 0 ? 'warning' : 'success');
-        } catch (err: unknown) {
-            console.error('일괄 알림톡 발송 실패:', err);
-            showToast((err as Error)?.message || '발송에 실패했습니다.', 'error');
-        } finally {
-            setSendingReminder(false);
-        }
-    };
-
     if (loading) {
         return (
             <div className="flex items-center justify-center py-20">
@@ -311,31 +283,6 @@ export default function OrgManagement() {
                             placeholder="기관명, 고유번호, 주소, 신청자 검색"
                         />
                     </div>
-                </div>
-            )}
-
-            {/* 미활성 기관 일괄 알림톡 발송 버튼 */}
-            {activeTab === 'inactive' && inactiveOrgs.length > 0 && (
-                <div className="mb-4">
-                    <button
-                        onClick={handleSendBulkReminder}
-                        disabled={sendingReminder}
-                        className="w-full py-3 px-4 rounded-xl text-sm font-semibold transition-all
-                            bg-amber-500 hover:bg-amber-600 dark:bg-amber-600 dark:hover:bg-amber-500 text-white
-                            disabled:opacity-50 disabled:cursor-not-allowed
-                            flex items-center justify-center gap-2"
-                    >
-                        {sendingReminder ? (
-                            <>
-                                <div className="w-4 h-4 spinner" />
-                                발송 중...
-                            </>
-                        ) : (
-                            <>
-                                📢 미활성 기관 일괄 알림톡 발송 ({inactiveOrgs.length}곳)
-                            </>
-                        )}
-                    </button>
                 </div>
             )}
 
