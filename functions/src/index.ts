@@ -5,16 +5,16 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 // 시스템 전역 옵션 - 유휴 리소스 절감 및 불필요한 과금 방지
 setGlobalOptions({ 
     maxInstances: 10, 
-    memory: "128MiB", 
+    memory: "256MiB", 
     timeoutSeconds: 60, 
     region: "asia-northeast3" 
 });
 
-// Sentry 에러 모니터링 초기화 (모든 함수 실행 전에 활성화)
-import "./sentry";
-
-// Firebase Admin 초기화
+// Firebase Admin 초기화 (모든 다른 모듈보다 먼저 실행되어야 함)
 initializeApp();
+
+// Sentry 에러 모니터링 초기화 (initializeApp 이후에 로드)
+import "./sentry";
 
 // OCR Functions
 export { ocrDashboard } from "./ocrDashboard";
