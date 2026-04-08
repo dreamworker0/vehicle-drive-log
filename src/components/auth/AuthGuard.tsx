@@ -67,9 +67,15 @@ export function AuthGuard({
 
   // 1. 비로그인 상태 가드 (Guest 전용 라우트 접근 시 대시보드로 이동)
   if (requireGuest && user) {
-    if (isSuperAdmin && !saTestRole) return <Navigate to="/super-admin" replace />;
-    if (userData?.role === 'admin') return <Navigate to="/admin" replace />;
-    if (userData?.role === 'employee') return <Navigate to="/employee" replace />;
+    let effectiveRole = userData?.role;
+    if (isSuperAdmin && saTestRole) {
+      if (saTestRole === 'admin') effectiveRole = 'admin';
+      else if (saTestRole === 'employee') effectiveRole = 'employee';
+    }
+
+    if (effectiveRole === 'superAdmin') return <Navigate to="/super-admin" replace />;
+    if (effectiveRole === 'admin') return <Navigate to="/admin" replace />;
+    if (effectiveRole === 'employee') return <Navigate to="/employee" replace />;
     return <Navigate to="/invite" replace />;
   }
 
