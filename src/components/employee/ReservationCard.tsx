@@ -36,7 +36,7 @@ export default function ReservationCard({
             const now = new Date();
             const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
             // reservation.date가 없을 수 있으나 대부분 존재
-            if ((reservation as any).date && (reservation as any).date !== todayStr) return false;
+            if (reservation.date && reservation.date !== todayStr) return false;
 
             const [hours, minutes] = reservation.startTime.split(':').map(Number);
             const resTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), hours, minutes);
@@ -90,11 +90,11 @@ export default function ReservationCard({
                                     🔗 다일 예약
                                 </span>
                             )}
-                            {(reservation as unknown as { routeDistance?: number }).routeDistance && (
+                            {reservation.routeDistance && (
                                 <p className="text-xs text-blue-500 flex items-center gap-2 mt-0.5">
-                                    <span>↔{Math.floor((reservation as unknown as { routeDistance: number }).routeDistance)}km</span>
-                                    <span>⏱{(reservation as unknown as { routeDuration?: number }).routeDuration}분</span>
-                                    {((reservation as unknown as { routeTollFee?: number }).routeTollFee ?? 0) > 0 && <span>₩{(reservation as unknown as { routeTollFee: number }).routeTollFee.toLocaleString()}</span>}
+                                    <span>↔{Math.floor(reservation.routeDistance)}km</span>
+                                    <span>⏱{reservation.routeDuration}분</span>
+                                    {(reservation.routeTollFee ?? 0) > 0 && <span>₩{reservation.routeTollFee!.toLocaleString()}</span>}
                                 </p>
                             )}
                         </div>

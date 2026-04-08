@@ -10,7 +10,7 @@ export interface ReleaseItem {
     text: string;
 }
 
-export interface ReleaseNote {
+interface ReleaseNote {
     date: string;
     title?: string;
     items: ReleaseItem[];

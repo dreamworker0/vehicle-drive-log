@@ -195,26 +195,26 @@ export default function DailyLogView() {
 
                         {/* 모바일 카드 뷰 */}
                         <div className="sm:hidden divide-y divide-surface-100 dark:divide-surface-700">
-                            {driveLogs.map((log: any, idx: number) => {
-                                const distance = (log.endKm || 0) - (log.startKm || 0);
+                            {driveLogs.map((log: Record<string, unknown>, idx: number) => {
+                                const distance = (Number(log.endKm) || 0) - (Number(log.startKm) || 0);
                                 return (
                                     <div key={idx} className="p-4">
                                         <div className="flex items-center justify-between mb-1.5">
                                             <span className="font-medium text-sm text-surface-900 dark:text-surface-100">
-                                                {log.driverName || '(이름 없음)'}
+                                                {String(log.driverName || '(이름 없음)')}
                                             </span>
                                             <span className="font-bold text-primary-600 dark:text-primary-400">
                                                 {distance > 0 ? `${distance.toLocaleString()} km` : '-'}
                                             </span>
                                         </div>
                                         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-surface-500 dark:text-surface-400">
-                                            {log.destination && <span>{log.destination}</span>}
-                                            {log.purpose && <span>· {log.purpose}</span>}
-                                            {(log.startTime || log.endTime) && (
-                                                <span>· {log.startTime || '?'}~{log.endTime || '?'}</span>
+                                            {Boolean(log.destination) && <span>{String(log.destination)}</span>}
+                                            {Boolean(log.purpose) && <span>· {String(log.purpose)}</span>}
+                                            {Boolean(log.startTime || log.endTime) && (
+                                                <span>· {String(log.startTime || '?')}~{String(log.endTime || '?')}</span>
                                             )}
-                                            {log.passengers > 0 && (
-                                                <span className="text-primary-500">· 👥 {log.passengers}명</span>
+                                            {Number(log.passengers) > 0 && (
+                                                <span className="text-primary-500">· 👥 {Number(log.passengers)}명</span>
                                             )}
                                         </div>
                                     </div>
@@ -237,24 +237,24 @@ export default function DailyLogView() {
                                     </tr>
                                 </thead>
                                 <tbody className="divide-y divide-surface-100 dark:divide-surface-800">
-                                    {driveLogs.map((log: any, idx: number) => {
-                                        const distance = (log.endKm || 0) - (log.startKm || 0);
+                                    {driveLogs.map((log: Record<string, unknown>, idx: number) => {
+                                        const distance = (Number(log.endKm) || 0) - (Number(log.startKm) || 0);
                                         const timeStr = (log.startTime && log.endTime)
-                                            ? `${log.startTime}~${log.endTime}`
-                                            : (log.startTime || log.endTime || '-');
+                                            ? `${String(log.startTime)}~${String(log.endTime)}`
+                                            : String(log.startTime || log.endTime || '-');
                                         return (
                                             <tr key={idx} className="hover:bg-surface-50 dark:hover:bg-surface-800/50 transition-colors">
                                                 <td className="px-4 py-2.5 text-surface-900 dark:text-surface-100 font-medium">
-                                                    {log.driverName || '-'}
+                                                    {String(log.driverName || '-')}
                                                 </td>
                                                 <td className="px-2 py-2.5 text-center text-surface-600 dark:text-surface-400">
-                                                    {log.passengers || '-'}
+                                                    {String(log.passengers || '-')}
                                                 </td>
                                                 <td className="px-3 py-2.5 text-surface-600 dark:text-surface-400">
-                                                    {log.purpose || '-'}
+                                                    {String(log.purpose || '-')}
                                                 </td>
                                                 <td className="px-3 py-2.5 text-surface-600 dark:text-surface-400">
-                                                    {log.destination || '-'}
+                                                    {String(log.destination || '-')}
                                                 </td>
                                                 <td className="px-3 py-2.5 text-center text-surface-500 dark:text-surface-400 font-mono text-xs">
                                                     {timeStr}
@@ -263,7 +263,7 @@ export default function DailyLogView() {
                                                     {distance > 0 ? distance.toLocaleString() : '-'}
                                                 </td>
                                                 <td className="px-3 py-2.5 text-right text-surface-500 dark:text-surface-400 font-mono text-xs">
-                                                    {log.endKm ? log.endKm.toLocaleString() : '-'}
+                                                    {log.endKm ? Number(log.endKm).toLocaleString() : '-'}
                                                 </td>
                                             </tr>
                                         );

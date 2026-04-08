@@ -111,7 +111,7 @@ const searchPOI = async (keyword: string) => {
  * 주소 → 좌표 변환 (지오코딩)
  * 캐싱 적용
  */
-export const geocode = async (address: string) => {
+const geocode = async (address: string) => {
     if (!address?.trim()) return null;
     if (geoCache.has(address)) return geoCache.get(address) || null;
     if (isTmapCoolingDown()) return null;
@@ -148,7 +148,7 @@ export const geocode = async (address: string) => {
 };
 
 /** 자동차 경로 탐색 */
-export const getRoute = async (startLon: number, startLat: number, endLon: number, endLat: number, { carType = '0', searchOption = '0' } = {}) => {
+const getRoute = async (startLon: number, startLat: number, endLon: number, endLat: number, { carType = '0', searchOption = '0' } = {}) => {
     if (isTmapCoolingDown()) return null;
     if (!import.meta.env.PROD && !TMAP_API_KEY) return null;
 
@@ -194,7 +194,7 @@ export const parseDestinations = (text: string) => {
 };
 
 /** 주소로 경로 탐색 (원스톱) */
-export const getRouteByAddress = async (startAddress: string, endAddress: string, { carType = '0', searchOption = '0' } = {}) => {
+const getRouteByAddress = async (startAddress: string, endAddress: string, { carType = '0', searchOption = '0' } = {}) => {
     if (!startAddress?.trim() || !endAddress?.trim()) return null;
 
     const [startCoord, endCoord] = await Promise.all([
@@ -265,7 +265,7 @@ export const getMultiRoute = async (origin: string, destinationText: string, { c
 };
 
 /** TMap 경로 안내 딥링크 생성 */
-export const getTmapDeeplink = async (destination: string) => {
+const getTmapDeeplink = async (destination: string) => {
     if (!destination) return 'tmap://open';
 
     const dests = parseDestinations(destination);
@@ -291,7 +291,7 @@ export const getTmapDeeplink = async (destination: string) => {
 export const isTmapAvailable = () => import.meta.env.PROD || !!TMAP_API_KEY;
 
 /** 네이버 지도 경로 안내 딥링크 생성 */
-export const getNaverMapDeeplink = async (destination: string) => {
+const getNaverMapDeeplink = async (destination: string) => {
     if (!destination) return 'nmap://actionPath?appname=vehicle-log';
 
     const dests = parseDestinations(destination);
@@ -319,7 +319,7 @@ export const getNaverMapDeeplink = async (destination: string) => {
 };
 
 /** 카카오맵 경로 안내 딥링크 생성 */
-export const getKakaoMapDeeplink = async (destination: string) => {
+const getKakaoMapDeeplink = async (destination: string) => {
     if (!destination) return 'kakaomap://open';
 
     const dests = parseDestinations(destination);

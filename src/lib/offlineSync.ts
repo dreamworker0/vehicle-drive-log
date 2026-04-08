@@ -9,7 +9,7 @@ const DB_NAME = 'veh-log-offline-sync';
 const STORE_NAME = 'action-queue';
 const DB_VERSION = 1;
 
-export interface OfflineAction {
+interface OfflineAction {
     id: string; // 고유 ID (timestamp + random)
     type: 'CREATE_DRIVELOG' | 'UPDATE_DRIVELOG' | 'CREATE_RESERVATION' | 'UPDATE_RESERVATION' | 'DELETE_DRIVELOG';
     payload: unknown;

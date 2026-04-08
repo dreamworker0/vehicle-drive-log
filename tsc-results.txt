@@ -1,4 +1,0 @@
-src/__tests__/lib/firestore.test.ts(142,34): error TS2345: Argument of type '{ message: string; userEmail: string; userName: string; imageUrls: never[]; organizationId: string; }' is not assignable to parameter of type 'CreateFeedbackData'.
-  Property 'authorUid' is missing in type '{ message: string; userEmail: string; userName: string; imageUrls: never[]; organizationId: string; }' but required in type 'CreateFeedbackData'.
-src/hooks/useDriveLogOcr.ts(151,34): error TS2345: Argument of type '{ message: string; imageUrls: string[]; userEmail: string; userName: string; organizationId: string; type: string; }' is not assignable to parameter of type 'CreateFeedbackData'.
-  Property 'authorUid' is missing in type '{ message: string; imageUrls: string[]; userEmail: string; userName: string; organizationId: string; type: string; }' but required in type 'CreateFeedbackData'.

@@ -1,4 +1,4 @@
-import { signInWithPopup, signInWithRedirect, signOut, getRedirectResult } from 'firebase/auth';
+import { signInWithRedirect, signOut, getRedirectResult } from 'firebase/auth';
 import type { AuthError } from 'firebase/auth';
 import { auth, googleProvider } from './firebase';
 

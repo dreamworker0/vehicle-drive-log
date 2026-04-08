@@ -5,7 +5,7 @@
  * FAQ를 수정할 때 양쪽을 함께 업데이트해야 한다.
  */
 
-export interface FAQItem {
+interface FAQItem {
     id: string; // 고유 질문 식별자 (URL 해시 딥링크 등에 사용)
     question: string;
     answer: string[];
@@ -323,11 +323,3 @@ export const FAQ_ITEMS: FAQItem[] = [
     },
 ];
 
-/**
- * FAQ 데이터를 Gemini 프롬프트용 텍스트로 변환
- */
-export function buildFaqPromptText(): string {
-    return FAQ_ITEMS.map((item) =>
-        `[FAQ ID: ${item.id}]\nQ: ${item.question}\nA: ${item.answer.join(" ")}`
-    ).join("\n\n");
-}

@@ -22,7 +22,7 @@ const INITIAL_FORM = {
 };
 
 /** 숫자만 남기고 4자리마다 하이픈 삽입 */
-export const formatCardNumber = (raw: string): string => {
+const formatCardNumber = (raw: string): string => {
     const digits = raw.replace(/\D/g, '').slice(0, 16);
     return digits.replace(/(.{4})(?=.)/g, '$1-');
 };

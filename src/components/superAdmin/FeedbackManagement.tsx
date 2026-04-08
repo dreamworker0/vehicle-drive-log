@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import useFeedbackManagement from '../../hooks/useFeedbackManagement';
 import { formatTimestampFull } from '../../lib/dateUtils';
+import type { Feedback } from '../../types';
 
 export default function FeedbackManagement() {
     const {
@@ -43,7 +44,7 @@ export default function FeedbackManagement() {
     // 보기 모드 상태
     const [viewMode, setViewMode] = useState<'grouped' | 'timeline'>('grouped');
 
-    const renderFeedbackItem = (fb: any, showAuthorInfo = false) => {
+    const renderFeedbackItem = (fb: Feedback, showAuthorInfo = false) => {
         const isExpanded = expandedId === fb.id;
         const isResolved = fb.status === 'read' || fb.status === 'resolved';
         const isUnread = !isResolved;
@@ -66,7 +67,7 @@ export default function FeedbackManagement() {
                                     </span>
                                     {(fb.organizationId || fb.organizationName) && (
                                         <span className="text-xs text-surface-500 dark:text-surface-400">
-                                            {fb.organizationName || orgNames[fb.organizationId] || fb.organizationId}
+                                            {fb.organizationName || (fb.organizationId && orgNames[fb.organizationId]) || fb.organizationId}
                                         </span>
                                     )}
                                     {fb.userEmail && (

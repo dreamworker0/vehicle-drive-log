@@ -2,7 +2,7 @@
  * useOrgApplication — 기관 사용 신청 폼 로직 훅
  * 폼 상태, 파일 처리(검증/압축/드래그), 제출(익명로그인+업로드+OCR) 관리
  */
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { auth as firebaseAuth, firebaseFunctions } from '../lib/firebase';
 import { httpsCallable } from 'firebase/functions';
 import imageCompression from 'browser-image-compression';

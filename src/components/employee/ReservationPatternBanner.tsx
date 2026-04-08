@@ -27,7 +27,7 @@ export default function ReservationPatternBanner() {
         );
     }
 
-    const handleQuickReserve = (pattern: any) => {
+    const handleQuickReserve = (pattern: (typeof recommended)[number]) => {
         // 예약 라우트로 이동하며, 위치 폼을 열기 위한 state 조작 및 추천 예약 출처 기록
         navigate('/employee/reservations', {
             state: {

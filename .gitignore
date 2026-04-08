@@ -29,11 +29,20 @@ dist-ssr
 func_logs*.txt
 *_test.json
 
-# Build / lint temp output
+# Build / lint / analysis temp output
 build-*.txt
 build_*.txt
 lint_*.txt
 lint-result.*
+lint-results*
+lint-analysis.*
+lint.json
+lint-text.txt
+git-diff.txt
+git_log*.txt
+reflog.txt
+test-output.txt
+tsc-*.txt
 # Firebase
 .firebase/
 *-adminsdk-*.json

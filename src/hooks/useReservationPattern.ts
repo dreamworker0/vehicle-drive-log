@@ -86,8 +86,8 @@ export function useReservationPattern() {
                 }
 
                 // 2. 다중 패턴 집계 (일일/주간/다빈도 목적지)
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                type PatternResult = { score: number; count: number; type: 'weekly' | 'daily' | 'dest-weekly' | 'dest-daily'; targetWeekday?: number; reservation: any; times?: string[] };
+                type RecentReservation = Awaited<ReturnType<typeof getMyRecentReservations>>[number];
+                type PatternResult = { score: number; count: number; type: 'weekly' | 'daily' | 'dest-weekly' | 'dest-daily'; targetWeekday?: number; reservation: RecentReservation; times?: string[] };
                 const patternMap = new Map<string, PatternResult>();
 
                 for (const r of recent) {
@@ -157,7 +157,7 @@ export function useReservationPattern() {
                     const r = bestMatch.reservation;
                     
                     // 다빈도 목적지 패턴일 경우 가장 빈번한 시간대를 출발 시간으로 산출
-                    let targetStartTime = r.startTime;
+                    let targetStartTime = r.startTime || '09:00';
                     if (bestMatch.times && bestMatch.times.length > 0) {
                         const timeCounts = new Map<string, number>();
                         let maxTimeCount = 0;
@@ -224,20 +224,22 @@ export function useReservationPattern() {
                             };
 
                             const targetStart = targetStartTime;
-                            const targetEnd = r.endTime && r.startTime < r.endTime ? 
-                                (targetStartTime < r.endTime ? r.endTime : targetStartTime) : targetStartTime;
+                            const rStart = r.startTime || '09:00';
+                            const rEnd = r.endTime || rStart;
+                            const targetEnd = rEnd && rStart < rEnd ? 
+                                (targetStartTime < rEnd ? rEnd : targetStartTime) : targetStartTime;
 
                             // 1. 내 일정이 동일한 날짜/시간대에 겹치는지 우선 검사
                             const isMyScheduleConflict = activeResList.some(res => 
                                 res.reservedByUid === uid && 
-                                isTimeConflict(targetStart, targetEnd, res.startTime, res.endTime || res.startTime)
+                                isTimeConflict(targetStart, targetEnd, res.startTime || '', res.endTime || res.startTime || '')
                             );
 
                             if (!isMyScheduleConflict) {
                                 // 2. 내 일정이 가능할 때, 1순위 추천 차량이 겹치는지 검사
                                 const isVehicleUnavailable = activeResList.some(res => 
                                     res.vehicleId === targetVehicleId && 
-                                    isTimeConflict(targetStart, targetEnd, res.startTime, res.endTime || res.startTime)
+                                    isTimeConflict(targetStart, targetEnd, res.startTime || '', res.endTime || res.startTime || '')
                                 );
 
                                 if (!isVehicleUnavailable) {
@@ -247,7 +249,7 @@ export function useReservationPattern() {
                                     // 3. 대체 차량 탐색
                                     const unavailableVehicleIds = new Set(
                                         activeResList
-                                            .filter(res => isTimeConflict(targetStart, targetEnd, res.startTime, res.endTime || res.startTime))
+                                            .filter(res => isTimeConflict(targetStart, targetEnd, res.startTime || '', res.endTime || res.startTime || ''))
                                             .map(res => res.vehicleId)
                                     );
                                     
@@ -294,12 +296,15 @@ export function useReservationPattern() {
                         );
                         if (!isDuplicateTime) {
                             finalRecommendations.push({
-                                vehicleId: targetVehicleId,
+                                vehicleId: targetVehicleId || '',
                                 vehicleName: targetVehicleName,
                                 date: finalDateStr,
                                 startTime: targetStartTime,
-                                endTime: r.endTime && r.startTime < r.endTime ? 
-                                    (targetStartTime < r.endTime ? r.endTime : targetStartTime) : targetStartTime,
+                                endTime: (() => {
+                                    const s = r.startTime || '09:00';
+                                    const e = r.endTime || s;
+                                    return e && s < e ? (targetStartTime < e ? e : targetStartTime) : targetStartTime;
+                                })(),
                                 destination: r.destination || '',
                                 dayOfWeekRaw: targetWeekday,
                             });

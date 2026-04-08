@@ -15,7 +15,7 @@ export function extractDateStr(log: DriveLog): string {
 }
 
 /** 변화율 계산 (전월 대비) */
-export function calcChange(cur: number, prev: number): number {
+function calcChange(cur: number, prev: number): number {
     if (prev === 0) return cur > 0 ? 100 : 0;
     return Math.round(((cur - prev) / prev) * 100);
 }

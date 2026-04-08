@@ -25,6 +25,7 @@ import type { Reservation, CalendarDay } from '../types/reservation';
 import type { CustomHoliday } from '../types/holiday';
 import type { Favorite } from '../types/favorite';
 import type { User as UserDoc } from '../types/user';
+import type { RecommendedPattern } from './useReservationPattern';
 
 interface ReservationForm {
     vehicleId: string;
@@ -136,7 +137,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
             setCurrentMonth(new Date(dateParam));
         }
 
-        const state = location.state as { openForm?: boolean; prefillPattern?: any; defaultVehicleId?: string; source?: string } | null;
+        const state = location.state as { openForm?: boolean; prefillPattern?: RecommendedPattern; defaultVehicleId?: string; source?: string } | null;
         if (state?.prefillPattern && state.openForm) {
             if (state.source) {
                 setReservationSource(state.source);

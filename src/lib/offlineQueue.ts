@@ -26,9 +26,9 @@ function openDB(): Promise<IDBDatabase> {
     });
 }
 
-export type QueueAction = 'create' | 'update';
+type QueueAction = 'create' | 'update';
 
-export interface QueuedLog {
+interface QueuedLog {
     id?: number;
     action: QueueAction;
     /** update 시 대상 문서 ID */
@@ -128,7 +128,7 @@ export async function processQueue(): Promise<number> {
 
 /** 온라인 복귀 이벤트에 자동 동기화 등록 */
 let _registered = false;
-export function registerAutoSync() {
+function registerAutoSync() {
     if (_registered || typeof window === 'undefined') return;
     _registered = true;
     window.addEventListener('online', () => {

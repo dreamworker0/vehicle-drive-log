@@ -13,9 +13,9 @@ import {
 import { db } from '../firebase';
 import type { DriveLog } from '../../types/driveLog';
 
-export const driveLogConverter = {
+const driveLogConverter = {
     toFirestore: (log: Partial<DriveLog>): DocumentData => {
-        const { id, ...data } = log as any;
+        const { id: _id, ...data } = log as Record<string, unknown>;
         return data;
     },
     fromFirestore: (snapshot: QueryDocumentSnapshot, options: SnapshotOptions): DriveLog => {

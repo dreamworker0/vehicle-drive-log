@@ -20,7 +20,7 @@ export interface PdfColumn {
 }
 
 /** PDF 보고서 설정 */
-export interface PdfReportConfig<T> {
+interface PdfReportConfig<T> {
     title: string;
     orgName: string;
     records: T[];
@@ -76,7 +76,7 @@ export function buildEmptyRows(colCount: number, rowCount: number): string {
 }
 
 /** A4 가로형 공통 CSS */
-export function getLandscapePdfStyles(columnStyles: string, extraStyles = ''): string {
+function getLandscapePdfStyles(columnStyles: string, extraStyles = ''): string {
     return `
         @page { size: A4 landscape; margin: 12mm 10mm; }
         * { margin: 0; padding: 0; box-sizing: border-box; }
