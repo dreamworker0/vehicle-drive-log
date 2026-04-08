@@ -25,6 +25,7 @@ export interface Reservation extends FirestoreDoc {
     routeTollFee?: number | null;
     groupId?: string;            // 다일 연속 예약 그룹 식별자
     isQuickDrive?: boolean;      // 바로 운행(예약 없이 출발) 여부 플래그
+    source?: 'recommendation' | string; // 예약 출처 (예: 추천 예약)
     createdAt?: TimestampField;
 }
 

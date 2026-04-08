@@ -26,7 +26,7 @@ async function findUserByEmail(email: string) {
  */
 export const syncCalendarToApp = onSchedule(
     {
-        schedule: "every 5 minutes",
+        schedule: "every 30 minutes",
         timeZone: "Asia/Seoul",
         retryCount: 1,
     },

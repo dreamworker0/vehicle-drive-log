@@ -7,7 +7,8 @@ setGlobalOptions({
     maxInstances: 10, 
     memory: "256MiB", 
     timeoutSeconds: 60, 
-    region: "asia-northeast3" 
+    region: "asia-northeast3",
+    concurrency: 80
 });
 
 // Firebase Admin 초기화 (모든 다른 모듈보다 먼저 실행되어야 함)
@@ -56,7 +57,7 @@ import { checkReservationReminders } from "./reservationReminder";
 
 export const reservationReminder = onSchedule(
     {
-        schedule: "every 10 minutes",
+        schedule: "every 15 minutes",
         timeZone: "Asia/Seoul",
         retryCount: 0,
     },
@@ -65,19 +66,7 @@ export const reservationReminder = onSchedule(
     }
 );
 
-// OCR 워밍업 스케줄러 (근무시간 콜드 스타트 방지)
-import { warmupOcrFunction } from "./warmupOcr";
 
-export const warmupOcr = onSchedule(
-    {
-        schedule: "every 5 minutes",
-        timeZone: "Asia/Seoul",
-        retryCount: 0,
-    },
-    async function () {
-        await warmupOcrFunction();
-    }
-);
 
 // 예약 트리거 (Google Calendar 연동 + 푸시 알림)
 export { onReservationCreated, onReservationUpdated, onReservationDeleted } from "./reservationTriggers";
@@ -115,21 +104,7 @@ export { regenerateFeedbackDraft } from "./regenerateFeedbackDraft";
 // 피드백 답변 발송 (슈퍼관리자 → 사용자 알림)
 export { sendFeedbackReply } from "./sendFeedbackReply";
 
-// Rate Limit 문서 자동 정리 (매일 05:00 KST)
-// TODO: GCP Console → Firestore → TTL 정책에서 _rateLimits 컬렉션의
-//       expiresAt 필드에 자동 삭제 TTL을 설정하면 이 스케줄러를 제거할 수 있음
-import { cleanupExpiredRateLimits } from "./rateLimit";
 
-export const cleanupRateLimits = onSchedule(
-    {
-        schedule: "0 5 * * *",
-        timeZone: "Asia/Seoul",
-        retryCount: 0,
-    },
-    async function () {
-        await cleanupExpiredRateLimits();
-    }
-);
 
 // 미활성 기관 일괄 알림톡 발송
 import { onCall, HttpsError } from "firebase-functions/v2/https";
@@ -219,3 +194,9 @@ export { notifyRoleChange } from "./notifyRoleChange";
 
 // 디스코드 정기 리포트 및 미활성 알림 스케줄러
 export { scheduledDiscordBriefing } from "./discordScheduler";
+
+// 익명 로그인 대체용 기관 신청 API
+export { submitOrgApplication } from "./submitOrgApplication";
+
+// 랜딩 페이지 비번/기관 미로그인 유저의 문의 접수용 API
+export { submitPublicFeedback } from "./submitPublicFeedback";

@@ -1,32 +1,66 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useReservationPattern } from '../../hooks/useReservationPattern';
 
 export default function ReservationPatternBanner() {
     const { recommended, loading } = useReservationPattern();
     const navigate = useNavigate();
+    const [isDismissed, setIsDismissed] = useState(false);
 
     if (loading || !recommended || recommended.length === 0) return null;
 
+    if (isDismissed) {
+        return (
+            <button
+                onClick={() => setIsDismissed(false)}
+                className="fixed bottom-[85px] right-4 z-[90] flex items-center justify-center w-11 h-11 bg-surface-100/70 dark:bg-surface-800/70 backdrop-blur-md text-primary-600 dark:text-primary-400 border border-surface-200/50 dark:border-surface-700/50 rounded-full shadow-sm hover:bg-surface-200/80 dark:hover:bg-surface-700/80 transition-all active:scale-95 animate-fade-in-up md:bottom-8 md:right-8"
+                title="추천 예약 켜기"
+            >
+                <div className="relative">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    {/* 작고 부드러운 뱃지 */}
+                    <span className="absolute -top-0.5 -right-0.5 flex h-2 w-2 rounded-full bg-primary-400 ring-2 ring-surface-100 dark:ring-surface-800"></span>
+                </div>
+            </button>
+        );
+    }
+
     const handleQuickReserve = (pattern: any) => {
-        // 예약 라우트로 이동하며, 위치 폼을 열기 위한 state 조작
+        // 예약 라우트로 이동하며, 위치 폼을 열기 위한 state 조작 및 추천 예약 출처 기록
         navigate('/employee/reservations', {
             state: {
                 openForm: true,
-                prefillPattern: pattern
+                prefillPattern: pattern,
+                source: 'recommendation'
             }
         });
     };
 
     return (
-        <div className="mt-6 animate-fade-in-up">
+        <div className="fixed bottom-[85px] left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-lg z-[40] bg-transparent px-4 py-4 animate-fade-in-up md:relative md:bottom-auto md:w-full md:max-w-none md:translate-x-0 md:left-auto md:z-10 md:p-0 md:mt-6 group">
             {/* 섹션 타이틀 */}
-            <div className="flex items-center gap-2 mb-3">
-                <h2 className="text-lg font-bold text-surface-900 dark:text-surface-100 flex items-center gap-2">
-                    원클릭 추천 예약
-                </h2>
-                <span className="inline-block px-1.5 py-0.5 text-[0.65rem] font-medium text-surface-500 bg-surface-100 border border-surface-200 rounded-md dark:bg-surface-800 dark:border-surface-700 dark:text-surface-400">
-                    패턴 분석
-                </span>
+            <div className="flex items-center justify-between gap-2 mb-3">
+                <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-bold text-surface-900 dark:text-surface-100 flex items-center gap-2">
+                        원클릭 추천 예약
+                    </h2>
+                    <span className="inline-block px-1.5 py-0.5 text-[0.65rem] font-medium text-surface-500 bg-surface-100 border border-surface-200 rounded-md dark:bg-surface-800 dark:border-surface-700 dark:text-surface-400">
+                        패턴 분석
+                    </span>
+                </div>
+                {/* 닫기 버튼 */}
+                <button
+                    onClick={() => setIsDismissed(true)}
+                    className="p-1 rounded-full text-surface-400 hover:text-surface-800 hover:bg-surface-200 dark:hover:text-surface-200 dark:hover:bg-surface-700 transition-colors"
+                    title="닫기"
+                    aria-label="추천 예약 닫기"
+                >
+                    <svg className="w-5 h-5 opacity-50 group-hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
             </div>
 
             {/* 추천 항목 리스트 */}

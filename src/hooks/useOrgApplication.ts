@@ -3,11 +3,8 @@
  * 폼 상태, 파일 처리(검증/압축/드래그), 제출(익명로그인+업로드+OCR) 관리
  */
 import { useState, useRef, useEffect, useCallback } from 'react';
-import { createOrganization, updateOrganization } from '../lib/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage, auth as firebaseAuth } from '../lib/firebase';
-import { signInAnonymously } from 'firebase/auth';
-import { logout } from '../lib/auth';
+import { auth as firebaseAuth, firebaseFunctions } from '../lib/firebase';
+import { httpsCallable } from 'firebase/functions';
 import imageCompression from 'browser-image-compression';
 
 // 허용 파일 타입
@@ -32,6 +29,24 @@ async function compressImage(file: File): Promise<File> {
 }
 
 /**
+ * File을 Base64 문자열로 변환 (data: MIME;base64, 포맷)
+ */
+async function fileToBase64(file: File | Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            if (typeof reader.result === 'string') {
+                resolve(reader.result);
+            } else {
+                reject(new Error('파일 읽기 실패(결과가 문자열이 아님)'));
+            }
+        };
+        reader.onerror = error => reject(error);
+        reader.readAsDataURL(file);
+    });
+}
+
+/**
  * 전화번호 포맷팅 (000-0000-0000)
  */
 export function formatPhoneNumber(value: string) {
@@ -44,20 +59,6 @@ export function formatPhoneNumber(value: string) {
 export default function useOrgApplication() {
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const currentUser = firebaseAuth.currentUser;
-
-    // 비인증 상태일 때 익명 로그인 (Storage 보안 규칙 인증 체크용)
-    useEffect(() => {
-        if (!firebaseAuth.currentUser) {
-            signInAnonymously(firebaseAuth).catch((err) => {
-                console.warn('익명 로그인 실패:', err.message);
-            });
-        }
-        return () => {
-            if (firebaseAuth.currentUser?.isAnonymous) {
-                logout().catch(() => { });
-            }
-        };
-    }, []);
 
     // 폼 상태
     const [form, setForm] = useState({
@@ -159,32 +160,7 @@ export default function useOrgApplication() {
         setError('');
 
         try {
-            // 인증 상태 확인
-            if (!firebaseAuth.currentUser) {
-                try {
-                    await signInAnonymously(firebaseAuth);
-                } catch (authErr) {
-                    console.error('익명 로그인 실패:', authErr);
-                    setError('인증에 실패했습니다. 페이지를 새로고침 후 다시 시도해주세요.');
-                    setLoading(false);
-                    return;
-                }
-            }
-
-            // 1. 기관 신청 생성
-            setOcrStatus('uploading');
-            const orgId = await createOrganization({
-                name: form.orgName,
-                applicantName: form.applicantName,
-                applicantEmail: form.applicantEmail,
-                applicantPhone: form.applicantPhone,
-                applicantUid: firebaseAuth.currentUser?.uid || '',
-                aiVerified: false,
-                uniqueNumberImageUrl: '',
-                ...(form.message.trim() && { message: form.message.trim() }),
-            });
-
-            // 2. 파일 업로드
+            // 1. 파일 압축 및 변환
             let fileToUpload: File | Blob = imageFile;
             let finalMimeType = imageFile.type;
 
@@ -194,19 +170,32 @@ export default function useOrgApplication() {
                 finalMimeType = 'image/jpeg';
             }
 
-            const fileExt = finalMimeType === 'application/pdf' ? 'pdf' : 'jpg';
-            const storageRef = ref(storage, `organizations/${orgId}/uniqueNumberImage.${fileExt}`);
-            await uploadBytes(storageRef, fileToUpload, { contentType: finalMimeType });
-            const imageUrl = await getDownloadURL(storageRef);
+            const base64Data = await fileToBase64(fileToUpload);
 
-            // 3. 이미지 URL 저장 → AI 분석 트리거
-            setOcrStatus('analyzing');
-            await updateOrganization(orgId, { uniqueNumberImageUrl: imageUrl });
+            // 2. Cloud Functions Callable 호출 (기관 생성 + Storage 업로드)
+            setOcrStatus('uploading');
+            const submitAppFn = httpsCallable(firebaseFunctions, 'submitOrgApplication');
+            
+            await submitAppFn({
+                orgName: form.orgName.trim(),
+                applicantName: form.applicantName.trim(),
+                applicantEmail: form.applicantEmail.trim(),
+                applicantPhone: form.applicantPhone.trim(),
+                message: form.message.trim(),
+                imageBase64: base64Data,
+                imageMimeType: finalMimeType,
+            });
 
+            // 완료
             setOcrStatus('done');
             setSuccess(true);
-        } catch (err) {
-            setError('신청 중 오류가 발생했습니다. 다시 시도해주세요.');
+        } catch (err: unknown) {
+            const errorMsg = (err as Error).message;
+            if (errorMsg.includes('resource-exhausted') || errorMsg.includes('요청이 너무 많습니다')) {
+                setError('요청 횟수를 초과했습니다. 나중에 다시 시도해주세요.');
+            } else {
+                setError('신청 중 오류가 발생했습니다. 다시 시도해주세요.');
+            }
             console.error(err);
         } finally {
             setLoading(false);
@@ -214,11 +203,7 @@ export default function useOrgApplication() {
         }
     }, [form, imageFile]);
 
-    // 뒤로가기 (익명 세션 정리)
     const handleGoBack = useCallback(async (navigate: (path: string) => void) => {
-        if (firebaseAuth.currentUser?.isAnonymous) {
-            await logout();
-        }
         navigate('/');
     }, []);
 

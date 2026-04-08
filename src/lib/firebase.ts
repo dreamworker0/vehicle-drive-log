@@ -2,6 +2,7 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, browserLocalPersistence, setPersistence } from 'firebase/auth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
+import { getFunctions } from 'firebase/functions';
 // firebase/analytics, firebase/app-check, firebase/messaging은 동적 import (번들 최적화)
 
 const firebaseConfig = {
@@ -79,7 +80,9 @@ function isFirestorePersistenceError(msg: string) {
         msg.includes('mutating the [[Prototype]]') ||
         msg.includes('A mutation operation was attempted on a database that did not allow mutations') ||
         msg.includes('The object can not be found here') ||
-        msg.includes('The node to be removed is not a child of this node')
+        msg.includes('The node to be removed is not a child of this node') ||
+        msg.includes('BloomFilter') ||
+        msg.includes('BloomFilterError')
     );
 }
 
@@ -197,6 +200,7 @@ checkIndexedDBAvailability().then((available) => {
 export { db };
 export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
+export const firebaseFunctions = getFunctions(app, 'asia-northeast3');
 
 // FCM은 브라우저 지원 시에만 초기화 (동적 import로 번들 최적화)
 let _messaging: ReturnType<typeof import('firebase/messaging').getMessaging> | null = null;

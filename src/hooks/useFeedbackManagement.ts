@@ -206,6 +206,10 @@ export default function useFeedbackManagement() {
     const unreadCount = feedbacks.filter(f => f.status !== 'read' && f.status !== 'resolved').length;
     const resolvedCount = feedbacks.filter(f => f.status === 'read' || f.status === 'resolved').length;
 
+    const timelineFeedbacks = useMemo(() => {
+        return [...filteredRaw].sort((a, b) => getTime(b) - getTime(a));
+    }, [filteredRaw]);
+
     return {
         loading,
         feedbacks,
@@ -232,6 +236,7 @@ export default function useFeedbackManagement() {
         handleSendReply,
         handleRegenerateDraft,
         groupedFeedbacks,
+        timelineFeedbacks,
         toggleGroup,
         handleCopyEmail,
         handleCopyMessage,

@@ -64,7 +64,7 @@ export default function useVehicleHistory() {
                 // 서버 사이드 기간 필터링 (Firestore where 조건)
                 const allLogs = await getVehicleDriveLogs(selectedVehicleId, since);
                 setLogs(
-                    allLogs.sort((a, b) => {
+                    (allLogs as DriveLog[]).sort((a, b) => {
                         const getTime = (ts: unknown): number => {
                             if (ts && typeof ts === 'object' && 'toDate' in ts && typeof (ts as { toDate?: unknown }).toDate === 'function') return (ts as { toDate: () => Date }).toDate().getTime();
                             if (ts instanceof Date) return ts.getTime();

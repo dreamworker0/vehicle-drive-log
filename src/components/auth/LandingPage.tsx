@@ -1,10 +1,12 @@
 /**
  * LandingPage — 서비스 소개 (비로그인 첫 화면)
  */
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useForceLightMode from '../../hooks/useForceLightMode';
 import SEOHead from '../common/SEOHead';
 import PublicNav from '../common/PublicNav';
+import PublicFeedbackModal from '../common/PublicFeedbackModal';
 
 interface Feature {
     icon: string;
@@ -88,6 +90,7 @@ const SUB_FEATURES: SubFeature[] = [
 ];
 
 export default function LandingPage() {
+    const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
     useForceLightMode();
     const navigate = useNavigate();
 
@@ -141,7 +144,15 @@ export default function LandingPage() {
                     </button>
                 </div>
 
-                <p className="mt-4 text-primary-300/60 text-xs">✨ 완전 무료 · 광고 없음</p>
+                <div className="mt-4 flex flex-col items-center gap-2">
+                    <p className="text-primary-300/60 text-xs">✨ 완전 무료 · 광고 없음</p>
+                    <button 
+                        onClick={() => setIsFeedbackModalOpen(true)}
+                        className="text-primary-300/80 hover:text-white text-sm underline underline-offset-4 transition-colors"
+                    >
+                        이용 문의하기
+                    </button>
+                </div>
             </header>
 
             {/* ─── 3단계로 시작하세요 ─── */}
@@ -250,6 +261,11 @@ export default function LandingPage() {
                 </nav>
                 <p>© 2026 차량 운행일지. All rights reserved.</p>
             </footer>
+            {/* 피드백(문의하기) 모달 */}
+            <PublicFeedbackModal 
+                isOpen={isFeedbackModalOpen} 
+                onClose={() => setIsFeedbackModalOpen(false)} 
+            />
         </div>
     );
 }

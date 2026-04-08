@@ -111,9 +111,11 @@ export const getWeekReservations = async (orgId: string, startDate: string, endD
 export const getReservationsByDateRange = getWeekReservations;
 
 // groupId로 연속 예약 그룹 조회
-export const getReservationsByGroupId = async (groupId: string) => {
+// Firestore Rules가 organizationId 기반 접근 제어를 하므로 orgId 필터 필수
+export const getReservationsByGroupId = async (groupId: string, orgId: string) => {
     const q = query(
         collection(db, 'reservations'),
+        where('organizationId', '==', orgId),
         where('groupId', '==', groupId),
     );
     const snap = await getDocs(q);
@@ -123,8 +125,8 @@ export const getReservationsByGroupId = async (groupId: string) => {
 };
 
 // 연속 예약 그룹 일괄 취소
-export const cancelReservationGroup = async (groupId: string) => {
-    const reservations = await getReservationsByGroupId(groupId);
+export const cancelReservationGroup = async (groupId: string, orgId: string) => {
+    const reservations = await getReservationsByGroupId(groupId, orgId);
     const active = reservations.filter(r => r.status !== 'cancelled' && r.status !== 'completed');
     await Promise.all(
         active.map(r => updateDoc(doc(db, 'reservations', r.id), { status: 'cancelled' }))
@@ -133,8 +135,8 @@ export const cancelReservationGroup = async (groupId: string) => {
 };
 
 // 연속 예약 그룹 삭제 (수정 전 기존 그룹 제거용)
-export const deleteReservationGroup = async (groupId: string) => {
-    const reservations = await getReservationsByGroupId(groupId);
+export const deleteReservationGroup = async (groupId: string, orgId: string) => {
+    const reservations = await getReservationsByGroupId(groupId, orgId);
     const active = reservations.filter(r => r.status !== 'cancelled' && r.status !== 'completed');
     await Promise.all(
         active.map(r => deleteDoc(doc(db, 'reservations', r.id)))

@@ -46,7 +46,10 @@ export default function DashboardOverviewCards({ stats }: Props) {
                 unit="개"
                 icon="🏢"
                 color="blue"
-                sub={stats.pendingApps > 0 ? `신청 대기 ${stats.pendingApps}건` : null}
+                sub={[
+                    stats.pendingApps > 0 ? `대기 ${stats.pendingApps}건` : null,
+                    stats.calendarSyncOrgs > 0 ? `연동 ${stats.calendarSyncOrgs}곳` : null
+                ].filter(Boolean).join(' · ') || null}
             />
             <StatCard
                 label="전체 사용자"

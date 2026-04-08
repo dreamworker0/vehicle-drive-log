@@ -4,6 +4,7 @@ import ChartDAU from './ChartDAU';
 import ChartFirstEmployee from './ChartFirstEmployee';
 import ChartInputMethod from './ChartInputMethod';
 import ChartQuickDrive from './ChartQuickDrive';
+import ChartRecommendation from './ChartRecommendation';
 import ChartDistribution from './ChartDistribution';
 import ChartHipass from './ChartHipass';
 import ChartFuelHipass from './ChartFuelHipass';
@@ -22,6 +23,9 @@ interface Props {
     // 바로 운행 vs 사전 예약
     quickDriveStats: { date: string; regular: number; quick: number }[];
     quickDriveRatio: { total: number; quick: number; regular: number; rate: number };
+    // 추천 예약 현황
+    recommendationStats: { date: string; recommendation: number; normal: number }[];
+    recommendationRatio: { total: number; recommendation: number; normal: number; rate: number };
     // 기관/차량 분포
     orgSizeDistribution: { label: string; count: number; color: string }[];
     fuelTypeStats: { type: string; label: string; count: number; color: string }[];
@@ -53,6 +57,10 @@ export default function DashboardChartSection(props: Props) {
             <ChartQuickDrive 
                 quickDriveStats={props.quickDriveStats} 
                 quickDriveRatio={props.quickDriveRatio} 
+            />
+            <ChartRecommendation 
+                recommendationStats={props.recommendationStats} 
+                recommendationRatio={props.recommendationRatio} 
             />
             <ChartDistribution
                 orgSizeDistribution={props.orgSizeDistribution}

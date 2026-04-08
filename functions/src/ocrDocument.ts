@@ -120,7 +120,7 @@ export const ocrDocument = onCall(
 확인할 수 없는 값은 null로 표시하세요.`;
 
             const response = await ai.models.generateContent({
-                model: "gemini-2.0-flash",
+                model: "gemini-3.1-flash-lite-preview",
                 contents: [
                     {
                         role: "user",

@@ -1,7 +1,7 @@
 /**
  * autoVerifyDocument — 기관 신청 자동 검증 (OCR + AI 분석 + 이메일)
  */
-import { onDocumentUpdated } from "firebase-functions/firestore";
+import { onDocumentWritten } from "firebase-functions/firestore";
 import { GoogleGenAI } from "@google/genai";
 import { defineString } from "firebase-functions/params";
 import { getFirestore } from "firebase-admin/firestore";
@@ -247,9 +247,9 @@ async function sendRejectionEmail(recipientEmail: string, orgName: string, reaso
 }
 
 /**
- * Firestore Trigger — organization 문서에 uniqueNumberImageUrl이 추가되면 자동 OCR 실행
+ * Firestore Trigger — organization 문서에 uniqueNumberImageUrl이 추가되거나 문서가 생성될 때 자동 OCR 실행
  */
-export const autoVerifyDocument = onDocumentUpdated(
+export const autoVerifyDocument = onDocumentWritten(
     {
         document: "organizations/{orgId}",
         region: "asia-northeast3",
@@ -257,12 +257,18 @@ export const autoVerifyDocument = onDocumentUpdated(
         memory: "512MiB",
     },
     async (event) => {
-        const before = event.data!.before.data();
-        const after = event.data!.after.data();
+        const before = event.data?.before?.data();
+        const after = event.data?.after?.data();
         const orgId = event.params.orgId;
 
+        // 문서 삭제된 경우 중단
+        if (!after) return;
+        
+        // 이미지가 존재하지 않으면 중단
         if (!after.uniqueNumberImageUrl) return;
-        if (before.uniqueNumberImageUrl === after.uniqueNumberImageUrl) return;
+
+        // 문서가 변경(update)된 경우라면 이미지 URL이 새로 등록(또는 변경)된 건지 확인
+        if (before && before.uniqueNumberImageUrl === after.uniqueNumberImageUrl) return;
         if (after.aiVerifyDetail) return;
 
         const orgName = after.name as string;
@@ -378,7 +384,7 @@ export const autoVerifyDocument = onDocumentUpdated(
             const fileInfo = await downloadFileAsBase64(imageUrl);
 
             const response = await ai.models.generateContent({
-                model: "gemini-2.5-flash",
+                model: "gemini-3.1-flash-lite-preview",
                 contents: [
                     {
                         role: "user",

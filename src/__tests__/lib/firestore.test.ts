@@ -2,7 +2,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Firebase 모듈 모킹
 vi.mock('firebase/firestore', () => ({
-    collection: vi.fn(),
+    collection: vi.fn(() => ({
+        withConverter: vi.fn().mockReturnThis(),
+    })),
     query: vi.fn(),
     where: vi.fn(),
     orderBy: vi.fn(),
@@ -39,8 +41,8 @@ describe('Firestore 유틸리티 함수', () => {
     describe('getDriveLogs', () => {
         it('orgId로 운행일지를 조회한다', async () => {
             const mockDocs = [
-                { id: 'log1', data: () => ({ destination: '서울역', driverUid: 'user1' }) },
-                { id: 'log2', data: () => ({ destination: '강남역', driverUid: 'user2' }) },
+                { id: 'log1', data: () => ({ id: 'log1', destination: '서울역', driverUid: 'user1' }) },
+                { id: 'log2', data: () => ({ id: 'log2', destination: '강남역', driverUid: 'user2' }) },
             ];
             vi.mocked(getDocs).mockResolvedValue({ docs: mockDocs } as ReturnType<typeof getDocs> extends Promise<infer R> ? R : never);
 

@@ -79,15 +79,15 @@ export async function downloadDriveLogsExcel(logs: ExcelDriveLog[], filename = '
     // 열 너비 설정
     const cols = [
         { wch: 12 },  // 날짜
-        { wch: 8 },   // 출발시각
-        { wch: 8 },   // 도착시각
+        { wch: 6 },   // 출발시각
+        { wch: 6 },   // 도착시각
         { wch: 10 },  // 운전자
         { wch: 14 },  // 차량
-        { wch: 20 },  // 목적지
-        { wch: 14 },  // 사용목적
-        { wch: 10 },  // 출발Km
-        { wch: 10 },  // 도착Km
-        { wch: 12 },  // 주행거리
+        { wch: 28 },  // 목적지
+        { wch: 22 },  // 사용목적
+        { wch: 8 },   // 출발Km
+        { wch: 8 },   // 도착Km
+        { wch: 8 },   // 주행거리
         { wch: 8 },   // 탑승인원
     ];
     if (includeHipass) {

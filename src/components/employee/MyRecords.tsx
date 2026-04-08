@@ -125,7 +125,7 @@ export default function MyRecords() {
                             <div className="space-y-2">
                                 {monthLogs.map((log: DriveLog) => (
                                     <div key={log.id} className="glass-card overflow-hidden transition-all duration-200">
-                                        <button onClick={() => setExpandedId(expandedId === log.id ? null : log.id)} className="w-full p-4 text-left flex items-center gap-3">
+                                        <button onClick={() => setExpandedId(expandedId === log.id ? null : log.id)} className="w-full p-4 text-left flex items-center gap-3 group">
                                             <div className={`w-10 h-10 rounded-xl ${log.vehicleId ? getVehicleColor(log.vehicleId) : 'bg-primary-50'} flex items-center justify-center text-lg flex-shrink-0`}>{VEHICLE_TYPE_ICONS[log.vehicleType ?? ''] || '🚗'}</div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center gap-1.5 flex-wrap">
@@ -141,7 +141,13 @@ export default function MyRecords() {
                                                     {!log.purpose && !log.destination && <span className="text-xs text-surface-400">-</span>}
                                                 </div>
                                             </div>
-                                            <div className="text-right flex-shrink-0"><p className="text-sm font-bold text-primary-600">{((log.endKm - log.startKm) || 0).toLocaleString()} km</p></div>
+                                            <div className="text-right flex-shrink-0 flex flex-col items-end gap-1">
+                                                <p className="text-sm font-bold text-primary-600">{((log.endKm - log.startKm) || 0).toLocaleString()} km</p>
+                                                <div className="flex items-center text-xs text-surface-400 gap-0.5 group-hover:text-primary-500 transition-colors">
+                                                    <span>수정·상세</span>
+                                                    <svg className={`w-3.5 h-3.5 transition-transform duration-200 ${expandedId === log.id ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>
+                                                </div>
+                                            </div>
                                         </button>
                                         {expandedId === log.id && (
                                             <div className="px-4 pb-4 border-t border-surface-100 dark:border-surface-700 pt-3 animate-fade-in">

@@ -41,9 +41,6 @@ export default defineConfig({
         rewrite: (path) => path.replace(/^\/api\/tmap/, '/tmap'),
       },
     },
-    headers: {
-      'Cross-Origin-Opener-Policy': 'same-origin-allow-popups',
-    },
   },
   build: {
     reportCompressedSize: true,

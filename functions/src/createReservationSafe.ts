@@ -28,6 +28,7 @@ export const createReservationSafe = onCall(
             routeDuration,
             routeTollFee,
             groupId,
+            source,
         } = request.data;
 
         if (!organizationId || !vehicleId || !date || !startTime || !endTime) {
@@ -93,6 +94,7 @@ export const createReservationSafe = onCall(
                     routeDuration: routeDuration || null,
                     routeTollFee: routeTollFee || null,
                     ...(groupId ? { groupId } : {}),
+                    ...(source ? { source } : {}),
                     status: "reserved",
                     createdAt: FieldValue.serverTimestamp(),
                 });

@@ -95,11 +95,11 @@ export default function useMonthlyReport() {
                 sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
 
                 const [driveResult, fuelResult, hipassResult] = await Promise.all([
-                    getDriveLogs(orgId, { limit: 500, since: sixMonthsAgo }),
-                    getFuelLogs(orgId, null, { since: sixMonthsAgo }).catch(() => []),
-                    getAllHipassCharges(orgId, { since: sixMonthsAgo }).catch(() => []),
+                    getDriveLogs(orgId!, { limit: 500, since: sixMonthsAgo }),
+                    getFuelLogs(orgId!, null, { since: sixMonthsAgo }).catch(() => []),
+                    getAllHipassCharges(orgId!, { since: sixMonthsAgo }).catch(() => []),
                 ]);
-                setLogs(driveResult.docs);
+                setLogs(driveResult.docs as DriveLog[]);
                 setFuelLogs(fuelResult as FuelLog[]);
                 setHipassCharges(hipassResult as HipassCharge[]);
             } catch (err) {

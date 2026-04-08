@@ -59,6 +59,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
     const [holidays, setHolidays] = useState<CustomHoliday[]>([]);
     const [members, setMembers] = useState<UserDoc[]>([]);
     const [orgAddress, setOrgAddress] = useState('');
+    const [reservationSource, setReservationSource] = useState<string | null>(null);
 
     // 폼 상태
     const [form, setForm] = useState<ReservationForm>({
@@ -135,8 +136,11 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
             setCurrentMonth(new Date(dateParam));
         }
 
-        const state = location.state as { openForm?: boolean; prefillPattern?: any; defaultVehicleId?: string } | null;
+        const state = location.state as { openForm?: boolean; prefillPattern?: any; defaultVehicleId?: string; source?: string } | null;
         if (state?.prefillPattern && state.openForm) {
+            if (state.source) {
+                setReservationSource(state.source);
+            }
             const p = state.prefillPattern;
             setSelectedDate(p.date);
             setCurrentMonth(new Date(p.date));
@@ -285,6 +289,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
             setEditingReservation(null);
             setForm({ vehicleId: '', destination: '', purpose: '', startTime: '', endTime: '', endDate: '' });
             setRouteInfo(null);
+            setReservationSource(null);
             setShowFavSave(false);
             setFavName('');
             return;
@@ -381,7 +386,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
 
             if (editingReservation && editingGroupId) {
                 // ── 다일 예약 그룹 수정: 기존 그룹 삭제 → 새 그룹 재생성 ──
-                await deleteReservationGroup(editingGroupId);
+                await deleteReservationGroup(editingGroupId, userData.organizationId!);
 
                 const newGroupId = `grp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
                 const effectiveEndDateForGroup = form.endDate || selectedDate;
@@ -400,6 +405,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
                     organizationId: userData.organizationId,
                     groupId: newGroupId,
                     ...routeData,
+                    ...(reservationSource ? { source: reservationSource } : {}),
                 };
 
                 for (let i = 0; i < totalDays; i++) {
@@ -440,6 +446,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
                     organizationId: userData.organizationId,
                     groupId,
                     ...routeData,
+                    ...(reservationSource ? { source: reservationSource } : {}),
                 };
 
                 for (let i = 0; i < totalDays; i++) {
@@ -464,6 +471,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
                     reservedByUid: user.uid,
                     reservedByName: userData.name || user.email || '익명',
                     organizationId: userData.organizationId,
+                    ...(reservationSource ? { source: reservationSource } : {}),
                 });
                 showToast('예약이 완료되었습니다.');
             }
@@ -478,6 +486,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
             setEditingGroupId(null);
             setForm({ vehicleId: '', destination: '', purpose: '', startTime: '', endTime: '', endDate: '' });
             setRouteInfo(null);
+            setReservationSource(null);
         } catch (error: unknown) {
             // Cloud Function already-exists 에러 처리
             const firebaseErr = error as { code?: string; message?: string };
@@ -551,7 +560,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
             if (!choice) return;
 
             try {
-                const cancelled = await cancelReservationGroup(groupId);
+                const cancelled = await cancelReservationGroup(groupId, userData?.organizationId || '');
                 showToast(`다일 예약 ${cancelled}건이 취소되었습니다.`);
                 setReservations(prev => prev.map(r => r.groupId === groupId ? { ...r, status: 'cancelled' } : r));
             } catch (error: unknown) {

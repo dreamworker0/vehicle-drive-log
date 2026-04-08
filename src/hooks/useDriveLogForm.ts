@@ -143,7 +143,7 @@ export default function useDriveLogForm() {
 
                 const resolveStartKm = async (vehicleId: string, fallbackKm: number | string | undefined) => {
                     const lastEndKm = await getLastVehicleEndKm(orgId, vehicleId);
-                    return (lastEndKm ?? fallbackKm ?? '').toString();
+                    return (fallbackKm ?? lastEndKm ?? '').toString();
                 };
 
                 if (isEditMode) {
@@ -180,6 +180,13 @@ export default function useDriveLogForm() {
             try {
                 const res = await getReservationById(queryReservationId);
                 if (res) {
+                    if (res.status === 'completed') {
+                        showToast('이미 운행일지 작성이 완료된 건입니다.', 'info');
+                        clearDrivingNotification(queryReservationId);
+                        navigate('/employee/today', { replace: true });
+                        return;
+                    }
+
                     const data: LocationState = {
                         reservationId: res.id,
                         vehicleId: res.vehicleId,
@@ -201,9 +208,9 @@ export default function useDriveLogForm() {
                         startTime: data.actualStartTime || prev.startTime,
                     }));
 
-                    // startKm 조회
+                    // startKm 조회 (현재차량정보가 우선)
                     const lastEndKm = await getLastVehicleEndKm(orgId, data.vehicleId!);
-                    const km = (lastEndKm ?? data.currentKm ?? '').toString();
+                    const km = (data.currentKm ?? lastEndKm ?? '').toString();
                     setForm(prev => ({ ...prev, startKm: km }));
                 }
             } catch (err) {
@@ -243,7 +250,7 @@ export default function useDriveLogForm() {
                 // 오늘 + 출발 시각 없음: 기본 동작
                 const lastEndKm = await getLastVehicleEndKm(orgId, form.vehicleId);
                 const v = vehicles.find(veh => veh.id === form.vehicleId);
-                km = lastEndKm ?? v?.currentKm ?? '';
+                km = v?.currentKm ?? lastEndKm ?? '';
             }
             setForm(prev => ({ ...prev, startKm: km.toString() }));
         };
@@ -301,7 +308,7 @@ export default function useDriveLogForm() {
         } else {
             // 오늘 + 출발 시각 없음: 기본 동작
             const lastEndKm = await getLastVehicleEndKm(orgId!, vehicleId);
-            km = lastEndKm ?? v?.currentKm ?? '';
+            km = v?.currentKm ?? lastEndKm ?? '';
         }
         setForm(prev => ({
             ...prev,

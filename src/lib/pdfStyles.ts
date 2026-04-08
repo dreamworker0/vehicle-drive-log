@@ -153,9 +153,9 @@ export function getPdfStyles() {
         .col-driver { width: 48px; }
         .col-vehicle { width: 76px; }
         .col-dest { width: auto; }
-        .col-purpose { width: 56px; }
-        .col-time { width: 40px; }
-        .col-km { width: 56px; }
+        .col-purpose { width: auto; }
+        .col-time { width: 34px; }
+        .col-km { width: 46px; }
         .col-passenger { width: 30px; }
         .col-note { width: 80px; }
 

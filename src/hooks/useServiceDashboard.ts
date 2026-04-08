@@ -5,7 +5,7 @@ import {
     FUEL_LABELS, FUEL_COLORS, VT_LABELS, VT_COLORS,
     computeDistance, computeDuration, ORG_PAGE_SIZE,
 } from '../components/superAdmin/dashboard/dashboardUtils';
-import type { SortKey } from '../components/superAdmin/dashboard/dashboardUtils';
+import type { SortKey, ServiceStats } from '../components/superAdmin/dashboard/dashboardUtils';
 
 interface OrgStat {
     id: string; name: string; address: string; lat: number; lng: number;
@@ -24,10 +24,7 @@ type SharedSnaps = {
 };
 
 export default function useServiceDashboard() {
-    const [stats, setStats] = useState<{
-        approvedOrgs: number; totalUsers: number; adminCount: number; employeeCount: number;
-        totalLogs: number; totalDistance: number; pendingApps: number;
-    } | null>(null);
+    const [stats, setStats] = useState<ServiceStats | null>(null);
     const [monthlyStats, setMonthlyStats] = useState<{
         monthLabel: string; logs: number; distance: number; activeUsers: number;
         prevLogs: number; prevDistance: number; prevActiveUsers: number;
@@ -39,6 +36,10 @@ export default function useServiceDashboard() {
     // 바로 운행 vs 사전 예약 통계
     const [quickDriveStats, setQuickDriveStats] = useState<{ date: string; regular: number; quick: number }[]>([]);
     const [quickDriveRatio, setQuickDriveRatio] = useState<{ total: number; quick: number; regular: number; rate: number }>({ total: 0, quick: 0, regular: 0, rate: 0 });
+
+    // 추천 예약 통계
+    const [recommendationStats, setRecommendationStats] = useState<{ date: string; recommendation: number; normal: number }[]>([]);
+    const [recommendationRatio, setRecommendationRatio] = useState<{ total: number; recommendation: number; normal: number; rate: number }>({ total: 0, recommendation: 0, normal: 0, rate: 0 });
 
     // 고도화 state
     const [_dailyDriveStats, setDailyDriveStats] = useState<{ date: string; count: number }[]>([]);
@@ -363,7 +364,8 @@ export default function useServiceDashboard() {
                 pendingApps = appSnap.data().count;
             } catch { /* ignore */ }
 
-            setStats({
+            setStats(prev => ({
+                ...prev,
                 approvedOrgs,
                 totalUsers,
                 adminCount,
@@ -371,7 +373,8 @@ export default function useServiceDashboard() {
                 totalLogs,
                 totalDistance: Math.round(totalDistance),
                 pendingApps,
-            });
+                calendarSyncOrgs: prev?.calendarSyncOrgs || 0,
+            }));
 
             setInputMethodStats(
                 Object.entries(dailyMap).map(([date, counts]) => ({ date, ...counts }))
@@ -527,6 +530,7 @@ export default function useServiceDashboard() {
             const modelMap: Record<string, number> = {};
             let calendarSyncCount = 0;
             let calendarNotSyncCount = 0;
+            const calendarSyncOrgSet = new Set<string>();
 
             vehicleSnap.docs.forEach(doc => {
                 const data = doc.data();
@@ -536,6 +540,9 @@ export default function useServiceDashboard() {
 
                 if (data.googleCalendarId) {
                     calendarSyncCount++;
+                    if (data.organizationId) {
+                        calendarSyncOrgSet.add(data.organizationId);
+                    }
                 } else {
                     calendarNotSyncCount++;
                 }
@@ -566,6 +573,7 @@ export default function useServiceDashboard() {
 
             setHipassRatio({ withHipass: hipassWithCount, withoutHipass: hipassTotalCount - hipassWithCount });
             setCalendarSyncRatio({ sync: calendarSyncCount, notSync: calendarNotSyncCount });
+            setStats(prev => prev ? { ...prev, calendarSyncOrgs: calendarSyncOrgSet.size } : null);
 
             setHipassTopOrgs(
                 Object.entries(orgHipassMap)
@@ -865,15 +873,16 @@ export default function useServiceDashboard() {
             const q = query(collection(db, 'reservations'), where('date', '>=', thirtyDaysAgoStr));
             const snap = await getDocs(q);
 
-            const dailyMap: Record<string, { regular: number; quick: number }> = {};
+            const dailyMap: Record<string, { regular: number; quick: number; recommendation: number; normal: number }> = {};
             for (let i = 0; i < 30; i++) {
                 const d = new Date(thirtyDaysAgo);
                 d.setDate(d.getDate() + i);
                 const key = `${d.getMonth() + 1}/${d.getDate()}`;
-                dailyMap[key] = { regular: 0, quick: 0 };
+                dailyMap[key] = { regular: 0, quick: 0, recommendation: 0, normal: 0 };
             }
 
             let total = 0, quick = 0, regular = 0;
+            let recTotal = 0, recommendation = 0, normal = 0;
 
             snap.docs.forEach(doc => {
                 const data = doc.data();
@@ -886,6 +895,8 @@ export default function useServiceDashboard() {
                 if (parsed >= thirtyDaysAgo) {
                     const key = `${parsed.getMonth() + 1}/${parsed.getDate()}`;
                     total++;
+                    recTotal++;
+                    
                     if (data.isQuickDrive) {
                         quick++;
                         if (dailyMap[key]) dailyMap[key].quick++;
@@ -893,13 +904,24 @@ export default function useServiceDashboard() {
                         regular++;
                         if (dailyMap[key]) dailyMap[key].regular++;
                     }
+
+                    if (data.source === 'recommendation') {
+                        recommendation++;
+                        if (dailyMap[key]) dailyMap[key].recommendation++;
+                    } else {
+                        normal++;
+                        if (dailyMap[key]) dailyMap[key].normal++;
+                    }
                 }
             });
 
             setQuickDriveRatio({ total, quick, regular, rate: total > 0 ? Math.round((quick / total) * 100) : 0 });
-            setQuickDriveStats(Object.entries(dailyMap).map(([date, counts]) => ({ date, ...counts })));
+            setQuickDriveStats(Object.entries(dailyMap).map(([date, counts]) => ({ date, regular: counts.regular, quick: counts.quick })));
+
+            setRecommendationRatio({ total: recTotal, recommendation, normal, rate: recTotal > 0 ? Math.round((recommendation / recTotal) * 100) : 0 });
+            setRecommendationStats(Object.entries(dailyMap).map(([date, counts]) => ({ date, recommendation: counts.recommendation, normal: counts.normal })));
         } catch (err) {
-            console.error('바로 운행 통계 로드 실패:', err);
+            console.error('바로 운행 및 추천 예약 통계 로드 실패:', err);
         }
     };
 
@@ -918,6 +940,8 @@ export default function useServiceDashboard() {
         inputMethodStats,
         quickDriveStats,
         quickDriveRatio,
+        recommendationStats,
+        recommendationRatio,
         orgSizeDistribution,
         fuelTypeStats,
         vehicleTypeStats,

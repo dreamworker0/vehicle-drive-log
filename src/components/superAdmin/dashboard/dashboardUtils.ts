@@ -86,6 +86,7 @@ export interface ServiceStats {
     totalLogs: number;
     totalDistance: number;
     pendingApps: number;
+    calendarSyncOrgs: number;
 }
 
 export interface MonthlyStatsData {
