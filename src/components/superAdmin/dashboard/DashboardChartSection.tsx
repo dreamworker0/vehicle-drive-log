@@ -7,6 +7,7 @@ import ChartQuickDrive from './ChartQuickDrive';
 import ChartDistribution from './ChartDistribution';
 import ChartHipass from './ChartHipass';
 import ChartFuelHipass from './ChartFuelHipass';
+import ChartCalendarSync from './ChartCalendarSync';
 
 interface Props {
     // 일별 기관 추이
@@ -34,6 +35,8 @@ interface Props {
     hipassStats: HipassStatsData | null;
     dailyFuelCost: { date: string; cost: number }[];
     dailyHipassAmount: { date: string; amount: number }[];
+    // 구글 캘린더 연동
+    calendarSyncRatio: { sync: number; notSync: number };
 }
 
 export default function DashboardChartSection(props: Props) {
@@ -60,6 +63,9 @@ export default function DashboardChartSection(props: Props) {
             <ChartHipass
                 hipassRatio={props.hipassRatio}
                 hipassTopOrgs={props.hipassTopOrgs}
+            />
+            <ChartCalendarSync 
+                calendarSyncRatio={props.calendarSyncRatio}
             />
             <ChartFuelHipass
                 fuelStats={props.fuelStats}

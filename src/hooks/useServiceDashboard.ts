@@ -49,6 +49,7 @@ export default function useServiceDashboard() {
     const [vehicleTypeStats, setVehicleTypeStats] = useState<{ type: string; label: string; count: number; color: string }[]>([]);
     const [vehicleModelStats, setVehicleModelStats] = useState<{ model: string; count: number }[]>([]);
     const [hipassRatio, setHipassRatio] = useState<{ withHipass: number; withoutHipass: number }>({ withHipass: 0, withoutHipass: 0 });
+    const [calendarSyncRatio, setCalendarSyncRatio] = useState<{ sync: number; notSync: number }>({ sync: 0, notSync: 0 });
     const [hipassTopOrgs, setHipassTopOrgs] = useState<{ name: string; count: number }[]>([]);
     const [weeklyActiveRate, setWeeklyActiveRate] = useState<{ active: number; total: number }>({ active: 0, total: 0 });
     const [monthlyGrowth, setMonthlyGrowth] = useState<{ month: string; cumulative: number }[]>([]);
@@ -92,14 +93,14 @@ export default function useServiceDashboard() {
     const orgSizeDistribution = useMemo(() => {
         let small = 0, medium = 0, large = 0;
         topOrgs.forEach(org => {
-            if (org.users <= 3) small++;
+            if (org.users <= 2) small++;
             else if (org.users <= 10) medium++;
             else large++;
         });
         return [
-            { label: '소규모 (1~3명)', count: small, color: '#60a5fa' },
-            { label: '중규모 (4~10명)', count: medium, color: '#34d399' },
-            { label: '대규모 (11명+)', count: large, color: '#f59e0b' },
+            { label: '소규모 (1~2명)', count: small, color: '#60a5fa' },
+            { label: '중규모 (3~10명)', count: medium, color: '#34d399' },
+            { label: '대규모 (11명 이상)', count: large, color: '#f59e0b' },
         ];
     }, [topOrgs]);
 
@@ -176,12 +177,21 @@ export default function useServiceDashboard() {
     };
 
     useEffect(() => {
-        loadAllStats();
+        const cachedTime = sessionStorage.getItem('svc_dashboard_cache_time');
+        const now = Date.now();
+        
+        // 5분 내 재진입 시 로딩 애니메이션 생략 (UI 블로킹 방지)
+        const isBackground = cachedTime && (now - parseInt(cachedTime) < 5 * 60 * 1000);
+        if (isBackground) {
+            setLoading(false); 
+        }
+        
+        loadAllStats(!!isBackground);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    const loadAllStats = async () => {
-        setLoading(true);
+    const loadAllStats = async (isBackground = false) => {
+        if (!isBackground) setLoading(true);
         try {
             // 공유 컬렉션을 1회만 조회
             const [orgSnap, userSnap, logSnap, vehicleSnap, hipassCardSnap] = await Promise.all([
@@ -202,8 +212,10 @@ export default function useServiceDashboard() {
                 loadNotificationStats(),
                 loadQuickDriveStats(),
             ]);
+            
+            sessionStorage.setItem('svc_dashboard_cache_time', Date.now().toString());
         } finally {
-            setLoading(false);
+            if (!isBackground) setLoading(false);
         }
     };
 
@@ -513,11 +525,21 @@ export default function useServiceDashboard() {
             const fuelMap: Record<string, number> = {};
             const vtMap: Record<string, number> = {};
             const modelMap: Record<string, number> = {};
+            let calendarSyncCount = 0;
+            let calendarNotSyncCount = 0;
+
             vehicleSnap.docs.forEach(doc => {
                 const data = doc.data();
                 if (data.organizationId && orgMap[data.organizationId]) {
                     orgMap[data.organizationId].vehicles++;
                 }
+
+                if (data.googleCalendarId) {
+                    calendarSyncCount++;
+                } else {
+                    calendarNotSyncCount++;
+                }
+
                 const ft = (data.fuelType as string) || 'gasoline';
                 fuelMap[ft] = (fuelMap[ft] || 0) + 1;
                 const vt = (data.vehicleType as string) || 'sedan';
@@ -543,6 +565,7 @@ export default function useServiceDashboard() {
             const hipassTotalCount = vehicleSnap.size;
 
             setHipassRatio({ withHipass: hipassWithCount, withoutHipass: hipassTotalCount - hipassWithCount });
+            setCalendarSyncRatio({ sync: calendarSyncCount, notSync: calendarNotSyncCount });
 
             setHipassTopOrgs(
                 Object.entries(orgHipassMap)
@@ -900,6 +923,7 @@ export default function useServiceDashboard() {
         vehicleTypeStats,
         vehicleModelStats,
         hipassRatio,
+        calendarSyncRatio,
         hipassTopOrgs,
         fuelStats,
         hipassStats,
