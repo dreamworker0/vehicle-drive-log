@@ -1,5 +1,6 @@
 import { getOfflineActions, removeOfflineAction, incrementRetryCount } from './offlineSync';
 import { createDriveLog, updateDriveLog } from './firestore/driveLogs';
+import { isCreateDriveLogPayload, isUpdateDriveLogPayload } from '../types/driveLog';
 
 export const processOfflineQueue = async () => {
     if (typeof window === 'undefined' || !navigator.onLine) return;
@@ -20,10 +21,18 @@ export const processOfflineQueue = async () => {
 
                 switch (action.type) {
                     case 'CREATE_DRIVELOG':
-                        await createDriveLog(action.payload);
+                        if (isCreateDriveLogPayload(action.payload)) {
+                            await createDriveLog(action.payload);
+                        } else {
+                            console.warn('[OfflineSync] Invalid CREATE payload:', action.payload);
+                        }
                         break;
                     case 'UPDATE_DRIVELOG':
-                        await updateDriveLog(action.payload.id, action.payload);
+                        if (isUpdateDriveLogPayload(action.payload)) {
+                            await updateDriveLog(action.payload.id, action.payload);
+                        } else {
+                            console.warn('[OfflineSync] Invalid UPDATE payload:', action.payload);
+                        }
                         break;
                     // TODO: 예약 생성 등 다른 액션 타입 추가 가능
                     default:

@@ -60,3 +60,22 @@ export interface DriveLogFilters {
     limit?: number;
     startAfter?: unknown;  // Firestore DocumentSnapshot
 }
+
+/** 오프라인 동기화 큐페이로드 타입 검증 가드 (Create) */
+export function isCreateDriveLogPayload(payload: unknown): payload is Record<string, unknown> {
+    if (typeof payload !== 'object' || payload === null) return false;
+    const p = payload as Record<string, unknown>;
+    // 최소한의 필수 속성 타입 체크
+    return typeof p.organizationId === 'string' 
+        && typeof p.vehicleId === 'string'
+        && typeof p.driverUid === 'string'
+        && typeof p.startKm === 'number'
+        && typeof p.endKm === 'number';
+}
+
+/** 오프라인 동기화 큐페이로드 타입 검증 가드 (Update) */
+export function isUpdateDriveLogPayload(payload: unknown): payload is Record<string, unknown> & { id: string } {
+    if (typeof payload !== 'object' || payload === null) return false;
+    const p = payload as Record<string, unknown>;
+    return typeof p.id === 'string';
+}

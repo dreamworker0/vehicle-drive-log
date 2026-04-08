@@ -58,6 +58,43 @@ export const createMaintenanceRecord = async (data: Record<string, unknown>) => 
     return docRef;
 };
 
+// 정비 기록 수정
+export const updateMaintenanceRecord = async (recordId: string, data: Record<string, unknown>) => {
+    const { blockVehicle, blockEndDate, ...recordData } = data;
+    await updateDoc(doc(db, 'maintenanceRecords', recordId), {
+        ...(recordData as Record<string, unknown>),
+        blockVehicle: blockVehicle || false,
+        blockEndDate: blockEndDate || null,
+        updatedAt: serverTimestamp(),
+    });
+
+    // 차량 차단 플래그 동기화
+    if (recordData.vehicleId) {
+        if (blockVehicle) {
+            await updateDoc(doc(db, 'vehicles', recordData.vehicleId as string), {
+                maintenance: {
+                    isBlocked: true,
+                    reason: recordData.type,
+                    endDate: blockEndDate || null,
+                    recordId: recordId,
+                    blockedAt: serverTimestamp(),
+                },
+            });
+        } else {
+            // 만약 해당 블록 레코드로 잠겨있었는데 이제 해제되었다면
+            const vehicleSnap = await getDoc(doc(db, 'vehicles', recordData.vehicleId as string));
+            if (vehicleSnap.exists()) {
+                const vehicle = vehicleSnap.data();
+                if (vehicle.maintenance?.recordId === recordId) {
+                    await updateDoc(doc(db, 'vehicles', recordData.vehicleId as string), {
+                        maintenance: null,
+                    });
+                }
+            }
+        }
+    }
+};
+
 // 정비 기록 삭제 (연결된 차량 차단도 해제)
 export const deleteMaintenanceRecord = async (recordId: string, vehicleId: string | null = null) => {
     // 차량 차단과 연결된 기록이면 차단도 해제

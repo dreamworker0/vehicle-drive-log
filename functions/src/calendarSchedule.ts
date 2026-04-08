@@ -114,7 +114,33 @@ export const syncCalendarToApp = onSchedule(
                         // 취소된 이벤트는 건너뜀
                         if (calEvent.status === "cancelled") continue;
 
-                        const existing = existingByEventId[calEvent.id];
+                        let existing = existingByEventId[calEvent.id];
+
+                        if (!existing) {
+                            // calendarEventId로 연결되지 않은 예약 중에서, 동일 조건(날짜, 시간, 차량)의 앱 생성 예약 찾기
+                            const tempParsed = parseEventToReservation(calEvent, vehicleId, vehicleName, organizationId) as Record<string, unknown>;
+                            const matchingAppReservation = existingReservations.find(function (r) {
+                                return r.date === tempParsed.date &&
+                                       r.startTime === tempParsed.startTime &&
+                                       r.endTime === tempParsed.endTime &&
+                                       r.vehicleId === vehicleId &&
+                                       r.status !== "cancelled" &&
+                                       !r.calendarEventId; // 아직 calendarEventId가 없는 예약 (최신 생성 등)
+                            });
+
+                            if (matchingAppReservation) {
+                                // 앱에서 생성되었으나 아직 calendarEventId가 매핑되지 않은 예약 발견
+                                existing = matchingAppReservation;
+                                // Firestore에 calendarEventId 업데이트 후 중첩 방지
+                                await db.collection("reservations").doc(existing.id as string).update({
+                                    calendarEventId: calEvent.id
+                                });
+                                existing.calendarEventId = calEvent.id;
+                                existingByEventId[calEvent.id] = existing;
+                                globalProcessedEventIds.add(calEvent.id);
+                                console.log("[" + vehicleName + "] Linked unmapped app reservation " + existing.id + " with calendar event " + calEvent.id);
+                            }
+                        }
 
                         if (!existing) {
                             // 같은 calendarEventId가 다른 차량에서 이미 처리되었으면 건너뛰기

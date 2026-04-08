@@ -1,0 +1,30 @@
+﻿211c687 HEAD@{2026-04-07 23:06:38 +0900}: reset: moving to HEAD
+211c687 HEAD@{2026-03-29 07:34:56 +0900}: commit: test: 실패하던 3개의 테스트 코드 오류 수정
+703339c HEAD@{2026-03-28 18:13:36 +0900}: commit: fix: global memory 128MiB→256MiB (Cloud Run OOM 해결) + initializeApp 순서 수정
+8563bc1 HEAD@{2026-03-28 18:06:30 +0900}: commit: fix: reservationTriggers getFirestore() 초기화 순서 수정 (Cloud Run 컨테이너 시작 실패 해결)
+f29465d HEAD@{2026-03-28 17:36:06 +0900}: commit: fix: 배포를 위한 린트 통과 및 미사용 코드 정리
+e40b42e HEAD@{2026-03-23 13:57:34 +0900}: commit: refactor: ServiceDashboard 차트 분리, 훅 추출, 테스트/타입 정리 (Phase 38 마무리)
+f224ec2 HEAD@{2026-03-23 11:35:51 +0900}: commit: fix: TypeScript 컴파일 에러 전수 해결 (any 리팩토링 후속)
+925a356 HEAD@{2026-03-23 09:50:55 +0900}: commit: fix(test): useEmployeeManager 테스트에 firebase/analytics mock 추가 — window is not defined 에러 해결
+8a3e997 HEAD@{2026-03-23 09:37:06 +0900}: commit: fix(e2e): auth-guard strict mode violation 수정 — .or() 제거
+f2bd57e HEAD@{2026-03-23 09:23:05 +0900}: commit: fix(e2e): 모든 E2E 테스트 CI 안정화
+f4001df HEAD@{2026-03-23 09:13:14 +0900}: commit: fix(e2e): auth-guard, offline-pwa 테스트 CI 환경 안정화
+043f1aa HEAD@{2026-03-23 09:01:05 +0900}: commit: fix(test): useToast 테스트 격리 — afterEach에서 pending timers 실행 및 cleanup 추가
+cb24930 HEAD@{2026-03-23 08:45:58 +0900}: commit: fix(types): tsc --noEmit 타입 에러 수정 — DailyLogView org null 체크, EmployeeManager original 타입 통일
+c570e9a HEAD@{2026-03-23 08:25:53 +0900}: commit: refactor: ESLint 에러 일괄 수정 — 훅 분리, any 타입 제거, alert→DOM 피드백
+f51058e HEAD@{2026-03-22 19:09:35 +0900}: commit: refactor(frontend): Zustand 이관 및 AuthGuard 적용, AI OCR UI 추가
+98c4593 HEAD@{2026-03-22 18:51:15 +0900}: reset: moving to HEAD
+98c4593 HEAD@{2026-03-22 18:49:29 +0900}: rebase (abort): returning to refs/heads/master
+8bb9f8e HEAD@{2026-03-22 18:49:10 +0900}: pull origin master --rebase (start): checkout 8bb9f8e213f0787c08bbb4431efab669e65c2432
+98c4593 HEAD@{2026-03-22 18:44:56 +0900}: commit: chore(docs/ci): README 갱신 및 CI(E2E) 설정, ESLint 최적화
+5ebdcc3 HEAD@{2026-03-21 13:35:10 +0900}: commit: Phase C~D 완료 + 추가 최적화: 프록시 팩토리, Remote Config, gzip 아카이브, 스케줄러 주기 조정, 에뮬레이터 테스트, E2E 테스트, 모니터링 가이드
+4aa7247 HEAD@{2026-03-21 11:39:17 +0900}: commit: Phase B: Sentry Cloud Functions 연동 + 배포 롤백 전략 문서화 + 로드맵 갱신
+09f8900 HEAD@{2026-03-13 21:27:02 +0900}: commit: docs: 구현계획서 Phase 34 갱신 (FAQ, 업데이트 소식, 번들 최적화, Sentry 필터링 등 반영)
+0100bd0 HEAD@{2026-03-13 21:23:24 +0900}: commit: docs: Phase 34 CHANGELOG 추가
+4bf3921 HEAD@{2026-03-13 21:18:07 +0900}: commit: Phase 34: 주유 기록, FAQ, 업데이트 소식, 히트맵, ConfirmContext, 번들 최적화, ESLint/테스트 정비
+268822a HEAD@{2026-03-09 20:17:08 +0900}: commit: Phase 30: 운영 개선 & 사용성 강화 & 컨텐츠 갱신
+504073e HEAD@{2026-03-07 13:00:47 +0900}: commit: refactor: Cloud Functions, E2E 테스트, 유틸 스크립트 TypeScript 전환
+25f6412 HEAD@{2026-03-06 22:58:41 +0900}: commit: 변경: 외부 동승자 이름 입력 → 숫자(인원수) 스테퍼 UI로 간소화
+7459467 HEAD@{2026-03-06 22:53:47 +0900}: commit: 기능 추가: 외부 동승자 입력 + 자동 인원수 계산 (조직원 + 외부인 합산)
+faf361b HEAD@{2026-03-06 22:40:06 +0900}: commit: 수정: 예약 종료 시간 24:00 캡핑 (23:59) - HTML time input 호환
+3a31d20 HEAD@{2026-03-06 22:35:51 +0900}: commit: 버그 수정: 예약 폼 시작/종료 시간 기본값 자동 설정 (30분 스냅)

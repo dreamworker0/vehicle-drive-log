@@ -95,18 +95,21 @@ export async function deleteCalendarEvent(calendarId: string, eventId: string): 
  * 예약 데이터 → 캘린더 이벤트 객체 변환
  */
 function buildEvent(reservation: ReservationData): calendar_v3.Schema$Event {
-    const { date, startTime, endTime, reservedByName, purpose, destination } = reservation;
+    const { date, startTime, endTime, reservedByName, purpose, destination, vehicleName } = reservation;
 
     // ISO 8601 datetime 생성 (Asia/Seoul)
     const startDateTime = `${date}T${startTime}:00`;
     const endDateTime = `${date}T${endTime}:00`;
 
-    // 차량별 캘린더이므로 차량명 생략, 목적지 — 예약자 형식
-    const summary = destination
+    // 캘린더 보기 편의를 위해 [차량명] 추가
+    const summaryStr = destination
         ? `${destination} — ${reservedByName || ""}`
         : reservedByName || "예약";
+        
+    const summary = vehicleName ? `[${vehicleName}] ${summaryStr}` : summaryStr;
 
     const descriptionParts: string[] = [];
+    if (vehicleName) descriptionParts.push(`차량: ${vehicleName}`);
     if (reservedByName) descriptionParts.push(`예약자: ${reservedByName}`);
     if (purpose) descriptionParts.push(`용도: ${purpose}`);
     if (destination) descriptionParts.push(`목적지: ${destination}`);
@@ -201,13 +204,15 @@ export function parseEventToReservation(event: CalendarEvent, vehicleId: string,
     // 제목에서 "목적지 - 예약자" 형식 파싱 (description에 정보가 없을 때)
     const summary = event.summary || "";
     if (!reservedByName || !destination) {
+        // 제목 앞에 붙은 [차량명] 제거 후 파싱
+        const cleanedSummary = summary.replace(/^\[.*?\]\s*/, '');
         // 구분자: —, –, - (앞뒤 공백 포함)
-        const match = summary.match(/^(.+?)\s*[—–\-]\s*(.+)$/);
+        const match = cleanedSummary.match(/^(.+?)\s*[—–\-]\s*(.+)$/);
         if (match) {
             if (!destination) destination = match[1].trim();
             if (!reservedByName) reservedByName = match[2].trim();
-        } else if (!destination && summary) {
-            destination = summary;
+        } else if (!destination && cleanedSummary) {
+            destination = cleanedSummary;
         }
     }
 

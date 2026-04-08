@@ -12,6 +12,18 @@ import { nowTime, todayStr, validateDriveLogForm, buildLogData, timestampToDateS
 import { getVehicles, createDriveLog, updateDriveLog, updateReservationStatus, getFavorites, createFavorite, getOrganizationMembers, getLastVehicleEndKm, getLastVehicleEndBattery, getVehicleEndKmBefore, getReservationById, getHipassCards, updateHipassCard } from '../lib/firestore';
 import { enqueueLog } from '../lib/offlineQueue';
 import type { Vehicle } from '../types/vehicle';
+
+const clearDrivingNotification = async (resId?: string) => {
+    if (!resId || !('Notification' in window)) return;
+    try {
+        const reg = await navigator.serviceWorker?.ready;
+        if (!reg) return;
+        const notifications = await reg.getNotifications({ tag: `driving-${resId}` });
+        notifications.forEach(n => n.close());
+    } catch {
+        // 무시
+    }
+};
 import type { Favorite } from '../types/favorite';
 import type { User as UserDoc } from '../types/user';
 import type { DriveLog } from '../types/driveLog';
@@ -401,6 +413,7 @@ export default function useDriveLogForm() {
                     actualStartTime: form.startTime || '',
                     actualEndTime: form.endTime || nowTime(),
                 });
+                await clearDrivingNotification(reservationData.reservationId);
             }
 
             // 하이패스 잔액 업데이트

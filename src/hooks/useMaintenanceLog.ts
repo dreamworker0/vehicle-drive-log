@@ -8,7 +8,7 @@ import { useToast } from './useToast';
 import { useConfirm } from './useConfirm';
 import type { Vehicle } from '../types/vehicle';
 import type { MaintenanceRecord } from '../types/maintenance';
-import { getVehicles, getMaintenanceRecords, createMaintenanceRecord, deleteMaintenanceRecord, clearVehicleMaintenanceBlock, cancelVehicleReservations } from '../lib/firestore';
+import { getVehicles, getMaintenanceRecords, createMaintenanceRecord, deleteMaintenanceRecord, clearVehicleMaintenanceBlock, cancelVehicleReservations, updateMaintenanceRecord } from '../lib/firestore';
 import { toLocalDateStr } from '../lib/dateUtils';
 
 export const MAINTENANCE_TYPES = [
@@ -39,6 +39,7 @@ export default function useMaintenanceLog() {
     const [records, setRecords] = useState<MaintenanceRecord[]>([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
     const [filters, setFilters] = useState({
         search: '',
@@ -104,36 +105,49 @@ export default function useMaintenanceLog() {
         if (!form.vehicleId || !form.date || !form.type) return;
         setSaving(true);
         try {
-            await createMaintenanceRecord({
+            const data = {
                 organizationId: orgId,
                 vehicleId: form.vehicleId,
                 vehicleName: form.vehicleName,
                 date: form.date,
                 type: form.type,
                 description: form.description.trim(),
-                cost: form.cost ? parseInt(form.cost) : null,
+                cost: form.cost ? parseInt(String(form.cost)) : null,
                 shop: form.shop.trim(),
-                km: form.km ? parseInt(form.km) : null,
-                nextDueKm: form.nextDueKm ? parseInt(form.nextDueKm) : null,
+                km: form.km ? parseInt(String(form.km)) : null,
+                nextDueKm: form.nextDueKm ? parseInt(String(form.nextDueKm)) : null,
                 nextDueDate: form.nextDueDate || null,
                 blockVehicle: form.blockVehicle,
                 blockEndDate: form.blockEndDate || null,
-            });
+            };
+
+            if (editingId) {
+                await updateMaintenanceRecord(editingId, data);
+            } else {
+                await createMaintenanceRecord(data);
+            }
+
             // 차단 설정 시 기존 예약 자동 취소 + 차량 목록 새로고침
             let cancelledCount = 0;
             if (form.blockVehicle) {
                 const typeInfo = MAINTENANCE_TYPES.find((t) => t.value === form.type);
                 cancelledCount = await cancelVehicleReservations(
-                    orgId!, form.vehicleId, form.vehicleName,
+                    orgId!, form.vehicleId, form.vehicleName || '',
                     form.date, form.blockEndDate || null,
                     typeInfo?.label || '정비'
                 );
                 const v = await getVehicles(orgId!);
                 setVehicles(v as Vehicle[]);
+            } else if (editingId) {
+                // 수정 시 차단이 풀렸을 수 있으므로 차량 정보를 새로고침
+                const v = await getVehicles(orgId!);
+                setVehicles(v as Vehicle[]);
             }
+
             const updated = await getMaintenanceRecords(orgId!);
             setRecords(updated as MaintenanceRecord[]);
             setShowForm(false);
+            setEditingId(null);
             setForm(INITIAL_FORM);
             showToast(
                 form.blockVehicle
@@ -147,6 +161,31 @@ export default function useMaintenanceLog() {
         } finally {
             setSaving(false);
         }
+    };
+
+    const handleEdit = (rec: MaintenanceRecord) => {
+        setForm({
+            vehicleId: rec.vehicleId,
+            vehicleName: rec.vehicleName || '',
+            date: rec.date,
+            type: rec.type,
+            description: rec.description || '',
+            cost: rec.cost ? String(rec.cost) : '',
+            shop: rec.shop || '',
+            km: rec.km ? String(rec.km) : '',
+            nextDueKm: rec.nextDueKm ? String(rec.nextDueKm) : '',
+            nextDueDate: rec.nextDueDate || '',
+            blockVehicle: rec.blockVehicle || false,
+            blockEndDate: rec.blockEndDate || toLocalDateStr(),
+        });
+        setEditingId(rec.id);
+        setShowForm(true);
+    };
+
+    const handleCancelEdit = () => {
+        setForm(INITIAL_FORM);
+        setEditingId(null);
+        setShowForm(false);
     };
 
     const handleDelete = async (rec: MaintenanceRecord) => {
@@ -187,8 +226,8 @@ export default function useMaintenanceLog() {
     return {
         vehicles, loading, showForm, setShowForm,
         saving, filters, setFilters, resetFilters,
-        form, setForm, filteredRecords,
-        handleSubmit, handleDelete, getTypeInfo, handleVehicleSelect,
+        form, setForm, filteredRecords, editingId,
+        handleSubmit, handleEdit, handleCancelEdit, handleDelete, getTypeInfo, handleVehicleSelect,
         handleClearBlock,
     };
 }

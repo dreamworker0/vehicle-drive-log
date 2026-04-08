@@ -18,6 +18,14 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
     {
+        date: '2026-04-08',
+        title: '대시보드 통계 및 캘린더 연동 UI 개선',
+        items: [
+            { type: 'new', text: '시스템 관리자의 대시보드 통계에 "구글 캘린더 연동 비율" 차트가 추가되어 전체 차량의 캘린더 등록 현황을 한눈에 볼 수 있습니다.' },
+            { type: 'new', text: '차량 목록에 "📅 캘린더 연동" 뱃지가 새롭게 표시되어, 어떤 차량이 구글 캘린더와 연동되어 있는지 쉽게 확인할 수 있습니다.' }
+        ],
+    },
+    {
         date: '2026-03-28',
         title: '원클릭 예약 추천 & UI 개선',
         items: [

@@ -7,9 +7,25 @@ import {
     orderBy, limit, serverTimestamp, getCountFromServer, Timestamp,
     type QueryConstraint,
     type DocumentData,
+    type QueryDocumentSnapshot,
+    type SnapshotOptions
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { DriveLog } from '../../types/driveLog';
+
+export const driveLogConverter = {
+    toFirestore: (log: Partial<DriveLog>): DocumentData => {
+        const { id, ...data } = log as any;
+        return data;
+    },
+    fromFirestore: (snapshot: QueryDocumentSnapshot, options: SnapshotOptions): DriveLog => {
+        const data = snapshot.data(options);
+        return {
+            id: snapshot.id,
+            ...data
+        } as DriveLog;
+    }
+};
 
 /** 특정 시점 이후에 같은 차량의 운행기록이 존재하는지 확인 */
 const hasLaterDriveLog = async (orgId: string, vehicleId: string, afterTimestamp: Date) => {
@@ -223,9 +239,9 @@ export const getDriveLogs = async (
         constraints.push(startAfterFn(filters.startAfter as DocumentData));
     }
 
-    const q = query(collection(db, 'driveLogs'), ...constraints);
+    const q = query(collection(db, 'driveLogs').withConverter(driveLogConverter), ...constraints);
     const snap = await getDocs(q);
-    const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }) as DriveLog);
+    const docs = snap.docs.map(d => d.data());
 
     return {
         docs,
@@ -249,9 +265,9 @@ export const getAllDriveLogsForExport = async (
     
     constraints.push(orderBy('timestamp', 'desc'));
 
-    const q = query(collection(db, 'driveLogs'), ...constraints);
+    const q = query(collection(db, 'driveLogs').withConverter(driveLogConverter), ...constraints);
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DriveLog);
+    return snap.docs.map(d => d.data());
 };
 
 /**
@@ -278,14 +294,14 @@ export const getDriveLogCount = async (
 // 내 운행일지 목록 조회
 export const getMyDriveLogs = async (orgId: string, uid: string, limitCount = 30) => {
     const q = query(
-        collection(db, 'driveLogs'),
+        collection(db, 'driveLogs').withConverter(driveLogConverter),
         where('organizationId', '==', orgId),
         where('driverUid', '==', uid),
         orderBy('timestamp', 'desc'),
         limit(limitCount)
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DriveLog);
+    return snap.docs.map(d => d.data());
 };
 
 // 운행일지 수정
@@ -323,9 +339,9 @@ export const getVehicleDriveLogs = async (vehicleId: string, since?: Date, limit
     if (since) {
         constraints.splice(1, 0, where('timestamp', '>=', since));
     }
-    const q = query(collection(db, 'driveLogs'), ...constraints);
+    const q = query(collection(db, 'driveLogs').withConverter(driveLogConverter), ...constraints);
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DriveLog);
+    return snap.docs.map(d => d.data());
 };
 
 // 차량에 운행일지가 1건이라도 있는지 확인

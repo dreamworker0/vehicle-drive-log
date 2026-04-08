@@ -9,6 +9,7 @@ import VehicleSelector from './VehicleSelector';
 import MileageInput from './MileageInput';
 import type { DriveLog } from '../../types/driveLog';
 import type { Favorite } from '../../types/favorite';
+import { toLocalDateStr } from '../../lib/dateUtils';
 import type { User as UserDoc } from '../../types/user';
 
 export default function DriveLogForm() {
@@ -45,6 +46,13 @@ export default function DriveLogForm() {
             </div>
         );
     }
+
+    const todayStr = toLocalDateStr(new Date());
+    const minDateStr = (() => {
+        const d = new Date();
+        d.setDate(d.getDate() - 7);
+        return toLocalDateStr(d);
+    })();
 
     // 제목 결정
     const title = isEditMode ? '운행일지 수정' : '운행일지 작성';
@@ -128,34 +136,45 @@ export default function DriveLogForm() {
 
 
 
-                {/* 운행 시간 (수정 모드 시 출발/도착 시간 모두 편집 가능) */}
-                {isEditMode && (
-                    <div className="glass-card p-4">
-                        <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300 mb-3">🕐 운행 시간</h3>
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <label htmlFor="startTime" className="label text-xs">출발 시각</label>
-                                <input
-                                    id="startTime"
-                                    type="time"
-                                    value={form.startTime}
-                                    onChange={e => setForm({ ...form, startTime: e.target.value })}
-                                    className="input"
-                                />
-                            </div>
-                            <div>
-                                <label htmlFor="endTime" className="label text-xs">도착 시각</label>
-                                <input
-                                    id="endTime"
-                                    type="time"
-                                    value={form.endTime}
-                                    onChange={e => setForm({ ...form, endTime: e.target.value })}
-                                    className="input"
-                                />
-                            </div>
+                {/* 운행 일자 및 시간 */}
+                <div className="glass-card p-4">
+                    <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300 mb-3">🕐 운행 시간</h3>
+                    <div className="mb-4">
+                        <label htmlFor="driveDate" className="label text-xs">운행 일자</label>
+                        <input
+                            id="driveDate"
+                            type="date"
+                            value={form.driveDate}
+                            min={minDateStr}
+                            max={todayStr}
+                            onChange={e => setForm({ ...form, driveDate: e.target.value })}
+                            className="input"
+                        />
+                        <p className="text-[11px] text-surface-400 mt-1">일주일 이내의 날짜만 선택할 수 있습니다.</p>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label htmlFor="startTime" className="label text-xs">출발 시각</label>
+                            <input
+                                id="startTime"
+                                type="time"
+                                value={form.startTime}
+                                onChange={e => setForm({ ...form, startTime: e.target.value })}
+                                className="input"
+                            />
+                        </div>
+                        <div>
+                            <label htmlFor="endTime" className="label text-xs">도착 시각</label>
+                            <input
+                                id="endTime"
+                                type="time"
+                                value={form.endTime}
+                                onChange={e => setForm({ ...form, endTime: e.target.value })}
+                                className="input"
+                            />
                         </div>
                     </div>
-                )}
+                </div>
 
                 {/* 운행 목적 & 행선지 - 예약 없이 직접 작성 시 또는 수정 모드 */}
                 {(!reservationData?.vehicleId || isEditMode) && (

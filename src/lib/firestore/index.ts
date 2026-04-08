@@ -106,6 +106,7 @@ export {
 export {
     getMaintenanceRecords,
     createMaintenanceRecord,
+    updateMaintenanceRecord,
     deleteMaintenanceRecord,
     clearVehicleMaintenanceBlock,
     cancelVehicleReservations,

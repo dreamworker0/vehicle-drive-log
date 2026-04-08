@@ -79,15 +79,40 @@ export const generateFeedbackDraft = onDocumentCreated(
         }
 
         // --- 디스코드 알림 ---
-        const authorName = data.authorName || "이름 없음";
+        const userNameInfo = data.userName || data.authorName || "";
+        const emailInfo = data.userEmail || data.authorEmail || "";
+        
+        let authorName = "이름 없음";
+        if (userNameInfo && emailInfo) {
+            authorName = `${userNameInfo} (${emailInfo})`;
+        } else if (userNameInfo) {
+            authorName = userNameInfo;
+        } else if (emailInfo) {
+            authorName = emailInfo;
+        }
+
         const category = data.category || "일반";
+        
+        let orgName = data.organizationName || "";
+        if (!orgName && data.organizationId) {
+            try {
+                const orgDoc = await db.collection("organizations").doc(data.organizationId).get();
+                if (orgDoc.exists) {
+                    orgName = orgDoc.data()?.name || "";
+                }
+            } catch (e) {
+                console.warn("[generateFeedbackDraft] 기관명 조회 실패:", e);
+            }
+        }
+        
+        const finalAuthorDisplay = orgName ? `${authorName}\n${orgName}` : authorName;
         
         await sendDiscordAlert({
             title: `💡 🆕 사용자 의견 등록`,
             description: `새로운 사용자 의견 (피드백/문의)이 등록되었습니다.`,
             color: 16776960, // 노란색
             fields: [
-                { name: "작성자", value: authorName, inline: true },
+                { name: "작성자", value: finalAuthorDisplay, inline: true },
                 { name: "분류", value: category, inline: true },
                 { name: "내용", value: message, inline: false },
             ]
@@ -116,10 +141,11 @@ ${pastExamples}
 "${message}"
 
 다음 규칙을 따르세요:
-1. FAQ와 매칭되면 답변을 기반으로 초안을 작성하고, 매칭된 항목의 고유 ID(faqId)와 확신도(confidence, 0~1)를 응답에 포함하세요.
-2. FAQ에 없는 내용이라도 (기능 요청, 버그 신고 등) 반드시 친절한 답변 초안을 작성하세요.
-3. 과거 답변 사례를 참고해 사람처럼 자연스럽고 친절하게 작성하세요. (존댓말, 2~4문장)
-4. FAQ와 매칭된 경우, 답변 끝에 반드시 해당 FAQ 항목으로 바로 이동할 수 있는 링크를 남겨주세요.
+1. 첫 문장은 반드시 다음 내용만을 정확히 사용하세요: "안녕하세요. 김종원입니다. 초안은 인공지능이 작성합니다." (다른 중복된 인사말은 절대 넣지 마세요)
+2. FAQ와 매칭되면 답변을 기반으로 초안을 작성하고, 매칭된 항목의 고유 ID(faqId)와 확신도(confidence, 0~1)를 응답에 포함하세요.
+3. FAQ에 없는 내용이라도 (기능 요청, 버그 신고 등) 반드시 친절한 답변 초안을 작성하세요.
+4. 과거 답변 사례를 참고해 사람처럼 자연스럽고 친절하게 본론을 작성하세요. (존댓말, 2~4문장 내외)
+5. FAQ와 매칭된 경우, 답변 끝에 반드시 해당 FAQ 항목으로 바로 이동할 수 있는 링크를 남겨주세요.
    - 링크 형식: https://vehicle-drive-log.web.app/faq#{해당 faqId}
    - 예시 문구: "자세한 설정 방법은 아래 링크(자주 하는 질문)를 참고해 주세요. \n👉 https://vehicle-drive-log.web.app/faq#app-install"
 
@@ -138,9 +164,16 @@ ${pastExamples}
             const text = response.text?.trim() || "";
             const result = parseAiResponse(text);
 
+            // AI가 규칙을 놓칠 경우를 대비하여 접두어 강제 추가
+            const prefix = "안녕하세요. 김종원입니다. 초안은 인공지능이 작성합니다.";
+            let finalDraft = result.draft.trim();
+            if (!finalDraft.startsWith(prefix)) {
+                finalDraft = `${prefix}\n\n${finalDraft}`;
+            }
+
             // 5. Firestore 업데이트
             await snap.ref.update({
-                aiDraft: result.draft,
+                aiDraft: finalDraft,
                 aiMatchedFaqId: result.faqId,
                 aiMatchedFaqIndex: null, // 기존 필드는 null 처리
                 aiConfidence: result.confidence,
@@ -155,7 +188,7 @@ ${pastExamples}
 
             // 실패해도 기본 초안은 저장
             await snap.ref.update({
-                aiDraft: "소중한 의견 감사합니다. 검토 후 답변드리겠습니다.",
+                aiDraft: "안녕하세요. 김종원입니다. 초안은 인공지능이 작성합니다.\n\n소중한 의견 감사합니다. 검토 후 답변드리겠습니다.",
                 aiMatchedFaqId: null,
                 aiMatchedFaqIndex: null,
                 aiConfidence: 0,

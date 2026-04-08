@@ -21,8 +21,8 @@ export default function MaintenanceLog() {
     const {
         vehicles, loading, showForm, setShowForm,
         saving, filters, setFilters, resetFilters,
-        form, setForm, filteredRecords,
-        handleSubmit, handleDelete, getTypeInfo, handleVehicleSelect,
+        form, setForm, filteredRecords, editingId,
+        handleSubmit, handleEdit, handleCancelEdit, handleDelete, getTypeInfo, handleVehicleSelect,
         handleClearBlock,
     } = useMaintenanceLog();
     const { userData } = useAuth();
@@ -60,7 +60,7 @@ export default function MaintenanceLog() {
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button onClick={() => setShowForm(!showForm)} className="btn-primary btn-sm flex items-center gap-1">
+                    <button onClick={() => { if (showForm) { handleCancelEdit(); } else { setShowForm(true); } }} className="btn-primary btn-sm flex items-center gap-1">
                         {showForm ? '✕ 닫기' : '＋ 정비 기록 추가'}
                     </button>
                     <button
@@ -107,7 +107,7 @@ export default function MaintenanceLog() {
             {/* 등록 폼 */}
             {showForm && (
                 <form onSubmit={handleSubmit} className="glass-card p-5 mb-6 space-y-4 animate-fade-in">
-                    <h2 className="font-semibold text-surface-800 dark:text-surface-200">새 정비 기록</h2>
+                    <h2 className="font-semibold text-surface-800 dark:text-surface-200">{editingId ? '정비 기록 수정' : '새 정비 기록'}</h2>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label className="label">차량 <span className="text-red-500">*</span></label>
@@ -192,9 +192,12 @@ export default function MaintenanceLog() {
                         )}
                     </div>
 
-                    <div className="flex justify-end">
+                    <div className="flex justify-end gap-2">
+                        {editingId && (
+                            <button type="button" onClick={handleCancelEdit} className="btn-secondary">취소</button>
+                        )}
                         <button type="submit" disabled={saving} className="btn-primary">
-                            {saving ? '저장 중...' : form.blockVehicle ? '🚫 정비 기록 저장 + 차량 차단' : '정비 기록 저장'}
+                            {saving ? '저장 중...' : form.blockVehicle ? (editingId ? '🚫 기록 수정 + 차량 차단' : '🚫 정비 기록 저장 + 차량 차단') : (editingId ? '정비 기록 수정' : '정비 기록 저장')}
                         </button>
                     </div>
                 </form>
@@ -322,7 +325,10 @@ export default function MaintenanceLog() {
                                         <span className="text-xs px-2 py-0.5 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-full font-medium">🚫 차단</span>
                                     )}
                                     {rec.cost && <span className="text-sm font-bold text-surface-700 dark:text-surface-300">{rec.cost.toLocaleString()}원</span>}
-                                    <button onClick={() => handleDelete(rec)} className="text-xs text-surface-300 hover:text-red-500 transition-colors">삭제</button>
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <button onClick={() => handleEdit(rec)} className="text-xs text-surface-400 hover:text-primary-500 transition-colors">수정</button>
+                                        <button onClick={() => handleDelete(rec)} className="text-xs text-surface-300 hover:text-red-500 transition-colors">삭제</button>
+                                    </div>
                                 </div>
                             </div>
                         );

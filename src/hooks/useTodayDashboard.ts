@@ -14,6 +14,18 @@ import type { Vehicle } from '../types/vehicle';
 import { isVehicleBlocked } from '../lib/vehicleUtils';
 import type { Reservation } from '../types/reservation';
 
+const clearDrivingNotification = async (resId?: string) => {
+    if (!resId || !('Notification' in window)) return;
+    try {
+        const reg = await navigator.serviceWorker?.ready;
+        if (!reg) return;
+        const notifications = await reg.getNotifications({ tag: `driving-${resId}` });
+        notifications.forEach(n => n.close());
+    } catch {
+        // 무시
+    }
+};
+
 export default function useTodayDashboard() {
     const { user, userData } = useAuth();
     const navigate = useNavigate();
@@ -242,6 +254,7 @@ export default function useTodayDashboard() {
         try {
             await cancelReservation(reservation.id);
             setWeekReservations(prev => prev.filter(r => r.id !== reservation.id));
+            await clearDrivingNotification(reservation.id);
         } catch (err) {
             console.error('예약 취소 실패:', err);
             showToast('예약 취소에 실패했습니다.', 'error');
@@ -255,6 +268,7 @@ export default function useTodayDashboard() {
         try {
             await cancelReservation(reservation.id);
             setTodayReservations(prev => prev.filter(r => r.id !== reservation.id));
+            await clearDrivingNotification(reservation.id);
         } catch (err) {
             console.error('예약 취소 실패:', err);
             showToast('예약 취소에 실패했습니다.', 'error');
