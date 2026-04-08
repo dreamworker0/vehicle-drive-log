@@ -139,19 +139,6 @@ export default function DriveLogForm() {
                 {/* 운행 일자 및 시간 */}
                 <div className="glass-card p-4">
                     <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300 mb-3">🕐 운행 시간</h3>
-                    <div className="mb-4">
-                        <label htmlFor="driveDate" className="label text-xs">운행 일자</label>
-                        <input
-                            id="driveDate"
-                            type="date"
-                            value={form.driveDate}
-                            min={minDateStr}
-                            max={todayStr}
-                            onChange={e => setForm({ ...form, driveDate: e.target.value })}
-                            className="input"
-                        />
-                        <p className="text-[11px] text-surface-400 mt-1">일주일 이내의 날짜만 선택할 수 있습니다.</p>
-                    </div>
                     <div className="grid grid-cols-2 gap-4">
                         <div>
                             <label htmlFor="startTime" className="label text-xs">출발 시각</label>
