@@ -136,33 +136,6 @@ export default function DriveLogForm() {
 
 
 
-                {/* 운행 일자 및 시간 */}
-                <div className="glass-card p-4">
-                    <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300 mb-3">🕐 운행 시간</h3>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label htmlFor="startTime" className="label text-xs">출발 시각</label>
-                            <input
-                                id="startTime"
-                                type="time"
-                                value={form.startTime}
-                                onChange={e => setForm({ ...form, startTime: e.target.value })}
-                                className="input"
-                            />
-                        </div>
-                        <div>
-                            <label htmlFor="endTime" className="label text-xs">도착 시각</label>
-                            <input
-                                id="endTime"
-                                type="time"
-                                value={form.endTime}
-                                onChange={e => setForm({ ...form, endTime: e.target.value })}
-                                className="input"
-                            />
-                        </div>
-                    </div>
-                </div>
-
                 {/* 운행 목적 & 행선지 - 예약 없이 직접 작성 시 또는 수정 모드 */}
                 {(!reservationData?.vehicleId || isEditMode) && (
                     <div className="space-y-4">
