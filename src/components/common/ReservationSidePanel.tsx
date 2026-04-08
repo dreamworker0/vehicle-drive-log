@@ -136,7 +136,7 @@ export default function ReservationSidePanel({
                             : 'bg-primary-500 text-white hover:bg-primary-600 shadow-sm'
                             }`}
                     >
-                        {showForm ? '닫기' : '+ 예약하기'}
+                        {showForm ? '닫기' : '+ 예약'}
                     </button>
                 )}
             </div>

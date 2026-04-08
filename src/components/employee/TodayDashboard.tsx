@@ -154,7 +154,7 @@ export default function TodayDashboard() {
                             <span className="reservation-cta-glow" />
                             <span className="relative z-10 flex items-center gap-1.5">
                                 <span>📅</span>
-                                <span>예약하기</span>
+                                <span>예약</span>
                             </span>
                         </button>
                     </div>

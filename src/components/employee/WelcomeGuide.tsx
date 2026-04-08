@@ -23,7 +23,7 @@ export default function WelcomeGuide({ onDismiss }: WelcomeGuideProps) {
                 <div className="flex items-start gap-3">
                     <span className="w-7 h-7 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-sm flex-shrink-0">📅</span>
                     <div>
-                        <p className="font-medium text-surface-800 dark:text-surface-200">예약하기</p>
+                        <p className="font-medium text-surface-800 dark:text-surface-200">예약</p>
                         <p className="text-xs text-surface-400">달력에서 차량과 시간을 선택하세요</p>
                     </div>
                 </div>
