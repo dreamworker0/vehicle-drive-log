@@ -11,75 +11,129 @@ export const VEHICLE_TYPE_TO_CAR_TYPE: Record<string, string> = {
     truck: '1',    // 화물차 (1톤급은 승용차 요금)
 };
 
-// API 실패 쿨다운 (3회 연속 실패 시 5분간 비활성화)
-let _failCount = 0;
+// API 쿨다운 관리
 let _cooldownUntil = 0;
-const COOLDOWN_MS = 5 * 60 * 1000; // 5분
+const COOLDOWN_429_MS = 30 * 1000; // 429 시 30초 쿨다운
+const COOLDOWN_FAIL_MS = 5 * 60 * 1000; // 연속 실패 시 5분 쿨다운
+let _failCount = 0;
 const MAX_FAIL = 3;
 
 /** API 호출 전 쿨다운 체크 */
 export const isTmapCoolingDown = () => Date.now() < _cooldownUntil;
 
 /** 실패 기록 */
-const recordFail = () => {
+const recordFail = (is429 = false) => {
+    if (is429) {
+        // 429는 즉시 쿨다운 (재시도 폭주 방지)
+        _cooldownUntil = Math.max(_cooldownUntil, Date.now() + COOLDOWN_429_MS);
+        console.warn(`TMap API 429 → ${COOLDOWN_429_MS / 1000}초 쿨다운`);
+        return;
+    }
     _failCount++;
     if (_failCount >= MAX_FAIL) {
-        _cooldownUntil = Date.now() + COOLDOWN_MS;
-        console.warn(`TMap API ${MAX_FAIL}회 연속 실패 → ${COOLDOWN_MS / 1000}초 쿨다운`);
+        _cooldownUntil = Date.now() + COOLDOWN_FAIL_MS;
+        console.warn(`TMap API ${MAX_FAIL}회 연속 실패 → ${COOLDOWN_FAIL_MS / 1000}초 쿨다운`);
     }
 };
 
 /** 성공 시 카운터 리셋 */
 const recordSuccess = () => { _failCount = 0; };
 
-// 지오코딩 캐시 (메모리 캐싱으로 API 중복 호출 최소화)
-const geoCache = new Map<string, { lat: number, lon: number, name: string } | null>();
+// LocalStorage 기반 캐싱 헬퍼
+const GEO_CACHE_KEY = 'tmap_geo_cache_v1';
+const ROUTE_CACHE_KEY = 'tmap_route_cache_v1';
 
-/** 공통 T-Map API Fetch 헬퍼 - 중복 제거 및 지수 백오프 기반 재시도 적용 */
+const safeParseJSON = (str: string | null, fallback: any) => {
+    if (!str) return fallback;
+    try { return JSON.parse(str); } catch { return fallback; }
+};
+
+const initialGeoData = safeParseJSON(typeof window !== 'undefined' ? localStorage.getItem(GEO_CACHE_KEY) : null, []);
+const initialRouteData = safeParseJSON(typeof window !== 'undefined' ? localStorage.getItem(ROUTE_CACHE_KEY) : null, []);
+
+// 지오코딩 캐시 (LocalStorage 영구 캐싱으로 API 중복 호출 최소화)
+const geoCache = new Map<string, { lat: number, lon: number, name: string } | null>(initialGeoData);
+const originalGeoSet = geoCache.set.bind(geoCache);
+geoCache.set = function(key, value) {
+    const result = originalGeoSet(key, value);
+    try { if (typeof window !== 'undefined') localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(Array.from(geoCache.entries()))); } catch (e) { /* ignore */ }
+    return result;
+};
+
+// 경로 결과 캐시 (동일 출발·도착 좌표 재조회 방지, 영구 캐싱)
+const routeCache = new Map<string, { distance: number; duration: number; tollFee: number; fuelCost: number } | null>(initialRouteData);
+const originalRouteSet = routeCache.set.bind(routeCache);
+routeCache.set = function(key, value) {
+    const result = originalRouteSet(key, value);
+    try { if (typeof window !== 'undefined') localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(Array.from(routeCache.entries()))); } catch (e) { /* ignore */ }
+    return result;
+};
+
+/** 요청 간 딜레이 */
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * 글로벌 요청 큐 — 동시 1개 요청 + 요청 완료 후 최소 간격 보장
+ * T-Map 무료 API의 rate limit(초당 ~1건)을 준수
+ */
+let _queue: Promise<void> = Promise.resolve();
+const MIN_GAP_MS = 1200; // 무료 API 제약(초당 1건 수준) 준수를 위해 최소 1200ms 간격으로 상향
+
+function enqueue<T>(fn: () => Promise<T>): Promise<T> {
+    return new Promise<T>((resolve, reject) => {
+        _queue = _queue.then(async () => {
+            if (isTmapCoolingDown()) {
+                resolve(null as unknown as T);
+                return;
+            }
+            try {
+                const result = await fn();
+                resolve(result);
+            } catch (e) {
+                reject(e);
+            }
+            // 다음 요청까지 최소 간격 보장
+            await delay(MIN_GAP_MS);
+        });
+    });
+}
+
+/** 공통 T-Map API Fetch 헬퍼 — 글로벌 큐 적용, 429 즉시 쿨다운 */
 async function fetchTmap(prodUrl: string, devUrl: string, method = 'GET', bodyObj?: object) {
-    const isProd = import.meta.env.PROD;
-    const url = isProd ? prodUrl : devUrl;
-    
-    const headers: Record<string, string> = {};
-    if (bodyObj) headers['Content-Type'] = 'application/json';
-    
-    if (isProd) {
-        Object.assign(headers, await getAuthHeaders());
-    } else {
-        headers['appKey'] = TMAP_API_KEY;
-    }
+    // 쿨다운 중이면 즉시 null 반환 (조용히 스킵)
+    if (isTmapCoolingDown()) return null;
 
-    const MAX_RETRIES = 3;
-    let attempt = 0;
+    return enqueue(async () => {
+        const isProd = import.meta.env.PROD;
+        const url = isProd ? prodUrl : devUrl;
 
-    while (attempt < MAX_RETRIES) {
-        try {
-            const res = await fetch(url, {
-                method,
-                headers,
-                body: bodyObj ? JSON.stringify(bodyObj) : undefined,
-            });
-            
-            if (!res.ok) {
-                // 429(Too Many Requests) 혹여는 5xx 계열 서버 에러일 경우에만 재시도 타겟으로 삼음
-                if (res.status === 429 || res.status >= 500) {
-                    throw new Error(`T-Map API HTTP Error: ${res.status}`);
-                }
-                // 400~404 등 클라이언트 요청 오류는 재시도 없이 바로 에러 던짐
-                throw new Error(`T-Map API HTTP Error (No Retry): ${res.status}`);
-            }
-            return await res.json();
-        } catch (error: any) {
-            attempt++;
-            const isNoRetry = error instanceof Error && error.message.includes('No Retry');
-            if (attempt >= MAX_RETRIES || isNoRetry) {
-                throw error;
-            }
-            // Exponential backoff: 500ms -> 1000ms -> 2000ms
-            const backoffTime = 500 * Math.pow(2, attempt - 1);
-            await new Promise(resolve => setTimeout(resolve, backoffTime));
+        const headers: Record<string, string> = {};
+        if (bodyObj) headers['Content-Type'] = 'application/json';
+
+        if (isProd) {
+            Object.assign(headers, await getAuthHeaders());
+        } else {
+            headers['appKey'] = TMAP_API_KEY;
         }
-    }
+
+        // 단일 시도 — 재시도는 큐 밖에서 하지 않음 (429 폭주 방지)
+        const res = await fetch(url, {
+            method,
+            headers,
+            body: bodyObj ? JSON.stringify(bodyObj) : undefined,
+        });
+
+        if (!res.ok) {
+            if (res.status === 429) {
+                recordFail(true); // 즉시 쿨다운 활성화
+                return null; // 빨간 에러 방지를 위해 throw 대신 조용히 null 반환
+            }
+            throw new Error(`T-Map API HTTP Error: ${res.status}`);
+        }
+
+        recordSuccess();
+        return await res.json();
+    });
 }
 
 /**
@@ -147,10 +201,14 @@ const geocode = async (address: string) => {
     return result;
 };
 
-/** 자동차 경로 탐색 */
+/** 자동차 경로 탐색 (캐싱 적용) */
 const getRoute = async (startLon: number, startLat: number, endLon: number, endLat: number, { carType = '0', searchOption = '0' } = {}) => {
     if (isTmapCoolingDown()) return null;
     if (!import.meta.env.PROD && !TMAP_API_KEY) return null;
+
+    // 캐시 키: 좌표+옵션 조합 (소수점 5자리로 정규화)
+    const cacheKey = `${startLon.toFixed(5)},${startLat.toFixed(5)}-${endLon.toFixed(5)},${endLat.toFixed(5)}-${carType}-${searchOption}`;
+    if (routeCache.has(cacheKey)) return routeCache.get(cacheKey) || null;
 
     const routeBody = {
         startX: startLon.toString(),
@@ -172,14 +230,16 @@ const getRoute = async (startLon: number, startLat: number, endLon: number, endL
         );
 
         const props = data?.features?.[0]?.properties;
-        if (!props) return null;
+        if (!props) { routeCache.set(cacheKey, null); return null; }
 
-        return {
+        const result = {
             distance: Math.floor(props.totalDistance / 1000), 
             duration: Math.round(props.totalTime / 60), 
             tollFee: props.totalFare || 0, 
             fuelCost: props.taxiFare || 0, 
         };
+        routeCache.set(cacheKey, result);
+        return result;
     } catch (err) {
         console.error('경로 탐색 실패:', err);
         return null;
@@ -197,10 +257,9 @@ export const parseDestinations = (text: string) => {
 const getRouteByAddress = async (startAddress: string, endAddress: string, { carType = '0', searchOption = '0' } = {}) => {
     if (!startAddress?.trim() || !endAddress?.trim()) return null;
 
-    const [startCoord, endCoord] = await Promise.all([
-        geocode(startAddress),
-        geocode(endAddress),
-    ]);
+    // 순차 호출 (큐 내에서도 rate limit 준수)
+    const startCoord = await geocode(startAddress);
+    const endCoord = await geocode(endAddress);
 
     if (!startCoord || !endCoord) return null;
 
@@ -229,16 +288,22 @@ export const getMultiRoute = async (origin: string, destinationText: string, { c
     }
 
     const allAddresses = [origin, ...dests];
-    const coords = await Promise.all(allAddresses.map(addr => geocode(addr)));
+    // 순차 지오코딩 (글로벌 큐가 간격 보장)
+    const coords = [];
+    for (const addr of allAddresses) {
+        const coord = await geocode(addr);
+        coords.push(coord);
+    }
     if (coords.some(c => !c)) return null;
 
-    // 병렬로 모든 구간 경로 탐색 (기존 순차 방식에서 개선)
-    const routePromises = coords.map((from, i) => {
-        const to = coords[(i + 1) % coords.length]!; // 순환
-        return getRoute(from!.lon, from!.lat, to.lon, to.lat, { carType, searchOption });
-    });
-
-    const routeResults = await Promise.all(routePromises);
+    // 순차 라우팅 (글로벌 큐가 700ms 간격 보장)
+    const routeResults = [];
+    for (let i = 0; i < coords.length; i++) {
+        const from = coords[i]!;
+        const to = coords[(i + 1) % coords.length]!;
+        const result = await getRoute(from.lon, from.lat, to.lon, to.lat, { carType, searchOption });
+        routeResults.push(result);
+    }
     if (routeResults.some(r => !r)) return null;
 
     const segments = routeResults.map((seg, i) => ({
@@ -326,7 +391,10 @@ const getKakaoMapDeeplink = async (destination: string) => {
     if (dests.length === 0) return 'kakaomap://open';
 
     try {
-        const coords = await Promise.all(dests.map(d => geocode(d)));
+        const coords = [];
+        for (const d of dests) {
+            coords.push(await geocode(d));
+        }
         const goalIdx = dests.length - 1;
         const goalCoord = coords[goalIdx];
 
@@ -368,26 +436,33 @@ export const getRouteInfo = async (destination: string) => {
     }
 };
 
-/** 기존(추천) 경로와 무료도로 경로를 병렬 조회 */
+/** 기존(추천) 경로와 무료도로 경로를 순차 조회 */
 export const getMultiRouteWithFreeRoad = async (origin: string, destinationText: string, { carType = '0' } = {}) => {
-    const [normal, freeRoad] = await Promise.all([
-        getMultiRoute(origin, destinationText, { carType, searchOption: '0' }),
-        getMultiRoute(origin, destinationText, { carType, searchOption: '1' }),
-    ]);
+    // 일반 경로 우선 조회
+    const normal = await getMultiRoute(origin, destinationText, { carType, searchOption: '0' });
 
-    if (!normal) return null;
+    // 일반 경로 실패 또는 쿨다운 시 무료도로 조회 스킵
+    if (!normal || isTmapCoolingDown()) {
+        return normal ? { ...normal, freeRoadRoute: undefined } : normal;
+    }
 
-    const isDifferent = freeRoad && (
-        Math.floor(freeRoad.distance) !== Math.floor(normal.distance) ||
-        (freeRoad.tollFee || 0) !== (normal.tollFee || 0)
-    );
+    // 통행료가 있을 때만 무료도로 대체 경로를 조회 (비용 절약)
+    if (normal.tollFee && normal.tollFee > 0) {
+        const freeRoad = await getMultiRoute(origin, destinationText, { carType, searchOption: '1' });
+        const isDifferent = freeRoad && (
+            Math.floor(freeRoad.distance) !== Math.floor(normal.distance) ||
+            (freeRoad.tollFee || 0) !== (normal.tollFee || 0)
+        );
 
-    return {
-        ...normal,
-        freeRoadRoute: isDifferent ? {
-            distance: freeRoad.distance,
-            duration: freeRoad.duration,
-            tollFee: freeRoad.tollFee || 0,
-        } : undefined,
-    };
+        return {
+            ...normal,
+            freeRoadRoute: isDifferent ? {
+                distance: freeRoad.distance,
+                duration: freeRoad.duration,
+                tollFee: freeRoad.tollFee || 0,
+            } : undefined,
+        };
+    }
+
+    return { ...normal, freeRoadRoute: undefined };
 };

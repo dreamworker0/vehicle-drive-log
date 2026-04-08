@@ -54,6 +54,13 @@ export default function ReservationCard({
     })();
 
     const handleNavSelect = (appId: string) => {
+        const hasWaypoints = reservation.destination && reservation.destination.includes(',');
+        if (hasWaypoints && appId !== 'naver') {
+            if (!window.confirm('카카오맵/티맵은 다중 경유지를 완벽히 지원하지 않아 최종 목적지로만 안내될 수 있습니다.\n\n경유지가 포함된 경로는 설정에서 "네이버 지도"를 기본 길안내 앱으로 변경하시길 권장합니다.\n\n그래도 현재 선택된 앱으로 길안내를 계속하시겠습니까?')) {
+                return;
+            }
+        }
+
         if (onStartNavigation) {
             onStartNavigation(reservation, appId);
         } else if (onStartWithTmap) {

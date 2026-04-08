@@ -138,16 +138,25 @@ export default function TodayDashboard() {
 
             {/* 예약이 없을 때 안내 */}
             {myReservations.length === 0 && (
-                <div className="glass-card px-4 py-3 border-l-4 border-l-primary-400">
-                    <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0 flex-1">
-                            <span className="w-8 h-8 rounded-lg bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center text-sm flex-shrink-0">📋</span>
+                <div className="glass-card px-5 py-5 border-l-4 border-l-primary-400">
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4 min-w-0 flex-1">
+                            <span className="w-11 h-11 rounded-xl bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center text-lg flex-shrink-0">📋</span>
                             <div className="min-w-0">
-                                <p className="font-medium text-surface-800 dark:text-surface-200 text-sm">오늘 예약 없음</p>
-                                <p className="text-xs text-surface-500 dark:text-surface-400">새 예약을 등록해보세요</p>
+                                <p className="font-semibold text-surface-800 dark:text-surface-200 text-base">오늘 예약 없음</p>
+                                <p className="text-sm text-surface-500 dark:text-surface-400 mt-0.5">새 예약을 등록해보세요</p>
                             </div>
                         </div>
-                        <button onClick={navigateToReservations} className="btn-sm btn-primary w-[72px] inline-flex items-center justify-center text-xs whitespace-nowrap flex-shrink-0">예약</button>
+                        <button
+                            onClick={navigateToReservations}
+                            className="reservation-cta-btn flex-shrink-0"
+                        >
+                            <span className="reservation-cta-glow" />
+                            <span className="relative z-10 flex items-center gap-1.5">
+                                <span>📅</span>
+                                <span>예약하기</span>
+                            </span>
+                        </button>
                     </div>
                 </div>
             )}

@@ -209,10 +209,6 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
                         tollFee: result.tollFee,
                         freeRoadRoute: result.freeRoadRoute,
                     });
-                    if (form.startTime && result.duration) {
-                        const autoEnd = calcEndTime(form.startTime, result.duration);
-                        setForm(prev => ({ ...prev, endTime: autoEnd }));
-                    }
                 } else {
                     setRouteInfo(null);
                 }
@@ -221,10 +217,20 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
             } finally {
                 setRouteLoading(false);
             }
-        }, 800);
+        }, 1200); // 충분한 디바운스로 불필요한 연속 호출 방지
 
         return () => clearTimeout(timer);
-    }, [form.destination, form.startTime, form.vehicleId, orgAddress, vehicles]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [form.destination, form.vehicleId, orgAddress]);
+
+    // startTime 변경 시 도착 시간 자동 계산 (API 재호출 없음)
+    useEffect(() => {
+        if (form.startTime && routeInfo?.duration) {
+            const autoEnd = calcEndTime(form.startTime, routeInfo.duration);
+            setForm(prev => ({ ...prev, endTime: autoEnd }));
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [form.startTime, routeInfo?.duration]);
 
     // 달력 데이터 생성
     const calendarDays = useMemo(() => {

@@ -319,6 +319,87 @@
   }
 }
 
+/* ===== 예약 CTA 버튼 (breathing 강조) ===== */
+.reservation-cta-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 22px;
+  min-height: 48px;
+  min-width: 110px;
+  border: none;
+  border-radius: 14px;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #6366f1 0%, #4f46e5 50%, #4338ca 100%);
+  box-shadow:
+    0 4px 14px rgba(99, 102, 241, 0.35),
+    0 1px 3px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  animation: ctaBreathing 2.5s ease-in-out infinite;
+}
+
+.reservation-cta-btn:hover {
+  transform: translateY(-1px) scale(1.03);
+  box-shadow:
+    0 6px 20px rgba(99, 102, 241, 0.45),
+    0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.reservation-cta-btn:active {
+  transform: scale(0.97);
+}
+
+/* 숨쉬는 glow 레이어 */
+.reservation-cta-glow {
+  position: absolute;
+  inset: -2px;
+  border-radius: 16px;
+  background: linear-gradient(135deg, rgba(129, 140, 248, 0.5), rgba(99, 102, 241, 0) 60%);
+  animation: ctaGlow 2.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes ctaBreathing {
+  0%, 100% {
+    box-shadow:
+      0 4px 14px rgba(99, 102, 241, 0.35),
+      0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+  50% {
+    box-shadow:
+      0 6px 24px rgba(99, 102, 241, 0.55),
+      0 2px 8px rgba(0, 0, 0, 0.15);
+  }
+}
+
+@keyframes ctaGlow {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.04);
+  }
+}
+
+/* 다크 모드 */
+:is(.dark) .reservation-cta-btn {
+  background: linear-gradient(135deg, #818cf8 0%, #6366f1 50%, #4f46e5 100%);
+  box-shadow:
+    0 4px 14px rgba(129, 140, 248, 0.3),
+    0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+:is(.dark) .reservation-cta-glow {
+  background: linear-gradient(135deg, rgba(165, 180, 252, 0.4), rgba(129, 140, 248, 0) 60%);
+}
+
 /* ===== 토스트 애니메이션 ===== */
 .animate-slide-in {
   animation: slideIn 0.3s ease-out;

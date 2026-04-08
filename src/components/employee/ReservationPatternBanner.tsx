@@ -39,7 +39,7 @@ export default function ReservationPatternBanner() {
     };
 
     return (
-        <div className="fixed bottom-[85px] left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-lg z-[40] bg-transparent px-4 py-4 animate-fade-in-up md:relative md:bottom-auto md:w-full md:max-w-none md:translate-x-0 md:left-auto md:z-10 md:p-0 md:mt-6 group">
+        <div className="fixed bottom-[85px] left-1/2 -translate-x-1/2 w-[calc(100%-2rem)] max-w-lg z-[40] bg-transparent px-4 py-4 animate-fade-in-up group">
             {/* 섹션 타이틀 */}
             <div className="flex items-center justify-between gap-2 mb-3">
                 <div className="flex items-center gap-2">
@@ -93,9 +93,6 @@ export default function ReservationPatternBanner() {
                             className="glass-card px-4 py-3 flex items-center justify-between gap-3 shrink-0 min-w-[85%] snap-center transition-colors hover:shadow-md"
                         >
                             <div className="flex items-center gap-3 min-w-0 pr-2">
-                                <span className="flex-shrink-0 text-sm font-bold text-indigo-600 dark:text-indigo-400">
-                                    {idx + 1}.
-                                </span>
                                 <div className="min-w-0 text-left">
                                     <p className="text-sm font-medium truncate text-surface-800 dark:text-surface-200">
                                         {rec.vehicleName}
