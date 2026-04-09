@@ -47,7 +47,7 @@ export const createReservationSafe = onCall(
 
         try {
             const reservationId = await db.runTransaction(async (transaction) => {
-                // 부모 차량 문서를 먼저 읽어 Lock 획득 (Phantom Read 방지)
+                // 부모 차량 문서를 읽고 의도적으로 업데이트하여 해당 차량의 트랜잭션 Lock 획득 강제 (동시 예약 생성 방지)
                 const vehicleRef = db.collection("vehicles").doc(vehicleId);
                 await transaction.get(vehicleRef);
 
@@ -77,6 +77,9 @@ export const createReservationSafe = onCall(
                         `해당 차량은 ${effStart} ~ ${effEnd}에 이미 예약되어 있습니다.`
                     );
                 }
+
+                // 모든 읽기 작업(get)이 종료된 후 쓰기 작업(update, set)을 수행 (Firestore Transaction 제약조건)
+                transaction.update(vehicleRef, { _lastReservationLock: FieldValue.serverTimestamp() });
 
                 const newRef = db.collection("reservations").doc();
                 transaction.set(newRef, {

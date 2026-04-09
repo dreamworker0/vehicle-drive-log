@@ -4,8 +4,8 @@ import { sendPushToUser, createInAppNotification } from "./sendNotification";
 const db = getFirestore();
 
 /**
- * 예약 시작 10분 전 알림 전송 + 운행일지 미작성 알림 전송
- * Cloud Functions Scheduler에서 5분마다 호출
+ * 예약 시작 10분 전 알림 + 운행일지 미작성 알림 전송
+ * Cloud Functions Scheduler에서 15분마다 호출 (비용 최적화 적용됨)
  */
 export async function checkReservationReminders(): Promise<void> {
     const now = new Date();

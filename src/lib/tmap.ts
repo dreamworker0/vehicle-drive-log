@@ -43,7 +43,7 @@ const recordSuccess = () => { _failCount = 0; };
 const GEO_CACHE_KEY = 'tmap_geo_cache_v1';
 const ROUTE_CACHE_KEY = 'tmap_route_cache_v1';
 
-const safeParseJSON = (str: string | null, fallback: any) => {
+const safeParseJSON = (str: string | null, fallback: unknown) => {
     if (!str) return fallback;
     try { return JSON.parse(str); } catch { return fallback; }
 };
@@ -56,7 +56,7 @@ const geoCache = new Map<string, { lat: number, lon: number, name: string } | nu
 const originalGeoSet = geoCache.set.bind(geoCache);
 geoCache.set = function(key, value) {
     const result = originalGeoSet(key, value);
-    try { if (typeof window !== 'undefined') localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(Array.from(geoCache.entries()))); } catch (e) { /* ignore */ }
+    try { if (typeof window !== 'undefined') localStorage.setItem(GEO_CACHE_KEY, JSON.stringify(Array.from(geoCache.entries()))); } catch { /* ignore */ }
     return result;
 };
 
@@ -65,7 +65,7 @@ const routeCache = new Map<string, { distance: number; duration: number; tollFee
 const originalRouteSet = routeCache.set.bind(routeCache);
 routeCache.set = function(key, value) {
     const result = originalRouteSet(key, value);
-    try { if (typeof window !== 'undefined') localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(Array.from(routeCache.entries()))); } catch (e) { /* ignore */ }
+    try { if (typeof window !== 'undefined') localStorage.setItem(ROUTE_CACHE_KEY, JSON.stringify(Array.from(routeCache.entries()))); } catch { /* ignore */ }
     return result;
 };
 

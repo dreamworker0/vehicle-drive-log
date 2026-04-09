@@ -130,6 +130,8 @@ export async function checkRateLimitByIp(
 
 /**
  * 만료된 Rate Limit 문서 정리
+ * (주의: 현재 시스템 스케줄러에서 해제되었습니다. 비용 최적화를 위해
+ * GCP Firestore 콘솔에서 `expiresAt` 필드에 TTL 정책을 설정하여 수명주기를 자동 관리해야 합니다.)
  */
 export async function cleanupExpiredRateLimits(): Promise<number> {
     const db = getFirestore();

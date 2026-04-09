@@ -168,16 +168,29 @@ export default function useFeedbackManagement() {
         setRegeneratingDraftId(feedbackId);
         try {
             const fns = getFunctions(undefined, 'asia-northeast3');
-            const fn = httpsCallable(fns, 'regenerateFeedbackDraft');
-            await fn({ feedbackId });
-            // firestore 구독(subscribeFeedbacks)이 동작하여 화면(AI 초안 결과)이 자동 갱신됨
+            const fn = httpsCallable<unknown, { success: boolean; faqId: string | null; confidence: number; draft: string }>(fns, 'regenerateFeedbackDraft');
+            const response = await fn({ feedbackId });
+            
+            if (response.data && response.data.success) {
+                // 로컬 상태 업데이트
+                setFeedbacks(prev => prev.map(f => f.id === feedbackId ? {
+                    ...f,
+                    aiDraft: response.data.draft,
+                    aiMatchedFaqId: response.data.faqId,
+                    aiMatchedFaqIndex: undefined,
+                    aiConfidence: response.data.confidence,
+                } : f));
+                showToast('AI 초안이 새롭게 작성되었습니다.', 'success');
+            } else {
+                throw new Error('응답 실패');
+            }
         } catch (err) {
             console.error('AI 초안 재생성 실패:', err);
             showToast('초안을 새로 생성하지 못했습니다. 콘솔 로그를 확인해주세요.', 'error');
         } finally {
             setRegeneratingDraftId(null);
         }
-    }, []);
+    }, [showToast]);
 
     // 답변 발송
     const handleSendReply = useCallback(async (feedbackId: string, replyText: string) => {
@@ -194,13 +207,14 @@ export default function useFeedbackManagement() {
                     : f
                 )
             );
+            showToast('답변이 성공적으로 발송되었습니다.', 'success');
         } catch (err) {
             console.error('답변 발송 실패:', err);
             setReplyError('답변 발송에 실패했습니다. 다시 시도해주세요.');
         } finally {
             setSendingReply(null);
         }
-    }, []);
+    }, [showToast]);
 
     const totalFiltered = groupedFeedbacks.reduce((s, g) => s + g.items.length, 0);
     const unreadCount = feedbacks.filter(f => f.status !== 'read' && f.status !== 'resolved').length;

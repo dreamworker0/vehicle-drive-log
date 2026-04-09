@@ -29,7 +29,6 @@ describe('reservationUtils', () => {
 
     const mockDate = (isoString: string) => {
         const fixed = new originalDate(isoString);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         (globalThis as unknown as Record<string, unknown>).Date = class extends (originalDate as unknown as { new(...args: unknown[]): Date }) {
             constructor(...args: unknown[]) {
                 super(...args);

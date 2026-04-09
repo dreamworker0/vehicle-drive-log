@@ -50,8 +50,9 @@ async function main(): Promise<void> {
     await captureScreenshot(page, { width: 1280, height: 800 }, 'screenshot-desktop.webp');
 
     console.log('\n🎉 모든 스크린샷 생성 완료!');
-  } catch (err: any) {
-    console.error('❌ 스크린샷 생성 실패:', err.message);
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    console.error('❌ 스크린샷 생성 실패:', errorMsg);
     console.error('   → 개발 서버가 http://localhost:5173 에서 실행 중인지 확인하세요.');
     process.exit(1);
   } finally {

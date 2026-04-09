@@ -99,6 +99,11 @@ import { onDocumentCreated, onDocumentUpdated, onDocumentDeleted }
 - **무한 루프 방지**: 트리거가 같은 문서를 수정하는 경우, `syncSource` 같은 플래그로 제어
 - **calendarEventId 패턴**: 외부 ID를 Firestore에 저장할 때, 해당 업데이트가 트리거를 다시 호출하지 않도록 조건 추가
 
+### 3.4 데이터 무결성 및 동시성 제어 활용
+
+- **트랜잭션(Transaction) 필수 적용**: `createReservationSafe` 등 데이터 정합성이 중요하거나, 동시에 여러 접근이 일어나 중복/충돌 오류(Race Condition)가 발생할 가능성이 있는 데이터 기능(예: 중복 예약 방지, 차량 누적 거리 계산 등)은 반드시 `db.runTransaction` 내부에서 락(Lock)을 획득하고 업데이트 해야 한다.
+- **예외 처리와 Lock**: Transaction 실패나 무한 재시도 시의 회피를 대비하여, 트랜잭션 구문 내부에서 최신 문서를 읽고 조건(잔여 수량, 기 예약 여부 등)을 검증하는 로직을 반드시 포함한다.
+
 ---
 
 ## 4. 에러 처리

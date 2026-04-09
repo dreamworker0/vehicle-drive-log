@@ -9,7 +9,6 @@ import VehicleSelector from './VehicleSelector';
 import MileageInput from './MileageInput';
 import type { DriveLog } from '../../types/driveLog';
 import type { Favorite } from '../../types/favorite';
-import { toLocalDateStr } from '../../lib/dateUtils';
 import type { User as UserDoc } from '../../types/user';
 
 export default function DriveLogForm() {
@@ -46,13 +45,6 @@ export default function DriveLogForm() {
             </div>
         );
     }
-
-    const todayStr = toLocalDateStr(new Date());
-    const minDateStr = (() => {
-        const d = new Date();
-        d.setDate(d.getDate() - 7);
-        return toLocalDateStr(d);
-    })();
 
     // 제목 결정
     const title = isEditMode ? '운행일지 수정' : '운행일지 작성';

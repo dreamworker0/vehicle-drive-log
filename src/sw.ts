@@ -46,7 +46,7 @@ registerRoute(
 );
 
 // 4. Background Sync 이벤트 리스너 등록
-self.addEventListener('sync', (event: any) => {
+self.addEventListener('sync', (event: ExtendableEvent & { tag: string }) => {
     if (event.tag === 'sync-offline-actions') {
         console.log('[SW] Background Sync 이벤트 수신: sync-offline-actions');
         event.waitUntil(processBackgroundSync());
@@ -88,7 +88,7 @@ self.addEventListener('message', (event) => {
 });
 
 // 6. 알림 클릭 이벤트 처리 (Notification Click)
-self.addEventListener('notificationclick', (event: any) => {
+self.addEventListener('notificationclick', (event: NotificationEvent) => {
     event.notification.close();
     
     // 알림을 발생시킬 때 data에 넣은 click_action URL 가져오기

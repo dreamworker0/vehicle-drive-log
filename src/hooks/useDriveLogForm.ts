@@ -143,7 +143,9 @@ export default function useDriveLogForm() {
 
                 const resolveStartKm = async (vehicleId: string, fallbackKm: number | string | undefined) => {
                     const lastEndKm = await getLastVehicleEndKm(orgId, vehicleId);
-                    return (fallbackKm ?? lastEndKm ?? '').toString();
+                    const k1 = Number(fallbackKm || 0);
+                    const k2 = Number(lastEndKm || 0);
+                    return (Math.max(k1, k2) || '').toString();
                 };
 
                 if (isEditMode) {
@@ -231,26 +233,22 @@ export default function useDriveLogForm() {
                 // 과거 날짜: 해당 날짜 이전의 마지막 endKm
                 const [y, m, d] = form.driveDate.split('-').map(Number);
                 const beforeDate = new Date(y, m - 1, d);
-                km = await getVehicleEndKmBefore(orgId, form.vehicleId, beforeDate) ?? '';
-                if (km === '') {
-                    const v = vehicles.find(veh => veh.id === form.vehicleId);
-                    km = v?.currentKm ?? '';
-                }
+                const fetchedKm = await getVehicleEndKmBefore(orgId, form.vehicleId, beforeDate);
+                km = fetchedKm !== null ? fetchedKm : (v?.currentKm ?? '');
             } else if (form.startTime) {
                 // 오늘 + 출발 시각: 해당 시각 이전의 마지막 endKm (같은 날 소급)
                 const [y, m, d] = form.driveDate.split('-').map(Number);
                 const [h, min] = form.startTime.split(':').map(Number);
                 const beforeTime = new Date(y, m - 1, d, h, min);
-                km = await getVehicleEndKmBefore(orgId, form.vehicleId, beforeTime) ?? '';
-                if (km === '') {
-                    const v = vehicles.find(veh => veh.id === form.vehicleId);
-                    km = v?.currentKm ?? '';
-                }
+                const fetchedKm = await getVehicleEndKmBefore(orgId, form.vehicleId, beforeTime);
+                km = fetchedKm !== null ? fetchedKm : (v?.currentKm ?? '');
             } else {
                 // 오늘 + 출발 시각 없음: 기본 동작
                 const lastEndKm = await getLastVehicleEndKm(orgId, form.vehicleId);
                 const v = vehicles.find(veh => veh.id === form.vehicleId);
-                km = v?.currentKm ?? lastEndKm ?? '';
+                const k1 = Number(v?.currentKm || 0);
+                const k2 = Number(lastEndKm || 0);
+                km = Math.max(k1, k2) || '';
             }
             setForm(prev => ({ ...prev, startKm: km.toString() }));
         };
@@ -297,18 +295,22 @@ export default function useDriveLogForm() {
             // 과거 날짜
             const [y, m, d] = form.driveDate.split('-').map(Number);
             const beforeDate = new Date(y, m - 1, d);
-            km = await getVehicleEndKmBefore(orgId!, vehicleId, beforeDate) ?? v?.currentKm ?? '';
+            const fetchedKm = await getVehicleEndKmBefore(orgId!, vehicleId, beforeDate);
+            km = fetchedKm !== null ? fetchedKm : (v?.currentKm ?? '');
         } else if (form.startTime) {
             // 오늘 + 출발 시각: 해당 시각 이전의 마지막 endKm
             const dateStr = form.driveDate || todayStr();
             const [y, m, d] = dateStr.split('-').map(Number);
             const [h, min] = form.startTime.split(':').map(Number);
             const beforeTime = new Date(y, m - 1, d, h, min);
-            km = await getVehicleEndKmBefore(orgId!, vehicleId, beforeTime) ?? v?.currentKm ?? '';
+            const fetchedKm = await getVehicleEndKmBefore(orgId!, vehicleId, beforeTime);
+            km = fetchedKm !== null ? fetchedKm : (v?.currentKm ?? '');
         } else {
             // 오늘 + 출발 시각 없음: 기본 동작
             const lastEndKm = await getLastVehicleEndKm(orgId!, vehicleId);
-            km = v?.currentKm ?? lastEndKm ?? '';
+            const k1 = Number(v?.currentKm || 0);
+            const k2 = Number(lastEndKm || 0);
+            km = Math.max(k1, k2) || '';
         }
         setForm(prev => ({
             ...prev,

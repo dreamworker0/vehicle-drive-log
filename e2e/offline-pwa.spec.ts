@@ -55,14 +55,16 @@ test.describe('오프라인 큐잉 & PWA', () => {
         await page.evaluate(async () => {
             return new Promise<void>((resolve, reject) => {
                 const req = window.indexedDB.open('veh-log-offline-sync', 1);
-                req.onupgradeneeded = (e: any) => {
-                    const db = e.target.result;
+                req.onupgradeneeded = (e: Event) => {
+                    const target = e.target as IDBOpenDBRequest;
+                    const db = target.result;
                     if (!db.objectStoreNames.contains('action-queue')) {
                         db.createObjectStore('action-queue', { keyPath: 'id' });
                     }
                 };
-                req.onsuccess = (e: any) => {
-                    const db = e.target.result;
+                req.onsuccess = (e: Event) => {
+                    const target = e.target as IDBOpenDBRequest;
+                    const db = target.result;
                     const tx = db.transaction('action-queue', 'readwrite');
                     const store = tx.objectStore('action-queue');
                     store.add({
@@ -81,10 +83,11 @@ test.describe('오프라인 큐잉 & PWA', () => {
 
         // 2. 큐에 제대로 적재되었는지 확인
         const initialCount = await page.evaluate(async () => {
-            return new Promise<number>((resolve, reject) => {
+            return new Promise<number>((resolve) => {
                 const req = window.indexedDB.open('veh-log-offline-sync', 1);
-                req.onsuccess = (e: any) => {
-                    const db = e.target.result;
+                req.onsuccess = (e: Event) => {
+                    const target = e.target as IDBOpenDBRequest;
+                    const db = target.result;
                     const tx = db.transaction('action-queue', 'readonly');
                     const store = tx.objectStore('action-queue');
                     const countReq = store.count();
@@ -105,10 +108,11 @@ test.describe('오프라인 큐잉 & PWA', () => {
         // 성공 시 큐에서 제거되거나 에러를 발생시킬 것임.
         // 현재 로직상 타입 가드 실패 시 catch로 넘어가지 않고 진행되므로 큐에서 제거(removeOfflineAction)됨
         const finalCount = await page.evaluate(async () => {
-            return new Promise<number>((resolve, reject) => {
+            return new Promise<number>((resolve) => {
                 const req = window.indexedDB.open('veh-log-offline-sync', 1);
-                req.onsuccess = (e: any) => {
-                    const db = e.target.result;
+                req.onsuccess = (e: Event) => {
+                    const target = e.target as IDBOpenDBRequest;
+                    const db = target.result;
                     const tx = db.transaction('action-queue', 'readonly');
                     const store = tx.objectStore('action-queue');
                     const countReq = store.count();

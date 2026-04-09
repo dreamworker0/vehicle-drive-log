@@ -43,7 +43,7 @@ export const processOfflineQueue = async () => {
                 // 성공 시 큐에서 제거
                 await removeOfflineAction(action.id);
                 console.log(`[OfflineSync] 액션 처리 완료: ${action.id} (${action.type})`);
-            } catch (err: any) {
+            } catch (err: unknown) {
                 console.error(`[OfflineSync] 액션 처리 실패: ${action.id}`, err);
                 
                 // 일시적인 네트워크 문제거나 서버 응답 없음인 경우 재시도 카운트 증가

@@ -29,7 +29,7 @@ function runAudit(dir: string, label: string): AuditCounts {
         });
 
         const audit = JSON.parse(result);
-        const vulns: Record<string, any> = audit.vulnerabilities || {};
+        const vulns: Record<string, unknown> = audit.vulnerabilities || {};
         const counts: AuditCounts = { critical: 0, high: 0, moderate: 0, low: 0 };
 
         for (const [, info] of Object.entries(vulns)) {
@@ -49,12 +49,13 @@ function runAudit(dir: string, label: string): AuditCounts {
         }
 
         return counts;
-    } catch (err: any) {
+    } catch (err: unknown) {
         // npm audit가 취약점 발견 시 비정상 종료 코드를 반환함
         try {
-            const output = err.stdout || '';
+            const errorObj = err as { stdout?: string };
+            const output = errorObj.stdout || '';
             const audit = JSON.parse(output);
-            const vulns: Record<string, any> = audit.vulnerabilities || {};
+            const vulns: Record<string, unknown> = audit.vulnerabilities || {};
             const counts: AuditCounts = { critical: 0, high: 0, moderate: 0, low: 0 };
 
             for (const [, info] of Object.entries(vulns)) {
@@ -70,7 +71,8 @@ function runAudit(dir: string, label: string): AuditCounts {
 
             return counts;
         } catch {
-            console.log('   ⚠️  audit 실행 실패:', err.message?.slice(0, 100));
+            const errorMessage = err instanceof Error ? err.message : String(err);
+            console.log('   ⚠️  audit 실행 실패:', errorMessage.slice(0, 100));
             return { critical: 0, high: 0, moderate: 0, low: 0 };
         }
     }

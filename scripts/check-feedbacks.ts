@@ -35,7 +35,7 @@ async function main(): Promise<void> {
 
     // 전체 통계
     const allSnap = await db.collection('feedbacks').get();
-    const allDocs = allSnap.docs.map(d => ({ id: d.id, ...d.data() } as Record<string, any>));
+    const allDocs = allSnap.docs.map(d => ({ id: d.id, ...d.data() } as Record<string, unknown>));
 
     if (allDocs.length === 0) {
         console.log('\n✅ 등록된 피드백이 없습니다.\n');
@@ -45,7 +45,7 @@ async function main(): Promise<void> {
     // 타입별 통계
     const byType: Record<string, number> = {};
     const byStatus: Record<string, number> = {};
-    allDocs.forEach((fb: Record<string, any>) => {
+    allDocs.forEach((fb: Record<string, unknown>) => {
         const type = fb.type || 'other';
         const status = fb.status || 'pending';
         byType[type] = (byType[type] || 0) + 1;

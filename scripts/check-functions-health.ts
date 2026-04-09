@@ -67,8 +67,9 @@ try {
     } else {
         console.log(`🚨 에러 빈도 높음 (${errorCount}회)! 점검이 필요합니다.`);
     }
-} catch (err: any) {
+} catch (err: unknown) {
     console.log('⚠️  로그 조회 실패 — Firebase CLI 인증 또는 네트워크 확인 필요');
-    console.log(`   상세: ${err.message?.slice(0, 100)}`);
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    console.log(`   상세: ${errorMessage.slice(0, 100)}`);
     console.log('\n💡 팁: "firebase login" 실행 후 다시 시도하세요.');
 }

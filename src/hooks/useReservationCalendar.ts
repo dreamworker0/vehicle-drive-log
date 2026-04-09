@@ -229,7 +229,6 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
             const autoEnd = calcEndTime(form.startTime, routeInfo.duration);
             setForm(prev => ({ ...prev, endTime: autoEnd }));
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [form.startTime, routeInfo?.duration]);
 
     // 달력 데이터 생성

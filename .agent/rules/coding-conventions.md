@@ -315,6 +315,7 @@ const getVehicleColor = (id) => {
 ## 7. 기술 스택 제약사항
 
 - **React**: 함수 컴포넌트 + Hooks만 사용 (클래스 컴포넌트 금지)
+- **TypeScript**: `any` 타입 사용을 엄격히 금지한다. 타입을 구체적으로 정의하거나 `unknown`을 사용 후 타입 단언/타입 가드를 이용해 처리한다 (`@typescript-eslint/no-explicit-any` 경고 제로화 유지).
 - **TailwindCSS v3**: `@apply`, `@layer` 사용 가능, v4 문법 사용 금지
 - **라우팅**: React Router v6 (`Routes`, `Route`, `NavLink`, `useNavigate`, `useLocation`)
 - **Firebase**: v9+ Modular SDK (`import { ... } from 'firebase/firestore'`)
@@ -330,3 +331,4 @@ const getVehicleColor = (id) => {
 3. **console.error**: 에러 로깅 시 한글 설명 포함 (`console.error('로드 실패:', err)`)
 4. **JSX 중복 최소화**: 반복되는 UI 패턴은 함수 또는 서브 컴포넌트로 추출
 5. **하드코딩 금지**: 역할명(`'admin'`, `'employee'`), 이메일(`'ehsheh@gmail.com'`) 등은 상수로 관리
+6. **외부 API (Rate Limit & 캐싱)**: TMap 등 외부 API를 호출할 때는 `429 Too Many Requests` 에러를 방지하고 비용을 절감하기 위해 불필요한 호출을 최소화해야 한다. `localStorage`, 인메모리 캐싱 또는 큐(Queue) 패턴을 적용하여 안정성을 확보한다.
