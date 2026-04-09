@@ -8,6 +8,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { auth } from '../../lib/firebase';
 import { refreshTokenSilently } from '../../lib/tokenRefresh';
 import { getVehicles, getOrganizationMembers, getDriveLogs, getOrganization, getTodayReservations } from '../../lib/firestore';
+import { getDriveLogAggregatedStats } from '../../lib/firestore/driveLogs';
 import { toLocalDateStr } from '../../lib/dateUtils';
 import { SkeletonStatCard, SkeletonList } from '../common/Skeleton';
 import type { DriveLog } from '../../types/driveLog';
@@ -23,6 +24,8 @@ export default function AdminDashboard() {
         vehicleCount: 0,
         employeeCount: 0,
         monthLogs: 0,
+        totalLogs: 0,
+        totalDistance: 0,
     });
     const [recentLogs, setRecentLogs] = useState<DriveLog[]>([]);
     const [loading, setLoading] = useState(true);
@@ -39,20 +42,19 @@ export default function AdminDashboard() {
                 const d = new Date();
                 const y = d.getFullYear();
                 const m = d.getMonth() + 1;
-                const lastDay = new Date(y, m, 0).getDate();
-                const monthStartStr = `${y}-${String(m).padStart(2, '0')}-01`;
-                const monthEndStr = `${y}-${String(m).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`;
+                const monthKey = `${y}-${String(m).padStart(2, '0')}`;
 
-                const [vehicles, members, logsResult, todayRes, todayLogs, monthLogs] = await Promise.all([
+                const [vehicles, members, logsResult, todayRes, todayLogs, aggregatedData] = await Promise.all([
                     getVehicles(orgId),
                     getOrganizationMembers(orgId),
                     getDriveLogs(orgId, { limit: 5 }),
                     getTodayReservations(orgId, todayStr),
                     import('../../lib/firestore/driveLogs').then(m => m.getDriveLogCount(orgId, { startDate: todayStr, endDate: todayStr })),
-                    import('../../lib/firestore/driveLogs').then(m => m.getDriveLogCount(orgId, { startDate: monthStartStr, endDate: monthEndStr }))
+                    getDriveLogAggregatedStats(orgId)
                 ]);
 
                 const logs = logsResult.docs;
+                const monthLogs = aggregatedData?.monthlyStats?.[monthKey]?.count || 0;
 
                 setStats({
                     todayLogs,
@@ -60,6 +62,8 @@ export default function AdminDashboard() {
                     vehicleCount: vehicles.length,
                     employeeCount: members.filter(m => m.role !== 'superAdmin').length,
                     monthLogs,
+                    totalLogs: aggregatedData?.count || 0,
+                    totalDistance: aggregatedData?.totalDistance || 0,
                 });
                 setRecentLogs(logs as DriveLog[]);
 
@@ -106,9 +110,9 @@ export default function AdminDashboard() {
     const statCards = [
         { label: '오늘 운행', value: `${stats.todayLogs}건`, icon: '🚗', color: 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400' },
         { label: '오늘 예약', value: `${stats.todayReservations}건`, icon: '📅', color: 'bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400' },
-        { label: '등록 차량', value: `${stats.vehicleCount}대`, icon: '🅿️', color: 'bg-accent-50 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400' },
-        { label: '등록 직원', value: `${stats.employeeCount}명`, icon: '👤', color: 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
         { label: '이번 달 운행', value: `${stats.monthLogs}건`, icon: '📊', color: 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' },
+        { label: '등록 차량/직원', value: `${stats.vehicleCount}대 / ${stats.employeeCount}명`, icon: '🏢', color: 'bg-accent-50 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400' },
+        { label: '누적 주행거리', value: `${Math.round(stats.totalDistance).toLocaleString()}km`, icon: '🛣️', color: 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
     ];
 
     return (

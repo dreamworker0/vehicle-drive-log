@@ -51,15 +51,27 @@
 
 ## Phase D — 장기 (1~2개월)
 
-- [ ] **D-1. 익명 인증 제거 검토** (기획 필요)
-  - 기관 신청 UX에 영향 → 사용자 의견 수렴 필요
-  - Google 로그인만으로 충분한지 판단
+- [x] **D-1. 익명 인증 제거 검토** (완료: 유지 결정)
+  - 기획 결정 사항: 기관 신청서는 사용자가 구글 로그인을 하지 않아도 제출할 수 있어야 함.
+  - 현행 유지: 파일 업로드용으로만 격리된 제한적 익명 세션 아키텍처 계속 사용.
 - [x] **D-2. Rate Limit 값 Remote Config 전환** (~반나절)
   - `getRateLimits()` 비동기 함수 + 5분 캐시 + 기본값 fallback 구현
   - Firebase Console에서 재배포 없이 Rate Limit 실시간 조정 가능
 - [x] **D-3. CI/CD 파이프라인 구축** (~1~2일)
   - GitHub Actions: `ci.yml` (Lint→Test→Build), `deploy.yml` (프로덕션 배포), `preview.yml` (PR 프리뷰)
   - Dependabot 자동 의존성 업데이트 포함
+
+## Phase E — 성능 극대화 및 데이터 무결성 (완료)
+
+- [x] **E-1. UX 극대화 (Optimistic UI)**
+  - 운행일지 제출 폼 지연 최소화 (인위적인 타임아웃 딜레이 제거)
+- [x] **E-2. Firestore 비용 및 조회 성능 최적화**
+  - 대시보드 조회용 `organizations/{orgId}/stats/aggregate` 통계 단일 문서 트리거 생성
+  - 클라이언트 대시보드 렌더링 로직 수정 (전체 스캔 방지)
+- [x] **E-3. 프론트엔드 네트워크 최적화**
+  - 서비스워커 Navigation Preload 활성화로 TTFB 단축
+- [x] **E-4. 차량 마일리지 무결성 검증 데몬**
+  - 매월 1일 자정, 전월 주행 로그의 갭(오차) 불일치 탐지 스케줄러 (`verifyMileageConsistency`)
 
 ---
 

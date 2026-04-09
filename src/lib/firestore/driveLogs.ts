@@ -2,7 +2,7 @@
  * Firestore — 운행일지 (Drive Logs) 관련 함수
  */
 import {
-    doc, updateDoc, deleteDoc,
+    doc, updateDoc, deleteDoc, getDoc,
     collection, query, where, getDocs, addDoc,
     orderBy, limit, serverTimestamp, getCountFromServer, Timestamp,
     type QueryConstraint,
@@ -399,4 +399,22 @@ export const cleanupDuplicateLogs = async (organizationId: string, { dryRun = tr
     const callable = httpsCallable(functions, 'cleanupDuplicateLogs', { timeout: 120000 });
     const result = await callable({ organizationId, dryRun });
     return result.data;
+};
+
+// 기관별 집계 통계 가져오기
+export interface AggregatedStats {
+    totalDistance: number;
+    totalRefuel: number;
+    count: number;
+    monthlyStats?: Record<string, { totalDistance: number; totalRefuel: number; count: number }>;
+    lastUpdatedAt?: string;
+}
+
+export const getDriveLogAggregatedStats = async (organizationId: string): Promise<AggregatedStats | null> => {
+    const docRef = doc(db, 'organizations', organizationId, 'stats', 'aggregate');
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+        return docSnap.data() as AggregatedStats;
+    }
+    return null;
 };

@@ -77,6 +77,9 @@ export { syncCalendarToApp } from "./calendarSchedule";
 // 운행일지 중복 정리 (관리자용)
 export { cleanupDuplicateLogs } from "./cleanupDuplicateLogs";
 
+// 대시보드 성능 고도화를 위한 운행일지 집계 통계 캐싱
+export { updateAggregatedStats } from "./caching/updateAggregatedStats";
+
 // 직원 삭제 (Auth 비활성화 + Firestore 삭제)
 export { disableUser } from "./disableUser";
 
@@ -200,3 +203,6 @@ export { submitOrgApplication } from "./submitOrgApplication";
 
 // 랜딩 페이지 비번/기관 미로그인 유저의 문의 접수용 API
 export { submitPublicFeedback } from "./submitPublicFeedback";
+
+// 차량 누적 주행거리 오차 검증 스케줄러 (매월 1일 실행)
+export { verifyMileageConsistency } from "./scheduler/verifyMileageConsistency";

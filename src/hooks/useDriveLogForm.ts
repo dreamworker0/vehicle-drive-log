@@ -443,9 +443,10 @@ export default function useDriveLogForm() {
             setSuccess(true);
             if (isEditMode) {
                 showToast('운행일지가 수정되었습니다.', 'success');
-                setTimeout(() => navigate('/employee/my-records', { replace: true }), 1500);
+                navigate('/employee/my-records', { replace: true });
             } else if (reservationData?.reservationId) {
-                setTimeout(() => navigate('/employee/today', { replace: true }), 1500);
+                showToast('예약 운행일지가 저장되었습니다.', 'success');
+                navigate('/employee/today', { replace: true });
             } else {
                 setForm({
                     vehicleId: '', vehicleName: '', purpose: '', destination: '',
@@ -455,7 +456,7 @@ export default function useDriveLogForm() {
                 });
                 setSelectedPassengers([]);
                 setExternalPassengerCount(0);
-                setTimeout(() => setSuccess(false), 3000);
+                setSuccess(false); // Reset success state immediately as toast covers user notification
             }
         } catch (err: unknown) {
             console.error('운행일지 저장 실패:', err);

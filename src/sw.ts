@@ -5,6 +5,10 @@ import { precacheAndRoute, cleanupOutdatedCaches, createHandlerBoundToURL } from
 import { registerRoute, NavigationRoute } from 'workbox-routing';
 import { CacheFirst, StaleWhileRevalidate } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
+import * as navigationPreload from 'workbox-navigation-preload';
+
+// Navigation Preload 활성화 (초기 로딩 속도 최적화)
+navigationPreload.enable();
 
 // 1. 기존 캐시 정리 및 정적 파일 프리캐싱
 cleanupOutdatedCaches();
