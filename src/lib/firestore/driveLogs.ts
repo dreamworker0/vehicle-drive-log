@@ -68,6 +68,33 @@ export const createDriveLog = async (data: Record<string, unknown>) => {
 
     const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
 
+    // === [추가된 방어 로직] 출발 Km 자동 보정 ===
+    const originalStartKm = data.startKm as number;
+    let correctedStartKm = originalStartKm;
+    let autocorrectedDistance = false;
+
+    if (data.organizationId && data.vehicleId && data.endKm != null && data.startKm != null && data.timestamp && !isOffline) {
+        const logDate = data.timestamp instanceof Date ? data.timestamp : new Date();
+        // 방금 입력하려는 시간 기준 "직전" 기록의 endKm을 조회
+        const beforeEndKm = await getVehicleEndKmBefore(data.organizationId as string, data.vehicleId as string, logDate);
+
+        // 직전 기록이 존재하고, 직전 마지막 도착 km가 현재 폼의 출발 km와 다르다면
+        if (beforeEndKm !== null && beforeEndKm !== correctedStartKm) {
+            correctedStartKm = beforeEndKm;
+            const newDistance = (data.endKm as number) - correctedStartKm;
+
+            if (newDistance < 0) {
+                // 음수가 된다면 운행 거리가 꼬이는 치명적 상태이므로 저장을 막음
+                throw new Error(`동기화 오류: 다른 사용자가 더 높은 누적 km(${beforeEndKm}km)를 이미 등록했습니다. 내역을 갱신해주세요.`);
+            }
+
+            data.startKm = correctedStartKm;
+            data.distance = newDistance;
+            autocorrectedDistance = true;
+        }
+    }
+    // === 끝 ===
+
     // Use a deterministic generated ID for offline idempotency
     const docRef = doc(collection(db, 'driveLogs'));
     const finalData = { ...data, createdAt: serverTimestamp() };
@@ -94,7 +121,12 @@ export const createDriveLog = async (data: Record<string, unknown>) => {
         syncResult = await syncNextLogStartKm(data.organizationId as string, data.vehicleId as string, data.timestamp as Date, data.endKm as number);
     }
 
-    return { id: docRef.id, syncResult };
+    return { 
+        id: docRef.id, 
+        syncResult,
+        correctedStartKm: autocorrectedDistance ? correctedStartKm : undefined,
+        oldStartKm: autocorrectedDistance ? originalStartKm : undefined
+    };
 };
 
 /** 차량의 마지막 운행기록에서 endKm 조회 (currentKm과 비교하여 큰 값 반환) */

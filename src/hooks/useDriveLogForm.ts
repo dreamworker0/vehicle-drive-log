@@ -416,6 +416,12 @@ export default function useDriveLogForm() {
                 if (syncResult?.updated) {
                     showToast(`다음 기록의 출발 km가 ${syncResult.oldStartKm?.toLocaleString()} → ${syncResult.newStartKm?.toLocaleString()}으로 자동 조정되었습니다.`, 'info');
                 }
+
+                const autocorrectedKm = (result as Record<string, unknown>)?.correctedStartKm as number | undefined;
+                const origStartKm = (result as Record<string, unknown>)?.oldStartKm as number | undefined;
+                if (autocorrectedKm !== undefined) {
+                    showToast(`동시 작성 감지: 출발 km가 최신 기준인 ${origStartKm?.toLocaleString()} → ${autocorrectedKm?.toLocaleString()}(으)로 자동 보정 저장되었습니다.`, 'info');
+                }
             }
 
             if (!isEditMode && reservationData?.reservationId) {
