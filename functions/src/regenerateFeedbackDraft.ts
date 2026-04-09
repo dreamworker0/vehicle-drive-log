@@ -103,14 +103,15 @@ export const regenerateFeedbackDraft = onCall(
 [자주 하는 질문(FAQ)]
 ${faqText}
 ${pastExamples}
-[현재 사용자 의견]
+[현재 사용자 의견 (이미지가 첨부된 경우 이미지도 함께 분석하세요)]
 "${message}"
 
 다음 규칙을 따르세요:
 1. FAQ와 매칭되면 답변을 기반으로 초안을 작성하고, 매칭된 항목의 고유 ID(faqId)와 확신도(confidence, 0~1)를 응답에 포함하세요.
-2. FAQ에 없는 내용이라도 (기능 요청, 버그 신고 등) 반드시 친절한 답변 초안을 작성하세요.
-3. 과거 답변 사례를 참고해 사람처럼 자연스럽고 친절하게 작성하세요. (존댓말, 2~4문장)
-4. FAQ와 매칭된 경우, 답변 끝에 반드시 해당 FAQ 항목으로 바로 이동할 수 있는 링크를 남겨주세요.
+2. 첨부된 이미지가 있는 경우, 텍스트 질문이 너무 짧더라도 이미지 속 상황(수정 버튼 없음, 에러 메시지 등)을 분석해 문의 의도를 파악하세요.
+3. FAQ에 없는 내용이라도 (기능 요청, 버그 신고 등) 반드시 친절한 답변 초안을 작성하세요.
+4. 과거 답변 사례를 참고해 사람처럼 자연스럽고 친절하게 작성하세요. (존댓말, 2~4문장)
+5. FAQ와 매칭된 경우, 답변 끝에 반드시 해당 FAQ 항목으로 바로 이동할 수 있는 링크를 남겨주세요.
    - 링크 형식: https://vehicle-drive-log.web.app/faq#{해당 faqId}
    - 예시 문구: "자세한 설정 방법은 아래 링크(자주 하는 질문)를 참고해 주세요. \n👉 https://vehicle-drive-log.web.app/faq#app-install"
 
@@ -119,11 +120,32 @@ ${pastExamples}
 
 매칭되는 FAQ가 없다면 faqId를 null로 설정하세요.`;
 
-            // 4. Gemini API 호출
+            // 4. 첨부 이미지 처리 및 Gemini API 호출
+            const imageUrls = Array.isArray(data.imageUrls) ? data.imageUrls : [];
+            const parts: any[] = [{ text: prompt }];
+
+            for (const url of imageUrls) {
+                try {
+                    const res = await fetch(url);
+                    if (res.ok) {
+                        const arrayBuffer = await res.arrayBuffer();
+                        const mimeType = res.headers.get("content-type") || "image/jpeg";
+                        parts.push({
+                            inlineData: {
+                                data: Buffer.from(arrayBuffer).toString("base64"),
+                                mimeType,
+                            },
+                        });
+                    }
+                } catch (imgErr) {
+                    console.warn("[regenerateFeedbackDraft] 이미지 불러오기 실패:", imgErr);
+                }
+            }
+
             const ai = new GoogleGenAI({ apiKey: geminiApiKey.value() });
             const response = await ai.models.generateContent({
                 model: "gemini-3.1-flash-lite-preview",
-                contents: [{ role: "user", parts: [{ text: prompt }] }],
+                contents: [{ role: "user", parts }],
             });
 
             const text = response.text?.trim() || "";

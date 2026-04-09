@@ -18,6 +18,21 @@ export interface RecommendedPattern {
     dayOfWeekRaw: number; // 요일 데이터 (0: 일, ~ 6: 토)
 }
 
+const timeToMinutes = (timeStr: string) => {
+    if (!timeStr) return 0;
+    const [h, m] = timeStr.split(':').map(Number);
+    return (h || 0) * 60 + (m || 0);
+};
+
+const minutesToTime = (totalMins: number) => {
+    let h = Math.floor(totalMins / 60);
+    let m = Math.floor(totalMins % 60);
+    if (h >= 24) h = 23; 
+    const hh = String(h).padStart(2, '0');
+    const mm = String(m).padStart(2, '0');
+    return `${hh}:${mm}`;
+};
+
 export function useReservationPattern() {
     const { user, userData } = useAuth();
     const [recommended, setRecommended] = useState<RecommendedPattern[]>([]);
@@ -64,6 +79,9 @@ export function useReservationPattern() {
                     return;
                 }
 
+                // 최소 활성 기준 동적 적용: 내역이 15건 이하면 2건 일치로 완화. 그 이상이면 3건
+                const dynamicThreshold = recent.length <= 15 ? 2 : 3;
+
                 // 1. 최근 방문 목적지 (자주 가는 곳 제외, 단순 최근/빈도순 상위 3곳)
                 const destCounter = new Map<string, number>();
                 recent.forEach(r => {
@@ -77,7 +95,7 @@ export function useReservationPattern() {
                 
                 if (mounted) setRecentDestinations(topDests);
 
-                // 차량별 이용 빈도 집계 (가장 많이 타는 차량 파악용)
+                // 통계 백업용 전역 차량 빈도
                 const vehicleCounter = new Map<string, number>();
                 for (const r of recent) {
                     if (r.vehicleId) {
@@ -87,7 +105,16 @@ export function useReservationPattern() {
 
                 // 2. 다중 패턴 집계 (일일/주간/다빈도 목적지)
                 type RecentReservation = Awaited<ReturnType<typeof getMyRecentReservations>>[number];
-                type PatternResult = { score: number; count: number; type: 'weekly' | 'daily' | 'dest-weekly' | 'dest-daily'; targetWeekday?: number; reservation: RecentReservation; times?: string[] };
+                type PatternResult = { 
+                    score: number; 
+                    count: number; 
+                    type: 'weekly' | 'daily' | 'dest-weekly' | 'dest-daily'; 
+                    targetWeekday?: number; 
+                    reservation: RecentReservation; 
+                    times: string[];
+                    vehicles: string[]; 
+                    durations: number[]; 
+                };
                 const patternMap = new Map<string, PatternResult>();
 
                 for (const r of recent) {
@@ -98,27 +125,39 @@ export function useReservationPattern() {
                     const dest = (r.destination || '').trim();
                     const timeWindow = r.startTime;
                     
+                    const durationMins = r.endTime ? (timeToMinutes(r.endTime) - timeToMinutes(r.startTime)) : 0;
+                    const validDuration = durationMins > 0 ? durationMins : 60; // 최소 기본 60분
+                    
+                    // 목적지가 비어있을 때는 DW, DD가 생성되지 않는다. W, D 에서는 빈칸을 하나의 카테고리로 인식.
+                    const baseDestKey = dest || "EMPTY_DEST";
+                    
                     // 1. Weekly (매주 이 요일 + 시간)
-                    const wKey = `W_${weekday}_${timeWindow}_${dest}`;
+                    const wKey = `W_${weekday}_${timeWindow}_${baseDestKey}`;
                     const existingW = patternMap.get(wKey);
                     if (existingW) {
                         existingW.count += 1;
                         existingW.score += 1.0;
+                        existingW.vehicles.push(r.vehicleId);
+                        existingW.durations.push(validDuration);
+                        if (!existingW.times.includes(timeWindow)) existingW.times.push(timeWindow);
                     } else {
-                        patternMap.set(wKey, { score: 1.0, count: 1, type: 'weekly', targetWeekday: weekday, reservation: r });
+                        patternMap.set(wKey, { score: 1.0, count: 1, type: 'weekly', targetWeekday: weekday, reservation: r, times: [timeWindow], vehicles: [r.vehicleId], durations: [validDuration] });
                     }
 
                     // 2. Daily (요일 무관 자주 + 시간)
-                    const dKey = `D_${timeWindow}_${dest}`;
+                    const dKey = `D_${timeWindow}_${baseDestKey}`;
                     const existingD = patternMap.get(dKey);
                     if (existingD) {
                         existingD.count += 1;
                         existingD.score += 0.8; 
+                        existingD.vehicles.push(r.vehicleId);
+                        existingD.durations.push(validDuration);
+                        if (!existingD.times.includes(timeWindow)) existingD.times.push(timeWindow);
                     } else {
-                        patternMap.set(dKey, { score: 0.8, count: 1, type: 'daily', reservation: r });
+                        patternMap.set(dKey, { score: 0.8, count: 1, type: 'daily', reservation: r, times: [timeWindow], vehicles: [r.vehicleId], durations: [validDuration] });
                     }
 
-                    // 목적지가 있는 경우 목적지 전용 복합 패턴 추가
+                    // 목적지가 있는 경우에만 복합 패턴 추가
                     if (dest) {
                         // 3. Dest-Weekly
                         const dwKey = `DW_${weekday}_${dest}`;
@@ -126,9 +165,11 @@ export function useReservationPattern() {
                         if (existingDW) {
                             existingDW.count += 1;
                             existingDW.score += 0.9;
-                            existingDW.times?.push(timeWindow);
+                            existingDW.times.push(timeWindow);
+                            existingDW.vehicles.push(r.vehicleId);
+                            existingDW.durations.push(validDuration);
                         } else {
-                            patternMap.set(dwKey, { score: 0.9, count: 1, type: 'dest-weekly', targetWeekday: weekday, reservation: r, times: [timeWindow] });
+                            patternMap.set(dwKey, { score: 0.9, count: 1, type: 'dest-weekly', targetWeekday: weekday, reservation: r, times: [timeWindow], vehicles: [r.vehicleId], durations: [validDuration] });
                         }
 
                         // 4. Dest-Daily
@@ -137,16 +178,18 @@ export function useReservationPattern() {
                         if (existingDD) {
                             existingDD.count += 1;
                             existingDD.score += 0.6;
-                            existingDD.times?.push(timeWindow);
+                            existingDD.times.push(timeWindow);
+                            existingDD.vehicles.push(r.vehicleId);
+                            existingDD.durations.push(validDuration);
                         } else {
-                            patternMap.set(ddKey, { score: 0.6, count: 1, type: 'dest-daily', reservation: r, times: [timeWindow] });
+                            patternMap.set(ddKey, { score: 0.6, count: 1, type: 'dest-daily', reservation: r, times: [timeWindow], vehicles: [r.vehicleId], durations: [validDuration] });
                         }
                     }
                 }
 
-                // 점수가 가장 높고 count >= 3 인 상위 2개 추출
+                // 점수가 가장 높고 count >= 동적 조건 인 상위 2개 추출
                 const topPatterns = Array.from(patternMap.values())
-                    .filter(item => item.count >= 3)
+                    .filter(item => item.count >= dynamicThreshold)
                     .sort((a, b) => b.score - a.score)
                     .slice(0, 2);
 
@@ -156,7 +199,7 @@ export function useReservationPattern() {
                 for (const bestMatch of topPatterns) {
                     const r = bestMatch.reservation;
                     
-                    // 다빈도 목적지 패턴일 경우 가장 빈번한 시간대를 출발 시간으로 산출
+                    // 출발 시간 최적화
                     let targetStartTime = r.startTime || '09:00';
                     if (bestMatch.times && bestMatch.times.length > 0) {
                         const timeCounts = new Map<string, number>();
@@ -174,6 +217,12 @@ export function useReservationPattern() {
                         targetStartTime = maxTimeStr;
                     }
                     
+                    // 반납 시간 (평균 소요분 계산)
+                    const avgDuration = bestMatch.durations.length > 0 
+                        ? bestMatch.durations.reduce((a,b) => a+b, 0) / bestMatch.durations.length 
+                        : 60;
+                    const calculatedEndTime = minutesToTime(timeToMinutes(targetStartTime) + avgDuration);
+
                     // 다음 추천 날짜 산정
                     let targetDateStr = '';
                     let targetWeekday = 0;
@@ -182,7 +231,7 @@ export function useReservationPattern() {
                         targetWeekday = bestMatch.targetWeekday;
                         targetDateStr = getNextDateForWeekday(targetWeekday);
                     } else {
-                        // 일일(Daily, Dest-Daily) 패턴인 경우 무조건 다가오는 다음번 평일 추천
+                        // 일일 패턴인 경우 무조건 다가오는 다음번 평일 추천
                         const tomorrow = new Date();
                         tomorrow.setDate(tomorrow.getDate() + 1);
                         if (tomorrow.getDay() === 6) tomorrow.setDate(tomorrow.getDate() + 2); // 토요일 -> 월요일
@@ -198,12 +247,28 @@ export function useReservationPattern() {
                     let finalDateStr = targetDateStr;
                     let isValidDate = false;
                     
-                    // 차량에 구애받지 않고 패턴을 찾았으므로, 탑승 빈도가 가장 높았던 차량 1순위
+                    // 1순위 선호 차량 산출 로직 
+                    let patternFavVehicleId = '';
+                    if (bestMatch.vehicles.length > 0) {
+                        const pvCount = new Map<string, number>();
+                        let maxVC = 0;
+                        bestMatch.vehicles.forEach(v => {
+                            const c = (pvCount.get(v) || 0) + 1;
+                            pvCount.set(v, c);
+                            if (c > maxVC) {
+                                maxVC = c;
+                                patternFavVehicleId = v;
+                            }
+                        });
+                    }
+
+                    // 패턴 최우선 차량이 없으면(또는 에러), 전체 최다 탑승 차량으로 우회
                     const fallbackVehicles = Array.from(vehicleCounter.entries()).sort((a,b) => b[1] - a[1]);
-                    const topPrefVehicleId = fallbackVehicles.length > 0 ? fallbackVehicles[0][0] : r.vehicleId;
+                    const topGlobalVehicleId = fallbackVehicles.length > 0 ? fallbackVehicles[0][0] : r.vehicleId;
                     
-                    let targetVehicleId = topPrefVehicleId;
-                    let targetVehicleName = r.vehicleName || '차량';
+                    let targetVehicleId = patternFavVehicleId || topGlobalVehicleId;
+                    const originVehicleData = vehiclesDataCache.find(v => v.id === targetVehicleId);
+                    let targetVehicleName = originVehicleData ? (originVehicleData.displayName || originVehicleData.name) : (r.vehicleName || '차량');
 
                     try {
                         let attempts = 0;
@@ -224,10 +289,7 @@ export function useReservationPattern() {
                             };
 
                             const targetStart = targetStartTime;
-                            const rStart = r.startTime || '09:00';
-                            const rEnd = r.endTime || rStart;
-                            const targetEnd = rEnd && rStart < rEnd ? 
-                                (targetStartTime < rEnd ? rEnd : targetStartTime) : targetStartTime;
+                            const targetEnd = calculatedEndTime;
 
                             // 1. 내 일정이 동일한 날짜/시간대에 겹치는지 우선 검사
                             const isMyScheduleConflict = activeResList.some(res => 
@@ -246,7 +308,7 @@ export function useReservationPattern() {
                                     isValidDate = true;
                                     break;
                                 } else {
-                                    // 3. 대체 차량 탐색
+                                    // 3. 대체 차량 탐색 (전체 패턴에서 많이 탄 차 순서)
                                     const unavailableVehicleIds = new Set(
                                         activeResList
                                             .filter(res => isTimeConflict(targetStart, targetEnd, res.startTime || '', res.endTime || res.startTime || ''))
@@ -289,8 +351,7 @@ export function useReservationPattern() {
                     }
                     
                     if (isValidDate) {
-                        // 결과 배열에 넣되, 중복 날짜+시간 등이 들어가면 사용자는 헷갈리므로
-                        // 날짜와 시간이 완전히 동일한 경우 필터링 (가장 점수 높은 하나만 반영)
+                        // 결과 배열 점수로 필터링
                         const isDuplicateTime = finalRecommendations.some(
                             rec => rec.date === finalDateStr && rec.startTime === targetStartTime
                         );
@@ -300,12 +361,8 @@ export function useReservationPattern() {
                                 vehicleName: targetVehicleName,
                                 date: finalDateStr,
                                 startTime: targetStartTime,
-                                endTime: (() => {
-                                    const s = r.startTime || '09:00';
-                                    const e = r.endTime || s;
-                                    return e && s < e ? (targetStartTime < e ? e : targetStartTime) : targetStartTime;
-                                })(),
-                                destination: r.destination || '',
+                                endTime: calculatedEndTime,
+                                destination: (r.destination || '').trim(),
                                 dayOfWeekRaw: targetWeekday,
                             });
                         }
