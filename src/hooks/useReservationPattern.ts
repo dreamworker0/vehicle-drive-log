@@ -26,7 +26,7 @@ const timeToMinutes = (timeStr: string) => {
 
 const minutesToTime = (totalMins: number) => {
     let h = Math.floor(totalMins / 60);
-    let m = Math.floor(totalMins % 60);
+    const m = Math.floor(totalMins % 60);
     if (h >= 24) h = 23; 
     const hh = String(h).padStart(2, '0');
     const mm = String(m).padStart(2, '0');
