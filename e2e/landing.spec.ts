@@ -19,24 +19,17 @@ test.describe('랜딩 페이지', () => {
 
     test('3단계 시작 섹션이 표시된다', async ({ page }) => {
         const heading = page.getByText('3단계로 시작하세요');
-        await expect(heading).toBeAttached({ timeout: 10000 });
-        await heading.scrollIntoViewIfNeeded();
         await expect(heading).toBeVisible({ timeout: 10000 });
         const steps = ['기관 신청', '직원 초대', '바로 사용'];
         for (const step of steps) {
-            const el = page.getByRole('heading', { name: step });
-            await expect(el).toBeAttached({ timeout: 5000 });
-            await el.scrollIntoViewIfNeeded();
-            await expect(el).toBeVisible();
+            await expect(page.getByRole('heading', { name: step })).toBeVisible({ timeout: 10000 });
         }
     });
 
     test('주요 기능 카드 6개가 표시된다', async ({ page }) => {
         const features = ['AI 계기판 인식', '운행일지 자동화', '차량 예약 시스템', '길안내 앱 연동', '통계·분석·출력', '정비 기록 관리'];
         for (const title of features) {
-            const el = page.getByRole('heading', { name: title });
-            await el.scrollIntoViewIfNeeded();
-            await expect(el).toBeVisible({ timeout: 10000 });
+            await expect(page.getByRole('heading', { name: title })).toBeVisible({ timeout: 10000 });
         }
     });
 
@@ -49,7 +42,6 @@ test.describe('랜딩 페이지', () => {
 
     test('대상 안내 섹션이 표시된다', async ({ page }) => {
         const heading = page.getByText('누가 사용할 수 있나요?');
-        await heading.scrollIntoViewIfNeeded();
         await expect(heading).toBeVisible({ timeout: 10000 });
         await expect(page.getByText(/고유번호증 또는 사업자등록증/)).toBeVisible();
         await expect(page.getByText(/영리 기업/)).toBeVisible();
