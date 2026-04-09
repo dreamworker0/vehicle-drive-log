@@ -46,7 +46,7 @@ registerRoute(
 );
 
 // 4. Background Sync 이벤트 리스너 등록
-self.addEventListener('sync', (event: ExtendableEvent & { tag: string }) => {
+self.addEventListener('sync', (event: any) => {
     if (event.tag === 'sync-offline-actions') {
         console.log('[SW] Background Sync 이벤트 수신: sync-offline-actions');
         event.waitUntil(processBackgroundSync());

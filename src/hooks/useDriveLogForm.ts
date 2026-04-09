@@ -229,6 +229,8 @@ export default function useDriveLogForm() {
         if (!orgId || !form.vehicleId || !form.driveDate) return;
         const refreshStartKm = async () => {
             let km: number | string;
+            const v = vehicles.find(veh => veh.id === form.vehicleId);
+            
             if (form.driveDate !== todayStr()) {
                 // 과거 날짜: 해당 날짜 이전의 마지막 endKm
                 const [y, m, d] = form.driveDate.split('-').map(Number);
@@ -245,7 +247,6 @@ export default function useDriveLogForm() {
             } else {
                 // 오늘 + 출발 시각 없음: 기본 동작
                 const lastEndKm = await getLastVehicleEndKm(orgId, form.vehicleId);
-                const v = vehicles.find(veh => veh.id === form.vehicleId);
                 const k1 = Number(v?.currentKm || 0);
                 const k2 = Number(lastEndKm || 0);
                 km = Math.max(k1, k2) || '';
