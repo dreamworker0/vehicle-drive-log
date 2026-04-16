@@ -1,5 +1,5 @@
-import React, { useState, Suspense } from 'react';
-import { Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom';
+import React, { useState, Suspense, startTransition } from 'react';
+import { Routes, Route, NavLink, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { lazyWithRetry } from '../../lib/lazyWithRetry';
 import { useAuth } from '../../hooks/useAuth';
 import { logout } from '../../lib/auth';
@@ -27,12 +27,14 @@ interface NavItemProps {
     icon: React.ReactNode;
     label: string;
     badge?: number | null;
+    onClick?: (e: React.MouseEvent<HTMLAnchorElement>, to: string) => void;
 }
 
-function NavItem({ to, icon, label, badge }: NavItemProps) {
+function NavItem({ to, icon, label, badge, onClick }: NavItemProps) {
     return (
         <NavLink
             to={to}
+            onClick={(e) => onClick?.(e, to)}
             className={({ isActive }) =>
                 `sidebar-link ${isActive ? 'sidebar-link-active' : ''}`
             }
@@ -52,10 +54,23 @@ export default function AdminLayout() {
     const { user, isSuperAdmin } = useAuth();
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const navigate = useNavigate();
+    const location = useLocation();
     const { isDark, toggleTheme } = useTheme();
     useBackButton();
 
     const { vehicleCount, employeeCount, hipassCount, reservationCount } = useAdminBadges();
+
+    const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, to: string) => {
+        if (location.pathname === to) {
+            e.preventDefault();
+            return;
+        }
+        e.preventDefault();
+        startTransition(() => {
+            navigate(to);
+        });
+        setSidebarOpen(false); // 모바일에서 클릭 시 닫기
+    };
 
     const menuItems = [
         {
@@ -145,7 +160,7 @@ export default function AdminLayout() {
 
                 <nav className="flex-1 p-3 space-y-1 overflow-y-auto" aria-label="관리자 메뉴">
                     {menuItems.map((item) => (
-                        <NavItem key={item.to} {...item} />
+                        <NavItem key={item.to} {...item} onClick={handleNavClick} />
                     ))}
 
 
@@ -193,7 +208,12 @@ export default function AdminLayout() {
                     <div className="flex items-center gap-2">
                         {isSuperAdmin && (
                             <button
-                                onClick={() => { localStorage.removeItem(SA_TEST_ROLE_KEY); window.location.href = '/super-admin'; }}
+                                onClick={() => {
+                                    startTransition(() => {
+                                        localStorage.removeItem(SA_TEST_ROLE_KEY);
+                                        window.location.href = '/super-admin';
+                                    });
+                                }}
                                 className="flex items-center gap-1 text-xs bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 px-2.5 py-1 rounded-lg transition-colors font-medium"
                                 title="슈퍼관리자 화면으로 복귀"
                             >
@@ -204,9 +224,13 @@ export default function AdminLayout() {
                             onClick={() => {
                                 if (isSuperAdmin) {
                                     localStorage.setItem(SA_TEST_ROLE_KEY, 'employee');
-                                    window.location.href = '/employee';
+                                    startTransition(() => {
+                                        window.location.href = '/employee';
+                                    });
                                 } else {
-                                    navigate('/employee');
+                                    startTransition(() => {
+                                        navigate('/employee');
+                                    });
                                 }
                             }}
                             className="btn-icon text-surface-500 dark:text-surface-400 hover:text-primary-600 dark:hover:text-primary-400"

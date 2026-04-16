@@ -15,6 +15,7 @@ export interface Reservation extends FirestoreDoc {
     endTime: string;             // 'HH:MM'
     actualStartTime?: string;
     actualEndTime?: string;
+    currentKm?: number;
     purpose?: string;
     destination?: string;
     reservedByUid: string;

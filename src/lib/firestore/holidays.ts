@@ -8,6 +8,7 @@ import {
     type DocumentData,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { captureError } from '../sentry';
 
 // 기관 커스텀 휴일 목록 조회
 export const getCustomHolidays = async (orgId: string) => {
@@ -21,14 +22,24 @@ export const getCustomHolidays = async (orgId: string) => {
 
 // 커스텀 휴일 추가
 export const addCustomHoliday = async (orgId: string, data: Record<string, unknown>) => {
-    const docRef = await addDoc(collection(db, 'organizations', orgId, 'customHolidays'), {
-        ...data,
-        createdAt: serverTimestamp(),
-    });
-    return docRef.id;
+    try {
+        const docRef = await addDoc(collection(db, 'organizations', orgId, 'customHolidays'), {
+            ...data,
+            createdAt: serverTimestamp(),
+        });
+        return docRef.id;
+    } catch (error) {
+        captureError(error as Error, { context: 'addCustomHoliday', orgId, data });
+        throw error;
+    }
 };
 
 // 커스텀 휴일 삭제
 export const deleteCustomHoliday = async (orgId: string, holidayId: string) => {
-    await deleteDoc(doc(db, 'organizations', orgId, 'customHolidays', holidayId));
+    try {
+        await deleteDoc(doc(db, 'organizations', orgId, 'customHolidays', holidayId));
+    } catch (error) {
+        captureError(error as Error, { context: 'deleteCustomHoliday', orgId, holidayId });
+        throw error;
+    }
 };

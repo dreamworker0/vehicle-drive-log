@@ -2,7 +2,7 @@
  * useTodayDashboard — 오늘의 운행 대시보드 상태 + 로직
  * TodayDashboard에서 추출된 커스텀 훅
  */
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo, use } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
@@ -12,7 +12,7 @@ import { auth as firebaseAuth } from '../lib/firebase';
 import { refreshTokenSilently } from '../lib/tokenRefresh';
 import type { Vehicle } from '../types/vehicle';
 import { isVehicleBlocked } from '../lib/vehicleUtils';
-import type { Reservation } from '../types/reservation';
+import type { Reservation, ReservationStatus } from '../types/reservation';
 
 const clearDrivingNotification = async (resId?: string) => {
     if (!resId || !('Notification' in window)) return;
@@ -26,87 +26,112 @@ const clearDrivingNotification = async (resId?: string) => {
     }
 };
 
+// React 19 Suspense 데이터 캐시
+let globalDashboardCache: { key: string, promise: Promise<any>, data?: any } | null = null;
+
+function getDashboardData(orgId: string, uid: string, todayStr: string, weekEndDate: string) {
+    const key = `${orgId}-${uid}-${todayStr}`;
+    
+    // 캐시 히트 시 반환
+    if (globalDashboardCache?.key === key) {
+        if (globalDashboardCache.data) return globalDashboardCache.data as [Vehicle[], Reservation[], Reservation[], any[]];
+        return globalDashboardCache.promise;
+    }
+    
+    // 캐시 미스: 신규 페치
+    const promise = Promise.all([
+        getVehicles(orgId),
+        getTodayReservations(orgId, todayStr),
+        getWeekReservations(orgId, todayStr, weekEndDate),
+        getMyDriveLogs(orgId, uid, 50),
+    ]).then(async (res) => {
+        globalDashboardCache!.data = res;
+        return res;
+    }).catch(async (err) => {
+        const errCode = (err as { code?: string })?.code;
+        if (errCode === 'permission-denied') {
+            if (firebaseAuth.currentUser) {
+                await refreshTokenSilently(firebaseAuth.currentUser);
+                // 재시도 캐시 교체는 생략하나, 재호출 트리거됨
+            }
+        }
+        globalDashboardCache = null; // 실패 시 초기화
+        throw err;
+    });
+
+    globalDashboardCache = { key, promise };
+    return promise;
+}
+
 export default function useTodayDashboard() {
     const { user, userData } = useAuth();
     const navigate = useNavigate();
     const { showToast } = useToast();
-    const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-    const [todayReservations, setTodayReservations] = useState<Reservation[]>([]);
-    const [weekReservations, setWeekReservations] = useState<Reservation[]>([]);
-    const [loading, setLoading] = useState(true);
+    
     const [startingId, setStartingId] = useState<string | null>(null);
     const [cancellingId, setCancellingId] = useState<string | null>(null);
-    const [incompleteAlerts, setIncompleteAlerts] = useState<(Reservation & { type: string })[]>([]);
-    const [vehicleUsageCounts, setVehicleUsageCounts] = useState<Map<string, number>>(new Map());
+
+    // 서버 데이터 업데이트(Mutations) 후 UI 동기화를 위한 로컬 오버라이드 상태
+    const [localCancelledIds, setLocalCancelledIds] = useState<Set<string>>(new Set());
+    const [localStartedIds, setLocalStartedIds] = useState<Map<string, string>>(new Map());
 
     const orgId = userData?.organizationId;
-    const todayStr = toLocalDateStr();
-
+    const todayStr = useMemo(() => toLocalDateStr(), []);
     const weekEndDate = useMemo(() => {
         const d = new Date();
         d.setDate(d.getDate() + 7);
         return toLocalDateStr(d);
     }, []);
 
-    useEffect(() => {
-        if (!orgId) {
-            setLoading(false);
-            return;
-        }
-        const fetchData = async (retryCount = 0) => {
-            try {
-                const [v, r, wr, myLogs] = await Promise.all([
-                    getVehicles(orgId),
-                    getTodayReservations(orgId, todayStr),
-                    getWeekReservations(orgId, todayStr, weekEndDate),
-                    getMyDriveLogs(orgId, user?.uid ?? '', 50),
-                ]);
-                setVehicles(v as Vehicle[]);
-                setTodayReservations(r as Reservation[]);
-                setWeekReservations(wr as Reservation[]);
+    // 1. 데이터 페칭 - Suspense 유발
+    // use() 훅이 Promise 인스턴스를 받으면 Resolve 될 때까지 상위 Suspense로 렌더링을 중단합니다.
+    const dataOrPromise = orgId && user?.uid ? getDashboardData(orgId, user.uid, todayStr, weekEndDate) : null;
+    const resolvedData = dataOrPromise instanceof Promise ? use(dataOrPromise) : dataOrPromise;
 
-                // 미작성 알림: 어제까지 in_progress/completed인데 일지 미연결 예약
-                const logReservationIds = new Set(myLogs.filter(l => l.reservationId).map(l => l.reservationId));
-                const yesterday = new Date();
-                yesterday.setDate(yesterday.getDate() - 1);
-                const yesterdayStr = toLocalDateStr(yesterday);
+    const serverVehicles: Vehicle[] = resolvedData ? resolvedData[0] : [];
+    const serverToday: Reservation[] = resolvedData ? resolvedData[1] : [];
+    const serverWeek: Reservation[] = resolvedData ? resolvedData[2] : [];
+    const myLogs = resolvedData ? resolvedData[3] : [];
 
-                const incomplete = wr
-                    .filter(res => res.reservedByUid === user?.uid
-                        && (res.status === 'in_progress' || res.status === 'completed')
-                        && (res.date ?? '') <= yesterdayStr
-                        && !logReservationIds.has(res.id)
-                    );
+    // 2. 로컬 Override 반영
+    const vehicles = serverVehicles;
+    const todayReservations = useMemo(() => 
+        serverToday
+            .filter(r => !localCancelledIds.has(r.id))
+            .map(r => localStartedIds.has(r.id) ? { ...r, status: 'in_progress' as ReservationStatus, actualStartTime: localStartedIds.get(r.id) } : r)
+    , [serverToday, localCancelledIds, localStartedIds]);
 
-                setIncompleteAlerts(
-                    incomplete.map(res => ({ type: 'reservation' as const, ...res })) as (Reservation & { type: string })[]
-                );
+    const weekReservations = useMemo(() => 
+        serverWeek
+            .filter(r => !localCancelledIds.has(r.id))
+            .map(r => localStartedIds.has(r.id) ? { ...r, status: 'in_progress' as ReservationStatus, actualStartTime: localStartedIds.get(r.id) } : r)
+    , [serverWeek, localCancelledIds, localStartedIds]);
 
-                // 차량별 사용 빈도 집계
-                const counts = new Map<string, number>();
-                for (const log of myLogs) {
-                    if (log.vehicleId) {
-                        counts.set(log.vehicleId, (counts.get(log.vehicleId) || 0) + 1);
-                    }
-                }
-                setVehicleUsageCounts(counts);
-            } catch (err) {
-                const errCode = (err as { code?: string })?.code;
-                if (errCode === 'permission-denied' && retryCount < 1) {
-                    // Custom Claims 미반영 → 토큰 갱신 후 재시도
-                    console.debug('Claims 미반영 감지 — 토큰 갱신 후 재시도');
-                    if (firebaseAuth.currentUser) {
-                        await refreshTokenSilently(firebaseAuth.currentUser);
-                    }
-                    return fetchData(retryCount + 1);
-                }
-                console.error('로드 실패:', err);
-            } finally {
-                setLoading(false);
+    // 3. 파생 상태 연산
+    const incompleteAlerts = useMemo(() => {
+        if (!user?.uid) return [];
+        const logReservationIds = new Set(myLogs.filter((l: any) => l.reservationId).map((l: any) => l.reservationId));
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        const yesterdayStr = toLocalDateStr(yesterday);
+
+        return weekReservations
+            .filter(res => res.reservedByUid === user.uid
+                && (res.status === 'in_progress' || res.status === 'completed')
+                && (res.date ?? '') <= yesterdayStr
+                && !logReservationIds.has(res.id)
+            ).map(res => ({ type: 'reservation' as const, ...res })) as (Reservation & { type: string })[];
+    }, [weekReservations, myLogs, user?.uid]);
+
+    const vehicleUsageCounts = useMemo(() => {
+        const counts = new Map<string, number>();
+        for (const log of myLogs) {
+            if (log.vehicleId) {
+                counts.set(log.vehicleId, (counts.get(log.vehicleId) || 0) + 1);
             }
-        };
-        fetchData();
-    }, [orgId, todayStr, weekEndDate, user?.uid]);
+        }
+        return counts;
+    }, [myLogs]);
 
     const myReservations = useMemo(() =>
         todayReservations
@@ -211,11 +236,8 @@ export default function useTodayDashboard() {
             const now = new Date();
             const actualStartTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
             await updateReservationStatus(reservation.id, 'in_progress', { actualStartTime });
-            setTodayReservations(prev => prev.map(r =>
-                r.id === reservation.id ? { ...r, status: 'in_progress', actualStartTime } : r
-            ));
-
-            // 클라이언트 로컬 알림 (외부 앱 사용 후 복귀 유도)
+            
+            setLocalStartedIds(prev => new Map(prev).set(reservation.id, actualStartTime));
             showDrivingNotification(reservation);
         } catch (err) {
             console.error('운행 시작 실패:', err);
@@ -231,11 +253,8 @@ export default function useTodayDashboard() {
             const now = new Date();
             const actualStartTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
             await updateReservationStatus(reservation.id, 'in_progress', { actualStartTime });
-            setTodayReservations(prev => prev.map(r =>
-                r.id === reservation.id ? { ...r, status: 'in_progress', actualStartTime } : r
-            ));
-
-            // 클라이언트 로컬 알림 (외부 앱 사용 후 복귀 유도)
+            
+            setLocalStartedIds(prev => new Map(prev).set(reservation.id, actualStartTime));
             showDrivingNotification(reservation);
 
             const destination = reservation.destination || '';
@@ -253,7 +272,7 @@ export default function useTodayDashboard() {
         setCancellingId(reservation.id);
         try {
             await cancelReservation(reservation.id);
-            setWeekReservations(prev => prev.filter(r => r.id !== reservation.id));
+            setLocalCancelledIds(prev => new Set(prev).add(reservation.id));
             await clearDrivingNotification(reservation.id);
         } catch (err) {
             console.error('예약 취소 실패:', err);
@@ -267,7 +286,7 @@ export default function useTodayDashboard() {
         setCancellingId(reservation.id);
         try {
             await cancelReservation(reservation.id);
-            setTodayReservations(prev => prev.filter(r => r.id !== reservation.id));
+            setLocalCancelledIds(prev => new Set(prev).add(reservation.id));
             await clearDrivingNotification(reservation.id);
         } catch (err) {
             console.error('예약 취소 실패:', err);
@@ -324,7 +343,7 @@ export default function useTodayDashboard() {
     });
 
     return {
-        vehicles, loading, startingId, cancellingId,
+        vehicles, startingId, cancellingId,
         myReservations, weekGrouped, todayLabel,
         upcomingAlerts, incompleteAlerts, hasActiveDrive,
         handleStartDrive, handleStartNavigation,

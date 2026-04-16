@@ -8,10 +8,11 @@ import { useToast } from './useToast';
 import { useConfirm } from './useConfirm';
 import type { Vehicle } from '../types/vehicle';
 import type { FuelLog } from '../types/fuelLog';
-import { getVehicles, getFuelLogs, createFuelLog, deleteFuelLog, updateFuelLog, getTodayReservations } from '../lib/firestore';
+import { createFuelLog, updateFuelLog, getFuelLogs, getTodayReservations } from '../lib/firestore';
 import { isChargeableFuel } from './useVehicleManager';
 import { toLocalDateStr } from '../lib/dateUtils';
 import { ocrDashboard } from '../lib/ocr';
+import useBaseFuelLog from './base/useBaseFuelLog';
 
 const INITIAL_FORM = {
     vehicleId: '',
@@ -27,9 +28,15 @@ export default function useFuelLog() {
     const { user, userData } = useAuth();
     const { showToast } = useToast();
     const { confirm } = useConfirm();
-    const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-    const [records, setRecords] = useState<FuelLog[]>([]);
-    const [loading, setLoading] = useState(true);
+    
+    const orgId = userData?.organizationId;
+    const todayStr = toLocalDateStr();
+
+    const {
+        vehicles, records, setRecords, loading, 
+        totalCost, totalAmount, handleDeleteBase
+    } = useBaseFuelLog(orgId ? orgId : undefined);
+
     const [showForm, setShowForm] = useState(false);
     const [saving, setSaving] = useState(false);
     const [form, setForm] = useState(INITIAL_FORM);
@@ -44,53 +51,31 @@ export default function useFuelLog() {
     const [ocrImageUrl, setOcrImageUrl] = useState<string | null>(null);
     const cameraInputRef = useRef<HTMLInputElement>(null);
 
-    const orgId = userData?.organizationId;
-    const todayStr = toLocalDateStr();
-
     useEffect(() => {
-        if (!orgId) { setLoading(false); return; }
-        const fetchData = async () => {
-            // 차량 목록은 반드시 로드 (다른 쿼리 실패해도 차량 카드 표시)
-            try {
-                const v = await getVehicles(orgId);
-                setVehicles(v as Vehicle[]);
+        if (!orgId || vehicles.length === 0 || form.vehicleId) return;
 
-                // 운행 중 차량 자동 선택
-                try {
-                    const todayRes = await getTodayReservations(orgId, todayStr);
-                    const activeRes = (todayRes as { reservedByUid?: string; status?: string; vehicleId?: string }[]).find(
-                        res => res.reservedByUid === user?.uid && res.status === 'in_progress'
-                    );
-                    if (activeRes) {
-                        const activeVehicle = (v as Vehicle[]).find(vh => vh.id === activeRes.vehicleId);
-                        if (activeVehicle) {
-                            setForm(prev => ({
-                                ...prev,
-                                vehicleId: activeVehicle.id,
-                                vehicleName: activeVehicle.displayName || activeVehicle.name || '',
-                            }));
-                        }
+        const findActiveVehicle = async () => {
+            try {
+                const todayRes = await getTodayReservations(orgId, todayStr);
+                const activeRes = (todayRes as any[]).find(
+                    res => res.reservedByUid === user?.uid && res.status === 'in_progress'
+                );
+                if (activeRes) {
+                    const activeVehicle = vehicles.find(vh => vh.id === activeRes.vehicleId);
+                    if (activeVehicle) {
+                        setForm(prev => ({
+                            ...prev,
+                            vehicleId: activeVehicle.id,
+                            vehicleName: activeVehicle.displayName || activeVehicle.name || '',
+                        }));
                     }
-                } catch (err) {
-                    console.warn('오늘 예약 로드 실패 (무시):', err);
                 }
             } catch (err) {
-                console.error('차량 목록 로드 실패:', err);
+                console.warn('오늘 예약 로드 실패 (무시):', err);
             }
-
-            // 주유 기록 로드 (인덱스 빌드 중이면 빈 배열로 처리)
-            try {
-                const r = await getFuelLogs(orgId);
-                setRecords(r as FuelLog[]);
-            } catch (err) {
-                console.warn('주유 기록 로드 실패 (인덱스 빌드 중일 수 있음):', err);
-                setRecords([]);
-            }
-
-            setLoading(false);
         };
-        fetchData();
-    }, [orgId, todayStr, user?.uid]);
+        findActiveVehicle();
+    }, [orgId, todayStr, user?.uid, vehicles, form.vehicleId]);
 
     // 기록에 차량 아이콘 정보 병합
     const enrichedRecords = useMemo(() => {
@@ -99,10 +84,6 @@ export default function useFuelLog() {
             return { ...r, vehicleType: v?.vehicleType || null };
         });
     }, [records, vehicles]);
-
-    // 합계 계산
-    const totalCost = useMemo(() => records.reduce((sum, r) => sum + (r.fuelCost || 0), 0), [records]);
-    const totalAmount = useMemo(() => records.reduce((sum, r) => sum + (r.fuelAmount || 0), 0), [records]);
 
     // 선택된 차량의 현재 누적 km
     const selectedVehicleKm = useMemo(() => {
@@ -256,22 +237,7 @@ export default function useFuelLog() {
         }
     };
 
-    const handleDelete = async (rec: FuelLog) => {
-        // 본인 기록만 삭제 가능
-        if (rec.driverUid !== user?.uid) {
-            showToast('본인의 주유 기록만 삭제할 수 있습니다.', 'warning');
-            return;
-        }
-        if (!await confirm({ message: '이 주유 기록을 삭제하시겠습니까?', confirmColor: 'danger' })) return;
-        try {
-            await deleteFuelLog(rec.id);
-            setRecords(prev => prev.filter(r => r.id !== rec.id));
-            showToast('주유 기록이 삭제되었습니다.', 'success');
-        } catch (err) {
-            console.error('삭제 실패:', err);
-            showToast('삭제에 실패했습니다.', 'error');
-        }
-    };
+    const handleDelete = (rec: FuelLog) => handleDeleteBase(rec, user?.uid);
 
     return {
         vehicles, loading, showForm, setShowForm,

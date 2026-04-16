@@ -167,7 +167,15 @@ export default function MorePage() {
                         ))}
                     </div>
                 </div>
-                <button onClick={async () => { if (!await confirm({ message: '정말 이 기관에서 나가시겠습니까?\n나가면 다시 초대 코드를 입력해야 합니다.', confirmColor: 'warning' })) return; await leaveOrganization(user!.uid); }} className="w-full flex items-center gap-3 p-4 hover:bg-orange-50 dark:hover:bg-orange-900/30 transition-colors text-left">
+                <button onClick={async () => { 
+                    if (!await confirm({ message: '정말 이 기관에서 나가시겠습니까?\n나가면 다시 초대 코드를 입력해야 합니다.', confirmColor: 'warning' })) return; 
+                    try {
+                        await leaveOrganization(user!.uid); 
+                    } catch (err) {
+                        console.error('leaveOrganization 실패:', err);
+                        showToast('기관 나가기에 실패했습니다.', 'error');
+                    }
+                }} className="w-full flex items-center gap-3 p-4 hover:bg-orange-50 dark:hover:bg-orange-900/30 transition-colors text-left">
                     <svg className="w-5 h-5 text-orange-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9 15 3 9m0 0 6-6M3 9h12a6 6 0 0 1 0 12h-3" /></svg>
                     <span className="text-sm text-orange-600 dark:text-orange-400">기관 나가기</span>
                 </button>

@@ -60,9 +60,15 @@ export default function useNotification() {
 
             showToast('알림이 활성화되었습니다.', 'success');
             return fcmToken;
-        } catch (err) {
-            console.error('FCM 토큰 요청 실패:', err);
-            showToast('알림 설정 중 오류가 발생했습니다.', 'error');
+        } catch (err: unknown) {
+            const errorMessage = err instanceof Error ? err.message : String(err);
+            if (errorMessage.includes('failed-service-worker-registration')) {
+                console.warn('FCM 토큰 요청 실패: 서비스워커 등록 타임아웃 (브라우저 환경 제약)');
+                showToast('이 브라우저 환경에서는 푸시 알림 설정이 지연되거나 지원되지 않을 수 있습니다.', 'warning');
+            } else {
+                console.error('FCM 토큰 요청 실패:', err);
+                showToast('알림 설정 중 오류가 발생했습니다.', 'error');
+            }
             return null;
         }
     }, [user, showToast]);
@@ -82,8 +88,13 @@ export default function useNotification() {
                     setToken(fcmToken);
                     await updateUser(user.uid, { fcmToken });
                 }
-            } catch (err) {
-                console.error('FCM 토큰 자동 갱신 실패:', err);
+            } catch (err: unknown) {
+                const errorMessage = err instanceof Error ? err.message : String(err);
+                if (errorMessage.includes('failed-service-worker-registration')) {
+                    console.warn('FCM 토큰 자동 갱신 실패: 서비스워커 등록 타임아웃');
+                } else {
+                    console.error('FCM 토큰 자동 갱신 실패:', err);
+                }
             }
         })();
     }, [user]);

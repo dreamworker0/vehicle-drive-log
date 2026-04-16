@@ -34,7 +34,7 @@ export default function HipassChargeLogManager() {
         if (!userData?.organizationId) return;
         getOrganization(userData.organizationId).then((o) => {
             if (o) setOrg(o as Organization);
-        });
+        }).catch(err => console.error('getOrganization failed:', err));
     }, [userData?.organizationId]);
 
     if (loading) {
@@ -61,10 +61,15 @@ export default function HipassChargeLogManager() {
                 <div className="flex items-center gap-2">
                     <button
                         onClick={async () => {
-                            const { downloadHipassChargesExcel } = await import('../../lib/excelExport');
-                            await downloadHipassChargesExcel(filteredRecords, `하이패스충전기록_${orgName || '전체'}`, {
-                                onError: (msg) => showToast(msg, 'warning'),
-                            });
+                            try {
+                                const { downloadHipassChargesExcel } = await import('../../lib/excelExport');
+                                await downloadHipassChargesExcel(filteredRecords, `하이패스충전기록_${orgName || '전체'}`, {
+                                    onError: (msg) => showToast(msg, 'warning'),
+                                });
+                            } catch (err) {
+                                console.error('엑셀 다운로드 실패:', err);
+                                showToast('엑셀 다운로드 중 오류가 발생했습니다.', 'error');
+                            }
                         }}
                         disabled={filteredRecords.length === 0}
                         className="btn-secondary btn-sm flex items-center gap-2 disabled:opacity-50"
@@ -76,16 +81,21 @@ export default function HipassChargeLogManager() {
                     </button>
                     <button
                         onClick={async () => {
-                            const { downloadHipassChargePdf } = await import('../../lib/pdf/hipassChargePdfExport');
-                            const defaultApproval = [{ title: '담당' }, { title: '팀장' }];
-                            const useApproval = org?.hideApprovalLine
-                                ? []
-                                : ((org?.approvalLine?.length ?? 0) > 0 ? org!.approvalLine! : defaultApproval);
-                            downloadHipassChargePdf(filteredRecords, {
-                                orgName,
-                                approvalLine: useApproval,
-                                onError: (msg) => showToast(msg, 'error'),
-                            });
+                            try {
+                                const { downloadHipassChargePdf } = await import('../../lib/pdf/hipassChargePdfExport');
+                                const defaultApproval = [{ title: '담당' }, { title: '팀장' }];
+                                const useApproval = org?.hideApprovalLine
+                                    ? []
+                                    : ((org?.approvalLine?.length ?? 0) > 0 ? org!.approvalLine! : defaultApproval);
+                                downloadHipassChargePdf(filteredRecords, {
+                                    orgName,
+                                    approvalLine: useApproval,
+                                    onError: (msg) => showToast(msg, 'error'),
+                                });
+                            } catch (err) {
+                                console.error('PDF 다운로드 실패:', err);
+                                showToast('PDF 다운로드 중 오류가 발생했습니다.', 'error');
+                            }
                         }}
                         disabled={filteredRecords.length === 0}
                         className="btn-primary btn-sm flex items-center gap-2 disabled:opacity-50"

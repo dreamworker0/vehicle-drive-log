@@ -3,11 +3,15 @@
  */
 import {
     doc, getDoc, updateDoc,
-    collection, query, where, getDocs, addDoc,
+    collection, query, where, getDocs, addDoc, getCountFromServer,
     orderBy, limit, serverTimestamp, writeBatch,
-    type DocumentData,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import type { Organization } from '../../types/organization';
+import { createZodConverter, organizationSchema } from '../../schemas';
+import { captureError } from '../sentry';
+
+const orgConverter = createZodConverter(organizationSchema);
 
 // ========================
 // 초대 코드
@@ -21,22 +25,27 @@ export const generateInviteCode = () => {
 // 초대 코드로 기관 찾기
 export const findOrganizationByInviteCode = async (code: string) => {
     const q = query(
-        collection(db, 'organizations'),
+        collection(db, 'organizations').withConverter(orgConverter),
         where('inviteCode', '==', code),
         where('status', '==', 'approved'),
         limit(1)
     );
     const snap = await getDocs(q);
-    return snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() };
+    return snap.empty ? null : snap.docs[0].data();
 };
 
 // 초대 코드 재발급
 export const regenerateInviteCode = async (orgId: string) => {
     const newCode = generateInviteCode();
-    await updateDoc(doc(db, 'organizations', orgId), {
-        inviteCode: newCode,
-    });
-    return newCode;
+    try {
+        await updateDoc(doc(db, 'organizations', orgId), {
+            inviteCode: newCode,
+        });
+        return newCode;
+    } catch (error) {
+        captureError(error, { context: 'regenerateInviteCode', orgId });
+        throw error;
+    }
 };
 
 // ========================
@@ -44,114 +53,159 @@ export const regenerateInviteCode = async (orgId: string) => {
 // ========================
 
 // 기관 생성
-export const createOrganization = async (data: Record<string, unknown>) => {
-    const docRef = await addDoc(collection(db, 'organizations'), {
-        ...data,
-        status: 'pending',
-        createdAt: serverTimestamp(),
-    });
-    return docRef.id;
+export const createOrganization = async (data: Partial<Organization>) => {
+    try {
+        const docRef = await addDoc(collection(db, 'organizations'), {
+            ...data,
+            status: 'pending',
+            createdAt: serverTimestamp(),
+        });
+        return docRef.id;
+    } catch (error) {
+        captureError(error, { context: 'createOrganization', data });
+        throw error;
+    }
 };
 
 // 기관 조회
 export const getOrganization = async (orgId: string) => {
-    const snap = await getDoc(doc(db, 'organizations', orgId));
-    return snap.exists() ? { id: snap.id, ...snap.data() } : null;
+    const snap = await getDoc(doc(db, 'organizations', orgId).withConverter(orgConverter));
+    return snap.exists() ? snap.data() : null;
 };
 
 // 기관 정보 수정
-export const updateOrganization = async (orgId: string, data: Record<string, unknown>) => {
-    await updateDoc(doc(db, 'organizations', orgId), data);
+export const updateOrganization = async (orgId: string, data: Partial<Organization>) => {
+    try {
+        await updateDoc(doc(db, 'organizations', orgId), data);
+    } catch (error) {
+        captureError(error, { context: 'updateOrganization', orgId, data });
+        throw error;
+    }
 };
 
 // 기관 Soft delete (30일 내 복구 가능)
 // 소속 직원 문서도 함께 삭제 → 재로그인 시 초대 코드 화면으로 이동
 export const deleteOrganization = async (orgId: string) => {
-    const usersQuery = query(
-        collection(db, 'users'),
-        where('organizationId', '==', orgId)
-    );
-    const usersSnap = await getDocs(usersQuery);
-    const batch = writeBatch(db);
-    usersSnap.docs.forEach(userDoc => {
-        batch.delete(userDoc.ref);
-    });
-    batch.update(doc(db, 'organizations', orgId), {
-        status: 'deleted',
-        deletedAt: serverTimestamp(),
-    });
-    await batch.commit();
+    try {
+        const usersQuery = query(
+            collection(db, 'users'),
+            where('organizationId', '==', orgId)
+        );
+        const usersSnap = await getDocs(usersQuery);
+        const batch = writeBatch(db);
+        usersSnap.docs.forEach(userDoc => {
+            batch.delete(userDoc.ref);
+        });
+        batch.update(doc(db, 'organizations', orgId), {
+            status: 'deleted',
+            deletedAt: serverTimestamp(),
+        });
+        await batch.commit();
+    } catch (error) {
+        captureError(error, { context: 'deleteOrganization', orgId });
+        throw error;
+    }
 };
 
 // 영구 삭제 (소속 사용자 + 기관 문서 완전 제거)
 export const permanentDeleteOrganization = async (orgId: string) => {
-    const usersQuery = query(
-        collection(db, 'users'),
-        where('organizationId', '==', orgId)
-    );
-    const usersSnap = await getDocs(usersQuery);
-    const batch = writeBatch(db);
-    usersSnap.docs.forEach(userDoc => {
-        batch.delete(userDoc.ref);
-    });
-    batch.delete(doc(db, 'organizations', orgId));
-    await batch.commit();
+    try {
+        const usersQuery = query(
+            collection(db, 'users'),
+            where('organizationId', '==', orgId)
+        );
+        const usersSnap = await getDocs(usersQuery);
+        const batch = writeBatch(db);
+        usersSnap.docs.forEach(userDoc => {
+            batch.delete(userDoc.ref);
+        });
+        batch.delete(doc(db, 'organizations', orgId));
+        await batch.commit();
+    } catch (error) {
+        captureError(error, { context: 'permanentDeleteOrganization', orgId });
+        throw error;
+    }
 };
 
 // 삭제된 기관 복구
 export const restoreOrganization = async (orgId: string) => {
-    await updateDoc(doc(db, 'organizations', orgId), {
-        status: 'approved',
-        deletedAt: null,
-    });
+    try {
+        await updateDoc(doc(db, 'organizations', orgId), {
+            status: 'approved',
+            deletedAt: null,
+        });
+    } catch (error) {
+        captureError(error, { context: 'restoreOrganization', orgId });
+        throw error;
+    }
 };
 
 // ========================
 // 기관 상태별 조회 / 구독
 // ========================
 
+// 대기 중 기관 모집 카운트
+export const getPendingOrganizationsCount = async () => {
+    const q = query(
+        collection(db, 'organizations'),
+        where('status', '==', 'pending')
+    );
+    const snap = await getCountFromServer(q);
+    return snap.data().count;
+};
+
+// 승인된 기관 모집 카운트
+export const getApprovedOrganizationsCount = async () => {
+    const q = query(
+        collection(db, 'organizations'),
+        where('status', '==', 'approved')
+    );
+    const snap = await getCountFromServer(q);
+    return snap.data().count;
+};
+
 // 대기 중 기관 목록 조회
 export const getPendingOrganizations = async () => {
     const q = query(
-        collection(db, 'organizations'),
+        collection(db, 'organizations').withConverter(orgConverter),
         where('status', '==', 'pending'),
         orderBy('createdAt', 'desc')
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
+    return snap.docs.map(d => d.data());
 };
 
 // 거절된 기관 목록 조회
 export const getRejectedOrganizations = async () => {
     const q = query(
-        collection(db, 'organizations'),
+        collection(db, 'organizations').withConverter(orgConverter),
         where('status', '==', 'rejected'),
         orderBy('createdAt', 'desc')
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
+    return snap.docs.map(d => d.data());
 };
 
 // 삭제된 기관 목록 조회
 export const getDeletedOrganizations = async () => {
     const q = query(
-        collection(db, 'organizations'),
+        collection(db, 'organizations').withConverter(orgConverter),
         where('status', '==', 'deleted'),
         orderBy('deletedAt', 'desc')
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
+    return snap.docs.map(d => d.data());
 };
 
 // 승인된 기관 목록 조회
 export const getApprovedOrganizations = async () => {
     const q = query(
-        collection(db, 'organizations'),
+        collection(db, 'organizations').withConverter(orgConverter),
         where('status', '==', 'approved'),
         orderBy('createdAt', 'desc')
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
+    return snap.docs.map(d => d.data());
 };
 
 // ========================
@@ -160,17 +214,27 @@ export const getApprovedOrganizations = async () => {
 
 // 기관 승인
 export const approveOrganization = async (orgId: string) => {
-    await updateDoc(doc(db, 'organizations', orgId), {
-        status: 'approved',
-        approvedAt: serverTimestamp(),
-        inviteCode: generateInviteCode(),
-    });
+    try {
+        await updateDoc(doc(db, 'organizations', orgId), {
+            status: 'approved',
+            approvedAt: serverTimestamp(),
+            inviteCode: generateInviteCode(),
+        });
+    } catch (error) {
+        captureError(error, { context: 'approveOrganization', orgId });
+        throw error;
+    }
 };
 
 // 기관 거절
 export const rejectOrganization = async (orgId: string) => {
-    await updateDoc(doc(db, 'organizations', orgId), {
-        status: 'rejected',
-        rejectedAt: new Date(),
-    });
+    try {
+        await updateDoc(doc(db, 'organizations', orgId), {
+            status: 'rejected',
+            rejectedAt: new Date(),
+        });
+    } catch (error) {
+        captureError(error, { context: 'rejectOrganization', orgId });
+        throw error;
+    }
 };

@@ -56,6 +56,10 @@ export interface CachedDashboardTimeSeries {
     hourlyAvgDuration: { hour: string; avg: number }[];
     heatmapData: { items: { dayIdx: number; hour: number; count: number }[]; maxCount: number };
     favoriteLogRatio: { total: number; favorite: number; normal: number; rate: number };
+    quickDriveStats?: { date: string; regular: number; quick: number }[];
+    quickDriveRatio?: { total: number; quick: number; regular: number; rate: number };
+    recommendationStats?: { date: string; recommendation: number; normal: number }[];
+    recommendationRatio?: { total: number; recommendation: number; normal: number; rate: number };
     lastUpdatedAt: string;
 }
 
@@ -95,12 +99,4 @@ export interface NotificationSetters {
     } | null>>;
     setDailyNotifStats: React.Dispatch<React.SetStateAction<{ date: string; sent: number; read: number }[]>>;
     setNotifTypeStats: React.Dispatch<React.SetStateAction<{ type: string; count: number; color: string }[]>>;
-}
-
-// Setter callback types for loadQuickDriveStats
-export interface QuickDriveSetters {
-    setQuickDriveStats: React.Dispatch<React.SetStateAction<{ date: string; regular: number; quick: number }[]>>;
-    setQuickDriveRatio: React.Dispatch<React.SetStateAction<{ total: number; quick: number; regular: number; rate: number }>>;
-    setRecommendationStats: React.Dispatch<React.SetStateAction<{ date: string; recommendation: number; normal: number }[]>>;
-    setRecommendationRatio: React.Dispatch<React.SetStateAction<{ total: number; recommendation: number; normal: number; rate: number }>>;
 }

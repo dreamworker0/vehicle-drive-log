@@ -60,20 +60,12 @@ describe('useTodayDashboard', () => {
         vi.clearAllMocks();
     });
 
-    it('초기 상태에서 loading이 true이다', async () => {
-        const { result } = renderHook(() => useTodayDashboard());
-        expect(result.current.loading).toBe(true);
-        // Wait for fetch completion to avoid act warnings during teardown
-        await waitFor(() => {
-            expect(result.current.loading).toBe(false);
-        });
-    });
-
+    // suspense 패턴 도입으로 loading 상태 제외
     it('orgId가 있으면 차량/예약/일지를 로드한다', async () => {
         const { result } = renderHook(() => useTodayDashboard());
 
         await waitFor(() => {
-            expect(result.current.loading).toBe(false);
+            expect(result.current.myReservations || result.current.todayLabel).toBeDefined();
         });
 
         expect(mockGetVehicles).toHaveBeenCalledWith('org1');
@@ -86,7 +78,7 @@ describe('useTodayDashboard', () => {
         const { result } = renderHook(() => useTodayDashboard());
 
         await waitFor(() => {
-            expect(result.current.loading).toBe(false);
+            expect(result.current.myReservations || result.current.todayLabel).toBeDefined();
         });
 
         // testUser의 예약만 (res1만, completed 제외)
@@ -98,7 +90,7 @@ describe('useTodayDashboard', () => {
         const { result } = renderHook(() => useTodayDashboard());
 
         await waitFor(() => {
-            expect(result.current.loading).toBe(false);
+            expect(result.current.myReservations || result.current.todayLabel).toBeDefined();
         });
 
         expect(result.current.hasActiveDrive).toBe(false);
@@ -112,7 +104,7 @@ describe('useTodayDashboard', () => {
         const { result } = renderHook(() => useTodayDashboard());
 
         await waitFor(() => {
-            expect(result.current.loading).toBe(false);
+            expect(result.current.myReservations || result.current.todayLabel).toBeDefined();
         });
 
         expect(result.current.hasActiveDrive).toBe(true);
@@ -122,7 +114,7 @@ describe('useTodayDashboard', () => {
         const { result } = renderHook(() => useTodayDashboard());
 
         await waitFor(() => {
-            expect(result.current.loading).toBe(false);
+            expect(result.current.myReservations || result.current.todayLabel).toBeDefined();
         });
 
         act(() => {
@@ -136,7 +128,7 @@ describe('useTodayDashboard', () => {
         const { result } = renderHook(() => useTodayDashboard());
 
         await waitFor(() => {
-            expect(result.current.loading).toBe(false);
+            expect(result.current.myReservations || result.current.todayLabel).toBeDefined();
         });
 
         // 오늘 날짜가 한국어로 포맷팅 되었는지 확인

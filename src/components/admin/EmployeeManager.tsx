@@ -227,7 +227,7 @@ export default function EmployeeManager() {
                                                 <>
                                                     <select
                                                         value={member.role || 'employee'}
-                                                        onChange={(e) => handleChangeRole(member.original, e.target.value)}
+                                                        onChange={(e) => handleChangeRole(member.original, e.target.value as import('../../types').UserRole)}
                                                         disabled={isSelf}
                                                         title={isSelf ? '자신의 역할은 변경할 수 없습니다' : ''}
                                                         className={`text-xs border border-surface-200 dark:border-surface-600 rounded-lg px-2 py-1 bg-white dark:bg-surface-800 text-surface-600 dark:text-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 ${isSelf ? 'opacity-40 cursor-not-allowed' : ''}`}

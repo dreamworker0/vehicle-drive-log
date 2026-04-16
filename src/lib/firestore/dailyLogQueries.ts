@@ -6,6 +6,9 @@ import {
     collection, query, where, getDocs, orderBy, limit,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { createZodConverter, driveLogSchema } from '../../schemas';
+import type { DriveLog } from '../../types/driveLog';
+import type { FuelLog } from '../../types/fuelLog';
 
 /**
  * 특정 날짜 + 차량의 운행일지 조회
@@ -18,7 +21,7 @@ export const getDriveLogsByDate = async (orgId: string, vehicleId: string, dateS
     const dayEnd = new Date(`${dateStr}T23:59:59.999`);
 
     const q = query(
-        collection(db, 'driveLogs'),
+        collection(db, 'driveLogs').withConverter(createZodConverter(driveLogSchema)),
         where('organizationId', '==', orgId),
         where('vehicleId', '==', vehicleId),
         where('timestamp', '>=', dayStart),
@@ -26,7 +29,7 @@ export const getDriveLogsByDate = async (orgId: string, vehicleId: string, dateS
         orderBy('timestamp', 'asc'),
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) }));
+    return snap.docs.map(d => d.data() as DriveLog);
 };
 
 /**
@@ -43,7 +46,7 @@ export const getFuelLogsByDate = async (orgId: string, vehicleId: string, dateSt
         where('date', '==', dateStr),
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) }));
+    return snap.docs.map(d => ({ ...(d.data() as FuelLog), id: d.id }));
 };
 
 /**

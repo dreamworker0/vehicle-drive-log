@@ -13,8 +13,9 @@ import type { User } from '../types/user';
 import type { MaintenanceRecord } from '../types/maintenance';
 import type { FuelLog } from '../types/fuelLog';
 import type { HipassCharge } from '../types/hipassCharge';
+import { getRecentMonthKeys, extractDateStr } from './utils/aggregationUtils';
 import {
-    MONTH_LABELS, getLogDate, getRecentMonthKeys, getWorkdaysInMonth,
+    MONTH_LABELS, getWorkdaysInMonth,
     calcMonthlyTrend, calcHeatmapData, detectAnomalies,
 } from './utils/analyticsCalc';
 import type { LogEntry } from './utils/analyticsCalc';
@@ -74,7 +75,7 @@ export default function useAnalytics() {
     const filteredLogs = useMemo(() => {
         const startMonth = monthKeys[0];
         const filtered = logs.filter(l => {
-            const d = getLogDate(l as unknown as LogEntry);
+            const d = extractDateStr(l as unknown as LogEntry);
             if (!d) return false;
             return d >= `${startMonth}-01`;
         });
@@ -90,7 +91,7 @@ export default function useAnalytics() {
         const map: Record<string, { name: string; totalCount: number; totalDistance: number; months: Record<string, { count: number; distance: number }> }> = {};
 
         filteredLogs.forEach(l => {
-            const d = getLogDate(l);
+            const d = extractDateStr(l);
             if (!d) return;
             const mk = d.slice(0, 7);
             if (!recentKeys.includes(mk)) return;
@@ -109,7 +110,7 @@ export default function useAnalytics() {
                 name: d.name,
                 totalCount: d.totalCount,
                 totalDistance: d.totalDistance,
-                ...recentKeys.reduce((acc, mk) => {
+                ...recentKeys.reduce((acc: Record<string, number>, mk: string) => {
                     const label = MONTH_LABELS[parseInt(mk.split('-')[1], 10) - 1];
                     acc[`${label}_count`] = d.months[mk]?.count || 0;
                     acc[`${label}_distance`] = d.months[mk]?.distance || 0;
@@ -126,7 +127,7 @@ export default function useAnalytics() {
 
         const daysByVehicle: Record<string, Set<string>> = {};
         filteredLogs.forEach(l => {
-            const d = getLogDate(l);
+            const d = extractDateStr(l);
             if (!d) return;
             const mk = d.slice(0, 7);
             if (!recentKeys.includes(mk)) return;
@@ -259,9 +260,10 @@ export default function useAnalytics() {
         });
     }, [fuelLogs, hipassCharges, maintenanceRecords, monthKeys]);
 
-    const totalFuelCost = useMemo(() => costTrend.reduce((s, c) => s + c.fuelCost, 0), [costTrend]);
-    const totalHipassCost = useMemo(() => costTrend.reduce((s, c) => s + c.hipassCost, 0), [costTrend]);
-    const totalMaintenanceCost = useMemo(() => costTrend.reduce((s, c) => s + c.maintenanceCost, 0), [costTrend]);
+    type CostTrendItem = { label: string; fuelCost: number; hipassCost: number; maintenanceCost: number; totalCost: number };
+    const totalFuelCost = useMemo(() => costTrend.reduce((s: number, c: CostTrendItem) => s + c.fuelCost, 0), [costTrend]);
+    const totalHipassCost = useMemo(() => costTrend.reduce((s: number, c: CostTrendItem) => s + c.hipassCost, 0), [costTrend]);
+    const totalMaintenanceCost = useMemo(() => costTrend.reduce((s: number, c: CostTrendItem) => s + c.maintenanceCost, 0), [costTrend]);
     const totalOperatingCost = useMemo(() => totalFuelCost + totalHipassCost + totalMaintenanceCost, [totalFuelCost, totalHipassCost, totalMaintenanceCost]);
 
     /** 최적화 추천 카드 생성 */

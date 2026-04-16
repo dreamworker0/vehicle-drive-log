@@ -57,9 +57,9 @@ export function validateDriveLogForm(
 
     // 배터리 범위 검증 (전기차만)
     if (isElectric) {
-        const bs = form.batteryStart ? parseInt(form.batteryStart) : null;
-        const be = form.batteryEnd ? parseInt(form.batteryEnd) : null;
-        if ((bs !== null && (bs < 0 || bs > 100)) || (be !== null && (be < 0 || be > 100))) {
+        const bs = form.batteryStart ? parseInt(form.batteryStart) : undefined;
+        const be = form.batteryEnd ? parseInt(form.batteryEnd) : undefined;
+        if ((bs !== undefined && (bs < 0 || bs > 100)) || (be !== undefined && (be < 0 || be > 100))) {
             return { valid: false, message: '배터리 값은 0~100% 사이여야 합니다.' };
         }
     }
@@ -105,25 +105,25 @@ export function buildLogData(form: DriveLogForm, { orgId, user, userData, select
     const driveTimestamp = buildDriveTimestamp(form.driveDate, form.endTime, form.startTime);
 
     return {
-        organizationId: orgId,
+        organizationId: orgId ? String(orgId) : '',
         vehicleId: form.vehicleId,
         vehicleName: form.vehicleName,
         vehicleType: selectedVehicle?.vehicleType || '',
         driverUid: user.uid,
-        driverName: userData?.name || user.displayName || user.email,
+        driverName: userData?.name || user.displayName || user.email || '',
         purpose: form.purpose.trim(),
         destination: form.destination.trim(),
         startTime: form.startTime || '',
         endTime: form.endTime || nowTime(),
         startKm,
         endKm,
-        distance: (startKm !== null && endKm !== null) ? endKm - startKm : null,
-        batteryStart: form.batteryStart ? parseInt(form.batteryStart) : null,
-        batteryEnd: form.batteryEnd ? parseInt(form.batteryEnd) : null,
+        distance: (!isNaN(startKm) && !isNaN(endKm)) ? endKm - startKm : undefined,
+        batteryStart: form.batteryStart ? parseInt(form.batteryStart) : undefined,
+        batteryEnd: form.batteryEnd ? parseInt(form.batteryEnd) : undefined,
         notes: form.notes.trim(),
         timestamp: driveTimestamp,
         passengerCount: selectedPassengers.length + externalPassengerCount + 1,
-        passengerNames: selectedPassengers.map(p => p.name || p.email),
+        passengerNames: selectedPassengers.map(p => p.name || p.email || ''),
         externalPassengerCount,
         inputMethod: ocrUsed ? 'ocr' as const : (favoriteUsed ? 'favorite' as const : 'manual' as const),
         ...(isRetroactive && { isRetroactive: true }),

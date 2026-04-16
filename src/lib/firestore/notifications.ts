@@ -8,14 +8,20 @@ import {
     type DocumentData,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { captureError } from '../sentry';
 
 // 알림 생성
 export const createNotification = async (data: Record<string, unknown>) => {
-    return await addDoc(collection(db, 'notifications'), {
-        ...data,
-        read: false,
-        createdAt: serverTimestamp(),
-    });
+    try {
+        return await addDoc(collection(db, 'notifications'), {
+            ...data,
+            read: false,
+            createdAt: serverTimestamp(),
+        });
+    } catch (error) {
+        captureError(error as Error, { context: 'createNotification', data });
+        throw error;
+    }
 };
 
 // 알림 목록 조회
@@ -32,9 +38,14 @@ export const getNotifications = async (uid: string, limitCount = 20) => {
 
 // 알림 읽음 처리
 export const markNotificationRead = async (notificationId: string) => {
-    await updateDoc(doc(db, 'notifications', notificationId), {
-        read: true,
-    });
+    try {
+        await updateDoc(doc(db, 'notifications', notificationId), {
+            read: true,
+        });
+    } catch (error) {
+        captureError(error as Error, { context: 'markNotificationRead', notificationId });
+        throw error;
+    }
 };
 
 // 미읽은 알림 실시간 구독

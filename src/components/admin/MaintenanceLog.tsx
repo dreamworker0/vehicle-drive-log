@@ -34,7 +34,7 @@ export default function MaintenanceLog() {
         if (!userData?.organizationId) return;
         getOrganization(userData.organizationId).then((o) => {
             if (o) setOrg(o as Organization);
-        });
+        }).catch(err => console.error('getOrganization failed:', err));
     }, [userData?.organizationId]);
 
     const blockedVehicles = vehicles.filter(v => isVehicleBlocked(v.maintenance));
@@ -65,11 +65,16 @@ export default function MaintenanceLog() {
                     </button>
                     <button
                         onClick={async () => {
-                            const { downloadMaintenanceExcel } = await import('../../lib/excelExport');
-                            await downloadMaintenanceExcel(filteredRecords, `정비기록_${orgName || '전체'}`, {
-                                onError: (msg) => showToast(msg, 'warning'),
-                                typeLabels: TYPE_LABELS,
-                            });
+                            try {
+                                const { downloadMaintenanceExcel } = await import('../../lib/excelExport');
+                                await downloadMaintenanceExcel(filteredRecords, `정비기록_${orgName || '전체'}`, {
+                                    onError: (msg) => showToast(msg, 'warning'),
+                                    typeLabels: TYPE_LABELS,
+                                });
+                            } catch (err) {
+                                console.error('엑셀 다운로드 실패:', err);
+                                showToast('엑셀 다운로드 중 오류가 발생했습니다.', 'error');
+                            }
                         }}
                         disabled={filteredRecords.length === 0}
                         className="btn-secondary btn-sm flex items-center gap-2 disabled:opacity-50"
@@ -81,17 +86,22 @@ export default function MaintenanceLog() {
                     </button>
                     <button
                         onClick={async () => {
-                            const { downloadMaintenancePdf } = await import('../../lib/pdf/maintenancePdfExport');
-                            const defaultApproval = [{ title: '담당' }, { title: '팀장' }];
-                            const useApproval = org?.hideApprovalLine
-                                ? []
-                                : ((org?.approvalLine?.length ?? 0) > 0 ? org!.approvalLine! : defaultApproval);
-                            downloadMaintenancePdf(filteredRecords, {
-                                orgName,
-                                typeLabels: TYPE_LABELS,
-                                approvalLine: useApproval,
-                                onError: (msg) => showToast(msg, 'error'),
-                            });
+                            try {
+                                const { downloadMaintenancePdf } = await import('../../lib/pdf/maintenancePdfExport');
+                                const defaultApproval = [{ title: '담당' }, { title: '팀장' }];
+                                const useApproval = org?.hideApprovalLine
+                                    ? []
+                                    : ((org?.approvalLine?.length ?? 0) > 0 ? org!.approvalLine! : defaultApproval);
+                                downloadMaintenancePdf(filteredRecords, {
+                                    orgName,
+                                    typeLabels: TYPE_LABELS,
+                                    approvalLine: useApproval,
+                                    onError: (msg) => showToast(msg, 'error'),
+                                });
+                            } catch (err) {
+                                console.error('PDF 다운로드 실패:', err);
+                                showToast('PDF 다운로드 중 오류가 발생했습니다.', 'error');
+                            }
                         }}
                         disabled={filteredRecords.length === 0}
                         className="btn-primary btn-sm flex items-center gap-2 disabled:opacity-50"

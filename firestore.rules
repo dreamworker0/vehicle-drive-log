@@ -50,7 +50,8 @@ service cloud.firestore {
       allow create: if isOwner(userId)
                     && request.auth.token.firebase.sign_in_provider != 'anonymous'
                     && request.resource.data.keys().hasAll(['email'])
-                    && request.resource.data.email is string;
+                    && request.resource.data.email is string
+                    && !request.resource.data.keys().hasAny(['role', 'organizationId']);
       allow update: if (isOwner(userId)
                         && !request.resource.data.diff(resource.data).affectedKeys()
                             .hasAny(['role', 'organizationId']))
@@ -69,7 +70,7 @@ service cloud.firestore {
                     && request.resource.data.keys().hasAll(['name', 'applicantUid'])
                     && request.resource.data.applicantUid == request.auth.uid;
       allow update: if isOrgAdmin(orgId) || isSuperAdmin()
-                    || (isSignedIn() && resource.data.status == 'pending' && resource.data.applicantUid == request.auth.uid);
+                    || (isSignedIn() && resource.data.status == 'pending' && resource.data.applicantUid == request.auth.uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'role']));
       allow delete: if isSuperAdmin();
 
       // 커스텀 휴일 (서브컬렉션)
@@ -124,8 +125,10 @@ service cloud.firestore {
                     && request.resource.data.keys().hasAll(['organizationId', 'vehicleId', 'driverUid'])
                     && request.resource.data.driverUid == request.auth.uid;
       allow update: if isSuperAdmin()
-                    || (belongsToMyOrg() && (resource.data.driverUid == request.auth.uid
-                        || isOrgAdmin(resource.data.organizationId)));
+                    || (belongsToMyOrg() && (
+                        (resource.data.driverUid == request.auth.uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['organizationId', 'vehicleId', 'driverUid']))
+                        || isOrgAdmin(resource.data.organizationId)
+                    ));
       allow delete: if isOrgAdmin(resource.data.organizationId) || isSuperAdmin();
     }
 
@@ -136,8 +139,10 @@ service cloud.firestore {
                     && request.resource.data.keys().hasAll(['organizationId', 'vehicleId', 'reservedByUid'])
                     && request.resource.data.reservedByUid == request.auth.uid;
       allow update: if isSuperAdmin()
-                    || (belongsToMyOrg() && (resource.data.reservedByUid == request.auth.uid
-                        || isOrgAdmin(resource.data.organizationId)));
+                    || (belongsToMyOrg() && (
+                        (resource.data.reservedByUid == request.auth.uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['organizationId', 'reservedByUid']))
+                        || isOrgAdmin(resource.data.organizationId)
+                    ));
       allow delete: if isSuperAdmin();
     }
 
@@ -150,7 +155,8 @@ service cloud.firestore {
                         && request.resource.data.keys().hasAll(['targetUid'])
                         && request.resource.data.targetUid is string
                         && request.resource.data.organizationId == userOrgId());
-      allow update: if resource.data.targetUid == request.auth.uid;
+      allow update: if resource.data.targetUid == request.auth.uid
+                    && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'updatedAt']);
       allow delete: if resource.data.targetUid == request.auth.uid || isSuperAdmin();
     }
 
@@ -168,10 +174,11 @@ service cloud.firestore {
       allow create: if newBelongsToMyOrg()
                     && request.resource.data.keys().hasAll(['organizationId', 'vehicleId', 'driverUid'])
                     && request.resource.data.driverUid == request.auth.uid;
-      allow update: if belongsToMyOrg()
-                    && (resource.data.driverUid == request.auth.uid
-                        || isOrgAdmin(resource.data.organizationId))
-                    || isSuperAdmin();
+      allow update: if isSuperAdmin()
+                    || (belongsToMyOrg() && (
+                        (resource.data.driverUid == request.auth.uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['organizationId', 'vehicleId', 'driverUid']))
+                        || isOrgAdmin(resource.data.organizationId)
+                    ));
       allow delete: if (belongsToMyOrg()
                     && (resource.data.driverUid == request.auth.uid
                         || isOrgAdmin(resource.data.organizationId)))
@@ -184,10 +191,11 @@ service cloud.firestore {
       allow create: if newBelongsToMyOrg()
                     && request.resource.data.keys().hasAll(['organizationId', 'cardId', 'chargerUid'])
                     && request.resource.data.chargerUid == request.auth.uid;
-      allow update: if belongsToMyOrg()
-                    && (resource.data.chargerUid == request.auth.uid
-                        || isOrgAdmin(resource.data.organizationId))
-                    || isSuperAdmin();
+      allow update: if isSuperAdmin()
+                    || (belongsToMyOrg() && (
+                        (resource.data.chargerUid == request.auth.uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['organizationId', 'cardId', 'chargerUid']))
+                        || isOrgAdmin(resource.data.organizationId)
+                    ));
       allow delete: if (belongsToMyOrg()
                     && (resource.data.chargerUid == request.auth.uid
                         || isOrgAdmin(resource.data.organizationId)))

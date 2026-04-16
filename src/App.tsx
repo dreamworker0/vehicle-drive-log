@@ -110,7 +110,10 @@ export default function App() {
     return cleanup;
   }, []);
 
-  const { open, options, handleConfirm, handleCancel } = useConfirmStore();
+  const open = useConfirmStore(state => state.open);
+  const options = useConfirmStore(state => state.options);
+  const handleConfirm = useConfirmStore(state => state.handleConfirm);
+  const handleCancel = useConfirmStore(state => state.handleCancel);
 
   return (
     <>

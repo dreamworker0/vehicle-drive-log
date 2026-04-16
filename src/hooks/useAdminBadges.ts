@@ -3,7 +3,7 @@
  * 차량(활성만), 직원, 하이패스 카드, 오늘 예약(취소 제외) 수를 반환한다.
  */
 import { useState, useEffect } from 'react';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs, getCountFromServer } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from './useAuth';
 
@@ -37,19 +37,19 @@ export default function useAdminBadges(): AdminBadges {
                 const vSnap = await getDocs(vehicleQ);
                 const activeVehicles = vSnap.docs.filter(d => !d.data().retired?.isRetired);
                 
-                // 직원 수
+                // 직원 수 (getCountFromServer로 최적화)
                 const employeeQ = query(
                     collection(db, 'users'),
                     where('organizationId', '==', orgId)
                 );
-                const eSnap = await getDocs(employeeQ);
+                const employeeSnap = await getCountFromServer(employeeQ);
                 
-                // 하이패스 카드 수
+                // 하이패스 카드 수 (getCountFromServer로 최적화)
                 const hipassQ = query(
                     collection(db, 'hipassCards'),
                     where('organizationId', '==', orgId)
                 );
-                const hSnap = await getDocs(hipassQ);
+                const hipassSnap = await getCountFromServer(hipassQ);
                 
                 // 오늘 예약 수 
                 const today = new Date().toISOString().slice(0, 10);
@@ -63,8 +63,8 @@ export default function useAdminBadges(): AdminBadges {
 
                 if (isMounted) {
                     setVehicleCount(activeVehicles.length);
-                    setEmployeeCount(eSnap.size);
-                    setHipassCount(hSnap.size);
+                    setEmployeeCount(employeeSnap.data().count);
+                    setHipassCount(hipassSnap.data().count);
                     setReservationCount(activeReservations.length);
                 }
             } catch (err) {

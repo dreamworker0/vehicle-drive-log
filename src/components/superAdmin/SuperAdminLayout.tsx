@@ -2,7 +2,11 @@ import { useState, useEffect, Suspense, type ReactNode } from 'react';
 import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { logout } from '../../lib/auth';
-import { getPendingOrganizations, getApprovedOrganizations, getAllFeedbacks, getOrgMemberCounts, getSuperAdmins } from '../../lib/firestore';
+import { getApprovedOrganizations } from '../../lib/firestore/organizations';
+import { getOrgMemberCounts } from '../../lib/firestore/users';
+import { getPendingOrganizationsCount, getApprovedOrganizationsCount } from '../../lib/firestore/organizations';
+import { getUnreadFeedbacksCount } from '../../lib/firestore/feedbacks';
+import { getSuperAdminsCount } from '../../lib/firestore/superAdmin';
 import { SA_TEST_ROLE_KEY } from '../../App';
 import { useTheme } from '../../hooks/useTheme';
 
@@ -58,24 +62,27 @@ export default function SuperAdminLayout() {
         let isMounted = true;
         const fetchCounts = async () => {
             try {
-                const pendings = await getPendingOrganizations();
-                const approved = await getApprovedOrganizations();
-                const allFeedbacks = await getAllFeedbacks(200);
+                const [pendingsCount, approvedCount, unreadFeedbackCount] = await Promise.all([
+                    getPendingOrganizationsCount(),
+                    getApprovedOrganizationsCount(),
+                    getUnreadFeedbacksCount()
+                ]);
 
                 if (!isMounted) return;
 
-                setPendingCount(pendings.length);
-                setTotalOrgCount(approved.length);
-                setFeedbackCount(allFeedbacks.filter(f => f.status !== 'read' && f.status !== 'resolved').length);
+                setPendingCount(pendingsCount);
+                setTotalOrgCount(approvedCount);
+                setFeedbackCount(unreadFeedbackCount);
 
                 try {
+                    const approved = await getApprovedOrganizations();
                     const counts = await getOrgMemberCounts();
                     if (isMounted) {
                         const active = approved.filter(o => counts[o.id] > 0).length;
                         setActiveOrgCount(active);
                     }
                 } catch {
-                    if (isMounted) setActiveOrgCount(approved.length);
+                    if (isMounted) setActiveOrgCount(approvedCount);
                 }
             } catch(e) {
                 console.error("SuperAdmin 뱃지 카운트 조회 에러:", e);
@@ -89,7 +96,7 @@ export default function SuperAdminLayout() {
 
     // 슈퍼관리자 수 조회
     useEffect(() => {
-        getSuperAdmins().then(admins => setAdminCount(admins.length)).catch(() => {});
+        getSuperAdminsCount().then(count => setAdminCount(count)).catch(() => {});
     }, []);
 
     return (

@@ -11,6 +11,7 @@ import type { User as UserDoc } from '../../types/user';
 import type { DriveLog } from '../../types/driveLog';
 import type { HipassCard } from '../../types/hipass';
 import type { User as FirebaseUser } from 'firebase/auth';
+import { captureError } from '../../lib/sentry';
 
 interface SubmitContext {
     form: DriveLogForm;
@@ -67,7 +68,7 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
     } = ctx;
 
     const logData = buildLogData(form, {
-        orgId, user, userData, selectedVehicle,
+        orgId: orgId || undefined, user, userData, selectedVehicle,
         selectedPassengers, externalPassengerCount,
         isRetroactive, ocrUsed, favoriteUsed,
     });
@@ -136,6 +137,7 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
                 await clearDrivingNotification(resId);
             } catch (e) {
                 console.warn('[submitDriveLog] 예약 상태 업데이트 실패(백그라운드):', e);
+                captureError(e, { context: 'submitDriveLog.updateReservationStatus', resId });
             }
         });
     }
@@ -144,7 +146,7 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
     if (hipassCard && form.hipassBalanceAfter !== '') {
         const hipassId = hipassCard.id;
         const bal = Number(form.hipassBalanceAfter);
-        const org = orgId;
+        const org = orgId ? orgId : undefined;
         
         Promise.resolve().then(async () => {
             try {
@@ -154,6 +156,7 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
                 });
             } catch (e) {
                 console.warn('[submitDriveLog] 하이패스 잔액 업데이트 실패(백그라운드):', e);
+                captureError(e, { context: 'submitDriveLog.updateHipassCard', hipassId, bal, org });
             }
         });
     }

@@ -11,8 +11,8 @@ export default function OfflineBanner() {
     // 오프라인 시 대기 항목 수 업데이트
     useEffect(() => {
         if (!isOffline) return;
-        getPendingCount().then(setPendingCount);
-        const interval = setInterval(() => { getPendingCount().then(setPendingCount); }, 3000);
+        getPendingCount().then(setPendingCount).catch(console.error);
+        const interval = setInterval(() => { getPendingCount().then(setPendingCount).catch(console.error); }, 3000);
         return () => clearInterval(interval);
     }, [isOffline]);
 

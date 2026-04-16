@@ -3,7 +3,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 import { useConfirmStore } from '../../store/useConfirmStore';
 import useRetry from '../../hooks/useRetry';
-import { subscribePendingReservations, updateReservationStatus } from '../../lib/firestore/reservations';
+import { getPendingReservations, updateReservationStatus } from '../../lib/firestore/reservations';
 import { getVehicles } from '../../lib/firestore/vehicles';
 import type { Vehicle } from '../../types/vehicle';
 import { getOrganizationMembers } from '../../lib/firestore/users';
@@ -16,7 +16,7 @@ export default function PendingReservationList() {
     const [employees, setEmployees] = useState<Record<string, { displayName: string; department?: string }>>({});
     
     const { showToast } = useToast();
-    const { confirm } = useConfirmStore();
+    const confirm = useConfirmStore(state => state.confirm);
     const { runWithRetry } = useRetry();
 
     const [pendingLoading, setPendingLoading] = useState(true);
@@ -24,11 +24,19 @@ export default function PendingReservationList() {
 
     useEffect(() => {
         if (!userData?.organizationId) return;
-        const unsub = subscribePendingReservations(userData.organizationId, (data) => {
-            setPendingList(data);
-            setPendingLoading(false);
-        });
-        return () => unsub();
+        
+        const loadPending = async () => {
+            try {
+                const data = await getPendingReservations(userData.organizationId!);
+                setPendingList(data);
+            } catch (error) {
+                console.error("Failed to load pending reservations:", error);
+            } finally {
+                setPendingLoading(false);
+            }
+        };
+
+        loadPending();
     }, [userData?.organizationId]);
 
     useEffect(() => {
@@ -44,7 +52,8 @@ export default function PendingReservationList() {
                 setVehicles(vList);
                 const empMap: Record<string, { displayName: string; department?: string }> = {};
                 empData.forEach(e => {
-                    empMap[e.uid || e.id] = { displayName: e.displayName || e.name, department: e.department };
+                    const extra = e as any;
+                    empMap[e.uid || e.id] = { displayName: extra.displayName || e.name, department: extra.department };
                 });
                 setEmployees(empMap);
             } catch (error) {
@@ -61,6 +70,7 @@ export default function PendingReservationList() {
     const handleApprove = async (id: string) => {
         await runWithRetry(`approve-res-${id}`, async () => {
             await updateReservationStatus(id, 'reserved', {}, 'pending');
+            setPendingList(prev => prev.filter(r => r.id !== id));
             showToast('예약이 승인되었습니다.', 'success');
         }, {
             errorMessage: '예약 승인에 실패했습니다.',
@@ -91,6 +101,7 @@ export default function PendingReservationList() {
                 rejectedReason: reason as string,
                 rejectedAt: new Date().toISOString()
             }, 'pending');
+            setPendingList(prev => prev.filter(r => r.id !== id));
             showToast('예약이 반려되었습니다.', 'success');
         }, {
             errorMessage: '예약 반려 처리에 실패했습니다.',

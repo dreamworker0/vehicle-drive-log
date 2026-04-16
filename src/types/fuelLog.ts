@@ -5,6 +5,7 @@ import type { FirestoreDoc, TimestampField } from './common';
 import type { FuelType } from './vehicle';
 
 export interface FuelLog extends FirestoreDoc {
+    [key: string]: unknown;
     organizationId: string;
     vehicleId: string;
     vehicleName?: string;

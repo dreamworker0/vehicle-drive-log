@@ -4,6 +4,7 @@
  */
 import { useCallback, useEffect, useRef } from 'react';
 import { useToast } from './useToast';
+import { captureError } from '../lib/sentry';
 
 interface RetryRunOptions {
     errorMessage?: string;
@@ -76,6 +77,7 @@ export default function useRetry({ maxRetries = 2, retryLabel = '재시도' } = 
                 console.warn(`[useRetry:${key}] ${err.message}`);
             } else {
                 console.error(`[useRetry:${key}]`, err);
+                captureError(err, { key, retryCount: retryCountRef.current.get(key) || 0, context: 'useRetry' });
             }
 
             const handled = opts.onError ? opts.onError(err) : false;

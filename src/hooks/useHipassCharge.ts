@@ -5,16 +5,15 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
-import { useConfirm } from './useConfirm';
 import type { HipassCard } from '../types/hipass';
 import type { HipassCharge } from '../types/hipassCharge';
 import type { Vehicle } from '../types/vehicle';
 import {
-    getVehicles,
-    getHipassCards, updateHipassCard,
-    getHipassCharges, createHipassCharge, deleteHipassCharge,
+    updateHipassCard,
+    createHipassCharge,
 } from '../lib/firestore';
 import { toLocalDateStr } from '../lib/dateUtils';
+import useBaseHipassCharge from './base/useBaseHipassCharge';
 
 const INITIAL_FORM = {
     date: toLocalDateStr(),
@@ -24,57 +23,34 @@ const INITIAL_FORM = {
 export default function useHipassCharge() {
     const { user, userData } = useAuth();
     const { showToast } = useToast();
-    const { confirm } = useConfirm();
 
-    const [cards, setCards] = useState<HipassCard[]>([]);
-    const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+    const orgId = userData?.organizationId;
+    const { 
+        cards, setCards, 
+        vehicles, 
+        records, 
+        loading, 
+        loadRecordsForCard, 
+        calculateTotalCharge, 
+        handleDeleteBase 
+    } = useBaseHipassCharge(orgId || undefined);
+
     const [selectedCardId, setSelectedCardId] = useState('');
-    const [records, setRecords] = useState<HipassCharge[]>([]);
-    const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [showForm, setShowForm] = useState(false);
     const [form, setForm] = useState(INITIAL_FORM);
 
-    const orgId = userData?.organizationId;
-
-    // 하이패스 카드 목록 로드
+    // 하이패스 카드가 1개일 경우 자동 선택
     useEffect(() => {
-        if (!orgId) { setLoading(false); return; }
-        const fetchAll = async () => {
-            try {
-                const [c, v] = await Promise.all([
-                    getHipassCards(orgId),
-                    getVehicles(orgId),
-                ]);
-                setCards(c as HipassCard[]);
-                setVehicles(v as Vehicle[]);
-                // 카드가 1개면 자동 선택
-                if (c.length === 1) setSelectedCardId(c[0].id);
-            } catch (err) {
-                console.error('하이패스 카드/차량 로드 실패:', err);
-            }
-            setLoading(false);
-        };
-        fetchAll();
-    }, [orgId]);
+        if (cards.length === 1 && !selectedCardId) {
+            setSelectedCardId(cards[0].id);
+        }
+    }, [cards, selectedCardId]);
 
     // 선택된 카드 변경 시 충전 기록 로드
     useEffect(() => {
-        if (!orgId || !selectedCardId) {
-            setRecords([]);
-            return;
-        }
-        const fetchCharges = async () => {
-            try {
-                const r = await getHipassCharges(orgId, selectedCardId);
-                setRecords(r as HipassCharge[]);
-            } catch (err) {
-                console.warn('충전 기록 로드 실패:', err);
-                setRecords([]);
-            }
-        };
-        fetchCharges();
-    }, [orgId, selectedCardId]);
+        loadRecordsForCard(selectedCardId);
+    }, [selectedCardId, loadRecordsForCard]);
 
     // 선택된 카드 정보
     const selectedCard = useMemo(
@@ -92,8 +68,8 @@ export default function useHipassCharge() {
 
     // 충전 기록 합계
     const totalChargeAmount = useMemo(
-        () => records.reduce((sum, r) => sum + (r.chargeAmount || 0), 0),
-        [records],
+        () => calculateTotalCharge(records),
+        [records, calculateTotalCharge],
     );
 
     // vehicleId로 차량 조회 헬퍼
@@ -149,8 +125,7 @@ export default function useHipassCharge() {
             setCards(prev => prev.map(c =>
                 c.id === selectedCard.id ? { ...c, balance: after } : c
             ));
-            const updated = await getHipassCharges(orgId!, selectedCardId);
-            setRecords(updated as HipassCharge[]);
+            await loadRecordsForCard(selectedCardId);
 
             setForm(INITIAL_FORM);
             setShowForm(false);
@@ -165,32 +140,7 @@ export default function useHipassCharge() {
 
     // 삭제
     const handleDelete = async (rec: HipassCharge) => {
-        if (rec.chargerUid !== user?.uid) {
-            showToast('본인의 충전 기록만 삭제할 수 있습니다.', 'warning');
-            return;
-        }
-        if (!await confirm({ message: '이 충전 기록을 삭제하시겠습니까?\n카드 잔액이 원래대로 되돌아갑니다.', confirmColor: 'danger' })) return;
-
-        try {
-            // 1. 충전 기록 삭제
-            await deleteHipassCharge(rec.id);
-
-            // 2. 카드 잔액 원복 (충전금액만큼 차감)
-            const card = cards.find(c => c.id === rec.cardId);
-            if (card) {
-                const newBalance = Math.max(0, card.balance - rec.chargeAmount);
-                await updateHipassCard(card.id, { balance: newBalance });
-                setCards(prev => prev.map(c =>
-                    c.id === card.id ? { ...c, balance: newBalance } : c
-                ));
-            }
-
-            setRecords(prev => prev.filter(r => r.id !== rec.id));
-            showToast('충전 기록이 삭제되었습니다.', 'success');
-        } catch (err) {
-            console.error('삭제 실패:', err);
-            showToast('삭제에 실패했습니다.', 'error');
-        }
+        await handleDeleteBase(rec, { checkingUid: user?.uid, rollbackBalance: true });
     };
 
     return {

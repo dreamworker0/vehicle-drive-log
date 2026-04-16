@@ -6,8 +6,9 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { getDriveLogs, getFuelLogs, getAllHipassCharges } from '../lib/firestore';
 import { toLocalDateStr } from '../lib/dateUtils';
+import { extractDateStr } from './utils/aggregationUtils';
 import {
-    extractDateStr, calcDriveStats, filterPrevPeriodLogs,
+    calcDriveStats, filterPrevPeriodLogs,
     calcFuelStats, calcHipassStats, calcCostTrend,
     formatDriverData, formatVehicleData, formatPurposeData,
     formatVehicleFuelData, formatDailyTrendData,

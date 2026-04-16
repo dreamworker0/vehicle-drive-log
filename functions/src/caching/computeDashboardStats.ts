@@ -51,8 +51,17 @@ export async function computeAllDashboardStats(): Promise<void> {
     const startTime = Date.now();
     const db = getFirestore();
 
-    // 1. 6개 컬렉션 병렬 조회
-    const [orgSnap, userSnap, logSnap, vehicleSnap, hipassCardSnap, favoriteSnap, pendingAppSnap] = await Promise.all([
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth();
+    const thirtyDaysAgo = new Date(year, month, now.getDate() - 29);
+    const thirtyDaysAgoStr = `${thirtyDaysAgo.getFullYear()}-${String(thirtyDaysAgo.getMonth() + 1).padStart(2, "0")}-${String(thirtyDaysAgo.getDate()).padStart(2, "0")}`;
+    const sevenDaysAgo = new Date(year, month, now.getDate() - 6);
+    const prevMonth = month === 0 ? 11 : month - 1;
+    const prevYear = month === 0 ? year - 1 : year;
+
+    // 1. 7개 컬렉션 병렬 조회
+    const [orgSnap, userSnap, logSnap, vehicleSnap, hipassCardSnap, favoriteSnap, pendingAppSnap, reservationSnap] = await Promise.all([
         db.collection("organizations").get(),
         db.collection("users").get(),
         db.collection("driveLogs").get(),
@@ -60,15 +69,8 @@ export async function computeAllDashboardStats(): Promise<void> {
         db.collection("hipassCards").get(),
         db.collection("favorites").get(),
         db.collection("orgApplications").where("status", "==", "pending").count().get(),
+        db.collection("reservations").where("date", ">=", thirtyDaysAgoStr).get(),
     ]);
-
-    const now = new Date();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    const thirtyDaysAgo = new Date(year, month, now.getDate() - 29);
-    const sevenDaysAgo = new Date(year, month, now.getDate() - 6);
-    const prevMonth = month === 0 ? 11 : month - 1;
-    const prevYear = month === 0 ? year - 1 : year;
 
     // ── 2. 기관 기초 데이터 ──
 
@@ -279,6 +281,56 @@ export async function computeAllDashboardStats(): Promise<void> {
 
         if (ts >= sevenDaysAgo && data.driverUid) wauSet.add(data.driverUid);
     });
+
+    // ── 5.5. 예약 (바로운행 및 추천) 집계 ──
+
+    const dailyResMap: Record<string, { regular: number; quick: number; recommendation: number; normal: number }> = {};
+    for (let i = 0; i < 30; i++) {
+        const d = new Date(thirtyDaysAgo);
+        d.setDate(d.getDate() + i);
+        const key = `${d.getMonth() + 1}/${d.getDate()}`;
+        dailyResMap[key] = { regular: 0, quick: 0, recommendation: 0, normal: 0 };
+    }
+
+    let qTotal = 0, qQuick = 0, qRegular = 0;
+    let recTotal = 0, recRecommendation = 0, recNormal = 0;
+
+    reservationSnap.docs.forEach(doc => {
+        const data = doc.data();
+        if (data.status === "cancelled") return;
+
+        const dStr = data.date as string;
+        if (!dStr) return;
+        const [y, m, dd] = dStr.split("-").map(Number);
+        const parsed = new Date(y, m - 1, dd);
+        
+        if (parsed >= thirtyDaysAgo) {
+            const key = `${parsed.getMonth() + 1}/${parsed.getDate()}`;
+            qTotal++;
+            recTotal++;
+
+            if (data.isQuickDrive) {
+                qQuick++;
+                if (dailyResMap[key]) dailyResMap[key].quick++;
+            } else {
+                qRegular++;
+                if (dailyResMap[key]) dailyResMap[key].regular++;
+            }
+
+            if (data.source === "recommendation") {
+                recRecommendation++;
+                if (dailyResMap[key]) dailyResMap[key].recommendation++;
+            } else {
+                recNormal++;
+                if (dailyResMap[key]) dailyResMap[key].normal++;
+            }
+        }
+    });
+
+    const quickDriveRatio = { total: qTotal, quick: qQuick, regular: qRegular, rate: qTotal > 0 ? Math.round((qQuick / qTotal) * 100) : 0 };
+    const recommendationRatio = { total: recTotal, recommendation: recRecommendation, normal: recNormal, rate: recTotal > 0 ? Math.round((recRecommendation / recTotal) * 100) : 0 };
+    const quickDriveStats = Object.entries(dailyResMap).map(([date, counts]) => ({ date, regular: counts.regular, quick: counts.quick }));
+    const recommendationStats = Object.entries(dailyResMap).map(([date, counts]) => ({ date, recommendation: counts.recommendation, normal: counts.normal }));
 
     // ── 6. 차량 집계 ──
 
@@ -580,6 +632,10 @@ export async function computeAllDashboardStats(): Promise<void> {
             normal: totalNorm,
             rate: favTotal > 0 ? Math.round((totalFav / favTotal) * 100) : 0,
         },
+        quickDriveStats,
+        quickDriveRatio,
+        recommendationStats,
+        recommendationRatio,
         lastUpdatedAt: new Date().toISOString(),
     });
 

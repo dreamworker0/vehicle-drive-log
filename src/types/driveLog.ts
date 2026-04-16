@@ -4,6 +4,7 @@
 import type { FirestoreDoc, TimestampField } from './common';
 
 export interface DriveLog extends FirestoreDoc {
+    [key: string]: unknown;
     organizationId: string;
     vehicleId: string;
     vehicleName?: string;
@@ -32,7 +33,7 @@ export interface DriveLog extends FirestoreDoc {
     isRetroactive?: boolean;
     isIncomplete?: boolean;
     reservationId?: string;
-    inputMethod?: 'ocr' | 'manual';
+    inputMethod?: 'ocr' | 'manual' | 'favorite';
     createdAt?: TimestampField;
     editedAt?: TimestampField;
     expiresAt?: Date | TimestampField;

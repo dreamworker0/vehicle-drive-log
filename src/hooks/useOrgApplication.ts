@@ -190,11 +190,15 @@ export default function useOrgApplication() {
             setOcrStatus('done');
             setSuccess(true);
         } catch (err: unknown) {
-            const errorMsg = (err as Error).message;
-            if (errorMsg.includes('resource-exhausted') || errorMsg.includes('요청이 너무 많습니다')) {
-                setError('요청 횟수를 초과했습니다. 나중에 다시 시도해주세요.');
+            if (err instanceof Error) {
+                const errorMsg = err.message;
+                if (errorMsg.includes('resource-exhausted') || errorMsg.includes('요청이 너무 많습니다')) {
+                    setError('요청 횟수를 초과했습니다. 나중에 다시 시도해주세요.');
+                } else {
+                    setError('신청 중 오류가 발생했습니다. 다시 시도해주세요.');
+                }
             } else {
-                setError('신청 중 오류가 발생했습니다. 다시 시도해주세요.');
+                setError('원인을 알 수 없는 오류가 발생했습니다.');
             }
             console.error(err);
         } finally {

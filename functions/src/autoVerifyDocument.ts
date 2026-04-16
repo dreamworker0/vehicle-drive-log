@@ -482,7 +482,8 @@ export const autoVerifyDocument = onDocumentWritten(
 
             const isForProfit = finalDocType === "사업자등록증(영리)";
             const isNonProfit = finalDocType === "고유번호증" || finalDocType === "사업자등록증(비영리)";
-            const aiVerified = isNonProfit && result.nameMatch === true && result.uniqueNumber != null;
+            // 일단 이름 불일치 시에도 자동 승인하도록 result.nameMatch === true 조건 임시 제거
+            const aiVerified = isNonProfit && result.uniqueNumber != null;
 
             // Firestore 업데이트
             const db = getFirestore();

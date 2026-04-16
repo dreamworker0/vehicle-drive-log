@@ -1,4 +1,4 @@
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, Suspense, startTransition } from 'react';
 import { Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { lazyWithRetry } from '../../lib/lazyWithRetry';
@@ -120,7 +120,9 @@ export default function EmployeeLayout() {
                                     localStorage.setItem(SA_TEST_ROLE_KEY, 'admin');
                                     window.location.href = '/admin';
                                 } else {
-                                    navigate('/admin');
+                                    startTransition(() => {
+                                        navigate('/admin');
+                                    });
                                 }
                             }}
                             className="btn-icon text-surface-500 dark:text-surface-400 hover:text-primary-600"
@@ -161,12 +163,23 @@ export default function EmployeeLayout() {
             <nav className="fixed bottom-0 left-0 right-0 bg-white/85 dark:bg-surface-900/85 backdrop-blur-xl border-t border-surface-200/50 dark:border-surface-700/50 z-30 safe-bottom" aria-label="직원 메뉴">
                 <div className="flex items-center justify-between h-[68px] max-w-lg mx-auto px-4 relative">
                     {navItems.map((item, idx) => {
+                        // NavLink 클릭 시 startTransition을 통해 부드러운 페이지 전환 유도
+                        const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement, MouseEvent>) => {
+                            if (e.button === 0 && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+                                e.preventDefault();
+                                startTransition(() => {
+                                    navigate(item.to);
+                                });
+                            }
+                        };
+
                         // 중앙의 Elevated FAB (주유/충전)
                         if (idx === 2) {
                             return (
                                 <NavLink
                                     key={item.to}
                                     to={item.to}
+                                    onClick={handleNavClick}
                                     className={({ isActive }) =>
                                         `absolute left-1/2 -translate-x-1/2 -top-5 flex flex-col items-center justify-center w-14 h-14 rounded-full shadow-lg transition-all duration-300 transform hover:scale-105 active:scale-95 ${isActive
                                             ? 'bg-primary-600 text-white ring-4 ring-white/50 dark:ring-surface-900/50'
@@ -184,6 +197,7 @@ export default function EmployeeLayout() {
                             <NavLink
                                 key={item.to}
                                 to={item.to}
+                                onClick={handleNavClick}
                                 className={({ isActive }) =>
                                     `flex flex-col items-center gap-1 w-14 py-1.5 rounded-xl transition-all duration-200 ${
                                         idx === 1 ? 'mr-14' : idx === 3 ? 'ml-14' : ''

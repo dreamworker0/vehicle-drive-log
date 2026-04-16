@@ -2,6 +2,9 @@
  * 분석(Analytics) 계산 유틸리티 — 순수 함수로 단위 테스트 가능
  */
 
+import { extractDateStr, formatMonth, getRecentMonthKeys } from './aggregationUtils';
+export { formatMonth, extractDateStr as getLogDate, getRecentMonthKeys };
+
 export const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
 export const MONTH_LABELS = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
 
@@ -28,38 +31,7 @@ interface TrendEntry {
     label: string;
 }
 
-/**
- * Date 객체를 YYYY-MM 형식으로 변환
- */
-export const formatMonth = (date: Date) => {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    return `${y}-${m}`;
-};
-
-/**
- * 로그에서 날짜 문자열(YYYY-MM-DD) 추출 — date 필드 우선, 없으면 timestamp 폴백
- */
-export const getLogDate = (l: LogEntry) => {
-    if (l.date) return l.date;
-    const ts = l.timestamp;
-    if (!ts) return '';
-    const d = ts instanceof Date ? ts : ts.toDate?.();
-    return d?.toISOString?.()?.slice(0, 10) || '';
-};
-
-/**
- * 최근 N개월의 월 키 목록 생성 (예: ['2025-09', '2025-10', ...])
- */
-export function getRecentMonthKeys(monthCount = 6) {
-    const keys: string[] = [];
-    const now = new Date();
-    for (let i = monthCount - 1; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-        keys.push(formatMonth(d));
-    }
-    return keys;
-}
+// aggregationUtils 참조로 대체됨
 
 /**
  * 해당 월의 근무일 수 추정 (주말 제외, 공휴일 미포함)
@@ -84,7 +56,7 @@ export function calcMonthlyTrend(logs: LogEntry[], monthKeys: string[]): TrendEn
     monthKeys.forEach(k => { map[k] = { month: k, count: 0, distance: 0, fuelCost: 0 }; });
 
     logs.forEach(l => {
-        const d = getLogDate(l);
+        const d = extractDateStr(l);
         if (!d) return;
         const mk = d.slice(0, 7);
         if (!map[mk]) return;
@@ -106,7 +78,7 @@ export function calcHeatmapData(logs: LogEntry[]) {
     const grid = Array.from({ length: 7 }, () => Array(24).fill(0) as number[]);
 
     logs.forEach(l => {
-        const d = getLogDate(l);
+        const d = extractDateStr(l);
         const t = l.startTime || l.departureTime || '';
         if (!d || !t) return;
         const dayIdx = new Date(d).getDay();
@@ -140,7 +112,7 @@ export function detectAnomalies(logs: LogEntry[]) {
 
     // 주말 운행
     const weekendLogs = logs.filter(l => {
-        const d = getLogDate(l);
+        const d = extractDateStr(l);
         if (!d) return false;
         const dow = new Date(d).getDay();
         return dow === 0 || dow === 6;
@@ -178,7 +150,7 @@ export function detectAnomalies(logs: LogEntry[]) {
     // 1일 과다 주행 (200km 이상)
     const dailyDist: Record<string, { driver: string; date: string; distance: number }> = {};
     logs.forEach(l => {
-        const d = getLogDate(l);
+        const d = extractDateStr(l);
         if (!d) return;
         const key = `${l.driverName || '?'}_${d}`;
         if (!dailyDist[key]) dailyDist[key] = { driver: l.driverName || '(이름 없음)', date: d, distance: 0 };

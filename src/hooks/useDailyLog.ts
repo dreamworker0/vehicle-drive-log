@@ -8,6 +8,8 @@ import { getVehicles, getOrganization } from '../lib/firestore';
 import { getDriveLogsByDate, getFuelLogsByDate, getPreviousDayEndKm } from '../lib/firestore/dailyLogQueries';
 import type { Vehicle } from '../types/vehicle';
 import type { Organization } from '../types/organization';
+import type { DriveLog } from '../types/driveLog';
+import type { FuelLog } from '../types/fuelLog';
 import { toLocalDateStr } from '../lib/dateUtils';
 
 interface DailyLogSummary {
@@ -24,8 +26,8 @@ export default function useDailyLog() {
     const [selectedVehicleId, setSelectedVehicleId] = useState('');
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
     const [org, setOrg] = useState<Organization | null>(null);
-    const [driveLogs, setDriveLogs] = useState<Record<string, unknown>[]>([]);
-    const [fuelLogs, setFuelLogs] = useState<Record<string, unknown>[]>([]);
+    const [driveLogs, setDriveLogs] = useState<DriveLog[]>([]);
+    const [fuelLogs, setFuelLogs] = useState<FuelLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingData, setLoadingData] = useState(false);
     const [previousEndKm, setPreviousEndKm] = useState<number | null>(null);

@@ -7,18 +7,7 @@ import type { DriveLog } from '../../types/driveLog';
 import type { FuelLog } from '../../types/fuelLog';
 import type { HipassCharge } from '../../types/hipassCharge';
 
-// ── 헬퍼 ──
-
-/** 안전한 날짜 문자열 추출 */
-export function extractDateStr(log: DriveLog): string {
-    return log.date || (log.timestamp as { toDate?: () => Date })?.toDate?.()?.toISOString?.()?.slice(0, 10) || '';
-}
-
-/** 변화율 계산 (전월 대비) */
-function calcChange(cur: number, prev: number): number {
-    if (prev === 0) return cur > 0 ? 100 : 0;
-    return Math.round(((cur - prev) / prev) * 100);
-}
+import { extractDateStr, calcChangeRate, filterLogsByDateRange } from './aggregationUtils';
 
 // ── 메인 통계 ──
 
@@ -45,9 +34,9 @@ export function calcDriveStats(
     const prevDistance = prevPeriodLogs.reduce((s, l) => s + ((l.endKm - l.startKm) || 0), 0);
     const prevFuel = prevPeriodLogs.reduce((s, l) => s + (l.fuelAmount || l.energyCost || 0), 0);
 
-    const runsChange = calcChange(totalRuns, prevRuns);
-    const distanceChange = calcChange(totalDistance, prevDistance);
-    const fuelChange = calcChange(totalFuel, prevFuel);
+    const runsChange = calcChangeRate(totalRuns, prevRuns);
+    const distanceChange = calcChangeRate(totalDistance, prevDistance);
+    const fuelChange = calcChangeRate(totalFuel, prevFuel);
 
     // 직원별
     const byDriver: Record<string, { count: number; distance: number }> = {};
@@ -131,16 +120,12 @@ export function filterPrevPeriodLogs(logs: DriveLog[], startDate: string, endDat
     const ps = toLocalDateStr(prevStart);
     const pe = toLocalDateStr(prevEnd);
 
-    return logs.filter(l => {
-        const d = extractDateStr(l);
-        if (!d) return false;
-        return d >= ps && d <= pe;
-    });
+    return filterLogsByDateRange(logs, ps, pe);
 }
 
 /** 주유 통계 */
 export function calcFuelStats(fuelLogs: FuelLog[], startDate: string, endDate: string) {
-    const filtered = fuelLogs.filter(l => l.date >= startDate && l.date <= endDate);
+    const filtered = filterLogsByDateRange(fuelLogs, startDate, endDate);
     const totalCost = filtered.reduce((s, l) => s + (l.fuelCost || 0), 0);
     const totalAmount = filtered.reduce((s, l) => s + (l.fuelAmount || 0), 0);
 
@@ -162,7 +147,7 @@ export function calcFuelStats(fuelLogs: FuelLog[], startDate: string, endDate: s
 
 /** 하이패스 통계 */
 export function calcHipassStats(hipassCharges: HipassCharge[], startDate: string, endDate: string) {
-    const filtered = hipassCharges.filter(l => l.date >= startDate && l.date <= endDate);
+    const filtered = filterLogsByDateRange(hipassCharges, startDate, endDate);
     const totalAmount = filtered.reduce((s, l) => s + (l.chargeAmount || 0), 0);
 
     const byVehicle: Record<string, { amount: number; count: number }> = {};
@@ -184,14 +169,18 @@ export function calcHipassStats(hipassCharges: HipassCharge[], startDate: string
 export function calcCostTrend(fuelLogs: FuelLog[], hipassCharges: HipassCharge[], startDate: string, endDate: string) {
     const byDate: Record<string, { fuel: number; hipass: number }> = {};
 
-    fuelLogs.filter(l => l.date >= startDate && l.date <= endDate).forEach(l => {
-        if (!byDate[l.date]) byDate[l.date] = { fuel: 0, hipass: 0 };
-        byDate[l.date].fuel += l.fuelCost || 0;
+    filterLogsByDateRange(fuelLogs, startDate, endDate).forEach(l => {
+        const d = extractDateStr(l);
+        if (!d) return;
+        if (!byDate[d]) byDate[d] = { fuel: 0, hipass: 0 };
+        byDate[d].fuel += l.fuelCost || 0;
     });
 
-    hipassCharges.filter(l => l.date >= startDate && l.date <= endDate).forEach(l => {
-        if (!byDate[l.date]) byDate[l.date] = { fuel: 0, hipass: 0 };
-        byDate[l.date].hipass += l.chargeAmount || 0;
+    filterLogsByDateRange(hipassCharges, startDate, endDate).forEach(l => {
+        const d = extractDateStr(l);
+        if (!d) return;
+        if (!byDate[d]) byDate[d] = { fuel: 0, hipass: 0 };
+        byDate[d].hipass += l.chargeAmount || 0;
     });
 
     return Object.entries(byDate)

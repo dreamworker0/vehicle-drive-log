@@ -10,8 +10,9 @@ import useRetry from './useRetry';
 import { getOrganizationMembers, getOrganization, regenerateInviteCode, updateUser } from '../lib/firestore';
 import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import type { User } from '../types/user';
+import type { User, UserRole } from '../types/user';
 import type { Organization } from '../types/organization';
+import { captureError } from '../lib/sentry';
 
 export default function useEmployeeManager() {
     const { userData } = useAuth();
@@ -62,6 +63,7 @@ export default function useEmployeeManager() {
             setOrganization(org as Organization | null);
         } catch (err) {
             console.error('데이터 로드 실패:', err);
+            captureError(err, { context: 'useEmployeeManager.fetchData', orgId });
         } finally {
             setLoading(false);
         }
@@ -164,7 +166,7 @@ export default function useEmployeeManager() {
         }, { errorMessage: '활성화에 실패했습니다.' });
     };
 
-    const handleChangeRole = async (emp: User, newRole: string) => {
+    const handleChangeRole = async (emp: User, newRole: UserRole) => {
         // 자기 자신 역할 변경 금지
         if (emp.id === userData?.uid) {
             showToast('자신의 역할은 변경할 수 없습니다.', 'warning');

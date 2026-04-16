@@ -2,7 +2,7 @@
  * useDriveLogForm — 운행일지 작성/수정 폼의 상태 관리 + 비즈니스 로직
  * DriveLogForm에서 추출된 커스텀 훅
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useTransition } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
@@ -13,6 +13,7 @@ import { getVehicles, getFavorites, createFavorite, getOrganizationMembers, getL
 import { resolveStartKm } from './driveLogForm/resolveStartKm';
 import { submitDriveLog, getEmptyForm } from './driveLogForm/submitDriveLog';
 import type { Vehicle } from '../types/vehicle';
+import { captureError } from '../lib/sentry';
 
 const clearDrivingNotification = async (resId?: string) => {
     if (!resId || !('Notification' in window)) return;
@@ -81,7 +82,8 @@ export default function useDriveLogForm() {
     const [favorites, setFavorites] = useState<Favorite[]>([]);
     const [members, setMembers] = useState<UserDoc[]>([]);
     const [loading, setLoading] = useState(true);
-    const [submitting, setSubmitting] = useState(false);
+    const [isPending, startTransition] = useTransition();
+    const submitting = isPending;
     const [success, setSuccess] = useState(false);
     const [selectedPassengers, setSelectedPassengers] = useState<UserDoc[]>([]);
     const [externalPassengerCount, setExternalPassengerCount] = useState(0);
@@ -161,6 +163,7 @@ export default function useDriveLogForm() {
                 }
             } catch (err) {
                 console.error('데이터 로드 실패:', err);
+                captureError(err, { context: 'useDriveLogForm.fetch', orgId });
             } finally {
                 setLoading(false);
             }
@@ -210,6 +213,7 @@ export default function useDriveLogForm() {
                 }
             } catch (err) {
                 console.error('예약 데이터 로드 실패:', err);
+                captureError(err, { context: 'useDriveLogForm.loadReservation', queryReservationId });
             }
         };
         loadReservation();
@@ -224,7 +228,7 @@ export default function useDriveLogForm() {
             driveDate: form.driveDate,
             startTime: form.startTime,
             vehicle: v || null,
-        }).then(km => setForm(prev => ({ ...prev, startKm: km })));
+        }).then(km => setForm(prev => ({ ...prev, startKm: km }))).catch(console.error);
     }, [form.driveDate, form.vehicleId, form.startTime, orgId, vehicles, isEditMode]);
 
     // 전기차: 이전 운행일지의 도착 배터리 조회 (출발 배터리 placeholder 힌트)
@@ -293,6 +297,7 @@ export default function useDriveLogForm() {
             setFavName('');
         } catch (err) {
             console.error('즐겨찾기 저장 실패:', err);
+            captureError(err, { context: 'useDriveLogForm.saveFavorite', destination: form.destination, orgId });
         }
     }, [form.destination, user, favName, orgId]);
 
@@ -313,9 +318,9 @@ export default function useDriveLogForm() {
             return;
         }
 
-        setSubmitting(true);
-        try {
-            const result = await runWithRetry(
+        startTransition(async () => {
+            try {
+                const result = await runWithRetry(
                 'submit-drive-log',
                 () => submitDriveLog({
                     form, orgId, user: user!, userData, selectedVehicle,
@@ -382,7 +387,6 @@ export default function useDriveLogForm() {
                     setExternalPassengerCount(0);
                 }
                 setTimeout(() => setSuccess(false), 3000);
-                setSubmitting(false);
                 return;
             }
 
@@ -404,9 +408,8 @@ export default function useDriveLogForm() {
             // 따라서 이곳으로 에러 스로우가 전달되는 일은 드물지만 방어 코드 유지
             console.error('운행일지 과정 중 예상치 못한 오류:', err);
             showToast('알 수 없는 오류가 발생했습니다.', 'error');
-        } finally {
-            setSubmitting(false);
         }
+        });
     };
 
     return {

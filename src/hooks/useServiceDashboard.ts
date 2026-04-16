@@ -6,7 +6,6 @@ import type { SortKey } from '../components/superAdmin/dashboard/dashboardUtils'
 import type { OrgStat, CachedDashboardStats, CachedDashboardTimeSeries, CachedDashboardOrgRankings } from './serviceDashboard/types';
 import { loadFuelHipassStats } from './serviceDashboard/loadFuelHipassStats';
 import { loadNotificationStats } from './serviceDashboard/loadNotificationStats';
-import { loadQuickDriveStats } from './serviceDashboard/loadQuickDriveStats';
 
 export default function useServiceDashboard() {
     const [stats, setStats] = useState<CachedDashboardStats['monthlyStats'] extends infer _ ? {
@@ -190,6 +189,11 @@ export default function useServiceDashboard() {
             const grid = Array.from({ length: 7 }, () => Array(24).fill(0) as number[]);
             ts.heatmapData.items.forEach(({ dayIdx, hour, count }) => { grid[dayIdx][hour] = count; });
             setHeatmapData({ grid, maxCount: ts.heatmapData.maxCount });
+
+            if (ts.quickDriveStats) setQuickDriveStats(ts.quickDriveStats);
+            if (ts.quickDriveRatio) setQuickDriveRatio(ts.quickDriveRatio);
+            if (ts.recommendationStats) setRecommendationStats(ts.recommendationStats);
+            if (ts.recommendationRatio) setRecommendationRatio(ts.recommendationRatio);
         }
 
         if (orgRankingsSnap.exists()) {
@@ -244,9 +248,6 @@ export default function useServiceDashboard() {
                 }),
                 loadNotificationStats({
                     setNotifSummary, setDailyNotifStats, setNotifTypeStats,
-                }),
-                loadQuickDriveStats({
-                    setQuickDriveStats, setQuickDriveRatio, setRecommendationStats, setRecommendationRatio,
                 }),
             ]);
 

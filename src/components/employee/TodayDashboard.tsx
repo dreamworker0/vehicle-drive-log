@@ -17,7 +17,7 @@ import type { Vehicle } from '../../types/vehicle';
 
 export default function TodayDashboard() {
     const {
-        vehicles, loading, startingId, cancellingId,
+        vehicles, startingId, cancellingId,
         myReservations, weekGrouped, todayLabel,
         incompleteAlerts, hasActiveDrive,
         handleStartDrive, handleStartNavigation,
@@ -35,19 +35,6 @@ export default function TodayDashboard() {
         setShowWelcome(false);
         try { localStorage.setItem('employee-welcome-dismissed', 'true'); } catch { /* noop */ }
     };
-
-    if (loading) {
-        return (
-            <div className="max-w-lg mx-auto animate-fade-in">
-                <SkeletonBox className="h-6 w-32 mb-1" />
-                <SkeletonBox className="h-4 w-48 mb-5" />
-                <div className="space-y-3">
-                    <SkeletonCard />
-                    <SkeletonCard />
-                </div>
-            </div>
-        );
-    }
 
     return (
         <div className="max-w-lg mx-auto animate-fade-in">

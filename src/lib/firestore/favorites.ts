@@ -8,6 +8,7 @@ import {
     type DocumentData,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { captureError } from '../sentry';
 
 // 즐겨찾기 목록 조회
 export const getFavorites = async (uid: string) => {
@@ -22,13 +23,23 @@ export const getFavorites = async (uid: string) => {
 
 // 즐겨찾기 추가
 export const createFavorite = async (data: Record<string, unknown>) => {
-    return await addDoc(collection(db, 'favorites'), {
-        ...data,
-        createdAt: serverTimestamp(),
-    });
+    try {
+        return await addDoc(collection(db, 'favorites'), {
+            ...data,
+            createdAt: serverTimestamp(),
+        });
+    } catch (error) {
+        captureError(error as Error, { context: 'createFavorite', data });
+        throw error;
+    }
 };
 
 // 즐겨찾기 삭제
 export const deleteFavorite = async (favoriteId: string) => {
-    await deleteDoc(doc(db, 'favorites', favoriteId));
+    try {
+        await deleteDoc(doc(db, 'favorites', favoriteId));
+    } catch (error) {
+        captureError(error as Error, { context: 'deleteFavorite', favoriteId });
+        throw error;
+    }
 };

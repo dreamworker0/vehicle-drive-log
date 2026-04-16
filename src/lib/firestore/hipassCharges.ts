@@ -8,6 +8,7 @@ import {
     type DocumentData,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { captureError } from '../sentry';
 
 /** 기관 전체 하이패스 충전 기록 조회 (최신순, 200건) */
 export const getAllHipassCharges = async (orgId: string, options?: { since?: Date; until?: Date }) => {
@@ -42,14 +43,24 @@ export const getHipassCharges = async (orgId: string, cardId: string) => {
 
 // 충전 기록 생성
 export const createHipassCharge = async (data: Record<string, unknown>) => {
-    const docRef = await addDoc(collection(db, 'hipassCharges'), {
-        ...data,
-        createdAt: serverTimestamp(),
-    });
-    return docRef.id;
+    try {
+        const docRef = await addDoc(collection(db, 'hipassCharges'), {
+            ...data,
+            createdAt: serverTimestamp(),
+        });
+        return docRef.id;
+    } catch (error) {
+        captureError(error as Error, { context: 'createHipassCharge', data });
+        throw error;
+    }
 };
 
 // 충전 기록 삭제
 export const deleteHipassCharge = async (chargeId: string) => {
-    await deleteDoc(doc(db, 'hipassCharges', chargeId));
+    try {
+        await deleteDoc(doc(db, 'hipassCharges', chargeId));
+    } catch (error) {
+        captureError(error as Error, { context: 'deleteHipassCharge', chargeId });
+        throw error;
+    }
 };

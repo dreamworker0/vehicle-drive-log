@@ -2,48 +2,30 @@
  * useHipassChargeAdmin — 관리자용 하이패스 충전 기록 관리 훅
  * useFuelLogAdmin 패턴 기반
  */
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuth } from './useAuth';
-import { useToast } from './useToast';
-import { useConfirm } from './useConfirm';
 import type { Vehicle } from '../types/vehicle';
 import type { HipassCharge } from '../types/hipassCharge';
-import { getVehicles, getAllHipassCharges, deleteHipassCharge } from '../lib/firestore';
+import useBaseHipassCharge from './base/useBaseHipassCharge';
 
 export default function useHipassChargeAdmin() {
     const { userData } = useAuth();
-    const { showToast } = useToast();
-    const { confirm } = useConfirm();
-    const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-    const [records, setRecords] = useState<HipassCharge[]>([]);
-    const [loading, setLoading] = useState(true);
+    const orgId = userData?.organizationId;
+
+    const { 
+        vehicles, 
+        records, 
+        loading, 
+        calculateTotalCharge, 
+        handleDeleteBase 
+    } = useBaseHipassCharge(orgId ? orgId : undefined, { isAdmin: true });
+
     const [filters, setFilters] = useState({
         search: '',
         vehicleId: '',
         startDate: '',
         endDate: '',
     });
-
-    const orgId = userData?.organizationId;
-
-    useEffect(() => {
-        if (!orgId) { setLoading(false); return; }
-        const fetch = async () => {
-            try {
-                const [v, r] = await Promise.all([
-                    getVehicles(orgId),
-                    getAllHipassCharges(orgId),
-                ]);
-                setVehicles(v as Vehicle[]);
-                setRecords(r as HipassCharge[]);
-            } catch (err) {
-                console.error('하이패스 충전 기록 로드 실패:', err);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetch();
-    }, [orgId]);
 
     const filteredRecords = useMemo(() => {
         return records
@@ -63,7 +45,7 @@ export default function useHipassChargeAdmin() {
             });
     }, [records, filters]);
 
-    const totalChargeAmount = useMemo(() => filteredRecords.reduce((sum, r) => sum + (r.chargeAmount || 0), 0), [filteredRecords]);
+    const totalChargeAmount = useMemo(() => calculateTotalCharge(filteredRecords), [filteredRecords, calculateTotalCharge]);
 
     // ── 통계 데이터 ──
 
@@ -114,15 +96,7 @@ export default function useHipassChargeAdmin() {
     const resetFilters = () => setFilters({ search: '', vehicleId: '', startDate: '', endDate: '' });
 
     const handleDelete = async (rec: HipassCharge) => {
-        if (!await confirm({ message: '이 충전 기록을 삭제하시겠습니까?', confirmColor: 'danger' })) return;
-        try {
-            await deleteHipassCharge(rec.id);
-            setRecords(prev => prev.filter(r => r.id !== rec.id));
-            showToast('충전 기록이 삭제되었습니다.', 'success');
-        } catch (err) {
-            console.error('삭제 실패:', err);
-            showToast('삭제에 실패했습니다.', 'error');
-        }
+        await handleDeleteBase(rec);
     };
 
     return {

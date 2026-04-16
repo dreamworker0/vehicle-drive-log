@@ -13,6 +13,7 @@ interface VehicleModal {
 }
 import { getVehicles, createVehicle, updateVehicle, deleteVehicle, hasVehicleDriveLogs, clearVehicleMaintenanceBlock, retireVehicle, restoreVehicle, cancelVehicleReservations } from '../lib/firestore';
 import { useToast } from './useToast';
+import { captureError } from '../lib/sentry';
 
 // 전기차 모델명 목록 (감지 시 fuelType을 electric으로 자동 설정)
 const ELECTRIC_MODELS = [
@@ -126,6 +127,7 @@ export default function useVehicleManager() {
                 return;
             }
             console.error('차량 목록 로드 실패:', err);
+            captureError(err, { context: 'fetchVehicles', orgId, retryCount });
         } finally {
             setLoading(false);
         }

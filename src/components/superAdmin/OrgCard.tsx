@@ -437,6 +437,8 @@ export default memo(function OrgCard({
                                                     await onRestoreUser(restoreForm.email.trim(), org.id, restoreForm.name.trim());
                                                     setRestoreForm({ email: '', name: '' });
                                                     setShowRestore(false);
+                                                } catch (err) {
+                                                    console.error('계정 복원 중 에러:', err);
                                                 } finally {
                                                     setRestoring(false);
                                                 }

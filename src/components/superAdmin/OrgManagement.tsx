@@ -135,7 +135,7 @@ export default function OrgManagement() {
 
         setChangingRole(member.id);
         try {
-            await updateUser(member.id, { role: newRole });
+            await updateUser(member.id, { role: newRole as import('../../types').UserRole });
             setMembersMap(prev => ({
                 ...prev,
                 [orgId]: prev[orgId].map((m) =>

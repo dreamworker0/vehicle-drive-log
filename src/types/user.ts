@@ -18,6 +18,7 @@ export interface User extends FirestoreDoc {
     createdAt?: TimestampField;
     disabledAt?: TimestampField;
     promotedAt?: TimestampField;
+    fcmToken?: string;
 }
 
 /** createUser에 전달할 데이터 (id, createdAt 제외) */

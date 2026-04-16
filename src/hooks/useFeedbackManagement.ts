@@ -47,9 +47,9 @@ export default function useFeedbackManagement() {
                     return [id, (org as Record<string, unknown>)?.name as string || id] as [string, string];
                 })).then(entries => {
                     if (isMounted) {
-                        setOrgNames(prev => ({ ...prev, ...Object.fromEntries(entries) }));
+                        setOrgNames(prev => ({ ...prev, ... Object.fromEntries(entries) }));
                     }
-                });
+                }).catch(err => console.error('조직명 일괄 불러오기 실패:', err));
             }
         }).catch(err => {
             console.error(err);
