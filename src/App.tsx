@@ -1,7 +1,8 @@
 import { Suspense, useEffect, type ReactNode } from 'react';
-import { ThemeProvider } from './contexts/ThemeContext';
-import { FontSizeProvider } from './contexts/FontSizeContext';
-import { ConfirmProvider } from './contexts/ConfirmContext';
+import ConfirmModal from './components/common/ConfirmModal';
+import { useConfirmStore } from './store/useConfirmStore';
+import { useThemeStore } from './store/useThemeStore';
+import { useFontSizeStore } from './store/useFontSizeStore';
 import { lazyWithRetry } from './lib/lazyWithRetry';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
@@ -25,8 +26,8 @@ const PrivacyPage = lazyWithRetry(() => import('./components/auth/PrivacyPage'))
 const ReleaseNotesPage = lazyWithRetry(() => import('./components/auth/ReleaseNotesPage'));
 const FAQPage = lazyWithRetry(() => import('./components/auth/FAQPage'));
 
-// 슈퍼관리자 테스트 모드: 기관 관리자·직원 UI 체험
-export const SA_TEST_ROLE_KEY = 'sa-test-role';
+// 슈퍼관리자 테스트 모드: 기관 관리자·직원 UI 체험 (sessionStorage key)
+export const SA_TEST_ROLE_KEY = 'sa-test-role' as const;
 
 export function LoadingScreen() {
   return (
@@ -60,20 +61,71 @@ const legalRoutes = [
 import { mountOfflineQueueProcessor } from './lib/offlineSyncProcessor';
 
 export default function App() {
+  const theme = useThemeStore(state => state.theme);
+  const setTheme = useThemeStore(state => state.setTheme);
+  const fontSize = useFontSizeStore(state => state.fontSize);
+
+  // <html>에 dark 클래스 토글 + theme-color 메타 태그 동기화
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+
+    // Android 상태바 색상을 테마 배경색과 통일
+    const themeColor = theme === 'dark' ? '#020617' : '#f8fafc';
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) {
+      meta.setAttribute('content', themeColor);
+    }
+  }, [theme]);
+
+  // 시스템 설정 변경 감지 (사용자가 수동 설정한 경우 무시)
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (e: MediaQueryListEvent) => {
+      const stored = localStorage.getItem('theme-preference');
+      if (!stored) {
+        setTheme(e.matches ? 'dark' : 'light');
+      }
+    };
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, [setTheme]);
+
+  // <html>에 font-size class 적용
+  useEffect(() => {
+    const root = document.documentElement;
+    // 이전 class 제거
+    root.classList.remove('font-small', 'font-normal', 'font-large');
+    // 새 class 추가
+    root.classList.add(`font-${fontSize}`);
+  }, [fontSize]);
+
   useEffect(() => {
     // 앱 전역 단위에서 마운트하여 네트워크가 연결될 때마다 오프라인 큐 처리
     const cleanup = mountOfflineQueueProcessor();
     return cleanup;
   }, []);
 
+  const { open, options, handleConfirm, handleCancel } = useConfirmStore();
+
   return (
-    <ThemeProvider>
-      <FontSizeProvider>
-        <ConfirmProvider>
-          <AppContent />
-        </ConfirmProvider>
-      </FontSizeProvider>
-    </ThemeProvider>
+    <>
+      <AppContent />
+      <ConfirmModal
+        open={open}
+        title={options.title}
+        message={options.message}
+        confirmText={options.confirmText || '확인'}
+        cancelText={options.cancelText || '취소'}
+        confirmColor={options.confirmColor || 'primary'}
+        onConfirm={handleConfirm}
+        onCancel={handleCancel}
+      />
+    </>
   );
 }
 

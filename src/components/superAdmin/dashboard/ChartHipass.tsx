@@ -11,7 +11,24 @@ interface Props {
 }
 
 export default function ChartHipass({ hipassRatio, hipassTopOrgs }: Props) {
-    if (hipassRatio.withHipass === 0 && hipassRatio.withoutHipass === 0) return null;
+    if (hipassRatio.withHipass === 0 && hipassRatio.withoutHipass === 0) {
+        return (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="glass-card p-5">
+                    <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-4">
+                        🛣️ 하이패스 연결 비율
+                    </h2>
+                    <div className="flex flex-col items-center justify-center py-12 text-surface-400">데이터가 없습니다.</div>
+                </div>
+                <div className="glass-card p-5">
+                    <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-4">
+                        🏆 하이패스 사용 기관 TOP 5
+                    </h2>
+                    <div className="flex flex-col items-center justify-center py-12 text-surface-400">데이터가 없습니다.</div>
+                </div>
+            </div>
+        );
+    }
     const total = hipassRatio.withHipass + hipassRatio.withoutHipass;
     const pct = total > 0 ? Math.round((hipassRatio.withHipass / total) * 100) : 0;
     const donutData = [

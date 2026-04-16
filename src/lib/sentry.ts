@@ -58,6 +58,16 @@ export function initSentry() {
             /reCAPTCHA.*(Timeout|timeout)/,
             // Whale 브라우저 비밀번호 관리자가 DOM 스캔 중 SecurityError 발생 (브라우저 내부 동작, 앱 버그 아님)
             /hasPasswordField_/,
+            // App Check / recaptcha 토큰 실패 에러 제외
+            /AppCheck: .*/,
+            /reCAPTCHA token is invalid/,
+            // React Hydration 에러 제외 (사용자 환경의 번역기 플러그인 등으로 발생)
+            /Hydration failed because the initial UI does not match what was rendered on the server/,
+            /Text content does not match server-rendered HTML/,
+            // Firestore 권한 부족 에러 (앱 내에서 catch 되어 정상 처리되는 케이스 억제)
+            /Missing or insufficient permissions/,
+            // 브라우저 확장 프로그램(번역기 등)의 중복 Custom Element 선언 에러 억제
+            /has already been defined/,
         ],
         // 브라우저 확장 프로그램 에러 제외
         denyUrls: [

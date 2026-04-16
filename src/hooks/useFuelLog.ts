@@ -110,6 +110,13 @@ export default function useFuelLog() {
         return v?.currentKm || 0;
     }, [form.vehicleId, vehicles]);
 
+    // 선택된 차량이 전기차인지 여부
+    const isElectric = useMemo(() => {
+        if (!form.vehicleId) return false;
+        const v = vehicles.find(v => v.id === form.vehicleId);
+        return v?.fuelType === 'electric';
+    }, [form.vehicleId, vehicles]);
+
     const handleVehicleSelect = (vehicleId: string) => {
         const v = vehicles.find(v => v.id === vehicleId);
         setForm({ ...form, vehicleId, vehicleName: v?.displayName || '' });
@@ -216,6 +223,7 @@ export default function useFuelLog() {
                 driverName: userData?.name || user?.displayName || '',
                 date: form.date,
                 meterReading: parseInt(form.meterReading),
+                fuelType: isElectric ? 'electric' as const : 'gasoline' as const,
                 fuelAmount: parseFloat(form.fuelAmount),
                 fuelCost: parseInt(form.fuelCost),
                 notes: form.notes.trim() || '',
@@ -265,6 +273,7 @@ export default function useFuelLog() {
         vehicles, loading, showForm, setShowForm,
         saving, form, setForm, enrichedRecords,
         totalCost, totalAmount, selectedVehicleKm,
+        isElectric,
         editingId, handleEdit, handleCancelEdit,
         handleSubmit, handleDelete, handleVehicleSelect,
         currentUid: user?.uid,

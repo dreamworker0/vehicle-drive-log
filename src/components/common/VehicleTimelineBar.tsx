@@ -113,6 +113,10 @@ export default function VehicleTimelineBar({
                         <span className="text-[10px] text-surface-500 dark:text-surface-400">예약됨</span>
                     </div>
                     <div className="flex items-center gap-1">
+                        <div className="w-2.5 h-2.5 rounded-sm bg-[repeating-linear-gradient(45deg,rgba(0,0,0,0.1),rgba(0,0,0,0.1)_2px,rgba(255,255,255,0.8)_2px,rgba(255,255,255,0.8)_4px)] dark:bg-[repeating-linear-gradient(45deg,rgba(255,255,255,0.1),rgba(255,255,255,0.1)_2px,rgba(0,0,0,0.4)_2px,rgba(0,0,0,0.4)_4px)] border border-surface-300 dark:border-surface-600" />
+                        <span className="text-[10px] text-surface-500 dark:text-surface-400">승인 대기</span>
+                    </div>
+                    <div className="flex items-center gap-1">
                         <div className="w-2.5 h-2.5 rounded-sm bg-surface-100 dark:bg-surface-700/50 border border-surface-200 dark:border-surface-600" />
                         <span className="text-[10px] text-surface-500 dark:text-surface-400">예약 가능</span>
                     </div>
@@ -183,6 +187,7 @@ export default function VehicleTimelineBar({
                                         {/* 예약 블록 — 타임라인 렌더 범위(06:00~23:00) 밖이더라도 최소한 클리핑해서 표시 */}
                                         {vRes.map(r => {
                                             const isCompleted = r.status === 'completed';
+                                            const isPending = r.status === 'pending';
                                             const effStart = (isCompleted && r.actualStartTime) ? r.actualStartTime : (r.startTime || '');
                                             const effEnd = (isCompleted && r.actualEndTime) ? r.actualEndTime : (r.endTime || '');
                                             const rStartMin = timeToMinutes(effStart);
@@ -211,12 +216,16 @@ export default function VehicleTimelineBar({
                                             }
                                             
                                             const colorClass = getVehicleColor(vehicle.id);
+                                            const bgClass = isPending
+                                                ? `${colorClass} ${colorClass.replace('bg-', 'text-')}/20 bg-[repeating-linear-gradient(45deg,currentColor,currentColor_2px,transparent_2px,transparent_6px)] opacity-90`
+                                                : `${colorClass} ${isCompleted ? 'opacity-60 dark:opacity-40' : 'opacity-80 dark:opacity-60'}`;
+
                                             return (
                                                 <div
                                                     key={r.id}
-                                                    className={`absolute top-0.5 bottom-0.5 rounded-sm ${colorClass} ${isCompleted ? 'opacity-60 dark:opacity-40' : 'opacity-80 dark:opacity-60'} border border-white/30 dark:border-surface-500/30 cursor-pointer hover:opacity-100 dark:hover:opacity-80 transition-opacity`}
+                                                    className={`absolute top-0.5 bottom-0.5 rounded-sm ${bgClass} border border-white/40 dark:border-surface-500/30 cursor-pointer hover:opacity-100 dark:hover:opacity-80 transition-opacity`}
                                                     style={{ left: `${left}%`, width: `${width}%` }}
-                                                    title={`${r.reservedByName}: ${r.startTime}~${r.endTime} ${r.purpose || ''}${isCompleted ? ' (운행완료)' : ''}`}
+                                                    title={`${r.reservedByName}: ${r.startTime}~${r.endTime} ${r.purpose || ''}${isCompleted ? ' (운행완료)' : isPending ? ' (승인 대기)' : ''}`}
                                                     onClick={() => toggleExpand(vehicle.id)}
                                                 />
                                             );
@@ -292,6 +301,11 @@ export default function VehicleTimelineBar({
                                                             {(r as unknown as { syncSource?: string }).syncSource === 'calendar' && (
                                                                 <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300 rounded-full font-medium">
                                                                     📅
+                                                                </span>
+                                                            )}
+                                                            {r.status === 'pending' && (
+                                                                <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 rounded-full font-medium whitespace-nowrap">
+                                                                    승인 대기
                                                                 </span>
                                                             )}
                                                             {(isAdmin || r.reservedByUid === user?.id || r.reservedByUid === user?.uid) && !isPastReservation && (

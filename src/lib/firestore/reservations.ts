@@ -21,10 +21,10 @@ export const getReservationById = async (reservationId: string) => {
 };
 
 // 예약 생성 (클라이언트 측)
-export const createReservation = async (data: Record<string, unknown>) => {
+export const createReservation = async (data: Record<string, unknown>, requireApproval: boolean = false) => {
     const docRef = await addDoc(collection(db, 'reservations'), {
         ...data,
-        status: 'reserved',
+        status: requireApproval ? 'pending' : 'reserved',
         createdAt: serverTimestamp(),
     });
     return docRef.id;
@@ -58,6 +58,25 @@ export const subscribeReservations = (orgId: string, callback: (reservations: (D
     );
     return onSnapshot(q, (snap) => {
         const reservations = snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
+        callback(reservations);
+    });
+};
+
+// 승인 대기 중인 예약 실시간 구독
+export const subscribePendingReservations = (orgId: string, callback: (reservations: (DocumentData & { id: string })[]) => void) => {
+    const q = query(
+        collection(db, 'reservations'),
+        where('organizationId', '==', orgId),
+        where('status', '==', 'pending')
+    );
+    return onSnapshot(q, (snap) => {
+        const reservations = snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
+        // 생성일 순으로 정렬 (가장 오래된 것이 위로 오게)
+        reservations.sort((a, b) => {
+            const timeA = a.createdAt?.toMillis ? a.createdAt.toMillis() : 0;
+            const timeB = b.createdAt?.toMillis ? b.createdAt.toMillis() : 0;
+            return timeA - timeB; // 오름차순
+        });
         callback(reservations);
     });
 };
@@ -168,3 +187,37 @@ export const getMyRecentReservations = async (orgId: string, uid: string, limitC
         .slice(0, limitCount);
 };
 
+// ─── 반복(정기) 예약 그룹 관련 ───
+
+// recurringGroupId로 반복 예약 그룹 조회
+export const getReservationsByRecurringGroupId = async (recurringGroupId: string, orgId: string) => {
+    const q = query(
+        collection(db, 'reservations'),
+        where('organizationId', '==', orgId),
+        where('recurringGroupId', '==', recurringGroupId),
+    );
+    const snap = await getDocs(q);
+    return snap.docs
+        .map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string; status?: string; date?: string })
+        .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+};
+
+// 반복 예약 그룹 일괄 취소
+export const cancelRecurringGroup = async (recurringGroupId: string, orgId: string) => {
+    const reservations = await getReservationsByRecurringGroupId(recurringGroupId, orgId);
+    const active = reservations.filter(r => r.status !== 'cancelled' && r.status !== 'completed');
+    await Promise.all(
+        active.map(r => updateDoc(doc(db, 'reservations', r.id), { status: 'cancelled' }))
+    );
+    return active.length;
+};
+
+// 반복 예약 그룹 삭제 (수정 전 기존 그룹 제거용)
+export const deleteRecurringGroup = async (recurringGroupId: string, orgId: string) => {
+    const reservations = await getReservationsByRecurringGroupId(recurringGroupId, orgId);
+    const active = reservations.filter(r => r.status !== 'cancelled' && r.status !== 'completed');
+    await Promise.all(
+        active.map(r => deleteDoc(doc(db, 'reservations', r.id)))
+    );
+    return active.length;
+};

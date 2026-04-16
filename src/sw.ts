@@ -1,6 +1,17 @@
 /// <reference lib="webworker" />
 declare let self: ServiceWorkerGlobalScope;
 
+interface SyncEvent extends ExtendableEvent {
+    readonly lastChance: boolean;
+    readonly tag: string;
+}
+
+declare global {
+    interface ServiceWorkerGlobalScopeEventMap {
+        sync: SyncEvent;
+    }
+}
+
 import { precacheAndRoute, cleanupOutdatedCaches, createHandlerBoundToURL } from 'workbox-precaching';
 import { registerRoute, NavigationRoute } from 'workbox-routing';
 import { CacheFirst, StaleWhileRevalidate } from 'workbox-strategies';
@@ -49,8 +60,24 @@ registerRoute(
     })
 );
 
+// 지도(Tile) 이미지 캐싱 제한 적용
+// Leaflet 지도 조각 이미지가 디바이스 용량을 무한정 잡아먹지 않도록 제한합니다.
+registerRoute(
+    /^https:\/\/[a-c]\.tile\.openstreetmap\.org\/.*/i,
+    new StaleWhileRevalidate({
+        cacheName: 'map-tiles-cache',
+        plugins: [
+            new ExpirationPlugin({ 
+                maxEntries: 200, 
+                maxAgeSeconds: 60 * 60 * 24 * 15, // 15일 보관
+                purgeOnQuotaError: true // 용량 부족시 우선 삭제
+            }),
+        ],
+    })
+);
+
 // 4. Background Sync 이벤트 리스너 등록
-self.addEventListener('sync', (event: any) => {
+self.addEventListener('sync', (event: ExtendableEvent & { tag: string }) => {
     if (event.tag === 'sync-offline-actions') {
         console.log('[SW] Background Sync 이벤트 수신: sync-offline-actions');
         event.waitUntil(processBackgroundSync());

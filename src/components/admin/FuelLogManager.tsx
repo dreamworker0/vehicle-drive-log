@@ -69,7 +69,7 @@ export default function FuelLogManager() {
                     </button>
                     <button
                         onClick={async () => {
-                            const { downloadFuelLogPdf } = await import('../../lib/fuelLogPdfExport');
+                            const { downloadFuelLogPdf } = await import('../../lib/pdf/fuelLogPdfExport');
                             const defaultApproval = [{ title: '담당' }, { title: '팀장' }];
                             const useApproval = org?.hideApprovalLine
                                 ? []
@@ -178,7 +178,7 @@ export default function FuelLogManager() {
                                             <span className="text-xs text-surface-400">{dateStr} {timeStr}</span>
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <span className="font-bold text-emerald-600 dark:text-emerald-400">{rec.fuelAmount}L</span>
+                                            <span className="font-bold text-emerald-600 dark:text-emerald-400">{rec.fuelAmount}{rec.fuelType === 'electric' ? 'kWh' : 'L'}</span>
                                             <button
                                                 onClick={() => handleDelete(rec)}
                                                 className="p-1.5 rounded-lg text-surface-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
@@ -218,7 +218,7 @@ export default function FuelLogManager() {
                                         <p className="text-sm text-surface-700 dark:text-surface-300 truncate">{rec.vehicleName}</p>
                                     </div>
                                     <div className="text-right">
-                                        <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{rec.fuelAmount}L</span>
+                                        <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{rec.fuelAmount}{rec.fuelType === 'electric' ? 'kWh' : 'L'}</span>
                                     </div>
                                     <div className="text-right">
                                         <span className="text-sm text-surface-700 dark:text-surface-300">{rec.fuelCost?.toLocaleString()}원</span>

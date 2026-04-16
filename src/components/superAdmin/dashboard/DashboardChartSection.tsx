@@ -5,6 +5,7 @@ import ChartFirstEmployee from './ChartFirstEmployee';
 import ChartInputMethod from './ChartInputMethod';
 import ChartQuickDrive from './ChartQuickDrive';
 import ChartRecommendation from './ChartRecommendation';
+import ChartFavoriteDestination from './ChartFavoriteDestination';
 import ChartDistribution from './ChartDistribution';
 import ChartHipass from './ChartHipass';
 import ChartFuelHipass from './ChartFuelHipass';
@@ -26,6 +27,10 @@ interface Props {
     // 추천 예약 현황
     recommendationStats: { date: string; recommendation: number; normal: number }[];
     recommendationRatio: { total: number; recommendation: number; normal: number; rate: number };
+    // 목적지 즐겨찾기 현황
+    favoriteStats: { date: string; favorite: number; normal: number }[];
+    favoriteRatio: { total: number; favorite: number; normal: number; rate: number };
+    favoriteUserRatio: { total: number; withFavorite: number; rate: number };
     // 기관/차량 분포
     orgSizeDistribution: { label: string; count: number; color: string }[];
     fuelTypeStats: { type: string; label: string; count: number; color: string }[];
@@ -61,6 +66,11 @@ export default function DashboardChartSection(props: Props) {
             <ChartRecommendation 
                 recommendationStats={props.recommendationStats} 
                 recommendationRatio={props.recommendationRatio} 
+            />
+            <ChartFavoriteDestination
+                favoriteStats={props.favoriteStats}
+                favoriteRatio={props.favoriteRatio}
+                favoriteUserRatio={props.favoriteUserRatio}
             />
             <ChartDistribution
                 orgSizeDistribution={props.orgSizeDistribution}

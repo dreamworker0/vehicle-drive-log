@@ -2,7 +2,7 @@
  * pdfStyles.test.js — PDF 스타일 유틸리티 함수 테스트
  */
 import { describe, it, expect } from 'vitest';
-import { getPdfStyles, formatDate, formatNumber } from '../../lib/pdfStyles';
+import { getPdfStyles, formatDate, formatNumber } from '../../lib/pdf/pdfStyles';
 
 describe('getPdfStyles', () => {
     it('CSS 문자열을 반환', () => {

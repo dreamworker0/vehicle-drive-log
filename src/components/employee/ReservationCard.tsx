@@ -92,7 +92,12 @@ export default function ReservationCard({
                                 {reservation.startTime} ~ {reservation.endTime}
                                 {reservation.destination && ` · ${reservation.destination}`}
                             </p>
-                            {reservation.groupId && (
+                            {reservation.recurringGroupId && (
+                                <span className="inline-flex items-center gap-0.5 mt-0.5 text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300 rounded-full font-medium w-fit">
+                                    반복 예약
+                                </span>
+                            )}
+                            {reservation.groupId && !reservation.recurringGroupId && (
                                 <span className="inline-flex items-center gap-0.5 mt-0.5 text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300 rounded-full font-medium w-fit">
                                     🔗 다일 예약
                                 </span>

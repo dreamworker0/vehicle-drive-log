@@ -181,6 +181,7 @@ interface ExcelFuelLog {
     vehicleName?: string;
     driverName?: string;
     meterReading?: number;
+    fuelType?: string;
     fuelAmount?: number;
     fuelCost?: number;
     notes?: string;
@@ -209,14 +210,16 @@ export async function downloadFuelLogsExcel(
             const d = ca instanceof Date ? ca : ca?.toDate?.() || null;
             if (d) timeStr = d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
         }
+        const isEV = rec.fuelType === 'electric';
+        const unit = isEV ? 'kWh' : 'L';
         return {
             '날짜': rec.date || '',
             '시각': timeStr,
             '차량': rec.vehicleName || '',
-            '주유원': rec.driverName || '',
+            '주유/충전원': rec.driverName || '',
             '주유미터(km)': rec.meterReading ? rec.meterReading : '',
-            '주유량(L)': rec.fuelAmount ? rec.fuelAmount : '',
-            '주유금액(원)': rec.fuelCost ? rec.fuelCost : '',
+            [`주유/충전량`]: rec.fuelAmount ? `${rec.fuelAmount} ${unit}` : '',
+            '주유/충전금액(원)': rec.fuelCost ? rec.fuelCost : '',
             '비고': rec.notes || '',
         };
     });
@@ -227,15 +230,15 @@ export async function downloadFuelLogsExcel(
         { wch: 12 },  // 날짜
         { wch: 8 },   // 시각
         { wch: 14 },  // 차량
-        { wch: 10 },  // 주유원
+        { wch: 10 },  // 주유/충전원
         { wch: 12 },  // 주유미터
-        { wch: 10 },  // 주유량
-        { wch: 12 },  // 주유금액
+        { wch: 12 },  // 주유/충전량
+        { wch: 14 },  // 주유/충전금액
         { wch: 24 },  // 비고
     ];
 
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, '주유기록');
+    XLSX.utils.book_append_sheet(wb, ws, '주유충전기록');
     XLSX.writeFile(wb, `${filename}.xlsx`);
 }
 

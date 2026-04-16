@@ -101,12 +101,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                                                     (err) => {
                                                         console.error('기관 상태 감시 실패:', err);
                                                         const errCode = (err as { code?: string })?.code;
-                                                        if (errCode === 'permission-denied' && orgRetryCount < 1) {
+                                                        if (errCode === 'permission-denied' && orgRetryCount < 2) {
                                                             if (unsubscribeOrg) { unsubscribeOrg(); unsubscribeOrg = null; }
-                                                            setTimeout(() => {
-                                                                startOrgWatch(orgRetryCount + 1);
-                                                            }, 1000);
+                                                            const waitMs = 1000 * 2 ** orgRetryCount;
+                                                            refreshToken(firebaseUser)
+                                                                .catch(() => {}) // 토큰 갱신 실패해도 재시도
+                                                                .then(() => setTimeout(() => startOrgWatch(orgRetryCount + 1), waitMs));
                                                         } else if (errCode === 'permission-denied') {
+                                                            console.warn('[Auth] 기관 상태 감시 — 재시도 소진, 로그아웃');
                                                             logout();
                                                         }
                                                     }
@@ -152,20 +154,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                                 }
                             },
                             (err: { code?: string }) => {
-                                if (err?.code === 'permission-denied' && retryCount < 1) {
+                                if (err?.code === 'permission-denied' && retryCount < 2) {
                                     // 캐시된 세션의 낡은 토큰일 수 있음 → 토큰 갱신 후 재시도
-                                    console.debug('사용자 데이터 접근 권한 없음 — 토큰 갱신 후 재시도');
+                                    console.debug(`[Auth] 사용자 데이터 접근 권한 없음 — 토큰 갱신 후 재시도 (${retryCount + 1}/2)`);
                                     if (unsubscribeUser) { unsubscribeUser(); unsubscribeUser = null; }
+                                    const waitMs = 1000 * 2 ** retryCount;
                                     refreshToken(firebaseUser)
-                                        .then(() => { startUserWatch(retryCount + 1); })
+                                        .then(() => { setTimeout(() => startUserWatch(retryCount + 1), waitMs); })
                                         .catch(() => {
-                                            setUserData(null);
-                                            setLoading(false);
-                                            logout();
+                                            // 토큰 갱신 실패해도 재시도
+                                            setTimeout(() => startUserWatch(retryCount + 1), waitMs);
                                         });
                                 } else if (err?.code === 'permission-denied') {
-                                    // 재시도에도 실패 → 로그아웃
-                                    console.debug('사용자 데이터 접근 권한 없음 — 로그아웃 처리');
+                                    // 재시도 소진 → 로그아웃
+                                    console.warn('[Auth] 사용자 데이터 접근 — 재시도 소진, 로그아웃');
                                     setUserData(null);
                                     setLoading(false);
                                     logout();
@@ -189,9 +191,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
         });
 
+        // 탭 복귀 시 토큰 선갱신 — 백그라운드 탭의 토큰 만료로 인한 강제 로그아웃 방지
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'visible' && auth.currentUser && !auth.currentUser.isAnonymous) {
+                refreshTokenSilently(auth.currentUser);
+            }
+        };
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
         return () => {
             cancelled = true;
             clearTimeout(timeout);
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
             if (unsubscribeAuth) unsubscribeAuth();
             if (unsubscribeUser) unsubscribeUser();
             if (unsubscribeOrg) unsubscribeOrg();

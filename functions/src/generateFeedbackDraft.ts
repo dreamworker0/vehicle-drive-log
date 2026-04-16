@@ -63,8 +63,8 @@ export const generateFeedbackDraft = onDocumentCreated(
     {
         document: "feedbacks/{feedbackId}",
         region: "asia-northeast3",
-        timeoutSeconds: 60,
-        memory: "256MiB",
+        timeoutSeconds: 90,
+        memory: "512MiB",
     },
     async (event) => {
         const snap = event.data;

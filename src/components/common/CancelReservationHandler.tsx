@@ -163,7 +163,7 @@ export default function CancelReservationHandler() {
                                 <button
                                     onClick={handleCancel}
                                     disabled={cancelling}
-                                    className="flex-1 py-3 px-4 rounded-xl bg-red-500 hover:bg-red-600 text-white font-semibold text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                    className="flex-1 py-3 px-4 rounded-xl bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 text-white font-semibold text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
                                 >
                                     {cancelling ? (
                                         <>

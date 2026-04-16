@@ -13,6 +13,7 @@ import { useToast } from '../../hooks/useToast';
 import { useConfirm } from '../../hooks/useConfirm';
 import FeedbackForm from '../common/FeedbackForm';
 import UserManual from '../common/UserManual';
+import AskAIModal from '../common/AskAIModal';
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
 import type { Vehicle } from '../../types/vehicle';
 
@@ -21,6 +22,7 @@ export default function MorePage() {
     const navigate = useNavigate();
     const [showFeedback, setShowFeedback] = useState(false);
     const [showManual, setShowManual] = useState(false);
+    const [showAskAI, setShowAskAI] = useState(false);
     const { permission, requestPermission } = useNotification();
     const { isDark, toggleTheme } = useTheme();
     const { fontSize, setSize } = useFontSize();
@@ -67,7 +69,7 @@ export default function MorePage() {
                 </button>
                 <button onClick={() => navigate('/employee/vehicle-history')} className="w-full flex items-center gap-3 p-4 hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors text-left">
                     <svg className="w-5 h-5 text-surface-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 0 0-10.026 0 1.106 1.106 0 0 0-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" /></svg>
-                    <span className="text-sm text-surface-700 dark:text-surface-300">차량 이용 내역</span>
+                    <span className="text-sm text-surface-700 dark:text-surface-300">차량 전체 이용 내역</span>
                 </button>
                 <button onClick={() => setShowInsurance(!showInsurance)} className="w-full flex items-center gap-3 p-4 hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors text-left">
                     <svg className="w-5 h-5 text-surface-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75m-3-7.036A11.959 11.959 0 0 1 3.598 6 11.99 11.99 0 0 0 3 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285Z" /></svg>
@@ -100,9 +102,13 @@ export default function MorePage() {
                     <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" /></svg>
                     <span className="text-sm text-blue-600 dark:text-blue-400">사용 설명서</span>
                 </button>
+                <button onClick={() => setShowAskAI(true)} className="w-full flex items-center gap-3 p-4 hover:bg-blue-50 dark:hover:bg-blue-900/30 transition-colors text-left">
+                    <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 0 0-2.455 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" /></svg>
+                    <span className="text-sm text-blue-600 dark:text-blue-400">AI에게 물어보기</span>
+                </button>
                 <button onClick={() => setShowFeedback(true)} className="w-full flex items-center gap-3 p-4 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors text-left">
                     <svg className="w-5 h-5 text-primary-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 0 1 1.037-.443 48.282 48.282 0 0 0 5.68-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" /></svg>
-                    <span className="text-sm text-primary-600 dark:text-primary-400">개발자에게 의견남기기</span>
+                    <span className="text-sm text-primary-600 dark:text-primary-400">개발자에게 건의하기</span>
                 </button>
                 {/* 알림 설정 */}
                 {notifApiAvailable && (
@@ -176,6 +182,7 @@ export default function MorePage() {
 
             {showFeedback && <FeedbackForm onClose={() => setShowFeedback(false)} />}
             {showManual && <UserManual role="employee" onClose={() => setShowManual(false)} />}
+            <AskAIModal isOpen={showAskAI} onClose={() => setShowAskAI(false)} />
         </div>
     );
 }

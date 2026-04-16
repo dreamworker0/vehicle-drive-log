@@ -76,7 +76,7 @@ export default function HipassChargeLogManager() {
                     </button>
                     <button
                         onClick={async () => {
-                            const { downloadHipassChargePdf } = await import('../../lib/hipassChargePdfExport');
+                            const { downloadHipassChargePdf } = await import('../../lib/pdf/hipassChargePdfExport');
                             const defaultApproval = [{ title: '담당' }, { title: '팀장' }];
                             const useApproval = org?.hideApprovalLine
                                 ? []

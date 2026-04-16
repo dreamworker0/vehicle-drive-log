@@ -185,9 +185,17 @@ export default function FAQPage() {
                                     ref={el => { itemRefs.current[idx] = el; }}
                                     className={`border rounded-xl overflow-hidden transition-all duration-700 ease-out origin-center ${containerClasses}`}
                                 >
-                                    <button
+                                    <div
+                                        role="button"
+                                        tabIndex={0}
                                         onClick={() => toggle(idx)}
-                                        className={`w-full flex items-center gap-3 px-4 py-3.5 text-left outline-none focus-visible:bg-primary-50 transition-colors ${
+                                        onKeyDown={(e) => {
+                                            if (e.key === 'Enter' || e.key === ' ') {
+                                                e.preventDefault();
+                                                toggle(idx);
+                                            }
+                                        }}
+                                        className={`cursor-pointer w-full flex items-center gap-3 px-4 py-3.5 text-left outline-none focus-visible:bg-primary-50 transition-colors ${
                                             isHighlighted ? 'bg-transparent' : 'bg-surface-50 hover:bg-primary-50/50'
                                         }`}
                                     >
@@ -219,7 +227,7 @@ export default function FAQPage() {
                                         >
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
                                         </svg>
-                                    </button>
+                                    </div>
 
                                     {/* 답변 영역 */}
                                     <div
@@ -243,7 +251,7 @@ export default function FAQPage() {
 
                     <div className="border-t border-surface-100 pt-4 text-center">
                         <p className="text-xs text-surface-400">
-                            더 궁금한 점이 있으시면 더보기 → 의견 보내기를 이용해주세요.
+                            더 궁금한 점이 있으시면 더보기 → 건의하기를 이용해주세요.
                         </p>
                     </div>
                 </div>

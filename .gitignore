@@ -46,6 +46,14 @@ tsc-*.txt
 # Firebase
 .firebase/
 *-adminsdk-*.json
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Secrets — never commit these
+functions/.env
+*.pem
+*.key
 
 # Functions
 functions/node_modules/

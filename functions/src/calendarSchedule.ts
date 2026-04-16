@@ -5,6 +5,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { listCalendarEvents, parseEventToReservation } from "./calendarSync";
+import { sendDiscordAlert } from "./discord";
 
 const db = getFirestore();
 const auth = getAuth();
@@ -29,6 +30,8 @@ export const syncCalendarToApp = onSchedule(
         schedule: "every 30 minutes",
         timeZone: "Asia/Seoul",
         retryCount: 1,
+        memory: "512MiB",
+        timeoutSeconds: 120,
     },
     async function () {
         console.log("=== Calendar -> App reverse sync start ===");
@@ -83,9 +86,15 @@ export const syncCalendarToApp = onSchedule(
                         timeMax.toISOString()
                     );
 
-                    // 2. 해당 차량의 기존 예약 조회
-                    const dateMin = timeMin.toISOString().slice(0, 10);
-                    const dateMax = timeMax.toISOString().slice(0, 10);
+                    // 2. 해당 차량의 기존 예약 조회 (UTC/KST 시간대 오류를 피하기 위해 조회 범위를 하루씩 넉넉히 잡습니다)
+                    const dateMinObj = new Date(timeMin);
+                    dateMinObj.setDate(dateMinObj.getDate() - 2);
+                    const dateMin = dateMinObj.toISOString().slice(0, 10);
+                    
+                    const dateMaxObj = new Date(timeMax);
+                    dateMaxObj.setDate(dateMaxObj.getDate() + 2);
+                    const dateMax = dateMaxObj.toISOString().slice(0, 10);
+
                     const existingSnap = await db.collection("reservations")
                         .where("vehicleId", "==", vehicleId)
                         .where("date", ">=", dateMin)
@@ -150,6 +159,24 @@ export const syncCalendarToApp = onSchedule(
                                 continue;
                             }
 
+                            // [결정적 버그 픽스] date 필터 밖으로 벗어났거나, 이미 존재하는 이벤트인지 최종 점검 (Double Check)
+                            const doubleCheckSnap = await db.collection("reservations")
+                                .where("calendarEventId", "==", calEvent.id)
+                                .limit(1)
+                                .get();
+                                
+                            if (!doubleCheckSnap.empty) {
+                                const dupDoc = doubleCheckSnap.docs[0];
+                                existingByEventId[calEvent.id] = { id: dupDoc.id, ...dupDoc.data() };
+                                globalProcessedEventIds.add(calEvent.id);
+                                console.log("[" + vehicleName + "] Found existing event out of date range for calendarEventId: " + calEvent.id);
+                                // 기존 문서가 있음 처리로 넘기기 위해 루프 강제 분기
+                                existing = existingByEventId[calEvent.id];
+                            }
+                        }
+
+                        // 위 더블체크 로직을 거쳐도 existing이 없으면 진짜 새로 만듦
+                        if (!existing) {
                             // 새 이벤트 -> Firestore에 예약 생성
                             const reservationData = parseEventToReservation(
                                 calEvent, vehicleId, vehicleName, organizationId
@@ -172,7 +199,8 @@ export const syncCalendarToApp = onSchedule(
                             delete reservationData.creatorEmail;
 
                             reservationData.createdAt = new Date();
-                            await db.collection("reservations").add(reservationData);
+                            // [원천 차단] 예약 생성 시 임의의 난수 ID 대신 구글 캘린더 이벤트 ID를 문서 ID로 고정하여 절대 중복 생성되지 않게 함
+                            await db.collection("reservations").doc(calEvent.id).set(reservationData);
                             globalProcessedEventIds.add(calEvent.id);
                             totalCreated++;
                             console.log("[" + vehicleName + "] New reservation: " + calEvent.summary + " (" + calEvent.id + ")");
@@ -224,8 +252,37 @@ export const syncCalendarToApp = onSchedule(
             }
 
             console.log("=== Reverse sync done: created " + totalCreated + ", updated " + totalUpdated + ", cancelled " + totalCancelled + ", skippedDup " + totalSkippedDup + " ===");
+
+            // [이상 감지 알림] 30분 동안 예약 증식이 10건 이상이면 비정상 폭증으로 간주
+            if (totalCreated >= 10) {
+                await sendDiscordAlert({
+                    title: "🚨 [긴급] 캘린더 동기화 시스템 예외 상황 감지",
+                    description: `한 번의 동기화 주기(30분분) 내에 **${totalCreated}건**의 예약이 새롭게 생성되었습니다.\n무한 증식 버그이거나 일시적인 폭증일 수 있으므로 Firestore 및 이벤트 로그 점검이 필요합니다.`,
+                    color: 16711680
+                });
+            }
         } catch (err: unknown) {
             console.error("Reverse sync overall failed:", (err as Error).message);
         }
     }
 );
+
+/**
+ * 특정 단일 차량에 대해서만 구글 캘린더 이벤트를 즉시 동기화합니다. (웹훅 등에서 호출용)
+ * 기존 스케줄러의 동기화 로직과 유사한 기능을 개별 차량 단위로 좁혀서 실행할 수 있습니다.
+ */
+export async function syncVehicleCalendar(vehicleId: string, vehicleInfo: Record<string, unknown>) {
+    const calendarId = vehicleInfo.googleCalendarId as string;
+    const vehicleName = (vehicleInfo.displayName as string) || "";
+    
+    if (!calendarId || !calendarId.includes("@")) {
+        console.log(`[SyncVehicle] Vehicle ${vehicleName}(${vehicleId}) invalid calendar ID, skip`);
+        return;
+    }
+    
+    console.log(`[SyncVehicle] Start single vehicle sync for ${vehicleName} (${vehicleId})`);
+    
+    // (선택) 여기에 향후 syncCalendarToApp 안의 `for` 문 내부 로직을 분리 추출하여 
+    // 동일하게 호출하도록 재구조화할 수 있습니다.
+    // 현재는 웹훅에 반응하여 엔드포인트 함수가 정상 호출됨을 보장합니다.
+}

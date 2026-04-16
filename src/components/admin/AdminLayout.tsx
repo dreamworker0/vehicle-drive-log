@@ -201,7 +201,14 @@ export default function AdminLayout() {
                             </button>
                         )}
                         <button
-                            onClick={() => navigate('/employee')}
+                            onClick={() => {
+                                if (isSuperAdmin) {
+                                    localStorage.setItem(SA_TEST_ROLE_KEY, 'employee');
+                                    window.location.href = '/employee';
+                                } else {
+                                    navigate('/employee');
+                                }
+                            }}
                             className="btn-icon text-surface-500 dark:text-surface-400 hover:text-primary-600 dark:hover:text-primary-400"
                             title="직원 화면으로 전환"
                         >

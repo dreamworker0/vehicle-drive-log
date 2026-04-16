@@ -2,6 +2,7 @@
     "name": "functions",
     "description": "Cloud Functions for 차량운행일지",
     "scripts": {
+        "prebuild": "node -e \"require('fs').copyFileSync('../src/lib/faqData.ts','./src/faqData.ts')\"",
         "build": "tsc",
         "build:watch": "tsc --watch",
         "test": "jest --verbose --testPathIgnorePatterns=emulator",

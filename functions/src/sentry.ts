@@ -12,12 +12,17 @@
 const DSN = process.env.SENTRY_DSN_FUNCTIONS || "";
 const IS_TEST = process.env.NODE_ENV === "test";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _sentry: any = null;
+interface SentryLike {
+    init(options: { dsn: string; environment: string; tracesSampleRate: number }): void;
+    captureException(error: unknown, options?: { extra?: Record<string, unknown> }): void;
+    captureMessage(message: string, options?: { level?: string; extra?: Record<string, unknown> }): void;
+    flush(timeoutMs?: number): Promise<boolean>;
+}
+
+let _sentry: SentryLike | null = null;
 
 if (DSN && !IS_TEST) {
     try {
-        // eslint-disable-next-line @typescript-eslint/no-require-imports
         _sentry = require("@sentry/node");
         _sentry.init({
             dsn: DSN,

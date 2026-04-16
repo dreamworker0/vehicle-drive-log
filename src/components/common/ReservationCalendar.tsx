@@ -7,6 +7,7 @@ import useVehiclePriority from '../../hooks/useVehiclePriority';
 import { useReservationPattern } from '../../hooks/useReservationPattern';
 import CalendarGrid from './CalendarGrid';
 import ReservationSidePanel from './ReservationSidePanel';
+import PendingReservationList from '../admin/PendingReservationList';
 
 interface Props {
     isAdmin?: boolean;
@@ -17,7 +18,7 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
         vehicles, loading, form, setForm,
         selectedDate, showForm, setShowForm,
         sideTab, setSideTab,
-        submitting, editingReservation, editingGroupId,
+        submitting, editingReservation, editingGroupId, editingRecurringGroupId,
         favorites, routeInfo, routeLoading,
         showFavSave, setShowFavSave,
         favName, setFavName,
@@ -29,6 +30,7 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
         handleSubmit, handleEdit, handleCancel, handleSaveFavorite, handleOpenForm,
         getCurrentTimeStr, getMinStartTime,
         getNavigationDeeplink,
+        holidays, reservations,
     } = useReservationCalendar({ isAdmin });
     const { usageCounts } = useVehiclePriority();
     const { recentDestinations } = useReservationPattern();
@@ -44,6 +46,8 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
     return (
         <div className={`${isAdmin ? 'max-w-4xl' : 'max-w-lg'} mx-auto animate-fade-in`}>
             <h1 className={`font-bold text-surface-900 dark:text-surface-100 ${isAdmin ? 'text-2xl mb-6' : 'text-lg mb-2'}`}>차량 예약</h1>
+
+            {isAdmin && <PendingReservationList />}
 
             <div className="space-y-4">
                 {/* 달력 */}
@@ -96,6 +100,9 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
                         onOpenForm={handleOpenForm}
                         usageCounts={usageCounts}
                         recentDestinations={recentDestinations}
+                        holidays={holidays}
+                        allReservations={reservations}
+                        editingRecurringGroupId={editingRecurringGroupId}
                         onSlotClick={(vehicleId: string, startTime: string, endTime: string) => {
                             setForm(prev => ({ ...prev, vehicleId, startTime, endTime }));
                             setShowForm(true);

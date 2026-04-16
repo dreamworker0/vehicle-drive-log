@@ -78,6 +78,9 @@ export {
     getReservationsByGroupId,
     cancelReservationGroup,
     deleteReservationGroup,
+    getReservationsByRecurringGroupId,
+    cancelRecurringGroup,
+    deleteRecurringGroup,
 } from './reservations';
 
 // 알림 (Notifications)

@@ -20,6 +20,7 @@ interface SettingsForm {
     phone: string;
     approvalLine: { title: string }[];
     hideApprovalLine: boolean;
+    requireReservationApproval: boolean;
 }
 
 interface HolidayForm {
@@ -42,6 +43,7 @@ export default function useSettings() {
         phone: '',
         approvalLine: [{ title: '담당' }, { title: '팀장' }],
         hideApprovalLine: false,
+        requireReservationApproval: false,
     });
 
     // 공휴일 관리 상태
@@ -73,6 +75,7 @@ export default function useSettings() {
                             ? orgData.approvalLine
                             : [{ title: '담당' }, { title: '팀장' }],
                         hideApprovalLine: orgData.hideApprovalLine ?? false,
+                        requireReservationApproval: orgData.requireReservationApproval ?? false,
                     });
                 }
                 setCustomHolidays(holidays as CustomHoliday[]);
@@ -105,19 +108,24 @@ export default function useSettings() {
             .sort((a, b) => a.date.localeCompare(b.date));
     }, [customHolidays, holidayYear]);
 
-    const handleSave = async (e?: React.FormEvent) => {
+    const handleSave = async (e?: React.FormEvent | null, overrides?: Partial<SettingsForm>) => {
         if (e) e.preventDefault();
         if (!orgId) return;
         setSaving(true);
+        const targetData = { ...form, ...overrides };
         try {
             await updateOrganization(orgId, {
-                name: form.name.trim(),
-                adminEmail: form.adminEmail.trim(),
-                address: form.address.trim(),
-                phone: form.phone.trim(),
-                approvalLine: form.approvalLine.filter(a => a.title.trim()).map(a => ({ title: a.title.trim() })),
-                hideApprovalLine: form.hideApprovalLine,
+                name: targetData.name.trim(),
+                adminEmail: targetData.adminEmail.trim(),
+                address: targetData.address.trim(),
+                phone: targetData.phone.trim(),
+                approvalLine: targetData.approvalLine.filter(a => a.title.trim()).map(a => ({ title: a.title.trim() })),
+                hideApprovalLine: targetData.hideApprovalLine,
+                requireReservationApproval: targetData.requireReservationApproval,
             });
+            if (overrides) {
+                setForm(targetData);
+            }
             setSuccess(true);
             setTimeout(() => setSuccess(false), 3000);
         } catch (err) {

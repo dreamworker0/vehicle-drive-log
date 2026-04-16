@@ -57,7 +57,7 @@ export default class ErrorBoundary extends Component<Props, State> {
                         </p>
                         <button
                             onClick={this.handleReset}
-                            className="px-6 py-2.5 bg-blue-600 text-white rounded-lg
+                            className="px-6 py-2.5 bg-blue-600 dark:bg-blue-700 text-white rounded-lg
                                        hover:bg-blue-700 dark:hover:bg-blue-500 transition-colors font-medium"
                         >
                             🔄 새로고침

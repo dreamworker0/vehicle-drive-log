@@ -4,6 +4,13 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 /**
  * 운행일지가 생성, 수정, 삭제될 때마다 기관(Organization) 레벨의 요약 통계(Aggregated Stats)를 자동으로 계산하여 캐싱합니다.
  * 이 캐싱 데이터를 프론트엔드 대시보드 등에서 조회하면, 수천 건의 로그 조회를 1건으로 줄일 수 있습니다.
+ *
+ * 저장 경로: organizations/{orgId}/stats/aggregate
+ * 저장 구조:
+ *   - count: 전체 운행 건수
+ *   - totalDistance: 전체 누적 거리
+ *   - monthlyStats: { "YYYY-MM": { count, totalDistance } }
+ *   - lastUpdatedAt: 마지막 업데이트 시각
  */
 export const updateAggregatedStats = onDocumentWritten(
     {
@@ -27,45 +34,121 @@ export const updateAggregatedStats = onDocumentWritten(
         const db = getFirestore();
         const orgStatsRef = db.collection("organizations").doc(organizationId).collection("stats").doc("aggregate");
 
-        let logCountChange = 0;
-        let distanceChange = 0;
-
-        // 1. 문서 생성 (Insert)
-        if (!change.before.exists && change.after.exists) {
-            logCountChange = 1;
-            const dist = (afterData?.endKm || 0) - (afterData?.startKm || 0);
-            if (dist > 0) distanceChange += dist;
-        }
-        // 2. 문서 삭제 (Delete)
-        else if (change.before.exists && !change.after.exists) {
-            logCountChange = -1;
-            const dist = (beforeData?.endKm || 0) - (beforeData?.startKm || 0);
-            if (dist > 0) distanceChange -= dist;
-        }
-        // 3. 문서 수정 (Update)
-        else if (change.before.exists && change.after.exists) {
-            const beforeDist = (beforeData?.endKm || 0) - (beforeData?.startKm || 0);
-            const afterDist = (afterData?.endKm || 0) - (afterData?.startKm || 0);
-            // 만약 거리가 변경되었다면 차이만큼만 증감
-            if (beforeDist !== afterDist) {
-                distanceChange = (afterDist > 0 ? afterDist : 0) - (beforeDist > 0 ? beforeDist : 0);
+        /** 타임스탬프에서 월 키(YYYY-MM) 추출 */
+        const getMonthKey = (data: FirebaseFirestore.DocumentData | undefined): string | null => {
+            if (!data) return null;
+            const ts = data.timestamp;
+            if (ts && typeof ts.toDate === "function") {
+                const d = ts.toDate() as Date;
+                return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
             }
-        }
+            if (ts instanceof Date) {
+                return `${ts.getFullYear()}-${String(ts.getMonth() + 1).padStart(2, "0")}`;
+            }
+            return null;
+        };
 
-        // 아무 변경이 없으면 무시
-        if (logCountChange === 0 && distanceChange === 0) return;
+        /** 운행 거리 계산 (endKm - startKm, 음수 방지) */
+        const calcDistance = (data: FirebaseFirestore.DocumentData | undefined): number => {
+            if (!data) return 0;
+            const dist = (data.endKm || 0) - (data.startKm || 0);
+            return dist > 0 ? dist : 0;
+        };
+
+        const isCreate = !change.before.exists && change.after.exists;
+        const isDelete = change.before.exists && !change.after.exists;
 
         try {
-            await orgStatsRef.set(
-                {
-                    totalLogs: FieldValue.increment(logCountChange),
-                    totalDistance: FieldValue.increment(distanceChange),
-                    lastUpdatedAt: FieldValue.serverTimestamp(),
-                },
-                { merge: true }
-            );
+            // === 1. 문서 생성 ===
+            if (isCreate) {
+                const dist = calcDistance(afterData);
+                const monthKey = getMonthKey(afterData);
 
-            // TODO : 월별 통계(YYYY-MM) 추가 확장 가능
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const payload: Record<string, any> = {
+                    count: FieldValue.increment(1),
+                    totalDistance: FieldValue.increment(dist),
+                    lastUpdatedAt: FieldValue.serverTimestamp(),
+                };
+
+                if (monthKey) {
+                    payload.monthlyStats = {
+                        [monthKey]: {
+                            count: FieldValue.increment(1),
+                            totalDistance: FieldValue.increment(dist),
+                        },
+                    };
+                }
+
+                await orgStatsRef.set(payload, { merge: true });
+                return;
+            }
+
+            // === 2. 문서 삭제 ===
+            if (isDelete) {
+                const dist = calcDistance(beforeData);
+                const monthKey = getMonthKey(beforeData);
+
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const payload: Record<string, any> = {
+                    count: FieldValue.increment(-1),
+                    totalDistance: FieldValue.increment(-dist),
+                    lastUpdatedAt: FieldValue.serverTimestamp(),
+                };
+
+                if (monthKey) {
+                    payload.monthlyStats = {
+                        [monthKey]: {
+                            count: FieldValue.increment(-1),
+                            totalDistance: FieldValue.increment(-dist),
+                        },
+                    };
+                }
+
+                await orgStatsRef.set(payload, { merge: true });
+                return;
+            }
+
+            // === 3. 문서 수정 ===
+            const beforeDist = calcDistance(beforeData);
+            const afterDist = calcDistance(afterData);
+            const distanceChange = afterDist - beforeDist;
+            const beforeMonth = getMonthKey(beforeData);
+            const afterMonth = getMonthKey(afterData);
+            const monthChanged = beforeMonth && afterMonth && beforeMonth !== afterMonth;
+
+            // 거리 변경도 없고 월 이동도 없으면 무시
+            if (distanceChange === 0 && !monthChanged) return;
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const payload: Record<string, any> = {
+                totalDistance: FieldValue.increment(distanceChange),
+                lastUpdatedAt: FieldValue.serverTimestamp(),
+            };
+
+            if (monthChanged) {
+                // 월이 바뀐 수정: 이전 월에서 빼고, 새 월에 넣기
+                payload.count = FieldValue.increment(0); // 전체 카운트는 변동 없음
+                payload.monthlyStats = {
+                    [beforeMonth!]: {
+                        count: FieldValue.increment(-1),
+                        totalDistance: FieldValue.increment(-beforeDist),
+                    },
+                    [afterMonth!]: {
+                        count: FieldValue.increment(1),
+                        totalDistance: FieldValue.increment(afterDist),
+                    },
+                };
+            } else if (distanceChange !== 0 && afterMonth) {
+                // 같은 월 내 거리만 변경
+                payload.monthlyStats = {
+                    [afterMonth]: {
+                        totalDistance: FieldValue.increment(distanceChange),
+                    },
+                };
+            }
+
+            await orgStatsRef.set(payload, { merge: true });
         } catch (error) {
             console.error(`[updateAggregatedStats] 통계 업데이트 실패 (${organizationId}):`, error);
         }

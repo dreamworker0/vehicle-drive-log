@@ -115,7 +115,14 @@ export default function EmployeeLayout() {
                     )}
                     {(userData?.role === 'admin' || isSuperAdmin) && (
                         <button
-                            onClick={() => navigate('/admin')}
+                            onClick={() => {
+                                if (isSuperAdmin) {
+                                    localStorage.setItem(SA_TEST_ROLE_KEY, 'admin');
+                                    window.location.href = '/admin';
+                                } else {
+                                    navigate('/admin');
+                                }
+                            }}
                             className="btn-icon text-surface-500 dark:text-surface-400 hover:text-primary-600"
                             title="관리자 화면으로 전환"
                         >

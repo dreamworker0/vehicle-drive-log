@@ -69,32 +69,67 @@ export default function OrgMapView({ orgs }: OrgMapViewProps) {
             if (!org.lat || !org.lng) return;
 
             const popupContent = document.createElement('div');
-            popupContent.innerHTML = `
-                <div style="min-width:200px">
-                    <strong>${org.name}</strong><br/>
-                    <span style="font-size:12px;color:#666">${org.address}</span><br/>
-                    <span style="font-size:11px;color:#999">좌표: ${org.lat.toFixed(4)}, ${org.lng.toFixed(4)}</span>
-                    <div style="margin-top:8px;border-top:1px solid #eee;padding-top:8px">
-                        <div style="font-size:11px;color:#666;margin-bottom:4px">좌표 수정:</div>
-                        <div style="display:flex;gap:4px;align-items:center">
-                            <input type="number" step="any" placeholder="위도" value="${org.lat}" 
-                                style="width:80px;padding:3px 6px;font-size:11px;border:1px solid #ddd;border-radius:4px" 
-                                class="coord-lat" />
-                            <input type="number" step="any" placeholder="경도" value="${org.lng}" 
-                                style="width:80px;padding:3px 6px;font-size:11px;border:1px solid #ddd;border-radius:4px" 
-                                class="coord-lng" />
-                            <button class="coord-save" style="padding:3px 8px;font-size:11px;background:#059669;color:white;border:none;border-radius:4px;cursor:pointer">
-                                저장
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
 
-            const saveBtn = popupContent.querySelector('.coord-save') as HTMLButtonElement;
+            // XSS 방지: innerHTML 대신 DOM API 사용 (Firestore 데이터 직접 삽입 금지)
+            const wrapper = document.createElement('div');
+            wrapper.style.minWidth = '200px';
+
+            const nameEl = document.createElement('strong');
+            nameEl.textContent = org.name;
+            wrapper.appendChild(nameEl);
+            wrapper.appendChild(document.createElement('br'));
+
+            const addressEl = document.createElement('span');
+            addressEl.style.cssText = 'font-size:12px;color:#666';
+            addressEl.textContent = org.address;
+            wrapper.appendChild(addressEl);
+            wrapper.appendChild(document.createElement('br'));
+
+            const coordEl = document.createElement('span');
+            coordEl.style.cssText = 'font-size:11px;color:#999';
+            coordEl.textContent = `좌표: ${org.lat.toFixed(4)}, ${org.lng.toFixed(4)}`;
+            wrapper.appendChild(coordEl);
+
+            const editSection = document.createElement('div');
+            editSection.style.cssText = 'margin-top:8px;border-top:1px solid #eee;padding-top:8px';
+
+            const editLabel = document.createElement('div');
+            editLabel.style.cssText = 'font-size:11px;color:#666;margin-bottom:4px';
+            editLabel.textContent = '좌표 수정:';
+            editSection.appendChild(editLabel);
+
+            const inputRow = document.createElement('div');
+            inputRow.style.cssText = 'display:flex;gap:4px;align-items:center';
+
+            const latInput = document.createElement('input');
+            latInput.type = 'number';
+            latInput.step = 'any';
+            latInput.placeholder = '위도';
+            latInput.value = String(org.lat);
+            latInput.style.cssText = 'width:80px;padding:3px 6px;font-size:11px;border:1px solid #ddd;border-radius:4px';
+            latInput.className = 'coord-lat';
+
+            const lngInput = document.createElement('input');
+            lngInput.type = 'number';
+            lngInput.step = 'any';
+            lngInput.placeholder = '경도';
+            lngInput.value = String(org.lng);
+            lngInput.style.cssText = 'width:80px;padding:3px 6px;font-size:11px;border:1px solid #ddd;border-radius:4px';
+            lngInput.className = 'coord-lng';
+
+            const saveBtn = document.createElement('button');
+            saveBtn.className = 'coord-save';
+            saveBtn.style.cssText = 'padding:3px 8px;font-size:11px;background:#059669;color:white;border:none;border-radius:4px;cursor:pointer';
+            saveBtn.textContent = '저장';
+
+            inputRow.appendChild(latInput);
+            inputRow.appendChild(lngInput);
+            inputRow.appendChild(saveBtn);
+            editSection.appendChild(inputRow);
+            wrapper.appendChild(editSection);
+            popupContent.appendChild(wrapper);
+
             saveBtn.addEventListener('click', async () => {
-                const latInput = popupContent.querySelector('.coord-lat') as HTMLInputElement;
-                const lngInput = popupContent.querySelector('.coord-lng') as HTMLInputElement;
                 const lat = parseFloat(latInput.value);
                 const lng = parseFloat(lngInput.value);
                 if (!lat || !lng || lat < 33 || lat > 43 || lng < 124 || lng > 132) {

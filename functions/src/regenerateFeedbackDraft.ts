@@ -53,7 +53,7 @@ function parseAiResponse(text: string): {
 }
 
 export const regenerateFeedbackDraft = onCall(
-    { region: "asia-northeast3", timeoutSeconds: 60, enforceAppCheck: false },
+    { region: "asia-northeast3", timeoutSeconds: 60, enforceAppCheck: true },
     async (request) => {
         // 인증 확인
         if (!request.auth) {
@@ -122,7 +122,11 @@ ${pastExamples}
 
             // 4. 첨부 이미지 처리 및 Gemini API 호출
             const imageUrls = Array.isArray(data.imageUrls) ? data.imageUrls : [];
-            const parts: any[] = [{ text: prompt }];
+            interface GeminiPart {
+                text?: string;
+                inlineData?: { data: string; mimeType: string };
+            }
+            const parts: GeminiPart[] = [{ text: prompt }];
 
             for (const url of imageUrls) {
                 try {

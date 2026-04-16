@@ -84,7 +84,7 @@ export default function DailyLogView() {
 
     const handlePdfDownload = useCallback(async () => {
         if (driveLogs.length === 0 || loadingData) return;
-        const { downloadDailyLogPdf } = await import('../../lib/dailyLogPdfExport');
+        const { downloadDailyLogPdf } = await import('../../lib/pdf/dailyLogPdfExport');
         downloadDailyLogPdf(driveLogs, fuelLogs, {
             orgName: org?.name || '',
             vehicleName: selectedVehicle?.displayName || selectedVehicle?.name || '',
@@ -216,29 +216,32 @@ export default function DailyLogView() {
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 8.25h1.5a2.25 2.25 0 0 1 2.25 2.25v3a1.5 1.5 0 0 0 3 0V7.5l-2.25-3" />
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 9h9.5" />
                                 </svg>
-                                주유 정보
+                                {selectedVehicle?.fuelType === 'electric' ? '충전 정보' : '주유 정보'}
                             </h3>
                             <div className="space-y-2">
-                                {fuelLogs.map((fuel, idx) => (
+                                {fuelLogs.map((fuel, idx) => {
+                                    const isEV = (fuel as Record<string, unknown>).fuelType === 'electric' || selectedVehicle?.fuelType === 'electric';
+                                    return (
                                     <div key={idx} className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
                                         <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg px-3 py-2">
-                                            <span className="text-xs text-surface-400">주유원</span>
+                                            <span className="text-xs text-surface-400">{isEV ? '충전원' : '주유원'}</span>
                                             <p className="font-medium text-surface-900 dark:text-surface-100">{String(fuel.driverName || '-')}</p>
                                         </div>
                                         <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg px-3 py-2">
-                                            <span className="text-xs text-surface-400">주유미터</span>
+                                            <span className="text-xs text-surface-400">{isEV ? '충전미터' : '주유미터'}</span>
                                             <p className="font-medium text-surface-900 dark:text-surface-100">{fuel.meterReading ? Number(fuel.meterReading).toLocaleString() : '-'} km</p>
                                         </div>
                                         <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg px-3 py-2">
-                                            <span className="text-xs text-surface-400">주유량</span>
-                                            <p className="font-medium text-surface-900 dark:text-surface-100">{String(fuel.fuelAmount || '-')} ℓ</p>
+                                            <span className="text-xs text-surface-400">{isEV ? '충전량' : '주유량'}</span>
+                                            <p className="font-medium text-surface-900 dark:text-surface-100">{String(fuel.fuelAmount || '-')} {isEV ? 'kWh' : 'ℓ'}</p>
                                         </div>
                                         <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg px-3 py-2">
-                                            <span className="text-xs text-surface-400">주유금액</span>
+                                            <span className="text-xs text-surface-400">{isEV ? '충전금액' : '주유금액'}</span>
                                             <p className="font-medium text-surface-900 dark:text-surface-100">{fuel.fuelCost ? Number(fuel.fuelCost).toLocaleString() : '-'} 원</p>
                                         </div>
                                     </div>
-                                ))}
+                                    );
+                                })}
                             </div>
                         </div>
                     )}

@@ -12,7 +12,19 @@ interface Props {
 }
 
 export default function ChartQuickDrive({ quickDriveStats, quickDriveRatio }: Props) {
-    if (quickDriveStats.length === 0) return null;
+    if (quickDriveStats.length === 0) {
+        return (
+            <div className="glass-card p-5">
+                <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
+                    🚀 사전 예약 vs 바로 운행 (최근 30일)
+                </h2>
+                <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">
+                    기존 예약 방식 대비 바로 운행(예약 없이 출발) 활용도 추이
+                </p>
+                <div className="flex flex-col items-center justify-center py-12 text-surface-400">최근 발생한 데이터가 없습니다.</div>
+            </div>
+        );
+    }
 
     return (
         <div className="glass-card p-5">
@@ -28,7 +40,7 @@ export default function ChartQuickDrive({ quickDriveStats, quickDriveRatio }: Pr
                 {/* 콤보: 누적 요약 비율 */}
                 <div className="flex items-center gap-4 bg-surface-50 dark:bg-surface-800/50 p-3 rounded-xl border border-surface-200 dark:border-surface-700">
                     <div className="text-center">
-                        <div className="text-[11px] text-surface-500 mb-0.5">최근 총 생성</div>
+                        <div className="text-[11px] text-surface-500 dark:text-surface-400 mb-0.5">최근 총 생성</div>
                         <div className="text-sm font-bold text-surface-700 dark:text-surface-300">{quickDriveRatio.total.toLocaleString()}건</div>
                     </div>
                     <div className="w-px h-8 bg-surface-200 dark:bg-surface-700"></div>

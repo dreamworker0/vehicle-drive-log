@@ -83,6 +83,12 @@ service cloud.firestore {
         allow read: if isOrgMember(orgId) || isSuperAdmin();
         allow write: if isOrgAdmin(orgId) || isSuperAdmin();
       }
+
+      // 집계 통계 (서브컬렉션 — Cloud Functions에서 생성/갱신)
+      match /stats/{statId} {
+        allow read: if isOrgMember(orgId) || isSuperAdmin();
+        allow write: if false; // Cloud Functions(admin SDK)에서만 쓰기
+      }
     }
 
     // === 차량 ===
@@ -150,10 +156,10 @@ service cloud.firestore {
 
     // === 즐겨찾기 ===
     match /favorites/{favoriteId} {
-      allow read: if resource.data.userId == request.auth.uid;
-      allow create: if request.resource.data.userId == request.auth.uid;
-      allow update: if resource.data.userId == request.auth.uid;
-      allow delete: if resource.data.userId == request.auth.uid;
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isSuperAdmin());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
     // === 주유 기록 ===

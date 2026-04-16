@@ -74,11 +74,15 @@ export { onReservationCreated, onReservationUpdated, onReservationDeleted } from
 // Google Calendar -> App 역동기화 (10분마다)
 export { syncCalendarToApp } from "./calendarSchedule";
 
+// (Google Calendar Push Webhook 기능은 도메인 인증 문제로 보류됨)
+
 // 운행일지 중복 정리 (관리자용)
 export { cleanupDuplicateLogs } from "./cleanupDuplicateLogs";
 
 // 대시보드 성능 고도화를 위한 운행일지 집계 통계 캐싱
 export { updateAggregatedStats } from "./caching/updateAggregatedStats";
+// 집계 통계 일괄 재계산 (마이그레이션/보정용)
+export { recalculateAggregatedStats } from "./caching/recalculateAggregatedStats";
 
 // 직원 삭제 (Auth 비활성화 + Firestore 삭제)
 export { disableUser } from "./disableUser";
@@ -106,6 +110,9 @@ export { regenerateFeedbackDraft } from "./regenerateFeedbackDraft";
 
 // 피드백 답변 발송 (슈퍼관리자 → 사용자 알림)
 export { sendFeedbackReply } from "./sendFeedbackReply";
+
+// AI에게 물어보기 (FAQ 기반 Gemini 답변)
+export { askAI } from "./askAI";
 
 
 

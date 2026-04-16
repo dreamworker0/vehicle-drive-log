@@ -38,6 +38,9 @@ jobs:
       - name: Unit tests
         run: npx vitest run
 
+      - name: Security audit
+        run: npm run audit
+
       - name: Deploy Hosting
         uses: FirebaseExtended/action-hosting-deploy@v0
         with:
@@ -51,3 +54,4 @@ jobs:
           export GOOGLE_APPLICATION_CREDENTIALS=$(mktemp)
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > $GOOGLE_APPLICATION_CREDENTIALS
           npx firebase-tools deploy --only functions,firestore:rules --force --project vehicle-drive-log
+          rm -f "$GOOGLE_APPLICATION_CREDENTIALS"

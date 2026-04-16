@@ -62,7 +62,11 @@ export default function useFuelLogAdmin() {
             })
             .map(r => {
                 const v = vehicles.find(v => v.id === r.vehicleId);
-                return { ...r, vehicleType: v?.vehicleType || null };
+                return {
+                    ...r,
+                    vehicleType: v?.vehicleType || null,
+                    fuelType: (r.fuelType || v?.fuelType || 'gasoline') as 'gasoline' | 'electric',
+                };
             });
     }, [records, filters, vehicles]);
 

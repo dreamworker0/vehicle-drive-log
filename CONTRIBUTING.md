@@ -29,11 +29,11 @@ npm run dev
 
 | 대상 | 규칙 | 예시 |
 |------|------|------|
-| React 컴포넌트 | PascalCase + `.jsx` | `DriveLogForm.jsx` |
-| 커스텀 훅 | camelCase + `use` 접두사 + `.js` | `useDriveLogForm.js` |
-| 유틸/서비스 | camelCase + `.js` | `firestore.js`, `tmap.js` |
-| 테스트 | 원본명 + `.test.jsx` / `.test.js` | `useToast.test.jsx` |
-| Cloud Functions | camelCase + `.js` | `ocrDashboard.js` |
+| React 컴포넌트 | PascalCase + `.tsx` | `DriveLogForm.tsx` |
+| 커스텀 훅 | camelCase + `use` 접두사 + `.ts` | `useDriveLogForm.ts` |
+| 유틸/서비스 | camelCase + `.ts` | `firestore.ts`, `tmap.ts` |
+| 테스트 | 원본명 + `.test.tsx` / `.test.ts` | `useToast.test.tsx` |
+| Cloud Functions | camelCase + `.ts` | `ocrDashboard.ts` |
 
 ### 컴포넌트 구조
 
@@ -133,8 +133,8 @@ npm run test:e2e
 
 ## Cloud Functions 개발
 
-- 파일 위치: `functions/` 디렉토리
-- 새 함수 추가 시 `functions/index.js`에 등록
+- 파일 위치: `functions/src/` 디렉토리
+- 새 함수 추가 시 `functions/src/index.ts`에 등록
 - 배포: `firebase deploy --only functions`
 - 로그 확인: `firebase functions:log` 또는 `npm run health`
 

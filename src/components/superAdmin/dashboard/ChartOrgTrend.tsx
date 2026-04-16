@@ -11,7 +11,19 @@ interface Props {
 }
 
 export default function ChartOrgTrend({ dailyActiveOrgStats }: Props) {
-    if (dailyActiveOrgStats.length === 0) return null;
+    if (dailyActiveOrgStats.length === 0) {
+        return (
+            <div className="glass-card p-5">
+                <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
+                    📈 일별 기관 추이 (최근 30일)
+                </h2>
+                <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">
+                    신청일 기준 누적 기관 수 (활성/미활성/반려/삭제)
+                </p>
+                <div className="flex flex-col items-center justify-center py-12 text-surface-400">최근 발생한 데이터가 없습니다.</div>
+            </div>
+        );
+    }
     return (
         <div className="glass-card p-5">
             <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">

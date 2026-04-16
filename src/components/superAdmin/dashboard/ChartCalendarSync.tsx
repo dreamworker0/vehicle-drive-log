@@ -8,7 +8,18 @@ interface Props {
 }
 
 export default function ChartCalendarSync({ calendarSyncRatio }: Props) {
-    if (calendarSyncRatio.sync === 0 && calendarSyncRatio.notSync === 0) return null;
+    if (calendarSyncRatio.sync === 0 && calendarSyncRatio.notSync === 0) {
+        return (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
+                <div className="glass-card p-5">
+                    <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-4 flex items-center gap-2">
+                        <span role="img" aria-label="calendar">📅</span> 구글 캘린더 연동 비율
+                    </h2>
+                    <div className="flex flex-col items-center justify-center py-12 text-surface-400">데이터가 없습니다.</div>
+                </div>
+            </div>
+        );
+    }
 
     const total = calendarSyncRatio.sync + calendarSyncRatio.notSync;
     const pct = total > 0 ? Math.round((calendarSyncRatio.sync / total) * 100) : 0;

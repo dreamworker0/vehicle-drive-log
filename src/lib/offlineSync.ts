@@ -11,7 +11,7 @@ const DB_VERSION = 1;
 
 interface OfflineAction {
     id: string; // 고유 ID (timestamp + random)
-    type: 'CREATE_DRIVELOG' | 'UPDATE_DRIVELOG' | 'CREATE_RESERVATION' | 'UPDATE_RESERVATION' | 'DELETE_DRIVELOG';
+    type: 'CREATE_DRIVELOG' | 'UPDATE_DRIVELOG' | 'CREATE_RESERVATION' | 'UPDATE_RESERVATION' | 'DELETE_RESERVATION' | 'DELETE_DRIVELOG';
     payload: unknown;
     timestamp: number;
     retryCount: number;

@@ -84,7 +84,7 @@ firebase functions:log --only ocrDashboard,autoVerifyDocument
 
 ### 3.2 외부 API 장애 시
 
-> 자세한 내용: [API_FALLBACK.md](API_FALLBACK.md)
+> 자세한 내용: [API_FALLBACK.md](docs/API_FALLBACK.md)
 
 | API | 영향 | 대응 |
 |-----|------|------|

@@ -55,7 +55,7 @@ export default function ReservationPatternBanner() {
                         {/* 닫기 버튼 */}
                         <button
                             onClick={() => setIsDismissed(true)}
-                            className="p-1 rounded-full text-surface-400 hover:text-surface-800 hover:bg-surface-200 dark:hover:text-surface-200 dark:hover:bg-surface-700 transition-colors"
+                            className="p-1 rounded-full text-surface-400 dark:text-surface-500 hover:text-surface-800 hover:bg-surface-200 dark:hover:text-surface-200 dark:hover:bg-surface-700 transition-colors"
                             title="닫기"
                             aria-label="추천 예약 닫기"
                         >

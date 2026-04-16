@@ -5,7 +5,18 @@ interface Props {
 }
 
 export default function DashboardFunnelChart({ funnelData }: Props) {
-    if (funnelData.length === 0) return null;
+    if (funnelData.length === 0) {
+        return (
+            <div className="glass-card p-5">
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200">
+                        🔄 기관 활성화 퍼널
+                    </h2>
+                </div>
+                <div className="flex flex-col items-center justify-center py-12 text-surface-400">최근 발생한 데이터가 없습니다.</div>
+            </div>
+        );
+    }
 
     const overallRate = funnelData.length > 1
         ? Math.round((funnelData[funnelData.length - 1].value / funnelData[0].value) * 100)

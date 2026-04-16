@@ -11,7 +11,7 @@
 | 기능 | 설명 |
 |------|------|
 | 📝 운행일지 자동화 | 계기판 OCR 촬영으로 주행거리 자동 입력, 목적 프리셋, 동승자 선택, 이어서 기록 |
-| 📅 차량 예약 시스템 | 달력 UI, 시간대 충돌 방지, 구글 캘린더 양방향 동기화, 서버사이드 동시성 안전 |
+| 📅 차량 예약 시스템 | 달력 UI, 구글 캘린더 연동, 시간대 충돌 방지, 다일 및 요일 지정 반복 예약(휴일 제외) 옵션 지원 |
 | 📊 통계 & 출력 | 월별·직원별·목적별 통계, 공식 양식 PDF/Excel 다운로드, 결재란 커스터마이징 |
 | 📱 앱처럼 설치 | iPhone/Android 홈 화면에 추가하여 네이티브 앱처럼 사용 (PWA) |
 | 🤖 AI 기관 인증 | 고유번호증/사업자등록증 OCR → 자동 승인/거절 (영리 기업 자동 차단) |
@@ -199,6 +199,7 @@ firebase deploy --only firestore:rules,storage
 | `disableUser` | 사용자 비활성화 (Firebase Auth + Firestore) |
 | `restoreUser` | 비활성화된 사용자 복원 |
 | `joinOrganization` | 초대 코드로 기관 가입 (서버사이드 권한 처리) |
+| `askAI` | FAQ·매뉴얼 기반 AI 챗봇 답변 생성 (Gemini) |
 
 ### Firestore 트리거
 
@@ -254,8 +255,7 @@ firebase deploy --only firestore:rules,storage
 | [OPERATIONS.md](OPERATIONS.md) | 시스템 관리자용 운영 매뉴얼 (백업, 장애 대응, 기관 관리) |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | 개발 참여 가이드 (코딩 컨벤션, PR 규칙, 브랜치 전략) |
 | [CHANGELOG.md](CHANGELOG.md) | Phase별 변경 이력 |
-| [API_FALLBACK.md](API_FALLBACK.md) | 외부 API 장애 대응 매뉴얼 |
-| [TYPESCRIPT_MIGRATION.md](TYPESCRIPT_MIGRATION.md) | TypeScript 전환 가이드 및 코드 패턴 |
+| [API_FALLBACK.md](docs/API_FALLBACK.md) | 외부 API 장애 대응 매뉴얼 |
 
 ---
 

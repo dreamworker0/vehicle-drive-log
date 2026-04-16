@@ -81,7 +81,7 @@ export default function MaintenanceLog() {
                     </button>
                     <button
                         onClick={async () => {
-                            const { downloadMaintenancePdf } = await import('../../lib/maintenancePdfExport');
+                            const { downloadMaintenancePdf } = await import('../../lib/pdf/maintenancePdfExport');
                             const defaultApproval = [{ title: '담당' }, { title: '팀장' }];
                             const useApproval = org?.hideApprovalLine
                                 ? []

@@ -188,7 +188,7 @@ export default function UserManual({ role = 'employee', onClose }: UserManualPro
                         자주 하는 질문 (FAQ) 보기
                     </a>
                     <p className="text-xs text-surface-400 text-center">
-                        💡 궁금한 점이 있으시면 <strong>의견남기기</strong>를 이용해 주세요
+                        💡 궁금한 점이 있으시면 <strong>건의하기</strong>를 이용해 주세요
                     </p>
                 </div>
             </div>

@@ -199,8 +199,8 @@ try {
 
 | 대상 | 규칙 | 예시 |
 |------|------|------|
-| 컴포넌트 파일 | PascalCase | `TodayDashboard.jsx` |
-| 유틸 파일 | camelCase | `firestore.js`, `holidayApi.js` |
+| 컴포넌트 파일 | PascalCase | `TodayDashboard.tsx` |
+| 유틸 파일 | camelCase | `firestore.ts`, `holidayApi.ts` |
 | 컴포넌트 함수 | PascalCase | `function TodayDashboard()` |
 | 이벤트 핸들러 | `handle` + 동사 | `handleStartDrive`, `handleSubmit` |
 | 상태 변수 | camelCase | `loading`, `todayReservations` |
@@ -305,7 +305,7 @@ const getVehicleColor = (id) => {
 };
 ```
 
-> ✅ 이 상수들은 `lib/constants.js`에 통합되어 있다. 새 컴포넌트에서는 반드시 여기서 import한다.
+> ✅ 이 상수들은 `lib/constants.ts`에 통합되어 있다. 새 컴포넌트에서는 반드시 여기서 import한다.
 > ```js
 > import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
 > ```

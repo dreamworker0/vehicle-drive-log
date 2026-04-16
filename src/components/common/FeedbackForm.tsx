@@ -1,5 +1,5 @@
 /**
- * FeedbackForm — 의견남기기 모달 컴포넌트
+ * FeedbackForm — 건의하기 모달 컴포넌트
  * 텍스트 + 이미지(최대 3장) 첨부 가능
  */
 import React, { useState, useRef, useEffect } from 'react';
@@ -149,7 +149,7 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
                             <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                         </svg>
                     </div>
-                    <h3 className="text-lg font-bold text-surface-900 dark:text-surface-100 mb-1">의견이 전송되었습니다!</h3>
+                    <h3 className="text-lg font-bold text-surface-900 dark:text-surface-100 mb-1">건의가 전송되었습니다!</h3>
                     <p className="text-sm text-surface-500 dark:text-surface-400">소중한 의견 감사합니다.</p>
                 </div>
             </div>
@@ -164,7 +164,7 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
             >
                 {/* 헤더 */}
                 <div className="flex items-center justify-between p-5 border-b border-surface-100 dark:border-surface-700">
-                    <h2 className="text-lg font-bold text-surface-900 dark:text-surface-100">개발자에게 의견남기기</h2>
+                    <h2 className="text-lg font-bold text-surface-900 dark:text-surface-100">개발자에게 건의하기</h2>
                     <button onClick={onClose} className="btn-icon text-surface-400 hover:text-surface-600 dark:text-surface-400">
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -196,7 +196,7 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
                 {/* 폼 */}
                 <form onSubmit={handleSubmit} className="p-5 space-y-4">
                     <div>
-                        <label className="label">의견 내용 <span className="text-red-500">*</span></label>
+                        <label className="label">건의 내용 <span className="text-red-500">*</span></label>
                         <textarea
                             ref={textareaRef}
                             value={message}
@@ -218,7 +218,7 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
                                     <button
                                         type="button"
                                         onClick={() => removeImage(idx)}
-                                        className="absolute top-0.5 right-0.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                        className="absolute top-0.5 right-0.5 w-5 h-5 bg-red-500 dark:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
                                     >
                                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -265,7 +265,7 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
                                 <span className="flex items-center justify-center gap-2">
                                     <span className="w-4 h-4 spinner" />전송 중...
                                 </span>
-                            ) : '의견 보내기'}
+                            ) : '건의 보내기'}
                         </button>
                     </div>
                 </form>

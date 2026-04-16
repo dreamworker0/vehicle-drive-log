@@ -8,9 +8,10 @@ import { useAuth } from './useAuth';
 import { useToast } from './useToast';
 import useRetry from './useRetry';
 import useDriveLogOcr from './useDriveLogOcr';
-import { nowTime, todayStr, validateDriveLogForm, buildLogData, timestampToDateStr } from './utils/driveLogValidation';
-import { getVehicles, createDriveLog, updateDriveLog, updateReservationStatus, getFavorites, createFavorite, getOrganizationMembers, getLastVehicleEndKm, getLastVehicleEndBattery, getVehicleEndKmBefore, getReservationById, getHipassCards, updateHipassCard } from '../lib/firestore';
-import { enqueueLog } from '../lib/offlineQueue';
+import { nowTime, todayStr, validateDriveLogForm, timestampToDateStr } from './utils/driveLogValidation';
+import { getVehicles, getFavorites, createFavorite, getOrganizationMembers, getLastVehicleEndKm, getLastVehicleEndBattery, getReservationById, getHipassCards } from '../lib/firestore';
+import { resolveStartKm } from './driveLogForm/resolveStartKm';
+import { submitDriveLog, getEmptyForm } from './driveLogForm/submitDriveLog';
 import type { Vehicle } from '../types/vehicle';
 
 const clearDrivingNotification = async (resId?: string) => {
@@ -20,10 +21,9 @@ const clearDrivingNotification = async (resId?: string) => {
         if (!reg) return;
         const notifications = await reg.getNotifications({ tag: `driving-${resId}` });
         notifications.forEach(n => n.close());
-    } catch {
-        // 무시
-    }
+    } catch { /* 무시 */ }
 };
+
 import type { Favorite } from '../types/favorite';
 import type { User as UserDoc } from '../types/user';
 import type { DriveLog } from '../types/driveLog';
@@ -74,6 +74,7 @@ export default function useDriveLogForm() {
     const reservationData = resolvedReservationData;
     const editLog = state?.editLog || null;
     const isEditMode = !!editLog;
+    /** @deprecated 바로 운행 기능은 사전 예약 체계로 대체됨 */
     const isQuickDrive = false;
 
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -141,18 +142,11 @@ export default function useDriveLogForm() {
                     if (externals.length > 0) setExternalPassengerCount(externals.length);
                 }
 
-                const resolveStartKm = async (vehicleId: string, fallbackKm: number | string | undefined) => {
-                    const lastEndKm = await getLastVehicleEndKm(orgId, vehicleId);
-                    const k1 = Number(fallbackKm || 0);
-                    const k2 = Number(lastEndKm || 0);
-                    return (Math.max(k1, k2) || '').toString();
-                };
-
                 if (isEditMode) {
                     // 수정 모드 유지
                 } else if (reservationData?.vehicleId) {
                     const rv = v.find(veh => veh.id === reservationData.vehicleId);
-                    const km = await resolveStartKm(reservationData.vehicleId!, rv?.currentKm ?? reservationData.currentKm);
+                    const km = await resolveStartKm(orgId, reservationData.vehicleId!, { vehicle: rv || null });
                     setForm(prev => ({
                         ...prev,
                         vehicleId: reservationData.vehicleId!,
@@ -162,7 +156,7 @@ export default function useDriveLogForm() {
                         startKm: km,
                     }));
                 } else if (v.length === 1) {
-                    const km = await resolveStartKm(v[0].id, v[0].currentKm);
+                    const km = await resolveStartKm(orgId, v[0].id, { vehicle: v[0] });
                     setForm(prev => ({ ...prev, vehicleId: v[0].id, vehicleName: v[0].displayName || v[0].name, startKm: km }));
                 }
             } catch (err) {
@@ -227,33 +221,12 @@ export default function useDriveLogForm() {
         // 수정 모드에서는 기존 기록의 startKm을 유지 (최신 endKm으로 덮어쓰지 않음)
         if (isEditMode) return;
         if (!orgId || !form.vehicleId || !form.driveDate) return;
-        const refreshStartKm = async () => {
-            let km: number | string;
-            const v = vehicles.find(veh => veh.id === form.vehicleId);
-            
-            if (form.driveDate !== todayStr()) {
-                // 과거 날짜: 해당 날짜 이전의 마지막 endKm
-                const [y, m, d] = form.driveDate.split('-').map(Number);
-                const beforeDate = new Date(y, m - 1, d);
-                const fetchedKm = await getVehicleEndKmBefore(orgId, form.vehicleId, beforeDate);
-                km = fetchedKm !== null ? fetchedKm : (v?.currentKm ?? '');
-            } else if (form.startTime) {
-                // 오늘 + 출발 시각: 해당 시각 이전의 마지막 endKm (같은 날 소급)
-                const [y, m, d] = form.driveDate.split('-').map(Number);
-                const [h, min] = form.startTime.split(':').map(Number);
-                const beforeTime = new Date(y, m - 1, d, h, min);
-                const fetchedKm = await getVehicleEndKmBefore(orgId, form.vehicleId, beforeTime);
-                km = fetchedKm !== null ? fetchedKm : (v?.currentKm ?? '');
-            } else {
-                // 오늘 + 출발 시각 없음: 기본 동작
-                const lastEndKm = await getLastVehicleEndKm(orgId, form.vehicleId);
-                const k1 = Number(v?.currentKm || 0);
-                const k2 = Number(lastEndKm || 0);
-                km = Math.max(k1, k2) || '';
-            }
-            setForm(prev => ({ ...prev, startKm: km.toString() }));
-        };
-        refreshStartKm();
+        const v = vehicles.find(veh => veh.id === form.vehicleId);
+        resolveStartKm(orgId, form.vehicleId, {
+            driveDate: form.driveDate,
+            startTime: form.startTime,
+            vehicle: v || null,
+        }).then(km => setForm(prev => ({ ...prev, startKm: km })));
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [form.driveDate, form.vehicleId, form.startTime, orgId, vehicles]);
 
@@ -291,33 +264,16 @@ export default function useDriveLogForm() {
 
     const handleVehicleSelect = async (vehicleId: string) => {
         const v = vehicles.find(veh => veh.id === vehicleId);
-        let km: number | string;
-        if (form.driveDate && form.driveDate !== todayStr()) {
-            // 과거 날짜
-            const [y, m, d] = form.driveDate.split('-').map(Number);
-            const beforeDate = new Date(y, m - 1, d);
-            const fetchedKm = await getVehicleEndKmBefore(orgId!, vehicleId, beforeDate);
-            km = fetchedKm !== null ? fetchedKm : (v?.currentKm ?? '');
-        } else if (form.startTime) {
-            // 오늘 + 출발 시각: 해당 시각 이전의 마지막 endKm
-            const dateStr = form.driveDate || todayStr();
-            const [y, m, d] = dateStr.split('-').map(Number);
-            const [h, min] = form.startTime.split(':').map(Number);
-            const beforeTime = new Date(y, m - 1, d, h, min);
-            const fetchedKm = await getVehicleEndKmBefore(orgId!, vehicleId, beforeTime);
-            km = fetchedKm !== null ? fetchedKm : (v?.currentKm ?? '');
-        } else {
-            // 오늘 + 출발 시각 없음: 기본 동작
-            const lastEndKm = await getLastVehicleEndKm(orgId!, vehicleId);
-            const k1 = Number(v?.currentKm || 0);
-            const k2 = Number(lastEndKm || 0);
-            km = Math.max(k1, k2) || '';
-        }
+        const km = await resolveStartKm(orgId!, vehicleId, {
+            driveDate: form.driveDate,
+            startTime: form.startTime,
+            vehicle: v || null,
+        });
         setForm(prev => ({
             ...prev,
             vehicleId,
             vehicleName: v?.displayName || v?.name || '',
-            startKm: km.toString(),
+            startKm: km,
         }));
     };
 
@@ -362,101 +318,45 @@ export default function useDriveLogForm() {
 
         setSubmitting(true);
         try {
-            const logData = buildLogData(form, {
-                orgId, user: user!, userData, selectedVehicle, selectedPassengers, externalPassengerCount, isRetroactive, ocrUsed: ocr.ocrSuccess,
+            const result = await submitDriveLog({
+                form, orgId, user: user!, userData, selectedVehicle,
+                selectedPassengers, externalPassengerCount, isRetroactive,
+                ocrUsed: ocr.ocrSuccess, isElectric, isEditMode, editLog,
+                reservationData, hipassCard,
             });
 
-            // 하이패스 정보를 운행일지에 저장
-            if (hipassCard && form.hipassBalanceAfter !== '') {
-                Object.assign(logData, {
-                    hipassCardNumber: hipassCard.cardNumber || '',
-                    hipassBalanceBefore: hipassCard.balance,
-                    hipassBalanceAfter: Number(form.hipassBalanceAfter),
-                });
+            if (result.syncResult?.updated) {
+                showToast(`다음 기록의 출발 km가 ${result.syncResult.oldStartKm?.toLocaleString()} → ${result.syncResult.newStartKm?.toLocaleString()}으로 자동 조정되었습니다.`, 'info');
+            }
+            if (result.correctedKm) {
+                showToast(`동시 작성 감지: 출발 km가 최신 기준인 ${result.correctedKm.oldStartKm?.toLocaleString()} → ${result.correctedKm.correctedStartKm?.toLocaleString()}(으)로 자동 보정 저장되었습니다.`, 'info');
             }
 
-            if (isEditMode && editLog) {
-                // 오프라인 감지: 수정도 큐잉
-                if (!navigator.onLine) {
-                    await enqueueLog(logData as Record<string, unknown>, 'update', editLog.id);
-                    setSuccess(true);
-                    showToast('오프라인에서 수정 저장됨 · 온라인 복귀 시 자동 반영', 'info');
-                    setTimeout(() => setSuccess(false), 3000);
-                    setSubmitting(false);
-                    return;
-                }
-                const result = await updateDriveLog(editLog.id, logData);
-                const syncResult = (result as Record<string, unknown>)?.syncResult as { updated?: boolean; oldStartKm?: number; newStartKm?: number } | undefined;
-                if (syncResult?.updated) {
-                    showToast(`다음 기록의 출발 km가 ${syncResult.oldStartKm?.toLocaleString()} → ${syncResult.newStartKm?.toLocaleString()}으로 자동 조정되었습니다.`, 'info');
-                }
-            } else {
-                const extendedLogData = { ...logData, reservationId: reservationData?.reservationId || null };
-
-                // 오프라인 감지: IndexedDB 큐에 저장
-                if (!navigator.onLine) {
-                    await enqueueLog(extendedLogData as Record<string, unknown>);
-                    setSuccess(true);
-                    showToast('오프라인에서 저장됨 · 온라인 복귀 시 자동 전송', 'info');
-                    setForm({
-                        vehicleId: '', vehicleName: '', purpose: '', destination: '',
-                        startKm: '', endKm: '', startTime: nowTime(),
-                        endTime: '', batteryStart: '', batteryEnd: '', notes: '',
-                        driveDate: todayStr(), hipassBalanceAfter: '',
-                    });
+            if (result.offline) {
+                setSuccess(true);
+                showToast(result.message!, 'info');
+                if (result.shouldResetForm) {
+                    setForm(getEmptyForm());
                     setSelectedPassengers([]);
                     setExternalPassengerCount(0);
-                    setTimeout(() => setSuccess(false), 3000);
-                    setSubmitting(false);
-                    return;
                 }
-
-                const result = await createDriveLog(extendedLogData as Parameters<typeof createDriveLog>[0]);
-                const syncResult = (result as Record<string, unknown>)?.syncResult as { updated?: boolean; oldStartKm?: number; newStartKm?: number } | undefined;
-                if (syncResult?.updated) {
-                    showToast(`다음 기록의 출발 km가 ${syncResult.oldStartKm?.toLocaleString()} → ${syncResult.newStartKm?.toLocaleString()}으로 자동 조정되었습니다.`, 'info');
-                }
-
-                const autocorrectedKm = (result as Record<string, unknown>)?.correctedStartKm as number | undefined;
-                const origStartKm = (result as Record<string, unknown>)?.oldStartKm as number | undefined;
-                if (autocorrectedKm !== undefined) {
-                    showToast(`동시 작성 감지: 출발 km가 최신 기준인 ${origStartKm?.toLocaleString()} → ${autocorrectedKm?.toLocaleString()}(으)로 자동 보정 저장되었습니다.`, 'info');
-                }
-            }
-
-            if (!isEditMode && reservationData?.reservationId) {
-                await updateReservationStatus(reservationData.reservationId, 'completed', {
-                    actualStartTime: form.startTime || '',
-                    actualEndTime: form.endTime || nowTime(),
-                });
-                await clearDrivingNotification(reservationData.reservationId);
-            }
-
-            // 하이패스 잔액 업데이트
-            if (hipassCard && form.hipassBalanceAfter !== '') {
-                await updateHipassCard(hipassCard.id, {
-                    balance: Number(form.hipassBalanceAfter),
-                    organizationId: orgId,
-                });
+                setTimeout(() => setSuccess(false), 3000);
+                setSubmitting(false);
+                return;
             }
 
             setSuccess(true);
-            if (isEditMode) {
-                showToast('운행일지가 수정되었습니다.', 'success');
+            if (result.shouldNavigate === 'my-records') {
+                showToast(result.message || '운행일지가 수정되었습니다.', 'success');
                 navigate('/employee/my-records', { replace: true });
-            } else if (reservationData?.reservationId) {
-                showToast('예약 운행일지가 저장되었습니다.', 'success');
+            } else if (result.shouldNavigate === 'today') {
+                showToast(result.message || '예약 운행일지가 저장되었습니다.', 'success');
                 navigate('/employee/today', { replace: true });
-            } else {
-                setForm({
-                    vehicleId: '', vehicleName: '', purpose: '', destination: '',
-                    startKm: '', endKm: '', startTime: nowTime(),
-                    endTime: '', batteryStart: '', batteryEnd: '', notes: '',
-                    driveDate: todayStr(), hipassBalanceAfter: '',
-                });
+            } else if (result.shouldResetForm) {
+                setForm(getEmptyForm());
                 setSelectedPassengers([]);
                 setExternalPassengerCount(0);
-                setSuccess(false); // Reset success state immediately as toast covers user notification
+                setSuccess(false);
             }
         } catch (err: unknown) {
             console.error('운행일지 저장 실패:', err);

@@ -34,7 +34,12 @@ export const processOfflineQueue = async () => {
                             console.warn('[OfflineSync] Invalid UPDATE payload:', action.payload);
                         }
                         break;
-                    // TODO: 예약 생성 등 다른 액션 타입 추가 가능
+                    case 'CREATE_RESERVATION':
+                    case 'UPDATE_RESERVATION':
+                    case 'DELETE_RESERVATION':
+                        // TODO: 예약 생성/수정/삭제 오프라인 지원 시 이곳에 구현
+                        console.log(`[OfflineSync] 예약 관련 액션 대기 중 (미구현 상태): ${action.type}`);
+                        break;
                     default:
                         console.warn(`[OfflineSync] 알 수 없는 액션 타입: ${action.type}`);
                         break;

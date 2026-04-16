@@ -30,7 +30,16 @@ export default function DashboardOrgTable({
 }: Props) {
     const { showToast } = useToast();
 
-    if (topOrgs.length === 0) return null;
+    if (topOrgs.length === 0) {
+        return (
+            <div className="glass-card p-5">
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200">🏆 활성도</h2>
+                </div>
+                <div className="flex flex-col items-center justify-center py-12 text-surface-400">최근 발생한 데이터가 없습니다.</div>
+            </div>
+        );
+    }
 
     const totalPages = Math.ceil(sortedOrgs.length / ORG_PAGE_SIZE);
     const pagedOrgs = sortedOrgs.slice(orgPage * ORG_PAGE_SIZE, (orgPage + 1) * ORG_PAGE_SIZE);
@@ -68,19 +77,19 @@ export default function DashboardOrgTable({
                         <thead>
                             <tr className="border-b border-surface-100 dark:border-surface-700 text-surface-500 dark:text-surface-400">
                                 <th className="text-left py-2 px-1.5 sm:px-3 font-medium">#</th>
-                                <th className="text-left py-2 px-1.5 sm:px-3 font-medium cursor-pointer select-none hover:text-surface-700 dark:hover:text-surface-200 transition-colors" onClick={() => handleSort('name')}>
+                                <th className="text-left py-2 px-1.5 sm:px-3 font-medium text-surface-500 dark:text-surface-400 cursor-pointer select-none hover:text-surface-700 dark:hover:text-surface-200 transition-colors" onClick={() => handleSort('name')}>
                                     <span className="hidden sm:inline">기관명</span><span className="sm:hidden">🏢</span>{sortIndicator('name')}
                                 </th>
-                                <th className="text-right py-2 px-1.5 sm:px-3 font-medium cursor-pointer select-none hover:text-surface-700 dark:hover:text-surface-200 transition-colors" onClick={() => handleSort('users')}>
+                                <th className="text-right py-2 px-1.5 sm:px-3 font-medium text-surface-500 dark:text-surface-400 cursor-pointer select-none hover:text-surface-700 dark:hover:text-surface-200 transition-colors" onClick={() => handleSort('users')}>
                                     <span className="hidden sm:inline">사용자</span><span className="sm:hidden">👤</span>{sortIndicator('users')}
                                 </th>
-                                <th className="text-right py-2 px-1.5 sm:px-3 font-medium cursor-pointer select-none hover:text-surface-700 dark:hover:text-surface-200 transition-colors" onClick={() => handleSort('vehicles')}>
+                                <th className="text-right py-2 px-1.5 sm:px-3 font-medium text-surface-500 dark:text-surface-400 cursor-pointer select-none hover:text-surface-700 dark:hover:text-surface-200 transition-colors" onClick={() => handleSort('vehicles')}>
                                     <span className="hidden sm:inline">차량</span><span className="sm:hidden">🚗</span>{sortIndicator('vehicles')}
                                 </th>
-                                <th className="text-right py-2 px-1.5 sm:px-3 font-medium cursor-pointer select-none hover:text-surface-700 dark:hover:text-surface-200 transition-colors" onClick={() => handleSort('logs')}>
+                                <th className="text-right py-2 px-1.5 sm:px-3 font-medium text-surface-500 dark:text-surface-400 cursor-pointer select-none hover:text-surface-700 dark:hover:text-surface-200 transition-colors" onClick={() => handleSort('logs')}>
                                     <span className="hidden sm:inline">운행 횟수</span><span className="sm:hidden">📊</span>{sortIndicator('logs')}
                                 </th>
-                                <th className="text-right py-2 px-1.5 sm:px-3 font-medium cursor-pointer select-none hover:text-surface-700 dark:hover:text-surface-200 transition-colors" onClick={() => handleSort('lastDriveDate')}>
+                                <th className="text-right py-2 px-1.5 sm:px-3 font-medium text-surface-500 dark:text-surface-400 cursor-pointer select-none hover:text-surface-700 dark:hover:text-surface-200 transition-colors" onClick={() => handleSort('lastDriveDate')}>
                                     <span className="hidden sm:inline">최근 운행</span><span className="sm:hidden">📅</span>{sortIndicator('lastDriveDate')}
                                 </th>
                                 <th className="text-center py-2 px-1.5 sm:px-3 font-medium hidden sm:table-cell">온보딩</th>
@@ -197,7 +206,7 @@ export default function DashboardOrgTable({
                                 >
                                     <input name="lat" type="number" step="any" placeholder="위도 (lat)" className="w-24 px-2 py-1.5 text-xs rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-700 text-surface-800 dark:text-surface-200" />
                                     <input name="lng" type="number" step="any" placeholder="경도 (lng)" className="w-24 px-2 py-1.5 text-xs rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-700 text-surface-800 dark:text-surface-200" />
-                                    <button type="submit" className="px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors disabled:opacity-50">
+                                    <button type="submit" className="px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600 rounded-lg transition-colors disabled:opacity-50">
                                         저장
                                     </button>
                                 </form>

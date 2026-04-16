@@ -51,6 +51,10 @@ export const createReservationSafe = onCall(
                 const vehicleRef = db.collection("vehicles").doc(vehicleId);
                 await transaction.get(vehicleRef);
 
+                const orgRef = db.collection("organizations").doc(organizationId);
+                const orgSnap = await transaction.get(orgRef);
+                const requireReservationApproval = orgSnap.exists ? (orgSnap.data()?.requireReservationApproval || false) : false;
+
                 const existingSnap = await transaction.get(
                     db.collection("reservations")
                         .where("organizationId", "==", organizationId)
@@ -98,7 +102,7 @@ export const createReservationSafe = onCall(
                     routeTollFee: routeTollFee || null,
                     ...(groupId ? { groupId } : {}),
                     ...(source ? { source } : {}),
-                    status: "reserved",
+                    status: requireReservationApproval ? "pending" : "reserved",
                     createdAt: FieldValue.serverTimestamp(),
                 });
 

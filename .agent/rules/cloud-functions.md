@@ -51,53 +51,30 @@ const db = getFirestore();
 
 ---
 
-## 3. 함수 유형별 설정
+## 3. 함수 유형별 필수 설정
 
-### 3.1 HTTP 함수
+> 상세 코드 템플릿은 [add-cloud-function 스킬](../skills/add-cloud-function/SKILL.md)을 참고한다.
 
-```ts
-import { onRequest } from "firebase-functions/v2/https";
+### 3.1 공통 필수 설정
 
-export const myFunction = onRequest(
-    {
-        region: "asia-northeast3",
-        cors: true,
-    },
-    async (req, res) => { ... }
-);
-```
+| 설정 | 값 | 이유 |
+|------|-----|------|
+| `region` | `asia-northeast3` (서울) | 사용자가 한국에 집중, 지연 최소화 |
+| `cors` | `true` (HTTP 함수) | 프론트엔드에서 직접 호출 시 CORS 필요 |
+| `timeZone` | `Asia/Seoul` (스케줄 함수) | 한국 시간 기준으로 실행 |
+| `retryCount` | `0` (스케줄 함수) | 중복 실행 방지 |
 
-- **리전**: `asia-northeast3` (서울) 고정
-- **CORS**: `cors: true` 필수
-- **메모리/타임아웃**: 무거운 작업은 명시 (`memory: "512MiB"`, `timeoutSeconds: 120`)
+### 3.2 무거운 작업
 
-### 3.2 스케줄 함수
+기본값(`256MiB`, `60s`)으로 부족한 경우에만 명시한다:
+- OCR/AI 함수: `memory: "512MiB"`, `timeoutSeconds: 120`
+- 백업/아카이빙: `memory: "1GiB"`, `timeoutSeconds: 540`
 
-```ts
-import { onSchedule } from "firebase-functions/v2/scheduler";
+### 3.3 Firestore 트리거 무한 루프 방지
 
-export const mySchedule = onSchedule(
-    {
-        schedule: "every 5 minutes",
-        timeZone: "Asia/Seoul",
-        retryCount: 0,
-    },
-    async () => { ... }
-);
-```
-
-- **타임존**: `Asia/Seoul` 고정
-- **retryCount**: 일반적으로 `0` (중복 실행 방지)
-
-### 3.3 Firestore 트리거
-
-```ts
-import { onDocumentCreated, onDocumentUpdated, onDocumentDeleted }
-    from "firebase-functions/v2/firestore";
-```
-
-- **무한 루프 방지**: 트리거가 같은 문서를 수정하는 경우, `syncSource` 같은 플래그로 제어
-- **calendarEventId 패턴**: 외부 ID를 Firestore에 저장할 때, 해당 업데이트가 트리거를 다시 호출하지 않도록 조건 추가
+트리거가 같은 문서를 수정하는 경우 반드시 제어 장치를 둔다:
+- `syncSource` 플래그: 외부 동기화(캘린더 등)로 인한 업데이트를 구별
+- 변경 필드 비교: `before.data()` vs `after.data()`에서 실제 변경이 있을 때만 동작
 
 ### 3.4 데이터 무결성 및 동시성 제어 활용
 

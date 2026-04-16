@@ -12,6 +12,7 @@ import { useToast } from '../../hooks/useToast';
 import HolidayManager from './HolidayManager';
 import FeedbackForm from '../common/FeedbackForm';
 import UserManual from '../common/UserManual';
+import AskAIModal from '../common/AskAIModal';
 
 export default function Settings() {
     const { user } = useAuth();
@@ -27,6 +28,7 @@ export default function Settings() {
 
     const [showFeedback, setShowFeedback] = useState(false);
     const [showManual, setShowManual] = useState(false);
+    const [showAskAI, setShowAskAI] = useState(false);
     const { permission, requestPermission } = useNotification();
     const { showToast } = useToast();
     const notifApiAvailable = typeof window !== 'undefined' && 'Notification' in window;
@@ -105,6 +107,33 @@ export default function Settings() {
                         </button>
                     </div>
                 </form>
+            </div>
+
+            {/* 예약 승인 설정 */}
+            <div className="glass-card p-6 mb-6">
+                <div className="flex items-center justify-between mb-1">
+                    <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100">예약 관리자 승인</h2>
+                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <span className={`text-xs font-medium ${!form.requireReservationApproval ? 'text-surface-400' : 'text-primary-600 dark:text-primary-400'}`}>
+                            {form.requireReservationApproval ? '사용' : '사용 안함'}
+                        </span>
+                        <button
+                            type="button"
+                            role="switch"
+                            aria-checked={form.requireReservationApproval}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                handleSave(null, { requireReservationApproval: !form.requireReservationApproval });
+                            }}
+                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.requireReservationApproval ? 'bg-primary-600' : 'bg-surface-300 dark:bg-surface-600'}`}
+                        >
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${form.requireReservationApproval ? 'translate-x-6' : 'translate-x-1'}`} />
+                        </button>
+                    </label>
+                </div>
+                <p className="text-xs text-surface-400">
+                    💡 사용 시 직원들의 차량 예약이 즉시 확정되지 않고, 관리자의 승인을 거쳐야 합니다.
+                </p>
             </div>
 
             {/* 결재 라인 설정 */}
@@ -310,7 +339,28 @@ export default function Settings() {
 
                 <div className="border-t border-surface-100 dark:border-surface-700 my-3" />
 
-                {/* 의견남기기 */}
+                {/* AI에게 물어보기 */}
+                <button
+                    onClick={() => setShowAskAI(true)}
+                    className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors text-left"
+                >
+                    <div className="w-10 h-10 bg-blue-100 dark:bg-blue-900/40 rounded-full flex items-center justify-center flex-shrink-0">
+                        <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904 9 18.75l-.813-2.846a4.5 4.5 0 0 0-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 0 0 3.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 0 0 3.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 0 0-3.09 3.09ZM18.259 8.715 18 9.75l-.259-1.035a3.375 3.375 0 0 0-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 0 0 2.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 0 0 2.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 0 0-2.455 2.456ZM16.894 20.567 16.5 21.75l-.394-1.183a2.25 2.25 0 0 0-1.423-1.423L13.5 18.75l1.183-.394a2.25 2.25 0 0 0 1.423-1.423l.394-1.183.394 1.183a2.25 2.25 0 0 0 1.423 1.423l1.183.394-1.183.394a2.25 2.25 0 0 0-1.423 1.423Z" />
+                        </svg>
+                    </div>
+                    <div className="flex-1">
+                        <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">AI에게 물어보기</p>
+                        <p className="text-xs text-surface-400">앱 사용법이 궁금할 때 AI에게 물어보세요</p>
+                    </div>
+                    <svg className="w-4 h-4 text-surface-300" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                    </svg>
+                </button>
+
+                <div className="border-t border-surface-100 dark:border-surface-700 my-3" />
+
+                {/* 건의하기 */}
                 <button
                     onClick={() => setShowFeedback(true)}
                     className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors text-left"
@@ -321,7 +371,7 @@ export default function Settings() {
                         </svg>
                     </div>
                     <div className="flex-1">
-                        <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">개발자에게 의견남기기</p>
+                        <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">개발자에게 건의하기</p>
                         <p className="text-xs text-surface-400">소셜프리즘 · ehsheh@gmail.com</p>
                     </div>
                     <svg className="w-4 h-4 text-surface-300" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -332,6 +382,7 @@ export default function Settings() {
 
             {showFeedback && <FeedbackForm onClose={() => setShowFeedback(false)} />}
             {showManual && <UserManual role="admin" onClose={() => setShowManual(false)} />}
+            <AskAIModal isOpen={showAskAI} onClose={() => setShowAskAI(false)} />
 
 
         </div>

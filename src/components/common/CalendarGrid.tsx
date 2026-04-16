@@ -75,9 +75,11 @@ export default function CalendarGrid({
                                 <div className={`absolute bottom-0.5 left-1/2 -translate-x-1/2 flex gap-0.5`}>
                                     {day.reservations.slice(0, 3).map((r, idx) => {
                                         const isGroup = !!r.groupId;
+                                        const isRecurring = !!r.recurringGroupId;
                                         return (
                                             <div key={idx} className={`w-1 h-1 rounded-full ${
                                                 isSelected ? 'bg-white dark:bg-surface-800' :
+                                                isRecurring ? 'bg-purple-500' :
                                                 isGroup ? 'bg-blue-500' : 'bg-primary-500'
                                             }`} />
                                         );

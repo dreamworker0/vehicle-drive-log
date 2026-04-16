@@ -54,5 +54,5 @@ jobs:
       - name: Bundle size check
         run: npx tsx scripts/check-bundle-size.ts
 
-      - name: Security audit (non-blocking)
-        run: npm audit --audit-level=critical || true
+      - name: Security audit
+        run: npm run audit

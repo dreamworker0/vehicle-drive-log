@@ -62,7 +62,7 @@ export default function WeekReservationList({
                                         <p className="text-sm font-medium text-surface-800 dark:text-surface-200 truncate">{res.vehicleName || vehicle?.displayName || vehicle?.name || ''}</p>
                                         <p className="text-xs text-surface-400">
                                             {res.startTime} ~ {res.endTime}
-                                            {res.destination && <span className="text-surface-500 font-medium ml-1">· {res.destination}</span>}
+                                            {res.destination && <span className="text-surface-500 dark:text-surface-400 font-medium ml-1">· {res.destination}</span>}
                                         </p>
                                     </div>
                                 </div>

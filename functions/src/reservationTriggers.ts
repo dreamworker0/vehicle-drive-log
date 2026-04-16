@@ -33,35 +33,42 @@ export const onReservationCreated = onDocumentCreated("reservations/{reservation
         return;
     }
 
-    try {
-        const calendarId = await getVehicleCalendarId(reservation.vehicleId);
-        if (!calendarId) {
-            console.log("Vehicle " + reservation.vehicleId + ": no calendar ID, skip");
-            return;
+    // 승인 대기(pending) 상태라면 캘린더 이벤트를 만들지 않음
+    if (reservation.status !== 'pending') {
+        try {
+            const calendarId = await getVehicleCalendarId(reservation.vehicleId);
+            if (!calendarId) {
+                console.log("Vehicle " + reservation.vehicleId + ": no calendar ID, skip");
+                // 캘린더 연동을 안해도 실패 처리는 아님, 알림 로직으로 넘어가도록 수정
+            } else {
+                const eventId = await createCalendarEvent(calendarId, reservation as any);
+
+                // 생성된 이벤트 ID를 예약 문서에 저장
+                await getFirestore().collection("reservations").doc(reservationId).update({
+                    calendarEventId: eventId,
+                });
+
+                console.log("Reservation " + reservationId + ": calendar event created (" + eventId + ")");
+            }
+        } catch (err: unknown) {
+            console.error("Reservation " + reservationId + ": calendar event creation failed", (err as Error).message);
         }
-
-        const eventId = await createCalendarEvent(calendarId, reservation as any);
-
-        // 생성된 이벤트 ID를 예약 문서에 저장
-        await getFirestore().collection("reservations").doc(reservationId).update({
-            calendarEventId: eventId,
-        });
-
-        console.log("Reservation " + reservationId + ": calendar event created (" + eventId + ")");
-    } catch (err: unknown) {
-        console.error("Reservation " + reservationId + ": calendar event creation failed", (err as Error).message);
+    } else {
+        console.log("Reservation " + reservationId + ": status is pending, skipping calendar event creation");
     }
 
-    // 푸시 알림 전송 (예약 생성자 제외)
+    // 푸시 알림 전송 (예약 관리자/지정 수신자에게)
     try {
         if (reservation.organizationId) {
+            const title = reservation.status === 'pending' ? '새 예약 신청 (승인 대기)' : '새 차량 예약';
+            const body = reservation.status === 'pending' 
+                ? `${reservation.reservedByName || '사용자'}님이 ${reservation.vehicleName || '차량'} 예약을 신청했습니다. 승인 대기 중입니다.` 
+                : `${reservation.reservedByName || '사용자'}님이 ${reservation.vehicleName || '차량'} 예약 (${reservation.date} ${reservation.startTime || ''})`;
+            
             await sendPushToOrg(
                 reservation.organizationId,
-                {
-                    title: '새 차량 예약',
-                    body: `${reservation.reservedByName || '사용자'}님이 ${reservation.vehicleName || '차량'} 예약 (${reservation.date} ${reservation.startTime || ''})`,
-                },
-                reservation.reservedBy
+                { title, body },
+                reservation.reservedByUid || reservation.reservedBy
             );
         }
     } catch (err: unknown) {
@@ -101,6 +108,39 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
         const calendarId = await getVehicleCalendarId(after.vehicleId);
 
         const eventId = after.calendarEventId;
+
+        // 반려된 경우 (pending -> rejected)
+        if (after.status === "rejected" && before.status === "pending") {
+            if (after.reservedByUid || after.userId) {
+                const uid = after.reservedByUid || after.userId;
+                const bodyMsg = `${after.vehicleDisplayName || "차량"} 예약이 반려되었습니다.${after.rejectedReason ? ` 사유: ${after.rejectedReason}` : ''}`;
+                await createInAppNotification(uid, "reservation_rejected", "❌ 예약 반려", bodyMsg, after.organizationId);
+                await sendPushToUser(uid, { title: "❌ 예약 반려", body: bodyMsg });
+            }
+            return;
+        }
+
+        // 승인된 경우 (pending -> reserved)
+        if (after.status === "reserved" && before.status === "pending") {
+            let newEventId = eventId;
+            if (calendarId && !eventId) {
+                try {
+                    newEventId = await createCalendarEvent(calendarId, after as any);
+                    await getFirestore().collection("reservations").doc(reservationId).update({
+                        calendarEventId: newEventId,
+                    });
+                } catch(e) {
+                    console.error("Calendar creation failed on approval:", e);
+                }
+            }
+            if (after.reservedByUid || after.userId) {
+                const uid = after.reservedByUid || after.userId;
+                const bodyMsg = `${after.vehicleDisplayName || "차량"} 예약이 승인되었습니다. (${after.date} ${after.startTime || ""})`;
+                await createInAppNotification(uid, "reservation_approved", "✅ 예약 승인", bodyMsg, after.organizationId);
+                await sendPushToUser(uid, { title: "✅ 예약 승인", body: bodyMsg });
+            }
+            return;
+        }
 
         // 취소된 경우 -> 이벤트 삭제 + 알림
         if (after.status === "cancelled" && before.status !== "cancelled") {
