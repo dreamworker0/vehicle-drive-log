@@ -16,7 +16,11 @@ vi.mock('../../hooks/useToast', () => ({
 }));
 
 vi.mock('../../hooks/useRetry', () => ({
-    default: () => { },
+    default: () => ({
+        runWithRetry: async (_: string, fn: () => Promise<unknown>) => await fn(),
+        resetRetry: vi.fn(),
+        isNetworkError: () => false,
+    }),
 }));
 
 const mockOcrReturn = {
