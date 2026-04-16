@@ -20,6 +20,9 @@ node --version
 ```
 Working directory: `.`
 
+> [!IMPORTANT]
+> 프로덕션 빌드 시 Sentry 소스맵을 원활히 업로드하려면 환경변수(또는 `.env.local`)에 `SENTRY_AUTH_TOKEN`이 설정되어 있어야 합니다. (필요 시 확인)
+
 3. Build for production:
 ```
 npm run build

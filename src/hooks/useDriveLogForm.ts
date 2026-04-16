@@ -2,7 +2,7 @@
  * useDriveLogForm — 운행일지 작성/수정 폼의 상태 관리 + 비즈니스 로직
  * DriveLogForm에서 추출된 커스텀 훅
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
@@ -166,8 +166,7 @@ export default function useDriveLogForm() {
             }
         };
         fetch();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [orgId, reservationData, user]);
+    }, [orgId, reservationData?.vehicleId, reservationData?.vehicleName, reservationData?.purpose, reservationData?.destination, user, isEditMode, editLog?.passengerNames]);
 
     // URL 쿼리 파라미터에서 reservationId로 예약 데이터 로드 (알림 클릭 시)
     useEffect(() => {
@@ -214,8 +213,7 @@ export default function useDriveLogForm() {
             }
         };
         loadReservation();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [queryReservationId, orgId]);
+    }, [queryReservationId, orgId, resolvedReservationData, showToast, navigate, form.startTime]);
 
     useEffect(() => {
         // 수정 모드에서는 기존 기록의 startKm을 유지 (최신 endKm으로 덮어쓰지 않음)
@@ -227,8 +225,7 @@ export default function useDriveLogForm() {
             startTime: form.startTime,
             vehicle: v || null,
         }).then(km => setForm(prev => ({ ...prev, startKm: km })));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [form.driveDate, form.vehicleId, form.startTime, orgId, vehicles]);
+    }, [form.driveDate, form.vehicleId, form.startTime, orgId, vehicles, isEditMode]);
 
     // 전기차: 이전 운행일지의 도착 배터리 조회 (출발 배터리 placeholder 힌트)
     useEffect(() => {
@@ -262,7 +259,7 @@ export default function useDriveLogForm() {
         loadHipass();
     }, [orgId, form.vehicleId]);
 
-    const handleVehicleSelect = async (vehicleId: string) => {
+    const handleVehicleSelect = useCallback(async (vehicleId: string) => {
         const v = vehicles.find(veh => veh.id === vehicleId);
         const km = await resolveStartKm(orgId!, vehicleId, {
             driveDate: form.driveDate,
@@ -275,13 +272,13 @@ export default function useDriveLogForm() {
             vehicleName: v?.displayName || v?.name || '',
             startKm: km,
         }));
-    };
+    }, [orgId, form.driveDate, form.startTime, vehicles]);
 
-    const handleFavoriteSelect = (fav: Favorite) => {
+    const handleFavoriteSelect = useCallback((fav: Favorite) => {
         setForm(prev => ({ ...prev, destination: fav.address || fav.destination }));
-    };
+    }, []);
 
-    const handleSaveFavorite = async () => {
+    const handleSaveFavorite = useCallback(async () => {
         if (!form.destination.trim() || !user) return;
         try {
             await createFavorite({
@@ -297,15 +294,15 @@ export default function useDriveLogForm() {
         } catch (err) {
             console.error('즐겨찾기 저장 실패:', err);
         }
-    };
+    }, [form.destination, user, favName, orgId]);
 
-    const togglePassenger = (member: UserDoc) => {
+    const togglePassenger = useCallback((member: UserDoc) => {
         setSelectedPassengers(prev => {
             const exists = prev.find(p => p.id === member.id);
             if (exists) return prev.filter(p => p.id !== member.id);
             return [...prev, member];
         });
-    };
+    }, []);
 
     const handleSubmit = async (e: React.FormEvent | Event) => {
         if (e && 'preventDefault' in e) e.preventDefault();
@@ -327,15 +324,27 @@ export default function useDriveLogForm() {
                     reservationData, hipassCard,
                 }),
                 {
-                    timeoutMs: 30000, // Firestore 콜드스타트 및 느린 3G 네트워크 환경 고려하여 타임아웃 30초로 증가
+                    timeoutMs: 8000, // UX 개선: 8초 안에 응답이 없으면 오프라인 큐 저장으로 간주하고 처리 종료
                     onError: (err: unknown) => {
-                        console.error('운행일지 저장 실패:', err);
+                        const isDuplicate = err instanceof Error && err.message?.includes('중복');
+                        const isTimeout = err instanceof Error && err.message?.includes('TIMEOUT');
                         
-                        // 중복 저장 에러: 타임아웃 등으로 첫 번째 저장 시도가 보이지 않게 성공한 후 사용자가 재시도한 경우
-                        if (err instanceof Error && err.message?.includes('중복')) {
-                            showToast('요청된 내용이 정상 반영되어 이미 목록에 저장되었습니다.', 'success');
+                        if (isDuplicate || isTimeout) {
+                            console.warn(`[useDriveLogForm] ${err instanceof Error ? err.message : '알 수 없는 경고'}`);
+                        } else {
+                            console.error('운행일지 저장 실패:', err);
+                        }
+                        
+                        // 중복 저장 또는 타임아웃 발생 시, 완료(Success) 상태로 간주하고 UI 처리
+                        if (isDuplicate || isTimeout) {
+                            if (isTimeout) {
+                                showToast('네트워크 지연으로 운행일지를 로컬에 임시 저장했습니다. 연결 시 동기화됩니다.', 'success');
+                            } else {
+                                showToast('요청된 내용이 정상 반영되어 이미 목록에 저장되었습니다.', 'success');
+                            }
+                            
                             setSuccess(true);
-                            if (reservationData?.reservationId) {
+                            if (reservationData?.reservationId || reservationData?.actualStartTime) {
                                 navigate('/employee/today', { replace: true });
                             } else if (isEditMode) {
                                 navigate('/employee/my-records', { replace: true });
@@ -345,23 +354,14 @@ export default function useDriveLogForm() {
                                 setExternalPassengerCount(0);
                                 setTimeout(() => setSuccess(false), 2000);
                             }
-                            return true; // 에러로서 표시하지 않고 종료
-                        }
-                        
-                        // 타임아웃 에러
-                        if (err instanceof Error && err.message?.includes('TIMEOUT')) {
-                            showToast('서버 연결이 원활하지 않아 응답이 늦어지고 있습니다. 백그라운드에서 저장이 성공했을 수 있습니다.', 'error', {
-                                actionLabel: '다시 제출 시도',
-                                onAction: () => handleSubmit(new Event('submit') as any)
-                            });
-                            return true;
+                            return true; // 에러로서 표시하지 않고 정상 플로우 종료
                         }
                         
                         // 그 외 단일 에러
                         return false; 
                     }
                 }
-            ) as any;
+            ) as { syncResult?: { updated: boolean; oldStartKm?: number; newStartKm?: number; }; correctedKm?: { oldStartKm?: number; correctedStartKm?: number; }; offline?: boolean; message?: string; shouldResetForm?: boolean; shouldNavigate?: string; } | undefined;
 
             if (!result) return;
 

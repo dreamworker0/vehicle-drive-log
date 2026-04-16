@@ -33,7 +33,7 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
   });
 
   // Mock Contexts
-  const setupContext = (uid: string, token: Record<string, any>) => testEnv.authenticatedContext(uid, token);
+  const setupContext = (uid: string, token: Record<string, unknown>) => testEnv.authenticatedContext(uid, token);
   const _unauthContext = () => testEnv.unauthenticatedContext();
 
   it('1. 타 조직 데이터 접근 공격 (Tenant Isolation)', async () => {

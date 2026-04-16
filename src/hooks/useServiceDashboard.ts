@@ -135,21 +135,10 @@ export default function useServiceDashboard() {
         return sortDir === 'asc' ? '▲' : '▼';
     };
 
-    useEffect(() => {
-        const cachedTime = sessionStorage.getItem('svc_dashboard_cache_time');
-        const now = Date.now();
 
-        // 5분 내 재진입 시 로딩 애니메이션 생략 (UI 블로킹 방지)
-        const isBackground = cachedTime && (now - parseInt(cachedTime) < 5 * 60 * 1000);
-        if (isBackground) {
-            setLoading(false);
-        }
-
-        loadAllStats(!!isBackground);
-    }, []);
 
     // ── 캐시 문서 데이터를 state에 반영하는 헬퍼 ──
-    const applyCacheDocuments = (
+    const applyCacheDocuments = useCallback((
         statsSnap: Awaited<ReturnType<typeof getDoc>>,
         timeSeriesSnap: Awaited<ReturnType<typeof getDoc>>,
         orgRankingsSnap: Awaited<ReturnType<typeof getDoc>>,
@@ -213,9 +202,9 @@ export default function useServiceDashboard() {
             setOrgAvgDuration(r.orgAvgDuration);
             setFunnelData(r.funnelData);
         }
-    };
+    }, []);
 
-    const loadAllStats = async (isBackground = false) => {
+    const loadAllStats = useCallback(async (isBackground = false) => {
         if (!isBackground) setLoading(true);
         try {
             // 캐시 문서 3건 + 독립 통계 3건 병렬 로드
@@ -265,7 +254,20 @@ export default function useServiceDashboard() {
         } finally {
             if (!isBackground) setLoading(false);
         }
-    };
+    }, [applyCacheDocuments]);
+
+    useEffect(() => {
+        const cachedTime = sessionStorage.getItem('svc_dashboard_cache_time');
+        const now = Date.now();
+
+        // 5분 내 재진입 시 로딩 애니메이션 생략 (UI 블로킹 방지)
+        const isBackground = cachedTime && (now - parseInt(cachedTime) < 5 * 60 * 1000);
+        if (isBackground) {
+            setLoading(false);
+        }
+
+        loadAllStats(!!isBackground);
+    }, [loadAllStats]);
 
     /**
      * 서버 측 대시보드 통계 재계산 요청 (Cloud Function 호출)

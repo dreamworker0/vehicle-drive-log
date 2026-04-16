@@ -56,7 +56,7 @@ export default function PendingReservationList() {
         };
 
         fetchData();
-    }, [userData?.organizationId]);
+    }, [userData?.organizationId, showToast]);
 
     const handleApprove = async (id: string) => {
         await runWithRetry(`approve-res-${id}`, async () => {
@@ -64,8 +64,8 @@ export default function PendingReservationList() {
             showToast('예약이 승인되었습니다.', 'success');
         }, {
             errorMessage: '예약 승인에 실패했습니다.',
-            onError: (error: any) => {
-                if (error?.message && error.message.includes('동시성 오류')) {
+            onError: (error: unknown) => {
+                if (error instanceof Error && error.message.includes('동시성 오류')) {
                     showToast('이미 처리되어 상태가 변경된 예약입니다.', 'error');
                     return true;
                 }
@@ -94,8 +94,8 @@ export default function PendingReservationList() {
             showToast('예약이 반려되었습니다.', 'success');
         }, {
             errorMessage: '예약 반려 처리에 실패했습니다.',
-            onError: (error: any) => {
-                if (error?.message && error.message.includes('동시성 오류')) {
+            onError: (error: unknown) => {
+                if (error instanceof Error && error.message.includes('동시성 오류')) {
                     showToast('이미 처리되어 상태가 변경된 예약입니다.', 'error');
                     return true;
                 }

@@ -71,7 +71,13 @@ export default function useRetry({ maxRetries = 2, retryLabel = '재시도' } = 
             retryCountRef.current.delete(key);
             return result;
         } catch (err) {
-            console.error(`[useRetry:${key}]`, err);
+            const isTimeoutOrDuplicate = err instanceof Error && (err.message.includes('TIMEOUT') || err.message.includes('중복'));
+            if (isTimeoutOrDuplicate) {
+                console.warn(`[useRetry:${key}] ${err.message}`);
+            } else {
+                console.error(`[useRetry:${key}]`, err);
+            }
+
             const handled = opts.onError ? opts.onError(err) : false;
             if (handled === true) return undefined; // 에러 처리를 위임하고 기본 플로우 종료
 

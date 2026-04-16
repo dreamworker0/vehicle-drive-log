@@ -15,7 +15,7 @@
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
-    "test:rules": "vitest run tests/firestore-rules.test.ts",
+    "test:rules": "firebase emulators:exec --only firestore \"vitest run tests/firestore-rules.test.ts\"",
     "audit": "tsx scripts/security-audit.ts",
     "health": "tsx scripts/check-functions-health.ts",
     "test:e2e": "playwright test",

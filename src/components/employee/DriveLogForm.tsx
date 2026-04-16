@@ -2,7 +2,7 @@
  * DriveLogForm — 운행일지 작성/수정 폼
  * 로직은 useDriveLogForm 훅으로 분리, UI만 담당
  */
-import { useMemo } from 'react';
+import { useMemo, memo } from 'react';
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
 import useDriveLogForm from '../../hooks/useDriveLogForm';
 import useVehiclePriority from '../../hooks/useVehiclePriority';
@@ -22,7 +22,7 @@ function getMinDateStr(): string {
 }
 
 /** 운행 일자 및 시각 선택 섹션 (수정 모드에서만 표시) */
-function DateSection({ form, setForm, isRetroactive }: {
+const DateSection = memo(function DateSection({ form, setForm, isRetroactive }: {
     form: DriveLogFormType;
     setForm: (f: DriveLogFormType) => void;
     isRetroactive: boolean;
@@ -75,7 +75,7 @@ function DateSection({ form, setForm, isRetroactive }: {
             </div>
         </div>
     );
-}
+});
 
 export default function DriveLogForm() {
     const {

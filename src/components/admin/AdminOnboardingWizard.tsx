@@ -4,6 +4,7 @@
  */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '../../hooks/useToast';
 
 interface Props {
     inviteCode: string;
@@ -23,29 +24,29 @@ const LS_KEY = 'admin-onboarding-dismissed';
 const STEPS = [
     {
         icon: '🚗',
-        title: '차량을 등록하세요',
-        desc: '운행일지를 작성하려면 먼저 차량이 필요합니다.\n차량번호, 모델명, 연료 유형을 입력하면 끝!',
+        title: 'STEP 1: 차량 정보 등록',
+        desc: '운행일지를 작성할 차량을 먼저 등록해주세요.\n차량번호, 모델명, 연료 정보만 입력하면 됩니다.',
         action: '차량 등록하러 가기',
         path: '/admin/vehicles',
     },
     {
         icon: '👥',
-        title: '직원을 등록하세요',
-        desc: '직원 이름과 이메일을 미리 등록해놓으면,\n초대 링크로 가입할 때 자동으로 매칭됩니다.',
-        action: '직원 관리 열기',
+        title: 'STEP 2: 직원 명단 등록 (선택)',
+        desc: '팀원들의 이름과 이메일을 미리 등록해두면,\n직원들이 가입할 때 번거로운 승인 절차 없이 즉시 합류할 수 있습니다.',
+        action: '직원 명단 추가하기',
         path: '/admin/employees',
     },
     {
         icon: '🔗',
-        title: '초대 링크를 공유하세요',
-        desc: '아래 링크를 직원들에게 보내주세요.\n링크를 클릭하면 기관에 자동으로 연결됩니다.',
+        title: 'STEP 3: 전용 초대 링크 공유',
+        desc: '설정이 준비되었습니다! 아래의 기관 전용 초대 링크를 복사하여\n카카오톡이나 사내 메신저로 팀원들에게 공유해주세요.',
         action: null,
         path: null,
     },
     {
-        icon: '✅',
-        title: '준비 완료!',
-        desc: '직원들이 초대 링크를 통해 가입하면\n바로 차량 예약과 운행일지 작성이 가능합니다.',
+        icon: '🎉',
+        title: '가입 및 운행 시작',
+        desc: '팀원들이 초대 링크를 통해 가입하면\n스마트폰만으로 간편하게 차량 예약과 일지 작성을 시작할 수 있습니다.',
         action: null,
         path: null,
     },
@@ -54,6 +55,7 @@ const STEPS = [
 export default function AdminOnboardingWizard({ inviteCode, onDismiss }: Props) {
     const [step, setStep] = useState(0);
     const navigate = useNavigate();
+    const { showToast } = useToast();
     const current = STEPS[step];
     const isLast = step === STEPS.length - 1;
 
@@ -118,7 +120,9 @@ export default function AdminOnboardingWizard({ inviteCode, onDismiss }: Props) 
                         <button
                             onClick={() => {
                                 const link = `https://vehicle-drive-log.web.app?code=${inviteCode}`;
-                                navigator.clipboard?.writeText(link);
+                                navigator.clipboard?.writeText(link)
+                                    .then(() => showToast('초대 링크가 클립보드에 복사되었습니다.', 'success'))
+                                    .catch(() => showToast('링크 복사에 실패했습니다.', 'error'));
                             }}
                             className="btn-secondary btn-sm inline-flex items-center gap-1.5"
                         >

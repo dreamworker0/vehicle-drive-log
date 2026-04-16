@@ -199,7 +199,7 @@ export default function useVehicleManager() {
                     displayName: form.displayName.trim(),
                     modelName: form.modelName.trim(),
                     plateNumber: form.plateNumber.trim(),
-                    vehicleType: form.vehicleType as any,
+                    vehicleType: form.vehicleType as Vehicle['vehicleType'],
                     fuelType: form.fuelType as FuelType,
                     currentKm: form.currentKm ? parseInt(form.currentKm) : 0,
                     organizationId: orgId!,
@@ -240,8 +240,8 @@ export default function useVehicleManager() {
                 showToast('운행일지가 존재하는 차량은 삭제할 수 없습니다. 폐차 처리를 이용하세요.', 'error');
                 setModal(null);
                 // 강제 예외 발생으로 기본 success toast 및 재시도 방지 (이미 유저 알림 띄웠으므로)
-                const error = new Error('has_logs');
-                (error as any).isHandled = true;
+                const error = new Error('has_logs') as Error & { isHandled?: boolean };
+                error.isHandled = true;
                 throw error;
             }
             await deleteVehicle(vehicle.id);
@@ -250,7 +250,7 @@ export default function useVehicleManager() {
         }, {
             errorMessage: '차량 삭제 처리 중 오류가 발생했습니다.',
             onError: (err: unknown) => {
-                if ((err as any).isHandled) return true; // 이미 토스트 띄움
+                if ((err as Error & { isHandled?: boolean }).isHandled) return true; // 이미 토스트 띄움
                 return false; // 그 외 네트워크 에러 등은 공통 처리
             }
         });

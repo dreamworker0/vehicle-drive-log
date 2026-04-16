@@ -5,6 +5,7 @@
 import type { Request, Response } from "firebase-functions/node_modules/@types/express";
 import { getAuth } from "firebase-admin/auth";
 import { captureError, flushSentry } from "./sentry";
+import { sendDiscordAlert } from "./discord";
 
 type Severity = "DEBUG" | "INFO" | "WARNING" | "ERROR";
 
@@ -40,6 +41,18 @@ export function log(severity: Severity, functionName: string, message: string, e
     if (severity === "ERROR") {
         console.error(JSON.stringify(entry));
         captureError(new Error(message), { function: functionName, ...extra });
+        
+        // Discord Webhook으로 심각한 에러 즉시 알림
+        sendDiscordAlert({
+            title: `🚨 Cloud Function Error: ${functionName}`,
+            description: message,
+            fields: Object.entries(extra)
+                .map(([name, value]) => ({
+                    name,
+                    value: String(value).substring(0, 1024),
+                }))
+                .slice(0, 25), // Discord Embed 길이/필드 제한 방어
+        }).catch((e) => console.error("[Discord] 발송 실패", e));
     } else if (severity === "WARNING") {
         console.warn(JSON.stringify(entry));
     } else if (severity === "DEBUG") {

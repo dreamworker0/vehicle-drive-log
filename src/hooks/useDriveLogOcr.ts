@@ -53,29 +53,23 @@ export default function useDriveLogOcr({ isElectric, setForm, user, userData, ve
         setOcrImageUrl(null);
 
         try {
-            // 이미지를 Canvas로 리사이즈(최대 512px) + JPEG 압축 후 base64 변환
-            const base64 = await new Promise((resolve, reject) => {
-                const img = new Image();
-                const objectUrl = URL.createObjectURL(file);
-                img.onload = () => {
-                    URL.revokeObjectURL(objectUrl);
-                    const MAX = 1024;
-                    const scale = Math.min(1, MAX / Math.max(img.width, img.height));
-                    const canvas = document.createElement('canvas');
-                    canvas.width = Math.round(img.width * scale);
-                    canvas.height = Math.round(img.height * scale);
-                    canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    resolve(canvas.toDataURL('image/jpeg', 0.80));
-                };
-                img.onerror = reject;
-                img.src = objectUrl;
+            // browser-image-compression을 통해 WebWorker 기반 리사이즈 및 WebP 변환
+            const compressedFile = await imageCompression(file, {
+                maxSizeMB: 0.5,
+                maxWidthOrHeight: 1024,
+                useWebWorker: true,
+                fileType: 'image/webp'
             });
+            
+            const base64 = await imageCompression.getDataUrlFromFile(compressedFile);
 
-            // "data:image/jpeg;base64," 접두사 처리
-            const base64Data = (base64 as string).split(',')[1];
-            setOcrImageUrl(base64 as string);
+            // "data:image/webp;base64," 접두사 처리
+            const base64Data = base64.split(',')[1];
+            setOcrImageUrl(base64);
 
-            const result = await ocrDashboard(base64Data, 'image/jpeg', isElectric) as { km: number | null; battery: number | null; raw: string };
+            // OCR AI 서버에는 가급적 jpeg(또는 컨텍스트에 맞게) 전송하지만 OpenAI는 webp와 base64 모두 지원.
+            // mime-type 매개변수에 맞춰서 그대로 호출
+            const result = await ocrDashboard(base64Data, 'image/webp', isElectric) as { km: number | null; battery: number | null; raw: string };
 
             // 신고용으로 원본 이미지 + 결과 저장
             lastOcrRef.current = {
@@ -118,16 +112,16 @@ export default function useDriveLogOcr({ isElectric, setForm, user, userData, ve
             const imageUrls: string[] = [];
             if (ocrData.imageFile) {
                 const timestamp = Date.now();
-                const storageRef = ref(storage, `feedbacks/ocr-report/${user?.uid || 'unknown'}/${timestamp}.jpg`);
+                const storageRef = ref(storage, `feedbacks/ocr-report/${user?.uid || 'unknown'}/${timestamp}.webp`);
 
-                // 이미지 압축 (1200px)
+                // 이미지 압축 (1200px, WebP 변환)
                 let compressed: File | Blob = ocrData.imageFile;
                 try {
                     compressed = await imageCompression(ocrData.imageFile, {
                         maxSizeMB: 1,
                         maxWidthOrHeight: 1200,
                         useWebWorker: true,
-                        fileType: 'image/jpeg'
+                        fileType: 'image/webp'
                     });
                 } catch (err) {
                     console.error('이미지 압축 실패, 원본 유지:', err);

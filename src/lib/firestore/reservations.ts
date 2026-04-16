@@ -95,7 +95,7 @@ export const updateReservation = async (reservationId: string, data: Record<stri
     await updateDoc(doc(db, 'reservations', reservationId), data);
 };
 
-// 예약 상태 변경 (클라이언트 트랜잭션을 통한 동시성 제어 보호)
+// 예약 상태 변경 (온라인 트랜잭션 또는 오프라인 큐 낙관적 업데이트)
 export const updateReservationStatus = async (
     reservationId: string, 
     status: string, 
@@ -103,6 +103,17 @@ export const updateReservationStatus = async (
     expectedCurrentStatus?: string
 ) => {
     const reservationRef = doc(db, 'reservations', reservationId);
+    
+    // 운행 종료 등 사용자가 직접 업데이트하는 경우, 오프라인 큐 및 즉각적인 UI 반영(낙관적 업데이트)을 위해 일반 updateDoc 사용.
+    // expectedCurrentStatus가 들어오는 경우(관리자 승인 등)만 동시성 방어를 위해 트랜잭션(온라인 한정) 사용.
+    if (!expectedCurrentStatus) {
+        await updateDoc(reservationRef, {
+            status,
+            ...extraData,
+        });
+        return;
+    }
+
     await runTransaction(db, async (transaction) => {
         const sfDoc = await transaction.get(reservationRef);
         if (!sfDoc.exists()) {

@@ -121,29 +121,41 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
         }
     }
 
-    // 예약 상태 업데이트 (운행일지 저장 실패와 독립적으로 처리)
+    // 예약 상태 업데이트: 병목(waterfall) 방지를 위해 fire-and-forget 백그라운드 태스크로 전환
     if (!isEditMode && reservationData?.reservationId) {
-        try {
-            await updateReservationStatus(reservationData.reservationId, 'completed', {
-                actualStartTime: form.startTime || '',
-                actualEndTime: form.endTime || nowTime(),
-            });
-            await clearDrivingNotification(reservationData.reservationId);
-        } catch (e) {
-            console.warn('[submitDriveLog] 예약 상태 업데이트 실패:', e);
-        }
+        const resId = reservationData.reservationId;
+        const actualStart = form.startTime || '';
+        const actualEnd = form.endTime || nowTime();
+        
+        Promise.resolve().then(async () => {
+            try {
+                await updateReservationStatus(resId, 'completed', {
+                    actualStartTime: actualStart,
+                    actualEndTime: actualEnd,
+                });
+                await clearDrivingNotification(resId);
+            } catch (e) {
+                console.warn('[submitDriveLog] 예약 상태 업데이트 실패(백그라운드):', e);
+            }
+        });
     }
 
-    // 하이패스 잔액 업데이트 (운행일지 저장 실패와 독립적으로 처리)
+    // 하이패스 잔액 업데이트: 병목(waterfall) 방지를 위해 fire-and-forget 백그라운드 태스크로 전환
     if (hipassCard && form.hipassBalanceAfter !== '') {
-        try {
-            await updateHipassCard(hipassCard.id, {
-                balance: Number(form.hipassBalanceAfter),
-                organizationId: orgId,
-            });
-        } catch (e) {
-            console.warn('[submitDriveLog] 하이패스 잔액 업데이트 실패:', e);
-        }
+        const hipassId = hipassCard.id;
+        const bal = Number(form.hipassBalanceAfter);
+        const org = orgId;
+        
+        Promise.resolve().then(async () => {
+            try {
+                await updateHipassCard(hipassId, {
+                    balance: bal,
+                    organizationId: org,
+                });
+            } catch (e) {
+                console.warn('[submitDriveLog] 하이패스 잔액 업데이트 실패(백그라운드):', e);
+            }
+        });
     }
 
     // 결과 결정
