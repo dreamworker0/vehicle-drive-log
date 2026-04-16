@@ -71,7 +71,7 @@ export default function FeedbackManagement() {
                                         </span>
                                     )}
                                     {fb.userEmail && (
-                                        <span className="text-xs text-surface-400">
+                                        <span className="text-xs text-surface-400 dark:text-surface-500">
                                             {fb.userEmail}
                                         </span>
                                     )}
@@ -237,7 +237,7 @@ export default function FeedbackManagement() {
                                         <button
                                             onClick={() => handleRegenerateDraft(fb.id)}
                                             disabled={regeneratingDraftId === fb.id || sendingReply === fb.id}
-                                            className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-surface-500 hover:text-primary-600 bg-surface-100 dark:bg-surface-700 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                            className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-surface-500 dark:text-surface-400 hover:text-primary-600 dark:hover:text-primary-400 bg-surface-100 dark:bg-surface-700 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                             title="새로운 답변 초안 생성"
                                         >
                                             {regeneratingDraftId === fb.id ? (
@@ -544,7 +544,7 @@ export default function FeedbackManagement() {
                             <button
                                 onClick={handleDelete}
                                 disabled={deleting}
-                                className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-red-500 hover:bg-red-600 transition-colors disabled:opacity-50"
+                                className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 transition-colors disabled:opacity-50"
                             >
                                 {deleting ? '삭제 중...' : '삭제'}
                             </button>

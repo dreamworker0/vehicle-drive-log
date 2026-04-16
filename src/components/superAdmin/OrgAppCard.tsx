@@ -2,6 +2,9 @@
  * OrgAppCard — 기관 신청 카드 컴포넌트
  * OrgApplicationList에서 추출된 서브 컴포넌트
  */
+import { memo } from 'react';
+import { formatTimestampFull } from '../../lib/dateUtils';
+import DocumentViewer from '../common/DocumentViewer';
 import type { Organization } from '../../types';
 
 interface OrgAppCardProps {
@@ -17,7 +20,7 @@ interface OrgAppCardProps {
     onToggleImage: (id: string) => void;
 }
 
-export default function OrgAppCard({
+export default memo(function OrgAppCard({
     app,
     tab,
     actionLoading,
@@ -51,7 +54,7 @@ export default function OrgAppCard({
                                     ❌ AI: 거절 추천
                                 </span>
                             ) : (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-surface-100 text-surface-500 dark:text-surface-400 border border-surface-200 dark:border-surface-600">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium bg-surface-100 dark:bg-surface-800 text-surface-500 dark:text-surface-400 border border-surface-200 dark:border-surface-600">
                                     🔍 AI 분석 필요
                                 </span>
                             )
@@ -102,7 +105,7 @@ export default function OrgAppCard({
                             <div className="sm:col-span-2">
                                 <span className="text-surface-400">거절일:</span>
                                 <span className="ml-2 text-surface-700 dark:text-surface-300">
-                                    {typeof (app.rejectedAt as unknown as { toDate?: () => Date })?.toDate === 'function' ? (app.rejectedAt as unknown as { toDate: () => Date }).toDate().toLocaleDateString('ko-KR') : new Date(app.rejectedAt as unknown as string).toLocaleDateString('ko-KR')}
+                                    {formatTimestampFull(app.rejectedAt) || '-'}
                                 </span>
                             </div>
                         )}
@@ -110,9 +113,7 @@ export default function OrgAppCard({
                             <div className="sm:col-span-2">
                                 <span className="text-surface-400">신청일시:</span>
                                 <span className="ml-2 text-surface-700 dark:text-surface-300">
-                                    {typeof (app.createdAt as unknown as { toDate?: () => Date })?.toDate === 'function'
-                                        ? (app.createdAt as unknown as { toDate: () => Date }).toDate().toLocaleString('ko-KR', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })
-                                        : new Date(app.createdAt as unknown as string).toLocaleString('ko-KR', { year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                    {formatTimestampFull(app.createdAt) || '-'}
                                 </span>
                             </div>
                         )}
@@ -136,29 +137,7 @@ export default function OrgAppCard({
                                 {selectedApp === app.id ? '사본 닫기 ▲' : '증빙서류 사본 보기 ▼'}
                             </button>
                             {selectedApp === app.id && (
-                                (() => {
-                                    const url = app.uniqueNumberImageUrl || '';
-                                    const isPdf = /\.pdf($|\?)/i.test(url) || url.includes('%2F') && url.toLowerCase().includes('.pdf');
-                                    if (isPdf) {
-                                        return (
-                                            <a
-                                                href={url}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="mt-2 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-700 hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors text-sm font-medium animate-slide-down"
-                                            >
-                                                📄 PDF 증빙서류 보기 (새 창)
-                                            </a>
-                                        );
-                                    }
-                                    return (
-                                        <img
-                                            src={url}
-                                            alt="증빙서류"
-                                            className="mt-2 max-w-md rounded-lg border border-surface-200 dark:border-surface-600 animate-slide-down"
-                                        />
-                                    );
-                                })()
+                                <DocumentViewer url={app.uniqueNumberImageUrl || ''} />
                             )}
                         </div>
                     )}
@@ -197,7 +176,7 @@ export default function OrgAppCard({
                             </div>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-sm">
                                 <div className="flex items-center gap-1.5">
-                                    <span className={`w-2 h-2 rounded-full ${app.aiVerifyDetail.documentType === '고유번호증' || app.aiVerifyDetail.documentType === '사업자등록증(비영리)' ? 'bg-green-500' : 'bg-red-500'}`} />
+                                    <span className={`w-2 h-2 rounded-full ${app.aiVerifyDetail.documentType === '고유번호증' || app.aiVerifyDetail.documentType === '사업자등록증(비영리)' ? 'bg-green-500 dark:bg-green-400' : 'bg-red-500 dark:bg-red-400'}`} />
                                     <span className="text-surface-400">문서 유형:</span>
                                     <span className={`font-medium ${app.aiVerifyDetail.documentType === '고유번호증' || app.aiVerifyDetail.documentType === '사업자등록증(비영리)' ? 'text-green-700' : 'text-red-700'}`}>
                                         {app.aiVerifyDetail.documentType || '확인 불가'}
@@ -215,14 +194,14 @@ export default function OrgAppCard({
                                 )}
                                 {app.aiVerifyDetail.uniqueNumber && (
                                     <div className="flex items-center gap-1.5">
-                                        <span className="w-2 h-2 rounded-full bg-green-500" />
+                                        <span className="w-2 h-2 rounded-full bg-green-500 dark:bg-green-400" />
                                         <span className="text-surface-400">{app.aiVerifyDetail.documentType === '고유번호증' ? '고유번호:' : '사업자번호:'}</span>
                                         <span className="font-mono text-surface-700 dark:text-surface-300">{app.aiVerifyDetail.uniqueNumber}</span>
                                     </div>
                                 )}
                                 {app.aiVerifyDetail.address && (
                                     <div className="flex items-center gap-1.5 sm:col-span-2">
-                                        <span className="w-2 h-2 rounded-full bg-green-500" />
+                                        <span className="w-2 h-2 rounded-full bg-green-500 dark:bg-green-400" />
                                         <span className="text-surface-400">주소:</span>
                                         <span className="text-surface-700 dark:text-surface-300">{app.aiVerifyDetail.address}</span>
                                         <a
@@ -295,4 +274,4 @@ export default function OrgAppCard({
             </div>
         </div>
     );
-}
+});

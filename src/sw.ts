@@ -97,14 +97,20 @@ async function processBackgroundSync() {
     }
 
     // 2. 창이 모두 닫힌 상태라면 직접 백그라운드에서 실행합니다.
+    // 주의: offlineSyncProcessor → firebase.ts 체인에서 browserLocalPersistence가
+    //       window 객체를 참조하므로 Service Worker 환경에서는 에러가 발생할 수 있습니다.
+    //       이 경우 다음 활성 클라이언트에서 큐를 처리하도록 위임합니다.
     console.log('[SW] 활성 클라이언트 없음 - 백그라운드에서 직접 큐 처리 시도');
     try {
-        // 기존 offlineSyncProcessor의 전송 로직을 동적으로 불러옵니다.
-        // Worker 컨텍스트에서 Firestore를 사용할 때 번들 용량을 최적화하기 위함입니다.
         const { processOfflineQueue } = await import('./lib/offlineSyncProcessor');
         await processOfflineQueue();
         console.log('[SW] 백그라운드 오프라인 큐 처리 완료');
     } catch (err) {
+        // window/document 참조 에러는 SW 환경의 정상적인 제약 — 다음 클라이언트 활성화 시 처리
+        if (err instanceof ReferenceError && (err.message.includes('window') || err.message.includes('document'))) {
+            console.warn('[SW] Service Worker에서 window/document 접근 불가 — 다음 클라이언트 활성화 시 큐 처리 예정');
+            return;
+        }
         console.error('[SW] 백그라운드 오프라인 큐 처리 실패:', err);
         // 에러를 던져야 브라우저가 다시 Background Sync를 스케줄링(재시도)합니다.
         throw err;

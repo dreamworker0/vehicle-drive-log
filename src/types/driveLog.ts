@@ -35,6 +35,7 @@ export interface DriveLog extends FirestoreDoc {
     inputMethod?: 'ocr' | 'manual';
     createdAt?: TimestampField;
     editedAt?: TimestampField;
+    expiresAt?: Date | TimestampField;
 }
 
 /** createDriveLog에 전달할 데이터 */

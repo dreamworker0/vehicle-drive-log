@@ -9,6 +9,7 @@ import { useConfirm } from './useConfirm';
 import type { Vehicle } from '../types/vehicle';
 import type { FuelLog } from '../types/fuelLog';
 import { getVehicles, getFuelLogs, createFuelLog, deleteFuelLog, updateFuelLog, getTodayReservations } from '../lib/firestore';
+import { isChargeableFuel } from './useVehicleManager';
 import { toLocalDateStr } from '../lib/dateUtils';
 import { ocrDashboard } from '../lib/ocr';
 
@@ -110,11 +111,11 @@ export default function useFuelLog() {
         return v?.currentKm || 0;
     }, [form.vehicleId, vehicles]);
 
-    // 선택된 차량이 전기차인지 여부
-    const isElectric = useMemo(() => {
+    // 선택된 차량이 충전식(전기/수소 등)인지 여부
+    const isChargeable = useMemo(() => {
         if (!form.vehicleId) return false;
         const v = vehicles.find(v => v.id === form.vehicleId);
-        return v?.fuelType === 'electric';
+        return isChargeableFuel(v?.fuelType);
     }, [form.vehicleId, vehicles]);
 
     const handleVehicleSelect = (vehicleId: string) => {
@@ -215,6 +216,9 @@ export default function useFuelLog() {
         }
         setSaving(true);
         try {
+            const selectedVehicle = vehicles.find(v => v.id === form.vehicleId);
+            const actualFuelType = selectedVehicle?.fuelType || 'gasoline';
+
             const payload = {
                 organizationId: orgId,
                 vehicleId: form.vehicleId,
@@ -223,7 +227,7 @@ export default function useFuelLog() {
                 driverName: userData?.name || user?.displayName || '',
                 date: form.date,
                 meterReading: parseInt(form.meterReading),
-                fuelType: isElectric ? 'electric' as const : 'gasoline' as const,
+                fuelType: actualFuelType,
                 fuelAmount: parseFloat(form.fuelAmount),
                 fuelCost: parseInt(form.fuelCost),
                 notes: form.notes.trim() || '',
@@ -273,7 +277,7 @@ export default function useFuelLog() {
         vehicles, loading, showForm, setShowForm,
         saving, form, setForm, enrichedRecords,
         totalCost, totalAmount, selectedVehicleKm,
-        isElectric,
+        isChargeable,
         editingId, handleEdit, handleCancelEdit,
         handleSubmit, handleDelete, handleVehicleSelect,
         currentUid: user?.uid,

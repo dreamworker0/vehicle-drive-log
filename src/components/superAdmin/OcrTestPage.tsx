@@ -205,7 +205,7 @@ export default function OcrTestPage() {
                         </h2>
                         <button
                             onClick={() => setHistory([])}
-                            className="text-xs text-surface-400 hover:text-red-500 transition-colors"
+                            className="text-xs text-surface-400 dark:text-surface-500 hover:text-red-500 dark:hover:text-red-400 transition-colors"
                         >
                             전체 삭제
                         </button>

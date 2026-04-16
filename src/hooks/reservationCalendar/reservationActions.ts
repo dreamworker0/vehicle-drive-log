@@ -42,7 +42,7 @@ export interface ActionDeps {
         confirmText?: string;
         cancelText?: string;
         confirmColor?: 'primary' | 'danger' | 'warning';
-    }) => Promise<boolean>;
+    }) => Promise<boolean | string | null>;
     setSubmitting: (v: boolean) => void;
     setReservations: React.Dispatch<React.SetStateAction<Reservation[]>>;
     resetFormState: () => void;
@@ -432,7 +432,7 @@ export interface CancelDeps {
         confirmText?: string;
         cancelText?: string;
         confirmColor?: 'primary' | 'danger' | 'warning';
-    }) => Promise<boolean>;
+    }) => Promise<boolean | string | null>;
     setReservations: React.Dispatch<React.SetStateAction<Reservation[]>>;
 }
 

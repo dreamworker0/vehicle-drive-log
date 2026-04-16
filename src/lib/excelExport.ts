@@ -210,8 +210,8 @@ export async function downloadFuelLogsExcel(
             const d = ca instanceof Date ? ca : ca?.toDate?.() || null;
             if (d) timeStr = d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
         }
-        const isEV = rec.fuelType === 'electric';
-        const unit = isEV ? 'kWh' : 'L';
+        const isChargeable = ['electric', 'hydrogen'].includes(rec.fuelType || '');
+        const unit = isChargeable ? (rec.fuelType === 'hydrogen' ? 'kg' : 'kWh') : 'L';
         return {
             '날짜': rec.date || '',
             '시각': timeStr,

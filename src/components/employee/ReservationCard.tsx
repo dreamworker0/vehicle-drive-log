@@ -31,7 +31,7 @@ export default function ReservationCard({
 
     // 운행 시작 임박 여부 계산 (오늘 30분 전 ~ 15분 경과)
     const isSoon = (() => {
-        if (isInProgress) return false;
+        if (isInProgress || reservation.status === 'pending') return false;
         try {
             const now = new Date();
             const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -112,15 +112,23 @@ export default function ReservationCard({
                         </div>
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
-                        <div className="flex flex-col gap-2">
-                            {isInProgress ? (
+                        <div className="flex flex-col gap-2 w-full sm:w-auto min-w-[110px]">
+                            {reservation.status === 'pending' ? (
+                                <div className="py-2.5 px-3 rounded-xl bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-bold text-center border border-amber-200 dark:border-amber-800/50 shadow-sm flex items-center justify-center gap-1.5 w-full text-sm">
+                                    <svg className="w-4 h-4 animate-pulse" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2.25m0 2.25h.01M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25Z" />
+                                    </svg>
+                                    승인 대기 중
+                                </div>
+                            ) : isInProgress ? (
                                 <>
-                                    <span className="driving-badge">
+                                    <span className="driving-badge w-full justify-center">
                                         <span className="driving-dot" />
                                         운행 중
                                     </span>
-                                    <button onClick={() => onArrival(reservation)} className="btn-sm py-2 px-3 bg-amber-600 dark:bg-amber-500 text-white hover:bg-amber-700 dark:hover:bg-amber-400 text-sm whitespace-nowrap font-bold shadow-md hover:shadow-lg transition-all rounded-lg">
-                                        🏁 도착
+                                    <button onClick={() => onArrival(reservation)} className="w-full bg-amber-600 dark:bg-amber-500 text-white hover:bg-amber-700 dark:hover:bg-amber-400 shadow-md hover:shadow-lg transition-all rounded-xl py-2 px-2 flex flex-col items-center justify-center min-w-[120px]">
+                                        <span className="text-sm font-bold whitespace-nowrap">🏁 운행 종료</span>
+                                        <span className="text-[10px] text-amber-100 font-normal mt-0.5 whitespace-nowrap tracking-tight">종료 후 일지작성</span>
                                     </button>
                                 </>
                             ) : (

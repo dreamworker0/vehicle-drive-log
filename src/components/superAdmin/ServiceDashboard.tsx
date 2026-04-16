@@ -43,6 +43,8 @@ export default function ServiceDashboard() {
         vehicleModelStats,
         hipassRatio,
         calendarSyncRatio,
+        calendarTopOrgs,
+        calendarSyncOrgCount,
         hipassTopOrgs,
         fuelStats,
         hipassStats,
@@ -65,7 +67,7 @@ export default function ServiceDashboard() {
         sortDir,
         handleSort,
         sortIndicator,
-        loadAllStats,
+        refreshServerStats,
     } = useServiceDashboard();
 
     if (loading) {
@@ -80,11 +82,11 @@ export default function ServiceDashboard() {
         <div className="animate-fade-in space-y-6">
             <div className="flex items-center justify-between">
                 <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100">서비스 운영 대시보드</h1>
-                <button onClick={() => loadAllStats(false)} className="btn-ghost text-sm flex items-center gap-1">
+                <button onClick={() => refreshServerStats()} className="btn-ghost text-sm flex items-center gap-1">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
                     </svg>
-                    새로고침
+                    전체 통계 갱신
                 </button>
             </div>
 
@@ -130,6 +132,8 @@ export default function ServiceDashboard() {
                     vehicleModelStats={vehicleModelStats}
                     hipassRatio={hipassRatio}
                     calendarSyncRatio={calendarSyncRatio}
+                    calendarTopOrgs={calendarTopOrgs}
+                    calendarSyncOrgs={calendarSyncOrgCount}
                     hipassTopOrgs={hipassTopOrgs}
                     fuelStats={fuelStats}
                     hipassStats={hipassStats}

@@ -3,8 +3,9 @@
  * 접힌 상태: 기관명 + 직원 수 + 초대코드 요약만 표시
  * 펼친 상태: 상세 정보 + 멤버 목록 + 편집/복원 기능
  */
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { formatTimestampFull } from '../../lib/dateUtils';
+import DocumentViewer from '../common/DocumentViewer';
 import type { Organization } from '../../types';
 
 interface OrgMember {
@@ -31,7 +32,7 @@ interface OrgCardProps {
 }
 
 
-export default function OrgCard({
+export default memo(function OrgCard({
     org, members, memberCount, isExpanded, changingRole, loadingMembers,
     onToggle, onDelete, onEditOrg, onRoleChange, onRemoveMember, onRestoreUser,
 }: OrgCardProps) {
@@ -47,17 +48,7 @@ export default function OrgCard({
         return Math.floor((Date.now() - approved.getTime()) / (1000 * 60 * 60 * 24));
     })();
 
-    const appliedDate = (() => {
-        if (!org.createdAt) return null;
-        const d = 'toDate' in org.createdAt
-            ? (org.createdAt as { toDate: () => Date }).toDate()
-            : new Date(org.createdAt as unknown as string);
-        const mm = String(d.getMonth() + 1).padStart(2, '0');
-        const dd = String(d.getDate()).padStart(2, '0');
-        const hh = String(d.getHours()).padStart(2, '0');
-        const mi = String(d.getMinutes()).padStart(2, '0');
-        return `${d.getFullYear()}.${mm}.${dd} ${hh}:${mi}`;
-    })();
+    const appliedDate = formatTimestampFull(org.createdAt);
 
     const getDaysBadgeStyle = (days: number) => {
         if (days >= 14) return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
@@ -161,6 +152,7 @@ export default function OrgCard({
                 <button
                     onClick={(e) => { e.stopPropagation(); onDelete(org); }}
                     className="btn-ghost btn-sm text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 shrink-0 ml-2"
+                    aria-label="기관 삭제"
                 >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
@@ -223,6 +215,7 @@ export default function OrgCard({
                                         onClick={startEdit}
                                         className="p-1 rounded-lg text-surface-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors"
                                         title="기관명·주소 편집"
+                                        aria-label="기관명·주소 편집"
                                     >
                                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
@@ -280,31 +273,9 @@ export default function OrgCard({
                                         >
                                             {showImage ? '증빙서류 닫기 ▲' : '📋 증빙서류 보기 ▼'}
                                         </button>
-                                        {showImage && (() => {
-                                            const url = org.uniqueNumberImageUrl || '';
-                                            const isPdf = /\.pdf($|\?)/i.test(url) || (url.includes('%2F') && url.toLowerCase().includes('.pdf'));
-                                            if (isPdf) {
-                                                return (
-                                                    <a
-                                                        href={url}
-                                                        target="_blank"
-                                                        rel="noopener noreferrer"
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        className="mt-2 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-700 hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors text-sm font-medium animate-slide-down"
-                                                    >
-                                                        📄 PDF 증빙서류 보기 (새 창)
-                                                    </a>
-                                                );
-                                            }
-                                            return (
-                                                <img
-                                                    src={url}
-                                                    alt="증빙서류"
-                                                    className="mt-2 max-w-md rounded-lg border border-surface-200 dark:border-surface-600 animate-slide-down"
-                                                    onClick={(e) => e.stopPropagation()}
-                                                />
-                                            );
-                                        })()}
+                                        {showImage && (
+                                            <DocumentViewer url={org.uniqueNumberImageUrl || ''} stopPropagation />
+                                        )}
                                     </div>
                                 )}
 
@@ -398,6 +369,7 @@ export default function OrgCard({
                                                             onClick={() => onRemoveMember(member, org.id)}
                                                             className="btn-icon btn-sm text-surface-400 hover:text-red-500 transition-colors"
                                                             title="직원 제거"
+                                                            aria-label={`${member.name || '직원'} 제거`}
                                                         >
                                                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                                                                 <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
@@ -434,7 +406,7 @@ export default function OrgCard({
                                         </h4>
                                         <button
                                             onClick={() => { setShowRestore(false); setRestoreForm({ email: '', name: '' }); }}
-                                            className="text-xs text-surface-400 hover:text-surface-600 transition-colors"
+                                            className="text-xs text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
                                         >
                                             닫기
                                         </button>
@@ -483,4 +455,4 @@ export default function OrgCard({
             )}
         </div>
     );
-}
+});

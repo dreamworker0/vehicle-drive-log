@@ -10,6 +10,10 @@ export function initSentry() {
         environment: import.meta.env.MODE,
         // 프로덕션에서만 100% 샘플링, 개발 시 0%
         tracesSampleRate: import.meta.env.PROD ? 1.0 : 0,
+        // 브라우저 성능 및 라우팅 트레이싱 활성화
+        integrations: [
+            Sentry.browserTracingIntegration(),
+        ],
         // 노이즈 에러 필터링
         ignoreErrors: [
             'ResizeObserver loop',

@@ -49,8 +49,11 @@ export async function getRateLimits(name: RateLimitKey): Promise<RateLimitConfig
             return parsed[name] || DEFAULT_RATE_LIMITS[name];
         }
     } catch (err) {
-        log("WARNING", "constants", "Remote Config fetch failed, using defaults", {
-            error: (err as Error).message,
+        const errorMsg = (err as Error).message;
+        // Remote Config 템플릿 미설정은 정상적인 fallback 경로 → DEBUG
+        const level = errorMsg.includes("NOT_FOUND") ? "DEBUG" : "WARNING";
+        log(level, "constants", "Remote Config fetch failed, using defaults", {
+            error: errorMsg,
         });
     }
 

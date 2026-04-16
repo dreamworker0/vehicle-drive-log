@@ -1,19 +1,27 @@
-import { signInWithRedirect, signOut, getRedirectResult } from 'firebase/auth';
+import { signInWithRedirect, signInWithPopup, signOut, getRedirectResult } from 'firebase/auth';
 import type { AuthError } from 'firebase/auth';
 import { auth, googleProvider } from './firebase';
 
 /**
  * Google 로그인.
- * 팝업(signInWithPopup)의 고질적인 COOP 에러, Chrome 창 닫힘 추적 실패 이슈를 차단하기 위해
- * 환경 구분 없이 무조건 다이렉트(signInWithRedirect) 로그인만 사용합니다.
+ *
+ * - 프로덕션: signInWithRedirect 사용 (COOP 에러 없는 안정적인 리다이렉트 플로우)
+ * - 개발 환경(localhost): signInWithPopup 사용
+ *   → signInWithRedirect는 authDomain(vehicle-drive-log.web.app)과 localhost 간
+ *     cross-origin storage 문제로 인증 상태가 유실됨
  */
 export const signInWithGoogle = async () => {
     try {
-        console.info('[Auth] Google 로그인 - signInWithRedirect 시도');
-        await signInWithRedirect(auth, googleProvider);
+        if (import.meta.env.DEV) {
+            console.info('[Auth] Google 로그인 - signInWithPopup 시도 (개발 환경)');
+            await signInWithPopup(auth, googleProvider);
+        } else {
+            console.info('[Auth] Google 로그인 - signInWithRedirect 시도');
+            await signInWithRedirect(auth, googleProvider);
+        }
     } catch (error) {
         const authErr = error as AuthError;
-        console.error('Google 다이렉트 로그인 통신 실패:', authErr.code, authErr.message, error);
+        console.error('Google 로그인 실패:', authErr.code, authErr.message, error);
         throw error;
     }
 };

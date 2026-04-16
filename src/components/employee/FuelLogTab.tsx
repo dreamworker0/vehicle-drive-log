@@ -9,6 +9,7 @@ import { SkeletonBox, SkeletonList } from '../common/Skeleton';
 import VehicleSelector from './VehicleSelector';
 import useVehiclePriority from '../../hooks/useVehiclePriority';
 import HipassChargeTab from './HipassChargeTab';
+import { isChargeableFuel } from '../../hooks/useVehicleManager';
 
 type TabType = 'fuel' | 'charge';
 
@@ -19,7 +20,7 @@ export default function FuelLogTab() {
         vehicles, loading, showForm, setShowForm,
         saving, form, setForm, enrichedRecords,
         totalCost, totalAmount, selectedVehicleKm,
-        isElectric,
+        isChargeable,
         editingId, handleEdit, handleCancelEdit,
         handleSubmit, handleDelete, handleVehicleSelect,
         currentUid,
@@ -95,7 +96,7 @@ export default function FuelLogTab() {
                     {showForm && (
                         <form onSubmit={handleSubmit} className="glass-card p-4 mb-4 space-y-3 animate-fade-in">
                         <h2 className="font-semibold text-sm text-surface-800 dark:text-surface-200">
-                                {editingId ? (isElectric ? '✏️ 충전 기록 수정' : '✏️ 주유 기록 수정') : (isElectric ? '새 충전 기록' : '새 주유 기록')}
+                                {editingId ? (isChargeable ? '✏️ 충전 기록 수정' : '✏️ 주유 기록 수정') : (isChargeable ? '새 충전 기록' : '새 주유 기록')}
                             </h2>
 
                             {/* 차량 선택 — VehicleSelector 재사용 */}
@@ -191,7 +192,7 @@ export default function FuelLogTab() {
                             {/* 주유량 + 주유금액 */}
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="label text-xs">{isElectric ? '⚡ 충전량 (kWh)' : '⛽ 주유량 (L)'} <span className="text-red-500">*</span></label>
+                                    <label className="label text-xs">{isChargeable ? '⚡ 충전량 (kWh/kg)' : '⛽ 주유량 (L)'} <span className="text-red-500">*</span></label>
                                     <input
                                         type="number"
                                         step="0.01"
@@ -199,12 +200,12 @@ export default function FuelLogTab() {
                                         value={form.fuelAmount}
                                         onChange={e => setForm({ ...form, fuelAmount: e.target.value })}
                                         className="input"
-                                        placeholder={isElectric ? '30.5' : '40.5'}
+                                        placeholder={isChargeable ? '30.5' : '40.5'}
                                         required
                                     />
                                 </div>
                                 <div>
-                                    <label className="label text-xs">{isElectric ? '💰 충전금액 (원)' : '💰 주유금액 (원)'} <span className="text-red-500">*</span></label>
+                                    <label className="label text-xs">{isChargeable ? '💰 충전금액 (원)' : '💰 주유금액 (원)'} <span className="text-red-500">*</span></label>
                                     <input
                                         type="number"
                                         min="0"
@@ -236,7 +237,7 @@ export default function FuelLogTab() {
                                     </button>
                                 )}
                                 <button type="submit" disabled={saving} className="btn-primary btn-sm">
-                                    {saving ? '저장 중...' : editingId ? '수정 완료' : (isElectric ? '충전 기록 저장' : '주유 기록 저장')}
+                                    {saving ? '저장 중...' : editingId ? '수정 완료' : (isChargeable ? '충전 기록 저장' : '주유 기록 저장')}
                                 </button>
                             </div>
                         </form>
@@ -289,7 +290,8 @@ export default function FuelLogTab() {
                                         {/* 금액/리터 + 삭제 */}
                                         <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
                                             <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                                                {rec.fuelAmount}{(rec as unknown as { fuelType?: string }).fuelType === 'electric' ? 'kWh' : 'L'}
+                                                {rec.fuelAmount}
+                                                {isChargeableFuel(rec.fuelType) ? (rec.fuelType === 'hydrogen' ? 'kg' : 'kWh') : 'L'}
                                             </span>
                                             <span className="text-xs text-surface-500 dark:text-surface-400">
                                                 {rec.fuelCost?.toLocaleString()}원

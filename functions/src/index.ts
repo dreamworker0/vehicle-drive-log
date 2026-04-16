@@ -4,9 +4,9 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 
 // 시스템 전역 옵션 - 유휴 리소스 절감 및 불필요한 과금 방지
 setGlobalOptions({ 
-    maxInstances: 10, 
-    memory: "256MiB", 
-    timeoutSeconds: 60, 
+    maxInstances: 50, 
+    memory: "512MiB", 
+    timeoutSeconds: 120, 
     region: "asia-northeast3",
     concurrency: 80
 });
@@ -83,6 +83,25 @@ export { cleanupDuplicateLogs } from "./cleanupDuplicateLogs";
 export { updateAggregatedStats } from "./caching/updateAggregatedStats";
 // 집계 통계 일괄 재계산 (마이그레이션/보정용)
 export { recalculateAggregatedStats } from "./caching/recalculateAggregatedStats";
+
+// SuperAdmin 대시보드 통계 캐싱 (1시간 주기 배치)
+import { computeAllDashboardStats } from "./caching/computeDashboardStats";
+
+export const computeDashboardStats = onSchedule(
+    {
+        schedule: "every 1 hours",
+        timeZone: "Asia/Seoul",
+        retryCount: 1,
+        memory: "512MiB",
+        timeoutSeconds: 300,
+    },
+    async function () {
+        await computeAllDashboardStats();
+    }
+);
+
+// SuperAdmin 대시보드 통계 수동 갱신
+export { refreshDashboardStats } from "./caching/refreshDashboardStats";
 
 // 직원 삭제 (Auth 비활성화 + Firestore 삭제)
 export { disableUser } from "./disableUser";
@@ -213,3 +232,6 @@ export { submitPublicFeedback } from "./submitPublicFeedback";
 
 // 차량 누적 주행거리 오차 검증 스케줄러 (매월 1일 실행)
 export { verifyMileageConsistency } from "./scheduler/verifyMileageConsistency";
+
+// 회원 탈퇴 시 개인정보 익명화 트리거
+export { onUserDelete } from "./onUserDelete";

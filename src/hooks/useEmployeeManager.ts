@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
 import { useConfirm } from './useConfirm';
+import useRetry from './useRetry';
 import { getOrganizationMembers, getOrganization, regenerateInviteCode, updateUser } from '../lib/firestore';
 import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -16,6 +17,7 @@ export default function useEmployeeManager() {
     const { userData } = useAuth();
     const { showToast } = useToast();
     const { confirm } = useConfirm();
+    const { runWithRetry } = useRetry();
     const [employees, setEmployees] = useState<User[]>([]);
     const [disabledEmployees, setDisabledEmployees] = useState<User[]>([]);
     const [preRegisteredEmployees, setPreRegisteredEmployees] = useState<{ id: string; name: string; email: string; createdAt: unknown }[]>([]);
@@ -72,7 +74,7 @@ export default function useEmployeeManager() {
     const handleAddEmployee = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!newEmployee.name.trim()) return;
-        try {
+        await runWithRetry('add-emp', async () => {
             await addDoc(collection(db, 'organizations', orgId!, 'preRegistered'), {
                 name: newEmployee.name.trim(),
                 email: newEmployee.email.trim().toLowerCase(),
@@ -81,9 +83,7 @@ export default function useEmployeeManager() {
             setNewEmployee({ name: '', email: '' });
             setShowAddForm(false);
             await fetchData();
-        } catch (err) {
-            console.error('직원 추가 실패:', err);
-        }
+        }, { errorMessage: '직원 추가에 실패했습니다.' });
     };
 
     const handleCopyInviteCode = async () => {
@@ -108,14 +108,11 @@ export default function useEmployeeManager() {
     const handleRegenerateCode = async () => {
         if (!await confirm({ message: '초대 코드를 재발급하시겠습니까?\n기존 코드는 더 이상 사용할 수 없습니다.', confirmColor: 'warning' })) return;
         setRegenerating(true);
-        try {
+        await runWithRetry('regen-code', async () => {
             const newCode = await regenerateInviteCode(orgId!);
             setOrganization(prev => prev ? ({ ...prev, inviteCode: newCode }) : null);
-        } catch (err) {
-            console.error('코드 재발급 실패:', err);
-        } finally {
-            setRegenerating(false);
-        }
+        }, { errorMessage: '코드 재발급에 실패했습니다.' });
+        setRegenerating(false);
     };
 
     const handleEditEmployee = (emp: User) => {
@@ -124,13 +121,11 @@ export default function useEmployeeManager() {
     };
 
     const handleSaveEdit = async (empId: string) => {
-        try {
+        await runWithRetry(`save-edit-${empId}`, async () => {
             await updateUser(empId, { name: editForm.name.trim() });
             setEditingId(null);
             await fetchData();
-        } catch (err) {
-            console.error('수정 실패:', err);
-        }
+        }, { errorMessage: '수정에 실패했습니다.' });
     };
 
     const handleDeleteEmployee = async (emp: User) => {
@@ -140,29 +135,33 @@ export default function useEmployeeManager() {
             return;
         }
         if (!await confirm({ message: `${emp.name || emp.email} 직원을 비활성화하시겠습니까?\n\n비활성 직원은 앱 이용이 차단됩니다.`, confirmColor: 'danger' })) return;
-        try {
+        
+        await runWithRetry(`disable-emp-${emp.id}`, async () => {
             const { getFunctions, httpsCallable } = await import('firebase/functions');
             const functions = getFunctions(undefined, 'asia-northeast3');
             const callable = httpsCallable(functions, 'disableUser');
             await callable({ uid: emp.id });
             showToast('직원이 비활성화되었습니다.', 'success');
             await fetchData();
-        } catch (err: unknown) {
-            console.error('비활성화 실패:', err);
-            showToast(err instanceof Error ? err.message : '비활성화에 실패했습니다.', 'error');
-        }
+        }, {
+            errorMessage: '비활성화에 실패했습니다.',
+            onError: (err: unknown) => {
+                const message = err instanceof Error ? err.message : null;
+                if (message && !message.toLowerCase().includes('network')) {
+                    showToast(message, 'error');
+                    return true;
+                }
+            }
+        });
     };
 
     const handleRestoreEmployee = async (emp: User) => {
         if (!await confirm({ message: `${emp.name || emp.email} 직원을 다시 활성화하시겠습니까?` })) return;
-        try {
+        await runWithRetry(`restore-emp-${emp.id}`, async () => {
             await updateDoc(doc(db, 'users', emp.id), { status: 'active', disabledAt: null });
             showToast('직원이 활성화되었습니다.', 'success');
             await fetchData();
-        } catch (err: unknown) {
-            console.error('활성화 실패:', err);
-            showToast(err instanceof Error ? err.message : '활성화에 실패했습니다.', 'error');
-        }
+        }, { errorMessage: '활성화에 실패했습니다.' });
     };
 
     const handleChangeRole = async (emp: User, newRole: string) => {
@@ -181,25 +180,20 @@ export default function useEmployeeManager() {
                 return;
             }
         }
-        try {
+        await runWithRetry(`change-role-${emp.id}`, async () => {
             await updateUser(emp.id, { role: newRole });
             await fetchData();
-        } catch (err) {
-            console.error('역할 변경 실패:', err);
-        }
+        }, { errorMessage: '역할 변경에 실패했습니다.' });
     };
 
     const handleDeletePreRegistered = async (preRegId: string) => {
         if (!orgId) return;
         if (!await confirm({ message: '사전 등록을 취소하시겠습니까?', confirmColor: 'warning' })) return;
-        try {
+        await runWithRetry(`del-prereg-${preRegId}`, async () => {
             await deleteDoc(doc(db, 'organizations', orgId, 'preRegistered', preRegId));
             showToast('사전 등록이 취소되었습니다.', 'success');
             await fetchData();
-        } catch (err) {
-            console.error('사전 등록 삭제 실패:', err);
-            showToast('삭제에 실패했습니다.', 'error');
-        }
+        }, { errorMessage: '삭제에 실패했습니다.' });
     };
 
     const filteredEmployees = employees.filter(emp => {

@@ -4,7 +4,8 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './useAuth';
-import type { Vehicle } from '../types/vehicle';
+import type { Vehicle, FuelType } from '../types/vehicle';
+import useRetry from './useRetry';
 
 interface VehicleModal {
     type: 'delete' | 'clearMaintenance' | 'retire' | 'restore';
@@ -24,6 +25,9 @@ const ELECTRIC_MODELS = [
     '포터EV', '포터 EV', '봉고EV', '봉고 EV',
 ];
 
+// 수소차 모델명 목록
+const HYDROGEN_MODELS = ['넥쏘', 'nexo'];
+
 // 모델명 → 차종 자동 매핑
 const MODEL_TYPE_MAP = {
     compact: ['모닝', '캐스퍼', '마티즈', '레이', '스파크', '다마스', '티코', '트위즈', '피카퇠', 'ZOE', '트위지'],
@@ -32,6 +36,7 @@ const MODEL_TYPE_MAP = {
         '아이오닉', 'EV3', 'EV5', 'EV6', 'EV9', '니로', '코나', '볼트',
         '테슬라', 'Model 3', 'Model Y', 'Model S', 'Model X',
         'e-트론', 'ID.4', '폴스타', '제로', 'i4', 'iX',
+        '넥쏘', 'nexo'
     ],
     van: ['스타렉스', '스타랙스', '스타리아', '스타리야', '카니발', '카니벌', '콴라티', '보나식', '투산', '마스터', '보고', '싶온', '라바'],
     bus: ['유니버스', '에어로', '카운티', '카운디', '레스타', '솔라티', '솔라디', '시티', '그린시티'],
@@ -45,6 +50,16 @@ const isElectricModel = (modelName: string) => {
     return ELECTRIC_MODELS.some(m => name.includes(m.toLowerCase()));
 };
 
+// 모델명이 수소차인지 판별
+const isHydrogenModel = (modelName: string) => {
+    const name = modelName.trim().toLowerCase();
+    if (!name) return false;
+    return HYDROGEN_MODELS.some(m => name.includes(m.toLowerCase()));
+};
+
+// 연료 타입 판별 유틸
+export const isChargeableFuel = (fuel?: string | null) => fuel === 'electric' || fuel === 'hydrogen';
+
 const guessVehicleType = (modelName: string): string | null => {
     const name = modelName.trim().toLowerCase();
     if (!name) return null;
@@ -55,7 +70,7 @@ const guessVehicleType = (modelName: string): string | null => {
 };
 
 // 차종별 기본 연료 유형
-export const DEFAULT_FUEL: Record<string, string> = { compact: 'gasoline', sedan: 'gasoline', van: 'diesel', bus: 'diesel', truck: 'diesel' };
+export const DEFAULT_FUEL: Record<string, FuelType> = { compact: 'gasoline', sedan: 'gasoline', van: 'diesel', bus: 'diesel', truck: 'diesel' };
 
 const INITIAL_FORM = {
     displayName: '', modelName: '', plateNumber: '',
@@ -67,6 +82,7 @@ const INITIAL_FORM = {
 export default function useVehicleManager() {
     const { userData } = useAuth();
     const { showToast } = useToast();
+    const { runWithRetry } = useRetry();
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
     const [loading, setLoading] = useState(true);
     const [deletableIds, setDeletableIds] = useState<Set<string>>(new Set());
@@ -142,48 +158,68 @@ export default function useVehicleManager() {
     };
 
     const handleModelNameChange = (val: string) => {
-        const electric = isElectricModel(val);
-        const guessed = guessVehicleType(val);
-        setForm(prev => ({
-            ...prev,
-            modelName: val,
-            // 전기차 모델이면 fuelType을 electric으로 강제 설정
-            ...(electric ? { fuelType: 'electric' } : {}),
-            ...(guessed ? { vehicleType: guessed, ...(!electric ? { fuelType: DEFAULT_FUEL[guessed] || prev.fuelType } : {}) } : {}),
-        }));
+        setForm(prev => {
+            const electric = isElectricModel(val);
+            const hydrogen = isHydrogenModel(val);
+            const guessed = guessVehicleType(val);
+
+            let nextFuelType = prev.fuelType;
+            
+            // 친환경차(전기/수소)면 무조건 해당 연료로 고정
+            if (electric) {
+                nextFuelType = 'electric';
+            } else if (hydrogen) {
+                nextFuelType = 'hydrogen';
+            } else if (guessed) {
+                // 이전 연료가 전기/수소였는데 이제 아니게 된 경우 (예: '넥쏘' -> '소나타'로 수정)
+                // 또는 원래부터 내연기관이었던 경우 -> 차종의 기본 연료 부여
+                // (일반 차종의 기본 연료로 변경)
+                if (prev.fuelType === 'electric' || prev.fuelType === 'hydrogen' || DEFAULT_FUEL[guessed]) {
+                    nextFuelType = DEFAULT_FUEL[guessed] || prev.fuelType;
+                }
+            }
+
+            return {
+                ...prev,
+                modelName: val,
+                ...(guessed ? { vehicleType: guessed } : {}),
+                fuelType: nextFuelType,
+            };
+        });
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!form.displayName.trim() || !form.plateNumber.trim()) return;
-        setFormLoading(true);
-        try {
-            const vehicleData = {
-                displayName: form.displayName.trim(),
-                modelName: form.modelName.trim(),
-                plateNumber: form.plateNumber.trim(),
-                vehicleType: form.vehicleType,
-                fuelType: form.fuelType,
-                currentKm: form.currentKm ? parseInt(form.currentKm) : 0,
-                organizationId: orgId,
-                insurance: {
-                    company: form.insuranceCompany.trim(),
-                    phone: form.insurancePhone.trim(),
-                },
-                ...(form.googleCalendarId.trim() ? { googleCalendarId: form.googleCalendarId.trim() } : {}),
-            };
-            if (editingVehicle) {
-                await updateVehicle(editingVehicle.id, vehicleData);
-            } else {
-                await createVehicle(vehicleData);
+        const action = editingVehicle ? '차량 부분 수정' : '차량 등록';
+        await runWithRetry(action, async () => {
+            setFormLoading(true);
+            try {
+                const vehicleData = {
+                    displayName: form.displayName.trim(),
+                    modelName: form.modelName.trim(),
+                    plateNumber: form.plateNumber.trim(),
+                    vehicleType: form.vehicleType as any,
+                    fuelType: form.fuelType as FuelType,
+                    currentKm: form.currentKm ? parseInt(form.currentKm) : 0,
+                    organizationId: orgId!,
+                    insurance: {
+                        company: form.insuranceCompany.trim(),
+                        phone: form.insurancePhone.trim(),
+                    },
+                    ...(form.googleCalendarId.trim() ? { googleCalendarId: form.googleCalendarId.trim() } : {}),
+                };
+                if (editingVehicle) {
+                    await updateVehicle(editingVehicle.id, vehicleData);
+                } else {
+                    await createVehicle(vehicleData);
+                }
+                resetForm();
+                await fetchVehicles();
+            } finally {
+                setFormLoading(false);
             }
-            resetForm();
-            await fetchVehicles();
-        } catch (err) {
-            console.error('저장 실패:', err);
-        } finally {
-            setFormLoading(false);
-        }
+        }, { errorMessage: `${action} 처리 중 오류가 발생했습니다.` });
     };
 
     // ── 모달을 통한 액션들 ──
@@ -197,21 +233,27 @@ export default function useVehicleManager() {
     const confirmDelete = async () => {
         const vehicle = modal?.vehicle;
         if (!vehicle) return;
-        try {
+        await runWithRetry('delete_vehicle', async () => {
             // 운행일지가 있으면 삭제 차단
             const hasLogs = await hasVehicleDriveLogs(vehicle.id);
             if (hasLogs) {
                 showToast('운행일지가 존재하는 차량은 삭제할 수 없습니다. 폐차 처리를 이용하세요.', 'error');
                 setModal(null);
-                return;
+                // 강제 예외 발생으로 기본 success toast 및 재시도 방지 (이미 유저 알림 띄웠으므로)
+                const error = new Error('has_logs');
+                (error as any).isHandled = true;
+                throw error;
             }
             await deleteVehicle(vehicle.id);
             await fetchVehicles();
-        } catch (err) {
-            console.error('삭제 실패:', err);
-        } finally {
             setModal(null);
-        }
+        }, {
+            errorMessage: '차량 삭제 처리 중 오류가 발생했습니다.',
+            onError: (err: unknown) => {
+                if ((err as any).isHandled) return true; // 이미 토스트 띄움
+                return false; // 그 외 네트워크 에러 등은 공통 처리
+            }
+        });
     };
 
     // 정비 완료 (confirm 모달)
@@ -221,14 +263,11 @@ export default function useVehicleManager() {
     const confirmClearMaintenance = async () => {
         const vehicle = modal?.vehicle;
         if (!vehicle) return;
-        try {
+        await runWithRetry('clear_maintenance', async () => {
             await clearVehicleMaintenanceBlock(vehicle.id);
             await fetchVehicles();
-        } catch (err) {
-            console.error('차단 해제 실패:', err);
-        } finally {
             setModal(null);
-        }
+        }, { errorMessage: '정비/수리 차단 해제 중 오류가 발생했습니다.' });
     };
 
     // 폐차 처리 (input 모달)
@@ -238,17 +277,14 @@ export default function useVehicleManager() {
     const confirmRetire = async (reason: string) => {
         const vehicle = modal?.vehicle;
         if (!vehicle) return;
-        try {
+        await runWithRetry('retire_vehicle', async () => {
             await retireVehicle(vehicle.id, reason);
             const today = new Date();
             const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
             await cancelVehicleReservations(orgId!, vehicle.id, vehicle.displayName || '', todayStr, null, `폐차 (${reason})`);
             await fetchVehicles();
-        } catch (err) {
-            console.error('폐차 처리 실패:', err);
-        } finally {
             setModal(null);
-        }
+        }, { errorMessage: '차량 폐차 처리 중 오류가 발생했습니다.' });
     };
 
     // 차량 복원 (confirm 모달)
@@ -258,14 +294,11 @@ export default function useVehicleManager() {
     const confirmRestore = async () => {
         const vehicle = modal?.vehicle;
         if (!vehicle) return;
-        try {
+        await runWithRetry('restore_vehicle', async () => {
             await restoreVehicle(vehicle.id);
             await fetchVehicles();
-        } catch (err) {
-            console.error('복원 실패:', err);
-        } finally {
             setModal(null);
-        }
+        }, { errorMessage: '차량 복원 처리 중 오류가 발생했습니다.' });
     };
 
     return {

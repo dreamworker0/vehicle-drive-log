@@ -8,7 +8,7 @@ export default defineConfig({
     plugins: [react()],
     resolve: {
         alias: {
-            '@': __dirname + 'src',
+            '@': fileURLToPath(new URL('./src', import.meta.url)),
         },
     },
     test: {
@@ -16,5 +16,20 @@ export default defineConfig({
         globals: true,
         setupFiles: ['./src/__tests__/setup.ts'],
         exclude: ['**/node_modules/**', '**/e2e/**', '**/functions/**'],
+        coverage: {
+            provider: 'v8',
+            reporter: ['text', 'text-summary', 'json', 'lcov'],
+            include: ['src/**/*.{ts,tsx}'],
+            exclude: [
+                'src/__tests__/**',
+                'src/types/**',
+                'src/main.tsx',
+                'src/sw.ts',
+                'src/vite-env.d.ts',
+                'src/components/common/UpdatePrompt.tsx',
+                'src/components/common/InstallPrompt.tsx',
+                'src/components/common/IOSInstallPrompt.tsx',
+            ],
+        },
     },
 });

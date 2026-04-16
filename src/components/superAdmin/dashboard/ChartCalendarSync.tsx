@@ -5,9 +5,11 @@ import { tooltipStyle, tooltipFormatter } from './dashboardUtils';
 
 interface Props {
     calendarSyncRatio: { sync: number; notSync: number };
+    calendarTopOrgs: { name: string; count: number }[];
+    calendarSyncOrgs: number;
 }
 
-export default function ChartCalendarSync({ calendarSyncRatio }: Props) {
+export default function ChartCalendarSync({ calendarSyncRatio, calendarTopOrgs, calendarSyncOrgs }: Props) {
     if (calendarSyncRatio.sync === 0 && calendarSyncRatio.notSync === 0) {
         return (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mt-6">
@@ -85,24 +87,50 @@ export default function ChartCalendarSync({ calendarSyncRatio }: Props) {
 
             {/* 안내 및 인사이트 요약 영역 */}
             <div className="glass-card p-5 flex flex-col justify-center">
-                <h3 className="text-md font-semibold text-surface-800 dark:text-surface-200 mb-3 block">
-                    💡 캘린더 연동 인사이트
-                </h3>
-                <p className="text-sm text-surface-600 dark:text-surface-300 mb-4 leading-relaxed">
-                    구글 캘린더를 연동한 차량에서는 <strong>사전 예약 생성 시 자동으로 캘린더에 일정 등록</strong> 및 변동 알림이 연동됩니다. 
-                    연동률을 높이면 운행 스케줄 관리가 더욱 직관적이고 효율적으로 변합니다.
-                </p>
-                <div className="bg-blue-50/50 dark:bg-blue-900/20 rounded-lg p-4 border border-blue-100 dark:border-blue-800/30">
-                    {pct >= 50 ? (
-                        <p className="text-sm text-blue-700 dark:text-blue-300 font-medium">
-                            {pct}%의 높은 연동률을 보이고 있습니다. 서비스 효율성이 증가하고 있습니다!
-                        </p>
-                    ) : (
-                        <p className="text-sm text-blue-700 dark:text-blue-300 font-medium">
-                            현재 {pct}%로 절반 이상의 차량이 미연동 상태입니다. 각 기관에 연동 가이드를 안내해 보세요.
-                        </p>
+                <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-md font-semibold text-surface-800 dark:text-surface-200">
+                        💡 캘린더 연동 인사이트
+                    </h3>
+                    {calendarSyncOrgs > 0 && (
+                        <span className="text-xs font-medium bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2.5 py-1 rounded-full border border-blue-200 dark:border-blue-800/50 shadow-sm">
+                            1대 이상 연동: {calendarSyncOrgs}개 기관
+                        </span>
                     )}
                 </div>
+
+                {/* 연동 기관 TOP 10 */}
+                {calendarTopOrgs.length > 0 && (
+                    <div className="mb-4">
+                        <h4 className="text-xs font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider mb-2">
+                            🏆 연동 기관 TOP 10
+                        </h4>
+                        <div className="space-y-1.5">
+                            {calendarTopOrgs.map((org, idx) => {
+                                const maxCount = calendarTopOrgs[0]?.count || 1;
+                                const barWidth = Math.max((org.count / maxCount) * 100, 8);
+                                const medals = ['🥇', '🥈', '🥉'];
+                                return (
+                                    <div key={idx} className="flex items-center gap-2 text-xs">
+                                        <span className="w-5 text-center shrink-0">
+                                            {idx < 3 ? medals[idx] : `${idx + 1}`}
+                                        </span>
+                                        <span className="w-28 truncate text-surface-700 dark:text-surface-300 shrink-0" title={org.name}>
+                                            {org.name}
+                                        </span>
+                                        <div className="flex-1 bg-surface-100 dark:bg-surface-700 rounded-full h-4 overflow-hidden">
+                                            <div
+                                                className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-400 flex items-center justify-end pr-1.5 transition-all duration-500"
+                                                style={{ width: `${barWidth}%` }}
+                                            >
+                                                <span className="text-[10px] font-bold text-white">{org.count}대</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );

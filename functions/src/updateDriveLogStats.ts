@@ -7,6 +7,7 @@ import * as admin from 'firebase-admin';
  */
 export const updateDriveLogStats = functions
     .region('asia-northeast3')
+    .runWith({ memory: '512MB', timeoutSeconds: 120, maxInstances: 50 })
     .firestore.document('organizations/{orgId}/driveLogs/{logId}')
     .onWrite(async (change, context) => {
         const { orgId } = context.params;

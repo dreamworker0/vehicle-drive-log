@@ -46,6 +46,8 @@ interface Props {
     dailyHipassAmount: { date: string; amount: number }[];
     // 구글 캘린더 연동
     calendarSyncRatio: { sync: number; notSync: number };
+    calendarTopOrgs: { name: string; count: number }[];
+    calendarSyncOrgs: number;
 }
 
 export default function DashboardChartSection(props: Props) {
@@ -84,6 +86,8 @@ export default function DashboardChartSection(props: Props) {
             />
             <ChartCalendarSync 
                 calendarSyncRatio={props.calendarSyncRatio}
+                calendarTopOrgs={props.calendarTopOrgs}
+                calendarSyncOrgs={props.calendarSyncOrgs}
             />
             <ChartFuelHipass
                 fuelStats={props.fuelStats}

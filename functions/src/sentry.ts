@@ -20,18 +20,25 @@ interface SentryLike {
 }
 
 let _sentry: SentryLike | null = null;
+let _sentryInitialized = false;
 
-if (DSN && !IS_TEST) {
-    try {
-        _sentry = require("@sentry/node");
-        _sentry.init({
-            dsn: DSN,
-            environment: "cloud-functions",
-            tracesSampleRate: 0,
-        });
-    } catch {
-        // @sentry/node 로드 실패 시 무시
+function getSentry(): SentryLike | null {
+    if (_sentryInitialized) return _sentry;
+    _sentryInitialized = true;
+    
+    if (DSN && !IS_TEST) {
+        try {
+            _sentry = require("@sentry/node");
+            _sentry?.init({
+                dsn: DSN,
+                environment: "cloud-functions",
+                tracesSampleRate: 0,
+            });
+        } catch {
+            // @sentry/node 로드 실패 시 무시
+        }
     }
+    return _sentry;
 }
 
 import { sendDiscordAlert } from "./discord";
@@ -41,16 +48,17 @@ import { sendDiscordAlert } from "./discord";
  * DSN이 설정되지 않거나 테스트 환경이면 아무것도 하지 않는다.
  */
 export function captureError(error: unknown, context: Record<string, unknown> = {}): void {
-    if (!_sentry) return;
+    const sentry = getSentry();
+    if (!sentry) return;
     
     let errorMessage = "Unknown Error";
 
     if (error instanceof Error) {
         errorMessage = error.message;
-        _sentry.captureException(error, { extra: context });
+        sentry.captureException(error, { extra: context });
     } else {
         errorMessage = String(error);
-        _sentry.captureMessage(errorMessage, {
+        sentry.captureMessage(errorMessage, {
             level: "error",
             extra: context,
         });
@@ -68,8 +76,9 @@ export function captureError(error: unknown, context: Record<string, unknown> = 
  * Sentry에 경고 메시지를 전송한다.
  */
 export function captureWarning(message: string, context: Record<string, unknown> = {}): void {
-    if (!_sentry) return;
-    _sentry.captureMessage(message, {
+    const sentry = getSentry();
+    if (!sentry) return;
+    sentry.captureMessage(message, {
         level: "warning",
         extra: context,
     });

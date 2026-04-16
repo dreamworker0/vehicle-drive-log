@@ -1,6 +1,4 @@
-import type React from 'react';
-import type { QuerySnapshot, DocumentData } from 'firebase/firestore';
-import type { ServiceStats } from '../../components/superAdmin/dashboard/dashboardUtils';
+
 
 export interface OrgStat {
     id: string; name: string; address: string; lat: number; lng: number;
@@ -9,57 +7,71 @@ export interface OrgStat {
     [key: string]: unknown;
 }
 
-export type SharedSnaps = {
-    orgSnap: QuerySnapshot<DocumentData, DocumentData>;
-    userSnap: QuerySnapshot<DocumentData, DocumentData>;
-    logSnap: QuerySnapshot<DocumentData, DocumentData>;
-    vehicleSnap: QuerySnapshot<DocumentData, DocumentData>;
-    hipassCardSnap: QuerySnapshot<DocumentData, DocumentData>;
-    favoriteSnap: QuerySnapshot<DocumentData, DocumentData>;
-};
+// ── 캐시 문서 타입 (system/dashboardStats) ──
 
-// Setter callback types for processServiceStats
-export interface ServiceStatsSetters {
-    setStats: React.Dispatch<React.SetStateAction<ServiceStats | null>>;
-    setFavoriteUserRatio: React.Dispatch<React.SetStateAction<{ total: number; withFavorite: number; rate: number }>>;
-    setInputMethodStats: React.Dispatch<React.SetStateAction<{ date: string; ocr: number; manual: number }[]>>;
-    setDailyDriveStats: React.Dispatch<React.SetStateAction<{ date: string; count: number }[]>>;
-    setDailyActiveUserStats: React.Dispatch<React.SetStateAction<{ date: string; users: number }[]>>;
-    setDailyActiveOrgStats: React.Dispatch<React.SetStateAction<{ date: string; active: number; inactive: number; rejected: number; deleted: number; dayActive: number; dayInactive: number; dayRejected: number; dayDeleted: number }[]>>;
-    setHourlyStats: React.Dispatch<React.SetStateAction<{ hour: string; count: number }[]>>;
-    setWeeklyActiveRate: React.Dispatch<React.SetStateAction<{ active: number; total: number }>>;
-    setFavoriteStats: React.Dispatch<React.SetStateAction<{ date: string; favorite: number; normal: number }[]>>;
-    setFavoriteLogRatio: React.Dispatch<React.SetStateAction<{ total: number; favorite: number; normal: number; rate: number }>>;
-    setHeatmapData: React.Dispatch<React.SetStateAction<{ grid: number[][]; maxCount: number }>>;
-    setDailyAvgDuration: React.Dispatch<React.SetStateAction<{ date: string; avg: number }[]>>;
-    setHourlyAvgDuration: React.Dispatch<React.SetStateAction<{ hour: string; avg: number }[]>>;
-}
-
-// Setter callback types for processMonthlyStats
-export interface MonthlyStatsSetters {
-    setMonthlyStats: React.Dispatch<React.SetStateAction<{
+export interface CachedDashboardStats {
+    approvedOrgs: number;
+    totalUsers: number;
+    adminCount: number;
+    employeeCount: number;
+    totalLogs: number;
+    totalDistance: number;
+    pendingApps: number;
+    calendarSyncOrgs: number;
+    calendarSyncVehicles: number;
+    calendarNotSyncVehicles: number;
+    fuelTypeStats: { type: string; label: string; count: number; color: string }[];
+    vehicleTypeStats: { type: string; label: string; count: number; color: string }[];
+    vehicleModelStats: { model: string; count: number }[];
+    hipassRatio: { withHipass: number; withoutHipass: number };
+    hipassTopOrgs: { name: string; count: number }[];
+    calendarSyncRatio: { sync: number; notSync: number };
+    calendarTopOrgs: { name: string; count: number }[];
+    favoriteUserRatio: { total: number; withFavorite: number; rate: number };
+    weeklyActiveRate: { active: number; total: number };
+    monthlyGrowth: { month: string; cumulative: number }[];
+    monthlyStats: {
         monthLabel: string; logs: number; distance: number; activeUsers: number;
         prevLogs: number; prevDistance: number; prevActiveUsers: number;
-    } | null>>;
+    };
+    firstEmployeeStats: { avg: number; median: number; sameDayRate: number; total: number } | null;
+    firstEmployeeDist: { label: string; count: number; color: string }[];
+    firstEmployeeTrend: { month: string; avg: number }[];
+    onboardingStats: { total: number; completed: number; rate: number };
+    orgSizeDistribution: { label: string; count: number; color: string }[];
+    lastUpdatedAt: string;
+    computeDurationMs: number;
 }
 
-// Setter callback types for processTopOrganizations
-export interface TopOrganizationsSetters {
-    setTopOrgs: React.Dispatch<React.SetStateAction<OrgStat[]>>;
-    setStats: React.Dispatch<React.SetStateAction<ServiceStats | null>>;
-    setHipassRatio: React.Dispatch<React.SetStateAction<{ withHipass: number; withoutHipass: number }>>;
-    setCalendarSyncRatio: React.Dispatch<React.SetStateAction<{ sync: number; notSync: number }>>;
-    setHipassTopOrgs: React.Dispatch<React.SetStateAction<{ name: string; count: number }[]>>;
-    setFuelTypeStats: React.Dispatch<React.SetStateAction<{ type: string; label: string; count: number; color: string }[]>>;
-    setVehicleTypeStats: React.Dispatch<React.SetStateAction<{ type: string; label: string; count: number; color: string }[]>>;
-    setVehicleModelStats: React.Dispatch<React.SetStateAction<{ model: string; count: number }[]>>;
-    setOrgAvgDuration: React.Dispatch<React.SetStateAction<{ name: string; avg: number }[]>>;
-    setMonthlyGrowth: React.Dispatch<React.SetStateAction<{ month: string; cumulative: number }[]>>;
-    setFirstEmployeeStats: React.Dispatch<React.SetStateAction<{
-        avg: number; median: number; sameDayRate: number; total: number;
-    } | null>>;
-    setFirstEmployeeDist: React.Dispatch<React.SetStateAction<{ label: string; count: number; color: string }[]>>;
-    setFirstEmployeeTrend: React.Dispatch<React.SetStateAction<{ month: string; avg: number }[]>>;
+// ── 캐시 문서 타입 (system/dashboardTimeSeries) ──
+
+export interface CachedDashboardTimeSeries {
+    dailyDriveStats: { date: string; count: number }[];
+    dailyActiveUserStats: { date: string; users: number }[];
+    dailyActiveOrgStats: { date: string; active: number; inactive: number; rejected: number; deleted: number; dayActive: number; dayInactive: number; dayRejected: number; dayDeleted: number }[];
+    inputMethodStats: { date: string; ocr: number; manual: number }[];
+    favoriteStats: { date: string; favorite: number; normal: number }[];
+    dailyAvgDuration: { date: string; avg: number }[];
+    hourlyStats: { hour: string; count: number }[];
+    hourlyAvgDuration: { hour: string; avg: number }[];
+    heatmapData: { items: { dayIdx: number; hour: number; count: number }[]; maxCount: number };
+    favoriteLogRatio: { total: number; favorite: number; normal: number; rate: number };
+    lastUpdatedAt: string;
+}
+
+// ── 캐시 문서 타입 (system/dashboardOrgRankings) ──
+
+export interface CachedOrgStat {
+    id: string; name: string; address: string; lat: number; lng: number;
+    logs: number; users: number; vehicles: number; distance: number;
+    lastDriveDate: string | null; totalDuration: number; durationCount: number;
+}
+
+export interface CachedDashboardOrgRankings {
+    topOrgs: CachedOrgStat[];
+    orgAvgDuration: { name: string; avg: number }[];
+    funnelData: { label: string; value: number; icon: string; color: string; gradient: string; rate: number; dropoff: number; conversionFromPrev: number }[];
+    lastUpdatedAt: string;
 }
 
 // Setter callback types for loadFuelHipassStats

@@ -1,0 +1,2155 @@
+﻿
+> vehicle-drive-log@1.0.0 test:coverage
+> vitest run --coverage
+
+
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.4 [39m[90mD:/apps/차량운행일지[39m
+      [2mCoverage enabled with [22m[33mv8[39m
+
+ [31m❯[39m src/__tests__/components/PendingReservationList.test.tsx [2m([22m[2m0 test[22m[2m)[22m
+ [31m❯[39m src/__tests__/components/ConfirmModal.test.tsx [2m([22m[2m0 test[22m[2m)[22m
+node.exe : [90mstderr[2m | src/__tests__/hooks/useDriveLogForm.test.ts[2m > [22m[2museDriveLogForm[2m > [22m[2m
+초기 상태에서 loading이 true이다
+At line:1 char:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Program Files\nodejs/node_mo ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: ([90mstderr[2m...loading이 true이다:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useTodayDashboard.test.ts[2m > [22m[2museTodayDashboard[2m > [22m[2m초기 상태에서
+ loading이 true이다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useDriveLogForm.test.ts[2m > [22m[2museDriveLogForm[2m > [22m[2morgId가 있으면 
+차량 목록 및 즐겨찾기를 로드한다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useTodayDashboard.test.ts[2m > [22m[2museTodayDashboard[2m > [22m[2morgId가 
+있으면 차량/예약/일지를 로드한다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/lib/tmap.test.ts[2m > [22m[2mtmap 유틸리티[2m > [22m[2m초기 상태에서 쿨다운이 아니어야 한다
+[22m[39m[Firestore] IndexedDB 사용 불가 → memoryLocalCache로 재초기화
+
+[90mstderr[2m | src/__tests__/hooks/useDriveLogForm.test.ts[2m > [22m[2museDriveLogForm[2m > [22m[2m차량이 1개만 있으면
+ 자동 선택된다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useDriveLogForm.test.ts[2m > [22m[2museDriveLogForm[2m > [22m[2m차량이 1개만 있으면
+ 자동 선택된다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+ [32m✓[39m src/__tests__/lib/firestore.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 663[2mms[22m[39m
+       [33m[2m✓[22m[39m orgId로 운행일지를 조회한다 [33m 641[2mms[22m[39m
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/lib/tmap.test.ts[2m > [22m[2mtmap 유틸리티[2m > [22m[2mAPI 키가 있으면 사용 가능해야 한다
+[22m[39m[Firestore] IndexedDB 사용 불가 → memoryLocalCache로 재초기화
+
+[90mstderr[2m | src/__tests__/hooks/useTodayDashboard.test.ts[2m > [22m[2museTodayDashboard[2m > [22m[2mmyReser
+vations는 본인 예약만 필터링한다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useMaintenanceLog.test.ts[2m > [22m[2museMaintenanceLog[2m > [22m[2mhandleV
+ehicleSelect가 form을 업데이트한다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useDriveLogForm.test.ts[2m > [22m[2museDriveLogForm[2m > [22m[2m차량이 1개만 있으면
+ 자동 선택된다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/lib/tmap.test.ts[2m > [22m[2mparseDestinations[2m > [22m[2m단일 목적지를 배열로 반환한다
+[22m[39m[Firestore] IndexedDB 사용 불가 → memoryLocalCache로 재초기화
+
+[90mstderr[2m | src/__tests__/hooks/useTodayDashboard.test.ts[2m > [22m[2museTodayDashboard[2m > [22m[2m운행 중인 예
+약이 없으면 hasActiveDrive는 false이다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useDriveLogForm.test.ts[2m > [22m[2museDriveLogForm[2m > [22m[2m차량이 1개만 있으면
+ 자동 선택된다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/lib/tmap.test.ts[2m > [22m[2mparseDestinations[2m > [22m[2m여러 목적지를 쉼표로 분리한다
+[22m[39m[Firestore] IndexedDB 사용 불가 → memoryLocalCache로 재초기화
+
+[90mstderr[2m | src/__tests__/hooks/useMaintenanceLog.test.ts[2m > [22m[2museMaintenanceLog[2m > [22m[2mshowFor
+m 토글이 동작한다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useDriveLogForm.test.ts[2m > [22m[2museDriveLogForm[2m > [22m[2mhandleFavor
+iteSelect로 목적지가 채워진다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/lib/tmap.test.ts[2m > [22m[2mparseDestinations[2m > [22m[2m여러 목적지를 쉼표로 분리 (3곳)
+[22m[39m[Firestore] IndexedDB 사용 불가 → memoryLocalCache로 재초기화
+
+[90mstderr[2m | src/__tests__/hooks/useTodayDashboard.test.ts[2m > [22m[2museTodayDashboard[2m > [22m[2m운행 중인 예
+약이 있으면 hasActiveDrive는 true이다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/lib/tmap.test.ts[2m > [22m[2mparseDestinations[2m > [22m[2m앞뒤 공백을 제거한다
+[22m[39m[Firestore] IndexedDB 사용 불가 → memoryLocalCache로 재초기화
+
+[90mstderr[2m | src/__tests__/hooks/useDriveLogForm.test.ts[2m > [22m[2museDriveLogForm[2m > [22m[2mtogglePasse
+nger로 동승자를 추가/제거한다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/lib/tmap.test.ts[2m > [22m[2mparseDestinations[2m > [22m[2m빈 문자열은 빈 배열을 반환한다
+[22m[39m[Firestore] IndexedDB 사용 불가 → memoryLocalCache로 재초기화
+
+[90mstderr[2m | src/__tests__/hooks/useTodayDashboard.test.ts[2m > [22m[2museTodayDashboard[2m > [22m[2mnavigat
+eToReservations가 올바른 경로로 이동한다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+ [32m✓[39m src/__tests__/hooks/useAnalytics.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 271[2mms[22m[39m
+ [32m✓[39m src/__tests__/lib/tmap.test.ts [2m([22m[2m11 tests[22m[2m)[22m[33m 765[2mms[22m[39m
+     [33m[2m✓[22m[39m 초기 상태에서 쿨다운이 아니어야 한다 [33m 706[2mms[22m[39m
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useDriveLogForm.test.ts[2m > [22m[2museDriveLogForm[2m > [22m[2m폼 검증 실패 시 t
+oast를 표시한다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstdout[2m | src/__tests__/lib/offlineQueue.test.ts[2m > [22m[2mofflineSync[2m > [22m[2mprocessOfflineQueue는 오프라인 상태에서 0 반환
+[22m[39mApp Check debug token: 77d43479-352c-4378-92f6-4cc7c42908e5. You will need to add it to your app's App Check settings in the Firebase console for it to work.
+
+[90mstderr[2m | src/__tests__/lib/tmap.test.ts[2m > [22m[2mparseDestinations[2m > [22m[2mnull은 빈 배열을 반환한다
+[22m[39m[Firestore] IndexedDB 사용 불가 → memoryLocalCache로 재초기화
+
+[90mstderr[2m | src/__tests__/lib/tmap.test.ts[2m > [22m[2mparseDestinations[2m > [22m[2m공백만 있으면 빈 배열을 반환한다
+[22m[39m[Firestore] IndexedDB 사용 불가 → memoryLocalCache로 재초기화
+
+[90mstderr[2m | src/__tests__/lib/tmap.test.ts[2m > [22m[2mparseDestinations[2m > [22m[2m빈 쉼표 항목은 제거한다
+[22m[39m[Firestore] IndexedDB 사용 불가 → memoryLocalCache로 재초기화
+
+[90mstderr[2m | src/__tests__/lib/tmap.test.ts[2m > [22m[2mparseDestinations[2m > [22m[2m최대 5곳으로 제한한다
+[22m[39m[Firestore] IndexedDB 사용 불가 → memoryLocalCache로 재초기화
+
+ [32m✓[39m src/__tests__/hooks/useMaintenanceLog.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 450[2mms[22m[39m
+ [32m✓[39m src/__tests__/hooks/useQuickDriveStart.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 506[2mms[22m[39m
+[90mstderr[2m | src/__tests__/hooks/useTodayDashboard.test.ts[2m > [22m[2museTodayDashboard[2m > [22m[2mtodayLa
+bel이 한국어 형식이다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useHipassCharge.test.ts[2m > [22m[2museHipassCharge[2m > [22m[2mshowForm 토글
+이 동작한다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+ [32m✓[39m src/__tests__/hooks/useMonthlyReport.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 407[2mms[22m[39m
+ [32m✓[39m src/__tests__/hooks/useDriveLogForm.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 379[2mms[22m[39m
+[90mstderr[2m | src/__tests__/hooks/useFuelLog.test.ts[2m > [22m[2museFuelLog[2m > [22m[2mshowForm 토글이 동작한다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useFuelLog.test.ts[2m > [22m[2museFuelLog[2m > [22m[2mshowForm 토글이 동작한다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+ [32m✓[39m src/__tests__/hooks/useHipassCharge.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 586[2mms[22m[39m
+ [32m✓[39m src/__tests__/hooks/useTodayDashboard.test.ts [2m([22m[2m7 tests[22m[2m)[22m[33m 483[2mms[22m[39m
+[90mstdout[2m | file:\D:\apps\%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80\node_modules\@firebase\app-check\dist\esm\index.esm.js:1494:17
+[22m[39mApp Check debug token: 77d43479-352c-4378-92f6-4cc7c42908e5. You will need to add it to your app's App Check settings in the Firebase console for it to work.
+App Check debug token: 77d43479-352c-4378-92f6-4cc7c42908e5. You will need to add it to your app's App Check settings in the Firebase console for it to work.
+App Check debug token: 77d43479-352c-4378-92f6-4cc7c42908e5. You will need to add it to your app's App Check settings in the Firebase console for it to work.
+App Check debug token: 77d43479-352c-4378-92f6-4cc7c42908e5. You will need to add it to your app's App Check settings in the Firebase console for it to work.
+App Check debug token: 77d43479-352c-4378-92f6-4cc7c42908e5. You will need to add it to your app's App Check settings in the Firebase console for it to work.
+App Check debug token: 77d43479-352c-4378-92f6-4cc7c42908e5. You will need to add it to your app's App Check settings in the Firebase console for it to work.
+App Check debug token: 77d43479-352c-4378-92f6-4cc7c42908e5. You will need to add it to your app's App Check settings in the Firebase console for it to work.
+App Check debug token: 77d43479-352c-4378-92f6-4cc7c42908e5. You will need to add it to your app's App Check settings in the Firebase console for it to work.
+App Check debug token: 77d43479-352c-4378-92f6-4cc7c42908e5. You will need to add it to your app's App Check settings in the Firebase console for it to work.
+App Check debug token: 77d43479-352c-4378-92f6-4cc7c42908e5. You will need to add it to your app's App Check settings in the Firebase console for it to work.
+App Check debug token: 77d43479-352c-4378-92f6-4cc7c42908e5. You will need to add it to your app's App Check settings in the Firebase console for it to work.
+
+[90mstderr[2m | Logger.defaultLogHandler [as _logHandler] (file:\D:\apps\%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%B
+C%EC%A7%80\node_modules\@firebase\logger\dist\esm\index.esm.js:78:24)
+[22m[39m[2026-04-16T12:36:52.439Z]  @firebase/analytics: Analytics: IndexedDB unavailable or restricted in this envir
+onment. Wrap initialization of analytics in analytics.isSupported() to prevent initialization in unsupported environmen
+ts. Details: IndexedDB is not available in this environment. (analytics/indexeddb-unavailable).
+
+ [32m✓[39m src/__tests__/lib/offlineQueue.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 972[2mms[22m[39m
+     [33m[2m✓[22m[39m processOfflineQueue는 오프라인 상태에서 0 반환 [33m 840[2mms[22m[39m
+ [32m✓[39m src/__tests__/hooks/useFuelLog.test.ts [2m([22m[2m8 tests[22m[2m)[22m[33m 649[2mms[22m[39m
+ [32m✓[39m src/__tests__/hooks/useEmployeeManager.test.ts [2m([22m[2m5 tests[22m[2m)[22m[33m 394[2mms[22m[39m
+[90mstderr[2m | src/__tests__/hooks/useVehicleHistory.test.ts[2m > [22m[2museVehicleHistory[2m > [22m[2mPERIOD_
+OPTIONS가 올바르게 정의되어 있다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useSettings.test.ts[2m > [22m[2museSettings[2m > [22m[2morgId가 존재한다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useVehicleHistory.test.ts[2m > [22m[2museVehicleHistory[2m > [22m[2mhandleS
+electVehicle이 차량을 변경한다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+ [32m✓[39m src/__tests__/hooks/useVehicleHistory.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 272[2mms[22m[39m
+[90mstderr[2m | src/__tests__/hooks/useSettings.test.ts[2m > [22m[2museSettings[2m > [22m[2mholidayYear 기본값은 현재
+ 연도이다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useSettings.test.ts[2m > [22m[2museSettings[2m > [22m[2mformatDate 함수가 존재한다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+ [32m✓[39m src/__tests__/hooks/useSettings.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 248[2mms[22m[39m
+[90mstderr[2m | src/__tests__/hooks/useReservationCalendar.test.ts[2m > [22m[2museReservationCalendar[2m > [22m
+[2m초기 상태에서 loading이 true이다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useReservationCalendar.test.ts[2m > [22m[2museReservationCalendar[2m > [22m
+[2morgId가 있으면 차량을 로드한다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useReservationCalendar.test.ts[2m > [22m[2museReservationCalendar[2m > [22m
+[2morgId가 있으면 차량을 로드한다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+ [32m✓[39m src/__tests__/lib/ocr.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 55[2mms[22m[39m
+[90mstderr[2m | src/__tests__/hooks/useReservationCalendar.test.ts[2m > [22m[2museReservationCalendar[2m > [22m
+[2m날짜 선택 시 handleDateSelect가 상태를 업데이트한다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useReservationCalendar.test.ts[2m > [22m[2museReservationCalendar[2m > [22m
+[2m날짜 선택 시 handleDateSelect가 상태를 업데이트한다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+ [32m✓[39m src/__tests__/lib/pdfStyles.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 51[2mms[22m[39m
+[90mstderr[2m | src/__tests__/hooks/useReservationCalendar.test.ts[2m > [22m[2museReservationCalendar[2m > [22m
+[2mprevMonth/nextMonth로 기준 월을 이동한다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useReservationCalendar.test.ts[2m > [22m[2museReservationCalendar[2m > [22m
+[2mprevMonth/nextMonth로 기준 월을 이동한다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useReservationCalendar.test.ts[2m > [22m[2museReservationCalendar[2m > [22m
+[2mprevMonth/nextMonth로 기준 월을 이동한다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useReservationCalendar.test.ts[2m > [22m[2museReservationCalendar[2m > [22m
+[2mhandleCancel이 예약을 취소한다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useReservationCalendar.test.ts[2m > [22m[2museReservationCalendar[2m > [22m
+[2mhandleCancel이 예약을 취소한다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useReservationCalendar.test.ts[2m > [22m[2museReservationCalendar[2m > [22m
+[2mcalendarDays가 올바른 달력 데이터를 생성한다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useReservationCalendar.test.ts[2m > [22m[2museReservationCalendar[2m > [22m
+[2mcalendarDays가 올바른 달력 데이터를 생성한다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+ [32m✓[39m src/__tests__/hooks/useTimelineDrag.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 101[2mms[22m[39m
+[90mstderr[2m | src/__tests__/hooks/useNotification.test.ts[2m > [22m[2museNotification[2m > [22m[2m초기 상태가 올바르다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useVehicleManager.test.ts[2m > [22m[2museVehicleManager[2m > [22m[2m초기 로딩 후
+ 차량 목록을 가져온다
+[22m[39m차량 목록 로드 실패: Error: [vitest] No "hasVehicleDriveLogs" export is defined on the "../../lib/firestore" mock. Di
+d you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+    at VitestMocker.createError [90m(file:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_
+modules/[4mvitest[24m/dist/chunks/startVitestModuleRunner.bRl2_oI_.js:62:17[90m)[39m
+    at Object.get [90m(file:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4mvi
+test[24m/dist/chunks/startVitestModuleRunner.bRl2_oI_.js:324:16[90m)[39m
+    at D:/apps/차량운행일지/src/hooks/useVehicleManager.ts:108:39
+    at Array.map (<anonymous>)
+    at fetchVehicles (D:/apps/차량운행일지/src/hooks/useVehicleManager.ts:107:22)
+[90m    at processTicksAndRejections (node:internal/process/task_queues:104:5)[39m {
+  codeFrame: [32m'vi.mock(import("../../lib/firestore"), async (importOriginal) => {\n'[39m +
+    [32m'  const actual = await importOriginal()\n'[39m +
+    [32m'  return {\n'[39m +
+    [32m'    ...actual,\n'[39m +
+    [32m'    // your mocked methods\n'[39m +
+    [32m'  }\n'[39m +
+    [32m'})'[39m
+}
+
+[90mstderr[2m | src/__tests__/hooks/useNotification.test.ts[2m > [22m[2museNotification[2m > [22m[2mreturn 값에 필
+수 속성이 포함된다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+ [32m✓[39m src/__tests__/hooks/useReservationCalendar.test.ts [2m([22m[2m6 tests[22m[2m)[22m[33m 537[2mms[22m[39m
+ [32m✓[39m src/__tests__/hooks/useNotification.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 80[2mms[22m[39m
+ [32m✓[39m src/__tests__/hooks/useOrientationLock.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 79[2mms[22m[39m
+[90mstderr[2m | src/__tests__/hooks/useRetry.test.ts[2m > [22m[2museRetry[2m > [22m[2m네트워크 에러 시 재시도 토스트를 표시한다
+[22m[39m[useRetry:test-key] Error: network error
+    at D:/apps/차량운행일지/src/__tests__/hooks/useRetry.test.ts:33:51
+    at [90mfile:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:302:11
+    at [90mfile:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:1903:26
+    at [90mfile:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4
+m@vitest/runner[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+    at [90mfile:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[
+4m@vitest/runner[24m/dist/chunk-artifact.js:2272:10[90m)[39m
+    at [90mfile:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:2955:64
+
+[90mstderr[2m | src/__tests__/hooks/useVehicleManager.test.ts[2m > [22m[2museVehicleManager[2m > [22m[2mgetVehi
+cles를 orgId로 호출한다
+[22m[39m차량 목록 로드 실패: Error: [vitest] No "hasVehicleDriveLogs" export is defined on the "../../lib/firestore" mock. Di
+d you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+    at VitestMocker.createError [90m(file:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_
+modules/[4mvitest[24m/dist/chunks/startVitestModuleRunner.bRl2_oI_.js:62:17[90m)[39m
+    at Object.get [90m(file:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4mvi
+test[24m/dist/chunks/startVitestModuleRunner.bRl2_oI_.js:324:16[90m)[39m
+    at D:/apps/차량운행일지/src/hooks/useVehicleManager.ts:108:39
+    at Array.map (<anonymous>)
+    at fetchVehicles (D:/apps/차량운행일지/src/hooks/useVehicleManager.ts:107:22) {
+  codeFrame: [32m'vi.mock(import("../../lib/firestore"), async (importOriginal) => {\n'[39m +
+    [32m'  const actual = await importOriginal()\n'[39m +
+    [32m'  return {\n'[39m +
+    [32m'    ...actual,\n'[39m +
+    [32m'    // your mocked methods\n'[39m +
+    [32m'  }\n'[39m +
+    [32m'})'[39m
+}
+
+[90mstderr[2m | src/__tests__/hooks/useVehicleManager.test.ts[2m > [22m[2museVehicleManager[2m > [22m[2mshowFor
+m 토글이 동작한다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useVehicleManager.test.ts[2m > [22m[2museVehicleManager[2m > [22m[2mshowFor
+m 토글이 동작한다
+[22m[39m차량 목록 로드 실패: Error: [vitest] No "hasVehicleDriveLogs" export is defined on the "../../lib/firestore" mock. Di
+d you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+    at VitestMocker.createError [90m(file:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_
+modules/[4mvitest[24m/dist/chunks/startVitestModuleRunner.bRl2_oI_.js:62:17[90m)[39m
+    at Object.get [90m(file:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4mvi
+test[24m/dist/chunks/startVitestModuleRunner.bRl2_oI_.js:324:16[90m)[39m
+    at D:/apps/차량운행일지/src/hooks/useVehicleManager.ts:108:39
+    at Array.map (<anonymous>)
+    at fetchVehicles (D:/apps/차량운행일지/src/hooks/useVehicleManager.ts:107:22) {
+  codeFrame: [32m'vi.mock(import("../../lib/firestore"), async (importOriginal) => {\n'[39m +
+    [32m'  const actual = await importOriginal()\n'[39m +
+    [32m'  return {\n'[39m +
+    [32m'    ...actual,\n'[39m +
+    [32m'    // your mocked methods\n'[39m +
+    [32m'  }\n'[39m +
+    [32m'})'[39m
+}
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useVehicleManager.test.ts[2m > [22m[2museVehicleManager[2m > [22m[2mmodal 상
+태가 초기에 null이다
+[22m[39mAn update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useVehicleManager.test.ts[2m > [22m[2museVehicleManager[2m > [22m[2mmodal 상
+태가 초기에 null이다
+[22m[39m차량 목록 로드 실패: Error: [vitest] No "hasVehicleDriveLogs" export is defined on the "../../lib/firestore" mock. Di
+d you forget to return it from "vi.mock"?
+If you need to partially mock a module, you can use "importOriginal" helper inside:
+
+    at VitestMocker.createError [90m(file:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_
+modules/[4mvitest[24m/dist/chunks/startVitestModuleRunner.bRl2_oI_.js:62:17[90m)[39m
+    at Object.get [90m(file:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4mvi
+test[24m/dist/chunks/startVitestModuleRunner.bRl2_oI_.js:324:16[90m)[39m
+    at D:/apps/차량운행일지/src/hooks/useVehicleManager.ts:108:39
+    at Array.map (<anonymous>)
+    at fetchVehicles (D:/apps/차량운행일지/src/hooks/useVehicleManager.ts:107:22) {
+  codeFrame: [32m'vi.mock(import("../../lib/firestore"), async (importOriginal) => {\n'[39m +
+    [32m'  const actual = await importOriginal()\n'[39m +
+    [32m'  return {\n'[39m +
+    [32m'    ...actual,\n'[39m +
+    [32m'    // your mocked methods\n'[39m +
+    [32m'  }\n'[39m +
+    [32m'})'[39m
+}
+An update to TestComponent inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/w
+rap-tests-with-act
+
+[90mstderr[2m | src/__tests__/hooks/useRetry.test.ts[2m > [22m[2museRetry[2m > [22m[2m비네트워크 에러 시 일반 에러 토스트를 표시한
+다
+[22m[39m[useRetry:test-key] Error: validation failed
+    at D:/apps/차량운행일지/src/__tests__/hooks/useRetry.test.ts:50:51
+    at [90mfile:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:302:11
+    at [90mfile:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:1903:26
+    at [90mfile:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4
+m@vitest/runner[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+    at [90mfile:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[
+4m@vitest/runner[24m/dist/chunk-artifact.js:2272:10[90m)[39m
+    at [90mfile:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:2955:64
+
+[90mstderr[2m | src/__tests__/hooks/useRetry.test.ts[2m > [22m[2museRetry[2m > [22m[2m커스텀 에러 메시지를 표시한다
+[22m[39m[useRetry:test-key] Error: any error
+    at D:/apps/차량운행일지/src/__tests__/hooks/useRetry.test.ts:64:51
+    at [90mfile:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:302:11
+    at [90mfile:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:1903:26
+    at [90mfile:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4
+m@vitest/runner[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+    at [90mfile:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[
+4m@vitest/runner[24m/dist/chunk-artifact.js:2272:10[90m)[39m
+    at [90mfile:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:2955:64
+
+[90mstderr[2m | src/__tests__/hooks/useRetry.test.ts[2m > [22m[2museRetry[2m > [22m[2monError 콜백이 호출된다
+[22m[39m[useRetry:test-key] Error: test
+    at D:/apps/차량운행일지/src/__tests__/hooks/useRetry.test.ts:80:51
+    at [90mfile:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:302:11
+    at [90mfile:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:1903:26
+    at [90mfile:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4
+m@vitest/runner[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+    at [90mfile:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[
+4m@vitest/runner[24m/dist/chunk-artifact.js:2272:10[90m)[39m
+    at [90mfile:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:2955:64
+
+[90mstderr[2m | src/__tests__/hooks/useRetry.test.ts[2m > [22m[2museRetry[2m > [22m[2mresetRetry로 특정 키나 전체 카운터를
+ 초기화한다
+[22m[39m[useRetry:key1] Error: network
+    at D:/apps/차량운행일지/src/__tests__/hooks/useRetry.test.ts:94:51
+    at [90mfile:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:302:11
+    at [90mfile:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:1903:26
+    at [90mfile:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:2326:20
+    at new Promise (<anonymous>)
+    at runWithCancel [90m(file:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4
+m@vitest/runner[24m/dist/chunk-artifact.js:2323:10[90m)[39m
+    at [90mfile:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:2305:20
+    at new Promise (<anonymous>)
+    at runWithTimeout [90m(file:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[
+4m@vitest/runner[24m/dist/chunk-artifact.js:2272:10[90m)[39m
+    at [90mfile:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:2955:64
+
+ [32m✓[39m src/__tests__/hooks/useToast.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 351[2mms[22m[39m
+ [32m✓[39m src/__tests__/hooks/useAuth.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 276[2mms[22m[39m
+ [32m✓[39m src/__tests__/hooks/useVehicleManager.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 213[2mms[22m[39m
+ [32m✓[39m src/__tests__/hooks/useRetry.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 216[2mms[22m[39m
+ [32m✓[39m src/__tests__/components/MyStatsSummary.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[33m 319[2mms[22m[39m
+ [32m✓[39m src/__tests__/hooks/useDriveLogOcr.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 71[2mms[22m[39m
+ [32m✓[39m src/__tests__/hooks/useForceLightMode.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 84[2mms[22m[39m
+[90mstderr[2m | src/__tests__/lib/tokenRefresh.test.ts[2m > [22m[2mtokenRefresh[2m > [22m[2mrefreshTokenSilentl
+y는 에러 삼킴
+[22m[39m[TokenRefresh] 토큰 갱신 실패 (무시): Error: auth/user-disabled
+    at D:/apps/차량운행일지/src/__tests__/lib/tokenRefresh.test.ts:23:51
+[90m    at processTicksAndRejections (node:internal/process/task_queues:104:5)[39m
+    at [90mfile:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/[39mnode_modules/[4m@vitest/runner
+[24m/dist/chunk-artifact.js:1903:20
+
+ [32m✓[39m src/__tests__/lib/tokenRefresh.test.ts [2m([22m[2m3 tests[22m[2m)[22m[32m 34[2mms[22m[39m
+ [32m✓[39m src/__tests__/lib/manualSections.test.ts [2m([22m[2m8 tests[22m[2m)[22m[32m 32[2mms[22m[39m
+ [32m✓[39m src/__tests__/lib/analyticsCalc.test.ts [2m([22m[2m21 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m src/__tests__/lib/inAppBrowser.test.ts [2m([22m[2m11 tests[22m[2m)[22m[32m 25[2mms[22m[39m
+ [32m✓[39m src/__tests__/lib/reservationUtils.test.ts [2m([22m[2m28 tests[22m[2m)[22m[32m 22[2mms[22m[39m
+ [32m✓[39m src/__tests__/lib/excelExport.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 16[2mms[22m[39m
+ [32m✓[39m src/__tests__/lib/timelineUtils.test.ts [2m([22m[2m17 tests[22m[2m)[22m[32m 18[2mms[22m[39m
+ [32m✓[39m src/__tests__/lib/driveLogValidation.extra.test.ts [2m([22m[2m12 tests[22m[2m)[22m[32m 17[2mms[22m[39m
+ [32m✓[39m src/__tests__/lib/constants.test.ts [2m([22m[2m7 tests[22m[2m)[22m[32m 12[2mms[22m[39m
+ [32m✓[39m src/__tests__/lib/dateUtils.test.ts [2m([22m[2m5 tests[22m[2m)[22m[32m 8[2mms[22m[39m
+ [32m✓[39m src/__tests__/lib/driveLogValidation.test.ts [2m([22m[2m14 tests[22m[2m)[22m[32m 14[2mms[22m[39m
+[90mstderr[2m | src/__tests__/hooks/useOrgApplication.test.ts
+[22m[39m[Firestore] IndexedDB 사용 불가 → memoryLocalCache로 재초기화
+
+ [32m✓[39m src/__tests__/hooks/useOrgApplication.test.ts [2m([22m[2m6 tests[22m[2m)[22m[32m 4[2mms[22m[39m
+Failed to parse file:///D:/apps/차량운행일지/src/components/common/UpdatePrompt.tsx. Excluding it from coverage.
+ Error [RollupError]: Expected a semicolon
+    at getRollupError (file:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/node_modules/rollup/dist/
+es/shared/parseAst.js:402:41)
+    at convertProgram (file:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/node_modules/rollup/dist/
+es/shared/parseAst.js:1114:26)
+    at parseAstAsync (file:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/node_modules/rollup/dist/e
+s/shared/parseAst.js:2100:106)
+    at V8CoverageProvider.remapCoverage (file:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/node_mo
+dules/@vitest/coverage-v8/dist/provider.js:133:10)
+    at file:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/node_modules/@vitest/coverage-v8/dist/pro
+vider.js:119:23
+    at async Promise.all (index 15)
+    at V8CoverageProvider.getCoverageMapForUncoveredFiles (file:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%B
+C%EC%A7%80/node_modules/@vitest/coverage-v8/dist/provider.js:109:4)
+    at V8CoverageProvider.generateCoverage (file:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/node
+_modules/@vitest/coverage-v8/dist/provider.js:56:29)
+    at file:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/node_modules/vitest/dist/chunks/cli-api.l
+Dy4N9kC.js:13580:23
+    at file:///D:/apps/%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/node_modules/vitest/dist/chunks/cli-api.l
+Dy4N9kC.js:13593:11 {
+  code: 'PARSE_ERROR',
+  pos: 250
+}
+
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Suites 2 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/__tests__/components/ConfirmModal.test.tsx[2m [ src/__tests__/components/ConfirmModal.te
+st.tsx ][22m
+[31m[1mError[22m: Failed to resolve import "../../../components/common/ConfirmModal" from "src/__tests__/components/
+ConfirmModal.test.tsx". Does the file exist?[39m
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mD:/apps/차량운행일지/src/__tests__/components/ConfirmModal.test.tsx[39m:3:25
+[33m  2  |  import { render, screen, fireEvent } from "@testing-library/react";
+  3  |  import { describe, it, expect, vi, beforeEach } from "vitest";
+  4  |  import ConfirmModal from "../../../components/common/ConfirmModal";
+     |                            ^
+  5  |  import { useConfirmStore } from "../../../store/useConfirmStore";
+  6  |  describe("ConfirmModal Component", () => {[39m
+[90m [2m❯[22m TransformPluginContext._formatLog ../%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/node_modul
+es/vite/dist/node/chunks/config.js:[2m29003:43[22m[39m
+[90m [2m❯[22m TransformPluginContext.error ../%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/node_modules/vi
+te/dist/node/chunks/config.js:[2m29000:14[22m[39m
+[90m [2m❯[22m normalizeUrl ../%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/node_modules/vite/dist/node/chu
+nks/config.js:[2m27123:18[22m[39m
+[90m [2m❯[22m ../%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/node_modules/vite/dist/node/chunks/config.js
+:[2m27181:32[22m[39m
+[90m [2m❯[22m TransformPluginContext.transform ../%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/node_module
+s/vite/dist/node/chunks/config.js:[2m27149:4[22m[39m
+[90m [2m❯[22m EnvironmentPluginContainer.transform ../%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/node_mo
+dules/vite/dist/node/chunks/config.js:[2m28801:14[22m[39m
+[90m [2m❯[22m loadAndTransform ../%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/node_modules/vite/dist/node
+/chunks/config.js:[2m22670:26[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/2]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m src/__tests__/components/PendingReservationList.test.tsx[2m [ src/__tests__/components/Pendi
+ngReservationList.test.tsx ][22m
+[31m[1mError[22m: Failed to resolve import "../../../components/admin/PendingReservationList" from "src/__tests__/co
+mponents/PendingReservationList.test.tsx". Does the file exist?[39m
+  Plugin: [35mvite:import-analysis[39m
+  File: [36mD:/apps/차량운행일지/src/__tests__/components/PendingReservationList.test.tsx[39m:3:0
+[33m  22 |  const __vi_import_0__ = await import("react/jsx-dev-runtime");
+  23 |  const __vi_import_1__ = await import("@testing-library/react");
+  24 |  const __vi_import_2__ = await import("../../../components/admin/PendingReservationList");
+     |                                       ^
+  25 |  const __vi_import_3__ = await import("../../../hooks/useAuth");
+  26 |  const __vi_import_4__ = await import("../../../hooks/useToast");[39m
+[90m [2m❯[22m TransformPluginContext._formatLog ../%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/node_modul
+es/vite/dist/node/chunks/config.js:[2m29003:43[22m[39m
+[90m [2m❯[22m TransformPluginContext.error ../%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/node_modules/vi
+te/dist/node/chunks/config.js:[2m29000:14[22m[39m
+[90m [2m❯[22m normalizeUrl ../%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/node_modules/vite/dist/node/chu
+nks/config.js:[2m27123:18[22m[39m
+[90m [2m❯[22m ../%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/node_modules/vite/dist/node/chunks/config.js
+:[2m27181:32[22m[39m
+[90m [2m❯[22m TransformPluginContext.transform ../%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/node_module
+s/vite/dist/node/chunks/config.js:[2m27149:4[22m[39m
+[90m [2m❯[22m EnvironmentPluginContainer.transform ../%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/node_mo
+dules/vite/dist/node/chunks/config.js:[2m28801:14[22m[39m
+[90m [2m❯[22m loadAndTransform ../%EC%B0%A8%EB%9F%89%EC%9A%B4%ED%96%89%EC%9D%BC%EC%A7%80/node_modules/vite/dist/node
+/chunks/config.js:[2m22670:26[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/2]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m39 passed[39m[22m[90m (41)[39m
+[2m      Tests [22m [1m[32m285 passed[39m[22m[90m (285)[39m
+[2m   Start at [22m 21:36:47
+[2m   Duration [22m 13.77s[2m (transform 6.28s, setup 11.29s, import 17.06s, tests 9.70s, environment 94.24s)[22m
+

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 
 vi.mock('../../hooks/useAuth', () => ({
     useAuth: () => ({
@@ -83,7 +83,9 @@ describe('useMaintenanceLog', () => {
             expect(result.current.loading).toBe(false);
         });
 
-        result.current.handleVehicleSelect('v1');
+        act(() => {
+            result.current.handleVehicleSelect('v1');
+        });
 
         await waitFor(() => {
             expect(result.current.form.vehicleId).toBe('v1');
@@ -94,9 +96,15 @@ describe('useMaintenanceLog', () => {
     it('showForm 토글이 동작한다', async () => {
         const { result } = renderHook(() => useMaintenanceLog());
 
+        await waitFor(() => {
+            expect(result.current.loading).toBe(false);
+        });
+        
         expect(result.current.showForm).toBe(false);
 
-        result.current.setShowForm(true);
+        act(() => {
+            result.current.setShowForm(true);
+        });
 
         await waitFor(() => {
             expect(result.current.showForm).toBe(true);

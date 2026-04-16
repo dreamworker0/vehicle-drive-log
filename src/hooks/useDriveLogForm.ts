@@ -50,7 +50,7 @@ export default function useDriveLogForm() {
     const location = useLocation();
     const navigate = useNavigate();
     const { showToast } = useToast();
-    useRetry();
+    const { runWithRetry } = useRetry();
 
     interface LocationState {
         reservationId?: string;
@@ -318,12 +318,53 @@ export default function useDriveLogForm() {
 
         setSubmitting(true);
         try {
-            const result = await submitDriveLog({
-                form, orgId, user: user!, userData, selectedVehicle,
-                selectedPassengers, externalPassengerCount, isRetroactive,
-                ocrUsed: ocr.ocrSuccess, isElectric, isEditMode, editLog,
-                reservationData, hipassCard,
-            });
+            const result = await runWithRetry(
+                'submit-drive-log',
+                () => submitDriveLog({
+                    form, orgId, user: user!, userData, selectedVehicle,
+                    selectedPassengers, externalPassengerCount, isRetroactive,
+                    ocrUsed: ocr.ocrSuccess, favoriteUsed: false, isElectric, isEditMode, editLog,
+                    reservationData, hipassCard,
+                }),
+                {
+                    timeoutMs: 30000, // Firestore 콜드스타트 및 느린 3G 네트워크 환경 고려하여 타임아웃 30초로 증가
+                    onError: (err: unknown) => {
+                        console.error('운행일지 저장 실패:', err);
+                        
+                        // 중복 저장 에러: 타임아웃 등으로 첫 번째 저장 시도가 보이지 않게 성공한 후 사용자가 재시도한 경우
+                        if (err instanceof Error && err.message?.includes('중복')) {
+                            showToast('요청된 내용이 정상 반영되어 이미 목록에 저장되었습니다.', 'success');
+                            setSuccess(true);
+                            if (reservationData?.reservationId) {
+                                navigate('/employee/today', { replace: true });
+                            } else if (isEditMode) {
+                                navigate('/employee/my-records', { replace: true });
+                            } else {
+                                setForm(getEmptyForm());
+                                setSelectedPassengers([]);
+                                setExternalPassengerCount(0);
+                                setTimeout(() => setSuccess(false), 2000);
+                            }
+                            return true; // 에러로서 표시하지 않고 종료
+                        }
+                        
+                        // 타임아웃 에러
+                        if (err instanceof Error && err.message?.includes('TIMEOUT')) {
+                            showToast('서버 연결이 원활하지 않아 응답이 늦어지고 있습니다. 백그라운드에서 저장이 성공했을 수 있습니다.', 'error', {
+                                actionLabel: '다시 제출 시도',
+                                onAction: () => handleSubmit(new Event('submit') as any)
+                            });
+                            return true;
+                        }
+                        
+                        // 그 외 단일 에러
+                        return false; 
+                    }
+                }
+            ) as any;
+
+            if (!result) return;
+
 
             if (result.syncResult?.updated) {
                 showToast(`다음 기록의 출발 km가 ${result.syncResult.oldStartKm?.toLocaleString()} → ${result.syncResult.newStartKm?.toLocaleString()}으로 자동 조정되었습니다.`, 'info');
@@ -359,15 +400,10 @@ export default function useDriveLogForm() {
                 setSuccess(false);
             }
         } catch (err: unknown) {
-            console.error('운행일지 저장 실패:', err);
-            if (err instanceof Error && err.message?.includes('중복')) {
-                showToast(err.message, 'warning');
-            } else {
-                showToast('저장에 실패했습니다.', 'error', {
-                    actionLabel: '재시도',
-                    onAction: () => handleSubmit(new Event('submit')),
-                });
-            }
+            // runWithRetry는 내부적으로 에러를 잡아서 처리 (undefined 반환)
+            // 따라서 이곳으로 에러 스로우가 전달되는 일은 드물지만 방어 코드 유지
+            console.error('운행일지 과정 중 예상치 못한 오류:', err);
+            showToast('알 수 없는 오류가 발생했습니다.', 'error');
         } finally {
             setSubmitting(false);
         }

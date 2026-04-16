@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // import.meta.env 모킹
 vi.stubGlobal('import', { meta: { env: { VITE_TMAP_API_KEY: 'test-key', PROD: false } } });
@@ -13,6 +13,12 @@ beforeEach(async () => {
     isTmapAvailable = mod.isTmapAvailable;
     parseDestinations = mod.parseDestinations;
     MAX_DESTINATIONS = mod.MAX_DESTINATIONS;
+});
+
+afterEach(() => {
+    document.head.innerHTML = '';
+    vi.restoreAllMocks();
+    vi.clearAllTimers();
 });
 
 describe('tmap 유틸리티', () => {

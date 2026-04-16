@@ -59,10 +59,10 @@ export default function TodayDashboard() {
                 {!hasActiveDrive && (
                     <button
                         onClick={navigateToQuickDrive}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 text-xs font-bold rounded-full hover:bg-emerald-100 dark:hover:bg-emerald-900/50 transition-all border border-emerald-200 dark:border-emerald-800/50 shadow-sm hover:shadow active:scale-95"
-                        title="예약 없이 바로 운행 시작"
+                        className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-colors text-xs font-medium"
                     >
-                        <span>🚀 바로 운행</span>
+                        <span className="text-sm">🚀</span>
+                        <span>바로 운행</span>
                     </button>
                 )}
             </div>
@@ -72,13 +72,18 @@ export default function TodayDashboard() {
 
             {/* 미작성 알림 */}
             {incompleteAlerts.length > 0 && (
-                <div className="mb-4 space-y-2">
+                <div className="mb-6 space-y-3">
                     {incompleteAlerts.map((alert: Reservation & { type: string }, idx: number) => (
-                        <div key={alert.id || idx} className="bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-700/50 rounded-xl p-3 flex items-center gap-3 animate-fade-in">
-                            <span className="text-xl">📝</span>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold text-red-800 dark:text-red-200">운행일지 미작성</p>
-                                <p className="text-xs text-red-600 dark:text-red-400 truncate">
+                        <div key={alert.id || idx} className="relative overflow-hidden bg-gradient-to-br from-red-500 to-rose-600 rounded-2xl p-4 shadow-md flex items-center gap-4 animate-fade-in group">
+                            {/* 배경 효과 */}
+                            <div className="absolute -right-4 -top-4 w-24 h-24 bg-white opacity-10 rounded-full blur-xl mix-blend-overlay group-hover:scale-150 transition-transform duration-700"></div>
+                            
+                            <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center text-2xl flex-shrink-0 z-10 backdrop-blur-sm">
+                                📝
+                            </div>
+                            <div className="flex-1 min-w-0 z-10">
+                                <p className="text-base font-bold text-white tracking-tight">작성 대기중인 운행일지!</p>
+                                <p className="text-sm text-red-100 truncate mt-0.5 opacity-90">
                                     {`${alert.vehicleName || ''} · ${alert.date || ''} ${alert.startTime || ''}~${alert.endTime || ''}`}
                                 </p>
                             </div>
@@ -97,14 +102,16 @@ export default function TodayDashboard() {
                                         },
                                     });
                                 }}
-                                className="btn-sm text-xs whitespace-nowrap bg-red-100 text-red-700 hover:bg-red-200 dark:bg-red-900/40 dark:text-red-300 dark:hover:bg-red-900/60"
+                                className="z-10 bg-white text-red-600 hover:bg-red-50 px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition-transform active:scale-95 whitespace-nowrap"
                             >
-                                작성하기
+                                바로 작성
                             </button>
                         </div>
                     ))}
                 </div>
             )}
+
+            {/* (바로 운행 버튼은 상단 타이틀 영역으로 이동됨) */}
 
             {/* 내 예약 */}
             {myReservations.length > 0 && (

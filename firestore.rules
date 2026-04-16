@@ -223,7 +223,7 @@ service cloud.firestore {
 
     // === 시스템 ===
     match /system/{document} {
-      allow read: if isSignedIn();
+      allow read: if isSuperAdmin();
       allow write: if false; // Cloud Functions에서만 쓰기
     }
   }

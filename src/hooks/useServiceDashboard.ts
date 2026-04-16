@@ -1,17 +1,18 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '../lib/firebase';
-import type { SortKey, ServiceStats } from '../components/superAdmin/dashboard/dashboardUtils';
-import type { OrgStat, SharedSnaps } from './serviceDashboard/types';
-import { processServiceStats } from './serviceDashboard/processServiceStats';
-import { processMonthlyStats } from './serviceDashboard/processMonthlyStats';
-import { processTopOrganizations } from './serviceDashboard/processTopOrganizations';
+import { doc, getDoc } from 'firebase/firestore';
+import { httpsCallable } from 'firebase/functions';
+import { db, firebaseFunctions } from '../lib/firebase';
+import type { SortKey } from '../components/superAdmin/dashboard/dashboardUtils';
+import type { OrgStat, CachedDashboardStats, CachedDashboardTimeSeries, CachedDashboardOrgRankings } from './serviceDashboard/types';
 import { loadFuelHipassStats } from './serviceDashboard/loadFuelHipassStats';
 import { loadNotificationStats } from './serviceDashboard/loadNotificationStats';
 import { loadQuickDriveStats } from './serviceDashboard/loadQuickDriveStats';
 
 export default function useServiceDashboard() {
-    const [stats, setStats] = useState<ServiceStats | null>(null);
+    const [stats, setStats] = useState<CachedDashboardStats['monthlyStats'] extends infer _ ? {
+        approvedOrgs: number; totalUsers: number; adminCount: number; employeeCount: number;
+        totalLogs: number; totalDistance: number; pendingApps: number; calendarSyncOrgs: number;
+    } | null : never>(null);
     const [monthlyStats, setMonthlyStats] = useState<{
         monthLabel: string; logs: number; distance: number; activeUsers: number;
         prevLogs: number; prevDistance: number; prevActiveUsers: number;
@@ -43,6 +44,8 @@ export default function useServiceDashboard() {
     const [vehicleModelStats, setVehicleModelStats] = useState<{ model: string; count: number }[]>([]);
     const [hipassRatio, setHipassRatio] = useState<{ withHipass: number; withoutHipass: number }>({ withHipass: 0, withoutHipass: 0 });
     const [calendarSyncRatio, setCalendarSyncRatio] = useState<{ sync: number; notSync: number }>({ sync: 0, notSync: 0 });
+    const [calendarTopOrgs, setCalendarTopOrgs] = useState<{ name: string; count: number }[]>([]);
+    const [calendarSyncOrgCount, setCalendarSyncOrgCount] = useState<number>(0);
     const [hipassTopOrgs, setHipassTopOrgs] = useState<{ name: string; count: number }[]>([]);
     const [weeklyActiveRate, setWeeklyActiveRate] = useState<{ active: number; total: number }>({ active: 0, total: 0 });
     const [monthlyGrowth, setMonthlyGrowth] = useState<{ month: string; cumulative: number }[]>([]);
@@ -81,54 +84,17 @@ export default function useServiceDashboard() {
     const [firstEmployeeDist, setFirstEmployeeDist] = useState<{ label: string; count: number; color: string }[]>([]);
     const [firstEmployeeTrend, setFirstEmployeeTrend] = useState<{ month: string; avg: number }[]>([]);
 
+    // 기관 규모별 분포 (캐시에서 바로 세팅, fallback용 useMemo 유지)
+    const [orgSizeDistribution, setOrgSizeDistribution] = useState<{ label: string; count: number; color: string }[]>([]);
 
-    // 기관 규모별 분포
-    const orgSizeDistribution = useMemo(() => {
-        let small = 0, medium = 0, large = 0;
-        topOrgs.forEach(org => {
-            if (org.users <= 2) small++;
-            else if (org.users <= 10) medium++;
-            else large++;
-        });
-        return [
-            { label: '소규모 (1~2명)', count: small, color: '#60a5fa' },
-            { label: '중규모 (3~10명)', count: medium, color: '#34d399' },
-            { label: '대규모 (11명 이상)', count: large, color: '#f59e0b' },
-        ];
-    }, [topOrgs]);
+    // 온보딩 완료율
+    const [onboardingStats, setOnboardingStats] = useState<{ total: number; completed: number; rate: number }>({ total: 0, completed: 0, rate: 0 });
 
-    // 온보딩 완료율 (차량+사용자+운행 모두 있는 기관)
-    const onboardingStats = useMemo(() => {
-        const total = topOrgs.length;
-        if (total === 0) return { total: 0, completed: 0, rate: 0 };
-        const completed = topOrgs.filter(org => org.users > 0 && org.vehicles > 0 && org.logs > 0).length;
-        return { total, completed, rate: Math.round((completed / total) * 100) };
-    }, [topOrgs]);
+    // 퍼널 데이터
+    const [funnelData, setFunnelData] = useState<{ label: string; value: number; icon: string; color: string; gradient: string; rate: number; dropoff: number; conversionFromPrev: number }[]>([]);
 
-    // 기관 활성화 퍼널 데이터
-    const funnelData = useMemo(() => {
-        const totalOrgs = topOrgs.length;
-        if (totalOrgs === 0) return [];
-        const activeOrgs = topOrgs.filter(org => org.users > 0).length;
-        const vehicleOrgs = topOrgs.filter(org => org.vehicles > 0).length;
-        const drivingOrgs = topOrgs.filter(org => org.logs > 0).length;
-
-        const steps = [
-            { label: '신청 기관', value: totalOrgs, icon: '📋', color: '#3b82f6', gradient: 'from-blue-500 to-blue-600' },
-            { label: '활성 기관 (직원 등록)', value: activeOrgs, icon: '👥', color: '#8b5cf6', gradient: 'from-violet-500 to-violet-600' },
-            { label: '차량 등록', value: vehicleOrgs, icon: '🚗', color: '#f59e0b', gradient: 'from-amber-500 to-amber-600' },
-            { label: '주행 실행', value: drivingOrgs, icon: '🛣️', color: '#22c55e', gradient: 'from-emerald-500 to-emerald-600' },
-        ];
-
-        return steps.map((step, idx) => ({
-            ...step,
-            rate: Math.round((step.value / totalOrgs) * 100),
-            dropoff: idx > 0 ? steps[idx - 1].value - step.value : 0,
-            conversionFromPrev: idx > 0 && steps[idx - 1].value > 0
-                ? Math.round((step.value / steps[idx - 1].value) * 100)
-                : 100,
-        }));
-    }, [topOrgs]);
+    // 캐시 마지막 갱신 시각
+    const [lastCacheUpdated, setLastCacheUpdated] = useState<string | null>(null);
 
     const [orgPage, setOrgPage] = useState(0);
     const [sortKey, setSortKey] = useState<SortKey>('logs');
@@ -182,35 +148,108 @@ export default function useServiceDashboard() {
         loadAllStats(!!isBackground);
     }, []);
 
+    // ── 캐시 문서 데이터를 state에 반영하는 헬퍼 ──
+    const applyCacheDocuments = (
+        statsSnap: Awaited<ReturnType<typeof getDoc>>,
+        timeSeriesSnap: Awaited<ReturnType<typeof getDoc>>,
+        orgRankingsSnap: Awaited<ReturnType<typeof getDoc>>,
+    ) => {
+        if (statsSnap.exists()) {
+            const s = statsSnap.data() as CachedDashboardStats;
+            setStats({
+                approvedOrgs: s.approvedOrgs,
+                totalUsers: s.totalUsers,
+                adminCount: s.adminCount,
+                employeeCount: s.employeeCount,
+                totalLogs: s.totalLogs,
+                totalDistance: s.totalDistance,
+                pendingApps: s.pendingApps,
+                calendarSyncOrgs: s.calendarSyncOrgs,
+            });
+            setMonthlyStats(s.monthlyStats);
+            setFavoriteUserRatio(s.favoriteUserRatio);
+            setWeeklyActiveRate(s.weeklyActiveRate);
+            setMonthlyGrowth(s.monthlyGrowth);
+            setFirstEmployeeStats(s.firstEmployeeStats);
+            setFirstEmployeeDist(s.firstEmployeeDist);
+            setFirstEmployeeTrend(s.firstEmployeeTrend);
+            setOnboardingStats(s.onboardingStats);
+            setOrgSizeDistribution(s.orgSizeDistribution);
+            setFuelTypeStats(s.fuelTypeStats);
+            setVehicleTypeStats(s.vehicleTypeStats);
+            setVehicleModelStats(s.vehicleModelStats);
+            setHipassRatio(s.hipassRatio);
+            setHipassTopOrgs(s.hipassTopOrgs);
+            setCalendarSyncRatio(s.calendarSyncRatio);
+            setCalendarTopOrgs(s.calendarTopOrgs);
+            setCalendarSyncOrgCount(s.calendarSyncOrgs);
+            setLastCacheUpdated(s.lastUpdatedAt);
+        }
+
+        if (timeSeriesSnap.exists()) {
+            const ts = timeSeriesSnap.data() as CachedDashboardTimeSeries;
+            setInputMethodStats(ts.inputMethodStats);
+            setDailyDriveStats(ts.dailyDriveStats);
+            setDailyActiveUserStats(ts.dailyActiveUserStats);
+            setDailyActiveOrgStats(ts.dailyActiveOrgStats);
+            setFavoriteStats(ts.favoriteStats);
+            setFavoriteLogRatio(ts.favoriteLogRatio);
+            setHourlyStats(ts.hourlyStats);
+            setDailyAvgDuration(ts.dailyAvgDuration);
+            setHourlyAvgDuration(ts.hourlyAvgDuration);
+            // items(flat) → grid(2D) 변환
+            const grid = Array.from({ length: 7 }, () => Array(24).fill(0) as number[]);
+            ts.heatmapData.items.forEach(({ dayIdx, hour, count }) => { grid[dayIdx][hour] = count; });
+            setHeatmapData({ grid, maxCount: ts.heatmapData.maxCount });
+        }
+
+        if (orgRankingsSnap.exists()) {
+            const r = orgRankingsSnap.data() as CachedDashboardOrgRankings;
+            const orgs: OrgStat[] = r.topOrgs.map(o => ({
+                ...o,
+                lastDriveDate: o.lastDriveDate ? new Date(o.lastDriveDate) : null,
+            }));
+            setTopOrgs(orgs);
+            setOrgAvgDuration(r.orgAvgDuration);
+            setFunnelData(r.funnelData);
+        }
+    };
+
     const loadAllStats = async (isBackground = false) => {
         if (!isBackground) setLoading(true);
         try {
-            // 공유 컬렉션을 1회만 조회
-            const [orgSnap, userSnap, logSnap, vehicleSnap, hipassCardSnap, favoriteSnap] = await Promise.all([
-                getDocs(collection(db, 'organizations')),
-                getDocs(collection(db, 'users')),
-                getDocs(collection(db, 'driveLogs')),
-                getDocs(collection(db, 'vehicles')),
-                getDocs(collection(db, 'hipassCards')),
-                getDocs(collection(db, 'favorites')),
+            // 캐시 문서 3건 + 독립 통계 3건 병렬 로드
+            const [statsDoc, timeSeriesDoc, orgRankingsDoc] = await Promise.all([
+                getDoc(doc(db, 'system', 'dashboardStats')),
+                getDoc(doc(db, 'system', 'dashboardTimeSeries')),
+                getDoc(doc(db, 'system', 'dashboardOrgRankings')),
             ]);
-            const shared: SharedSnaps = { orgSnap, userSnap, logSnap, vehicleSnap, hipassCardSnap, favoriteSnap };
 
-            // 공유 데이터로 통계 계산 + 독립 컬렉션은 개별 로드
+            // ── 캐시 문서가 하나도 없으면 자동으로 초기 시딩 수행 ──
+            const noneExists = !statsDoc.exists() && !timeSeriesDoc.exists() && !orgRankingsDoc.exists();
+            if (noneExists) {
+                console.info('[Dashboard] 캐시 문서가 없습니다. 자동으로 초기 통계를 생성합니다...');
+                try {
+                    const refreshFn = httpsCallable(firebaseFunctions, 'refreshDashboardStats');
+                    await refreshFn();
+                    // 캐시 생성 후 다시 로드
+                    const [s2, ts2, r2] = await Promise.all([
+                        getDoc(doc(db, 'system', 'dashboardStats')),
+                        getDoc(doc(db, 'system', 'dashboardTimeSeries')),
+                        getDoc(doc(db, 'system', 'dashboardOrgRankings')),
+                    ]);
+                    applyCacheDocuments(s2, ts2, r2);
+                    console.info('[Dashboard] 초기 시딩 완료');
+                } catch (seedErr) {
+                    console.error('[Dashboard] 자동 초기 시딩 실패:', seedErr);
+                }
+            } else {
+                // ── 캐시 문서별 개별 처리 (일부만 있어도 해당 데이터는 표시) ──
+                applyCacheDocuments(statsDoc, timeSeriesDoc, orgRankingsDoc);
+            }
+
+            // 독립 통계는 기존 방식 그대로 (이미 서버 집계/날짜 필터 사용)
             await Promise.all([
-                processServiceStats(shared, {
-                    setStats, setFavoriteUserRatio, setInputMethodStats, setDailyDriveStats,
-                    setDailyActiveUserStats, setDailyActiveOrgStats, setHourlyStats,
-                    setWeeklyActiveRate, setFavoriteStats, setFavoriteLogRatio,
-                    setHeatmapData, setDailyAvgDuration, setHourlyAvgDuration,
-                }),
-                processMonthlyStats(shared, { setMonthlyStats }),
-                processTopOrganizations(shared, {
-                    setTopOrgs, setStats, setHipassRatio, setCalendarSyncRatio,
-                    setHipassTopOrgs, setFuelTypeStats, setVehicleTypeStats,
-                    setVehicleModelStats, setOrgAvgDuration, setMonthlyGrowth,
-                    setFirstEmployeeStats, setFirstEmployeeDist, setFirstEmployeeTrend,
-                }),
                 loadFuelHipassStats({
                     setFuelStats, setHipassStats, setDailyFuelCost, setDailyHipassAmount,
                 }),
@@ -225,6 +264,24 @@ export default function useServiceDashboard() {
             sessionStorage.setItem('svc_dashboard_cache_time', Date.now().toString());
         } finally {
             if (!isBackground) setLoading(false);
+        }
+    };
+
+    /**
+     * 서버 측 대시보드 통계 재계산 요청 (Cloud Function 호출)
+     */
+    const refreshServerStats = async () => {
+        setLoading(true);
+        try {
+            const refreshFn = httpsCallable(firebaseFunctions, 'refreshDashboardStats');
+            await refreshFn();
+            // 재집계 완료 후 데이터 다시 로드
+            await loadAllStats(false);
+        } catch (err) {
+            console.error('[Dashboard] 서버 갱신 실패:', err);
+            throw err;
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -251,6 +308,8 @@ export default function useServiceDashboard() {
         vehicleModelStats,
         hipassRatio,
         calendarSyncRatio,
+        calendarTopOrgs,
+        calendarSyncOrgCount,
         hipassTopOrgs,
         fuelStats,
         hipassStats,
@@ -277,5 +336,7 @@ export default function useServiceDashboard() {
         handleSort,
         sortIndicator,
         loadAllStats,
+        refreshServerStats,
+        lastCacheUpdated,
     };
 }

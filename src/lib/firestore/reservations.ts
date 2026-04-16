@@ -4,7 +4,7 @@
 import {
     doc, getDoc, updateDoc, deleteDoc,
     collection, query, where, getDocs, addDoc,
-    serverTimestamp, onSnapshot,
+    serverTimestamp, onSnapshot, runTransaction,
     type DocumentData,
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -22,10 +22,12 @@ export const getReservationById = async (reservationId: string) => {
 
 // 예약 생성 (클라이언트 측)
 export const createReservation = async (data: Record<string, unknown>, requireApproval: boolean = false) => {
+    const expiresAt = new Date(Date.now() + 5 * 365 * 24 * 60 * 60 * 1000); // TTL: 5 years
     const docRef = await addDoc(collection(db, 'reservations'), {
         ...data,
         status: requireApproval ? 'pending' : 'reserved',
         createdAt: serverTimestamp(),
+        expiresAt,
     });
     return docRef.id;
 };
@@ -93,11 +95,29 @@ export const updateReservation = async (reservationId: string, data: Record<stri
     await updateDoc(doc(db, 'reservations', reservationId), data);
 };
 
-// 예약 상태 변경
-export const updateReservationStatus = async (reservationId: string, status: string, extraData: Record<string, unknown> = {}) => {
-    await updateDoc(doc(db, 'reservations', reservationId), {
-        status,
-        ...extraData,
+// 예약 상태 변경 (클라이언트 트랜잭션을 통한 동시성 제어 보호)
+export const updateReservationStatus = async (
+    reservationId: string, 
+    status: string, 
+    extraData: Record<string, unknown> = {},
+    expectedCurrentStatus?: string
+) => {
+    const reservationRef = doc(db, 'reservations', reservationId);
+    await runTransaction(db, async (transaction) => {
+        const sfDoc = await transaction.get(reservationRef);
+        if (!sfDoc.exists()) {
+            throw new Error("예약 정보가 존재하지 않습니다.");
+        }
+        
+        const currentData = sfDoc.data();
+        if (expectedCurrentStatus && currentData.status !== expectedCurrentStatus) {
+            throw new Error(`동시성 오류: 이미 다른 관리자에 의해 상태가 변경되었습니다. (현재 상태: ${currentData.status})`);
+        }
+        
+        transaction.update(reservationRef, {
+            status,
+            ...extraData,
+        });
     });
 };
 

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 
 // ── Mocks ──
 const mockNavigate = vi.fn();
@@ -60,15 +60,19 @@ describe('useTodayDashboard', () => {
         vi.clearAllMocks();
     });
 
-    it('초기 상태에서 loading이 true이다', () => {
+    it('초기 상태에서 loading이 true이다', async () => {
         const { result } = renderHook(() => useTodayDashboard());
         expect(result.current.loading).toBe(true);
+        // Wait for fetch completion to avoid act warnings during teardown
+        await waitFor(() => {
+            expect(result.current.loading).toBe(false);
+        });
     });
 
     it('orgId가 있으면 차량/예약/일지를 로드한다', async () => {
         const { result } = renderHook(() => useTodayDashboard());
 
-        await vi.waitFor(() => {
+        await waitFor(() => {
             expect(result.current.loading).toBe(false);
         });
 
@@ -81,7 +85,7 @@ describe('useTodayDashboard', () => {
     it('myReservations는 본인 예약만 필터링한다', async () => {
         const { result } = renderHook(() => useTodayDashboard());
 
-        await vi.waitFor(() => {
+        await waitFor(() => {
             expect(result.current.loading).toBe(false);
         });
 
@@ -93,7 +97,7 @@ describe('useTodayDashboard', () => {
     it('운행 중인 예약이 없으면 hasActiveDrive는 false이다', async () => {
         const { result } = renderHook(() => useTodayDashboard());
 
-        await vi.waitFor(() => {
+        await waitFor(() => {
             expect(result.current.loading).toBe(false);
         });
 
@@ -107,7 +111,7 @@ describe('useTodayDashboard', () => {
 
         const { result } = renderHook(() => useTodayDashboard());
 
-        await vi.waitFor(() => {
+        await waitFor(() => {
             expect(result.current.loading).toBe(false);
         });
 
@@ -117,11 +121,13 @@ describe('useTodayDashboard', () => {
     it('navigateToReservations가 올바른 경로로 이동한다', async () => {
         const { result } = renderHook(() => useTodayDashboard());
 
-        await vi.waitFor(() => {
+        await waitFor(() => {
             expect(result.current.loading).toBe(false);
         });
 
-        result.current.navigateToReservations();
+        act(() => {
+            result.current.navigateToReservations();
+        });
 
         expect(mockNavigate).toHaveBeenCalledWith('/employee/reservations', { state: { defaultVehicleId: 'v1', openForm: true } });
     });
@@ -129,7 +135,7 @@ describe('useTodayDashboard', () => {
     it('todayLabel이 한국어 형식이다', async () => {
         const { result } = renderHook(() => useTodayDashboard());
 
-        await vi.waitFor(() => {
+        await waitFor(() => {
             expect(result.current.loading).toBe(false);
         });
 

@@ -7,7 +7,7 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 const db = getFirestore();
 
 export const createReservationSafe = onCall(
-    { region: "asia-northeast3", enforceAppCheck: true },
+    { region: "asia-northeast3", enforceAppCheck: true, minInstances: 1 },
     async (request) => {
         if (!request.auth) {
             throw new HttpsError("unauthenticated", "로그인이 필요합니다.");

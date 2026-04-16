@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 
 // ── Mocks ──
 vi.mock('../../hooks/useAuth', () => ({
@@ -80,6 +80,8 @@ describe('useVehicleHistory', () => {
     it('PERIOD_OPTIONS가 올바르게 정의되어 있다', async () => {
         const { result } = renderHook(() => useVehicleHistory());
 
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
         expect(result.current.PERIOD_OPTIONS).toHaveLength(3);
         expect(result.current.PERIOD_OPTIONS[0]).toEqual({ label: '1주일', days: 7 });
     });
@@ -89,18 +91,23 @@ describe('useVehicleHistory', () => {
 
         await waitFor(() => expect(result.current.loading).toBe(false));
 
-        // act로 차량 선택 변경
-        const { act } = await import('@testing-library/react');
         act(() => {
             result.current.handleSelectVehicle('v2');
         });
 
         expect(result.current.selectedVehicleId).toBe('v2');
+        
+        // Wait for logs to finish loading to prevent act() warnings during teardown
+        await waitFor(() => expect(result.current.logsLoading).toBe(false));
     });
 
     it('getVehicles를 orgId로 호출한다', async () => {
-        renderHook(() => useVehicleHistory());
+        const { result } = renderHook(() => useVehicleHistory());
 
-        await waitFor(() => expect(mockGetVehicles).toHaveBeenCalledWith('org1'));
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        // Wait for logs to finish loading to prevent act() warnings during teardown
+        await waitFor(() => expect(result.current.logsLoading).toBe(false));
+        
+        expect(mockGetVehicles).toHaveBeenCalledWith('org1');
     });
 });

@@ -128,20 +128,35 @@ export default function InviteCodePage() {
                         </button>
                     </form>
 
-                    <div className="mt-4 pt-4 border-t border-surface-100 dark:border-surface-700 space-y-2">
-                        <button
-                            onClick={() => navigate('/apply')}
-                            className="btn-ghost w-full text-sm"
-                        >
-                            새 기관 등록 신청하기
-                        </button>
-                        <button
-                            onClick={logout}
-                            className="btn-ghost w-full text-sm text-surface-400 hover:text-red-500"
-                        >
-                            로그아웃
-                        </button>
-                    </div>
+                        {user?.isAnonymous ? (
+                            <div className="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700/50 rounded-xl p-4 mt-6 animate-fade-in text-center">
+                                <p className="text-sm text-amber-800 dark:text-amber-200 mb-3 font-medium">안전한 사용을 위해 로그인이 필요합니다.</p>
+                                <button
+                                    onClick={() => {
+                                        if (code) sessionStorage.setItem('pendingInviteCode', code);
+                                        logout().then(() => navigate('/login'));
+                                    }}
+                                    className="btn-primary w-full shadow-sm text-sm"
+                                >
+                                    Google 계정으로 로그인하기
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="mt-4 pt-4 border-t border-surface-100 dark:border-surface-700 space-y-3">
+                                <button
+                                    onClick={() => navigate('/apply')}
+                                    className="btn-secondary w-full text-sm py-2.5 font-medium border-primary-200 text-primary-700 hover:bg-primary-50 dark:border-primary-800 dark:text-primary-300 dark:hover:bg-primary-900/30"
+                                >
+                                    초대 코드가 없나요? 새 기관 등록 신청하기
+                                </button>
+                                <button
+                                    onClick={logout}
+                                    className="btn-ghost w-full text-sm text-surface-400 hover:text-red-500"
+                                >
+                                    다른 계정으로 로그인
+                                </button>
+                            </div>
+                        )}
                 </div>
             </div>
         </div>

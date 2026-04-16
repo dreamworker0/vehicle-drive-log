@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { getPendingCount, processQueue } from '../../lib/offlineQueue';
+import { getPendingCount } from '../../lib/offlineSync';
+import { processOfflineQueue } from '../../lib/offlineSyncProcessor';
 
 export default function OfflineBanner() {
     const [isOffline, setIsOffline] = useState(!navigator.onLine);
@@ -20,7 +21,7 @@ export default function OfflineBanner() {
         const handleOnline = async () => {
             setIsOffline(false);
             // 큐 동기화 실행
-            const synced = await processQueue();
+            const synced = await processOfflineQueue();
             if (synced > 0) {
                 setSyncedCount(synced);
                 setShowReconnected(true);

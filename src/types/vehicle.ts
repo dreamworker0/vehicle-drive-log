@@ -5,6 +5,15 @@ import type { FirestoreDoc, TimestampField } from './common';
 
 export type VehicleType = 'compact' | 'sedan' | 'van' | 'bus' | 'truck';
 
+export type FuelType = 'gasoline' | 'diesel' | 'lpg' | 'electric' | 'hydrogen';
+export const FUEL_TYPES: { id: FuelType; label: string }[] = [
+    { id: 'gasoline', label: '가솔린' },
+    { id: 'diesel', label: '디젤' },
+    { id: 'lpg', label: 'LPG' },
+    { id: 'electric', label: '전기' },
+    { id: 'hydrogen', label: '수소' }
+];
+
 export interface VehicleRetired {
     isRetired: boolean;
     reason: string;
@@ -27,7 +36,7 @@ export interface Vehicle extends FirestoreDoc {
     plateNumber: string;
     type: VehicleType;
     vehicleType?: string;
-    fuelType?: string;
+    fuelType?: FuelType;
     currentKm: number;
     insurance?: {
         company: string;

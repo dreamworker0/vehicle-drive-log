@@ -93,12 +93,13 @@ interface BuildLogContext {
     externalPassengerCount?: number;
     isRetroactive: boolean;
     ocrUsed?: boolean;
+    favoriteUsed?: boolean;
 }
 
 /**
  * 폼 데이터로 저장용 logData 객체를 구성한다.
  */
-export function buildLogData(form: DriveLogForm, { orgId, user, userData, selectedVehicle, selectedPassengers, externalPassengerCount = 0, isRetroactive, ocrUsed = false }: BuildLogContext) {
+export function buildLogData(form: DriveLogForm, { orgId, user, userData, selectedVehicle, selectedPassengers, externalPassengerCount = 0, isRetroactive, ocrUsed = false, favoriteUsed = false }: BuildLogContext) {
     const startKm = parseInt(form.startKm);
     const endKm = parseInt(form.endKm);
     const driveTimestamp = buildDriveTimestamp(form.driveDate, form.endTime, form.startTime);
@@ -124,7 +125,7 @@ export function buildLogData(form: DriveLogForm, { orgId, user, userData, select
         passengerCount: selectedPassengers.length + externalPassengerCount + 1,
         passengerNames: selectedPassengers.map(p => p.name || p.email),
         externalPassengerCount,
-        inputMethod: ocrUsed ? 'ocr' as const : 'manual' as const,
+        inputMethod: ocrUsed ? 'ocr' as const : (favoriteUsed ? 'favorite' as const : 'manual' as const),
         ...(isRetroactive && { isRetroactive: true }),
     };
 }

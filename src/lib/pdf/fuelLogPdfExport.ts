@@ -33,7 +33,9 @@ const COLUMNS: PdfColumn[] = [
 const ROWS_PER_PAGE = 25;
 
 function renderRow(rec: PdfFuelLogEntry, idx: number, pageIdx: number, rowsPerPage: number): string {
-    const unit = rec.fuelType === 'electric' ? 'kWh' : 'L';
+    const unit = ['electric', 'hydrogen'].includes(rec.fuelType || '')
+        ? (rec.fuelType === 'hydrogen' ? 'kg' : 'kWh')
+        : 'L';
     return `
         <tr>
             <td class="center">${idx + 1 + (pageIdx * rowsPerPage)}</td>

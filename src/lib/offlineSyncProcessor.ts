@@ -1,13 +1,30 @@
-import { getOfflineActions, removeOfflineAction, incrementRetryCount } from './offlineSync';
+import { getOfflineActions, removeOfflineAction, incrementRetryCount, purgeStaleActions } from './offlineSync';
 import { createDriveLog, updateDriveLog } from './firestore/driveLogs';
 import { isCreateDriveLogPayload, isUpdateDriveLogPayload } from '../types/driveLog';
 
-export const processOfflineQueue = async () => {
-    if (typeof window === 'undefined' || !navigator.onLine) return;
+// 동시 실행 방지 lock
+let _processing = false;
+
+/**
+ * 오프라인 큐의 모든 액션을 순서대로 처리한 뒤 처리 건수를 반환합니다.
+ * 동시 호출 시 lock으로 중복 실행을 방지합니다.
+ */
+export const processOfflineQueue = async (): Promise<number> => {
+    if (typeof window === 'undefined' || !navigator.onLine) return 0;
+    if (_processing) {
+        console.log('[OfflineSync] 이미 큐 처리 중 — 중복 실행 방지');
+        return 0;
+    }
+
+    _processing = true;
+    let processed = 0;
 
     try {
+        // 만료된 액션 먼저 정리
+        await purgeStaleActions();
+
         const actions = await getOfflineActions();
-        if (!actions.length) return;
+        if (!actions.length) return 0;
 
         console.log(`[OfflineSync] 처리 대기 중인 액션: ${actions.length}건`);
 
@@ -47,6 +64,7 @@ export const processOfflineQueue = async () => {
 
                 // 성공 시 큐에서 제거
                 await removeOfflineAction(action.id);
+                processed++;
                 console.log(`[OfflineSync] 액션 처리 완료: ${action.id} (${action.type})`);
             } catch (err: unknown) {
                 console.error(`[OfflineSync] 액션 처리 실패: ${action.id}`, err);
@@ -58,7 +76,15 @@ export const processOfflineQueue = async () => {
         }
     } catch (e) {
         console.error('[OfflineSyncProcessor] 큐 처리 중 오류:', e);
+    } finally {
+        _processing = false;
     }
+
+    if (processed > 0) {
+        console.info(`[OfflineSync] ${processed}건 동기화 완료`);
+    }
+
+    return processed;
 };
 
 /**
@@ -67,10 +93,10 @@ export const processOfflineQueue = async () => {
 export const mountOfflineQueueProcessor = () => {
     if (typeof window === 'undefined') return () => {};
 
-    // 온라인 전환 시 큐 비우기 실행
+    // 온라인 전환 시 큐 비우기 실행 (안정화 딜레이 포함)
     const handleOnline = () => {
         console.log('[OfflineSync] 네트워크 온라인 감지, 큐 처리 시작...');
-        processOfflineQueue();
+        setTimeout(() => { processOfflineQueue(); }, 1500);
     };
 
     window.addEventListener('online', handleOnline);

@@ -3,7 +3,7 @@
  * useDriveLogForm에서 추출
  */
 import { createDriveLog, updateDriveLog, updateReservationStatus, updateHipassCard } from '../../lib/firestore';
-import { enqueueLog } from '../../lib/offlineQueue';
+import { enqueueLog } from '../../lib/offlineSync';
 import { validateDriveLogForm, buildLogData, nowTime, todayStr } from '../utils/driveLogValidation';
 import type { DriveLogForm } from '../useDriveLogForm';
 import type { Vehicle } from '../../types/vehicle';
@@ -22,6 +22,7 @@ interface SubmitContext {
     externalPassengerCount: number;
     isRetroactive: boolean;
     ocrUsed: boolean;
+    favoriteUsed: boolean;
     isElectric: boolean;
     isEditMode: boolean;
     editLog: (DriveLog & { passengerNames?: string[] }) | null;
@@ -61,14 +62,14 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
     const {
         form, orgId, user, userData, selectedVehicle,
         selectedPassengers, externalPassengerCount, isRetroactive,
-        ocrUsed, isEditMode, editLog, reservationData,
+        ocrUsed, favoriteUsed, isEditMode, editLog, reservationData,
         hipassCard,
     } = ctx;
 
     const logData = buildLogData(form, {
         orgId, user, userData, selectedVehicle,
         selectedPassengers, externalPassengerCount,
-        isRetroactive, ocrUsed,
+        isRetroactive, ocrUsed, favoriteUsed,
     });
 
     // 하이패스 정보를 운행일지에 저장
@@ -120,21 +121,29 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
         }
     }
 
-    // 예약 상태 업데이트
+    // 예약 상태 업데이트 (운행일지 저장 실패와 독립적으로 처리)
     if (!isEditMode && reservationData?.reservationId) {
-        await updateReservationStatus(reservationData.reservationId, 'completed', {
-            actualStartTime: form.startTime || '',
-            actualEndTime: form.endTime || nowTime(),
-        });
-        await clearDrivingNotification(reservationData.reservationId);
+        try {
+            await updateReservationStatus(reservationData.reservationId, 'completed', {
+                actualStartTime: form.startTime || '',
+                actualEndTime: form.endTime || nowTime(),
+            });
+            await clearDrivingNotification(reservationData.reservationId);
+        } catch (e) {
+            console.warn('[submitDriveLog] 예약 상태 업데이트 실패:', e);
+        }
     }
 
-    // 하이패스 잔액 업데이트
+    // 하이패스 잔액 업데이트 (운행일지 저장 실패와 독립적으로 처리)
     if (hipassCard && form.hipassBalanceAfter !== '') {
-        await updateHipassCard(hipassCard.id, {
-            balance: Number(form.hipassBalanceAfter),
-            organizationId: orgId,
-        });
+        try {
+            await updateHipassCard(hipassCard.id, {
+                balance: Number(form.hipassBalanceAfter),
+                organizationId: orgId,
+            });
+        } catch (e) {
+            console.warn('[submitDriveLog] 하이패스 잔액 업데이트 실패:', e);
+        }
     }
 
     // 결과 결정

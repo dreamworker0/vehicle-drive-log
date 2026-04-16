@@ -52,8 +52,8 @@ export const queueOfflineAction = async (type: OfflineAction['type'], payload: u
             const tx = db.transaction(STORE_NAME, 'readwrite');
             const store = tx.objectStore(STORE_NAME);
             const req = store.add(action);
-            req.onsuccess = () => resolve();
-            req.onerror = () => reject(req.error);
+            req.onsuccess = () => { db.close(); resolve(); };
+            req.onerror = () => { db.close(); reject(req.error); };
         });
         
         // Background Sync 등록 (SW가 지원하는 경우)
@@ -80,8 +80,8 @@ export const getOfflineActions = async (): Promise<OfflineAction[]> => {
             const tx = db.transaction(STORE_NAME, 'readonly');
             const store = tx.objectStore(STORE_NAME);
             const req = store.getAll();
-            req.onsuccess = () => resolve(req.result);
-            req.onerror = () => reject(req.error);
+            req.onsuccess = () => { db.close(); resolve(req.result); };
+            req.onerror = () => { db.close(); reject(req.error); };
         });
     } catch {
         return [];
@@ -97,8 +97,8 @@ export const removeOfflineAction = async (id: string) => {
             const tx = db.transaction(STORE_NAME, 'readwrite');
             const store = tx.objectStore(STORE_NAME);
             const req = store.delete(id);
-            req.onsuccess = () => resolve();
-            req.onerror = () => reject(req.error);
+            req.onsuccess = () => { db.close(); resolve(); };
+            req.onerror = () => { db.close(); reject(req.error); };
         });
     } catch {
         // ignore removal errors
@@ -119,15 +119,74 @@ export const incrementRetryCount = async (id: string) => {
                 if (action) {
                     action.retryCount += 1;
                     const updateReq = store.put(action);
-                    updateReq.onsuccess = () => resolve();
-                    updateReq.onerror = () => reject();
+                    updateReq.onsuccess = () => { db.close(); resolve(); };
+                    updateReq.onerror = () => { db.close(); reject(); };
                 } else {
+                    db.close();
                     resolve();
                 }
             };
-            req.onerror = () => reject();
+            req.onerror = () => { db.close(); reject(); };
         });
     } catch {
         // ignore retry increment errors
     }
+};
+
+/** 큐에 대기 중인 항목 수 조회 (OfflineBanner 등에서 사용) */
+export const getPendingCount = async (): Promise<number> => {
+    if (typeof window === 'undefined') return 0;
+    try {
+        const db = await openDB();
+        return await new Promise<number>((resolve) => {
+            const tx = db.transaction(STORE_NAME, 'readonly');
+            const store = tx.objectStore(STORE_NAME);
+            const req = store.count();
+            req.onsuccess = () => { db.close(); resolve(req.result); };
+            req.onerror = () => { db.close(); resolve(0); };
+        });
+    } catch {
+        return 0;
+    }
+};
+
+/**
+ * 만료된 오프라인 액션 정리 (기본 7일 초과)
+ * @returns 삭제된 항목 수
+ */
+const STALE_THRESHOLD_MS = 7 * 24 * 60 * 60 * 1000; // 7일
+export const purgeStaleActions = async (): Promise<number> => {
+    if (typeof window === 'undefined') return 0;
+    try {
+        const actions = await getOfflineActions();
+        const cutoff = Date.now() - STALE_THRESHOLD_MS;
+        let purged = 0;
+        for (const action of actions) {
+            if (action.timestamp < cutoff) {
+                console.warn(`[OfflineSync] 만료 액션 제거 (${Math.round((Date.now() - action.timestamp) / 86400000)}일 경과): ${action.id}`);
+                await removeOfflineAction(action.id);
+                purged++;
+            }
+        }
+        if (purged > 0) {
+            console.info(`[OfflineSync] ${purged}건의 만료 액션 정리 완료`);
+        }
+        return purged;
+    } catch {
+        return 0;
+    }
+};
+
+/**
+ * 호환용 래퍼: offlineQueue.ts의 enqueueLog를 대체
+ * submitDriveLog 등에서 사용
+ */
+export const enqueueLog = async (
+    data: Record<string, unknown>,
+    action: 'create' | 'update' = 'create',
+    docId?: string,
+): Promise<void> => {
+    const type: OfflineAction['type'] = action === 'update' ? 'UPDATE_DRIVELOG' : 'CREATE_DRIVELOG';
+    const payload = docId ? { ...data, id: docId } : data;
+    await queueOfflineAction(type, payload);
 };

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 
 // ── Mocks ──
 const mockNavigate = vi.fn();
@@ -77,18 +77,22 @@ describe('useDriveLogForm', () => {
         vi.clearAllMocks();
     });
 
-    it('초기 상태에서 loading이 true이다', () => {
+    it('초기 상태에서 loading이 true이다', async () => {
         const { result } = renderHook(() => useDriveLogForm());
         expect(result.current.loading).toBe(true);
         expect(result.current.submitting).toBe(false);
         expect(result.current.success).toBe(false);
+
+        await waitFor(() => {
+            expect(result.current.loading).toBe(false);
+        });
     });
 
     it('orgId가 있으면 차량 목록 및 즐겨찾기를 로드한다', async () => {
         const { result } = renderHook(() => useDriveLogForm());
 
         // useEffect 완료 대기
-        await vi.waitFor(() => {
+        await waitFor(() => {
             expect(result.current.loading).toBe(false);
         });
 
@@ -104,7 +108,7 @@ describe('useDriveLogForm', () => {
 
         const { result } = renderHook(() => useDriveLogForm());
 
-        await vi.waitFor(() => {
+        await waitFor(() => {
             expect(result.current.loading).toBe(false);
         });
 
@@ -115,7 +119,7 @@ describe('useDriveLogForm', () => {
     it('handleFavoriteSelect로 목적지가 채워진다', async () => {
         const { result } = renderHook(() => useDriveLogForm());
 
-        await vi.waitFor(() => {
+        await waitFor(() => {
             expect(result.current.loading).toBe(false);
         });
 
@@ -134,7 +138,7 @@ describe('useDriveLogForm', () => {
 
         const { result } = renderHook(() => useDriveLogForm());
 
-        await vi.waitFor(() => {
+        await waitFor(() => {
             expect(result.current.loading).toBe(false);
         });
 
@@ -154,7 +158,7 @@ describe('useDriveLogForm', () => {
     it('폼 검증 실패 시 toast를 표시한다', async () => {
         const { result } = renderHook(() => useDriveLogForm());
 
-        await vi.waitFor(() => {
+        await waitFor(() => {
             expect(result.current.loading).toBe(false);
         });
 

@@ -7,7 +7,10 @@ import { useToast } from './useToast';
 
 interface RetryRunOptions {
     errorMessage?: string;
-    onError?: (err: unknown) => void;
+    /** 에러를 직접 처리하고 기본 Toast 알림을 무시하려면 true를 반환하세요. */
+    onError?: (err: unknown) => boolean | void;
+    /** 실행 타임아웃 (밀리초). 지정하지 않으면 대기(pending)합니다. */
+    timeoutMs?: number;
 }
 
 /**
@@ -42,8 +45,6 @@ export default function useRetry({ maxRetries = 2, retryLabel = '재시도' } = 
      * @param {string} key - 재시도 카운터 키 (고유 식별자)
      * @param {Function} asyncFn - 실행할 비동기 함수
      * @param {Object} [opts] - 추가 옵션
-     * @param {string} [opts.errorMessage] - 커스텀 에러 메시지
-     * @param {Function} [opts.onError] - 에러 발생 시 추가 콜백
      * @returns {Promise<*>} asyncFn의 반환값 또는 에러 시 undefined
      */
     const runWithRetry = useCallback(async (key: string, asyncFn: () => Promise<unknown>, opts: RetryRunOptions & { useBackoff?: boolean; baseDelayMs?: number } = {}) => {
@@ -56,13 +57,23 @@ export default function useRetry({ maxRetries = 2, retryLabel = '재시도' } = 
                 await new Promise(res => setTimeout(res, delayMs));
             }
 
-            const result = await asyncFn();
+            let result;
+            if (opts.timeoutMs) {
+                const timeoutPromise = new Promise((_, reject) => {
+                    setTimeout(() => reject(new Error('TIMEOUT_ERROR: 요청 시간이 초과되었습니다.')), opts.timeoutMs);
+                });
+                result = await Promise.race([asyncFn(), timeoutPromise]);
+            } else {
+                result = await asyncFn();
+            }
+
             // 성공 시 재시도 카운터 초기화
             retryCountRef.current.delete(key);
             return result;
         } catch (err) {
             console.error(`[useRetry:${key}]`, err);
-            if (opts.onError) opts.onError(err);
+            const handled = opts.onError ? opts.onError(err) : false;
+            if (handled === true) return undefined; // 에러 처리를 위임하고 기본 플로우 종료
 
             const currentCount = retryCountRef.current.get(key) || 0;
 

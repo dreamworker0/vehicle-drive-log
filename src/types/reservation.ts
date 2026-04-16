@@ -29,6 +29,7 @@ export interface Reservation extends FirestoreDoc {
     isQuickDrive?: boolean;      // 바로 운행(예약 없이 출발) 여부 플래그
     source?: 'recommendation' | string; // 예약 출처 (예: 추천 예약)
     createdAt?: TimestampField;
+    expiresAt?: Date | TimestampField;
 }
 
 /** 예약 폼 상태 (ReservationSidePanel / useReservationCalendar 공용) */

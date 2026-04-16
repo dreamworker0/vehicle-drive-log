@@ -11,7 +11,12 @@
       "Bash(npx tsc *)",
       "Bash(npx eslint *)",
       "Bash(npm run *)",
-      "Bash(npx vitest *)"
+      "Bash(npx vitest *)",
+      "Bash(ls -lh /d/apps/차량운행일지/*.md)",
+      "Bash(grep -r \"API_KEY\\\\|apiKey\\\\|FIREBASE_KEY\" /d/apps/차량운행일지/src /d/apps/차량운행일지/.env*)",
+      "Bash(grep -r \"\\\\.then\\(\" /d/apps/차량운행일지/src/lib/firestore/*.ts)",
+      "Bash(grep -r \"import.*from.*\\\\\\\\.\\\\\\\\/\" /d/apps/차량운행일지/src --include=\"*.ts\" --include=\"*.tsx\")",
+      "Bash(grep -n \"const updateHipassCard\\\\|export const updateHipassCard\" /d/apps/차량운행일지/src/lib/firestore/*.ts)"
     ]
   }
 }

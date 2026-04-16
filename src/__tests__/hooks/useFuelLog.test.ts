@@ -133,6 +133,7 @@ describe('useFuelLog', () => {
     it('showForm 토글이 동작한다', async () => {
         const { result } = renderHook(() => useFuelLog());
 
+        await waitFor(() => expect(result.current.loading).toBe(false));
         expect(result.current.showForm).toBe(false);
 
         act(() => {

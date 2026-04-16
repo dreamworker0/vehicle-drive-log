@@ -6,7 +6,7 @@ import type { Request, Response } from "firebase-functions/node_modules/@types/e
 import { getAuth } from "firebase-admin/auth";
 import { captureError, flushSentry } from "./sentry";
 
-type Severity = "INFO" | "WARNING" | "ERROR";
+type Severity = "DEBUG" | "INFO" | "WARNING" | "ERROR";
 
 /**
  * HTTP 요청에서 Firebase Auth ID 토큰을 검증
@@ -42,6 +42,8 @@ export function log(severity: Severity, functionName: string, message: string, e
         captureError(new Error(message), { function: functionName, ...extra });
     } else if (severity === "WARNING") {
         console.warn(JSON.stringify(entry));
+    } else if (severity === "DEBUG") {
+        console.debug(JSON.stringify(entry));
     } else {
         console.log(JSON.stringify(entry));
     }

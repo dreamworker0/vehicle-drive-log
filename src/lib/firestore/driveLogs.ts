@@ -4,7 +4,7 @@
 import {
     doc, updateDoc, deleteDoc, getDoc,
     collection, query, where, getDocs, addDoc,
-    orderBy, limit, serverTimestamp, getCountFromServer, Timestamp,
+    orderBy, limit, serverTimestamp, getCountFromServer, Timestamp, increment,
     type QueryConstraint,
     type DocumentData,
     type QueryDocumentSnapshot,
@@ -97,33 +97,54 @@ export const createDriveLog = async (data: Record<string, unknown>) => {
 
     // Use a deterministic generated ID for offline idempotency
     const docRef = doc(collection(db, 'driveLogs'));
-    const finalData = { ...data, createdAt: serverTimestamp() };
+    const expiresAt = new Date(Date.now() + 5 * 365 * 24 * 60 * 60 * 1000); // TTL: 5 years
+    const finalData = { ...data, createdAt: serverTimestamp(), expiresAt };
     const promise = addDoc(collection(db, 'driveLogs'), finalData);
 
     if (isOffline) {
-        import('../offlineSync').then(({ queueOfflineAction }) => queueOfflineAction('CREATE_DRIVELOG', { ...data, id: docRef.id }));
+        import('../offlineSync').then(({ queueOfflineAction }) => queueOfflineAction('CREATE_DRIVELOG', { ...data, id: docRef.id })).catch(() => console.warn('[offlineSync] CREATE_DRIVELOG 큐잉 실패'));
     }
     await promise;
 
-    // 차량의 누적 Km 갱신 — 이 기록 이후에 같은 차량의 기록이 없을 때만
-    const isEffectivelyRetroactive = data.isRetroactive ||
-        (data.organizationId && data.vehicleId && data.timestamp &&
-            await hasLaterDriveLog(data.organizationId as string, data.vehicleId as string, data.timestamp as Date));
-    if (data.endKm && data.vehicleId && !isEffectivelyRetroactive) {
-        await updateDoc(doc(db, 'vehicles', data.vehicleId as string), {
-            currentKm: data.endKm,
-        });
-    }
+    // 부가 작업(차량 계기판 갱신, 후속 기록 자동 보정)은 백그라운드에서 비동기 처리하여 응답성을 높임
+    const runBackgroundUpdates = async () => {
+        try {
+            // 차량의 누적 Km 갱신 — 이 기록 이후에 같은 차량의 기록이 없을 때만
+            const isEffectivelyRetroactive = data.isRetroactive ||
+                (data.organizationId && data.vehicleId && data.timestamp &&
+                    await hasLaterDriveLog(data.organizationId as string, data.vehicleId as string, data.timestamp as Date));
+            
+            if (data.endKm && data.vehicleId && !isEffectivelyRetroactive) {
+                // 레이스 컨디션 방어: 단순 덮어쓰기가 아니라 이번 기록의 주행거리만큼 increment()
+                let distanceToAdd = 0;
+                if (data.distance != null) {
+                    distanceToAdd = data.distance as number;
+                } else if (data.startKm != null && data.endKm != null) {
+                    distanceToAdd = (data.endKm as number) - (data.startKm as number);
+                }
 
-    // 다음 기록의 startKm 자동 연동 (소급이든 아니든 항상 시도)
-    let syncResult: Awaited<ReturnType<typeof syncNextLogStartKm>> | null = null;
-    if (data.endKm && data.vehicleId && data.organizationId && data.timestamp) {
-        syncResult = await syncNextLogStartKm(data.organizationId as string, data.vehicleId as string, data.timestamp as Date, data.endKm as number);
-    }
+                if (distanceToAdd > 0) {
+                    await updateDoc(doc(db, 'vehicles', data.vehicleId as string), {
+                        currentKm: increment(distanceToAdd),
+                    });
+                }
+            }
+
+            // 다음 기록의 startKm 자동 연동 (소급이든 아니든 항상 시도)
+            if (data.endKm && data.vehicleId && data.organizationId && data.timestamp) {
+                await syncNextLogStartKm(data.organizationId as string, data.vehicleId as string, data.timestamp as Date, data.endKm as number);
+            }
+        } catch(err) {
+            console.error('[createDriveLog] 백그라운드 작업 중 오류:', err);
+        }
+    };
+
+    // 즉시 실행하되 await 하지 않고 넘어가서 Fire-and-forget 처리 (빠른 응답)
+    runBackgroundUpdates();
 
     return { 
         id: docRef.id, 
-        syncResult,
+        syncResult: null, // 백그라운드로 빠졌으므로 동기적으로 결과를 반환하지 않음
         correctedStartKm: autocorrectedDistance ? correctedStartKm : undefined,
         oldStartKm: autocorrectedDistance ? originalStartKm : undefined
     };
@@ -343,22 +364,33 @@ export const updateDriveLog = async (logId: string, data: Record<string, unknown
     const promise = updateDoc(doc(db, 'driveLogs', logId), finalData);
 
     if (isOffline) {
-        import('../offlineSync').then(({ queueOfflineAction }) => queueOfflineAction('UPDATE_DRIVELOG', { ...data, id: logId }));
+        import('../offlineSync').then(({ queueOfflineAction }) => queueOfflineAction('UPDATE_DRIVELOG', { ...data, id: logId })).catch(() => console.warn('[offlineSync] UPDATE_DRIVELOG 큐잉 실패'));
     }
-    await promise;
-    // endKm이 변경되고 vehicleId가 있으면 차량 currentKm 갱신
-    if (data.endKm && data.vehicleId) {
-        await updateDoc(doc(db, 'vehicles', data.vehicleId as string), {
-            currentKm: data.endKm,
-        });
-    }
+    await promise; // 본체 갱신 완료까지는 기다림
 
-    // endKm 변경 시 다음 기록의 startKm 자동 연동
-    let syncResult: Awaited<ReturnType<typeof syncNextLogStartKm>> | null = null;
-    if (data.endKm && data.vehicleId && data.organizationId && data.timestamp) {
-        syncResult = await syncNextLogStartKm(data.organizationId as string, data.vehicleId as string, data.timestamp as Date, data.endKm as number);
-    }
-    return { syncResult };
+    // 부가 작업 백그라운드 처리 (Fire-and-forget 방식)
+    const runBackgroundUpdates = async () => {
+        try {
+            // endKm이 변경되고 vehicleId가 있으면 차량 currentKm 갱신
+            if (data.endKm && data.vehicleId) {
+                await updateDoc(doc(db, 'vehicles', data.vehicleId as string), {
+                    currentKm: data.endKm,
+                });
+            }
+
+            // endKm 변경 시 다음 기록의 startKm 자동 연동
+            if (data.endKm && data.vehicleId && data.organizationId && data.timestamp) {
+                await syncNextLogStartKm(data.organizationId as string, data.vehicleId as string, data.timestamp as Date, data.endKm as number);
+            }
+        } catch (err) {
+            console.error('[updateDriveLog] 백그라운드 작업 중 오류:', err);
+        }
+    };
+
+    // await 하지 않고 위임 후 곧바로 리턴
+    runBackgroundUpdates();
+
+    return { syncResult: null }; // 백그라운드로 처리하므로 동기적으로 반환 안 얻음
 };
 
 // 차량별 운행일지 조회 (기간 필터 + limit 기본 200)

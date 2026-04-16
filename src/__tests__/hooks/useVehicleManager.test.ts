@@ -22,6 +22,7 @@ const mockClearVehicleMaintenanceBlock = vi.fn().mockResolvedValue({});
 const mockRetireVehicle = vi.fn().mockResolvedValue({});
 const mockRestoreVehicle = vi.fn().mockResolvedValue({});
 const mockCancelVehicleReservations = vi.fn().mockResolvedValue({});
+const mockHasVehicleDriveLogs = vi.fn().mockResolvedValue(false);
 
 vi.mock('../../lib/firestore', () => ({
     getVehicles: (...args: unknown[]) => mockGetVehicles(...args),
@@ -32,6 +33,7 @@ vi.mock('../../lib/firestore', () => ({
     retireVehicle: (...args: unknown[]) => mockRetireVehicle(...args),
     restoreVehicle: (...args: unknown[]) => mockRestoreVehicle(...args),
     cancelVehicleReservations: (...args: unknown[]) => mockCancelVehicleReservations(...args),
+    hasVehicleDriveLogs: (...args: unknown[]) => mockHasVehicleDriveLogs(...args),
 }));
 
 import useVehicleManager from '../../hooks/useVehicleManager';

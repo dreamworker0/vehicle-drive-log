@@ -5,6 +5,7 @@
 import React from 'react';
 import { DEFAULT_FUEL } from '../../hooks/useVehicleManager';
 import type { Vehicle } from '../../types';
+import { FUEL_TYPES } from '../../types/vehicle';
 
 interface VehicleFormData {
     displayName: string;
@@ -34,13 +35,6 @@ const VEHICLE_TYPES = [
     { value: 'van', label: '승합차', icon: '🚐' },
     { value: 'truck', label: '화물차', icon: '🚚' },
     { value: 'bus', label: '버스', icon: '🚌' },
-];
-
-const FUEL_TYPES = [
-    { value: 'gasoline', label: '휘발유', icon: '⛽' },
-    { value: 'diesel', label: '경유', icon: '🟤' },
-    { value: 'lpg', label: 'LPG', icon: '🔵' },
-    { value: 'electric', label: '전기차', icon: '⚡' },
 ];
 
 export default function VehicleForm({
@@ -99,7 +93,14 @@ export default function VehicleForm({
                             {VEHICLE_TYPES.map(vt => (
                                 <button
                                     key={vt.value} type="button"
-                                    onClick={() => setForm({ ...form, vehicleType: vt.value, fuelType: DEFAULT_FUEL[vt.value] || form.fuelType })}
+                                    onClick={() => {
+                                        const keepFuel = form.fuelType === 'electric' || form.fuelType === 'hydrogen';
+                                        setForm({
+                                            ...form,
+                                            vehicleType: vt.value,
+                                            fuelType: keepFuel ? form.fuelType : (DEFAULT_FUEL[vt.value] || form.fuelType)
+                                        });
+                                    }}
                                     className={`flex flex-col items-center gap-1 px-2 py-3 rounded-xl text-xs font-medium border transition-all ${form.vehicleType === vt.value
                                         ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 dark:border-primary-400'
                                         : 'border-surface-200 dark:border-surface-600 text-surface-500 dark:text-surface-400 hover:border-surface-300'
@@ -116,14 +117,14 @@ export default function VehicleForm({
                         <div className="grid grid-cols-2 gap-2">
                             {FUEL_TYPES.map(ft => (
                                 <button
-                                    key={ft.value} type="button"
-                                    onClick={() => setForm({ ...form, fuelType: ft.value })}
-                                    className={`px-3 py-2.5 rounded-xl text-sm font-medium border transition-all ${form.fuelType === ft.value
+                                    key={ft.id} type="button"
+                                    onClick={() => setForm({ ...form, fuelType: ft.id })}
+                                    className={`px-3 py-2.5 rounded-xl text-sm font-medium border transition-all ${form.fuelType === ft.id
                                         ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 dark:border-primary-400'
                                         : 'border-surface-200 dark:border-surface-600 text-surface-500 dark:text-surface-400 hover:border-surface-300'
                                         }`}
                                 >
-                                    {ft.icon} {ft.label}
+                                    {ft.label}
                                 </button>
                             ))}
                         </div>
