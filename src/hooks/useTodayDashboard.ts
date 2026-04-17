@@ -29,6 +29,10 @@ const clearDrivingNotification = async (resId?: string) => {
 // React 19 Suspense 데이터 캐시
 let globalDashboardCache: { key: string, promise: Promise<any>, data?: any } | null = null;
 
+export function invalidateDashboardCache() {
+    globalDashboardCache = null;
+}
+
 function getDashboardData(orgId: string, uid: string, todayStr: string, weekEndDate: string) {
     const key = `${orgId}-${uid}-${todayStr}`;
     
@@ -238,6 +242,7 @@ export default function useTodayDashboard() {
             await updateReservationStatus(reservation.id, 'in_progress', { actualStartTime });
             
             setLocalStartedIds(prev => new Map(prev).set(reservation.id, actualStartTime));
+            invalidateDashboardCache();
             showDrivingNotification(reservation);
         } catch (err) {
             console.error('운행 시작 실패:', err);
@@ -255,6 +260,7 @@ export default function useTodayDashboard() {
             await updateReservationStatus(reservation.id, 'in_progress', { actualStartTime });
             
             setLocalStartedIds(prev => new Map(prev).set(reservation.id, actualStartTime));
+            invalidateDashboardCache();
             showDrivingNotification(reservation);
 
             const destination = reservation.destination || '';
@@ -273,6 +279,7 @@ export default function useTodayDashboard() {
         try {
             await cancelReservation(reservation.id);
             setLocalCancelledIds(prev => new Set(prev).add(reservation.id));
+            invalidateDashboardCache();
             await clearDrivingNotification(reservation.id);
         } catch (err) {
             console.error('예약 취소 실패:', err);
@@ -287,6 +294,7 @@ export default function useTodayDashboard() {
         try {
             await cancelReservation(reservation.id);
             setLocalCancelledIds(prev => new Set(prev).add(reservation.id));
+            invalidateDashboardCache();
             await clearDrivingNotification(reservation.id);
         } catch (err) {
             console.error('예약 취소 실패:', err);

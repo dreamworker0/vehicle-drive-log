@@ -18,6 +18,7 @@ import type { Reservation, ReservationForm } from '../../types/reservation';
 import type { CustomHoliday } from '../../types/holiday';
 import type { Favorite } from '../../types/favorite';
 import type { RouteInfoData } from './useRouteInfo';
+import { invalidateDashboardCache } from '../useTodayDashboard';
 
 // ─── Shared dependency types ─────────────────────────────────────
 
@@ -310,6 +311,7 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
         const res = await getReservationsByDateRange(userData.organizationId, start, end);
         setReservations(res as Reservation[]);
 
+        invalidateDashboardCache();
         resetFormState();
         setRouteInfo(null);
     } catch (error: unknown) {
@@ -461,11 +463,13 @@ export async function handleCancel(id: string, deps: CancelDeps) {
                 const cancelled = await cancelRecurringGroup(rGroupId, userData?.organizationId || '');
                 showToast(`반복 예약 ${cancelled}건이 취소되었습니다.`);
                 setReservations(prev => prev.map(r => r.recurringGroupId === rGroupId ? { ...r, status: 'cancelled' } : r));
+                invalidateDashboardCache();
             } else {
                 // 이 날짜만 취소
                 await cancelReservation(id);
                 showToast('해당 날짜의 예약이 취소되었습니다.');
                 setReservations(prev => prev.map(r => r.id === id ? { ...r, status: 'cancelled' } : r));
+                invalidateDashboardCache();
             }
         } catch (error: unknown) {
             const errMsg = error instanceof Error ? error.message : '취소에 실패했습니다.';
@@ -494,6 +498,7 @@ export async function handleCancel(id: string, deps: CancelDeps) {
             const cancelled = await cancelReservationGroup(groupId, userData?.organizationId || '');
             showToast(`다일 예약 ${cancelled}건이 취소되었습니다.`);
             setReservations(prev => prev.map(r => r.groupId === groupId ? { ...r, status: 'cancelled' } : r));
+            invalidateDashboardCache();
         } catch (error: unknown) {
             const errMsg = error instanceof Error ? error.message : '취소에 실패했습니다.';
             showToast(errMsg, 'error');
@@ -506,6 +511,7 @@ export async function handleCancel(id: string, deps: CancelDeps) {
             await cancelReservation(id);
             showToast('예약이 취소되었습니다.');
             setReservations(prev => prev.filter(r => r.id !== id));
+            invalidateDashboardCache();
         } catch (error: unknown) {
             const errMsg = error instanceof Error ? error.message : '취소에 실패했습니다.';
             showToast(errMsg, 'error');

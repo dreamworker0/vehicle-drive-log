@@ -14,6 +14,7 @@ import { toLocalDateStr } from '../lib/dateUtils';
 import type { Vehicle } from '../types/vehicle';
 import { isVehicleBlocked } from '../lib/vehicleUtils';
 import type { Organization } from '../types/organization';
+import { invalidateDashboardCache } from './useTodayDashboard';
 
 export default function useQuickDriveStart() {
     const { user, userData } = useAuth();
@@ -165,6 +166,7 @@ export default function useQuickDriveStart() {
             await updateReservationStatus(reservationId, 'in_progress', { actualStartTime });
 
             showToast('운행이 시작되었습니다!', 'success');
+            invalidateDashboardCache();
             navigate('/employee/today', { replace: true });
         } catch (err) {
             console.error('운행 시작 실패:', err);

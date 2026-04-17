@@ -236,15 +236,17 @@ export default function useVehicleManager() {
         const vehicle = modal?.vehicle;
         if (!vehicle) return;
         await runWithRetry('delete_vehicle', async () => {
-            // 운행일지가 있으면 삭제 차단
-            const hasLogs = await hasVehicleDriveLogs(vehicle.id);
-            if (hasLogs) {
-                showToast('운행일지가 존재하는 차량은 삭제할 수 없습니다. 폐차 처리를 이용하세요.', 'error');
-                setModal(null);
-                // 강제 예외 발생으로 기본 success toast 및 재시도 방지 (이미 유저 알림 띄웠으므로)
-                const error = new Error('has_logs') as Error & { isHandled?: boolean };
-                error.isHandled = true;
-                throw error;
+            // 폐차된 차량이 아니라면 운행일지가 있는지 체크하여 삭제 차단 (폐차된 차량은 완전 삭제 허용)
+            if (!vehicle.retired?.isRetired) {
+                const hasLogs = await hasVehicleDriveLogs(vehicle.id);
+                if (hasLogs) {
+                    showToast('운행일지가 존재하는 차량은 삭제할 수 없습니다. 폐차 처리를 이용하세요.', 'error');
+                    setModal(null);
+                    // 강제 예외 발생으로 기본 success toast 및 재시도 방지 (이미 유저 알림 띄웠으므로)
+                    const error = new Error('has_logs') as Error & { isHandled?: boolean };
+                    error.isHandled = true;
+                    throw error;
+                }
             }
             await deleteVehicle(vehicle.id);
             await fetchVehicles();
