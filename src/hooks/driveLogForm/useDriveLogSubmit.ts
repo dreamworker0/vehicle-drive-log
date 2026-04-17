@@ -184,6 +184,9 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
                 if (result.correctedKm) {
                     showToast(`동시 작성 감지: 출발 km가 최신 기준인 ${result.correctedKm.oldStartKm?.toLocaleString()} → ${result.correctedKm.correctedStartKm?.toLocaleString()}(으)로 자동 보정 저장되었습니다.`, 'info');
                 }
+                if (result.backgroundWarning) {
+                    showToast(result.backgroundWarning, 'warning');
+                }
 
                 if (result.offline) {
                     setSuccess(true);

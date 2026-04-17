@@ -50,8 +50,8 @@ export default function useAnalytics() {
                     getVehicles(orgId),
                     getOrganizationMembers(orgId),
                     getMaintenanceRecords(orgId),
-                    getFuelLogs(orgId).catch(() => []),
-                    getAllHipassCharges(orgId).catch(() => []),
+                    getFuelLogs(orgId, null, { since: sinceDate }).catch(() => []),
+                    getAllHipassCharges(orgId, { since: sinceDate }).catch(() => []),
                 ]);
                 setLogs(l as DriveLog[]);
                 setVehicles(v as Vehicle[]);

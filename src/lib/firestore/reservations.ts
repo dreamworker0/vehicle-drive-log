@@ -2,9 +2,9 @@
  * Firestore — 차량 예약 (Reservations) 관련 함수
  */
 import {
-    doc, getDoc, updateDoc, deleteDoc,
+    doc, getDoc, updateDoc,
     collection, query, where, getDocs, addDoc,
-    serverTimestamp, onSnapshot, runTransaction, Timestamp,
+    serverTimestamp, onSnapshot, runTransaction, writeBatch, Timestamp,
     type DocumentData,
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -33,6 +33,9 @@ export const getReservationById = async (reservationId: string) => {
 // 예약 생성 (클라이언트 측)
 export const createReservation = async (data: Partial<Reservation>, requireApproval: boolean = false) => {
     try {
+        // zod 스키마로 런타임 값 검증 (실패 시 ZodError throw)
+        reservationSchema.parse(data);
+
         const expiresAt = new Date(Date.now() + 5 * 365 * 24 * 60 * 60 * 1000); // TTL: 5 years
         const docRef = await addDoc(reservationsCollection(), {
             ...data,
@@ -219,11 +222,13 @@ export const getWeekReservations = async (orgId: string, startDate: string, endD
         const q = query(
             reservationsCollection(),
             where('organizationId', '==', orgId),
+            where('date', '>=', startDate),
+            where('date', '<=', endDate),
         );
         const snap = await getDocs(q);
         return snap.docs
             .map(d => d.data() as Reservation)
-            .filter(r => r.status !== 'cancelled' && (r.date ?? '') >= startDate && (r.date ?? '') <= endDate);
+            .filter(r => r.status !== 'cancelled');
     } catch (error) {
         captureError(error, { context: 'getWeekReservations', orgId, startDate, endDate });
         throw error;
@@ -257,9 +262,9 @@ export const cancelReservationGroup = async (groupId: string, orgId: string) => 
     try {
         const reservations = await getReservationsByGroupId(groupId, orgId);
         const active = reservations.filter(r => r.status !== 'cancelled' && r.status !== 'completed');
-        await Promise.all(
-            active.map(r => updateDoc(reservationDoc(r.id), { status: 'cancelled' }))
-        );
+        const batch = writeBatch(db);
+        active.forEach(r => batch.update(reservationDoc(r.id), { status: 'cancelled' }));
+        await batch.commit();
         return active.length;
     } catch (error) {
         captureError(error, { context: 'cancelReservationGroup', groupId, orgId });
@@ -272,9 +277,9 @@ export const deleteReservationGroup = async (groupId: string, orgId: string) => 
     try {
         const reservations = await getReservationsByGroupId(groupId, orgId);
         const active = reservations.filter(r => r.status !== 'cancelled' && r.status !== 'completed');
-        await Promise.all(
-            active.map(r => deleteDoc(reservationDoc(r.id)))
-        );
+        const batch = writeBatch(db);
+        active.forEach(r => batch.delete(reservationDoc(r.id)));
+        await batch.commit();
         return active.length;
     } catch (error) {
         captureError(error, { context: 'deleteReservationGroup', groupId, orgId });
@@ -328,9 +333,9 @@ export const cancelRecurringGroup = async (recurringGroupId: string, orgId: stri
     try {
         const reservations = await getReservationsByRecurringGroupId(recurringGroupId, orgId);
         const active = reservations.filter(r => r.status !== 'cancelled' && r.status !== 'completed');
-        await Promise.all(
-            active.map(r => updateDoc(reservationDoc(r.id), { status: 'cancelled' }))
-        );
+        const batch = writeBatch(db);
+        active.forEach(r => batch.update(reservationDoc(r.id), { status: 'cancelled' }));
+        await batch.commit();
         return active.length;
     } catch (error) {
         captureError(error, { context: 'cancelRecurringGroup', recurringGroupId, orgId });
@@ -343,9 +348,9 @@ export const deleteRecurringGroup = async (recurringGroupId: string, orgId: stri
     try {
         const reservations = await getReservationsByRecurringGroupId(recurringGroupId, orgId);
         const active = reservations.filter(r => r.status !== 'cancelled' && r.status !== 'completed');
-        await Promise.all(
-            active.map(r => deleteDoc(reservationDoc(r.id)))
-        );
+        const batch = writeBatch(db);
+        active.forEach(r => batch.delete(reservationDoc(r.id)));
+        await batch.commit();
         return active.length;
     } catch (error) {
         captureError(error, { context: 'deleteRecurringGroup', recurringGroupId, orgId });

@@ -44,6 +44,8 @@ interface SubmitResult {
     correctedKm?: { oldStartKm?: number; correctedStartKm?: number };
     /** 폼 리셋 필요 여부 */
     shouldResetForm?: boolean;
+    /** km 동기화 실패 경고 */
+    backgroundWarning?: string;
 }
 
 /**
@@ -98,6 +100,15 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
         const result = await updateDriveLog(editLog.id, logData);
         const sr = (result as Record<string, unknown>)?.syncResult as SubmitResult['syncResult'];
         if (sr?.updated) syncResult = sr;
+        if ((result as Record<string, unknown>)?.backgroundError) {
+            return {
+                success: true,
+                message: '운행일지가 수정되었습니다.',
+                shouldNavigate: 'my-records',
+                syncResult,
+                backgroundWarning: '운행일지는 저장되었으나, 차량 km 동기화에 실패했습니다. 관리자에게 문의해주세요.',
+            };
+        }
     } else {
         const extendedLogData = { ...logData, reservationId: reservationData?.reservationId || null };
 
@@ -119,6 +130,16 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
         const origStartKm = (result as Record<string, unknown>)?.oldStartKm as number | undefined;
         if (autocorrectedKm !== undefined) {
             correctedKm = { oldStartKm: origStartKm, correctedStartKm: autocorrectedKm };
+        }
+
+        if ((result as Record<string, unknown>)?.backgroundError) {
+            return {
+                success: true,
+                shouldResetForm: true,
+                syncResult,
+                correctedKm,
+                backgroundWarning: '운행일지는 저장되었으나, 차량 km 동기화에 실패했습니다. 관리자에게 문의해주세요.',
+            };
         }
     }
 

@@ -2,7 +2,6 @@ import React, { useMemo } from 'react';
 import type { FuelStatsData, HipassStatsData, FirstEmployeeStatsData } from './dashboardUtils';
 import ChartOrgTrend from './ChartOrgTrend';
 import ChartDAU from './ChartDAU';
-import ChartFirstEmployee from './ChartFirstEmployee';
 import ChartInputMethod from './ChartInputMethod';
 import ChartQuickDrive from './ChartQuickDrive';
 import ChartReservationType from './ChartReservationType';
@@ -62,11 +61,7 @@ function DashboardChartSection(props: Props) {
         <>
             <ChartOrgTrend dailyActiveOrgStats={props.dailyActiveOrgStats} />
             <ChartDAU dailyActiveUserStats={props.dailyActiveUserStats} />
-            <ChartFirstEmployee
-                firstEmployeeStats={props.firstEmployeeStats}
-                firstEmployeeDist={props.firstEmployeeDist}
-                firstEmployeeTrend={props.firstEmployeeTrend}
-            />
+
             <ChartInputMethod inputMethodStats={props.inputMethodStats} />
             <ChartQuickDrive
                 quickDriveStats={props.quickDriveStats}
