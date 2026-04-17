@@ -3,7 +3,7 @@
  * 로직은 useTodayDashboard 훅 사용
  * 서브 컴포넌트: WelcomeGuide, ReservationCard, WeekReservationList
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import useTodayDashboard from '../../hooks/useTodayDashboard';
@@ -38,21 +38,20 @@ export default function TodayDashboard() {
         try { return localStorage.getItem('employee-welcome-dismissed') !== 'true'; } catch { return true; }
     });
 
-    const dismissWelcome = () => {
+    const dismissWelcome = useCallback(() => {
         setShowWelcome(false);
         try { localStorage.setItem('employee-welcome-dismissed', 'true'); } catch { /* noop */ }
         if (user?.uid && !userData?.welcomeDismissed) {
             updateUser(user.uid, { welcomeDismissed: true }).catch(console.error);
         }
-    };
+    }, [user, userData]);
 
     // 주행 기록을 3회 이상 남긴 사용자는 시스템에 익숙한 것으로 간주하여 가이드를 자동 종료 및 마킹
     useEffect(() => {
         if (showWelcome && myLogsCount >= 3) {
             setTimeout(dismissWelcome, 0);
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [showWelcome, myLogsCount]);
+    }, [showWelcome, myLogsCount, dismissWelcome]);
 
     return (
         <div className="max-w-lg mx-auto animate-fade-in">

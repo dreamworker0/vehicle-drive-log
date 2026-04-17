@@ -93,7 +93,9 @@ export default function useTodayDashboard() {
 
     // 1. 데이터 페칭 - Suspense 유발
     // use() 훅이 Promise 인스턴스를 받으면 Resolve 될 때까지 상위 Suspense로 렌더링을 중단합니다.
-    const dataOrPromise = orgId && user?.uid ? getDashboardData(orgId, user.uid, todayStr, weekEndDate) : null;
+    const dataOrPromise = useMemo(() => {
+        return (orgId && user?.uid) ? getDashboardData(orgId, user.uid, todayStr, weekEndDate) : null;
+    }, [orgId, user?.uid, todayStr, weekEndDate]);
     type DashboardData = [Vehicle[], Reservation[], Reservation[], FuelLog[]];
     const resolvedData = (dataOrPromise instanceof Promise ? use(dataOrPromise) : dataOrPromise) as DashboardData | null;
 
@@ -351,9 +353,11 @@ export default function useTodayDashboard() {
         });
     };
 
-    const todayLabel = new Date().toLocaleDateString('ko-KR', {
-        month: 'long', day: 'numeric', weekday: 'long',
-    });
+    const todayLabel = useMemo(() =>
+        new Date().toLocaleDateString('ko-KR', {
+            month: 'long', day: 'numeric', weekday: 'long',
+        })
+    , []);
 
     return {
         vehicles, startingId, cancellingId,

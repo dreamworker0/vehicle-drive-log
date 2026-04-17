@@ -12,33 +12,48 @@ import { captureError } from '../sentry';
 
 /** 전체 슈퍼관리자 목록 조회 */
 export const getSuperAdmins = async () => {
-    const q = query(
-        collection(db, 'users'),
-        where('role', '==', 'superAdmin')
-    );
-    const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
+    try {
+        const q = query(
+            collection(db, 'users'),
+            where('role', '==', 'superAdmin')
+        );
+        const snap = await getDocs(q);
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
+    } catch (error) {
+        captureError(error, { context: 'getSuperAdmins' });
+        throw error;
+    }
 };
 
 /** 전체 슈퍼관리자 수 카운트 */
 export const getSuperAdminsCount = async () => {
-    const q = query(
-        collection(db, 'users'),
-        where('role', '==', 'superAdmin')
-    );
-    const snap = await getCountFromServer(q);
-    return snap.data().count;
+    try {
+        const q = query(
+            collection(db, 'users'),
+            where('role', '==', 'superAdmin')
+        );
+        const snap = await getCountFromServer(q);
+        return snap.data().count;
+    } catch (error) {
+        captureError(error, { context: 'getSuperAdminsCount' });
+        throw error;
+    }
 };
 
 /** 이메일로 사용자 찾기 */
 export const getUserByEmail = async (email: string) => {
-    const q = query(
-        collection(db, 'users'),
-        where('email', '==', email),
-        limit(1)
-    );
-    const snap = await getDocs(q);
-    return snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() };
+    try {
+        const q = query(
+            collection(db, 'users'),
+            where('email', '==', email),
+            limit(1)
+        );
+        const snap = await getDocs(q);
+        return snap.empty ? null : { id: snap.docs[0].id, ...snap.docs[0].data() };
+    } catch (error) {
+        captureError(error, { context: 'getUserByEmail', email });
+        throw error;
+    }
 };
 
 /** 슈퍼관리자 추가 (기존 users 문서의 role을 superAdmin으로) */

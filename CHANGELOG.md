@@ -5,6 +5,31 @@
 
 ---
 
+## Phase 40 — 대규모 리팩토링 및 아키텍처 고도화 🏗️
+
+> 2026-04-17
+
+### Added
+- `DriveLogForm` 리팩토링을 위한 레이아웃 컴포넌트 분할 (`DateSection`, `WaypointSection`, `PassengerSection`, `VehicleStatusSection`)
+- 운행일지 비즈니스 로직 훅 추출 및 책임 분리 (`useDriveLogInitializer`, `useDriveLogSubmit`)
+- 예약 캘린더 도메인 액션 모듈화 (`actions/cancelActions.ts`, `editActions.ts`, `submitActions.ts` 등)
+- Tmap SDK 연동 레이어 모듈화 (`src/lib/tmap/` — core, routing, geocoding, deeplink 분리)
+- 운행 데이터(DriveLogs) 처리 레이어 고도화 (`src/lib/firestore/driveLogs/` — mutations, queries, stats 분리)
+
+### Changed
+- **컴포넌트 SRP(단일 책임 원칙) 강화**: 1,000라인이 넘던 `DriveLogForm.tsx`를 목적지, 탑승자, 차량 상태 등 기능별 서브 컴포넌트로 분해하여 가독성 및 유지보수성 극대화
+- **비즈니스 로직 캡슐화**: Firestore 접근 및 데이터 가공 로직을 UI 영역에서 완전히 분리하여 순수 함수 및 전용 훅으로 이전
+- **Firestore 에러 핸들링 표준화**: 모든 데이터 접근 레이어에 `try-catch` 및 Sentry(`captureError`) 기반의 공통 에러 모니터링 패턴 적용
+- **대시보드 성능 최적화**: 슈퍼관리자 대시보드의 차트 및 목록 20여 개 컴포넌트에 `React.memo` 및 `useMemo`를 적용하여 렌더링 성능 대폭 개선
+- **타입 시스템 정교화**: 코드베이스 전반의 `any` 타입을 구체적인 인터페이스 및 제네릭으로 교체하여 `tsc` 빌드 시점의 오류 탐지 능력 강화
+
+### Fixed
+- 테스트 코드 안정화: `useTodayDashboard.test.ts` 등 주요 훅의 Mocking 불일치 및 비동기 `act()` 처리 오류 수정
+- 대시보드 `useMemo` 종속성 배열 누락으로 인해 차트가 무한 재생성되던 성능 저하 버그 수정
+- 조직 좌표 저장 시 리스트에 실시간으로 반영되지 않던 상태 업데이트 누락 수정 (DashboardOrgTable)
+
+---
+
 ## Phase 39 — 로그인/안정성 개선 및 통계·사용성 보강 🔧
 
 > 2026-04-17

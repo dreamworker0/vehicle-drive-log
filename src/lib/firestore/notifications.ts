@@ -26,14 +26,19 @@ export const createNotification = async (data: Record<string, unknown>) => {
 
 // 알림 목록 조회
 export const getNotifications = async (uid: string, limitCount = 20) => {
-    const q = query(
-        collection(db, 'notifications'),
-        where('targetUid', '==', uid),
-        orderBy('createdAt', 'desc'),
-        limit(limitCount)
-    );
-    const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
+    try {
+        const q = query(
+            collection(db, 'notifications'),
+            where('targetUid', '==', uid),
+            orderBy('createdAt', 'desc'),
+            limit(limitCount)
+        );
+        const snap = await getDocs(q);
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
+    } catch (error) {
+        captureError(error as Error, { context: 'getNotifications', uid });
+        throw error;
+    }
 };
 
 // 알림 읽음 처리

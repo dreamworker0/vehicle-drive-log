@@ -1,3 +1,4 @@
+import React, { useMemo } from 'react';
 import type { MonthlyStatsData } from './dashboardUtils';
 
 /* ── 월간 지표 카드 (전월 대비) ── */
@@ -40,8 +41,8 @@ interface Props {
     onboardingStats: { total: number; completed: number; rate: number };
 }
 
-export default function DashboardMonthlyMetrics({ monthlyStats, weeklyActiveRate, onboardingStats }: Props) {
-    return (
+function DashboardMonthlyMetrics({ monthlyStats, weeklyActiveRate, onboardingStats }: Props) {
+    const content = useMemo(() => (
         <div className="glass-card p-5">
             <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-4">
                 📅 {monthlyStats.monthLabel} 운영 지표
@@ -70,5 +71,9 @@ export default function DashboardMonthlyMetrics({ monthlyStats, weeklyActiveRate
                 </div>
             </div>
         </div>
-    );
+    ), [monthlyStats, weeklyActiveRate, onboardingStats]);
+
+    return content;
 }
+
+export default React.memo(DashboardMonthlyMetrics);

@@ -5,7 +5,7 @@
 import { createDriveLog, updateDriveLog, updateReservationStatus, updateHipassCard } from '../../lib/firestore';
 import { enqueueLog } from '../../lib/offlineSync';
 import { validateDriveLogForm, buildLogData, nowTime, todayStr } from '../utils/driveLogValidation';
-import type { DriveLogForm } from '../useDriveLogForm';
+import type { DriveLogForm } from './types';
 import type { Vehicle } from '../../types/vehicle';
 import type { User as UserDoc } from '../../types/user';
 import type { DriveLog } from '../../types/driveLog';

@@ -234,6 +234,7 @@ export default function ServiceDashboard() {
                 sortDir={sortDir}
                 handleSort={handleSort}
                 sortIndicator={sortIndicator}
+                onRefresh={refreshServerStats}
             />
         </div>
     );

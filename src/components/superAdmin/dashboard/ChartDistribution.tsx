@@ -1,3 +1,5 @@
+import React, { useMemo } from 'react';
+
 interface Props {
     orgSizeDistribution: { label: string; count: number; color: string }[];
     fuelTypeStats: { type: string; label: string; count: number; color: string }[];
@@ -5,8 +7,8 @@ interface Props {
     vehicleModelStats: { model: string; count: number }[];
 }
 
-export default function ChartDistribution({ orgSizeDistribution, fuelTypeStats, vehicleTypeStats, vehicleModelStats }: Props) {
-    return (
+function ChartDistribution({ orgSizeDistribution, fuelTypeStats, vehicleTypeStats, vehicleModelStats }: Props) {
+    const chartContent = useMemo(() => (
         <>
             {/* ── 2열 그리드: 기관 규모별 | 연료 유형별 ── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -128,5 +130,9 @@ export default function ChartDistribution({ orgSizeDistribution, fuelTypeStats, 
                 </div>
             )}
         </>
-    );
+    ), [orgSizeDistribution, fuelTypeStats, vehicleTypeStats, vehicleModelStats]);
+
+    return chartContent;
 }
+
+export default React.memo(ChartDistribution);

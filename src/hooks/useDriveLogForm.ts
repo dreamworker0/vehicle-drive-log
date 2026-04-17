@@ -1,74 +1,37 @@
 /**
- * useDriveLogForm — 운행일지 작성/수정 폼의 상태 관리 + 비즈니스 로직
- * DriveLogForm에서 추출된 커스텀 훅
+ * useDriveLogForm — 운행일지 작성/수정 폼의 상태 관리 및 서비스 통합 (Facade)
+ * 리팩토링: 로직을 driveLogForm/ 하위 모듈로 분산하여 유지보수성 개선
  */
-import { useState, useEffect, useCallback, useTransition } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
+import { useState, useTransition } from 'react';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
 import useRetry from './useRetry';
 import useDriveLogOcr from './useDriveLogOcr';
-import { nowTime, todayStr, validateDriveLogForm, timestampToDateStr } from './utils/driveLogValidation';
-import { getVehicles, getFavorites, createFavorite, getOrganizationMembers, getLastVehicleEndKm, getLastVehicleEndBattery, getReservationById, getHipassCards } from '../lib/firestore';
-import { resolveStartKm } from './driveLogForm/resolveStartKm';
-import { submitDriveLog, getEmptyForm } from './driveLogForm/submitDriveLog';
+import { nowTime, todayStr, timestampToDateStr } from './utils/driveLogValidation';
+
 import type { Vehicle } from '../types/vehicle';
-import { captureError } from '../lib/sentry';
-
-const clearDrivingNotification = async (resId?: string) => {
-    if (!resId || !('Notification' in window)) return;
-    try {
-        const reg = await navigator.serviceWorker?.ready;
-        if (!reg) return;
-        const notifications = await reg.getNotifications({ tag: `driving-${resId}` });
-        notifications.forEach(n => n.close());
-    } catch { /* 무시 */ }
-};
-
 import type { Favorite } from '../types/favorite';
 import type { User as UserDoc } from '../types/user';
-import type { DriveLog } from '../types/driveLog';
 import type { HipassCard } from '../types/hipass';
+import type { DriveLogForm, LocationState } from './driveLogForm/types';
 
-export interface DriveLogForm {
-    vehicleId: string;
-    vehicleName: string;
-    purpose: string;
-    destination: string;
-    startTime: string;
-    endTime: string;
-    startKm: string;
-    endKm: string;
-    batteryStart: string;
-    batteryEnd: string;
-    notes: string;
-    driveDate: string;
-    hipassBalanceAfter: string;
-}
+// 타입 재수출 (하위 호환성 및 외부 참조용)
+export type { DriveLogForm, LocationState };
+
+// 하이 레벨에서 분리된 훅들 임포트
+import { useDriveLogInitializer } from './driveLogForm/useDriveLogInitializer';
+import { useDriveLogSubmit } from './driveLogForm/useDriveLogSubmit';
 
 export default function useDriveLogForm() {
     const { user, userData } = useAuth();
     const location = useLocation();
-    const navigate = useNavigate();
     const { showToast } = useToast();
     const { runWithRetry } = useRetry();
-
-    interface LocationState {
-        reservationId?: string;
-        vehicleId?: string;
-        vehicleName?: string;
-        purpose?: string;
-        destination?: string;
-        actualStartTime?: string;
-        currentKm?: number;
-        editLog?: DriveLog & { passengerNames?: string[] };
-    }
-
-    const state = location.state as LocationState | null;
     const [searchParams] = useSearchParams();
     const queryReservationId = searchParams.get('reservationId');
 
-    // location.state 또는 URL 쿼리에서 예약 데이터 결정
+    const state = location.state as LocationState | null;
     const [resolvedReservationData, setResolvedReservationData] = useState<LocationState | null>(
         state?.reservationId ? state : null
     );
@@ -78,12 +41,12 @@ export default function useDriveLogForm() {
     /** @deprecated 바로 운행 기능은 사전 예약 체계로 대체됨 */
     const isQuickDrive = false;
 
+    // ── 상태 정의 ──────────────────────────────────────────────────
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
     const [favorites, setFavorites] = useState<Favorite[]>([]);
     const [members, setMembers] = useState<UserDoc[]>([]);
     const [loading, setLoading] = useState(true);
     const [isPending, startTransition] = useTransition();
-    const submitting = isPending;
     const [success, setSuccess] = useState(false);
     const [selectedPassengers, setSelectedPassengers] = useState<UserDoc[]>([]);
     const [externalPassengerCount, setExternalPassengerCount] = useState(0);
@@ -93,13 +56,12 @@ export default function useDriveLogForm() {
     const [lastEndBattery, setLastEndBattery] = useState<number | null>(null);
 
     const editDriveDate = editLog?.timestamp ? timestampToDateStr(editLog.timestamp) : todayStr();
-
     const [form, setForm] = useState<DriveLogForm>({
         vehicleId: editLog?.vehicleId || '',
         vehicleName: editLog?.vehicleName || '',
         purpose: editLog?.purpose || '',
         destination: editLog?.destination || '',
-        startTime: editLog?.startTime as string || reservationData?.actualStartTime || (isQuickDrive ? '' : nowTime()),
+        startTime: editLog?.startTime as string || reservationData?.actualStartTime || nowTime(),
         endTime: editLog?.endTime as string || '',
         startKm: editLog?.startKm?.toString() || '',
         endKm: editLog?.endKm?.toString() || '',
@@ -111,311 +73,50 @@ export default function useDriveLogForm() {
     });
 
     const orgId = userData?.organizationId;
-
     const selectedVehicle = vehicles.find(v => v.id === form.vehicleId);
     const isElectric = selectedVehicle?.fuelType === 'electric';
     const isRetroactive = form.driveDate !== todayStr();
 
-    // OCR 서브 훅
-    const ocr = useDriveLogOcr({ isElectric, setForm, user, userData, vehicleName: form.vehicleName });
+    // ── 하위 모듈 1: OCR (기존 훅 유지) ──────────────────────────
+    const ocr = useDriveLogOcr({ 
+        isElectric, 
+        setForm, 
+        user, 
+        userData, 
+        vehicleName: form.vehicleName 
+    });
 
-    useEffect(() => {
-        if (!orgId || !user) return;
-        const fetch = async () => {
-            try {
-                const [v, favs, mems] = await Promise.all([
-                    getVehicles(orgId),
-                    getFavorites(user.uid),
-                    getOrganizationMembers(orgId),
-                ]);
-                setVehicles(v as Vehicle[]);
-                setFavorites(favs as Favorite[]);
-                const otherMembers = (mems as UserDoc[]).filter(m => m.id !== user.uid);
-                setMembers(otherMembers);
+    // ── 하위 모듈 2: 초기화 (Side Effects) ─────────────────────
+    useDriveLogInitializer({
+        orgId, user, isEditMode, editLog, reservationData,
+        queryReservationId, resolvedReservationData, isElectric,
+        form, showToast,
+        setVehicles, setFavorites, setMembers, setLoading,
+        setForm, setSelectedPassengers, setExternalPassengerCount,
+        setResolvedReservationData, setLastEndBattery, setHipassCard,
+        vehicles
+    });
 
-                if (isEditMode && editLog?.passengerNames && editLog.passengerNames.length > 0) {
-                    const matched = otherMembers.filter(m =>
-                        editLog.passengerNames?.includes(m.name || m.email?.split('@')[0])
-                    );
-                    setSelectedPassengers(matched);
-                    // 조직원 이름에 매칭되지 않은 수 = 외부 동승자 수
-                    const memberNames = otherMembers.map(m => m.name || m.email?.split('@')[0]);
-                    const externals = editLog.passengerNames.filter(n => !memberNames.includes(n));
-                    if (externals.length > 0) setExternalPassengerCount(externals.length);
-                }
+    // ── 하위 모듈 3: 핸들러 및 제출 ───────────────────────────
+    const {
+        handleVehicleSelect,
+        handleFavoriteSelect,
+        handleSaveFavorite,
+        togglePassenger,
+        handleSubmit
+    } = useDriveLogSubmit({
+        form, setForm, orgId, user, userData, vehicles, selectedVehicle,
+        selectedPassengers, setSelectedPassengers, externalPassengerCount, setExternalPassengerCount,
+        setFavorites, setShowFavSave, setFavName, setSuccess,
+        isElectric, isQuickDrive, isRetroactive, isEditMode, editLog, reservationData, hipassCard, favName,
+        showToast, runWithRetry, startTransition, ocrSuccess: ocr.ocrSuccess
+    });
 
-                if (isEditMode) {
-                    // 수정 모드 유지
-                } else if (reservationData?.vehicleId) {
-                    const rv = v.find(veh => veh.id === reservationData.vehicleId);
-                    const km = await resolveStartKm(orgId, reservationData.vehicleId!, { vehicle: rv || null });
-                    setForm(prev => ({
-                        ...prev,
-                        vehicleId: reservationData.vehicleId!,
-                        vehicleName: reservationData.vehicleName || rv?.displayName || '',
-                        purpose: reservationData.purpose || '',
-                        destination: reservationData.destination || '',
-                        startKm: km,
-                    }));
-                } else if (v.length === 1) {
-                    const km = await resolveStartKm(orgId, v[0].id, { vehicle: v[0] });
-                    setForm(prev => ({ ...prev, vehicleId: v[0].id, vehicleName: v[0].displayName || v[0].name, startKm: km }));
-                }
-            } catch (err) {
-                console.error('데이터 로드 실패:', err);
-                captureError(err, { context: 'useDriveLogForm.fetch', orgId });
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetch();
-    }, [orgId, reservationData?.vehicleId, reservationData?.vehicleName, reservationData?.purpose, reservationData?.destination, user, isEditMode, editLog?.passengerNames]);
-
-    // URL 쿼리 파라미터에서 reservationId로 예약 데이터 로드 (알림 클릭 시)
-    useEffect(() => {
-        if (!queryReservationId || resolvedReservationData || !orgId) return;
-        const loadReservation = async () => {
-            try {
-                const res = await getReservationById(queryReservationId);
-                if (res) {
-                    if (res.status === 'completed') {
-                        showToast('이미 운행일지 작성이 완료된 건입니다.', 'info');
-                        clearDrivingNotification(queryReservationId);
-                        navigate('/employee/today', { replace: true });
-                        return;
-                    }
-
-                    const data: LocationState = {
-                        reservationId: res.id,
-                        vehicleId: res.vehicleId,
-                        vehicleName: res.vehicleName || res.vehicleDisplayName,
-                        purpose: res.purpose || '',
-                        destination: res.destination || '',
-                        actualStartTime: res.actualStartTime || '',
-                        currentKm: res.currentKm || 0,
-                    };
-                    setResolvedReservationData(data);
-
-                    // 폼에 예약 정보 반영
-                    setForm(prev => ({
-                        ...prev,
-                        vehicleId: data.vehicleId || '',
-                        vehicleName: data.vehicleName || '',
-                        purpose: data.purpose || '',
-                        destination: data.destination || '',
-                        startTime: data.actualStartTime || prev.startTime,
-                    }));
-
-                    // startKm 조회 (현재차량정보가 우선)
-                    const lastEndKm = await getLastVehicleEndKm(orgId, data.vehicleId!);
-                    const km = (data.currentKm ?? lastEndKm ?? '').toString();
-                    setForm(prev => ({ ...prev, startKm: km }));
-                }
-            } catch (err) {
-                console.error('예약 데이터 로드 실패:', err);
-                captureError(err, { context: 'useDriveLogForm.loadReservation', queryReservationId });
-            }
-        };
-        loadReservation();
-    }, [queryReservationId, orgId, resolvedReservationData, showToast, navigate, form.startTime]);
-
-    useEffect(() => {
-        // 수정 모드에서는 기존 기록의 startKm을 유지 (최신 endKm으로 덮어쓰지 않음)
-        if (isEditMode) return;
-        if (!orgId || !form.vehicleId || !form.driveDate) return;
-        const v = vehicles.find(veh => veh.id === form.vehicleId);
-        resolveStartKm(orgId, form.vehicleId, {
-            driveDate: form.driveDate,
-            startTime: form.startTime,
-            vehicle: v || null,
-        }).then(km => setForm(prev => ({ ...prev, startKm: km }))).catch(console.error);
-    }, [form.driveDate, form.vehicleId, form.startTime, orgId, vehicles, isEditMode]);
-
-    // 전기차: 이전 운행일지의 도착 배터리 조회 (출발 배터리 placeholder 힌트)
-    useEffect(() => {
-        if (!orgId || !form.vehicleId || !isElectric) {
-            setLastEndBattery(null);
-            return;
-        }
-        getLastVehicleEndBattery(orgId, form.vehicleId)
-            .then(val => setLastEndBattery(val))
-            .catch(() => setLastEndBattery(null));
-    }, [orgId, form.vehicleId, isElectric]);
-
-    // 차량 변경 시 해당 차량에 연결된 하이패스 카드 조회
-    useEffect(() => {
-        if (!orgId || !form.vehicleId) {
-            setHipassCard(null);
-            return;
-        }
-        const loadHipass = async () => {
-            try {
-                const cards = await getHipassCards(orgId);
-                const card = cards.find((c: HipassCard) => c.vehicleId === form.vehicleId);
-                setHipassCard(card || null);
-                if (card) {
-                    setForm(prev => ({ ...prev, hipassBalanceAfter: '' }));
-                }
-            } catch {
-                setHipassCard(null);
-            }
-        };
-        loadHipass();
-    }, [orgId, form.vehicleId]);
-
-    const handleVehicleSelect = useCallback(async (vehicleId: string) => {
-        const v = vehicles.find(veh => veh.id === vehicleId);
-        const km = await resolveStartKm(orgId!, vehicleId, {
-            driveDate: form.driveDate,
-            startTime: form.startTime,
-            vehicle: v || null,
-        });
-        setForm(prev => ({
-            ...prev,
-            vehicleId,
-            vehicleName: v?.displayName || v?.name || '',
-            startKm: km,
-        }));
-    }, [orgId, form.driveDate, form.startTime, vehicles]);
-
-    const handleFavoriteSelect = useCallback((fav: Favorite) => {
-        setForm(prev => ({ ...prev, destination: fav.address || fav.destination }));
-    }, []);
-
-    const handleSaveFavorite = useCallback(async () => {
-        if (!form.destination.trim() || !user) return;
-        try {
-            await createFavorite({
-                userId: user.uid,
-                name: favName.trim() || form.destination.trim(),
-                destination: form.destination.trim(),
-                organizationId: orgId || '',
-            });
-            const updated = await getFavorites(user.uid);
-            setFavorites(updated as Favorite[]);
-            setShowFavSave(false);
-            setFavName('');
-        } catch (err) {
-            console.error('즐겨찾기 저장 실패:', err);
-            captureError(err, { context: 'useDriveLogForm.saveFavorite', destination: form.destination, orgId });
-        }
-    }, [form.destination, user, favName, orgId]);
-
-    const togglePassenger = useCallback((member: UserDoc) => {
-        setSelectedPassengers(prev => {
-            const exists = prev.find(p => p.id === member.id);
-            if (exists) return prev.filter(p => p.id !== member.id);
-            return [...prev, member];
-        });
-    }, []);
-
-    const handleSubmit = async (e: React.FormEvent | Event) => {
-        if (e && 'preventDefault' in e) e.preventDefault();
-
-        const validation = validateDriveLogForm(form, { isElectric, isQuickDrive });
-        if (!validation.valid) {
-            showToast(validation.message as string, 'warning');
-            return;
-        }
-
-        startTransition(async () => {
-            try {
-                const result = await runWithRetry(
-                'submit-drive-log',
-                () => submitDriveLog({
-                    form, orgId, user: user!, userData, selectedVehicle,
-                    selectedPassengers, externalPassengerCount, isRetroactive,
-                    ocrUsed: ocr.ocrSuccess, favoriteUsed: false, isElectric, isEditMode, editLog,
-                    reservationData, hipassCard,
-                }),
-                {
-                    timeoutMs: 8000, // UX 개선: 8초 안에 응답이 없으면 오프라인 큐 저장으로 간주하고 처리 종료
-                    onError: (err: unknown) => {
-                        const isDuplicate = err instanceof Error && err.message?.includes('중복');
-                        const isTimeout = err instanceof Error && err.message?.includes('TIMEOUT');
-                        
-                        if (isDuplicate || isTimeout) {
-                            console.warn(`[useDriveLogForm] ${err instanceof Error ? err.message : '알 수 없는 경고'}`);
-                        } else {
-                            console.error('운행일지 저장 실패:', err);
-                        }
-                        
-                        // 중복 저장 또는 타임아웃 발생 시, 완료(Success) 상태로 간주하고 UI 처리
-                        if (isDuplicate || isTimeout) {
-                            if (isTimeout) {
-                                showToast('네트워크 지연으로 운행일지를 로컬에 임시 저장했습니다. 연결 시 동기화됩니다.', 'success');
-                            } else {
-                                showToast('요청된 내용이 정상 반영되어 이미 목록에 저장되었습니다.', 'success');
-                            }
-                            
-                            setSuccess(true);
-                            if (reservationData?.reservationId || reservationData?.actualStartTime) {
-                                navigate('/employee/today', { replace: true });
-                            } else if (isEditMode) {
-                                navigate('/employee/my-records', { replace: true });
-                            } else {
-                                setForm(getEmptyForm());
-                                setSelectedPassengers([]);
-                                setExternalPassengerCount(0);
-                                setTimeout(() => setSuccess(false), 2000);
-                            }
-                            return true; // 에러로서 표시하지 않고 정상 플로우 종료
-                        }
-                        
-                        // 그 외 단일 에러
-                        return false; 
-                    }
-                }
-            ) as { syncResult?: { updated: boolean; oldStartKm?: number; newStartKm?: number; }; correctedKm?: { oldStartKm?: number; correctedStartKm?: number; }; offline?: boolean; message?: string; shouldResetForm?: boolean; shouldNavigate?: string; } | undefined;
-
-            if (!result) return;
-
-
-            if (result.syncResult?.updated) {
-                showToast(`다음 기록의 출발 km가 ${result.syncResult.oldStartKm?.toLocaleString()} → ${result.syncResult.newStartKm?.toLocaleString()}으로 자동 조정되었습니다.`, 'info');
-            }
-            if (result.correctedKm) {
-                showToast(`동시 작성 감지: 출발 km가 최신 기준인 ${result.correctedKm.oldStartKm?.toLocaleString()} → ${result.correctedKm.correctedStartKm?.toLocaleString()}(으)로 자동 보정 저장되었습니다.`, 'info');
-            }
-
-            if (result.offline) {
-                setSuccess(true);
-                showToast(result.message!, 'info');
-                if (result.shouldResetForm) {
-                    setForm(getEmptyForm());
-                    setSelectedPassengers([]);
-                    setExternalPassengerCount(0);
-                }
-                setTimeout(() => setSuccess(false), 3000);
-                return;
-            }
-
-            setSuccess(true);
-            if (result.shouldNavigate === 'my-records') {
-                showToast(result.message || '운행일지가 수정되었습니다.', 'success');
-                navigate('/employee/my-records', { replace: true });
-            } else if (result.shouldNavigate === 'today') {
-                showToast(result.message || '예약 운행일지가 저장되었습니다.', 'success');
-                navigate('/employee/today', { replace: true });
-            } else if (result.shouldResetForm) {
-                setForm(getEmptyForm());
-                setSelectedPassengers([]);
-                setExternalPassengerCount(0);
-                setSuccess(false);
-            }
-        } catch (err: unknown) {
-            // runWithRetry는 내부적으로 에러를 잡아서 처리 (undefined 반환)
-            // 따라서 이곳으로 에러 스로우가 전달되는 일은 드물지만 방어 코드 유지
-            console.error('운행일지 과정 중 예상치 못한 오류:', err);
-            showToast('알 수 없는 오류가 발생했습니다.', 'error');
-        }
-        });
-    };
-
+    // ── 공개 API ──────────────────────────────────────────────────
     return {
         form, setForm,
         vehicles, favorites, members,
-        loading, submitting, success,
+        loading, submitting: isPending, success,
         selectedPassengers, selectedVehicle,
         isElectric,
         reservationData, isQuickDrive,

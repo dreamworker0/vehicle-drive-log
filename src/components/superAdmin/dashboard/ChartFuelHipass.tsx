@@ -1,3 +1,4 @@
+import React, { useMemo } from 'react';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid,
     Tooltip, ResponsiveContainer,
@@ -12,8 +13,8 @@ interface Props {
     dailyHipassAmount: { date: string; amount: number }[];
 }
 
-export default function ChartFuelHipass({ fuelStats, hipassStats, dailyFuelCost, dailyHipassAmount }: Props) {
-    return (
+function ChartFuelHipass({ fuelStats, hipassStats, dailyFuelCost, dailyHipassAmount }: Props) {
+    const chartContent = useMemo(() => (
         <>
             {/* ── 주유 / 하이패스 월간 지표 ── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -126,5 +127,9 @@ export default function ChartFuelHipass({ fuelStats, hipassStats, dailyFuelCost,
                 </div>
             )}
         </>
-    );
+    ), [fuelStats, hipassStats, dailyFuelCost, dailyHipassAmount]);
+
+    return chartContent;
 }
+
+export default React.memo(ChartFuelHipass);

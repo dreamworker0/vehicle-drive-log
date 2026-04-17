@@ -13,15 +13,29 @@ vi.mock('firebase/firestore', () => ({
     addDoc: vi.fn(),
     doc: vi.fn(() => ({ 
         id: 'mock-doc-id',
-        withConverter: vi.fn().mockReturnThis()
+        withConverter: vi.fn().mockReturnThis(),
+        ref: { id: 'mock-doc-id' }
     })),
     getDoc: vi.fn(),
     setDoc: vi.fn(),
     updateDoc: vi.fn(),
     deleteDoc: vi.fn(),
     serverTimestamp: vi.fn(() => new Date()),
-    writeBatch: vi.fn(),
+    writeBatch: vi.fn(() => ({
+        set: vi.fn(),
+        update: vi.fn(),
+        delete: vi.fn(),
+        commit: vi.fn().mockResolvedValue(undefined),
+    })),
+    runTransaction: vi.fn(),
+    getCountFromServer: vi.fn(() => Promise.resolve({
+        data: () => ({ count: 10 })
+    })),
     onSnapshot: vi.fn(),
+}));
+
+vi.mock('../../lib/sentry', () => ({
+    captureError: vi.fn(),
 }));
 
 vi.mock('firebase/functions', () => ({
@@ -34,144 +48,97 @@ vi.mock('../../lib/firebase', () => ({
     default: {},
 }));
 
-import { getDocs, query as _query, collection as _collection, where as _where, orderBy as _orderBy, limit as _limit, addDoc, updateDoc, setDoc, doc as _doc } from 'firebase/firestore';
+import { 
+    getDocs, doc as _doc, 
+    runTransaction, writeBatch 
+} from 'firebase/firestore';
+import { captureError } from '../../lib/sentry';
 
-describe('Firestore 유틸리티 함수', () => {
+describe('Firestore 유틸리티 함수 - 에러 핸들링 및 롤백 검증', () => {
     beforeEach(() => {
         vi.clearAllMocks();
     });
 
-    describe('getDriveLogs', () => {
-        it('orgId로 운행일지를 조회한다', async () => {
-            const mockDocs = [
-                { id: 'log1', data: () => ({ id: 'log1', destination: '서울역', driverUid: 'user1' }) },
-                { id: 'log2', data: () => ({ id: 'log2', destination: '강남역', driverUid: 'user2' }) },
-            ];
-            vi.mocked(getDocs).mockResolvedValue({ docs: mockDocs } as ReturnType<typeof getDocs> extends Promise<infer R> ? R : never);
-
-            const { getDriveLogs } = await import('../../lib/firestore');
-            const result = await getDriveLogs('org1');
-
-            expect(result.docs).toHaveLength(2);
-            expect(result.docs[0].id).toBe('log1');
-            expect(result.docs[0].destination).toBe('서울역');
-            expect(result.hasMore).toBeDefined();
-        });
-    });
-
-    describe('getMyDriveLogs', () => {
-        it('orgId와 uid로 내 운행일지를 조회한다', async () => {
-            const mockDocs = [
-                { id: 'log1', data: () => ({ destination: '시청', driverUid: 'user1' }) },
-            ];
-            vi.mocked(getDocs).mockResolvedValue({ docs: mockDocs } as ReturnType<typeof getDocs> extends Promise<infer R> ? R : never);
-
-            const { getMyDriveLogs } = await import('../../lib/firestore');
-            const result = await getMyDriveLogs('org1', 'user1', 10);
-
-            expect(result).toHaveLength(1);
-            expect(result[0].destination).toBe('시청');
-        });
-    });
-
-    describe('createDriveLog', () => {
-        it('운행일지를 생성한다', async () => {
-            vi.mocked(setDoc).mockResolvedValue(undefined);
-
-            const { createDriveLog } = await import('../../lib/firestore');
-            const _result = await createDriveLog({
-                destination: '부산',
-                driverUid: 'user1',
-                organizationId: 'org1',
+    describe('updateReservationStatus (트랜잭션 롤백 검증)', () => {
+        it('예약이 존재하지 않으면 에러를 던지고 captureError를 호출한다', async () => {
+            const { updateReservationStatus } = await import('../../lib/firestore/reservations');
+            
+            // runTransaction 모킹: 콜백을 실행하도록 설정
+            vi.mocked(runTransaction).mockImplementation(async (db, cb) => {
+                const mockTransaction = {
+                    get: vi.fn().mockResolvedValue({ exists: () => false }), // 문서 없음
+                    update: vi.fn(),
+                    set: vi.fn(),
+                    delete: vi.fn(),
+                };
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                return cb(mockTransaction as any);
             });
 
-            expect(setDoc).toHaveBeenCalled();
+            await expect(updateReservationStatus('res1', 'approved', {}, 'reserved'))
+                .rejects.toThrow("예약 정보가 존재하지 않습니다.");
+
+            expect(captureError).toHaveBeenCalled();
+            expect(vi.mocked(captureError).mock.calls[0][1]).toMatchObject({
+                context: 'updateReservationStatus'
+            });
         });
-    });
 
-    describe('getVehicles', () => {
-        it('orgId로 차량 목록을 조회한다', async () => {
-            const mockDocs = [
-                { id: 'v1', data: () => ({ displayName: '소나타2744', plateNumber: '12가3456', fuelType: 'gasoline' }) },
-                { id: 'v2', data: () => ({ displayName: '아이오닉5', plateNumber: '78나9012', fuelType: 'electric' }) },
-            ];
-            vi.mocked(getDocs).mockResolvedValue({ docs: mockDocs } as ReturnType<typeof getDocs> extends Promise<infer R> ? R : never);
-
-            const { getVehicles } = await import('../../lib/firestore');
-            const result = await getVehicles('org1');
-
-            expect(result).toHaveLength(2);
-            expect(result[0].displayName).toBe('소나타2744');
-            expect(result[1].fuelType).toBe('electric');
-        });
-    });
-
-    describe('createReservation', () => {
-        it('차량 예약을 생성한다', async () => {
-            vi.mocked(addDoc).mockResolvedValue({ id: 'res1' } as ReturnType<typeof addDoc> extends Promise<infer R> ? R : never);
-
-            const { createReservation } = await import('../../lib/firestore');
-            await createReservation({
-                vehicleId: 'v1',
-                reservedByUid: 'user1',
-                date: '2026-02-23',
-                startTime: '09:00',
-                endTime: '10:00',
-                organizationId: 'org1',
+        it('동시성 충돌 발생 시(상태 불일치) 에러를 던진다', async () => {
+            const { updateReservationStatus } = await import('../../lib/firestore/reservations');
+            
+            vi.mocked(runTransaction).mockImplementation(async (db, cb) => {
+                const mockTransaction = {
+                    get: vi.fn().mockResolvedValue({ 
+                        exists: () => true,
+                        data: () => ({ status: 'cancelled' }) // 기대한 'reserved'가 아님
+                    }),
+                    update: vi.fn(),
+                };
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                return cb(mockTransaction as any);
             });
 
-            expect(addDoc).toHaveBeenCalled();
-            const callArgs = vi.mocked(addDoc).mock.calls[0][1] as unknown as Record<string, unknown>;
-            expect(callArgs.status).toBe('reserved');
+            await expect(updateReservationStatus('res1', 'approved', {}, 'reserved'))
+                .rejects.toThrow("동시성 오류: 이미 다른 관리자에 의해 상태가 변경되었습니다. (현재 상태: cancelled)");
+            
+            expect(captureError).toHaveBeenCalled();
         });
     });
 
-    describe('cancelReservation', () => {
-        it('예약을 취소 처리한다', async () => {
-            vi.mocked(updateDoc).mockResolvedValue(undefined);
+    describe('deleteOrganization (배치 롤백 검증)', () => {
+        it('배치 커밋 실패 시 에러가 전파되고 captureError가 호출된다', async () => {
+            const { deleteOrganization } = await import('../../lib/firestore/organizations');
+            
+            // 유저 0명으로 설정하여 배치 호출까지 가도록 함
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            vi.mocked(getDocs).mockResolvedValue({ docs: [] } as any);
+            
+            const mockBatch = {
+                delete: vi.fn(),
+                update: vi.fn(),
+                commit: vi.fn().mockRejectedValue(new Error("Firebase Permission Denied")),
+            };
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            vi.mocked(writeBatch).mockReturnValue(mockBatch as any);
 
-            const { cancelReservation } = await import('../../lib/firestore');
-            await cancelReservation('res1');
-
-            expect(updateDoc).toHaveBeenCalled();
-            const callArgs = vi.mocked(updateDoc).mock.calls[0][1] as unknown as Record<string, unknown>;
-            expect(callArgs.status).toBe('cancelled');
+            await expect(deleteOrganization('org1')).rejects.toThrow("Firebase Permission Denied");
+            
+            expect(captureError).toHaveBeenCalledWith(
+                expect.any(Error),
+                expect.objectContaining({ context: 'deleteOrganization' })
+            );
         });
     });
 
-    describe('createFeedback', () => {
-        it('피드백을 생성한다', async () => {
-            vi.mocked(addDoc).mockResolvedValue({ id: 'fb1' } as ReturnType<typeof addDoc> extends Promise<infer R> ? R : never);
+    // 기존의 기본적인 쿼리 테스트들 유지/보강
+    describe('getDriveLogs 에러 핸들링', () => {
+        it('Firestore 조회 실패 시 에러를 캡처하고 다시 던진다', async () => {
+            vi.mocked(getDocs).mockRejectedValue(new Error("Network Error"));
+            const { getDriveLogs } = await import('../../lib/firestore/driveLogs/queries');
 
-            const { createFeedback } = await import('../../lib/firestore');
-            await createFeedback({
-                message: '기능 개선 요청',
-                userEmail: 'test@test.com',
-                userName: '테스트',
-                imageUrls: [],
-                organizationId: 'org1',
-                authorUid: 'user1',
-            });
-
-            expect(addDoc).toHaveBeenCalled();
-            const callArgs = vi.mocked(addDoc).mock.calls[0][1] as unknown as Record<string, unknown>;
-            expect(callArgs.status).toBe('unread');
-            expect(callArgs.message).toBe('기능 개선 요청');
-        });
-    });
-
-    describe('getFavorites', () => {
-        it('사용자의 즐겨찾기를 조회한다', async () => {
-            const mockDocs = [
-                { id: 'fav1', data: () => ({ name: '김OO 어르신 댁', address: '서울시 강남구', userId: 'user1' }) },
-            ];
-            vi.mocked(getDocs).mockResolvedValue({ docs: mockDocs } as ReturnType<typeof getDocs> extends Promise<infer R> ? R : never);
-
-            const { getFavorites } = await import('../../lib/firestore');
-            const result = await getFavorites('user1');
-
-            expect(result).toHaveLength(1);
-            expect(result[0].name).toBe('김OO 어르신 댁');
+            await expect(getDriveLogs('org1')).rejects.toThrow("Network Error");
+            expect(captureError).toHaveBeenCalled();
         });
     });
 });

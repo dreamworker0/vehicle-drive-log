@@ -1,3 +1,4 @@
+import React, { useMemo } from 'react';
 import type { FuelStatsData, HipassStatsData, FirstEmployeeStatsData } from './dashboardUtils';
 import ChartOrgTrend from './ChartOrgTrend';
 import ChartDAU from './ChartDAU';
@@ -54,8 +55,10 @@ interface Props {
     calendarSyncOrgs: number;
 }
 
-export default function DashboardChartSection(props: Props) {
-    return (
+function DashboardChartSection(props: Props) {
+    // 각 차트 컴포넌트가 이미 React.memo를 적용하고 있으므로
+    // 부모인 이 컴포넌트도 React.memo로 감싸 props 변경 없을 때 리렌더링 방지
+    const content = useMemo(() => (
         <>
             <ChartOrgTrend dailyActiveOrgStats={props.dailyActiveOrgStats} />
             <ChartDAU dailyActiveUserStats={props.dailyActiveUserStats} />
@@ -65,17 +68,17 @@ export default function DashboardChartSection(props: Props) {
                 firstEmployeeTrend={props.firstEmployeeTrend}
             />
             <ChartInputMethod inputMethodStats={props.inputMethodStats} />
-            <ChartQuickDrive 
-                quickDriveStats={props.quickDriveStats} 
-                quickDriveRatio={props.quickDriveRatio} 
+            <ChartQuickDrive
+                quickDriveStats={props.quickDriveStats}
+                quickDriveRatio={props.quickDriveRatio}
             />
             <ChartReservationType
                 reservationTypeStats={props.reservationTypeStats}
                 reservationTypeRatio={props.reservationTypeRatio}
             />
-            <ChartRecommendation 
-                recommendationStats={props.recommendationStats} 
-                recommendationRatio={props.recommendationRatio} 
+            <ChartRecommendation
+                recommendationStats={props.recommendationStats}
+                recommendationRatio={props.recommendationRatio}
             />
             <ChartFavoriteDestination
                 favoriteStats={props.favoriteStats}
@@ -92,7 +95,7 @@ export default function DashboardChartSection(props: Props) {
                 hipassRatio={props.hipassRatio}
                 hipassTopOrgs={props.hipassTopOrgs}
             />
-            <ChartCalendarSync 
+            <ChartCalendarSync
                 calendarSyncRatio={props.calendarSyncRatio}
                 calendarTopOrgs={props.calendarTopOrgs}
                 calendarSyncOrgs={props.calendarSyncOrgs}
@@ -104,5 +107,9 @@ export default function DashboardChartSection(props: Props) {
                 dailyHipassAmount={props.dailyHipassAmount}
             />
         </>
-    );
+    ), [props]);
+
+    return content;
 }
+
+export default React.memo(DashboardChartSection);

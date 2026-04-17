@@ -24,14 +24,19 @@ export const generateInviteCode = () => {
 
 // 초대 코드로 기관 찾기
 export const findOrganizationByInviteCode = async (code: string) => {
-    const q = query(
-        collection(db, 'organizations').withConverter(orgConverter),
-        where('inviteCode', '==', code),
-        where('status', '==', 'approved'),
-        limit(1)
-    );
-    const snap = await getDocs(q);
-    return snap.empty ? null : snap.docs[0].data();
+    try {
+        const q = query(
+            collection(db, 'organizations').withConverter(orgConverter),
+            where('inviteCode', '==', code),
+            where('status', '==', 'approved'),
+            limit(1)
+        );
+        const snap = await getDocs(q);
+        return snap.empty ? null : snap.docs[0].data();
+    } catch (error) {
+        captureError(error, { context: 'findOrganizationByInviteCode' });
+        throw error;
+    }
 };
 
 // 초대 코드 재발급
@@ -69,8 +74,13 @@ export const createOrganization = async (data: Partial<Organization>) => {
 
 // 기관 조회
 export const getOrganization = async (orgId: string) => {
-    const snap = await getDoc(doc(db, 'organizations', orgId).withConverter(orgConverter));
-    return snap.exists() ? snap.data() : null;
+    try {
+        const snap = await getDoc(doc(db, 'organizations', orgId).withConverter(orgConverter));
+        return snap.exists() ? snap.data() : null;
+    } catch (error) {
+        captureError(error, { context: 'getOrganization', orgId });
+        throw error;
+    }
 };
 
 // 기관 정보 수정
@@ -146,66 +156,96 @@ export const restoreOrganization = async (orgId: string) => {
 
 // 대기 중 기관 모집 카운트
 export const getPendingOrganizationsCount = async () => {
-    const q = query(
-        collection(db, 'organizations'),
-        where('status', '==', 'pending')
-    );
-    const snap = await getCountFromServer(q);
-    return snap.data().count;
+    try {
+        const q = query(
+            collection(db, 'organizations'),
+            where('status', '==', 'pending')
+        );
+        const snap = await getCountFromServer(q);
+        return snap.data().count;
+    } catch (error) {
+        captureError(error, { context: 'getPendingOrganizationsCount' });
+        throw error;
+    }
 };
 
 // 승인된 기관 모집 카운트
 export const getApprovedOrganizationsCount = async () => {
-    const q = query(
-        collection(db, 'organizations'),
-        where('status', '==', 'approved')
-    );
-    const snap = await getCountFromServer(q);
-    return snap.data().count;
+    try {
+        const q = query(
+            collection(db, 'organizations'),
+            where('status', '==', 'approved')
+        );
+        const snap = await getCountFromServer(q);
+        return snap.data().count;
+    } catch (error) {
+        captureError(error, { context: 'getApprovedOrganizationsCount' });
+        throw error;
+    }
 };
 
 // 대기 중 기관 목록 조회
 export const getPendingOrganizations = async () => {
-    const q = query(
-        collection(db, 'organizations').withConverter(orgConverter),
-        where('status', '==', 'pending'),
-        orderBy('createdAt', 'desc')
-    );
-    const snap = await getDocs(q);
-    return snap.docs.map(d => d.data());
+    try {
+        const q = query(
+            collection(db, 'organizations').withConverter(orgConverter),
+            where('status', '==', 'pending'),
+            orderBy('createdAt', 'desc')
+        );
+        const snap = await getDocs(q);
+        return snap.docs.map(d => d.data());
+    } catch (error) {
+        captureError(error, { context: 'getPendingOrganizations' });
+        throw error;
+    }
 };
 
 // 거절된 기관 목록 조회
 export const getRejectedOrganizations = async () => {
-    const q = query(
-        collection(db, 'organizations').withConverter(orgConverter),
-        where('status', '==', 'rejected'),
-        orderBy('createdAt', 'desc')
-    );
-    const snap = await getDocs(q);
-    return snap.docs.map(d => d.data());
+    try {
+        const q = query(
+            collection(db, 'organizations').withConverter(orgConverter),
+            where('status', '==', 'rejected'),
+            orderBy('createdAt', 'desc')
+        );
+        const snap = await getDocs(q);
+        return snap.docs.map(d => d.data());
+    } catch (error) {
+        captureError(error, { context: 'getRejectedOrganizations' });
+        throw error;
+    }
 };
 
 // 삭제된 기관 목록 조회
 export const getDeletedOrganizations = async () => {
-    const q = query(
-        collection(db, 'organizations').withConverter(orgConverter),
-        where('status', '==', 'deleted'),
-        orderBy('deletedAt', 'desc')
-    );
-    const snap = await getDocs(q);
-    return snap.docs.map(d => d.data());
+    try {
+        const q = query(
+            collection(db, 'organizations').withConverter(orgConverter),
+            where('status', '==', 'deleted'),
+            orderBy('deletedAt', 'desc')
+        );
+        const snap = await getDocs(q);
+        return snap.docs.map(d => d.data());
+    } catch (error) {
+        captureError(error, { context: 'getDeletedOrganizations' });
+        throw error;
+    }
 };
 
 // 승인된 기관 목록 조회
 export const getApprovedOrganizations = async () => {
-    const q = query(
-        collection(db, 'organizations').withConverter(orgConverter),
-        where('status', '==', 'approved'),
-        orderBy('createdAt', 'desc')
-    );
-    const snap = await getDocs(q);
-    return snap.docs.map(d => d.data());
+    try {
+        const q = query(
+            collection(db, 'organizations').withConverter(orgConverter),
+            where('status', '==', 'approved'),
+            orderBy('createdAt', 'desc')
+        );
+        const snap = await getDocs(q);
+        return snap.docs.map(d => d.data());
+    } catch (error) {
+        captureError(error, { context: 'getApprovedOrganizations' });
+        throw error;
+    }
 };
 
 // ========================

@@ -20,9 +20,14 @@ const reservationDoc = (id: string) => doc(db, 'reservations', id).withConverter
 
 // 예약 ID로 단일 조회
 export const getReservationById = async (reservationId: string) => {
-    const snap = await getDoc(reservationDoc(reservationId));
-    if (!snap.exists()) return null;
-    return snap.data() as Reservation;
+    try {
+        const snap = await getDoc(reservationDoc(reservationId));
+        if (!snap.exists()) return null;
+        return snap.data() as Reservation;
+    } catch (error) {
+        captureError(error, { context: 'getReservationById', reservationId });
+        throw error;
+    }
 };
 
 // 예약 생성 (클라이언트 측)
@@ -60,15 +65,20 @@ export const createReservationSafe = async (data: Partial<Reservation>) => {
 
 // 날짜별 예약 목록 조회
 export const getReservations = async (orgId: string, date?: string) => {
-    const constraints = [
-        where('organizationId', '==', orgId),
-    ];
-    if (date) {
-        constraints.push(where('date', '==', date));
+    try {
+        const constraints = [
+            where('organizationId', '==', orgId),
+        ];
+        if (date) {
+            constraints.push(where('date', '==', date));
+        }
+        const q = query(reservationsCollection(), ...constraints);
+        const snap = await getDocs(q);
+        return snap.docs.map(d => d.data() as Reservation);
+    } catch (error) {
+        captureError(error, { context: 'getReservations', orgId, date });
+        throw error;
     }
-    const q = query(reservationsCollection(), ...constraints);
-    const snap = await getDocs(q);
-    return snap.docs.map(d => d.data() as Reservation);
 };
 
 // 예약 실시간 구독
@@ -187,27 +197,37 @@ export const updateReservationStatus = async (
 
 // 오늘 예약 조회 (취소 제외)
 export const getTodayReservations = async (orgId: string, date: string) => {
-    const q = query(
-        reservationsCollection(),
-        where('organizationId', '==', orgId),
-        where('date', '==', date),
-    );
-    const snap = await getDocs(q);
-    return snap.docs
-        .map(d => d.data() as Reservation)
-        .filter(r => r.status !== 'cancelled');
+    try {
+        const q = query(
+            reservationsCollection(),
+            where('organizationId', '==', orgId),
+            where('date', '==', date),
+        );
+        const snap = await getDocs(q);
+        return snap.docs
+            .map(d => d.data() as Reservation)
+            .filter(r => r.status !== 'cancelled');
+    } catch (error) {
+        captureError(error, { context: 'getTodayReservations', orgId, date });
+        throw error;
+    }
 };
 
 // 주간 예약 조회 (취소 제외)
 export const getWeekReservations = async (orgId: string, startDate: string, endDate: string) => {
-    const q = query(
-        reservationsCollection(),
-        where('organizationId', '==', orgId),
-    );
-    const snap = await getDocs(q);
-    return snap.docs
-        .map(d => d.data() as Reservation)
-        .filter(r => r.status !== 'cancelled' && (r.date ?? '') >= startDate && (r.date ?? '') <= endDate);
+    try {
+        const q = query(
+            reservationsCollection(),
+            where('organizationId', '==', orgId),
+        );
+        const snap = await getDocs(q);
+        return snap.docs
+            .map(d => d.data() as Reservation)
+            .filter(r => r.status !== 'cancelled' && (r.date ?? '') >= startDate && (r.date ?? '') <= endDate);
+    } catch (error) {
+        captureError(error, { context: 'getWeekReservations', orgId, startDate, endDate });
+        throw error;
+    }
 };
 
 // 날짜 범위별 예약 조회 (getWeekReservations 별칭)
@@ -216,15 +236,20 @@ export const getReservationsByDateRange = getWeekReservations;
 // groupId로 연속 예약 그룹 조회
 // Firestore Rules가 organizationId 기반 접근 제어를 하므로 orgId 필터 필수
 export const getReservationsByGroupId = async (groupId: string, orgId: string) => {
-    const q = query(
-        reservationsCollection(),
-        where('organizationId', '==', orgId),
-        where('groupId', '==', groupId),
-    );
-    const snap = await getDocs(q);
-    return snap.docs
-        .map(d => d.data() as Reservation)
-        .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    try {
+        const q = query(
+            reservationsCollection(),
+            where('organizationId', '==', orgId),
+            where('groupId', '==', groupId),
+        );
+        const snap = await getDocs(q);
+        return snap.docs
+            .map(d => d.data() as Reservation)
+            .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    } catch (error) {
+        captureError(error, { context: 'getReservationsByGroupId', groupId, orgId });
+        throw error;
+    }
 };
 
 // 연속 예약 그룹 일괄 취소
@@ -260,32 +285,42 @@ export const deleteReservationGroup = async (groupId: string, orgId: string) => 
 // 내 최근 예약 조회 (취소 제외, 최신 순 정렬하여 반환)
 // 복합 인덱스 생성을 피하기 위해 클라이언트 메모리에서 정렬 처리
 export const getMyRecentReservations = async (orgId: string, uid: string, limitCount = 50) => {
-    const q = query(
-        reservationsCollection(),
-        where('organizationId', '==', orgId),
-        where('reservedByUid', '==', uid)
-    );
-    const snap = await getDocs(q);
-    return snap.docs
-        .map(d => d.data() as Reservation)
-        .filter(r => r.status !== 'cancelled')
-        .sort((a, b) => ((b.date || '') + (b.startTime || '')).localeCompare((a.date || '') + (a.startTime || '')))
-        .slice(0, limitCount);
+    try {
+        const q = query(
+            reservationsCollection(),
+            where('organizationId', '==', orgId),
+            where('reservedByUid', '==', uid)
+        );
+        const snap = await getDocs(q);
+        return snap.docs
+            .map(d => d.data() as Reservation)
+            .filter(r => r.status !== 'cancelled')
+            .sort((a, b) => ((b.date || '') + (b.startTime || '')).localeCompare((a.date || '') + (a.startTime || '')))
+            .slice(0, limitCount);
+    } catch (error) {
+        captureError(error, { context: 'getMyRecentReservations', orgId, uid });
+        throw error;
+    }
 };
 
 // ─── 반복(정기) 예약 그룹 관련 ───
 
 // recurringGroupId로 반복 예약 그룹 조회
 export const getReservationsByRecurringGroupId = async (recurringGroupId: string, orgId: string) => {
-    const q = query(
-        reservationsCollection(),
-        where('organizationId', '==', orgId),
-        where('recurringGroupId', '==', recurringGroupId),
-    );
-    const snap = await getDocs(q);
-    return snap.docs
-        .map(d => d.data() as Reservation)
-        .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    try {
+        const q = query(
+            reservationsCollection(),
+            where('organizationId', '==', orgId),
+            where('recurringGroupId', '==', recurringGroupId),
+        );
+        const snap = await getDocs(q);
+        return snap.docs
+            .map(d => d.data() as Reservation)
+            .sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    } catch (error) {
+        captureError(error, { context: 'getReservationsByRecurringGroupId', recurringGroupId, orgId });
+        throw error;
+    }
 };
 
 // 반복 예약 그룹 일괄 취소

@@ -1,4 +1,4 @@
-import { Suspense, useEffect, type ReactNode } from 'react';
+import { Suspense, useEffect, useRef, type ReactNode } from 'react';
 import ConfirmModal from './components/common/ConfirmModal';
 import { useConfirmStore } from './store/useConfirmStore';
 import { useThemeStore } from './store/useThemeStore';
@@ -137,15 +137,37 @@ function AppContent() {
   const { user, userData, loading } = useAuth();
   useOrientationLock();
   const theme = useThemeStore(state => state.theme);
+  const setTheme = useThemeStore(state => state.setTheme);
 
-  // Firestore DB에 사용자의 테마 상태 동기화
+  // Firestore DB <-> 로컬 테마 상태 양방향 동기화
+  const isThemeFirstSynced = useRef(false);
+
   useEffect(() => {
-    if (user && userData && userData.theme !== theme) {
-      updateUser(user.uid, { theme }).catch(err => {
-        console.error('테마 설정 동기화 실패:', err);
-      });
+    if (!user || !userData) {
+      isThemeFirstSynced.current = false;
+      return;
     }
-  }, [user, userData, theme]);
+
+    // 1. 로그인 직후(초기 1회): DB 테마 정보가 있다면 로컬 스토어에 반영
+    if (!isThemeFirstSynced.current && userData.theme) {
+      if (userData.theme !== theme) {
+        setTheme(userData.theme as 'light' | 'dark');
+      }
+      isThemeFirstSynced.current = true;
+      return;
+    }
+
+    // 2. 초기 동기화 이후: 로컬 테마 변경 시 DB에 업데이트
+    if (isThemeFirstSynced.current || !userData.theme) {
+      if (userData.theme !== theme) {
+        updateUser(user.uid, { theme }).catch(err => {
+          console.error('테마 설정 DB 동기화 실패:', err);
+        });
+        // 테마가 없던 사용자가 처음 설정한 경우에도 이후엔 동기화된 것으로 간주
+        if (!isThemeFirstSynced.current) isThemeFirstSynced.current = true;
+      }
+    }
+  }, [user, userData, theme, setTheme]);
 
   // 이메일 링크의 ?code= 파라미터를 localStorage에 저장
   // (Google 로그인 리다이렉트 도메인 횡단 시 sessionStorage 증발 방지)

@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import React, { lazy, Suspense } from 'react';
 import { useToast } from '../../../hooks/useToast';
 import { doc, updateDoc } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -18,17 +18,20 @@ interface Props {
     sortDir: 'asc' | 'desc';
     handleSort: (key: SortKey) => void;
     sortIndicator: (key: SortKey) => React.ReactNode;
+    onRefresh: () => void;
 }
 
-export default function DashboardOrgTable({
+function DashboardOrgTable({
     topOrgs,
     sortedOrgs,
     orgPage,
     setOrgPage,
     handleSort,
     sortIndicator,
+    onRefresh,
 }: Props) {
     const { showToast } = useToast();
+    const [hiddenOrgIds, setHiddenOrgIds] = React.useState<Set<string>>(new Set());
 
     if (!sortedOrgs || sortedOrgs.length === 0) {
         return (
@@ -142,11 +145,11 @@ export default function DashboardOrgTable({
             )}
 
             {/* 좌표 없는 기관 리스트 + 수동 입력 */}
-            {topOrgs.filter(o => o.address && (!o.lat || !o.lng)).length > 0 && (
+            {topOrgs.filter(o => o.address && (!o.lat || !o.lng) && !hiddenOrgIds.has(o.id)).length > 0 && (
                 <div className="glass-card p-5">
                     <div className="flex items-center justify-between mb-4">
                         <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200">
-                            📡 좌표 미등록 기관 ({topOrgs.filter(o => o.address && (!o.lat || !o.lng)).length}개)
+                            📡 좌표 미등록 기관 ({topOrgs.filter(o => o.address && (!o.lat || !o.lng) && !hiddenOrgIds.has(o.id)).length}개)
                         </h2>
                         <button
                             className="px-3 py-1.5 text-xs font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors disabled:opacity-50"
@@ -171,7 +174,7 @@ export default function DashboardOrgTable({
                         </button>
                     </div>
                     <div className="space-y-3">
-                        {topOrgs.filter(o => o.address && (!o.lat || !o.lng)).map(org => (
+                        {topOrgs.filter(o => o.address && (!o.lat || !o.lng) && !hiddenOrgIds.has(o.id)).map(org => (
                             <div key={org.id} className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 bg-surface-50 dark:bg-surface-800 rounded-xl">
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium text-surface-800 dark:text-surface-200 truncate">{org.name}</p>
@@ -195,8 +198,9 @@ export default function DashboardOrgTable({
                                         btn.textContent = '저장 중...';
                                         try {
                                             await updateDoc(doc(db, 'organizations', org.id), { lat, lng });
-                                            btn.textContent = '✅';
-                                            setTimeout(() => window.location.reload(), 1000);
+                                            setHiddenOrgIds(prev => new Set([...prev, org.id]));
+                                            showToast(`${org.name} 좌표가 저장되었습니다.`, 'success');
+                                            onRefresh();
                                         } catch (err: unknown) {
                                             btn.textContent = '❌';
                                             showToast('저장 실패: ' + (err instanceof Error ? err.message : '알 수 없는 오류'), 'error');
@@ -240,3 +244,5 @@ export default function DashboardOrgTable({
         </>
     );
 }
+
+export default React.memo(DashboardOrgTable);

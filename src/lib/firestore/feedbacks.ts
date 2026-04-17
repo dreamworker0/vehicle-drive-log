@@ -26,23 +26,33 @@ export const createFeedback = async (data: CreateFeedbackData) => {
 
 // 읽지 않은 피드백 카운트
 export const getUnreadFeedbacksCount = async () => {
-    const q = query(
-        collection(db, 'feedbacks'),
-        where('status', 'in', ['unread', 'in_progress'])
-    );
-    const snap = await getCountFromServer(q);
-    return snap.data().count;
+    try {
+        const q = query(
+            collection(db, 'feedbacks'),
+            where('status', 'in', ['unread', 'in_progress'])
+        );
+        const snap = await getCountFromServer(q);
+        return snap.data().count;
+    } catch (error) {
+        captureError(error as Error, { context: 'getUnreadFeedbacksCount' });
+        throw error;
+    }
 };
 
 // 전체 피드백 목록 조회
 export const getAllFeedbacks = async (limitCount = 100): Promise<Feedback[]> => {
-    const q = query(
-        collection(db, 'feedbacks'),
-        orderBy('createdAt', 'desc'),
-        limit(limitCount)
-    );
-    const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Feedback);
+    try {
+        const q = query(
+            collection(db, 'feedbacks'),
+            orderBy('createdAt', 'desc'),
+            limit(limitCount)
+        );
+        const snap = await getDocs(q);
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }) as Feedback);
+    } catch (error) {
+        captureError(error as Error, { context: 'getAllFeedbacks' });
+        throw error;
+    }
 };
 
 // 피드백 상태 수정

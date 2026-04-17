@@ -1,3 +1,4 @@
+import React, { useMemo } from 'react';
 import {
     AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid,
     Tooltip, ResponsiveContainer, Cell,
@@ -14,7 +15,7 @@ interface Props {
     orgAvgDuration: { name: string; avg: number }[];
 }
 
-export default function DashboardDriveAnalysis({
+function DashboardDriveAnalysis({
     heatmapData,
     hourlyStats,
     monthlyGrowth,
@@ -22,7 +23,7 @@ export default function DashboardDriveAnalysis({
     hourlyAvgDuration,
     orgAvgDuration,
 }: Props) {
-    return (
+    const content = useMemo(() => (
         <>
             {/* ── 2열 그리드: 피크 시간대 | 기관 증가 추이 ── */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -41,7 +42,7 @@ export default function DashboardDriveAnalysis({
                                         axisLine={{ stroke: '#4b5563' }} interval={1}
                                         tickFormatter={(v: string) => v.replace('시', '')} />
                                     <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false} allowDecimals={false} />
-                            <Tooltip {...tooltipStyle} formatter={tooltipFormatter('건', '출발 건수')} />
+                                    <Tooltip {...tooltipStyle} formatter={tooltipFormatter('건', '출발 건수')} />
                                     <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                                         {hourlyStats.map((entry, idx) => (
                                             <Cell key={idx} fill={entry.count > 0 ? '#8b5cf6' : '#374151'} opacity={entry.count > 0 ? 0.85 : 0.3} />
@@ -74,7 +75,7 @@ export default function DashboardDriveAnalysis({
                                         axisLine={{ stroke: '#4b5563' }}
                                         interval={monthlyGrowth.length > 8 ? Math.ceil(monthlyGrowth.length / 6) : 0} />
                                     <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false} allowDecimals={false} />
-                            <Tooltip {...tooltipStyle} formatter={tooltipFormatter('개', '누적 기관')} />
+                                    <Tooltip {...tooltipStyle} formatter={tooltipFormatter('개', '누적 기관')} />
                                     <Area type="monotone" dataKey="cumulative" stroke="#10b981" strokeWidth={2} fill="url(#colorGrowth)" />
                                 </AreaChart>
                             </ResponsiveContainer>
@@ -172,5 +173,9 @@ export default function DashboardDriveAnalysis({
                 )}
             </div>
         </>
-    );
+    ), [heatmapData, hourlyStats, monthlyGrowth, dailyAvgDuration, hourlyAvgDuration, orgAvgDuration]);
+
+    return content;
 }
+
+export default React.memo(DashboardDriveAnalysis);

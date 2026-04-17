@@ -1,3 +1,4 @@
+import React, { useMemo } from 'react';
 import type { ServiceStats } from './dashboardUtils';
 
 /* ── 통계 카드 ── */
@@ -37,8 +38,8 @@ interface Props {
     stats: ServiceStats;
 }
 
-export default function DashboardOverviewCards({ stats }: Props) {
-    return (
+function DashboardOverviewCards({ stats }: Props) {
+    const content = useMemo(() => (
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
                 label="신청 기관"
@@ -68,5 +69,9 @@ export default function DashboardOverviewCards({ stats }: Props) {
                 color="orange"
             />
         </div>
-    );
+    ), [stats]);
+
+    return content;
 }
+
+export default React.memo(DashboardOverviewCards);

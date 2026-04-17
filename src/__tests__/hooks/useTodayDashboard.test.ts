@@ -59,12 +59,12 @@ import useTodayDashboard, { invalidateDashboardCache } from '../../hooks/useToda
 
 const wrapper = ({ children }: { children: React.ReactNode }) => React.createElement(Suspense, { fallback: null }, children);
 const renderDashboardHook = async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    let utils: any;
+    let result: Record<string, unknown> | undefined;
     await act(async () => {
-        utils = renderHook(() => useTodayDashboard(), { wrapper });
+        result = renderHook(() => useTodayDashboard(), { wrapper }).result as unknown as Record<string, unknown>;
+        await new Promise(resolve => setTimeout(resolve, 50));
     });
-    return utils as { result: { current: Awaited<ReturnType<typeof useTodayDashboard>> } };
+    return { result: result as { current: ReturnType<typeof useTodayDashboard> } };
 };
 
 describe('useTodayDashboard', () => {

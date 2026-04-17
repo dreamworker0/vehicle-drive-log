@@ -1,3 +1,4 @@
+import React, { useMemo } from 'react';
 import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid,
     Tooltip, ResponsiveContainer, Legend,
@@ -13,8 +14,8 @@ interface Props {
     notifTypeStats: { type: string; count: number; color: string }[];
 }
 
-export default function DashboardNotificationStats({ notifSummary, dailyNotifStats, notifTypeStats }: Props) {
-    return (
+function DashboardNotificationStats({ notifSummary, dailyNotifStats, notifTypeStats }: Props) {
+    const content = useMemo(() => (
         <div className="glass-card p-5">
             <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-4">
                 🔔 알림 활용 현황
@@ -122,5 +123,9 @@ export default function DashboardNotificationStats({ notifSummary, dailyNotifSta
                 </div>
             )}
         </div>
-    );
+    ), [notifSummary, dailyNotifStats, notifTypeStats]);
+
+    return content;
 }
+
+export default React.memo(DashboardNotificationStats);

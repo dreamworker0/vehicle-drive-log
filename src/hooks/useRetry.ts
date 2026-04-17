@@ -39,7 +39,7 @@ export default function useRetry({ maxRetries = 2, retryLabel = '재시도' } = 
     const { showToast } = useToast();
     const retryCountRef = useRef(new Map());
     // 안정적인 최신 함수 참조를 위한 ref (순환 참조 방지)
-    const runWithRetryRef = useRef<((key: string, asyncFn: () => Promise<unknown>, opts?: RetryRunOptions) => Promise<unknown>) | null>(null);
+    const runWithRetryRef = useRef<(<T>(key: string, asyncFn: () => Promise<T>, opts?: RetryRunOptions & { useBackoff?: boolean; baseDelayMs?: number }) => Promise<T | undefined>) | null>(null);
 
     /**
      * 비동기 함수를 실행하고, 실패 시 재시도 토스트를 표시한다.
@@ -48,7 +48,7 @@ export default function useRetry({ maxRetries = 2, retryLabel = '재시도' } = 
      * @param {Object} [opts] - 추가 옵션
      * @returns {Promise<*>} asyncFn의 반환값 또는 에러 시 undefined
      */
-    const runWithRetry = useCallback(async (key: string, asyncFn: () => Promise<unknown>, opts: RetryRunOptions & { useBackoff?: boolean; baseDelayMs?: number } = {}) => {
+    const runWithRetry = useCallback(async <T>(key: string, asyncFn: () => Promise<T>, opts: RetryRunOptions & { useBackoff?: boolean; baseDelayMs?: number } = {}): Promise<T | undefined> => {
         try {
             const currentCount = retryCountRef.current.get(key) || 0;
             // 백오프 옵션이 켜져있고 처음 시도가 아니면 지연
@@ -58,9 +58,9 @@ export default function useRetry({ maxRetries = 2, retryLabel = '재시도' } = 
                 await new Promise(res => setTimeout(res, delayMs));
             }
 
-            let result;
+            let result: T;
             if (opts.timeoutMs) {
-                const timeoutPromise = new Promise((_, reject) => {
+                const timeoutPromise = new Promise<never>((_, reject) => {
                     setTimeout(() => reject(new Error('TIMEOUT_ERROR: 요청 시간이 초과되었습니다.')), opts.timeoutMs);
                 });
                 result = await Promise.race([asyncFn(), timeoutPromise]);

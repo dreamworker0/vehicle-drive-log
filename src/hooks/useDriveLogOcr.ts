@@ -8,8 +8,7 @@ import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../lib/firebase';
 import { createFeedback } from '../lib/firestore';
 import imageCompression from 'browser-image-compression';
-
-import type { DriveLogForm } from './useDriveLogForm';
+import type { DriveLogForm } from './driveLogForm/types';
 import type { User as FirebaseUser } from 'firebase/auth';
 
 interface OcrProps {
@@ -81,7 +80,7 @@ export default function useDriveLogOcr({ isElectric, setForm, user, userData, ve
             };
 
             if (result.km != null) {
-                setForm(prev => ({
+                setForm((prev: DriveLogForm) => ({
                     ...prev,
                     endKm: result.km!.toString(),
                     ...(isElectric && result.battery != null ? { batteryEnd: result.battery.toString() } : {}),
