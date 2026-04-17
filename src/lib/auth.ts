@@ -1,19 +1,21 @@
-import { signInWithRedirect, signInWithPopup, signOut, getRedirectResult } from 'firebase/auth';
+import { signInWithPopup, signInWithRedirect, signOut, getRedirectResult } from 'firebase/auth';
 import type { AuthError } from 'firebase/auth';
 import { auth, googleProvider } from './firebase';
+
+const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
 /**
  * Google 로그인.
  *
- * - 프로덕션: signInWithRedirect 사용 (COOP 에러 없는 안정적인 리다이렉트 플로우)
+ * - 프로덕션: signInWithRedirect 사용 (안정적인 리다이렉트 플로우)
  * - 개발 환경(localhost): signInWithPopup 사용
  *   → signInWithRedirect는 authDomain(vehicle-drive-log.web.app)과 localhost 간
  *     cross-origin storage 문제로 인증 상태가 유실됨
  */
 export const signInWithGoogle = async () => {
     try {
-        if (import.meta.env.DEV) {
-            console.info('[Auth] Google 로그인 - signInWithPopup 시도 (개발 환경)');
+        if (isLocalhost) {
+            console.info('[Auth] Google 로그인 - signInWithPopup 시도 (localhost)');
             await signInWithPopup(auth, googleProvider);
         } else {
             console.info('[Auth] Google 로그인 - signInWithRedirect 시도');

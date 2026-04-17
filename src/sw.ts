@@ -16,10 +16,20 @@ import { precacheAndRoute, cleanupOutdatedCaches, createHandlerBoundToURL } from
 import { registerRoute, NavigationRoute } from 'workbox-routing';
 import { CacheFirst, StaleWhileRevalidate } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
-import * as navigationPreload from 'workbox-navigation-preload';
 
-// Navigation Preload 활성화 (초기 로딩 속도 최적화)
-navigationPreload.enable();
+// Navigation Preload 비활성화
+// 이전 버전의 SW에서 활성화된 navigation preload가 브라우저에 남아있으면
+// "preloadResponse settled before respondWith" 경고가 발생합니다.
+// 명시적으로 disable하여 완전히 해제합니다.
+self.addEventListener('activate', (event) => {
+    event.waitUntil(
+        (async () => {
+            if (self.registration.navigationPreload) {
+                await self.registration.navigationPreload.disable();
+            }
+        })()
+    );
+});
 
 // 1. 기존 캐시 정리 및 정적 파일 프리캐싱
 cleanupOutdatedCaches();
