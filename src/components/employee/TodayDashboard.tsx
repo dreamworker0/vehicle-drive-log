@@ -132,34 +132,24 @@ export default function TodayDashboard() {
 
             {/* 예약이 없을 때 안내 */}
             {myReservations.length === 0 && (
-                <div className="glass-card p-4 space-y-4 border border-primary-100 dark:border-primary-900/30">
-                    <div className="flex items-center gap-3">
-                        <span className="w-10 h-10 rounded-full bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center text-lg">💡</span>
-                        <div>
-                            <p className="font-bold text-surface-900 dark:text-surface-100">현재 예정된 운행이 없습니다</p>
-                            <p className="text-xs text-surface-500 mt-0.5">어떤 작업이 필요하신가요?</p>
-                        </div>
-                    </div>
-                    <div className="flex gap-2">
-                        <button
-                            onClick={navigateToQuickDrive}
-                            className="flex-1 btn-primary py-3 rounded-xl font-bold flex items-center justify-center gap-2 shadow-md hover:shadow-lg transition-all"
-                        >
-                            <span className="text-lg">🚀</span>
-                            <div className="text-left">
-                                <div className="text-sm font-bold leading-none">바로 운행</div>
-                                <div className="text-[10px] text-primary-100 font-normal leading-tight mt-0.5">예약없이 지금 타기</div>
+                <div className="glass-card px-5 py-5 border-l-4 border-l-primary-400">
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4 min-w-0 flex-1">
+                            <span className="w-11 h-11 rounded-xl bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center text-lg flex-shrink-0">📋</span>
+                            <div className="min-w-0">
+                                <p className="font-semibold text-surface-800 dark:text-surface-200 text-base">오늘 예약 없음</p>
+                                <p className="text-sm text-surface-500 dark:text-surface-400 mt-0.5">새 예약을 등록해보세요</p>
                             </div>
-                        </button>
+                        </div>
                         <button
                             onClick={navigateToReservations}
-                            className="flex-[0.8] bg-surface-100 hover:bg-surface-200 dark:bg-surface-800 dark:hover:bg-surface-700 text-surface-700 dark:text-surface-200 py-3 rounded-xl font-bold flex items-center justify-center gap-2 transition-all"
+                            className="reservation-cta-btn flex-shrink-0"
                         >
-                            <span className="text-lg text-surface-500">📅</span>
-                            <div className="text-left">
-                                <div className="text-sm font-bold leading-none">일정 예약</div>
-                                <div className="text-[10px] text-surface-500 dark:text-surface-400 font-normal leading-tight mt-0.5">나중 날짜에 타기</div>
-                            </div>
+                            <span className="reservation-cta-glow" />
+                            <span className="relative z-10 flex items-center gap-1.5">
+                                <span>📅</span>
+                                <span>예약</span>
+                            </span>
                         </button>
                     </div>
                 </div>
