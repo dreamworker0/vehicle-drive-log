@@ -97,10 +97,10 @@ describe('buildLogData', () => {
 
 
 
-    it('배터리 값이 빈 문자열이면 null이어야 한다', () => {
+    it('배터리 값이 빈 문자열이면 undefined이어야 한다', () => {
         const result = buildLogData(baseMockForm, baseContext);
-        expect(result.batteryStart).toBeNull();
-        expect(result.batteryEnd).toBeNull();
+        expect(result.batteryStart).toBeUndefined();
+        expect(result.batteryEnd).toBeUndefined();
     });
 
     it('전기차 배터리 값이 있으면 정수로 변환해야 한다', () => {

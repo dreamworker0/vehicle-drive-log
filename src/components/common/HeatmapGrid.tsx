@@ -14,8 +14,8 @@ export default function HeatmapGrid({ data }: HeatmapGridProps) {
     const hours = Array.from({ length: 13 }, (_, i) => i + 6); // 06시~18시 주요 시간만
     const dayOrder = [1, 2, 3, 4, 5, 6, 0]; // 월~금, 토, 일
 
-    const getColor = (count: number) => {
-        if (count === 0) return 'bg-surface-100 dark:bg-surface-800';
+    const getColor = (count: number = 0) => {
+        if (!count) return 'bg-surface-100 dark:bg-surface-800';
         const intensity = Math.min(count / maxCount, 1);
         if (intensity < 0.25) return 'bg-primary-100 dark:bg-primary-900/40';
         if (intensity < 0.5) return 'bg-primary-200 dark:bg-primary-800/60';
@@ -43,8 +43,8 @@ export default function HeatmapGrid({ data }: HeatmapGridProps) {
                         {hours.map(h => (
                             <div
                                 key={h}
-                                className={`flex-1 aspect-square rounded-sm ${getColor(grid[dayIdx][h])} transition-colors cursor-default`}
-                                title={`${DAY_NAMES[dayIdx]} ${h}시: ${grid[dayIdx][h]}건`}
+                                className={`flex-1 aspect-square rounded-sm ${getColor(grid?.[dayIdx]?.[h] ?? 0)} transition-colors cursor-default`}
+                                title={`${DAY_NAMES[dayIdx]} ${h}시: ${grid?.[dayIdx]?.[h] ?? 0}건`}
                             />
                         ))}
                     </div>

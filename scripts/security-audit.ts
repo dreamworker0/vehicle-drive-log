@@ -22,10 +22,11 @@ function runAudit(dir: string, label: string): AuditCounts {
     console.log('─'.repeat(50));
 
     try {
-        const result = execSync('npm audit --json 2>/dev/null', {
+        const result = execSync('npm audit --json', {
             cwd: dir,
             encoding: 'utf-8',
             timeout: 30000,
+            stdio: ['pipe', 'pipe', 'ignore']
         });
 
         const audit = JSON.parse(result);

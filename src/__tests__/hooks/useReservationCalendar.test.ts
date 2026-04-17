@@ -84,9 +84,13 @@ describe('useReservationCalendar', () => {
         vi.clearAllMocks();
     });
 
-    it('초기 상태에서 loading이 true이다', () => {
+    it('초기 상태에서 loading이 true이다', async () => {
         const { result } = renderHook(() => useReservationCalendar());
         expect(result.current.loading).toBe(true);
+
+        await vi.waitFor(() => {
+            expect(result.current.loading).toBe(false);
+        });
     });
 
     it('orgId가 있으면 차량을 로드한다', async () => {

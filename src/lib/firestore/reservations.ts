@@ -48,8 +48,11 @@ export const createReservationSafe = async (data: Record<string, unknown>) => {
         const callable = httpsCallable(functions, 'createReservationSafe', { timeout: 15000 });
         const result = await callable(data);
         return (result.data as { reservationId: string }).reservationId;
-    } catch (error) {
-        captureError(error, { context: 'createReservationSafe', data });
+    } catch (error: any) {
+        // 중복 예약 및 유효성 검사 등 기대되는 비즈니스 로직 에러는 Sentry에 보고하지 않음
+        if (error?.code !== 'functions/already-exists' && error?.code !== 'functions/invalid-argument') {
+            captureError(error, { context: 'createReservationSafe', data });
+        }
         throw error;
     }
 };

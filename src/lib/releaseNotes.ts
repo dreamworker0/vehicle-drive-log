@@ -18,6 +18,14 @@ interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
     {
+        date: '2026-04-17',
+        title: '데이터 안정성 패치 및 버그 수정',
+        items: [
+            { type: 'fixed', text: '과거 기준의 오래된 차량, 운행일지, 예약 데이터가 있을 경우 알림 오류가 발생하거나 빈 화면이 나타나는 문제를 수정했습니다.' },
+            { type: 'improved', text: '일부 입력 항목의 엄격한 유효성 검사를 보다 유연하게 변경하여 구형 데이터 환경에서도 앱이 부드럽게 작동하도록 개선했습니다.' }
+        ]
+    },
+    {
         date: '2026-04-16',
         title: '예약 사용성 증대 & 폼 구조 최적화',
         items: [

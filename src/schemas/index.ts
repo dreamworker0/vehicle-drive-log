@@ -26,7 +26,7 @@ export function createZodConverter<T extends z.ZodObject<any>>(schema: T): Fires
             const parsed = schema.safeParse(data);
             if (!parsed.success) {
                 // 파싱에 실패하더라도 애플리케이션 크래시를 막기 위해 Sentry에 경고성으로만 로깅합니다.
-                captureError(new Error(`[Zod Error] Firestore document parsing failed`), {
+                captureError(new Error(`[Zod] Parsing failed for ${snapshot.ref.path}`), {
                     docId: snapshot.id,
                     path: snapshot.ref.path,
                     errors: parsed.error.format(),
