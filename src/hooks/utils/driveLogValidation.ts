@@ -104,7 +104,7 @@ export function buildLogData(form: DriveLogForm, { orgId, user, userData, select
     const endKm = parseInt(form.endKm);
     const driveTimestamp = buildDriveTimestamp(form.driveDate, form.endTime, form.startTime);
 
-    const rawData = {
+    const cleanData: Record<string, unknown> = {
         organizationId: orgId ? String(orgId) : '',
         vehicleId: form.vehicleId,
         vehicleName: form.vehicleName,
@@ -117,21 +117,31 @@ export function buildLogData(form: DriveLogForm, { orgId, user, userData, select
         endTime: form.endTime || nowTime(),
         startKm,
         endKm,
-        distance: (!isNaN(startKm) && !isNaN(endKm)) ? endKm - startKm : undefined,
-        batteryStart: form.batteryStart && !isNaN(parseInt(form.batteryStart)) ? parseInt(form.batteryStart) : undefined,
-        batteryEnd: form.batteryEnd && !isNaN(parseInt(form.batteryEnd)) ? parseInt(form.batteryEnd) : undefined,
         notes: form.notes.trim(),
         timestamp: driveTimestamp,
         passengerCount: selectedPassengers.length + externalPassengerCount + 1,
         passengerNames: selectedPassengers.map(p => p.name || p.email || ''),
         externalPassengerCount,
-        inputMethod: ocrUsed ? 'ocr' as const : (favoriteUsed ? 'favorite' as const : 'manual' as const),
-        ...(isRetroactive && { isRetroactive: true }),
+        inputMethod: ocrUsed ? 'ocr' : (favoriteUsed ? 'favorite' : 'manual'),
     };
 
-    // undefined 속성 제거 (Firestore 에러 방지)
-    const cleanData = Object.fromEntries(Object.entries(rawData).filter(([, v]) => v !== undefined));
-    return cleanData as Partial<typeof rawData>;
+    if (!isNaN(startKm) && !isNaN(endKm)) {
+        cleanData.distance = endKm - startKm;
+    }
+
+    if (form.batteryStart && !isNaN(parseInt(form.batteryStart))) {
+        cleanData.batteryStart = parseInt(form.batteryStart);
+    }
+
+    if (form.batteryEnd && !isNaN(parseInt(form.batteryEnd))) {
+        cleanData.batteryEnd = parseInt(form.batteryEnd);
+    }
+
+    if (isRetroactive) {
+        cleanData.isRetroactive = true;
+    }
+
+    return cleanData;
 }
 
 /**

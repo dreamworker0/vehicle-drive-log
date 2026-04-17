@@ -17,10 +17,28 @@ import { captureError } from '../sentry';
 
 const driveLogConverter = createZodConverter(driveLogSchema);
 
-const sanitizeUndefined = <T extends Record<string, unknown>>(obj: T): T => {
-    return Object.fromEntries(
-        Object.entries(obj).filter(([, v]) => v !== undefined && !(typeof v === 'number' && isNaN(v)))
-    ) as T;
+const sanitizeUndefined = <T>(obj: T): T => {
+    if (obj === undefined) return undefined as unknown as T;
+    if (obj === null) return null as unknown as T;
+    if (typeof obj !== 'object') return obj;
+    if (Array.isArray(obj)) {
+        return obj.map(sanitizeUndefined).filter(v => v !== undefined) as unknown as T;
+    }
+    if (obj instanceof Date) return obj;
+    // Firebase 특별 객체 (Timestamp, FieldValue 등)
+    if ('toDate' in obj || 'seconds' in obj || 'nanoseconds' in obj || 'isEqual' in obj) {
+        return obj;
+    }
+
+    const result: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(obj)) {
+        const sanitized = sanitizeUndefined(v);
+        // undefined 및 NaN 제외
+        if (sanitized !== undefined && !(typeof sanitized === 'number' && isNaN(sanitized))) {
+            result[k] = sanitized;
+        }
+    }
+    return result as T;
 };
 
 /** 특정 시점 이후에 같은 차량의 운행기록이 존재하는지 확인 */
