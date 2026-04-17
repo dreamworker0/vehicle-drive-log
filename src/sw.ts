@@ -96,25 +96,13 @@ async function processBackgroundSync() {
         return;
     }
 
-    // 2. 창이 모두 닫힌 상태라면 직접 백그라운드에서 실행합니다.
-    // 주의: offlineSyncProcessor → firebase.ts 체인에서 browserLocalPersistence가
-    //       window 객체를 참조하므로 Service Worker 환경에서는 에러가 발생할 수 있습니다.
-    //       이 경우 다음 활성 클라이언트에서 큐를 처리하도록 위임합니다.
-    console.log('[SW] 활성 클라이언트 없음 - 백그라운드에서 직접 큐 처리 시도');
-    try {
-        const { processOfflineQueue } = await import('./lib/offlineSyncProcessor');
-        await processOfflineQueue();
-        console.log('[SW] 백그라운드 오프라인 큐 처리 완료');
-    } catch (err) {
-        // window/document 참조 에러는 SW 환경의 정상적인 제약 — 다음 클라이언트 활성화 시 처리
-        if (err instanceof ReferenceError && (err.message.includes('window') || err.message.includes('document'))) {
-            console.warn('[SW] Service Worker에서 window/document 접근 불가 — 다음 클라이언트 활성화 시 큐 처리 예정');
-            return;
-        }
-        console.error('[SW] 백그라운드 오프라인 큐 처리 실패:', err);
-        // 에러를 던져야 브라우저가 다시 Background Sync를 스케줄링(재시도)합니다.
-        throw err;
-    }
+    // 2. 창이 모두 닫힌 상태라면 다음 클라이언트 활성화 시 처리하도록 재시도를 예약합니다.
+    // offlineSyncProcessor를 import하면 Firebase Auth SDK가 함께 로드되어
+    // window.localStorage를 비동기 polling으로 참조하게 되고, 이는 Service Worker 환경에서
+    // catch할 수 없는 unhandled rejection을 발생시킵니다.
+    // 따라서 SW에서는 직접 큐 처리를 시도하지 않고, 에러를 던져 브라우저가 다음에 재시도하도록 합니다.
+    console.log('[SW] 활성 클라이언트 없음 — 다음 클라이언트 활성화 시 큐 처리 예정 (Background Sync 재시도 예약)');
+    throw new Error('NO_ACTIVE_CLIENT');
 }
 
 // 5. 업데이트 시 새 워커 활성화 메세지 처리
