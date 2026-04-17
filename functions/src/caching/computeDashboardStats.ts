@@ -132,6 +132,11 @@ export async function computeAllDashboardStats(): Promise<void> {
     let totalUsers = 0;
     let adminCount = 0;
     let employeeCount = 0;
+    let darkCount = 0;
+    let lightCount = 0;
+    let noneCount = 0;
+    let welcomeDismissedCount = 0;
+    let welcomeNotDismissedCount = 0;
     const orgHasEmployee = new Set<string>();
 
     userSnap.docs.forEach(doc => {
@@ -140,6 +145,14 @@ export async function computeAllDashboardStats(): Promise<void> {
         totalUsers++;
         if (data.role === "admin") adminCount++;
         else if (data.role === "employee") employeeCount++;
+        
+        if (data.theme === 'dark') darkCount++;
+        else if (data.theme === 'light') lightCount++;
+        else noneCount++;
+
+        if (data.welcomeDismissed === true) welcomeDismissedCount++;
+        else welcomeNotDismissedCount++;
+
         if (data.organizationId) {
             orgHasEmployee.add(data.organizationId);
             if (approvedOrgMap[data.organizationId]) {
@@ -613,6 +626,12 @@ export async function computeAllDashboardStats(): Promise<void> {
         },
         weeklyActiveRate: { active: wauSet.size, total: totalUsers },
         monthlyGrowth,
+        themeStats: { dark: darkCount, light: lightCount, none: noneCount },
+        welcomeStats: {
+            dismissed: welcomeDismissedCount,
+            notDismissed: welcomeNotDismissedCount,
+            rate: totalUsers > 0 ? Math.round((welcomeDismissedCount / totalUsers) * 100) : 0,
+        },
         monthlyStats: {
             monthLabel: `${year}년 ${month + 1}월`,
             logs: monthLogs,

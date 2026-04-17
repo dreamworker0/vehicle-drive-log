@@ -11,6 +11,8 @@ export default function useServiceDashboard() {
     const [stats, setStats] = useState<CachedDashboardStats['monthlyStats'] extends infer _ ? {
         approvedOrgs: number; totalUsers: number; adminCount: number; employeeCount: number;
         totalLogs: number; totalDistance: number; pendingApps: number; calendarSyncOrgs: number;
+        themeStats?: { dark: number; light: number; none: number };
+        welcomeStats?: { dismissed: number; notDismissed: number; rate: number };
     } | null : never>(null);
     const [monthlyStats, setMonthlyStats] = useState<{
         monthLabel: string; logs: number; distance: number; activeUsers: number;
@@ -157,6 +159,8 @@ export default function useServiceDashboard() {
                 totalDistance: s.totalDistance,
                 pendingApps: s.pendingApps,
                 calendarSyncOrgs: s.calendarSyncOrgs,
+                themeStats: s.themeStats,
+                welcomeStats: s.welcomeStats,
             });
             setMonthlyStats(s.monthlyStats);
             setFavoriteUserRatio(s.favoriteUserRatio);

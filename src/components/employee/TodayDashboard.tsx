@@ -5,7 +5,9 @@
  */
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
 import useTodayDashboard from '../../hooks/useTodayDashboard';
+import { updateUser } from '../../lib/firestore';
 import { SkeletonCard, SkeletonBox } from '../common/Skeleton';
 import WelcomeGuide from './WelcomeGuide';
 import ReservationCard from './ReservationCard';
@@ -16,6 +18,7 @@ import type { Reservation } from '../../types/reservation';
 import type { Vehicle } from '../../types/vehicle';
 
 export default function TodayDashboard() {
+    const { user } = useAuth();
     const {
         vehicles, startingId, cancellingId,
         myReservations, weekGrouped, todayLabel,
@@ -34,6 +37,9 @@ export default function TodayDashboard() {
     const dismissWelcome = () => {
         setShowWelcome(false);
         try { localStorage.setItem('employee-welcome-dismissed', 'true'); } catch { /* noop */ }
+        if (user?.uid) {
+            updateUser(user.uid, { welcomeDismissed: true }).catch(console.error);
+        }
     };
 
     return (

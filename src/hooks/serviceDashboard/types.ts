@@ -30,6 +30,8 @@ export interface CachedDashboardStats {
     favoriteUserRatio: { total: number; withFavorite: number; rate: number };
     weeklyActiveRate: { active: number; total: number };
     monthlyGrowth: { month: string; cumulative: number }[];
+    themeStats: { dark: number; light: number; none: number };
+    welcomeStats?: { dismissed: number; notDismissed: number; rate: number };
     monthlyStats: {
         monthLabel: string; logs: number; distance: number; activeUsers: number;
         prevLogs: number; prevDistance: number; prevActiveUsers: number;

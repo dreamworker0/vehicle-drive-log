@@ -15,6 +15,7 @@ export const userSchema = z.object({
     status: z.enum(['active', 'disabled']).optional().catch('active'),
     photoURL: z.string().optional().catch(''),
     phone: z.string().optional().catch(''),
+    welcomeDismissed: z.boolean().optional().catch(undefined),
     createdAt: timestampSchema.optional().catch(undefined),
     disabledAt: timestampSchema.optional().catch(undefined),
     promotedAt: timestampSchema.optional().catch(undefined),

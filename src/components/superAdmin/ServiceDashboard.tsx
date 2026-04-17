@@ -95,6 +95,65 @@ export default function ServiceDashboard() {
             {/* ── 서비스 개요 카드 ── */}
             {stats && <DashboardOverviewCards stats={stats} />}
 
+            {/* ── 테마 사용 현황 ── */}
+            {stats && stats.themeStats && (
+                <div className="glass-card p-5 mb-6">
+                    <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4 flex items-center gap-2">
+                        <span className="text-xl">🌗</span> 전체 테마 사용 현황 (총 {stats.totalUsers}명 대상)
+                    </h2>
+                    <div className="flex flex-col sm:flex-row items-center gap-4 text-sm font-medium">
+                        <div className="flex-1 w-full">
+                            <p className="text-surface-600 dark:text-surface-300 mb-1">
+                                다크 모드 {stats.themeStats.dark}명 ({Math.round((stats.themeStats.dark / (stats.totalUsers || 1)) * 100) || 0}%)
+                            </p>
+                            <div className="w-full bg-surface-200 dark:bg-surface-700 h-2 rounded-full overflow-hidden">
+                                <div className="bg-slate-700 dark:bg-slate-300 h-full rounded-full transition-all duration-500" style={{ width: `${Math.round((stats.themeStats.dark / (stats.totalUsers || 1)) * 100) || 0}%` }} />
+                            </div>
+                        </div>
+                        <div className="flex-1 w-full">
+                            <p className="text-surface-600 dark:text-surface-300 mb-1">
+                                라이트 모드 {stats.themeStats.light + stats.themeStats.none}명 ({Math.round(((stats.themeStats.light + stats.themeStats.none) / (stats.totalUsers || 1)) * 100) || 0}%)
+                            </p>
+                            <div className="w-full bg-surface-200 dark:bg-surface-700 h-2 rounded-full overflow-hidden">
+                                <div className="bg-yellow-400 dark:bg-yellow-500 h-full rounded-full transition-all duration-500" style={{ width: `${Math.round(((stats.themeStats.light + stats.themeStats.none) / (stats.totalUsers || 1)) * 100) || 0}%` }} />
+                            </div>
+                        </div>
+                    </div>
+                    {stats.themeStats.none > 0 && (
+                        <p className="text-xs text-surface-400 mt-3">* 기본 테마 유지 사용자({stats.themeStats.none}명)는 자동 라이트 모드로 간주되어 합산되었습니다.</p>
+                    )}
+                </div>
+            )}
+
+            {/* ── 웰컴(초기 안내) 화면 활용 현황 ── */}
+            {stats && stats.welcomeStats && (
+                <div className="glass-card p-5 mb-6">
+                    <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4 flex items-center gap-2">
+                        <span className="text-xl">👋</span> 웰컴 화면 진입 현황 (총 {stats.welcomeStats.dismissed + stats.welcomeStats.notDismissed}명 대상)
+                    </h2>
+                    <div className="flex flex-col sm:flex-row items-center gap-4 text-sm font-medium">
+                        <div className="flex-1 w-full">
+                            <p className="text-surface-600 dark:text-surface-300 mb-1 flex justify-between">
+                                <span>닫기 완료 (온보딩 달성) {stats.welcomeStats.dismissed}명</span>
+                                <span>{stats.welcomeStats.rate}%</span>
+                            </p>
+                            <div className="w-full bg-surface-200 dark:bg-surface-700 h-2 rounded-full overflow-hidden">
+                                <div className="bg-emerald-500 h-full rounded-full transition-all duration-500" style={{ width: `${stats.welcomeStats.rate}%` }} />
+                            </div>
+                        </div>
+                        <div className="flex-1 w-full">
+                            <p className="text-surface-600 dark:text-surface-300 mb-1 flex justify-between">
+                                <span>닫지 않음 (최초 진입 대기 등) {stats.welcomeStats.notDismissed}명</span>
+                                <span>{100 - stats.welcomeStats.rate}%</span>
+                            </p>
+                            <div className="w-full bg-surface-200 dark:bg-surface-700 h-2 rounded-full overflow-hidden">
+                                <div className="bg-amber-400 h-full rounded-full transition-all duration-500" style={{ width: `${100 - stats.welcomeStats.rate}%` }} />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             {/* ── 월간 운영 지표 ── */}
             {monthlyStats && (
                 <DashboardMonthlyMetrics

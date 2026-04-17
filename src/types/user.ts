@@ -16,6 +16,7 @@ export interface User extends FirestoreDoc {
     status?: 'active' | 'disabled';
     photoURL?: string;
     phone?: string;
+    welcomeDismissed?: boolean;
     createdAt?: TimestampField;
     disabledAt?: TimestampField;
     promotedAt?: TimestampField;
