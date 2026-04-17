@@ -188,8 +188,19 @@ export default function VehicleTimelineBar({
                                         {vRes.map(r => {
                                             const isCompleted = r.status === 'completed';
                                             const isPending = r.status === 'pending';
-                                            const effStart = (isCompleted && r.actualStartTime) ? r.actualStartTime : (r.startTime || '');
-                                            const effEnd = (isCompleted && r.actualEndTime) ? r.actualEndTime : (r.endTime || '');
+
+                                            // completed 상태에서 actualTime이 예약 시간과 2시간 이상 벗어나면
+                                            // 잘못된 완료 처리로 판단하여 원래 예약 시간을 폴백으로 사용
+                                            const isActualValid = (actual: string | undefined, scheduled: string) => {
+                                                if (!actual) return false;
+                                                const diff = Math.abs(timeToMinutes(actual) - timeToMinutes(scheduled));
+                                                return diff <= 120; // 2시간 이내
+                                            };
+
+                                            const effStart = (isCompleted && isActualValid(r.actualStartTime, r.startTime || ''))
+                                                ? r.actualStartTime! : (r.startTime || '');
+                                            const effEnd = (isCompleted && isActualValid(r.actualEndTime, r.endTime || ''))
+                                                ? r.actualEndTime! : (r.endTime || '');
                                             const rStartMin = timeToMinutes(effStart);
                                             const rEndMin = timeToMinutes(effEnd);
                                             
