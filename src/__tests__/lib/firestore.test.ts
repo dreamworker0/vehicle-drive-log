@@ -34,7 +34,7 @@ vi.mock('../../lib/firebase', () => ({
     default: {},
 }));
 
-import { getDocs, query as _query, collection as _collection, where as _where, orderBy as _orderBy, limit as _limit, addDoc, updateDoc, doc as _doc } from 'firebase/firestore';
+import { getDocs, query as _query, collection as _collection, where as _where, orderBy as _orderBy, limit as _limit, addDoc, updateDoc, setDoc, doc as _doc } from 'firebase/firestore';
 
 describe('Firestore 유틸리티 함수', () => {
     beforeEach(() => {
@@ -76,7 +76,7 @@ describe('Firestore 유틸리티 함수', () => {
 
     describe('createDriveLog', () => {
         it('운행일지를 생성한다', async () => {
-            vi.mocked(addDoc).mockResolvedValue({ id: 'newLog1' } as ReturnType<typeof addDoc> extends Promise<infer R> ? R : never);
+            vi.mocked(setDoc).mockResolvedValue(undefined);
 
             const { createDriveLog } = await import('../../lib/firestore');
             const _result = await createDriveLog({
@@ -85,7 +85,7 @@ describe('Firestore 유틸리티 함수', () => {
                 organizationId: 'org1',
             });
 
-            expect(addDoc).toHaveBeenCalled();
+            expect(setDoc).toHaveBeenCalled();
         });
     });
 

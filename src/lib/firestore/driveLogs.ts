@@ -2,8 +2,8 @@
  * Firestore — 운행일지 (Drive Logs) 관련 함수
  */
 import {
-    doc, updateDoc, deleteDoc, getDoc,
-    collection, query, where, getDocs, addDoc,
+    doc, updateDoc, deleteDoc, getDoc, setDoc,
+    collection, query, where, getDocs,
     orderBy, limit, serverTimestamp, getCountFromServer, Timestamp, increment,
     type QueryConstraint,
     type DocumentData,
@@ -25,16 +25,23 @@ const sanitizeUndefined = <T>(obj: T): T => {
         return obj.map(sanitizeUndefined).filter(v => v !== undefined) as unknown as T;
     }
     if (obj instanceof Date) return obj;
+    
+    const objRecord = obj as Record<string, unknown>;
     // Firebase 특별 객체 (Timestamp, FieldValue 등)
-    if ('toDate' in obj || 'seconds' in obj || 'nanoseconds' in obj || 'isEqual' in obj) {
+    if (typeof objRecord.toDate === 'function' || 
+        typeof objRecord.isEqual === 'function' || 
+        ('seconds' in objRecord && 'nanoseconds' in objRecord)) {
         return obj;
     }
 
     const result: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(obj)) {
+        // 명시적으로 undefined 및 NaN 제외
+        if (v === undefined) continue;
+        if (typeof v === 'number' && Number.isNaN(v)) continue;
+        
         const sanitized = sanitizeUndefined(v);
-        // undefined 및 NaN 제외
-        if (sanitized !== undefined && !(typeof sanitized === 'number' && isNaN(sanitized))) {
+        if (sanitized !== undefined && !(typeof sanitized === 'number' && Number.isNaN(sanitized))) {
             result[k] = sanitized;
         }
     }
@@ -115,7 +122,7 @@ export const createDriveLog = async (data: Partial<DriveLog>) => {
         const docRef = doc(collection(db, 'driveLogs'));
         const expiresAt = new Date(Date.now() + 5 * 365 * 24 * 60 * 60 * 1000); // TTL: 5 years
         const finalData = sanitizeUndefined({ ...data, createdAt: serverTimestamp(), expiresAt });
-        const promise = addDoc(collection(db, 'driveLogs'), finalData);
+        const promise = setDoc(docRef, finalData);
 
         if (isOffline) {
             import('../offlineSync').then(({ queueOfflineAction }) => queueOfflineAction('CREATE_DRIVELOG', { ...data, id: docRef.id })).catch(() => console.warn('[offlineSync] CREATE_DRIVELOG 큐잉 실패'));

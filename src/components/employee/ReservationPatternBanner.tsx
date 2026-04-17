@@ -107,9 +107,9 @@ export default function ReservationPatternBanner() {
                                     </div>
                                     <button
                                         onClick={() => handleQuickReserve(rec)}
-                                        className="relative z-10 inline-flex items-center justify-center shrink-0 min-w-[60px] px-3 py-1.5 text-xs font-semibold text-white transition-colors rounded-lg bg-primary-600 hover:bg-primary-700 whitespace-nowrap"
+                                        className="relative z-10 inline-flex items-center justify-center shrink-0 min-w-[65px] px-2.5 py-1.5 text-[11px] font-bold text-white transition-colors rounded-lg bg-primary-600 hover:bg-primary-700 whitespace-nowrap"
                                     >
-                                        예약
+                                        + 미리예약
                                     </button>
                                 </div>
                             );
