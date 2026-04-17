@@ -34,10 +34,10 @@ export default function LoginPage() {
         }
     };
 
-    /** 공유할 URL 획득 (초대 코드가 세션에 있으면 복원) */
+    /** 공유할 URL 획득 (초대 코드가 로컬스토리지에 있으면 복원) */
     const getShareUrl = () => {
         const url = new URL(window.location.href);
-        const code = sessionStorage.getItem('pendingInviteCode');
+        const code = localStorage.getItem('pendingInviteCode');
         if (code) {
             url.searchParams.set('code', code);
         }

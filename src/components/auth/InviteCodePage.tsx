@@ -14,13 +14,13 @@ export default function InviteCodePage() {
     const navigate = useNavigate();
     const autoSubmitDone = useRef(false);
 
-    // sessionStorage에서 초대 코드 자동 입력
+    // localStorage에서 초대 코드 자동 입력 (리다이렉트 초기화 방지)
     useEffect(() => {
-        const savedCode = sessionStorage.getItem('pendingInviteCode');
+        const savedCode = localStorage.getItem('pendingInviteCode');
         if (savedCode && !autoSubmitDone.current) {
             const cleaned = savedCode.replace(/\s/g, '').toUpperCase().slice(0, 6);
             setCode(cleaned);
-            sessionStorage.removeItem('pendingInviteCode');
+            localStorage.removeItem('pendingInviteCode');
         }
     }, []);
 
@@ -134,7 +134,7 @@ export default function InviteCodePage() {
                                 <p className="text-sm text-amber-800 dark:text-amber-200 mb-3 font-medium">안전한 사용을 위해 로그인이 필요합니다.</p>
                                 <button
                                     onClick={() => {
-                                        if (code) sessionStorage.setItem('pendingInviteCode', code);
+                                        if (code) localStorage.setItem('pendingInviteCode', code);
                                         logout().then(() => navigate('/login'));
                                     }}
                                     className="btn-primary w-full shadow-sm text-sm"

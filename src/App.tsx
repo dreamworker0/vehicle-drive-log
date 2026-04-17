@@ -136,13 +136,13 @@ function AppContent() {
   const { userData, loading } = useAuth();
   useOrientationLock();
 
-  // 이메일 링크의 ?code= 파라미터를 sessionStorage에 저장
-  // (Google 로그인 리다이렉트 후에도 코드 유지)
+  // 이메일 링크의 ?code= 파라미터를 localStorage에 저장
+  // (Google 로그인 리다이렉트 도메인 횡단 시 sessionStorage 증발 방지)
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('code');
     if (code) {
-      sessionStorage.setItem('pendingInviteCode', code.toUpperCase());
+      localStorage.setItem('pendingInviteCode', code.toUpperCase());
       params.delete('code');
       const newUrl = params.toString()
         ? `${window.location.pathname}?${params}`
