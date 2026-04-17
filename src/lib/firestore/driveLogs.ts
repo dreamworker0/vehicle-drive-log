@@ -17,6 +17,10 @@ import { captureError } from '../sentry';
 
 const driveLogConverter = createZodConverter(driveLogSchema);
 
+const sanitizeUndefined = <T extends Record<string, unknown>>(obj: T): T => {
+    return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T;
+};
+
 /** 특정 시점 이후에 같은 차량의 운행기록이 존재하는지 확인 */
 const hasLaterDriveLog = async (orgId: string, vehicleId: string, afterTimestamp: Date) => {
     const q = query(
@@ -90,7 +94,7 @@ export const createDriveLog = async (data: Partial<DriveLog>) => {
         // Use a deterministic generated ID for offline idempotency
         const docRef = doc(collection(db, 'driveLogs'));
         const expiresAt = new Date(Date.now() + 5 * 365 * 24 * 60 * 60 * 1000); // TTL: 5 years
-        const finalData = { ...data, createdAt: serverTimestamp(), expiresAt };
+        const finalData = sanitizeUndefined({ ...data, createdAt: serverTimestamp(), expiresAt });
         const promise = addDoc(collection(db, 'driveLogs'), finalData);
 
         if (isOffline) {
@@ -358,7 +362,7 @@ export const getMyDriveLogs = async (orgId: string, uid: string, limitCount = 30
 export const updateDriveLog = async (logId: string, data: Partial<DriveLog>) => {
     try {
         const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
-        const finalData = { ...data, editedAt: serverTimestamp() };
+        const finalData = sanitizeUndefined({ ...data, editedAt: serverTimestamp() });
         const promise = updateDoc(doc(db, 'driveLogs', logId), finalData);
 
         if (isOffline) {

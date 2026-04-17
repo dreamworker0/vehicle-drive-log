@@ -9,7 +9,7 @@ test.describe('핵심 워크플로우 E2E 테스트', () => {
 
         // TODO: UI 모드에서 실제 DOM locator (예: button[name="new-reservation"]) 추가 시 적용
         // 임시로 랜딩 페이지 진입 보장 체크만 삽입 (초기 스켈레톤)
-        await expect(page).toHaveTitle(/차량운행일지/);
+        await expect(page).toHaveTitle(/차량 운행일지/);
 
         // 2. 사용자가 예약 폼 접속 및 제출 (출/퇴근, 혹은 업무 등)
         /*
