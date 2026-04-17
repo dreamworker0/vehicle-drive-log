@@ -32,6 +32,7 @@ func_logs*.txt
 # Build / lint / analysis temp output
 build-*.txt
 build_*.txt
+eslint-errors*
 lint_*.txt
 lint-result.*
 lint-results*
@@ -43,6 +44,7 @@ git_log*.txt
 reflog.txt
 test-output.txt
 tsc-*.txt
+tsc.log
 # Firebase
 .firebase/
 *-adminsdk-*.json

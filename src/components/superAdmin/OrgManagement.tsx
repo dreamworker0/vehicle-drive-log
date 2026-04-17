@@ -88,7 +88,7 @@ export default function OrgManagement() {
         });
     }, [membersMap, loadMembers]);
 
-    const handleDelete = async (org: Organization) => {
+    const handleDelete = useCallback(async (org: Organization) => {
         if (!await confirm({ message: `${org.name} 기관을 삭제하시겠습니까?\n\n• 30일 내 복구 가능합니다.\n• 소속 직원은 기능 접근이 차단됩니다.`, confirmColor: 'danger' })) return;
         try {
             await deleteOrganization(org.id);
@@ -98,7 +98,7 @@ export default function OrgManagement() {
             console.error('삭제 실패:', err);
             showToast('삭제에 실패했습니다.', 'error');
         }
-    };
+    }, [confirm, showToast]);
 
     const handleRestore = async (org: Organization) => {
         if (!await confirm({ message: `${org.name} 기관을 복구하시겠습니까?` })) return;
@@ -128,7 +128,7 @@ export default function OrgManagement() {
         }
     };
 
-    const handleRoleChange = async (member: OrgMember, orgId: string, newRole: string) => {
+    const handleRoleChange = useCallback(async (member: OrgMember, orgId: string, newRole: string) => {
         if (member.role === newRole) return;
         const roleLabel = newRole === 'admin' ? '기관관리자' : '직원';
         if (!await confirm({ message: `${member.name || member.email}의 역할을 "${roleLabel}"(으)로 변경하시겠습니까?` })) return;
@@ -148,9 +148,9 @@ export default function OrgManagement() {
         } finally {
             setChangingRole(null);
         }
-    };
+    }, [confirm, showToast]);
 
-    const handleRemoveMember = async (member: OrgMember, orgId: string) => {
+    const handleRemoveMember = useCallback(async (member: OrgMember, orgId: string) => {
         if (!await confirm({ message: `${member.name || member.email || '이 사용자'}를 기관에서 제거하시겠습니까?\n\n제거된 사용자는 초대 코드를 통해 다시 가입할 수 있습니다.`, confirmColor: 'danger' })) return;
         try {
             await leaveOrganization(member.id);
@@ -163,9 +163,9 @@ export default function OrgManagement() {
             console.error('직원 제거 실패:', err);
             showToast('직원 제거에 실패했습니다.', 'error');
         }
-    };
+    }, [confirm, showToast]);
 
-    const handleEditOrg = async (orgId: string, updates: { name: string; address: string }) => {
+    const handleEditOrg = useCallback(async (orgId: string, updates: { name: string; address: string }) => {
         try {
             await updateOrganization(orgId, updates as Record<string, unknown>);
             setOrganizations(prev => prev.map(o =>
@@ -177,9 +177,9 @@ export default function OrgManagement() {
             showToast('기관 정보 수정에 실패했습니다.', 'error');
             throw err;
         }
-    };
+    }, [showToast]);
 
-    const handleRestoreUser = async (email: string, orgId: string, name: string) => {
+    const handleRestoreUser = useCallback(async (email: string, orgId: string, name: string) => {
         if (!await confirm({ message: `${email} 계정을 복원하시겠습니까?\n\n• Auth 계정이 다시 활성화됩니다.\n• 이 기관의 직원으로 복원됩니다.` })) return;
         try {
             const restoreUser = httpsCallable(getFunctions(undefined, 'asia-northeast3'), 'restoreUser');
@@ -197,7 +197,7 @@ export default function OrgManagement() {
             showToast(msg, 'error');
             throw err;
         }
-    };
+    }, [confirm, showToast]);
 
     if (loading) {
         return (

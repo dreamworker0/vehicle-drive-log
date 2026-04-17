@@ -4,13 +4,13 @@ import { ORG_PAGE_SIZE } from './dashboard/dashboardUtils';
 import {
     DashboardOverviewCards,
     DashboardMonthlyMetrics,
-    DashboardNotificationStats,
     DashboardOrgTable,
 } from './dashboard';
 
 const DashboardFunnelChart = lazy(() => import('./dashboard/DashboardFunnelChart'));
 const DashboardChartSection = lazy(() => import('./dashboard/DashboardChartSection'));
 const DashboardDriveAnalysis = lazy(() => import('./dashboard/DashboardDriveAnalysis'));
+const DashboardNotificationStats = lazy(() => import('./dashboard/DashboardNotificationStats'));
 
 /**
  * 슈퍼관리자 운영 대시보드
@@ -217,11 +217,17 @@ export default function ServiceDashboard() {
 
             {/* ── 알림 활용 현황 ── */}
             {notifSummary && (
-                <DashboardNotificationStats
-                    notifSummary={notifSummary}
-                    dailyNotifStats={dailyNotifStats}
-                    notifTypeStats={notifTypeStats}
-                />
+                <Suspense fallback={
+                    <div className="flex items-center justify-center py-10 text-surface-400">
+                        <div className="w-6 h-6 spinner" />
+                    </div>
+                }>
+                    <DashboardNotificationStats
+                        notifSummary={notifSummary}
+                        dailyNotifStats={dailyNotifStats}
+                        notifTypeStats={notifTypeStats}
+                    />
+                </Suspense>
             )}
 
             {/* ── 기관 활성도 테이블 + 지도 ── */}

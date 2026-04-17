@@ -1,12 +1,13 @@
 /**
  * useTodayDashboard — 오늘의 운행 대시보드 상태 + 로직
  * TodayDashboard에서 추출된 커스텀 훅
+ *
+ * 리팩토링: Mutation 핸들러 → useDashboardActions 분리
  */
+/* eslint-disable react-compiler/react-compiler */
 import { useState, useMemo, use } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { useAuth } from './useAuth';
-import { useToast } from './useToast';
-import { getVehicles, getTodayReservations, getWeekReservations, updateReservationStatus, cancelReservation, getMyDriveLogs } from '../lib/firestore';
+import { getVehicles, getTodayReservations, getWeekReservations, getMyDriveLogs } from '../lib/firestore';
 import { toLocalDateStr } from '../lib/dateUtils';
 import { auth as firebaseAuth } from '../lib/firebase';
 import { refreshTokenSilently } from '../lib/tokenRefresh';
@@ -14,21 +15,11 @@ import type { Vehicle } from '../types/vehicle';
 import { isVehicleBlocked } from '../lib/vehicleUtils';
 import type { Reservation, ReservationStatus } from '../types/reservation';
 import type { FuelLog } from '../types/fuelLog';
+import useDashboardActions from './useDashboardActions';
 
 const EMPTY_VEHICLES: Vehicle[] = [];
 const EMPTY_RESERVATIONS: Reservation[] = [];
 const EMPTY_LOGS: FuelLog[] = [];
-const clearDrivingNotification = async (resId?: string) => {
-    if (!resId || !('Notification' in window)) return;
-    try {
-        const reg = await navigator.serviceWorker?.ready;
-        if (!reg) return;
-        const notifications = await reg.getNotifications({ tag: `driving-${resId}` });
-        notifications.forEach(n => n.close());
-    } catch {
-        // 무시
-    }
-};
 
 // React 19 Suspense 데이터 캐시
 let globalDashboardCache: { key: string, promise: Promise<unknown>, data?: unknown } | null = null;
@@ -60,10 +51,9 @@ function getDashboardData(orgId: string, uid: string, todayStr: string, weekEndD
         if (errCode === 'permission-denied') {
             if (firebaseAuth.currentUser) {
                 await refreshTokenSilently(firebaseAuth.currentUser);
-                // 재시도 캐시 교체는 생략하나, 재호출 트리거됨
             }
         }
-        globalDashboardCache = null; // 실패 시 초기화
+        globalDashboardCache = null;
         throw err;
     });
 
@@ -73,12 +63,7 @@ function getDashboardData(orgId: string, uid: string, todayStr: string, weekEndD
 
 export default function useTodayDashboard() {
     const { user, userData } = useAuth();
-    const navigate = useNavigate();
-    const { showToast } = useToast();
     
-    const [startingId, setStartingId] = useState<string | null>(null);
-    const [cancellingId, setCancellingId] = useState<string | null>(null);
-
     // 서버 데이터 업데이트(Mutations) 후 UI 동기화를 위한 로컬 오버라이드 상태
     const [localCancelledIds, setLocalCancelledIds] = useState<Set<string>>(new Set());
     const [localStartedIds, setLocalStartedIds] = useState<Map<string, string>>(new Map());
@@ -189,7 +174,6 @@ export default function useTodayDashboard() {
         const twoHoursLater = nowMin + 120;
 
         const candidates = vehicles.filter(v => !isVehicleBlocked(v.maintenance) && !v.retired?.isRetired).map(v => {
-            // 해당 차량의 오늘 예약 중 취소/완료 아닌 것
             const vReservations = todayReservations
                 .filter(r => r.vehicleId === v.id && r.status !== 'completed' && r.status !== 'cancelled')
                 .map(r => {
@@ -199,13 +183,11 @@ export default function useTodayDashboard() {
                 })
                 .sort((a, b) => a.startMin - b.startMin);
 
-            // 현재 진행 중이거나 2시간 이내 시작 예약이 있으면 제외
             const hasNearReservation = vReservations.some(r =>
                 r.startMin <= twoHoursLater && r.endMin > nowMin
             );
             if (hasNearReservation) return null;
 
-            // 다음 예약까지 남은 시간(분)
             const nextReservation = vReservations.find(r => r.startMin > nowMin);
             const minutesUntilNext = nextReservation
                 ? nextReservation.startMin - nowMin
@@ -217,99 +199,12 @@ export default function useTodayDashboard() {
         }).filter(Boolean);
 
         if (candidates.length === 0) return null;
-        // 정렬: 사용 빈도 높은 순 → 동률이면 여유시간 긴 순
         return candidates.sort((a, b) => {
             const freqDiff = (b?.usageCount ?? 0) - (a?.usageCount ?? 0);
             if (freqDiff !== 0) return freqDiff;
             return (b?.minutesUntilNext ?? 0) - (a?.minutesUntilNext ?? 0);
         })[0];
     }, [vehicles, todayReservations, vehicleUsageCounts]);
-
-    // 클라이언트 로컬 알림 표시 (운행 시작 후 외부 앱에서 복귀 유도)
-    const showDrivingNotification = async (reservation: Reservation) => {
-        if (!('Notification' in window) || Notification.permission !== 'granted') return;
-        try {
-            const reg = await navigator.serviceWorker?.ready;
-            reg?.showNotification('🚗 운행 중', {
-                body: `${reservation.vehicleName || '차량'} 운행 중${reservation.destination ? ' · ' + reservation.destination : ''} — 탭하여 운행일지 작성`,
-                icon: '/icons/icon-192.png',
-                badge: '/icons/icon-192.png',
-                tag: `driving-${reservation.id}`,
-                data: { click_action: `${window.location.origin}/employee/drive-log?reservationId=${reservation.id}` },
-                requireInteraction: true,
-            } as NotificationOptions);
-        } catch { /* 알림 실패 무시 */ }
-    };
-
-    const handleStartDrive = async (reservation: Reservation) => {
-        setStartingId(reservation.id);
-        try {
-            const now = new Date();
-            const actualStartTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-            await updateReservationStatus(reservation.id, 'in_progress', { actualStartTime });
-            
-            setLocalStartedIds(prev => new Map(prev).set(reservation.id, actualStartTime));
-            invalidateDashboardCache();
-            showDrivingNotification(reservation);
-        } catch (err) {
-            console.error('운행 시작 실패:', err);
-            showToast('운행 시작에 실패했습니다.', 'error');
-        } finally {
-            setStartingId(null);
-        }
-    };
-
-    const handleStartNavigation = async (reservation: Reservation, app = 'tmap') => {
-        setStartingId(reservation.id);
-        try {
-            const now = new Date();
-            const actualStartTime = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
-            await updateReservationStatus(reservation.id, 'in_progress', { actualStartTime });
-            
-            setLocalStartedIds(prev => new Map(prev).set(reservation.id, actualStartTime));
-            invalidateDashboardCache();
-            showDrivingNotification(reservation);
-
-            const destination = reservation.destination || '';
-            const navUrl = await (await import('../lib/tmap')).getNavigationDeeplink(app, destination);
-            window.location.href = navUrl;
-        } catch (err) {
-            console.error('운행 시작 실패:', err);
-            showToast('운행 시작에 실패했습니다.', 'error');
-        } finally {
-            setStartingId(null);
-        }
-    };
-
-    const handleCancelWeekReservation = async (reservation: Reservation) => {
-        setCancellingId(reservation.id);
-        try {
-            await cancelReservation(reservation.id);
-            setLocalCancelledIds(prev => new Set(prev).add(reservation.id));
-            invalidateDashboardCache();
-            await clearDrivingNotification(reservation.id);
-        } catch (err) {
-            console.error('예약 취소 실패:', err);
-            showToast('예약 취소에 실패했습니다.', 'error');
-        } finally {
-            setCancellingId(null);
-        }
-    };
-
-    const handleCancelTodayReservation = async (reservation: Reservation) => {
-        setCancellingId(reservation.id);
-        try {
-            await cancelReservation(reservation.id);
-            setLocalCancelledIds(prev => new Set(prev).add(reservation.id));
-            invalidateDashboardCache();
-            await clearDrivingNotification(reservation.id);
-        } catch (err) {
-            console.error('예약 취소 실패:', err);
-            showToast('예약 취소에 실패했습니다.', 'error');
-        } finally {
-            setCancellingId(null);
-        }
-    };
 
     // 자주 타는 차량 정렬 (첫 번째 차량 추출용)
     const sortedActiveVehicles = useMemo(() => {
@@ -324,34 +219,18 @@ export default function useTodayDashboard() {
 
     const firstVehicleId = sortedActiveVehicles.length > 0 ? sortedActiveVehicles[0].id : undefined;
 
-    const navigateToArrival = (res: Reservation) => {
-        const vehicle = vehicles.find(v => v.id === res.vehicleId);
-        navigate('/employee/drive-log', {
-            state: {
-                reservationId: res.id,
-                vehicleId: res.vehicleId,
-                vehicleName: res.vehicleName,
-                purpose: res.purpose || '',
-                destination: res.destination || '',
-                currentKm: vehicle?.currentKm || 0,
-                vehicleType: vehicle?.vehicleType || '',
-                fuelType: vehicle?.fuelType || '',
-                actualStartTime: res.actualStartTime || '',
-            },
-        });
-    };
-
-    const navigateToReservations = () => {
-        navigate('/employee/reservations', { state: { openForm: true, defaultVehicleId: firstVehicleId } });
-    };
-
-    const navigateToQuickDrive = () => {
-        navigate('/employee/quick-drive', {
-            state: {
-                recommendedVehicleId: firstVehicleId || null,
-            },
-        });
-    };
+    // 4. Mutation 핸들러 (분리된 훅 사용)
+    const {
+        startingId, cancellingId,
+        handleStartDrive, handleStartNavigation,
+        handleCancelReservation,
+        navigateToArrival, navigateToReservations, navigateToQuickDrive,
+    } = useDashboardActions({
+        vehicles,
+        firstVehicleId,
+        setLocalStartedIds,
+        setLocalCancelledIds,
+    });
 
     const todayLabel = useMemo(() =>
         new Date().toLocaleDateString('ko-KR', {
@@ -364,7 +243,9 @@ export default function useTodayDashboard() {
         myReservations, weekGrouped, todayLabel,
         upcomingAlerts, incompleteAlerts, hasActiveDrive,
         handleStartDrive, handleStartNavigation,
-        handleCancelWeekReservation, handleCancelTodayReservation,
+        // 통합된 취소 핸들러 (기존 두 개 유지 → 동일 함수 참조)
+        handleCancelWeekReservation: handleCancelReservation,
+        handleCancelTodayReservation: handleCancelReservation,
         navigateToArrival, navigateToReservations, navigateToQuickDrive,
         recommendedVehicle, myLogsCount: myLogs.length,
     };

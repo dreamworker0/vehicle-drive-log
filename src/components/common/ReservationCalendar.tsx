@@ -2,6 +2,7 @@
  * ReservationCalendar — 차량 예약 캘린더
  * 로직은 useReservationCalendar 훅으로 분리, UI는 CalendarGrid + ReservationSidePanel 사용
  */
+import { useCallback } from 'react';
 import useReservationCalendar from '../../hooks/useReservationCalendar';
 import useVehiclePriority from '../../hooks/useVehiclePriority';
 import { useReservationPattern } from '../../hooks/useReservationPattern';
@@ -34,6 +35,11 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
     } = useReservationCalendar({ isAdmin });
     const { usageCounts } = useVehiclePriority();
     const { recentDestinations } = useReservationPattern();
+
+    const handleSlotClick = useCallback((vehicleId: string, startTime: string, endTime: string) => {
+        setForm(prev => ({ ...prev, vehicleId, startTime, endTime }));
+        setShowForm(true);
+    }, [setForm, setShowForm]);
 
     if (loading) {
         return (
@@ -103,10 +109,7 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
                         holidays={holidays}
                         allReservations={reservations}
                         editingRecurringGroupId={editingRecurringGroupId}
-                        onSlotClick={(vehicleId: string, startTime: string, endTime: string) => {
-                            setForm(prev => ({ ...prev, vehicleId, startTime, endTime }));
-                            setShowForm(true);
-                        }}
+                        onSlotClick={handleSlotClick}
                     />
                 </div>
             </div>

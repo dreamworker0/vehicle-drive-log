@@ -1,7 +1,7 @@
 /**
  * ReservationTabContent - 탭 네비게이션 + 예약내역/운행완료 콘텐츠
  */
-import React from 'react';
+import React, { memo } from 'react';
 import VehicleTimelineBar from '../VehicleTimelineBar';
 import type { Vehicle } from '../../../types/vehicle';
 import type { Reservation } from '../../../types/reservation';
@@ -23,7 +23,7 @@ interface ReservationTabContentProps {
     setShowForm: (show: boolean) => void;
 }
 
-export default function ReservationTabContent({
+export default memo(function ReservationTabContent({
     sideTab,
     setSideTab,
     activeRes,
@@ -152,4 +152,4 @@ export default function ReservationTabContent({
             )}
         </>
     );
-}
+});
