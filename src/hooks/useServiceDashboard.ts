@@ -28,6 +28,10 @@ export default function useServiceDashboard() {
     const [recommendationStats, setRecommendationStats] = useState<{ date: string; recommendation: number; normal: number }[]>([]);
     const [recommendationRatio, setRecommendationRatio] = useState<{ total: number; recommendation: number; normal: number; rate: number }>({ total: 0, recommendation: 0, normal: 0, rate: 0 });
 
+    // 예약 유형별(하루/다일/반복) 통계
+    const [reservationTypeStats, setReservationTypeStats] = useState<{ date: string; single: number; multiDay: number; recurring: number }[]>([]);
+    const [reservationTypeRatio, setReservationTypeRatio] = useState<{ total: number; single: number; multiDay: number; recurring: number; singleRate: number; multiDayRate: number; recurringRate: number }>({ total: 0, single: 0, multiDay: 0, recurring: 0, singleRate: 0, multiDayRate: 0, recurringRate: 0 });
+
     // 목적지 즐겨찾기 통계
     const [favoriteUserRatio, setFavoriteUserRatio] = useState<{ total: number; withFavorite: number; rate: number }>({ total: 0, withFavorite: 0, rate: 0 });
     const [favoriteLogRatio, setFavoriteLogRatio] = useState<{ total: number; favorite: number; normal: number; rate: number }>({ total: 0, favorite: 0, normal: 0, rate: 0 });
@@ -194,6 +198,8 @@ export default function useServiceDashboard() {
             if (ts.quickDriveRatio) setQuickDriveRatio(ts.quickDriveRatio);
             if (ts.recommendationStats) setRecommendationStats(ts.recommendationStats);
             if (ts.recommendationRatio) setRecommendationRatio(ts.recommendationRatio);
+            if (ts.reservationTypeStats) setReservationTypeStats(ts.reservationTypeStats);
+            if (ts.reservationTypeRatio) setReservationTypeRatio(ts.reservationTypeRatio);
         }
 
         if (orgRankingsSnap.exists()) {
@@ -305,6 +311,8 @@ export default function useServiceDashboard() {
         quickDriveRatio,
         recommendationStats,
         recommendationRatio,
+        reservationTypeStats,
+        reservationTypeRatio,
         orgSizeDistribution,
         fuelTypeStats,
         vehicleTypeStats,

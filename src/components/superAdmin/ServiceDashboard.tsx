@@ -34,6 +34,8 @@ export default function ServiceDashboard() {
         quickDriveRatio,
         recommendationStats,
         recommendationRatio,
+        reservationTypeStats,
+        reservationTypeRatio,
         favoriteUserRatio,
         favoriteLogRatio,
         favoriteStats,
@@ -123,6 +125,8 @@ export default function ServiceDashboard() {
                     quickDriveRatio={quickDriveRatio}
                     recommendationStats={recommendationStats}
                     recommendationRatio={recommendationRatio}
+                    reservationTypeStats={reservationTypeStats}
+                    reservationTypeRatio={reservationTypeRatio}
                     favoriteStats={favoriteStats}
                     favoriteRatio={favoriteLogRatio}
                     favoriteUserRatio={favoriteUserRatio}

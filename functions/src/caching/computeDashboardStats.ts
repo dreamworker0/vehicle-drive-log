@@ -284,16 +284,17 @@ export async function computeAllDashboardStats(): Promise<void> {
 
     // ── 5.5. 예약 (바로운행 및 추천) 집계 ──
 
-    const dailyResMap: Record<string, { regular: number; quick: number; recommendation: number; normal: number }> = {};
+    const dailyResMap: Record<string, { regular: number; quick: number; recommendation: number; normal: number; single: number; multiDay: number; recurring: number }> = {};
     for (let i = 0; i < 30; i++) {
         const d = new Date(thirtyDaysAgo);
         d.setDate(d.getDate() + i);
         const key = `${d.getMonth() + 1}/${d.getDate()}`;
-        dailyResMap[key] = { regular: 0, quick: 0, recommendation: 0, normal: 0 };
+        dailyResMap[key] = { regular: 0, quick: 0, recommendation: 0, normal: 0, single: 0, multiDay: 0, recurring: 0 };
     }
 
     let qTotal = 0, qQuick = 0, qRegular = 0;
     let recTotal = 0, recRecommendation = 0, recNormal = 0;
+    let rtSingle = 0, rtMultiDay = 0, rtRecurring = 0;
 
     reservationSnap.docs.forEach(doc => {
         const data = doc.data();
@@ -324,6 +325,18 @@ export async function computeAllDashboardStats(): Promise<void> {
                 recNormal++;
                 if (dailyResMap[key]) dailyResMap[key].normal++;
             }
+
+            // 예약 유형별 집계: 반복 > 다일 > 하루
+            if (data.recurringGroupId) {
+                rtRecurring++;
+                if (dailyResMap[key]) dailyResMap[key].recurring++;
+            } else if (data.groupId) {
+                rtMultiDay++;
+                if (dailyResMap[key]) dailyResMap[key].multiDay++;
+            } else {
+                rtSingle++;
+                if (dailyResMap[key]) dailyResMap[key].single++;
+            }
         }
     });
 
@@ -331,6 +344,15 @@ export async function computeAllDashboardStats(): Promise<void> {
     const recommendationRatio = { total: recTotal, recommendation: recRecommendation, normal: recNormal, rate: recTotal > 0 ? Math.round((recRecommendation / recTotal) * 100) : 0 };
     const quickDriveStats = Object.entries(dailyResMap).map(([date, counts]) => ({ date, regular: counts.regular, quick: counts.quick }));
     const recommendationStats = Object.entries(dailyResMap).map(([date, counts]) => ({ date, recommendation: counts.recommendation, normal: counts.normal }));
+
+    const rtTotal = rtSingle + rtMultiDay + rtRecurring;
+    const reservationTypeRatio = {
+        total: rtTotal, single: rtSingle, multiDay: rtMultiDay, recurring: rtRecurring,
+        singleRate: rtTotal > 0 ? Math.round((rtSingle / rtTotal) * 100) : 0,
+        multiDayRate: rtTotal > 0 ? Math.round((rtMultiDay / rtTotal) * 100) : 0,
+        recurringRate: rtTotal > 0 ? Math.round((rtRecurring / rtTotal) * 100) : 0,
+    };
+    const reservationTypeStats = Object.entries(dailyResMap).map(([date, counts]) => ({ date, single: counts.single, multiDay: counts.multiDay, recurring: counts.recurring }));
 
     // ── 6. 차량 집계 ──
 
@@ -636,6 +658,8 @@ export async function computeAllDashboardStats(): Promise<void> {
         quickDriveRatio,
         recommendationStats,
         recommendationRatio,
+        reservationTypeStats,
+        reservationTypeRatio,
         lastUpdatedAt: new Date().toISOString(),
     });
 

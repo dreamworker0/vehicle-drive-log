@@ -60,6 +60,8 @@ export interface CachedDashboardTimeSeries {
     quickDriveRatio?: { total: number; quick: number; regular: number; rate: number };
     recommendationStats?: { date: string; recommendation: number; normal: number }[];
     recommendationRatio?: { total: number; recommendation: number; normal: number; rate: number };
+    reservationTypeStats?: { date: string; single: number; multiDay: number; recurring: number }[];
+    reservationTypeRatio?: { total: number; single: number; multiDay: number; recurring: number; singleRate: number; multiDayRate: number; recurringRate: number };
     lastUpdatedAt: string;
 }
 

@@ -4,6 +4,7 @@ import ChartDAU from './ChartDAU';
 import ChartFirstEmployee from './ChartFirstEmployee';
 import ChartInputMethod from './ChartInputMethod';
 import ChartQuickDrive from './ChartQuickDrive';
+import ChartReservationType from './ChartReservationType';
 import ChartRecommendation from './ChartRecommendation';
 import ChartFavoriteDestination from './ChartFavoriteDestination';
 import ChartDistribution from './ChartDistribution';
@@ -27,6 +28,9 @@ interface Props {
     // 추천 예약 현황
     recommendationStats: { date: string; recommendation: number; normal: number }[];
     recommendationRatio: { total: number; recommendation: number; normal: number; rate: number };
+    // 예약 유형별 비율
+    reservationTypeStats: { date: string; single: number; multiDay: number; recurring: number }[];
+    reservationTypeRatio: { total: number; single: number; multiDay: number; recurring: number; singleRate: number; multiDayRate: number; recurringRate: number };
     // 목적지 즐겨찾기 현황
     favoriteStats: { date: string; favorite: number; normal: number }[];
     favoriteRatio: { total: number; favorite: number; normal: number; rate: number };
@@ -64,6 +68,10 @@ export default function DashboardChartSection(props: Props) {
             <ChartQuickDrive 
                 quickDriveStats={props.quickDriveStats} 
                 quickDriveRatio={props.quickDriveRatio} 
+            />
+            <ChartReservationType
+                reservationTypeStats={props.reservationTypeStats}
+                reservationTypeRatio={props.reservationTypeRatio}
             />
             <ChartRecommendation 
                 recommendationStats={props.recommendationStats} 

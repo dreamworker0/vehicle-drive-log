@@ -18,7 +18,9 @@ import { captureError } from '../sentry';
 const driveLogConverter = createZodConverter(driveLogSchema);
 
 const sanitizeUndefined = <T extends Record<string, unknown>>(obj: T): T => {
-    return Object.fromEntries(Object.entries(obj).filter(([, v]) => v !== undefined)) as T;
+    return Object.fromEntries(
+        Object.entries(obj).filter(([, v]) => v !== undefined && !(typeof v === 'number' && isNaN(v)))
+    ) as T;
 };
 
 /** 특정 시점 이후에 같은 차량의 운행기록이 존재하는지 확인 */
@@ -146,7 +148,11 @@ export const createDriveLog = async (data: Partial<DriveLog>) => {
             oldStartKm: autocorrectedDistance ? originalStartKm : undefined
         };
     } catch (error) {
-        captureError(error, { context: 'createDriveLog', data });
+        // 중복 저장 방지 / 동기화 오류는 의도된 비즈니스 로직이므로 Sentry에 보고하지 않음
+        const isBizError = error instanceof Error && (error.message.includes('중복') || error.message.includes('동기화 오류'));
+        if (!isBizError) {
+            captureError(error, { context: 'createDriveLog', data });
+        }
         throw error;
     }
 };
