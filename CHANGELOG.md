@@ -23,6 +23,7 @@
 - TypeScript 컴파일 에러 전수 해결 (`any` 리팩토링 후속)
 - `useEmployeeManager` 테스트 `window is not defined` 에러 수정 (firebase/analytics mock 추가)
 - CI 파이프라인 안정화: E2E 테스트 CI 환경 분기 처리
+- Sentry 모니터링 노이즈 개선: "동일한 운행 기록이 이미 존재합니다" 등 비즈니스 로직 예외 필터링 추가
 
 ---
 

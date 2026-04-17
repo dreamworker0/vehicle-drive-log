@@ -72,6 +72,9 @@ export function initSentry() {
             /Missing or insufficient permissions/,
             // 브라우저 확장 프로그램(번역기 등)의 중복 Custom Element 선언 에러 억제
             /has already been defined/,
+            // 의도된 비즈니스 로직 에러 (글로벌 바운더리로 전파되는 노이즈 방지)
+            /동일한 운행 기록이 이미 존재합니다/,
+            /동기화 오류: 다른 사용자가 더 높은 누적 km/,
         ],
         // 브라우저 확장 프로그램 에러 제외
         denyUrls: [
