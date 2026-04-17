@@ -6,7 +6,7 @@ const SW_CHECK_INTERVAL = 10 * 60 * 1000;
 
 export default function UpdatePrompt() {
     useEffect(() => {
-        let intervalId: ReturnType<typeof setTimeout>;
+        let intervalId: number | NodeJS.Timeout | undefined;
         let registration: ServiceWorkerRegistration | undefined;
 
         const updateSW = registerSW({

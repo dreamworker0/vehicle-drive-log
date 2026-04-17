@@ -52,8 +52,14 @@ export default function PendingReservationList() {
                 setVehicles(vList);
                 const empMap: Record<string, { displayName: string; department?: string }> = {};
                 empData.forEach(e => {
-                    const extra = e as any;
-                    empMap[e.uid || e.id] = { displayName: extra.displayName || e.name, department: extra.department };
+                    const extra = e as Record<string, unknown>;
+                    const uid = (extra.uid || extra.id) as string;
+                    if (uid) {
+                        empMap[uid] = { 
+                            displayName: (extra.displayName || extra.name) as string, 
+                            department: extra.department as string | undefined 
+                        };
+                    }
                 });
                 setEmployees(empMap);
             } catch (error) {

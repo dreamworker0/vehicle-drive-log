@@ -13,7 +13,7 @@ interface Props {
 }
 
 export default function ChartFavoriteDestination({ favoriteStats, favoriteRatio, favoriteUserRatio }: Props) {
-    if (favoriteStats.length === 0) {
+    if (!favoriteStats || favoriteStats.length === 0) {
         return (
             <div className="glass-card p-5">
                 <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">

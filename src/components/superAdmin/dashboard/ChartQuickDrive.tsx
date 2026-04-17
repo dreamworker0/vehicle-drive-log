@@ -12,7 +12,7 @@ interface Props {
 }
 
 export default function ChartQuickDrive({ quickDriveStats, quickDriveRatio }: Props) {
-    if (quickDriveStats.length === 0) {
+    if (!quickDriveStats || quickDriveStats.length === 0) {
         return (
             <div className="glass-card p-5">
                 <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">

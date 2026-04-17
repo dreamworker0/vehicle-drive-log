@@ -21,7 +21,7 @@ const LEGEND_MAP: Record<string, string> = {
 };
 
 export default function ChartReservationType({ reservationTypeStats, reservationTypeRatio }: Props) {
-    if (reservationTypeStats.length === 0) {
+    if (!reservationTypeStats || reservationTypeStats.length === 0) {
         return (
             <div className="glass-card p-5">
                 <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">

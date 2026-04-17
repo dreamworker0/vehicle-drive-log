@@ -9,7 +9,7 @@ interface Props {
 }
 
 export default function ChartDAU({ dailyActiveUserStats }: Props) {
-    if (dailyActiveUserStats.length === 0) {
+    if (!dailyActiveUserStats || dailyActiveUserStats.length === 0) {
         return (
             <div className="glass-card p-5">
                 <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">

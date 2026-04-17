@@ -30,7 +30,7 @@ export default function DashboardOrgTable({
 }: Props) {
     const { showToast } = useToast();
 
-    if (topOrgs.length === 0) {
+    if (!sortedOrgs || sortedOrgs.length === 0) {
         return (
             <div className="glass-card p-5">
                 <div className="flex items-center justify-between mb-4">

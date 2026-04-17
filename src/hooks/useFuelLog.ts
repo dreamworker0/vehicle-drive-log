@@ -57,7 +57,7 @@ export default function useFuelLog() {
         const findActiveVehicle = async () => {
             try {
                 const todayRes = await getTodayReservations(orgId, todayStr);
-                const activeRes = (todayRes as any[]).find(
+                const activeRes = (todayRes as { reservedByUid?: string; status?: string; vehicleId?: string; }[]).find(
                     res => res.reservedByUid === user?.uid && res.status === 'in_progress'
                 );
                 if (activeRes) {

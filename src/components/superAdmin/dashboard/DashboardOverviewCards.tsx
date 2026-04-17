@@ -59,10 +59,10 @@ export default function DashboardOverviewCards({ stats }: Props) {
                 color="green"
                 sub={`관리자 ${stats.adminCount} · 직원 ${stats.employeeCount}`}
             />
-            <StatCard label="총 운행" value={stats.totalLogs.toLocaleString()} unit="회" icon="📊" color="purple" />
+            <StatCard label="총 운행" value={(stats.totalLogs || 0).toLocaleString()} unit="회" icon="📊" color="purple" />
             <StatCard
                 label="총 주행거리"
-                value={stats.totalDistance.toLocaleString()}
+                value={(stats.totalDistance || 0).toLocaleString()}
                 unit="km"
                 icon="🛣️"
                 color="orange"

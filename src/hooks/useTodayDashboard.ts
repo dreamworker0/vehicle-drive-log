@@ -13,6 +13,7 @@ import { refreshTokenSilently } from '../lib/tokenRefresh';
 import type { Vehicle } from '../types/vehicle';
 import { isVehicleBlocked } from '../lib/vehicleUtils';
 import type { Reservation, ReservationStatus } from '../types/reservation';
+import type { FuelLog } from '../types/fuelLog';
 
 const clearDrivingNotification = async (resId?: string) => {
     if (!resId || !('Notification' in window)) return;
@@ -27,7 +28,7 @@ const clearDrivingNotification = async (resId?: string) => {
 };
 
 // React 19 Suspense 데이터 캐시
-let globalDashboardCache: { key: string, promise: Promise<any>, data?: any } | null = null;
+let globalDashboardCache: { key: string, promise: Promise<unknown>, data?: unknown } | null = null;
 
 export function invalidateDashboardCache() {
     globalDashboardCache = null;
@@ -38,7 +39,7 @@ function getDashboardData(orgId: string, uid: string, todayStr: string, weekEndD
     
     // 캐시 히트 시 반환
     if (globalDashboardCache?.key === key) {
-        if (globalDashboardCache.data) return globalDashboardCache.data as [Vehicle[], Reservation[], Reservation[], any[]];
+        if (globalDashboardCache.data) return globalDashboardCache.data as [Vehicle[], Reservation[], Reservation[], FuelLog[]];
         return globalDashboardCache.promise;
     }
     
@@ -114,7 +115,7 @@ export default function useTodayDashboard() {
     // 3. 파생 상태 연산
     const incompleteAlerts = useMemo(() => {
         if (!user?.uid) return [];
-        const logReservationIds = new Set(myLogs.filter((l: any) => l.reservationId).map((l: any) => l.reservationId));
+        const logReservationIds = new Set(myLogs.filter((l: FuelLog) => l.reservationId).map((l: FuelLog) => l.reservationId));
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         const yesterdayStr = toLocalDateStr(yesterday);
@@ -357,6 +358,6 @@ export default function useTodayDashboard() {
         handleStartDrive, handleStartNavigation,
         handleCancelWeekReservation, handleCancelTodayReservation,
         navigateToArrival, navigateToReservations, navigateToQuickDrive,
-        recommendedVehicle,
+        recommendedVehicle, myLogsCount: myLogs.length,
     };
 }

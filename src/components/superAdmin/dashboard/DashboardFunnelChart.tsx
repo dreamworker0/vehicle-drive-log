@@ -5,7 +5,7 @@ interface Props {
 }
 
 export default function DashboardFunnelChart({ funnelData }: Props) {
-    if (funnelData.length === 0) {
+    if (!funnelData || funnelData.length === 0) {
         return (
             <div className="glass-card p-5">
                 <div className="flex items-center justify-between mb-4">

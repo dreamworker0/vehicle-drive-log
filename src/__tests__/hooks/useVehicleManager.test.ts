@@ -61,6 +61,9 @@ describe('useVehicleManager', () => {
         const { result } = renderHook(() => useVehicleManager());
         const { act } = await import('@testing-library/react');
 
+        // 초기 비동기 데이터 로딩 대기
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
         expect(result.current.showForm).toBe(false);
 
         act(() => {
@@ -72,6 +75,9 @@ describe('useVehicleManager', () => {
 
     it('modal 상태가 초기에 null이다', async () => {
         const { result } = renderHook(() => useVehicleManager());
+
+        // 초기 비동기 데이터 로딩 대기
+        await waitFor(() => expect(result.current.loading).toBe(false));
 
         expect(result.current.modal).toBeNull();
     });

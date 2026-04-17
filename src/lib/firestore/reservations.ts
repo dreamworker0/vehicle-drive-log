@@ -4,7 +4,7 @@
 import {
     doc, getDoc, updateDoc, deleteDoc,
     collection, query, where, getDocs, addDoc,
-    serverTimestamp, onSnapshot, runTransaction,
+    serverTimestamp, onSnapshot, runTransaction, Timestamp,
     type DocumentData,
 } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -34,7 +34,7 @@ export const createReservation = async (data: Record<string, unknown>, requireAp
             status: requireApproval ? 'pending' : 'reserved',
             createdAt: serverTimestamp(),
             expiresAt,
-        } as any);
+        } as Record<string, unknown>);
         return docRef.id;
     } catch (error) {
         captureError(error, { context: 'createReservation', data, requireApproval });
@@ -48,9 +48,10 @@ export const createReservationSafe = async (data: Record<string, unknown>) => {
         const callable = httpsCallable(functions, 'createReservationSafe', { timeout: 15000 });
         const result = await callable(data);
         return (result.data as { reservationId: string }).reservationId;
-    } catch (error: any) {
+    } catch (error: unknown) {
         // 중복 예약 및 유효성 검사 등 기대되는 비즈니스 로직 에러는 Sentry에 보고하지 않음
-        if (error?.code !== 'functions/already-exists' && error?.code !== 'functions/invalid-argument') {
+        const err = error as { code?: string };
+        if (err?.code !== 'functions/already-exists' && err?.code !== 'functions/invalid-argument') {
             captureError(error, { context: 'createReservationSafe', data });
         }
         throw error;
@@ -93,8 +94,8 @@ export const subscribePendingReservations = (orgId: string, callback: (reservati
         const reservations = snap.docs.map(d => d.data() as Reservation);
         // 생성일 순으로 정렬 (가장 오래된 것이 위로 오게)
         reservations.sort((a, b) => {
-            const timeA = typeof (a.createdAt as any)?.toMillis === 'function' ? (a.createdAt as any).toMillis() : 0;
-            const timeB = typeof (b.createdAt as any)?.toMillis === 'function' ? (b.createdAt as any).toMillis() : 0;
+            const timeA = typeof (a.createdAt as Timestamp)?.toMillis === 'function' ? (a.createdAt as Timestamp).toMillis() : 0;
+            const timeB = typeof (b.createdAt as Timestamp)?.toMillis === 'function' ? (b.createdAt as Timestamp).toMillis() : 0;
             return timeA - timeB; // 오름차순
         });
         callback(reservations);
@@ -113,8 +114,8 @@ export const getPendingReservations = async (orgId: string) => {
     
     // 생성일 순으로 정렬 (가장 오래된 것이 위로 오게)
     reservations.sort((a, b) => {
-        const timeA = typeof (a.createdAt as any)?.toMillis === 'function' ? (a.createdAt as any).toMillis() : 0;
-        const timeB = typeof (b.createdAt as any)?.toMillis === 'function' ? (b.createdAt as any).toMillis() : 0;
+        const timeA = typeof (a.createdAt as Timestamp)?.toMillis === 'function' ? (a.createdAt as Timestamp).toMillis() : 0;
+        const timeB = typeof (b.createdAt as Timestamp)?.toMillis === 'function' ? (b.createdAt as Timestamp).toMillis() : 0;
         return timeA - timeB; // 오름차순
     });
     return reservations;

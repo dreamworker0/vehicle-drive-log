@@ -11,7 +11,7 @@ interface Props {
 }
 
 export default function ChartInputMethod({ inputMethodStats }: Props) {
-    if (inputMethodStats.length === 0) {
+    if (!inputMethodStats || inputMethodStats.length === 0) {
         return (
             <div className="glass-card p-5">
                 <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">

@@ -12,7 +12,7 @@ interface Props {
 }
 
 export default function ChartRecommendation({ recommendationStats, recommendationRatio }: Props) {
-    if (recommendationStats.length === 0) {
+    if (!recommendationStats || recommendationStats.length === 0) {
         return (
             <div className="glass-card p-5">
                 <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">

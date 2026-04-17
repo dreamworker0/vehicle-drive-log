@@ -35,20 +35,20 @@ vi.mock('../../lib/firestore/users', () => ({
 }));
 
 describe.skip('PendingReservationList Component', () => {
-    let mockSubscribe: any;
-    let mockToast: any;
+    let mockSubscribe: ReturnType<typeof vi.fn>;
+    let mockToast: ReturnType<typeof vi.fn>;
 
     beforeEach(() => {
         vi.clearAllMocks();
         
         // Mock default behaviors
-        (useAuth as any).mockReturnValue({
+        vi.mocked(useAuth).mockReturnValue({
             userData: { organizationId: 'org1', uid: 'admin_u1' },
             loading: false,
         });
 
         mockToast = vi.fn();
-        (useToast as any).mockReturnValue({ showToast: mockToast });
+        vi.mocked(useToast).mockReturnValue({ showToast: mockToast });
 
         // subscribeMocking
         mockSubscribe = vi.fn((orgId, callback) => {
@@ -66,7 +66,7 @@ describe.skip('PendingReservationList Component', () => {
             ]);
             return vi.fn(); // unsub function
         });
-        (subscribePendingReservations as any).mockImplementation(mockSubscribe);
+        vi.mocked(subscribePendingReservations).mockImplementation(mockSubscribe);
         
         useConfirmStore.setState({
             confirm: vi.fn(() => Promise.resolve('test reason')),

@@ -3,7 +3,7 @@
  * 로직은 useTodayDashboard 훅 사용
  * 서브 컴포넌트: WelcomeGuide, ReservationCard, WeekReservationList
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import useTodayDashboard from '../../hooks/useTodayDashboard';
@@ -18,7 +18,7 @@ import type { Reservation } from '../../types/reservation';
 import type { Vehicle } from '../../types/vehicle';
 
 export default function TodayDashboard() {
-    const { user } = useAuth();
+    const { user, userData } = useAuth();
     const {
         vehicles, startingId, cancellingId,
         myReservations, weekGrouped, todayLabel,
@@ -26,21 +26,34 @@ export default function TodayDashboard() {
         handleStartDrive, handleStartNavigation,
         handleCancelWeekReservation, handleCancelTodayReservation,
         navigateToArrival, navigateToReservations, navigateToQuickDrive,
+        myLogsCount,
     } = useTodayDashboard();
     const navigate = useNavigate();
     const [cancelTarget, setCancelTarget] = useState<{ reservation: Reservation; type: 'today' | 'week' } | null>(null);
 
     // 웰컴 가이드 (첫 방문 시 1회 표시)
+    // 웰컴 가이드 표시 여부
     const [showWelcome, setShowWelcome] = useState(() => {
+        if (userData?.welcomeDismissed) return false;
         try { return localStorage.getItem('employee-welcome-dismissed') !== 'true'; } catch { return true; }
     });
+
     const dismissWelcome = () => {
         setShowWelcome(false);
         try { localStorage.setItem('employee-welcome-dismissed', 'true'); } catch { /* noop */ }
-        if (user?.uid) {
+        if (user?.uid && !userData?.welcomeDismissed) {
             updateUser(user.uid, { welcomeDismissed: true }).catch(console.error);
         }
     };
+
+    // 주행 기록을 3회 이상 남긴 사용자는 시스템에 익숙한 것으로 간주하여 가이드를 자동 종료 및 마킹
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    useEffect(() => {
+        if (showWelcome && myLogsCount >= 3) {
+            // eslint-disable-next-line react-hooks/set-state-in-effect
+            dismissWelcome();
+        }
+    }, [showWelcome, myLogsCount]);
 
     return (
         <div className="max-w-lg mx-auto animate-fade-in">

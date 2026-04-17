@@ -5,8 +5,8 @@
 
 export interface BaseLog {
     date?: string;
-    timestamp?: any;
-    [key: string]: any;
+    timestamp?: unknown;
+    [key: string]: unknown;
 }
 
 /**

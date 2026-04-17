@@ -20,7 +20,7 @@ function MonthlyMetric({ label, value, prev, unit, color }: MonthlyMetricProps) 
     return (
         <div className="text-center p-4 bg-surface-50 dark:bg-surface-800 rounded-xl">
             <p className={`text-2xl font-bold ${colorClass[color] || colorClass.primary}`}>
-                {value.toLocaleString()}
+                {(value || 0).toLocaleString()}
                 {unit && <span className="text-sm font-normal ml-0.5">{unit}</span>}
             </p>
             <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">{label}</p>
