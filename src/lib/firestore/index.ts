@@ -89,6 +89,7 @@ export {
     getNotifications,
     markNotificationRead,
     subscribeNotifications,
+    deleteNotification,
 } from './notifications';
 
 // 즐겨찾기 (Favorites)

@@ -3,7 +3,7 @@
  */
 import {
     doc, updateDoc,
-    collection, query, where, getDocs, addDoc,
+    collection, query, where, getDocs, addDoc, deleteDoc,
     orderBy, limit, serverTimestamp, onSnapshot,
     type DocumentData,
 } from 'firebase/firestore';
@@ -61,4 +61,14 @@ export const subscribeNotifications = (uid: string, callback: (notifications: (D
         const notifications = snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
         callback(notifications);
     });
+};
+
+// 알림 삭제 처리
+export const deleteNotification = async (notificationId: string) => {
+    try {
+        await deleteDoc(doc(db, 'notifications', notificationId));
+    } catch (error) {
+        captureError(error as Error, { context: 'deleteNotification', notificationId });
+        throw error;
+    }
 };

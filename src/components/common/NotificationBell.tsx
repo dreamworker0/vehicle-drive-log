@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../../hooks/useAuth';
-import { subscribeNotifications, markNotificationRead, getNotifications } from '../../lib/firestore';
+import { subscribeNotifications, markNotificationRead, getNotifications, deleteNotification } from '../../lib/firestore';
 import type { Notification } from '../../types/notification';
 
 const URL_REGEX = /(https?:\/\/[^\s]+)/g;
@@ -92,6 +92,17 @@ export default function NotificationBell() {
         );
     };
 
+    const handleDelete = async (e: React.MouseEvent, id: string) => {
+        e.stopPropagation();
+        try {
+            await deleteNotification(id);
+            setAllNotifications(prev => prev.filter(n => n.id !== id));
+            setNotifications(prev => prev.filter(n => n.id !== id));
+        } catch (error) {
+            console.error('Failed to delete notification:', error);
+        }
+    };
+
     const unreadCount = notifications.length;
 
     return (
@@ -133,8 +144,19 @@ export default function NotificationBell() {
                                     >
                                         <div className="flex items-start gap-2">
                                             <span className="text-base mt-0.5 flex-shrink-0">{icon}</span>
-                                            <div className="min-w-0 flex-1">
-                                                <p className="text-sm font-medium text-surface-800 dark:text-surface-200">{n.title}</p>
+                                            <div className="min-w-0 flex-1 pr-4">
+                                                <div className="flex justify-between items-start gap-2">
+                                                    <p className="text-sm font-medium text-surface-800 dark:text-surface-200">{n.title}</p>
+                                                    <button
+                                                        onClick={(e) => handleDelete(e, n.id)}
+                                                        className="text-surface-400 hover:text-red-500 transition-colors p-1 -mr-2"
+                                                        aria-label="알림 삭제"
+                                                    >
+                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                                        </svg>
+                                                    </button>
+                                                </div>
                                                 <p className="text-xs text-surface-500 dark:text-surface-400 mt-1 break-words whitespace-pre-wrap leading-relaxed">
                                                     {renderMessageWithLinks(n.message)}
                                                 </p>
