@@ -4,19 +4,19 @@ import { timestampSchema } from './index';
 export const userRoleSchema = z.enum(['employee', 'admin', 'superAdmin']);
 
 export const userSchema = z.object({
-    id: z.string(),
-    uid: z.string().optional(),
-    name: z.string(),
-    email: z.string(),
-    role: userRoleSchema,
-    organizationId: z.string().nullable(),
-    organizationStatus: z.string().optional(),
-    status: z.enum(['active', 'disabled']).optional(),
-    photoURL: z.string().optional(),
-    phone: z.string().optional(),
-    createdAt: timestampSchema.optional(),
-    disabledAt: timestampSchema.optional(),
-    promotedAt: timestampSchema.optional(),
+    id: z.string().catch(''),
+    uid: z.string().optional().catch(''),
+    name: z.string().catch('-'),
+    email: z.string().catch(''),
+    role: userRoleSchema.catch('employee'),
+    organizationId: z.string().nullable().catch(null),
+    organizationStatus: z.string().optional().catch(''),
+    status: z.enum(['active', 'disabled']).optional().catch('active'),
+    photoURL: z.string().optional().catch(''),
+    phone: z.string().optional().catch(''),
+    createdAt: timestampSchema.optional().catch(undefined),
+    disabledAt: timestampSchema.optional().catch(undefined),
+    promotedAt: timestampSchema.optional().catch(undefined),
 });
 
 export type UserSchemaType = z.infer<typeof userSchema>;

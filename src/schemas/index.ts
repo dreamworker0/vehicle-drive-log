@@ -13,8 +13,10 @@ export * from './organization';
  * @param schema 변환에 사용할 Zod Object Schema
  * @returns FirestoreDataConverter
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function createZodConverter<T extends z.ZodObject<any>>(schema: T): FirestoreDataConverter<z.infer<T> & { id: string }> {
     return {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         toFirestore(data: any): DocumentData {
             // Write 단계에서는 기존처럼 그대로 씁니다 (여기서도 원한다면 schema.parse() 사용 가능).
             // id 필드는 Firestore 문서의 id가 되므로 저장 시 제외합니다.
@@ -34,9 +36,9 @@ export function createZodConverter<T extends z.ZodObject<any>>(schema: T): Fires
                 });
                 // 파싱에 실패한 원시 데이터라도 렌더링에 사용될 수 있도록 fallback 반환을 할 수도 있으나
                 // 컨버터 제네릭 타입 에러를 피하기 위해 강제 캐스팅으로 돌려줍니다.
-                return { id: snapshot.id, ...data } as unknown as z.infer<T> & { id: string };
+                return { ...data, id: snapshot.id } as unknown as z.infer<T> & { id: string };
             }
-            return { id: snapshot.id, ...parsed.data } as z.infer<T> & { id: string };
+            return { ...parsed.data, id: snapshot.id } as z.infer<T> & { id: string };
         }
     };
 }
