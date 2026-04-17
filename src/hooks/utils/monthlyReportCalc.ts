@@ -7,7 +7,7 @@ import type { DriveLog } from '../../types/driveLog';
 import type { FuelLog } from '../../types/fuelLog';
 import type { HipassCharge } from '../../types/hipassCharge';
 
-import { extractDateStr, calcChangeRate, filterLogsByDateRange } from './aggregationUtils';
+import { extractDateStr, calcChangeRate, filterLogsByDateRange, type BaseLog } from './aggregationUtils';
 
 // ── 메인 통계 ──
 
@@ -147,7 +147,8 @@ export function calcFuelStats(fuelLogs: FuelLog[], startDate: string, endDate: s
 
 /** 하이패스 통계 */
 export function calcHipassStats(hipassCharges: HipassCharge[], startDate: string, endDate: string) {
-    const filtered = filterLogsByDateRange(hipassCharges, startDate, endDate);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const filtered = filterLogsByDateRange(hipassCharges as any[], startDate, endDate) as unknown as HipassCharge[];
     const totalAmount = filtered.reduce((s, l) => s + (l.chargeAmount || 0), 0);
 
     const byVehicle: Record<string, { amount: number; count: number }> = {};
@@ -169,14 +170,16 @@ export function calcHipassStats(hipassCharges: HipassCharge[], startDate: string
 export function calcCostTrend(fuelLogs: FuelLog[], hipassCharges: HipassCharge[], startDate: string, endDate: string) {
     const byDate: Record<string, { fuel: number; hipass: number }> = {};
 
-    filterLogsByDateRange(fuelLogs, startDate, endDate).forEach(l => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    filterLogsByDateRange(fuelLogs as any[], startDate, endDate).forEach(l => {
         const d = extractDateStr(l);
         if (!d) return;
         if (!byDate[d]) byDate[d] = { fuel: 0, hipass: 0 };
         byDate[d].fuel += l.fuelCost || 0;
     });
 
-    filterLogsByDateRange(hipassCharges, startDate, endDate).forEach(l => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    filterLogsByDateRange(hipassCharges as any[], startDate, endDate).forEach(l => {
         const d = extractDateStr(l);
         if (!d) return;
         if (!byDate[d]) byDate[d] = { fuel: 0, hipass: 0 };

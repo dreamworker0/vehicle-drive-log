@@ -106,7 +106,7 @@ export default function PendingReservationList() {
             await updateReservationStatus(id, 'rejected', {
                 rejectedReason: reason as string,
                 rejectedAt: new Date().toISOString()
-            }, 'pending');
+            } as Record<string, unknown>, 'pending');
             setPendingList(prev => prev.filter(r => r.id !== id));
             showToast('예약이 반려되었습니다.', 'success');
         }, {

@@ -26,7 +26,7 @@ export const getReservationById = async (reservationId: string) => {
 };
 
 // 예약 생성 (클라이언트 측)
-export const createReservation = async (data: Record<string, unknown>, requireApproval: boolean = false) => {
+export const createReservation = async (data: Partial<Reservation>, requireApproval: boolean = false) => {
     try {
         const expiresAt = new Date(Date.now() + 5 * 365 * 24 * 60 * 60 * 1000); // TTL: 5 years
         const docRef = await addDoc(reservationsCollection(), {
@@ -43,7 +43,7 @@ export const createReservation = async (data: Record<string, unknown>, requireAp
 };
 
 /** 서버 측 중복 검증 기반 예약 생성 (Cloud Function + Firestore Transaction) */
-export const createReservationSafe = async (data: Record<string, unknown>) => {
+export const createReservationSafe = async (data: Partial<Reservation>) => {
     try {
         const callable = httpsCallable(functions, 'createReservationSafe', { timeout: 15000 });
         const result = await callable(data);
@@ -134,7 +134,7 @@ export const cancelReservation = async (reservationId: string) => {
 };
 
 // 예약 정보 수정
-export const updateReservation = async (reservationId: string, data: Record<string, unknown>) => {
+export const updateReservation = async (reservationId: string, data: Partial<Reservation>) => {
     try {
         await updateDoc(reservationDoc(reservationId), data);
     } catch (error) {
@@ -147,7 +147,7 @@ export const updateReservation = async (reservationId: string, data: Record<stri
 export const updateReservationStatus = async (
     reservationId: string, 
     status: string, 
-    extraData: Record<string, unknown> = {},
+    extraData: Partial<Reservation> = {},
     expectedCurrentStatus?: string
 ) => {
     try {

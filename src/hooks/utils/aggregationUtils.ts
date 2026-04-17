@@ -6,7 +6,6 @@
 export interface BaseLog {
     date?: string;
     timestamp?: unknown;
-    [key: string]: unknown;
 }
 
 /**
@@ -17,7 +16,17 @@ export function extractDateStr(log: BaseLog): string {
     if (log.date) return log.date;
     const ts = log.timestamp;
     if (!ts) return '';
-    const d = ts instanceof Date ? ts : ts.toDate?.();
+    
+    let d: Date | undefined;
+    if (ts instanceof Date) {
+        d = ts;
+    } else if (typeof ts === 'object' && ts !== null && 'toDate' in ts) {
+        const toDateFunc = (ts as Record<string, unknown>).toDate;
+        if (typeof toDateFunc === 'function') {
+            d = (ts as { toDate: () => Date }).toDate();
+        }
+    }
+    
     return d?.toISOString?.()?.slice(0, 10) || '';
 }
 

@@ -15,6 +15,9 @@ import { isVehicleBlocked } from '../lib/vehicleUtils';
 import type { Reservation, ReservationStatus } from '../types/reservation';
 import type { FuelLog } from '../types/fuelLog';
 
+const EMPTY_VEHICLES: Vehicle[] = [];
+const EMPTY_RESERVATIONS: Reservation[] = [];
+const EMPTY_LOGS: FuelLog[] = [];
 const clearDrivingNotification = async (resId?: string) => {
     if (!resId || !('Notification' in window)) return;
     try {
@@ -91,12 +94,13 @@ export default function useTodayDashboard() {
     // 1. 데이터 페칭 - Suspense 유발
     // use() 훅이 Promise 인스턴스를 받으면 Resolve 될 때까지 상위 Suspense로 렌더링을 중단합니다.
     const dataOrPromise = orgId && user?.uid ? getDashboardData(orgId, user.uid, todayStr, weekEndDate) : null;
-    const resolvedData = dataOrPromise instanceof Promise ? use(dataOrPromise) : dataOrPromise;
+    type DashboardData = [Vehicle[], Reservation[], Reservation[], FuelLog[]];
+    const resolvedData = (dataOrPromise instanceof Promise ? use(dataOrPromise) : dataOrPromise) as DashboardData | null;
 
-    const serverVehicles: Vehicle[] = resolvedData ? resolvedData[0] : [];
-    const serverToday: Reservation[] = resolvedData ? resolvedData[1] : [];
-    const serverWeek: Reservation[] = resolvedData ? resolvedData[2] : [];
-    const myLogs = resolvedData ? resolvedData[3] : [];
+    const serverVehicles: Vehicle[] = resolvedData ? resolvedData[0] : EMPTY_VEHICLES;
+    const serverToday: Reservation[] = resolvedData ? resolvedData[1] : EMPTY_RESERVATIONS;
+    const serverWeek: Reservation[] = resolvedData ? resolvedData[2] : EMPTY_RESERVATIONS;
+    const myLogs = resolvedData ? resolvedData[3] : EMPTY_LOGS;
 
     // 2. 로컬 Override 반영
     const vehicles = serverVehicles;

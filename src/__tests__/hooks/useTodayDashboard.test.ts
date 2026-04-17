@@ -1,3 +1,4 @@
+// @vitest-environment jsdom
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 import React, { Suspense } from 'react';
@@ -38,12 +39,12 @@ const mockUpdateReservationStatus = vi.fn().mockResolvedValue({});
 const mockCancelReservation = vi.fn().mockResolvedValue({});
 
 vi.mock('../../lib/firestore', () => ({
-    getVehicles: (...args: unknown[]) => mockGetVehicles(...args),
-    getTodayReservations: (...args: unknown[]) => mockGetTodayReservations(...args),
-    getWeekReservations: (...args: unknown[]) => mockGetWeekReservations(...args),
-    updateReservationStatus: (...args: unknown[]) => mockUpdateReservationStatus(...args),
-    cancelReservation: (...args: unknown[]) => mockCancelReservation(...args),
-    getMyDriveLogs: (...args: unknown[]) => mockGetMyDriveLogs(...args),
+    getVehicles: vi.fn().mockImplementation((...args: unknown[]) => mockGetVehicles(...args)),
+    getTodayReservations: vi.fn().mockImplementation((...args: unknown[]) => mockGetTodayReservations(...args)),
+    getWeekReservations: vi.fn().mockImplementation((...args: unknown[]) => mockGetWeekReservations(...args)),
+    updateReservationStatus: vi.fn().mockImplementation((...args: unknown[]) => mockUpdateReservationStatus(...args)),
+    cancelReservation: vi.fn().mockImplementation((...args: unknown[]) => mockCancelReservation(...args)),
+    getMyDriveLogs: vi.fn().mockImplementation((...args: unknown[]) => mockGetMyDriveLogs(...args)),
 }));
 
 vi.mock('../../lib/firebase', () => ({ db: {}, auth: { currentUser: null }, default: {} }));
@@ -54,19 +55,27 @@ vi.mock('../../lib/dateUtils', () => ({
     }),
 }));
 
-import useTodayDashboard from '../../hooks/useTodayDashboard';
+import useTodayDashboard, { invalidateDashboardCache } from '../../hooks/useTodayDashboard';
 
 const wrapper = ({ children }: { children: React.ReactNode }) => React.createElement(Suspense, { fallback: null }, children);
-const renderDashboardHook = () => renderHook(() => useTodayDashboard(), { wrapper });
+const renderDashboardHook = async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let utils: any;
+    await act(async () => {
+        utils = renderHook(() => useTodayDashboard(), { wrapper });
+    });
+    return utils as { result: { current: Awaited<ReturnType<typeof useTodayDashboard>> } };
+};
 
-describe.skip('useTodayDashboard', () => {
+describe('useTodayDashboard', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        invalidateDashboardCache();
     });
 
     // suspense 패턴 도입으로 loading 상태 제외
     it('orgId가 있으면 차량/예약/일지를 로드한다', async () => {
-        const { result } = renderDashboardHook();
+        const { result } = await renderDashboardHook();
 
         await waitFor(() => {
             expect(result.current?.myReservations || result.current?.todayLabel).toBeDefined();
@@ -79,7 +88,7 @@ describe.skip('useTodayDashboard', () => {
     });
 
     it('myReservations는 본인 예약만 필터링한다', async () => {
-        const { result } = renderDashboardHook();
+        const { result } = await renderDashboardHook();
 
         await waitFor(() => {
             expect(result.current?.myReservations || result.current?.todayLabel).toBeDefined();
@@ -91,7 +100,7 @@ describe.skip('useTodayDashboard', () => {
     });
 
     it('운행 중인 예약이 없으면 hasActiveDrive는 false이다', async () => {
-        const { result } = renderDashboardHook();
+        const { result } = await renderDashboardHook();
 
         await waitFor(() => {
             expect(result.current?.myReservations || result.current?.todayLabel).toBeDefined();
@@ -105,7 +114,7 @@ describe.skip('useTodayDashboard', () => {
             { id: 'res1', vehicleId: 'v1', reservedByUid: 'testUser', status: 'in_progress', startTime: '09:00', endTime: '12:00', date: '2026-03-04' },
         ]);
 
-        const { result } = renderDashboardHook();
+        const { result } = await renderDashboardHook();
 
         await waitFor(() => {
             expect(result.current?.myReservations || result.current?.todayLabel).toBeDefined();
@@ -115,7 +124,7 @@ describe.skip('useTodayDashboard', () => {
     });
 
     it('navigateToReservations가 올바른 경로로 이동한다', async () => {
-        const { result } = renderDashboardHook();
+        const { result } = await renderDashboardHook();
 
         await waitFor(() => {
             expect(result.current?.myReservations || result.current?.todayLabel).toBeDefined();
@@ -129,7 +138,7 @@ describe.skip('useTodayDashboard', () => {
     });
 
     it('todayLabel이 한국어 형식이다', async () => {
-        const { result } = renderDashboardHook();
+        const { result } = await renderDashboardHook();
 
         await waitFor(() => {
             expect(result.current?.myReservations || result.current?.todayLabel).toBeDefined();

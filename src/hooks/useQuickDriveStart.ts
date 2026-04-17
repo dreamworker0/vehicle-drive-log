@@ -145,19 +145,19 @@ export default function useQuickDriveStart() {
 
             // Cloud Function으로 예약 생성 (중복 방지 + 서버 검증)
             const result = await createReservationSafe({
-                organizationId: orgId,
+                organizationId: orgId!,
                 vehicleId: form.vehicleId,
                 vehicleName: form.vehicleName,
                 reservedByUid: user!.uid,
-                reservedByName: userData?.name || user!.displayName || user!.email,
+                reservedByName: userData?.name || user!.displayName || user!.email || '',
                 date: todayStr,
                 startTime: actualStartTime,
                 endTime: calcEndTime(actualStartTime, routeInfo?.duration || 0),
                 purpose: form.purpose.trim(),
                 destination: form.destination.trim(),
-                routeDistance: routeInfo?.distance || null,
-                routeDuration: routeInfo?.duration || null,
-                routeTollFee: routeInfo?.tollFee || null,
+                routeDistance: routeInfo?.distance ?? undefined,
+                routeDuration: routeInfo?.duration ?? undefined,
+                routeTollFee: routeInfo?.tollFee ?? undefined,
                 isQuickDrive: true,
             });
             const reservationId = result;

@@ -47,12 +47,11 @@ export default function TodayDashboard() {
     };
 
     // 주행 기록을 3회 이상 남긴 사용자는 시스템에 익숙한 것으로 간주하여 가이드를 자동 종료 및 마킹
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
         if (showWelcome && myLogsCount >= 3) {
-            // eslint-disable-next-line react-hooks/set-state-in-effect
-            dismissWelcome();
+            setTimeout(dismissWelcome, 0);
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [showWelcome, myLogsCount]);
 
     return (

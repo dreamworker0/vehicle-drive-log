@@ -12,6 +12,7 @@ import { createFuelLog, updateFuelLog, getFuelLogs, getTodayReservations } from 
 import { isChargeableFuel } from './useVehicleManager';
 import { toLocalDateStr } from '../lib/dateUtils';
 import { ocrDashboard } from '../lib/ocr';
+import type { Reservation } from '../types/reservation';
 import useBaseFuelLog from './base/useBaseFuelLog';
 
 const INITIAL_FORM = {
@@ -57,7 +58,7 @@ export default function useFuelLog() {
         const findActiveVehicle = async () => {
             try {
                 const todayRes = await getTodayReservations(orgId, todayStr);
-                const activeRes = (todayRes as { reservedByUid?: string; status?: string; vehicleId?: string; }[]).find(
+                const activeRes = (todayRes as Reservation[]).find(
                     res => res.reservedByUid === user?.uid && res.status === 'in_progress'
                 );
                 if (activeRes) {

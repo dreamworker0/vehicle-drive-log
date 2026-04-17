@@ -5,7 +5,7 @@ import PendingReservationList from '../../components/admin/PendingReservationLis
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 import { useConfirmStore } from '../../store/useConfirmStore';
-import { updateReservationStatus, subscribePendingReservations } from '../../lib/firestore/reservations';
+import { updateReservationStatus, getPendingReservations } from '../../lib/firestore/reservations';
 
 // Mocking Custom Hooks
 vi.mock('../../hooks/useAuth');
@@ -18,8 +18,8 @@ vi.mock('../../hooks/useRetry', () => ({
 
 // Mocking Firestore functions
 vi.mock('../../lib/firestore/reservations', () => ({
-    subscribePendingReservations: vi.fn(),
     updateReservationStatus: vi.fn(),
+    getPendingReservations: vi.fn(() => Promise.resolve([])),
 }));
 
 vi.mock('../../lib/firestore/vehicles', () => ({
@@ -34,8 +34,7 @@ vi.mock('../../lib/firestore/users', () => ({
     ])),
 }));
 
-describe.skip('PendingReservationList Component', () => {
-    let mockSubscribe: ReturnType<typeof vi.fn>;
+describe('PendingReservationList Component', () => {
     let mockToast: ReturnType<typeof vi.fn>;
 
     beforeEach(() => {
@@ -45,28 +44,26 @@ describe.skip('PendingReservationList Component', () => {
         vi.mocked(useAuth).mockReturnValue({
             userData: { organizationId: 'org1', uid: 'admin_u1' },
             loading: false,
-        });
+        } as unknown as ReturnType<typeof useAuth>);
 
         mockToast = vi.fn();
-        vi.mocked(useToast).mockReturnValue({ showToast: mockToast });
+        vi.mocked(useToast).mockReturnValue({ showToast: mockToast as unknown as ReturnType<typeof useToast>['showToast'] });
 
-        // subscribeMocking
-        mockSubscribe = vi.fn((orgId, callback) => {
-            // Mock empty load intentionally or dummy
-            callback([
-                {
-                    id: 'res1',
-                    vehicleId: 'v1',
-                    reservedByUid: 'u1',
-                    date: '2026-04-16',
-                    startTime: '09:00',
-                    endTime: '12:00',
-                    destination: '거래처 방문',
-                }
-            ]);
-            return vi.fn(); // unsub function
-        });
-        vi.mocked(subscribePendingReservations).mockImplementation(mockSubscribe);
+        // getPendingReservations Mocking
+        vi.mocked(getPendingReservations).mockResolvedValue([
+            {
+                id: 'res1',
+                organizationId: 'org1',
+                vehicleId: 'v1',
+                reservedByUid: 'u1',
+                date: '2026-04-16',
+                startTime: '09:00',
+                endTime: '12:00',
+                destination: '거래처 방문',
+                status: 'pending',
+                purpose: '테스트',
+            } as import('../../types/reservation').Reservation
+        ]);
         
         useConfirmStore.setState({
             confirm: vi.fn(() => Promise.resolve('test reason')),

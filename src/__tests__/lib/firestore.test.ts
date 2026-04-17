@@ -113,7 +113,7 @@ describe('Firestore 유틸리티 함수', () => {
             const { createReservation } = await import('../../lib/firestore');
             await createReservation({
                 vehicleId: 'v1',
-                userId: 'user1',
+                reservedByUid: 'user1',
                 date: '2026-02-23',
                 startTime: '09:00',
                 endTime: '10:00',
