@@ -50,6 +50,7 @@ export default function InviteCodePage() {
 
             // onSnapshot이 자동으로 userData를 업데이트하므로 잠시 대기
             await new Promise(resolve => setTimeout(resolve, 1000));
+            navigate('/', { replace: true });
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : '';
             // Cloud Function에서 반환한 에러 메시지 그대로 표시

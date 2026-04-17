@@ -26,7 +26,7 @@ export default function useEmployeeManager() {
     const [loading, setLoading] = useState(true);
     const [showAddForm, setShowAddForm] = useState(false);
     const [newEmployee, setNewEmployee] = useState({ name: '', email: '' });
-    const [inviteCodeCopied, setInviteCodeCopied] = useState(false);
+    const [copiedType, setCopiedType] = useState<'none' | 'link' | 'code'>('none');
     const [regenerating, setRegenerating] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editForm, setEditForm] = useState({ name: '', email: '' });
@@ -88,22 +88,25 @@ export default function useEmployeeManager() {
         }, { errorMessage: '직원 추가에 실패했습니다.' });
     };
 
-    const handleCopyInviteCode = async () => {
+    const handleCopyInviteCode = async (type: 'link' | 'code' = 'link') => {
         if (!organization?.inviteCode) return;
-        const inviteLink = `https://vehicle-drive-log.web.app?code=${organization.inviteCode}`;
+        const textToCopy = type === 'link' 
+            ? `https://vehicle-drive-log.web.app?code=${organization.inviteCode}`
+            : organization.inviteCode;
+            
         try {
-            await navigator.clipboard.writeText(inviteLink);
-            setInviteCodeCopied(true);
-            setTimeout(() => setInviteCodeCopied(false), 2000);
+            await navigator.clipboard.writeText(textToCopy);
+            setCopiedType(type);
+            setTimeout(() => setCopiedType('none'), 2000);
         } catch {
             const textArea = document.createElement('textarea');
-            textArea.value = inviteLink;
+            textArea.value = textToCopy;
             document.body.appendChild(textArea);
             textArea.select();
             document.execCommand('copy');
             document.body.removeChild(textArea);
-            setInviteCodeCopied(true);
-            setTimeout(() => setInviteCodeCopied(false), 2000);
+            setCopiedType(type);
+            setTimeout(() => setCopiedType('none'), 2000);
         }
     };
 
@@ -269,7 +272,7 @@ export default function useEmployeeManager() {
         employees, disabledEmployees, preRegisteredEmployees, organization, loading,
         showAddForm, setShowAddForm,
         newEmployee, setNewEmployee,
-        inviteCodeCopied, regenerating,
+        copiedType, regenerating,
         editingId, setEditingId, editForm, setEditForm,
         searchQuery, setSearchQuery,
         filteredEmployees, admins, regularEmployees,

@@ -12,7 +12,7 @@ export default function EmployeeManager() {
         organization, loading,
         showAddForm, setShowAddForm,
         newEmployee, setNewEmployee,
-        inviteCodeCopied, regenerating,
+        copiedType, regenerating,
         editingId, setEditingId, editForm, setEditForm,
         searchQuery, setSearchQuery,
         filteredUnifiedList, stats,
@@ -57,36 +57,61 @@ export default function EmployeeManager() {
             <div className="glass-card p-5 mb-6">
                 <div className="flex flex-col gap-3">
                     <div className="flex items-center justify-between">
-                        <h3 className="text-sm font-semibold text-surface-600 dark:text-surface-400">직원 초대 링크</h3>
-                        <div className="flex items-center gap-1">
-                            <button onClick={handleCopyInviteCode} className={`btn-sm flex items-center gap-1.5 ${inviteCodeCopied ? 'bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-400' : 'btn-primary'}`}>
-                                {inviteCodeCopied ? (
-                                    <>
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                                        </svg>
-                                        복사됨
-                                    </>
-                                ) : (
-                                    <>
-                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" />
-                                        </svg>
-                                        링크 복사
-                                    </>
-                                )}
-                            </button>
-                            <button onClick={handleRegenerateCode} disabled={regenerating} className="btn-ghost btn-sm text-surface-400 hover:text-amber-600" title="초대 코드 재발급">
-                                <svg className={`w-4 h-4 ${regenerating ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
-                                </svg>
-                            </button>
+                        <h3 className="text-sm font-semibold text-surface-600 dark:text-surface-400">직원 초대</h3>
+                        <button onClick={handleRegenerateCode} disabled={regenerating} className="btn-ghost btn-sm text-surface-400 hover:text-amber-600" title="초대 코드 재발급">
+                            <svg className={`w-4 h-4 ${regenerating ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-1">
+                        {/* 초대 링크 */}
+                        <div className="sm:col-span-2 bg-surface-50 dark:bg-surface-800/50 rounded-lg border border-surface-200 dark:border-surface-700/50 p-3.5 flex flex-col justify-center relative group overflow-hidden">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs font-semibold text-surface-500">초대 링크</span>
+                                <button onClick={() => handleCopyInviteCode('link')} className={`text-xs flex items-center gap-1 transition-colors ${copiedType === 'link' ? 'text-accent-600 dark:text-accent-400 font-medium' : 'text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-200'}`}>
+                                    {copiedType === 'link' ? (
+                                        <>
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                                            복사됨
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m13.35-.622 1.757-1.757a4.5 4.5 0 0 0-6.364-6.364l-4.5 4.5a4.5 4.5 0 0 0 1.242 7.244" /></svg>
+                                            링크 복사
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                            <div className="font-mono text-sm text-surface-700 dark:text-surface-300 break-all select-all pr-2">
+                                https://vehicle-drive-log.web.app?code={organization?.inviteCode || '------'}
+                            </div>
+                        </div>
+
+                        {/* 초대 코드 */}
+                        <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg border border-surface-200 dark:border-surface-700/50 p-3.5 flex flex-col justify-center">
+                            <div className="flex items-center justify-between mb-2">
+                                <span className="text-xs font-semibold text-surface-500">기관 코드</span>
+                                <button onClick={() => handleCopyInviteCode('code')} className={`text-xs flex items-center gap-1 transition-colors ${copiedType === 'code' ? 'text-accent-600 dark:text-accent-400 font-medium' : 'text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-200'}`}>
+                                    {copiedType === 'code' ? (
+                                        <>
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" /></svg>
+                                            복사됨
+                                        </>
+                                    ) : (
+                                        <>
+                                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" /></svg>
+                                            코드 복사
+                                        </>
+                                    )}
+                                </button>
+                            </div>
+                            <div className="font-mono text-lg font-bold text-primary-600 dark:text-primary-400 select-all">
+                                {organization?.inviteCode || '------'}
+                            </div>
                         </div>
                     </div>
-                    <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg px-4 py-2.5 font-mono text-sm text-surface-600 dark:text-surface-400 break-all select-all">
-                        https://vehicle-drive-log.web.app?code={organization?.inviteCode || '------'}
-                    </div>
-                    <p className="text-xs text-surface-400">이 링크에는 기관 코드가 포함되어 있으므로, 반드시 소속 직원에게만 공유해 주세요</p>
+                    <p className="text-xs text-surface-400 mt-1">이 링크 또는 기관 코드를 소속 직원에게 공유해 주세요. 직원 가입 시 자동으로 연결됩니다.</p>
                 </div>
             </div>
 
