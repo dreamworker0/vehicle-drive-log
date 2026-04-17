@@ -34,14 +34,24 @@ export default function LoginPage() {
         }
     };
 
+    /** 공유할 URL 획득 (초대 코드가 세션에 있으면 복원) */
+    const getShareUrl = () => {
+        const url = new URL(window.location.href);
+        const code = sessionStorage.getItem('pendingInviteCode');
+        if (code) {
+            url.searchParams.set('code', code);
+        }
+        return url.toString();
+    };
+
     /** 외부 브라우저로 전환 */
     const handleOpenExternal = () => {
-        openInExternalBrowser();
+        openInExternalBrowser(getShareUrl());
     };
 
     /** URL 복사 */
     const handleCopyUrl = async () => {
-        const ok = await copyUrlToClipboard();
+        const ok = await copyUrlToClipboard(getShareUrl());
         if (ok) {
             setCopied(true);
             setTimeout(() => setCopied(false), 2000);
