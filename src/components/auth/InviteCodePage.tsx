@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useNavigate } from 'react-router-dom';
@@ -8,21 +8,29 @@ import { refreshTokenSilently } from '../../lib/tokenRefresh';
 
 export default function InviteCodePage() {
     const { user } = useAuth();
-    const [code, setCode] = useState('');
+    const [code, setCode] = useState(() => {
+        // 1. URL 파라미터가 가장 우선순위 (마운트 시점에 App.tsx가 아직 URL을 비우지 않았을 경우)
+        const params = new URLSearchParams(window.location.search);
+        const urlCode = params.get('code');
+        if (urlCode) return urlCode.replace(/\s/g, '').toUpperCase().slice(0, 6);
+
+        // 2. localStorage 확인 (리다이렉트 등으로 URL에서 파라미터가 유실되었을 경우 복원)
+        const savedCode = localStorage.getItem('pendingInviteCode');
+        if (savedCode) return savedCode.replace(/\s/g, '').toUpperCase().slice(0, 6);
+
+        return '';
+    });
+    
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const navigate = useNavigate();
-    const autoSubmitDone = useRef(false);
 
-    // localStorage에서 초대 코드 자동 입력 (리다이렉트 초기화 방지)
+    // 코드 값을 성공적으로 불러왔다면, 더 이상 불필요하므로 정리
     useEffect(() => {
-        const savedCode = localStorage.getItem('pendingInviteCode');
-        if (savedCode && !autoSubmitDone.current) {
-            const cleaned = savedCode.replace(/\s/g, '').toUpperCase().slice(0, 6);
-            setCode(cleaned);
+        if (code) {
             localStorage.removeItem('pendingInviteCode');
         }
-    }, []);
+    }, [code]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();

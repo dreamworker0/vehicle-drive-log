@@ -11,6 +11,7 @@ export const userSchema = z.object({
     role: userRoleSchema.catch('employee'),
     organizationId: z.string().nullable().catch(null),
     organizationStatus: z.string().optional().catch(''),
+    theme: z.enum(['light', 'dark']).optional().catch(undefined),
     status: z.enum(['active', 'disabled']).optional().catch('active'),
     photoURL: z.string().optional().catch(''),
     phone: z.string().optional().catch(''),

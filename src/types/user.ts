@@ -12,6 +12,7 @@ export interface User extends FirestoreDoc {
     role: UserRole;
     organizationId: string | null;
     organizationStatus?: string;
+    theme?: 'light' | 'dark';
     status?: 'active' | 'disabled';
     photoURL?: string;
     phone?: string;

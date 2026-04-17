@@ -5,6 +5,23 @@
 
 ---
 
+## Phase 39 — 로그인/안정성 개선 및 부가 통계 추가 🔧
+
+> 2026-04-17
+
+### Added
+- 대시보드 통계 화면 내 사용자의 다크 모드 데이터 집계용 테마(Theme) 사용 비율 차트 추가
+
+### Changed
+- 로그인 흐름 개선: Popup 인증에서 호환성이 뛰어난 Redirect 방식으로 롤백 (`src/lib/auth.ts`)
+- 대시보드 버튼 위젯의 접근성 UI 롤백 (이전 레이아웃으로 변경)
+
+### Fixed
+- Firebase 연동 시 `batteryStart`, `batteryEnd` 등의 undefined 프로퍼티가 그대로 전달되어 발생하는 `FirebaseError: Function addDoc() called with invalid data` 에러 수정
+- 초대 코드가 담긴 딥링크 접속 시, 추출된 URL 파라미터를 뷰에 정상 반영하도록 수정
+
+---
+
 ## Phase 38 — 코드 품질 강화 & 아키텍처 개선 🏗️
 
 > 2026-03-22~23

@@ -26,6 +26,7 @@ export default function AdminDashboard() {
         monthLogs: 0,
         totalLogs: 0,
         totalDistance: 0,
+        themeStats: { dark: 0, light: 0, none: 0 },
     });
     const [recentLogs, setRecentLogs] = useState<DriveLog[]>([]);
     const [loading, setLoading] = useState(true);
@@ -56,6 +57,15 @@ export default function AdminDashboard() {
                 const logs = logsResult.docs;
                 const monthLogs = aggregatedData?.monthlyStats?.[monthKey]?.count || 0;
 
+                let darkCount = 0;
+                let lightCount = 0;
+                let noneCount = 0;
+                members.forEach(m => {
+                    if (m.theme === 'dark') darkCount++;
+                    else if (m.theme === 'light') lightCount++;
+                    else noneCount++;
+                });
+
                 setStats({
                     todayLogs,
                     todayReservations: todayRes.filter(r => r.status === 'reserved' || r.status === 'in_progress').length,
@@ -64,6 +74,7 @@ export default function AdminDashboard() {
                     monthLogs,
                     totalLogs: aggregatedData?.count || 0,
                     totalDistance: aggregatedData?.totalDistance || 0,
+                    themeStats: { dark: darkCount, light: lightCount, none: noneCount }
                 });
                 setRecentLogs(logs as DriveLog[]);
 
@@ -141,6 +152,34 @@ export default function AdminDashboard() {
                     </div>
                 ))}
             </div>
+
+            <div className="glass-card p-5 mb-8">
+                <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4 flex items-center gap-2">
+                    <span className="text-xl">🌗</span> 테마 사용 현황 (소속 멤버 전체 {stats.employeeCount}명)
+                </h2>
+                <div className="flex flex-col sm:flex-row items-center gap-4 text-sm font-medium">
+                    <div className="flex-1 w-full">
+                        <p className="text-surface-600 dark:text-surface-300 mb-1">
+                            다크 모드 {stats.themeStats.dark}명 ({Math.round((stats.themeStats.dark / (stats.employeeCount || 1)) * 100) || 0}%)
+                        </p>
+                        <div className="w-full bg-surface-200 dark:bg-surface-700 h-2 rounded-full overflow-hidden">
+                            <div className="bg-slate-700 dark:bg-slate-300 h-full rounded-full transition-all duration-500" style={{ width: `${Math.round((stats.themeStats.dark / (stats.employeeCount || 1)) * 100) || 0}%` }} />
+                        </div>
+                    </div>
+                    <div className="flex-1 w-full">
+                        <p className="text-surface-600 dark:text-surface-300 mb-1">
+                            라이트 모드 {stats.themeStats.light + stats.themeStats.none}명 ({Math.round(((stats.themeStats.light + stats.themeStats.none) / (stats.employeeCount || 1)) * 100) || 0}%)
+                        </p>
+                        <div className="w-full bg-surface-200 dark:bg-surface-700 h-2 rounded-full overflow-hidden">
+                            <div className="bg-yellow-400 dark:bg-yellow-500 h-full rounded-full transition-all duration-500" style={{ width: `${Math.round(((stats.themeStats.light + stats.themeStats.none) / (stats.employeeCount || 1)) * 100) || 0}%` }} />
+                        </div>
+                    </div>
+                </div>
+                {stats.themeStats.none > 0 && (
+                    <p className="text-xs text-surface-400 mt-3">* 앱 미접속 또는 기본 테마 유지 사용자({stats.themeStats.none}명)는 라이트 모드 사용자로 합산되었습니다.</p>
+                )}
+            </div>
+
             {recentLogs.length > 0 ? (
                 <div className="glass-card p-5">
                     <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4">최근 운행 기록</h2>

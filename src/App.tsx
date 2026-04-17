@@ -8,6 +8,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import { useOrientationLock } from './hooks/useOrientationLock';
 import { AuthGuard } from './components/auth/AuthGuard';
+import { updateUser } from './lib/firestore/users';
 
 // 레이아웃 (기존)
 const SuperAdminLayout = lazyWithRetry(() => import('./components/superAdmin/SuperAdminLayout'));
@@ -133,8 +134,18 @@ export default function App() {
 }
 
 function AppContent() {
-  const { userData, loading } = useAuth();
+  const { user, userData, loading } = useAuth();
   useOrientationLock();
+  const theme = useThemeStore(state => state.theme);
+
+  // Firestore DB에 사용자의 테마 상태 동기화
+  useEffect(() => {
+    if (user && userData && userData.theme !== theme) {
+      updateUser(user.uid, { theme }).catch(err => {
+        console.error('테마 설정 동기화 실패:', err);
+      });
+    }
+  }, [user, userData, theme]);
 
   // 이메일 링크의 ?code= 파라미터를 localStorage에 저장
   // (Google 로그인 리다이렉트 도메인 횡단 시 sessionStorage 증발 방지)
