@@ -144,7 +144,9 @@ export default function VehicleTimelineBar({
                         const isDraggingThis = dragState?.vehicleId === vehicle.id;
                         const isExpanded = expandedVehicleId === vehicle.id;
 
-                        const vehicleDisplayName = vehicle.name || (vehicle as unknown as { displayName?: string }).displayName || '차량';
+                        const vehicleDisplayName = (vehicle.name && vehicle.name !== '이름 없음' && vehicle.name !== 'null') 
+                            ? vehicle.name 
+                            : (vehicle.displayName || vehicle.plateNumber || vehicle.modelName || '차량');
 
                         return (
                             <div key={vehicle.id}>

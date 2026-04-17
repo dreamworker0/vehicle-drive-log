@@ -21,7 +21,7 @@ export const vehicleMaintenanceSchema = z.object({
 
 export const vehicleSchema = z.object({
     organizationId: z.string().catch(''),
-    name: z.string().catch('이름 없음'),
+    name: z.string().catch(''),
     displayName: z.string().optional().catch(undefined),
     modelName: z.string().optional().catch(undefined),
     plateNumber: z.string().catch('번호 없음'),
