@@ -29,14 +29,14 @@ function SectionTitle({ title }: { title: string; icon?: string }) {
 function DistanceCountTooltip({ active, payload, label }: { active?: boolean; payload?: ChartPayloadEntry[]; label?: string }) {
     if (!active || !payload?.length) return null;
     return (
-        <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-surface-100 dark:border-surface-700 px-4 py-3 text-sm">
+        <div className="bg-white/95 dark:bg-surface-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-surface-100 dark:border-surface-700 px-4 py-3 text-sm">
             <p className="font-semibold text-surface-700 dark:text-surface-300 mb-1">{label}</p>
             {payload.map((p, i) => (
                 <p key={i} className="text-surface-600 dark:text-surface-400">
                     <span className="inline-block w-2.5 h-2.5 rounded-full mr-1.5" style={{ backgroundColor: p.color }} />
                     {p.dataKey === 'distance' ? '주행거리' : '운행횟수'}:
                     <span className="font-semibold text-surface-900 dark:text-surface-100 ml-1">
-                        {p.dataKey === 'distance' ? `${p.value.toLocaleString()} km` : `${p.value}건`}
+                        {p.dataKey === 'distance' ? `${(p.value ?? 0).toLocaleString()} km` : `${p.value ?? 0}건`}
                     </span>
                 </p>
             ))}
@@ -48,7 +48,7 @@ function DistanceCountTooltip({ active, payload, label }: { active?: boolean; pa
 function SimpleCountTooltip({ active, payload, label, suffix = '' }: { active?: boolean; payload?: ChartPayloadEntry[]; label?: string; suffix?: string }) {
     if (!active || !payload?.length) return null;
     return (
-        <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-surface-100 dark:border-surface-700 px-4 py-3 text-sm">
+        <div className="bg-white/95 dark:bg-surface-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-surface-100 dark:border-surface-700 px-4 py-3 text-sm">
             <p className="font-semibold text-surface-700 dark:text-surface-300 mb-1">{label}{suffix}</p>
             <p className="text-surface-600 dark:text-surface-400">
                 {payload[0]?.name === 'count' ? '운행' : '출발'}{' '}
@@ -62,14 +62,14 @@ function SimpleCountTooltip({ active, payload, label, suffix = '' }: { active?: 
 function TrendTooltip({ active, payload, label }: { active?: boolean; payload?: ChartPayloadEntry[]; label?: string }) {
     if (!active || !payload?.length) return null;
     return (
-        <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-surface-100 dark:border-surface-700 px-4 py-3 text-sm">
+        <div className="bg-white/95 dark:bg-surface-800/95 backdrop-blur-sm rounded-xl shadow-lg border border-surface-100 dark:border-surface-700 px-4 py-3 text-sm">
             <p className="font-semibold text-surface-700 dark:text-surface-300 mb-1">{label}</p>
             {payload.map((p, i) => (
                 <p key={i} className="text-surface-600 dark:text-surface-400">
                     <span className="inline-block w-2.5 h-2.5 rounded-full mr-1.5" style={{ backgroundColor: p.color }} />
                     {p.dataKey === 'count' ? '운행 건수' : '주행거리'}:
                     <span className="font-semibold text-surface-900 dark:text-surface-100 ml-1">
-                        {p.dataKey === 'count' ? `${p.value}건` : `${p.value.toLocaleString()}km`}
+                        {p.dataKey === 'count' ? `${p.value ?? 0}건` : `${(p.value ?? 0).toLocaleString()}km`}
                     </span>
                 </p>
             ))}

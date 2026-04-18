@@ -18,6 +18,15 @@ interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
     {
+        date: '2026-04-18',
+        title: '대시보드 기능 및 성능 최적화 업데이트 📊',
+        items: [
+            { type: 'new', text: '시스템 관리자가 통계를 개별 기관(조직)별로 필터링하여 상세 분석할 수 있도록 대시보드가 고도화되었습니다.' },
+            { type: 'fixed', text: '관리자 대시보드 차트의 툴팁 표기에서 주행거리 및 운행횟수가 누락되던 시각적 오류를 해결했습니다.' },
+            { type: 'improved', text: '통계 산출 속도 및 대시보드 화면 전환을 위한 데이터 캐싱 구조가 더욱 최적화되었습니다.' }
+        ]
+    },
+    {
         date: '2026-04-17',
         title: '운행일지 데이터 안정성 및 성능 최적화 🚀',
         items: [

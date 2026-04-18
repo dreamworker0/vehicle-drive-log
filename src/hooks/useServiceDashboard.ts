@@ -7,7 +7,7 @@ import type { OrgStat, CachedDashboardStats, CachedDashboardTimeSeries, CachedDa
 import { loadFuelHipassStats } from './serviceDashboard/loadFuelHipassStats';
 import { loadNotificationStats } from './serviceDashboard/loadNotificationStats';
 
-export default function useServiceDashboard() {
+export default function useServiceDashboard(orgFilterId: string = 'ALL') {
     const [stats, setStats] = useState<CachedDashboardStats['monthlyStats'] extends infer _ ? {
         approvedOrgs: number; totalUsers: number; adminCount: number; employeeCount: number;
         totalLogs: number; totalDistance: number; pendingApps: number; calendarSyncOrgs: number;
@@ -146,9 +146,9 @@ export default function useServiceDashboard() {
     const applyCacheDocuments = useCallback((
         statsSnap: Awaited<ReturnType<typeof getDoc>>,
         timeSeriesSnap: Awaited<ReturnType<typeof getDoc>>,
-        orgRankingsSnap: Awaited<ReturnType<typeof getDoc>>,
+        orgRankingsSnap: Awaited<ReturnType<typeof getDoc>> | null,
     ) => {
-        if (statsSnap.exists()) {
+        if (statsSnap && statsSnap.exists()) {
             const s = statsSnap.data() as CachedDashboardStats;
             setStats({
                 approvedOrgs: s.approvedOrgs,
@@ -182,7 +182,7 @@ export default function useServiceDashboard() {
             setLastCacheUpdated(s.lastUpdatedAt);
         }
 
-        if (timeSeriesSnap.exists()) {
+        if (timeSeriesSnap && timeSeriesSnap.exists()) {
             const ts = timeSeriesSnap.data() as CachedDashboardTimeSeries;
             setInputMethodStats(ts.inputMethodStats);
             setDailyDriveStats(ts.dailyDriveStats);
@@ -195,8 +195,10 @@ export default function useServiceDashboard() {
             setHourlyAvgDuration(ts.hourlyAvgDuration);
             // items(flat) → grid(2D) 변환
             const grid = Array.from({ length: 7 }, () => Array(24).fill(0) as number[]);
-            ts.heatmapData.items.forEach(({ dayIdx, hour, count }) => { grid[dayIdx][hour] = count; });
-            setHeatmapData({ grid, maxCount: ts.heatmapData.maxCount });
+            if (ts.heatmapData?.items) {
+                ts.heatmapData.items.forEach(({ dayIdx, hour, count }) => { grid[dayIdx][hour] = count; });
+                setHeatmapData({ grid, maxCount: ts.heatmapData.maxCount });
+            }
 
             if (ts.quickDriveStats) setQuickDriveStats(ts.quickDriveStats);
             if (ts.quickDriveRatio) setQuickDriveRatio(ts.quickDriveRatio);
@@ -206,7 +208,7 @@ export default function useServiceDashboard() {
             if (ts.reservationTypeRatio) setReservationTypeRatio(ts.reservationTypeRatio);
         }
 
-        if (orgRankingsSnap.exists()) {
+        if (orgRankingsSnap && orgRankingsSnap.exists()) {
             const r = orgRankingsSnap.data() as CachedDashboardOrgRankings;
             const orgs: OrgStat[] = r.topOrgs.map(o => ({
                 ...o,
@@ -221,25 +223,30 @@ export default function useServiceDashboard() {
     const loadAllStats = useCallback(async (isBackground = false) => {
         if (!isBackground) setLoading(true);
         try {
+            const isAll = orgFilterId === 'ALL';
+            const statsDocName = isAll ? 'dashboardStats' : `dashboardStats_${orgFilterId}`;
+            const timeSeriesDocName = isAll ? 'dashboardTimeSeries' : `dashboardTimeSeries_${orgFilterId}`;
+            const orgRankingsDocName = 'dashboardOrgRankings';
+
             // 캐시 문서 3건 + 독립 통계 3건 병렬 로드
             const [statsDoc, timeSeriesDoc, orgRankingsDoc] = await Promise.all([
-                getDoc(doc(db, 'system', 'dashboardStats')),
-                getDoc(doc(db, 'system', 'dashboardTimeSeries')),
-                getDoc(doc(db, 'system', 'dashboardOrgRankings')),
+                getDoc(doc(db, 'system', statsDocName)),
+                getDoc(doc(db, 'system', timeSeriesDocName)),
+                getDoc(doc(db, 'system', orgRankingsDocName)),
             ]);
 
-            // ── 캐시 문서가 하나도 없으면 자동으로 초기 시딩 수행 ──
-            const noneExists = !statsDoc.exists() && !timeSeriesDoc.exists() && !orgRankingsDoc.exists();
-            if (noneExists) {
+            // ── 캐시 문서가 하나도 없으면 자동으로 초기 시딩 수행 (ALL인 경우만) ──
+            const noneExists = !statsDoc.exists() && !timeSeriesDoc.exists() && (orgRankingsDoc ? !orgRankingsDoc.exists() : true);
+            if (noneExists && isAll) {
                 console.info('[Dashboard] 캐시 문서가 없습니다. 자동으로 초기 통계를 생성합니다...');
                 try {
                     const refreshFn = httpsCallable(firebaseFunctions, 'refreshDashboardStats');
                     await refreshFn();
                     // 캐시 생성 후 다시 로드
                     const [s2, ts2, r2] = await Promise.all([
-                        getDoc(doc(db, 'system', 'dashboardStats')),
-                        getDoc(doc(db, 'system', 'dashboardTimeSeries')),
-                        getDoc(doc(db, 'system', 'dashboardOrgRankings')),
+                        getDoc(doc(db, 'system', statsDocName)),
+                        getDoc(doc(db, 'system', timeSeriesDocName)),
+                        getDoc(doc(db, 'system', orgRankingsDocName)),
                     ]);
                     applyCacheDocuments(s2, ts2, r2);
                     console.info('[Dashboard] 초기 시딩 완료');
@@ -251,8 +258,10 @@ export default function useServiceDashboard() {
                 applyCacheDocuments(statsDoc, timeSeriesDoc, orgRankingsDoc);
             }
 
-            // 독립 통계는 기존 방식 그대로 (이미 서버 집계/날짜 필터 사용)
+            // 독립 통계는 기존 방식 유지 -> 서버 단 필터링이 필요할 수 있지만 프론트에서는 일단 호출
+            // 서버쪽 refactoring에 orgFilterId가 반영되어야 완벽함. (loadFuelHipassStats 등은 개별 구현 확인 필요)
             await Promise.all([
+                // loadFuelHipassStats, loadNotificationStats 는 추후 orgFilterId 반영 검토
                 loadFuelHipassStats({
                     setFuelStats, setHipassStats, setDailyFuelCost, setDailyHipassAmount,
                 }),
@@ -261,11 +270,11 @@ export default function useServiceDashboard() {
                 }),
             ]);
 
-            sessionStorage.setItem('svc_dashboard_cache_time', Date.now().toString());
+            sessionStorage.setItem(`svc_dashboard_cache_time_${orgFilterId}`, Date.now().toString());
         } finally {
             if (!isBackground) setLoading(false);
         }
-    }, [applyCacheDocuments]);
+    }, [applyCacheDocuments, orgFilterId]);
 
     useEffect(() => {
         const cachedTime = sessionStorage.getItem('svc_dashboard_cache_time');
