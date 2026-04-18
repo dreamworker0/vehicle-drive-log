@@ -160,9 +160,9 @@ export default function MonthlyReport() {
                             <button
                                 key={tab.key}
                                 onClick={() => setActiveTab(tab.key)}
-                                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${activeTab === tab.key
-                                    ? 'bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 shadow-sm'
-                                    : 'text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:text-surface-300'
+                                className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${activeTab === tab.key
+                                    ? 'bg-white dark:bg-surface-700 text-surface-900 dark:text-surface-100 shadow-sm'
+                                    : 'text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-300'
                                     }`}
                             >
                                 {tab.label}
