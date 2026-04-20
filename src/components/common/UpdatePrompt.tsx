@@ -12,7 +12,13 @@ export default function UpdatePrompt() {
         const updateSW = registerSW({
             onNeedRefresh() {
                 console.log('[PWA] 새 버전 감지 → 자동 업데이트 적용');
-                updateSW(true);
+                // updateSW(true)는 Promise를 반환 — .catch()로 비동기 에러도 처리
+                Promise.resolve(updateSW(true)).catch(() => {
+                    // iOS Safari에서 newestWorker가 null인 경우
+                    // InvalidStateError 발생 — 페이지 새로고침으로 대체
+                    console.warn('[PWA] SW 업데이트 실패, 새로고침으로 대체');
+                    window.location.reload();
+                });
             },
             onOfflineReady() {
                 console.log('[PWA] 오프라인 사용 준비 완료');

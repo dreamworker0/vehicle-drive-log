@@ -9,6 +9,7 @@ import NotificationBell from '../common/NotificationBell';
 import AdminNotice from '../admin/AdminNotice';
 import IOSInstallPrompt from '../common/IOSInstallPrompt';
 import useBackButton from '../../hooks/useBackButton';
+import ErrorBoundary from '../common/ErrorBoundary';
 
 const TodayDashboard = lazyWithRetry(() => import('./TodayDashboard'));
 const DriveLogForm = lazyWithRetry(() => import('./DriveLogForm'));
@@ -143,6 +144,7 @@ export default function EmployeeLayout() {
 
             {/* 메인 콘텐츠 */}
             <main className="flex-1 p-4 overflow-y-auto" style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}>
+                <ErrorBoundary>
                 <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-8 h-8 spinner" /></div>}>
                     <Routes>
                         <Route path="today" element={<TodayDashboard />} />
@@ -157,6 +159,7 @@ export default function EmployeeLayout() {
                         <Route path="" element={<Navigate to="today" replace />} />
                     </Routes>
                 </Suspense>
+                </ErrorBoundary>
             </main>
 
             {/* 하단 탭 바 (모바일 최적화) */}

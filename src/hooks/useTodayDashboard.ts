@@ -37,6 +37,9 @@ function getDashboardData(orgId: string, uid: string, todayStr: string, weekEndD
         return globalDashboardCache.promise;
     }
     
+    // 빈 데이터 Fallback (에러 시 사용)
+    const EMPTY_FALLBACK: [Vehicle[], Reservation[], Reservation[], FuelLog[]] = [[], [], [], []];
+
     // 캐시 미스: 신규 페치
     const promise = Promise.all([
         getVehicles(orgId),
@@ -53,8 +56,11 @@ function getDashboardData(orgId: string, uid: string, todayStr: string, weekEndD
                 await refreshTokenSilently(firebaseAuth.currentUser);
             }
         }
+        // 캐시 무효화하여 다음 렌더링에서 재시도할 수 있게 함
         globalDashboardCache = null;
-        throw err;
+        // use()에서 throw되지 않도록 빈 데이터를 반환 → UI는 "예약 없음" 상태로 표시
+        console.warn('[TodayDashboard] 데이터 로드 실패, 빈 데이터로 대체:', errCode || err);
+        return EMPTY_FALLBACK;
     });
 
     globalDashboardCache = { key, promise };
