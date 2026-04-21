@@ -2,6 +2,7 @@
  * MileageInput — 주행 거리 입력 + OCR 계기판 촬영
  * DriveLogForm에서 추출된 서브 컴포넌트
  */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React from 'react';
 
 interface MileageForm {
@@ -70,14 +71,15 @@ export default function MileageInput({
                     className="hidden"
                 />
             </div>
-            {ocrImageUrl && (
+            {/* 원본 촬영 이미지 숨김 처리 (사용자 요청)
+              ocrImageUrl && (
                 <div className="mb-3 animate-fade-in relative rounded-lg overflow-hidden border border-surface-200 dark:border-surface-700 bg-black max-h-48 flex items-center justify-center">
                     <img src={`data:image/jpeg;base64,${ocrImageUrl}`} alt="계기판 캡처" className="max-w-full max-h-48 object-contain" />
                     <div className="absolute top-0 right-0 left-0 p-2 bg-gradient-to-b from-black/60 to-transparent flex justify-between items-center text-white text-xs">
                         <span className="font-medium drop-shadow-md">원본 촬영 이미지</span>
                     </div>
                 </div>
-            )}
+            ) */}
             {ocrError && (
                 <div className="mb-3 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700 text-xs text-amber-700 dark:text-amber-300 animate-fade-in">
                     <div className="flex items-center gap-1.5">
@@ -92,10 +94,10 @@ export default function MileageInput({
                     </button>
                 </div>
             )}
-            {ocrSuccess && (
+            {/* 인식 오류 신고 기능 제외 (사용자 요청)
+              ocrSuccess && (
                 <div className="mb-3 space-y-2 animate-fade-in">
 
-                    {/* 인식 오류 보내기 버튼 */}
                     {onOcrReport && !ocrReportSent && (
                         <button
                             type="button"
@@ -120,7 +122,7 @@ export default function MileageInput({
                     )}
 
                 </div>
-            )}
+            ) */}
             <div className="grid grid-cols-2 gap-4">
                 <div>
                     <label className="label text-xs">출발 km <span className="text-red-500">*</span></label>

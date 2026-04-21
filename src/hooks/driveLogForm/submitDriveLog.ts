@@ -143,24 +143,24 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
         }
     }
 
-    // 예약 상태 업데이트: 병목(waterfall) 방지를 위해 fire-and-forget 백그라운드 태스크로 전환
+    // 예약 상태 업데이트: 일지 저장 후 예약을 completed로 전환
+    let reservationUpdateFailed = false;
     if (!isEditMode && reservationData?.reservationId) {
         const resId = reservationData.reservationId;
         const actualStart = form.startTime || '';
         const actualEnd = form.endTime || nowTime();
         
-        Promise.resolve().then(async () => {
-            try {
-                await updateReservationStatus(resId, 'completed', {
-                    actualStartTime: actualStart,
-                    actualEndTime: actualEnd,
-                });
-                await clearDrivingNotification(resId);
-            } catch (e) {
-                console.warn('[submitDriveLog] 예약 상태 업데이트 실패(백그라운드):', e);
-                captureError(e, { context: 'submitDriveLog.updateReservationStatus', resId });
-            }
-        });
+        try {
+            await updateReservationStatus(resId, 'completed', {
+                actualStartTime: actualStart,
+                actualEndTime: actualEnd,
+            });
+            await clearDrivingNotification(resId);
+        } catch (e) {
+            console.warn('[submitDriveLog] 예약 상태 업데이트 실패:', e);
+            captureError(e, { context: 'submitDriveLog.updateReservationStatus', resId });
+            reservationUpdateFailed = true;
+        }
     }
 
     // 하이패스 잔액 업데이트: 병목(waterfall) 방지를 위해 fire-and-forget 백그라운드 태스크로 전환
@@ -199,6 +199,9 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
             shouldNavigate: 'today',
             syncResult,
             correctedKm,
+            backgroundWarning: reservationUpdateFailed
+                ? '운행일지는 저장되었으나, 예약 상태 변경에 실패했습니다. 새로고침 후에도 "운행 중"으로 표시되면 관리자에게 문의해주세요.'
+                : undefined,
         };
     }
 

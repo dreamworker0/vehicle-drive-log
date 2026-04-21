@@ -6,6 +6,7 @@ import { useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createFavorite, getFavorites } from '../../lib/firestore';
 import { resolveStartKm } from './resolveStartKm';
+import { invalidateDashboardCache } from '../useTodayDashboard';
 import { submitDriveLog, getEmptyForm } from './submitDriveLog';
 import { validateDriveLogForm } from '../utils/driveLogValidation';
 import { captureError } from '../../lib/sentry';
@@ -206,6 +207,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
                     navigate('/employee/my-records', { replace: true });
                 } else if (result.shouldNavigate === 'today') {
                     showToast(result.message || '예약 운행일지가 저장되었습니다.', 'success');
+                    invalidateDashboardCache();
                     navigate('/employee/today', { replace: true });
                 } else if (result.shouldResetForm) {
                     setForm(getEmptyForm());
