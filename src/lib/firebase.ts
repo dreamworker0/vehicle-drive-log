@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, browserLocalPersistence, setPersistence } from 'firebase/auth';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, getFirestore } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, getFirestore, clearIndexedDbPersistence } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
 // firebase/analytics, firebase/app-check, firebase/messaging은 동적 import (번들 최적화)
@@ -97,11 +97,53 @@ function showQuotaAlert(msg: string) {
     }
 }
 
+function isCacheCorruptionError(msg: string) {
+    if (!msg) return false;
+    return (
+        msg.includes('Failed to obtain exclusive access') ||
+        msg.includes('Internal error opening backing store') ||
+        msg.includes('A mutation operation was attempted on a database that did not allow mutations') ||
+        msg.includes('BloomFilter') ||
+        msg.includes('BloomFilterError') ||
+        msg.includes('indexedDB.open')
+    );
+}
+
+let isRecoveringCache = false;
+async function attemptCacheRecovery() {
+    if (isRecoveringCache || typeof window === 'undefined') return;
+    isRecoveringCache = true;
+    console.warn('[Firestore] 로컬 캐시 꼬임 감지. 자동 복구를 시작합니다.');
+    try {
+        if (typeof db !== 'undefined' && db) {
+            await clearIndexedDbPersistence(db);
+        }
+        console.warn('[Firestore] 복구 완료. 페이지를 새로고침합니다.');
+        if (!sessionStorage.getItem('firestore_recovered')) {
+            sessionStorage.setItem('firestore_recovered', 'true');
+            window.location.reload();
+        } else {
+            // eslint-disable-next-line no-restricted-globals
+            alert('오프라인 데이터 로딩 중 지속적인 문제가 발생하고 있습니다.\n브라우저 방문 기록(캐시 및 쿠키)을 비운 후 다시 시도해주세요.');
+            sessionStorage.removeItem('firestore_recovered');
+        }
+    } catch (err) {
+        console.error('[Firestore] 캐시 자동 복구 실패:', err);
+    } finally {
+        isRecoveringCache = false;
+    }
+}
+
 if (typeof window !== 'undefined') {
     window.addEventListener('error', (event) => {
-        if (isFirestorePersistenceError(event?.message)) {
-            console.warn('[Firestore] 지속성 에러 억제:', event.message);
-            showQuotaAlert(event?.message || '');
+        const msg = event?.message || '';
+        if (isFirestorePersistenceError(msg)) {
+            console.warn('[Firestore] 지속성 에러 억제:', msg);
+            if (isCacheCorruptionError(msg)) {
+                attemptCacheRecovery();
+            } else {
+                showQuotaAlert(msg);
+            }
             event.preventDefault();
             return true;
         }
@@ -110,7 +152,11 @@ if (typeof window !== 'undefined') {
         const msg = event?.reason?.message || String(event?.reason || '');
         if (isFirestorePersistenceError(msg)) {
             console.warn('[Firestore] 지속성 에러 억제:', msg);
-            showQuotaAlert(msg);
+            if (isCacheCorruptionError(msg)) {
+                attemptCacheRecovery();
+            } else {
+                showQuotaAlert(msg);
+            }
             event.preventDefault();
         }
         // permission-denied 에러는 useAuth의 onSnapshot에서 재시도/로그아웃으로
