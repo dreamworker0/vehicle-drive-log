@@ -271,7 +271,7 @@ export default function SuperAdminLayout() {
                             <Route path="feedbacks" element={<FeedbackManagement />} />
                             <Route path="admins" element={<SuperAdminManager />} />
                             <Route path="ocr-test" element={<OcrTestPage />} />
-                            <Route path="" element={<Navigate to="applications" replace />} />
+                            <Route path="" element={<Navigate to="dashboard" replace />} />
                         </Routes>
                     </Suspense>
                 </div>

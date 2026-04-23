@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import ServiceDashboard from '../../components/superAdmin/ServiceDashboard';
 import useServiceDashboard from '../../hooks/useServiceDashboard';
@@ -124,8 +124,11 @@ describe('ServiceDashboard', () => {
         // 화면 구성이 비동기로 완료되기를 기다립니다
         expect(await screen.findByText('서비스 운영 대시보드')).toBeInTheDocument();
         
+        // 탭 변경 (기본값이 '운행 분석'으로 바뀌었으므로 '운영 요약' 탭 클릭)
+        fireEvent.click(screen.getByText('운영 요약'));
+
         // 카드 내 타이틀들
-        expect(screen.getByText('전체 사용자')).toBeInTheDocument();
+        expect(await screen.findByText('전체 사용자')).toBeInTheDocument();
         expect(screen.getByText('주간 활성 (WAU)')).toBeInTheDocument();
         expect(screen.getByText('온보딩 완료율')).toBeInTheDocument();
 
@@ -137,6 +140,7 @@ describe('ServiceDashboard', () => {
 
     it('빈 데이터 상태일 때 방어 코드가 동작하여 안내 문구를 렌더링한다', async () => {
         render(<ServiceDashboard />);
+        fireEvent.click(screen.getByText('운영 요약'));
         
         // 데이터가 없을 때의 안내 문구를 비동기적으로 대기 (Suspense 해결 후 노출)
         const emptyTexts = await screen.findAllByText(/데이터가 없습니다/);
@@ -145,6 +149,7 @@ describe('ServiceDashboard', () => {
 
     it('기관 활성도 섹션이 렌더링된다', async () => {
         render(<ServiceDashboard />);
+        fireEvent.click(screen.getByText('운영 요약'));
         expect(await screen.findByText(/활성도/)).toBeInTheDocument();
     });
 });

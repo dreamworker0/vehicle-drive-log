@@ -20,7 +20,7 @@ type TabType = 'overview' | 'analysis' | 'experience';
  * 서비스 전체 통계: 기관 수, 사용자 수, 운행 횟수, 총 주행거리 + 고도화 인사이트
  */
 export default function ServiceDashboard() {
-    const [activeTab, setActiveTab] = useState<TabType>('overview');
+    const [activeTab, setActiveTab] = useState<TabType>('analysis');
     const [selectedOrgId, setSelectedOrgId] = useState<string>('ALL');
 
     const {
@@ -97,7 +97,7 @@ export default function ServiceDashboard() {
                         className="p-1.5 text-sm font-medium rounded-lg border border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 outline-none focus:ring-2 focus:ring-primary-500 w-full sm:w-auto"
                     >
                         <option value="ALL">전체 기관 통계</option>
-                        {topOrgs.map(org => (
+                        {[...topOrgs].sort((a, b) => a.name.localeCompare(b.name)).map(org => (
                             <option key={org.id} value={org.id}>
                                 {org.name}
                             </option>

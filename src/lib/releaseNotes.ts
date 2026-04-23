@@ -18,6 +18,13 @@ interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
     {
+        date: '2026-04-23',
+        title: '관리자 대시보드 접근성 개선 ✨',
+        items: [
+            { type: 'improved', text: '시스템 관리자 로그인 시 첫 화면이 직관적인 통계 확인을 위해 운영 대시보드의 "운행 분석" 탭으로 바로 이동하도록 접근성이 개선되었습니다.' }
+        ]
+    },
+    {
         date: '2026-04-18',
         title: '대시보드 기능 및 성능 최적화 업데이트 📊',
         items: [
