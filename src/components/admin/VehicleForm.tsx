@@ -2,7 +2,7 @@
  * VehicleForm — 차량 등록/수정 모달 폼
  * VehicleManager에서 추출된 서브 컴포넌트
  */
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { DEFAULT_FUEL } from '../../hooks/useVehicleManager';
 import type { Vehicle } from '../../types';
 import { FUEL_TYPES } from '../../types/vehicle';
@@ -27,6 +27,7 @@ interface Props {
     onSubmit: (e: React.FormEvent) => void;
     onCancel: () => void;
     onModelNameChange: (value: string) => void;
+    modelSuggestions: string[];
 }
 
 const VEHICLE_TYPES = [
@@ -39,8 +40,57 @@ const VEHICLE_TYPES = [
 
 export default function VehicleForm({
     form, setForm, editingVehicle, formLoading,
-    onSubmit, onCancel, onModelNameChange,
+    onSubmit, onCancel, onModelNameChange, modelSuggestions,
 }: Props) {
+    const [showSuggestions, setShowSuggestions] = useState(false);
+    const [activeIndex, setActiveIndex] = useState(-1);
+    const modelInputRef = useRef<HTMLInputElement>(null);
+    const suggestionsRef = useRef<HTMLUListElement>(null);
+
+    // 필터링된 후보 목록
+    const filtered = form.modelName.trim()
+        ? modelSuggestions.filter(s =>
+            s.toLowerCase().includes(form.modelName.trim().toLowerCase())
+          )
+        : modelSuggestions;
+
+    // 드롭다운 외부 클릭 시 닫기
+    useEffect(() => {
+        const handler = (e: MouseEvent) => {
+            if (
+                modelInputRef.current && !modelInputRef.current.contains(e.target as Node) &&
+                suggestionsRef.current && !suggestionsRef.current.contains(e.target as Node)
+            ) {
+                setShowSuggestions(false);
+                setActiveIndex(-1);
+            }
+        };
+        document.addEventListener('mousedown', handler);
+        return () => document.removeEventListener('mousedown', handler);
+    }, []);
+
+    const selectSuggestion = (value: string) => {
+        onModelNameChange(value);
+        setShowSuggestions(false);
+        setActiveIndex(-1);
+    };
+
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (!showSuggestions || filtered.length === 0) return;
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            setActiveIndex(i => Math.min(i + 1, filtered.length - 1));
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            setActiveIndex(i => Math.max(i - 1, 0));
+        } else if (e.key === 'Enter' && activeIndex >= 0) {
+            e.preventDefault();
+            selectSuggestion(filtered[activeIndex]);
+        } else if (e.key === 'Escape') {
+            setShowSuggestions(false);
+            setActiveIndex(-1);
+        }
+    };
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
             <div className="glass-card p-6 w-full max-w-md max-h-[90vh] overflow-y-auto animate-scale-in">
@@ -70,13 +120,53 @@ export default function VehicleForm({
                         <p className="text-xs text-surface-400 mt-1">직원들이 쉽게 구분할 수 있는 이름</p>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
-                        <div>
+                    <div>
                             <label className="label">모델명</label>
-                            <input
-                                type="text" value={form.modelName}
-                                onChange={e => onModelNameChange(e.target.value)}
-                                className="input" placeholder="소나타"
-                            />
+                            <div className="relative">
+                                <input
+                                    ref={modelInputRef}
+                                    type="text"
+                                    value={form.modelName}
+                                    onChange={e => {
+                                        onModelNameChange(e.target.value);
+                                        setShowSuggestions(true);
+                                        setActiveIndex(-1);
+                                    }}
+                                    onFocus={() => setShowSuggestions(true)}
+                                    onKeyDown={handleKeyDown}
+                                    className="input pr-8"
+                                    placeholder="소나타"
+                                    autoComplete="off"
+                                />
+                                {/* 화살표 아이콘 */}
+                                <svg
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400 pointer-events-none"
+                                    fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"
+                                >
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+                                </svg>
+                                {/* 자동완성 드롭다운 */}
+                                {showSuggestions && filtered.length > 0 && (
+                                    <ul
+                                        ref={suggestionsRef}
+                                        className="absolute z-50 w-full mt-1 bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-600 rounded-xl shadow-lg max-h-48 overflow-y-auto"
+                                    >
+                                        {filtered.map((s, i) => (
+                                            <li
+                                                key={s}
+                                                onMouseDown={() => selectSuggestion(s)}
+                                                className={`px-3 py-2 cursor-pointer text-sm transition-colors
+                                                    ${i === activeIndex
+                                                        ? 'bg-primary-50 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300'
+                                                        : 'text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-700'
+                                                    }`}
+                                            >
+                                                {s}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
+                            </div>
                         </div>
                         <div>
                             <label className="label">차량번호 <span className="text-red-500">*</span></label>

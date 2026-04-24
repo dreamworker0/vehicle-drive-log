@@ -120,10 +120,10 @@ export default function FAQPage() {
             <PublicNav />
             <div className="flex-1 py-8 px-4">
             <div className="w-full max-w-2xl mx-auto animate-fade-in">
-                <div className="bg-white rounded-2xl shadow-soft p-6 md:p-8 space-y-6">
+                <div className="bg-white dark:bg-surface-900 rounded-2xl shadow-soft p-6 md:p-8 space-y-6">
                     <div className="text-center border-b border-surface-100 pb-6">
-                        <h1 className="text-2xl font-bold text-surface-900 mb-1">❓ 자주 하는 질문</h1>
-                        <p className="text-sm text-surface-400">
+                        <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-1">❓ 자주 하는 질문</h1>
+                        <p className="text-sm text-surface-400 dark:text-surface-500">
                             궁금한 점을 빠르게 확인하세요.
                         </p>
                     </div>
@@ -141,7 +141,7 @@ export default function FAQPage() {
                             value={search}
                             onChange={e => setSearch(e.target.value)}
                             placeholder="질문 검색..."
-                            className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-surface-200 bg-surface-50 text-sm text-surface-800 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-300 focus:border-primary-300 transition-all"
+                            className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/50 text-sm text-surface-800 dark:text-surface-200 placeholder:text-surface-400 dark:placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-primary-300 transition-all"
                         />
                         {search && (
                             <button
@@ -157,7 +157,7 @@ export default function FAQPage() {
 
                     {/* 검색 결과 요약 */}
                     {search.trim() && (
-                        <p className="text-xs text-surface-400 -mt-2">
+                        <p className="text-xs text-surface-400 dark:text-surface-500 -mt-2">
                             {filtered.length > 0
                                 ? `${filtered.length}개의 결과가 있습니다.`
                                 : '검색 결과가 없습니다. 다른 키워드로 검색해 보세요.'}
@@ -202,7 +202,7 @@ export default function FAQPage() {
                                         <span className="flex-shrink-0 w-7 h-7 rounded-lg bg-primary-100 text-primary-600 flex items-center justify-center text-xs font-bold">
                                             Q{idx + 1}
                                         </span>
-                                        <span className="flex-1 text-sm font-semibold text-surface-800 leading-snug">
+                                        <span className="flex-1 text-sm font-semibold text-surface-800 dark:text-surface-200 leading-snug">
                                             {item.question}
                                         </span>
                                         {/* 링크 복사 버튼 */}
@@ -237,7 +237,7 @@ export default function FAQPage() {
                                         <div className="overflow-hidden">
                                             <div className="px-4 pb-4 pt-2 space-y-1.5">
                                                 {item.answer.map((line, lineIdx) => (
-                                                    <p key={lineIdx} className="text-sm text-surface-600 leading-relaxed">
+                                                    <p key={lineIdx} className="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
                                                         {line}
                                                     </p>
                                                 ))}
@@ -250,7 +250,7 @@ export default function FAQPage() {
                     </div>
 
                     <div className="border-t border-surface-100 pt-4 text-center">
-                        <p className="text-xs text-surface-400">
+                        <p className="text-xs text-surface-400 dark:text-surface-500">
                             더 궁금한 점이 있으시면 더보기 → 건의하기를 이용해주세요.
                         </p>
                     </div>

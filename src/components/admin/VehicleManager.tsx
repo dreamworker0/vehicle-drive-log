@@ -19,6 +19,7 @@ export default function VehicleManager() {
         editingVehicle, formLoading, form, setForm,
         modal, closeModal, deletableIds,
         resetForm, handleEdit, handleModelNameChange, handleSubmit,
+        modelSuggestions,
         openDeleteModal, confirmDelete,
         openClearMaintenanceModal, confirmClearMaintenance,
         openRetireModal, confirmRetire,
@@ -217,13 +218,14 @@ export default function VehicleManager() {
             </div>
 
             {showForm && (
-                <VehicleForm
+            <VehicleForm
                     form={form} setForm={setForm}
                     editingVehicle={editingVehicle}
                     formLoading={formLoading}
                     onSubmit={handleSubmit}
                     onCancel={resetForm}
                     onModelNameChange={handleModelNameChange}
+                    modelSuggestions={modelSuggestions}
                 />
             )}
 

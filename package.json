@@ -35,14 +35,11 @@
     "react-router-dom": "^7.13.0",
     "recharts": "^3.8.0",
     "web-vitals": "^5.2.0",
-    "workbox-navigation-preload": "^7.4.0",
     "xlsx": "^0.18.5",
     "zod": "^4.3.6",
     "zustand": "^5.0.12"
   },
   "devDependencies": {
-    "@commitlint/cli": "^20.5.0",
-    "@commitlint/config-conventional": "^20.5.0",
     "@eslint/js": "^9.39.1",
     "@firebase/rules-unit-testing": "^5.0.0",
     "@playwright/test": "^1.58.2",
@@ -53,7 +50,6 @@
     "@vitejs/plugin-react": "^5.1.1",
     "@vitest/coverage-v8": "^4.1.4",
     "autoprefixer": "^10.4.24",
-    "commitlint": "^20.5.0",
     "dotenv": "^17.3.1",
     "eslint": "^9.39.1",
     "eslint-plugin-react-hooks": "^7.0.1",

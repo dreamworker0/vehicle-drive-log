@@ -60,11 +60,24 @@ export const regenerateInviteCode = async (orgId: string) => {
 // 기관 생성
 export const createOrganization = async (data: Partial<Organization>) => {
     try {
-        const docRef = await addDoc(collection(db, 'organizations'), {
+        const uniqueNumber = data.uniqueNumber || '';
+        const cleanNumber = uniqueNumber.replace(/-/g, '');
+        const isNonProfit = cleanNumber.length === 10 && cleanNumber.substring(3, 5) === '82';
+
+        const status = isNonProfit ? 'approved' : 'pending';
+        const inviteCode = isNonProfit ? generateInviteCode() : undefined;
+        const approvedAt = isNonProfit ? serverTimestamp() : undefined;
+
+        const docData: Partial<Organization> = {
             ...data,
-            status: 'pending',
+            status,
             createdAt: serverTimestamp(),
-        });
+        };
+        
+        if (inviteCode) docData.inviteCode = inviteCode;
+        if (approvedAt) docData.approvedAt = approvedAt;
+
+        const docRef = await addDoc(collection(db, 'organizations'), docData);
         return docRef.id;
     } catch (error) {
         captureError(error, { context: 'createOrganization', data });

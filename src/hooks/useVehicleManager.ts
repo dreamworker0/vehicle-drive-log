@@ -15,15 +15,48 @@ import { getVehicles, createVehicle, updateVehicle, deleteVehicle, hasVehicleDri
 import { useToast } from './useToast';
 import { captureError } from '../lib/sentry';
 
+// ─────────────────────────────────────────────────────────────
+// 자동완성용 한국 차량 모델명 정적 목록
+// ─────────────────────────────────────────────────────────────
+export const VEHICLE_MODEL_SUGGESTIONS = [
+    // 현대 — 승용/SUV
+    '아반떼', '소나타', '그랜저', '아이오닉', '아이오닉5', '아이오닉6', '코나', '투싼', '싼타페', '팰리세이드',
+    '엑센트', '클릭', '베뉴', '캐스퍼',
+    // 현대 — 상용/승합/버스
+    '스타리아', '스타렉스', '그랜드 스타렉스', '포터', '마이티', '카운티', '솔라티', '에어로타운', '유니버스',
+    // 기아 — 승용/SUV
+    'K3', 'K5', 'K8', 'K9', '레이', '모닝', '스포티지', '쏘렌토', '카니발', '그랜드 카니발', '텔루라이드',
+    '셀토스', '니로', '쏘울', '프라이드', '로체',
+    // 기아 — 전기
+    'EV3', 'EV5', 'EV6', 'EV9', 'PV5',
+    // 기아 — 상용
+    '봉고3',
+    // 제네시스
+    'G70', 'G80', 'G90', 'GV70', 'GV80',
+    // KG모빌리티(구 쌍용)
+    '티볼리', '코란도', '렉스턴', '무쏘', '토레스',
+    // 르노코리아
+    'SM6', 'SM7', 'QM6', '클리오', 'XM3',
+    // 쉐보레/GM대우
+    '스파크', '말리부', '트랙스', '트레일블레이저', '이쿼녹스', '마티즈', '볼트EV',
+    // 도요타
+    '캠리',
+    // 버스
+    'BH090', 'CEVO-C',
+    // 수소·전기 전용
+    '넥쏘',
+];
+
 // 전기차 모델명 목록 (감지 시 fuelType을 electric으로 자동 설정)
 const ELECTRIC_MODELS = [
     '아이오닉', '아이오닉5', '아이오닉6', '아이오닉7',
     'EV3', 'EV5', 'EV6', 'EV9', '니로EV', '니로 EV', '코나EV', '코나 EV', '코나 일렉트릭',
-    '볼트EV', '볼트 EV', '볼트EUV',
+    '볼트EV', '볼트 EV', '볼트EUV', '쉐보레 볼트',
     '테슬라', 'Model 3', 'Model Y', 'Model S', 'Model X',
     'e-트론', 'ID.4', '폴스타', '제로', 'i4', 'iX',
     'SM3 Z.E', 'ZOE', '트위지',
     '포터EV', '포터 EV', '봉고EV', '봉고 EV',
+    'PV5',
 ];
 
 // 수소차 모델명 목록
@@ -31,16 +64,17 @@ const HYDROGEN_MODELS = ['넥쏘', 'nexo'];
 
 // 모델명 → 차종 자동 매핑
 const MODEL_TYPE_MAP = {
-    compact: ['모닝', '캐스퍼', '마티즈', '레이', '스파크', '다마스', '티코', '트위즈', '피카퇠', 'ZOE', '트위지'],
+    compact: ['모닝', '캐스퍼', '마티즈', '레이', '스파크', '다마스', '티코', '트위즈', '피카퇴', 'ZOE', '트위지'],
     sedan: [
         '소나타', '아반떼', '그랜저', 'K5', 'K3', 'K7', 'K8', 'K9', '말리부', '셀토스', '제네시스', 'SM6', 'SM3', '투슨', 'i30', 'i40',
-        '아이오닉', 'EV3', 'EV5', 'EV6', 'EV9', '니로', '코나', '볼트',
+        '엑센트', '클릭', '베뉴', '쏘울', '프라이드', '로체', '캠리',
+        '아이오닉', 'EV3', 'EV5', 'EV6', 'EV9', '니로', '코나', '볼트', 'PV5',
         '테슬라', 'Model 3', 'Model Y', 'Model S', 'Model X',
         'e-트론', 'ID.4', '폴스타', '제로', 'i4', 'iX',
         '넥쏘', 'nexo'
     ],
-    van: ['스타렉스', '스타랙스', '스타리아', '스타리야', '카니발', '카니벌', '콴라티', '보나식', '투산', '마스터', '보고', '싶온', '라바'],
-    bus: ['유니버스', '에어로', '카운티', '카운디', '레스타', '솔라티', '솔라디', '시티', '그린시티'],
+    van: ['스타렉스', '스타랙스', '그랜드 스타렉스', '스타리아', '스타리야', '카니발', '카니벌', '솔라티', '솔라디'],
+    bus: ['유니버스', '에어로타운', '에어로', '카운티', '카운디', '레스타', 'BH090', 'CEVO-C', '시티', '그린시티'],
     truck: ['포터', '봉고', '봉구', '마이티', '메가트럭', '노부스', '파비스', '더카고', '그랜버드'],
 };
 
@@ -91,6 +125,15 @@ export default function useVehicleManager() {
     const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
     const [formLoading, setFormLoading] = useState(false);
     const [form, setForm] = useState(INITIAL_FORM);
+
+    // 자동완성 후보: 정적 목록 + 기존 등록 차량 모델명 합산
+    const modelSuggestions = (() => {
+        const fromVehicles = vehicles
+            .map(v => v.modelName?.trim())
+            .filter((m): m is string => !!m);
+        const merged = [...new Set([...VEHICLE_MODEL_SUGGESTIONS, ...fromVehicles])];
+        return merged.sort((a, b) => a.localeCompare(b, 'ko'));
+    })();
 
     // 모달 상태 — { type, vehicle, action } 형태로 관리
     const [modal, setModal] = useState<VehicleModal | null>(null);
@@ -310,6 +353,7 @@ export default function useVehicleManager() {
         editingVehicle, formLoading, form, setForm,
         modal, closeModal, deletableIds,
         resetForm, handleEdit, handleModelNameChange, handleSubmit,
+        modelSuggestions,
         openDeleteModal, confirmDelete,
         openClearMaintenanceModal, confirmClearMaintenance,
         openRetireModal, confirmRetire,

@@ -130,7 +130,7 @@ export default function AdminDashboard() {
                         <div className="flex items-center justify-between gap-2">
                             <div className="min-w-0">
                                 <p className="text-xs text-surface-500 dark:text-surface-400 mb-1 whitespace-nowrap">{stat.label}</p>
-                                <p className="text-xl font-bold text-surface-900 dark:text-surface-100">
+                                <p className="text-xl font-bold text-surface-900 dark:text-surface-100 whitespace-nowrap">
                                     {loading ? <span className="w-5 h-5 spinner inline-block" /> : stat.value}
                                 </p>
                             </div>

@@ -22,10 +22,10 @@ export default function ReleaseNotesPage() {
             <PublicNav />
             <div className="flex-1 py-8 px-4">
             <div className="w-full max-w-2xl mx-auto animate-fade-in">
-                <div className="bg-white rounded-2xl shadow-soft p-6 md:p-8 space-y-8">
+                <div className="bg-white dark:bg-surface-900 rounded-2xl shadow-soft p-6 md:p-8 space-y-8">
                     <div className="text-center border-b border-surface-100 pb-6">
-                        <h1 className="text-2xl font-bold text-surface-900 mb-1">📋 업데이트 소식</h1>
-                        <p className="text-sm text-surface-400">
+                        <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-1">📋 업데이트 소식</h1>
+                        <p className="text-sm text-surface-400 dark:text-surface-500">
                             차량 운행일지 서비스의 변경 사항을 확인하세요.
                         </p>
                     </div>
@@ -38,7 +38,7 @@ export default function ReleaseNotesPage() {
                                     {note.date}
                                 </time>
                                 {note.title && (
-                                    <span className="text-sm font-medium text-surface-700 truncate">
+                                    <span className="text-sm font-medium text-surface-700 dark:text-surface-300 truncate">
                                         {note.title}
                                     </span>
                                 )}
@@ -49,7 +49,7 @@ export default function ReleaseNotesPage() {
                                 {note.items.map((item, idx) => {
                                     const cfg = TYPE_CONFIG[item.type];
                                     return (
-                                        <li key={idx} className="flex items-start gap-2.5 text-sm text-surface-600 leading-relaxed">
+                                        <li key={idx} className="flex items-start gap-2.5 text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
                                             <span
                                                 className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium whitespace-nowrap mt-0.5 ${cfg.color}`}
                                             >
@@ -69,7 +69,7 @@ export default function ReleaseNotesPage() {
                     ))}
 
                     <div className="border-t border-surface-100 pt-4 text-center">
-                        <p className="text-xs text-surface-400">
+                        <p className="text-xs text-surface-400 dark:text-surface-500">
                             © 2026 차량 운행일지. 지속적으로 개선하고 있습니다.
                         </p>
                     </div>

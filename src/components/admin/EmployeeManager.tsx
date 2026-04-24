@@ -68,7 +68,7 @@ export default function EmployeeManager() {
                         {/* 초대 링크 */}
                         <div className="sm:col-span-2 bg-surface-50 dark:bg-surface-800/50 rounded-lg border border-surface-200 dark:border-surface-700/50 p-3.5 flex flex-col justify-center relative group overflow-hidden">
                             <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-semibold text-surface-500">초대 링크</span>
+                                <span className="text-xs font-semibold text-surface-500 dark:text-surface-400">초대 링크</span>
                                 <button onClick={() => handleCopyInviteCode('link')} className={`text-xs flex items-center gap-1 transition-colors ${copiedType === 'link' ? 'text-accent-600 dark:text-accent-400 font-medium' : 'text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-200'}`}>
                                     {copiedType === 'link' ? (
                                         <>
@@ -91,7 +91,7 @@ export default function EmployeeManager() {
                         {/* 초대 코드 */}
                         <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg border border-surface-200 dark:border-surface-700/50 p-3.5 flex flex-col justify-center">
                             <div className="flex items-center justify-between mb-2">
-                                <span className="text-xs font-semibold text-surface-500">기관 코드</span>
+                                <span className="text-xs font-semibold text-surface-500 dark:text-surface-400">기관 코드</span>
                                 <button onClick={() => handleCopyInviteCode('code')} className={`text-xs flex items-center gap-1 transition-colors ${copiedType === 'code' ? 'text-accent-600 dark:text-accent-400 font-medium' : 'text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-200'}`}>
                                     {copiedType === 'code' ? (
                                         <>
@@ -111,7 +111,7 @@ export default function EmployeeManager() {
                             </div>
                         </div>
                     </div>
-                    <p className="text-xs text-surface-400 mt-1">이 링크 또는 기관 코드를 소속 직원에게 공유해 주세요. 직원 가입 시 자동으로 연결됩니다.</p>
+                    <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">이 링크 또는 기관 코드를 소속 직원에게 공유해 주세요. 직원 가입 시 자동으로 연결됩니다.</p>
                 </div>
             </div>
 
@@ -172,7 +172,7 @@ export default function EmployeeManager() {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M18 18.72a9.094 9.094 0 0 0 3.741-.479 3 3 0 0 0-4.682-2.72m.94 3.198.001.031c0 .225-.012.447-.037.666A11.944 11.944 0 0 1 12 21c-2.17 0-4.207-.576-5.963-1.584A6.062 6.062 0 0 1 6 18.719m12 0a5.971 5.971 0 0 0-.941-3.197m0 0A5.995 5.995 0 0 0 12 12.75a5.995 5.995 0 0 0-5.058 2.772m0 0a3 3 0 0 0-4.681 2.72 8.986 8.986 0 0 0 3.74.477m.94-3.197a5.971 5.971 0 0 0-.94 3.197M15 6.75a3 3 0 1 1-6 0 3 3 0 0 1 6 0Zm6 3a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Zm-13.5 0a2.25 2.25 0 1 1-4.5 0 2.25 2.25 0 0 1 4.5 0Z" />
                     </svg>
                     <p className="text-surface-400 text-lg font-medium">등록된 직원이 없습니다</p>
-                    <p className="text-sm text-surface-300 mt-1">초대 링크를 직원들에게 공유하세요</p>
+                    <p className="text-sm text-surface-400 dark:text-surface-500 mt-1">초대 링크를 직원들에게 공유하세요</p>
                 </div>
             ) : filteredUnifiedList.length === 0 ? (
                 <div className="glass-card p-12 text-center">

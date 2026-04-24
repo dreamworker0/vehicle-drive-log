@@ -91,7 +91,7 @@ export const computeDashboardStats = onSchedule(
     {
         schedule: "every 1 hours",
         timeZone: "Asia/Seoul",
-        retryCount: 1,
+        retryCount: 0,
         memory: "512MiB",
         timeoutSeconds: 300,
     },

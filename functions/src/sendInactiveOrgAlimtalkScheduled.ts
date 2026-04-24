@@ -1,6 +1,7 @@
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { getFirestore } from "firebase-admin/firestore";
 import { sendReminderAlimtalk } from "./sendAlimtalk";
+import { sendDiscordAlert } from "./discord";
 
 export const sendInactiveOrgAlimtalkScheduled = onSchedule(
     {
@@ -131,7 +132,6 @@ export const sendInactiveOrgAlimtalkScheduled = onSchedule(
 
         console.log(`[Scheduled Alimtalk] 발송 완료: 성공 ${sentCount}, 실패 ${failCount}, 번호없음 ${noPhoneCount}`);
 
-        // 5. 발송 여부 최종 기록
         await logRef.set({
             sent: true,
             sentAt: new Date(),
@@ -141,6 +141,18 @@ export const sendInactiveOrgAlimtalkScheduled = onSchedule(
             results,
             targetWeek: `${lastWeekMondayStr} ~ ${lastWeekSundayStr}`,
             holidaySkipped: dayOfWeek > 1 ? true : false, // 월요일이 아닌 날 발송된 경우
+        });
+
+        // 6. 디스코드 알림 발송
+        await sendDiscordAlert({
+            title: "📢 미활성 기관 알림톡 발송 완료",
+            description: `미신청 기관에 대한 리마인드 알림톡 발송이 완료되었습니다.\n대상 가입일: ${lastWeekMondayStr} ~ ${lastWeekSundayStr}`,
+            color: 3066993, // Green
+            fields: [
+                { name: "발송 성공", value: `${sentCount}건`, inline: true },
+                { name: "발송 실패", value: `${failCount}건`, inline: true },
+                { name: "전화번호 없음", value: `${noPhoneCount}건`, inline: true }
+            ]
         });
     }
 );

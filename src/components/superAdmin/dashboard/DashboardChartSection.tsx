@@ -1,6 +1,5 @@
 import React, { useMemo } from 'react';
 import type { FuelStatsData, HipassStatsData, FirstEmployeeStatsData } from './dashboardUtils';
-import ChartOrgTrend from './ChartOrgTrend';
 import ChartDAU from './ChartDAU';
 import ChartInputMethod from './ChartInputMethod';
 import ChartQuickDrive from './ChartQuickDrive';
@@ -13,8 +12,6 @@ import ChartFuelHipass from './ChartFuelHipass';
 import ChartCalendarSync from './ChartCalendarSync';
 
 interface Props {
-    // 일별 기관 추이
-    dailyActiveOrgStats: { date: string; active: number; inactive: number; rejected: number; deleted: number; dayActive: number; dayInactive: number; dayRejected: number; dayDeleted: number }[];
     // 활성 사용자 추이
     dailyActiveUserStats: { date: string; users: number }[];
     // 첫 직원 등록 소요시간
@@ -59,7 +56,6 @@ function DashboardChartSection(props: Props) {
     // 부모인 이 컴포넌트도 React.memo로 감싸 props 변경 없을 때 리렌더링 방지
     const content = useMemo(() => (
         <>
-            <ChartOrgTrend dailyActiveOrgStats={props.dailyActiveOrgStats} />
             <ChartDAU dailyActiveUserStats={props.dailyActiveUserStats} />
 
             <ChartInputMethod inputMethodStats={props.inputMethodStats} />

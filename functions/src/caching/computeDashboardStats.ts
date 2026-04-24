@@ -71,7 +71,59 @@ export async function computeAllDashboardStats(): Promise<void> {
         db.collection("orgApplications").where("status", "==", "pending").count().get(),
         db.collection("reservations").where("date", ">=", thirtyDaysAgoStr).get(),
     ]);
+
+    // 1.5. 사전 분류 (O(N+M) 최적화를 위해 기관별로 문서 분배)
+    const userByOrg: Record<string, FirebaseFirestore.QueryDocumentSnapshot[]> = {};
+    const logByOrg: Record<string, FirebaseFirestore.QueryDocumentSnapshot[]> = {};
+    const vehicleByOrg: Record<string, FirebaseFirestore.QueryDocumentSnapshot[]> = {};
+    const hipassByOrg: Record<string, FirebaseFirestore.QueryDocumentSnapshot[]> = {};
+    const reservationByOrg: Record<string, FirebaseFirestore.QueryDocumentSnapshot[]> = {};
+
+    userSnap.docs.forEach(doc => {
+        const oId = doc.data().organizationId;
+        if (oId) {
+            if (!userByOrg[oId]) userByOrg[oId] = [];
+            userByOrg[oId].push(doc);
+        }
+    });
+    logSnap.docs.forEach(doc => {
+        const oId = doc.data().organizationId;
+        if (oId) {
+            if (!logByOrg[oId]) logByOrg[oId] = [];
+            logByOrg[oId].push(doc);
+        }
+    });
+    vehicleSnap.docs.forEach(doc => {
+        const oId = doc.data().organizationId;
+        if (oId) {
+            if (!vehicleByOrg[oId]) vehicleByOrg[oId] = [];
+            vehicleByOrg[oId].push(doc);
+        }
+    });
+    hipassCardSnap.docs.forEach(doc => {
+        const oId = doc.data().organizationId;
+        if (oId) {
+            if (!hipassByOrg[oId]) hipassByOrg[oId] = [];
+            hipassByOrg[oId].push(doc);
+        }
+    });
+    reservationSnap.docs.forEach(doc => {
+        const oId = doc.data().organizationId;
+        if (oId) {
+            if (!reservationByOrg[oId]) reservationByOrg[oId] = [];
+            reservationByOrg[oId].push(doc);
+        }
+    });
+
     function buildStats(orgFilterId: string | null) {
+        // 기관 필터 유무에 따라 순회할 배열 선택 (O(1) 접근)
+        const currentOrgDocs = orgFilterId ? orgSnap.docs.filter(d => d.id === orgFilterId) : orgSnap.docs;
+        const currentUserDocs = orgFilterId ? (userByOrg[orgFilterId] || []) : userSnap.docs;
+        const currentLogDocs = orgFilterId ? (logByOrg[orgFilterId] || []) : logSnap.docs;
+        const currentVehicleDocs = orgFilterId ? (vehicleByOrg[orgFilterId] || []) : vehicleSnap.docs;
+        const currentHipassDocs = orgFilterId ? (hipassByOrg[orgFilterId] || []) : hipassCardSnap.docs;
+        const currentReservationDocs = orgFilterId ? (reservationByOrg[orgFilterId] || []) : reservationSnap.docs;
+
             // ── 2. 기관 기초 데이터 ──
         
             interface OrgInfo {
@@ -90,7 +142,7 @@ export async function computeAllDashboardStats(): Promise<void> {
             const approvalList: { approvedAt: Date; name: string }[] = [];
             const firstEmpDaysList: { days: number; approvedAt: Date }[] = [];
         
-            orgSnap.docs.forEach(doc => {
+            currentOrgDocs.forEach(doc => {
                 if (orgFilterId && doc.id !== orgFilterId) return;
                 const data = doc.data();
                 const createdAt = toDate(data.createdAt);
@@ -140,7 +192,7 @@ export async function computeAllDashboardStats(): Promise<void> {
             let welcomeNotDismissedCount = 0;
             const orgHasEmployee = new Set<string>();
         
-            userSnap.docs.forEach(doc => {
+            currentUserDocs.forEach(doc => {
                 const data = doc.data();
                 if (orgFilterId && data.organizationId !== orgFilterId) return;
                 if (data.role === "superAdmin") return;
@@ -178,7 +230,7 @@ export async function computeAllDashboardStats(): Promise<void> {
             });
         
             let withFavCount = 0;
-            userSnap.docs.forEach(doc => {
+            currentUserDocs.forEach(doc => {
                 const data = doc.data();
                 if (orgFilterId && data.organizationId !== orgFilterId) return;
                 if (data.role !== "superAdmin" && userFavoritesMap.has(doc.id)) withFavCount++;
@@ -221,7 +273,7 @@ export async function computeAllDashboardStats(): Promise<void> {
                 hourDurMap[hKey] = [];
             }
         
-            logSnap.docs.forEach(doc => {
+            currentLogDocs.forEach(doc => {
                 const data = doc.data();
                 if (orgFilterId && data.organizationId !== orgFilterId) return;
                 const dist = computeDistance(data);
@@ -316,7 +368,7 @@ export async function computeAllDashboardStats(): Promise<void> {
             // 캘린더 동기화 중복 예약 방지: 동일 calendarEventId+date 조합은 1건만 집계
             const processedCalendarEvents = new Set<string>();
         
-            reservationSnap.docs.forEach(doc => {
+            currentReservationDocs.forEach(doc => {
                 const data = doc.data();
                 if (orgFilterId && data.organizationId !== orgFilterId) return;
                 if (data.status === "cancelled") return;
@@ -392,7 +444,7 @@ export async function computeAllDashboardStats(): Promise<void> {
             const calendarSyncOrgSet = new Set<string>();
             const orgCalendarMap: Record<string, number> = {};
         
-            vehicleSnap.docs.forEach(doc => {
+            currentVehicleDocs.forEach(doc => {
                 const data = doc.data();
                 if (orgFilterId && data.organizationId !== orgFilterId) return;
                 if (data.organizationId && approvedOrgMap[data.organizationId]) {
@@ -420,7 +472,7 @@ export async function computeAllDashboardStats(): Promise<void> {
         
             const hipassVehicleSet = new Set<string>();
             const orgHipassMap: Record<string, number> = {};
-            hipassCardSnap.docs.forEach(doc => {
+            currentHipassDocs.forEach(doc => {
                 const data = doc.data();
                 if (orgFilterId && data.organizationId !== orgFilterId) return;
                 if (data.vehicleId) hipassVehicleSet.add(data.vehicleId);

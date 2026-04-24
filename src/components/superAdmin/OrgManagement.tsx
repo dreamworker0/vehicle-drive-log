@@ -38,17 +38,19 @@ export default function OrgManagement() {
     const fetchOrganizations = async () => {
         setLoading(true);
         try {
-            const [orgs, deleted, counts] = await Promise.all([
+            const [orgs, deleted] = await Promise.all([
                 getApprovedOrganizations(),
                 getDeletedOrganizations().catch((err: unknown) => {
                     console.warn('삭제된 기관 목록 로드 실패 (인덱스 빌드 중일 수 있음):', err);
                     return [];
-                }),
-                getOrgMemberCounts().catch((err: unknown) => {
-                    console.warn('멤버 수 조회 실패:', err);
-                    return {};
-                }),
+                })
             ]);
+            
+            const counts = await getOrgMemberCounts((orgs as Organization[]).map(o => o.id)).catch((err: unknown) => {
+                console.warn('멤버 수 조회 실패:', err);
+                return {};
+            });
+
             setOrganizations(orgs as Organization[]);
             setDeletedOrgs(deleted as Organization[]);
             setMemberCountMap(counts);

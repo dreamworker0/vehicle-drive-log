@@ -4,7 +4,7 @@
  *
  * 리팩토링: Mutation 핸들러 → useDashboardActions 분리
  */
-/* eslint-disable react-compiler/react-compiler */
+
 import { useState, useMemo, use } from 'react';
 import { useAuth } from './useAuth';
 import { getVehicles, getTodayReservations, getWeekReservations, getMyDriveLogs } from '../lib/firestore';
@@ -86,7 +86,7 @@ export default function useTodayDashboard() {
     // use() 훅이 Promise 인스턴스를 받으면 Resolve 될 때까지 상위 Suspense로 렌더링을 중단합니다.
     const dataOrPromise = useMemo(() => {
         return (orgId && user?.uid) ? getDashboardData(orgId, user.uid, todayStr, weekEndDate) : null;
-    }, [orgId, user?.uid, todayStr, weekEndDate]);
+    }, [orgId, user, todayStr, weekEndDate]);
     type DashboardData = [Vehicle[], Reservation[], Reservation[], FuelLog[]];
     const resolvedData = (dataOrPromise instanceof Promise ? use(dataOrPromise) : dataOrPromise) as DashboardData | null;
 
@@ -123,7 +123,7 @@ export default function useTodayDashboard() {
                 && (res.date ?? '') <= yesterdayStr
                 && !logReservationIds.has(res.id)
             ).map(res => ({ type: 'reservation' as const, ...res })) as (Reservation & { type: string })[];
-    }, [weekReservations, myLogs, user?.uid]);
+    }, [weekReservations, myLogs, user]);
 
     const vehicleUsageCounts = useMemo(() => {
         const counts = new Map<string, number>();
@@ -139,7 +139,7 @@ export default function useTodayDashboard() {
         todayReservations
             .filter(r => r.reservedByUid === user?.uid && r.status !== 'completed')
             .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || '')),
-        [todayReservations, user?.uid]
+        [todayReservations, user]
     );
 
     const weekGrouped = useMemo(() => {
@@ -152,7 +152,7 @@ export default function useTodayDashboard() {
             grouped[r.date].push(r);
         });
         return grouped;
-    }, [weekReservations, user?.uid, todayStr]);
+    }, [weekReservations, user, todayStr]);
 
     // 30분 이내 임박 예약 감지
     const upcomingAlerts = useMemo(() => {

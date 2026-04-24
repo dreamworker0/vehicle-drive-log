@@ -3,7 +3,7 @@
  */
 import {
     doc, getDoc, setDoc, updateDoc, deleteDoc,
-    collection, query, where, getDocs,
+    collection, query, where, getDocs, getCountFromServer,
     serverTimestamp,
     type DocumentData,
 } from 'firebase/firestore';
@@ -29,6 +29,7 @@ export const getUser = async (uid: string) => {
 export const createUser = async (uid: string, data: Partial<User>) => {
     try {
         await setDoc(doc(db, 'users', uid), {
+            theme: 'dark',
             ...data,
             createdAt: serverTimestamp(),
         });
@@ -76,20 +77,40 @@ export const getOrganizationMembers = async (orgId: string) => {
 };
 
 // 전체 기관별 유효 멤버 수 조회 (미활성 기관 판별용)
-export const getOrgMemberCounts = async (): Promise<Record<string, number>> => {
+export const getOrgMemberCounts = async (orgIds?: string[]): Promise<Record<string, number>> => {
     try {
-        const snap = await getDocs(collection(db, 'users'));
         const counts: Record<string, number> = {};
-        snap.docs.forEach(d => {
-            const data = d.data();
-            const orgId = data.organizationId;
-            if (!orgId) return;
-            if (!counts[orgId]) counts[orgId] = 0;
-            // 이름이 있고 '-'가 아닌 사용자만 유효 멤버로 카운트
-            if (data.name && data.name !== '-') {
-                counts[orgId]++;
-            }
-        });
+        
+        if (!orgIds) {
+            console.warn('[getOrgMemberCounts] orgIds 파라미터 없이 호출됨. 전체 users 조회가 발생하여 Firestore Read 비용이 높을 수 있습니다.');
+            const snap = await getDocs(collection(db, 'users'));
+            snap.docs.forEach(d => {
+                const data = d.data();
+                const orgId = data.organizationId;
+                if (!orgId) return;
+                if (!counts[orgId]) counts[orgId] = 0;
+                if (data.name && data.name !== '-') {
+                    counts[orgId]++;
+                }
+            });
+            return counts;
+        }
+
+        if (orgIds.length === 0) return counts;
+
+        // 기관별로 getCountFromServer 병렬 수행 (개별 문서 읽기 없이 인덱스 스캔만 수행)
+        // note: name != '-' 조건은 복합 인덱스 필요 → organizationId 단일 조건으로 조회 후 클라이언트 필터링
+        await Promise.all(
+            orgIds.map(async (orgId) => {
+                const q = query(
+                    collection(db, 'users'),
+                    where('organizationId', '==', orgId)
+                );
+                const snap = await getCountFromServer(q);
+                counts[orgId] = snap.data().count;
+            })
+        );
+        
         return counts;
     } catch (error) {
         captureError(error, { context: 'getOrgMemberCounts' });

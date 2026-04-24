@@ -9,6 +9,7 @@ import {
 
 const DashboardFunnelChart = lazy(() => import('./dashboard/DashboardFunnelChart'));
 const DashboardChartSection = lazy(() => import('./dashboard/DashboardChartSection'));
+const ChartOrgTrend = lazy(() => import('./dashboard/ChartOrgTrend'));
 const ChartFirstEmployee = lazy(() => import('./dashboard/ChartFirstEmployee'));
 const DashboardDriveAnalysis = lazy(() => import('./dashboard/DashboardDriveAnalysis'));
 const DashboardNotificationStats = lazy(() => import('./dashboard/DashboardNotificationStats'));
@@ -153,6 +154,16 @@ export default function ServiceDashboard() {
                 <div className="space-y-6 animate-fade-in">
                     {stats && <DashboardOverviewCards stats={stats} />}
 
+                    {dailyActiveOrgStats && (
+                        <Suspense fallback={
+                            <div className="flex items-center justify-center py-20 text-surface-400">
+                                <div className="w-8 h-8 spinner mx-auto mb-3" />
+                            </div>
+                        }>
+                            <ChartOrgTrend dailyActiveOrgStats={dailyActiveOrgStats} />
+                        </Suspense>
+                    )}
+
                     {monthlyStats && (
                         <DashboardMonthlyMetrics
                             monthlyStats={monthlyStats}
@@ -209,7 +220,6 @@ export default function ServiceDashboard() {
                         </div>
                     }>
                         <DashboardChartSection
-                            dailyActiveOrgStats={dailyActiveOrgStats}
                             dailyActiveUserStats={dailyActiveUserStats}
                             firstEmployeeStats={firstEmployeeStats}
                             firstEmployeeDist={firstEmployeeDist}
