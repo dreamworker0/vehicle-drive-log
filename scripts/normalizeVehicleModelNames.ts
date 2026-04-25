@@ -39,7 +39,7 @@ const STANDARD_MODELS: string[] = [
     // 기아 — 전기
     'EV3', 'EV5', 'EV6', 'EV9', 'PV5',
     // 기아 — 상용
-    '봉고3',
+    '봉고',
     // 제네시스
     'G70', 'G80', 'G90', 'GV70', 'GV80',
     // KG모빌리티(구 쌍용)
@@ -64,6 +64,10 @@ const ALIAS_MAP: Record<string, string> = {
     '포터2':             '포터',
     '포터Ⅱ':           '포터',
     '1톤 포터':        '포터',
+    // 봉고 계열 통합
+    '봉고3':             '봉고',
+    '봉고3 1.2톤':     '봉고',
+    '봉고 3':            '봉고',
     // 스타렉스 계열
     '그랜드스타렉스': '그랜드 스타렉스',
     '뉴스타렉스':     '스타렉스',
@@ -175,11 +179,16 @@ async function migrate() {
 
     for (const doc of snapshot.docs) {
         const data = doc.data();
-        const rawModelName: string | undefined = data.modelName;
+        let rawModelName: string | undefined = data.modelName;
 
-        // modelName 필드가 없거나 빈 값이면 스킵
+        // modelName 필드가 없거나 빈 값이면 displayName을 폴백으로 사용
         if (!rawModelName || rawModelName.trim() === "") {
-            console.log(`  ⏭  [SKIP]    ${doc.id} — modelName 없음`);
+            rawModelName = data.displayName || data.name;
+        }
+
+        // 그래도 없으면 진짜 스킵
+        if (!rawModelName || rawModelName.trim() === "") {
+            console.log(`  ⏭  [SKIP]    ${doc.id} — modelName/displayName 모두 없음`);
             totalSkipped++;
             continue;
         }

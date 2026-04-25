@@ -121,7 +121,7 @@ export default function VehicleForm({
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                     <div>
-                            <label className="label">모델명</label>
+                            <label className="label">모델명 <span className="text-red-500">*</span></label>
                             <div className="relative">
                                 <input
                                     ref={modelInputRef}
@@ -137,6 +137,7 @@ export default function VehicleForm({
                                     className="input pr-8"
                                     placeholder="소나타"
                                     autoComplete="off"
+                                    required
                                 />
                                 {/* 화살표 아이콘 */}
                                 <svg

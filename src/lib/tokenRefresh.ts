@@ -66,12 +66,18 @@ export async function refreshToken(user: User, maxRetries = 3): Promise<void> {
  * 토큰 갱신 (실패 무시 — fire-and-forget 용도)
  *
  * 갱신 실패 시 console.warn만 남기고 에러를 삼킴.
- * 초기 로드나 Claims 변경 감지 후 "최선 노력" 갱신에 사용.
+ * onError 콜백을 넘기면 실패를 UI로 전달할 수 있다 (예: 권한 변경 후 반영 실패 토스트).
  */
-export async function refreshTokenSilently(user: User): Promise<void> {
+export async function refreshTokenSilently(
+    user: User,
+    onError?: (err: unknown) => void
+): Promise<void> {
     try {
         await refreshToken(user);
     } catch (err) {
         console.warn('[TokenRefresh] 토큰 갱신 실패 (무시):', err);
+        if (onError) {
+            try { onError(err); } catch { /* 콜백 오류는 무시 */ }
+        }
     }
 }

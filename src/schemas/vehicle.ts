@@ -23,7 +23,7 @@ export const vehicleSchema = z.object({
     organizationId: z.string().catch(''),
     name: z.string().catch(''),
     displayName: z.string().optional().catch(undefined),
-    modelName: z.string().optional().catch(undefined),
+    modelName: z.string().min(1, '모델명을 입력해주세요'),
     plateNumber: z.string().catch('번호 없음'),
     type: z.custom<VehicleType>().catch('car' as VehicleType),
     vehicleType: z.string().optional().catch(undefined),

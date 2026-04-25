@@ -37,6 +37,8 @@ interface Props {
     fuelTypeStats: { type: string; label: string; count: number; color: string }[];
     vehicleTypeStats: { type: string; label: string; count: number; color: string }[];
     vehicleModelStats: { model: string; count: number }[];
+    vehicleModelStatsActive: { model: string; count: number }[];
+    vehicleModelStatsRetired: { model: string; count: number }[];
     // 하이패스
     hipassRatio: { withHipass: number; withoutHipass: number };
     hipassTopOrgs: { name: string; count: number }[];
@@ -81,6 +83,8 @@ function DashboardChartSection(props: Props) {
                 fuelTypeStats={props.fuelTypeStats}
                 vehicleTypeStats={props.vehicleTypeStats}
                 vehicleModelStats={props.vehicleModelStats}
+                vehicleModelStatsActive={props.vehicleModelStatsActive}
+                vehicleModelStatsRetired={props.vehicleModelStatsRetired}
             />
             <ChartHipass
                 hipassRatio={props.hipassRatio}

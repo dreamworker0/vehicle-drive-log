@@ -47,6 +47,8 @@ export default function useServiceDashboard(orgFilterId: string = 'ALL') {
     const [fuelTypeStats, setFuelTypeStats] = useState<{ type: string; label: string; count: number; color: string }[]>([]);
     const [vehicleTypeStats, setVehicleTypeStats] = useState<{ type: string; label: string; count: number; color: string }[]>([]);
     const [vehicleModelStats, setVehicleModelStats] = useState<{ model: string; count: number }[]>([]);
+    const [vehicleModelStatsActive, setVehicleModelStatsActive] = useState<{ model: string; count: number }[]>([]);
+    const [vehicleModelStatsRetired, setVehicleModelStatsRetired] = useState<{ model: string; count: number }[]>([]);
     const [hipassRatio, setHipassRatio] = useState<{ withHipass: number; withoutHipass: number }>({ withHipass: 0, withoutHipass: 0 });
     const [calendarSyncRatio, setCalendarSyncRatio] = useState<{ sync: number; notSync: number }>({ sync: 0, notSync: 0 });
     const [calendarTopOrgs, setCalendarTopOrgs] = useState<{ name: string; count: number }[]>([]);
@@ -174,6 +176,8 @@ export default function useServiceDashboard(orgFilterId: string = 'ALL') {
             setFuelTypeStats(s.fuelTypeStats);
             setVehicleTypeStats(s.vehicleTypeStats);
             setVehicleModelStats(s.vehicleModelStats);
+            if (s.vehicleModelStatsActive) setVehicleModelStatsActive(s.vehicleModelStatsActive);
+            if (s.vehicleModelStatsRetired) setVehicleModelStatsRetired(s.vehicleModelStatsRetired);
             setHipassRatio(s.hipassRatio);
             setHipassTopOrgs(s.hipassTopOrgs);
             setCalendarSyncRatio(s.calendarSyncRatio);
@@ -330,6 +334,8 @@ export default function useServiceDashboard(orgFilterId: string = 'ALL') {
         fuelTypeStats,
         vehicleTypeStats,
         vehicleModelStats,
+        vehicleModelStatsActive,
+        vehicleModelStatsRetired,
         hipassRatio,
         calendarSyncRatio,
         calendarTopOrgs,

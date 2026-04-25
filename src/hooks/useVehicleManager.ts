@@ -30,7 +30,7 @@ export const VEHICLE_MODEL_SUGGESTIONS = [
     // 기아 — 전기
     'EV3', 'EV5', 'EV6', 'EV9', 'PV5',
     // 기아 — 상용
-    '봉고3',
+    '봉고',
     // 제네시스
     'G70', 'G80', 'G90', 'GV70', 'GV80',
     // KG모빌리티(구 쌍용)
@@ -235,7 +235,7 @@ export default function useVehicleManager() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!form.displayName.trim() || !form.plateNumber.trim()) return;
+        if (!form.displayName.trim() || !form.plateNumber.trim() || !form.modelName.trim()) return;
         const action = editingVehicle ? '차량 부분 수정' : '차량 등록';
         await runWithRetry(action, async () => {
             setFormLoading(true);

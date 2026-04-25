@@ -50,6 +50,8 @@ export default function ServiceDashboard() {
         fuelTypeStats,
         vehicleTypeStats,
         vehicleModelStats,
+        vehicleModelStatsActive,
+        vehicleModelStatsRetired,
         hipassRatio,
         calendarSyncRatio,
         calendarTopOrgs,
@@ -238,6 +240,8 @@ export default function ServiceDashboard() {
                             fuelTypeStats={fuelTypeStats}
                             vehicleTypeStats={vehicleTypeStats}
                             vehicleModelStats={vehicleModelStats}
+                            vehicleModelStatsActive={vehicleModelStatsActive}
+                            vehicleModelStatsRetired={vehicleModelStatsRetired}
                             hipassRatio={hipassRatio}
                             calendarSyncRatio={calendarSyncRatio}
                             calendarTopOrgs={calendarTopOrgs}

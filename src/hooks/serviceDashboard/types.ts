@@ -23,6 +23,8 @@ export interface CachedDashboardStats {
     fuelTypeStats: { type: string; label: string; count: number; color: string }[];
     vehicleTypeStats: { type: string; label: string; count: number; color: string }[];
     vehicleModelStats: { model: string; count: number }[];
+    vehicleModelStatsActive: { model: string; count: number }[];
+    vehicleModelStatsRetired: { model: string; count: number }[];
     hipassRatio: { withHipass: number; withoutHipass: number };
     hipassTopOrgs: { name: string; count: number }[];
     calendarSyncRatio: { sync: number; notSync: number };

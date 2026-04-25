@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useState, useEffect } from 'react';
 import type { User as UserDoc } from '../../../types/user';
 
 interface PassengerSectionProps {
@@ -16,18 +16,61 @@ const PassengerSection = memo(function PassengerSection({
     togglePassenger,
     setExternalPassengerCount
 }: PassengerSectionProps) {
+    // 로컬 스토리지에서 이전 상태 불러오기 (기본값: false)
+    const [isExpanded, setIsExpanded] = useState(() => {
+        try {
+            const saved = localStorage.getItem('driveLog_passengerExpanded');
+            return saved !== null ? JSON.parse(saved) : false;
+        } catch {
+            return false;
+        }
+    });
+
+    // 상태 변경 시 로컬 스토리지에 저장
+    useEffect(() => {
+        localStorage.setItem('driveLog_passengerExpanded', JSON.stringify(isExpanded));
+    }, [isExpanded]);
+
     return (
         <div className="glass-card p-4">
-            <label className="label">
-                🧑‍🤝‍🧑 동승자
-                {(selectedPassengers.length + externalPassengerCount) > 0 && (
-                    <span className="ml-2 text-primary-600 font-bold">
-                        {selectedPassengers.length + externalPassengerCount}명
-                    </span>
+            <div className="flex items-center justify-between mb-3">
+                <label className="label mb-0">
+                    🧑‍🤝‍🧑 동승자
+                    {(selectedPassengers.length + externalPassengerCount) > 0 && (
+                        <span className="ml-2 text-primary-600 font-bold">
+                            {selectedPassengers.length + externalPassengerCount}명
+                        </span>
+                    )}
+                </label>
+                {members.length > 0 && (
+                    <button
+                        type="button"
+                        onClick={() => setIsExpanded(!isExpanded)}
+                        className="text-xs px-2.5 py-1 rounded-md bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors flex items-center font-medium"
+                    >
+                        {isExpanded ? '직원 목록 닫기 ▲' : '직원 선택 ▼'}
+                    </button>
                 )}
-            </label>
-            {/* 조직원 칩 */}
-            {members.length > 0 && (
+            </div>
+
+            {/* 선택된 조직원 요약 (접혀있을 때) */}
+            {!isExpanded && selectedPassengers.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                    {selectedPassengers.map((m: UserDoc) => (
+                        <button
+                            key={`selected-${m.id}`}
+                            type="button"
+                            onClick={() => togglePassenger(m)}
+                            className="px-3 py-1.5 rounded-full text-xs font-medium border transition-all bg-primary-100 border-primary-300 text-primary-700 ring-1 ring-primary-200 shadow-sm"
+                        >
+                            ✓ {m.name || m.email?.split('@')[0]}
+                        </button>
+                    ))}
+                </div>
+            )}
+
+            {/* 전체 조직원 목록 (펼쳐있을 때) */}
+            {members.length > 0 && isExpanded && (
                 <div className="flex flex-wrap gap-1.5 mb-3">
                     {members.map((m: UserDoc) => {
                         const isSelected = selectedPassengers.some((p: UserDoc) => p.id === m.id);
@@ -49,8 +92,10 @@ const PassengerSection = memo(function PassengerSection({
             )}
 
             {/* 외부 인원 */}
-            <div className="flex items-center gap-3">
-                <p className="text-xs text-surface-500 dark:text-surface-400 whitespace-nowrap">외부 인원</p>
+            <div className="flex items-center gap-3 mt-1">
+                <p className="text-xs text-surface-500 dark:text-surface-400 whitespace-nowrap min-w-[3.5rem]">
+                    {isExpanded ? '외부 인원' : '인원'}
+                </p>
                 <div className="flex items-center gap-1.5">
                     <button
                         type="button"

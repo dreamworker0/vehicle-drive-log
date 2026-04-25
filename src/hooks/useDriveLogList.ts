@@ -1,7 +1,7 @@
 /**
  * useDriveLogList — 운행일지 목록 데이터 fetching, 페이지네이션, 중복 검사, 내보내기 핸들러
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
 import { useConfirm } from './useConfirm';
@@ -87,9 +87,13 @@ export default function useDriveLogList() {
 
     const orgId = userData?.organizationId;
 
+    // 필터 변경 시 이전 요청의 응답이 나중에 도착해 최신 상태를 덮어쓰는 걸 방지
+    const requestIdRef = useRef(0);
+
     // 초기 데이터 로드
     useEffect(() => {
         if (!orgId) return;
+        const myRequestId = ++requestIdRef.current;
         const fetchData = async () => {
             setLoading(true);
             try {
@@ -105,6 +109,7 @@ export default function useDriveLogList() {
                     getOrganizationMembers(orgId),
                     getOrganization(orgId),
                 ]);
+                if (myRequestId !== requestIdRef.current) return; // stale 응답 폐기
                 setLogs(result.docs as unknown as DriveLogEntry[]);
                 setLastDoc(result.lastDoc as DocumentSnapshot | null);
                 setHasMore(result.hasMore);
@@ -112,9 +117,10 @@ export default function useDriveLogList() {
                 setMembers((m as MemberEntry[]).filter(x => x.role !== 'superAdmin'));
                 setOrg(orgData as OrgInfo | null);
             } catch (err) {
+                if (myRequestId !== requestIdRef.current) return;
                 console.error('데이터 로드 실패:', err);
             } finally {
-                setLoading(false);
+                if (myRequestId === requestIdRef.current) setLoading(false);
             }
         };
         fetchData();
@@ -123,6 +129,7 @@ export default function useDriveLogList() {
     // 더보기
     const loadMore = async () => {
         if (!lastDoc || !hasMore || loadingMore) return;
+        const myRequestId = requestIdRef.current; // 현재 필터 세대
         setLoadingMore(true);
         try {
             const result = await getDriveLogs(orgId!, {
@@ -133,14 +140,16 @@ export default function useDriveLogList() {
                 startDate: filters.startDate || undefined,
                 endDate: filters.endDate || undefined
             });
+            if (myRequestId !== requestIdRef.current) return; // 필터가 바뀌었으면 결과 폐기
             setLogs(prev => [...prev, ...result.docs as unknown as DriveLogEntry[]]);
             setLastDoc(result.lastDoc as DocumentSnapshot | null);
             setHasMore(result.hasMore);
         } catch (err) {
+            if (myRequestId !== requestIdRef.current) return;
             console.error('추가 로드 실패:', err);
             showToast('추가 데이터를 불러오지 못했습니다.', 'error');
         } finally {
-            setLoadingMore(false);
+            if (myRequestId === requestIdRef.current) setLoadingMore(false);
         }
     };
 

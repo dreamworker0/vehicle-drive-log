@@ -439,6 +439,8 @@ export async function computeAllDashboardStats(): Promise<void> {
             const fuelMap: Record<string, number> = {};
             const vtMap: Record<string, number> = {};
             const modelMap: Record<string, number> = {};
+            const modelActiveMap: Record<string, number> = {};
+            const modelRetiredMap: Record<string, number> = {};
             let calendarSyncCount = 0;
             let calendarNotSyncCount = 0;
             const calendarSyncOrgSet = new Set<string>();
@@ -466,6 +468,12 @@ export async function computeAllDashboardStats(): Promise<void> {
                 vtMap[vt] = (vtMap[vt] || 0) + 1;
                 const model = (data.modelName as string) || (data.displayName as string) || (data.name as string) || "알 수 없음";
                 modelMap[model] = (modelMap[model] || 0) + 1;
+                const isRetired = data.retired?.isRetired === true;
+                if (isRetired) {
+                    modelRetiredMap[model] = (modelRetiredMap[model] || 0) + 1;
+                } else {
+                    modelActiveMap[model] = (modelActiveMap[model] || 0) + 1;
+                }
             });
         
             // ── 7. 하이패스 집계 ──
@@ -666,6 +674,8 @@ export async function computeAllDashboardStats(): Promise<void> {
                     fuelTypeStats: Object.entries(fuelMap).map(([type, count]) => ({ type, label: FUEL_LABELS[type] || type, count, color: FUEL_COLORS[type] || "#9ca3af" })).sort((a, b) => b.count - a.count),
                     vehicleTypeStats: Object.entries(vtMap).map(([type, count]) => ({ type, label: VT_LABELS[type] || type, count, color: VT_COLORS[type] || "#9ca3af" })).sort((a, b) => b.count - a.count),
                     vehicleModelStats: Object.entries(modelMap).map(([model, count]) => ({ model, count })).sort((a, b) => b.count - a.count).slice(0, 15),
+                    vehicleModelStatsActive: Object.entries(modelActiveMap).map(([model, count]) => ({ model, count })).sort((a, b) => b.count - a.count).slice(0, 15),
+                    vehicleModelStatsRetired: Object.entries(modelRetiredMap).map(([model, count]) => ({ model, count })).sort((a, b) => b.count - a.count).slice(0, 15),
                     hipassRatio: { withHipass: hipassWithCount, withoutHipass: hipassTotalCount - hipassWithCount },
                     hipassTopOrgs: Object.entries(orgHipassMap).map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count).slice(0, 5),
                     calendarSyncRatio: { sync: calendarSyncCount, notSync: calendarNotSyncCount },

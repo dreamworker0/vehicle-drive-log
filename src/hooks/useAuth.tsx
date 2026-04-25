@@ -6,6 +6,7 @@ import { auth, db, authReady } from '../lib/firebase';
 import { refreshTokenSilently, refreshToken } from '../lib/tokenRefresh';
 import { handleRedirectResult, logout } from '../lib/auth';
 import { setSentryUser } from '../lib/sentry';
+import { useToastStore } from '../store/useToastStore';
 import type { User as UserDoc } from '../types/user';
 
 interface AuthContextType {
@@ -138,7 +139,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                                                 .finally(() => { finishLoading(); });
                                         } else {
                                             // 이후 변경: fire-and-forget + 즉시 loading 해제
-                                            refreshTokenSilently(firebaseUser);
+                                            // 갱신 실패 시 UI가 옛 권한을 계속 보여줄 수 있으므로 토스트로 안내
+                                            refreshTokenSilently(firebaseUser, () => {
+                                                useToastStore.getState().showToast(
+                                                    '권한 정보 갱신에 실패했습니다. 다시 로그인해 주세요.',
+                                                    'warning'
+                                                );
+                                            });
                                             finishLoading();
                                         }
                                     } else {
