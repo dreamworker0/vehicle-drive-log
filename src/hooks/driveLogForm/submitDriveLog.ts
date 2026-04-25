@@ -21,6 +21,7 @@ interface SubmitContext {
     selectedVehicle: Vehicle | undefined;
     selectedPassengers: UserDoc[];
     externalPassengerCount: number;
+    externalPassengerNames: string;
     isRetroactive: boolean;
     ocrUsed: boolean;
     favoriteUsed: boolean;
@@ -64,14 +65,14 @@ export function validateForm(
 export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> {
     const {
         form, orgId, user, userData, selectedVehicle,
-        selectedPassengers, externalPassengerCount, isRetroactive,
+        selectedPassengers, externalPassengerCount, externalPassengerNames, isRetroactive,
         ocrUsed, favoriteUsed, isEditMode, editLog, reservationData,
         hipassCard,
     } = ctx;
 
     const logData = buildLogData(form, {
         orgId: orgId || undefined, user, userData, selectedVehicle,
-        selectedPassengers, externalPassengerCount,
+        selectedPassengers, externalPassengerCount, externalPassengerNames,
         isRetroactive, ocrUsed, favoriteUsed,
     });
 

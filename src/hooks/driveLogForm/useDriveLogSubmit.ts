@@ -31,6 +31,7 @@ export interface SubmitDeps {
     setSelectedPassengers: React.Dispatch<React.SetStateAction<UserDoc[]>>;
     externalPassengerCount: number;
     setExternalPassengerCount: (v: number) => void;
+    externalPassengerNames: string;
     setFavorites: React.Dispatch<React.SetStateAction<Favorite[]>>;
     setShowFavSave: (v: boolean) => void;
     setFavName: (v: string) => void;
@@ -68,6 +69,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
     const {
         form, setForm, orgId, user, userData, vehicles, selectedVehicle,
         selectedPassengers, setSelectedPassengers, externalPassengerCount, setExternalPassengerCount,
+        externalPassengerNames,
         setFavorites, setShowFavSave, setFavName, setSuccess,
         isElectric, isQuickDrive, isRetroactive, isEditMode, editLog, reservationData, hipassCard, favName,
         showToast, runWithRetry, startTransition, ocrSuccess
@@ -136,7 +138,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
                     'submit-drive-log',
                     () => submitDriveLog({
                         form, orgId, user: user!, userData, selectedVehicle,
-                        selectedPassengers, externalPassengerCount, isRetroactive,
+                        selectedPassengers, externalPassengerCount, externalPassengerNames, isRetroactive,
                         ocrUsed: ocrSuccess, favoriteUsed: false, isElectric, isEditMode, editLog,
                         reservationData, hipassCard,
                     }),
