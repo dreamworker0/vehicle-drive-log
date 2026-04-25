@@ -50,6 +50,7 @@ export default function useDriveLogForm() {
     const [success, setSuccess] = useState(false);
     const [selectedPassengers, setSelectedPassengers] = useState<UserDoc[]>([]);
     const [externalPassengerCount, setExternalPassengerCount] = useState(0);
+    const [externalPassengerNames, setExternalPassengerNames] = useState('');
     const [showFavSave, setShowFavSave] = useState(false);
     const [favName, setFavName] = useState('');
     const [hipassCard, setHipassCard] = useState<HipassCard | null>(null);
@@ -107,6 +108,7 @@ export default function useDriveLogForm() {
     } = useDriveLogSubmit({
         form, setForm, orgId, user, userData, vehicles, selectedVehicle,
         selectedPassengers, setSelectedPassengers, externalPassengerCount, setExternalPassengerCount,
+        externalPassengerNames,
         setFavorites, setShowFavSave, setFavName, setSuccess,
         isElectric, isQuickDrive, isRetroactive, isEditMode, editLog, reservationData, hipassCard, favName,
         showToast, runWithRetry, startTransition, ocrSuccess: ocr.ocrSuccess
@@ -138,6 +140,7 @@ export default function useDriveLogForm() {
         handleSaveFavorite,
         togglePassenger,
         externalPassengerCount, setExternalPassengerCount,
+        externalPassengerNames, setExternalPassengerNames,
         handleOcrCapture: ocr.handleOcrCapture,
         handleOcrReport: ocr.handleOcrReport,
         handleSubmit,

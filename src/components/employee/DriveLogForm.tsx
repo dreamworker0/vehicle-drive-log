@@ -31,6 +31,7 @@ export default function DriveLogForm() {
         handleSaveFavorite,
         togglePassenger,
         externalPassengerCount, setExternalPassengerCount,
+        externalPassengerNames, setExternalPassengerNames,
         handleOcrCapture,
         handleOcrReport,
         handleSubmit,
@@ -129,8 +130,10 @@ export default function DriveLogForm() {
                     members={members}
                     selectedPassengers={selectedPassengers}
                     externalPassengerCount={externalPassengerCount}
+                    externalPassengerNames={externalPassengerNames}
                     togglePassenger={togglePassenger}
                     setExternalPassengerCount={setExternalPassengerCount}
+                    setExternalPassengerNames={setExternalPassengerNames}
                 />
 
                 {/* 6. 차량 상태 섹션 (배터리/하이패스) */}

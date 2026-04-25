@@ -23,13 +23,6 @@ export default function FavoritesManager() {
     const { showToast } = useToast();
     const { confirm } = useConfirm();
 
-    /* eslint-disable react-hooks/exhaustive-deps */
-    useEffect(() => {
-        if (!user?.uid) return;
-        loadFavorites();
-    }, [user?.uid]);
-    /* eslint-enable react-hooks/exhaustive-deps */
-
     const loadFavorites = async () => {
         try {
             const data = await getFavorites(user!.uid);
@@ -40,6 +33,13 @@ export default function FavoritesManager() {
             setLoading(false);
         }
     };
+
+    /* eslint-disable react-hooks/exhaustive-deps */
+    useEffect(() => {
+        if (!user?.uid) return;
+        loadFavorites();
+    }, [user?.uid]);
+    /* eslint-enable react-hooks/exhaustive-deps */
 
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();

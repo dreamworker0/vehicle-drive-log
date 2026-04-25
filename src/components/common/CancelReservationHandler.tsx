@@ -11,18 +11,16 @@ import type { Reservation } from '../../types/reservation';
 
 export default function CancelReservationHandler() {
     const [searchParams, setSearchParams] = useSearchParams();
+    const reservationId = searchParams.get('cancelReservation');
     const [reservation, setReservation] = useState<Reservation | null>(null);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(!!reservationId);
     const [cancelling, setCancelling] = useState(false);
     const [result, setResult] = useState<'cancelled' | 'kept' | 'error' | null>(null);
-
-    const reservationId = searchParams.get('cancelReservation');
 
     // 예약 정보 조회
     useEffect(() => {
         if (!reservationId) return;
 
-        setLoading(true);
         getDoc(doc(db, 'reservations', reservationId))
             .then((snap) => {
                 if (snap.exists()) {

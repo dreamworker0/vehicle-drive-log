@@ -5,24 +5,28 @@ interface PassengerSectionProps {
     members: UserDoc[];
     selectedPassengers: UserDoc[];
     externalPassengerCount: number;
+    externalPassengerNames: string;
     togglePassenger: (user: UserDoc) => void;
     setExternalPassengerCount: (count: number) => void;
+    setExternalPassengerNames: (names: string) => void;
 }
 
 const PassengerSection = memo(function PassengerSection({
     members,
     selectedPassengers,
     externalPassengerCount,
+    externalPassengerNames,
     togglePassenger,
-    setExternalPassengerCount
+    setExternalPassengerCount,
+    setExternalPassengerNames
 }: PassengerSectionProps) {
-    // 로컬 스토리지에서 이전 상태 불러오기 (기본값: false)
+    // 로컬 스토리지에서 이전 상태 불러오기 (기본값: true)
     const [isExpanded, setIsExpanded] = useState(() => {
         try {
             const saved = localStorage.getItem('driveLog_passengerExpanded');
-            return saved !== null ? JSON.parse(saved) : false;
+            return saved !== null ? JSON.parse(saved) : true;
         } catch {
-            return false;
+            return true;
         }
     });
 
@@ -30,6 +34,20 @@ const PassengerSection = memo(function PassengerSection({
     useEffect(() => {
         localStorage.setItem('driveLog_passengerExpanded', JSON.stringify(isExpanded));
     }, [isExpanded]);
+
+    // 직접 입력창 상태 관리 (기본값: false)
+    const [isManualInputExpanded, setIsManualInputExpanded] = useState(() => {
+        try {
+            const saved = localStorage.getItem('driveLog_manualInputExpanded');
+            return saved !== null ? JSON.parse(saved) : false;
+        } catch {
+            return false;
+        }
+    });
+
+    useEffect(() => {
+        localStorage.setItem('driveLog_manualInputExpanded', JSON.stringify(isManualInputExpanded));
+    }, [isManualInputExpanded]);
 
     return (
         <div className="glass-card p-4">
@@ -42,15 +60,29 @@ const PassengerSection = memo(function PassengerSection({
                         </span>
                     )}
                 </label>
-                {members.length > 0 && (
+                <div className="flex items-center gap-2">
+                    {!isManualInputExpanded && externalPassengerNames && (
+                        <span className="text-xs font-medium text-surface-700 dark:text-surface-300 truncate max-w-[80px] sm:max-w-[150px]">
+                            {externalPassengerNames}
+                        </span>
+                    )}
+                    {members.length > 0 && (
+                        <button
+                            type="button"
+                            onClick={() => setIsExpanded(!isExpanded)}
+                            className="text-xs px-2.5 py-1 rounded-md bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors flex items-center font-medium"
+                        >
+                            {isExpanded ? '직원 목록 닫기 ▲' : '직원 선택 ▼'}
+                        </button>
+                    )}
                     <button
                         type="button"
-                        onClick={() => setIsExpanded(!isExpanded)}
+                        onClick={() => setIsManualInputExpanded(!isManualInputExpanded)}
                         className="text-xs px-2.5 py-1 rounded-md bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors flex items-center font-medium"
                     >
-                        {isExpanded ? '직원 목록 닫기 ▲' : '직원 선택 ▼'}
+                        {isManualInputExpanded ? '직접 입력 닫기 ▲' : '직접 입력 열기 ▼'}
                     </button>
-                )}
+                </div>
             </div>
 
             {/* 선택된 조직원 요약 (접혀있을 때) */}
@@ -91,8 +123,24 @@ const PassengerSection = memo(function PassengerSection({
                 </div>
             )}
 
+            {/* 직접 입력 필드 */}
+            {isManualInputExpanded && (
+                <div className="mt-4 border-t border-surface-100 dark:border-surface-700 pt-3">
+                    <p className="text-xs text-surface-500 dark:text-surface-400 mb-2">
+                        이름 직접 입력
+                    </p>
+                    <input
+                        type="text"
+                        value={externalPassengerNames}
+                        onChange={(e) => setExternalPassengerNames(e.target.value)}
+                        placeholder="예: 홍길동, 김철수, 이영희"
+                        className="input text-sm py-1.5 px-3 w-full"
+                    />
+                </div>
+            )}
+
             {/* 외부 인원 */}
-            <div className="flex items-center gap-3 mt-1">
+            <div className="flex items-center gap-3 mt-4 border-t border-surface-100 dark:border-surface-700 pt-3">
                 <p className="text-xs text-surface-500 dark:text-surface-400 whitespace-nowrap min-w-[3.5rem]">
                     {isExpanded ? '외부 인원' : '인원'}
                 </p>

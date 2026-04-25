@@ -39,7 +39,11 @@ export default function useVehicleHistory() {
     }, []);
 
     useEffect(() => {
-        if (!orgId) { setLoading(false); return; }
+        if (!orgId) {
+             
+            setLoading(false);
+            return;
+        }
         const fetch = async () => {
             try {
                 const v = await getVehicles(orgId);

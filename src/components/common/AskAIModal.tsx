@@ -113,10 +113,12 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
                 setTimeout(() => textareaRef.current?.focus(), 200);
             }
         } else {
+             
             setQuestion('');
             setMessages([]);
             setError('');
             setLoading(false);
+             
         }
     }, [isOpen]);
 
