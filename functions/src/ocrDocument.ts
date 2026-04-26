@@ -70,7 +70,6 @@ export const ocrDocument = onCall(
         timeoutSeconds: 120,
         memory: "512MiB",
         enforceAppCheck: true,
-        minInstances: 1,
     },
     async (request) => {
         if (!request.auth) {

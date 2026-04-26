@@ -5,7 +5,7 @@ import { TMAP_API_KEY } from './core';
  * POI 검색으로 좌표 찾기
  */
 export const searchPOI = async (keyword: string) => {
-    if (!keyword?.trim() || (!import.meta.env.PROD && !TMAP_API_KEY)) return null;
+    if (!keyword?.trim() || keyword.trim().length < 2 || (!import.meta.env.PROD && !TMAP_API_KEY)) return null;
 
     try {
         const data = await fetchTmap(
@@ -31,7 +31,7 @@ export const searchPOI = async (keyword: string) => {
  * 캐싱 적용
  */
 export const geocode = async (address: string) => {
-    if (!address?.trim()) return null;
+    if (!address?.trim() || address.trim().length < 2) return null;
     if (geoCache.has(address)) return geoCache.get(address) || null;
     if (isTmapCoolingDown()) return null;
     if (!import.meta.env.PROD && !TMAP_API_KEY) return null;

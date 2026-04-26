@@ -23,17 +23,26 @@ async function findUserByEmail(email: string) {
 }
 
 /**
- * Google Calendar -> App 역동기화 (10분마다)
+ * Google Calendar -> App 역동기화 (2시간마다)
+ * 비용 최적화: 30분 → 2시간, 주말 스킵, 실패 캘린더 자동 제외
  */
 export const syncCalendarToApp = onSchedule(
     {
-        schedule: "every 30 minutes",
+        schedule: "every 2 hours",
         timeZone: "Asia/Seoul",
-        retryCount: 1,
+        retryCount: 0,
         memory: "512MiB",
         timeoutSeconds: 120,
     },
     async function () {
+        // 주말(토/일)에는 동기화 스킵 (비용 절감)
+        const nowKST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+        const dayOfWeek = nowKST.getDay(); // 0=일, 6=토
+        if (dayOfWeek === 0 || dayOfWeek === 6) {
+            console.log("=== Calendar sync skipped (weekend) ===");
+            return;
+        }
+
         console.log("=== Calendar -> App reverse sync start ===");
 
         try {
@@ -75,6 +84,13 @@ export const syncCalendarToApp = onSchedule(
                 // 유효하지 않은 캘린더 ID 건너뛰기 (@ 포함 필수)
                 if (!calendarId || !calendarId.includes("@")) {
                     console.log("Vehicle " + vehicleName + "(" + vehicleId + "): invalid calendar ID, skip");
+                    continue;
+                }
+
+                // 연속 실패 3회 이상인 캘린더는 동기화 대상에서 자동 제외 (비용 절감)
+                const failCount = (vehicle.calendarSyncFailCount as number) || 0;
+                if (failCount >= 3) {
+                    console.log("Vehicle " + vehicleName + "(" + vehicleId + "): skipped (" + failCount + " consecutive failures)");
                     continue;
                 }
 
@@ -246,18 +262,34 @@ export const syncCalendarToApp = onSchedule(
                             console.log("[" + vehicleName + "] Reservation cancelled (calendar deleted): " + reservation.id);
                         }
                     }
+                    // 동기화 성공 시 실패 카운터 리셋
+                    if (failCount > 0) {
+                        await db.collection("vehicles").doc(vehicleId).update({ calendarSyncFailCount: 0 });
+                    }
                 } catch (vehicleErr: unknown) {
-                    console.error("Vehicle " + vehicleName + "(" + vehicleId + ") sync failed:", (vehicleErr as Error).message);
+                    const errMsg = (vehicleErr as Error).message;
+                    console.error("Vehicle " + vehicleName + "(" + vehicleId + ") sync failed:", errMsg);
+
+                    // Not Found 에러 시 실패 카운터 증가 (삭제된 캘린더 자동 감지)
+                    if (errMsg.includes("Not Found") || errMsg.includes("404")) {
+                        const newFailCount = failCount + 1;
+                        await db.collection("vehicles").doc(vehicleId).update({
+                            calendarSyncFailCount: newFailCount,
+                        });
+                        if (newFailCount >= 3) {
+                            console.warn("Vehicle " + vehicleName + "(" + vehicleId + "): auto-disabled after " + newFailCount + " failures");
+                        }
+                    }
                 }
             }
 
             console.log("=== Reverse sync done: created " + totalCreated + ", updated " + totalUpdated + ", cancelled " + totalCancelled + ", skippedDup " + totalSkippedDup + " ===");
 
-            // [이상 감지 알림] 30분 동안 예약 증식이 10건 이상이면 비정상 폭증으로 간주
+            // [이상 감지 알림] 2시간 동안 예약 증식이 10건 이상이면 비정상 폭증으로 간주
             if (totalCreated >= 10) {
                 await sendDiscordAlert({
                     title: "🚨 [긴급] 캘린더 동기화 시스템 예외 상황 감지",
-                    description: `한 번의 동기화 주기(30분분) 내에 **${totalCreated}건**의 예약이 새롭게 생성되었습니다.\n무한 증식 버그이거나 일시적인 폭증일 수 있으므로 Firestore 및 이벤트 로그 점검이 필요합니다.`,
+                    description: `한 번의 동기화 주기(2시간) 내에 **${totalCreated}건**의 예약이 새롭게 생성되었습니다.\n무한 증식 버그이거나 일시적인 폭증일 수 있으므로 Firestore 및 이벤트 로그 점검이 필요합니다.`,
                     color: 16711680
                 });
             }

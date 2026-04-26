@@ -87,16 +87,16 @@ async function executeTmapProxy(
 
     // 3. 라우팅
     if (action === "geocode") {
-        if (!query.address) {
-            return { status: 400, body: { error: "address is required" } };
+        if (!query.address || query.address.trim().length < 2) {
+            return { status: 400, body: { error: "address is required and must be at least 2 characters" } };
         }
         const data = await (await mockFetch("https://apis.openapi.sk.com/tmap/geo/fullAddrGeo")).json();
         return { status: 200, body: data };
     }
 
     if (action === "poi") {
-        if (!query.keyword) {
-            return { status: 400, body: { error: "keyword is required" } };
+        if (!query.keyword || query.keyword.trim().length < 2) {
+            return { status: 400, body: { error: "keyword is required and must be at least 2 characters" } };
         }
         const data = await (await mockFetch("https://apis.openapi.sk.com/tmap/pois")).json();
         return { status: 200, body: data };
@@ -188,7 +188,7 @@ describe("tmapProxy — 에뮬레이터 통합 테스트", () => {
 
         expect(result.status).toBe(400);
         expect(result.body).toEqual(
-            expect.objectContaining({ error: "address is required" })
+            expect.objectContaining({ error: "address is required and must be at least 2 characters" })
         );
     });
 

@@ -4,7 +4,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 
 // 시스템 전역 옵션 - 유휴 리소스 절감 및 불필요한 과금 방지
 setGlobalOptions({ 
-    maxInstances: 50, 
+    maxInstances: 10, 
     memory: "512MiB", 
     timeoutSeconds: 120, 
     region: "asia-northeast3",
@@ -62,6 +62,12 @@ export const reservationReminder = onSchedule(
         retryCount: 0,
     },
     async function () {
+        // 주말(토/일)에는 스킵 (비용 절감)
+        const nowKST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+        const dayOfWeek = nowKST.getDay();
+        if (dayOfWeek === 0 || dayOfWeek === 6) {
+            return;
+        }
         await checkReservationReminders();
     }
 );
@@ -71,7 +77,7 @@ export const reservationReminder = onSchedule(
 // 예약 트리거 (Google Calendar 연동 + 푸시 알림)
 export { onReservationCreated, onReservationUpdated, onReservationDeleted } from "./reservationTriggers";
 
-// Google Calendar -> App 역동기화 (10분마다)
+// Google Calendar -> App 역동기화 (2시간마다)
 export { syncCalendarToApp } from "./calendarSchedule";
 
 // (Google Calendar Push Webhook 기능은 도메인 인증 문제로 보류됨)

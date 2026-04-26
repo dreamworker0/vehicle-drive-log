@@ -69,9 +69,9 @@ export const tmapProxy = createAuthenticatedProxy("tmapProxy", async (req, res) 
 
     // ── 패턴 A: ?action= 방식 (신버전 빌드) ──────────────────────────
     if (action === "geocode") {
-        const { address } = req.query;
-        if (!address) {
-            res.status(400).json({ error: "address is required" });
+        const address = req.query.address as string | undefined;
+        if (!address || address.trim().length < 2) {
+            res.status(400).json({ error: "address is required and must be at least 2 characters" });
             return;
         }
         const url = `https://apis.openapi.sk.com/tmap/geo/fullAddrGeo?version=1&format=json&coordType=WGS84GEO&fullAddr=${encodeURIComponent(address as string)}`;
@@ -81,9 +81,9 @@ export const tmapProxy = createAuthenticatedProxy("tmapProxy", async (req, res) 
     }
 
     if (action === "poi") {
-        const { keyword } = req.query;
-        if (!keyword) {
-            res.status(400).json({ error: "keyword is required" });
+        const keyword = req.query.keyword as string | undefined;
+        if (!keyword || keyword.trim().length < 2) {
+            res.status(400).json({ error: "keyword is required and must be at least 2 characters" });
             return;
         }
         const url = `https://apis.openapi.sk.com/tmap/pois?version=1&format=json&searchKeyword=${encodeURIComponent(keyword as string)}&resCoordType=WGS84GEO&reqCoordType=WGS84GEO&count=1`;
@@ -110,9 +110,9 @@ export const tmapProxy = createAuthenticatedProxy("tmapProxy", async (req, res) 
 
     // ── 패턴 B: 경로 방식 (구버전 빌드 호환) ─────────────────────────
     if (path.includes("/geo/fullAddrGeo")) {
-        const { fullAddr } = req.query;
-        if (!fullAddr) {
-            res.status(400).json({ error: "fullAddr is required" });
+        const fullAddr = req.query.fullAddr as string | undefined;
+        if (!fullAddr || fullAddr.trim().length < 2) {
+            res.status(400).json({ error: "fullAddr is required and must be at least 2 characters" });
             return;
         }
         const url = `https://apis.openapi.sk.com/tmap/geo/fullAddrGeo?version=1&format=json&coordType=WGS84GEO&fullAddr=${encodeURIComponent(fullAddr as string)}`;
@@ -122,9 +122,9 @@ export const tmapProxy = createAuthenticatedProxy("tmapProxy", async (req, res) 
     }
 
     if (path.includes("/pois")) {
-        const { searchKeyword } = req.query;
-        if (!searchKeyword) {
-            res.status(400).json({ error: "searchKeyword is required" });
+        const searchKeyword = req.query.searchKeyword as string | undefined;
+        if (!searchKeyword || searchKeyword.trim().length < 2) {
+            res.status(400).json({ error: "searchKeyword is required and must be at least 2 characters" });
             return;
         }
         const params = new URLSearchParams({
