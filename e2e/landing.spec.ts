@@ -18,7 +18,7 @@ test.describe('랜딩 페이지', () => {
     });
 
     test('3단계 시작 섹션이 표시된다', async ({ page }) => {
-        const heading = page.getByText('3단계로 시작하세요');
+        const heading = page.getByText('단 3단계면 시작할 수 있어요!');
         await expect(heading).toBeVisible({ timeout: 10000 });
         const steps = ['기관 신청', '직원 초대', '바로 사용'];
         for (const step of steps) {
@@ -41,14 +41,14 @@ test.describe('랜딩 페이지', () => {
     });
 
     test('대상 안내 섹션이 표시된다', async ({ page }) => {
-        const heading = page.getByText('누가 사용할 수 있나요?');
+        const heading = page.getByText('어떤 곳에서 쓸 수 있나요?');
         await expect(heading).toBeVisible({ timeout: 10000 });
         await expect(page.getByText(/고유번호증 또는 사업자등록증/)).toBeVisible();
         await expect(page.getByText(/영리 기업/)).toBeVisible();
     });
 
     test('하단 CTA 섹션이 표시된다', async ({ page }) => {
-        await expect(page.getByText('지금 바로 시작하세요')).toBeVisible({ timeout: 10000 });
+        await expect(page.getByText('지금 바로 든든한 차량 관리를 시작해볼까요?')).toBeVisible({ timeout: 10000 });
         await expect(page.getByRole('button', { name: '기관 사용 신청하기' })).toBeVisible();
     });
 
