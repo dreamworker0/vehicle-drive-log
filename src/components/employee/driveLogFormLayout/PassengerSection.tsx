@@ -1,4 +1,4 @@
-import { memo, useState, useEffect } from 'react';
+import { memo, useState, useEffect, useRef } from 'react';
 import type { User as UserDoc } from '../../../types/user';
 
 interface PassengerSectionProps {
@@ -48,6 +48,76 @@ const PassengerSection = memo(function PassengerSection({
     useEffect(() => {
         localStorage.setItem('driveLog_manualInputExpanded', JSON.stringify(isManualInputExpanded));
     }, [isManualInputExpanded]);
+
+    const inputRef = useRef<HTMLInputElement>(null);
+    const [autocompleteState, setAutocompleteState] = useState({
+        isOpen: false,
+        suggestions: [] as UserDoc[],
+        startIndex: 0,
+        endIndex: 0,
+    });
+
+    const handleManualInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const val = e.target.value;
+        setExternalPassengerNames(val);
+
+        const cursor = e.target.selectionStart || 0;
+        const textBeforeCursor = val.slice(0, cursor);
+        const lastCommaIndex = textBeforeCursor.lastIndexOf(',');
+        const startIndex = lastCommaIndex === -1 ? 0 : lastCommaIndex + 1;
+        
+        const textAfterCursor = val.slice(cursor);
+        const nextCommaIndex = textAfterCursor.indexOf(',');
+        const endIndex = nextCommaIndex === -1 ? val.length : cursor + nextCommaIndex;
+
+        const searchTerm = val.slice(startIndex, cursor).trim();
+
+        if (searchTerm.length > 0) {
+            const suggestions = members.filter(m => {
+                const name = m.name || m.email?.split('@')[0] || '';
+                return name.toLowerCase().includes(searchTerm.toLowerCase());
+            });
+            setAutocompleteState({
+                isOpen: suggestions.length > 0,
+                suggestions,
+                startIndex,
+                endIndex
+            });
+        } else {
+            setAutocompleteState(prev => ({ ...prev, isOpen: false }));
+        }
+    };
+
+    const handleSuggestionClick = (member: UserDoc) => {
+        const name = member.name || member.email?.split('@')[0] || '';
+        const val = externalPassengerNames;
+        const before = val.slice(0, autocompleteState.startIndex);
+        const after = val.slice(autocompleteState.endIndex);
+        
+        let newBefore = before.trim() === '' ? '' : before;
+        if (newBefore !== '' && !newBefore.endsWith(',') && !newBefore.endsWith(' ')) {
+            newBefore += ', ';
+        } else if (newBefore.endsWith(',')) {
+            newBefore += ' ';
+        }
+
+        let newAfter = after.trim();
+        if (newAfter !== '' && !newAfter.startsWith(',')) {
+            newAfter = ', ' + newAfter;
+        } else if (newAfter === '') {
+            newAfter = ', '; // 항상 다음 입력을 위해 쉼표 추가
+        }
+
+        const newValue = newBefore + name + newAfter;
+        setExternalPassengerNames(newValue);
+        setAutocompleteState(prev => ({ ...prev, isOpen: false }));
+        
+        setTimeout(() => {
+            if (inputRef.current) {
+                inputRef.current.focus();
+            }
+        }, 0);
+    };
 
     return (
         <div className="glass-card p-4">
@@ -129,13 +199,38 @@ const PassengerSection = memo(function PassengerSection({
                     <p className="text-xs text-surface-500 dark:text-surface-400 mb-2">
                         이름 직접 입력
                     </p>
-                    <input
-                        type="text"
-                        value={externalPassengerNames}
-                        onChange={(e) => setExternalPassengerNames(e.target.value)}
-                        placeholder="예: 홍길동, 김철수, 이영희"
-                        className="input text-sm py-1.5 px-3 w-full"
-                    />
+                    <div className="relative">
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            value={externalPassengerNames}
+                            onChange={handleManualInputChange}
+                            onBlur={() => {
+                                // 약간의 지연을 주어 클릭 이벤트가 먼저 발생하도록 함
+                                setTimeout(() => {
+                                    setAutocompleteState(prev => ({ ...prev, isOpen: false }));
+                                }, 200);
+                            }}
+                            placeholder="예: 홍길동, 김철수, 이영희"
+                            className="input text-sm py-1.5 px-3 w-full"
+                        />
+                        {autocompleteState.isOpen && (
+                            <div className="absolute z-20 w-full mt-1 bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-md shadow-lg max-h-48 overflow-y-auto">
+                                {autocompleteState.suggestions.map(m => {
+                                    const name = m.name || m.email?.split('@')[0];
+                                    return (
+                                        <div
+                                            key={`auto-${m.id}`}
+                                            onClick={() => handleSuggestionClick(m)}
+                                            className="px-3 py-2.5 text-sm text-surface-700 dark:text-surface-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 cursor-pointer transition-colors border-b border-surface-100 dark:border-surface-700 last:border-0"
+                                        >
+                                            {name}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        )}
+                    </div>
                 </div>
             )}
 
