@@ -24,21 +24,21 @@ export default function WelcomeGuide({ onDismiss }: WelcomeGuideProps) {
                     <span className="w-7 h-7 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-sm flex-shrink-0">📅</span>
                     <div>
                         <p className="font-medium text-surface-800 dark:text-surface-200">예약</p>
-                        <p className="text-xs text-surface-400">달력에서 차량과 시간을 선택하세요</p>
+                        <p className="text-xs text-surface-400">먼저 달력에서 원하시는 차량과 날짜를 콕 찍어주세요!</p>
                     </div>
                 </div>
                 <div className="flex items-start gap-3">
                     <span className="w-7 h-7 rounded-lg bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center text-sm flex-shrink-0">🚗</span>
                     <div>
                         <p className="font-medium text-surface-800 dark:text-surface-200">운행 시작</p>
-                        <p className="text-xs text-surface-400">예약 카드에서 '운행 시작'을 눌러주세요</p>
+                        <p className="text-xs text-surface-400">예약해 둔 카드에서 '운행 시작' 버튼을 누르면 출발 준비 끝이에요.</p>
                     </div>
                 </div>
                 <div className="flex items-start gap-3">
                     <span className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-sm flex-shrink-0">📸</span>
                     <div>
                         <p className="font-medium text-surface-800 dark:text-surface-200">일지 작성</p>
-                        <p className="text-xs text-surface-400">도착 후 계기판을 촬영하면 주행거리가 자동 입력됩니다</p>
+                        <p className="text-xs text-surface-400">운행을 마치고 계기판 사진을 찰칵 찍으면 귀찮은 주행거리가 알아서 쏙 입력된답니다.</p>
                     </div>
                 </div>
             </div>

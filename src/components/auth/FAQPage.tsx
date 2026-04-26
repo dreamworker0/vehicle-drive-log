@@ -124,7 +124,7 @@ export default function FAQPage() {
                     <div className="text-center border-b border-surface-100 pb-6">
                         <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-1">❓ 자주 하는 질문</h1>
                         <p className="text-sm text-surface-400 dark:text-surface-500">
-                            궁금한 점을 빠르게 확인하세요.
+                            평소에 궁금하셨던 점들을 모아두었어요.
                         </p>
                     </div>
 
@@ -140,7 +140,7 @@ export default function FAQPage() {
                             type="text"
                             value={search}
                             onChange={e => setSearch(e.target.value)}
-                            placeholder="질문 검색..."
+                            placeholder="어떤 점이 궁금하신가요?"
                             className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/50 text-sm text-surface-800 dark:text-surface-200 placeholder:text-surface-400 dark:placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-primary-300 transition-all"
                         />
                         {search && (
@@ -159,8 +159,8 @@ export default function FAQPage() {
                     {search.trim() && (
                         <p className="text-xs text-surface-400 dark:text-surface-500 -mt-2">
                             {filtered.length > 0
-                                ? `${filtered.length}개의 결과가 있습니다.`
-                                : '검색 결과가 없습니다. 다른 키워드로 검색해 보세요.'}
+                                ? `총 ${filtered.length}개의 질문을 찾았어요.`
+                                : '앗, 일치하는 질문이 없네요. 다른 단어로 검색해 보시겠어요?'}
                         </p>
                     )}
 
@@ -251,7 +251,7 @@ export default function FAQPage() {
 
                     <div className="border-t border-surface-100 pt-4 text-center">
                         <p className="text-xs text-surface-400 dark:text-surface-500">
-                            더 궁금한 점이 있으시면 더보기 → 건의하기를 이용해주세요.
+                            여기에 없는 내용이 궁금하시다면 '더보기 → 건의하기'를 통해 편하게 물어보세요!
                         </p>
                     </div>
                 </div>
@@ -265,7 +265,7 @@ export default function FAQPage() {
                         <svg className="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                         </svg>
-                        Q{copiedIdx + 1} 링크가 복사되었습니다
+                        Q{copiedIdx + 1} 링크가 복사되었어요!
                     </div>
                 </div>
             )}

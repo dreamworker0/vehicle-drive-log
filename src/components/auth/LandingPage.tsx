@@ -158,7 +158,7 @@ export default function LandingPage() {
             {/* ─── 3단계로 시작하세요 ─── */}
             <section className="relative bg-primary-800/50 backdrop-blur-sm px-4 py-12 sm:py-16">
                 <div className="max-w-3xl mx-auto">
-                    <h2 className="text-2xl font-bold text-center mb-10">3단계로 시작하세요</h2>
+                    <h2 className="text-2xl font-bold text-center mb-10">단 3단계면 시작할 수 있어요!</h2>
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                         {STEPS.map((s) => (
                             <div key={s.num} className="text-center">
@@ -176,9 +176,9 @@ export default function LandingPage() {
             {/* ─── 사용법 영상 ─── */}
             <section className="relative bg-primary-700/50 backdrop-blur-sm px-4 py-12 sm:py-16">
                 <div className="max-w-2xl mx-auto text-center">
-                    <h2 className="text-2xl font-bold mb-2">📺 사용법 영상</h2>
+                    <h2 className="text-2xl font-bold mb-2">📺 이렇게 사용해보세요</h2>
                     <p className="text-primary-200/80 text-sm mb-6">
-                        영상으로 사용법을 확인해보세요.
+                        영상으로 쉽고 빠르게 사용법을 알아보세요.
                     </p>
                     <div className="relative w-full overflow-hidden rounded-xl" style={{ paddingBottom: '56.25%' }}>
                         <iframe
@@ -228,7 +228,7 @@ export default function LandingPage() {
             {/* ─── 대상 안내 ─── */}
             <section className="relative bg-surface-50 dark:bg-surface-800 text-surface-900 dark:text-surface-100 px-4 py-12 sm:py-16">
                 <div className="max-w-2xl mx-auto text-center">
-                    <h2 className="text-xl font-bold mb-4">누가 사용할 수 있나요?</h2>
+                    <h2 className="text-xl font-bold mb-4">어떤 곳에서 쓸 수 있나요?</h2>
                     <p className="text-surface-600 dark:text-surface-400 text-sm leading-relaxed mb-6">
                         사회복지법인, 사회복지시설, 비영리사단법인·재단법인 등<br />
                         <strong>고유번호증 또는 사업자등록증을 보유한 비영리단체</strong>라면 누구나 신청할 수 있습니다.
@@ -242,8 +242,8 @@ export default function LandingPage() {
 
             {/* ─── CTA ─── */}
             <section className="relative bg-primary-800 text-white px-4 py-12 sm:py-16 text-center">
-                <h2 className="text-xl font-bold mb-2">지금 바로 시작하세요</h2>
-                <p className="text-primary-300 text-sm mb-6">신청부터 승인까지 보통 1~2 영업일이면 완료됩니다.</p>
+                <h2 className="text-xl font-bold mb-2">지금 바로 든든한 차량 관리를 시작해볼까요?</h2>
+                <p className="text-primary-300 text-sm mb-6">신청 후 영업일 기준 1~2일 안에 꼼꼼히 확인하고 승인해 드립니다.</p>
                 <button
                     onClick={() => navigate('/apply')}
                     className="btn bg-white dark:bg-surface-800 text-primary-700 font-bold hover:bg-primary-50 shadow-lg hover:shadow-xl transition-all"

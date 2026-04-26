@@ -106,10 +106,10 @@ export default function LoginPage() {
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
                                     </svg>
                                 </div>
-                                <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">외부 브라우저 필요</h2>
+                                <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">앗, 외부 브라우저가 필요해요!</h2>
                                 <p className="text-sm text-surface-500 leading-relaxed">
-                                    현재 앱 내부 브라우저에서는<br />
-                                    Google 로그인이 지원되지 않습니다.
+                                    카카오톡이나 네이버 같은 앱 안에서는<br />
+                                    구글 로그인을 켤 수가 없거든요.
                                 </p>
                             </div>
 
@@ -147,7 +147,7 @@ export default function LoginPage() {
                             </button>
 
                             <p className="text-xs text-surface-400 text-center leading-relaxed">
-                                복사한 URL을 Chrome 또는 Safari에<br />붙여넣어 접속해주세요.
+                                복사하신 주소를 크롬이나 사파리 같은<br />인터넷 브라우저에 쏙 붙여넣고 들어와 주세요!
                             </p>
                         </>
                     ) : (
