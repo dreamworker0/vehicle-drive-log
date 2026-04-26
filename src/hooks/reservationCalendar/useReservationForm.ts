@@ -36,7 +36,7 @@ export function useReservationForm() {
     const todayStr = useMemo(() => format(new Date(), 'yyyy-MM-dd'), []);
 
     // URL 파라미터 처리 (날짜 선택) 및 라우트 state 처리 (패턴 prefill 등)
-    /* eslint-disable react-hooks/set-state-in-effect -- URL state → React state 초기화는 effect에서 수행 필요 */
+     
     useEffect(() => {
         const dateParam = searchParams.get('date');
         if (dateParam) {
@@ -91,7 +91,7 @@ export function useReservationForm() {
             window.history.replaceState({}, document.title);
         }
     }, [searchParams, location.state]);
-    /* eslint-enable react-hooks/set-state-in-effect */
+     
 
     const isPastDate = isBefore(startOfDay(new Date(selectedDate)), startOfDay(new Date()));
     const isToday = selectedDate === todayStr;

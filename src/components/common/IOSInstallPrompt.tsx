@@ -28,7 +28,7 @@ export default function IOSInstallPrompt() {
             const dismissedAt = parseInt(dismissed, 10);
             if (Date.now() - dismissedAt < DISMISS_DAYS * 24 * 60 * 60 * 1000) return;
         }
-        // eslint-disable-next-line react-hooks/set-state-in-effect -- 마운트 시 조건부 표시 의도적 패턴
+         
         setVisible(true);
     }, []);
 

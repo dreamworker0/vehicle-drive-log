@@ -40,7 +40,7 @@ export default function ConfirmModal({
     const dialogRef = useRef<HTMLDivElement>(null);
 
     // 모달 열릴 때 기본값 초기화 + 포커스
-    /* eslint-disable react-hooks/set-state-in-effect -- 모달 open 시 초기값 동기화 의도적 패턴 */
+     
     useEffect(() => {
         if (open) {
             setInputValue(inputDefault);
@@ -51,7 +51,7 @@ export default function ConfirmModal({
             }, 50);
         }
     }, [open, inputDefault, type]);
-    /* eslint-enable react-hooks/set-state-in-effect */
+     
 
     // 포커스 트랩: Tab 키로 모달 내부에서만 순환
     const handleTrapFocus = useCallback((e: KeyboardEvent) => {

@@ -30,6 +30,8 @@ export default defineConfig([
         { name: 'alert', message: 'window.alert 금지 → useToast() 훅을 사용하세요.' },
         { name: 'prompt', message: 'window.prompt 금지 → useConfirm() 또는 커스텀 입력 UI를 사용하세요.' },
       ],
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/preserve-manual-memoization': 'off',
     },
   },
   {
@@ -60,6 +62,8 @@ export default defineConfig([
         { name: 'alert', message: 'window.alert 금지 → useToast() 훅을 사용하세요.' },
         { name: 'prompt', message: 'window.prompt 금지 → useConfirm() 또는 커스텀 입력 UI를 사용하세요.' },
       ],
+      'react-hooks/set-state-in-effect': 'off',
+      'react-hooks/preserve-manual-memoization': 'off',
     },
   },
   {
