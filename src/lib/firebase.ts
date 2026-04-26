@@ -3,7 +3,8 @@ import { getAuth, GoogleAuthProvider, browserLocalPersistence, setPersistence } 
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, getFirestore, clearIndexedDbPersistence } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
-// firebase/analytics, firebase/app-check, firebase/messaging은 동적 import (번들 최적화)
+import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
+// firebase/analytics, firebase/messaging은 동적 import (번들 최적화)
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -26,7 +27,7 @@ function initAnalyticsLazy() {
     }).catch(() => { /* Analytics 로드 실패 무시 */ });
 }
 
-// === App Check 비동기 즉시 초기화 (초기 번들에서 ~30KB 제외 유지) ===
+// === App Check 동기 초기화 (Firebase 쿼리 전 토큰 확보 보장) ===
 function initAppCheck() {
     if (typeof window === 'undefined') return;
     const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY;
@@ -41,15 +42,15 @@ function initAppCheck() {
         }
         (self as unknown as Record<string, unknown>).FIREBASE_APPCHECK_DEBUG_TOKEN = import.meta.env.VITE_APPCHECK_DEBUG_TOKEN || true;
     }
-    import('firebase/app-check').then(({ initializeAppCheck, ReCaptchaEnterpriseProvider }) => {
+    try {
         initializeAppCheck(app, {
             provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey),
             isTokenAutoRefreshEnabled: true,
         });
         console.info('[AppCheck] 초기화 완료');
-    }).catch((err) => {
+    } catch (err) {
         console.warn('[AppCheck] 초기화 실패:', err);
-    });
+    }
 }
 
 // 브라우저 유휴 시점에 Analytics 초기화 (메인 스레드 미차단)

@@ -5,6 +5,20 @@
 
 ---
 
+## Phase 44 — CI/CD 자동 배포 파이프라인 구축 및 워크플로우 고도화 🚀
+
+> 2026-04-26
+
+### Added
+- GitHub Actions 기반의 프로덕션 CI/CD 자동 배포 파이프라인 구축 (`deploy.yml` 작성 및 연동 완료)
+- GitHub 저장소 Secrets(환경변수 및 인증키) 연동을 통해 Firebase Hosting 및 Functions 무중단 배포 자동화
+- 에이전트 전용 프리-커밋(Pre-commit) 문서 갱신 워크플로우(`git.md`) 추가 (문서 최신화 후 배포 강제화)
+
+### Changed
+- 배포 프로세스 전환: 기존 로컬 PC에서의 수동 `firebase deploy` 방식에서 깃허브 `master` 브랜치 푸시 감지 방식(GitHub Actions)으로 전면 교체
+
+---
+
 ## Phase 43 — 동승자 선택 UI 및 사용성 개선 🧑‍🤝‍🧑
 
 > 2026-04-25
