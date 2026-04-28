@@ -131,7 +131,7 @@ export default function DashboardApiHealth() {
                 <div className="flex items-center gap-2">
                     <span className="text-xl">🏥</span>
                     <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100">
-                        API 헬스 체크
+                        헬스 체크
                     </h2>
                     {summary && (
                         <div className="flex items-center gap-1.5 ml-2">
@@ -203,8 +203,18 @@ export default function DashboardApiHealth() {
                 </div>
             )}
 
-            {/* API 상태 카드 그리드 */}
+            {/* 외부 서비스 상태 */}
             {results && (
+                <>
+                <div className="flex items-center gap-2 mb-3">
+                    <span className="text-base">🌐</span>
+                    <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300">
+                        외부 서비스
+                    </h3>
+                    <span className="inline-flex items-center gap-0.5 text-xs font-medium text-surface-500 bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded-full">
+                        {results.length}
+                    </span>
+                </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3">
                     {results.map((api) => {
                         const cfg = STATUS_CONFIG[api.status];
@@ -252,6 +262,7 @@ export default function DashboardApiHealth() {
                         );
                     })}
                 </div>
+                </>
             )}
 
             {/* 내부 서비스 상태 */}
