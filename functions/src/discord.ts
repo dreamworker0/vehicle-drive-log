@@ -21,7 +21,7 @@ export async function sendDiscordAlert({
     fields = [],
 }: DiscordAlertOptions): Promise<void> {
     if (!DISCORD_WEBHOOK_URL) {
-        // 웹훅 URL이 설정되지 않은 로컬/테스트 환경에서는 조용히 넘어갑니다.
+        console.warn("⚠️ [Discord Alert] DISCORD_WEBHOOK_URL 환경 변수가 누락되어 알림을 발송하지 않습니다. 메시지 요약:", title);
         return;
     }
 
