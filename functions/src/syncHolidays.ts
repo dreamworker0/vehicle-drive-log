@@ -4,6 +4,7 @@
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineString } from "firebase-functions/params";
 import { getFirestore } from "firebase-admin/firestore";
+import { recordHeartbeat } from "./helpers";
 
 const HOLIDAY_API_KEY = defineString("HOLIDAY_API_KEY");
 
@@ -30,12 +31,21 @@ export const syncHolidaysScheduled = onSchedule(
                     `?serviceKey=${apiKey}&solYear=${year}&numOfRows=100&_type=json`;
 
                 const response = await fetch(url);
-                if (!response.ok) {
-                    console.error(`Failed to fetch holidays for year ${year}: ${response.status}`);
+                const text = await response.text();
+
+                let data: any;
+                try {
+                    data = JSON.parse(text);
+                } catch (parseError) {
+                    console.error(`[공공데이터 API] JSON 파싱 실패 (year: ${year}): ${text.substring(0, 200)}`);
                     continue;
                 }
 
-                const data: any = await response.json();
+                if (!response.ok) {
+                    console.error(`[공공데이터 API] 상태 코드 에러 (year: ${year}): ${response.status}`);
+                    continue;
+                }
+
                 const items = data?.response?.body?.items?.item;
 
                 const map: Record<string, string> = {};
@@ -60,6 +70,8 @@ export const syncHolidaysScheduled = onSchedule(
             } else {
                 console.log("No holiday data fetched, skipping Firestore update");
             }
+
+            await recordHeartbeat("syncHolidays");
         } catch (error: unknown) {
             console.error("Error syncing holidays:", error);
         }

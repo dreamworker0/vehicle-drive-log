@@ -1,6 +1,7 @@
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { getFirestore } from "firebase-admin/firestore";
 import { sendDiscordAlert } from "./discord";
+import { recordHeartbeat } from "./helpers";
 
 export const scheduledDiscordBriefing = onSchedule(
     {
@@ -82,5 +83,7 @@ export const scheduledDiscordBriefing = onSchedule(
                 ]
             }).catch(e => console.error("Discord alert error:", e));
         }
+
+        await recordHeartbeat("discordBriefing");
     }
 );

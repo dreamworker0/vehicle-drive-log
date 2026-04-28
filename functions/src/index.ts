@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase-admin/app";
 import { setGlobalOptions } from "firebase-functions/v2";
 import { onSchedule } from "firebase-functions/v2/scheduler";
+import { recordHeartbeat } from "./helpers";
 
 // 시스템 전역 옵션 - 유휴 리소스 절감 및 불필요한 과금 방지
 setGlobalOptions({ 
@@ -69,6 +70,7 @@ export const reservationReminder = onSchedule(
             return;
         }
         await checkReservationReminders();
+        await recordHeartbeat("reservationReminder");
     }
 );
 
@@ -103,6 +105,7 @@ export const computeDashboardStats = onSchedule(
     },
     async function () {
         await computeAllDashboardStats();
+        await recordHeartbeat("computeDashboardStats");
     }
 );
 
@@ -138,6 +141,12 @@ export { sendFeedbackReply } from "./sendFeedbackReply";
 
 // AI에게 물어보기 (FAQ 기반 Gemini 답변)
 export { askAI } from "./askAI";
+
+// 슈퍼관리자 API 헬스 체크
+export { apiHealthCheck } from "./apiHealthCheck";
+
+// 캘린더 동기화 실패 카운터 리셋 (슈퍼관리자용)
+export { resetCalendarSyncFails } from "./scripts/resetCalendarSyncFails";
 
 
 

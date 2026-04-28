@@ -1,11 +1,16 @@
 /**
  * calendarSchedule — Google Calendar → App 역동기화 스케줄러
  */
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { listCalendarEvents, parseEventToReservation } from "./calendarSync";
 import { sendDiscordAlert } from "./discord";
+import { recordHeartbeat } from "./helpers";
+
+/** 쿨다운 재시도 관련 상수 */
+const RETRY_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24시간
+const MAX_FAIL_COUNT = 10; // 10회 이상 실패 시 진짜 영구 제외
 
 const db = getFirestore();
 const auth = getAuth();
@@ -69,6 +74,8 @@ export const syncCalendarToApp = onSchedule(
             let totalUpdated = 0;
             let totalCancelled = 0;
             let totalSkippedDup = 0;
+            let totalSkippedCooldown = 0;
+            let totalSkippedPermanent = 0;
 
             // 동일 calendarEventId가 여러 차량 캘린더에 존재할 때 중복 예약 방지
             const globalProcessedEventIds = new Set<string>();
@@ -87,11 +94,22 @@ export const syncCalendarToApp = onSchedule(
                     continue;
                 }
 
-                // 연속 실패 3회 이상인 캘린더는 동기화 대상에서 자동 제외 (비용 절감)
+                // 연속 실패 횟수에 따른 동기화 제외 판단
                 const failCount = (vehicle.calendarSyncFailCount as number) || 0;
-                if (failCount >= 3) {
-                    console.log("Vehicle " + vehicleName + "(" + vehicleId + "): skipped (" + failCount + " consecutive failures)");
+                if (failCount >= MAX_FAIL_COUNT) {
+                    // 10회 이상: 영구 제외 (수동 리셋 필요)
+                    totalSkippedPermanent++;
                     continue;
+                }
+                if (failCount >= 3) {
+                    // 3~9회: 24시간 쿨다운 후 1회 재시도
+                    const lastFailAt = vehicle.calendarSyncLastFailAt;
+                    const lastFailTime = lastFailAt?.toDate?.() || lastFailAt;
+                    if (lastFailTime && (Date.now() - new Date(lastFailTime).getTime()) < RETRY_COOLDOWN_MS) {
+                        totalSkippedCooldown++;
+                        continue;
+                    }
+                    console.log("Vehicle " + vehicleName + "(" + vehicleId + "): 24h cooldown passed, retrying (failCount: " + failCount + ")");
                 }
 
                 try {
@@ -270,20 +288,23 @@ export const syncCalendarToApp = onSchedule(
                     const errMsg = (vehicleErr as Error).message;
                     console.error("Vehicle " + vehicleName + "(" + vehicleId + ") sync failed:", errMsg);
 
-                    // Not Found 에러 시 실패 카운터 증가 (삭제된 캘린더 자동 감지)
-                    if (errMsg.includes("Not Found") || errMsg.includes("404")) {
+                    // Not Found / 인증 에러 시 실패 카운터 증가
+                    if (errMsg.includes("Not Found") || errMsg.includes("404") || errMsg.includes("403")) {
                         const newFailCount = failCount + 1;
                         await db.collection("vehicles").doc(vehicleId).update({
                             calendarSyncFailCount: newFailCount,
+                            calendarSyncLastFailAt: FieldValue.serverTimestamp(),
                         });
-                        if (newFailCount >= 3) {
-                            console.warn("Vehicle " + vehicleName + "(" + vehicleId + "): auto-disabled after " + newFailCount + " failures");
+                        if (newFailCount >= MAX_FAIL_COUNT) {
+                            console.warn("Vehicle " + vehicleName + "(" + vehicleId + "): permanently disabled after " + newFailCount + " failures");
+                        } else if (newFailCount >= 3) {
+                            console.warn("Vehicle " + vehicleName + "(" + vehicleId + "): cooldown activated after " + newFailCount + " failures (retry in 24h)");
                         }
                     }
                 }
             }
 
-            console.log("=== Reverse sync done: created " + totalCreated + ", updated " + totalUpdated + ", cancelled " + totalCancelled + ", skippedDup " + totalSkippedDup + " ===");
+            console.log("=== Reverse sync done: created " + totalCreated + ", updated " + totalUpdated + ", cancelled " + totalCancelled + ", skippedDup " + totalSkippedDup + ", skippedCooldown " + totalSkippedCooldown + ", skippedPermanent " + totalSkippedPermanent + " ===");
 
             // [이상 감지 알림] 2시간 동안 예약 증식이 10건 이상이면 비정상 폭증으로 간주
             if (totalCreated >= 10) {
@@ -293,6 +314,8 @@ export const syncCalendarToApp = onSchedule(
                     color: 16711680
                 });
             }
+
+            await recordHeartbeat("syncCalendarToApp");
         } catch (err: unknown) {
             console.error("Reverse sync overall failed:", (err as Error).message);
         }

@@ -18,6 +18,7 @@ const OrgManagement = lazyWithRetry(() => import('./OrgManagement'));
 const FeedbackManagement = lazyWithRetry(() => import('./FeedbackManagement'));
 const SuperAdminManager = lazyWithRetry(() => import('./SuperAdminManager'));
 const ServiceDashboard = lazyWithRetry(() => import('./ServiceDashboard'));
+const ApiHealthPage = lazyWithRetry(() => import('./ApiHealthPage'));
 
 interface NavItemProps {
     to: string;
@@ -182,6 +183,15 @@ export default function SuperAdminLayout() {
                         label="관리자 관리"
                         badge={adminCount}
                     />
+                    <NavItem
+                        to="/super-admin/api-health"
+                        icon={
+                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 13.5l3-3 3 3m-3-3v10.5m-3.75-15h7.5a2.25 2.25 0 0 1 2.25 2.25v7.5a2.25 2.25 0 0 1-2.25 2.25h-7.5a2.25 2.25 0 0 1-2.25-2.25v-7.5a2.25 2.25 0 0 1 2.25-2.25z" />
+                            </svg>
+                        }
+                        label="헬스 체크"
+                    />
 
                 </nav>
 
@@ -257,6 +267,7 @@ export default function SuperAdminLayout() {
                             <Route path="organizations" element={<OrgManagement />} />
                             <Route path="feedbacks" element={<FeedbackManagement />} />
                             <Route path="admins" element={<SuperAdminManager />} />
+                            <Route path="api-health" element={<ApiHealthPage />} />
                             <Route path="" element={<Navigate to="dashboard" replace />} />
                         </Routes>
                     </Suspense>

@@ -100,3 +100,21 @@ export function wrapHandler<T extends unknown[], R>(functionName: string, handle
         }
     };
 }
+
+/**
+ * 스케줄러 heartbeat 기록 — _health/{schedulerName} 문서에 마지막 실행 시각 저장
+ * 헬스 체크에서 이 값을 읽어 스케줄러가 정상 동작 중인지 판단한다.
+ */
+export async function recordHeartbeat(schedulerName: string): Promise<void> {
+    try {
+        const { getFirestore, FieldValue } = await import("firebase-admin/firestore");
+        const db = getFirestore();
+        await db.collection("_health").doc(schedulerName).set({
+            lastRun: FieldValue.serverTimestamp(),
+            updatedAt: new Date().toISOString(),
+        }, { merge: true });
+    } catch (err) {
+        // heartbeat 실패가 스케줄러 자체를 중단시키면 안 됨
+        console.warn(`[Heartbeat] ${schedulerName} 기록 실패:`, (err as Error).message);
+    }
+}
