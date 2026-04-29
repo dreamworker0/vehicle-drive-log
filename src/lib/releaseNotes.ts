@@ -18,6 +18,13 @@ interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
     {
+        date: '2026-04-30',
+        title: '운행 시작 속도 및 안정성 보강 🚀',
+        items: [
+            { type: 'fixed', text: '인터넷 환경이 조금 느릴 때 "빠른 출발(운행 시작)" 버튼을 누르면 에러가 나던 문제를 깔끔하게 해결했습니다.' }
+        ]
+    },
+    {
         date: '2026-04-26',
         title: '동승자 입력이 훨씬 편해졌어요! 🧑‍🤝‍🧑 & 시스템 튼튼하게 보강 🚀',
         items: [

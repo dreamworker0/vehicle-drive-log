@@ -53,7 +53,7 @@ export const createReservation = async (data: Partial<Reservation>, requireAppro
 /** 서버 측 중복 검증 기반 예약 생성 (Cloud Function + Firestore Transaction) */
 export const createReservationSafe = async (data: Partial<Reservation>) => {
     try {
-        const callable = httpsCallable(functions, 'createReservationSafe', { timeout: 15000 });
+        const callable = httpsCallable(functions, 'createReservationSafe', { timeout: 60000 });
         const result = await callable(data);
         return (result.data as { reservationId: string }).reservationId;
     } catch (error: unknown) {

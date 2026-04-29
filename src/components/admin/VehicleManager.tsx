@@ -108,37 +108,48 @@ export default function VehicleManager() {
                     {(vehicle.currentKm || 0).toLocaleString()} km
                 </span>
             </div>
-            {vehicle.insurance?.company && (
-                <div className="mt-1.5 flex items-center gap-2 text-xs text-surface-500 dark:text-surface-400">
-                    <span>🛡️ {vehicle.insurance.company}</span>
-                    {vehicle.insurance.phone && (
-                        <a href={`tel:${vehicle.insurance.phone}`} className="text-primary-500 hover:underline">{vehicle.insurance.phone}</a>
+            {/* 보험 정보 및 캘린더 상태 */}
+            {(vehicle.insurance?.company || vehicle.googleCalendarId) && (
+                <div className="mt-1.5 flex items-center justify-between gap-2 text-xs text-surface-500 dark:text-surface-400 min-h-[20px]">
+                    <div className="flex items-center gap-2">
+                        {vehicle.insurance?.company && (
+                            <>
+                                <span>🛡️ {vehicle.insurance.company}</span>
+                                {vehicle.insurance.phone && (
+                                    <a href={`tel:${vehicle.insurance.phone}`} className="text-primary-500 hover:underline">{vehicle.insurance.phone}</a>
+                                )}
+                            </>
+                        )}
+                    </div>
+                    {vehicle.googleCalendarId && (
+                        <div className="shrink-0 text-right">
+                            {(() => {
+                                const failCount = vehicle.calendarSyncFailCount || 0;
+                                if (failCount >= 3) {
+                                    return (
+                                        <span className="px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 font-medium animate-pulse cursor-pointer"
+                                            title="캘린더 동기화에 실패했습니다. 차량을 수정하여 해결 방법을 확인하세요."
+                                            onClick={(e) => { e.stopPropagation(); handleEdit(vehicle); }}
+                                        >
+                                            📅 동기화 실패 ⚠️
+                                        </span>
+                                    );
+                                }
+                                if (failCount >= 1) {
+                                    return <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 font-medium">📅 재시도 중</span>;
+                                }
+                                return <span className="text-green-600 dark:text-green-400">📅 캘린더 정상</span>;
+                            })()}
+                        </div>
                     )}
                 </div>
             )}
             {/* 정비 중 / 폐차 사유 표시 */}
-            {(vehicle.fuelType === 'electric' || vehicle.googleCalendarId || isVehicleBlocked(vehicle.maintenance) || isRetired) && (
+            {(vehicle.fuelType === 'electric' || isVehicleBlocked(vehicle.maintenance) || isRetired) && (
                 <div className="mt-2 flex items-center gap-3 text-xs text-surface-400">
                     {vehicle.fuelType === 'electric' && (vehicle as unknown as { currentBattery?: number }).currentBattery != null && (
                         <span className="flex items-center gap-1">🔋 {(vehicle as unknown as { currentBattery?: number }).currentBattery}%</span>
                     )}
-                    {vehicle.googleCalendarId && (() => {
-                        const failCount = vehicle.calendarSyncFailCount || 0;
-                        if (failCount >= 3) {
-                            return (
-                                <span className="px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 font-medium animate-pulse cursor-pointer"
-                                    title="캘린더 동기화에 실패했습니다. 차량을 수정하여 해결 방법을 확인하세요."
-                                    onClick={(e) => { e.stopPropagation(); handleEdit(vehicle); }}
-                                >
-                                    📅 동기화 실패 ⚠️
-                                </span>
-                            );
-                        }
-                        if (failCount >= 1) {
-                            return <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 font-medium">📅 재시도 중</span>;
-                        }
-                        return <span className="text-green-600 dark:text-green-400">📅 캘린더 정상</span>;
-                    })()}
                     {isRetired && (
                         <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full font-medium">
                             🚫 {vehicle.retired?.reason || '폐차'}
