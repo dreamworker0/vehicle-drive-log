@@ -44,6 +44,8 @@ export interface Vehicle extends FirestoreDoc {
     };
     hipassCardNumber?: string;
     googleCalendarId?: string;
+    calendarSyncFailCount?: number;
+    calendarSyncLastFailAt?: TimestampField;
     retired?: VehicleRetired | null;
     maintenance?: VehicleMaintenance | null;
     createdAt?: TimestampField;

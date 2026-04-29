@@ -122,9 +122,23 @@ export default function VehicleManager() {
                     {vehicle.fuelType === 'electric' && (vehicle as unknown as { currentBattery?: number }).currentBattery != null && (
                         <span className="flex items-center gap-1">🔋 {(vehicle as unknown as { currentBattery?: number }).currentBattery}%</span>
                     )}
-                    {vehicle.googleCalendarId && (
-                        <span className="text-primary-500">📅 캘린더 연동</span>
-                    )}
+                    {vehicle.googleCalendarId && (() => {
+                        const failCount = vehicle.calendarSyncFailCount || 0;
+                        if (failCount >= 3) {
+                            return (
+                                <span className="px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 font-medium animate-pulse cursor-pointer"
+                                    title="캘린더 동기화에 실패했습니다. 차량을 수정하여 해결 방법을 확인하세요."
+                                    onClick={(e) => { e.stopPropagation(); handleEdit(vehicle); }}
+                                >
+                                    📅 동기화 실패 ⚠️
+                                </span>
+                            );
+                        }
+                        if (failCount >= 1) {
+                            return <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 font-medium">📅 재시도 중</span>;
+                        }
+                        return <span className="text-green-600 dark:text-green-400">📅 캘린더 정상</span>;
+                    })()}
                     {isRetired && (
                         <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full font-medium">
                             🚫 {vehicle.retired?.reason || '폐차'}

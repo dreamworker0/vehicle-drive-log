@@ -148,6 +148,9 @@ export { apiHealthCheck } from "./apiHealthCheck";
 // 캘린더 동기화 실패 카운터 리셋 (슈퍼관리자용)
 export { resetCalendarSyncFails } from "./scripts/resetCalendarSyncFails";
 
+// 캘린더 접근 테스트 (관리자용)
+export { testCalendarAccess } from "./testCalendarAccess";
+
 
 
 // 미활성 기관 일괄 알림톡 발송
