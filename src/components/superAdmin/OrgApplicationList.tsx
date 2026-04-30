@@ -116,13 +116,14 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
         }
     };
 
-    const handleReject = async (app: Organization) => {
-        if (!await confirm({ message: `${app.name} 기관의 신청을 거절하시겠습니까?`, confirmColor: 'danger' })) return;
+    const handleReject = async (app: Organization, reason: string) => {
+        if (!reason.trim()) return;
 
         setActionLoading(prev => ({ ...prev, [app.id]: 'reject' }));
         try {
-            await rejectOrganization(app.id);
+            await rejectOrganization(app.id, reason);
 
+            // In-app 알림 생성
             const usersQuery = query(
                 collection(db, 'users'),
                 where('organizationId', '==', app.id),
@@ -134,11 +135,31 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
                     targetUid: userDoc.id,
                     type: 'rejection',
                     title: '기관 승인 거절',
-                    message: `${app.name} 기관 신청이 거절되었습니다.`,
+                    message: `${app.name} 기관 신청이 거절되었습니다.\n사유: ${reason}`,
                     organizationId: app.id,
                 });
             }
 
+            // 반려 이메일 발송
+            try {
+                if (app.applicantEmail) {
+                    const { getFunctions, httpsCallable } = await import('firebase/functions');
+                    const functions = getFunctions(undefined, 'asia-northeast3');
+                    const sendRejectionEmail = httpsCallable(functions, 'sendRejectionEmail');
+                    await sendRejectionEmail({
+                        recipientEmail: app.applicantEmail,
+                        orgName: app.name,
+                        applicantName: app.applicantName,
+                        reason: reason,
+                    });
+                    console.log('📧 반려 이메일 발송 완료');
+                } else {
+                    console.warn('⚠️ 신청자 이메일이 없어 반려 안내 이메일을 발송하지 못했습니다.');
+                }
+            } catch (emailErr) {
+                console.warn('반려 이메일 발송 실패:', emailErr);
+                showToast('반려 처리는 완료되었으나 이메일 발송에 실패했습니다.', 'warning');
+            }
 
             // 로컬 상태 업데이트
             setApplications(prev => prev.filter(a => a.id !== app.id));
@@ -147,6 +168,7 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
 
         } catch (err) {
             console.error('거절 실패:', err);
+            showToast('기관 반려 처리에 실패했습니다.', 'error');
         } finally {
             setActionLoading(prev => ({ ...prev, [app.id]: null }));
         }

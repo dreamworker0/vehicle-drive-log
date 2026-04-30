@@ -280,12 +280,16 @@ export const approveOrganization = async (orgId: string) => {
 };
 
 // 기관 거절
-export const rejectOrganization = async (orgId: string) => {
+export const rejectOrganization = async (orgId: string, reason?: string) => {
     try {
-        await updateDoc(doc(db, 'organizations', orgId), {
+        const updateData: Record<string, unknown> = {
             status: 'rejected',
             rejectedAt: new Date(),
-        });
+        };
+        if (reason) {
+            updateData.rejectReason = reason;
+        }
+        await updateDoc(doc(db, 'organizations', orgId), updateData);
     } catch (error) {
         captureError(error, { context: 'rejectOrganization', orgId });
         throw error;

@@ -50,6 +50,9 @@ export { notifyNewApplication } from "./notifyNewApplication";
 // 기관 승인 이메일 발송 (서버사이드)
 export { sendApprovalEmail } from "./sendApprovalEmail";
 
+// 기관 거절 이메일 발송 (서버사이드)
+export { sendRejectionEmail } from "./sendRejectionEmail";
+
 // 수동 승인 시 알림톡 발송
 export { sendManualApprovalAlimtalk } from "./sendManualApprovalAlimtalk";
 

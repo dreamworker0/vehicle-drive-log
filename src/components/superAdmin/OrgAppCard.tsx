@@ -2,7 +2,7 @@
  * OrgAppCard — 기관 신청 카드 컴포넌트
  * OrgApplicationList에서 추출된 서브 컴포넌트
  */
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { formatTimestampFull } from '../../lib/dateUtils';
 import DocumentViewer from '../common/DocumentViewer';
 import type { Organization } from '../../types';
@@ -13,7 +13,7 @@ interface OrgAppCardProps {
     actionLoading: Record<string, string | null>;
     selectedApp: string | null;
     onApprove: (app: Organization) => void;
-    onReject: (app: Organization) => void;
+    onReject: (app: Organization, reason: string) => void;
     onDelete: (app: Organization) => void;
     onMoveToPending: (app: Organization) => void;
     onAiReanalyze: (app: Organization) => void;
@@ -32,6 +32,15 @@ export default memo(function OrgAppCard({
     onAiReanalyze,
     onToggleImage,
 }: OrgAppCardProps) {
+    const [isRejecting, setIsRejecting] = useState(false);
+    const [rejectReason, setRejectReason] = useState('');
+
+    const handleRejectClick = () => {
+        const defaultReason = app.aiVerifyDetail?.reason || '비영리 목적의 사업자등록증이 제출되지 않았거나 내용 식별이 어렵습니다.\n서류 보완 후 다시 신청해 주시기 바랍니다.';
+        setRejectReason(defaultReason);
+        setIsRejecting(true);
+    };
+
     return (
         <div className="glass-card p-5 hover:shadow-glass-lg transition-shadow">
             <div className="flex flex-col md:flex-row md:items-start gap-4">
@@ -228,24 +237,59 @@ export default memo(function OrgAppCard({
                 {/* 액션 버튼 */}
                 {tab === 'pending' && (
                     <div className="flex md:flex-col gap-2">
-                        <button
-                            onClick={() => onApprove(app)}
-                            disabled={!!actionLoading[app.id]}
-                            className="btn-success btn-sm flex-1 md:flex-none"
-                        >
-                            {actionLoading[app.id] === 'approve' ? (
-                                <div className="w-4 h-4 spinner" />
-                            ) : '승인'}
-                        </button>
-                        <button
-                            onClick={() => onReject(app)}
-                            disabled={!!actionLoading[app.id]}
-                            className="btn-danger btn-sm flex-1 md:flex-none"
-                        >
-                            {actionLoading[app.id] === 'reject' ? (
-                                <div className="w-4 h-4 spinner" />
-                            ) : '거절'}
-                        </button>
+                        {!isRejecting ? (
+                            <>
+                                <button
+                                    onClick={() => onApprove(app)}
+                                    disabled={!!actionLoading[app.id]}
+                                    className="btn-success btn-sm flex-1 md:flex-none"
+                                >
+                                    {actionLoading[app.id] === 'approve' ? (
+                                        <div className="w-4 h-4 spinner" />
+                                    ) : '승인'}
+                                </button>
+                                <button
+                                    onClick={handleRejectClick}
+                                    disabled={!!actionLoading[app.id]}
+                                    className="btn-danger btn-sm flex-1 md:flex-none"
+                                >
+                                    {actionLoading[app.id] === 'reject' ? (
+                                        <div className="w-4 h-4 spinner" />
+                                    ) : '거절'}
+                                </button>
+                            </>
+                        ) : (
+                            <div className="w-full p-3 rounded-lg bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-800/30">
+                                <label className="block text-xs font-semibold text-red-800 dark:text-red-300 mb-1.5 uppercase tracking-wide">
+                                    반려 사유 입력 (이메일 발송)
+                                </label>
+                                <textarea
+                                    value={rejectReason}
+                                    onChange={(e) => setRejectReason(e.target.value)}
+                                    className="w-full text-sm p-2 rounded-md border border-red-200 dark:border-red-800/50 bg-white dark:bg-surface-900 focus:ring-2 focus:ring-red-500/20 outline-none resize-none text-surface-900 dark:text-surface-100"
+                                    rows={3}
+                                    placeholder="신청자에게 발송될 거절 사유를 입력하세요."
+                                />
+                                <div className="flex flex-col sm:flex-row justify-end gap-2 mt-2">
+                                    <button
+                                        onClick={() => setIsRejecting(false)}
+                                        className="px-3 py-1.5 text-sm font-medium rounded-md bg-white dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-700 border border-surface-200 dark:border-surface-700 transition-colors"
+                                    >
+                                        취소
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setIsRejecting(false);
+                                            onReject(app, rejectReason);
+                                        }}
+                                        className="px-3 py-1.5 text-sm font-medium rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        disabled={!!actionLoading[app.id] || !rejectReason.trim()}
+                                    >
+                                        {actionLoading[app.id] === 'reject' ? '처리 중...' : '거절 및 이메일 발송'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
 
