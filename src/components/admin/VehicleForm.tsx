@@ -30,6 +30,8 @@ interface Props {
     onCancel: () => void;
     onModelNameChange: (value: string) => void;
     modelSuggestions: string[];
+    onCalendarTestResult?: (vehicleId: string, success: boolean) => Promise<void>;
+    initialCalendarError?: boolean;
 }
 
 const VEHICLE_TYPES = [
@@ -43,11 +45,13 @@ const VEHICLE_TYPES = [
 export default function VehicleForm({
     form, setForm, editingVehicle, formLoading,
     onSubmit, onCancel, onModelNameChange, modelSuggestions,
+    onCalendarTestResult, initialCalendarError,
 }: Props) {
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [activeIndex, setActiveIndex] = useState(-1);
     const modelInputRef = useRef<HTMLInputElement>(null);
     const suggestionsRef = useRef<HTMLUListElement>(null);
+    const calendarInputRef = useRef<HTMLInputElement>(null);
 
     // 캘린더 연동 테스트 상태
     const [calTestLoading, setCalTestLoading] = useState(false);
@@ -58,7 +62,11 @@ export default function VehicleForm({
         errorTitle?: string;
     } | null>(null);
 
-    const handleCalendarTest = async () => {
+    const handleCalendarTest = async (e?: React.MouseEvent) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
         const calId = form.googleCalendarId.trim();
         if (!calId) return;
         setCalTestLoading(true);
@@ -66,9 +74,18 @@ export default function VehicleForm({
         try {
             const fn = httpsCallable(firebaseFunctions, 'testCalendarAccess');
             const res = await fn({ calendarId: calId });
-            setCalTestResult(res.data as typeof calTestResult);
+            const result = res.data as typeof calTestResult;
+            setCalTestResult(result);
+            // 수정 모드이고 콜백이 있을 때만 Firestore에 결과 반영
+            if (editingVehicle && onCalendarTestResult) {
+                await onCalendarTestResult(editingVehicle.id, result?.success ?? false);
+            }
         } catch {
-            setCalTestResult({ success: false, message: '테스트 요청 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.' });
+            const errResult = { success: false, message: '테스트 요청 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.' };
+            setCalTestResult(errResult);
+            if (editingVehicle && onCalendarTestResult) {
+                await onCalendarTestResult(editingVehicle.id, false);
+            }
         } finally {
             setCalTestLoading(false);
         }
@@ -99,6 +116,22 @@ export default function VehicleForm({
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
     }, []);
+
+    // initialCalendarError=true: 에러 상태로 초기화 + 캘린더 ID 입력란 포커스
+    useEffect(() => {
+        if (!initialCalendarError) return;
+        setCalTestResult({
+            success: false,
+            errorTitle: '캘린더를 찾을 수 없음',
+            message: '입력한 캘린더 ID가 올바르지 않거나 삭제된 캘린더입니다. 캘린더 설정 → 캘린더 통합에서 캘린더 ID를 다시 확인해주세요.',
+        });
+        // 약간의 딜레이 후 캘린더 ID 입력란으로 포커스 + 스크롤
+        const timer = setTimeout(() => {
+            calendarInputRef.current?.focus();
+            calendarInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }, 150);
+        return () => clearTimeout(timer);
+    }, [initialCalendarError]);
 
     const selectSuggestion = (value: string) => {
         onModelNameChange(value);
@@ -281,6 +314,7 @@ export default function VehicleForm({
                         <label className="label">Google 캘린더 ID (선택)</label>
                         <div className="flex gap-2">
                             <input
+                                ref={calendarInputRef}
                                 type="text" value={form.googleCalendarId}
                                 onChange={e => { setForm({ ...form, googleCalendarId: e.target.value }); setCalTestResult(null); }}
                                 className="input flex-1" placeholder="calendar-resource-id@resource.calendar.google.com"

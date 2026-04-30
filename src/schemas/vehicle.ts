@@ -35,6 +35,7 @@ export const vehicleSchema = z.object({
     }).optional().nullable().catch(null),
     hipassCardNumber: z.string().optional().nullable().catch(null),
     googleCalendarId: z.string().optional().nullable().catch(null),
+    calendarSyncFailCount: z.coerce.number().optional().catch(0),
     retired: vehicleRetiredSchema.nullable().optional().catch(null),
     maintenance: vehicleMaintenanceSchema.nullable().optional().catch(null),
     createdAt: timestampSchema.optional().nullable().catch(null),

@@ -125,6 +125,7 @@ export default function useVehicleManager() {
     const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
     const [formLoading, setFormLoading] = useState(false);
     const [form, setForm] = useState(INITIAL_FORM);
+    const [openWithCalendarError, setOpenWithCalendarError] = useState(false);
 
     // 자동완성 후보: 정적 목록 + 기존 등록 차량 모델명 합산
     const modelSuggestions = (() => {
@@ -184,9 +185,10 @@ export default function useVehicleManager() {
         setForm(INITIAL_FORM);
         setEditingVehicle(null);
         setShowForm(false);
+        setOpenWithCalendarError(false);
     };
 
-    const handleEdit = (vehicle: Vehicle) => {
+    const handleEdit = (vehicle: Vehicle, calendarError = false) => {
         setForm({
             displayName: vehicle.displayName || '',
             modelName: vehicle.modelName || '',
@@ -199,6 +201,7 @@ export default function useVehicleManager() {
             insurancePhone: vehicle.insurance?.phone || '',
         });
         setEditingVehicle(vehicle);
+        setOpenWithCalendarError(calendarError);
         setShowForm(true);
     };
 
@@ -253,6 +256,9 @@ export default function useVehicleManager() {
                         phone: form.insurancePhone.trim(),
                     },
                     ...(form.googleCalendarId.trim() ? { googleCalendarId: form.googleCalendarId.trim() } : {}),
+                    // googleCalendarId가 변경된 경우 failCount 초기화
+                    ...((editingVehicle && (editingVehicle.googleCalendarId || '') !== form.googleCalendarId.trim())
+                        ? { calendarSyncFailCount: 0 } : {}),
                 };
                 if (editingVehicle) {
                     await updateVehicle(editingVehicle.id, vehicleData);
@@ -265,6 +271,33 @@ export default function useVehicleManager() {
                 setFormLoading(false);
             }
         }, { errorMessage: `${action} 처리 중 오류가 발생했습니다.` });
+    };
+
+    // 연동 테스트 결과 → Firestore에 즉시 반영 + 로컬 상태 직접 업데이트
+    // fetchVehicles()를 호출하면 setLoading(true)로 인해 전체 UI가
+    // 스켈레톤으로 교체되어 "리프레시"처럼 보이는 문제가 있으므로,
+    // Firestore 저장 후 로컬 상태만 패치하여 카드 UI를 즉시 반영한다.
+    const handleCalendarTestResult = async (vehicleId: string, success: boolean) => {
+        const newFailCount = success ? 0 : 3;
+        try {
+            await updateVehicle(vehicleId, { calendarSyncFailCount: newFailCount });
+            // 로컬 vehicles 배열만 업데이트 (로딩 스켈레톤 없이 카드 즉시 반영)
+            setVehicles(prev =>
+                prev.map(v =>
+                    v.id === vehicleId
+                        ? { ...v, calendarSyncFailCount: newFailCount }
+                        : v
+                )
+            );
+            // editingVehicle도 업데이트하여 폼 내부 상태도 동기화
+            setEditingVehicle(prev =>
+                prev && prev.id === vehicleId
+                    ? { ...prev, calendarSyncFailCount: newFailCount }
+                    : prev
+            );
+        } catch (err) {
+            console.error('캘린더 테스트 결과 저장 실패:', err);
+        }
     };
 
     // ── 모달을 통한 액션들 ──
@@ -352,7 +385,9 @@ export default function useVehicleManager() {
         vehicles, loading, showForm, setShowForm,
         editingVehicle, formLoading, form, setForm,
         modal, closeModal, deletableIds,
+        openWithCalendarError,
         resetForm, handleEdit, handleModelNameChange, handleSubmit,
+        handleCalendarTestResult,
         modelSuggestions,
         openDeleteModal, confirmDelete,
         openClearMaintenanceModal, confirmClearMaintenance,

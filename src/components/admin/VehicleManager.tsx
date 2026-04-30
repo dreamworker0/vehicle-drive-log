@@ -2,9 +2,11 @@
  * VehicleManager — 차량 관리 페이지
  * 로직은 useVehicleManager 훅, 폼은 VehicleForm 사용
  */
+import { useState } from 'react';
 import useVehicleManager from '../../hooks/useVehicleManager';
 import VehicleForm from './VehicleForm';
 import ConfirmModal from '../common/ConfirmModal';
+import CalendarSyncTroubleshootModal from './CalendarSyncTroubleshootModal';
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
 import { isVehicleBlocked } from '../../lib/vehicleUtils';
 import { SkeletonCard, SkeletonBox } from '../common/Skeleton';
@@ -18,13 +20,18 @@ export default function VehicleManager() {
         vehicles, loading, showForm, setShowForm,
         editingVehicle, formLoading, form, setForm,
         modal, closeModal, deletableIds,
+        openWithCalendarError,
         resetForm, handleEdit, handleModelNameChange, handleSubmit,
+        handleCalendarTestResult,
         modelSuggestions,
         openDeleteModal, confirmDelete,
         openClearMaintenanceModal, confirmClearMaintenance,
         openRetireModal, confirmRetire,
         openRestoreModal, confirmRestore,
     } = useVehicleManager();
+
+    // 캘린더 동기화 문제 해결 모달 상태
+    const [calendarTroubleshootVehicle, setCalendarTroubleshootVehicle] = useState<Vehicle | null>(null);
 
     // 활성 차량과 폐차 차량 분리
     const activeVehicles = vehicles.filter(v => !v.retired?.isRetired);
@@ -127,18 +134,18 @@ export default function VehicleManager() {
                                 const failCount = vehicle.calendarSyncFailCount || 0;
                                 if (failCount >= 3) {
                                     return (
-                                        <span className="px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 font-medium animate-pulse cursor-pointer"
-                                            title="캘린더 동기화에 실패했습니다. 차량을 수정하여 해결 방법을 확인하세요."
-                                            onClick={(e) => { e.stopPropagation(); handleEdit(vehicle); }}
+                                        <span className="px-2 py-0.5 rounded-full bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 font-medium animate-pulse cursor-pointer hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors"
+                                            title="클릭하여 캘린더 연동 문제 해결 방법을 확인하세요."
+                                            onClick={(e) => { e.stopPropagation(); setCalendarTroubleshootVehicle(vehicle); }}
                                         >
-                                            📅 동기화 실패 ⚠️
+                                            📅 캘린더 동기화 실패 ⚠️
                                         </span>
                                     );
                                 }
                                 if (failCount >= 1) {
                                     return <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 font-medium">📅 재시도 중</span>;
                                 }
-                                return <span className="text-green-600 dark:text-green-400">📅 캘린더 정상</span>;
+                                return <span className="text-green-600 dark:text-green-400">📅 캘린더 동기화 정상</span>;
                             })()}
                         </div>
                     )}
@@ -251,6 +258,8 @@ export default function VehicleManager() {
                     onCancel={resetForm}
                     onModelNameChange={handleModelNameChange}
                     modelSuggestions={modelSuggestions}
+                    onCalendarTestResult={handleCalendarTestResult}
+                    initialCalendarError={openWithCalendarError}
                 />
             )}
 
@@ -287,6 +296,16 @@ export default function VehicleManager() {
             {/* 통합 확인/입력 모달 */}
             {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
             <ConfirmModal {...getModalProps() as any} />
+
+            {/* 캘린더 동기화 문제 해결 모달 */}
+            {calendarTroubleshootVehicle && (
+                <CalendarSyncTroubleshootModal
+                    vehicle={calendarTroubleshootVehicle}
+                    onClose={() => setCalendarTroubleshootVehicle(null)}
+                    onGoToEdit={(v) => { setCalendarTroubleshootVehicle(null); handleEdit(v, false); }}
+                    onCalendarTestResult={handleCalendarTestResult}
+                />
+            )}
         </div>
     );
 }
