@@ -3,7 +3,7 @@ import { getAuth, GoogleAuthProvider, browserLocalPersistence, setPersistence } 
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, getFirestore, clearIndexedDbPersistence } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
-import { initializeAppCheck, ReCaptchaEnterpriseProvider } from 'firebase/app-check';
+import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 // firebase/analytics, firebase/messaging은 동적 import (번들 최적화)
 
 const firebaseConfig = {
@@ -30,9 +30,9 @@ function initAnalyticsLazy() {
 // === App Check 동기 초기화 (Firebase 쿼리 전 토큰 확보 보장) ===
 function initAppCheck() {
     if (typeof window === 'undefined') return;
-    const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_ENTERPRISE_SITE_KEY;
+    const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
     if (!recaptchaSiteKey) {
-        console.warn('[AppCheck] VITE_RECAPTCHA_ENTERPRISE_SITE_KEY 미설정 — App Check 비활성화');
+        console.warn('[AppCheck] VITE_RECAPTCHA_SITE_KEY 미설정 — App Check 비활성화');
         return;
     }
     // 개발 환경에서 디버그 토큰 사용 (Firebase Console → App Check → 디버그 토큰 등록 필요)
@@ -44,7 +44,7 @@ function initAppCheck() {
     }
     try {
         initializeAppCheck(app, {
-            provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey),
+            provider: new ReCaptchaV3Provider(recaptchaSiteKey),
             isTokenAutoRefreshEnabled: true,
         });
         console.info('[AppCheck] 초기화 완료');
