@@ -2,8 +2,8 @@
     "name": "functions",
     "description": "Cloud Functions for 차량운행일지",
     "scripts": {
-        "prebuild": "node -e \"require('fs').copyFileSync('../src/lib/faqData.ts','./src/faqData.ts')\"",
         "build": "tsc",
+        "gcp-build": "",
         "build:watch": "tsc --watch",
         "test": "jest --verbose --testPathIgnorePatterns=emulator",
         "test:emulator": "jest --verbose --runInBand --testPathPattern=\"emulator\\.test\"",
@@ -16,7 +16,7 @@
     "engines": {
         "node": "22"
     },
-    "main": "lib/index.js",
+    "main": "lib/functions/src/index.js",
     "dependencies": {
         "@emailjs/nodejs": "^5.0.2",
         "@google/genai": "^1.0.0",

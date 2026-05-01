@@ -12,7 +12,7 @@
         "firebase-debug.log",
         "firebase-debug.*.log",
         "*.local",
-        "src"
+        "/src"
       ]
     }
   ],
