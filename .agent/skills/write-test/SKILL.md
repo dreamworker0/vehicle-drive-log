@@ -68,7 +68,7 @@ describe('useMyHook', () => {
 });
 ```
 
-### Firestore Mock 패턴
+### Firestore 및 Auth Mock 패턴
 
 Firebase 모듈은 항상 mock 처리한다:
 
@@ -77,6 +77,9 @@ vi.mock('../../lib/firebase', () => ({
     db: {},
     auth: { currentUser: { uid: 'test-uid' } },
 }));
+
+// Vitest 로컬 실행 시 auth/invalid-api-key 에러를 방지하려면,
+// 테스트 상단에 VITE_FIREBASE_API_KEY 환경변수나 Mock 초기화 코드가 필요할 수 있다.
 
 vi.mock('firebase/firestore', () => ({
     collection: vi.fn(),
@@ -91,6 +94,10 @@ vi.mock('firebase/firestore', () => ({
     },
 }));
 ```
+
+### 상태 변경 부작용과 `act(...)` 래핑
+- 컴포넌트 렌더링 테스트나 커스텀 훅 내에서 상태 변경(state update)이 일어나는 모든 이벤트(클릭, 타이핑)와 비동기 결과 처리는 **반드시** `@testing-library/react`의 `act(...)` 로 감싸야 한다.
+- 그렇지 않을 경우 `Warning: An update to X inside a test was not wrapped in act(...)` 경고가 발생하며, 비동기 상태의 단언(assertion)이 실패할 수 있다.
 
 ### ⚠️ Mock 안티패턴 (반드시 회피)
 

@@ -167,9 +167,12 @@ ALIMTALK_PROXY_TOKEN=your-api-token
 
 ---
 
-## 8. 배포
+## 8. 배포 및 빌드 최적화
 
 ```bash
+# 로컬에서 트랜스파일링 수행
+cd functions && npm run build && cd ..
+
 # Functions만 배포
 firebase deploy --only functions
 
@@ -177,4 +180,9 @@ firebase deploy --only functions
 firebase deploy --only functions:functionName
 ```
 
-> ⚠️ 배포 전 반드시 Node 22 확인: `fnm use 22 && node --version`
+### 8.1 빌드 최적화 규칙
+Cloud Build에서의 이중 빌드로 인한 메모리 부족(OOM) 및 스택 오버플로우를 막기 위해 다음 규칙을 준수한다.
+1. **gcp-build 무효화**: `functions/package.json`의 `"scripts": { "gcp-build": "" }` 를 유지한다.
+2. **사전 빌드**: GitHub Actions나 로컬 배포 스크립트 실행 시, Firebase deploy를 호출하기 직전에 반드시 `cd functions && npm run build`(tsc 트랜스파일링)를 선행한다.
+3. **진입점**: `functions/package.json`의 `"main"` 속성은 컴파일된 결과물 경로인 `"lib/functions/src/index.js"`를 유지한다.
+4. **Node 버전**: 배포 전 반드시 Node 22를 확인한다 (`fnm use 22 && node --version`).

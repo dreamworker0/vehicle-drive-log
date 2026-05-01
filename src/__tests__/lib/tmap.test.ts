@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-// import.meta.env 모킹
-vi.stubGlobal('import', { meta: { env: { VITE_TMAP_API_KEY: 'test-key', PROD: false } } });
+// 환경변수 모킹 (Vite 환경)
+vi.stubEnv('VITE_TMAP_API_KEY', 'test-key');
 
 // 모듈 상태 초기화를 위해 동적 import
 let isTmapCoolingDown: () => boolean, isTmapAvailable: () => boolean, parseDestinations: (s: string) => string[], MAX_DESTINATIONS: number;

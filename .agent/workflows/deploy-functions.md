@@ -18,9 +18,9 @@ node --version
 ```
 Working directory: `.`
 
-3. Deploy Cloud Functions:
+3. Build and Deploy Cloud Functions:
 ```
-fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression; fnm use 22; firebase deploy --only functions
+fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression; fnm use 22; cd functions; npm run build; cd ..; firebase deploy --only functions
 ```
 Working directory: `.`
 ⚠️ exit code 1로 실패하면 최대 2회 재시도한다.

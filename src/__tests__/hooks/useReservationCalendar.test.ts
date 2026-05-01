@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, act } from '@testing-library/react';
+import { renderHook, act, waitFor } from '@testing-library/react';
 
 // ── Mocks ──
 const mockNavigate = vi.fn();
@@ -88,7 +88,7 @@ describe('useReservationCalendar', () => {
         const { result } = renderHook(() => useReservationCalendar());
         expect(result.current.loading).toBe(true);
 
-        await vi.waitFor(() => {
+        await waitFor(() => {
             expect(result.current.loading).toBe(false);
         });
     });
@@ -96,7 +96,7 @@ describe('useReservationCalendar', () => {
     it('orgId가 있으면 차량을 로드한다', async () => {
         const { result } = renderHook(() => useReservationCalendar());
 
-        await vi.waitFor(() => {
+        await waitFor(() => {
             expect(result.current.loading).toBe(false);
         });
 
@@ -107,7 +107,7 @@ describe('useReservationCalendar', () => {
     it('날짜 선택 시 handleDateSelect가 상태를 업데이트한다', async () => {
         const { result } = renderHook(() => useReservationCalendar());
 
-        await vi.waitFor(() => {
+        await waitFor(() => {
             expect(result.current.loading).toBe(false);
         });
 
@@ -121,7 +121,7 @@ describe('useReservationCalendar', () => {
     it('prevMonth/nextMonth로 기준 월을 이동한다', async () => {
         const { result } = renderHook(() => useReservationCalendar());
 
-        await vi.waitFor(() => {
+        await waitFor(() => {
             expect(result.current.loading).toBe(false);
         });
 
@@ -147,7 +147,7 @@ describe('useReservationCalendar', () => {
 
         const { result } = renderHook(() => useReservationCalendar());
 
-        await vi.waitFor(() => {
+        await waitFor(() => {
             expect(result.current.loading).toBe(false);
         });
 
@@ -164,7 +164,7 @@ describe('useReservationCalendar', () => {
     it('calendarDays가 올바른 달력 데이터를 생성한다', async () => {
         const { result } = renderHook(() => useReservationCalendar());
 
-        await vi.waitFor(() => {
+        await waitFor(() => {
             expect(result.current.loading).toBe(false);
         });
 

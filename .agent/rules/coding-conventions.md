@@ -62,6 +62,20 @@ src/
 - **새 커스텀 훅** → `hooks/`에 생성
 - **외부 API 연동** → `lib/`에 별도 파일
 
+### 5.3 커스텀 훅(Custom Hooks) 사용 기준
+
+- 컴포넌트 내 상태(State) 로직이 복잡해질 경우, 반드시 `src/hooks/` 내부의 커스텀 훅으로 분리한다.
+- 현재 정의되어 있는 주요 훅 목록 및 용도:
+  - `useAuth`: 현재 사용자 정보(Current User) 및 인증 상태(Authentication State) 관리.
+  - `useToast`: 공통 Toast 메시지 팝업 트리거 및 상태 관리.
+  - `useReservations`: Firestore 예약 데이터 구독 및 조회 (현재 로그인한 사용자 관련 데이터 위주).
+  - `useVehicles`: 전체/소속 기관(Organization)의 차량 정보 로드 및 상태 관리.
+  - `useOrganizations`: 사용자 소속 기관 목록 및 활성 기관 상태 관리.
+  - `useReservationCalendar`: 예약 달력, 월별 탐색 및 캘린더 UI 렌더링 상태 분리.
+  - `useNotification`: 알림(Notification) 읽음 처리 및 상태 관리.
+
+- **규칙**: 컴포넌트에서는 UI 렌더링에 집중하고, 복잡한 데이터 로딩이나 변환 로직은 위 훅들을 재사용하거나 신규 훅을 생성하여 위임한다.
+
 ### 주요 커스텀 훅 목록
 | 훅 | 역할 |
 |---|---|
