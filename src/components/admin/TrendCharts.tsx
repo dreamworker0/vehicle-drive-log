@@ -145,8 +145,7 @@ export default function TrendCharts({
                             <XAxis dataKey="label" tick={{ fontSize: 12 }} />
                             <YAxis tick={{ fontSize: 11 }} tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`} />
                             <Tooltip
-                                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                formatter={(value: any, name: any) => [
+                                formatter={(value, name) => [
                                     `${Number(value).toLocaleString()}원`,
                                     name === 'fuelCost' ? '주유비' : '하이패스',
                                 ]}

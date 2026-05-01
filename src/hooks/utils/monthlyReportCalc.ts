@@ -147,8 +147,7 @@ export function calcFuelStats(fuelLogs: FuelLog[], startDate: string, endDate: s
 
 /** 하이패스 통계 */
 export function calcHipassStats(hipassCharges: HipassCharge[], startDate: string, endDate: string) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const filtered = filterLogsByDateRange(hipassCharges as any[], startDate, endDate) as unknown as HipassCharge[];
+    const filtered = filterLogsByDateRange(hipassCharges, startDate, endDate);
     const totalAmount = filtered.reduce((s, l) => s + (l.chargeAmount || 0), 0);
 
     const byVehicle: Record<string, { amount: number; count: number }> = {};
@@ -170,16 +169,14 @@ export function calcHipassStats(hipassCharges: HipassCharge[], startDate: string
 export function calcCostTrend(fuelLogs: FuelLog[], hipassCharges: HipassCharge[], startDate: string, endDate: string) {
     const byDate: Record<string, { fuel: number; hipass: number }> = {};
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    filterLogsByDateRange(fuelLogs as any[], startDate, endDate).forEach(l => {
+    filterLogsByDateRange(fuelLogs, startDate, endDate).forEach(l => {
         const d = extractDateStr(l);
         if (!d) return;
         if (!byDate[d]) byDate[d] = { fuel: 0, hipass: 0 };
         byDate[d].fuel += l.fuelCost || 0;
     });
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    filterLogsByDateRange(hipassCharges as any[], startDate, endDate).forEach(l => {
+    filterLogsByDateRange(hipassCharges, startDate, endDate).forEach(l => {
         const d = extractDateStr(l);
         if (!d) return;
         if (!byDate[d]) byDate[d] = { fuel: 0, hipass: 0 };

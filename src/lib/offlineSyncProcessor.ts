@@ -12,7 +12,7 @@ let _processing = false;
 export const processOfflineQueue = async (): Promise<number> => {
     if (typeof window === 'undefined' || !navigator.onLine) return 0;
     if (_processing) {
-        console.log('[OfflineSync] 이미 큐 처리 중 — 중복 실행 방지');
+        console.debug('[OfflineSync] 이미 큐 처리 중 — 중복 실행 방지');
         return 0;
     }
 
@@ -26,7 +26,7 @@ export const processOfflineQueue = async (): Promise<number> => {
         const actions = await getOfflineActions();
         if (!actions.length) return 0;
 
-        console.log(`[OfflineSync] 처리 대기 중인 액션: ${actions.length}건`);
+        console.debug(`[OfflineSync] 처리 대기 중인 액션: ${actions.length}건`);
 
         for (const action of actions) {
             try {
@@ -54,8 +54,9 @@ export const processOfflineQueue = async (): Promise<number> => {
                     case 'CREATE_RESERVATION':
                     case 'UPDATE_RESERVATION':
                     case 'DELETE_RESERVATION':
-                        // TODO: 예약 생성/수정/삭제 오프라인 지원 시 이곳에 구현
-                        console.log(`[OfflineSync] 예약 관련 액션 대기 중 (미구현 상태): ${action.type}`);
+                        // 예약은 서버 트랜잭션(createReservationSafe)으로만 처리 가능하므로
+                        // 오프라인 지원은 구조적으로 불가 — 온라인 복귀 시 사용자에게 재시도 안내
+                        console.debug(`[OfflineSync] 예약 관련 액션은 오프라인 미지원: ${action.type}`);
                         break;
                     default:
                         console.warn(`[OfflineSync] 알 수 없는 액션 타입: ${action.type}`);
@@ -65,7 +66,7 @@ export const processOfflineQueue = async (): Promise<number> => {
                 // 성공 시 큐에서 제거
                 await removeOfflineAction(action.id);
                 processed++;
-                console.log(`[OfflineSync] 액션 처리 완료: ${action.id} (${action.type})`);
+                console.debug(`[OfflineSync] 액션 처리 완료: ${action.id} (${action.type})`);
             } catch (err: unknown) {
                 console.error(`[OfflineSync] 액션 처리 실패: ${action.id}`, err);
                 
@@ -95,7 +96,7 @@ export const mountOfflineQueueProcessor = () => {
 
     // 온라인 전환 시 큐 비우기 실행 (안정화 딜레이 포함)
     const handleOnline = () => {
-        console.log('[OfflineSync] 네트워크 온라인 감지, 큐 처리 시작...');
+        console.debug('[OfflineSync] 네트워크 온라인 감지, 큐 처리 시작...');
         setTimeout(() => { processOfflineQueue(); }, 1500);
     };
 
@@ -104,7 +105,7 @@ export const mountOfflineQueueProcessor = () => {
     // 서비스 워커(백그라운드 싱크)로부터 오는 동기화 요청 메시지 처리
     const handleServiceWorkerMessage = (event: MessageEvent) => {
         if (event.data && event.data.type === 'FLUSH_OFFLINE_QUEUE') {
-            console.log('[OfflineSync] Service Worker의 Background Sync 요청 수신');
+            console.debug('[OfflineSync] Service Worker의 Background Sync 요청 수신');
             processOfflineQueue();
         }
     };

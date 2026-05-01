@@ -11,7 +11,7 @@ export default function UpdatePrompt() {
 
         const updateSW = registerSW({
             onNeedRefresh() {
-                console.log('[PWA] 새 버전 감지 → 자동 업데이트 적용');
+                console.debug('[PWA] 새 버전 감지 → 자동 업데이트 적용');
                 // updateSW(true)는 Promise를 반환 — .catch()로 비동기 에러도 처리
                 Promise.resolve(updateSW(true)).catch(() => {
                     // iOS Safari에서 newestWorker가 null인 경우
@@ -21,7 +21,7 @@ export default function UpdatePrompt() {
                 });
             },
             onOfflineReady() {
-                console.log('[PWA] 오프라인 사용 준비 완료');
+                console.debug('[PWA] 오프라인 사용 준비 완료');
             },
             onRegisteredSW(_swUrl, reg) {
                 registration = reg;
@@ -37,7 +37,7 @@ export default function UpdatePrompt() {
         // 탭 복귀(visibility change) 시 즉시 SW 업데이트 체크
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible' && registration) {
-                console.log('[PWA] 탭 복귀 → SW 업데이트 체크');
+                console.debug('[PWA] 탭 복귀 → SW 업데이트 체크');
                 registration.update();
             }
         };

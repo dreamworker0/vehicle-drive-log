@@ -36,7 +36,7 @@ export const fetchPublicHolidays = async (year: number) => {
             if (data[yearStr]) {
                 map = data[yearStr] as Record<string, string>;
                 cache[year] = map;
-                console.log(`Loaded holidays for ${year} from Firestore`);
+                console.debug(`Loaded holidays for ${year} from Firestore`);
                 return map;
             }
         }
@@ -45,7 +45,7 @@ export const fetchPublicHolidays = async (year: number) => {
     }
 
     // 3. Firestore에 데이터가 없거나 에러 발생 시, 공공데이터 API 폴백 호출
-    console.log(`Fetching holidays for ${year} from public API as fallback`);
+    console.debug(`Fetching holidays for ${year} from public API as fallback`);
     try {
         let url;
         if (import.meta.env.DEV) {

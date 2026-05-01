@@ -45,6 +45,8 @@ vi.mock('firebase/functions', () => ({
 
 vi.mock('../../lib/firebase', () => ({
     db: {},
+    firebaseFunctions: {},
+    auth: { currentUser: null },
     default: {},
 }));
 

@@ -77,10 +77,10 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
 
             // 이메일 발송 (실패해도 승인은 유지)
             try {
-                console.log('📋 승인된 기관 데이터:', JSON.stringify(app));
+                console.debug('📋 승인된 기관 데이터:', JSON.stringify(app));
                 if (app.applicantEmail) {
                     await sendApprovalEmail(app.applicantEmail, app.name, inviteCode, app.applicantName);
-                    console.log('📧 수동 승인 이메일 발송 완료');
+                    console.debug('📧 수동 승인 이메일 발송 완료');
                 } else {
                     console.warn('⚠️ 신청자 이메일이 없어서 이메일을 보낼 수 없습니다');
                     showToast('신청자 이메일 정보가 없어서 승인 이메일을 보내지 못했습니다.', 'warning');
@@ -97,7 +97,7 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
                     const functions = getFunctions(undefined, 'asia-northeast3');
                     const sendAlimtalk = httpsCallable(functions, 'sendManualApprovalAlimtalk');
                     await sendAlimtalk({ orgId: app.id });
-                    console.log('📱 수동 승인 알림톡 발송 완료');
+                    console.debug('📱 수동 승인 알림톡 발송 완료');
                 } else {
                     console.warn('⚠️ 신청자 전화번호가 없어서 알림톡을 보낼 수 없습니다');
                 }
@@ -152,7 +152,7 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
                         applicantName: app.applicantName,
                         reason: reason,
                     });
-                    console.log('📧 반려 이메일 발송 완료');
+                    console.debug('📧 반려 이메일 발송 완료');
                 } else {
                     console.warn('⚠️ 신청자 이메일이 없어 반려 안내 이메일을 발송하지 못했습니다.');
                 }

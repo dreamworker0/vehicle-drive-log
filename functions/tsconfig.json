@@ -6,7 +6,7 @@
             "ES2022"
         ],
         "outDir": "lib",
-        "rootDir": "src",
+        "rootDir": "..",
         "strict": true,
         "esModuleInterop": true,
         "skipLibCheck": true,
@@ -17,7 +17,8 @@
         "sourceMap": true
     },
     "include": [
-        "src"
+        "src",
+        "../shared"
     ],
     "exclude": [
         "node_modules",

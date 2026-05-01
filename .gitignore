@@ -70,5 +70,13 @@ coverage/
 Thumbs.db
 Desktop.ini
 
+# Scratch scripts & temp files
+find_dark.mjs
+get_doc.cjs
+validate_doc.cjs
+test-zod.ts
+validate_result.txt
+coverage-output*.txt
+
 # Agent / AI
 .gemini/

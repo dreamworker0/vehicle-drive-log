@@ -33,15 +33,15 @@ function SectionTitle({ title }: { title: string; icon?: string }) {
 }
 
 /* 연료 효율 바 차트 툴팁 */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function FuelTooltip({ active, payload }: { active?: boolean; payload?: any[] }) {
+function FuelTooltip({ active, payload }: { active?: boolean; payload?: Array<{ value: number; payload?: Record<string, unknown> }> }) {
     if (!active || !payload?.length) return null;
-    const d = payload[0]?.payload;
+    const d = payload[0]?.payload as { name?: string; costPerKm?: number; totalDist?: number; totalCost?: number } | undefined;
+    if (!d) return null;
     return (
         <div className="bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-600 rounded-lg p-3 shadow-lg text-sm">
-            <p className="font-semibold text-surface-900 dark:text-surface-100 mb-1">{d?.name}</p>
-            <p className="text-surface-600 dark:text-surface-400">km당 연료비: <span className="font-mono font-bold text-primary-600">{d?.costPerKm}원</span></p>
-            <p className="text-surface-400 text-xs mt-1">총 주행: {d?.totalDist?.toLocaleString()}km · 총 비용: {d?.totalCost?.toLocaleString()}원</p>
+            <p className="font-semibold text-surface-900 dark:text-surface-100 mb-1">{d.name}</p>
+            <p className="text-surface-600 dark:text-surface-400">km당 연료비: <span className="font-mono font-bold text-primary-600">{d.costPerKm}원</span></p>
+            <p className="text-surface-400 text-xs mt-1">총 주행: {d.totalDist?.toLocaleString()}km · 총 비용: {d.totalCost?.toLocaleString()}원</p>
         </div>
     );
 }
@@ -137,11 +137,10 @@ export default function CostOptimization({
                                     <XAxis dataKey="label" tick={{ fontSize: 11 }} />
                                     <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => v >= 10000 ? `${v / 10000}만` : String(v)} />
                                     <Tooltip
-                                        formatter={((value: number, name: string) => [
-                                            `${value.toLocaleString()}원`,
+                                        formatter={(value, name) => [
+                                            `${Number(value).toLocaleString()}원`,
                                             name === 'fuelCost' ? '주유비' : name === 'hipassCost' ? '하이패스' : '정비비',
-                                        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                                        ]) as any}
+                                        ]}
                                         contentStyle={{ borderRadius: '8px', fontSize: '12px' }}
                                     />
                                     <Legend

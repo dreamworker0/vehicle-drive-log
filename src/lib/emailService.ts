@@ -26,7 +26,7 @@ export const sendApprovalEmail = async (recipientEmail: string, orgName: string,
             applicantName,
         });
 
-        console.log('✅ 승인 이메일 발송 성공 (Cloud Function):', result.data);
+        console.debug('✅ 승인 이메일 발송 성공 (Cloud Function):', result.data);
         return true;
     } catch (err) {
         console.error('❌ 승인 이메일 발송 실패:', err);

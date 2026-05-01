@@ -3,7 +3,6 @@ import { getAuth, GoogleAuthProvider, browserLocalPersistence, setPersistence } 
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, getFirestore, clearIndexedDbPersistence } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
-import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 // firebase/analytics, firebase/messaging은 동적 import (번들 최적화)
 
 const firebaseConfig = {
@@ -27,32 +26,6 @@ function initAnalyticsLazy() {
     }).catch(() => { /* Analytics 로드 실패 무시 */ });
 }
 
-// === App Check 동기 초기화 (Firebase 쿼리 전 토큰 확보 보장) ===
-function initAppCheck() {
-    if (typeof window === 'undefined') return;
-    const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY;
-    if (!recaptchaSiteKey) {
-        console.warn('[AppCheck] VITE_RECAPTCHA_SITE_KEY 미설정 — App Check 비활성화');
-        return;
-    }
-    // 개발 환경에서 디버그 토큰 사용 (Firebase Console → App Check → 디버그 토큰 등록 필요)
-    if (import.meta.env.DEV) {
-        if (!import.meta.env.VITE_APPCHECK_DEBUG_TOKEN) {
-            console.warn('[AppCheck] VITE_APPCHECK_DEBUG_TOKEN이 환경변수에 없습니다. App Check로 인해 로컬 Firestore 접근이 제한될 수 있습니다.');
-        }
-        (self as unknown as Record<string, unknown>).FIREBASE_APPCHECK_DEBUG_TOKEN = import.meta.env.VITE_APPCHECK_DEBUG_TOKEN || true;
-    }
-    try {
-        initializeAppCheck(app, {
-            provider: new ReCaptchaV3Provider(recaptchaSiteKey),
-            isTokenAutoRefreshEnabled: true,
-        });
-        console.info('[AppCheck] 초기화 완료');
-    } catch (err) {
-        console.warn('[AppCheck] 초기화 실패:', err);
-    }
-}
-
 // 브라우저 유휴 시점에 Analytics 초기화 (메인 스레드 미차단)
 const scheduleIdle = typeof requestIdleCallback === 'function'
     ? requestIdleCallback
@@ -60,9 +33,6 @@ const scheduleIdle = typeof requestIdleCallback === 'function'
 scheduleIdle(() => {
     initAnalyticsLazy();
 });
-
-// 첫 데이터 요청 전 가능한 빠르게 토큰을 확보하기 위해 즉시 비동기 실행
-initAppCheck();
 
 export const auth = getAuth(app);
 // iOS Safari ITP 대응: 명시적으로 local persistence 설정하여 세션 유지 보장
@@ -170,11 +140,6 @@ if (typeof window !== 'undefined') {
         // 이미 처리되므로 unhandledrejection으로 Sentry에 중복 리포트되지 않도록 억제
         if (event?.reason?.code === 'permission-denied' || msg.includes('Missing or insufficient permissions')) {
             console.warn('[Firestore] 권한 에러 억제 (앱 로직에서 처리됨):', msg);
-            event.preventDefault();
-        }
-        // App Check reCAPTCHA 타임아웃 (구형 브라우저·느린 네트워크 환경 이슈, 앱 버그 아님)
-        if (/reCAPTCHA.*(Timeout|timeout)/.test(msg)) {
-            console.warn('[AppCheck] reCAPTCHA 타임아웃 억제:', msg);
             event.preventDefault();
         }
     });

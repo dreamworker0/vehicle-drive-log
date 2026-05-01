@@ -7,14 +7,13 @@ import {
     serverTimestamp, onSnapshot, runTransaction, writeBatch, Timestamp,
     type DocumentData,
 } from 'firebase/firestore';
-import { getFunctions, httpsCallable } from 'firebase/functions';
-import { db } from '../firebase';
-import app from '../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, firebaseFunctions, auth } from '../firebase';
 import { createZodConverter, reservationSchema } from '../../schemas';
 import type { Reservation } from '../../types/reservation';
 import { captureError } from '../sentry';
 
-const functions = getFunctions(app, 'asia-northeast3');
+const functions = firebaseFunctions;
 const reservationsCollection = () => collection(db, 'reservations').withConverter(createZodConverter(reservationSchema));
 const reservationDoc = (id: string) => doc(db, 'reservations', id).withConverter(createZodConverter(reservationSchema));
 
@@ -53,6 +52,11 @@ export const createReservation = async (data: Partial<Reservation>, requireAppro
 /** 서버 측 중복 검증 기반 예약 생성 (Cloud Function + Firestore Transaction) */
 export const createReservationSafe = async (data: Partial<Reservation>) => {
     try {
+        // 모바일 백그라운드 복귀 시 Firebase 토큰 만료에 따른 Unauthenticated 에러 방지
+        if (auth.currentUser) {
+            await auth.currentUser.getIdToken();
+        }
+
         const callable = httpsCallable(functions, 'createReservationSafe', { timeout: 60000 });
         const result = await callable(data);
         return (result.data as { reservationId: string }).reservationId;
@@ -257,35 +261,42 @@ export const getReservationsByGroupId = async (groupId: string, orgId: string) =
     }
 };
 
-// 연속 예약 그룹 일괄 취소
-export const cancelReservationGroup = async (groupId: string, orgId: string) => {
+// ─── 그룹 일괄 액션 헬퍼 ───
+
+/** 그룹 내 활성 예약을 조회하여 일괄 batch 액션(update/delete)을 실행하는 공용 헬퍼 */
+const batchGroupAction = async (
+    fetchFn: (id: string, orgId: string) => Promise<Reservation[]>,
+    action: 'cancel' | 'delete',
+    id: string,
+    orgId: string,
+    context: string,
+) => {
     try {
-        const reservations = await getReservationsByGroupId(groupId, orgId);
+        const reservations = await fetchFn(id, orgId);
         const active = reservations.filter(r => r.status !== 'cancelled' && r.status !== 'completed');
         const batch = writeBatch(db);
-        active.forEach(r => batch.update(reservationDoc(r.id), { status: 'cancelled' }));
+        active.forEach(r => {
+            if (action === 'cancel') {
+                batch.update(reservationDoc(r.id), { status: 'cancelled' });
+            } else {
+                batch.delete(reservationDoc(r.id));
+            }
+        });
         await batch.commit();
         return active.length;
     } catch (error) {
-        captureError(error, { context: 'cancelReservationGroup', groupId, orgId });
+        captureError(error, { context, id, orgId });
         throw error;
     }
 };
 
+// 연속 예약 그룹 일괄 취소
+export const cancelReservationGroup = (groupId: string, orgId: string) =>
+    batchGroupAction(getReservationsByGroupId, 'cancel', groupId, orgId, 'cancelReservationGroup');
+
 // 연속 예약 그룹 삭제 (수정 전 기존 그룹 제거용)
-export const deleteReservationGroup = async (groupId: string, orgId: string) => {
-    try {
-        const reservations = await getReservationsByGroupId(groupId, orgId);
-        const active = reservations.filter(r => r.status !== 'cancelled' && r.status !== 'completed');
-        const batch = writeBatch(db);
-        active.forEach(r => batch.delete(reservationDoc(r.id)));
-        await batch.commit();
-        return active.length;
-    } catch (error) {
-        captureError(error, { context: 'deleteReservationGroup', groupId, orgId });
-        throw error;
-    }
-};
+export const deleteReservationGroup = (groupId: string, orgId: string) =>
+    batchGroupAction(getReservationsByGroupId, 'delete', groupId, orgId, 'deleteReservationGroup');
 
 // 내 최근 예약 조회 (취소 제외, 최신 순 정렬하여 반환)
 // 복합 인덱스 생성을 피하기 위해 클라이언트 메모리에서 정렬 처리
@@ -329,31 +340,10 @@ export const getReservationsByRecurringGroupId = async (recurringGroupId: string
 };
 
 // 반복 예약 그룹 일괄 취소
-export const cancelRecurringGroup = async (recurringGroupId: string, orgId: string) => {
-    try {
-        const reservations = await getReservationsByRecurringGroupId(recurringGroupId, orgId);
-        const active = reservations.filter(r => r.status !== 'cancelled' && r.status !== 'completed');
-        const batch = writeBatch(db);
-        active.forEach(r => batch.update(reservationDoc(r.id), { status: 'cancelled' }));
-        await batch.commit();
-        return active.length;
-    } catch (error) {
-        captureError(error, { context: 'cancelRecurringGroup', recurringGroupId, orgId });
-        throw error;
-    }
-};
+export const cancelRecurringGroup = (recurringGroupId: string, orgId: string) =>
+    batchGroupAction(getReservationsByRecurringGroupId, 'cancel', recurringGroupId, orgId, 'cancelRecurringGroup');
 
 // 반복 예약 그룹 삭제 (수정 전 기존 그룹 제거용)
-export const deleteRecurringGroup = async (recurringGroupId: string, orgId: string) => {
-    try {
-        const reservations = await getReservationsByRecurringGroupId(recurringGroupId, orgId);
-        const active = reservations.filter(r => r.status !== 'cancelled' && r.status !== 'completed');
-        const batch = writeBatch(db);
-        active.forEach(r => batch.delete(reservationDoc(r.id)));
-        await batch.commit();
-        return active.length;
-    } catch (error) {
-        captureError(error, { context: 'deleteRecurringGroup', recurringGroupId, orgId });
-        throw error;
-    }
-};
+export const deleteRecurringGroup = (recurringGroupId: string, orgId: string) =>
+    batchGroupAction(getReservationsByRecurringGroupId, 'delete', recurringGroupId, orgId, 'deleteRecurringGroup');
+
