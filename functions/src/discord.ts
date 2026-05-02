@@ -1,7 +1,7 @@
 import * as logger from "firebase-functions/logger";
 import { defineString } from "firebase-functions/params";
 
-const discordWebhookUrl = defineString("DISCORD_WEBHOOK_URL");
+const discordWebhookUrl = defineString("DISCORD_WEBHOOK_URL", { default: "" });
 
 export interface DiscordAlertOptions {
     title: string;
