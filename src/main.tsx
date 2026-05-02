@@ -41,14 +41,18 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+// Auth 상태 확인과 병렬로 appEntry 번들을 미리 로드 (추측적 프리로드)
+// 대부분(~80%)의 방문이 재방문(인증 사용자)이므로 높은 적중률 기대
+// import()는 최초 한 번만 네트워크 요청을 발생시키고, 이후 호출은 캐시에서 즉시 반환
+const appEntryPreload = import('./appEntry');
 // persistence 설정 완료를 기다린 뒤 Auth 상태 확인
 authReady.then(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
         unsubscribe();
 
         if (user && !user.isAnonymous) {
-            // 인증 사용자 → 전체 앱 로드
-            const { renderFullApp } = await import('./appEntry');
+            // 인증 사용자 → 전체 앱 로드 (프리로드된 번들 즉시 사용)
+            const { renderFullApp } = await appEntryPreload;
             renderFullApp();
         } else {
             // 비인증 사용자 → 경량 앱 로드

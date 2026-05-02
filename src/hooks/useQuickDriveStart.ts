@@ -46,6 +46,11 @@ export default function useQuickDriveStart() {
         if (!orgId) { setLoading(false); return; }
         const fetch = async () => {
             try {
+                // 모바일 백그라운드 복귀 시 Firebase 토큰 만료에 따른 Unauthenticated 에러 방지
+                if (user) {
+                    await user.getIdToken();
+                }
+
                 const [v, favs, org] = await Promise.all([
                     getVehicles(orgId),
                     getFavorites(user!.uid),

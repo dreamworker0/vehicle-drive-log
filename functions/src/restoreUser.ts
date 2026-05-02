@@ -9,7 +9,7 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 export const restoreUser = onCall(
     {
         region: "asia-northeast3",
-        enforceAppCheck: true,
+        enforceAppCheck: false,
     },
     async (request) => {
         if (!request.auth) {

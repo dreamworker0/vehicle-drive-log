@@ -9,7 +9,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { sendApprovalAlimtalk } from "./sendAlimtalk";
 
 export const sendManualApprovalAlimtalk = onCall(
-    { region: "asia-northeast3", enforceAppCheck: true },
+    { region: "asia-northeast3", enforceAppCheck: false },
     async (request) => {
         // 인증 확인
         if (!request.auth) {

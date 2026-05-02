@@ -43,6 +43,9 @@ export function initSentry() {
             /Script .* load failed/,
             // Service Worker 업데이트 경합 에러 (배포 후 SW 교체 시 환경 이슈, 앱 버그 아님)
             /Failed to update a ServiceWorker/,
+            // SW registration이 null/unregistered 상태에서 .update() 호출 시 발생 (환경 이슈, 앱 버그 아님)
+            /Cannot update a null/,
+            /nonexistent service worker/,
             // vite-plugin-pwa registerSW 내부에서 iOS Safari SW lifecycle 타이밍 이슈로 발생 (앱 버그 아님)
             /newestWorker is null/,
             // Facebook 인앱 브라우저 네이티브 브릿지 에러 (WebView 내부 이슈, 앱 버그 아님)

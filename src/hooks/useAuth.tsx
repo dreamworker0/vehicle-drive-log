@@ -134,8 +134,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
                                     if (isInitialLoad || isClaimsChanged) {
                                         if (isInitialLoad) {
-                                            // 초기 로드: 토큰 갱신 완료 후 loading 해제 (재시도 포함)
-                                            refreshTokenSilently(firebaseUser)
+                                            // 초기 로드: 만료된 토큰만 갱신 (getIdToken(false))
+                                            // onAuthStateChanged가 유효 사용자를 반환했으므로 강제 갱신(네트워크 왕복) 불필요
+                                            // Custom Claims 변경은 onSnapshot → isClaimsChanged에서 별도 트리거됨
+                                            firebaseUser.getIdToken()
+                                                .catch(() => {})
                                                 .finally(() => { finishLoading(); });
                                         } else {
                                             // 이후 변경: fire-and-forget + 즉시 loading 해제

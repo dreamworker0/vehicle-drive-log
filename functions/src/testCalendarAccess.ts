@@ -26,7 +26,7 @@ export const testCalendarAccess = onCall(
         region: "asia-northeast3",
         timeoutSeconds: 15,
         memory: "256MiB",
-        enforceAppCheck: true,
+        enforceAppCheck: false,
         cors: true,
     },
     async (request) => {

@@ -7,7 +7,7 @@ export const submitPublicFeedback = onCall(
     { 
         region: "asia-northeast3", 
         timeoutSeconds: 30,
-        enforceAppCheck: true,
+        enforceAppCheck: false,
     },
     async (request) => {
         // 입력 정보 추출

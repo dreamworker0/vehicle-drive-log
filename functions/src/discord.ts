@@ -1,6 +1,7 @@
 import * as logger from "firebase-functions/logger";
+import { defineString } from "firebase-functions/params";
 
-const DISCORD_WEBHOOK_URL = process.env.DISCORD_WEBHOOK_URL || "";
+const discordWebhookUrl = defineString("DISCORD_WEBHOOK_URL");
 
 export interface DiscordAlertOptions {
     title: string;
@@ -20,13 +21,14 @@ export async function sendDiscordAlert({
     color = 16711680, // Error Red (16진수 FF0000)
     fields = [],
 }: DiscordAlertOptions): Promise<void> {
-    if (!DISCORD_WEBHOOK_URL) {
+    const url = discordWebhookUrl.value();
+    if (!url) {
         console.warn("⚠️ [Discord Alert] DISCORD_WEBHOOK_URL 환경 변수가 누락되어 알림을 발송하지 않습니다. 메시지 요약:", title);
         return;
     }
 
     try {
-        const response = await fetch(DISCORD_WEBHOOK_URL, {
+        const response = await fetch(url, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

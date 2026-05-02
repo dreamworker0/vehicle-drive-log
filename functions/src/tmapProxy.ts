@@ -104,7 +104,16 @@ export const tmapProxy = createAuthenticatedProxy("tmapProxy", async (req, res) 
             headers: { "Content-Type": "application/json", appKey: apiKey },
             body: JSON.stringify(body),
         });
-        sendResult(res, await safeFetchJson(response, "route"));
+        const result = await safeFetchJson(response, "route");
+        // 클라이언트는 features[0].properties(총 거리/시간/요금)만 사용하므로
+        // 전체 경로 좌표(features 배열)를 제거하여 페이로드를 대폭 경량화한다.
+        if (result.ok) {
+            const data = result.data as { features?: { properties?: unknown }[] };
+            const props = data?.features?.[0]?.properties;
+            res.status(200).json({ features: [{ properties: props || {} }] });
+        } else {
+            res.status(result.status).json({ error: result.error });
+        }
         return;
     }
 
@@ -153,7 +162,14 @@ export const tmapProxy = createAuthenticatedProxy("tmapProxy", async (req, res) 
             headers: { "Content-Type": "application/json", appKey: apiKey },
             body: JSON.stringify(body),
         });
-        sendResult(res, await safeFetchJson(response, "route-legacy"));
+        const result = await safeFetchJson(response, "route-legacy");
+        if (result.ok) {
+            const data = result.data as { features?: { properties?: unknown }[] };
+            const props = data?.features?.[0]?.properties;
+            res.status(200).json({ features: [{ properties: props || {} }] });
+        } else {
+            res.status(result.status).json({ error: result.error });
+        }
         return;
     }
 

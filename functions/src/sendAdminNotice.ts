@@ -9,7 +9,7 @@ import { checkRateLimitByUid } from "./rateLimit";
 const db = getFirestore();
 
 export const sendAdminNotice = onCall(
-    { region: "asia-northeast3", enforceAppCheck: true },
+    { region: "asia-northeast3", enforceAppCheck: false },
     async (request) => {
         if (!request.auth) {
             throw new HttpsError("unauthenticated", "로그인이 필요합니다.");

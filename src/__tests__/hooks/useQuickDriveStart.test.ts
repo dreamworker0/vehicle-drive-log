@@ -4,7 +4,7 @@ import { renderHook, waitFor, act } from '@testing-library/react';
 // ── Mocks ──
 vi.mock('../../hooks/useAuth', () => ({
     useAuth: () => ({
-        user: { uid: 'emp1', displayName: '김직원', email: 'emp@test.com' },
+        user: { uid: 'emp1', displayName: '김직원', email: 'emp@test.com', getIdToken: vi.fn().mockResolvedValue('fake-token') },
         userData: { organizationId: 'org1', name: '김직원', role: 'employee' },
     }),
 }));

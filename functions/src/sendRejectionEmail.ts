@@ -21,7 +21,7 @@ function createTransporter() {
 }
 
 export const sendRejectionEmail = onCall(
-    { region: "asia-northeast3", enforceAppCheck: true },
+    { region: "asia-northeast3", enforceAppCheck: false },
     async (request) => {
         // 인증 확인
         if (!request.auth) {

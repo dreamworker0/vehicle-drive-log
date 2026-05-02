@@ -45,6 +45,7 @@ export const syncCalendarToApp = onSchedule(
         const dayOfWeek = nowKST.getDay(); // 0=일, 6=토
         if (dayOfWeek === 0 || dayOfWeek === 6) {
             console.log("=== Calendar sync skipped (weekend) ===");
+            await recordHeartbeat("syncCalendarToApp");
             return;
         }
 

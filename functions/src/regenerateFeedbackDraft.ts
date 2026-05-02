@@ -53,7 +53,7 @@ function parseAiResponse(text: string): {
 }
 
 export const regenerateFeedbackDraft = onCall(
-    { region: "asia-northeast3", timeoutSeconds: 60, enforceAppCheck: true },
+    { region: "asia-northeast3", timeoutSeconds: 60, enforceAppCheck: false },
     async (request) => {
         // 인증 확인
         if (!request.auth) {

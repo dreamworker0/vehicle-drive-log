@@ -70,6 +70,7 @@ export const reservationReminder = onSchedule(
         const nowKST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
         const dayOfWeek = nowKST.getDay();
         if (dayOfWeek === 0 || dayOfWeek === 6) {
+            await recordHeartbeat("reservationReminder");
             return;
         }
         await checkReservationReminders();
@@ -162,7 +163,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { sendReminderAlimtalk } from "./sendAlimtalk";
 
 export const sendBulkReminder = onCall(
-    { region: "asia-northeast3", timeoutSeconds: 120, enforceAppCheck: true },
+    { region: "asia-northeast3", timeoutSeconds: 120, enforceAppCheck: false },
     async (request) => {
         // 인증 확인
         if (!request.auth) {

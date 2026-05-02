@@ -14,7 +14,7 @@ export const ocrDashboard = onCall(
         region: "asia-northeast3",
         timeoutSeconds: 60,
         memory: "512MiB",
-        enforceAppCheck: true,
+        enforceAppCheck: false,
     },
     async (request) => {
         if (!request.auth) {

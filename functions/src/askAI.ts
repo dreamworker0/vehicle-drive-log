@@ -46,7 +46,7 @@ export const askAI = onCall(
         region: "asia-northeast3",
         timeoutSeconds: 30,
         memory: "256MiB",
-        enforceAppCheck: true,
+        enforceAppCheck: false,
         cors: true,
     },
     async (request) => {

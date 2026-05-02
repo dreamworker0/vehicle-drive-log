@@ -26,7 +26,7 @@ export const submitOrgApplication = onCall(
         region: "asia-northeast3",
         memory: "512MiB",
         timeoutSeconds: 60,
-        enforceAppCheck: true,
+        enforceAppCheck: false,
     },
     wrapHandler("submitOrgApplication", async (request: CallableRequest<Partial<SubmitApplicationPayload>>) => {
         const payload = request.data;

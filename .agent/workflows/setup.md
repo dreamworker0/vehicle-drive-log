@@ -16,9 +16,18 @@ npm install
 ## 2. 필수 `.env` 파일 확인 및 복사
 > [!NOTE]
 > `.env.local` 파일이 존재하지 않는 경우 `.env.example` 템플릿으로부터 복사합니다.
+> **주의**: 로컬에서 프로덕션 빌드나 이메일 발송 기능을 테스트하려면 `SENTRY_AUTH_TOKEN`, `EMAILJS_PRIVATE_KEY` 등의 민감한 Secret이 `.env.local`에 반드시 채워져 있어야 합니다.
 ```bash
 // turbo
 if (-not (Test-Path ".env.local")) { Copy-Item ".env.example" ".env.local" ; Write-Host ".env.local 파일이 생성되었습니다. 필요한 키를 입력해 주세요." } else { Write-Host ".env.local 파일이 이미 존재합니다." }
+```
+
+## 2.5. Node.js 환경 고정 (Node 22 LTS)
+> [!IMPORTANT]
+> 프로젝트의 호환성을 위해 반드시 Node 22 환경으로 강제 전환합니다.
+```bash
+// turbo
+fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression; fnm use 22
 ```
 
 ## 3. Husky 및 Pre-commit 훅 초기화

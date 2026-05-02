@@ -15,7 +15,7 @@ export const resetCalendarSyncFails = onCall(
         region: "asia-northeast3",
         timeoutSeconds: 30,
         memory: "256MiB",
-        enforceAppCheck: true,
+        enforceAppCheck: false,
     },
     async (request) => {
         // 인증 확인

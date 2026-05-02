@@ -276,7 +276,7 @@ export const apiHealthCheck = onCall(
         region: "asia-northeast3",
         timeoutSeconds: 60,
         memory: "256MiB",
-        enforceAppCheck: true,
+        enforceAppCheck: false,
         cors: true,
     },
     async (request) => {
