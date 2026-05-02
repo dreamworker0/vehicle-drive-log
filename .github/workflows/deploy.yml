@@ -31,6 +31,7 @@ jobs:
         run: |
           echo "${{ secrets.ENV_FILE }}" > .env
           echo "${{ secrets.FUNCTIONS_ENV_FILE }}" > functions/.env
+          echo "DISCORD_WEBHOOK_URL=" >> functions/.env
 
       - name: Build
         run: npm run build
