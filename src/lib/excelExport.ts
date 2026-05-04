@@ -26,6 +26,7 @@ interface ExcelDriveLog {
     startKm?: number;
     endKm?: number;
     passengerCount?: number;
+    passengerNames?: string[];
     hipassCardNumber?: string;
     hipassBalanceBefore?: number;
     hipassBalanceAfter?: number;
@@ -33,7 +34,7 @@ interface ExcelDriveLog {
     [key: string]: unknown;
 }
 
-export async function downloadDriveLogsExcel(logs: ExcelDriveLog[], filename = '운행일지', { onError, includeHipass = false }: { onError?: (msg: string) => void; includeHipass?: boolean } = {}) {
+export async function downloadDriveLogsExcel(logs: ExcelDriveLog[], filename = '운행일지', { onError, includeHipass = false, includePassengers = false }: { onError?: (msg: string) => void; includeHipass?: boolean; includePassengers?: boolean } = {}) {
     if (!logs || logs.length === 0) {
         onError?.('다운로드할 데이터가 없습니다.');
         return false;
@@ -69,6 +70,10 @@ export async function downloadDriveLogsExcel(logs: ExcelDriveLog[], filename = '
             row['사용후금액'] = log.hipassBalanceAfter != null ? log.hipassBalanceAfter : '';
         }
 
+        if (includePassengers) {
+            row['동행자'] = log.passengerNames && log.passengerNames.length > 0 ? log.passengerNames.join(', ') : '';
+        }
+
         row['비고'] = log.notes || '';
         return row;
     });
@@ -94,6 +99,9 @@ export async function downloadDriveLogsExcel(logs: ExcelDriveLog[], filename = '
         cols.push({ wch: 20 });  // 하이패스카드
         cols.push({ wch: 12 });  // 사용전금액
         cols.push({ wch: 12 });  // 사용후금액
+    }
+    if (includePassengers) {
+        cols.push({ wch: 20 });  // 동행자
     }
     cols.push({ wch: 20 });  // 비고
     ws['!cols'] = cols;

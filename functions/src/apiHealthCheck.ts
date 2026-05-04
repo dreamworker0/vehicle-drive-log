@@ -146,9 +146,11 @@ async function pingAlimtalk(): Promise<void> {
     }
 }
 
+const discordWebhookUrl = defineString("DISCORD_WEBHOOK_URL", { default: "" });
+
 /** Discord Webhook 핑 */
 async function pingDiscord(): Promise<void> {
-    const webhookUrl = process.env.DISCORD_WEBHOOK_URL;
+    const webhookUrl = discordWebhookUrl.value();
     if (!webhookUrl) throw new Error("DISCORD_WEBHOOK_URL 미설정");
 
     const response = await fetch(webhookUrl, {

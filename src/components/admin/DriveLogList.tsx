@@ -8,7 +8,7 @@ export default function DriveLogList() {
     const {
         logs, vehicles, members, loading, loadingMore, hasMore,
         filters, setFilters, filteredLogs, totalDistance,
-        deletingId, includeHipass, setIncludeHipass,
+        deletingId, includeHipass, setIncludeHipass, includePassengers, setIncludePassengers,
         dupState, dupResult,
         loadMore, handleDelete,
         handleDupScan, handleDupClean, handleDupCancel,
@@ -32,6 +32,8 @@ export default function DriveLogList() {
                 totalDistance={totalDistance}
                 includeHipass={includeHipass}
                 onIncludeHipassChange={setIncludeHipass}
+                includePassengers={includePassengers}
+                onIncludePassengersChange={setIncludePassengers}
                 dupState={dupState}
                 dupResult={dupResult}
                 onDupScan={handleDupScan}

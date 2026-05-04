@@ -9,6 +9,8 @@ export interface DriveLogExportBarProps {
     totalDistance: number;
     includeHipass: boolean;
     onIncludeHipassChange: (value: boolean) => void;
+    includePassengers?: boolean;
+    onIncludePassengersChange?: (value: boolean) => void;
     dupState: 'idle' | 'scanning' | 'result' | 'cleaning';
     dupResult: DupResult | null;
     onDupScan: () => void;
@@ -23,6 +25,8 @@ export default function DriveLogExportBar({
     totalDistance,
     includeHipass,
     onIncludeHipassChange,
+    includePassengers = false,
+    onIncludePassengersChange,
     dupState,
     dupResult,
     onDupScan,
@@ -49,6 +53,15 @@ export default function DriveLogExportBar({
                             className="rounded border-surface-300 dark:border-surface-600 text-primary-600 focus:ring-primary-500 w-3.5 h-3.5"
                         />
                         하이패스 포함
+                    </label>
+                    <label className="flex items-center gap-1.5 text-xs text-surface-500 dark:text-surface-400 cursor-pointer select-none mr-2">
+                        <input
+                            type="checkbox"
+                            checked={includePassengers}
+                            onChange={e => onIncludePassengersChange?.(e.target.checked)}
+                            className="rounded border-surface-300 dark:border-surface-600 text-primary-600 focus:ring-primary-500 w-3.5 h-3.5"
+                        />
+                        동행자 포함
                     </label>
                     <button
                         onClick={onDupScan}

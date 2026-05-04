@@ -67,6 +67,11 @@ export default function FeedbackItem({
                                 <span className="font-semibold text-surface-900 dark:text-surface-100 text-sm">
                                     {fb.userName || '이름 없음'}
                                 </span>
+                                {fb.authorUid === 'public-inquiry' && (
+                                    <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-surface-200 text-surface-600 dark:bg-surface-700 dark:text-surface-300">
+                                        비회원 (로그인 전) 문의
+                                    </span>
+                                )}
                                 {(fb.organizationId || fb.organizationName) && (
                                     <span className="text-xs text-surface-500 dark:text-surface-400">
                                         {fb.organizationName || (fb.organizationId && orgNames[fb.organizationId]) || fb.organizationId}

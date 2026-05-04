@@ -72,6 +72,7 @@ export default function useDriveLogList() {
     const [dupResult, setDupResult] = useState<DupResult | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [includeHipass, setIncludeHipass] = useState(false);
+    const [includePassengers, setIncludePassengers] = useState(false);
 
     const now = new Date();
     const firstDay = toLocalDateStr(new Date(now.getFullYear(), now.getMonth(), 1));
@@ -258,7 +259,7 @@ export default function useDriveLogList() {
     };
 
     // 서버 내보내기
-    const handleServerExport = async (period: string, hipass: boolean, isPdf: boolean) => {
+    const handleServerExport = async (period: string, hipass: boolean, passengers: boolean, isPdf: boolean) => {
         if (!orgId) return;
         showToast('전체 데이터를 불러오고 있습니다. 잠시만 기다려주세요.', 'info');
         try {
@@ -295,6 +296,7 @@ export default function useDriveLogList() {
                     period,
                     approvalLine: useApproval,
                     includeHipass: hipass,
+                    includePassengers: passengers,
                     onError: (msg) => showToast(msg, 'error'),
                 });
             } else {
@@ -302,6 +304,7 @@ export default function useDriveLogList() {
                 await downloadDriveLogsExcel(finalLogs, `운행일지_${period}`, {
                     onError: (msg) => showToast(msg, 'warning'),
                     includeHipass: hipass,
+                    includePassengers: passengers,
                 });
             }
         } catch (err) {
@@ -312,19 +315,19 @@ export default function useDriveLogList() {
 
     const handleExportExcel = () => {
         const period = validateExportDates('엑셀');
-        if (period) handleServerExport(period, includeHipass, false);
+        if (period) handleServerExport(period, includeHipass, includePassengers, false);
     };
 
     const handleExportPdf = () => {
         const period = validateExportDates('PDF');
-        if (period) handleServerExport(period, includeHipass, true);
+        if (period) handleServerExport(period, includeHipass, includePassengers, true);
     };
 
     return {
         // 상태
         logs, vehicles, members, loading, loadingMore, hasMore,
         filters, setFilters, filteredLogs, totalDistance,
-        deletingId, includeHipass, setIncludeHipass,
+        deletingId, includeHipass, setIncludeHipass, includePassengers, setIncludePassengers,
         dupState, dupResult,
         // 핸들러
         loadMore, handleDelete,
