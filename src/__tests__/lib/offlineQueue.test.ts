@@ -2,6 +2,7 @@
  * offlineSync — 통합 오프라인 큐 유틸리티 테스트
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { processOfflineQueue } from '../../lib/offlineSyncProcessor';
 
 // IndexedDB mock (fake-indexeddb)
 import 'fake-indexeddb/auto';
@@ -40,8 +41,6 @@ describe('offlineSync', () => {
     });
 
     it('processOfflineQueue는 오프라인 상태에서 0 반환', async () => {
-        const { processOfflineQueue } = await import('../../lib/offlineSyncProcessor');
-
         // navigator.onLine을 false로 설정
         Object.defineProperty(navigator, 'onLine', { value: false, writable: true });
 

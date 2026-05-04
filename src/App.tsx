@@ -9,6 +9,8 @@ import { useAuth } from './hooks/useAuth';
 import { useOrientationLock } from './hooks/useOrientationLock';
 import { AuthGuard } from './components/auth/AuthGuard';
 import { updateUser } from './lib/firestore/users';
+import { isInAppBrowser } from './lib/inAppBrowser';
+import InAppBrowserWarning from './components/common/InAppBrowserWarning';
 
 // 레이아웃 (기존)
 const SuperAdminLayout = lazyWithRetry(() => import('./components/superAdmin/SuperAdminLayout'));
@@ -62,6 +64,7 @@ const legalRoutes = [
 import { mountOfflineQueueProcessor } from './lib/offlineSyncProcessor';
 
 export default function App() {
+
   const theme = useThemeStore(state => state.theme);
   const setTheme = useThemeStore(state => state.setTheme);
   const fontSize = useFontSizeStore(state => state.fontSize);
@@ -115,6 +118,12 @@ export default function App() {
   const options = useConfirmStore(state => state.options);
   const handleConfirm = useConfirmStore(state => state.handleConfirm);
   const handleCancel = useConfirmStore(state => state.handleCancel);
+
+  // 인앱 브라우저 감지 시 메인 화면 마운트 대신 안내 화면만 표시
+  // (React Rules of Hooks 준수를 위해 모든 훅 호출 이후에 얼리 리턴 위치)
+  if (isInAppBrowser()) {
+    return <InAppBrowserWarning />;
+  }
 
   return (
     <>
