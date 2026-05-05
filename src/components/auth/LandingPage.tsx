@@ -134,13 +134,13 @@ export default function LandingPage() {
                         onClick={() => navigate('/apply')}
                         className="flex-1 btn bg-white dark:bg-surface-800 text-primary-700 font-bold hover:bg-primary-50 shadow-lg hover:shadow-xl transition-all"
                     >
-                        기관 신청하기
+                        서비스 도입 신청
                     </button>
                     <button
                         onClick={() => navigate('/login')}
                         className="flex-1 btn bg-white/10 dark:bg-surface-800/10 backdrop-blur-sm text-white border border-white/20 hover:bg-white/20 transition-all"
                     >
-                        로그인
+                        직원 로그인
                     </button>
                 </div>
 
@@ -248,7 +248,7 @@ export default function LandingPage() {
                     onClick={() => navigate('/apply')}
                     className="btn bg-white dark:bg-surface-800 text-primary-700 font-bold hover:bg-primary-50 shadow-lg hover:shadow-xl transition-all"
                 >
-                    기관 사용 신청하기
+                    서비스 도입 신청
                 </button>
             </section>
 
