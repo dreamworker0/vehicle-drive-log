@@ -6,8 +6,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { DEFAULT_FUEL } from '../../hooks/useVehicleManager';
 import type { Vehicle } from '../../types';
 import { FUEL_TYPES } from '../../types/vehicle';
-import { firebaseFunctions } from '../../lib/firebase';
-import { httpsCallable } from 'firebase/functions';
+import VehicleCalendarSection from './VehicleCalendarSection';
 
 interface VehicleFormData {
     displayName: string;
@@ -51,49 +50,6 @@ export default function VehicleForm({
     const [activeIndex, setActiveIndex] = useState(-1);
     const modelInputRef = useRef<HTMLInputElement>(null);
     const suggestionsRef = useRef<HTMLUListElement>(null);
-    const calendarInputRef = useRef<HTMLInputElement>(null);
-
-    // 캘린더 연동 테스트 상태
-    const [calTestLoading, setCalTestLoading] = useState(false);
-    const [calTestResult, setCalTestResult] = useState<{
-        success: boolean;
-        message: string;
-        errorType?: string;
-        errorTitle?: string;
-    } | null>(null);
-
-    const handleCalendarTest = async (e?: React.MouseEvent) => {
-        if (e) {
-            e.preventDefault();
-            e.stopPropagation();
-        }
-        const calId = form.googleCalendarId.trim();
-        if (!calId) return;
-        setCalTestLoading(true);
-        setCalTestResult(null);
-        try {
-            const fn = httpsCallable(firebaseFunctions, 'testCalendarAccess');
-            const res = await fn({ calendarId: calId });
-            const result = res.data as typeof calTestResult;
-            setCalTestResult(result);
-            // 수정 모드이고 콜백이 있을 때만 Firestore에 결과 반영
-            if (editingVehicle && onCalendarTestResult) {
-                await onCalendarTestResult(editingVehicle.id, result?.success ?? false);
-            }
-        } catch {
-            const errResult = { success: false, message: '테스트 요청 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.' };
-            setCalTestResult(errResult);
-            if (editingVehicle && onCalendarTestResult) {
-                await onCalendarTestResult(editingVehicle.id, false);
-            }
-        } finally {
-            setCalTestLoading(false);
-        }
-    };
-
-    // 캘린더 동기화 실패 상태
-    const calSyncFailCount = editingVehicle?.calendarSyncFailCount || 0;
-    const hasCalSyncError = calSyncFailCount >= 3;
 
     // 필터링된 후보 목록
     const filtered = form.modelName.trim()
@@ -116,22 +72,6 @@ export default function VehicleForm({
         document.addEventListener('mousedown', handler);
         return () => document.removeEventListener('mousedown', handler);
     }, []);
-
-    // initialCalendarError=true: 에러 상태로 초기화 + 캘린더 ID 입력란 포커스
-    useEffect(() => {
-        if (!initialCalendarError) return;
-        setCalTestResult({
-            success: false,
-            errorTitle: '캘린더를 찾을 수 없음',
-            message: '입력한 캘린더 ID가 올바르지 않거나 삭제된 캘린더입니다. 캘린더 설정 → 캘린더 통합에서 캘린더 ID를 다시 확인해주세요.',
-        });
-        // 약간의 딜레이 후 캘린더 ID 입력란으로 포커스 + 스크롤
-        const timer = setTimeout(() => {
-            calendarInputRef.current?.focus();
-            calendarInputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }, 150);
-        return () => clearTimeout(timer);
-    }, [initialCalendarError]);
 
     const selectSuggestion = (value: string) => {
         onModelNameChange(value);
@@ -310,106 +250,13 @@ export default function VehicleForm({
                         <p className="text-xs text-surface-400 mt-1">사고 시 연락할 보험사 정보</p>
                     </div>
 
-                    <div>
-                        <label className="label">Google 캘린더 ID (선택)</label>
-                        <div className="flex gap-2">
-                            <input
-                                ref={calendarInputRef}
-                                type="text" value={form.googleCalendarId}
-                                onChange={e => { setForm({ ...form, googleCalendarId: e.target.value }); setCalTestResult(null); }}
-                                className="input flex-1" placeholder="calendar-resource-id@resource.calendar.google.com"
-                            />
-                            {form.googleCalendarId.trim() && (
-                                <button
-                                    type="button"
-                                    onClick={handleCalendarTest}
-                                    disabled={calTestLoading}
-                                    className="shrink-0 px-3 py-2 rounded-xl text-xs font-medium border border-primary-300 dark:border-primary-600 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors disabled:opacity-50"
-                                >
-                                    {calTestLoading ? (
-                                        <span className="flex items-center gap-1.5"><span className="w-3 h-3 spinner" />테스트 중</span>
-                                    ) : '🔄 연동 테스트'}
-                                </button>
-                            )}
-                        </div>
-
-                        {/* 연동 테스트 결과 */}
-                        {calTestResult && (
-                            <div className={`mt-2 p-3 rounded-lg text-xs border ${
-                                calTestResult.success
-                                    ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-400'
-                                    : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400'
-                            }`}>
-                                <p className="font-medium">
-                                    {calTestResult.success ? '✅ ' : '❌ '}
-                                    {calTestResult.errorTitle || (calTestResult.success ? '연동 정상' : '연동 실패')}
-                                </p>
-                                <p className="mt-1 text-surface-600 dark:text-surface-400">{calTestResult.message}</p>
-                            </div>
-                        )}
-
-                        {/* 수정 모드: 동기화 실패 알림 */}
-                        {editingVehicle && form.googleCalendarId.trim() && !calTestResult && hasCalSyncError && (
-                            <div className="mt-2 p-3 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-xs">
-                                <p className="font-medium text-red-700 dark:text-red-400">
-                                    ⚠️ 이 차량의 캘린더 동기화가 실패하고 있습니다 (실패 {calSyncFailCount}회)
-                                </p>
-                                <p className="mt-1 text-surface-600 dark:text-surface-400">
-                                    아래 설정 방법을 따라 서비스 계정에 캘린더 공유를 추가한 뒤, "🔄 연동 테스트" 버튼으로 확인해주세요.
-                                </p>
-                            </div>
-                        )}
-
-                        {/* 수정 모드: 정상 동기화 확인 */}
-                        {editingVehicle && form.googleCalendarId.trim() && !calTestResult && !hasCalSyncError && calSyncFailCount === 0 && (
-                            <p className="mt-1.5 text-xs text-green-600 dark:text-green-400">✅ 정상 동기화 중</p>
-                        )}
-
-                        <details className={`mt-2 text-xs text-surface-500 dark:text-surface-400`} open={hasCalSyncError || (calTestResult != null && !calTestResult.success)}>
-                            <summary className="cursor-pointer text-primary-600 dark:text-primary-400 hover:underline font-medium">
-                                📋 설정 방법 안내
-                            </summary>
-                            <div className="mt-2 p-3 rounded-lg bg-surface-50 dark:bg-surface-800 space-y-2 border border-surface-200 dark:border-surface-700">
-                                <p className="font-medium text-surface-700 dark:text-surface-300">구글 캘린더 동기화 설정 방법:</p>
-                                <ol className="list-decimal list-inside space-y-1.5 text-surface-600 dark:text-surface-400">
-                                    <li>구글 캘린더에서 공유할 캘린더의 <strong className="text-surface-700 dark:text-surface-300">설정 및 공유</strong>로 이동</li>
-                                    <li><strong className="text-surface-700 dark:text-surface-300">공유 대상</strong>에서 <strong className="text-surface-700 dark:text-surface-300">+ 사용자 및 그룹 추가</strong>를 클릭하고, 아래 이메일을 <strong className="text-surface-700 dark:text-surface-300">"일정 변경"</strong> 권한으로 추가</li>
-                                    <li><strong className="text-surface-700 dark:text-surface-300">캘린더 통합</strong> 섹션에서 캘린더 ID를 복사하여 위 입력란에 붙여넣기</li>
-                                    <li>위 <strong className="text-surface-700 dark:text-surface-300">"🔄 연동 테스트"</strong> 버튼을 눌러 정상 연결을 확인</li>
-                                </ol>
-                                <div className="mt-3 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
-                                    <p className="font-medium text-amber-700 dark:text-amber-400 mb-1.5">⚠️ Google Workspace(업무 계정) 사용 시</p>
-                                    <p className="text-surface-600 dark:text-surface-400 mb-1">관리 콘솔에서 캘린더 외부 공유를 허용해야 합니다:</p>
-                                    <ol className="list-decimal list-inside space-y-1 text-surface-600 dark:text-surface-400 ml-1">
-                                        <li><strong className="text-surface-700 dark:text-surface-300">Google 관리 콘솔</strong> → 앱 → Google Workspace → Calendar 설정 → <strong className="text-surface-700 dark:text-surface-300">일반 설정</strong></li>
-                                        <li><strong className="text-surface-700 dark:text-surface-300">보조 캘린더의 외부 공유 옵션</strong>에서 <strong className="text-surface-700 dark:text-surface-300">"모든 정보를 공유하며 외부 사용자도 캘린더를 변경할 수 있음"</strong> 선택</li>
-                                        <li>오른쪽 하단의 <strong className="text-surface-700 dark:text-surface-300">[저장]</strong> 클릭</li>
-                                    </ol>
-                                </div>
-                                <div className="mt-2">
-                                    <p className="text-[11px] text-surface-500 dark:text-surface-400 mb-1.5">공유 대상에 추가할 서비스 계정 이메일:</p>
-                                    <div className="flex items-center gap-2">
-                                        <code className="flex-1 px-2 py-1.5 rounded bg-surface-100 dark:bg-surface-900 text-[11px] font-mono text-surface-700 dark:text-surface-300 select-all break-all">
-                                            1066541065552-compute@developer.gserviceaccount.com
-                                        </code>
-                                        <button
-                                            type="button"
-                                            onClick={(e) => {
-                                                navigator.clipboard.writeText('1066541065552-compute@developer.gserviceaccount.com');
-                                                const btn = e.currentTarget;
-                                                btn.textContent = '✓ 복사됨';
-                                                setTimeout(() => { btn.textContent = '복사'; }, 1500);
-                                            }}
-                                            className="shrink-0 px-2.5 py-1.5 text-[11px] rounded bg-primary-500 text-white hover:bg-primary-600 transition-colors"
-                                        >복사</button>
-                                    </div>
-                                </div>
-                                <p className="text-[11px] text-surface-400 dark:text-surface-500 mt-1">
-                                    💡 기관 내 모든 차량에 같은 캘린더 ID를 사용하면 통합 관리가 편리합니다
-                                </p>
-                            </div>
-                        </details>
-                    </div>
+                    <VehicleCalendarSection
+                        calendarId={form.googleCalendarId}
+                        onChange={value => setForm({ ...form, googleCalendarId: value })}
+                        editingVehicle={editingVehicle}
+                        onCalendarTestResult={onCalendarTestResult}
+                        initialCalendarError={initialCalendarError}
+                    />
                     <div className="flex gap-3 pt-2">
                         <button type="button" onClick={onCancel} className="btn-secondary flex-1">취소</button>
                         <button type="submit" disabled={formLoading} className="btn-primary flex-1">

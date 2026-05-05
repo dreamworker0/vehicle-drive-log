@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 import { initializeApp, applicationDefault } from 'firebase-admin/app';
-import { getFirestore } from 'firebase-admin/firestore';
 
 try {
     initializeApp({ credential: applicationDefault() });
@@ -10,7 +9,7 @@ try {
 }
 
 // computeDashboardStats import 시 ts-node/tsx에서 경로 해석에 유의.
-const { computeAllDashboardStats } = require('../functions/lib/caching/computeDashboardStats.js');
+import { computeAllDashboardStats } from '../functions/lib/caching/computeDashboardStats.js';
 
 async function main() {
     console.log("Starting computeAllDashboardStats...");

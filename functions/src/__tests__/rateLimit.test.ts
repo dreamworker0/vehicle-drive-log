@@ -78,4 +78,114 @@ describe('rateLimit — Rate Limiting 유틸리티', () => {
             expect(mockBatchCommit).toHaveBeenCalledTimes(1);
         });
     });
+
+    describe('checkRateLimitByIp() — IP 기반 Rate Limit', () => {
+        it('허용 범위 내 요청 → false 반환 (통과)', async () => {
+            // 현재 count=2, max=5이므로 통과
+            mockRunTransaction.mockImplementationOnce(async (fn: any) =>
+                fn({
+                    get: jest.fn().mockResolvedValue({ exists: true, data: () => ({ count: 2 }) }),
+                    set: jest.fn(),
+                })
+            );
+
+            const { checkRateLimitByIp } = await import('../rateLimit');
+            const exceeded = await checkRateLimitByIp('tmapProxy', '192.168.1.1', 5, 60);
+            expect(exceeded).toBe(false);
+        });
+
+        it('한도 초과 → true 반환 (차단)', async () => {
+            // 현재 count=5, max=5이므로 초과
+            mockRunTransaction.mockImplementationOnce(async (fn: any) =>
+                fn({
+                    get: jest.fn().mockResolvedValue({ exists: true, data: () => ({ count: 5 }) }),
+                    set: jest.fn(),
+                })
+            );
+
+            const { checkRateLimitByIp } = await import('../rateLimit');
+            const exceeded = await checkRateLimitByIp('tmapProxy', '192.168.1.1', 5, 60);
+            expect(exceeded).toBe(true);
+        });
+
+        it('첫 번째 요청 (문서 없음) → false 반환 (통과)', async () => {
+            mockRunTransaction.mockImplementationOnce(async (fn: any) =>
+                fn({
+                    get: jest.fn().mockResolvedValue({ exists: false, data: () => null }),
+                    set: jest.fn(),
+                })
+            );
+
+            const { checkRateLimitByIp } = await import('../rateLimit');
+            const exceeded = await checkRateLimitByIp('tmapProxy', '10.0.0.1', 10, 60);
+            expect(exceeded).toBe(false);
+        });
+
+        it('IPv4 점(.)이 포함된 IP → 안전한 문자로 치환 후 동작', async () => {
+            mockRunTransaction.mockImplementationOnce(async (fn: any) =>
+                fn({
+                    get: jest.fn().mockResolvedValue({ exists: false }),
+                    set: jest.fn(),
+                })
+            );
+
+            const { checkRateLimitByIp } = await import('../rateLimit');
+            // 에러 없이 실행되면 통과
+            await expect(
+                checkRateLimitByIp('tmapProxy', '192.168.100.200', 5, 60)
+            ).resolves.not.toThrow();
+        });
+
+        it('IPv6 콜론(:)이 포함된 IP → 안전한 문자로 치환 후 동작', async () => {
+            mockRunTransaction.mockImplementationOnce(async (fn: any) =>
+                fn({
+                    get: jest.fn().mockResolvedValue({ exists: false }),
+                    set: jest.fn(),
+                })
+            );
+
+            const { checkRateLimitByIp } = await import('../rateLimit');
+            await expect(
+                checkRateLimitByIp('tmapProxy', '2001:db8::1', 5, 60)
+            ).resolves.not.toThrow();
+        });
+
+        it('Firestore 에러 발생 시 → false 반환 (장애 시 기능 차단 방지)', async () => {
+            mockRunTransaction.mockRejectedValueOnce(new Error('Firestore 연결 실패'));
+
+            const { checkRateLimitByIp } = await import('../rateLimit');
+            const exceeded = await checkRateLimitByIp('tmapProxy', '1.2.3.4', 5, 60);
+            expect(exceeded).toBe(false);
+        });
+    });
+
+    describe('checkRateLimitByUid() — UID 기반 Rate Limit', () => {
+        it('허용 범위 내 → 정상 통과 (에러 없음)', async () => {
+            mockRunTransaction.mockImplementationOnce(async (fn: any) =>
+                fn({
+                    get: jest.fn().mockResolvedValue({ exists: true, data: () => ({ count: 3 }) }),
+                    set: jest.fn(),
+                })
+            );
+
+            const { checkRateLimitByUid } = await import('../rateLimit');
+            await expect(
+                checkRateLimitByUid('ocrDashboard', 'uid-abc', 10, 3600)
+            ).resolves.not.toThrow();
+        });
+
+        it('한도 초과 → HttpsError("resource-exhausted") throw', async () => {
+            mockRunTransaction.mockImplementationOnce(async (fn: any) =>
+                fn({
+                    get: jest.fn().mockResolvedValue({ exists: true, data: () => ({ count: 10 }) }),
+                    set: jest.fn(),
+                })
+            );
+
+            const { checkRateLimitByUid } = await import('../rateLimit');
+            await expect(
+                checkRateLimitByUid('ocrDashboard', 'uid-abc', 10, 3600)
+            ).rejects.toThrow('요청이 너무 많습니다');
+        });
+    });
 });

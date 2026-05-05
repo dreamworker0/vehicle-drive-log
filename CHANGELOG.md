@@ -5,6 +5,19 @@
 
 ---
 
+## Phase 45 — 아키텍처 정리 및 프로젝트 품질 대규모 개선 🧹
+
+> 2026-05-06
+
+### Added
+- 핵심 백엔드 비즈니스 로직(rateLimit, notifyNewApplication, generateFeedbackDraft, setCustomClaims 등)에 대한 유닛 테스트(Unit Test)를 대거 추가하여 테스트 커버리지 대폭 확대 (전체 50개 테스트 통과)
+- `scripts/generate-functions-doc.ts`를 도입하여 Cloud Functions API Reference 문서(`docs/FUNCTIONS_REFERENCE.md`) 자동 생성 파이프라인 구축
+
+### Changed
+- 프론트엔드 대형 컴포넌트(`VehicleForm`, `EmployeeManager`)의 핵심 비즈니스 UI(캘린더 연동 영역, 직원 목록 카드)를 각각 독립적인 서브 컴포넌트(`VehicleCalendarSection`, `EmployeeListItem`)로 분리하여 기술 부채 해소
+- 프로젝트 최상단 디렉터리에 잔존하던 임시 스크립트 파일(`.cjs`, `.mjs`) 및 테스트 텍스트 결과 파일들을 `scripts/`와 `docs/`로 이동, 또는 `.gitignore` 처리하여 깨끗한 빌드 환경 보장
+- 배포 스크립트 및 빌드 검증 파이프라인 내 ES Module(`"type": "module"`) 호환성 오류 수정
+
 ## Phase 44 — CI/CD 자동 배포 파이프라인 구축 및 워크플로우 고도화 🚀
 
 > 2026-04-26

@@ -70,13 +70,18 @@ coverage/
 Thumbs.db
 Desktop.ini
 
-# Scratch scripts & temp files
-find_dark.mjs
-get_doc.cjs
-validate_doc.cjs
-test-zod.ts
-validate_result.txt
+# Scratch scripts & temp files (루트 잔존 방지)
+scripts/find_dark.mjs
+scripts/get_doc.cjs
+scripts/validate_doc.cjs
+scripts/test-zod.ts
 coverage-output*.txt
+deploy.log
+logs.txt
+npm-audit-report.txt
+
+# Scratch / 일회성 작업 디렉터리
+scratch/
 
 # Agent / AI
 .gemini/
