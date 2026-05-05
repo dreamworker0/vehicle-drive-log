@@ -1,4 +1,4 @@
-﻿/**
+/**
  * releaseNotes — 사용자용 업데이트 소식 데이터
  *
  * 서비스 이용자가 이해할 수 있는 변경 사항만 기술합니다.
@@ -17,6 +17,13 @@ interface ReleaseNote {
 }
 
 export const RELEASE_NOTES: ReleaseNote[] = [
+    {
+        date: '2026-05-06',
+        title: '보안 강화 🔒',
+        items: [
+            { type: 'improved', text: '서비스를 더 안전하게 보호하기 위해 Firebase App Check 보안 레이어를 적용했습니다. 사용 중에는 아무런 차이를 느끼실 수 없지만, 외부의 불법적인 접근 시도를 더 효과적으로 차단합니다.' },
+        ]
+    },
     {
         date: '2026-04-30',
         title: '운행 시작 속도 및 안정성 보강 🚀',

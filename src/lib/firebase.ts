@@ -4,6 +4,7 @@ import { authReady as _authReady } from './firebaseAuth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, getFirestore, clearIndexedDbPersistence } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
+import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
 // firebase/analytics, firebase/messaging은 동적 import (번들 최적화)
 
 const firebaseConfig = {
@@ -17,6 +18,21 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
+
+// === App Check 초기화 (initializeApp 직후, 다른 서비스보다 먼저) ===
+// 개발 환경: VITE_APPCHECK_DEBUG_TOKEN으로 에뮬레이터/로컬 통과
+// 프로덕션: reCAPTCHA v3 토큰 자동 발급
+if (typeof window !== 'undefined') {
+    const debugToken = import.meta.env.VITE_APPCHECK_DEBUG_TOKEN;
+    if (debugToken) {
+        // @ts-expect-error -- 글로벌 디버그 토큰 설정 (firebase 공식 방법)
+        self.FIREBASE_APPCHECK_DEBUG_TOKEN = debugToken;
+    }
+    initializeAppCheck(app, {
+        provider: new ReCaptchaV3Provider(import.meta.env.VITE_RECAPTCHA_SITE_KEY),
+        isTokenAutoRefreshEnabled: true,
+    });
+}
 
 // === Analytics 지연 초기화 (초기 번들에서 ~20KB 제외) ===
 let _analytics: ReturnType<typeof import('firebase/analytics').getAnalytics> | null = null;

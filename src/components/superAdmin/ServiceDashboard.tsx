@@ -44,6 +44,8 @@ export default function ServiceDashboard() {
         recommendationRatio,
         reservationTypeStats,
         reservationTypeRatio,
+        futureReservationTypeStats,
+        futureReservationTypeRatio,
         favoriteUserRatio,
         favoriteLogRatio,
         favoriteStats,
@@ -227,6 +229,8 @@ export default function ServiceDashboard() {
                             recommendationRatio={recommendationRatio}
                             reservationTypeStats={reservationTypeStats}
                             reservationTypeRatio={reservationTypeRatio}
+                            futureReservationTypeStats={futureReservationTypeStats}
+                            futureReservationTypeRatio={futureReservationTypeRatio}
                             favoriteStats={favoriteStats}
                             favoriteRatio={favoriteLogRatio}
                             favoriteUserRatio={favoriteUserRatio}
