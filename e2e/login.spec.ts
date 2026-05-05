@@ -21,7 +21,7 @@ test.describe('로그인 페이지', () => {
     test('기관 신청 링크가 존재한다', async ({ page }) => {
         await page.goto('/');
         // 랜딩 페이지에서 기관 신청 버튼 확인
-        const applyBtn = page.getByRole('button', { name: '기관 신청하기' });
+        const applyBtn = page.getByRole('button', { name: '서비스 도입 신청' }).first();
         await expect(applyBtn).toBeVisible({ timeout: 10000 });
     });
 });

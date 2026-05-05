@@ -11,8 +11,8 @@ test.describe('랜딩 페이지', () => {
         // 서브 타이틀
         await expect(page.getByText('사회복지기관·비영리단체 전용')).toBeVisible();
         // CTA 버튼 2개
-        await expect(page.getByRole('button', { name: '기관 신청하기' })).toBeVisible();
-        await expect(page.getByRole('button', { name: '로그인' })).toBeVisible();
+        await expect(page.getByRole('button', { name: '서비스 도입 신청' }).first()).toBeVisible();
+        await expect(page.getByRole('button', { name: '직원 로그인' })).toBeVisible();
         // 무료 안내 텍스트
         await expect(page.getByText(/완전 무료/)).toBeVisible();
     });
@@ -49,7 +49,7 @@ test.describe('랜딩 페이지', () => {
 
     test('하단 CTA 섹션이 표시된다', async ({ page }) => {
         await expect(page.getByText('지금 바로 든든한 차량 관리를 시작해볼까요?')).toBeVisible({ timeout: 10000 });
-        await expect(page.getByRole('button', { name: '기관 사용 신청하기' })).toBeVisible();
+        await expect(page.getByRole('button', { name: '서비스 도입 신청' }).last()).toBeVisible();
     });
 
     test('푸터에 약관/개인정보 링크가 있다', async ({ page }) => {
@@ -58,14 +58,14 @@ test.describe('랜딩 페이지', () => {
         await expect(page.getByText(/© 2026/)).toBeVisible();
     });
 
-    test('기관 신청하기 CTA 클릭 시 신청 페이지로 이동한다', async ({ page }) => {
-        const ctaBtn = page.getByRole('button', { name: '기관 신청하기' }).first();
+    test('서비스 도입 신청 CTA 클릭 시 신청 페이지로 이동한다', async ({ page }) => {
+        const ctaBtn = page.getByRole('button', { name: '서비스 도입 신청' }).first();
         await ctaBtn.click();
         await expect(page).toHaveURL(/\/apply/);
     });
 
-    test('로그인 버튼 클릭 시 로그인 페이지로 이동한다', async ({ page }) => {
-        const loginBtn = page.getByRole('button', { name: '로그인' });
+    test('직원 로그인 버튼 클릭 시 로그인 페이지로 이동한다', async ({ page }) => {
+        const loginBtn = page.getByRole('button', { name: '직원 로그인' });
         await loginBtn.click();
         await expect(page).toHaveURL(/login/);
     });

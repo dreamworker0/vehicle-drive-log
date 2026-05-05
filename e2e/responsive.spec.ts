@@ -5,7 +5,7 @@ test.describe('반응형 레이아웃', () => {
         await page.setViewportSize({ width: 375, height: 812 }); // iPhone 크기
         await page.goto('/');
         await expect(page.getByRole('heading', { name: /차량 운행일지/ })).toBeVisible({ timeout: 10000 });
-        await expect(page.getByRole('button', { name: '기관 신청하기' })).toBeVisible();
+        await expect(page.getByRole('button', { name: '서비스 도입 신청' }).first()).toBeVisible();
     });
 
     test('태블릿 뷰포트에서 랜딩 페이지가 정상 렌더링된다', async ({ page }) => {

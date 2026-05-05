@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('기관 사용 신청 플로우', () => {
     test('신청 페이지로 이동할 수 있다', async ({ page }) => {
         await page.goto('/');
-        const applyBtn = page.getByRole('button', { name: '기관 신청하기' }).first();
+        const applyBtn = page.getByRole('button', { name: '서비스 도입 신청' }).first();
         await expect(applyBtn).toBeVisible({ timeout: 10000 });
         await applyBtn.click();
         await expect(page).toHaveURL(/\/apply/);
