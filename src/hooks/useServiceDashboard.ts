@@ -33,6 +33,8 @@ export default function useServiceDashboard(orgFilterId: string = 'ALL') {
     // 예약 유형별(하루/다일/반복) 통계
     const [reservationTypeStats, setReservationTypeStats] = useState<{ date: string; single: number; multiDay: number; recurring: number }[]>([]);
     const [reservationTypeRatio, setReservationTypeRatio] = useState<{ total: number; single: number; multiDay: number; recurring: number; singleRate: number; multiDayRate: number; recurringRate: number }>({ total: 0, single: 0, multiDay: 0, recurring: 0, singleRate: 0, multiDayRate: 0, recurringRate: 0 });
+    const [futureReservationTypeStats, setFutureReservationTypeStats] = useState<{ date: string; single: number; multiDay: number; recurring: number }[]>([]);
+    const [futureReservationTypeRatio, setFutureReservationTypeRatio] = useState<{ total: number; single: number; multiDay: number; recurring: number; singleRate: number; multiDayRate: number; recurringRate: number }>({ total: 0, single: 0, multiDay: 0, recurring: 0, singleRate: 0, multiDayRate: 0, recurringRate: 0 });
 
     // 목적지 즐겨찾기 통계
     const [favoriteUserRatio, setFavoriteUserRatio] = useState<{ total: number; withFavorite: number; rate: number }>({ total: 0, withFavorite: 0, rate: 0 });
@@ -210,6 +212,8 @@ export default function useServiceDashboard(orgFilterId: string = 'ALL') {
             if (ts.recommendationRatio) setRecommendationRatio(ts.recommendationRatio);
             if (ts.reservationTypeStats) setReservationTypeStats(ts.reservationTypeStats);
             if (ts.reservationTypeRatio) setReservationTypeRatio(ts.reservationTypeRatio);
+            if (ts.futureReservationTypeStats) setFutureReservationTypeStats(ts.futureReservationTypeStats);
+            if (ts.futureReservationTypeRatio) setFutureReservationTypeRatio(ts.futureReservationTypeRatio);
         }
 
         if (orgRankingsSnap && orgRankingsSnap.exists()) {
@@ -330,6 +334,8 @@ export default function useServiceDashboard(orgFilterId: string = 'ALL') {
         recommendationRatio,
         reservationTypeStats,
         reservationTypeRatio,
+        futureReservationTypeStats,
+        futureReservationTypeRatio,
         orgSizeDistribution,
         fuelTypeStats,
         vehicleTypeStats,

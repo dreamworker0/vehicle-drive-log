@@ -361,9 +361,19 @@ export async function computeAllDashboardStats(): Promise<void> {
                 dailyResMap[key] = { regular: 0, quick: 0, recommendation: 0, normal: 0, single: 0, multiDay: 0, recurring: 0 };
             }
         
+            const futureResMap: Record<string, { single: number; multiDay: number; recurring: number }> = {};
+            const todayStart = new Date(year, month, now.getDate());
+            for (let i = 0; i < 30; i++) {
+                const d = new Date(todayStart);
+                d.setDate(d.getDate() + i);
+                const key = `${d.getMonth() + 1}/${d.getDate()}`;
+                futureResMap[key] = { single: 0, multiDay: 0, recurring: 0 };
+            }
+
             let qTotal = 0, qQuick = 0, qRegular = 0;
             let recTotal = 0, recRecommendation = 0, recNormal = 0;
             let rtSingle = 0, rtMultiDay = 0, rtRecurring = 0;
+            let ftSingle = 0, ftMultiDay = 0, ftRecurring = 0;
         
             // 캘린더 동기화 중복 예약 방지: 동일 calendarEventId+date 조합은 1건만 집계
             const processedCalendarEvents = new Set<string>();
@@ -418,6 +428,26 @@ export async function computeAllDashboardStats(): Promise<void> {
                         if (dailyResMap[key]) dailyResMap[key].single++;
                     }
                 }
+                
+                if (parsed >= todayStart) {
+                    const key = `${parsed.getMonth() + 1}/${parsed.getDate()}`;
+                    if (data.recurringGroupId) {
+                        if (futureResMap[key]) {
+                            futureResMap[key].recurring++;
+                            ftRecurring++;
+                        }
+                    } else if (data.groupId) {
+                        if (futureResMap[key]) {
+                            futureResMap[key].multiDay++;
+                            ftMultiDay++;
+                        }
+                    } else {
+                        if (futureResMap[key]) {
+                            futureResMap[key].single++;
+                            ftSingle++;
+                        }
+                    }
+                }
             });
         
             const quickDriveRatio = { total: qTotal, quick: qQuick, regular: qRegular, rate: qTotal > 0 ? Math.round((qQuick / qTotal) * 100) : 0 };
@@ -433,6 +463,15 @@ export async function computeAllDashboardStats(): Promise<void> {
                 recurringRate: rtTotal > 0 ? Math.round((rtRecurring / rtTotal) * 100) : 0,
             };
             const reservationTypeStats = Object.entries(dailyResMap).map(([date, counts]) => ({ date, single: counts.single, multiDay: counts.multiDay, recurring: counts.recurring }));
+
+            const ftTotal = ftSingle + ftMultiDay + ftRecurring;
+            const futureReservationTypeRatio = {
+                total: ftTotal, single: ftSingle, multiDay: ftMultiDay, recurring: ftRecurring,
+                singleRate: ftTotal > 0 ? Math.round((ftSingle / ftTotal) * 100) : 0,
+                multiDayRate: ftTotal > 0 ? Math.round((ftMultiDay / ftTotal) * 100) : 0,
+                recurringRate: ftTotal > 0 ? Math.round((ftRecurring / ftTotal) * 100) : 0,
+            };
+            const futureReservationTypeStats = Object.entries(futureResMap).map(([date, counts]) => ({ date, single: counts.single, multiDay: counts.multiDay, recurring: counts.recurring }));
         
             // ── 6. 차량 집계 ──
         
@@ -694,6 +733,7 @@ export async function computeAllDashboardStats(): Promise<void> {
                     dailyAvgDuration, hourlyStats, hourlyAvgDuration, heatmapData: { items: heatItems, maxCount: Math.max(1, ...heatItems.map(i => i.count)) },
                     favoriteLogRatio: { total: favTotal, favorite: totalFav, normal: totalNorm, rate: favTotal > 0 ? Math.round((totalFav / favTotal) * 100) : 0 },
                     quickDriveStats, quickDriveRatio, recommendationStats, recommendationRatio, reservationTypeStats, reservationTypeRatio,
+                    futureReservationTypeStats, futureReservationTypeRatio,
                     lastUpdatedAt: new Date().toISOString()
                 },
                 dashboardOrgRankings: {

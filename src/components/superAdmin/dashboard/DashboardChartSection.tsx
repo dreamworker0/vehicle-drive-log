@@ -28,6 +28,8 @@ interface Props {
     // 예약 유형별 비율
     reservationTypeStats: { date: string; single: number; multiDay: number; recurring: number }[];
     reservationTypeRatio: { total: number; single: number; multiDay: number; recurring: number; singleRate: number; multiDayRate: number; recurringRate: number };
+    futureReservationTypeStats?: { date: string; single: number; multiDay: number; recurring: number }[];
+    futureReservationTypeRatio?: { total: number; single: number; multiDay: number; recurring: number; singleRate: number; multiDayRate: number; recurringRate: number };
     // 목적지 즐겨찾기 현황
     favoriteStats: { date: string; favorite: number; normal: number }[];
     favoriteRatio: { total: number; favorite: number; normal: number; rate: number };
@@ -68,6 +70,8 @@ function DashboardChartSection(props: Props) {
             <ChartReservationType
                 reservationTypeStats={props.reservationTypeStats}
                 reservationTypeRatio={props.reservationTypeRatio}
+                futureReservationTypeStats={props.futureReservationTypeStats}
+                futureReservationTypeRatio={props.futureReservationTypeRatio}
             />
             <ChartRecommendation
                 recommendationStats={props.recommendationStats}

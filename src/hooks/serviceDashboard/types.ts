@@ -66,6 +66,8 @@ export interface CachedDashboardTimeSeries {
     recommendationRatio?: { total: number; recommendation: number; normal: number; rate: number };
     reservationTypeStats?: { date: string; single: number; multiDay: number; recurring: number }[];
     reservationTypeRatio?: { total: number; single: number; multiDay: number; recurring: number; singleRate: number; multiDayRate: number; recurringRate: number };
+    futureReservationTypeStats?: { date: string; single: number; multiDay: number; recurring: number }[];
+    futureReservationTypeRatio?: { total: number; single: number; multiDay: number; recurring: number; singleRate: number; multiDayRate: number; recurringRate: number };
     lastUpdatedAt: string;
 }
 

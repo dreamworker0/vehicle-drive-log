@@ -6,6 +6,7 @@ import {
     DashboardMonthlyMetrics,
     DashboardOrgTable,
 } from './dashboard';
+import OrgSearchDropdown from './OrgSearchDropdown';
 
 const DashboardFunnelChart = lazy(() => import('./dashboard/DashboardFunnelChart'));
 const DashboardChartSection = lazy(() => import('./dashboard/DashboardChartSection'));
@@ -94,18 +95,11 @@ export default function ServiceDashboard() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                     <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100 shrink-0">서비스 운영 대시보드</h1>
-                    <select
-                        value={selectedOrgId}
-                        onChange={(e) => setSelectedOrgId(e.target.value)}
-                        className="p-1.5 text-sm font-medium rounded-lg border border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 outline-none focus:ring-2 focus:ring-primary-500 w-full sm:w-auto"
-                    >
-                        <option value="ALL">전체 기관 통계</option>
-                        {[...topOrgs].sort((a, b) => a.name.localeCompare(b.name)).map(org => (
-                            <option key={org.id} value={org.id}>
-                                {org.name}
-                            </option>
-                        ))}
-                    </select>
+                    <OrgSearchDropdown 
+                        selectedOrgId={selectedOrgId} 
+                        onChange={setSelectedOrgId} 
+                        orgs={topOrgs} 
+                    />
                 </div>
                 <button onClick={() => refreshServerStats()} className="btn-ghost w-fit text-sm flex items-center gap-1">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
