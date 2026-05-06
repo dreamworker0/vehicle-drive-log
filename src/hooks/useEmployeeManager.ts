@@ -150,6 +150,7 @@ export default function useEmployeeManager() {
             await fetchData();
         }, {
             errorMessage: '비활성화에 실패했습니다.',
+            useBackoff: true,
             onError: (err: unknown) => {
                 const message = err instanceof Error ? err.message : null;
                 if (message && !message.toLowerCase().includes('network')) {

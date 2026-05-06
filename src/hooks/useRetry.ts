@@ -27,6 +27,7 @@ function isNetworkError(err: unknown) {
     // Firebase 에러 코드
     if (e.code === 'unavailable' || e.code === 'deadline-exceeded') return true;
     if (e.code === 'resource-exhausted' || e.code === 'aborted') return true;
+    if (e.code === 'internal') return true;
     return false;
 }
 

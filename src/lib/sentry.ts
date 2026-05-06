@@ -22,6 +22,7 @@ export function initSentry() {
             /is not a function or its return value is not iterable/,
             'Failed to get document because the client is offline',
             /FirebaseError.*unavailable/,
+            /FirebaseError.*internal/,
             /is not a valid JavaScript MIME type/,
             // 배포 후 구버전 청크 로드 에러
             'ChunkLoadError',
