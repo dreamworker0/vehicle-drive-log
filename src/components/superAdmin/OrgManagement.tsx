@@ -35,7 +35,7 @@ export default function OrgManagement() {
     const { showToast } = useToast();
     const { confirm } = useConfirm();
 
-    const fetchOrganizations = async () => {
+    const fetchOrganizations = useCallback(async (retryCount = 0) => {
         setLoading(true);
         try {
             const [orgs, deleted] = await Promise.all([
@@ -55,11 +55,24 @@ export default function OrgManagement() {
             setDeletedOrgs(deleted as Organization[]);
             setMemberCountMap(counts);
         } catch (err) {
+            // 일시적 연결 실패 시 자동 재시도 (최대 2회, 지수 백오프)
+            const isTransient = err instanceof Error && (
+                err.message.includes('Connection failed') ||
+                err.message.includes('unavailable') ||
+                err.message.includes('internal')
+            );
+            if (isTransient && retryCount < 2) {
+                const delay = 1000 * Math.pow(2, retryCount); // 1s, 2s
+                console.warn(`[OrgManagement] 일시적 연결 실패, ${delay}ms 후 재시도 (${retryCount + 1}/2)`);
+                await new Promise(r => setTimeout(r, delay));
+                return fetchOrganizations(retryCount + 1);
+            }
             console.error('기관 목록 로드 실패:', err);
+            showToast('기관 목록을 불러오는 데 실패했습니다. 잠시 후 다시 시도해주세요.', 'error');
         } finally {
             setLoading(false);
         }
-    };
+    }, [showToast]);
 
     // 특정 기관의 멤버를 레이지 로드
     const loadMembers = useCallback(async (orgId: string) => {
@@ -77,7 +90,7 @@ export default function OrgManagement() {
 
     useEffect(() => {
         fetchOrganizations();
-    }, []);
+    }, [fetchOrganizations]);
 
     // 기관 카드 토글 시 멤버 레이지 로드
     const toggleExpand = useCallback((orgId: string) => {
@@ -100,7 +113,7 @@ export default function OrgManagement() {
             console.error('삭제 실패:', err);
             showToast('삭제에 실패했습니다.', 'error');
         }
-    }, [confirm, showToast]);
+    }, [confirm, showToast, fetchOrganizations]);
 
     const handleRestore = async (org: Organization) => {
         if (!await confirm({ message: `${org.name} 기관을 복구하시겠습니까?` })) return;

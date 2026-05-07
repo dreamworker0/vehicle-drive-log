@@ -23,6 +23,8 @@ export function initSentry() {
             'Failed to get document because the client is offline',
             /FirebaseError.*unavailable/,
             /FirebaseError.*internal/,
+            // 모바일 네트워크 불안정 시 Firestore 연결 실패 (환경 이슈, 앱 버그 아님)
+            /FirebaseError.*Connection failed/,
             /is not a valid JavaScript MIME type/,
             // 배포 후 구버전 청크 로드 에러
             'ChunkLoadError',
