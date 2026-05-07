@@ -18,6 +18,13 @@ interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
     {
+        date: '2026-05-07',
+        title: '차량 예약 캘린더 연동 개선 📅',
+        items: [
+            { type: 'improved', text: '직원 공용 캘린더 연동 시 개인 일정이 혼입되는 것을 막기 위해, 구글 캘린더 연동 시 "새 캘린더" 생성을 권장하는 안내 문구를 추가했습니다.' }
+        ]
+    },
+    {
         date: '2026-05-06',
         title: '보안 강화 🔒',
         items: [

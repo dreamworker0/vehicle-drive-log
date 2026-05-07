@@ -171,6 +171,18 @@ export default function VehicleCalendarSection({
                     📋 설정 방법 안내
                 </summary>
                 <div className="mt-2 p-3 rounded-lg bg-surface-50 dark:bg-surface-800 space-y-2 border border-surface-200 dark:border-surface-700">
+                    
+                    {/* 새 캘린더 생성 주의사항 추가 */}
+                    <div className="mb-3 p-2.5 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                        <p className="font-medium text-red-700 dark:text-red-400 flex items-center gap-1.5">
+                            <span className="text-sm">⚠️</span> 주의사항: 새 캘린더 생성 권장
+                        </p>
+                        <p className="mt-1 text-red-600 dark:text-red-300">
+                            직원 공용 업무 캘린더나 개인 캘린더를 연동하면 <strong>회의, 연차 등 개인 일정까지 모두 차량 예약으로 동기화</strong>됩니다.
+                            반드시 구글 캘린더에서 <strong className="underline">차량 전용 새 캘린더를 생성</strong>하여 연동해 주세요.
+                        </p>
+                    </div>
+
                     <p className="font-medium text-surface-700 dark:text-surface-300">구글 캘린더 동기화 설정 방법:</p>
                     <ol className="list-decimal list-inside space-y-1.5 text-surface-600 dark:text-surface-400">
                         <li>
