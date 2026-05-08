@@ -49,10 +49,43 @@ export default function NotificationBell() {
 
     useEffect(() => {
         if (!user) return;
-        const unsubscribe = subscribeNotifications(user.uid, (notifs) => {
-            setNotifications(notifs as Notification[]);
-        });
-        return () => unsubscribe();
+
+        let unsubscribe: (() => void) | null = null;
+
+        const startWatch = () => {
+            if (!unsubscribe) {
+                unsubscribe = subscribeNotifications(user.uid, (notifs) => {
+                    setNotifications(notifs as Notification[]);
+                });
+            }
+        };
+
+        const stopWatch = () => {
+            if (unsubscribe) {
+                unsubscribe();
+                unsubscribe = null;
+            }
+        };
+
+        const handleVisibility = () => {
+            if (document.visibilityState === 'visible') {
+                startWatch();
+            } else {
+                stopWatch();
+            }
+        };
+
+        // 초기 마운트 시 가시성 체크 후 시작
+        if (document.visibilityState === 'visible') {
+            startWatch();
+        }
+
+        document.addEventListener('visibilitychange', handleVisibility);
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibility);
+            stopWatch();
+        };
     }, [user]);
 
     // 외부 클릭 감지

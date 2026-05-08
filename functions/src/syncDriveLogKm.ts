@@ -2,6 +2,7 @@ import { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } from "firebas
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { captureError } from "./sentry";
 import { recordHeartbeat } from "./helpers";
+import { handleStatsOnCreate, handleStatsOnUpdate, handleStatsOnDelete } from "./caching/updateAggregatedStats";
 
 const db = getFirestore();
 
@@ -103,6 +104,9 @@ export const onDriveLogCreated = onDocumentCreated(
             // 다음 기록의 startKm 자동 연동 (소급이든 아니든 항상 시도)
             await syncNextLogStartKm(orgId, vehId, ts, endKm);
 
+            // [통합 트리거] 기관 통계 증분 업데이트
+            await handleStatsOnCreate(orgId, data);
+
             await recordHeartbeat("onDriveLogCreated");
         } catch (error) {
             console.error('[onDriveLogCreated] km 동기화 오류:', error);
@@ -162,6 +166,12 @@ export const onDriveLogUpdated = onDocumentUpdated(
                 if (data.endKm !== oldData.endKm) {
                     await syncNextLogStartKm(orgId, vehId, ts, data.endKm);
                 }
+            }
+
+            // [통합 트리거] 기관 통계 차분 업데이트
+            const finalOrgId = data.organizationId || oldData.organizationId;
+            if (finalOrgId) {
+                await handleStatsOnUpdate(finalOrgId, oldData, data);
             }
 
             await recordHeartbeat("onDriveLogUpdated");
@@ -232,6 +242,11 @@ export const onDriveLogDeleted = onDocumentDeleted(
                 }
 
                 await syncNextLogStartKm(orgId, vehId, ts, prevEndKm);
+            }
+
+            // [통합 트리거] 기관 통계 차감 업데이트
+            if (orgId) {
+                await handleStatsOnDelete(orgId, data);
             }
 
             await recordHeartbeat("onDriveLogDeleted");

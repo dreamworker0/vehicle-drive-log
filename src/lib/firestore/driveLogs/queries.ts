@@ -12,6 +12,7 @@ import { db } from '../../firebase';
 import type { DriveLog } from '../../../types/driveLog';
 import { createZodConverter, driveLogSchema } from '../../../schemas';
 import { captureError } from '../../sentry';
+import { cachedQuery } from '../cache';
 
 const driveLogConverter = createZodConverter(driveLogSchema);
 
@@ -101,42 +102,56 @@ export const getAllDriveLogsForExport = async (
     }
 };
 
-// 내 운행일지 목록 조회
+// 내 운행일지 목록 조회 (캐시 적용, TTL: 3분)
 export const getMyDriveLogs = async (orgId: string, uid: string, limitCount = 30) => {
-    try {
-        const q = query(
-            collection(db, 'driveLogs').withConverter(driveLogConverter),
-            where('organizationId', '==', orgId),
-            where('driverUid', '==', uid),
-            orderBy('timestamp', 'desc'),
-            limit(limitCount)
-        );
-        const snap = await getDocs(q);
-        return snap.docs.map(d => d.data());
-    } catch (error) {
-        captureError(error, { context: 'getMyDriveLogs', orgId, uid });
-        throw error;
-    }
+    const cacheKey = `driveLogs:my:${orgId}:${uid}:${limitCount}`;
+    return cachedQuery(
+        cacheKey,
+        async () => {
+            try {
+                const q = query(
+                    collection(db, 'driveLogs').withConverter(driveLogConverter),
+                    where('organizationId', '==', orgId),
+                    where('driverUid', '==', uid),
+                    orderBy('timestamp', 'desc'),
+                    limit(limitCount)
+                );
+                const snap = await getDocs(q);
+                return snap.docs.map(d => d.data());
+            } catch (error) {
+                captureError(error, { context: 'getMyDriveLogs', orgId, uid });
+                throw error;
+            }
+        },
+        180_000 // 3분 캐시
+    );
 };
 
-// 차량별 운행일지 조회 (기간 필터 + limit 기본 200)
+// 차량별 운행일지 조회 (기간 필터 + limit 기본 200) (캐시 적용, TTL: 3분)
 export const getVehicleDriveLogs = async (vehicleId: string, since?: Date, limitCount = 200) => {
-    try {
-        const constraints: QueryConstraint[] = [
-            where('vehicleId', '==', vehicleId),
-            orderBy('timestamp', 'desc'),
-            limit(limitCount),
-        ];
-        if (since) {
-            constraints.splice(1, 0, where('timestamp', '>=', since));
-        }
-        const q = query(collection(db, 'driveLogs').withConverter(driveLogConverter), ...constraints);
-        const snap = await getDocs(q);
-        return snap.docs.map(d => d.data());
-    } catch (error) {
-        captureError(error, { context: 'getVehicleDriveLogs', vehicleId });
-        throw error;
-    }
+    const cacheKey = `driveLogs:vehicle:${vehicleId}:${since?.getTime() || 'all'}:${limitCount}`;
+    return cachedQuery(
+        cacheKey,
+        async () => {
+            try {
+                const constraints: QueryConstraint[] = [
+                    where('vehicleId', '==', vehicleId),
+                    orderBy('timestamp', 'desc'),
+                    limit(limitCount),
+                ];
+                if (since) {
+                    constraints.splice(1, 0, where('timestamp', '>=', since));
+                }
+                const q = query(collection(db, 'driveLogs').withConverter(driveLogConverter), ...constraints);
+                const snap = await getDocs(q);
+                return snap.docs.map(d => d.data());
+            } catch (error) {
+                captureError(error, { context: 'getVehicleDriveLogs', vehicleId });
+                throw error;
+            }
+        },
+        180_000 // 3분 캐시
+    );
 };
 
 // 차량에 운행일지가 1건이라도 있는지 확인

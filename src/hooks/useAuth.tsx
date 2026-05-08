@@ -45,6 +45,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         let unsubscribeUser: Unsubscribe | null = null;
         let unsubscribeOrg: Unsubscribe | null = null;
 
+        let pauseWatches: (() => void) | null = null;
+        let resumeWatches: (() => void) | null = null;
+
         // persistence 설정 완료 후 onAuthStateChanged 구독 시작
         // 이를 통해 새 탭에서도 localStorage의 기존 세션이 올바르게 복원된다.
         authReady.then(() => {
@@ -190,8 +193,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         );
                     };
 
-                    startUserWatch();
+                    // visibility 상태에 따른 구독 제어
+                    pauseWatches = () => {
+                        if (unsubscribeUser) { unsubscribeUser(); unsubscribeUser = null; }
+                        if (unsubscribeOrg) { unsubscribeOrg(); unsubscribeOrg = null; }
+                    };
+
+                    resumeWatches = () => {
+                        if (unsubscribeUser) return; // 이미 구독중이면 무시
+                        startUserWatch();
+                    };
+
+                    if (document.visibilityState === 'visible') {
+                        startUserWatch();
+                    }
                 } else {
+                    pauseWatches = null;
+                    resumeWatches = null;
                     setUser(null);
                     setUserData(null);
                     setOrgDeleted(false);
@@ -201,10 +219,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
         });
 
-        // 탭 복귀 시 토큰 선갱신 — 백그라운드 탭의 토큰 만료로 인한 강제 로그아웃 방지
+        // 탭 복귀 시 토큰 선갱신 및 리스너 재시작 — 백그라운드 탭의 토큰 만료 및 비용 최적화
         const handleVisibilityChange = () => {
-            if (document.visibilityState === 'visible' && auth.currentUser && !auth.currentUser.isAnonymous) {
-                refreshTokenSilently(auth.currentUser);
+            if (document.visibilityState === 'visible') {
+                if (auth.currentUser && !auth.currentUser.isAnonymous) {
+                    refreshTokenSilently(auth.currentUser);
+                }
+                if (resumeWatches) resumeWatches();
+            } else {
+                if (pauseWatches) pauseWatches();
             }
         };
         document.addEventListener('visibilitychange', handleVisibilityChange);

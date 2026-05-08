@@ -88,11 +88,15 @@ export const getReservations = async (orgId: string, date?: string) => {
     }
 };
 
-// 예약 실시간 구독
+// 예약 실시간 구독 (오늘 이후 데이터만)
 export const subscribeReservations = (orgId: string, callback: (reservations: (DocumentData & { id: string })[]) => void) => {
+    const today = new Date();
+    const todayStr = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+
     const q = query(
         reservationsCollection(),
         where('organizationId', '==', orgId),
+        where('date', '>=', todayStr)
     );
     return onSnapshot(q, (snap) => {
         const reservations = snap.docs.map(d => d.data() as Reservation);
@@ -100,12 +104,16 @@ export const subscribeReservations = (orgId: string, callback: (reservations: (D
     });
 };
 
-// 승인 대기 중인 예약 실시간 구독
+// 승인 대기 중인 예약 실시간 구독 (과거 방치 건 무시, 오늘 이후)
 export const subscribePendingReservations = (orgId: string, callback: (reservations: (DocumentData & { id: string })[]) => void) => {
+    const today = new Date();
+    const todayStr = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
+
     const q = query(
         reservationsCollection(),
         where('organizationId', '==', orgId),
-        where('status', '==', 'pending')
+        where('status', '==', 'pending'),
+        where('date', '>=', todayStr)
     );
     return onSnapshot(q, (snap) => {
         const reservations = snap.docs.map(d => d.data() as Reservation);

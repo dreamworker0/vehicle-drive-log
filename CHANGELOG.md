@@ -10,12 +10,17 @@
 > 2026-05-08
 
 ### Added
-- **Firestore Trigger 도입**: 운행일지 기록 생성/수정 시 누적 주행거리(currentKm) 및 하이패스 잔액 동기화 등 주요 Side Effect를 프론트엔드가 아닌 서버사이드 Cloud Functions(`syncDriveLogKm`, `syncHipassBalance`)에서 처리하도록 이관하여 오프라인 상태 또는 네트워크 단절 시에도 데이터 무결성 100% 보장
+- **Firestore Trigger 도입**: 운행일지 기록 생성/수정 시 누적 주행거리(currentKm) 및 하이패스 실시간 잔액 동기화 등 주요 Side Effect를 프론트엔드가 아닌 서버사이드 Cloud Functions(`syncDriveLogKm`)에서 처리하도록 이관하여 오프라인 상태 또는 네트워크 단절 시에도 데이터 무결성 100% 보장
 - **오프라인 Sync 멱등성(Idempotency) 확보**: 운행 기록 저장 시 클라이언트에서 고유 ID(`{vehicleId}_{uid}_{date}_{startKm}_{endKm}`)를 사전에 발급하여 중복 저장(Race Condition)을 원천 차단
 
 ### Changed
 - **오프라인 지속성(Offline Persistence) 활용**: 불안정한 커스텀 오프라인 큐(`offlineSyncProcessor`)를 제거하고, Firebase Firestore SDK에 내장된 오프라인 캐시 및 동기화 기능을 100% 활용하도록 아키텍처 전면 개편 (관련 코드 1,000줄 이상 제거)
 - **과거 운행기록 수정 프로세스 개선**: 사용자가 과거 기록 수정 시 이전 기록의 종료Km와 새 기록의 시작Km가 불일치할 경우, 백그라운드 자동 덮어쓰기 대신 사용자에게 "수정 확인(Confirm)" 다이얼로그를 명시적으로 노출하여 휴먼 에러 방지 및 투명성 제공
+- **Firestore 리스너 및 쿼리 최적화**: 
+  - 인증, 유저, 알림, 예약 등 전역 실시간 리스너(`onSnapshot`)에 브라우저 가시성(`visibilitychange`) 이벤트를 결합하여 백그라운드 탭에서의 불필요한 네트워크 통신 및 비용 최소화
+  - 운행일지 리스트 및 통계 쿼리 호출 시 `cachedQuery` 유틸리티를 도입하여 중복 읽기 횟수 감소
+  - 시스템 관리자 대시보드 상태 관리 훅(`useServiceDashboard`)을 4개의 도메인 단위로 분할하여 React 리렌더링 성능 대폭 개선
+- **Cloud Functions 트리거 로직 통합**: 분산되어 있던 `updateAggregatedStats`를 헬퍼 함수로 분리하여 `syncDriveLogKm` 내부로 통합 호출함으로써 불필요한 Cloud Function 웜업 및 중복 실행 비용 절감
 
 ### Fixed
 - Firebase SDK가 내부적으로 재시도하는 과정에서 발생하는 `AppCheck: Fetch failed to connect to a network` 및 `Requests throttled` 등 단순 인프라 레벨의 네트워크 에러들이 Sentry에 노이즈로 리포트되지 않도록 글로벌 필터링 정책 업데이트

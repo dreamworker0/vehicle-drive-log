@@ -91,8 +91,7 @@ export { syncCalendarToApp } from "./calendarSchedule";
 // 운행일지 중복 정리 (관리자용)
 export { cleanupDuplicateLogs } from "./cleanupDuplicateLogs";
 
-// 대시보드 성능 고도화를 위한 운행일지 집계 통계 캐싱
-export { updateAggregatedStats } from "./caching/updateAggregatedStats";
+// 대시보드 성능 고도화를 위한 운행일지 집계 통계 캐싱 (현재 syncDriveLogKm.ts 통합 트리거 내부에서 병합 처리됨)
 // 집계 통계 일괄 재계산 (마이그레이션/보정용)
 export { recalculateAggregatedStats } from "./caching/recalculateAggregatedStats";
 

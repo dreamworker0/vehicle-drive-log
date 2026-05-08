@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
@@ -7,111 +8,60 @@ import type { OrgStat, CachedDashboardStats, CachedDashboardTimeSeries, CachedDa
 import { loadFuelHipassStats } from './serviceDashboard/loadFuelHipassStats';
 import { loadNotificationStats } from './serviceDashboard/loadNotificationStats';
 
-export default function useServiceDashboard(orgFilterId: string = 'ALL') {
-    const [stats, setStats] = useState<CachedDashboardStats['monthlyStats'] extends infer _ ? {
-        approvedOrgs: number; totalUsers: number; adminCount: number; employeeCount: number;
-        totalLogs: number; totalDistance: number; pendingApps: number; calendarSyncOrgs: number;
+/** 
+ * 도메인별 통계 상태를 그룹화하기 위한 기본 타입
+ */
+export type DashboardSummaryState = Partial<CachedDashboardStats> & {
+    stats?: {
+        approvedOrgs: number;
+        totalUsers: number;
+        adminCount: number;
+        employeeCount: number;
+        totalLogs: number;
+        totalDistance: number;
+        pendingApps: number;
+        calendarSyncOrgs: number;
         themeStats?: { dark: number; light: number; none: number };
         welcomeStats?: { dismissed: number; notDismissed: number; rate: number };
-    } | null : never>(null);
-    const [monthlyStats, setMonthlyStats] = useState<{
-        monthLabel: string; logs: number; distance: number; activeUsers: number;
-        prevLogs: number; prevDistance: number; prevActiveUsers: number;
-    } | null>(null);
-    const [topOrgs, setTopOrgs] = useState<OrgStat[]>([]);
+    };
+};
+export type DashboardTimeSeriesState = Omit<Partial<CachedDashboardTimeSeries>, 'heatmapData'> & {
+    heatmapData?: { grid: number[][]; maxCount: number };
+};
+export type DashboardRankingsState = Omit<Partial<CachedDashboardOrgRankings>, 'topOrgs'> & {
+    topOrgs: OrgStat[];
+};
+export type DashboardExternalState = {
+    fuelStats: any | null; hipassStats: any | null; dailyFuelCost: any[]; dailyHipassAmount: any[];
+    notifSummary: any | null; dailyNotifStats: any[]; notifTypeStats: any[];
+};
 
-    const [inputMethodStats, setInputMethodStats] = useState<{ date: string; ocr: number; manual: number }[]>([]);
+export default function useServiceDashboard(orgFilterId: string = 'ALL') {
+    // 1. 요약 통계 그룹 (CachedDashboardStats)
+    const [summary, setSummary] = useState<DashboardSummaryState>({});
 
-    // 바로 운행 vs 사전 예약 통계
-    const [quickDriveStats, setQuickDriveStats] = useState<{ date: string; regular: number; quick: number }[]>([]);
-    const [quickDriveRatio, setQuickDriveRatio] = useState<{ total: number; quick: number; regular: number; rate: number }>({ total: 0, quick: 0, regular: 0, rate: 0 });
+    // 2. 시계열 통계 그룹 (CachedDashboardTimeSeries)
+    const [timeSeries, setTimeSeries] = useState<DashboardTimeSeriesState>({
+        heatmapData: { grid: Array.from({ length: 7 }, () => Array(24).fill(0)), maxCount: 1 }
+    });
 
-    // 추천 예약 통계
-    const [recommendationStats, setRecommendationStats] = useState<{ date: string; recommendation: number; normal: number }[]>([]);
-    const [recommendationRatio, setRecommendationRatio] = useState<{ total: number; recommendation: number; normal: number; rate: number }>({ total: 0, recommendation: 0, normal: 0, rate: 0 });
+    // 3. 랭킹 통계 그룹 (CachedDashboardOrgRankings)
+    const [rankings, setRankings] = useState<DashboardRankingsState>({ topOrgs: [] });
 
-    // 예약 유형별(하루/다일/반복) 통계
-    const [reservationTypeStats, setReservationTypeStats] = useState<{ date: string; single: number; multiDay: number; recurring: number }[]>([]);
-    const [reservationTypeRatio, setReservationTypeRatio] = useState<{ total: number; single: number; multiDay: number; recurring: number; singleRate: number; multiDayRate: number; recurringRate: number }>({ total: 0, single: 0, multiDay: 0, recurring: 0, singleRate: 0, multiDayRate: 0, recurringRate: 0 });
-    const [futureReservationTypeStats, setFutureReservationTypeStats] = useState<{ date: string; single: number; multiDay: number; recurring: number }[]>([]);
-    const [futureReservationTypeRatio, setFutureReservationTypeRatio] = useState<{ total: number; single: number; multiDay: number; recurring: number; singleRate: number; multiDayRate: number; recurringRate: number }>({ total: 0, single: 0, multiDay: 0, recurring: 0, singleRate: 0, multiDayRate: 0, recurringRate: 0 });
+    // 4. 외부 비동기 로드 통계 그룹 (주유/하이패스, 알림)
+    const [external, setExternal] = useState<DashboardExternalState>({
+        fuelStats: null, hipassStats: null, dailyFuelCost: [], dailyHipassAmount: [],
+        notifSummary: null, dailyNotifStats: [], notifTypeStats: []
+    });
 
-    // 목적지 즐겨찾기 통계
-    const [favoriteUserRatio, setFavoriteUserRatio] = useState<{ total: number; withFavorite: number; rate: number }>({ total: 0, withFavorite: 0, rate: 0 });
-    const [favoriteLogRatio, setFavoriteLogRatio] = useState<{ total: number; favorite: number; normal: number; rate: number }>({ total: 0, favorite: 0, normal: 0, rate: 0 });
-    const [favoriteStats, setFavoriteStats] = useState<{ date: string; favorite: number; normal: number }[]>([]);
-
-    // 고도화 state
-    const [_dailyDriveStats, setDailyDriveStats] = useState<{ date: string; count: number }[]>([]);
-    const [dailyActiveUserStats, setDailyActiveUserStats] = useState<{ date: string; users: number }[]>([]);
-    const [dailyActiveOrgStats, setDailyActiveOrgStats] = useState<{ date: string; active: number; inactive: number; rejected: number; deleted: number; dayActive: number; dayInactive: number; dayRejected: number; dayDeleted: number }[]>([]);
-    const [hourlyStats, setHourlyStats] = useState<{ hour: string; count: number }[]>([]);
-    const [fuelTypeStats, setFuelTypeStats] = useState<{ type: string; label: string; count: number; color: string }[]>([]);
-    const [vehicleTypeStats, setVehicleTypeStats] = useState<{ type: string; label: string; count: number; color: string }[]>([]);
-    const [vehicleModelStats, setVehicleModelStats] = useState<{ model: string; count: number }[]>([]);
-    const [vehicleModelStatsActive, setVehicleModelStatsActive] = useState<{ model: string; count: number }[]>([]);
-    const [vehicleModelStatsRetired, setVehicleModelStatsRetired] = useState<{ model: string; count: number }[]>([]);
-    const [hipassRatio, setHipassRatio] = useState<{ withHipass: number; withoutHipass: number }>({ withHipass: 0, withoutHipass: 0 });
-    const [calendarSyncRatio, setCalendarSyncRatio] = useState<{ sync: number; notSync: number }>({ sync: 0, notSync: 0 });
-    const [calendarTopOrgs, setCalendarTopOrgs] = useState<{ name: string; count: number }[]>([]);
-    const [calendarSyncOrgCount, setCalendarSyncOrgCount] = useState<number>(0);
-    const [hipassTopOrgs, setHipassTopOrgs] = useState<{ name: string; count: number }[]>([]);
-    const [weeklyActiveRate, setWeeklyActiveRate] = useState<{ active: number; total: number }>({ active: 0, total: 0 });
-    const [monthlyGrowth, setMonthlyGrowth] = useState<{ month: string; cumulative: number }[]>([]);
-
-    // 히트맵 state
-    const [heatmapData, setHeatmapData] = useState<{ grid: number[][]; maxCount: number }>({ grid: Array.from({ length: 7 }, () => Array(24).fill(0)), maxCount: 1 });
-
-    // 평균 주행시간 state
-    const [dailyAvgDuration, setDailyAvgDuration] = useState<{ date: string; avg: number }[]>([]);
-    const [hourlyAvgDuration, setHourlyAvgDuration] = useState<{ hour: string; avg: number }[]>([]);
-    const [orgAvgDuration, setOrgAvgDuration] = useState<{ name: string; avg: number }[]>([]);
-
-    // 주유 / 하이패스 통계
-    const [fuelStats, setFuelStats] = useState<{
-        totalCount: number; totalCost: number;
-        monthCount: number; monthCost: number; prevMonthCost: number;
-    } | null>(null);
-    const [hipassStats, setHipassStats] = useState<{
-        totalCount: number; totalAmount: number;
-        monthCount: number; monthAmount: number; prevMonthAmount: number;
-    } | null>(null);
-    const [dailyFuelCost, setDailyFuelCost] = useState<{ date: string; cost: number }[]>([]);
-    const [dailyHipassAmount, setDailyHipassAmount] = useState<{ date: string; amount: number }[]>([]);
-
-    // 알림 통계
-    const [notifSummary, setNotifSummary] = useState<{
-        total: number; read: number; unread: number; readRate: number;
-    } | null>(null);
-    const [dailyNotifStats, setDailyNotifStats] = useState<{ date: string; sent: number; read: number }[]>([]);
-    const [notifTypeStats, setNotifTypeStats] = useState<{ type: string; count: number; color: string }[]>([]);
-
-    // 첫 직원 등록 소요시간 통계
-    const [firstEmployeeStats, setFirstEmployeeStats] = useState<{
-        avg: number; median: number; sameDayRate: number; total: number;
-    } | null>(null);
-    const [firstEmployeeDist, setFirstEmployeeDist] = useState<{ label: string; count: number; color: string }[]>([]);
-    const [firstEmployeeTrend, setFirstEmployeeTrend] = useState<{ month: string; avg: number }[]>([]);
-
-    // 기관 규모별 분포 (캐시에서 바로 세팅, fallback용 useMemo 유지)
-    const [orgSizeDistribution, setOrgSizeDistribution] = useState<{ label: string; count: number; color: string }[]>([]);
-
-    // 온보딩 완료율
-    const [onboardingStats, setOnboardingStats] = useState<{ total: number; completed: number; rate: number }>({ total: 0, completed: 0, rate: 0 });
-
-    // 퍼널 데이터
-    const [funnelData, setFunnelData] = useState<{ label: string; value: number; icon: string; color: string; gradient: string; rate: number; dropoff: number; conversionFromPrev: number }[]>([]);
-
-    // 캐시 마지막 갱신 시각
-    const [lastCacheUpdated, setLastCacheUpdated] = useState<string | null>(null);
-
+    // 5. UI 및 제어 상태
     const [orgPage, setOrgPage] = useState(0);
     const [sortKey, setSortKey] = useState<SortKey>('logs');
     const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
     const [loading, setLoading] = useState(true);
 
     const sortedOrgs = useMemo(() => {
-        const list = [...topOrgs];
+        const list = [...rankings.topOrgs];
         const dir = sortDir === 'asc' ? 1 : -1;
         list.sort((a: OrgStat, b: OrgStat) => {
             if (sortKey === 'name') {
@@ -125,7 +75,7 @@ export default function useServiceDashboard(orgFilterId: string = 'ALL') {
             return dir * ((a[sortKey] as number || 0) - (b[sortKey] as number || 0));
         });
         return list;
-    }, [topOrgs, sortKey, sortDir]);
+    }, [rankings.topOrgs, sortKey, sortDir]);
 
     const handleSort = useCallback((key: SortKey) => {
         setSortKey(prev => {
@@ -144,8 +94,6 @@ export default function useServiceDashboard(orgFilterId: string = 'ALL') {
         return sortDir === 'asc' ? '▲' : '▼';
     };
 
-
-
     // ── 캐시 문서 데이터를 state에 반영하는 헬퍼 ──
     const applyCacheDocuments = useCallback((
         statsSnap: Awaited<ReturnType<typeof getDoc>>,
@@ -154,77 +102,42 @@ export default function useServiceDashboard(orgFilterId: string = 'ALL') {
     ) => {
         if (statsSnap && statsSnap.exists()) {
             const s = statsSnap.data() as CachedDashboardStats;
-            setStats({
-                approvedOrgs: s.approvedOrgs,
-                totalUsers: s.totalUsers,
-                adminCount: s.adminCount,
-                employeeCount: s.employeeCount,
-                totalLogs: s.totalLogs,
-                totalDistance: s.totalDistance,
-                pendingApps: s.pendingApps,
-                calendarSyncOrgs: s.calendarSyncOrgs,
-                themeStats: s.themeStats,
-                welcomeStats: s.welcomeStats,
+            setSummary({
+                stats: {
+                    approvedOrgs: s.approvedOrgs, totalUsers: s.totalUsers, adminCount: s.adminCount,
+                    employeeCount: s.employeeCount, totalLogs: s.totalLogs, totalDistance: s.totalDistance,
+                    pendingApps: s.pendingApps, calendarSyncOrgs: s.calendarSyncOrgs,
+                    themeStats: s.themeStats, welcomeStats: s.welcomeStats,
+                },
+                ...s
             });
-            setMonthlyStats(s.monthlyStats);
-            setFavoriteUserRatio(s.favoriteUserRatio);
-            setWeeklyActiveRate(s.weeklyActiveRate);
-            setMonthlyGrowth(s.monthlyGrowth);
-            setFirstEmployeeStats(s.firstEmployeeStats);
-            setFirstEmployeeDist(s.firstEmployeeDist);
-            setFirstEmployeeTrend(s.firstEmployeeTrend);
-            setOnboardingStats(s.onboardingStats);
-            setOrgSizeDistribution(s.orgSizeDistribution);
-            setFuelTypeStats(s.fuelTypeStats);
-            setVehicleTypeStats(s.vehicleTypeStats);
-            setVehicleModelStats(s.vehicleModelStats);
-            if (s.vehicleModelStatsActive) setVehicleModelStatsActive(s.vehicleModelStatsActive);
-            if (s.vehicleModelStatsRetired) setVehicleModelStatsRetired(s.vehicleModelStatsRetired);
-            setHipassRatio(s.hipassRatio);
-            setHipassTopOrgs(s.hipassTopOrgs);
-            setCalendarSyncRatio(s.calendarSyncRatio);
-            setCalendarTopOrgs(s.calendarTopOrgs);
-            setCalendarSyncOrgCount(s.calendarSyncOrgs);
-            setLastCacheUpdated(s.lastUpdatedAt);
         }
 
         if (timeSeriesSnap && timeSeriesSnap.exists()) {
             const ts = timeSeriesSnap.data() as CachedDashboardTimeSeries;
-            setInputMethodStats(ts.inputMethodStats);
-            setDailyDriveStats(ts.dailyDriveStats);
-            setDailyActiveUserStats(ts.dailyActiveUserStats);
-            setDailyActiveOrgStats(ts.dailyActiveOrgStats);
-            setFavoriteStats(ts.favoriteStats);
-            setFavoriteLogRatio(ts.favoriteLogRatio);
-            setHourlyStats(ts.hourlyStats);
-            setDailyAvgDuration(ts.dailyAvgDuration);
-            setHourlyAvgDuration(ts.hourlyAvgDuration);
-            // items(flat) → grid(2D) 변환
+            
+            // heatmapData 변환 (items(flat) → grid(2D))
             const grid = Array.from({ length: 7 }, () => Array(24).fill(0) as number[]);
             if (ts.heatmapData?.items) {
                 ts.heatmapData.items.forEach(({ dayIdx, hour, count }) => { grid[dayIdx][hour] = count; });
-                setHeatmapData({ grid, maxCount: ts.heatmapData.maxCount });
             }
 
-            if (ts.quickDriveStats) setQuickDriveStats(ts.quickDriveStats);
-            if (ts.quickDriveRatio) setQuickDriveRatio(ts.quickDriveRatio);
-            if (ts.recommendationStats) setRecommendationStats(ts.recommendationStats);
-            if (ts.recommendationRatio) setRecommendationRatio(ts.recommendationRatio);
-            if (ts.reservationTypeStats) setReservationTypeStats(ts.reservationTypeStats);
-            if (ts.reservationTypeRatio) setReservationTypeRatio(ts.reservationTypeRatio);
-            if (ts.futureReservationTypeStats) setFutureReservationTypeStats(ts.futureReservationTypeStats);
-            if (ts.futureReservationTypeRatio) setFutureReservationTypeRatio(ts.futureReservationTypeRatio);
+            setTimeSeries({
+                ...ts,
+                heatmapData: { grid, maxCount: ts.heatmapData?.maxCount || 1 }
+            });
         }
 
         if (orgRankingsSnap && orgRankingsSnap.exists()) {
             const r = orgRankingsSnap.data() as CachedDashboardOrgRankings;
-            const orgs: OrgStat[] = r.topOrgs.map(o => ({
+            const orgs: OrgStat[] = (r.topOrgs || []).map(o => ({
                 ...o,
                 lastDriveDate: o.lastDriveDate ? new Date(o.lastDriveDate) : null,
             }));
-            setTopOrgs(orgs);
-            setOrgAvgDuration(r.orgAvgDuration);
-            setFunnelData(r.funnelData);
+            setRankings({
+                ...r,
+                topOrgs: orgs,
+            });
         }
     }, []);
 
@@ -266,15 +179,18 @@ export default function useServiceDashboard(orgFilterId: string = 'ALL') {
                 applyCacheDocuments(statsDoc, timeSeriesDoc, orgRankingsDoc);
             }
 
-            // 독립 통계는 기존 방식 유지 -> 서버 단 필터링이 필요할 수 있지만 프론트에서는 일단 호출
-            // 서버쪽 refactoring에 orgFilterId가 반영되어야 완벽함. (loadFuelHipassStats 등은 개별 구현 확인 필요)
+            // 외부 독립 통계는 개별 setter 래퍼를 통해 external state로 병합
             await Promise.all([
-                // loadFuelHipassStats, loadNotificationStats 는 추후 orgFilterId 반영 검토
                 loadFuelHipassStats({
-                    setFuelStats, setHipassStats, setDailyFuelCost, setDailyHipassAmount,
+                    setFuelStats: (val) => setExternal(prev => ({ ...prev, fuelStats: typeof val === 'function' ? val(prev.fuelStats) : val })),
+                    setHipassStats: (val) => setExternal(prev => ({ ...prev, hipassStats: typeof val === 'function' ? val(prev.hipassStats) : val })),
+                    setDailyFuelCost: (val) => setExternal(prev => ({ ...prev, dailyFuelCost: typeof val === 'function' ? val(prev.dailyFuelCost) : val })),
+                    setDailyHipassAmount: (val) => setExternal(prev => ({ ...prev, dailyHipassAmount: typeof val === 'function' ? val(prev.dailyHipassAmount) : val })),
                 }),
                 loadNotificationStats({
-                    setNotifSummary, setDailyNotifStats, setNotifTypeStats,
+                    setNotifSummary: (val) => setExternal(prev => ({ ...prev, notifSummary: typeof val === 'function' ? val(prev.notifSummary) : val })),
+                    setDailyNotifStats: (val) => setExternal(prev => ({ ...prev, dailyNotifStats: typeof val === 'function' ? val(prev.dailyNotifStats) : val })),
+                    setNotifTypeStats: (val) => setExternal(prev => ({ ...prev, notifTypeStats: typeof val === 'function' ? val(prev.notifTypeStats) : val })),
                 }),
             ]);
 
@@ -317,62 +233,17 @@ export default function useServiceDashboard(orgFilterId: string = 'ALL') {
 
     return {
         loading,
-        stats,
-        monthlyStats,
-        weeklyActiveRate,
-        onboardingStats,
-        funnelData,
-        dailyActiveOrgStats,
-        dailyActiveUserStats,
-        firstEmployeeStats,
-        firstEmployeeDist,
-        firstEmployeeTrend,
-        inputMethodStats,
-        quickDriveStats,
-        quickDriveRatio,
-        recommendationStats,
-        recommendationRatio,
-        reservationTypeStats,
-        reservationTypeRatio,
-        futureReservationTypeStats,
-        futureReservationTypeRatio,
-        orgSizeDistribution,
-        fuelTypeStats,
-        vehicleTypeStats,
-        vehicleModelStats,
-        vehicleModelStatsActive,
-        vehicleModelStatsRetired,
-        hipassRatio,
-        calendarSyncRatio,
-        calendarTopOrgs,
-        calendarSyncOrgCount,
-        hipassTopOrgs,
-        fuelStats,
-        hipassStats,
-        dailyFuelCost,
-        dailyHipassAmount,
-        heatmapData,
-        hourlyStats,
-        monthlyGrowth,
-        dailyAvgDuration,
-        hourlyAvgDuration,
-        orgAvgDuration,
-        notifSummary,
-        dailyNotifStats,
-        notifTypeStats,
-        topOrgs,
+        summary,
+        timeSeries,
+        rankings,
+        external,
         sortedOrgs,
-        favoriteUserRatio,
-        favoriteLogRatio,
-        favoriteStats,
-        orgPage,
-        setOrgPage,
-        sortKey,
-        sortDir,
-        handleSort,
-        sortIndicator,
-        loadAllStats,
-        refreshServerStats,
-        lastCacheUpdated,
+        ui: {
+            orgPage, setOrgPage, sortKey, sortDir, handleSort, sortIndicator
+        },
+        actions: {
+            loadAllStats, refreshServerStats
+        }
     };
 }
+
