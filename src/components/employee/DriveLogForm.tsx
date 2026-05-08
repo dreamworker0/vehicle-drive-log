@@ -179,9 +179,9 @@ export default function DriveLogForm() {
 
             <ConfirmModal
                 open={!!confirmStartKm}
-                title="출발 주행거리 보정 안내"
-                message={`직전 운행 기록이 ${confirmStartKm?.suggested?.toLocaleString()} km로 끝났습니다.\n\n입력하신 ${confirmStartKm?.original?.toLocaleString()} km 대신, 직전 기록인 ${confirmStartKm?.suggested?.toLocaleString()} km로 자동 보정하여 저장하시겠습니까?`}
-                confirmText="보정하여 저장"
+                title="출발 주행거리 일치 확인"
+                message={`직전 운행 기록이 ${confirmStartKm?.suggested?.toLocaleString()} km로 끝났습니다.\n\n입력하신 ${confirmStartKm?.original?.toLocaleString()} km 대신, 직전 기록인 ${confirmStartKm?.suggested?.toLocaleString()} km에 맞춰 일치시켜 저장하시겠습니까?`}
+                confirmText="일치시켜 저장"
                 cancelText="취소"
                 onConfirm={handleConfirmStartKm}
                 onCancel={handleCancelConfirm}

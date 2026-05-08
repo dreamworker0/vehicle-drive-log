@@ -61,7 +61,7 @@ const legalRoutes = [
   <Route key="faq" path="/faq" element={<FAQPage />} />,
 ];
 
-import { mountOfflineQueueProcessor } from './lib/offlineSyncProcessor';
+
 import toast from 'react-hot-toast';
 
 export default function App() {
@@ -129,11 +129,7 @@ export default function App() {
     root.classList.add(`font-${fontSize}`);
   }, [fontSize]);
 
-  useEffect(() => {
-    // 앱 전역 단위에서 마운트하여 네트워크가 연결될 때마다 오프라인 큐 처리
-    const cleanup = mountOfflineQueueProcessor();
-    return cleanup;
-  }, []);
+
 
   const open = useConfirmStore(state => state.open);
   const options = useConfirmStore(state => state.options);

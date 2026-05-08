@@ -173,10 +173,16 @@ export const updateReservationStatus = async (
         // 운행 종료 등 사용자가 직접 업데이트하는 경우, 오프라인 큐 및 즉각적인 UI 반영(낙관적 업데이트)을 위해 일반 updateDoc 사용.
         // expectedCurrentStatus가 들어오는 경우(관리자 승인 등)만 동시성 방어를 위해 트랜잭션(온라인 한정) 사용.
         if (!expectedCurrentStatus) {
-            await updateDoc(reservationRef, {
+            const promise = updateDoc(reservationRef, {
                 status,
                 ...extraData,
             });
+            const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+            if (!isOffline) {
+                await promise;
+            } else {
+                promise.catch(e => console.error('[Firestore Offline Sync Error]', e));
+            }
             return;
         }
 

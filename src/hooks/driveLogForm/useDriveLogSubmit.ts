@@ -193,10 +193,10 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
                 if (!result) return;
 
                 if (result.syncResult?.updated) {
-                    showToast(`다음 기록의 출발 km가 ${result.syncResult.oldStartKm?.toLocaleString()} → ${result.syncResult.newStartKm?.toLocaleString()}으로 자동 조정되었습니다.`, 'info');
+                    showToast(`다음 기록의 출발 km가 ${result.syncResult.oldStartKm?.toLocaleString()} → ${result.syncResult.newStartKm?.toLocaleString()}으로 자동 갱신되었습니다.`, 'info');
                 }
                 if (result.correctedKm) {
-                    showToast(`동시 작성 감지: 출발 km가 최신 기준인 ${result.correctedKm.oldStartKm?.toLocaleString()} → ${result.correctedKm.correctedStartKm?.toLocaleString()}(으)로 자동 보정 저장되었습니다.`, 'info');
+                    showToast(`동시 작성 감지: 출발 km가 최신 기준인 ${result.correctedKm.oldStartKm?.toLocaleString()} → ${result.correctedKm.correctedStartKm?.toLocaleString()}(으)로 자동 일치되어 저장되었습니다.`, 'info');
                 }
                 if (result.backgroundWarning) {
                     showToast(result.backgroundWarning, 'warning');

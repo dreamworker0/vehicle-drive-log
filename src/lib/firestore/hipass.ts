@@ -40,10 +40,16 @@ export const createHipassCard = async (data: Record<string, unknown>) => {
 // 하이패스 카드 수정
 export const updateHipassCard = async (cardId: string, data: Record<string, unknown>) => {
     try {
-        await updateDoc(doc(db, 'hipassCards', cardId), {
+        const promise = updateDoc(doc(db, 'hipassCards', cardId), {
             ...data,
             updatedAt: serverTimestamp(),
         });
+        const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+        if (!isOffline) {
+            await promise;
+        } else {
+            promise.catch(e => console.error('[Firestore Offline Sync Error]', e));
+        }
     } catch (error) {
         captureError(error as Error, { context: 'updateHipassCard', cardId, data });
         throw error;

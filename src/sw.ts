@@ -86,34 +86,6 @@ registerRoute(
     })
 );
 
-// 4. Background Sync 이벤트 리스너 등록
-self.addEventListener('sync', (event: ExtendableEvent & { tag: string }) => {
-    if (event.tag === 'sync-offline-actions') {
-        console.log('[SW] Background Sync 이벤트 수신: sync-offline-actions');
-        event.waitUntil(processBackgroundSync());
-    }
-});
-
-// 백그라운드 동기화 처리 로직
-async function processBackgroundSync() {
-    // 1. 현재 열려있는 창(클라이언트 앱)이 있는지 확인합니다.
-    const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-    
-    if (clients && clients.length > 0) {
-        // 창이 활성화되어 있으면 무거운 처리를 메인 스레드로 넘깁니다. (UI 반영 및 배터리 세이브)
-        console.log('[SW] 활성 클라이언트 감지, FLUSH_OFFLINE_QUEUE 메시지 전송');
-        clients[0].postMessage({ type: 'FLUSH_OFFLINE_QUEUE' });
-        return;
-    }
-
-    // 2. 창이 모두 닫힌 상태라면 다음 클라이언트 활성화 시 처리하도록 재시도를 예약합니다.
-    // offlineSyncProcessor를 import하면 Firebase Auth SDK가 함께 로드되어
-    // window.localStorage를 비동기 polling으로 참조하게 되고, 이는 Service Worker 환경에서
-    // catch할 수 없는 unhandled rejection을 발생시킵니다.
-    // 따라서 SW에서는 직접 큐 처리를 시도하지 않고, 에러를 던져 브라우저가 다음에 재시도하도록 합니다.
-    console.log('[SW] 활성 클라이언트 없음 — 다음 클라이언트 활성화 시 큐 처리 예정 (Background Sync 재시도 예약)');
-    throw new Error('NO_ACTIVE_CLIENT');
-}
 
 // 5. 업데이트 시 새 워커 활성화 메세지 처리
 self.addEventListener('message', (event) => {

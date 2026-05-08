@@ -3,9 +3,8 @@
  * useDriveLogForm에서 추출
  */
 import { createDriveLog, updateDriveLog, updateReservationStatus, updateHipassCard } from '../../lib/firestore';
-import { enqueueLog } from '../../lib/offlineSync';
-import { doc, collection, increment } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+
+import { increment } from 'firebase/firestore';
 import { validateDriveLogForm, buildLogData, nowTime, todayStr } from '../utils/driveLogValidation';
 import type { DriveLogForm } from './types';
 import type { Vehicle } from '../../types/vehicle';
@@ -42,7 +41,7 @@ interface SubmitResult {
     offline?: boolean;
     /** 수정 모드: navigate 필요 여부 */
     shouldNavigate?: 'my-records' | 'today' | null;
-    /** 자동 보정된 startKm 정보 */
+    /** 서버/트리거에 의해 자동 갱신된 startKm 정보 */
     syncResult?: { updated?: boolean; oldStartKm?: number; newStartKm?: number };
     correctedKm?: { oldStartKm?: number; correctedStartKm?: number };
     /** 폼 리셋 필요 여부 */
@@ -91,45 +90,30 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
     let correctedKm: SubmitResult['correctedKm'];
     const backgroundWarnings: string[] = [];
 
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+
     if (isEditMode && editLog) {
-        // 오프라인 큐잉
-        if (!navigator.onLine) {
-            await enqueueLog(logData as Record<string, unknown>, 'update', editLog.id);
-            return {
-                success: true,
-                message: '오프라인에서 수정 저장됨 · 온라인 복귀 시 자동 반영',
-                offline: true,
-            };
-        }
         const result = await updateDriveLog(editLog.id, logData);
         if (result.syncResult?.updated) syncResult = result.syncResult;
         if (result.backgroundError) {
             backgroundWarnings.push('차량 km 동기화에 실패했습니다');
         }
     } else {
-        const generatedId = doc(collection(db, 'driveLogs')).id;
+        // 멱등성 보장(Idempotency) 및 중복 생성 방지를 위한 결정론적 해시 ID 생성
+        // 동일 차량, 동일 운전자, 동일 날짜, 동일 계기판 입력 시 무조건 같은 ID를 가져 덮어쓰기 됨
+        const deterministicId = `${form.vehicleId}_${user.uid}_${form.driveDate.replace(/-/g, '')}_${form.startKm}_${form.endKm}`;
+        const generatedId = deterministicId;
         const extendedLogData = {
             ...logData,
             id: generatedId,
             reservationId: reservationData?.reservationId || null
         };
 
-        if (!navigator.onLine) {
-            await enqueueLog(extendedLogData as Record<string, unknown>);
-            return {
-                success: true,
-                message: '오프라인에서 저장됨 · 온라인 복귀 시 자동 전송',
-                offline: true,
-                shouldResetForm: true,
-            };
-        }
 
         const result = await createDriveLog(extendedLogData as Parameters<typeof createDriveLog>[0]);
         if (result.syncResult?.updated) syncResult = result.syncResult;
 
-        if (result.correctedStartKm !== undefined) {
-            correctedKm = { oldStartKm: result.oldStartKm, correctedStartKm: result.correctedStartKm };
-        }
+        // 기존의 correctedStartKm 참조 코드 제거 (더 이상 자동 보정하지 않음)
 
         if (result.backgroundError) {
             backgroundWarnings.push('차량 km 동기화에 실패했습니다');
@@ -182,8 +166,9 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
     if (isEditMode) {
         return {
             success: true,
-            message: '운행일지가 수정되었습니다.',
+            message: isOffline ? '오프라인 상태입니다. 수정 사항이 기기에 저장되었으며 통신 재개 시 자동 반영됩니다.' : '운행일지가 수정되었습니다.',
             shouldNavigate: 'my-records',
+            offline: isOffline,
             syncResult,
             backgroundWarning: finalBackgroundWarning,
         };
@@ -192,8 +177,9 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
     if (reservationData?.reservationId) {
         return {
             success: true,
-            message: '예약 운행일지가 저장되었습니다.',
+            message: isOffline ? '오프라인 상태입니다. 예약 운행일지가 기기에 저장되었으며 통신 재개 시 자동 반영됩니다.' : '예약 운행일지가 저장되었습니다.',
             shouldNavigate: 'today',
+            offline: isOffline,
             syncResult,
             correctedKm,
             backgroundWarning: finalBackgroundWarning,
@@ -202,6 +188,8 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
 
     return {
         success: true,
+        message: isOffline ? '오프라인 상태입니다. 운행일지가 기기에 저장되었으며 통신 재개 시 자동 반영됩니다.' : undefined,
+        offline: isOffline,
         shouldResetForm: true,
         syncResult,
         correctedKm,

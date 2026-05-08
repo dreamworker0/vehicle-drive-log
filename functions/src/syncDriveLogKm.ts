@@ -1,4 +1,4 @@
-import { onDocumentCreated, onDocumentUpdated } from "firebase-functions/v2/firestore";
+import { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { captureError } from "./sentry";
 import { recordHeartbeat } from "./helpers";
@@ -168,6 +168,76 @@ export const onDriveLogUpdated = onDocumentUpdated(
         } catch (error) {
             console.error('[onDriveLogUpdated] km 동기화 오류:', error);
             captureError(error, { context: 'onDriveLogUpdated', logId });
+        }
+    }
+);
+
+/**
+ * 운행일지 삭제 시 부수효과 처리 (currentKm 차감 및 startKm 연쇄 동기화)
+ */
+export const onDriveLogDeleted = onDocumentDeleted(
+    { document: "driveLogs/{logId}", region: "asia-northeast3", memory: "256MiB" },
+    async (event) => {
+        const snap = event.data;
+        if (!snap) return;
+
+        const data = snap.data();
+        const logId = event.params.logId;
+
+        try {
+            const orgId = data.organizationId;
+            const vehId = data.vehicleId;
+            const tsRaw = data.timestamp;
+            const ts = tsRaw instanceof Date ? tsRaw : tsRaw?.toDate();
+            const endKm = data.endKm;
+            const startKm = data.startKm;
+            const distance = data.distance;
+
+            if (!orgId || !vehId || !ts) return;
+
+            // 최신 기록 삭제 여부 판별 (자기 자신은 삭제되었으므로 본인 이후의 기록이 있는지 확인)
+            const isEffectivelyRetroactive = await hasLaterDriveLog(orgId, vehId, ts);
+
+            if (!isEffectivelyRetroactive) {
+                // 가장 최근 기록이 삭제된 경우, 해당 거리만큼 차량 누적 Km 차감 롤백
+                let distanceToSubtract = 0;
+                if (distance != null) {
+                    distanceToSubtract = distance;
+                } else if (startKm != null && endKm != null) {
+                    distanceToSubtract = endKm - startKm;
+                }
+
+                if (distanceToSubtract > 0) {
+                    await db.collection("vehicles").doc(vehId).update({
+                        currentKm: FieldValue.increment(-distanceToSubtract),
+                    });
+                }
+            } else {
+                // 소급(중간) 기록이 삭제된 경우: 
+                // 삭제된 기록 이전의 마지막 운행일지를 찾아서 그 endKm부터 이후 기록들의 startKm을 연동
+                const prevLogSnap = await db.collection('driveLogs')
+                    .where('organizationId', '==', orgId)
+                    .where('vehicleId', '==', vehId)
+                    .where('timestamp', '<', ts)
+                    .orderBy('timestamp', 'desc')
+                    .limit(1)
+                    .get();
+
+                let prevEndKm = 0;
+                if (!prevLogSnap.empty) {
+                    prevEndKm = prevLogSnap.docs[0].data().endKm ?? 0;
+                } else {
+                    // 이전 기록이 아예 없다면 삭제된 기록의 startKm을 시작점으로 사용 (또는 0)
+                    prevEndKm = startKm ?? 0; 
+                }
+
+                await syncNextLogStartKm(orgId, vehId, ts, prevEndKm);
+            }
+
+            await recordHeartbeat("onDriveLogDeleted");
+        } catch (error) {
+            console.error('[onDriveLogDeleted] km 동기화(삭제) 오류:', error);
+            captureError(error, { context: 'onDriveLogDeleted', logId });
         }
     }
 );

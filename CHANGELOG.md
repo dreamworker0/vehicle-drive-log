@@ -5,6 +5,24 @@
 
 ---
 
+## Phase 46 — 데이터 무결성 강화 및 오프라인 동기화 아키텍처 개편 🔄
+
+> 2026-05-08
+
+### Added
+- **Firestore Trigger 도입**: 운행일지 기록 생성/수정 시 누적 주행거리(currentKm) 및 하이패스 잔액 동기화 등 주요 Side Effect를 프론트엔드가 아닌 서버사이드 Cloud Functions(`syncDriveLogKm`, `syncHipassBalance`)에서 처리하도록 이관하여 오프라인 상태 또는 네트워크 단절 시에도 데이터 무결성 100% 보장
+- **오프라인 Sync 멱등성(Idempotency) 확보**: 운행 기록 저장 시 클라이언트에서 고유 ID(`{vehicleId}_{uid}_{date}_{startKm}_{endKm}`)를 사전에 발급하여 중복 저장(Race Condition)을 원천 차단
+
+### Changed
+- **오프라인 지속성(Offline Persistence) 활용**: 불안정한 커스텀 오프라인 큐(`offlineSyncProcessor`)를 제거하고, Firebase Firestore SDK에 내장된 오프라인 캐시 및 동기화 기능을 100% 활용하도록 아키텍처 전면 개편 (관련 코드 1,000줄 이상 제거)
+- **과거 운행기록 수정 프로세스 개선**: 사용자가 과거 기록 수정 시 이전 기록의 종료Km와 새 기록의 시작Km가 불일치할 경우, 백그라운드 자동 덮어쓰기 대신 사용자에게 "수정 확인(Confirm)" 다이얼로그를 명시적으로 노출하여 휴먼 에러 방지 및 투명성 제공
+
+### Fixed
+- Firebase SDK가 내부적으로 재시도하는 과정에서 발생하는 `AppCheck: Fetch failed to connect to a network` 및 `Requests throttled` 등 단순 인프라 레벨의 네트워크 에러들이 Sentry에 노이즈로 리포트되지 않도록 글로벌 필터링 정책 업데이트
+- Hipass 잔액 업데이트 시 기존 절대값 덮어쓰기(last-write-wins)로 인해 다중 기기 환경에서 잔액 데이터가 유실되던 버그를 `increment` 원자적 연산으로 교체하여 완벽 해결
+
+---
+
 ## Phase 45 — 아키텍처 정리 및 프로젝트 품질 대규모 개선 🧹
 
 > 2026-05-06
