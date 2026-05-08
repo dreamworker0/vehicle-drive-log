@@ -62,8 +62,29 @@ const legalRoutes = [
 ];
 
 import { mountOfflineQueueProcessor } from './lib/offlineSyncProcessor';
+import toast from 'react-hot-toast';
 
 export default function App() {
+
+  // 전역 비동기 에러(App Check 등) 캐치 후 사용자 UI 피드백 제공
+  useEffect(() => {
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      const reason = event.reason?.message || event.reason?.toString() || '';
+      if (
+        reason.includes('appCheck/throttled') ||
+        reason.includes('appCheck/initial-throttle') ||
+        (reason.includes('AppCheck') && reason.includes('500 error'))
+      ) {
+        // react-hot-toast 동일 ID 지정 시 중복 팝업 방지
+        toast.error('현재 네트워크 환경이 불안정하여 보안 인증이 지연되고 있습니다. 1분 후 다시 시도해주세요.', { 
+          id: 'appcheck-error',
+          duration: 5000 
+        });
+      }
+    };
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    return () => window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+  }, []);
 
   const theme = useThemeStore(state => state.theme);
   const setTheme = useThemeStore(state => state.setTheme);

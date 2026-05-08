@@ -257,3 +257,6 @@ export { verifyMileageConsistency } from "./scheduler/verifyMileageConsistency";
 
 // 회원 탈퇴 시 개인정보 익명화 트리거
 export { onUserDelete } from "./onUserDelete";
+
+// 운행일지 생성/수정 시 차량 주행거리 증분 및 자동 연쇄 동기화
+export { onDriveLogCreated, onDriveLogUpdated } from "./syncDriveLogKm";

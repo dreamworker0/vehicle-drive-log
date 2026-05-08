@@ -1,6 +1,8 @@
 import { getOfflineActions, removeOfflineAction, incrementRetryCount, purgeStaleActions } from './offlineSync';
 import { createDriveLog, updateDriveLog } from './firestore/driveLogs';
 import { isCreateDriveLogPayload, isUpdateDriveLogPayload } from '../types/driveLog';
+import { captureError } from './sentry';
+import { useToastStore } from '../store/useToastStore';
 
 // 동시 실행 방지 lock
 let _processing = false;
@@ -31,7 +33,10 @@ export const processOfflineQueue = async (): Promise<number> => {
         for (const action of actions) {
             try {
                 if (action.retryCount >= 10) {
-                    console.error(`[OfflineSync] 재시도 횟수 초과로 액션 포기: ${action.id}`);
+                    const errDesc = `[OfflineSync] 재시도 횟수 초과로 액션 포기 및 영구 삭제: ${action.id}`;
+                    console.error(errDesc);
+                    captureError(new Error(errDesc), { context: 'offline_sync_max_retries', action });
+                    useToastStore.getState().showToast('오프라인에서 작성한 기록 1건이 저장되지 못했습니다 (재시도 초과). 관리자에게 문의해주세요.', 'error', { duration: 10000 });
                     await removeOfflineAction(action.id);
                     continue;
                 }
@@ -41,14 +46,20 @@ export const processOfflineQueue = async (): Promise<number> => {
                         if (isCreateDriveLogPayload(action.payload)) {
                             await createDriveLog(action.payload);
                         } else {
-                            console.warn('[OfflineSync] Invalid CREATE payload:', action.payload);
+                            const errDesc = '[OfflineSync] Invalid CREATE payload - 데이터 유효성 검증 실패로 영구 삭제됨';
+                            console.error(errDesc, action.payload);
+                            captureError(new Error(errDesc), { context: 'offline_sync_invalid_payload_create', action });
+                            useToastStore.getState().showToast('오프라인에서 작성한 기록 1건이 저장되지 못했습니다 (형식 오류). 관리자에게 문의해주세요.', 'error', { duration: 10000 });
                         }
                         break;
                     case 'UPDATE_DRIVELOG':
                         if (isUpdateDriveLogPayload(action.payload)) {
                             await updateDriveLog(action.payload.id, action.payload);
                         } else {
-                            console.warn('[OfflineSync] Invalid UPDATE payload:', action.payload);
+                            const errDesc = '[OfflineSync] Invalid UPDATE payload - 데이터 유효성 검증 실패로 영구 삭제됨';
+                            console.error(errDesc, action.payload);
+                            captureError(new Error(errDesc), { context: 'offline_sync_invalid_payload_update', action });
+                            useToastStore.getState().showToast('오프라인에서 수정한 기록 1건이 반영되지 못했습니다 (형식 오류). 관리자에게 문의해주세요.', 'error', { duration: 10000 });
                         }
                         break;
                     case 'CREATE_RESERVATION':

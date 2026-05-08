@@ -1,6 +1,7 @@
 import useDriveLogForm from '../../hooks/useDriveLogForm';
 import useVehiclePriority from '../../hooks/useVehiclePriority';
 import MileageInput from './MileageInput';
+import ConfirmModal from '../common/ConfirmModal';
 import type { DriveLog } from '../../types/driveLog';
 
 // 하위 레이아웃 컴포넌트 임포트
@@ -35,6 +36,9 @@ export default function DriveLogForm() {
         handleOcrCapture,
         handleOcrReport,
         handleSubmit,
+        confirmStartKm,
+        handleConfirmStartKm,
+        handleCancelConfirm,
     } = useDriveLogForm();
     const { usageCounts } = useVehiclePriority();
 
@@ -172,6 +176,16 @@ export default function DriveLogForm() {
                     ) : isEditMode ? '운행일지 수정' : '운행일지 저장'}
                 </button>
             </form>
+
+            <ConfirmModal
+                open={!!confirmStartKm}
+                title="출발 주행거리 보정 안내"
+                message={`직전 운행 기록이 ${confirmStartKm?.suggested?.toLocaleString()} km로 끝났습니다.\n\n입력하신 ${confirmStartKm?.original?.toLocaleString()} km 대신, 직전 기록인 ${confirmStartKm?.suggested?.toLocaleString()} km로 자동 보정하여 저장하시겠습니까?`}
+                confirmText="보정하여 저장"
+                cancelText="취소"
+                onConfirm={handleConfirmStartKm}
+                onCancel={handleCancelConfirm}
+            />
         </div>
     );
 }

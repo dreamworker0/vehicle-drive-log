@@ -2,7 +2,7 @@
  * driveLogForm/useDriveLogSubmit.ts
  * 운행일지 폼의 제출 및 사용자 입력 핸들러 모음
  */
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createFavorite, getFavorites } from '../../lib/firestore';
 import { resolveStartKm } from './resolveStartKm';
@@ -75,6 +75,8 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
         showToast, runWithRetry, startTransition, ocrSuccess
     } = deps;
 
+    const [confirmStartKm, setConfirmStartKm] = useState<{ original: number, suggested: number } | null>(null);
+
     const handleVehicleSelect = useCallback(async (vehicleId: string) => {
         const v = vehicles.find(veh => veh.id === vehicleId);
         const km = await resolveStartKm(orgId!, vehicleId, {
@@ -123,7 +125,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
         });
     }, [setSelectedPassengers]);
 
-    const handleSubmit = async (e: React.FormEvent | Event) => {
+    const handleSubmit = useCallback(async (e: React.FormEvent | Event) => {
         if (e && 'preventDefault' in e) e.preventDefault();
 
         const validation = validateDriveLogForm(form, { isElectric, isQuickDrive });
@@ -145,6 +147,15 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
                     {
                         timeoutMs: 8000,
                         onError: (err: unknown) => {
+                            const errObj = err as { code?: string; originalStartKm?: number; suggestedStartKm?: number };
+                            if (errObj && errObj.code === 'REQUIRES_START_KM_CONFIRMATION') {
+                                setConfirmStartKm({ 
+                                    original: errObj.originalStartKm ?? 0, 
+                                    suggested: errObj.suggestedStartKm ?? 0 
+                                });
+                                return true; // 에러 무시하고 재시도 중단 (모달 표시)
+                            }
+
                             const isDuplicate = err instanceof Error && err.message?.includes('중복');
                             const isTimeout = err instanceof Error && err.message?.includes('TIMEOUT');
                             
@@ -222,9 +233,31 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
                 showToast('알 수 없는 오류가 발생했습니다.', 'error');
             }
         });
-    };
+    }, [
+        form, isElectric, isQuickDrive, showToast, startTransition, runWithRetry,
+        orgId, user, userData, selectedVehicle, selectedPassengers, externalPassengerCount,
+        externalPassengerNames, isRetroactive, ocrSuccess, isEditMode, editLog,
+        reservationData, hipassCard, setConfirmStartKm, setSuccess, navigate, setForm,
+        setSelectedPassengers, setExternalPassengerCount
+    ]);
+
+    const handleConfirmStartKm = useCallback(() => {
+        if (!confirmStartKm) return;
+        setForm(prev => ({ ...prev, startKm: String(confirmStartKm.suggested) }));
+        setConfirmStartKm(null);
+        setTimeout(() => {
+            handleSubmit(new Event('submit') as unknown as React.FormEvent);
+        }, 50);
+    }, [confirmStartKm, setForm, handleSubmit]);
+
+    const handleCancelConfirm = useCallback(() => {
+        setConfirmStartKm(null);
+    }, []);
 
     return {
+        confirmStartKm,
+        handleConfirmStartKm,
+        handleCancelConfirm,
         handleVehicleSelect,
         handleFavoriteSelect,
         handleSaveFavorite,

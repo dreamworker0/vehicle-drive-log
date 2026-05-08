@@ -5,7 +5,7 @@
 import {
     doc, updateDoc, deleteDoc, setDoc,
     collection, query, where, getDocs,
-    serverTimestamp, increment,
+    serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import type { DriveLog } from '../../../types/driveLog';
@@ -13,13 +13,24 @@ import { captureError } from '../../sentry';
 import {
     sanitizeUndefined,
     getVehicleEndKmBefore,
-    syncNextLogStartKm,
-    hasLaterDriveLog,
 } from './utils';
 import { driveLogSchema } from '../../../schemas';
 
+export interface CreateDriveLogResult {
+    id: string;
+    syncResult: { updated?: boolean; oldStartKm?: number; newStartKm?: number } | null;
+    correctedStartKm?: number;
+    oldStartKm?: number;
+    backgroundError: Error | string | null;
+}
+
+export interface UpdateDriveLogResult {
+    syncResult: { updated?: boolean; oldStartKm?: number; newStartKm?: number } | null;
+    backgroundError: Error | string | null;
+}
+
 // 운행일지 생성 (중복 방지 체크 포함)
-export const createDriveLog = async (data: Partial<DriveLog>) => {
+export const createDriveLog = async (data: Partial<DriveLog>): Promise<CreateDriveLogResult> => {
     try {
         const logDate = data.timestamp instanceof Date ? data.timestamp : new Date();
 
@@ -50,8 +61,8 @@ export const createDriveLog = async (data: Partial<DriveLog>) => {
 
         // === [추가된 방어 로직] 출발 Km 자동 보정 ===
         const originalStartKm = data.startKm;
-        let correctedStartKm = originalStartKm || 0;
-        let autocorrectedDistance = false;
+        const correctedStartKm = originalStartKm || 0;
+        const autocorrectedDistance = false;
 
         if (data.organizationId && data.vehicleId && data.endKm != null && data.startKm != null && data.timestamp && !isOffline) {
             const logDate = data.timestamp instanceof Date ? data.timestamp : (data.timestamp as import("firebase/firestore").Timestamp).toDate ? (data.timestamp as import("firebase/firestore").Timestamp).toDate() : new Date();
@@ -60,17 +71,13 @@ export const createDriveLog = async (data: Partial<DriveLog>) => {
 
             // 직전 기록이 존재하고, 직전 마지막 도착 km가 현재 폼의 출발 km와 다르다면
             if (beforeEndKm !== null && beforeEndKm !== correctedStartKm) {
-                correctedStartKm = beforeEndKm;
-                const newDistance = data.endKm - correctedStartKm;
-
-                if (newDistance < 0) {
-                    // 음수가 된다면 운행 거리가 꼬이는 치명적 상태이므로 저장을 막음
-                    throw new Error(`동기화 오류: 다른 사용자가 더 높은 누적 km(${beforeEndKm}km)를 이미 등록했습니다. 내역을 갱신해주세요.`);
-                }
-
-                data.startKm = correctedStartKm;
-                data.distance = newDistance;
-                autocorrectedDistance = true;
+                const error = new Error('직전 운행 기록과 출발 주행거리가 일치하지 않습니다.');
+                Object.assign(error, {
+                    code: 'REQUIRES_START_KM_CONFIRMATION',
+                    suggestedStartKm: beforeEndKm,
+                    originalStartKm: correctedStartKm
+                });
+                throw error;
             }
         }
         // === 끝 ===
@@ -78,10 +85,10 @@ export const createDriveLog = async (data: Partial<DriveLog>) => {
         // zod 스키마로 런타임 값 검증 (실패 시 ZodError throw)
         driveLogSchema.parse(data);
 
-        // Use a deterministic generated ID for offline idempotency
-        const docRef = doc(collection(db, 'driveLogs'));
+        // Use a deterministic generated ID for offline idempotency (if provided from client)
+        const docRef = data.id ? doc(db, 'driveLogs', data.id as string) : doc(collection(db, 'driveLogs'));
         const expiresAt = new Date(Date.now() + 5 * 365 * 24 * 60 * 60 * 1000); // TTL: 5 years
-        const finalData = sanitizeUndefined({ ...data, createdAt: serverTimestamp(), expiresAt });
+        const finalData = sanitizeUndefined({ ...data, id: docRef.id, createdAt: serverTimestamp(), expiresAt });
         const promise = setDoc(docRef, finalData);
 
         if (isOffline) {
@@ -89,46 +96,15 @@ export const createDriveLog = async (data: Partial<DriveLog>) => {
         }
         await promise;
 
-        // 부가 작업(차량 계기판 갱신, 후속 기록 자동 보정) — await 하여 실패 시 호출자에게 알림
-        let backgroundError: unknown = null;
-        try {
-            // 차량의 누적 Km 갱신 — 이 기록 이후에 같은 차량의 기록이 없을 때만
-            const isEffectivelyRetroactive = data.isRetroactive ||
-                (data.organizationId && data.vehicleId && data.timestamp &&
-                    await hasLaterDriveLog(data.organizationId, data.vehicleId, logDate));
-            
-            if (data.endKm && data.vehicleId && !isEffectivelyRetroactive) {
-                // 레이스 컨디션 방어: 단순 덮어쓰기가 아니라 이번 기록의 주행거리만큼 increment()
-                let distanceToAdd = 0;
-                if (data.distance != null) {
-                    distanceToAdd = data.distance;
-                } else if (data.startKm != null && data.endKm != null) {
-                    distanceToAdd = data.endKm - data.startKm;
-                }
-
-                if (distanceToAdd > 0) {
-                    await updateDoc(doc(db, 'vehicles', data.vehicleId), {
-                        currentKm: increment(distanceToAdd),
-                    });
-                }
-            }
-
-            // 다음 기록의 startKm 자동 연동 (소급이든 아니든 항상 시도)
-            if (data.endKm && data.vehicleId && data.organizationId && data.timestamp) {
-                await syncNextLogStartKm(data.organizationId, data.vehicleId, logDate, data.endKm);
-            }
-        } catch(err) {
-            console.error('[createDriveLog] km 동기화 중 오류:', err);
-            captureError(err, { context: 'createDriveLog_backgroundUpdate', data });
-            backgroundError = err;
-        }
+        // 기존 클라이언트 측 차량 km 갱신 및 startKm 연쇄 보정 로직은 
+        // Cloud Functions(syncDriveLogKm.ts)의 트리거로 이전되어 삭제됨
 
         return { 
             id: docRef.id, 
             syncResult: null,
             correctedStartKm: autocorrectedDistance ? correctedStartKm : undefined,
             oldStartKm: autocorrectedDistance ? originalStartKm : undefined,
-            backgroundError,
+            backgroundError: null,
         };
     } catch (error) {
         // 중복 저장 방지 / 동기화 오류는 의도된 비즈니스 로직이므로 Sentry에 보고하지 않음
@@ -141,39 +117,23 @@ export const createDriveLog = async (data: Partial<DriveLog>) => {
 };
 
 // 운행일지 수정
-export const updateDriveLog = async (logId: string, data: Partial<DriveLog>) => {
+export const updateDriveLog = async (logId: string, data: Partial<DriveLog>): Promise<UpdateDriveLogResult> => {
     try {
+        const logRef = doc(db, 'driveLogs', logId);
+        
         const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
         const finalData = sanitizeUndefined({ ...data, editedAt: serverTimestamp() });
-        const promise = updateDoc(doc(db, 'driveLogs', logId), finalData);
+        const promise = updateDoc(logRef, finalData);
 
         if (isOffline) {
             import('../../offlineSync').then(({ queueOfflineAction }) => queueOfflineAction('UPDATE_DRIVELOG', { ...data, id: logId })).catch(() => console.warn('[offlineSync] UPDATE_DRIVELOG 큐잉 실패'));
         }
         await promise; // 본체 갱신 완료까지는 기다림
 
-        // 부가 작업(차량 계기판 갱신, 후속 기록 자동 보정) — await 하여 실패 시 호출자에게 알림
-        let backgroundError: unknown = null;
-        try {
-            // endKm이 변경되고 vehicleId가 있으면 차량 currentKm 갱신
-            if (data.endKm && data.vehicleId) {
-                await updateDoc(doc(db, 'vehicles', data.vehicleId), {
-                    currentKm: data.endKm,
-                });
-            }
+        // 기존 클라이언트 측 차량 km 갱신 및 startKm 연쇄 보정 로직은 
+        // Cloud Functions(syncDriveLogKm.ts)의 트리거로 이전되어 삭제됨
 
-            // endKm 변경 시 다음 기록의 startKm 자동 연동
-            if (data.endKm && data.vehicleId && data.organizationId && data.timestamp) {
-                const logDate = data.timestamp instanceof Date ? data.timestamp : (data.timestamp as import("firebase/firestore").Timestamp).toDate ? (data.timestamp as import("firebase/firestore").Timestamp).toDate() : new Date();
-                await syncNextLogStartKm(data.organizationId, data.vehicleId, logDate, data.endKm);
-            }
-        } catch (err) {
-            console.error('[updateDriveLog] km 동기화 중 오류:', err);
-            captureError(err, { context: 'updateDriveLog_backgroundUpdate', logId, data });
-            backgroundError = err;
-        }
-
-        return { syncResult: null, backgroundError };
+        return { syncResult: null, backgroundError: null };
     } catch (error) {
         captureError(error, { context: 'updateDriveLog', logId, data });
         throw error;

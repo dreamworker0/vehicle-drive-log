@@ -4,6 +4,8 @@
  */
 import { createDriveLog, updateDriveLog, updateReservationStatus, updateHipassCard } from '../../lib/firestore';
 import { enqueueLog } from '../../lib/offlineSync';
+import { doc, collection, increment } from 'firebase/firestore';
+import { db } from '../../lib/firebase';
 import { validateDriveLogForm, buildLogData, nowTime, todayStr } from '../utils/driveLogValidation';
 import type { DriveLogForm } from './types';
 import type { Vehicle } from '../../types/vehicle';
@@ -87,6 +89,7 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
 
     let syncResult: SubmitResult['syncResult'];
     let correctedKm: SubmitResult['correctedKm'];
+    const backgroundWarnings: string[] = [];
 
     if (isEditMode && editLog) {
         // 오프라인 큐잉
@@ -99,19 +102,17 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
             };
         }
         const result = await updateDriveLog(editLog.id, logData);
-        const sr = (result as Record<string, unknown>)?.syncResult as SubmitResult['syncResult'];
-        if (sr?.updated) syncResult = sr;
-        if ((result as Record<string, unknown>)?.backgroundError) {
-            return {
-                success: true,
-                message: '운행일지가 수정되었습니다.',
-                shouldNavigate: 'my-records',
-                syncResult,
-                backgroundWarning: '운행일지는 저장되었으나, 차량 km 동기화에 실패했습니다. 관리자에게 문의해주세요.',
-            };
+        if (result.syncResult?.updated) syncResult = result.syncResult;
+        if (result.backgroundError) {
+            backgroundWarnings.push('차량 km 동기화에 실패했습니다');
         }
     } else {
-        const extendedLogData = { ...logData, reservationId: reservationData?.reservationId || null };
+        const generatedId = doc(collection(db, 'driveLogs')).id;
+        const extendedLogData = {
+            ...logData,
+            id: generatedId,
+            reservationId: reservationData?.reservationId || null
+        };
 
         if (!navigator.onLine) {
             await enqueueLog(extendedLogData as Record<string, unknown>);
@@ -124,28 +125,18 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
         }
 
         const result = await createDriveLog(extendedLogData as Parameters<typeof createDriveLog>[0]);
-        const sr = (result as Record<string, unknown>)?.syncResult as SubmitResult['syncResult'];
-        if (sr?.updated) syncResult = sr;
+        if (result.syncResult?.updated) syncResult = result.syncResult;
 
-        const autocorrectedKm = (result as Record<string, unknown>)?.correctedStartKm as number | undefined;
-        const origStartKm = (result as Record<string, unknown>)?.oldStartKm as number | undefined;
-        if (autocorrectedKm !== undefined) {
-            correctedKm = { oldStartKm: origStartKm, correctedStartKm: autocorrectedKm };
+        if (result.correctedStartKm !== undefined) {
+            correctedKm = { oldStartKm: result.oldStartKm, correctedStartKm: result.correctedStartKm };
         }
 
-        if ((result as Record<string, unknown>)?.backgroundError) {
-            return {
-                success: true,
-                shouldResetForm: true,
-                syncResult,
-                correctedKm,
-                backgroundWarning: '운행일지는 저장되었으나, 차량 km 동기화에 실패했습니다. 관리자에게 문의해주세요.',
-            };
+        if (result.backgroundError) {
+            backgroundWarnings.push('차량 km 동기화에 실패했습니다');
         }
     }
 
     // 예약 상태 업데이트: 일지 저장 후 예약을 completed로 전환
-    let reservationUpdateFailed = false;
     if (!isEditMode && reservationData?.reservationId) {
         const resId = reservationData.reservationId;
         const actualStart = form.startTime || '';
@@ -160,28 +151,32 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
         } catch (e) {
             console.warn('[submitDriveLog] 예약 상태 업데이트 실패:', e);
             captureError(e, { context: 'submitDriveLog.updateReservationStatus', resId });
-            reservationUpdateFailed = true;
+            backgroundWarnings.push('예약 상태 변경에 실패했습니다 (새로고침 후에도 "운행 중"일 시 관리자 문의)');
         }
     }
 
-    // 하이패스 잔액 업데이트: 병목(waterfall) 방지를 위해 fire-and-forget 백그라운드 태스크로 전환
+    // 하이패스 잔액 업데이트: 동기적으로 await하여 잔액 불일치(데이터 정합성) 방지
     if (hipassCard && form.hipassBalanceAfter !== '') {
         const hipassId = hipassCard.id;
-        const bal = Number(form.hipassBalanceAfter);
+        const balAfter = Number(form.hipassBalanceAfter);
+        const usedAmount = hipassCard.balance - balAfter;
         const org = orgId ? orgId : undefined;
         
-        Promise.resolve().then(async () => {
-            try {
-                await updateHipassCard(hipassId, {
-                    balance: bal,
-                    organizationId: org,
-                });
-            } catch (e) {
-                console.warn('[submitDriveLog] 하이패스 잔액 업데이트 실패(백그라운드):', e);
-                captureError(e, { context: 'submitDriveLog.updateHipassCard', hipassId, bal, org });
-            }
-        });
+        try {
+            await updateHipassCard(hipassId, {
+                balance: increment(-usedAmount),
+                organizationId: org,
+            });
+        } catch (e) {
+            console.warn('[submitDriveLog] 하이패스 잔액 업데이트 실패:', e);
+            captureError(e, { context: 'submitDriveLog.updateHipassCard', hipassId, balAfter, usedAmount, org });
+            backgroundWarnings.push('하이패스 잔액 동기화에 실패했습니다');
+        }
     }
+
+    const finalBackgroundWarning = backgroundWarnings.length > 0
+        ? '운행일지는 저장되었으나 일부 동기화에 실패했습니다: ' + backgroundWarnings.join(', ') + '. 관리자에게 문의해주세요.'
+        : undefined;
 
     // 결과 결정
     if (isEditMode) {
@@ -190,6 +185,7 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
             message: '운행일지가 수정되었습니다.',
             shouldNavigate: 'my-records',
             syncResult,
+            backgroundWarning: finalBackgroundWarning,
         };
     }
 
@@ -200,9 +196,7 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
             shouldNavigate: 'today',
             syncResult,
             correctedKm,
-            backgroundWarning: reservationUpdateFailed
-                ? '운행일지는 저장되었으나, 예약 상태 변경에 실패했습니다. 새로고침 후에도 "운행 중"으로 표시되면 관리자에게 문의해주세요.'
-                : undefined,
+            backgroundWarning: finalBackgroundWarning,
         };
     }
 
@@ -211,6 +205,7 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
         shouldResetForm: true,
         syncResult,
         correctedKm,
+        backgroundWarning: finalBackgroundWarning,
     };
 }
 

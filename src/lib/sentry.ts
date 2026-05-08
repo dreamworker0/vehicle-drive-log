@@ -66,14 +66,13 @@ export function initSentry() {
             /exceeded the quota/i,
             // 브라우저 비밀번호 관리자/확장이 크로스오리진 프레임 접근 시 발생 (앱 버그 아님)
             /Blocked a frame with origin/,
-            // [임시 주석 처리] App Check 에러 파악을 위해 수집 활성화
-            // // App Check reCAPTCHA Enterprise 타임아웃 (구형 브라우저·느린 네트워크 환경 이슈, 앱 버그 아님)
-            // /reCAPTCHA.*(Timeout|timeout)/,
+            // App Check reCAPTCHA Enterprise 타임아웃 (구형 브라우저·느린 네트워크 환경 이슈, 앱 버그 아님)
+            /reCAPTCHA.*(Timeout|timeout)/,
             // Whale 브라우저 비밀번호 관리자가 DOM 스캔 중 SecurityError 발생 (브라우저 내부 동작, 앱 버그 아님)
             /hasPasswordField_/,
-            // // App Check / recaptcha 토큰 실패 에러 제외
-            // /AppCheck: .*/,
-            // /reCAPTCHA token is invalid/,
+            // Firebase App Check 에러 (인프라 일시적 장애 및 모바일 네트워크 오프라인 노이즈)
+            /AppCheck:.*(throttled|initial-throttle|500 error|fetch-network-error|failed to connect)/i,
+            /reCAPTCHA token is invalid/,
             // React Hydration 에러 제외 (사용자 환경의 번역기 플러그인 등으로 발생)
             /Hydration failed because the initial UI does not match what was rendered on the server/,
             /Text content does not match server-rendered HTML/,
