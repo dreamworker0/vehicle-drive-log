@@ -66,13 +66,14 @@ export function initSentry() {
             /exceeded the quota/i,
             // 브라우저 비밀번호 관리자/확장이 크로스오리진 프레임 접근 시 발생 (앱 버그 아님)
             /Blocked a frame with origin/,
-            // App Check reCAPTCHA Enterprise 타임아웃 (구형 브라우저·느린 네트워크 환경 이슈, 앱 버그 아님)
-            /reCAPTCHA.*(Timeout|timeout)/,
+            // [임시 주석 처리] App Check 에러 파악을 위해 수집 활성화
+            // // App Check reCAPTCHA Enterprise 타임아웃 (구형 브라우저·느린 네트워크 환경 이슈, 앱 버그 아님)
+            // /reCAPTCHA.*(Timeout|timeout)/,
             // Whale 브라우저 비밀번호 관리자가 DOM 스캔 중 SecurityError 발생 (브라우저 내부 동작, 앱 버그 아님)
             /hasPasswordField_/,
-            // App Check / recaptcha 토큰 실패 에러 제외
-            /AppCheck: .*/,
-            /reCAPTCHA token is invalid/,
+            // // App Check / recaptcha 토큰 실패 에러 제외
+            // /AppCheck: .*/,
+            // /reCAPTCHA token is invalid/,
             // React Hydration 에러 제외 (사용자 환경의 번역기 플러그인 등으로 발생)
             /Hydration failed because the initial UI does not match what was rendered on the server/,
             /Text content does not match server-rendered HTML/,
@@ -100,8 +101,9 @@ export function initSentry() {
             // Firebase SDK 번들 내부 에러 필터링 (Vite 빌드: firebase-{hash}.js)
             const frames = event.exception?.values?.[0]?.stacktrace?.frames;
             if (frames?.some(f =>
-                f.filename?.includes('/firebase-') ||
-                f.filename?.includes('recaptcha')
+                f.filename?.includes('/firebase-') 
+                // [임시 주석 처리] App Check 에러 추적을 위해 recaptcha 스택트레이스 포함 시 허용
+                // || f.filename?.includes('recaptcha')
             )) {
                 return null;
             }
