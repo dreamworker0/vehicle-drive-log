@@ -4,7 +4,7 @@ import { authReady as _authReady } from './firebaseAuth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, getFirestore, clearIndexedDbPersistence } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
-import { initializeAppCheck, ReCaptchaV3Provider } from 'firebase/app-check';
+import { initializeAppCheck, ReCaptchaV3Provider, onTokenChanged } from 'firebase/app-check';
 // firebase/analytics, firebase/messaging은 동적 import (번들 최적화)
 
 const firebaseConfig = {
@@ -28,9 +28,24 @@ if (typeof window !== 'undefined') {
         // @ts-expect-error -- 글로벌 디버그 토큰 설정 (firebase 공식 방법)
         self.FIREBASE_APPCHECK_DEBUG_TOKEN = debugToken;
     }
-    initializeAppCheck(app, {
+    const appCheck = initializeAppCheck(app, {
         provider: new ReCaptchaV3Provider(import.meta.env.VITE_RECAPTCHA_SITE_KEY),
         isTokenAutoRefreshEnabled: true,
+    });
+
+    // App Check 내부 에러(500 에러 등) 명시적 Sentry 수집
+    onTokenChanged(appCheck, {
+        next: () => { /* 정상 토큰 발급 시 무시 */ },
+        error: (err) => {
+            console.error('[App Check] 토큰 발급 에러 강제 수집 (Sentry 전송):', err);
+            // 초기 번들 크기 절감을 위해 Sentry는 비동기 동적 로딩
+            import('@sentry/react').then((Sentry) => {
+                Sentry.captureException(err, {
+                    tags: { feature: 'app-check' },
+                    extra: { context: 'initializeAppCheck onTokenChanged' }
+                });
+            }).catch(() => { /* Sentry 모듈 로드 실패 시 무시 */ });
+        }
     });
 }
 
