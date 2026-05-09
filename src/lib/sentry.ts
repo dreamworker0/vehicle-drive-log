@@ -83,6 +83,7 @@ export function initSentry() {
             // 의도된 비즈니스 로직 에러 (글로벌 바운더리로 전파되는 노이즈 방지)
             /동일한 운행 기록이 이미 존재합니다/,
             /동기화 오류: 다른 사용자가 더 높은 누적 km/,
+            /직전 운행 기록과 출발 주행거리가 일치하지 않습니다/,
             // 구버전 클라이언트 캐시가 보내는 undefined 필드값 Firestore 저장 시도 에러 억제
             /Unsupported field value: undefined/,
         ],
