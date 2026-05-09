@@ -47,7 +47,7 @@ function NavItem({ to, icon, label, badge }: NavItemProps) {
 }
 
 export default function SuperAdminLayout() {
-    const { user } = useAuth();
+    const { user, userData } = useAuth();
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [pendingCount, setPendingCount] = useState(0);
     const [activeOrgCount, setActiveOrgCount] = useState(0);
@@ -56,11 +56,12 @@ export default function SuperAdminLayout() {
     const [adminCount, setAdminCount] = useState(0);
     const { isDark, toggleTheme } = useTheme();
 
-
     // 사이드바 배지 카운트 단발성 조회 (비용 절감)
     useEffect(() => {
         let isMounted = true;
         const fetchCounts = async () => {
+            if (!user || userData?.role !== 'superAdmin') return; // Auth/AppCheck 검증 안된 상태 쿼리 차단
+
             try {
                 const [pendingsCount, approvedCount, unreadFeedbackCount] = await Promise.all([
                     getPendingOrganizationsCount(),
@@ -85,14 +86,20 @@ export default function SuperAdminLayout() {
                     if (isMounted) setActiveOrgCount(approvedCount);
                 }
             } catch(e) {
-                console.error("SuperAdmin 뱃지 카운트 조회 에러:", e);
+                const err = e as { code?: string; message?: string };
+                if (err?.code === 'permission-denied' || err?.message?.includes('Missing or insufficient permissions')) {
+                    // AppCheck 실패 또는 권한 없음 에러는 의도된 방어이므로 에러 노이즈 억제
+                    console.warn("SuperAdmin 뱃지 카운트 조회 억제됨 (권한 부족)");
+                } else {
+                    console.error("SuperAdmin 뱃지 카운트 조회 에러:", e);
+                }
             }
         };
 
         fetchCounts();
 
         return () => { isMounted = false; };
-    }, []);
+    }, [user, userData?.role]);
 
     // 슈퍼관리자 수 조회
     useEffect(() => {

@@ -33,16 +33,22 @@ if (typeof window !== 'undefined') {
         isTokenAutoRefreshEnabled: true,
     });
 
-    // App Check 내부 에러(500 에러 등) 명시적 Sentry 수집
+    // App Check 내부 에러(500 에러 등) 명시적 Sentry 수집 (에러 노이즈 방지를 위해 완화)
     onTokenChanged(appCheck, {
         next: () => { /* 정상 토큰 발급 시 무시 */ },
         error: (err) => {
-            console.error('[App Check] 토큰 발급 에러 강제 수집 (Sentry 전송):', err);
+            const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+            if (isLocalhost) {
+                console.warn('[App Check] 로컬 환경 토큰 발급 500 에러 감지 (Sentry 전송 무시됨):', err);
+                return;
+            }
+            console.warn('[App Check] 토큰 발급 500 에러 감지 (Sentry Warning 전송):', err);
             // 초기 번들 크기 절감을 위해 Sentry는 비동기 동적 로딩
             import('@sentry/react').then((Sentry) => {
-                Sentry.captureException(err, {
+                Sentry.captureMessage('App Check 토큰 발급 에러 (500)', {
+                    level: 'warning',
                     tags: { feature: 'app-check' },
-                    extra: { context: 'initializeAppCheck onTokenChanged' }
+                    extra: { err: String(err), context: 'initializeAppCheck onTokenChanged' }
                 });
             }).catch(() => { /* Sentry 모듈 로드 실패 시 무시 */ });
         }
