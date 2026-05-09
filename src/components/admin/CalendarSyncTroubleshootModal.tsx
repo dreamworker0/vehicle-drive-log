@@ -151,6 +151,17 @@ export default function CalendarSyncTroubleshootModal({
                         </div>
                     )}
 
+                    {/* ── 주의사항: 새 캘린더 생성 권장 ── */}
+                    <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                        <p className="font-medium text-red-700 dark:text-red-400 flex items-center gap-1.5 mb-1">
+                            <span className="text-sm">⚠️</span> 주의사항: 새 캘린더 생성 권장
+                        </p>
+                        <p className="text-xs text-red-600 dark:text-red-300 leading-relaxed">
+                            직원 공용 업무 캘린더나 개인 캘린더를 연동하면 <strong>회의, 연차 등 개인 일정까지 모두 차량 예약으로 동기화</strong>됩니다.
+                            반드시 구글 캘린더에서 <strong className="underline">차량 전용 새 캘린더를 생성</strong>하여 연동해 주세요.
+                        </p>
+                    </div>
+
                     {/* ── 1단계: 서비스 계정 이메일 공유 ── */}
                     <div className="space-y-2">
                         <div className="flex items-center gap-2">

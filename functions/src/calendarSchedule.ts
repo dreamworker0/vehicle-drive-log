@@ -28,23 +28,25 @@ async function findUserByEmail(email: string) {
 }
 
 /**
- * Google Calendar -> App 역동기화 (2시간마다)
- * 비용 최적화: 30분 → 2시간, 주말 스킵, 실패 캘린더 자동 제외
+ * Google Calendar -> App 역동기화 (평일 06~22시, 1시간마다)
+ * 비용 최적화: 주말 및 심야(23~05시) 스킵, 실패 캘린더 자동 제외
  */
 export const syncCalendarToApp = onSchedule(
     {
-        schedule: "every 2 hours",
+        schedule: "0 6-22 * * 1-5", // 평일(월~금) 06시부터 22시까지 매시 정각 (1시간 주기)
         timeZone: "Asia/Seoul",
         retryCount: 0,
         memory: "512MiB",
         timeoutSeconds: 120,
     },
     async function () {
-        // 주말(토/일)에는 동기화 스킵 (비용 절감)
+        // 주말(토/일) 및 심야 시간(23시~05시) 동기화 스킵 (방어적 코드)
         const nowKST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
         const dayOfWeek = nowKST.getDay(); // 0=일, 6=토
-        if (dayOfWeek === 0 || dayOfWeek === 6) {
-            console.log("=== Calendar sync skipped (weekend) ===");
+        const hour = nowKST.getHours();
+
+        if (dayOfWeek === 0 || dayOfWeek === 6 || hour < 6 || hour > 22) {
+            console.log(`=== Calendar sync skipped (weekend or night: ${hour}시) ===`);
             await recordHeartbeat("syncCalendarToApp");
             return;
         }
