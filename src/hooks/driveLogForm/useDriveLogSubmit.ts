@@ -97,12 +97,12 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
     }, [setForm]);
 
     const handleSaveFavorite = useCallback(async () => {
-        if (!form.destination.trim() || !user) return;
+        if (!(form.destination || '').trim() || !user) return;
         try {
             await createFavorite({
                 userId: user.uid,
-                name: favName.trim() || form.destination.trim(),
-                destination: form.destination.trim(),
+                name: (favName || '').trim() || (form.destination || '').trim(),
+                destination: (form.destination || '').trim(),
                 organizationId: orgId || '',
             });
             const updated = await getFavorites(user.uid);
