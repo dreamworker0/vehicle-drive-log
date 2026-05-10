@@ -72,6 +72,7 @@ export function initSentry() {
             /hasPasswordField_/,
             // Firebase App Check 에러 (인프라 일시적 장애 및 모바일 네트워크 오프라인 노이즈)
             /AppCheck:.*(throttled|initial-throttle|500 error|fetch-network-error|failed to connect)/i,
+            /App Check 토큰 발급 에러/i,
             /reCAPTCHA token is invalid/,
             // React Hydration 에러 제외 (사용자 환경의 번역기 플러그인 등으로 발생)
             /Hydration failed because the initial UI does not match what was rendered on the server/,

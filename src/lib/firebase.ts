@@ -42,15 +42,7 @@ if (typeof window !== 'undefined') {
                 console.warn('[App Check] 로컬 환경 토큰 발급 500 에러 감지 (Sentry 전송 무시됨):', err);
                 return;
             }
-            console.warn('[App Check] 토큰 발급 500 에러 감지 (Sentry Warning 전송):', err);
-            // 초기 번들 크기 절감을 위해 Sentry는 비동기 동적 로딩
-            import('@sentry/react').then((Sentry) => {
-                Sentry.captureMessage('App Check 토큰 발급 에러 (500)', {
-                    level: 'warning',
-                    tags: { feature: 'app-check' },
-                    extra: { err: String(err), context: 'initializeAppCheck onTokenChanged' }
-                });
-            }).catch(() => { /* Sentry 모듈 로드 실패 시 무시 */ });
+            console.warn('[App Check] 토큰 발급 500 에러 감지 (인프라/네트워크 이슈로 간주하여 Sentry 무시):', err);
         }
     });
 }
