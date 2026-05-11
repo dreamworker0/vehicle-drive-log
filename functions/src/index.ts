@@ -32,11 +32,9 @@ export { syncHolidaysScheduled } from "./syncHolidays";
 // Tmap Proxy (프로덕션 CORS 해결)
 export { tmapProxy } from "./tmapProxy";
 
-// 데이터 백업 & 자동 퍼지 & 아카이빙
+// 데이터 백업 & 야간 배치(자동 퍼지/아카이빙/클린업)
 export { backupFirestore } from "./backupFirestore";
-export { autoPurgeOrgs } from "./autoPurgeOrgs";
-export { archiveDriveLogs } from "./archiveDriveLogs";
-export { cleanupCertificateImages } from "./cleanupCertificateImages";
+export { dailyNightlyBatch } from "./dailyNightlyBatch";
 
 // Admin Notice
 export { sendAdminNotice } from "./sendAdminNotice";
@@ -95,7 +93,7 @@ export { cleanupDuplicateLogs } from "./cleanupDuplicateLogs";
 // 집계 통계 일괄 재계산 (마이그레이션/보정용)
 export { recalculateAggregatedStats } from "./caching/recalculateAggregatedStats";
 
-// SuperAdmin 대시보드 통계 캐싱 (1시간 주기 배치)
+// SuperAdmin 대시보드 통계 캐싱 (1시간 주기 배치, 저녁/새벽은 3시간)
 import { computeAllDashboardStats } from "./caching/computeDashboardStats";
 
 export const computeDashboardStats = onSchedule(
@@ -107,6 +105,15 @@ export const computeDashboardStats = onSchedule(
         timeoutSeconds: 300,
     },
     async function () {
+        // 저녁 20시 ~ 아침 8시 사이에는 3시간 단위(hour % 3 === 0)일 때만 실행
+        const nowKST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+        const hour = nowKST.getHours();
+        
+        if ((hour > 19 || hour < 9) && hour % 3 !== 0) {
+            await recordHeartbeat("computeDashboardStats (skipped by time policy)");
+            return;
+        }
+
         await computeAllDashboardStats();
         await recordHeartbeat("computeDashboardStats");
     }

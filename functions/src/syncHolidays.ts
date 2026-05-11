@@ -10,7 +10,7 @@ const HOLIDAY_API_KEY = defineString("HOLIDAY_API_KEY");
 
 export const syncHolidaysScheduled = onSchedule(
     {
-        schedule: "0 6 * * *",
+        schedule: "0 6 1 * *",
         timeZone: "Asia/Seoul",
         retryCount: 3,
     },

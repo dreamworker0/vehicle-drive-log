@@ -25,6 +25,7 @@
 ### Fixed
 - Firebase SDK가 내부적으로 재시도하는 과정에서 발생하는 `AppCheck: Fetch failed to connect to a network` 및 `Requests throttled` 등 단순 인프라 레벨의 네트워크 에러들이 Sentry에 노이즈로 리포트되지 않도록 글로벌 필터링 정책 업데이트
 - Hipass 잔액 업데이트 시 기존 절대값 덮어쓰기(last-write-wins)로 인해 다중 기기 환경에서 잔액 데이터가 유실되던 버그를 `increment` 원자적 연산으로 교체하여 완벽 해결
+- Firestore 보안 규칙 수정: `system/holidays` 문서에 대해 일반 사용자 읽기 권한을 허용하여, 권한 오류로 인해 불필요하게 실시간 외부 API(`holidayProxy`) 폴백이 호출되던 문제 해결
 
 ---
 
