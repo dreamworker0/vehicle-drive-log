@@ -199,6 +199,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                                                 indexedDB.deleteDatabase('firebaseLocalStorageDb');
                                                 indexedDB.deleteDatabase('firestore/[DEFAULT]/vehicle-drive-log/main');
                                             } catch { /* IDB 미지원 등은 무시 */ }
+                                            
+                                            // 메모리에 남은 Firebase 인스턴스의 꼬인 상태를 완전 초기화하기 위해 강제 리로드
+                                            setTimeout(() => {
+                                                window.location.href = '/login';
+                                            }, 1500);
                                         });
                                     setUserData(null);
                                     setLoading(false);

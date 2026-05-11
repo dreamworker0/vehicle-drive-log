@@ -18,6 +18,13 @@ interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
     {
+        date: '2026-05-12',
+        title: '로그인 무한 루프 현상 긴급 수정 🛠️',
+        items: [
+            { type: 'fixed', text: '일부 사용자 기기에서 로그인이 정상적으로 완료되었음에도 세션이 꼬이면서 로그아웃이 무한 반복되던 심각한 문제를 찾아내 즉시 해결했습니다.' }
+        ]
+    },
+    {
         date: '2026-05-11',
         title: '로그인 안정성 대폭 개선 🛠️',
         items: [
