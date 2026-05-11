@@ -18,6 +18,13 @@ interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
     {
+        date: '2026-05-11',
+        title: '로그인 안정성 대폭 개선 🛠️',
+        items: [
+            { type: 'fixed', text: '오랜만에 앱을 켰을 때 자꾸만 로그아웃되며 튕기던 답답한 문제를 시원하게 해결했습니다.' }
+        ]
+    },
+    {
         date: '2026-05-08',
         title: '성능 대폭 개선 및 오프라인 환경 강화 🚀',
         items: [
