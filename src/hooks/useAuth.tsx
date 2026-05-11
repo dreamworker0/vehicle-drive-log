@@ -112,8 +112,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                                                                 .catch(() => {}) // 토큰 갱신 실패해도 재시도
                                                                 .then(() => setTimeout(() => startOrgWatch(orgRetryCount + 1), waitMs));
                                                         } else if (errCode === 'permission-denied') {
-                                                            console.warn('[Auth] 기관 상태 감시 — 권한 오류, 로그아웃 방지');
-                                                            useToastStore.getState().showToast('기관 접근 권한을 갱신 중입니다. 문제가 지속되면 페이지를 새로고침 해주세요.', 'warning');
+                                                            console.warn('[Auth] 기관 상태 감시 — 권한 오류 만료 간주, 강제 로그아웃');
+                                                            useToastStore.getState().showToast('보안을 위해 세션이 만료되었습니다. 다시 로그인해 주세요.', 'error');
+                                                            auth.signOut().catch(() => {});
                                                         }
                                                     }
                                                 );
@@ -184,9 +185,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                                             setTimeout(() => startUserWatch(retryCount + 1), waitMs);
                                         });
                                 } else if (err?.code === 'permission-denied') {
-                                    // 재시도 소진 → 로그아웃 방지 (세션 유지)
-                                    console.warn('[Auth] 사용자 데이터 접근 권한 오류 — 로그아웃 대신 안내 표시');
-                                    useToastStore.getState().showToast('권한 정보를 불러올 수 없습니다. 브라우저를 새로고침 하거나 다시 로그인해 주세요.', 'error');
+                                    // 재시도 소진 → 세션 만료 간주하여 강제 로그아웃 처리
+                                    console.warn('[Auth] 사용자 데이터 접근 권한 오류 — 세션 만료 간주, 강제 로그아웃');
+                                    useToastStore.getState().showToast('보안을 위해 세션이 만료되었습니다. 다시 로그인해 주세요.', 'error');
+                                    auth.signOut().catch(() => {});
                                     setUserData(null);
                                     setLoading(false);
                                 } else {
