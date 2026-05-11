@@ -185,10 +185,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                                             setTimeout(() => startUserWatch(retryCount + 1), waitMs);
                                         });
                                 } else if (err?.code === 'permission-denied') {
-                                    // 재시도 소진 → 세션 만료 간주하여 강제 로그아웃 처리
-                                    console.warn('[Auth] 사용자 데이터 접근 권한 오류 — 세션 만료 간주, 강제 로그아웃');
-                                    useToastStore.getState().showToast('보안을 위해 세션이 만료되었습니다. 다시 로그인해 주세요.', 'error');
-                                    auth.signOut().catch(() => {});
+                                    // 재시도 소진 → 캐시 손상 가능성. IDB까지 정리 후 강제 로그아웃.
+                                    // 슈퍼관리자 승격 직후 등 클레임 drift가 클 때 stale 토큰이
+                                    // signOut만으로 복구되지 않는 케이스 대응 (운영 중 실제 발생).
+                                    console.warn('[Auth] 사용자 데이터 접근 권한 오류 — 캐시 정리 후 강제 로그아웃');
+                                    useToastStore.getState().showToast('권한 정보가 손상되어 세션을 초기화합니다. 잠시 후 다시 로그인해 주세요.', 'error');
+                                    auth.signOut()
+                                        .catch(() => {})
+                                        .finally(() => {
+                                            // Firebase가 사용하는 IndexedDB 데이터베이스 삭제
+                                            // (firebaseLocalStorageDb: Auth 세션, firestore/*: Firestore 캐시)
+                                            try {
+                                                indexedDB.deleteDatabase('firebaseLocalStorageDb');
+                                                indexedDB.deleteDatabase('firestore/[DEFAULT]/vehicle-drive-log/main');
+                                            } catch { /* IDB 미지원 등은 무시 */ }
+                                        });
                                     setUserData(null);
                                     setLoading(false);
                                 } else {
