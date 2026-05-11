@@ -24,7 +24,8 @@ const app = initializeApp(firebaseConfig);
 // 프로덕션: reCAPTCHA v3 토큰 자동 발급
 if (typeof window !== 'undefined') {
     const debugToken = import.meta.env.VITE_APPCHECK_DEBUG_TOKEN;
-    if (debugToken) {
+    const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    if (debugToken && isLocalhost) {
         // @ts-expect-error -- 글로벌 디버그 토큰 설정 (firebase 공식 방법)
         self.FIREBASE_APPCHECK_DEBUG_TOKEN = debugToken;
     }
