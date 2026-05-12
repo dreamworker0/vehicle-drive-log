@@ -2,10 +2,10 @@ import { useMemo, memo } from 'react';
 import { todayStr } from '../../../hooks/utils/driveLogValidation';
 import type { DriveLogForm } from '../../../hooks/driveLogForm/types';
 
-/** 일주일 전 날짜를 YYYY-MM-DD로 반환 */
+/** 2달 전 날짜를 YYYY-MM-DD로 반환 */
 function getMinDateStr(): string {
     const d = new Date();
-    d.setDate(d.getDate() - 7);
+    d.setMonth(d.getMonth() - 2);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
@@ -33,7 +33,7 @@ const DateSection = memo(function DateSection({ form, setForm, isRetroactive }: 
                     onChange={e => setForm({ ...form, driveDate: e.target.value })}
                     className="input"
                 />
-                <p className="text-[11px] text-surface-400 mt-1">일주일 이내의 날짜만 선택할 수 있습니다.</p>
+                <p className="text-[11px] text-surface-400 mt-1">2달 이내의 날짜만 선택할 수 있습니다.</p>
                 {isRetroactive && (
                     <p className="text-[11px] text-amber-500 dark:text-amber-400 mt-0.5">
                         ⚠️ 소급 입력: 오늘이 아닌 날짜로 기록됩니다.

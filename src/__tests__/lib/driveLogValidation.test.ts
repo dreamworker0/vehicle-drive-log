@@ -49,14 +49,15 @@ describe('운행일지 폼 유효성 검증', () => {
         expect(result.message).toBe('km 값은 0 이상이어야 합니다.');
     });
 
-    it('도착Km가 출발Km와 같거나 작으면 에러를 반환한다', () => {
-        let result = validateDriveLogForm({ ...validForm, startKm: '1050', endKm: '1000' });
+    it('도착Km가 출발Km보다 작으면 에러를 반환한다', () => {
+        const result = validateDriveLogForm({ ...validForm, startKm: '1050', endKm: '1000' });
         expect(result.valid).toBe(false);
-        expect(result.message).toBe('도착 km는 출발 km보다 커야 합니다.');
+        expect(result.message).toBe('도착 km는 출발 km보다 크거나 같아야 합니다.');
+    });
 
-        result = validateDriveLogForm({ ...validForm, startKm: '1050', endKm: '1050' });
-        expect(result.valid).toBe(false);
-        expect(result.message).toBe('도착 km는 출발 km보다 커야 합니다.');
+    it('도착Km가 출발Km와 같으면 통과한다', () => {
+        const result = validateDriveLogForm({ ...validForm, startKm: '1050', endKm: '1050' });
+        expect(result.valid).toBe(true);
     });
 
     it('한 번에 10,000km 이상 운행 시 에러를 반환한다', () => {
@@ -132,6 +133,8 @@ describe('buildLogData', () => {
             userData: { name: '홍길동' },
             selectedVehicle: { vehicleType: 'sedan' },
             selectedPassengers: [{ name: '김철수' }],
+            externalPassengerNames: '김종원, 이영희, ',
+            externalPassengerCount: 2,
             isRetroactive: true,
         };
 
@@ -142,8 +145,8 @@ describe('buildLogData', () => {
         expect(result.endKm).toBe(1050);
         expect(result.distance).toBe(50);
 
-        expect(result.passengerCount).toBe(2); // 기사 + 동승자 1명
-        expect(result.passengerNames).toEqual(['김철수']);
+        expect(result.passengerCount).toBe(4); // 기사 + 직원 동승자 1명 + 외부 2명
+        expect(result.passengerNames).toEqual(['김철수', '김종원', '이영희']);
         expect(result.isRetroactive).toBe(true);
     });
 });

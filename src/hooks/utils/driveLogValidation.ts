@@ -48,8 +48,8 @@ export function validateDriveLogForm(
     if (startKm < 0 || endKm < 0) {
         return { valid: false, message: 'km 값은 0 이상이어야 합니다.' };
     }
-    if (endKm <= startKm) {
-        return { valid: false, message: '도착 km는 출발 km보다 커야 합니다.' };
+    if (endKm < startKm) {
+        return { valid: false, message: '도착 km는 출발 km보다 크거나 같아야 합니다.' };
     }
     if (endKm - startKm > 10000) {
         return { valid: false, message: '한 번의 운행에 10,000km 이상은 입력할 수 없습니다. 값을 확인해주세요.' };
@@ -105,6 +105,11 @@ export function buildLogData(form: DriveLogForm, { orgId, user, userData, select
     const endKm = parseInt(form.endKm);
     const driveTimestamp = buildDriveTimestamp(form.driveDate, form.endTime, form.startTime);
 
+    const parsedExternalNames = (externalPassengerNames || '')
+        .split(',')
+        .map(name => name.trim())
+        .filter(Boolean);
+
     const cleanData: Record<string, unknown> = {
         organizationId: orgId ? String(orgId) : '',
         vehicleId: form.vehicleId,
@@ -121,7 +126,10 @@ export function buildLogData(form: DriveLogForm, { orgId, user, userData, select
         notes: (form.notes || '').trim(),
         timestamp: driveTimestamp,
         passengerCount: selectedPassengers.length + externalPassengerCount + 1,
-        passengerNames: selectedPassengers.map(p => p.name || p.email || ''),
+        passengerNames: [
+            ...selectedPassengers.map(p => p.name || p.email || ''),
+            ...parsedExternalNames
+        ],
         externalPassengerCount,
         externalPassengerNames,
         inputMethod: ocrUsed ? 'ocr' : (favoriteUsed ? 'favorite' : 'manual'),
