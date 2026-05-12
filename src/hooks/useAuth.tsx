@@ -112,9 +112,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                                                                 .catch(() => {}) // 토큰 갱신 실패해도 재시도
                                                                 .then(() => setTimeout(() => startOrgWatch(orgRetryCount + 1), waitMs));
                                                         } else if (errCode === 'permission-denied') {
-                                                            console.warn('[Auth] 기관 상태 감시 — 권한 오류 만료 간주, 강제 로그아웃');
-                                                            useToastStore.getState().showToast('보안을 위해 세션이 만료되었습니다. 다시 로그인해 주세요.', 'error');
-                                                            auth.signOut().catch(() => {});
+                                                            console.warn('[Auth] 기관 상태 감시 — 권한 오류 발생. 세션 유지 및 데이터 로딩 보류');
+                                                            useToastStore.getState().showToast('데이터 접근 권한이 없거나 오프라인 상태입니다. (페이지 새로고침 요망)', 'warning');
+                                                            // auth.signOut().catch(() => {}); 무한루프 방지를 위해 로그아웃 제거
                                                         }
                                                     }
                                                 );
@@ -185,26 +185,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                                             setTimeout(() => startUserWatch(retryCount + 1), waitMs);
                                         });
                                 } else if (err?.code === 'permission-denied') {
-                                    // 재시도 소진 → 캐시 손상 가능성. IDB까지 정리 후 강제 로그아웃.
-                                    // 슈퍼관리자 승격 직후 등 클레임 drift가 클 때 stale 토큰이
-                                    // signOut만으로 복구되지 않는 케이스 대응 (운영 중 실제 발생).
-                                    console.warn('[Auth] 사용자 데이터 접근 권한 오류 — 캐시 정리 후 강제 로그아웃');
-                                    useToastStore.getState().showToast('권한 정보가 손상되어 세션을 초기화합니다. 잠시 후 다시 로그인해 주세요.', 'error');
-                                    auth.signOut()
-                                        .catch(() => {})
-                                        .finally(() => {
-                                            // Firebase가 사용하는 IndexedDB 데이터베이스 삭제
-                                            // (firebaseLocalStorageDb: Auth 세션, firestore/*: Firestore 캐시)
-                                            try {
-                                                indexedDB.deleteDatabase('firebaseLocalStorageDb');
-                                                indexedDB.deleteDatabase('firestore/[DEFAULT]/vehicle-drive-log/main');
-                                            } catch { /* IDB 미지원 등은 무시 */ }
-                                            
-                                            // 메모리에 남은 Firebase 인스턴스의 꼬인 상태를 완전 초기화하기 위해 강제 리로드
-                                            setTimeout(() => {
-                                                window.location.href = '/login';
-                                            }, 1500);
-                                        });
+                                    // 재시도 소진 시 강제 로그아웃(무한루프) 방지. 대신 세션 유지하고 데이터만 null 처리.
+                                    console.error('[Auth] 사용자 데이터 접근 권한 오류 — 갱신 실패. 관리자에게 문의하세요.', err);
+                                    useToastStore.getState().showToast('데이터 접근 권한이 없거나 네트워크 설정 문제가 있습니다. (App Check 또는 권한 확인 필요)', 'error');
                                     setUserData(null);
                                     setLoading(false);
                                 } else {

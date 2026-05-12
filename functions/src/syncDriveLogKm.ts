@@ -46,13 +46,17 @@ async function syncNextLogStartKm(orgId: string, vehicleId: string, afterDate: D
         // startKm이 이미 일치하면 연쇄 중단
         if (oldStartKm === carryKm) break;
 
+        const diff = carryKm - oldStartKm;
+        const newEndKm = (nextData.endKm ?? carryKm) + diff;
+
         await nextDoc.ref.update({
             startKm: carryKm,
+            endKm: newEndKm,
             editedAt: FieldValue.serverTimestamp(),
         });
 
-        // 다음 연쇄: 현재 기록의 endKm → 그 다음 기록의 startKm
-        carryKm = nextData.endKm ?? carryKm;
+        // 다음 연쇄: 현재 기록의 새롭게 계산된 endKm → 그 다음 기록의 startKm
+        carryKm = newEndKm;
         currentAfterDate = nextData.timestamp instanceof Date 
             ? nextData.timestamp 
             : nextData.timestamp.toDate();

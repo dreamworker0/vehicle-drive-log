@@ -15,6 +15,7 @@ import {
     getVehicleEndKmBefore,
 } from './utils';
 import { driveLogSchema } from '../../../schemas';
+import { invalidateCache } from '../cache';
 
 export interface CreateDriveLogResult {
     id: string;
@@ -77,8 +78,9 @@ export const createDriveLog = async (data: Partial<DriveLog>): Promise<CreateDri
             promise.catch(e => console.error('[Firestore Offline Sync Error]', e));
         }
 
-        // 기존 클라이언트 측 차량 km 갱신 및 startKm 연쇄 갱신 로직은 
         // Cloud Functions(syncDriveLogKm.ts)의 트리거로 이전되어 삭제됨
+
+        invalidateCache('driveLogs');
 
         return { 
             id: docRef.id, 
@@ -140,8 +142,9 @@ export const updateDriveLog = async (logId: string, data: Partial<DriveLog>): Pr
             promise.catch(e => console.error('[Firestore Offline Sync Error]', e));
         }
 
-        // 기존 클라이언트 측 차량 km 갱신 및 startKm 연쇄 갱신 로직은 
         // Cloud Functions(syncDriveLogKm.ts)의 트리거로 이전되어 삭제됨
+
+        invalidateCache('driveLogs');
 
         return { syncResult: null, backgroundError: null };
     } catch (error) {
@@ -162,6 +165,7 @@ export const updateDriveLog = async (logId: string, data: Partial<DriveLog>): Pr
 export const deleteDriveLog = async (logId: string) => {
     try {
         await deleteDoc(doc(db, 'driveLogs', logId));
+        invalidateCache('driveLogs');
     } catch (error) {
         captureError(error, { context: 'deleteDriveLog', logId });
         throw error;

@@ -4,7 +4,7 @@ import { authReady as _authReady } from './firebaseAuth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, getFirestore, clearIndexedDbPersistence } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
-import { initializeAppCheck, ReCaptchaV3Provider, CustomProvider, onTokenChanged } from 'firebase/app-check';
+import { initializeAppCheck, ReCaptchaV3Provider, onTokenChanged } from 'firebase/app-check';
 // firebase/analytics, firebase/messaging은 동적 import (번들 최적화)
 
 const firebaseConfig = {
@@ -29,28 +29,11 @@ if (typeof window !== 'undefined') {
         // @ts-expect-error -- 글로벌 디버그 토큰 설정 (firebase 공식 방법)
         self.FIREBASE_APPCHECK_DEBUG_TOKEN = debugToken;
     }
-    const recaptchaProvider = new ReCaptchaV3Provider(import.meta.env.VITE_RECAPTCHA_SITE_KEY);
-    const customProvider = new CustomProvider({
-        getToken: async () => {
-            try {
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                return await (recaptchaProvider as any).getToken();
-            } catch (error) {
-                const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-                if (!isLocalhost) {
-                    console.warn('[App Check] reCAPTCHA 토큰 발급 실패, 더미 토큰으로 우회 (로그인 차단 방지):', error);
-                }
-                // 시크릿 모드 또는 네트워크 에러로 토큰 발급 실패 시 로그인이 막히는 현상을 방지하기 위해 더미 토큰 반환
-                return {
-                    token: 'dummy_token_fallback',
-                    expireTimeMillis: Date.now() + 1000 * 60 * 60, // 1시간 만료
-                };
-            }
-        }
-    });
-
+    // ReCaptchaV3Provider는 initializeAppCheck를 통해 등록돼야 내부 스크립트가 로드됨.
+    // CustomProvider로 감싸서 getToken()을 직접 호출하면 동작하지 않고 더미 토큰 fallback이
+    // 모든 요청을 App Check 거부로 만들었음(b295455 이후 표면화). 공식 패턴으로 환원.
     const appCheck = initializeAppCheck(app, {
-        provider: customProvider,
+        provider: new ReCaptchaV3Provider(import.meta.env.VITE_RECAPTCHA_SITE_KEY),
         isTokenAutoRefreshEnabled: true,
     });
 

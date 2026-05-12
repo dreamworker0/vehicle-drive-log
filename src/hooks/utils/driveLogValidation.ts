@@ -48,8 +48,8 @@ export function validateDriveLogForm(
     if (startKm < 0 || endKm < 0) {
         return { valid: false, message: 'km 값은 0 이상이어야 합니다.' };
     }
-    if (endKm < startKm) {
-        return { valid: false, message: '도착 km가 출발 km보다 작습니다.' };
+    if (endKm <= startKm) {
+        return { valid: false, message: '도착 km는 출발 km보다 커야 합니다.' };
     }
     if (endKm - startKm > 10000) {
         return { valid: false, message: '한 번의 운행에 10,000km 이상은 입력할 수 없습니다. 값을 확인해주세요.' };

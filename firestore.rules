@@ -46,7 +46,7 @@ service cloud.firestore {
       // 자기 자신 + superAdmin + 같은 기관 멤버만 읽기 가능
       allow read: if isOwner(userId)
                   || isSuperAdmin()
-                  || (isSignedIn() && resource.data.organizationId == userOrgId());
+                  || (isSignedIn() && resource != null && resource.data.organizationId == userOrgId());
       allow create: if isOwner(userId)
                     && request.auth.token.firebase.sign_in_provider != 'anonymous'
                     && request.resource.data.keys().hasAll(['email'])
