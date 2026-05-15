@@ -138,31 +138,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
                                     if (isInitialLoad || isClaimsChanged) {
                                         if (isInitialLoad) {
-                                            // 캐시된 토큰의 Claims와 DB 데이터가 불일치하는지 검사 (예: 1달 만의 접속)
+                                            // 캐시된 토큰의 Claims와 DB 데이터가 불일치하면 백그라운드에서 갱신.
+                                            // 첫 쿼리가 permission-denied를 받으면 onSnapshot err 핸들러의
+                                            // retry+refresh가 자동 복구하므로, 로딩을 막지 않는다.
                                             firebaseUser.getIdTokenResult(false)
                                                 .then(tokenResult => {
                                                     const claims = tokenResult.claims;
                                                     if (claims.orgId !== data.organizationId || claims.role !== data.role) {
-                                                        console.debug('[Auth] 로컬 Claims 불일치 감지. 토큰 강제 갱신 진행');
+                                                        console.debug('[Auth] 로컬 Claims 불일치 감지. 백그라운드 토큰 갱신');
                                                         return refreshToken(firebaseUser);
                                                     }
                                                 })
-                                                .catch(() => {})
-                                                .finally(() => { finishLoading(); });
+                                                .catch(() => {});
                                         } else {
-                                            // 이후 변경: fire-and-forget + 즉시 loading 해제
-                                            // 갱신 실패 시 UI가 옛 권한을 계속 보여줄 수 있으므로 토스트로 안내
+                                            // 이후 변경: fire-and-forget. 갱신 실패 시 토스트로 안내
                                             refreshTokenSilently(firebaseUser, () => {
                                                 useToastStore.getState().showToast(
                                                     '권한 정보 갱신에 실패했습니다. 다시 로그인해 주세요.',
                                                     'warning'
                                                 );
                                             });
-                                            finishLoading();
                                         }
-                                    } else {
-                                        finishLoading();
                                     }
+                                    finishLoading();
                                 } else {
                                     // 사용자 문서가 없거나 삭제됨
                                     // orgWatch가 남아있으면 orgDeleted=true를 계속 세팅하므로 반드시 해제
