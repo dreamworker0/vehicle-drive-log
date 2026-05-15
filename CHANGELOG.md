@@ -377,7 +377,7 @@
 - 예약 화면 즐겨찾기 등록 버튼
 
 ### Changed
-- OCR 모델 업그레이드: `gemini-3.1-flash-lite-preview` (`ocrDashboard.ts`, `ocrDocument.ts`)
+- OCR 모델 업그레이드: `gemini-3.1-flash-lite` (`ocrDashboard.ts`, `ocrDocument.ts`)
 - 목적지 입력 placeholder 축약 (모바일 가독성 향상)
 - Firestore 보안 규칙 정비 (즐겨찾기/예약 권한 검증 강화)
 - Firestore 복합 인덱스 추가 (신규 쿼리 패턴)

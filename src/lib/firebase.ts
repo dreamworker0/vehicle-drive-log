@@ -23,6 +23,31 @@ const app = initializeApp(firebaseConfig);
 // 개발 환경: VITE_APPCHECK_DEBUG_TOKEN으로 에뮬레이터/로컬 통과
 // 프로덕션: reCAPTCHA v3 토큰 자동 발급
 if (typeof window !== 'undefined') {
+    // @firebase/app-check / @firebase/auth SDK 내부 logger가 토큰 교환 500/throttle 시
+    // console.warn을 N회 직접 호출한다 (per-component setLogLevel 미제공). 우리 쪽
+    // onTokenChanged 핸들러에서 이미 60초 dedup으로 1회 안내하므로, 동일한 의미의
+    // SDK 내부 경고만 좁게 필터링한다. 전역 setLogLevel은 다른 진단 경고까지 막아 부적합.
+    const origWarn = console.warn.bind(console);
+    const appCheckNoisePatterns = [
+        '@firebase/app-check',
+        'Error while retrieving App Check token',
+    ];
+    const appCheckNoiseCodes = [
+        'appCheck/throttled',
+        'appCheck/initial-throttle',
+        'AppCheck: 500 error',
+        'Requests throttled due to previous',
+    ];
+    console.warn = (...args: unknown[]) => {
+        const first = typeof args[0] === 'string' ? args[0] : '';
+        if (
+            appCheckNoisePatterns.some(p => first.includes(p)) &&
+            appCheckNoiseCodes.some(c => first.includes(c))
+        ) {
+            return;
+        }
+        origWarn(...args);
+    };
     const debugToken = import.meta.env.VITE_APPCHECK_DEBUG_TOKEN;
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     if (debugToken && isLocalhost) {
@@ -37,16 +62,21 @@ if (typeof window !== 'undefined') {
         isTokenAutoRefreshEnabled: true,
     });
 
-    // App Check 내부 에러(500 에러 등) 명시적 Sentry 수집 (에러 노이즈 방지를 위해 완화)
+    // App Check 내부 에러(500 에러 등) — 동일 errorCode 기준 60초 윈도우에 1회만 출력
+    const appCheckWarnDedup = new Map<string, number>();
     onTokenChanged(appCheck, {
         next: () => { /* 정상 토큰 발급 시 무시 */ },
         error: (err) => {
+            const code = (err as { code?: string })?.code || 'unknown';
+            const now = Date.now();
+            const last = appCheckWarnDedup.get(code) ?? 0;
+            if (now - last < 60_000) return;
+            appCheckWarnDedup.set(code, now);
             const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-            if (isLocalhost) {
-                console.warn('[App Check] 로컬 환경 토큰 발급 500 에러 감지 (Sentry 전송 무시됨):', err);
-                return;
-            }
-            console.warn('[App Check] 토큰 발급 500 에러 감지 (인프라/네트워크 이슈로 간주하여 Sentry 무시):', err);
+            console.warn(
+                `[App Check] 토큰 발급 실패 (${code}) — ${isLocalhost ? '로컬' : '인프라/네트워크'} 이슈로 간주:`,
+                err
+            );
         }
     });
 }

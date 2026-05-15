@@ -104,7 +104,7 @@ ${MANUAL_SUMMARY}
 
             const ai = new GoogleGenAI({ apiKey: geminiApiKey.value() });
             const response = await ai.models.generateContent({
-                model: "gemini-3.1-flash-lite-preview",
+                model: "gemini-3.1-flash-lite",
                 contents: [{ role: "user", parts: [{ text: prompt }] }],
                 config: {
                     maxOutputTokens: 500,

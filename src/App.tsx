@@ -1,4 +1,4 @@
-import { Suspense, useEffect, useRef, type ReactNode } from 'react';
+import { Suspense, useEffect, useRef, useState, type ReactNode } from 'react';
 import ConfirmModal from './components/common/ConfirmModal';
 import { useConfirmStore } from './store/useConfirmStore';
 import { useThemeStore } from './store/useThemeStore';
@@ -33,11 +33,25 @@ const FAQPage = lazyWithRetry(() => import('./components/auth/FAQPage'));
 export const SA_TEST_ROLE_KEY = 'sa-test-role' as const;
 
 export function LoadingScreen() {
+  const [elapsed, setElapsed] = useState(0);
+
+  useEffect(() => {
+    const start = Date.now();
+    const id = setInterval(() => setElapsed(Math.floor((Date.now() - start) / 1000)), 500);
+    return () => clearInterval(id);
+  }, []);
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-primary-100 dark:from-surface-950 dark:via-surface-900 dark:to-surface-950">
       <div className="text-center animate-fade-in">
         <div className="w-16 h-16 spinner mx-auto mb-4"></div>
         <p className="text-surface-500 font-medium">로딩 중...</p>
+        {elapsed >= 2 && elapsed < 8 && (
+          <p className="mt-2 text-sm text-surface-400">권한 정보를 동기화 중입니다…</p>
+        )}
+        {elapsed >= 8 && (
+          <p className="mt-2 text-sm text-surface-400">네트워크가 느리거나 보안 인증이 지연되고 있습니다.</p>
+        )}
       </div>
     </div>
   );
