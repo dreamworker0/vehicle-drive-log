@@ -1,4 +1,5 @@
-import { RELEASE_NOTES, type ReleaseItem } from '../../lib/releaseNotes';
+import { useState, useEffect } from 'react';
+import { loadReleaseNotes, type ReleaseItem, type ReleaseNote } from '../../lib/releaseNotes';
 import useForceLightMode from '../../hooks/useForceLightMode';
 import SEOHead from '../common/SEOHead';
 import PublicNav from '../common/PublicNav';
@@ -11,6 +12,15 @@ const TYPE_CONFIG: Record<ReleaseItem['type'], { emoji: string; label: string; c
 
 export default function ReleaseNotesPage() {
     useForceLightMode();
+    const [notes, setNotes] = useState<ReleaseNote[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        loadReleaseNotes().then((data) => {
+            setNotes(data);
+            setLoading(false);
+        });
+    }, []);
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-surface-50 to-primary-50 flex flex-col">
@@ -30,43 +40,49 @@ export default function ReleaseNotesPage() {
                         </p>
                     </div>
 
-                    {RELEASE_NOTES.map((note) => (
-                        <section key={note.date} className="space-y-3">
-                            {/* 날짜 헤더 */}
-                            <div className="flex items-center gap-3">
-                                <time className="text-sm font-mono font-semibold text-primary-600 whitespace-nowrap">
-                                    {note.date}
-                                </time>
-                                {note.title && (
-                                    <span className="text-sm font-medium text-surface-700 dark:text-surface-300 truncate">
-                                        {note.title}
-                                    </span>
+                    {loading ? (
+                        <div className="flex justify-center py-12">
+                            <div className="w-8 h-8 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+                        </div>
+                    ) : (
+                        notes.map((note, noteIdx) => (
+                            <section key={note.date + noteIdx} className="space-y-3">
+                                {/* 날짜 헤더 */}
+                                <div className="flex items-center gap-3">
+                                    <time className="text-sm font-mono font-semibold text-primary-600 whitespace-nowrap">
+                                        {note.date}
+                                    </time>
+                                    {note.title && (
+                                        <span className="text-sm font-medium text-surface-700 dark:text-surface-300 truncate">
+                                            {note.title}
+                                        </span>
+                                    )}
+                                </div>
+
+                                {/* 변경 사항 리스트 */}
+                                <ul className="space-y-2 pl-1">
+                                    {note.items.map((item, idx) => {
+                                        const cfg = TYPE_CONFIG[item.type];
+                                        return (
+                                            <li key={idx} className="flex items-start gap-2.5 text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
+                                                <span
+                                                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium whitespace-nowrap mt-0.5 ${cfg.color}`}
+                                                >
+                                                    {cfg.emoji} {cfg.label}
+                                                </span>
+                                                <span>{item.text}</span>
+                                            </li>
+                                        );
+                                    })}
+                                </ul>
+
+                                {/* 구분선 (마지막 제외) */}
+                                {noteIdx < notes.length - 1 && (
+                                    <hr className="border-surface-100" />
                                 )}
-                            </div>
-
-                            {/* 변경 사항 리스트 */}
-                            <ul className="space-y-2 pl-1">
-                                {note.items.map((item, idx) => {
-                                    const cfg = TYPE_CONFIG[item.type];
-                                    return (
-                                        <li key={idx} className="flex items-start gap-2.5 text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
-                                            <span
-                                                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium whitespace-nowrap mt-0.5 ${cfg.color}`}
-                                            >
-                                                {cfg.emoji} {cfg.label}
-                                            </span>
-                                            <span>{item.text}</span>
-                                        </li>
-                                    );
-                                })}
-                            </ul>
-
-                            {/* 구분선 (마지막 제외) */}
-                            {note !== RELEASE_NOTES[RELEASE_NOTES.length - 1] && (
-                                <hr className="border-surface-100" />
-                            )}
-                        </section>
-                    ))}
+                            </section>
+                        ))
+                    )}
 
                     <div className="border-t border-surface-100 pt-4 text-center">
                         <p className="text-xs text-surface-400 dark:text-surface-500">

@@ -57,6 +57,7 @@ export default defineConfig({
           'date-fns': ['date-fns'],
           'recharts': ['recharts'],
           'leaflet': ['leaflet'],
+          'image-compression': ['browser-image-compression'],
         },
       },
     },

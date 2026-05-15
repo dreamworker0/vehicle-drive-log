@@ -1,9 +1,9 @@
 /**
  * UserManual — 사용 설명서 모달
- * 콘텐츠 데이터는 manualSections.ts에서 관리
+ * 콘텐츠 데이터는 public/data/manualSections.json에서 비동기 로드
  */
 import React, { useState, useEffect } from 'react';
-import { ADMIN_SECTIONS, EMPLOYEE_SECTIONS } from '../../lib/manualSections';
+import { loadManualSections, type ManualSection } from '../../lib/manualSections';
 
 /* 항목 타입별 스타일 */
 interface ItemStyle {
@@ -111,8 +111,17 @@ function AccordionItem({ title, content, isOpen, onToggle }: AccordionItemProps)
 }
 
 export default function UserManual({ role = 'employee', onClose }: UserManualProps) {
-    const sections = role === 'admin' ? ADMIN_SECTIONS : EMPLOYEE_SECTIONS;
+    const [sections, setSections] = useState<ManualSection[]>([]);
+    const [loading, setLoading] = useState(true);
     const [openIndex, setOpenIndex] = useState(0);
+
+    // 데이터 비동기 로드
+    useEffect(() => {
+        loadManualSections().then((data) => {
+            setSections(role === 'admin' ? data.adminSections : data.employeeSections);
+            setLoading(false);
+        });
+    }, [role]);
 
     // ESC 키로 닫기
     useEffect(() => {
@@ -163,15 +172,21 @@ export default function UserManual({ role = 'employee', onClose }: UserManualPro
 
                 {/* 본문 */}
                 <div className="flex-1 overflow-y-auto">
-                    {sections.map((section, idx) => (
-                        <AccordionItem
-                            key={idx}
-                            title={section.title}
-                            content={section.content as (string | ManualContent)[]}
-                            isOpen={openIndex === idx}
-                            onToggle={() => setOpenIndex(openIndex === idx ? -1 : idx)}
-                        />
-                    ))}
+                    {loading ? (
+                        <div className="flex justify-center py-12">
+                            <div className="w-8 h-8 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+                        </div>
+                    ) : (
+                        sections.map((section, idx) => (
+                            <AccordionItem
+                                key={idx}
+                                title={section.title}
+                                content={section.content as (string | ManualContent)[]}
+                                isOpen={openIndex === idx}
+                                onToggle={() => setOpenIndex(openIndex === idx ? -1 : idx)}
+                            />
+                        ))
+                    )}
                 </div>
 
                 {/* 하단 팁 */}
