@@ -39,10 +39,13 @@ if (typeof window !== 'undefined') {
         'Requests throttled due to previous',
     ];
     console.warn = (...args: unknown[]) => {
-        const first = typeof args[0] === 'string' ? args[0] : '';
+        // @firebase/logger는 prefix("[ts]  @firebase/xxx:")를 args[0]에,
+        // 실제 메시지(코드 포함)를 args[1]+에 넣어 호출한다. 따라서 두 패턴을
+        // 같은 인자에서 찾으면 안 되고, args 전체를 합쳐서 본다.
+        const combined = args.map(a => (typeof a === 'string' ? a : '')).join(' ');
         if (
-            appCheckNoisePatterns.some(p => first.includes(p)) &&
-            appCheckNoiseCodes.some(c => first.includes(c))
+            appCheckNoisePatterns.some(p => combined.includes(p)) &&
+            appCheckNoiseCodes.some(c => combined.includes(c))
         ) {
             return;
         }
