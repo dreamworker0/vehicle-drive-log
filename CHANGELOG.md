@@ -19,6 +19,9 @@
 - **데이터 내보내기 안전성 강화**: 운행일지 엑셀/PDF 내보내기 시 성능 및 과금 방지를 위한 최대 5,000건 상한 로직 추가 및 기간 검색 필수화 (`queries.ts`)
 - **코드베이스 정리**: 미사용 중인 예약 실시간 구독 함수(`subscribeReservations`, `subscribePendingReservations`) 제거 (`reservations.ts`)
 
+### Fixed
+- **E2E 테스트 안정화**: 기관 신청 플로우(`org-application.spec.ts`)에서 약관 동의 시 체크박스 상태가 즉각 반영되지 않아 제출 버튼 클릭 시 타임아웃이 발생하던 문제 해결 (강제 클릭 처리 및 명시적 상태 대기 추가)
+
 ---
 
 ## Phase 47 — 로그인/인증 안정성 패치 🛡️

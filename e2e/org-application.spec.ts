@@ -22,10 +22,11 @@ test.describe('기관 사용 신청 플로우', () => {
         await page.goto('/apply');
         // 약관 동의 체크
         const checkboxes = page.locator('input[type="checkbox"]');
-        await checkboxes.nth(0).check();
-        await checkboxes.nth(1).check();
-        // 빈 폼으로 제출 시도
+        await checkboxes.nth(0).check({ force: true });
+        await checkboxes.nth(1).check({ force: true });
+        // 빈 폼으로 제출 시도 전 버튼이 활성화될 때까지 대기
         const submitBtn = page.getByRole('button', { name: '신청하기' });
+        await expect(submitBtn).toBeEnabled({ timeout: 10000 });
         await submitBtn.click();
         // 에러 메시지가 표시되어야 한다
         await expect(page.getByText(/필수|업로드/).first()).toBeVisible({ timeout: 5000 });
@@ -55,9 +56,10 @@ test.describe('기관 사용 신청 플로우', () => {
             const checkboxes = page.locator('input[type="checkbox"]');
             const count = await checkboxes.count();
             for (let i = 0; i < count; i++) {
-                await checkboxes.nth(i).check();
+                await checkboxes.nth(i).check({ force: true });
             }
             const submitBtn = page.getByRole('button', { name: '신청하기' });
+            await expect(submitBtn).toBeEnabled({ timeout: 10000 });
             await submitBtn.click();
             // HTML5 이메일 유효성 검사로 제출이 차단되어야 함
             const currentUrl = page.url();
