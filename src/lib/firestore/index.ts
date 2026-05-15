@@ -68,7 +68,6 @@ export {
     createReservationSafe,
     getReservations,
     getReservationById,
-    subscribeReservations,
     cancelReservation,
     updateReservation,
     updateReservationStatus,

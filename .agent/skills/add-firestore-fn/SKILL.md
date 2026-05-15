@@ -47,7 +47,7 @@ import { getVehicles, createDriveLog } from '../../lib/firestore';
 | 하이패스 단말기 | `hipass.ts` | 하이패스 단말기 관리 |
 | 하이패스 충전 | `hipassCharges.ts` | 하이패스 충전 기록 CRUD |
 | 차량 | `vehicles.ts` | `getVehicles`, `createVehicle`, `updateVehicle`, `deleteVehicle` |
-| 예약 | `reservations.ts` | `createReservationSafe`, `subscribeReservations`, `cancelReservation` |
+| 예약 | `reservations.ts` | `createReservationSafe`, `getReservations`, `cancelReservation` |
 | 사용자 | `users.ts` | `getUser`, `createUser`, `updateUser`, `leaveOrganization` |
 | 기관 | `organizations.ts` | `createOrganization`, `approveOrganization`, `findOrganizationByInviteCode` |
 | 정비 | `maintenance.ts` | `getMaintenanceRecords`, `createMaintenanceRecord`, `retireVehicle` |

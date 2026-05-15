@@ -293,7 +293,8 @@ export default function useDriveLogList() {
             }
         } catch (err) {
             console.error('Export 데이터 로드 실패:', err);
-            showToast('데이터를 불러오는데 실패했습니다.', 'error');
+            const msg = err instanceof Error && err.message ? err.message : '데이터를 불러오는데 실패했습니다.';
+            showToast(msg, 'error');
         }
     };
 

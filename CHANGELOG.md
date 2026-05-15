@@ -14,8 +14,10 @@
 - **운행일지 리스트 최적화**: `useDriveLogList` 훅 내의 필터링 및 합계 계산 로직에 `useMemo`를 도입하여 불필요한 리렌더링 및 재계산 성능 저하 방지
 - **타입 시스템 정비**: `DriveLogTableRow.tsx`와 `useDriveLogList.ts`에 산재해 있던 중복 `DriveLogEntry` 인터페이스를 `src/types/driveLog.ts`로 통합 분리하여 코드 중복 제거 및 타입 일관성 확보
 - **초기 번들 사이즈 최적화**: 릴리즈 노트와 매뉴얼 데이터를 JSON으로 분리하고 Lazy Loading 적용. 이미지 압축 라이브러리 비동기 청크 분할 (메인 번들 약 60KB+ 축소)
-- **백엔드 모놀리식 모듈 분할**: 773줄 규모의 `computeDashboardStats`를 헬퍼 및 섹션 모듈로 분할. 586줄 규모의 `autoVerifyDocument` 비즈니스 로직(마스킹, 지오코딩, 알림)을 순수 함수로 추출 (`verifyHelpers`)하여 유지보수성 및 단위 테스트 기반 확보
+- **백엔드 모놀리식 모듈 분할**: 773줄 규모의 `computeDashboardStats`를 헬퍼 및 섹션 모듈 분할. 586줄 규모의 `autoVerifyDocument` 비즈니스 로직(마스킹, 지오코딩, 알림)을 순수 함수로 추출 (`verifyHelpers`)하여 유지보수성 및 단위 테스트 기반 확보
 - **프론트엔드 비즈니스 로직 최적화**: `useVehicleManager` 훅 내부의 차량 정적 모델 데이터 및 판별 로직을 `vehicleModelData.ts` 순수 유틸리티로 분리하여 훅 책임 완화 및 가독성 향상
+- **데이터 내보내기 안전성 강화**: 운행일지 엑셀/PDF 내보내기 시 성능 및 과금 방지를 위한 최대 5,000건 상한 로직 추가 및 기간 검색 필수화 (`queries.ts`)
+- **코드베이스 정리**: 미사용 중인 예약 실시간 구독 함수(`subscribeReservations`, `subscribePendingReservations`) 제거 (`reservations.ts`)
 
 ---
 

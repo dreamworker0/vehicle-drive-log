@@ -4,8 +4,7 @@
 import {
     doc, getDoc, updateDoc,
     collection, query, where, getDocs, addDoc,
-    serverTimestamp, onSnapshot, runTransaction, writeBatch, Timestamp,
-    type DocumentData,
+    serverTimestamp, runTransaction, writeBatch, Timestamp,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, firebaseFunctions, auth } from '../firebase';
@@ -86,45 +85,6 @@ export const getReservations = async (orgId: string, date?: string) => {
         captureError(error, { context: 'getReservations', orgId, date });
         throw error;
     }
-};
-
-// 예약 실시간 구독 (오늘 이후 데이터만)
-export const subscribeReservations = (orgId: string, callback: (reservations: (DocumentData & { id: string })[]) => void) => {
-    const today = new Date();
-    const todayStr = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-
-    const q = query(
-        reservationsCollection(),
-        where('organizationId', '==', orgId),
-        where('date', '>=', todayStr)
-    );
-    return onSnapshot(q, (snap) => {
-        const reservations = snap.docs.map(d => d.data() as Reservation);
-        callback(reservations);
-    });
-};
-
-// 승인 대기 중인 예약 실시간 구독 (과거 방치 건 무시, 오늘 이후)
-export const subscribePendingReservations = (orgId: string, callback: (reservations: (DocumentData & { id: string })[]) => void) => {
-    const today = new Date();
-    const todayStr = new Date(today.getTime() - today.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-
-    const q = query(
-        reservationsCollection(),
-        where('organizationId', '==', orgId),
-        where('status', '==', 'pending'),
-        where('date', '>=', todayStr)
-    );
-    return onSnapshot(q, (snap) => {
-        const reservations = snap.docs.map(d => d.data() as Reservation);
-        // 생성일 순으로 정렬 (가장 오래된 것이 위로 오게)
-        reservations.sort((a, b) => {
-            const timeA = typeof (a.createdAt as Timestamp)?.toMillis === 'function' ? (a.createdAt as Timestamp).toMillis() : 0;
-            const timeB = typeof (b.createdAt as Timestamp)?.toMillis === 'function' ? (b.createdAt as Timestamp).toMillis() : 0;
-            return timeA - timeB; // 오름차순
-        });
-        callback(reservations);
-    });
 };
 
 // 승인 대기 중인 예약 일회성 조회 (getDocs 기반)

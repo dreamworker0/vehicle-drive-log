@@ -77,24 +77,34 @@ export const getDriveLogs = async (
     }
 };
 
+// 내보내기 1회 호출당 안전 상한 — 초과 시 사용자에게 기간을 좁히도록 유도
+export const EXPORT_MAX_DOCS = 5000;
+
 /** 특정 기간/조건의 모든 운행일지를 엑셀/PDF 다운로드 용도로 한 번에 가져오기 */
 export const getAllDriveLogsForExport = async (
     orgId: string,
     filters: { vehicleId?: string; driverUid?: string; startDate?: string; endDate?: string }
 ) => {
+    if (!filters.startDate || !filters.endDate) {
+        throw new Error('내보내기에는 시작일과 종료일이 필수입니다.');
+    }
     try {
         const constraints: QueryConstraint[] = [];
         if (filters.driverUid) constraints.push(where('driverUid', '==', filters.driverUid));
         constraints.push(where('organizationId', '==', orgId));
         if (filters.vehicleId) constraints.push(where('vehicleId', '==', filters.vehicleId));
-        
-        if (filters.startDate) constraints.push(where('timestamp', '>=', new Date(`${filters.startDate}T00:00:00`)));
-        if (filters.endDate) constraints.push(where('timestamp', '<=', new Date(`${filters.endDate}T23:59:59.999`)));
-        
+
+        constraints.push(where('timestamp', '>=', new Date(`${filters.startDate}T00:00:00`)));
+        constraints.push(where('timestamp', '<=', new Date(`${filters.endDate}T23:59:59.999`)));
+
         constraints.push(orderBy('timestamp', 'desc'));
+        constraints.push(limit(EXPORT_MAX_DOCS + 1));
 
         const q = query(collection(db, 'driveLogs').withConverter(driveLogConverter), ...constraints);
         const snap = await getDocs(q);
+        if (snap.docs.length > EXPORT_MAX_DOCS) {
+            throw new Error(`기간 내 운행일지가 ${EXPORT_MAX_DOCS}건을 초과합니다. 기간을 좁혀 다시 시도해 주세요.`);
+        }
         return snap.docs.map(d => d.data());
     } catch (error) {
         captureError(error, { context: 'getAllDriveLogsForExport', orgId, filters });
