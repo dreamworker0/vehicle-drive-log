@@ -197,13 +197,17 @@ export const getApprovedOrganizationsCount = async () => {
     }
 };
 
+// 슈퍼관리자 상태별 목록 조회용 상한. 폭주 시 전체 풀스캔 방지 안전장치.
+const ORG_LIST_LIMIT = 100;
+
 // 대기 중 기관 목록 조회
 export const getPendingOrganizations = async () => {
     try {
         const q = query(
             collection(db, 'organizations').withConverter(orgConverter),
             where('status', '==', 'pending'),
-            orderBy('createdAt', 'desc')
+            orderBy('createdAt', 'desc'),
+            limit(ORG_LIST_LIMIT)
         );
         const snap = await getDocs(q);
         return snap.docs.map(d => d.data());
@@ -219,7 +223,8 @@ export const getRejectedOrganizations = async () => {
         const q = query(
             collection(db, 'organizations').withConverter(orgConverter),
             where('status', '==', 'rejected'),
-            orderBy('createdAt', 'desc')
+            orderBy('createdAt', 'desc'),
+            limit(ORG_LIST_LIMIT)
         );
         const snap = await getDocs(q);
         return snap.docs.map(d => d.data());
@@ -235,7 +240,8 @@ export const getDeletedOrganizations = async () => {
         const q = query(
             collection(db, 'organizations').withConverter(orgConverter),
             where('status', '==', 'deleted'),
-            orderBy('deletedAt', 'desc')
+            orderBy('deletedAt', 'desc'),
+            limit(ORG_LIST_LIMIT)
         );
         const snap = await getDocs(q);
         return snap.docs.map(d => d.data());
@@ -251,7 +257,8 @@ export const getApprovedOrganizations = async () => {
         const q = query(
             collection(db, 'organizations').withConverter(orgConverter),
             where('status', '==', 'approved'),
-            orderBy('createdAt', 'desc')
+            orderBy('createdAt', 'desc'),
+            limit(ORG_LIST_LIMIT)
         );
         const snap = await getDocs(q);
         return snap.docs.map(d => d.data());

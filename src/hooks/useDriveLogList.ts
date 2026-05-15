@@ -1,31 +1,14 @@
 /**
  * useDriveLogList — 운행일지 목록 데이터 fetching, 페이지네이션, 중복 검사, 내보내기 핸들러
  */
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
 import { useConfirm } from './useConfirm';
 import { getDriveLogs, getVehicles, getOrganizationMembers, getOrganization, cleanupDuplicateLogs, deleteDriveLog, getAllDriveLogsForExport } from '../lib/firestore';
 import { toLocalDateStr } from '../lib/dateUtils';
 import type { DocumentSnapshot } from 'firebase/firestore';
-
-interface DriveLogEntry {
-    id: string;
-    vehicleId?: string;
-    vehicleName?: string;
-    driverUid?: string;
-    driverName?: string;
-    date?: string;
-    startKm: number;
-    endKm: number;
-    startTime?: string;
-    endTime?: string;
-    destination?: string;
-    purpose?: string;
-    passengerCount?: number;
-    timestamp?: { toDate: () => Date };
-    [key: string]: unknown;
-}
+import type { DriveLogEntry } from '../types/driveLog';
 
 interface VehicleEntry {
     id: string;
@@ -154,21 +137,22 @@ export default function useDriveLogList() {
         }
     };
 
-    // 검색 필터링
-    const filteredLogs = logs.filter(log => {
-        if (filters.search) {
-            const s = filters.search.toLowerCase();
-            return (
-                log.driverName?.toLowerCase().includes(s) ||
-                log.vehicleName?.toLowerCase().includes(s) ||
-                log.purpose?.toLowerCase().includes(s) ||
-                log.destination?.toLowerCase().includes(s)
-            );
-        }
-        return true;
-    });
+    // 검색 필터링 — logs/filters.search가 동일하면 재계산 생략
+    const filteredLogs = useMemo(() => {
+        if (!filters.search) return logs;
+        const s = filters.search.toLowerCase();
+        return logs.filter(log => (
+            log.driverName?.toLowerCase().includes(s) ||
+            log.vehicleName?.toLowerCase().includes(s) ||
+            log.purpose?.toLowerCase().includes(s) ||
+            log.destination?.toLowerCase().includes(s)
+        ));
+    }, [logs, filters.search]);
 
-    const totalDistance = filteredLogs.reduce((sum, l) => sum + ((l.endKm - l.startKm) || 0), 0);
+    const totalDistance = useMemo(
+        () => filteredLogs.reduce((sum, l) => sum + ((l.endKm - l.startKm) || 0), 0),
+        [filteredLogs]
+    );
 
     // 삭제
     const handleDelete = async (logId: string, driverName: string) => {

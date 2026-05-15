@@ -5,6 +5,17 @@
 
 ---
 
+## Phase 48 — 성능 최적화 및 타입 안정성 패치 🚀
+
+> 2026-05-15
+
+### Changed
+- **관리자 대시보드 성능 최적화**: 슈퍼관리자의 기관 목록 조회 시 `limit(100)` 안전장치를 추가하여 비정상적인 풀스캔 및 과부하 방지 (`organizations.ts`)
+- **운행일지 리스트 최적화**: `useDriveLogList` 훅 내의 필터링 및 합계 계산 로직에 `useMemo`를 도입하여 불필요한 리렌더링 및 재계산 성능 저하 방지
+- **타입 시스템 정비**: `DriveLogTableRow.tsx`와 `useDriveLogList.ts`에 산재해 있던 중복 `DriveLogEntry` 인터페이스를 `src/types/driveLog.ts`로 통합 분리하여 코드 중복 제거 및 타입 일관성 확보
+
+---
+
 ## Phase 47 — 로그인/인증 안정성 패치 🛡️
 
 > 2026-05-15

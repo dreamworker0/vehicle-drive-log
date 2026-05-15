@@ -42,6 +42,29 @@ export interface DriveLog extends FirestoreDoc {
 /** createDriveLog에 전달할 데이터 */
 export type CreateDriveLogData = Omit<DriveLog, 'id' | 'createdAt' | 'editedAt'>;
 
+/**
+ * 관리자 목록·테이블에서 다루는 운행일지 UI 뷰 타입.
+ * Firestore 결과를 그대로 렌더에 쓰기 때문에 timestamp는 toDate()를 갖는 Firestore Timestamp 형태.
+ * 정식 DriveLog는 timestamp가 Date | TimestampField 라서 별도 분리.
+ */
+export interface DriveLogEntry {
+    id: string;
+    vehicleId?: string;
+    vehicleName?: string;
+    driverUid?: string;
+    driverName?: string;
+    date?: string;
+    startKm: number;
+    endKm: number;
+    startTime?: string;
+    endTime?: string;
+    destination?: string;
+    purpose?: string;
+    passengerCount?: number;
+    timestamp?: { toDate: () => Date };
+    [key: string]: unknown;
+}
+
 /** DriveLog 페이지네이션 결과 */
 export interface DriveLogPage {
     docs: DriveLog[];

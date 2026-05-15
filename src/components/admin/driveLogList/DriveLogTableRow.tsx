@@ -1,20 +1,4 @@
-interface DriveLogEntry {
-    id: string;
-    vehicleId?: string;
-    vehicleName?: string;
-    driverUid?: string;
-    driverName?: string;
-    date?: string;
-    startKm: number;
-    endKm: number;
-    startTime?: string;
-    endTime?: string;
-    destination?: string;
-    purpose?: string;
-    passengerCount?: number;
-    timestamp?: { toDate: () => Date };
-    [key: string]: unknown;
-}
+import type { DriveLogEntry } from '../../../types/driveLog';
 
 export interface DriveLogTableRowProps {
     log: DriveLogEntry;
