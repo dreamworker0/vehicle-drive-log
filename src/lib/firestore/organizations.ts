@@ -198,7 +198,7 @@ export const getApprovedOrganizationsCount = async () => {
 };
 
 // 슈퍼관리자 상태별 목록 조회용 상한. 폭주 시 전체 풀스캔 방지 안전장치.
-const ORG_LIST_LIMIT = 100;
+const ORG_LIST_LIMIT = 500;
 
 // 대기 중 기관 목록 조회
 export const getPendingOrganizations = async () => {

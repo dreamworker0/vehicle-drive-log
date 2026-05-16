@@ -10,7 +10,8 @@
 > 2026-05-15
 
 ### Changed
-- **관리자 대시보드 성능 최적화**: 슈퍼관리자의 기관 목록 조회 시 `limit(100)` 안전장치를 추가하여 비정상적인 풀스캔 및 과부하 방지 (`organizations.ts`)
+- **기관 조회 제한 상향**: 시스템 관리자의 기관 목록에서 누락되는 데이터가 없도록 `ORG_LIST_LIMIT`을 100에서 500으로 상향 조정 (`organizations.ts`)
+- **관리자 대시보드 성능 최적화**: 슈퍼관리자의 기관 목록 조회 시 `limit(500)` 안전장치를 유지하여 비정상적인 풀스캔 및 과부하 방지 (`organizations.ts`)
 - **운행일지 리스트 최적화**: `useDriveLogList` 훅 내의 필터링 및 합계 계산 로직에 `useMemo`를 도입하여 불필요한 리렌더링 및 재계산 성능 저하 방지
 - **타입 시스템 정비**: `DriveLogTableRow.tsx`와 `useDriveLogList.ts`에 산재해 있던 중복 `DriveLogEntry` 인터페이스를 `src/types/driveLog.ts`로 통합 분리하여 코드 중복 제거 및 타입 일관성 확보
 - **초기 번들 사이즈 최적화**: 릴리즈 노트와 매뉴얼 데이터를 JSON으로 분리하고 Lazy Loading 적용. 이미지 압축 라이브러리 비동기 청크 분할 (메인 번들 약 60KB+ 축소)
