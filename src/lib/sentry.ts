@@ -8,8 +8,10 @@ export function initSentry() {
     Sentry.init({
         dsn: SENTRY_DSN,
         environment: import.meta.env.MODE,
-        // 프로덕션에서만 100% 샘플링, 개발 시 0%
-        tracesSampleRate: import.meta.env.PROD ? 1.0 : 0,
+        // 프로덕션 30% 샘플링 (주간 ~5k 샘플 확보, 비용·오버헤드 절감), 개발 시 0%
+        tracesSampleRate: import.meta.env.PROD ? 0.3 : 0,
+        // 자체 도메인만 트레이스 전파 (외부 API로의 불필요한 헤더 전송 차단)
+        tracePropagationTargets: ['localhost', /^https:\/\/vehicle-drive-log\.web\.app/],
         // 브라우저 성능 및 라우팅 트레이싱 활성화
         integrations: [
             Sentry.browserTracingIntegration(),
@@ -81,10 +83,13 @@ export function initSentry() {
             /Missing or insufficient permissions/,
             // 브라우저 확장 프로그램(번역기 등)의 중복 Custom Element 선언 에러 억제
             /has already been defined/,
+            // 브라우저 비밀번호 관리자·자동완성 확장이 Custom Element를 이중 등록하는 에러 (앱 버그 아님)
+            /autocomplete-textarea/,
             // 의도된 비즈니스 로직 에러 (글로벌 바운더리로 전파되는 노이즈 방지)
             /동일한 운행 기록이 이미 존재합니다/,
             /동기화 오류: 다른 사용자가 더 높은 누적 km/,
             /직전 운행 기록과 출발 주행거리가 일치하지 않습니다/,
+            /REQUIRES_START_KM_CONFIRMATION/,
             // 구버전 클라이언트 캐시가 보내는 undefined 필드값 Firestore 저장 시도 에러 억제
             /Unsupported field value: undefined/,
         ],
@@ -116,6 +121,14 @@ export function initSentry() {
             // - Safari/iOS:     "The object can not be found here"
             const errorMsg = event.exception?.values?.[0]?.value || '';
             if (/removeChild|The node to be removed is not a child|The object can not be found here/i.test(errorMsg)) {
+                return null;
+            }
+
+            // 의도된 비즈니스 로직 에러 확정적 필터링 (ignoreErrors를 우회해 전파되는 케이스 차단)
+            // ignoreErrors는 exception.values[0].value만 매칭하지만,
+            // ErrorBoundary나 unhandledrejection 경로로 감싸진 에러는 원본 메시지가 달라질 수 있음
+            const allMessages = (event.exception?.values || []).map(v => v.value || '').join(' ');
+            if (/일치하지 않습니다|REQUIRES_START_KM_CONFIRMATION|동일한 운행 기록|동기화 오류.*누적 km/.test(allMessages)) {
                 return null;
             }
 

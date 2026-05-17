@@ -5,6 +5,18 @@
 
 ---
 
+## Phase 49 — Sentry 모니터링 최적화 📊
+
+> 2026-05-17
+
+### Changed
+- **트레이스 샘플링 감소**: `tracesSampleRate`를 1.0(100%)에서 0.3(30%)으로 감소하여 클라이언트 오버헤드 및 Sentry 비용 절감 (주간 ~5k 샘플로 통계적 충분성 확보)
+- **트레이스 전파 범위 한정**: `tracePropagationTargets`를 자체 도메인(`vehicle-drive-log.web.app`)으로 제한하여 외부 API로의 불필요한 Sentry 헤더 전송 차단
+- **비즈니스 에러 확정적 필터링**: `beforeSend` 훅에서 주행거리 불일치(`REQUIRES_START_KM_CONFIRMATION`), 중복 운행 기록, 동기화 오류 등 의도된 비즈니스 에러를 `ignoreErrors`와 이중으로 차단하여 ErrorBoundary 경유 전파까지 완전 억제
+- **노이즈 패턴 보강**: 브라우저 확장 프로그램(비밀번호 관리자 등)의 `autocomplete-textarea` Custom Element 중복 등록 에러 필터링 추가
+
+---
+
 ## Phase 48 — 성능 최적화 및 타입 안정성 패치 🚀
 
 > 2026-05-15
