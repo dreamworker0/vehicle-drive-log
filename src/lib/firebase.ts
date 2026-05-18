@@ -57,13 +57,20 @@ if (typeof window !== 'undefined') {
         // @ts-expect-error -- 글로벌 디버그 토큰 설정 (firebase 공식 방법)
         self.FIREBASE_APPCHECK_DEBUG_TOKEN = debugToken;
     }
-    // ReCaptchaV3Provider는 initializeAppCheck를 통해 등록돼야 내부 스크립트가 로드됨.
-    // CustomProvider로 감싸서 getToken()을 직접 호출하면 동작하지 않고 더미 토큰 fallback이
-    // 모든 요청을 App Check 거부로 만들었음(b295455 이후 표면화). 공식 패턴으로 환원.
-    const appCheck = initializeAppCheck(app, {
-        provider: new ReCaptchaV3Provider(import.meta.env.VITE_RECAPTCHA_SITE_KEY),
-        isTokenAutoRefreshEnabled: true,
-    });
+    
+    let appCheck;
+    // @ts-expect-error -- HMR 및 중복 실행 시 reCAPTCHA 중복 렌더링 에러 방지
+    if (!window.__APP_CHECK_INITIALIZED__) {
+        appCheck = initializeAppCheck(app, {
+            provider: new ReCaptchaV3Provider(import.meta.env.VITE_RECAPTCHA_SITE_KEY),
+            isTokenAutoRefreshEnabled: true,
+        });
+        // @ts-expect-error -- window.__APP_CHECK_INITIALIZED__ 속성 할당 허용
+        window.__APP_CHECK_INITIALIZED__ = appCheck;
+    } else {
+        // @ts-expect-error -- window.__APP_CHECK_INITIALIZED__ 속성 참조 허용
+        appCheck = window.__APP_CHECK_INITIALIZED__;
+    }
 
     // App Check 내부 에러(500 에러 등) — 동일 errorCode 기준 60초 윈도우에 1회만 출력
     const appCheckWarnDedup = new Map<string, number>();
