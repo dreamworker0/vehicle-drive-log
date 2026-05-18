@@ -101,13 +101,15 @@ service cloud.firestore {
     // === 차량 ===
     match /vehicles/{vehicleId} {
       allow read: if belongsToMyOrg() || isSuperAdmin();
-      allow create: if (newBelongsToMyOrg() && isOrgAdmin(request.resource.data.organizationId))
-                    || isSuperAdmin();
-      allow update: if isOrgAdmin(resource.data.organizationId) || isSuperAdmin()
+      allow create: if ((newBelongsToMyOrg() && isOrgAdmin(request.resource.data.organizationId)) || isSuperAdmin())
+                    && (!request.resource.data.keys().hasAny(['currentKm']) || request.resource.data.currentKm >= 0);
+      allow update: if (isOrgAdmin(resource.data.organizationId) || isSuperAdmin())
+                    && (!request.resource.data.keys().hasAny(['currentKm']) || request.resource.data.currentKm >= 0)
                     // 소속 기관 멤버가 운행일지 저장 시 currentKm만 갱신 가능 (감소 방지)
                     || (isOrgMember(resource.data.organizationId)
                         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['currentKm'])
-                        && request.resource.data.currentKm >= resource.data.currentKm);
+                        && request.resource.data.currentKm >= resource.data.currentKm
+                        && request.resource.data.currentKm >= 0);
       allow delete: if isOrgAdmin(resource.data.organizationId) || isSuperAdmin();
     }
 
@@ -129,12 +131,16 @@ service cloud.firestore {
       allow read: if belongsToMyOrg() || isSuperAdmin();
       allow create: if newBelongsToMyOrg()
                     && request.resource.data.keys().hasAll(['organizationId', 'vehicleId', 'driverUid'])
-                    && request.resource.data.driverUid == request.auth.uid;
-      allow update: if isSuperAdmin()
+                    && request.resource.data.driverUid == request.auth.uid
+                    && (!request.resource.data.keys().hasAny(['startKm']) || request.resource.data.startKm >= 0)
+                    && (!request.resource.data.keys().hasAny(['endKm']) || request.resource.data.endKm >= 0);
+      allow update: if (isSuperAdmin()
                     || (belongsToMyOrg() && (
                         (resource.data.driverUid == request.auth.uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['organizationId', 'vehicleId', 'driverUid']))
                         || isOrgAdmin(resource.data.organizationId)
-                    ));
+                    )))
+                    && (!request.resource.data.keys().hasAny(['startKm']) || request.resource.data.startKm >= 0)
+                    && (!request.resource.data.keys().hasAny(['endKm']) || request.resource.data.endKm >= 0);
       allow delete: if isOrgAdmin(resource.data.organizationId) || isSuperAdmin();
     }
 

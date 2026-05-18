@@ -47,7 +47,11 @@ async function syncNextLogStartKm(orgId: string, vehicleId: string, afterDate: D
         if (oldStartKm === carryKm) break;
 
         const diff = carryKm - oldStartKm;
-        const newEndKm = (nextData.endKm ?? carryKm) + diff;
+        let newEndKm = (nextData.endKm ?? carryKm) + diff;
+
+        // [방어 코드] 주행거리가 마이너스로 전파되는 것 원천 차단
+        carryKm = Math.max(0, carryKm);
+        newEndKm = Math.max(0, newEndKm);
 
         await nextDoc.ref.update({
             startKm: carryKm,
