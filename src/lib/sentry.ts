@@ -130,7 +130,7 @@ export function initSentry() {
             // ignoreErrors는 exception.values[0].value만 매칭하지만,
             // ErrorBoundary나 unhandledrejection 경로로 감싸진 에러는 원본 메시지가 달라질 수 있음
             const allMessages = (event.exception?.values || []).map(v => v.value || '').join(' ');
-            if (/일치하지 않습니다|REQUIRES_START_KM_CONFIRMATION|동일한 운행 기록|동기화 오류.*누적 km/.test(allMessages)) {
+            if (/일치하지 않습니다|REQUIRES_START_KM_CONFIRMATION|동일한 운행 기록|동기화 오류.*누적 km|mobileapp_refresh/.test(allMessages)) {
                 return null;
             }
 
