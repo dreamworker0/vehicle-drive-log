@@ -56,7 +56,7 @@ export function initSentry() {
             // Facebook 인앱 브라우저 네이티브 브릿지 에러 (WebView 내부 이슈, 앱 버그 아님)
             /webkit\.messageHandlers/,
             // 특정 하이브리드 앱 또는 인앱 브라우저에서 스크립트 주입 시 발생하는 노이즈 에러 (앱 버그 아님)
-            /mobileapp_refresh/,
+            /mobileapp_.*/,
             // Facebook 인앱 브라우저 DOMException (WebView 호환성 이슈, 앱 버그 아님)
             /The object does not support the operation or argument/,
             // iOS Safari IndexedDB 삭제 에러 (사용자 데이터 삭제 또는 iOS 저장공간 자동 정리, 앱 버그 아님)
@@ -130,7 +130,7 @@ export function initSentry() {
             // ignoreErrors는 exception.values[0].value만 매칭하지만,
             // ErrorBoundary나 unhandledrejection 경로로 감싸진 에러는 원본 메시지가 달라질 수 있음
             const allMessages = (event.exception?.values || []).map(v => v.value || '').join(' ');
-            if (/일치하지 않습니다|REQUIRES_START_KM_CONFIRMATION|동일한 운행 기록|동기화 오류.*누적 km|mobileapp_refresh/.test(allMessages)) {
+            if (/일치하지 않습니다|REQUIRES_START_KM_CONFIRMATION|동일한 운행 기록|동기화 오류.*누적 km|mobileapp_.*/.test(allMessages)) {
                 return null;
             }
 
