@@ -55,6 +55,8 @@ export function initSentry() {
             /newestWorker is null/,
             // Facebook 인앱 브라우저 네이티브 브릿지 에러 (WebView 내부 이슈, 앱 버그 아님)
             /webkit\.messageHandlers/,
+            // 특정 하이브리드 앱 또는 인앱 브라우저에서 스크립트 주입 시 발생하는 노이즈 에러 (앱 버그 아님)
+            /mobileapp_refresh/,
             // Facebook 인앱 브라우저 DOMException (WebView 호환성 이슈, 앱 버그 아님)
             /The object does not support the operation or argument/,
             // iOS Safari IndexedDB 삭제 에러 (사용자 데이터 삭제 또는 iOS 저장공간 자동 정리, 앱 버그 아님)
