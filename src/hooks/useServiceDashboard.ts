@@ -24,6 +24,7 @@ export type DashboardSummaryState = Partial<CachedDashboardStats> & {
         themeStats?: { dark: number; light: number; none: number };
         welcomeStats?: { dismissed: number; notDismissed: number; rate: number };
     };
+    lastUpdatedAt?: string;
 };
 export type DashboardTimeSeriesState = Omit<Partial<CachedDashboardTimeSeries>, 'heatmapData'> & {
     heatmapData?: { grid: number[][]; maxCount: number };
