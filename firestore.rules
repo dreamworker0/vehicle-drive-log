@@ -54,15 +54,18 @@ service cloud.firestore {
                     && !request.resource.data.keys().hasAny(['role', 'organizationId']);
       allow update: if (isOwner(userId)
                         && (
-                            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'organizationId'])
+                            !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'organizationId', 'status', 'disabledAt'])
                             || (
                                 // 사용자가 스스로 기관을 탈퇴/초기화하여 '다른 기관으로 가입'하는 행위 허용
                                 request.resource.data.organizationId == null
                                 && request.resource.data.role == 'employee'
+                                && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'disabledAt'])
                             )
                         ))
                     || isSuperAdmin()
-                    || isOrgAdmin(resource.data.organizationId);
+                    // orgAdmin은 소속 기관 사용자만 수정 가능하되, superAdmin 역할 부여 불가
+                    || (isOrgAdmin(resource.data.organizationId)
+                        && request.resource.data.role != 'superAdmin');
       allow delete: if isSuperAdmin();
     }
 

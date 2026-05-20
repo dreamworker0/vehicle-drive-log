@@ -38,6 +38,15 @@ export const createReservationSafe = onCall(
             );
         }
 
+        // 호출자가 해당 기관에 소속되어 있는지 검증 (조직 격리)
+        const callerOrgId = request.auth.token.orgId;
+        if (callerOrgId !== organizationId) {
+            throw new HttpsError(
+                "permission-denied",
+                "자기 기관의 차량만 예약할 수 있습니다."
+            );
+        }
+
         if (startTime >= endTime) {
             throw new HttpsError(
                 "invalid-argument",
@@ -90,7 +99,7 @@ export const createReservationSafe = onCall(
                     organizationId,
                     vehicleId,
                     vehicleName: vehicleName || "",
-                    reservedByUid: reservedByUid || request.auth!.uid,
+                    reservedByUid: request.auth!.uid,
                     reservedByName: reservedByName || "",
                     date,
                     startTime,

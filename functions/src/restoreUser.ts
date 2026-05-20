@@ -87,7 +87,7 @@ export const restoreUser = onCall(
         } catch (err: unknown) {
             console.error("계정 복원 실패:", (err as Error).message);
             if (err instanceof HttpsError) throw err;
-            throw new HttpsError("internal", (err as Error).message);
+            throw new HttpsError("internal", "계정 복원 중 오류가 발생했습니다.");
         }
     }
 );

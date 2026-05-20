@@ -85,6 +85,17 @@ export const ocrDocument = onCall(
             throw new HttpsError("invalid-argument", "storagePath 또는 imageBase64가 필요합니다.");
         }
 
+        // storagePath 경로 조작 방지: 호출자의 기관 또는 본인 폴더만 접근 허용
+        if (storagePath) {
+            const callerOrgId = request.auth.token.orgId;
+            const callerUid = request.auth.uid;
+            const isOrgPath = callerOrgId && storagePath.startsWith(`organizations/${callerOrgId}/`);
+            const isFeedbackPath = storagePath.startsWith(`feedbacks/${callerUid}/`) || storagePath.startsWith(`feedbacks/ocr-report/${callerUid}/`);
+            if (!isOrgPath && !isFeedbackPath) {
+                throw new HttpsError("permission-denied", "접근 권한이 없는 파일입니다.");
+            }
+        }
+
         // imageBase64 크기 제한 (~5MB 원본 = ~6.67MB base64)
         if (imageBase64 && imageBase64.length > MAX_BASE64_SIZE) {
             throw new HttpsError("invalid-argument", "이미지 크기가 너무 큽니다 (최대 5MB).");

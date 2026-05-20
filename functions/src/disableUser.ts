@@ -56,7 +56,7 @@ export const disableUser = onCall(
         } catch (err: unknown) {
             console.error("직원 비활성화 실패:", (err as Error).message);
             if (err instanceof HttpsError) throw err;
-            throw new HttpsError("internal", (err as Error).message);
+            throw new HttpsError("internal", "직원 비활성화 중 오류가 발생했습니다.");
         }
     }
 );

@@ -16,10 +16,8 @@ export function BlockedScreen({ emoji, title, description, uid }: {
   const handleTransferOrg = async () => {
     try {
       await updateDoc(doc(db, 'users', uid), {
-        status: 'active',
         organizationId: null,
         role: 'employee',
-        disabledAt: null,
       });
     } catch (err) {
       console.error('기관 이동 실패:', err);

@@ -228,7 +228,13 @@ function AppContent() {
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       if (event.data?.type === 'NOTIFICATION_CLICK' && event.data?.url) {
-        window.location.href = event.data.url;
+        // Open Redirect 방지: 같은 origin의 URL만 허용
+        try {
+          const targetUrl = new URL(event.data.url, window.location.origin);
+          if (targetUrl.origin === window.location.origin) {
+            window.location.href = targetUrl.href;
+          }
+        } catch { /* 잘못된 URL은 무시 */ }
       }
     };
     navigator.serviceWorker?.addEventListener('message', handler);

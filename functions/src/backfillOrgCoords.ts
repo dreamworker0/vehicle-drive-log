@@ -48,6 +48,11 @@ export const backfillOrgCoords = onCall(
             throw new HttpsError("unauthenticated", "인증이 필요합니다.");
         }
 
+        // superAdmin만 전체 기관 좌표 일괄 수정 가능
+        if (request.auth.token.role !== "superAdmin") {
+            throw new HttpsError("permission-denied", "슈퍼관리자만 실행할 수 있습니다.");
+        }
+
         const db = getFirestore();
         const apiKey = tmapApiKey.value();
 
