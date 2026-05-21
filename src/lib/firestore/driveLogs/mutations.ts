@@ -108,29 +108,8 @@ export const updateDriveLog = async (logId: string, data: Partial<DriveLog>): Pr
         
         const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
 
-        // === [직전 기록 일치 검증] 직전 기록과 주행거리 일치 여부 확인 ===
-        if (data.organizationId && data.vehicleId && data.endKm != null && data.startKm != null && data.timestamp && !isOffline) {
-            const logDate = data.timestamp instanceof Date 
-                ? data.timestamp 
-                : (data.timestamp as import("firebase/firestore").Timestamp)?.toDate 
-                    ? (data.timestamp as import("firebase/firestore").Timestamp).toDate() 
-                    : new Date();
-
-            // 방금 입력하려는 시간 기준 "직전" 기록의 endKm을 조회
-            const beforeEndKm = await getVehicleEndKmBefore(data.organizationId as string, data.vehicleId as string, logDate);
-
-            // 직전 기록이 존재하고, 직전 마지막 도착 km가 현재 폼의 출발 km와 다르다면
-            if (beforeEndKm !== null && beforeEndKm !== data.startKm) {
-                const error = new Error('직전 운행 기록과 출발 주행거리가 일치하지 않습니다.');
-                Object.assign(error, {
-                    code: 'REQUIRES_START_KM_CONFIRMATION',
-                    suggestedStartKm: beforeEndKm,
-                    originalStartKm: data.startKm
-                });
-                throw error;
-            }
-        }
-        // === 끝 ===
+        // 수정 모드에서는 직전 기록 일치 강제 확인을 하지 않음
+        // — 사용자가 의도적으로 km를 변경하는 것이므로 MileageInput의 경고 배너로 충분
 
         const finalData = sanitizeUndefined({ ...data, editedAt: serverTimestamp() });
         const promise = updateDoc(logRef, finalData);

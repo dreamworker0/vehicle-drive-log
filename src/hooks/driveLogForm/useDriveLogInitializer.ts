@@ -9,7 +9,7 @@
  */
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getVehicles, getFavorites, getOrganizationMembers, getLastVehicleEndKm, getLastVehicleEndBattery, getReservationById, getHipassCards } from '../../lib/firestore';
+import { getVehicles, getFavorites, getOrganizationMembers, getLastVehicleEndKm, getLastVehicleEndBattery, getReservationById, getHipassCards, getLastVehicleDriveLog, getAdjacentDriveLogs } from '../../lib/firestore';
 import { resolveStartKm } from './resolveStartKm';
 import { captureError } from '../../lib/sentry';
 import type { User } from 'firebase/auth';
@@ -18,6 +18,7 @@ import type { Favorite } from '../../types/favorite';
 import type { User as UserDoc } from '../../types/user';
 import type { HipassCard } from '../../types/hipass';
 import type { DriveLogForm, LocationState } from './types';
+import type { DriveLog } from '../../types/driveLog';
 
 const clearDrivingNotification = async (resId?: string) => {
     if (!resId || !('Notification' in window)) return;
@@ -33,7 +34,7 @@ export interface InitializerDeps {
     orgId: string | null | undefined;
     user: User | null;
     isEditMode: boolean;
-    editLog: (import('../../types/driveLog').DriveLog & { passengerNames?: string[] }) | null;
+    editLog: (DriveLog & { passengerNames?: string[] }) | null;
     reservationData: LocationState | null;
     queryReservationId: string | null;
     resolvedReservationData: LocationState | null;
@@ -51,6 +52,8 @@ export interface InitializerDeps {
     setResolvedReservationData: (v: LocationState | null) => void;
     setLastEndBattery: (v: number | null) => void;
     setHipassCard: (v: HipassCard | null) => void;
+    setLastDriveLog: React.Dispatch<React.SetStateAction<DriveLog | null>>;
+    setNextDriveLog: React.Dispatch<React.SetStateAction<DriveLog | null>>;
     vehicles: Vehicle[];
 }
 
@@ -67,6 +70,8 @@ export function useDriveLogInitializer(deps: InitializerDeps) {
         setVehicles, setFavorites, setMembers, setLoading,
         setForm, setSelectedPassengers, setExternalPassengerCount,
         setResolvedReservationData, setLastEndBattery, setHipassCard,
+        setLastDriveLog,
+        setNextDriveLog,
         vehicles,
     } = deps;
 
@@ -96,11 +101,17 @@ export function useDriveLogInitializer(deps: InitializerDeps) {
                     if (externals.length > 0) setExternalPassengerCount(externals.length);
                 }
 
-                if (isEditMode) {
-                    // 수정 모드 유지
+                if (isEditMode && editLog?.vehicleId) {
+                    const { prev, next } = await getAdjacentDriveLogs(orgId, editLog.vehicleId, editLog);
+                    setLastDriveLog(prev);
+                    setNextDriveLog(next);
                 } else if (reservationData?.vehicleId) {
                     const rv = v.find(veh => veh.id === reservationData.vehicleId);
-                    const km = await resolveStartKm(orgId, reservationData.vehicleId!, { vehicle: rv || null });
+                    const [km, lastLog] = await Promise.all([
+                        resolveStartKm(orgId, reservationData.vehicleId!, { vehicle: rv || null }),
+                        getLastVehicleDriveLog(orgId, reservationData.vehicleId!),
+                    ]);
+                    setLastDriveLog(lastLog);
                     setForm(prev => ({
                         ...prev,
                         vehicleId: reservationData.vehicleId!,
@@ -110,7 +121,11 @@ export function useDriveLogInitializer(deps: InitializerDeps) {
                         startKm: km,
                     }));
                 } else if (v.length === 1) {
-                    const km = await resolveStartKm(orgId, v[0].id, { vehicle: v[0] });
+                    const [km, lastLog] = await Promise.all([
+                        resolveStartKm(orgId, v[0].id, { vehicle: v[0] }),
+                        getLastVehicleDriveLog(orgId, v[0].id),
+                    ]);
+                    setLastDriveLog(lastLog);
                     setForm(prev => ({ ...prev, vehicleId: v[0].id, vehicleName: v[0].displayName || v[0].name, startKm: km }));
                 }
             } catch (err) {
@@ -121,7 +136,7 @@ export function useDriveLogInitializer(deps: InitializerDeps) {
             }
         };
         fetch();
-    }, [orgId, reservationData?.vehicleId, reservationData?.vehicleName, reservationData?.purpose, reservationData?.destination, user, isEditMode, editLog?.passengerNames, setVehicles, setFavorites, setMembers, setSelectedPassengers, setExternalPassengerCount, setForm, setLoading]);
+    }, [orgId, reservationData?.vehicleId, reservationData?.vehicleName, reservationData?.purpose, reservationData?.destination, user, isEditMode, editLog, editLog?.id, editLog?.passengerNames, editLog?.vehicleId, setVehicles, setFavorites, setMembers, setSelectedPassengers, setExternalPassengerCount, setForm, setLoading, setLastDriveLog, setNextDriveLog]);
 
     // ── Effect 2: URL 쿼리 파라미터에서 reservationId로 예약 데이터 로드 (알림 클릭 시) ──
     useEffect(() => {
@@ -159,7 +174,11 @@ export function useDriveLogInitializer(deps: InitializerDeps) {
                     }));
 
                     // startKm 조회 (현재차량정보가 우선)
-                    const lastEndKm = await getLastVehicleEndKm(orgId, data.vehicleId!);
+                    const [lastEndKm, lastLog] = await Promise.all([
+                        getLastVehicleEndKm(orgId, data.vehicleId!),
+                        getLastVehicleDriveLog(orgId, data.vehicleId!),
+                    ]);
+                    setLastDriveLog(lastLog);
                     const km = (data.currentKm ?? lastEndKm ?? '').toString();
                     setForm(prev => ({ ...prev, startKm: km }));
                 }
@@ -169,20 +188,30 @@ export function useDriveLogInitializer(deps: InitializerDeps) {
             }
         };
         loadReservation();
-    }, [queryReservationId, orgId, resolvedReservationData, showToast, navigate, form.startTime, setResolvedReservationData, setForm]);
+    }, [queryReservationId, orgId, resolvedReservationData, showToast, navigate, form.startTime, setResolvedReservationData, setForm, setLastDriveLog]);
 
     // ── Effect 3: 차량 변경 시 startKm 자동 갱신 ──
     useEffect(() => {
         // 수정 모드에서는 기존 기록의 startKm을 유지 (최신 endKm으로 덮어쓰지 않음)
         if (isEditMode) return;
-        if (!orgId || !form.vehicleId || !form.driveDate) return;
+        if (!orgId || !form.vehicleId || !form.driveDate) {
+            setLastDriveLog(null);
+            return;
+        }
         const v = vehicles.find(veh => veh.id === form.vehicleId);
-        resolveStartKm(orgId, form.vehicleId, {
-            driveDate: form.driveDate,
-            startTime: form.startTime,
-            vehicle: v || null,
-        }).then(km => setForm(prev => ({ ...prev, startKm: km }))).catch(console.error);
-    }, [form.driveDate, form.vehicleId, form.startTime, orgId, vehicles, isEditMode, setForm]);
+        
+        Promise.all([
+            resolveStartKm(orgId, form.vehicleId, {
+                driveDate: form.driveDate,
+                startTime: form.startTime,
+                vehicle: v || null,
+            }),
+            getLastVehicleDriveLog(orgId, form.vehicleId)
+        ]).then(([km, lastLog]) => {
+            setForm(prev => ({ ...prev, startKm: km }));
+            setLastDriveLog(lastLog);
+        }).catch(console.error);
+    }, [form.driveDate, form.vehicleId, form.startTime, orgId, vehicles, isEditMode, setForm, setLastDriveLog]);
 
     // ── Effect 4: 전기차 도착 배터리 조회 + 하이패스 카드 조회 ──
     useEffect(() => {

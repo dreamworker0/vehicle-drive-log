@@ -29,6 +29,8 @@ export const driveLogSchema = z.object({
     batteryEnd: z.coerce.number().optional().catch(undefined),
     isRetroactive: z.boolean().optional().catch(undefined),
     isIncomplete: z.boolean().optional().catch(undefined),
+    isManuallyCorrected: z.boolean().optional().catch(undefined),
+    originalStartKm: z.coerce.number().optional().catch(undefined),
     reservationId: z.string().optional().catch(undefined),
     inputMethod: z.enum(['ocr', 'manual', 'favorite']).optional().catch(undefined),
     createdAt: timestampSchema.optional().catch(undefined),

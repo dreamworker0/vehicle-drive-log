@@ -24,6 +24,8 @@ export default function DriveLogForm() {
         favName, setFavName,
         hipassCard,
         lastEndBattery,
+        lastDriveLog,
+        nextDriveLog,
         ocrLoading, ocrError, ocrSuccess, ocrImageUrl,
         ocrReportSending, ocrReportSent,
         cameraInputRef, endKmInputRef,
@@ -37,6 +39,8 @@ export default function DriveLogForm() {
         handleOcrReport,
         handleSubmit,
         confirmStartKm,
+        kmRangeError,
+        handleDismissKmRangeError,
         handleConfirmStartKm,
         handleCancelConfirm,
     } = useDriveLogForm();
@@ -115,6 +119,7 @@ export default function DriveLogForm() {
                 {/* 4. 주행 거리 입력 섹션 */}
                 <MileageInput
                     form={form}
+                    onStartKmChange={(value) => setForm({ ...form, startKm: value })}
                     onEndKmChange={(value) => setForm({ ...form, endKm: value })}
                     ocrLoading={ocrLoading}
                     ocrError={ocrError}
@@ -127,6 +132,8 @@ export default function DriveLogForm() {
                     onOcrReport={handleOcrReport}
                     vehicleSelected={!!form.vehicleId}
                     endKmRef={endKmInputRef}
+                    lastDriveLog={lastDriveLog}
+                    nextDriveLog={nextDriveLog}
                 />
 
                 {/* 5. 동승자 섹션 */}
@@ -185,6 +192,17 @@ export default function DriveLogForm() {
                 cancelText="취소"
                 onConfirm={handleConfirmStartKm}
                 onCancel={handleCancelConfirm}
+            />
+
+            <ConfirmModal
+                open={!!kmRangeError}
+                title="⚠️ 주행거리 범위 오류"
+                message={kmRangeError || ''}
+                confirmText="확인"
+                cancelText=""
+                confirmColor="warning"
+                onConfirm={handleDismissKmRangeError}
+                onCancel={handleDismissKmRangeError}
             />
         </div>
     );

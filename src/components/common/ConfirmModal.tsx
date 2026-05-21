@@ -129,7 +129,7 @@ export default function ConfirmModal({
                     </div>
                 )}
                 <div className="flex gap-3">
-                    <button type="button" onClick={onCancel} className="btn-secondary flex-1">{cancelText}</button>
+                    {cancelText && <button type="button" onClick={onCancel} className="btn-secondary flex-1">{cancelText}</button>}
                     <button
                         ref={confirmBtnRef}
                         type="button"

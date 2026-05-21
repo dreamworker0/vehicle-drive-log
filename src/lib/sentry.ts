@@ -61,6 +61,8 @@ export function initSentry() {
             /The object does not support the operation or argument/,
             // iOS Safari IndexedDB 삭제 에러 (사용자 데이터 삭제 또는 iOS 저장공간 자동 정리, 앱 버그 아님)
             /Database deleted by request of the user/,
+            // iOS Safari IndexedDB 레코드 삭제 에러 (기기 저장 공간 부족 또는 시스템 락, 앱 버그 아님)
+            /Failed to delete record from object store/,
             // Firestore IndexedDB 내부 캐시 손상 (Firebase SDK 버그, 앱 버그 아님)
             /INTERNAL ASSERTION FAILED/,
             /Unexpected state/,

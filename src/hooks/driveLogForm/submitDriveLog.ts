@@ -31,6 +31,8 @@ interface SubmitContext {
     editLog: (DriveLog & { passengerNames?: string[] }) | null;
     reservationData: { reservationId?: string } | null;
     hipassCard: HipassCard | null;
+    isManuallyCorrected?: boolean;
+    originalStartKm?: number;
 }
 
 interface SubmitResult {
@@ -68,7 +70,7 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
         form, orgId, user, userData, selectedVehicle,
         selectedPassengers, externalPassengerCount, externalPassengerNames, isRetroactive,
         ocrUsed, favoriteUsed, isEditMode, editLog, reservationData,
-        hipassCard,
+        hipassCard, isManuallyCorrected, originalStartKm,
     } = ctx;
 
     const logData = buildLogData(form, {
@@ -76,6 +78,13 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
         selectedPassengers, externalPassengerCount, externalPassengerNames,
         isRetroactive, ocrUsed, favoriteUsed,
     });
+
+    if (isManuallyCorrected !== undefined) {
+        Object.assign(logData, {
+            isManuallyCorrected,
+            originalStartKm: originalStartKm ?? null,
+        });
+    }
 
     // 하이패스 정보를 운행일지에 저장
     if (hipassCard && form.hipassBalanceAfter !== '') {

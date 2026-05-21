@@ -86,6 +86,40 @@ export const getLastVehicleEndKm = async (orgId: string, vehicleId: string) => {
     }
 };
 
+/** 차량의 마지막 운행기록 객체 조회 */
+export const getLastVehicleDriveLog = async (
+    orgId: string, 
+    vehicleId: string,
+    excludeId?: string
+): Promise<DriveLog | null> => {
+    try {
+        const q = query(
+            collection(db, 'driveLogs'),
+            where('organizationId', '==', orgId),
+            where('vehicleId', '==', vehicleId),
+            orderBy('timestamp', 'desc'),
+            limit(excludeId ? 2 : 1)
+        );
+        const snap = await getDocs(q);
+        if (snap.empty) return null;
+        
+        const docs = snap.docs.map(docSnap => ({
+            id: docSnap.id,
+            ...docSnap.data()
+        } as DriveLog));
+        
+        if (excludeId) {
+            const filtered = docs.filter(d => d.id !== excludeId);
+            return filtered.length > 0 ? filtered[0] : null;
+        }
+        
+        return docs[0];
+    } catch (error) {
+        captureError(error, { context: 'getLastVehicleDriveLog', orgId, vehicleId });
+        throw error;
+    }
+};
+
 /** 차량의 마지막 운행기록에서 도착 배터리(%) 조회 — 출발 배터리 힌트용 */
 export const getLastVehicleEndBattery = async (orgId: string, vehicleId: string): Promise<number | null> => {
     try {
@@ -197,3 +231,79 @@ export const cleanupDuplicateLogs = async (organizationId: string, { dryRun = tr
         throw error;
     }
 };
+
+/**
+ * 수정 대상 로그의 직전 로그(prev)와 직후 로그(next)를 효율적으로 한 번에 조회
+ * - Firestore 복합 인덱스 에러 방지를 위해 orderBy('timestamp', 'desc') 쿼리 활용
+ */
+export const getAdjacentDriveLogs = async (
+    orgId: string,
+    vehicleId: string,
+    currentLog: DriveLog
+): Promise<{ prev: DriveLog | null; next: DriveLog | null }> => {
+    try {
+        const rawTimestamp = currentLog.timestamp;
+        let currentTimestamp: Date;
+        if (rawTimestamp instanceof Date) {
+            currentTimestamp = rawTimestamp;
+        } else if (
+            rawTimestamp &&
+            typeof rawTimestamp === 'object' &&
+            'toDate' in rawTimestamp &&
+            typeof (rawTimestamp as { toDate: () => unknown }).toDate === 'function'
+        ) {
+            currentTimestamp = (rawTimestamp as { toDate: () => Date }).toDate();
+        } else if (
+            rawTimestamp &&
+            typeof rawTimestamp === 'object' &&
+            'seconds' in rawTimestamp &&
+            typeof (rawTimestamp as { seconds: number }).seconds === 'number'
+        ) {
+            // React Router state 직렬화로 toDate()가 소실된 Firestore Timestamp 처리
+            currentTimestamp = new Date((rawTimestamp as { seconds: number }).seconds * 1000);
+        } else {
+            currentTimestamp = new Date(rawTimestamp as unknown as string | number);
+        }
+
+        // 유효하지 않은 날짜일 경우 빈 결과 반환 (에러 방지)
+        if (isNaN(currentTimestamp.getTime())) {
+            return { prev: null, next: null };
+        }
+
+        // 1. 직전 로그 조회: currentTimestamp 이하인 것 중 본인 제외 최근 것 (최대 2개 가져와서 필터링)
+        const prevQuery = query(
+            collection(db, 'driveLogs'),
+            where('organizationId', '==', orgId),
+            where('vehicleId', '==', vehicleId),
+            where('timestamp', '<=', currentTimestamp),
+            orderBy('timestamp', 'desc'),
+            limit(2)
+        );
+        const prevSnap = await getDocs(prevQuery);
+        const prevDocs = prevSnap.docs
+            .map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as DriveLog))
+            .filter(d => d.id !== currentLog.id);
+        const prev = prevDocs.length > 0 ? prevDocs[0] : null;
+
+        // 2. 직후 로그 조회: currentTimestamp 보다 큰 것 중 본인 제외 가장 과거 것 (최대 10개 가져와서 필터링 후 가장 마지막 원소)
+        const nextQuery = query(
+            collection(db, 'driveLogs'),
+            where('organizationId', '==', orgId),
+            where('vehicleId', '==', vehicleId),
+            where('timestamp', '>', currentTimestamp),
+            orderBy('timestamp', 'desc'),
+            limit(10)
+        );
+        const nextSnap = await getDocs(nextQuery);
+        const nextDocs = nextSnap.docs
+            .map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as DriveLog))
+            .filter(d => d.id !== currentLog.id);
+        const next = nextDocs.length > 0 ? nextDocs[nextDocs.length - 1] : null;
+
+        return { prev, next };
+    } catch (error) {
+        captureError(error, { context: 'getAdjacentDriveLogs', orgId, vehicleId, currentLogId: currentLog.id });
+        throw error;
+    }
+};
+

@@ -48,6 +48,7 @@ export {
 export {
     createDriveLog,
     getLastVehicleEndKm,
+    getLastVehicleDriveLog,
     getLastVehicleEndBattery,
     getVehicleEndKmBefore,
     getDriveLogs,
@@ -60,6 +61,7 @@ export {
     cleanupDuplicateLogs,
     syncNextLogStartKm,
     deleteDriveLog,
+    getAdjacentDriveLogs,
 } from './driveLogs';
 
 // 차량 예약 (Reservations)

@@ -32,6 +32,8 @@ export interface DriveLog extends FirestoreDoc {
     batteryEnd?: number;
     isRetroactive?: boolean;
     isIncomplete?: boolean;
+    isManuallyCorrected?: boolean;
+    originalStartKm?: number;
     reservationId?: string;
     inputMethod?: 'ocr' | 'manual' | 'favorite';
     createdAt?: TimestampField;

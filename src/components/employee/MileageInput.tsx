@@ -4,6 +4,7 @@
  */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React from 'react';
+import type { DriveLog } from '../../types/driveLog';
 
 interface MileageForm {
     startKm: string;
@@ -12,6 +13,7 @@ interface MileageForm {
 
 interface MileageInputProps {
     form: MileageForm;
+    onStartKmChange: (value: string) => void;
     onEndKmChange: (value: string) => void;
     ocrLoading: boolean;
     ocrError: string;
@@ -24,10 +26,13 @@ interface MileageInputProps {
     onOcrReport?: () => void;
     vehicleSelected: boolean;
     endKmRef?: React.RefObject<HTMLInputElement | null>;
+    lastDriveLog?: DriveLog | null;
+    nextDriveLog?: DriveLog | null;
 }
 
 export default function MileageInput({
     form,
+    onStartKmChange,
     onEndKmChange,
     ocrLoading,
     ocrError,
@@ -40,6 +45,8 @@ export default function MileageInput({
     onOcrReport,
     vehicleSelected,
     endKmRef,
+    lastDriveLog,
+    nextDriveLog,
 }: MileageInputProps) {
     return (
         <div className="glass-card p-4">
@@ -94,46 +101,62 @@ export default function MileageInput({
                     </button>
                 </div>
             )}
-            {/* 인식 오류 신고 기능 제외 (사용자 요청)
-              ocrSuccess && (
-                <div className="mb-3 space-y-2 animate-fade-in">
-
-                    {onOcrReport && !ocrReportSent && (
-                        <button
-                            type="button"
-                            onClick={onOcrReport}
-                            disabled={ocrReportSending}
-                            className="w-full flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs text-surface-500 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-800 border border-surface-200 dark:border-surface-700 transition-colors disabled:opacity-50"
-                        >
-                            {ocrReportSending ? (
-                                <>
-                                    <div className="w-3 h-3 spinner" />
-                                    전송 중...
-                                </>
-                            ) : (
-                                <>
-                                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 3.75h.008v.008H12v-.008Z" />
-                                    </svg>
-                                    인식 오류 보내기
-                                </>
-                            )}
-                        </button>
-                    )}
-
+            
+            {/* 직전 운전자 정보 노출 배너 */}
+            {lastDriveLog && (
+                <div className="mb-4 px-3 py-2.5 rounded-xl bg-surface-50 dark:bg-surface-800/60 border border-surface-200 dark:border-surface-700 text-xs text-surface-600 dark:text-surface-400 flex flex-col gap-1 animate-fade-in">
+                    <div className="flex items-center justify-between">
+                        <span className="font-medium text-surface-700 dark:text-surface-300">ℹ️ 직전 운전 정보</span>
+                        <span className="text-[10px] text-surface-400 dark:text-surface-500">비교하여 기록할 수 있습니다</span>
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:justify-between text-surface-500 dark:text-surface-400 mt-0.5 gap-1 sm:gap-0">
+                        <span>운전자: <strong className="text-surface-800 dark:text-surface-200">{lastDriveLog.driverName || '알 수 없음'}</strong></span>
+                        <span>
+                            직전 주행: <strong className="text-surface-800 dark:text-surface-200">{lastDriveLog.startKm?.toLocaleString() ?? 0} km</strong> → <strong className="text-surface-800 dark:text-surface-200">{lastDriveLog.endKm?.toLocaleString() ?? 0} km</strong> 
+                            <span className="text-primary-600 dark:text-primary-400 ml-1.5 font-medium">
+                                (총 {((lastDriveLog.endKm || 0) - (lastDriveLog.startKm || 0)).toLocaleString()} km 주행)
+                            </span>
+                        </span>
+                    </div>
                 </div>
-            ) */}
+            )}
+
+            {/* 직후 운전자 정보 노출 배너 */}
+            {nextDriveLog && (
+                <div className="mb-4 px-3 py-2.5 rounded-xl bg-surface-50 dark:bg-surface-800/60 border border-surface-200 dark:border-surface-700 text-xs text-surface-600 dark:text-surface-400 flex flex-col gap-1 animate-fade-in">
+                    <div className="flex items-center justify-between">
+                        <span className="font-medium text-surface-700 dark:text-surface-300">ℹ️ 직후 운전 정보</span>
+                        <span className="text-[10px] text-surface-400 dark:text-surface-500">비교하여 기록할 수 있습니다</span>
+                    </div>
+                    <div className="flex flex-col sm:flex-row sm:justify-between text-surface-500 dark:text-surface-400 mt-0.5 gap-1 sm:gap-0">
+                        <span>운전자: <strong className="text-surface-800 dark:text-surface-200">{nextDriveLog.driverName || '알 수 없음'}</strong></span>
+                        <span>
+                            직후 주행: <strong className="text-surface-800 dark:text-surface-200">{nextDriveLog.startKm?.toLocaleString() ?? 0} km</strong> → <strong className="text-surface-800 dark:text-surface-200">{nextDriveLog.endKm?.toLocaleString() ?? 0} km</strong> 
+                            <span className="text-primary-600 dark:text-primary-400 ml-1.5 font-medium">
+                                (총 {((nextDriveLog.endKm || 0) - (nextDriveLog.startKm || 0)).toLocaleString()} km 주행)
+                            </span>
+                        </span>
+                    </div>
+                </div>
+            )}
+
             <div className="grid grid-cols-2 gap-4">
                 <div>
                     <label className="label text-xs">출발 km <span className="text-red-500">*</span></label>
                     <input
                         type="number"
                         value={form.startKm}
-                        readOnly
-                        className="input bg-surface-50 dark:bg-surface-800 text-surface-500 dark:text-surface-400 cursor-not-allowed"
-                        placeholder="차량 선택 시 자동 입력"
+                        onChange={e => onStartKmChange(e.target.value)}
+                        readOnly={!vehicleSelected}
+                        className={`input ${!vehicleSelected ? 'bg-surface-50 dark:bg-surface-800 text-surface-500 dark:text-surface-400 cursor-not-allowed' : ''}`}
+                        placeholder={vehicleSelected ? "출발 km 입력" : "차량 선택 시 자동 입력"}
                         required
                     />
+                    {lastDriveLog && form.startKm && parseInt(form.startKm) < (lastDriveLog.startKm || 0) && (
+                        <p className="text-[11px] text-amber-600 dark:text-amber-500 mt-1 font-medium leading-tight">
+                            ⚠️ 직전 출발({lastDriveLog.startKm?.toLocaleString()})보다 낮음
+                        </p>
+                    )}
                 </div>
                 <div>
                     <label className="label text-xs">도착 km <span className="text-red-500">*</span></label>
@@ -146,6 +169,11 @@ export default function MileageInput({
                         placeholder="12400"
                         required
                     />
+                    {nextDriveLog && form.endKm && parseInt(form.endKm) > (nextDriveLog.endKm || 0) && (
+                        <p className="text-[11px] text-amber-600 dark:text-amber-500 mt-1 font-medium leading-tight">
+                            ⚠️ 직후 도착({nextDriveLog.endKm?.toLocaleString()})보다 높음
+                        </p>
+                    )}
                 </div>
             </div>
             {form.startKm && form.endKm && parseInt(form.endKm) >= parseInt(form.startKm) && (

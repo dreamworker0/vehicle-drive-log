@@ -50,8 +50,11 @@ export default function OrgMapView({ orgs }: OrgMapViewProps) {
         }).addTo(leafletMap.current);
 
         return () => {
-            leafletMap.current?.remove();
-            leafletMap.current = null;
+            if (leafletMap.current) {
+                leafletMap.current.off();
+                leafletMap.current.remove();
+                leafletMap.current = null;
+            }
         };
     }, []);
 
@@ -157,10 +160,10 @@ export default function OrgMapView({ orgs }: OrgMapViewProps) {
             markersRef.current.push(marker);
         });
 
-        // 마커가 있으면 bounds 맞추기
+        // 마커가 있으면 bounds 맞추기 (비동기 줌 트랜지션 에러 방지를 위해 애니메이션 비활성화)
         if (markersRef.current.length > 0) {
             const group = L.featureGroup(markersRef.current);
-            map.fitBounds(group.getBounds().pad(0.2));
+            map.fitBounds(group.getBounds().pad(0.2), { animate: false });
         }
     }, [orgs]);
 

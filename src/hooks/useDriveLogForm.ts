@@ -15,6 +15,7 @@ import type { Favorite } from '../types/favorite';
 import type { User as UserDoc } from '../types/user';
 import type { HipassCard } from '../types/hipass';
 import type { DriveLogForm, LocationState } from './driveLogForm/types';
+import type { DriveLog } from '../types/driveLog';
 
 // 타입 재수출 (하위 호환성 및 외부 참조용)
 export type { DriveLogForm, LocationState };
@@ -55,6 +56,8 @@ export default function useDriveLogForm() {
     const [favName, setFavName] = useState('');
     const [hipassCard, setHipassCard] = useState<HipassCard | null>(null);
     const [lastEndBattery, setLastEndBattery] = useState<number | null>(null);
+    const [lastDriveLog, setLastDriveLog] = useState<DriveLog | null>(null);
+    const [nextDriveLog, setNextDriveLog] = useState<DriveLog | null>(null);
 
     const editDriveDate = editLog?.timestamp ? timestampToDateStr(editLog.timestamp) : todayStr();
     const [form, setForm] = useState<DriveLogForm>({
@@ -95,12 +98,16 @@ export default function useDriveLogForm() {
         setVehicles, setFavorites, setMembers, setLoading,
         setForm, setSelectedPassengers, setExternalPassengerCount,
         setResolvedReservationData, setLastEndBattery, setHipassCard,
+        setLastDriveLog,
+        setNextDriveLog,
         vehicles
     });
 
     // ── 하위 모듈 3: 핸들러 및 제출 ───────────────────────────
     const {
         confirmStartKm,
+        kmRangeError,
+        handleDismissKmRangeError,
         handleConfirmStartKm,
         handleCancelConfirm,
         handleVehicleSelect,
@@ -114,7 +121,8 @@ export default function useDriveLogForm() {
         externalPassengerNames,
         setFavorites, setShowFavSave, setFavName, setSuccess,
         isElectric, isQuickDrive, isRetroactive, isEditMode, editLog, reservationData, hipassCard, favName,
-        showToast, runWithRetry, startTransition, ocrSuccess: ocr.ocrSuccess
+        showToast, runWithRetry, startTransition, ocrSuccess: ocr.ocrSuccess,
+        lastDriveLog, nextDriveLog, setLastDriveLog
     });
 
     // ── 공개 API ──────────────────────────────────────────────────
@@ -130,6 +138,8 @@ export default function useDriveLogForm() {
         favName, setFavName,
         hipassCard,
         lastEndBattery,
+        lastDriveLog,
+        nextDriveLog,
         ocrLoading: ocr.ocrLoading,
         ocrError: ocr.ocrError,
         ocrSuccess: ocr.ocrSuccess,
@@ -148,6 +158,8 @@ export default function useDriveLogForm() {
         handleOcrReport: ocr.handleOcrReport,
         handleSubmit,
         confirmStartKm,
+        kmRangeError,
+        handleDismissKmRangeError,
         handleConfirmStartKm,
         handleCancelConfirm,
     };

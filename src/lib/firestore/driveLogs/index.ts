@@ -16,10 +16,12 @@ export {
     sanitizeUndefined,
     hasLaterDriveLog,
     getLastVehicleEndKm,
+    getLastVehicleDriveLog,
     getLastVehicleEndBattery,
     getVehicleEndKmBefore,
     syncNextLogStartKm,
     cleanupDuplicateLogs,
+    getAdjacentDriveLogs,
 } from './utils';
 
 export type { AggregatedStats } from './stats';

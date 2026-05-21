@@ -125,6 +125,7 @@ function isFirestorePersistenceError(msg: string) {
         msg.includes('indexedDB.open') ||
         (msg.includes('AbortError') && !msg.includes('fetch')) ||
         msg.includes('UnknownError') ||
+        msg.includes('Failed to delete record from object store') ||
         msg.includes("Cannot read properties of null (reading 'Te')") ||
         msg.includes('mutating the [[Prototype]]') ||
         msg.includes('A mutation operation was attempted on a database that did not allow mutations') ||
