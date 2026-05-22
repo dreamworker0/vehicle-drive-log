@@ -105,12 +105,12 @@ export const computeDashboardStats = onSchedule(
         timeoutSeconds: 300,
     },
     async function () {
-        // 저녁 20시 ~ 아침 8시 사이에는 3시간 단위(hour % 3 === 0)일 때만 실행
+        // 저녁 20시 ~ 아침 8시 사이에는 통계 캐싱 스케줄러 실행을 완전히 건너뜀 (야간 유휴 시간 리소스 및 과금 절감)
         const nowKST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
         const hour = nowKST.getHours();
         
-        if ((hour > 19 || hour < 9) && hour % 3 !== 0) {
-            await recordHeartbeat("computeDashboardStats (skipped by time policy)");
+        if (hour >= 20 || hour < 8) {
+            await recordHeartbeat("computeDashboardStats (skipped by night time policy)");
             return;
         }
 
