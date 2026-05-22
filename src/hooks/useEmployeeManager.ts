@@ -134,8 +134,13 @@ export default function useEmployeeManager() {
     };
 
     const handleDeleteEmployee = async (emp: User) => {
+        // 안전 검증: 세션 유저 정보가 아직 로드되지 않은 경우 동작 차단
+        if (!userData?.uid) {
+            showToast('사용자 정보를 불러오는 중입니다. 잠시 후 다시 시도해 주세요.', 'warning');
+            return;
+        }
         // 자기 자신 삭제 금지
-        if (emp.id === userData?.uid) {
+        if (emp.id === userData.uid) {
             showToast('자기 자신은 비활성화할 수 없습니다.', 'warning');
             return;
         }

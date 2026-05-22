@@ -44,10 +44,11 @@ export default function EmployeeListItem({
     onDeletePreRegistered,
     onRestore,
 }: Props) {
-    const isSelf = member.memberStatus === 'active' && member.id === selfUid;
+    const isSelf = member.memberStatus === 'active' && !!selfUid && member.id === selfUid;
     const isActive = member.memberStatus === 'active';
     const isPending = member.memberStatus === 'pending';
     const isDisabled = member.memberStatus === 'disabled';
+    const isActionDisabled = !selfUid || isSelf;
 
     const avatarBg = isDisabled
         ? 'bg-red-50 dark:bg-red-900/30'
@@ -138,9 +139,9 @@ export default function EmployeeListItem({
                                     onChange={e =>
                                         onChangeRole(member.original, e.target.value as UserRole)
                                     }
-                                    disabled={isSelf}
-                                    title={isSelf ? '자신의 역할은 변경할 수 없습니다' : ''}
-                                    className={`text-xs border border-surface-200 dark:border-surface-600 rounded-lg px-2 py-1 bg-white dark:bg-surface-800 text-surface-600 dark:text-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 ${isSelf ? 'opacity-40 cursor-not-allowed' : ''}`}
+                                    disabled={isActionDisabled}
+                                    title={!selfUid ? '사용자 정보를 불러오는 중입니다' : isSelf ? '자신의 역할은 변경할 수 없습니다' : ''}
+                                    className={`text-xs border border-surface-200 dark:border-surface-600 rounded-lg px-2 py-1 bg-white dark:bg-surface-800 text-surface-600 dark:text-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 ${isActionDisabled ? 'opacity-40 cursor-not-allowed' : ''}`}
                                 >
                                     <option value="employee">직원</option>
                                     <option value="admin">관리자</option>
@@ -165,9 +166,9 @@ export default function EmployeeListItem({
                                 </button>
                                 <button
                                     onClick={() => onDelete(member.original)}
-                                    disabled={isSelf}
-                                    title={isSelf ? '자기 자신은 삭제할 수 없습니다' : ''}
-                                    className={`btn-icon btn-sm ${isSelf ? 'text-surface-200 cursor-not-allowed' : 'text-surface-400 hover:text-red-500'}`}
+                                    disabled={isActionDisabled}
+                                    title={!selfUid ? '사용자 정보를 불러오는 중입니다' : isSelf ? '자기 자신은 비활성화할 수 없습니다' : ''}
+                                    className={`btn-icon btn-sm ${isActionDisabled ? 'text-surface-200 cursor-not-allowed' : 'text-surface-400 hover:text-red-500'}`}
                                 >
                                     <svg
                                         className="w-4 h-4"
