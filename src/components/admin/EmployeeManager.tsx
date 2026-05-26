@@ -22,7 +22,7 @@ export default function EmployeeManager() {
         handleDeletePreRegistered, handleRestoreEmployee,
     } = useEmployeeManager();
     const { userData } = useAuth();
-    const selfUid = userData?.uid;
+    const selfUid = userData?.id;
 
     if (loading) {
         return (

@@ -135,12 +135,12 @@ export default function useEmployeeManager() {
 
     const handleDeleteEmployee = async (emp: User) => {
         // 안전 검증: 세션 유저 정보가 아직 로드되지 않은 경우 동작 차단
-        if (!userData?.uid) {
+        if (!userData?.id) {
             showToast('사용자 정보를 불러오는 중입니다. 잠시 후 다시 시도해 주세요.', 'warning');
             return;
         }
         // 자기 자신 삭제 금지
-        if (emp.id === userData.uid) {
+        if (emp.id === userData.id) {
             showToast('자기 자신은 비활성화할 수 없습니다.', 'warning');
             return;
         }
@@ -177,7 +177,7 @@ export default function useEmployeeManager() {
 
     const handleChangeRole = async (emp: User, newRole: UserRole) => {
         // 자기 자신 역할 변경 금지
-        if (emp.id === userData?.uid) {
+        if (emp.id === userData?.id) {
             showToast('자신의 역할은 변경할 수 없습니다.', 'warning');
             await fetchData(); // select 원래 값으로 복원
             return;
