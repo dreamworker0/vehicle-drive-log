@@ -26,6 +26,47 @@ export const searchPOI = async (keyword: string) => {
     }
 };
 
+export interface PoiResult {
+    lat: number;
+    lon: number;
+    name: string;
+    address: string;
+}
+
+/**
+ * POI 검색으로 후보 목록 반환 (드롭다운용)
+ */
+export const searchPOIList = async (keyword: string, count = 5): Promise<PoiResult[]> => {
+    if (!keyword?.trim() || keyword.trim().length < 2 || (!import.meta.env.PROD && !TMAP_API_KEY)) return [];
+
+    try {
+        const data = await fetchTmap(
+            `/api/tmap?action=poi&keyword=${encodeURIComponent(keyword)}&count=${count}`,
+            `/api/tmap/pois?version=1&format=json&searchKeyword=${encodeURIComponent(keyword)}&resCoordType=WGS84GEO&reqCoordType=WGS84GEO&count=${count}`
+        );
+
+        const pois = data?.searchPoiInfo?.pois?.poi;
+        if (!Array.isArray(pois)) return [];
+
+        return pois
+            .filter((poi: Record<string, string>) => poi.noorLat && poi.noorLon)
+            .map((poi: Record<string, string>) => {
+                const parts = [poi.upperAddrName, poi.middleAddrName, poi.roadName || poi.lowerAddrName]
+                    .filter(Boolean);
+                return {
+                    lat: parseFloat(poi.noorLat),
+                    lon: parseFloat(poi.noorLon),
+                    name: poi.name || keyword,
+                    address: parts.join(' '),
+                };
+            });
+    } catch (err) {
+        console.error('POI 리스트 검색 실패:', err);
+        return [];
+    }
+};
+
+
 /**
  * 주소 → 좌표 변환 (지오코딩)
  * 캐싱 적용

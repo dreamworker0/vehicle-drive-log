@@ -5,7 +5,25 @@
 
 ---
 
+## Phase 50 — 목적지 POI 드롭다운 검색 🔍
+
+> 2026-05-27
+
+### Added
+- **목적지 POI 자동완성 드롭다운**: 목적지 입력란에 "부산 영인모터스"처럼 지역명 + 업체명을 입력하면 500ms 디바운스 후 티맵 POI API로 최대 5개 후보 목록을 드롭다운으로 표시
+- **업체명 + 주소 표시**: 드롭다운 각 항목에 업체명과 시·구·도로명 주소를 함께 표시해 동명 업체 구분 가능
+- **선택 후 경로 자동 계산**: 드롭다운에서 항목 선택 시 기존 RouteInfoPanel이 자동으로 해당 목적지까지의 거리(km)와 소요 시간 계산
+- **`usePoiSearch` 훅 신규 추가**: debounce·suppressNext 플래그·드롭다운 상태 관리 캡슐화 (`src/hooks/usePoiSearch.ts`)
+- **`searchPOIList()` 함수 추가**: 티맵 POI API에서 복수 결과를 반환하는 함수 추가 (`src/lib/tmap/geocoding.ts`)
+
+### Changed
+- **tmapProxy `count` 동적 처리**: `action=poi` 핸들러에서 `count` 파라미터를 클라이언트에서 전달받아 처리 (기존 1 하드코딩 → 1~10 동적, `functions/src/tmapProxy.ts`)
+- **DestinationInput 드롭다운 UI**: 기존 단순 텍스트 입력에서 POI 자동완성 드롭다운 포함 UI로 개선, 외부 클릭 시 닫기·로딩 스피너·선택 후 재검색 방지(`suppressNext`) 처리
+
+---
+
 ## Phase 49 — Sentry 모니터링 최적화 📊
+
 
 > 2026-05-17
 

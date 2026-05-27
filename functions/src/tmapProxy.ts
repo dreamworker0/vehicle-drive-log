@@ -86,7 +86,9 @@ export const tmapProxy = createAuthenticatedProxy("tmapProxy", async (req, res) 
             res.status(400).json({ error: "keyword is required and must be at least 2 characters" });
             return;
         }
-        const url = `https://apis.openapi.sk.com/tmap/pois?version=1&format=json&searchKeyword=${encodeURIComponent(keyword as string)}&resCoordType=WGS84GEO&reqCoordType=WGS84GEO&count=1`;
+        const countRaw = parseInt((req.query.count as string) || "1", 10);
+        const count = Math.min(Math.max(isNaN(countRaw) ? 1 : countRaw, 1), 10);
+        const url = `https://apis.openapi.sk.com/tmap/pois?version=1&format=json&searchKeyword=${encodeURIComponent(keyword as string)}&resCoordType=WGS84GEO&reqCoordType=WGS84GEO&count=${count}`;
         const response = await fetch(url, { headers: { appKey: apiKey } });
         sendResult(res, await safeFetchJson(response, "poi"));
         return;

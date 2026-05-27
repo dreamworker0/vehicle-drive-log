@@ -7,7 +7,8 @@ export {
     parseDestinations,
 } from './core';
 
-export { searchPOI, geocode } from './geocoding';
+export { searchPOI, searchPOIList, geocode } from './geocoding';
+export type { PoiResult } from './geocoding';
 
 export {
     getRoute,
