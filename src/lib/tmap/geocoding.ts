@@ -77,13 +77,25 @@ export const geocode = async (address: string) => {
     if (isTmapCoolingDown()) return null;
     if (!import.meta.env.PROD && !TMAP_API_KEY) return null;
 
-    let result = await searchPOI(address);
+    // 괄호 전처리: "서울역 (서울 용산구 청파동3가 10-3)" -> 괄호 내 실제 주소("서울 용산구 청파동3가 10-3") 추출
+    const match = address.match(/\(([^)]+)\)/);
+    const cleanAddress = match ? match[1].trim() : address.trim();
+    const cleanName = match ? address.replace(/\([^)]+\)/, '').trim() : address.trim();
+
+    // 1차 시도: 괄호 안의 정제된 주소로 POI 검색 시도
+    let result = await searchPOI(cleanAddress);
     
+    if (!result && cleanAddress !== address) {
+        // 주소로 실패 시, 2차 시도로 괄호 앞의 장소명(cleanName)으로 검색 시도
+        result = await searchPOI(cleanName);
+    }
+
     if (!result) {
         try {
+            // POI 검색이 모두 실패할 경우 3차 시도로 정제 주소를 티맵 지오코딩 API에 전달
             const data = await fetchTmap(
-                `/api/tmap?action=geocode&address=${encodeURIComponent(address)}`,
-                `/api/tmap/geo/fullAddrGeo?version=1&format=json&coordType=WGS84GEO&fullAddr=${encodeURIComponent(address)}`
+                `/api/tmap?action=geocode&address=${encodeURIComponent(cleanAddress)}`,
+                `/api/tmap/geo/fullAddrGeo?version=1&format=json&coordType=WGS84GEO&fullAddr=${encodeURIComponent(cleanAddress)}`
             );
 
             const item = data?.coordinateInfo?.coordinate?.[0];

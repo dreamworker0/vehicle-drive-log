@@ -60,7 +60,7 @@ export function usePoiSearch(keyword: string, debounceMs = 500): UsePoiSearchRet
             lastKeyword.current = trimmed;
             setPoiLoading(true);
             try {
-                const list = await searchPOIList(trimmed, 5);
+                const list = await searchPOIList(trimmed, 10);
                 setPoiResults(list);
                 setShowPoiDropdown(list.length > 0);
             } catch {

@@ -196,7 +196,7 @@ export default function ReservationSidePanel({
                             <DestinationInput
                                 form={form}
                                 setForm={setForm}
-                                destinationRef={destinationRef}
+                                ref={destinationRef}
                                 favorites={favorites}
                                 recentDestinations={recentDestinations}
                                 showFavSave={showFavSave}

@@ -218,7 +218,7 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
                             value={message}
                             onChange={e => setMessage(e.target.value)}
                             className="input min-h-[120px] resize-y"
-                            placeholder="개선 사항, 요청 기능, 오류 신고 등 자유롭게 작성해주세요."
+                            placeholder={`개발자 김종원이 직접 답변합니다.\n개선 사항, 요청 기능, 오류 신고를 자세하게 작성해서 보내주세요.`}
                             maxLength={2000}
                         />
                         <p className="text-xs text-surface-400 mt-1 text-right">{message.length}/2000</p>
