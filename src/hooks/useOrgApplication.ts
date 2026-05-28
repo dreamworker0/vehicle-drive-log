@@ -2,8 +2,9 @@
  * useOrgApplication — 기관 사용 신청 폼 로직 훅
  * 폼 상태, 파일 처리(검증/압축/드래그), 제출(익명로그인+업로드+OCR) 관리
  */
-import { useState, useRef, useCallback } from 'react';
-import { auth as firebaseAuth, firebaseFunctions } from '../lib/firebase';
+import { useState, useRef, useCallback, useEffect } from 'react';
+import { firebaseFunctions } from '../lib/firebase';
+import { useAuth } from './useAuth';
 import { httpsCallable } from 'firebase/functions';
 import imageCompression from 'browser-image-compression';
 
@@ -58,13 +59,13 @@ export function formatPhoneNumber(value: string) {
 
 export default function useOrgApplication() {
     const fileInputRef = useRef<HTMLInputElement | null>(null);
-    const currentUser = firebaseAuth.currentUser;
+    const { user: currentUser, loading: authLoading } = useAuth();
 
     // 폼 상태
     const [form, setForm] = useState({
-        applicantName: currentUser?.displayName || '',
+        applicantName: '',
         orgName: '',
-        applicantEmail: currentUser?.email || '',
+        applicantEmail: '',
         applicantPhone: '',
         message: '',
     });
@@ -77,6 +78,25 @@ export default function useOrgApplication() {
     const [success, setSuccess] = useState(false);
     const [agreeTerms, setAgreeTerms] = useState(false);
     const [agreePrivacy, setAgreePrivacy] = useState(false);
+
+    // 로그인 정보 반응형 동기화 및 비로그인 클린업
+    useEffect(() => {
+        if (!authLoading) {
+            if (currentUser) {
+                setForm(prev => ({
+                    ...prev,
+                    applicantName: currentUser.displayName || '',
+                    applicantEmail: currentUser.email || '',
+                }));
+            } else {
+                setForm(prev => ({
+                    ...prev,
+                    applicantName: '',
+                    applicantEmail: '',
+                }));
+            }
+        }
+    }, [currentUser, authLoading]);
 
     // 폼 입력 핸들러
     const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {

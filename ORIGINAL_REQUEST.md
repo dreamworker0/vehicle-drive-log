@@ -1,0 +1,24 @@
+# Original User Request
+
+## Initial Request — 2026-05-28T09:36:31Z
+
+# Goal
+비로그인 상태에서 서비스 도입 신청(/apply) 시 로그인 페이지로 강제 리다이렉트되는 라우팅 가드 버그를 해결합니다.
+
+Working directory: d:\apps\차량운행일지
+Integrity mode: development
+
+## Requirements
+
+### R1. `/apply` 경로의 로그인 필수 제한(requireAuth) 해제
+- `src/App.tsx`에서 `/apply` 라우트의 `AuthGuard` 설정을 수정하거나 제거하여, 비로그인 사용자도 서비스 도입 신청 페이지 (`OrgApplicationPage`)에 바로 접근할 수 있도록 조치해야 합니다.
+
+### R2. 로그인 유무에 따른 동적 필드 렌더링 검증
+- 신청 양식 페이지에서 현재 로그인된 사용자가 있을 때는 이메일/이름이 자동으로 채워지고 읽기 전용 상태가 유지되는 반면, 로그아웃 상태(비로그인 상태)일 때는 이메일과 이름을 수동으로 입력할 수 있는지 코드가 정상 동작하는지 점검해야 합니다.
+
+## Acceptance Criteria
+
+### 라우팅 및 접근성
+- [ ] 로그아웃 상태에서 `/apply` 주소로 직접 브라우저 접근 시 로그인 페이지로 리다이렉트되지 않고 신청 화면이 로드된다.
+- [ ] 메인 화면(LandingPage)에서 "서비스 도입 신청" 버튼 클릭 시 `/apply` 페이지로 정상 이동한다.
+- [ ] 신청 폼 제출 시 비로그인 사용자용 익명 제출 API(`submitOrgApplication`)가 정상 동작하여 신청이 완료된다.

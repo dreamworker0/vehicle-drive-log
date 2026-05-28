@@ -85,7 +85,10 @@ export default function OrgApplicationPage() {
                             <label className="label">이름 <span className="text-red-500">*</span></label>
                             <input
                                 type="text" name="applicantName" value={form.applicantName}
-                                onChange={handleChange} className="input" placeholder="홍길동" required
+                                onChange={handleChange}
+                                className={`input ${currentUser?.displayName ? 'bg-surface-50 dark:bg-surface-800 text-surface-500' : ''}`}
+                                readOnly={!!currentUser?.displayName}
+                                placeholder="홍길동" required
                                 autoFocus
                             />
                         </div>

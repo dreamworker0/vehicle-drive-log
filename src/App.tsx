@@ -254,7 +254,7 @@ function AppContent() {
         
         {/* 기관 가입/생성 (로그인은 했지만 기관이 없거나 등록 중인 상태 허용) */}
         <Route path="/invite" element={<AuthGuard requireAuth><InviteCodePage /></AuthGuard>} />
-        <Route path="/apply" element={<AuthGuard requireAuth><OrgApplicationPage /></AuthGuard>} />
+        <Route path="/apply" element={<AuthGuard requireAuth={false}><OrgApplicationPage /></AuthGuard>} />
         <Route path="/pending" element={<AuthGuard requireAuth><PendingApprovalPage /></AuthGuard>} />
 
         {/* 역할별 메인 레이아웃 (기관 설정 완료 & 역할 일치 필요) */}
