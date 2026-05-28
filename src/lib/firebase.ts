@@ -94,7 +94,7 @@ if (typeof window !== 'undefined') {
 // === Analytics 지연 초기화 (초기 번들에서 ~20KB 제외) ===
 let _analytics: ReturnType<typeof import('firebase/analytics').getAnalytics> | null = null;
 function initAnalyticsLazy() {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined' || import.meta.env.MODE === 'test') return;
     import('firebase/analytics').then(({ getAnalytics }) => {
         _analytics = getAnalytics(app);
     }).catch(() => { /* Analytics 로드 실패 무시 */ });

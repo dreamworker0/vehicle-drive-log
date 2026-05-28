@@ -3,6 +3,13 @@
 이 문서는 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/) 형식을 따르는 **개발 참고용** 이력입니다.
 서비스 이용자용 변경 소식은 [업데이트 소식](https://vehicle-drive-log.web.app/release-notes)에서 확인할 수 있습니다.
 
+## Phase 51 — 테스트 환경 및 빌드 안정화 패치 🛡️
+
+> 2026-05-28
+
+### Fixed
+- **Vitest 테스트 환경 비동기 누수 방지**: Vitest 테스트 구동 도중 jsdom 환경이 정리(Teardown)된 후 뒤늦게 실행되는 Firebase Analytics 지연 초기화(`initAnalyticsLazy`) 콜백으로 인해 `ReferenceError: window is not defined` 미처리 에러(Unhandled Rejection)가 발생하며 빌드가 깨지던 문제 수정 (`src/lib/firebase.ts`)
+
 ---
 
 ## Phase 50 — 목적지 POI 드롭다운 검색 🔍
