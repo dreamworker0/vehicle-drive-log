@@ -12,6 +12,7 @@ import { createRoot } from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './lib/firebaseAuth';
+import { AuthProvider } from './hooks/useAuth';
 
 // 경량 모드에서는 lazy loading 없이 직접 import (번들 자체가 작으므로)
 import LandingPage from './components/auth/LandingPage';
@@ -43,16 +44,18 @@ export function renderLightApp() {
     lightRoot.render(
         <StrictMode>
             <BrowserRouter>
-                <Routes>
-                    <Route path="/" element={<LandingPage />} />
-                    <Route path="/login" element={<LoginPage />} />
-                    <Route path="/apply" element={<OrgApplicationPage />} />
-                    <Route path="/terms" element={<TermsPage />} />
-                    <Route path="/privacy" element={<PrivacyPage />} />
-                    <Route path="/release-notes" element={<ReleaseNotesPage />} />
-                    <Route path="/faq" element={<FAQPage />} />
-                    <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
+                <AuthProvider>
+                    <Routes>
+                        <Route path="/" element={<LandingPage />} />
+                        <Route path="/login" element={<LoginPage />} />
+                        <Route path="/apply" element={<OrgApplicationPage />} />
+                        <Route path="/terms" element={<TermsPage />} />
+                        <Route path="/privacy" element={<PrivacyPage />} />
+                        <Route path="/release-notes" element={<ReleaseNotesPage />} />
+                        <Route path="/faq" element={<FAQPage />} />
+                        <Route path="*" element={<Navigate to="/" replace />} />
+                    </Routes>
+                </AuthProvider>
             </BrowserRouter>
         </StrictMode>,
     );

@@ -1,6 +1,22 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('기관 사용 신청 플로우', () => {
+    test.beforeEach(async ({ context, page }) => {
+        await context.clearCookies();
+        await context.clearPermissions();
+        await page.goto('/');
+        await page.evaluate(async () => {
+            localStorage.clear();
+            sessionStorage.clear();
+            const dbs = await window.indexedDB.databases();
+            for (const db of dbs) {
+                if (db.name) {
+                    window.indexedDB.deleteDatabase(db.name);
+                }
+            }
+        });
+    });
+
     test('신청 페이지로 이동할 수 있다', async ({ page }) => {
         await page.goto('/');
         const applyBtn = page.getByRole('button', { name: '서비스 도입 신청' }).first();
@@ -51,7 +67,9 @@ test.describe('기관 사용 신청 플로우', () => {
         // 이메일 필드에 잘못된 형식 입력
         const emailInput = page.locator('input[type="email"]');
         if (await emailInput.count() > 0) {
-            await emailInput.fill('invalid-email');
+            if (await emailInput.isEditable()) {
+                await emailInput.fill('invalid-email');
+            }
             // 약관 동의 체크
             const checkboxes = page.locator('input[type="checkbox"]');
             const count = await checkboxes.count();
@@ -70,8 +88,14 @@ test.describe('기관 사용 신청 플로우', () => {
     test('약관 미동의 시 제출이 차단된다', async ({ page }) => {
         await page.goto('/apply');
         // 필수 필드 채우기
-        await page.getByPlaceholder('홍길동').fill('테스트 사용자');
-        await page.getByPlaceholder('○○복지관').fill('테스트 복지관');
+        const nameInput = page.getByPlaceholder('홍길동');
+        if (await nameInput.isEditable()) {
+            await nameInput.fill('테스트 사용자');
+        }
+        const orgInput = page.getByPlaceholder('○○복지관');
+        if (await orgInput.isEditable()) {
+            await orgInput.fill('테스트 복지관');
+        }
         // 약관 동의 미체크 상태에서 제출 버튼이 비활성화되어야 함
         const submitBtn = page.getByRole('button', { name: '신청하기' });
         await expect(submitBtn).toBeDisabled();

@@ -163,6 +163,8 @@ export default function OrgApplicationPage() {
                             </div>
                             <input
                                 ref={fileInputRef}
+                                id="nonprofit-document-upload"
+                                aria-label="비영리 증빙서류 업로드"
                                 type="file"
                                 accept="image/jpeg,image/png,application/pdf"
                                 onChange={handleImageChange}
@@ -198,8 +200,9 @@ export default function OrgApplicationPage() {
 
                     {/* 약관 동의 */}
                     <div className="space-y-3 bg-surface-50 dark:bg-surface-800 rounded-xl p-4">
-                        <label className="flex items-start gap-3 cursor-pointer group">
+                        <label htmlFor="agree-terms" className="flex items-start gap-3 cursor-pointer group">
                             <input
+                                id="agree-terms"
                                 type="checkbox"
                                 checked={agreeTerms}
                                 onChange={(e) => setAgreeTerms(e.target.checked)}
@@ -209,8 +212,9 @@ export default function OrgApplicationPage() {
                                 <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-primary-600 underline underline-offset-2 font-medium hover:text-primary-700">이용약관</a>에 동의합니다. <span className="text-red-500">*</span>
                             </span>
                         </label>
-                        <label className="flex items-start gap-3 cursor-pointer group">
+                        <label htmlFor="agree-privacy" className="flex items-start gap-3 cursor-pointer group">
                             <input
+                                id="agree-privacy"
                                 type="checkbox"
                                 checked={agreePrivacy}
                                 onChange={(e) => setAgreePrivacy(e.target.checked)}

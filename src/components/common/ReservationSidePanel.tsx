@@ -4,6 +4,7 @@
  */
 import React, { useRef, useMemo } from 'react';
 import { calcEndTime } from '../../hooks/utils/reservationUtils';
+import { generateRecurringDates } from '../../hooks/utils/recurringUtils';
 import VehicleSelector from './reservation/VehicleSelector';
 import DestinationInput from './reservation/DestinationInput';
 import RouteInfoPanel from './reservation/RouteInfoPanel';
@@ -82,7 +83,6 @@ export default function ReservationSidePanel({
     isAdmin = false,
     members = [],
     getCurrentTimeStr,
-    getMinStartTime,
     onSubmit,
     onEdit,
     onCancel,
@@ -107,6 +107,27 @@ export default function ReservationSidePanel({
         if (!usageCounts || usageCounts.size === 0) return filtered;
         return [...filtered].sort((a, b) => (usageCounts.get(b.id) || 0) - (usageCounts.get(a.id) || 0));
     }, [vehicles, usageCounts]);
+
+    // 실제로 오늘 날짜가 예약 대상에 포함되는지 여부 (다일/반복 예약 대응)
+    const actualIsToday = useMemo(() => {
+        if (!isToday) return false;
+        if (form.isRecurring) {
+            // 반복 예약일 경우, 실제 예약될 날짜 리스트에 오늘(selectedDate)이 포함되어 있는지 검사
+            const recurringStartDate = form.recurringStartDate || selectedDate;
+            const dates = generateRecurringDates({
+                startDate: recurringStartDate,
+                endDate: form.recurringEndDate || recurringStartDate,
+                selectedDays: form.recurringDays || [],
+                holidays: holidays || [],
+                excludeHolidays: form.excludeHolidays ?? true,
+                excludedDates: form.excludedDates,
+            });
+            return dates.includes(selectedDate);
+        }
+        return isToday;
+    }, [isToday, form.isRecurring, form.recurringStartDate, selectedDate, form.recurringEndDate, form.recurringDays, holidays, form.excludeHolidays, form.excludedDates]);
+
+    const effectiveMinTime = actualIsToday ? getCurrentTimeStr() : '00:00';
 
     if (!selectedDate) {
         return (
@@ -224,10 +245,10 @@ export default function ReservationSidePanel({
                                 <input
                                     type="time"
                                     value={form.startTime}
-                                    min={getMinStartTime()}
+                                    min={effectiveMinTime}
                                     onChange={e => {
                                         const val = e.target.value;
-                                        if (isToday && val < getCurrentTimeStr()) return;
+                                        if (actualIsToday && val < getCurrentTimeStr()) return;
                                         const autoEnd = calcEndTime(val, routeInfo?.duration || 0);
                                         setForm({ ...form, startTime: val, endTime: autoEnd });
                                     }}

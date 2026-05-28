@@ -1,6 +1,22 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('접근성 기본 검증', () => {
+    test.beforeEach(async ({ context, page }) => {
+        await context.clearCookies();
+        await context.clearPermissions();
+        await page.goto('/');
+        await page.evaluate(async () => {
+            localStorage.clear();
+            sessionStorage.clear();
+            const dbs = await window.indexedDB.databases();
+            for (const db of dbs) {
+                if (db.name) {
+                    window.indexedDB.deleteDatabase(db.name);
+                }
+            }
+        });
+    });
+
     test('랜딩 페이지에 h1 태그가 정확히 1개 존재한다', async ({ page }) => {
         await page.goto('/');
         const h1 = page.locator('h1');
