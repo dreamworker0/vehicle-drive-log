@@ -116,12 +116,27 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
                 imageUrls.push(url);
             }
 
+            // 실명과 소셜 프로필명 추출 및 중복 방지 결합
+            const realName = userData?.name?.trim() || '';
+            const displayName = user.displayName?.trim() || '';
+
+            let finalName = '';
+            if (realName && displayName) {
+                if (realName === displayName) {
+                    finalName = realName;
+                } else {
+                    finalName = `${realName} (${displayName})`;
+                }
+            } else {
+                finalName = realName || displayName || '';
+            }
+
             // Firestore에 피드백 저장
             const feedbackData: CreateFeedbackData = {
                 message: message.trim(),
                 imageUrls,
                 userEmail: user.email || '',
-                userName: user.displayName || userData?.name || '',
+                userName: finalName,
                 organizationId: userData?.organizationId || '',
                 authorUid: user.uid,
             };
