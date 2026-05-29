@@ -19,6 +19,7 @@
     "audit": "tsx scripts/security-audit.ts",
     "health": "tsx scripts/check-functions-health.ts",
     "test:e2e": "playwright test",
+    "test:e2e:emulator": "firebase emulators:exec --only auth,firestore \"playwright test -c playwright.emulator.config.ts\"",
     "prepare": "husky"
   },
   "dependencies": {

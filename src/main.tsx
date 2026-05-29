@@ -47,6 +47,13 @@ if ('serviceWorker' in navigator) {
 const appEntryPreload = import('./appEntry');
 // persistence 설정 완료를 기다린 뒤 Auth 상태 확인
 authReady.then(() => {
+    // 에뮬레이터(E2E) 모드: 항상 전체 앱을 로드한다.
+    // 경량 entry(lightEntry)에는 AuthProvider와 __E2E_AUTH__ 로그인 헬퍼가 없어
+    // 테스트에서 로그인 후 리다이렉트가 동작하지 않으므로, 전체 앱으로 고정한다.
+    if (import.meta.env.VITE_USE_EMULATOR === 'true') {
+        appEntryPreload.then(({ renderFullApp }) => renderFullApp());
+        return;
+    }
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
         unsubscribe();
 

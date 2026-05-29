@@ -14,7 +14,7 @@
  * iOS Safari ITP 대응도 이 호출로 처리된다.
  */
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, browserLocalPersistence, setPersistence } from 'firebase/auth';
+import { getAuth, browserLocalPersistence, setPersistence, connectAuthEmulator } from 'firebase/auth';
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -29,6 +29,16 @@ const firebaseConfig = {
 // 이미 초기화된 앱이 있으면 재사용 (appEntry에서 firebase.ts 로드 시 충돌 방지)
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+// 에뮬레이터 모드(E2E): 경량 경로(main.tsx)에서도 auth가 가장 먼저 사용되므로
+// 여기서 에뮬레이터에 연결해야 onAuthStateChanged가 에뮬레이터 세션을 본다.
+// firebase.ts와 동일 인스턴스를 공유하므로 emulatorConfig 유무로 중복 연결을 가드한다.
+if (
+    import.meta.env.VITE_USE_EMULATOR === 'true' &&
+    typeof window !== 'undefined' &&
+    !(auth as unknown as { emulatorConfig?: unknown }).emulatorConfig
+) {
+    connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+}
 // setPersistence 완료를 기다려야 새 탭에서 IndexedDB 세션 복원이 보장됨
 export const authReady = setPersistence(auth, browserLocalPersistence).catch((err) => {
     console.warn('[Auth] persistence 설정 실패:', err);

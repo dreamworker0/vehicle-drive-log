@@ -1,11 +1,17 @@
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, connectAuthEmulator } from 'firebase/auth';
 import { authReady as _authReady } from './firebaseAuth';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, getFirestore, clearIndexedDbPersistence } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, getFirestore, clearIndexedDbPersistence, connectFirestoreEmulator } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
-import { getFunctions } from 'firebase/functions';
+import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 import { initializeAppCheck, ReCaptchaV3Provider, onTokenChanged } from 'firebase/app-check';
 // firebase/analytics, firebase/messaging은 동적 import (번들 최적화)
+
+// === E2E/로컬 에뮬레이터 모드 ===
+// VITE_USE_EMULATOR=true 일 때만 Auth/Firestore/Functions 에뮬레이터에 연결하고
+// App Check를 비활성화한다. 빌드 타임 치환되는 환경변수이므로 프로덕션 빌드(false)에서는
+// 아래 분기들이 dead code로 제거되어 기존 동작과 100% 동일하다.
+const USE_EMULATOR = import.meta.env.VITE_USE_EMULATOR === 'true';
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -22,7 +28,7 @@ const app = initializeApp(firebaseConfig);
 // === App Check 초기화 (initializeApp 직후, 다른 서비스보다 먼저) ===
 // 개발 환경: VITE_APPCHECK_DEBUG_TOKEN으로 에뮬레이터/로컬 통과
 // 프로덕션: reCAPTCHA v3 토큰 자동 발급
-if (typeof window !== 'undefined') {
+if (typeof window !== 'undefined' && !USE_EMULATOR) {
     // @firebase/app-check / @firebase/auth SDK 내부 logger가 토큰 교환 500/throttle 시
     // console.warn을 N회 직접 호출한다 (per-component setLogLevel 미제공). 우리 쪽
     // onTokenChanged 핸들러에서 이미 60초 dedup으로 1회 안내하므로, 동일한 의미의
@@ -109,6 +115,11 @@ scheduleIdle(() => {
 });
 
 export const auth = getAuth(app);
+// 에뮬레이터 모드: Auth 에뮬레이터(9099)에 연결 (E2E 인증 세션용).
+// firebaseAuth.ts에서 이미 연결됐을 수 있으므로 emulatorConfig 유무로 중복 연결을 가드한다.
+if (USE_EMULATOR && typeof window !== 'undefined' && !(auth as unknown as { emulatorConfig?: unknown }).emulatorConfig) {
+    connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
+}
 // main.tsx → firebaseAuth.ts에서 이미 setPersistence 완료.
 // 중복 호출 대신 기존 Promise를 재수출하여 ~200-500ms 절감.
 export const authReady = _authReady;
@@ -245,6 +256,13 @@ let db: ReturnType<typeof getFirestore>;
 
 function initFirestoreSync() {
     try {
+        // 에뮬레이터 모드: 메모리 캐시 + Firestore 에뮬레이터(8080) 연결.
+        // 테스트 간 IndexedDB 캐시 오염을 피하기 위해 memoryLocalCache 사용.
+        if (USE_EMULATOR) {
+            const instance = initializeFirestore(app, { localCache: memoryLocalCache() });
+            connectFirestoreEmulator(instance, '127.0.0.1', 8080);
+            return instance;
+        }
         if (typeof window === 'undefined') {
             return initializeFirestore(app, { localCache: memoryLocalCache() });
         }
@@ -273,7 +291,9 @@ function initFirestoreSync() {
 db = initFirestoreSync()!;
 
 // 2단계: 비동기로 IndexedDB 검사 후 사용 불가 시 memoryLocalCache로 재초기화
+// (에뮬레이터 모드는 이미 memory 캐시 + 에뮬레이터 연결 상태이므로 재초기화 스킵)
 checkIndexedDBAvailability().then((available) => {
+    if (USE_EMULATOR) return db;
     if (!available && db) {
         if (typeof window !== 'undefined') {
             console.warn('[Firestore] IndexedDB 사용 불가 → memoryLocalCache로 재초기화');
@@ -292,6 +312,10 @@ export { db };
 export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
 export const firebaseFunctions = getFunctions(app, 'asia-northeast3');
+// 에뮬레이터 모드: Functions 에뮬레이터(5001)에 연결
+if (USE_EMULATOR && typeof window !== 'undefined') {
+    connectFunctionsEmulator(firebaseFunctions, '127.0.0.1', 5001);
+}
 
 // FCM은 브라우저 지원 시에만 초기화 (동적 import로 번들 최적화)
 let _messaging: ReturnType<typeof import('firebase/messaging').getMessaging> | null = null;
@@ -311,4 +335,18 @@ export async function getMessagingInstance() {
 }
 
 export function getAnalyticsInstance() { return _analytics; }
+
+// === E2E 전용 로그인 헬퍼 ===
+// 에뮬레이터 모드에서만 window에 노출한다. Google 로그인 전용 앱이라 Playwright로
+// OAuth 팝업을 자동화할 수 없으므로, Auth 에뮬레이터의 이메일/비밀번호 계정으로
+// 로그인하는 헬퍼를 제공해 인증 후 화면 E2E를 가능하게 한다. (프로덕션 빌드에선 제거됨)
+if (USE_EMULATOR && typeof window !== 'undefined') {
+    import('firebase/auth').then(({ signInWithEmailAndPassword, signOut }) => {
+        (window as unknown as Record<string, unknown>).__E2E_AUTH__ = {
+            signIn: (email: string, password: string) => signInWithEmailAndPassword(auth, email, password),
+            signOut: () => signOut(auth),
+        };
+    });
+}
+
 export default app;
