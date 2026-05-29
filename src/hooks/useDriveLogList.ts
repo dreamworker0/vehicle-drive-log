@@ -5,8 +5,10 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
 import { useConfirm } from './useConfirm';
-import { getDriveLogs, getVehicles, getOrganizationMembers, getOrganization, cleanupDuplicateLogs, deleteDriveLog, getAllDriveLogsForExport } from '../lib/firestore';
+import { getDriveLogs, getVehicles, getOrganizationMembers, getOrganization, cleanupDuplicateLogs, deleteDriveLog } from '../lib/firestore';
 import { toLocalDateStr } from '../lib/dateUtils';
+import { matchesSearch } from './driveLogList/matchesSearch';
+import { useDriveLogExport } from './driveLogList/useDriveLogExport';
 import type { DocumentSnapshot } from 'firebase/firestore';
 import type { DriveLogEntry } from '../types/driveLog';
 
@@ -54,8 +56,6 @@ export default function useDriveLogList() {
     const [dupState, setDupState] = useState<'idle' | 'scanning' | 'result' | 'cleaning'>('idle');
     const [dupResult, setDupResult] = useState<DupResult | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
-    const [includeHipass, setIncludeHipass] = useState(false);
-    const [includePassengers, setIncludePassengers] = useState(false);
 
     const now = new Date();
     const firstDay = toLocalDateStr(new Date(now.getFullYear(), now.getMonth(), 1));
@@ -140,13 +140,7 @@ export default function useDriveLogList() {
     // 검색 필터링 — logs/filters.search가 동일하면 재계산 생략
     const filteredLogs = useMemo(() => {
         if (!filters.search) return logs;
-        const s = filters.search.toLowerCase();
-        return logs.filter(log => (
-            log.driverName?.toLowerCase().includes(s) ||
-            log.vehicleName?.toLowerCase().includes(s) ||
-            log.purpose?.toLowerCase().includes(s) ||
-            log.destination?.toLowerCase().includes(s)
-        ));
+        return logs.filter(log => matchesSearch(log, filters.search));
     }, [logs, filters.search]);
 
     const totalDistance = useMemo(
@@ -223,90 +217,12 @@ export default function useDriveLogList() {
         setDupResult(null);
     };
 
-    // 내보내기 유효성 검사
-    const validateExportDates = (format: string): string | null => {
-        if (!filters.startDate || !filters.endDate) {
-            showToast('기간을 선택해주세요. (최대 3개월)', 'warning');
-            return null;
-        }
-        const start = new Date(filters.startDate);
-        const end = new Date(filters.endDate);
-        const diffMs = end.getTime() - start.getTime();
-        if (diffMs < 0) { showToast('종료일이 시작일보다 앞섭니다.', 'warning'); return null; }
-        if (diffMs > 92 * 24 * 60 * 60 * 1000) {
-            showToast(`${format} 다운로드는 최대 3개월까지 가능합니다.`, 'warning');
-            return null;
-        }
-        return format === 'PDF'
-            ? `${filters.startDate} ~ ${filters.endDate}`
-            : `${filters.startDate}~${filters.endDate}`;
-    };
-
-    // 서버 내보내기
-    const handleServerExport = async (period: string, hipass: boolean, passengers: boolean, isPdf: boolean) => {
-        if (!orgId) return;
-        showToast('전체 데이터를 불러오고 있습니다. 잠시만 기다려주세요.', 'info');
-        try {
-            const allLogs = await getAllDriveLogsForExport(orgId, {
-                vehicleId: filters.vehicleId || undefined,
-                driverUid: filters.driverUid || undefined,
-                startDate: filters.startDate || undefined,
-                endDate: filters.endDate || undefined
-            });
-            const finalLogs = (allLogs as unknown as DriveLogEntry[]).filter((log: DriveLogEntry) => {
-                if (filters.search) {
-                    const s = filters.search.toLowerCase();
-                    return (
-                        log.driverName?.toLowerCase().includes(s) ||
-                        log.vehicleName?.toLowerCase().includes(s) ||
-                        log.purpose?.toLowerCase().includes(s) ||
-                        log.destination?.toLowerCase().includes(s)
-                    );
-                }
-                return true;
-            });
-            if (finalLogs.length === 0) {
-                showToast('추출할 데이터가 없습니다.', 'warning');
-                return;
-            }
-            if (isPdf) {
-                const { downloadDriveLogsPdf } = await import('../lib/pdf/pdfExport');
-                const defaultApproval = [{ title: '담당' }, { title: '팀장' }];
-                const useApproval = org?.hideApprovalLine
-                    ? []
-                    : ((org?.approvalLine?.length ?? 0) > 0 ? org!.approvalLine! : defaultApproval);
-                downloadDriveLogsPdf(finalLogs, {
-                    orgName: org?.name || '',
-                    period,
-                    approvalLine: useApproval,
-                    includeHipass: hipass,
-                    includePassengers: passengers,
-                    onError: (msg) => showToast(msg, 'error'),
-                });
-            } else {
-                const { downloadDriveLogsExcel } = await import('../lib/excelExport');
-                await downloadDriveLogsExcel(finalLogs, `운행일지_${period}`, {
-                    onError: (msg) => showToast(msg, 'warning'),
-                    includeHipass: hipass,
-                    includePassengers: passengers,
-                });
-            }
-        } catch (err) {
-            console.error('Export 데이터 로드 실패:', err);
-            const msg = err instanceof Error && err.message ? err.message : '데이터를 불러오는데 실패했습니다.';
-            showToast(msg, 'error');
-        }
-    };
-
-    const handleExportExcel = () => {
-        const period = validateExportDates('엑셀');
-        if (period) handleServerExport(period, includeHipass, includePassengers, false);
-    };
-
-    const handleExportPdf = () => {
-        const period = validateExportDates('PDF');
-        if (period) handleServerExport(period, includeHipass, includePassengers, true);
-    };
+    // 내보내기(엑셀/PDF)는 목록 상태와 독립적이므로 별도 훅으로 분리
+    const {
+        includeHipass, setIncludeHipass,
+        includePassengers, setIncludePassengers,
+        handleExportExcel, handleExportPdf,
+    } = useDriveLogExport(orgId, filters, org);
 
     return {
         // 상태
