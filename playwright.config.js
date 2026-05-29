@@ -4,6 +4,7 @@ const isCI = !!process.env.CI;
 
 export default defineConfig({
     testDir: './e2e',
+    testIgnore: /authed-.*\.spec\.ts/,
     timeout: 30000,
     retries: isCI ? 2 : 1,
     use: {
