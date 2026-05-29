@@ -56,39 +56,45 @@ export default function useVehicleManager() {
 
     const orgId = userData?.organizationId;
 
-    const fetchVehicles = useCallback(async (retryCount = 0) => {
+    const fetchVehicles = useCallback(async () => {
         if (!orgId) { setLoading(false); return; }
         setLoading(true);
-        try {
-            const data = await getVehicles(orgId);
-            setVehicles(data);
-            // 각 차량의 운행일지 존재 여부 병렬 체크
-            const checks = await Promise.all(
-                data.map(async (v) => {
-                    const has = await hasVehicleDriveLogs(v.id);
-                    return { id: v.id, has };
-                })
-            );
-            setDeletableIds(new Set(checks.filter(c => !c.has).map(c => c.id)));
-        } catch (err) {
-            const errCode = (err as { code?: string })?.code;
-            // Custom Claims가 아직 토큰에 반영되지 않아 권한 거부된 경우 1회 재시도
-            if (errCode === 'permission-denied' && retryCount < 1) {
-                console.debug('Custom Claims 미반영 — 토큰 갱신 후 재시도');
-                try {
-                    const { auth: firebaseAuth } = await import('../lib/firebase');
-                    const { refreshTokenSilently } = await import('../lib/tokenRefresh');
-                    if (firebaseAuth.currentUser) {
-                        await refreshTokenSilently(firebaseAuth.currentUser);
-                    }
-                } catch { /* ignore */ }
-                setTimeout(() => fetchVehicles(retryCount + 1), 800);
-                return;
+        let retryCount = 0;
+        while (retryCount <= 1) {
+            try {
+                const data = await getVehicles(orgId);
+                setVehicles(data);
+                // 각 차량의 운행일지 존재 여부 병렬 체크
+                const checks = await Promise.all(
+                    data.map(async (v) => {
+                        const has = await hasVehicleDriveLogs(v.id);
+                        return { id: v.id, has };
+                    })
+                );
+                setDeletableIds(new Set(checks.filter(c => !c.has).map(c => c.id)));
+                break; // 성공 시 루프 탈출
+            } catch (err) {
+                const errCode = (err as { code?: string })?.code;
+                // Custom Claims가 아직 토큰에 반영되지 않아 권한 거부된 경우 1회 재시도
+                if (errCode === 'permission-denied' && retryCount < 1) {
+                    console.debug('Custom Claims 미반영 — 토큰 갱신 후 재시도');
+                    try {
+                        const { auth: firebaseAuth } = await import('../lib/firebase');
+                        const { refreshTokenSilently } = await import('../lib/tokenRefresh');
+                        if (firebaseAuth.currentUser) {
+                            await refreshTokenSilently(firebaseAuth.currentUser);
+                        }
+                    } catch { /* ignore */ }
+                    await new Promise(r => setTimeout(r, 800));
+                    retryCount++;
+                    continue;
+                }
+                console.error('차량 목록 로드 실패:', err);
+                captureError(err, { context: 'fetchVehicles', orgId, retryCount });
+                break;
+            } finally {
+                setLoading(false);
             }
-            console.error('차량 목록 로드 실패:', err);
-            captureError(err, { context: 'fetchVehicles', orgId, retryCount });
-        } finally {
-            setLoading(false);
         }
     }, [orgId]);
 

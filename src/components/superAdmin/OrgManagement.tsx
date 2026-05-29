@@ -35,42 +35,48 @@ export default function OrgManagement() {
     const { showToast } = useToast();
     const { confirm } = useConfirm();
 
-    const fetchOrganizations = useCallback(async (retryCount = 0) => {
+    const fetchOrganizations = useCallback(async () => {
         setLoading(true);
-        try {
-            const [orgs, deleted] = await Promise.all([
-                getApprovedOrganizations(),
-                getDeletedOrganizations().catch((err: unknown) => {
-                    console.warn('삭제된 기관 목록 로드 실패 (인덱스 빌드 중일 수 있음):', err);
-                    return [];
-                })
-            ]);
-            
-            const counts = await getOrgMemberCounts((orgs as Organization[]).map(o => o.id)).catch((err: unknown) => {
-                console.warn('멤버 수 조회 실패:', err);
-                return {};
-            });
+        let retryCount = 0;
+        while (retryCount <= 2) {
+            try {
+                const [orgs, deleted] = await Promise.all([
+                    getApprovedOrganizations(),
+                    getDeletedOrganizations().catch((err: unknown) => {
+                        console.warn('삭제된 기관 목록 로드 실패 (인덱스 빌드 중일 수 있음):', err);
+                        return [];
+                    })
+                ]);
+                
+                const counts = await getOrgMemberCounts((orgs as Organization[]).map(o => o.id)).catch((err: unknown) => {
+                    console.warn('멤버 수 조회 실패:', err);
+                    return {};
+                });
 
-            setOrganizations(orgs as Organization[]);
-            setDeletedOrgs(deleted as Organization[]);
-            setMemberCountMap(counts);
-        } catch (err) {
-            // 일시적 연결 실패 시 자동 재시도 (최대 2회, 지수 백오프)
-            const isTransient = err instanceof Error && (
-                err.message.includes('Connection failed') ||
-                err.message.includes('unavailable') ||
-                err.message.includes('internal')
-            );
-            if (isTransient && retryCount < 2) {
-                const delay = 1000 * Math.pow(2, retryCount); // 1s, 2s
-                console.warn(`[OrgManagement] 일시적 연결 실패, ${delay}ms 후 재시도 (${retryCount + 1}/2)`);
-                await new Promise(r => setTimeout(r, delay));
-                return fetchOrganizations(retryCount + 1);
+                setOrganizations(orgs as Organization[]);
+                setDeletedOrgs(deleted as Organization[]);
+                setMemberCountMap(counts);
+                break; // 성공 시 루프 탈출
+            } catch (err) {
+                // 일시적 연결 실패 시 자동 재시도 (최대 2회, 지수 백오프)
+                const isTransient = err instanceof Error && (
+                    err.message.includes('Connection failed') ||
+                    err.message.includes('unavailable') ||
+                    err.message.includes('internal')
+                );
+                if (isTransient && retryCount < 2) {
+                    const delay = 1000 * Math.pow(2, retryCount); // 1s, 2s
+                    console.warn(`[OrgManagement] 일시적 연결 실패, ${delay}ms 후 재시도 (${retryCount + 1}/2)`);
+                    await new Promise(r => setTimeout(r, delay));
+                    retryCount++;
+                    continue;
+                }
+                console.error('기관 목록 로드 실패:', err);
+                showToast('기관 목록을 불러오는 데 실패했습니다. 잠시 후 다시 시도해주세요.', 'error');
+                break;
+            } finally {
+                setLoading(false);
             }
-            console.error('기관 목록 로드 실패:', err);
-            showToast('기관 목록을 불러오는 데 실패했습니다. 잠시 후 다시 시도해주세요.', 'error');
-        } finally {
-            setLoading(false);
         }
     }, [showToast]);
 
