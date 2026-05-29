@@ -1,7 +1,9 @@
 // ── Mock 설정 ──
 const mockSendPushToUser = jest.fn().mockResolvedValue(undefined);
+const mockCreateInAppNotification = jest.fn().mockResolvedValue(undefined);
 jest.mock('../sendNotification', () => ({
     sendPushToUser: mockSendPushToUser,
+    createInAppNotification: mockCreateInAppNotification,
 }));
 
 const mockUpdate = jest.fn().mockResolvedValue(undefined);
@@ -29,8 +31,8 @@ import { checkReservationReminders } from '../reservationReminder';
 describe('checkReservationReminders', () => {
     beforeEach(() => {
         jest.clearAllMocks();
-        jest.spyOn(console, 'log').mockImplementation();
-        jest.spyOn(console, 'error').mockImplementation();
+        // jest.spyOn(console, 'log').mockImplementation();
+        // jest.spyOn(console, 'error').mockImplementation();
         // 2026-03-04 10:00 KST (= 01:00 UTC)
         jest.useFakeTimers();
         jest.setSystemTime(new Date('2026-03-04T01:00:00Z'));

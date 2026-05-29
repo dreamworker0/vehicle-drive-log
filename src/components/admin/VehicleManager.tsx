@@ -154,8 +154,8 @@ export default function VehicleManager() {
             {/* 정비 중 / 폐차 사유 표시 */}
             {(vehicle.fuelType === 'electric' || isVehicleBlocked(vehicle.maintenance) || isRetired) && (
                 <div className="mt-2 flex items-center gap-3 text-xs text-surface-400">
-                    {vehicle.fuelType === 'electric' && (vehicle as unknown as { currentBattery?: number }).currentBattery != null && (
-                        <span className="flex items-center gap-1">🔋 {(vehicle as unknown as { currentBattery?: number }).currentBattery}%</span>
+                    {vehicle.fuelType === 'electric' && vehicle.currentBattery != null && (
+                        <span className="flex items-center gap-1">🔋 {vehicle.currentBattery}%</span>
                     )}
                     {isRetired && (
                         <span className="px-2 py-0.5 bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 rounded-full font-medium">

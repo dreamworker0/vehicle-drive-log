@@ -13,7 +13,16 @@ export {
     updateUser,
     getOrganizationMembers,
     getOrgMemberCounts,
+    restoreUser,
+    clearUserOrganization,
 } from './users';
+
+// 사전 등록 직원 (Pre-registered Employees)
+export {
+    getPreRegisteredEmployees,
+    addPreRegisteredEmployee,
+    deletePreRegisteredEmployee,
+} from './preRegistered';
 
 // 기관 (Organizations)
 export {

@@ -5,8 +5,7 @@
  * 마커 팝업에서 좌표 수정 가능
  */
 import { useEffect, useRef } from 'react';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import { updateOrganization } from '../../lib/firestore';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -144,7 +143,7 @@ export default function OrgMapView({ orgs }: OrgMapViewProps) {
                 saveBtn.disabled = true;
                 saveBtn.textContent = '...';
                 try {
-                    await updateDoc(doc(db, 'organizations', org.id), { lat, lng });
+                    await updateOrganization(org.id, { lat, lng });
                     saveBtn.textContent = '✅';
                     setTimeout(() => window.location.reload(), 1000);
                 } catch (err: unknown) {

@@ -2,17 +2,16 @@
  * useEmployeeManager — 직원 관리 상태 + CRUD 로직
  * EmployeeManager에서 추출된 커스텀 훅
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
 import { useConfirm } from './useConfirm';
 import useRetry from './useRetry';
-import { getOrganizationMembers, getOrganization, regenerateInviteCode, updateUser } from '../lib/firestore';
-import { collection, addDoc, getDocs, deleteDoc, doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { getOrganizationMembers, getOrganization, regenerateInviteCode, updateUser, restoreUser, getPreRegisteredEmployees, addPreRegisteredEmployee, deletePreRegisteredEmployee } from '../lib/firestore';
 import type { User, UserRole } from '../types/user';
 import type { Organization } from '../types/organization';
 import { captureError } from '../lib/sentry';
+import { APP_URL } from '../lib/constants';
 
 export default function useEmployeeManager() {
     const { userData } = useAuth();
@@ -34,14 +33,14 @@ export default function useEmployeeManager() {
 
     const orgId = userData?.organizationId;
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         if (!orgId) return;
         setLoading(true);
         try {
-            const [members, org, preRegSnap] = await Promise.all([
+            const [members, org, preReg] = await Promise.all([
                 getOrganizationMembers(orgId),
                 getOrganization(orgId),
-                getDocs(collection(db, 'organizations', orgId, 'preRegistered')),
+                getPreRegisteredEmployees(orgId),
             ]);
             const nonSuperAdmins = members.filter((m) => m.role !== 'superAdmin');
             const activeMembers = nonSuperAdmins.filter((m) => m.status !== 'disabled');
@@ -56,10 +55,7 @@ export default function useEmployeeManager() {
             setDisabledEmployees(
                 disabledMembers.sort((a, b) => (a.name || '').localeCompare(b.name || '')) as User[]
             );
-            setPreRegisteredEmployees(
-                preRegSnap.docs.map(d => ({ id: d.id, ...d.data() } as { id: string; name: string; email: string; createdAt: unknown }))
-                    .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
-            );
+            setPreRegisteredEmployees(preReg);
             setOrganization(org as Organization | null);
         } catch (err) {
             console.error('데이터 로드 실패:', err);
@@ -67,21 +63,15 @@ export default function useEmployeeManager() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [orgId]);
 
-    /* eslint-disable react-hooks/exhaustive-deps */
-    useEffect(() => { fetchData(); }, [orgId]);
-    /* eslint-enable react-hooks/exhaustive-deps */
+    useEffect(() => { fetchData(); }, [fetchData]);
 
     const handleAddEmployee = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!newEmployee.name.trim()) return;
         await runWithRetry('add-emp', async () => {
-            await addDoc(collection(db, 'organizations', orgId!, 'preRegistered'), {
-                name: newEmployee.name.trim(),
-                email: newEmployee.email.trim().toLowerCase(),
-                createdAt: serverTimestamp(),
-            });
+            await addPreRegisteredEmployee(orgId!, newEmployee.name.trim(), newEmployee.email.trim().toLowerCase());
             setNewEmployee({ name: '', email: '' });
             setShowAddForm(false);
             await fetchData();
@@ -91,7 +81,7 @@ export default function useEmployeeManager() {
     const handleCopyInviteCode = async (type: 'link' | 'code' = 'link') => {
         if (!organization?.inviteCode) return;
         const textToCopy = type === 'link' 
-            ? `https://vehicle-drive-log.web.app?code=${organization.inviteCode}`
+            ? `${APP_URL}?code=${organization.inviteCode}`
             : organization.inviteCode;
             
         try {
@@ -169,7 +159,7 @@ export default function useEmployeeManager() {
     const handleRestoreEmployee = async (emp: User) => {
         if (!await confirm({ message: `${emp.name || emp.email} 직원을 다시 활성화하시겠습니까?` })) return;
         await runWithRetry(`restore-emp-${emp.id}`, async () => {
-            await updateDoc(doc(db, 'users', emp.id), { status: 'active', disabledAt: null });
+            await restoreUser(emp.id);
             showToast('직원이 활성화되었습니다.', 'success');
             await fetchData();
         }, { errorMessage: '활성화에 실패했습니다.' });
@@ -201,7 +191,7 @@ export default function useEmployeeManager() {
         if (!orgId) return;
         if (!await confirm({ message: '사전 등록을 취소하시겠습니까?', confirmColor: 'warning' })) return;
         await runWithRetry(`del-prereg-${preRegId}`, async () => {
-            await deleteDoc(doc(db, 'organizations', orgId, 'preRegistered', preRegId));
+            await deletePreRegisteredEmployee(orgId, preRegId);
             showToast('사전 등록이 취소되었습니다.', 'success');
             await fetchData();
         }, { errorMessage: '삭제에 실패했습니다.' });

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     getVehicles,
     getReservationsByDateRange,
@@ -8,6 +8,7 @@ import {
 } from '../../lib/firestore';
 import { getHolidays } from '../../lib/holiday';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
+import { useCalendarSync } from '../useCalendarSync';
 import type { Vehicle } from '../../types/vehicle';
 import type { Reservation, CalendarDay } from '../../types/reservation';
 import type { CustomHoliday } from '../../types/holiday';
@@ -36,6 +37,8 @@ export function useReservationData({
     const [holidays, setHolidays] = useState<CustomHoliday[]>([]);
     const [members, setMembers] = useState<UserDoc[]>([]);
     const [orgAddress, setOrgAddress] = useState('');
+
+    const { syncVehicleOnDemand, checkCooldown } = useCalendarSync();
 
     // 초기 데이터 로드
     useEffect(() => {
@@ -73,8 +76,8 @@ export function useReservationData({
         fetchData();
     }, [user, userData, isAdmin, showToast]);
 
-    // 예약 목록 로드 (월 변경 시)
-    useEffect(() => {
+    // 예약 목록 로드 함수 분리 (재사용 목적)
+    const fetchReservations = useCallback(() => {
         if (!userData?.organizationId) return;
 
         const start = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
@@ -84,6 +87,38 @@ export function useReservationData({
             .then(res => setReservations(res as Reservation[]))
             .catch(err => console.error('Reservation fetch error:', err));
     }, [currentMonth, userData]);
+
+    // 예약 목록 로드 (월 변경 시)
+    useEffect(() => {
+        fetchReservations();
+    }, [fetchReservations]);
+
+    // 구글 캘린더 온디맨드 백그라운드 동기화 트리거
+    useEffect(() => {
+        if (!userData?.organizationId || vehicles.length === 0) return;
+
+        const triggerSyncs = async () => {
+            let anySynced = false;
+            for (const vehicle of vehicles) {
+                const calId = vehicle.googleCalendarId;
+                // 유효한 구글 캘린더 ID를 가졌고, 30분 쿨다운을 지난 경우 백그라운드 동기화 자동 시작
+                if (calId && calId.includes('@') && checkCooldown(vehicle.id)) {
+                    console.log(`[useReservationData] Triggering background calendar sync for ${vehicle.displayName} (${vehicle.id})`);
+                    const success = await syncVehicleOnDemand(vehicle.id, userData.organizationId!);
+                    if (success) {
+                        anySynced = true;
+                    }
+                }
+            }
+            // 하나라도 성공했으면 예약을 즉시 리프레시하여 실시간 반영
+            if (anySynced) {
+                console.log('[useReservationData] Calendar sync completed, refreshing reservations...');
+                fetchReservations();
+            }
+        };
+
+        triggerSyncs();
+    }, [vehicles, userData?.organizationId, syncVehicleOnDemand, checkCooldown, fetchReservations]);
 
     // 달력 데이터 생성
     const calendarDays = useMemo(() => {

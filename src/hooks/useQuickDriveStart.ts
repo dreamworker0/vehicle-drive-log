@@ -2,12 +2,12 @@
  * useQuickDriveStart — 예약없는 출발 시작 페이지의 상태 + 로직
  * 차량 선택, 목적지, 목적 입력 후 in_progress 예약 생성
  */
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
 import { getVehicles, getFavorites, getOrganization, createReservationSafe, updateReservationStatus } from '../lib/firestore';
-import { getMultiRouteWithFreeRoad, isTmapAvailable, VEHICLE_TYPE_TO_CAR_TYPE } from '../lib/tmap';
+import { getMultiRouteWithFreeRoad, getFreeRoadRoute, isTmapAvailable, VEHICLE_TYPE_TO_CAR_TYPE } from '../lib/tmap';
 import type { Favorite } from '../types/favorite';
 import { calcEndTime } from './utils/reservationUtils';
 import { toLocalDateStr } from '../lib/dateUtils';
@@ -28,10 +28,13 @@ export default function useQuickDriveStart() {
     const [favorites, setFavorites] = useState<Favorite[]>([]);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
-    const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number; tollFee?: number; freeRoadRoute?: { distance: number; duration: number; tollFee: number } } | null>(null);
+    const [routeInfo, setRouteInfo] = useState<{ distance: number; duration: number; tollFee?: number; hasToll?: boolean } | null>(null);
     const [routeLoading, setRouteLoading] = useState(false);
+    const [freeRoadRoute, setFreeRoadRoute] = useState<{ distance: number; duration: number; tollFee: number } | null>(null);
+    const [freeRoadLoading, setFreeRoadLoading] = useState(false);
     const [orgAddress, setOrgAddress] = useState('');
     const routeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const lastRouteParamsRef = useRef<{ origin: string; destination: string; carType: string } | null>(null);
 
     const [form, setForm] = useState({
         vehicleId: '',
@@ -94,6 +97,7 @@ export default function useQuickDriveStart() {
     useEffect(() => {
         if (routeTimerRef.current) clearTimeout(routeTimerRef.current);
         setRouteInfo(null);
+        setFreeRoadRoute(null);
 
         if (!form.destination.trim() || !orgAddress || !isTmapAvailable()) return;
 
@@ -104,9 +108,16 @@ export default function useQuickDriveStart() {
                 const carType = VEHICLE_TYPE_TO_CAR_TYPE[selectedV?.vehicleType ?? ''] || '0';
 
                 const result = await getMultiRouteWithFreeRoad(orgAddress, form.destination.trim(), { carType });
-                setRouteInfo(result);
+                if (result) {
+                    setRouteInfo({ distance: result.distance, duration: result.duration, tollFee: result.tollFee, hasToll: result.hasToll });
+                    lastRouteParamsRef.current = { origin: orgAddress, destination: form.destination.trim(), carType };
+                } else {
+                    setRouteInfo(null);
+                    lastRouteParamsRef.current = null;
+                }
             } catch (err) {
                 console.error('경로 탐색 실패:', err);
+                lastRouteParamsRef.current = null;
             } finally {
                 setRouteLoading(false);
             }
@@ -116,6 +127,22 @@ export default function useQuickDriveStart() {
             if (routeTimerRef.current) clearTimeout(routeTimerRef.current);
         };
     }, [form.destination, form.vehicleId, orgAddress, vehicles]);
+
+    // 무료도로 경로 on-demand 조회 (펼치기 버튼 클릭 시 호출)
+    const handleFetchFreeRoad = useCallback(async () => {
+        if (!lastRouteParamsRef.current || freeRoadLoading) return;
+        setFreeRoadLoading(true);
+        try {
+            const { origin, destination, carType } = lastRouteParamsRef.current;
+            const result = await getFreeRoadRoute(origin, destination, { carType });
+            setFreeRoadRoute(result);
+        } catch (err) {
+            console.error('무료도로 탐색 실패:', err);
+            setFreeRoadRoute(null);
+        } finally {
+            setFreeRoadLoading(false);
+        }
+    }, [freeRoadLoading]);
 
     const selectedVehicle = vehicles.find(v => v.id === form.vehicleId);
 
@@ -193,6 +220,7 @@ export default function useQuickDriveStart() {
         loading, submitting,
         selectedVehicle,
         routeInfo, routeLoading,
+        freeRoadRoute, freeRoadLoading, handleFetchFreeRoad,
         handleVehicleSelect,
         handleFavoriteSelect,
         handleStart,

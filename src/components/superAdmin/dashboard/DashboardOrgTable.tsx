@@ -1,8 +1,7 @@
 import React, { lazy, Suspense } from 'react';
 import { useToast } from '../../../hooks/useToast';
-import { doc, updateDoc } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { db } from '../../../lib/firebase';
+import { updateOrganization } from '../../../lib/firestore';
 import app from '../../../lib/firebase';
 import { ORG_PAGE_SIZE } from './dashboardUtils';
 import type { OrgData, SortKey } from './dashboardUtils';
@@ -197,7 +196,7 @@ function DashboardOrgTable({
                                         btn.disabled = true;
                                         btn.textContent = '저장 중...';
                                         try {
-                                            await updateDoc(doc(db, 'organizations', org.id), { lat, lng });
+                                            await updateOrganization(org.id, { lat, lng });
                                             setHiddenOrgIds(prev => new Set([...prev, org.id]));
                                             showToast(`${org.name} 좌표가 저장되었습니다.`, 'success');
                                             onRefresh();

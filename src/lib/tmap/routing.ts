@@ -136,33 +136,32 @@ export const getRouteInfo = async (destination: string) => {
     }
 };
 
-/** 기존(추천) 경로와 무료도로 경로를 순차 조회 */
+/**
+ * 기존(추천) 경로 조회 — 일반 경로만 반환
+ * 무료도로 비교는 getFreeRoadRoute()로 별도 on-demand 호출
+ */
 export const getMultiRouteWithFreeRoad = async (origin: string, destinationText: string, { carType = '0' } = {}) => {
-    // 일반 경로 우선 조회
     const normal = await getMultiRoute(origin, destinationText, { carType, searchOption: '0' });
+    if (!normal) return null;
+    // hasToll: 통행료가 있는 경로임을 UI에 알려 펼치기 버튼 표시 여부 결정
+    return { ...normal, hasToll: (normal.tollFee ?? 0) > 0, freeRoadRoute: undefined };
+};
 
-    // 일반 경로 실패 또는 쿨다운 시 무료도로 조회 스킵
-    if (!normal || isTmapCoolingDown()) {
-        return normal ? { ...normal, freeRoadRoute: undefined } : normal;
-    }
-
-    // 통행료가 있을 때만 무료도로 대체 경로를 조회 (비용 절약)
-    if (normal.tollFee && normal.tollFee > 0) {
-        const freeRoad = await getMultiRoute(origin, destinationText, { carType, searchOption: '1' });
-        const isDifferent = freeRoad && (
-            Math.floor(freeRoad.distance) !== Math.floor(normal.distance) ||
-            (freeRoad.tollFee || 0) !== (normal.tollFee || 0)
-        );
-
-        return {
-            ...normal,
-            freeRoadRoute: isDifferent ? {
-                distance: freeRoad.distance,
-                duration: freeRoad.duration,
-                tollFee: freeRoad.tollFee || 0,
-            } : undefined,
-        };
-    }
-
-    return { ...normal, freeRoadRoute: undefined };
+/**
+ * 무료도로 경로 on-demand 조회
+ * 사용자가 펼치기 버튼을 클릭했을 때만 호출
+ */
+export const getFreeRoadRoute = async (
+    origin: string,
+    destinationText: string,
+    { carType = '0' } = {},
+): Promise<{ distance: number; duration: number; tollFee: number } | null> => {
+    if (isTmapCoolingDown()) return null;
+    const freeRoad = await getMultiRoute(origin, destinationText, { carType, searchOption: '1' });
+    if (!freeRoad) return null;
+    return {
+        distance: freeRoad.distance,
+        duration: freeRoad.duration,
+        tollFee: freeRoad.tollFee || 0,
+    };
 };

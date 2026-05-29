@@ -24,3 +24,6 @@ export const getVehicleColor = (id: string) => {
     for (let i = 0; i < id.length; i++) hash = ((hash << 5) - hash) + id.charCodeAt(i);
     return VEHICLE_COLORS[Math.abs(hash) % VEHICLE_COLORS.length];
 };
+
+// 앱 공개 URL
+export const APP_URL = 'https://vehicle-drive-log.web.app';

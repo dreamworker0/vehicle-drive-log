@@ -48,23 +48,25 @@ const mockGetOrganizationMembers = vi.fn().mockResolvedValue(mockMembers);
 const mockGetOrganization = vi.fn().mockResolvedValue(mockOrg);
 const mockUpdateUserRole = vi.fn().mockResolvedValue({});
 const mockRemoveUserFromOrganization = vi.fn().mockResolvedValue({});
+const mockGetPreRegisteredEmployees = vi.fn().mockResolvedValue([]);
+const mockRegenerateInviteCode = vi.fn().mockResolvedValue('NEW_CODE');
+const mockUpdateUser = vi.fn().mockResolvedValue({});
+const mockRestoreUser = vi.fn().mockResolvedValue({});
+const mockAddPreRegisteredEmployee = vi.fn().mockResolvedValue({});
+const mockDeletePreRegisteredEmployee = vi.fn().mockResolvedValue({});
 
 vi.mock('../../lib/firestore', () => ({
     getOrganizationMembers: (...args: unknown[]) => mockGetOrganizationMembers(...args),
     getOrganization: (...args: unknown[]) => mockGetOrganization(...args),
     updateUserRole: (...args: unknown[]) => mockUpdateUserRole(...args),
     removeUserFromOrganization: (...args: unknown[]) => mockRemoveUserFromOrganization(...args),
+    getPreRegisteredEmployees: (...args: unknown[]) => mockGetPreRegisteredEmployees(...args),
+    regenerateInviteCode: (...args: unknown[]) => mockRegenerateInviteCode(...args),
+    updateUser: (...args: unknown[]) => mockUpdateUser(...args),
+    restoreUser: (...args: unknown[]) => mockRestoreUser(...args),
+    addPreRegisteredEmployee: (...args: unknown[]) => mockAddPreRegisteredEmployee(...args),
+    deletePreRegisteredEmployee: (...args: unknown[]) => mockDeletePreRegisteredEmployee(...args),
 }));
-
-// Firebase Firestore mock — getDocs (preRegistered 서브컬렉션 조회에 필요)
-vi.mock('firebase/firestore', async () => {
-    const actual = await vi.importActual('firebase/firestore');
-    return {
-        ...actual,
-        collection: vi.fn(),
-        getDocs: vi.fn().mockResolvedValue({ docs: [] }),
-    };
-});
 
 import useEmployeeManager from '../../hooks/useEmployeeManager';
 

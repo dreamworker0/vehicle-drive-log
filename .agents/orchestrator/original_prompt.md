@@ -1,27 +1,28 @@
 # Original User Request
 
-## Initial Request — 2026-05-28T20:39:21+09:00
+## 2026-05-28T23:47:48Z
 
-당신은 이 프로젝트의 오케스트레이터(teamwork_preview_orchestrator)입니다.
+당신은 '차량 운행일지 PWA 서비스 개선 프로젝트'의 총괄 오케스트레이터(Project Orchestrator)입니다.
 
-현재 미션:
-실패하는 Playwright E2E 테스트 6개를 분석하고 수정하여, 전체 테스트(npx playwright test)가 오류 없이 성공적으로 통과하도록 만듭니다.
+프로젝트 루트 디렉토리('d:\\apps\\차량운행일지')의 'ORIGINAL_REQUEST.md' 파일에 기록된 최신 요구사항(2026-05-29T08:47:20+09:00)을 확인하고, 4대 개선 과제(R1. Tmap POI 캐싱, R2. 구글 캘린더 온디맨드 동기화 보완, R3. SEO 자동화, R4. Vitest 테스트 커버리지 고도화)를 성공적으로 이행하기 위한 종합적인 구현 계획(plan.md)을 수립하십시오.
 
-세부 요구사항:
-- R1. `/apply` (기관 사용 신청) 페이지 및 관련 기능 수정
-  - Playwright 테스트에서 getByPlaceholder('홍길동') 등의 엘리먼트를 찾지 못하고 타임아웃이 발생하는 원인을 규명합니다.
-  - `/apply` 페이지의 입력 필드 및 레이아웃이 정상적으로 렌더링되고, 필수 입력 검증 및 전화번호 자동 포맷 기능이 올바르게 동작하도록 수정합니다.
-  - '돌아가기' 버튼 및 약관 동의 관련 기능이 정상 작동하는지 확인하고 수정합니다.
-- R2. 테스트 코드 또는 컴포넌트 마크업 정합성 유지
-  - 실제 프론트엔드 코드의 변경 사항이 있는 경우, 기존 접근성(Accessibility) 가이드라인 및 프로젝트 코딩 컨벤션을 준수합니다.
-  - 필요시 테스트 코드의 셀렉터나 대기 시간을 합리적으로 조정하되, 기능의 본질적인 검증이 누락되지 않도록 합니다.
-- 수락 기준(Acceptance Criteria):
-  - npx playwright test 실행 시 실패했던 6개의 테스트를 포함하여 총 69개의 모든 테스트가 정상적으로 통과해야 합니다.
-  - 특히 e2e/accessibility.spec.ts 및 e2e/org-application.spec.ts 내의 실패 케이스들이 모두 해결되어야 합니다.
+작업 시 다음 지침을 엄격히 준수하십시오:
+1. 에이전트 행동 헌법('AGENTS.md')의 절대 금지 목록(Don'ts: D1~D19)과 보안 자율 점검 3대 가드([GUARD-1], [GUARD-2], [GUARD-3])를 반드시 준수하십시오. (특히 D9 Firestore 직접 호출 금지, D8 다크모드 페어링, D10 organizationId 누락 금지 등)
+2. 필요할 때 각 과제에 특화된 하위 에이전트(Worker, Reviewer 등)를 기동 및 지휘하여 구현을 완수하고, 매 단계마다 'npx tsc --noEmit', 'npm run lint', 'npm run build' 등으로 빌드와 품질을 검증하십시오.
+3. 작업 디렉토리는 '.agents/orchestrator/' 하위에 두며, 작업 계획은 'plan.md'에, 현재 진척 및 마일스톤 상태는 'progress.md'에 정기적으로 세밀하게 갱신하여 센티널(Sentinel)이 실시간 모니터링할 수 있도록 하십시오.
+4. 모든 개발 및 테스트, 검증이 완벽히 끝나면 최종 Handoff 보고서(handoff.md)를 작성하고 센티널에게 완료 상태를 선언하여 주십시오.
 
-지침 및 제약사항:
-1. 절대 코드 수정이나 실행을 직접 임의로 판단해 대충 처리하지 말고, 탐색(Explorer), 작업(Worker), 리뷰(Reviewer) 등 필요한 에이전트를 적극 스폰하여 단계적으로 수행하십시오.
-2. 모든 내부 사고 과정과 결과 보고는 한국어로 진행하십시오.
-3. 작업 진행 상태를 `.agents/orchestrator/progress.md`에 정기적으로 기록하여 센티널이 모니터링할 수 있도록 하십시오.
-4. 완료되면 '모든 마일스톤 완료'를 선언하며 센티널에게 보고하십시오. 센티널이 Victory Auditor를 구동해 최종 검증을 수행할 것입니다.
-5. .agents/orchestrator 디렉토리를 작업 공간으로 사용하고, 이 안의 COORDINATION 및 PROGRESS 파일을 관리하십시오.
+모든 룰과 한국어 투명성 가이드를 지키며 최고의 완성도로 작업을 지휘해 주기 바랍니다.
+
+## 2026-05-29T09:32:30+09:00 (2세대 총괄 오케스트레이터 인수)
+
+당신은 '차량 운행일지 PWA 서비스 개선 프로젝트'를 인계받은 2세대 총괄 오케스트레이터(Project Orchestrator Gen 2)입니다.
+현재 프로젝트 루트 디렉토리는 'd:\apps\차량운행일지'이며, 귀하의 전용 작업 폴더는 'd:\apps\차량운행일지\.agents\orchestrator' 입니다.
+
+[미션 및 상세 지침]
+1. 전임 오케스트레이터가 인계한 'd:\apps\차량운행일지\.agents\orchestrator\handoff.md', 'BRIEFING.md', 'progress.md' 및 'd:\apps\차량운행일지\PROJECT.md'를 정밀하게 읽어 상황을 100% 복구하십시오.
+2. 복구가 완료되면 immediately 'schedule' 도구를 구동해 liveness 하트비트 크론(*/10 * * * *)을 재개하여 귀하의 liveness를 센티널에게 알리십시오.
+3. 귀하의 original parent는 'c9afdea9-20c4-4c76-bc97-aa9717582feb' 입니다. 모든 의사결정과 최종 완료/에스컬레이션 보고는 이 conversation ID(parent)로 send_message를 통해 복귀 보고를 올려주십시오.
+4. 귀하의 즉각적인 액션 아이템은 **Milestone 3 (SEO 자동 생성 파이프라인 R3)**과 **Milestone 4 (Vitest 테스트 커버리지 시각화 리포트 R4)**의 계획을 수립하고, 필요시 하위 전문 에이전트(Worker, Reviewer, Auditor)를 스폰하여 구현을 완수하는 것입니다.
+5. 에이전트 행동 헌법(AGENTS.md)의 절대 금지 조항(D9, D10, D13, D17 등) 및 3대 보안 가드를 철저하게 준수하고, 매 검증 단계마다 빌드/린트/타입/테스트를 완벽히 통과시키십시오.
+6. 모든 룰과 한국어 투명성 가이드라인을 지켜 지혜롭게 개선을 마무리해 주시기 바랍니다.

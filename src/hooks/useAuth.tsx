@@ -15,6 +15,7 @@ interface AuthContextType {
     loading: boolean;
     isSuperAdmin: boolean;
     orgDeleted: boolean;
+    /** @deprecated onSnapshot이 자동 처리. 호환성을 위해 유지. */
     refreshUserData: () => Promise<void>;
 }
 
@@ -29,7 +30,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Custom Claims 토큰 갱신을 위한 이전 role/orgId 추적
     const prevClaimsRef = useRef<{ role?: string; orgId?: string }>({});
 
-    /* eslint-disable react-hooks/exhaustive-deps */
     useEffect(() => {
         let cancelled = false;
 
@@ -244,10 +244,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (unsubscribeUser) unsubscribeUser();
             if (unsubscribeOrg) unsubscribeOrg();
         };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
-    /* eslint-enable react-hooks/exhaustive-deps */
 
-    const refreshUserData = async () => {
+    /**
+     * @deprecated onSnapshot 구독이 자동으로 처리하므로 더 이상 사용하지 않습니다.
+     * 인터페이스 호환성을 위해 유지합니다.
+     */
+    const refreshUserData = async (): Promise<void> => {
         // onSnapshot이 자동으로 처리하므로 수동 새로고침 불필요
         // 호환성을 위해 빈 함수 유지
     };

@@ -16,6 +16,7 @@ export {
     getMultiRoute,
     getRouteInfo,
     getMultiRouteWithFreeRoad,
+    getFreeRoadRoute,
 } from './routing';
 
 export { getNavigationDeeplink } from './deeplink';

@@ -33,7 +33,7 @@ self.addEventListener('activate', (event) => {
 
 // 1. 기존 캐시 정리 및 정적 파일 프리캐싱
 cleanupOutdatedCaches();
-precacheAndRoute(self.__WB_MANIFEST || []);
+precacheAndRoute(self.__WB_MANIFEST);
 
 // 2. 라우팅 폴백 설정 (Single Page App 지원)
 // /__/auth/ 경로(Firebase Auth 리다이렉트 등)는 캐시에서 제외합니다.

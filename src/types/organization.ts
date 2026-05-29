@@ -39,6 +39,10 @@ export interface Organization extends FirestoreDoc {
     deletedAt?: TimestampField | null;
     firstEmployeeRegisteredAt?: TimestampField;
     timeToFirstEmployeeDays?: number;
+    /** 지도 표시용 위도 */
+    lat?: number;
+    /** 지도 표시용 경도 */
+    lng?: number;
 }
 
 /** createOrganization에 전달할 데이터 */

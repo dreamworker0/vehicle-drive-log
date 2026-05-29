@@ -29,6 +29,7 @@ export interface Reservation extends FirestoreDoc {
     recurringGroupId?: string;   // 반복(정기) 예약 그룹 식별자
     isQuickDrive?: boolean;      // 바로 운행(예약 없이 출발) 여부 플래그
     source?: 'recommendation' | string; // 예약 출처 (예: 추천 예약)
+    syncSource?: string;         // 예약 동기화 출처 (예: 'calendar')
     createdAt?: TimestampField;
     expiresAt?: Date | TimestampField;
 }

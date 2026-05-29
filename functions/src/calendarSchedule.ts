@@ -80,7 +80,6 @@ export const syncCalendarToApp = onSchedule(
             let totalSkippedCooldown = 0;
             let totalSkippedPermanent = 0;
 
-            // 동일 calendarEventId가 여러 차량 캘린더에 존재할 때 중복 예약 방지
             const globalProcessedEventIds = new Set<string>();
 
             for (let i = 0; i < vehiclesSnap.docs.length; i++) {
@@ -89,7 +88,6 @@ export const syncCalendarToApp = onSchedule(
                 const vehicleId = vehicleDoc.id;
                 const calendarId = vehicle.googleCalendarId as string;
                 const vehicleName = (vehicle.displayName as string) || "";
-                const organizationId = vehicle.organizationId as string;
 
                 // 유효하지 않은 캘린더 ID 건너뛰기 (@ 포함 필수)
                 if (!calendarId || !calendarId.includes("@")) {
@@ -116,173 +114,14 @@ export const syncCalendarToApp = onSchedule(
                 }
 
                 try {
-                    // 1. 캘린더 이벤트 조회
-                    const calendarEvents = await listCalendarEvents(
-                        calendarId,
-                        timeMin.toISOString(),
-                        timeMax.toISOString()
-                    );
-
-                    // 2. 해당 차량의 기존 예약 조회 (UTC/KST 시간대 오류를 피하기 위해 조회 범위를 하루씩 넉넉히 잡습니다)
-                    const dateMinObj = new Date(timeMin);
-                    dateMinObj.setDate(dateMinObj.getDate() - 2);
-                    const dateMin = dateMinObj.toISOString().slice(0, 10);
+                    // 개별 차량 동기화 로직 호출
+                    const result = await syncSingleVehicleCalendar(vehicleId, vehicle, globalProcessedEventIds);
                     
-                    const dateMaxObj = new Date(timeMax);
-                    dateMaxObj.setDate(dateMaxObj.getDate() + 2);
-                    const dateMax = dateMaxObj.toISOString().slice(0, 10);
+                    totalCreated += result.created;
+                    totalUpdated += result.updated;
+                    totalCancelled += result.cancelled;
+                    totalSkippedDup += result.skippedDup;
 
-                    const existingSnap = await db.collection("reservations")
-                        .where("vehicleId", "==", vehicleId)
-                        .where("date", ">=", dateMin)
-                        .where("date", "<=", dateMax)
-                        .get();
-
-                    const existingByEventId: Record<string, Record<string, unknown>> = {};
-                    const existingReservations: Array<Record<string, unknown>> = [];
-                    existingSnap.docs.forEach(function (d) {
-                        const data: Record<string, unknown> = { id: d.id, ...d.data() };
-                        existingReservations.push(data);
-                        if (data.calendarEventId) {
-                            existingByEventId[data.calendarEventId as string] = data;
-                            // 이미 존재하는 예약의 calendarEventId를 전역 Set에 등록
-                            if (data.status !== "cancelled") {
-                                globalProcessedEventIds.add(data.calendarEventId as string);
-                            }
-                        }
-                    });
-
-                    const calendarEventIds = new Set(calendarEvents.map(function (e) { return e.id; }));
-
-                    // 3. 캘린더 이벤트 기준으로 동기화
-                    for (let j = 0; j < calendarEvents.length; j++) {
-                        const calEvent = calendarEvents[j];
-                        // 취소된 이벤트는 건너뜀
-                        if (calEvent.status === "cancelled") continue;
-
-                        let existing = existingByEventId[calEvent.id];
-
-                        if (!existing) {
-                            // calendarEventId로 연결되지 않은 예약 중에서, 동일 조건(날짜, 시간, 차량)의 앱 생성 예약 찾기
-                            const tempParsed = parseEventToReservation(calEvent, vehicleId, vehicleName, organizationId) as Record<string, unknown>;
-                            const matchingAppReservation = existingReservations.find(function (r) {
-                                return r.date === tempParsed.date &&
-                                       r.startTime === tempParsed.startTime &&
-                                       r.endTime === tempParsed.endTime &&
-                                       r.vehicleId === vehicleId &&
-                                       r.status !== "cancelled" &&
-                                       !r.calendarEventId; // 아직 calendarEventId가 없는 예약 (최신 생성 등)
-                            });
-
-                            if (matchingAppReservation) {
-                                // 앱에서 생성되었으나 아직 calendarEventId가 매핑되지 않은 예약 발견
-                                existing = matchingAppReservation;
-                                // Firestore에 calendarEventId 업데이트 후 중첩 방지
-                                await db.collection("reservations").doc(existing.id as string).update({
-                                    calendarEventId: calEvent.id
-                                });
-                                existing.calendarEventId = calEvent.id;
-                                existingByEventId[calEvent.id] = existing;
-                                globalProcessedEventIds.add(calEvent.id);
-                                console.log("[" + vehicleName + "] Linked unmapped app reservation " + existing.id + " with calendar event " + calEvent.id);
-                            }
-                        }
-
-                        if (!existing) {
-                            // 같은 calendarEventId가 다른 차량에서 이미 처리되었으면 건너뛰기
-                            if (globalProcessedEventIds.has(calEvent.id)) {
-                                totalSkippedDup++;
-                                console.log("[" + vehicleName + "] Skip duplicate calendarEventId: " + calEvent.id + " (" + calEvent.summary + ")");
-                                continue;
-                            }
-
-                            // [결정적 버그 픽스] date 필터 밖으로 벗어났거나, 이미 존재하는 이벤트인지 최종 점검 (Double Check)
-                            const doubleCheckSnap = await db.collection("reservations")
-                                .where("calendarEventId", "==", calEvent.id)
-                                .limit(1)
-                                .get();
-                                
-                            if (!doubleCheckSnap.empty) {
-                                const dupDoc = doubleCheckSnap.docs[0];
-                                existingByEventId[calEvent.id] = { id: dupDoc.id, ...dupDoc.data() };
-                                globalProcessedEventIds.add(calEvent.id);
-                                console.log("[" + vehicleName + "] Found existing event out of date range for calendarEventId: " + calEvent.id);
-                                // 기존 문서가 있음 처리로 넘기기 위해 루프 강제 분기
-                                existing = existingByEventId[calEvent.id];
-                            }
-                        }
-
-                        // 위 더블체크 로직을 거쳐도 existing이 없으면 진짜 새로 만듦
-                        if (!existing) {
-                            // 새 이벤트 -> Firestore에 예약 생성
-                            const reservationData = parseEventToReservation(
-                                calEvent, vehicleId, vehicleName, organizationId
-                            ) as Record<string, unknown>;
-
-                            // creator.email로 사용자 UID 및 이름 조회
-                            if (reservationData.creatorEmail) {
-                                const userRecord = await findUserByEmail(reservationData.creatorEmail as string);
-                                if (userRecord) {
-                                    reservationData.reservedByUid = userRecord.uid;
-                                    reservationData.userId = userRecord.uid;
-                                    if (!reservationData.reservedByName && userRecord.displayName) {
-                                        reservationData.reservedByName = userRecord.displayName;
-                                    }
-                                    console.log("[" + vehicleName + "] User matched: " + reservationData.creatorEmail + " -> " + userRecord.uid + " (" + (userRecord.displayName || "") + ")");
-                                }
-                            }
-
-                            // creatorEmail은 Firestore에 저장하지 않음
-                            delete reservationData.creatorEmail;
-
-                            reservationData.createdAt = new Date();
-                            // [원천 차단] 예약 생성 시 임의의 난수 ID 대신 구글 캘린더 이벤트 ID를 문서 ID로 고정하여 절대 중복 생성되지 않게 함
-                            await db.collection("reservations").doc(calEvent.id).set(reservationData);
-                            globalProcessedEventIds.add(calEvent.id);
-                            totalCreated++;
-                            console.log("[" + vehicleName + "] New reservation: " + calEvent.summary + " (" + calEvent.id + ")");
-                        } else {
-                            // 기존 예약이 있음 -> 내용 비교 후 업데이트
-                            const parsed = parseEventToReservation(
-                                calEvent, vehicleId, vehicleName, organizationId
-                            );
-
-                            const fieldsToCompare = ["date", "startTime", "endTime", "purpose", "destination"];
-                            const changed = fieldsToCompare.some(function (f) { return (parsed as Record<string, unknown>)[f] !== existing[f]; });
-
-                            if (changed && existing.syncSource === "calendar") {
-                                await db.collection("reservations").doc(existing.id as string).update({
-                                    date: parsed.date,
-                                    startTime: parsed.startTime,
-                                    endTime: parsed.endTime,
-                                    purpose: parsed.purpose,
-                                    destination: parsed.destination,
-                                    reservedByName: parsed.reservedByName,
-                                    syncSource: "calendar",
-                                });
-                                totalUpdated++;
-                                console.log("[" + vehicleName + "] Reservation updated: " + existing.id);
-                            }
-                        }
-                    }
-
-                    // 4. Firestore에만 있고 캘린더에 없는 (캘린더에서 삭제된) 이벤트 처리
-                    for (let k = 0; k < existingReservations.length; k++) {
-                        const reservation = existingReservations[k];
-                        if (
-                            reservation.calendarEventId &&
-                            reservation.syncSource === "calendar" &&
-                            reservation.status !== "cancelled" &&
-                            !calendarEventIds.has(reservation.calendarEventId as string)
-                        ) {
-                            await db.collection("reservations").doc(reservation.id as string).update({
-                                status: "cancelled",
-                                syncSource: "calendar",
-                            });
-                            totalCancelled++;
-                            console.log("[" + vehicleName + "] Reservation cancelled (calendar deleted): " + reservation.id);
-                        }
-                    }
                     // 동기화 성공 시 실패 카운터 리셋
                     if (failCount > 0) {
                         await db.collection("vehicles").doc(vehicleId).update({ calendarSyncFailCount: 0 });
@@ -326,6 +165,214 @@ export const syncCalendarToApp = onSchedule(
 );
 
 /**
+ * 단일 차량 구글 캘린더 동기화 핵심 로직
+ */
+export async function syncSingleVehicleCalendar(
+    vehicleId: string,
+    vehicleData: any,
+    globalProcessedEventIds: Set<string> = new Set<string>()
+): Promise<{
+    created: number;
+    updated: number;
+    cancelled: number;
+    skippedDup: number;
+}> {
+    const calendarId = vehicleData.googleCalendarId as string;
+    const vehicleName = (vehicleData.displayName as string) || "";
+    const organizationId = vehicleData.organizationId as string;
+
+    let created = 0;
+    let updated = 0;
+    let cancelled = 0;
+    let skippedDup = 0;
+
+    // 유효하지 않은 캘린더 ID 건너뛰기 (@ 포함 필수)
+    if (!calendarId || !calendarId.includes("@")) {
+        console.log("Vehicle " + vehicleName + "(" + vehicleId + "): invalid calendar ID, skip");
+        return { created, updated, cancelled, skippedDup };
+    }
+
+    // 조회 범위: 오늘 기준 -1일 ~ +7일
+    const now = new Date();
+    const timeMin = new Date(now);
+    timeMin.setDate(timeMin.getDate() - 1);
+    timeMin.setHours(0, 0, 0, 0);
+    const timeMax = new Date(now);
+    timeMax.setDate(timeMax.getDate() + 7);
+    timeMax.setHours(23, 59, 59, 999);
+
+    // 1. 캘린더 이벤트 조회
+    const calendarEvents = await listCalendarEvents(
+        calendarId,
+        timeMin.toISOString(),
+        timeMax.toISOString()
+    );
+
+    // 2. 해당 차량의 기존 예약 조회 (UTC/KST 시간대 오류를 피하기 위해 조회 범위를 하루씩 넉넉히 잡습니다)
+    const dateMinObj = new Date(timeMin);
+    dateMinObj.setDate(dateMinObj.getDate() - 2);
+    const dateMin = dateMinObj.toISOString().slice(0, 10);
+    
+    const dateMaxObj = new Date(timeMax);
+    dateMaxObj.setDate(dateMaxObj.getDate() + 2);
+    const dateMax = dateMaxObj.toISOString().slice(0, 10);
+
+    const existingSnap = await db.collection("reservations")
+        .where("vehicleId", "==", vehicleId)
+        .where("date", ">=", dateMin)
+        .where("date", "<=", dateMax)
+        .get();
+
+    const existingByEventId: Record<string, Record<string, unknown>> = {};
+    const existingReservations: Array<Record<string, unknown>> = [];
+    existingSnap.docs.forEach(function (d) {
+        const data: Record<string, unknown> = { id: d.id, ...d.data() };
+        existingReservations.push(data);
+        if (data.calendarEventId) {
+            existingByEventId[data.calendarEventId as string] = data;
+            // 이미 존재하는 예약의 calendarEventId를 전역 Set에 등록
+            if (data.status !== "cancelled") {
+                globalProcessedEventIds.add(data.calendarEventId as string);
+            }
+        }
+    });
+
+    const calendarEventIds = new Set(calendarEvents.map(function (e) { return e.id; }));
+
+    // 3. 캘린더 이벤트 기준으로 동기화
+    for (let j = 0; j < calendarEvents.length; j++) {
+        const calEvent = calendarEvents[j];
+        // 취소된 이벤트는 건너뜀
+        if (calEvent.status === "cancelled") continue;
+
+        let existing = existingByEventId[calEvent.id];
+
+        if (!existing) {
+            // calendarEventId로 연결되지 않은 예약 중에서, 동일 조건(날짜, 시간, 차량)의 앱 생성 예약 찾기
+            const tempParsed = parseEventToReservation(calEvent, vehicleId, vehicleName, organizationId) as Record<string, unknown>;
+            const matchingAppReservation = existingReservations.find(function (r) {
+                return r.date === tempParsed.date &&
+                       r.startTime === tempParsed.startTime &&
+                       r.endTime === tempParsed.endTime &&
+                       r.vehicleId === vehicleId &&
+                       r.status !== "cancelled" &&
+                       !r.calendarEventId; // 아직 calendarEventId가 없는 예약 (최신 생성 등)
+            });
+
+            if (matchingAppReservation) {
+                // 앱에서 생성되었으나 아직 calendarEventId가 매핑되지 않은 예약 발견
+                existing = matchingAppReservation;
+                // Firestore에 calendarEventId 업데이트 후 중첩 방지
+                await db.collection("reservations").doc(existing.id as string).update({
+                    calendarEventId: calEvent.id
+                });
+                existing.calendarEventId = calEvent.id;
+                existingByEventId[calEvent.id] = existing;
+                globalProcessedEventIds.add(calEvent.id);
+                console.log("[" + vehicleName + "] Linked unmapped app reservation " + existing.id + " with calendar event " + calEvent.id);
+            }
+        }
+
+        if (!existing) {
+            // 같은 calendarEventId가 다른 차량에서 이미 처리되었으면 건너뛰기
+            if (globalProcessedEventIds.has(calEvent.id)) {
+                skippedDup++;
+                console.log("[" + vehicleName + "] Skip duplicate calendarEventId: " + calEvent.id + " (" + calEvent.summary + ")");
+                continue;
+            }
+
+            // [결정적 버그 픽스] date 필터 밖으로 벗어났거나, 이미 존재하는 이벤트인지 최종 점검 (Double Check)
+            const doubleCheckSnap = await db.collection("reservations")
+                .where("calendarEventId", "==", calEvent.id)
+                .limit(1)
+                .get();
+                
+            if (!doubleCheckSnap.empty) {
+                const dupDoc = doubleCheckSnap.docs[0];
+                existingByEventId[calEvent.id] = { id: dupDoc.id, ...dupDoc.data() };
+                globalProcessedEventIds.add(calEvent.id);
+                console.log("[" + vehicleName + "] Found existing event out of date range for calendarEventId: " + calEvent.id);
+                // 기존 문서가 있음 처리로 넘기기 위해 루프 강제 분기
+                existing = existingByEventId[calEvent.id];
+            }
+        }
+
+        // 위 더블체크 로직을 거쳐도 existing이 없으면 진짜 새로 만듦
+        if (!existing) {
+            // 새 이벤트 -> Firestore에 예약 생성
+            const reservationData = parseEventToReservation(
+                calEvent, vehicleId, vehicleName, organizationId
+            ) as Record<string, unknown>;
+
+            // creator.email로 사용자 UID 및 이름 조회
+            if (reservationData.creatorEmail) {
+                const userRecord = await findUserByEmail(reservationData.creatorEmail as string);
+                if (userRecord) {
+                    reservationData.reservedByUid = userRecord.uid;
+                    reservationData.userId = userRecord.uid;
+                    if (!reservationData.reservedByName && userRecord.displayName) {
+                        reservationData.reservedByName = userRecord.displayName;
+                    }
+                    console.log("[" + vehicleName + "] User matched: " + reservationData.creatorEmail + " -> " + userRecord.uid + " (" + (userRecord.displayName || "") + ")");
+                }
+            }
+
+            // creatorEmail은 Firestore에 저장하지 않음
+            delete reservationData.creatorEmail;
+
+            reservationData.createdAt = new Date();
+            // [원천 차단] 예약 생성 시 임의의 난수 ID 대신 구글 캘린더 이벤트 ID를 문서 ID로 고정하여 절대 중복 생성되지 않게 함
+            await db.collection("reservations").doc(calEvent.id).set(reservationData);
+            globalProcessedEventIds.add(calEvent.id);
+            created++;
+            console.log("[" + vehicleName + "] New reservation: " + calEvent.summary + " (" + calEvent.id + ")");
+        } else {
+            // 기존 예약이 있음 -> 내용 비교 후 업데이트
+            const parsed = parseEventToReservation(
+                calEvent, vehicleId, vehicleName, organizationId
+            );
+
+            const fieldsToCompare = ["date", "startTime", "endTime", "purpose", "destination"];
+            const changed = fieldsToCompare.some(function (f) { return (parsed as Record<string, unknown>)[f] !== existing[f]; });
+
+            if (changed && existing.syncSource === "calendar") {
+                await db.collection("reservations").doc(existing.id as string).update({
+                    date: parsed.date,
+                    startTime: parsed.startTime,
+                    endTime: parsed.endTime,
+                    purpose: parsed.purpose,
+                    destination: parsed.destination,
+                    reservedByName: parsed.reservedByName,
+                    syncSource: "calendar",
+                });
+                updated++;
+                console.log("[" + vehicleName + "] Reservation updated: " + existing.id);
+            }
+        }
+    }
+
+    // 4. Firestore에만 있고 캘린더에 없는 (캘린더에서 삭제된) 이벤트 처리
+    for (let k = 0; k < existingReservations.length; k++) {
+        const reservation = existingReservations[k];
+        if (
+            reservation.calendarEventId &&
+            reservation.syncSource === "calendar" &&
+            reservation.status !== "cancelled" &&
+            !calendarEventIds.has(reservation.calendarEventId as string)
+        ) {
+            await db.collection("reservations").doc(reservation.id as string).update({
+                status: "cancelled",
+                syncSource: "calendar",
+            });
+            cancelled++;
+            console.log("[" + vehicleName + "] Reservation cancelled (calendar deleted): " + reservation.id);
+        }
+    }
+
+    return { created, updated, cancelled, skippedDup };
+}
+
+/**
  * 특정 단일 차량에 대해서만 구글 캘린더 이벤트를 즉시 동기화합니다. (웹훅 등에서 호출용)
  * 기존 스케줄러의 동기화 로직과 유사한 기능을 개별 차량 단위로 좁혀서 실행할 수 있습니다.
  */
@@ -340,7 +387,9 @@ export async function syncVehicleCalendar(vehicleId: string, vehicleInfo: Record
     
     console.log(`[SyncVehicle] Start single vehicle sync for ${vehicleName} (${vehicleId})`);
     
-    // (선택) 여기에 향후 syncCalendarToApp 안의 `for` 문 내부 로직을 분리 추출하여 
-    // 동일하게 호출하도록 재구조화할 수 있습니다.
-    // 현재는 웹훅에 반응하여 엔드포인트 함수가 정상 호출됨을 보장합니다.
+    try {
+        await syncSingleVehicleCalendar(vehicleId, vehicleInfo);
+    } catch (err: unknown) {
+        console.error(`[SyncVehicle] Single sync failed for ${vehicleName}:`, (err as Error).message);
+    }
 }

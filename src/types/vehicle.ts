@@ -38,6 +38,7 @@ export interface Vehicle extends FirestoreDoc {
     vehicleType?: string;
     fuelType?: FuelType;
     currentKm: number;
+    currentBattery?: number;        // 전기차 배터리 잔량 (%)
     insurance?: {
         company: string;
         phone: string;

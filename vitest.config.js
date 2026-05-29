@@ -27,7 +27,7 @@ export default defineConfig({
         exclude: ['**/node_modules/**', '**/e2e/**', '**/functions/**'],
         coverage: {
             provider: 'v8',
-            reporter: ['text', 'text-summary', 'json', 'lcov'],
+            reporter: ['text', 'text-summary', 'json', 'lcov', 'html'],
             thresholds: {
                 lines: 20,
                 statements: 20,

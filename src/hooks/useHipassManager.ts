@@ -41,7 +41,7 @@ export default function useHipassManager() {
 
     const orgId = userData?.organizationId;
 
-    const fetchData = async () => {
+    const fetchData = useCallback(async () => {
         if (!orgId) { setLoading(false); return; }
         setLoading(true);
         try {
@@ -58,11 +58,9 @@ export default function useHipassManager() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [orgId]);
 
-    /* eslint-disable react-hooks/exhaustive-deps */
-    useEffect(() => { fetchData(); }, [orgId]);
-    /* eslint-enable react-hooks/exhaustive-deps */
+    useEffect(() => { fetchData(); }, [fetchData]);
 
     const resetForm = () => {
         setForm(INITIAL_FORM);

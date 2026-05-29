@@ -20,7 +20,7 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
         selectedDate, showForm, setShowForm,
         sideTab, setSideTab,
         submitting, editingReservation, editingGroupId, editingRecurringGroupId,
-        favorites, routeInfo, routeLoading,
+        favorites, routeInfo, routeLoading, freeRoadRoute, freeRoadLoading, handleFetchFreeRoad,
         showFavSave, setShowFavSave,
         favName, setFavName,
         calendarDays, monthLabel, todayStr,
@@ -89,6 +89,9 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
                         editingGroupId={editingGroupId}
                         routeInfo={routeInfo}
                         routeLoading={routeLoading}
+                        freeRoadRoute={freeRoadRoute}
+                        freeRoadLoading={freeRoadLoading}
+                        onFetchFreeRoad={handleFetchFreeRoad}
                         user={user!}
                         isAdmin={isAdmin}
                         members={members}

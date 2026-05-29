@@ -1,33 +1,30 @@
-# BRIEFING — 2026-05-28T21:01:08+09:00
+# BRIEFING — 2026-05-29T09:55:00+09:00
 
 ## Mission
-실패하는 Playwright E2E 테스트 6개 실패 원인을 분석하고 해결하여 전체 69개 테스트가 성공적으로 통과하도록 지원한다.
+비즈니스 가치 확장 및 운영 효율 극대화를 위한 Tmap POI 캐싱(R1), 구글 캘린더 온디맨드 동기화(R2), SEO 자동화(R3), 테스트 커버리지 고도화(R4) 4대 개선 과제 이행
 
 ## 🔒 My Identity
 - Archetype: sentinel
-- Working directory: d:\apps\차량운행일지\.agents\sentinel\
-- Orchestrator: 44687a7d-396c-46a1-b3fd-c9ad76627cc1
-- Victory Auditor: ba127cf2-2ead-4e6c-8fdf-b2636f956667
+- Working directory: d:\apps\차량운행일지\.agents\sentinel
+- Orchestrator: 58b5b741-80c5-4e4d-9da9-48e6ea965491
+- Victory Auditor: 94f0f512-3d7a-49cf-9e42-aa76223e26bd
 
 ## 🔒 Key Constraints
 - No technical decisions — relay only
 - Victory Audit is MANDATORY before reporting completion
-- 모든 의사결정과 계획은 한국어로 투명하게 기록한다.
-- 임의의 코드 수정 및 배포를 절대 직접 하지 않으며 오케스트레이터를 통해서만 진행한다.
+- Do not write code or make architectural decisions
 
 ## User Context
-- **Last user request**: 실패하는 Playwright E2E 테스트 6개(특히 e2e/accessibility.spec.ts 및 e2e/org-application.spec.ts)를 분석 및 수정하여, npx playwright test 전체가 성공적으로 통과하도록 조치.
-- **Pending clarifications**: 없음
-- **Delivered results**: 
-  - 69개 E2E 테스트 100% 그린 사인(전원 성공 통과) 달성.
-  - 접근성(Accessibility) 마크업(체크박스, 파일업로드) 완벽 해결.
-  - 세션 격리(쿠키/스토리지/IndexedDB 클린업)로 타임아웃 오류 완벽 격파.
-  - 비로그인 경량 렌더링(lightEntry.tsx) 내 AuthProvider 누락 런타임 크래시 핫픽스.
-  - 빌드, 린트, 타입 시스템 전체 품질 통과.
-  - 독립 승리 감사관(Victory Auditor)의 정밀 3단계 감사 통과 및 최종 승인 완료 (VERDICT: VICTORY CONFIRMED).
+- **Last user request**: Tmap POI 캐싱, 구글 캘린더 온디맨드 동기화 보완, SEO 자동화, 테스트 커버리지 고도화의 4대 개선 과제 적용
+- **Pending clarifications**: none
+- **Delivered results**: none
 
 ## Project Status
 - **Phase**: complete
+- **Milestone 1**: DONE (Tmap POI caching)
+- **Milestone 2**: DONE (Google Calendar On-demand sync & backoff)
+- **Milestone 3**: DONE (SEO auto generation pipeline)
+- **Milestone 4**: DONE (Vitest coverage report & ThemeStore unit test)
 
 ## Victory Audit Status
 - **Triggered**: yes
@@ -35,9 +32,10 @@
 - **Retry count**: 0
 
 ## Artifact Index
-- d:\apps\차량운행일지\ORIGINAL_REQUEST.md — 원본 요구사항 기록
-- d:\apps\차량운행일지\.agents\original_prompt.md — 프롬프트 히스토리
-- d:\apps\차량운행일지\.agents\sentinel\BRIEFING.md — 센티널 브리핑 문서
-- d:\apps\차량운행일지\.agents\sentinel\handoff.md — 센티널 인계 리포트
-- d:\apps\차량운행일지\.agents\victory_auditor\audit_report.md — 독립 승리 감사 보고서
-- d:\apps\차량운행일지\.agents\victory_auditor\handoff.md — 독립 감사관 상세 검증서
+- d:\apps\차량운행일지\ORIGINAL_REQUEST.md — 사용자 요청 원문 (append-only)
+- d:\apps\차량운행일지\src\hooks\usePoiSearch.ts — POI 캐시가 이식된 훅 (M1)
+- d:\apps\차량운행일지\src\__tests__\hooks\usePoiSearch.test.ts — POI 캐시 단위 테스트 (M1)
+- d:\apps\차량운행일지\scripts\generate-seo.ts — Sitemap/Robots 자동 생성기 (M3)
+- d:\apps\차량운행일지\vitest.config.js — v8 커버리지 구성 설정 파일 (M4)
+- d:\apps\차량운행일지\src\__tests__\store\useThemeStore.test.ts — Statements 커버리지 돌파 유닛 테스트 (M4)
+- d:\apps\차량운행일지\.agents\victory_auditor\audit_report.md — 독립 오디터 최종 상세 감사 보고서 (Audit Evidence)

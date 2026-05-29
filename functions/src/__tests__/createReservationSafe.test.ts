@@ -19,9 +19,11 @@ jest.mock('firebase-functions/v2/https', () => ({
 // ── Firestore Mock ──
 const mockTransactionGet = jest.fn();
 const mockTransactionSet = jest.fn();
+const mockTransactionUpdate = jest.fn().mockResolvedValue(undefined);
 const mockTransaction = {
     get: mockTransactionGet,
     set: mockTransactionSet,
+    update: mockTransactionUpdate,
 };
 const mockRunTransaction = jest.fn(async (fn: (t: any) => Promise<any>) => fn(mockTransaction));
 const mockWhere = jest.fn().mockReturnThis();
@@ -47,7 +49,7 @@ require('../createReservationSafe');
 
 describe('createReservationSafe', () => {
     const validRequest = {
-        auth: { uid: 'user1' },
+        auth: { uid: 'user1', token: { orgId: 'org1' } },
         data: {
             organizationId: 'org1',
             vehicleId: 'v1',
@@ -65,7 +67,7 @@ describe('createReservationSafe', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         jest.spyOn(console, 'log').mockImplementation();
-        jest.spyOn(console, 'error').mockImplementation();
+        // jest.spyOn(console, 'error').mockImplementation();
     });
 
     afterEach(() => {
@@ -79,7 +81,7 @@ describe('createReservationSafe', () => {
 
     it('필수 필드가 누락되면 invalid-argument 에러를 던진다', async () => {
         const request = {
-            auth: { uid: 'user1' },
+            auth: { uid: 'user1', token: { orgId: 'org1' } },
             data: { organizationId: 'org1' },
         };
         await expect(capturedHandler(request)).rejects.toThrow('필수입니다');
@@ -144,6 +146,8 @@ describe('createReservationSafe', () => {
                 status: 'completed',
                 startTime: '10:00',
                 endTime: '11:00',
+                actualStartTime: '07:00',
+                actualEndTime: '08:00',
             }),
         };
         mockTransactionGet.mockResolvedValue({ docs: [completedReservation] });

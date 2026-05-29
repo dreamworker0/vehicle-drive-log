@@ -117,3 +117,26 @@ export const getOrgMemberCounts = async (orgIds?: string[]): Promise<Record<stri
         throw error;
     }
 };
+
+// 사용자 계정 활성화 복원
+export const restoreUser = async (uid: string): Promise<void> => {
+    try {
+        await updateDoc(doc(db, 'users', uid), { status: 'active', disabledAt: null });
+    } catch (error) {
+        captureError(error, { context: 'restoreUser', uid });
+        throw error;
+    }
+};
+
+// 사용자의 기관 정보 초기화 (기관 이동 준비)
+export const clearUserOrganization = async (uid: string): Promise<void> => {
+    try {
+        await updateDoc(doc(db, 'users', uid), {
+            organizationId: null,
+            role: 'employee',
+        });
+    } catch (error) {
+        captureError(error, { context: 'clearUserOrganization', uid });
+        throw error;
+    }
+};

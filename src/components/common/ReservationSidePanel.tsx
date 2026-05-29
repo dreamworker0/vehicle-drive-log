@@ -32,8 +32,11 @@ interface Props {
     submitting: boolean;
     editingReservation: Reservation | null;
     editingGroupId?: string | null;
-    routeInfo: { distance: number; duration: number; tollFee?: number; isMulti?: boolean; freeRoadRoute?: { distance: number; duration: number; tollFee: number } } | null;
+    routeInfo: { distance: number; duration: number; tollFee?: number; hasToll?: boolean; isMulti?: boolean } | null;
     routeLoading: boolean;
+    freeRoadRoute?: { distance: number; duration: number; tollFee: number } | null;
+    freeRoadLoading?: boolean;
+    onFetchFreeRoad?: () => void;
     user: { uid?: string; id?: string } | null;
     isAdmin?: boolean;
     members?: UserDoc[];
@@ -79,6 +82,9 @@ export default function ReservationSidePanel({
     editingGroupId,
     routeInfo,
     routeLoading,
+    freeRoadRoute,
+    freeRoadLoading,
+    onFetchFreeRoad,
     user,
     isAdmin = false,
     members = [],
@@ -206,7 +212,13 @@ export default function ReservationSidePanel({
                                 onSaveFavorite={onSaveFavorite}
                             />
                             {/* 경로 정보 */}
-                            <RouteInfoPanel routeInfo={routeInfo} routeLoading={routeLoading} />
+                            <RouteInfoPanel
+                                routeInfo={routeInfo}
+                                routeLoading={routeLoading}
+                                freeRoadRoute={freeRoadRoute}
+                                freeRoadLoading={freeRoadLoading}
+                                onFetchFreeRoad={onFetchFreeRoad}
+                            />
                         </div>
                         <div>
                             <label className="label text-sm font-medium">📝 목적</label>

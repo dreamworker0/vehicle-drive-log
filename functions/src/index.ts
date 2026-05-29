@@ -266,3 +266,6 @@ export { onUserDelete } from "./onUserDelete";
 
 // 운행일지 생성/수정/삭제 시 차량 주행거리 증분 및 자동 연쇄 동기화
 export { onDriveLogCreated, onDriveLogUpdated, onDriveLogDeleted } from "./syncDriveLogKm";
+
+// 구글 캘린더 온디맨드 동기화 API
+export { triggerOnDemandCalendarSync } from "./triggerOnDemandCalendarSync";

@@ -20,6 +20,7 @@ export {
     getMultiRoute,
     getRouteInfo,
     getMultiRouteWithFreeRoad,
+    getFreeRoadRoute,
 } from './tmap/routing';
 
 export { getNavigationDeeplink } from './tmap/deeplink';

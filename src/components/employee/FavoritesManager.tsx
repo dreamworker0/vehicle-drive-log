@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { getFavorites, createFavorite, deleteFavorite } from '../../lib/firestore';
 import { useToast } from '../../hooks/useToast';
@@ -23,7 +23,7 @@ export default function FavoritesManager() {
     const { showToast } = useToast();
     const { confirm } = useConfirm();
 
-    const loadFavorites = async () => {
+    const loadFavorites = useCallback(async () => {
         try {
             const data = await getFavorites(user!.uid);
             setFavorites(data as Favorite[]);
@@ -32,14 +32,12 @@ export default function FavoritesManager() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [user]);
 
-    /* eslint-disable react-hooks/exhaustive-deps */
     useEffect(() => {
         if (!user?.uid) return;
         loadFavorites();
-    }, [user?.uid]);
-    /* eslint-enable react-hooks/exhaustive-deps */
+    }, [user?.uid, loadFavorites]);
 
     const handleAdd = async (e: React.FormEvent) => {
         e.preventDefault();

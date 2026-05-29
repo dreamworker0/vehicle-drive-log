@@ -2,7 +2,7 @@
  * useVehicleManager — 차량 관리 상태 + CRUD 로직
  * VehicleManager에서 추출된 커스텀 훅
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './useAuth';
 import type { Vehicle, FuelType } from '../types/vehicle';
 import useRetry from './useRetry';
@@ -43,20 +43,20 @@ export default function useVehicleManager() {
     const [openWithCalendarError, setOpenWithCalendarError] = useState(false);
 
     // 자동완성 후보: 정적 목록 + 기존 등록 차량 모델명 합산
-    const modelSuggestions = (() => {
+    const modelSuggestions = useMemo(() => {
         const fromVehicles = vehicles
             .map(v => v.modelName?.trim())
             .filter((m): m is string => !!m);
         const merged = [...new Set([...VEHICLE_MODEL_SUGGESTIONS, ...fromVehicles])];
         return merged.sort((a, b) => a.localeCompare(b, 'ko'));
-    })();
+    }, [vehicles]);
 
     // 모달 상태 — { type, vehicle, action } 형태로 관리
     const [modal, setModal] = useState<VehicleModal | null>(null);
 
     const orgId = userData?.organizationId;
 
-    const fetchVehicles = async (retryCount = 0) => {
+    const fetchVehicles = useCallback(async (retryCount = 0) => {
         if (!orgId) { setLoading(false); return; }
         setLoading(true);
         try {
@@ -90,11 +90,9 @@ export default function useVehicleManager() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [orgId]);
 
-    /* eslint-disable react-hooks/exhaustive-deps */
-    useEffect(() => { fetchVehicles(); }, [orgId]);
-    /* eslint-enable react-hooks/exhaustive-deps */
+    useEffect(() => { fetchVehicles(); }, [fetchVehicles]);
 
     const resetForm = () => {
         setForm(INITIAL_FORM);

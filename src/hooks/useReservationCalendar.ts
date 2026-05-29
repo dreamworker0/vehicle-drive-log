@@ -51,7 +51,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
     } = dataHook;
 
     // ── Route info (tmap debounce, auto end-time) ──
-    const { routeInfo, setRouteInfo, routeLoading } = useRouteInfo({
+    const { routeInfo, setRouteInfo, routeLoading, freeRoadRoute, freeRoadLoading, handleFetchFreeRoad } = useRouteInfo({
         form, setForm, orgAddress, vehicles,
     });
 
@@ -113,7 +113,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
         selectedDate, showForm, setShowForm,
         sideTab, setSideTab,
         submitting, editingReservation, editingGroupId, editingRecurringGroupId,
-        favorites, routeInfo, routeLoading,
+        favorites, routeInfo, routeLoading, freeRoadRoute, freeRoadLoading, handleFetchFreeRoad,
         showFavSave, setShowFavSave,
         favName, setFavName,
         calendarDays, monthLabel, todayStr,

@@ -2,8 +2,7 @@ import { ReactNode, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { SA_TEST_ROLE_KEY } from '../../App';
-import { doc, updateDoc } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import { clearUserOrganization } from '../../lib/firestore';
 import { logout } from '../../lib/auth';
 
 /** 비활성화/기관 삭제 등 차단 상태 공통 화면 */
@@ -15,10 +14,7 @@ export function BlockedScreen({ emoji, title, description, uid }: {
 }) {
   const handleTransferOrg = async () => {
     try {
-      await updateDoc(doc(db, 'users', uid), {
-        organizationId: null,
-        role: 'employee',
-      });
+      await clearUserOrganization(uid);
     } catch (err) {
       console.error('기관 이동 실패:', err);
     }

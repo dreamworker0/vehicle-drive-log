@@ -7,7 +7,7 @@
     "dev": "vite",
     "prebuild": "tsx scripts/generate-sw-config.ts",
     "build": "vite build",
-    "postbuild": "tsx scripts/check-bundle-size.ts",
+    "postbuild": "tsx scripts/check-bundle-size.ts && tsx scripts/generate-seo.ts",
     "screenshots": "tsx scripts/generate-screenshots.ts",
     "lint": "eslint .",
     "type-check": "tsc --noEmit",
