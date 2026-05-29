@@ -181,7 +181,7 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
                                     if (poiResults.length > 0) setShowPoiDropdown(true);
                                 }}
                                 className="flex-1 bg-transparent border-0 outline-none p-0 text-sm focus:ring-0 focus:ring-offset-0 min-w-[100px] dark:text-surface-100"
-                                placeholder={destinationList.length === 0 ? '예: 부산 영인모터스, 강남역 (쉼표로 여러 곳)' : '추가 목적지 입력...'}
+                                placeholder={destinationList.length === 0 ? '장소 검색 또는 직접 입력 후 Enter (최대 5개)' : '추가 목적지 입력...'}
                                 required={destinationList.length === 0}
                                 autoComplete="off"
                             />
