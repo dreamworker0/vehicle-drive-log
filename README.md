@@ -251,7 +251,7 @@ firebase deploy --only firestore:rules,storage
 
 | 문서 | 설명 |
 |------|------|
-| [구현계획서.md](구현계획서.md) | 전체 설계 문서 (아키텍처, DB 스키마, API 명세, 시퀀스 다이어그램) |
+| [구현계획서](docs/차량운행일지_구현계획서.md) | 전체 설계 문서 (아키텍처, DB 스키마, API 명세, 시퀀스 다이어그램, Phase별 구현 이력) |
 | [OPERATIONS.md](OPERATIONS.md) | 시스템 관리자용 운영 매뉴얼 (백업, 장애 대응, 기관 관리) |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | 개발 참여 가이드 (코딩 컨벤션, PR 규칙, 브랜치 전략) |
 | [CHANGELOG.md](CHANGELOG.md) | Phase별 변경 이력 |
