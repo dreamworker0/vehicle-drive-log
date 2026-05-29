@@ -1,50 +1,39 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 
-test.describe('핵심 워크플로우 E2E 테스트', () => {
-
-    test('차량 예약 생성 및 승인/반려 프로세스 (관리자-사용자 흐름)', async ({ page }) => {
-        // [Happy Path]
-        // 1. 사용자 로그인 (Firebase Emulator Test Token 환경 가정)
-        await page.goto('/');
-
-        // TODO: UI 모드에서 실제 DOM locator (예: button[name="new-reservation"]) 추가 시 적용
-        // 임시로 랜딩 페이지 진입 보장 체크만 삽입 (초기 스켈레톤)
-        await expect(page).toHaveTitle(/차량 운행일지/);
-
-        // 2. 사용자가 예약 폼 접속 및 제출 (출/퇴근, 혹은 업무 등)
-        /*
-        await page.click('button:has-text("예약하기")');
-        await page.fill('input[name="purpose"]', '외근');
-        await page.click('button:has-text("제출")');
-        */
-
-        // 3. 내 예약 리스트에서 '대기 상태' 인지 확인
+/**
+ * 핵심 워크플로우(예약 생성·운행일지 작성·데이터 내보내기) E2E.
+ *
+ * 이 플로우들은 모두 "로그인된 직원/관리자" 상태를 전제로 하지만, 현재 E2E 환경은
+ *   1) 앱이 실제 Firebase에 연결됨(에뮬레이터 연결 분기 없음)
+ *   2) 로그인이 Google OAuth 전용이라 Playwright로 로그인 세션을 만들 수 없음
+ * 이라는 두 가지 제약 때문에 인증 후 화면을 띄울 수 없다.
+ *
+ * 과거에는 `await expect(page).toHaveTitle(...)`만 호출하고 본문을 주석 처리해
+ * "통과처럼 보이지만 아무것도 검증하지 않는" 테스트였다. 거짓 신호를 주므로 제거하고,
+ * 아래와 같이 핵심 로직은 단위/통합 테스트로 위임한다.
+ *
+ *   - 예약 생성(동시성·시간겹침·취소/완료 예약 처리)
+ *       → functions/src/__tests__/createReservationSafe.test.ts
+ *   - 운행일지 제출(신규/수정/예약연계/오프라인/하이패스)
+ *       → src/__tests__/hooks/submitDriveLog.test.ts, useDriveLogForm.test.ts
+ *   - 엑셀/PDF 내보내기
+ *       → src/__tests__/lib/excelExport.test.ts
+ *
+ * 인증 가능한 Firebase 에뮬레이터 기반 E2E 인프라가 갖춰지면 fixme를 해제하고 구현한다.
+ */
+test.describe('핵심 워크플로우 E2E (인증 필요 — 인프라 부재로 보류)', () => {
+    test.fixme('차량 예약 생성 및 승인/반려 프로세스 (관리자-사용자 흐름)', async () => {
+        // 에뮬레이터 기반 인증 E2E 인프라 구축 후 구현.
+        // 현재는 createReservationSafe.test.ts + PendingReservationList.test.tsx가 로직을 커버한다.
     });
 
-    test('운행기록일지 작성 및 첨부파일 검증', async ({ page }) => {
-        await page.goto('/');
-        
-        // 1. 운행기록 작성 모달/페이지 진입
-        // 2. 목적지, 거리 기입 완료
-        // 3. 영수증 이미지 Mock 첨부
-        /*
-        await page.setInputFiles('input[type="file"]', 'e2e/fixtures/mock-receipt.jpg');
-        await expect(page.locator('.preview-image')).toBeVisible();
-        */
+    test.fixme('운행기록일지 작성 및 첨부파일 검증', async () => {
+        // 에뮬레이터 기반 인증 E2E 인프라 구축 후 구현.
+        // 현재는 submitDriveLog.test.ts + useDriveLogForm.test.ts가 로직을 커버한다.
     });
 
-    test('관리자 데이터 내보내기 (엑셀 및 PDF) 검증', async ({ page }) => {
-        await page.goto('/');
-
-        // 1. 관리자 탭 (혹은 다운로드 가능한 메뉴) 진입 보장
-        
-        // 2. 다운로드 동작 인터셉트
-        /*
-        const downloadPromise = page.waitForEvent('download');
-        await page.click('button:has-text("엑셀 내보내기")');
-        const download = await downloadPromise;
-        expect(download.suggestedFilename()).toContain('.xlsx');
-        */
+    test.fixme('관리자 데이터 내보내기 (엑셀 및 PDF) 검증', async () => {
+        // 에뮬레이터 기반 인증 E2E 인프라 구축 후 구현.
+        // 현재는 excelExport.test.ts가 내보내기 직렬화 로직을 커버한다.
     });
-
 });

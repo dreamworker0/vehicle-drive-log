@@ -1,63 +1,29 @@
-import { test, expect } from '@playwright/test';
+import { test } from '@playwright/test';
 
-test.describe('예약 승인 및 반려 워크플로우(Pending Reservation)', () => {
-  // Mock Firebase / API calls using Playwright routing
-  test.beforeEach(async ({ page }) => {
-    await page.route('**/firestore/**', async (route) => {
-      // Firestore 요청을 낚아채서 승인 대기 중인 예약 하나가 있는 것처럼 모킹
-      const requestUrl = route.request().url();
-      if (requestUrl.includes('reservations') && requestUrl.includes('pending')) {
-        await route.fulfill({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify([
-            { id: 'res_123', vehicleId: 'v1', reservedByUid: 'emp1', status: 'pending', date: '2026-04-16' }
-          ]),
-        });
-      } else {
-        await route.continue();
-      }
+/**
+ * 예약 승인/반려 워크플로우 E2E.
+ *
+ * 과거 구현은 Playwright의 page.route()로 Firestore 요청 URL을 가로채 응답을
+ * 모킹하려 했으나 이는 동작하지 않는다 — Firestore Web SDK는 일반 REST가 아니라
+ * gRPC/WebChannel 스트림을 사용하므로 URL 패턴 라우팅으로 가로채지지 않는다. 게다가
+ * 모든 단언이 "if (await button.isVisible()) { ... }"로 감싸여 있어, 로그인이 안 되어
+ * 버튼이 렌더링되지 않으면 본문이 통째로 건너뛰어진다. 즉 "항상 통과하지만 아무것도
+ * 검증하지 않는" 테스트였다. 거짓 신호를 제거하고 단위 테스트로 위임한다.
+ *
+ * 승인/반려 UI 동작(승인 토스트, 반려 모달·사유 입력·토스트)은 다음에서 검증된다:
+ *   - src/__tests__/components/PendingReservationList.test.tsx
+ *
+ * 서버사이드 예약 생성·동시성·상태 전환은 다음에서 검증된다:
+ *   - functions/src/__tests__/createReservationSafe.test.ts
+ *
+ * 인증 가능한 Firebase 에뮬레이터 기반 E2E 인프라가 갖춰지면 fixme를 해제하고 구현한다.
+ */
+test.describe('예약 승인/반려 워크플로우 (인증 필요 — 인프라 부재로 보류)', () => {
+    test.fixme('승인 버튼 클릭 시 승인 토스트가 발생해야 한다', async () => {
+        // PendingReservationList.test.tsx가 승인 동작을 커버한다.
     });
 
-    // 어드민 대시보드 또는 승인 대기 리스트 페이지로 이동
-    await page.goto('/admin'); 
-  });
-
-  test('승인 버튼 클릭 시 승인 토스트가 발생해야 한다', async ({ page }) => {
-    // "승인" 버튼 찾기 (PendingReservationList 내의 버튼)
-    const approveButton = page.getByRole('button', { name: '승인' }).first();
-    
-    // 버튼이 화면 상에 렌더링될 때까지 대기
-    if (await approveButton.isVisible()) {
-        await approveButton.click();
-        // Toast provider가 노출하는 메시지 검증
-        const toastMessage = page.getByText('예약이 승인되었습니다.');
-        await expect(toastMessage).toBeVisible();
-    }
-  });
-
-  test('반려 버튼 클릭 시 모달이 나타나고 반려 처리를 성공해야 한다', async ({ page }) => {
-    const rejectButton = page.getByRole('button', { name: '반려' }).first();
-    
-    if (await rejectButton.isVisible()) {
-        await rejectButton.click();
-        
-        // ConfirmModal의 dialog가 올바르게 호출되었는지 테스트
-        const dialog = page.getByRole('dialog');
-        await expect(dialog).toBeVisible();
-        await expect(page.getByText('예약을 반려하시겠습니까?')).toBeVisible();
-
-        // 입력 폼에 사유 작성
-        const input = page.getByPlaceholder('예: 부적절한 사용 목적');
-        await input.fill('사적 이용 금지');
-        
-        // 확인 (반려 등록)
-        const confirmButton = dialog.getByRole('button', { name: '반려' }).or(dialog.getByRole('button', { name: '확인' }));
-        await confirmButton.click();
-        
-        // 성공 토스트 확인
-        const toastMessage = page.getByText('예약이 반려되었습니다.');
-        await expect(toastMessage).toBeVisible();
-    }
-  });
+    test.fixme('반려 버튼 클릭 시 모달이 나타나고 반려 처리를 성공해야 한다', async () => {
+        // PendingReservationList.test.tsx가 반려 모달·사유 입력·토스트를 커버한다.
+    });
 });
