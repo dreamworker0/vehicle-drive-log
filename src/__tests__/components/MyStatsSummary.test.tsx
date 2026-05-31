@@ -1,7 +1,4 @@
-/**
- * MyStatsSummary — 월간 운행 통계 요약 컴포넌트 테스트
- */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import MyStatsSummary from '../../components/employee/MyStatsSummary';
 
@@ -19,6 +16,13 @@ function makeLog(daysAgo: number, startKm: number, endKm: number) {
 describe('MyStatsSummary', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        vi.useFakeTimers();
+        // 2026년 6월 15일로 시스템 시간 고정 (매달 1일 전월에 걸치는 빌드 깨짐 현상 완치)
+        vi.setSystemTime(new Date('2026-06-15T12:00:00Z'));
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
     });
 
     it('로그가 없으면 렌더링하지 않음', () => {
