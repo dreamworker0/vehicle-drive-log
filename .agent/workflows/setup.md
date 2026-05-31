@@ -40,10 +40,10 @@ npm run prepare
 
 ## 4. 로컬 빌드 검증
 > [!IMPORTANT]
-> 설치가 정상적인지 확인하기 위해 Type Check 및 린트 검사를 1회 수행합니다.
+> 설치가 정상적인지 확인하기 위해 Lint, Type Check, 빌드를 1회 수행합니다.
 ```bash
 // turbo
-npm run x:run-all-checks
+npm run lint && npm run type-check && npm run build
 ```
 
 ---

@@ -13,6 +13,8 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './lib/firebaseAuth';
 import { AuthProvider } from './hooks/useAuth';
+import UpdatePrompt from './components/common/UpdatePrompt';
+import InstallPrompt from './components/common/InstallPrompt';
 
 // 경량 모드에서는 lazy loading 없이 직접 import (번들 자체가 작으므로)
 import LandingPage from './components/auth/LandingPage';
@@ -55,6 +57,8 @@ export function renderLightApp() {
                         <Route path="/faq" element={<FAQPage />} />
                         <Route path="*" element={<Navigate to="/" replace />} />
                     </Routes>
+                    <UpdatePrompt />
+                    <InstallPrompt />
                 </AuthProvider>
             </BrowserRouter>
         </StrictMode>,

@@ -18,7 +18,13 @@ node --version
 ```
 Working directory: `.`
 
-3. Build and Deploy Cloud Functions:
+3. Lint + Type check:
+```
+npm run lint && npm run type-check
+```
+Working directory: `.`
+
+4. Build and Deploy Cloud Functions:
 ```
 fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression; fnm use 22; cd functions; npm run build; cd ..; firebase deploy --only functions
 ```

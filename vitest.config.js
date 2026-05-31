@@ -29,10 +29,10 @@ export default defineConfig({
             provider: 'v8',
             reporter: ['text', 'text-summary', 'json', 'lcov', 'html'],
             thresholds: {
-                lines: 20,
-                statements: 20,
-                functions: 15,
-                branches: 10
+                lines: 24,
+                statements: 23,
+                functions: 18,
+                branches: 13
             },
             include: ['src/**/*.{ts,tsx}'],
             exclude: [

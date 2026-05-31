@@ -4,7 +4,13 @@ description: Firestore Rules + Storage Rules만 Firebase에 배포
 
 // turbo-all
 
-1. Deploy security rules (Firestore + Storage):
+1. Validate security rules before deploy:
+```
+fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression; fnm use 22; firebase deploy --only "firestore:rules" --dry-run
+```
+Working directory: `.`
+
+2. Deploy security rules (Firestore + Storage):
 ```
 fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression; fnm use 22; firebase deploy --only "firestore:rules,storage"
 ```

@@ -12,34 +12,57 @@ description: 프로젝트 컨벤션에 맞게 새 커스텀 훅을 추가하는 
 | 훅 | 역할 | 위치 |
 |---|---|---|
 | `useAuth` | 인증 상태 + 사용자 정보 (전역 Context) | `hooks/useAuth.tsx` |
-| `useToast` | 토스트 알림 표시 (전역 Context) | `hooks/useToast.tsx` |
-| `useAdminBadges` | 관리자 사이드바 배지 실시간 구독 | `hooks/useAdminBadges.ts` |
-| `useTodayDashboard` | 오늘 대시보드 (예약·운행 현황) | `hooks/useTodayDashboard.ts` |
-| `useReservationCalendar` | 예약 캘린더 로직 | `hooks/useReservationCalendar.ts` |
-| `useDriveLogForm` | 운행일지 작성 폼 로직 | `hooks/useDriveLogForm.ts` |
-| `useDriveLogOcr` | 운행일지 OCR 관련 로직 | `hooks/useDriveLogOcr.ts` |
-| `useMonthlyReport` | 월간 보고서 데이터 | `hooks/useMonthlyReport.ts` |
-| `useAnalytics` | 분석 대시보드 데이터 | `hooks/useAnalytics.ts` |
-| `useVehicleManager` | 차량 관리 CRUD | `hooks/useVehicleManager.ts` |
-| `useVehicleHistory` | 차량별 이용 내역 조회 | `hooks/useVehicleHistory.ts` |
-| `useEmployeeManager` | 직원 관리 CRUD | `hooks/useEmployeeManager.ts` |
-| `useMaintenanceLog` | 차량 정비 기록 | `hooks/useMaintenanceLog.ts` |
-| `useSettings` | 기관 설정 관리 | `hooks/useSettings.ts` |
-| `useNotification` | FCM 푸시 알림 토큰 관리 | `hooks/useNotification.ts` |
-| `useOrgApplication` | 기관 신청 폼 로직 | `hooks/useOrgApplication.ts` |
-| `useQuickDriveStart` | 예약 없이 바로 운행 시작 | `hooks/useQuickDriveStart.ts` |
-| `useBackButton` | 모바일 뒤로가기 처리 | `hooks/useBackButton.ts` |
-| `useForceLightMode` | 랜딩/인증 페이지 강제 라이트 모드 | `hooks/useForceLightMode.ts` |
-| `useOrientationLock` | 화면 회전 잠금 (PDF 출력 시 가로 모드) | `hooks/useOrientationLock.ts` |
-| `useRetry` | 재시도 로직 (에러 시 자동 재시도) | `hooks/useRetry.ts` |
-| `useTimelineDrag` | 타임라인 드래그 로직 | `hooks/useTimelineDrag.ts` |
-| `useDailyLog` | 일일 운행일지 관리 | `hooks/useDailyLog.ts` |
-| `useFuelLog` | 주유 기록 관리 | `hooks/useFuelLog.ts` |
-| `useFuelLogAdmin` | 주유 기록 관리자 기능 | `hooks/useFuelLogAdmin.ts` |
-| `useHipassCharge` | 하이패스 충전 기록 관리 | `hooks/useHipassCharge.ts` |
-| `useHipassChargeAdmin` | 하이패스 충전 관리자 기능 | `hooks/useHipassChargeAdmin.ts` |
-| `useHipassManager` | 하이패스 단말기 관리 CRUD | `hooks/useHipassManager.ts` |
-| `useVehiclePriority` | 차량 우선순위 관리 | `hooks/useVehiclePriority.ts` |
+| `useToast` | 토스트 알림 표시 (전역 Context) | `hooks/useToast.ts` |
+| `useConfirm` | 확인/취소 모달 호출 및 제어 (전역) | `hooks/useConfirm.ts` |
+| `useTheme` | 라이트/다크 테마 설정 관리 | `hooks/useTheme.ts` |
+| `useFontSize` | 화면 글자 크기 조절 (접근성 설정) | `hooks/useFontSize.ts` |
+| `useForceLightMode` | 랜딩 및 인증 화면 강제 라이트 모드 | `hooks/useForceLightMode.ts` |
+| `useOrientationLock` | 화면 회전 잠금 제어 (PDF 가로 모드) | `hooks/useOrientationLock.ts` |
+| `useBackButton` | 모바일 웹 브라우저 뒤로가기 제어 | `hooks/useBackButton.ts` |
+| `useAdminBadges` | 관리자 사이드바 미승인 건수 배지 실시간 구독 | `hooks/useAdminBadges.ts` |
+| `useTodayDashboard` | 오늘 하루 차량 예약 현황 및 즉시 운행 조회 | `hooks/useTodayDashboard.ts` |
+| `useReservationCalendar` | 예약 캘린더 뷰 제어 및 조작 | `hooks/useReservationCalendar.ts` |
+| `useDriveLogForm` | 운행일지 기록 폼의 유효성 검사 및 상태 | `hooks/useDriveLogForm.ts` |
+| `useDriveLogList` | 운행일지 리스트 필터링, 검색 및 조회 | `hooks/useDriveLogList.ts` |
+| `useDriveLogOcr` | 계기판 사진 OCR 텍스트 인식 처리 | `hooks/useDriveLogOcr.ts` |
+| `useMonthlyReport` | 월간 차량 운행/정비 보고서 생성 데이터 | `hooks/useMonthlyReport.ts` |
+| `useAnalytics` | 통계 및 분석 대시보드 데이터 조회 | `hooks/useAnalytics.ts` |
+| `useVehicleManager` | 차량 목록 등록/수정/삭제 CRUD | `hooks/useVehicleManager.ts` |
+| `useVehicleHistory` | 차량별 상세 운행 및 정비 이력 타임라인 조회 | `hooks/useVehicleHistory.ts` |
+| `useEmployeeManager` | 직원 목록 조회, 승인/반려/삭제 관리 | `hooks/useEmployeeManager.ts` |
+| `useMaintenanceLog` | 차량 정비 기록 작성, 목록 조회 및 알림 | `hooks/useMaintenanceLog.ts` |
+| `useSettings` | 기관 전체 설정 및 환경 설정 관리 | `hooks/useSettings.ts` |
+| `useNotification` | FCM 알림 권한 획득 및 수신 관리 | `hooks/useNotification.ts` |
+| `useOrgApplication` | 기관 신규 가입 신청서 폼 상태 관리 | `hooks/useOrgApplication.ts` |
+| `useQuickDriveStart` | 예약 없이 운행 바로 시작하기 기능 | `hooks/useQuickDriveStart.ts` |
+| `usePoiSearch` | Tmap API 연동 목적지(POI) 검색 및 기록 | `hooks/usePoiSearch.ts` |
+| `useReservationPattern` | 요일/시간대별 단골 예약 패턴 제어 | `hooks/useReservationPattern.ts` |
+| `useTimelineDrag` | 예약 타임라인 그리드에서의 드래그 앤 드롭 | `hooks/useTimelineDrag.ts` |
+| `useFeedbackManagement` | 사용자 피드백 목록 조회 및 답변 작성/관리 | `hooks/useFeedbackManagement.ts` |
+| `useDailyLog` | 특정 일자의 일일 운행기록 조회 및 관리 | `hooks/useDailyLog.ts` |
+| `useFuelLog` | 직원/관리자 공용 주유 기록 관리 | `hooks/useFuelLog.ts` |
+| `useFuelLogAdmin` | 관리자용 전체 주유 기록 목록 조회/내보내기 | `hooks/useFuelLogAdmin.ts` |
+| `useHipassCharge` | 하이패스 충전 기록 조회 및 작성 | `hooks/useHipassCharge.ts` |
+| `useHipassChargeAdmin` | 관리자용 하이패스 충전 기록 관리 및 조회 | `hooks/useHipassChargeAdmin.ts` |
+| `useHipassManager` | 하이패스 단말기 및 카드 등록 CRUD | `hooks/useHipassManager.ts` |
+| `useVehiclePriority` | 배차 시 선호 차량 및 정렬 우선순위 설정 | `hooks/useVehiclePriority.ts` |
+| `useRetry` | 비동기 요청 실패 시 점진적 재시도 | `hooks/useRetry.ts` |
+| `useServiceDashboard` | 종합 서비스 대시보드 데이터 연동 | `hooks/useServiceDashboard.ts` |
+
+### 도메인별 세부 훅 (`hooks/{domain}/`)
+
+더 복잡한 도메인은 하위 디렉터리 내에 독립된 기능별 훅으로 관리한다.
+
+| 훅 | 역할 | 위치 |
+|---|---|---|
+| `useBaseFuelLog` | 주유 기록 CRUD 공통 베이스 로직 | `hooks/base/useBaseFuelLog.ts` |
+| `useBaseHipassCharge` | 하이패스 충전 CRUD 공통 베이스 로직 | `hooks/base/useBaseHipassCharge.ts` |
+| `useDriveLogInitializer` | 운행일지 폼 진입 시 초기값 및 이전 주행거리 조회 | `hooks/driveLogForm/useDriveLogInitializer.ts` |
+| `useDriveLogSubmit` | 운행일지 실제 제출 처리 및 유효성 검사 | `hooks/driveLogForm/useDriveLogSubmit.ts` |
+| `useDriveLogExport` | 운행일지 목록 엑셀 내보내기 | `hooks/driveLogList/useDriveLogExport.ts` |
+| `useReservationData` | 예약 데이터 실시간 구독 및 캐싱 | `hooks/reservationCalendar/useReservationData.ts` |
+| `useReservationForm` | 예약 신청/수정 폼의 유효성 검사 및 상태 관리 | `hooks/reservationCalendar/useReservationForm.ts` |
+| `useRouteInfo` | 예약 경로 정보 및 Tmap 거리 계산 | `hooks/reservationCalendar/useRouteInfo.ts` |
 
 ### 훅 유틸리티 (`hooks/utils/`)
 
@@ -47,9 +70,13 @@ description: 프로젝트 컨벤션에 맞게 새 커스텀 훅을 추가하는 
 
 | 파일 | 역할 |
 |------|------|
-| `analyticsCalc.ts` | 분석 계산 유틸리티 |
-| `driveLogValidation.ts` | 운행일지 유효성 검증 |
-| `reservationUtils.ts` | 예약 관련 유틸리티 |
+| `aggregationUtils.ts` | 주유/하이패스 등 통계 집계 유틸리티 |
+| `analyticsCalc.ts` | 차량별, 부서별 운행 분석 계산 |
+| `driveLogValidation.ts` | 운행일지 주행거리/주유량 유효성 검증 |
+| `monthlyReportCalc.ts` | 월간 차량별 보고서 수치 집계 계산 |
+| `recurringUtils.ts` | 반복 예약 일정 생성 및 관리 유틸리티 |
+| `reservationPatternCalc.ts` | 사용자의 예약 패턴 분석 계산 |
+| `reservationUtils.ts` | 예약 가능 여부, 충돌 검사 등 예약 비즈니스 헬퍼 |
 
 ## 훅 생성 규칙
 

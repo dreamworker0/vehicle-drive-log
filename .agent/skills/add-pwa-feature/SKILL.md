@@ -43,3 +43,7 @@ export function useNetworkStatus() {
 ## 3. 에이전트 행동 지침
 - "오프라인에서도 글 작성 되게 해줘"라는 요청을 받으면, `IndexedDB` 나 `dexie.js` 등 브라우저 기반 저장소를 사용하는 로직 초안을 제안하세요.
 - 단순히 UI만 바꾸지 말고, 오프라인 시 Firebase Sync 지연(Timeout)을 우회/재시도(`useRetry`)하는 설계를 병행해야 합니다.
+
+## 관련 문서
+- [offline-first 룰](../../rules/offline-first.md): 오프라인 우선주의 체크 규칙
+- [pwa-mobile-first 룰](../../rules/pwa-mobile-first.md): PWA 모바일 우선 개발 원칙

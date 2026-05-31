@@ -26,16 +26,28 @@ src/components/
 
 | 컴포넌트 | 역할 |
 |---------|------|
-| `ConfirmModal` | 확인/취소 모달, 텍스트 입력 모달 |
-| `CalendarGrid` | 달력 그리드 UI |
-| `ReservationCalendar` | 예약 달력 (관리자/직원 공용) |
-| `NotificationBell` | 알림 벨 아이콘 + 드롭다운 |
-| `ErrorBoundary` | React 에러 경계 |
-| `OfflineBanner` | 오프라인 상태 안내 배너 |
-| `Skeleton` | 로딩 스켈레톤 |
-| `FeedbackForm` | 사용자 피드백 폼 |
-| `SEOHead` | SEO 메타 태그 |
-| `PublicNav` | 공개 페이지 네비게이션 |
+| `ConfirmModal` | 확인/취소 모달, 단순 텍스트 입력 모달 |
+| `CalendarGrid` | 달력 그리드 UI 뼈대 |
+| `ReservationCalendar` | 예약 달력 (관리자/직원 공용 통합 캘린더) |
+| `NotificationBell` | 신규 알림 수신 배지 표시 및 알림 드롭다운 |
+| `ErrorBoundary` | 하위 컴포넌트 렌더링 실패 시 대체 UI 제공 및 에러 리포팅 |
+| `OfflineBanner` | 네트워크 오프라인 상태 안내 상단 배너 |
+| `Skeleton` | 비동기 로딩 중 보여줄 스켈레톤 레이아웃 |
+| `FeedbackForm` | 사용자 피드백 제출 전용 폼 모달 |
+| `SEOHead` | HTML head 메타 태그 (SEO 용도) 삽입기 |
+| `PublicNav` | 공개 랜딩/인증 페이지 상단 네비게이션바 |
+| `AskAIModal` | AI 조수 비서 연동 및 대화 질의 모달 |
+| `CancelReservationHandler` | 차량 예약 취소 처리 공용 UI/로직 핸들러 |
+| `DocumentViewer` | 증빙 서류 및 차량 사진 뷰어 오버레이 |
+| `HeatmapGrid` | 사용 빈도 및 배차 밀도 시각화용 맵 그리드 |
+| `IOSInstallPrompt` | iOS(Safari) 모바일 환경 PWA 설치 가이드 모달 |
+| `InAppBrowserWarning` | 카카오톡 등 앱 내부 브라우저 진입 시 외부 브라우저 실행 안내 |
+| `InstallPrompt` | 일반 PWA 설치 유도 모달 (A2HS 지원) |
+| `PublicFeedbackModal` | 비로그인 사용자용 공개 피드백 제출 모달 |
+| `ReservationSidePanel` | 예약 클릭 시 슬라이딩되는 세부 예약 정보/관리 패널 |
+| `UpdatePrompt` | 앱 최신 업데이트 배포 시 감지 및 리로드 안내 배너 |
+| `UserManual` | 서비스 전체 사용법 및 도움말(FAQ) 오버레이 모달 |
+| `VehicleTimelineBar` | 일자별 차량 타임라인(일정 바 형태) 시각화 컴포넌트 |
 
 ### 3. 파일 생성
 

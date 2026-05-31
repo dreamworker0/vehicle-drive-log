@@ -25,14 +25,14 @@ description: Firestore & Storage 보안 규칙 수정 가이드. firestore.rules
 | `belongsToMyOrg()` | 기존 문서가 내 기관 소속인지 (`resource.data`) |
 | `newBelongsToMyOrg()` | 새 문서가 내 기관 소속인지 (`request.resource.data`) |
 
-### 4. Rate Limiting 및 데이터 수명 주기 (TTL)
+### 1.2 Rate Limiting 및 데이터 수명 주기 (TTL)
 
 데이터베이스 부하를 막고 비용을 절감하기 위해 임시성 데이터에 대한 관리를 철저히 한다.
 - **보안 규칙 상의 제약 방어**: Firestore 자체 보안 규칙으로는 분당 요청 수(Rate Limit)를 제한하기 어렵다.
 - **TTL (Time-To-Live)**: `rateLimits`, `temporaryData` 등 영구 저장이 불필요한 컬렉션의 데이터는 **문서 내에 `expiresAt` (Timestamp) 필드**를 두어 GCP Firestore TTL 정책을 통해 자동 삭제되도록 유도한다.
 - **App Check 제거**: 현재 프로젝트에서는 App Check 인프라가 제거되었으므로, 규칙 파일에서 App Check 토큰(`request.app == null` 검사 등)을 요구해서는 안 되며, 오직 유저 인증 토큰(`request.auth`)과 역할(`role`) 기반으로만 검증한다.
 
-### 1.2 역할 체계
+### 1.3 역할 체계
 
 | 역할 | Firestore `role` | 권한 범위 |
 |------|------------------|-----------|

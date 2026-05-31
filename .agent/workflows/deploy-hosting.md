@@ -18,13 +18,19 @@ node --version
 ```
 Working directory: `.`
 
-3. Build for production:
+3. Lint + Type check:
+```
+npm run lint && npm run type-check
+```
+Working directory: `.`
+
+4. Build for production:
 ```
 npm run build
 ```
 Working directory: `.`
 
-4. Deploy Hosting only:
+5. Deploy Hosting only:
 ```
 fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression; fnm use 22; firebase deploy --only hosting
 ```

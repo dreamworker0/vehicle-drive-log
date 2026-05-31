@@ -1,7 +1,5 @@
 import { initializeApp } from "firebase-admin/app";
 import { setGlobalOptions } from "firebase-functions/v2";
-import { onSchedule } from "firebase-functions/v2/scheduler";
-import { recordHeartbeat } from "./helpers";
 
 // 시스템 전역 옵션 - 유휴 리소스 절감 및 불필요한 과금 방지
 setGlobalOptions({ 
@@ -55,26 +53,7 @@ export { sendRejectionEmail } from "./sendRejectionEmail";
 export { sendManualApprovalAlimtalk } from "./sendManualApprovalAlimtalk";
 
 // Reservation Reminder (예약 알림 + 미작성 알림)
-import { checkReservationReminders } from "./reservationReminder";
-
-export const reservationReminder = onSchedule(
-    {
-        schedule: "every 15 minutes",
-        timeZone: "Asia/Seoul",
-        retryCount: 0,
-    },
-    async function () {
-        // 주말(토/일)에는 스킵 (비용 절감)
-        const nowKST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
-        const dayOfWeek = nowKST.getDay();
-        if (dayOfWeek === 0 || dayOfWeek === 6) {
-            await recordHeartbeat("reservationReminder");
-            return;
-        }
-        await checkReservationReminders();
-        await recordHeartbeat("reservationReminder");
-    }
-);
+export { reservationReminder } from "./reservationReminderScheduler";
 
 
 
@@ -93,31 +72,8 @@ export { cleanupDuplicateLogs } from "./cleanupDuplicateLogs";
 // 집계 통계 일괄 재계산 (마이그레이션/보정용)
 export { recalculateAggregatedStats } from "./caching/recalculateAggregatedStats";
 
-// SuperAdmin 대시보드 통계 캐싱 (1시간 주기 배치, 저녁/새벽은 3시간)
-import { computeAllDashboardStats } from "./caching/computeDashboardStats";
-
-export const computeDashboardStats = onSchedule(
-    {
-        schedule: "every 1 hours",
-        timeZone: "Asia/Seoul",
-        retryCount: 0,
-        memory: "512MiB",
-        timeoutSeconds: 300,
-    },
-    async function () {
-        // 저녁 20시 ~ 아침 8시 사이에는 통계 캐싱 스케줄러 실행을 완전히 건너뜀 (야간 유휴 시간 리소스 및 과금 절감)
-        const nowKST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
-        const hour = nowKST.getHours();
-        
-        if (hour >= 20 || hour < 8) {
-            await recordHeartbeat("computeDashboardStats (skipped by night time policy)");
-            return;
-        }
-
-        await computeAllDashboardStats();
-        await recordHeartbeat("computeDashboardStats");
-    }
-);
+// SuperAdmin 대시보드 통계 캐싱 (1시간 주기 배치, 저녁/새벽은 스킵)
+export { computeDashboardStats } from "./computeDashboardStatsScheduler";
 
 // SuperAdmin 대시보드 통계 수동 갱신
 export { refreshDashboardStats } from "./caching/refreshDashboardStats";
@@ -162,86 +118,8 @@ export { resetCalendarSyncFails } from "./scripts/resetCalendarSyncFails";
 export { testCalendarAccess } from "./testCalendarAccess";
 
 
-
 // 미활성 기관 일괄 알림톡 발송
-import { onCall, HttpsError } from "firebase-functions/v2/https";
-import { getFirestore } from "firebase-admin/firestore";
-import { sendReminderAlimtalk } from "./sendAlimtalk";
-
-export const sendBulkReminder = onCall(
-    { region: "asia-northeast3", timeoutSeconds: 120, enforceAppCheck: false },
-    async (request) => {
-        // 인증 확인
-        if (!request.auth) {
-            throw new HttpsError("unauthenticated", "인증이 필요합니다.");
-        }
-        // superAdmin 권한 확인
-        if (request.auth.token.role !== "superAdmin") {
-            throw new HttpsError("permission-denied", "시스템 관리자만 사용할 수 있습니다.");
-        }
-
-        const db = getFirestore();
-
-        // 승인된 기관 조회
-        const orgsSnap = await db.collection("organizations")
-            .where("status", "==", "approved")
-            .get();
-
-        const results: { orgName: string; phone: string; success: boolean; message?: string }[] = [];
-        let sentCount = 0;
-        let failCount = 0;
-        let noPhoneCount = 0;
-
-        for (const orgDoc of orgsSnap.docs) {
-            const org = orgDoc.data();
-
-            // 직원 수 확인 (0명 = 미활성)
-            const membersSnap = await db.collection("users")
-                .where("organizationId", "==", orgDoc.id)
-                .limit(1)
-                .get();
-
-            if (!membersSnap.empty) continue; // 직원이 있으면 건너뛰기
-
-            // 전화번호 확인
-            const phone = org.applicantPhone || org.phone;
-            if (!phone) {
-                noPhoneCount++;
-                results.push({ orgName: org.name, phone: "-", success: false, message: "전화번호 없음" });
-                continue;
-            }
-
-            // 알림톡 발송
-            const name = org.applicantName || org.name;
-            const inviteCode = org.inviteCode || "";
-
-            if (!inviteCode) {
-                results.push({ orgName: org.name, phone, success: false, message: "초대코드 없음" });
-                failCount++;
-                continue;
-            }
-
-            const result = await sendReminderAlimtalk(phone, name, org.name, inviteCode);
-
-            if (result.success) {
-                sentCount++;
-            } else {
-                failCount++;
-            }
-
-            results.push({
-                orgName: org.name,
-                phone,
-                success: result.success,
-                message: result.message,
-            });
-        }
-
-        console.log(`[BulkReminder] 완료: 성공 ${sentCount}, 실패 ${failCount}, 번호없음 ${noPhoneCount}`);
-
-        return { sentCount, failCount, noPhoneCount, results };
-    }
-);
+export { sendBulkReminder } from "./sendBulkReminder";
 
 // 미활성 기관 발송 스케줄러 (매주 월~금 14시 점검, 주 1회 발송)
 export { sendInactiveOrgAlimtalkScheduled } from "./sendInactiveOrgAlimtalkScheduled";

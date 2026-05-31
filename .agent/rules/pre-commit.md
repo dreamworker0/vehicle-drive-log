@@ -1,3 +1,7 @@
+---
+description: 프리커밋 훅(Husky + lint-staged) 설정 및 동작 설명. Git 커밋 전 자동 검증 관련 참고.
+---
+
 # 프리커밋 훅 (Pre-commit Hook)
 
 Git 커밋 전에 자동으로 실행되는 검증 게이트. `Husky` + `lint-staged`로 구현.
