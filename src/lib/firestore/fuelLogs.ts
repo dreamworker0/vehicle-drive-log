@@ -8,6 +8,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { captureError } from '../sentry';
+import { toLocalDateStr } from '../dateUtils';
 
 /** 주유 기록 목록 조회 (기관 전체, 최신순) */
 export const getFuelLogs = async (orgId: string, vehicleId: string | null = null, options?: { since?: Date; until?: Date }) => {
@@ -19,11 +20,11 @@ export const getFuelLogs = async (orgId: string, vehicleId: string | null = null
     }
     if (options?.since) {
         constraints.push(where('date', '>=', options.since instanceof Date
-            ? options.since.toISOString().slice(0, 10) : options.since));
+            ? toLocalDateStr(options.since) : options.since));
     }
     if (options?.until) {
         constraints.push(where('date', '<=', options.until instanceof Date
-            ? options.until.toISOString().slice(0, 10) : options.until));
+            ? toLocalDateStr(options.until) : options.until));
     }
     constraints.push(orderBy('date', 'desc'), limit(200));
     const q = query(collection(db, 'fuelLogs'), ...constraints);

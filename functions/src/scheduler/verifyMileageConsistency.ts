@@ -1,5 +1,6 @@
 import { onSchedule } from 'firebase-functions/v2/scheduler';
 import * as admin from 'firebase-admin';
+import { toKSTDate } from '../utils/kstDate';
 
 /**
  * 매월 1일 자정(KST), 차량별 지난달 기록을 체크하여 마일리지(누적 주행거리) 불일치가 있는지 검증하는 데몬 함수.
@@ -11,7 +12,7 @@ export const verifyMileageConsistency = onSchedule(
         const db = admin.firestore();
         const organizationsSnap = await db.collection('organizations').get();
 
-        const latestMonth = new Date();
+        const latestMonth = toKSTDate();
         latestMonth.setMonth(latestMonth.getMonth() - 1);
         const y = latestMonth.getFullYear();
         const m = latestMonth.getMonth() + 1;

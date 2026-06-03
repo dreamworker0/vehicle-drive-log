@@ -1,5 +1,6 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore } from "firebase-admin/firestore";
+import { getKSTMonthKey } from "../utils/kstDate";
 
 /**
  * 모든 기관(또는 특정 기관)의 운행일지 집계 통계를 처음부터 재계산합니다.
@@ -64,8 +65,7 @@ export const recalculateAggregatedStats = onCall(
                 let monthKey: string | null = null;
                 const ts = data.timestamp;
                 if (ts && typeof ts.toDate === "function") {
-                    const d = ts.toDate() as Date;
-                    monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+                    monthKey = getKSTMonthKey(ts.toDate());
                 }
 
                 if (monthKey) {

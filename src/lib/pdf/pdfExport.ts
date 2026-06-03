@@ -3,6 +3,7 @@
  * 공식 차량운행일지 양식을 브라우저 인쇄 기능으로 PDF 생성
  */
 import { getPdfStyles, formatDate, formatNumber } from './pdfStyles';
+import { toLocalDateStr } from '../dateUtils';
 
 /** PDF용 운행일지 행 */
 interface PdfLogEntry {
@@ -54,8 +55,8 @@ export function downloadDriveLogsPdf(logs: PdfLogEntry[], options: { onError?: (
 
     // 날짜순 정렬 (오래된 순), 같은 날짜 내 출발 시간 오름차순
     const sorted = [...logs].sort((a, b) => {
-        const dateA = a.date || (a.timestamp?.toDate ? a.timestamp.toDate().toISOString().slice(0, 10) : '');
-        const dateB = b.date || (b.timestamp?.toDate ? b.timestamp.toDate().toISOString().slice(0, 10) : '');
+        const dateA = a.date || (a.timestamp?.toDate ? toLocalDateStr(a.timestamp.toDate()) : '');
+        const dateB = b.date || (b.timestamp?.toDate ? toLocalDateStr(b.timestamp.toDate()) : '');
         const dateCmp = dateA.localeCompare(dateB);
         if (dateCmp !== 0) return dateCmp;
         const timeA = a.startTime || a.departureTime || '';
@@ -94,7 +95,7 @@ export function downloadDriveLogsPdf(logs: PdfLogEntry[], options: { onError?: (
  */
 function buildLogRow(log: PdfLogEntry, idx: number, pageIdx: number, includeHipass = false, includePassengers = false) {
     const date = log.date || (log.timestamp?.toDate
-        ? log.timestamp.toDate().toISOString().slice(0, 10)
+        ? toLocalDateStr(log.timestamp.toDate())
         : '-');
     const distance = ((log.arrivalKm || log.endKm || 0) - (log.departureKm || log.startKm || 0));
 

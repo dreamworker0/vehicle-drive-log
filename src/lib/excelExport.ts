@@ -3,6 +3,7 @@
  * 운행일지 데이터를 엑셀 파일로 내보냅니다.
  * xlsx 라이브러리는 동적 import로 필요 시에만 로드합니다 (276KB 절약).
  */
+import { toLocalDateStr } from './dateUtils';
 
 /**
  * 운행일지 데이터를 엑셀 파일로 다운로드
@@ -47,7 +48,7 @@ export async function downloadDriveLogsExcel(logs: ExcelDriveLog[], filename = '
     const rows = logs.map((log: ExcelDriveLog) => {
         const distance = ((log.arrivalKm || log.endKm || 0) - (log.departureKm || log.startKm || 0));
         const dateStr = log.date || (log.timestamp?.toDate
-            ? log.timestamp.toDate().toISOString().slice(0, 10)
+            ? toLocalDateStr(log.timestamp.toDate())
             : '-');
 
         const row: Record<string, string | number> = {

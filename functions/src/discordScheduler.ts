@@ -2,6 +2,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { getFirestore } from "firebase-admin/firestore";
 import { sendDiscordAlert } from "./discord";
 import { recordHeartbeat } from "./helpers";
+import { toKSTDate } from "./utils/kstDate";
 
 export const scheduledDiscordBriefing = onSchedule(
     {
@@ -12,13 +13,13 @@ export const scheduledDiscordBriefing = onSchedule(
     async (event) => {
         const db = getFirestore();
         const now = new Date();
-        const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-        const dayOfWeek = kstNow.getUTCDay(); // 0: Sunday, 1: Monday...
+        const kstNow = toKSTDate(now);
+        const dayOfWeek = kstNow.getDay(); // 0: Sunday, 1: Monday...
 
         // --- 1. 매일: 가입 후 3일 경과 & 미작성 기관 체크 ---
-        const threeDaysAgo = new Date();
+        const threeDaysAgo = toKSTDate();
         threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-        const fourDaysAgo = new Date();
+        const fourDaysAgo = toKSTDate();
         fourDaysAgo.setDate(fourDaysAgo.getDate() - 4);
 
         const inactiveSnap = await db.collection("organizations")
@@ -56,7 +57,7 @@ export const scheduledDiscordBriefing = onSchedule(
 
         // --- 2. 주간 브리핑 (월요일 오전 9시에만 실행) ---
         if (dayOfWeek === 1) { // 1 = 월요일
-            const sevenDaysAgo = new Date();
+            const sevenDaysAgo = toKSTDate();
             sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
             // 주간 신규 가입 기관수

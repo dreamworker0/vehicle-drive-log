@@ -7,6 +7,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { listCalendarEvents, parseEventToReservation } from "./calendarSync";
 import { sendDiscordAlert } from "./discord";
 import { recordHeartbeat } from "./helpers";
+import { toKSTDate, getKSTDateString } from "./utils/kstDate";
 
 /** 쿨다운 재시도 관련 상수 */
 const RETRY_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24시간
@@ -41,7 +42,7 @@ export const syncCalendarToApp = onSchedule(
     },
     async function () {
         // 주말(토/일) 및 심야 시간(23시~05시) 동기화 스킵 (방어적 코드)
-        const nowKST = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+        const nowKST = toKSTDate();
         const dayOfWeek = nowKST.getDay(); // 0=일, 6=토
         const hour = nowKST.getHours();
 
@@ -211,11 +212,11 @@ export async function syncSingleVehicleCalendar(
     // 2. 해당 차량의 기존 예약 조회 (UTC/KST 시간대 오류를 피하기 위해 조회 범위를 하루씩 넉넉히 잡습니다)
     const dateMinObj = new Date(timeMin);
     dateMinObj.setDate(dateMinObj.getDate() - 2);
-    const dateMin = dateMinObj.toISOString().slice(0, 10);
+    const dateMin = getKSTDateString(dateMinObj);
     
     const dateMaxObj = new Date(timeMax);
     dateMaxObj.setDate(dateMaxObj.getDate() + 2);
-    const dateMax = dateMaxObj.toISOString().slice(0, 10);
+    const dateMax = getKSTDateString(dateMaxObj);
 
     const existingSnap = await db.collection("reservations")
         .where("vehicleId", "==", vehicleId)

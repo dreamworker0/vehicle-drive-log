@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, getCountFromServer } from 'firebase/firestore';
 import { db } from '../lib/firebase';
 import { useAuth } from './useAuth';
+import { toLocalDateStr } from '../lib/dateUtils';
 
 interface AdminBadges {
     vehicleCount: number | null;
@@ -52,7 +53,7 @@ export default function useAdminBadges(): AdminBadges {
                 const hipassSnap = await getCountFromServer(hipassQ);
                 
                 // 오늘 예약 수 
-                const today = new Date().toISOString().slice(0, 10);
+                const today = toLocalDateStr();
                 const reservationQ = query(
                     collection(db, 'reservations'),
                     where('organizationId', '==', orgId),

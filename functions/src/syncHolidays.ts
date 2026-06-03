@@ -5,6 +5,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineString } from "firebase-functions/params";
 import { getFirestore } from "firebase-admin/firestore";
 import { recordHeartbeat } from "./helpers";
+import { getKSTYear } from "./utils/kstDate";
 
 const HOLIDAY_API_KEY = defineString("HOLIDAY_API_KEY");
 
@@ -18,7 +19,7 @@ export const syncHolidaysScheduled = onSchedule(
         try {
             const db = getFirestore();
             const apiKey = HOLIDAY_API_KEY.value();
-            const currentYear = new Date().getFullYear();
+            const currentYear = getKSTYear();
             const yearsToFetch = [currentYear, currentYear + 1];
 
             const docRef = db.collection("system").doc("holidays");

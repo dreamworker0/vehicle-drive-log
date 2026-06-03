@@ -1,15 +1,15 @@
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getKSTMonthKey } from "../utils/kstDate";
 
 /** 타임스탬프에서 월 키(YYYY-MM) 추출 */
 export const getMonthKey = (data: FirebaseFirestore.DocumentData | undefined): string | null => {
     if (!data) return null;
     const ts = data.timestamp;
     if (ts && typeof ts.toDate === "function") {
-        const d = ts.toDate() as Date;
-        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+        return getKSTMonthKey(ts.toDate());
     }
     if (ts instanceof Date) {
-        return `${ts.getFullYear()}-${String(ts.getMonth() + 1).padStart(2, "0")}`;
+        return getKSTMonthKey(ts);
     }
     return null;
 };

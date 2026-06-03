@@ -175,8 +175,10 @@ export default function useMonthlyReport() {
         const XLSX = await import('xlsx');
 
         const headers = ['날짜', '운전자', '차량', '도착지', '출발(km)', '도착(km)', '주행거리(km)', '목적', '출발시간', '도착시간'];
-        const rows = filteredLogs.map(l => [
-            l.date || (l.timestamp as { toDate?: () => Date })?.toDate?.()?.toISOString?.()?.slice(0, 10) || '',
+        const rows = filteredLogs.map(l => {
+            const ts = (l.timestamp as { toDate?: () => Date })?.toDate?.();
+            return [
+            l.date || (ts ? toLocalDateStr(ts) : ''),
             l.driverName || '',
             l.vehicleDisplayName || l.vehicleName || '',
             l.destination || '',
@@ -186,7 +188,8 @@ export default function useMonthlyReport() {
             l.purpose || '',
             l.startTime || '',
             l.endTime || '',
-        ]);
+            ];
+        });
 
         const wsData = [headers, ...rows];
         const ws = XLSX.utils.aoa_to_sheet(wsData);

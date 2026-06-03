@@ -2,6 +2,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import {
     computeDistance, computeDuration, toDate, groupByOrg,
 } from "./dashboardHelpers";
+import { toKSTDate, getKSTDateString, getKSTDayOfWeek } from "../utils/kstDate";
 import {
     computeOrgBase, computeUserStats, computeFavoriteUsers,
     computeVehicleStats, computeHipassStats,
@@ -24,7 +25,7 @@ export async function computeAllDashboardStats(): Promise<void> {
     const startTime = Date.now();
     const db = getFirestore();
 
-    const now = new Date();
+    const now = toKSTDate();
     const year = now.getFullYear();
     const month = now.getMonth();
     const thirtyDaysAgo = new Date(year, month, now.getDate() - 29);
@@ -90,7 +91,7 @@ export async function computeAllDashboardStats(): Promise<void> {
         for (let i = 0; i < 30; i++) {
             const d = new Date(thirtyDaysAgo);
             d.setDate(d.getDate() + i);
-            const key = d.toISOString().split("T")[0];
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
             dateKeys.push(key);
             dailyInputMap[key] = { ocr: 0, manual: 0 };
             dailyDriveMap[key] = 0;
@@ -116,8 +117,9 @@ export async function computeAllDashboardStats(): Promise<void> {
                 org.distance += dist;
                 const ts = toDate(data.timestamp);
                 if (ts) {
-                    if (!org.lastDriveDate || ts.toISOString() > org.lastDriveDate) {
-                        org.lastDriveDate = ts.toISOString();
+                    const kstTs = toKSTDate(ts);
+                    if (!org.lastDriveDate || kstTs.toISOString() > org.lastDriveDate) {
+                        org.lastDriveDate = kstTs.toISOString();
                     }
                 }
                 const dur = computeDuration(data.startTime, data.endTime);
@@ -126,17 +128,18 @@ export async function computeAllDashboardStats(): Promise<void> {
 
             const ts = toDate(data.timestamp);
             if (ts) {
-                if (ts.getFullYear() === year && ts.getMonth() === month) {
+                const kstTsMonth = toKSTDate(ts);
+                if (kstTsMonth.getFullYear() === year && kstTsMonth.getMonth() === month) {
                     monthLogs++; monthDistance += dist;
                     if (data.driverUid) monthActiveUsers.add(data.driverUid);
-                } else if (ts.getFullYear() === prevYear && ts.getMonth() === prevMonth) {
+                } else if (kstTsMonth.getFullYear() === prevYear && kstTsMonth.getMonth() === prevMonth) {
                     prevLogs++; prevDistance += dist;
                     if (data.driverUid) prevMonthActiveUsers.add(data.driverUid);
                 }
             }
 
             if (!ts || ts < thirtyDaysAgo) return;
-            const dateKey = ts.toISOString().split("T")[0];
+            const dateKey = getKSTDateString(ts);
             if (dailyInputMap[dateKey]) {
                 if (data.inputMethod === "ocr") dailyInputMap[dateKey].ocr++;
                 else dailyInputMap[dateKey].manual++;
@@ -156,7 +159,7 @@ export async function computeAllDashboardStats(): Promise<void> {
                     const hKey = `${hourInt.toString().padStart(2, "0")}시`;
                     if (hourMap[hKey] !== undefined) hourMap[hKey]++;
                     if (dur > 0 && hourDurMap[hKey]) hourDurMap[hKey].push(dur);
-                    heatGrid[ts.getDay()][hourInt]++;
+                    heatGrid[getKSTDayOfWeek(ts)][hourInt]++;
                 }
             }
             if (dur > 0 && dailyDurMap[dateKey]) dailyDurMap[dateKey].push(dur);
@@ -268,7 +271,7 @@ export async function computeAllDashboardStats(): Promise<void> {
             d.setDate(d.getDate() + i);
             const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
             const dayEnd = new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999);
-            const key = d.toISOString().split("T")[0];
+            const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
             let dayA = 0, dayI = 0, dayR = 0, dayD = 0;
             orgListFiltered.filter(o => o.createdAt && o.createdAt >= dayStart && o.createdAt <= dayEnd).forEach(o => {

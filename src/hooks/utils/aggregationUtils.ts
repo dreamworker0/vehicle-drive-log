@@ -2,6 +2,7 @@
  * 데이터 집계(Aggregation) 및 공통 유틸리티
  * 여러 통계/분석 파일에서 공통으로 사용되는 날짜 추출 및 기초 수학/필터링 함수들을 정의합니다.
  */
+import { toLocalDateStr } from '../../lib/dateUtils';
 
 export interface BaseLog {
     date?: string;
@@ -27,7 +28,7 @@ export function extractDateStr(log: BaseLog): string {
         }
     }
     
-    return d?.toISOString?.()?.slice(0, 10) || '';
+    return d ? toLocalDateStr(d) : '';
 }
 
 /**

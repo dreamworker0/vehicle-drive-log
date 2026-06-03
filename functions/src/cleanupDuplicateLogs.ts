@@ -3,6 +3,7 @@
  */
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore } from "firebase-admin/firestore";
+import { getKSTDateString } from "./utils/kstDate";
 
 export const cleanupDuplicateLogs = onCall(
     {
@@ -42,9 +43,7 @@ export const cleanupDuplicateLogs = onCall(
             logsSnap.forEach((doc) => {
                 const data = doc.data();
                 const ts = data.timestamp?.toDate ? data.timestamp.toDate() : null;
-                const dateStr = ts
-                    ? `${ts.getFullYear()}-${String(ts.getMonth() + 1).padStart(2, "0")}-${String(ts.getDate()).padStart(2, "0")}`
-                    : "unknown";
+                const dateStr = ts ? getKSTDateString(ts) : "unknown";
 
                 const key = `${dateStr}|${data.vehicleId}|${data.driverUid}|${data.startKm}|${data.endKm}`;
 

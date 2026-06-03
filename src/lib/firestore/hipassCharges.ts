@@ -9,6 +9,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { captureError } from '../sentry';
+import { toLocalDateStr } from '../dateUtils';
 
 /** 기관 전체 하이패스 충전 기록 조회 (최신순, 200건) */
 export const getAllHipassCharges = async (orgId: string, options?: { since?: Date; until?: Date }) => {
@@ -17,11 +18,11 @@ export const getAllHipassCharges = async (orgId: string, options?: { since?: Dat
     ];
     if (options?.since) {
         constraints.push(where('date', '>=', options.since instanceof Date
-            ? options.since.toISOString().slice(0, 10) : options.since));
+            ? toLocalDateStr(options.since) : options.since));
     }
     if (options?.until) {
         constraints.push(where('date', '<=', options.until instanceof Date
-            ? options.until.toISOString().slice(0, 10) : options.until));
+            ? toLocalDateStr(options.until) : options.until));
     }
     constraints.push(orderBy('date', 'desc'), limit(200));
     const q = query(collection(db, 'hipassCharges'), ...constraints);

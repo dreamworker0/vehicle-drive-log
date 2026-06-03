@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import { toLocalDateStr } from '../../lib/dateUtils';
 
 interface DriveLogLike {
     date?: string;
@@ -21,14 +22,15 @@ function getMonthRange(offset = 0) {
     const start = new Date(y, m, 1);
     const end = offset === 0 ? now : new Date(y, m + 1, 0); // 이번 달이면 오늘까지
     return {
-        start: start.toISOString().slice(0, 10),
-        end: end.toISOString().slice(0, 10),
+        start: toLocalDateStr(start),
+        end: toLocalDateStr(end),
         label: `${start.getFullYear()}년 ${start.getMonth() + 1}월`,
     };
 }
 
 function getLogDate(log: DriveLogLike): string {
-    return log.date || log.timestamp?.toDate?.()?.toISOString?.()?.slice(0, 10) || '';
+    const ts = log.timestamp?.toDate?.();
+    return log.date || (ts ? toLocalDateStr(ts) : '');
 }
 
 export default function MyStatsSummary({ logs }: MyStatsSummaryProps) {
