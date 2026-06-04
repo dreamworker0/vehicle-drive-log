@@ -36,9 +36,19 @@ test.describe('기관 사용 신청 플로우', () => {
 
     test('필수 항목 미입력 시 에러 표시', async ({ page }) => {
         await page.goto('/apply');
+
+        // 약관 체크박스가 렌더링될 때까지 대기
+        const termsCheckbox = page.locator('#agree-terms');
+        const privacyCheckbox = page.locator('#agree-privacy');
+        await expect(termsCheckbox).toBeVisible({ timeout: 10000 });
+        await expect(privacyCheckbox).toBeVisible();
+
         // 약관 동의 — label 클릭으로 React 상태 업데이트
         await page.locator('label[for="agree-terms"]').click();
+        await expect(termsCheckbox).toBeChecked({ timeout: 5000 });
         await page.locator('label[for="agree-privacy"]').click();
+        await expect(privacyCheckbox).toBeChecked({ timeout: 5000 });
+
         // 빈 폼으로 제출 시도 전 버튼이 활성화될 때까지 대기
         const submitBtn = page.getByRole('button', { name: '신청하기' });
         await expect(submitBtn).toBeEnabled({ timeout: 10000 });

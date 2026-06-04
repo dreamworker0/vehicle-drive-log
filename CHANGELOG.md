@@ -3,6 +3,16 @@
 이 문서는 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/) 형식을 따르는 **개발 참고용** 이력입니다.
 서비스 이용자용 변경 소식은 [업데이트 소식](https://vehicle-drive-log.web.app/release-notes)에서 확인할 수 있습니다.
 
+## Phase 52 — KST 타임존 이중 변환 버그 수정 🕐
+
+> 2026-06-04
+
+### Fixed
+- **대시보드 "최근 운행" 날짜 +1일 표시 버그 수정**: `toKSTDate(ts).toISOString()`이 이미 +9시간된 epoch을 UTC로 출력하여 프론트엔드에서 `new Date()`로 파싱 시 KST 오프셋이 이중 적용되던 문제 해결. 원본 UTC ISO string(`ts.toISOString()`)을 저장하도록 수정 (`computeDashboardStats.ts`)
+- **Discord/알림톡 스케줄러 Firestore 비교 9시간 오차 수정**: `toKSTDate()`로 생성된 +9h 오프셋 Date를 Firestore `where()` 비교에 사용하여 "가입 후 3일 경과" 판단이 9시간 어긋나던 문제 해결. UTC 기준 `new Date()`로 수정 (`discordScheduler.ts`, `sendInactiveOrgAlimtalkScheduled.ts`)
+
+---
+
 ## Phase 51 — 테스트 환경 및 빌드 안정화 패치 🛡️
 
 > 2026-05-28

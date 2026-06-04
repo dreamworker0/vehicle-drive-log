@@ -14,9 +14,9 @@ async function runDiscordBriefing(db: FirebaseFirestore.Firestore) {
     const dayOfWeek = kstNow.getDay();
 
     // --- 1. 매일: 가입 후 3일 경과 & 미작성 기관 체크 ---
-    const threeDaysAgo = toKSTDate();
+    const threeDaysAgo = new Date();
     threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
-    const fourDaysAgo = toKSTDate();
+    const fourDaysAgo = new Date();
     fourDaysAgo.setDate(fourDaysAgo.getDate() - 4);
 
     const inactiveSnap = await db.collection("organizations")
@@ -53,7 +53,7 @@ async function runDiscordBriefing(db: FirebaseFirestore.Firestore) {
 
     // --- 2. 주간 브리핑 (월요일에만 실행) ---
     if (dayOfWeek === 1) {
-        const sevenDaysAgo = toKSTDate();
+        const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
 
         const newOrgsAgg = await db.collection("organizations")

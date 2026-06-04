@@ -117,9 +117,9 @@ export async function computeAllDashboardStats(): Promise<void> {
                 org.distance += dist;
                 const ts = toDate(data.timestamp);
                 if (ts) {
-                    const kstTs = toKSTDate(ts);
-                    if (!org.lastDriveDate || kstTs.toISOString() > org.lastDriveDate) {
-                        org.lastDriveDate = kstTs.toISOString();
+                    const tsIso = ts.toISOString();
+                    if (!org.lastDriveDate || tsIso > org.lastDriveDate) {
+                        org.lastDriveDate = tsIso;
                     }
                 }
                 const dur = computeDuration(data.startTime, data.endTime);
