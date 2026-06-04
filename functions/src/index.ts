@@ -30,8 +30,7 @@ export { syncHolidaysScheduled } from "./syncHolidays";
 // Tmap Proxy (프로덕션 CORS 해결)
 export { tmapProxy } from "./tmapProxy";
 
-// 데이터 백업 & 야간 배치(자동 퍼지/아카이빙/클린업)
-export { backupFirestore } from "./backupFirestore";
+// 통합 야간 배치 (백업 + 퍼지/아카이빙/클린업)
 export { dailyNightlyBatch } from "./dailyNightlyBatch";
 
 // Admin Notice
@@ -127,8 +126,7 @@ export { sendInactiveOrgAlimtalkScheduled } from "./sendInactiveOrgAlimtalkSched
 // 사용자 권한 변경 탐지 (보안 알림)
 export { notifyRoleChange } from "./notifyRoleChange";
 
-// 디스코드 정기 리포트 및 미활성 알림 스케줄러
-export { scheduledDiscordBriefing } from "./discordScheduler";
+// (디스코드 브리핑은 sendInactiveOrgAlimtalkScheduled에 통합됨)
 
 // 익명 로그인 대체용 기관 신청 API
 export { submitOrgApplication } from "./submitOrgApplication";

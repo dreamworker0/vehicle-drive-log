@@ -1,8 +1,8 @@
 /**
  * reservationReminderScheduler — 예약 알림 스케줄러 (D13 규칙 준수: index.ts에서 분리)
  *
- * 15분마다 실행하여 예약 임박 알림 및 미작성 운행일지 알림을 발송한다.
- * 주말(토/일)에는 비용 절감을 위해 스킵한다.
+ * 평일 08~18시, 매시 정각에 실행하여 예약 임박 알림 및 미작성 운행일지 알림을 발송한다.
+ * 비용 최적화: 15분→1시간 주기로 변경, 주말/야간 제외 (App Engine cron → 표준 cron 전환)
  */
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { checkReservationReminders } from "./reservationReminder";
@@ -10,7 +10,7 @@ import { recordHeartbeat } from "./helpers";
 
 export const reservationReminder = onSchedule(
     {
-        schedule: "every 15 minutes",
+        schedule: "0 8-18 * * 1-5",
         timeZone: "Asia/Seoul",
         retryCount: 0,
     },

@@ -1,7 +1,8 @@
 /**
- * dailyNightlyBatch — 매일 04:30(KST) 통합 야간 배치 작업
+ * dailyNightlyBatch — 매일 03:00(KST) 통합 야간 배치 작업
  * 
- * 기존 3개의 개별 스케줄러를 통합하여 인프라 비용 절감:
+ * 기존 개별 스케줄러들을 통합하여 인프라 비용 절감:
+ * 0. backupFirestore: Firestore 전체 백업 (GCS)
  * 1. autoPurgeOrgs: soft-deleted 기관 30일 후 영구 삭제
  * 2. cleanupCertificateImages: 승인 후 30일 경과 기관 인증서 스토리지 삭제
  * 3. archiveDriveLogs: 3년 이상 된 운행 기록을 GCS 아카이빙 후 삭제
@@ -13,7 +14,35 @@ import { log } from "./helpers";
 import { gzip } from "node:zlib";
 import { promisify } from "node:util";
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const firestoreAdmin = require("@google-cloud/firestore");
+
 const gzipAsync = promisify(gzip);
+
+/**
+ * Step 0: Firestore 전체 백업 (기존 backupFirestore 로직 통합)
+ */
+async function backupFirestoreData() {
+    console.log("[Batch] Starting backupFirestore...");
+    const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT;
+    const bucket = `gs://${projectId}.appspot.com/backups/firestore`;
+
+    const now = new Date();
+    const dateStr = now.toISOString().split("T")[0];
+    const outputUri = `${bucket}/${dateStr}`;
+
+    const client = new firestoreAdmin.v1.FirestoreAdminClient();
+    const databaseName = client.databasePath(projectId, "(default)");
+
+    const [response] = await client.exportDocuments({
+        name: databaseName,
+        outputUriPrefix: outputUri,
+        collectionIds: [],
+    });
+
+    console.log(`Firestore backup started: ${outputUri}`);
+    console.log(`Operation: ${response.name}`);
+}
 
 async function purgeOrgs(db: FirebaseFirestore.Firestore) {
     console.log("[Batch] Starting autoPurgeOrgs...");
@@ -155,7 +184,7 @@ async function archiveLogs(db: FirebaseFirestore.Firestore, bucket: any) {
 
 export const dailyNightlyBatch = onSchedule(
     {
-        schedule: "30 19 * * *", // UTC 19:30 = KST 04:30
+        schedule: "0 3 * * *", // KST 03:00 (백업 + 야간 배치 통합)
         timeZone: "Asia/Seoul",
         retryCount: 1,
         memory: "512MiB",
@@ -165,18 +194,28 @@ export const dailyNightlyBatch = onSchedule(
         const db = getFirestore();
         const bucket = getStorage().bucket();
 
+        // Step 0: Firestore 백업 (기존 backupFirestore 통합)
+        try {
+            await backupFirestoreData();
+        } catch (e: unknown) {
+            console.error("Error in backupFirestore:", (e as Error).message);
+        }
+
+        // Step 1: 기관 퍼지
         try {
             await purgeOrgs(db);
         } catch (e: unknown) {
             console.error("Error in purgeOrgs:", (e as Error).message);
         }
 
+        // Step 2: 인증서 이미지 정리
         try {
             await cleanupImages(db, bucket);
         } catch (e: unknown) {
             console.error("Error in cleanupImages:", (e as Error).message);
         }
 
+        // Step 3: 운행 기록 아카이빙
         try {
             await archiveLogs(db, bucket);
         } catch (e: unknown) {
@@ -186,3 +225,4 @@ export const dailyNightlyBatch = onSchedule(
         console.log("[Batch] dailyNightlyBatch completed.");
     }
 );
+

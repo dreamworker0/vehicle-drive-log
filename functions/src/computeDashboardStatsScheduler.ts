@@ -3,6 +3,7 @@
  *
  * 1시간마다 SuperAdmin 대시보드 통계를 배치 계산하여 Firestore에 캐싱한다.
  * 저녁 20시 ~ 아침 8시 사이에는 야간 유휴 시간 절감을 위해 스킵한다.
+ * (App Engine cron → 표준 cron 전환)
  */
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { computeAllDashboardStats } from "./caching/computeDashboardStats";
@@ -10,7 +11,7 @@ import { recordHeartbeat } from "./helpers";
 
 export const computeDashboardStats = onSchedule(
     {
-        schedule: "every 1 hours",
+        schedule: "0 * * * *",
         timeZone: "Asia/Seoul",
         retryCount: 0,
         memory: "512MiB",
