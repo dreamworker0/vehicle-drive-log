@@ -11,6 +11,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { log } from "./helpers";
+import { getKSTDateString } from "./utils/kstDate";
 import { gzip } from "node:zlib";
 import { promisify } from "node:util";
 
@@ -28,7 +29,7 @@ async function backupFirestoreData() {
     const bucket = `gs://${projectId}.appspot.com/backups/firestore`;
 
     const now = new Date();
-    const dateStr = now.toISOString().split("T")[0];
+    const dateStr = getKSTDateString(now);
     const outputUri = `${bucket}/${dateStr}`;
 
     const client = new firestoreAdmin.v1.FirestoreAdminClient();
@@ -153,7 +154,7 @@ async function archiveLogs(db: FirebaseFirestore.Firestore, bucket: any) {
 
     const logs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
-    const dateStr = new Date().toISOString().split("T")[0];
+    const dateStr = getKSTDateString();
     const filePath = `archives/driveLogs/${dateStr}_${logs.length}records.json.gz`;
     const file = bucket.file(filePath);
 

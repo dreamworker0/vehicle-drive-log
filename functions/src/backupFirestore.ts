@@ -3,6 +3,7 @@
  */
 import { getFirestore } from "firebase-admin/firestore";
 import { onSchedule } from "firebase-functions/v2/scheduler";
+import { getKSTDateString } from "./utils/kstDate";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const firestoreAdmin = require("@google-cloud/firestore");
@@ -18,7 +19,7 @@ export const backupFirestore = onSchedule(
         const bucket = `gs://${projectId}.appspot.com/backups/firestore`;
 
         const now = new Date();
-        const dateStr = now.toISOString().split("T")[0];
+        const dateStr = getKSTDateString(now);
         const outputUri = `${bucket}/${dateStr}`;
 
         try {

@@ -38,7 +38,7 @@ async function runDiscordBriefing(db: FirebaseFirestore.Firestore) {
 
             if (membersSnap.empty) {
                 inactiveCount++;
-                inactiveListText += `• **${org.name || "이름없음"}** (가입일: ${new Date(org.createdAt?.seconds * 1000).toLocaleDateString()})\n`;
+                inactiveListText += `• **${org.name || "이름없음"}** (가입일: ${new Date(org.createdAt?.seconds * 1000).toLocaleDateString("ko-KR", { timeZone: "Asia/Seoul" })})\n`;
             }
         }
 

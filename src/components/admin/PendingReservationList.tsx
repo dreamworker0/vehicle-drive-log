@@ -7,6 +7,7 @@ import { getPendingReservations, updateReservationStatus } from '../../lib/fires
 import { getVehicles } from '../../lib/firestore/vehicles';
 import type { Vehicle } from '../../types/vehicle';
 import { getOrganizationMembers } from '../../lib/firestore/users';
+import { serverTimestamp } from 'firebase/firestore';
 import type { DocumentData } from 'firebase/firestore';
 
 export default function PendingReservationList() {
@@ -105,7 +106,7 @@ export default function PendingReservationList() {
         await runWithRetry(`reject-res-${id}`, async () => {
             await updateReservationStatus(id, 'rejected', {
                 rejectedReason: reason as string,
-                rejectedAt: new Date().toISOString()
+                rejectedAt: serverTimestamp()
             } as Record<string, unknown>, 'pending');
             setPendingList(prev => prev.filter(r => r.id !== id));
             showToast('예약이 반려되었습니다.', 'success');

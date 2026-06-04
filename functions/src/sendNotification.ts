@@ -1,4 +1,4 @@
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
 
 const db = getFirestore();
@@ -95,7 +95,7 @@ export async function createInAppNotification(targetUid: string, type: string, t
         message,
         organizationId: organizationId || "",
         read: false,
-        createdAt: new Date(),
+        createdAt: FieldValue.serverTimestamp(),
     });
 }
 
@@ -119,7 +119,7 @@ export async function createInAppNotificationForOrg(orgId: string, type: string,
                 message,
                 organizationId: orgId,
                 read: false,
-                createdAt: new Date(),
+                createdAt: FieldValue.serverTimestamp(),
             });
         }
     });

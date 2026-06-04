@@ -1,5 +1,6 @@
 import { getFirestore } from "firebase-admin/firestore";
 import { sendPushToUser, createInAppNotification } from "./sendNotification";
+import { toKSTDate, getKSTDateString } from "./utils/kstDate";
 
 const db = getFirestore();
 
@@ -9,10 +10,9 @@ const db = getFirestore();
  */
 export async function checkReservationReminders(): Promise<void> {
     const now = new Date();
-    // OS 타임존에 관계없이 항상 정확한 KST(UTC+9) 날짜와 시간을 도출하기 위한 보정
-    const kstNow = new Date(now.getTime() + (now.getTimezoneOffset() * 60 * 1000) + (9 * 60 * 60 * 1000));
+    const kstNow = toKSTDate(now);
 
-    const todayStr = kstNow.toISOString().slice(0, 10);
+    const todayStr = getKSTDateString(now);
     const currentHH = String(kstNow.getHours()).padStart(2, "0");
     const currentMM = String(kstNow.getMinutes()).padStart(2, "0");
     const currentTime = `${currentHH}:${currentMM}`;

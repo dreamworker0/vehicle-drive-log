@@ -25,12 +25,13 @@ export async function computeAllDashboardStats(): Promise<void> {
     const startTime = Date.now();
     const db = getFirestore();
 
-    const now = toKSTDate();
-    const year = now.getFullYear();
-    const month = now.getMonth();
-    const thirtyDaysAgo = new Date(year, month, now.getDate() - 29);
-    const thirtyDaysAgoStr = `${thirtyDaysAgo.getFullYear()}-${String(thirtyDaysAgo.getMonth() + 1).padStart(2, "0")}-${String(thirtyDaysAgo.getDate()).padStart(2, "0")}`;
-    const sevenDaysAgo = new Date(year, month, now.getDate() - 6);
+    const kstNow = toKSTDate();
+    const year = kstNow.getFullYear();
+    const month = kstNow.getMonth();
+    // Firestore UTC Timestamp 비교용: UTC 기준 Date 사용
+    const thirtyDaysAgo = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000);
+    const thirtyDaysAgoStr = getKSTDateString(thirtyDaysAgo);
+    const sevenDaysAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
     const prevMonth = month === 0 ? 11 : month - 1;
     const prevYear = month === 0 ? year - 1 : year;
 
@@ -176,7 +177,7 @@ export async function computeAllDashboardStats(): Promise<void> {
         }
 
         const futureResMap: Record<string, { single: number; multiDay: number; recurring: number }> = {};
-        const todayStart = new Date(year, month, now.getDate());
+        const todayStart = new Date(year, month, kstNow.getDate());
         for (let i = 0; i < 30; i++) {
             const d = new Date(todayStart);
             d.setDate(d.getDate() + i);

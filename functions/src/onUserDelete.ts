@@ -1,5 +1,5 @@
 import * as functions from 'firebase-functions/v1';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { log } from './helpers';
 
 export const onUserDelete = functions
@@ -17,7 +17,7 @@ export const onUserDelete = functions
                 phone: '***-****-****',
                 status: 'disabled',
                 photoURL: '',
-                deletedAt: new Date().toISOString()
+                deletedAt: FieldValue.serverTimestamp()
             });
             log('INFO', 'onUserDelete', '유저 익명화 처리 완료', { uid });
         } catch (error: any) {

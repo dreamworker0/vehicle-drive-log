@@ -321,7 +321,7 @@ export async function syncSingleVehicleCalendar(
             // creatorEmail은 Firestore에 저장하지 않음
             delete reservationData.creatorEmail;
 
-            reservationData.createdAt = new Date();
+            reservationData.createdAt = FieldValue.serverTimestamp();
             // [원천 차단] 예약 생성 시 임의의 난수 ID 대신 구글 캘린더 이벤트 ID를 문서 ID로 고정하여 절대 중복 생성되지 않게 함
             await db.collection("reservations").doc(calEvent.id).set(reservationData);
             globalProcessedEventIds.add(calEvent.id);

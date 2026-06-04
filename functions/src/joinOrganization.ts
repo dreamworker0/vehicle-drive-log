@@ -5,7 +5,7 @@
  * 보안 규칙에 막히므로, Admin SDK로 서버사이드에서 처리한다.
  */
 import { onCall, HttpsError } from "firebase-functions/v2/https";
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { checkRateLimitByUid } from "./rateLimit";
 import { RATE_LIMITS } from "./constants";
 
@@ -131,7 +131,7 @@ export const joinOrganization = onCall(
                     role,
                     organizationId: orgId,
                     phone: "",
-                    createdAt: new Date(),
+                    createdAt: FieldValue.serverTimestamp(),
                 });
 
             // Claims를 즉시 설정 (onDocumentWritten 트리거 대기 없이)
