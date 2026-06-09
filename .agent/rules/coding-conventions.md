@@ -328,13 +328,13 @@ const getVehicleColor = (id) => {
 
 ## 7. 기술 스택 제약사항
 
-- **React**: 함수 컴포넌트 + Hooks만 사용 (클래스 컴포넌트 금지)
+- **React**: 함수 컴포넌트 + Hooks만 사용 (클래스 컴포넌트 금지). React 19 아키텍처에 따라 비동기 폼(Form) 상태 제어 시 `useActionState` 및 `useFormStatus` API의 활용을 권장하며, 무분별한 로컬 비동기 제출 플래그 작성을 금지합니다.
 - **TypeScript**: `any` 타입 사용을 엄격히 금지한다. 타입을 구체적으로 정의하거나 `unknown`을 사용 후 타입 단언/타입 가드를 이용해 처리한다 (`@typescript-eslint/no-explicit-any` 경고 제로화 유지).
 - **TailwindCSS v3**: `@apply`, `@layer` 사용 가능, v4 문법 사용 금지
 - **라우팅**: React Router v6 (`Routes`, `Route`, `NavLink`, `useNavigate`, `useLocation`)
 - **Firebase**: v9+ Modular SDK (`import { ... } from 'firebase/firestore'`)
-- **빌드**: Vite (HMR, ESM)
-- **Node.js**: v22 (Firebase Functions 호환성)
+- **빌드**: Vite 7 (HMR, ESM)
+- **Node.js**: v22 필수 (Firebase Functions 호환성 및 ESM 모듈 사용 필수). Cloud Functions(Node 22)에서는 ESM 방식을 준수하여 `import`/`export` 문법을 강제하며, CommonJS(`require`)를 사용하지 않습니다.
 
 ---
 

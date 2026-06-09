@@ -23,22 +23,25 @@ git add . ; git commit -m "chore: 배포 전 문서 및 환경 갱신 완료"
 ```
 Working directory: `.`
 
-### --- [STEP 1: 프로덕션 빌드 및 배포] ---
+### --- [STEP 1: 사전 빌드 검증 및 Node 22 환경 강제] ---
 
-3. Activate fnm + Switch to Node 22 LTS:
-```
-fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression; fnm use 22
+배포를 빌드하기 전, 코드의 무결성과 Node.js 버전 호환성을 완벽히 확인해야 합니다.
+
+3. Node 22 LTS 버전 강제 검증:
+   * **지시사항**: 아래 한 줄 스크립트를 실행하여 현재 Node.js 버전이 22.x 대인지 엄격히 검증합니다. v22가 아닐 경우 즉시 배포 프로세스를 중단하고 `fnm use 22`를 사용하여 환경을 전환합니다.
+```powershell
+node -e "if(!process.version.startsWith('v22.')) { console.error('❌ 에러: Node 22 LTS 버전이 필요합니다. 현재 버전: ' + process.version); process.exit(1); }"
 ```
 Working directory: `.`
 
-4. Verify Node version (반드시 v22.x 확인):
-```
-node --version
+4. 전체 사전 검증 실행 (TypeScript / Lint / Test):
+   * **지시사항**: 빌드 전에 타입 검사와 린터, 단위 테스트를 무조건 통과해야 배포할 수 있습니다.
+```powershell
+npm run type-check && npm run lint && npm test run
 ```
 Working directory: `.`
 
-> [!IMPORTANT]
-> 프로덕션 빌드 시 Sentry 소스맵을 원활히 업로드하려면 환경변수(또는 `.env.local`)에 `SENTRY_AUTH_TOKEN`이 설정되어 있어야 합니다. (필요 시 확인)
+### --- [STEP 2: 프로덕션 빌드 및 배포] ---
 
 5. Build for production:
 ```
@@ -59,6 +62,6 @@ fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression; fnm use
 ```
 Working directory: `.`
 ⚠️ exit code 1로 실패하면 최대 2회 재시도한다.
-💡 `functions/` 디렉터리에 변경이 없으면 이 단계를 **건너뛴다**.
+💡 `functions/` 디렉터리에 변경이 없으면 이 단계를 **건너뜬다**.
    - 판단 기준: `src/`, `public/`, `package.json`(루트) 등 프론트엔드 코드만 변경된 경우 → 스킵
    - `functions/src/`, `functions/package.json` 등 백엔드 로직이 변경된 경우 → 반드시 실행

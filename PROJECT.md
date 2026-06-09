@@ -16,6 +16,8 @@
 | 3 | Firestore 캐싱 확대 및 리페치 방지 | `useReservationData` 및 Firestore 쿼리 함수 `cachedQuery` 래핑, 의존성 원시값 변경 | M2 | DONE |
 | 4 | Cloud Functions 리팩토링 및 헬스 체크 | `functions/src/` 내 중복 로직 제거 및 `npm run health` 통과 | M3 | DONE |
 | 5 | 종합 품질 및 테스트 검증 (Quality Gate) | 린트(0에러, 0경고), 타입체크, Vitest 및 Playwright E2E 테스트 전원 통과 검증 | M4 | DONE |
+| 6 | 프론트엔드 레거시 직접 Firestore 호출 해소 | `CancelReservationHandler.tsx`, `EmployeeLayout.tsx`, `OrgApplicationList.tsx` 직접 호출 해소 및 도메인 이관 | M5 | DONE |
+| 7 | 개인 Google Calendar OAuth 동기화 확장 | `users/{uid}/googleOauth` 설계, 오프라인 토큰 갱신 및 예약 OAuth 동기화 핵심 구현 | M6 | DONE |
 
 ## Interface Contracts
 ### usePoiSearch ↔ sessionStorage
@@ -36,3 +38,9 @@
 - `scripts/generate-seo.ts` — 빌드 완료 후 Sitemap 및 Robots 자동 생성 스크립트
 - `vitest.config.js` — 테스트 커버리지 리포트 수집 설정
 - `src/__tests__/store/useThemeStore.test.ts` — 테스트 커버리지 퀄리티 게이트 패치를 위한 테마 스토어 단위 테스트
+- `src/components/reservation/CancelReservationHandler.tsx` — 예약 취소 처리 컴포넌트 (직접 호출 제거 대상)
+- `src/layouts/EmployeeLayout.tsx` — 직원용 기본 레이아웃 컴포넌트 (직접 호출 제거 대상)
+- `src/components/superAdmin/OrgApplicationList.tsx` — 기관 가입 신청 목록 컴포넌트 (직접 호출 제거 대상)
+- `src/lib/firestore/reservations.ts` — 예약 도메인 Firestore 데이터 헬퍼 파일
+- `src/lib/firestore/orgApplications.ts` — 기관 신청 정보 도메인 Firestore 데이터 헬퍼 파일
+- `src/lib/firestore/users.ts` — 사용자 도메인 및 Google OAuth 필드 헬퍼 파일

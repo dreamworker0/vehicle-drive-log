@@ -5,6 +5,13 @@ import type { FirestoreDoc, TimestampField } from './common';
 
 export type UserRole = 'employee' | 'admin' | 'superAdmin';
 
+export interface GoogleOauthData {
+    accessToken: string;
+    refreshToken: string;
+    expiryDate: number; // Token 만료 Unix Timestamp (ms)
+    email?: string;
+}
+
 export interface User extends FirestoreDoc {
     uid?: string;
     name: string;
@@ -21,6 +28,7 @@ export interface User extends FirestoreDoc {
     disabledAt?: TimestampField;
     promotedAt?: TimestampField;
     fcmToken?: string;
+    googleOauth?: GoogleOauthData;
 }
 
 /** createUser에 전달할 데이터 (id, createdAt 제외) */

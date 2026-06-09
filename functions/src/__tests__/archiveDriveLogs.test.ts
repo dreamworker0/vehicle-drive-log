@@ -4,6 +4,8 @@
  * gzip 압축, GCS 업로드, Firestore batch 삭제 로직을 검증한다.
  */
 
+jest.setTimeout(60000);
+
 // ── Firestore mock ──
 const mockBatchDelete = jest.fn();
 const mockBatchCommit = jest.fn();

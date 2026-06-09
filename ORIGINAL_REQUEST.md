@@ -179,3 +179,33 @@ Integrity mode: development
   * 마일스톤 5 (종합 품질 및 E2E 테스트 최종 검증): 대기 중
 
 프로젝트 루트 및 `.agents/` 디렉터리에 기록된 `ORIGINAL_REQUEST.md`, `PROJECT.md`, `progress.md`, `plan.md`, `BRIEFING.md` 파일들의 상태 및 리팩토링 이력을 확인하여, 멈췄던 마일스톤 4의 남은 단계부터 유기적으로 작업을 재개하고 완수해 주십시오.
+
+## Follow-up — 2026-06-09T19:07:17+09:00
+
+차량운행일지 프로젝트의 프론트엔드 레거시 파일들에서 직접 Firestore를 호출하는 부분을 헬퍼 및 커스텀 훅으로 분리하여 구조적 일관성을 유지하고, Google Calendar API를 사용자 개인 구글 계정 OAuth 연동으로 전환하기 위한 토큰 보관 및 오프라인 갱신 정책을 실제 구현으로 확장합니다.
+
+Working directory: d:\apps\차량운행일지
+Integrity mode: development
+
+## Requirements
+
+### R1. 프론트엔드 레거시 파일 내 직접 Firestore 호출 해소 (규칙 D9 준수)
+- `CancelReservationHandler.tsx`, `EmployeeLayout.tsx`, `OrgApplicationList.tsx` 파일에서 Firestore API 직접 호출(`getDoc`, `updateDoc`, `collection` 등)을 제거합니다.
+- 대신 `src/lib/firestore/` 디렉터리에 도메인별 데이터 접근 헬퍼 함수를 작성하거나 기존 함수를 이용하고, 컴포넌트에서는 이를 사용하도록 변경합니다.
+
+### R2. Google Calendar API 개인 캘린더 동기화 확장
+- 기존 공용 서비스 계정 기반의 동기화에서 사용자 개인 구글 계정 OAuth 연동으로의 전환을 진행합니다.
+- 사용자가 구글 캘린더 개인 연동을 완료하면 발급되는 Access Token과 Refresh Token을 Firestore의 개별 사용자 프로필(`users/{uid}`) 내부에 안전하게 저장하도록 설계합니다.
+- 예약 생성 시 공용 서비스 계정이 아닌 사용자 본인의 Access Token을 사용하여 개인 캘린더에 직접 예약 이벤트를 생성하는 로직을 마련합니다.
+- Access Token 만료 시, 시스템이 보관 중인 Refresh Token을 활용하여 자동으로 Access Token을 재발급(오프라인 갱신)받을 수 있는 헬퍼 함수 및 갱신 정책을 구현합니다.
+
+## Acceptance Criteria
+
+### A1. 아키텍처 규칙 D9 준수 및 빌드 검증
+- 수정된 3개 컴포넌트 파일(`CancelReservationHandler.tsx`, `EmployeeLayout.tsx`, `OrgApplicationList.tsx`)에서 Firestore 라이브러리를 직접 import하여 호출하는 로직이 없어야 합니다.
+- 전체 프로젝트 빌드(`npm run build`)와 린트(`npm run lint`)가 경고/에러 없이 정상적으로 통과해야 합니다.
+
+### A2. Google Calendar API 개인 OAuth 동기화 구현
+- `users/{uid}` 하위에 `googleOauth` 필드(속성: `accessToken`, `refreshToken`, `expiryDate` 등)를 정의하고 이를 읽고 쓰는 Firestore 헬퍼 함수가 구현되어야 합니다.
+- 만료된 `accessToken`을 `refreshToken`을 사용하여 Google API에 갱신을 요청하고 갱신된 토큰을 다시 Firestore에 보존하는 토큰 오프라인 갱신 함수가 구현되어야 합니다.
+- 예약 생성 시점에 해당 사용자의 연동 정보가 존재할 경우, 개인 캘린더에 이벤트를 추가하는 OAuth 기반 동기화 로직의 뼈대 혹은 핵심 함수가 정의되어야 합니다.

@@ -2,8 +2,7 @@ import { useState, useEffect, Suspense, startTransition } from 'react';
 import { Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { lazyWithRetry } from '../../lib/lazyWithRetry';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
+import { getOrganization } from '../../lib/firestore';
 import { SA_TEST_ROLE_KEY } from '../../App';
 import NotificationBell from '../common/NotificationBell';
 import AdminNotice from '../admin/AdminNotice';
@@ -87,8 +86,8 @@ export default function EmployeeLayout() {
 
     useEffect(() => {
         if (!userData?.organizationId) return;
-        getDoc(doc(db, 'organizations', userData.organizationId))
-            .then(snap => snap.exists() && setOrgName((snap.data() as Record<string, string>).name || ''))
+        getOrganization(userData.organizationId)
+            .then(org => org && setOrgName(org.name || ''))
             .catch(() => { });
     }, [userData?.organizationId]);
 

@@ -28,6 +28,23 @@ export const getReservationById = async (reservationId: string) => {
     }
 };
 
+// 예약 ID 및 조직 ID로 단일 조회 (조직 격리 보호)
+export const getReservationByIdAndOrg = async (reservationId: string, orgId: string) => {
+    try {
+        const snap = await getDoc(reservationDoc(reservationId));
+        if (!snap.exists()) return null;
+        const data = snap.data() as Reservation;
+        if (data.organizationId !== orgId) {
+            console.warn(`[Security Warning] Unauthorized access attempt to reservation ${reservationId} from organization ${orgId}`);
+            return null;
+        }
+        return data;
+    } catch (error) {
+        captureError(error, { context: 'getReservationByIdAndOrg', reservationId, orgId });
+        throw error;
+    }
+};
+
 // 예약 생성 (클라이언트 측)
 export const createReservation = async (data: Partial<Reservation>, requireApproval: boolean = false) => {
     try {

@@ -51,7 +51,29 @@ export const onReservationCreated = onDocumentCreated("reservations/{reservation
                 console.log("Reservation " + reservationId + ": calendar event created (" + eventId + ")");
             }
         } catch (err: unknown) {
+            const { captureError } = await import("../../core/sentry");
+            captureError(err, { context: "officialCalendarSync_created", reservationId, vehicleId: reservation.vehicleId });
             console.error("Reservation " + reservationId + ": calendar event creation failed", (err as Error).message);
+        }
+
+        // 개인 구글 캘린더 동기화 (예외 격리)
+        if (reservation.reservedByUid) {
+            try {
+                const userSnap = await getFirestore().collection("users").doc(reservation.reservedByUid).get();
+                if (userSnap.exists && userSnap.data()?.googleOauth) {
+                    const { getValidOAuth2Client, createPersonalCalendarEvent } = await import("../../services/calendar/personalCalendarSync");
+                    const oauth2Client = await getValidOAuth2Client(reservation.reservedByUid);
+                    const personalEventId = await createPersonalCalendarEvent(oauth2Client, reservation as any);
+                    await getFirestore().collection("reservations").doc(reservationId).update({
+                        personalCalendarEventId: personalEventId,
+                    });
+                    console.log("Reservation " + reservationId + ": personal calendar event created (" + personalEventId + ")");
+                }
+            } catch (err: unknown) {
+                const { captureError } = await import("../../core/sentry");
+                captureError(err, { context: "personalCalendarSync_created", reservationId, reservedByUid: reservation.reservedByUid });
+                console.error("Reservation " + reservationId + ": personal calendar event creation failed", (err as Error).message);
+            }
         }
     } else {
         console.log("Reservation " + reservationId + ": status is pending, skipping calendar event creation");
@@ -129,10 +151,33 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
                     await getFirestore().collection("reservations").doc(reservationId).update({
                         calendarEventId: newEventId,
                     });
-                } catch(e) {
-                    console.error("Calendar creation failed on approval:", e);
+                } catch(e: unknown) {
+                    const { captureError } = await import("../../core/sentry");
+                    captureError(e, { context: "officialCalendarSync_approval_created", reservationId, vehicleId: after.vehicleId });
+                    console.error("Calendar creation failed on approval:", (e as Error).message);
                 }
             }
+
+            // 개인 캘린더 생성 (예외 격리)
+            if (after.reservedByUid && !after.personalCalendarEventId) {
+                try {
+                    const userSnap = await getFirestore().collection("users").doc(after.reservedByUid).get();
+                    if (userSnap.exists && userSnap.data()?.googleOauth) {
+                        const { getValidOAuth2Client, createPersonalCalendarEvent } = await import("../../services/calendar/personalCalendarSync");
+                        const oauth2Client = await getValidOAuth2Client(after.reservedByUid);
+                        const personalEventId = await createPersonalCalendarEvent(oauth2Client, after as any);
+                        await getFirestore().collection("reservations").doc(reservationId).update({
+                            personalCalendarEventId: personalEventId,
+                        });
+                        console.log("Reservation " + reservationId + ": personal calendar event created on approval (" + personalEventId + ")");
+                    }
+                } catch (err: unknown) {
+                    const { captureError } = await import("../../core/sentry");
+                    captureError(err, { context: "personalCalendarSync_approved", reservationId, reservedByUid: after.reservedByUid });
+                    console.error("Reservation " + reservationId + ": personal calendar event creation on approval failed", (err as Error).message);
+                }
+            }
+
             if (after.reservedByUid || after.userId) {
                 const uid = after.reservedByUid || after.userId;
                 const bodyMsg = `${after.vehicleDisplayName || "차량"} 예약이 승인되었습니다. (${after.date} ${after.startTime || ""})`;
@@ -147,6 +192,20 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
             if (calendarId && eventId) {
                 await deleteCalendarEvent(calendarId, eventId);
                 console.log("Reservation " + reservationId + ": cancelled -> calendar event deleted");
+            }
+
+            // 개인 캘린더 삭제 (예외 격리)
+            if (after.reservedByUid && after.personalCalendarEventId) {
+                try {
+                    const { getValidOAuth2Client, deletePersonalCalendarEvent } = await import("../../services/calendar/personalCalendarSync");
+                    const oauth2Client = await getValidOAuth2Client(after.reservedByUid);
+                    await deletePersonalCalendarEvent(oauth2Client, after.personalCalendarEventId);
+                    console.log("Reservation " + reservationId + ": cancelled -> personal calendar event deleted");
+                } catch (err: unknown) {
+                    const { captureError } = await import("../../core/sentry");
+                    captureError(err, { context: "personalCalendarSync_cancelled", reservationId, reservedByUid: after.reservedByUid });
+                    console.error("Reservation " + reservationId + ": personal calendar event delete failed", (err as Error).message);
+                }
             }
 
             // 예약자에게 취소 알림 (취소한 본인이 아닌 경우)
@@ -176,6 +235,20 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
                 console.log("Reservation " + reservationId + ": calendar event updated");
             }
 
+            // 개인 캘린더 수정 (예외 격리)
+            if (after.reservedByUid && after.personalCalendarEventId) {
+                try {
+                    const { getValidOAuth2Client, updatePersonalCalendarEvent } = await import("../../services/calendar/personalCalendarSync");
+                    const oauth2Client = await getValidOAuth2Client(after.reservedByUid);
+                    await updatePersonalCalendarEvent(oauth2Client, after.personalCalendarEventId, after as any);
+                    console.log("Reservation " + reservationId + ": personal calendar event updated");
+                } catch (err: unknown) {
+                    const { captureError } = await import("../../core/sentry");
+                    captureError(err, { context: "personalCalendarSync_updated", reservationId, reservedByUid: after.reservedByUid });
+                    console.error("Reservation " + reservationId + ": personal calendar event update failed", (err as Error).message);
+                }
+            }
+
             // 예약자에게 변경 알림
             if (after.userId) {
                 const changeParts: string[] = [];
@@ -203,6 +276,8 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
             }
         }
     } catch (err: unknown) {
+        const { captureError } = await import("../../core/sentry");
+        captureError(err, { context: "officialCalendarSync_updated", reservationId, vehicleId: after.vehicleId });
         console.error("Reservation " + reservationId + ": calendar event update failed", (err as Error).message);
     }
 });
@@ -223,6 +298,22 @@ export const onReservationDeleted = onDocumentDeleted("reservations/{reservation
         await deleteCalendarEvent(calendarId, reservation.calendarEventId);
         console.log("Reservation " + reservationId + ": deleted -> calendar event deleted");
     } catch (err: unknown) {
+        const { captureError } = await import("../../core/sentry");
+        captureError(err, { context: "officialCalendarSync_deleted", reservationId, vehicleId: reservation.vehicleId });
         console.error("Reservation " + reservationId + ": calendar event delete failed", (err as Error).message);
+    }
+
+    // 개인 캘린더 삭제 (예외 격리)
+    if (reservation.reservedByUid && reservation.personalCalendarEventId) {
+        try {
+            const { getValidOAuth2Client, deletePersonalCalendarEvent } = await import("../../services/calendar/personalCalendarSync");
+            const oauth2Client = await getValidOAuth2Client(reservation.reservedByUid);
+            await deletePersonalCalendarEvent(oauth2Client, reservation.personalCalendarEventId);
+            console.log("Reservation " + reservationId + ": deleted -> personal calendar event deleted");
+        } catch (err: unknown) {
+            const { captureError } = await import("../../core/sentry");
+            captureError(err, { context: "personalCalendarSync_deleted", reservationId, reservedByUid: reservation.reservedByUid });
+            console.error("Reservation " + reservationId + ": personal calendar event delete failed", (err as Error).message);
+        }
     }
 });

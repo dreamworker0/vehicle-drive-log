@@ -1,8 +1,6 @@
 import { useState, useEffect } from 'react';
-import { getPendingOrganizations, getRejectedOrganizations, rejectOrganization, deleteOrganization, createNotification, updateOrganization, generateInviteCode } from '../../lib/firestore';
+import { getPendingOrganizations, getRejectedOrganizations, rejectOrganization, deleteOrganization, createNotification, updateOrganization, generateInviteCode, getOrganizationAdmins } from '../../lib/firestore';
 import { sendApprovalEmail } from '../../lib/emailService';
-import { collection, query, where, getDocs } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
 import { ocrDocumentVerify } from '../../lib/ocr';
 import OrgAppCard from './OrgAppCard';
 import { useToast } from '../../hooks/useToast';
@@ -56,18 +54,13 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
                 inviteCode,
             });
 
-            const usersQuery = query(
-                collection(db, 'users'),
-                where('organizationId', '==', app.id),
-                where('role', '==', 'admin')
-            );
-            const usersSnap = await getDocs(usersQuery);
-            for (const userDoc of usersSnap.docs) {
+            const admins = await getOrganizationAdmins(app.id);
+            for (const admin of admins) {
                 const { updateUser } = await import('../../lib/firestore');
-                await updateUser(userDoc.id, { organizationStatus: 'approved' });
+                await updateUser(admin.id, { organizationStatus: 'approved' });
 
                 await createNotification({
-                    targetUid: userDoc.id,
+                    targetUid: admin.id,
                     type: 'approval',
                     title: '기관 승인 완료',
                     message: `${app.name} 기관이 승인되었습니다. 초대 코드: ${inviteCode}`,
@@ -124,15 +117,10 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
             await rejectOrganization(app.id, reason);
 
             // In-app 알림 생성
-            const usersQuery = query(
-                collection(db, 'users'),
-                where('organizationId', '==', app.id),
-                where('role', '==', 'admin')
-            );
-            const usersSnap = await getDocs(usersQuery);
-            for (const userDoc of usersSnap.docs) {
+            const admins = await getOrganizationAdmins(app.id);
+            for (const admin of admins) {
                 await createNotification({
-                    targetUid: userDoc.id,
+                    targetUid: admin.id,
                     type: 'rejection',
                     title: '기관 승인 거절',
                     message: `${app.name} 기관 신청이 거절되었습니다.\n사유: ${reason}`,

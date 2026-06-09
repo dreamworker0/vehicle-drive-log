@@ -4,9 +4,8 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { doc, getDoc } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
-import { cancelReservation } from '../../lib/firestore';
+import { getReservationByIdAndOrg, cancelReservation } from '../../lib/firestore';
+import { useAuth } from '../../hooks/useAuth';
 import type { Reservation } from '../../types/reservation';
 
 export default function CancelReservationHandler() {
@@ -17,21 +16,31 @@ export default function CancelReservationHandler() {
     const [cancelling, setCancelling] = useState(false);
     const [result, setResult] = useState<'cancelled' | 'kept' | 'error' | null>(null);
 
+    const { userData, loading: authLoading } = useAuth();
+
     // 예약 정보 조회
     useEffect(() => {
         if (!reservationId) return;
+        if (authLoading) return;
 
-        getDoc(doc(db, 'reservations', reservationId))
-            .then((snap) => {
-                if (snap.exists()) {
-                    setReservation({ id: snap.id, ...snap.data() } as Reservation);
+        const orgId = userData?.organizationId;
+        if (!orgId) {
+            setResult('error');
+            setLoading(false);
+            return;
+        }
+
+        getReservationByIdAndOrg(reservationId, orgId)
+            .then((res) => {
+                if (res) {
+                    setReservation(res);
                 } else {
                     setResult('error');
                 }
             })
             .catch(() => setResult('error'))
             .finally(() => setLoading(false));
-    }, [reservationId]);
+    }, [reservationId, userData, authLoading]);
 
     // URL 파라미터 제거
     const clearParam = useCallback(() => {
@@ -108,7 +117,7 @@ export default function CancelReservationHandler() {
                 {!loading && !result && reservation && (
                     <div>
                         {/* 헤더 */}
-                        <div className="bg-gradient-to-r from-red-500 to-orange-500 p-5 text-white text-center">
+                        <div className="bg-gradient-to-r from-red-500 to-amber-500 p-5 text-white text-center">
                             <div className="text-3xl mb-2">🚨</div>
                             <h3 className="text-lg font-bold">예약 시작시간이 지났습니다</h3>
                         </div>
