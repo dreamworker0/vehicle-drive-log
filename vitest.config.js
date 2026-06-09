@@ -24,7 +24,12 @@ export default defineConfig({
         environment: 'jsdom',
         globals: true,
         setupFiles: ['./src/__tests__/setup.ts'],
-        exclude: ['**/node_modules/**', '**/e2e/**', '**/functions/**'],
+        exclude: [
+            '**/node_modules/**',
+            '**/e2e/**',
+            '**/functions/**',
+            ...(!process.env.FIRESTORE_EMULATOR_HOST ? ['tests/firestore-rules.test.ts'] : [])
+        ],
         coverage: {
             provider: 'v8',
             reporter: ['text', 'text-summary', 'json', 'lcov', 'html'],

@@ -1,4 +1,4 @@
-import { cleanupExpiredRateLimits } from '../rateLimit';
+import { cleanupExpiredRateLimits } from "../utils/rateLimit";
 
 // Firestore mock
 const mockGet = jest.fn();
@@ -89,7 +89,7 @@ describe('rateLimit — Rate Limiting 유틸리티', () => {
                 })
             );
 
-            const { checkRateLimitByIp } = await import('../rateLimit');
+            const { checkRateLimitByIp } = await import('../utils/rateLimit');
             const exceeded = await checkRateLimitByIp('tmapProxy', '192.168.1.1', 5, 60);
             expect(exceeded).toBe(false);
         });
@@ -103,7 +103,7 @@ describe('rateLimit — Rate Limiting 유틸리티', () => {
                 })
             );
 
-            const { checkRateLimitByIp } = await import('../rateLimit');
+            const { checkRateLimitByIp } = await import('../utils/rateLimit');
             const exceeded = await checkRateLimitByIp('tmapProxy', '192.168.1.1', 5, 60);
             expect(exceeded).toBe(true);
         });
@@ -116,7 +116,7 @@ describe('rateLimit — Rate Limiting 유틸리티', () => {
                 })
             );
 
-            const { checkRateLimitByIp } = await import('../rateLimit');
+            const { checkRateLimitByIp } = await import('../utils/rateLimit');
             const exceeded = await checkRateLimitByIp('tmapProxy', '10.0.0.1', 10, 60);
             expect(exceeded).toBe(false);
         });
@@ -129,7 +129,7 @@ describe('rateLimit — Rate Limiting 유틸리티', () => {
                 })
             );
 
-            const { checkRateLimitByIp } = await import('../rateLimit');
+            const { checkRateLimitByIp } = await import('../utils/rateLimit');
             // 에러 없이 실행되면 통과
             await expect(
                 checkRateLimitByIp('tmapProxy', '192.168.100.200', 5, 60)
@@ -144,7 +144,7 @@ describe('rateLimit — Rate Limiting 유틸리티', () => {
                 })
             );
 
-            const { checkRateLimitByIp } = await import('../rateLimit');
+            const { checkRateLimitByIp } = await import('../utils/rateLimit');
             await expect(
                 checkRateLimitByIp('tmapProxy', '2001:db8::1', 5, 60)
             ).resolves.not.toThrow();
@@ -153,7 +153,7 @@ describe('rateLimit — Rate Limiting 유틸리티', () => {
         it('Firestore 에러 발생 시 → false 반환 (장애 시 기능 차단 방지)', async () => {
             mockRunTransaction.mockRejectedValueOnce(new Error('Firestore 연결 실패'));
 
-            const { checkRateLimitByIp } = await import('../rateLimit');
+            const { checkRateLimitByIp } = await import('../utils/rateLimit');
             const exceeded = await checkRateLimitByIp('tmapProxy', '1.2.3.4', 5, 60);
             expect(exceeded).toBe(false);
         });
@@ -168,7 +168,7 @@ describe('rateLimit — Rate Limiting 유틸리티', () => {
                 })
             );
 
-            const { checkRateLimitByUid } = await import('../rateLimit');
+            const { checkRateLimitByUid } = await import('../utils/rateLimit');
             await expect(
                 checkRateLimitByUid('ocrDashboard', 'uid-abc', 10, 3600)
             ).resolves.not.toThrow();
@@ -182,7 +182,7 @@ describe('rateLimit — Rate Limiting 유틸리티', () => {
                 })
             );
 
-            const { checkRateLimitByUid } = await import('../rateLimit');
+            const { checkRateLimitByUid } = await import('../utils/rateLimit');
             await expect(
                 checkRateLimitByUid('ocrDashboard', 'uid-abc', 10, 3600)
             ).rejects.toThrow('요청이 너무 많습니다');

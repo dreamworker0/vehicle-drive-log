@@ -22,6 +22,9 @@ jest.mock('firebase-admin/firestore', () => ({
         collection: mockCollection,
         batch: () => ({ set: mockBatchSet, commit: mockBatchCommit }),
     }),
+    FieldValue: {
+        serverTimestamp: () => 'mock-timestamp',
+    },
 }));
 
 const mockSend = jest.fn();
@@ -34,7 +37,7 @@ import {
     sendPushToOrg,
     createInAppNotification,
     createInAppNotificationForOrg,
-} from '../sendNotification';
+} from "../services/alimtalk/sendNotification";
 
 describe('sendNotification', () => {
     beforeEach(() => {

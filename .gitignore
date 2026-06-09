@@ -85,3 +85,5 @@ scratch/
 
 # Agent / AI
 .gemini/
+.agents/
+progress.md

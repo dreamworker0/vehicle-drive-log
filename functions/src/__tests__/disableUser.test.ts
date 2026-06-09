@@ -35,7 +35,7 @@ jest.mock('firebase-functions/v2/https', () => ({
     },
 }));
 
-import { disableUser } from '../disableUser';
+import { disableUser } from "../handlers/callable/disableUser";
 
 const handler = disableUser as unknown as (req: Record<string, unknown>) => Promise<unknown>;
 

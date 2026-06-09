@@ -6,14 +6,14 @@
 
 // ── Rate Limit Mock ──
 const mockCheckRateLimit = jest.fn().mockResolvedValue(undefined);
-jest.mock('../rateLimit', () => ({
+jest.mock('../utils/rateLimit', () => ({
     checkRateLimitByUid: mockCheckRateLimit,
 }));
 
 // ── sendNotification Mock ──
 const mockSendPushToOrg = jest.fn().mockResolvedValue(undefined);
 const mockCreateInAppNotificationForOrg = jest.fn().mockResolvedValue(undefined);
-jest.mock('../sendNotification', () => ({
+jest.mock('../services/alimtalk/sendNotification', () => ({
     sendPushToOrg: mockSendPushToOrg,
     createInAppNotificationForOrg: mockCreateInAppNotificationForOrg,
 }));
@@ -39,7 +39,7 @@ jest.mock('firebase-functions/v2/https', () => ({
     },
 }));
 
-import { sendAdminNotice } from '../sendAdminNotice';
+import { sendAdminNotice } from "../handlers/callable/sendAdminNotice";
 
 const handler = sendAdminNotice as unknown as (req: Record<string, unknown>) => Promise<unknown>;
 

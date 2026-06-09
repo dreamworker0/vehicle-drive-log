@@ -10,11 +10,12 @@
 
 ## Milestones
 | # | Name | Scope | Dependencies | Status |
-|---|------|-------|-------------|--------|
-| 1 | Tmap POI 캐싱 | `usePoiSearch.ts` 및 단위 테스트 구현, 50개 FIFO 캐시 링 버퍼 적용 | none | DONE |
-| 2 | Google Calendar 동기화 보완 | 백엔드 리팩토링 및 Callable API 구현, 프론트엔드 백오프 재시도 및 30분 쿨다운 연동 | M1 | DONE |
-| 3 | SEO 자동화 | Vite 빌드 완료 후 Sitemap/Robots 자동 생성 파이프라인 연동 | M2 | DONE |
-| 4 | Vitest 테스트 커버리지 고도화 | `vitest.config.js` 및 npm run test:coverage 시각화 리포트 체계 수립 | M3 | DONE |
+|---|---|---|---|---|
+| 1 | PWA 진입점 및 InstallPrompt 번들 최적화 | `src/lightEntry.tsx` 및 `InstallPrompt.tsx` dynamic import 분리 | none | DONE |
+| 2 | 대용량 라이브러리 Dynamic Import 전환 | `recharts` 및 `leaflet` 연동 컴포넌트 지연 로딩 적용 | M1 | DONE |
+| 3 | Firestore 캐싱 확대 및 리페치 방지 | `useReservationData` 및 Firestore 쿼리 함수 `cachedQuery` 래핑, 의존성 원시값 변경 | M2 | DONE |
+| 4 | Cloud Functions 리팩토링 및 헬스 체크 | `functions/src/` 내 중복 로직 제거 및 `npm run health` 통과 | M3 | DONE |
+| 5 | 종합 품질 및 테스트 검증 (Quality Gate) | 린트(0에러, 0경고), 타입체크, Vitest 및 Playwright E2E 테스트 전원 통과 검증 | M4 | DONE |
 
 ## Interface Contracts
 ### usePoiSearch ↔ sessionStorage

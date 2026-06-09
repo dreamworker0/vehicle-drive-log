@@ -22,7 +22,7 @@ jest.mock('firebase-functions/firestore', () => ({
 let capturedHandler: any;
 
 // 모듈 로드 (capturedHandler에 핸들러 저장)
-require('../setCustomClaims');
+require("../handlers/triggers/setCustomClaims");
 
 import { getAuth } from 'firebase-admin/auth';
 

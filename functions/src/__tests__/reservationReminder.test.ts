@@ -1,7 +1,7 @@
 // ── Mock 설정 ──
 const mockSendPushToUser = jest.fn().mockResolvedValue(undefined);
 const mockCreateInAppNotification = jest.fn().mockResolvedValue(undefined);
-jest.mock('../sendNotification', () => ({
+jest.mock('../services/alimtalk/sendNotification', () => ({
     sendPushToUser: mockSendPushToUser,
     createInAppNotification: mockCreateInAppNotification,
 }));
@@ -26,7 +26,7 @@ jest.mock('firebase-admin/firestore', () => ({
     FieldValue: { serverTimestamp: jest.fn() },
 }));
 
-import { checkReservationReminders } from '../reservationReminder';
+import { checkReservationReminders } from "../services/alimtalk/reservationReminder";
 
 describe('checkReservationReminders', () => {
     beforeEach(() => {

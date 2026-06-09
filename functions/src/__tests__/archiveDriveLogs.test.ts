@@ -40,7 +40,7 @@ jest.mock('firebase-admin/storage', () => ({
 }));
 
 // ── helpers mock ──
-jest.mock('../helpers', () => ({
+jest.mock('../utils/helpers', () => ({
     log: jest.fn(),
 }));
 
@@ -49,8 +49,10 @@ jest.mock('firebase-functions/v2/scheduler', () => ({
     onSchedule: (_opts: unknown, handler: Function) => handler,
 }));
 
-import { archiveDriveLogs } from '../archiveDriveLogs';
-import { log } from '../helpers';
+import { archiveLogs as archiveDriveLogs } from "../handlers/scheduled/dailyNightlyBatch";
+import { getFirestore } from "firebase-admin/firestore";
+import { getStorage } from "firebase-admin/storage";
+import { log } from "../utils/helpers";
 
 describe('archiveDriveLogs', () => {
     beforeEach(() => jest.clearAllMocks());
@@ -58,9 +60,9 @@ describe('archiveDriveLogs', () => {
     it('3년 이상 된 기록이 없으면 아카이빙을 건너뛴다', async () => {
         mockGetDocs.mockResolvedValue({ empty: true, docs: [] });
 
-        await (archiveDriveLogs as unknown as Function)();
+        await (archiveDriveLogs as unknown as Function)(getFirestore(), getStorage().bucket());
 
-        expect(log).toHaveBeenCalledWith('INFO', 'archiveDriveLogs', expect.stringContaining('스킵'));
+        expect(log).toHaveBeenCalledWith('INFO', 'dailyNightlyBatch', expect.stringContaining('스킵'));
         expect(mockFileSave).not.toHaveBeenCalled();
         expect(mockBatchCommit).not.toHaveBeenCalled();
     });
@@ -76,7 +78,7 @@ describe('archiveDriveLogs', () => {
         mockFileSave.mockResolvedValue(undefined);
         mockBatchCommit.mockResolvedValue(undefined);
 
-        await (archiveDriveLogs as unknown as Function)();
+        await (archiveDriveLogs as unknown as Function)(getFirestore(), getStorage().bucket());
 
         // GCS에 저장 확인 (gzip된 Buffer)
         expect(mockFileSave).toHaveBeenCalledTimes(1);
@@ -91,7 +93,7 @@ describe('archiveDriveLogs', () => {
 
         // 완료 로그 확인
         expect(log).toHaveBeenCalledWith(
-            'INFO', 'archiveDriveLogs',
+            'INFO', 'dailyNightlyBatch',
             expect.stringContaining('2건 아카이빙'),
             expect.objectContaining({ compressionRatio: expect.any(String) })
         );
@@ -100,7 +102,7 @@ describe('archiveDriveLogs', () => {
     it('Firestore 쿼리는 500건으로 제한한다', async () => {
         mockGetDocs.mockResolvedValue({ empty: true, docs: [] });
 
-        await (archiveDriveLogs as unknown as Function)();
+        await (archiveDriveLogs as unknown as Function)(getFirestore(), getStorage().bucket());
 
         expect(mockLimit).toHaveBeenCalledWith(500);
     });
@@ -109,7 +111,7 @@ describe('archiveDriveLogs', () => {
         mockGetDocs.mockResolvedValue({ empty: true, docs: [] });
 
         const before = new Date();
-        await (archiveDriveLogs as unknown as Function)();
+        await (archiveDriveLogs as unknown as Function)(getFirestore(), getStorage().bucket());
 
         expect(mockWhere).toHaveBeenCalledWith('timestamp', '<', expect.any(Date));
         const filterDate = mockWhere.mock.calls[0][2] as Date;

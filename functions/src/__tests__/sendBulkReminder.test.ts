@@ -6,7 +6,7 @@
 
 // ── sendAlimtalk Mock ──
 const mockSendReminderAlimtalk = jest.fn();
-jest.mock('../sendAlimtalk', () => ({
+jest.mock('../services/alimtalk/sendAlimtalk', () => ({
     sendReminderAlimtalk: mockSendReminderAlimtalk,
 }));
 
@@ -42,7 +42,7 @@ jest.mock('firebase-functions/v2/https', () => ({
     },
 }));
 
-import { sendBulkReminder } from '../sendBulkReminder';
+import { sendBulkReminder } from "../handlers/callable/sendBulkReminder";
 
 const handler = sendBulkReminder as unknown as (req: Record<string, unknown>) => Promise<unknown>;
 

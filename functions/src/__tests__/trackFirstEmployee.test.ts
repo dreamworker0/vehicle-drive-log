@@ -23,7 +23,7 @@ jest.mock('firebase-functions/firestore', () => ({
     onDocumentCreated: (_opts: unknown, handler: (event: unknown) => unknown) => handler,
 }));
 
-import { trackFirstEmployee } from '../trackFirstEmployee';
+import { trackFirstEmployee } from "../handlers/triggers/trackFirstEmployee";
 
 const handler = trackFirstEmployee as unknown as (event: Record<string, unknown>) => Promise<void>;
 

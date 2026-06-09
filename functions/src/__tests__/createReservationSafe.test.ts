@@ -45,7 +45,7 @@ jest.mock('firebase-admin/firestore', () => ({
 }));
 
 // 모듈 로드 (이 시점에서 capturedHandler가 설정됨)
-require('../createReservationSafe');
+require("../handlers/callable/createReservationSafe");
 
 describe('createReservationSafe', () => {
     const validRequest = {

@@ -18,7 +18,7 @@ jest.mock('firebase-admin/firestore', () => ({
 const mockCreateCalendarEvent = jest.fn();
 const mockUpdateCalendarEvent = jest.fn();
 const mockDeleteCalendarEvent = jest.fn();
-jest.mock('../calendarSync', () => ({
+jest.mock('../services/calendar/calendarSync', () => ({
     createCalendarEvent: (...args: unknown[]) => mockCreateCalendarEvent(...args),
     updateCalendarEvent: (...args: unknown[]) => mockUpdateCalendarEvent(...args),
     deleteCalendarEvent: (...args: unknown[]) => mockDeleteCalendarEvent(...args),
@@ -27,7 +27,7 @@ jest.mock('../calendarSync', () => ({
 const mockSendPushToOrg = jest.fn();
 const mockSendPushToUser = jest.fn();
 const mockCreateInAppNotification = jest.fn();
-jest.mock('../sendNotification', () => ({
+jest.mock('../services/alimtalk/sendNotification', () => ({
     sendPushToOrg: (...args: unknown[]) => mockSendPushToOrg(...args),
     sendPushToUser: (...args: unknown[]) => mockSendPushToUser(...args),
     createInAppNotification: (...args: unknown[]) => mockCreateInAppNotification(...args),
@@ -40,7 +40,7 @@ jest.mock('firebase-functions/v2/firestore', () => ({
     onDocumentDeleted: (_path: string, handler: Function) => handler,
 }));
 
-import { onReservationCreated, onReservationUpdated, onReservationDeleted } from '../reservationTriggers';
+import { onReservationCreated, onReservationUpdated, onReservationDeleted } from "../handlers/triggers/reservationTriggers";
 
 describe('reservationTriggers', () => {
     beforeEach(() => {

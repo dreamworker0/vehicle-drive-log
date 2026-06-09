@@ -11,7 +11,7 @@ jest.mock('nodemailer', () => ({
     })),
 }));
 
-jest.mock('../discord', () => ({
+jest.mock('../core/discord', () => ({
     sendDiscordAlert: jest.fn().mockResolvedValue(undefined),
 }));
 
@@ -19,7 +19,7 @@ jest.mock('firebase-functions/v2/firestore', () => ({
     onDocumentWritten: (_doc: string, handler: any) => handler,
 }));
 
-import { sendDiscordAlert } from '../discord';
+import { sendDiscordAlert } from "../core/discord";
 
 // notifyNewApplication 로직 핵심 함수만 재현하여 테스트
 // (함수 내부 상태 변화 감지 로직 추출)

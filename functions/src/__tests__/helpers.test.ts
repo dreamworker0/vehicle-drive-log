@@ -1,4 +1,4 @@
-import { log, wrapHttps, wrapHandler } from '../helpers';
+import { log, wrapHttps, wrapHandler } from "../utils/helpers";
 
 describe('helpers — 공통 유틸리티', () => {
     describe('log()', () => {

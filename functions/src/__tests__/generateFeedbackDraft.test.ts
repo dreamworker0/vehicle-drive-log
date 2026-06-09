@@ -17,8 +17,8 @@ jest.mock('firebase-admin/firestore', () => ({
         })),
     })),
 }));
-jest.mock('../faqData', () => ({ buildFaqPromptText: jest.fn(() => '가짜 FAQ 텍스트') }));
-jest.mock('../discord', () => ({ sendDiscordAlert: jest.fn().mockResolvedValue(undefined) }));
+jest.mock('../utils/faqData', () => ({ buildFaqPromptText: jest.fn(() => '가짜 FAQ 텍스트') }));
+jest.mock('../core/discord', () => ({ sendDiscordAlert: jest.fn().mockResolvedValue(undefined) }));
 jest.mock('firebase-functions/params', () => ({
     defineString: jest.fn(() => ({ value: jest.fn(() => 'mock-key') })),
 }));

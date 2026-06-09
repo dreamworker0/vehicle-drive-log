@@ -44,7 +44,7 @@ jest.mock('firebase-functions/v2/https', () => ({
     },
 }));
 
-import { restoreUser } from '../restoreUser';
+import { restoreUser } from "../handlers/callable/restoreUser";
 
 const handler = restoreUser as unknown as (req: Record<string, unknown>) => Promise<unknown>;
 
