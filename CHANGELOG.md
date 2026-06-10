@@ -3,6 +3,23 @@
 이 문서는 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/) 형식을 따르는 **개발 참고용** 이력입니다.
 서비스 이용자용 변경 소식은 [업데이트 소식](https://vehicle-drive-log.web.app/release-notes)에서 확인할 수 있습니다.
 
+## Phase 59 — 전면 보안 감사 및 취약점 일괄 해소 🔒
+
+> 2026-06-10
+
+### Security
+- **테넌트 격리 보강**: `getVehicleDriveLogs`·`hasVehicleDriveLogs`에 누락됐던 `organizationId` 필터 추가 (`src/lib/firestore/driveLogs/queries.ts`)
+- **권한 상승 방어**: `setCustomClaims` 트리거·`restoreUser`에 role 화이트리스트 검증 추가 (미정의 role은 `employee`로 강등), `disableUser`에서 admin의 superAdmin 비활성화 차단
+- **Storage 규칙 강화**: `organizations/{orgId}` 경로 와일드카드를 단일 파일 수준으로 축소하고 클라이언트 쓰기 차단 (업로드는 `submitOrgApplication` Admin SDK 전용)
+- **경로 조작 방지**: `ocrDocument`의 storagePath에 `..`·역슬래시·선행 슬래시 거부 검증 추가
+- **PDF XSS 방지**: PDF 내보내기 6개 모듈의 사용자 입력 보간 전체에 `escapeHtml` 적용
+- **민감정보 로그 마스킹**: 초대코드 평문 로깅 마스킹, 수신 이메일 로깅 제거, 하드코딩 관리자 이메일을 `ADMIN_NOTIFICATION_EMAIL` 환경변수로 이동
+
+### Fixed
+- **증빙 이미지 정리 배치 보완**: 반려 기관(`rejectedAt` 30일 경과) 이미지도 정리 대상에 포함, 기존 쿼리에 필요했던 `(status, approvedAt)`·`(status, rejectedAt)` 복합 인덱스를 `firestore.indexes.json`에 추가
+
+---
+
 ## Phase 52 — KST 타임존 이중 변환 버그 수정 및 날짜 패턴 전면 정비 🕐
 
 > 2026-06-04
