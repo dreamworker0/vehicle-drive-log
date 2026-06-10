@@ -22,7 +22,7 @@
 | `npm run test:rules` | Firestore Rules (에뮬레이터) |
 | `npm run health` | Cloud Functions 상태 점검 |
 | `npm run audit` | 보안 감사 |
-| `firebase deploy` | 전체 배포 (반드시 Node 22 확인) |
+| `firebase deploy` | **로컬에서 직접 실행 금지** — 배포는 master 푸시 시 CI(Deploy 워크플로)가 수행한다. 로컬 배포를 병행하면 동일 함수 동시 업데이트 충돌이 발생. 긴급 시에만 CI 미실행을 확인하고 Node 22로 실행 |
 
 ## 디렉토리 컨벤션
 
