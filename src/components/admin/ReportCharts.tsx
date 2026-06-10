@@ -287,7 +287,7 @@ export default function ReportCharts({
                             </ResponsiveContainer>
                         </div>
                     ) : (
-                        <p className="text-surface-400 text-center py-8">주유 기록이 없습니다</p>
+                        <p className="text-surface-400 dark:text-surface-500 text-center py-8">주유 기록이 없습니다</p>
                     )}
                 </div>
 
@@ -307,7 +307,7 @@ export default function ReportCharts({
                             </ResponsiveContainer>
                         </div>
                     ) : (
-                        <p className="text-surface-400 text-center py-8">하이패스 충전 기록이 없습니다</p>
+                        <p className="text-surface-400 dark:text-surface-500 text-center py-8">하이패스 충전 기록이 없습니다</p>
                     )}
                 </div>
             </div>

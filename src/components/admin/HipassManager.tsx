@@ -40,7 +40,7 @@ export default function HipassManager() {
                         등록 {cards.length}건
                     </p>
                 </div>
-                <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary btn-sm">
+                <button onClick={() => { resetForm(); setShowForm(true); }} className="btn-primary btn-sm min-h-[48px]">
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                     </svg>
@@ -59,7 +59,7 @@ export default function HipassManager() {
                             <button
                                 type="button"
                                 onClick={resetForm}
-                                className="p-1.5 rounded-lg text-surface-400 hover:text-surface-600 hover:bg-surface-100 dark:hover:text-surface-300 dark:hover:bg-surface-700 transition-colors"
+                                className="p-1.5 rounded-lg text-surface-400 hover:text-surface-600 hover:bg-surface-100 dark:hover:text-surface-300 dark:hover:bg-surface-700 transition-colors min-h-[48px] min-w-[48px] flex items-center justify-center"
                                 aria-label="닫기"
                             >
                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -73,10 +73,10 @@ export default function HipassManager() {
                                 <input
                                     type="text" value={form.cardNumber}
                                     onChange={e => handleCardNumberChange(e.target.value)}
-                                    className="input font-mono tracking-wider"
+                                    className="input font-mono tracking-wider min-h-[48px]"
                                     placeholder="0000-0000-0000-0000"
                                     maxLength={19}
-                                    required autoFocus
+                                    required
                                     inputMode="numeric"
                                 />
                                 <p className="text-xs text-surface-400 mt-1">숫자 16자리 (자동으로 하이픈이 삽입됩니다)</p>
@@ -86,7 +86,7 @@ export default function HipassManager() {
                                 <select
                                     value={form.vehicleId}
                                     onChange={e => setForm({ ...form, vehicleId: e.target.value })}
-                                    className="input"
+                                    className="input min-h-[48px]"
                                     required
                                 >
                                     <option value="">차량을 선택하세요</option>
@@ -105,7 +105,7 @@ export default function HipassManager() {
                                 <input
                                     type="number" value={form.balance}
                                     onChange={e => setForm({ ...form, balance: e.target.value })}
-                                    className="input" placeholder="0" min="0"
+                                    className="input min-h-[48px]" placeholder="0" min="0"
                                 />
                                 <p className="text-xs text-surface-400 mt-1">하이패스 카드의 현재 충전 잔액</p>
                             </div>
@@ -114,12 +114,12 @@ export default function HipassManager() {
                                 <input
                                     type="text" value={form.memo}
                                     onChange={e => setForm({ ...form, memo: e.target.value })}
-                                    className="input" placeholder="비고 사항"
+                                    className="input min-h-[48px]" placeholder="비고 사항"
                                 />
                             </div>
                             <div className="flex gap-3 pt-2">
-                                <button type="button" onClick={resetForm} className="btn-secondary flex-1">취소</button>
-                                <button type="submit" disabled={formLoading} className="btn-primary flex-1">
+                                <button type="button" onClick={resetForm} className="btn-secondary flex-1 min-h-[48px]">취소</button>
+                                <button type="submit" disabled={formLoading} className="btn-primary flex-1 min-h-[48px]">
                                     {formLoading ? (<><div className="w-4 h-4 spinner" />저장 중...</>) : editingCard ? '수정' : '등록'}
                                 </button>
                             </div>
@@ -134,7 +134,7 @@ export default function HipassManager() {
                     <svg className="w-16 h-16 mx-auto text-surface-200 dark:text-surface-700 mb-4" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 0 0 2.25-2.25V6.75A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25v10.5A2.25 2.25 0 0 0 4.5 19.5Z" />
                     </svg>
-                    <p className="text-surface-400 text-lg font-medium">등록된 하이패스가 없습니다</p>
+                    <p className="text-surface-400 dark:text-surface-500 text-lg font-medium">등록된 하이패스가 없습니다</p>
                     <p className="text-sm text-surface-300 dark:text-surface-500 mt-1">하이패스 카드를 등록하고 차량에 연결하세요</p>
                 </div>
             ) : (
@@ -154,18 +154,18 @@ export default function HipassManager() {
                                             <h3 className="font-semibold text-surface-900 dark:text-surface-100">
                                                 {card.vehicleName || vehicle?.displayName || '(차량 미연결)'}
                                             </h3>
-                                            <p className="text-sm text-surface-400 font-mono">
+                                            <p className="text-sm text-surface-400 dark:text-surface-500 font-mono">
                                                 💳 {card.cardNumber}
                                             </p>
                                         </div>
                                     </div>
                                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={() => handleEdit(card)} className="btn-icon btn-sm text-surface-400 hover:text-primary-600">
+                                        <button onClick={() => handleEdit(card)} className="btn-icon btn-sm text-surface-400 dark:text-surface-500 hover:text-primary-600 dark:hover:text-primary-400 min-h-[48px] min-w-[48px]">
                                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                                                 <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" />
                                             </svg>
                                         </button>
-                                        <button onClick={() => openDeleteModal(card)} className="btn-icon btn-sm text-surface-400 hover:text-red-500">
+                                        <button onClick={() => openDeleteModal(card)} className="btn-icon btn-sm text-surface-400 dark:text-surface-500 hover:text-red-500 dark:hover:text-red-400 min-h-[48px] min-w-[48px]">
                                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                                                 <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                                             </svg>
@@ -173,7 +173,7 @@ export default function HipassManager() {
                                     </div>
                                 </div>
                                 <div className="flex items-center justify-between">
-                                    <span className="text-xs text-surface-400">{card.memo}</span>
+                                    <span className="text-xs text-surface-400 dark:text-surface-500">{card.memo}</span>
                                     <span className={`text-lg font-bold ${
                                         card.balance <= 5000
                                             ? 'text-red-500 dark:text-red-400'

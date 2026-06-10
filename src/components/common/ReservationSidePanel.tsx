@@ -139,7 +139,7 @@ export default function ReservationSidePanel({
         return (
             <div className="glass-card p-8 text-center">
                 <div className="text-3xl mb-2">📅</div>
-                <p className="text-sm text-surface-400">날짜를 선택하세요</p>
+                <p className="text-sm text-surface-400 dark:text-surface-500">날짜를 선택하세요</p>
             </div>
         );
     }
@@ -157,7 +157,7 @@ export default function ReservationSidePanel({
                 {!isPastDate && (
                     <button
                         onClick={() => onOpenForm(showForm ? undefined : sortedActiveVehicles[0]?.id)}
-                        className={`text-xs font-medium px-3 py-1.5 rounded-lg transition-all ${showForm
+                        className={`text-xs font-medium px-4 py-2 min-h-[48px] rounded-lg transition-all ${showForm
                             ? 'bg-surface-200 text-surface-600 dark:bg-surface-600 dark:text-surface-300'
                             : 'bg-primary-500 text-white hover:bg-primary-600 shadow-sm'
                             }`}
@@ -188,7 +188,7 @@ export default function ReservationSidePanel({
                                         const selected = members.find(m => m.id === e.target.value);
                                         setForm({ ...form, reservedByUid: e.target.value, reservedByName: selected?.name || '' });
                                     }}
-                                    className="input text-sm"
+                                    className="input text-sm min-h-[48px]"
                                 >
                                     {members.map(m => (
                                         <option key={m.id} value={m.id}>
@@ -226,7 +226,7 @@ export default function ReservationSidePanel({
                                 type="text"
                                 value={form.purpose}
                                 onChange={e => setForm({ ...form, purpose: e.target.value })}
-                                className="input w-full mt-1 text-sm"
+                                className="input w-full mt-1 text-sm min-h-[48px]"
                                 placeholder="출장, 외근 등"
                             />
                         </div>
@@ -264,9 +264,9 @@ export default function ReservationSidePanel({
                                         const autoEnd = calcEndTime(val, routeInfo?.duration || 0);
                                         setForm({ ...form, startTime: val, endTime: autoEnd });
                                     }}
-                                    className="input flex-1 text-base font-medium px-2 text-center"
+                                    className="input flex-1 text-base font-medium px-2 text-center min-h-[48px]"
                                 />
-                                <span className="text-surface-400 font-bold px-1 text-lg">~</span>
+                                <span className="text-surface-400 dark:text-surface-500 font-bold px-1 text-lg">~</span>
                                 <input
                                     type="time"
                                     value={form.endTime}
@@ -276,11 +276,11 @@ export default function ReservationSidePanel({
                                         if (val <= form.startTime) return;
                                         setForm({ ...form, endTime: val });
                                     }}
-                                    className="input flex-1 text-base font-medium px-2 text-center"
+                                    className="input flex-1 text-base font-medium px-2 text-center min-h-[48px]"
                                 />
                             </div>
                         </div>
-                        <button type="submit" disabled={submitting} className={`w-full btn-sm ${form.isRecurring ? 'bg-purple-500 hover:bg-purple-600 text-white rounded-xl py-2 font-semibold transition-colors disabled:opacity-50' : 'btn-primary'}`}>
+                        <button type="submit" disabled={submitting} className={`w-full btn-sm min-h-[48px] ${form.isRecurring ? 'bg-purple-500 hover:bg-purple-600 dark:hover:bg-purple-500 text-white rounded-xl py-2 font-semibold transition-colors disabled:opacity-50' : 'btn-primary'}`}>
                             {submitting
                                 ? (editingRecurringGroupId ? '반복 예약 수정 중...' : editingGroupId ? '다일 예약 수정 중...' : editingReservation ? '수정 중...' : form.isRecurring ? '반복 예약 생성 중...' : '예약 중...')
                                 : (editingRecurringGroupId ? '반복 예약 수정' : editingGroupId ? '다일 예약 수정' : editingReservation ? '예약 수정' : form.isRecurring ? '반복 예약 확정' : '예약 확정')}

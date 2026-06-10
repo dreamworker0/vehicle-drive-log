@@ -11,7 +11,7 @@ function DeleteButton({ onClick, disabled }: { onClick: () => void; disabled: bo
         <button
             onClick={onClick}
             disabled={disabled}
-            className="p-1.5 rounded-lg text-surface-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50"
+            className="p-1.5 rounded-lg text-surface-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50 min-h-[48px]"
             title="삭제"
         >
             {disabled ? (
@@ -41,10 +41,10 @@ export default function DriveLogTableRow({ log, deletingId, onDelete }: DriveLog
                 <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                         <span className="font-medium text-sm text-surface-900 dark:text-surface-100">{log.driverName || '(이름 없음)'}</span>
-                        <span className="text-xs text-surface-400">{date}</span>
+                        <span className="text-xs text-surface-400 dark:text-surface-500">{date}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                        <span className="font-bold text-primary-600">{distance.toLocaleString()} km</span>
+                        <span className="font-bold text-primary-600 dark:text-primary-400">{distance.toLocaleString()} km</span>
                         <DeleteButton onClick={() => onDelete(log.id, log.driverName || '')} disabled={isDeleting} />
                     </div>
                 </div>
@@ -53,10 +53,10 @@ export default function DriveLogTableRow({ log, deletingId, onDelete }: DriveLog
                     <span>·</span>
                     <span>{log.destination || '-'}</span>
                     {(log.startTime || log.endTime) && (
-                        <span className="text-surface-400">({log.startTime || '?'} ~ {log.endTime || '?'})</span>
+                        <span className="text-surface-400 dark:text-surface-500">({log.startTime || '?'} ~ {log.endTime || '?'})</span>
                     )}
                     {(log.passengerCount ?? 0) > 1 && (
-                        <span className="text-primary-500">👥 {log.passengerCount}명</span>
+                        <span className="text-primary-500 dark:text-primary-400">👥 {log.passengerCount}명</span>
                     )}
                 </div>
             </div>
@@ -90,7 +90,7 @@ export default function DriveLogTableRow({ log, deletingId, onDelete }: DriveLog
                     <p className="text-xs text-surface-600 dark:text-surface-400">{log.passengerCount || '-'}</p>
                 </div>
                 <div className="text-right">
-                    <span className="font-bold text-primary-600">{distance.toLocaleString()} km</span>
+                    <span className="font-bold text-primary-600 dark:text-primary-400">{distance.toLocaleString()} km</span>
                 </div>
                 <div className="text-center">
                     <DeleteButton onClick={() => onDelete(log.id, log.driverName || '')} disabled={isDeleting} />

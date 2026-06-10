@@ -79,14 +79,14 @@ export default function MonthlyReport() {
                     <button
                         onClick={exportPdf}
                         disabled={filteredLogs.length === 0}
-                        className="btn-secondary btn-sm text-xs"
+                        className="btn-secondary btn-sm text-xs min-h-[48px]"
                     >
                         🖨️ PDF 인쇄
                     </button>
                     <button
                         onClick={exportExcel}
                         disabled={filteredLogs.length === 0}
-                        className="btn-secondary btn-sm text-xs"
+                        className="btn-secondary btn-sm text-xs min-h-[48px]"
                     >
                         📥 엑셀 다운로드
                     </button>
@@ -128,26 +128,26 @@ export default function MonthlyReport() {
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
                 <StatCard
                     icon="🚗" value={stats.totalRuns} label="총 운행 횟수"
-                    change={stats.runsChange} sub={`일 평균 ${stats.avgDailyRuns}건`} color="bg-primary-400"
+                    change={stats.runsChange} sub={`일 평균 ${stats.avgDailyRuns}건`} color="bg-primary-400 dark:bg-primary-900/40"
                 />
                 <StatCard
                     icon="📏" value={stats.totalDistance.toLocaleString()} label="총 주행거리 (km)"
-                    change={stats.distanceChange} sub={`건당 평균 ${stats.avgDistance.toLocaleString()}km`} color="bg-accent-400"
+                    change={stats.distanceChange} sub={`건당 평균 ${stats.avgDistance.toLocaleString()}km`} color="bg-accent-400 dark:bg-accent-900/40"
                 />
                 <StatCard
                     icon="⛽" value={fuelLogStats.totalCost ? fuelLogStats.totalCost.toLocaleString() : '-'}
-                    label="주유비 (원)" sub={fuelLogStats.count > 0 ? `${fuelLogStats.count}건 · ${fuelLogStats.totalAmount.toLocaleString()}L` : ''} color="bg-amber-400"
+                    label="주유비 (원)" sub={fuelLogStats.count > 0 ? `${fuelLogStats.count}건 · ${fuelLogStats.totalAmount.toLocaleString()}L` : ''} color="bg-amber-400 dark:bg-amber-900/40"
                 />
                 <StatCard
                     icon="🛣️" value={hipassChargeStats.totalAmount ? hipassChargeStats.totalAmount.toLocaleString() : '-'}
-                    label="하이패스 충전 (원)" sub={hipassChargeStats.count > 0 ? `${hipassChargeStats.count}건` : ''} color="bg-purple-400"
+                    label="하이패스 충전 (원)" sub={hipassChargeStats.count > 0 ? `${hipassChargeStats.count}건` : ''} color="bg-purple-400 dark:bg-purple-900/40"
                 />
             </div>
 
             {filteredLogs.length === 0 ? (
                 <div className="glass-card p-12 text-center">
                     <div className="text-4xl mb-3">📊</div>
-                    <p className="text-surface-400 font-medium">해당 기간의 운행 기록이 없습니다</p>
+                    <p className="text-surface-400 dark:text-surface-500 font-medium">해당 기간의 운행 기록이 없습니다</p>
                 </div>
             ) : (
                 <>

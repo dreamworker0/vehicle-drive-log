@@ -42,7 +42,7 @@ export default function RouteInfoPanel({
     return (
         <div className="mt-2">
             {routeLoading ? (
-                <div className="flex items-center gap-2 text-xs text-surface-400 py-1">
+                <div className="flex items-center gap-2 text-xs text-surface-400 dark:text-surface-500 py-1">
                     <div className="w-3 h-3 spinner" />
                     경로 탐색 중...
                 </div>

@@ -47,7 +47,7 @@ export default function Settings() {
             <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-6">설정</h1>
 
             {success && (
-                <div className="mb-4 p-4 rounded-xl bg-accent-50 border border-accent-200 text-accent-700 text-sm flex items-center gap-2 animate-fade-in">
+                <div className="mb-4 p-4 rounded-xl bg-accent-50 dark:bg-accent-900/30 border border-accent-200 dark:border-accent-800/50 text-accent-700 dark:text-accent-400 text-sm flex items-center gap-2 animate-fade-in">
                     <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                     </svg>
@@ -64,12 +64,12 @@ export default function Settings() {
                 <form onSubmit={handleSave} className="space-y-4">
                     <div>
                         <label className="label">기관명</label>
-                        <input type="text" value={form.name} className="input opacity-60 cursor-not-allowed" disabled />
+                        <input type="text" value={form.name} className="input opacity-60 cursor-not-allowed min-h-[48px]" disabled />
                     </div>
                     <div>
                         <label className="label">주소</label>
                         {form.address ? (
-                            <input type="text" value={form.address} className="input opacity-60 cursor-not-allowed" disabled />
+                            <input type="text" value={form.address} className="input opacity-60 cursor-not-allowed min-h-[48px]" disabled />
                         ) : (
                             <input
                                 type="text"
@@ -89,20 +89,20 @@ export default function Settings() {
                     </div>
                     <div>
                         <label className="label">전화번호</label>
-                        <input type="tel" value={form.phone} onChange={handlePhoneChange} className="input" placeholder="010-0000-0000" />
+                        <input type="tel" value={form.phone} onChange={handlePhoneChange} className="input min-h-[48px]" placeholder="010-0000-0000" />
                     </div>
                     <button
                         type="button"
                         onClick={() => setShowFeedback(true)}
-                        className="text-xs text-primary-500 dark:text-primary-400 hover:text-primary-600 dark:hover:text-primary-300 flex items-center gap-1 transition-colors"
+                        className="text-xs text-primary-500 dark:text-primary-400 hover:text-primary-600 dark:hover:text-primary-300 flex items-center gap-1 transition-colors min-h-[48px] py-2"
                     >
-                        <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
                         </svg>
                         기관명과 주소 변경은 슈퍼관리자에게 요청하세요.
                     </button>
                     <div className="flex justify-end">
-                        <button type="submit" disabled={saving} className="btn-primary">
+                        <button type="submit" disabled={saving} className="btn-primary min-h-[48px]">
                             {saving ? (<><div className="w-4 h-4 spinner" />저장 중...</>) : '변경사항 저장'}
                         </button>
                     </div>
@@ -114,7 +114,7 @@ export default function Settings() {
                 <div className="flex items-center justify-between mb-1">
                     <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100">예약 관리자 승인</h2>
                     <label className="flex items-center gap-2 cursor-pointer select-none">
-                        <span className={`text-xs font-medium ${!form.requireReservationApproval ? 'text-surface-400' : 'text-primary-600 dark:text-primary-400'}`}>
+                        <span className={`text-xs font-medium ${!form.requireReservationApproval ? 'text-surface-400 dark:text-surface-500' : 'text-primary-600 dark:text-primary-400'}`}>
                             {form.requireReservationApproval ? '사용' : '사용 안함'}
                         </span>
                         <button
@@ -125,9 +125,9 @@ export default function Settings() {
                                 e.preventDefault();
                                 handleSave(null, { requireReservationApproval: !form.requireReservationApproval });
                             }}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.requireReservationApproval ? 'bg-primary-600' : 'bg-surface-300 dark:bg-surface-600'}`}
+                            className={`relative inline-flex h-6 w-11 min-h-[48px] min-w-[48px] items-center justify-center rounded-full transition-colors ${form.requireReservationApproval ? 'bg-primary-600' : 'bg-surface-300 dark:bg-surface-600'}`}
                         >
-                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform ${form.requireReservationApproval ? 'translate-x-6' : 'translate-x-1'}`} />
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-surface-800 shadow-sm transition-transform ${form.requireReservationApproval ? 'translate-x-3' : '-translate-x-3'}`} />
                         </button>
                     </label>
                 </div>
@@ -141,7 +141,7 @@ export default function Settings() {
                 <div className="flex items-center justify-between mb-1">
                     <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100">결재 라인</h2>
                     <label className="flex items-center gap-2 cursor-pointer select-none">
-                        <span className={`text-xs font-medium ${form.hideApprovalLine ? 'text-surface-400' : 'text-primary-600 dark:text-primary-400'}`}>
+                        <span className={`text-xs font-medium ${form.hideApprovalLine ? 'text-surface-400 dark:text-surface-500' : 'text-primary-600 dark:text-primary-400'}`}>
                             {form.hideApprovalLine ? 'PDF 결재란 숨김' : 'PDF 결재란 표시'}
                         </span>
                         <button
@@ -149,9 +149,9 @@ export default function Settings() {
                             role="switch"
                             aria-checked={!form.hideApprovalLine}
                             onClick={() => setForm({ ...form, hideApprovalLine: !form.hideApprovalLine })}
-                            className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${!form.hideApprovalLine ? 'bg-primary-600' : 'bg-surface-300 dark:bg-surface-600'}`}
+                            className={`relative inline-flex h-6 w-11 min-h-[48px] min-w-[48px] items-center justify-center rounded-full transition-colors ${!form.hideApprovalLine ? 'bg-primary-600' : 'bg-surface-300 dark:bg-surface-600'}`}
                         >
-                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${!form.hideApprovalLine ? 'translate-x-6' : 'translate-x-1'}`} />
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-surface-800 transition-transform ${!form.hideApprovalLine ? 'translate-x-3' : '-translate-x-3'}`} />
                         </button>
                     </label>
                 </div>
@@ -177,10 +177,10 @@ export default function Settings() {
                                     const next = form.approvalLine.filter((_, i) => i !== idx);
                                     setForm({ ...form, approvalLine: next });
                                 }}
-                                className="text-red-400 hover:text-red-600 transition-colors p-1"
+                                className="text-red-400 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 transition-colors p-2 min-h-[48px] min-w-[48px] flex items-center justify-center"
                                 title="삭제"
                             >
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
                                 </svg>
                             </button>
@@ -192,14 +192,14 @@ export default function Settings() {
                     <button
                         type="button"
                         onClick={() => setForm({ ...form, approvalLine: [...form.approvalLine, { title: '' }] })}
-                        className="text-xs text-primary-500 hover:text-primary-700 dark:text-primary-400 font-medium transition-colors"
+                        className="text-sm text-primary-500 hover:text-primary-700 dark:text-primary-400 font-medium transition-colors py-3 min-h-[48px]"
                     >
                         + 결재자 추가
                     </button>
                 )}
 
                 <div className="flex justify-end mt-4">
-                    <button onClick={handleSave} disabled={saving} className="btn-primary btn-sm">
+                    <button onClick={handleSave} disabled={saving} className="btn-primary btn-sm min-h-[48px]">
                         {saving ? (<><div className="w-4 h-4 spinner" />저장 중...</>) : '결재 라인 저장'}
                     </button>
                 </div>
@@ -261,9 +261,9 @@ export default function Settings() {
                     </div>
                     <button
                         onClick={logout}
-                        className="flex-shrink-0 flex items-center gap-1.5 text-xs font-medium text-red-500 dark:text-red-400 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors"
+                        className="flex-shrink-0 flex items-center gap-1.5 text-sm font-medium text-red-500 dark:text-red-400 px-4 py-2 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors min-h-[48px]"
                     >
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
                         </svg>
                         로그아웃
@@ -274,6 +274,8 @@ export default function Settings() {
                     <>
                         <div className="border-t border-surface-100 dark:border-surface-700 my-1 mx-3" />
                         <div
+                            role="button"
+                            tabIndex={0}
                             className="flex items-center justify-between cursor-pointer rounded-xl p-3 hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors"
                             onClick={() => {
                                 if (permission === 'default') {
@@ -290,10 +292,28 @@ export default function Settings() {
                                     }
                                 }
                             }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    e.preventDefault();
+                                    if (permission === 'default') {
+                                        requestPermission();
+                                    } else {
+                                        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+                                        const isAndroid = /Android/.test(navigator.userAgent);
+                                        if (isIOS) {
+                                            showToast('설정 → 알림에서 이 앱의 알림을 변경할 수 있습니다.', 'info');
+                                        } else if (isAndroid) {
+                                            showToast('앱 아이콘을 길게 눌러 앱 정보 → 알림에서 변경할 수 있습니다.', 'info');
+                                        } else {
+                                            showToast('주소창 왼쪽 🔒 아이콘을 눌러 알림을 변경할 수 있습니다.', 'info');
+                                        }
+                                    }
+                                }
+                            }}
                         >
                             <div className="flex items-center gap-3">
                                 <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${permission === 'granted' ? 'bg-blue-100 dark:bg-blue-900/40' : 'bg-surface-100 dark:bg-surface-800'}`}>
-                                    <svg className={`w-5 h-5 ${permission === 'granted' ? 'text-blue-500' : 'text-surface-400'}`} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                    <svg className={`w-5 h-5 ${permission === 'granted' ? 'text-blue-500 dark:text-blue-400' : 'text-surface-400 dark:text-surface-500'}`} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
                                     </svg>
                                 </div>
@@ -381,6 +401,7 @@ export default function Settings() {
             </div>
 
             {showFeedback && <FeedbackForm onClose={() => setShowFeedback(false)} />}
+            {/* eslint-disable-next-line jsx-a11y/aria-role */}
             {showManual && <UserManual role="admin" onClose={() => setShowManual(false)} />}
             <AskAIModal isOpen={showAskAI} onClose={() => setShowAskAI(false)} />
 

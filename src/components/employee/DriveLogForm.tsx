@@ -72,7 +72,7 @@ export default function DriveLogForm() {
 
             {success && (
                 <div className="mb-4 p-4 rounded-xl bg-accent-50 dark:bg-accent-900/20 border border-accent-200 dark:border-accent-800 text-accent-700 dark:text-accent-400 text-sm flex items-center gap-2 animate-fade-in">
-                    <svg className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <svg aria-hidden="true" className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                     </svg>
                     {isEditMode ? '운행일지가 수정되었습니다!' : '운행일지가 저장되었습니다!'}
@@ -173,7 +173,7 @@ export default function DriveLogForm() {
                 <button
                     type="submit"
                     disabled={submitting || !form.vehicleId || !form.startKm || !form.endKm}
-                    className="w-full btn-primary"
+                    className="w-full btn-primary min-h-[48px]"
                 >
                     {submitting ? (
                         <>

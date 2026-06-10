@@ -57,8 +57,8 @@ export default function ServiceDashboard() {
                     />
                 </div>
                 <div className="flex flex-col items-end gap-1">
-                    <button onClick={() => actions.refreshServerStats()} className="btn-ghost w-fit text-sm flex items-center gap-1">
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <button onClick={() => actions.refreshServerStats()} className="btn-ghost w-fit text-sm flex items-center gap-1 min-h-[48px] px-3">
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
                         </svg>
                         전체 통계 갱신
@@ -77,7 +77,7 @@ export default function ServiceDashboard() {
             <div className="flex space-x-1 bg-surface-100 dark:bg-surface-800 p-1.5 rounded-xl glass-card overflow-x-auto hide-scrollbar">
                 <button
                     onClick={() => setActiveTab('overview')}
-                    className={`flex-1 min-w-[100px] py-2.5 text-sm font-medium rounded-lg transition-all ${
+                    className={`flex-1 min-w-[100px] min-h-[48px] py-2.5 text-sm font-medium rounded-lg transition-all ${
                         activeTab === 'overview'
                             ? 'bg-white dark:bg-surface-700 shadow text-primary-600 dark:text-primary-400'
                             : 'text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-200'
@@ -87,7 +87,7 @@ export default function ServiceDashboard() {
                 </button>
                 <button
                     onClick={() => setActiveTab('analysis')}
-                    className={`flex-1 min-w-[100px] py-2.5 text-sm font-medium rounded-lg transition-all ${
+                    className={`flex-1 min-w-[100px] min-h-[48px] py-2.5 text-sm font-medium rounded-lg transition-all ${
                         activeTab === 'analysis'
                             ? 'bg-white dark:bg-surface-700 shadow text-primary-600 dark:text-primary-400'
                             : 'text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-200'
@@ -97,7 +97,7 @@ export default function ServiceDashboard() {
                 </button>
                 <button
                     onClick={() => setActiveTab('experience')}
-                    className={`flex-1 min-w-[100px] py-2.5 text-sm font-medium rounded-lg transition-all ${
+                    className={`flex-1 min-w-[100px] min-h-[48px] py-2.5 text-sm font-medium rounded-lg transition-all ${
                         activeTab === 'experience'
                             ? 'bg-white dark:bg-surface-700 shadow text-primary-600 dark:text-primary-400'
                             : 'text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-200'
@@ -116,7 +116,7 @@ export default function ServiceDashboard() {
 
                     {timeSeries.dailyActiveOrgStats && (
                         <Suspense fallback={
-                            <div className="flex items-center justify-center py-20 text-surface-400">
+                            <div className="flex items-center justify-center py-20 text-surface-400 dark:text-surface-500">
                                 <div className="w-8 h-8 spinner mx-auto mb-3" />
                             </div>
                         }>
@@ -134,7 +134,7 @@ export default function ServiceDashboard() {
 
                     {summary.firstEmployeeStats && (
                         <Suspense fallback={
-                            <div className="flex items-center justify-center py-10 text-surface-400">
+                            <div className="flex items-center justify-center py-10 text-surface-400 dark:text-surface-500">
                                 <div className="w-6 h-6 spinner" />
                             </div>
                         }>
@@ -147,7 +147,7 @@ export default function ServiceDashboard() {
                     )}
 
                     <Suspense fallback={
-                        <div className="flex items-center justify-center py-20 text-surface-400">
+                        <div className="flex items-center justify-center py-20 text-surface-400 dark:text-surface-500">
                             <div className="w-8 h-8 spinner mx-auto mb-3" />
                         </div>
                     }>
@@ -174,7 +174,7 @@ export default function ServiceDashboard() {
             {activeTab === 'analysis' && (
                 <div className="space-y-6 animate-fade-in">
                     <Suspense fallback={
-                        <div className="flex items-center justify-center py-20 text-surface-400">
+                        <div className="flex items-center justify-center py-20 text-surface-400 dark:text-surface-500">
                             <div className="w-8 h-8 spinner mx-auto mb-3" />
                             <p className="text-sm">차트 데이터를 불러오는 중...</p>
                         </div>
@@ -267,7 +267,7 @@ export default function ServiceDashboard() {
                                     </div>
                                 </div>
                                 {s.themeStats.none > 0 && (
-                                    <p className="text-xs text-surface-400 mt-4">* 기본 테마 유지 사용자({s.themeStats.none}명)는 자동 라이트 모드로 간주되어 합산되었습니다.</p>
+                                    <p className="text-xs text-surface-400 dark:text-surface-500 mt-4">* 기본 테마 유지 사용자({s.themeStats.none}명)는 자동 라이트 모드로 간주되어 합산되었습니다.</p>
                                 )}
                             </div>
                         );
@@ -297,7 +297,7 @@ export default function ServiceDashboard() {
                                             <span className="font-bold text-surface-900 dark:text-white">{s.welcomeStats.dismissed}명 ({s.welcomeStats.rate}%)</span>
                                         </p>
                                         <div className="w-full bg-surface-200 dark:bg-surface-700 h-2.5 rounded-full overflow-hidden">
-                                            <div className="bg-emerald-500 h-full rounded-full transition-all duration-500" style={{ width: `${s.welcomeStats.rate}%` }} />
+                                            <div className="bg-emerald-500 dark:bg-emerald-600 h-full rounded-full transition-all duration-500" style={{ width: `${s.welcomeStats.rate}%` }} />
                                         </div>
                                     </div>
                                     <div className="flex-1 w-full">
@@ -316,7 +316,7 @@ export default function ServiceDashboard() {
 
                     {external.notifSummary && (
                         <Suspense fallback={
-                            <div className="flex items-center justify-center py-10 text-surface-400">
+                            <div className="flex items-center justify-center py-10 text-surface-400 dark:text-surface-500">
                                 <div className="w-6 h-6 spinner" />
                             </div>
                         }>

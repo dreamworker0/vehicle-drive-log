@@ -244,6 +244,14 @@ service cloud.firestore {
       allow delete: if isSuperAdmin();
     }
 
+    // === 통계 컬렉션 ===
+    match /orgStats/{orgId} {
+      match /monthly/{docId} {
+        allow read: if isOrgMember(orgId) || isSuperAdmin();
+        allow write: if false; // Cloud Functions에서만 쓰기
+      }
+    }
+
     // === 시스템 ===
     match /system/{document} {
       allow read: if isSuperAdmin() || (document == 'holidays' && isSignedIn());

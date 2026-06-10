@@ -38,7 +38,7 @@ export default function DeletedOrgCard({ org, isDeleting, onRestore, onPermanent
                                 <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">삭제됨</span>
                             )}
                         </div>
-                        <div className="flex flex-wrap gap-3 text-sm text-surface-400">
+                        <div className="flex flex-wrap gap-3 text-sm text-surface-400 dark:text-surface-500">
                             <span>고유번호: {org.uniqueNumber}</span>
                             <span>•</span>
                             <span>삭제 {elapsed}일 경과</span>
@@ -48,14 +48,14 @@ export default function DeletedOrgCard({ org, isDeleting, onRestore, onPermanent
                             </span>
                         </div>
                         {org.address && (
-                            <p className="text-sm text-surface-400">{org.address}</p>
+                            <p className="text-sm text-surface-400 dark:text-surface-500">{org.address}</p>
                         )}
                     </div>
                     <div className="flex gap-2">
                         <button
                             onClick={() => onRestore(org)}
                             disabled={isDeleting}
-                            className="btn-ghost btn-sm text-primary-600 hover:text-primary-700 hover:bg-primary-50 dark:hover:bg-primary-900/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="btn-ghost btn-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 disabled:opacity-40 disabled:cursor-not-allowed"
                             title="복구"
                         >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -65,7 +65,7 @@ export default function DeletedOrgCard({ org, isDeleting, onRestore, onPermanent
                         <button
                             onClick={() => onPermanentDelete(org)}
                             disabled={isDeleting}
-                            className="btn-ghost btn-sm text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-40 disabled:cursor-not-allowed"
+                            className="btn-ghost btn-sm text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 disabled:opacity-40 disabled:cursor-not-allowed"
                             title="영구 삭제"
                         >
                             {isDeleting ? (

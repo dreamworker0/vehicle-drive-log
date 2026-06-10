@@ -84,7 +84,7 @@ export default memo(function OrgCard({
                                             e.stopPropagation();
                                             setEditing(true);
                                         }}
-                                        className="p-1 rounded-lg text-surface-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors"
+                                        className="p-3 min-h-[48px] min-w-[48px] flex items-center justify-center rounded-lg text-surface-400 dark:text-surface-500 hover:text-primary-500 dark:hover:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors"
                                         title="기관명·주소 편집"
                                         aria-label="기관명·주소 편집"
                                     >
@@ -96,7 +96,10 @@ export default memo(function OrgCard({
 
                                 <div className="flex flex-wrap gap-3 text-sm text-surface-500 dark:text-surface-400">
                                     <span
-                                        className="cursor-pointer hover:text-primary-500 transition-colors"
+                                        role="button"
+                                        tabIndex={0}
+                                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); navigator.clipboard.writeText(org.id); } }}
+                                        className="cursor-pointer hover:text-primary-500 dark:hover:text-primary-400 transition-colors"
                                         title="클릭하여 기관 ID 복사"
                                         onClick={(e) => {
                                             e.stopPropagation();
@@ -120,7 +123,7 @@ export default memo(function OrgCard({
                                 </div>
 
                                 {org.address && (
-                                    <p className="text-sm text-surface-400 flex items-center gap-1.5">
+                                    <p className="text-sm text-surface-400 dark:text-surface-500 flex items-center gap-1.5">
                                         {org.address}
                                         <a
                                             href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(org.address)}`}
@@ -140,7 +143,7 @@ export default memo(function OrgCard({
                                     <div className="mt-1">
                                         <button
                                             onClick={(e) => { e.stopPropagation(); setShowImage(v => !v); }}
-                                            className="text-xs text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium transition-colors"
+                                            className="text-xs text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium transition-colors min-h-[48px] py-2 px-3"
                                         >
                                             {showImage ? '증빙서류 닫기 ▲' : '📋 증빙서류 보기 ▼'}
                                         </button>

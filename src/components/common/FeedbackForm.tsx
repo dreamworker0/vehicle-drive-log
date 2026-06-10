@@ -159,10 +159,10 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
 
     if (success) {
         return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
-                <div className="bg-white dark:bg-surface-800 rounded-2xl p-8 max-w-sm mx-4 text-center animate-scale-in" onClick={e => e.stopPropagation()}>
-                    <div className="w-16 h-16 mx-auto mb-4 bg-accent-100 rounded-full flex items-center justify-center">
-                        <svg className="w-8 h-8 text-accent-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClose(); }}>
+                <div className="bg-white dark:bg-surface-800 rounded-2xl p-8 max-w-sm mx-4 text-center animate-scale-in" onClick={e => e.stopPropagation()} role="presentation" onKeyDown={(e) => e.stopPropagation()}>
+                    <div className="w-16 h-16 mx-auto mb-4 bg-accent-100 dark:bg-accent-900/40 rounded-full flex items-center justify-center">
+                        <svg aria-hidden="true" className="w-8 h-8 text-accent-600 dark:text-accent-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                         </svg>
                     </div>
@@ -174,16 +174,18 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClose(); }}>
             <div
                 className="bg-white dark:bg-surface-800 rounded-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto animate-scale-in"
                 onClick={e => e.stopPropagation()}
+                role="presentation"
+                onKeyDown={(e) => e.stopPropagation()}
             >
                 {/* 헤더 */}
                 <div className="flex items-center justify-between p-5 border-b border-surface-100 dark:border-surface-700">
                     <h2 className="text-lg font-bold text-surface-900 dark:text-surface-100">개발자에게 건의하기</h2>
-                    <button onClick={onClose} className="btn-icon text-surface-400 hover:text-surface-600 dark:text-surface-400">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <button onClick={onClose} aria-label="닫기" className="btn-icon text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 dark:text-surface-400 min-w-[48px] min-h-[48px] flex items-center justify-center">
+                        <svg aria-hidden="true" className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
                         </svg>
                     </button>
@@ -194,9 +196,9 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
                     <button
                         type="button"
                         onClick={() => setShowAskAI(true)}
-                        className="w-full text-left flex items-center gap-2 text-sm text-primary-700 dark:text-primary-300 hover:text-primary-800 dark:hover:text-primary-200 transition-colors"
+                        className="w-full text-left flex items-center gap-2 text-sm text-primary-700 dark:text-primary-300 hover:text-primary-800 dark:hover:text-primary-200 transition-colors min-h-[48px]"
                     >
-                        <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <svg aria-hidden="true" className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
                         </svg>
                         <span><strong className="underline">AI에게 먼저 물어보기</strong></span>
@@ -212,7 +214,7 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
                 {/* 폼 */}
                 <form onSubmit={handleSubmit} className="p-5 space-y-4">
                     <div>
-                        <label className="label">건의 내용 <span className="text-red-500">*</span></label>
+                        <label className="label">건의 내용 <span className="text-red-500 dark:text-red-400">*</span></label>
                         <textarea
                             ref={textareaRef}
                             value={message}
@@ -221,7 +223,7 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
                             placeholder={`개발자 김종원이 직접 답변합니다.\n개선 사항, 요청 기능, 오류 신고를 자세하게 작성해서 보내주세요.`}
                             maxLength={2000}
                         />
-                        <p className="text-xs text-surface-400 mt-1 text-right">{message.length}/2000</p>
+                        <p className="text-xs text-surface-400 dark:text-surface-500 mt-1 text-right">{message.length}/2000</p>
                     </div>
 
                     {/* 이미지 첨부 */}
@@ -233,10 +235,11 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
                                     <img src={img.preview} alt={`첨부 ${idx + 1}`} className="w-full h-full object-cover" />
                                     <button
                                         type="button"
+                                        aria-label="이미지 삭제"
                                         onClick={() => removeImage(idx)}
-                                        className="absolute top-0.5 right-0.5 w-5 h-5 bg-red-500 dark:bg-red-600 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                                        className="absolute -top-2 -right-2 w-10 h-10 bg-transparent text-red-500 dark:text-red-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity min-w-[48px] min-h-[48px]"
                                     >
-                                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                        <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
                                         </svg>
                                     </button>
@@ -247,12 +250,12 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
                                 <button
                                     type="button"
                                     onClick={() => fileInputRef.current?.click()}
-                                    className="w-20 h-20 rounded-xl border-2 border-dashed border-surface-200 dark:border-surface-600 hover:border-primary-300 hover:bg-primary-50/30 flex flex-col items-center justify-center transition-all"
+                                    className="w-20 h-20 rounded-xl border-2 border-dashed border-surface-200 dark:border-surface-600 hover:border-primary-300 dark:hover:border-primary-700/50 hover:bg-primary-50/30 flex flex-col items-center justify-center transition-all"
                                 >
-                                    <svg className="w-6 h-6 text-surface-300" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                    <svg aria-hidden="true" className="w-6 h-6 text-surface-300 dark:text-surface-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                                     </svg>
-                                    <span className="text-[10px] text-surface-400 mt-0.5">추가</span>
+                                    <span className="text-[10px] text-surface-400 dark:text-surface-500 mt-0.5">추가</span>
                                 </button>
                             )}
                         </div>
@@ -273,10 +276,10 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
                     )}
 
                     <div className="flex gap-3 pt-2">
-                        <button type="button" onClick={onClose} className="btn-secondary flex-1">
+                        <button type="button" onClick={onClose} className="btn-secondary flex-1 min-h-[48px]">
                             취소
                         </button>
-                        <button type="submit" disabled={sending} className="btn-primary flex-1">
+                        <button type="submit" disabled={sending} className="btn-primary flex-1 min-h-[48px]">
                             {sending ? (
                                 <span className="flex items-center justify-center gap-2">
                                     <span className="w-4 h-4 spinner" />전송 중...

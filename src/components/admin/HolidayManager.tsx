@@ -83,7 +83,7 @@ export default function HolidayManager({
                 <div className="flex items-center justify-center gap-2">
                     <button
                         onClick={() => setHolidayYear(y => y - 1)}
-                        className="btn-icon btn-ghost text-sm"
+                        className="btn-icon btn-ghost text-sm min-h-[48px] min-w-[48px]"
                     >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
@@ -92,7 +92,7 @@ export default function HolidayManager({
                     <span className="text-sm font-semibold text-surface-700 dark:text-surface-300 min-w-[4rem] text-center">{holidayYear}년</span>
                     <button
                         onClick={() => setHolidayYear(y => y + 1)}
-                        className="btn-icon btn-ghost text-sm"
+                        className="btn-icon btn-ghost text-sm min-h-[48px] min-w-[48px]"
                     >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
@@ -102,7 +102,7 @@ export default function HolidayManager({
                 <div className="flex justify-end">
                     <button
                         onClick={() => setShowAddForm(v => !v)}
-                        className="btn-sm btn-primary flex-shrink-0"
+                        className="btn-sm btn-primary flex-shrink-0 min-h-[48px]"
                     >
                         {showAddForm ? '닫기' : '+ 커스텀 추가'}
                     </button>
@@ -116,7 +116,7 @@ export default function HolidayManager({
                         type="date"
                         value={holidayForm.date}
                         onChange={e => setHolidayForm({ ...holidayForm, date: e.target.value })}
-                        className="input text-sm flex-shrink-0"
+                        className="input text-sm flex-shrink-0 min-h-[48px]"
                         style={{ width: '160px' }}
                         required
                     />
@@ -124,11 +124,11 @@ export default function HolidayManager({
                         type="text"
                         value={holidayForm.name}
                         onChange={e => setHolidayForm({ ...holidayForm, name: e.target.value })}
-                        className="input text-sm flex-1"
+                        className="input text-sm flex-1 min-h-[48px]"
                         placeholder="휴일명 (예: 창립기념일)"
                         required
                     />
-                    <button type="submit" disabled={addingHoliday} className="btn-sm btn-primary flex-shrink-0">
+                    <button type="submit" disabled={addingHoliday} className="btn-sm btn-primary flex-shrink-0 min-h-[48px] px-4">
                         {addingHoliday ? (<div className="w-4 h-4 spinner" />) : '추가'}
                     </button>
                 </form>
@@ -161,7 +161,7 @@ export default function HolidayManager({
                                                 {h.type === 'custom' && (
                                                     <button
                                                         onClick={() => onDeleteHoliday(h.id!)}
-                                                        className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 transition-all ml-auto flex-shrink-0"
+                                                        className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 dark:hover:text-red-500 transition-all ml-auto flex-shrink-0 min-h-[48px] min-w-[48px] flex items-center justify-center p-2"
                                                         title="삭제"
                                                     >
                                                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">

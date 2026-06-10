@@ -133,7 +133,7 @@ export default function AdminLayout() {
         <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex">
             {/* 모바일 오버레이 */}
             {sidebarOpen && (
-                <div className="fixed inset-0 bg-black/30 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
+                <div role="presentation" className="fixed inset-0 bg-black/30 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} onKeyDown={(e) => { if (e.key === 'Escape') setSidebarOpen(false); }} />
             )}
 
             {/* 사이드바 */}
@@ -147,13 +147,13 @@ export default function AdminLayout() {
                 <div className="p-4 border-b border-surface-100 dark:border-surface-700" role="banner">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/40 rounded-xl flex items-center justify-center">
-                            <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                            <svg className="w-5 h-5 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 0 0-10.026 0 1.106 1.106 0 0 0-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
                             </svg>
                         </div>
                         <div className="min-w-0">
                             <p className="font-semibold text-surface-900 dark:text-surface-100 text-sm truncate">차량 운행일지</p>
-                            <p className="text-xs text-surface-400 truncate">{user?.displayName || user?.email}</p>
+                            <p className="text-xs text-surface-400 dark:text-surface-500 truncate">{user?.displayName || user?.email}</p>
                         </div>
                     </div>
                 </div>
@@ -170,11 +170,11 @@ export default function AdminLayout() {
                     <div className="flex items-center justify-between px-3 py-2 rounded-lg">
                         <div className="flex items-center gap-3">
                             {isDark ? (
-                                <svg className="w-5 h-5 text-amber-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                <svg className="w-5 h-5 text-amber-400 dark:text-amber-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M21.752 15.002A9.72 9.72 0 0 1 18 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 0 0 3 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 0 0 9.002-5.998Z" />
                                 </svg>
                             ) : (
-                                <svg className="w-5 h-5 text-amber-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                <svg className="w-5 h-5 text-amber-500 dark:text-amber-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" />
                                 </svg>
                             )}
@@ -182,12 +182,12 @@ export default function AdminLayout() {
                         </div>
                         <button
                             onClick={toggleTheme}
-                            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors duration-300 focus:outline-none ${isDark ? 'bg-primary-600' : 'bg-surface-200'}`}
+                            className={`relative inline-flex h-7 w-12 items-center justify-center rounded-full transition-colors duration-300 focus:outline-none ${isDark ? 'bg-primary-600' : 'bg-surface-200 dark:bg-surface-700'}`}
                         >
-                            <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform duration-300 ${isDark ? 'translate-x-6' : 'translate-x-1'}`} />
+                            <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform duration-300 ${isDark ? 'translate-x-3' : '-translate-x-3'}`} />
                         </button>
                     </div>
-                    <button onClick={logout} className="sidebar-link w-full text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-300">
+                    <button onClick={logout} className="sidebar-link w-full text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-300 min-h-[48px]">
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
                         </svg>
@@ -199,7 +199,7 @@ export default function AdminLayout() {
             {/* 메인 콘텐츠 */}
             <main className="flex-1 flex flex-col min-w-0" role="main">
                 <header className="sticky top-0 z-30 bg-white/80 dark:bg-surface-900/80 backdrop-blur-md border-b border-surface-100 dark:border-surface-700 px-4 lg:px-6 h-14 flex items-center justify-between safe-top">
-                    <button onClick={() => setSidebarOpen(true)} className="btn-icon lg:hidden">
+                    <button onClick={() => setSidebarOpen(true)} className="btn-icon lg:hidden min-h-[48px] min-w-[48px]">
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5" />
                         </svg>
@@ -214,7 +214,7 @@ export default function AdminLayout() {
                                         window.location.href = '/super-admin';
                                     });
                                 }}
-                                className="flex items-center gap-1 text-xs bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 px-2.5 py-1 rounded-lg transition-colors font-medium"
+                                className="flex items-center gap-1 text-xs bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 px-3 py-2 rounded-lg transition-colors font-medium"
                                 title="슈퍼관리자 화면으로 복귀"
                             >
                                 ⚡ 슈퍼관리자

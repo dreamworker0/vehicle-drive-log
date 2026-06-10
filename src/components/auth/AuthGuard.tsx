@@ -26,12 +26,12 @@ export function BlockedScreen({ emoji, title, description, uid }: {
         <h2 className="text-xl font-bold text-surface-900 dark:text-surface-100 mb-2">{title}</h2>
         <p className="text-surface-500 dark:text-surface-400 text-sm mb-6">{description}</p>
         <div className="space-y-3">
-          <button onClick={handleTransferOrg} className="btn-primary w-full">
+          <button onClick={handleTransferOrg} className="btn-primary w-full min-h-[48px]">
             다른 기관으로 가입
           </button>
           <button
             onClick={() => { logout(); }}
-            className="btn-ghost w-full text-surface-500"
+            className="btn-ghost w-full text-surface-500 min-h-[48px]"
           >
             로그아웃
           </button>

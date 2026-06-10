@@ -11,6 +11,7 @@ import { db, firebaseFunctions, auth } from '../firebase';
 import { createZodConverter, reservationSchema } from '../../schemas';
 import type { Reservation } from '../../types/reservation';
 import { captureError } from '../sentry';
+import { enqueue } from '../offline/syncQueue';
 
 const functions = firebaseFunctions;
 const reservationsCollection = () => collection(db, 'reservations').withConverter(createZodConverter(reservationSchema));
@@ -167,6 +168,13 @@ export const updateReservationStatus = async (
                 await promise;
             } else {
                 promise.catch(e => console.error('[Firestore Offline Sync Error]', e));
+                await enqueue('UPDATE', 'reservations', reservationId, { status, ...extraData });
+                if (typeof window !== 'undefined' && 'serviceWorker' in navigator && 'SyncManager' in window) {
+                    navigator.serviceWorker.ready.then(reg => {
+                        const syncReg = reg as ServiceWorkerRegistration & { sync?: { register: (tag: string) => Promise<void> } };
+                        if (syncReg.sync) syncReg.sync.register('sync-db');
+                    });
+                }
             }
             return;
         }

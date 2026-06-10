@@ -18,7 +18,7 @@ function ChartDAU({ dailyActiveUserStats }: Props) {
                         👤 일별 활성 사용자 (DAU)
                     </h2>
                     <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">출발 기록이 있는 고유 사용자 수</p>
-                    <div className="flex flex-col items-center justify-center py-12 text-surface-400">최근 발생한 데이터가 없습니다.</div>
+                    <div className="flex flex-col items-center justify-center py-12 text-surface-400 dark:text-surface-500">최근 발생한 데이터가 없습니다.</div>
                 </div>
             );
         }

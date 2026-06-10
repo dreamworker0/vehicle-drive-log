@@ -24,7 +24,7 @@ export default function VehicleSelector({
 }: VehicleSelectorProps) {
     return (
         <div>
-            <label className="label text-sm font-medium">🚘 차량 <span className="text-red-500">*</span></label>
+            <label className="label text-sm font-medium">🚘 차량 <span className="text-red-500 dark:text-red-400">*</span></label>
             <div className="grid grid-cols-3 gap-2 mt-1.5">
                 {vehicles.map(v => {
                     const isBlocked = isVehicleBlocked(v.maintenance);
@@ -43,7 +43,7 @@ export default function VehicleSelector({
                                 }`}
                         >
                             {count > 0 && !isBlocked && (
-                                <span title={`최근 사용: ${count}회`} className="absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] px-1 rounded-full bg-primary-500 text-white text-[10px] font-bold flex items-center justify-center shadow-md">
+                                <span title={`최근 사용: ${count}회`} className="absolute -top-1.5 -right-1.5 min-w-[20px] h-[20px] px-1 rounded-full bg-primary-500 dark:bg-primary-600 text-white text-[10px] font-bold flex items-center justify-center shadow-md">
                                     {count}
                                 </span>
                             )}

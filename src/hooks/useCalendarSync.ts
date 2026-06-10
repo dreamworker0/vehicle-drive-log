@@ -72,10 +72,19 @@ export function useCalendarSync() {
                 
                 throw new Error('On-demand calendar sync failed without success status.');
             } catch (err) {
-                attempt++;
                 const errMsg = err instanceof Error ? err.message : String(err);
-                console.warn(`[useCalendarSync] Sync attempt ${attempt} failed:`, errMsg);
-                
+                console.warn(`[useCalendarSync] Sync attempt ${attempt + 1} failed:`, errMsg);
+
+                // 캘린더를 찾을 수 없는 경우 무의미한 재시도를 중단하고 쿨다운 적용
+                if (errMsg.includes('Not Found') || errMsg.includes('찾을 수 없습니다') || errMsg.includes('not-found')) {
+                    console.log(`[useCalendarSync] Calendar not found or unlinked for vehicle ${vehicleId}. Stopping retries.`);
+                    updateSyncTime(vehicleId); // 쿨다운 적용하여 당분간 재시도 방지
+                    setError(errMsg);
+                    setLoading(false);
+                    return false;
+                }
+
+                attempt++;
                 if (attempt >= maxAttempts) {
                     setError(errMsg);
                     setLoading(false);

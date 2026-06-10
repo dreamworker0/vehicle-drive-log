@@ -124,9 +124,9 @@ export default memo(function MaintenanceForm({
 
             <div className="flex justify-end gap-2">
                 {editingId && (
-                    <button type="button" onClick={onCancelEdit} className="btn-secondary">취소</button>
+                    <button type="button" onClick={onCancelEdit} className="btn-secondary min-h-[48px]">취소</button>
                 )}
-                <button type="submit" disabled={saving} className="btn-primary">
+                <button type="submit" disabled={saving} className="btn-primary min-h-[48px]">
                     {saving ? '저장 중...' : form.blockVehicle ? (editingId ? '🚫 기록 수정 + 차량 차단' : '🚫 정비 기록 저장 + 차량 차단') : (editingId ? '정비 기록 수정' : '정비 기록 저장')}
                 </button>
             </div>

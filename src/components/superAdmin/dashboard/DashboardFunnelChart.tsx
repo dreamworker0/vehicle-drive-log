@@ -15,7 +15,7 @@ function DashboardFunnelChart({ funnelData }: Props) {
                             🔄 기관 활성화 퍼널
                         </h2>
                     </div>
-                    <div className="flex flex-col items-center justify-center py-12 text-surface-400">최근 발생한 데이터가 없습니다.</div>
+                    <div className="flex flex-col items-center justify-center py-12 text-surface-400 dark:text-surface-500">최근 발생한 데이터가 없습니다.</div>
                 </div>
             );
         }

@@ -38,9 +38,9 @@ function ContentItem({ item }: { item: ManualContent }) {
                     href={item.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors text-sm font-medium text-red-600 dark:text-red-400"
+                    className="flex items-center gap-2 px-3 py-2.5 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/40 transition-colors text-sm font-medium text-red-600 dark:text-red-400 min-h-[48px]"
                 >
-                    <svg className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                    <svg aria-hidden="true" className="w-5 h-5 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z" />
                     </svg>
                     {item.text}
@@ -69,7 +69,7 @@ function ContentItem({ item }: { item: ManualContent }) {
 
     return (
         <li className="flex gap-2 text-xs text-surface-600 dark:text-surface-400 leading-relaxed">
-            <span className="text-primary-400 mt-0.5 flex-shrink-0">•</span>
+            <span className="text-primary-400 dark:text-primary-500 mt-0.5 flex-shrink-0">•</span>
             <span>{item.text}</span>
         </li>
     );
@@ -87,11 +87,12 @@ function AccordionItem({ title, content, isOpen, onToggle }: AccordionItemProps)
         <div className="border-b border-surface-100 dark:border-surface-700 last:border-b-0">
             <button
                 onClick={onToggle}
-                className="w-full flex items-center justify-between p-4 hover:bg-surface-50 dark:bg-surface-800 transition-colors text-left"
+                className="w-full flex items-center justify-between p-4 hover:bg-surface-50 dark:hover:bg-surface-800/50 dark:bg-surface-800 transition-colors text-left"
             >
                 <span className="text-sm font-medium text-surface-800 dark:text-surface-200">{title}</span>
                 <svg
-                    className={`w-4 h-4 text-surface-400 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+                    aria-hidden="true"
+                    className={`w-4 h-4 text-surface-400 dark:text-surface-500 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
                     fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"
                 >
                     <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
@@ -134,6 +135,7 @@ export default function UserManual({ role = 'employee', onClose }: UserManualPro
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={onClose} role="presentation">
+            {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */}
             <div
                 className="bg-white dark:bg-surface-800 rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col animate-fade-in"
                 onClick={e => e.stopPropagation()}
@@ -144,20 +146,20 @@ export default function UserManual({ role = 'employee', onClose }: UserManualPro
                 {/* 헤더 */}
                 <div className="flex items-center justify-between p-5 border-b border-surface-100 dark:border-surface-700">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-primary-100 rounded-full flex items-center justify-center">
-                            <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/40 rounded-full flex items-center justify-center">
+                            <svg aria-hidden="true" className="w-5 h-5 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 6.042A8.967 8.967 0 0 0 6 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 0 1 6 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 0 1 6-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0 0 18 18a8.967 8.967 0 0 0-6 2.292m0-14.25v14.25" />
                             </svg>
                         </div>
                         <div>
                             <h2 id="manual-title" className="text-lg font-bold text-surface-900 dark:text-surface-100">사용 설명서</h2>
-                            <p className="text-xs text-surface-400">
+                            <p className="text-xs text-surface-400 dark:text-surface-500">
                                 {role === 'admin' ? '관리자 기능 안내' : '직원 기능 안내'}
                             </p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="btn-icon text-surface-400 hover:text-surface-600 dark:text-surface-400" aria-label="닫기">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <button onClick={onClose} className="btn-icon text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 dark:text-surface-400 min-w-[48px] min-h-[48px] flex items-center justify-center" aria-label="닫기">
+                        <svg aria-hidden="true" className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
                         </svg>
                     </button>
@@ -165,16 +167,16 @@ export default function UserManual({ role = 'employee', onClose }: UserManualPro
 
                 {/* 범례 */}
                 <div className="px-5 pt-3 pb-1 flex flex-wrap gap-2 text-[10px]">
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border bg-primary-50 text-primary-600 border-primary-200 dark:bg-primary-900/30 dark:text-primary-400 dark:border-primary-800 font-semibold">📌 단계</span>
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800 font-semibold">💡 팁</span>
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800 font-semibold">⚠️ 주의</span>
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border btn-soft-primary border-primary-200 dark:bg-primary-900/30 dark:text-primary-400 dark:border-primary-800 font-semibold">📌 단계</span>
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border btn-soft-blue border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800 font-semibold">💡 팁</span>
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border btn-soft-amber border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800 font-semibold">⚠️ 주의</span>
                 </div>
 
                 {/* 본문 */}
                 <div className="flex-1 overflow-y-auto">
                     {loading ? (
                         <div className="flex justify-center py-12">
-                            <div className="w-8 h-8 border-4 border-primary-200 border-t-primary-600 rounded-full animate-spin" />
+                            <div className="w-8 h-8 border-4 border-primary-200 dark:border-primary-800/50 border-t-primary-600 rounded-full animate-spin" />
                         </div>
                     ) : (
                         sections.map((section, idx) => (
@@ -195,14 +197,14 @@ export default function UserManual({ role = 'employee', onClose }: UserManualPro
                         href="/faq"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center justify-center gap-1.5 text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors"
+                        className="flex items-center justify-center gap-1.5 text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 transition-colors min-h-[48px]"
                     >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                        <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M9.879 7.519c1.171-1.025 3.071-1.025 4.242 0 1.172 1.025 1.172 2.687 0 3.712-.203.179-.43.326-.67.442-.745.361-1.45.999-1.45 1.827v.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Zm-9 5.25h.008v.008H12v-.008Z" />
                         </svg>
                         자주 하는 질문 (FAQ) 보기
                     </a>
-                    <p className="text-xs text-surface-400 text-center">
+                    <p className="text-xs text-surface-400 dark:text-surface-500 text-center">
                         💡 궁금한 점이 있으시면 <strong>건의하기</strong>를 이용해 주세요
                     </p>
                 </div>

@@ -22,8 +22,8 @@ export default function OrgApplicationPage() {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-surface-50 to-accent-50 dark:from-surface-950 dark:to-surface-900 px-4">
                 <div className="w-full max-w-sm text-center animate-scale-in">
-                    <div className="w-20 h-20 mx-auto mb-6 bg-accent-100 rounded-full flex items-center justify-center">
-                        <svg className="w-10 h-10 text-accent-600" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <div className="w-20 h-20 mx-auto mb-6 bg-accent-100 dark:bg-accent-900/40 rounded-full flex items-center justify-center">
+                        <svg aria-hidden="true" className="w-10 h-10 text-accent-600 dark:text-accent-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                         </svg>
                     </div>
@@ -31,11 +31,11 @@ export default function OrgApplicationPage() {
                     <p className="text-surface-500 dark:text-surface-400 mb-6">
                         AI가 서류를 검증 중입니다.
                         <br />승인되면 <strong className="text-surface-700 dark:text-surface-300">{form.applicantEmail}</strong>와 카톡으로
-                        <br /><strong className="text-primary-600">앱 링크와 초대 코드</strong>가 발송됩니다.
+                        <br /><strong className="text-primary-600 dark:text-primary-400">앱 링크와 초대 코드</strong>가 발송됩니다.
                         <br /><br />
                         <span className="text-xs">보통 1분 이내에 처리되며, 보류 시 영업일 기준 1~2일 내에 처리됩니다.</span>
                     </p>
-                    <button onClick={() => handleGoBack(navigate)} className="btn-primary">
+                    <button onClick={() => handleGoBack(navigate)} className="btn-primary min-h-[48px] w-full mt-4">
                         확인
                     </button>
                 </div>
@@ -56,9 +56,9 @@ export default function OrgApplicationPage() {
                 <button
                     type="button"
                     onClick={() => handleGoBack(navigate)}
-                    className="flex items-center gap-1 text-sm text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 mb-4 transition-colors"
+                    className="flex items-center gap-1 text-sm text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-200 mb-4 transition-colors min-h-[48px] px-2 -ml-2"
                 >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <svg aria-hidden="true" className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
                     </svg>
                     돌아가기
@@ -82,21 +82,20 @@ export default function OrgApplicationPage() {
                     <div className="space-y-4">
                         <h3 className="text-sm font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-wider">신청자 정보</h3>
                         <div>
-                            <label className="label">이름 <span className="text-red-500">*</span></label>
+                            <label className="label">이름 <span className="text-red-500 dark:text-red-400">*</span></label>
                             <input
                                 type="text" name="applicantName" value={form.applicantName}
                                 onChange={handleChange}
-                                className={`input ${currentUser?.displayName ? 'bg-surface-50 dark:bg-surface-800 text-surface-500' : ''}`}
+                                className={`input ${currentUser?.displayName ? 'bg-surface-50 dark:bg-surface-800 text-surface-500' : ''} min-h-[48px]`}
                                 readOnly={!!currentUser?.displayName}
                                 placeholder="홍길동" required
-                                autoFocus
                             />
                         </div>
                         <div>
-                            <label className="label">이메일 <span className="text-red-500">*</span></label>
+                            <label className="label">이메일 <span className="text-red-500 dark:text-red-400">*</span></label>
                             <input
                                 type="email" name="applicantEmail" value={form.applicantEmail}
-                                onChange={handleChange} className={`input ${currentUser?.email ? 'bg-surface-50 dark:bg-surface-800' : ''}`} readOnly={!!currentUser?.email}
+                                onChange={handleChange} className={`input ${currentUser?.email ? 'bg-surface-50 dark:bg-surface-800' : ''} min-h-[48px]`} readOnly={!!currentUser?.email}
                                 placeholder="example@email.com" required
                             />
                         </div>
@@ -104,7 +103,7 @@ export default function OrgApplicationPage() {
                             <label className="label">전화번호</label>
                             <input
                                 type="tel" name="applicantPhone" value={form.applicantPhone}
-                                onChange={handlePhoneChange} className="input" placeholder="010-0000-0000"
+                                onChange={handlePhoneChange} className="input min-h-[48px]" placeholder="010-0000-0000"
                             />
                         </div>
                     </div>
@@ -115,17 +114,20 @@ export default function OrgApplicationPage() {
                     <div className="space-y-4">
                         <h3 className="text-sm font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-wider">기관 정보</h3>
                         <div>
-                            <label className="label">기관명 <span className="text-red-500">*</span></label>
+                            <label className="label">기관명 <span className="text-red-500 dark:text-red-400">*</span></label>
                             <input
                                 type="text" name="orgName" value={form.orgName}
-                                onChange={handleChange} className="input" placeholder="○○복지관" required
+                                onChange={handleChange} className="input min-h-[48px]" placeholder="○○복지관" required
                             />
                         </div>
 
                         <div>
-                            <label className="label">비영리 증빙서류 (고유번호증 또는 사업자등록증) <span className="text-red-500">*</span></label>
+                            <label className="label">비영리 증빙서류 (고유번호증 또는 사업자등록증) <span className="text-red-500 dark:text-red-400">*</span></label>
                             <div
                                 onClick={() => fileInputRef.current?.click()}
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') fileInputRef.current?.click(); }}
                                 onDragOver={handleDragOver}
                                 onDragLeave={handleDragLeave}
                                 onDrop={handleDrop}
@@ -140,11 +142,11 @@ export default function OrgApplicationPage() {
                                     <div className="space-y-2">
                                         {imageFile?.type === 'application/pdf' ? (
                                             <div className="py-4">
-                                                <svg className="w-16 h-16 mx-auto text-red-500 mb-2" fill="currentColor" viewBox="0 0 24 24">
+                                                <svg aria-hidden="true" className="w-16 h-16 mx-auto text-red-500 dark:text-red-400 mb-2" fill="currentColor" viewBox="0 0 24 24">
                                                     <path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm-1 7V3.5L18.5 9H13zm-2.5 5.5c0 .83-.67 1.5-1.5 1.5s-1.5-.67-1.5-1.5.67-1.5 1.5-1.5 1.5.67 1.5 1.5zm5 1.5c-.55 0-1.04-.22-1.4-.57l-.1.07c0 .55-.45 1-1 1H12v-4h1c.55 0 1 .45 1 1l.1.07c.36-.35.85-.57 1.4-.57.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5z" />
                                                 </svg>
                                                 <p className="text-sm font-medium text-surface-700 dark:text-surface-200">{imageFile.name}</p>
-                                                <p className="text-xs text-surface-500">PDF 문서가 선택되었습니다</p>
+                                                <p className="text-xs text-surface-500 dark:text-surface-400">PDF 문서가 선택되었습니다</p>
                                             </div>
                                         ) : (
                                             <img src={imagePreview} alt="미리보기" className="max-h-40 mx-auto rounded-lg" />
@@ -153,11 +155,11 @@ export default function OrgApplicationPage() {
                                     </div>
                                 ) : (
                                     <div className="space-y-2">
-                                        <svg className={`w-10 h-10 mx-auto transition-colors ${isDragging ? 'text-primary-400' : 'text-surface-300'}`} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                        <svg aria-hidden="true" className={`w-10 h-10 mx-auto transition-colors ${isDragging ? 'text-primary-400' : 'text-surface-300'}`} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v13.5A1.5 1.5 0 0 0 3.75 21z" />
                                         </svg>
                                         <p className="text-sm text-surface-500 dark:text-surface-400">{isDragging ? '여기에 놓으세요!' : '클릭 또는 드래그하여 업로드'}</p>
-                                        <p className="text-xs text-surface-400">JPG, PNG, PDF (5MB 이하)</p>
+                                        <p className="text-xs text-surface-400 dark:text-surface-500">JPG, PNG, PDF (5MB 이하)</p>
                                     </div>
                                 )}
                             </div>
@@ -200,28 +202,28 @@ export default function OrgApplicationPage() {
 
                     {/* 약관 동의 */}
                     <div className="space-y-3 bg-surface-50 dark:bg-surface-800 rounded-xl p-4">
-                        <label htmlFor="agree-terms" className="flex items-start gap-3 cursor-pointer group">
+                        <label htmlFor="agree-terms" className="flex items-start gap-3 cursor-pointer group min-h-[48px] py-2">
                             <input
                                 id="agree-terms"
                                 type="checkbox"
                                 checked={agreeTerms}
                                 onChange={(e) => setAgreeTerms(e.target.checked)}
-                                className="mt-0.5 w-4 h-4 rounded border-surface-300 text-primary-600 focus:ring-primary-500"
+                                className="mt-0.5 w-4 h-4 rounded border-surface-300 dark:border-surface-600 text-primary-600 dark:text-primary-400 focus:ring-primary-500"
                             />
-                            <span className="text-sm text-surface-600 dark:text-surface-400 group-hover:text-surface-800 dark:text-surface-200 transition-colors">
-                                <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-primary-600 underline underline-offset-2 font-medium hover:text-primary-700">이용약관</a>에 동의합니다. <span className="text-red-500">*</span>
+                            <span className="text-sm text-surface-600 dark:text-surface-400 group-hover:text-surface-800 dark:group-hover:text-surface-200 dark:text-surface-200 transition-colors">
+                                <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-primary-600 dark:text-primary-400 underline underline-offset-2 font-medium hover:text-primary-700 dark:hover:text-primary-300">이용약관</a>에 동의합니다. <span className="text-red-500 dark:text-red-400">*</span>
                             </span>
                         </label>
-                        <label htmlFor="agree-privacy" className="flex items-start gap-3 cursor-pointer group">
+                        <label htmlFor="agree-privacy" className="flex items-start gap-3 cursor-pointer group min-h-[48px] py-2">
                             <input
                                 id="agree-privacy"
                                 type="checkbox"
                                 checked={agreePrivacy}
                                 onChange={(e) => setAgreePrivacy(e.target.checked)}
-                                className="mt-0.5 w-4 h-4 rounded border-surface-300 text-primary-600 focus:ring-primary-500"
+                                className="mt-0.5 w-4 h-4 rounded border-surface-300 dark:border-surface-600 text-primary-600 dark:text-primary-400 focus:ring-primary-500"
                             />
-                            <span className="text-sm text-surface-600 dark:text-surface-400 group-hover:text-surface-800 dark:text-surface-200 transition-colors">
-                                <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-primary-600 underline underline-offset-2 font-medium hover:text-primary-700">개인정보 처리방침</a>에 동의합니다. <span className="text-red-500">*</span>
+                            <span className="text-sm text-surface-600 dark:text-surface-400 group-hover:text-surface-800 dark:group-hover:text-surface-200 dark:text-surface-200 transition-colors">
+                                <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-primary-600 dark:text-primary-400 underline underline-offset-2 font-medium hover:text-primary-700 dark:hover:text-primary-300">개인정보 처리방침</a>에 동의합니다. <span className="text-red-500 dark:text-red-400">*</span>
                             </span>
                         </label>
                     </div>
@@ -230,14 +232,14 @@ export default function OrgApplicationPage() {
                         <button
                             type="button"
                             onClick={() => handleGoBack(navigate)}
-                            className="btn-secondary flex-1"
+                            className="btn-secondary flex-1 min-h-[48px]"
                         >
                             취소
                         </button>
                         <button
                             type="submit"
                             disabled={loading || !agreeTerms || !agreePrivacy}
-                            className="btn-primary flex-1"
+                            className="btn-primary flex-1 min-h-[48px]"
                         >
                             {loading ? (
                                 <div className="flex items-center justify-center gap-2">

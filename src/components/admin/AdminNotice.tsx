@@ -54,7 +54,7 @@ export default function AdminNotice() {
         <>
             <button
                 onClick={() => setIsOpen(true)}
-                className="btn-icon text-surface-500 hover:text-primary-600"
+                className="btn-icon min-h-[48px] min-w-[48px] text-surface-500 dark:text-surface-400 hover:text-primary-600 dark:hover:text-primary-400"
                 title="공지 보내기"
             >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -63,16 +63,18 @@ export default function AdminNotice() {
             </button>
 
             {isOpen && createPortal(
-                <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4" onClick={() => !sending && setIsOpen(false)}>
+                <div role="presentation" className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/40 p-4" onClick={() => !sending && setIsOpen(false)} onKeyDown={(e) => { if (e.key === 'Escape' && !sending) setIsOpen(false); }}>
                     <div
+                        role="presentation"
                         className="bg-white dark:bg-surface-800 rounded-2xl shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto p-6 animate-scale-in"
                         onClick={(e) => e.stopPropagation()}
+                        onKeyDown={(e) => e.stopPropagation()}
                     >
                         <div className="flex items-center justify-between mb-4">
                             <h3 className="text-lg font-bold text-surface-900 dark:text-surface-100">📢 공지사항 보내기</h3>
                             <button
                                 onClick={() => setIsOpen(false)}
-                                className="btn-icon text-surface-400 hover:text-surface-600 dark:hover:text-surface-300"
+                                className="btn-icon min-h-[48px] min-w-[48px] text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300"
                                 aria-label="닫기"
                                 disabled={sending}
                             >
@@ -95,7 +97,7 @@ export default function AdminNotice() {
                                     value={title}
                                     onChange={(e) => setTitle(e.target.value)}
                                     placeholder="공지 제목을 입력하세요"
-                                    className="input w-full"
+                                    className="input w-full min-h-[48px]"
                                     maxLength={100}
                                     disabled={sending}
                                 />
@@ -111,20 +113,20 @@ export default function AdminNotice() {
                                     maxLength={500}
                                     disabled={sending}
                                 />
-                                <p className="text-xs text-surface-400 mt-1 text-right">{message.length}/500</p>
+                                <p className="text-xs text-surface-400 dark:text-surface-500 mt-1 text-right">{message.length}/500</p>
                             </div>
                             <div className="flex gap-2 pt-2">
                                 <button
                                     type="button"
                                     onClick={() => setIsOpen(false)}
-                                    className="btn-secondary flex-1"
+                                    className="btn-secondary flex-1 min-h-[48px]"
                                     disabled={sending}
                                 >
                                     취소
                                 </button>
                                 <button
                                     type="submit"
-                                    className="btn-primary flex-1"
+                                    className="btn-primary flex-1 min-h-[48px]"
                                     disabled={sending}
                                 >
                                     {sending ? '전송 중...' : '📢 공지 전송'}

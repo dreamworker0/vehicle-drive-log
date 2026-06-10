@@ -50,7 +50,7 @@ export default function DriveLogExportBar({
                             type="checkbox"
                             checked={includeHipass}
                             onChange={e => onIncludeHipassChange(e.target.checked)}
-                            className="rounded border-surface-300 dark:border-surface-600 text-primary-600 focus:ring-primary-500 w-3.5 h-3.5"
+                            className="rounded border-surface-300 dark:border-surface-600 text-primary-600 dark:text-primary-500 focus:ring-primary-500 w-3.5 h-3.5"
                         />
                         하이패스 포함
                     </label>
@@ -59,14 +59,14 @@ export default function DriveLogExportBar({
                             type="checkbox"
                             checked={includePassengers}
                             onChange={e => onIncludePassengersChange?.(e.target.checked)}
-                            className="rounded border-surface-300 dark:border-surface-600 text-primary-600 focus:ring-primary-500 w-3.5 h-3.5"
+                            className="rounded border-surface-300 dark:border-surface-600 text-primary-600 dark:text-primary-500 focus:ring-primary-500 w-3.5 h-3.5"
                         />
                         동행자 포함
                     </label>
                     <button
                         onClick={onDupScan}
                         disabled={dupState === 'scanning' || dupState === 'cleaning'}
-                        className="btn-secondary btn-sm flex items-center gap-2 disabled:opacity-50"
+                        className="btn-secondary btn-sm flex items-center gap-2 disabled:opacity-50 min-h-[48px]"
                     >
                         {dupState === 'scanning' ? (
                             <span className="w-4 h-4 spinner" />
@@ -80,7 +80,7 @@ export default function DriveLogExportBar({
                     <button
                         onClick={onExportExcel}
                         disabled={filteredCount === 0}
-                        className="btn-secondary btn-sm flex items-center gap-2 disabled:opacity-50"
+                        className="btn-secondary btn-sm flex items-center gap-2 disabled:opacity-50 min-h-[48px]"
                     >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
@@ -90,7 +90,7 @@ export default function DriveLogExportBar({
                     <button
                         onClick={onExportPdf}
                         disabled={filteredCount === 0}
-                        className="btn-primary btn-sm flex items-center gap-2 disabled:opacity-50"
+                        className="btn-primary btn-sm flex items-center gap-2 disabled:opacity-50 min-h-[48px]"
                     >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
@@ -118,14 +118,14 @@ export default function DriveLogExportBar({
                         <div className="flex items-center gap-2">
                             <button
                                 onClick={onDupCancel}
-                                className="btn-secondary btn-sm"
+                                className="btn-secondary btn-sm min-h-[48px]"
                             >
                                 취소
                             </button>
                             <button
                                 onClick={onDupClean}
                                 disabled={dupState === 'cleaning'}
-                                className="btn-sm flex items-center gap-2 disabled:opacity-50 bg-red-600 hover:bg-red-700 text-white rounded-lg px-3 py-1.5 text-sm font-medium transition-colors"
+                                className="btn-sm flex items-center gap-2 disabled:opacity-50 bg-red-600 dark:bg-red-700 hover:bg-red-700 dark:hover:bg-red-800 text-white rounded-lg px-3 py-1.5 text-sm font-medium transition-colors min-h-[48px]"
                             >
                                 {dupState === 'cleaning' ? (
                                     <><span className="w-4 h-4 spinner" /> 정리 중...</>

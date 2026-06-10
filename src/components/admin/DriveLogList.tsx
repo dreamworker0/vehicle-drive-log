@@ -54,14 +54,14 @@ export default function DriveLogList() {
             {filteredLogs.length === 0 ? (
                 <div className="glass-card p-12 text-center">
                     <div className="text-4xl mb-3">📋</div>
-                    <p className="text-surface-400 font-medium">
+                    <p className="text-surface-400 dark:text-surface-500 font-medium">
                         {logs.length === 0 ? '운행 기록이 없습니다' : '검색 결과가 없습니다'}
                     </p>
                 </div>
             ) : (
                 <div className="space-y-2">
                     {/* 헤더 (데스크탑) */}
-                    <div className="hidden sm:grid gap-2 px-4 py-2 text-xs font-medium text-surface-400" style={{ gridTemplateColumns: GRID_COLUMNS }}>
+                    <div className="hidden sm:grid gap-2 px-4 py-2 text-xs font-medium text-surface-400 dark:text-surface-500" style={{ gridTemplateColumns: GRID_COLUMNS }}>
                         <div>날짜</div>
                         <div>출발</div>
                         <div>도착</div>
@@ -91,7 +91,7 @@ export default function DriveLogList() {
                     <button
                         onClick={loadMore}
                         disabled={loadingMore}
-                        className="btn-secondary px-6 py-2 text-sm"
+                        className="btn-secondary px-6 py-2 text-sm min-h-[48px]"
                     >
                         {loadingMore ? (
                             <span className="flex items-center gap-2">

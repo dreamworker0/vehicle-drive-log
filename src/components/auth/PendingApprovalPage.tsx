@@ -8,7 +8,7 @@ export default function PendingApprovalPage() {
         <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-surface-50 to-amber-50 px-4">
             <div className="w-full max-w-sm text-center animate-scale-in">
                 <div className="w-20 h-20 mx-auto mb-6 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center">
-                    <svg className="w-10 h-10 text-amber-600 animate-pulse-soft" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <svg className="w-10 h-10 text-amber-600 dark:text-amber-400 animate-pulse-soft" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0z" />
                     </svg>
                 </div>
@@ -16,7 +16,7 @@ export default function PendingApprovalPage() {
                 <p className="text-surface-500 dark:text-surface-400 mb-2">
                     기관 신청이 검토 중입니다.
                 </p>
-                <p className="text-sm text-surface-400 mb-8">
+                <p className="text-sm text-surface-400 dark:text-surface-500 mb-8">
                     승인이 완료되면 알림으로 안내드립니다.
                     <br />보통 1~2일 내에 처리됩니다.
                 </p>
@@ -27,7 +27,7 @@ export default function PendingApprovalPage() {
                             <img
                                 src={user.photoURL}
                                 alt=""
-                                className="w-10 h-10 rounded-full bg-surface-200"
+                                className="w-10 h-10 rounded-full bg-surface-200 dark:bg-surface-700"
                             />
                         ) : (
                             <div className="w-10 h-10 rounded-full bg-primary-100 dark:bg-primary-900 flex items-center justify-center">
@@ -45,7 +45,7 @@ export default function PendingApprovalPage() {
 
                 <button
                     onClick={logout}
-                    className="btn-ghost text-sm text-surface-400 hover:text-red-500"
+                    className="btn-ghost text-sm text-surface-400 dark:text-surface-500 hover:text-red-500 dark:hover:text-red-400 min-h-[48px] px-4 py-2"
                 >
                     로그아웃
                 </button>

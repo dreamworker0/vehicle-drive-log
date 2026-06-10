@@ -19,7 +19,7 @@ function ChartCalendarSync({ calendarSyncRatio, calendarTopOrgs, calendarSyncOrg
                         <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-4 flex items-center gap-2">
                             <span role="img" aria-label="calendar">📅</span> 구글 캘린더 연동 비율
                         </h2>
-                        <div className="flex flex-col items-center justify-center py-12 text-surface-400">데이터가 없습니다.</div>
+                        <div className="flex flex-col items-center justify-center py-12 text-surface-400 dark:text-surface-500">데이터가 없습니다.</div>
                     </div>
                 </div>
             );
@@ -71,12 +71,12 @@ function ChartCalendarSync({ calendarSyncRatio, calendarTopOrgs, calendarSyncOrg
                         </div>
                         <div className="space-y-3">
                             <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full bg-blue-500" />
+                                <div className="w-3 h-3 rounded-full bg-blue-500 dark:bg-blue-600" />
                                 <span className="text-sm text-surface-600 dark:text-surface-300">연동됨</span>
                                 <span className="text-sm font-bold text-surface-800 dark:text-surface-100 ml-auto">{calendarSyncRatio.sync}대</span>
                             </div>
                             <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full bg-surface-600" />
+                                <div className="w-3 h-3 rounded-full bg-surface-600 dark:bg-surface-500" />
                                 <span className="text-sm text-surface-600 dark:text-surface-300">미연동</span>
                                 <span className="text-sm font-bold text-surface-800 dark:text-surface-100 ml-auto">{calendarSyncRatio.notSync}대</span>
                             </div>

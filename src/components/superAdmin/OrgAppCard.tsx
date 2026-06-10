@@ -49,17 +49,17 @@ export default memo(function OrgAppCard({
                     <div className="flex items-center gap-3 flex-wrap">
                         <h3 className="text-lg font-semibold text-surface-900 dark:text-surface-100">{app.name}</h3>
                         {tab === 'rejected' && (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium badge-danger dark:text-red-400">
                                 거절됨
                             </span>
                         )}
                         {tab === 'pending' && (
                             app.aiVerified ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-700">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold badge-success dark:text-green-400 border border-green-200 dark:border-green-700">
                                     ✅ AI 자동 승인
                                 </span>
                             ) : app.aiVerifyDetail ? (
-                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-700">
+                                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold badge-danger dark:text-red-400 border border-red-200 dark:border-red-700">
                                     ❌ AI: 거절 추천
                                 </span>
                             ) : (
@@ -69,7 +69,7 @@ export default memo(function OrgAppCard({
                             )
                         )}
                         {tab === 'rejected' && app.aiVerifyDetail?.rejected && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-700">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold badge-danger dark:text-red-400 border border-red-200 dark:border-red-700">
                                 🤖 AI 자동 거부
                             </span>
                         )}
@@ -78,26 +78,26 @@ export default memo(function OrgAppCard({
                     {/* 기관 상세 정보 */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
                         <div>
-                            <span className="text-surface-400">신청자:</span>
+                            <span className="text-surface-400 dark:text-surface-500">신청자:</span>
                             <span className="ml-2 text-surface-700 dark:text-surface-300 font-medium">{app.applicantName}</span>
                         </div>
                         <div>
-                            <span className="text-surface-400">이메일:</span>
+                            <span className="text-surface-400 dark:text-surface-500">이메일:</span>
                             <span className="ml-2 text-surface-700 dark:text-surface-300">{app.applicantEmail}</span>
                         </div>
                         {app.uniqueNumber && (
                             <div>
-                                <span className="text-surface-400">고유번호:</span>
+                                <span className="text-surface-400 dark:text-surface-500">고유번호:</span>
                                 <span className="ml-2 text-surface-700 dark:text-surface-300 font-mono">{app.uniqueNumber}</span>
                             </div>
                         )}
                         <div>
-                            <span className="text-surface-400">전화번호:</span>
+                            <span className="text-surface-400 dark:text-surface-500">전화번호:</span>
                             <span className="ml-2 text-surface-700 dark:text-surface-300">{app.applicantPhone || '-'}</span>
                         </div>
                         {app.address && (
                             <div className="sm:col-span-2 flex items-center gap-1.5">
-                                <span className="text-surface-400">주소:</span>
+                                <span className="text-surface-400 dark:text-surface-500">주소:</span>
                                 <span className="ml-2 text-surface-700 dark:text-surface-300">{app.address}</span>
                                 <a
                                     href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(app.address)}`}
@@ -112,7 +112,7 @@ export default memo(function OrgAppCard({
                         )}
                         {tab === 'rejected' && app.rejectedAt && (
                             <div className="sm:col-span-2">
-                                <span className="text-surface-400">거절일:</span>
+                                <span className="text-surface-400 dark:text-surface-500">거절일:</span>
                                 <span className="ml-2 text-surface-700 dark:text-surface-300">
                                     {formatTimestampFull(app.rejectedAt) || '-'}
                                 </span>
@@ -120,7 +120,7 @@ export default memo(function OrgAppCard({
                         )}
                         {app.createdAt && (
                             <div className="sm:col-span-2">
-                                <span className="text-surface-400">신청일시:</span>
+                                <span className="text-surface-400 dark:text-surface-500">신청일시:</span>
                                 <span className="ml-2 text-surface-700 dark:text-surface-300">
                                     {formatTimestampFull(app.createdAt) || '-'}
                                 </span>
@@ -141,7 +141,7 @@ export default memo(function OrgAppCard({
                         <div>
                             <button
                                 onClick={() => onToggleImage(app.id)}
-                                className="text-sm text-primary-600 hover:text-primary-700 font-medium"
+                                className="text-sm text-primary-600 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
                             >
                                 {selectedApp === app.id ? '사본 닫기 ▲' : '증빙서류 사본 보기 ▼'}
                             </button>
@@ -178,7 +178,7 @@ export default memo(function OrgAppCard({
                                     type="button"
                                     onClick={() => onAiReanalyze(app)}
                                     disabled={!!actionLoading[app.id]}
-                                    className="text-xs text-primary-500 hover:text-primary-700 font-medium"
+                                    className="text-xs text-primary-500 dark:text-primary-400 hover:text-primary-700 dark:hover:text-primary-300 font-medium"
                                 >
                                     {actionLoading[app.id] === 'ai' ? '분석 중...' : '재분석'}
                                 </button>
@@ -186,7 +186,7 @@ export default memo(function OrgAppCard({
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 text-sm">
                                 <div className="flex items-center gap-1.5">
                                     <span className={`w-2 h-2 rounded-full ${app.aiVerifyDetail.documentType === '고유번호증' || app.aiVerifyDetail.documentType === '사업자등록증(비영리)' ? 'bg-green-500 dark:bg-green-400' : 'bg-red-500 dark:bg-red-400'}`} />
-                                    <span className="text-surface-400">문서 유형:</span>
+                                    <span className="text-surface-400 dark:text-surface-500">문서 유형:</span>
                                     <span className={`font-medium ${app.aiVerifyDetail.documentType === '고유번호증' || app.aiVerifyDetail.documentType === '사업자등록증(비영리)' ? 'text-green-700' : 'text-red-700'}`}>
                                         {app.aiVerifyDetail.documentType || '확인 불가'}
                                     </span>
@@ -194,7 +194,7 @@ export default memo(function OrgAppCard({
                                 {app.aiVerifyDetail.extractedName && (
                                     <div className="flex items-center gap-1.5">
                                         <span className={`w-2 h-2 rounded-full ${app.aiVerifyDetail.nameMatch ? 'bg-green-500' : 'bg-red-500'}`} />
-                                        <span className="text-surface-400">추출 기관명:</span>
+                                        <span className="text-surface-400 dark:text-surface-500">추출 기관명:</span>
                                         <span className={`font-medium ${app.aiVerifyDetail.nameMatch ? 'text-green-700' : 'text-red-700'}`}>
                                             {app.aiVerifyDetail.extractedName}
                                             {app.aiVerifyDetail.nameMatch ? ' ✓' : ' ✗'}
@@ -204,14 +204,14 @@ export default memo(function OrgAppCard({
                                 {app.aiVerifyDetail.uniqueNumber && (
                                     <div className="flex items-center gap-1.5">
                                         <span className="w-2 h-2 rounded-full bg-green-500 dark:bg-green-400" />
-                                        <span className="text-surface-400">{app.aiVerifyDetail.documentType === '고유번호증' ? '고유번호:' : '사업자번호:'}</span>
+                                        <span className="text-surface-400 dark:text-surface-500">{app.aiVerifyDetail.documentType === '고유번호증' ? '고유번호:' : '사업자번호:'}</span>
                                         <span className="font-mono text-surface-700 dark:text-surface-300">{app.aiVerifyDetail.uniqueNumber}</span>
                                     </div>
                                 )}
                                 {app.aiVerifyDetail.address && (
                                     <div className="flex items-center gap-1.5 sm:col-span-2">
                                         <span className="w-2 h-2 rounded-full bg-green-500 dark:bg-green-400" />
-                                        <span className="text-surface-400">주소:</span>
+                                        <span className="text-surface-400 dark:text-surface-500">주소:</span>
                                         <span className="text-surface-700 dark:text-surface-300">{app.aiVerifyDetail.address}</span>
                                         <a
                                             href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(app.aiVerifyDetail.address)}`}
@@ -251,7 +251,7 @@ export default memo(function OrgAppCard({
                                 <button
                                     onClick={handleRejectClick}
                                     disabled={!!actionLoading[app.id]}
-                                    className="btn-danger btn-sm flex-1 md:flex-none"
+                                    className="btn-danger btn-sm flex-1 md:flex-none min-h-[48px]"
                                 >
                                     {actionLoading[app.id] === 'reject' ? (
                                         <div className="w-4 h-4 spinner" />
@@ -282,7 +282,7 @@ export default memo(function OrgAppCard({
                                             setIsRejecting(false);
                                             onReject(app, rejectReason);
                                         }}
-                                        className="px-3 py-1.5 text-sm font-medium rounded-md bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="px-3 py-1.5 text-sm font-medium rounded-md bg-red-600 dark:bg-red-500 text-white hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                         disabled={!!actionLoading[app.id] || !rejectReason.trim()}
                                     >
                                         {actionLoading[app.id] === 'reject' ? '처리 중...' : '거절 및 이메일 발송'}
@@ -307,7 +307,7 @@ export default memo(function OrgAppCard({
                         <button
                             onClick={() => onDelete(app)}
                             disabled={!!actionLoading[app.id]}
-                            className="btn-sm text-surface-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border border-surface-200 dark:border-surface-600 hover:border-red-200 dark:hover:border-red-700 rounded-lg px-3 py-1.5 text-sm transition-colors"
+                            className="btn-sm text-surface-400 dark:text-surface-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 border border-surface-200 dark:border-surface-600 hover:border-red-200 dark:hover:border-red-700 rounded-lg px-3 py-1.5 text-sm transition-colors"
                         >
                             {actionLoading[app.id] === 'delete' ? (
                                 <div className="w-4 h-4 spinner" />

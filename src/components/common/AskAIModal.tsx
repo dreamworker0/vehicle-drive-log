@@ -164,6 +164,7 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
 
     return (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm"
+             role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { if (e.target === e.currentTarget) onClose(); } }}
              onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
             <div className="w-full max-w-lg bg-white dark:bg-surface-800 rounded-t-2xl sm:rounded-2xl shadow-2xl flex flex-col"
                  style={{ maxHeight: '85vh' }}>
@@ -174,8 +175,8 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
                         <span className="text-xl">🤖</span>
                         <h2 className="text-lg font-bold text-surface-900 dark:text-surface-100">AI에게 물어보기</h2>
                     </div>
-                    <button onClick={onClose} className="btn-icon text-surface-400 hover:text-surface-600 dark:text-surface-400">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <button onClick={onClose} aria-label="닫기" className="btn-icon text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 dark:text-surface-400 min-h-[48px] min-w-[48px] flex items-center justify-center">
+                        <svg aria-hidden="true" className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
                         </svg>
                     </button>
@@ -194,7 +195,7 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
                                     <button
                                         key={q}
                                         onClick={() => setQuestion(q)}
-                                        className="text-xs px-3 py-1.5 rounded-full bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-800/40 transition-colors"
+                                        className="text-xs px-3 py-1.5 rounded-full btn-soft-primary dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-800/40 transition-colors min-h-[48px]"
                                     >
                                         {q}
                                     </button>
@@ -244,20 +245,21 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
                             onKeyDown={handleKeyDown}
                             placeholder="질문을 입력하세요..."
                             rows={1}
-                            className="flex-1 resize-none rounded-xl border border-surface-200 dark:border-surface-600 bg-surface-50 dark:bg-surface-900 text-surface-900 dark:text-surface-100 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 dark:focus:ring-primary-500"
+                            className="flex-1 resize-none rounded-xl border border-surface-200 dark:border-surface-600 bg-surface-50 dark:bg-surface-900 text-surface-900 dark:text-surface-100 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 dark:focus:ring-primary-500 min-h-[48px]"
                             disabled={loading}
                         />
                         <button
                             type="submit"
+                            aria-label="보내기"
                             disabled={!question.trim() || loading}
-                            className="shrink-0 w-10 h-10 rounded-xl bg-primary-500 text-white flex items-center justify-center disabled:opacity-40 hover:bg-primary-600 transition-colors"
+                            className="shrink-0 w-12 h-12 rounded-xl bg-primary-500 dark:bg-primary-600 text-white flex items-center justify-center disabled:opacity-40 hover:bg-primary-600 dark:hover:bg-primary-500 transition-colors"
                         >
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                            <svg aria-hidden="true" className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 12 3.269 3.125A59.769 59.769 0 0 1 21.485 12 59.768 59.768 0 0 1 3.27 20.875L5.999 12Zm0 0h7.5" />
                             </svg>
                         </button>
                     </div>
-                    <p className="text-[10px] text-surface-400 mt-1.5 text-center">
+                    <p className="text-[10px] text-surface-400 dark:text-surface-500 mt-1.5 text-center">
                         AI 답변은 FAQ와 설명서를 기반으로 합니다 · {question.length}/500
                     </p>
                 </form>

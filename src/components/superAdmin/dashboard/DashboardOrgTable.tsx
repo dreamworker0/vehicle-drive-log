@@ -38,7 +38,7 @@ function DashboardOrgTable({
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200">🏆 활성도</h2>
                 </div>
-                <div className="flex flex-col items-center justify-center py-12 text-surface-400">최근 발생한 데이터가 없습니다.</div>
+                <div className="flex flex-col items-center justify-center py-12 text-surface-400 dark:text-surface-500">최근 발생한 데이터가 없습니다.</div>
             </div>
         );
     }
@@ -119,7 +119,7 @@ function DashboardOrgTable({
                                         </td>
                                         <td className="py-2.5 px-1.5 sm:px-3 text-center hidden sm:table-cell">
                                             {onboarded
-                                                ? <span className="text-emerald-500">✅</span>
+                                                ? <span className="text-emerald-500 dark:text-emerald-400">✅</span>
                                                 : <span className="text-surface-300 dark:text-surface-600">○</span>}
                                         </td>
                                     </tr>
@@ -134,7 +134,7 @@ function DashboardOrgTable({
             {topOrgs.filter(o => o.lat && o.lng).length > 0 && (
                 <Suspense fallback={
                     <div className="glass-card p-5">
-                        <div className="flex items-center justify-center py-10 gap-2 text-sm text-surface-400">
+                        <div className="flex items-center justify-center py-10 gap-2 text-sm text-surface-400 dark:text-surface-500">
                             <div className="w-4 h-4 spinner" /> 지도 로딩 중...
                         </div>
                     </div>
@@ -151,7 +151,7 @@ function DashboardOrgTable({
                             📡 좌표 미등록 기관 ({topOrgs.filter(o => o.address && (!o.lat || !o.lng) && !hiddenOrgIds.has(o.id)).length}개)
                         </h2>
                         <button
-                            className="px-3 py-1.5 text-xs font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-lg transition-colors disabled:opacity-50"
+                            className="px-3 py-1.5 text-xs font-medium text-white bg-primary-600 dark:bg-primary-500 hover:bg-primary-700 rounded-lg transition-colors disabled:opacity-50 min-h-[48px]"
                             onClick={async (e) => {
                                 const btn = e.currentTarget;
                                 btn.disabled = true;
@@ -177,7 +177,7 @@ function DashboardOrgTable({
                             <div key={org.id} className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 bg-surface-50 dark:bg-surface-800 rounded-xl">
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium text-surface-800 dark:text-surface-200 truncate">{org.name}</p>
-                                    <p className="text-xs text-surface-400 truncate">{org.address}</p>
+                                    <p className="text-xs text-surface-400 dark:text-surface-500 truncate">{org.address}</p>
                                 </div>
                                 <form
                                     className="flex items-center gap-2 shrink-0"
@@ -207,16 +207,16 @@ function DashboardOrgTable({
                                         }
                                     }}
                                 >
-                                    <input name="lat" type="number" step="any" placeholder="위도 (lat)" className="w-24 px-2 py-1.5 text-xs rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-700 text-surface-800 dark:text-surface-200" />
-                                    <input name="lng" type="number" step="any" placeholder="경도 (lng)" className="w-24 px-2 py-1.5 text-xs rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-700 text-surface-800 dark:text-surface-200" />
-                                    <button type="submit" className="px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600 rounded-lg transition-colors disabled:opacity-50">
+                                    <input name="lat" type="number" step="any" placeholder="위도 (lat)" className="w-24 px-2 py-1.5 text-xs rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-700 text-surface-800 dark:text-surface-200 min-h-[48px]" />
+                                    <input name="lng" type="number" step="any" placeholder="경도 (lng)" className="w-24 px-2 py-1.5 text-xs rounded-lg border border-surface-300 dark:border-surface-600 bg-white dark:bg-surface-700 text-surface-800 dark:text-surface-200 min-h-[48px]" />
+                                    <button type="submit" className="px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-600 rounded-lg transition-colors disabled:opacity-50 min-h-[48px]">
                                         저장
                                     </button>
                                 </form>
                             </div>
                         ))}
                     </div>
-                    <p className="text-xs text-surface-400 mt-3">
+                    <p className="text-xs text-surface-400 dark:text-surface-500 mt-3">
                         💡 Google Maps에서 주소를 검색한 후 좌표를 복사하여 입력하세요
                     </p>
                 </div>
@@ -230,12 +230,12 @@ function DashboardOrgTable({
                     </p>
                     <div className="space-y-1">
                         {topOrgs.filter(o => !o.address).map(org => (
-                            <p key={org.id} className="text-xs text-surface-400 pl-4">
+                            <p key={org.id} className="text-xs text-surface-400 dark:text-surface-500 pl-4">
                                 • {org.name}
                             </p>
                         ))}
                     </div>
-                    <p className="text-xs text-surface-400 mt-2">
+                    <p className="text-xs text-surface-400 dark:text-surface-500 mt-2">
                         기관 관리에서 해당 기관의 주소를 입력하면 좌표 변환이 가능합니다.
                     </p>
                 </div>

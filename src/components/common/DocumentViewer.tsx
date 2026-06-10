@@ -19,7 +19,7 @@ export default function DocumentViewer({ url, stopPropagation }: DocumentViewerP
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={handleClick}
-                className="mt-2 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-700 hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors text-sm font-medium animate-slide-down"
+                className="mt-2 inline-flex items-center gap-2 px-4 py-2.5 rounded-lg bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-700 hover:bg-primary-100 dark:hover:bg-primary-900/30 transition-colors text-sm font-medium animate-slide-down min-h-[48px]"
             >
                 PDF 증빙서류 보기 (새 창)
             </a>
@@ -27,11 +27,12 @@ export default function DocumentViewer({ url, stopPropagation }: DocumentViewerP
     }
 
     return (
-        <img
-            src={url}
-            alt="증빙서류"
-            className="mt-2 max-w-md rounded-lg border border-surface-200 dark:border-surface-600 animate-slide-down"
-            onClick={handleClick}
-        />
+        <button type="button" onClick={handleClick} className="p-0 border-0 bg-transparent text-left mt-2 min-h-[48px] animate-slide-down rounded-lg focus:outline-none focus:ring-2 focus:ring-primary-500">
+            <img
+                src={url}
+                alt="증빙서류"
+                className="max-w-md rounded-lg border border-surface-200 dark:border-surface-600 block"
+            />
+        </button>
     );
 }

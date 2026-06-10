@@ -20,13 +20,13 @@ function ChartHipass({ hipassRatio, hipassTopOrgs }: Props) {
                         <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-4">
                             🛣️ 하이패스 연결 비율
                         </h2>
-                        <div className="flex flex-col items-center justify-center py-12 text-surface-400">데이터가 없습니다.</div>
+                        <div className="flex flex-col items-center justify-center py-12 text-surface-400 dark:text-surface-500">데이터가 없습니다.</div>
                     </div>
                     <div className="glass-card p-5">
                         <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-4">
                             🏆 하이패스 사용 기관 TOP 5
                         </h2>
-                        <div className="flex flex-col items-center justify-center py-12 text-surface-400">데이터가 없습니다.</div>
+                        <div className="flex flex-col items-center justify-center py-12 text-surface-400 dark:text-surface-500">데이터가 없습니다.</div>
                     </div>
                 </div>
             );

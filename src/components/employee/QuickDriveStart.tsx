@@ -43,7 +43,7 @@ export default function QuickDriveStart() {
             <div className="space-y-5">
                 {/* 차량 선택 */}
                 <div>
-                    <label className="label">차량 선택 <span className="text-red-500">*</span></label>
+                    <label className="label">차량 선택 <span className="text-red-500 dark:text-red-400">*</span></label>
                     <VehicleSelector
                         vehicles={vehicles}
                         selectedVehicleId={form.vehicleId}
@@ -60,19 +60,19 @@ export default function QuickDriveStart() {
                         </span>
                         <div>
                             <p className="font-semibold text-surface-900 dark:text-surface-100">{form.vehicleName}</p>
-                            <p className="text-xs text-surface-400">선택된 차량</p>
+                            <p className="text-xs text-surface-400 dark:text-surface-500">선택된 차량</p>
                         </div>
                     </div>
                 )}
 
                 {/* 목적지 */}
                 <div>
-                    <label className="label">목적지 <span className="text-red-500">*</span></label>
+                    <label className="label">목적지 <span className="text-red-500 dark:text-red-400">*</span></label>
                     <input
                         type="text"
                         value={form.destination}
                         onChange={e => setForm({ ...form, destination: e.target.value })}
-                        className="input"
+                        className="input min-h-[48px]"
                         placeholder="예: 강남역, 서울역 (여러 곳 운행은 쉼표로 구분)"
                     />
                     {/* 즐겨찾기 칩 */}
@@ -83,9 +83,9 @@ export default function QuickDriveStart() {
                                     key={fav.id}
                                     type="button"
                                     onClick={() => handleFavoriteSelect(fav)}
-                                    className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${form.destination === (fav.address || fav.name)
+                                    className={`px-3 py-2 min-h-[48px] rounded-full text-xs font-medium border transition-all flex items-center justify-center ${form.destination === (fav.address || fav.name)
                                         ? 'bg-amber-100 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400'
-                                        : 'bg-surface-50 dark:bg-surface-800 border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400 hover:border-amber-300 hover:bg-amber-50'
+                                        : 'bg-surface-50 dark:bg-surface-800 border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400 hover:border-amber-300 dark:hover:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20'
                                         }`}
                                 >
                                     ⭐ {fav.name}
@@ -97,12 +97,12 @@ export default function QuickDriveStart() {
                     {(routeLoading || routeInfo) && (
                         <div className="mt-2">
                             {routeLoading ? (
-                                <div className="flex items-center gap-2 text-xs text-surface-400 py-1">
+                                <div className="flex items-center gap-2 text-xs text-surface-400 dark:text-surface-500 py-1">
                                     <div className="w-3 h-3 spinner" />
                                     경로 탐색 중...
                                 </div>
                             ) : routeInfo && (
-                                <div className="p-2.5 rounded-lg bg-blue-50 border border-blue-200 dark:bg-blue-900/20 dark:border-blue-800/40 animate-fade-in space-y-1.5">
+                                <div className="p-2.5 rounded-lg bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:bg-blue-900/20 dark:border-blue-800/40 animate-fade-in space-y-1.5">
                                     <div className="flex items-center gap-3 text-xs">
                                         {routeInfo.hasToll && <span className="text-[11px] font-semibold text-blue-500 dark:text-blue-400 bg-blue-100 dark:bg-blue-800/40 px-1.5 py-0.5 rounded">고속</span>}
                                         <span className="font-bold text-blue-700 dark:text-blue-300">🗺️ {'isMulti' in routeInfo && routeInfo.isMulti ? '총 ' : ''}{Math.floor(routeInfo.distance)}km</span>
@@ -118,12 +118,12 @@ export default function QuickDriveStart() {
                                                     setShowFreeRoad(next);
                                                     if (next && !freeRoadRoute && !freeRoadLoading) handleFetchFreeRoad();
                                                 }}
-                                                className="ml-auto flex-shrink-0 w-6 h-6 flex items-center justify-center rounded hover:bg-blue-100 dark:hover:bg-blue-800/40 transition-colors"
+                                                className="ml-auto flex-shrink-0 min-w-[48px] min-h-[48px] flex items-center justify-center rounded hover:bg-blue-100 dark:hover:bg-blue-800/40 transition-colors"
                                                 title="무료도로 경로 보기"
                                             >
                                                 {freeRoadLoading && showFreeRoad
                                                     ? <div className="w-3 h-3 spinner" />
-                                                    : <svg className={`w-3.5 h-3.5 text-blue-500 dark:text-blue-400 transition-transform duration-200 ${showFreeRoad ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
+                                                    : <svg aria-hidden="true" className={`w-3.5 h-3.5 text-blue-500 dark:text-blue-400 transition-transform duration-200 ${showFreeRoad ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
                                                 }
                                             </button>
                                         )}
@@ -151,7 +151,7 @@ export default function QuickDriveStart() {
                         type="text"
                         value={form.purpose}
                         onChange={e => setForm({ ...form, purpose: e.target.value })}
-                        className="input"
+                        className="input min-h-[48px]"
                         placeholder="출장, 외근 등"
                     />
                 </div>
@@ -160,7 +160,7 @@ export default function QuickDriveStart() {
                 <button
                     onClick={handleStart}
                     disabled={submitting || !form.vehicleId || !form.destination.trim()}
-                    className="w-full btn-primary py-3 text-base font-bold"
+                    className="w-full btn-primary py-3 text-base font-bold min-h-[48px]"
                 >
                     {submitting ? (
                         <span className="flex items-center justify-center gap-2">

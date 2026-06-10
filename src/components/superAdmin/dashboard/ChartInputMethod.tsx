@@ -22,7 +22,7 @@ function ChartInputMethod({ inputMethodStats }: Props) {
                     <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">
                         계기판 촬영(OCR)과 수동 입력의 일별 건수 (쌓기)
                     </p>
-                    <div className="flex flex-col items-center justify-center py-12 text-surface-400">최근 발생한 데이터가 없습니다.</div>
+                    <div className="flex flex-col items-center justify-center py-12 text-surface-400 dark:text-surface-500">최근 발생한 데이터가 없습니다.</div>
                 </div>
             );
         }

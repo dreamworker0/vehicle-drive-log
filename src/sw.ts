@@ -94,6 +94,15 @@ self.addEventListener('message', (event) => {
     }
 });
 
+// 백그라운드 동기화 (Background Sync) 처리
+import { flushQueue } from './lib/offline/syncQueue';
+
+self.addEventListener('sync', (event: SyncEvent) => {
+    if (event.tag === 'sync-db') {
+        event.waitUntil(flushQueue());
+    }
+});
+
 // 6. 알림 클릭 이벤트 처리 (Notification Click)
 self.addEventListener('notificationclick', (event: NotificationEvent) => {
     event.notification.close();

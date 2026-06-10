@@ -105,7 +105,7 @@ export default function VehicleForm({
                     <button
                         type="button"
                         onClick={onCancel}
-                        className="p-1.5 rounded-lg text-surface-400 hover:text-surface-600 hover:bg-surface-100 dark:hover:text-surface-300 dark:hover:bg-surface-700 transition-colors"
+                        className="p-1.5 rounded-lg text-surface-400 hover:text-surface-600 hover:bg-surface-100 dark:hover:text-surface-300 dark:hover:bg-surface-700 transition-colors min-h-[48px]"
                         aria-label="닫기"
                     >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -119,9 +119,9 @@ export default function VehicleForm({
                         <input
                             type="text" value={form.displayName}
                             onChange={e => setForm({ ...form, displayName: e.target.value })}
-                            className="input" placeholder="예: 소나타2744" required autoFocus
+                            className="input" placeholder="예: 소나타2744" required
                         />
-                        <p className="text-xs text-surface-400 mt-1">직원들이 쉽게 구분할 수 있는 이름</p>
+                        <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">직원들이 쉽게 구분할 수 있는 이름</p>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -145,7 +145,7 @@ export default function VehicleForm({
                                 />
                                 {/* 화살표 아이콘 */}
                                 <svg
-                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400 pointer-events-none"
+                                    className="absolute right-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400 dark:text-surface-500 pointer-events-none"
                                     fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"
                                 >
                                     <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
@@ -159,7 +159,11 @@ export default function VehicleForm({
                                         {filtered.map((s, i) => (
                                             <li
                                                 key={s}
+                                                role="option"
+                                                aria-selected={i === activeIndex}
+                                                tabIndex={0}
                                                 onMouseDown={() => selectSuggestion(s)}
+                                                onKeyDown={(e) => { if (e.key === 'Enter') selectSuggestion(s); }}
                                                 className={`px-3 py-2 cursor-pointer text-sm transition-colors
                                                     ${i === activeIndex
                                                         ? 'bg-primary-50 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300'
@@ -198,7 +202,7 @@ export default function VehicleForm({
                                     }}
                                     className={`flex flex-col items-center gap-1 px-2 py-3 rounded-xl text-xs font-medium border transition-all ${form.vehicleType === vt.value
                                         ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 dark:border-primary-400'
-                                        : 'border-surface-200 dark:border-surface-600 text-surface-500 dark:text-surface-400 hover:border-surface-300'
+                                        : 'border-surface-200 dark:border-surface-600 text-surface-500 dark:text-surface-400 hover:border-surface-300 dark:hover:border-surface-500'
                                         }`}
                                 >
                                     <span className="text-2xl">{vt.icon}</span>
@@ -216,7 +220,7 @@ export default function VehicleForm({
                                     onClick={() => setForm({ ...form, fuelType: ft.id })}
                                     className={`px-3 py-2.5 rounded-xl text-sm font-medium border transition-all ${form.fuelType === ft.id
                                         ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 dark:border-primary-400'
-                                        : 'border-surface-200 dark:border-surface-600 text-surface-500 dark:text-surface-400 hover:border-surface-300'
+                                        : 'border-surface-200 dark:border-surface-600 text-surface-500 dark:text-surface-400 hover:border-surface-300 dark:hover:border-surface-500'
                                         }`}
                                 >
                                     {ft.label}
@@ -231,7 +235,7 @@ export default function VehicleForm({
                             onChange={e => setForm({ ...form, currentKm: e.target.value })}
                             className="input" placeholder="0"
                         />
-                        <p className="text-xs text-surface-400 mt-1">차량 등록 시점의 누적 주행거리</p>
+                        <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">차량 등록 시점의 누적 주행거리</p>
                     </div>
                     <div>
                         <label className="label">보험 정보</label>
@@ -247,7 +251,7 @@ export default function VehicleForm({
                                 className="input" placeholder="전화번호"
                             />
                         </div>
-                        <p className="text-xs text-surface-400 mt-1">사고 시 연락할 보험사 정보</p>
+                        <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">사고 시 연락할 보험사 정보</p>
                     </div>
 
                     <VehicleCalendarSection
@@ -258,8 +262,8 @@ export default function VehicleForm({
                         initialCalendarError={initialCalendarError}
                     />
                     <div className="flex gap-3 pt-2">
-                        <button type="button" onClick={onCancel} className="btn-secondary flex-1">취소</button>
-                        <button type="submit" disabled={formLoading} className="btn-primary flex-1">
+                        <button type="button" onClick={onCancel} className="btn-secondary flex-1 min-h-[48px]">취소</button>
+                        <button type="submit" disabled={formLoading} className="btn-primary flex-1 min-h-[48px]">
                             {formLoading ? (<><div className="w-4 h-4 spinner" />저장 중...</>) : editingVehicle ? '수정' : '등록'}
                         </button>
                     </div>

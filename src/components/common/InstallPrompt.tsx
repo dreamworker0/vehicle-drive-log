@@ -131,6 +131,7 @@ export default function InstallPrompt() {
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
                     flexShrink: 0,
+                    minHeight: '48px',
                 }}
             >
                 설치
@@ -146,6 +147,8 @@ export default function InstallPrompt() {
                     padding: '0.25rem',
                     lineHeight: 1,
                     flexShrink: 0,
+                    minWidth: '48px',
+                    minHeight: '48px',
                 }}
                 aria-label="닫기"
             >

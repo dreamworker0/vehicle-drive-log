@@ -71,17 +71,17 @@ function ChartReservationType({ reservationTypeStats, reservationTypeRatio, futu
                         </div>
                         <div className="w-px h-8 bg-surface-200 dark:bg-surface-700"></div>
                         <div className="text-center">
-                            <div className="text-[11px] text-blue-500 mb-0.5">하루</div>
+                            <div className="text-[11px] text-blue-500 dark:text-blue-400 mb-0.5">하루</div>
                             <div className="text-sm font-bold text-blue-600 dark:text-blue-400">{currentRatio.singleRate}%</div>
                         </div>
                         <div className="w-px h-8 bg-surface-200 dark:bg-surface-700"></div>
                         <div className="text-center">
-                            <div className="text-[11px] text-amber-500 mb-0.5">다일</div>
+                            <div className="text-[11px] text-amber-500 dark:text-amber-400 mb-0.5">다일</div>
                             <div className="text-sm font-bold text-amber-600 dark:text-amber-400">{currentRatio.multiDayRate}%</div>
                         </div>
                         <div className="w-px h-8 bg-surface-200 dark:bg-surface-700"></div>
                         <div className="text-center">
-                            <div className="text-[11px] text-purple-500 mb-0.5">반복</div>
+                            <div className="text-[11px] text-purple-500 dark:text-purple-400 mb-0.5">반복</div>
                             <div className="text-sm font-bold text-purple-600 dark:text-purple-400">{currentRatio.recurringRate}%</div>
                         </div>
                     </div>
@@ -141,7 +141,7 @@ function ChartReservationType({ reservationTypeStats, reservationTypeRatio, futu
                             </AreaChart>
                         </ResponsiveContainer>
                     ) : (
-                        <div className="flex flex-col items-center justify-center h-[256px] text-surface-400">해당 기간에 발생한 데이터가 없습니다.</div>
+                        <div className="flex flex-col items-center justify-center h-[256px] text-surface-400 dark:text-surface-500">해당 기간에 발생한 데이터가 없습니다.</div>
                     )}
                 </div>
             </div>

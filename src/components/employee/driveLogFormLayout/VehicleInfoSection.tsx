@@ -34,15 +34,15 @@ const VehicleInfoSection = memo(function VehicleInfoSection({
                         </span>
                         <div>
                             <p className="font-semibold text-surface-900 dark:text-surface-100">{form.vehicleName}</p>
-                            <p className="text-xs text-surface-400">
+                            <p className="text-xs text-surface-400 dark:text-surface-500">
                                 {isEditMode ? '수정 중인 차량' : '예약 배정 차량'}
                             </p>
                         </div>
                     </div>
                     {form.startTime && (
                         <div className="text-right">
-                            <p className="text-lg font-bold text-primary-600">{form.startTime}</p>
-                            <p className="text-xs text-surface-400">출발 시각</p>
+                            <p className="text-lg font-bold text-primary-600 dark:text-primary-400">{form.startTime}</p>
+                            <p className="text-xs text-surface-400 dark:text-surface-500">출발 시각</p>
                         </div>
                     )}
                 </div>
@@ -50,13 +50,13 @@ const VehicleInfoSection = memo(function VehicleInfoSection({
                     <div className="mt-3 pt-3 border-t border-surface-100 dark:border-surface-700 grid grid-cols-2 gap-4">
                         {form.purpose && (
                             <div>
-                                <p className="text-xs text-surface-400">운행 목적</p>
+                                <p className="text-xs text-surface-400 dark:text-surface-500">운행 목적</p>
                                 <p className="text-sm font-medium text-surface-800 dark:text-surface-200">{form.purpose}</p>
                             </div>
                         )}
                         {form.destination && (
                             <div>
-                                <p className="text-xs text-surface-400">행선지</p>
+                                <p className="text-xs text-surface-400 dark:text-surface-500">행선지</p>
                                 <p className="text-sm font-medium text-surface-800 dark:text-surface-200">{form.destination}</p>
                             </div>
                         )}
@@ -68,7 +68,7 @@ const VehicleInfoSection = memo(function VehicleInfoSection({
 
     return (
         <div>
-            <label className="label">차량 선택 <span className="text-red-500">*</span></label>
+            <label className="label">차량 선택 <span className="text-red-500 dark:text-red-400">*</span></label>
             <VehicleSelector
                 vehicles={vehicles}
                 selectedVehicleId={form.vehicleId}

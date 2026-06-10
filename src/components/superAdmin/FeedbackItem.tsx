@@ -57,6 +57,9 @@ export default function FeedbackItem({
             className={`border-b border-surface-50 dark:border-surface-700/50 last:border-b-0 ${isResolved ? 'border-l-4 border-l-green-400' : isUnread ? 'border-l-4 border-l-primary-400' : ''}`}
         >
             <div
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggleExpand(isExpanded ? null : fb.id); } }}
                 className="p-4 cursor-pointer hover:bg-surface-50/50 dark:hover:bg-surface-700/20 transition-colors"
                 onClick={() => onToggleExpand(isExpanded ? null : fb.id)}
             >
@@ -87,7 +90,7 @@ export default function FeedbackItem({
                         <p className={`text-sm text-surface-600 dark:text-surface-400 ${isExpanded ? '' : 'line-clamp-2'}`}>
                             {fb.message}
                         </p>
-                        <div className="flex items-center gap-3 mt-2 text-xs text-surface-400">
+                        <div className="flex items-center gap-3 mt-2 text-xs text-surface-400 dark:text-surface-500">
                             <span>{formatTimestampFull(fb.createdAt) || '-'}</span>
                             {fb.imageUrls && fb.imageUrls.length > 0 && (
                                 <span className="flex items-center gap-1">
@@ -101,7 +104,7 @@ export default function FeedbackItem({
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                         {isResolved ? (
-                            <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-green-50 text-green-600 dark:bg-green-900/30 dark:text-green-300">
+                            <span className="px-2.5 py-1 rounded-lg text-xs font-medium btn-soft-green">
                                 ✅ 처리완료
                             </span>
                         ) : null}
@@ -110,7 +113,7 @@ export default function FeedbackItem({
                                 e.stopPropagation();
                                 onToggleResolve(fb);
                             }}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${isUnread
+                            className={`px-3 py-1.5 min-h-[48px] rounded-lg text-xs font-medium transition-all ${isUnread
                                 ? 'bg-primary-50 text-primary-600 hover:bg-primary-100 dark:bg-primary-900/30 dark:text-primary-300 dark:hover:bg-primary-900/50'
                                 : 'bg-surface-100 text-surface-500 hover:bg-surface-200 dark:bg-surface-700 dark:text-surface-400 dark:hover:bg-surface-600'
                                 }`}
@@ -120,11 +123,11 @@ export default function FeedbackItem({
                         </button>
                         <button
                             onClick={(e) => onCopyMessage(e, fb.id, fb.message || '')}
-                            className="p-1.5 rounded-lg text-surface-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:text-primary-400 dark:hover:bg-primary-900/30 transition-all"
+                            className="p-2 min-h-[48px] min-w-[48px] flex items-center justify-center rounded-lg text-surface-400 dark:text-surface-500 hover:text-primary-500 hover:bg-primary-50 dark:hover:text-primary-400 dark:hover:bg-primary-900/30 transition-all"
                             title="본문 복사"
                         >
                             {copiedMessage === fb.id ? (
-                                <svg className="w-4 h-4 text-green-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                <svg className="w-4 h-4 text-green-500 dark:text-green-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                                 </svg>
                             ) : (
@@ -138,7 +141,7 @@ export default function FeedbackItem({
                                 e.stopPropagation();
                                 onSetDeleteTarget(fb);
                             }}
-                            className="p-1.5 rounded-lg text-surface-400 hover:text-red-500 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-900/30 transition-all"
+                            className="p-2 min-h-[48px] min-w-[48px] flex items-center justify-center rounded-lg text-surface-400 dark:text-surface-500 hover:text-red-500 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-900/30 transition-all"
                             title="삭제"
                         >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -146,7 +149,7 @@ export default function FeedbackItem({
                             </svg>
                         </button>
                         <svg
-                            className={`w-4 h-4 text-surface-400 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
+                            className={`w-4 h-4 text-surface-400 dark:text-surface-500 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`}
                             fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"
                         >
                             <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
@@ -171,7 +174,7 @@ export default function FeedbackItem({
                                     <button
                                         key={idx}
                                         onClick={() => onSetSelectedImage(url)}
-                                        className="w-24 h-24 rounded-xl overflow-hidden border border-surface-200 dark:border-surface-600 hover:border-primary-300 hover:shadow-md transition-all"
+                                        className="w-24 h-24 rounded-xl overflow-hidden border border-surface-200 dark:border-surface-600 hover:border-primary-300 dark:hover:border-primary-700/50 hover:shadow-md transition-all"
                                     >
                                         <img
                                             src={url}
@@ -192,12 +195,12 @@ export default function FeedbackItem({
                                 <div className="flex items-center gap-2 mb-2">
                                     <span className="text-sm font-semibold text-green-600 dark:text-green-400">✅ 발송된 답변</span>
                                     {fb.repliedBy === 'superAdmin' && (
-                                        <span className="text-xs px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300">
+                                        <span className="text-xs px-1.5 py-0.5 rounded-full btn-soft-blue">
                                             관리자
                                         </span>
                                     )}
                                     {fb.repliedAt && (
-                                        <span className="text-xs text-surface-400">
+                                        <span className="text-xs text-surface-400 dark:text-surface-500">
                                             {formatTimestampFull(fb.repliedAt)}
                                         </span>
                                     )}
@@ -214,7 +217,7 @@ export default function FeedbackItem({
                                     <div className="flex items-center gap-2 flex-wrap">
                                         <span className="text-sm font-semibold text-surface-700 dark:text-surface-300">🤖 AI 답변 초안</span>
                                         {fb.aiMatchedFaqId != null || fb.aiMatchedFaqIndex != null ? (
-                                            <span className="text-xs px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-600 dark:bg-blue-900/30 dark:text-blue-300 whitespace-nowrap">
+                                            <span className="text-xs px-1.5 py-0.5 rounded-full btn-soft-blue whitespace-nowrap">
                                                 {fb.aiMatchedFaqId ? 'FAQ 매칭' : `Q${fb.aiMatchedFaqIndex} 매칭`}
                                                 {fb.aiConfidence != null && ` (${Math.round(fb.aiConfidence * 100)}%)`}
                                             </span>
@@ -236,7 +239,7 @@ export default function FeedbackItem({
                                                     ⚠ 실패
                                                 </span>
                                             ) : (
-                                                <span className="flex items-center gap-1 text-xs text-surface-400">
+                                                <span className="flex items-center gap-1 text-xs text-surface-400 dark:text-surface-500">
                                                     <span className="w-3 h-3 spinner" /> 생성 중...
                                                 </span>
                                             );
@@ -245,7 +248,7 @@ export default function FeedbackItem({
                                     <button
                                         onClick={() => onRegenerateDraft(fb.id)}
                                         disabled={regeneratingDraftId === fb.id || sendingReply === fb.id}
-                                        className="flex-shrink-0 flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-surface-500 dark:text-surface-400 hover:text-primary-600 dark:hover:text-primary-400 bg-surface-100 dark:bg-surface-700 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 min-h-[48px] text-xs font-medium text-surface-500 dark:text-surface-400 hover:text-primary-600 dark:hover:text-primary-400 bg-surface-100 dark:bg-surface-700 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                                         title="새로운 답변 초안 생성"
                                     >
                                         {regeneratingDraftId === fb.id ? (
@@ -274,7 +277,7 @@ export default function FeedbackItem({
 
                                 {/* 에러 메시지 */}
                                 {replyError && sendingReply === fb.id && (
-                                    <p className="text-xs text-red-500 mt-1">{replyError}</p>
+                                    <p className="text-xs text-red-500 dark:text-red-400 mt-1">{replyError}</p>
                                 )}
 
                                 {/* 발송 버튼 */}
@@ -284,7 +287,7 @@ export default function FeedbackItem({
                                             if (replyText.trim()) onSendReply(fb.id, replyText);
                                         }}
                                         disabled={sendingReply === fb.id || !replyText.trim()}
-                                        className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-primary-500 hover:bg-primary-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
+                                        className="px-4 py-2 min-h-[48px] rounded-xl text-sm font-medium text-white bg-primary-500 dark:bg-primary-600 hover:bg-primary-600 dark:hover:bg-primary-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center gap-2"
                                     >
                                         {sendingReply === fb.id ? (
                                             <>

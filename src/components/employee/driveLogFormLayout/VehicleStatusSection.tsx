@@ -34,7 +34,7 @@ const VehicleStatusSection = memo(function VehicleStatusSection({
                                 min="0" max="100"
                                 value={form.batteryStart}
                                 onChange={e => setForm({ ...form, batteryStart: e.target.value })}
-                                className="input"
+                                className="input min-h-[48px]"
                                 placeholder={lastEndBattery != null ? `이전 도착: ${lastEndBattery}%` : '80'}
                             />
                         </div>
@@ -46,7 +46,7 @@ const VehicleStatusSection = memo(function VehicleStatusSection({
                                 min="0" max="100"
                                 value={form.batteryEnd}
                                 onChange={e => setForm({ ...form, batteryEnd: e.target.value })}
-                                className="input"
+                                className="input min-h-[48px]"
                                 placeholder="45"
                             />
                         </div>
@@ -72,7 +72,7 @@ const VehicleStatusSection = memo(function VehicleStatusSection({
                                 type="number"
                                 value={form.hipassBalanceAfter}
                                 onChange={e => setForm({ ...form, hipassBalanceAfter: e.target.value })}
-                                className="input"
+                                className="input min-h-[48px]"
                                 placeholder={hipassCard.balance.toLocaleString()}
                                 min="0"
                             />
@@ -80,21 +80,21 @@ const VehicleStatusSection = memo(function VehicleStatusSection({
                     </div>
                     {form.hipassBalanceAfter !== '' && (
                         <div className="mt-3 flex items-center justify-between px-1">
-                            <span className="text-xs text-surface-400">
-                                사용 금액: <span className="font-bold text-red-500">-{(hipassCard.balance - Number(form.hipassBalanceAfter)).toLocaleString()}원</span>
+                            <span className="text-xs text-surface-400 dark:text-surface-500">
+                                사용 금액: <span className="font-bold text-red-500 dark:text-red-400">-{(hipassCard.balance - Number(form.hipassBalanceAfter)).toLocaleString()}원</span>
                             </span>
                             <span className={`text-sm font-bold ${
                                 Number(form.hipassBalanceAfter) <= 5000
-                                    ? 'text-red-500'
+                                    ? 'text-red-500 dark:text-red-400'
                                     : Number(form.hipassBalanceAfter) <= 20000
-                                        ? 'text-amber-500'
+                                        ? 'text-amber-500 dark:text-amber-400'
                                         : 'text-accent-600 dark:text-accent-400'
                             }`}>
                                 잔액: {Number(form.hipassBalanceAfter).toLocaleString()}원
                             </span>
                         </div>
                     )}
-                    <p className="text-xs text-surface-400 mt-2">하이패스 사용 시 사용후 금액을 입력하면 잔액이 자동으로 업데이트됩니다</p>
+                    <p className="text-xs text-surface-400 dark:text-surface-500 mt-2">하이패스 사용 시 사용후 금액을 입력하면 잔액이 자동으로 업데이트됩니다</p>
                 </div>
             )}
         </div>

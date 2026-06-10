@@ -32,7 +32,7 @@ export default function VehicleHistory() {
             {vehicles.length === 0 ? (
                 <div className="glass-card p-12 text-center">
                     <div className="text-4xl mb-3">🚗</div>
-                    <p className="text-surface-400 font-medium">등록된 차량이 없습니다</p>
+                    <p className="text-surface-400 dark:text-surface-500 font-medium">등록된 차량이 없습니다</p>
                 </div>
             ) : (
                 <>
@@ -41,7 +41,7 @@ export default function VehicleHistory() {
                         <button
                             type="button"
                             onClick={() => setDropdownOpen((prev: boolean) => !prev)}
-                            className="w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl border border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 transition-all hover:border-surface-300 dark:hover:border-surface-500"
+                            className="w-full flex items-center justify-between gap-3 px-4 py-3 min-h-[48px] rounded-xl border border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 transition-all hover:border-surface-300 dark:hover:border-surface-500"
                         >
                             <div className="flex items-center gap-3 min-w-0">
                                 {selectedVehicle && (
@@ -51,13 +51,13 @@ export default function VehicleHistory() {
                                         </span>
                                         <div className="min-w-0 text-left">
                                             <p className="text-sm font-semibold text-surface-900 dark:text-surface-100 truncate">{selectedVehicle.displayName}</p>
-                                            <p className="text-xs text-surface-400 truncate">{selectedVehicle.plateNumber}</p>
+                                            <p className="text-xs text-surface-400 dark:text-surface-500 truncate">{selectedVehicle.plateNumber}</p>
                                         </div>
                                     </>
                                 )}
                             </div>
                             {/* 화살표 아이콘 */}
-                            <svg className={`w-4 h-4 text-surface-400 flex-shrink-0 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <svg aria-hidden="true" className={`w-4 h-4 text-surface-400 dark:text-surface-500 flex-shrink-0 transition-transform duration-200 ${dropdownOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                             </svg>
                         </button>
@@ -71,7 +71,7 @@ export default function VehicleHistory() {
                                             key={v.id}
                                             type="button"
                                             onClick={() => handleSelectVehicle(v.id)}
-                                            className={`w-full flex items-center gap-3 px-4 py-2.5 text-left transition-colors ${selectedVehicleId === v.id
+                                            className={`w-full flex items-center gap-3 px-4 py-2.5 min-h-[48px] text-left transition-colors ${selectedVehicleId === v.id
                                                 ? 'bg-primary-50 dark:bg-primary-900/20'
                                                 : 'hover:bg-surface-50 dark:hover:bg-surface-700'
                                                 }`}
@@ -81,10 +81,10 @@ export default function VehicleHistory() {
                                             </span>
                                             <div className="min-w-0 flex-1">
                                                 <p className="text-sm font-medium text-surface-900 dark:text-surface-100 truncate">{v.displayName}</p>
-                                                <p className="text-xs text-surface-400 truncate">{v.plateNumber}</p>
+                                                <p className="text-xs text-surface-400 dark:text-surface-500 truncate">{v.plateNumber}</p>
                                             </div>
                                             {selectedVehicleId === v.id && (
-                                                <svg className="w-4 h-4 text-primary-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                                <svg aria-hidden="true" className="w-4 h-4 text-primary-500 dark:text-primary-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                                     <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
                                                 </svg>
                                             )}
@@ -101,9 +101,9 @@ export default function VehicleHistory() {
                             <button
                                 key={opt.days}
                                 onClick={() => setPeriod(opt.days)}
-                                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${period === opt.days
-                                    ? 'bg-surface-800 text-white border-surface-800'
-                                    : 'bg-white dark:bg-surface-800 text-surface-600 dark:text-surface-400 border-surface-200 dark:border-surface-600 hover:border-surface-400'
+                                className={`px-3 py-1.5 min-h-[48px] min-w-[48px] rounded-full text-xs font-medium border transition-all ${period === opt.days
+                                    ? 'bg-surface-800 text-white border-surface-800 dark:bg-surface-600 dark:border-surface-600'
+                                    : 'bg-white dark:bg-surface-800 text-surface-600 dark:text-surface-400 border-surface-200 dark:border-surface-600 hover:border-surface-400 dark:hover:border-surface-500'
                                     }`}
                             >
                                 {opt.label}
@@ -121,12 +121,12 @@ export default function VehicleHistory() {
                                     </span>
                                     <div>
                                         <p className="font-semibold text-surface-900 dark:text-surface-100">{selectedVehicle.displayName}</p>
-                                        <p className="text-xs text-surface-400">{selectedVehicle.plateNumber}</p>
+                                        <p className="text-xs text-surface-400 dark:text-surface-500">{selectedVehicle.plateNumber}</p>
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                    <p className="text-lg font-bold text-primary-600">{totalDistance.toLocaleString()} km</p>
-                                    <p className="text-xs text-surface-400">{logs.length}건 운행</p>
+                                    <p className="text-lg font-bold text-primary-600 dark:text-primary-400">{totalDistance.toLocaleString()} km</p>
+                                    <p className="text-xs text-surface-400 dark:text-surface-500">{logs.length}건 운행</p>
                                 </div>
                             </div>
                         </div>
@@ -139,7 +139,7 @@ export default function VehicleHistory() {
                         </div>
                     ) : logs.length === 0 ? (
                         <div className="glass-card p-10 text-center">
-                            <p className="text-surface-400 text-sm">해당 기간에 운행 기록이 없습니다</p>
+                            <p className="text-surface-400 dark:text-surface-500 text-sm">해당 기간에 운행 기록이 없습니다</p>
                         </div>
                     ) : (
                         <div className="space-y-2">
@@ -148,28 +148,28 @@ export default function VehicleHistory() {
                                     <div className="flex items-center justify-between mb-2">
                                         <div className="flex items-center gap-2">
                                             <span className="text-xs font-medium text-surface-500 dark:text-surface-400">{formatTimestamp(log.timestamp)}</span>
-                                            <span className="text-xs text-surface-300">{formatTimestampTime(log.timestamp)}</span>
+                                            <span className="text-xs text-surface-300 dark:text-surface-600">{formatTimestampTime(log.timestamp)}</span>
                                         </div>
-                                        <span className="text-sm font-bold text-primary-600">
+                                        <span className="text-sm font-bold text-primary-600 dark:text-primary-400">
                                             {((log.endKm - log.startKm) || 0).toLocaleString()} km
                                         </span>
                                     </div>
                                     <div className="flex items-center gap-2 text-sm">
-                                        <span className="w-6 h-6 rounded-full bg-surface-100 flex items-center justify-center text-xs">
+                                        <span className="w-6 h-6 rounded-full bg-surface-100 dark:bg-surface-800 flex items-center justify-center text-xs">
                                             👤
                                         </span>
                                         <span className="text-surface-700 dark:text-surface-300 font-medium">{log.driverName}</span>
                                         {log.destination && (
                                             <>
-                                                <span className="text-surface-300">→</span>
+                                                <span className="text-surface-300 dark:text-surface-600">→</span>
                                                 <span className="text-surface-600 dark:text-surface-400 truncate">{log.destination}</span>
                                             </>
                                         )}
                                     </div>
                                     {log.purpose && (
-                                        <p className="text-xs text-surface-400 mt-1 ml-8">{log.purpose}</p>
+                                        <p className="text-xs text-surface-400 dark:text-surface-500 mt-1 ml-8">{log.purpose}</p>
                                     )}
-                                    <div className="text-xs text-surface-400 mt-1.5 ml-8 font-mono">
+                                    <div className="text-xs text-surface-400 dark:text-surface-500 mt-1.5 ml-8 font-mono">
                                         {log.startKm?.toLocaleString()} → {log.endKm?.toLocaleString()} km
                                         {log.startTime && log.endTime && (
                                             <span className="ml-2">({log.startTime} ~ {log.endTime})</span>

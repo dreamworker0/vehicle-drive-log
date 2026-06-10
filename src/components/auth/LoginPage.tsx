@@ -47,7 +47,7 @@ export default function LoginPage() {
                 {/* 첫 페이지로 돌아가기 */}
                 <button
                     onClick={() => navigate('/')}
-                    className="flex items-center gap-1.5 text-primary-200/80 hover:text-white text-sm mb-4 transition-colors group"
+                    className="flex items-center gap-1.5 text-primary-200/80 hover:text-white text-sm mb-4 transition-colors group min-h-[48px] px-2 -ml-2"
                 >
                     <svg className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
@@ -82,7 +82,7 @@ export default function LoginPage() {
                             <button
                                 onClick={handleGoogleLogin}
                                 disabled={loading}
-                                className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-600 rounded-xl font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:bg-surface-800 hover:shadow-md transition-all duration-200 disabled:opacity-50 active:scale-[0.98]"
+                                className="w-full flex items-center justify-center gap-3 px-4 py-3 min-h-[48px] bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-600 rounded-xl font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800/50 dark:bg-surface-800 hover:shadow-md transition-all duration-200 disabled:opacity-50 active:scale-[0.98]"
                             >
                                 {loading ? (
                                     <div className="w-5 h-5 spinner" />
@@ -98,14 +98,14 @@ export default function LoginPage() {
                             </button>
                 </div>
 
-                <p className="text-center text-primary-200/80 text-xs mt-6 space-x-2">
-                    <a href="/terms" className="hover:text-white underline underline-offset-2 transition-colors">이용약관</a>
+                <p className="text-center text-primary-200/80 text-xs mt-6 flex flex-wrap justify-center gap-x-2 gap-y-2 items-center min-h-[48px]">
+                    <a href="/terms" className="hover:text-white underline underline-offset-2 transition-colors p-2 -m-2">이용약관</a>
                     <span className="text-primary-300/40">|</span>
-                    <a href="/privacy" className="hover:text-white underline underline-offset-2 transition-colors">개인정보 처리방침</a>
+                    <a href="/privacy" className="hover:text-white underline underline-offset-2 transition-colors p-2 -m-2">개인정보 처리방침</a>
                     <span className="text-primary-300/40">|</span>
-                    <a href="/release-notes" className="hover:text-white underline underline-offset-2 transition-colors">업데이트 소식</a>
+                    <a href="/release-notes" className="hover:text-white underline underline-offset-2 transition-colors p-2 -m-2">업데이트 소식</a>
                     <span className="text-primary-300/40">|</span>
-                    <a href="/faq" className="hover:text-white underline underline-offset-2 transition-colors">자주 하는 질문</a>
+                    <a href="/faq" className="hover:text-white underline underline-offset-2 transition-colors p-2 -m-2">자주 하는 질문</a>
                 </p>
 
                 <p className="text-center text-primary-300/60 text-xs mt-2">

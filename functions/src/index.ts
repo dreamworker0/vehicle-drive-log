@@ -126,3 +126,6 @@ export { onDriveLogCreated, onDriveLogUpdated, onDriveLogDeleted } from "./handl
 
 // 구글 캘린더 온디맨드 동기화 API
 export { triggerOnDemandCalendarSync } from "./handlers/callable/triggerOnDemandCalendarSync";
+
+// 대시보드 통계용 일일 배치 집계 스케줄러 (매일 새벽 2시)
+export { dailyAggregation } from "./handlers/scheduled/dailyAggregation";

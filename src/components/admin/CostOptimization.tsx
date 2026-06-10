@@ -41,7 +41,7 @@ function FuelTooltip({ active, payload }: { active?: boolean; payload?: Array<{ 
         <div className="bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-600 rounded-lg p-3 shadow-lg text-sm">
             <p className="font-semibold text-surface-900 dark:text-surface-100 mb-1">{d.name}</p>
             <p className="text-surface-600 dark:text-surface-400">km당 연료비: <span className="font-mono font-bold text-primary-600">{d.costPerKm}원</span></p>
-            <p className="text-surface-400 text-xs mt-1">총 주행: {d.totalDist?.toLocaleString()}km · 총 비용: {d.totalCost?.toLocaleString()}원</p>
+            <p className="text-surface-400 dark:text-surface-500 text-xs mt-1">총 주행: {d.totalDist?.toLocaleString()}km · 총 비용: {d.totalCost?.toLocaleString()}원</p>
         </div>
     );
 }
@@ -190,8 +190,8 @@ export default function CostOptimization({
             <div className="glass-card p-5">
                 <SectionTitle icon="⛽" title="차량별 연료 효율 (km당 비용)" />
                 {avgCostPerKm > 0 && (
-                    <p className="text-xs text-surface-400 mb-3">
-                        전체 평균: <span className="font-mono font-semibold text-primary-600">{avgCostPerKm}원/km</span>
+                    <p className="text-xs text-surface-400 dark:text-surface-500 mb-3">
+                        전체 평균: <span className="font-mono font-semibold text-primary-600 dark:text-primary-400">{avgCostPerKm}원/km</span>
                     </p>
                 )}
                 {fuelItems.length > 0 ? (
@@ -241,7 +241,7 @@ export default function CostOptimization({
                         </div>
                     </>
                 ) : (
-                    <p className="text-surface-400 text-center py-8">연료비 데이터가 없습니다</p>
+                    <p className="text-surface-400 dark:text-surface-500 text-center py-8">연료비 데이터가 없습니다</p>
                 )}
             </div>
 
@@ -274,7 +274,7 @@ export default function CostOptimization({
                         </table>
                     </div>
                 ) : (
-                    <p className="text-surface-400 text-center py-8">정비 기록이 없습니다</p>
+                    <p className="text-surface-400 dark:text-surface-500 text-center py-8">정비 기록이 없습니다</p>
                 )}
             </div>
 
@@ -306,7 +306,7 @@ export default function CostOptimization({
                 <div className="glass-card p-8 text-center">
                     <div className="text-4xl mb-3">✅</div>
                     <p className="text-surface-600 dark:text-surface-400 font-medium">모든 지표가 양호합니다</p>
-                    <p className="text-surface-400 text-sm mt-1">특별한 최적화 추천 사항이 없습니다.</p>
+                    <p className="text-surface-400 dark:text-surface-500 text-sm mt-1">특별한 최적화 추천 사항이 없습니다.</p>
                 </div>
             )}
         </div>

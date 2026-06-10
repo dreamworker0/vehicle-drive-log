@@ -107,6 +107,7 @@ export default function ConfirmModal({
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={onCancel} role="presentation">
+            {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */}
             <div ref={dialogRef} className="glass-card p-6 w-full max-w-sm animate-scale-in" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title" aria-describedby="confirm-modal-desc">
                 {title && (
                     <h3 id="confirm-modal-title" className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-2">{title}</h3>
@@ -123,18 +124,18 @@ export default function ConfirmModal({
                             value={inputValue}
                             onChange={e => setInputValue(e.target.value)}
                             onKeyDown={handleKeyDown}
-                            className="input"
+                            className="input min-h-[48px]"
                             placeholder={inputPlaceholder}
                         />
                     </div>
                 )}
                 <div className="flex gap-3">
-                    {cancelText && <button type="button" onClick={onCancel} className="btn-secondary flex-1">{cancelText}</button>}
+                    {cancelText && <button type="button" onClick={onCancel} className="btn-secondary flex-1 min-h-[48px]">{cancelText}</button>}
                     <button
                         ref={confirmBtnRef}
                         type="button"
                         onClick={handleConfirm}
-                        className={`flex-1 px-4 py-2.5 rounded-xl font-medium transition-all ${btnColors[confirmColor] || btnColors.primary}`}
+                        className={`flex-1 px-4 py-2.5 rounded-xl font-medium transition-all min-h-[48px] ${btnColors[confirmColor] || btnColors.primary}`}
                     >
                         {confirmText}
                     </button>

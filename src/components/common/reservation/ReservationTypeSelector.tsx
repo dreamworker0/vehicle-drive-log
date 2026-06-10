@@ -31,7 +31,7 @@ export default memo(function ReservationTypeSelector({ form, setForm, selectedDa
                                 setForm(prev => ({ ...prev, endDate: '' }));
                             }
                         }}
-                        className="w-4 h-4 rounded border-surface-300 dark:border-surface-600 text-primary-600 focus:ring-primary-500"
+                        className="w-4 h-4 rounded border-surface-300 dark:border-surface-600 text-primary-600 dark:text-primary-400 focus:ring-primary-500"
                     />
                     <span className="text-sm font-medium text-surface-600 dark:text-surface-300">
                         다일 예약
@@ -74,7 +74,7 @@ export default memo(function ReservationTypeSelector({ form, setForm, selectedDa
                                 }));
                             }
                         }}
-                        className="w-4 h-4 rounded border-surface-300 dark:border-surface-600 text-purple-600 focus:ring-purple-500"
+                        className="w-4 h-4 rounded border-surface-300 dark:border-surface-600 text-purple-600 dark:text-purple-400 focus:ring-purple-500"
                     />
                     <span className="text-sm font-medium text-surface-600 dark:text-surface-300">
                         반복 예약
@@ -86,10 +86,10 @@ export default memo(function ReservationTypeSelector({ form, setForm, selectedDa
             {form.endDate && form.endDate > selectedDate && !form.isRecurring && (
                 <div className="grid grid-cols-2 gap-2 animate-fade-in">
                     <div>
-                        <label className="label text-xs text-surface-400">시작일</label>
+                        <label className="label text-xs text-surface-400 dark:text-surface-500">시작일</label>
                         <p className="text-sm text-surface-600 dark:text-surface-300 px-2 py-1.5 bg-surface-100 dark:bg-surface-700/50 rounded-lg h-[38px] flex items-center">
                             {selectedDate}
-                            <span className="text-surface-400 ml-1 text-xs">
+                            <span className="text-surface-400 dark:text-surface-500 ml-1 text-xs">
                                 ({['일','월','화','수','목','금','토'][new Date(selectedDate + 'T00:00').getDay()]})
                             </span>
                         </p>

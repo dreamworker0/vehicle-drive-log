@@ -84,7 +84,7 @@ export default function CancelReservationHandler() {
                 {loading && (
                     <div className="p-8 text-center">
                         <div className="w-10 h-10 spinner mx-auto mb-3"></div>
-                        <p className="text-surface-500 text-sm">예약 정보를 불러오는 중...</p>
+                        <p className="text-surface-500 dark:text-surface-400 text-sm">예약 정보를 불러오는 중...</p>
                     </div>
                 )}
 
@@ -106,7 +106,7 @@ export default function CancelReservationHandler() {
                         </p>
                         <button
                             onClick={handleClose}
-                            className="btn-primary w-full"
+                            className="btn-primary w-full min-h-[48px]"
                         >
                             확인
                         </button>
@@ -163,14 +163,14 @@ export default function CancelReservationHandler() {
                                 <button
                                     onClick={handleKeep}
                                     disabled={cancelling}
-                                    className="flex-1 py-3 px-4 rounded-xl border-2 border-surface-200 dark:border-surface-600 text-surface-700 dark:text-surface-200 font-semibold text-sm hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors"
+                                    className="flex-1 py-3 px-4 rounded-xl border-2 border-surface-200 dark:border-surface-600 text-surface-700 dark:text-surface-200 font-semibold text-sm hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors min-h-[48px]"
                                 >
                                     계속 유지
                                 </button>
                                 <button
                                     onClick={handleCancel}
                                     disabled={cancelling}
-                                    className="flex-1 py-3 px-4 rounded-xl bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 text-white font-semibold text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                                    className="flex-1 py-3 px-4 rounded-xl bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 text-white font-semibold text-sm transition-colors disabled:opacity-50 flex items-center justify-center gap-2 min-h-[48px]"
                                 >
                                     {cancelling ? (
                                         <>

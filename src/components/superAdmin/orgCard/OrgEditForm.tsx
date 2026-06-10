@@ -37,7 +37,7 @@ export default memo(function OrgEditForm({ orgId, initialName, initialAddress, o
     };
 
     return (
-        <div className="space-y-3" onClick={e => e.stopPropagation()}>
+        <div role="presentation" className="space-y-3" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
             <div>
                 <label className="text-xs font-medium text-surface-500 dark:text-surface-400 mb-1 block">기관명 <span className="text-red-500">*</span></label>
                 <input
@@ -46,7 +46,6 @@ export default memo(function OrgEditForm({ orgId, initialName, initialAddress, o
                     onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))}
                     className="input text-sm"
                     placeholder="기관명"
-                    autoFocus
                 />
             </div>
             <div>
@@ -63,14 +62,14 @@ export default memo(function OrgEditForm({ orgId, initialName, initialAddress, o
                 <button
                     onClick={handleSave}
                     disabled={saving || !form.name.trim()}
-                    className="btn-primary btn-sm text-xs"
+                    className="btn-primary btn-sm text-xs min-h-[48px]"
                 >
                     {saving ? (<><div className="w-3 h-3 spinner" />저장 중...</>) : '저장'}
                 </button>
                 <button
                     onClick={handleCancel}
                     disabled={saving}
-                    className="btn-ghost btn-sm text-xs"
+                    className="btn-ghost btn-sm text-xs min-h-[48px]"
                 >
                     취소
                 </button>

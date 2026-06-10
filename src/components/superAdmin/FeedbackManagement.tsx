@@ -99,7 +99,7 @@ export default function FeedbackManagement() {
                         <button
                             key={f.key}
                             onClick={() => setFilter(f.key as 'all' | 'unread' | 'resolved')}
-                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${filter === f.key
+                            className={`px-3 py-1.5 min-h-[48px] rounded-lg text-sm font-medium transition-all ${filter === f.key
                                 ? 'bg-white dark:bg-surface-700 text-primary-700 dark:text-primary-300 shadow-sm'
                                 : 'text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-300'
                                 }`}
@@ -117,7 +117,7 @@ export default function FeedbackManagement() {
                         <button
                             key={v.key}
                             onClick={() => setViewMode(v.key as 'grouped' | 'timeline')}
-                            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-all ${viewMode === v.key
+                            className={`px-3 py-1.5 min-h-[48px] rounded-lg text-sm font-medium transition-all ${viewMode === v.key
                                 ? 'bg-white dark:bg-surface-700 text-primary-700 dark:text-primary-300 shadow-sm'
                                 : 'text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-300'
                                 }`}
@@ -128,7 +128,7 @@ export default function FeedbackManagement() {
                 </div>
 
                 <div className="relative flex-1">
-                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                    <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400 dark:text-surface-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
                     </svg>
                     <input
@@ -144,10 +144,10 @@ export default function FeedbackManagement() {
             {/* 피드백 목록 */}
             {totalFiltered === 0 ? (
                 <div className="glass-card p-12 text-center">
-                    <svg className="w-16 h-16 mx-auto text-surface-200 mb-4" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
+                    <svg className="w-16 h-16 mx-auto text-surface-200 dark:text-surface-600 mb-4" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 0 1 1.037-.443 48.282 48.282 0 0 0 5.68-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
                     </svg>
-                    <p className="text-surface-400 text-lg font-medium">
+                    <p className="text-surface-400 dark:text-surface-500 text-lg font-medium">
                         {feedbacks.length === 0 ? '받은 의견이 없습니다' : '검색 결과가 없습니다'}
                     </p>
                 </div>
@@ -192,21 +192,21 @@ export default function FeedbackManagement() {
                                                         {group.items.length}
                                                     </span>
                                                     {group.unreadCount > 0 && (
-                                                        <span className="w-2 h-2 rounded-full bg-primary-500 flex-shrink-0" />
+                                                        <span className="w-2 h-2 rounded-full bg-primary-500 dark:bg-primary-600 flex-shrink-0" />
                                                     )}
                                                 </div>
                                                 {group.email && (
                                                     <span className="flex items-center gap-1 min-w-0">
-                                                        <span className="text-xs text-surface-400 truncate">
+                                                        <span className="text-xs text-surface-400 dark:text-surface-500 truncate">
                                                             {group.email}
                                                         </span>
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); handleCopyEmail(e, group.email); }}
-                                                            className="flex-shrink-0 p-0.5 rounded hover:bg-surface-200 dark:hover:bg-surface-600 text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
+                                                            className="flex-shrink-0 p-2 min-h-[48px] min-w-[48px] flex items-center justify-center rounded hover:bg-surface-200 dark:hover:bg-surface-600 text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
                                                             title="이메일 복사"
                                                         >
                                                             {copiedEmail === group.email ? (
-                                                                <svg className="w-3.5 h-3.5 text-green-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                                                <svg className="w-3.5 h-3.5 text-green-500 dark:text-green-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                                                                     <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                                                                 </svg>
                                                             ) : (
@@ -222,11 +222,11 @@ export default function FeedbackManagement() {
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2 flex-shrink-0">
-                                            <span className="text-xs text-surface-400 hidden sm:inline">
+                                            <span className="text-xs text-surface-400 dark:text-surface-500 hidden sm:inline">
                                                 최근 {latestTime}
                                             </span>
                                             <svg
-                                                className={`w-4 h-4 text-surface-400 transition-transform duration-200 ${isGroupOpen ? 'rotate-180' : ''}`}
+                                                className={`w-4 h-4 text-surface-400 dark:text-surface-500 transition-transform duration-200 ${isGroupOpen ? 'rotate-180' : ''}`}
                                                 fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"
                                             >
                                                 <path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
@@ -250,23 +250,28 @@ export default function FeedbackManagement() {
             {/* 이미지 확대 모달 */}
             {selectedImage && (
                 <div
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedImage(null); } }}
                     className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
                     onClick={() => setSelectedImage(null)}
                 >
                     <div className="relative max-w-3xl max-h-[90vh] mx-4 animate-scale-in">
                         <button
                             onClick={() => setSelectedImage(null)}
-                            className="absolute -top-3 -right-3 w-8 h-8 bg-white dark:bg-surface-800 rounded-full shadow-lg flex items-center justify-center text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:text-surface-300 transition-colors z-10"
+                            className="absolute -top-3 -right-3 w-12 h-12 bg-white dark:bg-surface-800 rounded-full shadow-lg flex items-center justify-center text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-300 transition-colors z-10"
                         >
                             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
                             </svg>
                         </button>
                         <img
+                            role="presentation"
                             src={selectedImage}
                             alt="확대 이미지"
                             className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain"
                             onClick={e => e.stopPropagation()}
+                            onKeyDown={e => e.stopPropagation()}
                         />
                     </div>
                 </div>
@@ -275,16 +280,21 @@ export default function FeedbackManagement() {
             {/* 삭제 확인 모달 */}
             {deleteTarget && (
                 <div
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (!deleting) setDeleteTarget(null); } }}
                     className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
                     onClick={() => !deleting && setDeleteTarget(null)}
                 >
                     <div
+                        role="presentation"
                         className="bg-white dark:bg-surface-800 rounded-2xl shadow-2xl p-6 max-w-sm mx-4 animate-scale-in"
                         onClick={e => e.stopPropagation()}
+                        onKeyDown={e => e.stopPropagation()}
                     >
                         <div className="flex items-center gap-3 mb-4">
                             <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center flex-shrink-0">
-                                <svg className="w-5 h-5 text-red-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                <svg className="w-5 h-5 text-red-500 dark:text-red-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                                 </svg>
                             </div>
@@ -295,19 +305,19 @@ export default function FeedbackManagement() {
                                 </p>
                             </div>
                         </div>
-                        <p className="text-xs text-surface-400 mb-5">삭제된 의견은 복구할 수 없습니다.</p>
+                        <p className="text-xs text-surface-400 dark:text-surface-500 mb-5">삭제된 의견은 복구할 수 없습니다.</p>
                         <div className="flex gap-2 justify-end">
                             <button
                                 onClick={() => setDeleteTarget(null)}
                                 disabled={deleting}
-                                className="px-4 py-2 rounded-xl text-sm font-medium text-surface-600 dark:text-surface-400 bg-surface-100 dark:bg-surface-700 hover:bg-surface-200 dark:hover:bg-surface-600 transition-colors"
+                                className="px-4 py-2 min-h-[48px] rounded-xl text-sm font-medium text-surface-600 dark:text-surface-400 bg-surface-100 dark:bg-surface-700 hover:bg-surface-200 dark:hover:bg-surface-600 transition-colors"
                             >
                                 취소
                             </button>
                             <button
                                 onClick={handleDelete}
                                 disabled={deleting}
-                                className="px-4 py-2 rounded-xl text-sm font-medium text-white bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 transition-colors disabled:opacity-50"
+                                className="px-4 py-2 min-h-[48px] rounded-xl text-sm font-medium text-white bg-red-500 hover:bg-red-600 dark:bg-red-600 dark:hover:bg-red-700 transition-colors disabled:opacity-50"
                             >
                                 {deleting ? '삭제 중...' : '삭제'}
                             </button>

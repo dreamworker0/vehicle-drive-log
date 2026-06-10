@@ -114,7 +114,7 @@ export default function VehicleCalendarSection({
                         type="button"
                         onClick={handleCalendarTest}
                         disabled={calTestLoading}
-                        className="shrink-0 px-3 py-2 rounded-xl text-xs font-medium border border-primary-300 dark:border-primary-600 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors disabled:opacity-50"
+                        className="shrink-0 px-3 py-2 rounded-xl text-xs font-medium border border-primary-300 dark:border-primary-600 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors disabled:opacity-50 min-h-[48px]"
                     >
                         {calTestLoading ? (
                             <span className="flex items-center gap-1.5">
@@ -242,7 +242,7 @@ export default function VehicleCalendarSection({
                             <button
                                 type="button"
                                 onClick={handleCopyEmail}
-                                className="shrink-0 px-2.5 py-1.5 text-[11px] rounded bg-primary-500 text-white hover:bg-primary-600 transition-colors"
+                                className="shrink-0 px-2.5 py-1.5 text-[11px] rounded bg-primary-500 text-white hover:bg-primary-600 transition-colors min-h-[48px]"
                             >
                                 복사
                             </button>

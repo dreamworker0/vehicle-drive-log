@@ -26,7 +26,7 @@ const DriveLogMobileCard = React.memo(({ log }: { log: Record<string, unknown> }
                     <span>· {String(log.startTime || '?')}~{String(log.endTime || '?')}</span>
                 )}
                 {Number(log.passengers) > 0 && (
-                    <span className="text-primary-500">· 👥 {Number(log.passengers)}명</span>
+                    <span className="text-primary-500 dark:text-primary-400">· 👥 {Number(log.passengers)}명</span>
                 )}
             </div>
         </div>
@@ -120,7 +120,7 @@ export default function DailyLogView() {
                             type="date"
                             value={selectedDate}
                             onChange={e => setSelectedDate(e.target.value)}
-                            className="input w-full"
+                            className="input w-full min-h-[48px]"
                         />
                     </div>
                     <div className="flex-1">
@@ -130,7 +130,7 @@ export default function DailyLogView() {
                         <select
                             value={selectedVehicleId}
                             onChange={e => setSelectedVehicleId(e.target.value)}
-                            className="input w-full"
+                            className="input w-full min-h-[48px]"
                         >
                             {vehicles.length === 0 && <option value="">차량 없음</option>}
                             {vehicles.map(v => (
@@ -143,7 +143,7 @@ export default function DailyLogView() {
                     <button
                         onClick={handlePdfDownload}
                         disabled={driveLogs.length === 0 || loadingData}
-                        className="btn-primary btn-sm flex items-center gap-2 disabled:opacity-50 whitespace-nowrap h-[42px]"
+                        className="btn-primary btn-sm flex items-center gap-2 disabled:opacity-50 whitespace-nowrap min-h-[48px]"
                     >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
@@ -165,7 +165,7 @@ export default function DailyLogView() {
                 <div className="glass-card p-12 text-center">
                     <div className="text-4xl mb-3">📋</div>
                     <p className="text-surface-900 dark:text-surface-100 font-medium mb-1">운행 기록 없음</p>
-                    <p className="text-sm text-surface-400">
+                    <p className="text-sm text-surface-400 dark:text-surface-500">
                         {selectedDate} · {selectedVehicle?.displayName || '차량 미선택'} — 해당 날짜에 기록이 없습니다
                     </p>
                 </div>
@@ -177,28 +177,28 @@ export default function DailyLogView() {
                     {/* 운행상황 요약 카드 */}
                     <div className="glass-card p-4">
                         <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300 mb-3 flex items-center gap-2">
-                            <svg className="w-4 h-4 text-primary-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                            <svg className="w-4 h-4 text-primary-500 dark:text-primary-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 0 1 3 19.875v-6.75ZM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V8.625ZM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 0 1-1.125-1.125V4.125Z" />
                             </svg>
                             운행 상황
                         </h3>
                         <div className="grid grid-cols-3 gap-3">
                             <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg p-3 text-center">
-                                <p className="text-xs text-surface-400 mb-1">금일 운행거리</p>
+                                <p className="text-xs text-surface-400 dark:text-surface-500 mb-1">금일 운행거리</p>
                                 <p className="text-lg font-bold text-primary-600 dark:text-primary-400">
                                     {summary.todayDistance.toLocaleString()}
                                     <span className="text-xs font-normal ml-0.5">km</span>
                                 </p>
                             </div>
                             <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg p-3 text-center">
-                                <p className="text-xs text-surface-400 mb-1">전일 누계</p>
+                                <p className="text-xs text-surface-400 dark:text-surface-500 mb-1">전일 누계</p>
                                 <p className="text-lg font-bold text-surface-700 dark:text-surface-200">
                                     {summary.previousEndKm !== null ? summary.previousEndKm.toLocaleString() : '-'}
                                     <span className="text-xs font-normal ml-0.5">km</span>
                                 </p>
                             </div>
                             <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg p-3 text-center">
-                                <p className="text-xs text-surface-400 mb-1">금일 누계</p>
+                                <p className="text-xs text-surface-400 dark:text-surface-500 mb-1">금일 누계</p>
                                 <p className="text-lg font-bold text-surface-700 dark:text-surface-200">
                                     {summary.todayEndKm !== null ? summary.todayEndKm.toLocaleString() : '-'}
                                     <span className="text-xs font-normal ml-0.5">km</span>
@@ -211,7 +211,7 @@ export default function DailyLogView() {
                     {fuelLogs.length > 0 && (
                         <div className="glass-card p-4">
                             <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300 mb-3 flex items-center gap-2">
-                                <svg className="w-4 h-4 text-amber-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                <svg className="w-4 h-4 text-amber-500 dark:text-amber-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 11.25V4.875A2.625 2.625 0 0 0 12.375 2.25h-4.75A2.625 2.625 0 0 0 5 4.875V18.75a2.25 2.25 0 0 0 2.25 2.25h5.5A2.25 2.25 0 0 0 15 18.75v-3" />
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M15 8.25h1.5a2.25 2.25 0 0 1 2.25 2.25v3a1.5 1.5 0 0 0 3 0V7.5l-2.25-3" />
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M5.25 9h9.5" />
@@ -224,19 +224,19 @@ export default function DailyLogView() {
                                     return (
                                     <div key={idx} className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
                                         <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg px-3 py-2">
-                                            <span className="text-xs text-surface-400">{isEV ? '충전원' : '주유원'}</span>
+                                            <span className="text-xs text-surface-400 dark:text-surface-500">{isEV ? '충전원' : '주유원'}</span>
                                             <p className="font-medium text-surface-900 dark:text-surface-100">{String(fuel.driverName || '-')}</p>
                                         </div>
                                         <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg px-3 py-2">
-                                            <span className="text-xs text-surface-400">{isEV ? '충전미터' : '주유미터'}</span>
+                                            <span className="text-xs text-surface-400 dark:text-surface-500">{isEV ? '충전미터' : '주유미터'}</span>
                                             <p className="font-medium text-surface-900 dark:text-surface-100">{fuel.meterReading ? Number(fuel.meterReading).toLocaleString() : '-'} km</p>
                                         </div>
                                         <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg px-3 py-2">
-                                            <span className="text-xs text-surface-400">{isEV ? '충전량' : '주유량'}</span>
+                                            <span className="text-xs text-surface-400 dark:text-surface-500">{isEV ? '충전량' : '주유량'}</span>
                                             <p className="font-medium text-surface-900 dark:text-surface-100">{String(fuel.fuelAmount || '-')} {isEV ? 'kWh' : 'ℓ'}</p>
                                         </div>
                                         <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg px-3 py-2">
-                                            <span className="text-xs text-surface-400">{isEV ? '충전금액' : '주유금액'}</span>
+                                            <span className="text-xs text-surface-400 dark:text-surface-500">{isEV ? '충전금액' : '주유금액'}</span>
                                             <p className="font-medium text-surface-900 dark:text-surface-100">{fuel.fuelCost ? Number(fuel.fuelCost).toLocaleString() : '-'} 원</p>
                                         </div>
                                     </div>
@@ -250,7 +250,7 @@ export default function DailyLogView() {
                     <div className="glass-card overflow-hidden">
                         <div className="px-4 py-3 border-b border-surface-200 dark:border-surface-700">
                             <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300 flex items-center gap-2">
-                                <svg className="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                <svg className="w-4 h-4 text-blue-500 dark:text-blue-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 6.75h12M8.25 12h12m-12 5.25h12M3.75 6.75h.007v.008H3.75V6.75Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0ZM3.75 12h.007v.008H3.75V12Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm-.375 5.25h.007v.008H3.75v-.008Zm.375 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Z" />
                                 </svg>
                                 운행 기록 ({driveLogs.length}건)
@@ -268,7 +268,7 @@ export default function DailyLogView() {
                         <div className="hidden sm:block overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="text-xs text-surface-400 border-b border-surface-200 dark:border-surface-700">
+                                    <tr className="text-xs text-surface-400 dark:text-surface-500 border-b border-surface-200 dark:border-surface-700">
                                         <th className="px-4 py-2 text-left font-medium">사용자</th>
                                         <th className="px-2 py-2 text-center font-medium w-14">인원</th>
                                         <th className="px-3 py-2 text-left font-medium">용무</th>

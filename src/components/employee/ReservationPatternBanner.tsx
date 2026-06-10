@@ -13,11 +13,11 @@ export default function ReservationPatternBanner() {
         return (
             <button
                 onClick={() => setIsDismissed(false)}
-                className="fixed bottom-[85px] right-4 z-[90] flex items-center justify-center w-11 h-11 bg-surface-100/70 dark:bg-surface-800/70 backdrop-blur-md text-primary-600 dark:text-primary-400 border border-surface-200/50 dark:border-surface-700/50 rounded-full shadow-sm hover:bg-surface-200/80 dark:hover:bg-surface-700/80 transition-all active:scale-95 animate-fade-in-up md:right-8"
+                className="fixed bottom-[85px] right-4 z-[90] flex items-center justify-center w-12 h-12 min-w-[48px] min-h-[48px] bg-surface-100 dark:bg-surface-800/70 backdrop-blur-md text-primary-600 dark:text-primary-400 border border-surface-200/50 dark:border-surface-700/50 rounded-full shadow-sm hover:bg-surface-200/80 dark:hover:bg-surface-700/80 transition-all active:scale-95 animate-fade-in-up md:right-8"
                 title="추천 예약 켜기"
             >
                 <div className="relative">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg aria-hidden="true" className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                     {/* 작고 부드러운 뱃지 */}
@@ -48,18 +48,18 @@ export default function ReservationPatternBanner() {
                             <h2 className="text-lg font-bold text-surface-900 dark:text-surface-100 flex items-center gap-2">
                                 원클릭 추천 예약
                             </h2>
-                            <span className="inline-block px-1.5 py-0.5 text-[0.65rem] font-medium text-surface-500 bg-surface-100 border border-surface-200 rounded-md dark:bg-surface-800 dark:border-surface-700 dark:text-surface-400">
+                            <span className="inline-block px-1.5 py-0.5 text-[0.65rem] font-medium text-surface-500 dark:text-surface-400 bg-surface-100 dark:bg-surface-800 border border-surface-200 rounded-md dark:bg-surface-800 dark:border-surface-700 dark:text-surface-400">
                                 패턴 분석
                             </span>
                         </div>
                         {/* 닫기 버튼 */}
                         <button
                             onClick={() => setIsDismissed(true)}
-                            className="p-1 rounded-full text-surface-400 dark:text-surface-500 hover:text-surface-800 hover:bg-surface-200 dark:hover:text-surface-200 dark:hover:bg-surface-700 transition-colors"
+                            className="p-1 rounded-full text-surface-400 dark:text-surface-500 hover:text-surface-800 hover:bg-surface-200 dark:hover:text-surface-200 dark:hover:bg-surface-700 transition-colors min-w-[48px] min-h-[48px] flex items-center justify-center"
                             title="닫기"
                             aria-label="추천 예약 닫기"
                         >
-                            <svg className="w-5 h-5 opacity-50 hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <svg aria-hidden="true" className="w-5 h-5 opacity-50 hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
                             </svg>
                         </button>
@@ -100,14 +100,14 @@ export default function ReservationPatternBanner() {
                                                 {rec.vehicleName}
                                             </p>
                                             <p className="text-xs truncate text-surface-500 dark:text-surface-400 mt-0.5">
-                                                {month}.{date} ({koWeekday}) {rec.startTime} <span className="text-primary-500 font-medium ml-1">· {weekPrefix}</span>
+                                                {month}.{date} ({koWeekday}) {rec.startTime} <span className="text-primary-500 dark:text-primary-400 font-medium ml-1">· {weekPrefix}</span>
                                                 {rec.destination ? ` · ${rec.destination}` : ''}
                                             </p>
                                         </div>
                                     </div>
                                     <button
                                         onClick={() => handleQuickReserve(rec)}
-                                        className="relative z-10 inline-flex items-center justify-center shrink-0 min-w-[60px] px-3 py-1.5 text-xs font-semibold text-white transition-colors rounded-lg bg-primary-600 hover:bg-primary-700 whitespace-nowrap"
+                                        className="relative z-10 inline-flex items-center justify-center shrink-0 min-w-[60px] px-3 py-1.5 text-xs font-semibold text-white transition-colors rounded-lg min-h-[48px] bg-primary-600 dark:bg-primary-500 hover:bg-primary-700 dark:hover:bg-primary-400 whitespace-nowrap"
                                     >
                                         예약
                                     </button>

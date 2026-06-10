@@ -5,6 +5,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent } from "../../services/calendar/calendarSync";
 import { sendPushToOrg, sendPushToUser, createInAppNotification } from "../../services/alimtalk/sendNotification";
+import { checkReservationTimeConflict, resolveReservationConflict } from "../sync/conflictResolver";
 
 /**
  * 차량의 googleCalendarId를 조회
@@ -31,6 +32,30 @@ export const onReservationCreated = onDocumentCreated("reservations/{reservation
     if (reservation.syncSource === "calendar") {
         console.log("Reservation " + reservationId + ": calendar reverse-sync, skip calendar event creation");
         return;
+    }
+
+    // [오프라인 충돌 방어] 생성 시 시간 겹침 검사
+    if (reservation.status === 'pending' || reservation.status === 'reserved') {
+        const isTimeConflict = await checkReservationTimeConflict(
+            reservation.vehicleId,
+            reservation.date,
+            reservation.startTime,
+            reservation.endTime,
+            reservationId
+        );
+        if (isTimeConflict) {
+            await getFirestore().collection("reservations").doc(reservationId).update({
+                status: "rejected",
+                rejectedReason: "offline_time_conflict"
+            });
+            const uid = reservation.reservedByUid || reservation.userId;
+            if (uid) {
+                const bodyMsg = `[오프라인 동기화 안내] ${reservation.vehicleDisplayName || "차량"} 예약이 이미 다른 예약과 시간이 겹쳐 반려/취소되었습니다. (${reservation.date})`;
+                await createInAppNotification(uid, "reservation_rejected", "⚠️ 예약 시간 충돌", bodyMsg, reservation.organizationId);
+                await sendPushToUser(uid, { title: "⚠️ 예약 시간 충돌", body: bodyMsg });
+            }
+            return;
+        }
     }
 
     // 승인 대기(pending) 상태라면 캘린더 이벤트를 만들지 않음
@@ -106,6 +131,10 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
     const after = event.data!.after.data();
     const reservationId = event.params.reservationId;
 
+    // [오프라인 충돌 방어] LWW 기반
+    const isConflict = await resolveReservationConflict(event.data!.after.ref, before, after);
+    if (isConflict) return;
+
     // 역동기화로 수정된 예약이면 캘린더에 다시 반영하지 않음 (무한 루프 방지)
     if (after.syncSource === "calendar" && before.syncSource !== "calendar") {
         console.log("Reservation " + reservationId + ": calendar reverse-sync update, skip");
@@ -124,6 +153,24 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
             return !ignoredFields.includes(k) && JSON.stringify(before[k]) !== JSON.stringify(after[k]);
         });
         if (!nonIgnoredChanged) return;
+    }
+
+    // [오프라인 충돌 방어] 시간이나 상태가 변경된 경우 겹침 체크
+    if (after.status === 'pending' || after.status === 'reserved') {
+        const timeChanged = before.date !== after.date || before.startTime !== after.startTime || before.endTime !== after.endTime || before.status !== after.status;
+        if (timeChanged) {
+            const isTimeConflict = await checkReservationTimeConflict(after.vehicleId, after.date, after.startTime, after.endTime, reservationId);
+            if (isTimeConflict) {
+                await event.data!.after.ref.update({ status: "rejected", rejectedReason: "offline_time_conflict" });
+                const uid = after.reservedByUid || after.userId;
+                if (uid) {
+                    const bodyMsg = `[오프라인 동기화 안내] ${after.vehicleDisplayName || "차량"} 예약 변경이 다른 예약과 시간이 겹쳐 반려/취소되었습니다.`;
+                    await createInAppNotification(uid, "reservation_rejected", "⚠️ 예약 시간 충돌", bodyMsg, after.organizationId);
+                    await sendPushToUser(uid, { title: "⚠️ 예약 시간 충돌", body: bodyMsg });
+                }
+                return;
+            }
+        }
     }
 
     try {

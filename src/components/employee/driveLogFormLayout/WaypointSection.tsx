@@ -41,7 +41,7 @@ const WaypointSection = memo(function WaypointSection({
                     type="text"
                     value={form.purpose}
                     onChange={e => setForm({ ...form, purpose: e.target.value })}
-                    className="input"
+                    className="input min-h-[48px]"
                     placeholder="출장"
                 />
             </div>
@@ -53,7 +53,7 @@ const WaypointSection = memo(function WaypointSection({
                         type="text"
                         value={form.destination}
                         onChange={e => setForm({ ...form, destination: e.target.value })}
-                        className="input flex-1"
+                        className="input min-h-[48px] flex-1"
                         placeholder="서울시청"
                     />
                     {/* 즐겨찾기 저장 아이콘 버튼 */}
@@ -61,9 +61,9 @@ const WaypointSection = memo(function WaypointSection({
                         <button
                             type="button"
                             onClick={() => setShowFavSave(!showFavSave)}
-                            className={`flex-shrink-0 w-9 h-9 rounded-lg flex items-center justify-center transition-all ${showFavSave
+                            className={`flex-shrink-0 w-12 h-12 min-w-[48px] min-h-[48px] rounded-lg flex items-center justify-center transition-all ${showFavSave
                                 ? 'bg-amber-100 text-amber-600 border border-amber-300 dark:bg-amber-900/40 dark:text-amber-300 dark:border-amber-700'
-                                : 'bg-surface-100 text-amber-500 border border-surface-200 hover:bg-amber-50 hover:border-amber-300 hover:text-amber-600 dark:bg-surface-700 dark:border-surface-600 dark:text-amber-400 dark:hover:bg-amber-900/30'
+                                : 'bg-surface-100 dark:bg-surface-800 text-amber-500 dark:text-amber-400 border border-surface-200 hover:bg-amber-50 hover:border-amber-300 hover:text-amber-600 dark:bg-surface-700 dark:border-surface-600 dark:text-amber-400 dark:hover:bg-amber-900/30'
                                 }`}
                             title="즐겨찾기에 저장"
                         >
@@ -79,14 +79,14 @@ const WaypointSection = memo(function WaypointSection({
                                 type="text"
                                 value={favName}
                                 onChange={e => setFavName(e.target.value)}
-                                className="input flex-1 text-sm py-1.5"
+                                className="input flex-1 min-h-[48px] text-sm py-1.5"
                                 placeholder="별칭 (예: 김OO 어르신 댁)"
                                 aria-label="즐겨찾기 별칭"
                             />
                             <button
                                 type="button"
                                 onClick={handleSaveFavorite}
-                                className="btn-primary btn-sm whitespace-nowrap"
+                                className="btn-primary btn-sm whitespace-nowrap min-h-[48px]"
                             >
                                 저장
                             </button>
@@ -101,9 +101,9 @@ const WaypointSection = memo(function WaypointSection({
                                 key={fav.id}
                                 type="button"
                                 onClick={() => handleFavoriteSelect(fav)}
-                                className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all ${form.destination === (fav.address || fav.name)
+                                className={`px-3 py-2 min-h-[48px] rounded-full text-xs font-medium border transition-all flex items-center justify-center ${form.destination === (fav.address || fav.name)
                                     ? 'bg-amber-100 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400'
-                                    : 'bg-surface-50 dark:bg-surface-800 border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400 hover:border-amber-300 hover:bg-amber-50'
+                                    : 'bg-surface-50 dark:bg-surface-800 border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400 hover:border-amber-300 dark:hover:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20'
                                     }`}
                             >
                                 ⭐ {fav.name}

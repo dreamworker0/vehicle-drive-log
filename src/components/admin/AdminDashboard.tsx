@@ -152,11 +152,11 @@ export default function AdminDashboard() {
                             <div key={log.id} className="flex items-center justify-between p-3 rounded-xl bg-surface-50 dark:bg-surface-800">
                                 <div>
                                     <p className="font-medium text-sm text-surface-900 dark:text-surface-100">{log.driverName || '(이름 없음)'}</p>
-                                    <p className="text-xs text-surface-400">{log.destination || '-'}</p>
+                                    <p className="text-xs text-surface-400 dark:text-surface-500">{log.destination || '-'}</p>
                                 </div>
                                 <div className="text-right">
                                     <p className="text-sm font-mono text-surface-600 dark:text-surface-400">{(log.endKm - log.startKm) || 0} km</p>
-                                    <p className="text-xs text-surface-400">
+                                    <p className="text-xs text-surface-400 dark:text-surface-500">
                                         {(() => { const ts = log.timestamp; return (ts && typeof ts === 'object' && 'toDate' in ts && typeof (ts as { toDate?: unknown }).toDate === 'function') ? (ts as { toDate: () => Date }).toDate().toLocaleDateString('ko-KR') : '-'; })()}
                                         {log.startTime && log.endTime && ` ${log.startTime}~${log.endTime}`}
                                     </p>
@@ -168,16 +168,16 @@ export default function AdminDashboard() {
             ) : (
                 <div className="glass-card p-8 text-center">
                     {loading ? (
-                        <p className="text-surface-400">데이터를 불러오는 중...</p>
+                        <p className="text-surface-400 dark:text-surface-500">데이터를 불러오는 중...</p>
                     ) : (
                         <>
                             <div className="text-4xl mb-3">📋</div>
                             <p className="text-surface-500 dark:text-surface-400 font-medium mb-1">아직 운행 기록이 없습니다</p>
-                            <p className="text-sm text-surface-400 mb-4">
+                            <p className="text-sm text-surface-400 dark:text-surface-500 mb-4">
                                 직원들이 운행을 시작하면 이곳에 기록이 표시됩니다.
                             </p>
                             {stats.vehicleCount === 0 && (
-                                <button onClick={() => navigate('/admin/vehicles')} className="btn-primary btn-sm">
+                                <button onClick={() => navigate('/admin/vehicles')} className="btn-primary btn-sm min-h-[48px]">
                                     🚗 먼저 차량을 등록하세요
                                 </button>
                             )}

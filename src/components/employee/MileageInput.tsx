@@ -56,7 +56,7 @@ export default function MileageInput({
                     type="button"
                     onClick={() => cameraInputRef.current?.click()}
                     disabled={ocrLoading || !vehicleSelected}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-700 hover:bg-primary-100 dark:hover:bg-primary-800/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-700 hover:bg-primary-100 dark:hover:bg-primary-800/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed min-h-[48px]"
                 >
                     {ocrLoading ? (
                         <>
@@ -95,7 +95,7 @@ export default function MileageInput({
                     <button
                         type="button"
                         onClick={() => endKmRef?.current?.focus()}
-                        className="mt-1 text-amber-800 dark:text-amber-300 font-medium underline"
+                        className="mt-1 text-amber-800 dark:text-amber-300 font-medium underline min-h-[48px] px-2 py-1 flex items-center justify-center"
                     >
                         수동 입력하기 →
                     </button>
@@ -142,13 +142,13 @@ export default function MileageInput({
 
             <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <label className="label text-xs">출발 km <span className="text-red-500">*</span></label>
+                    <label className="label text-xs">출발 km <span className="text-red-500 dark:text-red-400">*</span></label>
                     <input
                         type="number"
                         value={form.startKm}
                         onChange={e => onStartKmChange(e.target.value)}
                         readOnly={!vehicleSelected}
-                        className={`input ${!vehicleSelected ? 'bg-surface-50 dark:bg-surface-800 text-surface-500 dark:text-surface-400 cursor-not-allowed' : ''}`}
+                        className={`input min-h-[48px] ${!vehicleSelected ? 'bg-surface-50 dark:bg-surface-800 text-surface-500 dark:text-surface-400 cursor-not-allowed' : ''}`}
                         placeholder={vehicleSelected ? "출발 km 입력" : "차량 선택 시 자동 입력"}
                         required
                     />
@@ -159,13 +159,13 @@ export default function MileageInput({
                     )}
                 </div>
                 <div>
-                    <label className="label text-xs">도착 km <span className="text-red-500">*</span></label>
+                    <label className="label text-xs">도착 km <span className="text-red-500 dark:text-red-400">*</span></label>
                     <input
                         ref={endKmRef}
                         type="number"
                         value={form.endKm}
                         onChange={e => onEndKmChange(e.target.value)}
-                        className="input"
+                        className="input min-h-[48px]"
                         placeholder="12400"
                         required
                     />
@@ -178,10 +178,10 @@ export default function MileageInput({
             </div>
             {form.startKm && form.endKm && parseInt(form.endKm) >= parseInt(form.startKm) && (
                 <div className="mt-3 text-center">
-                    <span className="text-lg font-bold text-primary-600">
+                    <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
                         {(parseInt(form.endKm) - parseInt(form.startKm)).toLocaleString()} km
                     </span>
-                    <span className="text-sm text-surface-400 ml-1">주행</span>
+                    <span className="text-sm text-surface-400 dark:text-surface-500 ml-1">주행</span>
                 </div>
             )}
         </div>

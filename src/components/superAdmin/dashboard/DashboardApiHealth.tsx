@@ -136,17 +136,17 @@ export default function DashboardApiHealth() {
                     {summary && (
                         <div className="flex items-center gap-1.5 ml-2">
                             {summary.ok > 0 && (
-                                <span className="inline-flex items-center gap-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded-full">
+                                <span className="inline-flex items-center gap-0.5 text-xs font-medium btn-soft-emerald dark:bg-emerald-900/30 px-1.5 py-0.5 rounded-full">
                                     🟢 {summary.ok}
                                 </span>
                             )}
                             {summary.degraded > 0 && (
-                                <span className="inline-flex items-center gap-0.5 text-xs font-medium text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/30 px-1.5 py-0.5 rounded-full">
+                                <span className="inline-flex items-center gap-0.5 text-xs font-medium btn-soft-amber dark:bg-amber-900/30 px-1.5 py-0.5 rounded-full">
                                     🟡 {summary.degraded}
                                 </span>
                             )}
                             {summary.error > 0 && (
-                                <span className="inline-flex items-center gap-0.5 text-xs font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 px-1.5 py-0.5 rounded-full">
+                                <span className="inline-flex items-center gap-0.5 text-xs font-medium btn-soft-red dark:bg-red-900/30 px-1.5 py-0.5 rounded-full">
                                     🔴 {summary.error}
                                 </span>
                             )}
@@ -155,12 +155,12 @@ export default function DashboardApiHealth() {
                 </div>
                 <div className="flex items-center gap-2">
                     {lastChecked && (
-                        <span className="text-xs text-surface-400">{lastChecked} 기준</span>
+                        <span className="text-xs text-surface-400 dark:text-surface-500">{lastChecked} 기준</span>
                     )}
                     <button
                         onClick={runHealthCheck}
                         disabled={loading}
-                        className="btn-ghost text-sm flex items-center gap-1 disabled:opacity-50"
+                        className="btn-ghost text-sm flex items-center gap-1 disabled:opacity-50 min-h-[48px]"
                     >
                         <svg
                             className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`}
@@ -211,7 +211,7 @@ export default function DashboardApiHealth() {
                     <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300">
                         외부 서비스
                     </h3>
-                    <span className="inline-flex items-center gap-0.5 text-xs font-medium text-surface-500 bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded-full">
+                    <span className="inline-flex items-center gap-0.5 text-xs font-medium text-surface-500 dark:text-surface-400 bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded-full">
                         {results.length}
                     </span>
                 </div>
@@ -273,14 +273,14 @@ export default function DashboardApiHealth() {
                         <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300">
                             내부 서비스
                         </h3>
-                        <span className="inline-flex items-center gap-0.5 text-xs font-medium text-surface-500 bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded-full">
+                        <span className="inline-flex items-center gap-0.5 text-xs font-medium text-surface-500 dark:text-surface-400 bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded-full">
                             {internalResults.length}
                         </span>
                         {hasCalendarIssue && (
                             <button
                                 onClick={resetCalendarSync}
                                 disabled={resetting}
-                                className="ml-auto btn-ghost text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 disabled:opacity-50"
+                                className="ml-auto btn-ghost text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 disabled:opacity-50 min-h-[48px]"
                             >
                                 {resetting ? '리셋 중...' : '🔄 동기화 리셋'}
                             </button>
@@ -330,7 +330,7 @@ export default function DashboardApiHealth() {
             )}
 
             {/* 안내 메시지 */}
-            <p className="mt-3 text-xs text-surface-400">
+            <p className="mt-3 text-xs text-surface-400 dark:text-surface-500">
                 * 각 API에 가벼운 핑을 보내 응답 속도와 가용성을 확인합니다. 🟢 정상(3초 미만) · 🟡 지연(3초 이상) · 🔴 에러(응답 없음)
             </p>
         </div>

@@ -15,7 +15,7 @@ export default function PrivacyPage() {
                 {/* 뒤로가기 */}
                 <button
                     onClick={() => navigate(-1)}
-                    className="flex items-center gap-1.5 text-sm text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:text-surface-300 mb-6 transition-colors"
+                    className="flex items-center gap-1.5 text-sm text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-300 dark:text-surface-300 mb-6 transition-colors min-h-[48px] px-2 -ml-2"
                 >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
@@ -26,7 +26,7 @@ export default function PrivacyPage() {
                 <div className="bg-white dark:bg-surface-800 rounded-2xl shadow-soft p-6 md:p-8 space-y-8">
                     <div className="text-center border-b border-surface-100 dark:border-surface-700 pb-6">
                         <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-1">개인정보 처리방침</h1>
-                        <p className="text-sm text-surface-400">시행일: 2026년 2월 1일</p>
+                        <p className="text-sm text-surface-400 dark:text-surface-500">시행일: 2026년 2월 1일</p>
                     </div>
 
                     {/* 제1조 */}
@@ -182,7 +182,7 @@ export default function PrivacyPage() {
                     </section>
 
                     <div className="border-t border-surface-100 dark:border-surface-700 pt-4 text-center">
-                        <p className="text-xs text-surface-400">본 개인정보 처리방침은 2026년 2월 1일부터 시행됩니다.</p>
+                        <p className="text-xs text-surface-400 dark:text-surface-500">본 개인정보 처리방침은 2026년 2월 1일부터 시행됩니다.</p>
                     </div>
                 </div>
             </div>

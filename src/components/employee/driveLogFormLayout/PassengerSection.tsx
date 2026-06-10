@@ -125,7 +125,7 @@ const PassengerSection = memo(function PassengerSection({
                 <label className="label mb-0">
                     🧑‍🤝‍🧑 동승자
                     {(selectedPassengers.length + externalPassengerCount) > 0 && (
-                        <span className="ml-2 text-primary-600 font-bold">
+                        <span className="ml-2 text-primary-600 dark:text-primary-400 font-bold">
                             {selectedPassengers.length + externalPassengerCount}명
                         </span>
                     )}
@@ -140,7 +140,7 @@ const PassengerSection = memo(function PassengerSection({
                         <button
                             type="button"
                             onClick={() => setIsExpanded(!isExpanded)}
-                            className="text-xs px-2.5 py-1 rounded-md bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors flex items-center font-medium"
+                            className="text-xs px-3 py-2 min-h-[48px] rounded-md bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors flex items-center justify-center font-medium"
                         >
                             {isExpanded ? '직원 목록 닫기 ▲' : '직원 선택 ▼'}
                         </button>
@@ -148,7 +148,7 @@ const PassengerSection = memo(function PassengerSection({
                     <button
                         type="button"
                         onClick={() => setIsManualInputExpanded(!isManualInputExpanded)}
-                        className="text-xs px-2.5 py-1 rounded-md bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors flex items-center font-medium"
+                        className="text-xs px-3 py-2 min-h-[48px] rounded-md bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors flex items-center justify-center font-medium"
                     >
                         {isManualInputExpanded ? '직접 입력 닫기 ▲' : '직접 입력 열기 ▼'}
                     </button>
@@ -163,7 +163,7 @@ const PassengerSection = memo(function PassengerSection({
                             key={`selected-${m.id}`}
                             type="button"
                             onClick={() => togglePassenger(m)}
-                            className="px-3 py-1.5 rounded-full text-xs font-medium border transition-all bg-primary-100 border-primary-300 text-primary-700 ring-1 ring-primary-200 shadow-sm"
+                            className="px-4 py-2 min-h-[48px] rounded-full text-xs font-medium border transition-all bg-primary-100 dark:bg-primary-900/40 border-primary-300 text-primary-700 dark:text-primary-300 ring-1 ring-primary-200 dark:ring-primary-900/40 shadow-sm"
                         >
                             ✓ {m.name || m.email?.split('@')[0]}
                         </button>
@@ -181,9 +181,9 @@ const PassengerSection = memo(function PassengerSection({
                                 key={m.id}
                                 type="button"
                                 onClick={() => togglePassenger(m)}
-                                className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${isSelected
-                                    ? 'bg-primary-100 border-primary-300 text-primary-700 ring-1 ring-primary-200'
-                                    : 'bg-surface-50 dark:bg-surface-800 border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400 hover:border-primary-300'
+                                className={`px-4 py-2 min-h-[48px] rounded-full text-xs font-medium border transition-all ${isSelected
+                                    ? 'bg-primary-100 dark:bg-primary-900/40 border-primary-300 text-primary-700 dark:text-primary-300 ring-1 ring-primary-200 dark:ring-primary-900/40'
+                                    : 'bg-surface-50 dark:bg-surface-800 border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400 hover:border-primary-300 dark:hover:border-primary-700'
                                     }`}
                             >
                                 {isSelected && '✓ '}{m.name || m.email?.split('@')[0]}
@@ -212,20 +212,21 @@ const PassengerSection = memo(function PassengerSection({
                                 }, 200);
                             }}
                             placeholder="예: 홍길동, 김철수, 이영희"
-                            className="input text-sm py-1.5 px-3 w-full"
+                            className="input min-h-[48px] text-sm py-1.5 px-3 w-full"
                         />
                         {autocompleteState.isOpen && (
                             <div className="absolute z-20 w-full mt-1 bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-700 rounded-md shadow-lg max-h-48 overflow-y-auto">
                                 {autocompleteState.suggestions.map(m => {
                                     const name = m.name || m.email?.split('@')[0];
                                     return (
-                                        <div
+                                        <button
+                                            type="button"
                                             key={`auto-${m.id}`}
                                             onClick={() => handleSuggestionClick(m)}
-                                            className="px-3 py-2.5 text-sm text-surface-700 dark:text-surface-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 cursor-pointer transition-colors border-b border-surface-100 dark:border-surface-700 last:border-0"
+                                            className="w-full text-left px-3 py-2.5 min-h-[48px] text-sm text-surface-700 dark:text-surface-300 hover:bg-primary-50 dark:hover:bg-primary-900/20 cursor-pointer transition-colors border-b border-surface-100 dark:border-surface-700 last:border-0"
                                         >
                                             {name}
-                                        </div>
+                                        </button>
                                     );
                                 })}
                             </div>
@@ -244,7 +245,7 @@ const PassengerSection = memo(function PassengerSection({
                         type="button"
                         onClick={() => setExternalPassengerCount(Math.max(0, externalPassengerCount - 1))}
                         disabled={externalPassengerCount <= 0}
-                        className="w-8 h-8 rounded-lg border border-surface-200 dark:border-surface-600 flex items-center justify-center text-sm font-bold text-surface-500 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-700 disabled:opacity-30 transition-all"
+                        className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-lg border border-surface-200 dark:border-surface-600 flex items-center justify-center text-sm font-bold text-surface-500 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-700 disabled:opacity-30 transition-all"
                     >
                         −
                     </button>
@@ -252,11 +253,11 @@ const PassengerSection = memo(function PassengerSection({
                     <button
                         type="button"
                         onClick={() => setExternalPassengerCount(externalPassengerCount + 1)}
-                        className="w-8 h-8 rounded-lg border border-surface-200 dark:border-surface-600 flex items-center justify-center text-sm font-bold text-surface-500 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-700 transition-all"
+                        className="w-12 h-12 min-w-[48px] min-h-[48px] rounded-lg border border-surface-200 dark:border-surface-600 flex items-center justify-center text-sm font-bold text-surface-500 dark:text-surface-400 hover:bg-surface-100 dark:hover:bg-surface-700 transition-all"
                     >
                         +
                     </button>
-                    <span className="text-xs text-surface-400">명</span>
+                    <span className="text-xs text-surface-400 dark:text-surface-500">명</span>
                 </div>
             </div>
 

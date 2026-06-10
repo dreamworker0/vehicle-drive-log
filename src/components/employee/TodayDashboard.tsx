@@ -58,12 +58,12 @@ export default function TodayDashboard() {
             <div className="flex items-center justify-between mb-5">
                 <div className="flex items-baseline gap-2">
                     <h1 className="text-lg font-bold text-surface-900 dark:text-surface-100">오늘의 운행</h1>
-                    <p className="text-sm text-surface-400">{todayLabel}</p>
+                    <p className="text-sm text-surface-400 dark:text-surface-500">{todayLabel}</p>
                 </div>
                 {!hasActiveDrive && (
                     <button
                         onClick={navigateToQuickDrive}
-                        className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-colors text-xs font-medium"
+                        className="flex items-center gap-1 px-4 py-2 min-h-[48px] rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-colors text-xs font-medium"
                     >
                         <span className="text-sm">🚀</span>
                         <span>바로 운행</span>
@@ -106,7 +106,7 @@ export default function TodayDashboard() {
                                         },
                                     });
                                 }}
-                                className="z-10 bg-white text-red-600 hover:bg-red-50 px-4 py-2 rounded-xl text-sm font-bold shadow-sm transition-transform active:scale-95 whitespace-nowrap"
+                                className="z-10 bg-white text-red-600 hover:bg-red-50 px-4 py-2 min-h-[48px] rounded-xl text-sm font-bold shadow-sm transition-transform active:scale-95 whitespace-nowrap"
                             >
                                 바로 작성
                             </button>
@@ -121,7 +121,7 @@ export default function TodayDashboard() {
             {myReservations.length > 0 && (
                 <div className="mb-6">
                     <h2 className="text-sm font-semibold text-surface-600 dark:text-surface-400 mb-3 flex items-center gap-2">
-                        <span className="w-2 h-2 rounded-full bg-primary-500" />
+                        <span className="w-2 h-2 rounded-full bg-primary-50 dark:bg-primary-900/300" />
                         내 예약
                     </h2>
                     <div className="space-y-2">
@@ -160,7 +160,7 @@ export default function TodayDashboard() {
                         </div>
                         <button
                             onClick={navigateToReservations}
-                            className="reservation-cta-btn flex-shrink-0"
+                            className="reservation-cta-btn flex-shrink-0 min-h-[48px]"
                         >
                             <span className="reservation-cta-glow" />
                             <span className="relative z-10 flex items-center gap-1.5">

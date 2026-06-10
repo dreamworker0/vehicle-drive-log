@@ -62,7 +62,7 @@ export default function MaintenanceLog() {
                     </p>
                 </div>
                 <div className="flex items-center gap-2">
-                    <button onClick={() => { if (showForm) { handleCancelEdit(); } else { setShowForm(true); } }} className="btn-primary btn-sm flex items-center gap-1">
+                    <button onClick={() => { if (showForm) { handleCancelEdit(); } else { setShowForm(true); } }} className="btn-primary btn-sm flex items-center gap-1 min-h-[48px]">
                         {showForm ? '✕ 닫기' : '＋ 정비 기록 추가'}
                     </button>
                     <button
@@ -79,7 +79,7 @@ export default function MaintenanceLog() {
                             }
                         }}
                         disabled={filteredRecords.length === 0}
-                        className="btn-secondary btn-sm flex items-center gap-2 disabled:opacity-50"
+                        className="btn-secondary btn-sm flex items-center gap-2 disabled:opacity-50 min-h-[48px]"
                     >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
@@ -106,7 +106,7 @@ export default function MaintenanceLog() {
                             }
                         }}
                         disabled={filteredRecords.length === 0}
-                        className="btn-primary btn-sm flex items-center gap-2 disabled:opacity-50"
+                        className="btn-primary btn-sm flex items-center gap-2 disabled:opacity-50 min-h-[48px]"
                     >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
@@ -141,11 +141,11 @@ export default function MaintenanceLog() {
                                 <div key={v.id} className="flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 rounded-full text-xs">
                                     <span className="text-amber-700 dark:text-amber-400 font-medium">
                                         {typeInfo.icon} {v.displayName}
-                                        {v.maintenance?.endDate && <span className="text-surface-400"> (~{v.maintenance.endDate.slice(5)})</span>}
+                                        {v.maintenance?.endDate && <span className="text-surface-400 dark:text-surface-500"> (~{v.maintenance.endDate.slice(5)})</span>}
                                     </span>
                                     <button
                                         onClick={() => handleClearBlock(v.id)}
-                                        className="text-amber-600 hover:text-green-600 dark:text-amber-400 dark:hover:text-green-400 font-bold transition-colors"
+                                        className="text-amber-600 hover:text-green-600 dark:text-amber-400 dark:hover:text-green-400 font-bold transition-colors min-h-[48px] px-2 py-1"
                                         title="정비 완료 (차단 해제)"
                                     >
                                         ✓ 해제
@@ -169,8 +169,8 @@ export default function MaintenanceLog() {
             {filteredRecords.length === 0 ? (
                 <div className="glass-card p-12 text-center">
                     <div className="text-4xl mb-3">🔧</div>
-                    <p className="text-surface-400 font-medium">정비 기록이 없습니다</p>
-                    <p className="text-sm text-surface-300 mt-1">위의 버튼으로 새 기록을 추가하세요</p>
+                    <p className="text-surface-400 dark:text-surface-500 font-medium">정비 기록이 없습니다</p>
+                    <p className="text-sm text-surface-300 dark:text-surface-600 mt-1">위의 버튼으로 새 기록을 추가하세요</p>
                 </div>
             ) : (
                 <div className="space-y-2">

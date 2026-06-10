@@ -29,7 +29,7 @@ export default function HeatmapGrid({ data }: HeatmapGridProps) {
                 {/* 시간대 헤더 */}
                 <div className="flex items-center gap-0.5 mb-0.5 pl-10">
                     {hours.map(h => (
-                        <div key={h} className="flex-1 text-center text-[10px] font-medium text-surface-400">
+                        <div key={h} className="flex-1 text-center text-[10px] font-medium text-surface-400 dark:text-surface-500">
                             {h}시
                         </div>
                     ))}
@@ -50,7 +50,7 @@ export default function HeatmapGrid({ data }: HeatmapGridProps) {
                     </div>
                 ))}
                 {/* 범례 */}
-                <div className="flex items-center justify-end gap-1 mt-2 text-[10px] text-surface-400">
+                <div className="flex items-center justify-end gap-1 mt-2 text-[10px] text-surface-400 dark:text-surface-500">
                     <span>적음</span>
                     <div className="w-3 h-3 rounded-sm bg-surface-100 dark:bg-surface-800" />
                     <div className="w-3 h-3 rounded-sm bg-primary-100 dark:bg-primary-900/40" />

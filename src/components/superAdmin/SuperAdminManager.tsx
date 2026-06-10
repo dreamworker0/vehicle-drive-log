@@ -83,14 +83,14 @@ export default function SuperAdminManager() {
                         value={email}
                         onChange={e => setEmail(e.target.value)}
                         placeholder="이메일 주소 입력"
-                        className="flex-1 input text-sm"
+                        className="flex-1 input text-sm min-h-[48px]"
                         disabled={adding}
                         required
                     />
                     <button
                         type="submit"
                         disabled={adding || !email.trim()}
-                        className="btn-primary px-4 py-2 text-sm whitespace-nowrap disabled:opacity-50"
+                        className="btn-primary px-4 py-2 text-sm whitespace-nowrap disabled:opacity-50 min-h-[48px]"
                     >
                         {adding ? '추가 중...' : '추가'}
                     </button>
@@ -101,24 +101,24 @@ export default function SuperAdminManager() {
             <div className="glass-card divide-y divide-surface-100 dark:divide-surface-700">
                 <div className="px-4 py-3 flex items-center justify-between">
                     <span className="text-sm font-semibold text-surface-700 dark:text-surface-300">슈퍼관리자 목록</span>
-                    <span className="text-xs text-surface-400">{admins.length}명</span>
+                    <span className="text-xs text-surface-400 dark:text-surface-500">{admins.length}명</span>
                 </div>
 
                 {loading ? (
-                    <div className="p-8 text-center text-surface-400 text-sm">불러오는 중...</div>
+                    <div className="p-8 text-center text-surface-400 dark:text-surface-500 text-sm">불러오는 중...</div>
                 ) : admins.length === 0 ? (
-                    <div className="p-8 text-center text-surface-400 text-sm">슈퍼관리자가 없습니다.</div>
+                    <div className="p-8 text-center text-surface-400 dark:text-surface-500 text-sm">슈퍼관리자가 없습니다.</div>
                 ) : (
                     admins.map(admin => (
                         <div key={admin.id} className="px-4 py-4 flex items-center gap-3">
                             <div className="w-9 h-9 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center flex-shrink-0">
-                                <span className="text-amber-600 text-sm font-bold">⚡</span>
+                                <span className="text-amber-600 dark:text-amber-400 text-sm font-bold">⚡</span>
                             </div>
                             <div className="flex-1 min-w-0">
                                 <p className="text-sm font-semibold text-surface-900 dark:text-surface-100 truncate">
                                     {admin.name || '이름 없음'}
                                     {admin.id === user?.uid && (
-                                        <span className="ml-1.5 text-xs text-primary-500 font-normal">(나)</span>
+                                        <span className="ml-1.5 text-xs text-primary-500 dark:text-primary-400 font-normal">(나)</span>
                                     )}
                                 </p>
                                 <p className="text-xs text-surface-500 dark:text-surface-400 truncate">{admin.email}</p>
@@ -126,7 +126,7 @@ export default function SuperAdminManager() {
                             {admin.id !== user?.uid && (
                                 <button
                                     onClick={() => handleRemove(admin)}
-                                    className="text-xs text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 px-2 py-1 rounded-lg transition-colors flex-shrink-0"
+                                    className="text-xs text-red-500 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 px-3 py-2 min-h-[48px] rounded-lg transition-colors flex-shrink-0"
                                 >
                                     제거
                                 </button>

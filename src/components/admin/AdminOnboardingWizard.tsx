@@ -81,7 +81,7 @@ export default function AdminOnboardingWizard({ inviteCode, onDismiss }: Props) 
                 </h2>
                 <button
                     onClick={handleDismiss}
-                    className="text-xs text-surface-400 hover:text-surface-600 dark:text-surface-400 transition-colors"
+                    className="text-xs text-surface-400 hover:text-surface-600 dark:text-surface-400 transition-colors min-h-[48px]"
                 >
                     건너뛰기
                 </button>
@@ -110,7 +110,7 @@ export default function AdminOnboardingWizard({ inviteCode, onDismiss }: Props) 
                 {step === 2 && inviteCode && (
                     <div className="mt-4 flex flex-col items-center gap-2">
                         <div className="inline-flex items-center gap-2 bg-primary-50 dark:bg-primary-900/30 px-4 py-2.5 rounded-xl max-w-full">
-                            <svg className="w-4 h-4 text-primary-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                            <svg className="w-4 h-4 text-primary-500 dark:text-primary-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m9.862-2.22a4.5 4.5 0 0 0-1.242-7.244l-4.5-4.5a4.5 4.5 0 0 0-6.364 6.364L4.25 8.81" />
                             </svg>
                             <span className="text-sm font-medium text-primary-700 dark:text-primary-300 truncate">
@@ -147,12 +147,12 @@ export default function AdminOnboardingWizard({ inviteCode, onDismiss }: Props) 
 
                 <div className="flex gap-2">
                     {current.action && (
-                        <button onClick={handleAction} className="btn-primary btn-sm">
+                        <button onClick={handleAction} className="btn-primary btn-sm min-h-[48px]">
                             {current.action}
                         </button>
                     )}
                     {isLast ? (
-                        <button onClick={handleDismiss} className="btn-primary btn-sm">
+                        <button onClick={handleDismiss} className="btn-primary btn-sm min-h-[48px]">
                             시작하기 🎉
                         </button>
                     ) : (

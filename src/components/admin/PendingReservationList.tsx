@@ -146,7 +146,7 @@ export default function PendingReservationList() {
                                 <div className="space-y-2.5 mb-4 sm:mb-0 w-full overflow-hidden">
                                     <div className="flex flex-wrap items-center gap-2 text-sm">
                                         <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-surface-100 dark:bg-surface-800 text-surface-800 dark:text-surface-200 text-xs font-medium transition-colors duration-300 shadow-sm border border-surface-200/50 dark:border-surface-700/50">
-                                            <svg className="w-3.5 h-3.5 text-surface-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                            <svg className="w-3.5 h-3.5 text-surface-500 dark:text-surface-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
                                             </svg>
                                             {reserver?.department ? `${reserver.department} ` : ''}
@@ -172,7 +172,7 @@ export default function PendingReservationList() {
                                         </div>
                                         <div className="hidden sm:block w-1 h-1 rounded-full bg-surface-300 dark:bg-surface-600"></div>
                                         <div className="text-sm text-surface-600 dark:text-surface-400 transition-colors duration-300 flex items-start gap-2">
-                                            <svg className="w-4 h-4 mt-0.5 shrink-0 text-surface-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                            <svg className="w-4 h-4 mt-0.5 shrink-0 text-surface-400 dark:text-surface-500" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" />
                                             </svg>

@@ -35,13 +35,16 @@ export default memo(function OrgCardHeader({ org, memberCount, isExpanded, editi
 
     return (
         <div
+            role="button"
+            tabIndex={0}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); if (!editing) onToggle(org.id); } }}
             className="flex items-center justify-between px-4 py-3 cursor-pointer select-none"
             onClick={() => !editing && onToggle(org.id)}
         >
             <div className="flex items-center gap-3 flex-1 min-w-0">
                 {/* 펼침/접힘 화살표 */}
                 <svg
-                    className={`w-4 h-4 text-surface-400 shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}
+                    className={`w-4 h-4 text-surface-400 dark:text-surface-500 shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`}
                     fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor"
                 >
                     <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
@@ -85,7 +88,7 @@ export default memo(function OrgCardHeader({ org, memberCount, isExpanded, editi
             {/* 삭제 버튼 */}
             <button
                 onClick={(e) => { e.stopPropagation(); onDelete(org); }}
-                className="btn-ghost btn-sm text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 shrink-0 ml-2"
+                className="btn-ghost btn-sm text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 shrink-0 ml-2"
                 aria-label="기관 삭제"
             >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">

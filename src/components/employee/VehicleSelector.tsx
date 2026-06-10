@@ -25,7 +25,7 @@ export default function VehicleSelector({ vehicles, selectedVehicleId, onSelect,
     }, [vehicles, usageCounts]);
 
     if (activeVehicles.length === 0) {
-        return <p className="text-sm text-surface-400">등록된 차량이 없습니다. 관리자에게 문의하세요.</p>;
+        return <p className="text-sm text-surface-400 dark:text-surface-500">등록된 차량이 없습니다. 관리자에게 문의하세요.</p>;
     }
 
     return (
@@ -39,7 +39,7 @@ export default function VehicleSelector({ vehicles, selectedVehicleId, onSelect,
                         type="button"
                         onClick={() => !isBlocked && onSelect(v.id)}
                         disabled={isBlocked}
-                        className={`p-2 rounded-lg border text-left transition-all relative ${isBlocked
+                        className={`p-2 min-h-[48px] min-w-[48px] rounded-lg border text-left transition-all relative ${isBlocked
                             ? 'border-surface-200 dark:border-surface-700 bg-surface-100 dark:bg-surface-800 opacity-50 cursor-not-allowed'
                             : selectedVehicleId === v.id
                                 ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/30 ring-2 ring-primary-500/30 dark:ring-primary-400/30'
@@ -48,7 +48,7 @@ export default function VehicleSelector({ vehicles, selectedVehicleId, onSelect,
                     >
                         {/* 사용 횟수 배지 */}
                         {count > 0 && !isBlocked && (
-                            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-primary-500 text-white text-[10px] font-bold flex items-center justify-center shadow-sm">
+                            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-primary-50 dark:bg-primary-900/300 text-white text-[10px] font-bold flex items-center justify-center shadow-sm">
                                 {count}
                             </span>
                         )}
@@ -56,7 +56,7 @@ export default function VehicleSelector({ vehicles, selectedVehicleId, onSelect,
                             <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-base ${isBlocked ? 'bg-surface-200 dark:bg-surface-700' : getVehicleColor(v.id)}`}>
                                 {isBlocked ? '🔧' : (VEHICLE_TYPE_ICONS[v.vehicleType!] || '🚗')}
                             </span>
-                            <p className={`font-medium text-xs text-center leading-tight ${isBlocked ? 'text-surface-400' : 'text-surface-900 dark:text-surface-100'}`}>
+                            <p className={`font-medium text-xs text-center leading-tight ${isBlocked ? 'text-surface-400 dark:text-surface-500' : 'text-surface-900 dark:text-surface-100'}`}>
                                 {v.displayName}
                             </p>
                             {isBlocked && (

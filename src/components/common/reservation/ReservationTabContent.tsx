@@ -95,7 +95,7 @@ export default memo(function ReservationTabContent({
                     {activeRes.length === 0 && (
                         <div className="text-center py-8">
                             <div className="text-2xl mb-2">📋</div>
-                            <p className="text-sm text-surface-400">예약 내역이 없습니다</p>
+                            <p className="text-sm text-surface-400 dark:text-surface-500">예약 내역이 없습니다</p>
                         </div>
                     )}
                 </div>
@@ -107,7 +107,7 @@ export default memo(function ReservationTabContent({
                     {completedRes.length === 0 ? (
                         <div className="text-center py-8">
                             <div className="text-2xl mb-2">✅</div>
-                            <p className="text-sm text-surface-400">운행 완료 내역이 없습니다</p>
+                            <p className="text-sm text-surface-400 dark:text-surface-500">운행 완료 내역이 없습니다</p>
                         </div>
                     ) : (
                         <div className="space-y-1.5">
@@ -116,26 +116,26 @@ export default memo(function ReservationTabContent({
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2 min-w-0 flex-1">
                                             <p className="font-medium text-sm text-surface-600 dark:text-surface-400">{res.vehicleName}</p>
-                                            <span className="text-[10px] px-1.5 py-0.5 bg-green-100 text-green-700 dark:bg-green-900/50 dark:text-green-400 rounded-full font-medium whitespace-nowrap">운행 완료</span>
+                                            <span className="text-[10px] px-1.5 py-0.5 badge-success rounded-full font-medium whitespace-nowrap">운행 완료</span>
                                         </div>
                                         {(isAdmin || res.reservedByUid === user?.uid) && (
                                             <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                                                 <button
                                                     onClick={() => { onEdit(res); setShowForm(true); }}
-                                                    className="text-xs leading-none py-0.5 text-primary-500 hover:underline whitespace-nowrap"
+                                                    className="text-xs leading-none py-0.5 text-primary-500 dark:text-primary-400 hover:underline whitespace-nowrap"
                                                 >
                                                     수정
                                                 </button>
                                                 <button
                                                     onClick={() => onCancel(res.id)}
-                                                    className="text-xs leading-none py-0.5 text-red-500 hover:underline whitespace-nowrap"
+                                                    className="text-xs leading-none py-0.5 text-red-500 dark:text-red-400 hover:underline whitespace-nowrap"
                                                 >
                                                     취소
                                                 </button>
                                             </div>
                                         )}
                                     </div>
-                                    <p className="text-xs text-surface-400 mt-1">
+                                    <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
                                         예약 {res.startTime} ~ {res.endTime}
                                         {(res.actualStartTime || res.actualEndTime) && (
                                             <span className="ml-2 text-green-600 dark:text-green-400 font-medium">
@@ -143,7 +143,7 @@ export default memo(function ReservationTabContent({
                                             </span>
                                         )}
                                     </p>
-                                    <p className="text-xs text-surface-400">{res.reservedByName}{res.purpose ? ` · ${res.purpose}` : ''}{res.destination ? ` → ${res.destination}` : ''}</p>
+                                    <p className="text-xs text-surface-400 dark:text-surface-500">{res.reservedByName}{res.purpose ? ` · ${res.purpose}` : ''}{res.destination ? ` → ${res.destination}` : ''}</p>
                                 </div>
                             ))}
                         </div>

@@ -50,6 +50,9 @@ export default function OrgSearchDropdown({ selectedOrgId, onChange, orgs }: Org
     return (
         <div ref={wrapperRef} className="relative w-full sm:w-64">
             <div
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setIsOpen(!isOpen); } }}
                 className="flex items-center justify-between p-1.5 px-3 text-sm font-medium rounded-lg border border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 text-surface-900 dark:text-surface-100 cursor-pointer hover:border-primary-500 focus-within:ring-2 focus-within:ring-primary-500 transition-colors"
                 onClick={() => setIsOpen(!isOpen)}
             >
@@ -57,18 +60,17 @@ export default function OrgSearchDropdown({ selectedOrgId, onChange, orgs }: Org
                 {isOpen ? (
                     <input
                         type="text"
-                        className="w-full bg-transparent outline-none"
+                        className="w-full bg-transparent outline-none min-h-[48px]"
                         placeholder="기관명 검색..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        autoFocus
                         onClick={(e) => e.stopPropagation()} // input 클릭 시 닫히지 않도록
                     />
                 ) : (
                     <span className="truncate">{selectedOrg.name}</span>
                 )}
                 <svg 
-                    className={`w-4 h-4 ml-2 text-surface-500 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
+                    className={`w-4 h-4 ml-2 text-surface-500 dark:text-surface-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} 
                     fill="none" 
                     viewBox="0 0 24 24" 
                     stroke="currentColor"
@@ -85,6 +87,10 @@ export default function OrgSearchDropdown({ selectedOrgId, onChange, orgs }: Org
                             {filteredOptions.map((org) => (
                                 <li
                                     key={org.id}
+                                    role="option"
+                                    aria-selected={org.id === selectedOrgId}
+                                    tabIndex={0}
+                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleSelect(org.id); } }}
                                     className={`px-3 py-2 text-sm cursor-pointer transition-colors
                                         ${org.id === selectedOrgId 
                                             ? 'bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-400 font-medium' 
@@ -97,7 +103,7 @@ export default function OrgSearchDropdown({ selectedOrgId, onChange, orgs }: Org
                             ))}
                         </ul>
                     ) : (
-                        <div className="px-3 py-3 text-sm text-center text-surface-500">
+                        <div className="px-3 py-3 text-sm text-center text-surface-500 dark:text-surface-400">
                             검색 결과가 없습니다.
                         </div>
                     )}

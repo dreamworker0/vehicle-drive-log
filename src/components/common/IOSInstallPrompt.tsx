@@ -44,7 +44,7 @@ export default function IOSInstallPrompt() {
             <div className="relative bg-gradient-to-r from-primary-50 to-blue-50 dark:from-primary-950/60 dark:to-blue-950/60 border border-primary-200 dark:border-primary-800 rounded-xl px-4 py-3">
                 <button
                     onClick={handleDismiss}
-                    className="absolute top-2 right-2 p-1 text-surface-400 hover:text-surface-600 dark:text-surface-500 dark:hover:text-surface-300"
+                    className="absolute top-0 right-0 p-1 text-surface-400 hover:text-surface-600 dark:text-surface-500 dark:hover:text-surface-300 min-w-[48px] min-h-[48px] flex items-center justify-center"
                     aria-label="닫기"
                 >
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -63,7 +63,7 @@ export default function IOSInstallPrompt() {
                         </p>
                         <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5 leading-relaxed">
                             하단 <span className="inline-flex items-center">
-                                <svg className="w-3.5 h-3.5 text-primary-600 mx-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                <svg className="w-3.5 h-3.5 text-primary-600 dark:text-primary-400 mx-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M9 8.25H7.5a2.25 2.25 0 0 0-2.25 2.25v9a2.25 2.25 0 0 0 2.25 2.25h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25H15m0-3-3-3m0 0-3 3m3-3V15" />
                                 </svg>
                             </span> 버튼 → &ldquo;홈 화면에 추가&rdquo;로 앱처럼 사용하고 푸시 알림도 받을 수 있습니다.

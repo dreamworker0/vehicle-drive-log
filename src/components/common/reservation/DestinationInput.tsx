@@ -126,11 +126,14 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
 
         return (
             <>
-                <label className="label text-sm font-medium">📍 목적지 <span className="text-red-500">*</span></label>
+                <label className="label text-sm font-medium">📍 목적지 <span className="text-red-500 dark:text-red-400">*</span></label>
                 <div className="relative mt-1">
                     {/* 태그 입력창 컨테이너 */}
                     <div
                         onClick={() => internalInputRef.current?.focus()}
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') internalInputRef.current?.focus(); }}
                         className="input flex flex-wrap items-center gap-1.5 p-1.5 min-h-[42px] cursor-text focus-within:ring-2 focus-within:ring-primary-500 focus-within:border-primary-500 flex-1 w-full bg-white dark:bg-surface-800"
                     >
                         {/* 확정된 목적지 칩 리스트 */}
@@ -147,7 +150,7 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
                                         e.stopPropagation();
                                         handleRemoveDestination(idx);
                                     }}
-                                    className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-primary-400 hover:text-primary-600 dark:hover:text-primary-200 hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors ml-0.5"
+                                    className="w-3.5 h-3.5 rounded-full flex items-center justify-center text-primary-400 dark:text-primary-500 hover:text-primary-600 dark:hover:text-primary-200 hover:bg-primary-100 dark:hover:bg-primary-900/50 transition-colors ml-0.5"
                                     title="목적지 삭제"
                                 >
                                     ✕
@@ -239,7 +242,7 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
                                     }}
                                     className="w-full text-left px-3 py-2.5 flex items-start gap-2.5 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors border-b border-surface-100 dark:border-surface-700 last:border-0"
                                 >
-                                    <span className="mt-0.5 text-primary-500 text-sm flex-shrink-0">📍</span>
+                                    <span className="mt-0.5 text-primary-500 dark:text-primary-400 text-sm flex-shrink-0">📍</span>
                                     <div className="min-w-0">
                                         <p className="text-sm font-medium text-surface-900 dark:text-surface-100 truncate">
                                             {poi.name}

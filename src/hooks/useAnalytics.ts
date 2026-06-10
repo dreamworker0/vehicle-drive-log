@@ -1,64 +1,41 @@
-/**
- * useAnalytics — 트렌드 분석 + 비용 최적화 데이터 훅
- * AnalyticsDashboard에서 사용하는 커스텀 훅
- *
- * 리팩토링: 순수 계산 로직 → utils/analyticsCalc
- */
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from './useAuth';
-import { getDriveLogs, getVehicles, getOrganizationMembers, getMaintenanceRecords, getFuelLogs, getAllHipassCharges } from '../lib/firestore';
-import type { DriveLog } from '../types/driveLog';
+import { getVehicles, getOrganizationMembers } from '../lib/firestore';
+import { getMonthlyStats, MonthlyStat } from '../lib/firestore/statistics';
 import type { Vehicle } from '../types/vehicle';
 import type { User } from '../types/user';
-import type { MaintenanceRecord } from '../types/maintenance';
-import type { FuelLog } from '../types/fuelLog';
-import type { HipassCharge } from '../types/hipassCharge';
-import { getRecentMonthKeys, extractDateStr } from './utils/aggregationUtils';
+import { getRecentMonthKeys } from './utils/aggregationUtils';
 import {
-    calcMonthlyTrend, calcHeatmapData, detectAnomalies,
-    calcDriverComparison, calcVehicleUtilization,
-    calcFuelEfficiency, calcMaintenanceCostAnalysis,
-    calcCostTrend, calcRecommendations,
+    DAY_NAMES, MONTH_LABELS, getWorkdaysInMonth, calcRecommendations,
 } from './utils/analyticsCalc';
-import type { LogEntry, CostTrendItem } from './utils/analyticsCalc';
+import type { CostTrendItem, DriverComparisonItem, RecommendationItem } from './utils/analyticsCalc';
 
 export default function useAnalytics() {
     const { userData } = useAuth();
     const orgId = userData?.organizationId;
 
-    const [logs, setLogs] = useState<DriveLog[]>([]);
+    const [stats, setStats] = useState<MonthlyStat[]>([]);
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
     const [members, setMembers] = useState<User[]>([]);
-    const [maintenanceRecords, setMaintenanceRecords] = useState<MaintenanceRecord[]>([]);
-    const [fuelLogs, setFuelLogs] = useState<FuelLog[]>([]);
-    const [hipassCharges, setHipassCharges] = useState<HipassCharge[]>([]);
     const [loading, setLoading] = useState(true);
     const [rangeMonths, setRangeMonths] = useState(6);
 
-    // ── 데이터 페칭 (IO) ─────────────────────────────────
+    const monthKeys = useMemo(() => getRecentMonthKeys(rangeMonths), [rangeMonths]);
+
+    // ── 데이터 페칭 (비용 최적화 적용됨) ─────────────────────────────────
     useEffect(() => {
         if (!orgId) { setLoading(false); return; }
         const fetchAll = async () => {
             setLoading(true);
             try {
-                const sinceDate = new Date();
-                sinceDate.setMonth(sinceDate.getMonth() - rangeMonths - 1);
-                sinceDate.setDate(1);
-
-                const [l, v, m, mr, fl, hc] = await Promise.all([
-                    getDriveLogs(orgId, { limit: 2000, since: sinceDate }).then(r => r.docs),
+                const [s, v, m] = await Promise.all([
+                    getMonthlyStats(orgId, monthKeys),
                     getVehicles(orgId),
                     getOrganizationMembers(orgId),
-                    getMaintenanceRecords(orgId),
-                    getFuelLogs(orgId, null, { since: sinceDate }).catch(() => []),
-                    getAllHipassCharges(orgId, { since: sinceDate }).catch(() => []),
                 ]);
-                setLogs(l as DriveLog[]);
+                setStats(s);
                 setVehicles(v as Vehicle[]);
                 setMembers((m as User[]).filter(u => u.role !== 'superAdmin'));
-                setMaintenanceRecords(mr as MaintenanceRecord[]);
-                setFuelLogs(fl as FuelLog[]);
-                setHipassCharges(hc as HipassCharge[]);
             } catch (err) {
                 console.error('분석 데이터 로드 실패:', err);
             } finally {
@@ -66,28 +43,190 @@ export default function useAnalytics() {
             }
         };
         fetchAll();
-    }, [orgId, rangeMonths]);
+    }, [orgId, monthKeys]);
 
-    // ── 파생 계산 (순수 함수 위임) ────────────────────────
-    const monthKeys = useMemo(() => getRecentMonthKeys(rangeMonths), [rangeMonths]);
+    // ── 파생 계산 (월별 집계 문서를 Recharts 상태 구조로 병합) ────────────────────────
+    
+    const monthlyTrend = useMemo(() => {
+        return monthKeys.map(mk => {
+            const stat = stats.find(s => s.monthKey === mk);
+            const label = MONTH_LABELS[parseInt(mk.split('-')[1], 10) - 1];
+            return {
+                month: mk,
+                label,
+                count: stat?.totalLogs || 0,
+                distance: stat?.totalDistance || 0,
+                fuelCost: stat?.fuelCost || 0,
+            };
+        });
+    }, [stats, monthKeys]);
 
-    const filteredLogs = useMemo(() => {
-        const startMonth = monthKeys[0];
-        return logs.filter(l => {
-            const d = extractDateStr(l as unknown as LogEntry);
-            if (!d) return false;
-            return d >= `${startMonth}-01`;
-        }) as unknown as LogEntry[];
-    }, [logs, monthKeys]);
+    const driverComparison = useMemo(() => {
+        const recentKeys = monthKeys.slice(-3);
+        const map: Record<string, { totalCount: number, totalDistance: number, months: Record<string, {count: number, distance: number}> }> = {};
+        
+        recentKeys.forEach(mk => {
+            const stat = stats.find(s => s.monthKey === mk);
+            if (stat?.driverStats) {
+                Object.entries(stat.driverStats).forEach(([driverName, dStat]) => {
+                    if (!map[driverName]) map[driverName] = { totalCount: 0, totalDistance: 0, months: {} };
+                    if (!map[driverName].months[mk]) map[driverName].months[mk] = { count: 0, distance: 0 };
+                    
+                    map[driverName].months[mk].count += dStat.count;
+                    map[driverName].months[mk].distance += dStat.distance;
+                    map[driverName].totalCount += dStat.count;
+                    map[driverName].totalDistance += dStat.distance;
+                });
+            }
+        });
 
-    const monthlyTrend = useMemo(() => calcMonthlyTrend(filteredLogs, monthKeys), [filteredLogs, monthKeys]);
-    const driverComparison = useMemo(() => calcDriverComparison(filteredLogs, monthKeys), [filteredLogs, monthKeys]);
-    const vehicleUtilization = useMemo(() => calcVehicleUtilization(filteredLogs, vehicles, monthKeys), [filteredLogs, vehicles, monthKeys]);
-    const heatmapData = useMemo(() => calcHeatmapData(filteredLogs), [filteredLogs]);
-    const fuelEfficiency = useMemo(() => calcFuelEfficiency(filteredLogs), [filteredLogs]);
-    const maintenanceCostAnalysis = useMemo(() => calcMaintenanceCostAnalysis(vehicles, maintenanceRecords), [vehicles, maintenanceRecords]);
-    const anomalies = useMemo(() => detectAnomalies(filteredLogs), [filteredLogs]);
-    const costTrend = useMemo(() => calcCostTrend(fuelLogs, hipassCharges, maintenanceRecords, monthKeys), [fuelLogs, hipassCharges, maintenanceRecords, monthKeys]);
+        return Object.entries(map).map(([name, d]) => ({
+            name,
+            totalCount: d.totalCount,
+            totalDistance: d.totalDistance,
+            ...recentKeys.reduce((acc, mk) => {
+                const label = MONTH_LABELS[parseInt(mk.split('-')[1], 10) - 1];
+                acc[`${label}_count`] = d.months[mk]?.count || 0;
+                acc[`${label}_distance`] = d.months[mk]?.distance || 0;
+                return acc;
+            }, {} as Record<string, number>),
+            monthLabels: recentKeys.map(mk => MONTH_LABELS[parseInt(mk.split('-')[1], 10) - 1]),
+        })).sort((a, b) => b.totalCount - a.totalCount);
+    }, [stats, monthKeys]);
+
+    const vehicleUtilization = useMemo(() => {
+        const recentKeys = monthKeys.slice(-3);
+        const totalWorkdays = recentKeys.reduce((s, k) => s + getWorkdaysInMonth(k), 0);
+        const map: Record<string, number> = {};
+        
+        recentKeys.forEach(mk => {
+            const stat = stats.find(s => s.monthKey === mk);
+            if (stat?.vehicleStats) {
+                Object.entries(stat.vehicleStats).forEach(([vName, vStat]) => {
+                    map[vName] = (map[vName] || 0) + (vStat.usedDays || 0);
+                });
+            }
+        });
+        
+        return vehicles.map(v => {
+            const name = v.displayName || v.plateNumber || '(미지정)';
+            const usedDays = map[name] || 0;
+            const rate = totalWorkdays > 0 ? Math.round((usedDays / totalWorkdays) * 100) : 0;
+            return { name, usedDays, totalWorkdays, rate };
+        }).sort((a, b) => b.rate - a.rate);
+    }, [stats, vehicles, monthKeys]);
+
+    const heatmapData = useMemo(() => {
+        const grid = Array.from({ length: 7 }, () => Array(24).fill(0) as number[]);
+        stats.forEach(stat => {
+            if (stat.heatmapData) {
+                stat.heatmapData.forEach(h => {
+                    if (h.dayIdx >= 0 && h.dayIdx < 7 && h.hour >= 0 && h.hour < 24) {
+                        grid[h.dayIdx][h.hour] += h.count;
+                    }
+                });
+            }
+        });
+        
+        const items: { day: string, dayIdx: number, hour: number, count: number }[] = [];
+        for (let d = 0; d < 7; d++) {
+            for (let h = 0; h < 24; h++) {
+                if (grid[d][h] > 0) items.push({ day: DAY_NAMES[d], dayIdx: d, hour: h, count: grid[d][h] });
+            }
+        }
+        return { grid, items, maxCount: Math.max(1, ...items.map(i => i.count)) };
+    }, [stats]);
+
+    const fuelEfficiency = useMemo(() => {
+        const map: Record<string, { totalDist: number, totalCost: number }> = {};
+        stats.forEach(stat => {
+            if (stat.vehicleStats) {
+                Object.entries(stat.vehicleStats).forEach(([vName, vStat]) => {
+                    if (!map[vName]) map[vName] = { totalDist: 0, totalCost: 0 };
+                    map[vName].totalDist += (vStat.totalDist || 0);
+                    map[vName].totalCost += (vStat.totalCost || 0);
+                });
+            }
+        });
+        
+        const items = Object.entries(map).filter(([, v]) => v.totalDist > 0 && v.totalCost > 0).map(([name, v]) => ({
+            name,
+            totalDist: v.totalDist,
+            totalCost: v.totalCost,
+            costPerKm: Math.round((v.totalCost / v.totalDist) * 10) / 10
+        })).sort((a, b) => b.costPerKm - a.costPerKm);
+        
+        const avgCostPerKm = items.length > 0 ? Math.round((items.reduce((s, r) => s + r.costPerKm, 0) / items.length) * 10) / 10 : 0;
+        return { items, avgCostPerKm };
+    }, [stats]);
+
+    const maintenanceCostAnalysis = useMemo(() => {
+        const map: Record<string, { totalCost: number, count: number, lastDate: string }> = {};
+        stats.forEach(stat => {
+            if (stat.vehicleStats) {
+                Object.entries(stat.vehicleStats).forEach(([vName, vStat]) => {
+                    if (!map[vName]) map[vName] = { totalCost: 0, count: 0, lastDate: '' };
+                    map[vName].totalCost += (vStat.maintenanceCost || 0);
+                    map[vName].count += (vStat.maintenanceCount || 0);
+                    if (vStat.lastMaintenanceDate && vStat.lastMaintenanceDate > map[vName].lastDate) {
+                        map[vName].lastDate = vStat.lastMaintenanceDate;
+                    }
+                });
+            }
+        });
+        
+        return vehicles.map(v => {
+            const name = v.displayName || v.plateNumber || '(미지정)';
+            const maint = map[name] || { totalCost: 0, count: 0, lastDate: '' };
+            const currentKm = v.currentKm || 0;
+            return {
+                name,
+                totalMaintenanceCost: maint.totalCost,
+                maintenanceCount: maint.count,
+                lastMaintenanceDate: maint.lastDate,
+                currentKm,
+                costPerKm: currentKm > 0 ? Math.round((maint.totalCost / currentKm) * 100) / 100 : 0
+            };
+        }).sort((a, b) => b.totalMaintenanceCost - a.totalMaintenanceCost);
+    }, [stats, vehicles]);
+
+    const anomalies = useMemo(() => {
+        const sums = { weekend: 0, night: 0, overDrive: 0, totalLogs: 0 };
+        stats.forEach(s => {
+            sums.weekend += (s.anomalies?.weekend || 0);
+            sums.night += (s.anomalies?.night || 0);
+            sums.overDrive += (s.anomalies?.overDrive || 0);
+            sums.totalLogs += (s.totalLogs || 0);
+        });
+        
+        const items: { type: string; icon: string; severity: string; title: string; desc: string }[] = [];
+        const weekendRate = sums.totalLogs > 0 ? Math.round((sums.weekend / sums.totalLogs) * 100) : 0;
+        
+        if (weekendRate > 15) {
+            items.push({ type: 'weekend', icon: '📅', severity: weekendRate > 30 ? 'high' : 'medium', title: `주말 운행 비율 ${weekendRate}%`, desc: `전체 ${sums.totalLogs}건 중 ${sums.weekend}건이 주말 운행입니다. 예약 정책 검토를 권장합니다.` });
+        }
+        if (sums.night > 3) {
+            items.push({ type: 'night', icon: '🌙', severity: sums.night > 10 ? 'high' : 'medium', title: `심야 운행 ${sums.night}건 감지`, desc: `22시~06시 사이 운행이 ${sums.night}건 발생했습니다.` });
+        }
+        if (sums.overDrive > 0) {
+            items.push({ type: 'overdrive', icon: '⚡', severity: sums.overDrive > 5 ? 'high' : 'low', title: `1일 200km 이상 주행 ${sums.overDrive}건`, desc: `장거리 운행이 빈번합니다. 운행 분담 또는 경로 최적화를 검토하세요.` });
+        }
+        return items;
+    }, [stats]);
+
+    const costTrend = useMemo(() => {
+        return monthKeys.map(mk => {
+            const stat = stats.find(s => s.monthKey === mk);
+            const monthNum = parseInt(mk.split('-')[1], 10);
+            return {
+                label: MONTH_LABELS[monthNum - 1],
+                fuelCost: stat?.fuelCost || 0,
+                hipassCost: stat?.hipassCost || 0,
+                maintenanceCost: stat?.maintenanceCost || 0,
+                totalCost: (stat?.fuelCost || 0) + (stat?.hipassCost || 0) + (stat?.maintenanceCost || 0)
+            };
+        });
+    }, [stats, monthKeys]);
 
     const totalFuelCost = useMemo(() => costTrend.reduce((s: number, c: CostTrendItem) => s + c.fuelCost, 0), [costTrend]);
     const totalHipassCost = useMemo(() => costTrend.reduce((s: number, c: CostTrendItem) => s + c.hipassCost, 0), [costTrend]);
@@ -95,9 +234,11 @@ export default function useAnalytics() {
     const totalOperatingCost = useMemo(() => totalFuelCost + totalHipassCost + totalMaintenanceCost, [totalFuelCost, totalHipassCost, totalMaintenanceCost]);
 
     const recommendations = useMemo(() => calcRecommendations({
-        fuelEfficiency, driverComparison, maintenanceCostAnalysis,
+        fuelEfficiency, driverComparison: driverComparison as DriverComparisonItem[], maintenanceCostAnalysis,
         anomalies, vehicleUtilization, monthKeys,
     }), [fuelEfficiency, driverComparison, maintenanceCostAnalysis, anomalies, vehicleUtilization, monthKeys]);
+
+    const totalLogs = useMemo(() => stats.reduce((s, st) => s + (st.totalLogs || 0), 0), [stats]);
 
     return {
         loading,
@@ -120,7 +261,7 @@ export default function useAnalytics() {
         totalMaintenanceCost,
         totalOperatingCost,
         // 원시 통계
-        totalLogs: filteredLogs.length,
+        totalLogs,
         totalVehicles: vehicles.length,
         totalMembers: members.length,
     };

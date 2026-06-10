@@ -50,11 +50,11 @@ function StatMini({ icon, value, label, sub, color, onClick }: StatMiniProps) {
                 <span className="text-2xl">{icon}</span>
                 <div>
                     <p className="text-xl font-bold text-surface-900 dark:text-surface-100">{value}</p>
-                    <p className="text-xs text-surface-400">{label}</p>
+                    <p className="text-xs text-surface-400 dark:text-surface-500">{label}</p>
                     {sub && <p className="text-[10px] text-surface-500 dark:text-surface-500 mt-0.5">{sub}</p>}
                 </div>
             </div>
-            {onClick && <span className="absolute bottom-1 right-2 text-[9px] text-surface-400 opacity-0 group-hover:opacity-100 transition-opacity">클릭하여 보기 →</span>}
+            {onClick && <span className="absolute bottom-1 right-2 text-[9px] text-surface-400 dark:text-surface-500 opacity-0 group-hover:opacity-100 transition-opacity">클릭하여 보기 →</span>}
         </div>
     );
 }
@@ -78,7 +78,7 @@ export default function AnalyticsDashboard() {
             <div className="flex items-center justify-center py-20">
                 <div className="text-center animate-fade-in">
                     <div className="w-8 h-8 spinner mx-auto mb-3" />
-                    <p className="text-surface-400 text-sm">분석 데이터를 불러오는 중...</p>
+                    <p className="text-surface-400 dark:text-surface-500 text-sm">분석 데이터를 불러오는 중...</p>
                 </div>
             </div>
         );
@@ -95,7 +95,7 @@ export default function AnalyticsDashboard() {
                             key={op.value}
                             onClick={() => setRangeMonths(op.value)}
                             className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${rangeMonths === op.value
-                                ? 'bg-primary-600 text-white shadow-md'
+                                ? 'bg-primary-600 dark:bg-primary-700 text-white shadow-md'
                                 : 'bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-400 hover:bg-surface-200 dark:hover:bg-surface-700'
                                 }`}
                         >
@@ -107,11 +107,11 @@ export default function AnalyticsDashboard() {
 
             {/* 요약 통계 */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
-                <StatMini icon="📊" value={`${totalLogs}건`} label="분석 기간 운행" sub={totalDistance > 0 ? `총 ${totalDistance.toLocaleString()}km` : undefined} color="bg-primary-400" />
-                <StatMini icon="🚗" value={totalVehicles} label="등록 차량" sub={`직원 ${totalMembers}명`} color="bg-accent-400" />
-                <StatMini icon="⛽" value={formatCost(totalFuelCost)} label="총 주유비" sub={totalFuelCost > 0 ? `${totalFuelCost.toLocaleString()}원` : undefined} color="bg-amber-400" />
-                <StatMini icon="🛣️" value={formatCost(totalHipassCost)} label="하이패스 충전" sub={totalHipassCost > 0 ? `${totalHipassCost.toLocaleString()}원` : undefined} color="bg-purple-400" />
-                <StatMini icon="💡" value={recommendations.length} label="최적화 추천" sub="연료·정비·가동률 개선 제안" color="bg-rose-400" onClick={() => setActiveTab('cost')} />
+                <StatMini icon="📊" value={`${totalLogs}건`} label="분석 기간 운행" sub={totalDistance > 0 ? `총 ${totalDistance.toLocaleString()}km` : undefined} color="bg-primary-400 dark:bg-primary-600/50" />
+                <StatMini icon="🚗" value={totalVehicles} label="등록 차량" sub={`직원 ${totalMembers}명`} color="bg-accent-400 dark:bg-accent-600/50" />
+                <StatMini icon="⛽" value={formatCost(totalFuelCost)} label="총 주유비" sub={totalFuelCost > 0 ? `${totalFuelCost.toLocaleString()}원` : undefined} color="bg-amber-400 dark:bg-amber-600/50" />
+                <StatMini icon="🛣️" value={formatCost(totalHipassCost)} label="하이패스 충전" sub={totalHipassCost > 0 ? `${totalHipassCost.toLocaleString()}원` : undefined} color="bg-purple-400 dark:bg-purple-600/50" />
+                <StatMini icon="💡" value={recommendations.length} label="최적화 추천" sub="연료·정비·가동률 개선 제안" color="bg-rose-400 dark:bg-rose-600/50" onClick={() => setActiveTab('cost')} />
             </div>
 
             {/* 탭 */}
@@ -134,7 +134,7 @@ export default function AnalyticsDashboard() {
             </div>
 
             {/* 콘텐츠 */}
-            <Suspense fallback={<div className="p-10 text-center text-surface-400 spinner mx-auto">분석 차트를 불러오는 중...</div>}>
+            <Suspense fallback={<div className="p-10 text-center text-surface-400 dark:text-surface-500 spinner mx-auto">분석 차트를 불러오는 중...</div>}>
                 {activeTab === 'trend' ? (
                     <TrendCharts
                         monthlyTrend={monthlyTrend}

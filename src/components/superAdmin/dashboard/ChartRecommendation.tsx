@@ -23,7 +23,7 @@ function ChartRecommendation({ recommendationStats, recommendationRatio }: Props
                     <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">
                         빈 시간 추천 기능을 통한 예약 생성 추이
                     </p>
-                    <div className="flex flex-col items-center justify-center py-12 text-surface-400">최근 발생한 데이터가 없습니다.</div>
+                    <div className="flex flex-col items-center justify-center py-12 text-surface-400 dark:text-surface-500">최근 발생한 데이터가 없습니다.</div>
                 </div>
             );
         }
@@ -47,7 +47,7 @@ function ChartRecommendation({ recommendationStats, recommendationRatio }: Props
                         </div>
                         <div className="w-px h-8 bg-surface-200 dark:bg-surface-700"></div>
                         <div className="text-center">
-                            <div className="text-[11px] text-amber-500 mb-0.5">추천 예약 비율</div>
+                            <div className="text-[11px] text-amber-500 dark:text-amber-400 mb-0.5">추천 예약 비율</div>
                             <div className="text-sm font-bold text-amber-600 dark:text-amber-400">{recommendationRatio.rate}%</div>
                         </div>
                     </div>

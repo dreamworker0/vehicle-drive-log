@@ -26,7 +26,7 @@ export default memo(function OrgMemberTable({ members, orgId, changingRole, load
 
     if (loadingMembers) {
         return (
-            <div className="p-6 flex items-center justify-center gap-2 text-sm text-surface-400">
+            <div className="p-6 flex items-center justify-center gap-2 text-sm text-surface-400 dark:text-surface-500">
                 <div className="w-4 h-4 spinner" />
                 멤버 정보 불러오는 중...
             </div>
@@ -35,7 +35,7 @@ export default memo(function OrgMemberTable({ members, orgId, changingRole, load
 
     if (visibleMembers.length === 0) {
         return (
-            <div className="p-4 text-center text-sm text-surface-400">
+            <div className="p-4 text-center text-sm text-surface-400 dark:text-surface-500">
                 소속된 멤버가 없습니다
             </div>
         );
@@ -77,7 +77,7 @@ export default memo(function OrgMemberTable({ members, orgId, changingRole, load
                             <td className="py-2.5 px-3 text-center">
                                 <button
                                     onClick={() => onRemoveMember(member, orgId)}
-                                    className="btn-icon btn-sm text-surface-400 hover:text-red-500 transition-colors"
+                                    className="btn-icon btn-sm text-surface-400 dark:text-surface-500 hover:text-red-500 dark:hover:text-red-400 transition-colors"
                                     title="직원 제거"
                                     aria-label={`${member.name || '직원'} 제거`}
                                 >

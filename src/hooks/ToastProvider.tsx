@@ -33,9 +33,9 @@ export function ToastProviderWrapper({ children }: { children: ReactNode }) {
                                     toast.type === 'success' ? '✅' :
                                         toast.type === 'warning' ? '⚠️' : 'ℹ️'}
                             </span>
-                            <span className="flex-1 cursor-pointer" onClick={() => removeToast(toast.id)}>
+                            <button type="button" className="flex-1 text-left cursor-pointer bg-transparent border-0 text-white p-0 m-0 focus:outline-none" onClick={() => removeToast(toast.id)}>
                                 {toast.message}
-                            </span>
+                            </button>
                             {toast.actionLabel && (
                                 <button
                                     onClick={() => handleAction(toast)}

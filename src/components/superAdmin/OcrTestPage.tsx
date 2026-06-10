@@ -120,13 +120,16 @@ export default function OcrTestPage() {
                             onClick={() => setIsElectric(!isElectric)}
                             className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors duration-300 focus:outline-none ${isElectric ? 'bg-emerald-500' : 'bg-surface-200 dark:bg-surface-700'}`}
                         >
-                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform duration-300 ${isElectric ? 'translate-x-5' : 'translate-x-1'}`} />
+                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-surface-900 shadow-md transition-transform duration-300 ${isElectric ? 'translate-x-5' : 'translate-x-1'}`} />
                         </button>
                     </label>
                 </div>
 
                 {!imagePreview ? (
                     <div
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); fileInputRef.current?.click(); } }}
                         className={`border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${dragOver
                             ? 'border-primary-400 bg-primary-50 dark:bg-primary-900/20'
                             : 'border-surface-200 dark:border-surface-700 hover:border-primary-300 hover:bg-surface-50 dark:hover:bg-surface-800/50'
@@ -156,7 +159,7 @@ export default function OcrTestPage() {
                             />
                             <button
                                 onClick={handleClear}
-                                className="absolute top-2 right-2 w-8 h-8 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center text-white transition-colors"
+                                className="absolute top-2 right-2 w-8 h-8 bg-black/50 hover:bg-black/70 rounded-full flex items-center justify-center text-white transition-colors min-h-[48px]"
                             >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -191,7 +194,7 @@ export default function OcrTestPage() {
                     ref={fileInputRef}
                     type="file"
                     accept="image/*"
-                    className="hidden"
+                    className="hidden min-h-[48px]"
                     onChange={handleFileChange}
                 />
             </div>
@@ -232,11 +235,11 @@ export default function OcrTestPage() {
                                     <div className="flex items-start justify-between gap-2 mb-2">
                                         <div className="flex items-center gap-2">
                                             {item.success ? (
-                                                <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-0.5 rounded-full">
+                                                <span className="inline-flex items-center gap-1 text-xs font-medium btn-soft-emerald dark:bg-emerald-900/30 px-2 py-0.5 rounded-full">
                                                     ✓ 성공
                                                 </span>
                                             ) : (
-                                                <span className="inline-flex items-center gap-1 text-xs font-medium text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/30 px-2 py-0.5 rounded-full">
+                                                <span className="inline-flex items-center gap-1 text-xs font-medium btn-soft-red dark:bg-red-900/30 px-2 py-0.5 rounded-full">
                                                     ✗ 실패
                                                 </span>
                                             )}
@@ -244,7 +247,7 @@ export default function OcrTestPage() {
                                                 <span className="text-xs text-emerald-500 dark:text-emerald-400">⚡ 전기차</span>
                                             )}
                                         </div>
-                                        <span className="text-[11px] text-surface-400 whitespace-nowrap">
+                                        <span className="text-[11px] text-surface-400 dark:text-surface-500 whitespace-nowrap">
                                             {item.timestamp} · {item.elapsed}s
                                         </span>
                                     </div>
@@ -277,7 +280,7 @@ export default function OcrTestPage() {
                                             )}
                                         </div>
                                     ) : (
-                                        <p className="text-sm text-red-500">{item.raw}</p>
+                                        <p className="text-sm text-red-500 dark:text-red-400">{item.raw}</p>
                                     )}
                                 </div>
                             </div>
@@ -285,7 +288,7 @@ export default function OcrTestPage() {
                             {/* AI Raw 응답 (접기) */}
                             {item.success && item.raw && (
                                 <details className="border-t border-surface-100 dark:border-surface-700">
-                                    <summary className="px-4 py-2 text-xs text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 cursor-pointer select-none transition-colors">
+                                    <summary className="px-4 py-2 text-xs text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 cursor-pointer select-none transition-colors">
                                         AI 원본 응답 보기
                                     </summary>
                                     <div className="px-4 pb-3">

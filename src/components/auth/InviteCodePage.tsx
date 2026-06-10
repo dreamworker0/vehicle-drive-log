@@ -81,8 +81,8 @@ export default function InviteCodePage() {
         <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-surface-50 to-primary-50 px-4">
             <div className="w-full max-w-sm animate-scale-in">
                 <div className="text-center mb-8">
-                    <div className="w-16 h-16 mx-auto mb-4 bg-primary-100 rounded-2xl flex items-center justify-center">
-                        <svg className="w-8 h-8 text-primary-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                    <div className="w-16 h-16 mx-auto mb-4 bg-primary-100 dark:bg-primary-900/40 rounded-2xl flex items-center justify-center">
+                        <svg aria-hidden="true" className="w-8 h-8 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25z" />
                         </svg>
                     </div>
@@ -97,7 +97,7 @@ export default function InviteCodePage() {
                         <img
                             src={user?.photoURL || ''}
                             alt=""
-                            className="w-10 h-10 rounded-full bg-surface-200"
+                            className="w-10 h-10 rounded-full bg-surface-200 dark:bg-surface-700"
                         />
                         <div>
                             <p className="text-sm font-medium text-surface-800 dark:text-surface-200">{user?.displayName}</p>
@@ -112,21 +112,20 @@ export default function InviteCodePage() {
                                 type="text"
                                 value={code}
                                 onChange={(e) => setCode(e.target.value.replace(/\s/g, '').toUpperCase().slice(0, 6))}
-                                className="input text-center text-2xl tracking-[0.5em] font-mono uppercase"
+                                className="input text-center text-2xl tracking-[0.5em] font-mono uppercase min-h-[48px]"
                                 placeholder="______"
                                 maxLength={6}
-                                autoFocus
                             />
                         </div>
 
                         {error && (
-                            <p className="text-sm text-red-500 animate-slide-down">{error}</p>
+                            <p className="text-sm text-red-500 dark:text-red-400 animate-slide-down">{error}</p>
                         )}
 
                         <button
                             type="submit"
                             disabled={loading || code.length !== 6}
-                            className="btn-primary w-full"
+                            className="btn-primary w-full min-h-[48px]"
                         >
                             {loading ? (
                                 <>
@@ -145,7 +144,7 @@ export default function InviteCodePage() {
                                         if (code) localStorage.setItem('pendingInviteCode', code);
                                         logout().then(() => navigate('/login'));
                                     }}
-                                    className="btn-primary w-full shadow-sm text-sm"
+                                    className="btn-primary w-full shadow-sm text-sm min-h-[48px]"
                                 >
                                     Google 계정으로 로그인하기
                                 </button>
@@ -154,13 +153,13 @@ export default function InviteCodePage() {
                             <div className="mt-4 pt-4 border-t border-surface-100 dark:border-surface-700 space-y-3">
                                 <button
                                     onClick={() => navigate('/apply')}
-                                    className="btn-secondary w-full text-sm py-2.5 font-medium border-primary-200 text-primary-700 hover:bg-primary-50 dark:border-primary-800 dark:text-primary-300 dark:hover:bg-primary-900/30"
+                                    className="btn-secondary w-full text-sm py-2.5 font-medium border-primary-200 text-primary-700 hover:bg-primary-50 dark:border-primary-800 dark:text-primary-300 dark:hover:bg-primary-900/30 min-h-[48px]"
                                 >
                                     초대 코드가 없나요? 새 기관 등록 신청하기
                                 </button>
                                 <button
                                     onClick={logout}
-                                    className="btn-ghost w-full text-sm text-surface-400 hover:text-red-500"
+                                    className="btn-ghost w-full text-sm text-surface-400 dark:text-surface-500 hover:text-red-500 dark:hover:text-red-400 min-h-[48px]"
                                 >
                                     다른 계정으로 로그인
                                 </button>

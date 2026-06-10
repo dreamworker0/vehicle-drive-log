@@ -61,14 +61,14 @@ export default function DriveLogFilters({ filters, onFiltersChange, vehicles, me
             </div>
             {/* 기간 필터 */}
             <div className="flex items-center gap-2 mt-3">
-                <span className="text-xs text-surface-400 whitespace-nowrap">기간</span>
+                <span className="text-xs text-surface-400 dark:text-surface-500 whitespace-nowrap">기간</span>
                 <input
                     type="date"
                     value={filters.startDate}
                     onChange={e => onFiltersChange({ ...filters, startDate: e.target.value })}
                     className="input text-sm flex-1"
                 />
-                <span className="text-surface-300">~</span>
+                <span className="text-surface-300 dark:text-surface-600">~</span>
                 <input
                     type="date"
                     value={filters.endDate}
@@ -78,7 +78,7 @@ export default function DriveLogFilters({ filters, onFiltersChange, vehicles, me
                 {(filters.startDate || filters.endDate) && (
                     <button
                         onClick={() => onFiltersChange({ ...filters, startDate: '', endDate: '' })}
-                        className="text-xs text-surface-400 hover:text-red-500 whitespace-nowrap"
+                        className="text-xs text-surface-400 dark:text-surface-500 hover:text-red-500 dark:hover:text-red-400 whitespace-nowrap"
                     >
                         초기화
                     </button>

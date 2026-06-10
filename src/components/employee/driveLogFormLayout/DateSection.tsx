@@ -31,9 +31,9 @@ const DateSection = memo(function DateSection({ form, setForm, isRetroactive }: 
                     min={minDate}
                     max={today}
                     onChange={e => setForm({ ...form, driveDate: e.target.value })}
-                    className="input"
+                    className="input min-h-[48px]"
                 />
-                <p className="text-[11px] text-surface-400 mt-1">2달 이내의 날짜만 선택할 수 있습니다.</p>
+                <p className="text-[11px] text-surface-400 dark:text-surface-500 mt-1">2달 이내의 날짜만 선택할 수 있습니다.</p>
                 {isRetroactive && (
                     <p className="text-[11px] text-amber-500 dark:text-amber-400 mt-0.5">
                         ⚠️ 소급 입력: 오늘이 아닌 날짜로 기록됩니다.
@@ -48,7 +48,7 @@ const DateSection = memo(function DateSection({ form, setForm, isRetroactive }: 
                         type="time"
                         value={form.startTime}
                         onChange={e => setForm({ ...form, startTime: e.target.value })}
-                        className="input"
+                        className="input min-h-[48px]"
                     />
                 </div>
                 <div>
@@ -58,7 +58,7 @@ const DateSection = memo(function DateSection({ form, setForm, isRetroactive }: 
                         type="time"
                         value={form.endTime}
                         onChange={e => setForm({ ...form, endTime: e.target.value })}
-                        className="input"
+                        className="input min-h-[48px]"
                     />
                 </div>
             </div>

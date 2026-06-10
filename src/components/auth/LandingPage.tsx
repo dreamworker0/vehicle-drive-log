@@ -132,13 +132,13 @@ export default function LandingPage() {
                 <div className="flex flex-col sm:flex-row gap-3 w-full max-w-xs sm:max-w-md animate-fade-in">
                     <button
                         onClick={() => navigate('/apply')}
-                        className="flex-1 btn bg-white dark:bg-surface-800 text-primary-700 font-bold hover:bg-primary-50 shadow-lg hover:shadow-xl transition-all"
+                        className="flex-1 btn bg-white dark:bg-surface-800 text-primary-700 dark:text-primary-300 font-bold hover:bg-primary-50 dark:hover:bg-primary-900/30 shadow-lg hover:shadow-xl transition-all min-h-[48px]"
                     >
                         서비스 도입 신청
                     </button>
                     <button
                         onClick={() => navigate('/login')}
-                        className="flex-1 btn bg-white/10 dark:bg-surface-800/10 backdrop-blur-sm text-white border border-white/20 hover:bg-white/20 transition-all"
+                        className="flex-1 btn bg-white/10 dark:bg-surface-800/10 backdrop-blur-sm text-white border border-white/20 hover:bg-white/20 transition-all min-h-[48px]"
                     >
                         직원 로그인
                     </button>
@@ -148,7 +148,7 @@ export default function LandingPage() {
                     <p className="text-primary-300/60 text-xs">✨ 완전 무료 · 광고 없음</p>
                     <button 
                         onClick={() => setIsFeedbackModalOpen(true)}
-                        className="text-primary-300/80 hover:text-white text-sm underline underline-offset-4 transition-colors"
+                        className="text-primary-300/80 hover:text-white text-sm underline underline-offset-4 transition-colors min-h-[48px] px-4 py-2"
                     >
                         이용 문의하기
                     </button>
@@ -216,7 +216,7 @@ export default function LandingPage() {
                         {SUB_FEATURES.map((s) => (
                             <span
                                 key={s.label}
-                                className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-50 text-primary-700 rounded-full text-sm font-medium"
+                                className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 rounded-full text-sm font-medium"
                             >
                                 {s.icon} {s.label}
                             </span>
@@ -233,7 +233,7 @@ export default function LandingPage() {
                         사회복지법인, 사회복지시설, 비영리사단법인·재단법인 등<br />
                         <strong>고유번호증 또는 사업자등록증을 보유한 비영리단체</strong>라면 누구나 신청할 수 있습니다.
                     </p>
-                    <div className="inline-flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-2 text-sm">
+                    <div className="inline-flex items-center gap-2 bg-amber-50 dark:bg-amber-900/30 border border-amber-200 dark:border-amber-800/50 text-amber-800 dark:text-amber-200 rounded-xl px-4 py-2 text-sm">
                         <span>⚠️</span>
                         <span>영리 기업 및 종교단체, 학교, 병원은 이용 대상이 아닙니다</span>
                     </div>
@@ -246,7 +246,7 @@ export default function LandingPage() {
                 <p className="text-primary-300 text-sm mb-6">신청 후 영업일 기준 1~2일 안에 꼼꼼히 확인하고 승인해 드립니다.</p>
                 <button
                     onClick={() => navigate('/apply')}
-                    className="btn bg-white dark:bg-surface-800 text-primary-700 font-bold hover:bg-primary-50 shadow-lg hover:shadow-xl transition-all"
+                    className="btn bg-white dark:bg-surface-800 text-primary-700 dark:text-primary-300 font-bold hover:bg-primary-50 dark:hover:bg-primary-900/30 shadow-lg hover:shadow-xl transition-all min-h-[48px]"
                 >
                     서비스 도입 신청
                 </button>
@@ -254,10 +254,10 @@ export default function LandingPage() {
 
             {/* ─── 푸터 ─── */}
             <footer className="relative bg-primary-900 text-primary-300/60 text-center text-xs px-4 py-6 space-y-2" role="contentinfo">
-                <nav className="space-x-2" aria-label="법적 고지">
-                    <a href="/terms" className="hover:text-white underline underline-offset-2 transition-colors">이용약관</a>
+                <nav className="space-x-2 flex items-center justify-center min-h-[48px]" aria-label="법적 고지">
+                    <a href="/terms" className="hover:text-white underline underline-offset-2 transition-colors p-2">이용약관</a>
                     <span className="text-primary-300/30" aria-hidden="true">|</span>
-                    <a href="/privacy" className="hover:text-white underline underline-offset-2 transition-colors">개인정보 처리방침</a>
+                    <a href="/privacy" className="hover:text-white underline underline-offset-2 transition-colors p-2">개인정보 처리방침</a>
                 </nav>
                 <p>© 2026 차량 운행일지. All rights reserved.</p>
             </footer>

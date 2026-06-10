@@ -16,6 +16,7 @@ import {
 } from './utils';
 import { driveLogSchema } from '../../../schemas';
 import { invalidateCache } from '../cache';
+import { enqueue } from '../../offline/syncQueue';
 
 export interface CreateDriveLogResult {
     id: string;
@@ -76,6 +77,13 @@ export const createDriveLog = async (data: Partial<DriveLog>): Promise<CreateDri
         } else {
             // 오프라인 상태일 때는 Firebase SDK의 백그라운드 큐에만 쌓이게 하고 무한 대기를 피하기 위해 즉시 통과시킵니다.
             promise.catch(e => console.error('[Firestore Offline Sync Error]', e));
+            await enqueue('CREATE', 'driveLogs', docRef.id, finalData as Record<string, unknown>);
+            if (typeof window !== 'undefined' && 'serviceWorker' in navigator && 'SyncManager' in window) {
+                navigator.serviceWorker.ready.then(reg => {
+                    const syncReg = reg as ServiceWorkerRegistration & { sync?: { register: (tag: string) => Promise<void> } };
+                    if (syncReg.sync) syncReg.sync.register('sync-db');
+                });
+            }
         }
 
         // Cloud Functions(syncDriveLogKm.ts)의 트리거로 이전되어 삭제됨
@@ -119,6 +127,13 @@ export const updateDriveLog = async (logId: string, data: Partial<DriveLog>): Pr
         } else {
             // 오프라인 상태일 때는 백그라운드로 갱신이 밀리므로 즉시 통과시킵니다.
             promise.catch(e => console.error('[Firestore Offline Sync Error]', e));
+            await enqueue('UPDATE', 'driveLogs', logId, finalData as Record<string, unknown>);
+            if (typeof window !== 'undefined' && 'serviceWorker' in navigator && 'SyncManager' in window) {
+                navigator.serviceWorker.ready.then(reg => {
+                    const syncReg = reg as ServiceWorkerRegistration & { sync?: { register: (tag: string) => Promise<void> } };
+                    if (syncReg.sync) syncReg.sync.register('sync-db');
+                });
+            }
         }
 
         // Cloud Functions(syncDriveLogKm.ts)의 트리거로 이전되어 삭제됨
@@ -143,7 +158,21 @@ export const updateDriveLog = async (logId: string, data: Partial<DriveLog>): Pr
 // 운행일지 삭제
 export const deleteDriveLog = async (logId: string) => {
     try {
-        await deleteDoc(doc(db, 'driveLogs', logId));
+        const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+        const promise = deleteDoc(doc(db, 'driveLogs', logId));
+
+        if (!isOffline) {
+            await promise;
+        } else {
+            promise.catch(e => console.error('[Firestore Offline Sync Error]', e));
+            await enqueue('DELETE', 'driveLogs', logId, null);
+            if (typeof window !== 'undefined' && 'serviceWorker' in navigator && 'SyncManager' in window) {
+                navigator.serviceWorker.ready.then(reg => {
+                    const syncReg = reg as ServiceWorkerRegistration & { sync?: { register: (tag: string) => Promise<void> } };
+                    if (syncReg.sync) syncReg.sync.register('sync-db');
+                });
+            }
+        }
         invalidateCache('driveLogs');
     } catch (error) {
         captureError(error, { context: 'deleteDriveLog', logId });

@@ -24,7 +24,7 @@ function ChartFavoriteDestination({ favoriteStats, favoriteRatio, favoriteUserRa
                     <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">
                         목적지를 즐겨찾기에서 선택하여 운행한 비율 (최근 30일 로그 기준)
                     </p>
-                    <div className="flex flex-col items-center justify-center py-12 text-surface-400">최근 발생한 데이터가 없습니다.</div>
+                    <div className="flex flex-col items-center justify-center py-12 text-surface-400 dark:text-surface-500">최근 발생한 데이터가 없습니다.</div>
                 </div>
             );
         }
@@ -51,7 +51,7 @@ function ChartFavoriteDestination({ favoriteStats, favoriteRatio, favoriteUserRa
                             </div>
                             <div className="w-px h-8 bg-surface-200 dark:bg-surface-700"></div>
                             <div className="text-center">
-                                <div className="text-[11px] text-indigo-500 mb-0.5">유저 보유율</div>
+                                <div className="text-[11px] text-indigo-500 dark:text-indigo-400 mb-0.5">유저 보유율</div>
                                 <div className="text-sm font-bold text-indigo-600 dark:text-indigo-400">{favoriteUserRatio.rate}%</div>
                             </div>
                         </div>
@@ -63,7 +63,7 @@ function ChartFavoriteDestination({ favoriteStats, favoriteRatio, favoriteUserRa
                             </div>
                             <div className="w-px h-8 bg-surface-200 dark:bg-surface-700"></div>
                             <div className="text-center">
-                                <div className="text-[11px] text-teal-500 mb-0.5">로그 즐겨찾기율</div>
+                                <div className="text-[11px] text-teal-500 dark:text-teal-400 mb-0.5">로그 즐겨찾기율</div>
                                 <div className="text-sm font-bold text-teal-600 dark:text-teal-400">{favoriteRatio.rate}%</div>
                             </div>
                         </div>

@@ -142,10 +142,10 @@ export default function NotificationBell() {
         <div className="relative" ref={containerRef}>
             <button
                 onClick={handleOpen}
-                className="relative btn-icon text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:text-surface-300"
+                className="relative btn-icon text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-300 dark:text-surface-300 min-w-[48px] min-h-[48px] flex items-center justify-center"
                 aria-label={`알림${unreadCount > 0 ? ` (${unreadCount}건 읽지 않음)` : ''}`}
             >
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <svg aria-hidden="true" className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
                 </svg>
                 {unreadCount > 0 && (
@@ -161,7 +161,7 @@ export default function NotificationBell() {
                         <h3 className="font-semibold text-surface-800 dark:text-surface-200">알림</h3>
                     </div>
                     {allNotifications.length === 0 ? (
-                        <div className="p-8 text-center text-sm text-surface-400">
+                        <div className="p-8 text-center text-sm text-surface-400 dark:text-surface-500">
                             알림이 없습니다
                         </div>
                     ) : (
@@ -172,6 +172,9 @@ export default function NotificationBell() {
                                     <div
                                         key={n.id}
                                         onClick={() => !n.read && handleMarkRead(n.id)}
+                                        role="button"
+                                        tabIndex={0}
+                                        onKeyDown={(e) => { if ((e.key === 'Enter' || e.key === ' ') && !n.read) handleMarkRead(n.id); }}
                                         className={`p-4 cursor-pointer transition-colors ${n.read ? 'bg-white dark:bg-surface-800' : 'bg-primary-50/50 dark:bg-primary-900/20'
                                             } hover:bg-surface-50 dark:hover:bg-surface-700`}
                                     >
@@ -182,10 +185,10 @@ export default function NotificationBell() {
                                                     <p className="text-sm font-medium text-surface-800 dark:text-surface-200">{n.title}</p>
                                                     <button
                                                         onClick={(e) => handleDelete(e, n.id)}
-                                                        className="text-surface-400 hover:text-red-500 transition-colors p-1 -mr-2"
+                                                        className="text-surface-400 dark:text-surface-500 hover:text-red-500 dark:hover:text-red-400 transition-colors p-1 -mr-2 min-w-[48px] min-h-[48px] flex items-center justify-center"
                                                         aria-label="알림 삭제"
                                                     >
-                                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                                        <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                                                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                                                         </svg>
                                                     </button>

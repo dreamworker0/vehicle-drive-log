@@ -75,10 +75,12 @@ export default function CalendarSyncTroubleshootModal({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose}>
+        <div role="presentation" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50" onClick={onClose} onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}>
             <div
+                role="presentation"
                 className="glass-card w-full max-w-lg max-h-[90vh] overflow-y-auto animate-scale-in"
                 onClick={e => e.stopPropagation()}
+                onKeyDown={e => e.stopPropagation()}
             >
                 {/* ── 헤더 ── */}
                 <div className="flex items-start justify-between p-6 pb-4 border-b border-surface-200 dark:border-surface-700">
@@ -97,7 +99,7 @@ export default function CalendarSyncTroubleshootModal({
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-1.5 rounded-lg text-surface-400 hover:text-surface-600 hover:bg-surface-100 dark:hover:text-surface-300 dark:hover:bg-surface-700 transition-colors shrink-0"
+                        className="p-1.5 rounded-lg text-surface-400 dark:text-surface-500 hover:text-surface-600 hover:bg-surface-100 dark:hover:text-surface-300 dark:hover:bg-surface-700 transition-colors shrink-0 min-h-[48px]"
                         aria-label="닫기"
                     >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -165,7 +167,7 @@ export default function CalendarSyncTroubleshootModal({
                     {/* ── 1단계: 서비스 계정 이메일 공유 ── */}
                     <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                            <span className="w-5 h-5 rounded-full bg-primary-500 text-white text-[11px] font-bold flex items-center justify-center shrink-0">1</span>
+                            <span className="w-5 h-5 rounded-full bg-primary-500 dark:bg-primary-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0">1</span>
                             <p className="text-sm font-medium text-surface-800 dark:text-surface-200">
                                 Google 캘린더에 서비스 계정 추가
                             </p>
@@ -185,8 +187,8 @@ export default function CalendarSyncTroubleshootModal({
                                     onClick={handleCopyEmail}
                                     className={`shrink-0 px-2.5 py-1.5 text-[11px] font-medium rounded-lg transition-colors ${
                                         emailCopied
-                                            ? 'bg-green-500 text-white'
-                                            : 'bg-primary-500 hover:bg-primary-600 text-white'
+                                            ? 'bg-green-500 dark:bg-green-600 text-white'
+                                            : 'bg-primary-500 dark:bg-primary-600 hover:bg-primary-600 dark:hover:bg-primary-700 text-white'
                                     }`}
                                 >
                                     {emailCopied ? '✓ 복사됨' : '복사'}
@@ -198,7 +200,7 @@ export default function CalendarSyncTroubleshootModal({
                     {/* ── 2단계: 캘린더 ID 확인 ── */}
                     <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                            <span className="w-5 h-5 rounded-full bg-primary-500 text-white text-[11px] font-bold flex items-center justify-center shrink-0">2</span>
+                            <span className="w-5 h-5 rounded-full bg-primary-500 dark:bg-primary-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0">2</span>
                             <p className="text-sm font-medium text-surface-800 dark:text-surface-200">
                                 캘린더 ID 확인
                             </p>
@@ -211,7 +213,7 @@ export default function CalendarSyncTroubleshootModal({
                             </p>
                             {calendarId && (
                                 <div className="mt-1.5 p-2 rounded-lg bg-surface-100 dark:bg-surface-800 border border-surface-200 dark:border-surface-700">
-                                    <p className="text-[10px] text-surface-400 mb-0.5">현재 등록된 캘린더 ID:</p>
+                                    <p className="text-[10px] text-surface-400 dark:text-surface-500 mb-0.5">현재 등록된 캘린더 ID:</p>
                                     <code className="text-[11px] font-mono text-surface-600 dark:text-surface-400 break-all">
                                         {calendarId}
                                     </code>
@@ -223,7 +225,7 @@ export default function CalendarSyncTroubleshootModal({
                     {/* ── 3단계: 연동 테스트 ── */}
                     <div className="space-y-2">
                         <div className="flex items-center gap-2">
-                            <span className="w-5 h-5 rounded-full bg-primary-500 text-white text-[11px] font-bold flex items-center justify-center shrink-0">3</span>
+                            <span className="w-5 h-5 rounded-full bg-primary-500 dark:bg-primary-600 text-white text-[11px] font-bold flex items-center justify-center shrink-0">3</span>
                             <p className="text-sm font-medium text-surface-800 dark:text-surface-200">
                                 연동 테스트로 확인
                             </p>
@@ -236,7 +238,7 @@ export default function CalendarSyncTroubleshootModal({
                                 type="button"
                                 onClick={handleTest}
                                 disabled={testLoading || !calendarId}
-                                className="w-full px-4 py-2.5 rounded-xl text-sm font-medium border-2 border-primary-400 dark:border-primary-600 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                                className="w-full px-4 py-2.5 rounded-xl text-sm font-medium border-2 border-primary-400 dark:border-primary-600 text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 min-h-[48px]"
                             >
                                 {testLoading ? (
                                     <>
@@ -289,7 +291,7 @@ export default function CalendarSyncTroubleshootModal({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex-1 px-4 py-2 rounded-xl text-sm font-medium bg-surface-100 dark:bg-surface-700 text-surface-700 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-600 transition-colors"
+                        className="flex-1 px-4 py-2 rounded-xl text-sm font-medium bg-surface-100 dark:bg-surface-700 text-surface-700 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-600 transition-colors min-h-[48px]"
                     >
                         닫기
                     </button>

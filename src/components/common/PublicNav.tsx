@@ -53,7 +53,7 @@ export default function PublicNav({ variant = 'solid' }: PublicNavProps) {
             <div className="max-w-5xl mx-auto px-4 h-12 flex items-center justify-between">
                 <a
                     href="/"
-                    className={`text-sm font-semibold tracking-tight transition-colors ${
+                    className={`text-sm font-semibold tracking-tight transition-colors min-h-[48px] flex items-center px-2 -ml-2 ${
                         isOverlay
                             ? isScrolled ? 'text-surface-800 dark:text-surface-200 hover:text-primary-600 dark:hover:text-primary-400' : 'text-white/90 hover:text-white'
                             : 'text-surface-800 dark:text-surface-200 hover:text-primary-600 dark:hover:text-primary-400'
@@ -68,7 +68,7 @@ export default function PublicNav({ variant = 'solid' }: PublicNavProps) {
                             <a
                                 key={item.href}
                                 href={item.href}
-                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors min-h-[48px] flex items-center ${
                                     isOverlay
                                         ? isScrolled
                                             ? isActive

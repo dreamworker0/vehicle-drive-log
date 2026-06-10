@@ -172,7 +172,7 @@ export default function OrgMapView({ orgs }: OrgMapViewProps) {
                 <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200">
                     📍 기관 위치 지도
                 </h2>
-                <span className="text-xs text-surface-400">
+                <span className="text-xs text-surface-400 dark:text-surface-500">
                     {orgs.filter(o => o.lat && o.lng).length}개 기관 표시
                 </span>
             </div>

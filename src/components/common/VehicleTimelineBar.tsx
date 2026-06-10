@@ -95,6 +95,7 @@ export default function VehicleTimelineBar({
     return (
         <div
             className="mb-4 animate-fade-in"
+            role="presentation"
             onMouseMove={handleDragMove}
             onMouseUp={handleDragEnd}
             onMouseLeave={handleDragEnd}
@@ -165,7 +166,7 @@ export default function VehicleTimelineBar({
                                     >
                                         {isBlocked ? '🔧 ' : ''}{vehicleDisplayName}
                                         {vRes.length > 0 && (
-                                            <svg className={`w-2.5 h-2.5 flex-shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                            <svg aria-hidden="true" className={`w-2.5 h-2.5 flex-shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
                                             </svg>
                                         )}
@@ -240,6 +241,9 @@ export default function VehicleTimelineBar({
                                                     style={{ left: `${left}%`, width: `${width}%` }}
                                                     title={`${r.reservedByName}: ${r.startTime}~${r.endTime} ${r.purpose || ''}${isCompleted ? ' (운행완료)' : isPending ? ' (승인 대기)' : ''}`}
                                                     onClick={() => toggleExpand(vehicle.id)}
+                                                    role="button"
+                                                    tabIndex={0}
+                                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleExpand(vehicle.id); }}
                                                 />
                                             );
                                         })}
@@ -258,6 +262,7 @@ export default function VehicleTimelineBar({
                                                     title={`${minutesToTime(gap.start)}~${minutesToTime(gap.end)} 예약 가능 (드래그로 선택)`}
                                                     onMouseDown={(e) => handleDragStart(e, vehicle.id, gap.start, gap.end)}
                                                     onTouchStart={(e) => handleDragStart(e, vehicle.id, gap.start, gap.end)}
+                                                    role="presentation"
                                                 >
                                                     {!isDraggingThis && (
                                                         <div className="absolute inset-0 hover:bg-primary-200/40 dark:hover:bg-primary-500/20 transition-colors rounded-sm" />
@@ -308,7 +313,7 @@ export default function VehicleTimelineBar({
                                                             {r.destination && <span className="mx-1 text-surface-300 dark:text-surface-600">|</span>}
                                                             {r.destination && <span>{r.destination}</span>}
                                                             {r.purpose && <span>, {r.purpose}</span>}
-                                                            {r.groupId && <span className="ml-1 text-blue-500" title="다일 예약">🔗</span>}
+                                                            {r.groupId && <span className="ml-1 text-blue-500 dark:text-blue-400" title="다일 예약">🔗</span>}
                                                         </div>
                                                         <div className="flex items-center gap-1.5 flex-shrink-0">
                                                             {r.syncSource === 'calendar' && (
@@ -317,20 +322,20 @@ export default function VehicleTimelineBar({
                                                                 </span>
                                                             )}
                                                             {r.status === 'pending' && (
-                                                                <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 rounded-full font-medium whitespace-nowrap">
+                                                                <span className="text-[10px] px-1.5 py-0.5 badge-warning rounded-full font-medium whitespace-nowrap">
                                                                     승인 대기
                                                                 </span>
                                                             )}
                                                             {(isAdmin || r.reservedByUid === user?.id || r.reservedByUid === user?.uid) && !isPastReservation && (
                                                                 <>
-                                                                    <button onClick={() => { onEdit?.(r); setShowForm?.(true); }} className="text-[11px] leading-none py-0.5 text-primary-500 hover:underline">수정</button>
-                                                                    <button onClick={() => onCancel?.(r.id)} className="text-[11px] leading-none py-0.5 text-red-500 hover:underline">취소</button>
+                                                                    <button onClick={() => { onEdit?.(r); setShowForm?.(true); }} className="text-[11px] leading-none py-0.5 text-primary-500 dark:text-primary-400 hover:underline min-w-[48px] min-h-[48px] flex items-center justify-center">수정</button>
+                                                                    <button onClick={() => onCancel?.(r.id)} className="text-[11px] leading-none py-0.5 text-red-500 dark:text-red-400 hover:underline min-w-[48px] min-h-[48px] flex items-center justify-center">취소</button>
                                                                 </>
                                                             )}
                                                         </div>
                                                     </div>
                                                     {r.routeDistance && (
-                                                        <p className="text-[11px] text-blue-500 mt-0.5 flex items-center gap-2">
+                                                        <p className="text-[11px] text-blue-500 dark:text-blue-400 mt-0.5 flex items-center gap-2">
                                                             <span>🗺️ {Math.floor(r.routeDistance)}km</span>
                                                             <span>⏱ {r.routeDuration}분</span>
                                                             {(r.routeTollFee ?? 0) > 0 && <span>₩{r.routeTollFee?.toLocaleString()}</span>}
@@ -348,7 +353,7 @@ export default function VehicleTimelineBar({
 
                 {/* 조작 안내 팁 */}
                 <div className="mt-2 text-right">
-                    <span className="text-[10px] text-surface-400 whitespace-nowrap">
+                    <span className="text-[10px] text-surface-400 dark:text-surface-500 whitespace-nowrap">
                         {!isPastDate && '시간을 드래그하여 예약 · '}차량을 터치하여 상세 확인
                     </span>
                 </div>

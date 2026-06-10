@@ -47,20 +47,20 @@ export default function FuelLogTab() {
             <div className="flex bg-surface-100 dark:bg-surface-800 rounded-xl p-1 mb-4">
                 <button
                     onClick={() => setActiveTab('fuel')}
-                    className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
+                    className={`flex-1 py-2 min-h-[48px] text-sm font-medium rounded-lg transition-all ${
                         activeTab === 'fuel'
                             ? 'bg-white dark:bg-surface-700 text-surface-900 dark:text-surface-100 shadow-sm'
-                            : 'text-surface-400 hover:text-surface-600 dark:hover:text-surface-300'
+                            : 'text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300'
                     }`}
                 >
                     ⛽ 주유
                 </button>
                 <button
                     onClick={() => setActiveTab('charge')}
-                    className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
+                    className={`flex-1 py-2 min-h-[48px] text-sm font-medium rounded-lg transition-all ${
                         activeTab === 'charge'
                             ? 'bg-white dark:bg-surface-700 text-surface-900 dark:text-surface-100 shadow-sm'
-                            : 'text-surface-400 hover:text-surface-600 dark:hover:text-surface-300'
+                            : 'text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300'
                     }`}
                 >
                     💳 하이패스 충전
@@ -76,7 +76,7 @@ export default function FuelLogTab() {
                     {/* 헤더 */}
                     <div className="flex items-center justify-between mb-4">
                         <div>
-                            <p className="text-xs text-surface-400 mt-0.5">
+                            <p className="text-xs text-surface-400 dark:text-surface-500 mt-0.5">
                                 {enrichedRecords.length}건
                                 {totalAmount > 0 && ` · ${totalAmount.toLocaleString()}L`}
                                 {totalCost > 0 && ` · ${totalCost.toLocaleString()}원`}
@@ -86,7 +86,7 @@ export default function FuelLogTab() {
                             onClick={() => {
                                 if (showForm) { handleCancelEdit(); } else { setShowForm(true); }
                             }}
-                            className="btn-primary btn-sm flex items-center gap-1"
+                            className="btn-primary btn-sm flex items-center gap-1 min-h-[48px]"
                         >
                             {showForm ? '✕ 닫기' : '⛽ 주유 등록'}
                         </button>
@@ -101,7 +101,7 @@ export default function FuelLogTab() {
 
                             {/* 차량 선택 — VehicleSelector 재사용 */}
                             <div>
-                                <label className="label text-xs">🚘 차량 <span className="text-red-500">*</span></label>
+                                <label className="label text-xs">🚘 차량 <span className="text-red-500 dark:text-red-400">*</span></label>
                                 <VehicleSelector
                                     vehicles={vehicles}
                                     selectedVehicleId={form.vehicleId}
@@ -112,12 +112,12 @@ export default function FuelLogTab() {
 
                             {/* 날짜 */}
                             <div>
-                                <label className="label text-xs">📅 날짜 <span className="text-red-500">*</span></label>
+                                <label className="label text-xs">📅 날짜 <span className="text-red-500 dark:text-red-400">*</span></label>
                                 <input
                                     type="date"
                                     value={form.date}
                                     onChange={e => setForm({ ...form, date: e.target.value })}
-                                    className="input"
+                                    className="input min-h-[48px]"
                                     required
                                 />
                             </div>
@@ -125,12 +125,12 @@ export default function FuelLogTab() {
                             {/* 주유미터 (현재 km) + 촬영 버튼 */}
                             <div>
                                 <div className="flex items-center justify-between mb-1">
-                                    <label className="label text-xs mb-0">🔢 주유미터 (현재 km) <span className="text-red-500">*</span></label>
+                                    <label className="label text-xs mb-0">🔢 주유미터 (현재 km) <span className="text-red-500 dark:text-red-400">*</span></label>
                                     <button
                                         type="button"
                                         onClick={() => cameraInputRef.current?.click()}
                                         disabled={ocrLoading}
-                                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-700 hover:bg-primary-100 dark:hover:bg-primary-800/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                                        className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 min-h-[48px] rounded-lg text-xs font-medium bg-primary-50 dark:bg-primary-900/30 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-700 hover:bg-primary-100 dark:hover:bg-primary-800/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         {ocrLoading ? (
                                             <>
@@ -156,12 +156,12 @@ export default function FuelLogTab() {
                                     type="number"
                                     value={form.meterReading}
                                     onChange={e => setForm({ ...form, meterReading: e.target.value })}
-                                    className="input"
+                                    className="input min-h-[48px]"
                                     placeholder="45000"
                                     required
                                 />
                                 {selectedVehicleKm > 0 && (
-                                    <p className="text-xs text-surface-400 mt-1">
+                                    <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
                                         📍 현재 누적: <span className="font-medium">{selectedVehicleKm.toLocaleString()} km</span>
                                     </p>
                                 )}
@@ -174,7 +174,7 @@ export default function FuelLogTab() {
                                     <p className="text-xs text-primary mt-1 animate-pulse">📷 계기판 인식 중...</p>
                                 )}
                                 {ocrSuccess && (
-                                    <p className="text-xs text-emerald-500 mt-1">✅ 계기판 인식 완료</p>
+                                    <p className="text-xs text-emerald-500 dark:text-emerald-400 mt-1">✅ 계기판 인식 완료</p>
                                 )}
                                 {ocrImageUrl && (
                                     <div className="mt-3 mb-1 animate-fade-in relative rounded-lg overflow-hidden border border-surface-200 dark:border-surface-700 bg-black max-h-48 flex items-center justify-center">
@@ -185,33 +185,33 @@ export default function FuelLogTab() {
                                     </div>
                                 )}
                                 {ocrError && (
-                                    <p className="text-xs text-red-500 mt-1">{ocrError}</p>
+                                    <p className="text-xs text-red-500 dark:text-red-400 mt-1">{ocrError}</p>
                                 )}
                             </div>
 
                             {/* 주유량 + 주유금액 */}
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="label text-xs">{isChargeable ? '⚡ 충전량 (kWh/kg)' : '⛽ 주유량 (L)'} <span className="text-red-500">*</span></label>
+                                    <label className="label text-xs">{isChargeable ? '⚡ 충전량 (kWh/kg)' : '⛽ 주유량 (L)'} <span className="text-red-500 dark:text-red-400">*</span></label>
                                     <input
                                         type="number"
                                         step="0.01"
                                         min="0"
                                         value={form.fuelAmount}
                                         onChange={e => setForm({ ...form, fuelAmount: e.target.value })}
-                                        className="input"
+                                        className="input min-h-[48px]"
                                         placeholder={isChargeable ? '30.5' : '40.5'}
                                         required
                                     />
                                 </div>
                                 <div>
-                                    <label className="label text-xs">{isChargeable ? '💰 충전금액 (원)' : '💰 주유금액 (원)'} <span className="text-red-500">*</span></label>
+                                    <label className="label text-xs">{isChargeable ? '💰 충전금액 (원)' : '💰 주유금액 (원)'} <span className="text-red-500 dark:text-red-400">*</span></label>
                                     <input
                                         type="number"
                                         min="0"
                                         value={form.fuelCost}
                                         onChange={e => setForm({ ...form, fuelCost: e.target.value })}
-                                        className="input"
+                                        className="input min-h-[48px]"
                                         placeholder="65000"
                                         required
                                     />
@@ -232,11 +232,11 @@ export default function FuelLogTab() {
 
                             <div className="flex justify-end gap-2 pt-1">
                                 {editingId && (
-                                    <button type="button" onClick={handleCancelEdit} className="btn-secondary btn-sm">
+                                    <button type="button" onClick={handleCancelEdit} className="btn-secondary btn-sm min-h-[48px]">
                                         취소
                                     </button>
                                 )}
-                                <button type="submit" disabled={saving} className="btn-primary btn-sm">
+                                <button type="submit" disabled={saving} className="btn-primary btn-sm min-h-[48px]">
                                     {saving ? '저장 중...' : editingId ? '수정 완료' : (isChargeable ? '충전 기록 저장' : '주유 기록 저장')}
                                 </button>
                             </div>
@@ -247,12 +247,12 @@ export default function FuelLogTab() {
                     {enrichedRecords.length === 0 ? (
                         <div className="glass-card p-12 text-center">
                             <div className="text-4xl mb-3">⛽</div>
-                            <p className="text-surface-400 font-medium">아직 주유 기록이 없어요</p>
+                            <p className="text-surface-400 dark:text-surface-500 font-medium">아직 주유 기록이 없어요</p>
                             <p className="text-sm text-surface-300 dark:text-surface-500 mt-1">차량 주유 후 기록을 등록하면 연료 사용량을 한눈에 볼 수 있어요</p>
                             {!showForm && (
                                 <button
                                     onClick={() => setShowForm(true)}
-                                    className="mt-4 btn-primary btn-sm text-sm"
+                                    className="mt-4 btn-primary btn-sm text-sm min-h-[48px]"
                                 >
                                     ⛽ 첫 주유 기록 등록하기
                                 </button>
@@ -267,6 +267,14 @@ export default function FuelLogTab() {
                                     <div
                                         key={rec.id}
                                         onClick={() => isOwn && handleEdit(rec)}
+                                        onKeyDown={(e) => {
+                                            if ((e.key === 'Enter' || e.key === ' ') && isOwn) {
+                                                e.preventDefault();
+                                                handleEdit(rec);
+                                            }
+                                        }}
+                                        role={isOwn ? "button" : undefined}
+                                        tabIndex={isOwn ? 0 : undefined}
                                         className={`glass-card p-3.5 flex items-center gap-3 transition-all
                                             ${isOwn ? 'cursor-pointer hover:ring-2 hover:ring-primary/30 active:scale-[0.99]' : ''}
                                             ${editingId === rec.id ? 'ring-2 ring-primary' : ''}`}
@@ -280,9 +288,9 @@ export default function FuelLogTab() {
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2">
                                                 <span className="font-bold text-sm text-surface-900 dark:text-surface-100">{rec.vehicleName}</span>
-                                                <span className="text-xs text-surface-400">{rec.driverName}</span>
+                                                <span className="text-xs text-surface-400 dark:text-surface-500">{rec.driverName}</span>
                                             </div>
-                                            <p className="text-xs text-surface-400 mt-0.5">
+                                            <p className="text-xs text-surface-400 dark:text-surface-500 mt-0.5">
                                                 {rec.date} · {rec.meterReading?.toLocaleString()} km
                                             </p>
                                         </div>
@@ -299,7 +307,8 @@ export default function FuelLogTab() {
                                             {isOwn && (
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); handleDelete(rec); }}
-                                                    className="text-[10px] text-surface-300 hover:text-red-500 transition-colors mt-0.5"
+                                                    className="text-[10px] text-surface-300 dark:text-surface-600 hover:text-red-500 dark:hover:text-red-400 transition-colors mt-0.5 min-w-[48px] min-h-[48px] flex items-center justify-center"
+                                                    aria-label="기록 삭제"
                                                 >
                                                     삭제
                                                 </button>

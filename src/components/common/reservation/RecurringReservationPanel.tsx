@@ -85,7 +85,7 @@ export default function RecurringReservationPanel({
             {/* 기간 설정 */}
             <div className="grid grid-cols-2 gap-2">
                 <div>
-                    <label className="label text-xs text-surface-400">시작일</label>
+                    <label className="label text-xs text-surface-400 dark:text-surface-500">시작일</label>
                     <input
                         type="date"
                         value={form.recurringStartDate || selectedDate}
@@ -111,7 +111,7 @@ export default function RecurringReservationPanel({
                     type="checkbox"
                     checked={form.excludeHolidays ?? true}
                     onChange={e => setForm({ ...form, excludeHolidays: e.target.checked })}
-                    className="w-3.5 h-3.5 rounded border-surface-300 dark:border-surface-600 text-purple-600 focus:ring-purple-500"
+                    className="w-3.5 h-3.5 rounded border-surface-300 dark:border-surface-600 text-purple-600 dark:text-purple-400 focus:ring-purple-500"
                 />
                 <span className="text-xs text-surface-500 dark:text-surface-400">공휴일 자동 제외</span>
             </label>
@@ -165,7 +165,7 @@ export default function RecurringReservationPanel({
             )}
 
             {(form.recurringDays || []).length === 0 && (
-                <p className="text-xs text-surface-400 text-center py-2">반복할 요일을 선택하세요</p>
+                <p className="text-xs text-surface-400 dark:text-surface-500 text-center py-2">반복할 요일을 선택하세요</p>
             )}
         </div>
     );

@@ -23,7 +23,7 @@ function ChartQuickDrive({ quickDriveStats, quickDriveRatio }: Props) {
                     <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">
                         기존 예약 방식 대비 바로 운행(예약 없이 출발) 활용도 추이
                     </p>
-                    <div className="flex flex-col items-center justify-center py-12 text-surface-400">최근 발생한 데이터가 없습니다.</div>
+                    <div className="flex flex-col items-center justify-center py-12 text-surface-400 dark:text-surface-500">최근 발생한 데이터가 없습니다.</div>
                 </div>
             );
         }
@@ -47,7 +47,7 @@ function ChartQuickDrive({ quickDriveStats, quickDriveRatio }: Props) {
                         </div>
                         <div className="w-px h-8 bg-surface-200 dark:bg-surface-700"></div>
                         <div className="text-center">
-                            <div className="text-[11px] text-emerald-500 mb-0.5">바로 운행 비율</div>
+                            <div className="text-[11px] text-emerald-500 dark:text-emerald-400 mb-0.5">바로 운행 비율</div>
                             <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{quickDriveRatio.rate}%</div>
                         </div>
                     </div>

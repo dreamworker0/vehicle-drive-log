@@ -93,7 +93,7 @@ export default function MyStatsSummary({ logs }: MyStatsSummaryProps) {
                     <p className="text-2xl font-bold text-primary-600 dark:text-primary-400">{stats.avgDaily}</p>
                     <p className="text-[10px] text-surface-500 dark:text-surface-400 mt-0.5">일평균(회)</p>
                     {stats.cost > 0 && (
-                        <p className="text-[10px] text-surface-400 mt-0.5">비용 {stats.cost.toLocaleString()}원</p>
+                        <p className="text-[10px] text-surface-400 dark:text-surface-500 mt-0.5">비용 {stats.cost.toLocaleString()}원</p>
                     )}
                 </div>
             </div>
