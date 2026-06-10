@@ -39,14 +39,13 @@ test.describe('기관 사용 신청 플로우', () => {
 
         // 약관 체크박스가 렌더링될 때까지 대기
         const termsCheckbox = page.locator('#agree-terms');
+        await termsCheckbox.waitFor({ state: 'attached', timeout: 10000 });
         const privacyCheckbox = page.locator('#agree-privacy');
-        await expect(termsCheckbox).toBeVisible({ timeout: 10000 });
-        await expect(privacyCheckbox).toBeVisible();
 
-        // 약관 동의 — evaluate로 React onChange 확실히 트리거
-        await termsCheckbox.evaluate((el: HTMLInputElement) => el.click());
+        // 약관 동의 — Playwright 권장 방식으로 React onChange 트리거
+        await termsCheckbox.check({ force: true });
         await expect(termsCheckbox).toBeChecked({ timeout: 5000 });
-        await privacyCheckbox.evaluate((el: HTMLInputElement) => el.click());
+        await privacyCheckbox.check({ force: true });
         await expect(privacyCheckbox).toBeChecked({ timeout: 5000 });
 
         // 빈 폼으로 제출 시도
@@ -80,9 +79,9 @@ test.describe('기관 사용 신청 플로우', () => {
             if (await emailInput.isEditable()) {
                 await emailInput.fill('invalid-email');
             }
-            // 약관 동의 — evaluate로 React onChange 확실히 트리거
-            await page.locator('#agree-terms').evaluate((el: HTMLInputElement) => el.click());
-            await page.locator('#agree-privacy').evaluate((el: HTMLInputElement) => el.click());
+            // 약관 동의 — Playwright 권장 방식으로 트리거
+            await page.locator('#agree-terms').check({ force: true });
+            await page.locator('#agree-privacy').check({ force: true });
             const submitBtn = page.getByRole('button', { name: '신청하기' });
             await expect(submitBtn).toBeEnabled({ timeout: 10000 });
             await submitBtn.click({ force: true });
