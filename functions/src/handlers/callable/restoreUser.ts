@@ -17,6 +17,8 @@ export const restoreUser = onCall(
         }
 
         const { email, organizationId, name, role } = request.data;
+        // 클라이언트 입력 role은 화이트리스트로 제한 (superAdmin 주입 방지)
+        const safeRole = ["employee", "admin"].includes(role) ? role : "employee";
         if (!email) {
             throw new HttpsError("invalid-argument", "복원할 사용자 이메일이 필요합니다.");
         }
@@ -72,7 +74,7 @@ export const restoreUser = onCall(
                 name: name || authUser.displayName || email.split("@")[0],
                 email: email,
                 organizationId: organizationId,
-                role: role || "employee",
+                role: safeRole,
                 restoredAt: FieldValue.serverTimestamp(),
                 createdAt: FieldValue.serverTimestamp(),
             });

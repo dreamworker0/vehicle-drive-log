@@ -2,7 +2,7 @@
  * PDF 정비 기록 다운로드 유틸리티
  * pdfEngine 공통 엔진 기반
  */
-import { printPdfReport, formatDate, formatNumber } from './pdfEngine';
+import { printPdfReport, formatDate, formatNumber, escapeHtml } from './pdfEngine';
 import type { ApprovalEntry, PdfColumn } from './pdfEngine';
 
 /** PDF용 정비 기록 행 */
@@ -42,14 +42,14 @@ function createRenderRow(typeLabels: Record<string, string>) {
             <tr>
                 <td class="center">${idx + 1 + (pageIdx * rowsPerPage)}</td>
                 <td class="center">${formatDate(rec.date || '')}</td>
-                <td class="center">${rec.vehicleName || ''}</td>
-                <td class="center">${typeLabel}</td>
+                <td class="center">${escapeHtml(rec.vehicleName || '')}</td>
+                <td class="center">${escapeHtml(typeLabel)}</td>
                 <td class="right">${rec.cost ? rec.cost.toLocaleString() : ''}</td>
-                <td>${rec.shop || ''}</td>
+                <td>${escapeHtml(rec.shop || '')}</td>
                 <td class="right">${formatNumber(rec.km)}</td>
                 <td class="right">${formatNumber(rec.nextDueKm)}</td>
                 <td class="center">${rec.nextDueDate ? formatDate(rec.nextDueDate) : ''}</td>
-                <td>${rec.description || ''}</td>
+                <td>${escapeHtml(rec.description || '')}</td>
                 <td class="center">${rec.blockVehicle ? '●' : ''}</td>
             </tr>
         `;

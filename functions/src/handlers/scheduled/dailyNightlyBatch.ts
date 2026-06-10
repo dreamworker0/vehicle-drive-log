@@ -93,19 +93,26 @@ async function cleanupImages(db: FirebaseFirestore.Firestore, bucket: any) {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const orgsSnap = await db
-        .collection("organizations")
-        .where("status", "==", "approved")
-        .where("approvedAt", "<=", thirtyDaysAgo)
-        .get();
+    // 승인 기관뿐 아니라 반려 기관의 증빙 이미지도 30일 후 정리 (영구 보존 방지)
+    const [approvedSnap, rejectedSnap] = await Promise.all([
+        db.collection("organizations")
+            .where("status", "==", "approved")
+            .where("approvedAt", "<=", thirtyDaysAgo)
+            .get(),
+        db.collection("organizations")
+            .where("status", "==", "rejected")
+            .where("rejectedAt", "<=", thirtyDaysAgo)
+            .get(),
+    ]);
+    const targetDocs = [...approvedSnap.docs, ...rejectedSnap.docs];
 
-    if (orgsSnap.empty) {
+    if (targetDocs.length === 0) {
         console.log("No certificate images to clean up.");
         return;
     }
 
     let totalCleaned = 0;
-    for (const orgDoc of orgsSnap.docs) {
+    for (const orgDoc of targetDocs) {
         const orgId = orgDoc.id;
         const data = orgDoc.data();
         const imageUrl = data.uniqueNumberImageUrl as string;

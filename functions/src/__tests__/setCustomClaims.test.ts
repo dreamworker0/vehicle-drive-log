@@ -60,7 +60,7 @@ describe('setCustomClaims — Custom Claims 자동 설정', () => {
                 before: { data: () => null },
                 after: {
                     data: () => ({
-                        role: 'manager',
+                        role: 'admin',
                         organizationId: 'org2',
                     }),
                 },
@@ -70,7 +70,7 @@ describe('setCustomClaims — Custom Claims 자동 설정', () => {
         await capturedHandler(event);
 
         expect(mockSetCustomUserClaims).toHaveBeenCalledWith('user-456', {
-            role: 'manager',
+            role: 'admin',
             orgId: 'org2',
         });
     });
@@ -113,7 +113,7 @@ describe('setCustomClaims — Custom Claims 자동 설정', () => {
                 },
                 after: {
                     data: () => ({
-                        role: 'manager',
+                        role: 'admin',
                         organizationId: 'org4',
                     }),
                 },
@@ -123,7 +123,7 @@ describe('setCustomClaims — Custom Claims 자동 설정', () => {
         await capturedHandler(event);
 
         expect(mockSetCustomUserClaims).toHaveBeenCalledWith('user-101', {
-            role: 'manager',
+            role: 'admin',
             orgId: 'org4',
         });
     });
@@ -135,7 +135,7 @@ describe('setCustomClaims — Custom Claims 자동 설정', () => {
                 before: { data: () => null },
                 after: {
                     data: () => ({
-                        role: 'super_admin',
+                        role: 'superAdmin',
                     }),
                 },
             },
@@ -144,8 +144,30 @@ describe('setCustomClaims — Custom Claims 자동 설정', () => {
         await capturedHandler(event);
 
         expect(mockSetCustomUserClaims).toHaveBeenCalledWith('user-202', {
-            role: 'super_admin',
+            role: 'superAdmin',
             orgId: null,
+        });
+    });
+
+    it('정의되지 않은 role은 employee로 강등 (권한 상승 방지)', async () => {
+        const event = {
+            params: { uid: 'user-204' },
+            data: {
+                before: { data: () => null },
+                after: {
+                    data: () => ({
+                        role: 'hacker-made-up-role',
+                        organizationId: 'org7',
+                    }),
+                },
+            },
+        };
+
+        await capturedHandler(event);
+
+        expect(mockSetCustomUserClaims).toHaveBeenCalledWith('user-204', {
+            role: 'employee',
+            orgId: 'org7',
         });
     });
 

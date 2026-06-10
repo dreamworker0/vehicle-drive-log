@@ -3,7 +3,7 @@
  * 종이 양식 기반의 일별 차량 운행일지를 브라우저 인쇄 기능으로 PDF 생성
  * A4 세로 (portrait)
  */
-import { formatNumber } from './pdfStyles';
+import { formatNumber, escapeHtml } from './pdfStyles';
 
 interface DailyDriveEntry {
     driverName?: string;
@@ -84,7 +84,7 @@ function buildApprovalHtml(approvalLine: ApprovalEntry[]) {
         <table class="approval-table">
             <tr>
                 <th class="approval-header" rowspan="2">결<br/>재</th>
-                ${approvalLine.map(a => `<td class="approval-title">${a.title || ''}</td>`).join('')}
+                ${approvalLine.map(a => `<td class="approval-title">${escapeHtml(a.title || '')}</td>`).join('')}
             </tr>
             <tr>
                 ${approvalLine.map(() => `<td class="approval-sign">&nbsp;</td>`).join('')}
@@ -118,7 +118,7 @@ function buildSummaryHtml(
                 <td class="label-cell">구 분</td>
                 <td class="label-cell">운행거리</td>
                 ${hasFuel ? `<th class="fuel-header" rowspan="4">주<br/>유<br/>상<br/>황</th>` : ''}
-                ${hasFuel ? `<td class="fuel-label">주유원</td><td class="fuel-value">${fuel!.driverName || ''}</td>` : ''}
+                ${hasFuel ? `<td class="fuel-label">주유원</td><td class="fuel-value">${escapeHtml(fuel!.driverName || '')}</td>` : ''}
             </tr>
             <tr>
                 <td class="label-cell">금 일</td>
@@ -148,11 +148,11 @@ function buildDriveRow(log: DailyDriveEntry) {
 
     return `
         <tr>
-            <td class="center">${log.driverName || ''}</td>
+            <td class="center">${escapeHtml(log.driverName || '')}</td>
             <td class="center">${log.passengers || ''}</td>
-            <td>${log.purpose || ''}</td>
-            <td>${log.destination || ''}</td>
-            <td class="center nowrap">${timeStr}</td>
+            <td>${escapeHtml(log.purpose || '')}</td>
+            <td>${escapeHtml(log.destination || '')}</td>
+            <td class="center nowrap">${escapeHtml(timeStr)}</td>
             <td class="right">${distance > 0 ? formatNumber(distance) : ''}</td>
             <td class="right">${log.endKm ? formatNumber(log.endKm) : ''}</td>
         </tr>
@@ -192,7 +192,7 @@ function buildDailyPdfHtml(
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>차량운행일지 - ${orgName} - ${date}</title>
+    <title>차량운행일지 - ${escapeHtml(orgName)} - ${escapeHtml(date)}</title>
     <style>${getDailyPdfStyles()}</style>
 </head>
 <body>
@@ -203,8 +203,8 @@ function buildDailyPdfHtml(
         </div>
 
         <div class="date-org-row">
-            <span class="date-text">날짜 &nbsp; <strong>${formatDateKorean(date)}</strong> &nbsp;&nbsp;&nbsp; 차량 &nbsp; <strong>${vehicleName}</strong></span>
-            <span class="org-text">기관명 &nbsp; <strong>${orgName}</strong></span>
+            <span class="date-text">날짜 &nbsp; <strong>${escapeHtml(formatDateKorean(date))}</strong> &nbsp;&nbsp;&nbsp; 차량 &nbsp; <strong>${escapeHtml(vehicleName)}</strong></span>
+            <span class="org-text">기관명 &nbsp; <strong>${escapeHtml(orgName)}</strong></span>
         </div>
 
         ${summaryHtml}

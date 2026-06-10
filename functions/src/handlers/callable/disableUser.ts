@@ -44,6 +44,10 @@ export const disableUser = onCall(
             if (callerRole === "admin" && callerDoc.data()?.organizationId !== targetDoc.data()?.organizationId) {
                 throw new HttpsError("permission-denied", "다른 기관의 직원을 비활성화할 수 없습니다.");
             }
+            // 상위 권한(superAdmin) 계정은 admin이 비활성화할 수 없음
+            if (callerRole === "admin" && targetDoc.data()?.role === "superAdmin") {
+                throw new HttpsError("permission-denied", "시스템 관리자 계정은 비활성화할 수 없습니다.");
+            }
 
             // 3. users 문서의 status를 'disabled'로 변경 (soft delete)
             await db.collection("users").doc(uid).update({

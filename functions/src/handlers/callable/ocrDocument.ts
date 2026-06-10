@@ -77,6 +77,10 @@ export const ocrDocument = onCall(
 
         // storagePath 경로 조작 방지: 호출자의 기관 또는 본인 폴더만 접근 허용
         if (storagePath) {
+            // 상대경로·역슬래시·선행 슬래시가 섞인 경로는 prefix 검사 우회 시도로 간주하고 거부
+            if (storagePath.includes("..") || storagePath.includes("\\") || storagePath.startsWith("/")) {
+                throw new HttpsError("invalid-argument", "유효하지 않은 파일 경로입니다.");
+            }
             const callerOrgId = request.auth!.token.orgId;
             const callerUid = request.auth!.uid;
             const isOrgPath = callerOrgId && storagePath.startsWith(`organizations/${callerOrgId}/`);

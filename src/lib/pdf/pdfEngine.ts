@@ -3,7 +3,7 @@
  * fuelLogPdfExport, hipassChargePdfExport, maintenancePdfExport 의 공통 로직을 통합.
  * 각 모듈은 컬럼 정의 + 행 변환 로직만 제공하고, 이 엔진이 HTML 조립·페이지 분할·인쇄를 처리.
  */
-import { formatDate, formatNumber } from './pdfStyles';
+import { formatDate, formatNumber, escapeHtml } from './pdfStyles';
 
 // ── 공통 타입 ──
 
@@ -40,7 +40,7 @@ interface PdfReportConfig<T> {
 
 // ── 공통 유틸 ──
 
-export { formatDate, formatNumber };
+export { formatDate, formatNumber, escapeHtml };
 
 /** Firestore timestamp → 시각 문자열 */
 export function getTimeStr(createdAt: unknown): string {
@@ -60,7 +60,7 @@ export function buildApprovalHtml(approvalLine: ApprovalEntry[]): string {
         <table class="approval-table">
             <tr>
                 <th class="approval-header" rowspan="2">결<br/>재</th>
-                ${approvalLine.map(a => `<td class="approval-title">${a.title || ''}</td>`).join('')}
+                ${approvalLine.map(a => `<td class="approval-title">${escapeHtml(a.title || '')}</td>`).join('')}
             </tr>
             <tr>
                 ${approvalLine.map(() => `<td class="approval-sign">&nbsp;</td>`).join('')}
@@ -202,7 +202,7 @@ export function printPdfReport<T>(config: PdfReportConfig<T>): boolean {
                 <div class="info-row">
                     <div class="info-left">
                         <span class="info-label">기관명</span>
-                        <span class="info-value">${orgName}</span>
+                        <span class="info-value">${escapeHtml(orgName)}</span>
                     </div>
                     <div class="info-right">
                         <span class="page-num">(${pageIdx + 1} / ${totalPages})</span>
@@ -228,7 +228,7 @@ export function printPdfReport<T>(config: PdfReportConfig<T>): boolean {
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>${title} - ${orgName}</title>
+    <title>${title} - ${escapeHtml(orgName)}</title>
     <style>${styles}</style>
 </head>
 <body>${pagesHtml}</body>

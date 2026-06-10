@@ -2,7 +2,7 @@
  * PDF 주유 기록 다운로드 유틸리티
  * pdfEngine 공통 엔진 기반
  */
-import { printPdfReport, getTimeStr, formatDate, formatNumber } from './pdfEngine';
+import { printPdfReport, getTimeStr, formatDate, formatNumber, escapeHtml } from './pdfEngine';
 import type { ApprovalEntry, PdfColumn } from './pdfEngine';
 
 /** PDF용 주유 기록 행 */
@@ -41,12 +41,12 @@ function renderRow(rec: PdfFuelLogEntry, idx: number, pageIdx: number, rowsPerPa
             <td class="center">${idx + 1 + (pageIdx * rowsPerPage)}</td>
             <td class="center">${formatDate(rec.date || '')}</td>
             <td class="center">${getTimeStr(rec.createdAt)}</td>
-            <td class="center">${rec.vehicleName || ''}</td>
-            <td class="center">${rec.driverName || ''}</td>
+            <td class="center">${escapeHtml(rec.vehicleName || '')}</td>
+            <td class="center">${escapeHtml(rec.driverName || '')}</td>
             <td class="right">${formatNumber(rec.meterReading)}</td>
             <td class="right">${rec.fuelAmount ? `${rec.fuelAmount} ${unit}` : ''}</td>
             <td class="right">${rec.fuelCost ? rec.fuelCost.toLocaleString() : ''}</td>
-            <td class="left">${rec.notes || ''}</td>
+            <td class="left">${escapeHtml(rec.notes || '')}</td>
         </tr>
     `;
 }

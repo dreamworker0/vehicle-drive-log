@@ -138,25 +138,26 @@ export const getMyDriveLogs = async (orgId: string, uid: string, limitCount = 30
 };
 
 // 차량별 운행일지 조회 (기간 필터 + limit 기본 200) (캐시 적용, TTL: 3분)
-export const getVehicleDriveLogs = async (vehicleId: string, since?: Date, limitCount = 200) => {
-    const cacheKey = `driveLogs:vehicle:${vehicleId}:${since?.getTime() || 'all'}:${limitCount}`;
+export const getVehicleDriveLogs = async (orgId: string, vehicleId: string, since?: Date, limitCount = 200) => {
+    const cacheKey = `driveLogs:vehicle:${orgId}:${vehicleId}:${since?.getTime() || 'all'}:${limitCount}`;
     return cachedQuery(
         cacheKey,
         async () => {
             try {
                 const constraints: QueryConstraint[] = [
+                    where('organizationId', '==', orgId),
                     where('vehicleId', '==', vehicleId),
                     orderBy('timestamp', 'desc'),
                     limit(limitCount),
                 ];
                 if (since) {
-                    constraints.splice(1, 0, where('timestamp', '>=', since));
+                    constraints.splice(2, 0, where('timestamp', '>=', since));
                 }
                 const q = query(collection(db, 'driveLogs').withConverter(driveLogConverter), ...constraints);
                 const snap = await getDocs(q);
                 return snap.docs.map(d => d.data());
             } catch (error) {
-                captureError(error, { context: 'getVehicleDriveLogs', vehicleId });
+                captureError(error, { context: 'getVehicleDriveLogs', orgId, vehicleId });
                 throw error;
             }
         },
@@ -165,17 +166,18 @@ export const getVehicleDriveLogs = async (vehicleId: string, since?: Date, limit
 };
 
 // 차량에 운행일지가 1건이라도 있는지 확인
-export const hasVehicleDriveLogs = async (vehicleId: string): Promise<boolean> => {
+export const hasVehicleDriveLogs = async (orgId: string, vehicleId: string): Promise<boolean> => {
     try {
         const q = query(
             collection(db, 'driveLogs'),
+            where('organizationId', '==', orgId),
             where('vehicleId', '==', vehicleId),
             limit(1)
         );
         const snap = await getDocs(q);
         return !snap.empty;
     } catch (error) {
-        captureError(error, { context: 'hasVehicleDriveLogs', vehicleId });
+        captureError(error, { context: 'hasVehicleDriveLogs', orgId, vehicleId });
         throw error;
     }
 };

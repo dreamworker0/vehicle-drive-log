@@ -2,7 +2,7 @@
  * PDF 운행일지 다운로드 유틸리티
  * 공식 차량운행일지 양식을 브라우저 인쇄 기능으로 PDF 생성
  */
-import { getPdfStyles, formatDate, formatNumber } from './pdfStyles';
+import { getPdfStyles, formatDate, formatNumber, escapeHtml } from './pdfStyles';
 import { toLocalDateStr } from '../dateUtils';
 
 /** PDF용 운행일지 행 */
@@ -110,18 +110,18 @@ function buildLogRow(log: PdfLogEntry, idx: number, pageIdx: number, includeHipa
         <tr>
             <td class="center">${idx + 1 + (pageIdx * ROWS_PER_PAGE)}</td>
             <td class="center">${formatDate(date)}</td>
-            <td class="center">${log.startTime || log.departureTime || ''}</td>
-            <td class="center">${log.endTime || log.arrivalTime || ''}</td>
-            <td class="center">${log.driverName || ''}</td>
-            <td class="center">${log.vehicleDisplayName || log.vehicleName || ''}</td>
-            <td>${log.destination || ''}</td>
-            <td>${log.purpose || ''}</td>
+            <td class="center">${escapeHtml(log.startTime || log.departureTime || '')}</td>
+            <td class="center">${escapeHtml(log.endTime || log.arrivalTime || '')}</td>
+            <td class="center">${escapeHtml(log.driverName || '')}</td>
+            <td class="center">${escapeHtml(log.vehicleDisplayName || log.vehicleName || '')}</td>
+            <td>${escapeHtml(log.destination || '')}</td>
+            <td>${escapeHtml(log.purpose || '')}</td>
             <td class="right">${formatNumber(log.departureKm ?? log.startKm)}</td>
             <td class="right">${formatNumber(log.arrivalKm ?? log.endKm)}</td>
             <td class="right">${distance > 0 ? distance.toLocaleString() : ''}</td>
             <td class="center">${log.passengerCount || ''}</td>
-            ${includePassengers ? `<td class="center" style="font-size: 8px;">${log.passengerNames?.join(', ') || ''}</td>` : ''}
-            <td>${noteText}</td>
+            ${includePassengers ? `<td class="center" style="font-size: 8px;">${escapeHtml(log.passengerNames?.join(', ') || '')}</td>` : ''}
+            <td>${escapeHtml(noteText)}</td>
         </tr>
     `;
 }
@@ -151,7 +151,7 @@ function buildApprovalHtml(approvalLine: ApprovalEntry[]) {
         <table class="approval-table">
             <tr>
                 <th class="approval-header" rowspan="2">결<br/>재</th>
-                ${approvalLine.map(a => `<td class="approval-title">${a.title || ''}</td>`).join('')}
+                ${approvalLine.map(a => `<td class="approval-title">${escapeHtml(a.title || '')}</td>`).join('')}
             </tr>
             <tr>
                 ${approvalLine.map(() => `<td class="approval-sign">&nbsp;</td>`).join('')}
@@ -183,11 +183,11 @@ function buildPageHtml(pageRows: PdfLogEntry[], pageIdx: number, totalPages: num
             <div class="info-row">
                 <div class="info-left">
                     <span class="info-label">기관명</span>
-                    <span class="info-value">${orgName}</span>
+                    <span class="info-value">${escapeHtml(orgName)}</span>
                 </div>
                 <div class="info-right">
                     <span class="info-label">기간</span>
-                    <span class="info-value">${period}</span>
+                    <span class="info-value">${escapeHtml(period)}</span>
                     <span class="page-num">(${pageNum} / ${totalPages})</span>
                 </div>
             </div>
@@ -257,7 +257,7 @@ function buildPdfHtml(pages: PdfLogEntry[][], options: { orgName: string; period
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>차량운행일지 - ${options.orgName}</title>
+    <title>차량운행일지 - ${escapeHtml(options.orgName)}</title>
     <style>${getPdfStyles()}</style>
 </head>
 <body>

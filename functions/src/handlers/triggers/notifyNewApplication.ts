@@ -56,7 +56,8 @@ export const notifyNewApplication = onDocumentWritten(
                 ? new Date((after.createdAt as { seconds: number }).seconds * 1000).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })
                 : new Date().toLocaleString("ko-KR", { timeZone: "Asia/Seoul" });
 
-            const adminEmail = "ehsheh@gmail.com";
+            // 수신자는 환경변수로 관리 (미설정 시 발신 계정으로 수신)
+            const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL || process.env.GMAIL_USER;
 
             const mailOptions = {
                 from: `"차량운행일지 시스템" <${process.env.GMAIL_USER}>`,
@@ -107,7 +108,7 @@ export const notifyNewApplication = onDocumentWritten(
             try {
                 const transporter = createTransporter();
                 await transporter.sendMail(mailOptions);
-                console.log(`신청 알림 이메일 전송 완료: org=${orgId}, name=${orgName}, to=${adminEmail}`);
+                console.log(`신청 알림 이메일 전송 완료: org=${orgId}, name=${orgName}`);
             } catch (err: unknown) {
                 console.error("신청 알림 이메일 전송 실패:", (err as Error).message);
             }

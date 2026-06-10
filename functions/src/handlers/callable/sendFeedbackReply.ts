@@ -136,7 +136,7 @@ export const sendFeedbackReply = onCall(
                         `,
                     };
                     await transporter.sendMail(mailOptions);
-                    console.log(`[sendFeedbackReply] 이메일 발송 완료: ${feedbackId} → ${targetEmail}`);
+                    console.log(`[sendFeedbackReply] 이메일 발송 완료: ${feedbackId}`);
                 }
             } catch (err: unknown) {
                 console.error("[sendFeedbackReply] 이메일 발송 실패:", (err as Error).message);

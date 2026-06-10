@@ -228,3 +228,19 @@ export function formatNumber(val: unknown) {
     if (val === undefined || val === null || val === '') return '';
     return Number(val).toLocaleString();
 }
+
+/**
+ * HTML escape — 사용자 입력(기관명·운전자명·목적지·비고 등)을 document.write로
+ * 새 창에 보간하기 전에 반드시 거친다 (XSS 방지)
+ * @param {*} value
+ * @returns {string}
+ */
+export function escapeHtml(value: unknown): string {
+    if (value === undefined || value === null) return '';
+    return String(value)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}

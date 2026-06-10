@@ -67,7 +67,7 @@ export default function useVehicleManager() {
                 // 각 차량의 운행일지 존재 여부 병렬 체크
                 const checks = await Promise.all(
                     data.map(async (v) => {
-                        const has = await hasVehicleDriveLogs(v.id);
+                        const has = await hasVehicleDriveLogs(orgId, v.id);
                         return { id: v.id, has };
                     })
                 );
@@ -229,11 +229,11 @@ export default function useVehicleManager() {
     };
     const confirmDelete = async () => {
         const vehicle = modal?.vehicle;
-        if (!vehicle) return;
+        if (!vehicle || !orgId) return;
         await runWithRetry('delete_vehicle', async () => {
             // 폐차된 차량이 아니라면 운행일지가 있는지 체크하여 삭제 차단 (폐차된 차량은 완전 삭제 허용)
             if (!vehicle.retired?.isRetired) {
-                const hasLogs = await hasVehicleDriveLogs(vehicle.id);
+                const hasLogs = await hasVehicleDriveLogs(orgId, vehicle.id);
                 if (hasLogs) {
                     showToast('운행일지가 존재하는 차량은 삭제할 수 없습니다. 폐차 처리를 이용하세요.', 'error');
                     setModal(null);

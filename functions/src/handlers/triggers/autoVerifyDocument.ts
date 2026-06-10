@@ -118,7 +118,8 @@ export const autoVerifyDocument = onDocumentWritten(
                 inviteCode,
             });
 
-            console.log(`[AutoVerify] 화이트리스트 자동 승인: ${orgName} (${orgId}), 초대코드: ${inviteCode}`);
+            // 초대코드는 재사용 가능한 민감정보이므로 로그에는 마스킹하여 남긴다
+            console.log(`[AutoVerify] 화이트리스트 자동 승인: ${orgName} (${orgId}), 초대코드: ${inviteCode.slice(0, 2)}****`);
 
             if (applicantEmail) {
                 await sendApprovalEmailServer(applicantEmail, orgName, inviteCode, applicantName);
@@ -307,7 +308,7 @@ export const autoVerifyDocument = onDocumentWritten(
                 updateData.approvedAt = new Date();
                 updateData.inviteCode = inviteCode;
 
-                console.log(`[AutoVerify] 기관 ${orgName} (${orgId}) AI 자동 승인! 초대코드: ${inviteCode}`);
+                console.log(`[AutoVerify] 기관 ${orgName} (${orgId}) AI 자동 승인! 초대코드: ${inviteCode.slice(0, 2)}****`);
 
                 if (applicantEmail) {
                     await sendApprovalEmailServer(applicantEmail, orgName, inviteCode, applicantName);

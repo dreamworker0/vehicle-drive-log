@@ -11,18 +11,11 @@ function isOrgMember(orgId) {
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // 기관 고유번호증 사본 업로드
-    // 신청자는 아직 Custom Claims가 없으므로 Firestore fallback 유지
-    match /organizations/{orgId}/{allPaths=**} {
-      allow read: if isOrgMember(orgId)
-                  || isSuperAdmin()
-                  || (request.auth != null
-                      && firestore.get(/databases/(default)/documents/organizations/$(orgId)).data.applicantUid == request.auth.uid);
-      allow write: if request.auth != null
-                   && request.resource.size < 5 * 1024 * 1024
-                   && (request.resource.contentType.matches('image/.*') || request.resource.contentType == 'application/pdf')
-                   && (isOrgMember(orgId)
-                       || firestore.get(/databases/(default)/documents/organizations/$(orgId)).data.applicantUid == request.auth.uid);
+    // 기관 고유번호증 사본 — 업로드는 submitOrgApplication 함수(Admin SDK)가 수행하므로
+    // 클라이언트 쓰기는 차단하고, 경로도 단일 파일 수준으로 제한 (중첩 경로 업로드 방지)
+    match /organizations/{orgId}/{fileName} {
+      allow read: if isOrgMember(orgId) || isSuperAdmin();
+      allow write: if false;
     }
 
     // OCR 인식 오류 신고 이미지 업로드 (본인 폴더만)

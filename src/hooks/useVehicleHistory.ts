@@ -59,14 +59,14 @@ export default function useVehicleHistory() {
     }, [orgId]);
 
     useEffect(() => {
-        if (!selectedVehicleId) return;
+        if (!selectedVehicleId || !orgId) return;
         const fetchLogs = async () => {
             setLogsLoading(true);
             try {
                 const since = new Date();
                 since.setDate(since.getDate() - period);
                 // 서버 사이드 기간 필터링 (Firestore where 조건)
-                const allLogs = await getVehicleDriveLogs(selectedVehicleId, since);
+                const allLogs = await getVehicleDriveLogs(orgId, selectedVehicleId, since);
                 setLogs(
                     (allLogs as DriveLog[]).sort((a, b) => {
                         const getTime = (ts: unknown): number => {
@@ -84,7 +84,7 @@ export default function useVehicleHistory() {
             }
         };
         fetchLogs();
-    }, [selectedVehicleId, period]);
+    }, [selectedVehicleId, period, orgId]);
 
     const selectedVehicle = vehicles.find(v => v.id === selectedVehicleId);
     const totalDistance = logs.reduce((sum, l) => sum + ((l.endKm - l.startKm) || 0), 0);

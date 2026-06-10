@@ -25,8 +25,10 @@ export const setCustomClaims = onDocumentWritten(
                 return;
             }
 
+            // 시스템에 정의된 역할만 Claims에 반영 — 예상 밖 값이 문서에 들어와도 권한 상승으로 이어지지 않도록 employee로 강등
+            const VALID_ROLES = ["superAdmin", "admin", "employee"];
             const newClaims = {
-                role: after.role || "employee",
+                role: VALID_ROLES.includes(after.role) ? after.role : "employee",
                 orgId: after.organizationId || null,
             };
 

@@ -2,7 +2,7 @@
  * PDF 하이패스 충전 기록 다운로드 유틸리티
  * pdfEngine 공통 엔진 기반
  */
-import { printPdfReport, getTimeStr, formatDate, formatNumber } from './pdfEngine';
+import { printPdfReport, getTimeStr, formatDate, formatNumber, escapeHtml } from './pdfEngine';
 import type { ApprovalEntry, PdfColumn } from './pdfEngine';
 
 /** PDF용 하이패스 충전 기록 행 */
@@ -37,9 +37,9 @@ function renderRow(rec: PdfHipassChargeEntry, idx: number, pageIdx: number, rows
             <td class="center">${idx + 1 + (pageIdx * rowsPerPage)}</td>
             <td class="center">${formatDate(rec.date || '')}</td>
             <td class="center">${getTimeStr(rec.createdAt)}</td>
-            <td class="center">${rec.vehicleName || ''}</td>
-            <td class="center">${rec.chargerName || ''}</td>
-            <td class="center">${rec.cardNumber || ''}</td>
+            <td class="center">${escapeHtml(rec.vehicleName || '')}</td>
+            <td class="center">${escapeHtml(rec.chargerName || '')}</td>
+            <td class="center">${escapeHtml(rec.cardNumber || '')}</td>
             <td class="right">${formatNumber(rec.chargeAmount)}</td>
             <td class="right">${formatNumber(rec.balanceBefore)}</td>
             <td class="right">${formatNumber(rec.balanceAfter)}</td>
