@@ -89,6 +89,10 @@ export function initSentry() {
             /has already been defined/,
             // 브라우저 비밀번호 관리자·자동완성 확장이 Custom Element를 이중 등록하는 에러 (앱 버그 아님)
             /autocomplete-textarea/,
+            // CSP 위반 에러 (Firebase Auth signInWithRedirect, reCAPTCHA v3 App Check 등
+            // Google/Firebase SDK 내부에서 동적 스크립트 삽입·eval() 사용으로 발생하는 환경 노이즈, 앱 버그 아님)
+            /Refused to .* because it violates the .* Content Security Policy directive/,
+            /blocked by Content Security Policy/i,
             // 의도된 비즈니스 로직 에러 (글로벌 바운더리로 전파되는 노이즈 방지)
             /동일한 운행 기록이 이미 존재합니다/,
             /동기화 오류: 다른 사용자가 더 높은 누적 km/,
@@ -125,6 +129,16 @@ export function initSentry() {
             // - Safari/iOS:     "The object can not be found here"
             const errorMsg = event.exception?.values?.[0]?.value || '';
             if (/removeChild|The node to be removed is not a child|The object can not be found here/i.test(errorMsg)) {
+                return null;
+            }
+
+            // CSP 위반 이벤트 보완 필터링 (ignoreErrors를 우회해 전파되는 케이스 차단)
+            // SecurityPolicyViolationEvent 타입이거나 CSP 디렉티브 키워드가 메시지에 포함된 경우
+            const exceptionType = event.exception?.values?.[0]?.type || '';
+            if (
+                exceptionType === 'SecurityPolicyViolationEvent' ||
+                /(?:script-src|connect-src|style-src|font-src|img-src|frame-src|default-src)(?:-elem|-attr)?\b/.test(errorMsg)
+            ) {
                 return null;
             }
 
