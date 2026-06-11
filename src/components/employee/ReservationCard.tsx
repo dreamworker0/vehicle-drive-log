@@ -82,18 +82,16 @@ export default function ReservationCard({
                 <button
                     onClick={() => onCancel(reservation)}
                     disabled={cancellingId === reservation.id}
-                    className="absolute -top-2 -right-2 z-10 text-surface-400 dark:text-surface-500 hover:text-red-500 dark:hover:text-red-400 transition-colors w-12 h-12 flex items-center justify-center"
+                    className="absolute -top-1.5 -right-1.5 z-10 text-surface-400 dark:text-surface-500 hover:text-red-500 dark:hover:text-red-400 transition-colors w-7 h-7 rounded-full bg-white dark:bg-surface-800 shadow-md border border-surface-200 dark:border-surface-700 flex items-center justify-center hover:bg-red-50 dark:hover:bg-red-955/30 before:content-[''] before:absolute before:-inset-3"
                     title="예약 취소"
                 >
-                    <div className="w-7 h-7 rounded-full bg-white dark:bg-surface-800 shadow-md border border-surface-200 dark:border-surface-700 flex items-center justify-center hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors">
-                        {cancellingId === reservation.id ? (
-                            <div className="w-3.5 h-3.5 spinner" />
-                        ) : (
-                            <svg aria-hidden="true" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                            </svg>
-                        )}
-                    </div>
+                    {cancellingId === reservation.id ? (
+                        <div className="w-3.5 h-3.5 spinner" />
+                    ) : (
+                        <svg aria-hidden="true" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                        </svg>
+                    )}
                 </button>
             )}
 
