@@ -86,19 +86,31 @@ export default function useMonthlyReport() {
     }, []);
 
 
+    // 전월 비교 기간 계산
+    const prevStartDate = useMemo(() => {
+        const s = new Date(startDate);
+        const e = new Date(endDate);
+        const daysDiff = Math.ceil((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24));
+        const prevEnd = new Date(s);
+        prevEnd.setDate(prevEnd.getDate() - 1);
+        const prevStart = new Date(prevEnd);
+        prevStart.setDate(prevStart.getDate() - daysDiff);
+        return toLocalDateStr(prevStart);
+    }, [startDate, endDate]);
+
     useEffect(() => {
         if (!orgId) { setLoading(false); return; }
-        const fetch = async () => {
+        const fetchData = async () => {
             setLoading(true);
             try {
-                // 최대 6개월 전 데이터만 조회 (Firestore 읽기 비용 절감)
-                const sixMonthsAgo = new Date();
-                sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+                // 선택 기간 + 전월 비교 기간만 서버에서 조회 (Firestore 읽기 비용 절감)
+                const sinceDate = new Date(`${prevStartDate}T00:00:00`);
+                const untilDate = new Date(`${endDate}T23:59:59`);
 
                 const [driveResult, fuelResult, hipassResult] = await Promise.all([
-                    getDriveLogs(orgId!, { limit: 500, since: sixMonthsAgo }),
-                    getFuelLogs(orgId!, null, { since: sixMonthsAgo }).catch(() => []),
-                    getAllHipassCharges(orgId!, { since: sixMonthsAgo }).catch(() => []),
+                    getDriveLogs(orgId!, { limit: 500, startDate: prevStartDate, endDate }),
+                    getFuelLogs(orgId!, null, { since: sinceDate, until: untilDate }).catch(() => []),
+                    getAllHipassCharges(orgId!, { since: sinceDate, until: untilDate }).catch(() => []),
                 ]);
                 setLogs(driveResult.docs as DriveLog[]);
                 setFuelLogs(fuelResult as FuelLog[]);
@@ -109,8 +121,8 @@ export default function useMonthlyReport() {
                 setLoading(false);
             }
         };
-        fetch();
-    }, [orgId]);
+        fetchData();
+    }, [orgId, startDate, endDate, prevStartDate]);
 
     const filteredLogs = useMemo(
         () => logs.filter(l => {

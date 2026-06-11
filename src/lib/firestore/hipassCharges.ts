@@ -30,13 +30,14 @@ export const getAllHipassCharges = async (orgId: string, options?: { since?: Dat
     return snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) }));
 };
 
-// 카드별 충전 기록 조회 (최신순)
+// 카드별 충전 기록 조회 (최신순, 최대 100건)
 export const getHipassCharges = async (orgId: string, cardId: string) => {
     const q = query(
         collection(db, 'hipassCharges'),
         where('organizationId', '==', orgId),
         where('cardId', '==', cardId),
         orderBy('createdAt', 'desc'),
+        limit(100),
     );
     const snap = await getDocs(q);
     return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });

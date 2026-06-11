@@ -95,6 +95,11 @@ export const getReservations = async (orgId: string, date?: string) => {
         ];
         if (date) {
             constraints.push(where('date', '==', date));
+        } else {
+            // date 미지정 시 최근 1개월로 제한 (Firestore 읽기 비용 절감)
+            const oneMonthAgo = new Date();
+            oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+            constraints.push(where('date', '>=', oneMonthAgo.toISOString().slice(0, 10)));
         }
         const q = query(reservationsCollection(), ...constraints);
         const snap = await getDocs(q);
@@ -301,10 +306,15 @@ export const deleteReservationGroup = (groupId: string, orgId: string) =>
 // 복합 인덱스 생성을 피하기 위해 클라이언트 메모리에서 정렬 처리
 export const getMyRecentReservations = async (orgId: string, uid: string, limitCount = 50) => {
     try {
+        // 최근 3개월치만 조회하여 Firestore 읽기 비용 절감
+        const threeMonthsAgo = new Date();
+        threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+        const sinceStr = threeMonthsAgo.toISOString().slice(0, 10);
         const q = query(
             reservationsCollection(),
             where('organizationId', '==', orgId),
-            where('reservedByUid', '==', uid)
+            where('reservedByUid', '==', uid),
+            where('date', '>=', sinceStr),
         );
         const snap = await getDocs(q);
         return snap.docs

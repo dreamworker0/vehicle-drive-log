@@ -3,6 +3,20 @@
 이 문서는 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/) 형식을 따르는 **개발 참고용** 이력입니다.
 서비스 이용자용 변경 소식은 [업데이트 소식](https://vehicle-drive-log.web.app/release-notes)에서 확인할 수 있습니다.
 
+## Phase 60 — Firestore 읽기 비용 절감 1단계 💰
+
+> 2026-06-11
+
+### Changed
+- **월간 보고서 쿼리 최적화**: 6개월치 500건 일괄 로드 → 선택 기간 + 전월 비교 기간만 서버 조회 (읽기 약 80% 절감) (`useMonthlyReport.ts`)
+- **내 최근 예약 기간 제한**: 전체 예약 로드 → 최근 3개월 `where('date', '>=')` 서버 필터 추가 (`reservations.ts`)
+- **정비 차단 쿼리 서버 이동**: 클라이언트 날짜·상태 필터링 → `where('status', '==', 'reserved')`, `where('date', '>=')` 서버 사이드로 이동 (`maintenance.ts`)
+- **관리자 배지 캐시 적용**: 차량·예약 조회에 `cachedQuery` (5분 TTL) 래퍼 적용하여 반복 호출 시 읽기 0건 (`useAdminBadges.ts`)
+- **하이패스 충전 기록 제한**: 카드별 조회에 `limit(100)` 추가 (무한 읽기 방지) (`hipassCharges.ts`)
+- **예약 전체 로드 방지**: `getReservations` date 미지정 시 기본 1개월 제한 추가 (`reservations.ts`)
+
+---
+
 ## Phase 59 — 전면 보안 감사 및 취약점 일괄 해소 🔒
 
 > 2026-06-10

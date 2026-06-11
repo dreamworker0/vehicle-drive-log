@@ -143,17 +143,23 @@ export const clearVehicleMaintenanceBlock = async (vehicleId: string) => {
 // 차량 정비 차단 시 기존 예약 일괄 취소 + 예약자 알림
 export const cancelVehicleReservations = async (orgId: string, vehicleId: string, vehicleName: string, startDate: string, endDate: string | null, reason: string) => {
     try {
-        const q = query(
-            collection(db, 'reservations'),
+        const constraints = [
             where('organizationId', '==', orgId),
             where('vehicleId', '==', vehicleId),
+            where('status', '==', 'reserved'),
+            where('date', '>=', startDate),
+        ];
+        if (endDate) {
+            constraints.push(where('date', '<=', endDate));
+        }
+        const q = query(
+            collection(db, 'reservations'),
+            ...constraints,
         );
         const snap = await getDocs(q);
 
-        // 날짜 범위 + 활성 상태 필터링
         const targets = snap.docs
-            .map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string; status?: string; date?: string; reservedByUid?: string })
-            .filter(r => r.status === 'reserved' && (r.date ?? '') >= startDate && (!endDate || (r.date ?? '') <= endDate));
+            .map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string; date?: string; reservedByUid?: string });
 
         // 일괄 취소 + 예약자에게 알림 발송
         for (const res of targets) {

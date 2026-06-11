@@ -7,6 +7,7 @@ import { collection, query, where, getDocs, getCountFromServer } from 'firebase/
 import { db } from '../lib/firebase';
 import { useAuth } from './useAuth';
 import { toLocalDateStr } from '../lib/dateUtils';
+import { cachedQuery } from '../lib/firestore/cache';
 
 interface AdminBadges {
     vehicleCount: number | null;
@@ -30,13 +31,19 @@ export default function useAdminBadges(): AdminBadges {
 
         const fetchCounts = async () => {
             try {
-                // 활성 차량 수 
-                const vehicleQ = query(
-                    collection(db, 'vehicles'),
-                    where('organizationId', '==', orgId) // retire 여부는 클라이언트 필터링
+                // 활성 차량 수 (5분 캐시 적용)
+                const activeVehicles = await cachedQuery(
+                    `adminBadges:vehicles:${orgId}`,
+                    async () => {
+                        const vehicleQ = query(
+                            collection(db, 'vehicles'),
+                            where('organizationId', '==', orgId)
+                        );
+                        const vSnap = await getDocs(vehicleQ);
+                        return vSnap.docs.filter(d => !d.data().retired?.isRetired);
+                    },
+                    300_000, // 5분 캐시
                 );
-                const vSnap = await getDocs(vehicleQ);
-                const activeVehicles = vSnap.docs.filter(d => !d.data().retired?.isRetired);
                 
                 // 직원 수 (getCountFromServer로 최적화)
                 const employeeQ = query(
@@ -52,15 +59,21 @@ export default function useAdminBadges(): AdminBadges {
                 );
                 const hipassSnap = await getCountFromServer(hipassQ);
                 
-                // 오늘 예약 수 
+                // 오늘 예약 수 (5분 캐시 적용)
                 const today = toLocalDateStr();
-                const reservationQ = query(
-                    collection(db, 'reservations'),
-                    where('organizationId', '==', orgId),
-                    where('date', '==', today)
+                const activeReservations = await cachedQuery(
+                    `adminBadges:reservations:${orgId}:${today}`,
+                    async () => {
+                        const reservationQ = query(
+                            collection(db, 'reservations'),
+                            where('organizationId', '==', orgId),
+                            where('date', '==', today)
+                        );
+                        const rSnap = await getDocs(reservationQ);
+                        return rSnap.docs.filter(d => d.data().status !== 'cancelled');
+                    },
+                    300_000, // 5분 캐시
                 );
-                const rSnap = await getDocs(reservationQ);
-                const activeReservations = rSnap.docs.filter(d => d.data().status !== 'cancelled');
 
                 if (isMounted) {
                     setVehicleCount(activeVehicles.length);
