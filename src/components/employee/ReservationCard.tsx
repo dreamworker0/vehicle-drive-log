@@ -70,7 +70,7 @@ export default function ReservationCard({
 
 
     return (
-        <div className={`relative ${
+        <div className={`relative overflow-visible ${
             isInProgress ? 'driving-card' : 
             isSoon ? 'glass-card px-4 py-3 border-l-4 border-l-amber-500 shadow-md ring-1 ring-amber-500/50 bg-amber-50/10 dark:bg-amber-900/10' : 
             'glass-card px-4 py-3 border-l-4 border-l-primary-400'
@@ -82,16 +82,18 @@ export default function ReservationCard({
                 <button
                     onClick={() => onCancel(reservation)}
                     disabled={cancellingId === reservation.id}
-                    className="absolute top-1.5 right-1.5 z-10 text-surface-300 dark:text-surface-600 hover:text-red-500 dark:hover:text-red-400 transition-colors rounded-full p-1.5 min-w-[36px] min-h-[36px] flex items-center justify-center hover:bg-red-50 dark:hover:bg-red-900/20"
+                    className="absolute -top-2 -right-2 z-10 text-surface-400 dark:text-surface-500 hover:text-red-500 dark:hover:text-red-400 transition-colors w-12 h-12 flex items-center justify-center"
                     title="예약 취소"
                 >
-                    {cancellingId === reservation.id ? (
-                        <div className="w-3 h-3 spinner" />
-                    ) : (
-                        <svg aria-hidden="true" className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                        </svg>
-                    )}
+                    <div className="w-7 h-7 rounded-full bg-white dark:bg-surface-800 shadow-md border border-surface-200 dark:border-surface-700 flex items-center justify-center hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors">
+                        {cancellingId === reservation.id ? (
+                            <div className="w-3.5 h-3.5 spinner" />
+                        ) : (
+                            <svg aria-hidden="true" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                            </svg>
+                        )}
+                    </div>
                 </button>
             )}
 
