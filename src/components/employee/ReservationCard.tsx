@@ -68,13 +68,33 @@ export default function ReservationCard({
         }
     };
 
+
     return (
-        <div className={
+        <div className={`relative ${
             isInProgress ? 'driving-card' : 
             isSoon ? 'glass-card px-4 py-3 border-l-4 border-l-amber-500 shadow-md ring-1 ring-amber-500/50 bg-amber-50/10 dark:bg-amber-900/10' : 
             'glass-card px-4 py-3 border-l-4 border-l-primary-400'
-        }>
+        }`}>
             {isInProgress && <div className="driving-progress-bar" />}
+
+            {/* 우상단 취소 버튼 */}
+            {onCancel && !isInProgress && (
+                <button
+                    onClick={() => onCancel(reservation)}
+                    disabled={cancellingId === reservation.id}
+                    className="absolute top-1.5 right-1.5 z-10 text-surface-300 dark:text-surface-600 hover:text-red-500 dark:hover:text-red-400 transition-colors rounded-full p-1.5 min-w-[36px] min-h-[36px] flex items-center justify-center hover:bg-red-50 dark:hover:bg-red-900/20"
+                    title="예약 취소"
+                >
+                    {cancellingId === reservation.id ? (
+                        <div className="w-3 h-3 spinner" />
+                    ) : (
+                        <svg aria-hidden="true" className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
+                        </svg>
+                    )}
+                </button>
+            )}
+
             <div className={isInProgress ? 'p-4' : ''}>
                 <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0 flex-1">
@@ -111,8 +131,8 @@ export default function ReservationCard({
                             )}
                         </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
-                        <div className="flex flex-col gap-2 w-full sm:w-auto min-w-[110px]">
+                    <div className="flex items-center flex-shrink-0">
+                        <div className="flex flex-col gap-2 min-w-[100px]">
                             {reservation.status === 'pending' ? (
                                 <div className="py-2.5 px-3 rounded-xl bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-bold text-center border border-amber-200 dark:border-amber-800/50 shadow-sm flex items-center justify-center gap-1.5 w-full text-sm">
                                     <svg aria-hidden="true" className="w-4 h-4 animate-pulse" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -158,22 +178,6 @@ export default function ReservationCard({
                                 </>
                             )}
                         </div>
-                        {onCancel && (
-                            <button
-                                onClick={() => onCancel(reservation)}
-                                disabled={cancellingId === reservation.id}
-                                className="text-surface-400 dark:text-surface-500 hover:text-red-500 dark:hover:text-red-400 transition-colors p-1 min-w-[48px] min-h-[48px] flex items-center justify-center"
-                                title="예약 취소"
-                            >
-                                {cancellingId === reservation.id ? (
-                                    <div className="w-3.5 h-3.5 spinner" />
-                                ) : (
-                                    <svg aria-hidden="true" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                                    </svg>
-                                )}
-                            </button>
-                        )}
                     </div>
                 </div>
             </div>
