@@ -110,8 +110,12 @@ export default function ReservationCard({
                             <p className={`${isInProgress ? 'font-bold text-amber-900 dark:text-amber-200 text-base' : isSoon ? 'font-bold text-surface-900 dark:text-surface-100 text-sm' : 'font-medium text-surface-800 dark:text-surface-200 text-sm'}`}>{reservation.vehicleName || vehicle?.displayName || vehicle?.name || ''}</p>
                             <p className={`text-xs ${isInProgress ? 'text-amber-700/70 dark:text-amber-300/80' : 'text-surface-500 dark:text-surface-300'}`}>
                                 {reservation.startTime} ~ {reservation.endTime}
-                                {reservation.destination && ` · ${reservation.destination}`}
                             </p>
+                            {reservation.destination && (
+                                <p className={`text-xs truncate ${isInProgress ? 'text-amber-700/70 dark:text-amber-300/80' : 'text-surface-500 dark:text-surface-300'}`}>
+                                    {reservation.destination}
+                                </p>
+                            )}
                             {reservation.recurringGroupId && (
                                 <span className="inline-flex items-center gap-0.5 mt-0.5 text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300 rounded-full font-medium w-fit">
                                     반복 예약
