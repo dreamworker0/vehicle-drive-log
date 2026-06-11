@@ -303,7 +303,8 @@ export const deleteReservationGroup = (groupId: string, orgId: string) =>
     batchGroupAction(getReservationsByGroupId, 'delete', groupId, orgId, 'deleteReservationGroup');
 
 // 내 최근 예약 조회 (취소 제외, 최신 순 정렬하여 반환)
-// 복합 인덱스 생성을 피하기 위해 클라이언트 메모리에서 정렬 처리
+// 복합 인덱스: organizationId + reservedByUid + date (firestore.indexes.json)
+// orderBy 없이 클라이언트 메모리에서 정렬 처리
 export const getMyRecentReservations = async (orgId: string, uid: string, limitCount = 50) => {
     try {
         // 최근 3개월치만 조회하여 Firestore 읽기 비용 절감
