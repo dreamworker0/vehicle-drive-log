@@ -1,9 +1,9 @@
 /**
  * computeDashboardStatsScheduler — 대시보드 통계 캐싱 스케줄러 (D13 규칙 준수: index.ts에서 분리)
  *
- * 1시간마다 SuperAdmin 대시보드 통계를 배치 계산하여 Firestore에 캐싱한다.
- * 저녁 20시 ~ 아침 8시 사이에는 야간 유휴 시간 절감을 위해 스킵한다.
- * (App Engine cron → 표준 cron 전환)
+ * 하루 2회(09시, 17시) SuperAdmin 대시보드 통계를 배치 계산하여 Firestore에 캐싱한다.
+ * 비용 절감을 위해 매시간 → 하루 2회로 축소 (수동 갱신은 refreshDashboardStats callable로 가능).
+ * 저녁 20시 ~ 아침 8시 사이에는 야간 유휴 시간 절감을 위해 스킵한다 (안전장치).
  */
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { computeAllDashboardStats } from "../../services/statistics/computeDashboardStats";
@@ -11,7 +11,7 @@ import { recordHeartbeat } from "../../utils/helpers";
 
 export const computeDashboardStats = onSchedule(
     {
-        schedule: "0 * * * *",
+        schedule: "0 9,17 * * *",
         timeZone: "Asia/Seoul",
         retryCount: 0,
         memory: "512MiB",

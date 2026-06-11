@@ -231,7 +231,7 @@ interface SchedulerHealthResult {
 
 const SCHEDULER_CONFIG: { name: string; displayName: string; expectedIntervalMs: number }[] = [
     { name: "reservationReminder", displayName: "예약 알림", expectedIntervalMs: 30 * 60 * 1000 },        // 15분마다, 30분 여유
-    { name: "computeDashboardStats", displayName: "대시보드 캐싱", expectedIntervalMs: 2 * 60 * 60 * 1000 },  // 1시간마다, 2시간 여유
+    { name: "computeDashboardStats", displayName: "대시보드 캐싱", expectedIntervalMs: 18 * 60 * 60 * 1000 },  // 하루 2회(09/17시), 18시간 여유
     { name: "syncCalendarToApp", displayName: "캘린더 싱크", expectedIntervalMs: 4 * 60 * 60 * 1000 },      // 2시간마다, 4시간 여유
     { name: "syncHolidays", displayName: "공휴일 동기화", expectedIntervalMs: 32 * 24 * 60 * 60 * 1000 },    // 한달마다, 32일 여유
 ];

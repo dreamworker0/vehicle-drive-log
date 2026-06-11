@@ -35,4 +35,5 @@ jobs:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
           projectId: vehicle-drive-log
+          expires: 3d
           # channelId 생략 시 PR 번호 기반 임시 채널 자동 생성
