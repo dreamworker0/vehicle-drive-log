@@ -34,12 +34,15 @@ export async function computeAllDashboardStats(): Promise<void> {
     const sevenDaysAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
     const prevMonth = month === 0 ? 11 : month - 1;
     const prevYear = month === 0 ? year - 1 : year;
+    // 전달 1일: 현재월·전월 비교 통계를 커버하는 최소 범위 (~45일)
+    const prevMonthStart = new Date(prevYear, prevMonth, 1);
 
-    // 1. 7개 컬렉션 병렬 조회
-    const [orgSnap, userSnap, logSnap, vehicleSnap, hipassCardSnap, favoriteSnap, pendingAppSnap, reservationSnap] = await Promise.all([
+    // 1. 컬렉션 병렬 조회 (driveLogs는 count + 최근 필터로 분리)
+    const [orgSnap, userSnap, logCountSnap, recentLogSnap, vehicleSnap, hipassCardSnap, favoriteSnap, pendingAppSnap, reservationSnap] = await Promise.all([
         db.collection("organizations").get(),
         db.collection("users").get(),
-        db.collection("driveLogs").get(),
+        db.collection("driveLogs").count().get(),
+        db.collection("driveLogs").where("timestamp", ">=", prevMonthStart).get(),
         db.collection("vehicles").get(),
         db.collection("hipassCards").get(),
         db.collection("favorites").get(),
@@ -49,7 +52,7 @@ export async function computeAllDashboardStats(): Promise<void> {
 
     // 1.5. 사전 분류 (O(N+M) 최적화를 위해 기관별로 문서 분배)
     const userByOrg = groupByOrg(userSnap.docs);
-    const logByOrg = groupByOrg(logSnap.docs);
+    const logByOrg = groupByOrg(recentLogSnap.docs);
     const vehicleByOrg = groupByOrg(vehicleSnap.docs);
     const hipassByOrg = groupByOrg(hipassCardSnap.docs);
     const reservationByOrg = groupByOrg(reservationSnap.docs);
@@ -58,7 +61,7 @@ export async function computeAllDashboardStats(): Promise<void> {
         // 기관 필터 유무에 따라 순회할 배열 선택
         const currentOrgDocs = orgFilterId ? orgSnap.docs.filter(d => d.id === orgFilterId) : orgSnap.docs;
         const currentUserDocs = orgFilterId ? (userByOrg[orgFilterId] || []) : userSnap.docs;
-        const currentLogDocs = orgFilterId ? (logByOrg[orgFilterId] || []) : logSnap.docs;
+        const currentLogDocs = orgFilterId ? (logByOrg[orgFilterId] || []) : recentLogSnap.docs;
         const currentVehicleDocs = orgFilterId ? (vehicleByOrg[orgFilterId] || []) : vehicleSnap.docs;
         const currentHipassDocs = orgFilterId ? (hipassByOrg[orgFilterId] || []) : hipassCardSnap.docs;
         const currentReservationDocs = orgFilterId ? (reservationByOrg[orgFilterId] || []) : reservationSnap.docs;
@@ -328,7 +331,7 @@ export async function computeAllDashboardStats(): Promise<void> {
         return {
             dashboardStats: {
                 approvedOrgs, totalUsers: userStats.totalUsers, adminCount: userStats.adminCount, employeeCount: userStats.employeeCount,
-                totalLogs: logSnap.size, totalDistance: Math.round(totalDistance),
+                totalLogs: logCountSnap.data().count, totalDistance: Math.round(totalDistance),
                 pendingApps: orgFilterId ? 0 : pendingAppSnap.data().count,
                 calendarSyncOrgs: vehicleResult.calendarSyncOrgSet.size, calendarSyncVehicles: vehicleResult.calendarSyncCount,
                 calendarNotSyncVehicles: vehicleResult.calendarNotSyncCount,
@@ -389,5 +392,5 @@ export async function computeAllDashboardStats(): Promise<void> {
     }
 
     const elapsed = Date.now() - startTime;
-    console.log(`[computeDashboardStats] 완료: ${elapsed}ms, orgs=${allStats.dashboardStats.approvedOrgs}, logs=${allStats.dashboardStats.totalLogs}, users=${allStats.dashboardStats.totalUsers}, dbWrites=${writeChunks.length}`);
+    console.log(`[computeDashboardStats] 완료: ${elapsed}ms, orgs=${allStats.dashboardStats.approvedOrgs}, logs=${allStats.dashboardStats.totalLogs}(count), recentLogs=${recentLogSnap.size}, users=${allStats.dashboardStats.totalUsers}, dbWrites=${writeChunks.length}`);
 }
