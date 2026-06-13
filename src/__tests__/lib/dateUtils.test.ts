@@ -74,7 +74,7 @@ describe('dateUtils', () => {
             const mockTimestamp = { toDate: () => new Date(2026, 4, 5, 14, 30) }; // 14:30
             const result = formatTimestampTime(mockTimestamp);
             // 한국어 로케일("오후 2:30")과 영어 로케일("PM 2:30" 또는 "PM 02:30") 모두 호환되도록 정규식 단언
-            expect(result).toMatch(/(오후\s*2:30|PM\s*0?2:30)/i);
+            expect(result).toMatch(/(오후\s*0?2:30|PM\s*0?2:30)/i);
         });
 
         it('toDate 함수가 없는 잘못된 값은 빈 문자열을 반환한다', () => {
