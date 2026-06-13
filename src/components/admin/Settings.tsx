@@ -13,6 +13,7 @@ import HolidayManager from './HolidayManager';
 import FeedbackForm from '../common/FeedbackForm';
 import UserManual from '../common/UserManual';
 import AskAIModal from '../common/AskAIModal';
+import Toggle from '../common/Toggle';
 
 export default function Settings() {
     const { user } = useAuth();
@@ -117,18 +118,11 @@ export default function Settings() {
                         <span className={`text-xs font-medium ${!form.requireReservationApproval ? 'text-surface-400 dark:text-surface-500' : 'text-primary-600 dark:text-primary-400'}`}>
                             {form.requireReservationApproval ? '사용' : '사용 안함'}
                         </span>
-                        <button
-                            type="button"
-                            role="switch"
-                            aria-checked={form.requireReservationApproval}
-                            onClick={(e) => {
-                                e.preventDefault();
-                                handleSave(null, { requireReservationApproval: !form.requireReservationApproval });
-                            }}
-                            className={`relative inline-flex h-6 w-11 min-h-[48px] min-w-[48px] items-center justify-center rounded-full transition-colors ${form.requireReservationApproval ? 'bg-primary-600' : 'bg-surface-300 dark:bg-surface-600'}`}
-                        >
-                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-surface-800 shadow-sm transition-transform ${form.requireReservationApproval ? 'translate-x-3' : '-translate-x-3'}`} />
-                        </button>
+                        <Toggle
+                            label="예약 관리자 승인"
+                            checked={form.requireReservationApproval}
+                            onChange={(next) => handleSave(null, { requireReservationApproval: next })}
+                        />
                     </label>
                 </div>
                 <p className="text-xs text-surface-400">
@@ -144,15 +138,11 @@ export default function Settings() {
                         <span className={`text-xs font-medium ${form.hideApprovalLine ? 'text-surface-400 dark:text-surface-500' : 'text-primary-600 dark:text-primary-400'}`}>
                             {form.hideApprovalLine ? 'PDF 결재란 숨김' : 'PDF 결재란 표시'}
                         </span>
-                        <button
-                            type="button"
-                            role="switch"
-                            aria-checked={!form.hideApprovalLine}
-                            onClick={() => setForm({ ...form, hideApprovalLine: !form.hideApprovalLine })}
-                            className={`relative inline-flex h-6 w-11 min-h-[48px] min-w-[48px] items-center justify-center rounded-full transition-colors ${!form.hideApprovalLine ? 'bg-primary-600' : 'bg-surface-300 dark:bg-surface-600'}`}
-                        >
-                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-surface-800 transition-transform ${!form.hideApprovalLine ? 'translate-x-3' : '-translate-x-3'}`} />
-                        </button>
+                        <Toggle
+                            label="PDF 결재란 표시"
+                            checked={!form.hideApprovalLine}
+                            onChange={(next) => setForm({ ...form, hideApprovalLine: !next })}
+                        />
                     </label>
                 </div>
                 <p className="text-xs text-surface-400 mb-4">PDF 운행일지에 표시될 결재란을 설정합니다. (수동 결재용)</p>
