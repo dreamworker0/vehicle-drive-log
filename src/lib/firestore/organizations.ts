@@ -122,6 +122,7 @@ export const deleteOrganization = async (orgId: string) => {
         batch.update(doc(db, 'organizations', orgId), {
             status: 'deleted',
             deletedAt: serverTimestamp(),
+            deletedBy: 'superAdmin',
         });
         await batch.commit();
     } catch (error) {

@@ -7,10 +7,11 @@ import { useAuth } from './useAuth';
 import { useToast } from './useToast';
 import { useConfirm } from './useConfirm';
 import { getOrganization, updateOrganization, regenerateInviteCode, getCustomHolidays, addCustomHoliday, deleteCustomHoliday } from '../lib/firestore';
+import { getFunctions, httpsCallable } from 'firebase/functions';
 import { fetchPublicHolidays, groupHolidaysByMonth } from '../lib/holidayApi';
 import { formatDateKr } from '../lib/dateUtils';
 import { formatPhoneNumber } from './useOrgApplication';
-import type { Organization } from '../types/organization';
+import type { Organization, WithdrawReason } from '../types/organization';
 import type { CustomHoliday } from '../types/holiday';
 
 interface SettingsForm {
@@ -36,6 +37,7 @@ export default function useSettings() {
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [success, setSuccess] = useState(false);
+    const [withdrawing, setWithdrawing] = useState(false);
     const [form, setForm] = useState<SettingsForm>({
         name: '',
         adminEmail: '',
@@ -153,6 +155,23 @@ export default function useSettings() {
         }
     };
 
+    // 기관 서비스 해지 (자발적 탈퇴) — Admin SDK callable 호출
+    // 성공 시 본인 user 문서가 삭제되며 auth/org 리스너가 자동 로그아웃·초대코드 화면으로 이동시킨다.
+    const handleWithdraw = async (reason: WithdrawReason, reasonDetail?: string) => {
+        if (!orgId) return;
+        setWithdrawing(true);
+        try {
+            const withdrawOrganization = httpsCallable(getFunctions(undefined, 'asia-northeast3'), 'withdrawOrganization');
+            await withdrawOrganization({ organizationId: orgId, reason, reasonDetail });
+            showToast('서비스가 해지되었습니다.', 'success');
+            // 본인 문서 삭제로 인한 자동 로그아웃까지 약간의 시간차가 있을 수 있어 별도 후처리는 하지 않는다.
+        } catch (err) {
+            console.error('서비스 해지 실패:', err);
+            showToast('서비스 해지에 실패했습니다. 잠시 후 다시 시도해주세요.', 'error');
+            setWithdrawing(false);
+        }
+    };
+
     const handleAddHoliday = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!holidayForm.date || !holidayForm.name.trim() || !orgId) return;
@@ -185,7 +204,7 @@ export default function useSettings() {
     };
 
     return {
-        org, orgId, loading, saving, success,
+        org, orgId, loading, saving, success, withdrawing,
         form, setForm,
         // 공휴일
         holidayYear, setHolidayYear,
@@ -193,7 +212,7 @@ export default function useSettings() {
         addingHoliday, publicHolidays,
         filteredCustomHolidays,
         // 핸들러
-        handleSave, handleRegenCode, handlePhoneChange,
+        handleSave, handleRegenCode, handlePhoneChange, handleWithdraw,
         handleAddHoliday, handleDeleteHoliday,
         formatDate: formatDateKr,
     };

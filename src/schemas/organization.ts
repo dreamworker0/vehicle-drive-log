@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { timestampSchema } from './index';
 
 export const orgStatusSchema = z.enum(['pending', 'approved', 'rejected', 'deleted']);
+export const withdrawReasonSchema = z.enum(['no_longer_needed', 'too_difficult', 'missing_features', 'other']);
 
 export const organizationSchema = z.object({
     id: z.string().catch(''),
@@ -36,6 +37,9 @@ export const organizationSchema = z.object({
     approvedAt: timestampSchema.optional().catch(undefined),
     rejectedAt: timestampSchema.optional().catch(undefined),
     deletedAt: timestampSchema.nullable().optional().catch(null),
+    deletedBy: z.enum(['admin', 'superAdmin']).optional().catch(undefined),
+    withdrawReason: withdrawReasonSchema.optional().catch(undefined),
+    withdrawReasonDetail: z.string().optional().catch(undefined),
     firstEmployeeRegisteredAt: timestampSchema.optional().catch(undefined),
     timeToFirstEmployeeDays: z.number().optional().catch(undefined),
 });

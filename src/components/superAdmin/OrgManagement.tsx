@@ -3,7 +3,7 @@
  * 활성 기관 카드: OrgCard, 삭제된 기관 카드: DeletedOrgCard 서브 컴포넌트 사용
  * 멤버 데이터는 기관 카드를 펼칠 때 레이지 로딩
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getApprovedOrganizations, deleteOrganization, getDeletedOrganizations, restoreOrganization, permanentDeleteOrganization, getOrganizationMembers, updateUser, leaveOrganization, updateOrganization, getOrgMemberCounts } from '../../lib/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useToast } from '../../hooks/useToast';
@@ -11,6 +11,8 @@ import { useConfirm } from '../../hooks/useConfirm';
 import OrgCard from './OrgCard';
 import DeletedOrgCard from './DeletedOrgCard';
 import type { Organization } from '../../types';
+import { WITHDRAW_REASON_LABELS } from '../../types/organization';
+import type { WithdrawReason } from '../../types/organization';
 
 interface OrgMember {
     id: string;
@@ -220,6 +222,18 @@ export default function OrgManagement() {
         }
     }, [confirm, showToast]);
 
+    // 삭제된 기관 중 자발적 탈퇴(deletedBy==='admin') 집계 + 사유 분포
+    const withdrawalStats = useMemo(() => {
+        const voluntary = deletedOrgs.filter(o => o.deletedBy === 'admin');
+        const byAdmin = deletedOrgs.length - voluntary.length; // superAdmin 정리 + legacy
+        const reasonCounts = voluntary.reduce<Record<string, number>>((acc, o) => {
+            const key = o.withdrawReason || 'other';
+            acc[key] = (acc[key] || 0) + 1;
+            return acc;
+        }, {});
+        return { voluntaryCount: voluntary.length, byAdminCount: byAdmin, reasonCounts };
+    }, [deletedOrgs]);
+
     if (loading) {
         return (
             <div className="flex items-center justify-center py-20">
@@ -362,6 +376,28 @@ export default function OrgManagement() {
                     </div>
                 ) : (
                     <div className="grid gap-2">
+                        {/* 이탈 통계 요약 */}
+                        <div className="glass-card p-4 mb-2">
+                            <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
+                                <div>
+                                    <span className="text-xs text-surface-400 dark:text-surface-500">자발적 탈퇴</span>
+                                    <p className="text-xl font-bold text-amber-600 dark:text-amber-400">{withdrawalStats.voluntaryCount}<span className="text-sm font-normal text-surface-400 ml-1">건</span></p>
+                                </div>
+                                <div>
+                                    <span className="text-xs text-surface-400 dark:text-surface-500">운영자 정리</span>
+                                    <p className="text-xl font-bold text-surface-600 dark:text-surface-300">{withdrawalStats.byAdminCount}<span className="text-sm font-normal text-surface-400 ml-1">건</span></p>
+                                </div>
+                            </div>
+                            {withdrawalStats.voluntaryCount > 0 && (
+                                <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-surface-100 dark:border-surface-700">
+                                    {(Object.keys(withdrawalStats.reasonCounts) as WithdrawReason[]).map((reason) => (
+                                        <span key={reason} className="px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400">
+                                            {WITHDRAW_REASON_LABELS[reason] ?? reason} {withdrawalStats.reasonCounts[reason]}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
                         {deletedOrgs.map((org) => (
                             <DeletedOrgCard
                                 key={org.id}

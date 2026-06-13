@@ -67,6 +67,9 @@ export { disableUser } from "./handlers/callable/disableUser";
 // 계정 복원 (Auth 재활성화 + Firestore 재생성)
 export { restoreUser } from "./handlers/callable/restoreUser";
 
+// 기관 자발적 서비스 해지 (관리자가 사유와 함께 직접 탈퇴)
+export { withdrawOrganization } from "./handlers/callable/withdrawOrganization";
+
 // Custom Claims 자동 동기화 (users 문서 변경 → Auth Claims 설정)
 export { setCustomClaims } from "./handlers/triggers/setCustomClaims";
 

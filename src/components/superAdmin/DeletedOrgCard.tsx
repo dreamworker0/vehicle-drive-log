@@ -2,6 +2,7 @@
  * DeletedOrgCard — 삭제된 기관 카드 (OrgManagement에서 분리)
  */
 import type { Organization } from '../../types';
+import { WITHDRAW_REASON_LABELS } from '../../types/organization';
 
 interface DeletedOrgCardProps {
     org: Organization;
@@ -21,6 +22,8 @@ function getDaysInfo(deletedAt: Organization['deletedAt']): { elapsed: number; r
 
 export default function DeletedOrgCard({ org, isDeleting, onRestore, onPermanentDelete }: DeletedOrgCardProps) {
     const { elapsed, remaining } = getDaysInfo(org.deletedAt);
+    const isVoluntary = org.deletedBy === 'admin';
+    const reasonLabel = org.withdrawReason ? WITHDRAW_REASON_LABELS[org.withdrawReason] : null;
 
     return (
         <div className={`glass-card overflow-hidden border-l-4 border-l-red-300 dark:border-l-red-700 transition-opacity ${isDeleting ? 'opacity-60' : ''}`}>
@@ -37,7 +40,16 @@ export default function DeletedOrgCard({ org, isDeleting, onRestore, onPermanent
                             ) : (
                                 <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">삭제됨</span>
                             )}
+                            {!isDeleting && isVoluntary && (
+                                <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400">자발적 탈퇴</span>
+                            )}
                         </div>
+                        {isVoluntary && reasonLabel && (
+                            <p className="text-xs text-amber-700 dark:text-amber-400">
+                                사유: {reasonLabel}
+                                {org.withdrawReason === 'other' && org.withdrawReasonDetail ? ` — ${org.withdrawReasonDetail}` : ''}
+                            </p>
+                        )}
                         <div className="flex flex-wrap gap-3 text-sm text-surface-400 dark:text-surface-500">
                             <span>고유번호: {org.uniqueNumber}</span>
                             <span>•</span>
