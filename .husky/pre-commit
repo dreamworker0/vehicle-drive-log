@@ -1,2 +1,10 @@
 npm run type-check
+
+# .agent/ 스킬·워크플로우가 스테이징되면 .claude/ 브리지를 재생성해 함께 커밋한다 (CI --check 실패 예방)
+if git diff --cached --name-only | grep -qE '^\.agent/(skills|workflows)/'; then
+  echo "🔄 .agent/ 변경 감지 — .claude/ 브리지 재생성 (npm run sync:agents)"
+  npm run sync:agents || exit 1
+  git add -A .claude/skills .claude/commands
+fi
+
 npx lint-staged

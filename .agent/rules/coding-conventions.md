@@ -205,7 +205,7 @@ try {
     showToast('사용자 친화적 에러 메시지', 'error');
 }
 ```
-> ⚠️ 브라우저 기본 `alert()` 대신 반드시 `useToast` 훅을 사용한다.
+> ⚠️ 사용자 알림은 `useToast` 훅을 사용한다 (§5.4~5.5 참고).
 
 ---
 
@@ -296,7 +296,7 @@ const { showToast } = useToast();
 showToast('저장되었습니다', 'success');  // type: 'success' | 'error' | 'info'
 ```
 - 커스텀 훅 `useToast`를 사용 (`hooks/useToast.tsx`)
-- 브라우저 기본 `alert()` 대신 이 훅을 사용한다
+- `window.alert/confirm/prompt` 금지 — §5.4 참고
 
 ---
 

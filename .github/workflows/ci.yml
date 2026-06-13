@@ -34,6 +34,9 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      - name: .agent ↔ .claude 동기화 검증
+        run: npm run sync:agents -- --check
+
       - name: Create .env file
         run: echo "${{ secrets.ENV_FILE }}" > .env
 

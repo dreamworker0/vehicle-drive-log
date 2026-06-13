@@ -1,6 +1,13 @@
 # CLAUDE.md
 
-차량 운행일지(`vehicle-drive-log`) — 사회복지기관·비영리단체용 무료 차량 운행일지 PWA. 작업할 때 알아야 할 핵심만 정리한다. 전체 개요는 [README.md](README.md), 운영 매뉴얼은 [OPERATIONS.md](OPERATIONS.md), 컨벤션은 [CONTRIBUTING.md](CONTRIBUTING.md).
+차량 운행일지(`vehicle-drive-log`) — 사회복지기관·비영리단체용 무료 차량 운행일지 PWA. 전체 개요는 [README.md](README.md), 운영 매뉴얼은 [OPERATIONS.md](OPERATIONS.md), 컨벤션은 [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## 핵심 참조 (반드시 따를 것)
+
+- **에이전트 행동 규칙**: [.agent/agents.md](.agent/agents.md) — 절대 금지 목록(§1), 자동 교정 루프(§2), 작업별 체크리스트(§4), 판단 가이드(§5)
+- **세부 규칙**: [.agent/rules/](.agent/rules/) — coding-conventions, design-system, cloud-functions, firestore-rules 등 12개 규칙 파일
+- **스킬 가이드**: [.agent/skills/](.agent/skills/) — 작업별 패턴 가이드 (아래 테이블 참고)
+- **워크플로우**: [.agent/workflows/](.agent/workflows/) — `/deploy`, `/test`, `/build` 등 자동화 스크립트
 
 ## 스택 & 환경
 
@@ -27,49 +34,53 @@
 ## 디렉토리 컨벤션
 
 - `src/components/` — 역할별 분리: `auth/`, `superAdmin/`, `admin/`, `employee/`, `common/`. 역할 경계 넘기지 않기.
-- `src/lib/firestore/` — **도메인별 파일 분리** (driveLogs.ts, reservations.ts, users.ts 등). 컴포넌트에서는 항상 `../../lib/firestore`의 `index.ts`를 통해 import. 새 함수 추가 시 [.agent/skills/add-firestore-fn/SKILL.md](.agent/skills/add-firestore-fn/SKILL.md) 참고.
-- `src/hooks/` — 비즈니스 로직을 컴포넌트에서 분리. `utils/` 하위는 훅에서 추출된 순수 함수.
-- `src/store/` — Zustand 글로벌 UI 상태 (테마, Toast, 모달 등). 도메인 데이터는 Zustand에 넣지 않는다.
-- `functions/src/` — Cloud Functions. 함수 추가는 [.agent/skills/add-firestore-fn/SKILL.md](.agent/skills/add-firestore-fn/SKILL.md)·`add-cloud-function`·`add-scheduler-job` 참고. `index.ts`에서 export 필수.
-- `scripts/` — 일회성/운영 스크립트 (`tsx`로 실행). 마이그레이션·점검은 여기.
+- `src/lib/firestore/` — **도메인별 파일 분리**. 컴포넌트에서는 `index.ts`를 통해 import. → [firestore-model-pattern](.agent/skills/firestore-model-pattern/SKILL.md) 참고.
+- `src/hooks/` — 비즈니스 로직을 컴포넌트에서 분리. → [add-hook](.agent/skills/add-hook/SKILL.md) 참고.
+- `src/store/` — Zustand 글로벌 UI 상태. 도메인 데이터는 Zustand에 넣지 않는다.
+- `functions/src/` — Cloud Functions. → [add-cloud-function](.agent/skills/add-cloud-function/SKILL.md) 참고. `index.ts`에서 export 필수.
+- `scripts/` — 일회성/운영 스크립트 (`tsx`로 실행).
 
 ## 절대 규칙
 
-1. **`organizationId` 필터 필수** — Firestore 쿼리는 멀티테넌트. 누락 시 다른 기관 데이터가 새거나 권한 거부가 난다. 예외는 시스템 관리자 전용 컬렉션뿐.
-2. **`firestore.indexes.json` 동기화** — 복합 쿼리 추가하면 인덱스도 추가. 누락 시 운영에서 쿼리 실패.
+1. **`organizationId` 필터 필수** — Firestore 쿼리는 멀티테넌트. 누락 시 다른 기관 데이터가 새거나 권한 거부가 난다.
+2. **`firestore.indexes.json` 동기화** — 복합 쿼리 추가하면 인덱스도 추가.
 3. **`functions/src/index.ts` 등록** — 새 함수는 여기서 export하지 않으면 배포되지 않는다.
-4. **커밋 메시지는 한국어 + Conventional Commits** — `feat:`, `fix:`, `chore:`, `refactor:`. commitlint로 강제됨. 본문은 한국어.
+4. **커밋 메시지는 한국어 + Conventional Commits** — `feat:`, `fix:`, `chore:`, `refactor:`. commitlint로 강제됨.
 5. **민감 정보 금지** — `.env`/`.env.local`은 절대 커밋·노출 금지. API 키는 코드에 하드코딩하지 않는다.
+6. **코드 수정 후 자동 교정 루프** — [agents.md §2](.agent/agents.md) 참고. lint → tsc → build → test 순서로 검증.
 
-## 자주 하는 작업과 참고할 스킬
+## 스킬 참조 테이블
 
-`.agent/skills/`의 가이드는 **자동 발동되지 않는 참고 문서**다. 작업이 다음에 해당하면 해당 SKILL.md를 먼저 읽고 진행한다.
+`.agent/skills/`가 단일 원본이며, `scripts/sync-claude-agents.ts`가 이를 `.claude/skills/`(자동 발동 포인터)로 동기화하므로 Claude Code에서는 **아래 스킬이 자동 발동**된다(`npm run sync:agents`). 자동 발동되지 않더라도, 작업이 다음에 해당하면 해당 SKILL.md를 먼저 읽고 진행한다.
 
 | 작업 | 가이드 |
 |---|---|
-| Firestore 함수 추가 | [.agent/skills/add-firestore-fn/SKILL.md](.agent/skills/add-firestore-fn/SKILL.md) |
-| Cloud Function 추가 | [.agent/skills/add-cloud-function/SKILL.md](.agent/skills/add-cloud-function/SKILL.md) |
-| 스케줄 함수 추가 | [.agent/skills/add-scheduler-job/SKILL.md](.agent/skills/add-scheduler-job/SKILL.md) |
-| Firestore 필드 추가/마이그레이션 | [.agent/skills/add-firestore-field/SKILL.md](.agent/skills/add-firestore-field/SKILL.md), [.agent/skills/data-migration-script/SKILL.md](.agent/skills/data-migration-script/SKILL.md) |
-| 커스텀 훅 추가 | [.agent/skills/add-hook/SKILL.md](.agent/skills/add-hook/SKILL.md) |
-| 컴포넌트 추가 | [.agent/skills/add-component/SKILL.md](.agent/skills/add-component/SKILL.md) |
-| Zod 스키마 추가 | [.agent/skills/add-zod-validation/SKILL.md](.agent/skills/add-zod-validation/SKILL.md) |
-| PDF/Excel 내보내기 | [.agent/skills/add-pdf-export/SKILL.md](.agent/skills/add-pdf-export/SKILL.md), [.agent/skills/add-excel-export/SKILL.md](.agent/skills/add-excel-export/SKILL.md) |
-| 카카오 알림톡 | [.agent/skills/add-alimtalk/SKILL.md](.agent/skills/add-alimtalk/SKILL.md) |
-| 이메일 알림 | [.agent/skills/add-email-notification/SKILL.md](.agent/skills/add-email-notification/SKILL.md) |
-| 캘린더 연동 | [.agent/skills/add-calendar-integration/SKILL.md](.agent/skills/add-calendar-integration/SKILL.md) |
-| 쿼리 성능 최적화 | [.agent/skills/firestore-query-optimization/SKILL.md](.agent/skills/firestore-query-optimization/SKILL.md) |
-| 분석 이벤트 트래킹 | [.agent/skills/add-analytics-tracking/SKILL.md](.agent/skills/add-analytics-tracking/SKILL.md) |
-| PWA 기능 추가 | [.agent/skills/add-pwa-feature/SKILL.md](.agent/skills/add-pwa-feature/SKILL.md) |
-| 다크모드 점검 | [.agent/skills/dark-mode-audit/SKILL.md](.agent/skills/dark-mode-audit/SKILL.md) |
-| 한국어 문구 다듬기 | [.agent/skills/humanize-korean/SKILL.md](.agent/skills/humanize-korean/SKILL.md) |
-| 테스트 작성 | [.agent/skills/write-test/SKILL.md](.agent/skills/write-test/SKILL.md) |
-| 배포 문제 진단 | [.agent/skills/troubleshoot-deployment/SKILL.md](.agent/skills/troubleshoot-deployment/SKILL.md) |
-| FAQ 갱신 | [.agent/skills/update-faq/SKILL.md](.agent/skills/update-faq/SKILL.md) |
+| Firestore 함수 추가 | [firestore-model-pattern](.agent/skills/firestore-model-pattern/SKILL.md) |
+| Cloud Function 추가 (스케줄 포함) | [add-cloud-function](.agent/skills/add-cloud-function/SKILL.md) |
+| Firestore 필드 추가/마이그레이션 | [firestore-model-pattern](.agent/skills/firestore-model-pattern/SKILL.md), [data-migration-script](.agent/skills/data-migration-script/SKILL.md) |
+| 커스텀 훅 추가 | [add-hook](.agent/skills/add-hook/SKILL.md) |
+| 컴포넌트 추가 | [add-component](.agent/skills/add-component/SKILL.md) |
+| 토글/스위치 등 공용 컨트롤 | [shared-ui-controls](.agent/skills/shared-ui-controls/SKILL.md) |
+| Zod 스키마 추가 | [add-zod-validation](.agent/skills/add-zod-validation/SKILL.md) |
+| PDF/Excel 내보내기 | [data-export-pattern](.agent/skills/data-export-pattern/SKILL.md) |
+| 카카오 알림톡 | [add-alimtalk](.agent/skills/add-alimtalk/SKILL.md) |
+| 이메일 알림 | [add-email-notification](.agent/skills/add-email-notification/SKILL.md) |
+| 캘린더 연동 | [add-calendar-integration](.agent/skills/add-calendar-integration/SKILL.md) |
+| 쿼리 성능 최적화 | [firestore-query-optimization](.agent/skills/firestore-query-optimization/SKILL.md) |
+| Firebase 운영 비용 절감 | [firebase-cost-reduction](.agent/skills/firebase-cost-reduction/SKILL.md) |
+| 분석 이벤트 트래킹 | [add-analytics-tracking](.agent/skills/add-analytics-tracking/SKILL.md) |
+| PWA 기능 추가 | [add-pwa-feature](.agent/skills/add-pwa-feature/SKILL.md) |
+| 다크모드 점검 | [dark-mode-audit](.agent/skills/dark-mode-audit/SKILL.md) |
+| 테스트 작성 | [write-test](.agent/skills/write-test/SKILL.md) |
+| 배포 문제 진단 | [troubleshoot-deployment](.agent/skills/troubleshoot-deployment/SKILL.md) |
+| FAQ 갱신 | [update-faq](.agent/skills/update-faq/SKILL.md) |
+| 설정 UI 추가 | [settings-ui](.agent/skills/settings-ui/SKILL.md) |
+| 차량 색상 표시 | [vehicle-color](.agent/skills/vehicle-color/SKILL.md) |
+| 대시보드 UI | [dashboard-ui-pattern](.agent/skills/dashboard-ui-pattern/SKILL.md) |
+| 코드 정리 | [cleanup](.agent/skills/cleanup/SKILL.md) |
+| Gemini OCR 연동 | [gemini-ocr-integration](.agent/skills/gemini-ocr-integration/SKILL.md) |
 
-자동 발동되는 `.claude/skills/`의 스킬:
-- **`pre-deploy-check`** — 배포 전 점검 루틴
-- **`sentry-noise-filter`** — Sentry 노이즈 에러 필터 추가
+위 테이블의 스킬은 모두 `.claude/skills/`로 동기화되어 Claude Code에서 자동 발동된다. `.agent/workflows/`도 `.claude/commands/`로 동기화되어 `/deploy`, `/test`, `/build` 등 **슬래시 커맨드**로 사용할 수 있다. 두 브리지 모두 `scripts/sync-claude-agents.ts`가 생성하므로 **원본은 항상 `.agent/`에서만 수정**하고 `npm run sync:agents`로 재생성한다 (CI가 `--check`로 강제).
 
 ## 테스트 정책
 

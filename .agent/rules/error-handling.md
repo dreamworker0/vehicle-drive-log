@@ -37,3 +37,7 @@ try {
 
 ## 4. 에이전트 체크리스트
 에이전트는 사용자가 코드를 수정해달라고 요청할 때 위 사항이 누락되어 있다면 먼저 **"try-catch 및 Sentry 로깅 처리를 포함해 작성해드릴까요?"** 라고 묻거나 코드를 자동으로 보강하여 제시해야 합니다.
+
+## 5. 관련 규칙
+- **인증 토큰 복원력**: [token-auth-resilience](token-auth-resilience.md) — Firebase Auth 토큰 만료/갱신, 세션 유지 패턴
+- **OCR 비용 보안**: [ocr-cost-security](ocr-cost-security.md) — API 할당량 초과 시 에러 처리 포함

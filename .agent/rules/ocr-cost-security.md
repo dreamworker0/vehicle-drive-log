@@ -2,6 +2,8 @@
 
 이 규칙은 AI API(Gemini OCR) 호출로 인한 비정상적인 비용 청구를 예방하고, 업로드된 민감 증빙 서류 이미지의 불법적인 접근을 차단하기 위한 필수 아키텍처 규칙입니다.
 
+> 📌 구현 패턴은 [gemini-ocr-integration 스킬](../skills/gemini-ocr-integration/SKILL.md) 참고
+
 ---
 
 ## 1. OCR API 비용 통제 (Rate Limit)
