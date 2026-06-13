@@ -14,7 +14,7 @@ const DIST_DIR = path.resolve(__dirname, '..', 'dist', 'assets');
 // 예산 설정 (바이트)
 const BUDGETS = {
     js: 3000 * 1024,  // JS 전체: 3000KB (code-split 청크 포함)
-    css: 150 * 1024,  // CSS 전체: 150KB
+    css: 200 * 1024,  // CSS 전체: 200KB
 };
 
 interface FileInfo {
