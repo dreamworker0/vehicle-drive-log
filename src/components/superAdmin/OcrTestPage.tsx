@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { ocrDashboard } from '../../lib/ocr';
+import Toggle from '../common/Toggle';
 
 interface OcrHistoryItem {
     id: number;
@@ -115,13 +116,7 @@ export default function OcrTestPage() {
                     <h2 className="text-sm font-semibold text-surface-700 dark:text-surface-300">이미지 업로드</h2>
                     <label className="flex items-center gap-2 cursor-pointer select-none">
                         <span className="text-xs text-surface-500 dark:text-surface-400">전기차</span>
-                        <button
-                            type="button"
-                            onClick={() => setIsElectric(!isElectric)}
-                            className={`relative inline-flex h-6 w-10 items-center rounded-full transition-colors duration-300 focus:outline-none ${isElectric ? 'bg-emerald-500' : 'bg-surface-200 dark:bg-surface-700'}`}
-                        >
-                            <span className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-surface-900 shadow-md transition-transform duration-300 ${isElectric ? 'translate-x-5' : 'translate-x-1'}`} />
-                        </button>
+                        <Toggle label="전기차" checked={isElectric} onChange={setIsElectric} onClassName="bg-emerald-500" />
                     </label>
                 </div>
 

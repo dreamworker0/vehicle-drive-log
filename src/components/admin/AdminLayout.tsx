@@ -5,6 +5,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { logout } from '../../lib/auth';
 import { SA_TEST_ROLE_KEY } from '../../App';
 import NotificationBell from '../common/NotificationBell';
+import Toggle from '../common/Toggle';
 import AdminNotice from './AdminNotice';
 import { useTheme } from '../../hooks/useTheme';
 import useBackButton from '../../hooks/useBackButton';
@@ -180,12 +181,7 @@ export default function AdminLayout() {
                             )}
                             <span className="text-sm text-surface-600 dark:text-surface-300">{isDark ? '다크 모드' : '라이트 모드'}</span>
                         </div>
-                        <button
-                            onClick={toggleTheme}
-                            className={`relative inline-flex h-7 w-12 items-center justify-center rounded-full transition-colors duration-300 focus:outline-none ${isDark ? 'bg-primary-600' : 'bg-surface-200 dark:bg-surface-700'}`}
-                        >
-                            <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform duration-300 ${isDark ? 'translate-x-3' : '-translate-x-3'}`} />
-                        </button>
+                        <Toggle label="다크 모드" checked={isDark} onChange={toggleTheme} />
                     </div>
                     <button onClick={logout} className="sidebar-link w-full text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-300 min-h-[48px]">
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">

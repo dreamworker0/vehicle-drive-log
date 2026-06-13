@@ -14,6 +14,7 @@ import { useConfirm } from '../../hooks/useConfirm';
 import FeedbackForm from '../common/FeedbackForm';
 import UserManual from '../common/UserManual';
 import AskAIModal from '../common/AskAIModal';
+import Toggle from '../common/Toggle';
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
 import type { Vehicle } from '../../types/vehicle';
 
@@ -150,9 +151,7 @@ export default function MorePage() {
                             : (<svg aria-hidden="true" className="w-5 h-5 text-amber-500 dark:text-amber-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v2.25m6.364.386-1.591 1.591M21 12h-2.25m-.386 6.364-1.591-1.591M12 18.75V21m-4.773-4.227-1.591 1.591M5.25 12H3m4.227-4.773L5.636 5.636M15.75 12a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0Z" /></svg>)}
                         <span className="text-sm text-surface-700 dark:text-surface-300">{isDark ? '다크 모드' : '라이트 모드'}</span>
                     </div>
-                    <button onClick={toggleTheme} className={`relative inline-flex h-7 w-12 items-center justify-center rounded-full transition-colors duration-300 focus:outline-none ${isDark ? 'bg-primary-600 dark:bg-primary-500' : 'bg-surface-200'}`}>
-                        <span className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform duration-300 ${isDark ? 'translate-x-3' : '-translate-x-3'}`} />
-                    </button>
+                    <Toggle label="다크 모드" checked={isDark} onChange={toggleTheme} />
                 </div>
 
                 {/* 내비게이션 앱 선택 */}
