@@ -18,6 +18,8 @@ export function initSentry() {
         ],
         // 노이즈 에러 필터링
         ignoreErrors: [
+            // reCAPTCHA 중복 렌더링 에러 (인앱 브라우저 및 특정 WebView 환경에서 발생하는 외부 노이즈)
+            'reCAPTCHA has already been rendered in this element',
             'ResizeObserver loop',
             'Non-Error promise rejection',
             'Network request failed',

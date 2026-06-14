@@ -5,6 +5,7 @@ import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager
 import { getStorage } from 'firebase/storage';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 import { initializeAppCheck, ReCaptchaV3Provider, onTokenChanged } from 'firebase/app-check';
+import { isInAppBrowser } from './inAppBrowser';
 // firebase/analytics, firebase/messaging은 동적 import (번들 최적화)
 
 // === E2E/로컬 에뮬레이터 모드 ===
@@ -28,7 +29,7 @@ const app = initializeApp(firebaseConfig);
 // === App Check 초기화 (initializeApp 직후, 다른 서비스보다 먼저) ===
 // 개발 환경: VITE_APPCHECK_DEBUG_TOKEN으로 에뮬레이터/로컬 통과
 // 프로덕션: reCAPTCHA v3 토큰 자동 발급
-if (typeof window !== 'undefined' && !USE_EMULATOR) {
+if (typeof window !== 'undefined' && !USE_EMULATOR && !isInAppBrowser()) {
     // @firebase/app-check / @firebase/auth SDK 내부 logger가 토큰 교환 500/throttle 시
     // console.warn을 N회 직접 호출한다 (per-component setLogLevel 미제공). 우리 쪽
     // onTokenChanged 핸들러에서 이미 60초 dedup으로 1회 안내하므로, 동일한 의미의

@@ -3,6 +3,16 @@
 이 문서는 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/) 형식을 따르는 **개발 참고용** 이력입니다.
 서비스 이용자용 변경 소식은 [업데이트 소식](https://vehicle-drive-log.web.app/release-notes)에서 확인할 수 있습니다.
 
+## Phase 61 — 인앱 브라우저 reCAPTCHA 렌더링 에러 해결 & Sentry 노이즈 억제 🔐
+
+> 2026-06-14
+
+### Changed
+- **인앱 브라우저 App Check 초기화 우회**: 인앱 브라우저 환경(`isInAppBrowser() === true`)일 때, 백그라운드에서 불필요하게 reCAPTCHA v3 스크립트를 로드하여 발생하는 렌더링 충돌 오류(`reCAPTCHA has already been rendered in this element`)를 막기 위해 App Check 초기화 조건식에 `!isInAppBrowser()` 가드 적용 (`firebase.ts`)
+- **Sentry 에러 필터링 강화**: reCAPTCHA 중복 렌더링으로 인해 발생하는 무해한 외부 노이즈 에러를 Sentry 수집에서 제외하도록 `ignoreErrors` 목록에 추가 (`sentry.ts`)
+
+---
+
 ## Phase 60 — Firestore 읽기 비용 절감 1단계 💰
 
 > 2026-06-11
