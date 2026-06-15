@@ -167,8 +167,10 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
                 });
             }
             showToast(`${totalDays}일간 다일 예약이 완료되었습니다.`);
-        } else {
+        } else if (!isRecurring) {
             // ── 단일 날짜 예약 (기존 로직) ──
+            // 반복 예약은 아래 전용 블록에서 모든 날짜를 일괄 생성하므로 여기서 단일 생성하지 않는다.
+            // (과거 이 분기가 selectedDate에 단일 예약을 먼저 만들어 반복 루프 첫 날짜와 409 충돌을 일으켰음)
             await createReservationSafe({
                 ...form,
                 vehicleName,

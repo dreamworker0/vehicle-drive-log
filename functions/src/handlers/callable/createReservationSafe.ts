@@ -28,6 +28,7 @@ export const createReservationSafe = onCall(
             routeDuration,
             routeTollFee,
             groupId,
+            recurringGroupId,
             source,
         } = request.data;
 
@@ -110,6 +111,7 @@ export const createReservationSafe = onCall(
                     routeDuration: routeDuration || null,
                     routeTollFee: routeTollFee || null,
                     ...(groupId ? { groupId } : {}),
+                    ...(recurringGroupId ? { recurringGroupId } : {}),
                     ...(source ? { source } : {}),
                     status: requireReservationApproval ? "pending" : "reserved",
                     createdAt: FieldValue.serverTimestamp(),
