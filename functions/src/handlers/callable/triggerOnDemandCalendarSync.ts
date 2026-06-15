@@ -1,5 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { syncSingleVehicleCalendar } from "../scheduled/calendarSchedule";
 
 const db = getFirestore();
@@ -92,19 +92,47 @@ export const triggerOnDemandCalendarSync = onCall(
         // 4. 동기화 핵심 로직 수행
         try {
             console.log(`[OnDemandSync] Triggering on-demand sync for vehicle ${vehicleId} in org ${organizationId}`);
-            
+
             const result = await syncSingleVehicleCalendar(vehicleId, vehicleData);
-            
+
+            // 동기화 성공 시 실패 카운터 리셋
+            if ((vehicleData.calendarSyncFailCount || 0) > 0) {
+                await db.collection("vehicles").doc(vehicleId).update({ calendarSyncFailCount: 0 });
+            }
+
             return {
                 success: true,
                 message: "구글 캘린더 동기화가 완료되었습니다.",
                 stats: result,
             };
         } catch (err: unknown) {
-            console.error(`[OnDemandSync] Sync execution failed for vehicle ${vehicleId}:`, (err as Error).message);
+            const errMsg = (err as Error).message;
+            console.error(`[OnDemandSync] Sync execution failed for vehicle ${vehicleId}:`, errMsg);
+
+            // 캘린더 미존재/공유 권한 누락(404/403)은 "사용자 설정 오류"인 예상된 상태이다.
+            // 500(internal)으로 던지면 콘솔·모니터링에 서버 장애처럼 노이즈가 쌓이므로,
+            // (1) 실패 카운터를 올려 관리자 차량 목록에 '동기화 실패' 배지가 뜨게 하고,
+            // (2) 에러가 아닌 정상 응답(success:false)으로 반환해 클라이언트가 조용히 재시도를 멈추게 한다.
+            if (errMsg.includes("Not Found") || errMsg.includes("404") || errMsg.includes("403")) {
+                try {
+                    await db.collection("vehicles").doc(vehicleId).update({
+                        calendarSyncFailCount: FieldValue.increment(1),
+                        calendarSyncLastFailAt: FieldValue.serverTimestamp(),
+                    });
+                } catch (updateErr: unknown) {
+                    console.error(`[OnDemandSync] Failed to record sync failure for ${vehicleId}:`, (updateErr as Error).message);
+                }
+                return {
+                    success: false,
+                    errorType: "calendar-not-found",
+                    message: "캘린더에 접근할 수 없습니다. 구글 캘린더가 서비스 계정에 '변경 권한'으로 공유되어 있는지 확인해주세요.",
+                };
+            }
+
+            // 그 외의 실제 오류는 기존대로 internal 에러로 던져 클라이언트가 재시도하게 한다.
             throw new HttpsError(
                 "internal",
-                `캘린더 동기화 실행 중 오류가 발생했습니다: ${(err as Error).message}`
+                `캘린더 동기화 실행 중 오류가 발생했습니다: ${errMsg}`
             );
         }
     }

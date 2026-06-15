@@ -49,7 +49,10 @@ export function useCalendarSync() {
         setLoading(true);
         setError(null);
 
-        const callable = httpsCallable<{ vehicleId: string; organizationId: string }, { success: boolean }>(
+        const callable = httpsCallable<
+            { vehicleId: string; organizationId: string },
+            { success: boolean; errorType?: string; message?: string }
+        >(
             firebaseFunctions,
             'triggerOnDemandCalendarSync'
         );
@@ -69,7 +72,16 @@ export function useCalendarSync() {
                     console.log(`[useCalendarSync] Success syncing vehicle ${vehicleId}`);
                     return true;
                 }
-                
+
+                // 캘린더 미존재/공유 권한 누락은 설정 오류이므로 재시도 무의미 → 쿨다운 적용 후 조용히 중단
+                if (response.data && response.data.errorType === 'calendar-not-found') {
+                    console.log(`[useCalendarSync] Calendar not found or unlinked for vehicle ${vehicleId}. Stopping retries.`);
+                    updateSyncTime(vehicleId);
+                    setError(response.data.message || 'calendar-not-found');
+                    setLoading(false);
+                    return false;
+                }
+
                 throw new Error('On-demand calendar sync failed without success status.');
             } catch (err) {
                 const errMsg = err instanceof Error ? err.message : String(err);
