@@ -1,19 +1,17 @@
-import { onSchedule } from "firebase-functions/v2/scheduler";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import { getKSTMonthKey, toKSTDate } from "../../utils/kstDate";
 
 const db = getFirestore();
 
-export const dailyAggregation = onSchedule(
-    {
-        schedule: "0 2 * * *",
-        timeZone: "Asia/Seoul",
-        region: "asia-northeast3",
-        timeoutSeconds: 540,
-        memory: "512MiB",
-    },
-    async (event) => {
+/**
+ * 전체 기관의 당월(매월 1일 새벽 실행 시 전월) 운행/비용 데이터를 집계해
+ * orgStats/{orgId}/monthly/{YYYY-MM} 문서에 캐싱한다.
+ *
+ * 통합 야간 배치(dailyNightlyBatch)의 한 단계로 KST 02:00에 실행되며,
+ * 실행 시각 -3시간 기준으로 대상 월을 정하므로 02:00 실행이 전제다.
+ */
+export async function runDailyAggregation(): Promise<void> {
         logger.info("[dailyAggregation] 일일 배치 집계 시작");
 
         // 배치 실행 시간이 새벽 02:00이므로, 전날 기준의 달을 대상으로 처리 (1일 새벽 실행 시 전월 집계)
@@ -148,5 +146,4 @@ export const dailyAggregation = onSchedule(
         } catch (error) {
             logger.error("[dailyAggregation] 오류 발생:", error);
         }
-    }
-);
+}

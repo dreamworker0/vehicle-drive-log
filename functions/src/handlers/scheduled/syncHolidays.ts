@@ -1,7 +1,8 @@
 /**
- * syncHolidays — 매일 오전 6시에 공공데이터 포털 공휴일 정보를 가져와 Firestore에 캐싱
+ * syncHolidays — 공공데이터 포털 공휴일 정보를 가져와 Firestore에 캐싱
+ *
+ * 매월 1일 통합 월배치(monthlyBatch)의 한 단계로 실행된다.
  */
-import { onSchedule } from "firebase-functions/v2/scheduler";
 import { defineString } from "firebase-functions/params";
 import { getFirestore } from "firebase-admin/firestore";
 import { recordHeartbeat } from "../../utils/helpers";
@@ -9,14 +10,8 @@ import { getKSTYear } from "../../utils/kstDate";
 
 const HOLIDAY_API_KEY = defineString("HOLIDAY_API_KEY");
 
-export const syncHolidaysScheduled = onSchedule(
-    {
-        schedule: "0 6 1 * *",
-        timeZone: "Asia/Seoul",
-        retryCount: 3,
-    },
-    async () => {
-        try {
+export async function syncHolidays(): Promise<void> {
+    try {
             const db = getFirestore();
             const apiKey = HOLIDAY_API_KEY.value();
             const currentYear = getKSTYear();
@@ -76,5 +71,4 @@ export const syncHolidaysScheduled = onSchedule(
         } catch (error: unknown) {
             console.error("Error syncing holidays:", error);
         }
-    }
-);
+}

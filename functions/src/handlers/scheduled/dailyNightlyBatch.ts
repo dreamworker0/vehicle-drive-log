@@ -1,17 +1,19 @@
 /**
- * dailyNightlyBatch — 매일 03:00(KST) 통합 야간 배치 작업
- * 
+ * dailyNightlyBatch — 매일 02:00(KST) 통합 야간 배치 작업
+ *
  * 기존 개별 스케줄러들을 통합하여 인프라 비용 절감:
- * 0. backupFirestore: Firestore 전체 백업 (GCS)
- * 1. autoPurgeOrgs: soft-deleted 기관 30일 후 영구 삭제
- * 2. cleanupCertificateImages: 승인 후 30일 경과 기관 인증서 스토리지 삭제
- * 3. archiveDriveLogs: 3년 이상 된 운행 기록을 GCS 아카이빙 후 삭제
+ * 0. dailyAggregation: 전체 기관 월간 집계 통계 캐싱 (02:00 실행 전제)
+ * 1. backupFirestore: Firestore 전체 백업 (GCS)
+ * 2. autoPurgeOrgs: soft-deleted 기관 30일 후 영구 삭제
+ * 3. cleanupCertificateImages: 승인 후 30일 경과 기관 인증서 스토리지 삭제
+ * 4. archiveDriveLogs: 3년 이상 된 운행 기록을 GCS 아카이빙 후 삭제
  */
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { log } from "../../utils/helpers";
 import { getKSTDateString } from "../../utils/kstDate";
+import { runDailyAggregation } from "./dailyAggregation";
 import { gzip } from "node:zlib";
 import { promisify } from "node:util";
 
@@ -192,17 +194,24 @@ export async function archiveLogs(db: FirebaseFirestore.Firestore, bucket: any) 
 
 export const dailyNightlyBatch = onSchedule(
     {
-        schedule: "0 3 * * *", // KST 03:00 (백업 + 야간 배치 통합)
+        schedule: "0 2 * * *", // KST 02:00 (집계 + 백업 + 야간 배치 통합)
         timeZone: "Asia/Seoul",
         retryCount: 1,
         memory: "512MiB",
-        timeoutSeconds: 300,
+        timeoutSeconds: 540,
     },
     async function () {
         const db = getFirestore();
         const bucket = getStorage().bucket();
 
-        // Step 0: Firestore 백업 (기존 backupFirestore 통합)
+        // Step 0: 월간 집계 통계 캐싱 (기존 dailyAggregation 통합, 02:00 실행 전제)
+        try {
+            await runDailyAggregation();
+        } catch (e: unknown) {
+            console.error("Error in dailyAggregation:", (e as Error).message);
+        }
+
+        // Step 1: Firestore 백업 (기존 backupFirestore 통합)
         try {
             await backupFirestoreData();
         } catch (e: unknown) {

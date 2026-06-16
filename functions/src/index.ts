@@ -12,14 +12,14 @@ export { autoVerifyDocument } from "./handlers/triggers/autoVerifyDocument";
 // Holiday Proxy
 export { holidayProxy } from "./handlers/https/holidayProxy";
 
-// Holiday Sync Scheduler (오전 6시마다 실행)
-export { syncHolidaysScheduled } from "./handlers/scheduled/syncHolidays";
-
 // Tmap Proxy (프로덕션 CORS 해결)
 export { tmapProxy } from "./handlers/https/tmapProxy";
 
-// 통합 야간 배치 (백업 + 퍼지/아카이빙/클린업)
+// 통합 야간 배치 (집계 + 백업 + 퍼지/아카이빙/클린업, 매일 02:00)
 export { dailyNightlyBatch } from "./handlers/scheduled/dailyNightlyBatch";
+
+// 통합 월배치 (공휴일 동기화 + 마일리지 검증, 매월 1일 06:00)
+export { monthlyBatch } from "./handlers/scheduled/monthlyBatch";
 
 // Admin Notice
 export { sendAdminNotice } from "./handlers/callable/sendAdminNotice";
@@ -54,9 +54,6 @@ export { cleanupDuplicateLogs } from "./handlers/callable/cleanupDuplicateLogs";
 // 대시보드 성능 고도화를 위한 운행일지 집계 통계 캐싱
 // 집계 통계 일괄 재계산 (마이그레이션/보정용)
 export { recalculateAggregatedStats } from "./handlers/callable/recalculateAggregatedStats";
-
-// SuperAdmin 대시보드 통계 캐싱 (1시간 주기 배치, 저녁/새벽은 스킵)
-export { computeDashboardStats } from "./handlers/scheduled/computeDashboardStatsScheduler";
 
 // SuperAdmin 대시보드 통계 수동 갱신
 export { refreshDashboardStats } from "./handlers/callable/refreshDashboardStats";
@@ -118,9 +115,6 @@ export { submitOrgApplication } from "./handlers/https/submitOrgApplication";
 // 랜딩 페이지 비번/기관 미로그인 유저의 문의 접수용 API
 export { submitPublicFeedback } from "./handlers/https/submitPublicFeedback";
 
-// 차량 누적 주행거리 오차 검증 스케줄러 (매월 1일 실행)
-export { verifyMileageConsistency } from "./handlers/scheduled/verifyMileageConsistency";
-
 // 회원 탈퇴 시 개인정보 익명화 트리거
 export { onUserDelete } from "./handlers/triggers/onUserDelete";
 
@@ -129,6 +123,3 @@ export { onDriveLogCreated, onDriveLogUpdated, onDriveLogDeleted } from "./handl
 
 // 구글 캘린더 온디맨드 동기화 API
 export { triggerOnDemandCalendarSync } from "./handlers/callable/triggerOnDemandCalendarSync";
-
-// 대시보드 통계용 일일 배치 집계 스케줄러 (매일 새벽 2시)
-export { dailyAggregation } from "./handlers/scheduled/dailyAggregation";

@@ -1,14 +1,11 @@
-import { onSchedule } from 'firebase-functions/v2/scheduler';
 import * as admin from 'firebase-admin';
 import { toKSTDate } from '../../utils/kstDate';
 
 /**
- * 매월 1일 자정(KST), 차량별 지난달 기록을 체크하여 마일리지(누적 주행거리) 불일치가 있는지 검증하는 데몬 함수.
- * 데이터 무결성을 위해 백그라운드 환경에서 정기적으로 실행됩니다.
+ * 차량별 지난달 기록을 체크하여 마일리지(누적 주행거리) 불일치가 있는지 검증한다.
+ * 데이터 무결성을 위해 매월 1일 통합 월배치(monthlyBatch)의 한 단계로 실행된다.
  */
-export const verifyMileageConsistency = onSchedule(
-    { schedule: '0 0 1 * *', timeZone: 'Asia/Seoul', timeoutSeconds: 540 },
-    async (event) => {
+export async function verifyMileageConsistency(): Promise<void> {
         const db = admin.firestore();
         const organizationsSnap = await db.collection('organizations').get();
 
@@ -67,5 +64,4 @@ export const verifyMileageConsistency = onSchedule(
         }
         
         console.log(`[verifyMileageConsistency] 검증 완료. 총 불일치 발견: ${totalInconsistencies}건`);
-    }
-);
+}
