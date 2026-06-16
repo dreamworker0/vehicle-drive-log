@@ -176,3 +176,72 @@ export async function sendReminderAlimtalk(
         return { success: false, message: (err as Error).message };
     }
 }
+
+/**
+ * 기관 신청 반려 안내 알림톡 발송 (템플릿 UI_6491)
+ *
+ * message_1 본문은 등록된 템플릿 내용과 정확히 일치해야 발송된다(변수만 실제값으로 치환).
+ * 승인 알림톡과 달리 버튼이 없는 템플릿이므로 button_1을 보내지 않는다.
+ */
+export async function sendRejectionAlimtalk(
+    phone: string,
+    name: string,
+    orgName: string,
+    applicationDate: string,
+    reason: string
+): Promise<AlimtalkResult> {
+    const proxyUrl = process.env.ALIMTALK_PROXY_URL;
+    const proxyToken = process.env.ALIMTALK_PROXY_TOKEN;
+
+    if (!proxyUrl || !proxyToken) {
+        console.error("[Alimtalk] ❌ 프록시 환경변수가 설정되지 않았습니다.");
+        return { success: false, message: "프록시 환경변수 미설정" };
+    }
+
+    const cleanPhone = phone.replace(/-/g, "");
+
+    // 템플릿 UI_6491 본문 (강조 제목 "기관 신청 결과 안내" 아래 내용)
+    const message = [
+        `안녕하세요, ${name}님.`,
+        "차량운행일지 프로그램에 신청하신 기관 등록이 아래와 같은 사유로 반려되었습니다.",
+        "내용을 확인하신 후 정보를 수정하여 다시 신청해 주시기 바랍니다.",
+        `■ 신청 기관: ${orgName}`,
+        `■ 신청 일자: ${applicationDate}`,
+        "■ 반려 사유:",
+        reason,
+    ].join("\n");
+
+    const aligoParams: Record<string, string> = {
+        tpl_code: "UI_6491",
+        receiver_1: cleanPhone,
+        recvname_1: name,
+        subject_1: "차량 운행일지",
+        emtitle_1: "기관 신청 결과 안내",
+        message_1: message,
+    };
+
+    try {
+        const response = await fetch(proxyUrl, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-API-Token": proxyToken,
+            },
+            body: JSON.stringify({ aligo_params: aligoParams }),
+        });
+
+        const result = await response.json() as Record<string, unknown>;
+        console.log(`[Alimtalk] 반려 프록시 응답: ${JSON.stringify(result)}`);
+
+        if (result.success) {
+            console.log(`[Alimtalk] ✅ 반려 알림톡 발송 성공: ${phone} (${name})`);
+        } else {
+            console.error(`[Alimtalk] ❌ 반려 알림톡 발송 실패: code=${result.code}, message=${result.message}`);
+        }
+
+        return result as unknown as AlimtalkResult;
+    } catch (err: unknown) {
+        console.error("[Alimtalk] ❌ 반려 알림톡 프록시 호출 중 예외:", (err as Error).message);
+        return { success: false, message: (err as Error).message };
+    }
+}

@@ -39,6 +39,9 @@ export { sendRejectionEmail } from "./handlers/callable/sendRejectionEmail";
 // 수동 승인 시 알림톡 발송
 export { sendManualApprovalAlimtalk } from "./handlers/callable/sendManualApprovalAlimtalk";
 
+// 수동 반려 시 알림톡 발송
+export { sendManualRejectionAlimtalk } from "./handlers/callable/sendManualRejectionAlimtalk";
+
 // Reservation Reminder (예약 알림 + 미작성 알림)
 export { reservationReminder } from "./handlers/scheduled/reservationReminderScheduler";
 

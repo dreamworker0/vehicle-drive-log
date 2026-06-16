@@ -149,6 +149,21 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
                 showToast('반려 처리는 완료되었으나 이메일 발송에 실패했습니다.', 'warning');
             }
 
+            // 반려 알림톡 발송 (실패해도 반려는 유지)
+            try {
+                if (app.applicantPhone) {
+                    const { getFunctions, httpsCallable } = await import('firebase/functions');
+                    const functions = getFunctions(undefined, 'asia-northeast3');
+                    const sendRejectionAlimtalk = httpsCallable(functions, 'sendManualRejectionAlimtalk');
+                    await sendRejectionAlimtalk({ orgId: app.id, reason });
+                    console.debug('📱 반려 알림톡 발송 완료');
+                } else {
+                    console.warn('⚠️ 신청자 전화번호가 없어 반려 알림톡을 발송하지 못했습니다.');
+                }
+            } catch (alimtalkErr) {
+                console.warn('반려 알림톡 발송 실패 (반려는 완료됨):', alimtalkErr);
+            }
+
             // 로컬 상태 업데이트
             setApplications(prev => prev.filter(a => a.id !== app.id));
             setRejectedApps(prev => [{ ...app, status: 'rejected' }, ...prev]);
