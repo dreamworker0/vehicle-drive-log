@@ -2,11 +2,9 @@
 import { lazy, Suspense, useState } from 'react';
 import useServiceDashboard from '../../hooks/useServiceDashboard';
 import { ORG_PAGE_SIZE } from './dashboard/dashboardUtils';
-import {
-    DashboardOverviewCards,
-    DashboardMonthlyMetrics,
-    DashboardOrgTable,
-} from './dashboard';
+import DashboardOverviewCards from './dashboard/DashboardOverviewCards';
+import DashboardMonthlyMetrics from './dashboard/DashboardMonthlyMetrics';
+import DashboardOrgTable from './dashboard/DashboardOrgTable';
 import OrgSearchDropdown from './OrgSearchDropdown';
 
 const DashboardFunnelChart = lazy(() => import('./dashboard/DashboardFunnelChart'));
