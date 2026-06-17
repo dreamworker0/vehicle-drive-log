@@ -31,7 +31,7 @@
 |------|------|
 | 프론트엔드 | Vite 7 + React 19 + TypeScript |
 | 상태 관리 | Zustand (글로벌 UI 상태) |
-| 스타일링 | TailwindCSS v3 (반응형, 다크 모드) |
+| 스타일링 | TailwindCSS v4 (반응형, 다크 모드) |
 | 언어 | TypeScript (프론트엔드 + Cloud Functions + 테스트 + 스크립트) |
 | 인증 | Firebase Auth (Google 로그인 전용) |
 | 데이터베이스 | Cloud Firestore (실시간 구독 + 하이브리드 캐시) |
@@ -66,6 +66,7 @@
 ```bash
 npm install
 cd functions && npm install && cd ..
+npx playwright install
 ```
 
 ### 환경변수 설정
@@ -123,6 +124,7 @@ ALIMTALK_PROXY_TOKEN=...
 | `npm run lint` | ESLint 실행 |
 | `npm test` | 단위 테스트 (Vitest) |
 | `npm run test:e2e` | E2E 테스트 (Playwright) |
+| `npm run test:e2e:emulator` | Firebase Emulator 기반 인증 E2E 테스트 |
 | `npm run screenshots` | PWA 스크린샷 생성 (Playwright + sharp) |
 | `npm run audit` | npm 보안 감사 리포트 |
 | `npm run health` | Cloud Functions 상태 점검 |
@@ -217,15 +219,11 @@ firebase deploy --only firestore:rules,storage
 
 | 함수명 | 주기 | 용도 |
 |--------|------|------|
-| `reservationReminder` | 10분 | 예약 10분 전 FCM + 일지 미작성 FCM |
-| `warmupOcr` | 5분 | OCR 함수 콜드 스타트 방지 (근무 시간) |
+| `reservationReminder` | 10분 | 예약 10분 전 FCM + 일지 미작성/미출발 알림 |
 | `syncCalendarToApp` | 10분 | 구글 캘린더 → Firestore 역동기화 |
-| `backupFirestore` | 매일 03:00 | Firestore 전체 → Cloud Storage 백업 |
-| `autoPurgeOrgs` | 매일 04:00 | soft delete 30일 경과 기관 영구 삭제 |
-| `archiveDriveLogs` | 매일 04:30 | 3년+ 운행 기록 GCS 아카이빙 |
-| `cleanupCertificateImages` | 매일 04:00 | 승인 30일 경과 기관 고유번호증 이미지 삭제 |
-| `cleanupRateLimits` | 매일 05:00 | 만료된 Rate Limit 문서 정리 |
-| `syncHolidaysScheduled` | 매일 06:00 | 공공데이터포털 공휴일 캐시 |
+| `dailyNightlyBatch` | 매일 02:00 | Firestore 백업, 기관/이미지 정리, 3년+ 운행 기록 아카이빙, 보험 만료 알림 |
+| `monthlyBatch` | 매월 1일 06:00 | 공휴일 캐시 동기화 + 주행거리 정합성 검증 |
+| `sendInactiveOrgAlimtalkScheduled` | 평일 14:00 | 미활성 기관 알림톡 발송 대상 점검 |
 
 ### HTTP 함수
 
@@ -242,8 +240,10 @@ firebase deploy --only firestore:rules,storage
 
 | 종류 | 규모 | 도구 |
 |------|------|------|
-| 단위 테스트 | 49파일 (프론트 39 + Functions 10) | Vitest |
-| E2E 테스트 | 11파일 | Playwright |
+| 프론트 단위 테스트 | 49파일 / 357개 테스트 | Vitest |
+| Functions 단위 테스트 | 19개 suite / 172개 테스트 (emulator 테스트 제외) | Jest + ts-jest |
+| Firestore Rules 테스트 | 1파일 | Firebase Emulator + Vitest |
+| E2E 테스트 | 18개 spec 파일 (일부 인증/오프라인 시나리오 fixme) | Playwright |
 
 ---
 
