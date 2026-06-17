@@ -252,12 +252,16 @@ export default function VehicleForm({
                                 className="input" placeholder="전화번호"
                             />
                         </div>
+                        <label htmlFor="insurance-expiry-date" className="label mt-3">보험 만료일</label>
                         <input
+                            id="insurance-expiry-date"
                             type="date" value={form.insuranceExpiryDate}
                             onChange={e => setForm({ ...form, insuranceExpiryDate: e.target.value })}
-                            className="input mt-3" aria-label="보험 만료일"
+                            className="input" aria-describedby="insurance-info-help"
                         />
-                        <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">사고 시 연락할 보험사 정보 · 보험 만료일 (만료 15일 전 관리자에게 알림)</p>
+                        <p id="insurance-info-help" className="text-xs text-surface-400 dark:text-surface-500 mt-1">
+                            사고 시 연락할 보험사 정보 · 만료 15일 전 관리자에게 알림
+                        </p>
                     </div>
 
                     <VehicleCalendarSection
