@@ -1,11 +1,21 @@
-import { useState } from 'react';
+import { useState, useRef, type RefObject } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useReservationPattern } from '../../hooks/useReservationPattern';
+import useVerticalOverlap from '../../hooks/useVerticalOverlap';
 
-export default function ReservationPatternBanner() {
+interface ReservationPatternBannerProps {
+    /** 겹침을 감지할 기준 요소(이번 주 예약 목록)의 ref */
+    anchorRef?: RefObject<HTMLElement | null>;
+}
+
+export default function ReservationPatternBanner({ anchorRef }: ReservationPatternBannerProps = {}) {
     const { recommended, loading } = useReservationPattern();
     const navigate = useNavigate();
     const [isDismissed, setIsDismissed] = useState(false);
+    const bannerRef = useRef<HTMLDivElement>(null);
+    const fallbackRef = useRef<HTMLElement>(null);
+    // "이번 주 예약"과 화면에서 세로로 겹칠 때만 확장 배너를 숨긴다
+    const overlap = useVerticalOverlap(anchorRef ?? fallbackRef, bannerRef);
 
     if (loading || !recommended || recommended.length === 0) return null;
 
@@ -39,7 +49,10 @@ export default function ReservationPatternBanner() {
     };
 
     return (
-        <div className="fixed bottom-[85px] left-0 right-0 z-[40] pointer-events-none">
+        <div
+            ref={bannerRef}
+            className={`fixed bottom-[85px] left-0 right-0 z-[40] pointer-events-none transition-opacity ${overlap ? 'opacity-0 invisible' : 'opacity-100'}`}
+        >
             <div className="max-w-screen-md mx-auto px-4 w-full">
                 <div className="max-w-lg mx-auto animate-fade-in-up">
                     {/* 섹션 타이틀 */}

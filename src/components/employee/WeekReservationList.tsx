@@ -1,6 +1,7 @@
 /**
  * WeekReservationList — 이번 주 예약 목록
  */
+import { forwardRef } from 'react';
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
 import type { Vehicle } from '../../types/vehicle';
 import type { Reservation } from '../../types/reservation';
@@ -12,13 +13,13 @@ interface WeekReservationListProps {
     onCancelReservation: (res: Reservation) => void;
 }
 
-export default function WeekReservationList({
+const WeekReservationList = forwardRef<HTMLDivElement, WeekReservationListProps>(function WeekReservationList({
     weekGrouped, vehicles, cancellingId, onCancelReservation,
-}: WeekReservationListProps) {
+}, ref) {
     if (Object.keys(weekGrouped).length === 0) return null;
 
     return (
-        <div className="mt-6">
+        <div ref={ref} className="mt-6">
             <h2 className="text-lg font-bold text-surface-900 dark:text-surface-100 mb-3">
                 이번 주 예약
             </h2>
@@ -73,4 +74,6 @@ export default function WeekReservationList({
             </div>
         </div>
     );
-}
+});
+
+export default WeekReservationList;

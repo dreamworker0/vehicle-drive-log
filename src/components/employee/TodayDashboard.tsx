@@ -3,7 +3,7 @@
  * 로직은 useTodayDashboard 훅 사용
  * 서브 컴포넌트: WelcomeGuide, ReservationCard, WeekReservationList
  */
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import useTodayDashboard from '../../hooks/useTodayDashboard';
@@ -30,6 +30,8 @@ export default function TodayDashboard() {
     } = useTodayDashboard();
     const navigate = useNavigate();
     const [cancelTarget, setCancelTarget] = useState<{ reservation: Reservation; type: 'today' | 'week' } | null>(null);
+    // "이번 주 예약" 요소 ref — 추천 배너와의 화면 겹침 감지에 사용
+    const weekRef = useRef<HTMLDivElement>(null);
 
     // 웰컴 가이드 (첫 방문 시 1회 표시)
     // 웰컴 가이드 표시 여부
@@ -176,15 +178,16 @@ export default function TodayDashboard() {
 
             {/* 이번 주 예약 */}
             <WeekReservationList
+                ref={weekRef}
                 weekGrouped={weekGrouped}
                 vehicles={vehicles}
                 cancellingId={cancellingId}
                 onCancelReservation={(res) => setCancelTarget({ reservation: res, type: 'week' })}
             />
 
-            {/* 예약 추천 (화면 맨 아래로 배치) */}
+            {/* 예약 추천 (화면 맨 아래로 배치) — 이번 주 예약과 겹치면 자동 숨김 */}
             {!hasActiveDrive && (
-                <ReservationPatternBanner />
+                <ReservationPatternBanner anchorRef={weekRef} />
             )}
 
             {/* 예약 취소 확인 모달 */}
