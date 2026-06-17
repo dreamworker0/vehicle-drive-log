@@ -100,4 +100,73 @@ describe('dailyNightlyBatch — 날짜 조건 비즈니스 로직', () => {
             expect(ratio).toBe(0);
         });
     });
+
+    describe('checkInsuranceExpiry: 만료일 잔여일 계산 + 알림 대상 판단', () => {
+        // 프로덕션 insuranceDaysLeft / 대상 수집 조건과 동일한 순수 로직
+        function daysLeft(today: string, expiry: string): number {
+            return Math.round((Date.parse(`${expiry}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86400000);
+        }
+        interface V {
+            retired?: { isRetired?: boolean };
+            insurance?: { expiryDate?: string };
+            insuranceExpiryNotifiedFor?: string;
+        }
+        function shouldNotify(v: V, days: number): boolean {
+            if (v.retired?.isRetired === true) return false;
+            const expiry = v.insurance?.expiryDate;
+            if (!expiry) return false;
+            if (days < 0 || days > 15) return false;
+            if (v.insuranceExpiryNotifiedFor === expiry) return false;
+            return true;
+        }
+
+        it('잔여일을 정확히 계산한다 (10일 후)', () => {
+            expect(daysLeft('2026-06-17', '2026-06-27')).toBe(10);
+        });
+
+        it('15일 이내 + 미알림 차량은 알림 대상이다', () => {
+            const v: V = { insurance: { expiryDate: '2026-06-27' } };
+            expect(shouldNotify(v, daysLeft('2026-06-17', '2026-06-27'))).toBe(true);
+        });
+
+        it('정확히 15일 전은 알림 대상이다 (경계 포함)', () => {
+            const v: V = { insurance: { expiryDate: '2026-07-02' } };
+            expect(shouldNotify(v, daysLeft('2026-06-17', '2026-07-02'))).toBe(true);
+        });
+
+        it('당일(0일) 만료도 알림 대상이다', () => {
+            const v: V = { insurance: { expiryDate: '2026-06-17' } };
+            expect(shouldNotify(v, daysLeft('2026-06-17', '2026-06-17'))).toBe(true);
+        });
+
+        it('같은 만료일로 이미 알림을 보냈으면 스킵한다 (멱등성)', () => {
+            const v: V = { insurance: { expiryDate: '2026-06-27' }, insuranceExpiryNotifiedFor: '2026-06-27' };
+            expect(shouldNotify(v, daysLeft('2026-06-17', '2026-06-27'))).toBe(false);
+        });
+
+        it('만료일을 갱신해 마커와 달라지면 다시 알림 대상이다', () => {
+            const v: V = { insurance: { expiryDate: '2027-06-27' }, insuranceExpiryNotifiedFor: '2026-06-27' };
+            expect(shouldNotify(v, daysLeft('2027-06-17', '2027-06-27'))).toBe(true);
+        });
+
+        it('폐차 차량은 스킵한다', () => {
+            const v: V = { retired: { isRetired: true }, insurance: { expiryDate: '2026-06-27' } };
+            expect(shouldNotify(v, daysLeft('2026-06-17', '2026-06-27'))).toBe(false);
+        });
+
+        it('만료일이 없으면 스킵한다', () => {
+            const v: V = { insurance: { expiryDate: undefined } };
+            expect(shouldNotify(v, 5)).toBe(false);
+        });
+
+        it('16일 이상 남았으면 스킵한다', () => {
+            const v: V = { insurance: { expiryDate: '2026-07-03' } };
+            expect(shouldNotify(v, daysLeft('2026-06-17', '2026-07-03'))).toBe(false);
+        });
+
+        it('이미 만료된(음수) 차량은 스킵한다', () => {
+            const v: V = { insurance: { expiryDate: '2026-06-10' } };
+            expect(shouldNotify(v, daysLeft('2026-06-17', '2026-06-10'))).toBe(false);
+        });
+    });
 });

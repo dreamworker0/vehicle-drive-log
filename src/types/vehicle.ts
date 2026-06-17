@@ -42,7 +42,9 @@ export interface Vehicle extends FirestoreDoc {
     insurance?: {
         company: string;
         phone: string;
+        expiryDate?: string;          // 보험 만료일 (YYYY-MM-DD, 선택)
     };
+    insuranceExpiryNotifiedFor?: string; // 야간 배치가 마지막으로 만료 알림을 보낸 만료일 (멱등성 마커, 백엔드 전용)
     hipassCardNumber?: string;
     googleCalendarId?: string;
     calendarSyncFailCount?: number;

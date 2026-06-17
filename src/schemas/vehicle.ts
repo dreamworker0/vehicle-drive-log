@@ -32,6 +32,7 @@ export const vehicleSchema = z.object({
     insurance: z.object({
         company: z.string().catch(''),
         phone: z.string().catch(''),
+        expiryDate: z.string().optional().catch(undefined),
     }).optional().nullable().catch(null),
     hipassCardNumber: z.string().optional().nullable().catch(null),
     googleCalendarId: z.string().optional().nullable().catch(null),

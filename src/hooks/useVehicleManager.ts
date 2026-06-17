@@ -26,7 +26,7 @@ const INITIAL_FORM = {
     displayName: '', modelName: '', plateNumber: '',
     vehicleType: 'sedan', fuelType: 'gasoline',
     currentKm: '', googleCalendarId: '',
-    insuranceCompany: '', insurancePhone: '',
+    insuranceCompany: '', insurancePhone: '', insuranceExpiryDate: '',
 };
 
 export default function useVehicleManager() {
@@ -118,6 +118,7 @@ export default function useVehicleManager() {
             googleCalendarId: vehicle.googleCalendarId || '',
             insuranceCompany: vehicle.insurance?.company || '',
             insurancePhone: vehicle.insurance?.phone || '',
+            insuranceExpiryDate: vehicle.insurance?.expiryDate || '',
         });
         setEditingVehicle(vehicle);
         setOpenWithCalendarError(calendarError);
@@ -173,6 +174,7 @@ export default function useVehicleManager() {
                     insurance: {
                         company: form.insuranceCompany.trim(),
                         phone: form.insurancePhone.trim(),
+                        ...(form.insuranceExpiryDate ? { expiryDate: form.insuranceExpiryDate } : {}),
                     },
                     ...(form.googleCalendarId.trim() ? { googleCalendarId: form.googleCalendarId.trim() } : {}),
                     // googleCalendarId가 변경된 경우 failCount 초기화

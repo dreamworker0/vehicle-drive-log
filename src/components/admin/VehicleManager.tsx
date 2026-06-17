@@ -15,6 +15,16 @@ import type { Vehicle } from '../../types/vehicle';
 const FUEL_TYPE_LABELS: Record<string, string> = { gasoline: '휘발유', diesel: '경유', lpg: 'LPG', electric: '전기차' };
 const FUEL_TYPE_COLORS: Record<string, string> = { gasoline: 'badge-primary', diesel: 'badge-neutral', lpg: 'badge-warning', electric: 'badge-success' };
 
+/** 보험 만료일(YYYY-MM-DD)까지 남은 일수. 음수면 이미 만료, 형식 오류면 null */
+function insuranceDaysLeft(dateStr?: string): number | null {
+    if (!dateStr) return null;
+    const target = new Date(`${dateStr}T00:00:00`);
+    if (Number.isNaN(target.getTime())) return null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    return Math.round((target.getTime() - today.getTime()) / 86400000);
+}
+
 export default function VehicleManager() {
     const {
         vehicles, loading, showForm, setShowForm,
@@ -116,9 +126,9 @@ export default function VehicleManager() {
                 </span>
             </div>
             {/* 보험 정보 및 캘린더 상태 */}
-            {(vehicle.insurance?.company || vehicle.googleCalendarId) && (
+            {(vehicle.insurance?.company || vehicle.insurance?.expiryDate || vehicle.googleCalendarId) && (
                 <div className="mt-1.5 flex items-center justify-between gap-2 text-xs text-surface-500 dark:text-surface-400 min-h-[20px]">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                         {vehicle.insurance?.company && (
                             <>
                                 <span>🛡️ {vehicle.insurance.company}</span>
@@ -127,6 +137,18 @@ export default function VehicleManager() {
                                 )}
                             </>
                         )}
+                        {vehicle.insurance?.expiryDate && (() => {
+                            const d = insuranceDaysLeft(vehicle.insurance.expiryDate);
+                            const cls = d === null ? 'text-surface-400 dark:text-surface-500'
+                                : d < 0 ? 'text-red-600 dark:text-red-400 font-semibold'
+                                : d <= 15 ? 'text-red-500 dark:text-red-400 font-semibold'
+                                : d <= 30 ? 'text-amber-600 dark:text-amber-400'
+                                : 'text-surface-400 dark:text-surface-500';
+                            const badge = d === null ? '' : d < 0 ? '만료됨' : d === 0 ? 'D-day' : `D-${d}`;
+                            return (
+                                <span className={cls}>· 만료 {vehicle.insurance.expiryDate}{badge && ` (${badge})`}</span>
+                            );
+                        })()}
                     </div>
                     {vehicle.googleCalendarId && (
                         <div className="shrink-0 text-right">

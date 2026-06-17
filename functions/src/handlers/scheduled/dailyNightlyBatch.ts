@@ -7,6 +7,7 @@
  * 2. autoPurgeOrgs: soft-deleted 기관 30일 후 영구 삭제
  * 3. cleanupCertificateImages: 승인 후 30일 경과 기관 인증서 스토리지 삭제
  * 4. archiveDriveLogs: 3년 이상 된 운행 기록을 GCS 아카이빙 후 삭제
+ * 5. checkInsuranceExpiry: 차량 보험 만료 15일 이내 시 기관 관리자에게 알림 + 푸시
  */
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
@@ -14,6 +15,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { log } from "../../utils/helpers";
 import { getKSTDateString } from "../../utils/kstDate";
 import { runDailyAggregation } from "./dailyAggregation";
+import { createInAppNotification, sendPushToUser } from "../../services/alimtalk/sendNotification";
 import { gzip } from "node:zlib";
 import { promisify } from "node:util";
 
@@ -192,6 +194,84 @@ export async function archiveLogs(db: FirebaseFirestore.Firestore, bucket: any) 
     });
 }
 
+/** 보험 만료일(YYYY-MM-DD)까지 남은 일수. KST 오늘 자정 기준, UTC 자정 파싱으로 TZ drift 방지 */
+function insuranceDaysLeft(expiry: string): number {
+    const today = Date.parse(`${getKSTDateString()}T00:00:00Z`);
+    const target = Date.parse(`${expiry}T00:00:00Z`);
+    return Math.round((target - today) / 86400000);
+}
+
+/**
+ * Step 5: 차량 보험 만료 임박(0~15일) 시 해당 기관 관리자(admin)에게 알림 + 푸시.
+ * 멱등성: 이미 같은 만료일로 알림을 보냈으면(insuranceExpiryNotifiedFor) 스킵 → 15일간 중복 발송 방지.
+ *         만료일을 갱신해 값이 바뀌면 다시 알림된다.
+ */
+export async function checkInsuranceExpiry(db: FirebaseFirestore.Firestore) {
+    console.log("[Batch] Starting checkInsuranceExpiry...");
+    const vehiclesSnap = await db.collection("vehicles").get();
+    if (vehiclesSnap.empty) {
+        console.log("No vehicles to check.");
+        return;
+    }
+
+    interface Target {
+        ref: FirebaseFirestore.DocumentReference;
+        orgId: string;
+        name: string;
+        expiry: string;
+        days: number;
+    }
+    const targets: Target[] = [];
+    for (const doc of vehiclesSnap.docs) {
+        const v = doc.data();
+        if (v.retired?.isRetired === true) continue;
+        const expiry: string | undefined = v.insurance?.expiryDate;
+        const orgId: string | undefined = v.organizationId;
+        if (!expiry || !orgId) continue;
+        const days = insuranceDaysLeft(expiry);
+        if (days < 0 || days > 15) continue;
+        if (v.insuranceExpiryNotifiedFor === expiry) continue;
+        targets.push({ ref: doc.ref, orgId, name: v.displayName || v.name || "차량", expiry, days });
+    }
+
+    if (targets.length === 0) {
+        console.log("No insurance expiry notifications needed.");
+        return;
+    }
+
+    // 기관별 admin 목록 1회 조회 후 캐시 (단일 등식 쿼리 → 복합 인덱스 불필요)
+    const adminCache = new Map<string, string[]>();
+    async function getAdmins(orgId: string): Promise<string[]> {
+        const cached = adminCache.get(orgId);
+        if (cached) return cached;
+        const usersSnap = await db.collection("users").where("organizationId", "==", orgId).get();
+        const admins = usersSnap.docs.filter((u) => u.data().role === "admin").map((u) => u.id);
+        adminCache.set(orgId, admins);
+        return admins;
+    }
+
+    let notified = 0;
+    for (const t of targets) {
+        try {
+            const admins = await getAdmins(t.orgId);
+            if (admins.length === 0) continue;
+            const title = "🛡️ 차량 보험 만료 예정";
+            const message = t.days === 0
+                ? `${t.name} 차량 보험이 오늘(${t.expiry}) 만료됩니다.`
+                : `${t.name} 차량 보험이 ${t.days}일 뒤(${t.expiry}) 만료됩니다.`;
+            for (const uid of admins) {
+                await createInAppNotification(uid, "insurance_expiry_warning", title, message, t.orgId);
+                await sendPushToUser(uid, { title, body: message });
+            }
+            await t.ref.update({ insuranceExpiryNotifiedFor: t.expiry });
+            notified++;
+        } catch (err: unknown) {
+            console.error(`Insurance expiry notify failed for vehicle ${t.ref.id}:`, (err as Error).message);
+        }
+    }
+    console.log(`Insurance expiry check complete: ${notified} vehicles notified.`);
+}
+
 export const dailyNightlyBatch = onSchedule(
     {
         schedule: "0 2 * * *", // KST 02:00 (집계 + 백업 + 야간 배치 통합)
@@ -237,6 +317,13 @@ export const dailyNightlyBatch = onSchedule(
             await archiveLogs(db, bucket);
         } catch (e: unknown) {
             console.error("Error in archiveLogs:", (e as Error).message);
+        }
+
+        // Step 4: 차량 보험 만료 임박 알림
+        try {
+            await checkInsuranceExpiry(db);
+        } catch (e: unknown) {
+            console.error("Error in checkInsuranceExpiry:", (e as Error).message);
         }
 
         console.log("[Batch] dailyNightlyBatch completed.");
