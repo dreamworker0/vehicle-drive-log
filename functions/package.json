@@ -36,15 +36,17 @@
         "typescript": "^5.7.0"
     },
     "jest": {
-        "preset": "ts-jest",
         "testEnvironment": "node",
         "roots": [
             "<rootDir>/src"
         ],
-        "globals": {
-            "ts-jest": {
+        "transform": {
+            "^.+\\.tsx?$": [
+                "ts-jest",
+                {
                 "diagnostics": false
-            }
+                }
+            ]
         }
     },
     "private": true,
