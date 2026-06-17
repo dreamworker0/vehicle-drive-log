@@ -102,7 +102,9 @@ function buildLogRow(log: PdfLogEntry, idx: number, pageIdx: number, includeHipa
     // 하이패스 정보를 비고에 합침
     let noteText = log.notes || '';
     if (includeHipass && log.hipassCardNumber) {
-        const hipassInfo = `[하이패스] ${log.hipassBalanceBefore?.toLocaleString() ?? ''}→${log.hipassBalanceAfter?.toLocaleString() ?? ''}원`;
+        const used = log.hipassBalanceAfter ?? 0;
+        const remaining = (log.hipassBalanceBefore ?? 0) - used;
+        const hipassInfo = `[하이패스] ${used.toLocaleString()}원 사용, ${remaining.toLocaleString()}원 남음`;
         noteText = noteText ? `${noteText} / ${hipassInfo}` : hipassInfo;
     }
 
