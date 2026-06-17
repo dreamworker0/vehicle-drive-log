@@ -25,6 +25,10 @@ export const driveLogSchema = z.object({
     notes: z.string().optional().catch(undefined),
     fuelAmount: z.coerce.number().optional().catch(undefined),
     energyCost: z.coerce.number().optional().catch(undefined),
+    // 하이패스 사용 정보 (운행일지 저장 시 선택적으로 기록 — PDF/Excel '하이패스 포함' 출력에 사용)
+    hipassCardNumber: z.string().optional().catch(undefined),
+    hipassBalanceBefore: z.coerce.number().optional().catch(undefined),
+    hipassBalanceAfter: z.coerce.number().optional().catch(undefined),
     batteryStart: z.coerce.number().optional().catch(undefined),
     batteryEnd: z.coerce.number().optional().catch(undefined),
     isRetroactive: z.boolean().optional().catch(undefined),

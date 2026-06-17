@@ -28,6 +28,9 @@ export interface DriveLog extends FirestoreDoc {
     notes?: string;
     fuelAmount?: number;
     energyCost?: number;
+    hipassCardNumber?: string;
+    hipassBalanceBefore?: number;
+    hipassBalanceAfter?: number;
     batteryStart?: number;
     batteryEnd?: number;
     isRetroactive?: boolean;
