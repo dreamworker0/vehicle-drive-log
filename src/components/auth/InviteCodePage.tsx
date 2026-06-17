@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useNavigate } from 'react-router-dom';
@@ -20,9 +20,13 @@ export default function InviteCodePage() {
 
         return '';
     });
-    
+
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    // 링크에 코드가 있으면 입력 화면 없이 자동으로 기관 연결을 시도한다.
+    // 코드가 없으면(직접 접속) 곧바로 입력 폼을 노출한다.
+    const [autoJoining, setAutoJoining] = useState(() => code.length === 6);
+    const autoTriedRef = useRef(false);
     const navigate = useNavigate();
 
     // 코드 값을 성공적으로 불러왔다면, 더 이상 불필요하므로 정리
@@ -32,17 +36,17 @@ export default function InviteCodePage() {
         }
     }, [code]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (code.length !== 6) {
+    const joinWithCode = useCallback(async (rawCode: string): Promise<boolean> => {
+        const finalCode = rawCode.replace(/\s/g, '').toUpperCase();
+        if (finalCode.length !== 6) {
             setError('6자리 초대 코드를 입력해주세요.');
-            return;
+            return false;
         }
 
         // 익명 사용자 가입 차단
         if (user?.isAnonymous) {
             setError('Google 계정으로 로그인 후 다시 시도해주세요.');
-            return;
+            return false;
         }
 
         setLoading(true);
@@ -51,7 +55,7 @@ export default function InviteCodePage() {
         try {
             const functions = getFunctions(undefined, 'asia-northeast3');
             const joinOrg = httpsCallable(functions, 'joinOrganization');
-            await joinOrg({ code: code.toUpperCase() });
+            await joinOrg({ code: finalCode });
 
             // Custom Claims 갱신을 위해 토큰 강제 리프레시
             if (auth.currentUser) await refreshTokenSilently(auth.currentUser);
@@ -59,6 +63,7 @@ export default function InviteCodePage() {
             // onSnapshot이 자동으로 userData를 업데이트하므로 잠시 대기
             await new Promise(resolve => setTimeout(resolve, 1000));
             navigate('/', { replace: true });
+            return true;
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : '';
             // Cloud Function에서 반환한 에러 메시지 그대로 표시
@@ -72,10 +77,51 @@ export default function InviteCodePage() {
                 setError('오류가 발생했습니다. 다시 시도해주세요.');
             }
             console.debug('[InviteCode] 가입 실패:', message || err);
+            return false;
         } finally {
             setLoading(false);
         }
+    }, [user, navigate]);
+
+    // 링크로 전달된 코드 자동 가입 처리
+    useEffect(() => {
+        if (!autoJoining || autoTriedRef.current) return;
+        if (!user) return; // 인증 정보 로딩 대기
+
+        // 로그인이 필요하거나 코드가 불완전하면 입력 폼으로 폴백
+        if (user.isAnonymous || code.length !== 6) {
+            setAutoJoining(false);
+            return;
+        }
+
+        autoTriedRef.current = true;
+        joinWithCode(code).then((ok) => {
+            // 실패(잘못된/만료된 코드 등) 시 입력 폼을 노출해 직접 수정하도록 한다.
+            if (!ok) setAutoJoining(false);
+        });
+    }, [autoJoining, user, code, joinWithCode]);
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        await joinWithCode(code);
     };
+
+    // 링크 코드 자동 연결 중에는 입력 화면 대신 진행 상태만 보여준다.
+    if (autoJoining) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-surface-50 to-primary-50 px-4">
+                <div className="w-full max-w-sm animate-scale-in text-center">
+                    <div className="w-16 h-16 mx-auto mb-4 bg-primary-100 dark:bg-primary-900/40 rounded-2xl flex items-center justify-center">
+                        <div className="w-8 h-8 spinner text-primary-600 dark:text-primary-400" />
+                    </div>
+                    <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-1">기관에 연결 중...</h1>
+                    <p className="text-sm text-surface-500 dark:text-surface-400">
+                        초대 코드를 확인하고 기관에 자동으로 연결하고 있어요.
+                    </p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-surface-50 to-primary-50 px-4">
