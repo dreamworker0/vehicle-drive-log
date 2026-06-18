@@ -16,6 +16,8 @@ description: 역할 기반 접근 권한(RBAC) 검증 원칙. 프론트엔드 UI
 
 ### 2. 백엔드(Firestore / Functions) 상 권한 검증 필수
 - **프론트에서 버튼을 가렸다고 안전한 것이 아닙니다.** 누군가 API나 브라우저 콘솔에서 우회 요청할 수 있으므로, **Firebase Security Rules**와 **Cloud Functions** 내부 로직에서는 요청자의 role이 `admin` 또는 `superAdmin`인지 재확인해야 합니다.
+- **라우터 가드(`AuthGuard`, `ProtectedRoute`)·조건부 렌더링도 전부 "프론트엔드"다.** 페이지 자체가 admin 라우트 뒤에 있어 "직원에겐 안 보인다"는 것은 *노출 분리(§1)*일 뿐, 권한 보장이 아니다. 라우팅으로 가려졌다는 이유로 백엔드 재검증을 생략하지 않는다.
+- **권한성 *변이*는 동사로 판단하지 않는다.** `delete`/`삭제`처럼 익숙한 파괴적 동작뿐 아니라 **승인·거절·상태변경·역할부여 등 워크플로우로 포장된 모든 변이**가 대상이다. 이런 변이를 구현하거나 버튼을 붙일 때는, 그 변이가 닿는 **컬렉션·동작의 백엔드 규칙(Rules) 또는 Function이 요청자 role을 실제로 막고 있는지 직접 확인**하고, 막고 있지 않으면 추가한다(확인 없이 "이미 안전하겠지"로 넘기지 않는다).
 - Cloud Function 코드 예시:
   ```typescript
   if (context.auth?.token.role !== 'admin' && context.auth?.token.role !== 'superAdmin') {

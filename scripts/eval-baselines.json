@@ -1,0 +1,45 @@
+{
+  "_doc": "하네스 eval 베이스라인. run-eval.ts score가 이 파일과 대조해 회귀(베이스라인 통과 → 현재 실패)를 잡는다. 갱신: npm run eval:<kind> -- baseline results.json. 측정 일자는 커밋 메시지/PR에 기록한다.",
+  "trigger": {
+    "score": "22/22",
+    "results": {
+      "1": "firestore-model-pattern",
+      "2": "firestore-query-optimization",
+      "3": "firebase-cost-reduction",
+      "4": "add-cloud-function",
+      "5": "add-alimtalk",
+      "6": "add-email-notification",
+      "7": "add-calendar-integration",
+      "8": "add-component",
+      "9": "settings-ui",
+      "10": "dark-mode-audit",
+      "11": "shared-ui-controls",
+      "12": "dashboard-ui-pattern",
+      "13": "data-export-pattern",
+      "14": "data-migration-script",
+      "15": "add-zod-validation",
+      "16": "gemini-ocr-integration",
+      "17": "write-test",
+      "18": "pre-deploy-check",
+      "19": "sentry-noise-filter",
+      "20": "cleanup",
+      "21": "troubleshoot-deployment",
+      "22": "add-pwa-feature"
+    }
+  },
+  "behavior": {
+    "score": "10/10",
+    "results": {
+      "1": "pass",
+      "2": "pass",
+      "3": "pass",
+      "4": "pass",
+      "5": "pass",
+      "6": "pass",
+      "7": "pass",
+      "8": "pass",
+      "9": "pass",
+      "10": "pass"
+    }
+  }
+}

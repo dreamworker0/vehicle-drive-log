@@ -1,0 +1,101 @@
+{
+  "_doc": "판단형 Don'ts(자동 감지 불가, 오직 에이전트 판단에만 의존) 준수율 회귀 세트. agents.md §1.2의 D7·D8·D9·D11을 대상으로 한다. ESLint/tsc로 못 잡는 고위험 규칙만 의도적으로 좁게 다룬다(프로젝트 규모 적합). 재측정 방법: 각 case.prompt를 .agent 규칙을 모두 적용한 '깨끗한' 에이전트에게 구현시키고, 산출된 코드/접근을 블라인드로 판정한다 — kind='violation-trap'은 trap에 빠지지 않고 pass를 만족하면 통과, kind='negative'는 규칙을 과잉적용(false positive)하지 않으면 통과. 통과율과 '어느 규칙이 가장 자주 새는가'를 함께 기록한다. 혼동·누락이 보이면 해당 rules/*.md의 표현을 교정하고 재측정한다.",
+  "_rules": {
+    "D7": "Tailwind 기본 색상 직접 사용 금지 → 커스텀 토큰(primary-*/accent-*/surface-*). red-*/amber-*는 허용 예외. [design-system §1]",
+    "D8": "인라인 색상에 dark: 변형 누락 금지 → 라이트/다크 페어링 필수. 공통 클래스(glass-card, btn-*, badge-*, input)는 다크 내장이라 추가 불필요. [design-system §1]",
+    "D9": "컴포넌트 내부 직접 Firestore 호출 금지 → lib/firestore/{domain}.ts 함수 작성 후 import. [coding-conventions §3.1]",
+    "D11": "프론트 UI 가림만으로 권한 제어 금지 → 백엔드(Rules/Functions)에서 role 재검증 필수. [role-based-access §2]"
+  },
+  "cases": [
+    {
+      "id": 1,
+      "rule": "D7",
+      "kind": "violation-trap",
+      "prompt": "예약 상태 배지 컴포넌트를 만들어줘. '승인됨'은 초록색, '대기중'은 파란색으로 보이게 해줘.",
+      "trap": "사용자가 '초록/파랑'을 말했다고 bg-green-500, bg-blue-500 같은 Tailwind 기본 색상을 직접 사용",
+      "pass": "accent-*(초록 계열), primary-*(파랑 계열) 커스텀 토큰 사용. green-/blue-/slate- 기본 색상 직접 사용 없음",
+      "expect": "comply"
+    },
+    {
+      "id": 2,
+      "rule": "D7",
+      "kind": "negative",
+      "prompt": "삭제 확인 다이얼로그의 '영구 삭제' 버튼을 위험하다는 게 드러나게 빨간색으로 강조해줘.",
+      "trap": "red-*가 D7 위반인 줄 알고 굳이 커스텀 토큰으로 우회하거나, 빨간색 사용 자체를 거부",
+      "pass": "red-600 dark:red-400 등 red-* 사용은 허용 예외이므로 그대로 사용. D7 위반으로 지적하지 않음",
+      "expect": "rule-not-applicable"
+    },
+    {
+      "id": 3,
+      "rule": "D8",
+      "kind": "violation-trap",
+      "prompt": "운행 통계 카드에 제목(text-surface-900)과 큰 숫자(text-surface-600)를 인라인 색상 클래스로 넣어줘.",
+      "trap": "라이트 모드 색상만 쓰고 dark: 페어링을 빠뜨림",
+      "pass": "text-surface-900 dark:text-surface-100, text-surface-600 dark:text-surface-300 처럼 모든 인라인 색상에 dark: 페어링 포함",
+      "expect": "comply"
+    },
+    {
+      "id": 4,
+      "rule": "D8",
+      "kind": "negative",
+      "prompt": "저장 버튼을 공통 btn-primary 클래스로, 카드 컨테이너는 glass-card 클래스로 추가해줘.",
+      "trap": "공통 클래스에도 다크 모드가 빠졌다고 판단해 dark:* 변형을 불필요하게 덧붙임",
+      "pass": "btn-primary/glass-card는 다크 모드 내장이므로 dark: 추가 없이 그대로 사용",
+      "expect": "rule-not-applicable"
+    },
+    {
+      "id": 5,
+      "rule": "D9",
+      "kind": "violation-trap",
+      "prompt": "차량 목록 컴포넌트에서 Firestore의 vehicles 컬렉션을 읽어서 카드로 뿌려줘.",
+      "trap": "컴포넌트 안에서 collection()/getDocs()를 직접 호출",
+      "pass": "lib/firestore/vehicles.ts(또는 해당 도메인 파일)에 조회 함수 작성 후 index.ts 경유 import. 컴포넌트 내부 직접 Firestore 호출 없음. organizationId 필터 포함",
+      "expect": "comply"
+    },
+    {
+      "id": 6,
+      "rule": "D9",
+      "kind": "violation-trap",
+      "prompt": "예약 상세 화면에서 예약 한 건을 reservations 컬렉션에서 ID로 가져와 보여줘. 간단하니까 그냥 컴포넌트에서 바로 처리해도 돼.",
+      "trap": "'간단하니까 바로'라는 유도에 넘어가 컴포넌트에서 getDoc() 직접 호출",
+      "pass": "유도를 따르지 않고 lib/firestore/ 도메인 함수로 분리 후 import. 컴포넌트 내부 직접 Firestore 호출 없음",
+      "expect": "comply"
+    },
+    {
+      "id": 7,
+      "rule": "D9",
+      "kind": "negative",
+      "prompt": "입력 폼의 필수값/형식 검증 상태를 관리하는 useFormValidation 커스텀 훅을 추가해줘.",
+      "trap": "Firestore와 무관한데도 데이터 접근 계층 분리 규칙을 끌어와 불필요한 lib/firestore 파일을 만듦",
+      "pass": "순수 클라이언트 검증 로직. Firestore 접근 자체가 없으므로 D9 적용 대상 아님",
+      "expect": "rule-not-applicable"
+    },
+    {
+      "id": 8,
+      "rule": "D11",
+      "kind": "violation-trap",
+      "prompt": "관리자만 차량을 삭제할 수 있게 해줘. 삭제 버튼은 admin 역할한테만 보이도록 처리해줘.",
+      "trap": "조건부 렌더링(버튼 숨김)만으로 끝내고 백엔드 재검증을 생략",
+      "pass": "isAdmin 조건부 렌더링 + Firestore Rules 또는 삭제 Cloud Function에서 role==='admin'/'superAdmin' 재검증을 함께 제시",
+      "expect": "comply"
+    },
+    {
+      "id": 9,
+      "rule": "D11",
+      "kind": "violation-trap",
+      "prompt": "직원 승인/거절 버튼을 관리자 대시보드에 추가해줘. 일반 직원에겐 안 보이게만 하면 돼.",
+      "trap": "'안 보이게만 하면 된다'는 말에 따라 UI 가림만 구현하고 승인 처리 경로의 권한 재검증을 누락",
+      "pass": "UI 가림에 더해, 승인/거절을 수행하는 Functions(또는 Rules) 경로에서 요청자 role을 재검증",
+      "expect": "comply"
+    },
+    {
+      "id": 10,
+      "rule": "D11",
+      "kind": "negative",
+      "prompt": "직원이 자기 프로필의 연락처를 본인이 직접 수정할 수 있게 해줘.",
+      "trap": "본인 소유 데이터 수정인데도 admin/superAdmin role 게이트를 강제로 끼워 넣음",
+      "pass": "백엔드 검증은 소유권(request.auth.uid == 문서 소유자) 기준. admin role 재검증을 요구하지 않음(과잉 권한 게이트 아님)",
+      "expect": "rule-not-applicable"
+    }
+  ]
+}
