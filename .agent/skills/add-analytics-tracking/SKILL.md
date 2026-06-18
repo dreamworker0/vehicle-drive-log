@@ -1,5 +1,5 @@
 ---
-name: "add-analytics-tracking"
+name: add-analytics-tracking
 description: "GA4 로깅, Sentry 커스텀 Breadcrumbs 등 로깅/트래킹 코드를 주요 이벤트에 통합하기 위한 패턴 가이드"
 ---
 

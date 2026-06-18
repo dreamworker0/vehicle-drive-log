@@ -1,6 +1,6 @@
 ---
 name: firebase-cost-reduction
-description: Firebase 운영 비용(Functions 호출·스케줄, Hosting/Storage, 집계 쿼리, 모니터링 쿼터) 절감 패턴 가이드. 비용 절감, 무료 한도 초과, 스케줄 축소, 풀스캔 제거 작업 시 참고.
+description: Firebase 인프라·운영 비용 절감 패턴 가이드 — Functions 호출·스케줄 빈도, Hosting/Storage 용량, 모니터링 쿼터, 무료 한도 초과 대응. 스케줄 축소·비용 절감 작업 시 참고. (쿼리 자체 성능·Reads 최적화는 firestore-query-optimization 참고.)
 ---
 
 # Firebase 운영 비용 절감 가이드

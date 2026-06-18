@@ -1,0 +1,27 @@
+{
+  "_doc": "스킬 자동 발동 정확도 회귀 세트. 각 prompt의 expected가 발동되어야 할 .agent/skills 슬러그. 재측정: 이 파일의 prompt들을 .claude/skills 카탈로그(name+description)만 보고 블라인드로 판정시켜 expected와 비교. 혼동 쌍을 보면 description을 교정한다.",
+  "cases": [
+    { "id": 1, "prompt": "운행일지에 차량 점검 주기(개월) 필드를 추가하고 저장·조회 함수를 만들어줘", "expected": "firestore-model-pattern" },
+    { "id": 2, "prompt": "대시보드가 매번 전체 운행일지를 읽어서 느려. Firestore 읽기 비용을 줄이고 싶어", "expected": "firestore-query-optimization" },
+    { "id": 3, "prompt": "Functions 호출이 무료 한도를 넘었어. 스케줄 함수 실행 빈도를 줄여줘", "expected": "firebase-cost-reduction" },
+    { "id": 4, "prompt": "매일 아침 9시에 미반납 차량을 점검하는 스케줄 함수를 추가해줘", "expected": "add-cloud-function" },
+    { "id": 5, "prompt": "예약이 확정되면 직원에게 카카오 알림톡을 보내는 기능 추가해줘", "expected": "add-alimtalk" },
+    { "id": 6, "prompt": "관리자에게 주간 운행 리포트를 이메일로 발송하는 기능 만들어줘", "expected": "add-email-notification" },
+    { "id": 7, "prompt": "구글 캘린더에 예약을 동기화하고 싶어", "expected": "add-calendar-integration" },
+    { "id": 8, "prompt": "직원 목록을 보여주는 새 카드 컴포넌트를 추가해줘", "expected": "add-component" },
+    { "id": 9, "prompt": "설정 페이지에 알림 수신 여부 항목을 추가해줘", "expected": "settings-ui" },
+    { "id": 10, "prompt": "다크모드에서 이 통계 카드 글자가 안 보여. 점검해줘", "expected": "dark-mode-audit" },
+    { "id": 11, "prompt": "예약 자동 승인을 켜고 끄는 토글 스위치를 추가해줘", "expected": "shared-ui-controls" },
+    { "id": 12, "prompt": "월별 운행 거리 막대 차트를 대시보드에 추가해줘", "expected": "dashboard-ui-pattern" },
+    { "id": 13, "prompt": "운행 기록을 PDF로 내보내는 버튼을 추가해줘", "expected": "data-export-pattern" },
+    { "id": 14, "prompt": "차량 데이터에 새로 추가한 색상 필드를 기존 문서에도 일괄 채워넣어야 해", "expected": "data-migration-script" },
+    { "id": 15, "prompt": "예약 입력값 검증 스키마를 Zod로 만들어줘", "expected": "add-zod-validation" },
+    { "id": 16, "prompt": "계기판 사진에서 주행거리 숫자를 자동 인식하게 해줘", "expected": "gemini-ocr-integration" },
+    { "id": 17, "prompt": "이 컴포넌트들 단위 테스트 작성해줘", "expected": "write-test" },
+    { "id": 18, "prompt": "배포하기 전에 점검 한번 돌려줘", "expected": "pre-deploy-check" },
+    { "id": 19, "prompt": "Sentry에 ResizeObserver 에러가 계속 떠. 무시하게 해줘", "expected": "sentry-noise-filter" },
+    { "id": 20, "prompt": "안 쓰는 코드랑 패키지 정리 좀 해줘", "expected": "cleanup" },
+    { "id": 21, "prompt": "배포했는데 functions가 Node 버전 에러로 실패해", "expected": "troubleshoot-deployment" },
+    { "id": 22, "prompt": "오프라인일 때도 운행 입력을 저장했다가 나중에 동기화되게 해줘", "expected": "add-pwa-feature" }
+  ]
+}

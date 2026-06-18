@@ -1,5 +1,5 @@
 ---
-name: 배포 트러블슈팅 (troubleshoot-deployment)
+name: troubleshoot-deployment
 description: Cloud Functions, 프론트엔드 빌드 및 배포 시 발생하는 다양한 오류(Node 버전, 의존성 충돌, 소스맵)의 해결 패턴을 모아둔 가이드.
 ---
 

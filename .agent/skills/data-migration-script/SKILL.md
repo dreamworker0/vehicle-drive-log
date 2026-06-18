@@ -1,5 +1,5 @@
 ---
-name: "data-migration-script"
+name: data-migration-script
 description: "기존 Firestore 데이터 구조가 변경될 때 사용할 일회성 데이터를 일괄 백그라운드로 갱신하는 배치(Batch) 마이그레이션 스크립트 패턴"
 ---
 

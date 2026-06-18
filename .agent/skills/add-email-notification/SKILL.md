@@ -1,5 +1,5 @@
 ---
-name: 이메일 알림 추가 패턴 (add-email-notification)
+name: add-email-notification
 description: EmailJS 또는 Nodemailer를 이용해 Cloud Functions에서 이메일을 발송하는 기능 추가 가이드.
 ---
 

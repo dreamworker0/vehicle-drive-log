@@ -1,5 +1,5 @@
 ---
-name: 구글 캘린더 연동 패턴 (add-calendar-integration)
+name: add-calendar-integration
 description: 차량운행일지와 Google Calendar API 간의 양방향/단방향 동기화, Service Account 및 사용자별 OAuth2 인증 패턴 가이드.
 ---
 

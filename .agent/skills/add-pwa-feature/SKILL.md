@@ -1,5 +1,5 @@
 ---
-name: "add-pwa-feature"
+name: add-pwa-feature
 description: "PWA 기능, 서비스워커 및 오프라인 상태 관련 로직을 추가하는 패턴 가이드"
 ---
 
