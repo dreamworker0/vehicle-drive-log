@@ -53,7 +53,9 @@ function fallbackTitle(content: string): string | undefined {
 
 /** 스킬 포인터(.claude/skills/<name>/SKILL.md) 내용 생성. */
 function renderSkill(dir: string, fm: Frontmatter): string {
-  const name = fm.name ?? dir;
+  // 스킬의 정식 ID는 디렉터리명이다. 프론트매터 name이 슬러그와 다르게 오염돼도
+  // (한글 제목·따옴표 등) 포인터는 항상 디렉터리명을 사용해 드리프트를 막는다.
+  const name = dir;
   const description = fm.description ?? '';
   return `---
 name: ${name}
