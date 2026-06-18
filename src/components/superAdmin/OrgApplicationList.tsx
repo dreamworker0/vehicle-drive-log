@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getPendingOrganizations, getRejectedOrganizations, rejectOrganization, deleteOrganization, createNotification, updateOrganization, generateInviteCode, getOrganizationAdmins } from '../../lib/firestore';
+import { getPendingOrganizations, getRejectedOrganizations, rejectOrganization, deleteOrganization, createNotification, updateOrganization, generateInviteCode, getOrganizationAdmins, approveOrganizationWithAdmins } from '../../lib/firestore';
 import { sendApprovalEmail } from '../../lib/emailService';
 import { ocrDocumentVerify } from '../../lib/ocr';
 import OrgAppCard from './OrgAppCard';
@@ -48,24 +48,25 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
         setActionLoading(prev => ({ ...prev, [app.id]: 'approve' }));
         try {
             const inviteCode = generateInviteCode();
-            await updateOrganization(app.id, {
-                status: 'approved',
-                approvedAt: new Date(),
-                inviteCode,
-            });
-
             const admins = await getOrganizationAdmins(app.id);
-            for (const admin of admins) {
-                const { updateUser } = await import('../../lib/firestore');
-                await updateUser(admin.id, { organizationStatus: 'approved' });
 
-                await createNotification({
-                    targetUid: admin.id,
-                    type: 'approval',
-                    title: '기관 승인 완료',
-                    message: `${app.name} 기관이 승인되었습니다. 초대 코드: ${inviteCode}`,
-                    organizationId: app.id,
-                });
+            // 기관 승인(status/approvedAt/inviteCode)과 소속 관리자 상태 갱신을
+            // 하나의 배치로 원자적으로 커밋 — 중간 실패로 인한 불일치 방지
+            await approveOrganizationWithAdmins(app.id, inviteCode, admins.map(a => a.id));
+
+            // 인앱 알림은 best-effort (실패해도 승인은 유지)
+            try {
+                for (const admin of admins) {
+                    await createNotification({
+                        targetUid: admin.id,
+                        type: 'approval',
+                        title: '기관 승인 완료',
+                        message: `${app.name} 기관이 승인되었습니다. 초대 코드: ${inviteCode}`,
+                        organizationId: app.id,
+                    });
+                }
+            } catch (notifyErr) {
+                console.warn('승인 알림 생성 실패 (승인은 완료됨):', notifyErr);
             }
 
             // 이메일 발송 (실패해도 승인은 유지)
@@ -104,6 +105,7 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
 
         } catch (err) {
             console.error('승인 실패:', err);
+            showToast('기관 승인 처리에 실패했습니다.', 'error');
         } finally {
             setActionLoading(prev => ({ ...prev, [app.id]: null }));
         }

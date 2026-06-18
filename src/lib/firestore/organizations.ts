@@ -287,6 +287,32 @@ export const approveOrganization = async (orgId: string) => {
     }
 };
 
+// 기관 승인 + 소속 관리자 상태를 원자적으로 갱신
+// 기관 status/approvedAt/inviteCode 와 각 admin user의 organizationStatus 를 하나의 배치로
+// 커밋해 "기관은 승인됐으나 관리자 상태는 미갱신"인 부분 실패를 방지한다.
+// (인앱 알림·이메일·알림톡은 호출부에서 배치 밖 best-effort로 처리)
+export const approveOrganizationWithAdmins = async (
+    orgId: string,
+    inviteCode: string,
+    adminIds: string[],
+) => {
+    try {
+        const batch = writeBatch(db);
+        batch.update(doc(db, 'organizations', orgId), {
+            status: 'approved',
+            approvedAt: serverTimestamp(),
+            inviteCode,
+        });
+        adminIds.forEach(adminId => {
+            batch.update(doc(db, 'users', adminId), { organizationStatus: 'approved' });
+        });
+        await batch.commit();
+    } catch (error) {
+        captureError(error, { context: 'approveOrganizationWithAdmins', orgId });
+        throw error;
+    }
+};
+
 // 기관 거절
 export const rejectOrganization = async (orgId: string, reason?: string) => {
     try {

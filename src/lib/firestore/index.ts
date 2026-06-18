@@ -41,6 +41,7 @@ export {
     getDeletedOrganizations,
     getApprovedOrganizations,
     approveOrganization,
+    approveOrganizationWithAdmins,
     rejectOrganization,
     generateInviteCode,
     findOrganizationByInviteCode,
