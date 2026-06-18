@@ -5,6 +5,7 @@ import reactRefresh from 'eslint-plugin-react-refresh'
 import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 import jsxA11y from 'eslint-plugin-jsx-a11y'
+import requireOrganizationFilter from './eslint-rules/require-organization-filter.js'
 
 export default defineConfig([
   globalIgnores(['dist', 'coverage', 'test-results', 'playwright-report', 'functions', 'scratch']),
@@ -90,6 +91,27 @@ export default defineConfig([
         beforeAll: 'readonly',
         afterAll: 'readonly',
       },
+    },
+  },
+  {
+    // 멀티테넌트 격리: tenant-scoped Firestore 도메인 파일의 query()에 organizationId 필터 강제.
+    // 전역 도메인(organizations, users, favorites, feedbacks, notifications, superAdmin,
+    // statistics, holidays, preRegistered, cache)은 조직 격리 대상이 아니므로 제외한다.
+    files: [
+      'src/lib/firestore/reservations.ts',
+      'src/lib/firestore/vehicles.ts',
+      'src/lib/firestore/fuelLogs.ts',
+      'src/lib/firestore/maintenance.ts',
+      'src/lib/firestore/hipass.ts',
+      'src/lib/firestore/hipassCharges.ts',
+      'src/lib/firestore/dailyLogQueries.ts',
+      'src/lib/firestore/driveLogs/**/*.ts',
+    ],
+    plugins: {
+      local: { rules: { 'require-organization-filter': requireOrganizationFilter } },
+    },
+    rules: {
+      'local/require-organization-filter': 'error',
     },
   },
 ])

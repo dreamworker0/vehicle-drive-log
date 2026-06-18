@@ -192,6 +192,8 @@ import { getVehicles, createReservation } from '../../lib/firestore';
 ### 3.3 조직 격리
 - **모든 쿼리**에 `organizationId` 조건 포함
 - 함수 첫 파라미터로 `orgId` 전달
+- **정적 강제**: tenant-scoped 도메인 파일(`reservations`, `vehicles`, `fuelLogs`, `maintenance`, `hipass`, `hipassCharges`, `dailyLogQueries`, `driveLogs/`)은 커스텀 ESLint 규칙 `local/require-organization-filter`(→ [eslint-rules/require-organization-filter.js](../../eslint-rules/require-organization-filter.js))가 `query()` 함수 본문에 `where('organizationId', ...)`가 없으면 CI lint 게이트에서 차단한다. 의도된 전역 쿼리는 `// eslint-disable-next-line local/require-organization-filter -- <사유>`로 예외 처리.
+- 전역 도메인(`organizations`, `users`, `favorites`, `feedbacks`, `notifications`, `superAdmin`, `statistics` 등)은 조직 격리 대상이 아니므로 규칙 적용 제외.
 
 ### 3.4 에러 처리
 ```jsx

@@ -42,7 +42,7 @@
 
 ## 절대 규칙
 
-1. **`organizationId` 필터 필수** — Firestore 쿼리는 멀티테넌트. 누락 시 다른 기관 데이터가 새거나 권한 거부가 난다.
+1. **`organizationId` 필터 필수** — Firestore 쿼리는 멀티테넌트. 누락 시 다른 기관 데이터가 새거나 권한 거부가 난다. tenant-scoped 도메인 파일(`src/lib/firestore/`)은 커스텀 ESLint 규칙 `local/require-organization-filter`가 정적으로 강제한다(전역 도메인 제외).
 2. **`firestore.indexes.json` 동기화** — 복합 쿼리 추가하면 인덱스도 추가.
 3. **`functions/src/index.ts` 등록** — 새 함수는 여기서 export하지 않으면 배포되지 않는다.
 4. **커밋 메시지는 한국어 + Conventional Commits** — `feat:`, `fix:`, `chore:`, `refactor:`. commitlint로 강제됨.
