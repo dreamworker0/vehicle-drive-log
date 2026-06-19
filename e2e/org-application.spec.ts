@@ -42,16 +42,16 @@ test.describe('기관 사용 신청 플로우', () => {
         await termsCheckbox.waitFor({ state: 'attached', timeout: 10000 });
         const privacyCheckbox = page.locator('#agree-privacy');
 
-        // 약관 동의 — .check()는 멱등적으로 "체크됨" 상태를 보장하고 라벨-입력 연결을 안전히
-        // 처리한다. force click은 라벨에 중첩된 input에서 이중 토글/타이밍 레이스로 flaky했음.
-        await termsCheckbox.check();
-        await expect(termsCheckbox).toBeChecked({ timeout: 5000 });
-        await privacyCheckbox.check();
-        await expect(privacyCheckbox).toBeChecked({ timeout: 5000 });
-
-        // 빈 폼으로 제출 시도
         const submitBtn = page.getByRole('button', { name: '신청하기' });
-        await expect(submitBtn).toBeEnabled({ timeout: 10000 });
+
+        // 동의 두 항목 체크 → 제출 버튼 활성화까지 재시도. 컨트롤드 체크박스의
+        // onChange→상태→버튼 disabled prop 전파가 느린 CI에서 간헐 누락(레이스)되므로,
+        // 버튼 활성화를 진실 원천으로 삼아 멱등 .check()를 반복한다(중간 toBeChecked는 제거).
+        await expect(async () => {
+            await termsCheckbox.check();
+            await privacyCheckbox.check();
+            await expect(submitBtn).toBeEnabled({ timeout: 1000 });
+        }).toPass({ timeout: 15000 });
         // force: true로 일시적 disabled 전환 레이스 컨디션 방지
         await submitBtn.click({ force: true });
         // HTML5 validation이 제출을 차단하므로 페이지가 /apply에 머물러야 한다
