@@ -17,6 +17,34 @@ interface AuditCounts {
     low: number;
 }
 
+/**
+ * 알려진 수용(accepted) 취약점 등록부.
+ * 업스트림 미패치 또는 미유지보수 transitive 의존성이라 지금은 깨끗이 고칠 수 없고,
+ * 강제 override 시 도구가 깨지는 것들. 사유·재검토 조건을 명시해 "방치"가 아닌
+ * "알고 수용 중"으로 추적한다. 재검토 조건이 충족되면 제거하고 정식 패치한다.
+ * (2026-06-19 등록)
+ */
+const KNOWN_ACCEPTED: {
+    advisory: string; pkg: string; severity: string; scope: string; reason: string; revisitWhen: string;
+}[] = [
+    {
+        advisory: 'GHSA-8988-4f7v-96qf',
+        pkg: '@opentelemetry/core (via @sentry/node)',
+        severity: 'moderate',
+        scope: 'functions (production, 단 발동에 악성 W3C baggage 헤더 필요 — 실노출 낮음)',
+        reason: '@sentry/node가 이미 최신(10.58.0)인데도 취약 otel을 물고 있어 업그레이드로 못 고침. transitive 강제 시 Sentry 계측이 깨질 위험.',
+        revisitWhen: '@sentry/node가 @opentelemetry/core >=2.8.0 물고 있는 버전을 릴리스하면 정식 업그레이드.',
+    },
+    {
+        advisory: 'GHSA-h67p-54hq-rp68',
+        pkg: 'js-yaml@3.x (via @istanbuljs/load-nyc-config ← jest 커버리지 계측)',
+        severity: 'moderate',
+        scope: 'dev/test 전용 (커버리지 시점 yaml 파싱 — 프로덕션 런타임 무관, 실노출 ~0)',
+        reason: 'load-nyc-config@1.1.0(최신·미유지보수)가 js-yaml ^3.x로 고정. babel-plugin-istanbul@8(최신)·jest 30도 동일 체인. 패치된 js-yaml 4.2.0은 API 비호환이라 강제 시 커버리지 파손.',
+        revisitWhen: 'istanbul/jest가 load-nyc-config를 벗어나거나 js-yaml 4.x로 이동하면 제거.',
+    },
+];
+
 function runAudit(dir: string, label: string): AuditCounts {
     console.log(`\n🔍 ${label} 보안 감사 (${dir})`);
     console.log('─'.repeat(50));
@@ -84,6 +112,17 @@ console.log('═'.repeat(50));
 
 const frontendCounts = runAudit(ROOT, '프론트엔드');
 const functionsCounts = runAudit(resolve(ROOT, 'functions'), 'Cloud Functions');
+
+if (KNOWN_ACCEPTED.length > 0) {
+    console.log('\n📋 알려진 수용 취약점 (문서화된 accepted-risk — 업스트림 패치 대기)');
+    console.log('─'.repeat(50));
+    for (const a of KNOWN_ACCEPTED) {
+        console.log(`   • [${a.severity}] ${a.pkg}  (${a.advisory})`);
+        console.log(`     범위: ${a.scope}`);
+        console.log(`     사유: ${a.reason}`);
+        console.log(`     재검토: ${a.revisitWhen}`);
+    }
+}
 
 console.log('\n' + '═'.repeat(50));
 const totalCritical = frontendCounts.critical + functionsCounts.critical;
