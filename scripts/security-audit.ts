@@ -19,24 +19,19 @@ interface AuditCounts {
 
 /**
  * 알려진 수용(accepted) 취약점 등록부.
- * 미유지보수 transitive 의존성이라 지금은 깨끗이 고칠 수 없고, 강제 override 시
- * 도구가 깨지는 것들. 사유·재검토 조건을 명시해 "방치"가 아닌 "알고 수용 중"으로
- * 추적한다. 재검토 조건이 충족되면 제거하고 정식 패치한다.
- * (2026-06-19 등록 / 같은 날 정정: @sentry/node otel 항목은 audit에서 해소되어 제거.
- *  현재 functions의 moderate 20건은 전부 아래 js-yaml advisory 하나가 근본 원인이다.)
+ * 업스트림 미패치/미유지보수 transitive라 깨끗이 못 고치고 강제 시 도구가 깨지는 것들을
+ * 사유·재검토 조건과 함께 추적한다. 재검토 조건 충족 시 제거하고 정식 패치한다.
+ *
+ * 현재: 비어 있음(수용 중인 항목 없음).
+ *  - js-yaml DoS(GHSA-h67p-54hq-rp68, functions moderate 20건의 단일 근본)는
+ *    functions/package.json의 overrides(js-yaml ^4.2.0) + jest coverageProvider 'v8'로
+ *    2026-06-19 실제 해소(audit 0). v8은 babel-plugin-istanbul/load-nyc-config 경로를
+ *    타지 않아 js-yaml 4.x로도 커버리지가 정상 동작한다.
+ *  - @sentry/node otel(GHSA-8988-4f7v-96qf)은 non-breaking audit fix로 해소됨.
  */
 const KNOWN_ACCEPTED: {
     advisory: string; pkg: string; severity: string; scope: string; reason: string; revisitWhen: string;
-}[] = [
-    {
-        advisory: 'GHSA-h67p-54hq-rp68',
-        pkg: 'js-yaml@3.x (via @istanbuljs/load-nyc-config ← babel-plugin-istanbul ← jest 트리)',
-        severity: 'moderate',
-        scope: 'dev/test 전용 (jest 커버리지 시점 yaml 파싱 — 프로덕션 런타임 무관, 실노출 ~0)',
-        reason: 'functions의 moderate 20건은 서로 다른 취약점이 아니라 이 js-yaml advisory 하나가 jest 의존성 트리(@jest/* · babel-jest · ts-jest · firebase-functions-test 등) 전체로 전파돼 패키지마다 카운트된 것. load-nyc-config@1.1.0(최신·미유지보수)가 js-yaml ^3.x로 고정하고, babel-plugin-istanbul@8(최신)·jest 30도 동일 체인. 패치된 js-yaml 4.2.0은 API 비호환이라 강제 시 커버리지 파손.',
-        revisitWhen: 'istanbul/jest가 load-nyc-config를 벗어나거나 js-yaml 4.x로 이동하면 제거.',
-    },
-];
+}[] = [];
 
 function runAudit(dir: string, label: string): AuditCounts {
     console.log(`\n🔍 ${label} 보안 감사 (${dir})`);

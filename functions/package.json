@@ -37,6 +37,7 @@
     },
     "jest": {
         "testEnvironment": "node",
+        "coverageProvider": "v8",
         "roots": [
             "<rootDir>/src"
         ],
@@ -52,6 +53,7 @@
     "private": true,
     "overrides": {
         "minimatch": ">=9.0.5",
-        "uuid": "^11.1.1"
+        "uuid": "^11.1.1",
+        "js-yaml": "^4.2.0"
     }
 }
