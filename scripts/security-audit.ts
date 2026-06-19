@@ -19,28 +19,21 @@ interface AuditCounts {
 
 /**
  * 알려진 수용(accepted) 취약점 등록부.
- * 업스트림 미패치 또는 미유지보수 transitive 의존성이라 지금은 깨끗이 고칠 수 없고,
- * 강제 override 시 도구가 깨지는 것들. 사유·재검토 조건을 명시해 "방치"가 아닌
- * "알고 수용 중"으로 추적한다. 재검토 조건이 충족되면 제거하고 정식 패치한다.
- * (2026-06-19 등록)
+ * 미유지보수 transitive 의존성이라 지금은 깨끗이 고칠 수 없고, 강제 override 시
+ * 도구가 깨지는 것들. 사유·재검토 조건을 명시해 "방치"가 아닌 "알고 수용 중"으로
+ * 추적한다. 재검토 조건이 충족되면 제거하고 정식 패치한다.
+ * (2026-06-19 등록 / 같은 날 정정: @sentry/node otel 항목은 audit에서 해소되어 제거.
+ *  현재 functions의 moderate 20건은 전부 아래 js-yaml advisory 하나가 근본 원인이다.)
  */
 const KNOWN_ACCEPTED: {
     advisory: string; pkg: string; severity: string; scope: string; reason: string; revisitWhen: string;
 }[] = [
     {
-        advisory: 'GHSA-8988-4f7v-96qf',
-        pkg: '@opentelemetry/core (via @sentry/node)',
-        severity: 'moderate',
-        scope: 'functions (production, 단 발동에 악성 W3C baggage 헤더 필요 — 실노출 낮음)',
-        reason: '@sentry/node가 이미 최신(10.58.0)인데도 취약 otel을 물고 있어 업그레이드로 못 고침. transitive 강제 시 Sentry 계측이 깨질 위험.',
-        revisitWhen: '@sentry/node가 @opentelemetry/core >=2.8.0 물고 있는 버전을 릴리스하면 정식 업그레이드.',
-    },
-    {
         advisory: 'GHSA-h67p-54hq-rp68',
-        pkg: 'js-yaml@3.x (via @istanbuljs/load-nyc-config ← jest 커버리지 계측)',
+        pkg: 'js-yaml@3.x (via @istanbuljs/load-nyc-config ← babel-plugin-istanbul ← jest 트리)',
         severity: 'moderate',
-        scope: 'dev/test 전용 (커버리지 시점 yaml 파싱 — 프로덕션 런타임 무관, 실노출 ~0)',
-        reason: 'load-nyc-config@1.1.0(최신·미유지보수)가 js-yaml ^3.x로 고정. babel-plugin-istanbul@8(최신)·jest 30도 동일 체인. 패치된 js-yaml 4.2.0은 API 비호환이라 강제 시 커버리지 파손.',
+        scope: 'dev/test 전용 (jest 커버리지 시점 yaml 파싱 — 프로덕션 런타임 무관, 실노출 ~0)',
+        reason: 'functions의 moderate 20건은 서로 다른 취약점이 아니라 이 js-yaml advisory 하나가 jest 의존성 트리(@jest/* · babel-jest · ts-jest · firebase-functions-test 등) 전체로 전파돼 패키지마다 카운트된 것. load-nyc-config@1.1.0(최신·미유지보수)가 js-yaml ^3.x로 고정하고, babel-plugin-istanbul@8(최신)·jest 30도 동일 체인. 패치된 js-yaml 4.2.0은 API 비호환이라 강제 시 커버리지 파손.',
         revisitWhen: 'istanbul/jest가 load-nyc-config를 벗어나거나 js-yaml 4.x로 이동하면 제거.',
     },
 ];
