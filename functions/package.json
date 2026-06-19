@@ -24,12 +24,12 @@
         "firebase-admin": "^13.0.0",
         "firebase-functions": "^6.0.0",
         "googleapis": "^144.0.0",
-        "nodemailer": "^8.0.1"
+        "nodemailer": "^9.0.1"
     },
     "devDependencies": {
         "@types/jest": "^30.0.0",
         "@types/node": "^22.0.0",
-        "@types/nodemailer": "^6.4.0",
+        "@types/nodemailer": "^7.0.12",
         "firebase-functions-test": "^3.1.0",
         "jest": "^29.7.0",
         "ts-jest": "^29.2.0",
@@ -44,7 +44,7 @@
             "^.+\\.tsx?$": [
                 "ts-jest",
                 {
-                "diagnostics": false
+                    "diagnostics": false
                 }
             ]
         }
