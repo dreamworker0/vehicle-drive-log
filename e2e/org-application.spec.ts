@@ -42,10 +42,11 @@ test.describe('기관 사용 신청 플로우', () => {
         await termsCheckbox.waitFor({ state: 'attached', timeout: 10000 });
         const privacyCheckbox = page.locator('#agree-privacy');
 
-        // 약관 동의 — Playwright click()으로 React onChange가 안전하게 트리거되도록 유도
-        await termsCheckbox.click({ force: true });
+        // 약관 동의 — .check()는 멱등적으로 "체크됨" 상태를 보장하고 라벨-입력 연결을 안전히
+        // 처리한다. force click은 라벨에 중첩된 input에서 이중 토글/타이밍 레이스로 flaky했음.
+        await termsCheckbox.check();
         await expect(termsCheckbox).toBeChecked({ timeout: 5000 });
-        await privacyCheckbox.click({ force: true });
+        await privacyCheckbox.check();
         await expect(privacyCheckbox).toBeChecked({ timeout: 5000 });
 
         // 빈 폼으로 제출 시도

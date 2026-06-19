@@ -202,7 +202,7 @@ export default function OrgApplicationPage() {
 
                     {/* 약관 동의 */}
                     <div className="space-y-3 bg-surface-50 dark:bg-surface-800 rounded-xl p-4">
-                        <label htmlFor="agree-terms" className="flex items-start gap-3 cursor-pointer group min-h-[48px] py-2">
+                        <label className="flex items-start gap-3 cursor-pointer group min-h-[48px] py-2">
                             <input
                                 id="agree-terms"
                                 type="checkbox"
@@ -214,7 +214,7 @@ export default function OrgApplicationPage() {
                                 <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-primary-600 dark:text-primary-400 underline underline-offset-2 font-medium hover:text-primary-700 dark:hover:text-primary-300">이용약관</a>에 동의합니다. <span className="text-red-500 dark:text-red-400">*</span>
                             </span>
                         </label>
-                        <label htmlFor="agree-privacy" className="flex items-start gap-3 cursor-pointer group min-h-[48px] py-2">
+                        <label className="flex items-start gap-3 cursor-pointer group min-h-[48px] py-2">
                             <input
                                 id="agree-privacy"
                                 type="checkbox"
