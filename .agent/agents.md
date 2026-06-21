@@ -56,11 +56,16 @@ Don'ts 항목 간 충돌, 또는 금지 항목과 기능 요구가 충돌할 때
 
 ### 2.1 검증 순서
 
+> ⚠️ **이 머신의 셸 기본 Node는 v24이고, Node 24는 Rollup 빌드(Step 3)가 실패한다.**
+> 검증 명령은 **반드시 Node 22**로 실행한다 — PowerShell: `fnm exec --using=22 npm.cmd run <script>`.
+> Step 1(ESLint)은 편집 직후 PostToolUse 훅(`scripts/hooks/lint-changed.mjs`)이 변경 파일에
+> 자동 실행하므로, 에이전트는 보통 Step 2~4에 집중한다(훅이 exit 2로 잔여 위반을 피드백).
+
 ```
-Step 1: ESLint ──────── npm run lint
-Step 2: TypeScript ──── npx tsc --noEmit
-Step 3: Build ───────── npm run build
-Step 4: Test ────────── npm test (변경 파일 관련 테스트만)
+Step 1: ESLint ──────── npm run lint          # 편집 시 훅이 변경 파일에 자동 실행
+Step 2: TypeScript ──── fnm exec --using=22 npm.cmd run type-check
+Step 3: Build ───────── fnm exec --using=22 npm.cmd run build   # Node 22 필수 (24는 Rollup 실패)
+Step 4: Test ────────── fnm exec --using=22 npm.cmd test (변경 파일 관련 테스트만)
 ```
 
 ### 2.2 변경 범위별 검증 수준
