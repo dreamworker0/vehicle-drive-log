@@ -4,15 +4,13 @@
  * 빈 영역 드래그 시 시간 범위를 선택하여 예약 폼에 자동 반영
  * 예약 블록 또는 차량명 클릭 시 해당 차량의 예약 상세를 아코디언으로 펼침
  */
-import React, { useMemo, useState, useEffect } from 'react';
-import { getVehicleColor } from '../../lib/constants';
+import { useMemo, useState, useEffect } from 'react';
 import {
     SNAP_MINUTES, RANGE_START, RANGE_END,
-    timeToMinutes, minutesToTime, snapMinutes,
-    getPercent, getGaps, getHourLabels,
+    snapMinutes, getPercent, getGaps, getHourLabels,
 } from '../../lib/timelineUtils';
 import useTimelineDrag from '../../hooks/useTimelineDrag';
-import { isVehicleBlocked } from '../../lib/vehicleUtils';
+import VehicleTimelineRow from './VehicleTimelineRow';
 import type { Vehicle } from '../../types/vehicle';
 import type { Reservation } from '../../types/reservation';
 
@@ -139,216 +137,28 @@ export default function VehicleTimelineBar({
 
                 {/* 차량별 타임라인 행 */}
                 <div className="space-y-1.5">
-                    {vehicleData.map(({ vehicle, reservations: vRes }) => {
-                        const isBlocked = isVehicleBlocked(vehicle.maintenance);
-                        const gaps = getGaps(vRes, isToday, nowSnapped);
-                        const isDraggingThis = dragState?.vehicleId === vehicle.id;
-                        const isExpanded = expandedVehicleId === vehicle.id;
-
-                        const vehicleDisplayName = (vehicle.name && vehicle.name !== '이름 없음' && vehicle.name !== 'null') 
-                            ? vehicle.name 
-                            : (vehicle.displayName || vehicle.plateNumber || vehicle.modelName || '차량');
-
-                        return (
-                            <div key={vehicle.id}>
-                                <div className="flex items-center gap-2">
-                                    {/* 차량명 라벨 */}
-                                    <button
-                                        type="button"
-                                        onClick={() => vRes.length > 0 && toggleExpand(vehicle.id)}
-                                        className={`w-[64px] text-[10px] font-medium truncate flex-shrink-0 text-right flex items-center justify-end gap-0.5 border-0 bg-transparent p-0 ${isBlocked
-                                            ? 'text-surface-400 line-through cursor-default'
-                                            : vRes.length > 0
-                                                ? 'text-surface-700 dark:text-surface-300 cursor-pointer hover:text-primary-500 dark:hover:text-primary-400'
-                                                : 'text-surface-700 dark:text-surface-300 cursor-default'
-                                            }`}
-                                        title={vehicleDisplayName}
-                                    >
-                                        {isBlocked ? '🔧 ' : ''}{vehicleDisplayName}
-                                        {vRes.length > 0 && (
-                                            <svg aria-hidden="true" className={`w-2.5 h-2.5 flex-shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                                            </svg>
-                                        )}
-                                    </button>
-
-                                    {/* 타임라인 바 */}
-                                    <div
-                                        ref={el => { barRefs.current[vehicle.id] = el; }}
-                                        className="relative flex-1 h-6 rounded bg-surface-100 dark:bg-surface-700/50 overflow-hidden select-none"
-                                        style={{ touchAction: 'none' }}
-                                    >
-                                        {/* 시간 눈금선 */}
-                                        {hourLabels.map(h => (
-                                            <div
-                                                key={h}
-                                                className="absolute top-0 bottom-0 w-px bg-surface-200/60 dark:bg-surface-600/40"
-                                                style={{ left: `${getPercent(h * 60, dynamicStart)}%` }}
-                                            />
-                                        ))}
-
-                                        {/* 예약 블록 — 타임라인 렌더 범위(06:00~23:00) 밖이더라도 최소한 클리핑해서 표시 */}
-                                        {vRes.map(r => {
-                                            const isCompleted = r.status === 'completed';
-                                            const isPending = r.status === 'pending';
-
-                                            // completed 상태에서 actualTime이 예약 시간과 2시간 이상 벗어나면
-                                            // 잘못된 완료 처리로 판단하여 원래 예약 시간을 폴백으로 사용
-                                            const isActualValid = (actual: string | undefined, scheduled: string) => {
-                                                if (!actual) return false;
-                                                const diff = Math.abs(timeToMinutes(actual) - timeToMinutes(scheduled));
-                                                return diff <= 120; // 2시간 이내
-                                            };
-
-                                            const effStart = (isCompleted && isActualValid(r.actualStartTime, r.startTime || ''))
-                                                ? r.actualStartTime! : (r.startTime || '');
-                                            const effEnd = (isCompleted && isActualValid(r.actualEndTime, r.endTime || ''))
-                                                ? r.actualEndTime! : (r.endTime || '');
-                                            const rStartMin = timeToMinutes(effStart);
-                                            const rEndMin = timeToMinutes(effEnd);
-                                            
-                                            const clampedStartMin = Math.max(rStartMin, dynamicStart);
-                                            const clampedEndMin = Math.max(rEndMin, dynamicStart);
-                                            
-                                            let left = getPercent(clampedStartMin, dynamicStart);
-                                            let right = getPercent(clampedEndMin, dynamicStart);
-                                            
-                                            if (left > right) {
-                                                const temp = left; left = right; right = temp;
-                                            }
-                                            
-                                            if (Number.isNaN(left)) left = 0;
-                                            if (Number.isNaN(right)) right = left + 1.5;
-                                            
-                                            let width = right - left;
-                                            
-                                            // 1% 미만의 아주 짧은 예약이거나 시야범위 밖 예약이더라도
-                                            // 사용자가 시각적으로 최소한의 블록을 클릭/인식할 수 있게 1.5% 보장
-                                            if (width < 1.5 || Number.isNaN(width)) {
-                                                width = 1.5;
-                                                if (left + width > 100) left = 100 - width;
-                                            }
-                                            
-                                            const colorClass = getVehicleColor(vehicle.id);
-                                            const bgClass = isPending
-                                                ? `${colorClass} ${colorClass.replace('bg-', 'text-')}/20 bg-[repeating-linear-gradient(45deg,currentColor,currentColor_2px,transparent_2px,transparent_6px)] opacity-90`
-                                                : `${colorClass} ${isCompleted ? 'opacity-60 dark:opacity-40' : 'opacity-80 dark:opacity-60'}`;
-
-                                            return (
-                                                <div
-                                                    key={r.id}
-                                                    className={`absolute top-0.5 bottom-0.5 rounded-sm ${bgClass} border border-white/40 dark:border-surface-500/30 cursor-pointer hover:opacity-100 dark:hover:opacity-80 transition-opacity`}
-                                                    style={{ left: `${left}%`, width: `${width}%` }}
-                                                    title={`${r.reservedByName}: ${r.startTime}~${r.endTime} ${r.purpose || ''}${isCompleted ? ' (운행완료)' : isPending ? ' (승인 대기)' : ''}`}
-                                                    onClick={() => toggleExpand(vehicle.id)}
-                                                    role="button"
-                                                    tabIndex={0}
-                                                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') toggleExpand(vehicle.id); }}
-                                                />
-                                            );
-                                        })}
-
-                                        {/* 빈 시간 드래그 영역 */}
-                                        {!isPastDate && !isBlocked && gaps.map((gap, gi) => {
-                                            const left = getPercent(gap.start, dynamicStart);
-                                            const right = getPercent(gap.end, dynamicStart);
-                                            const width = right - left;
-                                            if (gap.end - gap.start < 5) return null;
-                                            return (
-                                                <div
-                                                    key={gi}
-                                                    className="absolute top-0 bottom-0 cursor-pointer"
-                                                    style={{ left: `${left}%`, width: `${width}%` }}
-                                                    title={`${minutesToTime(gap.start)}~${minutesToTime(gap.end)} 예약 가능 (드래그로 선택)`}
-                                                    onMouseDown={(e) => handleDragStart(e, vehicle.id, gap.start, gap.end)}
-                                                    onTouchStart={(e) => handleDragStart(e, vehicle.id, gap.start, gap.end)}
-                                                    role="presentation"
-                                                >
-                                                    {!isDraggingThis && (
-                                                        <div className="absolute inset-0 hover:bg-primary-200/40 dark:hover:bg-primary-500/20 transition-colors rounded-sm" />
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
-
-                                        {/* 드래그 선택 오버레이 */}
-                                        {isDraggingThis && dragOverlay && (
-                                            <>
-                                                <div
-                                                    className="absolute top-0 bottom-0 bg-primary-400/40 dark:bg-primary-500/30 border border-primary-500/60 dark:border-primary-400/50 rounded-sm z-10 pointer-events-none transition-[left,width] duration-75"
-                                                    style={{
-                                                        left: `${dragOverlay.left}%`,
-                                                        width: `${Math.max(dragOverlay.width, 0.5)}%`,
-                                                    }}
-                                                />
-                                                {dragOverlay.width > 3 && (
-                                                    <div
-                                                        className="absolute -top-5 z-20 pointer-events-none text-[9px] font-bold text-primary-600 dark:text-primary-300 whitespace-nowrap bg-white/90 dark:bg-surface-800/90 px-1 rounded shadow-sm"
-                                                        style={{
-                                                            left: `${dragOverlay.left + dragOverlay.width / 2}%`,
-                                                            transform: 'translateX(-50%)',
-                                                        }}
-                                                    >
-                                                        {minutesToTime(dragOverlay.selStart)}~{minutesToTime(dragOverlay.selEnd)}
-                                                    </div>
-                                                )}
-                                            </>
-                                        )}
-                                    </div>
-                                </div>
-
-                                {/* 아코디언: 해당 차량 예약 상세 */}
-                                {isExpanded && vRes.length > 0 && (
-                                    <div className="ml-[72px] pl-2 mt-1 mb-1 border-l-2 border-primary-300 dark:border-primary-700 animate-fade-in">
-                                        {vRes.map(r => {
-                                            const resEndDateTime = new Date(`${r.date}T${r.endTime || '23:59'}`);
-                                            const isPastReservation = resEndDateTime < new Date();
-                                            return (
-                                                <div key={r.id} className="py-1.5 first:pt-0.5 last:pb-0.5">
-                                                    <div className="flex items-center justify-between gap-1">
-                                                        <div className="text-[11px] text-surface-600 dark:text-surface-300 truncate">
-                                                            <span className="font-medium">{r.reservedByName}</span>
-                                                            <span className="mx-1 text-surface-300 dark:text-surface-600">|</span>
-                                                            {r.startTime} ~ {r.endTime}
-                                                            {r.destination && <span className="mx-1 text-surface-300 dark:text-surface-600">|</span>}
-                                                            {r.destination && <span>{r.destination}</span>}
-                                                            {r.purpose && <span>, {r.purpose}</span>}
-                                                            {r.groupId && <span className="ml-1 text-blue-500 dark:text-blue-400" title="다일 예약">🔗</span>}
-                                                        </div>
-                                                        <div className="flex items-center gap-1.5 flex-shrink-0">
-                                                            {r.syncSource === 'calendar' && (
-                                                                <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300 rounded-full font-medium">
-                                                                    📅
-                                                                </span>
-                                                            )}
-                                                            {r.status === 'pending' && (
-                                                                <span className="text-[10px] px-1.5 py-0.5 badge-warning rounded-full font-medium whitespace-nowrap">
-                                                                    승인 대기
-                                                                </span>
-                                                            )}
-                                                            {(isAdmin || r.reservedByUid === user?.id || r.reservedByUid === user?.uid) && !isPastReservation && (
-                                                                <>
-                                                                    <button onClick={() => { onEdit?.(r); setShowForm?.(true); }} className="text-[11px] leading-none py-0.5 text-primary-500 dark:text-primary-400 hover:underline min-w-[48px] min-h-[48px] flex items-center justify-center">수정</button>
-                                                                    <button onClick={() => onCancel?.(r.id)} className="text-[11px] leading-none py-0.5 text-red-500 dark:text-red-400 hover:underline min-w-[48px] min-h-[48px] flex items-center justify-center">취소</button>
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                    {r.routeDistance && (
-                                                        <p className="text-[11px] text-blue-500 dark:text-blue-400 mt-0.5 flex items-center gap-2">
-                                                            <span>🗺️ {Math.floor(r.routeDistance)}km</span>
-                                                            <span>⏱ {r.routeDuration}분</span>
-                                                            {(r.routeTollFee ?? 0) > 0 && <span>₩{r.routeTollFee?.toLocaleString()}</span>}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
-                            </div>
-                        );
-                    })}
+                    {vehicleData.map(({ vehicle, reservations: vRes }) => (
+                        <VehicleTimelineRow
+                            key={vehicle.id}
+                            vehicle={vehicle}
+                            vRes={vRes}
+                            dynamicStart={dynamicStart}
+                            hourLabels={hourLabels}
+                            gaps={getGaps(vRes, isToday, nowSnapped)}
+                            isDragging={dragState?.vehicleId === vehicle.id}
+                            dragOverlay={dragOverlay}
+                            barRefCallback={el => { barRefs.current[vehicle.id] = el; }}
+                            handleDragStart={handleDragStart}
+                            isPastDate={isPastDate}
+                            isExpanded={expandedVehicleId === vehicle.id}
+                            toggleExpand={toggleExpand}
+                            onEdit={onEdit}
+                            onCancel={onCancel}
+                            user={user}
+                            isAdmin={isAdmin}
+                            setShowForm={setShowForm}
+                        />
+                    ))}
                 </div>
 
                 {/* 조작 안내 팁 */}

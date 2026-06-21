@@ -14,7 +14,7 @@ async function geocodeByTmapBackfill(address: string, apiKey: string): Promise<{
     try {
         const poiUrl = `https://apis.openapi.sk.com/tmap/pois?version=1&format=json&searchKeyword=${encodeURIComponent(address)}&resCoordType=WGS84GEO&reqCoordType=WGS84GEO&count=1`;
         const poiRes = await fetch(poiUrl, { headers: { appKey: apiKey } });
-        const poiData: any = await poiRes.json();
+        const poiData = await poiRes.json() as { searchPoiInfo?: { pois?: { poi?: Array<{ noorLat: string; noorLon: string }> } } };
         const poi = poiData?.searchPoiInfo?.pois?.poi?.[0];
         if (poi) {
             const lat = parseFloat(poi.noorLat);
@@ -24,7 +24,7 @@ async function geocodeByTmapBackfill(address: string, apiKey: string): Promise<{
 
         const geoUrl = `https://apis.openapi.sk.com/tmap/geo/fullAddrGeo?version=1&format=json&coordType=WGS84GEO&fullAddr=${encodeURIComponent(address)}`;
         const geoRes = await fetch(geoUrl, { headers: { appKey: apiKey } });
-        const geoData: any = await geoRes.json();
+        const geoData = await geoRes.json() as { coordinateInfo?: { coordinate?: Array<{ newLat: string; lat: string; newLon: string; lon: string }> } };
         const item = geoData?.coordinateInfo?.coordinate?.[0];
         if (item) {
             const lat = parseFloat(item.newLat || item.lat);

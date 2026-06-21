@@ -92,7 +92,7 @@ async function purgeOrgs(db: FirebaseFirestore.Firestore) {
     console.log(`Auto-purge complete: ${totalPurged} organizations permanently deleted.`);
 }
 
-async function cleanupImages(db: FirebaseFirestore.Firestore, bucket: any) {
+async function cleanupImages(db: FirebaseFirestore.Firestore, bucket: ReturnType<ReturnType<typeof getStorage>["bucket"]>) {
     console.log("[Batch] Starting cleanupCertificateImages...");
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -147,7 +147,7 @@ async function cleanupImages(db: FirebaseFirestore.Firestore, bucket: any) {
     console.log(`Certificate cleanup complete: ${totalCleaned} images deleted.`);
 }
 
-export async function archiveLogs(db: FirebaseFirestore.Firestore, bucket: any) {
+export async function archiveLogs(db: FirebaseFirestore.Firestore, bucket: ReturnType<ReturnType<typeof getStorage>["bucket"]>) {
     console.log("[Batch] Starting archiveDriveLogs...");
     const threeYearsAgo = new Date();
     threeYearsAgo.setFullYear(threeYearsAgo.getFullYear() - 3);

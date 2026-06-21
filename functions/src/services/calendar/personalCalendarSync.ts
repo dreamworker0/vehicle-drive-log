@@ -2,6 +2,9 @@ import { google, calendar_v3 } from "googleapis";
 import { db } from "../../core/firebase";
 import { captureError } from "../../core/sentry";
 
+// google.auth.OAuth2 인스턴스 타입(외부 패키지 직접 import 없이 파생)
+type OAuth2Client = InstanceType<typeof google.auth.OAuth2>;
+
 export interface GoogleOauthData {
     accessToken: string;
     refreshToken: string;
@@ -20,7 +23,7 @@ interface ReservationData {
     [key: string]: unknown;
 }
 
-export async function getValidOAuth2Client(uid: string): Promise<any> {
+export async function getValidOAuth2Client(uid: string): Promise<OAuth2Client> {
     const userRef = db.collection("users").doc(uid);
     const userSnap = await userRef.get();
     if (!userSnap.exists) {
@@ -136,7 +139,7 @@ function buildEvent(reservation: ReservationData): calendar_v3.Schema$Event {
 }
 
 // 개인 캘린더 이벤트 생성
-export async function createPersonalCalendarEvent(oauth2Client: any, reservation: ReservationData): Promise<string> {
+export async function createPersonalCalendarEvent(oauth2Client: OAuth2Client, reservation: ReservationData): Promise<string> {
     const calendar = google.calendar({ version: "v3", auth: oauth2Client });
     const event = buildEvent(reservation);
 
@@ -150,7 +153,7 @@ export async function createPersonalCalendarEvent(oauth2Client: any, reservation
 }
 
 // 개인 캘린더 이벤트 수정
-export async function updatePersonalCalendarEvent(oauth2Client: any, eventId: string, reservation: ReservationData): Promise<void> {
+export async function updatePersonalCalendarEvent(oauth2Client: OAuth2Client, eventId: string, reservation: ReservationData): Promise<void> {
     const calendar = google.calendar({ version: "v3", auth: oauth2Client });
     const event = buildEvent(reservation);
 
@@ -164,7 +167,7 @@ export async function updatePersonalCalendarEvent(oauth2Client: any, eventId: st
 }
 
 // 개인 캘린더 이벤트 삭제
-export async function deletePersonalCalendarEvent(oauth2Client: any, eventId: string): Promise<void> {
+export async function deletePersonalCalendarEvent(oauth2Client: OAuth2Client, eventId: string): Promise<void> {
     const calendar = google.calendar({ version: "v3", auth: oauth2Client });
 
     try {

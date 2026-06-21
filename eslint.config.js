@@ -8,7 +8,7 @@ import jsxA11y from 'eslint-plugin-jsx-a11y'
 import requireOrganizationFilter from './eslint-rules/require-organization-filter.js'
 
 export default defineConfig([
-  globalIgnores(['dist', 'coverage', 'test-results', 'playwright-report', 'functions', 'scratch']),
+  globalIgnores(['dist', 'coverage', 'test-results', 'playwright-report', 'functions/lib', 'functions/coverage', 'scratch']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [
@@ -40,6 +40,8 @@ export default defineConfig([
   },
   {
     files: ['**/*.{ts,tsx}'],
+    // functions/는 Node/ESM 백엔드라 브라우저·React 규칙 대상에서 제외하고 아래 별도 블록에서 린트.
+    ignores: ['functions/**'],
     extends: [
       js.configs.recommended,
       ...tseslint.configs.recommended,
@@ -83,6 +85,7 @@ export default defineConfig([
     languageOptions: {
       globals: {
         vi: 'readonly',
+        jest: 'readonly', // functions 테스트는 Jest 기반
         describe: 'readonly',
         it: 'readonly',
         expect: 'readonly',
@@ -91,6 +94,52 @@ export default defineConfig([
         beforeAll: 'readonly',
         afterAll: 'readonly',
       },
+    },
+  },
+  {
+    // Cloud Functions (Node, ESM TypeScript). 루트가 functions 전체를 ignore하던 것을 해제하고
+    // 프론트(브라우저/React) 규칙과 분리된 별도 규칙으로 린트한다. 컴파일 산출물(functions/lib)은
+    // globalIgnores에서 제외된다.
+    files: ['functions/**/*.ts'],
+    extends: [
+      js.configs.recommended,
+      ...tseslint.configs.recommended,
+    ],
+    languageOptions: {
+      ecmaVersion: 2022,
+      globals: globals.node,
+      parser: tseslint.parser,
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module',
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^[A-Z_]', ignoreRestSiblings: true }],
+      // Firestore 문서 등 동적 데이터가 많아 any는 경고로만 둔다(점진적 제거 대상, 빌드는 막지 않음).
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/no-empty-object-type': 'off',
+      'no-unused-vars': 'off',
+    },
+  },
+  {
+    // functions 테스트·일회성 스크립트: Jest 모킹/CJS require 패턴이 정당하게 쓰이므로
+    // 해당 규칙만 완화한다(소스 규칙은 위 블록에서 유지). node 런타임 글로벌도 부여.
+    files: [
+      'functions/**/__tests__/**/*.{ts,js}',
+      'functions/**/*.test.{ts,js}',
+      'functions/**/scripts/**/*.{ts,js}',
+      'functions/scripts/**/*.{ts,js}',
+    ],
+    languageOptions: {
+      globals: globals.node,
+    },
+    rules: {
+      '@typescript-eslint/no-unsafe-function-type': 'off',
+      '@typescript-eslint/no-require-imports': 'off',
+      // 테스트 모킹·일회성 스크립트에서는 any를 허용한다(과도한 타입화 비용 회피).
+      '@typescript-eslint/no-explicit-any': 'off',
+      'no-undef': 'off',
     },
   },
   {

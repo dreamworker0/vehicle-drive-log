@@ -30,6 +30,7 @@ function getSentry(): SentryLike | null {
     
     if (DSN && !IS_TEST) {
         try {
+            // eslint-disable-next-line @typescript-eslint/no-require-imports -- 테스트/미설정 환경에서 Sentry 미로딩을 위한 지연 require
             _sentry = require("@sentry/node");
             _sentry?.init({
                 dsn: DSN,

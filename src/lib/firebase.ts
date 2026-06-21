@@ -6,6 +6,7 @@ import { getStorage } from 'firebase/storage';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 import { initializeAppCheck, ReCaptchaV3Provider, onTokenChanged } from 'firebase/app-check';
 import { isInAppBrowser } from './inAppBrowser';
+import { notifyUser } from './notify';
 // firebase/analytics, firebase/messaging은 동적 import (번들 최적화)
 
 // === E2E/로컬 에뮬레이터 모드 ===
@@ -154,8 +155,7 @@ function showQuotaAlert(msg: string) {
     if (quotaAlertShown) return;
     if (msg.includes('QuotaExceededError') || msg.includes('Encountered full disk')) {
         quotaAlertShown = true;
-        // eslint-disable-next-line no-restricted-globals -- 비-React 모듈이라 useToast 사용 불가, 저장공간 부족 시 유일한 알림 수단
-        alert('기기 저장공간이 부족합니다.\n불필요한 앱이나 파일을 삭제한 후 다시 시도해주세요.');
+        notifyUser('기기 저장공간이 부족합니다. 불필요한 앱이나 파일을 삭제한 후 다시 시도해주세요.', 'error', 12000);
     }
 }
 
@@ -185,8 +185,7 @@ async function attemptCacheRecovery() {
             sessionStorage.setItem('firestore_recovered', 'true');
             window.location.reload();
         } else {
-            // eslint-disable-next-line no-restricted-globals
-            alert('오프라인 데이터 로딩 중 지속적인 문제가 발생하고 있습니다.\n브라우저 방문 기록(캐시 및 쿠키)을 비운 후 다시 시도해주세요.');
+            notifyUser('오프라인 데이터 로딩 중 지속적인 문제가 발생하고 있습니다. 브라우저 방문 기록(캐시 및 쿠키)을 비운 후 다시 시도해주세요.', 'error', 12000);
             sessionStorage.removeItem('firestore_recovered');
         }
     } catch (err) {

@@ -5,6 +5,7 @@
         "build": "tsc",
         "gcp-build": "",
         "build:watch": "tsc --watch",
+        "type-check": "tsc --noEmit",
         "test": "jest --verbose --testPathIgnorePatterns=emulator",
         "test:emulator": "jest --verbose --runInBand --testPathPattern=\"emulator\\.test\"",
         "serve": "npm run build && firebase emulators:start --only functions",

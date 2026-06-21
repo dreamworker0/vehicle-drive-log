@@ -36,7 +36,7 @@ export function createAuthenticatedProxy(
     return onRequest(
         {
             region: "asia-northeast3",
-            cors: [...CORS_ORIGINS] as any,
+            cors: [...CORS_ORIGINS] as (string | RegExp)[],
         },
         wrapHttps(name, async (req: Request, res: Response) => {
             // 1. Firebase Auth 인증 검증

@@ -7,12 +7,19 @@ import {
     RANGE_START, RANGE_END, SNAP_MINUTES,
 } from '../lib/timelineUtils';
 
-interface DragState {
+export interface DragState {
     vehicleId: string;
     gapStart: number;
     gapEnd: number;
     startMin: number;
     currentMin: number;
+}
+
+export interface DragOverlay {
+    left: number;
+    width: number;
+    selStart: number;
+    selEnd: number;
 }
 
 /**

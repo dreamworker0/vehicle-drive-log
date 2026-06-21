@@ -207,7 +207,7 @@ export function parseEventToReservation(event: CalendarEvent, vehicleId: string,
         // 제목 앞에 붙은 [차량명] 제거 후 파싱
         const cleanedSummary = summary.replace(/^\[.*?\]\s*/, '');
         // 구분자: —, –, - (앞뒤 공백 포함)
-        const match = cleanedSummary.match(/^(.+?)\s*[—–\-]\s*(.+)$/);
+        const match = cleanedSummary.match(/^(.+?)\s*[—–-]\s*(.+)$/);
         if (match) {
             if (!destination) destination = match[1].trim();
             if (!reservedByName) reservedByName = match[2].trim();

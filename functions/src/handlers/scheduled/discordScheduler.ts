@@ -10,7 +10,7 @@ export const scheduledDiscordBriefing = onSchedule(
         timeZone: "Asia/Seoul",
         retryCount: 0,
     },
-    async (event) => {
+    async (_event) => {
         const db = getFirestore();
         const now = new Date();
         const kstNow = toKSTDate(now);

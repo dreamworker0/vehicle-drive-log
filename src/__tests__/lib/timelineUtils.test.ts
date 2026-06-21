@@ -6,7 +6,7 @@ import {
     TIMELINE_START, TIMELINE_END, TIMELINE_HOURS,
     SNAP_MINUTES, RANGE_START, RANGE_END, TOTAL_MINUTES,
     timeToMinutes, minutesToTime, snapMinutes, getPercent,
-    getGaps, getHourLabels,
+    getGaps, getHourLabels, resolveReservationBlock,
 } from '../../lib/timelineUtils';
 
 describe('timelineUtils 상수', () => {
@@ -123,5 +123,53 @@ describe('getHourLabels', () => {
     it('3시간 간격 라벨 생성', () => {
         const labels = getHourLabels();
         expect(labels).toEqual([6, 9, 12, 15, 18, 21]);
+    });
+});
+
+describe('resolveReservationBlock', () => {
+    it('일반 예약의 left/width 계산 (09:00~10:00)', () => {
+        // 09:00=540, 10:00=600, dynamicStart=360(06:00)
+        // left = (540-360)/1020*100 ≈ 17.65, width = 60/1020*100 ≈ 5.88
+        const { left, width } = resolveReservationBlock(
+            { startTime: '09:00', endTime: '10:00' }, RANGE_START,
+        );
+        expect(left).toBeCloseTo(17.647, 2);
+        expect(width).toBeCloseTo(5.882, 2);
+    });
+
+    it('아주 짧은 예약도 최소 1.5% 폭 보장', () => {
+        const { width } = resolveReservationBlock(
+            { startTime: '09:00', endTime: '09:05' }, RANGE_START,
+        );
+        expect(width).toBe(1.5);
+    });
+
+    it('completed + actualTime이 2시간 이내면 실제 시각 사용', () => {
+        // 예약 09:00~10:00, 실제 09:30~10:30 (30분 차 → 유효)
+        const { left } = resolveReservationBlock(
+            { status: 'completed', startTime: '09:00', endTime: '10:00', actualStartTime: '09:30', actualEndTime: '10:30' },
+            RANGE_START,
+        );
+        // 09:30=570 → (570-360)/1020*100 ≈ 20.588
+        expect(left).toBeCloseTo(20.588, 2);
+    });
+
+    it('completed + actualTime이 2시간 초과로 벗어나면 예약 시각으로 폴백', () => {
+        // 예약 09:00~10:00, 실제 06:00 (180분 차 → 2시간 초과 → 무효, 폴백)
+        const { left } = resolveReservationBlock(
+            { status: 'completed', startTime: '09:00', endTime: '10:00', actualStartTime: '06:00', actualEndTime: '07:00' },
+            RANGE_START,
+        );
+        // 폴백 09:00 → 17.647
+        expect(left).toBeCloseTo(17.647, 2);
+    });
+
+    it('시야 시작점 이전 예약은 시작점으로 클램프', () => {
+        // dynamicStart=600(10:00), 예약 08:00~09:00 → 전부 시작점 이전
+        const { left, width } = resolveReservationBlock(
+            { startTime: '08:00', endTime: '09:00' }, 600,
+        );
+        expect(left).toBe(0);
+        expect(width).toBe(1.5);
     });
 });

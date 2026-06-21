@@ -3,14 +3,20 @@
   "private": true,
   "version": "1.0.0",
   "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "vite",
-    "prebuild": "tsx scripts/generate-sw-config.ts",
+    "check:node": "tsx scripts/check-node-version.ts",
+    "prebuild": "tsx scripts/check-node-version.ts && tsx scripts/generate-sw-config.ts",
     "build": "vite build",
     "postbuild": "tsx scripts/check-bundle-size.ts && tsx scripts/generate-seo.ts",
     "screenshots": "tsx scripts/generate-screenshots.ts",
     "lint": "eslint .",
+    "lint:functions": "eslint functions",
     "type-check": "tsc --noEmit",
+    "type-check:functions": "tsc --noEmit -p functions/tsconfig.json",
     "preview": "vite preview",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -21,6 +27,7 @@
     "eval:trigger": "tsx scripts/run-eval.ts trigger",
     "eval:behavior": "tsx scripts/run-eval.ts behavior",
     "health": "tsx scripts/check-functions-health.ts",
+    "pretest:e2e": "tsx scripts/check-e2e-ready.ts",
     "test:e2e": "playwright test",
     "test:e2e:emulator": "firebase emulators:exec --only auth,firestore \"playwright test -c playwright.emulator.config.ts\"",
     "prepare": "husky"

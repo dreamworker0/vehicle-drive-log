@@ -10,6 +10,12 @@ import { getKSTYear } from "../../utils/kstDate";
 
 const HOLIDAY_API_KEY = defineString("HOLIDAY_API_KEY");
 
+// 공공데이터 포털 공휴일 API 응답(사용 필드만)
+interface HolidayApiItem { isHoliday: string; locdate: number; dateName: string; }
+interface HolidayApiResponse {
+    response?: { body?: { items?: { item?: HolidayApiItem | HolidayApiItem[] } } };
+}
+
 export async function syncHolidays(): Promise<void> {
     try {
             const db = getFirestore();
@@ -29,10 +35,10 @@ export async function syncHolidays(): Promise<void> {
                 const response = await fetch(url);
                 const text = await response.text();
 
-                let data: any;
+                let data: HolidayApiResponse;
                 try {
                     data = JSON.parse(text);
-                } catch (parseError) {
+                } catch {
                     console.error(`[공공데이터 API] JSON 파싱 실패 (year: ${year}): ${text.substring(0, 200)}`);
                     continue;
                 }

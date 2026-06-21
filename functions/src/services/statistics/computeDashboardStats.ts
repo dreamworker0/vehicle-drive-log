@@ -9,6 +9,7 @@ import {
     computeFirstEmployeeAnalysis, computeMonthlyGrowth,
     computeFunnelData, computeOrgSizeDistribution,
     assembleFuelTypeStats, assembleVehicleTypeStats, assembleModelStats,
+    computeReservationStats,
 } from "./dashboardSections";
 
 /**
@@ -171,85 +172,13 @@ export async function computeAllDashboardStats(): Promise<void> {
         });
 
         // ── 5.5. 예약 집계 ──
-        const dailyResMap: Record<string, { regular: number; quick: number; recommendation: number; normal: number; single: number; multiDay: number; recurring: number }> = {};
-        for (let i = 0; i < 30; i++) {
-            const d = new Date(thirtyDaysAgo);
-            d.setDate(d.getDate() + i);
-            const key = `${d.getMonth() + 1}/${d.getDate()}`;
-            dailyResMap[key] = { regular: 0, quick: 0, recommendation: 0, normal: 0, single: 0, multiDay: 0, recurring: 0 };
-        }
-
-        const futureResMap: Record<string, { single: number; multiDay: number; recurring: number }> = {};
         const todayStart = new Date(year, month, kstNow.getDate());
-        for (let i = 0; i < 30; i++) {
-            const d = new Date(todayStart);
-            d.setDate(d.getDate() + i);
-            const key = `${d.getMonth() + 1}/${d.getDate()}`;
-            futureResMap[key] = { single: 0, multiDay: 0, recurring: 0 };
-        }
-
-        let qTotal = 0, qQuick = 0, qRegular = 0;
-        let recTotal = 0, recRecommendation = 0, recNormal = 0;
-        let rtSingle = 0, rtMultiDay = 0, rtRecurring = 0;
-        let ftSingle = 0, ftMultiDay = 0, ftRecurring = 0;
-        const processedCalendarEvents = new Set<string>();
-
-        currentReservationDocs.forEach(doc => {
-            const data = doc.data();
-            if (orgFilterId && data.organizationId !== orgFilterId) return;
-            if (data.status === "cancelled") return;
-            if (data.calendarEventId) {
-                const dedupeKey = `${data.calendarEventId}_${data.date || ""}`;
-                if (processedCalendarEvents.has(dedupeKey)) return;
-                processedCalendarEvents.add(dedupeKey);
-            }
-            const dStr = data.date as string;
-            if (!dStr) return;
-            const [y, m, dd] = dStr.split("-").map(Number);
-            const parsed = new Date(y, m - 1, dd);
-
-            if (parsed >= thirtyDaysAgo) {
-                const key = `${parsed.getMonth() + 1}/${parsed.getDate()}`;
-                qTotal++; recTotal++;
-                if (data.isQuickDrive) { qQuick++; if (dailyResMap[key]) dailyResMap[key].quick++; }
-                else { qRegular++; if (dailyResMap[key]) dailyResMap[key].regular++; }
-                if (data.source === "recommendation") { recRecommendation++; if (dailyResMap[key]) dailyResMap[key].recommendation++; }
-                else { recNormal++; if (dailyResMap[key]) dailyResMap[key].normal++; }
-                if (data.recurringGroupId) { rtRecurring++; if (dailyResMap[key]) dailyResMap[key].recurring++; }
-                else if (data.groupId) { rtMultiDay++; if (dailyResMap[key]) dailyResMap[key].multiDay++; }
-                else { rtSingle++; if (dailyResMap[key]) dailyResMap[key].single++; }
-            }
-
-            if (parsed >= todayStart) {
-                const key = `${parsed.getMonth() + 1}/${parsed.getDate()}`;
-                if (data.recurringGroupId) { if (futureResMap[key]) { futureResMap[key].recurring++; ftRecurring++; } }
-                else if (data.groupId) { if (futureResMap[key]) { futureResMap[key].multiDay++; ftMultiDay++; } }
-                else { if (futureResMap[key]) { futureResMap[key].single++; ftSingle++; } }
-            }
-        });
-
-        const quickDriveRatio = { total: qTotal, quick: qQuick, regular: qRegular, rate: qTotal > 0 ? Math.round((qQuick / qTotal) * 100) : 0 };
-        const recommendationRatio = { total: recTotal, recommendation: recRecommendation, normal: recNormal, rate: recTotal > 0 ? Math.round((recRecommendation / recTotal) * 100) : 0 };
-        const quickDriveStats = Object.entries(dailyResMap).map(([date, counts]) => ({ date, regular: counts.regular, quick: counts.quick }));
-        const recommendationStats = Object.entries(dailyResMap).map(([date, counts]) => ({ date, recommendation: counts.recommendation, normal: counts.normal }));
-
-        const rtTotal = rtSingle + rtMultiDay + rtRecurring;
-        const reservationTypeRatio = {
-            total: rtTotal, single: rtSingle, multiDay: rtMultiDay, recurring: rtRecurring,
-            singleRate: rtTotal > 0 ? Math.round((rtSingle / rtTotal) * 100) : 0,
-            multiDayRate: rtTotal > 0 ? Math.round((rtMultiDay / rtTotal) * 100) : 0,
-            recurringRate: rtTotal > 0 ? Math.round((rtRecurring / rtTotal) * 100) : 0,
-        };
-        const reservationTypeStats = Object.entries(dailyResMap).map(([date, counts]) => ({ date, single: counts.single, multiDay: counts.multiDay, recurring: counts.recurring }));
-
-        const ftTotal = ftSingle + ftMultiDay + ftRecurring;
-        const futureReservationTypeRatio = {
-            total: ftTotal, single: ftSingle, multiDay: ftMultiDay, recurring: ftRecurring,
-            singleRate: ftTotal > 0 ? Math.round((ftSingle / ftTotal) * 100) : 0,
-            multiDayRate: ftTotal > 0 ? Math.round((ftMultiDay / ftTotal) * 100) : 0,
-            recurringRate: ftTotal > 0 ? Math.round((ftRecurring / ftTotal) * 100) : 0,
-        };
-        const futureReservationTypeStats = Object.entries(futureResMap).map(([date, counts]) => ({ date, single: counts.single, multiDay: counts.multiDay, recurring: counts.recurring }));
+        const {
+            quickDriveRatio, quickDriveStats,
+            recommendationRatio, recommendationStats,
+            reservationTypeRatio, reservationTypeStats,
+            futureReservationTypeRatio, futureReservationTypeStats,
+        } = computeReservationStats(currentReservationDocs, thirtyDaysAgo, todayStart, orgFilterId);
 
         // ── 6. 차량 집계 ──
         const vehicleResult = computeVehicleStats(currentVehicleDocs, approvedOrgMap, orgFilterId);

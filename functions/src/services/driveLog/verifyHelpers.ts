@@ -91,6 +91,23 @@ export async function downloadFileAsBase64(downloadUrl: string): Promise<{ base6
 
 // ── 지오코딩 ──
 
+// Tmap POI/Geocoding API 응답의 사용 필드만 정의한 최소 타입
+interface TmapPoi {
+    noorLat: string;
+    noorLon: string;
+    newAddressList?: { newAddress?: Array<{ fullAddressRoad?: string }> };
+    upperAddrName?: string;
+    middleAddrName?: string;
+    lowerAddrName?: string;
+    detailAddrName?: string;
+}
+interface TmapPoiResponse {
+    searchPoiInfo?: { pois?: { poi?: TmapPoi[] } };
+}
+interface TmapGeoResponse {
+    coordinateInfo?: { coordinate?: Array<{ newLat: string; lat: string; newLon: string; lon: string }> };
+}
+
 /**
  * Tmap POI 검색으로 주소 + 좌표 찾기
  */
@@ -99,7 +116,7 @@ export async function searchAddressByTmap(keyword: string, apiKey: string): Prom
 
     const url = `https://apis.openapi.sk.com/tmap/pois?version=1&format=json&searchKeyword=${encodeURIComponent(keyword)}&resCoordType=WGS84GEO&reqCoordType=WGS84GEO&count=1`;
     const response = await fetch(url, { headers: { appKey: apiKey } });
-    const data: any = await response.json();
+    const data = await response.json() as TmapPoiResponse;
 
     const poi = data?.searchPoiInfo?.pois?.poi?.[0];
     if (!poi) return null;
@@ -131,7 +148,7 @@ export async function geocodeByTmap(address: string, apiKey: string): Promise<{ 
     try {
         const poiUrl = `https://apis.openapi.sk.com/tmap/pois?version=1&format=json&searchKeyword=${encodeURIComponent(address)}&resCoordType=WGS84GEO&reqCoordType=WGS84GEO&count=1`;
         const poiRes = await fetch(poiUrl, { headers: { appKey: apiKey } });
-        const poiData: any = await poiRes.json();
+        const poiData = await poiRes.json() as TmapPoiResponse;
         const poi = poiData?.searchPoiInfo?.pois?.poi?.[0];
         if (poi) {
             const lat = parseFloat(poi.noorLat);
@@ -141,7 +158,7 @@ export async function geocodeByTmap(address: string, apiKey: string): Promise<{ 
 
         const geoUrl = `https://apis.openapi.sk.com/tmap/geo/fullAddrGeo?version=1&format=json&coordType=WGS84GEO&fullAddr=${encodeURIComponent(address)}`;
         const geoRes = await fetch(geoUrl, { headers: { appKey: apiKey } });
-        const geoData: any = await geoRes.json();
+        const geoData = await geoRes.json() as TmapGeoResponse;
         const item = geoData?.coordinateInfo?.coordinate?.[0];
         if (item) {
             const lat = parseFloat(item.newLat || item.lat);

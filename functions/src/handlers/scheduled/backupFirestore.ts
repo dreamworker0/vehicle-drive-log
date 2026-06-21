@@ -1,7 +1,6 @@
 /**
  * backupFirestore — 매일 새벽 3시(KST) Firestore 자동 백업
  */
-import { getFirestore } from "firebase-admin/firestore";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { getKSTDateString } from "../../utils/kstDate";
 

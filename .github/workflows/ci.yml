@@ -34,6 +34,9 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
 
+      - name: Type check (functions)
+        run: npm run type-check:functions
+
       - name: .agent ↔ .claude 동기화 검증
         run: npm run sync:agents -- --check
 
@@ -45,6 +48,9 @@ jobs:
 
       - name: Unit tests
         run: npx vitest run
+
+      - name: Functions unit tests
+        run: cd functions && npm test
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium

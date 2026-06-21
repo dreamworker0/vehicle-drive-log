@@ -66,7 +66,7 @@ export const onReservationCreated = onDocumentCreated("reservations/{reservation
                 console.log("Vehicle " + reservation.vehicleId + ": no calendar ID, skip");
                 // 캘린더 연동을 안해도 실패 처리는 아님, 알림 로직으로 넘어가도록 수정
             } else {
-                const eventId = await createCalendarEvent(calendarId, reservation as any);
+                const eventId = await createCalendarEvent(calendarId, reservation as Parameters<typeof createCalendarEvent>[1]);
 
                 // 생성된 이벤트 ID를 예약 문서에 저장
                 await getFirestore().collection("reservations").doc(reservationId).update({
@@ -88,7 +88,7 @@ export const onReservationCreated = onDocumentCreated("reservations/{reservation
                 if (userSnap.exists && userSnap.data()?.googleOauth) {
                     const { getValidOAuth2Client, createPersonalCalendarEvent } = await import("../../services/calendar/personalCalendarSync");
                     const oauth2Client = await getValidOAuth2Client(reservation.reservedByUid);
-                    const personalEventId = await createPersonalCalendarEvent(oauth2Client, reservation as any);
+                    const personalEventId = await createPersonalCalendarEvent(oauth2Client, reservation as Parameters<typeof createPersonalCalendarEvent>[1]);
                     await getFirestore().collection("reservations").doc(reservationId).update({
                         personalCalendarEventId: personalEventId,
                     });
@@ -194,7 +194,7 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
             let newEventId = eventId;
             if (calendarId && !eventId) {
                 try {
-                    newEventId = await createCalendarEvent(calendarId, after as any);
+                    newEventId = await createCalendarEvent(calendarId, after as Parameters<typeof createCalendarEvent>[1]);
                     await getFirestore().collection("reservations").doc(reservationId).update({
                         calendarEventId: newEventId,
                     });
@@ -212,7 +212,7 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
                     if (userSnap.exists && userSnap.data()?.googleOauth) {
                         const { getValidOAuth2Client, createPersonalCalendarEvent } = await import("../../services/calendar/personalCalendarSync");
                         const oauth2Client = await getValidOAuth2Client(after.reservedByUid);
-                        const personalEventId = await createPersonalCalendarEvent(oauth2Client, after as any);
+                        const personalEventId = await createPersonalCalendarEvent(oauth2Client, after as Parameters<typeof createPersonalCalendarEvent>[1]);
                         await getFirestore().collection("reservations").doc(reservationId).update({
                             personalCalendarEventId: personalEventId,
                         });
@@ -278,7 +278,7 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
 
         if (changed) {
             if (calendarId && eventId) {
-                await updateCalendarEvent(calendarId, eventId, after as any);
+                await updateCalendarEvent(calendarId, eventId, after as Parameters<typeof updateCalendarEvent>[2]);
                 console.log("Reservation " + reservationId + ": calendar event updated");
             }
 
@@ -287,7 +287,7 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
                 try {
                     const { getValidOAuth2Client, updatePersonalCalendarEvent } = await import("../../services/calendar/personalCalendarSync");
                     const oauth2Client = await getValidOAuth2Client(after.reservedByUid);
-                    await updatePersonalCalendarEvent(oauth2Client, after.personalCalendarEventId, after as any);
+                    await updatePersonalCalendarEvent(oauth2Client, after.personalCalendarEventId, after as Parameters<typeof updatePersonalCalendarEvent>[2]);
                     console.log("Reservation " + reservationId + ": personal calendar event updated");
                 } catch (err: unknown) {
                     const { captureError } = await import("../../core/sentry");

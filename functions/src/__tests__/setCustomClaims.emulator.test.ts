@@ -14,7 +14,7 @@ import { getAuth } from "firebase-admin/auth";
 
 initializeTestApp();
 
-const db = getTestFirestore();
+const _db = getTestFirestore();
 const auth = getAuth();
 
 /**

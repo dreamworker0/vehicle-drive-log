@@ -74,7 +74,7 @@ export const ocrDashboard = onCall(
                 result.km = parsed.km != null ? Number(parsed.km) : null;
                 result.battery = parsed.battery != null ? Number(parsed.battery) : null;
             }
-        } catch (parseErr) {
+        } catch {
             // JSON 파싱 실패 시 숫자만 추출 시도
             const numbers = text.match(/\d+/g);
             if (numbers && numbers.length > 0) {

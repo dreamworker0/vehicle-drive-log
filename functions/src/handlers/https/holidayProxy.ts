@@ -26,7 +26,7 @@ export const holidayProxy = createAuthenticatedProxy("holidayProxy", async (req,
     let data;
     try {
         data = JSON.parse(text);
-    } catch (error) {
+    } catch {
         log("ERROR", "holidayProxy", `JSON 파싱 실패 (API 응답): ${text.substring(0, 200)}`);
         res.status(502).json({ error: "공공데이터 포털 API 연동 오류", details: text.substring(0, 100) });
         return;
