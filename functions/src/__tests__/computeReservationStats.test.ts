@@ -103,6 +103,19 @@ describe("computeReservationStats", () => {
         expect(r.futureReservationTypeRatio.recurring).toBe(1);
     });
 
+    it("thirtyDaysAgo에 시각이 실려도 윈도우 첫날 예약을 누락하지 않는다 (정규화 회귀)", () => {
+        // 실제 호출자는 new Date(Date.now() - 29d)로 시각(시/분/초)이 실린 값을 넘긴다.
+        const withTime = new Date(2026, 5, 1, 14, 30, 0); // 2026-06-01 14:30 (자정 아님)
+        const boundaryDay = dateStrFrom(withTime, 0); // 윈도우 첫날 = 2026-06-01 (parsed는 자정)
+        const docs = [fakeDoc({ date: boundaryDay })];
+
+        const r = computeReservationStats(docs, withTime, todayStart, null);
+
+        // 정규화 전에는 parsed(00:00) >= thirtyDaysAgo(14:30) === false 라 첫날이 누락되어 total=0이었다.
+        expect(r.reservationTypeRatio.total).toBe(1);
+        expect(r.reservationTypeStats.find(s => s.date === "6/1")?.single).toBe(1);
+    });
+
     it("반환 객체가 dashboardTimeSeries 기대 8개 키를 모두 포함", () => {
         const r = computeReservationStats([], thirtyDaysAgo, todayStart, null);
         expect(Object.keys(r).sort()).toEqual([

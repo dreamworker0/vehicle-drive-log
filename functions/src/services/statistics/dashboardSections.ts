@@ -354,9 +354,13 @@ export function computeReservationStats(
     todayStart: Date,
     orgFilterId: string | null,
 ): ReservationStatsResult {
+    // thirtyDaysAgo는 호출자가 Date.now() 기준으로 만들어 시각(시/분/초)이 실려 있을 수 있다.
+    // 아래 비교 대상 parsed는 new Date(y, m-1, dd)로 자정이므로, 시각을 0으로 정규화하지 않으면
+    // 윈도우 첫날(=thirtyDaysAgo와 같은 날짜)의 예약이 parsed >= thirtyDaysAgo에서 누락된다.
+    const startOfThirtyDaysAgo = new Date(thirtyDaysAgo.getFullYear(), thirtyDaysAgo.getMonth(), thirtyDaysAgo.getDate());
     const dailyResMap: Record<string, { regular: number; quick: number; recommendation: number; normal: number; single: number; multiDay: number; recurring: number }> = {};
     for (let i = 0; i < 30; i++) {
-        const d = new Date(thirtyDaysAgo);
+        const d = new Date(startOfThirtyDaysAgo);
         d.setDate(d.getDate() + i);
         const key = `${d.getMonth() + 1}/${d.getDate()}`;
         dailyResMap[key] = { regular: 0, quick: 0, recommendation: 0, normal: 0, single: 0, multiDay: 0, recurring: 0 };
@@ -390,7 +394,7 @@ export function computeReservationStats(
         const [y, m, dd] = dStr.split("-").map(Number);
         const parsed = new Date(y, m - 1, dd);
 
-        if (parsed >= thirtyDaysAgo) {
+        if (parsed >= startOfThirtyDaysAgo) {
             const key = `${parsed.getMonth() + 1}/${parsed.getDate()}`;
             qTotal++; recTotal++;
             if (data.isQuickDrive) { qQuick++; if (dailyResMap[key]) dailyResMap[key].quick++; }
