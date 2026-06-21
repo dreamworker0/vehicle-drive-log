@@ -34,7 +34,7 @@ export async function verifyMileageConsistency(): Promise<void> {
 
                 if (logsSnap.empty || logsSnap.docs.length < 2) continue;
 
-                const logs = logsSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
+                const logs = logsSnap.docs.map(d => ({ id: d.id, ...d.data() } as { id: string; startKm?: number; endKm?: number }));
 
                 // logs: [1000~1050, 950~1000, 900~950] (startKm 내림차순)
                 for (let i = 0; i < logs.length - 1; i++) {

@@ -117,8 +117,8 @@ export const notifyNewApplication = onDocumentWritten(
         // 2. 기관 승인 보류(거절) 알림
         else if (isRejected) {
             // (autoVerifyDocument.ts 등의 AI 검증 사유 혹은 관리자의 수동 입력 사유)
-            const aiDetail = after.aiVerifyDetail as Record<string, any>;
-            let reason = aiDetail?.reason || "알수없는 사유 또는 수동 반려";
+            const aiDetail = after.aiVerifyDetail as Record<string, unknown> | undefined;
+            const reason = (aiDetail?.reason as string | undefined) || "알수없는 사유 또는 수동 반려";
             
             await sendDiscordAlert({
                 title: `⛔ 🏢 기관 신청 보류(거절)`,

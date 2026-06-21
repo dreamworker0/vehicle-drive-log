@@ -14,7 +14,7 @@ import { formatPhoneNumber } from './useOrgApplication';
 import type { Organization, WithdrawReason } from '../types/organization';
 import type { CustomHoliday } from '../types/holiday';
 
-interface SettingsForm {
+export interface SettingsForm {
     name: string;
     adminEmail: string;
     address: string;

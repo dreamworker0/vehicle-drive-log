@@ -170,7 +170,7 @@ export const syncCalendarToApp = onSchedule(
  */
 export async function syncSingleVehicleCalendar(
     vehicleId: string,
-    vehicleData: any,
+    vehicleData: FirebaseFirestore.DocumentData,
     globalProcessedEventIds: Set<string> = new Set<string>()
 ): Promise<{
     created: number;

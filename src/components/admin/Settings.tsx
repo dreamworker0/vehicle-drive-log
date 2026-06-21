@@ -2,22 +2,20 @@
  * Settings — 기관 설정 페이지
  * 로직은 useSettings 훅, 공휴일 관리는 HolidayManager 사용
  */
-import { useState } from 'react';
 import useSettings from '../../hooks/useSettings';
-import { useAuth } from '../../hooks/useAuth';
-import { logout } from '../../lib/auth';
-import useNotification from '../../hooks/useNotification';
-import { useToast } from '../../hooks/useToast';
+import useSettingsModals from '../../hooks/useSettingsModals';
 
 import HolidayManager from './HolidayManager';
 import WithdrawOrgModal from './WithdrawOrgModal';
 import FeedbackForm from '../common/FeedbackForm';
 import UserManual from '../common/UserManual';
 import AskAIModal from '../common/AskAIModal';
-import Toggle from '../common/Toggle';
+import OrgInfoSection from './settings/OrgInfoSection';
+import ReservationApprovalSection from './settings/ReservationApprovalSection';
+import ApprovalLineSection from './settings/ApprovalLineSection';
+import AccountSection from './settings/AccountSection';
 
 export default function Settings() {
-    const { user } = useAuth();
     const {
         org, orgId, loading, saving, success, withdrawing,
         form, setForm,
@@ -28,13 +26,12 @@ export default function Settings() {
         handleSave, handlePhoneChange, handleAddHoliday, handleDeleteHoliday, handleWithdraw,
     } = useSettings();
 
-    const [showFeedback, setShowFeedback] = useState(false);
-    const [showManual, setShowManual] = useState(false);
-    const [showAskAI, setShowAskAI] = useState(false);
-    const [showWithdraw, setShowWithdraw] = useState(false);
-    const { permission, requestPermission } = useNotification();
-    const { showToast } = useToast();
-    const notifApiAvailable = typeof window !== 'undefined' && 'Notification' in window;
+    const {
+        showFeedback, setShowFeedback,
+        showManual, setShowManual,
+        showAskAI, setShowAskAI,
+        showWithdraw, setShowWithdraw,
+    } = useSettingsModals();
 
 
     if (loading) {
@@ -62,140 +59,28 @@ export default function Settings() {
             <h2 className="text-sm font-semibold text-surface-400 dark:text-surface-500 uppercase tracking-wider mb-3 px-1">기관 관리</h2>
 
             {/* 기관 정보 */}
-            <div className="glass-card p-6 mb-6">
-                <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4">기관 정보</h2>
-                <form onSubmit={handleSave} className="space-y-4">
-                    <div>
-                        <label className="label">기관명</label>
-                        <input type="text" value={form.name} className="input opacity-60 cursor-not-allowed min-h-[48px]" disabled />
-                    </div>
-                    <div>
-                        <label className="label">주소</label>
-                        {form.address ? (
-                            <input type="text" value={form.address} className="input opacity-60 cursor-not-allowed min-h-[48px]" disabled />
-                        ) : (
-                            <input
-                                type="text"
-                                value={form.address}
-                                onChange={e => setForm({ ...form, address: e.target.value })}
-                                className="input"
-                                placeholder="AI가 주소를 읽지 못한 경우 직접 입력해주세요"
-                            />
-                        )}
-                        <p className="text-xs text-surface-400 mt-1">
-                            💡 주소를 입력하면 예약 시 목적지까지의 소요 시간, 거리, 톨게이트비가 자동으로 계산됩니다.
-                        </p>
-                    </div>
-                    <div>
-                        <label className="label">관리자 이메일</label>
-                        <input type="email" value={form.adminEmail} onChange={e => setForm({ ...form, adminEmail: e.target.value })} className="input" />
-                    </div>
-                    <div>
-                        <label className="label">전화번호</label>
-                        <input type="tel" value={form.phone} onChange={handlePhoneChange} className="input min-h-[48px]" placeholder="010-0000-0000" />
-                    </div>
-                    <button
-                        type="button"
-                        onClick={() => setShowFeedback(true)}
-                        className="text-xs text-primary-500 dark:text-primary-400 hover:text-primary-600 dark:hover:text-primary-300 flex items-center gap-1 transition-colors min-h-[48px] py-2"
-                    >
-                        <svg className="w-4 h-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 1 0-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 0 0 2.25-2.25v-6.75a2.25 2.25 0 0 0-2.25-2.25H6.75a2.25 2.25 0 0 0-2.25 2.25v6.75a2.25 2.25 0 0 0 2.25 2.25Z" />
-                        </svg>
-                        기관명과 주소 변경은 슈퍼관리자에게 요청하세요.
-                    </button>
-                    <div className="flex justify-end">
-                        <button type="submit" disabled={saving} className="btn-primary min-h-[48px]">
-                            {saving ? (<><div className="w-4 h-4 spinner" />저장 중...</>) : '변경사항 저장'}
-                        </button>
-                    </div>
-                </form>
-            </div>
+            <OrgInfoSection
+                form={form}
+                setForm={setForm}
+                handlePhoneChange={handlePhoneChange}
+                handleSave={handleSave}
+                saving={saving}
+                onRequestFeedback={() => setShowFeedback(true)}
+            />
 
             {/* 예약 승인 설정 */}
-            <div className="glass-card p-6 mb-6">
-                <div className="flex items-center justify-between mb-1">
-                    <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100">예약 관리자 승인</h2>
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                        <span className={`text-xs font-medium ${!form.requireReservationApproval ? 'text-surface-400 dark:text-surface-500' : 'text-primary-600 dark:text-primary-400'}`}>
-                            {form.requireReservationApproval ? '사용' : '사용 안함'}
-                        </span>
-                        <Toggle
-                            label="예약 관리자 승인"
-                            checked={form.requireReservationApproval}
-                            onChange={(next) => handleSave(null, { requireReservationApproval: next })}
-                        />
-                    </label>
-                </div>
-                <p className="text-xs text-surface-400">
-                    💡 사용 시 직원들의 차량 예약이 즉시 확정되지 않고, 관리자의 승인을 거쳐야 합니다.
-                </p>
-            </div>
+            <ReservationApprovalSection
+                checked={form.requireReservationApproval}
+                onChange={(next) => handleSave(null, { requireReservationApproval: next })}
+            />
 
             {/* 결재 라인 설정 */}
-            <div className="glass-card p-6 mb-6">
-                <div className="flex items-center justify-between mb-1">
-                    <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100">결재 라인</h2>
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                        <span className={`text-xs font-medium ${form.hideApprovalLine ? 'text-surface-400 dark:text-surface-500' : 'text-primary-600 dark:text-primary-400'}`}>
-                            {form.hideApprovalLine ? 'PDF 결재란 숨김' : 'PDF 결재란 표시'}
-                        </span>
-                        <Toggle
-                            label="PDF 결재란 표시"
-                            checked={!form.hideApprovalLine}
-                            onChange={(next) => setForm({ ...form, hideApprovalLine: !next })}
-                        />
-                    </label>
-                </div>
-                <p className="text-xs text-surface-400 mb-4">PDF 운행일지에 표시될 결재란을 설정합니다. (수동 결재용)</p>
-
-                <div className={`space-y-2 mb-3 transition-opacity ${form.hideApprovalLine ? 'opacity-40 pointer-events-none' : ''}`}>
-                    {form.approvalLine.map((item, idx) => (
-                        <div key={idx} className="flex items-center gap-2">
-                            <input
-                                type="text"
-                                value={item.title}
-                                onChange={e => {
-                                    const next = [...form.approvalLine];
-                                    next[idx] = { ...next[idx], title: e.target.value };
-                                    setForm({ ...form, approvalLine: next });
-                                }}
-                                className="input text-sm flex-1"
-                                placeholder="직급 (예: 담당, 팀장)"
-                            />
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    const next = form.approvalLine.filter((_, i) => i !== idx);
-                                    setForm({ ...form, approvalLine: next });
-                                }}
-                                className="text-red-400 hover:text-red-600 dark:text-red-400 dark:hover:text-red-300 transition-colors p-2 min-h-[48px] min-w-[48px] flex items-center justify-center"
-                                title="삭제"
-                            >
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
-                                </svg>
-                            </button>
-                        </div>
-                    ))}
-                </div>
-
-                {form.approvalLine.length < 5 && !form.hideApprovalLine && (
-                    <button
-                        type="button"
-                        onClick={() => setForm({ ...form, approvalLine: [...form.approvalLine, { title: '' }] })}
-                        className="text-sm text-primary-500 hover:text-primary-700 dark:text-primary-400 font-medium transition-colors py-3 min-h-[48px]"
-                    >
-                        + 결재자 추가
-                    </button>
-                )}
-
-                <div className="flex justify-end mt-4">
-                    <button onClick={handleSave} disabled={saving} className="btn-primary btn-sm min-h-[48px]">
-                        {saving ? (<><div className="w-4 h-4 spinner" />저장 중...</>) : '결재 라인 저장'}
-                    </button>
-                </div>
-            </div>
+            <ApprovalLineSection
+                form={form}
+                setForm={setForm}
+                handleSave={handleSave}
+                saving={saving}
+            />
 
 
             <HolidayManager
@@ -279,91 +164,7 @@ export default function Settings() {
             {/* 내 계정 */}
             <h2 className="text-sm font-semibold text-surface-400 dark:text-surface-500 uppercase tracking-wider mt-8 mb-3 px-1">내 계정</h2>
 
-            <div className="glass-card p-6 mb-6">
-                <div className="flex items-center gap-3 p-3">
-                    <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/40 rounded-full flex items-center justify-center flex-shrink-0">
-                        <svg className="w-5 h-5 text-primary-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
-                        </svg>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                        <p className="text-sm font-semibold text-surface-900 dark:text-surface-100 truncate">{user?.displayName || '이름 없음'}</p>
-                        <p className="text-xs text-surface-400 truncate">{user?.email}</p>
-                    </div>
-                    <button
-                        onClick={logout}
-                        className="flex-shrink-0 flex items-center gap-1.5 text-sm font-medium text-red-500 dark:text-red-400 px-4 py-2 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/30 hover:bg-red-100 dark:hover:bg-red-900/50 transition-colors min-h-[48px]"
-                    >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" />
-                        </svg>
-                        로그아웃
-                    </button>
-                </div>
-
-                {notifApiAvailable && (
-                    <>
-                        <div className="border-t border-surface-100 dark:border-surface-700 my-1 mx-3" />
-                        <div
-                            role="button"
-                            tabIndex={0}
-                            className="flex items-center justify-between cursor-pointer rounded-xl p-3 hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors"
-                            onClick={() => {
-                                if (permission === 'default') {
-                                    requestPermission();
-                                } else {
-                                    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-                                    const isAndroid = /Android/.test(navigator.userAgent);
-                                    if (isIOS) {
-                                        showToast('설정 → 알림에서 이 앱의 알림을 변경할 수 있습니다.', 'info');
-                                    } else if (isAndroid) {
-                                        showToast('앱 아이콘을 길게 눌러 앱 정보 → 알림에서 변경할 수 있습니다.', 'info');
-                                    } else {
-                                        showToast('주소창 왼쪽 🔒 아이콘을 눌러 알림을 변경할 수 있습니다.', 'info');
-                                    }
-                                }
-                            }}
-                            onKeyDown={(e) => {
-                                if (e.key === 'Enter' || e.key === ' ') {
-                                    e.preventDefault();
-                                    if (permission === 'default') {
-                                        requestPermission();
-                                    } else {
-                                        const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-                                        const isAndroid = /Android/.test(navigator.userAgent);
-                                        if (isIOS) {
-                                            showToast('설정 → 알림에서 이 앱의 알림을 변경할 수 있습니다.', 'info');
-                                        } else if (isAndroid) {
-                                            showToast('앱 아이콘을 길게 눌러 앱 정보 → 알림에서 변경할 수 있습니다.', 'info');
-                                        } else {
-                                            showToast('주소창 왼쪽 🔒 아이콘을 눌러 알림을 변경할 수 있습니다.', 'info');
-                                        }
-                                    }
-                                }
-                            }}
-                        >
-                            <div className="flex items-center gap-3">
-                                <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${permission === 'granted' ? 'bg-blue-100 dark:bg-blue-900/40' : 'bg-surface-100 dark:bg-surface-800'}`}>
-                                    <svg className={`w-5 h-5 ${permission === 'granted' ? 'text-blue-500 dark:text-blue-400' : 'text-surface-400 dark:text-surface-500'}`} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
-                                    </svg>
-                                </div>
-                                <div>
-                                    <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">푸시 알림</p>
-                                    <p className="text-xs text-surface-400">예약 알림 및 운행 관련 알림</p>
-                                </div>
-                            </div>
-                            {permission === 'default' ? (
-                                <span className="text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/30 px-2.5 py-1 rounded-full">활성화</span>
-                            ) : permission === 'granted' ? (
-                                <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2.5 py-1 rounded-full">켜짐</span>
-                            ) : (
-                                <span className="text-xs font-medium text-red-500 dark:text-red-400 bg-red-50 dark:bg-red-900/30 px-2.5 py-1 rounded-full">꺼짐</span>
-                            )}
-                        </div>
-                    </>
-                )}
-            </div>
+            <AccountSection />
 
             {/* 기관 ID (읽기 전용) */}
             <h2 className="text-sm font-semibold text-surface-400 dark:text-surface-500 uppercase tracking-wider mt-8 mb-3 px-1">기관 정보 · 해지</h2>

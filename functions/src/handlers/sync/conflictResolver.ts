@@ -3,9 +3,11 @@ import { getFirestore, DocumentReference } from "firebase-admin/firestore";
 /**
  * 타임스탬프, Date, 문자열 등을 밀리초 단위 숫자로 변환합니다.
  */
-function getTimestamp(value: any): number {
+function getTimestamp(value: unknown): number {
     if (!value) return 0;
-    if (typeof value.toMillis === 'function') return value.toMillis();
+    if (typeof (value as { toMillis?: unknown }).toMillis === 'function') {
+        return (value as { toMillis: () => number }).toMillis();
+    }
     if (value instanceof Date) return value.getTime();
     if (typeof value === 'number') return value;
     if (typeof value === 'string') return new Date(value).getTime();
@@ -16,7 +18,7 @@ function getTimestamp(value: any): number {
  * Last-Writer-Wins (LWW) 정책에 따라 충돌 여부를 판단합니다.
  * 반환값이 true이면 새로 들어온 데이터가 구형 데이터이므로 덮어쓰기를 롤백해야 합니다.
  */
-export function shouldRevertLWW(beforeData: any, afterData: any): boolean {
+export function shouldRevertLWW(beforeData: FirebaseFirestore.DocumentData | undefined, afterData: FirebaseFirestore.DocumentData | undefined): boolean {
     if (!beforeData || !afterData) return false;
 
     // 클라이언트에서 기록한 최종 수정 시간(clientUpdatedAt) 또는 서버 수정 시간(updatedAt) 비교
@@ -34,7 +36,7 @@ export function shouldRevertLWW(beforeData: any, afterData: any): boolean {
  * 운행일지 충돌 해결
  * LWW 위반 시 기존 데이터로 롤백하고 true를 반환합니다.
  */
-export async function resolveDriveLogConflict(docRef: DocumentReference, beforeData: any, afterData: any): Promise<boolean> {
+export async function resolveDriveLogConflict(docRef: DocumentReference, beforeData: FirebaseFirestore.DocumentData, afterData: FirebaseFirestore.DocumentData): Promise<boolean> {
     if (shouldRevertLWW(beforeData, afterData)) {
         await docRef.set(beforeData);
         console.warn(`[ConflictResolver] DriveLog ${docRef.id} - 구형 데이터 덮어쓰기 감지. 이전 데이터로 롤백했습니다.`);
@@ -46,7 +48,7 @@ export async function resolveDriveLogConflict(docRef: DocumentReference, beforeD
 /**
  * 예약 데이터 충돌 해결 (LWW 위반 확인)
  */
-export async function resolveReservationConflict(docRef: DocumentReference, beforeData: any, afterData: any): Promise<boolean> {
+export async function resolveReservationConflict(docRef: DocumentReference, beforeData: FirebaseFirestore.DocumentData, afterData: FirebaseFirestore.DocumentData): Promise<boolean> {
     if (shouldRevertLWW(beforeData, afterData)) {
         await docRef.set(beforeData);
         console.warn(`[ConflictResolver] Reservation ${docRef.id} - 구형 데이터 덮어쓰기 감지. 이전 데이터로 롤백했습니다.`);

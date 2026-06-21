@@ -120,10 +120,13 @@ ALIMTALK_PROXY_TOKEN=...
 | 명령어 | 설명 |
 |--------|------|
 | `npm run dev` | 개발 서버 실행 (Vite, localhost:5173) |
-| `npm run build` | 프로덕션 빌드 (prebuild: SW 설정 생성, postbuild: 번들 크기 체크) |
-| `npm run lint` | ESLint 실행 |
+| `npm run build` | 프로덕션 빌드 (prebuild: Node 버전 확인 + SW 설정 생성, postbuild: 번들 크기 체크) |
+| `npm run check:node` | Node 메이저 버전이 22인지 확인 (불일치 시 경고) |
+| `npm run lint` | ESLint 실행 (프론트엔드 + Cloud Functions) |
+| `npm run lint:functions` | Cloud Functions만 ESLint 실행 |
+| `npm run type-check:functions` | Cloud Functions 타입 검사 (`tsc --noEmit`) |
 | `npm test` | 단위 테스트 (Vitest) |
-| `npm run test:e2e` | E2E 테스트 (Playwright) |
+| `npm run test:e2e` | E2E 테스트 (Playwright, 사전에 `npx playwright install chromium` 필요) |
 | `npm run test:e2e:emulator` | Firebase Emulator 기반 인증 E2E 테스트 |
 | `npm run screenshots` | PWA 스크린샷 생성 (Playwright + sharp) |
 | `npm run audit` | npm 보안 감사 리포트 |

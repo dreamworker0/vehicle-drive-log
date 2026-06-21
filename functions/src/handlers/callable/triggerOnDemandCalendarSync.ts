@@ -60,7 +60,7 @@ export const triggerOnDemandCalendarSync = onCall(
         }
 
         // 3. 차량 정보 조회 및 더블 검증
-        let vehicleData: any;
+        let vehicleData: FirebaseFirestore.DocumentData | undefined;
         try {
             const vehicleDoc = await db.collection("vehicles").doc(vehicleId).get();
             if (!vehicleDoc.exists) {

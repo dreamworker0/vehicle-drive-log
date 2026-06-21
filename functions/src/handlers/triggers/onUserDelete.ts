@@ -20,11 +20,12 @@ export const onUserDelete = functions
                 deletedAt: FieldValue.serverTimestamp()
             });
             log('INFO', 'onUserDelete', '유저 익명화 처리 완료', { uid });
-        } catch (error: any) {
-            if (error.code === 5) {
+        } catch (error: unknown) {
+            const e = error as { code?: number; message?: string };
+            if (e.code === 5) {
                 log('INFO', 'onUserDelete', '유저 문서가 존재하지 않아 익명화를 생략합니다.', { uid });
             } else {
-                log('ERROR', 'onUserDelete', '유저 익명화 실패', { uid, error: error.message });
+                log('ERROR', 'onUserDelete', '유저 익명화 실패', { uid, error: e.message });
             }
         }
     });

@@ -2,8 +2,6 @@ import { cleanupExpiredRateLimits } from "../utils/rateLimit";
 
 // Firestore mock
 const mockGet = jest.fn();
-const mockSet = jest.fn();
-const mockDelete = jest.fn();
 const mockRunTransaction = jest.fn();
 const mockBatchCommit = jest.fn();
 const mockBatchDelete = jest.fn();

@@ -24,8 +24,6 @@ let capturedHandler: any;
 // 모듈 로드 (capturedHandler에 핸들러 저장)
 require("../handlers/triggers/setCustomClaims");
 
-import { getAuth } from 'firebase-admin/auth';
-
 // ──────────────────────────────────────────────────
 describe('setCustomClaims — Custom Claims 자동 설정', () => {
     beforeEach(() => {

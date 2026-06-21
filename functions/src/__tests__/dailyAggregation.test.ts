@@ -52,7 +52,7 @@ jest.mock("firebase-admin/firestore", () => {
                     get: jest.fn().mockResolvedValue({ docs: [], size: 0, forEach: jest.fn() })
                 };
             }),
-            doc: jest.fn((docPath) => ({
+            doc: jest.fn(() => ({
                 set: mockSet
             }))
         }))

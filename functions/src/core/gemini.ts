@@ -16,10 +16,10 @@ export async function generateAiContent(
     prompt: string,
     image?: { mimeType: string; data: string } | Array<{ mimeType: string; data: string }>,
     model = "gemini-3.1-flash-lite",
-    config?: Record<string, any>
+    config?: Parameters<GoogleGenAI["models"]["generateContent"]>[0]["config"]
 ): Promise<string> {
     const ai = getGeminiClient();
-    const contents: any[] = [];
+    const contents: Array<{ inlineData?: { mimeType: string; data: string }; text?: string }> = [];
     
     if (image) {
         if (Array.isArray(image)) {

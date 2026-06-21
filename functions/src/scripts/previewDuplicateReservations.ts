@@ -1,4 +1,4 @@
-import { initializeApp, cert } from "firebase-admin/app";
+import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 // ts-node로 단독 실행 가능하도록 권한 설정이 세팅되어 있다고 가정 (또는 로컬 GOOGLE_APPLICATION_CREDENTIALS)
 // 로컬 실행용으로 admin 초기화 (default)

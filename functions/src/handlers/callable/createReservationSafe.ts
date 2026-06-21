@@ -17,7 +17,6 @@ export const createReservationSafe = onCall(
             organizationId,
             vehicleId,
             vehicleName,
-            reservedByUid,
             reservedByName,
             date,
             startTime,

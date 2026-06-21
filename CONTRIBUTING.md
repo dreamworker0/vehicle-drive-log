@@ -7,17 +7,21 @@
 ## 개발 환경 세팅
 
 ```bash
-# 1. Node.js 22 LTS 사용 (필수)
+# 1. Node.js 22 LTS 사용 (필수, Node 24는 Rollup 빌드 실패)
 fnm use 22
+npm run check:node   # 현재 Node 메이저가 22인지 확인 (불일치 시 경고)
 
 # 2. 의존성 설치
 npm install
 cd functions && npm install && cd ..
 
-# 3. 환경변수 설정
+# 3. E2E 브라우저 설치 (E2E 테스트를 돌릴 경우만)
+npx playwright install chromium
+
+# 4. 환경변수 설정
 # .env 파일 생성 (README.md 참고)
 
-# 4. 개발 서버 실행
+# 5. 개발 서버 실행
 npm run dev
 ```
 
@@ -123,11 +127,17 @@ npm run test:watch   # 감시 모드
 ### E2E 테스트 (Playwright)
 
 ```bash
+# 최초 1회: 브라우저(Chromium) 설치 (네트워크 다운로드)
+npx playwright install chromium
+
+# 실행
 npm run test:e2e
 ```
 
 - 테스트 파일 위치: `e2e/`
-- 개발 서버(`npm run dev`)가 실행 중이어야 함
+- 개발 서버는 Playwright `webServer` 설정이 자동 기동하므로 별도 실행 불필요
+- **브라우저 미설치 시** `npm run test:e2e`는 `pretest:e2e` 프리플라이트(`scripts/check-e2e-ready.ts`)에서 설치 명령을 안내하며 종료한다. 이는 앱 코드 실패가 아니라 **로컬 환경 미설치**다.
+- 에뮬레이터 기반 인증 E2E: `npm run test:e2e:emulator`
 
 ---
 
