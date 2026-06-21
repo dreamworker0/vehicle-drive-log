@@ -50,7 +50,9 @@ jobs:
         run: npx vitest run
 
       - name: Functions unit tests
-        run: cd functions && npm test
+        run: cd functions && npm test -- --maxWorkers=2 --workerIdleMemoryLimit=512MB
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
