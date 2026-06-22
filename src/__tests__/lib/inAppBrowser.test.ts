@@ -18,8 +18,15 @@ describe('inAppBrowser', () => {
             { name: '페이스북', ua: 'Mozilla/5.0 [FBAN/FBIOS]', expected: true },
             { name: '인스타그램', ua: 'Mozilla/5.0 Instagram 200', expected: true },
             { name: '라인', ua: 'Mozilla/5.0 Line/13.0', expected: true },
+            { name: '밴드', ua: 'Mozilla/5.0 (iPhone) BAND/14.0.0', expected: true },
+            { name: '카카오스토리', ua: 'Mozilla/5.0 (iPhone) kakaostory/4.0', expected: true },
+            { name: '다음', ua: 'Mozilla/5.0 (iPhone) DaumApps/4.5', expected: true },
+            { name: 'Android 인앱(WebView)', ua: 'Mozilla/5.0 (Linux; Android 13; SM-G991N; wv) AppleWebKit/537.36', expected: true },
             { name: 'Chrome 일반', ua: 'Mozilla/5.0 Chrome/120.0', expected: false },
             { name: 'Safari 일반', ua: 'Mozilla/5.0 Safari/605.1.15', expected: false },
+            // PWA 오탐 방지 회귀 케이스
+            { name: 'iOS 설치형 PWA (Safari 없음)', ua: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148', expected: false },
+            { name: 'Android Chrome 일반(비 WebView)', ua: 'Mozilla/5.0 (Linux; Android 13; SM-G991N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Mobile Safari/537.36', expected: false },
         ];
 
         testCases.forEach(({ name, ua, expected }) => {

@@ -1,18 +1,24 @@
 /**
  * 인앱 브라우저 감지 및 외부 브라우저 전환 유틸리티.
  *
- * 카카오톡, 네이버, LINE, Facebook, Instagram 등
- * 주요 인앱 브라우저에서 Google OAuth가 차단되는 문제를 우회한다.
+ * 카카오톡, 네이버, 밴드, 카카오스토리, 다음, LINE, Facebook, Instagram 등
+ * 주요 인앱 브라우저에서 Google OAuth가 차단되는("정책을 준수하지 않습니다",
+ * disallowed_useragent) 문제를 우회한다.
  */
 
 /**
  * 현재 브라우저가 인앱 브라우저(WebView)인지 감지한다.
+ *
+ * 주의: iOS 홈화면 설치 PWA는 UA에 "Safari"가 없으므로 "Safari 미포함 = 인앱" 식
+ * 휴리스틱은 우리 설치 사용자를 오탐(차단)한다. 따라서 명시적 키워드와, 오탐 없는
+ * Android WebView 토큰("; wv)")만 사용한다. 이름을 모르는 Android 계열 인앱
+ * 브라우저 대부분이 "; wv)"를 포함하므로 이 토큰으로 폭넓게 감지된다.
  * @returns {boolean} 인앱 브라우저이면 true
  */
 export function isInAppBrowser() {
     const ua = navigator.userAgent || navigator.vendor || '';
-    // 주요 인앱 브라우저 키워드
-    return /KAKAOTALK|NAVER|Line\/|FBAN|FBAV|Instagram|Snapchat|Twitter|MicroMessenger/i.test(ua);
+    // 주요 인앱 브라우저 키워드 + Android WebView 토큰("; wv)")
+    return /KAKAOTALK|kakaostory|NAVER|BAND\/|DaumApps|Line\/|FBAN|FBAV|Instagram|Snapchat|Twitter|MicroMessenger|;\s?wv\)/i.test(ua);
 }
 
 /**
