@@ -86,12 +86,12 @@ describe('Firestore 유틸리티 함수 - 에러 핸들링 및 롤백 검증', (
             });
         });
 
-        it('동시성 충돌 발생 시(상태 불일치) 에러를 던진다', async () => {
+        it('동시성 충돌 발생 시(상태 불일치) 에러를 던지되 Sentry에는 보고하지 않는다', async () => {
             const { updateReservationStatus } = await import('../../lib/firestore/reservations');
-            
+
             vi.mocked(runTransaction).mockImplementation(async (db, cb) => {
                 const mockTransaction = {
-                    get: vi.fn().mockResolvedValue({ 
+                    get: vi.fn().mockResolvedValue({
                         exists: () => true,
                         data: () => ({ status: 'cancelled' }) // 기대한 'reserved'가 아님
                     }),
@@ -103,8 +103,9 @@ describe('Firestore 유틸리티 함수 - 에러 핸들링 및 롤백 검증', (
 
             await expect(updateReservationStatus('res1', 'approved', {}, 'reserved'))
                 .rejects.toThrow("동시성 오류: 이미 다른 관리자에 의해 상태가 변경되었습니다. (현재 상태: cancelled)");
-            
-            expect(captureError).toHaveBeenCalled();
+
+            // 예측 가능한 사용자 충돌이므로 Sentry 노이즈 방지 차원에서 captureError를 호출하지 않는다.
+            expect(captureError).not.toHaveBeenCalled();
         });
     });
 

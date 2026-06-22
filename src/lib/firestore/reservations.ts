@@ -14,6 +14,18 @@ import { captureError } from '../sentry';
 import { enqueue } from '../offline/syncQueue';
 
 const functions = firebaseFunctions;
+
+/**
+ * 예약 상태 변경 시 두 관리자가 동시에 처리하려다 충돌한 경우.
+ * 예측 가능한 사용자 충돌이므로 Sentry error 보고 대상에서 제외한다(UI는 토스트로 안내).
+ */
+export class ReservationConcurrencyError extends Error {
+    constructor(currentStatus: string) {
+        super(`동시성 오류: 이미 다른 관리자에 의해 상태가 변경되었습니다. (현재 상태: ${currentStatus})`);
+        this.name = 'ReservationConcurrencyError';
+    }
+}
+
 const reservationsCollection = () => collection(db, 'reservations').withConverter(createZodConverter(reservationSchema));
 const reservationDoc = (id: string) => doc(db, 'reservations', id).withConverter(createZodConverter(reservationSchema));
 
@@ -192,7 +204,7 @@ export const updateReservationStatus = async (
             
             const currentData = sfDoc.data();
             if (expectedCurrentStatus && currentData.status !== expectedCurrentStatus) {
-                throw new Error(`동시성 오류: 이미 다른 관리자에 의해 상태가 변경되었습니다. (현재 상태: ${currentData.status})`);
+                throw new ReservationConcurrencyError(currentData.status);
             }
             
             transaction.update(reservationRef, {
@@ -201,7 +213,10 @@ export const updateReservationStatus = async (
             });
         });
     } catch (error) {
-        captureError(error, { context: 'updateReservationStatus', reservationId, status, extraData, expectedCurrentStatus });
+        // 예측 가능한 동시 편집 충돌은 노이즈이므로 Sentry 보고에서 제외(UI는 토스트로 안내).
+        if (!(error instanceof ReservationConcurrencyError)) {
+            captureError(error, { context: 'updateReservationStatus', reservationId, status, extraData, expectedCurrentStatus });
+        }
         throw error;
     }
 };
