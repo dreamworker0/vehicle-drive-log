@@ -22,6 +22,24 @@ export function isInAppBrowser() {
 }
 
 /**
+ * 현재 인앱 브라우저의 사용자 친화적 이름을 반환한다. 모르면 null.
+ * 안내 화면에서 "○○ 앱에서는…" 식으로 맞춤 문구를 보여주는 데 사용한다.
+ * @returns {string | null} 앱 이름(예: '카카오톡') 또는 null
+ */
+export function getInAppBrowserName() {
+    const ua = navigator.userAgent || navigator.vendor || '';
+    if (/KAKAOTALK/i.test(ua)) return '카카오톡';
+    if (/NAVER/i.test(ua)) return '네이버';
+    if (/BAND\//i.test(ua)) return '밴드';
+    if (/kakaostory/i.test(ua)) return '카카오스토리';
+    if (/DaumApps/i.test(ua)) return '다음';
+    if (/Line\//i.test(ua)) return '라인';
+    if (/FBAN|FBAV/i.test(ua)) return '페이스북';
+    if (/Instagram/i.test(ua)) return '인스타그램';
+    return null;
+}
+
+/**
  * 현재 페이지를 외부 브라우저(Chrome / Safari)에서 연다.
  * @param {string} [url] - 열 URL. 기본값은 현재 페이지 URL.
  */

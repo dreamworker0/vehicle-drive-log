@@ -2,7 +2,7 @@
  * inAppBrowser.js 테스트
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { isInAppBrowser, copyUrlToClipboard } from '../../lib/inAppBrowser';
+import { isInAppBrowser, copyUrlToClipboard, getInAppBrowserName } from '../../lib/inAppBrowser';
 
 describe('inAppBrowser', () => {
     const originalNavigator = { ...navigator };
@@ -34,6 +34,31 @@ describe('inAppBrowser', () => {
                 vi.stubGlobal('navigator', { userAgent: ua, vendor: '' });
                 expect(isInAppBrowser()).toBe(expected);
             });
+        });
+    });
+
+    describe('getInAppBrowserName', () => {
+        const nameCases = [
+            { ua: 'Mozilla/5.0 KAKAOTALK 10.0', expected: '카카오톡' },
+            { ua: 'Mozilla/5.0 NAVER(inapp;)', expected: '네이버' },
+            { ua: 'Mozilla/5.0 (iPhone) BAND/14.0.0', expected: '밴드' },
+            { ua: 'Mozilla/5.0 (iPhone) kakaostory/4.0', expected: '카카오스토리' },
+            { ua: 'Mozilla/5.0 (iPhone) DaumApps/4.5', expected: '다음' },
+            { ua: 'Mozilla/5.0 Line/13.0', expected: '라인' },
+            { ua: 'Mozilla/5.0 [FBAN/FBIOS]', expected: '페이스북' },
+            { ua: 'Mozilla/5.0 Instagram 200', expected: '인스타그램' },
+        ];
+
+        nameCases.forEach(({ ua, expected }) => {
+            it(`${expected} UA에서 "${expected}"를 반환해야 한다`, () => {
+                vi.stubGlobal('navigator', { userAgent: ua, vendor: '' });
+                expect(getInAppBrowserName()).toBe(expected);
+            });
+        });
+
+        it('일반 브라우저(미감지)에서는 null을 반환해야 한다', () => {
+            vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 Chrome/120.0', vendor: '' });
+            expect(getInAppBrowserName()).toBeNull();
         });
     });
 
