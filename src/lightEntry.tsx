@@ -32,17 +32,10 @@ export function renderLightApp() {
 
     const lightRoot = createRoot(rootEl);
 
-    // 인앱 브라우저(카톡·네이버 등)에서는 구글 로그인이 차단(disallowed_useragent)되므로
-    // 라우터/로그인 화면 대신 외부 브라우저 안내 화면만 표시한다.
-    // (appEntry의 App.tsx와 동일한 가드 — 비로그인 사용자도 반드시 안내받도록)
-    if (isInAppBrowser()) {
-        lightRoot.render(
-            <StrictMode>
-                <InAppBrowserWarning />
-            </StrictMode>,
-        );
-        return;
-    }
+    // 인앱 브라우저(카톡·네이버 등)에서는 구글 로그인이 차단(disallowed_useragent)된다.
+    // 단, 랜딩(/) 등 일반 페이지는 인앱에서도 그대로 보여야 하므로 전체를 막지 않고,
+    // 실제 구글 로그인이 필요한 /login 라우트에서만 안내 화면으로 대체한다.
+    const inApp = isInAppBrowser();
 
     // 로그인 성공 감지 → 전체 앱으로 전환
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -63,7 +56,7 @@ export function renderLightApp() {
                 <AuthProvider>
                     <Routes>
                         <Route path="/" element={<LandingPage />} />
-                        <Route path="/login" element={<LoginPage />} />
+                        <Route path="/login" element={inApp ? <InAppBrowserWarning /> : <LoginPage />} />
                         <Route path="/apply" element={<OrgApplicationPage />} />
                         <Route path="/terms" element={<TermsPage />} />
                         <Route path="/privacy" element={<PrivacyPage />} />
