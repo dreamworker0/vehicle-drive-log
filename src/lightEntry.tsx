@@ -15,8 +15,7 @@ import { auth } from './lib/firebaseAuth';
 import { AuthProvider } from './hooks/useAuth';
 import UpdatePrompt from './components/common/UpdatePrompt';
 import InstallPrompt from './components/common/InstallPrompt';
-import InAppBrowserWarning from './components/common/InAppBrowserWarning';
-import { isInAppBrowser } from './lib/inAppBrowser';
+import InAppBrowserGuard from './components/common/InAppBrowserGuard';
 
 // 경량 모드에서는 lazy loading 없이 직접 import (번들 자체가 작으므로)
 import LandingPage from './components/auth/LandingPage';
@@ -31,11 +30,6 @@ export function renderLightApp() {
     const rootEl = document.getElementById('root')!;
 
     const lightRoot = createRoot(rootEl);
-
-    // 인앱 브라우저(카톡·네이버 등)에서는 구글 로그인이 차단(disallowed_useragent)된다.
-    // 단, 랜딩(/) 등 일반 페이지는 인앱에서도 그대로 보여야 하므로 전체를 막지 않고,
-    // 실제 구글 로그인이 필요한 /login 라우트에서만 안내 화면으로 대체한다.
-    const inApp = isInAppBrowser();
 
     // 로그인 성공 감지 → 전체 앱으로 전환
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -56,7 +50,8 @@ export function renderLightApp() {
                 <AuthProvider>
                     <Routes>
                         <Route path="/" element={<LandingPage />} />
-                        <Route path="/login" element={inApp ? <InAppBrowserWarning /> : <LoginPage />} />
+                        {/* 인앱 브라우저에서는 외부 브라우저 안내로 대체 (랜딩 등 다른 라우트는 그대로 노출) */}
+                        <Route path="/login" element={<InAppBrowserGuard><LoginPage /></InAppBrowserGuard>} />
                         <Route path="/apply" element={<OrgApplicationPage />} />
                         <Route path="/terms" element={<TermsPage />} />
                         <Route path="/privacy" element={<PrivacyPage />} />

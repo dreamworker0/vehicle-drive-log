@@ -51,8 +51,10 @@ src/
 │   └── releaseNotes.ts ← 릴리스 노트 데이터
 ├── contexts/           ← React Context (ConfirmContext, ThemeContext, FontSizeContext)
 ├── index.css           ← TailwindCSS + 커스텀 스타일
-├── App.tsx             ← 역할별 라우팅
-└── main.tsx            ← React 엔트리
+├── App.tsx             ← 역할별 라우팅 (로그인 사용자: appEntry 경유)
+├── appEntry.tsx        ← 로그인 사용자용 전체 앱 엔트리 (App.tsx 렌더)
+├── lightEntry.tsx      ← 비로그인 사용자용 경량 엔트리 (랜딩/로그인만)
+└── main.tsx            ← React 엔트리 (인증 여부로 appEntry/lightEntry 분기)
 ```
 
 ### 파일 위치 결정 기준

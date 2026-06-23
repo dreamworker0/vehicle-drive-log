@@ -9,8 +9,7 @@ import { useAuth } from './hooks/useAuth';
 import { useOrientationLock } from './hooks/useOrientationLock';
 import { AuthGuard } from './components/auth/AuthGuard';
 import { updateUser } from './lib/firestore/users';
-import { isInAppBrowser } from './lib/inAppBrowser';
-import InAppBrowserWarning from './components/common/InAppBrowserWarning';
+import InAppBrowserGuard from './components/common/InAppBrowserGuard';
 
 // 레이아웃 (기존)
 const SuperAdminLayout = lazyWithRetry(() => import('./components/superAdmin/SuperAdminLayout'));
@@ -150,14 +149,10 @@ export default function App() {
   const handleConfirm = useConfirmStore(state => state.handleConfirm);
   const handleCancel = useConfirmStore(state => state.handleCancel);
 
-  // 인앱 브라우저 감지 시 메인 화면 마운트 대신 안내 화면만 표시
-  // (React Rules of Hooks 준수를 위해 모든 훅 호출 이후에 얼리 리턴 위치)
-  if (isInAppBrowser()) {
-    return <InAppBrowserWarning />;
-  }
-
+  // 인앱 브라우저(카톡·네이버 등)에서는 메인 화면 대신 외부 브라우저 안내를 표시.
+  // 가드 의도는 InAppBrowserGuard 한 곳에서 관리한다(lightEntry의 /login과 동일 컴포넌트).
   return (
-    <>
+    <InAppBrowserGuard>
       <AppContent />
       <ConfirmModal
         open={open}
@@ -169,7 +164,7 @@ export default function App() {
         onConfirm={handleConfirm}
         onCancel={handleCancel}
       />
-    </>
+    </InAppBrowserGuard>
   );
 }
 
