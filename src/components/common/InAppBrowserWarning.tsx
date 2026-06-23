@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { openInExternalBrowser, copyUrlToClipboard, getInAppBrowserName } from '../../lib/inAppBrowser';
+import useForceLightMode from '../../hooks/useForceLightMode';
 
 export default function InAppBrowserWarning() {
+    // 로그인 화면과 동일한 톤(밝은 카드 + 블루 그라데이션)을 유지한다.
+    useForceLightMode();
     const [copied, setCopied] = useState(false);
     const appName = getInAppBrowserName();
 
@@ -26,65 +29,111 @@ export default function InAppBrowserWarning() {
 
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-primary-600 via-primary-700 to-primary-900 px-4 py-8">
-            <div className="relative w-full max-w-sm glass-card p-6 space-y-5 animate-scale-in">
-                <div className="text-center">
-                    <div className="w-12 h-12 mx-auto mb-3 bg-amber-100 dark:bg-amber-900/30 rounded-full flex items-center justify-center">
-                        <svg className="w-6 h-6 text-amber-600 dark:text-amber-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+            {/* 배경 장식 */}
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+                <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary-400/20 rounded-full blur-3xl" />
+                <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-primary-300/10 rounded-full blur-3xl" />
+                <div className="absolute top-1/3 left-1/4 w-64 h-64 bg-accent-400/10 rounded-full blur-3xl" />
+            </div>
+
+            <div className="relative w-full max-w-sm animate-scale-in">
+                {/* 첫 페이지로 돌아가기 */}
+                <a
+                    href="/"
+                    className="flex items-center gap-1.5 text-primary-200/80 hover:text-white text-sm mb-4 transition-colors group min-h-[48px] px-2 -ml-2 w-fit"
+                >
+                    <svg className="w-4 h-4 transition-transform group-hover:-translate-x-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                    </svg>
+                    첫 페이지로
+                </a>
+
+                {/* 로고 / 아이콘 영역 */}
+                <div className="text-center mb-8">
+                    <div className="w-20 h-20 mx-auto mb-4 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/20">
+                        <svg className="w-10 h-10 text-white" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 0 0-10.026 0 1.106 1.106 0 0 0-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
                         </svg>
                     </div>
-                    <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
-                        {appName ? `${appName} 앱에서는 로그인이 안 돼요` : '외부 브라우저가 필요해요'}
-                    </h2>
-                    <p className="text-sm text-surface-500 dark:text-surface-400 leading-relaxed">
-                        구글 보안 정책상 앱 안에서는 구글 로그인이 차단됩니다.<br />
-                        크롬·사파리 같은 기본 브라우저로 열어 주세요.
-                    </p>
+                    <h1 className="text-3xl font-bold text-white mb-2">차량 운행일지</h1>
+                    <p className="text-primary-200 text-sm">기관 차량 관리를 더 쉽고 스마트하게</p>
                 </div>
 
-                {/* 1순위: 외부 브라우저로 열기 버튼 */}
-                <button
-                    onClick={handleOpenExternal}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-primary-600 dark:bg-primary-500 text-white rounded-xl font-medium hover:bg-primary-700 transition-all duration-200 active:scale-[0.98]"
-                >
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
-                    </svg>
-                    외부 브라우저에서 열기
-                </button>
+                {/* 안내 카드 */}
+                <div className="glass-card p-6 space-y-5">
+                    <div className="text-center">
+                        <div className="w-12 h-12 mx-auto mb-3 bg-amber-100 rounded-full flex items-center justify-center">
+                            <svg className="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126ZM12 15.75h.007v.008H12v-.008Z" />
+                            </svg>
+                        </div>
+                        <h2 className="text-lg font-semibold text-surface-800 mb-1">
+                            {appName ? `${appName} 앱에서는 로그인이 안 돼요` : '외부 브라우저가 필요해요'}
+                        </h2>
+                        <p className="text-sm text-surface-500 leading-relaxed">
+                            구글 보안 정책상 앱 안에서는 구글 로그인이 차단됩니다.<br />
+                            크롬·사파리 같은 기본 브라우저로 열어 주세요.
+                        </p>
+                    </div>
 
-                {/* 폴백: 버튼이 동작하지 않을 때 수동 안내 + URL 복사 */}
-                <div className="rounded-xl bg-surface-50 dark:bg-surface-800/50 border border-surface-200 dark:border-surface-700 p-4 space-y-3">
-                    <p className="text-xs font-medium text-surface-600 dark:text-surface-300">
-                        버튼이 동작하지 않으면, 이렇게 해보세요
-                    </p>
-                    <ol className="text-xs text-surface-500 dark:text-surface-400 space-y-1.5 list-decimal list-inside leading-relaxed">
-                        <li>오른쪽 위 또는 아래의 더보기(⋮) 메뉴 → <span className="font-medium text-surface-600 dark:text-surface-300">&ldquo;다른 브라우저로 열기&rdquo;</span></li>
-                        <li>또는 아래 버튼으로 주소를 복사한 뒤, 크롬·사파리 주소창에 붙여넣기</li>
-                    </ol>
-
-                    {/* URL 복사 버튼 */}
+                    {/* 1순위: 외부 브라우저로 열기 버튼 */}
                     <button
-                        onClick={handleCopyUrl}
-                        className="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-700 rounded-xl text-sm font-medium text-surface-700 dark:text-surface-300 hover:bg-surface-50 dark:hover:bg-surface-800/50 hover:shadow-md transition-all duration-200 active:scale-[0.98]"
+                        onClick={handleOpenExternal}
+                        className="w-full flex items-center justify-center gap-2 px-4 py-3 min-h-[48px] bg-primary-600 text-white rounded-xl font-medium hover:bg-primary-700 transition-all duration-200 active:scale-[0.98]"
                     >
-                        {copied ? (
-                            <>
-                                <svg className="w-5 h-5 text-green-500 dark:text-green-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
-                                </svg>
-                                복사 완료!
-                            </>
-                        ) : (
-                            <>
-                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
-                                </svg>
-                                주소(URL) 복사하기
-                            </>
-                        )}
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                        </svg>
+                        외부 브라우저에서 열기
                     </button>
+
+                    {/* 폴백: 버튼이 동작하지 않을 때 수동 안내 + URL 복사 */}
+                    <div className="rounded-xl bg-surface-50 border border-surface-200 p-4 space-y-3">
+                        <p className="text-xs font-medium text-surface-600">
+                            버튼이 동작하지 않으면, 이렇게 해보세요
+                        </p>
+                        <ol className="text-xs text-surface-500 space-y-1.5 list-decimal list-inside leading-relaxed">
+                            <li>오른쪽 위 또는 아래의 더보기(⋮) 메뉴 → <span className="font-medium text-surface-600">&ldquo;다른 브라우저로 열기&rdquo;</span></li>
+                            <li>또는 아래 버튼으로 주소를 복사한 뒤, 크롬·사파리 주소창에 붙여넣기</li>
+                        </ol>
+
+                        <button
+                            onClick={handleCopyUrl}
+                            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 min-h-[48px] bg-white border border-surface-200 rounded-xl text-sm font-medium text-surface-700 hover:bg-surface-50 hover:shadow-md transition-all duration-200 active:scale-[0.98]"
+                        >
+                            {copied ? (
+                                <>
+                                    <svg className="w-5 h-5 text-green-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
+                                    </svg>
+                                    복사 완료!
+                                </>
+                            ) : (
+                                <>
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 17.25v3.375c0 .621-.504 1.125-1.125 1.125h-9.75a1.125 1.125 0 0 1-1.125-1.125V7.875c0-.621.504-1.125 1.125-1.125H6.75a9.06 9.06 0 0 1 1.5.124m7.5 10.376h3.375c.621 0 1.125-.504 1.125-1.125V11.25c0-4.46-3.243-8.161-7.5-8.876a9.06 9.06 0 0 0-1.5-.124H9.375c-.621 0-1.125.504-1.125 1.125v3.5m7.5 10.375H9.375a1.125 1.125 0 0 1-1.125-1.125v-9.25m12 6.625v-1.875a3.375 3.375 0 0 0-3.375-3.375h-1.5a1.125 1.125 0 0 1-1.125-1.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H9.75" />
+                                    </svg>
+                                    주소(URL) 복사하기
+                                </>
+                            )}
+                        </button>
+                    </div>
                 </div>
+
+                {/* 푸터 링크 */}
+                <p className="text-center text-primary-200/80 text-xs mt-6 flex flex-wrap justify-center gap-x-2 gap-y-2 items-center min-h-[48px]">
+                    <a href="/terms" className="hover:text-white underline underline-offset-2 transition-colors p-2 -m-2">이용약관</a>
+                    <span className="text-primary-300/40">|</span>
+                    <a href="/privacy" className="hover:text-white underline underline-offset-2 transition-colors p-2 -m-2">개인정보 처리방침</a>
+                    <span className="text-primary-300/40">|</span>
+                    <a href="/release-notes" className="hover:text-white underline underline-offset-2 transition-colors p-2 -m-2">업데이트 소식</a>
+                    <span className="text-primary-300/40">|</span>
+                    <a href="/faq" className="hover:text-white underline underline-offset-2 transition-colors p-2 -m-2">자주 하는 질문</a>
+                </p>
+
+                <p className="text-center text-primary-300/60 text-xs mt-2">
+                    © 2026 차량 운행일지. All rights reserved.
+                </p>
             </div>
         </div>
     );
