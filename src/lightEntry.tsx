@@ -15,6 +15,8 @@ import { auth } from './lib/firebaseAuth';
 import { AuthProvider } from './hooks/useAuth';
 import UpdatePrompt from './components/common/UpdatePrompt';
 import InstallPrompt from './components/common/InstallPrompt';
+import InAppBrowserWarning from './components/common/InAppBrowserWarning';
+import { isInAppBrowser } from './lib/inAppBrowser';
 
 // 경량 모드에서는 lazy loading 없이 직접 import (번들 자체가 작으므로)
 import LandingPage from './components/auth/LandingPage';
@@ -29,6 +31,18 @@ export function renderLightApp() {
     const rootEl = document.getElementById('root')!;
 
     const lightRoot = createRoot(rootEl);
+
+    // 인앱 브라우저(카톡·네이버 등)에서는 구글 로그인이 차단(disallowed_useragent)되므로
+    // 라우터/로그인 화면 대신 외부 브라우저 안내 화면만 표시한다.
+    // (appEntry의 App.tsx와 동일한 가드 — 비로그인 사용자도 반드시 안내받도록)
+    if (isInAppBrowser()) {
+        lightRoot.render(
+            <StrictMode>
+                <InAppBrowserWarning />
+            </StrictMode>,
+        );
+        return;
+    }
 
     // 로그인 성공 감지 → 전체 앱으로 전환
     const unsubscribe = onAuthStateChanged(auth, (user) => {
