@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import useDriveLogForm from '../../hooks/useDriveLogForm';
 import useVehiclePriority from '../../hooks/useVehiclePriority';
 import MileageInput from './MileageInput';
@@ -45,6 +46,20 @@ export default function DriveLogForm() {
         handleCancelConfirm,
     } = useDriveLogForm();
     const { usageCounts } = useVehiclePriority();
+
+    // 비고 접기/펼치기 상태 (기본값: 접힘 — 자주 사용하지 않는 항목)
+    const [isNotesExpanded, setIsNotesExpanded] = useState(() => {
+        try {
+            const saved = localStorage.getItem('driveLog_notesExpanded');
+            return saved !== null ? JSON.parse(saved) : false;
+        } catch {
+            return false;
+        }
+    });
+
+    useEffect(() => {
+        localStorage.setItem('driveLog_notesExpanded', JSON.stringify(isNotesExpanded));
+    }, [isNotesExpanded]);
 
     if (loading) {
         return (
@@ -158,15 +173,33 @@ export default function DriveLogForm() {
 
                 {/* 7. 비고 섹션 */}
                 <div className="glass-card p-4">
-                    <label htmlFor="notes" className="label">📝 비고</label>
-                    <textarea
-                        id="notes"
-                        value={form.notes}
-                        onChange={e => setForm({ ...form, notes: e.target.value })}
-                        className="input min-h-[80px] resize-none"
-                        placeholder="특이사항이 있으면 작성해주세요"
-                        rows={3}
-                    />
+                    <div className={`flex items-center justify-between ${isNotesExpanded ? 'mb-3' : ''}`}>
+                        <label htmlFor="notes" className="label mb-0 flex items-center gap-2">
+                            📝 비고
+                            {!isNotesExpanded && form.notes.trim() !== '' && (
+                                <span className="text-xs font-normal text-surface-500 dark:text-surface-400 truncate max-w-[120px] sm:max-w-[200px]">
+                                    {form.notes}
+                                </span>
+                            )}
+                        </label>
+                        <button
+                            type="button"
+                            onClick={() => setIsNotesExpanded(!isNotesExpanded)}
+                            className="text-xs px-3 py-2 min-h-[48px] rounded-md bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors flex items-center justify-center font-medium"
+                        >
+                            {isNotesExpanded ? '닫기 ▲' : '열기 ▼'}
+                        </button>
+                    </div>
+                    {isNotesExpanded && (
+                        <textarea
+                            id="notes"
+                            value={form.notes}
+                            onChange={e => setForm({ ...form, notes: e.target.value })}
+                            className="input min-h-[80px] resize-none"
+                            placeholder="특이사항이 있으면 작성해주세요"
+                            rows={3}
+                        />
+                    )}
                 </div>
 
                 {/* 제출 버튼 */}
