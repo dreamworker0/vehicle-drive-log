@@ -4,13 +4,13 @@
  */
 import { useCallback, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
-import { db } from '../../lib/firebase';
 import { createFavorite, getFavorites, getLastVehicleDriveLog } from '../../lib/firestore';
 import { resolveStartKm } from './resolveStartKm';
 import { invalidateDashboardCache } from '../useTodayDashboard';
 import { submitDriveLog, getEmptyForm } from './submitDriveLog';
 import { validateDriveLogForm } from '../utils/driveLogValidation';
+import { validateEditKmRange } from './editKmRange';
+import { adjustAdjacentLogs } from './adjustAdjacentLogs';
 import { captureError } from '../../lib/sentry';
 import type { User } from 'firebase/auth';
 import type { User as UserDoc } from '../../types/user';
@@ -136,6 +136,49 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
         });
     }, [setSelectedPassengers]);
 
+    // submitDriveLog 재시도 중 발생한 에러 처리. true 반환 시 재시도 중단(에러 무시).
+    const handleSubmitError = useCallback((err: unknown): boolean | void => {
+        const errObj = err as { code?: string; originalStartKm?: number; suggestedStartKm?: number };
+        if (errObj && errObj.code === 'REQUIRES_START_KM_CONFIRMATION') {
+            setConfirmStartKm({
+                original: errObj.originalStartKm ?? 0,
+                suggested: errObj.suggestedStartKm ?? 0
+            });
+            return true; // 에러 무시하고 재시도 중단 (모달 표시)
+        }
+
+        const isDuplicate = err instanceof Error && err.message?.includes('중복');
+        const isTimeout = err instanceof Error && err.message?.includes('TIMEOUT');
+
+        if (isDuplicate || isTimeout) {
+            console.warn(`[useDriveLogForm] ${err instanceof Error ? err.message : '알 수 없는 경고'}`);
+        } else {
+            console.error('운행일지 저장 실패:', err);
+        }
+
+        if (isDuplicate || isTimeout) {
+            if (isTimeout) {
+                showToast('네트워크 지연으로 운행일지를 로컬에 임시 저장했습니다. 연결 시 동기화됩니다.', 'success');
+            } else {
+                showToast('요청된 내용이 정상 반영되어 이미 목록에 저장되었습니다.', 'success');
+            }
+
+            setSuccess(true);
+            if (reservationData?.reservationId || reservationData?.actualStartTime) {
+                navigate('/employee/today', { replace: true });
+            } else if (isEditMode) {
+                navigate('/employee/my-records', { replace: true });
+            } else {
+                setForm(getEmptyForm());
+                setSelectedPassengers([]);
+                setExternalPassengerCount(0);
+                setTimeout(() => setSuccess(false), 2000);
+            }
+            return true;
+        }
+        return false;
+    }, [reservationData, isEditMode, navigate, showToast, setSuccess, setForm, setSelectedPassengers, setExternalPassengerCount]);
+
     const handleSubmit = useCallback(async (e: React.FormEvent | Event) => {
         if (e && 'preventDefault' in e) e.preventDefault();
 
@@ -147,15 +190,9 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
 
         // ── 수정 모드 범위 검증: 직전/직후 기록의 범위 안에 있는지 확인 ──
         if (isEditMode) {
-            const startKm = Number(form.startKm || 0);
-            const endKm = Number(form.endKm || 0);
-
-            if (lastDriveLog && startKm < (lastDriveLog.startKm || 0)) {
-                setKmRangeError(`출발 km는 직전 기록의 출발(${lastDriveLog.startKm?.toLocaleString()} km) 이상이어야 합니다.`);
-                return;
-            }
-            if (nextDriveLog && endKm > (nextDriveLog.endKm || 0)) {
-                setKmRangeError(`도착 km는 직후 기록의 도착(${nextDriveLog.endKm?.toLocaleString()} km) 이하여야 합니다.`);
+            const rangeError = validateEditKmRange(form, lastDriveLog, nextDriveLog);
+            if (rangeError) {
+                setKmRangeError(rangeError);
                 return;
             }
         }
@@ -179,47 +216,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
                     }),
                     {
                         timeoutMs: 8000,
-                        onError: (err: unknown) => {
-                            const errObj = err as { code?: string; originalStartKm?: number; suggestedStartKm?: number };
-                            if (errObj && errObj.code === 'REQUIRES_START_KM_CONFIRMATION') {
-                                setConfirmStartKm({ 
-                                    original: errObj.originalStartKm ?? 0, 
-                                    suggested: errObj.suggestedStartKm ?? 0 
-                                });
-                                return true; // 에러 무시하고 재시도 중단 (모달 표시)
-                            }
-
-                            const isDuplicate = err instanceof Error && err.message?.includes('중복');
-                            const isTimeout = err instanceof Error && err.message?.includes('TIMEOUT');
-                            
-                            if (isDuplicate || isTimeout) {
-                                console.warn(`[useDriveLogForm] ${err instanceof Error ? err.message : '알 수 없는 경고'}`);
-                            } else {
-                                console.error('운행일지 저장 실패:', err);
-                            }
-                            
-                            if (isDuplicate || isTimeout) {
-                                if (isTimeout) {
-                                    showToast('네트워크 지연으로 운행일지를 로컬에 임시 저장했습니다. 연결 시 동기화됩니다.', 'success');
-                                } else {
-                                    showToast('요청된 내용이 정상 반영되어 이미 목록에 저장되었습니다.', 'success');
-                                }
-                                
-                                setSuccess(true);
-                                if (reservationData?.reservationId || reservationData?.actualStartTime) {
-                                    navigate('/employee/today', { replace: true });
-                                } else if (isEditMode) {
-                                    navigate('/employee/my-records', { replace: true });
-                                } else {
-                                    setForm(getEmptyForm());
-                                    setSelectedPassengers([]);
-                                    setExternalPassengerCount(0);
-                                    setTimeout(() => setSuccess(false), 2000);
-                                }
-                                return true;
-                            }
-                            return false; 
-                        }
+                        onError: handleSubmitError,
                     }
                 );
 
@@ -227,36 +224,12 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
 
                 // ── 수정 모드: 인접 기록 자동 조정 (직전 endKm, 직후 startKm) ──
                 if (isEditMode) {
-                    const startKm = Number(form.startKm || 0);
-                    const endKm = Number(form.endKm || 0);
-                    const adjustMessages: string[] = [];
-
-                    // 직전 기록의 endKm → 현재 기록의 startKm으로 자동 변경
-                    if (lastDriveLog && lastDriveLog.endKm !== startKm) {
-                        try {
-                            await updateDoc(doc(db, 'driveLogs', lastDriveLog.id), {
-                                endKm: startKm,
-                                editedAt: serverTimestamp(),
-                            });
-                            adjustMessages.push(`직전 기록 도착 km: ${lastDriveLog.endKm?.toLocaleString()} → ${startKm.toLocaleString()}`);
-                        } catch (err) {
-                            console.error('직전 기록 자동 조정 실패:', err);
-                        }
-                    }
-
-                    // 직후 기록의 startKm → 현재 기록의 endKm으로 자동 변경
-                    if (nextDriveLog && nextDriveLog.startKm !== endKm) {
-                        try {
-                            await updateDoc(doc(db, 'driveLogs', nextDriveLog.id), {
-                                startKm: endKm,
-                                editedAt: serverTimestamp(),
-                            });
-                            adjustMessages.push(`직후 기록 출발 km: ${nextDriveLog.startKm?.toLocaleString()} → ${endKm.toLocaleString()}`);
-                        } catch (err) {
-                            console.error('직후 기록 자동 조정 실패:', err);
-                        }
-                    }
-
+                    const adjustMessages = await adjustAdjacentLogs({
+                        lastDriveLog,
+                        nextDriveLog,
+                        startKm: Number(form.startKm || 0),
+                        endKm: Number(form.endKm || 0),
+                    });
                     if (adjustMessages.length > 0) {
                         showToast(`인접 기록이 자동 조정되었습니다: ${adjustMessages.join(', ')}`, 'info');
                     }
@@ -307,7 +280,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
         form, isElectric, isQuickDrive, showToast, startTransition, runWithRetry,
         orgId, user, userData, selectedVehicle, selectedPassengers, externalPassengerCount,
         externalPassengerNames, isRetroactive, ocrSuccess, isEditMode, editLog,
-        reservationData, hipassCard, setConfirmStartKm, setSuccess, navigate, setForm,
+        reservationData, hipassCard, handleSubmitError, setSuccess, navigate, setForm,
         setSelectedPassengers, setExternalPassengerCount, lastDriveLog, nextDriveLog
     ]);
 
