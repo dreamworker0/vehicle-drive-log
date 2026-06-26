@@ -1,7 +1,7 @@
 import { ReactNode, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
-import { SA_TEST_ROLE_KEY } from '../../App';
+import { SA_TEST_ROLE_KEY, LoadingScreen } from '../../App';
 import { clearUserOrganization } from '../../lib/firestore';
 import { logout } from '../../lib/auth';
 
@@ -56,8 +56,15 @@ export function AuthGuard({
   allowedRoles,
   requireOrgSetup = false,
 }: AuthGuardProps) {
-  const { user, userData, isSuperAdmin, orgDeleted } = useAuth();
+  const { user, userData, userDocState, isSuperAdmin, orgDeleted } = useAuth();
   const saTestRole = useMemo(() => (isSuperAdmin ? localStorage.getItem(SA_TEST_ROLE_KEY) : null), [isSuperAdmin]);
+
+  // 0. 인증은 됐지만 사용자 문서 로딩이 아직 확정되지 않음(pending)
+  //    userData=null을 '기관 미가입'으로 오인해 온보딩(/invite)으로 보내지 않도록 라우팅을 보류한다.
+  //    (재방문 시 토큰 갱신/네트워크 지연 도중 잘못된 온보딩 라우팅을 방지하는 핵심 가드)
+  if (user && userDocState === 'pending' && (requireGuest || requireAuth)) {
+    return <LoadingScreen />;
+  }
 
   // 1. 비로그인 상태 가드 (Guest 전용 라우트 접근 시 대시보드로 이동)
   if (requireGuest && user) {
@@ -83,7 +90,8 @@ export function AuthGuard({
   }
 
   if (requireAuth && user && !userData) {
-    // 유저 데이터 로딩을 아직 못한 것이 아니라 실제로 없는 경우 (신규가입)
+    // 여기 도달 시 userDocState === 'absent' (pending은 위 0번 가드에서 차단됨).
+    // 즉 사용자 문서가 확정적으로 없는 경우(신규가입)다.
     // superAdmin은 기관 소속 없이도 접근 가능하므로 invite로 보내지 않음
     if (isSuperAdmin) {
       return <Navigate to="/super-admin" replace />;

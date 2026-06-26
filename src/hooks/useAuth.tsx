@@ -9,9 +9,21 @@ import { setSentryUser } from '../lib/sentry';
 import { useToastStore } from '../store/useToastStore';
 import type { User as UserDoc } from '../types/user';
 
+/**
+ * 사용자 Firestore 문서의 로딩 확정 상태.
+ * - 'pending': 아직 로딩 중이거나 일시적 오류로 미확정 (라우팅 판단 보류 대상)
+ * - 'present': 문서가 존재함 (userData 세팅됨)
+ * - 'absent' : 문서가 확정적으로 없음 (신규가입 → 온보딩 필요)
+ *
+ * `userData === null`만으로는 '아직 로딩 중'과 '실제로 없음'을 구분할 수 없어
+ * 재방문 시 토큰 갱신/네트워크 지연 도중 잘못 온보딩 화면으로 라우팅되는 버그가 있었다.
+ */
+type UserDocState = 'pending' | 'present' | 'absent';
+
 interface AuthContextType {
     user: FirebaseUser | null;
     userData: UserDoc | null;
+    userDocState: UserDocState;
     loading: boolean;
     isSuperAdmin: boolean;
     orgDeleted: boolean;
@@ -24,6 +36,7 @@ const AuthContext = createContext<AuthContextType | null>(null);
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<FirebaseUser | null>(null);
     const [userData, setUserData] = useState<UserDoc | null>(null);
+    const [userDocState, setUserDocState] = useState<UserDocState>('pending');
     const [orgDeleted, setOrgDeleted] = useState(false);
     const [loading, setLoading] = useState(true);
 
@@ -67,6 +80,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 // 앱 라우팅에서는 비로그인으로 취급한다.
                 if (firebaseUser && !firebaseUser.isAnonymous) {
                     setUser(firebaseUser);
+                    setUserDocState('pending'); // 새 세션: 문서 로딩 확정 전까지 라우팅 보류
                     setLoading(true); // Firestore 데이터를 가져오기 전까지 라우팅 판단을 대기시킴
 
                     const startUserWatch = (retryCount = 0) => {
@@ -76,6 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                                 if (docSnap.exists()) {
                                     const data = { id: docSnap.id, ...docSnap.data() } as UserDoc;
                                     setUserData(data);
+                                    setUserDocState('present');
                                     // Sentry 사용자 컨텍스트 설정 (에러 추적 시 역할/기관 파악)
                                     setSentryUser({ uid: firebaseUser.uid, email: firebaseUser.email || '', role: data.role, organizationId: data.organizationId || '' });
 
@@ -166,6 +181,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                                     // orgWatch가 남아있으면 orgDeleted=true를 계속 세팅하므로 반드시 해제
                                     if (unsubscribeOrg) { unsubscribeOrg(); unsubscribeOrg = null; }
                                     setUserData(null);
+                                    setUserDocState('absent'); // 문서가 확정적으로 없음 → 신규가입/온보딩 대상
                                     setOrgDeleted(false);
                                     setLoading(false);
                                 }
@@ -216,6 +232,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     resumeWatches = null;
                     setUser(null);
                     setUserData(null);
+                    setUserDocState('pending');
                     setOrgDeleted(false);
                     setLoading(false);
                     setSentryUser(null); // 로그아웃 시 Sentry 컨텍스트 해제
@@ -262,6 +279,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const value = {
         user,
         userData,
+        userDocState,
         loading,
         isSuperAdmin,
         orgDeleted,

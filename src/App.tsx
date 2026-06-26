@@ -58,8 +58,10 @@ export function LoadingScreen() {
 
 /** 컴포넌트 마운트 에러 캐치용 Fallback (필요시 ErrorBoundary 추가 가능) */
 function RouteFallback() {
-  const { user, userData } = useAuth();
+  const { user, userData, userDocState } = useAuth();
   if (!user) return <Navigate to="/" replace />;
+  // 사용자 문서 로딩이 아직 확정되지 않았으면(pending) 온보딩으로 보내지 말고 대기
+  if (userDocState === 'pending') return <LoadingScreen />;
   if (!userData) return <Navigate to="/invite" replace />;
   if (userData.role === 'superAdmin') return <Navigate to="/super-admin" replace />;
   if (userData.role === 'admin') return <Navigate to="/admin" replace />;
