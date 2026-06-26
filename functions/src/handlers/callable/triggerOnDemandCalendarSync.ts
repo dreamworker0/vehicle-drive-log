@@ -1,6 +1,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
-import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getFirestore } from "firebase-admin/firestore";
 import { syncSingleVehicleCalendar } from "../scheduled/calendarSchedule";
+import { isCalendarAuthError, recordCalendarFailure, resetCalendarFailure } from "../../services/calendar/calendarFailTracking";
 
 const db = getFirestore();
 
@@ -97,7 +98,7 @@ export const triggerOnDemandCalendarSync = onCall(
 
             // 동기화 성공 시 실패 카운터 리셋
             if ((vehicleData.calendarSyncFailCount || 0) > 0) {
-                await db.collection("vehicles").doc(vehicleId).update({ calendarSyncFailCount: 0 });
+                await resetCalendarFailure(vehicleId);
             }
 
             return {
@@ -113,12 +114,9 @@ export const triggerOnDemandCalendarSync = onCall(
             // 500(internal)으로 던지면 콘솔·모니터링에 서버 장애처럼 노이즈가 쌓이므로,
             // (1) 실패 카운터를 올려 관리자 차량 목록에 '동기화 실패' 배지가 뜨게 하고,
             // (2) 에러가 아닌 정상 응답(success:false)으로 반환해 클라이언트가 조용히 재시도를 멈추게 한다.
-            if (errMsg.includes("Not Found") || errMsg.includes("404") || errMsg.includes("403")) {
+            if (isCalendarAuthError(err)) {
                 try {
-                    await db.collection("vehicles").doc(vehicleId).update({
-                        calendarSyncFailCount: FieldValue.increment(1),
-                        calendarSyncLastFailAt: FieldValue.serverTimestamp(),
-                    });
+                    await recordCalendarFailure(vehicleId, (vehicleData.calendarSyncFailCount as number) || 0);
                 } catch (updateErr: unknown) {
                     console.error(`[OnDemandSync] Failed to record sync failure for ${vehicleId}:`, (updateErr as Error).message);
                 }
