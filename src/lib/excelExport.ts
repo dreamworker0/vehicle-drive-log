@@ -3,7 +3,9 @@
  * 운행일지 데이터를 엑셀 파일로 내보냅니다.
  * xlsx 라이브러리는 동적 import로 필요 시에만 로드합니다 (276KB 절약).
  */
-import { toLocalDateStr } from './dateUtils';
+import {
+    resolveStartKm, resolveEndKm, resolveDistance, resolveDateStr, resolveStartTime, resolveEndTime,
+} from './driveLogExportFields';
 
 /**
  * 운행일지 데이터를 엑셀 파일로 다운로드
@@ -46,21 +48,18 @@ export async function downloadDriveLogsExcel(logs: ExcelDriveLog[], filename = '
 
     // 데이터 변환
     const rows = logs.map((log: ExcelDriveLog) => {
-        const distance = ((log.arrivalKm || log.endKm || 0) - (log.departureKm || log.startKm || 0));
-        const dateStr = log.date || (log.timestamp?.toDate
-            ? toLocalDateStr(log.timestamp.toDate())
-            : '-');
+        const distance = resolveDistance(log);
 
         const row: Record<string, string | number> = {
-            '날짜': dateStr,
-            '출발시각': log.startTime || log.departureTime || '',
-            '도착시각': log.endTime || log.arrivalTime || '',
+            '날짜': resolveDateStr(log, '-'),
+            '출발시각': resolveStartTime(log),
+            '도착시각': resolveEndTime(log),
             '운전자': log.driverName || '',
             '차량': log.vehicleDisplayName || log.vehicleName || '',
             '목적지': log.destination || '',
             '사용목적': log.purpose || '',
-            '출발Km': log.departureKm ?? log.startKm ?? '',
-            '도착Km': log.arrivalKm ?? log.endKm ?? '',
+            '출발Km': resolveStartKm(log) ?? '',
+            '도착Km': resolveEndKm(log) ?? '',
             '주행거리(km)': distance > 0 ? distance : '',
             '탑승인원': log.passengerCount ?? '',
         };

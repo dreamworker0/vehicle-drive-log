@@ -3,7 +3,9 @@
  * 공식 차량운행일지 양식을 브라우저 인쇄 기능으로 PDF 생성
  */
 import { getPdfStyles, formatDate, formatNumber, escapeHtml } from './pdfStyles';
-import { toLocalDateStr } from '../dateUtils';
+import {
+    resolveStartKm, resolveEndKm, resolveDistance, resolveDateStr, resolveStartTime, resolveEndTime,
+} from '../driveLogExportFields';
 
 /** PDF용 운행일지 행 */
 interface PdfLogEntry {
@@ -55,13 +57,9 @@ export function downloadDriveLogsPdf(logs: PdfLogEntry[], options: { onError?: (
 
     // 날짜순 정렬 (오래된 순), 같은 날짜 내 출발 시간 오름차순
     const sorted = [...logs].sort((a, b) => {
-        const dateA = a.date || (a.timestamp?.toDate ? toLocalDateStr(a.timestamp.toDate()) : '');
-        const dateB = b.date || (b.timestamp?.toDate ? toLocalDateStr(b.timestamp.toDate()) : '');
-        const dateCmp = dateA.localeCompare(dateB);
+        const dateCmp = resolveDateStr(a).localeCompare(resolveDateStr(b));
         if (dateCmp !== 0) return dateCmp;
-        const timeA = a.startTime || a.departureTime || '';
-        const timeB = b.startTime || b.departureTime || '';
-        return timeA.localeCompare(timeB);
+        return resolveStartTime(a).localeCompare(resolveStartTime(b));
     });
 
     // 페이지 분할
@@ -94,10 +92,8 @@ export function downloadDriveLogsPdf(logs: PdfLogEntry[], options: { onError?: (
  * 운행일지 데이터 행을 HTML TR로 변환
  */
 function buildLogRow(log: PdfLogEntry, idx: number, pageIdx: number, includeHipass = false, includePassengers = false) {
-    const date = log.date || (log.timestamp?.toDate
-        ? toLocalDateStr(log.timestamp.toDate())
-        : '-');
-    const distance = ((log.arrivalKm || log.endKm || 0) - (log.departureKm || log.startKm || 0));
+    const date = resolveDateStr(log, '-');
+    const distance = resolveDistance(log);
 
     // 하이패스 정보를 비고에 합침
     let noteText = log.notes || '';
@@ -112,14 +108,14 @@ function buildLogRow(log: PdfLogEntry, idx: number, pageIdx: number, includeHipa
         <tr>
             <td class="center">${idx + 1 + (pageIdx * ROWS_PER_PAGE)}</td>
             <td class="center">${formatDate(date)}</td>
-            <td class="center">${escapeHtml(log.startTime || log.departureTime || '')}</td>
-            <td class="center">${escapeHtml(log.endTime || log.arrivalTime || '')}</td>
+            <td class="center">${escapeHtml(resolveStartTime(log))}</td>
+            <td class="center">${escapeHtml(resolveEndTime(log))}</td>
             <td class="center">${escapeHtml(log.driverName || '')}</td>
             <td class="center">${escapeHtml(log.vehicleDisplayName || log.vehicleName || '')}</td>
             <td>${escapeHtml(log.destination || '')}</td>
             <td>${escapeHtml(log.purpose || '')}</td>
-            <td class="right">${formatNumber(log.departureKm ?? log.startKm)}</td>
-            <td class="right">${formatNumber(log.arrivalKm ?? log.endKm)}</td>
+            <td class="right">${formatNumber(resolveStartKm(log))}</td>
+            <td class="right">${formatNumber(resolveEndKm(log))}</td>
             <td class="right">${distance > 0 ? distance.toLocaleString() : ''}</td>
             <td class="center">${log.passengerCount || ''}</td>
             ${includePassengers ? `<td class="center" style="font-size: 8px;">${escapeHtml(log.passengerNames?.join(', ') || '')}</td>` : ''}
@@ -167,10 +163,7 @@ function buildApprovalHtml(approvalLine: ApprovalEntry[]) {
  */
 function buildPageHtml(pageRows: PdfLogEntry[], pageIdx: number, totalPages: number, { orgName, period, approvalLine, includeHipass = false, includePassengers = false, totalAllDistance = 0 }: { orgName: string; period: string; approvalLine: ApprovalEntry[]; includeHipass?: boolean; includePassengers?: boolean; totalAllDistance?: number }) {
     const pageNum = pageIdx + 1;
-    const pageTotalDistance = pageRows.reduce((sum, log) => {
-        const d = ((log.arrivalKm || log.endKm || 0) - (log.departureKm || log.startKm || 0));
-        return sum + (d > 0 ? d : 0);
-    }, 0);
+    const pageTotalDistance = pageRows.reduce((sum, log) => sum + resolveDistance(log), 0);
 
     const rowsHtml = pageRows.map((log: PdfLogEntry, idx: number) => buildLogRow(log, idx, pageIdx, includeHipass, includePassengers)).join('');
     const emptyRowsHtml = buildEmptyRows(ROWS_PER_PAGE - pageRows.length, includePassengers);
@@ -246,10 +239,7 @@ function buildPageHtml(pageRows: PdfLogEntry[], pageIdx: number, totalPages: num
 function buildPdfHtml(pages: PdfLogEntry[][], options: { orgName: string; period: string; approvalLine: ApprovalEntry[]; includeHipass?: boolean; includePassengers?: boolean }) {
     const totalPages = pages.length;
     // 전체 페이지에 걸친 총 주행거리 합계
-    const totalAllDistance = pages.flat().reduce((sum, log) => {
-        const d = ((log.arrivalKm || log.endKm || 0) - (log.departureKm || log.startKm || 0));
-        return sum + (d > 0 ? d : 0);
-    }, 0);
+    const totalAllDistance = pages.flat().reduce((sum, log) => sum + resolveDistance(log), 0);
     const pagesHtml = pages.map((pageRows, pageIdx) =>
         buildPageHtml(pageRows, pageIdx, totalPages, { ...options, totalAllDistance })
     ).join('');
