@@ -5,13 +5,10 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { listCalendarEvents, parseEventToReservation } from "../../services/calendar/calendarSync";
+import { RETRY_COOLDOWN_MS, MAX_FAIL_COUNT, isCalendarAuthError, recordCalendarFailure, resetCalendarFailure } from "../../services/calendar/calendarFailTracking";
 import { sendDiscordAlert } from "../../core/discord";
 import { recordHeartbeat } from "../../utils/helpers";
 import { toKSTDate, getKSTDateString } from "../../utils/kstDate";
-
-/** 쿨다운 재시도 관련 상수 */
-const RETRY_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24시간
-const MAX_FAIL_COUNT = 10; // 10회 이상 실패 시 진짜 영구 제외
 
 const db = getFirestore();
 const auth = getAuth();
@@ -125,19 +122,15 @@ export const syncCalendarToApp = onSchedule(
 
                     // 동기화 성공 시 실패 카운터 리셋
                     if (failCount > 0) {
-                        await db.collection("vehicles").doc(vehicleId).update({ calendarSyncFailCount: 0 });
+                        await resetCalendarFailure(vehicleId);
                     }
                 } catch (vehicleErr: unknown) {
                     const errMsg = (vehicleErr as Error).message;
                     console.error("Vehicle " + vehicleName + "(" + vehicleId + ") sync failed:", errMsg);
 
                     // Not Found / 인증 에러 시 실패 카운터 증가
-                    if (errMsg.includes("Not Found") || errMsg.includes("404") || errMsg.includes("403")) {
-                        const newFailCount = failCount + 1;
-                        await db.collection("vehicles").doc(vehicleId).update({
-                            calendarSyncFailCount: newFailCount,
-                            calendarSyncLastFailAt: FieldValue.serverTimestamp(),
-                        });
+                    if (isCalendarAuthError(vehicleErr)) {
+                        const newFailCount = await recordCalendarFailure(vehicleId, failCount);
                         if (newFailCount >= MAX_FAIL_COUNT) {
                             console.warn("Vehicle " + vehicleName + "(" + vehicleId + "): permanently disabled after " + newFailCount + " failures");
                         } else if (newFailCount >= 3) {

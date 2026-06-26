@@ -4,21 +4,34 @@
 import { getFirestore } from "firebase-admin/firestore";
 import { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent } from "../../services/calendar/calendarSync";
+import { isCalendarAuthError, shouldSkipVehicleCalendar, recordCalendarFailure, resetCalendarFailure } from "../../services/calendar/calendarFailTracking";
 import { sendPushToOrg, sendPushToUser, createInAppNotification } from "../../services/alimtalk/sendNotification";
 import { checkReservationTimeConflict, resolveReservationConflict } from "../sync/conflictResolver";
 
 /**
- * 차량의 googleCalendarId를 조회
+ * 차량의 캘린더 동기화 컨텍스트를 조회한다.
+ * - calendarId: 유효한 googleCalendarId(@ 포함). 없거나 형식 오류면 null.
+ * - failCount : 누적 실패 횟수 (백오프 판단/리셋용).
+ * - skip      : 실패 누적으로 쿨다운/영구제외 상태라 캘린더 호출을 건너뛰어야 하는지.
+ *
+ * 차량 문서가 없거나 calendarId가 유효하지 않으면 null을 반환한다.
  */
-async function getVehicleCalendarId(vehicleId: string): Promise<string | null> {
+async function getVehicleCalendar(
+    vehicleId: string,
+): Promise<{ calendarId: string; failCount: number; skip: boolean } | null> {
     if (!vehicleId) return null;
     const db = getFirestore();
     const snap = await db.collection("vehicles").doc(vehicleId).get();
     if (!snap.exists) return null;
-    const calendarId = (snap.data()?.googleCalendarId as string) || null;
+    const data = snap.data()!;
+    const calendarId = (data.googleCalendarId as string) || null;
     // 유효하지 않은 캘린더 ID 필터링 (@ 포함 필수)
-    if (calendarId && !calendarId.includes("@")) return null;
-    return calendarId;
+    if (!calendarId || !calendarId.includes("@")) return null;
+    return {
+        calendarId,
+        failCount: (data.calendarSyncFailCount as number) || 0,
+        skip: shouldSkipVehicleCalendar(data),
+    };
 }
 
 /**
@@ -60,25 +73,33 @@ export const onReservationCreated = onDocumentCreated("reservations/{reservation
 
     // 승인 대기(pending) 상태라면 캘린더 이벤트를 만들지 않음
     if (reservation.status !== 'pending') {
-        try {
-            const calendarId = await getVehicleCalendarId(reservation.vehicleId);
-            if (!calendarId) {
-                console.log("Vehicle " + reservation.vehicleId + ": no calendar ID, skip");
-                // 캘린더 연동을 안해도 실패 처리는 아님, 알림 로직으로 넘어가도록 수정
-            } else {
-                const eventId = await createCalendarEvent(calendarId, reservation as Parameters<typeof createCalendarEvent>[1]);
+        const vc = await getVehicleCalendar(reservation.vehicleId);
+        if (!vc) {
+            console.log("Vehicle " + reservation.vehicleId + ": no calendar ID, skip");
+            // 캘린더 연동을 안해도 실패 처리는 아님, 알림 로직으로 넘어가도록 수정
+        } else if (vc.skip) {
+            // 실패 누적(쿨다운/영구제외)으로 캘린더 호출을 건너뜀 — 반복 404로 인한 Sentry 스팸/쿼터 낭비 방지
+            console.log("Vehicle " + reservation.vehicleId + ": calendar sync disabled (failCount=" + vc.failCount + "), skip");
+        } else {
+            try {
+                const eventId = await createCalendarEvent(vc.calendarId, reservation as Parameters<typeof createCalendarEvent>[1]);
 
                 // 생성된 이벤트 ID를 예약 문서에 저장
                 await getFirestore().collection("reservations").doc(reservationId).update({
                     calendarEventId: eventId,
                 });
 
+                // 성공: 직전까지 누적된 실패 카운트가 있으면 리셋
+                if (vc.failCount > 0) await resetCalendarFailure(reservation.vehicleId);
+
                 console.log("Reservation " + reservationId + ": calendar event created (" + eventId + ")");
+            } catch (err: unknown) {
+                const { captureError } = await import("../../core/sentry");
+                captureError(err, { context: "officialCalendarSync_created", reservationId, vehicleId: reservation.vehicleId });
+                console.error("Reservation " + reservationId + ": calendar event creation failed", (err as Error).message);
+                // 캘린더 부재/권한 오류(404·403)면 실패 카운트 증가 → 쿨다운/영구제외로 자동 백오프
+                if (isCalendarAuthError(err)) await recordCalendarFailure(reservation.vehicleId, vc.failCount);
             }
-        } catch (err: unknown) {
-            const { captureError } = await import("../../core/sentry");
-            captureError(err, { context: "officialCalendarSync_created", reservationId, vehicleId: reservation.vehicleId });
-            console.error("Reservation " + reservationId + ": calendar event creation failed", (err as Error).message);
         }
 
         // 개인 구글 캘린더 동기화 (예외 격리)
@@ -173,9 +194,12 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
         }
     }
 
-    try {
-        const calendarId = await getVehicleCalendarId(after.vehicleId);
+    // 실패 누적(쿨다운/영구제외) 차량은 calendarId를 null 처리해 모든 캘린더 호출을 건너뛴다 (알림은 그대로 진행)
+    const vc = await getVehicleCalendar(after.vehicleId);
+    const calendarId = (vc && !vc.skip) ? vc.calendarId : null;
+    const calendarFailCount = vc?.failCount ?? 0;
 
+    try {
         const eventId = after.calendarEventId;
 
         // 반려된 경우 (pending -> rejected)
@@ -198,10 +222,12 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
                     await getFirestore().collection("reservations").doc(reservationId).update({
                         calendarEventId: newEventId,
                     });
+                    if (calendarFailCount > 0) await resetCalendarFailure(after.vehicleId);
                 } catch(e: unknown) {
                     const { captureError } = await import("../../core/sentry");
                     captureError(e, { context: "officialCalendarSync_approval_created", reservationId, vehicleId: after.vehicleId });
                     console.error("Calendar creation failed on approval:", (e as Error).message);
+                    if (isCalendarAuthError(e)) await recordCalendarFailure(after.vehicleId, calendarFailCount);
                 }
             }
 
@@ -279,6 +305,7 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
         if (changed) {
             if (calendarId && eventId) {
                 await updateCalendarEvent(calendarId, eventId, after as Parameters<typeof updateCalendarEvent>[2]);
+                if (calendarFailCount > 0) await resetCalendarFailure(after.vehicleId);
                 console.log("Reservation " + reservationId + ": calendar event updated");
             }
 
@@ -326,6 +353,8 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
         const { captureError } = await import("../../core/sentry");
         captureError(err, { context: "officialCalendarSync_updated", reservationId, vehicleId: after.vehicleId });
         console.error("Reservation " + reservationId + ": calendar event update failed", (err as Error).message);
+        // 캘린더 부재/권한 오류(404·403)면 실패 카운트 증가 → 쿨다운/영구제외로 자동 백오프
+        if (vc && isCalendarAuthError(err)) await recordCalendarFailure(after.vehicleId, calendarFailCount);
     }
 });
 
@@ -339,10 +368,16 @@ export const onReservationDeleted = onDocumentDeleted("reservations/{reservation
     try {
         if (!reservation.calendarEventId) return;
 
-        const calendarId = await getVehicleCalendarId(reservation.vehicleId);
-        if (!calendarId) return;
+        const vc = await getVehicleCalendar(reservation.vehicleId);
+        if (!vc) return;
+        // 실패 누적(쿨다운/영구제외) 차량은 삭제 호출도 건너뜀 (어차피 404 반복)
+        if (vc.skip) {
+            console.log("Vehicle " + reservation.vehicleId + ": calendar sync disabled (failCount=" + vc.failCount + "), skip delete");
+            return;
+        }
 
-        await deleteCalendarEvent(calendarId, reservation.calendarEventId);
+        await deleteCalendarEvent(vc.calendarId, reservation.calendarEventId);
+        if (vc.failCount > 0) await resetCalendarFailure(reservation.vehicleId);
         console.log("Reservation " + reservationId + ": deleted -> calendar event deleted");
     } catch (err: unknown) {
         const { captureError } = await import("../../core/sentry");

@@ -1,7 +1,7 @@
 /**
  * reservationTriggers.test.ts — 예약 트리거 단위 테스트
  *
- * getVehicleCalendarId 및 각 트리거의 핵심 분기 로직을 검증한다.
+ * getVehicleCalendar(캘린더 조회·실패 백오프) 및 각 트리거의 핵심 분기 로직을 검증한다.
  * Firebase 트리거 핸들러는 내부적으로 Firestore·Calendar·Push를 호출하므로
  * 모킹을 통해 호출 여부와 분기 조건만 검증한다.
  */
@@ -13,6 +13,7 @@ const mockDoc = jest.fn(() => ({ get: mockGet, update: mockUpdate }));
 const mockCollection = jest.fn(() => ({ doc: mockDoc }));
 jest.mock('firebase-admin/firestore', () => ({
     getFirestore: () => ({ collection: mockCollection, doc: mockDoc }),
+    FieldValue: { serverTimestamp: jest.fn(() => 'SERVER_TIMESTAMP') },
 }));
 
 const mockCreateCalendarEvent = jest.fn();
@@ -108,6 +109,35 @@ describe('reservationTriggers', () => {
                 expect.objectContaining({ title: '새 차량 예약' }),
                 'user1'
             );
+        });
+
+        it('실패 누적(영구제외)인 차량은 캘린더 생성을 건너뛴다', async () => {
+            // calendarSyncFailCount >= 10 → 영구 제외
+            mockGet.mockResolvedValue({ exists: true, data: () => ({ googleCalendarId: 'cal@group.calendar.google.com', calendarSyncFailCount: 10 }) });
+            mockSendPushToOrg.mockResolvedValue(undefined);
+
+            const event = makeCreateEvent({ vehicleId: 'v1', organizationId: 'org1', date: '2026-01-01' });
+            await (onReservationCreated as Function)(event);
+
+            expect(mockCreateCalendarEvent).not.toHaveBeenCalled();
+            // 캘린더는 건너뛰어도 푸시 알림은 정상 전송
+            expect(mockSendPushToOrg).toHaveBeenCalledTimes(1);
+        });
+
+        it('캘린더 생성이 Not Found면 실패 카운트를 증가시킨다', async () => {
+            mockGet.mockResolvedValue({ exists: true, data: () => ({ googleCalendarId: 'cal@group.calendar.google.com', calendarSyncFailCount: 2 }) });
+            mockCreateCalendarEvent.mockRejectedValue(new Error('Not Found'));
+            mockUpdate.mockResolvedValue(undefined);
+            mockSendPushToOrg.mockResolvedValue(undefined);
+
+            const event = makeCreateEvent({ vehicleId: 'v1', organizationId: 'org1', date: '2026-01-01' });
+            await (onReservationCreated as Function)(event);
+
+            // failCount 2 → 3 으로 증가 + 마지막 실패 시각 기록
+            expect(mockUpdate).toHaveBeenCalledWith({
+                calendarSyncFailCount: 3,
+                calendarSyncLastFailAt: 'SERVER_TIMESTAMP',
+            });
         });
     });
 
