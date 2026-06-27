@@ -10,6 +10,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { getStorage } from "firebase-admin/storage";
 import { log } from "../../utils/helpers";
+import { toKSTDate } from "../../utils/kstDate";
 
 const TMAP_API_KEY = defineString("TMAP_API_KEY");
 const HOLIDAY_API_KEY = defineString("HOLIDAY_API_KEY");
@@ -229,11 +230,91 @@ interface SchedulerHealthResult {
     expectedIntervalMs: number;
 }
 
-const SCHEDULER_CONFIG: { name: string; displayName: string; expectedIntervalMs: number }[] = [
-    { name: "reservationReminder", displayName: "예약 알림", expectedIntervalMs: 30 * 60 * 1000 },        // 15분마다, 30분 여유
-    { name: "syncCalendarToApp", displayName: "캘린더 싱크", expectedIntervalMs: 4 * 60 * 60 * 1000 },      // 2시간마다, 4시간 여유
-    { name: "syncHolidays", displayName: "공휴일 동기화", expectedIntervalMs: 32 * 24 * 60 * 60 * 1000 },    // 한달마다, 32일 여유
+/**
+ * 스케줄러 cron 활성 창 (KST 기준).
+ * 비용 절감을 위해 평일·업무시간에만 도는 스케줄러는 창 밖(주말/야간)에 실행되지 않으므로,
+ * 그 시간대의 "오래된 마지막 실행"을 에러로 오탐하지 않도록 한다.
+ */
+interface ActiveWindow {
+    days: number[];     // KST 요일 (0=일 ~ 6=토)
+    startHour: number;  // 포함 (매시 정각 틱 기준)
+    endHour: number;    // 포함
+}
+
+const SCHEDULER_CONFIG: {
+    name: string;
+    displayName: string;
+    expectedIntervalMs: number;
+    activeWindow?: ActiveWindow;
+}[] = [
+    // 평일 08~18시 매시 정각 (1시간 주기). cron "0 8-18 * * 1-5"
+    {
+        name: "reservationReminder",
+        displayName: "예약 알림",
+        expectedIntervalMs: 70 * 60 * 1000,
+        activeWindow: { days: [1, 2, 3, 4, 5], startHour: 8, endHour: 18 },
+    },
+    // 평일 06~22시 매시 정각 (1시간 주기). cron "0 6-22 * * 1-5"
+    {
+        name: "syncCalendarToApp",
+        displayName: "캘린더 싱크",
+        expectedIntervalMs: 70 * 60 * 1000,
+        activeWindow: { days: [1, 2, 3, 4, 5], startHour: 6, endHour: 22 },
+    },
+    // 월 1회 통합 월배치 (상시 활성으로 간주). 32일 여유
+    {
+        name: "syncHolidays",
+        displayName: "공휴일 동기화",
+        expectedIntervalMs: 32 * 24 * 60 * 60 * 1000,
+    },
 ];
+
+/** 정각 틱 직후 실행 지연을 감안한 유예 시간 */
+const SCHEDULER_GRACE_MS = 15 * 60 * 1000;
+
+/**
+ * activeWindow를 가진 스케줄러의, now 시점 직전(또는 동일)의 예정 실행 틱(매시 정각)을 구한다.
+ * 활성 창 안의 가장 최근 정각 시각(epoch ms)을 반환하며, 최근 8일 내 없으면 null.
+ * KST 오프셋은 정시 단위(+9:00)이므로 epoch를 시(hour) 경계로 내림하면 KST 정각과 일치한다.
+ */
+export function getLastScheduledTick(now: Date, win: ActiveWindow): number | null {
+    const HOUR_MS = 60 * 60 * 1000;
+    for (let i = 0; i < 8 * 24; i++) {
+        const candidate = new Date(now.getTime() - i * HOUR_MS);
+        const kst = toKSTDate(candidate);
+        const day = kst.getDay();
+        const hour = kst.getHours();
+        if (win.days.includes(day) && hour >= win.startHour && hour <= win.endHour) {
+            return Math.floor(candidate.getTime() / HOUR_MS) * HOUR_MS;
+        }
+    }
+    return null;
+}
+
+/**
+ * 스케줄러 상태 판정 (순수 함수, 테스트 용이).
+ * - activeWindow 있음: 가장 최근 예정 틱에 실행됐는지로 판정. 창 밖(주말/야간)이면 정상.
+ * - activeWindow 없음: 단순히 마지막 실행 후 expectedIntervalMs 초과 여부로 판정.
+ */
+export function evaluateSchedulerStatus(
+    lastRunMs: number | null,
+    nowMs: number,
+    cfg: { expectedIntervalMs: number; activeWindow?: ActiveWindow }
+): "ok" | "degraded" | "error" {
+    if (lastRunMs === null) return "degraded";
+
+    if (cfg.activeWindow) {
+        const tick = getLastScheduledTick(new Date(nowMs), cfg.activeWindow);
+        // 최근 8일 내 예정 틱이 없으면(이론상 드묾) 오탐 방지를 위해 정상 처리
+        if (tick === null) return "ok";
+        // 방금 정각이면 실행이 진행 중일 수 있어 유예
+        if (nowMs - tick < SCHEDULER_GRACE_MS) return "ok";
+        // 가장 최근 예정 틱 이후에 실행 기록이 있으면 정상, 없으면 (해당 틱을 놓쳤으므로) 에러
+        return lastRunMs >= tick ? "ok" : "error";
+    }
+
+    return nowMs - lastRunMs > cfg.expectedIntervalMs ? "error" : "ok";
+}
 
 async function checkSchedulerHealth(): Promise<SchedulerHealthResult[]> {
     const db = getFirestore();
@@ -244,21 +325,14 @@ async function checkSchedulerHealth(): Promise<SchedulerHealthResult[]> {
             const doc = await db.collection("_health").doc(cfg.name).get();
             const data = doc.data();
             const lastRun = data?.lastRun?.toDate?.() || data?.lastRun;
+            const lastRunMs = lastRun ? new Date(lastRun).getTime() : null;
 
-            if (!lastRun) {
-                results.push({
-                    ...cfg,
-                    status: "degraded",
-                    lastRun: null,
-                });
-                continue;
-            }
-
-            const elapsed = Date.now() - new Date(lastRun).getTime();
             results.push({
-                ...cfg,
-                status: elapsed > cfg.expectedIntervalMs ? "error" : "ok",
-                lastRun: new Date(lastRun).toISOString(),
+                name: cfg.name,
+                displayName: cfg.displayName,
+                expectedIntervalMs: cfg.expectedIntervalMs,
+                status: evaluateSchedulerStatus(lastRunMs, Date.now(), cfg),
+                lastRun: lastRunMs !== null ? new Date(lastRunMs).toISOString() : null,
             });
         } catch {
             results.push({
