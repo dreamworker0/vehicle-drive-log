@@ -1,7 +1,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore } from "firebase-admin/firestore";
 import { syncSingleVehicleCalendar } from "../scheduled/calendarSchedule";
-import { isCalendarAuthError, recordCalendarFailure, resetCalendarFailure } from "../../services/calendar/calendarFailTracking";
+import { isCalendarAuthError, recordCalendarFailure, resetCalendarFailure, shouldSkipVehicleCalendar, MAX_FAIL_COUNT } from "../../services/calendar/calendarFailTracking";
 
 const db = getFirestore();
 
@@ -88,6 +88,23 @@ export const triggerOnDemandCalendarSync = onCall(
                 "failed-precondition",
                 "해당 차량은 구글 캘린더가 연동되어 있지 않습니다."
             );
+        }
+
+        // 3-1. 실패 누적(쿨다운/영구제외) 차량은 동기화 호출 자체를 건너뛴다.
+        // 이 콜러블은 예약 캘린더를 열 때마다 백그라운드로 자동 호출되므로
+        // (useReservationData), 공유가 깨진 차량은 가드가 없으면 매번 403/404를 유발해
+        // 쿼터를 낭비하고 calendarSyncFailCount가 MAX를 넘어 무한 증가한다.
+        // errorType은 클라이언트가 30분 쿨다운을 적용하고 조용히 멈추도록 기존 값을 재사용한다.
+        const failCount = (vehicleData.calendarSyncFailCount as number) || 0;
+        if (shouldSkipVehicleCalendar(vehicleData)) {
+            console.log(`[OnDemandSync] Vehicle ${vehicleId}: calendar sync disabled (failCount=${failCount}), skip`);
+            return {
+                success: false,
+                errorType: "calendar-not-found",
+                message: failCount >= MAX_FAIL_COUNT
+                    ? "캘린더 동기화가 반복 실패로 중단된 차량입니다. 공유 설정을 정정한 뒤 헬스 체크에서 '동기화 리셋'을 해주세요."
+                    : "캘린더 동기화가 일시 중단(쿨다운) 상태입니다. 잠시 후 다시 시도됩니다.",
+            };
         }
 
         // 4. 동기화 핵심 로직 수행

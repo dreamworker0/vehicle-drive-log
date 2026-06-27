@@ -40,10 +40,12 @@ export function shouldSkipVehicleCalendar(vehicleData: FirebaseFirestore.Documen
 
 /**
  * 캘린더 인증/부재 오류 시 실패 카운트를 1 증가시키고 마지막 실패 시각을 기록한다.
- * @returns 증가된 새 failCount
+ * 카운터는 MAX_FAIL_COUNT를 넘지 않도록 캡한다(영구제외 임계). 일부 경로가 백오프 가드를
+ * 빠뜨려도 카운터가 무한 증가(예: 192회)하지 않도록 하는 방어적 불변식이다.
+ * @returns 증가된(캡 적용) 새 failCount
  */
 export async function recordCalendarFailure(vehicleId: string, currentFailCount: number): Promise<number> {
-    const newFailCount = currentFailCount + 1;
+    const newFailCount = Math.min(currentFailCount + 1, MAX_FAIL_COUNT);
     await getFirestore().collection("vehicles").doc(vehicleId).update({
         calendarSyncFailCount: newFailCount,
         calendarSyncLastFailAt: FieldValue.serverTimestamp(),
