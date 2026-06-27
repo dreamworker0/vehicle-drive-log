@@ -5,6 +5,13 @@ on:
     branches: [master]
   workflow_dispatch:
 
+# 동시 배포 방지: 여러 푸시가 겹쳐도 한 번에 하나만 실행하고 나머지는 대기시킨다.
+# (동일 Cloud Function을 동시에 업데이트하면 409 "unable to queue the operation"으로
+#  일부 함수 갱신이 조용히 누락된다. cancel-in-progress:false로 진행 중 배포는 끝까지 보장.)
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
