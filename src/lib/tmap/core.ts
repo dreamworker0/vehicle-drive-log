@@ -132,7 +132,14 @@ export async function fetchTmap(prodUrl: string, devUrl: string, method = 'GET',
         }
 
         recordSuccess();
-        return await res.json();
+        // 빈 본문(204/빈 200 응답)이면 JSON 파싱이 깨지므로 방어적으로 처리
+        const text = await res.text();
+        if (!text) return null;
+        try {
+            return JSON.parse(text);
+        } catch {
+            return null;
+        }
     });
 }
 
