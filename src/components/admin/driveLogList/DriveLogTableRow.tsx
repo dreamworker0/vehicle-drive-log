@@ -72,14 +72,14 @@ export default function DriveLogTableRow({ log, deletingId, onDelete }: DriveLog
                 <div>
                     <p className="text-xs font-mono text-surface-500 dark:text-surface-400">{log.endTime || '-'}</p>
                 </div>
-                <div>
+                <div className="min-w-0">
                     <p className="text-sm text-surface-900 dark:text-surface-100 truncate">{log.driverName || '(이름 없음)'}</p>
                 </div>
-                <div>
+                <div className="min-w-0">
                     <p className="text-sm text-surface-700 dark:text-surface-300 truncate">{log.vehicleName}</p>
                 </div>
-                <div>
-                    <p className="text-sm text-surface-600 dark:text-surface-400 truncate">{log.destination || '-'}</p>
+                <div className="min-w-0">
+                    <p className="text-sm text-surface-600 dark:text-surface-400 truncate" title={log.destination || ''}>{log.destination || '-'}</p>
                 </div>
                 <div>
                     <p className="text-xs font-mono text-surface-500 dark:text-surface-400">
