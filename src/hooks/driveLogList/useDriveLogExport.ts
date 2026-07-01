@@ -5,7 +5,8 @@
  */
 import { useState } from 'react';
 import { useToast } from '../useToast';
-import { getAllDriveLogsForExport } from '../../lib/firestore';
+import { getAllDriveLogsForExport, getFuelLogs } from '../../lib/firestore';
+import { attachFuelSummary } from '../../lib/driveLogExportFields';
 import { matchesSearch } from './matchesSearch';
 import type { DriveLogEntry } from '../../types/driveLog';
 
@@ -32,6 +33,7 @@ export function useDriveLogExport(
     const { showToast } = useToast();
     const [includeHipass, setIncludeHipass] = useState(false);
     const [includePassengers, setIncludePassengers] = useState(false);
+    const [includeFuel, setIncludeFuel] = useState(false);
 
     // 내보내기 유효성 검사 (기간 필수 + 최대 3개월)
     const validateExportDates = (format: string): string | null => {
@@ -53,7 +55,7 @@ export function useDriveLogExport(
     };
 
     // 서버에서 전체 데이터를 받아 직렬화
-    const handleServerExport = async (period: string, hipass: boolean, passengers: boolean, isPdf: boolean) => {
+    const handleServerExport = async (period: string, hipass: boolean, passengers: boolean, fuel: boolean, isPdf: boolean) => {
         if (!orgId) return;
         showToast('전체 데이터를 불러오고 있습니다. 잠시만 기다려주세요.', 'info');
         try {
@@ -70,6 +72,14 @@ export function useDriveLogExport(
                 showToast('추출할 데이터가 없습니다.', 'warning');
                 return;
             }
+            // 주유 포함 시 별도 컬렉션의 주유 기록을 조회해 차량+날짜로 조인 (그날 첫 운행 행에만 부착)
+            if (fuel) {
+                const fuelLogs = await getFuelLogs(orgId, filters.vehicleId || null, {
+                    since: filters.startDate || undefined,
+                    until: filters.endDate || undefined,
+                });
+                attachFuelSummary(finalLogs, fuelLogs);
+            }
             if (isPdf) {
                 const { downloadDriveLogsPdf } = await import('../../lib/pdf/pdfExport');
                 const defaultApproval = [{ title: '담당' }, { title: '팀장' }];
@@ -82,6 +92,7 @@ export function useDriveLogExport(
                     approvalLine: useApproval,
                     includeHipass: hipass,
                     includePassengers: passengers,
+                    includeFuel: fuel,
                     onError: (msg) => showToast(msg, 'error'),
                 });
             } else {
@@ -90,6 +101,7 @@ export function useDriveLogExport(
                     onError: (msg) => showToast(msg, 'warning'),
                     includeHipass: hipass,
                     includePassengers: passengers,
+                    includeFuel: fuel,
                 });
             }
         } catch (err) {
@@ -101,17 +113,18 @@ export function useDriveLogExport(
 
     const handleExportExcel = () => {
         const period = validateExportDates('엑셀');
-        if (period) handleServerExport(period, includeHipass, includePassengers, false);
+        if (period) handleServerExport(period, includeHipass, includePassengers, includeFuel, false);
     };
 
     const handleExportPdf = () => {
         const period = validateExportDates('PDF');
-        if (period) handleServerExport(period, includeHipass, includePassengers, true);
+        if (period) handleServerExport(period, includeHipass, includePassengers, includeFuel, true);
     };
 
     return {
         includeHipass, setIncludeHipass,
         includePassengers, setIncludePassengers,
+        includeFuel, setIncludeFuel,
         handleExportExcel, handleExportPdf,
     };
 }

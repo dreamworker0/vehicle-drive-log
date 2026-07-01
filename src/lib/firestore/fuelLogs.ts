@@ -11,7 +11,7 @@ import { captureError } from '../sentry';
 import { toLocalDateStr } from '../dateUtils';
 
 /** 주유 기록 목록 조회 (기관 전체, 최신순) */
-export const getFuelLogs = async (orgId: string, vehicleId: string | null = null, options?: { since?: Date; until?: Date }) => {
+export const getFuelLogs = async (orgId: string, vehicleId: string | null = null, options?: { since?: Date | string; until?: Date | string }) => {
     const constraints: import('firebase/firestore').QueryConstraint[] = [
         where('organizationId', '==', orgId),
     ];

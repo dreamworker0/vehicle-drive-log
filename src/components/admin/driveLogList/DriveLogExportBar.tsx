@@ -7,6 +7,8 @@ interface DupResult {
 export interface DriveLogExportBarProps {
     filteredCount: number;
     totalDistance: number;
+    includeFuel?: boolean;
+    onIncludeFuelChange?: (value: boolean) => void;
     includeHipass: boolean;
     onIncludeHipassChange: (value: boolean) => void;
     includePassengers?: boolean;
@@ -23,6 +25,8 @@ export interface DriveLogExportBarProps {
 export default function DriveLogExportBar({
     filteredCount,
     totalDistance,
+    includeFuel = false,
+    onIncludeFuelChange,
     includeHipass,
     onIncludeHipassChange,
     includePassengers = false,
@@ -45,6 +49,15 @@ export default function DriveLogExportBar({
                     </p>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
+                    <label className="flex items-center gap-1.5 text-xs text-surface-500 dark:text-surface-400 cursor-pointer select-none">
+                        <input
+                            type="checkbox"
+                            checked={includeFuel}
+                            onChange={e => onIncludeFuelChange?.(e.target.checked)}
+                            className="rounded border-surface-300 dark:border-surface-600 text-primary-600 dark:text-primary-500 focus:ring-primary-500 w-3.5 h-3.5"
+                        />
+                        주유 포함
+                    </label>
                     <label className="flex items-center gap-1.5 text-xs text-surface-500 dark:text-surface-400 cursor-pointer select-none">
                         <input
                             type="checkbox"

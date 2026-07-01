@@ -9,6 +9,7 @@ export default function DriveLogList() {
         logs, vehicles, members, loading, loadingMore, hasMore,
         filters, setFilters, filteredLogs, totalDistance,
         deletingId, includeHipass, setIncludeHipass, includePassengers, setIncludePassengers,
+        includeFuel, setIncludeFuel,
         dupState, dupResult,
         loadMore, handleDelete,
         handleDupScan, handleDupClean, handleDupCancel,
@@ -30,6 +31,8 @@ export default function DriveLogList() {
             <DriveLogExportBar
                 filteredCount={filteredLogs.length}
                 totalDistance={totalDistance}
+                includeFuel={includeFuel}
+                onIncludeFuelChange={setIncludeFuel}
                 includeHipass={includeHipass}
                 onIncludeHipassChange={setIncludeHipass}
                 includePassengers={includePassengers}

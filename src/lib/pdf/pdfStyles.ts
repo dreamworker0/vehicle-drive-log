@@ -157,6 +157,7 @@ export function getPdfStyles() {
         .col-time { width: 34px; }
         .col-km { width: 46px; }
         .col-passenger { width: 30px; }
+        .col-fuel { width: 64px; }
         .col-passengers { width: 50px; }
         .col-note { width: 80px; }
 

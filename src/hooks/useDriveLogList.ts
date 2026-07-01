@@ -221,6 +221,7 @@ export default function useDriveLogList() {
     const {
         includeHipass, setIncludeHipass,
         includePassengers, setIncludePassengers,
+        includeFuel, setIncludeFuel,
         handleExportExcel, handleExportPdf,
     } = useDriveLogExport(orgId, filters, org);
 
@@ -229,6 +230,7 @@ export default function useDriveLogList() {
         logs, vehicles, members, loading, loadingMore, hasMore,
         filters, setFilters, filteredLogs, totalDistance,
         deletingId, includeHipass, setIncludeHipass, includePassengers, setIncludePassengers,
+        includeFuel, setIncludeFuel,
         dupState, dupResult,
         // 핸들러
         loadMore, handleDelete,

@@ -29,6 +29,7 @@ interface PdfLogEntry {
     hipassCardNumber?: string;
     hipassBalanceBefore?: number;
     hipassBalanceAfter?: number;
+    fuelSummary?: string;
     notes?: string;
 }
 
@@ -47,13 +48,13 @@ const ROWS_PER_PAGE = 19;
  * @param {string} options.orgName - 기관명
  * @param {string} options.period - 기간 문자열
  */
-export function downloadDriveLogsPdf(logs: PdfLogEntry[], options: { onError?: (msg: string) => void; orgName?: string; period?: string; approvalLine?: ApprovalEntry[]; includeHipass?: boolean; includePassengers?: boolean } = {}) {
+export function downloadDriveLogsPdf(logs: PdfLogEntry[], options: { onError?: (msg: string) => void; orgName?: string; period?: string; approvalLine?: ApprovalEntry[]; includeHipass?: boolean; includePassengers?: boolean; includeFuel?: boolean } = {}) {
     if (!logs || logs.length === 0) {
         options.onError?.('다운로드할 데이터가 없습니다.');
         return false;
     }
 
-    const { orgName = '', period = '', approvalLine = [], includeHipass = false, includePassengers = false } = options;
+    const { orgName = '', period = '', approvalLine = [], includeHipass = false, includePassengers = false, includeFuel = false } = options;
 
     // 날짜순 정렬 (오래된 순), 같은 날짜 내 출발 시간 오름차순
     const sorted = [...logs].sort((a, b) => {
@@ -68,7 +69,7 @@ export function downloadDriveLogsPdf(logs: PdfLogEntry[], options: { onError?: (
         pages.push(sorted.slice(i, i + ROWS_PER_PAGE));
     }
 
-    const htmlContent = buildPdfHtml(pages, { orgName, period, approvalLine, includeHipass, includePassengers });
+    const htmlContent = buildPdfHtml(pages, { orgName, period, approvalLine, includeHipass, includePassengers, includeFuel });
 
     // 새 창에서 인쇄
     const printWindow = window.open('', '_blank', 'width=1100,height=800');
@@ -91,7 +92,7 @@ export function downloadDriveLogsPdf(logs: PdfLogEntry[], options: { onError?: (
 /**
  * 운행일지 데이터 행을 HTML TR로 변환
  */
-function buildLogRow(log: PdfLogEntry, idx: number, pageIdx: number, includeHipass = false, includePassengers = false) {
+function buildLogRow(log: PdfLogEntry, idx: number, pageIdx: number, includeHipass = false, includePassengers = false, includeFuel = false) {
     const date = resolveDateStr(log, '-');
     const distance = resolveDistance(log);
 
@@ -118,6 +119,7 @@ function buildLogRow(log: PdfLogEntry, idx: number, pageIdx: number, includeHipa
             <td class="right">${formatNumber(resolveEndKm(log))}</td>
             <td class="right">${distance > 0 ? distance.toLocaleString() : ''}</td>
             <td class="center">${log.passengerCount || ''}</td>
+            ${includeFuel ? `<td class="right" style="font-size: 8px;">${escapeHtml(log.fuelSummary || '')}</td>` : ''}
             ${includePassengers ? `<td class="center" style="font-size: 8px;">${escapeHtml(log.passengerNames?.join(', ') || '')}</td>` : ''}
             <td>${escapeHtml(noteText)}</td>
         </tr>
@@ -127,13 +129,14 @@ function buildLogRow(log: PdfLogEntry, idx: number, pageIdx: number, includeHipa
 /**
  * 빈 행 HTML (19행 맞추기)
  */
-function buildEmptyRows(count: number, includePassengers = false) {
+function buildEmptyRows(count: number, includePassengers = false, includeFuel = false) {
     return Array(count).fill(null).map(() => `
         <tr>
             <td class="center">&nbsp;</td>
             <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
             <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
             <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
+            ${includeFuel ? '<td>&nbsp;</td>' : ''}
             ${includePassengers ? '<td>&nbsp;</td>' : ''}
             <td>&nbsp;</td>
         </tr>
@@ -161,12 +164,12 @@ function buildApprovalHtml(approvalLine: ApprovalEntry[]) {
 /**
  * 단일 페이지 HTML 생성
  */
-function buildPageHtml(pageRows: PdfLogEntry[], pageIdx: number, totalPages: number, { orgName, period, approvalLine, includeHipass = false, includePassengers = false, totalAllDistance = 0 }: { orgName: string; period: string; approvalLine: ApprovalEntry[]; includeHipass?: boolean; includePassengers?: boolean; totalAllDistance?: number }) {
+function buildPageHtml(pageRows: PdfLogEntry[], pageIdx: number, totalPages: number, { orgName, period, approvalLine, includeHipass = false, includePassengers = false, includeFuel = false, totalAllDistance = 0 }: { orgName: string; period: string; approvalLine: ApprovalEntry[]; includeHipass?: boolean; includePassengers?: boolean; includeFuel?: boolean; totalAllDistance?: number }) {
     const pageNum = pageIdx + 1;
     const pageTotalDistance = pageRows.reduce((sum, log) => sum + resolveDistance(log), 0);
 
-    const rowsHtml = pageRows.map((log: PdfLogEntry, idx: number) => buildLogRow(log, idx, pageIdx, includeHipass, includePassengers)).join('');
-    const emptyRowsHtml = buildEmptyRows(ROWS_PER_PAGE - pageRows.length, includePassengers);
+    const rowsHtml = pageRows.map((log: PdfLogEntry, idx: number) => buildLogRow(log, idx, pageIdx, includeHipass, includePassengers, includeFuel)).join('');
+    const emptyRowsHtml = buildEmptyRows(ROWS_PER_PAGE - pageRows.length, includePassengers, includeFuel);
     const approvalHtml = buildApprovalHtml(approvalLine);
 
     return `
@@ -198,6 +201,7 @@ function buildPageHtml(pageRows: PdfLogEntry[], pageIdx: number, totalPages: num
                         <th rowspan="2" class="col-purpose">사용목적</th>
                         <th colspan="3">주행거리 (km)</th>
                         <th rowspan="2" class="col-passenger">탑승<br/>인원</th>
+                        ${includeFuel ? '<th rowspan="2" class="col-fuel">주유금액<br/>(주유량)</th>' : ''}
                         ${includePassengers ? '<th rowspan="2" class="col-passengers">동행자</th>' : ''}
                         <th rowspan="2" class="col-note">비고</th>
                     </tr>
@@ -216,6 +220,7 @@ function buildPageHtml(pageRows: PdfLogEntry[], pageIdx: number, totalPages: num
                         <td colspan="10" class="center total-label">소 계</td>
                         <td class="right total-value">${pageTotalDistance > 0 ? pageTotalDistance.toLocaleString() : ''}</td>
                         <td></td>
+                        ${includeFuel ? '<td></td>' : ''}
                         ${includePassengers ? '<td></td>' : ''}
                         <td></td>
                     </tr>
@@ -224,6 +229,7 @@ function buildPageHtml(pageRows: PdfLogEntry[], pageIdx: number, totalPages: num
                         <td colspan="10" class="center total-label">합 계</td>
                         <td class="right total-value">${totalAllDistance > 0 ? totalAllDistance.toLocaleString() : ''}</td>
                         <td></td>
+                        ${includeFuel ? '<td></td>' : ''}
                         ${includePassengers ? '<td></td>' : ''}
                         <td></td>
                     </tr>` : ''}
@@ -236,7 +242,7 @@ function buildPageHtml(pageRows: PdfLogEntry[], pageIdx: number, totalPages: num
 /**
  * 전체 HTML 문서 생성
  */
-function buildPdfHtml(pages: PdfLogEntry[][], options: { orgName: string; period: string; approvalLine: ApprovalEntry[]; includeHipass?: boolean; includePassengers?: boolean }) {
+function buildPdfHtml(pages: PdfLogEntry[][], options: { orgName: string; period: string; approvalLine: ApprovalEntry[]; includeHipass?: boolean; includePassengers?: boolean; includeFuel?: boolean }) {
     const totalPages = pages.length;
     // 전체 페이지에 걸친 총 주행거리 합계
     const totalAllDistance = pages.flat().reduce((sum, log) => sum + resolveDistance(log), 0);

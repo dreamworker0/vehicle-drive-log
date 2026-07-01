@@ -33,11 +33,12 @@ interface ExcelDriveLog {
     hipassCardNumber?: string;
     hipassBalanceBefore?: number;
     hipassBalanceAfter?: number;
+    fuelSummary?: string;
     notes?: string;
     [key: string]: unknown;
 }
 
-export async function downloadDriveLogsExcel(logs: ExcelDriveLog[], filename = '운행일지', { onError, includeHipass = false, includePassengers = false }: { onError?: (msg: string) => void; includeHipass?: boolean; includePassengers?: boolean } = {}) {
+export async function downloadDriveLogsExcel(logs: ExcelDriveLog[], filename = '운행일지', { onError, includeHipass = false, includePassengers = false, includeFuel = false }: { onError?: (msg: string) => void; includeHipass?: boolean; includePassengers?: boolean; includeFuel?: boolean } = {}) {
     if (!logs || logs.length === 0) {
         onError?.('다운로드할 데이터가 없습니다.');
         return false;
@@ -63,6 +64,10 @@ export async function downloadDriveLogsExcel(logs: ExcelDriveLog[], filename = '
             '주행거리(km)': distance > 0 ? distance : '',
             '탑승인원': log.passengerCount ?? '',
         };
+
+        if (includeFuel) {
+            row['주유금액(주유량)'] = log.fuelSummary || '';
+        }
 
         if (includeHipass) {
             row['하이패스카드'] = log.hipassCardNumber || '';
@@ -95,6 +100,9 @@ export async function downloadDriveLogsExcel(logs: ExcelDriveLog[], filename = '
         { wch: 8 },   // 주행거리
         { wch: 8 },   // 탑승인원
     ];
+    if (includeFuel) {
+        cols.push({ wch: 16 });  // 주유금액(주유량)
+    }
     if (includeHipass) {
         cols.push({ wch: 20 });  // 하이패스카드
         cols.push({ wch: 12 });  // 사용전금액
