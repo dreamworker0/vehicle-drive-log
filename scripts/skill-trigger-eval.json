@@ -20,7 +20,7 @@
     { "id": 17, "prompt": "이 컴포넌트들 단위 테스트 작성해줘", "expected": "write-test" },
     { "id": 18, "prompt": "배포하기 전에 점검 한번 돌려줘", "expected": "pre-deploy-check" },
     { "id": 19, "prompt": "Sentry에 ResizeObserver 에러가 계속 떠. 무시하게 해줘", "expected": "sentry-noise-filter" },
-    { "id": 20, "prompt": "안 쓰는 코드랑 패키지 정리 좀 해줘", "expected": "cleanup" },
+    { "id": 20, "prompt": "안 쓰는 코드랑 패키지 정리 좀 해줘", "expected": "code-cleanup" },
     { "id": 21, "prompt": "배포했는데 functions가 Node 버전 에러로 실패해", "expected": "troubleshoot-deployment" },
     { "id": 22, "prompt": "오프라인일 때도 운행 입력을 저장했다가 나중에 동기화되게 해줘", "expected": "add-pwa-feature" }
   ]

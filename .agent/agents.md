@@ -3,6 +3,7 @@
 > 이 문서는 AI 에이전트가 **모든 작업 전에 가장 먼저 참조**하는 최상위 규칙이다.
 > 세부 규칙은 `rules/`, 패턴 가이드는 `skills/`, 자동화는 `workflows/`에 있다.
 > **에이전트는 하위 문서를 선제적으로 읽지 않으며, 현재 작업 도메인에 해당하는 문서만 선택적으로 참조한다.**
+> 두 에이전트(Antigravity ↔ Claude Code) 공용 구조와 `.agent/`→`.claude/` 동기화 규칙은 [multi-agent-coordination](rules/multi-agent-coordination.md) 참고.
 
 ---
 
@@ -30,8 +31,8 @@
 | D15 | 불필요한 새 라이브러리 추가 | 기존 라이브러리로 해결 가능한지 먼저 확인 | [coding-conventions §8](rules/coding-conventions.md) |
 | D16 | 터치 타겟 48px 미만 | 최소 48px 확보 | [pwa-mobile-first §2](rules/pwa-mobile-first.md) |
 | D17 | TailwindCSS v4 문법 사용 | v3 문법만 (`@apply`, `@layer`) | [coding-conventions §7](rules/coding-conventions.md) |
-| D18 | 브라우저 서브 에이전트 자의적 실행 | 사용자 명시적 요청 시에만 | [user_global §5](rules) |
-| D19 | 사용자에게 질문/확인을 요청한 뒤 승인 없이 임의 단계 진행 | 반드시 사용자의 명확한 답변/승인을 기다린 후 다음 태스크 수행 | [user_global](rules) |
+| D18 | 브라우저 서브 에이전트 자의적 실행 | 사용자 명시적 요청 시에만 | 사용자 전역 지침 |
+| D19 | 사용자에게 질문/확인을 요청한 뒤 승인 없이 임의 단계 진행 | 반드시 사용자의 명확한 답변/승인을 기다린 후 다음 태스크 수행 | 사용자 전역 지침 |
 
 ### 1.3 충돌 해소 원칙
 

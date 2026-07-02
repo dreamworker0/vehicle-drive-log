@@ -5,7 +5,7 @@
 ## 핵심 참조 (반드시 따를 것)
 
 - **에이전트 행동 규칙**: [.agent/agents.md](.agent/agents.md) — 절대 금지 목록(§1), 자동 교정 루프(§2), 작업별 체크리스트(§4), 판단 가이드(§5)
-- **세부 규칙**: [.agent/rules/](.agent/rules/) — coding-conventions, design-system, cloud-functions, firestore-rules 등 12개 규칙 파일
+- **세부 규칙**: [.agent/rules/](.agent/rules/) — coding-conventions, design-system, cloud-functions, firestore-rules 등 도메인별 규칙 파일
 - **스킬 가이드**: [.agent/skills/](.agent/skills/) — 작업별 패턴 가이드 (아래 테이블 참고)
 - **워크플로우**: [.agent/workflows/](.agent/workflows/) — `/deploy`, `/test`, `/build` 등 자동화 스크립트
 
@@ -73,11 +73,13 @@
 | 다크모드 점검 | [dark-mode-audit](.agent/skills/dark-mode-audit/SKILL.md) |
 | 테스트 작성 | [write-test](.agent/skills/write-test/SKILL.md) |
 | 배포 문제 진단 | [troubleshoot-deployment](.agent/skills/troubleshoot-deployment/SKILL.md) |
+| 배포 전 일괄 점검 | [pre-deploy-check](.agent/skills/pre-deploy-check/SKILL.md) |
+| Sentry 노이즈 에러 필터 | [sentry-noise-filter](.agent/skills/sentry-noise-filter/SKILL.md) |
 | FAQ 갱신 | [update-faq](.agent/skills/update-faq/SKILL.md) |
 | 설정 UI 추가 | [settings-ui](.agent/skills/settings-ui/SKILL.md) |
 | 차량 색상 표시 | [vehicle-color](.agent/skills/vehicle-color/SKILL.md) |
 | 대시보드 UI | [dashboard-ui-pattern](.agent/skills/dashboard-ui-pattern/SKILL.md) |
-| 코드 정리 | [cleanup](.agent/skills/cleanup/SKILL.md) |
+| 코드 정리 (미사용 코드·패키지) | [code-cleanup](.agent/skills/code-cleanup/SKILL.md) |
 | Gemini OCR 연동 | [gemini-ocr-integration](.agent/skills/gemini-ocr-integration/SKILL.md) |
 
 위 테이블의 스킬은 모두 `.claude/skills/`로 동기화되어 Claude Code에서 자동 발동된다. `.agent/workflows/`도 `.claude/commands/`로 동기화되어 `/deploy`, `/test`, `/build` 등 **슬래시 커맨드**로 사용할 수 있다. 두 브리지 모두 `scripts/sync-claude-agents.ts`가 생성하므로 **원본은 항상 `.agent/`에서만 수정**하고 `npm run sync:agents`로 재생성한다 (CI가 `--check`로 강제).

@@ -28,7 +28,8 @@ function done(code) {
 
 let payload;
 try {
-  payload = JSON.parse(readFileSync(0, 'utf8'));
+  // BOM 제거: PowerShell 파이프 등 일부 호출 경로가 UTF-8 BOM을 붙인다.
+  payload = JSON.parse(readFileSync(0, 'utf8').replace(/^\uFEFF/, ''));
 } catch {
   // 훅 자체 오류로 편집을 막지 않는다.
   done(0);

@@ -22,7 +22,7 @@
       "17": "write-test",
       "18": "pre-deploy-check",
       "19": "sentry-noise-filter",
-      "20": "cleanup",
+      "20": "code-cleanup",
       "21": "troubleshoot-deployment",
       "22": "add-pwa-feature"
     }
