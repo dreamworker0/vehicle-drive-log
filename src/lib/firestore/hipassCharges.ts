@@ -11,7 +11,12 @@ import { db } from '../firebase';
 import { captureError } from '../sentry';
 import { toLocalDateStr } from '../dateUtils';
 
-/** 기관 전체 하이패스 충전 기록 조회 (최신순, 200건) */
+// 기간(since/until) 조회 상한 — 월간 보고서가 운행일지 상한(EXPORT_MAX_DOCS=5000)과 같은
+// 수준으로 집계하도록 맞춘다. 기간 없는 화면 목록 조회는 기존대로 200건 유지.
+const RANGE_FETCH_MAX = 5000;
+const LIST_FETCH_MAX = 200;
+
+/** 기관 전체 하이패스 충전 기록 조회 (최신순 — 기간 지정 시 상한 5,000건, 미지정 시 200건) */
 export const getAllHipassCharges = async (orgId: string, options?: { since?: Date; until?: Date }) => {
     const constraints: import('firebase/firestore').QueryConstraint[] = [
         where('organizationId', '==', orgId),
@@ -24,9 +29,13 @@ export const getAllHipassCharges = async (orgId: string, options?: { since?: Dat
         constraints.push(where('date', '<=', options.until instanceof Date
             ? toLocalDateStr(options.until) : options.until));
     }
-    constraints.push(orderBy('date', 'desc'), limit(200));
+    const hasRange = Boolean(options?.since || options?.until);
+    constraints.push(orderBy('date', 'desc'), limit(hasRange ? RANGE_FETCH_MAX : LIST_FETCH_MAX));
     const q = query(collection(db, 'hipassCharges'), ...constraints);
     const snap = await getDocs(q);
+    if (hasRange && snap.docs.length >= RANGE_FETCH_MAX) {
+        console.warn(`[getAllHipassCharges] 기간 조회가 상한 ${RANGE_FETCH_MAX}건에 도달 — 이후 충전 기록은 집계에서 누락될 수 있습니다.`);
+    }
     return snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) }));
 };
 
