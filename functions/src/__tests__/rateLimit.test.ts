@@ -186,4 +186,55 @@ describe('rateLimit — Rate Limiting 유틸리티', () => {
             ).rejects.toThrow('요청이 너무 많습니다');
         });
     });
+
+    describe('checkDailyOcrQuota() — OCR 일일 누적 한도 (사용자/조직)', () => {
+        const USER_LIMIT = { max: 20, windowSec: 86400 };
+        const ORG_LIMIT = { max: 50, windowSec: 86400 };
+
+        const txWithCount = (count: number) => async (fn: any) =>
+            fn({
+                get: jest.fn().mockResolvedValue({ exists: true, data: () => ({ count }) }),
+                set: jest.fn(),
+            });
+
+        it('사용자·조직 모두 한도 미만 → 통과 (카운터 2회 검사)', async () => {
+            mockRunTransaction.mockImplementation(txWithCount(3) as any);
+
+            const { checkDailyOcrQuota } = await import('../utils/rateLimit');
+            await expect(
+                checkDailyOcrQuota('uid-abc', 'org-1', USER_LIMIT, ORG_LIMIT)
+            ).resolves.not.toThrow();
+            expect(mockRunTransaction).toHaveBeenCalledTimes(2);
+        });
+
+        it('사용자 일일 한도 도달 → "일일 OCR 호출 한도" 에러', async () => {
+            mockRunTransaction.mockImplementationOnce(txWithCount(20) as any);
+
+            const { checkDailyOcrQuota } = await import('../utils/rateLimit');
+            await expect(
+                checkDailyOcrQuota('uid-abc', 'org-1', USER_LIMIT, ORG_LIMIT)
+            ).rejects.toThrow('일일 OCR 호출 한도를 초과했습니다');
+        });
+
+        it('조직 일일 한도 도달(사용자는 통과) → "일일 OCR 호출 한도" 에러', async () => {
+            mockRunTransaction
+                .mockImplementationOnce(txWithCount(3) as any)   // 사용자 카운터: 통과
+                .mockImplementationOnce(txWithCount(50) as any); // 조직 카운터: 초과
+
+            const { checkDailyOcrQuota } = await import('../utils/rateLimit');
+            await expect(
+                checkDailyOcrQuota('uid-abc', 'org-1', USER_LIMIT, ORG_LIMIT)
+            ).rejects.toThrow('일일 OCR 호출 한도를 초과했습니다');
+        });
+
+        it('orgId가 없으면 사용자 카운터만 검사한다', async () => {
+            mockRunTransaction.mockImplementation(txWithCount(3) as any);
+
+            const { checkDailyOcrQuota } = await import('../utils/rateLimit');
+            await expect(
+                checkDailyOcrQuota('uid-abc', undefined, USER_LIMIT, ORG_LIMIT)
+            ).resolves.not.toThrow();
+            expect(mockRunTransaction).toHaveBeenCalledTimes(1);
+        });
+    });
 });

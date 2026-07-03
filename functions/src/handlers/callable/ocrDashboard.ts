@@ -4,7 +4,8 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { generateAiContent } from "../../core/gemini";
 import { wrapCallableHandler } from "../../utils/helpers";
-import { MAX_BASE64_SIZE } from "../../utils/constants";
+import { MAX_BASE64_SIZE, getRateLimits } from "../../utils/constants";
+import { checkDailyOcrQuota } from "../../utils/rateLimit";
 
 export const ocrDashboard = onCall(
     {
@@ -14,6 +15,10 @@ export const ocrDashboard = onCall(
         enforceAppCheck: false,
     },
     wrapCallableHandler("ocrDashboard", { rateLimitKey: "ocrDashboard" }, async (request) => {
+        // 일일 누적 한도(사용자/조직) — 분 단위 제한과 별개의 비용 증폭 방어 (ocr-cost-security §1.1)
+        const [dailyUser, dailyOrg] = await Promise.all([getRateLimits("ocrDailyUser"), getRateLimits("ocrDailyOrg")]);
+        await checkDailyOcrQuota(request.auth!.uid, request.auth!.token.orgId as string | undefined, dailyUser, dailyOrg);
+
         const { imageBase64, mimeType, isElectric } = request.data as { imageBase64?: string; mimeType?: string; isElectric?: boolean };
 
         if (!imageBase64) {

@@ -13,6 +13,8 @@ export const DEFAULT_RATE_LIMITS = {
     holidayProxy: { max: 10, windowSec: 3600 },     // IP당 시간당 10회
     ocrDashboard: { max: 5, windowSec: 60 },        // uid당 분당 5회
     ocrDocument: { max: 3, windowSec: 60 },          // uid당 분당 3회
+    ocrDailyUser: { max: 20, windowSec: 86400 },     // OCR 통합(계기판+증빙) 사용자당 일일 누적 (ocr-cost-security §1.1)
+    ocrDailyOrg: { max: 50, windowSec: 86400 },      // OCR 통합 조직당 일일 누적
     joinOrganization: { max: 5, windowSec: 3600 },   // uid당 시간당 5회
     sendApprovalEmail: { max: 10, windowSec: 3600 },  // uid당 시간당 10회
     askAI: { max: 5, windowSec: 60 },               // uid당 분당 5회

@@ -6,6 +6,7 @@
  */
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { checkReservationReminders } from "../../services/alimtalk/reservationReminder";
+import { warmupOcrFunction } from "../../services/ocr/warmupOcr";
 import { recordHeartbeat } from "../../utils/helpers";
 
 export const reservationReminder = onSchedule(
@@ -23,6 +24,15 @@ export const reservationReminder = onSchedule(
             return;
         }
         await checkReservationReminders();
+
+        // OCR 콜드스타트 완화 — 같은 근무시간 cron에 편승해 ocrDashboard를 워밍업한다.
+        // (근무시간 가드·10초 타임아웃은 warmupOcrFunction 내부에 있음. 실패해도 알림 발송에 영향 없음)
+        try {
+            await warmupOcrFunction();
+        } catch (err) {
+            console.warn("[Warmup] OCR 워밍업 실패 (무시):", (err as Error).message);
+        }
+
         await recordHeartbeat("reservationReminder");
     }
 );

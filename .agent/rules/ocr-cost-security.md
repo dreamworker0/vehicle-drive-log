@@ -10,12 +10,17 @@
 
 Gemini API 호출은 종량제 비용이 발생하므로, 악의적이거나 비정상적인 반복 호출을 차단하기 위해 **반드시 서버사이드(Cloud Functions)에서 호출 제한 검증 로직을 수행**해야 합니다.
 
-### 1.1 일일 호출 제한 강제
-*   **규칙**: 사용자의 UID 또는 조직 ID(`organizationId`)를 기준으로, 하루 동안 허용되는 OCR 호출 최대 횟수를 제한합니다.
-    *   **기준값**: 사용자당 일일 최대 **20회**, 조직당 일일 최대 **50회** (프로젝트 환경에 따라 조율 가능).
-*   **구현 방법**:
-    *   호출 시 Firestore의 일일 카운터 문서(예: `organizations/{orgId}/usage/ocrCounter`)를 조회 또는 업데이트(Increment)하여 제한을 검증합니다.
-    *   초과 시 즉시 `functions.https.HttpsError("resource-exhausted", "일일 OCR 호출 한도를 초과했습니다.")` 에러를 반환해야 합니다.
+### 1.1 일일 호출 제한 강제 (구현됨 — 2026-07-03)
+*   **규칙**: 사용자의 UID **및** 조직 ID(`organizationId`)를 기준으로, 하루 동안 허용되는 OCR 호출 최대 횟수를 제한합니다. 분 단위 제한(§1.3)과 별개의 방어선입니다.
+    *   **기준값**: 사용자당 일일 최대 **20회**, 조직당 일일 최대 **50회** (`constants.ts`의 `ocrDailyUser`/`ocrDailyOrg`, Remote Config `rate_limits`로 조율 가능).
+*   **구현** (`functions/src/utils/rateLimit.ts`의 `checkDailyOcrQuota`):
+    *   기존 `_rateLimits` 컬렉션의 창 버킷 로직을 재사용합니다 — epoch 정렬 24시간 버킷, TTL(`expiresAt`) 자동 정리. 별도 카운터 문서를 만들지 않습니다.
+    *   `ocrDashboard`·`ocrDocument` 핸들러 서두에서 호출하며, 두 함수가 **통합 카운터**를 공유합니다 (키: `ocrDailyUser:{uid}`, `ocrDailyOrg:{orgId}`).
+    *   초과 시 `HttpsError("resource-exhausted", "일일 OCR 호출 한도를 초과했습니다. 내일 다시 시도해주세요.")`를 반환합니다.
+    *   창 경계는 KST 자정이 아니라 epoch 기준 24시간 버킷입니다(단순성 우선 — 남용 방어 목적에 충분).
+
+### 1.3 분 단위 제한 (기존)
+*   `wrapCallableHandler`의 `rateLimitKey`로 uid별 분 단위 제한이 걸려 있습니다: `ocrDashboard` 분당 5회, `ocrDocument` 분당 3회, `askAI` 분당 5회.
 
 ### 1.2 프론트엔드 중복 클릭 방지 (Debounce/Throttle)
 *   **규칙**: 프론트엔드에서 이미지 업로드 및 분석 버튼을 누른 후, 응답이 올 때까지 버튼을 비활성화(`disabled`)하고 스피너를 보여주어 중복 API 호출을 원천 차단해야 합니다.

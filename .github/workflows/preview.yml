@@ -28,12 +28,13 @@ jobs:
       - name: Build
         run: npm run build
 
+      # 서드파티 액션(action-hosting-deploy)은 서비스계정을 전달받는 공급망 리스크가 있어
+      # deploy.yml과 동일하게 firebase-tools CLI 직접 호출로 대체한다 (2026-06-26 보안 감사 F1).
+      # 프리뷰 URL은 스텝 로그에 출력된다.
       - name: Deploy to Preview Channel
         if: github.actor != 'dependabot[bot]'
-        uses: FirebaseExtended/action-hosting-deploy@v0
-        with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          projectId: vehicle-drive-log
-          expires: 3d
-          # channelId 생략 시 PR 번호 기반 임시 채널 자동 생성
+        run: |
+          export GOOGLE_APPLICATION_CREDENTIALS=$(mktemp)
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
+          npx firebase-tools hosting:channel:deploy "pr-${{ github.event.number }}" --expires 3d --project vehicle-drive-log
+          rm -f "$GOOGLE_APPLICATION_CREDENTIALS"

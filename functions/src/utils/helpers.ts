@@ -141,6 +141,20 @@ export function wrapCallableHandler<T, R>(
 }
 
 /**
+ * LLM 프롬프트에 보간되는 사용자 입력 위생 처리 — 프롬프트 인젝션 방어.
+ * 따옴표·백틱·백슬래시를 제거해 구분자 탈출을 막고, 개행·연속 공백을 압축한 뒤
+ * 길이를 절단한다. 사용자 입력은 데이터로만 취급되어야 하며 지시문이 되어선 안 된다.
+ */
+export function sanitizePromptValue(value: unknown, maxLen = 60): string {
+    if (typeof value !== "string") return "";
+    return value
+        .replace(/["'`\\]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .slice(0, maxLen);
+}
+
+/**
  * 스케줄러 heartbeat 기록 — _health/{schedulerName} 문서에 마지막 실행 시각 저장
  * 헬스 체크에서 이 값을 읽어 스케줄러가 정상 동작 중인지 판단한다.
  */

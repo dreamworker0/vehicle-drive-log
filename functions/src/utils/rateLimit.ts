@@ -75,6 +75,32 @@ export async function checkRateLimitByUid(
 }
 
 /**
+ * OCR 일일 누적 한도 검사 — 사용자·조직 단위 (ocr-cost-security §1.1).
+ * 분 단위 제한과 별개로, 하루 종일 반복 호출하는 비용 증폭을 막는 방어선이다.
+ * 기존 창 버킷 로직을 재사용한다: epoch 정렬 24시간 버킷(`_rateLimits`, TTL expiresAt).
+ * ocrDashboard·ocrDocument가 공유하는 통합 카운터 (uid: `ocrDailyUser:{uid}`, org: `ocrDailyOrg:{orgId}`).
+ */
+export async function checkDailyOcrQuota(
+    uid: string,
+    orgId: string | undefined,
+    userLimit: { max: number; windowSec: number },
+    orgLimit: { max: number; windowSec: number },
+): Promise<void> {
+    try {
+        await checkRateLimitByUid("ocrDailyUser", uid, userLimit.max, userLimit.windowSec);
+        if (orgId) {
+            // 조직 카운터는 uid 자리에 orgId를 키로 사용한다 (동일 버킷 로직 재사용)
+            await checkRateLimitByUid("ocrDailyOrg", orgId, orgLimit.max, orgLimit.windowSec);
+        }
+    } catch (err) {
+        if (err instanceof HttpsError && err.code === "resource-exhausted") {
+            throw new HttpsError("resource-exhausted", "일일 OCR 호출 한도를 초과했습니다. 내일 다시 시도해주세요.");
+        }
+        throw err;
+    }
+}
+
+/**
  * Rate Limit 검사 (onRequest 함수용 — IP 기반)
  *
  * @param functionName 함수 이름 (예: "tmapProxy")
