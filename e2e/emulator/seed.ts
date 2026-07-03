@@ -80,3 +80,32 @@ export async function seedEmulator(): Promise<void> {
         createdAt: now,
     }, { merge: true });
 }
+
+/**
+ * 승인 대기(pending) 예약 1건을 시드한다. 승인/반려 E2E 전용.
+ * `set`(merge 없음)으로 덮어써 재시드 시 항상 pending으로 초기화된다(재시도 안전).
+ * 예약 생성 UI는 createReservationSafe 콜러블 경유라 functions 에뮬레이터가 없는
+ * E2E 환경에서는 UI로 만들 수 없으므로, admin SDK로 직접 심는다.
+ */
+export async function seedPendingReservation(
+    id: string,
+    overrides: Record<string, unknown> = {},
+): Promise<void> {
+    if (!getApps().length) initializeApp({ projectId: PROJECT_ID });
+    const db = getFirestore();
+    await db.collection('reservations').doc(id).set({
+        organizationId: TEST_ORG_ID,
+        vehicleId: TEST_VEHICLE.id,
+        vehicleName: TEST_VEHICLE.displayName,
+        reservedByUid: TEST_EMPLOYEE.uid,
+        reservedByName: TEST_EMPLOYEE.name,
+        date: '2999-12-31',
+        startTime: '09:00',
+        endTime: '10:00',
+        destination: '(seed)',
+        purpose: '업무',
+        status: 'pending',
+        createdAt: new Date(),
+        ...overrides,
+    });
+}

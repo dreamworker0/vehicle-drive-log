@@ -24,10 +24,9 @@ import { test } from '@playwright/test';
  * 이관해 구현하면 된다 — 현재는 위 단위/통합 테스트가 로직을 커버하므로 보류 상태 유지.
  */
 test.describe('핵심 워크플로우 E2E (authed-* 에뮬레이터 스펙으로 이관 가능 — 단위 테스트가 커버 중)', () => {
-    test.fixme('차량 예약 생성 및 승인/반려 프로세스 (관리자-사용자 흐름)', async () => {
-        // 에뮬레이터 기반 인증 E2E 인프라 구축 후 구현.
-        // 현재는 createReservationSafe.test.ts + PendingReservationList.test.tsx가 로직을 커버한다.
-    });
+    // 승인/반려 여정은 authed-reservationApproval.spec.ts로 이관·구현됨(에뮬레이터 E2E).
+    // 예약 "생성"은 createReservationSafe 콜러블 경유라 functions 에뮬레이터가 없는 E2E 환경에서
+    // UI로 재현 불가 — createReservationSafe.test.ts가 서버 생성 로직을 커버한다.
 
     // '운행기록일지 작성 및 첨부파일 검증'은 authed-driveLogCreate.spec.ts로 이관·구현됨(에뮬레이터 E2E).
 
