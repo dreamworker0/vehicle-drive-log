@@ -41,7 +41,6 @@ export interface SubmitDeps {
     
     // Flags
     isElectric: boolean;
-    isQuickDrive: boolean;
     isRetroactive: boolean;
     isEditMode: boolean;
     editLog: DriveLog | null;
@@ -76,7 +75,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
         selectedPassengers, setSelectedPassengers, externalPassengerCount, setExternalPassengerCount,
         externalPassengerNames,
         setFavorites, setShowFavSave, setFavName, setSuccess,
-        isElectric, isQuickDrive, isRetroactive, isEditMode, editLog, reservationData, hipassCard, favName,
+        isElectric, isRetroactive, isEditMode, editLog, reservationData, hipassCard, favName,
         lastDriveLog, nextDriveLog, setLastDriveLog,
         showToast, runWithRetry, startTransition, ocrSuccess
     } = deps;
@@ -182,7 +181,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
     const handleSubmit = useCallback(async (e: React.FormEvent | Event) => {
         if (e && 'preventDefault' in e) e.preventDefault();
 
-        const validation = validateDriveLogForm(form, { isElectric, isQuickDrive });
+        const validation = validateDriveLogForm(form, { isElectric });
         if (!validation.valid) {
             showToast(validation.message as string, 'warning');
             return;
@@ -277,7 +276,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
             }
         });
     }, [
-        form, isElectric, isQuickDrive, showToast, startTransition, runWithRetry,
+        form, isElectric, showToast, startTransition, runWithRetry,
         orgId, user, userData, selectedVehicle, selectedPassengers, externalPassengerCount,
         externalPassengerNames, isRetroactive, ocrSuccess, isEditMode, editLog,
         reservationData, hipassCard, handleSubmitError, setSuccess, navigate, setForm,

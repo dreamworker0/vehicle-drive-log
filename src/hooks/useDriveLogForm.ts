@@ -39,8 +39,6 @@ export default function useDriveLogForm() {
     const reservationData = resolvedReservationData;
     const editLog = state?.editLog || null;
     const isEditMode = !!editLog;
-    /** @deprecated 바로 운행 기능은 사전 예약 체계로 대체됨 */
-    const isQuickDrive = false;
 
     // ── 상태 정의 ──────────────────────────────────────────────────
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -120,7 +118,7 @@ export default function useDriveLogForm() {
         selectedPassengers, setSelectedPassengers, externalPassengerCount, setExternalPassengerCount,
         externalPassengerNames,
         setFavorites, setShowFavSave, setFavName, setSuccess,
-        isElectric, isQuickDrive, isRetroactive, isEditMode, editLog, reservationData, hipassCard, favName,
+        isElectric, isRetroactive, isEditMode, editLog, reservationData, hipassCard, favName,
         showToast, runWithRetry, startTransition, ocrSuccess: ocr.ocrSuccess,
         lastDriveLog, nextDriveLog, setLastDriveLog
     });
@@ -132,7 +130,7 @@ export default function useDriveLogForm() {
         loading, submitting: isPending, success,
         selectedPassengers, selectedVehicle,
         isElectric,
-        reservationData, isQuickDrive,
+        reservationData,
         editLog, isEditMode, isRetroactive,
         showFavSave, setShowFavSave,
         favName, setFavName,

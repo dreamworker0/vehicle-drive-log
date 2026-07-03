@@ -16,9 +16,11 @@ import { test } from '@playwright/test';
  * 서버사이드 예약 생성·동시성·상태 전환은 다음에서 검증된다:
  *   - functions/src/__tests__/createReservationSafe.test.ts
  *
- * 인증 가능한 Firebase 에뮬레이터 기반 E2E 인프라가 갖춰지면 fixme를 해제하고 구현한다.
+ * [2026-07-03 현행화] 에뮬레이터 기반 인증 E2E 인프라는 이제 존재하며(playwright.emulator.config.ts,
+ * authed-*.spec.ts) CI 게이트로도 실행된다. 필요 시 authed-* 스펙으로 이관해 구현한다 —
+ * 현재는 위 단위 테스트가 승인/반려 동작을 커버하므로 보류 상태 유지.
  */
-test.describe('예약 승인/반려 워크플로우 (인증 필요 — 인프라 부재로 보류)', () => {
+test.describe('예약 승인/반려 워크플로우 (authed-* 에뮬레이터 스펙으로 이관 가능 — 단위 테스트가 커버 중)', () => {
     test.fixme('승인 버튼 클릭 시 승인 토스트가 발생해야 한다', async () => {
         // PendingReservationList.test.tsx가 승인 동작을 커버한다.
     });

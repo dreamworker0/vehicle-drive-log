@@ -3,11 +3,10 @@ import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 import { useConfirmStore } from '../../store/useConfirmStore';
 import useRetry from '../../hooks/useRetry';
-import { getPendingReservations, updateReservationStatus } from '../../lib/firestore/reservations';
+import { getPendingReservations, updateReservationStatus, rejectReservation } from '../../lib/firestore/reservations';
 import { getVehicles } from '../../lib/firestore/vehicles';
 import type { Vehicle } from '../../types/vehicle';
 import { getOrganizationMembers } from '../../lib/firestore/users';
-import { serverTimestamp } from 'firebase/firestore';
 import type { DocumentData } from 'firebase/firestore';
 
 export default function PendingReservationList() {
@@ -104,10 +103,7 @@ export default function PendingReservationList() {
         if (reason === false || reason === null) return; // 취소 누름
 
         await runWithRetry(`reject-res-${id}`, async () => {
-            await updateReservationStatus(id, 'rejected', {
-                rejectedReason: reason as string,
-                rejectedAt: serverTimestamp()
-            } as Record<string, unknown>, 'pending');
+            await rejectReservation(id, reason as string);
             setPendingList(prev => prev.filter(r => r.id !== id));
             showToast('예약이 반려되었습니다.', 'success');
         }, {

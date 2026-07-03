@@ -5,7 +5,7 @@
 import { createDriveLog, updateDriveLog, updateReservationStatus, updateHipassCard } from '../../lib/firestore';
 
 import { increment } from 'firebase/firestore';
-import { validateDriveLogForm, buildLogData, nowTime, todayStr } from '../utils/driveLogValidation';
+import { buildLogData, nowTime, todayStr } from '../utils/driveLogValidation';
 import type { DriveLogForm } from './types';
 import type { Vehicle } from '../../types/vehicle';
 import type { User as UserDoc } from '../../types/user';
@@ -50,16 +50,6 @@ interface SubmitResult {
     shouldResetForm?: boolean;
     /** km 동기화 실패 경고 */
     backgroundWarning?: string;
-}
-
-/**
- * 운행일지 유효성 검사
- */
-export function validateForm(
-    form: DriveLogForm,
-    options: { isElectric: boolean; isQuickDrive: boolean },
-): { valid: boolean; message?: string | null } {
-    return validateDriveLogForm(form, options);
 }
 
 /**

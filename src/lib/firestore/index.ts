@@ -88,6 +88,7 @@ export {
     cancelReservation,
     updateReservation,
     updateReservationStatus,
+    rejectReservation,
     getTodayReservations,
     getWeekReservations,
     getReservationsByDateRange,

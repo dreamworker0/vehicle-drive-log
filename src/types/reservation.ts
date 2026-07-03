@@ -22,6 +22,7 @@ export interface Reservation extends FirestoreDoc {
     reservedByName?: string;
     status: ReservationStatus;
     rejectedReason?: string;
+    rejectedAt?: TimestampField;  // 반려 처리 시각
     routeDistance?: number | null;
     routeDuration?: number | null;
     routeTollFee?: number | null;

@@ -19,9 +19,11 @@ import { test } from '@playwright/test';
  *   - 엑셀/PDF 내보내기
  *       → src/__tests__/lib/excelExport.test.ts
  *
- * 인증 가능한 Firebase 에뮬레이터 기반 E2E 인프라가 갖춰지면 fixme를 해제하고 구현한다.
+ * [2026-07-03 현행화] 에뮬레이터 기반 인증 E2E 인프라는 이제 존재하며(playwright.emulator.config.ts,
+ * authed-*.spec.ts) CI 게이트로도 실행된다. 이 플로우들을 E2E로 승격하려면 authed-* 스펙으로
+ * 이관해 구현하면 된다 — 현재는 위 단위/통합 테스트가 로직을 커버하므로 보류 상태 유지.
  */
-test.describe('핵심 워크플로우 E2E (인증 필요 — 인프라 부재로 보류)', () => {
+test.describe('핵심 워크플로우 E2E (authed-* 에뮬레이터 스펙으로 이관 가능 — 단위 테스트가 커버 중)', () => {
     test.fixme('차량 예약 생성 및 승인/반려 프로세스 (관리자-사용자 흐름)', async () => {
         // 에뮬레이터 기반 인증 E2E 인프라 구축 후 구현.
         // 현재는 createReservationSafe.test.ts + PendingReservationList.test.tsx가 로직을 커버한다.

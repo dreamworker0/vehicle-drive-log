@@ -221,6 +221,18 @@ export const updateReservationStatus = async (
     }
 };
 
+/**
+ * 예약 반려 — 사유와 반려 시각(serverTimestamp) 기록을 도메인 계층에서 캡슐화한다.
+ * pending 상태 검증 트랜잭션 경로를 사용하므로, 이미 처리된 예약이면
+ * ReservationConcurrencyError('동시성 오류')가 발생한다.
+ */
+export const rejectReservation = async (reservationId: string, reason: string) => {
+    return updateReservationStatus(reservationId, 'rejected', {
+        rejectedReason: reason,
+        rejectedAt: serverTimestamp(),
+    } as Partial<Reservation>, 'pending');
+};
+
 // 오늘 예약 조회 (취소 제외)
 export const getTodayReservations = async (orgId: string, date: string) => {
     try {

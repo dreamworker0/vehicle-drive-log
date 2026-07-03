@@ -1,9 +1,9 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
+ 
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, firebaseFunctions } from '../lib/firebase';
-import type { SortKey } from '../components/superAdmin/dashboard/dashboardUtils';
+import type { SortKey, FuelStatsData, HipassStatsData, NotifSummaryData } from '../components/superAdmin/dashboard/dashboardUtils';
 import type { OrgStat, CachedDashboardStats, CachedDashboardTimeSeries, CachedDashboardOrgRankings } from './serviceDashboard/types';
 import { loadFuelHipassStats } from './serviceDashboard/loadFuelHipassStats';
 import { loadNotificationStats } from './serviceDashboard/loadNotificationStats';
@@ -33,8 +33,13 @@ export type DashboardRankingsState = Omit<Partial<CachedDashboardOrgRankings>, '
     topOrgs: OrgStat[];
 };
 export type DashboardExternalState = {
-    fuelStats: any | null; hipassStats: any | null; dailyFuelCost: any[]; dailyHipassAmount: any[];
-    notifSummary: any | null; dailyNotifStats: any[]; notifTypeStats: any[];
+    fuelStats: FuelStatsData | null;
+    hipassStats: HipassStatsData | null;
+    dailyFuelCost: { date: string; cost: number }[];
+    dailyHipassAmount: { date: string; amount: number }[];
+    notifSummary: NotifSummaryData | null;
+    dailyNotifStats: { date: string; sent: number; read: number }[];
+    notifTypeStats: { type: string; count: number; color: string }[];
 };
 
 export default function useServiceDashboard(orgFilterId: string = 'ALL') {

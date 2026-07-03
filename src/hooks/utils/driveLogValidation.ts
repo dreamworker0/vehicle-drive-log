@@ -24,13 +24,10 @@ export const todayStr = () => {
  */
 export function validateDriveLogForm(
     form: Partial<DriveLogForm>,
-    { isElectric = false, isQuickDrive = false } = {}
+    { isElectric = false } = {}
 ) {
     if (!form.vehicleId) {
         return { valid: false, message: '차량을 선택해주세요.' };
-    }
-    if (isQuickDrive && !form.startTime) {
-        return { valid: false, message: '출발 시각을 입력해주세요.' };
     }
     if (!form.destination?.trim()) {
         return { valid: false, message: '목적지를 입력해주세요.' };

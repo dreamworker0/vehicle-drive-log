@@ -5,7 +5,7 @@ import PendingReservationList from '../../components/admin/PendingReservationLis
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 import { useConfirmStore } from '../../store/useConfirmStore';
-import { updateReservationStatus, getPendingReservations } from '../../lib/firestore/reservations';
+import { updateReservationStatus, rejectReservation, getPendingReservations } from '../../lib/firestore/reservations';
 
 // Mocking Custom Hooks
 vi.mock('../../hooks/useAuth');
@@ -19,6 +19,7 @@ vi.mock('../../hooks/useRetry', () => ({
 // Mocking Firestore functions
 vi.mock('../../lib/firestore/reservations', () => ({
     updateReservationStatus: vi.fn(),
+    rejectReservation: vi.fn(),
     getPendingReservations: vi.fn(() => Promise.resolve([])),
 }));
 
@@ -111,10 +112,8 @@ describe('PendingReservationList Component', () => {
         await waitFor(() => {
             // Check if useConfirmStore.confirm was triggered
             expect(confirmSpy).toHaveBeenCalled();
-            // DB Update check
-            expect(updateReservationStatus).toHaveBeenCalledWith('res1', 'rejected', expect.objectContaining({
-                rejectedReason: 'test reason'
-            }), 'pending');
+            // 반려는 도메인 함수(rejectReservation)로 캡슐화됨 — 사유가 그대로 전달되는지 확인
+            expect(rejectReservation).toHaveBeenCalledWith('res1', 'test reason');
         });
     });
 });

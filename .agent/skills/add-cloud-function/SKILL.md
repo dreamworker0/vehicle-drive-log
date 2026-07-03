@@ -35,7 +35,6 @@ functions/
 │   │
 │   ├── calendarSync.ts              ← Helper (Google Calendar 단방향/양방향 연동 헬퍼)
 │   ├── calendarSchedule.ts          ← Schedule (Google Calendar 10분 주기 역동기화)
-│   ├── calendarWebhook.ts           ← HTTP (Google Calendar API Push Notification 웹훅)
 │   ├── testCalendarAccess.ts        ← onCall (캘린더 연동 디버깅 및 API 테스트)
 │   ├── triggerOnDemandCalendarSync.ts← onCall (수동 즉시 캘린더 동기화 요청)
 │   ├── reservationTriggers.ts       ← Firestore 트리거 (예약 생성/수정/삭제 시 연동 처리)
@@ -44,7 +43,7 @@ functions/
 │   ├── holidayProxy.ts              ← HTTP (공공 휴일 Open API 프록시)
 │   ├── tmapProxy.ts                 ← HTTP (Tmap API 경로/거리 계산 프록시)
 │   ├── syncHolidays.ts              ← Schedule (매년 공휴일 자동 동기화 배치)
-│   ├── warmupOcr.ts                 ← Schedule (OCR 콜드 스타트 방지용 웜업)
+│   ├── warmupOcr.ts                 ← Helper (OCR 웜업 — reservationReminder 스케줄러에 편승 호출)
 │   │
 │   ├── backupFirestore.ts           ← Schedule (Firestore 스토리지 일일 백업 배치)
 │   ├── dailyNightlyBatch.ts         ← Schedule (야간 데이터 정리 및 백그라운드 통합 배치)
