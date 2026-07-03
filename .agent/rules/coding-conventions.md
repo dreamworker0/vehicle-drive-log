@@ -334,7 +334,7 @@ const getVehicleColor = (id) => {
 
 - **React**: 함수 컴포넌트 + Hooks만 사용 (클래스 컴포넌트 금지). React 19 아키텍처에 따라 비동기 폼(Form) 상태 제어 시 `useActionState` 및 `useFormStatus` API의 활용을 권장하며, 무분별한 로컬 비동기 제출 플래그 작성을 금지합니다.
 - **TypeScript**: `any` 타입 사용을 엄격히 금지한다. 타입을 구체적으로 정의하거나 `unknown`을 사용 후 타입 단언/타입 가드를 이용해 처리한다 (`@typescript-eslint/no-explicit-any` 경고 제로화 유지).
-- **TailwindCSS v3**: `@apply`, `@layer` 사용 가능, v4 문법 사용 금지
+- **TailwindCSS v4**: CSS 기반 설정 사용 (`@import "tailwindcss"`, `@theme`, `@custom-variant`). `@apply`·`@layer`도 사용 가능. v3식 `tailwind.config.js` 신설 금지(설정은 `src/index.css`의 `@theme`로 관리)
 - **라우팅**: React Router v6 (`Routes`, `Route`, `NavLink`, `useNavigate`, `useLocation`)
 - **Firebase**: v9+ Modular SDK (`import { ... } from 'firebase/firestore'`)
 - **빌드**: Vite 7 (HMR, ESM)

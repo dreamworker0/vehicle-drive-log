@@ -3,6 +3,9 @@
 이 문서는 [Keep a Changelog](https://keepachangelog.com/ko/1.1.0/) 형식을 따르는 **개발 참고용** 이력입니다.
 서비스 이용자용 변경 소식은 [업데이트 소식](https://vehicle-drive-log.web.app/release-notes)에서 확인할 수 있습니다.
 
+> **참고**: 이 CHANGELOG는 Phase 61(2026-06-14)까지만 관리됩니다. 이후 상세 구현 이력은
+> [`docs/구현이력.md`](docs/구현이력.md)로 일원화되었으므로 최신 변경은 해당 문서를 참고하세요.
+
 ## Phase 61 — 인앱 브라우저 reCAPTCHA 렌더링 에러 해결 & Sentry 노이즈 억제 🔐
 
 > 2026-06-14

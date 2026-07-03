@@ -105,7 +105,7 @@ firebase functions:log --only ocrDashboard,autoVerifyDocument
 
 ### 4.1 백업 확인
 
-- **자동 백업**: `backupFirestore` 함수가 매일 03:00 KST 실행
+- **자동 백업**: `dailyNightlyBatch` 함수(매일 02:00 KST)의 첫 단계에서 Firestore 전체 export 실행
 - **저장 위치**: Cloud Storage → `backups/firestore/YYYY-MM-DD/`
 - **포함 컬렉션**: organizations, users, vehicles, driveLogs, reservations, notifications
 
@@ -116,7 +116,7 @@ firebase functions:log --only ocrDashboard,autoVerifyDocument
 
 ### 4.2 데이터 아카이빙
 
-- `archiveDriveLogs` 함수가 매일 04:30 KST 실행
+- `dailyNightlyBatch` 함수(매일 02:00 KST)의 아카이빙 단계에서 실행
 - 3년 이상 된 운행 기록 → Cloud Storage로 이동 후 Firestore에서 삭제
 - 아카이빙된 데이터 위치: Cloud Storage → `archives/driveLogs/`
 

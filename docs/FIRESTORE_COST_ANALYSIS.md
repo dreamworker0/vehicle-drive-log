@@ -1,10 +1,13 @@
 # Firestore 비용 분석
 
-> 최종 분석일: 2026-03-21
+> 최종 분석일: 2026-03-21 · 스케줄·TTL·인덱스 수 갱신: 2026-07-04
 
 ## 1. 복합 인덱스 ↔ 쿼리 매핑
 
-### ✅ 사용 중인 인덱스 (16개)
+> 2026-07-04 기준 `firestore.indexes.json`의 복합 인덱스는 **총 25개**다. 아래 표는 2026-03 스냅샷(22개)이므로
+> 신규 3개를 포함한 정확한 매핑·미사용 판정은 GCP Console → Firestore → 인덱스 탭의 실제 히트 수로 재검증이 필요하다.
+
+### ✅ 사용 중인 인덱스 (2026-03 기준 16개)
 
 | # | 컬렉션 | 필드 | 사용 위치 |
 |---|---|---|---|
@@ -46,38 +49,38 @@
 
 ---
 
-## 2. 고빈도 스케줄러 비용 영향
+## 2. 스케줄러 비용 영향 (2026-07-04 갱신)
+
+개별 스케줄러들이 **야간/월간 배치 2개로 통합**되고, 상시 함수는 평일·근무시간으로 축소되었다.
 
 | 함수 | 주기 | Firestore 접근 | 비용 영향 |
 |---|---|---|---|
-| `reservationReminder` | 5분마다 | 예약 + 운행일지 읽기 | **중간** — 예약 건수에 비례 |
-| `warmupOcr` | 5분마다 | 없음 (HTTP ping) | **최소** |
-| `syncCalendarToApp` | 10분마다 | 예약 읽기/쓰기 | **중간** — 캘린더 연동 기관 수에 비례 |
-| `cleanupRateLimits` | 매일 05:00 | `_rateLimits` 삭제 | **최소** |
-| `archiveDriveLogs` | 매일 04:30 | driveLogs 읽기/삭제 | **최소** — 3년 이상 데이터만 |
-| `backupFirestore` | 스케줄 | 전체 export | **고정** — GCS 저장 비용 |
+| `dailyNightlyBatch` | 매일 02:00 KST | 백업 export + 아카이빙 + 퍼지 + 이미지 정리 통합 | **고정** — 야간 트래픽 없는 시간대 |
+| `monthlyBatch` | 매월 1일 06:00 | 공휴일 동기화 + 마일리지 검증 | **최소** |
+| `reservationReminder` | 평일 08~18시 매시 | 예약 + 운행일지 읽기 (OCR 워밍업 편승) | **중간** — 예약 건수에 비례 |
+| `syncCalendarToApp` | 평일 06~22시 매시 | 예약 읽기/쓰기 | **중간** — 캘린더 연동 기관 수에 비례 |
+| `sendInactiveOrgAlimtalkScheduled` | 평일 14:00 | 기관 활동 조회 | **최소** |
+
+> 과거의 `warmupOcr`(5분)·`cleanupRateLimits`(매일)·개별 `archiveDriveLogs`/`backupFirestore` 스케줄은 제거·통합되었다.
 
 ---
 
 ## 3. `_rateLimits` 컬렉션 관리
 
-- 현재 `cleanupExpiredRateLimits`가 매일 05:00에 만료 문서 삭제
 - Rate Limit 윈도우: 60초~3600초 → 대부분 1시간 이내 만료
-- TTL 정책이 없어서 정리 함수에 의존 → Firestore TTL 정책 적용 가능
-
-> [!TIP]
-> GCP Console → Firestore → TTL 정책에서 `expiresAt` 필드에 자동 삭제 TTL을 설정하면 `cleanupRateLimits` 스케줄러를 제거할 수 있음
+- **Firestore TTL 정책 적용 완료** (2026-07-04 확인): 컬렉션 그룹 `_rateLimits`, 필드 `expiresAt`, 만료 오프셋 0초, 상태 "제공 중"
+- 이에 따라 별도 정리 스케줄러(`cleanupRateLimits`)는 제거되었고, 만료 문서는 TTL로 자동 삭제된다
 
 ---
 
 ## 4. 최적화 권장사항
 
-### 즉시 적용 (비용 절감)
-1. **`_rateLimits` TTL 정책 적용** → `cleanupRateLimits` 스케줄러 제거 가능
-2. **인덱스 #21 (hipassCharges: date + chargeAmount) 확인 후 제거** → 인덱스 저장 비용 절감
+### 완료됨
+1. ~~**`_rateLimits` TTL 정책 적용**~~ → 완료 (2026-07-04, §3 참조). `cleanupRateLimits` 스케줄러 제거됨
+2. ~~**`reservationReminder` 주기 조정**~~ → 완료. 5분 → 평일 근무시간 매시(1시간)로 축소, OCR 워밍업도 이 cron에 편승
 
-### 중기 검토
-3. **`reservationReminder` 주기 조정** — 5분 → 10분으로 변경 시 Firestore 읽기 50% 절감
+### 검토 대기
+3. **신규 인덱스 3개 포함 25개 재검증** — GCP Console 실제 히트 수로 미사용 인덱스 판정 후 제거 (§1 참조)
 4. **`archiveDriveLogs` 배치 크기** — 500건 제한은 적절, 다만 3년 이상 데이터가 많아지면 반복 실행 필요
 
 ### 장기 모니터링

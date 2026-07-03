@@ -8,11 +8,11 @@ import { execSync } from 'child_process';
 
 const FUNCTIONS = [
     'ocrDashboard', 'ocrDocument', 'autoVerifyDocument',
-    'holidayProxy', 'syncHolidaysScheduled', 'tmapProxy',
-    'backupFirestore', 'autoPurgeOrgs', 'archiveDriveLogs',
-    'reservationReminder', 'warmupOcr',
+    'holidayProxy', 'tmapProxy',
+    'dailyNightlyBatch', 'monthlyBatch',
+    'reservationReminder', 'syncCalendarToApp',
     'onReservationCreated', 'onReservationUpdated', 'onReservationDeleted',
-    'syncCalendarToApp', 'sendAdminNotice', 'cleanupRateLimits',
+    'sendAdminNotice', 'sendInactiveOrgAlimtalkScheduled', 'apiHealthCheck',
 ];
 
 console.log('📊 Cloud Functions 상태 리포트');

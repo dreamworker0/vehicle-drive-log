@@ -30,7 +30,7 @@
 | D14 | 무한 루프 방지 없이 트리거가 같은 문서 수정 | `syncSource` 등 플래그로 제어 | [cloud-functions §3.3](rules/cloud-functions.md) |
 | D15 | 불필요한 새 라이브러리 추가 | 기존 라이브러리로 해결 가능한지 먼저 확인 | [coding-conventions §8](rules/coding-conventions.md) |
 | D16 | 터치 타겟 48px 미만 | 최소 48px 확보 | [pwa-mobile-first §2](rules/pwa-mobile-first.md) |
-| D17 | TailwindCSS v4 문법 사용 | v3 문법만 (`@apply`, `@layer`) | [coding-conventions §7](rules/coding-conventions.md) |
+| D17 | v3식 `tailwind.config.js` 신설·v3 전용 문법 혼용 | TailwindCSS v4 (`@import "tailwindcss"`, `@theme`, `@custom-variant`; `@apply`·`@layer` 가능) | [coding-conventions §7](rules/coding-conventions.md) |
 | D18 | 브라우저 서브 에이전트 자의적 실행 | 사용자 명시적 요청 시에만 | 사용자 전역 지침 |
 | D19 | 사용자에게 질문/확인을 요청한 뒤 승인 없이 임의 단계 진행 | 반드시 사용자의 명확한 답변/승인을 기다린 후 다음 태스크 수행 | 사용자 전역 지침 |
 

@@ -69,7 +69,7 @@ export default function MyComponent() {
 
 ### 스타일링
 
-- **TailwindCSS v3** 유틸리티 클래스 사용
+- **TailwindCSS v4** 유틸리티 클래스 사용 (설정은 `src/index.css`의 `@theme`로 관리, `tailwind.config.js` 없음)
 - 다크 모드: 모든 UI에 `dark:` 변형 적용 필수
 - 커스텀 스타일: `src/index.css`에 정의된 디자인 토큰 사용
 
@@ -81,7 +81,7 @@ export default function MyComponent() {
 
 | 브랜치 | 용도 |
 |--------|------|
-| `main` | 프로덕션 (자동 배포) |
+| `master` | 프로덕션 (푸시 시 CI 자동 배포) |
 | `feature/*` | 새 기능 개발 |
 | `fix/*` | 버그 수정 |
 | `docs/*` | 문서 변경 |
@@ -105,7 +105,7 @@ chore: 의존성 업데이트
 ## PR 규칙
 
 1. **PR 생성 전** `npm run lint` 및 `npm test` 통과 확인
-2. `main`에 직접 push 금지 → 반드시 PR 경유
+2. `master` 푸시는 CI 배포를 트리거하므로 로컬 `firebase deploy` 금지 (배포는 CI 단일 경로)
 3. CI (`ci.yml`)가 통과해야 머지 가능
 4. PR 제목은 커밋 메시지 규칙과 동일
 5. 변경 사항에 대한 간단한 설명 작성
@@ -122,7 +122,7 @@ npm run test:watch   # 감시 모드
 ```
 
 - 테스트 파일 위치: `src/__tests__/`
-- 네이밍: `*.test.js` 또는 `*.test.jsx`
+- 네이밍: `*.test.ts` 또는 `*.test.tsx`
 
 ### E2E 테스트 (Playwright)
 
@@ -145,7 +145,7 @@ npm run test:e2e
 
 - 파일 위치: `functions/src/` 디렉토리
 - 새 함수 추가 시 `functions/src/index.ts`에 등록
-- 배포: `firebase deploy --only functions`
+- 배포: `master` 푸시 시 CI가 수행 (로컬 `firebase deploy` 금지 — 동시 배포 충돌 방지)
 - 로그 확인: `firebase functions:log` 또는 `npm run health`
 
 > 💡 새 Cloud Function 추가 시 `.agent/skills/add-cloud-function/SKILL.md` 참고
