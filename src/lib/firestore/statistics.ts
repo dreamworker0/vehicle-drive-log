@@ -50,8 +50,13 @@ interface RawMonthlyDoc {
     monthlyTotal?: { count?: number; distance?: number };
     costStats?: { fuelCost?: number; hipassCost?: number; maintenanceCost?: number };
     driverStats?: Record<string, { name?: string; count?: number; distance?: number }>;
-    vehicleStats?: Record<string, { name?: string; usedDays?: number; count?: number }>;
+    vehicleStats?: Record<string, {
+        name?: string; usedDays?: number; count?: number;
+        distance?: number; fuelCost?: number;
+        maintenanceCost?: number; maintenanceCount?: number; lastMaintenanceDate?: string;
+    }>;
     heatmap?: Record<string, Record<string, number>>;
+    anomalies?: { weekend?: number; night?: number; overDrive?: number };
 }
 
 /**
@@ -59,7 +64,7 @@ interface RawMonthlyDoc {
  * - monthlyTotal/costStats(중첩) → totalLogs/totalDistance/fuelCost 등(평탄)
  * - heatmap(요일→시간 중첩객체) → heatmapData(배열)
  * - driverStats/vehicleStats는 프로듀서 키(uid/vehId)를 유지하되 name을 보존(소비자가 name/id로 매칭)
- * 프로듀서가 계산하지 않는 필드(차량별 연비·정비비, 이상탐지)는 0/빈 값으로 채워 소비자 계산이 안전히 통과하게 한다.
+ * 프로듀서가 아직 값을 채우지 않은 문서(구버전)는 누락 필드를 0/빈 값으로 안전히 채운다.
  */
 export function mapMonthlyDoc(monthKey: string, raw: RawMonthlyDoc): MonthlyStat {
     const heatmapData: HeatmapStat[] = [];
@@ -78,14 +83,15 @@ export function mapMonthlyDoc(monthKey: string, raw: RawMonthlyDoc): MonthlyStat
 
     const vehicleStats: Record<string, VehicleStat> = {};
     for (const [vehId, v] of Object.entries(raw.vehicleStats || {})) {
-        // 프로듀서는 차량별 usedDays만 계산하며, 연비·정비비 관련 필드는 산출하지 않는다(0으로 채움).
+        // 프로듀서 필드(distance/fuelCost) → 소비자 필드(totalDist/totalCost)로 정렬
         vehicleStats[vehId] = {
             name: v.name,
             usedDays: v.usedDays || 0,
-            totalDist: 0,
-            totalCost: 0,
-            maintenanceCost: 0,
-            maintenanceCount: 0,
+            totalDist: v.distance || 0,
+            totalCost: v.fuelCost || 0,
+            maintenanceCost: v.maintenanceCost || 0,
+            maintenanceCount: v.maintenanceCount || 0,
+            lastMaintenanceDate: v.lastMaintenanceDate,
         };
     }
 
@@ -99,7 +105,11 @@ export function mapMonthlyDoc(monthKey: string, raw: RawMonthlyDoc): MonthlyStat
         driverStats,
         vehicleStats,
         heatmapData,
-        anomalies: { weekend: 0, night: 0, overDrive: 0 },
+        anomalies: {
+            weekend: raw.anomalies?.weekend || 0,
+            night: raw.anomalies?.night || 0,
+            overDrive: raw.anomalies?.overDrive || 0,
+        },
     };
 }
 

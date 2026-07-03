@@ -20,13 +20,14 @@ describe('mapMonthlyDoc — 프로듀서 스키마 → 평탄 MonthlyStat', () =
             'uid-2': { name: '이기사', count: 5, distance: 140 },
         },
         vehicleStats: {
-            'veh-1': { name: '스타렉스', usedDays: 9, count: 7 },
-            'veh-2': { name: '카니발', usedDays: 4, count: 5 },
+            'veh-1': { name: '스타렉스', usedDays: 9, count: 7, distance: 220, fuelCost: 90000, maintenanceCost: 120000, maintenanceCount: 2, lastMaintenanceDate: '2026-06-20' },
+            'veh-2': { name: '카니발', usedDays: 4, count: 5, distance: 120, fuelCost: 40000, maintenanceCost: 0, maintenanceCount: 0, lastMaintenanceDate: '' },
         },
         heatmap: {
             '1': { '9': 3, '14': 2 }, // 월요일 09시 3건, 14시 2건
             '5': { '18': 1 },          // 금요일 18시 1건
         },
+        anomalies: { weekend: 4, night: 2, overDrive: 1 },
     };
 
     it('중첩 monthlyTotal/costStats를 평탄 필드로 변환한다', () => {
@@ -53,15 +54,20 @@ describe('mapMonthlyDoc — 프로듀서 스키마 → 평탄 MonthlyStat', () =
         expect(m.driverStats['uid-2'].name).toBe('이기사');
     });
 
-    it('vehicleStats는 vehId 키를 유지하고 usedDays를 보존하며 미산출 비용 필드는 0으로 채운다', () => {
+    it('vehicleStats는 vehId 키를 유지하고 distance/fuelCost를 totalDist/totalCost로 정렬한다', () => {
         const m = mapMonthlyDoc('2026-06', rawDoc);
         expect(m.vehicleStats['veh-1'].name).toBe('스타렉스');
         expect(m.vehicleStats['veh-1'].usedDays).toBe(9);
-        // 프로듀서가 계산하지 않는 필드 — 소비자 계산이 안전히 통과하도록 0
-        expect(m.vehicleStats['veh-1'].totalDist).toBe(0);
-        expect(m.vehicleStats['veh-1'].totalCost).toBe(0);
-        expect(m.vehicleStats['veh-1'].maintenanceCost).toBe(0);
-        expect(m.vehicleStats['veh-1'].maintenanceCount).toBe(0);
+        expect(m.vehicleStats['veh-1'].totalDist).toBe(220);     // ← distance
+        expect(m.vehicleStats['veh-1'].totalCost).toBe(90000);   // ← fuelCost
+        expect(m.vehicleStats['veh-1'].maintenanceCost).toBe(120000);
+        expect(m.vehicleStats['veh-1'].maintenanceCount).toBe(2);
+        expect(m.vehicleStats['veh-1'].lastMaintenanceDate).toBe('2026-06-20');
+    });
+
+    it('anomalies(weekend/night/overDrive)를 그대로 전달한다', () => {
+        const m = mapMonthlyDoc('2026-06', rawDoc);
+        expect(m.anomalies).toEqual({ weekend: 4, night: 2, overDrive: 1 });
     });
 
     it('필드가 누락된 문서도 안전하게 0/빈 값으로 변환한다', () => {
