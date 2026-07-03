@@ -54,6 +54,7 @@ jest.mock("firebase-admin/firestore", () => {
     const makeQuery = (docs: Array<Record<string, unknown>>) => {
         const q: Record<string, unknown> = {};
         q.where = jest.fn(() => q);
+        q.orderBy = jest.fn(() => q);
         q.get = jest.fn().mockResolvedValue(snap(docs));
         return q;
     };
@@ -95,9 +96,11 @@ import { runDailyAggregation } from "../handlers/scheduled/dailyAggregation";
 describe("runDailyAggregation — 월별 집계 프로듀서", () => {
     beforeEach(() => jest.clearAllMocks());
 
-    it("최근 1개월 집계 시 org당 1회 set을 호출한다", async () => {
-        await runDailyAggregation(1);
+    it("최근 1개월 집계 시 org당 1회 set을 호출하고 요약을 반환한다", async () => {
+        const res = await runDailyAggregation(1);
         expect(mockSet).toHaveBeenCalledTimes(1);
+        expect(res).toMatchObject({ orgs: 1, processed: 1, errors: 0 });
+        expect(res.months).toHaveLength(1);
     });
 
     it("driverStats를 driverUid로 키잉하고 이름·건수·거리를 집계한다 (uid/driverId 버그 회귀 방지)", async () => {

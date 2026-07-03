@@ -149,13 +149,16 @@ async function aggregateOrgMonth(
     anomalies.overDrive = Object.values(driverDayDistance).filter((d) => d > 200).length;
 
     // 2. 비용 집계 (주유·하이패스·정비) — date 문자열 월 범위
+    // orderBy("date","desc")로 기존 (organizationId ASC, date DESC) 복합 인덱스를 사용한다.
+    // orderBy 없이 범위 필터만 두면 Firestore가 date ASC 인덱스를 요구해 FAILED_PRECONDITION이 난다
+    // (정렬은 아래 forEach 집계 결과에 영향 없음).
     const [fuelSnap, hipassSnap, maintenanceSnap] = await Promise.all([
         db.collection("fuelLogs").where("organizationId", "==", orgId)
-            .where("date", ">=", win.datePrefixStart).where("date", "<=", win.datePrefixEnd).get(),
+            .where("date", ">=", win.datePrefixStart).where("date", "<=", win.datePrefixEnd).orderBy("date", "desc").get(),
         db.collection("hipassCharges").where("organizationId", "==", orgId)
-            .where("date", ">=", win.datePrefixStart).where("date", "<=", win.datePrefixEnd).get(),
+            .where("date", ">=", win.datePrefixStart).where("date", "<=", win.datePrefixEnd).orderBy("date", "desc").get(),
         db.collection("maintenanceRecords").where("organizationId", "==", orgId)
-            .where("date", ">=", win.datePrefixStart).where("date", "<=", win.datePrefixEnd).get(),
+            .where("date", ">=", win.datePrefixStart).where("date", "<=", win.datePrefixEnd).orderBy("date", "desc").get(),
     ]);
 
     // 주유: FuelLog.fuelCost(원) — 조직 합계 + 차량별 연비 계산용 누적
@@ -197,23 +200,36 @@ async function aggregateOrgMonth(
     }, { merge: true });
 }
 
+/** runDailyAggregation 실행 요약 — 호출자(백필 콜러블 등)가 성공/실패를 인지할 수 있게 반환 */
+export interface AggregationSummary {
+    orgs: number;       // 전체 기관 수
+    processed: number;  // 집계 성공 기관 수
+    errors: number;     // 집계 실패 기관 수
+    months: string[];   // 집계 대상 월(YYYY-MM)
+}
+
 /**
  * 전체 기관의 최근 N개월 운행/비용/이상 통계를 집계해 orgStats/{orgId}/monthly/{YYYY-MM}에 캐싱한다.
  *
  * 통합 야간 배치(dailyNightlyBatch)의 한 단계로 KST 02:00에 실행되며(실행 시각 -3h 기준으로 대상 월 산정),
  * 지각·소급 입력(retroactive) 로그를 반영하기 위해 당월+전월(기본 2개월)을 재집계한다.
  * 과거 월 전체를 소급 교정하려면 더 큰 recentMonths로 1회 호출(백필)하면 된다.
+ *
+ * 기관별로 오류를 격리해 한 기관 실패가 나머지를 중단시키지 않으며, 실행 요약을 반환한다.
+ * 기관 목록 조회 실패 등 치명적 오류는 상위로 전파해 호출자가 실패를 인지하도록 한다.
  */
-export async function runDailyAggregation(recentMonths = 2): Promise<void> {
-    logger.info(`[dailyAggregation] 일일 배치 집계 시작 (최근 ${recentMonths}개월)`);
+export async function runDailyAggregation(recentMonths = 2): Promise<AggregationSummary> {
     const windows = getRecentMonthWindows(recentMonths);
+    const months = windows.map((w) => w.yearMonth);
+    logger.info(`[dailyAggregation] 일일 배치 집계 시작 (최근 ${recentMonths}개월: ${months.join(", ")})`);
 
-    try {
-        const orgsSnap = await db.collection("organizations").get();
+    const orgsSnap = await db.collection("organizations").get();
+    let processed = 0;
+    let errors = 0;
 
-        for (const orgDoc of orgsSnap.docs) {
-            const orgId = orgDoc.id;
-
+    for (const orgDoc of orgsSnap.docs) {
+        const orgId = orgDoc.id;
+        try {
             // 유저·차량 메타데이터는 월과 무관하므로 기관당 1회만 로드해 월 루프에서 재사용
             const [usersSnap, vehiclesSnap] = await Promise.all([
                 db.collection("users").where("organizationId", "==", orgId).get(),
@@ -229,10 +245,15 @@ export async function runDailyAggregation(recentMonths = 2): Promise<void> {
             for (const win of windows) {
                 await aggregateOrgMonth(orgId, win, userMap, vehicleMap);
             }
-            logger.info(`[dailyAggregation] ${orgId} - ${windows.map((w) => w.yearMonth).join(", ")} 집계 완료`);
+            processed++;
+        } catch (err) {
+            // 한 기관 실패가 전체 배치를 중단시키지 않도록 격리 (나머지 기관은 계속 집계)
+            errors++;
+            logger.error(`[dailyAggregation] ${orgId} 집계 실패:`, (err as Error).message);
         }
-        logger.info("[dailyAggregation] 일일 배치 집계 전체 완료");
-    } catch (error) {
-        logger.error("[dailyAggregation] 오류 발생:", error);
     }
+
+    const summary: AggregationSummary = { orgs: orgsSnap.size, processed, errors, months };
+    logger.info(`[dailyAggregation] 집계 완료 — 기관 ${summary.orgs}, 성공 ${processed}, 실패 ${errors}`);
+    return summary;
 }

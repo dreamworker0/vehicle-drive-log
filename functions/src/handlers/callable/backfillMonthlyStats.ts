@@ -23,15 +23,24 @@ export const backfillMonthlyStats = onCall(
 
         console.log(`[backfillMonthlyStats] 최근 ${months}개월 소급 재집계 시작 (uid=${request.auth.uid})`);
         const startedAt = Date.now();
+        let summary;
         try {
-            await runDailyAggregation(months);
+            summary = await runDailyAggregation(months);
         } catch (err: unknown) {
             console.error("[backfillMonthlyStats] 실패:", (err as Error).message);
             throw new HttpsError("internal", "월별 집계 백필 중 오류가 발생했습니다.");
         }
         const durationMs = Date.now() - startedAt;
-        console.log(`[backfillMonthlyStats] 완료 (${months}개월, ${durationMs}ms)`);
+        console.log(`[backfillMonthlyStats] 완료 — 기관 ${summary.orgs}, 성공 ${summary.processed}, 실패 ${summary.errors} (${durationMs}ms)`);
 
-        return { success: true, months, durationMs };
+        // 일부 기관이라도 집계에 실패하면 success=false로 알린다(조용한 실패 방지)
+        return {
+            success: summary.errors === 0,
+            months,
+            orgs: summary.orgs,
+            processed: summary.processed,
+            errors: summary.errors,
+            durationMs,
+        };
     },
 );
