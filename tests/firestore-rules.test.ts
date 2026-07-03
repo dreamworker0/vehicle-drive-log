@@ -133,7 +133,7 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
   
   it('4. 관리자의 정상 오퍼레이션 허용', async () => {
     const orgAAdminDb = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
-    
+
     // 새 차량 등록 성공 여부
     const newVehicle = orgAAdminDb.collection('vehicles').doc('vehicle_new').set({
       organizationId: 'org-A',
@@ -141,5 +141,95 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
       currentKm: 0
     });
     await assertSucceeds(newVehicle);
+  });
+
+  it('5. 예약(reservations) 조직 격리 및 명의 위조 차단', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('reservations').doc('res_B').set({
+        organizationId: 'org-B',
+        vehicleId: 'vehicle_B',
+        reservedByUid: 'user_B',
+      });
+    });
+
+    const orgAMemberDb = setupContext('user_A', { role: 'member', orgId: 'org-A' }).firestore();
+
+    // 타 조직 예약 조회 차단
+    await assertFails(orgAMemberDb.collection('reservations').doc('res_B').get());
+
+    // 타 조직으로 예약 생성 차단
+    await assertFails(orgAMemberDb.collection('reservations').doc('res_evil').set({
+      organizationId: 'org-B',
+      vehicleId: 'vehicle_B',
+      reservedByUid: 'user_A',
+    }));
+
+    // 타인 명의(reservedByUid 위조) 예약 생성 차단
+    await assertFails(orgAMemberDb.collection('reservations').doc('res_spoof').set({
+      organizationId: 'org-A',
+      vehicleId: 'vehicle_A',
+      reservedByUid: 'user_B',
+    }));
+
+    // 본인 조직·본인 명의 정상 생성 허용
+    await assertSucceeds(orgAMemberDb.collection('reservations').doc('res_ok').set({
+      organizationId: 'org-A',
+      vehicleId: 'vehicle_A',
+      reservedByUid: 'user_A',
+    }));
+  });
+
+  it('6. 비용 데이터(주유·하이패스·정비) 교차 조직 접근 차단', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.collection('fuelLogs').doc('fuel_B').set({
+        organizationId: 'org-B', vehicleId: 'vehicle_B', driverUid: 'user_B', cost: 50000,
+      });
+      await db.collection('hipassCharges').doc('hp_B').set({
+        organizationId: 'org-B', cardId: 'card_B', chargerUid: 'user_B', amount: 30000,
+      });
+      await db.collection('maintenanceRecords').doc('mt_B').set({
+        organizationId: 'org-B', vehicleId: 'vehicle_B', description: '엔진오일 교체',
+      });
+      await db.collection('fuelLogs').doc('fuel_A').set({
+        organizationId: 'org-A', vehicleId: 'vehicle_A', driverUid: 'user_A', cost: 40000,
+      });
+    });
+
+    const orgAMemberDb = setupContext('user_A', { role: 'member', orgId: 'org-A' }).firestore();
+
+    // 타 조직 비용 데이터 조회는 전부 차단
+    await assertFails(orgAMemberDb.collection('fuelLogs').doc('fuel_B').get());
+    await assertFails(orgAMemberDb.collection('hipassCharges').doc('hp_B').get());
+    await assertFails(orgAMemberDb.collection('maintenanceRecords').doc('mt_B').get());
+
+    // 본인 조직 데이터는 정상 조회
+    await assertSucceeds(orgAMemberDb.collection('fuelLogs').doc('fuel_A').get());
+  });
+
+  it('7. 알림(notifications) 생성은 superAdmin 전용, 조회는 본인 대상만', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('notifications').doc('noti_A').set({
+        targetUid: 'user_A', organizationId: 'org-A', type: 'approval', message: '승인 알림',
+      });
+    });
+
+    const orgAMemberDb = setupContext('user_A', { role: 'member', orgId: 'org-A' }).firestore();
+
+    // 일반 사용자는 같은 조직 UID 대상이라도 알림 생성 불가 (superAdmin 전용 — 알림 주입 차단)
+    await assertFails(orgAMemberDb.collection('notifications').doc('noti_evil').set({
+      targetUid: 'user_A2', organizationId: 'org-A', message: '피싱 텍스트 주입 시도',
+    }));
+
+    // superAdmin은 생성 가능 (승인/반려 알림 화면)
+    const superDb = setupContext('super_1', { role: 'superAdmin' }).firestore();
+    await assertSucceeds(superDb.collection('notifications').doc('noti_ok').set({
+      targetUid: 'user_A', organizationId: 'org-A', message: '기관 승인 완료',
+    }));
+
+    // 본인 대상 알림은 조회 가능, 타인 알림은 차단
+    await assertSucceeds(orgAMemberDb.collection('notifications').doc('noti_A').get());
+    const orgBMemberDb = setupContext('user_B', { role: 'member', orgId: 'org-B' }).firestore();
+    await assertFails(orgBMemberDb.collection('notifications').doc('noti_A').get());
   });
 });

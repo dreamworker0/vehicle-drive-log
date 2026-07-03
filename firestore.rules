@@ -164,12 +164,11 @@ service cloud.firestore {
     // === 알림 ===
     match /notifications/{notificationId} {
       allow read: if resource.data.targetUid == request.auth.uid || isSuperAdmin();
-      // 같은 기관 멤버에게만 알림 생성 가능 (Cloud Functions는 admin SDK로 Rules 우회)
-      allow create: if isSuperAdmin()
-                    || (isSignedIn()
-                        && request.resource.data.keys().hasAll(['targetUid'])
-                        && request.resource.data.targetUid is string
-                        && request.resource.data.organizationId == userOrgId());
+      // 클라이언트 생성은 superAdmin 전용 (승인/반려 알림 화면). 나머지 알림은 전부
+      // Cloud Functions(admin SDK, Rules 우회)가 생성한다.
+      // 과거 isSignedIn() 분기는 targetUid 소속 검증이 없어 임의 사용자가 타 기관
+      // UID로 알림 텍스트를 주입할 수 있었음 (2026-07-03 감사 발견으로 제거).
+      allow create: if isSuperAdmin();
       allow update: if resource.data.targetUid == request.auth.uid
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'updatedAt']);
       allow delete: if resource.data.targetUid == request.auth.uid || isSuperAdmin();
