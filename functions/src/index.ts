@@ -82,6 +82,9 @@ export { trackFirstEmployee } from "./handlers/triggers/trackFirstEmployee";
 // 기존 기관 좌표 마이그레이션 (일회성)
 export { backfillOrgCoords } from "./handlers/callable/backfillOrgCoords";
 
+// 월별 집계(orgStats/monthly) 소급 재집계 (일회성 백필, superAdmin 호출)
+export { backfillMonthlyStats } from "./handlers/callable/backfillMonthlyStats";
+
 // 피드백 AI 답변 초안 생성 (의견 등록 시 자동 실행)
 export { generateFeedbackDraft } from "./handlers/triggers/generateFeedbackDraft";
 
