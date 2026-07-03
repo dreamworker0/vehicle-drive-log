@@ -2,9 +2,10 @@
  * backfillOrgCoords — 기존 기관 좌표 마이그레이션 (Callable Cloud Function)
  * address가 있지만 lat/lng가 없는 기관에 대해 Tmap으로 좌표를 조회하여 저장
  */
-import { onCall, HttpsError } from "firebase-functions/https";
+import { onCall } from "firebase-functions/https";
 import { defineString } from "firebase-functions/params";
 import { getFirestore } from "firebase-admin/firestore";
+import { requireSuperAdmin } from "../../utils/helpers";
 
 const tmapApiKey = defineString("TMAP_API_KEY");
 
@@ -44,14 +45,8 @@ export const backfillOrgCoords = onCall(
         memory: "256MiB",
     },
     async (request) => {
-        if (!request.auth) {
-            throw new HttpsError("unauthenticated", "인증이 필요합니다.");
-        }
-
         // superAdmin만 전체 기관 좌표 일괄 수정 가능
-        if (request.auth.token.role !== "superAdmin") {
-            throw new HttpsError("permission-denied", "슈퍼관리자만 실행할 수 있습니다.");
-        }
+        requireSuperAdmin(request);
 
         const db = getFirestore();
         const apiKey = tmapApiKey.value();

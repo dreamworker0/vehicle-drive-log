@@ -91,6 +91,22 @@ export function wrapHandler<T extends unknown[], R>(functionName: string, handle
     };
 }
 
+/**
+ * Callable 요청의 superAdmin 권한 가드.
+ * 미인증이면 unauthenticated, superAdmin 커스텀 클레임이 없으면 permission-denied를 던진다.
+ * 통과하면 request.auth가 non-null로 좁혀진다.
+ */
+export function requireSuperAdmin<T>(
+    request: CallableRequest<T>,
+): asserts request is CallableRequest<T> & { auth: NonNullable<CallableRequest["auth"]> } {
+    if (!request.auth) {
+        throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
+    }
+    if (request.auth.token.role !== "superAdmin") {
+        throw new HttpsError("permission-denied", "시스템 관리자만 사용할 수 있습니다.");
+    }
+}
+
 interface WrapCallableOptions {
     rateLimitKey?: RateLimitKey;
 }

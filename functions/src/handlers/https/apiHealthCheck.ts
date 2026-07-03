@@ -4,12 +4,12 @@
  * 5개 외부 API에 가벼운 핑을 병렬로 보내 상태를 확인한다.
  * 대시보드에서 신호등(🟢/🟡/🔴)으로 시각화하기 위한 데이터를 반환한다.
  */
-import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onCall } from "firebase-functions/v2/https";
 import { defineString } from "firebase-functions/params";
 import { getFirestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { getStorage } from "firebase-admin/storage";
-import { log } from "../../utils/helpers";
+import { log, requireSuperAdmin } from "../../utils/helpers";
 import { toKSTDate } from "../../utils/kstDate";
 
 const TMAP_API_KEY = defineString("TMAP_API_KEY");
@@ -355,15 +355,8 @@ export const apiHealthCheck = onCall(
         cors: true,
     },
     async (request) => {
-        // 인증 확인
-        if (!request.auth) {
-            throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
-        }
-
-        // 슈퍼관리자 권한 확인
-        if (request.auth.token.role !== "superAdmin") {
-            throw new HttpsError("permission-denied", "시스템 관리자만 사용할 수 있습니다.");
-        }
+        // 인증·슈퍼관리자 권한 확인
+        requireSuperAdmin(request);
 
         log("INFO", "apiHealthCheck", "헬스 체크 시작", { uid: request.auth.uid });
 

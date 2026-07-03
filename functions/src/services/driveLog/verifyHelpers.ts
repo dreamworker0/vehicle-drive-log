@@ -5,8 +5,8 @@
  */
 import { getStorage } from "firebase-admin/storage";
 import * as emailjs from "@emailjs/nodejs";
-import * as nodemailer from "nodemailer";
 import { defineString } from "firebase-functions/params";
+import { createGmailTransporter, systemMailFrom } from "../../core/mailer";
 
 // ── 마스킹 유틸리티 ──
 
@@ -213,16 +213,10 @@ export async function sendApprovalEmailServer(recipientEmail: string, orgName: s
  */
 export async function sendRejectionEmail(recipientEmail: string, orgName: string, reason: string): Promise<boolean> {
     try {
-        const transporter = nodemailer.createTransport({
-            service: "gmail",
-            auth: {
-                user: process.env.GMAIL_USER,
-                pass: process.env.GMAIL_APP_PASSWORD,
-            },
-        });
+        const transporter = createGmailTransporter();
 
         const mailOptions = {
-            from: `"차량운행일지 시스템" <${process.env.GMAIL_USER}>`,
+            from: systemMailFrom(),
             to: recipientEmail,
             subject: `[차량운행일지] 기관 신청 결과 안내: ${orgName}`,
             html: `

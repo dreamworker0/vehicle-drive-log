@@ -7,19 +7,10 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { sendPushToUser, createInAppNotification } from "../../services/alimtalk/sendNotification";
-import * as nodemailer from "nodemailer";
+import { requireSuperAdmin } from "../../utils/helpers";
+import { createGmailTransporter, isGmailConfigured, systemMailFrom } from "../../core/mailer";
 
 const db = getFirestore();
-
-function createTransporter() {
-    return nodemailer.createTransport({
-        service: "gmail",
-        auth: {
-            user: process.env.GMAIL_USER,
-            pass: process.env.GMAIL_APP_PASSWORD,
-        },
-    });
-}
 
 export const sendFeedbackReply = onCall(
     {
@@ -28,17 +19,10 @@ export const sendFeedbackReply = onCall(
         enforceAppCheck: false,
     },
     async (request) => {
-        // 1. 인증 확인
-        if (!request.auth) {
-            throw new HttpsError("unauthenticated", "인증이 필요합니다.");
-        }
+        // 1. 인증·superAdmin 권한 확인
+        requireSuperAdmin(request);
 
-        // 2. superAdmin 권한 확인
-        if (request.auth.token.role !== "superAdmin") {
-            throw new HttpsError("permission-denied", "시스템 관리자만 사용할 수 있습니다.");
-        }
-
-        // 3. 요청 데이터 검증
+        // 2. 요청 데이터 검증
         const { feedbackId, replyText } = request.data as {
             feedbackId?: string;
             replyText?: string;
@@ -105,12 +89,12 @@ export const sendFeedbackReply = onCall(
         // 7. 이메일 알림 발송 (이메일 정보가 있는 경우)
         if (targetEmail) {
             try {
-                if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+                if (!isGmailConfigured()) {
                     console.warn("[sendFeedbackReply] GMAIL 환경변수 누락으로 이메일 발송 생략");
                 } else {
-                    const transporter = createTransporter();
+                    const transporter = createGmailTransporter();
                     const mailOptions = {
-                        from: `"차량운행일지 시스템" <${process.env.GMAIL_USER}>`,
+                        from: systemMailFrom(),
                         to: targetEmail,
                         subject: `[차량운행일지] 접수하신 문의/의견에 답변이 등록되었습니다.`,
                         html: `

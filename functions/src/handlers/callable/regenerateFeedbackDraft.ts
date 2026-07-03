@@ -1,7 +1,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore } from "firebase-admin/firestore";
 import { generateAiContent } from "../../core/gemini";
-import { wrapCallableHandler } from "../../utils/helpers";
+import { wrapCallableHandler, requireSuperAdmin } from "../../utils/helpers";
 import { buildFaqPromptText } from "../../utils/faqData";
 
 const db = getFirestore();
@@ -55,9 +55,7 @@ export const regenerateFeedbackDraft = onCall(
     { region: "asia-northeast3", timeoutSeconds: 60, enforceAppCheck: false },
     wrapCallableHandler("regenerateFeedbackDraft", {}, async (request) => {
         // superAdmin 권한 확인 (관리자만 다시 생성 가능)
-        if (!request.auth || request.auth.token.role !== "superAdmin") {
-            throw new HttpsError("permission-denied", "시스템 관리자만 권한이 있습니다.");
-        }
+        requireSuperAdmin(request);
 
         const { feedbackId } = request.data as { feedbackId?: string };
         if (!feedbackId) {

@@ -4,9 +4,9 @@
  * calendarSyncFailCount >= 3으로 영구 제외된 차량들을 전부 0으로 리셋하여
  * 다음 syncCalendarToApp 주기에 재시도하게 합니다.
  */
-import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onCall } from "firebase-functions/v2/https";
 import { getFirestore } from "firebase-admin/firestore";
-import { log } from "../utils/helpers";
+import { log, requireSuperAdmin } from "../utils/helpers";
 
 const db = getFirestore();
 
@@ -18,15 +18,8 @@ export const resetCalendarSyncFails = onCall(
         enforceAppCheck: false,
     },
     async (request) => {
-        // 인증 확인
-        if (!request.auth) {
-            throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
-        }
-
-        // 슈퍼관리자 권한 확인
-        if (request.auth.token.role !== "superAdmin") {
-            throw new HttpsError("permission-denied", "시스템 관리자만 사용할 수 있습니다.");
-        }
+        // 인증·슈퍼관리자 권한 확인
+        requireSuperAdmin(request);
 
         log("INFO", "resetCalendarSyncFails", "캘린더 동기화 실패 카운터 리셋 시작", {
             uid: request.auth.uid,

@@ -2,18 +2,8 @@
  * notifyNewApplication — 기관 신청 시 슈퍼관리자에게 이메일 알림 및 디스코드 알림
  */
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
-import * as nodemailer from "nodemailer";
 import { sendDiscordAlert } from "../../core/discord";
-
-function createTransporter() {
-    return nodemailer.createTransport({
-        service: "gmail",
-        auth: {
-            user: process.env.GMAIL_USER,
-            pass: process.env.GMAIL_APP_PASSWORD,
-        },
-    });
-}
+import { createGmailTransporter, isGmailConfigured, systemMailFrom } from "../../core/mailer";
 
 export const notifyNewApplication = onDocumentWritten(
     "organizations/{orgId}",
@@ -47,7 +37,7 @@ export const notifyNewApplication = onDocumentWritten(
             }).catch(e => console.error("Discord alert error:", e));
 
             // 기존 이메일 알림 로직
-            if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+            if (!isGmailConfigured()) {
                 console.error("GMAIL_USER 또는 GMAIL_APP_PASSWORD 환경변수가 설정되지 않았습니다.");
                 return;
             }
@@ -60,7 +50,7 @@ export const notifyNewApplication = onDocumentWritten(
             const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL || process.env.GMAIL_USER;
 
             const mailOptions = {
-                from: `"차량운행일지 시스템" <${process.env.GMAIL_USER}>`,
+                from: systemMailFrom(),
                 to: adminEmail,
                 subject: `[차량운행일지] 새 기관 신청: ${orgName}`,
                 html: `
@@ -106,7 +96,7 @@ export const notifyNewApplication = onDocumentWritten(
             };
 
             try {
-                const transporter = createTransporter();
+                const transporter = createGmailTransporter();
                 await transporter.sendMail(mailOptions);
                 console.log(`신청 알림 이메일 전송 완료: org=${orgId}, name=${orgName}`);
             } catch (err: unknown) {

@@ -4,33 +4,17 @@
  * 프론트엔드 EmailJS 키 노출을 방지하기 위해 Cloud Function으로 구현.
  */
 import { onCall, HttpsError } from "firebase-functions/v2/https";
-import * as nodemailer from "nodemailer";
 import { checkRateLimitByUid } from "../../utils/rateLimit";
 import { RATE_LIMITS } from "../../utils/constants";
+import { requireSuperAdmin } from "../../utils/helpers";
+import { createGmailTransporter, isGmailConfigured, systemMailFrom } from "../../core/mailer";
 
 const SERVICE_URL = "https://vehicle-drive-log.web.app";
-
-function createTransporter() {
-    return nodemailer.createTransport({
-        service: "gmail",
-        auth: {
-            user: process.env.GMAIL_USER,
-            pass: process.env.GMAIL_APP_PASSWORD,
-        },
-    });
-}
 
 export const sendRejectionEmail = onCall(
     { region: "asia-northeast3", enforceAppCheck: false },
     async (request) => {
-        // 인증 확인
-        if (!request.auth) {
-            throw new HttpsError("unauthenticated", "인증이 필요합니다.");
-        }
-        // superAdmin 권한 확인
-        if (request.auth.token.role !== "superAdmin") {
-            throw new HttpsError("permission-denied", "시스템 관리자만 사용할 수 있습니다.");
-        }
+        requireSuperAdmin(request);
 
         // Rate Limiting
         await checkRateLimitByUid(
@@ -47,7 +31,7 @@ export const sendRejectionEmail = onCall(
         }
 
         // Gmail 환경변수 확인
-        if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+        if (!isGmailConfigured()) {
             console.error("GMAIL_USER 또는 GMAIL_APP_PASSWORD 환경변수가 설정되지 않았습니다.");
             throw new HttpsError("internal", "이메일 발송 설정이 완료되지 않았습니다.");
         }
@@ -61,7 +45,7 @@ export const sendRejectionEmail = onCall(
             : ``;
 
         const mailOptions = {
-            from: `"차량운행일지 시스템" <${process.env.GMAIL_USER}>`,
+            from: systemMailFrom(),
             to: recipientEmail,
             subject: `[차량운행일지] ${orgName} 기관 신청 반려 안내`,
             html: `
@@ -92,7 +76,7 @@ export const sendRejectionEmail = onCall(
         };
 
         try {
-            const transporter = createTransporter();
+            const transporter = createGmailTransporter();
             await transporter.sendMail(mailOptions);
             console.log(`반려 이메일 전송 완료: to=${recipientEmail}, org=${orgName}`);
             return { success: true };

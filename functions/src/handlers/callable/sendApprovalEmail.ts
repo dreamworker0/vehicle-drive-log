@@ -5,33 +5,17 @@
  * notifyNewApplication.ts의 nodemailer/Gmail SMTP 패턴을 재활용한다.
  */
 import { onCall, HttpsError } from "firebase-functions/v2/https";
-import * as nodemailer from "nodemailer";
 import { checkRateLimitByUid } from "../../utils/rateLimit";
 import { RATE_LIMITS } from "../../utils/constants";
+import { requireSuperAdmin } from "../../utils/helpers";
+import { createGmailTransporter, isGmailConfigured, systemMailFrom } from "../../core/mailer";
 
 const SERVICE_URL = "https://vehicle-drive-log.web.app";
-
-function createTransporter() {
-    return nodemailer.createTransport({
-        service: "gmail",
-        auth: {
-            user: process.env.GMAIL_USER,
-            pass: process.env.GMAIL_APP_PASSWORD,
-        },
-    });
-}
 
 export const sendApprovalEmail = onCall(
     { region: "asia-northeast3", enforceAppCheck: false },
     async (request) => {
-        // 인증 확인
-        if (!request.auth) {
-            throw new HttpsError("unauthenticated", "인증이 필요합니다.");
-        }
-        // superAdmin 권한 확인
-        if (request.auth.token.role !== "superAdmin") {
-            throw new HttpsError("permission-denied", "시스템 관리자만 사용할 수 있습니다.");
-        }
+        requireSuperAdmin(request);
 
         // Rate Limiting
         await checkRateLimitByUid(
@@ -48,7 +32,7 @@ export const sendApprovalEmail = onCall(
         }
 
         // Gmail 환경변수 확인
-        if (!process.env.GMAIL_USER || !process.env.GMAIL_APP_PASSWORD) {
+        if (!isGmailConfigured()) {
             console.error("GMAIL_USER 또는 GMAIL_APP_PASSWORD 환경변수가 설정되지 않았습니다.");
             throw new HttpsError("internal", "이메일 발송 설정이 완료되지 않았습니다.");
         }
@@ -57,7 +41,7 @@ export const sendApprovalEmail = onCall(
         const serviceUrl = `${SERVICE_URL}?code=${inviteCode}`;
 
         const mailOptions = {
-            from: `"차량운행일지 시스템" <${process.env.GMAIL_USER}>`,
+            from: systemMailFrom(),
             to: recipientEmail,
             subject: `[차량운행일지] ${orgName} 기관 승인 완료`,
             html: `
@@ -88,7 +72,7 @@ export const sendApprovalEmail = onCall(
         };
 
         try {
-            const transporter = createTransporter();
+            const transporter = createGmailTransporter();
             await transporter.sendMail(mailOptions);
             console.log(`승인 이메일 전송 완료: to=${recipientEmail}, org=${orgName}`);
             return { success: true };

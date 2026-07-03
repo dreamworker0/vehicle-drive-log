@@ -4,21 +4,15 @@
  * superAdmin이 호출하면 승인된 기관 중 직원이 0명인 미활성 기관에
  * 카카오 알림톡 리마인드를 일괄 발송한다.
  */
-import { onCall, HttpsError } from "firebase-functions/v2/https";
+import { onCall } from "firebase-functions/v2/https";
 import { getFirestore } from "firebase-admin/firestore";
 import { sendReminderAlimtalk } from "../../services/alimtalk/sendAlimtalk";
+import { requireSuperAdmin } from "../../utils/helpers";
 
 export const sendBulkReminder = onCall(
     { region: "asia-northeast3", timeoutSeconds: 120, enforceAppCheck: false },
     async (request) => {
-        // 인증 확인
-        if (!request.auth) {
-            throw new HttpsError("unauthenticated", "인증이 필요합니다.");
-        }
-        // superAdmin 권한 확인
-        if (request.auth.token.role !== "superAdmin") {
-            throw new HttpsError("permission-denied", "시스템 관리자만 사용할 수 있습니다.");
-        }
+        requireSuperAdmin(request);
 
         const db = getFirestore();
 
