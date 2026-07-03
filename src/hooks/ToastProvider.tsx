@@ -13,10 +13,16 @@ export function ToastProviderWrapper({ children }: { children: ReactNode }) {
     return (
         <>
             {children}
-            {/* 토스트 렌더링 */}
-            {toasts.length > 0 && (
-                <div className="fixed right-4 z-[9999] flex flex-col gap-2 max-w-sm" style={{ top: 'calc(1rem + env(safe-area-inset-top, 0px))' }}>
-                    {toasts.map(toast => (
+            {/* 토스트 렌더링 — 스크린리더 대응 라이브 리전.
+                내용 삽입 전부터 DOM에 존재해야 첫 토스트도 안정적으로 낭독되므로 항상 렌더링한다. */}
+            <div
+                role="status"
+                aria-live="polite"
+                aria-atomic="false"
+                className="fixed right-4 z-[9999] flex flex-col gap-2 max-w-sm"
+                style={{ top: 'calc(1rem + env(safe-area-inset-top, 0px))' }}
+            >
+                {toasts.map(toast => (
                         <div
                             key={toast.id}
                             className={`
@@ -53,7 +59,6 @@ export function ToastProviderWrapper({ children }: { children: ReactNode }) {
                         </div>
                     ))}
                 </div>
-            )}
         </>
     );
 }
