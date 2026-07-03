@@ -1,7 +1,12 @@
 name: Deploy — 프로덕션 배포
 
+# CI 성공이 배포의 하드 게이트다: master 푸시는 CI 워크플로가 전체 검증(lint·tsc·테스트·
+# Rules·E2E·번들 예산)을 통과했을 때만 이 워크플로가 이어서 배포한다.
+# workflow_dispatch는 긴급 수동 배포용 우회 경로(CI 미경유)로 유지.
 on:
-  push:
+  workflow_run:
+    workflows: ["CI — 린트 · 테스트 · 빌드"]
+    types: [completed]
     branches: [master]
   workflow_dispatch:
 
@@ -14,13 +19,18 @@ concurrency:
 
 jobs:
   deploy:
+    # workflow_run 트리거는 CI가 '성공'으로 끝났을 때만 배포 진행 (실패·취소 시 스킵)
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
       TZ: "Asia/Seoul"
 
     steps:
+      # CI가 검증한 바로 그 커밋을 배포한다 (workflow_run 사이에 새 푸시가 끼어도 안전)
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Setup Node 22
         uses: actions/setup-node@v5

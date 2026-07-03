@@ -46,19 +46,53 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Unit tests
-        run: npx vitest run
+      # --coverage로 vitest.config.js의 커버리지 임계치를 실제 게이트로 강제한다
+      - name: Unit tests (+coverage gate)
+        run: npx vitest run --coverage
 
       - name: Functions unit tests
         run: cd functions && npm test -- --maxWorkers=2 --workerIdleMemoryLimit=512MB
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
+      # ── Firestore Rules 테스트 (멀티테넌트 격리의 유일한 자동 검증) ──
+      - name: Setup Java (Firebase emulator)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Cache Firebase emulators
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}
+
+      - name: Firestore Rules tests (emulator)
+        run: npx firebase-tools emulators:exec --only firestore "npx vitest run --exclude='' tests/firestore-rules.test.ts"
+
+      # ── E2E ──
+      - name: Get Playwright version
+        id: pw-version
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
       - name: E2E tests
         run: npx playwright test
+        env:
+          CI: true
+
+      # 인증 E2E — 에뮬레이터(auth,firestore) 위에서 로그인·역할 리다이렉트·오프라인 동기화 검증
+      - name: Authed E2E (emulator)
+        run: npx firebase-tools emulators:exec --only auth,firestore "npx playwright test -c playwright.emulator.config.ts"
         env:
           CI: true
 

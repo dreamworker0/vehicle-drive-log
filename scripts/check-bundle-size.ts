@@ -99,7 +99,9 @@ function main(): void {
     console.log('─'.repeat(60));
 
     if (hasWarning) {
-        console.log('⚠️  예산을 초과한 항목이 있습니다. 번들 최적화를 검토하세요.\n');
+        console.log('❌ 예산을 초과한 항목이 있습니다. 번들 최적화를 검토하세요.\n');
+        // 예산은 게이트다 — postbuild·CI에서 초과 시 빌드를 실패시켜 회귀를 막는다.
+        process.exit(1);
     } else {
         console.log('✅ 모든 번들 크기가 예산 이내입니다.\n');
     }
