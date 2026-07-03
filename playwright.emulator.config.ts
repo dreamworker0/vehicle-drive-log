@@ -15,7 +15,10 @@ export default defineConfig({
     testDir: './e2e',
     testMatch: /authed-.*\.spec\.ts/,
     timeout: 45000,
-    retries: 0,
+    // CI에서 맨 처음 실행되는 테스트는 vite dev 서버의 온디맨드 콜드 컴파일(auth+라우팅+레이아웃
+    // 전체 그래프)을 홀로 부담해 로그인→리다이렉트가 간헐적으로 25s를 초과한다(로컬은 앞선 테스트가
+    // 서버를 예열해 통과). 제품 버그가 아닌 콜드스타트 타이밍이므로 CI에서만 재시도로 흡수한다.
+    retries: process.env.CI ? 2 : 0,
     globalSetup: './e2e/emulator/global-setup.ts',
     use: {
         baseURL: 'http://127.0.0.1:5174',
