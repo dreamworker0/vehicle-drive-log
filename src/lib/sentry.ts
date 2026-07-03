@@ -1,10 +1,37 @@
-import * as Sentry from '@sentry/react';
-
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
 
-export function initSentry() {
-    if (!SENTRY_DSN) return;
+// @sentry/react(~139KB)를 정적 import하지 않고 initSentry 시점에 동적 로드한다.
+// lightEntry(비로그인) 경로는 initSentry를 호출하지 않으므로 SDK 다운로드 자체가 생략되고,
+// appEntry의 지연 초기화(import('./lib/sentry').then(m => m.initSentry()))가 실제로 지연 효과를 갖는다.
+// 패키지를 직접 동적 import하지 않고 sentryClient(선별 재수출)를 경유해 트리셰이킹을 유지한다.
+type SentryModule = typeof import('./sentryClient');
 
+type SentryUserInfo = { uid: string; email?: string; role?: string; organizationId?: string } | null;
+
+let sentry: SentryModule | null = null;
+let sentryLoading: Promise<SentryModule | null> | null = null;
+// SDK 로드 완료 전에 setSentryUser가 호출되면 보관했다가 init 직후 적용 (undefined = 대기 없음)
+let queuedUser: SentryUserInfo | undefined;
+
+export function initSentry() {
+    if (!SENTRY_DSN || sentryLoading) return;
+
+    sentryLoading = import('./sentryClient')
+        .then((Sentry) => {
+            initSentryWithModule(Sentry);
+            sentry = Sentry;
+            if (queuedUser !== undefined) {
+                applySentryUser(Sentry, queuedUser);
+                queuedUser = undefined;
+            }
+            return Sentry;
+        })
+        .catch(() => null); // SDK 로드 실패(네트워크 등) 시 무시 — captureError는 console 출력만 유지
+
+    return;
+}
+
+function initSentryWithModule(Sentry: SentryModule) {
     Sentry.init({
         dsn: SENTRY_DSN,
         environment: import.meta.env.MODE,
@@ -158,17 +185,11 @@ export function initSentry() {
 
     // 프로덕션에서 Web Vitals 수집
     if (import.meta.env.PROD) {
-        reportWebVitals();
+        reportWebVitals(Sentry);
     }
 }
 
-/**
- * 인증된 사용자 정보를 Sentry 컨텍스트에 설정한다.
- * 에러 발생 시 어떤 사용자/역할/기관에서 발생했는지 추적할 수 있다.
- * @param {{ uid: string, email?: string, role?: string, organizationId?: string }} userInfo
- */
-export function setSentryUser(userInfo: { uid: string; email?: string; role?: string; organizationId?: string } | null) {
-    if (!SENTRY_DSN) return;
+function applySentryUser(Sentry: SentryModule, userInfo: SentryUserInfo) {
     if (userInfo) {
         Sentry.setUser({
             id: userInfo.uid,
@@ -183,9 +204,24 @@ export function setSentryUser(userInfo: { uid: string; email?: string; role?: st
     }
 }
 
+/**
+ * 인증된 사용자 정보를 Sentry 컨텍스트에 설정한다.
+ * 에러 발생 시 어떤 사용자/역할/기관에서 발생했는지 추적할 수 있다.
+ * SDK 로드 전 호출은 보관했다가 init 직후 적용된다.
+ */
+export function setSentryUser(userInfo: SentryUserInfo) {
+    if (!SENTRY_DSN) return;
+    if (sentry) {
+        applySentryUser(sentry, userInfo);
+    } else {
+        queuedUser = userInfo;
+    }
+}
+
 export function captureError(error: unknown, context: Record<string, unknown> = {}) {
-    if (SENTRY_DSN) {
-        Sentry.captureException(error, { extra: context });
+    // initSentry가 호출된 적 없으면(비로그인 경량 경로) 기존과 동일하게 콘솔 출력만 수행
+    if (SENTRY_DSN && sentryLoading) {
+        sentryLoading.then((Sentry) => Sentry?.captureException(error, { extra: context }));
     }
     console.error(error);
 }
@@ -193,7 +229,7 @@ export function captureError(error: unknown, context: Record<string, unknown> = 
 /**
  * Web Vitals(LCP, FID, CLS, FCP, TTFB) 수집 → Sentry Custom Measurements
  */
-function reportWebVitals() {
+function reportWebVitals(Sentry: SentryModule) {
     import('web-vitals').then(({ onCLS, onFCP, onLCP, onTTFB, onINP }) => {
         const sendToSentry = (metric: { name: string; value: number }) => {
             Sentry.setMeasurement(metric.name, metric.value, metric.name === 'CLS' ? '' : 'millisecond');

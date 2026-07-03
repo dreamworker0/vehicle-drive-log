@@ -6,7 +6,6 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { firebaseFunctions } from '../lib/firebase';
 import { useAuth } from './useAuth';
 import { httpsCallable } from 'firebase/functions';
-import imageCompression from 'browser-image-compression';
 
 // 허용 파일 타입
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
@@ -14,9 +13,12 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 /**
  * 이미지 압축 (최대 1200px, JPEG)
+ * browser-image-compression(~51KB)은 비로그인 공개 페이지(/apply) 경로에 정적으로 딸려 들어가지
+ * 않도록 압축 시점에 동적 로드한다.
  */
 async function compressImage(file: File): Promise<File> {
     try {
+        const { default: imageCompression } = await import('browser-image-compression');
         return await imageCompression(file, {
             maxSizeMB: 1,
             maxWidthOrHeight: 1200,

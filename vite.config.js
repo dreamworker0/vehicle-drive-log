@@ -53,9 +53,21 @@ export default defineConfig({
           'firebase-auth': ['firebase/app', 'firebase/auth'],
           'firebase-db': ['firebase/firestore', 'firebase/storage'],
           'firebase-messaging': ['firebase/messaging'],
-          'react-vendor': ['react', 'react-dom', 'react-router-dom'],
+          // react-dom/client·jsx-runtime·scheduler 서브패스를 명시하지 않으면 렌더러 본체(~200KB)가
+          // 앱 공유 청크로 흘러들어가 매 배포마다 재다운로드된다 (react-vendor는 버전 업 전까지 캐시 유지)
+          'react-vendor': [
+            'react',
+            'react/jsx-runtime',
+            'react-dom',
+            'react-dom/client',
+            'scheduler',
+            'react-router',
+            'react-router-dom',
+          ],
           'xlsx': ['xlsx'],
-          'sentry': ['@sentry/react'],
+          // sentryClient(재수출 파사드)를 SDK와 같은 청크에 강제 배치 — 파사드가 자체 코드가 없어
+          // Rollup이 공유 청크로 접어 넣으면 SDK로의 정적 엣지가 생겨 지연 로딩이 무력화된다
+          'sentry': ['@sentry/react', './src/lib/sentryClient.ts'],
           'date-fns': ['date-fns'],
           'recharts': ['recharts'],
           'leaflet': ['leaflet'],
