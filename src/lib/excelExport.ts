@@ -6,6 +6,7 @@
 import {
     resolveStartKm, resolveEndKm, resolveDistance, resolveDateStr, resolveStartTime, resolveEndTime,
 } from './driveLogExportFields';
+import { formatTimestampTime } from './dateUtils';
 
 /**
  * 운행일지 데이터를 엑셀 파일로 다운로드
@@ -220,12 +221,7 @@ export async function downloadFuelLogsExcel(
     const XLSX = await import('xlsx');
 
     const rows = records.map((rec) => {
-        let timeStr = '';
-        if (rec.createdAt) {
-            const ca = rec.createdAt as { seconds: number; toDate?: () => Date } | undefined;
-            const d = ca instanceof Date ? ca : ca?.toDate?.() || null;
-            if (d) timeStr = d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
-        }
+        const timeStr = formatTimestampTime(rec.createdAt, { hour12: false });
         const isChargeable = ['electric', 'hydrogen'].includes(rec.fuelType || '');
         const unit = isChargeable ? (rec.fuelType === 'hydrogen' ? 'kg' : 'kWh') : 'L';
         return {
@@ -288,12 +284,7 @@ export async function downloadHipassChargesExcel(
     const XLSX = await import('xlsx');
 
     const rows = records.map((rec) => {
-        let timeStr = '';
-        if (rec.createdAt) {
-            const ca = rec.createdAt as { seconds: number; toDate?: () => Date } | undefined;
-            const d = ca instanceof Date ? ca : ca?.toDate?.() || null;
-            if (d) timeStr = d.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false });
-        }
+        const timeStr = formatTimestampTime(rec.createdAt, { hour12: false });
         return {
             '날짜': rec.date || '',
             '시각': timeStr,

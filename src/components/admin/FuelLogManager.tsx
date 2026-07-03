@@ -6,6 +6,7 @@ import useFuelLogAdmin from '../../hooks/useFuelLogAdmin';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 import { getOrganization } from '../../lib/firestore';
+import { formatTimestampTime } from '../../lib/dateUtils';
 import type { Organization } from '../../types/organization';
 import { SkeletonBox, SkeletonList } from '../common/Skeleton';
 import { useState, useEffect } from 'react';
@@ -171,13 +172,7 @@ export default function FuelLogManager() {
 
                     {filteredRecords.map(rec => {
                         const dateStr = rec.date || '-';
-                        const ca = rec.createdAt;
-                        const timeDate = (ca && typeof ca === 'object' && 'toDate' in ca && typeof (ca as { toDate?: unknown }).toDate === 'function')
-                            ? (ca as { toDate: () => Date }).toDate()
-                            : (ca instanceof Date ? ca : null);
-                        const timeStr = timeDate
-                            ? timeDate.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })
-                            : '';
+                        const timeStr = formatTimestampTime(rec.createdAt, { hour12: false });
                         return (
                             <div key={rec.id} className="glass-card p-4 hover:shadow-glass-lg transition-all">
                                 {/* 모바일 */}

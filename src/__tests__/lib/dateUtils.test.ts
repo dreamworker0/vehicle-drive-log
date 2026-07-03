@@ -82,6 +82,15 @@ describe('dateUtils', () => {
             expect(formatTimestampTime(undefined)).toBe('');
             expect(formatTimestampTime({})).toBe('');
         });
+
+        it('hour12: false 옵션이면 24시간 표기로 변환한다', () => {
+            const mockTimestamp = { toDate: () => new Date(2026, 4, 5, 14, 30) };
+            expect(formatTimestampTime(mockTimestamp, { hour12: false })).toBe('14:30');
+        });
+
+        it('Date 객체를 직접 받아도 변환한다', () => {
+            expect(formatTimestampTime(new Date(2026, 4, 5, 14, 30), { hour12: false })).toBe('14:30');
+        });
     });
 
     describe('formatTimestampFull', () => {

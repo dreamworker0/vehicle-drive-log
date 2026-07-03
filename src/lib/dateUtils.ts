@@ -56,12 +56,24 @@ export function formatTimestampShort(ts: TimestampLike) {
 }
 
 /**
- * Firestore Timestamp → 'HH:MM' 형식
- * VehicleHistory, MyRecords 등에서 사용
+ * Firestore Timestamp 또는 Date → 시각 문자열
+ * 기본은 로케일 기본 표기('PM 02:05'), { hour12: false }면 24시간 표기('14:05').
+ * VehicleHistory, MyRecords(기본) / 주유·하이패스 관리, 엑셀 내보내기(24시간)에서 사용
  */
-export function formatTimestampTime(ts: TimestampLike) {
-    if (!ts || typeof ts !== 'object' || !('toDate' in ts) || typeof ts.toDate !== 'function') return '';
-    return ts.toDate().toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+export function formatTimestampTime(ts: TimestampLike, opts?: { hour12?: boolean }) {
+    let d: Date | null = null;
+    if (ts instanceof Date) {
+        d = ts;
+    } else if (ts && typeof ts === 'object' && 'toDate' in ts && typeof ts.toDate === 'function') {
+        d = ts.toDate();
+    }
+    if (!d) return '';
+    return d.toLocaleTimeString('ko-KR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        // 기존 호출부(옵션 미지정) 표기를 바꾸지 않도록 명시된 경우에만 hour12 전달
+        ...(opts?.hour12 !== undefined ? { hour12: opts.hour12 } : {}),
+    });
 }
 
 /**
