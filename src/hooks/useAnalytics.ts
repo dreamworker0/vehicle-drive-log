@@ -68,10 +68,12 @@ export default function useAnalytics() {
         recentKeys.forEach(mk => {
             const stat = stats.find(s => s.monthKey === mk);
             if (stat?.driverStats) {
-                Object.entries(stat.driverStats).forEach(([driverName, dStat]) => {
+                // 집계 문서의 driverStats는 uid 키 + name 필드 구조 → 표시는 name 기준으로 그룹화
+                Object.values(stat.driverStats).forEach((dStat) => {
+                    const driverName = dStat.name || '알 수 없음';
                     if (!map[driverName]) map[driverName] = { totalCount: 0, totalDistance: 0, months: {} };
                     if (!map[driverName].months[mk]) map[driverName].months[mk] = { count: 0, distance: 0 };
-                    
+
                     map[driverName].months[mk].count += dStat.count;
                     map[driverName].months[mk].distance += dStat.distance;
                     map[driverName].totalCount += dStat.count;
@@ -102,15 +104,16 @@ export default function useAnalytics() {
         recentKeys.forEach(mk => {
             const stat = stats.find(s => s.monthKey === mk);
             if (stat?.vehicleStats) {
-                Object.entries(stat.vehicleStats).forEach(([vName, vStat]) => {
-                    map[vName] = (map[vName] || 0) + (vStat.usedDays || 0);
+                // 집계 문서의 vehicleStats는 vehId 키 구조 → 차량 매칭은 v.id 기준 (이름 불일치 회피)
+                Object.entries(stat.vehicleStats).forEach(([vehId, vStat]) => {
+                    map[vehId] = (map[vehId] || 0) + (vStat.usedDays || 0);
                 });
             }
         });
-        
+
         return vehicles.map(v => {
             const name = v.displayName || v.plateNumber || '(미지정)';
-            const usedDays = map[name] || 0;
+            const usedDays = map[v.id] || 0;
             const rate = totalWorkdays > 0 ? Math.round((usedDays / totalWorkdays) * 100) : 0;
             return { name, usedDays, totalWorkdays, rate };
         }).sort((a, b) => b.rate - a.rate);
@@ -138,19 +141,21 @@ export default function useAnalytics() {
     }, [stats]);
 
     const fuelEfficiency = useMemo(() => {
-        const map: Record<string, { totalDist: number, totalCost: number }> = {};
+        // vehicleStats는 vehId 키 구조 → vehId로 누적하고 표시명은 vStat.name 사용
+        // (프로듀서가 아직 차량별 연비를 산출하지 않아 현재는 빈 결과, 향후 산출 시 조인 일관성 확보)
+        const map: Record<string, { name: string, totalDist: number, totalCost: number }> = {};
         stats.forEach(stat => {
             if (stat.vehicleStats) {
-                Object.entries(stat.vehicleStats).forEach(([vName, vStat]) => {
-                    if (!map[vName]) map[vName] = { totalDist: 0, totalCost: 0 };
-                    map[vName].totalDist += (vStat.totalDist || 0);
-                    map[vName].totalCost += (vStat.totalCost || 0);
+                Object.entries(stat.vehicleStats).forEach(([vehId, vStat]) => {
+                    if (!map[vehId]) map[vehId] = { name: vStat.name || vehId, totalDist: 0, totalCost: 0 };
+                    map[vehId].totalDist += (vStat.totalDist || 0);
+                    map[vehId].totalCost += (vStat.totalCost || 0);
                 });
             }
         });
-        
-        const items = Object.entries(map).filter(([, v]) => v.totalDist > 0 && v.totalCost > 0).map(([name, v]) => ({
-            name,
+
+        const items = Object.values(map).filter((v) => v.totalDist > 0 && v.totalCost > 0).map((v) => ({
+            name: v.name,
             totalDist: v.totalDist,
             totalCost: v.totalCost,
             costPerKm: Math.round((v.totalCost / v.totalDist) * 10) / 10
@@ -161,23 +166,25 @@ export default function useAnalytics() {
     }, [stats]);
 
     const maintenanceCostAnalysis = useMemo(() => {
+        // vehicleStats는 vehId 키 구조 → vehId로 누적하고 차량 매칭은 v.id 기준
+        // (프로듀서가 아직 차량별 정비비를 산출하지 않아 현재는 0, 향후 산출 시 조인 일관성 확보)
         const map: Record<string, { totalCost: number, count: number, lastDate: string }> = {};
         stats.forEach(stat => {
             if (stat.vehicleStats) {
-                Object.entries(stat.vehicleStats).forEach(([vName, vStat]) => {
-                    if (!map[vName]) map[vName] = { totalCost: 0, count: 0, lastDate: '' };
-                    map[vName].totalCost += (vStat.maintenanceCost || 0);
-                    map[vName].count += (vStat.maintenanceCount || 0);
-                    if (vStat.lastMaintenanceDate && vStat.lastMaintenanceDate > map[vName].lastDate) {
-                        map[vName].lastDate = vStat.lastMaintenanceDate;
+                Object.entries(stat.vehicleStats).forEach(([vehId, vStat]) => {
+                    if (!map[vehId]) map[vehId] = { totalCost: 0, count: 0, lastDate: '' };
+                    map[vehId].totalCost += (vStat.maintenanceCost || 0);
+                    map[vehId].count += (vStat.maintenanceCount || 0);
+                    if (vStat.lastMaintenanceDate && vStat.lastMaintenanceDate > map[vehId].lastDate) {
+                        map[vehId].lastDate = vStat.lastMaintenanceDate;
                     }
                 });
             }
         });
-        
+
         return vehicles.map(v => {
             const name = v.displayName || v.plateNumber || '(미지정)';
-            const maint = map[name] || { totalCost: 0, count: 0, lastDate: '' };
+            const maint = map[v.id] || { totalCost: 0, count: 0, lastDate: '' };
             const currentKm = v.currentKm || 0;
             return {
                 name,
