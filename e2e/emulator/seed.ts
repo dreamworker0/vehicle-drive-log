@@ -109,3 +109,33 @@ export async function seedPendingReservation(
         ...overrides,
     });
 }
+
+/**
+ * 운행일지 1건을 시드한다. 내보내기(엑셀/PDF) E2E 전용.
+ * `date`는 기간 필터·내보내기 범위 검증에 쓰이므로 overrides로 지정 가능.
+ */
+export async function seedDriveLog(
+    id: string,
+    overrides: Record<string, unknown> = {},
+): Promise<void> {
+    if (!getApps().length) initializeApp({ projectId: PROJECT_ID });
+    const db = getFirestore();
+    await db.collection('driveLogs').doc(id).set({
+        organizationId: TEST_ORG_ID,
+        vehicleId: TEST_VEHICLE.id,
+        vehicleName: TEST_VEHICLE.displayName,
+        driverUid: TEST_EMPLOYEE.uid,
+        driverName: TEST_EMPLOYEE.name,
+        date: '2026-07-02',
+        startTime: '09:00',
+        endTime: '10:00',
+        startKm: 50000,
+        endKm: 50042,
+        distance: 42,
+        purpose: '업무',
+        destination: '(seed)',
+        timestamp: new Date('2026-07-02T09:00:00+09:00'),
+        createdAt: new Date(),
+        ...overrides,
+    });
+}

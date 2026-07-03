@@ -48,8 +48,10 @@ test.describe('인증 상태 E2E (에뮬레이터)', () => {
     test('직원이 관리자 전용 화면에 접근하면 직원 화면으로 돌려보낸다', async ({ page }) => {
         await signIn(page, TEST_EMPLOYEE.email, TEST_EMPLOYEE.password);
         await page.waitForURL(/\/employee/, { timeout: 25000 });
-        // 권한 없는 /admin 직접 접근 → AuthGuard가 /employee로 리다이렉트
-        await page.goto('/admin');
+        // 권한 없는 /admin 직접 접근 → AuthGuard가 /employee로 리다이렉트.
+        // 가드 리다이렉트가 네비게이션 도중 발동하면 goto가 net::ERR_ABORTED로 중단될 수 있으므로
+        // 이를 허용하고, 최종 URL 단언으로 리다이렉트 결과를 검증한다(signIn의 catch와 동일 이유).
+        await page.goto('/admin').catch(() => { /* 리다이렉트로 인한 네비게이션 중단 무시 */ });
         await expect(page).toHaveURL(/\/employee/, { timeout: 15000 });
     });
 });

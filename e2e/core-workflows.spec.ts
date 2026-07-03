@@ -30,8 +30,6 @@ test.describe('핵심 워크플로우 E2E (authed-* 에뮬레이터 스펙으로
 
     // '운행기록일지 작성 및 첨부파일 검증'은 authed-driveLogCreate.spec.ts로 이관·구현됨(에뮬레이터 E2E).
 
-    test.fixme('관리자 데이터 내보내기 (엑셀 및 PDF) 검증', async () => {
-        // 에뮬레이터 기반 인증 E2E 인프라 구축 후 구현.
-        // 현재는 excelExport.test.ts가 내보내기 직렬화 로직을 커버한다.
-    });
+    // '관리자 데이터 내보내기'는 authed-driveLogExport.spec.ts로 이관·구현됨(에뮬레이터 E2E, 엑셀 다운로드).
+    // PDF는 window.open+print(인쇄 대화상자)라 헤드리스 자동화 불가 — excelExport.test.ts가 직렬화 로직 커버.
 });
