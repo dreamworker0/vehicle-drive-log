@@ -160,6 +160,10 @@ export default function App() {
         open={open}
         title={options.title}
         message={options.message}
+        type={options.type}
+        inputLabel={options.inputLabel}
+        inputPlaceholder={options.inputPlaceholder}
+        inputDefault={options.inputDefault}
         confirmText={options.confirmText || '확인'}
         cancelText={options.cancelText || '취소'}
         confirmColor={options.confirmColor || 'primary'}
