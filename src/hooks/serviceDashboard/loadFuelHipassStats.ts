@@ -1,14 +1,20 @@
-import { collection, getDocs, query, where, getAggregateFromServer, sum, count } from 'firebase/firestore';
+import { collection, getDocs, query, where, limit, getAggregateFromServer, sum, count, type QueryConstraint } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import type { FuelHipassSetters } from './types';
 
+// 일별 차트용 원본 문서 조회 상한 — 전 테넌트 30일치가 무제한으로 열리지 않도록 방어
+const DAILY_CHART_FETCH_MAX = 5000;
+
 /**
  * 주유/하이패스 통계 로드 (서버 집계 + 기간 필터 최적화)
+ * @param orgFilterId 'ALL'이면 전체 서비스, 기관 ID면 해당 기관으로 스코프 (캐시 문서 dashboardStats_{orgId}와 동일 규약)
  */
 export async function loadFuelHipassStats(
     setters: FuelHipassSetters,
+    orgFilterId: string = 'ALL',
 ): Promise<void> {
     const { setFuelStats, setHipassStats, setDailyFuelCost, setDailyHipassAmount } = setters;
+    const orgScope: QueryConstraint[] = orgFilterId === 'ALL' ? [] : [where('organizationId', '==', orgFilterId)];
 
     try {
         const now = new Date();
@@ -40,15 +46,19 @@ export async function loadFuelHipassStats(
         const hipassCol = collection(db, 'hipassCharges');
 
         const [fuelAgg, hipassAgg, fuelMonthAgg, hipassMonthAgg, fuelPrevMonthAgg, hipassPrevMonthAgg, fuelRecentSnap, hipassRecentSnap] = await Promise.all([
-            getAggregateFromServer(query(fuelCol), { totalCount: count(), totalCost: sum('fuelCost') }),
-            getAggregateFromServer(query(hipassCol), { totalCount: count(), totalAmount: sum('chargeAmount') }),
-            getAggregateFromServer(query(fuelCol, where('date', '>=', curMonthStart), where('date', '<=', curMonthEnd)), { monthCount: count(), monthCost: sum('fuelCost') }),
-            getAggregateFromServer(query(hipassCol, where('date', '>=', curMonthStart), where('date', '<=', curMonthEnd)), { monthCount: count(), monthAmount: sum('chargeAmount') }),
-            getAggregateFromServer(query(fuelCol, where('date', '>=', prevMonthStart), where('date', '<=', prevMonthEnd)), { prevCost: sum('fuelCost') }),
-            getAggregateFromServer(query(hipassCol, where('date', '>=', prevMonthStart), where('date', '<=', prevMonthEnd)), { prevAmount: sum('chargeAmount') }),
-            getDocs(query(fuelCol, where('date', '>=', recentDateStr))),
-            getDocs(query(hipassCol, where('date', '>=', recentDateStr))),
+            getAggregateFromServer(query(fuelCol, ...orgScope), { totalCount: count(), totalCost: sum('fuelCost') }),
+            getAggregateFromServer(query(hipassCol, ...orgScope), { totalCount: count(), totalAmount: sum('chargeAmount') }),
+            getAggregateFromServer(query(fuelCol, ...orgScope, where('date', '>=', curMonthStart), where('date', '<=', curMonthEnd)), { monthCount: count(), monthCost: sum('fuelCost') }),
+            getAggregateFromServer(query(hipassCol, ...orgScope, where('date', '>=', curMonthStart), where('date', '<=', curMonthEnd)), { monthCount: count(), monthAmount: sum('chargeAmount') }),
+            getAggregateFromServer(query(fuelCol, ...orgScope, where('date', '>=', prevMonthStart), where('date', '<=', prevMonthEnd)), { prevCost: sum('fuelCost') }),
+            getAggregateFromServer(query(hipassCol, ...orgScope, where('date', '>=', prevMonthStart), where('date', '<=', prevMonthEnd)), { prevAmount: sum('chargeAmount') }),
+            getDocs(query(fuelCol, ...orgScope, where('date', '>=', recentDateStr), limit(DAILY_CHART_FETCH_MAX))),
+            getDocs(query(hipassCol, ...orgScope, where('date', '>=', recentDateStr), limit(DAILY_CHART_FETCH_MAX))),
         ]);
+
+        if (fuelRecentSnap.size >= DAILY_CHART_FETCH_MAX || hipassRecentSnap.size >= DAILY_CHART_FETCH_MAX) {
+            console.warn(`[Dashboard] 일별 주유/하이패스 차트 조회가 상한(${DAILY_CHART_FETCH_MAX}건)에 도달 — 차트가 일부 누락될 수 있습니다.`);
+        }
 
         // 주유 일별 집계 (최근 30일 문서만)
         fuelRecentSnap.docs.forEach(doc => {

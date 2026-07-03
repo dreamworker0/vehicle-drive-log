@@ -192,12 +192,12 @@ export default function useServiceDashboard(orgFilterId: string = 'ALL') {
                     setHipassStats: (val) => setExternal(prev => ({ ...prev, hipassStats: typeof val === 'function' ? val(prev.hipassStats) : val })),
                     setDailyFuelCost: (val) => setExternal(prev => ({ ...prev, dailyFuelCost: typeof val === 'function' ? val(prev.dailyFuelCost) : val })),
                     setDailyHipassAmount: (val) => setExternal(prev => ({ ...prev, dailyHipassAmount: typeof val === 'function' ? val(prev.dailyHipassAmount) : val })),
-                }),
+                }, orgFilterId),
                 loadNotificationStats({
                     setNotifSummary: (val) => setExternal(prev => ({ ...prev, notifSummary: typeof val === 'function' ? val(prev.notifSummary) : val })),
                     setDailyNotifStats: (val) => setExternal(prev => ({ ...prev, dailyNotifStats: typeof val === 'function' ? val(prev.dailyNotifStats) : val })),
                     setNotifTypeStats: (val) => setExternal(prev => ({ ...prev, notifTypeStats: typeof val === 'function' ? val(prev.notifTypeStats) : val })),
-                }),
+                }, orgFilterId),
             ]);
 
             sessionStorage.setItem(`svc_dashboard_cache_time_${orgFilterId}`, Date.now().toString());

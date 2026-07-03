@@ -1,6 +1,9 @@
-import { collection, getDocs, query, where, getCountFromServer, Timestamp } from 'firebase/firestore';
+import { collection, getDocs, query, where, limit, getCountFromServer, Timestamp, type QueryConstraint } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import type { NotificationSetters } from './types';
+
+// 일별 차트용 원본 문서 조회 상한 — 알림은 발생량이 가장 많은 컬렉션이라 무제한 스캔 방어 필수
+const DAILY_CHART_FETCH_MAX = 5000;
 
 const NOTIF_TYPE_LABELS_LOCAL: Record<string, string> = {
     admin_notice: '관리자 공지', notice: '공지사항',
@@ -25,8 +28,10 @@ const NOTIF_TYPE_COLORS_LOCAL: Record<string, string> = {
  */
 export async function loadNotificationStats(
     setters: NotificationSetters,
+    orgFilterId: string = 'ALL',
 ): Promise<void> {
     const { setNotifSummary, setDailyNotifStats, setNotifTypeStats } = setters;
+    const orgScope: QueryConstraint[] = orgFilterId === 'ALL' ? [] : [where('organizationId', '==', orgFilterId)];
 
     try {
         const now = new Date();
@@ -34,10 +39,14 @@ export async function loadNotificationStats(
         const notifCol = collection(db, 'notifications');
 
         const [totalCountResult, readCountResult, notifRecentSnap] = await Promise.all([
-            getCountFromServer(query(notifCol)),
-            getCountFromServer(query(notifCol, where('read', '==', true))),
-            getDocs(query(notifCol, where('createdAt', '>=', Timestamp.fromDate(thirtyDaysAgo)))),
+            getCountFromServer(query(notifCol, ...orgScope)),
+            getCountFromServer(query(notifCol, ...orgScope, where('read', '==', true))),
+            getDocs(query(notifCol, ...orgScope, where('createdAt', '>=', Timestamp.fromDate(thirtyDaysAgo)), limit(DAILY_CHART_FETCH_MAX))),
         ]);
+
+        if (notifRecentSnap.size >= DAILY_CHART_FETCH_MAX) {
+            console.warn(`[Dashboard] 일별 알림 차트 조회가 상한(${DAILY_CHART_FETCH_MAX}건)에 도달 — 차트가 일부 누락될 수 있습니다.`);
+        }
 
         const total = totalCountResult.data().count;
         const readCount = readCountResult.data().count;
