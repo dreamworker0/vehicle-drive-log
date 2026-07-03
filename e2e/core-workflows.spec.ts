@@ -29,10 +29,7 @@ test.describe('핵심 워크플로우 E2E (authed-* 에뮬레이터 스펙으로
         // 현재는 createReservationSafe.test.ts + PendingReservationList.test.tsx가 로직을 커버한다.
     });
 
-    test.fixme('운행기록일지 작성 및 첨부파일 검증', async () => {
-        // 에뮬레이터 기반 인증 E2E 인프라 구축 후 구현.
-        // 현재는 submitDriveLog.test.ts + useDriveLogForm.test.ts가 로직을 커버한다.
-    });
+    // '운행기록일지 작성 및 첨부파일 검증'은 authed-driveLogCreate.spec.ts로 이관·구현됨(에뮬레이터 E2E).
 
     test.fixme('관리자 데이터 내보내기 (엑셀 및 PDF) 검증', async () => {
         // 에뮬레이터 기반 인증 E2E 인프라 구축 후 구현.
