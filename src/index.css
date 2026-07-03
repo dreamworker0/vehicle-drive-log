@@ -493,7 +493,7 @@
 }
 
 /* ===== 글자 크기 조절 (더보기 > 글자 크기) ===== */
-/* 보통: text-xs 13px, text-sm 15px (tailwind.config 기본값) */
+/* 보통: text-xs 13px, text-sm 15px (@theme 기본값) */
 html.font-small .text-xs {
   font-size: 0.625rem !important;
   /* 10px */
