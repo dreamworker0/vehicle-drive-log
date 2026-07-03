@@ -9,7 +9,8 @@ on:
 jobs:
   ci:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # 게이트 스텝(Rules·인증 E2E·커버리지) 추가로 첫 실행(캐시 미적중) 기준 ~20분 소요
+    timeout-minutes: 25
     env:
       TZ: "Asia/Seoul"
 
