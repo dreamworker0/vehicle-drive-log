@@ -22,13 +22,18 @@ export const cleanupDuplicateLogs = onCall(
             throw new HttpsError("invalid-argument", "organizationId가 필요합니다.");
         }
 
-        const db = getFirestore();
-        const userDoc = await db.collection("users").doc(request.auth.uid).get();
-        const userData = userDoc.data();
-
-        if (!userData || !["admin", "superAdmin"].includes(userData.role as string)) {
+        // 권한은 Firestore 문서가 아닌 Custom Claims 기준 (firestore.rules·requireSuperAdmin과 동일)
+        const callerRole = request.auth.token.role as string;
+        if (!["admin", "superAdmin"].includes(callerRole)) {
             throw new HttpsError("permission-denied", "관리자만 사용할 수 있습니다.");
         }
+
+        // 교차 테넌트 차단: admin은 자신의 기관만 정리 가능, superAdmin만 타 기관 허용
+        if (callerRole !== "superAdmin" && request.auth.token.orgId !== organizationId) {
+            throw new HttpsError("permission-denied", "자신의 기관 데이터만 정리할 수 있습니다.");
+        }
+
+        const db = getFirestore();
 
         try {
             const logsSnap = await db.collection("driveLogs")
