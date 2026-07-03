@@ -21,9 +21,12 @@ console.log(`검사 대상: ${FUNCTIONS.length}개 함수\n`);
 
 try {
     // 최근 100줄 로그 가져오기
+    // - 전역 firebase CLI 사용: npx firebase-tools는 매 실행 다운로드로 타임아웃이 잦다.
+    // - stderr는 stdio 옵션으로 버린다 — 셸 리다이렉트(2>/dev/null)는 Windows cmd에서
+    //   /dev/null 경로를 찾지 못해 스크립트 자체가 실패한다.
     const logs = execSync(
-        'npx firebase-tools functions:log --limit 100 2>/dev/null',
-        { encoding: 'utf-8', timeout: 30000 }
+        'firebase functions:log --lines 100',
+        { encoding: 'utf-8', timeout: 60000, stdio: ['ignore', 'pipe', 'ignore'] }
     );
 
     const lines = logs.split('\n').filter(Boolean);
@@ -33,17 +36,16 @@ try {
     const errorFunctions: Record<string, number> = {};
 
     for (const line of lines) {
-        const lower = line.toLowerCase();
-        if (lower.includes('error') || lower.includes('failed') || lower.includes('exception')) {
+        // firebase functions:log 형식: "<ISO타임스탬프> <심각도문자> <함수명>: <메시지>"
+        // 심각도 문자(D/I/W/E)로만 분류한다 — 본문의 "error" 문자열 매칭은 DEBUG 폴백
+        // 로그(예: Remote Config NOT_FOUND → 기본값 사용)까지 에러로 오분류한다.
+        const m = line.match(/^\S+\s+([DIWE])\s+(\S+?):/);
+        if (!m) continue;
+        const [, severity, fnName] = m;
+        if (severity === 'E') {
             errorCount++;
-            // 함수명 추출 시도
-            for (const fn of FUNCTIONS) {
-                if (line.includes(fn)) {
-                    errorFunctions[fn] = (errorFunctions[fn] || 0) + 1;
-                    break;
-                }
-            }
-        } else if (lower.includes('warning') || lower.includes('warn')) {
+            errorFunctions[fnName] = (errorFunctions[fnName] || 0) + 1;
+        } else if (severity === 'W') {
             warningCount++;
         }
     }
