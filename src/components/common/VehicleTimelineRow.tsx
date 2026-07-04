@@ -6,7 +6,7 @@
  */
 import { getVehicleColor } from '../../lib/constants';
 import { getPercent, minutesToTime, resolveReservationBlock } from '../../lib/timelineUtils';
-import { isVehicleBlocked } from '../../lib/vehicleUtils';
+import { isVehicleBlocked, isVehicleRestrictedForUser } from '../../lib/vehicleUtils';
 import ReservationAccordion from './ReservationAccordion';
 import type { DragOverlay } from '../../hooks/useTimelineDrag';
 import type { Vehicle } from '../../types/vehicle';
@@ -38,6 +38,8 @@ export default function VehicleTimelineRow({
     onEdit, onCancel, user, isAdmin, setShowForm,
 }: VehicleTimelineRowProps) {
     const isBlocked = isVehicleBlocked(vehicle.maintenance);
+    // 사용 제한 차량: 현황은 그대로 보여주되 드래그 예약 시작만 차단
+    const isRestricted = isVehicleRestrictedForUser(vehicle, user?.uid);
 
     const vehicleDisplayName = (vehicle.name && vehicle.name !== '이름 없음' && vehicle.name !== 'null')
         ? vehicle.name
@@ -50,15 +52,15 @@ export default function VehicleTimelineRow({
                 <button
                     type="button"
                     onClick={() => vRes.length > 0 && toggleExpand(vehicle.id)}
-                    className={`w-[64px] text-[10px] font-medium truncate flex-shrink-0 text-right flex items-center justify-end gap-0.5 border-0 bg-transparent p-0 ${isBlocked
+                    className={`w-[64px] text-[10px] font-medium truncate flex-shrink-0 text-right flex items-center justify-end gap-0.5 border-0 bg-transparent p-0 ${isRestricted ? 'opacity-70' : ''} ${isBlocked
                         ? 'text-surface-400 line-through cursor-default'
                         : vRes.length > 0
                             ? 'text-surface-700 dark:text-surface-300 cursor-pointer hover:text-primary-500 dark:hover:text-primary-400'
                             : 'text-surface-700 dark:text-surface-300 cursor-default'
                         }`}
-                    title={vehicleDisplayName}
+                    title={isRestricted ? `${vehicleDisplayName} — 지정 차량 (지정된 직원만 예약 가능)` : vehicleDisplayName}
                 >
-                    {isBlocked ? '🔧 ' : ''}{vehicleDisplayName}
+                    {isBlocked ? '🔧 ' : isRestricted ? '🔒 ' : ''}{vehicleDisplayName}
                     {vRes.length > 0 && (
                         <svg aria-hidden="true" className={`w-2.5 h-2.5 flex-shrink-0 transition-transform duration-200 ${isExpanded ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                             <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
@@ -107,8 +109,8 @@ export default function VehicleTimelineRow({
                         );
                     })}
 
-                    {/* 빈 시간 드래그 영역 */}
-                    {!isPastDate && !isBlocked && gaps.map((gap, gi) => {
+                    {/* 빈 시간 드래그 영역 (사용 제한 차량은 드래그 예약 불가) */}
+                    {!isPastDate && !isBlocked && !isRestricted && gaps.map((gap, gi) => {
                         const left = getPercent(gap.start, dynamicStart);
                         const right = getPercent(gap.end, dynamicStart);
                         const width = right - left;
