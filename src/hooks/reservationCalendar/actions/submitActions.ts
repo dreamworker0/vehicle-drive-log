@@ -11,6 +11,7 @@ import {
 } from '../../../lib/firestore';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { findOverlappingReservation, findUserOverlappingReservation } from '../../utils/reservationUtils';
+import { isVehicleRestrictedForUser } from '../../../lib/vehicleUtils';
 import { generateRecurringDates, generateRecurringGroupId } from '../../utils/recurringUtils';
 import type { Reservation } from '../../../types/reservation';
 import { invalidateDashboardCache } from '../../useTodayDashboard';
@@ -77,10 +78,15 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
         return;
     }
 
+    // 차량별 사용 가능 직원 제한 검증 (UI 비활성의 방어적 이중 체크, 서버 콜러블에서도 재검증됨)
+    const selectedVehicle = vehicles.find(v => v.id === form.vehicleId);
+    if (selectedVehicle && isVehicleRestrictedForUser(selectedVehicle, user.uid, userData.role)) {
+        showToast('이 차량은 지정된 직원만 예약할 수 있습니다.', 'warning');
+        return;
+    }
+
     setSubmitting(true);
     try {
-        // 선택된 차량 이름 조회
-        const selectedVehicle = vehicles.find(v => v.id === form.vehicleId);
         const vehicleName = selectedVehicle?.displayName || selectedVehicle?.name || '';
 
         // 경로 정보 (routeInfo가 있으면 포함)

@@ -29,6 +29,7 @@ export default function VehicleManager() {
     const {
         vehicles, loading, showForm, setShowForm,
         editingVehicle, formLoading, form, setForm,
+        members,
         modal, closeModal, deletableIds,
         openWithCalendarError,
         resetForm, handleEdit, handleModelNameChange, handleSubmit,
@@ -121,6 +122,11 @@ export default function VehicleManager() {
                 <span className={FUEL_TYPE_COLORS[vehicle.fuelType ?? ''] || 'badge-neutral'}>
                     {FUEL_TYPE_LABELS[vehicle.fuelType ?? ''] || vehicle.fuelType || '-'}
                 </span>
+                {(vehicle.allowedUserIds?.length ?? 0) > 0 && (
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-surface-100 dark:bg-surface-700 text-surface-600 dark:text-surface-300" title="지정된 직원만 예약·운행할 수 있는 차량">
+                        🔒 지정 {vehicle.allowedUserIds!.length}명
+                    </span>
+                )}
                 <span className="text-surface-400 text-xs ml-auto">
                     {(vehicle.currentKm || 0).toLocaleString()} km
                 </span>
@@ -280,6 +286,7 @@ export default function VehicleManager() {
                     onCancel={resetForm}
                     onModelNameChange={handleModelNameChange}
                     modelSuggestions={modelSuggestions}
+                    members={members}
                     onCalendarTestResult={handleCalendarTestResult}
                     initialCalendarError={openWithCalendarError}
                 />

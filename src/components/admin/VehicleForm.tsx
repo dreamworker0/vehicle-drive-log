@@ -5,6 +5,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { DEFAULT_FUEL } from '../../hooks/useVehicleManager';
 import type { Vehicle } from '../../types';
+import type { User } from '../../types/user';
 import { FUEL_TYPES } from '../../types/vehicle';
 import VehicleCalendarSection from './VehicleCalendarSection';
 
@@ -19,6 +20,7 @@ interface VehicleFormData {
     insuranceCompany: string;
     insurancePhone: string;
     insuranceExpiryDate: string;
+    allowedUserIds: string[];
 }
 
 interface Props {
@@ -30,6 +32,7 @@ interface Props {
     onCancel: () => void;
     onModelNameChange: (value: string) => void;
     modelSuggestions: string[];
+    members: User[];
     onCalendarTestResult?: (vehicleId: string, success: boolean) => Promise<void>;
     initialCalendarError?: boolean;
 }
@@ -45,8 +48,16 @@ const VEHICLE_TYPES = [
 export default function VehicleForm({
     form, setForm, editingVehicle, formLoading,
     onSubmit, onCancel, onModelNameChange, modelSuggestions,
-    onCalendarTestResult, initialCalendarError,
+    members, onCalendarTestResult, initialCalendarError,
 }: Props) {
+    const toggleAllowedUser = (uid: string) => {
+        setForm(prev => ({
+            ...prev,
+            allowedUserIds: prev.allowedUserIds.includes(uid)
+                ? prev.allowedUserIds.filter(id => id !== uid)
+                : [...prev.allowedUserIds, uid],
+        }));
+    };
     const [showSuggestions, setShowSuggestions] = useState(false);
     const [activeIndex, setActiveIndex] = useState(-1);
     const modelInputRef = useRef<HTMLInputElement>(null);
@@ -261,6 +272,35 @@ export default function VehicleForm({
                         />
                         <p id="insurance-info-help" className="text-xs text-surface-400 dark:text-surface-500 mt-1">
                             사고 시 연락할 보험사 정보 · 만료 15일 전 관리자에게 알림
+                        </p>
+                    </div>
+
+                    <div>
+                        <label className="label">🔒 사용 가능 직원 (선택)</label>
+                        {members.length > 0 ? (
+                            <div className="flex flex-wrap gap-1.5">
+                                {members.map(m => {
+                                    const isSelected = form.allowedUserIds.includes(m.id);
+                                    return (
+                                        <button
+                                            key={m.id}
+                                            type="button"
+                                            onClick={() => toggleAllowedUser(m.id)}
+                                            className={`px-4 py-2 min-h-[48px] rounded-full text-xs font-medium border transition-all ${isSelected
+                                                ? 'bg-primary-100 dark:bg-primary-900/40 border-primary-300 text-primary-700 dark:text-primary-300 ring-1 ring-primary-200 dark:ring-primary-900/40'
+                                                : 'bg-surface-50 dark:bg-surface-800 border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400 hover:border-primary-300 dark:hover:border-primary-700'
+                                                }`}
+                                        >
+                                            {isSelected && '✓ '}{m.name || m.email?.split('@')[0]}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        ) : (
+                            <p className="text-xs text-surface-400 dark:text-surface-500">직원 목록을 불러오는 중이거나 등록된 직원이 없습니다</p>
+                        )}
+                        <p className="text-xs text-surface-400 dark:text-surface-500 mt-1.5">
+                            선택하지 않으면 모든 직원이 사용할 수 있습니다 · 선택하면 지정된 직원과 관리자만 예약·운행 가능
                         </p>
                     </div>
 

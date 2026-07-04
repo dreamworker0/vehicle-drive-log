@@ -49,6 +49,7 @@ export interface Vehicle extends FirestoreDoc {
     googleCalendarId?: string;
     calendarSyncFailCount?: number;
     calendarSyncLastFailAt?: TimestampField;
+    allowedUserIds?: string[];      // 사용 가능 직원 uid 목록. undefined 또는 빈 배열 = 전체 허용
     retired?: VehicleRetired | null;
     maintenance?: VehicleMaintenance | null;
     createdAt?: TimestampField;

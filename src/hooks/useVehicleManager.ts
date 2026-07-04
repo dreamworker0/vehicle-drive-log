@@ -5,13 +5,14 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './useAuth';
 import type { Vehicle, FuelType } from '../types/vehicle';
+import type { User } from '../types/user';
 import useRetry from './useRetry';
 
 interface VehicleModal {
     type: 'delete' | 'clearMaintenance' | 'retire' | 'restore';
     vehicle: Vehicle;
 }
-import { getVehicles, createVehicle, updateVehicle, deleteVehicle, hasVehicleDriveLogs, clearVehicleMaintenanceBlock, retireVehicle, restoreVehicle, cancelVehicleReservations } from '../lib/firestore';
+import { getVehicles, createVehicle, updateVehicle, deleteVehicle, hasVehicleDriveLogs, clearVehicleMaintenanceBlock, retireVehicle, restoreVehicle, cancelVehicleReservations, getOrganizationMembers } from '../lib/firestore';
 import { useToast } from './useToast';
 import { captureError } from '../lib/sentry';
 import {
@@ -27,6 +28,7 @@ const INITIAL_FORM = {
     vehicleType: 'sedan', fuelType: 'gasoline',
     currentKm: '', googleCalendarId: '',
     insuranceCompany: '', insurancePhone: '', insuranceExpiryDate: '',
+    allowedUserIds: [] as string[],
 };
 
 export default function useVehicleManager() {
@@ -41,6 +43,7 @@ export default function useVehicleManager() {
     const [formLoading, setFormLoading] = useState(false);
     const [form, setForm] = useState(INITIAL_FORM);
     const [openWithCalendarError, setOpenWithCalendarError] = useState(false);
+    const [members, setMembers] = useState<User[]>([]);
 
     // 자동완성 후보: 정적 목록 + 기존 등록 차량 모델명 합산
     const modelSuggestions = useMemo(() => {
@@ -100,6 +103,17 @@ export default function useVehicleManager() {
 
     useEffect(() => { fetchVehicles(); }, [fetchVehicles]);
 
+    // 사용 가능 직원 선택 UI용 기관 직원 목록 (superAdmin·비활성 계정 제외)
+    useEffect(() => {
+        if (!orgId) return;
+        getOrganizationMembers(orgId)
+            .then(data => setMembers(data.filter(m => m.role !== 'superAdmin' && m.status !== 'disabled')))
+            .catch(err => {
+                console.error('직원 목록 로드 실패:', err);
+                captureError(err, { context: 'useVehicleManager.loadMembers', orgId });
+            });
+    }, [orgId]);
+
     const resetForm = () => {
         setForm(INITIAL_FORM);
         setEditingVehicle(null);
@@ -119,6 +133,7 @@ export default function useVehicleManager() {
             insuranceCompany: vehicle.insurance?.company || '',
             insurancePhone: vehicle.insurance?.phone || '',
             insuranceExpiryDate: vehicle.insurance?.expiryDate || '',
+            allowedUserIds: vehicle.allowedUserIds || [],
         });
         setEditingVehicle(vehicle);
         setOpenWithCalendarError(calendarError);
@@ -171,6 +186,8 @@ export default function useVehicleManager() {
                     fuelType: form.fuelType as FuelType,
                     currentKm: form.currentKm ? parseInt(form.currentKm) : 0,
                     organizationId: orgId!,
+                    // 전부 해제 시 빈 배열 저장으로 제한이 풀려야 하므로 항상 포함
+                    allowedUserIds: form.allowedUserIds,
                     insurance: {
                         company: form.insuranceCompany.trim(),
                         phone: form.insurancePhone.trim(),
@@ -305,6 +322,7 @@ export default function useVehicleManager() {
     return {
         vehicles, loading, showForm, setShowForm,
         editingVehicle, formLoading, form, setForm,
+        members,
         modal, closeModal, deletableIds,
         openWithCalendarError,
         resetForm, handleEdit, handleModelNameChange, handleSubmit,

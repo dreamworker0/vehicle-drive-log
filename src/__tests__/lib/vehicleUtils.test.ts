@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isVehicleBlocked } from '../../lib/vehicleUtils';
+import { isVehicleBlocked, isVehicleRestrictedForUser } from '../../lib/vehicleUtils';
 import { toLocalDateStr } from '../../lib/dateUtils';
 import { VehicleMaintenance } from '../../types/vehicle';
 
@@ -33,6 +33,33 @@ describe('vehicleUtils', () => {
         it('isBlocked가 true이고 endDate가 어제인 경우 자동으로 차단이 해제되어 false를 반환해야 한다', () => {
             const yesterday = toLocalDateStr(new Date(Date.now() - 86400000));
             expect(isVehicleBlocked({ isBlocked: true, endDate: yesterday } as unknown as VehicleMaintenance)).toBe(false);
+        });
+    });
+
+    describe('isVehicleRestrictedForUser', () => {
+        it('allowedUserIds가 없거나 빈 배열이면 전체 허용(false)이다', () => {
+            expect(isVehicleRestrictedForUser({}, 'user1')).toBe(false);
+            expect(isVehicleRestrictedForUser({ allowedUserIds: undefined }, 'user1')).toBe(false);
+            expect(isVehicleRestrictedForUser({ allowedUserIds: [] }, 'user1')).toBe(false);
+        });
+
+        it('허용 목록에 포함된 사용자는 제한되지 않는다(false)', () => {
+            expect(isVehicleRestrictedForUser({ allowedUserIds: ['user1', 'user2'] }, 'user1')).toBe(false);
+        });
+
+        it('허용 목록에 없는 사용자는 제한된다(true)', () => {
+            expect(isVehicleRestrictedForUser({ allowedUserIds: ['user1'] }, 'user2')).toBe(true);
+            expect(isVehicleRestrictedForUser({ allowedUserIds: ['user1'] }, 'user2', 'employee')).toBe(true);
+        });
+
+        it('admin/superAdmin은 허용 목록과 무관하게 제한되지 않는다(false)', () => {
+            expect(isVehicleRestrictedForUser({ allowedUserIds: ['user1'] }, 'admin-uid', 'admin')).toBe(false);
+            expect(isVehicleRestrictedForUser({ allowedUserIds: ['user1'] }, 'sa-uid', 'superAdmin')).toBe(false);
+        });
+
+        it('uid가 없으면(비로그인 등) 제한 차량은 제한된다(true)', () => {
+            expect(isVehicleRestrictedForUser({ allowedUserIds: ['user1'] }, null)).toBe(true);
+            expect(isVehicleRestrictedForUser({ allowedUserIds: ['user1'] }, undefined)).toBe(true);
         });
     });
 });

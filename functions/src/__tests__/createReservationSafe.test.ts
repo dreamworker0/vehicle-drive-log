@@ -166,4 +166,54 @@ describe('createReservationSafe', () => {
         expect(mockTransactionSet).not.toHaveBeenCalled();
         expect(mockTransactionUpdate).not.toHaveBeenCalled();
     });
+
+    describe('차량별 사용 가능 직원 제한 (allowedUserIds)', () => {
+        it('허용 목록에 없는 직원이 예약하면 permission-denied를 던진다', async () => {
+            mockTransactionGet.mockResolvedValue({
+                exists: true,
+                data: () => ({ organizationId: 'org1', allowedUserIds: ['other-user'] }),
+                docs: [],
+            });
+
+            await expect(capturedHandler(validRequest)).rejects.toThrow('지정된 직원만');
+            expect(mockTransactionSet).not.toHaveBeenCalled();
+        });
+
+        it('허용 목록에 포함된 직원은 정상 생성한다', async () => {
+            mockTransactionGet.mockResolvedValue({
+                exists: true,
+                data: () => ({ organizationId: 'org1', allowedUserIds: ['user1', 'other-user'] }),
+                docs: [],
+            });
+
+            const result = await capturedHandler(validRequest);
+            expect(result).toEqual({ success: true, reservationId: 'new-reservation-id' });
+        });
+
+        it('admin은 허용 목록에 없어도 정상 생성한다 (관리자 예외)', async () => {
+            mockTransactionGet.mockResolvedValue({
+                exists: true,
+                data: () => ({ organizationId: 'org1', allowedUserIds: ['other-user'] }),
+                docs: [],
+            });
+            const adminRequest = {
+                ...validRequest,
+                auth: { uid: 'admin-uid', token: { orgId: 'org1', role: 'admin' } },
+            };
+
+            const result = await capturedHandler(adminRequest);
+            expect(result).toEqual({ success: true, reservationId: 'new-reservation-id' });
+        });
+
+        it('allowedUserIds가 빈 배열이면 전체 허용으로 정상 생성한다', async () => {
+            mockTransactionGet.mockResolvedValue({
+                exists: true,
+                data: () => ({ organizationId: 'org1', allowedUserIds: [] }),
+                docs: [],
+            });
+
+            const result = await capturedHandler(validRequest);
+            expect(result).toEqual({ success: true, reservationId: 'new-reservation-id' });
+        });
+    });
 });

@@ -12,7 +12,7 @@ import type { Favorite } from '../types/favorite';
 import { calcEndTime } from './utils/reservationUtils';
 import { toLocalDateStr } from '../lib/dateUtils';
 import type { Vehicle } from '../types/vehicle';
-import { isVehicleBlocked } from '../lib/vehicleUtils';
+import { isVehicleBlocked, isVehicleRestrictedForUser } from '../lib/vehicleUtils';
 import type { Organization } from '../types/organization';
 import { invalidateDashboardCache } from './useTodayDashboard';
 
@@ -63,8 +63,11 @@ export default function useQuickDriveStart() {
                 setFavorites(favs as Favorite[]);
                 if ((org as Organization | null)?.address) setOrgAddress((org as Organization).address ?? '');
 
-                // 정비 중 차량 제외한 목록
-                const availableVehicles = v.filter(veh => !isVehicleBlocked(veh.maintenance) && !veh.retired?.isRetired);
+                // 정비 중·사용 제한 차량 제외한 목록
+                const availableVehicles = v.filter(veh =>
+                    !isVehicleBlocked(veh.maintenance) && !veh.retired?.isRetired &&
+                    !isVehicleRestrictedForUser(veh, user?.uid, userData?.role)
+                );
 
                 // 추천 차량 자동 선택 (정비 중이 아닌 차량만)
                 if (recommendedVehicleId) {
@@ -166,6 +169,11 @@ export default function useQuickDriveStart() {
         }
         if (!form.destination.trim()) {
             showToast('목적지를 입력해주세요.', 'warning');
+            return;
+        }
+        // 차량별 사용 가능 직원 제한 검증 (UI 비활성의 방어적 이중 체크, 서버 콜러블에서도 재검증됨)
+        if (selectedVehicle && isVehicleRestrictedForUser(selectedVehicle, user?.uid, userData?.role)) {
+            showToast('이 차량은 지정된 직원만 운행할 수 있습니다.', 'warning');
             return;
         }
 

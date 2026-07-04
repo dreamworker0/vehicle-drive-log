@@ -65,6 +65,17 @@ export const createReservationSafe = onCall(
                     throw new HttpsError("permission-denied", "자기 기관의 차량만 예약할 수 있습니다.");
                 }
 
+                // 차량별 사용 가능 직원 제한 검증 (allowedUserIds 없거나 빈 배열 = 전체 허용, 관리자는 예외)
+                const callerRole = request.auth!.token.role;
+                const allowedUserIds = vehicleSnap.data()?.allowedUserIds;
+                if (
+                    Array.isArray(allowedUserIds) && allowedUserIds.length > 0 &&
+                    callerRole !== "admin" && callerRole !== "superAdmin" &&
+                    !allowedUserIds.includes(request.auth!.uid)
+                ) {
+                    throw new HttpsError("permission-denied", "이 차량은 지정된 직원만 예약할 수 있습니다.");
+                }
+
                 const orgRef = db.collection("organizations").doc(organizationId);
                 const orgSnap = await transaction.get(orgRef);
                 const requireReservationApproval = orgSnap.exists ? (orgSnap.data()?.requireReservationApproval || false) : false;

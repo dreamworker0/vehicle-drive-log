@@ -92,7 +92,7 @@ export const createReservationSafe = async (data: Partial<Reservation>) => {
     } catch (error: unknown) {
         // 중복 예약 및 유효성 검사 등 기대되는 비즈니스 로직 에러는 Sentry에 보고하지 않음
         const err = error as { code?: string };
-        if (err?.code !== 'functions/already-exists' && err?.code !== 'functions/invalid-argument') {
+        if (err?.code !== 'functions/already-exists' && err?.code !== 'functions/invalid-argument' && err?.code !== 'functions/permission-denied') {
             captureError(error, { context: 'createReservationSafe', data });
         }
         throw error;
