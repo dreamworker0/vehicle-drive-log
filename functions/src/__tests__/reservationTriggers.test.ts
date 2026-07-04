@@ -85,7 +85,7 @@ describe('reservationTriggers', () => {
         });
 
         it('정상 생성 시 캘린더 이벤트를 생성하고 eventId를 저장한다', async () => {
-            mockGet.mockResolvedValue({ exists: true, data: () => ({ googleCalendarId: 'cal@group.calendar.google.com' }) });
+            mockGet.mockResolvedValue({ exists: true, data: () => ({ googleCalendarId: 'cal@group.calendar.google.com', organizationId: 'org1' }) });
             mockCreateCalendarEvent.mockResolvedValue('event-123');
             mockUpdate.mockResolvedValue(undefined);
             mockSendPushToOrg.mockResolvedValue(undefined);
@@ -111,9 +111,19 @@ describe('reservationTriggers', () => {
             );
         });
 
+        it('차량이 예약과 다른 기관 소속이면 캘린더 이벤트를 만들지 않는다 (교차 테넌트 차단 — 감사 N3)', async () => {
+            mockGet.mockResolvedValue({ exists: true, data: () => ({ googleCalendarId: 'cal@group.calendar.google.com', organizationId: 'org-OTHER' }) });
+            mockSendPushToOrg.mockResolvedValue(undefined);
+
+            const event = makeCreateEvent({ vehicleId: 'v1', organizationId: 'org1', date: '2026-01-01' });
+            await (onReservationCreated as Function)(event);
+
+            expect(mockCreateCalendarEvent).not.toHaveBeenCalled();
+        });
+
         it('실패 누적(영구제외)인 차량은 캘린더 생성을 건너뛴다', async () => {
             // calendarSyncFailCount >= 10 → 영구 제외
-            mockGet.mockResolvedValue({ exists: true, data: () => ({ googleCalendarId: 'cal@group.calendar.google.com', calendarSyncFailCount: 10 }) });
+            mockGet.mockResolvedValue({ exists: true, data: () => ({ googleCalendarId: 'cal@group.calendar.google.com', organizationId: 'org1', calendarSyncFailCount: 10 }) });
             mockSendPushToOrg.mockResolvedValue(undefined);
 
             const event = makeCreateEvent({ vehicleId: 'v1', organizationId: 'org1', date: '2026-01-01' });
@@ -125,7 +135,7 @@ describe('reservationTriggers', () => {
         });
 
         it('캘린더 생성이 Not Found면 실패 카운트를 증가시킨다', async () => {
-            mockGet.mockResolvedValue({ exists: true, data: () => ({ googleCalendarId: 'cal@group.calendar.google.com', calendarSyncFailCount: 2 }) });
+            mockGet.mockResolvedValue({ exists: true, data: () => ({ googleCalendarId: 'cal@group.calendar.google.com', organizationId: 'org1', calendarSyncFailCount: 2 }) });
             mockCreateCalendarEvent.mockRejectedValue(new Error('Not Found'));
             mockUpdate.mockResolvedValue(undefined);
             mockSendPushToOrg.mockResolvedValue(undefined);
@@ -161,7 +171,7 @@ describe('reservationTriggers', () => {
         });
 
         it('취소 시 캘린더 이벤트를 삭제하고 인앱 알림을 전송한다', async () => {
-            mockGet.mockResolvedValue({ exists: true, data: () => ({ googleCalendarId: 'cal@group.calendar.google.com' }) });
+            mockGet.mockResolvedValue({ exists: true, data: () => ({ googleCalendarId: 'cal@group.calendar.google.com', organizationId: 'org1' }) });
             mockDeleteCalendarEvent.mockResolvedValue(undefined);
             mockCreateInAppNotification.mockResolvedValue(undefined);
             mockSendPushToUser.mockResolvedValue(undefined);
@@ -176,6 +186,23 @@ describe('reservationTriggers', () => {
             expect(mockCreateInAppNotification).toHaveBeenCalledWith(
                 'user1', 'reservation_cancelled', expect.any(String), expect.any(String), 'org1'
             );
+        });
+
+        it('취소 시 차량·대상이 예약과 다른 기관이면 캘린더/알림을 차단한다 (교차 테넌트 — 감사 N2·N3)', async () => {
+            // 차량·대상 사용자 문서가 모두 예약(org1)과 다른 기관 소속으로 조회됨
+            mockGet.mockResolvedValue({ exists: true, data: () => ({ googleCalendarId: 'cal@group.calendar.google.com', organizationId: 'org-OTHER' }) });
+            mockDeleteCalendarEvent.mockResolvedValue(undefined);
+
+            const event = makeUpdateEvent(
+                { status: 'confirmed', vehicleId: 'v1', calendarEventId: 'ev1', date: '2026-01-01', startTime: '09:00' },
+                { status: 'cancelled', vehicleId: 'v1', calendarEventId: 'ev1', userId: 'user-victim', organizationId: 'org1', date: '2026-01-01', startTime: '09:00' }
+            );
+            await (onReservationUpdated as Function)(event);
+
+            // 타 기관 차량 캘린더 이벤트 삭제 차단(N3) + 타 기관 사용자 알림/푸시 주입 차단(N2)
+            expect(mockDeleteCalendarEvent).not.toHaveBeenCalled();
+            expect(mockCreateInAppNotification).not.toHaveBeenCalled();
+            expect(mockSendPushToUser).not.toHaveBeenCalled();
         });
     });
 

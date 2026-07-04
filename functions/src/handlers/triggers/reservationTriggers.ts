@@ -18,12 +18,16 @@ import { checkReservationTimeConflict, resolveReservationConflict } from "../syn
  */
 async function getVehicleCalendar(
     vehicleId: string,
+    expectedOrgId?: string,
 ): Promise<{ calendarId: string; failCount: number; skip: boolean } | null> {
     if (!vehicleId) return null;
     const db = getFirestore();
     const snap = await db.collection("vehicles").doc(vehicleId).get();
     if (!snap.exists) return null;
     const data = snap.data()!;
+    // 차량이 예약의 기관 소속이 아니면 캘린더를 다루지 않는다 — 미검증 vehicleId를 통한
+    // 타 기관 Google Calendar 이벤트 주입 차단 (2026-07-04 감사 N3)
+    if (expectedOrgId && data.organizationId !== expectedOrgId) return null;
     const calendarId = (data.googleCalendarId as string) || null;
     // 유효하지 않은 캘린더 ID 필터링 (@ 포함 필수)
     if (!calendarId || !calendarId.includes("@")) return null;
@@ -32,6 +36,18 @@ async function getVehicleCalendar(
         failCount: (data.calendarSyncFailCount as number) || 0,
         skip: shouldSkipVehicleCalendar(data),
     };
+}
+
+/**
+ * 알림 대상 uid가 예약의 기관 소속인지 검증한다.
+ * 예약 생성 규칙은 reservedByUid만 본인으로 고정하고 userId는 제약하지 않으므로,
+ * 트리거가 userId를 신뢰하면 타 기관 임의 사용자에게 알림·푸시를 주입할 수 있다(2026-07-04 감사 N2).
+ * 대상 문서의 organizationId가 예약 org와 일치할 때만 알림을 보낸다.
+ */
+async function isNotifiableOrgMember(uid: string | undefined | null, orgId: string | undefined | null): Promise<boolean> {
+    if (!uid || !orgId) return false;
+    const snap = await getFirestore().collection("users").doc(uid).get();
+    return snap.exists && snap.data()?.organizationId === orgId;
 }
 
 /**
@@ -62,7 +78,7 @@ export const onReservationCreated = onDocumentCreated("reservations/{reservation
                 rejectedReason: "offline_time_conflict"
             });
             const uid = reservation.reservedByUid || reservation.userId;
-            if (uid) {
+            if (await isNotifiableOrgMember(uid, reservation.organizationId)) {
                 const bodyMsg = `[오프라인 동기화 안내] ${reservation.vehicleDisplayName || "차량"} 예약이 이미 다른 예약과 시간이 겹쳐 반려/취소되었습니다. (${reservation.date})`;
                 await createInAppNotification(uid, "reservation_rejected", "⚠️ 예약 시간 충돌", bodyMsg, reservation.organizationId);
                 await sendPushToUser(uid, { title: "⚠️ 예약 시간 충돌", body: bodyMsg });
@@ -73,7 +89,7 @@ export const onReservationCreated = onDocumentCreated("reservations/{reservation
 
     // 승인 대기(pending) 상태라면 캘린더 이벤트를 만들지 않음
     if (reservation.status !== 'pending') {
-        const vc = await getVehicleCalendar(reservation.vehicleId);
+        const vc = await getVehicleCalendar(reservation.vehicleId, reservation.organizationId);
         if (!vc) {
             console.log("Vehicle " + reservation.vehicleId + ": no calendar ID, skip");
             // 캘린더 연동을 안해도 실패 처리는 아님, 알림 로직으로 넘어가도록 수정
@@ -184,7 +200,7 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
             if (isTimeConflict) {
                 await event.data!.after.ref.update({ status: "rejected", rejectedReason: "offline_time_conflict" });
                 const uid = after.reservedByUid || after.userId;
-                if (uid) {
+                if (await isNotifiableOrgMember(uid, after.organizationId)) {
                     const bodyMsg = `[오프라인 동기화 안내] ${after.vehicleDisplayName || "차량"} 예약 변경이 다른 예약과 시간이 겹쳐 반려/취소되었습니다.`;
                     await createInAppNotification(uid, "reservation_rejected", "⚠️ 예약 시간 충돌", bodyMsg, after.organizationId);
                     await sendPushToUser(uid, { title: "⚠️ 예약 시간 충돌", body: bodyMsg });
@@ -195,7 +211,7 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
     }
 
     // 실패 누적(쿨다운/영구제외) 차량은 calendarId를 null 처리해 모든 캘린더 호출을 건너뛴다 (알림은 그대로 진행)
-    const vc = await getVehicleCalendar(after.vehicleId);
+    const vc = await getVehicleCalendar(after.vehicleId, after.organizationId);
     const calendarId = (vc && !vc.skip) ? vc.calendarId : null;
     const calendarFailCount = vc?.failCount ?? 0;
 
@@ -204,8 +220,8 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
 
         // 반려된 경우 (pending -> rejected)
         if (after.status === "rejected" && before.status === "pending") {
-            if (after.reservedByUid || after.userId) {
-                const uid = after.reservedByUid || after.userId;
+            const uid = after.reservedByUid || after.userId;
+            if (await isNotifiableOrgMember(uid, after.organizationId)) {
                 const bodyMsg = `${after.vehicleDisplayName || "차량"} 예약이 반려되었습니다.${after.rejectedReason ? ` 사유: ${after.rejectedReason}` : ''}`;
                 await createInAppNotification(uid, "reservation_rejected", "❌ 예약 반려", bodyMsg, after.organizationId);
                 await sendPushToUser(uid, { title: "❌ 예약 반려", body: bodyMsg });
@@ -251,11 +267,11 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
                 }
             }
 
-            if (after.reservedByUid || after.userId) {
-                const uid = after.reservedByUid || after.userId;
+            const approveUid = after.reservedByUid || after.userId;
+            if (await isNotifiableOrgMember(approveUid, after.organizationId)) {
                 const bodyMsg = `${after.vehicleDisplayName || "차량"} 예약이 승인되었습니다. (${after.date} ${after.startTime || ""})`;
-                await createInAppNotification(uid, "reservation_approved", "✅ 예약 승인", bodyMsg, after.organizationId);
-                await sendPushToUser(uid, { title: "✅ 예약 승인", body: bodyMsg });
+                await createInAppNotification(approveUid, "reservation_approved", "✅ 예약 승인", bodyMsg, after.organizationId);
+                await sendPushToUser(approveUid, { title: "✅ 예약 승인", body: bodyMsg });
             }
             return;
         }
@@ -281,8 +297,8 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
                 }
             }
 
-            // 예약자에게 취소 알림 (취소한 본인이 아닌 경우)
-            if (after.userId) {
+            // 예약자에게 취소 알림 (취소한 본인이 아닌 경우) — 대상이 예약 org 소속일 때만
+            if (await isNotifiableOrgMember(after.userId, after.organizationId)) {
                 await createInAppNotification(
                     after.userId,
                     "reservation_cancelled",
@@ -323,8 +339,8 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
                 }
             }
 
-            // 예약자에게 변경 알림
-            if (after.userId) {
+            // 예약자에게 변경 알림 — 대상이 예약 org 소속일 때만
+            if (await isNotifiableOrgMember(after.userId, after.organizationId)) {
                 const changeParts: string[] = [];
                 if (before.date !== after.date) changeParts.push("날짜: " + after.date);
                 if (before.startTime !== after.startTime || before.endTime !== after.endTime) {
@@ -368,7 +384,7 @@ export const onReservationDeleted = onDocumentDeleted("reservations/{reservation
     try {
         if (!reservation.calendarEventId) return;
 
-        const vc = await getVehicleCalendar(reservation.vehicleId);
+        const vc = await getVehicleCalendar(reservation.vehicleId, reservation.organizationId);
         if (!vc) return;
         // 실패 누적(쿨다운/영구제외) 차량은 삭제 호출도 건너뜀 (어차피 404 반복)
         if (vc.skip) {

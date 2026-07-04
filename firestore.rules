@@ -63,9 +63,12 @@ service cloud.firestore {
                             )
                         ))
                     || isSuperAdmin()
-                    // orgAdmin은 소속 기관 사용자만 수정 가능하되, superAdmin 역할 부여 불가
+                    // orgAdmin은 소속 기관 사용자만 수정 가능하되, superAdmin 역할 부여 불가.
+                    // organizationId는 불변으로 강제한다 — admin이 자기/타인 문서의 org를 바꿔
+                    // 타 기관 admin 클레임을 획득하는 교차 테넌트 권한상승을 차단(2026-07-04 감사 N1).
                     || (isOrgAdmin(resource.data.organizationId)
-                        && request.resource.data.role != 'superAdmin');
+                        && request.resource.data.role != 'superAdmin'
+                        && request.resource.data.organizationId == resource.data.organizationId);
       allow delete: if isSuperAdmin();
     }
 

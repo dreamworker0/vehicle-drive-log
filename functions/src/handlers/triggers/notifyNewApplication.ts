@@ -4,6 +4,7 @@
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { sendDiscordAlert } from "../../core/discord";
 import { createGmailTransporter, isGmailConfigured, systemMailFrom } from "../../core/mailer";
+import { escapeHtml } from "../../utils/helpers";
 
 export const notifyNewApplication = onDocumentWritten(
     "organizations/{orgId}",
@@ -62,19 +63,19 @@ export const notifyNewApplication = onDocumentWritten(
                             <table style="width: 100%; border-collapse: collapse;">
                                 <tr>
                                     <td style="padding: 12px 0; border-bottom: 1px solid #E2E8F0; color: #64748B; width: 100px;">기관명</td>
-                                    <td style="padding: 12px 0; border-bottom: 1px solid #E2E8F0; font-weight: 600; color: #1E293B;">${orgName}</td>
+                                    <td style="padding: 12px 0; border-bottom: 1px solid #E2E8F0; font-weight: 600; color: #1E293B;">${escapeHtml(orgName)}</td>
                                 </tr>
                                 <tr>
                                     <td style="padding: 12px 0; border-bottom: 1px solid #E2E8F0; color: #64748B;">신청자</td>
-                                    <td style="padding: 12px 0; border-bottom: 1px solid #E2E8F0; color: #1E293B;">${applicantName}</td>
+                                    <td style="padding: 12px 0; border-bottom: 1px solid #E2E8F0; color: #1E293B;">${escapeHtml(applicantName)}</td>
                                 </tr>
                                 <tr>
                                     <td style="padding: 12px 0; border-bottom: 1px solid #E2E8F0; color: #64748B;">이메일</td>
-                                    <td style="padding: 12px 0; border-bottom: 1px solid #E2E8F0; color: #1E293B;">${orgEmail}</td>
+                                    <td style="padding: 12px 0; border-bottom: 1px solid #E2E8F0; color: #1E293B;">${escapeHtml(orgEmail)}</td>
                                 </tr>
                                 <tr>
                                     <td style="padding: 12px 0; border-bottom: 1px solid #E2E8F0; color: #64748B;">연락처</td>
-                                    <td style="padding: 12px 0; border-bottom: 1px solid #E2E8F0; color: #1E293B;">${orgPhone}</td>
+                                    <td style="padding: 12px 0; border-bottom: 1px solid #E2E8F0; color: #1E293B;">${escapeHtml(orgPhone)}</td>
                                 </tr>
                                 <tr>
                                     <td style="padding: 12px 0; color: #64748B;">신청일시</td>

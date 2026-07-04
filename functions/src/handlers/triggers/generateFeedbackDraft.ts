@@ -9,7 +9,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { generateAiContent } from "../../core/gemini";
 import { buildFaqPromptText } from "../../utils/faqData";
 import { sendDiscordAlert } from "../../core/discord";
-import { sanitizePromptValue } from "../../utils/helpers";
+import { sanitizePromptValue, fetchPromptImages } from "../../utils/helpers";
 const db = getFirestore();
 
 /**
@@ -157,25 +157,8 @@ ${pastExamples}
 
 매칭되는 FAQ가 없다면 faqId를 null로 설정하세요.`;
 
-            // 4. 첨부 이미지 처리 및 Gemini API 호출
-            const imageUrls = Array.isArray(data.imageUrls) ? data.imageUrls : [];
-            const images: Array<{ mimeType: string; data: string }> = [];
-
-            for (const url of imageUrls) {
-                try {
-                    const res = await fetch(url);
-                    if (res.ok) {
-                        const arrayBuffer = await res.arrayBuffer();
-                        const mimeType = res.headers.get("content-type") || "image/jpeg";
-                        images.push({
-                            data: Buffer.from(arrayBuffer).toString("base64"),
-                            mimeType,
-                        });
-                    }
-                } catch (imgErr) {
-                    console.warn("[generateFeedbackDraft] 이미지 불러오기 실패:", imgErr);
-                }
-            }
+            // 4. 첨부 이미지 처리 및 Gemini API 호출 (개수·크기 상한으로 비용 증폭 방어 — 2026-07-04 감사 N6)
+            const images = await fetchPromptImages(data.imageUrls, { logName: "generateFeedbackDraft" });
 
             const text = await generateAiContent(
                 prompt,

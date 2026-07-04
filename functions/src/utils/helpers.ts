@@ -171,6 +171,55 @@ export function sanitizePromptValue(value: unknown, maxLen = 60): string {
 }
 
 /**
+ * HTML 이스케이프 — 이메일/HTML 템플릿에 사용자 입력을 보간할 때 사용.
+ * 사용자 제어 문자열이 앵커·태그로 해석되어(예: 관리자 이메일에 피싱 링크 주입) 렌더되는 것을 막는다.
+ */
+export function escapeHtml(value: unknown): string {
+    if (value == null) return "";
+    return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#39;");
+}
+
+/**
+ * 프롬프트 첨부 이미지 다운로드 — Gemini 비용 증폭 방어(개수·크기 상한).
+ * 사용자가 대용량·다수 이미지 URL로 LLM 호출 비용을 폭증시키는 것을 막는다.
+ * 개수는 maxImages로 절단하고, 개별 이미지가 maxBytes를 넘으면 건너뛴다.
+ */
+export async function fetchPromptImages(
+    imageUrls: unknown,
+    opts: { logName: string; maxImages?: number; maxBytes?: number },
+): Promise<Array<{ mimeType: string; data: string }>> {
+    const maxImages = opts.maxImages ?? 3;
+    const maxBytes = opts.maxBytes ?? 5 * 1024 * 1024;
+    const urls = Array.isArray(imageUrls) ? imageUrls.slice(0, maxImages) : [];
+    const images: Array<{ mimeType: string; data: string }> = [];
+
+    for (const url of urls) {
+        if (typeof url !== "string") continue;
+        try {
+            const res = await fetch(url);
+            if (!res.ok) continue;
+            const buf = Buffer.from(await res.arrayBuffer());
+            if (buf.byteLength > maxBytes) {
+                log("WARNING", opts.logName, "이미지 크기 초과로 건너뜀", { bytes: buf.byteLength, maxBytes });
+                continue;
+            }
+            images.push({
+                data: buf.toString("base64"),
+                mimeType: res.headers.get("content-type") || "image/jpeg",
+            });
+        } catch (err) {
+            log("WARNING", opts.logName, "이미지 불러오기 실패", { error: (err as Error).message });
+        }
+    }
+    return images;
+}
+
+/**
  * 스케줄러 heartbeat 기록 — _health/{schedulerName} 문서에 마지막 실행 시각 저장
  * 헬스 체크에서 이 값을 읽어 스케줄러가 정상 동작 중인지 판단한다.
  */

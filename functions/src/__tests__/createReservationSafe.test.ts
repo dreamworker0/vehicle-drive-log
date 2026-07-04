@@ -96,7 +96,8 @@ describe('createReservationSafe', () => {
     });
 
     it('겹치는 예약이 없으면 정상 생성한다', async () => {
-        mockTransactionGet.mockResolvedValue({ docs: [] });
+        // 차량(1st get)·org(2nd get)·예약쿼리(3rd get)를 겸하는 스냅샷: 차량 org 검증 통과
+        mockTransactionGet.mockResolvedValue({ exists: true, data: () => ({ organizationId: 'org1' }), docs: [] });
 
         const result = await capturedHandler(validRequest);
 
@@ -120,7 +121,7 @@ describe('createReservationSafe', () => {
                 endTime: '11:00',
             }),
         };
-        mockTransactionGet.mockResolvedValue({ docs: [existingReservation] });
+        mockTransactionGet.mockResolvedValue({ exists: true, data: () => ({ organizationId: 'org1' }), docs: [existingReservation] });
 
         await expect(capturedHandler(validRequest)).rejects.toThrow('이미 예약되어 있습니다');
     });
@@ -133,7 +134,7 @@ describe('createReservationSafe', () => {
                 endTime: '11:00',
             }),
         };
-        mockTransactionGet.mockResolvedValue({ docs: [cancelledReservation] });
+        mockTransactionGet.mockResolvedValue({ exists: true, data: () => ({ organizationId: 'org1' }), docs: [cancelledReservation] });
 
         const result = await capturedHandler(validRequest);
 
@@ -150,10 +151,19 @@ describe('createReservationSafe', () => {
                 actualEndTime: '08:00',
             }),
         };
-        mockTransactionGet.mockResolvedValue({ docs: [completedReservation] });
+        mockTransactionGet.mockResolvedValue({ exists: true, data: () => ({ organizationId: 'org1' }), docs: [completedReservation] });
 
         const result = await capturedHandler(validRequest);
 
         expect(result).toEqual({ success: true, reservationId: 'new-reservation-id' });
+    });
+
+    it('차량이 다른 기관 소속이면 permission-denied를 던진다 (교차 테넌트 차단 — 감사 N3)', async () => {
+        // 차량 문서(1st get)가 호출자(org1)와 다른 기관 소속으로 조회됨
+        mockTransactionGet.mockResolvedValue({ exists: true, data: () => ({ organizationId: 'org-OTHER' }), docs: [] });
+
+        await expect(capturedHandler(validRequest)).rejects.toThrow('자기 기관의 차량만');
+        expect(mockTransactionSet).not.toHaveBeenCalled();
+        expect(mockTransactionUpdate).not.toHaveBeenCalled();
     });
 });

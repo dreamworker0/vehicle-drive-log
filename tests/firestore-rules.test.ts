@@ -232,4 +232,34 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     const orgBMemberDb = setupContext('user_B', { role: 'member', orgId: 'org-B' }).firestore();
     await assertFails(orgBMemberDb.collection('notifications').doc('noti_A').get());
   });
+
+  it('8. 관리자의 organizationId 변경(교차 테넌트 권한상승) 차단', async () => {
+    // given: 기관 A의 admin과 소속 직원 문서 존재
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.collection('users').doc('admin_A').set({
+        email: 'admin_a@x.com', role: 'admin', organizationId: 'org-A',
+      });
+      await db.collection('users').doc('user_A2').set({
+        email: 'user_a2@x.com', role: 'employee', organizationId: 'org-A',
+      });
+    });
+
+    const adminADb = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+
+    // admin이 자기 문서의 org를 타 기관으로 변경(자기 권한상승) → 차단
+    await assertFails(adminADb.collection('users').doc('admin_A').update({
+      organizationId: 'org-B',
+    }));
+
+    // admin이 소속 직원을 타 기관으로 이동 → 차단
+    await assertFails(adminADb.collection('users').doc('user_A2').update({
+      organizationId: 'org-B',
+    }));
+
+    // 정상: admin이 소속 직원 role을 변경(org 불변)하는 것은 허용
+    await assertSucceeds(adminADb.collection('users').doc('user_A2').update({
+      role: 'admin',
+    }));
+  });
 });

@@ -3,7 +3,7 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { v4 as uuidv4 } from "uuid";
 import { log, wrapHandler } from "../../utils/helpers";
-import { checkRateLimitByUid } from "../../utils/rateLimit";
+import { checkRateLimitByUid, checkRateLimitByIp } from "../../utils/rateLimit";
 
 interface SubmitApplicationPayload {
     orgName: string;
@@ -38,12 +38,25 @@ export const submitOrgApplication = onCall(
         if (!payload.imageBase64 || !payload.imageMimeType) {
             throw new HttpsError("invalid-argument", "증빙서류 이미지 데이터가 누락되었습니다.");
         }
+        // 입력 길이 상한 (과도한 문서/알림 페이로드 방지)
+        if (payload.orgName.length > 100 || payload.applicantName.length > 100
+            || payload.applicantPhone.length > 30 || (payload.message?.length ?? 0) > 2000) {
+            throw new HttpsError("invalid-argument", "입력 값의 길이가 허용 범위를 초과했습니다.");
+        }
 
         const email = payload.applicantEmail.trim().toLowerCase();
 
         // 2. Rate Limit 검사: 동일 이메일로 1시간에 3회 이상 신청 불가 (무단 반복 요청 방지)
         // checkRateLimitByUid는 원래 uid 기반이지만, 이메일을 uid처럼 활용하여 제한
         await checkRateLimitByUid("submitOrgApplication", email, 3, 3600);
+
+        // 2-1. IP 기반 상한 — 이메일을 회전시켜 이메일 키 제한을 우회하는 무제한 익명 쓰기 차단 (2026-07-04 감사 N4)
+        const clientIp = request.rawRequest?.ip
+            || (request.rawRequest?.headers["x-forwarded-for"] as string)
+            || "unknown";
+        if (await checkRateLimitByIp("submitOrgApplication", clientIp, 10, 3600)) {
+            throw new HttpsError("resource-exhausted", "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.");
+        }
 
         try {
             const db = getFirestore();

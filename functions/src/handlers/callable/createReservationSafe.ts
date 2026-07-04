@@ -58,7 +58,12 @@ export const createReservationSafe = onCall(
             const reservationId = await db.runTransaction(async (transaction) => {
                 // 부모 차량 문서를 읽고 의도적으로 업데이트하여 해당 차량의 트랜잭션 Lock 획득 강제 (동시 예약 생성 방지)
                 const vehicleRef = db.collection("vehicles").doc(vehicleId);
-                await transaction.get(vehicleRef);
+                const vehicleSnap = await transaction.get(vehicleRef);
+
+                // 차량이 실제로 호출자 기관 소속인지 검증 (교차 테넌트 차량 문서 무단 쓰기 차단 — 2026-07-04 감사 N3)
+                if (!vehicleSnap.exists || vehicleSnap.data()?.organizationId !== organizationId) {
+                    throw new HttpsError("permission-denied", "자기 기관의 차량만 예약할 수 있습니다.");
+                }
 
                 const orgRef = db.collection("organizations").doc(organizationId);
                 const orgSnap = await transaction.get(orgRef);

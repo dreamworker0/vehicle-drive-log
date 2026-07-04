@@ -1,7 +1,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore } from "firebase-admin/firestore";
 import * as admin from 'firebase-admin';
-import { checkRateLimitByUid } from "../../utils/rateLimit";
+import { checkRateLimitByUid, checkRateLimitByIp } from "../../utils/rateLimit";
 
 export const submitPublicFeedback = onCall(
     { 
@@ -24,10 +24,22 @@ export const submitPublicFeedback = onCall(
         if (!message || typeof message !== 'string' || message.trim().length === 0) {
             throw new HttpsError("invalid-argument", "문의 내용을 입력해주세요.");
         }
+        // 입력 길이 상한 (과도한 문서 페이로드 방지)
+        if (userName.length > 100 || message.length > 5000) {
+            throw new HttpsError("invalid-argument", "입력 값의 길이가 허용 범위를 초과했습니다.");
+        }
 
         // Rate Limit: 동일 이메일로 1시간에 5회 이상 제출 방지
         const safeEmail = userEmail.trim().toLowerCase();
         await checkRateLimitByUid("submitPublicFeedback", safeEmail, 5, 3600);
+
+        // IP 기반 상한 — 이메일을 회전시켜 이메일 키 제한을 우회하는 무제한 익명 쓰기 차단 (2026-07-04 감사 N4)
+        const clientIp = request.rawRequest?.ip
+            || (request.rawRequest?.headers["x-forwarded-for"] as string)
+            || "unknown";
+        if (await checkRateLimitByIp("submitPublicFeedback", clientIp, 10, 3600)) {
+            throw new HttpsError("resource-exhausted", "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.");
+        }
 
         try {
             const db = getFirestore();

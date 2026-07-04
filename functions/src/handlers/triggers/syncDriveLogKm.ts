@@ -104,9 +104,15 @@ export const onDriveLogCreated = onDocumentCreated(
                 }
 
                 if (distanceToAdd > 0) {
-                    await db.collection("vehicles").doc(vehId).update({
-                        currentKm: FieldValue.increment(distanceToAdd),
-                    });
+                    // 차량이 운행일지의 기관 소속인지 검증 후 갱신 (교차 테넌트 currentKm 오염 차단 — 2026-07-04 감사 N3)
+                    const vehSnap = await db.collection("vehicles").doc(vehId).get();
+                    if (vehSnap.exists && vehSnap.data()?.organizationId === orgId) {
+                        await db.collection("vehicles").doc(vehId).update({
+                            currentKm: FieldValue.increment(distanceToAdd),
+                        });
+                    } else {
+                        console.warn(`[onDriveLogCreated] 차량 org 불일치 — currentKm 갱신 건너뜀: veh=${vehId}, org=${orgId}`);
+                    }
                 }
             }
 

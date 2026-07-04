@@ -56,6 +56,10 @@ ui-debug.log
 functions/.env
 *.pem
 *.key
+# Firebase Admin SDK 서비스계정 키 (스크립트/스킬이 참조하는 파일명 — god-mode 자격증명, 커밋 금지)
+serviceAccountKey.json
+service-account.json
+*service*account*.json
 
 # Functions
 functions/node_modules/
