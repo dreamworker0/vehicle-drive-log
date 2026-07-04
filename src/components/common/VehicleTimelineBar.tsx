@@ -10,6 +10,7 @@ import {
     snapMinutes, getPercent, getGaps, getHourLabels,
 } from '../../lib/timelineUtils';
 import useTimelineDrag from '../../hooks/useTimelineDrag';
+import { isVehicleRestrictedForUser } from '../../lib/vehicleUtils';
 import VehicleTimelineRow from './VehicleTimelineRow';
 import type { Vehicle } from '../../types/vehicle';
 import type { Reservation } from '../../types/reservation';
@@ -73,15 +74,20 @@ export default function VehicleTimelineBar({
 
 
 
-    // 차량별 예약 데이터 그룹핑
+    // 차량별 예약 데이터 그룹핑 (사용 제한 차량은 맨 아래로, 상위 정렬 순서는 유지)
     const vehicleData = useMemo(() => {
-        return vehicles.filter(v => !v.retired?.isRetired).map(v => {
+        const active = vehicles.filter(v => !v.retired?.isRetired);
+        const ordered = [
+            ...active.filter(v => !isVehicleRestrictedForUser(v, user?.uid)),
+            ...active.filter(v => isVehicleRestrictedForUser(v, user?.uid)),
+        ];
+        return ordered.map(v => {
             const vRes = reservations
                 .filter(r => r.vehicleId === v.id && r.status !== 'cancelled')
                 .sort((a, b) => (a.startTime || '').localeCompare(b.startTime || ''));
             return { vehicle: v, reservations: vRes };
         });
-    }, [vehicles, reservations]);
+    }, [vehicles, reservations, user?.uid]);
 
     // gap 계산을 위한 스냅 현재 시각
     const nowSnapped = isToday ? snapMinutes(nowMinutes + SNAP_MINUTES - 1) : RANGE_START;
