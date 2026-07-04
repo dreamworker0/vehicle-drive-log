@@ -190,7 +190,7 @@ describe('createReservationSafe', () => {
             expect(result).toEqual({ success: true, reservationId: 'new-reservation-id' });
         });
 
-        it('admin은 허용 목록에 없어도 정상 생성한다 (관리자 예외)', async () => {
+        it('admin도 허용 목록에 없으면 permission-denied를 던진다 (역할 예외 없음)', async () => {
             mockTransactionGet.mockResolvedValue({
                 exists: true,
                 data: () => ({ organizationId: 'org1', allowedUserIds: ['other-user'] }),
@@ -201,8 +201,8 @@ describe('createReservationSafe', () => {
                 auth: { uid: 'admin-uid', token: { orgId: 'org1', role: 'admin' } },
             };
 
-            const result = await capturedHandler(adminRequest);
-            expect(result).toEqual({ success: true, reservationId: 'new-reservation-id' });
+            await expect(capturedHandler(adminRequest)).rejects.toThrow('지정된 직원만');
+            expect(mockTransactionSet).not.toHaveBeenCalled();
         });
 
         it('allowedUserIds가 빈 배열이면 전체 허용으로 정상 생성한다', async () => {

@@ -66,7 +66,7 @@ export default function useQuickDriveStart() {
                 // 정비 중·사용 제한 차량 제외한 목록
                 const availableVehicles = v.filter(veh =>
                     !isVehicleBlocked(veh.maintenance) && !veh.retired?.isRetired &&
-                    !isVehicleRestrictedForUser(veh, user?.uid, userData?.role)
+                    !isVehicleRestrictedForUser(veh, user?.uid)
                 );
 
                 // 추천 차량 자동 선택 (정비 중이 아닌 차량만)
@@ -172,7 +172,7 @@ export default function useQuickDriveStart() {
             return;
         }
         // 차량별 사용 가능 직원 제한 검증 (UI 비활성의 방어적 이중 체크, 서버 콜러블에서도 재검증됨)
-        if (selectedVehicle && isVehicleRestrictedForUser(selectedVehicle, user?.uid, userData?.role)) {
+        if (selectedVehicle && isVehicleRestrictedForUser(selectedVehicle, user?.uid)) {
             showToast('이 차량은 지정된 직원만 운행할 수 있습니다.', 'warning');
             return;
         }

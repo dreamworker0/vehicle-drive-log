@@ -18,7 +18,7 @@ interface VehicleSelectorProps {
 }
 
 export default function VehicleSelector({ vehicles, selectedVehicleId, onSelect, usageCounts }: VehicleSelectorProps) {
-    const { user, userData } = useAuth();
+    const { user } = useAuth();
     // 폐차 차량은 목록에서 제외 + 사용 빈도순 정렬
     const activeVehicles = useMemo(() => {
         const filtered = vehicles.filter(v => !v.retired?.isRetired);
@@ -34,7 +34,7 @@ export default function VehicleSelector({ vehicles, selectedVehicleId, onSelect,
         <div className="grid grid-cols-3 gap-1.5">
             {activeVehicles.map(v => {
                 const isBlocked = isVehicleBlocked(v.maintenance);
-                const isRestricted = !isBlocked && isVehicleRestrictedForUser(v, user?.uid, userData?.role);
+                const isRestricted = !isBlocked && isVehicleRestrictedForUser(v, user?.uid);
                 const isDisabled = isBlocked || isRestricted;
                 const count = usageCounts?.get(v.id) || 0;
                 return (

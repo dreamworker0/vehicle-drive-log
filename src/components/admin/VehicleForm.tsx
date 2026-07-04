@@ -300,7 +300,7 @@ export default function VehicleForm({
                             <p className="text-xs text-surface-400 dark:text-surface-500">직원 목록을 불러오는 중이거나 등록된 직원이 없습니다</p>
                         )}
                         <p className="text-xs text-surface-400 dark:text-surface-500 mt-1.5">
-                            선택하지 않으면 모든 직원이 사용할 수 있습니다 · 선택하면 지정된 직원과 관리자만 예약·운행 가능
+                            선택하지 않으면 모든 직원이 사용할 수 있습니다 · 선택하면 지정된 직원만(관리자 포함 그 외 전원 불가) 예약·운행 가능
                         </p>
                     </div>
 

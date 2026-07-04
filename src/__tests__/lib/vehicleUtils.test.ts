@@ -47,14 +47,9 @@ describe('vehicleUtils', () => {
             expect(isVehicleRestrictedForUser({ allowedUserIds: ['user1', 'user2'] }, 'user1')).toBe(false);
         });
 
-        it('허용 목록에 없는 사용자는 제한된다(true)', () => {
+        it('허용 목록에 없는 사용자는 역할과 무관하게 제한된다(true) — 관리자 예외 없음', () => {
             expect(isVehicleRestrictedForUser({ allowedUserIds: ['user1'] }, 'user2')).toBe(true);
-            expect(isVehicleRestrictedForUser({ allowedUserIds: ['user1'] }, 'user2', 'employee')).toBe(true);
-        });
-
-        it('admin/superAdmin은 허용 목록과 무관하게 제한되지 않는다(false)', () => {
-            expect(isVehicleRestrictedForUser({ allowedUserIds: ['user1'] }, 'admin-uid', 'admin')).toBe(false);
-            expect(isVehicleRestrictedForUser({ allowedUserIds: ['user1'] }, 'sa-uid', 'superAdmin')).toBe(false);
+            expect(isVehicleRestrictedForUser({ allowedUserIds: ['user1'] }, 'admin-uid')).toBe(true);
         });
 
         it('uid가 없으면(비로그인 등) 제한 차량은 제한된다(true)', () => {

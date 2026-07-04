@@ -3,7 +3,6 @@
  * reservationActions 공유 의존성 타입 정의
  */
 import type { Vehicle } from '../../../types/vehicle';
-import type { UserRole } from '../../../types/user';
 import type { Reservation, ReservationForm } from '../../../types/reservation';
 import type { CustomHoliday } from '../../../types/holiday';
 import type { Favorite } from '../../../types/favorite';
@@ -13,7 +12,7 @@ import type { RouteInfoData } from '../useRouteInfo';
 
 export interface ActionDeps {
     user: { uid: string; email?: string | null };
-    userData: { organizationId?: string | null; name?: string; role?: UserRole };
+    userData: { organizationId?: string | null; name?: string };
     form: ReservationForm;
     selectedDate: string;
     currentMonth: Date;

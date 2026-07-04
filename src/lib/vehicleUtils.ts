@@ -24,19 +24,16 @@ export function isVehicleBlocked(maintenance: VehicleMaintenance | null | undefi
 /**
  * 차량이 해당 사용자에게 사용 제한된 상태인지 판별한다.
  * - allowedUserIds가 없거나 빈 배열이면 전체 허용 (기존 차량 하위 호환)
- * - admin/superAdmin은 제한과 무관하게 항상 사용 가능
+ * - 목록이 있으면 역할(admin 포함)과 무관하게 목록에 포함된 사용자만 허용
  * @param vehicle allowedUserIds 필드를 가진 차량
  * @param uid 현재 사용자 uid
- * @param role 현재 사용자 역할
  * @returns true면 이 사용자에게 제한된 차량
  */
 export function isVehicleRestrictedForUser(
     vehicle: Pick<Vehicle, 'allowedUserIds'>,
-    uid: string | null | undefined,
-    role?: string
+    uid: string | null | undefined
 ): boolean {
     const allowed = vehicle.allowedUserIds;
     if (!allowed || allowed.length === 0) return false;
-    if (role === 'admin' || role === 'superAdmin') return false;
     return !uid || !allowed.includes(uid);
 }

@@ -80,7 +80,7 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
 
     // 차량별 사용 가능 직원 제한 검증 (UI 비활성의 방어적 이중 체크, 서버 콜러블에서도 재검증됨)
     const selectedVehicle = vehicles.find(v => v.id === form.vehicleId);
-    if (selectedVehicle && isVehicleRestrictedForUser(selectedVehicle, user.uid, userData.role)) {
+    if (selectedVehicle && isVehicleRestrictedForUser(selectedVehicle, user.uid)) {
         showToast('이 차량은 지정된 직원만 예약할 수 있습니다.', 'warning');
         return;
     }

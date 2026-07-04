@@ -23,14 +23,14 @@ export default function VehicleSelector({
     usageCounts,
     destinationRef,
 }: VehicleSelectorProps) {
-    const { user, userData } = useAuth();
+    const { user } = useAuth();
     return (
         <div>
             <label className="label text-sm font-medium">🚘 차량 <span className="text-red-500 dark:text-red-400">*</span></label>
             <div className="grid grid-cols-3 gap-2 mt-1.5">
                 {vehicles.map(v => {
                     const isBlocked = isVehicleBlocked(v.maintenance);
-                    const isRestricted = !isBlocked && isVehicleRestrictedForUser(v, user?.uid, userData?.role);
+                    const isRestricted = !isBlocked && isVehicleRestrictedForUser(v, user?.uid);
                     const isDisabled = isBlocked || isRestricted;
                     const count = usageCounts?.get(v.id) || 0;
                     return (
