@@ -3,6 +3,7 @@
  *
  * 기존 개별 스케줄러들을 통합하여 인프라 비용 절감:
  * 0. dailyAggregation: 전체 기관 월간 집계 통계 캐싱 (02:00 실행 전제)
+ * 0.5. computeAllDashboardStats: superAdmin 대시보드 통계 캐시 재집계
  * 1. backupFirestore: Firestore 전체 백업 (GCS)
  * 2. autoPurgeOrgs: soft-deleted 기관 30일 후 영구 삭제
  * 3. cleanupCertificateImages: 승인 후 30일 경과 기관 인증서 스토리지 삭제
@@ -15,6 +16,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { log } from "../../utils/helpers";
 import { getKSTDateString } from "../../utils/kstDate";
 import { runDailyAggregation } from "./dailyAggregation";
+import { computeAllDashboardStats } from "../../services/statistics/computeDashboardStats";
 import { createInAppNotification, sendPushToUser } from "../../services/alimtalk/sendNotification";
 import { gzip } from "node:zlib";
 import { promisify } from "node:util";
@@ -289,6 +291,13 @@ export const dailyNightlyBatch = onSchedule(
             await runDailyAggregation();
         } catch (e: unknown) {
             console.error("Error in dailyAggregation:", (e as Error).message);
+        }
+
+        // Step 0.5: superAdmin 대시보드 통계 캐시 재집계 — 매일 아침 수동 갱신 버튼 없이 최신 상태 유지
+        try {
+            await computeAllDashboardStats();
+        } catch (e: unknown) {
+            console.error("Error in computeAllDashboardStats:", (e as Error).message);
         }
 
         // Step 1: Firestore 백업 (기존 backupFirestore 통합)

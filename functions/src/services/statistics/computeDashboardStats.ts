@@ -1,4 +1,4 @@
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, AggregateField } from "firebase-admin/firestore";
 import {
     computeDistance, computeDuration, toDate, groupByOrg,
 } from "./dashboardHelpers";
@@ -10,6 +10,7 @@ import {
     computeFunnelData, computeOrgSizeDistribution,
     assembleFuelTypeStats, assembleVehicleTypeStats, assembleModelStats,
     computeReservationStats,
+    computeFuelHipassDaily, computeNotificationStats,
 } from "./dashboardSections";
 
 /**
@@ -29,17 +30,34 @@ export async function computeAllDashboardStats(): Promise<void> {
     const kstNow = toKSTDate();
     const year = kstNow.getFullYear();
     const month = kstNow.getMonth();
-    // Firestore UTC Timestamp 비교용: UTC 기준 Date 사용
-    const thirtyDaysAgo = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000);
-    const thirtyDaysAgoStr = getKSTDateString(thirtyDaysAgo);
+    const thirtyDaysAgoStr = getKSTDateString(new Date(Date.now() - 29 * 24 * 60 * 60 * 1000));
+    // KST 날짜 문자열에서 파생한 앵커/인스턴트 — UTC 런타임에서 로컬(=UTC) 날짜 파트로 키를 만들면
+    // 야간 배치(02:00 KST = 전일 17:00 UTC) 실행 시 일별 차트가 하루 밀리는 스큐가 생긴다.
+    const [tdY, tdM, tdD] = thirtyDaysAgoStr.split("-").map(Number);
+    const thirtyDaysAgo = new Date(tdY, tdM - 1, tdD); // 날짜 키 생성용 달력 앵커 (KST 날짜 파트)
+    const thirtyDaysAgoInstant = new Date(`${thirtyDaysAgoStr}T00:00:00+09:00`); // Timestamp 비교용 정확한 KST 자정 인스턴트
     const sevenDaysAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
     const prevMonth = month === 0 ? 11 : month - 1;
     const prevYear = month === 0 ? year - 1 : year;
     // 전달 1일: 현재월·전월 비교 통계를 커버하는 최소 범위 (~45일)
     const prevMonthStart = new Date(prevYear, prevMonth, 1);
+    // 당월/전월 경계 (date 문자열 비교용 — loadFuelHipassStats와 동일 규약)
+    const curMonthStartStr = `${year}-${String(month + 1).padStart(2, "0")}-01`;
+    const curMonthEndStr = `${year}-${String(month + 1).padStart(2, "0")}-31`;
+    const prevMonthStartStr = `${prevYear}-${String(prevMonth + 1).padStart(2, "0")}-01`;
+    const prevMonthEndStr = `${prevYear}-${String(prevMonth + 1).padStart(2, "0")}-31`;
 
     // 1. 컬렉션 병렬 조회 (driveLogs는 count + 최근 필터로 분리)
-    const [orgSnap, userSnap, logCountSnap, recentLogSnap, vehicleSnap, hipassCardSnap, favoriteSnap, pendingAppSnap, reservationSnap] = await Promise.all([
+    const fuelCol = db.collection("fuelLogs");
+    const hipassChargeCol = db.collection("hipassCharges");
+    const notifCol = db.collection("notifications");
+    const [
+        orgSnap, userSnap, logCountSnap, recentLogSnap, vehicleSnap, hipassCardSnap, favoriteSnap, pendingAppSnap, reservationSnap,
+        // ALL 스코프 캐시 이관: 주유/하이패스/알림 — 30일 원본 + 요약 집계쿼리 (열람 시 라이브 스캔 대체)
+        fuelRecentSnap, hipassRecentSnap, notifRecentSnap,
+        fuelAllAgg, hipassAllAgg, fuelMonthAgg, hipassMonthAgg, fuelPrevMonthAgg, hipassPrevMonthAgg,
+        notifTotalAgg, notifReadAgg,
+    ] = await Promise.all([
         db.collection("organizations").get(),
         db.collection("users").get(),
         db.collection("driveLogs").count().get(),
@@ -49,6 +67,21 @@ export async function computeAllDashboardStats(): Promise<void> {
         db.collection("favorites").get(),
         db.collection("orgApplications").where("status", "==", "pending").count().get(),
         db.collection("reservations").where("date", ">=", thirtyDaysAgoStr).get(),
+        fuelCol.where("date", ">=", thirtyDaysAgoStr).get(),
+        hipassChargeCol.where("date", ">=", thirtyDaysAgoStr).get(),
+        notifCol.where("createdAt", ">=", thirtyDaysAgoInstant).get(),
+        fuelCol.aggregate({ totalCount: AggregateField.count(), totalCost: AggregateField.sum("fuelCost") }).get(),
+        hipassChargeCol.aggregate({ totalCount: AggregateField.count(), totalAmount: AggregateField.sum("chargeAmount") }).get(),
+        fuelCol.where("date", ">=", curMonthStartStr).where("date", "<=", curMonthEndStr)
+            .aggregate({ monthCount: AggregateField.count(), monthCost: AggregateField.sum("fuelCost") }).get(),
+        hipassChargeCol.where("date", ">=", curMonthStartStr).where("date", "<=", curMonthEndStr)
+            .aggregate({ monthCount: AggregateField.count(), monthAmount: AggregateField.sum("chargeAmount") }).get(),
+        fuelCol.where("date", ">=", prevMonthStartStr).where("date", "<=", prevMonthEndStr)
+            .aggregate({ prevCost: AggregateField.sum("fuelCost") }).get(),
+        hipassChargeCol.where("date", ">=", prevMonthStartStr).where("date", "<=", prevMonthEndStr)
+            .aggregate({ prevAmount: AggregateField.sum("chargeAmount") }).get(),
+        notifCol.count().get(),
+        notifCol.where("read", "==", true).count().get(),
     ]);
 
     // 1.5. 사전 분류 (O(N+M) 최적화를 위해 기관별로 문서 분배)
@@ -143,7 +176,7 @@ export async function computeAllDashboardStats(): Promise<void> {
                 }
             }
 
-            if (!ts || ts < thirtyDaysAgo) return;
+            if (!ts || ts < thirtyDaysAgoInstant) return;
             const dateKey = getKSTDateString(ts);
             if (dailyInputMap[dateKey]) {
                 if (data.inputMethod === "ocr") dailyInputMap[dateKey].ocr++;
@@ -298,10 +331,33 @@ export async function computeAllDashboardStats(): Promise<void> {
 
     const allStats = buildStats(null);
 
+    // ── ALL 스코프 전용: 주유/하이패스/알림 사전집계 (기관별 변형 문서에는 넣지 않음 — 기관 필터는 라이브 로더 유지) ──
+    const { dailyFuelCost, dailyHipassAmount } = computeFuelHipassDaily(fuelRecentSnap.docs, hipassRecentSnap.docs, thirtyDaysAgoStr, null);
+    const { notifSummary, dailyNotifStats, notifTypeCounts } = computeNotificationStats(
+        notifRecentSnap.docs,
+        { total: notifTotalAgg.data().count, read: notifReadAgg.data().count },
+        thirtyDaysAgoStr,
+        null,
+    );
+    const fuelStats = {
+        totalCount: fuelAllAgg.data().totalCount,
+        totalCost: fuelAllAgg.data().totalCost ?? 0,
+        monthCount: fuelMonthAgg.data().monthCount,
+        monthCost: fuelMonthAgg.data().monthCost ?? 0,
+        prevMonthCost: fuelPrevMonthAgg.data().prevCost ?? 0,
+    };
+    const hipassStats = {
+        totalCount: hipassAllAgg.data().totalCount,
+        totalAmount: hipassAllAgg.data().totalAmount ?? 0,
+        monthCount: hipassMonthAgg.data().monthCount,
+        monthAmount: hipassMonthAgg.data().monthAmount ?? 0,
+        prevMonthAmount: hipassPrevMonthAgg.data().prevAmount ?? 0,
+    };
+
     // Batch Commits (Chunk size 400)
     const writeChunks: { docRef: FirebaseFirestore.DocumentReference; data: Record<string, unknown> }[] = [];
-    writeChunks.push({ docRef: db.doc("system/dashboardStats"), data: allStats.dashboardStats as unknown as Record<string, unknown> });
-    writeChunks.push({ docRef: db.doc("system/dashboardTimeSeries"), data: allStats.dashboardTimeSeries as unknown as Record<string, unknown> });
+    writeChunks.push({ docRef: db.doc("system/dashboardStats"), data: { ...allStats.dashboardStats, fuelStats, hipassStats, notifSummary } as unknown as Record<string, unknown> });
+    writeChunks.push({ docRef: db.doc("system/dashboardTimeSeries"), data: { ...allStats.dashboardTimeSeries, dailyFuelCost, dailyHipassAmount, dailyNotifStats, notifTypeCounts } as unknown as Record<string, unknown> });
     writeChunks.push({ docRef: db.doc("system/dashboardOrgRankings"), data: allStats.dashboardOrgRankings as unknown as Record<string, unknown> });
 
     // 각 승인된 기관별 캐시 생성
@@ -321,5 +377,5 @@ export async function computeAllDashboardStats(): Promise<void> {
     }
 
     const elapsed = Date.now() - startTime;
-    console.log(`[computeDashboardStats] 완료: ${elapsed}ms, orgs=${allStats.dashboardStats.approvedOrgs}, logs=${allStats.dashboardStats.totalLogs}(count), recentLogs=${recentLogSnap.size}, users=${allStats.dashboardStats.totalUsers}, dbWrites=${writeChunks.length}`);
+    console.log(`[computeDashboardStats] 완료: ${elapsed}ms, orgs=${allStats.dashboardStats.approvedOrgs}, logs=${allStats.dashboardStats.totalLogs}(count), recentLogs=${recentLogSnap.size}, users=${allStats.dashboardStats.totalUsers}, fuelDocs=${fuelRecentSnap.size}, hipassDocs=${hipassRecentSnap.size}, notifDocs=${notifRecentSnap.size}, dbWrites=${writeChunks.length}`);
 }

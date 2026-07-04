@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, firebaseFunctions } from '../lib/firebase';
-import type { SortKey, FuelStatsData, HipassStatsData, NotifSummaryData } from '../components/superAdmin/dashboard/dashboardUtils';
+import { mapNotifTypeCounts, type SortKey, type FuelStatsData, type HipassStatsData, type NotifSummaryData } from '../components/superAdmin/dashboard/dashboardUtils';
 import type { OrgStat, CachedDashboardStats, CachedDashboardTimeSeries, CachedDashboardOrgRankings } from './serviceDashboard/types';
 import { loadFuelHipassStats } from './serviceDashboard/loadFuelHipassStats';
 import { loadNotificationStats } from './serviceDashboard/loadNotificationStats';
@@ -155,50 +155,74 @@ export default function useServiceDashboard(orgFilterId: string = 'ALL') {
             const timeSeriesDocName = isAll ? 'dashboardTimeSeries' : `dashboardTimeSeries_${orgFilterId}`;
             const orgRankingsDocName = 'dashboardOrgRankings';
 
-            // 캐시 문서 3건 + 독립 통계 3건 병렬 로드
-            const [statsDoc, timeSeriesDoc, orgRankingsDoc] = await Promise.all([
+            // 캐시 문서 3건 병렬 로드
+            let [statsSnap, timeSeriesSnap, orgRankingsSnap] = await Promise.all([
                 getDoc(doc(db, 'system', statsDocName)),
                 getDoc(doc(db, 'system', timeSeriesDocName)),
                 getDoc(doc(db, 'system', orgRankingsDocName)),
             ]);
 
             // ── 캐시 문서가 하나도 없으면 자동으로 초기 시딩 수행 (ALL인 경우만) ──
-            const noneExists = !statsDoc.exists() && !timeSeriesDoc.exists() && (orgRankingsDoc ? !orgRankingsDoc.exists() : true);
+            const noneExists = !statsSnap.exists() && !timeSeriesSnap.exists() && (orgRankingsSnap ? !orgRankingsSnap.exists() : true);
             if (noneExists && isAll) {
                 console.info('[Dashboard] 캐시 문서가 없습니다. 자동으로 초기 통계를 생성합니다...');
                 try {
                     const refreshFn = httpsCallable(firebaseFunctions, 'refreshDashboardStats');
                     await refreshFn();
                     // 캐시 생성 후 다시 로드
-                    const [s2, ts2, r2] = await Promise.all([
+                    [statsSnap, timeSeriesSnap, orgRankingsSnap] = await Promise.all([
                         getDoc(doc(db, 'system', statsDocName)),
                         getDoc(doc(db, 'system', timeSeriesDocName)),
                         getDoc(doc(db, 'system', orgRankingsDocName)),
                     ]);
-                    applyCacheDocuments(s2, ts2, r2);
                     console.info('[Dashboard] 초기 시딩 완료');
                 } catch (seedErr) {
                     console.error('[Dashboard] 자동 초기 시딩 실패:', seedErr);
                 }
-            } else {
-                // ── 캐시 문서별 개별 처리 (일부만 있어도 해당 데이터는 표시) ──
-                applyCacheDocuments(statsDoc, timeSeriesDoc, orgRankingsDoc);
+            }
+
+            // ── 캐시 문서별 개별 처리 (일부만 있어도 해당 데이터는 표시) ──
+            applyCacheDocuments(statsSnap, timeSeriesSnap, orgRankingsSnap);
+
+            // ── 주유/하이패스/알림: ALL 스코프는 사전집계 캐시 우선, 아니면(기관 필터·구캐시) 라이브 로더 폴백 ──
+            const s = statsSnap.exists() ? statsSnap.data() as CachedDashboardStats : null;
+            const ts = timeSeriesSnap.exists() ? timeSeriesSnap.data() as CachedDashboardTimeSeries : null;
+            const fuelFromCache = isAll && !!s?.fuelStats && !!s?.hipassStats && !!ts?.dailyFuelCost && !!ts?.dailyHipassAmount;
+            const notifFromCache = isAll && !!s?.notifSummary && !!ts?.dailyNotifStats && !!ts?.notifTypeCounts;
+
+            if (fuelFromCache) {
+                setExternal(prev => ({
+                    ...prev,
+                    fuelStats: s!.fuelStats!, hipassStats: s!.hipassStats!,
+                    dailyFuelCost: ts!.dailyFuelCost!, dailyHipassAmount: ts!.dailyHipassAmount!,
+                }));
+            }
+            if (notifFromCache) {
+                setExternal(prev => ({
+                    ...prev,
+                    notifSummary: s!.notifSummary!, dailyNotifStats: ts!.dailyNotifStats!,
+                    notifTypeStats: mapNotifTypeCounts(ts!.notifTypeCounts!),
+                }));
             }
 
             // 외부 독립 통계는 개별 setter 래퍼를 통해 external state로 병합
-            await Promise.all([
-                loadFuelHipassStats({
+            const liveLoaders: Promise<void>[] = [];
+            if (!fuelFromCache) {
+                liveLoaders.push(loadFuelHipassStats({
                     setFuelStats: (val) => setExternal(prev => ({ ...prev, fuelStats: typeof val === 'function' ? val(prev.fuelStats) : val })),
                     setHipassStats: (val) => setExternal(prev => ({ ...prev, hipassStats: typeof val === 'function' ? val(prev.hipassStats) : val })),
                     setDailyFuelCost: (val) => setExternal(prev => ({ ...prev, dailyFuelCost: typeof val === 'function' ? val(prev.dailyFuelCost) : val })),
                     setDailyHipassAmount: (val) => setExternal(prev => ({ ...prev, dailyHipassAmount: typeof val === 'function' ? val(prev.dailyHipassAmount) : val })),
-                }, orgFilterId),
-                loadNotificationStats({
+                }, orgFilterId));
+            }
+            if (!notifFromCache) {
+                liveLoaders.push(loadNotificationStats({
                     setNotifSummary: (val) => setExternal(prev => ({ ...prev, notifSummary: typeof val === 'function' ? val(prev.notifSummary) : val })),
                     setDailyNotifStats: (val) => setExternal(prev => ({ ...prev, dailyNotifStats: typeof val === 'function' ? val(prev.dailyNotifStats) : val })),
                     setNotifTypeStats: (val) => setExternal(prev => ({ ...prev, notifTypeStats: typeof val === 'function' ? val(prev.notifTypeStats) : val })),
-                }, orgFilterId),
-            ]);
+                }, orgFilterId));
+            }
+            if (liveLoaders.length > 0) await Promise.all(liveLoaders);
 
             sessionStorage.setItem(`svc_dashboard_cache_time_${orgFilterId}`, Date.now().toString());
         } finally {

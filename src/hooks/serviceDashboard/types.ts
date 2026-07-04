@@ -1,4 +1,4 @@
-
+import type { FuelStatsData, HipassStatsData, NotifSummaryData } from '../../components/superAdmin/dashboard/dashboardUtils';
 
 export interface OrgStat {
     id: string; name: string; address: string; lat: number; lng: number;
@@ -43,6 +43,10 @@ export interface CachedDashboardStats {
     firstEmployeeTrend: { month: string; avg: number }[];
     onboardingStats: { total: number; completed: number; rate: number };
     orgSizeDistribution: { label: string; count: number; color: string }[];
+    // ── ALL 스코프 사전집계 (기관별 변형 문서에는 없음 — 캐시 이관 이전 재집계 문서에도 없을 수 있어 옵셔널) ──
+    fuelStats?: FuelStatsData;
+    hipassStats?: HipassStatsData;
+    notifSummary?: NotifSummaryData;
     lastUpdatedAt: string;
     computeDurationMs: number;
 }
@@ -68,6 +72,12 @@ export interface CachedDashboardTimeSeries {
     reservationTypeRatio?: { total: number; single: number; multiDay: number; recurring: number; singleRate: number; multiDayRate: number; recurringRate: number };
     futureReservationTypeStats?: { date: string; single: number; multiDay: number; recurring: number }[];
     futureReservationTypeRatio?: { total: number; single: number; multiDay: number; recurring: number; singleRate: number; multiDayRate: number; recurringRate: number };
+    // ── ALL 스코프 사전집계 (기관별 변형 문서에는 없음) ──
+    dailyFuelCost?: { date: string; cost: number }[];
+    dailyHipassAmount?: { date: string; amount: number }[];
+    dailyNotifStats?: { date: string; sent: number; read: number }[];
+    /** 원시 type 키 — 라벨/색상은 클라이언트 mapNotifTypeCounts로 매핑 */
+    notifTypeCounts?: { type: string; count: number }[];
     lastUpdatedAt: string;
 }
 

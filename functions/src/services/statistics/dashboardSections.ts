@@ -11,6 +11,7 @@ import {
     FIRST_EMPLOYEE_BUCKETS,
     type OrgInfo, type ApprovedOrgData,
 } from "./dashboardHelpers";
+import { getKSTDateString } from "../../utils/kstDate";
 
 // ── 2. 기관 기초 데이터 ──
 
@@ -442,5 +443,117 @@ export function computeReservationStats(
         recommendationRatio, recommendationStats,
         reservationTypeRatio, reservationTypeStats,
         futureReservationTypeRatio, futureReservationTypeStats,
+    };
+}
+
+// ── 10. 주유/하이패스 일별 집계 (ALL 스코프 캐시 이관) ──
+
+/** thirtyDaysAgoStr('YYYY-MM-DD')에서 파생한 로컬 자정 앵커 + 30일 'M/D' 키 맵 생성 */
+function buildDailyKeyMap<T>(thirtyDaysAgoStr: string, init: () => T): { anchor: Date; map: Record<string, T> } {
+    const [y, m, d] = thirtyDaysAgoStr.split("-").map(Number);
+    const anchor = new Date(y, m - 1, d);
+    const map: Record<string, T> = {};
+    for (let i = 0; i < 30; i++) {
+        const cur = new Date(anchor);
+        cur.setDate(cur.getDate() + i);
+        map[`${cur.getMonth() + 1}/${cur.getDate()}`] = init();
+    }
+    return { anchor, map };
+}
+
+export interface FuelHipassDailyResult {
+    dailyFuelCost: { date: string; cost: number }[];
+    dailyHipassAmount: { date: string; amount: number }[];
+}
+
+/**
+ * 주유/하이패스 일별 비용 시계열 (최근 30일, 'M/D' 키).
+ * thirtyDaysAgoStr는 KST 기준 윈도우 시작일(포함) — date 필드가 'YYYY-MM-DD' 문자열이라
+ * date-only 달력 연산만 하므로 UTC 런타임에서도 클라이언트(loadFuelHipassStats)와 키가 일치한다.
+ */
+export function computeFuelHipassDaily(
+    fuelDocs: FirebaseFirestore.QueryDocumentSnapshot[],
+    hipassDocs: FirebaseFirestore.QueryDocumentSnapshot[],
+    thirtyDaysAgoStr: string,
+    orgFilterId: string | null,
+): FuelHipassDailyResult {
+    const { anchor, map: fuelDailyMap } = buildDailyKeyMap(thirtyDaysAgoStr, () => 0);
+    const { map: hipassDailyMap } = buildDailyKeyMap(thirtyDaysAgoStr, () => 0);
+
+    const accumulate = (docs: FirebaseFirestore.QueryDocumentSnapshot[], map: Record<string, number>, field: string) => {
+        docs.forEach(doc => {
+            const data = doc.data();
+            if (orgFilterId && data.organizationId !== orgFilterId) return;
+            const dateStr = data.date as string;
+            if (!dateStr) return;
+            const [y, m, dd] = dateStr.split("-").map(Number);
+            const parsed = new Date(y, m - 1, dd);
+            if (!(parsed >= anchor)) return; // NaN(비정상 date)도 함께 배제
+            const key = `${parsed.getMonth() + 1}/${parsed.getDate()}`;
+            if (map[key] !== undefined) map[key] += (data[field] || 0);
+        });
+    };
+    accumulate(fuelDocs, fuelDailyMap, "fuelCost");
+    accumulate(hipassDocs, hipassDailyMap, "chargeAmount");
+
+    return {
+        dailyFuelCost: Object.entries(fuelDailyMap).map(([date, cost]) => ({ date, cost })),
+        dailyHipassAmount: Object.entries(hipassDailyMap).map(([date, amount]) => ({ date, amount })),
+    };
+}
+
+// ── 11. 알림 집계 (ALL 스코프 캐시 이관) ──
+
+export interface NotificationStatsResult {
+    notifSummary: { total: number; read: number; unread: number; readRate: number };
+    dailyNotifStats: { date: string; sent: number; read: number }[];
+    /** 원시 type 키 — 한글 라벨/색상 매핑은 클라이언트(dashboardUtils.mapNotifTypeCounts) 관심사 */
+    notifTypeCounts: { type: string; count: number }[];
+}
+
+/**
+ * 알림 요약·일별·타입별 집계 (최근 30일, 'M/D' 키).
+ * totals(전체/읽음 수)는 호출자가 count 집계쿼리로 구해 주입한다(원본 전체 스캔 방지).
+ * createdAt은 Timestamp라 getKSTDateString으로 KST 날짜에 버킷팅 — loadNotificationStats와 패리티.
+ */
+export function computeNotificationStats(
+    notifDocs: FirebaseFirestore.QueryDocumentSnapshot[],
+    totals: { total: number; read: number },
+    thirtyDaysAgoStr: string,
+    orgFilterId: string | null,
+): NotificationStatsResult {
+    const { map: dailyMap } = buildDailyKeyMap(thirtyDaysAgoStr, () => ({ sent: 0, read: 0 }));
+    const typeMap: Record<string, number> = {};
+
+    notifDocs.forEach(doc => {
+        const data = doc.data();
+        if (orgFilterId && data.organizationId !== orgFilterId) return;
+
+        const t = (data.type as string) || "system";
+        typeMap[t] = (typeMap[t] || 0) + 1;
+
+        const ts = toDate(data.createdAt);
+        if (!ts) return;
+        const kstStr = getKSTDateString(ts);
+        if (kstStr < thirtyDaysAgoStr) return;
+        const [, m, dd] = kstStr.split("-").map(Number);
+        const key = `${m}/${dd}`;
+        if (dailyMap[key]) {
+            dailyMap[key].sent++;
+            if (data.read) dailyMap[key].read++;
+        }
+    });
+
+    const { total, read } = totals;
+    return {
+        notifSummary: {
+            total, read,
+            unread: total - read,
+            readRate: total > 0 ? Math.round((read / total) * 100) : 0,
+        },
+        dailyNotifStats: Object.entries(dailyMap).map(([date, counts]) => ({ date, ...counts })),
+        notifTypeCounts: Object.entries(typeMap)
+            .map(([type, count]) => ({ type, count }))
+            .sort((a, b) => b.count - a.count),
     };
 }

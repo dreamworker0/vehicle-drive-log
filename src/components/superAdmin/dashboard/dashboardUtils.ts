@@ -148,6 +148,21 @@ export interface NotifSummaryData {
     readRate: number;
 }
 
+// ── 알림 타입 표시 매핑 (라이브 로더·캐시 경로 공용 — 상단 NOTIF_TYPE_LABELS/COLORS 재사용) ──
+
+const NOTIF_FALLBACK_PALETTE = ['#8b5cf6', '#f59e0b', '#3b82f6', '#10b981', '#6b7280', '#ef4444', '#ec4899', '#06b6d4'];
+
+/** 원시 알림 type 카운트 → 한글 라벨 + 색상 + count desc 정렬 (차트 표시 형태) */
+export function mapNotifTypeCounts(counts: { type: string; count: number }[]): { type: string; count: number; color: string }[] {
+    return counts
+        .map(({ type, count }, idx) => ({
+            type: NOTIF_TYPE_LABELS[type] || type,
+            count,
+            color: NOTIF_TYPE_COLORS[type] || NOTIF_FALLBACK_PALETTE[idx % NOTIF_FALLBACK_PALETTE.length],
+        }))
+        .sort((a, b) => b.count - a.count);
+}
+
 export interface FirstEmployeeStatsData {
     avg: number;
     median: number;
