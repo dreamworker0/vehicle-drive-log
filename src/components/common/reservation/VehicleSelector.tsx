@@ -1,7 +1,7 @@
 /**
  * VehicleSelector - 차량 그리드 선택기
  */
-import React from 'react';
+import React, { useMemo } from 'react';
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../../lib/constants';
 import { isVehicleBlocked, isVehicleRestrictedForUser } from '../../../lib/vehicleUtils';
 import { useAuth } from '../../../hooks/useAuth';
@@ -24,11 +24,16 @@ export default function VehicleSelector({
     destinationRef,
 }: VehicleSelectorProps) {
     const { user } = useAuth();
+    // 사용 제한 차량은 맨 뒤로 (상위에서 정렬된 순서는 유지)
+    const orderedVehicles = useMemo(() => [
+        ...vehicles.filter(v => !isVehicleRestrictedForUser(v, user?.uid)),
+        ...vehicles.filter(v => isVehicleRestrictedForUser(v, user?.uid)),
+    ], [vehicles, user?.uid]);
     return (
         <div>
             <label className="label text-sm font-medium">🚘 차량 <span className="text-red-500 dark:text-red-400">*</span></label>
             <div className="grid grid-cols-3 gap-2 mt-1.5">
-                {vehicles.map(v => {
+                {orderedVehicles.map(v => {
                     const isBlocked = isVehicleBlocked(v.maintenance);
                     const isRestricted = !isBlocked && isVehicleRestrictedForUser(v, user?.uid);
                     const isDisabled = isBlocked || isRestricted;

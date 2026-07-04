@@ -19,12 +19,17 @@ interface VehicleSelectorProps {
 
 export default function VehicleSelector({ vehicles, selectedVehicleId, onSelect, usageCounts }: VehicleSelectorProps) {
     const { user } = useAuth();
-    // 폐차 차량은 목록에서 제외 + 사용 빈도순 정렬
+    // 폐차 차량은 목록에서 제외 + 사용 빈도순 정렬 + 사용 제한 차량은 맨 뒤로
     const activeVehicles = useMemo(() => {
         const filtered = vehicles.filter(v => !v.retired?.isRetired);
-        if (!usageCounts || usageCounts.size === 0) return filtered;
-        return [...filtered].sort((a, b) => (usageCounts.get(b.id) || 0) - (usageCounts.get(a.id) || 0));
-    }, [vehicles, usageCounts]);
+        const sorted = (!usageCounts || usageCounts.size === 0)
+            ? filtered
+            : [...filtered].sort((a, b) => (usageCounts.get(b.id) || 0) - (usageCounts.get(a.id) || 0));
+        return [
+            ...sorted.filter(v => !isVehicleRestrictedForUser(v, user?.uid)),
+            ...sorted.filter(v => isVehicleRestrictedForUser(v, user?.uid)),
+        ];
+    }, [vehicles, usageCounts, user?.uid]);
 
     if (activeVehicles.length === 0) {
         return <p className="text-sm text-surface-400 dark:text-surface-500">등록된 차량이 없습니다. 관리자에게 문의하세요.</p>;

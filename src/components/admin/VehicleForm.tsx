@@ -45,6 +45,35 @@ const VEHICLE_TYPES = [
     { value: 'bus', label: '버스', icon: '🚌' },
 ];
 
+/** 선택 입력 섹션 접기/펼치기 래퍼 — 접힌 상태에서도 summary로 입력 여부를 보여준다 */
+function CollapsibleSection({ title, summary, defaultOpen = false, children }: {
+    title: string;
+    summary?: string;
+    defaultOpen?: boolean;
+    children: React.ReactNode;
+}) {
+    const [open, setOpen] = useState(defaultOpen);
+    return (
+        <div className="border border-surface-200 dark:border-surface-700 rounded-xl overflow-hidden">
+            <button
+                type="button"
+                onClick={() => setOpen(o => !o)}
+                aria-expanded={open}
+                className="w-full flex items-center justify-between gap-2 px-3 py-2.5 min-h-[48px] text-left bg-surface-50 dark:bg-surface-800 hover:bg-surface-100 dark:hover:bg-surface-700 transition-colors"
+            >
+                <span className="text-sm font-medium text-surface-700 dark:text-surface-300">{title}</span>
+                <span className="flex items-center gap-2 min-w-0">
+                    {summary && <span className="text-xs text-surface-400 dark:text-surface-500 truncate">{summary}</span>}
+                    <svg className={`w-4 h-4 shrink-0 text-surface-400 dark:text-surface-500 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
+                    </svg>
+                </span>
+            </button>
+            {open && <div className="p-3">{children}</div>}
+        </div>
+    );
+}
+
 export default function VehicleForm({
     form, setForm, editingVehicle, formLoading,
     onSubmit, onCancel, onModelNameChange, modelSuggestions,
@@ -249,8 +278,10 @@ export default function VehicleForm({
                         />
                         <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">차량 등록 시점의 누적 주행거리</p>
                     </div>
-                    <div>
-                        <label className="label">보험 정보</label>
+                    <CollapsibleSection
+                        title="🛡️ 보험 정보 (선택)"
+                        summary={form.insuranceCompany.trim() || (form.insuranceExpiryDate ? `만료 ${form.insuranceExpiryDate}` : '미입력')}
+                    >
                         <div className="grid grid-cols-2 gap-3">
                             <input
                                 type="text" value={form.insuranceCompany}
@@ -273,10 +304,12 @@ export default function VehicleForm({
                         <p id="insurance-info-help" className="text-xs text-surface-400 dark:text-surface-500 mt-1">
                             사고 시 연락할 보험사 정보 · 만료 15일 전 관리자에게 알림
                         </p>
-                    </div>
+                    </CollapsibleSection>
 
-                    <div>
-                        <label className="label">🔒 사용 가능 직원 (선택)</label>
+                    <CollapsibleSection
+                        title="🔒 사용 가능 직원 (선택)"
+                        summary={form.allowedUserIds.length > 0 ? `${form.allowedUserIds.length}명 지정` : '전체 허용'}
+                    >
                         {members.length > 0 ? (
                             <div className="flex flex-wrap gap-1.5">
                                 {members.map(m => {
@@ -302,15 +335,21 @@ export default function VehicleForm({
                         <p className="text-xs text-surface-400 dark:text-surface-500 mt-1.5">
                             선택하지 않으면 모든 직원이 사용할 수 있습니다 · 선택하면 지정된 직원만(관리자 포함 그 외 전원 불가) 예약·운행 가능
                         </p>
-                    </div>
+                    </CollapsibleSection>
 
-                    <VehicleCalendarSection
-                        calendarId={form.googleCalendarId}
-                        onChange={value => setForm({ ...form, googleCalendarId: value })}
-                        editingVehicle={editingVehicle}
-                        onCalendarTestResult={onCalendarTestResult}
-                        initialCalendarError={initialCalendarError}
-                    />
+                    <CollapsibleSection
+                        title="📅 Google 캘린더 (선택)"
+                        summary={(editingVehicle?.calendarSyncFailCount ?? 0) >= 3 ? '⚠️ 동기화 실패' : form.googleCalendarId.trim() ? '연동됨' : '미연동'}
+                        defaultOpen={initialCalendarError}
+                    >
+                        <VehicleCalendarSection
+                            calendarId={form.googleCalendarId}
+                            onChange={value => setForm({ ...form, googleCalendarId: value })}
+                            editingVehicle={editingVehicle}
+                            onCalendarTestResult={onCalendarTestResult}
+                            initialCalendarError={initialCalendarError}
+                        />
+                    </CollapsibleSection>
                     <div className="flex gap-3 pt-2">
                         <button type="button" onClick={onCancel} className="btn-secondary flex-1 min-h-[48px]">취소</button>
                         <button type="submit" disabled={formLoading} className="btn-primary flex-1 min-h-[48px]">
