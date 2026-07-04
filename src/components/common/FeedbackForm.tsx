@@ -237,7 +237,7 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
                                         type="button"
                                         aria-label="이미지 삭제"
                                         onClick={() => removeImage(idx)}
-                                        className="absolute -top-2 -right-2 w-10 h-10 bg-transparent text-red-500 dark:text-red-600 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity min-w-[48px] min-h-[48px]"
+                                        className="absolute -top-2 -right-2 w-10 h-10 bg-transparent text-red-500 dark:text-red-600 rounded-full flex items-center justify-center opacity-100 pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 transition-opacity min-w-[48px] min-h-[48px]"
                                     >
                                         <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />

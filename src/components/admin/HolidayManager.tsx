@@ -161,7 +161,7 @@ export default function HolidayManager({
                                                 {h.type === 'custom' && (
                                                     <button
                                                         onClick={() => onDeleteHoliday(h.id!)}
-                                                        className="opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 dark:hover:text-red-500 transition-all ml-auto flex-shrink-0 min-h-[48px] min-w-[48px] flex items-center justify-center p-2"
+                                                        className="opacity-100 pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 text-red-400 hover:text-red-600 dark:hover:text-red-500 transition-all ml-auto flex-shrink-0 min-h-[48px] min-w-[48px] flex items-center justify-center p-2"
                                                         title="삭제"
                                                     >
                                                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">

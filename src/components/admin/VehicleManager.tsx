@@ -80,7 +80,8 @@ export default function VehicleManager() {
                         <p className="text-sm text-surface-400">{vehicle.modelName}</p>
                     </div>
                 </div>
-                <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                {/* 터치 기기(마우스 없음)는 항상 표시, 데스크톱은 hover 시 표시 */}
+                <div className="flex gap-1 opacity-100 pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 transition-opacity">
                     {isRetired ? (
                         <>
                             <button onClick={() => openRestoreModal(vehicle)} className="btn-icon btn-sm text-green-500 hover:text-green-600 min-h-[48px] min-w-[48px]" title="복원">
