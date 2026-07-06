@@ -76,6 +76,19 @@ export const joinOrganization = onCall(
                 .doc(uid)
                 .get();
 
+            // 비활성화된 계정은 재가입으로 상태를 우회할 수 없다.
+            // (비활성 사용자가 스스로 organizationId를 비운 뒤 재가입해
+            //  status:'disabled'를 덮어써 관리자의 비활성화를 무력화하는 것을 차단)
+            if (
+                existingUser.exists &&
+                existingUser.data()?.status === "disabled"
+            ) {
+                throw new HttpsError(
+                    "permission-denied",
+                    "비활성화된 계정입니다. 기관 관리자에게 문의해 주세요."
+                );
+            }
+
             if (
                 existingUser.exists &&
                 existingUser.data()?.organizationId

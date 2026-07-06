@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Navigate } from 'react-router-dom';
 import { logout } from '../../lib/auth';
 import { auth } from '../../lib/firebase';
 import { refreshTokenSilently } from '../../lib/tokenRefresh';
 
 export default function InviteCodePage() {
-    const { user } = useAuth();
+    const { user, userData } = useAuth();
+    // 이미 기관에 소속된 멤버(초대 링크로 유입 등)는 여기 있으면 안 된다.
+    // 자동 가입이 "이미 소속" 에러로 막다른 길이 되므로 대시보드로 되돌린다.
+    const alreadyInOrg = !!userData?.organizationId;
     const [code, setCode] = useState(() => {
         // 1. URL 파라미터가 가장 우선순위 (마운트 시점에 App.tsx가 아직 URL을 비우지 않았을 경우)
         const params = new URLSearchParams(window.location.search);
@@ -67,7 +70,9 @@ export default function InviteCodePage() {
         } catch (err: unknown) {
             const message = err instanceof Error ? err.message : '';
             // Cloud Function에서 반환한 에러 메시지 그대로 표시
-            if (message.includes('유효하지 않은') || message.includes('초대 코드')) {
+            if (message.includes('비활성화')) {
+                setError('비활성화된 계정입니다. 기관 관리자에게 문의해 주세요.');
+            } else if (message.includes('유효하지 않은') || message.includes('초대 코드')) {
                 setError('유효하지 않은 초대 코드입니다.');
             } else if (message.includes('이미 기관에')) {
                 setError('이미 기관에 소속되어 있습니다. 로그아웃 후 다시 로그인해 주세요.');
@@ -88,6 +93,12 @@ export default function InviteCodePage() {
         if (!autoJoining || autoTriedRef.current) return;
         if (!user) return; // 인증 정보 로딩 대기
 
+        // 이미 기관에 소속된 경우 자동 가입을 시도하지 않는다 (리다이렉트가 처리)
+        if (alreadyInOrg) {
+            setAutoJoining(false);
+            return;
+        }
+
         // 로그인이 필요하거나 코드가 불완전하면 입력 폼으로 폴백
         if (user.isAnonymous || code.length !== 6) {
             setAutoJoining(false);
@@ -99,12 +110,17 @@ export default function InviteCodePage() {
             // 실패(잘못된/만료된 코드 등) 시 입력 폼을 노출해 직접 수정하도록 한다.
             if (!ok) setAutoJoining(false);
         });
-    }, [autoJoining, user, code, joinWithCode]);
+    }, [autoJoining, user, code, joinWithCode, alreadyInOrg]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         await joinWithCode(code);
     };
+
+    // 이미 소속된 멤버는 초대 코드 화면 대신 대시보드로 (게스트 라우트가 역할별로 재분배)
+    if (alreadyInOrg) {
+        return <Navigate to="/" replace />;
+    }
 
     // 링크 코드 자동 연결 중에는 입력 화면 대신 진행 상태만 보여준다.
     if (autoJoining) {
