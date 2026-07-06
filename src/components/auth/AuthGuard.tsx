@@ -6,11 +6,18 @@ import { clearUserOrganization } from '../../lib/firestore';
 import { logout } from '../../lib/auth';
 
 /** 비활성화/기관 삭제 등 차단 상태 공통 화면 */
-export function BlockedScreen({ emoji, title, description, uid }: {
+export function BlockedScreen({ emoji, title, description, uid, allowTransfer = false }: {
   emoji: string;
   title: string;
   description: ReactNode;
   uid: string;
+  /**
+   * '다른 기관으로 가입'(스스로 기관 초기화) 버튼 노출 여부.
+   * 기관 삭제됨 화면에서는 정당한 이동 경로이므로 true.
+   * 계정 비활성화 화면에서는 false — 비활성 사용자가 스스로 기관을 비우고
+   * 재가입해 비활성 상태를 우회하는 것을 막는다(관리자 재활성화만이 정상 경로).
+   */
+  allowTransfer?: boolean;
 }) {
   const handleTransferOrg = async () => {
     try {
@@ -26,12 +33,16 @@ export function BlockedScreen({ emoji, title, description, uid }: {
         <h2 className="text-xl font-bold text-surface-900 dark:text-surface-100 mb-2">{title}</h2>
         <p className="text-surface-500 dark:text-surface-400 text-sm mb-6">{description}</p>
         <div className="space-y-3">
-          <button onClick={handleTransferOrg} className="btn-primary w-full min-h-[48px]">
-            다른 기관으로 가입
-          </button>
+          {allowTransfer && (
+            <button onClick={handleTransferOrg} className="btn-primary w-full min-h-[48px]">
+              다른 기관으로 가입
+            </button>
+          )}
           <button
             onClick={() => { logout(); }}
-            className="btn-ghost w-full text-surface-500 min-h-[48px]"
+            className={allowTransfer
+              ? 'btn-ghost w-full text-surface-500 min-h-[48px]'
+              : 'btn-primary w-full min-h-[48px]'}
           >
             로그아웃
           </button>
@@ -121,6 +132,7 @@ export function AuthGuard({
         title="기관이 삭제되었습니다"
         description={<>소속 기관이 관리자에 의해 삭제되었습니다.<br />다른 기관의 초대 코드로 새로 가입할 수 있습니다.</>}
         uid={user!.uid}
+        allowTransfer
       />
     );
   }

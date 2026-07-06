@@ -62,6 +62,9 @@ async function executeJoinOrganization(params: {
 
     // 4. 이미 가입된 사용자인지 확인
     const existingUser = await db.collection("users").doc(uid).get();
+    if (existingUser.exists && existingUser.data()?.status === "disabled") {
+        throw { code: "permission-denied", message: "비활성화된 계정입니다. 기관 관리자에게 문의해 주세요." };
+    }
     if (existingUser.exists && existingUser.data()?.organizationId) {
         throw { code: "already-exists", message: "이미 기관에 소속되어 있습니다." };
     }
@@ -206,6 +209,32 @@ describe("joinOrganization — 에뮬레이터 통합 테스트", () => {
         ).rejects.toEqual(
             expect.objectContaining({ code: "already-exists" })
         );
+    });
+
+    it("비활성화(status:'disabled')된 계정은 org를 비웠어도 재가입 차단 → permission-denied", async () => {
+        await auth.createUser({ uid: "user-006", email: "disabled@example.com" });
+
+        // 관리자가 비활성화한 뒤 사용자가 스스로 org를 비운 상태를 가정
+        await db.collection("users").doc("user-006").set({
+            email: "disabled@example.com",
+            organizationId: null,
+            role: "employee",
+            status: "disabled",
+        });
+
+        await expect(
+            executeJoinOrganization({
+                uid: "user-006",
+                email: "disabled@example.com",
+                code: TEST_INVITE_CODE,
+            })
+        ).rejects.toEqual(
+            expect.objectContaining({ code: "permission-denied" })
+        );
+
+        // 문서가 재생성/덮어써지지 않았는지 확인 (비활성 상태 유지)
+        const userDoc = await db.collection("users").doc("user-006").get();
+        expect(userDoc.data()?.status).toBe("disabled");
     });
 
     it("admin이 이미 있으면 role은 employee로 설정", async () => {
