@@ -77,12 +77,16 @@ const legalRoutes = [
 ];
 
 
-import toast from 'react-hot-toast';
+import { notifyUser } from './lib/notify';
 
 export default function App() {
 
   // 전역 비동기 에러(App Check 등) 캐치 후 사용자 UI 피드백 제공
   useEffect(() => {
+    // AppCheck 스로틀은 짧은 시간에 rejection이 연발되므로 표시 시간 내 재알림을 억제한다
+    let lastAppCheckToastAt = 0;
+    const APPCHECK_TOAST_DURATION_MS = 5000;
+
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
       const reason = event.reason?.message || event.reason?.toString() || '';
       if (
@@ -90,11 +94,10 @@ export default function App() {
         reason.includes('appCheck/initial-throttle') ||
         (reason.includes('AppCheck') && reason.includes('500 error'))
       ) {
-        // react-hot-toast 동일 ID 지정 시 중복 팝업 방지
-        toast.error('현재 네트워크 환경이 불안정하여 보안 인증이 지연되고 있습니다. 1분 후 다시 시도해주세요.', { 
-          id: 'appcheck-error',
-          duration: 5000 
-        });
+        const now = Date.now();
+        if (now - lastAppCheckToastAt < APPCHECK_TOAST_DURATION_MS) return;
+        lastAppCheckToastAt = now;
+        notifyUser('현재 네트워크 환경이 불안정하여 보안 인증이 지연되고 있습니다. 1분 후 다시 시도해주세요.', 'error', APPCHECK_TOAST_DURATION_MS);
       }
     };
     window.addEventListener('unhandledrejection', handleUnhandledRejection);

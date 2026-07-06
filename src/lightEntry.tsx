@@ -13,6 +13,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth } from './lib/firebaseAuth';
 import { AuthProvider } from './hooks/useAuth';
+import { ToastProviderWrapper } from './hooks/ToastProvider';
 import UpdatePrompt from './components/common/UpdatePrompt';
 import InstallPrompt from './components/common/InstallPrompt';
 import InAppBrowserGuard from './components/common/InAppBrowserGuard';
@@ -48,19 +49,23 @@ export function renderLightApp() {
         <StrictMode>
             <BrowserRouter>
                 <AuthProvider>
-                    <Routes>
-                        <Route path="/" element={<LandingPage />} />
-                        {/* 인앱 브라우저에서는 외부 브라우저 안내로 대체 (랜딩 등 다른 라우트는 그대로 노출) */}
-                        <Route path="/login" element={<InAppBrowserGuard><LoginPage /></InAppBrowserGuard>} />
-                        <Route path="/apply" element={<OrgApplicationPage />} />
-                        <Route path="/terms" element={<TermsPage />} />
-                        <Route path="/privacy" element={<PrivacyPage />} />
-                        <Route path="/release-notes" element={<ReleaseNotesPage />} />
-                        <Route path="/faq" element={<FAQPage />} />
-                        <Route path="*" element={<Navigate to="/" replace />} />
-                    </Routes>
-                    <UpdatePrompt />
-                    <InstallPrompt />
+                    {/* 커스텀 토스트는 zustand 스토어만 사용하는 경량 컴포넌트 —
+                        랜딩 문의 폼 등 비인증 경로의 토스트 표시를 위해 경량 엔트리에도 마운트 */}
+                    <ToastProviderWrapper>
+                        <Routes>
+                            <Route path="/" element={<LandingPage />} />
+                            {/* 인앱 브라우저에서는 외부 브라우저 안내로 대체 (랜딩 등 다른 라우트는 그대로 노출) */}
+                            <Route path="/login" element={<InAppBrowserGuard><LoginPage /></InAppBrowserGuard>} />
+                            <Route path="/apply" element={<OrgApplicationPage />} />
+                            <Route path="/terms" element={<TermsPage />} />
+                            <Route path="/privacy" element={<PrivacyPage />} />
+                            <Route path="/release-notes" element={<ReleaseNotesPage />} />
+                            <Route path="/faq" element={<FAQPage />} />
+                            <Route path="*" element={<Navigate to="/" replace />} />
+                        </Routes>
+                        <UpdatePrompt />
+                        <InstallPrompt />
+                    </ToastProviderWrapper>
                 </AuthProvider>
             </BrowserRouter>
         </StrictMode>,

@@ -94,7 +94,7 @@
 
 - 프론트엔드 Sentry: [src/lib/sentry.ts](src/lib/sentry.ts) — `ignoreErrors` 리스트 + `beforeSend` 훅. 노이즈 에러는 여기에만 추가.
 - Functions Sentry: [functions/src/sentry.ts](functions/src/sentry.ts) — `captureError(err, ctx)` 사용. Discord 웹훅 병행.
-- 사용자 메시지 출력은 `react-hot-toast`. `alert()` 금지.
+- 사용자 메시지 출력은 커스텀 토스트 — 컴포넌트에서는 `useToast().showToast`, 비-React 모듈에서는 `notifyUser`([src/lib/notify.ts](src/lib/notify.ts)). `alert()`·react-hot-toast 금지 (Phase 90에서 패키지 제거).
 
 ## 작업 스타일
 

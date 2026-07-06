@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import { firebaseFunctions } from '../../lib/firebase';
-import toast from 'react-hot-toast';
+import { useToast } from '../../hooks/useToast';
 
 interface PublicFeedbackModalProps {
     isOpen: boolean;
@@ -13,15 +13,16 @@ export default function PublicFeedbackModal({ isOpen, onClose }: PublicFeedbackM
     const [email, setEmail] = useState('');
     const [message, setMessage] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const { showToast } = useToast(); // 조기 return보다 위에서 호출 (훅 규칙)
 
     if (!isOpen) return null;
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        
-        if (!name.trim()) return toast.error('이름을 입력해주세요.');
-        if (!email.trim() || !email.includes('@')) return toast.error('유효한 이메일을 입력해주세요.');
-        if (!message.trim()) return toast.error('문의하실 내용을 입력해주세요.');
+
+        if (!name.trim()) return showToast('이름을 입력해주세요.', 'error');
+        if (!email.trim() || !email.includes('@')) return showToast('유효한 이메일을 입력해주세요.', 'error');
+        if (!message.trim()) return showToast('문의하실 내용을 입력해주세요.', 'error');
 
         setIsSubmitting(true);
         const submitFn = httpsCallable(firebaseFunctions, 'submitPublicFeedback');
@@ -33,14 +34,14 @@ export default function PublicFeedbackModal({ isOpen, onClose }: PublicFeedbackM
                 message: message.trim(),
             });
             
-            toast.success('문의가 접수되었습니다. 최대한 빠르게 답변해 드리겠습니다.', { duration: 4000 });
+            showToast('문의가 접수되었습니다. 최대한 빠르게 답변해 드리겠습니다.', 'success', 4000);
             setName('');
             setEmail('');
             setMessage('');
             onClose();
         } catch (error: unknown) {
             console.error(error);
-            toast.error(error instanceof Error ? error.message : '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
+            showToast(error instanceof Error ? error.message : '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.', 'error');
         } finally {
             setIsSubmitting(false);
         }
