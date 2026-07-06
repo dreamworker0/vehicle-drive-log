@@ -3,8 +3,20 @@ name: CI — 린트 · 테스트 · 빌드
 on:
   push:
     branches: [master]
+    # 문서·마크다운만 변경된 푸시는 CI(및 이어지는 Deploy)를 건너뛴다 — Actions 무료 분량 절약.
+    # 1회 풀 사이클 ≈ 20분(CI ~16분 + Deploy ~4분)이라 문서 전용 푸시가 누적 비용의 주범이었다.
+    # 코드와 섞인 푸시는 정상 실행되고, .md 전용 변경의 sync --check는 다음 코드 푸시에서 검증된다.
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
   pull_request:
     branches: [master]
+
+# 연속 푸시가 겹치면 낡은 CI를 취소한다 — 마지막 푸시만 검증·배포된다.
+# (취소된 CI는 conclusion이 success가 아니므로 Deploy(workflow_run)로 이어지지 않아 안전)
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   ci:
