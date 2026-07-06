@@ -7,6 +7,8 @@
  * 사용법 (프로젝트 루트에서, ADC/서비스계정 설정된 상태):
  *   fnm exec --using=22 npx tsx scripts/diagnose-user.ts <이메일>
  *   fnm exec --using=22 npx tsx scripts/diagnose-user.ts <이메일> --fix
+ *   fnm exec --using=22 npx tsx scripts/diagnose-user.ts <이메일> --fix --org=<organizationId>
+ * (인수 순서 무관. organizationId 가 비워진 계정은 --org=<id> 로 되돌릴 기관 지정)
  *
  * --fix 는 다음을 수행한다(복구):
  *   1) Firebase Auth 계정 재활성화(disabled=false)
@@ -22,8 +24,13 @@ initializeApp();
 const db = getFirestore();
 const authAdmin = getAuth();
 
-const email = process.argv[2];
-const doFix = process.argv.includes('--fix');
+// 인수는 순서에 무관하게 파싱한다 (플래그가 이메일보다 앞에 와도 동작).
+const args = process.argv.slice(2);
+const doFix = args.includes('--fix');
+// organizationId 가 비워진 계정을 복구할 때, 되돌릴 기관을 명시 지정: --org=<id>
+const orgOverride = args.find((a) => a.startsWith('--org='))?.split('=')[1];
+// 이메일 = 플래그가 아닌 첫 인수
+const email = args.find((a) => !a.startsWith('--'));
 
 if (!email) {
   console.error('사용법: tsx scripts/diagnose-user.ts <이메일> [--fix]');
@@ -94,24 +101,41 @@ async function main() {
   console.log('\n=== --fix: 복구 시작 ===');
   const u = userSnap.exists ? userSnap.data()! : null;
 
-  if (!u || !u.organizationId) {
-    console.log('❌ organizationId 가 없어 자동 복구를 중단합니다.');
+  if (!u) {
+    console.log('❌ users 문서가 없어 자동 복구를 중단합니다.');
     console.log('   → superAdmin 화면의 "계정 복원"(기관/역할 지정)으로 문서를 재생성하세요.');
     return;
   }
+
+  // 되돌릴 기관: 문서에 남아 있으면 그대로, 비워졌으면 --org 로 지정한 기관을 검증 후 사용
+  const targetOrgId: string | null = u.organizationId || orgOverride || null;
+  if (!targetOrgId) {
+    console.log('❌ organizationId 가 비어 있고 --org 지정도 없어 자동 복구를 중단합니다.');
+    console.log('   → 되돌릴 기관을 알면 --org=<organizationId> 를 붙여 다시 실행하세요.');
+    return;
+  }
+  const targetOrgSnap = await db.collection('organizations').doc(targetOrgId).get();
+  if (!targetOrgSnap.exists || targetOrgSnap.data()?.status !== 'approved') {
+    console.log(`❌ 대상 기관(${targetOrgId})이 없거나 승인 상태가 아닙니다. 복구 중단.`);
+    return;
+  }
+  const targetRole = u.role || 'employee';
 
   if (authUser.disabled) {
     await authAdmin.updateUser(authUser.uid, { disabled: false });
     console.log('✅ Auth 계정 재활성화(disabled=false)');
   }
 
-  await userRef.update({ status: 'active', disabledAt: null });
-  console.log('✅ users 문서 status=active, disabledAt=null');
+  await userRef.update({ organizationId: targetOrgId, role: targetRole, status: 'active', disabledAt: null });
+  console.log(`✅ users 문서 organizationId=${targetOrgId}, role=${targetRole}, status=active, disabledAt=null`);
 
-  await authAdmin.setCustomUserClaims(authUser.uid, { role: u.role, orgId: u.organizationId });
+  await authAdmin.setCustomUserClaims(authUser.uid, { role: targetRole, orgId: targetOrgId });
   await authAdmin.revokeRefreshTokens(authUser.uid);
-  console.log(`✅ Custom Claims 재설정(role=${u.role}, orgId=${u.organizationId}) + 토큰 무효화`);
+  console.log(`✅ Custom Claims 재설정(role=${targetRole}, orgId=${targetOrgId}) + 토큰 무효화`);
   console.log('\n복구 완료. 직원에게 앱을 완전히 종료 후 다시 로그인하도록 안내하세요.\n');
 }
 
-main().catch(console.error);
+main().catch((err) => {
+  console.error(err);
+  process.exit(1);
+});
