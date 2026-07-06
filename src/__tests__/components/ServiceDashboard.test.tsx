@@ -112,7 +112,7 @@ const mockData = {
     },
     actions: {
         loadAllStats: vi.fn(),
-        refreshServerStats: vi.fn().mockResolvedValue(true)
+        refreshServerStats: vi.fn().mockResolvedValue({ skipped: false })
     }
 };
 

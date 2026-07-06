@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { lazy, Suspense, useState } from 'react';
+import { useToast } from '../../hooks/useToast';
 import useServiceDashboard from '../../hooks/useServiceDashboard';
 import { ORG_PAGE_SIZE } from './dashboard/dashboardUtils';
 import DashboardOverviewCards from './dashboard/DashboardOverviewCards';
@@ -23,6 +24,7 @@ type TabType = 'overview' | 'analysis' | 'experience';
 export default function ServiceDashboard() {
     const [activeTab, setActiveTab] = useState<TabType>('analysis');
     const [selectedOrgId, setSelectedOrgId] = useState<string>('ALL');
+    const { showToast } = useToast();
 
     const {
         loading,
@@ -34,6 +36,21 @@ export default function ServiceDashboard() {
         ui,
         actions
     } = useServiceDashboard(selectedOrgId);
+
+    // 수동 갱신 — 서버 쿨다운으로 생략되면 안내, 재집계되면 성공 토스트로 결과를 명확히 전달한다.
+    const handleRefresh = async () => {
+        try {
+            const { skipped, retryAfterSec } = await actions.refreshServerStats();
+            if (skipped) {
+                const min = retryAfterSec ? Math.ceil(retryAfterSec / 60) : 5;
+                showToast(`이미 최근에 갱신했습니다. 약 ${min}분 후 다시 시도할 수 있어요.`, 'info');
+            } else {
+                showToast('전체 통계를 갱신했습니다.', 'success');
+            }
+        } catch {
+            showToast('통계 갱신에 실패했습니다. 잠시 후 다시 시도해주세요.', 'error');
+        }
+    };
 
     if (loading) {
         return (
@@ -55,7 +72,7 @@ export default function ServiceDashboard() {
                     />
                 </div>
                 <div className="flex flex-col items-end gap-1">
-                    <button onClick={() => actions.refreshServerStats()} className="btn-ghost w-fit text-sm flex items-center gap-1 min-h-[48px] px-3">
+                    <button onClick={handleRefresh} className="btn-ghost w-fit text-sm flex items-center gap-1 min-h-[48px] px-3">
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
                         </svg>
@@ -161,7 +178,7 @@ export default function ServiceDashboard() {
                         sortDir={ui.sortDir}
                         handleSort={ui.handleSort}
                         sortIndicator={ui.sortIndicator}
-                        onRefresh={actions.refreshServerStats}
+                        onRefresh={handleRefresh}
                     />
                 </div>
             )}

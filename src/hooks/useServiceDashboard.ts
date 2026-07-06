@@ -1,5 +1,5 @@
  
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { doc, getDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, firebaseFunctions } from '../lib/firebase';
@@ -243,21 +243,33 @@ export default function useServiceDashboard(orgFilterId: string = 'ALL') {
         loadAllStats(!!isBackground);
     }, [loadAllStats]);
 
+    // 재집계 요청 진행 중 여부 — 스피너 전환 전(같은 프레임) 연타로 요청이 중복 발사되는 것을 막는다.
+    const refreshingRef = useRef(false);
+
     /**
-     * 서버 측 대시보드 통계 재계산 요청 (Cloud Function 호출)
+     * 서버 측 대시보드 통계 재계산 요청 (Cloud Function 호출).
+     * 반환: { skipped } — 서버 쿨다운으로 재집계가 생략됐는지 여부. retryAfterSec는 남은 대기(초).
      */
-    const refreshServerStats = async () => {
+    const refreshServerStats = async (): Promise<{ skipped: boolean; retryAfterSec?: number }> => {
+        // 클라이언트 재진입 가드: 이미 요청이 진행 중이면 무시 (중복 발사 차단)
+        if (refreshingRef.current) return { skipped: true };
+        refreshingRef.current = true;
         setLoading(true);
         try {
-            const refreshFn = httpsCallable(firebaseFunctions, 'refreshDashboardStats');
-            await refreshFn();
-            // 재집계 완료 후 데이터 다시 로드
-            await loadAllStats(false);
+            const refreshFn = httpsCallable<unknown, { success: boolean; skipped?: boolean; retryAfterSec?: number }>(
+                firebaseFunctions, 'refreshDashboardStats'
+            );
+            const { data } = await refreshFn();
+            const skipped = data?.skipped === true;
+            // 쿨다운으로 생략된 경우 캐시는 그대로이므로 재로드 없이 반환 (불필요한 read 절약)
+            if (!skipped) await loadAllStats(false);
+            return { skipped, retryAfterSec: data?.retryAfterSec };
         } catch (err) {
             console.error('[Dashboard] 서버 갱신 실패:', err);
             throw err;
         } finally {
             setLoading(false);
+            refreshingRef.current = false;
         }
     };
 
