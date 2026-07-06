@@ -517,3 +517,23 @@ html.font-large .text-sm {
   /* 17px */
   line-height: 1.5rem !important;
 }
+
+/* ===== 접근성: 동작 줄이기 (prefers-reduced-motion) ===== */
+/* 시스템 설정에서 "동작 줄이기"를 켠 사용자(전정 장애 등)에게는 장식성 애니메이션·전환을 비활성화한다.
+   로딩 스피너는 진행 상태를 전달하는 수단이므로 예외로 계속 회전시킨다. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .spinner,
+  .animate-spin {
+    animation-duration: 1.5s !important;
+    animation-iteration-count: infinite !important;
+  }
+}
