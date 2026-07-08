@@ -148,11 +148,25 @@ function initSentryWithModule(Sentry: SentryModule) {
             // Firebase SDK 번들 내부 에러 필터링 (Vite 빌드: firebase-{hash}.js)
             const frames = event.exception?.values?.[0]?.stacktrace?.frames;
             if (frames?.some(f =>
-                f.filename?.includes('/firebase-') 
+                f.filename?.includes('/firebase-')
                 // [임시 주석 처리] App Check 에러 추적을 위해 recaptcha 스택트레이스 포함 시 허용
                 // || f.filename?.includes('recaptcha')
             )) {
                 return null;
+            }
+
+            // 인앱 브라우저(WebView)에서 HTML 문서가 네트워크로 스트리밍되다 잘려
+            // 인라인 스크립트 파싱이 EOF/구문 오류로 실패하는 환경 노이즈 확정 차단.
+            // ignoreErrors(/Unexpected end of input/)가 놓치는 변형 메시지까지 포괄한다:
+            // 번들 스크립트(.js/.mjs)가 아니라 문서 URL(/login 등)에서 난 SyntaxError는
+            // 우리 코드 버그가 아니라 문서 전송 절단이므로 억제한다(트랜잭션 /login 등으로 보고됨).
+            // 진짜 코드 버그의 SyntaxError는 번들 청크(.js) 프레임을 가지므로 통과한다.
+            const firstException = event.exception?.values?.[0];
+            if (firstException?.type === 'SyntaxError') {
+                const topFrame = frames?.[frames.length - 1];
+                if (!/\.m?js(\?|$)/.test(topFrame?.filename || '')) {
+                    return null;
+                }
             }
 
             // 모든 브라우저의 DOM NotFoundError (DOMException code 8) 필터링
