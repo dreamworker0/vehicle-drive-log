@@ -62,6 +62,10 @@ function initSentryWithModule(Sentry: SentryModule) {
             /Loading chunk .* failed/,
             /Failed to fetch dynamically imported module/,
             /Importing a module script failed/,
+            // 인앱 브라우저(WebView)에서 불안정한 네트워크로 HTML 응답이 다운로드 중 잘려
+            // 인라인 스크립트 파싱이 EOF에 도달할 때 발생 (문서 URL /login:1 로 보고됨, 앱 버그 아님).
+            // 진짜 JSON.parse 버그는 "Unexpected end of JSON input"로 뜨므로 매칭되지 않음.
+            /Unexpected end of input/,
             // 브라우저/PWA 관련 무해한 에러
             'AbortError',
             /Object Not Found Matching Id/,
