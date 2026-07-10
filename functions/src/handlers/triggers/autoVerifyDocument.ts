@@ -22,9 +22,9 @@ const tmapApiKey = defineString("TMAP_API_KEY");
 // 화이트리스트 자동 승인은 테스트 프로젝트 전용 (ALLOW_TEST_WHITELIST=true).
 // 프로덕션은 기본적으로 정식 AI 검증 경로를 타야 하며, 화이트리스트가 승인 절차를
 // 우회하는 백도어가 되지 않도록 한다 (2026-07-10 감사 #2).
-// 기본값 "false" — .env에 미지정된 배포 환경에서도 비대화형 배포가 값을 요구하지 않게 하고
-// (params는 기본값 없으면 배포 시 값을 강제), 프로덕션은 명시적 "true" 없이는 항상 비활성이다.
-const allowTestWhitelist = defineString("ALLOW_TEST_WHITELIST", { default: "false" });
+// defineString 파라미터는 기본값이 있어도 (구버전 firebase-tools에서) 비대화형 배포 시 값을
+// 요구해 배포를 막으므로, params 매니페스트를 거치지 않는 런타임 process.env로 직접 읽는다.
+// 프로덕션은 .env에 미지정 → undefined → 비활성. 테스트 프로젝트만 .env에 "true"로 지정.
 
 // ── 화이트리스트 / 블랙리스트 상수 ──
 
@@ -111,7 +111,7 @@ export const autoVerifyDocument = onDocumentWritten(
         const applicantPhone = after.applicantPhone as string | undefined;
 
         // ── 화이트리스트 예외 처리 (테스트용) ──
-        const whitelistMatch = allowTestWhitelist.value() === "true"
+        const whitelistMatch = process.env.ALLOW_TEST_WHITELIST === "true"
             ? WHITELIST.find((w) => orgName.includes(w.name))
             : undefined;
         if (whitelistMatch) {
