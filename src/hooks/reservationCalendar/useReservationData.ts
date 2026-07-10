@@ -103,7 +103,8 @@ export function useReservationData({
                 const calId = vehicle.googleCalendarId;
                 // 유효한 구글 캘린더 ID를 가졌고, 30분 쿨다운을 지난 경우 백그라운드 동기화 자동 시작
                 if (calId && calId.includes('@') && checkCooldown(vehicle.id)) {
-                    console.log(`[useReservationData] Triggering background calendar sync for ${vehicle.displayName} (${vehicle.id})`);
+                    // 정보성 로그는 개발 모드에서만 — 프로덕션 콘솔 노이즈·차량 정보 노출 방지
+                    if (import.meta.env.DEV) console.log(`[useReservationData] Triggering background calendar sync for ${vehicle.displayName} (${vehicle.id})`);
                     const success = await syncVehicleOnDemand(vehicle.id, userData.organizationId!);
                     if (success) {
                         anySynced = true;
@@ -112,7 +113,7 @@ export function useReservationData({
             }
             // 하나라도 성공했으면 예약을 즉시 리프레시하여 실시간 반영
             if (anySynced) {
-                console.log('[useReservationData] Calendar sync completed, refreshing reservations...');
+                if (import.meta.env.DEV) console.log('[useReservationData] Calendar sync completed, refreshing reservations...');
                 fetchReservations();
             }
         };
