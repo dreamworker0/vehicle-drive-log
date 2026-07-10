@@ -33,13 +33,14 @@ export default defineConfig({
         coverage: {
             provider: 'v8',
             reporter: ['text', 'text-summary', 'json', 'lcov', 'html'],
-            // 실측(2026-07-06 2차: lines 28.08/stmts 26.94/funcs 21.63/branches 16.76) 기준
+            // 실측(2026-07-10: lines 29.12/stmts 27.89/funcs 21.88/branches 17.83) 기준
             // 후퇴 방지선(안전 마진 ~1pp). 목표는 숫자가 아니라 회귀 차단 — 테스트 추가에 맞춰 단계 상향.
+            // 2026-07-10 임계경로 테스트(syncQueue·auth·예약 제출) 추가로 하한 상향.
             thresholds: {
-                lines: 27,
-                statements: 26,
+                lines: 28,
+                statements: 27,
                 functions: 21,
-                branches: 16
+                branches: 17
             },
             include: ['src/**/*.{ts,tsx}'],
             exclude: [
