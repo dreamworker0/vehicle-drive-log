@@ -8,6 +8,15 @@
 const mockCallerGet = jest.fn();
 const mockTargetGet = jest.fn();
 const mockUpdate = jest.fn().mockResolvedValue(undefined);
+const mockAuthUpdateUser = jest.fn().mockResolvedValue(undefined);
+const mockRevokeRefreshTokens = jest.fn().mockResolvedValue(undefined);
+
+jest.mock('firebase-admin/auth', () => ({
+    getAuth: () => ({
+        updateUser: mockAuthUpdateUser,
+        revokeRefreshTokens: mockRevokeRefreshTokens,
+    }),
+}));
 
 jest.mock('firebase-admin/firestore', () => ({
     getFirestore: () => ({
@@ -43,6 +52,8 @@ describe('disableUser — 직원 비활성화', () => {
     beforeEach(() => {
         jest.clearAllMocks();
         mockUpdate.mockResolvedValue(undefined);
+        mockAuthUpdateUser.mockResolvedValue(undefined);
+        mockRevokeRefreshTokens.mockResolvedValue(undefined);
     });
 
     it('인증이 없으면 unauthenticated 에러를 던진다', async () => {
@@ -108,5 +119,25 @@ describe('disableUser — 직원 비활성화', () => {
             status: 'disabled',
             disabledAt: 'SERVER_TIMESTAMP',
         });
+        // 서버 차단: Auth 계정 비활성화 + 리프레시 토큰 폐기까지 수행해야 한다 (감사 #1)
+        expect(mockAuthUpdateUser).toHaveBeenCalledWith('target-uid', { disabled: true });
+        expect(mockRevokeRefreshTokens).toHaveBeenCalledWith('target-uid');
+    });
+
+    it('Auth 계정이 없어도(auth/user-not-found) Firestore 비활성화는 성공 처리한다', async () => {
+        mockCallerGet.mockResolvedValueOnce({
+            data: () => ({ role: 'admin', organizationId: 'org1' }),
+        });
+        mockTargetGet.mockResolvedValueOnce({
+            exists: true,
+            data: () => ({ role: 'employee', organizationId: 'org1' }),
+        });
+        mockAuthUpdateUser.mockRejectedValueOnce({ code: 'auth/user-not-found' });
+
+        const req = { auth: { uid: 'caller-uid', token: {} }, data: { uid: 'target-uid' } };
+        const result = await handler(req);
+
+        expect(result).toEqual({ success: true });
+        expect(mockUpdate).toHaveBeenCalled();
     });
 });

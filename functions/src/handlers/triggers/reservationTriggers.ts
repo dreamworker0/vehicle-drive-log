@@ -121,8 +121,8 @@ export const onReservationCreated = onDocumentCreated("reservations/{reservation
         // 개인 구글 캘린더 동기화 (예외 격리)
         if (reservation.reservedByUid) {
             try {
-                const userSnap = await getFirestore().collection("users").doc(reservation.reservedByUid).get();
-                if (userSnap.exists && userSnap.data()?.googleOauth) {
+                const oauthSnap = await getFirestore().collection("users").doc(reservation.reservedByUid).collection("private").doc("oauth").get();
+                if (oauthSnap.exists && oauthSnap.data()?.refreshToken) {
                     const { getValidOAuth2Client, createPersonalCalendarEvent } = await import("../../services/calendar/personalCalendarSync");
                     const oauth2Client = await getValidOAuth2Client(reservation.reservedByUid);
                     const personalEventId = await createPersonalCalendarEvent(oauth2Client, reservation as Parameters<typeof createPersonalCalendarEvent>[1]);
@@ -250,8 +250,8 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
             // 개인 캘린더 생성 (예외 격리)
             if (after.reservedByUid && !after.personalCalendarEventId) {
                 try {
-                    const userSnap = await getFirestore().collection("users").doc(after.reservedByUid).get();
-                    if (userSnap.exists && userSnap.data()?.googleOauth) {
+                    const oauthSnap = await getFirestore().collection("users").doc(after.reservedByUid).collection("private").doc("oauth").get();
+                    if (oauthSnap.exists && oauthSnap.data()?.refreshToken) {
                         const { getValidOAuth2Client, createPersonalCalendarEvent } = await import("../../services/calendar/personalCalendarSync");
                         const oauth2Client = await getValidOAuth2Client(after.reservedByUid);
                         const personalEventId = await createPersonalCalendarEvent(oauth2Client, after as Parameters<typeof createPersonalCalendarEvent>[1]);

@@ -5,6 +5,7 @@
  */
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { getAuth } from "firebase-admin/auth";
 
 export const disableUser = onCall(
     {
@@ -54,6 +55,22 @@ export const disableUser = onCall(
                 status: "disabled",
                 disabledAt: FieldValue.serverTimestamp(),
             });
+
+            // 4. 서버 차단 — Auth 계정을 실제로 비활성화하고 리프레시 토큰을 폐기한다.
+            //    (과거엔 Firestore status만 바꿔, 비활성 사용자가 SDK로 자기 기관 데이터에
+            //     계속 접근할 수 있었음. 2026-07-10 감사 #1)
+            try {
+                await getAuth().updateUser(uid, { disabled: true });
+                await getAuth().revokeRefreshTokens(uid);
+            } catch (authErr: unknown) {
+                const code = (authErr as { code?: string }).code;
+                if (code === "auth/user-not-found") {
+                    // Firestore 문서만 있고 Auth 계정이 없는 경우 — 문서 비활성화로 충분
+                    console.warn(`직원 비활성화: Auth 계정 없음, Firestore status만 적용 (${uid})`);
+                } else {
+                    throw authErr;
+                }
+            }
 
             console.log(`직원 비활성화 완료: ${uid} (호출자: ${request.auth.uid})`);
             return { success: true };

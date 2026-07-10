@@ -24,14 +24,12 @@ interface ReservationData {
 }
 
 export async function getValidOAuth2Client(uid: string): Promise<OAuth2Client> {
-    const userRef = db.collection("users").doc(uid);
-    const userSnap = await userRef.get();
-    if (!userSnap.exists) {
-        throw new Error(`User ${uid} not found`);
-    }
-
-    const userData = userSnap.data();
-    const oauthData = userData?.googleOauth as GoogleOauthData | undefined;
+    // OAuth 토큰은 users/{uid}/private/oauth 서브컬렉션에 보관한다 (Admin SDK 전용).
+    // 과거 users 문서 필드 저장은 같은 기관 멤버가 리프레시 토큰을 읽어 계정을
+    // 임퍼소네이션할 수 있었음 (2026-07-10 감사 #4).
+    const oauthRef = db.collection("users").doc(uid).collection("private").doc("oauth");
+    const oauthSnap = await oauthRef.get();
+    const oauthData = oauthSnap.exists ? (oauthSnap.data() as GoogleOauthData | undefined) : undefined;
 
     if (!oauthData || !oauthData.accessToken || !oauthData.refreshToken) {
         throw new Error(`Google OAuth credentials not found for user ${uid}`);
@@ -59,12 +57,8 @@ export async function getValidOAuth2Client(uid: string): Promise<OAuth2Client> {
             // 트랜잭션을 적용하여 동시성 상황에서 토큰 덮어쓰기 레이스 컨디션 방지
             let finalOauthData = oauthData;
             await db.runTransaction(async (transaction) => {
-                const freshSnap = await transaction.get(userRef);
-                if (!freshSnap.exists) {
-                    throw new Error(`User ${uid} not found`);
-                }
-                const freshData = freshSnap.data();
-                const freshOauthData = freshData?.googleOauth as GoogleOauthData | undefined;
+                const freshSnap = await transaction.get(oauthRef);
+                const freshOauthData = freshSnap.exists ? (freshSnap.data() as GoogleOauthData | undefined) : undefined;
 
                 // 만약 그 사이에 다른 트랜잭션이 이미 토큰을 더 최근에 갱신했다면 (만료 버퍼를 초과하게 갱신됨),
                 // 그것을 덮어쓰지 않고 최신 값을 그대로 유지합니다.
@@ -83,9 +77,7 @@ export async function getValidOAuth2Client(uid: string): Promise<OAuth2Client> {
                     updatedOauthData.refreshToken = credentials.refresh_token;
                 }
 
-                transaction.update(userRef, {
-                    googleOauth: updatedOauthData,
-                });
+                transaction.set(oauthRef, updatedOauthData, { merge: true });
                 finalOauthData = updatedOauthData;
             });
 

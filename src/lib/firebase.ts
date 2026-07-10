@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, connectAuthEmulator } from 'firebase/auth';
 import { authReady as _authReady } from './firebaseAuth';
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, getFirestore, clearIndexedDbPersistence, connectFirestoreEmulator } from 'firebase/firestore';
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, getFirestore, clearIndexedDbPersistence, terminate, connectFirestoreEmulator } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 import { initializeAppCheck, ReCaptchaV3Provider, onTokenChanged } from 'firebase/app-check';
@@ -309,6 +309,21 @@ checkIndexedDBAvailability().then((available) => {
 });
 
 export { db };
+
+/**
+ * 로그아웃 시 Firestore 영구(IndexedDB) 캐시를 폐기한다.
+ * 공용 기기에서 이전 사용자의 문서 캐시가 남지 않도록 한다 (2026-07-10 감사 #8).
+ * 인스턴스를 terminate하므로 호출 후에는 반드시 페이지를 리로드해야 한다.
+ * 다중 탭이 캐시를 점유 중이면 실패할 수 있으나, 로그아웃 흐름은 계속 진행한다.
+ */
+export async function clearOfflineCache(): Promise<void> {
+    try {
+        await terminate(db);
+        await clearIndexedDbPersistence(db);
+    } catch (err) {
+        console.warn('[Firestore] 오프라인 캐시 정리 실패 (계속 진행):', err);
+    }
+}
 export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
 export const firebaseFunctions = getFunctions(app, 'asia-northeast3');

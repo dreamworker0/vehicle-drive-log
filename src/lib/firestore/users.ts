@@ -4,11 +4,11 @@
 import {
     doc, getDoc, setDoc, updateDoc, deleteDoc,
     collection, query, where, getDocs, getCountFromServer,
-    serverTimestamp, deleteField,
+    serverTimestamp,
     type DocumentData,
 } from 'firebase/firestore';
 import { db } from '../firebase';
-import type { User, GoogleOauthData } from '../../types/user';
+import type { User } from '../../types/user';
 import { createZodConverter, userSchema } from '../../schemas';
 import { captureError } from '../sentry';
 
@@ -144,38 +144,6 @@ export const clearUserOrganization = async (uid: string): Promise<void> => {
     }
 };
 
-// Google OAuth 정보 저장
-export const saveUserGoogleOauth = async (uid: string, oauthData: GoogleOauthData): Promise<void> => {
-    try {
-        await updateDoc(doc(db, 'users', uid), {
-            googleOauth: oauthData,
-        });
-    } catch (error) {
-        captureError(error, { context: 'saveUserGoogleOauth', uid, oauthData });
-        throw error;
-    }
-};
-
-// Google OAuth 정보 조회
-export const getUserGoogleOauth = async (uid: string): Promise<GoogleOauthData | null> => {
-    try {
-        const snap = await getDoc(doc(db, 'users', uid).withConverter(userConverter));
-        if (!snap.exists()) return null;
-        return snap.data().googleOauth || null;
-    } catch (error) {
-        captureError(error, { context: 'getUserGoogleOauth', uid });
-        throw error;
-    }
-};
-
-// Google OAuth 정보 제거
-export const clearUserGoogleOauth = async (uid: string): Promise<void> => {
-    try {
-        await updateDoc(doc(db, 'users', uid), {
-            googleOauth: deleteField(),
-        });
-    } catch (error) {
-        captureError(error, { context: 'clearUserGoogleOauth', uid });
-        throw error;
-    }
-};
+// 참고: Google OAuth 토큰은 더 이상 클라이언트에서 다루지 않는다.
+// 토큰은 users/{uid}/private/oauth 서브컬렉션(Cloud Functions/Admin SDK 전용)에만 저장되며,
+// 과거 클라이언트용 save/get/clear 함수는 같은 기관 멤버 노출 위험 때문에 제거했다 (2026-07-10 감사 #4).

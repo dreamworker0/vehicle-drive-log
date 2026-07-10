@@ -70,6 +70,13 @@ service cloud.firestore {
                         && request.resource.data.role != 'superAdmin'
                         && request.resource.data.organizationId == resource.data.organizationId);
       allow delete: if isSuperAdmin();
+
+      // 비밀 사용자 데이터 (Google OAuth access/refresh 토큰 등) — Cloud Functions(Admin SDK) 전용.
+      // 과거 users 문서에 googleOauth를 저장해 같은 기관 멤버 누구나 리프레시 토큰을 읽어
+      // 계정을 임퍼소네이션할 수 있었음 (2026-07-10 감사 #4).
+      match /private/{docId} {
+        allow read, write: if false;
+      }
     }
 
     // === 기관 ===
@@ -78,9 +85,10 @@ service cloud.firestore {
       allow read: if isSuperAdmin()
                   || isOrgMember(orgId)
                   || (isSignedIn() && resource.data.applicantUid == request.auth.uid);
-      allow create: if isSignedIn()
-                    && request.resource.data.keys().hasAll(['name', 'applicantUid'])
-                    && request.resource.data.applicantUid == request.auth.uid;
+      // 기관 생성은 서버(submitOrgApplication, Admin SDK) 또는 superAdmin 전용.
+      // 과거 클라이언트 create는 status:'approved'·inviteCode를 임의 지정해 AI 검증·
+      // superAdmin 승인 절차를 통째로 우회할 수 있었음 (2026-07-10 감사 #2).
+      allow create: if isSuperAdmin();
       allow update: if isOrgAdmin(orgId) || isSuperAdmin()
                     || (isSignedIn() && resource.data.status == 'pending' && resource.data.applicantUid == request.auth.uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'role']));
       allow delete: if isSuperAdmin();
@@ -109,8 +117,12 @@ service cloud.firestore {
       allow read: if belongsToMyOrg() || isSuperAdmin();
       allow create: if ((newBelongsToMyOrg() && isOrgAdmin(request.resource.data.organizationId)) || isSuperAdmin())
                     && (!request.resource.data.keys().hasAny(['currentKm']) || request.resource.data.currentKm >= 0);
-      allow update: if (isOrgAdmin(resource.data.organizationId) || isSuperAdmin())
-                    && (!request.resource.data.keys().hasAny(['currentKm']) || request.resource.data.currentKm >= 0)
+      allow update: if isSuperAdmin()
+                    // organizationId는 불변 — admin이 차량을 타 기관으로 이전해 통계·주행거리를
+                    // 오염시키는 교차 테넌트 무결성 침해 차단 (2026-07-10 감사 #6).
+                    || (isOrgAdmin(resource.data.organizationId)
+                        && request.resource.data.organizationId == resource.data.organizationId
+                        && (!request.resource.data.keys().hasAny(['currentKm']) || request.resource.data.currentKm >= 0))
                     // 소속 기관 멤버가 운행일지 저장 시 currentKm만 갱신 가능 (감소 방지)
                     || (isOrgMember(resource.data.organizationId)
                         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['currentKm'])
@@ -124,7 +136,9 @@ service cloud.firestore {
       allow read: if belongsToMyOrg() || isSuperAdmin();
       allow create: if (newBelongsToMyOrg() && isOrgAdmin(request.resource.data.organizationId))
                     || isSuperAdmin();
-      allow update: if isOrgAdmin(resource.data.organizationId) || isSuperAdmin()
+      allow update: if isSuperAdmin()
+                    || (isOrgAdmin(resource.data.organizationId)
+                        && request.resource.data.organizationId == resource.data.organizationId)
                     // 소속 기관 멤버가 충전 시 balance만 갱신 가능 (음수 방지)
                     || (isOrgMember(resource.data.organizationId)
                         && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['balance', 'updatedAt'])
@@ -143,7 +157,8 @@ service cloud.firestore {
       allow update: if (isSuperAdmin()
                     || (belongsToMyOrg() && (
                         (resource.data.driverUid == request.auth.uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['organizationId', 'vehicleId', 'driverUid']))
-                        || isOrgAdmin(resource.data.organizationId)
+                        // organizationId 불변 — admin의 타 기관 이전 차단 (2026-07-10 감사 #6)
+                        || (isOrgAdmin(resource.data.organizationId) && request.resource.data.organizationId == resource.data.organizationId)
                     )))
                     && (!request.resource.data.keys().hasAny(['startKm']) || request.resource.data.startKm >= 0)
                     && (!request.resource.data.keys().hasAny(['endKm']) || request.resource.data.endKm >= 0);
@@ -153,13 +168,19 @@ service cloud.firestore {
     // === 예약 ===
     match /reservations/{reservationId} {
       allow read: if belongsToMyOrg() || isSuperAdmin();
-      allow create: if newBelongsToMyOrg()
-                    && request.resource.data.keys().hasAll(['organizationId', 'vehicleId', 'reservedByUid'])
-                    && request.resource.data.reservedByUid == request.auth.uid;
+      // 예약 생성은 createReservationSafe(콜러블, Admin SDK) 전용.
+      // 클라이언트 직접 create는 allowedUserIds(차량 사용 제한)·시간 중복·승인 필요 여부
+      // 검증을 우회할 수 있었음 (2026-07-10 감사 #5).
+      allow create: if isSuperAdmin();
       allow update: if isSuperAdmin()
                     || (belongsToMyOrg() && (
-                        (resource.data.reservedByUid == request.auth.uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['organizationId', 'reservedByUid']))
-                        || isOrgAdmin(resource.data.organizationId)
+                        // 소유자는 취소·운행 종료·정보 수정만 가능. pending→reserved 자가 승인은 차단
+                        // (requireReservationApproval 우회 방지 — 승인은 admin만).
+                        (resource.data.reservedByUid == request.auth.uid
+                            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['organizationId', 'reservedByUid'])
+                            && !(resource.data.status == 'pending' && request.resource.data.status == 'reserved'))
+                        // organizationId 불변 — admin의 타 기관 이전 차단 (2026-07-10 감사 #6)
+                        || (isOrgAdmin(resource.data.organizationId) && request.resource.data.organizationId == resource.data.organizationId)
                     ));
       allow delete: if isSuperAdmin();
     }
@@ -194,7 +215,8 @@ service cloud.firestore {
       allow update: if isSuperAdmin()
                     || (belongsToMyOrg() && (
                         (resource.data.driverUid == request.auth.uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['organizationId', 'vehicleId', 'driverUid']))
-                        || isOrgAdmin(resource.data.organizationId)
+                        // organizationId 불변 — admin의 타 기관 이전 차단 (2026-07-10 감사 #6)
+                        || (isOrgAdmin(resource.data.organizationId) && request.resource.data.organizationId == resource.data.organizationId)
                     ));
       allow delete: if (belongsToMyOrg()
                     && (resource.data.driverUid == request.auth.uid
@@ -211,7 +233,8 @@ service cloud.firestore {
       allow update: if isSuperAdmin()
                     || (belongsToMyOrg() && (
                         (resource.data.chargerUid == request.auth.uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['organizationId', 'cardId', 'chargerUid']))
-                        || isOrgAdmin(resource.data.organizationId)
+                        // organizationId 불변 — admin의 타 기관 이전 차단 (2026-07-10 감사 #6)
+                        || (isOrgAdmin(resource.data.organizationId) && request.resource.data.organizationId == resource.data.organizationId)
                     ));
       allow delete: if (belongsToMyOrg()
                     && (resource.data.chargerUid == request.auth.uid
@@ -224,7 +247,10 @@ service cloud.firestore {
       allow read: if belongsToMyOrg() || isSuperAdmin();
       allow create: if isSuperAdmin()
                     || (newBelongsToMyOrg() && isOrgAdmin(request.resource.data.organizationId));
-      allow update: if isOrgAdmin(resource.data.organizationId) || isSuperAdmin();
+      allow update: if isSuperAdmin()
+                    // organizationId 불변 — admin의 타 기관 이전 차단 (2026-07-10 감사 #6)
+                    || (isOrgAdmin(resource.data.organizationId)
+                        && request.resource.data.organizationId == resource.data.organizationId);
       allow delete: if isOrgAdmin(resource.data.organizationId) || isSuperAdmin();
     }
 

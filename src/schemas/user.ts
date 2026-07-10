@@ -3,13 +3,6 @@ import { timestampSchema } from './index';
 
 export const userRoleSchema = z.enum(['employee', 'admin', 'superAdmin']);
 
-export const googleOauthDataSchema = z.object({
-    accessToken: z.string(),
-    refreshToken: z.string(),
-    expiryDate: z.number(),
-    email: z.string().optional(),
-});
-
 export const userSchema = z.object({
     id: z.string().catch(''),
     uid: z.string().optional().catch(''),
@@ -26,7 +19,6 @@ export const userSchema = z.object({
     createdAt: timestampSchema.optional().catch(undefined),
     disabledAt: timestampSchema.optional().catch(undefined),
     promotedAt: timestampSchema.optional().catch(undefined),
-    googleOauth: googleOauthDataSchema.optional(),
 });
 
 export type UserSchemaType = z.infer<typeof userSchema>;

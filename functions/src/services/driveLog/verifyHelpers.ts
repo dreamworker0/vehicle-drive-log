@@ -74,14 +74,24 @@ export function classifyByBizNumber(bizNumber: string | null, orgName: string | 
 
 /**
  * Firebase Storage download URL에서 파일을 다운로드하여 base64로 변환
+ *
+ * Admin SDK 다운로드는 URL의 토큰을 무시하고 경로만 사용하므로, 호출자가 URL을 조작해
+ * 타 기관 파일을 읽을 수 있다. expectedPathPrefix로 허용 경로를 강제한다 (2026-07-10 감사 #3).
  */
-export async function downloadFileAsBase64(downloadUrl: string): Promise<{ base64: string; mimeType: string }> {
+export async function downloadFileAsBase64(downloadUrl: string, expectedPathPrefix?: string): Promise<{ base64: string; mimeType: string }> {
     const storage = getStorage();
     const pathMatch = downloadUrl.match(/\/o\/(.+?)\?/);
     if (!pathMatch) {
         throw new Error("유효하지 않은 Storage URL입니다: " + downloadUrl);
     }
     const filePath = decodeURIComponent(pathMatch[1]);
+    // 경로 조작(상대경로·역슬래시·선행 슬래시) 및 허용 범위 밖 접근 차단
+    if (filePath.includes("..") || filePath.includes("\\") || filePath.startsWith("/")) {
+        throw new Error("유효하지 않은 파일 경로입니다: " + filePath);
+    }
+    if (expectedPathPrefix && !filePath.startsWith(expectedPathPrefix)) {
+        throw new Error(`허용 범위를 벗어난 Storage 경로입니다: ${filePath} (기대 prefix: ${expectedPathPrefix})`);
+    }
     const isPdf = filePath.toLowerCase().endsWith(".pdf");
     const mimeType = isPdf ? "application/pdf" : "image/jpeg";
 

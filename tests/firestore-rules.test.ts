@@ -171,12 +171,40 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
       reservedByUid: 'user_B',
     }));
 
-    // 본인 조직·본인 명의 정상 생성 허용
-    await assertSucceeds(orgAMemberDb.collection('reservations').doc('res_ok').set({
+    // 예약 생성은 createReservationSafe(콜러블) 전용 — 클라이언트 직접 생성은 본인 조직·본인
+    // 명의여도 차단(allowedUserIds·중복·승인 검증 우회 방지, 2026-07-10 감사 #5)
+    await assertFails(orgAMemberDb.collection('reservations').doc('res_ok').set({
       organizationId: 'org-A',
       vehicleId: 'vehicle_A',
       reservedByUid: 'user_A',
     }));
+  });
+
+  it('5-1. 예약 소유자의 pending→reserved 자가 승인 차단, 취소/완료는 허용', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.collection('reservations').doc('res_pending').set({
+        organizationId: 'org-A', vehicleId: 'vehicle_A', reservedByUid: 'user_A', status: 'pending',
+      });
+      await db.collection('reservations').doc('res_reserved').set({
+        organizationId: 'org-A', vehicleId: 'vehicle_A', reservedByUid: 'user_A', status: 'reserved',
+      });
+    });
+
+    const orgAMemberDb = setupContext('user_A', { role: 'employee', orgId: 'org-A' }).firestore();
+
+    // 소유자가 승인 대기(pending)를 스스로 확정(reserved)으로 바꾸는 자가 승인 → 차단
+    await assertFails(orgAMemberDb.collection('reservations').doc('res_pending').update({ status: 'reserved' }));
+
+    // 소유자가 자기 예약을 취소하는 것은 허용
+    await assertSucceeds(orgAMemberDb.collection('reservations').doc('res_pending').update({ status: 'cancelled' }));
+
+    // 소유자가 운행 종료(reserved→completed)하는 것은 허용
+    await assertSucceeds(orgAMemberDb.collection('reservations').doc('res_reserved').update({ status: 'completed' }));
+
+    // admin은 승인(pending→reserved) 허용
+    const adminADb = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+    await assertSucceeds(adminADb.collection('reservations').doc('res_reserved').update({ status: 'reserved', reservedByName: 'x' }));
   });
 
   it('6. 비용 데이터(주유·하이패스·정비) 교차 조직 접근 차단', async () => {
@@ -261,5 +289,59 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertSucceeds(adminADb.collection('users').doc('user_A2').update({
       role: 'admin',
     }));
+  });
+
+  it('9. admin의 organizationId 변경 차단 — 차량·운행일지·예약·주유·정비 전 컬렉션', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.collection('vehicles').doc('v_A').set({ organizationId: 'org-A', plateNumber: '1', currentKm: 10 });
+      await db.collection('driveLogs').doc('dl_A').set({ organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'user_A', startKm: 10, endKm: 20 });
+      await db.collection('reservations').doc('r_A').set({ organizationId: 'org-A', vehicleId: 'v_A', reservedByUid: 'user_A', status: 'reserved' });
+      await db.collection('fuelLogs').doc('f_A').set({ organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'user_A', cost: 100 });
+      await db.collection('maintenanceRecords').doc('m_A').set({ organizationId: 'org-A', vehicleId: 'v_A', description: 'x' });
+    });
+
+    const adminADb = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+
+    // 모든 테넌트 문서에서 admin의 org 이전 시도 → 차단
+    await assertFails(adminADb.collection('vehicles').doc('v_A').update({ organizationId: 'org-B' }));
+    await assertFails(adminADb.collection('driveLogs').doc('dl_A').update({ organizationId: 'org-B' }));
+    await assertFails(adminADb.collection('reservations').doc('r_A').update({ organizationId: 'org-B' }));
+    await assertFails(adminADb.collection('fuelLogs').doc('f_A').update({ organizationId: 'org-B' }));
+    await assertFails(adminADb.collection('maintenanceRecords').doc('m_A').update({ organizationId: 'org-B' }));
+
+    // 정상: org를 유지한 채 다른 필드 수정은 허용
+    await assertSucceeds(adminADb.collection('maintenanceRecords').doc('m_A').update({ description: 'y' }));
+  });
+
+  it('10. 기관(organizations) 클라이언트 직접 생성 차단 (승인 절차 우회 방지)', async () => {
+    // 일반 로그인 사용자가 status:approved·inviteCode를 임의 지정해 승인된 기관을 생성 시도 → 차단
+    const memberDb = setupContext('user_X', { role: 'employee' }).firestore();
+    await assertFails(memberDb.collection('organizations').doc('org_evil').set({
+      name: '가짜기관', applicantUid: 'user_X', status: 'approved', inviteCode: 'ABC123',
+    }));
+
+    // superAdmin은 생성 가능
+    const superDb = setupContext('super_1', { role: 'superAdmin' }).firestore();
+    await assertSucceeds(superDb.collection('organizations').doc('org_ok').set({
+      name: '정상기관', applicantUid: 'super_1', status: 'pending',
+    }));
+  });
+
+  it('11. 비밀 사용자 데이터(users/{uid}/private) — 본인·같은 기관 모두 접근 차단 (Functions 전용)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().doc('users/user_A/private/oauth').set({
+        accessToken: 'a', refreshToken: 'r', expiryDate: 1,
+      });
+    });
+
+    // 본인조차 클라이언트에서 토큰을 읽거나 쓸 수 없다 (Admin SDK 전용)
+    const ownerDb = setupContext('user_A', { role: 'employee', orgId: 'org-A' }).firestore();
+    await assertFails(ownerDb.doc('users/user_A/private/oauth').get());
+    await assertFails(ownerDb.doc('users/user_A/private/oauth').set({ accessToken: 'z' }));
+
+    // 같은 기관 타 멤버도 당연히 차단
+    const mateDb = setupContext('user_A2', { role: 'employee', orgId: 'org-A' }).firestore();
+    await assertFails(mateDb.doc('users/user_A/private/oauth').get());
   });
 });

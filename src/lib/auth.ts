@@ -1,6 +1,7 @@
 import { signInWithPopup, signInWithRedirect, signOut, getRedirectResult } from 'firebase/auth';
 import type { AuthError } from 'firebase/auth';
-import { auth, googleProvider } from './firebase';
+import { auth, googleProvider, clearOfflineCache } from './firebase';
+import { clearQueue } from './offline/syncQueue';
 
 const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
@@ -56,5 +57,18 @@ export const logout = async () => {
     } catch (error) {
         console.error('로그아웃 실패:', error);
         throw error;
+    }
+
+    // 공용 기기 대비 로컬 잔존 데이터 폐기 (2026-07-10 감사 #8).
+    // 오프라인 큐는 사용자 식별자 없이 저장되어 다음 세션에 재생될 수 있으므로 반드시 제거한다.
+    try {
+        await clearQueue();
+    } catch (e) {
+        console.warn('[logout] 오프라인 큐 정리 실패:', e);
+    }
+    // Firestore 영구 캐시 폐기 → 인스턴스가 종료되므로 깨끗한 상태로 재시작한다.
+    await clearOfflineCache();
+    if (typeof window !== 'undefined') {
+        window.location.href = '/';
     }
 };

@@ -45,9 +45,7 @@ import {
     getUser, createUser, updateUser, leaveOrganization,
     restoreUser, clearUserOrganization,
     getOrganizationMembers, getOrganizationAdmins, getOrgMemberCounts,
-    saveUserGoogleOauth, getUserGoogleOauth, clearUserGoogleOauth,
 } from '../../../lib/firestore/users';
-import type { GoogleOauthData } from '../../../types/user';
 
 // 스냅샷 스텁 헬퍼
 const docsSnap = (rows: unknown[]) => ({ docs: rows.map(r => ({ data: () => r })) });
@@ -205,52 +203,4 @@ describe('firestore/users', () => {
         });
     });
 
-    describe('Google OAuth 필드 관리', () => {
-        const oauthData: GoogleOauthData = {
-            refreshToken: 'rt-1',
-        } as GoogleOauthData;
-
-        it('saveUserGoogleOauth는 googleOauth 필드로 updateDoc를 호출한다', async () => {
-            vi.mocked(fs.updateDoc).mockResolvedValue(undefined as never);
-
-            await saveUserGoogleOauth('u1', oauthData);
-
-            expect(fs.updateDoc).toHaveBeenCalledWith(
-                expect.anything(),
-                { googleOauth: oauthData },
-            );
-        });
-
-        it('getUserGoogleOauth는 문서가 없으면 null을 반환한다', async () => {
-            vi.mocked(fs.getDoc).mockResolvedValue(getDocSnap(null) as never);
-
-            expect(await getUserGoogleOauth('none')).toBeNull();
-        });
-
-        it('getUserGoogleOauth는 googleOauth 필드가 없으면 null, 있으면 그 값을 반환한다', async () => {
-            vi.mocked(fs.getDoc).mockResolvedValue(getDocSnap({ uid: 'u1' }) as never);
-            expect(await getUserGoogleOauth('u1')).toBeNull();
-
-            vi.mocked(fs.getDoc).mockResolvedValue(getDocSnap({ uid: 'u1', googleOauth: oauthData }) as never);
-            expect(await getUserGoogleOauth('u1')).toEqual(oauthData);
-        });
-
-        it('clearUserGoogleOauth는 deleteField로 필드를 제거한다', async () => {
-            vi.mocked(fs.updateDoc).mockResolvedValue(undefined as never);
-
-            await clearUserGoogleOauth('u1');
-
-            expect(fs.updateDoc).toHaveBeenCalledWith(
-                expect.anything(),
-                { googleOauth: '__deleteField__' },
-            );
-        });
-
-        it('clearUserGoogleOauth 실패 시 captureError로 보고하고 에러를 재던진다', async () => {
-            vi.mocked(fs.updateDoc).mockRejectedValue(new Error('updateDoc 실패') as never);
-
-            await expect(clearUserGoogleOauth('u1')).rejects.toThrow('updateDoc 실패');
-            expect(captureError).toHaveBeenCalled();
-        });
-    });
 });

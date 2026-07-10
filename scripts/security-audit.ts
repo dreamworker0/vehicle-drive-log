@@ -33,7 +33,7 @@ const KNOWN_ACCEPTED: {
     advisory: string; pkg: string; severity: string; scope: string; reason: string; revisitWhen: string;
 }[] = [];
 
-function runAudit(dir: string, label: string): AuditCounts {
+function runAudit(dir: string, label: string): AuditCounts | null {
     console.log(`\n🔍 ${label} 보안 감사 (${dir})`);
     console.log('─'.repeat(50));
 
@@ -90,7 +90,8 @@ function runAudit(dir: string, label: string): AuditCounts {
         } catch {
             const errorMessage = err instanceof Error ? err.message : String(err);
             console.log('   ⚠️  audit 실행 실패:', errorMessage.slice(0, 100));
-            return { critical: 0, high: 0, moderate: 0, low: 0 };
+            // fail-closed: 실행/파싱 실패를 취약점 0건으로 위장하지 않는다 (2026-07-10 감사 하드닝)
+            return null;
         }
     }
 }
@@ -100,6 +101,12 @@ console.log('═'.repeat(50));
 
 const frontendCounts = runAudit(ROOT, '프론트엔드');
 const functionsCounts = runAudit(resolve(ROOT, 'functions'), 'Cloud Functions');
+
+// fail-closed: 감사 자체가 실행/파싱 불가면 "취약점 없음"이 아니라 실패로 처리한다.
+if (frontendCounts === null || functionsCounts === null) {
+    console.log('\n🚨 보안 감사를 실행/파싱하지 못했습니다 — fail-closed로 중단합니다.');
+    process.exit(1);
+}
 
 if (KNOWN_ACCEPTED.length > 0) {
     console.log('\n📋 알려진 수용 취약점 (문서화된 accepted-risk — 업스트림 패치 대기)');
@@ -120,7 +127,9 @@ if (totalCritical > 0) {
     console.log(`\n🚨 Critical 취약점 ${totalCritical}개 발견! 즉시 조치 필요`);
     process.exit(1);
 } else if (totalHigh > 0) {
-    console.log(`\n⚠️  High 취약점 ${totalHigh}개 발견. 조치를 검토하세요.`);
+    // High도 CI 실패로 처리 (과거엔 경고만 하고 통과시켜 고위험을 방치할 수 있었음)
+    console.log(`\n🚨 High 취약점 ${totalHigh}개 발견! 조치 필요`);
+    process.exit(1);
 } else {
     console.log('\n✅ 심각한 취약점 없음');
 }

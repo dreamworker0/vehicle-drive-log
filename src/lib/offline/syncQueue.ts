@@ -45,6 +45,17 @@ export async function enqueue(type: SyncData['type'], collectionName: string, do
     });
 }
 
+/**
+ * 오프라인 동기화 큐를 전부 비운다.
+ * 큐 항목은 사용자·기관 식별자 없이 저장되므로, 로그아웃 시 폐기하지 않으면
+ * 공용 기기에서 다음 세션에 미동기 쓰기가 재생될 수 있다 (2026-07-10 감사 #8).
+ */
+export async function clearQueue() {
+    const database = await getSyncDB();
+    if (!database) return;
+    await database.clear('sync-store');
+}
+
 export async function flushQueue() {
     const database = await getSyncDB();
     if (!database) return;
