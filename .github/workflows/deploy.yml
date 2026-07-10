@@ -10,6 +10,10 @@ on:
     branches: [master]
   workflow_dispatch:
 
+# 최소 권한 — 배포는 Firebase 서비스 계정으로 수행하며 GITHUB_TOKEN으로 저장소에 쓰지 않는다.
+permissions:
+  contents: read
+
 # 동시 배포 방지: 여러 푸시가 겹쳐도 한 번에 하나만 실행하고 나머지는 대기시킨다.
 # (동일 Cloud Function을 동시에 업데이트하면 409 "unable to queue the operation"으로
 #  일부 함수 갱신이 조용히 누락된다. cancel-in-progress:false로 진행 중 배포는 끝까지 보장.)
