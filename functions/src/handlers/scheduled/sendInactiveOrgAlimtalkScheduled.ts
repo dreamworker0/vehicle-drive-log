@@ -4,6 +4,7 @@ import { sendReminderAlimtalk } from "../../services/alimtalk/sendAlimtalk";
 import { sendDiscordAlert } from "../../core/discord";
 import { recordHeartbeat } from "../../utils/helpers";
 import { toKSTDate } from "../../utils/kstDate";
+import { ALIMTALK_PROXY_TOKEN } from "../../core/params";
 
 /**
  * 디스코드 브리핑: 비활성 기관 알림 + 월요일 주간 리포트
@@ -87,6 +88,7 @@ export const sendInactiveOrgAlimtalkScheduled = onSchedule(
         schedule: "0 14 * * 1-5", // 매주 월~금 오후 2시 실행
         timeZone: "Asia/Seoul",
         retryCount: 0,
+        secrets: [ALIMTALK_PROXY_TOKEN],
     },
     async () => {
         const db = getFirestore();

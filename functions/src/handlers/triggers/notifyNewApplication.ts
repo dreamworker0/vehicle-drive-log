@@ -5,9 +5,10 @@ import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { sendDiscordAlert } from "../../core/discord";
 import { createGmailTransporter, isGmailConfigured, systemMailFrom } from "../../core/mailer";
 import { escapeHtml } from "../../utils/helpers";
+import { GMAIL_APP_PASSWORD } from "../../core/params";
 
 export const notifyNewApplication = onDocumentWritten(
-    "organizations/{orgId}",
+    { document: "organizations/{orgId}", secrets: [GMAIL_APP_PASSWORD] },
     async (event) => {
         const before = event.data?.before.data();
         const after = event.data?.after.data();

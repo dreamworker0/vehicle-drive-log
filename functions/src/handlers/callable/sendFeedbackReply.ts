@@ -9,6 +9,7 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { sendPushToUser, createInAppNotification } from "../../services/alimtalk/sendNotification";
 import { requireSuperAdmin } from "../../utils/helpers";
 import { createGmailTransporter, isGmailConfigured, systemMailFrom } from "../../core/mailer";
+import { GMAIL_APP_PASSWORD } from "../../core/params";
 
 const db = getFirestore();
 
@@ -17,6 +18,7 @@ export const sendFeedbackReply = onCall(
         region: "asia-northeast3",
         timeoutSeconds: 30,
         enforceAppCheck: false,
+        secrets: [GMAIL_APP_PASSWORD],
     },
     async (request) => {
         // 1. 인증·superAdmin 권한 확인

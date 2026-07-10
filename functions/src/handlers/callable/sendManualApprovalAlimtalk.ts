@@ -8,9 +8,10 @@ import { onCall } from "firebase-functions/v2/https";
 import { sendApprovalAlimtalk } from "../../services/alimtalk/sendAlimtalk";
 import { loadOrgForManualAlimtalk } from "../../services/alimtalk/manualSendHelpers";
 import { requireSuperAdmin } from "../../utils/helpers";
+import { ALIMTALK_PROXY_TOKEN } from "../../core/params";
 
 export const sendManualApprovalAlimtalk = onCall(
-    { region: "asia-northeast3", enforceAppCheck: false },
+    { region: "asia-northeast3", enforceAppCheck: false, secrets: [ALIMTALK_PROXY_TOKEN] },
     async (request) => {
         requireSuperAdmin(request);
 

@@ -7,6 +7,7 @@ import { defineString } from "firebase-functions/params";
 import { getFirestore } from "firebase-admin/firestore";
 import { sendApprovalAlimtalk } from "../../services/alimtalk/sendAlimtalk";
 import { sanitizePromptValue } from "../../utils/helpers";
+import { GMAIL_APP_PASSWORD, EMAILJS_PRIVATE_KEY, ALIMTALK_PROXY_TOKEN } from "../../core/params";
 import {
     maskName, maskEmail, classifyByBizNumber,
     downloadFileAsBase64, searchAddressByTmap, geocodeByTmap,
@@ -86,6 +87,7 @@ export const autoVerifyDocument = onDocumentWritten(
         region: "asia-northeast3",
         timeoutSeconds: 120,
         memory: "512MiB",
+        secrets: [GMAIL_APP_PASSWORD, EMAILJS_PRIVATE_KEY, ALIMTALK_PROXY_TOKEN],
     },
     async (event) => {
         const before = event.data?.before?.data();

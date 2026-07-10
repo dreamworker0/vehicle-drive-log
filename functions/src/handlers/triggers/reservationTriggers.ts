@@ -7,6 +7,7 @@ import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent } from ".
 import { isCalendarAuthError, shouldSkipVehicleCalendar, recordCalendarFailure, resetCalendarFailure } from "../../services/calendar/calendarFailTracking";
 import { sendPushToOrg, sendPushToUser, createInAppNotification } from "../../services/alimtalk/sendNotification";
 import { checkReservationTimeConflict, resolveReservationConflict } from "../sync/conflictResolver";
+import { GOOGLE_OAUTH_CLIENT_SECRET } from "../../core/params";
 
 /**
  * 차량의 캘린더 동기화 컨텍스트를 조회한다.
@@ -53,7 +54,7 @@ async function isNotifiableOrgMember(uid: string | undefined | null, orgId: stri
 /**
  * 예약 생성 시 -> 캘린더 이벤트 생성
  */
-export const onReservationCreated = onDocumentCreated("reservations/{reservationId}", async (event) => {
+export const onReservationCreated = onDocumentCreated({ document: "reservations/{reservationId}", secrets: [GOOGLE_OAUTH_CLIENT_SECRET] }, async (event) => {
     const reservation = event.data!.data();
     const reservationId = event.params.reservationId;
 
@@ -163,7 +164,7 @@ export const onReservationCreated = onDocumentCreated("reservations/{reservation
 /**
  * 예약 수정 시 -> 캘린더 이벤트 수정 또는 삭제 + 알림 전송
  */
-export const onReservationUpdated = onDocumentUpdated("reservations/{reservationId}", async (event) => {
+export const onReservationUpdated = onDocumentUpdated({ document: "reservations/{reservationId}", secrets: [GOOGLE_OAUTH_CLIENT_SECRET] }, async (event) => {
     const before = event.data!.before.data();
     const after = event.data!.after.data();
     const reservationId = event.params.reservationId;
@@ -377,7 +378,7 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
 /**
  * 예약 삭제 시 -> 캘린더 이벤트 삭제
  */
-export const onReservationDeleted = onDocumentDeleted("reservations/{reservationId}", async (event) => {
+export const onReservationDeleted = onDocumentDeleted({ document: "reservations/{reservationId}", secrets: [GOOGLE_OAUTH_CLIENT_SECRET] }, async (event) => {
     const reservation = event.data!.data();
     const reservationId = event.params.reservationId;
 

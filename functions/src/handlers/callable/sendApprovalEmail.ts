@@ -10,11 +10,12 @@ import { RATE_LIMITS } from "../../utils/constants";
 import { requireSuperAdmin } from "../../utils/helpers";
 import { createGmailTransporter, isGmailConfigured, systemMailFrom } from "../../core/mailer";
 import { maskEmail } from "../../utils/mask";
+import { GMAIL_APP_PASSWORD } from "../../core/params";
 
 const SERVICE_URL = "https://vehicle-drive-log.web.app";
 
 export const sendApprovalEmail = onCall(
-    { region: "asia-northeast3", enforceAppCheck: false },
+    { region: "asia-northeast3", enforceAppCheck: false, secrets: [GMAIL_APP_PASSWORD] },
     async (request) => {
         requireSuperAdmin(request);
 

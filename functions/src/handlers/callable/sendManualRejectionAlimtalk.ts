@@ -9,9 +9,10 @@ import { sendRejectionAlimtalk } from "../../services/alimtalk/sendAlimtalk";
 import { loadOrgForManualAlimtalk } from "../../services/alimtalk/manualSendHelpers";
 import { requireSuperAdmin } from "../../utils/helpers";
 import { getKSTDateString } from "../../utils/kstDate";
+import { ALIMTALK_PROXY_TOKEN } from "../../core/params";
 
 export const sendManualRejectionAlimtalk = onCall(
-    { region: "asia-northeast3", enforceAppCheck: false },
+    { region: "asia-northeast3", enforceAppCheck: false, secrets: [ALIMTALK_PROXY_TOKEN] },
     async (request) => {
         requireSuperAdmin(request);
 

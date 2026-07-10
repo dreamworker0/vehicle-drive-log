@@ -8,9 +8,10 @@ import { onCall } from "firebase-functions/v2/https";
 import { getFirestore } from "firebase-admin/firestore";
 import { sendReminderAlimtalk } from "../../services/alimtalk/sendAlimtalk";
 import { requireSuperAdmin } from "../../utils/helpers";
+import { ALIMTALK_PROXY_TOKEN } from "../../core/params";
 
 export const sendBulkReminder = onCall(
-    { region: "asia-northeast3", timeoutSeconds: 120, enforceAppCheck: true },
+    { region: "asia-northeast3", timeoutSeconds: 120, enforceAppCheck: true, secrets: [ALIMTALK_PROXY_TOKEN] },
     async (request) => {
         requireSuperAdmin(request);
 

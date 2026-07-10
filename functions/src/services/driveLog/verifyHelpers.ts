@@ -5,7 +5,7 @@
  */
 import { getStorage } from "firebase-admin/storage";
 import * as emailjs from "@emailjs/nodejs";
-import { defineString } from "firebase-functions/params";
+import { EMAILJS_PRIVATE_KEY } from "../../core/params";
 import { createGmailTransporter, systemMailFrom } from "../../core/mailer";
 import { maskEmail } from "../../utils/mask";
 
@@ -163,7 +163,7 @@ export async function geocodeByTmap(address: string, apiKey: string): Promise<{ 
 // ── 이메일 발송 ──
 
 const EMAILJS_PUBLIC_KEY = "2G7A7gudLQ01I4hJW";
-const EMAILJS_PRIVATE_KEY = defineString("EMAILJS_PRIVATE_KEY");
+// EMAILJS_PRIVATE_KEY는 defineSecret(core/params)로 이관 — 사용 함수는 secrets 선언 필수
 const EMAILJS_SERVICE_ID = "service_p4hpecv";
 const EMAILJS_TEMPLATE_ID = "template_qmfktgb";
 const SERVICE_URL = "https://vehicle-drive-log.web.app";
