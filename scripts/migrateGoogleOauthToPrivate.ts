@@ -17,11 +17,16 @@
 import { initializeApp, cert, type ServiceAccount } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { readFileSync, existsSync } from "fs";
-import { resolve } from "path";
+import { dirname, resolve } from "path";
+import { fileURLToPath } from "url";
 import { parseMigrationMode, shouldMoveOauth, type MigrationMode } from "./lib/googleOauthMigration";
 
+// ESM 스코프에는 __dirname이 없다(루트 package.json이 "type": "module").
+// 스크립트 파일 위치 기준으로 경로를 계산한다.
+const scriptDir = dirname(fileURLToPath(import.meta.url));
+
 // Firebase Admin 초기화 (서비스 계정 키 파일 또는 기본 인증)
-const saPath = resolve(__dirname, "../functions/serviceAccountKey.json");
+const saPath = resolve(scriptDir, "../functions/serviceAccountKey.json");
 if (existsSync(saPath)) {
     const sa = JSON.parse(readFileSync(saPath, "utf-8")) as ServiceAccount;
     initializeApp({ credential: cert(sa) });
