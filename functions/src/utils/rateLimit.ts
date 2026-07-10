@@ -9,6 +9,13 @@ import { log } from "../utils/helpers";
 const RATE_LIMIT_COLLECTION = "_rateLimits";
 
 /**
+ * Firestore 장애 등으로 한도 확인 자체가 실패했을 때의 정책 (2026-07-10 코덱스 평가 대응 — 작업 2).
+ * - "open"(기본): 요청 통과 — 일반 업무 API의 가용성 우선.
+ * - "closed": 요청 거부 — OCR·AI·공개 접수처럼 남용 시 비용이 증폭되는 고위험 경로에만 지정.
+ */
+export type RateLimitFailMode = "open" | "closed";
+
+/**
  * 시간 윈도우 키 생성 (분 단위 또는 시간 단위)
  */
 function getWindowKey(windowSeconds: number): string {
@@ -25,13 +32,15 @@ function getWindowKey(windowSeconds: number): string {
  * @param uid 사용자 UID
  * @param maxRequests 윈도우 내 최대 요청 수
  * @param windowSeconds 시간 윈도우 (초)
- * @throws HttpsError("resource-exhausted") 초과 시
+ * @param failMode 한도 확인 실패 시 정책 (기본 "open" — 기존 호출부 동작 보존)
+ * @throws HttpsError("resource-exhausted") 초과 시, failMode "closed"면 확인 실패 시에도
  */
 export async function checkRateLimitByUid(
     functionName: string,
     uid: string,
     maxRequests: number,
-    windowSeconds: number
+    windowSeconds: number,
+    failMode: RateLimitFailMode = "open"
 ): Promise<void> {
     const windowKey = getWindowKey(windowSeconds);
     const docId = `${functionName}:${uid}:${windowKey}`;
@@ -69,6 +78,11 @@ export async function checkRateLimitByUid(
     } catch (err) {
         // HttpsError는 그대로 재전파
         if (err instanceof HttpsError) throw err;
+        // 고위험 경로(failMode "closed")는 한도 확인 불가 시 거부 — 장애를 틈탄 비용 증폭 차단
+        if (failMode === "closed") {
+            log("ERROR", functionName, "Rate limit check failed, rejecting request (fail-closed)", { uid, error: (err as Error).message });
+            throw new HttpsError("resource-exhausted", "요청 한도를 확인할 수 없어 요청이 거부되었습니다. 잠시 후 다시 시도해주세요.");
+        }
         // Firestore 접근 에러 등은 Rate Limit을 무시하고 통과 (장애 시 기능 차단 방지)
         log("WARNING", functionName, "Rate limit check failed, allowing request", { uid, error: (err as Error).message });
     }
@@ -87,10 +101,11 @@ export async function checkDailyOcrQuota(
     orgLimit: { max: number; windowSec: number },
 ): Promise<void> {
     try {
-        await checkRateLimitByUid("ocrDailyUser", uid, userLimit.max, userLimit.windowSec);
+        // OCR 쿼터는 비용 방어선이므로 확인 실패 시에도 거부한다 (fail-closed)
+        await checkRateLimitByUid("ocrDailyUser", uid, userLimit.max, userLimit.windowSec, "closed");
         if (orgId) {
             // 조직 카운터는 uid 자리에 orgId를 키로 사용한다 (동일 버킷 로직 재사용)
-            await checkRateLimitByUid("ocrDailyOrg", orgId, orgLimit.max, orgLimit.windowSec);
+            await checkRateLimitByUid("ocrDailyOrg", orgId, orgLimit.max, orgLimit.windowSec, "closed");
         }
     } catch (err) {
         if (err instanceof HttpsError && err.code === "resource-exhausted") {
@@ -107,13 +122,15 @@ export async function checkDailyOcrQuota(
  * @param ip 클라이언트 IP
  * @param maxRequests 윈도우 내 최대 요청 수
  * @param windowSeconds 시간 윈도우 (초)
- * @returns true면 초과, false면 통과
+ * @param failMode 한도 확인 실패 시 정책 (기본 "open" — 기존 호출부 동작 보존)
+ * @returns true면 초과(또는 failMode "closed"에서 확인 실패), false면 통과
  */
 export async function checkRateLimitByIp(
     functionName: string,
     ip: string,
     maxRequests: number,
-    windowSeconds: number
+    windowSeconds: number,
+    failMode: RateLimitFailMode = "open"
 ): Promise<boolean> {
     const windowKey = getWindowKey(windowSeconds);
     // IP에 포함된 특수문자(콜론, 점)를 안전한 문자로 치환
@@ -148,6 +165,11 @@ export async function checkRateLimitByIp(
         }
         return result;
     } catch (err) {
+        // 고위험 경로(failMode "closed")는 한도 확인 불가 시 초과로 간주해 거부
+        if (failMode === "closed") {
+            log("ERROR", functionName, "Rate limit check failed (IP), rejecting request (fail-closed)", { ip: safeIp, error: (err as Error).message });
+            return true;
+        }
         // Firestore 에러 시 Rate Limit을 무시하고 통과
         log("WARNING", functionName, "Rate limit check failed (IP), allowing request", { ip: safeIp, error: (err as Error).message });
         return false;

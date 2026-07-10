@@ -6,7 +6,7 @@ import type { Request, Response } from "firebase-functions/node_modules/@types/e
 import { getAuth } from "firebase-admin/auth";
 import { HttpsError, CallableRequest } from "firebase-functions/v2/https";
 import { captureError, flushSentry } from "../core/sentry";
-import { checkRateLimitByUid } from "../utils/rateLimit";
+import { checkRateLimitByUid, type RateLimitFailMode } from "../utils/rateLimit";
 import { getRateLimits, type RateLimitKey } from "../utils/constants";
 
 type Severity = "DEBUG" | "INFO" | "WARNING" | "ERROR";
@@ -109,6 +109,8 @@ export function requireSuperAdmin<T>(
 
 interface WrapCallableOptions {
     rateLimitKey?: RateLimitKey;
+    /** 한도 확인 실패 시 정책 — 고위험(OCR·AI) 경로만 "closed" 지정 (기본 "open") */
+    rateLimitFailMode?: RateLimitFailMode;
 }
 
 /**
@@ -130,10 +132,11 @@ export function wrapCallableHandler<T, R>(
             if (options.rateLimitKey) {
                 const limit = await getRateLimits(options.rateLimitKey);
                 await checkRateLimitByUid(
-                    functionName, 
-                    request.auth.uid, 
-                    limit.max, 
-                    limit.windowSec
+                    functionName,
+                    request.auth.uid,
+                    limit.max,
+                    limit.windowSec,
+                    options.rateLimitFailMode
                 );
             }
             

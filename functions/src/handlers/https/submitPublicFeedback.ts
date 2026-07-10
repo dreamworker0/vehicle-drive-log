@@ -31,13 +31,13 @@ export const submitPublicFeedback = onCall(
 
         // Rate Limit: 동일 이메일로 1시간에 5회 이상 제출 방지
         const safeEmail = userEmail.trim().toLowerCase();
-        await checkRateLimitByUid("submitPublicFeedback", safeEmail, 5, 3600);
+        await checkRateLimitByUid("submitPublicFeedback", safeEmail, 5, 3600, "closed");
 
         // IP 기반 상한 — 이메일을 회전시켜 이메일 키 제한을 우회하는 무제한 익명 쓰기 차단 (2026-07-04 감사 N4)
         const clientIp = request.rawRequest?.ip
             || (request.rawRequest?.headers["x-forwarded-for"] as string)
             || "unknown";
-        if (await checkRateLimitByIp("submitPublicFeedback", clientIp, 10, 3600)) {
+        if (await checkRateLimitByIp("submitPublicFeedback", clientIp, 10, 3600, "closed")) {
             throw new HttpsError("resource-exhausted", "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.");
         }
 

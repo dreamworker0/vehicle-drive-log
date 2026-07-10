@@ -9,6 +9,7 @@ import { RETRY_COOLDOWN_MS, MAX_FAIL_COUNT, isCalendarAuthError, recordCalendarF
 import { sendDiscordAlert } from "../../core/discord";
 import { recordHeartbeat } from "../../utils/helpers";
 import { toKSTDate, getKSTDateString } from "../../utils/kstDate";
+import { maskEmail } from "../../utils/mask";
 
 const db = getFirestore();
 const auth = getAuth();
@@ -307,7 +308,7 @@ export async function syncSingleVehicleCalendar(
                     if (!reservationData.reservedByName && userRecord.displayName) {
                         reservationData.reservedByName = userRecord.displayName;
                     }
-                    console.log("[" + vehicleName + "] User matched: " + reservationData.creatorEmail + " -> " + userRecord.uid + " (" + (userRecord.displayName || "") + ")");
+                    console.log("[" + vehicleName + "] User matched: " + maskEmail(reservationData.creatorEmail as string) + " -> " + userRecord.uid);
                 }
             }
 

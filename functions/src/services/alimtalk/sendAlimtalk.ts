@@ -4,6 +4,7 @@
  * Cloud Functions에서 메시지를 구성하고, PHP 프록시는 알리고 API로 패스스루합니다.
  * Node.js의 \n은 확실히 LF(0x0A)이므로 CRLF 문제가 발생하지 않습니다.
  */
+import { maskPhone, maskName } from "../../utils/mask";
 
 interface AlimtalkResult {
     success: boolean;
@@ -86,7 +87,7 @@ export async function sendApprovalAlimtalk(
         console.log(`[Alimtalk] 프록시 응답: ${JSON.stringify(result)}`);
 
         if (result.success) {
-            console.log(`[Alimtalk] ✅ 알림톡 발송 성공: ${phone} (${name})`);
+            console.log(`[Alimtalk] ✅ 알림톡 발송 성공: ${maskPhone(phone)} (${maskName(name)})`);
         } else {
             console.error(`[Alimtalk] ❌ 알림톡 발송 실패: code=${result.code}, message=${result.message}`);
         }
@@ -165,7 +166,7 @@ export async function sendReminderAlimtalk(
         console.log(`[Alimtalk] 리마인드 프록시 응답: ${JSON.stringify(result)}`);
 
         if (result.success) {
-            console.log(`[Alimtalk] ✅ 리마인드 발송 성공: ${phone} (${name})`);
+            console.log(`[Alimtalk] ✅ 리마인드 발송 성공: ${maskPhone(phone)} (${maskName(name)})`);
         } else {
             console.error(`[Alimtalk] ❌ 리마인드 발송 실패: code=${result.code}, message=${result.message}`);
         }
@@ -234,7 +235,7 @@ export async function sendRejectionAlimtalk(
         console.log(`[Alimtalk] 반려 프록시 응답: ${JSON.stringify(result)}`);
 
         if (result.success) {
-            console.log(`[Alimtalk] ✅ 반려 알림톡 발송 성공: ${phone} (${name})`);
+            console.log(`[Alimtalk] ✅ 반려 알림톡 발송 성공: ${maskPhone(phone)} (${maskName(name)})`);
         } else {
             console.error(`[Alimtalk] ❌ 반려 알림톡 발송 실패: code=${result.code}, message=${result.message}`);
         }

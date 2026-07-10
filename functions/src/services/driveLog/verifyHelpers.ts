@@ -7,33 +7,12 @@ import { getStorage } from "firebase-admin/storage";
 import * as emailjs from "@emailjs/nodejs";
 import { defineString } from "firebase-functions/params";
 import { createGmailTransporter, systemMailFrom } from "../../core/mailer";
+import { maskEmail } from "../../utils/mask";
 
 // ── 마스킹 유틸리티 ──
-
-/**
- * 이름 마스킹 (가운데 글자 → *)
- * 예: "김종원" → "김*원", "홍길동" → "홍*동", "김수" → "김*"
- */
-export function maskName(name: string | null | undefined): string {
-    if (!name || name.length === 0) return "알 수 없음";
-    if (name.length === 1) return name;
-    if (name.length === 2) return name[0] + "*";
-    const first = name[0];
-    const last = name[name.length - 1];
-    const middle = "*".repeat(name.length - 2);
-    return first + middle + last;
-}
-
-/**
- * 이메일 마스킹 (앞 2글자만 표시, 나머지 ***)
- * 예: "example@email.com" → "ex***@email.com"
- */
-export function maskEmail(email: string | null | undefined): string {
-    if (!email || !email.includes("@")) return "알 수 없음";
-    const [local, domain] = email.split("@");
-    if (local.length <= 2) return local + "***@" + domain;
-    return local.substring(0, 2) + "***@" + domain;
-}
+// 구현은 utils/mask.ts로 승격됨 (알림톡·이메일 로그 마스킹과 공용).
+// 기존 import 경로 호환을 위해 re-export 유지.
+export { maskName, maskEmail } from "../../utils/mask";
 
 // ── 비영리 판별 ──
 
@@ -210,10 +189,10 @@ export async function sendApprovalEmailServer(recipientEmail: string, orgName: s
                 privateKey: EMAILJS_PRIVATE_KEY.value(),
             }
         );
-        console.log(`[AutoVerify] 📧 승인 이메일 발송 성공: ${recipientEmail}`, response.status, response.text);
+        console.log(`[AutoVerify] 📧 승인 이메일 발송 성공: ${maskEmail(recipientEmail)}`, response.status, response.text);
         return true;
     } catch (err: unknown) {
-        console.error(`[AutoVerify] ❌ 승인 이메일 발송 실패: ${recipientEmail}`, err);
+        console.error(`[AutoVerify] ❌ 승인 이메일 발송 실패: ${maskEmail(recipientEmail)}`, err);
         return false;
     }
 }
@@ -259,10 +238,10 @@ export async function sendRejectionEmail(recipientEmail: string, orgName: string
         };
 
         await transporter.sendMail(mailOptions);
-        console.log(`[AutoVerify] 📧 거부 이메일 발송 성공: ${recipientEmail}`);
+        console.log(`[AutoVerify] 📧 거부 이메일 발송 성공: ${maskEmail(recipientEmail)}`);
         return true;
     } catch (err: unknown) {
-        console.error(`[AutoVerify] ❌ 거부 이메일 발송 실패: ${recipientEmail}`, (err as Error).message);
+        console.error(`[AutoVerify] ❌ 거부 이메일 발송 실패: ${maskEmail(recipientEmail)}`, (err as Error).message);
         return false;
     }
 }

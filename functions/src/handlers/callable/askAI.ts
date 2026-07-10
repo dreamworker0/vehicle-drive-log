@@ -46,7 +46,7 @@ export const askAI = onCall(
         enforceAppCheck: false,
         cors: true,
     },
-    wrapCallableHandler("askAI", { rateLimitKey: "askAI" }, async (request) => {
+    wrapCallableHandler("askAI", { rateLimitKey: "askAI", rateLimitFailMode: "closed" }, async (request) => {
         const question = (request.data as { question?: string })?.question?.trim();
 
         if (!question) {

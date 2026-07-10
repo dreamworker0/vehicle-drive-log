@@ -5,6 +5,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { maskEmail } from "../../utils/mask";
 
 export const restoreUser = onCall(
     {
@@ -79,7 +80,7 @@ export const restoreUser = onCall(
                 createdAt: FieldValue.serverTimestamp(),
             });
 
-            console.log(`계정 복원 완료: ${email} (uid: ${authUser.uid}, 호출자: ${request.auth.uid})`);
+            console.log(`계정 복원 완료: ${maskEmail(email)} (uid: ${authUser.uid}, 호출자: ${request.auth.uid})`);
             return {
                 success: true,
                 uid: authUser.uid,

@@ -4,6 +4,20 @@ import { getStorage } from "firebase-admin/storage";
 import { v4 as uuidv4 } from "uuid";
 import { log, wrapHandler } from "../../utils/helpers";
 import { checkRateLimitByUid, checkRateLimitByIp } from "../../utils/rateLimit";
+import { maskEmail } from "../../utils/mask";
+
+/**
+ * 업로드 허용 MIME 화이트리스트 (2026-07-10 코덱스 평가 대응 — 작업 3).
+ * 캘러 제공 MIME을 그대로 contentType으로 저장하면 text/html 등이 Storage에
+ * 실행 가능한 형태로 서빙될 수 있으므로 증빙서류 형식만 허용한다.
+ * 매직 바이트 검증은 5MB 상한·rate limit·Storage Rules가 병존해 미채택.
+ */
+const ALLOWED_MIME_TYPES: Record<string, string> = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "application/pdf": "pdf",
+};
 
 interface SubmitApplicationPayload {
     orgName: string;
@@ -38,6 +52,9 @@ export const submitOrgApplication = onCall(
         if (!payload.imageBase64 || !payload.imageMimeType) {
             throw new HttpsError("invalid-argument", "증빙서류 이미지 데이터가 누락되었습니다.");
         }
+        if (!(payload.imageMimeType in ALLOWED_MIME_TYPES)) {
+            throw new HttpsError("invalid-argument", "지원하지 않는 파일 형식입니다. JPG·PNG·WebP 이미지 또는 PDF만 업로드할 수 있습니다.");
+        }
         // 입력 길이 상한 (과도한 문서/알림 페이로드 방지)
         if (payload.orgName.length > 100 || payload.applicantName.length > 100
             || payload.applicantPhone.length > 30 || (payload.message?.length ?? 0) > 2000) {
@@ -48,13 +65,13 @@ export const submitOrgApplication = onCall(
 
         // 2. Rate Limit 검사: 동일 이메일로 1시간에 3회 이상 신청 불가 (무단 반복 요청 방지)
         // checkRateLimitByUid는 원래 uid 기반이지만, 이메일을 uid처럼 활용하여 제한
-        await checkRateLimitByUid("submitOrgApplication", email, 3, 3600);
+        await checkRateLimitByUid("submitOrgApplication", email, 3, 3600, "closed");
 
         // 2-1. IP 기반 상한 — 이메일을 회전시켜 이메일 키 제한을 우회하는 무제한 익명 쓰기 차단 (2026-07-04 감사 N4)
         const clientIp = request.rawRequest?.ip
             || (request.rawRequest?.headers["x-forwarded-for"] as string)
             || "unknown";
-        if (await checkRateLimitByIp("submitOrgApplication", clientIp, 10, 3600)) {
+        if (await checkRateLimitByIp("submitOrgApplication", clientIp, 10, 3600, "closed")) {
             throw new HttpsError("resource-exhausted", "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.");
         }
 
@@ -74,7 +91,7 @@ export const submitOrgApplication = onCall(
                 const base64Data = payload.imageBase64.replace(/^data:([A-Za-z-+/]+);base64,/, '');
                 fileBuffer = Buffer.from(base64Data, "base64");
             } catch (bufferErr) {
-                log("ERROR", "submitOrgApplication", "이미지 디코딩 실패", { email, error: (bufferErr as Error).message });
+                log("ERROR", "submitOrgApplication", "이미지 디코딩 실패", { email: maskEmail(email), error: (bufferErr as Error).message });
                 throw new HttpsError("invalid-argument", "잘못된 이미지 형식입니다.");
             }
 
@@ -83,12 +100,11 @@ export const submitOrgApplication = onCall(
                 throw new HttpsError("out-of-range", "파일 크기는 5MB를 초과할 수 없습니다.");
             }
 
-            const isPdf = payload.imageMimeType === "application/pdf";
-            const ext = isPdf ? "pdf" : "jpg";
+            const ext = ALLOWED_MIME_TYPES[payload.imageMimeType];
             const filePath = `organizations/${orgId}/uniqueNumberImage.${ext}`;
             const file = bucket.file(filePath);
 
-            log("INFO", "submitOrgApplication", "Uploading image", { email, orgId, size: fileBuffer.byteLength });
+            log("INFO", "submitOrgApplication", "Uploading image", { email: maskEmail(email), orgId, size: fileBuffer.byteLength });
 
             // Firebase Storage Read를 위한 임시 다운로드 토큰 생성 (Client SDK URL과 동일한 형식)
             const token = uuidv4();
@@ -121,7 +137,7 @@ export const submitOrgApplication = onCall(
                 updatedAt: now,
             });
 
-            log("INFO", "submitOrgApplication", "신청 완료", { orgId, email });
+            log("INFO", "submitOrgApplication", "신청 완료", { orgId, email: maskEmail(email) });
 
             return {
                 success: true,
@@ -130,7 +146,7 @@ export const submitOrgApplication = onCall(
             };
         } catch (err: unknown) {
             log("ERROR", "submitOrgApplication", "업로드 또는 저장 처리 중 시스템 오류", {
-                email,
+                email: maskEmail(email),
                 error: (err as Error).message,
                 stack: (err as Error).stack,
             });

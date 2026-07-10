@@ -9,6 +9,7 @@ import { checkRateLimitByUid } from "../../utils/rateLimit";
 import { RATE_LIMITS } from "../../utils/constants";
 import { requireSuperAdmin } from "../../utils/helpers";
 import { createGmailTransporter, isGmailConfigured, systemMailFrom } from "../../core/mailer";
+import { maskEmail } from "../../utils/mask";
 
 const SERVICE_URL = "https://vehicle-drive-log.web.app";
 
@@ -74,7 +75,7 @@ export const sendApprovalEmail = onCall(
         try {
             const transporter = createGmailTransporter();
             await transporter.sendMail(mailOptions);
-            console.log(`승인 이메일 전송 완료: to=${recipientEmail}, org=${orgName}`);
+            console.log(`승인 이메일 전송 완료: to=${maskEmail(recipientEmail)}, org=${orgName}`);
             return { success: true };
         } catch (err: unknown) {
             console.error("승인 이메일 전송 실패:", (err as Error).message);

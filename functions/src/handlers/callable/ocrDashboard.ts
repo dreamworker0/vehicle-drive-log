@@ -14,7 +14,7 @@ export const ocrDashboard = onCall(
         memory: "512MiB",
         enforceAppCheck: false,
     },
-    wrapCallableHandler("ocrDashboard", { rateLimitKey: "ocrDashboard" }, async (request) => {
+    wrapCallableHandler("ocrDashboard", { rateLimitKey: "ocrDashboard", rateLimitFailMode: "closed" }, async (request) => {
         // 일일 누적 한도(사용자/조직) — 분 단위 제한과 별개의 비용 증폭 방어 (ocr-cost-security §1.1)
         const [dailyUser, dailyOrg] = await Promise.all([getRateLimits("ocrDailyUser"), getRateLimits("ocrDailyOrg")]);
         await checkDailyOcrQuota(request.auth!.uid, request.auth!.token.orgId as string | undefined, dailyUser, dailyOrg);
