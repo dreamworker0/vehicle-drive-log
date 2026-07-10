@@ -42,9 +42,13 @@ async function queueCount(page: Page): Promise<number> {
 
 test.describe('Offline-First 쓰기 큐 및 백그라운드 동기화 E2E', () => {
     test('오프라인 상태에서 운행일지 작성 후 온라인 전환 시 동기화된다', async ({ page, context }) => {
-        // CI 디버깅용: 브라우저 콘솔 에러를 테스트 출력으로 전달
+        // CI 디버깅용: 브라우저 콘솔 에러를 테스트 출력으로 전달 +
+        // 시드 계약 위반(`[Zod]`)을 수집해 테스트 종료 시 0건을 단언한다.
+        const zodErrors: string[] = [];
         page.on('console', (msg) => {
-            if (msg.type() === 'error') console.log('[browser error]', msg.text());
+            if (msg.type() !== 'error') return;
+            console.log('[browser error]', msg.text());
+            if (msg.text().includes('[Zod]')) zodErrors.push(msg.text());
         });
 
         // 1. 온라인 상태에서 앱에 로그인
@@ -53,7 +57,12 @@ test.describe('Offline-First 쓰기 큐 및 백그라운드 동기화 E2E', () =
 
         // 운행일지 작성 페이지로 이동 (EmployeeLayout의 "drive-log" 라우트)
         // networkidle 대기는 쓰지 않는다 — Firestore 리스너가 연결을 유지해 idle에 도달하지 못함.
-        await page.goto('/employee/drive-log');
+        // 로그인 직후 전체 리로드로 이동하면 인증 재초기화 중 가드가 잠시 리다이렉트해
+        // goto가 ERR_ABORTED로 중단될 수 있다. 최종적으로 drive-log에 안착할 때까지 재시도한다.
+        await expect(async () => {
+            await page.goto('/employee/drive-log', { waitUntil: 'commit' }).catch(() => { /* 리다이렉트 중단 무시 */ });
+            await expect(page).toHaveURL(/\/employee\/drive-log/, { timeout: 3000 });
+        }).toPass({ timeout: 25000 });
 
         // 차량 목록(VehicleSelector 그리드)이 뜰 때까지 대기 — 페이지 준비 신호로 충분
         const vehicleBtn = page.locator('.grid.grid-cols-3 button').first();
@@ -104,5 +113,8 @@ test.describe('Offline-First 쓰기 큐 및 백그라운드 동기화 E2E', () =
         //    (큐 flush는 SW sync 이벤트 전용이라 SW가 없는 dev 서버 E2E에선 검증 대상이 아님)
         await page.goto('/employee/my-records');
         await expect(page.locator('text=E2E 오프라인 목적지').first()).toBeVisible({ timeout: 20000 });
+
+        // 시드 계약 검증 — 여정 전체에서 Zod 파싱 오류가 없어야 한다.
+        expect(zodErrors).toEqual([]);
     });
 });

@@ -29,6 +29,7 @@ export const TEST_EMPLOYEE = {
 export const TEST_VEHICLE = {
     id: 'e2e-vehicle',
     displayName: '쏘나타 99가9999',
+    modelName: '쏘나타',
 };
 
 export async function seedEmulator(): Promise<void> {
@@ -69,16 +70,19 @@ export async function seedEmulator(): Promise<void> {
         status: 'active', createdAt: now,
     }, { merge: true });
 
+    // merge를 쓰지 않는다 — 과거 실행에서 남은 필드가 파싱/테스트 결과에 영향을 주지 않도록
+    // 매번 스키마에 맞는 완전한 문서로 덮어쓴다. modelName은 vehicleSchema 필수 필드다.
     await db.collection('vehicles').doc(TEST_VEHICLE.id).set({
         organizationId: TEST_ORG_ID,
         displayName: TEST_VEHICLE.displayName,
         name: TEST_VEHICLE.displayName,
+        modelName: TEST_VEHICLE.modelName,
         currentKm: 50000,
         fuelType: 'gasoline',
         vehicleType: 'sedan',
         status: 'active',
         createdAt: now,
-    }, { merge: true });
+    });
 }
 
 /**

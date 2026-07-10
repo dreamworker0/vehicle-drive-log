@@ -32,11 +32,25 @@ async function signIn(page: Page, email: string, password: string) {
     ).catch(() => { /* 네비게이션으로 인한 컨텍스트 파괴 무시 */ });
 }
 
+/** 브라우저 콘솔에서 Firestore 시드 계약 위반(`[Zod]` 파싱 실패)을 수집한다. */
+function collectZodErrors(page: Page): string[] {
+    const zodErrors: string[] = [];
+    page.on('console', (message) => {
+        if (message.type() === 'error' && message.text().includes('[Zod]')) {
+            zodErrors.push(message.text());
+        }
+    });
+    return zodErrors;
+}
+
 test.describe('인증 상태 E2E (에뮬레이터)', () => {
     test('직원 로그인 시 직원 대시보드로 자동 진입한다', async ({ page }) => {
+        const zodErrors = collectZodErrors(page);
         await signIn(page, TEST_EMPLOYEE.email, TEST_EMPLOYEE.password);
         await page.waitForURL(/\/employee/, { timeout: 25000 });
         await expect(page).toHaveURL(/\/employee/);
+        // 시드 데이터가 스키마 계약을 지키면 Zod 파싱 오류가 0건이어야 한다.
+        expect(zodErrors).toEqual([]);
     });
 
     test('관리자 로그인 시 관리자 화면으로 자동 진입한다', async ({ page }) => {

@@ -33,9 +33,15 @@ async function signIn(page: Page, email: string, password: string) {
 
 test.describe('운행일지 작성 여정 E2E (에뮬레이터)', () => {
     test('직원이 온라인에서 운행일지를 작성·저장하면 서버에 반영되고 폼이 리셋된다', async ({ page }) => {
-        // CI 디버깅용: 브라우저 콘솔 에러를 테스트 출력으로 전달
+        // CI 디버깅용: 브라우저 콘솔 에러를 테스트 출력으로 전달 +
+        // 시드 계약 위반(`[Zod]`)을 수집해 테스트 종료 시 0건을 단언한다.
+        // 이 여정은 /employee/drive-log에서 차량(vehicleSchema)을 실제 파싱하므로,
+        // 시드 필수 필드 누락이 여기서 표면화된다.
+        const zodErrors: string[] = [];
         page.on('console', (msg) => {
-            if (msg.type() === 'error') console.log('[browser error]', msg.text());
+            if (msg.type() !== 'error') return;
+            console.log('[browser error]', msg.text());
+            if (msg.text().includes('[Zod]')) zodErrors.push(msg.text());
         });
 
         const DESTINATION = 'E2E 온라인 작성 목적지';
@@ -44,7 +50,13 @@ test.describe('운행일지 작성 여정 E2E (에뮬레이터)', () => {
         await signIn(page, TEST_EMPLOYEE.email, TEST_EMPLOYEE.password);
         await page.waitForURL(/\/employee/, { timeout: 25000 });
         // networkidle 대기는 쓰지 않는다 — Firestore 리스너가 연결을 유지해 idle에 도달하지 못함.
-        await page.goto('/employee/drive-log');
+        // 로그인 직후 전체 리로드로 이동하면 인증 재초기화 중 가드가 잠시 리다이렉트해
+        // goto가 ERR_ABORTED로 중단될 수 있다(특히 콜드 컴파일이 겹치는 첫 실행). 최종적으로
+        // drive-log에 안착할 때까지 재시도한다.
+        await expect(async () => {
+            await page.goto('/employee/drive-log', { waitUntil: 'commit' }).catch(() => { /* 리다이렉트 중단 무시 */ });
+            await expect(page).toHaveURL(/\/employee\/drive-log/, { timeout: 3000 });
+        }).toPass({ timeout: 25000 });
 
         // 2. 차량 선택 (VehicleSelector 그리드)
         const vehicleBtn = page.locator('.grid.grid-cols-3 button').first();
@@ -75,5 +87,8 @@ test.describe('운행일지 작성 여정 E2E (에뮬레이터)', () => {
         // 7. 성공 계약 2 — 서버(에뮬레이터)에 실제 반영된다. 내 기록에서 조회로 검증.
         await page.goto('/employee/my-records');
         await expect(page.locator(`text=${DESTINATION}`).first()).toBeVisible({ timeout: 20000 });
+
+        // 시드 계약 검증 — 여정 전체에서 Zod 파싱 오류가 없어야 한다.
+        expect(zodErrors).toEqual([]);
     });
 });
