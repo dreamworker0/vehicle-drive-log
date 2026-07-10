@@ -43,6 +43,7 @@ export const backfillOrgCoords = onCall(
         region: "asia-northeast3",
         timeoutSeconds: 540,
         memory: "256MiB",
+        enforceAppCheck: true,
     },
     async (request) => {
         // superAdmin만 전체 기관 좌표 일괄 수정 가능

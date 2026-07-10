@@ -12,7 +12,7 @@ import { getKSTMonthKey } from "../../utils/kstDate";
  *   await fn({ organizationId: 'xxx' }); // 특정 기관만
  */
 export const recalculateAggregatedStats = onCall(
-    { region: "asia-northeast3", timeoutSeconds: 300 },
+    { region: "asia-northeast3", timeoutSeconds: 300, enforceAppCheck: true },
     async (request) => {
         // 인증 확인
         if (!request.auth) {

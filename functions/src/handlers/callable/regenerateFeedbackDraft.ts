@@ -53,7 +53,7 @@ function parseAiResponse(text: string): {
 }
 
 export const regenerateFeedbackDraft = onCall(
-    { region: "asia-northeast3", timeoutSeconds: 60, enforceAppCheck: false },
+    { region: "asia-northeast3", timeoutSeconds: 60, enforceAppCheck: true },
     wrapCallableHandler("regenerateFeedbackDraft", {}, async (request) => {
         // superAdmin 권한 확인 (관리자만 다시 생성 가능)
         requireSuperAdmin(request);

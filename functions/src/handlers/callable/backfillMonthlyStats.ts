@@ -13,6 +13,7 @@ export const backfillMonthlyStats = onCall(
         region: "asia-northeast3",
         timeoutSeconds: 540,
         memory: "512MiB",
+        enforceAppCheck: true,
     },
     async (request) => {
         requireSuperAdmin(request);

@@ -10,7 +10,7 @@ import { sendReminderAlimtalk } from "../../services/alimtalk/sendAlimtalk";
 import { requireSuperAdmin } from "../../utils/helpers";
 
 export const sendBulkReminder = onCall(
-    { region: "asia-northeast3", timeoutSeconds: 120, enforceAppCheck: false },
+    { region: "asia-northeast3", timeoutSeconds: 120, enforceAppCheck: true },
     async (request) => {
         requireSuperAdmin(request);
 

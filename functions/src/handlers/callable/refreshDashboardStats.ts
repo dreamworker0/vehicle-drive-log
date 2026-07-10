@@ -14,7 +14,7 @@ const REFRESH_COOLDOWN_SEC = 5 * 60; // 5분
  * 배포 직후 초기 시딩 또는 대량 작업 후 즉시 반영에 사용.
  */
 export const refreshDashboardStats = onCall(
-    { region: "asia-northeast3", timeoutSeconds: 300, memory: "512MiB" },
+    { region: "asia-northeast3", timeoutSeconds: 300, memory: "512MiB", enforceAppCheck: true },
     async (request) => {
         if (!request.auth) {
             throw new HttpsError("unauthenticated", "인증이 필요합니다.");
