@@ -31,16 +31,16 @@
 ## Code Layout
 - `src/hooks/usePoiSearch.ts` — POI 검색 및 캐시 훅
 - `src/__tests__/hooks/usePoiSearch.test.ts` — POI 캐시 유닛 테스트
-- `functions/src/calendarSchedule.ts` — 스케줄러 동기화 및 단일 차량 코어 로직
-- `functions/src/triggerOnDemandCalendarSync.ts` — 온디맨드 구글 캘린더 동기화 API
+- `functions/src/handlers/scheduled/calendarSchedule.ts` — 스케줄러 동기화 및 단일 차량 코어 로직
+- `functions/src/handlers/callable/triggerOnDemandCalendarSync.ts` — 온디맨드 구글 캘린더 동기화 API
 - `src/hooks/useCalendarSync.ts` — 30분 쿨다운 및 Exponential Backoff 재시도 훅
 - `src/hooks/reservationCalendar/useReservationData.ts` — 온디맨드 훅 연동 예약 데이터 처리 레이어
 - `scripts/generate-seo.ts` — 빌드 완료 후 Sitemap 및 Robots 자동 생성 스크립트
 - `vitest.config.js` — 테스트 커버리지 리포트 수집 설정
 - `src/__tests__/store/useThemeStore.test.ts` — 테스트 커버리지 퀄리티 게이트 패치를 위한 테마 스토어 단위 테스트
-- `src/components/reservation/CancelReservationHandler.tsx` — 예약 취소 처리 컴포넌트 (직접 호출 제거 대상)
-- `src/layouts/EmployeeLayout.tsx` — 직원용 기본 레이아웃 컴포넌트 (직접 호출 제거 대상)
-- `src/components/superAdmin/OrgApplicationList.tsx` — 기관 가입 신청 목록 컴포넌트 (직접 호출 제거 대상)
+- `src/components/common/CancelReservationHandler.tsx` — 예약 취소 처리 컴포넌트
+- `src/components/employee/EmployeeLayout.tsx` — 직원용 기본 레이아웃 컴포넌트
+- `src/components/superAdmin/OrgApplicationList.tsx` — 기관 가입 신청 목록 컴포넌트
 - `src/lib/firestore/reservations.ts` — 예약 도메인 Firestore 데이터 헬퍼 파일
-- `src/lib/firestore/orgApplications.ts` — 기관 신청 정보 도메인 Firestore 데이터 헬퍼 파일
-- `src/lib/firestore/users.ts` — 사용자 도메인 및 Google OAuth 필드 헬퍼 파일
+- `src/hooks/useOrgApplication.ts` — 기관 가입 신청 처리 훅 (별도 firestore 도메인 파일은 없음)
+- `src/lib/firestore/users.ts` — 사용자 도메인 Firestore 데이터 헬퍼 파일 (OAuth 토큰은 2026-07-10 보안 조치로 users 문서에서 제거, Functions 전용 private 서브컬렉션으로 이전)
