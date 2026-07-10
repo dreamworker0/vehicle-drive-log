@@ -72,6 +72,26 @@ describe('ConfirmModal Component', () => {
         expect(useConfirmStore.getState().open).toBe(false);
     });
 
+    it('마지막 버튼에서 Tab을 누르면 첫 버튼으로 순환한다 (포커스 트랩)', () => {
+        render(<TestConfirmModal />);
+        const cancel = screen.getByRole('button', { name: '취소' });
+        const confirm = screen.getByRole('button', { name: '확인' });
+        confirm.focus();
+        expect(confirm).toHaveFocus();
+        fireEvent.keyDown(window, { key: 'Tab' });
+        expect(cancel).toHaveFocus();
+    });
+
+    it('첫 버튼에서 Shift+Tab을 누르면 마지막 버튼으로 순환한다 (포커스 트랩)', () => {
+        render(<TestConfirmModal />);
+        const cancel = screen.getByRole('button', { name: '취소' });
+        const confirm = screen.getByRole('button', { name: '확인' });
+        cancel.focus();
+        expect(cancel).toHaveFocus();
+        fireEvent.keyDown(window, { key: 'Tab', shiftKey: true });
+        expect(confirm).toHaveFocus();
+    });
+
     it('타입이 input일 때 입력박스가 렌더링되고 입력값을 resolve로 전달한다', () => {
         useConfirmStore.setState({
             ...useConfirmStore.getState(),

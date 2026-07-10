@@ -1,18 +1,9 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('접근성 심화 검증', () => {
-    test('ConfirmModal에서 Tab 키로 포커스가 순환한다', async ({ page }) => {
-        // 이용약관 페이지 등 모달 트리거가 있는 곳에서 확인
-        await page.goto('/');
-        await page.waitForTimeout(2000);
-
-        // 모달이 있는 페이지를 직접 테스트하기 어려우므로
-        // 기본 접근성 속성 존재 확인으로 대체
-        const dialogElements = page.locator('[role="dialog"]');
-        const count = await dialogElements.count();
-        // 초기 화면에서 모달이 없어도 pass (모달은 동적으로 열림)
-        expect(count).toBeGreaterThanOrEqual(0);
-    });
+    // 참고: ConfirmModal 포커스 트랩은 컴포넌트 단위 테스트에서 실제 Tab/Shift+Tab 순환을
+    // 검증한다(src/__tests__/components/ConfirmModal.test.tsx). E2E에서는 초기 화면에 모달이
+    // 없어 의미 있는 단언이 어려우므로 여기서는 다루지 않는다.
 
     test('네비게이션에 aria-label이 있다', async ({ page }) => {
         await page.goto('/');
@@ -27,11 +18,11 @@ test.describe('접근성 심화 검증', () => {
         await page.goto('/');
         await page.waitForTimeout(2000);
 
-        // SPA이므로 동적 알림 영역이 존재할 수 있음
+        // 토스트 라이브 리전(role="status" aria-live="polite")은 ToastProviderWrapper가
+        // 비인증 경량 엔트리에도 상시 렌더링하므로 랜딩에서 최소 1개 존재해야 한다.
         const liveRegions = page.locator('[aria-live]');
-        const count = await liveRegions.count();
-        // 존재하거나 없어도 에러 아님 (페이지 상태에 따라 다름)
-        expect(count).toBeGreaterThanOrEqual(0);
+        await expect(liveRegions.first()).toBeAttached();
+        expect(await liveRegions.count()).toBeGreaterThanOrEqual(1);
     });
 
     test('인터랙티브 요소에 키보드 접근이 가능하다', async ({ page }) => {
