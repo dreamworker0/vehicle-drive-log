@@ -28,6 +28,9 @@ for (const path of PUBLIC_PATHS) {
 
         const result = await new AxeBuilder({ page })
             .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
+            // 서드파티 iframe(랜딩 YouTube 임베드 등) 내부는 우리 통제 밖이라 검사에서 제외한다.
+            // YouTube 플레이어의 button-name·aria-prohibited-attr 위반은 우리가 고칠 수 없다.
+            .exclude('iframe')
             .analyze();
 
         const seriousOrCritical = result.violations.filter(
