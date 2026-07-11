@@ -22,5 +22,7 @@ export const EMAILJS_PRIVATE_KEY = defineSecret("EMAILJS_PRIVATE_KEY");
 /** 알림톡 Cafe24 프록시 인증 토큰 — services/alimtalk 사용 함수 전부 */
 export const ALIMTALK_PROXY_TOKEN = defineSecret("ALIMTALK_PROXY_TOKEN");
 
-/** Google OAuth 클라이언트 시크릿 — 개인 캘린더 동기화 (personalCalendarSync) */
-export const GOOGLE_OAUTH_CLIENT_SECRET = defineSecret("GOOGLE_OAUTH_CLIENT_SECRET");
+// GOOGLE_OAUTH_CLIENT_SECRET은 이관 제외 (2026-07-11 확인):
+// 배포 환경에 값 자체가 없고, 개인 캘린더 토큰 갱신 경로(personalCalendarSync)는
+// 신규 토큰 발급 코드가 제거된 휴면(레거시) 상태다. OAuth 토큰 정리는
+// docs/개선계획서_2026-07 트랙(마이그레이션 verify remaining=0)에서 별도 처리.
