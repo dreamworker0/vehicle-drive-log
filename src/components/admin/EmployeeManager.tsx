@@ -19,7 +19,7 @@ export default function EmployeeManager() {
         filteredUnifiedList, stats,
         handleAddEmployee, handleCopyInviteCode, handleRegenerateCode,
         handleEditEmployee, handleSaveEdit, handleDeleteEmployee, handleChangeRole,
-        handleDeletePreRegistered, handleRestoreEmployee,
+        handleDeletePreRegistered, handleRestoreEmployee, handleDeletePermanently,
     } = useEmployeeManager();
     const { userData } = useAuth();
     const selfUid = userData?.id;
@@ -197,6 +197,7 @@ export default function EmployeeManager() {
                             onChangeRole={handleChangeRole}
                             onDeletePreRegistered={handleDeletePreRegistered}
                             onRestore={handleRestoreEmployee}
+                            onDeletePermanently={handleDeletePermanently}
                         />
                     ))}
                 </div>

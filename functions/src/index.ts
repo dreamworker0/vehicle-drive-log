@@ -67,6 +67,9 @@ export { disableUser } from "./handlers/callable/disableUser";
 // 계정 복원 (Auth 재활성화 + Firestore 재생성)
 export { restoreUser } from "./handlers/callable/restoreUser";
 
+// 비활성 직원 완전 삭제 (users 문서 + 즐겨찾기 + Auth 계정 영구 삭제, 운행 기록은 보존)
+export { deleteUserPermanently } from "./handlers/callable/deleteUserPermanently";
+
 // 기관 자발적 서비스 해지 (관리자가 사유와 함께 직접 탈퇴)
 export { withdrawOrganization } from "./handlers/callable/withdrawOrganization";
 

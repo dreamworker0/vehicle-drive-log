@@ -156,6 +156,47 @@ export default function useEmployeeManager() {
         });
     };
 
+    const handleDeletePermanently = async (emp: User) => {
+        if (!userData?.id) {
+            showToast('사용자 정보를 불러오는 중입니다. 잠시 후 다시 시도해 주세요.', 'warning');
+            return;
+        }
+        // 되돌릴 수 없는 작업 — 직원 이름(없으면 이메일)을 직접 입력받아 확인
+        const confirmKey = (emp.name || '').trim() || emp.email || '';
+        const typed = await confirm({
+            type: 'input',
+            title: '직원 완전 삭제',
+            message: `${emp.name || emp.email} 직원의 계정을 영구 삭제합니다.\n\n• 계정과 개인 데이터(즐겨찾기 등)가 삭제되며 되돌릴 수 없습니다.\n• 과거 운행 기록은 그대로 보존됩니다.\n\n삭제하려면 아래에 "${confirmKey}"를 입력하세요.`,
+            inputPlaceholder: confirmKey,
+            confirmColor: 'danger',
+            confirmText: '완전 삭제',
+            cancelText: '취소',
+        });
+        if (typed === false || typed === null) return;
+        if (typeof typed !== 'string' || typed.trim() !== confirmKey) {
+            showToast('입력한 내용이 일치하지 않아 삭제를 취소했습니다.', 'warning');
+            return;
+        }
+
+        await runWithRetry(`hard-delete-emp-${emp.id}`, async () => {
+            const { getFunctions, httpsCallable } = await import('firebase/functions');
+            const functions = getFunctions(undefined, 'asia-northeast3');
+            const callable = httpsCallable(functions, 'deleteUserPermanently');
+            await callable({ uid: emp.id });
+            showToast('직원 계정이 완전히 삭제되었습니다.', 'success');
+            await fetchData();
+        }, {
+            errorMessage: '완전 삭제에 실패했습니다.',
+            onError: (err: unknown) => {
+                const message = err instanceof Error ? err.message : null;
+                if (message && !message.toLowerCase().includes('network')) {
+                    showToast(message, 'error');
+                    return true;
+                }
+            }
+        });
+    };
+
     const handleRestoreEmployee = async (emp: User) => {
         if (!await confirm({ message: `${emp.name || emp.email} 직원을 다시 활성화하시겠습니까?` })) return;
         await runWithRetry(`restore-emp-${emp.id}`, async () => {
@@ -275,6 +316,6 @@ export default function useEmployeeManager() {
         unifiedList, filteredUnifiedList, stats,
         handleAddEmployee, handleCopyInviteCode, handleRegenerateCode,
         handleEditEmployee, handleSaveEdit, handleDeleteEmployee, handleChangeRole,
-        handleDeletePreRegistered, handleRestoreEmployee,
+        handleDeletePreRegistered, handleRestoreEmployee, handleDeletePermanently,
     };
 }

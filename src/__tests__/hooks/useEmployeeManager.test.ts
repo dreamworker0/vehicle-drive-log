@@ -18,7 +18,7 @@ vi.mock('../../lib/firebase', () => ({
 vi.mock('../../hooks/useAuth', () => ({
     useAuth: () => ({
         user: { uid: 'admin1', displayName: '관리자' },
-        userData: { organizationId: 'org1', name: '관리자', role: 'admin' },
+        userData: { id: 'admin1', organizationId: 'org1', name: '관리자', role: 'admin' },
     }),
 }));
 
@@ -27,8 +27,15 @@ vi.mock('../../hooks/useToast', () => ({
     useToast: () => ({ showToast: mockShowToast }),
 }));
 
+const mockConfirm = vi.fn();
 vi.mock('../../hooks/useConfirm', () => ({
-    useConfirm: () => ({ confirm: vi.fn().mockResolvedValue(true) }),
+    useConfirm: () => ({ confirm: mockConfirm }),
+}));
+
+const mockCallable = vi.fn().mockResolvedValue({ data: { success: true } });
+vi.mock('firebase/functions', () => ({
+    getFunctions: vi.fn(),
+    httpsCallable: () => mockCallable,
 }));
 
 const mockMembers = [
@@ -73,6 +80,8 @@ import useEmployeeManager from '../../hooks/useEmployeeManager';
 describe('useEmployeeManager', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        mockConfirm.mockResolvedValue(true);
+        mockCallable.mockResolvedValue({ data: { success: true } });
     });
 
     it('초기 로딩 후 직원 목록과 기관 정보를 가져온다', async () => {
@@ -119,5 +128,45 @@ describe('useEmployeeManager', () => {
         expect(result.current.stats.active).toBe(3);
         expect(result.current.stats.pending).toBe(0);
         expect(result.current.stats.disabled).toBe(0);
+    });
+
+    describe('handleDeletePermanently — 완전 삭제', () => {
+        const disabledEmp = { id: 'u9', name: '퇴사직원', email: 'out@test.com', role: 'employee', status: 'disabled' };
+
+        it('입력한 이름이 일치하면 deleteUserPermanently 함수를 호출한다', async () => {
+            mockConfirm.mockResolvedValue('퇴사직원');
+            const { result } = renderHook(() => useEmployeeManager());
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await result.current.handleDeletePermanently(disabledEmp as any);
+
+            expect(mockCallable).toHaveBeenCalledWith({ uid: 'u9' });
+            expect(mockShowToast).toHaveBeenCalledWith('직원 계정이 완전히 삭제되었습니다.', 'success');
+        });
+
+        it('입력한 이름이 일치하지 않으면 삭제를 중단한다', async () => {
+            mockConfirm.mockResolvedValue('다른이름');
+            const { result } = renderHook(() => useEmployeeManager());
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await result.current.handleDeletePermanently(disabledEmp as any);
+
+            expect(mockCallable).not.toHaveBeenCalled();
+            expect(mockShowToast).toHaveBeenCalledWith('입력한 내용이 일치하지 않아 삭제를 취소했습니다.', 'warning');
+        });
+
+        it('확인 모달을 취소하면 아무 동작도 하지 않는다', async () => {
+            mockConfirm.mockResolvedValue(false);
+            const { result } = renderHook(() => useEmployeeManager());
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await result.current.handleDeletePermanently(disabledEmp as any);
+
+            expect(mockCallable).not.toHaveBeenCalled();
+            expect(mockShowToast).not.toHaveBeenCalled();
+        });
     });
 });
