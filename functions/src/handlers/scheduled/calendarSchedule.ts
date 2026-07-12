@@ -305,10 +305,23 @@ export async function syncSingleVehicleCalendar(
                 if (userRecord) {
                     reservationData.reservedByUid = userRecord.uid;
                     reservationData.userId = userRecord.uid;
-                    if (!reservationData.reservedByName && userRecord.displayName) {
-                        reservationData.reservedByName = userRecord.displayName;
+                    if (!reservationData.reservedByName) {
+                        if (userRecord.displayName) {
+                            reservationData.reservedByName = userRecord.displayName;
+                        } else {
+                            // 이메일/비밀번호 계정은 Auth displayName이 비어 있는 경우가 많아
+                            // Firestore 프로필(users/{uid}.name)로 폴백
+                            const profileSnap = await db.collection("users").doc(userRecord.uid).get();
+                            const profileName = profileSnap.exists ? (profileSnap.data()?.name as string | undefined) : undefined;
+                            if (profileName) reservationData.reservedByName = profileName;
+                        }
                     }
                     console.log("[" + vehicleName + "] User matched: " + maskEmail(reservationData.creatorEmail as string) + " -> " + userRecord.uid);
+                }
+                // 최종 폴백: 이메일 로컬파트 — "예약자 미상"으로 남지 않게 최소 식별자 제공
+                // (개인정보 보호를 위해 이메일 전체는 저장하지 않음)
+                if (!reservationData.reservedByName) {
+                    reservationData.reservedByName = (reservationData.creatorEmail as string).split("@")[0];
                 }
             }
 
