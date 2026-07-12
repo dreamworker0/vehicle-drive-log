@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import useTodayDashboard from '../../hooks/useTodayDashboard';
+import { useCalendarSync } from '../../hooks/useCalendarSync';
 import { updateUser } from '../../lib/firestore';
 import { SkeletonCard, SkeletonBox } from '../common/Skeleton';
 import WelcomeGuide from './WelcomeGuide';
@@ -26,8 +27,9 @@ export default function TodayDashboard() {
         handleStartDrive, handleStartNavigation,
         handleCancelWeekReservation, handleCancelTodayReservation,
         navigateToArrival, navigateToReservations, navigateToQuickDrive,
-        myLogsCount,
+        myLogsCount, refresh,
     } = useTodayDashboard();
+    const { syncVehicleOnDemand, checkCooldown } = useCalendarSync();
     const navigate = useNavigate();
     const [cancelTarget, setCancelTarget] = useState<{ reservation: Reservation; type: 'today' | 'week' } | null>(null);
     // "이번 주 예약" 요소 ref — 추천 배너와의 화면 겹침 감지에 사용
@@ -54,6 +56,28 @@ export default function TodayDashboard() {
             setTimeout(dismissWelcome, 0);
         }
     }, [showWelcome, myLogsCount, dismissWelcome]);
+
+    // 구글 캘린더 온디맨드 백그라운드 동기화 — 홈 진입 시에도 캘린더 직접 등록분을 반영
+    // (기존에는 예약 캘린더 화면에서만 트리거되어 주말·홈 전용 사용자에게 사각지대가 있었음)
+    // 30분 쿨다운(checkCooldown)으로 홈의 높은 접근 빈도에 따른 호출 비용을 방어한다.
+    useEffect(() => {
+        if (!userData?.organizationId || vehicles.length === 0) return;
+
+        const triggerSyncs = async () => {
+            let anySynced = false;
+            for (const vehicle of vehicles as Vehicle[]) {
+                const calId = vehicle.googleCalendarId;
+                if (calId && calId.includes('@') && checkCooldown(vehicle.id)) {
+                    const success = await syncVehicleOnDemand(vehicle.id, userData.organizationId!);
+                    if (success) anySynced = true;
+                }
+            }
+            // 새로 당겨온 예약이 있을 수 있으므로 대시보드 데이터 갱신
+            if (anySynced) refresh();
+        };
+
+        triggerSyncs();
+    }, [vehicles, userData?.organizationId, syncVehicleOnDemand, checkCooldown, refresh]);
 
     return (
         <div className="max-w-lg mx-auto animate-fade-in">

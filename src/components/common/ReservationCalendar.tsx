@@ -3,6 +3,7 @@
  * 로직은 useReservationCalendar 훅으로 분리, UI는 CalendarGrid + ReservationSidePanel 사용
  */
 import { useCallback } from 'react';
+import { format } from 'date-fns';
 import useReservationCalendar from '../../hooks/useReservationCalendar';
 import useVehiclePriority from '../../hooks/useVehiclePriority';
 import { useReservationPattern } from '../../hooks/useReservationPattern';
@@ -32,7 +33,11 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
         getCurrentTimeStr, getMinStartTime,
         getNavigationDeeplink,
         holidays, reservations,
+        syncNow, syncing, lastSyncAt,
     } = useReservationCalendar({ isAdmin });
+
+    // 구글 캘린더 연동 차량이 하나라도 있을 때만 동기화 컨트롤 노출
+    const hasCalendarLinkedVehicle = vehicles.some(v => v.googleCalendarId && v.googleCalendarId.includes('@'));
     const { usageCounts } = useVehiclePriority();
     const { recentDestinations } = useReservationPattern();
 
@@ -51,7 +56,30 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
 
     return (
         <div className={`${isAdmin ? 'max-w-4xl' : 'max-w-lg'} mx-auto animate-fade-in`}>
-            <h1 className={`font-bold text-surface-900 dark:text-surface-100 ${isAdmin ? 'text-2xl mb-6' : 'text-lg mb-2'}`}>차량 예약</h1>
+            <div className={`flex items-center justify-between gap-2 ${isAdmin ? 'mb-6' : 'mb-2'}`}>
+                <h1 className={`font-bold text-surface-900 dark:text-surface-100 ${isAdmin ? 'text-2xl' : 'text-lg'}`}>차량 예약</h1>
+                {hasCalendarLinkedVehicle && (
+                    <div className="flex items-center gap-2 text-xs text-surface-500 dark:text-surface-400">
+                        <span>
+                            {lastSyncAt ? `마지막 동기화 ${format(lastSyncAt, 'HH:mm')}` : '동기화 이력 없음'}
+                        </span>
+                        <button
+                            type="button"
+                            onClick={syncNow}
+                            disabled={syncing}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg font-medium text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/20 hover:bg-primary-100 dark:hover:bg-primary-900/40 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                            aria-label="구글 캘린더 지금 동기화"
+                        >
+                            {syncing ? (
+                                <span className="w-3.5 h-3.5 spinner" aria-hidden="true" />
+                            ) : (
+                                <span aria-hidden="true">🔄</span>
+                            )}
+                            {syncing ? '동기화 중…' : '지금 동기화'}
+                        </button>
+                    </div>
+                )}
+            </div>
 
             {isAdmin && <PendingReservationList />}
 

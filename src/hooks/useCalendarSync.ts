@@ -43,9 +43,18 @@ export function useCalendarSync() {
         return Date.now() - lastSync >= COOLDOWN_MS;
     }, [getSyncTimeMap]);
 
-    const syncVehicleOnDemand = useCallback(async (vehicleId: string, organizationId: string): Promise<boolean> => {
-        // 쿨다운 상태 검증
-        if (!checkCooldown(vehicleId)) {
+    // 마지막 동기화 시각 조회 — 대상 차량들 중 가장 최근 성공 시각 (없으면 null)
+    const getLastSyncTime = useCallback((vehicleIds: string[]): number | null => {
+        const map = getSyncTimeMap();
+        const times = vehicleIds
+            .map((id) => map[id])
+            .filter((t): t is number => typeof t === 'number');
+        return times.length > 0 ? Math.max(...times) : null;
+    }, [getSyncTimeMap]);
+
+    const syncVehicleOnDemand = useCallback(async (vehicleId: string, organizationId: string, options?: { force?: boolean }): Promise<boolean> => {
+        // 쿨다운 상태 검증 (수동 "지금 동기화"는 force로 우회)
+        if (!options?.force && !checkCooldown(vehicleId)) {
             devLog(`[useCalendarSync] Vehicle ${vehicleId} is on cooldown. Skip on-demand sync.`);
             return false;
         }
@@ -120,6 +129,7 @@ export function useCalendarSync() {
     return {
         syncVehicleOnDemand,
         checkCooldown,
+        getLastSyncTime,
         loading,
         error,
     };

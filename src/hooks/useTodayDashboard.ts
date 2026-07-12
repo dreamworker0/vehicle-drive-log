@@ -5,7 +5,7 @@
  * 리팩토링: Mutation 핸들러 → useDashboardActions 분리
  */
 
-import { useState, useMemo, use } from 'react';
+import { useState, useMemo, useCallback, use } from 'react';
 import { useAuth } from './useAuth';
 import { getVehicles, getTodayReservations, getWeekReservations, getMyDriveLogs } from '../lib/firestore';
 import { toLocalDateStr } from '../lib/dateUtils';
@@ -82,11 +82,19 @@ export default function useTodayDashboard() {
         return toLocalDateStr(d);
     }, []);
 
+    // 캐시 무효화 + 재페치 트리거 (캘린더 백그라운드 동기화 후 갱신용)
+    const [refreshTick, setRefreshTick] = useState(0);
+    const refresh = useCallback(() => {
+        invalidateDashboardCache();
+        setRefreshTick(t => t + 1);
+    }, []);
+
     // 1. 데이터 페칭 - Suspense 유발
     // use() 훅이 Promise 인스턴스를 받으면 Resolve 될 때까지 상위 Suspense로 렌더링을 중단합니다.
     const dataOrPromise = useMemo(() => {
+        void refreshTick; // 캐시 무효화 후 재페치를 강제하기 위한 의존성
         return (orgId && user?.uid) ? getDashboardData(orgId, user.uid, todayStr, weekEndDate) : null;
-    }, [orgId, user, todayStr, weekEndDate]);
+    }, [orgId, user, todayStr, weekEndDate, refreshTick]);
     type DashboardData = [Vehicle[], Reservation[], Reservation[], FuelLog[]];
     const resolvedData = (dataOrPromise instanceof Promise ? use(dataOrPromise) : dataOrPromise) as DashboardData | null;
 
@@ -254,5 +262,6 @@ export default function useTodayDashboard() {
         handleCancelTodayReservation: handleCancelReservation,
         navigateToArrival, navigateToReservations, navigateToQuickDrive,
         recommendedVehicle, myLogsCount: myLogs.length,
+        refresh,
     };
 }

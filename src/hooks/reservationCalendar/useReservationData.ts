@@ -37,8 +37,22 @@ export function useReservationData({
     const [holidays, setHolidays] = useState<CustomHoliday[]>([]);
     const [members, setMembers] = useState<UserDoc[]>([]);
     const [orgAddress, setOrgAddress] = useState('');
+    const [syncing, setSyncing] = useState(false);
+    const [lastSyncAt, setLastSyncAt] = useState<number | null>(null);
 
-    const { syncVehicleOnDemand, checkCooldown } = useCalendarSync();
+    const { syncVehicleOnDemand, checkCooldown, getLastSyncTime } = useCalendarSync();
+
+    // 캘린더 연동 차량 목록 (유효한 구글 캘린더 ID 보유)
+    const calendarLinkedVehicles = useMemo(
+        () => vehicles.filter(v => v.googleCalendarId && v.googleCalendarId.includes('@')),
+        [vehicles]
+    );
+
+    // 차량 로드 후 저장된 마지막 동기화 시각 복원
+    useEffect(() => {
+        if (calendarLinkedVehicles.length === 0) return;
+        setLastSyncAt(getLastSyncTime(calendarLinkedVehicles.map(v => v.id)));
+    }, [calendarLinkedVehicles, getLastSyncTime]);
 
     // 초기 데이터 로드
     useEffect(() => {
@@ -95,14 +109,13 @@ export function useReservationData({
 
     // 구글 캘린더 온디맨드 백그라운드 동기화 트리거
     useEffect(() => {
-        if (!userData?.organizationId || vehicles.length === 0) return;
+        if (!userData?.organizationId || calendarLinkedVehicles.length === 0) return;
 
         const triggerSyncs = async () => {
             let anySynced = false;
-            for (const vehicle of vehicles) {
-                const calId = vehicle.googleCalendarId;
-                // 유효한 구글 캘린더 ID를 가졌고, 30분 쿨다운을 지난 경우 백그라운드 동기화 자동 시작
-                if (calId && calId.includes('@') && checkCooldown(vehicle.id)) {
+            for (const vehicle of calendarLinkedVehicles) {
+                // 30분 쿨다운을 지난 경우 백그라운드 동기화 자동 시작
+                if (checkCooldown(vehicle.id)) {
                     // 정보성 로그는 개발 모드에서만 — 프로덕션 콘솔 노이즈·차량 정보 노출 방지
                     if (import.meta.env.DEV) console.log(`[useReservationData] Triggering background calendar sync for ${vehicle.displayName} (${vehicle.id})`);
                     const success = await syncVehicleOnDemand(vehicle.id, userData.organizationId!);
@@ -115,11 +128,35 @@ export function useReservationData({
             if (anySynced) {
                 if (import.meta.env.DEV) console.log('[useReservationData] Calendar sync completed, refreshing reservations...');
                 fetchReservations();
+                setLastSyncAt(Date.now());
             }
         };
 
         triggerSyncs();
-    }, [vehicles, userData?.organizationId, syncVehicleOnDemand, checkCooldown, fetchReservations]);
+    }, [calendarLinkedVehicles, userData?.organizationId, syncVehicleOnDemand, checkCooldown, fetchReservations]);
+
+    // 수동 "지금 동기화" — 쿨다운을 우회하여 연동 차량 전체를 즉시 동기화
+    const syncNow = useCallback(async () => {
+        if (!userData?.organizationId || calendarLinkedVehicles.length === 0 || syncing) return;
+
+        setSyncing(true);
+        try {
+            let anySynced = false;
+            for (const vehicle of calendarLinkedVehicles) {
+                const success = await syncVehicleOnDemand(vehicle.id, userData.organizationId!, { force: true });
+                if (success) anySynced = true;
+            }
+            if (anySynced) {
+                fetchReservations();
+                setLastSyncAt(Date.now());
+                showToast('구글 캘린더 동기화가 완료되었습니다.', 'success');
+            } else {
+                showToast('동기화하지 못했습니다. 캘린더 공유 설정을 확인해주세요.', 'warning');
+            }
+        } finally {
+            setSyncing(false);
+        }
+    }, [userData?.organizationId, calendarLinkedVehicles, syncing, syncVehicleOnDemand, fetchReservations, showToast]);
 
     // 달력 데이터 생성
     const calendarDays = useMemo(() => {
@@ -151,5 +188,8 @@ export function useReservationData({
         members,
         orgAddress,
         calendarDays,
+        syncNow,
+        syncing,
+        lastSyncAt,
     };
 }

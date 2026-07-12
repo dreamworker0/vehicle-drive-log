@@ -205,6 +205,25 @@ export default function VehicleCalendarSection({
                             연결을 확인
                         </li>
                     </ol>
+
+                    {/* 캘린더 직접 등록 시 권장 제목 형식 안내 */}
+                    <div className="mt-3 p-2.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
+                        <p className="font-medium text-blue-700 dark:text-blue-400 mb-1.5">
+                            💡 구글 캘린더에서 직접 일정을 등록할 때
+                        </p>
+                        <p className="text-surface-600 dark:text-surface-400">
+                            제목을{' '}
+                            <strong className="text-surface-700 dark:text-surface-300">목적지 — 예약자</strong>{' '}
+                            형식(예: <code className="px-1 rounded bg-surface-100 dark:bg-surface-700">서울역 — 김직원</code>)으로
+                            작성하면 예약자와 목적지가 정확히 반영됩니다. 일정 설명란에{' '}
+                            <code className="px-1 rounded bg-surface-100 dark:bg-surface-700">예약자:</code>{' '}
+                            <code className="px-1 rounded bg-surface-100 dark:bg-surface-700">용도:</code>{' '}
+                            <code className="px-1 rounded bg-surface-100 dark:bg-surface-700">목적지:</code>{' '}
+                            줄을 넣어도 됩니다. 목적지만 적으면(예:{' '}
+                            <code className="px-1 rounded bg-surface-100 dark:bg-surface-700">합정역</code>) 예약자는 일정
+                            작성자 계정으로 자동 추정됩니다.
+                        </p>
+                    </div>
                     <div className="mt-3 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
                         <p className="font-medium text-amber-700 dark:text-amber-400 mb-1.5">
                             ⚠️ Google Workspace(업무 계정) 사용 시

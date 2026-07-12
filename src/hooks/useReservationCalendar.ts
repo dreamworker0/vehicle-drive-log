@@ -47,7 +47,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
     const {
         vehicles, reservations, setReservations, loading,
         favorites, setFavorites, holidays, members, orgAddress,
-        calendarDays,
+        calendarDays, syncNow, syncing, lastSyncAt,
     } = dataHook;
 
     // ── Route info (tmap debounce, auto end-time) ──
@@ -125,5 +125,6 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
         getCurrentTimeStr, getMinStartTime,
         getNavigationDeeplink,
         holidays, reservations,
+        syncNow, syncing, lastSyncAt,
     };
 }
