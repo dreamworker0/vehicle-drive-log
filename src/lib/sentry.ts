@@ -96,6 +96,11 @@ function initSentryWithModule(Sentry: SentryModule) {
             /Database deleted by request of the user/,
             // iOS Safari IndexedDB 레코드 삭제 에러 (기기 저장 공간 부족 또는 시스템 락, 앱 버그 아님)
             /Failed to delete record from object store/,
+            // iOS Safari(WebKit) IndexedDB 트랜잭션 조기 커밋 후 삭제 시도 에러.
+            // Firebase 영속성 레이어가 WebKit의 트랜잭션 auto-commit과 경합할 때 발생하는
+            // unhandledrejection 노이즈다(스택 프레임이 없어 firebase-* 번들 필터를 우회한다).
+            // iOS는 Background Sync 미지원('SyncManager' 부재)이라 자체 flushQueue 경로는 실행되지 않는다 — 앱 버그 아님.
+            /Attempt to delete range from database without an in-progress transaction/,
             // Firestore IndexedDB 내부 캐시 손상 (Firebase SDK 버그, 앱 버그 아님)
             /INTERNAL ASSERTION FAILED/,
             /Unexpected state/,

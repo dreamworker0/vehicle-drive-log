@@ -60,9 +60,11 @@ export async function flushQueue() {
     const database = await getSyncDB();
     if (!database) return;
 
-    const tx = database.transaction('sync-store', 'readwrite');
-    const store = tx.objectStore('sync-store');
-    const allRecords = await store.getAll();
+    // 단일 트랜잭션을 열어두고 그 안에서 Firestore 네트워크 쓰기를 await하면 안 된다.
+    // IndexedDB 트랜잭션은 비-IDB Promise를 await하는 순간 auto-commit되어 비활성화되고,
+    // 그 뒤의 store.delete는 "Attempt to delete range from database without an in-progress
+    // transaction"(WebKit) 등으로 실패한다. 따라서 읽기·삭제를 각각 독립된 짧은 트랜잭션으로 분리한다.
+    const allRecords = await database.getAll('sync-store');
 
     if (allRecords.length === 0) return;
 
@@ -76,8 +78,9 @@ export async function flushQueue() {
             } else if (record.type === 'DELETE') {
                 await deleteDoc(docRef);
             }
-            // 성공 시 큐에서 제거
-            await store.delete(record.id as number);
+            // 성공 시 큐에서 제거 — 자체 트랜잭션을 여는 database.delete를 사용해
+            // Firestore await 뒤에도 유효한 트랜잭션에서 실행되도록 한다.
+            await database.delete('sync-store', record.id as number);
         } catch (error) {
             console.error(`[SyncQueue] flush Error for ${record.docId}`, error);
             // 실패한 건은 그대로 두어 다음에 다시 시도할 수 있게 함
