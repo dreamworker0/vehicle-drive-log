@@ -90,7 +90,8 @@ export function useDriveLogInitializer(deps: InitializerDeps) {
                 ]);
                 setVehicles(v as Vehicle[]);
                 setFavorites(favs as Favorite[]);
-                const otherMembers = (mems as UserDoc[]).filter(m => m.id !== user.uid);
+                // 본인 제외 + 비활성(disabled) 사용자 제외 — 신규 선택 후보에 노출하지 않는다
+                const otherMembers = (mems as UserDoc[]).filter(m => m.id !== user.uid && m.status !== 'disabled');
                 setMembers(otherMembers);
 
                 if (isEditMode && editLog?.passengerNames && editLog.passengerNames.length > 0) {

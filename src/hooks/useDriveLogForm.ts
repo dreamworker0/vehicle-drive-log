@@ -105,9 +105,16 @@ export default function useDriveLogForm() {
             organizationId: userData?.organizationId ?? null,
         } as UserDoc;
     }, [user, userData]);
+    // 지정 차량(allowedUserIds)일 때는 그 차량을 탈 수 있는 조직원만 운전자 후보로 노출.
+    // 동승자는 운전이 아니므로 제한하지 않는다(members 원본 유지).
+    const driverEligibleMembers = useMemo<UserDoc[]>(() => {
+        const allowed = selectedVehicle?.allowedUserIds;
+        if (!allowed || allowed.length === 0) return members;
+        return members.filter(m => allowed.includes(m.id));
+    }, [members, selectedVehicle]);
     const driverCandidates = useMemo<UserDoc[]>(
-        () => (selfUserDoc ? [selfUserDoc, ...members] : members),
-        [selfUserDoc, members]
+        () => (selfUserDoc ? [selfUserDoc, ...driverEligibleMembers] : driverEligibleMembers),
+        [selfUserDoc, driverEligibleMembers]
     );
 
     // ── 하위 모듈 1: OCR (기존 훅 유지) ──────────────────────────
@@ -169,6 +176,7 @@ export default function useDriveLogForm() {
         toggleCoDriver,
         handleSelectDriver,
         driverCandidates,
+        driverEligibleMembers,
         isAdmin, canEditDriver,
         isElectric,
         reservationData,

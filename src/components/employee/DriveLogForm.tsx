@@ -24,6 +24,7 @@ export default function DriveLogForm() {
         toggleCoDriver,
         handleSelectDriver,
         driverCandidates,
+        driverEligibleMembers,
         canEditDriver,
         isElectric,
         reservationData,
@@ -164,7 +165,7 @@ export default function DriveLogForm() {
                     driverUid={form.driverUid}
                     onSelectDriver={handleSelectDriver}
                     canEditDriver={canEditDriver}
-                    members={members}
+                    members={driverEligibleMembers}
                     selectedCoDrivers={selectedCoDrivers}
                     toggleCoDriver={toggleCoDriver}
                     externalCoDriverNames={externalCoDriverNames}
