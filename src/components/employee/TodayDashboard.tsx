@@ -7,6 +7,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import useTodayDashboard from '../../hooks/useTodayDashboard';
+import ReleaseNotesBanner from '../common/ReleaseNotesBanner';
 import { useCalendarSync } from '../../hooks/useCalendarSync';
 import { updateUser } from '../../lib/firestore';
 import { SkeletonCard, SkeletonBox } from '../common/Skeleton';
@@ -81,6 +82,7 @@ export default function TodayDashboard() {
 
     return (
         <div className="max-w-lg mx-auto animate-fade-in">
+            <ReleaseNotesBanner />
             <div className="flex items-center justify-between mb-5">
                 <div className="flex items-baseline gap-2">
                     <h1 className="text-lg font-bold text-surface-900 dark:text-surface-100">오늘의 운행</h1>

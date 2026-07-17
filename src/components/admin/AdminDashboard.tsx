@@ -9,6 +9,7 @@ import { auth } from '../../lib/firebase';
 import { refreshTokenSilently } from '../../lib/tokenRefresh';
 import { getVehicles, getOrganizationMembers, getDriveLogs, getOrganization, getTodayReservations } from '../../lib/firestore';
 import { getDriveLogAggregatedStats } from '../../lib/firestore/driveLogs';
+import ReleaseNotesBanner from '../common/ReleaseNotesBanner';
 import { toLocalDateStr } from '../../lib/dateUtils';
 import { SkeletonStatCard, SkeletonList } from '../common/Skeleton';
 import type { DriveLog } from '../../types/driveLog';
@@ -117,6 +118,7 @@ export default function AdminDashboard() {
 
     return (
         <div className="max-w-4xl mx-auto animate-fade-in">
+            <ReleaseNotesBanner />
             {showOnboarding && (
                 <AdminOnboardingWizard
                     inviteCode={inviteCode}

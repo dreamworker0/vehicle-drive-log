@@ -14,6 +14,8 @@ import { useConfirm } from '../../hooks/useConfirm';
 import FeedbackForm from '../common/FeedbackForm';
 import UserManual from '../common/UserManual';
 import AskAIModal from '../common/AskAIModal';
+import ReleaseNotesModal from '../common/ReleaseNotesModal';
+import useReleaseNotesStatus from '../../hooks/useReleaseNotesStatus';
 import Toggle from '../common/Toggle';
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
 import type { Vehicle } from '../../types/vehicle';
@@ -24,6 +26,8 @@ export default function MorePage() {
     const [showFeedback, setShowFeedback] = useState(false);
     const [showManual, setShowManual] = useState(false);
     const [showAskAI, setShowAskAI] = useState(false);
+    const [showReleaseNotes, setShowReleaseNotes] = useState(false);
+    const { hasNew: hasNewReleaseNotes, markSeen: markReleaseNotesSeen } = useReleaseNotesStatus();
     const { permission, requestPermission } = useNotification();
     const { isDark, toggleTheme } = useTheme();
     const { fontSize, setSize } = useFontSize();
@@ -64,6 +68,13 @@ export default function MorePage() {
             </div>
 
             <div className="glass-card divide-y divide-surface-100 dark:divide-surface-700">
+                <button onClick={() => { markReleaseNotesSeen(); setShowReleaseNotes(true); }} className="w-full flex items-center gap-3 p-4 hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors text-left">
+                    <svg aria-hidden="true" className="w-5 h-5 text-surface-400 dark:text-surface-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 7.5h1.5m-1.5 3h1.5m-7.5 3h7.5m-7.5 3h7.5m3-9h3.375c.621 0 1.125.504 1.125 1.125V18a2.25 2.25 0 0 1-2.25 2.25M16.5 7.5V18a2.25 2.25 0 0 0 2.25 2.25M16.5 7.5V4.875c0-.621-.504-1.125-1.125-1.125H4.125C3.504 3.75 3 4.254 3 4.875V18a2.25 2.25 0 0 0 2.25 2.25h13.5M6 7.5h3v3H6v-3Z" /></svg>
+                    <span className="text-sm text-surface-700 dark:text-surface-300">업데이트 소식</span>
+                    {hasNewReleaseNotes && (
+                        <span className="ml-auto inline-flex items-center px-2 py-0.5 text-[11px] font-bold rounded-full bg-red-500 text-white">NEW</span>
+                    )}
+                </button>
                 <button onClick={() => navigate('/employee/favorites')} className="w-full flex items-center gap-3 p-4 hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors text-left">
                     <svg aria-hidden="true" className="w-5 h-5 text-surface-400 dark:text-surface-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 0 1 1.04 0l2.125 5.111a.563.563 0 0 0 .475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 0 0-.182.557l1.285 5.385a.562.562 0 0 1-.84.61l-4.725-2.885a.562.562 0 0 0-.586 0L6.982 20.54a.562.562 0 0 1-.84-.61l1.285-5.386a.562.562 0 0 0-.182-.557l-4.204-3.602a.562.562 0 0 1 .321-.988l5.518-.442a.563.563 0 0 0 .475-.345L11.48 3.5Z" /></svg>
                     <span className="text-sm text-surface-700 dark:text-surface-300">목적지 즐겨찾기</span>
@@ -199,6 +210,7 @@ export default function MorePage() {
                 <a href="mailto:ehsheh@gmail.com" className="text-primary-500 dark:text-primary-400 hover:text-primary-700 transition-colors">ehsheh@gmail.com</a>
             </div>
 
+            {showReleaseNotes && <ReleaseNotesModal onClose={() => setShowReleaseNotes(false)} />}
             {showFeedback && <FeedbackForm onClose={() => setShowFeedback(false)} />}
             {/* eslint-disable-next-line jsx-a11y/aria-role */}
             {showManual && <UserManual role="employee" onClose={() => setShowManual(false)} />}

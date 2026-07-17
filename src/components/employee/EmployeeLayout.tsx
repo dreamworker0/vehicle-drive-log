@@ -8,6 +8,7 @@ import NotificationBell from '../common/NotificationBell';
 import AdminNotice from '../admin/AdminNotice';
 import IOSInstallPrompt from '../common/IOSInstallPrompt';
 import useBackButton from '../../hooks/useBackButton';
+import useReleaseNotesStatus from '../../hooks/useReleaseNotesStatus';
 import ErrorBoundary from '../common/ErrorBoundary';
 
 const TodayDashboard = lazyWithRetry(() => import('./TodayDashboard'));
@@ -82,6 +83,7 @@ export default function EmployeeLayout() {
     const { userData, isSuperAdmin } = useAuth();
     const navigate = useNavigate();
     const [orgName, setOrgName] = useState('');
+    const { hasNew: hasNewReleaseNotes } = useReleaseNotesStatus();
     useBackButton();
 
     useEffect(() => {
@@ -211,8 +213,11 @@ export default function EmployeeLayout() {
                             >
                                 {({ isActive }) => (
                                     <>
-                                        <div className={isActive ? 'scale-110 transition-transform' : 'transition-transform'}>
+                                        <div className={`relative ${isActive ? 'scale-110 transition-transform' : 'transition-transform'}`}>
                                             {item.icon}
+                                            {item.to === '/employee/more' && hasNewReleaseNotes && (
+                                                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-surface-900" />
+                                            )}
                                         </div>
                                         <span className={`text-[10px] ${isActive ? 'tracking-tight' : ''}`}>{item.label}</span>
                                     </>
