@@ -86,6 +86,9 @@ npm-audit-report.txt
 
 # Scratch / 일회성 작업 디렉터리
 scratch/
+fix_dark_mode.py
+fix_touch_targets.py
+out.txt
 
 # Agent / AI
 .gemini/
