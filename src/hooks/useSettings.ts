@@ -156,37 +156,57 @@ export default function useSettings() {
         if (e) e.preventDefault();
         if (!orgId) return;
         setSaving(true);
-        const targetData = { ...form, ...overrides };
+        // 저장 실패 시 되돌릴 이전 값(변경 필드 한정). 최신 상태 기준으로 보관한다.
+        let rollback: Partial<SettingsForm> | null = null;
+        if (overrides) {
+            // 변경 필드의 이전 값을 동기적으로 캡처(각 토글은 서로 다른 키만 건드리므로
+            // 연속 클릭 상황에서도 해당 키 롤백은 정확하다).
+            const snapshot: Partial<SettingsForm> = {};
+            for (const key of Object.keys(overrides) as (keyof SettingsForm)[]) {
+                (snapshot as Record<string, unknown>)[key] = form[key];
+            }
+            rollback = snapshot;
+            // 기능 토글은 즉시 로컬 상태에 병합하고 변경 필드만 저장한다.
+            // 연속 클릭이 같은 이전 form 전체를 보내 서로의 변경을 되돌리는 경쟁을 막는다.
+            setForm(prev => ({ ...prev, ...overrides }));
+        }
+        const targetData = overrides ? null : form;
         try {
-            await updateOrganization(orgId, {
-                name: targetData.name.trim(),
-                adminEmail: targetData.adminEmail.trim(),
-                address: targetData.address.trim(),
-                phone: targetData.phone.trim(),
-                approvalLine: targetData.approvalLine.filter(a => a.title.trim()).map(a => ({ title: a.title.trim() })),
-                hideApprovalLine: targetData.hideApprovalLine,
-                requireReservationApproval: targetData.requireReservationApproval,
-                hipassEnabled: targetData.hipassEnabled,
-                maintenanceEnabled: targetData.maintenanceEnabled,
-                maintenanceEmployeeAccess: targetData.maintenanceEmployeeAccess,
-                allowedUsersEnabled: targetData.allowedUsersEnabled,
-                googleCalendarEnabled: targetData.googleCalendarEnabled,
-                driverSelectionEnabled: targetData.driverSelectionEnabled,
-                coDriverEnabled: targetData.coDriverEnabled,
-                passengerEnabled: targetData.passengerEnabled,
-                passengerAllowList: targetData.passengerAllowList,
-                passengerAllowSearch: targetData.passengerAllowSearch,
-                passengerAllowCount: targetData.passengerAllowCount,
-                driverAllowList: targetData.driverAllowList,
-                driverAllowSearch: targetData.driverAllowSearch,
-            });
             if (overrides) {
-                setForm(targetData);
+                await updateOrganization(orgId, overrides);
+            } else if (targetData) {
+                await updateOrganization(orgId, {
+                    name: targetData.name.trim(),
+                    adminEmail: targetData.adminEmail.trim(),
+                    address: targetData.address.trim(),
+                    phone: targetData.phone.trim(),
+                    approvalLine: targetData.approvalLine.filter(a => a.title.trim()).map(a => ({ title: a.title.trim() })),
+                    hideApprovalLine: targetData.hideApprovalLine,
+                    requireReservationApproval: targetData.requireReservationApproval,
+                    hipassEnabled: targetData.hipassEnabled,
+                    maintenanceEnabled: targetData.maintenanceEnabled,
+                    maintenanceEmployeeAccess: targetData.maintenanceEmployeeAccess,
+                    allowedUsersEnabled: targetData.allowedUsersEnabled,
+                    googleCalendarEnabled: targetData.googleCalendarEnabled,
+                    driverSelectionEnabled: targetData.driverSelectionEnabled,
+                    coDriverEnabled: targetData.coDriverEnabled,
+                    passengerEnabled: targetData.passengerEnabled,
+                    passengerAllowList: targetData.passengerAllowList,
+                    passengerAllowSearch: targetData.passengerAllowSearch,
+                    passengerAllowCount: targetData.passengerAllowCount,
+                    driverAllowList: targetData.driverAllowList,
+                    driverAllowSearch: targetData.driverAllowSearch,
+                });
             }
             setSuccess(true);
             setTimeout(() => setSuccess(false), 3000);
         } catch (err) {
             console.error('저장 실패:', err);
+            // 즉시 저장 토글의 낙관적 반영을 이전 값으로 되돌린다.
+            if (rollback) {
+                const revert = rollback as Partial<SettingsForm>;
+                setForm(prev => ({ ...prev, ...revert }));
+            }
             showToast('저장에 실패했습니다.', 'error');
         } finally {
             setSaving(false);

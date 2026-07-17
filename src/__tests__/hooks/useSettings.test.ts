@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 
 vi.mock('../../hooks/useAuth', () => ({
     useAuth: () => ({
@@ -46,6 +46,7 @@ vi.mock('../../hooks/useOrgApplication', () => ({
 }));
 
 import useSettings from '../../hooks/useSettings';
+import { updateOrganization } from '../../lib/firestore';
 
 describe('useSettings', () => {
     beforeEach(() => {
@@ -93,5 +94,52 @@ describe('useSettings', () => {
         const { result } = renderHook(() => useSettings());
 
         expect(typeof result.current.formatDate).toBe('function');
+    });
+
+    it('연속 토글을 각각 patch로 저장하고 로컬 상태를 합쳐 유지한다', async () => {
+        const { result } = renderHook(() => useSettings());
+
+        await waitFor(() => {
+            expect(result.current.loading).toBe(false);
+        });
+
+        let firstSave: Promise<void>;
+        let secondSave: Promise<void>;
+        act(() => {
+            firstSave = result.current.handleSave(null, { hipassEnabled: false });
+            secondSave = result.current.handleSave(null, { maintenanceEnabled: false });
+        });
+        await act(async () => {
+            await Promise.all([firstSave!, secondSave!]);
+        });
+
+        expect(vi.mocked(updateOrganization)).toHaveBeenNthCalledWith(1, 'org-1', {
+            hipassEnabled: false,
+        });
+        expect(vi.mocked(updateOrganization)).toHaveBeenNthCalledWith(2, 'org-1', {
+            maintenanceEnabled: false,
+        });
+        expect(result.current.form.hipassEnabled).toBe(false);
+        expect(result.current.form.maintenanceEnabled).toBe(false);
+    });
+
+    it('토글 저장이 실패하면 낙관적 반영을 이전 값으로 되돌린다', async () => {
+        vi.mocked(updateOrganization).mockRejectedValueOnce(new Error('network'));
+        const { result } = renderHook(() => useSettings());
+
+        await waitFor(() => {
+            expect(result.current.loading).toBe(false);
+        });
+
+        // 초기값은 미설정=켜짐이므로 true
+        expect(result.current.form.hipassEnabled).toBe(true);
+
+        await act(async () => {
+            await result.current.handleSave(null, { hipassEnabled: false });
+        });
+
+        // 저장 실패 → 이전 값(true)으로 롤백 + 에러 토스트
+        expect(result.current.form.hipassEnabled).toBe(true);
+        expect(mockShowToast).toHaveBeenCalledWith('저장에 실패했습니다.', 'error');
     });
 });
