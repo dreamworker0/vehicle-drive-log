@@ -97,6 +97,25 @@ describe('reservationTriggers', () => {
             expect(mockUpdate).toHaveBeenCalledWith({ calendarEventId: 'event-123' });
         });
 
+        it('기관이 Google 캘린더 기능을 끄면 기존 연결 차량도 동기화하지 않는다', async () => {
+            mockGet
+                .mockResolvedValueOnce({
+                    exists: true,
+                    data: () => ({ googleCalendarId: 'cal@group.calendar.google.com', organizationId: 'org1' }),
+                })
+                .mockResolvedValueOnce({
+                    exists: true,
+                    data: () => ({ googleCalendarEnabled: false }),
+                });
+            mockSendPushToOrg.mockResolvedValue(undefined);
+
+            const event = makeCreateEvent({ vehicleId: 'v1', organizationId: 'org1', date: '2026-01-01' });
+            await (onReservationCreated as Function)(event);
+
+            expect(mockCreateCalendarEvent).not.toHaveBeenCalled();
+            expect(mockSendPushToOrg).toHaveBeenCalledTimes(1);
+        });
+
         it('organizationId가 있으면 조직 푸시 알림을 전송한다', async () => {
             mockGet.mockResolvedValue({ exists: false });
             mockSendPushToOrg.mockResolvedValue(undefined);
@@ -214,10 +233,13 @@ describe('reservationTriggers', () => {
         });
 
         it('정상 삭제 시 캘린더 이벤트를 삭제한다', async () => {
-            mockGet.mockResolvedValue({ exists: true, data: () => ({ googleCalendarId: 'cal@group.calendar.google.com' }) });
+            mockGet.mockResolvedValue({
+                exists: true,
+                data: () => ({ googleCalendarId: 'cal@group.calendar.google.com', organizationId: 'org1' }),
+            });
             mockDeleteCalendarEvent.mockResolvedValue(undefined);
 
-            const event = makeDeleteEvent({ vehicleId: 'v1', calendarEventId: 'ev1' });
+            const event = makeDeleteEvent({ vehicleId: 'v1', calendarEventId: 'ev1', organizationId: 'org1' });
             await (onReservationDeleted as Function)(event);
 
             expect(mockDeleteCalendarEvent).toHaveBeenCalledWith('cal@group.calendar.google.com', 'ev1');

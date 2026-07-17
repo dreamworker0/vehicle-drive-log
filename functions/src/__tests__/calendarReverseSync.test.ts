@@ -13,12 +13,16 @@ const mockUpdate = jest.fn();
 const mockReservationsQueryGet = jest.fn();
 const mockDoubleCheckGet = jest.fn();
 const mockUserProfileGet = jest.fn();
+const mockOrganizationGet = jest.fn();
 
 jest.mock('firebase-admin/firestore', () => ({
     getFirestore: () => ({
         collection: (name: string) => {
             if (name === 'users') {
                 return { doc: () => ({ get: mockUserProfileGet }) };
+            }
+            if (name === 'organizations') {
+                return { doc: () => ({ get: mockOrganizationGet }) };
             }
             // reservations: 기간 쿼리(3중 where) / 더블체크(where+limit) / doc().set·update
             const q: Record<string, unknown> = { _limited: false };
@@ -135,6 +139,7 @@ describe('syncSingleVehicleCalendar — reservedByName 폴백 체인', () => {
         mockReservationsQueryGet.mockResolvedValue({ docs: [], empty: true });
         mockDoubleCheckGet.mockResolvedValue({ docs: [], empty: true });
         mockListCalendarEvents.mockResolvedValue([makeEvent()]);
+        mockOrganizationGet.mockResolvedValue({ exists: true, data: () => ({}) });
     });
     afterEach(() => jest.restoreAllMocks());
 
@@ -185,5 +190,18 @@ describe('syncSingleVehicleCalendar — reservedByName 폴백 체인', () => {
         expect(mockSet).toHaveBeenCalledWith(expect.objectContaining({
             reservedByName: '김종원',
         }));
+    });
+
+    it('기관이 Google 캘린더 기능을 끄면 역동기화를 시작하지 않는다', async () => {
+        mockOrganizationGet.mockResolvedValue({
+            exists: true,
+            data: () => ({ googleCalendarEnabled: false }),
+        });
+
+        const result = await syncSingleVehicleCalendar('veh-1', VEHICLE);
+
+        expect(result).toEqual({ created: 0, updated: 0, cancelled: 0, skippedDup: 0 });
+        expect(mockListCalendarEvents).not.toHaveBeenCalled();
+        expect(mockSet).not.toHaveBeenCalled();
     });
 });

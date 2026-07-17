@@ -5,6 +5,7 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { listCalendarEvents, parseEventToReservation } from "../../services/calendar/calendarSync";
+import { isGoogleCalendarEnabled } from "../../services/calendar/calendarFeature";
 import { RETRY_COOLDOWN_MS, MAX_FAIL_COUNT, isCalendarAuthError, recordCalendarFailure, resetCalendarFailure } from "../../services/calendar/calendarFailTracking";
 import { sendDiscordAlert } from "../../core/discord";
 import { recordHeartbeat } from "../../utils/helpers";
@@ -180,6 +181,11 @@ export async function syncSingleVehicleCalendar(
     let updated = 0;
     let cancelled = 0;
     let skippedDup = 0;
+
+    if (!await isGoogleCalendarEnabled(organizationId)) {
+        console.log("Vehicle " + vehicleName + "(" + vehicleId + "): organization calendar feature disabled, skip");
+        return { created, updated, cancelled, skippedDup };
+    }
 
     // 유효하지 않은 캘린더 ID 건너뛰기 (@ 포함 필수)
     if (!calendarId || !calendarId.includes("@")) {

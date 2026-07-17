@@ -4,6 +4,7 @@
 import { getFirestore } from "firebase-admin/firestore";
 import { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent } from "../../services/calendar/calendarSync";
+import { isGoogleCalendarEnabled } from "../../services/calendar/calendarFeature";
 import { isCalendarAuthError, shouldSkipVehicleCalendar, recordCalendarFailure, resetCalendarFailure } from "../../services/calendar/calendarFailTracking";
 import { sendPushToOrg, sendPushToUser, createInAppNotification } from "../../services/alimtalk/sendNotification";
 import { checkReservationTimeConflict, resolveReservationConflict } from "../sync/conflictResolver";
@@ -28,6 +29,7 @@ async function getVehicleCalendar(
     // 차량이 예약의 기관 소속이 아니면 캘린더를 다루지 않는다 — 미검증 vehicleId를 통한
     // 타 기관 Google Calendar 이벤트 주입 차단 (2026-07-04 감사 N3)
     if (expectedOrgId && data.organizationId !== expectedOrgId) return null;
+    if (!await isGoogleCalendarEnabled((expectedOrgId || data.organizationId) as string | undefined)) return null;
     const calendarId = (data.googleCalendarId as string) || null;
     // 유효하지 않은 캘린더 ID 필터링 (@ 포함 필수)
     if (!calendarId || !calendarId.includes("@")) return null;
