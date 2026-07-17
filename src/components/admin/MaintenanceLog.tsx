@@ -3,16 +3,14 @@
  * 로직은 useMaintenanceLog 훅 사용
  */
 import useMaintenanceLog, { MAINTENANCE_TYPES } from '../../hooks/useMaintenanceLog';
-import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
-import { getOrganization } from '../../lib/firestore';
-import type { Organization } from '../../types/organization';
+import useAdminLogExport from '../../hooks/useAdminLogExport';
 import { isVehicleBlocked } from '../../lib/vehicleUtils';
 import { SkeletonBox, SkeletonList } from '../common/Skeleton';
+import LogExportButtons from './LogExportButtons';
 import MaintenanceForm from './maintenanceLog/MaintenanceForm';
 import MaintenanceFilters from './maintenanceLog/MaintenanceFilters';
 import MaintenanceRecordCard from './maintenanceLog/MaintenanceRecordCard';
-import { useState, useEffect } from 'react';
 
 /** type 값 → 한글 라벨 매핑 */
 const TYPE_LABELS: Record<string, string> = Object.fromEntries(
@@ -27,17 +25,8 @@ export default function MaintenanceLog() {
         handleSubmit, handleEdit, handleCancelEdit, handleDelete, getTypeInfo, handleVehicleSelect,
         handleClearBlock,
     } = useMaintenanceLog();
-    const { userData } = useAuth();
     const { showToast } = useToast();
-    const [org, setOrg] = useState<Organization | null>(null);
-    const orgName = org?.name || '';
-
-    useEffect(() => {
-        if (!userData?.organizationId) return;
-        getOrganization(userData.organizationId).then((o) => {
-            if (o) setOrg(o as Organization);
-        }).catch(err => console.error('getOrganization failed:', err));
-    }, [userData?.organizationId]);
+    const { orgName, approvalLine, runExcel, runPdf } = useAdminLogExport();
 
     const blockedVehicles = vehicles.filter(v => isVehicleBlocked(v.maintenance));
     const totalCost = filteredRecords.reduce((sum, r) => sum + (r.cost || 0), 0);
@@ -65,54 +54,25 @@ export default function MaintenanceLog() {
                     <button onClick={() => { if (showForm) { handleCancelEdit(); } else { setShowForm(true); } }} className="btn-primary btn-sm flex items-center gap-1 min-h-[48px]">
                         {showForm ? '✕ 닫기' : '＋ 정비 기록 추가'}
                     </button>
-                    <button
-                        onClick={async () => {
-                            try {
-                                const { downloadMaintenanceExcel } = await import('../../lib/excelExport');
-                                await downloadMaintenanceExcel(filteredRecords, `정비기록_${orgName || '전체'}`, {
-                                    onError: (msg) => showToast(msg, 'warning'),
-                                    typeLabels: TYPE_LABELS,
-                                });
-                            } catch (err) {
-                                console.error('엑셀 다운로드 실패:', err);
-                                showToast('엑셀 다운로드 중 오류가 발생했습니다.', 'error');
-                            }
-                        }}
+                    <LogExportButtons
                         disabled={filteredRecords.length === 0}
-                        className="btn-secondary btn-sm flex items-center gap-2 disabled:opacity-50 min-h-[48px]"
-                    >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 0 0 5.25 21h13.5A2.25 2.25 0 0 0 21 18.75V16.5M16.5 12 12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                        </svg>
-                        엑셀
-                    </button>
-                    <button
-                        onClick={async () => {
-                            try {
-                                const { downloadMaintenancePdf } = await import('../../lib/pdf/maintenancePdfExport');
-                                const defaultApproval = [{ title: '담당' }, { title: '팀장' }];
-                                const useApproval = org?.hideApprovalLine
-                                    ? []
-                                    : ((org?.approvalLine?.length ?? 0) > 0 ? org!.approvalLine! : defaultApproval);
-                                downloadMaintenancePdf(filteredRecords, {
-                                    orgName,
-                                    typeLabels: TYPE_LABELS,
-                                    approvalLine: useApproval,
-                                    onError: (msg) => showToast(msg, 'error'),
-                                });
-                            } catch (err) {
-                                console.error('PDF 다운로드 실패:', err);
-                                showToast('PDF 다운로드 중 오류가 발생했습니다.', 'error');
-                            }
-                        }}
-                        disabled={filteredRecords.length === 0}
-                        className="btn-primary btn-sm flex items-center gap-2 disabled:opacity-50 min-h-[48px]"
-                    >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
-                        </svg>
-                        PDF
-                    </button>
+                        onExcel={() => runExcel(async () => {
+                            const { downloadMaintenanceExcel } = await import('../../lib/excelExport');
+                            await downloadMaintenanceExcel(filteredRecords, `정비기록_${orgName || '전체'}`, {
+                                onError: (msg) => showToast(msg, 'warning'),
+                                typeLabels: TYPE_LABELS,
+                            });
+                        })}
+                        onPdf={() => runPdf(async () => {
+                            const { downloadMaintenancePdf } = await import('../../lib/pdf/maintenancePdfExport');
+                            downloadMaintenancePdf(filteredRecords, {
+                                orgName,
+                                typeLabels: TYPE_LABELS,
+                                approvalLine,
+                                onError: (msg) => showToast(msg, 'error'),
+                            });
+                        })}
+                    />
                 </div>
             </div>
 
