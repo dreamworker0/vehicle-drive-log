@@ -41,6 +41,8 @@ describe('buildLogData', () => {
     const baseMockForm = {
         vehicleId: 'v1',
         vehicleName: '소나타',
+        driverUid: '',
+        driverName: '',
         purpose: '  가정방문  ',
         destination: '  김OO 어르신 댁  ',
         startTime: '09:00',

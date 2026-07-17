@@ -42,6 +42,8 @@ type Ctx = Parameters<typeof submitDriveLog>[0];
 const baseForm = {
     vehicleId: 'v1',
     vehicleName: '소나타',
+    driverUid: '',
+    driverName: '',
     purpose: '업무',
     destination: '서울역',
     startKm: '50000',

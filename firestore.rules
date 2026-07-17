@@ -149,14 +149,21 @@ service cloud.firestore {
     // === 운행일지 ===
     match /driveLogs/{logId} {
       allow read: if belongsToMyOrg() || isSuperAdmin();
-      allow create: if newBelongsToMyOrg()
-                    && request.resource.data.keys().hasAll(['organizationId', 'vehicleId', 'driverUid'])
-                    && request.resource.data.driverUid == request.auth.uid
+      // 작성자(createdByUid)만 생성 가능. driverUid(대표 운전자)는 작성자가 타인으로 지정할 수 있으므로
+      // 소유자 판정 기준을 createdByUid로 분리 (2026-07-17 운전자 지정 기능).
+      // 슈퍼관리자는 지원·테스트 목적으로 어느 기관에서든 생성 가능(작성자 위조는 여전히 금지).
+      allow create: if (isSuperAdmin() || newBelongsToMyOrg())
+                    && request.resource.data.keys().hasAll(['organizationId', 'vehicleId', 'driverUid', 'createdByUid'])
+                    && request.resource.data.createdByUid == request.auth.uid
                     && (!request.resource.data.keys().hasAny(['startKm']) || request.resource.data.startKm >= 0)
                     && (!request.resource.data.keys().hasAny(['endKm']) || request.resource.data.endKm >= 0);
       allow update: if (isSuperAdmin()
                     || (belongsToMyOrg() && (
-                        (resource.data.driverUid == request.auth.uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['organizationId', 'vehicleId', 'driverUid']))
+                        // 소유자(작성자)는 driverUid(대표 운전자) 포함 정보 수정 가능. createdByUid는 폴백으로 구 데이터 호환.
+                        // organizationId·vehicleId·createdByUid는 불변.
+                        ((resource.data.createdByUid == request.auth.uid
+                            || (!('createdByUid' in resource.data) && resource.data.driverUid == request.auth.uid))
+                            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['organizationId', 'vehicleId', 'createdByUid']))
                         // organizationId 불변 — admin의 타 기관 이전 차단 (2026-07-10 감사 #6)
                         || (isOrgAdmin(resource.data.organizationId) && request.resource.data.organizationId == resource.data.organizationId)
                     )))
@@ -246,12 +253,26 @@ service cloud.firestore {
     match /maintenanceRecords/{recordId} {
       allow read: if belongsToMyOrg() || isSuperAdmin();
       allow create: if isSuperAdmin()
-                    || (newBelongsToMyOrg() && isOrgAdmin(request.resource.data.organizationId));
+                    || (newBelongsToMyOrg() && isOrgAdmin(request.resource.data.organizationId))
+                    // 직원 본인 작성 — 차량 차단(blockVehicle) 권한은 관리자 전용이므로 false만 허용
+                    || (newBelongsToMyOrg()
+                        && request.resource.data.keys().hasAll(['organizationId', 'vehicleId', 'createdByUid'])
+                        && request.resource.data.createdByUid == request.auth.uid
+                        && request.resource.data.blockVehicle == false);
       allow update: if isSuperAdmin()
                     // organizationId 불변 — admin의 타 기관 이전 차단 (2026-07-10 감사 #6)
                     || (isOrgAdmin(resource.data.organizationId)
-                        && request.resource.data.organizationId == resource.data.organizationId);
-      allow delete: if isOrgAdmin(resource.data.organizationId) || isSuperAdmin();
+                        && request.resource.data.organizationId == resource.data.organizationId)
+                    // 직원 본인 작성 건만 수정 — 소유자·기관·차량 불변, 차량 차단 불가
+                    || (belongsToMyOrg()
+                        && resource.data.createdByUid == request.auth.uid
+                        && request.resource.data.createdByUid == resource.data.createdByUid
+                        && request.resource.data.organizationId == resource.data.organizationId
+                        && request.resource.data.vehicleId == resource.data.vehicleId
+                        && request.resource.data.blockVehicle == false);
+      allow delete: if isOrgAdmin(resource.data.organizationId) || isSuperAdmin()
+                    // 직원 본인 작성 건 삭제
+                    || (belongsToMyOrg() && resource.data.createdByUid == request.auth.uid);
     }
 
     // === 피드백 ===

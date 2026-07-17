@@ -9,6 +9,7 @@ import type { DriveLog } from '../../types/driveLog';
 import VehicleInfoSection from './driveLogFormLayout/VehicleInfoSection';
 import DateSection from './driveLogFormLayout/DateSection';
 import WaypointSection from './driveLogFormLayout/WaypointSection';
+import DriverSection from './driveLogFormLayout/DriverSection';
 import PassengerSection from './driveLogFormLayout/PassengerSection';
 import VehicleStatusSection from './driveLogFormLayout/VehicleStatusSection';
 
@@ -18,6 +19,12 @@ export default function DriveLogForm() {
         vehicles, favorites, members,
         loading, submitting, success,
         selectedPassengers, selectedVehicle,
+        selectedCoDrivers,
+        externalCoDriverNames, setExternalCoDriverNames,
+        toggleCoDriver,
+        handleSelectDriver,
+        driverCandidates,
+        canEditDriver,
         isElectric,
         reservationData,
         editLog, isEditMode, isRetroactive,
@@ -149,6 +156,19 @@ export default function DriveLogForm() {
                     endKmRef={endKmInputRef}
                     lastDriveLog={lastDriveLog}
                     nextDriveLog={nextDriveLog}
+                />
+
+                {/* 4-1. 운전자 섹션 (대표 운전자 + 공동 운전자) */}
+                <DriverSection
+                    driverCandidates={driverCandidates}
+                    driverUid={form.driverUid}
+                    onSelectDriver={handleSelectDriver}
+                    canEditDriver={canEditDriver}
+                    members={members}
+                    selectedCoDrivers={selectedCoDrivers}
+                    toggleCoDriver={toggleCoDriver}
+                    externalCoDriverNames={externalCoDriverNames}
+                    setExternalCoDriverNames={setExternalCoDriverNames}
                 />
 
                 {/* 5. 동승자 섹션 */}

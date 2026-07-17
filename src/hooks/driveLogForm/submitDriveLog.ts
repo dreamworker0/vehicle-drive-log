@@ -23,6 +23,8 @@ interface SubmitContext {
     selectedPassengers: UserDoc[];
     externalPassengerCount: number;
     externalPassengerNames: string;
+    selectedCoDrivers: UserDoc[];
+    externalCoDriverNames: string;
     isRetroactive: boolean;
     ocrUsed: boolean;
     favoriteUsed: boolean;
@@ -58,7 +60,8 @@ interface SubmitResult {
 export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> {
     const {
         form, orgId, user, userData, selectedVehicle,
-        selectedPassengers, externalPassengerCount, externalPassengerNames, isRetroactive,
+        selectedPassengers, externalPassengerCount, externalPassengerNames,
+        selectedCoDrivers, externalCoDriverNames, isRetroactive,
         ocrUsed, favoriteUsed, isEditMode, editLog, reservationData,
         hipassCard, isManuallyCorrected, originalStartKm,
     } = ctx;
@@ -66,6 +69,7 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
     const logData = buildLogData(form, {
         orgId: orgId || undefined, user, userData, selectedVehicle,
         selectedPassengers, externalPassengerCount, externalPassengerNames,
+        coDrivers: selectedCoDrivers, externalCoDriverNames,
         isRetroactive, ocrUsed, favoriteUsed,
     });
 
@@ -196,10 +200,11 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
     };
 }
 
-/** 운행일지 폼 초기값 */
+/** 운행일지 폼 초기값. driverUid/driverName은 리셋 후 호출부에서 작성자 본인으로 재주입한다. */
 export function getEmptyForm(): DriveLogForm {
     return {
-        vehicleId: '', vehicleName: '', purpose: '', destination: '',
+        vehicleId: '', vehicleName: '', driverUid: '', driverName: '',
+        purpose: '', destination: '',
         startKm: '', endKm: '', startTime: nowTime(),
         endTime: '', batteryStart: '', batteryEnd: '', notes: '',
         driveDate: todayStr(), hipassBalanceAfter: '',

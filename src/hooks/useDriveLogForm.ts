@@ -2,7 +2,7 @@
  * useDriveLogForm — 운행일지 작성/수정 폼의 상태 관리 및 서비스 통합 (Facade)
  * 리팩토링: 로직을 driveLogForm/ 하위 모듈로 분산하여 유지보수성 개선
  */
-import { useState, useTransition } from 'react';
+import { useState, useTransition, useMemo } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
@@ -50,6 +50,8 @@ export default function useDriveLogForm() {
     const [selectedPassengers, setSelectedPassengers] = useState<UserDoc[]>([]);
     const [externalPassengerCount, setExternalPassengerCount] = useState(0);
     const [externalPassengerNames, setExternalPassengerNames] = useState('');
+    const [selectedCoDrivers, setSelectedCoDrivers] = useState<UserDoc[]>([]);
+    const [externalCoDriverNames, setExternalCoDriverNames] = useState('');
     const [showFavSave, setShowFavSave] = useState(false);
     const [favName, setFavName] = useState('');
     const [hipassCard, setHipassCard] = useState<HipassCard | null>(null);
@@ -61,6 +63,9 @@ export default function useDriveLogForm() {
     const [form, setForm] = useState<DriveLogForm>({
         vehicleId: editLog?.vehicleId || '',
         vehicleName: editLog?.vehicleName || '',
+        // 대표 운전자: 편집 시 기존 값, 신규 시 작성자 본인
+        driverUid: editLog?.driverUid || user?.uid || '',
+        driverName: editLog?.driverName || userData?.name || user?.displayName || user?.email || '',
         purpose: editLog?.purpose || '',
         destination: editLog?.destination || '',
         startTime: editLog?.startTime as string || reservationData?.actualStartTime || nowTime(),
@@ -79,6 +84,32 @@ export default function useDriveLogForm() {
     const isElectric = selectedVehicle?.fuelType === 'electric';
     const isRetroactive = form.driveDate !== todayStr();
 
+    // ── 운전자 지정 관련 파생값 ──────────────────────────────────
+    const isAdmin = userData?.role === 'admin';
+    // 편집 대상 일지의 작성자 여부(구 데이터는 createdByUid가 없어 driverUid로 폴백)
+    const isOwner = !!user && !!editLog && (
+        editLog.createdByUid === user.uid ||
+        (!editLog.createdByUid && editLog.driverUid === user.uid)
+    );
+    // 대표 운전자 변경 허용: 신규 작성이거나, 관리자거나, 본인 일지 편집일 때
+    const canEditDriver = !isEditMode || isAdmin || isOwner;
+    // 대표 운전자 후보 = 본인 + 조직원(members는 initializer에서 본인 제외됨)
+    const selfUserDoc = useMemo<UserDoc | null>(() => {
+        if (!user) return null;
+        return {
+            id: user.uid,
+            uid: user.uid,
+            name: userData?.name || user.displayName || user.email || '나',
+            email: userData?.email || user.email || '',
+            role: userData?.role || 'employee',
+            organizationId: userData?.organizationId ?? null,
+        } as UserDoc;
+    }, [user, userData]);
+    const driverCandidates = useMemo<UserDoc[]>(
+        () => (selfUserDoc ? [selfUserDoc, ...members] : members),
+        [selfUserDoc, members]
+    );
+
     // ── 하위 모듈 1: OCR (기존 훅 유지) ──────────────────────────
     const ocr = useDriveLogOcr({ 
         isElectric, 
@@ -95,6 +126,7 @@ export default function useDriveLogForm() {
         form, showToast,
         setVehicles, setFavorites, setMembers, setLoading,
         setForm, setSelectedPassengers, setExternalPassengerCount,
+        setSelectedCoDrivers, setExternalCoDriverNames,
         setResolvedReservationData, setLastEndBattery, setHipassCard,
         setLastDriveLog,
         setNextDriveLog,
@@ -112,11 +144,14 @@ export default function useDriveLogForm() {
         handleFavoriteSelect,
         handleSaveFavorite,
         togglePassenger,
+        toggleCoDriver,
+        handleSelectDriver,
         handleSubmit
     } = useDriveLogSubmit({
         form, setForm, orgId, user, userData, vehicles, selectedVehicle,
         selectedPassengers, setSelectedPassengers, externalPassengerCount, setExternalPassengerCount,
         externalPassengerNames,
+        selectedCoDrivers, setSelectedCoDrivers, externalCoDriverNames, setExternalCoDriverNames,
         setFavorites, setShowFavSave, setFavName, setSuccess,
         isElectric, isRetroactive, isEditMode, editLog, reservationData, hipassCard, favName,
         showToast, runWithRetry, startTransition, ocrSuccess: ocr.ocrSuccess,
@@ -129,6 +164,12 @@ export default function useDriveLogForm() {
         vehicles, favorites, members,
         loading, submitting: isPending, success,
         selectedPassengers, selectedVehicle,
+        selectedCoDrivers,
+        externalCoDriverNames, setExternalCoDriverNames,
+        toggleCoDriver,
+        handleSelectDriver,
+        driverCandidates,
+        isAdmin, canEditDriver,
         isElectric,
         reservationData,
         editLog, isEditMode, isRetroactive,

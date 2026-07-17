@@ -31,6 +31,7 @@ interface ExcelDriveLog {
     endKm?: number;
     passengerCount?: number;
     passengerNames?: string[];
+    coDriverNames?: string[];
     hipassCardNumber?: string;
     hipassBalanceBefore?: number;
     hipassBalanceAfter?: number;
@@ -77,6 +78,7 @@ export async function downloadDriveLogsExcel(logs: ExcelDriveLog[], filename = '
         }
 
         if (includePassengers) {
+            row['공동운전자'] = log.coDriverNames && log.coDriverNames.length > 0 ? log.coDriverNames.join(', ') : '';
             row['동행자'] = log.passengerNames && log.passengerNames.length > 0 ? log.passengerNames.join(', ') : '';
         }
 
@@ -110,6 +112,7 @@ export async function downloadDriveLogsExcel(logs: ExcelDriveLog[], filename = '
         cols.push({ wch: 12 });  // 사용후금액
     }
     if (includePassengers) {
+        cols.push({ wch: 20 });  // 공동운전자
         cols.push({ wch: 20 });  // 동행자
     }
     cols.push({ wch: 20 });  // 비고

@@ -109,11 +109,13 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
 
     const orgAMemberDb = setupContext('user_A', { role: 'member', orgId: 'org-A' }).firestore();
 
-    // 타인의 UID로 운행일지 생성 시도
+    // 작성자(createdByUid)를 타인으로 위조해 운행일지 생성 시도 → 차단
+    // (driverUid는 대표 운전자로 타인 지정이 허용되지만, 작성자 위조는 금지)
     const spoofedLogWrite = orgAMemberDb.collection('driveLogs').doc('log_spoof').set({
       organizationId: 'org-A',
       vehicleId: 'vehicle_A',
-      driverUid: 'user_B_boss', // 타인의 uid 주입
+      driverUid: 'user_A',
+      createdByUid: 'user_B_boss', // 작성자 위조
       purpose: '몰래 쓴 내역',
     });
     await assertFails(spoofedLogWrite);
@@ -343,5 +345,118 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     // 같은 기관 타 멤버도 당연히 차단
     const mateDb = setupContext('user_A2', { role: 'employee', orgId: 'org-A' }).firestore();
     await assertFails(mateDb.doc('users/user_A/private/oauth').get());
+  });
+
+  it('12. 직원의 정비 기록 작성 — 본인 것만 허용, 차량 차단(blockVehicle)은 금지', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      // 관리자가 만든 기록 (작성자 없음)
+      await db.collection('maintenanceRecords').doc('m_admin').set({
+        organizationId: 'org-A', vehicleId: 'v_A', type: 'oil', blockVehicle: false,
+      });
+      // 다른 직원이 만든 기록
+      await db.collection('maintenanceRecords').doc('m_other').set({
+        organizationId: 'org-A', vehicleId: 'v_A', type: 'repair', blockVehicle: false, createdByUid: 'emp_2',
+      });
+      // 본인이 만든 기록
+      await db.collection('maintenanceRecords').doc('m_mine').set({
+        organizationId: 'org-A', vehicleId: 'v_A', type: 'repair', blockVehicle: false, createdByUid: 'emp_1',
+      });
+    });
+
+    const empDb = setupContext('emp_1', { role: 'employee', orgId: 'org-A' }).firestore();
+
+    // 본인 작성 정비 기록 생성 (blockVehicle:false) → 허용
+    await assertSucceeds(empDb.collection('maintenanceRecords').doc('m_new').set({
+      organizationId: 'org-A', vehicleId: 'v_A', type: 'repair', description: '범퍼 수리',
+      createdByUid: 'emp_1', blockVehicle: false,
+    }));
+
+    // 차량 차단을 켜서 생성 시도 → 차단 (예약 취소 권한 우회 방지)
+    await assertFails(empDb.collection('maintenanceRecords').doc('m_block').set({
+      organizationId: 'org-A', vehicleId: 'v_A', type: 'repair',
+      createdByUid: 'emp_1', blockVehicle: true,
+    }));
+
+    // 작성자를 타인으로 위조해 생성 시도 → 차단
+    await assertFails(empDb.collection('maintenanceRecords').doc('m_forge').set({
+      organizationId: 'org-A', vehicleId: 'v_A', type: 'repair',
+      createdByUid: 'emp_2', blockVehicle: false,
+    }));
+
+    // 본인 기록 수정 → 허용
+    await assertSucceeds(empDb.collection('maintenanceRecords').doc('m_mine').update({ description: '수정' }));
+
+    // 본인 기록이라도 차량 차단으로 전환하는 수정 → 차단
+    await assertFails(empDb.collection('maintenanceRecords').doc('m_mine').update({ blockVehicle: true }));
+
+    // 타인·관리자 작성 기록 수정·삭제 → 차단
+    await assertFails(empDb.collection('maintenanceRecords').doc('m_other').update({ description: '침범' }));
+    await assertFails(empDb.collection('maintenanceRecords').doc('m_other').delete());
+    await assertFails(empDb.collection('maintenanceRecords').doc('m_admin').update({ description: '침범' }));
+    await assertFails(empDb.collection('maintenanceRecords').doc('m_admin').delete());
+
+    // 본인 기록 삭제 → 허용 (마지막에 수행)
+    await assertSucceeds(empDb.collection('maintenanceRecords').doc('m_mine').delete());
+  });
+
+  it('9. 운행일지 대표 운전자 지정/수정 권한 (작성자·관리자, 구 데이터 폴백)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.collection('vehicles').doc('v_A').set({ organizationId: 'org-A', plateNumber: '1', currentKm: 10 });
+      // 구 데이터: createdByUid 없음, driverUid=본인
+      await db.collection('driveLogs').doc('legacy_mine').set({
+        organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'user_A', startKm: 0, endKm: 10,
+      });
+      // 구 데이터: createdByUid 없음, driverUid=타인
+      await db.collection('driveLogs').doc('legacy_other').set({
+        organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'user_X', startKm: 0, endKm: 10,
+      });
+      // 신 데이터: user_A가 작성, 대표 운전자는 타인(user_X)
+      await db.collection('driveLogs').doc('owned_by_A').set({
+        organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'user_X', createdByUid: 'user_A', startKm: 0, endKm: 10,
+      });
+    });
+
+    const memberA = setupContext('user_A', { role: 'member', orgId: 'org-A' }).firestore();
+    const memberC = setupContext('user_C', { role: 'member', orgId: 'org-A' }).firestore();
+    const adminA = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+
+    // (1) 작성자가 타인을 대표 운전자로 지정해 생성 → 허용 (createdByUid=본인)
+    await assertSucceeds(memberA.collection('driveLogs').doc('new_A').set({
+      organizationId: 'org-A', vehicleId: 'v_A',
+      driverUid: 'user_X', createdByUid: 'user_A', startKm: 10, endKm: 20,
+    }));
+
+    // (2) 작성자 본인 소유 일지의 대표 운전자 변경 → 허용
+    await assertSucceeds(memberA.collection('driveLogs').doc('owned_by_A').update({ driverUid: 'user_Y' }));
+
+    // (3) 비소유자·비관리자의 대표 운전자 변경 시도 → 차단
+    await assertFails(memberC.collection('driveLogs').doc('owned_by_A').update({ driverUid: 'user_C' }));
+
+    // (4) 구 데이터(createdByUid 없음)에서 driverUid==본인이면 폴백으로 수정 허용
+    await assertSucceeds(memberA.collection('driveLogs').doc('legacy_mine').update({ driverUid: 'user_Y' }));
+
+    // (5) 구 데이터에서 driverUid가 타인이면 비관리자는 수정 불가
+    await assertFails(memberC.collection('driveLogs').doc('legacy_other').update({ driverUid: 'user_C' }));
+
+    // (6) 관리자는 타인 소유 일지의 대표 운전자 변경 가능
+    await assertSucceeds(adminA.collection('driveLogs').doc('owned_by_A').update({ driverUid: 'user_Z' }));
+
+    // (7) createdByUid는 불변 (소유자도 변경 불가)
+    await assertFails(memberA.collection('driveLogs').doc('owned_by_A').update({ createdByUid: 'user_C' }));
+
+    // (8) 슈퍼관리자는 소속 기관이 없어도 어느 기관에든 운행일지 생성 가능 (지원·테스트용)
+    const superAdmin = setupContext('sa_1', { role: 'superAdmin' }).firestore();
+    await assertSucceeds(superAdmin.collection('driveLogs').doc('sa_log').set({
+      organizationId: 'org-A', vehicleId: 'v_A',
+      driverUid: 'user_X', createdByUid: 'sa_1', startKm: 20, endKm: 30,
+    }));
+
+    // (9) 슈퍼관리자도 작성자(createdByUid) 위조는 불가
+    await assertFails(superAdmin.collection('driveLogs').doc('sa_forge').set({
+      organizationId: 'org-A', vehicleId: 'v_A',
+      driverUid: 'user_X', createdByUid: 'someone_else', startKm: 20, endKm: 30,
+    }));
   });
 });

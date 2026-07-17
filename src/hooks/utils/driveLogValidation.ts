@@ -89,6 +89,10 @@ interface BuildLogContext {
     selectedPassengers: Array<{ name?: string; email?: string }>;
     externalPassengerCount?: number;
     externalPassengerNames?: string;
+    /** 공동 운전자로 선택된 조직원(정보성). */
+    coDrivers?: Array<{ id?: string; name?: string; email?: string }>;
+    /** 공동 운전자 직접 입력 이름(쉼표 구분). */
+    externalCoDriverNames?: string;
     isRetroactive: boolean;
     ocrUsed?: boolean;
     favoriteUsed?: boolean;
@@ -97,7 +101,7 @@ interface BuildLogContext {
 /**
  * 폼 데이터로 저장용 logData 객체를 구성한다.
  */
-export function buildLogData(form: DriveLogForm, { orgId, user, userData, selectedVehicle, selectedPassengers, externalPassengerCount = 0, externalPassengerNames = '', isRetroactive, ocrUsed = false, favoriteUsed = false }: BuildLogContext) {
+export function buildLogData(form: DriveLogForm, { orgId, user, userData, selectedVehicle, selectedPassengers, externalPassengerCount = 0, externalPassengerNames = '', coDrivers = [], externalCoDriverNames = '', isRetroactive, ocrUsed = false, favoriteUsed = false }: BuildLogContext) {
     const startKm = parseInt(form.startKm);
     const endKm = parseInt(form.endKm);
     const driveTimestamp = buildDriveTimestamp(form.driveDate, form.endTime, form.startTime);
@@ -107,13 +111,29 @@ export function buildLogData(form: DriveLogForm, { orgId, user, userData, select
         .map(name => name.trim())
         .filter(Boolean);
 
+    // 공동 운전자: 조직원 선택분 + 직접 입력분. 주행거리 배분 없이 이름만 기록(정보성).
+    const parsedExternalCoDriverNames = (externalCoDriverNames || '')
+        .split(',')
+        .map(name => name.trim())
+        .filter(Boolean);
+    const coDriverNames = [
+        ...coDrivers.map(c => c.name || c.email || '').filter(Boolean),
+        ...parsedExternalCoDriverNames,
+    ];
+    const coDriverUids = coDrivers.map(c => c.id).filter((id): id is string => !!id);
+
     const cleanData: Record<string, unknown> = {
         organizationId: orgId ? String(orgId) : '',
         vehicleId: form.vehicleId,
         vehicleName: form.vehicleName,
         vehicleType: selectedVehicle?.vehicleType || '',
-        driverUid: user.uid,
-        driverName: userData?.name || user.displayName || user.email || '',
+        // driverUid는 선택된 대표 운전자(기본값=작성자). createdByUid는 항상 작성자(규칙 소유자 판정용).
+        driverUid: form.driverUid || user.uid,
+        driverName: form.driverName || userData?.name || user.displayName || user.email || '',
+        createdByUid: user.uid,
+        // 공동 운전자는 값이 있을 때만 저장(빈 배열은 생략 → sanitizeUndefined 제거)
+        coDriverNames: coDriverNames.length > 0 ? coDriverNames : undefined,
+        coDriverUids: coDriverUids.length > 0 ? coDriverUids : undefined,
         purpose: (form.purpose || '').trim(),
         destination: (form.destination || '').trim(),
         startTime: form.startTime || '',

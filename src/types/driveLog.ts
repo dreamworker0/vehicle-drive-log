@@ -11,6 +11,12 @@ export interface DriveLog extends FirestoreDoc {
     vehicleDisplayName?: string;
     driverUid: string;
     driverName?: string;
+    /** 일지 작성자 uid. 규칙 소유자 판정용(driverUid는 대표 운전자로 선택 가능해졌으므로 분리). 기존 문서 호환 위해 optional. */
+    createdByUid?: string;
+    /** 공동 운전자 이름 목록(정보성). 주행거리는 대표 운전자(driverUid)에게 귀속되며 배분하지 않음. */
+    coDriverNames?: string[];
+    /** 공동 운전자 중 조직원으로 매칭된 uid(편집 프리로드용). */
+    coDriverUids?: string[];
     date?: string;
     timestamp: Date | TimestampField;
     startKm: number;
@@ -58,6 +64,8 @@ export interface DriveLogEntry {
     vehicleName?: string;
     driverUid?: string;
     driverName?: string;
+    createdByUid?: string;
+    coDriverNames?: string[];
     date?: string;
     startKm: number;
     endKm: number;

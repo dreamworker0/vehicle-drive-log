@@ -34,6 +34,10 @@ export interface SubmitDeps {
     externalPassengerCount: number;
     setExternalPassengerCount: (v: number) => void;
     externalPassengerNames: string;
+    selectedCoDrivers: UserDoc[];
+    setSelectedCoDrivers: React.Dispatch<React.SetStateAction<UserDoc[]>>;
+    externalCoDriverNames: string;
+    setExternalCoDriverNames: (v: string) => void;
     setFavorites: React.Dispatch<React.SetStateAction<Favorite[]>>;
     setShowFavSave: (v: boolean) => void;
     setFavName: (v: string) => void;
@@ -74,6 +78,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
         form, setForm, orgId, user, userData, vehicles, selectedVehicle,
         selectedPassengers, setSelectedPassengers, externalPassengerCount, setExternalPassengerCount,
         externalPassengerNames,
+        selectedCoDrivers, setSelectedCoDrivers, externalCoDriverNames, setExternalCoDriverNames,
         setFavorites, setShowFavSave, setFavName, setSuccess,
         isElectric, isRetroactive, isEditMode, editLog, reservationData, hipassCard, favName,
         lastDriveLog, nextDriveLog, setLastDriveLog,
@@ -135,6 +140,32 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
         });
     }, [setSelectedPassengers]);
 
+    const toggleCoDriver = useCallback((member: UserDoc) => {
+        setSelectedCoDrivers(prev => {
+            const exists = prev.find(p => p.id === member.id);
+            if (exists) return prev.filter(p => p.id !== member.id);
+            return [...prev, member];
+        });
+    }, [setSelectedCoDrivers]);
+
+    // 대표 운전자 선택 (기본값=작성자 본인)
+    const handleSelectDriver = useCallback((driverUid: string, driverName: string) => {
+        setForm(prev => ({ ...prev, driverUid, driverName }));
+    }, [setForm]);
+
+    // 폼 리셋 시 입력값 초기화 + 대표 운전자를 작성자 본인으로 재주입
+    const resetInputs = useCallback(() => {
+        setForm({
+            ...getEmptyForm(),
+            driverUid: user?.uid || '',
+            driverName: userData?.name || user?.displayName || user?.email || '',
+        });
+        setSelectedPassengers([]);
+        setExternalPassengerCount(0);
+        setSelectedCoDrivers([]);
+        setExternalCoDriverNames('');
+    }, [setForm, user, userData, setSelectedPassengers, setExternalPassengerCount, setSelectedCoDrivers, setExternalCoDriverNames]);
+
     // submitDriveLog 재시도 중 발생한 에러 처리. true 반환 시 재시도 중단(에러 무시).
     const handleSubmitError = useCallback((err: unknown): boolean | void => {
         const errObj = err as { code?: string; originalStartKm?: number; suggestedStartKm?: number };
@@ -168,15 +199,13 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
             } else if (isEditMode) {
                 navigate('/employee/my-records', { replace: true });
             } else {
-                setForm(getEmptyForm());
-                setSelectedPassengers([]);
-                setExternalPassengerCount(0);
+                resetInputs();
                 setTimeout(() => setSuccess(false), 2000);
             }
             return true;
         }
         return false;
-    }, [reservationData, isEditMode, navigate, showToast, setSuccess, setForm, setSelectedPassengers, setExternalPassengerCount]);
+    }, [reservationData, isEditMode, navigate, showToast, setSuccess, resetInputs]);
 
     const handleSubmit = useCallback(async (e: React.FormEvent | Event) => {
         if (e && 'preventDefault' in e) e.preventDefault();
@@ -207,7 +236,8 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
                     'submit-drive-log',
                     () => submitDriveLog({
                         form, orgId, user: user!, userData, selectedVehicle,
-                        selectedPassengers, externalPassengerCount, externalPassengerNames, isRetroactive,
+                        selectedPassengers, externalPassengerCount, externalPassengerNames,
+                        selectedCoDrivers, externalCoDriverNames, isRetroactive,
                         ocrUsed: ocrSuccess, favoriteUsed: false, isElectric, isEditMode, editLog,
                         reservationData, hipassCard,
                         isManuallyCorrected,
@@ -248,9 +278,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
                     setSuccess(true);
                     showToast(result.message!, 'info');
                     if (result.shouldResetForm) {
-                        setForm(getEmptyForm());
-                        setSelectedPassengers([]);
-                        setExternalPassengerCount(0);
+                        resetInputs();
                     }
                     setTimeout(() => setSuccess(false), 3000);
                     return;
@@ -265,9 +293,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
                     invalidateDashboardCache();
                     navigate('/employee/today', { replace: true });
                 } else if (result.shouldResetForm) {
-                    setForm(getEmptyForm());
-                    setSelectedPassengers([]);
-                    setExternalPassengerCount(0);
+                    resetInputs();
                     setSuccess(false);
                 }
             } catch (err: unknown) {
@@ -278,9 +304,10 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
     }, [
         form, isElectric, showToast, startTransition, runWithRetry,
         orgId, user, userData, selectedVehicle, selectedPassengers, externalPassengerCount,
-        externalPassengerNames, isRetroactive, ocrSuccess, isEditMode, editLog,
-        reservationData, hipassCard, handleSubmitError, setSuccess, navigate, setForm,
-        setSelectedPassengers, setExternalPassengerCount, lastDriveLog, nextDriveLog
+        externalPassengerNames, selectedCoDrivers, externalCoDriverNames, isRetroactive,
+        ocrSuccess, isEditMode, editLog,
+        reservationData, hipassCard, handleSubmitError, setSuccess, navigate, resetInputs,
+        lastDriveLog, nextDriveLog
     ]);
 
     const handleConfirmStartKm = useCallback(() => {
@@ -310,6 +337,8 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
         handleFavoriteSelect,
         handleSaveFavorite,
         togglePassenger,
+        toggleCoDriver,
+        handleSelectDriver,
         handleSubmit
     };
 }

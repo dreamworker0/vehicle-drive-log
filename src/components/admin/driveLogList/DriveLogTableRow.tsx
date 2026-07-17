@@ -1,9 +1,24 @@
+import { useNavigate } from 'react-router-dom';
 import type { DriveLogEntry } from '../../../types/driveLog';
 
 export interface DriveLogTableRowProps {
     log: DriveLogEntry;
     deletingId: string | null;
     onDelete: (logId: string, driverName: string) => void;
+}
+
+function EditButton({ onClick }: { onClick: () => void }) {
+    return (
+        <button
+            onClick={onClick}
+            className="p-1.5 rounded-lg text-surface-300 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors min-h-[48px]"
+            title="수정 (운전자 변경 등)"
+        >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+            </svg>
+        </button>
+    );
 }
 
 function DeleteButton({ onClick, disabled }: { onClick: () => void; disabled: boolean }) {
@@ -25,14 +40,29 @@ function DeleteButton({ onClick, disabled }: { onClick: () => void; disabled: bo
     );
 }
 
-const GRID_COLUMNS = '80px 60px 60px 70px 100px 1fr 100px 40px 80px 40px';
+/** 공동 운전자 배지 (있을 때만 표시) */
+function CoDriverBadge({ names }: { names?: string[] }) {
+    if (!names || names.length === 0) return null;
+    return (
+        <span
+            className="text-xs text-primary-500 dark:text-primary-400 whitespace-nowrap"
+            title={`공동 운전자: ${names.join(', ')}`}
+        >
+            🤝 외 {names.length}인
+        </span>
+    );
+}
+
+const GRID_COLUMNS = '80px 60px 60px 70px 100px 1fr 100px 40px 80px 76px';
 
 export default function DriveLogTableRow({ log, deletingId, onDelete }: DriveLogTableRowProps) {
+    const navigate = useNavigate();
     const date = log.timestamp?.toDate
         ? log.timestamp.toDate().toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })
         : '-';
     const distance = (log.endKm - log.startKm) || 0;
     const isDeleting = deletingId === log.id;
+    const handleEdit = () => navigate('/employee/drive-log', { state: { editLog: log } });
 
     return (
         <div className="glass-card p-4 hover:shadow-glass-lg transition-all">
@@ -41,10 +71,12 @@ export default function DriveLogTableRow({ log, deletingId, onDelete }: DriveLog
                 <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
                         <span className="font-medium text-sm text-surface-900 dark:text-surface-100">{log.driverName || '(이름 없음)'}</span>
+                        <CoDriverBadge names={log.coDriverNames} />
                         <span className="text-xs text-surface-400 dark:text-surface-500">{date}</span>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1">
                         <span className="font-bold text-primary-600 dark:text-primary-400">{distance.toLocaleString()} km</span>
+                        <EditButton onClick={handleEdit} />
                         <DeleteButton onClick={() => onDelete(log.id, log.driverName || '')} disabled={isDeleting} />
                     </div>
                 </div>
@@ -74,6 +106,7 @@ export default function DriveLogTableRow({ log, deletingId, onDelete }: DriveLog
                 </div>
                 <div className="min-w-0">
                     <p className="text-sm text-surface-900 dark:text-surface-100 truncate">{log.driverName || '(이름 없음)'}</p>
+                    <CoDriverBadge names={log.coDriverNames} />
                 </div>
                 <div className="min-w-0">
                     <p className="text-sm text-surface-700 dark:text-surface-300 truncate">{log.vehicleName}</p>
@@ -92,7 +125,8 @@ export default function DriveLogTableRow({ log, deletingId, onDelete }: DriveLog
                 <div className="text-right">
                     <span className="font-bold text-primary-600 dark:text-primary-400">{distance.toLocaleString()} km</span>
                 </div>
-                <div className="text-center">
+                <div className="flex items-center justify-center gap-0.5">
+                    <EditButton onClick={handleEdit} />
                     <DeleteButton onClick={() => onDelete(log.id, log.driverName || '')} disabled={isDeleting} />
                 </div>
             </div>

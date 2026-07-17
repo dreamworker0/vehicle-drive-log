@@ -49,6 +49,8 @@ export interface InitializerDeps {
     setForm: React.Dispatch<React.SetStateAction<DriveLogForm>>;
     setSelectedPassengers: React.Dispatch<React.SetStateAction<UserDoc[]>>;
     setExternalPassengerCount: (v: number) => void;
+    setSelectedCoDrivers: React.Dispatch<React.SetStateAction<UserDoc[]>>;
+    setExternalCoDriverNames: (v: string) => void;
     setResolvedReservationData: (v: LocationState | null) => void;
     setLastEndBattery: (v: number | null) => void;
     setHipassCard: (v: HipassCard | null) => void;
@@ -69,6 +71,7 @@ export function useDriveLogInitializer(deps: InitializerDeps) {
         form, showToast,
         setVehicles, setFavorites, setMembers, setLoading,
         setForm, setSelectedPassengers, setExternalPassengerCount,
+        setSelectedCoDrivers, setExternalCoDriverNames,
         setResolvedReservationData, setLastEndBattery, setHipassCard,
         setLastDriveLog,
         setNextDriveLog,
@@ -99,6 +102,21 @@ export function useDriveLogInitializer(deps: InitializerDeps) {
                     const memberNames = otherMembers.map(m => m.name || m.email?.split('@')[0]);
                     const externals = editLog.passengerNames.filter(n => !memberNames.includes(n));
                     if (externals.length > 0) setExternalPassengerCount(externals.length);
+                }
+
+                // 공동 운전자 복원(정보성) — uid 우선, 없으면 이름으로 매칭
+                if (isEditMode && editLog) {
+                    const coUids = editLog.coDriverUids || [];
+                    const coNames = editLog.coDriverNames || [];
+                    if (coUids.length > 0 || coNames.length > 0) {
+                        const matchedCo = otherMembers.filter(m =>
+                            coUids.includes(m.id) || coNames.includes(m.name || m.email?.split('@')[0])
+                        );
+                        setSelectedCoDrivers(matchedCo);
+                        const matchedCoNames = matchedCo.map(m => m.name || m.email?.split('@')[0]);
+                        const externalCo = coNames.filter(n => !matchedCoNames.includes(n));
+                        if (externalCo.length > 0) setExternalCoDriverNames(externalCo.join(', '));
+                    }
                 }
 
                 if (isEditMode && editLog?.vehicleId) {
@@ -136,7 +154,7 @@ export function useDriveLogInitializer(deps: InitializerDeps) {
             }
         };
         fetch();
-    }, [orgId, reservationData?.vehicleId, reservationData?.vehicleName, reservationData?.purpose, reservationData?.destination, user, isEditMode, editLog, editLog?.id, editLog?.passengerNames, editLog?.vehicleId, setVehicles, setFavorites, setMembers, setSelectedPassengers, setExternalPassengerCount, setForm, setLoading, setLastDriveLog, setNextDriveLog]);
+    }, [orgId, reservationData?.vehicleId, reservationData?.vehicleName, reservationData?.purpose, reservationData?.destination, user, isEditMode, editLog, editLog?.id, editLog?.passengerNames, editLog?.vehicleId, setVehicles, setFavorites, setMembers, setSelectedPassengers, setExternalPassengerCount, setSelectedCoDrivers, setExternalCoDriverNames, setForm, setLoading, setLastDriveLog, setNextDriveLog]);
 
     // ── Effect 2: URL 쿼리 파라미터에서 reservationId로 예약 데이터 로드 (알림 클릭 시) ──
     useEffect(() => {

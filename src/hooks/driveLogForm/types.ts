@@ -7,6 +7,10 @@ import type { DriveLog } from '../../types/driveLog';
 export interface DriveLogForm {
     vehicleId: string;
     vehicleName: string;
+    /** 대표 운전자 uid. 기본값은 작성자 본인이며, 조직원 중에서 선택 가능. */
+    driverUid: string;
+    /** 대표 운전자 표시 이름. */
+    driverName: string;
     purpose: string;
     destination: string;
     startTime: string;
