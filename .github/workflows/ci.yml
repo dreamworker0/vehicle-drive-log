@@ -33,6 +33,18 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
+      # 변경 경로 감지 — CI 1회 ~19분 중 Functions 단위 테스트가 ~11분(절반 이상)을 차지하므로,
+      # functions/** 미변경 푸시(프론트 전용)에서는 해당 스텝을 건너뛰어 Actions 분량을 절감한다.
+      # 워크플로 자체 변경 시에는 안전하게 전체 실행.
+      - name: 변경 경로 감지
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            functions:
+              - 'functions/**'
+              - '.github/workflows/ci.yml'
+
       - name: Setup Node 22
         uses: actions/setup-node@v5
         with:
@@ -67,7 +79,9 @@ jobs:
       - name: Unit tests (+coverage gate)
         run: npx vitest run --coverage
 
+      # functions/** 변경 시에만 실행 (프론트 전용 푸시에서 ~11분 절감)
       - name: Functions unit tests
+        if: steps.changes.outputs.functions == 'true'
         run: cd functions && npm test -- --maxWorkers=2 --workerIdleMemoryLimit=512MB
         env:
           NODE_OPTIONS: --max-old-space-size=4096

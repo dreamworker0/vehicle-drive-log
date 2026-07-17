@@ -56,10 +56,14 @@ jobs:
       - name: Build
         run: npm run build
 
-      - name: Unit tests
+      # CI 성공이 하드 게이트이므로 CI 경유(workflow_run) 배포에선 중복 검증을 생략한다 (~1.5분 절감).
+      # workflow_dispatch(긴급 수동 배포, CI 미경유)일 때만 최소 안전망으로 실행.
+      - name: Unit tests (긴급 우회 경로만)
+        if: github.event_name == 'workflow_dispatch'
         run: npx vitest run
 
-      - name: Security audit
+      - name: Security audit (긴급 우회 경로만)
+        if: github.event_name == 'workflow_dispatch'
         run: npm run audit
 
       # 함수/규칙을 Hosting보다 먼저 배포한다.
