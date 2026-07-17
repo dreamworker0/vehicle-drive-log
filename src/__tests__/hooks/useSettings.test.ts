@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 
 vi.mock('../../hooks/useAuth', () => ({
     useAuth: () => ({
@@ -46,6 +46,7 @@ vi.mock('../../hooks/useOrgApplication', () => ({
 }));
 
 import useSettings from '../../hooks/useSettings';
+import { updateOrganization } from '../../lib/firestore';
 
 describe('useSettings', () => {
     beforeEach(() => {
@@ -93,5 +94,32 @@ describe('useSettings', () => {
         const { result } = renderHook(() => useSettings());
 
         expect(typeof result.current.formatDate).toBe('function');
+    });
+
+    it('연속 토글을 각각 patch로 저장하고 로컬 상태를 합쳐 유지한다', async () => {
+        const { result } = renderHook(() => useSettings());
+
+        await waitFor(() => {
+            expect(result.current.loading).toBe(false);
+        });
+
+        let firstSave: Promise<void>;
+        let secondSave: Promise<void>;
+        act(() => {
+            firstSave = result.current.handleSave(null, { hipassEnabled: false });
+            secondSave = result.current.handleSave(null, { maintenanceEnabled: false });
+        });
+        await act(async () => {
+            await Promise.all([firstSave!, secondSave!]);
+        });
+
+        expect(vi.mocked(updateOrganization)).toHaveBeenNthCalledWith(1, 'org-1', {
+            hipassEnabled: false,
+        });
+        expect(vi.mocked(updateOrganization)).toHaveBeenNthCalledWith(2, 'org-1', {
+            maintenanceEnabled: false,
+        });
+        expect(result.current.form.hipassEnabled).toBe(false);
+        expect(result.current.form.maintenanceEnabled).toBe(false);
     });
 });

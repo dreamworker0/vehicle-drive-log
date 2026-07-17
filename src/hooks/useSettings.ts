@@ -156,32 +156,38 @@ export default function useSettings() {
         if (e) e.preventDefault();
         if (!orgId) return;
         setSaving(true);
-        const targetData = { ...form, ...overrides };
+        if (overrides) {
+            // 기능 토글은 즉시 로컬 상태에 병합하고 변경 필드만 저장한다.
+            // 연속 클릭이 같은 이전 form 전체를 보내 서로의 변경을 되돌리는 경쟁을 막는다.
+            setForm(prev => ({ ...prev, ...overrides }));
+        }
+        const targetData = overrides ? null : form;
         try {
-            await updateOrganization(orgId, {
-                name: targetData.name.trim(),
-                adminEmail: targetData.adminEmail.trim(),
-                address: targetData.address.trim(),
-                phone: targetData.phone.trim(),
-                approvalLine: targetData.approvalLine.filter(a => a.title.trim()).map(a => ({ title: a.title.trim() })),
-                hideApprovalLine: targetData.hideApprovalLine,
-                requireReservationApproval: targetData.requireReservationApproval,
-                hipassEnabled: targetData.hipassEnabled,
-                maintenanceEnabled: targetData.maintenanceEnabled,
-                maintenanceEmployeeAccess: targetData.maintenanceEmployeeAccess,
-                allowedUsersEnabled: targetData.allowedUsersEnabled,
-                googleCalendarEnabled: targetData.googleCalendarEnabled,
-                driverSelectionEnabled: targetData.driverSelectionEnabled,
-                coDriverEnabled: targetData.coDriverEnabled,
-                passengerEnabled: targetData.passengerEnabled,
-                passengerAllowList: targetData.passengerAllowList,
-                passengerAllowSearch: targetData.passengerAllowSearch,
-                passengerAllowCount: targetData.passengerAllowCount,
-                driverAllowList: targetData.driverAllowList,
-                driverAllowSearch: targetData.driverAllowSearch,
-            });
             if (overrides) {
-                setForm(targetData);
+                await updateOrganization(orgId, overrides);
+            } else if (targetData) {
+                await updateOrganization(orgId, {
+                    name: targetData.name.trim(),
+                    adminEmail: targetData.adminEmail.trim(),
+                    address: targetData.address.trim(),
+                    phone: targetData.phone.trim(),
+                    approvalLine: targetData.approvalLine.filter(a => a.title.trim()).map(a => ({ title: a.title.trim() })),
+                    hideApprovalLine: targetData.hideApprovalLine,
+                    requireReservationApproval: targetData.requireReservationApproval,
+                    hipassEnabled: targetData.hipassEnabled,
+                    maintenanceEnabled: targetData.maintenanceEnabled,
+                    maintenanceEmployeeAccess: targetData.maintenanceEmployeeAccess,
+                    allowedUsersEnabled: targetData.allowedUsersEnabled,
+                    googleCalendarEnabled: targetData.googleCalendarEnabled,
+                    driverSelectionEnabled: targetData.driverSelectionEnabled,
+                    coDriverEnabled: targetData.coDriverEnabled,
+                    passengerEnabled: targetData.passengerEnabled,
+                    passengerAllowList: targetData.passengerAllowList,
+                    passengerAllowSearch: targetData.passengerAllowSearch,
+                    passengerAllowCount: targetData.passengerAllowCount,
+                    driverAllowList: targetData.driverAllowList,
+                    driverAllowSearch: targetData.driverAllowSearch,
+                });
             }
             setSuccess(true);
             setTimeout(() => setSuccess(false), 3000);
