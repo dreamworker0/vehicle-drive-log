@@ -11,7 +11,7 @@ import FeedbackForm from '../common/FeedbackForm';
 import UserManual from '../common/UserManual';
 import AskAIModal from '../common/AskAIModal';
 import OrgInfoSection from './settings/OrgInfoSection';
-import ReservationApprovalSection from './settings/ReservationApprovalSection';
+import FeatureToggleSection from './settings/FeatureToggleSection';
 import ApprovalLineSection from './settings/ApprovalLineSection';
 import AccountSection from './settings/AccountSection';
 
@@ -68,10 +68,25 @@ export default function Settings() {
                 onRequestFeedback={() => setShowFeedback(true)}
             />
 
-            {/* 예약 승인 설정 */}
-            <ReservationApprovalSection
-                checked={form.requireReservationApproval}
-                onChange={(next) => handleSave(null, { requireReservationApproval: next })}
+            {/* 기능 사용 설정 */}
+            <FeatureToggleSection
+                values={{
+                    requireReservationApproval: form.requireReservationApproval,
+                    hipassEnabled: form.hipassEnabled,
+                    maintenanceEnabled: form.maintenanceEnabled,
+                    maintenanceEmployeeAccess: form.maintenanceEmployeeAccess,
+                    allowedUsersEnabled: form.allowedUsersEnabled,
+                    googleCalendarEnabled: form.googleCalendarEnabled,
+                    driverSelectionEnabled: form.driverSelectionEnabled,
+                    coDriverEnabled: form.coDriverEnabled,
+                    passengerEnabled: form.passengerEnabled,
+                    passengerAllowList: form.passengerAllowList,
+                    passengerAllowSearch: form.passengerAllowSearch,
+                    passengerAllowCount: form.passengerAllowCount,
+                    driverAllowList: form.driverAllowList,
+                    driverAllowSearch: form.driverAllowSearch,
+                }}
+                onChange={(patch) => handleSave(null, patch)}
             />
 
             {/* 결재 라인 설정 */}

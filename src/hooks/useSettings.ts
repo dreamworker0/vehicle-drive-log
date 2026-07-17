@@ -11,6 +11,7 @@ import { getFunctions, httpsCallable } from 'firebase/functions';
 import { fetchPublicHolidays, groupHolidaysByMonth } from '../lib/holidayApi';
 import { formatDateKr } from '../lib/dateUtils';
 import { formatPhoneNumber } from './useOrgApplication';
+import { resolveOrgFeatures } from '../lib/orgFeatures';
 import type { Organization, WithdrawReason } from '../types/organization';
 import type { CustomHoliday } from '../types/holiday';
 
@@ -22,6 +23,20 @@ export interface SettingsForm {
     approvalLine: { title: string }[];
     hideApprovalLine: boolean;
     requireReservationApproval: boolean;
+    // 기능 사용 토글(실제 켜짐 여부 boolean)
+    hipassEnabled: boolean;
+    maintenanceEnabled: boolean;
+    maintenanceEmployeeAccess: boolean;
+    allowedUsersEnabled: boolean;
+    googleCalendarEnabled: boolean;
+    driverSelectionEnabled: boolean;
+    coDriverEnabled: boolean;
+    passengerEnabled: boolean;
+    passengerAllowList: boolean;
+    passengerAllowSearch: boolean;
+    passengerAllowCount: boolean;
+    driverAllowList: boolean;
+    driverAllowSearch: boolean;
 }
 
 interface HolidayForm {
@@ -46,6 +61,19 @@ export default function useSettings() {
         approvalLine: [{ title: '담당' }, { title: '팀장' }],
         hideApprovalLine: false,
         requireReservationApproval: false,
+        hipassEnabled: true,
+        maintenanceEnabled: true,
+        maintenanceEmployeeAccess: true,
+        allowedUsersEnabled: true,
+        googleCalendarEnabled: true,
+        driverSelectionEnabled: true,
+        coDriverEnabled: true,
+        passengerEnabled: true,
+        passengerAllowList: true,
+        passengerAllowSearch: true,
+        passengerAllowCount: true,
+        driverAllowList: true,
+        driverAllowSearch: true,
     });
 
     // 공휴일 관리 상태
@@ -68,6 +96,7 @@ export default function useSettings() {
                 if (data) {
                     const orgData = data as Organization;
                     setOrg(orgData);
+                    const features = resolveOrgFeatures(orgData);
                     setForm({
                         name: orgData.name || '',
                         adminEmail: orgData.adminEmail || '',
@@ -78,6 +107,19 @@ export default function useSettings() {
                             : [{ title: '담당' }, { title: '팀장' }],
                         hideApprovalLine: orgData.hideApprovalLine ?? false,
                         requireReservationApproval: orgData.requireReservationApproval ?? false,
+                        hipassEnabled: features.hipass,
+                        maintenanceEnabled: features.maintenance,
+                        maintenanceEmployeeAccess: features.maintenanceEmployeeAccess,
+                        allowedUsersEnabled: features.allowedUsers,
+                        googleCalendarEnabled: features.googleCalendar,
+                        driverSelectionEnabled: features.driverSelection,
+                        coDriverEnabled: features.coDriver,
+                        passengerEnabled: features.passenger,
+                        passengerAllowList: features.passengerAllowList,
+                        passengerAllowSearch: features.passengerAllowSearch,
+                        passengerAllowCount: features.passengerAllowCount,
+                        driverAllowList: features.driverAllowList,
+                        driverAllowSearch: features.driverAllowSearch,
                     });
                 }
                 setCustomHolidays(holidays as CustomHoliday[]);
@@ -124,6 +166,19 @@ export default function useSettings() {
                 approvalLine: targetData.approvalLine.filter(a => a.title.trim()).map(a => ({ title: a.title.trim() })),
                 hideApprovalLine: targetData.hideApprovalLine,
                 requireReservationApproval: targetData.requireReservationApproval,
+                hipassEnabled: targetData.hipassEnabled,
+                maintenanceEnabled: targetData.maintenanceEnabled,
+                maintenanceEmployeeAccess: targetData.maintenanceEmployeeAccess,
+                allowedUsersEnabled: targetData.allowedUsersEnabled,
+                googleCalendarEnabled: targetData.googleCalendarEnabled,
+                driverSelectionEnabled: targetData.driverSelectionEnabled,
+                coDriverEnabled: targetData.coDriverEnabled,
+                passengerEnabled: targetData.passengerEnabled,
+                passengerAllowList: targetData.passengerAllowList,
+                passengerAllowSearch: targetData.passengerAllowSearch,
+                passengerAllowCount: targetData.passengerAllowCount,
+                driverAllowList: targetData.driverAllowList,
+                driverAllowSearch: targetData.driverAllowSearch,
             });
             if (overrides) {
                 setForm(targetData);

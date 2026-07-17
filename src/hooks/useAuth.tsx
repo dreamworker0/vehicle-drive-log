@@ -8,6 +8,7 @@ import { handleRedirectResult } from '../lib/auth';
 import { setSentryUser } from '../lib/sentry';
 import { useToastStore } from '../store/useToastStore';
 import type { User as UserDoc } from '../types/user';
+import { resolveOrgFeatures, ALL_FEATURES_ON, type OrgFeatures } from '../lib/orgFeatures';
 
 /**
  * 사용자 Firestore 문서의 로딩 확정 상태.
@@ -27,6 +28,8 @@ interface AuthContextType {
     loading: boolean;
     isSuperAdmin: boolean;
     orgDeleted: boolean;
+    /** 기관별 기능 사용 토글(실시간). 기본값 전부 켜짐. */
+    orgFeatures: OrgFeatures;
     /** @deprecated onSnapshot이 자동 처리. 호환성을 위해 유지. */
     refreshUserData: () => Promise<void>;
 }
@@ -38,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [userData, setUserData] = useState<UserDoc | null>(null);
     const [userDocState, setUserDocState] = useState<UserDocState>('pending');
     const [orgDeleted, setOrgDeleted] = useState(false);
+    const [orgFeatures, setOrgFeatures] = useState<OrgFeatures>(ALL_FEATURES_ON);
     const [loading, setLoading] = useState(true);
 
     // Custom Claims 토큰 갱신을 위한 이전 role/orgId 추적
@@ -103,18 +107,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                                     // 초기 로드 시: 토큰 갱신 완료까지 loading 유지 (대시보드의 Claims 의존 쿼리 보호)
                                     // 이후 변경 시: fire-and-forget (이미 화면 로드됨)
                                     const finishLoading = () => {
-                                        // 기관 상태 실시간 감시 (soft delete 감지)
-                                        if (data.organizationId && data.role !== 'superAdmin') {
+                                        // 기관 상태 실시간 감시 (soft delete 감지 + 기능 토글 반영)
+                                        // 슈퍼관리자도 본인 소속 기관을 볼 때 기능 토글이 반영되도록 구독한다.
+                                        // 단, soft-delete 로그아웃(orgDeleted)은 슈퍼관리자에게 적용하지 않는다.
+                                        if (data.organizationId) {
                                             if (unsubscribeOrg) unsubscribeOrg();
+
+                                            const isSuper = data.role === 'superAdmin';
 
                                             const startOrgWatch = (orgRetryCount = 0) => {
                                                 unsubscribeOrg = onSnapshot(
                                                     doc(db, 'organizations', data.organizationId!),
                                                     (orgSnap) => {
                                                         if (orgSnap.exists()) {
-                                                            setOrgDeleted(orgSnap.data().status === 'deleted');
+                                                            if (!isSuper) setOrgDeleted(orgSnap.data().status === 'deleted');
+                                                            setOrgFeatures(resolveOrgFeatures(orgSnap.data()));
                                                         } else {
-                                                            setOrgDeleted(true);
+                                                            if (!isSuper) setOrgDeleted(true);
+                                                            setOrgFeatures(ALL_FEATURES_ON);
                                                         }
                                                     },
                                                     (err) => {
@@ -183,6 +193,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                                     setUserData(null);
                                     setUserDocState('absent'); // 문서가 확정적으로 없음 → 신규가입/온보딩 대상
                                     setOrgDeleted(false);
+                                    setOrgFeatures(ALL_FEATURES_ON);
                                     setLoading(false);
                                 }
                             },
@@ -234,6 +245,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     setUserData(null);
                     setUserDocState('pending');
                     setOrgDeleted(false);
+                    setOrgFeatures(ALL_FEATURES_ON);
                     setLoading(false);
                     setSentryUser(null); // 로그아웃 시 Sentry 컨텍스트 해제
                 }
@@ -283,6 +295,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         loading,
         isSuperAdmin,
         orgDeleted,
+        orgFeatures,
         refreshUserData,
     };
 

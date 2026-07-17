@@ -8,6 +8,8 @@ interface VehicleStatusSectionProps {
     setForm: (f: DriveLogForm) => void;
     lastEndBattery: number | null;
     hipassCard: HipassCard | null;
+    /** 기관 설정: 하이패스 사용 여부(기본 true). false면 하이패스 블록 숨김 */
+    hipassEnabled?: boolean;
 }
 
 const VehicleStatusSection = memo(function VehicleStatusSection({
@@ -15,7 +17,8 @@ const VehicleStatusSection = memo(function VehicleStatusSection({
     form,
     setForm,
     lastEndBattery,
-    hipassCard
+    hipassCard,
+    hipassEnabled = true
 }: VehicleStatusSectionProps) {
     // 하이패스 접기/펼치기 상태 (기본값: 접힘 — 자주 사용하지 않는 항목)
     // 훅은 early return 앞에 위치해야 Rules of Hooks를 위반하지 않는다.
@@ -32,7 +35,10 @@ const VehicleStatusSection = memo(function VehicleStatusSection({
         localStorage.setItem('driveLog_hipassExpanded', JSON.stringify(isHipassExpanded));
     }, [isHipassExpanded]);
 
-    if (!isElectric && !hipassCard) return null;
+    // 기관 설정에서 하이패스를 끄면 카드가 있어도 하이패스 블록을 숨긴다.
+    const showHipass = hipassEnabled && !!hipassCard;
+
+    if (!isElectric && !showHipass) return null;
 
     return (
         <div className="space-y-5">
@@ -69,8 +75,8 @@ const VehicleStatusSection = memo(function VehicleStatusSection({
                 </div>
             )}
 
-            {/* 하이패스 (등록된 차량만) */}
-            {hipassCard && (
+            {/* 하이패스 (등록된 차량 + 기관 설정 켜짐) */}
+            {showHipass && (
                 <div className="glass-card p-4">
                     <div className={`flex items-center justify-between ${isHipassExpanded ? 'mb-3' : ''}`}>
                         <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300 flex items-center gap-2">

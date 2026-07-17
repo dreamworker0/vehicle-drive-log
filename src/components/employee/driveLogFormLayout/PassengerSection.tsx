@@ -2,6 +2,12 @@ import { memo, useState, useEffect, useRef } from 'react';
 import type { User as UserDoc } from '../../../types/user';
 
 interface PassengerSectionProps {
+    /** 기관 설정: 직원 목록 직접 선택 허용(기본 true) */
+    allowList?: boolean;
+    /** 기관 설정: 검색으로 선택(이름 직접 입력) 허용(기본 true) */
+    allowSearch?: boolean;
+    /** 기관 설정: 인원 숫자 입력 허용(기본 true) */
+    allowCount?: boolean;
     members: UserDoc[];
     selectedPassengers: UserDoc[];
     externalPassengerCount: number;
@@ -12,6 +18,9 @@ interface PassengerSectionProps {
 }
 
 const PassengerSection = memo(function PassengerSection({
+    allowList = true,
+    allowSearch = true,
+    allowCount = true,
     members,
     selectedPassengers,
     externalPassengerCount,
@@ -119,6 +128,16 @@ const PassengerSection = memo(function PassengerSection({
         }, 0);
     };
 
+    // 허용된 방식별 가시성
+    // - 목록·검색 둘 다 허용 → 현행처럼 접기 토글 제공
+    // - 하나만 허용 → 접기 없이 항상 노출
+    const bothPickMethods = allowList && allowSearch;
+    const showHeaderToggles = bothPickMethods;
+    const listVisible = allowList && (bothPickMethods ? isExpanded : true);
+    const manualVisible = allowSearch && (bothPickMethods ? isManualInputExpanded : true);
+    // 인원 숫자만 유일한 입력이면 '인원', 이름 선택 방식이 함께 있으면 '외부 인원'
+    const countLabel = (allowList || allowSearch) ? '외부 인원' : '인원';
+
     return (
         <div className="glass-card p-4">
             <div className="flex items-center justify-between mb-3">
@@ -130,33 +149,35 @@ const PassengerSection = memo(function PassengerSection({
                         </span>
                     )}
                 </label>
-                <div className="flex items-center gap-2">
-                    {!isManualInputExpanded && externalPassengerNames && (
-                        <span className="text-xs font-medium text-surface-700 dark:text-surface-300 truncate max-w-[80px] sm:max-w-[150px]">
-                            {externalPassengerNames}
-                        </span>
-                    )}
-                    {members.length > 0 && (
+                {showHeaderToggles && (
+                    <div className="flex items-center gap-2">
+                        {!isManualInputExpanded && externalPassengerNames && (
+                            <span className="text-xs font-medium text-surface-700 dark:text-surface-300 truncate max-w-[80px] sm:max-w-[150px]">
+                                {externalPassengerNames}
+                            </span>
+                        )}
+                        {members.length > 0 && (
+                            <button
+                                type="button"
+                                onClick={() => setIsExpanded(!isExpanded)}
+                                className="text-xs px-3 py-2 min-h-[48px] rounded-md bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors flex items-center justify-center font-medium"
+                            >
+                                {isExpanded ? '직원 목록 닫기 ▲' : '직원 선택 ▼'}
+                            </button>
+                        )}
                         <button
                             type="button"
-                            onClick={() => setIsExpanded(!isExpanded)}
+                            onClick={() => setIsManualInputExpanded(!isManualInputExpanded)}
                             className="text-xs px-3 py-2 min-h-[48px] rounded-md bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors flex items-center justify-center font-medium"
                         >
-                            {isExpanded ? '직원 목록 닫기 ▲' : '직원 선택 ▼'}
+                            {isManualInputExpanded ? '직접 입력 닫기 ▲' : '직접 입력 열기 ▼'}
                         </button>
-                    )}
-                    <button
-                        type="button"
-                        onClick={() => setIsManualInputExpanded(!isManualInputExpanded)}
-                        className="text-xs px-3 py-2 min-h-[48px] rounded-md bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700 transition-colors flex items-center justify-center font-medium"
-                    >
-                        {isManualInputExpanded ? '직접 입력 닫기 ▲' : '직접 입력 열기 ▼'}
-                    </button>
-                </div>
+                    </div>
+                )}
             </div>
 
-            {/* 선택된 조직원 요약 (접혀있을 때) */}
-            {!isExpanded && selectedPassengers.length > 0 && (
+            {/* 선택된 조직원 요약 (목록이 접혀있을 때) */}
+            {bothPickMethods && !isExpanded && selectedPassengers.length > 0 && (
                 <div className="flex flex-wrap gap-1.5 mb-3">
                     {selectedPassengers.map((m: UserDoc) => (
                         <button
@@ -171,8 +192,8 @@ const PassengerSection = memo(function PassengerSection({
                 </div>
             )}
 
-            {/* 전체 조직원 목록 (펼쳐있을 때) */}
-            {members.length > 0 && isExpanded && (
+            {/* 전체 조직원 목록 */}
+            {members.length > 0 && listVisible && (
                 <div className="flex flex-wrap gap-1.5 mb-3">
                     {members.map((m: UserDoc) => {
                         const isSelected = selectedPassengers.some((p: UserDoc) => p.id === m.id);
@@ -193,8 +214,8 @@ const PassengerSection = memo(function PassengerSection({
                 </div>
             )}
 
-            {/* 직접 입력 필드 */}
-            {isManualInputExpanded && (
+            {/* 직접 입력(검색) 필드 */}
+            {manualVisible && (
                 <div className="mt-4 border-t border-surface-100 dark:border-surface-700 pt-3">
                     <p className="text-xs text-surface-500 dark:text-surface-400 mb-2">
                         이름 직접 입력
@@ -235,10 +256,11 @@ const PassengerSection = memo(function PassengerSection({
                 </div>
             )}
 
-            {/* 외부 인원 */}
+            {/* 외부 인원 (허용 시) */}
+            {allowCount && (
             <div className="flex items-center gap-3 mt-4 border-t border-surface-100 dark:border-surface-700 pt-3">
                 <p className="text-xs text-surface-500 dark:text-surface-400 whitespace-nowrap min-w-[3.5rem]">
-                    {isExpanded ? '외부 인원' : '인원'}
+                    {countLabel}
                 </p>
                 <div className="flex items-center gap-1.5">
                     <button
@@ -260,6 +282,7 @@ const PassengerSection = memo(function PassengerSection({
                     <span className="text-xs text-surface-400 dark:text-surface-500">명</span>
                 </div>
             </div>
+            )}
 
             {/* 총 탑승 인원 */}
             {(selectedPassengers.length + externalPassengerCount) > 0 && (

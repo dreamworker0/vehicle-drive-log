@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import useDriveLogForm from '../../hooks/useDriveLogForm';
+import { useAuth } from '../../hooks/useAuth';
 import useVehiclePriority from '../../hooks/useVehiclePriority';
 import MileageInput from './MileageInput';
 import ConfirmModal from '../common/ConfirmModal';
@@ -53,6 +54,7 @@ export default function DriveLogForm() {
         handleConfirmStartKm,
         handleCancelConfirm,
     } = useDriveLogForm();
+    const { orgFeatures } = useAuth();
     const { usageCounts } = useVehiclePriority();
 
     // 비고 접기/펼치기 상태 (기본값: 접힘 — 자주 사용하지 않는 항목)
@@ -159,29 +161,40 @@ export default function DriveLogForm() {
                     nextDriveLog={nextDriveLog}
                 />
 
-                {/* 4-1. 운전자 섹션 (대표 운전자 + 공동 운전자) */}
-                <DriverSection
-                    driverCandidates={driverCandidates}
-                    driverUid={form.driverUid}
-                    onSelectDriver={handleSelectDriver}
-                    canEditDriver={canEditDriver}
-                    members={driverEligibleMembers}
-                    selectedCoDrivers={selectedCoDrivers}
-                    toggleCoDriver={toggleCoDriver}
-                    externalCoDriverNames={externalCoDriverNames}
-                    setExternalCoDriverNames={setExternalCoDriverNames}
-                />
+                {/* 4-1. 운전자 섹션 (대표 운전자 + 공동 운전자) — 기관 설정에 따라 표시 */}
+                {(orgFeatures.driverSelection || orgFeatures.coDriver) && (
+                    <DriverSection
+                        driverCandidates={driverCandidates}
+                        driverUid={form.driverUid}
+                        onSelectDriver={handleSelectDriver}
+                        canEditDriver={canEditDriver}
+                        driverSelectionEnabled={orgFeatures.driverSelection}
+                        coDriverEnabled={orgFeatures.coDriver}
+                        allowList={orgFeatures.driverAllowList}
+                        allowSearch={orgFeatures.driverAllowSearch}
+                        members={driverEligibleMembers}
+                        selectedCoDrivers={selectedCoDrivers}
+                        toggleCoDriver={toggleCoDriver}
+                        externalCoDriverNames={externalCoDriverNames}
+                        setExternalCoDriverNames={setExternalCoDriverNames}
+                    />
+                )}
 
-                {/* 5. 동승자 섹션 */}
-                <PassengerSection
-                    members={members}
-                    selectedPassengers={selectedPassengers}
-                    externalPassengerCount={externalPassengerCount}
-                    externalPassengerNames={externalPassengerNames}
-                    togglePassenger={togglePassenger}
-                    setExternalPassengerCount={setExternalPassengerCount}
-                    setExternalPassengerNames={setExternalPassengerNames}
-                />
+                {/* 5. 동승자 섹션 — 기관 설정에 따라 표시 */}
+                {orgFeatures.passenger && (
+                    <PassengerSection
+                        allowList={orgFeatures.passengerAllowList}
+                        allowSearch={orgFeatures.passengerAllowSearch}
+                        allowCount={orgFeatures.passengerAllowCount}
+                        members={members}
+                        selectedPassengers={selectedPassengers}
+                        externalPassengerCount={externalPassengerCount}
+                        externalPassengerNames={externalPassengerNames}
+                        togglePassenger={togglePassenger}
+                        setExternalPassengerCount={setExternalPassengerCount}
+                        setExternalPassengerNames={setExternalPassengerNames}
+                    />
+                )}
 
                 {/* 6. 차량 상태 섹션 (배터리/하이패스) */}
                 <VehicleStatusSection
@@ -190,6 +203,7 @@ export default function DriveLogForm() {
                     setForm={setForm}
                     lastEndBattery={lastEndBattery}
                     hipassCard={hipassCard}
+                    hipassEnabled={orgFeatures.hipass}
                 />
 
                 {/* 7. 비고 섹션 */}

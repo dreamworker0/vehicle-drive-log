@@ -8,6 +8,7 @@ import type { Vehicle } from '../../types';
 import type { User } from '../../types/user';
 import { FUEL_TYPES } from '../../types/vehicle';
 import VehicleCalendarSection from './VehicleCalendarSection';
+import { useAuth } from '../../hooks/useAuth';
 
 interface VehicleFormData {
     displayName: string;
@@ -79,6 +80,7 @@ export default function VehicleForm({
     onSubmit, onCancel, onModelNameChange, modelSuggestions,
     members, onCalendarTestResult, initialCalendarError,
 }: Props) {
+    const { orgFeatures } = useAuth();
     const toggleAllowedUser = (uid: string) => {
         setForm(prev => ({
             ...prev,
@@ -306,6 +308,7 @@ export default function VehicleForm({
                         </p>
                     </CollapsibleSection>
 
+                    {orgFeatures.allowedUsers && (
                     <CollapsibleSection
                         title="🔒 사용 가능 직원 (선택)"
                         summary={form.allowedUserIds.length > 0 ? `${form.allowedUserIds.length}명 지정` : '전체 허용'}
@@ -336,7 +339,9 @@ export default function VehicleForm({
                             선택하지 않으면 모든 직원이 사용할 수 있습니다 · 선택하면 지정된 직원만(관리자 포함 그 외 전원 불가) 예약·운행 가능
                         </p>
                     </CollapsibleSection>
+                    )}
 
+                    {orgFeatures.googleCalendar && (
                     <CollapsibleSection
                         title="📅 Google 캘린더 (선택)"
                         summary={(editingVehicle?.calendarSyncFailCount ?? 0) >= 3 ? '⚠️ 동기화 실패' : form.googleCalendarId.trim() ? '연동됨' : '미연동'}
@@ -350,6 +355,7 @@ export default function VehicleForm({
                             initialCalendarError={initialCalendarError}
                         />
                     </CollapsibleSection>
+                    )}
                     <div className="flex gap-3 pt-2">
                         <button type="button" onClick={onCancel} className="btn-secondary flex-1 min-h-[48px]">취소</button>
                         <button type="submit" disabled={formLoading} className="btn-primary flex-1 min-h-[48px]">

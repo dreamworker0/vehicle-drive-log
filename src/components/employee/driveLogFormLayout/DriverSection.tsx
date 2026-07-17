@@ -11,6 +11,14 @@ interface DriverSectionProps {
     onSelectDriver: (uid: string, name: string) => void;
     /** 대표 운전자 변경 가능 여부(신규 작성·관리자·본인 일지 편집) */
     canEditDriver: boolean;
+    /** 기관 설정: 대표 운전자 지정 사용 여부 */
+    driverSelectionEnabled: boolean;
+    /** 기관 설정: 공동 운전자 사용 여부 */
+    coDriverEnabled: boolean;
+    /** 기관 설정: 목록 직접 선택 허용(기본 true) */
+    allowList?: boolean;
+    /** 기관 설정: 검색으로 선택 허용(기본 true). 둘 다 켜지면 8명 기준 자동 전환 */
+    allowSearch?: boolean;
     /** 공동 운전자 후보(조직원, 본인 제외) */
     members: UserDoc[];
     /** 선택된 공동 운전자 */
@@ -41,6 +49,10 @@ const DriverSection = memo(function DriverSection({
     driverUid,
     onSelectDriver,
     canEditDriver,
+    driverSelectionEnabled,
+    coDriverEnabled,
+    allowList = true,
+    allowSearch = true,
     members,
     selectedCoDrivers,
     toggleCoDriver,
@@ -62,6 +74,9 @@ const DriverSection = memo(function DriverSection({
 
     // 좌/우 탭: 대표 운전자 | 공동 운전자
     const [activeTab, setActiveTab] = useState<'driver' | 'coDriver'>('driver');
+    // 기관 설정에 따라 탭 노출 결정. 둘 다 켜졌을 때만 탭바 표시.
+    const showTabs = driverSelectionEnabled && coDriverEnabled;
+    const effectiveTab: 'driver' | 'coDriver' = !driverSelectionEnabled ? 'coDriver' : (!coDriverEnabled ? 'driver' : activeTab);
 
     // 검색어
     const [driverQuery, setDriverQuery] = useState('');
@@ -79,15 +94,20 @@ const DriverSection = memo(function DriverSection({
     // 공동 운전자 후보 = 조직원 - 현재 대표 운전자 - 이미 선택된 공동운전자
     const coDriverPool = members.filter(m => m.id !== driverUid && !selectedCoDrivers.some(p => p.id === m.id));
 
-    // 인원이 적으면 바로 노출, 많으면 검색해야 노출
+    // 검색창 노출 여부: 검색 허용 && (목록 비허용 OR 목록·검색 둘 다 허용인데 후보가 8명 초과)
+    // → 목록만 허용: 검색창 없이 목록만 / 검색만 허용: 항상 검색 / 둘 다: 8명 이하 목록, 초과 검색
+    const showSearchFor = (pool: UserDoc[]) => allowSearch && (!allowList || pool.length > INLINE_LIST_THRESHOLD);
     const buildVisible = (pool: UserDoc[], q: string) => {
         if (q.trim()) return pool.filter(m => matches(m, q)).slice(0, MAX_RESULTS);
-        return pool.length <= INLINE_LIST_THRESHOLD ? pool : [];
+        if (showSearchFor(pool)) return []; // 검색 유도 중 → 힌트만
+        return pool; // 목록 노출
     };
+    const showDriverSearch = showSearchFor(driverCandidates);
+    const showCoSearch = showSearchFor(coDriverPool);
     const visibleDrivers = buildVisible(driverCandidates, driverQuery);
     const visibleCoDrivers = buildVisible(coDriverPool, coQuery);
-    const needDriverSearchHint = !driverQuery.trim() && driverCandidates.length > INLINE_LIST_THRESHOLD;
-    const needCoSearchHint = !coQuery.trim() && coDriverPool.length > INLINE_LIST_THRESHOLD;
+    const needDriverSearchHint = showDriverSearch && !driverQuery.trim();
+    const needCoSearchHint = showCoSearch && !coQuery.trim();
 
     const handleDriverPick = (m: UserDoc) => {
         setDriverQuery('');
@@ -132,7 +152,8 @@ const DriverSection = memo(function DriverSection({
 
             {isExpanded && (
                 <div className="mt-3">
-                    {/* 좌/우 탭 */}
+                    {/* 좌/우 탭 (대표·공동 둘 다 켜진 경우만) */}
+                    {showTabs && (
                     <div className="flex gap-1 p-1 rounded-lg bg-surface-100 dark:bg-surface-800 mb-3">
                         <button
                             type="button"
@@ -155,22 +176,25 @@ const DriverSection = memo(function DriverSection({
                             🤝 공동 운전자{coDriverCount > 0 ? ` (${coDriverCount})` : ''}
                         </button>
                     </div>
+                    )}
 
                     {/* 대표 운전자 탭 */}
-                    {activeTab === 'driver' && (
+                    {effectiveTab === 'driver' && driverSelectionEnabled && (
                         <div>
                             <p className="text-xs text-surface-500 dark:text-surface-400 mb-2">
                                 현재 운전자: <span className="font-bold text-primary-600 dark:text-primary-400">{currentDriverName}</span> · 주행거리가 이 사람에게 기록됩니다.
                             </p>
                             {canEditDriver ? (
                                 <>
-                                    <input
-                                        type="text"
-                                        value={driverQuery}
-                                        onChange={e => setDriverQuery(e.target.value)}
-                                        placeholder={driverCandidates.length > INLINE_LIST_THRESHOLD ? '운전자 이름 검색…' : '운전자 검색…'}
-                                        className="input min-h-[48px] text-sm py-1.5 px-3 w-full mb-2"
-                                    />
+                                    {showDriverSearch && (
+                                        <input
+                                            type="text"
+                                            value={driverQuery}
+                                            onChange={e => setDriverQuery(e.target.value)}
+                                            placeholder="운전자 이름 검색…"
+                                            className="input min-h-[48px] text-sm py-1.5 px-3 w-full mb-2"
+                                        />
+                                    )}
                                     {needDriverSearchHint ? (
                                         <p className="text-xs text-surface-400 dark:text-surface-500 py-2">이름을 입력해 운전자를 검색하세요.</p>
                                     ) : (
@@ -194,7 +218,7 @@ const DriverSection = memo(function DriverSection({
                     )}
 
                     {/* 공동 운전자 탭 */}
-                    {activeTab === 'coDriver' && (
+                    {effectiveTab === 'coDriver' && coDriverEnabled && (
                         <div>
                             <p className="text-xs text-surface-500 dark:text-surface-400 mb-2">
                                 두 명 이상이 나눠 운전한 경우 함께 운전한 사람을 기록합니다. 주행거리는 대표 운전자에게 귀속됩니다.
@@ -216,13 +240,15 @@ const DriverSection = memo(function DriverSection({
                                 </div>
                             )}
 
-                            <input
-                                type="text"
-                                value={coQuery}
-                                onChange={e => setCoQuery(e.target.value)}
-                                placeholder={coDriverPool.length > INLINE_LIST_THRESHOLD ? '조직원 이름 검색해 추가…' : '조직원 검색해 추가…'}
-                                className="input min-h-[48px] text-sm py-1.5 px-3 w-full mb-2"
-                            />
+                            {showCoSearch && (
+                                <input
+                                    type="text"
+                                    value={coQuery}
+                                    onChange={e => setCoQuery(e.target.value)}
+                                    placeholder="조직원 이름 검색해 추가…"
+                                    className="input min-h-[48px] text-sm py-1.5 px-3 w-full mb-2"
+                                />
+                            )}
                             {needCoSearchHint ? (
                                 <p className="text-xs text-surface-400 dark:text-surface-500 py-2">이름을 입력해 조직원을 검색하세요.</p>
                             ) : (

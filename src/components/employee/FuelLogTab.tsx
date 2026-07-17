@@ -2,8 +2,9 @@
  * FuelLogTab — 직원용 차량 관리 화면
  * 상단 탭 전환: 주유 | 충전 (하이패스) | 정비
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import useFuelLog from '../../hooks/useFuelLog';
+import { useAuth } from '../../hooks/useAuth';
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
 import { SkeletonBox, SkeletonList } from '../common/Skeleton';
 import VehicleSelector from './VehicleSelector';
@@ -16,6 +17,17 @@ type TabType = 'fuel' | 'charge' | 'maintenance';
 
 export default function FuelLogTab() {
     const [activeTab, setActiveTab] = useState<TabType>('fuel');
+    const { orgFeatures, userData, isSuperAdmin } = useAuth();
+    // 정비 탭 노출: 기능 켜짐 && (일반 직원 사용 허용 || 관리자·슈퍼관리자)
+    const isAdmin = userData?.role === 'admin' || isSuperAdmin;
+    const canSeeMaintenance = orgFeatures.maintenance && (orgFeatures.maintenanceEmployeeAccess || isAdmin);
+
+    // 기관 설정에서 꺼진 탭이 활성 상태면 주유 탭으로 되돌린다.
+    useEffect(() => {
+        if ((activeTab === 'charge' && !orgFeatures.hipass) || (activeTab === 'maintenance' && !canSeeMaintenance)) {
+            setActiveTab('fuel');
+        }
+    }, [activeTab, orgFeatures.hipass, canSeeMaintenance]);
 
     const {
         vehicles, loading, showForm, setShowForm,
@@ -56,33 +68,37 @@ export default function FuelLogTab() {
                 >
                     ⛽ 주유
                 </button>
-                <button
-                    onClick={() => setActiveTab('charge')}
-                    className={`flex-1 py-2 min-h-[48px] text-sm font-medium rounded-lg transition-all ${
-                        activeTab === 'charge'
-                            ? 'bg-white dark:bg-surface-700 text-surface-900 dark:text-surface-100 shadow-sm'
-                            : 'text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300'
-                    }`}
-                >
-                    💳 하이패스
-                </button>
-                <button
-                    onClick={() => setActiveTab('maintenance')}
-                    className={`flex-1 py-2 min-h-[48px] text-sm font-medium rounded-lg transition-all ${
-                        activeTab === 'maintenance'
-                            ? 'bg-white dark:bg-surface-700 text-surface-900 dark:text-surface-100 shadow-sm'
-                            : 'text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300'
-                    }`}
-                >
-                    🔧 수리ㆍ정비
-                </button>
+                {orgFeatures.hipass && (
+                    <button
+                        onClick={() => setActiveTab('charge')}
+                        className={`flex-1 py-2 min-h-[48px] text-sm font-medium rounded-lg transition-all ${
+                            activeTab === 'charge'
+                                ? 'bg-white dark:bg-surface-700 text-surface-900 dark:text-surface-100 shadow-sm'
+                                : 'text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300'
+                        }`}
+                    >
+                        💳 하이패스
+                    </button>
+                )}
+                {canSeeMaintenance && (
+                    <button
+                        onClick={() => setActiveTab('maintenance')}
+                        className={`flex-1 py-2 min-h-[48px] text-sm font-medium rounded-lg transition-all ${
+                            activeTab === 'maintenance'
+                                ? 'bg-white dark:bg-surface-700 text-surface-900 dark:text-surface-100 shadow-sm'
+                                : 'text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300'
+                        }`}
+                    >
+                        🔧 수리ㆍ정비
+                    </button>
+                )}
             </div>
 
             {/* 충전 탭 */}
-            {activeTab === 'charge' && <HipassChargeTab />}
+            {orgFeatures.hipass && activeTab === 'charge' && <HipassChargeTab />}
 
             {/* 정비 탭 */}
-            {activeTab === 'maintenance' && <MaintenanceTab />}
+            {canSeeMaintenance && activeTab === 'maintenance' && <MaintenanceTab />}
 
             {/* 주유 탭 */}
             {activeTab === 'fuel' && (
