@@ -122,4 +122,24 @@ describe('useSettings', () => {
         expect(result.current.form.hipassEnabled).toBe(false);
         expect(result.current.form.maintenanceEnabled).toBe(false);
     });
+
+    it('토글 저장이 실패하면 낙관적 반영을 이전 값으로 되돌린다', async () => {
+        vi.mocked(updateOrganization).mockRejectedValueOnce(new Error('network'));
+        const { result } = renderHook(() => useSettings());
+
+        await waitFor(() => {
+            expect(result.current.loading).toBe(false);
+        });
+
+        // 초기값은 미설정=켜짐이므로 true
+        expect(result.current.form.hipassEnabled).toBe(true);
+
+        await act(async () => {
+            await result.current.handleSave(null, { hipassEnabled: false });
+        });
+
+        // 저장 실패 → 이전 값(true)으로 롤백 + 에러 토스트
+        expect(result.current.form.hipassEnabled).toBe(true);
+        expect(mockShowToast).toHaveBeenCalledWith('저장에 실패했습니다.', 'error');
+    });
 });
