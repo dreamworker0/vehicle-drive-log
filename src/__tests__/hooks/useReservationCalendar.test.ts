@@ -133,11 +133,16 @@ describe('useReservationCalendar', () => {
 
         expect(result.current.monthLabel).not.toBe(initialLabel);
 
+        // 월 이동 시 트리거되는 예약 재조회가 act 밖에서 반영되지 않도록 정착 대기
+        await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+
         act(() => {
             result.current.prevMonth();
         });
 
         expect(result.current.monthLabel).toBe(initialLabel);
+
+        await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
     });
 
     it('handleCancel이 예약을 취소한다', async () => {

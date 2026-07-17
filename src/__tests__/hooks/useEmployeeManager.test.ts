@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 
 // ── Mocks ──
 // firebase/analytics mock — 테스트 환경에서 window 미정의로 인한 에러 방지
@@ -138,8 +138,11 @@ describe('useEmployeeManager', () => {
             const { result } = renderHook(() => useEmployeeManager());
             await waitFor(() => expect(result.current.loading).toBe(false));
 
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await result.current.handleDeletePermanently(disabledEmp as any);
+            // 삭제 성공 후 목록 재로드(setState)가 act 밖에서 반영되지 않도록 감싼다
+            await act(async () => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                await result.current.handleDeletePermanently(disabledEmp as any);
+            });
 
             expect(mockCallable).toHaveBeenCalledWith({ uid: 'u9' });
             expect(mockShowToast).toHaveBeenCalledWith('직원 계정이 완전히 삭제되었습니다.', 'success');

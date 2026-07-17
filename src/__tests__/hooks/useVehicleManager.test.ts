@@ -60,11 +60,13 @@ describe('useVehicleManager', () => {
     });
 
     it('showForm 토글이 동작한다', async () => {
-        const { result } = renderHook(() => useVehicleManager());
         const { act } = await import('@testing-library/react');
+        const { result } = renderHook(() => useVehicleManager());
 
-        // 초기 비동기 데이터 로딩 대기
-        await waitFor(() => expect(result.current.loading).toBe(false));
+        // 마운트 시 실행되는 모든 비동기 로드(차량·직원 목록)를 act 안에서 정착시킨다.
+        // 직원 목록 로드는 loading과 무관한 별도 effect라 waitFor(loading) 이후 새어나온다.
+        await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
+        expect(result.current.loading).toBe(false);
 
         expect(result.current.showForm).toBe(false);
 

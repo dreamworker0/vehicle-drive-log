@@ -68,6 +68,9 @@ describe('useSettings', () => {
         const { result } = renderHook(() => useSettings());
 
         expect(result.current.orgId).toBe('org-1');
+
+        // 마운트 시 비동기 기관 로드가 act 밖에서 반영되지 않도록 정착 대기
+        await waitFor(() => expect(result.current.loading).toBe(false));
     });
 
     it('핸들러가 함수로 존재한다', async () => {
@@ -84,16 +87,20 @@ describe('useSettings', () => {
         expect(typeof result.current.handleDeleteHoliday).toBe('function');
     });
 
-    it('holidayYear 기본값은 현재 연도이다', () => {
+    it('holidayYear 기본값은 현재 연도이다', async () => {
         const { result } = renderHook(() => useSettings());
 
         expect(result.current.holidayYear).toBe(new Date().getFullYear());
+
+        await waitFor(() => expect(result.current.loading).toBe(false));
     });
 
-    it('formatDate 함수가 존재한다', () => {
+    it('formatDate 함수가 존재한다', async () => {
         const { result } = renderHook(() => useSettings());
 
         expect(typeof result.current.formatDate).toBe('function');
+
+        await waitFor(() => expect(result.current.loading).toBe(false));
     });
 
     it('연속 토글을 각각 patch로 저장하고 로컬 상태를 합쳐 유지한다', async () => {

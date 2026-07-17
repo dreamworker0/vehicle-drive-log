@@ -39,11 +39,14 @@ describe('useNotification', () => {
         vi.clearAllMocks();
     });
 
-    it('초기 상태가 올바르다', () => {
+    it('초기 상태가 올바르다', async () => {
         const { result } = renderHook(() => useNotification());
 
         expect(result.current.token).toBeNull();
         expect(typeof result.current.requestPermission).toBe('function');
+
+        // 마운트 시 비동기 FCM 초기화가 act 밖에서 반영되지 않도록 정착 대기
+        await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
     });
 
     it('Notification API가 없는 환경에서 requestPermission이 안전하게 처리된다', async () => {
@@ -70,12 +73,14 @@ describe('useNotification', () => {
         }
     });
 
-    it('return 값에 필수 속성이 포함된다', () => {
+    it('return 값에 필수 속성이 포함된다', async () => {
         const { result } = renderHook(() => useNotification());
 
         expect(result.current).toHaveProperty('permission');
         expect(result.current).toHaveProperty('token');
         expect(result.current).toHaveProperty('requestPermission');
         expect(result.current).toHaveProperty('isSupported');
+
+        await act(async () => { await new Promise((resolve) => setTimeout(resolve, 0)); });
     });
 });

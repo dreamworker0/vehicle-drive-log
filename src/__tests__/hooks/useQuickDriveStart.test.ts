@@ -55,6 +55,7 @@ vi.mock('../../lib/dateUtils', () => ({
 
 vi.mock('../../lib/vehicleUtils', () => ({
     isVehicleBlocked: () => false,
+    isVehicleRestrictedForUser: () => false,
 }));
 
 vi.mock('../../hooks/utils/reservationUtils', () => ({
