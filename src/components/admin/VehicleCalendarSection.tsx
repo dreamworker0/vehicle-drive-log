@@ -171,7 +171,18 @@ export default function VehicleCalendarSection({
                     📋 설정 방법 안내
                 </summary>
                 <div className="mt-2 p-3 rounded-lg bg-surface-50 dark:bg-surface-800 space-y-2 border border-surface-200 dark:border-surface-700">
-                    
+                    {/* 사용법 동영상 링크 */}
+                    <p className="mb-2">
+                        <a
+                            href="https://www.youtube.com/watch?v=XdT5Wm_pd3s"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 font-medium text-primary-600 dark:text-primary-400 hover:underline"
+                        >
+                            📺 사용법 영상으로 보기
+                        </a>
+                    </p>
+
                     {/* 새 캘린더 생성 주의사항 추가 */}
                     <div className="mb-3 p-2.5 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
                         <p className="font-medium text-red-700 dark:text-red-400 flex items-center gap-1.5">
@@ -222,6 +233,15 @@ export default function VehicleCalendarSection({
                             줄을 넣어도 됩니다. 목적지만 적으면(예:{' '}
                             <code className="px-1 rounded bg-surface-100 dark:bg-surface-700">합정역</code>) 예약자는 일정
                             작성자 계정으로 자동 추정됩니다.
+                        </p>
+                        <p className="mt-1.5 text-surface-600 dark:text-surface-400">
+                            구글 캘린더에 등록한 일정은{' '}
+                            <strong className="text-surface-700 dark:text-surface-300">1시간마다(평일 06~22시)</strong> 앱
+                            예약으로 역동기화됩니다. 예약자가 본인 예약으로 정확히 연결되려면{' '}
+                            <strong className="text-surface-700 dark:text-surface-300">
+                                앱 계정과 구글 캘린더 계정(이메일)이 같아야
+                            </strong>{' '}
+                            합니다.
                         </p>
                     </div>
                     <div className="mt-3 p-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">

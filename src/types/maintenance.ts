@@ -17,6 +17,10 @@ export interface MaintenanceRecord extends FirestoreDoc {
     date: string;              // 'YYYY-MM-DD'
     blockVehicle: boolean;
     blockEndDate: string | null;
+    /** 작성자 UID — 직원이 작성한 기록의 "본인 것만 수정·삭제" 판정에 사용 (관리자 기존 기록은 없을 수 있음) */
+    createdByUid?: string;
+    /** 작성자 이름 (표시용) */
+    createdByName?: string;
     createdAt?: TimestampField;
 }
 

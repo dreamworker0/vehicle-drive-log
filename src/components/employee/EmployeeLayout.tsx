@@ -29,7 +29,7 @@ interface NavItem {
 const navItems: NavItem[] = [
     {
         to: '/employee/fuel',
-        label: '주유ㆍ충전',
+        label: '차량관리',
         icon: (
             <svg aria-hidden="true" className="w-6 h-6" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 11.25V4.875A2.625 2.625 0 0 0 12.375 2.25h-4.75A2.625 2.625 0 0 0 5 4.875V18.75a2.25 2.25 0 0 0 2.25 2.25h5.5A2.25 2.25 0 0 0 15 18.75v-3" />

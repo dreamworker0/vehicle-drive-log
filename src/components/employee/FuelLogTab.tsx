@@ -1,6 +1,6 @@
 /**
- * FuelLogTab — 직원용 주유ㆍ충전 기록 탭
- * 상단 탭 전환: 주유 | 충전 (하이패스)
+ * FuelLogTab — 직원용 차량 관리 화면
+ * 상단 탭 전환: 주유 | 충전 (하이패스) | 정비
  */
 import { useState } from 'react';
 import useFuelLog from '../../hooks/useFuelLog';
@@ -9,9 +9,10 @@ import { SkeletonBox, SkeletonList } from '../common/Skeleton';
 import VehicleSelector from './VehicleSelector';
 import useVehiclePriority from '../../hooks/useVehiclePriority';
 import HipassChargeTab from './HipassChargeTab';
+import MaintenanceTab from './MaintenanceTab';
 import { isChargeableFuel } from '../../hooks/useVehicleManager';
 
-type TabType = 'fuel' | 'charge';
+type TabType = 'fuel' | 'charge' | 'maintenance';
 
 export default function FuelLogTab() {
     const [activeTab, setActiveTab] = useState<TabType>('fuel');
@@ -41,7 +42,7 @@ export default function FuelLogTab() {
     return (
         <div className="max-w-lg mx-auto animate-fade-in">
             {/* 페이지 제목 */}
-            <h1 className="text-xl font-bold text-surface-900 dark:text-surface-100 mb-3">주유ㆍ하이패스 충전</h1>
+            <h1 className="text-xl font-bold text-surface-900 dark:text-surface-100 mb-3">차량 관리</h1>
 
             {/* 탭 전환 */}
             <div className="flex bg-surface-100 dark:bg-surface-800 rounded-xl p-1 mb-4">
@@ -63,12 +64,25 @@ export default function FuelLogTab() {
                             : 'text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300'
                     }`}
                 >
-                    💳 하이패스 충전
+                    💳 하이패스
+                </button>
+                <button
+                    onClick={() => setActiveTab('maintenance')}
+                    className={`flex-1 py-2 min-h-[48px] text-sm font-medium rounded-lg transition-all ${
+                        activeTab === 'maintenance'
+                            ? 'bg-white dark:bg-surface-700 text-surface-900 dark:text-surface-100 shadow-sm'
+                            : 'text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300'
+                    }`}
+                >
+                    🔧 수리ㆍ정비
                 </button>
             </div>
 
             {/* 충전 탭 */}
             {activeTab === 'charge' && <HipassChargeTab />}
+
+            {/* 정비 탭 */}
+            {activeTab === 'maintenance' && <MaintenanceTab />}
 
             {/* 주유 탭 */}
             {activeTab === 'fuel' && (
