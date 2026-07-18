@@ -34,14 +34,21 @@ let projectId: string | undefined;
 let app;
 try {
     const serviceAccountStr = fs.readFileSync(keyPath, "utf-8");
-    const serviceAccount = JSON.parse(serviceAccountStr) as ServiceAccount;
-    projectId = serviceAccount.projectId;
+    const rawServiceAccount = JSON.parse(serviceAccountStr) as Record<string, string>;
+    // 서비스계정 키 JSON은 snake_case(project_id)다. cert()는 양쪽을 받지만
+    // 버킷 조합용 projectId는 실제 필드명으로 읽어야 한다(projectId만 읽으면 undefined).
+    projectId = rawServiceAccount.project_id || rawServiceAccount.projectId;
     app = initializeApp({
-        credential: cert(serviceAccount),
+        credential: cert(rawServiceAccount as ServiceAccount),
         storageBucket: process.env.FIREBASE_STORAGE_BUCKET || `${projectId}.firebasestorage.app`,
     });
 } catch {
     app = initializeApp();
+}
+
+if (!projectId && !process.env.FIREBASE_STORAGE_BUCKET) {
+    console.error("❌ 서비스계정에서 project_id를 읽지 못했습니다. GOOGLE_APPLICATION_CREDENTIALS 또는 FIREBASE_STORAGE_BUCKET를 확인하세요.");
+    process.exit(1);
 }
 
 const db = getFirestore(app);
