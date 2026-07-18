@@ -10,7 +10,7 @@
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import { SLACK_BOT_TOKEN } from "../../core/params";
+import { SLACK_TOKEN_ENC_KEY } from "../../core/params";
 import { postMessage, respondToUrl, addReaction } from "../../services/slack/slackApi";
 import { resolveSlackUser, getSlackIntegration } from "../../services/slack/resolveSlackUser";
 import {
@@ -132,7 +132,7 @@ export const onSlackTaskCreated = onDocumentCreated(
     {
         document: "slackTasks/{taskId}",
         region: "asia-northeast3",
-        secrets: [SLACK_BOT_TOKEN],
+        secrets: [SLACK_TOKEN_ENC_KEY],
         timeoutSeconds: 60,
         memory: "512MiB",
     },
@@ -140,28 +140,33 @@ export const onSlackTaskCreated = onDocumentCreated(
         const snap = event.data;
         if (!snap) return;
         const task = snap.data() as SlackTask;
-        const botToken = SLACK_BOT_TOKEN.value();
 
+        // 봇 토큰은 기관별 — 연동 문서에서 복호화한 뒤에야 확보된다.
+        // action 실패는 responseUrl로 응답 가능하지만, message 실패는 토큰이 있어야 DM할 수 있다.
+        let botToken: string | undefined;
         const fail = async (userMessage: string) => {
             if (task.kind === "action" && task.responseUrl) {
                 await respondToUrl(task.responseUrl, { text: userMessage, replace_original: false });
-            } else if (task.channel) {
+            } else if (task.channel && botToken) {
                 await postMessage(botToken, task.channel, userMessage);
             }
         };
 
-        // 접수 즉시 이모지 리액션으로 "처리 중" 피드백 (비필수 — 실패해도 처리 계속)
-        if (task.kind === "message" && task.channel && task.messageTs) {
-            await addReaction(botToken, task.channel, task.messageTs, "eyes").catch(() => undefined);
-        }
-
         try {
-            // 1) 워크스페이스 ↔ 기관 매핑 확인
+            // 1) 워크스페이스 ↔ 기관 매핑 + 기관별 봇 토큰 확보
             const integration = await getSlackIntegration(task.teamId);
             if (!integration) {
+                // message 종류는 보낼 토큰이 없어 조용히 종료(미설치 워크스페이스는 애초에 이벤트도 안 옴),
+                // action 종류는 responseUrl로 안내 가능
                 await fail("이 Slack 워크스페이스는 차량 운행일지와 연동되어 있지 않습니다.");
                 await snap.ref.update({ status: "rejected", reason: "no-integration" });
                 return;
+            }
+            botToken = integration.botToken;
+
+            // 접수 즉시 이모지 리액션으로 "처리 중" 피드백 (토큰 확보 후, 비필수 — 실패해도 처리 계속)
+            if (task.kind === "message" && task.channel && task.messageTs) {
+                await addReaction(botToken, task.channel, task.messageTs, "eyes").catch(() => undefined);
             }
 
             // 2) rate limit — Gemini 비용 경로이므로 fail-closed

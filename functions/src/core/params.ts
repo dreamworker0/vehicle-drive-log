@@ -25,8 +25,15 @@ export const ALIMTALK_PROXY_TOKEN = defineSecret("ALIMTALK_PROXY_TOKEN");
 /** Slack 앱 서명 시크릿 — slackEvents 수신 요청의 v0 HMAC 서명 검증 */
 export const SLACK_SIGNING_SECRET = defineSecret("SLACK_SIGNING_SECRET");
 
-/** Slack 봇 토큰(xoxb-) — onSlackTaskCreated 워커의 Slack Web API 호출 (users.info, chat.postMessage) */
+/** Slack 봇 토큰(xoxb-) — onSlackTaskCreated 워커의 Slack Web API 호출 (users.info, chat.postMessage)
+ *  @deprecated 멀티테넌트 전환 중. 기관별 토큰은 integrations 문서에 암호화 저장하며,
+ *  전환 완료(Phase D) 후 제거 예정. */
 export const SLACK_BOT_TOKEN = defineSecret("SLACK_BOT_TOKEN");
+
+/** Slack 봇 토큰 암호화 마스터 키 — base64 인코딩된 32바이트(AES-256) 키.
+ *  integrations/slack_{teamId} 문서의 tokenCipher 복호화(services/slack/tokenCrypto)에 사용.
+ *  생성 예: `openssl rand -base64 32` → firebase functions:secrets:set SLACK_TOKEN_ENC_KEY */
+export const SLACK_TOKEN_ENC_KEY = defineSecret("SLACK_TOKEN_ENC_KEY");
 
 // GOOGLE_OAUTH_CLIENT_SECRET은 이관 대상 아님 (2026-07-11 확인):
 // 배포 환경에 값이 없었고, 이를 쓰던 개인 캘린더 동기화 기능은 한 번도

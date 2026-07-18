@@ -31,7 +31,7 @@ jest.mock('firebase-admin/firestore', () => ({
 
 // ── 시크릿·Slack API·신원·코어·rate limit Mock ──
 jest.mock('../core/params', () => ({
-    SLACK_BOT_TOKEN: { value: () => 'xoxb-test' },
+    SLACK_TOKEN_ENC_KEY: { value: () => 'enc-key' },
     SLACK_SIGNING_SECRET: { value: () => 'secret' },
 }));
 const mockPostMessage = jest.fn().mockResolvedValue(true);
@@ -88,7 +88,7 @@ describe('onSlackTaskCreated', () => {
         jest.clearAllMocks();
         jest.spyOn(console, 'log').mockImplementation();
         jest.spyOn(console, 'error').mockImplementation();
-        mockGetIntegration.mockResolvedValue({ organizationId: 'org1' });
+        mockGetIntegration.mockResolvedValue({ organizationId: 'org1', botToken: 'xoxb-test' });
         mockResolveUser.mockResolvedValue(RESOLVED_OK);
         mockConfAdd.mockResolvedValue({ id: 'conf-1' });
     });
@@ -97,14 +97,28 @@ describe('onSlackTaskCreated', () => {
         jest.restoreAllMocks();
     });
 
-    it('연동되지 않은 워크스페이스면 안내 후 rejected 처리한다', async () => {
+    it('연동되지 않은 워크스페이스면 (message) 보낼 토큰이 없어 조용히 rejected 처리한다', async () => {
         mockGetIntegration.mockResolvedValue(null);
 
         await capturedHandler(makeEvent(MESSAGE_TASK));
 
-        expect(mockPostMessage).toHaveBeenCalledWith('xoxb-test', 'D123', expect.stringContaining('연동되어 있지 않습니다'));
+        // 기관별 토큰은 연동 문서에서 오는데 미연동이라 토큰이 없음 → DM 불가(무응답)
+        expect(mockPostMessage).not.toHaveBeenCalled();
+        expect(mockAddReaction).not.toHaveBeenCalled();
         expect(mockTaskUpdate).toHaveBeenCalledWith({ status: 'rejected', reason: 'no-integration' });
         expect(mockHandleMessage).not.toHaveBeenCalled();
+    });
+
+    it('연동되지 않은 워크스페이스라도 (action) responseUrl로는 안내한다', async () => {
+        mockGetIntegration.mockResolvedValue(null);
+
+        await capturedHandler(makeEvent(ACTION_TASK));
+
+        // action은 responseUrl 기반이라 토큰 없이도 안내 가능
+        expect(mockRespondToUrl).toHaveBeenCalledWith(ACTION_TASK.responseUrl, expect.objectContaining({
+            text: expect.stringContaining('연동되어 있지 않습니다'),
+        }));
+        expect(mockTaskUpdate).toHaveBeenCalledWith({ status: 'rejected', reason: 'no-integration' });
     });
 
     it('rate limit 초과 시 사용자에게 안내하고 rate-limited 처리한다', async () => {
@@ -132,6 +146,18 @@ describe('onSlackTaskCreated', () => {
         await capturedHandler(makeEvent(MESSAGE_TASK));
 
         expect(mockAddReaction).toHaveBeenCalledWith('xoxb-test', 'D123', '1700000000.000100', 'eyes');
+    });
+
+    it('Slack 호출은 전역이 아닌 연동 문서의 기관별 토큰을 사용한다', async () => {
+        mockGetIntegration.mockResolvedValue({ organizationId: 'org1', botToken: 'xoxb-ORG-SPECIFIC' });
+        mockHandleMessage.mockResolvedValue({ replyText: '응답' });
+
+        await capturedHandler(makeEvent(MESSAGE_TASK));
+
+        // 리액션·신원매핑·응답 모두 그 기관 토큰으로 이뤄져야 한다
+        expect(mockAddReaction).toHaveBeenCalledWith('xoxb-ORG-SPECIFIC', 'D123', '1700000000.000100', 'eyes');
+        expect(mockResolveUser).toHaveBeenCalledWith('xoxb-ORG-SPECIFIC', 'T123', 'U123', 'org1');
+        expect(mockPostMessage).toHaveBeenCalledWith('xoxb-ORG-SPECIFIC', 'D123', '응답');
     });
 
     it('조회 응답(proposal 없음)은 그대로 DM으로 전송한다', async () => {

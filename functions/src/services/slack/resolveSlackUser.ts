@@ -9,6 +9,8 @@
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { getSlackUserInfo } from "./slackApi";
+import { decryptSlackToken } from "./tokenCrypto";
+import type { EncryptedRecord } from "../../core/crypto";
 import { log } from "../../utils/helpers";
 
 const db = getFirestore();
@@ -17,13 +19,37 @@ export type ResolveResult =
     | { ok: true; uid: string; orgId: string; displayName: string }
     | { ok: false; message: string };
 
-/** integrations/slack_{teamId} 문서에서 연동 기관 확인 */
-export async function getSlackIntegration(teamId: string): Promise<{ organizationId: string } | null> {
+export interface SlackIntegration {
+    organizationId: string;
+    /** 복호화된 봇 토큰(xoxb-) — 기관별 */
+    botToken: string;
+    teamName?: string;
+}
+
+/**
+ * integrations/slack_{teamId} 문서에서 연동 기관 + 복호화된 봇 토큰을 확인한다.
+ * 미연동/비활성/토큰 없음/복호화 실패 시 null (호출부는 "미연동"으로 처리).
+ */
+export async function getSlackIntegration(teamId: string): Promise<SlackIntegration | null> {
     const snap = await db.collection("integrations").doc(`slack_${teamId}`).get();
     if (!snap.exists) return null;
     const data = snap.data()!;
     if (data.enabled !== true || !data.organizationId) return null;
-    return { organizationId: data.organizationId };
+
+    const cipher = data.tokenCipher as EncryptedRecord | undefined;
+    if (!cipher) {
+        log("ERROR", "getSlackIntegration", "연동 문서에 암호화된 봇 토큰이 없습니다", { teamId });
+        return null;
+    }
+    let botToken: string;
+    try {
+        botToken = decryptSlackToken(teamId, cipher);
+    } catch (err) {
+        // 복호화 실패(키 불일치/변조) — 보안상 토큰 값·상세는 남기지 않는다
+        log("ERROR", "getSlackIntegration", "봇 토큰 복호화 실패", { teamId, error: (err as Error).message });
+        return null;
+    }
+    return { organizationId: data.organizationId, botToken, teamName: data.teamName };
 }
 
 /** uid로 users 문서를 읽어 소속·활성 상태 재검증 */
