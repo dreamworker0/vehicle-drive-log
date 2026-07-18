@@ -38,6 +38,10 @@ const mockCreateTx = jest.fn();
 jest.mock('../services/reservation/createReservationCore', () => ({
     createReservationTx: (...args: unknown[]) => mockCreateTx(...args),
 }));
+const mockAnswerData = jest.fn();
+jest.mock('../services/assistant/answerDataQuestion', () => ({
+    answerDataQuestion: (...args: unknown[]) => mockAnswerData(...args),
+}));
 
 import { handleAssistantMessage, executeReservationProposal } from "../services/assistant/handleAssistantMessage";
 
@@ -125,6 +129,17 @@ describe('handleAssistantMessage', () => {
         expect(result.replyText).toContain('정비 중');
     });
 
+    it('qa 의도면 answerDataQuestion 결과를 반환한다 (즉시 생성 없음)', async () => {
+        mockParseIntent.mockResolvedValue({ intent: 'qa' });
+        mockAnswerData.mockResolvedValue('홍길동님은 스타렉스를 예약했습니다.');
+
+        const result = await handleAssistantMessage('홍길동이 예약한 차', ACTOR);
+
+        expect(mockAnswerData).toHaveBeenCalledWith('홍길동이 예약한 차', 'org1', expect.any(Array));
+        expect(result.replyText).toContain('홍길동');
+        expect(result.proposal).toBeUndefined();
+    });
+
     it('unknown 의도면 도움말을 보여준다', async () => {
         mockParseIntent.mockResolvedValue({ intent: 'unknown', needsClarification: false });
 
@@ -202,6 +217,16 @@ describe('handleAssistantMessage', () => {
             mockBuildSummary.mockResolvedValue('📅 요약');
 
             await handleAssistantMessage('오늘 예약 현황', ACTOR_KEY);
+
+            expect(mockConvoDelete).toHaveBeenCalled();
+        });
+
+        it('qa(자유 질의)로 전환하면 진행 예약을 폐기한다', async () => {
+            mockConvoGet.mockResolvedValue({ exists: false });
+            mockParseIntent.mockResolvedValue({ intent: 'qa' });
+            mockAnswerData.mockResolvedValue('답변');
+
+            await handleAssistantMessage('이번주 예약 누가 했어', ACTOR_KEY);
 
             expect(mockConvoDelete).toHaveBeenCalled();
         });

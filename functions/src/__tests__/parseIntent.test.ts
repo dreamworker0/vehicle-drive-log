@@ -156,6 +156,24 @@ describe('parseIntent', () => {
         expect(result.needsClarification).toBe(false);
     });
 
+    it('qa 의도는 슬롯 재검증 없이 그대로 통과한다', async () => {
+        mockGenerateAiContent.mockResolvedValue(JSON.stringify({ intent: 'qa' }));
+
+        const result = await parseIntent('홍길동이 예약한 차 알려줘', VEHICLES);
+
+        expect(result.intent).toBe('qa');
+        expect(result.needsClarification).toBe(false);
+    });
+
+    it('qa 의도는 진행 중 예약(pending)이 있어도 create로 병합하지 않는다', async () => {
+        mockGenerateAiContent.mockResolvedValue(JSON.stringify({ intent: 'qa' }));
+        const pending = { date: seoulDate(1), startTime: '11:00', endTime: null, vehicleId: 'v1', purpose: '', destination: '' };
+
+        const result = await parseIntent('이번주 예약 누가 했어', VEHICLES, pending);
+
+        expect(result.intent).toBe('qa');
+    });
+
     it('JSON 강제 옵션(responseMimeType, temperature 0)으로 호출한다', async () => {
         mockGenerateAiContent.mockResolvedValue('{"intent":"unknown"}');
 

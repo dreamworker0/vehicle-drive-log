@@ -13,7 +13,7 @@ export interface AssistantVehicle {
 }
 
 export interface ParsedIntent {
-    intent: "query" | "create" | "unknown";
+    intent: "query" | "create" | "qa" | "unknown";
     date: string | null;
     startTime: string | null;
     endTime: string | null;
@@ -103,9 +103,10 @@ export async function parseIntent(text: string, vehicles: AssistantVehicle[], pe
 ${vehicleList || "(등록된 차량 없음)"}
 ${pendingSection}
 [의도 분류]
-- "query": 예약 현황/일정 조회 요청 (예: "오늘 예약 현황 알려줘", "내일 스타렉스 일정?")
+- "query": 특정 하루의 예약 목록을 그대로 보고 싶을 때 (예: "오늘 예약 현황 알려줘", "내일 스타렉스 일정?")
 - "create": 새 예약 생성 요청 (예: "내일 14시부터 16시까지 스타렉스 예약해줘")
-- "unknown": 위 둘 다 아님
+- "qa": 예약·차량 데이터에 대한 그 밖의 질문 — 특정 사람/차량 필터, 기간, 개수, "가장/마지막", 차량 목록 등 (예: "홍길동이 예약한 차 알려줘", "이번주 예약 누가 했어", "우리 기관 차량 뭐 있어", "화요일에 마지막에 예약한 사람")
+- "unknown": 위 어디에도 안 맞음 (인사·잡담 등)
 
 [규칙]
 1. vehicleId는 반드시 위 차량 목록의 id 중 하나 또는 null. 목록에 없는 차량명이면 null로 두고 needsClarification을 true로.
@@ -130,7 +131,7 @@ JSON 형식 (다른 텍스트 없이 JSON만):
     const parsed = extractJson(raw);
     if (!parsed) return { ...UNKNOWN };
 
-    const intent = parsed.intent === "query" || parsed.intent === "create" ? parsed.intent : "unknown";
+    const intent = parsed.intent === "query" || parsed.intent === "create" || parsed.intent === "qa" ? parsed.intent : "unknown";
     const result: ParsedIntent = {
         intent,
         date: DATE_RE.test(asString(parsed.date)) ? asString(parsed.date) : null,
@@ -142,6 +143,10 @@ JSON 형식 (다른 텍스트 없이 JSON만):
         needsClarification: parsed.needsClarification === true,
         clarificationQuestion: asString(parsed.clarificationQuestion).slice(0, 200),
     };
+
+    // qa(데이터 자유 질의)는 날짜·슬롯이 불필요 — 멀티턴 병합·재검증 없이 그대로 반환한다.
+    // (진행 중 예약이 있어도 조회성 질문이므로 create로 이어붙이지 않는다)
+    if (result.intent === "qa") return result;
 
     // --- 멀티턴 병합: 진행 중 예약이 있으면 이번 메시지 값으로 채우고 빈 슬롯은 기존 값 유지 ---
     if (pending) {

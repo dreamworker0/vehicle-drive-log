@@ -9,6 +9,7 @@ import { HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { parseIntent, type AssistantVehicle, type PendingSlots } from "./parseIntent";
 import { buildReservationSummary } from "./queryReservations";
+import { answerDataQuestion } from "./answerDataQuestion";
 import { createReservationTx } from "../reservation/createReservationCore";
 
 const db = getFirestore();
@@ -78,7 +79,8 @@ export interface AssistantResult {
 export const ASSISTANT_HELP_TEXT =
     "제가 도와드릴 수 있는 일이에요:\n" +
     "• 예약 조회 — 예: \"오늘 예약 현황 알려줘\", \"내일 일정 보여줘\"\n" +
-    "• 예약 생성 — 예: \"내일 14시부터 16시까지 스타렉스 예약해줘\"";
+    "• 예약 생성 — 예: \"내일 14시부터 16시까지 스타렉스 예약해줘\"\n" +
+    "• 자유 질문 — 예: \"홍길동이 예약한 차\", \"이번주 예약 누가 했어\", \"우리 기관 차량 뭐 있어\"";
 
 /** 기관의 예약 가능 차량 목록 조회 (퇴역 차량 제외) */
 async function getAssistantVehicles(orgId: string): Promise<Array<AssistantVehicle & { isBlocked: boolean }>> {
@@ -114,6 +116,12 @@ export async function handleAssistantMessage(text: string, actor: AssistantActor
     if (intent.intent === "query") {
         if (key) await clearPending(key); // 조회로 전환 → 진행 중 예약 폐기
         const replyText = await buildReservationSummary(actor.orgId, intent.date!);
+        return { replyText };
+    }
+
+    if (intent.intent === "qa") {
+        if (key) await clearPending(key); // 자유 질의로 전환 → 진행 중 예약 폐기
+        const replyText = await answerDataQuestion(text, actor.orgId, vehicles);
         return { replyText };
     }
 
