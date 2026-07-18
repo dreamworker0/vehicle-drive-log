@@ -51,7 +51,7 @@ export { reservationReminder } from "./handlers/scheduled/reservationReminderSch
 // 예약 트리거 (Google Calendar 연동 + 푸시 알림)
 export { onReservationCreated, onReservationUpdated, onReservationDeleted } from "./handlers/triggers/reservationTriggers";
 
-// Google Calendar -> App 역동기화 (2시간마다)
+// Google Calendar -> App 역동기화 (평일 06~22시, 30분마다)
 export { syncCalendarToApp } from "./handlers/scheduled/calendarSchedule";
 
 // 운행일지 중복 정리 (관리자용)

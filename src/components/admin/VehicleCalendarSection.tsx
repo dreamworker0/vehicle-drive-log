@@ -236,7 +236,7 @@ export default function VehicleCalendarSection({
                         </p>
                         <p className="mt-1.5 text-surface-600 dark:text-surface-400">
                             구글 캘린더에 등록한 일정은{' '}
-                            <strong className="text-surface-700 dark:text-surface-300">1시간마다(평일 06~22시)</strong> 앱
+                            <strong className="text-surface-700 dark:text-surface-300">30분마다(평일 06~22시)</strong> 앱
                             예약으로 역동기화됩니다. 예약자가 본인 예약으로 정확히 연결되려면{' '}
                             <strong className="text-surface-700 dark:text-surface-300">
                                 앱 계정과 구글 캘린더 계정(이메일)이 같아야

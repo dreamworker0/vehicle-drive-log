@@ -254,7 +254,8 @@ const SCHEDULER_CONFIG: {
         expectedIntervalMs: 70 * 60 * 1000,
         activeWindow: { days: [1, 2, 3, 4, 5], startHour: 8, endHour: 18 },
     },
-    // 평일 06~22시 매시 정각 (1시간 주기). cron "0 6-22 * * 1-5"
+    // 평일 06~22시 매시 0·30분 (30분 주기). cron "0,30 6-22 * * 1-5"
+    // 판정 틱은 시(hour) 단위(getLastScheduledTick)라 :00 실행만으로도 정상 처리 → 오탐 없음.
     {
         name: "syncCalendarToApp",
         displayName: "캘린더 싱크",

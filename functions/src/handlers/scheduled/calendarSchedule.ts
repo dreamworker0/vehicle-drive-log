@@ -28,12 +28,12 @@ async function findUserByEmail(email: string) {
 }
 
 /**
- * Google Calendar -> App 역동기화 (평일 06~22시, 1시간마다)
+ * Google Calendar -> App 역동기화 (평일 06~22시, 30분마다)
  * 비용 최적화: 주말 및 심야(23~05시) 스킵, 실패 캘린더 자동 제외
  */
 export const syncCalendarToApp = onSchedule(
     {
-        schedule: "0 6-22 * * 1-5", // 평일(월~금) 06시부터 22시까지 매시 정각 (1시간 주기)
+        schedule: "0,30 6-22 * * 1-5", // 평일(월~금) 06시부터 22시까지 매시 0·30분 (30분 주기)
         timeZone: "Asia/Seoul",
         retryCount: 0,
         memory: "512MiB",
@@ -144,11 +144,11 @@ export const syncCalendarToApp = onSchedule(
 
             console.log("=== Reverse sync done: created " + totalCreated + ", updated " + totalUpdated + ", cancelled " + totalCancelled + ", skippedDup " + totalSkippedDup + ", skippedCooldown " + totalSkippedCooldown + ", skippedPermanent " + totalSkippedPermanent + " ===");
 
-            // [이상 감지 알림] 2시간 동안 예약 증식이 10건 이상이면 비정상 폭증으로 간주
+            // [이상 감지 알림] 한 주기(30분) 동안 예약 증식이 10건 이상이면 비정상 폭증으로 간주
             if (totalCreated >= 10) {
                 await sendDiscordAlert({
                     title: "🚨 [긴급] 캘린더 동기화 시스템 예외 상황 감지",
-                    description: `한 번의 동기화 주기(2시간) 내에 **${totalCreated}건**의 예약이 새롭게 생성되었습니다.\n무한 증식 버그이거나 일시적인 폭증일 수 있으므로 Firestore 및 이벤트 로그 점검이 필요합니다.`,
+                    description: `한 번의 동기화 주기(30분) 내에 **${totalCreated}건**의 예약이 새롭게 생성되었습니다.\n무한 증식 버그이거나 일시적인 폭증일 수 있으므로 Firestore 및 이벤트 로그 점검이 필요합니다.`,
                     color: 16711680
                 });
             }
