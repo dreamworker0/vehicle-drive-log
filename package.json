@@ -23,6 +23,7 @@
     "test:watch": "vitest",
     "test:rules": "firebase emulators:exec --only firestore \"vitest run --exclude='' tests/firestore-rules.test.ts\"",
     "audit": "tsx scripts/security-audit.ts",
+    "verify:gitignore": "tsx scripts/verify-gitignore.ts",
     "sync:agents": "tsx scripts/sync-claude-agents.ts",
     "eval:trigger": "tsx scripts/run-eval.ts trigger",
     "eval:behavior": "tsx scripts/run-eval.ts behavior",
