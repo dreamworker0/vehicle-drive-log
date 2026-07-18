@@ -36,11 +36,11 @@ jest.mock('../core/params', () => ({
 }));
 const mockPostMessage = jest.fn().mockResolvedValue(true);
 const mockRespondToUrl = jest.fn().mockResolvedValue(undefined);
-const mockAuthTest = jest.fn().mockResolvedValue({ ok: true, teamId: 'T123', team: 'ws', botUserId: 'B1' });
+const mockAddReaction = jest.fn().mockResolvedValue(true);
 jest.mock('../services/slack/slackApi', () => ({
     postMessage: (...args: unknown[]) => mockPostMessage(...args),
     respondToUrl: (...args: unknown[]) => mockRespondToUrl(...args),
-    authTest: (...args: unknown[]) => mockAuthTest(...args),
+    addReaction: (...args: unknown[]) => mockAddReaction(...args),
 }));
 const mockGetIntegration = jest.fn();
 const mockResolveUser = jest.fn();
@@ -74,7 +74,7 @@ function makeEvent(task: Record<string, unknown>) {
 }
 
 const MESSAGE_TASK = {
-    kind: 'message', teamId: 'T123', slackUserId: 'U123', channel: 'D123', text: '오늘 예약 현황',
+    kind: 'message', teamId: 'T123', slackUserId: 'U123', channel: 'D123', text: '오늘 예약 현황', messageTs: '1700000000.000100',
 };
 const ACTION_TASK = {
     kind: 'action', teamId: 'T123', slackUserId: 'U123', channel: 'D123',
@@ -124,6 +124,14 @@ describe('onSlackTaskCreated', () => {
 
         expect(mockPostMessage).toHaveBeenCalledWith('xoxb-test', 'D123', '가입된 계정을 찾을 수 없습니다.');
         expect(mockTaskUpdate).toHaveBeenCalledWith({ status: 'rejected', reason: 'identity' });
+    });
+
+    it('메시지 접수 시 이모지 리액션(eyes)을 단다', async () => {
+        mockHandleMessage.mockResolvedValue({ replyText: '📅 오늘 예약 2건' });
+
+        await capturedHandler(makeEvent(MESSAGE_TASK));
+
+        expect(mockAddReaction).toHaveBeenCalledWith('xoxb-test', 'D123', '1700000000.000100', 'eyes');
     });
 
     it('조회 응답(proposal 없음)은 그대로 DM으로 전송한다', async () => {

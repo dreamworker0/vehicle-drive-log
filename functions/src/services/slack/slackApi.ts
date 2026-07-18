@@ -66,6 +66,12 @@ export async function postMessage(
     return data.ok;
 }
 
+/** 메시지에 이모지 리액션 추가 — "접수/처리 중" 즉시 피드백용. 실패는 무시(비필수) */
+export async function addReaction(botToken: string, channel: string, timestamp: string, name: string): Promise<boolean> {
+    const data = await slackApiCall("reactions.add", botToken, { channel, timestamp, name });
+    return data.ok;
+}
+
 /** 봇 토큰의 실제 소속 워크스페이스·봇 신원 확인 (진단용) */
 export async function authTest(botToken: string): Promise<{ ok: boolean; teamId: string | null; team: string | null; botUserId: string | null; error?: string }> {
     const data = await slackApiCall("auth.test", botToken, {});

@@ -11,7 +11,7 @@ import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { SLACK_BOT_TOKEN } from "../../core/params";
-import { postMessage, respondToUrl, authTest } from "../../services/slack/slackApi";
+import { postMessage, respondToUrl, addReaction } from "../../services/slack/slackApi";
 import { resolveSlackUser, getSlackIntegration } from "../../services/slack/resolveSlackUser";
 import {
     handleAssistantMessage,
@@ -33,6 +33,8 @@ interface SlackTask {
     slackUserId: string;
     channel: string;
     text?: string;
+    /** 원 메시지 타임스탬프 — 리액션(reactions.add) 대상 지정용 */
+    messageTs?: string;
     responseUrl?: string;
     actionId?: string;
     confirmationId?: string;
@@ -148,6 +150,11 @@ export const onSlackTaskCreated = onDocumentCreated(
             }
         };
 
+        // 접수 즉시 이모지 리액션으로 "처리 중" 피드백 (비필수 — 실패해도 처리 계속)
+        if (task.kind === "message" && task.channel && task.messageTs) {
+            await addReaction(botToken, task.channel, task.messageTs, "eyes").catch(() => undefined);
+        }
+
         try {
             // 1) 워크스페이스 ↔ 기관 매핑 확인
             const integration = await getSlackIntegration(task.teamId);
@@ -165,17 +172,6 @@ export const onSlackTaskCreated = onDocumentCreated(
             await checkRateLimitByUid("slackAssistantDailyOrg", integration.organizationId, orgLimit.max, orgLimit.windowSec, "closed");
 
             // 3) 신원 매핑 (Slack user → 앱 계정, 소속 검증 포함)
-            // 진단용: 수신된 식별자 + 봇 토큰의 실제 소속 워크스페이스 기록 (개인정보 아님)
-            const tokenIdentity = await authTest(botToken);
-            log("INFO", "onSlackTaskCreated", "신원 매핑 시도", {
-                eventTeamId: task.teamId,
-                slackUserId: task.slackUserId,
-                kind: task.kind,
-                tokenTeamId: tokenIdentity.teamId,
-                tokenTeam: tokenIdentity.team,
-                tokenOk: tokenIdentity.ok,
-                tokenError: tokenIdentity.error,
-            });
             const resolved = await resolveSlackUser(botToken, task.teamId, task.slackUserId, integration.organizationId);
             if (!resolved.ok) {
                 await fail(resolved.message);

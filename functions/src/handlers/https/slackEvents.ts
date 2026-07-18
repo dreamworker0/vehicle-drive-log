@@ -122,6 +122,7 @@ async function handler(req: Request, res: Response): Promise<void> {
                 slackUserId: event.user,
                 channel: String(event.channel || ""),
                 text: String(event.text).slice(0, MAX_TEXT_LEN),
+                messageTs: String(event.ts || ""),
             });
         }
         res.status(200).send("");
