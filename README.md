@@ -2,7 +2,27 @@
 
 사회복지기관·비영리단체를 위한 **무료** 차량 운행일지 웹 애플리케이션 (PWA)
 
-> **서비스 URL**: [vehicle-drive-log.web.app](https://vehicle-drive-log.web.app)
+> 🔗 **지금 써보기**: **[vehicle-drive-log.web.app](https://vehicle-drive-log.web.app)** &nbsp;·&nbsp; 🛠 **[내 기관에 직접 설치하기](docs/SELF_HOSTING.md)**
+
+<p>
+  <img src="public/icons/screenshot-desktop.webp" alt="데스크톱 화면" width="620">
+  <img src="public/icons/screenshot-mobile.webp" alt="모바일 화면" width="180">
+</p>
+
+---
+
+## 이렇게 활용하세요
+
+MIT 라이선스로 공개된 프로젝트입니다. 아래처럼 자유롭게 활용·응용할 수 있습니다.
+
+| 대상 | 활용 방법 |
+|------|-----------|
+| 🏢 **다른 기관·단체** | fork 후 자기 Firebase에 배포하면 무료 차량 운행일지 시스템을 그대로 사용. **멀티테넌트라 한 인스턴스로 여러 기관 수용** 가능 → [셀프호스팅 가이드](docs/SELF_HOSTING.md) |
+| 🔀 **인접 도메인** | 차량 → 회의실·장비·공용 물품으로 바꾸면 예약/사용대장 시스템. OCR 입력은 검침·영수증 등으로 응용 |
+| 👩‍💻 **개발자** | 실제 프로덕션에서 돌아가는 **React 19 + Firebase 멀티테넌트 PWA** 레퍼런스. OCR·PDF/Excel·FCM·캘린더 연동 등 패턴을 개별 참고 |
+| 🤖 **AI 협업 개발** | [.agent/](.agent/) 의 스킬·워크플로우·행동 규칙 셋업은 AI 에이전트로 규율 있게 개발하는 사례로 참고 가능 |
+
+> 한국 사회복지기관 환경(사업자번호 기반 기관 인증, 카카오 알림톡, 공휴일/티맵)에 맞춰져 있으나, 이 기능들을 끄면 **운행일지·예약·통계·출력·푸시** 등 핵심은 어느 지역에서든 동작합니다. 자세한 내용은 [셀프호스팅 가이드 §8](docs/SELF_HOSTING.md#8-한국-특화-기능-참고) 참고.
 
 ---
 
@@ -54,6 +74,8 @@
 ---
 
 ## 시작하기
+
+> 💡 **내 기관에 처음부터 설치**하려면 단계별 안내가 있는 **[셀프호스팅 가이드](docs/SELF_HOSTING.md)** 를 참고하세요. 아래는 개발용 요약입니다.
 
 ### 사전 요구사항
 
@@ -254,6 +276,7 @@ firebase deploy --only firestore:rules,storage
 
 | 문서 | 설명 |
 |------|------|
+| [셀프호스팅 가이드](docs/SELF_HOSTING.md) | 내 기관 Firebase에 직접 설치·배포하는 단계별 안내 |
 | [구현계획서](docs/차량운행일지_구현계획서.md) | 전체 설계 문서 (아키텍처, DB 스키마, API 명세, 시퀀스 다이어그램, Phase별 구현 이력) |
 | [OPERATIONS.md](OPERATIONS.md) | 시스템 관리자용 운영 매뉴얼 (백업, 장애 대응, 기관 관리) |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | 개발 참여 가이드 (코딩 컨벤션, PR 규칙, 브랜치 전략) |
