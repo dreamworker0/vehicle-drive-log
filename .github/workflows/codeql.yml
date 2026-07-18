@@ -1,0 +1,51 @@
+name: CodeQL — 코드 보안 스캔
+
+# GitHub 기본 정적 보안 분석(CodeQL)으로 JS/TS 취약점(인젝션·프로토타입 오염·안전하지 않은 정규식 등)을
+# 스캔한다. 공개 저장소라 무료. 결과는 Security 탭 > Code scanning alerts에 표시된다.
+# (2026-07-18 보안 재점검 H — advanced setup(워크플로 파일). GitHub UI의 default setup은 켜지 말 것: 중복 실행됨)
+
+on:
+  push:
+    branches: [master]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+  pull_request:
+    branches: [master]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+  schedule:
+    # 매주 월요일 09:00 KST(00:00 UTC) — 신규 CodeQL 룰/의존성 변화에 대한 정기 재스캔
+    - cron: '0 0 * * 1'
+
+# 코드 스캔 알림을 Security 탭에 기록하려면 security-events: write 필요
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  analyze:
+    name: CodeQL 분석 (JS/TS)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+          # 보안 관련 쿼리 확장(security-extended)으로 기본셋보다 넓게 스캔
+          queries: security-extended
+
+      # JS/TS는 인터프리티드 언어라 빌드 불필요 — CodeQL이 소스를 직접 분석한다.
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: '/language:javascript-typescript'

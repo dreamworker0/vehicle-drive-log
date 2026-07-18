@@ -28,7 +28,10 @@ export default defineConfig({
             '**/node_modules/**',
             '**/e2e/**',
             '**/functions/**',
-            ...(!process.env.FIRESTORE_EMULATOR_HOST ? ['tests/firestore-rules.test.ts'] : [])
+            // 에뮬레이터 없이 도는 일반 유닛 런/lint-staged에서는 rules 테스트를 제외한다.
+            // (해당 에뮬레이터 실행 시에만 호스트 env가 세팅되어 포함됨)
+            ...(!process.env.FIRESTORE_EMULATOR_HOST ? ['tests/firestore-rules.test.ts'] : []),
+            ...(!process.env.FIREBASE_STORAGE_EMULATOR_HOST ? ['tests/storage-rules.test.ts'] : [])
         ],
         coverage: {
             provider: 'v8',

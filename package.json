@@ -22,6 +22,7 @@
     "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "test:rules": "firebase emulators:exec --only firestore \"vitest run --exclude='' tests/firestore-rules.test.ts\"",
+    "test:rules:storage": "firebase emulators:exec --only storage \"vitest run --exclude='' tests/storage-rules.test.ts\"",
     "audit": "tsx scripts/security-audit.ts",
     "sync:agents": "tsx scripts/sync-claude-agents.ts",
     "eval:trigger": "tsx scripts/run-eval.ts trigger",

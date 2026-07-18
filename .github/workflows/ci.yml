@@ -38,7 +38,9 @@ jobs:
       # 워크플로 자체 변경 시에는 안전하게 전체 실행.
       - name: 변경 경로 감지
         id: changes
-        uses: dorny/paths-filter@v3
+        # 서드파티 액션은 커밋 SHA로 고정한다 — 태그는 이동 가능하므로 공급망 변조(태그 재지정) 방어.
+        # 공식 actions/*는 GitHub 관리(+Dependabot)라 메이저 태그를 유지한다. (2026-07-18 보안 재점검 G)
+        uses: dorny/paths-filter@d1c1ffe0248fe513906c8e24db8ea791d46f8590 # v3.0.3
         with:
           filters: |
             functions:
@@ -100,8 +102,8 @@ jobs:
           path: ~/.cache/firebase/emulators
           key: firebase-emulators-${{ runner.os }}
 
-      - name: Firestore Rules tests (emulator)
-        run: npx firebase-tools emulators:exec --only firestore "npx vitest run --exclude='' tests/firestore-rules.test.ts"
+      - name: Security Rules tests (Firestore + Storage emulator)
+        run: npx firebase-tools emulators:exec --only firestore,storage "npx vitest run --exclude='' tests/firestore-rules.test.ts tests/storage-rules.test.ts"
 
       # ── E2E ──
       - name: Get Playwright version
