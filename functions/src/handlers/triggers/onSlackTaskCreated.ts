@@ -11,7 +11,7 @@ import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { SLACK_BOT_TOKEN } from "../../core/params";
-import { postMessage, respondToUrl } from "../../services/slack/slackApi";
+import { postMessage, respondToUrl, authTest } from "../../services/slack/slackApi";
 import { resolveSlackUser, getSlackIntegration } from "../../services/slack/resolveSlackUser";
 import {
     handleAssistantMessage,
@@ -165,11 +165,16 @@ export const onSlackTaskCreated = onDocumentCreated(
             await checkRateLimitByUid("slackAssistantDailyOrg", integration.organizationId, orgLimit.max, orgLimit.windowSec, "closed");
 
             // 3) 신원 매핑 (Slack user → 앱 계정, 소속 검증 포함)
-            // 진단용: 수신된 식별자 기록 (개인정보 아님 — Slack 내부 ID)
+            // 진단용: 수신된 식별자 + 봇 토큰의 실제 소속 워크스페이스 기록 (개인정보 아님)
+            const tokenIdentity = await authTest(botToken);
             log("INFO", "onSlackTaskCreated", "신원 매핑 시도", {
-                teamId: task.teamId,
+                eventTeamId: task.teamId,
                 slackUserId: task.slackUserId,
                 kind: task.kind,
+                tokenTeamId: tokenIdentity.teamId,
+                tokenTeam: tokenIdentity.team,
+                tokenOk: tokenIdentity.ok,
+                tokenError: tokenIdentity.error,
             });
             const resolved = await resolveSlackUser(botToken, task.teamId, task.slackUserId, integration.organizationId);
             if (!resolved.ok) {

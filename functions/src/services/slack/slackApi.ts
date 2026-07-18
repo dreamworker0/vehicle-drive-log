@@ -44,6 +44,18 @@ export async function postMessage(
     return data.ok;
 }
 
+/** 봇 토큰의 실제 소속 워크스페이스·봇 신원 확인 (진단용) */
+export async function authTest(botToken: string): Promise<{ ok: boolean; teamId: string | null; team: string | null; botUserId: string | null; error?: string }> {
+    const data = await slackApiCall("auth.test", botToken, {});
+    return {
+        ok: data.ok,
+        teamId: (data.team_id as string) || null,
+        team: (data.team as string) || null,
+        botUserId: (data.user_id as string) || null,
+        error: data.error,
+    };
+}
+
 /** Slack 사용자 프로필 조회 — 이메일 매핑용 (users:read.email 스코프 필요) */
 export async function getSlackUserInfo(
     botToken: string,
