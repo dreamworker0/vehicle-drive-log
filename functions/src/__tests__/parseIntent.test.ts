@@ -124,6 +124,38 @@ describe('parseIntent', () => {
         expect(prompt).not.toContain('`백틱`');
     });
 
+    it('멀티턴: pending 슬롯과 병합해 완성한다 (시간만 답한 경우)', async () => {
+        // 이전 턴에서 날짜·차량은 받았고, 이번 메시지는 시간만 제공
+        mockGenerateAiContent.mockResolvedValue(JSON.stringify({
+            intent: 'create', date: null, startTime: '11:00', endTime: '12:00', vehicleId: null,
+            needsClarification: false,
+        }));
+        const pending = { date: seoulDate(1), startTime: null, endTime: null, vehicleId: 'v1', purpose: '', destination: '' };
+
+        const result = await parseIntent('11시~12시', VEHICLES, pending);
+
+        expect(result.intent).toBe('create');
+        expect(result.date).toBe(seoulDate(1));
+        expect(result.vehicleId).toBe('v1');
+        expect(result.startTime).toBe('11:00');
+        expect(result.endTime).toBe('12:00');
+        expect(result.needsClarification).toBe(false);
+    });
+
+    it('멀티턴: pending 있고 unknown이지만 슬롯을 채우면 create로 이어간다', async () => {
+        // "소나타3333"만 답 → Gemini가 vehicleId만 주고 intent unknown
+        mockGenerateAiContent.mockResolvedValue(JSON.stringify({
+            intent: 'unknown', vehicleId: 'v2',
+        }));
+        const pending = { date: seoulDate(1), startTime: '11:00', endTime: '12:00', vehicleId: null, purpose: '', destination: '' };
+
+        const result = await parseIntent('소나타3333', VEHICLES, pending);
+
+        expect(result.intent).toBe('create');
+        expect(result.vehicleId).toBe('v2');
+        expect(result.needsClarification).toBe(false);
+    });
+
     it('JSON 강제 옵션(responseMimeType, temperature 0)으로 호출한다', async () => {
         mockGenerateAiContent.mockResolvedValue('{"intent":"unknown"}');
 

@@ -24,6 +24,16 @@ export interface ParsedIntent {
     clarificationQuestion: string;
 }
 
+/** 진행 중인(멀티턴) 예약에서 이미 확보한 슬롯 — 되묻기 사이에 유지된다 */
+export interface PendingSlots {
+    date: string | null;
+    startTime: string | null;
+    endTime: string | null;
+    vehicleId: string | null;
+    purpose: string;
+    destination: string;
+}
+
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
 
@@ -70,10 +80,18 @@ function asString(v: unknown): string {
  * 자연어 메시지를 예약 의도로 파싱.
  * @param text 사용자 메시지 (위생 처리 전 원문)
  * @param vehicles 해당 기관의 예약 가능 차량 목록 (LLM이 이 목록의 id만 고르도록 강제)
+ * @param pending 진행 중인 예약 슬롯(멀티턴) — 있으면 이번 메시지 값과 병합한다
  */
-export async function parseIntent(text: string, vehicles: AssistantVehicle[]): Promise<ParsedIntent> {
+export async function parseIntent(text: string, vehicles: AssistantVehicle[], pending?: PendingSlots): Promise<ParsedIntent> {
     const now = getSeoulNow();
     const vehicleList = vehicles.map((v) => `- id: "${v.id}", 이름: "${sanitizePromptValue(v.name, 40)}"`).join("\n");
+
+    // 진행 중인 예약이 있으면(멀티턴) 이미 받은 슬롯을 프롬프트에 주입해 이번 메시지를 이어받게 한다
+    const pendingSection = pending
+        ? `\n[진행 중인 예약 — 이미 받은 정보]
+날짜: ${pending.date || "미정"}, 시작: ${pending.startTime || "미정"}, 종료: ${pending.endTime || "미정"}, 차량 id: ${pending.vehicleId || "미정"}
+사용자의 이번 메시지는 이 예약을 이어서 채우는 답변일 가능성이 높습니다. 이번 메시지에서 새로 얻은 값만 반영하고(예: 시간만 답하면 시간만), 나머지는 위 값을 그대로 쓴다고 보고 intent는 "create"로 두세요. 단, 사용자가 조회 등 완전히 다른 요청을 하면 그에 맞는 intent로 바꾸세요.\n`
+        : "";
 
     const prompt = `당신은 차량 운행일지 앱의 예약 도우미입니다. 사용자의 한국어 메시지를 분석해 JSON으로만 응답하세요.
 
@@ -83,7 +101,7 @@ export async function parseIntent(text: string, vehicles: AssistantVehicle[]): P
 
 [예약 가능 차량 목록]
 ${vehicleList || "(등록된 차량 없음)"}
-
+${pendingSection}
 [의도 분류]
 - "query": 예약 현황/일정 조회 요청 (예: "오늘 예약 현황 알려줘", "내일 스타렉스 일정?")
 - "create": 새 예약 생성 요청 (예: "내일 14시부터 16시까지 스타렉스 예약해줘")
@@ -124,6 +142,25 @@ JSON 형식 (다른 텍스트 없이 JSON만):
         needsClarification: parsed.needsClarification === true,
         clarificationQuestion: asString(parsed.clarificationQuestion).slice(0, 200),
     };
+
+    // --- 멀티턴 병합: 진행 중 예약이 있으면 이번 메시지 값으로 채우고 빈 슬롯은 기존 값 유지 ---
+    if (pending) {
+        // 이번 메시지가 실제로 예약 슬롯을 하나라도 새로 제공했는지
+        const contributed = Boolean(result.date || result.startTime || result.endTime || result.vehicleId);
+        result.date = result.date ?? pending.date;
+        result.startTime = result.startTime ?? pending.startTime;
+        result.endTime = result.endTime ?? pending.endTime;
+        result.vehicleId = result.vehicleId ?? pending.vehicleId;
+        result.purpose = result.purpose || pending.purpose;
+        result.destination = result.destination || pending.destination;
+        // 조회 등으로 전환한 게 아니고(=unknown) 뭔가 채웠으면 예약 이어가기로 간주
+        if (result.intent === "unknown" && contributed) result.intent = "create";
+        // 병합했으니 완결 여부는 아래 재검증이 단독 판정 (LLM의 needsClarification은 리셋)
+        if (result.intent === "create") {
+            result.needsClarification = false;
+            result.clarificationQuestion = "";
+        }
+    }
 
     // --- 서버측 재검증 (LLM 출력 불신) ---
     if (result.intent === "query") {

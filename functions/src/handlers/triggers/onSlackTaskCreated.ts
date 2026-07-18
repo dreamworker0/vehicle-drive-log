@@ -41,7 +41,7 @@ interface SlackTask {
 }
 
 /** 자연어 메시지 처리 — 조회 즉시 응답, 예약은 확인 버튼 전송 */
-async function processMessage(botToken: string, task: SlackTask, actor: { uid: string; orgId: string; displayName: string }): Promise<void> {
+async function processMessage(botToken: string, task: SlackTask, actor: { uid: string; orgId: string; displayName: string; conversationKey: string }): Promise<void> {
     const result = await handleAssistantMessage(task.text || "", actor);
 
     if (!result.proposal) {
@@ -187,6 +187,7 @@ export const onSlackTaskCreated = onDocumentCreated(
                     uid: resolved.uid,
                     orgId: resolved.orgId,
                     displayName: resolved.displayName,
+                    conversationKey: `slack_${task.teamId}_${task.slackUserId}`,
                 });
             }
             await snap.ref.update({ status: "done" });

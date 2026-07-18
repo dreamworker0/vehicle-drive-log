@@ -139,7 +139,7 @@ describe('onSlackTaskCreated', () => {
 
         await capturedHandler(makeEvent(MESSAGE_TASK));
 
-        expect(mockHandleMessage).toHaveBeenCalledWith('오늘 예약 현황', { uid: 'user1', orgId: 'org1', displayName: '홍길동' });
+        expect(mockHandleMessage).toHaveBeenCalledWith('오늘 예약 현황', { uid: 'user1', orgId: 'org1', displayName: '홍길동', conversationKey: 'slack_T123_U123' });
         expect(mockPostMessage).toHaveBeenCalledWith('xoxb-test', 'D123', '📅 오늘 예약 2건');
         expect(mockConfAdd).not.toHaveBeenCalled();
         expect(mockTaskUpdate).toHaveBeenCalledWith({ status: 'done' });

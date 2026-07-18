@@ -10,13 +10,17 @@ jest.mock('firebase-functions/v2/https', () => ({
     HttpsError: MockHttpsError,
 }));
 
-// ── 차량 목록 Firestore Mock ──
+// ── Firestore Mock: vehicles(where/get) + assistantConversations(doc get/set/delete) ──
 let vehicleDocs: Array<{ id: string; data: () => Record<string, unknown> }> = [];
+const mockConvoGet = jest.fn(async () => ({ exists: false }));
+const mockConvoSet = jest.fn().mockResolvedValue(undefined);
+const mockConvoDelete = jest.fn().mockResolvedValue(undefined);
 jest.mock('firebase-admin/firestore', () => ({
     getFirestore: () => ({
         collection: jest.fn(() => ({
             where: jest.fn().mockReturnThis(),
             get: jest.fn(async () => ({ docs: vehicleDocs })),
+            doc: jest.fn(() => ({ get: mockConvoGet, set: mockConvoSet, delete: mockConvoDelete })),
         })),
     }),
     FieldValue: { serverTimestamp: jest.fn(() => 'mock-timestamp') },
@@ -128,6 +132,79 @@ describe('handleAssistantMessage', () => {
 
         expect(result.replyText).toContain('예약 조회');
         expect(result.replyText).toContain('예약 생성');
+    });
+
+    describe('멀티턴 대화 기억', () => {
+        const ACTOR_KEY = { ...ACTOR, conversationKey: 'slack_T_U' };
+
+        it('진행 중 예약이 있으면 parseIntent에 pending 슬롯을 넘긴다', async () => {
+            mockConvoGet.mockResolvedValue({
+                exists: true,
+                data: () => ({
+                    slots: { date: '2026-07-19', startTime: null, endTime: null, vehicleId: 'v1', purpose: '', destination: '' },
+                    expiresAt: { toDate: () => new Date(Date.now() + 60_000) },
+                }),
+            });
+            mockParseIntent.mockResolvedValue({ intent: 'create', needsClarification: true, clarificationQuestion: '시간?' });
+
+            await handleAssistantMessage('11시~12시', ACTOR_KEY);
+
+            const pendingArg = mockParseIntent.mock.calls[0][2];
+            expect(pendingArg).toMatchObject({ date: '2026-07-19', vehicleId: 'v1' });
+        });
+
+        it('만료된 진행 예약은 무시한다 (pending 미전달)', async () => {
+            mockConvoGet.mockResolvedValue({
+                exists: true,
+                data: () => ({
+                    slots: { date: '2026-07-19', vehicleId: 'v1' },
+                    expiresAt: { toDate: () => new Date(Date.now() - 60_000) },
+                }),
+            });
+            mockParseIntent.mockResolvedValue({ intent: 'unknown', needsClarification: false });
+
+            await handleAssistantMessage('안녕', ACTOR_KEY);
+
+            expect(mockParseIntent.mock.calls[0][2]).toBeUndefined();
+        });
+
+        it('create가 정보 부족이면 현재까지 슬롯을 저장한다', async () => {
+            mockConvoGet.mockResolvedValue({ exists: false });
+            mockParseIntent.mockResolvedValue({
+                intent: 'create', needsClarification: true, clarificationQuestion: '종료 시간?',
+                date: '2026-07-19', startTime: '11:00', endTime: null, vehicleId: 'v1', purpose: '', destination: '',
+            });
+
+            await handleAssistantMessage('내일 11시 스타렉스', ACTOR_KEY);
+
+            expect(mockConvoSet).toHaveBeenCalledWith(expect.objectContaining({
+                orgId: 'org1',
+                slots: expect.objectContaining({ date: '2026-07-19', startTime: '11:00', endTime: null, vehicleId: 'v1' }),
+            }));
+        });
+
+        it('제안 완성 시 진행 예약을 폐기한다', async () => {
+            mockConvoGet.mockResolvedValue({ exists: false });
+            mockParseIntent.mockResolvedValue({
+                intent: 'create', needsClarification: false,
+                date: '2026-07-19', startTime: '11:00', endTime: '12:00', vehicleId: 'v1', purpose: '', destination: '',
+            });
+
+            const result = await handleAssistantMessage('내일 11~12시 스타렉스', ACTOR_KEY);
+
+            expect(result.proposal).toBeDefined();
+            expect(mockConvoDelete).toHaveBeenCalled();
+        });
+
+        it('조회로 전환하면 진행 예약을 폐기한다', async () => {
+            mockConvoGet.mockResolvedValue({ exists: false });
+            mockParseIntent.mockResolvedValue({ intent: 'query', date: '2026-07-18' });
+            mockBuildSummary.mockResolvedValue('📅 요약');
+
+            await handleAssistantMessage('오늘 예약 현황', ACTOR_KEY);
+
+            expect(mockConvoDelete).toHaveBeenCalled();
+        });
     });
 });
 

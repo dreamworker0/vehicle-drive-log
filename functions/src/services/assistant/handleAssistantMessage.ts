@@ -6,17 +6,53 @@
  * 어댑터가 사용자 확인(버튼 등)을 받은 뒤 executeReservationProposal로 실행한다.
  */
 import { HttpsError } from "firebase-functions/v2/https";
-import { getFirestore } from "firebase-admin/firestore";
-import { parseIntent, type AssistantVehicle } from "./parseIntent";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { parseIntent, type AssistantVehicle, type PendingSlots } from "./parseIntent";
 import { buildReservationSummary } from "./queryReservations";
 import { createReservationTx } from "../reservation/createReservationCore";
 
 const db = getFirestore();
 
+/** 멀티턴 대화 상태 유효기간 — 초과 시 진행 중 예약을 폐기 (TTL 정책으로 자동 삭제) */
+const CONVERSATION_TTL_MS = 10 * 60 * 1000;
+
 export interface AssistantActor {
     uid: string;
     orgId: string;
     displayName: string;
+    /** 멀티턴 대화 상태 키 (플랫폼별 사용자 식별자, 예: slack_{team}_{user}). 없으면 무상태 */
+    conversationKey?: string;
+}
+
+/** 진행 중인 예약 슬롯을 로드 (만료분은 무시) */
+async function loadPending(key: string): Promise<PendingSlots | null> {
+    const snap = await db.collection("assistantConversations").doc(key).get();
+    if (!snap.exists) return null;
+    const data = snap.data()!;
+    const expiresAt: Date | null = data.expiresAt?.toDate ? data.expiresAt.toDate() : null;
+    if (!expiresAt || expiresAt.getTime() < Date.now()) return null;
+    const s = data.slots || {};
+    return {
+        date: s.date ?? null,
+        startTime: s.startTime ?? null,
+        endTime: s.endTime ?? null,
+        vehicleId: s.vehicleId ?? null,
+        purpose: s.purpose ?? "",
+        destination: s.destination ?? "",
+    };
+}
+
+async function savePending(key: string, orgId: string, slots: PendingSlots): Promise<void> {
+    await db.collection("assistantConversations").doc(key).set({
+        orgId,
+        slots,
+        updatedAt: FieldValue.serverTimestamp(),
+        expiresAt: new Date(Date.now() + CONVERSATION_TTL_MS),
+    });
+}
+
+async function clearPending(key: string): Promise<void> {
+    await db.collection("assistantConversations").doc(key).delete().catch(() => undefined);
 }
 
 /** 사용자 확인 후 실행할 예약 제안 — createReservationTx 입력의 부분집합 */
@@ -67,26 +103,43 @@ export function formatProposalSummary(p: ReservationProposal): string {
     return `아래 내용으로 예약할까요?\n🚗 ${p.vehicleName}\n📅 ${p.date} ${p.startTime}~${p.endTime}\n👤 ${p.reservedByName}${extra ? `\n📝 ${extra}` : ""}`;
 }
 
-/** 자연어 메시지 처리 — 조회는 즉시 응답, 생성은 proposal 반환 */
+/** 자연어 메시지 처리 — 조회는 즉시 응답, 생성은 proposal 반환. 멀티턴 대화 상태 유지 */
 export async function handleAssistantMessage(text: string, actor: AssistantActor): Promise<AssistantResult> {
+    const key = actor.conversationKey;
     const vehicles = await getAssistantVehicles(actor.orgId);
-    const intent = await parseIntent(text, vehicles);
+    // 진행 중인 예약이 있으면 이번 메시지와 병합해 이어받는다
+    const pending = key ? await loadPending(key) : null;
+    const intent = await parseIntent(text, vehicles, pending || undefined);
 
     if (intent.intent === "query") {
+        if (key) await clearPending(key); // 조회로 전환 → 진행 중 예약 폐기
         const replyText = await buildReservationSummary(actor.orgId, intent.date!);
         return { replyText };
     }
 
     if (intent.intent === "create") {
         if (intent.needsClarification) {
+            // 지금까지 모은 슬롯을 저장해 다음 메시지에서 이어받게 한다
+            if (key) {
+                await savePending(key, actor.orgId, {
+                    date: intent.date,
+                    startTime: intent.startTime,
+                    endTime: intent.endTime,
+                    vehicleId: intent.vehicleId,
+                    purpose: intent.purpose,
+                    destination: intent.destination,
+                });
+            }
             return { replyText: intent.clarificationQuestion || ASSISTANT_HELP_TEXT };
         }
 
         const vehicle = vehicles.find((v) => v.id === intent.vehicleId)!;
         if (vehicle.isBlocked) {
+            if (key) await clearPending(key);
             return { replyText: `🚫 ${vehicle.name}은(는) 현재 정비 중이라 예약할 수 없습니다.` };
         }
 
+        if (key) await clearPending(key); // 제안 단계로 넘어가면 슬롯 채우기 상태는 종료
         const proposal: ReservationProposal = {
             organizationId: actor.orgId,
             vehicleId: vehicle.id,
@@ -102,6 +155,7 @@ export async function handleAssistantMessage(text: string, actor: AssistantActor
         return { replyText: formatProposalSummary(proposal), proposal };
     }
 
+    if (key) await clearPending(key);
     return { replyText: `무엇을 도와드릴까요?\n\n${ASSISTANT_HELP_TEXT}` };
 }
 
