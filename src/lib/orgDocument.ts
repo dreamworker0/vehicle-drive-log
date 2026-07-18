@@ -20,7 +20,8 @@ export function hasOrgDocument(org: OrgDocRef): boolean {
  */
 export function resolveOrgDocumentPath(org: OrgDocRef): string | null {
     if (org.uniqueNumberImagePath) return org.uniqueNumberImagePath;
-    const match = org.uniqueNumberImageUrl?.match(/\/o\/(.+?)\?/);
+    // 쿼리스트링/프래그먼트 전까지 매칭 — 쿼리 파라미터가 없어도 견고하게 동작한다.
+    const match = org.uniqueNumberImageUrl?.match(/\/o\/([^?#]+)/);
     return match ? decodeURIComponent(match[1]) : null;
 }
 

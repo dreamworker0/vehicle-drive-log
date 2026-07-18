@@ -58,7 +58,8 @@ export const getOrgDocumentUrl = onCall(
         let filePath = data.uniqueNumberImagePath as string | undefined;
         if (!filePath) {
             const legacyUrl = data.uniqueNumberImageUrl as string | undefined;
-            const match = legacyUrl?.match(/\/o\/(.+?)\?/);
+            // 쿼리스트링/프래그먼트 전까지 매칭 — 쿼리 파라미터가 없어도 견고하게 동작한다.
+            const match = legacyUrl?.match(/\/o\/([^?#]+)/);
             if (match) {
                 filePath = decodeURIComponent(match[1]);
             }

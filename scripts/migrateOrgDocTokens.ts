@@ -49,7 +49,8 @@ const bucket = getStorage(app).bucket();
 
 /** 레거시 토큰 URL에서 Storage 경로를 역추출한다. */
 function pathFromUrl(url: string): string | null {
-    const match = url.match(/\/o\/(.+?)\?/);
+    // 쿼리스트링/프래그먼트 전까지 매칭 — 쿼리 파라미터가 없어도 견고하게 동작한다.
+    const match = url.match(/\/o\/([^?#]+)/);
     return match ? decodeURIComponent(match[1]) : null;
 }
 
@@ -75,33 +76,33 @@ async function migrate() {
         scanned++;
         const orgId = doc.id;
         const derivedPath = existingPath || pathFromUrl(legacyUrl);
+        // 경로를 얻지 못하면(URL 파싱 실패) 문서를 건드리지 않고 건너뛴다.
+        // 여기서 uniqueNumberImageUrl을 비우면 증빙 참조가 영구 유실되므로 수동 확인 대상으로 남긴다.
         if (!derivedPath) {
-            console.warn(`⚠️  경로 추출 실패 (${orgId}) — URL 형식 불일치, 문서 필드만 정리`);
+            console.error(`❌ 경로 추출 실패 (${orgId}) — 마이그레이션 건너뜀 (수동 확인 필요, 문서 미변경)`);
+            failed++;
+            continue;
         }
 
         try {
             // 1) Storage 파일 토큰 무효화 (파일이 존재할 때만)
-            if (derivedPath) {
-                const file = bucket.file(derivedPath);
-                const [exists] = await file.exists();
-                if (exists) {
-                    if (!isDryRun) {
-                        await file.setMetadata({ metadata: { firebaseStorageDownloadTokens: "" } });
-                    }
-                    tokenRevoked++;
-                } else {
-                    skippedNoFile++;
+            const file = bucket.file(derivedPath);
+            const [exists] = await file.exists();
+            if (exists) {
+                if (!isDryRun) {
+                    await file.setMetadata({ metadata: { firebaseStorageDownloadTokens: "" } });
                 }
+                tokenRevoked++;
+            } else {
+                skippedNoFile++;
             }
 
             // 2) Firestore 필드 갱신 — 경로 백필 + 레거시 URL 제거
             if (!isDryRun) {
-                const update: Record<string, unknown> = { uniqueNumberImageUrl: "" };
-                if (derivedPath) update.uniqueNumberImagePath = derivedPath;
-                await doc.ref.update(update);
+                await doc.ref.update({ uniqueNumberImagePath: derivedPath, uniqueNumberImageUrl: "" });
             }
             migrated++;
-            console.log(`✅ ${orgId}${derivedPath ? ` → ${derivedPath}` : " (필드만 정리)"}`);
+            console.log(`✅ ${orgId} → ${derivedPath}`);
         } catch (err) {
             failed++;
             console.error(`❌ ${orgId} 처리 실패:`, (err as Error).message);

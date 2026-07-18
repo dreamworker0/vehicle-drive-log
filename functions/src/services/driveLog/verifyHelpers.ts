@@ -61,7 +61,8 @@ export async function downloadFileAsBase64(pathOrUrl: string, expectedPathPrefix
     const storage = getStorage();
     // 레거시 토큰 URL이면 경로를 역추출하고, 아니면 이미 Storage 경로로 간주한다.
     // (2026-07-18 보안 재검증 P0-3 — 신규 문서는 토큰 URL 대신 경로를 저장한다.)
-    const urlMatch = pathOrUrl.match(/\/o\/(.+?)\?/);
+    // 쿼리스트링/프래그먼트 전까지 매칭 — 쿼리 파라미터가 없어도 견고하게 동작한다.
+    const urlMatch = pathOrUrl.match(/\/o\/([^?#]+)/);
     const filePath = urlMatch ? decodeURIComponent(urlMatch[1]) : pathOrUrl;
     // 경로 조작(상대경로·역슬래시·선행 슬래시) 및 허용 범위 밖 접근 차단
     if (filePath.includes("..") || filePath.includes("\\") || filePath.startsWith("/")) {
