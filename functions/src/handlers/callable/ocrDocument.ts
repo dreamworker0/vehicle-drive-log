@@ -88,9 +88,12 @@ export const ocrDocument = onCall(
             }
             const callerOrgId = request.auth!.token.orgId;
             const callerUid = request.auth!.uid;
+            const isSuperAdmin = request.auth!.token.role === "superAdmin";
             const isOrgPath = callerOrgId && storagePath.startsWith(`organizations/${callerOrgId}/`);
             const isFeedbackPath = storagePath.startsWith(`feedbacks/${callerUid}/`) || storagePath.startsWith(`feedbacks/ocr-report/${callerUid}/`);
-            if (!isOrgPath && !isFeedbackPath) {
+            // superAdmin은 기관 심사를 위해 임의 기관 증빙서류를 재검증할 수 있다. (2026-07-18 보안 재검증 P0-3)
+            const isSuperAdminOrgPath = isSuperAdmin && storagePath.startsWith("organizations/");
+            if (!isOrgPath && !isFeedbackPath && !isSuperAdminOrgPath) {
                 throw new HttpsError("permission-denied", "접근 권한이 없는 파일입니다.");
             }
         }

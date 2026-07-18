@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { getPendingOrganizations, getRejectedOrganizations, rejectOrganization, deleteOrganization, createNotification, updateOrganization, generateInviteCode, getOrganizationAdmins, approveOrganizationWithAdmins } from '../../lib/firestore';
 import { sendApprovalEmail } from '../../lib/emailService';
 import { ocrDocumentVerify } from '../../lib/ocr';
+import { resolveOrgDocumentPath } from '../../lib/orgDocument';
 import OrgAppCard from './OrgAppCard';
 import { useToast } from '../../hooks/useToast';
 import { useConfirm } from '../../hooks/useConfirm';
@@ -218,13 +219,14 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
 
     // AI 재분석
     const handleAiReanalyze = async (app: Organization) => {
-        if (!app.uniqueNumberImageUrl) {
+        const storagePath = resolveOrgDocumentPath(app);
+        if (!storagePath) {
             showToast('고유번호증 사본이 없어 AI 분석을 할 수 없습니다.', 'warning');
             return;
         }
         setActionLoading(prev => ({ ...prev, [app.id]: 'ai' }));
         try {
-            const ocrResult = await ocrDocumentVerify(app.uniqueNumberImageUrl!, app.name) as Record<string, unknown>;
+            const ocrResult = await ocrDocumentVerify(storagePath, app.name) as Record<string, unknown>;
             await updateOrganization(app.id, {
                 aiVerified: ocrResult.aiVerified || false,
                 aiVerifyDetail: {

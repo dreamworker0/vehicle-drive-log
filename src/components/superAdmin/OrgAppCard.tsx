@@ -4,7 +4,8 @@
  */
 import { memo, useState } from 'react';
 import { formatTimestampFull } from '../../lib/dateUtils';
-import DocumentViewer from '../common/DocumentViewer';
+import OrgDocumentViewer from './OrgDocumentViewer';
+import { hasOrgDocument } from '../../lib/orgDocument';
 import type { Organization } from '../../types';
 
 interface OrgAppCardProps {
@@ -137,7 +138,7 @@ export default memo(function OrgAppCard({
                     )}
 
                     {/* 고유번호증 사본 토글 */}
-                    {app.uniqueNumberImageUrl && (
+                    {hasOrgDocument(app) && (
                         <div>
                             <button
                                 onClick={() => onToggleImage(app.id)}
@@ -146,13 +147,13 @@ export default memo(function OrgAppCard({
                                 {selectedApp === app.id ? '사본 닫기 ▲' : '증빙서류 사본 보기 ▼'}
                             </button>
                             {selectedApp === app.id && (
-                                <DocumentViewer url={app.uniqueNumberImageUrl || ''} />
+                                <OrgDocumentViewer orgId={app.id} />
                             )}
                         </div>
                     )}
 
                     {/* AI 분석 미완료 시 분석 버튼 */}
-                    {!app.aiVerifyDetail && app.uniqueNumberImageUrl && (
+                    {!app.aiVerifyDetail && hasOrgDocument(app) && (
                         <div className="mt-2">
                             <button
                                 type="button"

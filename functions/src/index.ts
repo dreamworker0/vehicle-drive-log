@@ -9,6 +9,9 @@ export { ocrDashboard } from "./handlers/callable/ocrDashboard";
 export { ocrDocument } from "./handlers/callable/ocrDocument";
 export { autoVerifyDocument } from "./handlers/triggers/autoVerifyDocument";
 
+// 기관 증빙서류 단기 서명 URL 발급 (심사 화면 표시용, superAdmin 전용)
+export { getOrgDocumentUrl } from "./handlers/callable/getOrgDocumentUrl";
+
 // Holiday Proxy
 export { holidayProxy } from "./handlers/https/holidayProxy";
 

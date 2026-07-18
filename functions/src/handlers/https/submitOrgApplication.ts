@@ -1,7 +1,6 @@
 import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
-import { v4 as uuidv4 } from "uuid";
 import { log, wrapHandler } from "../../utils/helpers";
 import { checkRateLimitByUid, checkRateLimitByIp } from "../../utils/rateLimit";
 import { maskEmail } from "../../utils/mask";
@@ -106,22 +105,16 @@ export const submitOrgApplication = onCall(
 
             log("INFO", "submitOrgApplication", "Uploading image", { email: maskEmail(email), orgId, size: fileBuffer.byteLength });
 
-            // Firebase Storage Read를 위한 임시 다운로드 토큰 생성 (Client SDK URL과 동일한 형식)
-            const token = uuidv4();
+            // 증빙서류는 민감정보이므로 영구 다운로드 토큰(firebaseStorageDownloadTokens)을 심지 않는다.
+            // 접근은 Storage 보안 규칙(superAdmin/기관 멤버 read)과 심사 시 발급하는 단기 서명 URL
+            // (getOrgDocumentUrl 콜러블)로만 통제한다. (2026-07-18 보안 재검증 P0-3)
             await file.save(fileBuffer, {
                 metadata: {
                     contentType: payload.imageMimeType,
-                    metadata: {
-                        firebaseStorageDownloadTokens: token,
-                    },
                 },
             });
 
-            // Firebase Storage Download URL 생성
-            const bucketName = bucket.name;
-            const uniqueNumberImageUrl = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodeURIComponent(filePath)}?alt=media&token=${token}`;
-
-            // 5. Firestore 문서 생성
+            // 5. Firestore 문서 생성 — 토큰 URL이 아닌 Storage 경로만 저장한다.
             const now = FieldValue.serverTimestamp();
             await orgRef.set({
                 name: payload.orgName.trim(),
@@ -132,7 +125,7 @@ export const submitOrgApplication = onCall(
                 message: payload.message ? payload.message.trim() : "",
                 status: "pending",
                 aiVerified: false,
-                uniqueNumberImageUrl,
+                uniqueNumberImagePath: filePath,
                 createdAt: now,
                 updatedAt: now,
             });
@@ -142,7 +135,6 @@ export const submitOrgApplication = onCall(
             return {
                 success: true,
                 orgId,
-                uniqueNumberImageUrl,
             };
         } catch (err: unknown) {
             log("ERROR", "submitOrgApplication", "업로드 또는 저장 처리 중 시스템 오류", {

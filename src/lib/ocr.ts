@@ -18,12 +18,12 @@ export const ocrDashboard = async (imageBase64: string, mimeType: string, isElec
 
 /**
  * 고유번호증 OCR — 문서 유형 판별 + 정보 추출 + 검증
- * @param {string} imageUrl - Storage에 저장된 이미지 URL
+ * @param {string} storagePath - Storage 파일 경로 (예: organizations/{orgId}/uniqueNumberImage.pdf)
  * @param {string} orgName - 입력한 기관명
  * @returns {Promise<{documentType, uniqueNumber, extractedName, nameMatch, address, aiVerified, rejected, rejectReason}>}
  */
-export const ocrDocumentVerify = async (imageUrl: string, orgName: string) => {
+export const ocrDocumentVerify = async (storagePath: string, orgName: string) => {
     const callable = httpsCallable(functions, 'ocrDocument', { timeout: 120000 });
-    const result = await callable({ imageUrl, orgName });
+    const result = await callable({ storagePath, orgName });
     return result.data;
 };

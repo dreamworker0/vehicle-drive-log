@@ -61,7 +61,10 @@ export interface Organization extends FirestoreDoc {
     status: OrgStatus;
     inviteCode?: string;
     uniqueNumber?: string;
+    /** @deprecated 레거시 — 토큰 포함 다운로드 URL. 신규 문서는 uniqueNumberImagePath 사용 (2026-07-18 P0-3) */
     uniqueNumberImageUrl?: string;
+    /** 증빙서류 Storage 경로. 표시용 URL은 getOrgDocumentUrl 콜러블로 온디맨드 발급 */
+    uniqueNumberImagePath?: string;
     aiVerified?: boolean;
     aiVerifyDetail?: {
         documentType?: string;

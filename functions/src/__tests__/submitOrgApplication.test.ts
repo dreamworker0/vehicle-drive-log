@@ -45,8 +45,6 @@ jest.mock('firebase-admin/storage', () => ({
     }),
 }));
 
-jest.mock('uuid', () => ({ v4: () => 'test-token' }));
-
 // helpers는 sentry 의존이 있어 로깅·래퍼만 통과시키는 mock으로 대체
 jest.mock('../utils/helpers', () => ({
     log: jest.fn(),
@@ -119,5 +117,29 @@ describe('submitOrgApplication — MIME 화이트리스트', () => {
                 metadata: expect.objectContaining({ contentType: 'application/pdf' }),
             })
         );
+    });
+
+    // ── 증빙서류 토큰 미노출 회귀 가드 (2026-07-18 보안 재검증 P0-3) ──
+    // 증빙서류(민감정보)에 만료 없는 다운로드 토큰을 심거나 그 URL을 저장/반환하면
+    // Storage 규칙을 우회하는 무인증 접근이 가능해진다. 아래 셋은 그 재발을 막는다.
+    it('영구 다운로드 토큰(firebaseStorageDownloadTokens)을 파일에 심지 않는다', async () => {
+        await capturedHandler(makeRequest());
+        const saveOptions = mockFileSave.mock.calls[0][1];
+        // 중첩 metadata.metadata(사용자 정의 메타)가 없어야 한다 — 토큰은 여기에 심겼었다.
+        expect(saveOptions.metadata).not.toHaveProperty('metadata');
+        expect(JSON.stringify(saveOptions)).not.toContain('firebaseStorageDownloadTokens');
+    });
+
+    it('Firestore에 토큰 URL이 아닌 Storage 경로(uniqueNumberImagePath)를 저장한다', async () => {
+        await capturedHandler(makeRequest());
+        const savedDoc = mockOrgSet.mock.calls[0][0];
+        expect(savedDoc.uniqueNumberImagePath).toBe('organizations/org-test-1/uniqueNumberImage.jpg');
+        expect(savedDoc).not.toHaveProperty('uniqueNumberImageUrl');
+    });
+
+    it('응답에 다운로드 URL을 포함하지 않는다', async () => {
+        const res = await capturedHandler(makeRequest());
+        expect(res).not.toHaveProperty('uniqueNumberImageUrl');
+        expect(res).toMatchObject({ success: true, orgId: 'org-test-1' });
     });
 });

@@ -56,9 +56,18 @@ const FUNCTIONS: FunctionEntry[] = [
     name: 'autoVerifyDocument',
     type: 'onDocumentWritten',
     file: 'autoVerifyDocument.ts',
-    description: 'organizations/{orgId} 문서에 uniqueNumberImageUrl이 추가되면 Gemini OCR + 비영리 판별 → 자동 승인/거절 처리 및 이메일 발송',
+    description: 'organizations/{orgId} 문서에 증빙서류(uniqueNumberImagePath, 레거시 uniqueNumberImageUrl)가 추가되면 Gemini OCR + 비영리 판별 → 자동 승인/거절 처리 및 이메일 발송',
     auth: '시스템 자동 실행 (Firestore 트리거)',
     note: '화이트리스트 기관은 즉시 승인. 종교/학교/병원/영리 사업자는 자동 거절.',
+  },
+  {
+    name: 'getOrgDocumentUrl',
+    type: 'onCall',
+    file: 'getOrgDocumentUrl.ts',
+    description: '기관 증빙서류의 5분 만료 서명 URL 발급 (심사 화면 표시용). 증빙서류는 영구 다운로드 토큰 없이 경로만 저장되므로 표시 시점마다 온디맨드 발급한다.',
+    auth: 'superAdmin 전용',
+    params: '{ orgId: string }',
+    returns: '{ url: string }',
   },
 
   // ── 프록시 ──

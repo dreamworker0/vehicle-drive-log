@@ -97,17 +97,19 @@ export const autoVerifyDocument = onDocumentWritten(
         // 문서 삭제된 경우 중단
         if (!after) return;
         
-        // 이미지가 존재하지 않으면 중단
-        if (!after.uniqueNumberImageUrl) return;
+        // 이미지가 존재하지 않으면 중단. 신규 문서는 경로(uniqueNumberImagePath),
+        // 레거시 문서는 토큰 URL(uniqueNumberImageUrl)을 쓴다. (2026-07-18 보안 재검증 P0-3)
+        const imagePath = (after.uniqueNumberImagePath || after.uniqueNumberImageUrl) as string | undefined;
+        if (!imagePath) return;
 
-        // 문서가 변경(update)된 경우라면 이미지 URL이 새로 등록(또는 변경)된 건지 확인
-        if (before && before.uniqueNumberImageUrl === after.uniqueNumberImageUrl) return;
+        // 문서가 변경(update)된 경우라면 이미지가 새로 등록(또는 변경)된 건지 확인
+        const beforePath = before ? (before.uniqueNumberImagePath || before.uniqueNumberImageUrl) : undefined;
+        if (before && beforePath === imagePath) return;
         if (after.aiVerifyDetail) return;
 
         // 사용자 입력 기관명은 프롬프트에 보간되므로 위생 처리한다 (따옴표·개행 제거 + 60자 절단).
         // 화이트/블랙리스트 매칭·Tmap 검색·사업자번호 보정에도 동일하게 위생값을 사용한다.
         const orgName = sanitizePromptValue(after.name, 60);
-        const imageUrl = after.uniqueNumberImageUrl as string;
         const applicantEmail = after.applicantEmail as string | undefined;
         const applicantName = after.applicantName as string | undefined;
         const applicantPhone = after.applicantPhone as string | undefined;
@@ -176,7 +178,7 @@ export const autoVerifyDocument = onDocumentWritten(
 
             const prompt = buildOcrPrompt(orgName);
             // 반드시 현재 기관 경로의 증빙서류만 다운로드 (교차 테넌트 OCR 차단, 감사 #3)
-            const fileInfo = await downloadFileAsBase64(imageUrl, `organizations/${orgId}/`);
+            const fileInfo = await downloadFileAsBase64(imagePath, `organizations/${orgId}/`);
 
             const text = await generateAiContent(
                 prompt,

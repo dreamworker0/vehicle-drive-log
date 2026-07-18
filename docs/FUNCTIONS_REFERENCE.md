@@ -1,7 +1,7 @@
 # Cloud Functions 레퍼런스
 
 > **자동 생성 문서** — `scripts/generate-functions-doc.ts`로 생성됨  
-> 마지막 업데이트: 2026. 5. 6. AM 7:53:51  
+> 마지막 업데이트: 2026. 7. 18. AM 10:04:23  
 > 총 함수 수: **47개**
 
 ---
@@ -20,7 +20,7 @@
 
 ## 📞 onCall (클라이언트 직접 호출)
 
-> 총 23개
+> 총 24개
 
 ### `ocrDashboard`
 
@@ -41,6 +41,16 @@
 | **인증** | 인증 필수 |
 | **요청 파라미터** | `{ imageBase64: string, mimeType: string }` |
 | **반환값** | `{ orgName: string, bizNumber: string, address: string }` |
+
+### `getOrgDocumentUrl`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/getOrgDocumentUrl.ts` |
+| **설명** | 기관 증빙서류의 5분 만료 서명 URL 발급 (심사 화면 표시용). 증빙서류는 영구 다운로드 토큰 없이 경로만 저장되므로 표시 시점마다 온디맨드 발급한다. |
+| **인증** | superAdmin 전용 |
+| **요청 파라미터** | `{ orgId: string }` |
+| **반환값** | `{ url: string }` |
 
 ### `createReservationSafe`
 
@@ -252,7 +262,7 @@
 
 ## ⏰ onSchedule (스케줄)
 
-> 총 11개
+> 총 10개
 
 ### `reservationReminder`
 
@@ -263,23 +273,14 @@
 | **인증** | 시스템 자동 실행 |
 | **비고** | schedule: "every 15 minutes" (Asia/Seoul), 주말 스킵 |
 
-### `computeDashboardStats`
+### `monthlyBatch`
 
 | 항목 | 내용 |
 |------|------|
-| **파일** | `functions/src/caching/computeDashboardStats.ts` |
-| **설명** | 1시간마다 SuperAdmin 대시보드용 통계(운행일지, 예약, 기관, 직원, 미래예약 등) 집계 후 system/dashboardTimeSeries에 캐싱 |
+| **파일** | `functions/src/monthlyBatch.ts` |
+| **설명** | 통합 월배치: 공휴일 동기화(syncHolidays) + 차량 마일리지 불일치 검증(verifyMileageConsistency) |
 | **인증** | 시스템 자동 실행 |
-| **비고** | schedule: "every 1 hours", 메모리: 512MiB, 타임아웃: 300s |
-
-### `syncHolidaysScheduled`
-
-| 항목 | 내용 |
-|------|------|
-| **파일** | `functions/src/syncHolidays.ts` |
-| **설명** | 공휴일 데이터를 공공데이터포털에서 주기적으로 동기화하여 Firestore에 저장 |
-| **인증** | 시스템 자동 실행 |
-| **비고** | schedule: "0 6 * * *" (매일 오전 6시) |
+| **비고** | schedule: "0 6 1 * *" (매월 1일 오전 6시) |
 
 ### `syncCalendarToApp`
 
@@ -387,7 +388,7 @@
 | 항목 | 내용 |
 |------|------|
 | **파일** | `functions/src/autoVerifyDocument.ts` |
-| **설명** | organizations/{orgId} 문서에 uniqueNumberImageUrl이 추가되면 Gemini OCR + 비영리 판별 → 자동 승인/거절 처리 및 이메일 발송 |
+| **설명** | organizations/{orgId} 문서에 증빙서류(uniqueNumberImagePath, 레거시 uniqueNumberImageUrl)가 추가되면 Gemini OCR + 비영리 판별 → 자동 승인/거절 처리 및 이메일 발송 |
 | **인증** | 시스템 자동 실행 (Firestore 트리거) |
 | **비고** | 화이트리스트 기관은 즉시 승인. 종교/학교/병원/영리 사업자는 자동 거절. |
 
