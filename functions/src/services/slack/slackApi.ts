@@ -1,7 +1,8 @@
 /**
  * slackApi — Slack Web API 최소 클라이언트 (fetch 기반, SDK 미도입)
  *
- * 파일럿에 필요한 3개 호출만 감싼다: chat.postMessage, users.info, response_url POST.
+ * 메시지(chat.postMessage, reactions.add), 읽기(users.info, auth.test),
+ * response_url POST, OAuth(oauth.v2.access, auth.revoke)를 감싼다.
  */
 import { log } from "../../utils/helpers";
 
@@ -96,6 +97,49 @@ export async function getSlackUserInfo(
         email: user?.profile?.email || null,
         realName: user?.profile?.real_name || null,
     };
+}
+
+/**
+ * OAuth v2 code → 봇 토큰 교환 (oauth.v2.access).
+ * 앱 크리덴셜(client_id/secret)로 호출하며 봇 토큰이 없다(설치 시점).
+ * 응답의 access_token이 워크스페이스별 봇 토큰(xoxb-)이다.
+ */
+export async function oauthV2Access(
+    clientId: string,
+    clientSecret: string,
+    code: string,
+    redirectUri: string
+): Promise<{ ok: boolean; accessToken: string | null; teamId: string | null; teamName: string | null; botUserId: string | null; scope: string | null; error?: string }> {
+    const res = await fetch(`${SLACK_API_BASE}/oauth.v2.access`, {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded; charset=utf-8" },
+        body: new URLSearchParams({
+            client_id: clientId,
+            client_secret: clientSecret,
+            code,
+            redirect_uri: redirectUri,
+        }).toString(),
+    });
+    const data = await res.json() as SlackApiResponse;
+    if (!data.ok) {
+        log("WARNING", "slackApi", "oauth.v2.access 실패", { error: data.error });
+    }
+    const team = data.team as { id?: string; name?: string } | undefined;
+    return {
+        ok: data.ok,
+        accessToken: (data.access_token as string) || null,
+        teamId: team?.id || null,
+        teamName: team?.name || null,
+        botUserId: (data.bot_user_id as string) || null,
+        scope: (data.scope as string) || null,
+        error: data.error,
+    };
+}
+
+/** 봇 토큰 무효화 (auth.revoke) — 연결 해제 시 Slack 측에서도 폐기. 실패는 무시 가능 */
+export async function authRevoke(token: string): Promise<boolean> {
+    const data = await slackApiCall("auth.revoke", token, {});
+    return data.ok === true && data.revoked === true;
 }
 
 /** Interactivity response_url로 응답 (원 메시지 교체 등) */

@@ -323,5 +323,8 @@ service cloud.firestore {
     match /assistantConversations/{docId} {
       allow read, write: if false; // 멀티턴 대화 상태(진행 중 예약 슬롯) (TTL 자동 정리)
     }
+    match /slackOauthStates/{docId} {
+      allow read, write: if false; // OAuth 설치 nonce(1회성) (TTL 자동 정리)
+    }
   }
 }

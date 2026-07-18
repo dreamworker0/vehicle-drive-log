@@ -141,3 +141,7 @@ export { slackEvents } from "./handlers/https/slackEvents";
 
 // Slack 어시스턴트 — 워커 (자연어 파싱 → 예약 조회/생성)
 export { onSlackTaskCreated } from "./handlers/triggers/onSlackTaskCreated";
+
+// Slack 멀티테넌트 셀프서비스 — OAuth 설치 URL 발급(콜러블) + 콜백(토큰 교환·암호화 저장)
+export { getSlackInstallUrl } from "./handlers/callable/getSlackInstallUrl";
+export { slackOauthCallback } from "./handlers/https/slackOauthCallback";

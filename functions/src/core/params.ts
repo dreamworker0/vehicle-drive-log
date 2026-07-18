@@ -35,6 +35,15 @@ export const SLACK_BOT_TOKEN = defineSecret("SLACK_BOT_TOKEN");
  *  생성 예: `openssl rand -base64 32` → firebase functions:secrets:set SLACK_TOKEN_ENC_KEY */
 export const SLACK_TOKEN_ENC_KEY = defineSecret("SLACK_TOKEN_ENC_KEY");
 
+/** Slack 앱 OAuth 클라이언트 ID — 셀프서비스 설치 URL 생성 + code 교환 (배포형 앱 1개, 비밀 아님이지만 일관성 위해 시크릿) */
+export const SLACK_CLIENT_ID = defineSecret("SLACK_CLIENT_ID");
+
+/** Slack 앱 OAuth 클라이언트 시크릿 — oauth.v2.access code 교환 전용 */
+export const SLACK_CLIENT_SECRET = defineSecret("SLACK_CLIENT_SECRET");
+
+/** OAuth state 서명 키 — 설치 흐름의 CSRF/변조 방지 HMAC. 아무 랜덤값(예: openssl rand -base64 32) */
+export const SLACK_STATE_SECRET = defineSecret("SLACK_STATE_SECRET");
+
 // GOOGLE_OAUTH_CLIENT_SECRET은 이관 대상 아님 (2026-07-11 확인):
 // 배포 환경에 값이 없었고, 이를 쓰던 개인 캘린더 동기화 기능은 한 번도
 // 완성·동작한 적 없는 미완성 코드라 같은 날 제거했다(예약 트리거 잔재 정리).
