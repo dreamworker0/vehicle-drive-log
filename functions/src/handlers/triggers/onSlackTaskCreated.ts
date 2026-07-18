@@ -165,6 +165,12 @@ export const onSlackTaskCreated = onDocumentCreated(
             await checkRateLimitByUid("slackAssistantDailyOrg", integration.organizationId, orgLimit.max, orgLimit.windowSec, "closed");
 
             // 3) 신원 매핑 (Slack user → 앱 계정, 소속 검증 포함)
+            // 진단용: 수신된 식별자 기록 (개인정보 아님 — Slack 내부 ID)
+            log("INFO", "onSlackTaskCreated", "신원 매핑 시도", {
+                teamId: task.teamId,
+                slackUserId: task.slackUserId,
+                kind: task.kind,
+            });
             const resolved = await resolveSlackUser(botToken, task.teamId, task.slackUserId, integration.organizationId);
             if (!resolved.ok) {
                 await fail(resolved.message);
