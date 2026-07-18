@@ -10,6 +10,14 @@
  */
 import { execFileSync } from "child_process";
 
+// git 실행 불가/비-저장소 환경에서 모든 검사가 잘못 실패하지 않도록 사전 확인한다.
+try {
+    execFileSync("git", ["rev-parse", "--is-inside-work-tree"], { stdio: "ignore" });
+} catch {
+    console.error("❌ Git 저장소가 아니거나 git을 실행할 수 없습니다.");
+    process.exit(1);
+}
+
 /** 반드시 무시되어야 하는 파일 (커밋 시 시크릿 유출 위험) */
 const MUST_IGNORE = [
     ".env",
@@ -26,13 +34,17 @@ const MUST_IGNORE = [
 
 /** 반드시 추적되어야 하는 파일 (예시/에뮬레이터 설정 — 시크릿 아님) */
 const MUST_TRACK = [
+    ".env.example",
     ".env.local.example",
     ".env.emulator",
+    "functions/.env.example",
 ];
 
 function isIgnored(relPath: string): boolean {
     try {
-        execFileSync("git", ["check-ignore", "-q", "--", relPath], { stdio: "ignore" });
+        // --no-index: 인덱스(추적) 상태와 무관하게 .gitignore 규칙 자체만 평가한다.
+        // (추적 중인 파일도 규칙 매치 여부를 정확히 검사하기 위함)
+        execFileSync("git", ["check-ignore", "-q", "--no-index", "--", relPath], { stdio: "ignore" });
         return true;
     } catch {
         return false;
