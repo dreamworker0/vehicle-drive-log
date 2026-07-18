@@ -5,7 +5,8 @@
  */
 import { memo, useState } from 'react';
 import { formatTimestampFull } from '../../lib/dateUtils';
-import DocumentViewer from '../common/DocumentViewer';
+import OrgDocumentViewer from './OrgDocumentViewer';
+import { hasOrgDocument } from '../../lib/orgDocument';
 import OrgCardHeader from './orgCard/OrgCardHeader';
 import OrgEditForm from './orgCard/OrgEditForm';
 import OrgMemberTable from './orgCard/OrgMemberTable';
@@ -139,7 +140,7 @@ export default memo(function OrgCard({
                                 )}
 
                                 {/* 증빙서류 보기 토글 */}
-                                {org.uniqueNumberImageUrl && (
+                                {hasOrgDocument(org) && (
                                     <div className="mt-1">
                                         <button
                                             onClick={(e) => { e.stopPropagation(); setShowImage(v => !v); }}
@@ -148,7 +149,7 @@ export default memo(function OrgCard({
                                             {showImage ? '증빙서류 닫기 ▲' : '📋 증빙서류 보기 ▼'}
                                         </button>
                                         {showImage && (
-                                            <DocumentViewer url={org.uniqueNumberImageUrl || ''} stopPropagation />
+                                            <OrgDocumentViewer orgId={org.id} stopPropagation />
                                         )}
                                     </div>
                                 )}

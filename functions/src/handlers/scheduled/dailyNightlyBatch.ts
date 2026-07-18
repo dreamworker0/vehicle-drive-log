@@ -121,16 +121,20 @@ async function cleanupImages(db: FirebaseFirestore.Firestore, bucket: ReturnType
     for (const orgDoc of targetDocs) {
         const orgId = orgDoc.id;
         const data = orgDoc.data();
-        const imageUrl = data.uniqueNumberImageUrl as string;
+        // 신규 문서는 경로(uniqueNumberImagePath), 레거시 문서는 토큰 URL(uniqueNumberImageUrl). (2026-07-18 P0-3)
+        const imagePath = (data.uniqueNumberImagePath as string) || "";
+        const imageUrl = (data.uniqueNumberImageUrl as string) || "";
 
-        if (!imageUrl) continue;
+        if (!imagePath && !imageUrl) continue;
 
         const orgName = (data.name as string) || orgId;
 
         try {
-            const extensions = ["jpg", "pdf"];
-            for (const ext of extensions) {
-                const filePath = `organizations/${orgId}/uniqueNumberImage.${ext}`;
+            // 저장된 경로가 있으면 그것만 삭제한다. 경로 미상(레거시)이면 허용 확장자를 모두 시도한다.
+            const candidatePaths = imagePath
+                ? [imagePath]
+                : ["jpg", "png", "webp", "pdf"].map((ext) => `organizations/${orgId}/uniqueNumberImage.${ext}`);
+            for (const filePath of candidatePaths) {
                 const file = bucket.file(filePath);
                 const [exists] = await file.exists();
                 if (exists) {
@@ -139,7 +143,7 @@ async function cleanupImages(db: FirebaseFirestore.Firestore, bucket: ReturnType
                 }
             }
 
-            await orgDoc.ref.update({ uniqueNumberImageUrl: "" });
+            await orgDoc.ref.update({ uniqueNumberImageUrl: "", uniqueNumberImagePath: "" });
             totalCleaned++;
             console.log(`Cleaned certificate for "${orgName}" (${orgId})`);
         } catch (err: unknown) {

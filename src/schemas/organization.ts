@@ -36,6 +36,7 @@ export const organizationSchema = z.object({
     inviteCode: z.string().optional().catch(undefined),
     uniqueNumber: z.string().optional().catch(undefined),
     uniqueNumberImageUrl: z.string().optional().catch(undefined),
+    uniqueNumberImagePath: z.string().optional().catch(undefined),
     aiVerified: z.boolean().optional().catch(undefined),
     aiVerifyDetail: z.object({
         documentType: z.string().optional().catch(undefined),
