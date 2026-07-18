@@ -271,4 +271,6 @@ firebase deploy --only firestore:rules,storage
 
 ## 라이선스
 
-비공개 프로젝트
+[MIT License](LICENSE) © 2026 소셜프리즘 (Social Prism)
+
+누구나 자유롭게 사용·수정·재배포할 수 있습니다. 저작권 표시만 유지해 주세요.
