@@ -9,10 +9,20 @@ lerna-debug.log*
 
 node_modules
 dist
-.env
-.env.local
 dist-ssr
 *.local
+
+# 환경변수 — 모든 변형을 기본 차단하고, 예시(*.example)와 에뮬레이터 설정만 명시 허용한다.
+# (.env.production/.development/.test, functions/.env.<project-id>, .runtimeconfig.json 등)
+.env
+.env.*
+functions/.env
+functions/.env.*
+.runtimeconfig.json
+!.env.example
+!.env.local.example
+!.env.emulator
+!functions/.env.example
 
 # Editor directories and files
 .vscode/*
@@ -52,8 +62,7 @@ firebase-debug.log
 firestore-debug.log
 ui-debug.log
 
-# Secrets — never commit these
-functions/.env
+# Secrets — never commit these (env 파일은 위 "환경변수" 블록에서 일괄 차단)
 *.pem
 *.key
 # Firebase Admin SDK 서비스계정 키 (스크립트/스킬이 참조하는 파일명 — god-mode 자격증명, 커밋 금지)
