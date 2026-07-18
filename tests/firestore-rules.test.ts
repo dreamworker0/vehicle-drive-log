@@ -459,4 +459,36 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
       driverUid: 'user_X', createdByUid: 'someone_else', startKm: 20, endKm: 30,
     }));
   });
+
+  it('13. 메신저 어시스턴트 서버 전용 컬렉션 — 클라이언트 접근 전면 차단', async () => {
+    // 연동 매핑·매핑 캐시·task 큐·확인 문서는 Functions(Admin SDK) 전용이며
+    // 어떤 역할의 클라이언트도 읽거나 쓸 수 없어야 한다.
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.collection('integrations').doc('slack_T123').set({ organizationId: 'org-A', enabled: true });
+      await db.collection('slackUsers').doc('T123_U1').set({ uid: 'user_A', email: 'a@x.com' });
+      await db.collection('slackTasks').doc('Ev1').set({ kind: 'message', teamId: 'T123' });
+      await db.collection('slackConfirmations').doc('conf1').set({ slackUserId: 'U1', status: 'pending' });
+    });
+
+    // 슈퍼관리자조차 접근 불가 (전면 false)
+    const superDb = setupContext('super_1', { role: 'superAdmin' }).firestore();
+    await assertFails(superDb.collection('integrations').doc('slack_T123').get());
+    await assertFails(superDb.collection('slackTasks').doc('Ev1').get());
+
+    // 일반 사용자의 읽기·쓰기 모두 차단
+    const memberDb = setupContext('user_A', { role: 'employee', orgId: 'org-A' }).firestore();
+    await assertFails(memberDb.collection('integrations').doc('slack_T123').get());
+    await assertFails(memberDb.collection('slackUsers').doc('T123_U1').get());
+    await assertFails(memberDb.collection('slackConfirmations').doc('conf1').get());
+
+    // 특히 예약 확인 문서를 임의 생성해 예약을 밀어넣는 우회 시도 → 차단
+    await assertFails(memberDb.collection('slackConfirmations').doc('conf_evil').set({
+      slackUserId: 'U1', status: 'pending', proposal: { organizationId: 'org-A', vehicleId: 'v_A' },
+    }));
+    // integrations 위조로 타 워크스페이스를 자기 기관에 연결하는 시도 → 차단
+    await assertFails(memberDb.collection('integrations').doc('slack_EVIL').set({
+      organizationId: 'org-A', enabled: true,
+    }));
+  });
 });

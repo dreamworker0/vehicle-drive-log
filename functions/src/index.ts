@@ -135,3 +135,9 @@ export { onDriveLogCreated, onDriveLogUpdated, onDriveLogDeleted } from "./handl
 
 // 구글 캘린더 온디맨드 동기화 API
 export { triggerOnDemandCalendarSync } from "./handlers/callable/triggerOnDemandCalendarSync";
+
+// Slack 어시스턴트 — 이벤트 수신 (서명 검증 + task 큐잉, 3초 ack)
+export { slackEvents } from "./handlers/https/slackEvents";
+
+// Slack 어시스턴트 — 워커 (자연어 파싱 → 예약 조회/생성)
+export { onSlackTaskCreated } from "./handlers/triggers/onSlackTaskCreated";

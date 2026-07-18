@@ -22,6 +22,12 @@ export const EMAILJS_PRIVATE_KEY = defineSecret("EMAILJS_PRIVATE_KEY");
 /** 알림톡 Cafe24 프록시 인증 토큰 — services/alimtalk 사용 함수 전부 */
 export const ALIMTALK_PROXY_TOKEN = defineSecret("ALIMTALK_PROXY_TOKEN");
 
+/** Slack 앱 서명 시크릿 — slackEvents 수신 요청의 v0 HMAC 서명 검증 */
+export const SLACK_SIGNING_SECRET = defineSecret("SLACK_SIGNING_SECRET");
+
+/** Slack 봇 토큰(xoxb-) — onSlackTaskCreated 워커의 Slack Web API 호출 (users.info, chat.postMessage) */
+export const SLACK_BOT_TOKEN = defineSecret("SLACK_BOT_TOKEN");
+
 // GOOGLE_OAUTH_CLIENT_SECRET은 이관 대상 아님 (2026-07-11 확인):
 // 배포 환경에 값이 없었고, 이를 쓰던 개인 캘린더 동기화 기능은 한 번도
 // 완성·동작한 적 없는 미완성 코드라 같은 날 제거했다(예약 트리거 잔재 정리).

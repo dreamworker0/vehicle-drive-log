@@ -306,5 +306,19 @@ service cloud.firestore {
       allow read: if isSuperAdmin() || (document == 'holidays' && isSignedIn());
       allow write: if false; // Cloud Functions에서만 쓰기
     }
+
+    // === 메신저 어시스턴트 (Slack 등) — 서버 전용, 클라이언트 접근 전면 차단 ===
+    match /integrations/{docId} {
+      allow read, write: if false; // 워크스페이스↔기관 매핑 (콘솔/Functions에서만 관리)
+    }
+    match /slackUsers/{docId} {
+      allow read, write: if false; // Slack 사용자↔앱 계정 매핑 캐시
+    }
+    match /slackTasks/{docId} {
+      allow read, write: if false; // 수신 이벤트 task 큐 (TTL 자동 정리)
+    }
+    match /slackConfirmations/{docId} {
+      allow read, write: if false; // 예약 확인 대기 문서 (TTL 자동 정리)
+    }
   }
 }

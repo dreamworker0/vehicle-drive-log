@@ -18,6 +18,8 @@ export const DEFAULT_RATE_LIMITS = {
     joinOrganization: { max: 5, windowSec: 3600 },   // uid당 시간당 5회
     sendApprovalEmail: { max: 10, windowSec: 3600 },  // uid당 시간당 10회
     askAI: { max: 5, windowSec: 60 },               // uid당 분당 5회
+    slackAssistant: { max: 10, windowSec: 600 },    // Slack 사용자당 10분당 10회 (Gemini 비용 방어, fail-closed)
+    slackAssistantDailyOrg: { max: 100, windowSec: 86400 }, // Slack 기관당 일일 누적
 } as const;
 
 export type RateLimitKey = keyof typeof DEFAULT_RATE_LIMITS;
