@@ -85,7 +85,7 @@ export default function SlackIntegrationSection() {
                     <p className="text-xs font-semibold uppercase tracking-wide text-surface-500 dark:text-surface-400 mb-2">연결 전 확인 (3가지)</p>
                     <div className="space-y-2 mb-5">
                         <CheckItem title="우리 기관 Slack 워크스페이스가 있다" />
-                        <CheckItem title="나는 워크스페이스 관리자다" hint="아니라면 워크스페이스 관리자가 대신 승인해야 합니다." />
+                        <CheckItem title="나는 Slack 워크스페이스 관리자다" hint="아니라면 Slack 워크스페이스 관리자가 대신 승인해야 합니다." />
                         <CheckItem warn title="직원의 Slack 이메일 = 차량운행일지 가입 이메일" hint="이메일이 다르면 봇이 예약자를 알아보지 못합니다. 연결 후 '직원 준비 상태'에서 자동으로 점검해 드립니다." />
                     </div>
 
