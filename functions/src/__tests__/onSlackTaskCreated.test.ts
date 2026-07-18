@@ -36,9 +36,11 @@ jest.mock('../core/params', () => ({
 }));
 const mockPostMessage = jest.fn().mockResolvedValue(true);
 const mockRespondToUrl = jest.fn().mockResolvedValue(undefined);
+const mockAuthTest = jest.fn().mockResolvedValue({ ok: true, teamId: 'T123', team: 'ws', botUserId: 'B1' });
 jest.mock('../services/slack/slackApi', () => ({
     postMessage: (...args: unknown[]) => mockPostMessage(...args),
     respondToUrl: (...args: unknown[]) => mockRespondToUrl(...args),
+    authTest: (...args: unknown[]) => mockAuthTest(...args),
 }));
 const mockGetIntegration = jest.fn();
 const mockResolveUser = jest.fn();
