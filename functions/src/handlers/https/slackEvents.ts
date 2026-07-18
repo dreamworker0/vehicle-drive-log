@@ -12,7 +12,7 @@ import { onRequest } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import type { Request, Response } from "firebase-functions/node_modules/@types/express";
 import { SLACK_SIGNING_SECRET } from "../../core/params";
-import { verifySlackSignature } from "../../services/slack/verifySlackSignature";
+import { checkSlackSignature } from "../../services/slack/verifySlackSignature";
 import { wrapHttps, log } from "../../utils/helpers";
 import { checkRateLimitByIp } from "../../utils/rateLimit";
 
@@ -52,16 +52,23 @@ async function handler(req: Request, res: Response): Promise<void> {
 
     // --- 서명 검증 (v0 HMAC + timestamp ±5분) ---
     const rawBody = (req as unknown as { rawBody?: Buffer }).rawBody;
-    const valid = verifySlackSignature({
+    const sigCheck = checkSlackSignature({
         signingSecret: SLACK_SIGNING_SECRET.value(),
         timestamp: req.headers["x-slack-request-timestamp"] as string | undefined,
         signature: req.headers["x-slack-signature"] as string | undefined,
         rawBody,
     });
-    if (!valid) {
+    if (!sigCheck.valid) {
         const ip = req.ip || "unknown";
         const exceeded = await checkRateLimitByIp("slackEvents", ip, 30, 600);
-        log("WARNING", "slackEvents", "서명 검증 실패", { ip });
+        // 진단용: 실패 사유·본문 길이·헤더 존재 여부만 기록 (시크릿·본문 내용은 남기지 않음)
+        log("WARNING", "slackEvents", "서명 검증 실패", {
+            ip,
+            reason: sigCheck.reason,
+            bodyLength: sigCheck.bodyLength,
+            hasTsHeader: Boolean(req.headers["x-slack-request-timestamp"]),
+            hasSigHeader: Boolean(req.headers["x-slack-signature"]),
+        });
         res.status(exceeded ? 429 : 401).json({ error: "invalid signature" });
         return;
     }
