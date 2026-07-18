@@ -25,10 +25,9 @@ export const ALIMTALK_PROXY_TOKEN = defineSecret("ALIMTALK_PROXY_TOKEN");
 /** Slack 앱 서명 시크릿 — slackEvents 수신 요청의 v0 HMAC 서명 검증 */
 export const SLACK_SIGNING_SECRET = defineSecret("SLACK_SIGNING_SECRET");
 
-/** Slack 봇 토큰(xoxb-) — onSlackTaskCreated 워커의 Slack Web API 호출 (users.info, chat.postMessage)
- *  @deprecated 멀티테넌트 전환 중. 기관별 토큰은 integrations 문서에 암호화 저장하며,
- *  전환 완료(Phase D) 후 제거 예정. */
-export const SLACK_BOT_TOKEN = defineSecret("SLACK_BOT_TOKEN");
+// SLACK_BOT_TOKEN(전역 봇 토큰) 제거됨 (2026-07-18, 멀티테넌트 전환 완료):
+// 기관별 봇 토큰을 integrations/slack_{teamId}.tokenCipher에 암호화 저장하고
+// 워커가 복호화해 쓴다(services/slack/tokenCrypto). Secret Manager의 SLACK_BOT_TOKEN은 폐기 대상.
 
 /** Slack 봇 토큰 암호화 마스터 키 — base64 인코딩된 32바이트(AES-256) 키.
  *  integrations/slack_{teamId} 문서의 tokenCipher 복호화(services/slack/tokenCrypto)에 사용.

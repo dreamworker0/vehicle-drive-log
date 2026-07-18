@@ -28,7 +28,6 @@ jest.mock('firebase-admin/firestore', () => ({
 const SECRET = 'test-signing-secret';
 jest.mock('../core/params', () => ({
     SLACK_SIGNING_SECRET: { value: () => 'test-signing-secret' },
-    SLACK_BOT_TOKEN: { value: () => 'xoxb-test' },
 }));
 const mockCheckRateLimitByIp = jest.fn().mockResolvedValue(false);
 jest.mock('../utils/rateLimit', () => ({
