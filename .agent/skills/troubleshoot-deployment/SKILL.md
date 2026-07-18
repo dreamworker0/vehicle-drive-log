@@ -43,6 +43,32 @@ description: Cloud Functions, 프론트엔드 빌드 및 배포 시 발생하는
 **해결책**:
 - `vite.config.ts`의 test 섹션에서 `env` 변수를 명시적으로 로드하거나 Mock 설정(`vi.mock`)을 통해 Firebase 초기화 부분을 모의(Mock) 객체로 우회한다.
 
+### 2.5 새 시크릿·새 공개 HTTP 함수 첫 배포 시 IAM 권한 거부 (403 setIamPolicy)
+**증상**: CI 배포의 "Deploy Functions & Rules" 단계가 아래 중 하나로 실패.
+- `Permission 'secretmanager.secrets.setIamPolicy' denied for resource '.../secrets/<NAME>'`
+- `Missing required permission ... cloudfunctions.functions.setIamPolicy ... to deploy the following functions: <fn>`
+
+**원인**: CI 배포 서비스계정(`firebase-adminsdk-fbsvc@vehicle-drive-log.iam.gserviceaccount.com`)은 `roles/editor`를 갖는데, **Editor 역할에는 `setIamPolicy` 계열 권한이 빠져 있다**(IAM 정책 변경은 admin/owner 역할에만 포함). 그래서:
+- **새 `defineSecret`을 쓰는 함수를 처음 배포**하면, 런타임 SA(`1066541065552-compute@developer.gserviceaccount.com`)에 시크릿 읽기 권한(secretAccessor)을 걸어야 하는데 그 IAM 설정에서 막힌다. (기존 시크릿은 바인딩이 이미 있어 재배포 시 통과)
+- **새 공개 HTTP 함수(onRequest, 미인증 호출용 — 예: 웹훅)를 처음 배포**하면, invoker를 공개(allUsers)로 여는 초기 IAM 설정에서 막힌다. (기존 HTTP 함수는 이미 바인딩이 있어 통과)
+
+**해결책** (프로젝트 소유자가 1회 부여, 이후 영구히 자동 처리):
+- **새 시크릿**: 런타임 SA에 시크릿별 읽기 권한을 미리 부여하면, 배포 시 CLI가 "이미 있음"을 확인하고 setIamPolicy 호출을 건너뛴다.
+  ```bash
+  gcloud secrets add-iam-policy-binding <SECRET_NAME> \
+    --member="serviceAccount:1066541065552-compute@developer.gserviceaccount.com" \
+    --role="roles/secretmanager.secretAccessor" --project=vehicle-drive-log
+  ```
+- **새 공개 HTTP 함수**: 배포 SA에 Cloud Functions Admin 역할 부여(`cloudfunctions.functions.setIamPolicy` 포함). 이미 있는 Editor에 더해지는 것이라 실질 확장은 setIamPolicy뿐.
+  ```bash
+  gcloud projects add-iam-policy-binding vehicle-drive-log \
+    --member="serviceAccount:firebase-adminsdk-fbsvc@vehicle-drive-log.iam.gserviceaccount.com" \
+    --role="roles/cloudfunctions.admin"
+  ```
+- 권한 부여 후 실패한 배포를 재실행: `gh run rerun <deploy_run_id> --failed`.
+- 순수 백그라운드 트리거(onDocumentCreated 등)는 공개 invoker가 아니므로 이 문제 없음. **공개 onRequest만** 해당.
+- 참고: 시크릿 값 갱신(`firebase functions:secrets:set`) 후에는 함수 재배포가 있어야 새 버전이 반영된다. 로컬 재배포 프롬프트(`Y/n`)는 **n**(로컬 배포 금지) 후 CI 재배포로 반영.
+
 ## 3. 롤백 전략 (긴급 복구 시)
 앱 배포 직후 치명적인 오류(예: App Check 적용 후 대량 인증 실패)가 발생하면, 즉각적인 문제 분석보다 **원복(Rollback)**이 우선입니다.
 - **프론트엔드 롤백**: `firebase hosting:rollback` 명령 실행
