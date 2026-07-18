@@ -13,6 +13,7 @@ interface SlackApiResponse {
     [key: string]: unknown;
 }
 
+/** JSON 본문 호출 — 쓰기 계열(chat.postMessage 등)에 사용 */
 async function slackApiCall(method: string, botToken: string, payload: Record<string, unknown>): Promise<SlackApiResponse> {
     const res = await fetch(`${SLACK_API_BASE}/${method}`, {
         method: "POST",
@@ -21,6 +22,27 @@ async function slackApiCall(method: string, botToken: string, payload: Record<st
             "Authorization": `Bearer ${botToken}`,
         },
         body: JSON.stringify(payload),
+    });
+    const data = await res.json() as SlackApiResponse;
+    if (!data.ok) {
+        log("WARNING", "slackApi", `Slack API ${method} 실패`, { error: data.error });
+    }
+    return data;
+}
+
+/**
+ * form-urlencoded 호출 — 읽기 계열(users.info 등)에 사용.
+ * Slack 읽기 메서드는 JSON 본문의 인자를 파싱하지 못해 파라미터가 누락되므로
+ * (예: users.info가 user 없이 호출되어 user_not_found) 반드시 폼 인코딩으로 보낸다.
+ */
+async function slackApiCallForm(method: string, botToken: string, params: Record<string, string>): Promise<SlackApiResponse> {
+    const res = await fetch(`${SLACK_API_BASE}/${method}`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
+            "Authorization": `Bearer ${botToken}`,
+        },
+        body: new URLSearchParams(params).toString(),
     });
     const data = await res.json() as SlackApiResponse;
     if (!data.ok) {
@@ -61,7 +83,7 @@ export async function getSlackUserInfo(
     botToken: string,
     slackUserId: string
 ): Promise<{ email: string | null; realName: string | null }> {
-    const data = await slackApiCall("users.info", botToken, { user: slackUserId });
+    const data = await slackApiCallForm("users.info", botToken, { user: slackUserId });
     if (!data.ok) return { email: null, realName: null };
     const user = data.user as { profile?: { email?: string; real_name?: string } } | undefined;
     return {
