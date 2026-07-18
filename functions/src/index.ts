@@ -145,3 +145,8 @@ export { onSlackTaskCreated } from "./handlers/triggers/onSlackTaskCreated";
 // Slack 멀티테넌트 셀프서비스 — OAuth 설치 URL 발급(콜러블) + 콜백(토큰 교환·암호화 저장)
 export { getSlackInstallUrl } from "./handlers/callable/getSlackInstallUrl";
 export { slackOauthCallback } from "./handlers/https/slackOauthCallback";
+
+// Slack 연결 설정 화면 — 상태 조회 / 연결 해제 / 직원 준비 상태 진단
+export { getSlackConnectionStatus } from "./handlers/callable/getSlackConnectionStatus";
+export { disconnectSlack } from "./handlers/callable/disconnectSlack";
+export { diagnoseSlackConnection } from "./handlers/callable/diagnoseSlackConnection";

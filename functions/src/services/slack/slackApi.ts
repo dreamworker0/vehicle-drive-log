@@ -142,6 +142,32 @@ export async function authRevoke(token: string): Promise<boolean> {
     return data.ok === true && data.revoked === true;
 }
 
+/**
+ * 워크스페이스 사용자 이메일 수집 (users.list, 읽기 계열 → form-urlencoded).
+ * 연결 진단(직원 이메일 매칭)용 — 봇·삭제 계정은 제외하고 소문자 이메일 Set을 반환.
+ * 페이지네이션 cursor를 따라가되 과도한 호출 방지를 위해 최대 5페이지(약 1,000명)로 제한.
+ */
+export async function listSlackEmails(botToken: string): Promise<{ ok: boolean; emails: Set<string>; error?: string }> {
+    const emails = new Set<string>();
+    let cursor = "";
+    for (let page = 0; page < 5; page++) {
+        const params: Record<string, string> = { limit: "200" };
+        if (cursor) params.cursor = cursor;
+        const data = await slackApiCallForm("users.list", botToken, params);
+        if (!data.ok) return { ok: false, emails, error: data.error };
+
+        const members = (data.members as Array<{ deleted?: boolean; is_bot?: boolean; profile?: { email?: string } }>) || [];
+        for (const m of members) {
+            if (m.deleted || m.is_bot) continue;
+            const email = m.profile?.email;
+            if (email) emails.add(email.toLowerCase());
+        }
+        cursor = ((data.response_metadata as { next_cursor?: string })?.next_cursor || "").trim();
+        if (!cursor) break;
+    }
+    return { ok: true, emails };
+}
+
 /** Interactivity response_url로 응답 (원 메시지 교체 등) */
 export async function respondToUrl(
     responseUrl: string,

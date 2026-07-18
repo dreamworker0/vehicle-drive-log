@@ -14,6 +14,7 @@ import OrgInfoSection from './settings/OrgInfoSection';
 import FeatureToggleSection from './settings/FeatureToggleSection';
 import ApprovalLineSection from './settings/ApprovalLineSection';
 import AccountSection from './settings/AccountSection';
+import SlackIntegrationSection from './settings/SlackIntegrationSection';
 
 export default function Settings() {
     const {
@@ -109,6 +110,9 @@ export default function Settings() {
                 onAddHoliday={handleAddHoliday}
                 onDeleteHoliday={handleDeleteHoliday}
             />
+
+            {/* Slack 연결 (기관 셀프서비스) */}
+            <SlackIntegrationSection />
 
             {/* 앱 정보 섹션 */}
             <h2 className="text-sm font-semibold text-surface-400 dark:text-surface-500 uppercase tracking-wider mt-8 mb-3 px-1">앱 정보</h2>

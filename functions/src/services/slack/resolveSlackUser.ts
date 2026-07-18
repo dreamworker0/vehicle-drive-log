@@ -27,6 +27,23 @@ export interface SlackIntegration {
 }
 
 /**
+ * 기관 ID로 Slack 연동 문서를 찾는다 (설정 화면용 — enabled 여부 무관).
+ * organizationId 단일 equality 조회 후 문서 ID 접두사(slack_)로 판별하므로 복합 인덱스가 필요 없다.
+ */
+export async function findSlackIntegrationByOrg(organizationId: string): Promise<{
+    teamId: string;
+    ref: FirebaseFirestore.DocumentReference;
+    data: FirebaseFirestore.DocumentData;
+} | null> {
+    const snap = await db.collection("integrations")
+        .where("organizationId", "==", organizationId)
+        .get();
+    const doc = snap.docs.find((d) => d.id.startsWith("slack_"));
+    if (!doc) return null;
+    return { teamId: doc.id.slice("slack_".length), ref: doc.ref, data: doc.data() };
+}
+
+/**
  * integrations/slack_{teamId} 문서에서 연동 기관 + 복호화된 봇 토큰을 확인한다.
  * 미연동/비활성/토큰 없음/복호화 실패 시 null (호출부는 "미연동"으로 처리).
  */

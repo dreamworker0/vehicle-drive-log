@@ -24,7 +24,8 @@ const APP_URL = "https://vehicle-drive-log.web.app";
 const REDIRECT_URI = "https://asia-northeast3-vehicle-drive-log.cloudfunctions.net/slackOauthCallback";
 
 function redirect(res: Response, params: string): void {
-    res.redirect(302, `${APP_URL}/?${params}`);
+    // 설정 페이지로 복귀 — SlackIntegrationSection이 ?slack= 쿼리를 감지해 토스트를 띄운다
+    res.redirect(302, `${APP_URL}/admin/settings?${params}`);
 }
 
 async function handler(req: Request, res: Response): Promise<void> {
