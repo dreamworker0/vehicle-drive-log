@@ -5,16 +5,15 @@ function isSuperAdmin() {
   return request.auth != null && request.auth.token.role == 'superAdmin';
 }
 
-function isOrgMember(orgId) {
-  return request.auth != null && request.auth.token.orgId == orgId;
-}
-
 service firebase.storage {
   match /b/{bucket}/o {
-    // 기관 고유번호증 사본 — 업로드는 submitOrgApplication 함수(Admin SDK)가 수행하므로
-    // 클라이언트 쓰기는 차단하고, 경로도 단일 파일 수준으로 제한 (중첩 경로 업로드 방지)
+    // 기관 고유번호증 사본(정부 발급 PII) — 업로드는 submitOrgApplication 함수(Admin SDK)가 수행하므로
+    // 클라이언트 쓰기는 차단하고, 경로도 단일 파일 수준으로 제한 (중첩 경로 업로드 방지).
+    // 읽기는 superAdmin 전용: 앱은 superAdmin 콜러블(getOrgDocumentUrl)이 발급하는 단기 서명 URL로만
+    // 표시하며, 어떤 클라이언트도 이 경로를 직접 읽지 않는다. org 멤버 직접 읽기 권한은 불필요한
+    // PII 노출 표면이라 제거한다. (2026-07-18 보안 재점검 B)
     match /organizations/{orgId}/{fileName} {
-      allow read: if isOrgMember(orgId) || isSuperAdmin();
+      allow read: if isSuperAdmin();
       allow write: if false;
     }
 
