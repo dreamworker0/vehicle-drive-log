@@ -2,7 +2,7 @@
 
 사회복지기관·비영리단체를 위한 **무료** 차량 운행일지 웹 애플리케이션 (PWA)
 
-> 🔗 **지금 써보기**: **[vehicle-drive-log.web.app](https://vehicle-drive-log.web.app)** &nbsp;·&nbsp; 🛠 **[내 기관에 직접 설치하기](docs/SELF_HOSTING.md)**
+> 🔗 **지금 써보기**: **[vehicle-drive-log.web.app](https://vehicle-drive-log.web.app)** &nbsp;·&nbsp; ▶️ **[데모 영상](https://youtu.be/XdT5Wm_pd3s)** &nbsp;·&nbsp; 🛠 **[내 기관에 직접 설치하기](docs/SELF_HOSTING.md)**
 
 <p>
   <img src="public/icons/screenshot-desktop.webp" alt="데스크톱 화면" width="620">
