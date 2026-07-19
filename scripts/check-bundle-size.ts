@@ -16,11 +16,11 @@ const DIST_DIR = path.resolve(__dirname, '..', 'dist', 'assets');
 // 원시(raw)는 다운로드 후 파싱/실행 비용, gzip은 실제 전송량을 각각 대변한다.
 // 둘 다 하드 게이트 — 어느 하나라도 넘으면 빌드를 실패시켜 회귀를 막는다.
 const BUDGETS = {
-    js: 3000 * 1024,        // JS 원시 전체: 3000KB (code-split 청크 포함)
+    js: 3150 * 1024,        // JS 원시 전체: 3150KB (firebase 12.16 정식 마이너로 실측 ~3064KB. gzip은 여전히 예산 이내)
     css: 200 * 1024,        // CSS 원시 전체: 200KB
-    jsGzip: 950 * 1024,     // JS gzip 전체: 950KB (실측 ~917KB)
+    jsGzip: 950 * 1024,     // JS gzip 전체: 950KB (실측 ~947KB — 실사용자 다운로드 기준 게이트)
     cssGzip: 35 * 1024,     // CSS gzip 전체: 35KB (실측 ~29KB)
-    largestJs: 420 * 1024,  // 단일 최대 JS 청크 원시: 420KB (실측 recharts ~399KB)
+    largestJs: 600 * 1024,  // 단일 최대 JS 청크 원시: 600KB (firebase 12.16에서 firebase-db 청크 ~582KB로 증가)
 };
 
 interface FileInfo {
