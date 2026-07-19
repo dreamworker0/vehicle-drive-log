@@ -14,7 +14,7 @@ const db = getFirestore();
 export const joinOrganization = onCall(
     {
         region: "asia-northeast3",
-        enforceAppCheck: false,
+        enforceAppCheck: true,
     },
     async (request) => {
         // 1. 인증 확인

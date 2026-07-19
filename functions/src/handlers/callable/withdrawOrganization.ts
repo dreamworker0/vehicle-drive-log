@@ -13,7 +13,7 @@ type WithdrawReason = (typeof WITHDRAW_REASONS)[number];
 export const withdrawOrganization = onCall(
     {
         region: "asia-northeast3",
-        enforceAppCheck: false,
+        enforceAppCheck: true,
     },
     async (request) => {
         if (!request.auth) {

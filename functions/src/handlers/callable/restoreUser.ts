@@ -10,7 +10,7 @@ import { maskEmail } from "../../utils/mask";
 export const restoreUser = onCall(
     {
         region: "asia-northeast3",
-        enforceAppCheck: false,
+        enforceAppCheck: true,
     },
     async (request) => {
         if (!request.auth) {

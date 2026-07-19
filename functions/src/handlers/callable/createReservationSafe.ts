@@ -8,7 +8,7 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { createReservationTx } from "../../services/reservation/createReservationCore";
 
 export const createReservationSafe = onCall(
-    { region: "asia-northeast3", enforceAppCheck: false },
+    { region: "asia-northeast3", enforceAppCheck: true },
     async (request) => {
         if (!request.auth) {
             throw new HttpsError("unauthenticated", "로그인이 필요합니다.");

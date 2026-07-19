@@ -12,7 +12,7 @@ import { getAuth } from "firebase-admin/auth";
 export const deleteUserPermanently = onCall(
     {
         region: "asia-northeast3",
-        enforceAppCheck: false,
+        enforceAppCheck: true,
     },
     async (request) => {
         if (!request.auth) {
