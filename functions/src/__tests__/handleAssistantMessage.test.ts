@@ -65,6 +65,17 @@ const mockModifyTx = jest.fn();
 jest.mock('../services/reservation/modifyReservationCore', () => ({
     modifyReservationTx: (...args: unknown[]) => mockModifyTx(...args),
 }));
+const mockEstimate = jest.fn();
+jest.mock('../services/tmap/routeEstimate', () => ({
+    estimateOneWayDurationMin: (...args: unknown[]) => mockEstimate(...args),
+    // 실제와 동일 계산: 왕복×2+60분, 10분 올림, 23:59 상한
+    calcEndTimeFromDuration: (start: string, dur: number) => {
+        const [h, m] = start.split(':').map(Number);
+        const add = Math.ceil((dur * 2 + 60) / 10) * 10;
+        const total = Math.min(h * 60 + m + add, 23 * 60 + 59);
+        return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
+    },
+}));
 
 import { handleAssistantMessage, executeReservationProposal, executeCancelProposal, executeModifyProposal } from "../services/assistant/handleAssistantMessage";
 
@@ -138,6 +149,52 @@ describe('handleAssistantMessage', () => {
         });
         expect(result.replyText).toContain('예약할까요?');
         expect(mockCreateTx).not.toHaveBeenCalled();
+    });
+
+    describe('예약 생성 — 목적지·TMAP 종료 계산', () => {
+        const ACTOR_KEY = { ...ACTOR, conversationKey: 'slack_T_U' };
+        const CREATE = {
+            intent: 'create', needsClarification: false,
+            date: '2026-07-19', startTime: '14:00', endTime: null,
+            vehicleId: 'v1', purpose: '', destination: '서울역',
+        };
+
+        it('목적지 있고 종료 미지정이면 TMAP 이동시간으로 종료를 계산해 제안한다', async () => {
+            mockConvoGet.mockResolvedValue({ exists: true, data: () => ({ address: '서울시 중구' }) });
+            mockParseIntent.mockResolvedValue({ ...CREATE });
+            mockEstimate.mockResolvedValue(30); // 편도 30분 → 왕복60+60=120 → 14:00+2:00 = 16:00
+
+            const result = await handleAssistantMessage('내일 14시 스타렉스로 서울역', ACTOR);
+
+            expect(mockEstimate).toHaveBeenCalledWith('서울시 중구', '서울역');
+            expect(result.proposal?.endTime).toBe('16:00');
+            expect(result.proposal?.destination).toBe('서울역');
+        });
+
+        it('TMAP 계산 실패면 종료 시간을 되묻고 슬롯을 저장한다', async () => {
+            mockConvoGet.mockResolvedValue({ exists: false });
+            mockParseIntent.mockResolvedValue({ ...CREATE });
+            mockEstimate.mockResolvedValue(null); // 주소 미등록·지오코딩 실패 등
+
+            const result = await handleAssistantMessage('내일 14시 스타렉스로 서울역', ACTOR_KEY);
+
+            expect(result.proposal).toBeUndefined();
+            expect(result.replyText).toContain('종료 시간');
+            expect(mockConvoSet).toHaveBeenCalledWith(expect.objectContaining({
+                kind: 'create',
+                slots: expect.objectContaining({ destination: '서울역', endTime: null }),
+            }));
+        });
+
+        it('사용자가 종료를 직접 주면 TMAP을 호출하지 않는다', async () => {
+            mockConvoGet.mockResolvedValue({ exists: false });
+            mockParseIntent.mockResolvedValue({ ...CREATE, endTime: '15:00' });
+
+            const result = await handleAssistantMessage('내일 14~15시 스타렉스로 서울역', ACTOR);
+
+            expect(mockEstimate).not.toHaveBeenCalled();
+            expect(result.proposal?.endTime).toBe('15:00');
+        });
     });
 
     it('정비 중 차량이면 예약 제안을 만들지 않는다', async () => {

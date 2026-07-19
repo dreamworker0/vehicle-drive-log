@@ -69,7 +69,7 @@ describe('parseIntent', () => {
     it('과거 날짜 create는 거부한다', async () => {
         mockGenerateAiContent.mockResolvedValue(JSON.stringify({
             intent: 'create', date: seoulDate(-1), startTime: '14:00', endTime: '16:00',
-            vehicleId: 'v1', needsClarification: false,
+            vehicleId: 'v1', destination: '복지관', needsClarification: false,
         }));
 
         const result = await parseIntent('어제 예약해줘', VEHICLES);
@@ -78,34 +78,35 @@ describe('parseIntent', () => {
         expect(result.clarificationQuestion).toContain('지난 날짜');
     });
 
-    it('create에서 시작만 있고 종료가 없으면 +1시간을 자동으로 채운다 (되묻지 않음)', async () => {
+    it('create에 목적지가 없으면 목적지를 되묻는다 (필수)', async () => {
         mockGenerateAiContent.mockResolvedValue(JSON.stringify({
             intent: 'create', date: seoulDate(1), startTime: '14:00', endTime: null,
-            vehicleId: 'v1', needsClarification: false,
+            vehicleId: 'v1', destination: '', needsClarification: false,
         }));
 
         const result = await parseIntent('내일 14시 스타렉스 예약', VEHICLES);
 
-        expect(result.startTime).toBe('14:00');
-        expect(result.endTime).toBe('15:00');       // +1시간 자동
-        expect(result.needsClarification).toBe(false);
+        expect(result.needsClarification).toBe(true);
+        expect(result.clarificationQuestion).toContain('목적지');
     });
 
-    it('+1시간 자동은 23:59로 상한 처리한다', async () => {
+    it('create에 목적지가 있으면 종료 시간이 없어도 통과한다 (TMAP/되묻기로 채움)', async () => {
         mockGenerateAiContent.mockResolvedValue(JSON.stringify({
-            intent: 'create', date: seoulDate(1), startTime: '23:30', endTime: null,
-            vehicleId: 'v1', needsClarification: false,
+            intent: 'create', date: seoulDate(1), startTime: '14:00', endTime: null,
+            vehicleId: 'v1', destination: '서울역', needsClarification: false,
         }));
 
-        const result = await parseIntent('내일 23시반 예약', VEHICLES);
+        const result = await parseIntent('내일 14시 스타렉스로 서울역', VEHICLES);
 
-        expect(result.endTime).toBe('23:59');
+        expect(result.needsClarification).toBe(false);
+        expect(result.endTime).toBeNull();
+        expect(result.destination).toBe('서울역');
     });
 
     it('시작 시간이 종료 시간 이후면 clarification으로 강등한다', async () => {
         mockGenerateAiContent.mockResolvedValue(JSON.stringify({
             intent: 'create', date: seoulDate(1), startTime: '16:00', endTime: '14:00',
-            vehicleId: 'v1', needsClarification: false,
+            vehicleId: 'v1', destination: '복지관', needsClarification: false,
         }));
 
         const result = await parseIntent('내일 16시부터 14시까지', VEHICLES);
@@ -154,7 +155,7 @@ describe('parseIntent', () => {
             intent: 'create', date: null, startTime: '11:00', endTime: '12:00', vehicleId: null,
             needsClarification: false,
         }));
-        const pending = { date: seoulDate(1), startTime: null, endTime: null, vehicleId: 'v1', purpose: '', destination: '' };
+        const pending = { date: seoulDate(1), startTime: null, endTime: null, vehicleId: 'v1', purpose: '', destination: '복지관' };
 
         const result = await parseIntent('11시~12시', VEHICLES, pending);
 
@@ -171,7 +172,7 @@ describe('parseIntent', () => {
         mockGenerateAiContent.mockResolvedValue(JSON.stringify({
             intent: 'unknown', vehicleId: 'v2',
         }));
-        const pending = { date: seoulDate(1), startTime: '11:00', endTime: '12:00', vehicleId: null, purpose: '', destination: '' };
+        const pending = { date: seoulDate(1), startTime: '11:00', endTime: '12:00', vehicleId: null, purpose: '', destination: '복지관' };
 
         const result = await parseIntent('소나타3333', VEHICLES, pending);
 

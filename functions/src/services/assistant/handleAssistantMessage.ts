@@ -14,6 +14,7 @@ import { findCancelCandidates, type CancelCandidate } from "./cancelReservation"
 import { createReservationTx } from "../reservation/createReservationCore";
 import { cancelReservationTx } from "../reservation/cancelReservationCore";
 import { modifyReservationTx } from "../reservation/modifyReservationCore";
+import { estimateOneWayDurationMin, calcEndTimeFromDuration } from "../tmap/routeEstimate";
 
 const db = getFirestore();
 
@@ -185,7 +186,7 @@ export interface AssistantResult {
 export const ASSISTANT_HELP_TEXT =
     "제가 도와드릴 수 있는 일이에요:\n" +
     "• 예약 조회 — 예: \"오늘 예약 현황 알려줘\", \"내일 일정 보여줘\"\n" +
-    "• 예약 생성 — 예: \"내일 14시부터 16시까지 스타렉스 예약해줘\"\n" +
+    "• 예약 생성 — 예: \"내일 14시 스타렉스로 서울역 예약해줘\" (목적지를 넣으면 종료 시간 자동)\n" +
     "• 예약 취소 — 예: \"내일 스타렉스 예약 취소해줘\"\n" +
     "• 예약 수정 — 예: \"내일 스타렉스 예약을 15시로 옮겨줘\"\n" +
     "• 자유 질문 — 예: \"홍길동이 예약한 차\", \"이번주 예약 누가 했어\", \"우리 기관 차량 뭐 있어\"";
@@ -203,6 +204,12 @@ async function getAssistantVehicles(orgId: string): Promise<Array<AssistantVehic
             name: doc.data().displayName || doc.data().name || "이름 없음",
             isBlocked: doc.data().maintenance?.isBlocked === true,
         }));
+}
+
+/** 기관 주소 조회 (TMAP 출발지). 미등록이면 undefined → 종료 시간 되묻기로 폴백 */
+async function getOrgAddress(orgId: string): Promise<string | undefined> {
+    const snap = await db.collection("organizations").doc(orgId).get();
+    return snap.exists ? (snap.data()?.address as string | undefined) : undefined;
 }
 
 /** 예약 제안 요약 텍스트 (확인 UI에 표시) */
@@ -442,6 +449,30 @@ export async function handleAssistantMessage(text: string, actor: AssistantActor
             return { replyText: `🚫 ${vehicle.name}은(는) 현재 정비 중이라 예약할 수 없습니다.` };
         }
 
+        // 종료 시간 결정: 사용자가 명시했으면 사용, 없으면 목적지 기반 TMAP 이동시간으로 자동 계산.
+        // 계산 실패(기관 주소 미등록·지오코딩 실패·TMAP 오류) 시 종료 시간을 되묻는다.
+        let endTime = intent.endTime;
+        if (!endTime) {
+            const orgAddress = await getOrgAddress(actor.orgId);
+            const durationMin = await estimateOneWayDurationMin(orgAddress, intent.destination);
+            if (durationMin != null) {
+                endTime = calcEndTimeFromDuration(intent.startTime!, durationMin);
+            } else {
+                // 슬롯을 저장해 다음 메시지(종료 시간)에서 이어받는다
+                if (key) {
+                    await savePending(key, actor.orgId, {
+                        date: intent.date,
+                        startTime: intent.startTime,
+                        endTime: null,
+                        vehicleId: intent.vehicleId,
+                        purpose: intent.purpose,
+                        destination: intent.destination,
+                    });
+                }
+                return { replyText: "이동시간을 계산하지 못했어요. 종료 시간을 알려주세요. 예: \"16시까지\"" };
+            }
+        }
+
         if (key) await clearPending(key); // 제안 단계로 넘어가면 슬롯 채우기 상태는 종료
         const proposal: ReservationProposal = {
             organizationId: actor.orgId,
@@ -449,7 +480,7 @@ export async function handleAssistantMessage(text: string, actor: AssistantActor
             vehicleName: vehicle.name,
             date: intent.date!,
             startTime: intent.startTime!,
-            endTime: intent.endTime!,
+            endTime,
             purpose: intent.purpose,
             destination: intent.destination,
             actorUid: actor.uid,

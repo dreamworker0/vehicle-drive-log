@@ -86,13 +86,6 @@ function asString(v: unknown): string {
     return typeof v === "string" ? v : "";
 }
 
-/** "HH:MM"에 분을 더한다(23:59 상한). 종료시간 미지정 시 +1시간 기본값 계산용. */
-function addMinutesCapped(hhmm: string, add: number): string {
-    const [h, m] = hhmm.split(":").map(Number);
-    const total = Math.min(h * 60 + m + add, 23 * 60 + 59);
-    return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
-}
-
 /**
  * 자연어 메시지를 예약 의도로 파싱.
  * @param text 사용자 메시지 (위생 처리 전 원문)
@@ -195,8 +188,8 @@ JSON 형식 (다른 텍스트 없이 JSON만):
 
     // --- 멀티턴 병합: 진행 중 예약이 있으면 이번 메시지 값으로 채우고 빈 슬롯은 기존 값 유지 ---
     if (pending) {
-        // 이번 메시지가 실제로 예약 슬롯을 하나라도 새로 제공했는지
-        const contributed = Boolean(result.date || result.startTime || result.endTime || result.vehicleId);
+        // 이번 메시지가 실제로 예약 슬롯을 하나라도 새로 제공했는지 (목적지만 답한 경우도 이어가기)
+        const contributed = Boolean(result.date || result.startTime || result.endTime || result.vehicleId || result.destination);
         result.date = result.date ?? pending.date;
         result.startTime = result.startTime ?? pending.startTime;
         result.endTime = result.endTime ?? pending.endTime;
@@ -224,16 +217,18 @@ JSON 형식 (다른 텍스트 없이 JSON만):
         if (result.vehicleId && !vehicles.some((v) => v.id === result.vehicleId)) {
             result.vehicleId = null;
         }
-        // 시작만 있고 종료가 없으면 +1시간 자동 (앱 calcEndTime(start,0)과 동일) → 종료를 되묻지 않음
-        if (result.startTime && !result.endTime) {
-            result.endTime = addMinutesCapped(result.startTime, 60);
-        }
-        // 필수 정보 누락 → clarification으로 강등
-        if (!result.date || !result.startTime || !result.endTime || !result.vehicleId) {
+        // 필수: 날짜·시작·차량·목적지 (종료 시간은 목적지 기반 TMAP 계산 또는 되묻기로 채운다)
+        if (!result.date || !result.startTime || !result.vehicleId || !result.destination) {
             result.needsClarification = true;
             if (!result.clarificationQuestion) {
-                result.clarificationQuestion =
-                    "예약에 필요한 정보가 부족합니다. 차량·날짜·시작/종료 시간을 함께 알려주세요. 예: \"내일 14시부터 16시까지 스타렉스 예약\"";
+                if (result.date && result.startTime && result.vehicleId && !result.destination) {
+                    // 목적지만 남은 경우 — 목적지를 받아 이동시간으로 종료를 자동 계산한다
+                    result.clarificationQuestion =
+                        "목적지를 알려주세요. 이동시간을 계산해 종료 시간을 자동으로 잡아드려요. 예: \"서울역\"";
+                } else {
+                    result.clarificationQuestion =
+                        "예약에 필요한 정보가 부족합니다. 차량·날짜·시작 시간·목적지를 함께 알려주세요. 예: \"내일 14시 스타렉스로 서울역 예약\"";
+                }
             }
             return result;
         }
@@ -243,8 +238,8 @@ JSON 형식 (다른 텍스트 없이 JSON만):
             result.clarificationQuestion = `지난 날짜(${result.date})에는 예약할 수 없습니다. 오늘(${now.date}) 이후 날짜로 다시 요청해주세요.`;
             return result;
         }
-        // 시작 >= 종료 거부
-        if (result.startTime >= result.endTime) {
+        // 시작 >= 종료 거부 (사용자가 종료를 직접 지정한 경우만 — 없으면 TMAP/되묻기로 채운다)
+        if (result.endTime && result.startTime >= result.endTime) {
             result.needsClarification = true;
             result.clarificationQuestion = "시작 시간이 종료 시간보다 빨라야 합니다. 시간을 다시 확인해주세요.";
             return result;
