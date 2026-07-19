@@ -102,4 +102,5 @@ out.txt
 # Agent / AI
 .gemini/
 .agents/
+.worktrees/
 progress.md
