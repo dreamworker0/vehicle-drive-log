@@ -210,6 +210,47 @@ describe('parseIntent', () => {
         expect(result.date).toBe(seoulDate(1));
     });
 
+    it('modify 의도는 대상 단서와 새 값을 구분해 추출한다', async () => {
+        const tomorrow = seoulDate(1);
+        mockGenerateAiContent.mockResolvedValue(JSON.stringify({
+            intent: 'modify', date: tomorrow, vehicleId: 'v1', startTime: null,
+            newDate: null, newStartTime: '15:00', newEndTime: '17:00', needsClarification: false,
+        }));
+
+        const result = await parseIntent('내일 스타렉스 예약을 15시~17시로 바꿔줘', VEHICLES);
+
+        expect(result.intent).toBe('modify');
+        expect(result.date).toBe(tomorrow);      // 대상 단서
+        expect(result.vehicleId).toBe('v1');
+        expect(result.newStartTime).toBe('15:00'); // 새 값
+        expect(result.newEndTime).toBe('17:00');
+    });
+
+    it('modify 의도에서 새 시간 형식이 깨지면 무효화한다', async () => {
+        mockGenerateAiContent.mockResolvedValue(JSON.stringify({
+            intent: 'modify', date: seoulDate(1), vehicleId: 'v1',
+            newStartTime: '오후 3시', newEndTime: '25:00',
+        }));
+
+        const result = await parseIntent('내일 예약 시간 바꿔줘', VEHICLES);
+
+        expect(result.intent).toBe('modify');
+        expect(result.newStartTime).toBeNull();
+        expect(result.newEndTime).toBeNull();
+    });
+
+    it('modify 의도는 진행 중 예약(pending)이 있어도 create로 병합하지 않는다', async () => {
+        mockGenerateAiContent.mockResolvedValue(JSON.stringify({
+            intent: 'modify', date: seoulDate(1), newStartTime: '15:00',
+        }));
+        const pending = { date: seoulDate(2), startTime: '11:00', endTime: null, vehicleId: 'v1', purpose: '', destination: '' };
+
+        const result = await parseIntent('예약 시간 바꿔줘', VEHICLES, pending);
+
+        expect(result.intent).toBe('modify');
+        expect(result.newStartTime).toBe('15:00');
+    });
+
     it('JSON 강제 옵션(responseMimeType, temperature 0)으로 호출한다', async () => {
         mockGenerateAiContent.mockResolvedValue('{"intent":"unknown"}');
 

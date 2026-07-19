@@ -29,7 +29,18 @@ jest.mock('firebase-admin/firestore', () => ({
 const mockParseIntent = jest.fn();
 jest.mock('../services/assistant/parseIntent', () => ({
     parseIntent: (...args: unknown[]) => mockParseIntent(...args),
+    // modify 분기의 과거일 검증이 실제 오늘(Asia/Seoul)을 참조하므로 실제 구현을 제공
+    getSeoulNow: () => ({
+        date: new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(new Date()),
+        weekday: '', time: '',
+    }),
 }));
+
+/** 오늘(Asia/Seoul) 기준 offset일 뒤 날짜 문자열 */
+function seoulDateStr(offsetDays: number): string {
+    const d = new Date(Date.now() + offsetDays * 86400_000);
+    return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' }).format(d);
+}
 const mockBuildSummary = jest.fn();
 jest.mock('../services/assistant/queryReservations', () => ({
     buildReservationSummary: (...args: unknown[]) => mockBuildSummary(...args),
@@ -50,8 +61,12 @@ const mockCancelTx = jest.fn();
 jest.mock('../services/reservation/cancelReservationCore', () => ({
     cancelReservationTx: (...args: unknown[]) => mockCancelTx(...args),
 }));
+const mockModifyTx = jest.fn();
+jest.mock('../services/reservation/modifyReservationCore', () => ({
+    modifyReservationTx: (...args: unknown[]) => mockModifyTx(...args),
+}));
 
-import { handleAssistantMessage, executeReservationProposal, executeCancelProposal } from "../services/assistant/handleAssistantMessage";
+import { handleAssistantMessage, executeReservationProposal, executeCancelProposal, executeModifyProposal } from "../services/assistant/handleAssistantMessage";
 
 const ACTOR = { uid: 'user1', orgId: 'org1', displayName: '홍길동' };
 
@@ -198,6 +213,69 @@ describe('handleAssistantMessage', () => {
             expect(result.replyText).toContain('여러 건');
             expect(result.replyText).toContain('09:00');
             expect(result.replyText).toContain('14:00');
+        });
+    });
+
+    describe('예약 수정', () => {
+        const FUTURE = seoulDateStr(2);
+        const TARGET = { id: 'r1', vehicleId: 'v1', vehicleName: '스타렉스', date: FUTURE, startTime: '09:00', endTime: '11:00' };
+
+        it('수정 후보가 없으면 안내만 하고 제안하지 않는다', async () => {
+            mockParseIntent.mockResolvedValue({ intent: 'modify', date: FUTURE, vehicleId: null, startTime: null, newStartTime: '15:00', newEndTime: '17:00', newDate: null });
+            mockFindCandidates.mockResolvedValue([]);
+
+            const result = await handleAssistantMessage('예약 15시로 바꿔', ACTOR);
+
+            expect(result.replyText).toContain('찾지 못했습니다');
+            expect(result.modifyProposal).toBeUndefined();
+        });
+
+        it('새 시간 범위를 주면 modifyProposal(변경 전/후)을 반환한다', async () => {
+            mockParseIntent.mockResolvedValue({ intent: 'modify', date: FUTURE, vehicleId: 'v1', startTime: null, newStartTime: '15:00', newEndTime: '17:00', newDate: null });
+            mockFindCandidates.mockResolvedValue([TARGET]);
+
+            const result = await handleAssistantMessage('내일 스타렉스 예약 15~17시로', ACTOR);
+
+            expect(result.modifyProposal).toMatchObject({
+                reservationId: 'r1', organizationId: 'org1', actorUid: 'user1', vehicleName: '스타렉스',
+                date: FUTURE, startTime: '15:00', endTime: '17:00',
+                beforeDate: FUTURE, beforeStartTime: '09:00', beforeEndTime: '11:00',
+            });
+            expect(result.replyText).toContain('변경할까요?');
+            expect(mockModifyTx).not.toHaveBeenCalled();
+        });
+
+        it('새 시작만 주면 원래 소요시간을 유지한다 (09~11시 → 15시 시작 → 17시)', async () => {
+            mockParseIntent.mockResolvedValue({ intent: 'modify', date: FUTURE, vehicleId: 'v1', startTime: null, newStartTime: '15:00', newEndTime: null, newDate: null });
+            mockFindCandidates.mockResolvedValue([TARGET]);
+
+            const result = await handleAssistantMessage('예약 15시로 옮겨', ACTOR);
+
+            expect(result.modifyProposal?.startTime).toBe('15:00');
+            expect(result.modifyProposal?.endTime).toBe('17:00'); // 2시간 유지
+        });
+
+        it('실제 변경이 없으면 무엇을 바꿀지 되묻는다', async () => {
+            mockParseIntent.mockResolvedValue({ intent: 'modify', date: FUTURE, vehicleId: 'v1', startTime: null, newStartTime: null, newEndTime: null, newDate: null });
+            mockFindCandidates.mockResolvedValue([TARGET]);
+
+            const result = await handleAssistantMessage('예약 바꿔줘', ACTOR);
+
+            expect(result.modifyProposal).toBeUndefined();
+            expect(result.replyText).toContain('무엇을 어떻게');
+        });
+
+        it('후보가 여러 건이면 되묻고 제안하지 않는다', async () => {
+            mockParseIntent.mockResolvedValue({ intent: 'modify', date: FUTURE, vehicleId: null, startTime: null, newStartTime: '15:00', newEndTime: null, newDate: null });
+            mockFindCandidates.mockResolvedValue([
+                TARGET,
+                { id: 'r2', vehicleId: 'v1', vehicleName: '스타렉스', date: FUTURE, startTime: '14:00', endTime: '15:00' },
+            ]);
+
+            const result = await handleAssistantMessage('예약 15시로', ACTOR);
+
+            expect(result.modifyProposal).toBeUndefined();
+            expect(result.replyText).toContain('여러 건');
         });
     });
 
@@ -351,6 +429,38 @@ describe('executeCancelProposal', () => {
         const text = await executeCancelProposal(CANCEL, 'slack');
 
         expect(text).toContain('이미 취소된 예약입니다');
+        expect(text).toContain('❌');
+    });
+});
+
+describe('executeModifyProposal', () => {
+    const MODIFY = {
+        reservationId: 'r1', organizationId: 'org1', actorUid: 'user1', vehicleName: '스타렉스',
+        date: '2026-07-21', startTime: '15:00', endTime: '17:00',
+        beforeDate: '2026-07-20', beforeStartTime: '09:00', beforeEndTime: '11:00',
+    };
+
+    beforeEach(() => jest.clearAllMocks());
+
+    it('성공 시 변경 완료 메시지를 반환한다 (최종값·actorUid·actorOrgId 주입)', async () => {
+        mockModifyTx.mockResolvedValue({ vehicleName: '스타렉스', date: '2026-07-21', startTime: '15:00', endTime: '17:00' });
+
+        const text = await executeModifyProposal(MODIFY, 'slack');
+
+        expect(mockModifyTx).toHaveBeenCalledWith({
+            reservationId: 'r1', actorUid: 'user1', actorOrgId: 'org1',
+            date: '2026-07-21', startTime: '15:00', endTime: '17:00',
+        });
+        expect(text).toContain('변경했습니다');
+        expect(text).toContain('✏️');
+    });
+
+    it('수정 실패(HttpsError·시간충돌)면 코어의 한국어 메시지를 그대로 전달한다', async () => {
+        mockModifyTx.mockRejectedValue(new MockHttpsError('already-exists', '해당 차량은 15:00 ~ 17:00에 이미 예약되어 있습니다.'));
+
+        const text = await executeModifyProposal(MODIFY, 'slack');
+
+        expect(text).toContain('이미 예약되어 있습니다');
         expect(text).toContain('❌');
     });
 });

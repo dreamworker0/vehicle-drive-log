@@ -17,8 +17,10 @@ import {
     handleAssistantMessage,
     executeReservationProposal,
     executeCancelProposal,
+    executeModifyProposal,
     type ReservationProposal,
     type CancelProposal,
+    type ModifyProposal,
 } from "../../services/assistant/handleAssistantMessage";
 import { checkRateLimitByUid } from "../../utils/rateLimit";
 import { getRateLimits } from "../../utils/constants";
@@ -69,6 +71,43 @@ async function processMessage(botToken: string, task: SlackTask, actor: { uid: s
                         text: { type: "plain_text", text: "🚫 예약 취소" },
                         style: "danger",
                         action_id: "confirm_cancel",
+                        value: confirmRef.id,
+                    },
+                    {
+                        type: "button",
+                        text: { type: "plain_text", text: "닫기" },
+                        action_id: "cancel_reservation",
+                        value: confirmRef.id,
+                    },
+                ],
+            },
+        ]);
+        return;
+    }
+
+    // 예약 수정 제안 → 확인 문서 저장 후 수정 확인 버튼 전송
+    if (result.modifyProposal) {
+        const confirmRef = await db.collection("slackConfirmations").add({
+            kind: "modify",
+            modifyProposal: result.modifyProposal,
+            teamId: task.teamId,
+            slackUserId: task.slackUserId,
+            channel: task.channel,
+            status: "pending",
+            createdAt: FieldValue.serverTimestamp(),
+            expiresAt: new Date(Date.now() + CONFIRMATION_TTL_MS),
+        });
+
+        await postMessage(botToken, task.channel, result.replyText, [
+            { type: "section", text: { type: "mrkdwn", text: result.replyText } },
+            {
+                type: "actions",
+                elements: [
+                    {
+                        type: "button",
+                        text: { type: "plain_text", text: "✏️ 변경 확정" },
+                        style: "primary",
+                        action_id: "confirm_modify",
                         value: confirmRef.id,
                     },
                     {
@@ -168,6 +207,8 @@ async function processAction(task: SlackTask): Promise<void> {
     let resultText: string;
     if (task.actionId === "confirm_cancel") {
         resultText = await executeCancelProposal(data.cancelProposal as CancelProposal, "slack");
+    } else if (task.actionId === "confirm_modify") {
+        resultText = await executeModifyProposal(data.modifyProposal as ModifyProposal, "slack");
     } else {
         resultText = await executeReservationProposal(data.proposal as ReservationProposal, "slack");
     }

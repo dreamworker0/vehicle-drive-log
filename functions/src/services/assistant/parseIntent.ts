@@ -13,7 +13,7 @@ export interface AssistantVehicle {
 }
 
 export interface ParsedIntent {
-    intent: "query" | "create" | "qa" | "cancel" | "unknown";
+    intent: "query" | "create" | "qa" | "cancel" | "modify" | "unknown";
     date: string | null;
     startTime: string | null;
     endTime: string | null;
@@ -22,6 +22,10 @@ export interface ParsedIntent {
     destination: string;
     needsClarification: boolean;
     clarificationQuestion: string;
+    /** modify 전용 — 변경할 새 값 (대상 예약은 date/vehicleId/startTime 단서로 특정) */
+    newDate: string | null;
+    newStartTime: string | null;
+    newEndTime: string | null;
 }
 
 /** 진행 중인(멀티턴) 예약에서 이미 확보한 슬롯 — 되묻기 사이에 유지된다 */
@@ -47,6 +51,9 @@ const UNKNOWN: ParsedIntent = {
     destination: "",
     needsClarification: false,
     clarificationQuestion: "",
+    newDate: null,
+    newStartTime: null,
+    newEndTime: null,
 };
 
 /** Asia/Seoul 기준 현재 날짜·요일·시각 (프롬프트 주입용) */
@@ -107,6 +114,7 @@ ${pendingSection}
 - "create": 새 예약 생성 요청 (예: "내일 14시부터 16시까지 스타렉스 예약해줘")
 - "qa": 예약·차량 데이터에 대한 그 밖의 질문 — 특정 사람/차량 필터, 기간, 개수, "가장/마지막", 차량 목록 등 (예: "홍길동이 예약한 차 알려줘", "이번주 예약 누가 했어", "우리 기관 차량 뭐 있어", "화요일에 마지막에 예약한 사람")
 - "cancel": 기존 예약 취소 요청 (예: "내일 스타렉스 예약 취소해줘", "3시 예약 취소", "예약 취소하고 싶어"). 취소할 예약을 찾기 위한 단서(날짜·차량·시작시간)를 최대한 추출하세요.
+- "modify": 기존 예약의 날짜·시간 변경 요청 (예: "내일 스타렉스 예약을 3시로 옮겨줘", "모레 예약을 14시~16시로 바꿔줘", "내일 예약을 금요일로 미뤄줘"). "~을/를 …로 바꿔/옮겨/변경/미뤄" 패턴. **바꿀 대상을 찾는 단서**(date·vehicleId·startTime = 기존 예약 값)와 **새 값**(newDate·newStartTime·newEndTime)을 구분해 추출하세요. 차량 자체를 바꾸는 요청은 지원하지 않습니다.
 - "unknown": 위 어디에도 안 맞음 (인사·잡담 등)
 
 [규칙]
@@ -121,7 +129,7 @@ ${pendingSection}
 "${sanitizePromptValue(text, 200)}"
 
 JSON 형식 (다른 텍스트 없이 JSON만):
-{"intent":"query|create|qa|cancel|unknown","date":"YYYY-MM-DD 또는 null","startTime":"HH:MM 또는 null","endTime":"HH:MM 또는 null","vehicleId":"차량 id 또는 null","purpose":"","destination":"","needsClarification":false,"clarificationQuestion":""}`;
+{"intent":"query|create|qa|cancel|modify|unknown","date":"YYYY-MM-DD 또는 null","startTime":"HH:MM 또는 null","endTime":"HH:MM 또는 null","vehicleId":"차량 id 또는 null","purpose":"","destination":"","needsClarification":false,"clarificationQuestion":"","newDate":"YYYY-MM-DD 또는 null","newStartTime":"HH:MM 또는 null","newEndTime":"HH:MM 또는 null"}`;
 
     const raw = await generateAiContent(prompt, undefined, "gemini-3.1-flash-lite", {
         responseMimeType: "application/json",
@@ -132,7 +140,8 @@ JSON 형식 (다른 텍스트 없이 JSON만):
     const parsed = extractJson(raw);
     if (!parsed) return { ...UNKNOWN };
 
-    const intent = parsed.intent === "query" || parsed.intent === "create" || parsed.intent === "qa" || parsed.intent === "cancel" ? parsed.intent : "unknown";
+    const VALID_INTENTS = ["query", "create", "qa", "cancel", "modify"];
+    const intent = VALID_INTENTS.includes(asString(parsed.intent)) ? (parsed.intent as ParsedIntent["intent"]) : "unknown";
     const result: ParsedIntent = {
         intent,
         date: DATE_RE.test(asString(parsed.date)) ? asString(parsed.date) : null,
@@ -143,6 +152,9 @@ JSON 형식 (다른 텍스트 없이 JSON만):
         destination: asString(parsed.destination).slice(0, 100),
         needsClarification: parsed.needsClarification === true,
         clarificationQuestion: asString(parsed.clarificationQuestion).slice(0, 200),
+        newDate: DATE_RE.test(asString(parsed.newDate)) ? asString(parsed.newDate) : null,
+        newStartTime: TIME_RE.test(asString(parsed.newStartTime)) ? asString(parsed.newStartTime) : null,
+        newEndTime: TIME_RE.test(asString(parsed.newEndTime)) ? asString(parsed.newEndTime) : null,
     };
 
     // qa(데이터 자유 질의)는 날짜·슬롯이 불필요 — 멀티턴 병합·재검증 없이 그대로 반환한다.
@@ -152,6 +164,15 @@ JSON 형식 (다른 텍스트 없이 JSON만):
     // cancel(예약 취소)도 멀티턴 병합·생성 재검증 대상이 아니다. 취소 단서(날짜·차량·시작시간)만
     // 남겨 오케스트레이터가 후보를 특정하게 한다. 존재하지 않는 차량 id는 무효화한다.
     if (result.intent === "cancel") {
+        if (result.vehicleId && !vehicles.some((v) => v.id === result.vehicleId)) {
+            result.vehicleId = null;
+        }
+        return result;
+    }
+
+    // modify(예약 수정)도 대상 단서 + 새 값을 남겨 오케스트레이터가 특정·적용하게 한다.
+    // (멀티턴 병합·생성 재검증 대상 아님) 존재하지 않는 대상 차량 id는 무효화한다.
+    if (result.intent === "modify") {
         if (result.vehicleId && !vehicles.some((v) => v.id === result.vehicleId)) {
             result.vehicleId = null;
         }

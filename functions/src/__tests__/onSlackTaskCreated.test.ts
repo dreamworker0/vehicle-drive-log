@@ -51,10 +51,12 @@ jest.mock('../services/slack/resolveSlackUser', () => ({
 const mockHandleMessage = jest.fn();
 const mockExecuteProposal = jest.fn();
 const mockExecuteCancel = jest.fn();
+const mockExecuteModify = jest.fn();
 jest.mock('../services/assistant/handleAssistantMessage', () => ({
     handleAssistantMessage: (...args: unknown[]) => mockHandleMessage(...args),
     executeReservationProposal: (...args: unknown[]) => mockExecuteProposal(...args),
     executeCancelProposal: (...args: unknown[]) => mockExecuteCancel(...args),
+    executeModifyProposal: (...args: unknown[]) => mockExecuteModify(...args),
 }));
 const mockCheckRateLimit = jest.fn().mockResolvedValue(undefined);
 jest.mock('../utils/rateLimit', () => ({
@@ -226,6 +228,47 @@ describe('onSlackTaskCreated', () => {
         expect(mockExecuteProposal).not.toHaveBeenCalled();
         expect(mockRespondToUrl).toHaveBeenCalledWith(ACTION_TASK.responseUrl, {
             text: '🚫 예약을 취소했습니다.',
+            replace_original: true,
+        });
+        expect(mockConfUpdate).toHaveBeenCalledWith({ status: 'executed' });
+    });
+
+    it('수정 제안이면 수정 확인 문서를 저장하고 변경 버튼(confirm_modify)을 전송한다', async () => {
+        const modifyProposal = { reservationId: 'r1', organizationId: 'org1', actorUid: 'user1', vehicleName: '스타렉스' };
+        mockHandleMessage.mockResolvedValue({ replyText: '변경할까요?', modifyProposal });
+
+        await capturedHandler(makeEvent(MESSAGE_TASK));
+
+        expect(mockConfAdd).toHaveBeenCalledWith(expect.objectContaining({
+            kind: 'modify',
+            modifyProposal,
+            status: 'pending',
+        }));
+        const blocks = mockPostMessage.mock.calls[0][3];
+        const actionBlock = blocks.find((b: { type: string }) => b.type === 'actions');
+        expect(actionBlock.elements[0].action_id).toBe('confirm_modify');
+        expect(actionBlock.elements[0].value).toBe('conf-1');
+    });
+
+    it('변경 확인 버튼(confirm_modify)이면 수정을 실행하고 결과로 교체한다', async () => {
+        const future = new Date(Date.now() + 60_000);
+        mockConfGet.mockResolvedValue({
+            exists: true,
+            data: () => ({
+                status: 'pending', slackUserId: 'U123', teamId: 'T123',
+                kind: 'modify', modifyProposal: { reservationId: 'r1' },
+                expiresAt: { toDate: () => future },
+            }),
+        });
+        mockExecuteModify.mockResolvedValue('✏️ 예약을 변경했습니다.');
+
+        await capturedHandler(makeEvent({ ...ACTION_TASK, actionId: 'confirm_modify' }));
+
+        expect(mockExecuteModify).toHaveBeenCalledWith({ reservationId: 'r1' }, 'slack');
+        expect(mockExecuteProposal).not.toHaveBeenCalled();
+        expect(mockExecuteCancel).not.toHaveBeenCalled();
+        expect(mockRespondToUrl).toHaveBeenCalledWith(ACTION_TASK.responseUrl, {
+            text: '✏️ 예약을 변경했습니다.',
             replace_original: true,
         });
         expect(mockConfUpdate).toHaveBeenCalledWith({ status: 'executed' });

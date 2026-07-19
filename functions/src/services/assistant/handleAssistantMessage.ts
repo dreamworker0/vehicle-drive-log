@@ -7,12 +7,13 @@
  */
 import { HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import { parseIntent, type AssistantVehicle, type PendingSlots } from "./parseIntent";
+import { parseIntent, getSeoulNow, type AssistantVehicle, type PendingSlots } from "./parseIntent";
 import { buildReservationSummary } from "./queryReservations";
 import { answerDataQuestion } from "./answerDataQuestion";
 import { findCancelCandidates, type CancelCandidate } from "./cancelReservation";
 import { createReservationTx } from "../reservation/createReservationCore";
 import { cancelReservationTx } from "../reservation/cancelReservationCore";
+import { modifyReservationTx } from "../reservation/modifyReservationCore";
 
 const db = getFirestore();
 
@@ -83,12 +84,30 @@ export interface CancelProposal {
     endTime: string;
 }
 
+/** 사용자 확인 후 실행할 예약 수정 제안 — modifyReservationTx 입력(최종값) + 변경 전 표시용 */
+export interface ModifyProposal {
+    reservationId: string;
+    organizationId: string;
+    actorUid: string;
+    vehicleName: string;
+    /** 변경 후 최종 값 (코어가 적용) */
+    date: string;
+    startTime: string;
+    endTime: string;
+    /** 변경 전 값 (확인 UI 표시용) */
+    beforeDate: string;
+    beforeStartTime: string;
+    beforeEndTime: string;
+}
+
 export interface AssistantResult {
     replyText: string;
     /** 있으면 어댑터가 예약 생성 확인 UI(버튼 등)를 띄워야 한다 */
     proposal?: ReservationProposal;
     /** 있으면 어댑터가 예약 취소 확인 UI(버튼 등)를 띄워야 한다 */
     cancelProposal?: CancelProposal;
+    /** 있으면 어댑터가 예약 수정 확인 UI(버튼 등)를 띄워야 한다 */
+    modifyProposal?: ModifyProposal;
 }
 
 export const ASSISTANT_HELP_TEXT =
@@ -96,6 +115,7 @@ export const ASSISTANT_HELP_TEXT =
     "• 예약 조회 — 예: \"오늘 예약 현황 알려줘\", \"내일 일정 보여줘\"\n" +
     "• 예약 생성 — 예: \"내일 14시부터 16시까지 스타렉스 예약해줘\"\n" +
     "• 예약 취소 — 예: \"내일 스타렉스 예약 취소해줘\"\n" +
+    "• 예약 수정 — 예: \"내일 스타렉스 예약을 15시로 옮겨줘\"\n" +
     "• 자유 질문 — 예: \"홍길동이 예약한 차\", \"이번주 예약 누가 했어\", \"우리 기관 차량 뭐 있어\"";
 
 /** 기관의 예약 가능 차량 목록 조회 (퇴역 차량 제외) */
@@ -130,6 +150,32 @@ export function formatCancelSummary(c: CancelProposal): string {
 export function formatCancelCandidates(list: CancelCandidate[]): string {
     const lines = list.map((c, i) => `${i + 1}) 🚗 ${c.vehicleName} 📅 ${c.date} ${c.startTime}~${c.endTime}`);
     return `취소할 예약이 여러 건이에요. 어느 건인지 날짜·시간을 함께 알려주세요:\n${lines.join("\n")}`;
+}
+
+/** 수정 후보가 여러 건일 때 되묻는 목록 텍스트 */
+export function formatModifyCandidates(list: CancelCandidate[]): string {
+    const lines = list.map((c, i) => `${i + 1}) 🚗 ${c.vehicleName} 📅 ${c.date} ${c.startTime}~${c.endTime}`);
+    return `수정할 예약이 여러 건이에요. 어느 건인지 날짜·시간을 함께 알려주세요:\n${lines.join("\n")}`;
+}
+
+/** 수정 제안 요약 텍스트 (변경 전 → 변경 후, 확인 UI에 표시) */
+export function formatModifySummary(p: ModifyProposal): string {
+    const before = `${p.beforeDate} ${p.beforeStartTime}~${p.beforeEndTime}`;
+    const after = `${p.date} ${p.startTime}~${p.endTime}`;
+    return `아래와 같이 예약을 변경할까요?\n🚗 ${p.vehicleName}\n📅 ${before}\n⬇️\n📅 ${after}`;
+}
+
+/** "HH:MM"을 분 단위 정수로 변환 */
+function toMinutes(hhmm: string): number {
+    const [h, m] = hhmm.split(":").map(Number);
+    return h * 60 + m;
+}
+
+/** 분 단위 정수를 "HH:MM"으로 변환 (0~1439 범위 가정) */
+function fromMinutes(total: number): string {
+    const h = Math.floor(total / 60);
+    const m = total % 60;
+    return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
 
 /** 자연어 메시지 처리 — 조회는 즉시 응답, 생성은 proposal 반환. 멀티턴 대화 상태 유지 */
@@ -183,6 +229,75 @@ export async function handleAssistantMessage(text: string, actor: AssistantActor
             endTime: c.endTime,
         };
         return { replyText: formatCancelSummary(cancelProposal), cancelProposal };
+    }
+
+    if (intent.intent === "modify") {
+        if (key) await clearPending(key); // 수정으로 전환 → 진행 중 예약 폐기
+        // 대상 특정은 취소와 동일한 후보 조회를 재사용 (단서: date·vehicleId·startTime)
+        const candidates = await findCancelCandidates(actor.orgId, actor.uid, {
+            date: intent.date,
+            vehicleId: intent.vehicleId,
+            startTime: intent.startTime,
+        });
+
+        if (candidates.length === 0) {
+            return {
+                replyText:
+                    "수정할 예약을 찾지 못했습니다. 본인이 예약한 예정된 건만 수정할 수 있어요. 날짜·차량을 함께 알려주시면 찾기 쉬워요.",
+            };
+        }
+        if (candidates.length > 1) {
+            return { replyText: formatModifyCandidates(candidates) };
+        }
+
+        const target = candidates[0];
+        // 새 값 계산: 제공값 우선, 없으면 기존값 유지. 새 시작만 주면 원래 소요시간 유지(shift).
+        const newDate = intent.newDate ?? target.date;
+        const newStartTime = intent.newStartTime ?? target.startTime;
+        let newEndTime: string;
+        if (intent.newEndTime) {
+            newEndTime = intent.newEndTime;
+        } else if (intent.newStartTime) {
+            // 종료 시간 미지정 + 시작만 변경 → 원래 소요시간을 유지해 종료를 이동
+            const durationMin = toMinutes(target.endTime) - toMinutes(target.startTime);
+            const endMin = toMinutes(newStartTime) + durationMin;
+            if (endMin >= 24 * 60) {
+                return { replyText: "변경하면 종료 시간이 자정을 넘어갑니다. 종료 시간을 함께 알려주세요." };
+            }
+            newEndTime = fromMinutes(endMin);
+        } else {
+            newEndTime = target.endTime;
+        }
+
+        // 실제 변경이 없으면 무엇을 바꿀지 되묻는다
+        if (newDate === target.date && newStartTime === target.startTime && newEndTime === target.endTime) {
+            return {
+                replyText:
+                    "무엇을 어떻게 바꿀지 알려주세요. 예: \"15시로 옮겨줘\", \"14시~16시로 바꿔줘\", \"금요일로 미뤄줘\"",
+            };
+        }
+        // 유효성: 새 날짜 과거 거부, 시작<종료
+        const seoulToday = getSeoulNow().date;
+        if (newDate < seoulToday) {
+            return { replyText: `지난 날짜(${newDate})로는 변경할 수 없습니다. 오늘(${seoulToday}) 이후로 알려주세요.` };
+        }
+        if (newStartTime >= newEndTime) {
+            return { replyText: "시작 시간이 종료 시간보다 빨라야 합니다. 시간을 다시 알려주세요." };
+        }
+
+        const modifyProposal: ModifyProposal = {
+            reservationId: target.id,
+            organizationId: actor.orgId,
+            actorUid: actor.uid,
+            vehicleName: target.vehicleName,
+            date: newDate,
+            startTime: newStartTime,
+            endTime: newEndTime,
+            beforeDate: target.date,
+            beforeStartTime: target.startTime,
+            beforeEndTime: target.endTime,
+        };
+        return { replyText: formatModifySummary(modifyProposal), modifyProposal };
     }
 
     if (intent.intent === "create") {
@@ -261,6 +376,27 @@ export async function executeCancelProposal(proposal: CancelProposal, _source: s
         if (err instanceof HttpsError) {
             // 코어의 한국어 에러 메시지를 그대로 전달 (예: "이미 취소된 예약입니다")
             return `❌ 예약 취소에 실패했습니다: ${err.message}`;
+        }
+        throw err;
+    }
+}
+
+/** 확인된 예약 수정 제안 실행 — 결과를 사용자용 텍스트로 반환 */
+export async function executeModifyProposal(proposal: ModifyProposal, _source: string): Promise<string> {
+    try {
+        await modifyReservationTx({
+            reservationId: proposal.reservationId,
+            actorUid: proposal.actorUid,
+            actorOrgId: proposal.organizationId,
+            date: proposal.date,
+            startTime: proposal.startTime,
+            endTime: proposal.endTime,
+        });
+        return `✏️ ${proposal.vehicleName} 예약을 변경했습니다.\n📅 ${proposal.date} ${proposal.startTime}~${proposal.endTime}`;
+    } catch (err) {
+        if (err instanceof HttpsError) {
+            // 코어의 한국어 에러 메시지를 그대로 전달 (예: "이미 예약되어 있습니다")
+            return `❌ 예약 수정에 실패했습니다: ${err.message}`;
         }
         throw err;
     }
