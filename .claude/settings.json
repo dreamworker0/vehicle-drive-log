@@ -1,4 +1,16 @@
 {
+  "permissions": {
+    "comment": "읽기전용·개발용 상시 명령의 공용 allowlist. 개인 전용 추가는 settings.local.json에.",
+    "allow": [
+      "Bash(npx tsc *)",
+      "Bash(npx eslint *)",
+      "Bash(npm run *)",
+      "Bash(npx vitest *)",
+      "Bash(npx jest *)",
+      "Bash(gh pr view *)",
+      "PowerShell(gh pr view *)"
+    ]
+  },
   "hooks": {
     "PreToolUse": [
       {
