@@ -239,6 +239,28 @@ describe('parseIntent', () => {
         expect(result.newEndTime).toBeNull();
     });
 
+    it('modify에서 다른 차량으로 바꾸는 요청은 newVehicleId로 추출한다', async () => {
+        mockGenerateAiContent.mockResolvedValue(JSON.stringify({
+            intent: 'modify', date: seoulDate(1), vehicleId: 'v1', newVehicleId: 'v2',
+        }));
+
+        const result = await parseIntent('내일 스타렉스 예약을 소나타로 바꿔줘', VEHICLES);
+
+        expect(result.intent).toBe('modify');
+        expect(result.vehicleId).toBe('v1');       // 대상(현재 차량)
+        expect(result.newVehicleId).toBe('v2');    // 새 차량
+    });
+
+    it('modify에서 목록에 없는 newVehicleId는 무효화한다', async () => {
+        mockGenerateAiContent.mockResolvedValue(JSON.stringify({
+            intent: 'modify', date: seoulDate(1), vehicleId: 'v1', newVehicleId: 'v999',
+        }));
+
+        const result = await parseIntent('내일 예약을 유령차로 바꿔줘', VEHICLES);
+
+        expect(result.newVehicleId).toBeNull();
+    });
+
     it('modify 의도는 진행 중 예약(pending)이 있어도 create로 병합하지 않는다', async () => {
         mockGenerateAiContent.mockResolvedValue(JSON.stringify({
             intent: 'modify', date: seoulDate(1), newStartTime: '15:00',

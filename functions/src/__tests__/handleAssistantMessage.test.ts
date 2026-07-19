@@ -255,6 +255,27 @@ describe('handleAssistantMessage', () => {
             expect(result.modifyProposal?.endTime).toBe('17:00'); // 2시간 유지
         });
 
+        it('차량 자체를 바꾸려 하면 앱으로 안내하고 제안하지 않는다', async () => {
+            mockParseIntent.mockResolvedValue({ intent: 'modify', date: FUTURE, vehicleId: 'v1', startTime: null, newStartTime: null, newEndTime: null, newDate: null, newVehicleId: 'v3' });
+            mockFindCandidates.mockResolvedValue([TARGET]); // TARGET.vehicleId === 'v1'
+
+            const result = await handleAssistantMessage('스타렉스 예약을 카니발로 바꿔줘', ACTOR);
+
+            expect(result.modifyProposal).toBeUndefined();
+            expect(result.replyText).toContain('앱에서');
+            expect(mockModifyTx).not.toHaveBeenCalled();
+        });
+
+        it('새 차량이 대상과 같으면(오탐) 안내하지 않고 정상 진행한다', async () => {
+            mockParseIntent.mockResolvedValue({ intent: 'modify', date: FUTURE, vehicleId: 'v1', startTime: null, newStartTime: '15:00', newEndTime: '17:00', newDate: null, newVehicleId: 'v1' });
+            mockFindCandidates.mockResolvedValue([TARGET]); // TARGET.vehicleId === 'v1'
+
+            const result = await handleAssistantMessage('스타렉스 예약 15~17시로', ACTOR);
+
+            expect(result.modifyProposal).toBeDefined();
+            expect(result.replyText).not.toContain('앱에서');
+        });
+
         it('실제 변경이 없으면 무엇을 바꿀지 되묻는다', async () => {
             mockParseIntent.mockResolvedValue({ intent: 'modify', date: FUTURE, vehicleId: 'v1', startTime: null, newStartTime: null, newEndTime: null, newDate: null });
             mockFindCandidates.mockResolvedValue([TARGET]);

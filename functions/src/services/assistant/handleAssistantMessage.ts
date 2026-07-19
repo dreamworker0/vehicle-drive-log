@@ -251,6 +251,18 @@ export async function handleAssistantMessage(text: string, actor: AssistantActor
         }
 
         const target = candidates[0];
+
+        // 차량 자체를 바꾸는 요청은 채팅에서 미지원(캘린더 크로스무브 등) — 앱으로 안내.
+        // 대상과 다른 차량을 새 차량으로 지목한 경우에만 우회한다(오파싱에 의한 오탐 방지).
+        if (intent.newVehicleId && intent.newVehicleId !== target.vehicleId) {
+            const newVehicle = vehicles.find((v) => v.id === intent.newVehicleId);
+            return {
+                replyText:
+                    `🔁 예약 차량 변경(${target.vehicleName} → ${newVehicle?.name ?? "다른 차량"})은 앱에서 해주세요. ` +
+                    "여기서는 예약의 날짜·시간 변경만 도와드릴 수 있어요.",
+            };
+        }
+
         // 새 값 계산: 제공값 우선, 없으면 기존값 유지. 새 시작만 주면 원래 소요시간 유지(shift).
         const newDate = intent.newDate ?? target.date;
         const newStartTime = intent.newStartTime ?? target.startTime;
