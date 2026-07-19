@@ -50,9 +50,11 @@ jest.mock('../services/slack/resolveSlackUser', () => ({
 }));
 const mockHandleMessage = jest.fn();
 const mockExecuteProposal = jest.fn();
+const mockExecuteCancel = jest.fn();
 jest.mock('../services/assistant/handleAssistantMessage', () => ({
     handleAssistantMessage: (...args: unknown[]) => mockHandleMessage(...args),
     executeReservationProposal: (...args: unknown[]) => mockExecuteProposal(...args),
+    executeCancelProposal: (...args: unknown[]) => mockExecuteCancel(...args),
 }));
 const mockCheckRateLimit = jest.fn().mockResolvedValue(undefined);
 jest.mock('../utils/rateLimit', () => ({
@@ -187,6 +189,46 @@ describe('onSlackTaskCreated', () => {
         const actionBlock = blocks.find((b: { type: string }) => b.type === 'actions');
         expect(actionBlock.elements[0].value).toBe('conf-1');
         expect(actionBlock.elements[0].action_id).toBe('confirm_reservation');
+    });
+
+    it('취소 제안이면 취소 확인 문서를 저장하고 취소 버튼(confirm_cancel)을 전송한다', async () => {
+        const cancelProposal = { reservationId: 'r1', organizationId: 'org1', actorUid: 'user1', vehicleName: '스타렉스' };
+        mockHandleMessage.mockResolvedValue({ replyText: '취소할까요?', cancelProposal });
+
+        await capturedHandler(makeEvent(MESSAGE_TASK));
+
+        expect(mockConfAdd).toHaveBeenCalledWith(expect.objectContaining({
+            kind: 'cancel',
+            cancelProposal,
+            status: 'pending',
+        }));
+        const blocks = mockPostMessage.mock.calls[0][3];
+        const actionBlock = blocks.find((b: { type: string }) => b.type === 'actions');
+        expect(actionBlock.elements[0].action_id).toBe('confirm_cancel');
+        expect(actionBlock.elements[0].value).toBe('conf-1');
+    });
+
+    it('취소 확인 버튼(confirm_cancel)이면 취소를 실행하고 결과로 교체한다', async () => {
+        const future = new Date(Date.now() + 60_000);
+        mockConfGet.mockResolvedValue({
+            exists: true,
+            data: () => ({
+                status: 'pending', slackUserId: 'U123', teamId: 'T123',
+                kind: 'cancel', cancelProposal: { reservationId: 'r1' },
+                expiresAt: { toDate: () => future },
+            }),
+        });
+        mockExecuteCancel.mockResolvedValue('🚫 예약을 취소했습니다.');
+
+        await capturedHandler(makeEvent({ ...ACTION_TASK, actionId: 'confirm_cancel' }));
+
+        expect(mockExecuteCancel).toHaveBeenCalledWith({ reservationId: 'r1' }, 'slack');
+        expect(mockExecuteProposal).not.toHaveBeenCalled();
+        expect(mockRespondToUrl).toHaveBeenCalledWith(ACTION_TASK.responseUrl, {
+            text: '🚫 예약을 취소했습니다.',
+            replace_original: true,
+        });
+        expect(mockConfUpdate).toHaveBeenCalledWith({ status: 'executed' });
     });
 
     it('확정 버튼이면 예약을 실행하고 원 메시지를 결과로 교체한다', async () => {

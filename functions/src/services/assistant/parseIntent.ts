@@ -13,7 +13,7 @@ export interface AssistantVehicle {
 }
 
 export interface ParsedIntent {
-    intent: "query" | "create" | "qa" | "unknown";
+    intent: "query" | "create" | "qa" | "cancel" | "unknown";
     date: string | null;
     startTime: string | null;
     endTime: string | null;
@@ -106,6 +106,7 @@ ${pendingSection}
 - "query": 특정 하루의 예약 목록을 그대로 보고 싶을 때 (예: "오늘 예약 현황 알려줘", "내일 스타렉스 일정?")
 - "create": 새 예약 생성 요청 (예: "내일 14시부터 16시까지 스타렉스 예약해줘")
 - "qa": 예약·차량 데이터에 대한 그 밖의 질문 — 특정 사람/차량 필터, 기간, 개수, "가장/마지막", 차량 목록 등 (예: "홍길동이 예약한 차 알려줘", "이번주 예약 누가 했어", "우리 기관 차량 뭐 있어", "화요일에 마지막에 예약한 사람")
+- "cancel": 기존 예약 취소 요청 (예: "내일 스타렉스 예약 취소해줘", "3시 예약 취소", "예약 취소하고 싶어"). 취소할 예약을 찾기 위한 단서(날짜·차량·시작시간)를 최대한 추출하세요.
 - "unknown": 위 어디에도 안 맞음 (인사·잡담 등)
 
 [규칙]
@@ -120,7 +121,7 @@ ${pendingSection}
 "${sanitizePromptValue(text, 200)}"
 
 JSON 형식 (다른 텍스트 없이 JSON만):
-{"intent":"query|create|unknown","date":"YYYY-MM-DD 또는 null","startTime":"HH:MM 또는 null","endTime":"HH:MM 또는 null","vehicleId":"차량 id 또는 null","purpose":"","destination":"","needsClarification":false,"clarificationQuestion":""}`;
+{"intent":"query|create|qa|cancel|unknown","date":"YYYY-MM-DD 또는 null","startTime":"HH:MM 또는 null","endTime":"HH:MM 또는 null","vehicleId":"차량 id 또는 null","purpose":"","destination":"","needsClarification":false,"clarificationQuestion":""}`;
 
     const raw = await generateAiContent(prompt, undefined, "gemini-3.1-flash-lite", {
         responseMimeType: "application/json",
@@ -131,7 +132,7 @@ JSON 형식 (다른 텍스트 없이 JSON만):
     const parsed = extractJson(raw);
     if (!parsed) return { ...UNKNOWN };
 
-    const intent = parsed.intent === "query" || parsed.intent === "create" || parsed.intent === "qa" ? parsed.intent : "unknown";
+    const intent = parsed.intent === "query" || parsed.intent === "create" || parsed.intent === "qa" || parsed.intent === "cancel" ? parsed.intent : "unknown";
     const result: ParsedIntent = {
         intent,
         date: DATE_RE.test(asString(parsed.date)) ? asString(parsed.date) : null,
@@ -147,6 +148,15 @@ JSON 형식 (다른 텍스트 없이 JSON만):
     // qa(데이터 자유 질의)는 날짜·슬롯이 불필요 — 멀티턴 병합·재검증 없이 그대로 반환한다.
     // (진행 중 예약이 있어도 조회성 질문이므로 create로 이어붙이지 않는다)
     if (result.intent === "qa") return result;
+
+    // cancel(예약 취소)도 멀티턴 병합·생성 재검증 대상이 아니다. 취소 단서(날짜·차량·시작시간)만
+    // 남겨 오케스트레이터가 후보를 특정하게 한다. 존재하지 않는 차량 id는 무효화한다.
+    if (result.intent === "cancel") {
+        if (result.vehicleId && !vehicles.some((v) => v.id === result.vehicleId)) {
+            result.vehicleId = null;
+        }
+        return result;
+    }
 
     // --- 멀티턴 병합: 진행 중 예약이 있으면 이번 메시지 값으로 채우고 빈 슬롯은 기존 값 유지 ---
     if (pending) {

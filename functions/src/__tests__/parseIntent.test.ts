@@ -174,6 +174,42 @@ describe('parseIntent', () => {
         expect(result.intent).toBe('qa');
     });
 
+    it('cancel 의도는 취소 단서(날짜·차량)를 남기고 그대로 통과한다', async () => {
+        const tomorrow = seoulDate(1);
+        mockGenerateAiContent.mockResolvedValue(JSON.stringify({
+            intent: 'cancel', date: tomorrow, startTime: '14:00', endTime: null, vehicleId: 'v1',
+            needsClarification: false,
+        }));
+
+        const result = await parseIntent('내일 스타렉스 예약 취소해줘', VEHICLES);
+
+        expect(result.intent).toBe('cancel');
+        expect(result.date).toBe(tomorrow);
+        expect(result.vehicleId).toBe('v1');
+        expect(result.startTime).toBe('14:00');
+    });
+
+    it('cancel 의도에서 목록에 없는 차량 id는 무효화한다 (강등 없이)', async () => {
+        mockGenerateAiContent.mockResolvedValue(JSON.stringify({
+            intent: 'cancel', date: seoulDate(1), vehicleId: 'v999', needsClarification: false,
+        }));
+
+        const result = await parseIntent('내일 유령차 예약 취소', VEHICLES);
+
+        expect(result.intent).toBe('cancel');
+        expect(result.vehicleId).toBeNull();
+    });
+
+    it('cancel 의도는 진행 중 예약(pending)이 있어도 create로 병합하지 않는다', async () => {
+        mockGenerateAiContent.mockResolvedValue(JSON.stringify({ intent: 'cancel', date: seoulDate(1) }));
+        const pending = { date: seoulDate(2), startTime: '11:00', endTime: null, vehicleId: 'v1', purpose: '', destination: '' };
+
+        const result = await parseIntent('예약 취소', VEHICLES, pending);
+
+        expect(result.intent).toBe('cancel');
+        expect(result.date).toBe(seoulDate(1));
+    });
+
     it('JSON 강제 옵션(responseMimeType, temperature 0)으로 호출한다', async () => {
         mockGenerateAiContent.mockResolvedValue('{"intent":"unknown"}');
 

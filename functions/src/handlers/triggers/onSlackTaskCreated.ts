@@ -16,7 +16,9 @@ import { resolveSlackUser, getSlackIntegration } from "../../services/slack/reso
 import {
     handleAssistantMessage,
     executeReservationProposal,
+    executeCancelProposal,
     type ReservationProposal,
+    type CancelProposal,
 } from "../../services/assistant/handleAssistantMessage";
 import { checkRateLimitByUid } from "../../utils/rateLimit";
 import { getRateLimits } from "../../utils/constants";
@@ -44,6 +46,43 @@ interface SlackTask {
 async function processMessage(botToken: string, task: SlackTask, actor: { uid: string; orgId: string; displayName: string; conversationKey: string }): Promise<void> {
     const result = await handleAssistantMessage(task.text || "", actor);
 
+    // 예약 취소 제안 → 확인 문서 저장 후 취소 확인 버튼 전송
+    if (result.cancelProposal) {
+        const confirmRef = await db.collection("slackConfirmations").add({
+            kind: "cancel",
+            cancelProposal: result.cancelProposal,
+            teamId: task.teamId,
+            slackUserId: task.slackUserId,
+            channel: task.channel,
+            status: "pending",
+            createdAt: FieldValue.serverTimestamp(),
+            expiresAt: new Date(Date.now() + CONFIRMATION_TTL_MS),
+        });
+
+        await postMessage(botToken, task.channel, result.replyText, [
+            { type: "section", text: { type: "mrkdwn", text: result.replyText } },
+            {
+                type: "actions",
+                elements: [
+                    {
+                        type: "button",
+                        text: { type: "plain_text", text: "🚫 예약 취소" },
+                        style: "danger",
+                        action_id: "confirm_cancel",
+                        value: confirmRef.id,
+                    },
+                    {
+                        type: "button",
+                        text: { type: "plain_text", text: "닫기" },
+                        action_id: "cancel_reservation",
+                        value: confirmRef.id,
+                    },
+                ],
+            },
+        ]);
+        return;
+    }
+
     if (!result.proposal) {
         await postMessage(botToken, task.channel, result.replyText);
         return;
@@ -51,6 +90,7 @@ async function processMessage(botToken: string, task: SlackTask, actor: { uid: s
 
     // 예약 제안 → 확인 문서 저장 후 버튼 전송 (버튼 value에는 문서 ID만)
     const confirmRef = await db.collection("slackConfirmations").add({
+        kind: "create",
         proposal: result.proposal,
         teamId: task.teamId,
         slackUserId: task.slackUserId,
@@ -116,14 +156,22 @@ async function processAction(task: SlackTask): Promise<void> {
     }
 
     if (task.actionId === "cancel_reservation") {
+        // 확인 창 닫기(제안 자체를 무르기) — 실제 예약/취소를 실행하지 않는다
         await confirmRef.update({ status: "cancelled", resolvedAt: FieldValue.serverTimestamp() });
-        await respond("예약 요청을 취소했습니다.");
+        await respond("요청을 취소했습니다.");
         return;
     }
 
-    // 확정 — 상태를 먼저 선점해 중복 클릭에 의한 이중 생성 방지
+    // 상태를 먼저 선점해 중복 클릭에 의한 이중 실행 방지
     await confirmRef.update({ status: "executing", resolvedAt: FieldValue.serverTimestamp() });
-    const resultText = await executeReservationProposal(data.proposal as ReservationProposal, "slack");
+
+    let resultText: string;
+    if (task.actionId === "confirm_cancel") {
+        resultText = await executeCancelProposal(data.cancelProposal as CancelProposal, "slack");
+    } else {
+        resultText = await executeReservationProposal(data.proposal as ReservationProposal, "slack");
+    }
+
     await confirmRef.update({ status: "executed" });
     await respond(resultText);
 }

@@ -10,7 +10,9 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { parseIntent, type AssistantVehicle, type PendingSlots } from "./parseIntent";
 import { buildReservationSummary } from "./queryReservations";
 import { answerDataQuestion } from "./answerDataQuestion";
+import { findCancelCandidates, type CancelCandidate } from "./cancelReservation";
 import { createReservationTx } from "../reservation/createReservationCore";
+import { cancelReservationTx } from "../reservation/cancelReservationCore";
 
 const db = getFirestore();
 
@@ -70,16 +72,30 @@ export interface ReservationProposal {
     reservedByName: string;
 }
 
+/** 사용자 확인 후 실행할 예약 취소 제안 — cancelReservationTx 입력 + 표시용 필드 */
+export interface CancelProposal {
+    reservationId: string;
+    organizationId: string;
+    actorUid: string;
+    vehicleName: string;
+    date: string;
+    startTime: string;
+    endTime: string;
+}
+
 export interface AssistantResult {
     replyText: string;
-    /** 있으면 어댑터가 확인 UI(버튼 등)를 띄워야 한다 */
+    /** 있으면 어댑터가 예약 생성 확인 UI(버튼 등)를 띄워야 한다 */
     proposal?: ReservationProposal;
+    /** 있으면 어댑터가 예약 취소 확인 UI(버튼 등)를 띄워야 한다 */
+    cancelProposal?: CancelProposal;
 }
 
 export const ASSISTANT_HELP_TEXT =
     "제가 도와드릴 수 있는 일이에요:\n" +
     "• 예약 조회 — 예: \"오늘 예약 현황 알려줘\", \"내일 일정 보여줘\"\n" +
     "• 예약 생성 — 예: \"내일 14시부터 16시까지 스타렉스 예약해줘\"\n" +
+    "• 예약 취소 — 예: \"내일 스타렉스 예약 취소해줘\"\n" +
     "• 자유 질문 — 예: \"홍길동이 예약한 차\", \"이번주 예약 누가 했어\", \"우리 기관 차량 뭐 있어\"";
 
 /** 기관의 예약 가능 차량 목록 조회 (퇴역 차량 제외) */
@@ -105,6 +121,17 @@ export function formatProposalSummary(p: ReservationProposal): string {
     return `아래 내용으로 예약할까요?\n🚗 ${p.vehicleName}\n📅 ${p.date} ${p.startTime}~${p.endTime}\n👤 ${p.reservedByName}${extra ? `\n📝 ${extra}` : ""}`;
 }
 
+/** 취소 제안 요약 텍스트 (확인 UI에 표시) */
+export function formatCancelSummary(c: CancelProposal): string {
+    return `아래 예약을 취소할까요?\n🚗 ${c.vehicleName}\n📅 ${c.date} ${c.startTime}~${c.endTime}`;
+}
+
+/** 취소 후보가 여러 건일 때 되묻는 목록 텍스트 */
+export function formatCancelCandidates(list: CancelCandidate[]): string {
+    const lines = list.map((c, i) => `${i + 1}) 🚗 ${c.vehicleName} 📅 ${c.date} ${c.startTime}~${c.endTime}`);
+    return `취소할 예약이 여러 건이에요. 어느 건인지 날짜·시간을 함께 알려주세요:\n${lines.join("\n")}`;
+}
+
 /** 자연어 메시지 처리 — 조회는 즉시 응답, 생성은 proposal 반환. 멀티턴 대화 상태 유지 */
 export async function handleAssistantMessage(text: string, actor: AssistantActor): Promise<AssistantResult> {
     const key = actor.conversationKey;
@@ -123,6 +150,39 @@ export async function handleAssistantMessage(text: string, actor: AssistantActor
         if (key) await clearPending(key); // 자유 질의로 전환 → 진행 중 예약 폐기
         const replyText = await answerDataQuestion(text, actor.orgId, vehicles);
         return { replyText };
+    }
+
+    if (intent.intent === "cancel") {
+        if (key) await clearPending(key); // 취소로 전환 → 진행 중 예약 폐기
+        const candidates = await findCancelCandidates(actor.orgId, actor.uid, {
+            date: intent.date,
+            vehicleId: intent.vehicleId,
+            startTime: intent.startTime,
+        });
+
+        if (candidates.length === 0) {
+            return {
+                replyText:
+                    "취소할 예약을 찾지 못했습니다. 본인이 예약한 예정된 건만 취소할 수 있어요. 날짜·차량을 함께 알려주시면 찾기 쉬워요.",
+            };
+        }
+
+        if (candidates.length > 1) {
+            // 여러 건 → 되묻기 (상태 저장 없이, 사용자가 시간을 더해 다시 요청)
+            return { replyText: formatCancelCandidates(candidates) };
+        }
+
+        const c = candidates[0];
+        const cancelProposal: CancelProposal = {
+            reservationId: c.id,
+            organizationId: actor.orgId,
+            actorUid: actor.uid,
+            vehicleName: c.vehicleName,
+            date: c.date,
+            startTime: c.startTime,
+            endTime: c.endTime,
+        };
+        return { replyText: formatCancelSummary(cancelProposal), cancelProposal };
     }
 
     if (intent.intent === "create") {
@@ -183,6 +243,24 @@ export async function executeReservationProposal(proposal: ReservationProposal, 
         if (err instanceof HttpsError) {
             // 코어의 한국어 에러 메시지를 그대로 사용자에게 전달 (예: "이미 예약되어 있습니다")
             return `❌ 예약에 실패했습니다: ${err.message}`;
+        }
+        throw err;
+    }
+}
+
+/** 확인된 예약 취소 제안 실행 — 결과를 사용자용 텍스트로 반환 */
+export async function executeCancelProposal(proposal: CancelProposal, _source: string): Promise<string> {
+    try {
+        await cancelReservationTx({
+            reservationId: proposal.reservationId,
+            actorUid: proposal.actorUid,
+            actorOrgId: proposal.organizationId,
+        });
+        return `🚫 ${proposal.vehicleName} ${proposal.date} ${proposal.startTime}~${proposal.endTime}\n예약을 취소했습니다.`;
+    } catch (err) {
+        if (err instanceof HttpsError) {
+            // 코어의 한국어 에러 메시지를 그대로 전달 (예: "이미 취소된 예약입니다")
+            return `❌ 예약 취소에 실패했습니다: ${err.message}`;
         }
         throw err;
     }

@@ -42,8 +42,16 @@ const mockAnswerData = jest.fn();
 jest.mock('../services/assistant/answerDataQuestion', () => ({
     answerDataQuestion: (...args: unknown[]) => mockAnswerData(...args),
 }));
+const mockFindCandidates = jest.fn();
+jest.mock('../services/assistant/cancelReservation', () => ({
+    findCancelCandidates: (...args: unknown[]) => mockFindCandidates(...args),
+}));
+const mockCancelTx = jest.fn();
+jest.mock('../services/reservation/cancelReservationCore', () => ({
+    cancelReservationTx: (...args: unknown[]) => mockCancelTx(...args),
+}));
 
-import { handleAssistantMessage, executeReservationProposal } from "../services/assistant/handleAssistantMessage";
+import { handleAssistantMessage, executeReservationProposal, executeCancelProposal } from "../services/assistant/handleAssistantMessage";
 
 const ACTOR = { uid: 'user1', orgId: 'org1', displayName: '홍길동' };
 
@@ -147,6 +155,50 @@ describe('handleAssistantMessage', () => {
 
         expect(result.replyText).toContain('예약 조회');
         expect(result.replyText).toContain('예약 생성');
+    });
+
+    describe('예약 취소', () => {
+        it('취소 후보가 없으면 안내만 하고 제안하지 않는다', async () => {
+            mockParseIntent.mockResolvedValue({ intent: 'cancel', date: '2026-07-20', vehicleId: null, startTime: null });
+            mockFindCandidates.mockResolvedValue([]);
+
+            const result = await handleAssistantMessage('예약 취소', ACTOR);
+
+            expect(mockFindCandidates).toHaveBeenCalledWith('org1', 'user1', { date: '2026-07-20', vehicleId: null, startTime: null });
+            expect(result.replyText).toContain('찾지 못했습니다');
+            expect(result.cancelProposal).toBeUndefined();
+        });
+
+        it('취소 후보가 1건이면 cancelProposal을 반환한다 (즉시 취소하지 않음)', async () => {
+            mockParseIntent.mockResolvedValue({ intent: 'cancel', date: '2026-07-20', vehicleId: 'v1', startTime: null });
+            mockFindCandidates.mockResolvedValue([
+                { id: 'r1', vehicleId: 'v1', vehicleName: '스타렉스', date: '2026-07-20', startTime: '14:00', endTime: '16:00' },
+            ]);
+
+            const result = await handleAssistantMessage('내일 스타렉스 예약 취소', ACTOR);
+
+            expect(result.cancelProposal).toEqual({
+                reservationId: 'r1', organizationId: 'org1', actorUid: 'user1',
+                vehicleName: '스타렉스', date: '2026-07-20', startTime: '14:00', endTime: '16:00',
+            });
+            expect(result.replyText).toContain('취소할까요?');
+            expect(mockCancelTx).not.toHaveBeenCalled();
+        });
+
+        it('취소 후보가 여러 건이면 되묻고 제안하지 않는다', async () => {
+            mockParseIntent.mockResolvedValue({ intent: 'cancel', date: '2026-07-20', vehicleId: null, startTime: null });
+            mockFindCandidates.mockResolvedValue([
+                { id: 'r1', vehicleId: 'v1', vehicleName: '스타렉스', date: '2026-07-20', startTime: '09:00', endTime: '10:00' },
+                { id: 'r2', vehicleId: 'v1', vehicleName: '스타렉스', date: '2026-07-20', startTime: '14:00', endTime: '16:00' },
+            ]);
+
+            const result = await handleAssistantMessage('예약 취소', ACTOR);
+
+            expect(result.cancelProposal).toBeUndefined();
+            expect(result.replyText).toContain('여러 건');
+            expect(result.replyText).toContain('09:00');
+            expect(result.replyText).toContain('14:00');
+        });
     });
 
     describe('멀티턴 대화 기억', () => {
@@ -269,6 +321,36 @@ describe('executeReservationProposal', () => {
         const text = await executeReservationProposal(PROPOSAL, 'slack');
 
         expect(text).toContain('이미 예약되어 있습니다');
+        expect(text).toContain('❌');
+    });
+});
+
+describe('executeCancelProposal', () => {
+    const CANCEL = {
+        reservationId: 'r1', organizationId: 'org1', actorUid: 'user1',
+        vehicleName: '스타렉스', date: '2026-07-20', startTime: '14:00', endTime: '16:00',
+    };
+
+    beforeEach(() => jest.clearAllMocks());
+
+    it('성공 시 취소 완료 메시지를 반환한다 (actorUid·actorOrgId 주입)', async () => {
+        mockCancelTx.mockResolvedValue({ vehicleName: '스타렉스', date: '2026-07-20', startTime: '14:00', endTime: '16:00' });
+
+        const text = await executeCancelProposal(CANCEL, 'slack');
+
+        expect(mockCancelTx).toHaveBeenCalledWith({
+            reservationId: 'r1', actorUid: 'user1', actorOrgId: 'org1',
+        });
+        expect(text).toContain('취소했습니다');
+        expect(text).toContain('🚫');
+    });
+
+    it('취소 실패(HttpsError)면 코어의 한국어 메시지를 그대로 전달한다', async () => {
+        mockCancelTx.mockRejectedValue(new MockHttpsError('failed-precondition', '이미 취소된 예약입니다.'));
+
+        const text = await executeCancelProposal(CANCEL, 'slack');
+
+        expect(text).toContain('이미 취소된 예약입니다');
         expect(text).toContain('❌');
     });
 });
