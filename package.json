@@ -13,6 +13,7 @@
     "build": "vite build",
     "postbuild": "tsx scripts/check-bundle-size.ts && tsx scripts/generate-seo.ts",
     "screenshots": "tsx scripts/generate-screenshots.ts",
+    "diagram:organization": "tsx scripts/render-organization-journey.ts",
     "lint": "eslint .",
     "lint:functions": "eslint functions",
     "type-check": "tsc --noEmit",

@@ -1,0 +1,116 @@
+<style>
+  :root { --admin:#1768b4; --admin2:#eaf3fd; --emp:#0d9994; --emp2:#e9f8f6; --support:#7050af; --tool:#ea7a22; --ink:#18324e; }
+  .perspective-wrap { max-width:1500px; margin:0 auto; }
+  .perspective-board { position:relative; min-width:1400px; height:800px; overflow:hidden; border:1px solid #b9c9da; border-radius:22px; background:#fbfdff; box-shadow:0 14px 40px #173b6418; }
+  .p-head { position:absolute; inset:0 0 auto 0; height:88px; display:flex; flex-direction:column; align-items:center; justify-content:center; background:linear-gradient(90deg,#edf5ff,#effbf9); border-bottom:1px solid #c9d6e4; z-index:5; }
+  .p-head h3 { margin:0 0 4px; color:#163957; font-size:25px; } .p-head p { margin:0; color:#5e7082; font-size:12px; }
+  .support-strip { position:absolute; top:104px; left:32px; right:32px; height:76px; border:1px solid #d8cbed; background:#f7f3fc; border-radius:16px; display:flex; align-items:center; padding:12px 18px; box-sizing:border-box; z-index:3; }
+  .support-title { width:165px; color:var(--support); font-weight:800; font-size:12px; line-height:1.3; }
+  .support-items { flex:1; display:flex; justify-content:space-around; align-items:center; gap:8px; }
+  .support-item { display:flex; align-items:center; gap:7px; color:#5f4a86; font-size:10px; font-weight:700; }
+  .support-icon { width:29px; height:29px; border-radius:10px; background:white; border:1px solid #c9b9e3; display:flex; align-items:center; justify-content:center; color:var(--support); font-size:14px; }
+  .journey { position:absolute; left:32px; right:32px; height:224px; border-radius:22px; border:1px solid; z-index:1; }
+  .journey.admin { top:198px; background:var(--admin2); border-color:#b8d3ef; }
+  .journey.emp { top:444px; background:var(--emp2); border-color:#b5dfdc; }
+  .persona { position:absolute; left:18px; top:24px; width:170px; height:176px; border-radius:19px; color:white; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center; box-shadow:0 8px 20px #173b6420; z-index:4; }
+  .admin .persona { background:linear-gradient(145deg,#1768b4,#155692); } .emp .persona { background:linear-gradient(145deg,#0d9994,#0b7774); }
+  .persona-icon { width:55px; height:55px; border-radius:50%; background:#ffffff22; border:2px solid #ffffffaa; display:flex; align-items:center; justify-content:center; font-size:27px; margin-bottom:10px; }
+  .persona strong { font-size:16px; } .persona span { margin-top:7px; font-size:10px; line-height:1.4; opacity:.93; }
+  .path { position:absolute; left:212px; right:20px; top:24px; bottom:24px; display:flex; align-items:center; gap:24px; z-index:4; }
+  .flow-card { position:relative; flex:1; min-width:0; height:152px; padding:12px 10px 9px; box-sizing:border-box; background:white; border:2px solid; border-radius:16px; box-shadow:0 6px 15px #1f3c5c12; }
+  .admin .flow-card { border-color:#76a9dd; } .emp .flow-card { border-color:#67bbb6; }
+  .num { position:absolute; top:-11px; left:11px; width:25px; height:25px; border-radius:50%; display:flex; align-items:center; justify-content:center; color:white; font-size:10px; font-weight:800; box-shadow:0 3px 7px #0002; }
+  .admin .num { background:var(--admin); } .emp .num { background:var(--emp); }
+  .flow-card h4 { margin:7px 0 6px; color:var(--ink); text-align:center; font-size:12px; }
+  .flow-card p { min-height:31px; margin:0 0 7px; color:#607183; text-align:center; font-size:9px; line-height:1.35; }
+  .chips { display:flex; flex-wrap:wrap; justify-content:center; gap:4px; }
+  .chip { padding:3px 5px; border-radius:999px; background:#f4f7fa; border:1px solid #d4dee8; color:#44586d; font-size:8px; font-weight:700; }
+  .arrow { position:absolute; right:-22px; top:65px; width:20px; height:3px; z-index:6; }
+  .admin .arrow { background:var(--admin); } .emp .arrow { background:var(--emp); }
+  .arrow:after { content:""; position:absolute; right:-1px; top:-4px; border-left:8px solid; border-top:5px solid transparent; border-bottom:5px solid transparent; }
+  .admin .arrow:after { border-left-color:var(--admin); } .emp .arrow:after { border-left-color:var(--emp); }
+  .handoff-svg { position:absolute; inset:88px 0 0 0; width:100%; height:610px; z-index:2; pointer-events:none; overflow:visible; }
+  .handoff-label { position:absolute; z-index:7; padding:5px 9px; border-radius:999px; color:#94470f; background:#fff8f1; border:1px solid #edb887; font-size:9px; font-weight:800; }
+  .invite-label { left:570px; top:394px; } .data-label { left:1100px; top:404px; }
+  .tool-footer { position:absolute; left:32px; right:32px; bottom:18px; height:96px; border-radius:18px; background:#fff7ef; border:1px solid #efc19e; display:flex; align-items:center; padding:12px 18px; box-sizing:border-box; z-index:3; }
+  .tool-footer-title { width:154px; color:#994b12; font-size:12px; font-weight:800; }
+  .tool-sections { flex:1; display:grid; grid-template-columns:1fr 1fr; gap:20px; }
+  .tool-section { display:flex; align-items:center; gap:10px; }
+  .tool-section strong { min-width:88px; font-size:10px; }
+  .tool-section.admin-tools strong { color:var(--admin); } .tool-section.emp-tools strong { color:var(--emp); }
+  .tools { display:flex; flex-wrap:wrap; gap:5px; }
+  .tool { padding:5px 8px; border-radius:8px; background:white; border:1px solid #e9a873; color:#83451a; font-size:8px; font-weight:700; }
+  .rationale { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:18px 0; }
+  .reason { padding:13px 15px; border-radius:13px; background:#f7f9fc; border:1px solid #dbe4ed; color:#485a6c; font-size:12px; }
+  .approval { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+</style>
+
+<div class="perspective-wrap">
+  <h2>수정 시안: “내가 어떻게 쓰는가”가 먼저 보이는 두 관점</h2>
+  <p class="subtitle">기관관리자와 기관직원을 주인공으로 키우고, 시스템 운영은 뒤에서 받쳐주는 지원 영역으로 축소했습니다.</p>
+
+  <div class="perspective-board">
+    <div class="p-head"><h3>차량운행일지 — 기관 도입부터 직원 사용까지</h3><p>기관관리자와 기관직원, 두 사람의 관점으로 보는 업무 흐름</p></div>
+
+    <div class="support-strip">
+      <div class="support-title">서비스가 뒤에서<br>안전하게 지원합니다</div>
+      <div class="support-items">
+        <div class="support-item"><span class="support-icon">✓</span>기관 심사·개설</div>
+        <div class="support-item"><span class="support-icon">🔒</span>인증·기관별 권한 보호</div>
+        <div class="support-item"><span class="support-icon">↻</span>알림·캘린더 동기화</div>
+        <div class="support-item"><span class="support-icon">◉</span>상태 관제·오류 대응</div>
+        <div class="support-item"><span class="support-icon">▣</span>백업·운영 지원</div>
+      </div>
+    </div>
+
+    <div class="journey admin">
+      <div class="persona"><div class="persona-icon">🏢</div><strong>기관관리자 관점</strong><span>“우리 기관에 도입하고<br>직원과 차량을 관리합니다”</span></div>
+      <div class="path">
+        <div class="flow-card"><span class="num">1</span><h4>서비스 도입 신청</h4><p>기관 정보와 증빙자료를 제출합니다.</p><div class="chips"><span class="chip">신청서</span><span class="chip">증빙 업로드</span></div><i class="arrow"></i></div>
+        <div class="flow-card"><span class="num">2</span><h4>승인·온보딩</h4><p>승인 결과를 받고 기관 운영을 시작합니다.</p><div class="chips"><span class="chip">이메일</span><span class="chip">알림톡</span><span class="chip">온보딩</span></div><i class="arrow"></i></div>
+        <div class="flow-card"><span class="num">3</span><h4>차량·운영 설정</h4><p>차량, 결재선, 기관별 기능을 설정합니다.</p><div class="chips"><span class="chip">차량 관리</span><span class="chip">결재선</span><span class="chip">기능 설정</span></div><i class="arrow"></i></div>
+        <div class="flow-card"><span class="num">4</span><h4>직원 초대·배포</h4><p>직원을 등록하고 앱 사용을 안내합니다.</p><div class="chips"><span class="chip">초대 코드</span><span class="chip">직원 관리</span><span class="chip">공지</span></div><i class="arrow"></i></div>
+        <div class="flow-card"><span class="num">5</span><h4>운영 현황 관리</h4><p>예약과 운행일지를 확인하고 승인합니다.</p><div class="chips"><span class="chip">예약 승인</span><span class="chip">일지 관리</span><span class="chip">알림</span></div><i class="arrow"></i></div>
+        <div class="flow-card"><span class="num">6</span><h4>보고·차량 개선</h4><p>통계와 유지관리 데이터를 기관 운영에 활용합니다.</p><div class="chips"><span class="chip">월간보고</span><span class="chip">PDF·Excel</span><span class="chip">정비·주유·하이패스</span></div></div>
+      </div>
+    </div>
+
+    <div class="journey emp">
+      <div class="persona"><div class="persona-icon">👤</div><strong>기관직원 관점</strong><span>“차량을 예약·운행하고<br>간편하게 기록합니다”</span></div>
+      <div class="path" style="left:300px">
+        <div class="flow-card"><span class="num">1</span><h4>초대받고 가입</h4><p>초대 코드로 기관에 참여합니다.</p><div class="chips"><span class="chip">Google 로그인</span><span class="chip">초대 코드</span></div><i class="arrow"></i></div>
+        <div class="flow-card"><span class="num">2</span><h4>앱 설치·연동</h4><p>홈 화면에 설치하고 알림과 일정을 연결합니다.</p><div class="chips"><span class="chip">PWA</span><span class="chip">푸시 알림</span><span class="chip">Google Calendar</span></div><i class="arrow"></i></div>
+        <div class="flow-card"><span class="num">3</span><h4>차량 예약</h4><p>필요한 차량과 시간을 선택합니다.</p><div class="chips"><span class="chip">예약 달력</span><span class="chip">반복 예약</span><span class="chip">Slack</span></div><i class="arrow"></i></div>
+        <div class="flow-card"><span class="num">4</span><h4>운행·일지 작성</h4><p>빠른 운행과 OCR로 현장에서 기록합니다.</p><div class="chips"><span class="chip">빠른 운행</span><span class="chip">OCR</span><span class="chip">TMAP</span><span class="chip">오프라인</span></div><i class="arrow"></i></div>
+        <div class="flow-card"><span class="num">5</span><h4>내 기록 확인</h4><p>운행 결과와 차량 이력을 확인합니다.</p><div class="chips"><span class="chip">내 기록</span><span class="chip">차량 이력</span><span class="chip">즐겨찾기</span></div></div>
+      </div>
+    </div>
+
+    <svg class="handoff-svg" viewBox="0 0 1400 610" preserveAspectRatio="none" aria-hidden="true">
+      <defs><marker id="handoff" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto"><path d="M0,0 L9,4.5 L0,9 Z" fill="#ea7a22"/></marker></defs>
+      <path d="M890 286 C890 320 424 346 424 380" stroke="#ea7a22" stroke-width="3" stroke-dasharray="7 5" fill="none" marker-end="url(#handoff)"/>
+      <path d="M1048 380 C1048 344 1078 322 1078 286" stroke="#ea7a22" stroke-width="3" stroke-dasharray="7 5" fill="none" marker-end="url(#handoff)"/>
+    </svg>
+    <span class="handoff-label invite-label">직원 초대·사용 권한 ↓</span>
+    <span class="handoff-label data-label">운행 기록·현황 ↑</span>
+
+    <div class="tool-footer">
+      <div class="tool-footer-title">관점별 핵심<br>기능·도구</div>
+      <div class="tool-sections">
+        <div class="tool-section admin-tools"><strong>기관관리자용</strong><div class="tools"><span class="tool">직원·차량 관리</span><span class="tool">예약·일지 관리</span><span class="tool">통계·보고서</span><span class="tool">정비·주유·하이패스</span></div></div>
+        <div class="tool-section emp-tools"><strong>기관직원용</strong><div class="tools"><span class="tool">PWA</span><span class="tool">차량 예약</span><span class="tool">빠른 운행·OCR</span><span class="tool">TMAP·캘린더</span><span class="tool">내 기록</span></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="rationale">
+    <div class="reason"><strong>내 역할부터 찾기</strong><br>관리자와 직원의 큰 인물 카드가 첫 시선을 잡습니다.</div>
+    <div class="reason"><strong>각자의 여정 이해</strong><br>두 역할이 독립적인 순서로 읽히면서 초대와 데이터로 연결됩니다.</div>
+    <div class="reason"><strong>기술은 뒤로</strong><br>시스템 운영은 작은 지원 영역으로 내려 주인공을 방해하지 않습니다.</div>
+  </div>
+
+  <div class="approval">
+    <div class="option" data-choice="approve-two-perspective-v3" onclick="toggleSelect(this)"><div class="letter">✓</div><div class="content"><h3>이 두 관점으로 PNG 제작</h3><p>기관관리자와 기관직원을 중심으로 최종 제작합니다.</p></div></div>
+    <div class="option" data-choice="revise-two-perspective-v3" onclick="toggleSelect(this)"><div class="letter">↻</div><div class="content"><h3>한 번 더 조정</h3><p>강조 비율, 기능 또는 흐름을 수정합니다.</p></div></div>
+  </div>
+</div>
