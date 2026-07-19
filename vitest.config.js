@@ -28,6 +28,8 @@ export default defineConfig({
             '**/node_modules/**',
             '**/e2e/**',
             '**/functions/**',
+            // git 워크트리(.worktrees/*)는 다른 브랜치의 중첩 체크아웃 — 부모 런이 스캔하면 안 된다
+            '**/.worktrees/**',
             // 에뮬레이터 없이 도는 일반 유닛 런/lint-staged에서는 rules 테스트를 제외한다.
             // (해당 에뮬레이터 실행 시에만 호스트 env가 세팅되어 포함됨)
             ...(!process.env.FIRESTORE_EMULATOR_HOST ? ['tests/firestore-rules.test.ts'] : []),
