@@ -174,6 +174,48 @@ describe('slackEvents', () => {
         }));
     });
 
+    it.each(['confirm_cancel', 'confirm_modify', 'cancel_reservation'])(
+        '%s 버튼도 action task를 만든다 (수신 화이트리스트 회귀 방지)',
+        async (actionId) => {
+            const payload = {
+                type: 'block_actions',
+                trigger_id: `trig-${actionId}`,
+                team: { id: 'T123' },
+                user: { id: 'U123' },
+                channel: { id: 'D123' },
+                response_url: 'https://hooks.slack.com/actions/xxx',
+                actions: [{ action_id: actionId, value: 'conf-9' }],
+            };
+            const raw = `payload=${encodeURIComponent(JSON.stringify(payload))}`;
+            const res = makeRes();
+            await capturedHandler(makeReq(raw, { payload: JSON.stringify(payload) }), res);
+
+            expect(res.statusCode).toBe(200);
+            expect(mockCreate).toHaveBeenCalledWith(expect.objectContaining({
+                kind: 'action',
+                actionId,
+                confirmationId: 'conf-9',
+            }));
+        },
+    );
+
+    it('화이트리스트에 없는 action_id는 task를 만들지 않는다', async () => {
+        const payload = {
+            type: 'block_actions',
+            trigger_id: 'trig-unknown',
+            team: { id: 'T123' },
+            user: { id: 'U123' },
+            channel: { id: 'D123' },
+            actions: [{ action_id: 'some_other_button', value: 'x' }],
+        };
+        const raw = `payload=${encodeURIComponent(JSON.stringify(payload))}`;
+        const res = makeRes();
+        await capturedHandler(makeReq(raw, { payload: JSON.stringify(payload) }), res);
+
+        expect(res.statusCode).toBe(200);
+        expect(mockCreate).not.toHaveBeenCalled();
+    });
+
     it('POST가 아니면 405를 반환한다', async () => {
         const res = makeRes();
         await capturedHandler(makeReq('{}', {}, { method: 'GET' }), res);

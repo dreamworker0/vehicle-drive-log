@@ -22,6 +22,18 @@ const db = getFirestore();
 const TASK_TTL_MS = 60 * 60 * 1000;
 const MAX_TEXT_LEN = 500;
 
+/**
+ * 처리 대상 인터랙션 action_id 목록.
+ * onSlackTaskCreated의 processMessage가 붙이는 버튼과 반드시 일치해야 한다.
+ * (누락 시 해당 버튼 클릭이 task로 만들어지지 않아 조용히 무반응이 된다)
+ */
+const ACTION_IDS = new Set([
+    "confirm_reservation", // ✅ 예약 확정
+    "confirm_cancel",      // 🚫 예약 취소
+    "confirm_modify",      // ✏️ 변경 확정
+    "cancel_reservation",  // 취소/닫기 (제안 무르기 공용)
+]);
+
 function isAlreadyExists(err: unknown): boolean {
     const e = err as { code?: number | string; message?: string };
     return e?.code === 6 || String(e?.message || "").includes("ALREADY_EXISTS");
@@ -78,7 +90,8 @@ async function handler(req: Request, res: Response): Promise<void> {
         const payload = JSON.parse(req.body.payload);
         if (payload.type === "block_actions" && Array.isArray(payload.actions) && payload.actions.length > 0) {
             const action = payload.actions[0];
-            if (action.action_id === "confirm_reservation" || action.action_id === "cancel_reservation") {
+            // 실행/취소 버튼 화이트리스트 — 예약 확정·취소, 예약 취소(confirm_cancel), 변경 확정(confirm_modify), 닫기
+            if (ACTION_IDS.has(action.action_id)) {
                 // trigger_id는 인터랙션마다 고유 — 재전송 중복 방지 겸 task ID로 사용
                 await createTaskOnce(`action_${payload.trigger_id}`, {
                     kind: "action",
