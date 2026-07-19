@@ -39,6 +39,7 @@
     "jest": {
         "testEnvironment": "node",
         "coverageProvider": "v8",
+        "maxWorkers": "50%",
         "roots": [
             "<rootDir>/src"
         ],

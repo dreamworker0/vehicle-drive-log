@@ -4,6 +4,15 @@ import { fileURLToPath } from 'url';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 
+// 로컬 테스트 워커 상한 — 강의·화면공유·브라우저 등 다른 작업과 동시에 돌려도
+// CPU가 꽉 차 끊기지 않도록 여유를 남긴다(기본 코어의 25%, 16코어 기준 4개).
+// CI(전용 러너)에서는 제한 없이 최대 병렬로 돌린다. 더 빠르게/느리게는
+// VITEST_MAX_WORKERS 로 조정(숫자 예: 8, 또는 백분율 예: '50%').
+const rawWorkers = process.env.VITEST_MAX_WORKERS;
+const localMaxWorkers = rawWorkers
+    ? (rawWorkers.includes('%') ? rawWorkers : Number(rawWorkers))
+    : '25%';
+
 export default defineConfig({
     plugins: [react()],
     resolve: {
@@ -24,6 +33,9 @@ export default defineConfig({
         environment: 'jsdom',
         globals: true,
         setupFiles: ['./src/__tests__/setup.ts'],
+        // 로컬은 워커 상한으로 CPU 여유 확보, CI는 기본값(최대 병렬)
+        maxWorkers: process.env.CI ? undefined : localMaxWorkers,
+        minWorkers: process.env.CI ? undefined : 1,
         exclude: [
             '**/node_modules/**',
             '**/e2e/**',
