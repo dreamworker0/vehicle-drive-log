@@ -86,6 +86,13 @@ function asString(v: unknown): string {
     return typeof v === "string" ? v : "";
 }
 
+/** "HH:MM"에 분을 더한다(23:59 상한). 종료시간 미지정 시 +1시간 기본값 계산용. */
+function addMinutesCapped(hhmm: string, add: number): string {
+    const [h, m] = hhmm.split(":").map(Number);
+    const total = Math.min(h * 60 + m + add, 23 * 60 + 59);
+    return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
 /**
  * 자연어 메시지를 예약 의도로 파싱.
  * @param text 사용자 메시지 (위생 처리 전 원문)
@@ -216,6 +223,10 @@ JSON 형식 (다른 텍스트 없이 JSON만):
         // 실제 차량 목록에 없는 id는 무효화
         if (result.vehicleId && !vehicles.some((v) => v.id === result.vehicleId)) {
             result.vehicleId = null;
+        }
+        // 시작만 있고 종료가 없으면 +1시간 자동 (앱 calcEndTime(start,0)과 동일) → 종료를 되묻지 않음
+        if (result.startTime && !result.endTime) {
+            result.endTime = addMinutesCapped(result.startTime, 60);
         }
         // 필수 정보 누락 → clarification으로 강등
         if (!result.date || !result.startTime || !result.endTime || !result.vehicleId) {

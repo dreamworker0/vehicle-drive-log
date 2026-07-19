@@ -78,6 +78,30 @@ describe('parseIntent', () => {
         expect(result.clarificationQuestion).toContain('지난 날짜');
     });
 
+    it('create에서 시작만 있고 종료가 없으면 +1시간을 자동으로 채운다 (되묻지 않음)', async () => {
+        mockGenerateAiContent.mockResolvedValue(JSON.stringify({
+            intent: 'create', date: seoulDate(1), startTime: '14:00', endTime: null,
+            vehicleId: 'v1', needsClarification: false,
+        }));
+
+        const result = await parseIntent('내일 14시 스타렉스 예약', VEHICLES);
+
+        expect(result.startTime).toBe('14:00');
+        expect(result.endTime).toBe('15:00');       // +1시간 자동
+        expect(result.needsClarification).toBe(false);
+    });
+
+    it('+1시간 자동은 23:59로 상한 처리한다', async () => {
+        mockGenerateAiContent.mockResolvedValue(JSON.stringify({
+            intent: 'create', date: seoulDate(1), startTime: '23:30', endTime: null,
+            vehicleId: 'v1', needsClarification: false,
+        }));
+
+        const result = await parseIntent('내일 23시반 예약', VEHICLES);
+
+        expect(result.endTime).toBe('23:59');
+    });
+
     it('시작 시간이 종료 시간 이후면 clarification으로 강등한다', async () => {
         mockGenerateAiContent.mockResolvedValue(JSON.stringify({
             intent: 'create', date: seoulDate(1), startTime: '16:00', endTime: '14:00',

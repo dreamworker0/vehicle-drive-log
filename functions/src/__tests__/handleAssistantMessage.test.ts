@@ -300,6 +300,86 @@ describe('handleAssistantMessage', () => {
         });
     });
 
+    describe('수정 되묻기 맥락 기억', () => {
+        const ACTOR_KEY = { ...ACTOR, conversationKey: 'slack_T_U' };
+        const F = seoulDateStr(2);
+        const CANDS = [
+            { id: 'r1', vehicleId: 'v1', vehicleName: '소나타3333', date: F, startTime: '09:00', endTime: '10:00' },
+            { id: 'r3', vehicleId: 'v3', vehicleName: 'EV52465', date: F, startTime: '12:00', endTime: '13:00' },
+        ];
+        function pendingModifyDoc(newValues: Record<string, unknown>, candidates = CANDS) {
+            return {
+                exists: true,
+                data: () => ({
+                    kind: 'modify',
+                    modify: { newValues, candidates },
+                    expiresAt: { toDate: () => new Date(Date.now() + 60_000) },
+                }),
+            };
+        }
+
+        it('N건 되묻기 시 새 값·후보를 저장한다 (다음 메시지 이어받기용)', async () => {
+            mockConvoGet.mockResolvedValue({ exists: false });
+            mockParseIntent.mockResolvedValue({ intent: 'modify', date: F, vehicleId: null, startTime: null, newStartTime: '13:00', newEndTime: '15:00', newDate: null, newVehicleId: null });
+            mockFindCandidates.mockResolvedValue(CANDS);
+
+            await handleAssistantMessage('13~15시로 변경', ACTOR_KEY);
+
+            expect(mockConvoSet).toHaveBeenCalledWith(expect.objectContaining({
+                kind: 'modify',
+                modify: expect.objectContaining({
+                    newValues: expect.objectContaining({ newStartTime: '13:00', newEndTime: '15:00' }),
+                }),
+            }));
+        });
+
+        it('되묻기 후 차량명으로 답하면 그 예약에 저장한 새 값을 적용한다', async () => {
+            mockConvoGet.mockResolvedValue(pendingModifyDoc({ newDate: null, newStartTime: '13:00', newEndTime: '15:00', newVehicleId: null }));
+
+            const result = await handleAssistantMessage('EV52465를 적용해줘', ACTOR_KEY);
+
+            expect(result.modifyProposal).toMatchObject({
+                reservationId: 'r3', vehicleName: 'EV52465', startTime: '13:00', endTime: '15:00',
+            });
+            expect(mockConvoDelete).toHaveBeenCalled(); // 확정되면 되묻기 상태 폐기
+            expect(mockParseIntent).not.toHaveBeenCalled(); // 후보 선택은 LLM 재파싱 없이 처리
+        });
+
+        it('되묻기 후 번호(2번)로 답해도 해당 후보에 적용한다', async () => {
+            mockConvoGet.mockResolvedValue(pendingModifyDoc({ newDate: null, newStartTime: '13:00', newEndTime: '15:00', newVehicleId: null }));
+
+            const result = await handleAssistantMessage('2번', ACTOR_KEY);
+
+            expect(result.modifyProposal).toMatchObject({ reservationId: 'r3' });
+        });
+
+        it('되묻기 후 매칭이 안 되면(주제 전환) 되묻기를 폐기하고 새로 파싱한다', async () => {
+            mockConvoGet.mockResolvedValue(pendingModifyDoc({ newDate: null, newStartTime: '13:00', newEndTime: '15:00', newVehicleId: null }));
+            mockParseIntent.mockResolvedValue({ intent: 'query', date: '2026-07-18' });
+            mockBuildSummary.mockResolvedValue('📅 요약');
+
+            const result = await handleAssistantMessage('오늘 예약 보여줘', ACTOR_KEY);
+
+            expect(mockConvoDelete).toHaveBeenCalled();
+            expect(mockParseIntent).toHaveBeenCalled();
+            expect(result.replyText).toBe('📅 요약');
+        });
+
+        it('같은 차량이 여러 건이면 좁혀 다시 되묻는다', async () => {
+            const same = [
+                { id: 'a', vehicleId: 'v1', vehicleName: '스타렉스8888', date: F, startTime: '12:00', endTime: '13:00' },
+                { id: 'b', vehicleId: 'v1', vehicleName: '스타렉스8888', date: F, startTime: '15:00', endTime: '16:00' },
+            ];
+            mockConvoGet.mockResolvedValue(pendingModifyDoc({ newDate: null, newStartTime: '13:00', newEndTime: '15:00', newVehicleId: null }, same));
+
+            const result = await handleAssistantMessage('스타렉스8888', ACTOR_KEY);
+
+            expect(result.modifyProposal).toBeUndefined();
+            expect(result.replyText).toContain('여러 건');
+            expect(mockConvoSet).toHaveBeenCalledWith(expect.objectContaining({ kind: 'modify' }));
+        });
+    });
+
     describe('멀티턴 대화 기억', () => {
         const ACTOR_KEY = { ...ACTOR, conversationKey: 'slack_T_U' };
 
