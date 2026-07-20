@@ -1,0 +1,55 @@
+name: Functions Coverage — 주간 커버리지 회귀 게이트
+
+# Functions 커버리지 계측은 GitHub 러너에서 실행 시간을 +15분(11분→26분) 늘린다. 이 비용을
+# 매 푸시 CI에 얹으면 배포 대기가 길어지고 타임아웃 변동으로 flaky해진다. 그래서 커버리지 회귀
+# 게이트(functions/package.json의 jest coverageThreshold)는 per-push에서 떼어내
+# 주 1회 스케줄 + 수동(workflow_dispatch)으로만 검사한다. 하한선 미달 시 잡이 실패하고
+# GitHub이 기본적으로 실패한 스케줄 실행을 저장소 관리자에게 메일로 알린다.
+# (per-push 빠른 pass/fail 테스트 게이트는 ci.yml의 functions-tests 잡이 담당)
+
+on:
+  schedule:
+    # 매주 월요일 00:00 KST (일요일 15:00 UTC)
+    - cron: '0 15 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: functions-coverage
+  cancel-in-progress: true
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      TZ: "Asia/Seoul"
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install functions dependencies
+        run: cd functions && npm ci
+
+      # --coverage로 functions/package.json jest 설정의 coverageThreshold를 게이트로 강제한다.
+      # 하한선(43/74/46/43) 미달 시 실패 → 커버리지 회귀 감지.
+      - name: Functions coverage gate
+        run: cd functions && npx jest --coverage --testPathIgnorePatterns=emulator --maxWorkers=2 --workerIdleMemoryLimit=512MB
+        env:
+          NODE_OPTIONS: --max-old-space-size=4096
+
+      - name: Upload functions coverage summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: functions-coverage-summary
+          path: functions/coverage/coverage-summary.json
+          if-no-files-found: ignore
+          retention-days: 30
