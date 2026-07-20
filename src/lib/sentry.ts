@@ -104,6 +104,11 @@ function initSentryWithModule(Sentry: SentryModule) {
             // Firestore IndexedDB 내부 캐시 손상 (Firebase SDK 버그, 앱 버그 아님)
             /INTERNAL ASSERTION FAILED/,
             /Unexpected state/,
+            // iOS Safari(WebKit) IndexedDB 내부 오류 — 스택 없는 "Internal error" unhandledrejection으로
+            // 보고되며(iOS 18.x /employee/drive-log 등), Firestore 영속성 레이어가 WebKit IDB의
+            // 내부 실패를 그대로 전파하는 환경 노이즈다(앱 버그 아님). 앵커로 정확 일치만 차단해
+            // "Internal error opening backing store" 등 다른 메시지와 겹치지 않게 좁힌다.
+            /^Internal error\.?$/,
             // IndexedDB 용량 초과 (사용자 기기 저장공간 부족, 앱 버그 아님)
             /QuotaExceededError/,
             /Encountered full disk/,
