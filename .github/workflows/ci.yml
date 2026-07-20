@@ -45,15 +45,15 @@ jobs:
               - 'shared/**'
               - '.github/workflows/ci.yml'
 
-  # Functions 단위 테스트 + 커버리지 게이트 — 메인 ci 잡과 병렬 실행해 전체 체감 시간을 줄인다.
-  # (한 잡에 직렬로 두면 CI 1회 ~19분 중 절반 이상이 이 테스트였다)
+  # Functions 단위 테스트(pass/fail 게이트) — 메인 ci 잡과 병렬 실행해 전체 체감 시간을 줄인다.
+  # 커버리지 계측은 이 러너에서 실행 시간을 +15분(11분→26분) 늘리는데 워커 수로는 못 줄여서
+  # (병목=계측 자체), per-push에서는 커버리지 없이 빠르게 pass/fail만 본다. 커버리지 회귀 게이트는
+  # 별도 스케줄 워크플로(functions-coverage.yml)가 주 1회 자동 검사한다.
   functions-tests:
     needs: changes
     if: needs.changes.outputs.functions == 'true'
     runs-on: ubuntu-latest
-    # 커버리지 계측이 실행 시간을 ~2배로 늘린다(로컬 8워커 4분 → CI 저워커 15분+). 전용 잡이
-    # 러너를 독점하므로 워커를 3으로 올려 체감 시간을 줄이고, 변동 폭까지 흡수하도록 30분 여유를 둔다.
-    timeout-minutes: 30
+    timeout-minutes: 20
     env:
       TZ: "Asia/Seoul"
     steps:
@@ -68,21 +68,10 @@ jobs:
       - name: Install functions dependencies
         run: cd functions && npm ci
 
-      # --coverage로 functions/package.json jest 설정의 coverageThreshold를 게이트로 강제한다.
-      # 워커 3개 × max-old-space 4GB = 최대 12GB로 러너(16GB) 이내. (전용 잡이라 다른 스텝과 메모리 비경합)
-      - name: Functions unit tests (+coverage gate)
-        run: cd functions && npx jest --coverage --testPathIgnorePatterns=emulator --maxWorkers=3 --workerIdleMemoryLimit=512MB
+      - name: Functions unit tests
+        run: cd functions && npx jest --testPathIgnorePatterns=emulator --maxWorkers=2 --workerIdleMemoryLimit=512MB
         env:
           NODE_OPTIONS: --max-old-space-size=4096
-
-      - name: Upload functions coverage summary
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: functions-coverage-summary
-          path: functions/coverage/coverage-summary.json
-          if-no-files-found: ignore
-          retention-days: 14
 
   ci:
     runs-on: ubuntu-latest
