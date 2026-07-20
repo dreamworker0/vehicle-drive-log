@@ -20,8 +20,10 @@
  *   행동:   { "1": "pass", "9": "fail", ... }   // 모든 케이스의 기대 결과는 pass
  */
 import { readFileSync, readdirSync, existsSync, writeFileSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { hashResults } from './check-harness';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const SKILLS_DIR = join(ROOT, '.agent', 'skills');
@@ -157,19 +159,73 @@ function score(kind: Kind, resultsPath: string): void {
 
 // ── baseline ───────────────────────────────────────────────────────────────────
 
+interface BaselineEntry {
+  score: string;
+  provenance: {
+    measuredAt: string;   // 측정일 (YYYY-MM-DD)
+    model: string;        // 판정에 사용한 모델
+    commitSha: string;    // 측정 시점 커밋
+    caseCount: number;    // 측정된 케이스 수
+    resultsHash: string;  // results 정규화 해시 (사후 변조/드리프트 감지)
+  };
+  results: Record<string, string>;
+}
+
+/** --model=X 또는 EVAL_MODEL 환경변수에서 모델명을 얻는다. 없으면 저장을 거부한다. */
+function resolveModel(): string {
+  const arg = process.argv.find((a) => a.startsWith('--model='));
+  const model = arg ? arg.slice('--model='.length) : process.env.EVAL_MODEL;
+  if (!model) {
+    console.error(`${C.red}모델명이 필요합니다.${C.reset} --model=<판정 모델> 또는 EVAL_MODEL 환경변수로 지정하세요.`);
+    console.error('예: npm run eval:trigger -- baseline results.json --model=claude-fable-5');
+    process.exit(2);
+  }
+  return model;
+}
+
+function currentCommitSha(): string {
+  try {
+    return execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf-8' }).trim();
+  } catch {
+    return 'unknown';
+  }
+}
+
 function saveBaseline(kind: Kind, resultsPath: string): void {
   if (!existsSync(resultsPath)) {
     console.error(`${C.red}결과 파일 없음:${C.reset} ${resultsPath}`);
     process.exit(2);
   }
+  const model = resolveModel();
   const results = readJson<Record<string, string>>(resultsPath);
-  const baselines = existsSync(BASELINE_FILE) ? readJson<Record<string, unknown>>(BASELINE_FILE) : {};
+  const baselines = existsSync(BASELINE_FILE)
+    ? readJson<Record<string, unknown> & { history?: unknown[] }>(BASELINE_FILE)
+    : {};
   const rows = kind === 'trigger' ? scoreTrigger(results) : scoreBehavior(results);
   const correct = rows.filter((r) => r.ok).length;
-  // 날짜는 스크립트가 임의로 박지 않는다(재현성). 운영자가 커밋 메시지/PR에 기록.
-  baselines[kind] = { score: `${correct}/${rows.length}`, results };
+
+  // 기존 베이스라인은 조용히 덮어쓰지 않고 history로 보존한다 (최근 5개).
+  const prev = baselines[kind] as BaselineEntry | undefined;
+  if (prev?.results) {
+    const history = Array.isArray(baselines.history) ? baselines.history : [];
+    history.push({ kind, ...prev });
+    baselines.history = history.slice(-5);
+  }
+
+  const entry: BaselineEntry = {
+    score: `${correct}/${rows.length}`,
+    provenance: {
+      measuredAt: new Date().toISOString().slice(0, 10),
+      model,
+      commitSha: currentCommitSha(),
+      caseCount: Object.keys(results).length,
+      resultsHash: hashResults(results),
+    },
+    results,
+  };
+  baselines[kind] = entry;
   writeFileSync(BASELINE_FILE, JSON.stringify(baselines, null, 2) + '\n', 'utf-8');
-  console.log(`${C.green}베이스라인 저장:${C.reset} ${kind} = ${correct}/${rows.length} → ${BASELINE_FILE}`);
+  console.log(`${C.green}베이스라인 저장:${C.reset} ${kind} = ${correct}/${rows.length} (${model}, ${entry.provenance.measuredAt}) → ${BASELINE_FILE}`);
 }
 
 // ── main ───────────────────────────────────────────────────────────────────────

@@ -49,7 +49,8 @@ export default defineConfig({
         ],
         coverage: {
             provider: 'v8',
-            reporter: ['text', 'text-summary', 'json', 'lcov', 'html'],
+            // json-summary는 CI 아티팩트(coverage-summary.json) 업로드용
+            reporter: ['text', 'text-summary', 'json', 'json-summary', 'lcov', 'html'],
             // 실측(2026-07-10: lines 29.12/stmts 27.89/funcs 21.88/branches 17.83) 기준
             // 후퇴 방지선(안전 마진 ~1pp). 목표는 숫자가 아니라 회귀 차단 — 테스트 추가에 맞춰 단계 상향.
             // 2026-07-10 임계경로 테스트(syncQueue·auth·예약 제출) 추가로 하한 상향.

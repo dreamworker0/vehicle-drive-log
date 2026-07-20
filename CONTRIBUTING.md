@@ -104,7 +104,7 @@ chore: 의존성 업데이트
 
 ## PR 규칙
 
-1. **PR 생성 전** `npm run lint` 및 `npm test` 통과 확인
+1. **PR 생성 전** `npm run verify:fast`(lint + 타입 검사) 및 `npm test` 통과 확인 — 전체 게이트를 미리 돌리려면 `npm run verify:full`, 에이전트 하네스(`.agent/`·훅·eval) 변경 시 `npm run verify:harness`
 2. `master` 푸시는 CI 배포를 트리거하므로 로컬 `firebase deploy` 금지 (배포는 CI 단일 경로)
 3. CI (`ci.yml`)가 통과해야 머지 가능
 4. PR 제목은 커밋 메시지 규칙과 동일

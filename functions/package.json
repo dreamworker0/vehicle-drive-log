@@ -7,6 +7,7 @@
         "build:watch": "tsc --watch",
         "type-check": "tsc --noEmit",
         "test": "jest --verbose --testPathIgnorePatterns=emulator",
+        "test:coverage": "jest --coverage --testPathIgnorePatterns=emulator",
         "test:emulator": "jest --verbose --runInBand --testPathPattern=\"emulator\\.test\"",
         "serve": "npm run build && firebase emulators:start --only functions",
         "shell": "npm run build && firebase functions:shell",
@@ -39,6 +40,20 @@
     "jest": {
         "testEnvironment": "node",
         "coverageProvider": "v8",
+        "collectCoverageFrom": [
+            "src/**/*.ts",
+            "!src/__tests__/**",
+            "!src/**/*.d.ts",
+            "!src/index.ts"
+        ],
+        "coverageThreshold": {
+            "global": {
+                "statements": 43,
+                "branches": 74,
+                "functions": 46,
+                "lines": 43
+            }
+        },
         "maxWorkers": "50%",
         "roots": [
             "<rootDir>/src"

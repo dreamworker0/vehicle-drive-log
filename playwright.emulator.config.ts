@@ -28,6 +28,8 @@ export default defineConfig({
         baseURL: 'http://127.0.0.1:5174',
         headless: true,
         screenshot: 'only-on-failure',
+        // CI 실패 진단용 trace — 실패한 테스트만 남기고 아티팩트로 업로드된다(ci.yml)
+        trace: process.env.CI ? 'retain-on-failure' : 'off',
     },
     webServer: {
         // --host 127.0.0.1 로 IPv4에 명시 바인딩 (Windows에서 localhost가 ::1로 해석되어

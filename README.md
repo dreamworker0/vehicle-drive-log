@@ -161,6 +161,10 @@ ALIMTALK_PROXY_TOKEN=...
 | `npm run screenshots` | PWA 스크린샷 생성 (Playwright + sharp) |
 | `npm run audit` | npm 보안 감사 리포트 |
 | `npm run health` | Cloud Functions 상태 점검 |
+| `npm run verify:harness` | 하네스 Doctor — 에이전트 지침·스킬·워크플로·eval 정합성 검사 |
+| `npm run verify:fast` | 빠른 검증 (Node 확인 + lint + 타입 검사 프론트/Functions) |
+| `npm run verify:full` | 전체 게이트 (하네스 + fast + 커버리지 + Functions 테스트 + 빌드 + Rules + E2E) |
+| `npm run test:functions` | Cloud Functions 단위 테스트 (Jest) |
 
 ---
 

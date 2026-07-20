@@ -22,6 +22,13 @@
     { "id": 19, "prompt": "Sentry에 ResizeObserver 에러가 계속 떠. 무시하게 해줘", "expected": "sentry-noise-filter" },
     { "id": 20, "prompt": "안 쓰는 코드랑 패키지 정리 좀 해줘", "expected": "code-cleanup" },
     { "id": 21, "prompt": "배포했는데 functions가 Node 버전 에러로 실패해", "expected": "troubleshoot-deployment" },
-    { "id": 22, "prompt": "오프라인일 때도 운행 입력을 저장했다가 나중에 동기화되게 해줘", "expected": "add-pwa-feature" }
+    { "id": 22, "prompt": "오프라인일 때도 운행 입력을 저장했다가 나중에 동기화되게 해줘", "expected": "add-pwa-feature" },
+    { "id": 23, "prompt": "차량 예약 완료 버튼 클릭을 GA4 이벤트로 기록하고 싶어", "expected": "add-analytics-tracking" },
+    { "id": 24, "prompt": "예약 목록 필터링 로직이 컴포넌트마다 중복돼 있어. 재사용 가능한 훅으로 분리해줘", "expected": "add-hook" },
+    { "id": 25, "prompt": "자주 하는 질문에 '차량 예약을 취소하는 방법' 항목을 추가해줘", "expected": "update-faq" },
+    { "id": 26, "prompt": "예약 카드에서 차량마다 아이콘 색이 제각각이야. 차량 색상 표시 방식을 통일해줘", "expected": "vehicle-color" },
+    { "id": 27, "prompt": "README의 오타를 고쳐줘", "expected": "none" },
+    { "id": 28, "prompt": "react를 19.3으로 업그레이드해줘", "expected": "none" },
+    { "id": 29, "prompt": "커밋 메시지 컨벤션이 뭐였지?", "expected": "none" }
   ]
 }

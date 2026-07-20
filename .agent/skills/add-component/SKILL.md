@@ -18,7 +18,7 @@ src/components/
 ├── superAdmin/  ← 슈퍼관리자 전용 (SuperAdminLayout 하위 라우트)
 ```
 
-> 상세 위치 결정 기준: [agents.md §5.2](../agents.md)
+> 상세 위치 결정 기준: [agents.md §5.2](../../agents.md)
 
 ### 2. 기존 공통 컴포넌트 재사용 확인
 
@@ -69,9 +69,9 @@ export default function NewComponent() {
 }
 ```
 
-> 스타일링 상세 규칙: [design-system.md](../rules/design-system.md)
-> 다크 모드 색상 페어링 표: [design-system.md §1](../rules/design-system.md)
-> 브라우저 팝업 금지 / useConfirm 사용: [agents.md §1 D1~D3](../agents.md)
+> 스타일링 상세 규칙: [design-system.md](../../rules/design-system.md)
+> 다크 모드 색상 페어링 표: [design-system.md §1](../../rules/design-system.md)
+> 브라우저 팝업 금지 / useConfirm 사용: [agents.md §1 D1~D3](../../agents.md)
 
 ### 4. 탭 UI 패턴 (2개 이상 탭 전환 시)
 
@@ -112,4 +112,4 @@ const NewComponent = lazyWithRetry(() => import('./NewComponent'));
 
 ### 7. 검증
 
-자동 교정 루프를 실행한다 → [agents.md §2](../agents.md)
+자동 교정 루프를 실행한다 → [agents.md §2](../../agents.md)

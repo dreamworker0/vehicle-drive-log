@@ -27,9 +27,13 @@ function main() {
 
     const lines = [
         '',
-        `⚠️  Node 버전 불일치: 현재 v${current}, 권장 v${REQUIRED_MAJOR}.x`,
+        `⚠️  Node 버전 불일치: 현재 v${current} (${process.platform}, ${process.execPath})`,
+        `   권장 v${REQUIRED_MAJOR}.x — 기준: .node-version / package.json engines / CI(setup-node)`,
         `   ${hint}`,
-        '   다음으로 전환하세요:  fnm use 22   (또는 nvm use 22)',
+        '   해결:',
+        '     - 셸 전환:        fnm use 22   (또는 nvm use 22)',
+        `     - 1회성 실행(PS): fnm exec --using=${REQUIRED_MAJOR} npm.cmd run <script>`,
+        '     - fnm/nvm이 없으면 설치가 필요합니다(자동 설치하지 않음): https://github.com/Schniz/fnm',
         '',
     ];
     console.warn(lines.join('\n'));

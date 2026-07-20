@@ -21,7 +21,7 @@ description: Antigravity와 Claude Code를 번갈아 사용할 때의 공유 규
 CLAUDE.md                  ← Claude Code 진입점 (.agent/를 가리키는 포인터 문서)
 .claude/skills/            ← Claude Code 자동발동 스킬 (.agent/skills/에서 자동 생성)
 .claude/commands/          ← Claude Code 슬래시 커맨드 (.agent/workflows/에서 자동 생성)
-.claude/settings.local.json ← Claude Code 권한 설정
+.claude/settings.local.json ← Claude Code 개인 권한 설정 (로컬 전용, gitignore — 공용은 .claude/settings.json)
 .agents/                   ← Antigravity 서브에이전트 작업 이력 (gitignore됨, 커밋 안 함)
 ```
 

@@ -25,13 +25,17 @@ description: 문서 갱신·검증·커밋 후 master 푸시로 CI 배포를 트
 
 2. Node 22 LTS 버전 강제 검증:
 ```powershell
-node -e "if(!process.version.startsWith('v22.')) { console.error('❌ 에러: Node 22 LTS 버전이 필요합니다. 현재 버전: ' + process.version); process.exit(1); }"
+npm run check:node -- --strict
 ```
 Working directory: `.`
 
 3. 전체 사전 검증 실행 (TypeScript / Lint / Test):
+   - ⚠️ PowerShell 5.1은 `&&` 체이닝을 지원하지 않는다. npm 스크립트 하나로 묶은 `verify:fast` + 전체 단위 테스트를 순서대로 실행하고, **앞 명령이 실패하면 중단**한다.
 ```powershell
-npm run type-check && npm run lint && npm test run
+npm run verify:fast
+```
+```powershell
+npm test
 ```
 Working directory: `.`
 

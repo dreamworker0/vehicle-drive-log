@@ -1,0 +1,79 @@
+name: Harness — 하네스 정합성
+
+# 메인 CI는 문서(.md) 전용 푸시를 paths-ignore로 건너뛴다(Actions 분량 절약).
+# 그 규칙에 .agent/** 등 하네스 변경까지 묻히면 브리지 드리프트·깨진 링크가 무검증으로
+# master에 들어가므로, 하네스 경로 전용의 빠른(~3분) 정합성 검사를 별도로 돌린다.
+# (코드가 섞인 푸시는 메인 CI도 함께 실행된다 — 이 워크플로는 배포를 트리거하지 않는다.)
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
+      - '.agent/**'
+      - '.claude/**'
+      - '.husky/**'
+      - 'scripts/hooks/**'
+      - 'scripts/run-eval.ts'
+      - 'scripts/check-harness.ts'
+      - 'scripts/sync-claude-agents.ts'
+      - 'scripts/check-node-version.ts'
+      - 'scripts/skill-trigger-eval.json'
+      - 'scripts/behavior-rule-eval.json'
+      - 'scripts/eval-baselines.json'
+      - '.github/workflows/harness-ci.yml'
+  pull_request:
+    branches: [master]
+    paths:
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
+      - '.agent/**'
+      - '.claude/**'
+      - '.husky/**'
+      - 'scripts/hooks/**'
+      - 'scripts/run-eval.ts'
+      - 'scripts/check-harness.ts'
+      - 'scripts/sync-claude-agents.ts'
+      - 'scripts/check-node-version.ts'
+      - 'scripts/skill-trigger-eval.json'
+      - 'scripts/behavior-rule-eval.json'
+      - 'scripts/eval-baselines.json'
+      - '.github/workflows/harness-ci.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: harness-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  harness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TZ: "Asia/Seoul"
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: .agent ↔ .claude 동기화 검증
+        run: npm run sync:agents -- --check
+
+      - name: 하네스 Doctor (정합성 검사)
+        run: npm run verify:harness
+
+      - name: 하네스 단위 테스트 (배포 가드 · Doctor 파서)
+        run: npx vitest run scripts/
+
+      - name: .gitignore 검증
+        run: npm run verify:gitignore

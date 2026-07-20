@@ -11,7 +11,7 @@ description: Gemini 3.1 Flash Lite API를 사용한 계기판 OCR 및 증빙 서
 
 ## 1. 공통 모듈 개요
 
-프로젝트의 모든 Gemini API 호출은 개별적으로 인스턴스를 생성하지 않고, 싱글톤 클라이언트와 공통 유틸 함수가 정의된 [gemini.ts](file:///d:/apps/차량운행일지/functions/src/core/gemini.ts)를 사용해야 합니다.
+프로젝트의 모든 Gemini API 호출은 개별적으로 인스턴스를 생성하지 않고, 싱글톤 클라이언트와 공통 유틸 함수가 정의된 [gemini.ts](../../../functions/src/core/gemini.ts)를 사용해야 합니다.
 
 ### 핵심 API 인터페이스
 *   `getGeminiClient()`: `GoogleGenAI` 싱글톤 객체를 반환합니다.

@@ -68,7 +68,7 @@ export function downloadVehiclePdf(
 엑셀 저장 기능은 번들 크기 최소화를 위해 `xlsx` 패키지를 전역적으로 가져오지 않고, **다운로드 함수 호출 시점에만 비동기 동적 임포트(Dynamic Import)** 해야 합니다.
 
 ### 2.1 파일 통합 규칙
-*   **통합 파일**: 모든 엑셀 다운로드 헬퍼는 개별 파일을 새로 만들지 않고, [`src/lib/excelExport.ts`](file:///d:/apps/차량운행일지/src/lib/excelExport.ts) 하나의 공용 파일 내에 함수를 추가하여 관리합니다.
+*   **통합 파일**: 모든 엑셀 다운로드 헬퍼는 개별 파일을 새로 만들지 않고, [`src/lib/excelExport.ts`](../../../src/lib/excelExport.ts) 하나의 공용 파일 내에 함수를 추가하여 관리합니다.
 
 ### 2.2 구현 5단계 및 예시 코드
 ```typescript

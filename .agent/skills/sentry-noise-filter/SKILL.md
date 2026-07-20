@@ -26,7 +26,7 @@ description: Sentry에 잡힌 환경/브라우저/외부 의존성 발 노이즈
 
 ## 어디에 추가하나
 
-### 프론트엔드: [src/lib/sentry.ts](src/lib/sentry.ts)
+### 프론트엔드: [src/lib/sentry.ts](../../../src/lib/sentry.ts)
 
 세 곳 중 한 곳을 고른다:
 
@@ -71,7 +71,7 @@ beforeSend(event) {
 - 특정 도메인/URL 발 → **(B) denyUrls**
 - 메시지가 너무 일반적이고 스택트레이스·이벤트 메타데이터로 구분해야 함 → **(C) beforeSend**
 
-### Cloud Functions: [functions/src/sentry.ts](functions/src/sentry.ts)
+### Cloud Functions: [functions/src/core/sentry.ts](../../../functions/src/core/sentry.ts)
 
 Functions 측은 `Sentry.init` 옵션에 `ignoreErrors`/`beforeSend`를 추가할 수 있지만, 현재 구현은 **모든 에러를 `captureError(err, ctx)` 헬퍼를 통해 명시적으로 전송**하는 구조다. 즉 호출자가 try/catch에서 노이즈를 판단해 `captureError`를 호출하지 않으면 된다.
 
@@ -102,7 +102,7 @@ Functions에서 노이즈 필터가 필요한 경우 두 가지 패턴:
 
 ## 자주 본 카테고리 (이미 필터링된 것들)
 
-[src/lib/sentry.ts](src/lib/sentry.ts)의 기존 항목을 카테고리별로 확인 후 중복 추가 방지:
+[src/lib/sentry.ts](../../../src/lib/sentry.ts)의 기존 항목을 카테고리별로 확인 후 중복 추가 방지:
 
 - ResizeObserver / Non-Error promise / Network failed
 - ChunkLoadError, Loading chunk failed (배포 후 구버전 청크)
