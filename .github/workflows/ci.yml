@@ -51,8 +51,10 @@ jobs:
     needs: changes
     if: needs.changes.outputs.functions == 'true'
     runs-on: ubuntu-latest
-    # 커버리지 계측이 실행 시간을 ~2배로 늘린다(로컬 8워커 4분 → CI 저워커 15분+). 전용 잡이
-    # 러너를 독점하므로 워커를 3으로 올려 체감 시간을 줄이고, 변동 폭까지 흡수하도록 30분 여유를 둔다.
+    # 커버리지 계측이 실행 시간을 크게 늘린다(로컬 8워커 4분 → CI 3워커 25분). 병목은 러너의 느린
+    # 코어 + 공격적인 workerIdleMemoryLimit(512MB)이 커버리지로 커진 힙과 맞물린 잦은 워커 재시작.
+    # 전용 잡이 러너(4 vCPU/16GB)를 독점하므로 워커를 4로 올리고 idle 한도를 1536MB로 완화해
+    # thrashing을 줄인다(4×1.5GB=6GB, max-old-space 포함해도 러너 메모리 이내). 30분 안전 여유 유지.
     timeout-minutes: 30
     env:
       TZ: "Asia/Seoul"
@@ -69,9 +71,10 @@ jobs:
         run: cd functions && npm ci
 
       # --coverage로 functions/package.json jest 설정의 coverageThreshold를 게이트로 강제한다.
-      # 워커 3개 × max-old-space 4GB = 최대 12GB로 러너(16GB) 이내. (전용 잡이라 다른 스텝과 메모리 비경합)
+      # 전용 잡이라 러너 4코어를 온전히 쓰고(maxWorkers=4), idle 한도를 1536MB로 완화해
+      # 커버리지 힙에 의한 잦은 워커 재시작을 줄인다(다른 스텝과 메모리 비경합).
       - name: Functions unit tests (+coverage gate)
-        run: cd functions && npx jest --coverage --testPathIgnorePatterns=emulator --maxWorkers=3 --workerIdleMemoryLimit=512MB
+        run: cd functions && npx jest --coverage --testPathIgnorePatterns=emulator --maxWorkers=4 --workerIdleMemoryLimit=1536MB
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
