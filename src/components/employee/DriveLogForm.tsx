@@ -29,7 +29,7 @@ export default function DriveLogForm() {
         canEditDriver,
         isElectric,
         reservationData,
-        editLog, isEditMode, isRetroactive,
+        editLog, isEditMode, isRetroactive, retroEntry,
         showFavSave, setShowFavSave,
         favName, setFavName,
         hipassCard,
@@ -80,11 +80,13 @@ export default function DriveLogForm() {
     }
 
     // 제목 결정
-    const title = isEditMode ? '운행일지 수정' : '운행일지 작성';
+    const title = isEditMode ? '운행일지 수정' : retroEntry ? '누락 운행 소급 입력' : '운행일지 작성';
 
     const subtitle = isEditMode
         ? `${(editLog as DriveLog).vehicleName || '차량'} · ${(editLog as DriveLog).destination || ''} 기록을 수정합니다`
-        : '차량 운행 기록을 입력하세요';
+        : retroEntry
+            ? '예약 없이 지난 운행을 소급하여 직접 기록합니다'
+            : '차량 운행 기록을 입력하세요';
 
     return (
         <div className="max-w-lg mx-auto animate-fade-in">
@@ -104,6 +106,14 @@ export default function DriveLogForm() {
                 </div>
             )}
 
+            {retroEntry && (
+                <div className="mb-4 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 text-xs leading-relaxed animate-fade-in">
+                    <p className="font-semibold mb-1">📌 누락 운행 소급 입력 안내</p>
+                    <p>차량과 운행 일자를 고르면 <strong>그 날짜 직전 기록의 도착 km</strong>가 출발 km로 자동 입력됩니다.</p>
+                    <p className="mt-0.5">계기판 숫자가 어긋나지 않도록, <strong>도착 km는 아래 표시되는 "직후 운전 정보"의 출발 km에 맞춰</strong> 입력하세요.</p>
+                </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-5">
 
                 {/* 1. 차량 정보 섹션 */}
@@ -117,8 +127,8 @@ export default function DriveLogForm() {
                     handleVehicleSelect={handleVehicleSelect}
                 />
 
-                {/* 2. 운행 일자 섹션 (수정 모드 시) */}
-                {isEditMode && (
+                {/* 2. 운행 일자 섹션 (수정 모드 또는 누락 소급 입력 모드) */}
+                {(isEditMode || retroEntry) && (
                     <DateSection
                         form={form}
                         setForm={setForm}

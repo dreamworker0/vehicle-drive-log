@@ -103,6 +103,17 @@ export default function MyRecords() {
                 {searchQuery ? `검색 결과 ${filteredLogs.length}건` : `총 ${logs.length}건`} · {totalDistance.toLocaleString()} km
             </p>
 
+            {/* 누락 운행 소급 입력 진입점 — 예약 없이 지난 운행을 직접 기록 */}
+            {!searchQuery && (
+                <button
+                    onClick={() => navigate('/employee/drive-log', { state: { retroactive: true } })}
+                    className="w-full mb-4 py-3 min-h-[48px] rounded-xl border border-dashed border-surface-300 dark:border-surface-600 text-sm font-medium text-surface-500 dark:text-surface-400 hover:border-primary-400 dark:hover:border-primary-500 hover:text-primary-600 dark:hover:text-primary-400 transition-colors flex items-center justify-center gap-1.5"
+                >
+                    <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
+                    누락 운행 입력
+                </button>
+            )}
+
             {filteredLogs.length === 0 ? (
                 <div className="glass-card p-12 text-center">
                     <div className="text-4xl mb-3">{searchQuery ? '🔍' : '📋'}</div>

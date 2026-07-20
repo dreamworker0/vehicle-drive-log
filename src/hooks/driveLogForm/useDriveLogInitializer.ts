@@ -11,6 +11,7 @@ import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getVehicles, getFavorites, getOrganizationMembers, getLastVehicleEndKm, getLastVehicleEndBattery, getReservationById, getHipassCards, getLastVehicleDriveLog, getAdjacentDriveLogs } from '../../lib/firestore';
 import { resolveStartKm } from './resolveStartKm';
+import { todayStr } from '../utils/driveLogValidation';
 import { captureError } from '../../lib/sentry';
 import type { User } from 'firebase/auth';
 import type { Vehicle } from '../../types/vehicle';
@@ -209,28 +210,44 @@ export function useDriveLogInitializer(deps: InitializerDeps) {
         loadReservation();
     }, [queryReservationId, orgId, resolvedReservationData, showToast, navigate, form.startTime, setResolvedReservationData, setForm, setLastDriveLog]);
 
-    // ── Effect 3: 차량 변경 시 startKm 자동 갱신 ──
+    // ── Effect 3: 차량/날짜 변경 시 startKm 및 인접 기록 자동 갱신 ──
     useEffect(() => {
         // 수정 모드에서는 기존 기록의 startKm을 유지 (최신 endKm으로 덮어쓰지 않음)
         if (isEditMode) return;
         if (!orgId || !form.vehicleId || !form.driveDate) {
             setLastDriveLog(null);
+            setNextDriveLog(null);
             return;
         }
-        const v = vehicles.find(veh => veh.id === form.vehicleId);
-        
+        const vehicleId = form.vehicleId;
+        const v = vehicles.find(veh => veh.id === vehicleId);
+        // 과거 날짜(소급 입력)이면 해당 일자 기준 직전/직후 기록을 함께 조회해
+        // 배너·경고에 활용한다(오늘 신규 작성은 최신 기록만 필요).
+        const isRetroDate = form.driveDate !== todayStr();
+
+        const loadAdjacent = async (): Promise<{ prev: DriveLog | null; next: DriveLog | null }> => {
+            if (isRetroDate) {
+                const [y, m, d] = form.driveDate.split('-').map(Number);
+                const anchor = new Date(y, m - 1, d); // 해당 일자 자정 기준
+                return getAdjacentDriveLogs(orgId, vehicleId, { id: '', timestamp: anchor } as DriveLog);
+            }
+            const lastLog = await getLastVehicleDriveLog(orgId, vehicleId);
+            return { prev: lastLog, next: null };
+        };
+
         Promise.all([
-            resolveStartKm(orgId, form.vehicleId, {
+            resolveStartKm(orgId, vehicleId, {
                 driveDate: form.driveDate,
                 startTime: form.startTime,
                 vehicle: v || null,
             }),
-            getLastVehicleDriveLog(orgId, form.vehicleId)
-        ]).then(([km, lastLog]) => {
+            loadAdjacent(),
+        ]).then(([km, adj]) => {
             setForm(prev => ({ ...prev, startKm: km }));
-            setLastDriveLog(lastLog);
+            setLastDriveLog(adj.prev);
+            setNextDriveLog(adj.next);
         }).catch(console.error);
-    }, [form.driveDate, form.vehicleId, form.startTime, orgId, vehicles, isEditMode, setForm, setLastDriveLog]);
+    }, [form.driveDate, form.vehicleId, form.startTime, orgId, vehicles, isEditMode, setForm, setLastDriveLog, setNextDriveLog]);
 
     // ── Effect 4: 전기차 도착 배터리 조회 + 하이패스 카드 조회 ──
     useEffect(() => {

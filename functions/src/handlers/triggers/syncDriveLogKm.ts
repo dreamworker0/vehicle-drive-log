@@ -23,8 +23,10 @@ async function hasLaterDriveLog(orgId: string, vehicleId: string, afterTimestamp
 /**
  * 소급 입력/수정 시 같은 차량의 이후 모든 운행기록 startKm을 연쇄적으로 자동 업데이트
  * (Admin SDK 버전)
+ *
+ * @remarks 단위 테스트(syncDriveLogKm.test.ts)를 위해 export한다.
  */
-async function syncNextLogStartKm(orgId: string, vehicleId: string, afterDate: Date, newStartKm: number) {
+export async function syncNextLogStartKm(orgId: string, vehicleId: string, afterDate: Date, newStartKm: number) {
     let currentAfterDate = afterDate;
     let carryKm = newStartKm; 
     let chainCount = 0;

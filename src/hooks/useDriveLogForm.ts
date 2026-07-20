@@ -39,6 +39,9 @@ export default function useDriveLogForm() {
     const reservationData = resolvedReservationData;
     const editLog = state?.editLog || null;
     const isEditMode = !!editLog;
+    // 예약 없이 과거 누락 건을 직접 소급 입력하는 진입점(내 기록 → "누락 운행 입력").
+    // 이 모드에서만 신규 작성 폼에 운행 일자 섹션을 노출해 과거 날짜 선택을 허용한다.
+    const retroEntry = !!state?.retroactive && !isEditMode;
 
     // ── 상태 정의 ──────────────────────────────────────────────────
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -180,7 +183,7 @@ export default function useDriveLogForm() {
         isAdmin, canEditDriver,
         isElectric,
         reservationData,
-        editLog, isEditMode, isRetroactive,
+        editLog, isEditMode, isRetroactive, retroEntry,
         showFavSave, setShowFavSave,
         favName, setFavName,
         hipassCard,
