@@ -11,7 +11,7 @@ vi.mock('firebase/firestore', () => ({
     limit: vi.fn(),
     getDocs: vi.fn(),
     addDoc: vi.fn(),
-    doc: vi.fn(() => ({ 
+    doc: vi.fn(() => ({
         id: 'mock-doc-id',
         withConverter: vi.fn().mockReturnThis(),
         ref: { id: 'mock-doc-id' }
@@ -50,11 +50,17 @@ vi.mock('../../lib/firebase', () => ({
     default: {},
 }));
 
-import { 
-    getDocs, doc as _doc, 
-    runTransaction, writeBatch 
+import {
+    getDocs, doc as _doc,
+    runTransaction, writeBatch
 } from 'firebase/firestore';
 import { captureError } from '../../lib/sentry';
+// 테스트 대상은 정적 import — 테스트 본문 내 동적 import는 병렬 부하에서 mock 교체와
+// 경합해 이전 테스트의 mockImplementation으로 실행되는 누수를 만든 전력이 있다(플레이키).
+// vi.mock은 호이스팅되므로 정적 import여도 위 모킹이 그대로 적용된다.
+import { updateReservationStatus } from '../../lib/firestore/reservations';
+import { deleteOrganization } from '../../lib/firestore/organizations';
+import { getDriveLogs } from '../../lib/firestore/driveLogs/queries';
 
 describe('Firestore 유틸리티 함수 - 에러 핸들링 및 롤백 검증', () => {
     beforeEach(() => {
@@ -62,11 +68,11 @@ describe('Firestore 유틸리티 함수 - 에러 핸들링 및 롤백 검증', (
     });
 
     describe('updateReservationStatus (트랜잭션 롤백 검증)', () => {
+        // mockImplementationOnce 사용 — clearAllMocks는 호출 기록만 지우고 구현은 남기므로,
+        // 1회용 구현으로 테스트 경계를 넘는 구현 누수를 원천 차단한다.
         it('예약이 존재하지 않으면 에러를 던지고 captureError를 호출한다', async () => {
-            const { updateReservationStatus } = await import('../../lib/firestore/reservations');
-            
             // runTransaction 모킹: 콜백을 실행하도록 설정
-            vi.mocked(runTransaction).mockImplementation(async (db, cb) => {
+            vi.mocked(runTransaction).mockImplementationOnce(async (db, cb) => {
                 const mockTransaction = {
                     get: vi.fn().mockResolvedValue({ exists: () => false }), // 문서 없음
                     update: vi.fn(),
@@ -87,9 +93,7 @@ describe('Firestore 유틸리티 함수 - 에러 핸들링 및 롤백 검증', (
         });
 
         it('동시성 충돌 발생 시(상태 불일치) 에러를 던지되 Sentry에는 보고하지 않는다', async () => {
-            const { updateReservationStatus } = await import('../../lib/firestore/reservations');
-
-            vi.mocked(runTransaction).mockImplementation(async (db, cb) => {
+            vi.mocked(runTransaction).mockImplementationOnce(async (db, cb) => {
                 const mockTransaction = {
                     get: vi.fn().mockResolvedValue({
                         exists: () => true,
@@ -111,22 +115,20 @@ describe('Firestore 유틸리티 함수 - 에러 핸들링 및 롤백 검증', (
 
     describe('deleteOrganization (배치 롤백 검증)', () => {
         it('배치 커밋 실패 시 에러가 전파되고 captureError가 호출된다', async () => {
-            const { deleteOrganization } = await import('../../lib/firestore/organizations');
-            
             // 유저 0명으로 설정하여 배치 호출까지 가도록 함
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            vi.mocked(getDocs).mockResolvedValue({ docs: [] } as any);
-            
+            vi.mocked(getDocs).mockResolvedValueOnce({ docs: [] } as any);
+
             const mockBatch = {
                 delete: vi.fn(),
                 update: vi.fn(),
                 commit: vi.fn().mockRejectedValue(new Error("Firebase Permission Denied")),
             };
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            vi.mocked(writeBatch).mockReturnValue(mockBatch as any);
+            vi.mocked(writeBatch).mockReturnValueOnce(mockBatch as any);
 
             await expect(deleteOrganization('org1')).rejects.toThrow("Firebase Permission Denied");
-            
+
             expect(captureError).toHaveBeenCalledWith(
                 expect.any(Error),
                 expect.objectContaining({ context: 'deleteOrganization' })
@@ -137,8 +139,7 @@ describe('Firestore 유틸리티 함수 - 에러 핸들링 및 롤백 검증', (
     // 기존의 기본적인 쿼리 테스트들 유지/보강
     describe('getDriveLogs 에러 핸들링', () => {
         it('Firestore 조회 실패 시 에러를 캡처하고 다시 던진다', async () => {
-            vi.mocked(getDocs).mockRejectedValue(new Error("Network Error"));
-            const { getDriveLogs } = await import('../../lib/firestore/driveLogs/queries');
+            vi.mocked(getDocs).mockRejectedValueOnce(new Error("Network Error"));
 
             await expect(getDriveLogs('org1')).rejects.toThrow("Network Error");
             expect(captureError).toHaveBeenCalled();
