@@ -104,7 +104,7 @@ function initSentryWithModule(Sentry: SentryModule) {
             // 로그아웃 시 Firestore를 의도적으로 terminate()한 뒤 하드 리로드하는데(logout→clearOfflineCache),
             // 그 순간 아직 진행 중이던 리스너/쿼리가 "Firestore shutting down"으로 reject되며 나는
             // teardown 레이스다. handled=yes이고 리로드 후 새 인스턴스로 정상 동작 — 앱 버그 아님.
-            /Firestore.*shutting down/i,
+            /Firestore shutting down/i,
             // Firestore IndexedDB 내부 캐시 손상 (Firebase SDK 버그, 앱 버그 아님)
             /INTERNAL ASSERTION FAILED/,
             /Unexpected state/,
@@ -233,6 +233,10 @@ function applySentryUser(Sentry: SentryModule, userInfo: SentryUserInfo) {
         }
     } else {
         Sentry.setUser(null);
+        // 로그아웃 시 이전 세션의 역할·기관 태그가 스코프에 잔존해 후속(teardown) 이벤트에
+        // 잘못 붙는 것을 방지 — 함께 정리한다.
+        Sentry.setTag('user.role', undefined);
+        Sentry.setTag('organizationId', undefined);
     }
 }
 
