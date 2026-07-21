@@ -101,6 +101,10 @@ function initSentryWithModule(Sentry: SentryModule) {
             // unhandledrejection 노이즈다(스택 프레임이 없어 firebase-* 번들 필터를 우회한다).
             // iOS는 Background Sync 미지원('SyncManager' 부재)이라 자체 flushQueue 경로는 실행되지 않는다 — 앱 버그 아님.
             /Attempt to delete range from database without an in-progress transaction/,
+            // 로그아웃 시 Firestore를 의도적으로 terminate()한 뒤 하드 리로드하는데(logout→clearOfflineCache),
+            // 그 순간 아직 진행 중이던 리스너/쿼리가 "Firestore shutting down"으로 reject되며 나는
+            // teardown 레이스다. handled=yes이고 리로드 후 새 인스턴스로 정상 동작 — 앱 버그 아님.
+            /Firestore.*shutting down/i,
             // Firestore IndexedDB 내부 캐시 손상 (Firebase SDK 버그, 앱 버그 아님)
             /INTERNAL ASSERTION FAILED/,
             /Unexpected state/,
