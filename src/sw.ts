@@ -16,6 +16,13 @@ import { precacheAndRoute, cleanupOutdatedCaches, createHandlerBoundToURL } from
 import { registerRoute, NavigationRoute } from 'workbox-routing';
 import { CacheFirst, StaleWhileRevalidate } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
+import { clientsClaim } from 'workbox-core';
+
+// 새 배포(새 워커)를 즉시 활성화하고 제어권을 넘겨받는다.
+// 이게 없으면 새 워커가 'waiting' 상태로 멈춰 사용자는 하드 리프레시 없이는 옛 버전만 보게 된다.
+// registerType:'autoUpdate'(vite.config.js)와 짝을 이뤄, 교체 즉시 새 버전으로 새로고침된다.
+self.skipWaiting();
+clientsClaim();
 
 // Navigation Preload 비활성화
 // 이전 버전의 SW에서 활성화된 navigation preload가 브라우저에 남아있으면
