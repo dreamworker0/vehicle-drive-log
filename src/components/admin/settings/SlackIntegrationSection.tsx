@@ -145,8 +145,8 @@ export default function SlackIntegrationSection() {
                                     ))}
                                 </div>
                                 {staff.some((s) => !s.matched) && (
-                                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-2.5 pl-1">
-                                        ↳ 표시된 직원에게 Slack 프로필 이메일을 <strong className="text-surface-700 dark:text-surface-300">앱 가입 이메일과 동일하게</strong> 맞추도록 안내하세요. 맞추면 자동으로 인식됩니다.
+                                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-2.5 pl-1 leading-relaxed">
+                                        ↳ 표시된 직원은 <strong className="text-surface-700 dark:text-surface-300">Slack 계정 설정(내 계정 관리)</strong>에서 이메일을 <strong className="text-surface-700 dark:text-surface-300">앱 가입 이메일과 동일하게</strong> 바꾸면 자동으로 인식됩니다. 회사 Slack이 Google·SSO로 관리돼 이메일 변경이 안 되면, 반대로 <strong className="text-surface-700 dark:text-surface-300">앱 가입 이메일</strong>을 Slack 이메일과 맞추셔도 됩니다.
                                     </p>
                                 )}
                             </>
