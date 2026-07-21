@@ -152,7 +152,7 @@ export default function MileageInput({
                         placeholder={vehicleSelected ? "출발 km 입력" : "차량 선택 시 자동 입력"}
                         required
                     />
-                    {lastDriveLog && form.startKm && parseInt(form.startKm) < (lastDriveLog.startKm || 0) && (
+                    {lastDriveLog && form.startKm && Number(form.startKm) < (lastDriveLog.startKm || 0) && (
                         <p className="text-[11px] text-amber-600 dark:text-amber-500 mt-1 font-medium leading-tight">
                             ⚠️ 직전 출발({lastDriveLog.startKm?.toLocaleString()})보다 낮음
                         </p>
@@ -169,22 +169,22 @@ export default function MileageInput({
                         placeholder="12400"
                         required
                     />
-                    {form.startKm && form.endKm && parseInt(form.endKm) < parseInt(form.startKm) && (
+                    {form.startKm && form.endKm && Number(form.endKm) < Number(form.startKm) && (
                         <p className="text-[11px] text-red-500 dark:text-red-400 mt-1 font-medium leading-tight">
-                            ⚠️ 도착 km가 출발 km({parseInt(form.startKm).toLocaleString()})보다 작아요
+                            ⚠️ 도착 km가 출발 km({Number(form.startKm).toLocaleString()})보다 작아요
                         </p>
                     )}
-                    {nextDriveLog && form.endKm && parseInt(form.endKm) > (nextDriveLog.endKm || 0) && (
+                    {nextDriveLog && form.endKm && Number(form.endKm) > (nextDriveLog.endKm || 0) && (
                         <p className="text-[11px] text-amber-600 dark:text-amber-500 mt-1 font-medium leading-tight">
                             ⚠️ 직후 도착({nextDriveLog.endKm?.toLocaleString()})보다 높음
                         </p>
                     )}
                 </div>
             </div>
-            {form.startKm && form.endKm && parseInt(form.endKm) >= parseInt(form.startKm) && (
+            {form.startKm && form.endKm && Number(form.endKm) >= Number(form.startKm) && (
                 <div className="mt-3 text-center">
                     <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
-                        {(parseInt(form.endKm) - parseInt(form.startKm)).toLocaleString()} km
+                        {(Number(form.endKm) - Number(form.startKm)).toLocaleString()} km
                     </span>
                     <span className="text-sm text-surface-400 dark:text-surface-500 ml-1">주행</span>
                 </div>

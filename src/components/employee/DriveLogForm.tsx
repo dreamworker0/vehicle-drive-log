@@ -250,7 +250,7 @@ export default function DriveLogForm() {
                 {/* 제출 버튼 */}
                 <button
                     type="submit"
-                    disabled={submitting || !form.vehicleId || !form.startKm || !form.endKm || (!!form.startKm && !!form.endKm && Number(form.endKm) < Number(form.startKm))}
+                    disabled={submitting || !form.vehicleId || !form.startKm || !form.endKm || Number(form.endKm) < Number(form.startKm)}
                     className="w-full btn-primary min-h-[48px]"
                 >
                     {submitting ? (

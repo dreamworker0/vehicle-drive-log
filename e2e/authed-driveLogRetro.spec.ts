@@ -109,7 +109,7 @@ test.describe('누락 운행 소급 입력 여정 E2E (에뮬레이터)', () => 
 
         // 7. 폼 작성(빈틈 메우기: 도착 km = 직후 출발 km) 후 저장
         await page.fill('input#destination', DESTINATION);
-        await page.locator('input[placeholder="12400"]').fill('60200');
+        await page.locator('input[type="number"]').nth(1).fill('60200');
         await page.getByRole('button', { name: /운행일지 저장/ }).click();
 
         // 8. 신규 저장 성공 계약 — 내비게이션 없이 폼이 리셋된다

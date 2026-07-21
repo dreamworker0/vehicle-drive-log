@@ -278,7 +278,7 @@ export default function VehicleForm({
                             onChange={e => setForm({ ...form, currentKm: e.target.value })}
                             className="input" placeholder="0"
                         />
-                        {form.currentKm !== '' && parseInt(form.currentKm) < 0 && (
+                        {form.currentKm !== '' && Number(form.currentKm) < 0 && (
                             <p className="text-[11px] text-red-500 dark:text-red-400 mt-1 font-medium">⚠️ 누적 km는 0 이상이어야 합니다.</p>
                         )}
                         <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">차량 등록 시점의 누적 주행거리</p>

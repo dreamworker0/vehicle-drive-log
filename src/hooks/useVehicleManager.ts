@@ -175,7 +175,7 @@ export default function useVehicleManager() {
         e.preventDefault();
         if (!form.displayName.trim() || !form.plateNumber.trim() || !form.modelName.trim()) return;
         // 현재 누적 km는 음수가 될 수 없다 (계기판 절대값)
-        if (form.currentKm !== '' && parseInt(form.currentKm) < 0) {
+        if (form.currentKm !== '' && Number(form.currentKm) < 0) {
             showToast('현재 누적 km는 0 이상이어야 합니다.', 'warning');
             return;
         }
