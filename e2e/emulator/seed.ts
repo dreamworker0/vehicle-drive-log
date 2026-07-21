@@ -32,6 +32,18 @@ export const TEST_VEHICLE = {
     modelName: '쏘나타',
 };
 
+/**
+ * 구글 캘린더가 연동된 차량. 캘린더 동기화 쿨다운/재시도 E2E 전용.
+ * googleCalendarId에 '@'가 있어야 calendarLinkedVehicles 필터를 통과해
+ * 동기화 컨트롤('지금 동기화')과 배경 자동 동기화가 활성화된다.
+ */
+export const TEST_CALENDAR_VEHICLE = {
+    id: 'e2e-vehicle-cal',
+    displayName: '카니발 88가8888',
+    modelName: '카니발',
+    googleCalendarId: 'e2e-cal@group.calendar.google.com',
+};
+
 export async function seedEmulator(): Promise<void> {
     if (!getApps().length) initializeApp({ projectId: PROJECT_ID });
     const auth = getAuth();
@@ -83,6 +95,36 @@ export async function seedEmulator(): Promise<void> {
         status: 'active',
         createdAt: now,
     });
+}
+
+/**
+ * 구글 캘린더 연동 차량 1대를 시드한다. 캘린더 동기화 쿨다운 E2E 전용.
+ * 기본 시드(seedEmulator)에는 넣지 않는다 — 다른 인증 스펙이 예약/대시보드
+ * 화면에서 불필요한 배경 캘린더 동기화(functions 에뮬레이터 부재로 실패)를
+ * 트리거하지 않도록, 이 차량은 해당 스펙의 beforeAll에서만 심고 afterAll에서 지운다.
+ */
+export async function seedCalendarLinkedVehicle(): Promise<void> {
+    if (!getApps().length) initializeApp({ projectId: PROJECT_ID });
+    const db = getFirestore();
+    await db.collection('vehicles').doc(TEST_CALENDAR_VEHICLE.id).set({
+        organizationId: TEST_ORG_ID,
+        displayName: TEST_CALENDAR_VEHICLE.displayName,
+        name: TEST_CALENDAR_VEHICLE.displayName,
+        modelName: TEST_CALENDAR_VEHICLE.modelName,
+        googleCalendarId: TEST_CALENDAR_VEHICLE.googleCalendarId,
+        currentKm: 30000,
+        fuelType: 'gasoline',
+        vehicleType: 'van',
+        status: 'active',
+        createdAt: new Date(),
+    });
+}
+
+/** 캘린더 연동 차량 시드를 제거한다(스펙 afterAll에서 호출해 다른 스펙과 격리). */
+export async function deleteCalendarLinkedVehicle(): Promise<void> {
+    if (!getApps().length) initializeApp({ projectId: PROJECT_ID });
+    const db = getFirestore();
+    await db.collection('vehicles').doc(TEST_CALENDAR_VEHICLE.id).delete();
 }
 
 /**
