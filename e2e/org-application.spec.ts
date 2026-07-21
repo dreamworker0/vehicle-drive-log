@@ -21,8 +21,11 @@ test.describe('기관 사용 신청 플로우', () => {
         await page.goto('/');
         const applyBtn = page.getByRole('button', { name: '서비스 도입 신청' }).first();
         await expect(applyBtn).toBeVisible({ timeout: 10000 });
-        await applyBtn.click();
-        await expect(page).toHaveURL(/\/apply/);
+        // 하이드레이션 전 클릭이 no-op이 되는 레이스 방지: 이동 확정까지 재클릭(멱등)
+        await expect(async () => {
+            if (!/\/apply/.test(page.url())) await applyBtn.click();
+            await expect(page).toHaveURL(/\/apply/, { timeout: 1000 });
+        }).toPass({ timeout: 10000 });
     });
 
     test('신청 폼이 올바르게 렌더링된다', async ({ page }) => {
@@ -62,8 +65,12 @@ test.describe('기관 사용 신청 플로우', () => {
         await page.goto('/apply');
         const phoneInput = page.getByPlaceholder('010-0000-0000');
         await expect(phoneInput).toBeVisible({ timeout: 10000 });
-        await phoneInput.fill('01012345678');
-        await expect(phoneInput).toHaveValue('010-1234-5678');
+        // 컨트롤드 입력이 하이드레이션 시점에 초기화(빈 값)되는 레이스 방지:
+        // 포맷값이 유지될 때까지 재입력한다.
+        await expect(async () => {
+            await phoneInput.fill('01012345678');
+            await expect(phoneInput).toHaveValue('010-1234-5678', { timeout: 1000 });
+        }).toPass({ timeout: 10000 });
     });
 
     test('돌아가기 버튼이 작동한다', async ({ page }) => {

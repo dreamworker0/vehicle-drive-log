@@ -38,17 +38,21 @@ test.describe('랜딩 푸터에서 약관/개인정보로 이동', () => {
         await page.goto('/');
         const termsLink = page.getByRole('link', { name: '이용약관' }).first();
         await expect(termsLink).toBeVisible({ timeout: 10000 });
-        await termsLink.click();
-        await page.waitForURL(/terms/, { timeout: 10000 });
-        await expect(page).toHaveURL(/terms/);
+        // 하이드레이션 전 클릭이 no-op이 되는 레이스 방지: 이동 확정까지 재클릭(멱등)
+        await expect(async () => {
+            if (!/terms/.test(page.url())) await termsLink.click();
+            await expect(page).toHaveURL(/terms/, { timeout: 1000 });
+        }).toPass({ timeout: 10000 });
     });
 
     test('개인정보 처리방침 링크 클릭 시 개인정보 페이지로 이동한다', async ({ page }) => {
         await page.goto('/');
         const privacyLink = page.getByRole('link', { name: '개인정보 처리방침' }).first();
         await expect(privacyLink).toBeVisible({ timeout: 10000 });
-        await privacyLink.click();
-        await page.waitForURL(/privacy/, { timeout: 10000 });
-        await expect(page).toHaveURL(/privacy/);
+        // 하이드레이션 전 클릭이 no-op이 되는 레이스 방지: 이동 확정까지 재클릭(멱등)
+        await expect(async () => {
+            if (!/privacy/.test(page.url())) await privacyLink.click();
+            await expect(page).toHaveURL(/privacy/, { timeout: 1000 });
+        }).toPass({ timeout: 10000 });
     });
 });

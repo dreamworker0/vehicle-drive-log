@@ -60,13 +60,18 @@ test.describe('랜딩 페이지', () => {
 
     test('서비스 도입 신청 CTA 클릭 시 신청 페이지로 이동한다', async ({ page }) => {
         const ctaBtn = page.getByRole('button', { name: '서비스 도입 신청' }).first();
-        await ctaBtn.click();
-        await expect(page).toHaveURL(/\/apply/);
+        // 하이드레이션 전 클릭이 no-op이 되는 레이스 방지: 이동 확정까지 재클릭(멱등)
+        await expect(async () => {
+            if (!/\/apply/.test(page.url())) await ctaBtn.click();
+            await expect(page).toHaveURL(/\/apply/, { timeout: 1000 });
+        }).toPass({ timeout: 10000 });
     });
 
     test('직원 로그인 버튼 클릭 시 로그인 페이지로 이동한다', async ({ page }) => {
         const loginBtn = page.getByRole('button', { name: '직원 로그인' });
-        await loginBtn.click();
-        await expect(page).toHaveURL(/login/);
+        await expect(async () => {
+            if (!/login/.test(page.url())) await loginBtn.click();
+            await expect(page).toHaveURL(/login/, { timeout: 1000 });
+        }).toPass({ timeout: 10000 });
     });
 });

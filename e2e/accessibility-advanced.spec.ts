@@ -7,11 +7,10 @@ test.describe('접근성 심화 검증', () => {
 
     test('네비게이션에 aria-label이 있다', async ({ page }) => {
         await page.goto('/');
-        await page.waitForTimeout(2000);
-
+        // 고정 대기(2s) 대신 렌더 완료를 폴링해 느린 CI에서의 레이스를 없앤다.
         const navs = page.locator('nav[aria-label]');
-        const count = await navs.count();
-        expect(count).toBeGreaterThanOrEqual(1);
+        await expect(navs.first()).toBeAttached({ timeout: 10000 });
+        expect(await navs.count()).toBeGreaterThanOrEqual(1);
     });
 
     test('aria-live 영역이 존재한다', async ({ page }) => {
