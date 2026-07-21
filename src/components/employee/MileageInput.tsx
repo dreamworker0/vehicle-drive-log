@@ -169,6 +169,11 @@ export default function MileageInput({
                         placeholder="12400"
                         required
                     />
+                    {form.startKm && form.endKm && parseInt(form.endKm) < parseInt(form.startKm) && (
+                        <p className="text-[11px] text-red-500 dark:text-red-400 mt-1 font-medium leading-tight">
+                            ⚠️ 도착 km가 출발 km({parseInt(form.startKm).toLocaleString()})보다 작아요
+                        </p>
+                    )}
                     {nextDriveLog && form.endKm && parseInt(form.endKm) > (nextDriveLog.endKm || 0) && (
                         <p className="text-[11px] text-amber-600 dark:text-amber-500 mt-1 font-medium leading-tight">
                             ⚠️ 직후 도착({nextDriveLog.endKm?.toLocaleString()})보다 높음
