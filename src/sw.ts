@@ -16,13 +16,15 @@ import { precacheAndRoute, cleanupOutdatedCaches, createHandlerBoundToURL } from
 import { registerRoute, NavigationRoute } from 'workbox-routing';
 import { CacheFirst, StaleWhileRevalidate } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
-import { clientsClaim } from 'workbox-core';
 
-// 새 배포(새 워커)를 즉시 활성화하고 제어권을 넘겨받는다.
-// 이게 없으면 새 워커가 'waiting' 상태로 멈춰 사용자는 하드 리프레시 없이는 옛 버전만 보게 된다.
-// registerType:'autoUpdate'(vite.config.js)와 짝을 이뤄, 교체 즉시 새 버전으로 새로고침된다.
+// 새 배포된 워커가 'waiting'에 멈추지 않고 즉시 활성화되도록 한다.
+// 이게 없으면 사용자는 하드 리프레시(또는 앱 완전 종료) 없이는 옛 캐시 버전만 보게 되고,
+// 재접속 시에도 계속 옛 버전으로 원복됐다. skipWaiting으로 새 워커가 바로 활성화되어
+// 다음 접속/재실행에서 최신 버전이 적용된다.
+// (clientsClaim은 첫 로드에서 현재 페이지 제어권을 즉시 가로채 autoUpdate 리로드를 유발 →
+//  Playwright E2E에서 "execution context destroyed"로 깨지므로 쓰지 않는다.
+//  현재 페이지 즉시 교체 대신 '다음 내비게이션에서 최신 반영' 방식을 택한다.)
 self.skipWaiting();
-clientsClaim();
 
 // Navigation Preload 비활성화
 // 이전 버전의 SW에서 활성화된 navigation preload가 브라우저에 남아있으면
