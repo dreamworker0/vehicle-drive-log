@@ -14,6 +14,7 @@ const ChartOrgTrend = lazy(() => import('./dashboard/ChartOrgTrend'));
 const ChartFirstEmployee = lazy(() => import('./dashboard/ChartFirstEmployee'));
 const DashboardDriveAnalysis = lazy(() => import('./dashboard/DashboardDriveAnalysis'));
 const DashboardNotificationStats = lazy(() => import('./dashboard/DashboardNotificationStats'));
+const SlackIntegrationStatus = lazy(() => import('./dashboard/SlackIntegrationStatus'));
 
 type TabType = 'overview' | 'analysis' | 'experience';
 
@@ -180,6 +181,14 @@ export default function ServiceDashboard() {
                         sortIndicator={ui.sortIndicator}
                         onRefresh={handleRefresh}
                     />
+
+                    <Suspense fallback={
+                        <div className="flex items-center justify-center py-10 text-surface-400 dark:text-surface-500">
+                            <div className="w-6 h-6 spinner" />
+                        </div>
+                    }>
+                        <SlackIntegrationStatus totalOrgs={summary.stats?.approvedOrgs ?? 0} />
+                    </Suspense>
                 </div>
             )}
 
