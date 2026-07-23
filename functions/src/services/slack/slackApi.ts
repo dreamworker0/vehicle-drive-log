@@ -36,7 +36,13 @@ async function slackApiCall(method: string, botToken: string, payload: Record<st
  * Slack 읽기 메서드는 JSON 본문의 인자를 파싱하지 못해 파라미터가 누락되므로
  * (예: users.info가 user 없이 호출되어 user_not_found) 반드시 폼 인코딩으로 보낸다.
  */
-async function slackApiCallForm(method: string, botToken: string, params: Record<string, string>): Promise<SlackApiResponse> {
+async function slackApiCallForm(
+    method: string,
+    botToken: string,
+    params: Record<string, string>,
+    /** 기대되는(=노이즈) 에러 코드는 WARNING 로그를 남기지 않는다. 예: 미매칭 조회의 users_not_found */
+    silentErrors?: string[]
+): Promise<SlackApiResponse> {
     const res = await fetch(`${SLACK_API_BASE}/${method}`, {
         method: "POST",
         headers: {
@@ -46,7 +52,7 @@ async function slackApiCallForm(method: string, botToken: string, params: Record
         body: new URLSearchParams(params).toString(),
     });
     const data = await res.json() as SlackApiResponse;
-    if (!data.ok) {
+    if (!data.ok && !(data.error && silentErrors?.includes(data.error))) {
         log("WARNING", "slackApi", `Slack API ${method} 실패`, { error: data.error });
     }
     return data;
@@ -105,7 +111,8 @@ export async function getSlackUserInfo(
  * 미가입·미매칭(users_not_found 등)이나 오류 시 null을 반환해 호출부가 조용히 skip하게 한다.
  */
 export async function lookupUserByEmail(botToken: string, email: string): Promise<string | null> {
-    const data = await slackApiCallForm("users.lookupByEmail", botToken, { email });
+    // users_not_found(Slack 미가입/이메일 불일치)·missing_scope는 정상적 skip 사유이므로 로그 노이즈로 남기지 않는다.
+    const data = await slackApiCallForm("users.lookupByEmail", botToken, { email }, ["users_not_found", "missing_scope"]);
     if (!data.ok) return null;
     const user = data.user as { id?: string } | undefined;
     return user?.id || null;

@@ -121,6 +121,32 @@ describe('checkReservationReminders', () => {
         expect(mockUpdate).toHaveBeenCalledWith({ reminderSent: true });
     });
 
+    it('같은 기관 예약이 여러 건이면 봇 토큰 조회를 1회로 캐시한다', async () => {
+        mockResolveOrgSlackBotToken.mockResolvedValueOnce('xoxb-token');
+        const mk = (id: string, uid: string) => ({
+            id,
+            data: () => ({
+                reservedByUid: uid,
+                organizationId: 'org1',
+                vehicleDisplayName: '소나타',
+                startTime: '10:05',
+                reminderSent: false,
+                status: 'reserved',
+            }),
+        });
+
+        mockGet
+            .mockResolvedValueOnce({ docs: [mk('res1', 'u1'), mk('res2', 'u2')] })
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [] });
+
+        await checkReservationReminders();
+
+        // 같은 org라 봇 토큰 조회는 1회, DM은 예약 건수(2회)만큼
+        expect(mockResolveOrgSlackBotToken).toHaveBeenCalledTimes(1);
+        expect(mockSendSlackDMToUser).toHaveBeenCalledTimes(2);
+    });
+
     it('미연동 기관 예약은 Slack DM을 보내지 않는다 (FCM은 정상)', async () => {
         mockResolveOrgSlackBotToken.mockResolvedValueOnce(null);
         const upcomingDoc = {
