@@ -100,6 +100,18 @@ export async function getSlackUserInfo(
 }
 
 /**
+ * 이메일로 Slack 사용자 ID 조회 (users.lookupByEmail, 읽기 계열 → form-urlencoded).
+ * outbound DM 발송 시 앱 계정 이메일 → Slack userId 매핑에 사용한다(users:read.email 스코프 필요).
+ * 미가입·미매칭(users_not_found 등)이나 오류 시 null을 반환해 호출부가 조용히 skip하게 한다.
+ */
+export async function lookupUserByEmail(botToken: string, email: string): Promise<string | null> {
+    const data = await slackApiCallForm("users.lookupByEmail", botToken, { email });
+    if (!data.ok) return null;
+    const user = data.user as { id?: string } | undefined;
+    return user?.id || null;
+}
+
+/**
  * OAuth v2 code → 봇 토큰 교환 (oauth.v2.access).
  * 앱 크리덴셜(client_id/secret)로 호출하며 봇 토큰이 없다(설치 시점).
  * 응답의 access_token이 워크스페이스별 봇 토큰(xoxb-)이다.

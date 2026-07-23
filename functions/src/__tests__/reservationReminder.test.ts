@@ -6,6 +6,13 @@ jest.mock('../services/alimtalk/sendNotification', () => ({
     createInAppNotification: mockCreateInAppNotification,
 }));
 
+const mockResolveOrgSlackBotToken = jest.fn().mockResolvedValue(null);
+const mockSendSlackDMToUser = jest.fn().mockResolvedValue(true);
+jest.mock('../services/slack/notifySlackUser', () => ({
+    resolveOrgSlackBotToken: mockResolveOrgSlackBotToken,
+    sendSlackDMToUser: mockSendSlackDMToUser,
+}));
+
 const mockUpdate = jest.fn().mockResolvedValue(undefined);
 const mockDocRef = { update: mockUpdate };
 const mockDoc = jest.fn(() => mockDocRef);
@@ -80,6 +87,63 @@ describe('checkReservationReminders', () => {
             body: '소나타 예약이 10:05에 시작됩니다.',
         });
         expect(mockUpdate).toHaveBeenCalledWith({ reminderSent: true });
+    });
+
+    it('Slack 연동 기관 예약은 FCM과 함께 Slack DM도 보낸다', async () => {
+        mockResolveOrgSlackBotToken.mockResolvedValueOnce('xoxb-token');
+        const upcomingDoc = {
+            id: 'res1',
+            data: () => ({
+                reservedByUid: 'user1',
+                organizationId: 'org1',
+                vehicleDisplayName: '소나타',
+                startTime: '10:05',
+                reminderSent: false,
+                status: 'reserved',
+            }),
+        };
+
+        mockGet
+            .mockResolvedValueOnce({ docs: [upcomingDoc] })
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [] });
+
+        await checkReservationReminders();
+
+        expect(mockResolveOrgSlackBotToken).toHaveBeenCalledWith('org1');
+        expect(mockSendSlackDMToUser).toHaveBeenCalledWith(
+            'xoxb-token',
+            'user1',
+            '🚗 소나타 예약이 10:05에 시작됩니다.'
+        );
+        // Slack을 보내도 기존 FCM/중복방지 플래그는 그대로
+        expect(mockSendPushToUser).toHaveBeenCalled();
+        expect(mockUpdate).toHaveBeenCalledWith({ reminderSent: true });
+    });
+
+    it('미연동 기관 예약은 Slack DM을 보내지 않는다 (FCM은 정상)', async () => {
+        mockResolveOrgSlackBotToken.mockResolvedValueOnce(null);
+        const upcomingDoc = {
+            id: 'res1',
+            data: () => ({
+                reservedByUid: 'user1',
+                organizationId: 'org-no-slack',
+                vehicleDisplayName: '소나타',
+                startTime: '10:05',
+                reminderSent: false,
+                status: 'reserved',
+            }),
+        };
+
+        mockGet
+            .mockResolvedValueOnce({ docs: [upcomingDoc] })
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [] });
+
+        await checkReservationReminders();
+
+        expect(mockSendSlackDMToUser).not.toHaveBeenCalled();
+        expect(mockSendPushToUser).toHaveBeenCalled();
     });
 
     it('이미 알림을 보낸 예약은 스킵한다', async () => {
