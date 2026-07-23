@@ -1,5 +1,6 @@
 import { getFirestore } from "firebase-admin/firestore";
 import { sendPushToUser, createInAppNotification } from "../../services/alimtalk/sendNotification";
+import { resolveOrgSlackBotToken, sendSlackDMToUser } from "../../services/slack/notifySlackUser";
 import { toKSTDate, getKSTDateString } from "../../utils/kstDate";
 
 const db = getFirestore();
@@ -34,6 +35,10 @@ export async function checkReservationReminders(): Promise<void> {
             .where("startTime", "<=", tenMinLaterTime)
             .get();
 
+        // 기관별 Slack 봇 토큰 캐시 — 같은 run에서 동일 기관 연동 조회를 1회로 줄인다.
+        // 값이 undefined면 미조회, null이면 미연동/조회 실패(재조회 안 함).
+        const slackTokenByOrg = new Map<string, string | null>();
+
         let reminderCount = 0;
         for (const doc of reservationsSnap.docs) {
             const res = doc.data();
@@ -46,6 +51,19 @@ export async function checkReservationReminders(): Promise<void> {
 
                 await sendPushToUser(targetUid, { title, body });
                 await createInAppNotification(targetUid, "reservation_reminder", title, body, res.organizationId);
+
+                // Slack DM(부가 채널) — 실패는 조용히 삼켜 FCM/인앱을 막지 않는다.
+                const orgId = res.organizationId as string | undefined;
+                if (orgId) {
+                    let botToken = slackTokenByOrg.get(orgId);
+                    if (botToken === undefined) {
+                        botToken = await resolveOrgSlackBotToken(orgId);
+                        slackTokenByOrg.set(orgId, botToken);
+                    }
+                    if (botToken) {
+                        await sendSlackDMToUser(botToken, targetUid, `🚗 ${body}`);
+                    }
+                }
 
                 await db.collection("reservations").doc(doc.id).update({
                     reminderSent: true,
