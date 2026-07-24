@@ -22,7 +22,10 @@ interface AuditCounts {
  * 업스트림 미패치/미유지보수 transitive라 깨끗이 못 고치고 강제 시 도구가 깨지는 것들을
  * 사유·재검토 조건과 함께 추적한다. 재검토 조건 충족 시 제거하고 정식 패치한다.
  *
- * 현재: 비어 있음(수용 중인 항목 없음).
+ * ⚠️ 여기 등록한 권고는 아래 집계에서 **차감**되어 게이트를 통과한다. 즉 "이 앱에
+ * 해당하지 않음"을 근거와 함께 확인한 것만 올린다(단순히 시끄러워서 끄는 용도 아님).
+ *
+ * 해소되어 제거된 이력:
  *  - js-yaml DoS(GHSA-h67p-54hq-rp68, functions moderate 20건의 단일 근본)는
  *    functions/package.json의 overrides(js-yaml ^4.2.0) + jest coverageProvider 'v8'로
  *    2026-06-19 실제 해소(audit 0). v8은 babel-plugin-istanbul/load-nyc-config 경로를
@@ -31,7 +34,48 @@ interface AuditCounts {
  */
 const KNOWN_ACCEPTED: {
     advisory: string; pkg: string; severity: string; scope: string; reason: string; revisitWhen: string;
-}[] = [];
+}[] = [
+    {
+        advisory: 'GHSA-qwww-vcr4-c8h2',
+        pkg: 'react-router / react-router-dom',
+        severity: 'high',
+        scope: '프론트엔드 (react-router 7.12.0~8.2.0, 현재 7.18.1)',
+        reason:
+            'RSC(React Server Components) 모드의 서버 액션이 400 응답 전에 실행되는 CSRF 우회. ' +
+            '이 앱은 순수 클라이언트 SPA(src/appEntry.tsx·lightEntry.tsx의 BrowserRouter + Vite 정적 빌드)로 ' +
+            'RSC·SSR·서버 액션을 전혀 쓰지 않아 취약 코드 경로가 존재하지 않는다. ' +
+            '업스트림 패치 버전이 없고 audit fix --force는 7.11.0 breaking 다운그레이드를 요구해 ' +
+            '라우팅 회귀 위험이 실익보다 크다(사용자 결정, 2026-07-25).',
+        revisitWhen:
+            '(1) react-router가 7.12+ 계열 패치 버전을 내면 즉시 상향하고 이 항목 제거, ' +
+            '(2) 이 앱이 RSC/SSR·서버 액션을 도입하면 수용 철회하고 재평가.',
+    },
+];
+
+/**
+ * 등록부에 있는 권고인지 판정.
+ * npm audit의 `via`는 두 형태가 섞인다 — 직접 권고는 객체(`{url: 'https://github.com/advisories/GHSA-…'}`),
+ * 취약 패키지에 의존해 전이로 걸린 항목은 **문자열 패키지명**(예: react-router-dom의 via `["react-router"]`).
+ * 따라서 객체는 권고 ID(url)로, 문자열은 그 패키지가 수용 등록된 근본인지로 매칭한다.
+ * via 항목이 전부 수용 대상이어야 차감한다(미등록 권고가 섞였으면 그대로 집계 = fail-closed).
+ */
+function isAccepted(info: unknown): boolean {
+    const via = (info as { via?: unknown[] }).via;
+    if (!Array.isArray(via) || via.length === 0) return false;
+    const advisoryIds = KNOWN_ACCEPTED.map((a) => a.advisory);
+    // 수용 등록된 권고의 근본 패키지명 집합 (전이 항목의 문자열 via 매칭용)
+    const acceptedPkgs = new Set(
+        KNOWN_ACCEPTED.flatMap((a) => a.pkg.split('/').map((p) => p.trim())).filter(Boolean),
+    );
+    return via.every((v) => {
+        if (typeof v === 'string') return acceptedPkgs.has(v.trim());
+        if (typeof v === 'object' && v !== null) {
+            const url = typeof (v as { url?: unknown }).url === 'string' ? (v as { url: string }).url : '';
+            return advisoryIds.some((id) => url.includes(id));
+        }
+        return false;
+    });
+}
 
 function runAudit(dir: string, label: string): AuditCounts | null {
     console.log(`\n🔍 ${label} 보안 감사 (${dir})`);
@@ -48,11 +92,14 @@ function runAudit(dir: string, label: string): AuditCounts | null {
         const audit = JSON.parse(result);
         const vulns: Record<string, unknown> = audit.vulnerabilities || {};
         const counts: AuditCounts = { critical: 0, high: 0, moderate: 0, low: 0 };
+        let accepted = 0;
 
         for (const [, info] of Object.entries(vulns)) {
+            if (isAccepted(info)) { accepted++; continue; } // 수용 등록된 권고는 차감
             const severity = (info.severity || 'low') as keyof AuditCounts;
             if (counts[severity] !== undefined) counts[severity]++;
         }
+        if (accepted > 0) console.log(`   ℹ️  수용 등록 제외: ${accepted}건 (아래 목록 참고)`);
 
         const total = Object.values(counts).reduce((a, b) => a + b, 0);
 
@@ -74,12 +121,15 @@ function runAudit(dir: string, label: string): AuditCounts | null {
             const audit = JSON.parse(output);
             const vulns: Record<string, unknown> = audit.vulnerabilities || {};
             const counts: AuditCounts = { critical: 0, high: 0, moderate: 0, low: 0 };
+            let accepted = 0;
 
             for (const [, info] of Object.entries(vulns)) {
+                if (isAccepted(info)) { accepted++; continue; } // 수용 등록된 권고는 차감
                 const severity = (info.severity || 'low') as keyof AuditCounts;
                 if (counts[severity] !== undefined) counts[severity]++;
             }
-
+            if (accepted > 0) console.log(`   ℹ️  수용 등록 제외: ${accepted}건 (아래 목록 참고)`);
+            if (Object.values(counts).reduce((a, b) => a + b, 0) === 0) console.log('   ✅ 취약점 없음');
 
             if (counts.critical > 0) console.log(`   🔴 Critical: ${counts.critical}`);
             if (counts.high > 0) console.log(`   🟠 High: ${counts.high}`);
