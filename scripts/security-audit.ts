@@ -4,7 +4,8 @@
  * 실행: node scripts/security-audit.js
  */
 import { execSync } from 'child_process';
-import { resolve, dirname } from 'path';
+import { realpathSync } from 'fs';
+import { resolve, dirname, basename } from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -70,26 +71,45 @@ const SEVERITY_RANK: Record<string, number> = { low: 0, moderate: 1, high: 2, cr
  * 등록부 자체를 검증한다 (설정 오류를 취약점 0건으로 위장하지 않기 위해 fail-closed).
  * 이 등록부는 이제 "문서"가 아니라 실행되는 게이트 설정이므로 형식을 강제한다.
  */
-export function validateRegistry(): string[] {
+/** npm 패키지명 형식 (스코프 포함) — 구 형식('a / b') 재입력 같은 오기입을 잡는다 */
+const PKG_RE = /^(@[a-z0-9-~][\w-.]*\/)?[a-z0-9-~][\w-.]*$/;
+
+export function validateRegistry(entries: AcceptedEntry[] = KNOWN_ACCEPTED): string[] {
     const errors: string[] = [];
-    for (const [i, a] of KNOWN_ACCEPTED.entries()) {
+    for (const [i, a] of entries.entries()) {
         const at = `KNOWN_ACCEPTED[${i}]`;
         if (!GHSA_RE.test(a.advisory)) errors.push(`${at}.advisory가 GHSA 형식이 아님: "${a.advisory}"`);
         if (!Array.isArray(a.pkgs) || a.pkgs.length === 0 || a.pkgs.some((p) => !p || !p.trim())) {
             errors.push(`${at}.pkgs가 비었거나 빈 문자열을 포함`);
+        } else {
+            // 구 형식('react-router / react-router-dom')을 배열 원소로 재입력하면 어떤 via와도
+            // 매칭되지 않아 조용히 무효가 된다 → 형식으로 잡는다.
+            for (const p of a.pkgs) {
+                if (!PKG_RE.test(p.trim())) errors.push(`${at}.pkgs에 npm 패키지명 형식이 아닌 값: "${p}"`);
+            }
         }
         if (SEVERITY_RANK[a.severity] === undefined) errors.push(`${at}.severity가 유효하지 않음: "${a.severity}"`);
         for (const field of ['reason', 'revisitWhen', 'scope'] as const) {
             if (!a[field] || a[field].trim().length < 10) errors.push(`${at}.${field}가 비었거나 너무 짧음(근거 필수)`);
         }
     }
-    const dupes = KNOWN_ACCEPTED.map((a) => a.advisory).filter((v, i, arr) => arr.indexOf(v) !== i);
+    const dupes = entries.map((a) => a.advisory).filter((v, i, arr) => arr.indexOf(v) !== i);
     if (dupes.length > 0) errors.push(`중복 등록: ${[...new Set(dupes)].join(', ')}`);
     return errors;
 }
 
 /** 등록 항목별 실제 매칭 횟수 — 0이면 이미 해소된 stale 항목이므로 정리 대상으로 경고한다 */
 const acceptedHits = new Map<string, number>();
+
+/** 테스트용 — 매칭 카운터 초기화 */
+export function resetAcceptedHits(): void {
+    acceptedHits.clear();
+}
+
+/** 테스트용 — 등록 항목의 매칭 횟수 조회 */
+export function getAcceptedHits(advisory: string): number {
+    return acceptedHits.get(advisory) ?? 0;
+}
 
 /**
  * 등록부에 있는 권고인지 판정.
@@ -101,38 +121,46 @@ const acceptedHits = new Map<string, number>();
  *  - via 항목이 **전부** 수용 대상이어야 차감한다(미등록 권고가 하나라도 섞이면 그대로 집계).
  *  - URL은 `includes`가 아니라 마지막 경로 세그먼트 **정확 일치**로 본다(부분 문자열 오매칭 방지).
  *  - audit의 심각도가 수용 시점보다 높으면 차감하지 않는다(재평가 트리거를 놓치지 않도록).
+ *    객체 via(직접 권고)뿐 아니라 문자열 via(전이)도 참조된 등록 항목 기준으로 검사한다.
+ *  - 알 수 없는 심각도 문자열은 최고 등급으로 취급한다(모르면 차감하지 않음).
  */
-export function isAccepted(info: unknown): boolean {
+export function isAccepted(info: unknown, registry: AcceptedEntry[] = KNOWN_ACCEPTED): boolean {
+    if (typeof info !== 'object' || info === null) return false;
     const via = (info as { via?: unknown[] }).via;
     if (!Array.isArray(via) || via.length === 0) return false;
 
-    // 심각도 상승 시 수용 무효화 (예: high로 수용했는데 critical로 재평가된 경우)
+    // via 각 항목이 어느 등록 항목에 해당하는지 먼저 해석한다 (해석 실패 원소가 있으면 차감 안 함)
+    const matchedEntries: AcceptedEntry[] = [];
+    const ok = via.every((v) => {
+        let entry: AcceptedEntry | undefined;
+        if (typeof v === 'string') {
+            // 전이 항목: via가 근본 패키지명 문자열
+            entry = registry.find((a) => a.pkgs.some((p) => p.trim() === v.trim()));
+        } else if (typeof v === 'object' && v !== null) {
+            // 직접 권고: via가 advisory 객체
+            const id = extractGhsa((v as { url?: unknown }).url);
+            entry = id ? registry.find((a) => a.advisory === id) : undefined;
+        }
+        if (!entry) return false;
+        matchedEntries.push(entry);
+        return true;
+    });
+    if (!ok) return false;
+
+    // 심각도 상승 시 수용 무효화 (예: high로 수용했는데 critical로 재평가된 경우).
+    // 문자열 via로 해석된 항목에도 적용된다. 모르는 심각도 값은 critical로 간주(fail-closed).
     const sev = (info as { severity?: unknown }).severity;
-    const entryForSeverity = KNOWN_ACCEPTED.find((a) =>
-        via.some((v) => typeof v === 'object' && v !== null && extractGhsa((v as { url?: unknown }).url) === a.advisory),
-    );
-    if (typeof sev === 'string' && entryForSeverity) {
-        const observed = SEVERITY_RANK[sev] ?? 0;
-        if (observed > SEVERITY_RANK[entryForSeverity.severity]) return false;
+    if (typeof sev === 'string') {
+        const observed = SEVERITY_RANK[sev] ?? SEVERITY_RANK.critical;
+        // 해당된 등록 항목 중 가장 높은 수용 등급과 비교 (여러 항목이 섞인 경우)
+        const acceptedRank = Math.max(...matchedEntries.map((a) => SEVERITY_RANK[a.severity] ?? 0));
+        if (observed > acceptedRank) return false;
     }
 
-    const matched: string[] = [];
-    const ok = via.every((v) => {
-        if (typeof v === 'string') {
-            const entry = KNOWN_ACCEPTED.find((a) => a.pkgs.some((p) => p.trim() === v.trim()));
-            if (entry) { matched.push(entry.advisory); return true; }
-            return false;
-        }
-        if (typeof v === 'object' && v !== null) {
-            const id = extractGhsa((v as { url?: unknown }).url);
-            const entry = id ? KNOWN_ACCEPTED.find((a) => a.advisory === id) : undefined;
-            if (entry) { matched.push(entry.advisory); return true; }
-            return false;
-        }
-        return false;
-    });
-    if (ok) for (const id of new Set(matched)) acceptedHits.set(id, (acceptedHits.get(id) ?? 0) + 1);
-    return ok;
+    for (const id of new Set(matchedEntries.map((a) => a.advisory))) {
+        acceptedHits.set(id, (acceptedHits.get(id) ?? 0) + 1);
+    }
+    return true;
 }
 
 /** advisory URL에서 GHSA ID만 추출 (마지막 경로 세그먼트가 GHSA 형식일 때만) */
@@ -142,75 +170,85 @@ export function extractGhsa(url: unknown): string | null {
     return GHSA_RE.test(last) ? last : null;
 }
 
+/**
+ * npm audit --json 리포트를 심각도별로 집계한다.
+ *
+ * fail-closed: 리포트가 유효한 audit 결과 형태가 아니면 `null`을 반환한다.
+ * npm은 레지스트리 접속 실패 시 **종료 코드 0**으로 `{message, error:{…}}`만 내보내는데,
+ * 이를 "취약점 0건"으로 읽으면 네트워크 장애 한 번이 게이트를 통째로 통과시킨다
+ * (2026-07-18 검증 보고서 #5). `auditReportVersion`+`metadata.vulnerabilities` 존재로 판별한다.
+ */
+export function summarizeAudit(raw: string): { counts: AuditCounts; accepted: number } | null {
+    let audit: Record<string, unknown>;
+    try {
+        audit = JSON.parse(raw) as Record<string, unknown>;
+    } catch {
+        return null;
+    }
+    if (typeof audit !== 'object' || audit === null) return null;
+    // 유효한 audit 리포트인지 검증 (레지스트리 오류 응답·부분 JSON 배제)
+    const meta = audit.metadata as { vulnerabilities?: unknown } | undefined;
+    const hasReportShape =
+        audit.auditReportVersion !== undefined &&
+        typeof meta === 'object' && meta !== null &&
+        typeof meta.vulnerabilities === 'object' && meta.vulnerabilities !== null;
+    if (!hasReportShape) return null;
+
+    const vulns = (audit.vulnerabilities ?? {}) as Record<string, { severity?: string }>;
+    const counts: AuditCounts = { critical: 0, high: 0, moderate: 0, low: 0 };
+    let accepted = 0;
+    for (const [, info] of Object.entries(vulns)) {
+        if (isAccepted(info)) { accepted++; continue; } // 수용 등록된 권고는 차감
+        const severity = (info.severity || 'low') as keyof AuditCounts;
+        if (counts[severity] !== undefined) counts[severity]++;
+    }
+    return { counts, accepted };
+}
+
 function runAudit(dir: string, label: string): AuditCounts | null {
     console.log(`\n🔍 ${label} 보안 감사 (${dir})`);
     console.log('─'.repeat(50));
 
+    // npm audit는 취약점을 찾으면 비정상 종료 코드를 내므로 stdout을 양쪽 경로에서 회수한다.
+    let raw: string;
     try {
-        const result = execSync('npm audit --json', {
+        raw = execSync('npm audit --json', {
             cwd: dir,
             encoding: 'utf-8',
             timeout: 30000,
-            stdio: ['pipe', 'pipe', 'ignore']
+            stdio: ['pipe', 'pipe', 'ignore'],
         });
-
-        const audit = JSON.parse(result);
-        const vulns: Record<string, unknown> = audit.vulnerabilities || {};
-        const counts: AuditCounts = { critical: 0, high: 0, moderate: 0, low: 0 };
-        let accepted = 0;
-
-        for (const [, info] of Object.entries(vulns)) {
-            if (isAccepted(info)) { accepted++; continue; } // 수용 등록된 권고는 차감
-            const severity = (info.severity || 'low') as keyof AuditCounts;
-            if (counts[severity] !== undefined) counts[severity]++;
-        }
-        if (accepted > 0) console.log(`   ℹ️  수용 등록 제외: ${accepted}건 (하단 등록부 참고)`);
-
-        const total = Object.values(counts).reduce((a, b) => a + b, 0);
-
-        if (total === 0) {
-            console.log(accepted > 0 ? '   ✅ 수용 제외 후 잔여 취약점 없음' : '   ✅ 취약점 없음');
-        } else {
-            if (counts.critical > 0) console.log(`   🔴 Critical: ${counts.critical}`);
-            if (counts.high > 0) console.log(`   🟠 High: ${counts.high}`);
-            if (counts.moderate > 0) console.log(`   🟡 Moderate: ${counts.moderate}`);
-            if (counts.low > 0) console.log(`   🟢 Low: ${counts.low}`);
-        }
-
-        return counts;
     } catch (err: unknown) {
-        // npm audit가 취약점 발견 시 비정상 종료 코드를 반환함
-        try {
-            const errorObj = err as { stdout?: string };
-            const output = errorObj.stdout || '';
-            const audit = JSON.parse(output);
-            const vulns: Record<string, unknown> = audit.vulnerabilities || {};
-            const counts: AuditCounts = { critical: 0, high: 0, moderate: 0, low: 0 };
-            let accepted = 0;
-
-            for (const [, info] of Object.entries(vulns)) {
-                if (isAccepted(info)) { accepted++; continue; } // 수용 등록된 권고는 차감
-                const severity = (info.severity || 'low') as keyof AuditCounts;
-                if (counts[severity] !== undefined) counts[severity]++;
-            }
-            if (accepted > 0) console.log(`   ℹ️  수용 등록 제외: ${accepted}건 (하단 등록부 참고)`);
-            if (Object.values(counts).reduce((a, b) => a + b, 0) === 0) {
-                console.log(accepted > 0 ? '   ✅ 수용 제외 후 잔여 취약점 없음' : '   ✅ 취약점 없음');
-            }
-
-            if (counts.critical > 0) console.log(`   🔴 Critical: ${counts.critical}`);
-            if (counts.high > 0) console.log(`   🟠 High: ${counts.high}`);
-            if (counts.moderate > 0) console.log(`   🟡 Moderate: ${counts.moderate}`);
-            if (counts.low > 0) console.log(`   🟢 Low: ${counts.low}`);
-
-            return counts;
-        } catch {
+        raw = (err as { stdout?: string }).stdout || '';
+        if (!raw) {
             const errorMessage = err instanceof Error ? err.message : String(err);
             console.log('   ⚠️  audit 실행 실패:', errorMessage.slice(0, 100));
-            // fail-closed: 실행/파싱 실패를 취약점 0건으로 위장하지 않는다 (2026-07-10 감사 하드닝)
+            // fail-closed: 실행 실패를 취약점 0건으로 위장하지 않는다 (2026-07-10 감사 하드닝)
             return null;
         }
     }
+
+    const summary = summarizeAudit(raw);
+    if (summary === null) {
+        console.log('   ⚠️  audit 리포트가 유효하지 않습니다 (레지스트리 오류·형식 불일치)');
+        // fail-closed: 유효한 리포트가 아니면 "취약점 없음"으로 처리하지 않는다
+        return null;
+    }
+
+    const { counts, accepted } = summary;
+    if (accepted > 0) console.log(`   ℹ️  수용 등록 제외: ${accepted}건 (하단 등록부 참고)`);
+
+    const total = Object.values(counts).reduce((a, b) => a + b, 0);
+    if (total === 0) {
+        console.log(accepted > 0 ? '   ✅ 수용 제외 후 잔여 취약점 없음' : '   ✅ 취약점 없음');
+    } else {
+        if (counts.critical > 0) console.log(`   🔴 Critical: ${counts.critical}`);
+        if (counts.high > 0) console.log(`   🟠 High: ${counts.high}`);
+        if (counts.moderate > 0) console.log(`   🟡 Moderate: ${counts.moderate}`);
+        if (counts.low > 0) console.log(`   🟢 Low: ${counts.low}`);
+    }
+
+    return counts;
 }
 
 function main(): void {
@@ -269,8 +307,23 @@ function main(): void {
     }
 }
 
-// 직접 실행일 때만 감사를 수행한다 (테스트에서 헬퍼만 import할 수 있도록. check-harness.ts와 동일 패턴)
+// 직접 실행일 때만 감사를 수행한다 (테스트에서 헬퍼만 import할 수 있도록. check-harness.ts와 동일 패턴).
+// 심링크/정션 경유 실행에서도 일치하도록 양쪽을 realpath로 정규화한다. 파일명은 같은데 경로가
+// 다르면(=이 파일을 실행하려던 것으로 보이는데 판정에 실패) 조용히 통과하지 않고 명시적으로 실패시킨다.
 const selfPath = fileURLToPath(import.meta.url);
-if (process.argv[1] && resolve(process.argv[1]).toLowerCase() === selfPath.toLowerCase()) {
-    main();
+function realOrSelf(p: string): string {
+    try { return realpathSync(p); } catch { return resolve(p); }
+}
+if (process.argv[1]) {
+    const invoked = realOrSelf(process.argv[1]);
+    const self = realOrSelf(selfPath);
+    if (invoked.toLowerCase() === self.toLowerCase()) {
+        main();
+    } else if (basename(invoked).toLowerCase() === basename(self).toLowerCase()) {
+        console.error(
+            `🚨 보안 감사 진입점 판정 실패 — 실행 경로(${invoked})와 모듈 경로(${self})가 다릅니다. ` +
+            '감사를 수행하지 않았으므로 fail-closed로 중단합니다.',
+        );
+        process.exit(1);
+    }
 }
