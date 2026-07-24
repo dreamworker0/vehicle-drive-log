@@ -480,9 +480,13 @@ export async function handleAssistantMessage(text: string, actor: AssistantActor
         });
 
         if (candidates.length === 0) {
-            // 수정할 대상이 없다. 진행 중이던 예약 생성 슬롯이 있었다면, "○○로 변경해서 예약해줘" 류의
-            // 차량 교체 발화를 "변경"이라는 단어 탓에 modify로 오분류한 것이다 → create 이어가기로 폴백한다.
-            if (createSlots) {
+            // 수정할 대상이 없다. 진행 중이던 예약 생성 슬롯이 있고 이번 발화가 새 날짜·시간 값 없이
+            // 차량만 지목했다면("○○로 변경해서 예약해줘"), "변경"이라는 단어 탓에 modify로 오분류한
+            // 차량 교체 발화이므로 create 이어가기로 폴백한다.
+            // 반대로 새 날짜·시간을 지목한 진짜 수정 시도가 대상을 못 찾은 경우엔 폴백하지 않고
+            // "찾지 못했습니다"로 정확히 안내한다(진행 중 초안 탓에 새 예약으로 헷갈리게 전환하지 않도록).
+            const hasNewSchedule = Boolean(intent.newDate || intent.newStartTime || intent.newEndTime);
+            if (createSlots && !hasNewSchedule) {
                 const namedVehicleId = intent.newVehicleId ?? intent.vehicleId;
                 return completeCreate(
                     { ...createSlots, vehicleId: namedVehicleId ?? createSlots.vehicleId },
