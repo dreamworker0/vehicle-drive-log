@@ -262,6 +262,31 @@ describe('handleAssistantMessage', () => {
         }));
     });
 
+    it('modify 오분류 폴백에서 날짜·시작 시간이 비어 있으면 크래시 없이 되묻는다', async () => {
+        const ACTOR_KEY = { ...ACTOR, conversationKey: 'slack_T_U' };
+        // 미완결 진행 예약(목적지만 있고 날짜·시작 시간 없음)이 저장돼 있던 상태
+        mockConvoGet.mockResolvedValue({
+            exists: true,
+            data: () => ({
+                kind: 'create',
+                slots: { date: null, startTime: null, endTime: null, vehicleId: null, purpose: '', destination: '익산역' },
+                expiresAt: { toDate: () => new Date(Date.now() + 60_000) },
+            }),
+        });
+        mockParseIntent.mockResolvedValue({
+            intent: 'modify', date: null, startTime: null, vehicleId: null,
+            newDate: null, newStartTime: null, newEndTime: null, newVehicleId: 'v1',
+        });
+        mockFindCandidates.mockResolvedValue([]);
+
+        const result = await handleAssistantMessage('스타렉스로 변경해서 예약해줘', ACTOR_KEY);
+
+        // 종료 계산(TMAP)에 진입해 null.split로 죽지 않고 되묻기로 안전하게 처리
+        expect(result.proposal).toBeUndefined();
+        expect(result.replyText).toContain('부족');
+        expect(mockEstimate).not.toHaveBeenCalled();
+    });
+
     it('qa 의도면 answerDataQuestion 결과를 반환한다 (즉시 생성 없음)', async () => {
         mockParseIntent.mockResolvedValue({ intent: 'qa' });
         mockAnswerData.mockResolvedValue('홍길동님은 스타렉스를 예약했습니다.');

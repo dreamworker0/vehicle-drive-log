@@ -335,6 +335,17 @@ async function completeCreate(
     key: string | undefined,
     vehicles: Array<AssistantVehicle & { isBlocked: boolean }>,
 ): Promise<AssistantResult> {
+    // 방어: 날짜·시작 시간이 없으면 완결 불가 → 슬롯 보존 후 되묻는다.
+    // 정상 create 경로는 parseIntent 재검증(needsClarification)이 date·startTime을 이미 보장하므로
+    // 여기 걸리지 않고, modify 오분류 폴백에서 미완결 슬롯이 넘어온 경우만 걸린다.
+    if (!slots.date || !slots.startTime) {
+        if (key) await savePending(key, actor.orgId, slots);
+        return {
+            replyText:
+                "예약에 필요한 정보가 부족합니다. 차량·날짜·시작 시간·목적지를 함께 알려주세요. 예: \"내일 14시 스타렉스로 서울역 예약\"",
+        };
+    }
+
     // 차량 미확정(정비 거부 후 이어받기에서 차량명을 못 알아들은 경우 등) → 차량만 되묻고 슬롯 보존.
     // 정상 create 경로는 parseIntent 재검증이 vehicleId를 이미 보장하므로 여기 걸리지 않는다.
     const vehicle = slots.vehicleId ? vehicles.find((v) => v.id === slots.vehicleId) : undefined;
