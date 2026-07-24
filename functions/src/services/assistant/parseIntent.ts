@@ -100,7 +100,7 @@ export async function parseIntent(text: string, vehicles: AssistantVehicle[], pe
     const pendingSection = pending
         ? `\n[진행 중인 예약 — 이미 받은 정보]
 날짜: ${pending.date || "미정"}, 시작: ${pending.startTime || "미정"}, 종료: ${pending.endTime || "미정"}, 차량 id: ${pending.vehicleId || "미정"}
-사용자의 이번 메시지는 이 예약을 이어서 채우는 답변일 가능성이 높습니다. 이번 메시지에서 새로 얻은 값만 반영하고(예: 시간만 답하면 시간만), 나머지는 위 값을 그대로 쓴다고 보고 intent는 "create"로 두세요. 단, 사용자가 조회 등 완전히 다른 요청을 하면 그에 맞는 intent로 바꾸세요.\n`
+사용자의 이번 메시지는 이 예약을 이어서 채우는 답변일 가능성이 높습니다. 이번 메시지에서 새로 얻은 값만 반영하고(예: 시간만 답하면 시간만), 나머지는 위 값을 그대로 쓴다고 보고 intent는 "create"로 두세요. 차량만 다른 걸로 바꿔 말해도(예: "○○로 변경해서 예약해줘", "○○로 바꿔줘") 이는 이 진행 중 예약의 차량 슬롯을 채우는 "create"입니다(기존에 저장된 예약을 고치는 modify가 아닙니다). 단, 사용자가 조회 등 완전히 다른 요청을 하면 그에 맞는 intent로 바꾸세요.\n`
         : "";
 
     const prompt = `당신은 차량 운행일지 앱의 예약 도우미입니다. 사용자의 한국어 메시지를 분석해 JSON으로만 응답하세요.
