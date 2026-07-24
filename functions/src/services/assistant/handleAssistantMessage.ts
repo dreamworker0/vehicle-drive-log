@@ -445,8 +445,27 @@ export async function handleAssistantMessage(text: string, actor: AssistantActor
 
         const vehicle = vehicles.find((v) => v.id === intent.vehicleId)!;
         if (vehicle.isBlocked) {
-            if (key) await clearPending(key);
-            return { replyText: `🚫 ${vehicle.name}은(는) 현재 정비 중이라 예약할 수 없습니다.` };
+            // 정비 중 차량이면 지금까지 받은 슬롯(날짜·시간·목적지)은 유지하고 차량만 비워 저장한다.
+            // 사용자가 다음 메시지에서 다른 차량만 말하면 같은 조건으로 이어서 예약된다.
+            if (key) {
+                await savePending(key, actor.orgId, {
+                    date: intent.date,
+                    startTime: intent.startTime,
+                    endTime: intent.endTime,
+                    vehicleId: null,
+                    purpose: intent.purpose,
+                    destination: intent.destination,
+                });
+            }
+            const timeRange = intent.startTime
+                ? `${intent.startTime}${intent.endTime ? `~${intent.endTime}` : ""}`
+                : "";
+            const cond = [intent.date, timeRange, intent.destination].filter(Boolean).join(" ");
+            return {
+                replyText:
+                    `🚫 ${vehicle.name}은(는) 현재 정비 중이라 예약할 수 없습니다. ` +
+                    `다른 차량 이름을 알려주시면 같은 조건(${cond})으로 예약해드릴게요.`,
+            };
         }
 
         // 종료 시간 결정: 사용자가 명시했으면 사용, 없으면 목적지 기반 TMAP 이동시간으로 자동 계산.

@@ -209,6 +209,31 @@ describe('handleAssistantMessage', () => {
         expect(result.replyText).toContain('정비 중');
     });
 
+    it('정비 중 차량 거부 시 차량만 비우고 날짜·시간·목적지 슬롯은 보존해 저장한다', async () => {
+        const ACTOR_KEY = { ...ACTOR, conversationKey: 'slack_T_U' };
+        mockConvoGet.mockResolvedValue({ exists: false });
+        mockParseIntent.mockResolvedValue({
+            intent: 'create', needsClarification: false,
+            date: '2026-07-19', startTime: '14:00', endTime: '16:00',
+            vehicleId: 'v3', purpose: '', destination: '익산역',
+        });
+
+        const result = await handleAssistantMessage('카니발 14~16시 익산역 예약', ACTOR_KEY);
+
+        expect(result.proposal).toBeUndefined();
+        expect(result.replyText).toContain('정비 중');
+        expect(result.replyText).toContain('익산역'); // 조건 보존 안내
+        // 슬롯은 차량만 비운 채 유지 → 다음 메시지에서 다른 차량으로 이어받기 가능
+        expect(mockConvoSet).toHaveBeenCalledWith(expect.objectContaining({
+            kind: 'create',
+            slots: expect.objectContaining({
+                date: '2026-07-19', startTime: '14:00', endTime: '16:00',
+                vehicleId: null, destination: '익산역',
+            }),
+        }));
+        expect(mockConvoDelete).not.toHaveBeenCalled();
+    });
+
     it('qa 의도면 answerDataQuestion 결과를 반환한다 (즉시 생성 없음)', async () => {
         mockParseIntent.mockResolvedValue({ intent: 'qa' });
         mockAnswerData.mockResolvedValue('홍길동님은 스타렉스를 예약했습니다.');
