@@ -287,6 +287,31 @@ describe('handleAssistantMessage', () => {
         expect(mockEstimate).not.toHaveBeenCalled();
     });
 
+    it('새 시간을 지목한 진짜 수정이 대상 0건이면, 진행 중 초안이 있어도 새 예약으로 전환하지 않는다', async () => {
+        const ACTOR_KEY = { ...ACTOR, conversationKey: 'slack_T_U' };
+        // 진행 중 예약 초안이 TTL 내에 남아 있는 상태
+        mockConvoGet.mockResolvedValue({
+            exists: true,
+            data: () => ({
+                kind: 'create',
+                slots: { date: '2026-07-19', startTime: '14:00', endTime: '16:00', vehicleId: null, purpose: '', destination: '익산역' },
+                expiresAt: { toDate: () => new Date(Date.now() + 60_000) },
+            }),
+        });
+        // "예약을 15시로 옮겨줘" — 새 시작 시간(newStartTime)을 지목한 진짜 수정 시도
+        mockParseIntent.mockResolvedValue({
+            intent: 'modify', date: '2026-07-19', startTime: null, vehicleId: 'v1',
+            newDate: null, newStartTime: '15:00', newEndTime: null, newVehicleId: null,
+        });
+        mockFindCandidates.mockResolvedValue([]); // 대상 예약을 못 찾음
+
+        const result = await handleAssistantMessage('내일 스타렉스 예약을 15시로 옮겨줘', ACTOR_KEY);
+
+        expect(result.proposal).toBeUndefined();
+        expect(result.replyText).toContain('찾지 못했습니다');
+        expect(mockConvoDelete).toHaveBeenCalled(); // 진행 중 초안 폐기
+    });
+
     it('qa 의도면 answerDataQuestion 결과를 반환한다 (즉시 생성 없음)', async () => {
         mockParseIntent.mockResolvedValue({ intent: 'qa' });
         mockAnswerData.mockResolvedValue('홍길동님은 스타렉스를 예약했습니다.');
