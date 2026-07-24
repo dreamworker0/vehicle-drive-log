@@ -324,6 +324,71 @@ function buildModifyResult(
     return { replyText: formatModifySummary(modifyProposal), modifyProposal };
 }
 
+/**
+ * 채워졌다고 판단된 예약 생성 슬롯을 완결한다: 정비 차단 확인 → 종료 시간(TMAP) 확정 → proposal.
+ * create 정상 경로와 "○○로 변경해서 예약" modify 오분류 폴백이 공유한다.
+ * 미완결(차량 미확정·정비 중·종료 계산 실패)이면 슬롯을 보존 저장하고 되묻는다.
+ */
+async function completeCreate(
+    slots: PendingSlots,
+    actor: AssistantActor,
+    key: string | undefined,
+    vehicles: Array<AssistantVehicle & { isBlocked: boolean }>,
+): Promise<AssistantResult> {
+    // 차량 미확정(정비 거부 후 이어받기에서 차량명을 못 알아들은 경우 등) → 차량만 되묻고 슬롯 보존.
+    // 정상 create 경로는 parseIntent 재검증이 vehicleId를 이미 보장하므로 여기 걸리지 않는다.
+    const vehicle = slots.vehicleId ? vehicles.find((v) => v.id === slots.vehicleId) : undefined;
+    if (!vehicle) {
+        if (key) await savePending(key, actor.orgId, { ...slots, vehicleId: null });
+        return { replyText: "어떤 차량으로 예약할까요? 차량 이름을 알려주세요." };
+    }
+
+    if (vehicle.isBlocked) {
+        // 정비 중 차량이면 지금까지 받은 슬롯(날짜·시간·목적지)은 유지하고 차량만 비워 저장한다.
+        // 사용자가 다음 메시지에서 다른 차량만 말하면 같은 조건으로 이어서 예약된다.
+        if (key) await savePending(key, actor.orgId, { ...slots, vehicleId: null });
+        const timeRange = slots.startTime
+            ? `${slots.startTime}${slots.endTime ? `~${slots.endTime}` : ""}`
+            : "";
+        const cond = [slots.date, timeRange, slots.destination].filter(Boolean).join(" ");
+        return {
+            replyText:
+                `🚫 ${vehicle.name}은(는) 현재 정비 중이라 예약할 수 없습니다. ` +
+                `다른 차량 이름을 알려주시면 같은 조건(${cond})으로 예약해드릴게요.`,
+        };
+    }
+
+    // 종료 시간 결정: 사용자가 명시했으면 사용, 없으면 목적지 기반 TMAP 이동시간으로 자동 계산.
+    // 계산 실패(기관 주소 미등록·지오코딩 실패·TMAP 오류) 시 종료 시간을 되묻는다.
+    let endTime = slots.endTime;
+    if (!endTime) {
+        const orgAddress = await getOrgAddress(actor.orgId);
+        const durationMin = await estimateOneWayDurationMin(orgAddress, slots.destination);
+        if (durationMin != null) {
+            endTime = calcEndTimeFromDuration(slots.startTime!, durationMin);
+        } else {
+            // 슬롯을 저장해 다음 메시지(종료 시간)에서 이어받는다
+            if (key) await savePending(key, actor.orgId, { ...slots, endTime: null });
+            return { replyText: "이동시간을 계산하지 못했어요. 종료 시간을 알려주세요. 예: \"16시까지\"" };
+        }
+    }
+
+    if (key) await clearPending(key); // 제안 단계로 넘어가면 슬롯 채우기 상태는 종료
+    const proposal: ReservationProposal = {
+        organizationId: actor.orgId,
+        vehicleId: vehicle.id,
+        vehicleName: vehicle.name,
+        date: slots.date!,
+        startTime: slots.startTime!,
+        endTime,
+        purpose: slots.purpose,
+        destination: slots.destination,
+        actorUid: actor.uid,
+        reservedByName: actor.displayName,
+    };
+    return { replyText: formatProposalSummary(proposal), proposal };
+}
+
 /** 자연어 메시지 처리 — 조회는 즉시 응답, 생성은 proposal 반환. 멀티턴 대화 상태 유지 */
 export async function handleAssistantMessage(text: string, actor: AssistantActor): Promise<AssistantResult> {
     const key = actor.conversationKey;
@@ -396,7 +461,6 @@ export async function handleAssistantMessage(text: string, actor: AssistantActor
     }
 
     if (intent.intent === "modify") {
-        if (key) await clearPending(key); // 진행 중이던 생성 슬롯 등은 폐기하고 수정 시작
         // 대상 특정은 취소와 동일한 후보 조회를 재사용 (단서: date·vehicleId·startTime)
         const candidates = await findCancelCandidates(actor.orgId, actor.uid, {
             date: intent.date,
@@ -405,11 +469,25 @@ export async function handleAssistantMessage(text: string, actor: AssistantActor
         });
 
         if (candidates.length === 0) {
+            // 수정할 대상이 없다. 진행 중이던 예약 생성 슬롯이 있었다면, "○○로 변경해서 예약해줘" 류의
+            // 차량 교체 발화를 "변경"이라는 단어 탓에 modify로 오분류한 것이다 → create 이어가기로 폴백한다.
+            if (createSlots) {
+                const namedVehicleId = intent.newVehicleId ?? intent.vehicleId;
+                return completeCreate(
+                    { ...createSlots, vehicleId: namedVehicleId ?? createSlots.vehicleId },
+                    actor,
+                    key,
+                    vehicles,
+                );
+            }
+            if (key) await clearPending(key);
             return {
                 replyText:
                     "수정할 예약을 찾지 못했습니다. 본인이 예약한 예정된 건만 수정할 수 있어요. 날짜·차량을 함께 알려주시면 찾기 쉬워요.",
             };
         }
+
+        if (key) await clearPending(key); // 실제 수정 대상 확정 → 진행 중이던 생성 슬롯은 폐기
 
         const newValues: ModifyNewValues = {
             newDate: intent.newDate,
@@ -443,69 +521,19 @@ export async function handleAssistantMessage(text: string, actor: AssistantActor
             return { replyText: intent.clarificationQuestion || ASSISTANT_HELP_TEXT };
         }
 
-        const vehicle = vehicles.find((v) => v.id === intent.vehicleId)!;
-        if (vehicle.isBlocked) {
-            // 정비 중 차량이면 지금까지 받은 슬롯(날짜·시간·목적지)은 유지하고 차량만 비워 저장한다.
-            // 사용자가 다음 메시지에서 다른 차량만 말하면 같은 조건으로 이어서 예약된다.
-            if (key) {
-                await savePending(key, actor.orgId, {
-                    date: intent.date,
-                    startTime: intent.startTime,
-                    endTime: intent.endTime,
-                    vehicleId: null,
-                    purpose: intent.purpose,
-                    destination: intent.destination,
-                });
-            }
-            const timeRange = intent.startTime
-                ? `${intent.startTime}${intent.endTime ? `~${intent.endTime}` : ""}`
-                : "";
-            const cond = [intent.date, timeRange, intent.destination].filter(Boolean).join(" ");
-            return {
-                replyText:
-                    `🚫 ${vehicle.name}은(는) 현재 정비 중이라 예약할 수 없습니다. ` +
-                    `다른 차량 이름을 알려주시면 같은 조건(${cond})으로 예약해드릴게요.`,
-            };
-        }
-
-        // 종료 시간 결정: 사용자가 명시했으면 사용, 없으면 목적지 기반 TMAP 이동시간으로 자동 계산.
-        // 계산 실패(기관 주소 미등록·지오코딩 실패·TMAP 오류) 시 종료 시간을 되묻는다.
-        let endTime = intent.endTime;
-        if (!endTime) {
-            const orgAddress = await getOrgAddress(actor.orgId);
-            const durationMin = await estimateOneWayDurationMin(orgAddress, intent.destination);
-            if (durationMin != null) {
-                endTime = calcEndTimeFromDuration(intent.startTime!, durationMin);
-            } else {
-                // 슬롯을 저장해 다음 메시지(종료 시간)에서 이어받는다
-                if (key) {
-                    await savePending(key, actor.orgId, {
-                        date: intent.date,
-                        startTime: intent.startTime,
-                        endTime: null,
-                        vehicleId: intent.vehicleId,
-                        purpose: intent.purpose,
-                        destination: intent.destination,
-                    });
-                }
-                return { replyText: "이동시간을 계산하지 못했어요. 종료 시간을 알려주세요. 예: \"16시까지\"" };
-            }
-        }
-
-        if (key) await clearPending(key); // 제안 단계로 넘어가면 슬롯 채우기 상태는 종료
-        const proposal: ReservationProposal = {
-            organizationId: actor.orgId,
-            vehicleId: vehicle.id,
-            vehicleName: vehicle.name,
-            date: intent.date!,
-            startTime: intent.startTime!,
-            endTime,
-            purpose: intent.purpose,
-            destination: intent.destination,
-            actorUid: actor.uid,
-            reservedByName: actor.displayName,
-        };
-        return { replyText: formatProposalSummary(proposal), proposal };
+        return completeCreate(
+            {
+                date: intent.date,
+                startTime: intent.startTime,
+                endTime: intent.endTime,
+                vehicleId: intent.vehicleId,
+                purpose: intent.purpose,
+                destination: intent.destination,
+            },
+            actor,
+            key,
+            vehicles,
+        );
     }
 
     if (key) await clearPending(key);

@@ -234,6 +234,34 @@ describe('handleAssistantMessage', () => {
         expect(mockConvoDelete).not.toHaveBeenCalled();
     });
 
+    it('정비 거부 후 "○○로 변경해서 예약"이 modify로 오분류돼도 보존 슬롯으로 이어서 예약한다', async () => {
+        const ACTOR_KEY = { ...ACTOR, conversationKey: 'slack_T_U' };
+        // 정비 거부로 저장돼 있던 진행 중 예약(차량만 비고 날짜·시간·목적지 보존)
+        mockConvoGet.mockResolvedValue({
+            exists: true,
+            data: () => ({
+                kind: 'create',
+                slots: { date: '2026-07-19', startTime: '14:00', endTime: '16:00', vehicleId: null, purpose: '', destination: '익산역' },
+                expiresAt: { toDate: () => new Date(Date.now() + 60_000) },
+            }),
+        });
+        // "변경"이라는 단어로 LLM이 modify로 분류하고, 새 차량은 newVehicleId로 온 상황
+        mockParseIntent.mockResolvedValue({
+            intent: 'modify', date: null, startTime: null, vehicleId: null,
+            newDate: null, newStartTime: null, newEndTime: null, newVehicleId: 'v1',
+        });
+        mockFindCandidates.mockResolvedValue([]); // 아직 생성된 예약이 없으니 수정 대상 0건
+
+        const result = await handleAssistantMessage('스타렉스로 변경해서 예약해줘', ACTOR_KEY);
+
+        // 죽지 않고 보존된 조건(익산역·날짜·시간) + 새 차량으로 proposal 생성
+        expect(result.replyText).not.toContain('찾지 못했습니다');
+        expect(result.proposal).toEqual(expect.objectContaining({
+            vehicleId: 'v1', vehicleName: '스타렉스',
+            date: '2026-07-19', startTime: '14:00', endTime: '16:00', destination: '익산역',
+        }));
+    });
+
     it('qa 의도면 answerDataQuestion 결과를 반환한다 (즉시 생성 없음)', async () => {
         mockParseIntent.mockResolvedValue({ intent: 'qa' });
         mockAnswerData.mockResolvedValue('홍길동님은 스타렉스를 예약했습니다.');
