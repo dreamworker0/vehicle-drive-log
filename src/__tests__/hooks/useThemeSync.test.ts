@@ -26,7 +26,7 @@ describe('useThemeSync', () => {
     beforeEach(() => {
         root.classList.remove('dark');
         document.querySelector('meta[name="theme-color"]')?.remove();
-        useThemeStore.setState({ theme: 'light' });
+        useThemeStore.setState({ theme: 'light', forceLightCount: 0 });
     });
 
     afterEach(() => {
@@ -92,5 +92,57 @@ describe('useThemeSync', () => {
 
         expect(() => renderHook(() => useThemeSync())).not.toThrow();
         expect(root.classList.contains('dark')).toBe(true);
+    });
+
+    describe('강제 라이트(forceLightCount)와의 협동', () => {
+        it('강제 라이트가 걸려 있으면 theme이 dark라도 라이트로 적용한다', () => {
+            useThemeStore.setState({ theme: 'dark', forceLightCount: 1 });
+
+            renderHook(() => useThemeSync());
+
+            expect(root.classList.contains('dark')).toBe(false);
+        });
+
+        // 회귀: 예전엔 useForceLightMode가 dark를 직접 제거했고, effect가 자식→부모 순이라
+        // 체류 중 테마가 바뀌면 부모인 useThemeSync가 나중에 실행되어 dark를 다시 붙였다
+        // (공개 페이지를 보는 중에 다크로 전환). 단일 writer가 됐으니 이제 뒤집히지 않는다.
+        it('강제 라이트 중 테마가 light→dark로 바뀌어도 다크로 뒤집히지 않는다', () => {
+            useThemeStore.setState({ theme: 'light', forceLightCount: 1 });
+            renderHook(() => useThemeSync());
+            expect(root.classList.contains('dark')).toBe(false);
+
+            act(() => { useThemeStore.setState({ theme: 'dark' }); });
+
+            expect(root.classList.contains('dark')).toBe(false);
+        });
+
+        it('강제 라이트가 해제되면 사용자 선호(dark)를 즉시 반영한다', () => {
+            useThemeStore.setState({ theme: 'dark', forceLightCount: 1 });
+            renderHook(() => useThemeSync());
+            expect(root.classList.contains('dark')).toBe(false);
+
+            act(() => { useThemeStore.setState({ forceLightCount: 0 }); });
+
+            expect(root.classList.contains('dark')).toBe(true);
+        });
+
+        it('강제 라이트 중에는 theme-color도 라이트 색상으로 유지한다', () => {
+            const meta = setupMeta('#020617');
+            useThemeStore.setState({ theme: 'dark', forceLightCount: 1 });
+
+            renderHook(() => useThemeSync());
+
+            expect(meta.getAttribute('content')).toBe('#f8fafc');
+        });
+
+        it('요구가 여러 개면 하나가 빠져도 라이트를 유지한다', () => {
+            useThemeStore.setState({ theme: 'dark', forceLightCount: 2 });
+            renderHook(() => useThemeSync());
+            expect(root.classList.contains('dark')).toBe(false);
+
+            act(() => { useThemeStore.setState({ forceLightCount: 1 }); });
+
+            expect(root.classList.contains('dark')).toBe(false);
+        });
     });
 });
