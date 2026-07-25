@@ -2,15 +2,13 @@
  * 공개 페이지 컴포넌트 전체가 useForceLightMode를 호출하는지 정적으로 강제한다.
  * 공개 페이지 목록은 lightEntry.tsx의 Route에서 추출한다(그 경로가 곧 공개 페이지 집합).
  *
- * 왜 필요한가: 이 컴포넌트들은 **appEntry(로그인 경로)에서도 재사용**된다
- * (App.tsx의 /terms·/privacy·/release-notes·/faq·/apply, 그리고 `AuthGuard requireGuest`로
- * 렌더되는 /·/login). 거기서는 useThemeSync가 마운트되어 사용자 선호가 dark면 `<html>`에
- * dark를 적용하므로, 훅으로 강제 라이트를 등록하지 않은 공개 페이지는 **다크로 렌더된다**.
- * 공개 페이지 4곳(FAQ·약관·개인정보·릴리즈노트)은 최상위 배경에 dark 변형이 없어
+ * 왜 필요한가: **두 렌더 경로 모두** 테마 소유자를 마운트한다 — appEntry는 `App` 본문에서
+ * useThemeSync를 호출하고, lightEntry는 `ThemeRoot`로 감싼다. 따라서 사용자 선호가 dark면
+ * `<html>`에 dark가 적용되며, 강제 라이트를 등록하지 않은 공개 페이지는 **다크로 렌더된다**.
+ * 대상 4곳(FAQ·약관·개인정보·릴리즈노트)은 최상위 배경에 dark 변형이 없어
  * (bg-gradient from-surface-50) 밝은 배경 + 다크용 텍스트로 대비가 깨진다.
- *
- * (lightEntry 자체에는 useThemeSync가 없어 dark를 쓰는 주체가 없다 — 아래 테스트가
- * 그 전제를 고정한다. 즉 이 검사의 실효는 appEntry 쪽에서 나온다.)
+ * 공개 페이지 컴포넌트는 appEntry에서도 재사용된다(App.tsx의 /terms·/privacy·
+ * /release-notes·/faq·/apply, `AuthGuard requireGuest`로 렌더되는 /·/login).
  *
  * ⚠️ 알려진 한계: 공개 페이지 목록을 **lightEntry.tsx에서만** 열거하므로, App.tsx에만
  * 공개 라우트를 추가하고 lightEntry에 빠뜨리면 이 검사를 통과한다. 두 엔트리에 같은
@@ -60,13 +58,24 @@ describe('공개 페이지 강제 라이트모드 불변식', () => {
      * 자체적으로 훅을 호출하지 않아도 되는 라우트 요소.
      * - Navigate: 리다이렉트라 DOM/테마에 관여하지 않는다
      * - InAppBrowserGuard: 순수 위임 래퍼 — 두 분기가 모두 훅을 호출한다(아래 테스트가 검증)
+     * - OrgApplicationPage: **의도적으로 다크를 지원한다**(최상위 배경부터 폼 요소까지
+     *   dark: 변형이 온전함) → 강제 라이트를 걸지 않고 사용자 테마를 따른다
      */
-    const EXEMPT = new Set(['Navigate', 'InAppBrowserGuard']);
+    const EXEMPT = new Set(['Navigate', 'InAppBrowserGuard', 'OrgApplicationPage']);
 
-    it('lightEntry에는 dark 클래스를 쓰는 주체(useThemeSync)가 없다', () => {
-        // 이 전제가 깨지면(=lightEntry도 테마를 DOM에 반영하게 되면) 비로그인 경로에서도
-        // 강제 라이트 등록이 실효를 갖게 된다. 그때 이 파일의 근거 설명을 갱신할 것.
-        expect(entry).not.toContain('useThemeSync');
+    it('lightEntry도 테마 소유자(ThemeRoot)를 마운트한다', () => {
+        // 이 전제가 있어야 비로그인 경로에서도 dark 클래스·theme-color가 스토어와 일치한다.
+        // (예전에는 소유자가 없어 index.html이 박은 다크 theme-color가 라이트 화면에 남았다)
+        expect(entry).toContain('ThemeRoot');
+    });
+
+    it('강제 라이트 예외 페이지는 다크 지원이 실제로 갖춰져 있다', () => {
+        // EXEMPT에 올린 근거(다크 지원 완비)가 사실인지 확인한다. 색상 클래스에 dark: 변형이
+        // 빠지면 예외 근거가 무너지므로, 최상위 컨테이너의 dark 배경을 대표값으로 검사한다.
+        const src = readFileSync(resolve(SRC, 'components/auth/OrgApplicationPage.tsx'), 'utf-8');
+        expect(src).toMatch(/min-h-screen[^"]*dark:from-/);
+        // 호출 여부로 본다 (주석에서 훅 이름을 언급할 수 있으므로 단순 포함 검사는 부정확)
+        expect(src).not.toContain('useForceLightMode(');
     });
 
     it('라우트 컴포넌트를 하나 이상 추출한다 (파서가 죽지 않았는지)', () => {
