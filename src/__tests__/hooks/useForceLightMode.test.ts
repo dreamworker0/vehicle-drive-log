@@ -6,6 +6,9 @@ import { useThemeStore } from '../../store/useThemeStore';
 describe('useForceLightMode', () => {
     const root = document.documentElement;
 
+    // 이 훅은 스토어를 구독하지 않고 cleanup에서 getState()만 읽으므로 setState가
+    // 리렌더를 유발하지 않는다 → act() 불필요. 구독 방식으로 바뀌면 setup.ts의
+    // act 경고 승격 가드에 걸리니 그때는 act()로 감싸야 한다(useThemeSync.test 참고).
     beforeEach(() => {
         root.classList.remove('dark');
         useThemeStore.setState({ theme: 'light' });
@@ -13,6 +16,7 @@ describe('useForceLightMode', () => {
 
     afterEach(() => {
         root.classList.remove('dark');
+        useThemeStore.setState({ theme: 'light' }); // 파일 종료 시 스토어 오염 방지
     });
 
     it('마운트 시 dark 클래스를 제거한다', () => {
