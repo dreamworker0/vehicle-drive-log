@@ -27,10 +27,13 @@ function assertSafeOrgPath(filePath: string, orgId: string): void {
     }
 }
 
+// 4차 배치(2026-07-25): 사업자등록증·고유번호증 서명 URL을 내주는 경로라 민감도가 높고,
+// 같은 심사 화면의 ocrDocument는 이미 강제 중이라 정책이 갈려 있었다(3차 리뷰 M2).
+// 호출부는 superAdmin 심사 화면(OrgDocumentViewer → fetchOrgDocumentUrl)뿐이다.
 export const getOrgDocumentUrl = onCall(
     {
         region: "asia-northeast3",
-        enforceAppCheck: false,
+        enforceAppCheck: true,
     },
     async (request) => {
         if (!request.auth) {

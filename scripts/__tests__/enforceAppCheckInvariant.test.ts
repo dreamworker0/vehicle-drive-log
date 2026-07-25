@@ -36,14 +36,13 @@ const PUBLIC_EXEMPT: Record<string, string> = {
 
 /**
  * 인증 사용자만 호출하므로 강제가 **가능**하지만 아직 배치에 포함하지 않은 것.
- * 4차 배치에서 포함 여부를 결정한다(3차 리뷰 M2 지적).
+ * 4차(2026-07-25)에서 비용·민감도가 높은 2종을 강제로 옮겼고, 남은 3종은 진단·동기화
+ * 계열이라 실패 시 관리자가 원인을 못 찾는 부작용이 커서 다음 배치로 미룬다.
  */
 const PENDING_DECISION: Record<string, string> = {
-    'callable/getOrgDocumentUrl.ts': 'superAdmin 신청 상세 — ocrDocument와 같은 화면인데 정책이 갈려 있다',
-    'callable/sendAdminNotice.ts': 'admin 공지 발송',
     'callable/sendFeedbackReply.ts': 'superAdmin 피드백 회신 — 같은 훅의 regenerateFeedbackDraft는 이미 강제',
-    'callable/testCalendarAccess.ts': 'admin 캘린더 연결 진단',
-    'callable/triggerOnDemandCalendarSync.ts': 'admin 수동 동기화',
+    'callable/testCalendarAccess.ts': 'admin 캘린더 연결 진단 — 연결 문제 진단 도구라 강제가 진단을 막을 수 있다',
+    'callable/triggerOnDemandCalendarSync.ts': 'admin 수동 동기화 — 위 진단과 같은 화면·같은 판단',
 };
 
 /**
@@ -70,6 +69,15 @@ const BATCH3_ENFORCED = [
     'callable/sendManualRejectionAlimtalk.ts',
     'callable/sendApprovalEmail.ts',
     'callable/sendRejectionEmail.ts',
+];
+
+/**
+ * 4차 배치(2026-07-25) — 비용 팬아웃(FCM)과 민감 문서 노출 경로.
+ * 3차와 같은 이유로 개별 고정한다: 목록 비교만으로는 "이 파일이 강제 상태"를 못 박지 못한다.
+ */
+const BATCH4_ENFORCED = [
+    'callable/sendAdminNotice.ts',
+    'callable/getOrgDocumentUrl.ts',
 ];
 
 /** handlers/ 하위 .ts 파일을 재귀 수집 (테스트 제외) */
@@ -136,6 +144,12 @@ describe('enforceAppCheck 불변식', () => {
         }
     });
 
+    it('4차 배치 2종은 강제 상태를 유지한다', () => {
+        for (const key of BATCH4_ENFORCED) {
+            expect(read(key), `${key}에 enforceAppCheck: true가 없다`).toMatch(/enforceAppCheck:\s*true/);
+        }
+    });
+
     describe('근거 검증 — 근거 없이 목록을 늘리지 못하게', () => {
         it('공개 면제 2종은 실제로 인증을 요구하지 않는다', () => {
             for (const key of Object.keys(PUBLIC_EXEMPT)) {
@@ -145,7 +159,7 @@ describe('enforceAppCheck 불변식', () => {
             }
         });
 
-        it('4차 대기 5종은 실제로 인증을 요구한다 (= 강제가 가능한 대상)', () => {
+        it('결정 대기 3종은 실제로 인증을 요구한다 (= 강제가 가능한 대상)', () => {
             for (const key of Object.keys(PENDING_DECISION)) {
                 const src = read(key);
                 expect(src, `${key}가 인증을 요구하지 않으면 공개 경로로 재분류해야 한다`)

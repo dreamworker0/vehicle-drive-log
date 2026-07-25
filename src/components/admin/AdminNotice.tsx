@@ -6,7 +6,8 @@ import { useState, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
-import { getFunctions, httpsCallable } from 'firebase/functions';
+import { httpsCallable } from 'firebase/functions';
+import { firebaseFunctions } from '../../lib/firebase';
 
 export default function AdminNotice() {
     const { userData } = useAuth();
@@ -30,8 +31,9 @@ export default function AdminNotice() {
 
         setSending(true);
         try {
-            const functions = getFunctions(undefined, 'asia-northeast3');
-            const sendNotice = httpsCallable(functions, 'sendAdminNotice');
+            // 공용 인스턴스를 쓴다 — getFunctions(undefined, ...)로 새로 만들면 App Check가
+            // 초기화된 앱·에뮬레이터 연결과 어긋날 수 있다 (sendAdminNotice는 enforceAppCheck: true)
+            const sendNotice = httpsCallable(firebaseFunctions, 'sendAdminNotice');
             await sendNotice({
                 orgId: userData!.organizationId,
                 title: title.trim(),
