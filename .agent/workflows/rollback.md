@@ -32,6 +32,13 @@ fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression; fnm use
 ```
 Working directory: `.`
 
+3-1. (선택) 특정 함수만 단독 롤백
+   - **지시사항**: 원인이 일부 함수에 한정될 때는 전량 배포 대신 함수 단위로 타깃합니다. `enforceAppCheck` 같은 코드 플래그는 콘솔 킬스위치가 없어 재배포가 유일한 복구 경로이므로, 반경을 좁히면 복구 시간이 크게 줄어듭니다. 해당 파일만 되돌린 뒤 실행합니다(`functions/src/index.ts`가 함수를 개별 export하므로 가능).
+```
+fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression; fnm use 22; cd functions; npm run build; cd ..; firebase deploy --only functions:ocrDashboard,functions:askAI
+```
+Working directory: `.`
+
 ### --- [STEP 3: Firestore/Storage Rules 복구 (필요시)] ---
 
 보안 규칙 변경으로 인해 정상 사용자가 데이터를 읽지 못하는 권한 에러(permission-denied) 급증 시:

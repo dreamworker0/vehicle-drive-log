@@ -145,6 +145,9 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
             const error = err as { code?: string; message?: string };
             if (error.code === 'functions/resource-exhausted') {
                 setError('질문이 너무 많습니다. 잠시 후 다시 시도해주세요.');
+            } else if (error.code === 'functions/unauthenticated') {
+                // App Check 미첨부(reCAPTCHA 차단·throttle)로 인한 거절 — 재시도가 유효한 원인이라 구분해 안내
+                setError('보안 인증에 실패했습니다. 잠시 후 다시 시도해주세요.');
             } else {
                 setError('답변을 가져오지 못했습니다. 다시 시도해주세요.');
             }

@@ -173,7 +173,12 @@ export default function useFuelLog() {
             }
         } catch (err) {
             console.error('계기판 OCR 실패:', err);
-            setOcrError('계기판 인식에 실패했습니다.');
+            // App Check 미첨부(reCAPTCHA 차단·throttle)로 인한 거절을 구분해 안내 — useDriveLogOcr와 동일 이유
+            if ((err as { code?: string })?.code === 'functions/unauthenticated') {
+                setOcrError('보안 인증에 실패했습니다. 잠시 후 다시 시도하거나 직접 입력해주세요.');
+            } else {
+                setOcrError('계기판 인식에 실패했습니다.');
+            }
         } finally {
             setOcrLoading(false);
             if (cameraInputRef.current) cameraInputRef.current.value = '';
