@@ -43,7 +43,7 @@ export const askAI = onCall(
         region: "asia-northeast3",
         timeoutSeconds: 30,
         memory: "256MiB",
-        enforceAppCheck: false,
+        enforceAppCheck: true,
         cors: true,
     },
     wrapCallableHandler("askAI", { rateLimitKey: "askAI", rateLimitFailMode: "closed" }, async (request) => {

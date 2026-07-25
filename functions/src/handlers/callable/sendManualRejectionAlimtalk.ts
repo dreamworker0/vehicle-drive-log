@@ -12,7 +12,7 @@ import { getKSTDateString } from "../../utils/kstDate";
 import { ALIMTALK_PROXY_TOKEN } from "../../core/params";
 
 export const sendManualRejectionAlimtalk = onCall(
-    { region: "asia-northeast3", enforceAppCheck: false, secrets: [ALIMTALK_PROXY_TOKEN] },
+    { region: "asia-northeast3", enforceAppCheck: true, secrets: [ALIMTALK_PROXY_TOKEN] },
     async (request) => {
         requireSuperAdmin(request);
 

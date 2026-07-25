@@ -67,7 +67,7 @@ export const ocrDocument = onCall(
         region: "asia-northeast3",
         timeoutSeconds: 120,
         memory: "512MiB",
-        enforceAppCheck: false,
+        enforceAppCheck: true,
     },
     wrapCallableHandler("ocrDocument", { rateLimitKey: "ocrDocument", rateLimitFailMode: "closed" }, async (request) => {
         // 일일 누적 한도(사용자/조직) — 분 단위 제한과 별개의 비용 증폭 방어 (ocr-cost-security §1.1)
