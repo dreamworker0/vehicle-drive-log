@@ -1,8 +1,11 @@
 import { useNavigate } from 'react-router-dom';
 import SEOHead from '../common/SEOHead';
+import useForceLightMode from '../../hooks/useForceLightMode';
 
 export default function TermsPage() {
     const navigate = useNavigate();
+    // 다른 공개 페이지와 동일하게 강제 라이트 (배경에 dark 변형이 없어 다크가 남으면 대비가 깨진다)
+    useForceLightMode();
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-surface-50 to-primary-50 py-8 px-4">
