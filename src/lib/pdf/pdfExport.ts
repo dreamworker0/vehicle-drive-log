@@ -99,8 +99,11 @@ function buildLogRow(log: PdfLogEntry, idx: number, pageIdx: number, includeHipa
     // 하이패스 정보를 비고에 합침
     let noteText = log.notes || '';
     if (includeHipass && log.hipassCardNumber) {
-        const used = log.hipassBalanceAfter ?? 0;
-        const remaining = (log.hipassBalanceBefore ?? 0) - used;
+        // hipassBalanceAfter는 '사용 후 잔액'(직원이 입력), hipassBalanceBefore는 '사용 전 잔액'(카드 잔액).
+        // 사용액은 before - after다 — submitDriveLog(usedAmount)·VehicleStatusSection 표시와 같은 규칙.
+        // 과거에는 after를 '사용액', before-after를 '남음'으로 인쇄해 두 값이 뒤바뀌어 나갔다.
+        const remaining = log.hipassBalanceAfter ?? 0;
+        const used = Math.max(0, (log.hipassBalanceBefore ?? 0) - remaining);
         const hipassInfo = `[하이패스] ${used.toLocaleString()}원 사용, ${remaining.toLocaleString()}원 남음`;
         noteText = noteText ? `${noteText} / ${hipassInfo}` : hipassInfo;
     }
