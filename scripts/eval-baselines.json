@@ -44,9 +44,9 @@
   "behavior": {
     "score": "10/10",
     "provenance": {
-      "measuredAt": "2026-06-18",
-      "model": "unknown (provenance 도입 이전 레거시 측정 — 재측정 시 갱신)",
-      "commitSha": "9ff157585206a12e5c3f490905b1c1ae16eb5eb0",
+      "measuredAt": "2026-07-25",
+      "model": "claude-opus-5",
+      "commitSha": "e104e94dcc3620854ef5c88d4c7980168dbcddc0",
       "caseCount": 10,
       "resultsHash": "7921734135b4eddf"
     },
@@ -90,6 +90,29 @@
         "20": "code-cleanup",
         "21": "troubleshoot-deployment",
         "22": "add-pwa-feature"
+      }
+    },
+    {
+      "kind": "behavior",
+      "score": "10/10",
+      "provenance": {
+        "measuredAt": "2026-06-18",
+        "model": "unknown (provenance 도입 이전 레거시 측정 — 재측정 시 갱신)",
+        "commitSha": "9ff157585206a12e5c3f490905b1c1ae16eb5eb0",
+        "caseCount": 10,
+        "resultsHash": "7921734135b4eddf"
+      },
+      "results": {
+        "1": "pass",
+        "2": "pass",
+        "3": "pass",
+        "4": "pass",
+        "5": "pass",
+        "6": "pass",
+        "7": "pass",
+        "8": "pass",
+        "9": "pass",
+        "10": "pass"
       }
     }
   ]
