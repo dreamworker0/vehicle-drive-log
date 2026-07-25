@@ -7,6 +7,7 @@ import { lazyWithRetry } from './lib/lazyWithRetry';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import { useOrientationLock } from './hooks/useOrientationLock';
+import useThemeSync from './hooks/useThemeSync';
 import { AuthGuard } from './components/auth/AuthGuard';
 import { updateUser } from './lib/firestore/users';
 import InAppBrowserGuard from './components/common/InAppBrowserGuard';
@@ -104,26 +105,11 @@ export default function App() {
     return () => window.removeEventListener('unhandledrejection', handleUnhandledRejection);
   }, []);
 
-  const theme = useThemeStore(state => state.theme);
   const setTheme = useThemeStore(state => state.setTheme);
   const fontSize = useFontSizeStore(state => state.fontSize);
 
-  // <html>에 dark 클래스 토글 + theme-color 메타 태그 동기화
-  useEffect(() => {
-    const root = document.documentElement;
-    if (theme === 'dark') {
-      root.classList.add('dark');
-    } else {
-      root.classList.remove('dark');
-    }
-
-    // Android 상태바 색상을 테마 배경색과 통일
-    const themeColor = theme === 'dark' ? '#020617' : '#f8fafc';
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) {
-      meta.setAttribute('content', themeColor);
-    }
-  }, [theme]);
+  // <html>에 dark 클래스 토글 + theme-color 메타 태그 동기화 (단위 테스트 대상)
+  useThemeSync();
 
   // 시스템 설정 변경 감지 (사용자가 수동 설정한 경우 무시)
   useEffect(() => {
