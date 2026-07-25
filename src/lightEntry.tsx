@@ -17,6 +17,7 @@ import { ToastProviderWrapper } from './hooks/ToastProvider';
 import UpdatePrompt from './components/common/UpdatePrompt';
 import InstallPrompt from './components/common/InstallPrompt';
 import InAppBrowserGuard from './components/common/InAppBrowserGuard';
+import ThemeRoot from './components/common/ThemeRoot';
 
 // 경량 모드에서는 lazy loading 없이 직접 import (번들 자체가 작으므로)
 import LandingPage from './components/auth/LandingPage';
@@ -47,27 +48,30 @@ export function renderLightApp() {
 
     lightRoot.render(
         <StrictMode>
-            <BrowserRouter>
-                <AuthProvider>
-                    {/* 커스텀 토스트는 zustand 스토어만 사용하는 경량 컴포넌트 —
-                        랜딩 문의 폼 등 비인증 경로의 토스트 표시를 위해 경량 엔트리에도 마운트 */}
-                    <ToastProviderWrapper>
-                        <Routes>
-                            <Route path="/" element={<LandingPage />} />
-                            {/* 인앱 브라우저에서는 외부 브라우저 안내로 대체 (랜딩 등 다른 라우트는 그대로 노출) */}
-                            <Route path="/login" element={<InAppBrowserGuard><LoginPage /></InAppBrowserGuard>} />
-                            <Route path="/apply" element={<OrgApplicationPage />} />
-                            <Route path="/terms" element={<TermsPage />} />
-                            <Route path="/privacy" element={<PrivacyPage />} />
-                            <Route path="/release-notes" element={<ReleaseNotesPage />} />
-                            <Route path="/faq" element={<FAQPage />} />
-                            <Route path="*" element={<Navigate to="/" replace />} />
-                        </Routes>
-                        <UpdatePrompt />
-                        <InstallPrompt />
-                    </ToastProviderWrapper>
-                </AuthProvider>
-            </BrowserRouter>
+            {/* 테마 소유자 — dark 클래스·theme-color를 스토어(+강제 라이트)에 맞춘다 */}
+            <ThemeRoot>
+                <BrowserRouter>
+                    <AuthProvider>
+                        {/* 커스텀 토스트는 zustand 스토어만 사용하는 경량 컴포넌트 —
+                            랜딩 문의 폼 등 비인증 경로의 토스트 표시를 위해 경량 엔트리에도 마운트 */}
+                        <ToastProviderWrapper>
+                            <Routes>
+                                <Route path="/" element={<LandingPage />} />
+                                {/* 인앱 브라우저에서는 외부 브라우저 안내로 대체 (랜딩 등 다른 라우트는 그대로 노출) */}
+                                <Route path="/login" element={<InAppBrowserGuard><LoginPage /></InAppBrowserGuard>} />
+                                <Route path="/apply" element={<OrgApplicationPage />} />
+                                <Route path="/terms" element={<TermsPage />} />
+                                <Route path="/privacy" element={<PrivacyPage />} />
+                                <Route path="/release-notes" element={<ReleaseNotesPage />} />
+                                <Route path="/faq" element={<FAQPage />} />
+                                <Route path="*" element={<Navigate to="/" replace />} />
+                            </Routes>
+                            <UpdatePrompt />
+                            <InstallPrompt />
+                        </ToastProviderWrapper>
+                    </AuthProvider>
+                </BrowserRouter>
+            </ThemeRoot>
         </StrictMode>,
     );
 }

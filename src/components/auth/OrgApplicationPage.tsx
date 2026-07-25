@@ -1,10 +1,10 @@
 import { useNavigate } from 'react-router-dom';
-import useForceLightMode from '../../hooks/useForceLightMode';
 import useOrgApplication from '../../hooks/useOrgApplication';
 import SEOHead from '../common/SEOHead';
 
+// 이 페이지는 다른 공개 페이지와 달리 다크모드를 지원한다(최상위 배경부터 폼 요소까지
+// dark: 변형이 온전히 갖춰져 있음) → useForceLightMode를 쓰지 않고 사용자 테마를 따른다.
 export default function OrgApplicationPage() {
-    useForceLightMode();
     const navigate = useNavigate();
 
     const {
