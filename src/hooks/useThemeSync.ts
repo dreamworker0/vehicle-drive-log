@@ -18,7 +18,12 @@ const LIGHT_THEME_COLOR = '#f8fafc';
  * 왜 단일 writer인가: 예전엔 useForceLightMode가 마운트 시 dark를 직접 제거했는데,
  * React effect가 자식→부모 순으로 실행되므로 체류 중 테마가 바뀌면 **부모인 이 훅이
  * 나중에 실행되어 dark를 다시 붙였다**(공개 페이지가 보는 중에 다크로 전환). 쓰는 주체를
- * 하나로 모으면 순서 경쟁 자체가 사라진다.
+ * 하나로 모으면 **최종 적용값**의 경쟁이 사라진다.
+ *
+ * 남는 것(의도적): 두 훅 모두 passive `useEffect`라 DOM 쓰기는 첫 페인트 뒤에 일어난다.
+ * 따라서 라우트 전환 시 직전 클래스가 1프레임 살아남을 수 있다(다크 앱 → 공개 페이지
+ * 진입 시 그 페이지가 한 프레임 다크로 페인트). `useLayoutEffect`로 바꾸면 없어지지만,
+ * 전환 1프레임 대비 동기 레이아웃 비용이 커서 현 규모에서는 채택하지 않았다.
  */
 export default function useThemeSync() {
     const theme = useThemeStore(state => state.theme);

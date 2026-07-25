@@ -17,6 +17,11 @@ import { useThemeStore } from '../store/useThemeStore';
  *
  * 카운터인 이유: 공개 화면이 동시에 여러 개 마운트될 수 있고(가드 래퍼 등), 하나가
  * 언마운트돼도 남은 화면의 요구가 유지되어야 한다.
+ *
+ * ⚠️ **새 공개 라우트를 추가할 때 이 훅을 함께 호출할 것.** 공개 페이지 컴포넌트는
+ * appEntry(App.tsx)에서도 재사용되고 거기서는 useThemeSync가 사용자 선호(dark)를
+ * 적용하므로, 등록하지 않으면 다크로 렌더된다(공개 페이지 배경엔 dark 변형이 없어
+ * 대비가 깨진다). `scripts/__tests__/lightEntryForceLightMode.test.ts`가 정적으로 강제한다.
  */
 export default function useForceLightMode() {
     useEffect(() => {

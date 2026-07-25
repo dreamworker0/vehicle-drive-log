@@ -3,14 +3,18 @@
  * 공개 페이지 목록은 lightEntry.tsx의 Route에서 추출한다(그 경로가 곧 공개 페이지 집합).
  *
  * 왜 필요한가: 이 컴포넌트들은 **appEntry(로그인 경로)에서도 재사용**된다
- * (App.tsx의 /terms·/privacy·/release-notes·/faq·/apply). 거기서는 useThemeSync가
- * 마운트되어 사용자 선호가 dark면 `<html>`에 dark를 적용하므로, 훅으로 강제 라이트를
- * 등록하지 않은 공개 페이지는 **다크로 렌더된다**. 공개 페이지 4곳(FAQ·약관·개인정보·
- * 릴리즈노트)은 최상위 배경에 dark 변형이 없어(bg-gradient from-surface-50) 밝은 배경 +
- * 다크용 텍스트로 대비가 깨진다.
+ * (App.tsx의 /terms·/privacy·/release-notes·/faq·/apply, 그리고 `AuthGuard requireGuest`로
+ * 렌더되는 /·/login). 거기서는 useThemeSync가 마운트되어 사용자 선호가 dark면 `<html>`에
+ * dark를 적용하므로, 훅으로 강제 라이트를 등록하지 않은 공개 페이지는 **다크로 렌더된다**.
+ * 공개 페이지 4곳(FAQ·약관·개인정보·릴리즈노트)은 최상위 배경에 dark 변형이 없어
+ * (bg-gradient from-surface-50) 밝은 배경 + 다크용 텍스트로 대비가 깨진다.
  *
  * (lightEntry 자체에는 useThemeSync가 없어 dark를 쓰는 주체가 없다 — 아래 테스트가
  * 그 전제를 고정한다. 즉 이 검사의 실효는 appEntry 쪽에서 나온다.)
+ *
+ * ⚠️ 알려진 한계: 공개 페이지 목록을 **lightEntry.tsx에서만** 열거하므로, App.tsx에만
+ * 공개 라우트를 추가하고 lightEntry에 빠뜨리면 이 검사를 통과한다. 두 엔트리에 같은
+ * 공개 라우트를 등록하는 현재 관행이 전제다(한쪽만 추가하는 것은 그 자체로 결함).
  *
  * 렌더링 대신 소스를 검사하는 이유: 라우트 추가는 소스 편집이므로 정적 검사로 충분하고,
  * 공개 페이지 전체를 렌더하는 비용(라우터·SEOHead·Firebase)을 피할 수 있다.

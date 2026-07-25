@@ -4,11 +4,12 @@ import useThemeSync from '../../hooks/useThemeSync';
 import { useThemeStore } from '../../store/useThemeStore';
 
 /**
- * 이 훅은 기존에 App.tsx 인라인 useEffect였고, E2E(`e2e/theme-toggle.spec.ts`)가
- * 검증을 시도했으나 실제로는 아무것도 검증하지 못했다 —
- * 랜딩 페이지(`/`)는 useForceLightMode로 dark를 의도적으로 제거하는데
- * 그 위에서 dark 클래스를 수동으로 붙이고 "있어야 한다"고 단언해 레이스로 실패했다.
- * 순수 DOM 동기화 로직이므로 단위 테스트로 결정적으로 검증한다.
+ * 이 훅은 기존에 App.tsx 인라인 useEffect였고, 삭제된 E2E(`e2e/theme-toggle.spec.ts`)가
+ * 검증을 시도했으나 실제로는 아무것도 검증하지 못했다(자기충족 단언 + 앱이 마운트되지
+ * 않는 경로에서 실행). 순수 DOM 동기화 로직이므로 단위 테스트로 결정적으로 검증한다.
+ *
+ * 여기서는 forceLightCount를 직접 주입해 이 훅의 판정 로직만 본다. 실제 push/pop과
+ * 부모·자식 effect 순서까지 포함한 협동은 `themeForceLightIntegration.test.tsx`가 검증한다.
  */
 describe('useThemeSync', () => {
     const root = document.documentElement;
@@ -135,12 +136,12 @@ describe('useThemeSync', () => {
             expect(meta.getAttribute('content')).toBe('#f8fafc');
         });
 
-        it('요구가 여러 개면 하나가 빠져도 라이트를 유지한다', () => {
+        // 카운터 누적 자체의 계약은 useForceLightMode.test와 통합 테스트가 커버한다.
+        // 여기서는 "0이 아니면 라이트"라는 판정만 경계값으로 확인한다.
+        it('요구가 2건이어도 라이트로 적용한다 (0 여부만 본다)', () => {
             useThemeStore.setState({ theme: 'dark', forceLightCount: 2 });
-            renderHook(() => useThemeSync());
-            expect(root.classList.contains('dark')).toBe(false);
 
-            act(() => { useThemeStore.setState({ forceLightCount: 1 }); });
+            renderHook(() => useThemeSync());
 
             expect(root.classList.contains('dark')).toBe(false);
         });
