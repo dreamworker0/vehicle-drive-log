@@ -14,7 +14,7 @@ import { GMAIL_APP_PASSWORD } from "../../core/params";
 const SERVICE_URL = "https://vehicle-drive-log.web.app";
 
 export const sendRejectionEmail = onCall(
-    { region: "asia-northeast3", enforceAppCheck: false, secrets: [GMAIL_APP_PASSWORD] },
+    { region: "asia-northeast3", enforceAppCheck: true, secrets: [GMAIL_APP_PASSWORD] },
     async (request) => {
         requireSuperAdmin(request);
 

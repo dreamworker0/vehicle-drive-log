@@ -91,7 +91,14 @@ export default function useDriveLogOcr({ isElectric, setForm, user, userData, ve
             }
         } catch (err) {
             console.error('계기판 OCR 실패:', err);
-            setOcrError('계기판 인식에 실패했습니다. 사진이 흐릿하지 않은지 확인 후 직접 입력해주세요.');
+            // 로그인 상태에서의 functions/unauthenticated는 App Check 토큰 미첨부가 사실상 유일한 원인이다.
+            // (reCAPTCHA 차단·throttle 시 SDK가 헤더 없이 조용히 호출 → 서버가 enforceAppCheck로 거절)
+            // 사진 문제로 안내하면 사용자가 재촬영만 반복하므로 원인을 구분해 알린다.
+            if ((err as { code?: string })?.code === 'functions/unauthenticated') {
+                setOcrError('보안 인증에 실패했습니다. 잠시 후 다시 시도하거나 직접 입력해주세요.');
+            } else {
+                setOcrError('계기판 인식에 실패했습니다. 사진이 흐릿하지 않은지 확인 후 직접 입력해주세요.');
+            }
             setTimeout(() => endKmInputRef.current?.focus(), 300);
         } finally {
             setOcrLoading(false);
