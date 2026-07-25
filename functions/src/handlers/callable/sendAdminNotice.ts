@@ -8,8 +8,10 @@ import { checkRateLimitByUid } from "../../utils/rateLimit";
 
 const db = getFirestore();
 
+// 4차 배치(2026-07-25): 기관 전체 FCM 팬아웃이라 남용이 곧 과금·스팸이다.
+// 호출부는 인증된 관리자 화면(AdminNotice.tsx)뿐이라 토큰을 항상 기대할 수 있다.
 export const sendAdminNotice = onCall(
-    { region: "asia-northeast3", enforceAppCheck: false },
+    { region: "asia-northeast3", enforceAppCheck: true },
     async (request) => {
         if (!request.auth) {
             throw new HttpsError("unauthenticated", "로그인이 필요합니다.");
