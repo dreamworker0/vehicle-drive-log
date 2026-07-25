@@ -1,13 +1,20 @@
 /**
- * lightEntry(비로그인 렌더 경로)의 모든 라우트가 useForceLightMode를 호출하는지
- * 정적으로 강제한다.
+ * 공개 페이지 컴포넌트 전체가 useForceLightMode를 호출하는지 정적으로 강제한다.
+ * 공개 페이지 목록은 lightEntry.tsx의 Route에서 추출한다(그 경로가 곧 공개 페이지 집합).
  *
- * 왜 필요한가: lightEntry에는 useThemeSync가 마운트되지 않아 `<html>`의 dark 클래스를
- * 스토어 값으로 되돌릴 주체가 없다. 그 경로에서 dark를 켤 수 있는 유일한 코드는
- * useForceLightMode의 cleanup(언마운트 시 스토어가 dark면 재적용)이므로, 훅을 쓰지 않는
- * 공개 라우트가 하나라도 생기면 그 페이지에 dark가 영구 잔류할 수 있다. 공개 페이지
- * 배경에는 dark 변형이 없어(bg-gradient from-surface-50) 밝은 배경 + 다크용 텍스트로
- * 대비가 깨진다.
+ * 왜 필요한가: 이 컴포넌트들은 **appEntry(로그인 경로)에서도 재사용**된다
+ * (App.tsx의 /terms·/privacy·/release-notes·/faq·/apply, 그리고 `AuthGuard requireGuest`로
+ * 렌더되는 /·/login). 거기서는 useThemeSync가 마운트되어 사용자 선호가 dark면 `<html>`에
+ * dark를 적용하므로, 훅으로 강제 라이트를 등록하지 않은 공개 페이지는 **다크로 렌더된다**.
+ * 공개 페이지 4곳(FAQ·약관·개인정보·릴리즈노트)은 최상위 배경에 dark 변형이 없어
+ * (bg-gradient from-surface-50) 밝은 배경 + 다크용 텍스트로 대비가 깨진다.
+ *
+ * (lightEntry 자체에는 useThemeSync가 없어 dark를 쓰는 주체가 없다 — 아래 테스트가
+ * 그 전제를 고정한다. 즉 이 검사의 실효는 appEntry 쪽에서 나온다.)
+ *
+ * ⚠️ 알려진 한계: 공개 페이지 목록을 **lightEntry.tsx에서만** 열거하므로, App.tsx에만
+ * 공개 라우트를 추가하고 lightEntry에 빠뜨리면 이 검사를 통과한다. 두 엔트리에 같은
+ * 공개 라우트를 등록하는 현재 관행이 전제다(한쪽만 추가하는 것은 그 자체로 결함).
  *
  * 렌더링 대신 소스를 검사하는 이유: 라우트 추가는 소스 편집이므로 정적 검사로 충분하고,
  * 공개 페이지 전체를 렌더하는 비용(라우터·SEOHead·Firebase)을 피할 수 있다.
@@ -45,7 +52,7 @@ function resolveComponentPath(entrySource: string, name: string): string | null 
     return null;
 }
 
-describe('lightEntry 강제 라이트모드 불변식', () => {
+describe('공개 페이지 강제 라이트모드 불변식', () => {
     const entryPath = resolve(SRC, 'lightEntry.tsx');
     const entry = readFileSync(entryPath, 'utf-8');
 
@@ -56,9 +63,9 @@ describe('lightEntry 강제 라이트모드 불변식', () => {
      */
     const EXEMPT = new Set(['Navigate', 'InAppBrowserGuard']);
 
-    it('lightEntry가 useThemeSync를 마운트하지 않음을 전제로 한다', () => {
-        // 이 전제가 깨지면(=lightEntry가 테마 소유자를 갖게 되면) 이 테스트의 근거가 바뀐다.
-        // 그때는 마운트 순서(자식 effect 우선)로 강제 라이트가 깨지지 않는지 재검토할 것.
+    it('lightEntry에는 dark 클래스를 쓰는 주체(useThemeSync)가 없다', () => {
+        // 이 전제가 깨지면(=lightEntry도 테마를 DOM에 반영하게 되면) 비로그인 경로에서도
+        // 강제 라이트 등록이 실효를 갖게 된다. 그때 이 파일의 근거 설명을 갱신할 것.
         expect(entry).not.toContain('useThemeSync');
     });
 
@@ -83,9 +90,10 @@ describe('lightEntry 강제 라이트모드 불변식', () => {
 
         expect(
             missing,
-            `lightEntry 라우트인데 useForceLightMode()를 호출하지 않습니다: ${missing.join(', ')}\n`
-            + '→ 이 경로에는 useThemeSync가 없어 dark 클래스가 영구 잔류할 수 있습니다. '
-            + '해당 컴포넌트에서 useForceLightMode()를 호출하세요.',
+            `공개 페이지인데 useForceLightMode()를 호출하지 않습니다: ${missing.join(', ')}\n`
+            + '→ 이 컴포넌트들은 appEntry(App.tsx)에서도 재사용되며, 거기서는 useThemeSync가 '
+            + '사용자 선호(dark)를 DOM에 적용합니다. 강제 라이트를 등록하지 않으면 다크로 '
+            + '렌더되어 대비가 깨집니다. 해당 컴포넌트에서 useForceLightMode()를 호출하세요.',
         ).toEqual([]);
     });
 
