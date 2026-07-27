@@ -34,7 +34,7 @@
         "@types/nodemailer": "^7.0.12",
         "firebase-functions-test": "^3.1.0",
         "jest": "^29.7.0",
-        "ts-jest": "^29.2.0",
+        "ts-jest": "^29.4.12",
         "typescript": "^5.7.0"
     },
     "jest": {
