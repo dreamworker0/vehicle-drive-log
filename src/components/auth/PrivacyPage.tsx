@@ -7,11 +7,21 @@ import useForceLightMode from '../../hooks/useForceLightMode';
  *
  * 실제 코드에서 개인정보가 나가는 경로와 1:1로 대응한다.
  * 외부 연동을 추가·제거하면 이 배열도 반드시 함께 갱신해야 한다.
- * - Firebase/Gemini/Gmail/Calendar: functions/src/core, functions/src/services
+ * - Firebase/Analytics: src/lib/firebase.ts, functions/src/core/firebase.ts
+ * - Gemini: functions/src/handlers/callable/{ocrDashboard,askAI}.ts,
+ *           functions/src/handlers/triggers/{autoVerifyDocument,generateFeedbackDraft}.ts,
+ *           functions/src/services/assistant/
+ * - Gmail: functions/src/core/mailer.ts 사용처
+ * - EmailJS: functions/src/services/driveLog/verifyHelpers.ts (승인 메일 트리거 경로)
+ * - Calendar: functions/src/services/calendar/calendarSync.ts
  * - 알리고·Cafe24: functions/src/services/alimtalk/sendAlimtalk.ts
- * - Discord: functions/src/core/discord.ts
+ * - Discord: functions/src/core/discord.ts 의 sendDiscordAlert 호출부 전부
  * - Slack: functions/src/services/slack
  * - Sentry: src/lib/sentry.ts, functions/src/core/sentry.ts
+ *
+ * 의도적 제외(개인 식별정보가 전달되지 않아 수탁자로 보지 않음):
+ * Tmap 경로 API(목적지 문자열·좌표만, 프록시 경유로 이용자 IP 미전달),
+ * 공공데이터포털 공휴일 API(개인정보 없음).
  */
 const PROCESSORS: {
     /** 수탁자(법인명) */
@@ -30,23 +40,30 @@ const PROCESSORS: {
     {
         name: 'Google LLC (Firebase)',
         country: '미국',
-        task: '이용자 인증, 데이터베이스·파일 저장, 웹 호스팅, 푸시 알림 발송',
-        items: '이메일 주소, 이름, 전화번호, 운행일지·차량·예약 데이터, 증빙서류 사본',
+        task: '이용자 인증, 데이터베이스·파일 저장, 웹 호스팅, 푸시 알림 발송, 서비스 이용 통계 분석',
+        items: '이메일 주소, 이름, 전화번호, 운행일지·차량·예약 데이터, 증빙서류 사본, 접속 기기·이용 기록',
         contact: 'https://support.google.com/policies/troubleshooter/7575787',
     },
     {
         name: 'Google LLC (Gemini API)',
         country: '미국',
-        task: '계기판 사진의 주행거리·배터리 잔량 판독, 비영리 증빙서류 유형 자동 판별',
-        items: '계기판 사진, 비영리 증빙서류 이미지',
+        task: '계기판 사진의 주행거리·배터리 잔량 판독, 비영리 증빙서류 유형 자동 판별, 문의 답변 초안 생성, 챗봇 질문 응답',
+        items: '계기판 사진, 비영리 증빙서류 이미지, 문의·질문 내용 및 첨부 이미지, 예약자 이름·예약 일시·용도·목적지·차량명',
         contact: 'https://support.google.com/policies/troubleshooter/7575787',
     },
     {
         name: 'Google LLC (Gmail)',
         country: '미국',
-        task: '기관 신청 승인·반려 및 문의 답변 안내 메일 발송',
-        items: '이메일 주소, 이름',
+        task: '기관 신청 승인·반려 안내, 문의 답변, 운영자 알림 메일 발송',
+        items: '이메일 주소, 이름, 전화번호, 기관명, 문의·답변 내용, 반려 사유',
         contact: 'https://support.google.com/policies/troubleshooter/7575787',
+    },
+    {
+        name: 'EmailJS Pte. Ltd.',
+        country: '싱가포르 (서버 소재: 미국)',
+        task: '기관 신청 자동 승인 안내 메일 발송',
+        items: '이메일 주소, 이름, 기관명, 초대 코드',
+        contact: 'https://www.emailjs.com/legal/privacy-policy/',
     },
     {
         name: 'Google LLC (Google Calendar)',
@@ -60,28 +77,28 @@ const PROCESSORS: {
         name: '(주)알리고',
         country: '대한민국',
         task: '기관 신청 승인·반려 및 등록 안내 카카오 알림톡 발송',
-        items: '휴대전화번호, 이름, 기관명',
+        items: '휴대전화번호, 이름, 기관명, 초대 코드, 반려 사유',
         contact: 'https://smartsms.aligo.in',
     },
     {
         name: '카페24 주식회사 (Cafe24)',
         country: '대한민국',
         task: '알림톡 발송 요청의 중계(프록시) 서버 운영',
-        items: '휴대전화번호, 이름, 기관명',
+        items: '휴대전화번호, 이름, 기관명, 초대 코드, 반려 사유',
         contact: 'https://www.cafe24.com',
     },
     {
         name: 'Discord Inc.',
         country: '미국',
-        task: '신규 기관 신청·시스템 오류의 운영자 실시간 알림',
-        items: '신청자 이름, 연락처, 기관 이메일',
+        task: '신규 기관 신청, 관리자 권한 변경, 이용자 의견 접수, 시스템 오류의 운영자 실시간 알림',
+        items: '이름, 이메일 주소, 전화번호, 기관명, 문의·의견 내용',
         contact: 'privacy@discord.com',
     },
     {
         name: 'Slack Technologies, LLC',
         country: '미국',
         task: '차량 예약 알림 발송 및 챗봇 문의 응답',
-        items: '예약자 이름, 예약 일시·용도·목적지, Slack 계정 식별자',
+        items: '예약자 이름, 예약 일시·용도·목적지, 이메일 주소(계정 매칭용), Slack 계정 식별자',
         contact: 'privacy@slack.com',
         optional: true,
     },
@@ -89,7 +106,7 @@ const PROCESSORS: {
         name: 'Functional Software, Inc. (Sentry)',
         country: '미국',
         task: '서비스 오류 수집 및 안정성 모니터링',
-        items: '오류 발생 시점의 접속 기록, 사용자 식별자, 브라우저 정보',
+        items: '이메일 주소, 사용자 식별자, 소속 기관 식별자, 오류 발생 시점의 접속 기록·브라우저 정보',
         contact: 'compliance@sentry.io',
     },
 ];
@@ -194,8 +211,17 @@ export default function PrivacyPage() {
                                 </ul>
                             </div>
 
+                            <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 dark:bg-amber-900/20 dark:border-amber-800">
+                                <p className="font-medium text-amber-800 dark:text-amber-300 mb-2">💬 문의 답변 및 챗봇 응답</p>
+                                <ul className="list-disc list-inside space-y-1 ml-2 text-amber-700 dark:text-amber-400 text-xs">
+                                    <li>서비스 내 문의·의견의 답변 초안 작성에 AI(Google Gemini API)가 사용되며, 문의 내용과 첨부 이미지가 전달됩니다.</li>
+                                    <li>챗봇에 예약 관련 질문을 하는 경우, 소속 기관의 예약 목록(예약자 이름·일시·용도·목적지)이 답변 근거로 함께 전달됩니다.</li>
+                                    <li>전달 범위는 <strong>질문자가 속한 기관의 데이터로 한정</strong>되며, 다른 기관의 데이터는 포함되지 않습니다.</li>
+                                </ul>
+                            </div>
+
                             <p className="text-xs">
-                                Google Gemini API는 미국에 소재한 Google LLC가 운영하므로, 위 이미지는 분석 과정에서 국외로 이전됩니다.
+                                Google Gemini API는 미국에 소재한 Google LLC가 운영하므로, 위 정보는 처리 과정에서 국외로 이전됩니다.
                                 자세한 내용은 <strong>제7조(위탁)</strong> 및 <strong>제8조(국외 이전)</strong>를 참고해 주십시오.
                             </p>
                         </div>
@@ -285,8 +311,8 @@ export default function PrivacyPage() {
 
                             <ul className="list-disc list-inside space-y-1 ml-2 text-xs">
                                 <li>
-                                    카카오 알림톡은 카페24 주식회사가 제공하는 호스팅 환경의 중계 서버를 거쳐 (주)알리고로 전달됩니다.
-                                    중계 서버는 발송 요청을 전달할 뿐 별도로 개인정보를 저장하지 않습니다.
+                                    카카오 알림톡은 카페24 주식회사가 제공하는 호스팅 환경의 중계 서버를 거쳐 (주)알리고로 전달되며,
+                                    최종 발송은 카카오톡을 통해 이루어집니다. 중계 서버는 발송 요청을 전달할 뿐 별도로 개인정보를 저장하지 않습니다.
                                 </li>
                                 <li>
                                     &lsquo;기관 선택 연동 시&rsquo; 항목은 기관관리자가 해당 연동을 직접 설정한 경우에만 발생하며,
@@ -337,7 +363,7 @@ export default function PrivacyPage() {
                                 <ul className="list-disc list-inside space-y-1 ml-2 text-xs">
                                     <li>해당 기능을 이용하는 시점에 정보통신망을 통해 암호화(HTTPS/TLS) 전송됩니다.</li>
                                     <li>
-                                        Firebase에 저장되는 데이터는 Google Cloud의 <strong>서울(asia-northeast3) 리전</strong>에 보관되나,
+                                        운행일지·예약 등 데이터베이스(Firestore)는 Google Cloud의 <strong>서울(asia-northeast3) 리전</strong>에 보관되나,
                                         운영 주체가 미국 법인이므로 국외 이전에 해당합니다.
                                     </li>
                                 </ul>
@@ -356,11 +382,13 @@ export default function PrivacyPage() {
                                 <ul className="list-disc list-inside space-y-1 ml-2 text-blue-700 dark:text-blue-400 text-xs">
                                     <li>제12조의 개인정보 보호책임자 또는 서비스 내 피드백 기능으로 국외 이전 거부를 요청할 수 있습니다.</li>
                                     <li>
-                                        다만 인증·데이터 저장(Google Firebase)은 서비스 제공에 필수적이어서,
-                                        거부하시는 경우 서비스 이용이 불가하며 계정 삭제로 처리됩니다.
+                                        <strong>이용하지 않으면 이전되지 않는 항목</strong> — Google Calendar·Slack 연동(기관관리자가 설정하지 않으면 발생하지 않음),
+                                        AI 판독·챗봇 기능(해당 기능을 사용하지 않으면 발생하지 않음).
                                     </li>
                                     <li>
-                                        Google Calendar·Slack 연동과 AI 판독 기능은 이용하지 않으시면 해당 정보가 이전되지 않습니다.
+                                        <strong>개별 거부가 불가한 항목</strong> — 인증·데이터 저장(Firebase), 운영자 알림(Discord),
+                                        오류 모니터링(Sentry), 안내 메일 발송(Gmail·EmailJS)은 서비스 제공과 장애 대응에 필수적입니다.
+                                        거부하시는 경우 서비스 이용이 불가하며 계정 삭제로 처리됩니다.
                                     </li>
                                 </ul>
                             </div>
