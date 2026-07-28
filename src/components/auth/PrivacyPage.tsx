@@ -341,6 +341,12 @@ export default function PrivacyPage() {
                                             <span className="text-[11px] font-normal px-1.5 py-0.5 rounded-md bg-surface-200 text-surface-600 dark:bg-surface-700 dark:text-surface-300">
                                                 {p.country}
                                             </span>
+                                            {/* 제7조와 동일하게 선택 연동 수탁자를 구분 — 배지가 없으면 상시 국외 이전으로 오인된다 */}
+                                            {p.optional && (
+                                                <span className="text-[11px] font-normal px-1.5 py-0.5 rounded-md bg-surface-200 text-surface-600 dark:bg-surface-700 dark:text-surface-300">
+                                                    기관 선택 연동 시
+                                                </span>
+                                            )}
                                         </p>
                                         <p className="text-xs">
                                             <span className="text-surface-400 dark:text-surface-500">이전 항목 · </span>
