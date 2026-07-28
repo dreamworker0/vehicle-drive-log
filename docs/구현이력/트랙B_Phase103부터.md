@@ -294,3 +294,27 @@
 | **커밋** | `ef88785`(squash) — 브랜치 `test/pdf-tmap-coverage-appcheck-2026-07-25` → PR #79. 내부 4커밋(`fix(pdf)` / `test` / `feat(security)` / `chore(docs)`)으로 성격 분리 |
 | **관찰(진행 중)** | 배포 완료(Deploy `30150994028`, 두 함수 Successful update 확인). 배포 후 **2영업일**: App Check invalid/expired <1%, 두 함수의 `unauthenticated` 오류율 7일 평균 대비 +20% 미만. `npm run health` 직후 에러 0이나 **두 함수가 아직 호출되지 않았을 수 있어** 관리자 공지 발송 1건·증빙서류 열람 1건 수동 확인 필요. 이상 시 해당 함수만 `false` 복원 단독 재배포 |
 | **남은 것** | 하이패스 표기 수정은 **인쇄물 문구가 바뀌는 변경** — 기존 출력·보관본과 같은 데이터라도 표기가 달라진다(이전 것이 틀린 값). 별도 공지는 하지 않되 문의 시 이 Phase를 근거로 안내 |
+
+---
+
+### Phase 121: 처리방침 위탁·국외이전·보호책임자 조항 신설 · Greptile 코드리뷰 도입 📋🤖 (CI 배포 완료)
+
+> 2026-07-28, 두 갈래다. ① 법정 필수 기재사항이 빠져 있던 개인정보 처리방침을 코드상 실제 연동 기준으로 재작성. ② Gemini Code Assist 종료(2026-07-22)로 비어 있던 머지 전 자동 리뷰 자리를 Greptile로 메움. 이 회차의 핵심은 조항을 늘린 것이 아니라, **문서가 코드보다 좁게 쓰여 있었다는 것을 두 번의 리뷰가 각각 다른 층위에서 찾아냈다**는 점이다 — 사람이 쓴 초안은 실제 데이터 흐름을 과소 기재했고, 봇은 그 수정본의 표기 불일치를 잡았다.
+
+| 항목 | 내용 |
+|------|------|
+| **출발점** | 기존 방침은 Gemini만 언급하고 **처리위탁 수탁자 고지 자체가 없었다**. 제6조가 "제3자 제공 안 함"으로만 되어 있어 외부 이전이 없는 것처럼 읽혔으나, 실제로는 증빙서류가 Gemini로, 신청자 연락처가 Cafe24·알리고·Discord로 나간다. 개인정보 보호책임자 조항도 없었다(처리방침 필수 기재사항) |
+| **제7조(위탁) 신설** | 코드상 실제 연동 9건을 수탁자·위탁업무·처리항목으로 공개(Firebase/Gemini/Gmail/Calendar, 알리고, Cafe24, Discord, Slack, Sentry). 목록은 `PROCESSORS` 배열 **단일 원본**으로 두고 선택 연동 수탁자는 `optional` 플래그로 구분 |
+| **제8조(국외 이전) 신설** | 보호법 제28조의8 제2항 고지 항목 전부 기재(항목·국가·이용목적·문의처·시기/방법·보유기간·거부 방법). `OVERSEAS_PROCESSORS = PROCESSORS.filter(country !== '대한민국')`로 **파생**시켜 두 조항이 구조적으로 어긋날 수 없게 했다 |
+| **제12조·기타** | 개인정보 보호책임자 조항 신설. 제6조에 위탁과 제3자 제공의 구분 문단 추가, 제3조 Gemini를 제7·8조로 연결, 제11조에 외부 연동 토큰 암호화 보관 항목 추가. 기존 제7~9조를 제9~11조로 재번호, 시행일 **2026-08-05** 및 개정 이력 표기 |
+| **머지 전 적대적 리뷰 — 사실관계 오류 6건** | 초안을 독립 에이전트로 검토하니 **문서가 코드보다 좁았다**. ① `EmailJS Pte. Ltd.` 누락 — 기관 자동 승인 메일은 nodemailer가 아니라 EmailJS로 발송된다(`verifyHelpers.ts`). callable 경로만 nodemailer로 이관됐고 트리거 경로는 여전히 EmailJS. 법인 싱가포르·서버 미국(AWS)으로 확인해 국외 항목 포함 ② Gemini 처리 항목 확대 — 이미지 2종 외에 문의 본문·챗봇 질문 원문과 예약자 이름·일시·용도·목적지가 프롬프트로 전달(`generateFeedbackDraft`·`askAI`·`answerDataQuestion`) ③ Discord 확대 — `notifyRoleChange`가 이용자 이메일을, `generateFeedbackDraft`가 이름·이메일·기관명·문의 본문 전체를 웹훅으로 전송 ④ Slack에 이메일 추가(`users.lookupByEmail`로 계정 매칭) ⑤ Sentry에 이메일·기관 식별자 추가 — `setUser({id, email})`·`setTag('organizationId')`로 **명시 전송**되며 `beforeSend`는 PII를 제거하지 않는다 ⑥ 리전 문구를 Firestore로 한정 — `firebase.json`에 Storage 버킷 리전 설정이 없어 "Firebase 전체가 서울"은 근거 없는 서술이었다 |
+| **국외 이전 거부 방법 분리** | 초안이 "이용 안 하면 미발생"으로 뭉쳐 있었으나, Discord·Sentry·Gmail·EmailJS는 **이용자가 회피할 수 없다**. '이용 안 하면 미발생'과 '개별 거부 불가'로 문단을 분리 |
+| **Greptile 도입 — 앱 식별** | 같은 `greptileai` 조직이 GitHub 앱을 3개 운영해 혼동 구간이 있었다: `Greptile` OAuth 앱(프로필·이메일 read, 로그인 전용) / `greptile` GitHub App(**권한·이벤트 전무한 껍데기**) / **`greptile-apps`**(`pull_requests:write`·`checks:write`·`issues:write` + `pull_request`·`issue_comment` 이벤트 = 실제 리뷰 봇, 봇 계정 `greptile-apps[bot]`). 앞의 둘을 설치해도 리뷰는 돌지 않는다 — 첫 두 번의 `@greptileai` 트리거가 7분 무반응이었던 원인 |
+| **Greptile 설정** | PR Summary·Sequence Diagrams OFF(1인 저장소에서 자기 코드 영어 요약은 무가치, `Update PR Description`은 한국어 PR 본문을 오염) / Issue Table·Confidence Score·**Comments Outside Diff** ON(diff 밖 파일까지 보는 코드베이스 인식이 도입 목적) / 접기 섹션은 `Default Open`(접힌 건 읽지 않는다) / Retrigger on new commits ON / 민감도 Medium / 결제 수단 **미등록** / 사용 데이터 학습 **OFF**(PR 본문에 공개 코드엔 없는 운영 맥락이 담긴다) |
+| **Greptile 검증 — 두 경로** | ① 수동: `@greptileai` 멘션 → **220초** 후 리뷰 게시(COMMENTED + 인라인 2건) ② 자동: 새 커밋 푸시 → `Greptile Review` 체크가 **2m46s pass**로 붙음(추가 지적 없음). 커밋마다 재리뷰 설정이 실제로 동작함을 확인. 최근 머지 PR 10건의 커밋 수가 평균 1.5개(1·4·1·1·2·1·1·1·2·1)로 재리뷰 낭비가 작아 ON 유지가 타당 |
+| **첫 리뷰 결과 — 1건 반영 / 1건 기각** | 둘 다 P2. **반영**: 제8조 국외 이전 목록에 제7조의 `기관 선택 연동 시` 배지가 빠져 Google Calendar·Slack이 상시 국외 이전 대상으로 보였다. `OVERSEAS_PROCESSORS`가 `PROCESSORS` 파생이라 `optional` 필드를 그대로 갖고 있어 제7조와 동일 분기를 추가(6줄). 각주가 설명하고 있었으나 법정 고지 문서에서 개별 항목 표기와 각주가 어긋나는 건 고칠 값이 있다. **기각**: React `key`를 `${p.name}-${p.task}` → `p.name`으로 줄이라는 제안. "이름이 이미 유일"은 현재 데이터 기준 사실이나, 같은 사업자명으로 위탁 업무가 하나 추가되면 키가 충돌한다 — 짧아지는 대신 방어력을 잃는 교환이라 무이득 |
+| **민감도 판단 수정** | 정적 도구(ESLint·Prettier·commitlint·`local/require-organization-filter`)가 P2 영역을 이미 잡으니 Low가 맞다고 판단했으나, 실측에서 **유효한 지적이 P2로 분류**됐다. Low였으면 이 PR의 리뷰가 비었을 것 — Greptile의 P2가 실제 중요도보다 낮게 잡히는 경향이 보여 Medium 유지로 정정 |
+| **비용 정책** | 저장소가 public + MIT라 OSS 프로그램(공개 저장소 + OSI 라이선스 무료) 대상이고 무료 티어(월 50리뷰)도 별도로 존재. OSS 무료를 약속받고도 과금된 사례 보고가 있어 **결제 수단은 등록하지 않았다** — 사고가 나면 조용한 결제가 아니라 결제 실패로 드러나야 한다. 트라이얼 14일 만료는 2026-08-11경 |
+| **검증** | `tsc --noEmit` 0, pre-commit(ESLint `--max-warnings=0` + `vitest related`) 통과. 처리방침 전용 테스트는 없으며 표시 로직만 바뀌고 `PROCESSORS` 구조는 불변이라 회귀 범위는 이 페이지 렌더링에 한정. CI 7체크(`ci`·CodeQL 2종·`changes`·`preview`·`functions-tests` skip·`Greptile Review`) 1회 통과 |
+| **커밋** | `30acd40`(squash) — 브랜치 `feat/privacy-consignment-notice` → PR #89. 내부 3커밋(`feat` 조항 신설 / `fix` 적대적 리뷰 6건 / `fix` Greptile 지적 1건). 총 293 insertions / 14 deletions, `PrivacyPage.tsx` 단일 파일 |
+| **남은 것** | ① **GitHub App이 계정 저장소 41개(공개 20·비공개 21) 전부에 붙어 있다** — 월 50리뷰는 계정 합산이라 쿼터가 분산되고, 비공개 저장소는 커밋 이력에 시크릿이 있으면 그것까지 인덱싱된다(해제해도 벤더 인덱스는 되돌릴 수 없음). 연결 **전** 시크릿 점검 후 범위 축소 필요 ② OSS 프로그램 신청(트라이얼 만료 전) ③ Dependabot PR 리뷰 제외 — 주 4~5건으로 쿼터 최대 소비자인데 의존성 버전업에 AI 리뷰는 무가치. Greptile이 접근하는 것은 소스 코드뿐이고 이용자 데이터에는 닿지 않으므로 **처리방침 수탁자 추가 대상은 아니다** |
