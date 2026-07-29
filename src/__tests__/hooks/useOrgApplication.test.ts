@@ -5,6 +5,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
 import useOrgApplication, { formatPhoneNumber } from '../../hooks/useOrgApplication';
+import { TERMS_VERSION, PRIVACY_VERSION } from '../../lib/constants';
 
 // 1. Mocking 설정
 let mockUser: { displayName: string | null; email: string | null } | null = null;
@@ -215,15 +216,73 @@ describe('useOrgApplication 통합 테스트', () => {
             result.current.handleChange({ target: { name: 'applicantEmail', value: 'test@example.com' } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.handleChange({ target: { name: 'orgName', value: '우리복지재단' } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.handleImageChange({ target: { files: [validFile] } } as unknown as React.ChangeEvent<HTMLInputElement>);
+            result.current.setAgreeTerms(true);
+            result.current.setAgreePrivacy(true);
         });
-        
+
         await act(async () => {
             await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent<HTMLFormElement>);
         });
-        
+
         expect(mockSubmitOrgApplication).toHaveBeenCalled();
         expect(result.current.success).toBe(true);
         expect(result.current.error).toBe('');
+    });
+
+    // 동의 기록은 위탁 계약(약관 제9조) 성립 근거이므로 페이로드에 반드시 실려야 한다.
+    it('시나리오 9-1: 동의 사실과 문서 버전이 제출 페이로드에 포함된다', async () => {
+        mockSubmitOrgApplication.mockResolvedValueOnce({ data: { success: true } });
+
+        const { result } = renderHook(() => useOrgApplication());
+        const validFile = new File(['image-data'], 'cert.png', { type: 'image/png' });
+
+        act(() => {
+            result.current.handleChange({ target: { name: 'applicantName', value: '홍길동' } } as unknown as React.ChangeEvent<HTMLInputElement>);
+            result.current.handleChange({ target: { name: 'applicantEmail', value: 'test@example.com' } } as unknown as React.ChangeEvent<HTMLInputElement>);
+            result.current.handleChange({ target: { name: 'orgName', value: '우리복지재단' } } as unknown as React.ChangeEvent<HTMLInputElement>);
+            result.current.handleImageChange({ target: { files: [validFile] } } as unknown as React.ChangeEvent<HTMLInputElement>);
+            result.current.setAgreeTerms(true);
+            result.current.setAgreePrivacy(true);
+        });
+
+        await act(async () => {
+            await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent<HTMLFormElement>);
+        });
+
+        expect(mockSubmitOrgApplication).toHaveBeenCalledWith(
+            expect.objectContaining({
+                agreedTerms: true,
+                agreedPrivacy: true,
+                termsVersion: TERMS_VERSION,
+                privacyVersion: PRIVACY_VERSION,
+            })
+        );
+    });
+
+    it.each([
+        ['약관 미동의', false, true],
+        ['처리방침 미동의', true, false],
+        ['둘 다 미동의', false, false],
+    ])('시나리오 9-2: %s → 제출 차단, 콜러블 미호출', async (_label, terms, privacy) => {
+        const { result } = renderHook(() => useOrgApplication());
+        const validFile = new File(['image-data'], 'cert.png', { type: 'image/png' });
+
+        act(() => {
+            result.current.handleChange({ target: { name: 'applicantName', value: '홍길동' } } as unknown as React.ChangeEvent<HTMLInputElement>);
+            result.current.handleChange({ target: { name: 'applicantEmail', value: 'test@example.com' } } as unknown as React.ChangeEvent<HTMLInputElement>);
+            result.current.handleChange({ target: { name: 'orgName', value: '우리복지재단' } } as unknown as React.ChangeEvent<HTMLInputElement>);
+            result.current.handleImageChange({ target: { files: [validFile] } } as unknown as React.ChangeEvent<HTMLInputElement>);
+            result.current.setAgreeTerms(terms);
+            result.current.setAgreePrivacy(privacy);
+        });
+
+        await act(async () => {
+            await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent<HTMLFormElement>);
+        });
+
+        expect(result.current.error).toBe('이용약관과 개인정보 처리방침에 동의해주세요.');
+        expect(mockSubmitOrgApplication).not.toHaveBeenCalled();
+        expect(result.current.success).toBe(false);
     });
 
     it('시나리오 10: resource-exhausted 한국어 에러 순화 검증 - 횟수 초과 안내로 전환되어야 함', async () => {
@@ -238,12 +297,14 @@ describe('useOrgApplication 통합 테스트', () => {
             result.current.handleChange({ target: { name: 'applicantEmail', value: 'test@example.com' } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.handleChange({ target: { name: 'orgName', value: '행복한복지관' } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.handleImageChange({ target: { files: [validFile] } } as unknown as React.ChangeEvent<HTMLInputElement>);
+            result.current.setAgreeTerms(true);
+            result.current.setAgreePrivacy(true);
         });
-        
+
         await act(async () => {
             await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent<HTMLFormElement>);
         });
-        
+
         expect(result.current.error).toBe('요청 횟수를 초과했습니다. 나중에 다시 시도해주세요.');
         expect(result.current.success).toBe(false);
     });
@@ -260,12 +321,14 @@ describe('useOrgApplication 통합 테스트', () => {
             result.current.handleChange({ target: { name: 'applicantEmail', value: 'test@example.com' } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.handleChange({ target: { name: 'orgName', value: '행복한복지관' } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.handleImageChange({ target: { files: [validFile] } } as unknown as React.ChangeEvent<HTMLInputElement>);
+            result.current.setAgreeTerms(true);
+            result.current.setAgreePrivacy(true);
         });
-        
+
         await act(async () => {
             await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent<HTMLFormElement>);
         });
-        
+
         expect(result.current.error).toBe('신청 중 오류가 발생했습니다. 다시 시도해주세요.');
         expect(result.current.success).toBe(false);
     });

@@ -26,7 +26,14 @@ interface SubmitApplicationPayload {
     message: string;
     imageBase64: string; // Base64 인코딩된 이미지 문자열 (data:image/jpeg;base64, 부분 제외)
     imageMimeType: string; // 예: "image/jpeg", "application/pdf"
+    agreedTerms: boolean; // 이용약관 동의 (제9조 개인정보 처리의 위탁 포함)
+    agreedPrivacy: boolean; // 개인정보 처리방침 동의
+    termsVersion: string; // 동의한 약관의 시행일 버전 (src/lib/constants.ts TERMS_VERSION)
+    privacyVersion: string; // 동의한 처리방침의 시행일 버전 (PRIVACY_VERSION)
 }
+
+/** 동의한 문서 버전 문자열의 상한 — 시행일(YYYY-MM-DD) 형식을 전제로 한다. */
+const MAX_VERSION_LENGTH = 20;
 
 /**
  * submitOrgApplication
@@ -58,6 +65,19 @@ export const submitOrgApplication = onCall(
         if (payload.orgName.length > 100 || payload.applicantName.length > 100
             || payload.applicantPhone.length > 30 || (payload.message?.length ?? 0) > 2000) {
             throw new HttpsError("invalid-argument", "입력 값의 길이가 허용 범위를 초과했습니다.");
+        }
+
+        // 1-1. 약관·처리방침 동의 검증
+        // 동의는 위탁 계약(약관 제9조) 성립의 요건이므로 서버에서 확정한다.
+        // 프론트의 버튼 disabled만으로는 콜러블 직접 호출을 막을 수 없어, 여기서 막지 않으면
+        // 동의 기록이 없는 기관 문서가 생성된다.
+        if (payload.agreedTerms !== true || payload.agreedPrivacy !== true) {
+            throw new HttpsError("invalid-argument", "이용약관과 개인정보 처리방침에 동의해야 신청할 수 있습니다.");
+        }
+        if (typeof payload.termsVersion !== "string" || typeof payload.privacyVersion !== "string"
+            || !payload.termsVersion || !payload.privacyVersion
+            || payload.termsVersion.length > MAX_VERSION_LENGTH || payload.privacyVersion.length > MAX_VERSION_LENGTH) {
+            throw new HttpsError("invalid-argument", "동의한 약관 버전 정보가 올바르지 않습니다.");
         }
 
         const email = payload.applicantEmail.trim().toLowerCase();
@@ -126,6 +146,16 @@ export const submitOrgApplication = onCall(
                 status: "pending",
                 aiVerified: false,
                 uniqueNumberImagePath: filePath,
+                // 위탁 계약 성립 근거 — 어느 버전에 언제 동의했는지를 기관 문서와 함께 보관한다.
+                // 동의 일시는 서버 시각으로 기록하며, 동의 시점 IP는 수집하지 않는다
+                // (신청자 이메일·전화번호로 동의 주체가 특정되므로 최소수집 원칙을 따른다).
+                consent: {
+                    terms: true,
+                    privacy: true,
+                    termsVersion: payload.termsVersion,
+                    privacyVersion: payload.privacyVersion,
+                    agreedAt: now,
+                },
                 createdAt: now,
                 updatedAt: now,
             });

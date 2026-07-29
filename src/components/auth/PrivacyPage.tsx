@@ -144,6 +144,32 @@ export default function PrivacyPage() {
                         <p className="text-sm text-surface-400 dark:text-surface-500">시행일: 2026년 8월 5일 (최초 시행: 2026년 2월 1일)</p>
                     </div>
 
+                    {/*
+                      지위 안내 — 조번호를 붙이지 않고 전문으로 둔다. 조를 신설하면 이하 12개 조의
+                      번호가 전부 밀려 외부 링크·재동의 안내와 어긋난다.
+                      본문은 이용약관 제9조(개인정보 처리의 위탁)와 짝을 이루므로 함께 개정해야 한다.
+                    */}
+                    <section className="space-y-3">
+                        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 dark:bg-blue-900/20 dark:border-blue-800">
+                            <p className="font-medium text-blue-800 dark:text-blue-300 mb-2">개인정보처리자와 수탁자의 구분</p>
+                            <div className="text-blue-700 dark:text-blue-400 text-xs space-y-1.5">
+                                <p>
+                                    서비스를 이용하는 <strong>각 기관이 소속 직원 개인정보의 개인정보처리자</strong>이며,
+                                    서비스 제공자는 기관의 위탁을 받아 개인정보를 처리하는 <strong>수탁자</strong>입니다.
+                                    위탁의 내용은 <strong>이용약관 제9조</strong>에 정하고 있습니다.
+                                </p>
+                                <p>
+                                    따라서 소속 직원의 개인정보 열람·정정·삭제 요구는 <strong>소속 기관</strong>이 처리하며,
+                                    서비스 제공자는 이에 필요한 기술적 협조를 제공합니다.
+                                </p>
+                                <p>
+                                    본 처리방침은 서비스 제공자가 수탁자로서 개인정보를 어떻게 처리하는지를 밝히는 문서이며,
+                                    기관이 정보주체에게 고지할 사항을 대체하지 않습니다.
+                                </p>
+                            </div>
+                        </div>
+                    </section>
+
                     {/* 제1조 */}
                     <section className="space-y-3">
                         <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200">제1조 (수집하는 개인정보 항목)</h2>
@@ -163,6 +189,17 @@ export default function PrivacyPage() {
                                 <ul className="list-disc list-inside space-y-1 ml-2">
                                     <li>전화번호 (기관 신청 시)</li>
                                 </ul>
+                            </div>
+
+                            <div className="bg-surface-50 dark:bg-surface-800 rounded-xl p-4 space-y-2">
+                                <p className="font-medium text-surface-700 dark:text-surface-300">동의 기록</p>
+                                <ul className="list-disc list-inside space-y-1 ml-2">
+                                    <li>기관 신청 시 이용약관·개인정보 처리방침에 동의한 사실, 동의한 문서의 시행일 버전, 동의 일시</li>
+                                </ul>
+                                <p className="text-xs text-surface-500 dark:text-surface-400">
+                                    위탁 계약(이용약관 제9조)의 성립을 입증하기 위한 항목으로, 해당 기관 정보와 함께 보관되며
+                                    기관 삭제 시 제9조에 따라 함께 파기됩니다. 동의 시점의 IP 주소는 수집하지 않습니다.
+                                </p>
                             </div>
 
                             <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 dark:bg-blue-900/20 dark:border-blue-800">
@@ -419,8 +456,15 @@ export default function PrivacyPage() {
                         <div className="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
                             <ul className="list-disc list-inside space-y-1 ml-2">
                                 <li>이용자는 자신의 개인정보 열람, 정정, 삭제를 요청할 수 있습니다.</li>
+                                <li>
+                                    개인정보처리자는 소속 기관이므로, 열람·정정·삭제 요구는 <strong>소속 기관의 관리자</strong>에게
+                                    먼저 요청해 주십시오. 서비스 제공자는 기관의 처리에 필요한 기술적 협조를 제공합니다.
+                                </li>
                                 <li>기관관리자는 소속 직원의 정보를 관리할 수 있습니다.</li>
-                                <li>개인정보 관련 문의는 서비스 내 피드백 기능 또는 제12조의 연락처로 접수할 수 있습니다.</li>
+                                <li>
+                                    기관을 통한 처리가 어려운 경우 또는 서비스 제공자의 처리 자체에 관한 문의는
+                                    서비스 내 피드백 기능 또는 제12조의 연락처로 접수할 수 있습니다.
+                                </li>
                             </ul>
                         </div>
                     </section>
@@ -443,8 +487,9 @@ export default function PrivacyPage() {
                         <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200">제12조 (개인정보 보호책임자)</h2>
                         <div className="text-sm text-surface-600 dark:text-surface-400 leading-relaxed space-y-3">
                             <p>
-                                개인정보 처리에 관한 업무를 총괄하고 이용자의 문의·불만·피해 구제를 처리하기 위하여
-                                아래와 같이 개인정보 보호책임자를 지정하고 있습니다.
+                                서비스 제공자는 수탁자로서 개인정보 처리에 관한 업무를 총괄하고 이용자의 문의·불만·피해 구제에
+                                협조하기 위하여 아래와 같이 개인정보 보호책임자를 지정하고 있습니다.
+                                소속 기관의 개인정보 보호책임자는 각 기관이 별도로 지정·공개합니다.
                             </p>
 
                             <div className="bg-surface-50 dark:bg-surface-800 rounded-xl p-4 space-y-1 text-xs">
@@ -463,7 +508,8 @@ export default function PrivacyPage() {
                     <div className="border-t border-surface-100 dark:border-surface-700 pt-4 space-y-2 text-center">
                         <p className="text-xs text-surface-400 dark:text-surface-500">본 개인정보 처리방침은 2026년 8월 5일부터 시행됩니다.</p>
                         <p className="text-xs text-surface-400 dark:text-surface-500">
-                            개정 이력 · 2026년 2월 1일 최초 시행 / 2026년 8월 5일 위탁·국외 이전·보호책임자 조항 신설
+                            개정 이력 · 2026년 2월 1일 최초 시행 / 2026년 8월 5일 위탁·국외 이전·보호책임자 조항 신설,
+                            개인정보처리자와 수탁자의 지위 명시
                         </p>
                     </div>
                 </div>

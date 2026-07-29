@@ -27,3 +27,13 @@ export const getVehicleColor = (id: string) => {
 
 // 앱 공개 URL
 export const APP_URL = 'https://vehicle-drive-log.web.app';
+
+/**
+ * 이용약관·개인정보 처리방침의 시행일 버전 (동의 기록용)
+ *
+ * TermsPage/PrivacyPage 본문을 개정하면 해당 문서의 시행일로 이 값을 함께 갱신한다.
+ * 기관 신청 시 동의한 버전이 organizations 문서에 저장되므로,
+ * 값을 갱신하지 않으면 개정 후 동의가 이전 버전으로 기록된다.
+ */
+export const TERMS_VERSION = '2026-08-05';
+export const PRIVACY_VERSION = '2026-08-05';
