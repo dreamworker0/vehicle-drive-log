@@ -71,11 +71,20 @@ export const restoreUser = onCall(
             }
 
             // 5. Firestore users 문서 재생성
+            //
+            // merge 없는 set이므로 기존 필드는 사라진다. 이용약관 동의 기록(consent)은
+            // 재수집 경로가 없다 — joinOrganization은 미가입자 전용이므로 복원된 직원은
+            // 다시 동의할 방법이 없고, Rules가 클라이언트 쓰기를 막아 손으로도 못 채운다.
+            // 따라서 동의 기록만은 명시적으로 이어받는다.
+            const priorDoc = await db.collection("users").doc(authUser.uid).get();
+            const priorConsent = priorDoc.exists ? priorDoc.data()?.consent : undefined;
+
             await db.collection("users").doc(authUser.uid).set({
                 name: name || authUser.displayName || email.split("@")[0],
                 email: email,
                 organizationId: organizationId,
                 role: safeRole,
+                ...(priorConsent ? { consent: priorConsent } : {}),
                 restoredAt: FieldValue.serverTimestamp(),
                 createdAt: FieldValue.serverTimestamp(),
             });

@@ -54,7 +54,9 @@ service cloud.firestore {
                     && request.resource.data.keys().hasAll(['email'])
                     && request.resource.data.email is string
                     && !request.resource.data.keys().hasAny(['role', 'organizationId', 'consent']);
-      // 동의 기록은 본인·기관관리자·superAdmin 누구도 변경·삭제할 수 없다.
+      // consent 필드는 본인·기관관리자·superAdmin 누구도 값을 바꿀 수 없다.
+      // (문서 자체의 삭제는 아래 allow delete가 superAdmin에게 허용하며,
+      //  Admin SDK 서버 경로는 Rules를 우회하므로 필드 단위 보호로 한정된다.)
       allow update: if !request.resource.data.diff(resource.data).affectedKeys().hasAny(['consent'])
                     && (
                        (isOwner(userId)

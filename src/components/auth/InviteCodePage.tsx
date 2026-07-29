@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useNavigate, Navigate } from 'react-router-dom';
@@ -36,14 +36,22 @@ export default function InviteCodePage() {
      * 동의로 볼 수 없으므로 기록의 의미가 없어진다.
      */
     const [fromLink] = useState(() => code.length === 6);
+    /*
+     * 링크 유입 문구는 마운트 시점 판정만으로 고정하지 않는다. 코드가 틀려 실패한 뒤
+     * 사용자가 직접 수정하는 화면에서 "코드를 불러왔어요"가 남으면 어긋난다.
+     */
+    const showLinkCopy = fromLink && code.length === 6;
     const navigate = useNavigate();
 
-    // 코드 값을 성공적으로 불러왔다면, 더 이상 불필요하므로 정리
-    useEffect(() => {
-        if (code) {
-            localStorage.removeItem('pendingInviteCode');
-        }
-    }, [code]);
+    /*
+     * pendingInviteCode는 가입 성공 전까지 지우지 않는다.
+     *
+     * App이 URL의 ?code=를 localStorage로 옮기고 history.replaceState로 제거하므로,
+     * 여기서 지우면 코드는 React state에만 남는다. 자동 가입 시절에는 마운트 직후
+     * 소비돼 무해했지만, 이제는 사용자가 약관을 읽고 동의할 때까지 대기한다.
+     * 그 사이 약관 링크(_blank)로 외부 브라우저에 나갔다가 PWA가 콜드 재시작되면
+     * URL·localStorage·state가 모두 비어 링크만 받은 직원은 코드를 복구할 수 없다.
+     */
 
     const joinWithCode = useCallback(async (rawCode: string): Promise<boolean> => {
         const finalCode = rawCode.replace(/\s/g, '').toUpperCase();
@@ -72,6 +80,9 @@ export default function InviteCodePage() {
             const joinOrg = httpsCallable(functions, 'joinOrganization');
             await joinOrg({ code: finalCode, agreedTerms: agreeTerms, termsVersion: TERMS_VERSION });
 
+            // 가입이 확정된 뒤에야 보관된 초대 코드를 정리한다.
+            localStorage.removeItem('pendingInviteCode');
+
             // Custom Claims 갱신을 위해 토큰 강제 리프레시
             if (auth.currentUser) await refreshTokenSilently(auth.currentUser);
 
@@ -90,6 +101,10 @@ export default function InviteCodePage() {
                 setError('이미 기관에 소속되어 있습니다. 로그아웃 후 다시 로그인해 주세요.');
             } else if (message.includes('Google 계정')) {
                 setError('Google 계정으로 로그인 후 다시 시도해주세요.');
+            } else if (message.includes('이용약관에 동의') || message.includes('약관 버전')) {
+                // 서버 동의 검증 실패. 매핑이 없으면 원인 불명 메시지만 뜨고, 사용자가
+                // 재시도를 반복해 uid 기준 rate limit(시간당 5회)에 스스로 갇힌다.
+                setError('약관 동의 정보를 확인할 수 없습니다. 페이지를 새로고침한 뒤 다시 시도해주세요.');
             } else {
                 setError('오류가 발생했습니다. 다시 시도해주세요.');
             }
@@ -120,10 +135,10 @@ export default function InviteCodePage() {
                         </svg>
                     </div>
                     <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-1">
-                        {fromLink ? '기관 참여 확인' : '초대 코드 입력'}
+                        {showLinkCopy ? '기관 참여 확인' : '초대 코드 입력'}
                     </h1>
                     <p className="text-sm text-surface-500 dark:text-surface-400">
-                        {fromLink
+                        {showLinkCopy
                             ? '초대 코드를 불러왔어요. 약관에 동의하면 참여가 완료됩니다.'
                             : '기관에서 받은 6자리 코드를 입력하세요'}
                     </p>
@@ -180,9 +195,22 @@ export default function InviteCodePage() {
                                 에 동의합니다. <span className="text-red-500 dark:text-red-400">*</span>
                             </span>
                         </label>
-                        <p className="text-xs text-surface-500 dark:text-surface-400 leading-relaxed">
-                            소속 기관이 개인정보처리자이므로, 개인정보의 수집·이용 안내는 소속 기관에서 받으실 수 있습니다.
-                        </p>
+                        {/*
+                          약관 제9조 ⑦은 기관에 직원 고지 책임을 부과한다. 여기서는 (1) 서비스가
+                          수탁자로서 개인정보를 처리한다는 사실, (2) 위탁 계약의 당사자는 기관이므로
+                          이 동의가 위탁 동의가 아니라는 점, (3) 동의 기록이 남는다는 점을 밝힌다.
+                          (3)은 기관 신청 화면(OrgApplicationPage)과 대칭을 맞춘 것이다.
+                        */}
+                        <div className="text-xs text-surface-500 dark:text-surface-400 leading-relaxed space-y-1.5">
+                            <p>
+                                소속 기관이 개인정보처리자이며, 서비스 제공자는 기관의 위탁을 받아 개인정보를 처리하는
+                                수탁자입니다. 개인정보의 수집·이용에 관한 고지는 소속 기관이 담당합니다.
+                            </p>
+                            <p>
+                                위탁 계약(약관 제9조)의 당사자는 기관이므로, 위 동의는 서비스 계정 개설을 위한
+                                이용약관 동의입니다. 동의 사실과 동의한 문서의 시행일은 기록·보관됩니다.
+                            </p>
+                        </div>
 
                         {error && (
                             <p className="text-sm text-red-500 dark:text-red-400 animate-slide-down">{error}</p>

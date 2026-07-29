@@ -25,7 +25,14 @@ export const getUser = async (uid: string) => {
     }
 };
 
-// 사용자 생성
+/**
+ * 사용자 생성
+ *
+ * 주의: merge 없는 setDoc이므로 기존 문서에 쓰면 필드가 사라진다. 특히 이용약관
+ * 동의 기록(consent)은 Rules가 클라이언트 변경을 차단하므로, 동의 기록이 있는
+ * 문서에 이 함수를 쓰면 permission-denied가 난다. 신규 문서 생성 전용으로만 쓴다.
+ * (현재 호출자 없음 — 사용자 문서는 joinOrganization/submitOrgApplication이 만든다.)
+ */
 export const createUser = async (uid: string, data: Partial<User>) => {
     try {
         await setDoc(doc(db, 'users', uid), {

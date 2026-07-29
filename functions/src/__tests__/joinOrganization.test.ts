@@ -32,11 +32,21 @@ let mockExistingUser: any = { exists: false, data: () => undefined };
 let mockMemberDocs: any[] = [];
 let mockPreRegDocs: any[] = [];
 
-/** where()/limit() 체인을 무시하고 지정된 docs를 돌려주는 쿼리 스텁 */
-const makeQuery = (getDocs: () => any[]): any => ({
-    where: () => makeQuery(getDocs),
-    limit: () => makeQuery(getDocs),
+/**
+ * 읽기 호출 기록 — 어떤 컬렉션을 어떤 조건으로 읽었는지 남긴다.
+ * where()/limit()를 버리는 스텁은 `.where("status","==","approved")`를 삭제해도
+ * 통과시켜(미승인 기관 초대 코드로 가입 가능해지는 회귀) 무의미하므로 조건을 기록한다.
+ */
+type QueryRead = { label: string; wheres: unknown[][] };
+const mockReads: QueryRead[] = [];
+/** 테스트마다 읽기 기록을 비운다 (배열 참조는 mock 팩토리가 잡고 있으므로 재할당하지 않는다) */
+const resetMockReads = () => { mockReads.length = 0; };
+
+const makeQuery = (label: string, getDocs: () => any[], wheres: unknown[][] = []): any => ({
+    where: (...args: unknown[]) => makeQuery(label, getDocs, [...wheres, args]),
+    limit: () => makeQuery(label, getDocs, wheres),
     get: async () => {
+        mockReads.push({ label, wheres });
         const docs = getDocs();
         return { empty: docs.length === 0, docs };
     },
@@ -47,10 +57,10 @@ jest.mock('firebase-admin/firestore', () => ({
         collection: (name: string) => {
             if (name === 'organizations') {
                 return {
-                    ...makeQuery(() => mockOrgDocs),
+                    ...makeQuery('organizations', () => mockOrgDocs),
                     doc: () => ({
                         collection: () => ({
-                            ...makeQuery(() => mockPreRegDocs),
+                            ...makeQuery('preRegistered', () => mockPreRegDocs),
                             doc: () => ({ delete: mockPreRegDelete }),
                         }),
                     }),
@@ -58,9 +68,12 @@ jest.mock('firebase-admin/firestore', () => ({
             }
             // users
             return {
-                ...makeQuery(() => mockMemberDocs),
+                ...makeQuery('users', () => mockMemberDocs),
                 doc: () => ({
-                    get: async () => mockExistingUser,
+                    get: async () => {
+                        mockReads.push({ label: 'users/doc', wheres: [] });
+                        return mockExistingUser;
+                    },
                     set: mockUserSet,
                 }),
             };
@@ -99,6 +112,7 @@ describe('joinOrganization — 이용약관 동의', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
+        resetMockReads();
         // 승인된 기관 1건, 기존 admin 1명(→ 신규 가입자는 employee)
         mockOrgDocs = [{ id: 'org-1', data: () => ({ name: '테스트복지관' }) }];
         mockExistingUser = { exists: false, data: () => undefined };
@@ -153,18 +167,23 @@ describe('joinOrganization — 이용약관 동의', () => {
     });
 
     it('동의 검증은 기관 조회보다 앞선다 — 동의 없는 요청은 Firestore를 읽지 않는다', async () => {
-        // 초대 코드가 유효해도 동의가 없으면 조회 이전에 거부되어야 한다
+        // 초대 코드가 유효해도 동의가 없으면 Firestore 읽기 이전에 거부되어야 한다.
+        // 읽기 기록이 비어 있어야만 "조회보다 앞선다"가 검증된다 —
+        // set/delete 미호출만 단정하면 검증을 조회 뒤로 옮겨도 통과한다.
         await expect(
             capturedHandler(makeRequest({ agreedTerms: false }))
         ).rejects.toMatchObject({ code: 'invalid-argument' });
+        expect(mockReads).toEqual([]);
         expect(mockUserSet).not.toHaveBeenCalled();
         expect(mockPreRegDelete).not.toHaveBeenCalled();
     });
 
-    it('초대 코드 검증은 동의 검증보다 앞선다 — 코드가 틀리면 동의 여부와 무관하게 거부', async () => {
+    it('초대 코드 검증은 동의 검증보다 앞선다 — 코드가 틀리면 코드 오류로 거부', async () => {
+        // 두 검증 모두 invalid-argument를 던지므로 코드만으로는 순서를 구분할 수 없다.
+        // 메시지를 단정해야 순서가 뒤바뀌는 회귀를 잡는다.
         await expect(
             capturedHandler(makeRequest({ code: 'ABC', agreedTerms: false }))
-        ).rejects.toMatchObject({ code: 'invalid-argument' });
+        ).rejects.toThrow('6자리 초대 코드를 입력해주세요.');
         expect(mockUserSet).not.toHaveBeenCalled();
     });
 
@@ -173,5 +192,17 @@ describe('joinOrganization — 이용약관 동의', () => {
 
         expect(result).toMatchObject({ success: true, orgId: 'org-1', orgName: '테스트복지관', role: 'employee' });
         expect(mockSetCustomUserClaims).toHaveBeenCalledWith('user-001', { role: 'employee', orgId: 'org-1' });
+    });
+
+    it('기관 조회는 초대 코드와 승인 상태를 함께 조건으로 쓴다', async () => {
+        // status=="approved" 조건이 빠지면 미승인 기관의 초대 코드로 가입할 수 있게 된다.
+        await capturedHandler(makeRequest());
+
+        const orgRead = mockReads.find((r) => r.label === 'organizations');
+        expect(orgRead).toBeDefined();
+        expect(orgRead!.wheres).toEqual([
+            ['inviteCode', '==', 'ABC123'],
+            ['status', '==', 'approved'],
+        ]);
     });
 });

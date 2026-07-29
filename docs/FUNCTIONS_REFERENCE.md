@@ -96,10 +96,10 @@
 | 항목 | 내용 |
 |------|------|
 | **파일** | `functions/src/handlers/callable/joinOrganization.ts` |
-| **설명** | 초대 코드로 기관에 가입. 신규 사용자가 Custom Claims 미보유 시에도 정상 처리. |
-| **인증** | 인증 필수 |
-| **요청 파라미터** | `{ inviteCode: string }` |
-| **반환값** | `{ success: boolean, organizationId: string }` |
+| **설명** | 초대 코드로 기관에 가입. 신규 사용자가 Custom Claims 미보유 시에도 정상 처리. 이용약관 동의를 함께 기록한다(개인정보 동의는 받지 않음 — 처리 근거가 기관의 업무 수행이므로). |
+| **인증** | 인증 필수 (익명 로그인 차단) |
+| **요청 파라미터** | `{ code: string, agreedTerms: true, termsVersion: string }` — `termsVersion`은 `YYYY-MM-DD` |
+| **반환값** | `{ success: boolean, orgId: string, orgName: string, role: 'admin' \| 'employee' }` |
 
 ### `disableUser`
 

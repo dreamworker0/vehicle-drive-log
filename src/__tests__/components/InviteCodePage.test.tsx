@@ -85,6 +85,28 @@ describe('InviteCodePage — 이용약관 동의 게이트', () => {
         }));
     });
 
+    // 자동 가입이 없어진 뒤에는 사용자가 약관을 읽는 동안 화면에 머문다.
+    // 그 사이 보관된 초대 코드를 지우면(_blank 링크로 이탈 후 PWA 콜드 재시작 등)
+    // 링크만 받은 직원은 6자리 코드를 복구할 수 없다.
+    it('동의 대기 중에는 보관된 초대 코드를 지우지 않는다', async () => {
+        window.localStorage.setItem('pendingInviteCode', 'ABC123');
+        renderPage();
+
+        expect(screen.getByPlaceholderText('______')).toHaveValue('ABC123');
+        await waitFor(() => expect(mockJoinOrg).not.toHaveBeenCalled());
+        expect(window.localStorage.getItem('pendingInviteCode')).toBe('ABC123');
+    });
+
+    it('가입이 성공한 뒤에 보관된 초대 코드를 정리한다', async () => {
+        window.localStorage.setItem('pendingInviteCode', 'ABC123');
+        renderPage();
+
+        fireEvent.click(screen.getByRole('checkbox'));
+        fireEvent.click(screen.getByRole('button', { name: '기관 참여하기' }));
+
+        await waitFor(() => expect(window.localStorage.getItem('pendingInviteCode')).toBeNull());
+    });
+
     it('초대 링크로 코드가 들어와도 자동 가입하지 않고 동의를 먼저 받는다', async () => {
         window.history.replaceState({}, '', '/invite?code=ABC123');
         renderPage();
