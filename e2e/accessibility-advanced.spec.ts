@@ -35,6 +35,9 @@ test.describe('접근성 심화 검증', () => {
         await expect(interactive.first()).toBeVisible({ timeout: 10000 });
 
         await expect(async () => {
+            // 재시도마다 포커스를 초기 상태로 되돌린다. 되돌리지 않으면 Tab이 누적되어
+            // "첫 Tab이 인터랙티브 요소로 가는가"가 "N번 누르면 가는가"로 약해진다.
+            await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
             await page.keyboard.press('Tab');
             const focused = await page.evaluate(() => document.activeElement?.tagName?.toLowerCase());
             // 포커스가 body가 아닌 인터랙티브 요소로 이동해야 함
