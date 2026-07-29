@@ -23,22 +23,25 @@ jest.mock('firebase-functions/v2/https', () => ({
 }));
 
 const mockUserGet = jest.fn();
-const mockUserSet = jest.fn().mockResolvedValue(undefined);
-const mockOrgSet = jest.fn().mockResolvedValue(undefined);
+/** batch.set(ref, data, opts) 호출 기록 — ref에 컬렉션 태그를 심어 대상을 구분한다 */
+const mockBatchSet = jest.fn();
+const mockBatchCommit = jest.fn().mockResolvedValue(undefined);
 
 jest.mock('firebase-admin/firestore', () => ({
     getFirestore: () => ({
         collection: (name: string) => ({
-            doc: () =>
-                name === 'users'
-                    ? { get: mockUserGet, set: mockUserSet }
-                    : { set: mockOrgSet },
+            doc: (id?: string) => ({ __col: name, __id: id, get: mockUserGet }),
         }),
+        batch: () => ({ set: mockBatchSet, commit: mockBatchCommit }),
     }),
     FieldValue: {
         serverTimestamp: jest.fn(() => 'mock-timestamp'),
     },
 }));
+
+/** 특정 컬렉션을 대상으로 한 batch.set 호출을 찾는다 */
+const findBatchSet = (collection: string) =>
+    mockBatchSet.mock.calls.find((call) => call[0]?.__col === collection);
 
 jest.mock('../utils/helpers', () => ({
     log: jest.fn(),
@@ -66,8 +69,7 @@ describe('acceptCurrentTerms — 재동의 기록', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
-        mockUserSet.mockResolvedValue(undefined);
-        mockOrgSet.mockResolvedValue(undefined);
+        mockBatchCommit.mockResolvedValue(undefined);
         setUserDoc({ role: 'employee', organizationId: 'org-1' });
     });
 
@@ -75,23 +77,22 @@ describe('acceptCurrentTerms — 재동의 기록', () => {
         const result = await capturedHandler(makeRequest());
 
         expect(result).toEqual({ success: true, orgRecorded: false });
-        expect(mockOrgSet).not.toHaveBeenCalled();
-        expect(mockUserSet).toHaveBeenCalledWith(
-            {
-                consent: { terms: true, termsVersion: '2026-08-05', agreedAt: 'mock-timestamp' },
-            },
-            { merge: true }
-        );
+        expect(findBatchSet('organizations')).toBeUndefined();
+        expect(findBatchSet('users')).toBeDefined();
+        expect(findBatchSet('users')!.slice(1)).toEqual([
+            { consent: { terms: true, termsVersion: '2026-08-05', agreedAt: 'mock-timestamp' } },
+            { merge: true },
+        ]);
     });
 
     it('직원: 개인정보 동의를 보내와도 기록하지 않는다', async () => {
         // 직원 개인정보의 처리 근거는 동의가 아니므로 privacy를 남기면 안 된다.
         await capturedHandler(makeRequest({ agreedPrivacy: true, privacyVersion: '2026-08-05' }));
 
-        const saved = mockUserSet.mock.calls[0][0];
+        const saved = findBatchSet('users')![1];
         expect(saved.consent).not.toHaveProperty('privacy');
         expect(saved.consent).not.toHaveProperty('privacyVersion');
-        expect(mockOrgSet).not.toHaveBeenCalled();
+        expect(findBatchSet('organizations')).toBeUndefined();
     });
 
     it('관리자: 기관 위탁 동의와 본인 약관 동의를 함께 기록한다', async () => {
@@ -102,7 +103,7 @@ describe('acceptCurrentTerms — 재동의 기록', () => {
         );
 
         expect(result).toEqual({ success: true, orgRecorded: true });
-        expect(mockOrgSet).toHaveBeenCalledWith(
+        expect(findBatchSet('organizations')!.slice(1)).toEqual([
             {
                 consent: {
                     terms: true,
@@ -114,17 +115,37 @@ describe('acceptCurrentTerms — 재동의 기록', () => {
                     agreedByUid: 'user-001',
                 },
             },
-            { merge: true }
-        );
-        expect(mockUserSet).toHaveBeenCalledTimes(1);
+            { merge: true },
+        ]);
+        expect(findBatchSet('users')).toBeDefined();
+    });
+
+    // 순차 쓰기였다면 기관 쓰기 실패 시 본인 동의만 기록된 상태가 남는다.
+    // batch는 커밋이 실패하면 두 문서 모두 기록되지 않는다.
+    it('관리자: 두 문서를 하나의 batch로 원자적으로 기록한다', async () => {
+        setUserDoc({ role: 'admin', organizationId: 'org-1' });
+
+        await capturedHandler(makeRequest({ agreedPrivacy: true, privacyVersion: '2026-08-05' }));
+
+        expect(mockBatchSet).toHaveBeenCalledTimes(2);
+        expect(mockBatchCommit).toHaveBeenCalledTimes(1);
+    });
+
+    it('기록 커밋이 실패하면 오류를 전파한다 (부분 기록 없음)', async () => {
+        setUserDoc({ role: 'admin', organizationId: 'org-1' });
+        mockBatchCommit.mockRejectedValueOnce(new Error('commit failed'));
+
+        await expect(
+            capturedHandler(makeRequest({ agreedPrivacy: true, privacyVersion: '2026-08-05' }))
+        ).rejects.toThrow('commit failed');
     });
 
     it('관리자: 처리방침 동의가 없으면 거부하고 아무것도 기록하지 않는다', async () => {
         setUserDoc({ role: 'admin', organizationId: 'org-1' });
 
         await expect(capturedHandler(makeRequest())).rejects.toMatchObject({ code: 'invalid-argument' });
-        expect(mockUserSet).not.toHaveBeenCalled();
-        expect(mockOrgSet).not.toHaveBeenCalled();
+        expect(mockBatchSet).not.toHaveBeenCalled();
+        expect(mockBatchCommit).not.toHaveBeenCalled();
     });
 
     it('관리자: 처리방침 버전 형식이 틀리면 거부한다', async () => {
@@ -133,7 +154,7 @@ describe('acceptCurrentTerms — 재동의 기록', () => {
         await expect(
             capturedHandler(makeRequest({ agreedPrivacy: true, privacyVersion: 'latest' }))
         ).rejects.toMatchObject({ code: 'invalid-argument' });
-        expect(mockOrgSet).not.toHaveBeenCalled();
+        expect(findBatchSet('organizations')).toBeUndefined();
     });
 
     it('기관이 없는 관리자(비정상 상태)는 기관 문서를 기록하지 않는다', async () => {
@@ -142,7 +163,7 @@ describe('acceptCurrentTerms — 재동의 기록', () => {
         const result = await capturedHandler(makeRequest());
 
         expect(result).toEqual({ success: true, orgRecorded: false });
-        expect(mockOrgSet).not.toHaveBeenCalled();
+        expect(findBatchSet('organizations')).toBeUndefined();
     });
 
     it('superAdmin은 본인 약관 동의만 기록한다', async () => {
@@ -151,14 +172,14 @@ describe('acceptCurrentTerms — 재동의 기록', () => {
         const result = await capturedHandler(makeRequest());
 
         expect(result).toEqual({ success: true, orgRecorded: false });
-        expect(mockOrgSet).not.toHaveBeenCalled();
+        expect(findBatchSet('organizations')).toBeUndefined();
     });
 
     it('미인증 요청 → unauthenticated', async () => {
         await expect(capturedHandler(makeRequest({}, null))).rejects.toMatchObject({
             code: 'unauthenticated',
         });
-        expect(mockUserSet).not.toHaveBeenCalled();
+        expect(mockBatchSet).not.toHaveBeenCalled();
     });
 
     it('사용자 문서가 없으면 failed-precondition', async () => {
@@ -167,7 +188,7 @@ describe('acceptCurrentTerms — 재동의 기록', () => {
         await expect(capturedHandler(makeRequest())).rejects.toMatchObject({
             code: 'failed-precondition',
         });
-        expect(mockUserSet).not.toHaveBeenCalled();
+        expect(mockBatchSet).not.toHaveBeenCalled();
     });
 
     it.each([
@@ -181,6 +202,6 @@ describe('acceptCurrentTerms — 재동의 기록', () => {
             code: 'invalid-argument',
         });
         expect(mockUserGet).not.toHaveBeenCalled();
-        expect(mockUserSet).not.toHaveBeenCalled();
+        expect(mockBatchSet).not.toHaveBeenCalled();
     });
 });

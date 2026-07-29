@@ -78,8 +78,14 @@ export const acceptCurrentTerms = onCall(
             }
         }
 
-        // 본인 이용약관 동의 — merge로 다른 필드를 건드리지 않는다.
-        await userRef.set(
+        // 두 문서를 batch로 원자적으로 기록한다.
+        // 순차 쓰기로 하면 기관 동의 쓰기가 실패했을 때 본인 동의만 기록된 상태가 남고,
+        // 관리자는 위탁 동의 없이 본인 동의만 가진 어정쩡한 상태가 된다.
+        // merge를 쓰는 이유는 두 문서의 다른 필드를 건드리지 않기 위함이다.
+        const batch = db.batch();
+
+        batch.set(
+            userRef,
             {
                 consent: {
                     terms: true,
@@ -91,26 +97,26 @@ export const acceptCurrentTerms = onCall(
         );
 
         if (isOrgAdmin) {
-            await db
-                .collection("organizations")
-                .doc(organizationId as string)
-                .set(
-                    {
-                        consent: {
-                            terms: true,
-                            privacy: true,
-                            termsVersion: payload.termsVersion,
-                            privacyVersion: payload.privacyVersion,
-                            agreedAt: now,
-                            // 신청이 아닌 재동의로 성립한 건임을 남긴다 — 약관 제9조 ①이
-                            // 신청 시점과 재동의 절차 두 경로를 모두 인정하므로 구분이 필요하다.
-                            source: "reconsent",
-                            agreedByUid: uid,
-                        },
+            batch.set(
+                db.collection("organizations").doc(organizationId as string),
+                {
+                    consent: {
+                        terms: true,
+                        privacy: true,
+                        termsVersion: payload.termsVersion,
+                        privacyVersion: payload.privacyVersion,
+                        agreedAt: now,
+                        // 신청이 아닌 재동의로 성립한 건임을 남긴다 — 약관 제9조 ①이
+                        // 신청 시점과 재동의 절차 두 경로를 모두 인정하므로 구분이 필요하다.
+                        source: "reconsent",
+                        agreedByUid: uid,
                     },
-                    { merge: true }
-                );
+                },
+                { merge: true }
+            );
         }
+
+        await batch.commit();
 
         log("INFO", "acceptCurrentTerms", "재동의 기록", {
             uid,
