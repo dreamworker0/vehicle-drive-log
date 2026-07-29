@@ -11,6 +11,9 @@ import { RATE_LIMITS } from "../../utils/constants";
 
 const db = getFirestore();
 
+/** 동의한 약관 버전은 시행일(YYYY-MM-DD)만 허용 — submitOrgApplication과 동일 기준. */
+const VERSION_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
 export const joinOrganization = onCall(
     {
         region: "asia-northeast3",
@@ -40,11 +43,32 @@ export const joinOrganization = onCall(
         }
 
         // 2. 파라미터 검증
-        const { code } = request.data as { code?: string };
+        const { code, agreedTerms, termsVersion } = request.data as {
+            code?: string;
+            agreedTerms?: boolean;
+            termsVersion?: string;
+        };
         if (!code || code.length !== 6) {
             throw new HttpsError(
                 "invalid-argument",
                 "6자리 초대 코드를 입력해주세요."
+            );
+        }
+
+        // 2-1. 이용약관 동의 검증 (개인정보 동의가 아니다 — src/types/user.ts consent 주석 참고)
+        // 클라이언트 버튼 disabled만으로는 콜러블 직접 호출을 막을 수 없다. 여기서 막지 않으면
+        // 약관 동의 기록이 없는 계정이 생겨 면책·이용자 의무 조항을 대항할 수 없다.
+        // 조직 조회보다 앞에 두어 동의 없는 요청이 Firestore를 읽지 않게 한다.
+        if (agreedTerms !== true) {
+            throw new HttpsError(
+                "invalid-argument",
+                "이용약관에 동의해야 기관에 참여할 수 있습니다."
+            );
+        }
+        if (typeof termsVersion !== "string" || !VERSION_PATTERN.test(termsVersion)) {
+            throw new HttpsError(
+                "invalid-argument",
+                "동의한 약관 버전 정보가 올바르지 않습니다."
             );
         }
 
@@ -144,6 +168,12 @@ export const joinOrganization = onCall(
                     role,
                     organizationId: orgId,
                     phone: "",
+                    // 이용약관 동의 기록 — 동의 일시는 클라이언트 시각을 신뢰하지 않고 서버에서 찍는다.
+                    consent: {
+                        terms: true,
+                        termsVersion,
+                        agreedAt: FieldValue.serverTimestamp(),
+                    },
                     createdAt: FieldValue.serverTimestamp(),
                 });
 

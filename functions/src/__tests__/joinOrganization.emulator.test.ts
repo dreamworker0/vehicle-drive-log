@@ -20,6 +20,9 @@ const auth = getAuth();
 
 // joinOrganization 내부 로직을 직접 테스트하기 위해 핵심 로직을 함수로 추출
 // (onCall 래퍼 없이 비즈니스 로직만 테스트)
+//
+// 주의: 아래 함수는 핸들러의 복제본이므로 실제 배포 코드를 보장하지 않는다.
+// 이용약관 동의 검증·기록은 실제 핸들러를 캡처하는 joinOrganization.test.ts에서 검증한다.
 async function executeJoinOrganization(params: {
     uid: string;
     email: string;

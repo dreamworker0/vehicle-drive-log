@@ -47,12 +47,17 @@ service cloud.firestore {
       allow read: if isOwner(userId)
                   || isSuperAdmin()
                   || (isSignedIn() && resource != null && resource.data.organizationId == userOrgId());
+      // consent(이용약관 동의 기록)는 joinOrganization(Admin SDK)만 기록한다.
+      // 클라이언트가 심으면 동의하지 않은 계정에 동의 기록이 생겨 입증 자료가 무의미해진다.
       allow create: if isOwner(userId)
                     && request.auth.token.firebase.sign_in_provider != 'anonymous'
                     && request.resource.data.keys().hasAll(['email'])
                     && request.resource.data.email is string
-                    && !request.resource.data.keys().hasAny(['role', 'organizationId']);
-      allow update: if (isOwner(userId)
+                    && !request.resource.data.keys().hasAny(['role', 'organizationId', 'consent']);
+      // 동의 기록은 본인·기관관리자·superAdmin 누구도 변경·삭제할 수 없다.
+      allow update: if !request.resource.data.diff(resource.data).affectedKeys().hasAny(['consent'])
+                    && (
+                       (isOwner(userId)
                         && (
                             !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'organizationId', 'status', 'disabledAt'])
                             || (
@@ -68,7 +73,8 @@ service cloud.firestore {
                     // 타 기관 admin 클레임을 획득하는 교차 테넌트 권한상승을 차단(2026-07-04 감사 N1).
                     || (isOrgAdmin(resource.data.organizationId)
                         && request.resource.data.role != 'superAdmin'
-                        && request.resource.data.organizationId == resource.data.organizationId);
+                        && request.resource.data.organizationId == resource.data.organizationId)
+                    );
       allow delete: if isSuperAdmin();
 
       // 비밀 사용자 데이터 (Google OAuth access/refresh 토큰 등) — Cloud Functions(Admin SDK) 전용.
