@@ -88,6 +88,10 @@ export interface Organization extends FirestoreDoc {
         /** 동의한 처리방침의 시행일 버전 */
         privacyVersion: string;
         agreedAt?: TimestampField;
+        /** 성립 경로 — 미설정은 기관 신청 시 동의, 'reconsent'는 개정 후 재동의 */
+        source?: 'reconsent';
+        /** 재동의로 성립한 경우 의사표시를 한 관리자 uid */
+        agreedByUid?: string;
     };
     createdAt?: TimestampField;
     approvedAt?: TimestampField;

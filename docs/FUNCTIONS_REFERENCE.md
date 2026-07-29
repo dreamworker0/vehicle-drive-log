@@ -101,6 +101,16 @@
 | **요청 파라미터** | `{ code: string, agreedTerms: true, termsVersion: string }` — `termsVersion`은 `YYYY-MM-DD` |
 | **반환값** | `{ success: boolean, orgId: string, orgName: string, role: 'admin' \| 'employee' }` |
 
+### `acceptCurrentTerms`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/callable/acceptCurrentTerms.ts` |
+| **설명** | 개정 약관·처리방침 재동의 기록. 동의 기록은 Rules가 클라이언트 쓰기를 차단하므로 이 함수만 기록한다. 기관 관리자는 기관 위탁 동의(`organizations.consent`)와 본인 약관 동의(`users.consent`)를 함께, 직원은 본인 약관 동의만 기록. |
+| **인증** | 인증 필수 |
+| **요청 파라미터** | `{ agreedTerms: true, termsVersion: string, agreedPrivacy?: true, privacyVersion?: string }` — 관리자는 `agreedPrivacy`·`privacyVersion` 필수 |
+| **반환값** | `{ success: boolean, orgRecorded: boolean }` |
+
 ### `disableUser`
 
 | 항목 | 내용 |
