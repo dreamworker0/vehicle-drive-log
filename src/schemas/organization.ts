@@ -47,6 +47,19 @@ export const organizationSchema = z.object({
         rejected: z.boolean().optional().catch(undefined),
         reason: z.string().optional().catch(undefined),
     }).optional().catch(undefined),
+    /**
+     * 약관·처리방침 동의 기록 (위탁 계약 성립 근거 — 약관 제9조).
+     * 여기서 빠지면 createZodConverter의 fromFirestore가 unknown key를 조용히 제거해
+     * (Zod z.object 기본 동작) Firestore에 저장돼 있어도 앱에서는 항상 undefined가 된다.
+     * 저장만 되고 조회가 불가능해지므로 입증 자료로 쓸 수 없다.
+     */
+    consent: z.object({
+        terms: z.boolean().catch(false),
+        privacy: z.boolean().catch(false),
+        termsVersion: z.string().catch(''),
+        privacyVersion: z.string().catch(''),
+        agreedAt: timestampSchema.optional().catch(undefined),
+    }).optional().catch(undefined),
     createdAt: timestampSchema.optional().catch(undefined),
     approvedAt: timestampSchema.optional().catch(undefined),
     rejectedAt: timestampSchema.optional().catch(undefined),

@@ -32,8 +32,17 @@ interface SubmitApplicationPayload {
     privacyVersion: string; // 동의한 처리방침의 시행일 버전 (PRIVACY_VERSION)
 }
 
-/** 동의한 문서 버전 문자열의 상한 — 시행일(YYYY-MM-DD) 형식을 전제로 한다. */
-const MAX_VERSION_LENGTH = 20;
+/**
+ * 동의한 문서 버전은 시행일(YYYY-MM-DD)만 허용한다.
+ *
+ * 현재 시행 중인 버전값과의 일치까지 강제하지는 않는다. 이 서비스는 PWA로
+ * 서비스워커가 이전 번들을 캐시하고 있을 수 있어, 캐시된 화면에서 신청하면
+ * 직전 버전을 보내온다. 이때 서버가 거부하면 정상 신청자가 가입 자체를 못 하게 되고,
+ * 이는 임의 날짜가 기록되는 것보다 큰 손실이다.
+ * 신청 문서의 다른 필드(기관명·연락처)도 모두 신청자가 제출한 값이고 superAdmin 심사를
+ * 거치므로, 버전값의 신뢰 수준을 나머지 필드보다 높게 잡을 실익도 없다.
+ */
+const VERSION_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * submitOrgApplication
@@ -75,8 +84,7 @@ export const submitOrgApplication = onCall(
             throw new HttpsError("invalid-argument", "이용약관과 개인정보 처리방침에 동의해야 신청할 수 있습니다.");
         }
         if (typeof payload.termsVersion !== "string" || typeof payload.privacyVersion !== "string"
-            || !payload.termsVersion || !payload.privacyVersion
-            || payload.termsVersion.length > MAX_VERSION_LENGTH || payload.privacyVersion.length > MAX_VERSION_LENGTH) {
+            || !VERSION_PATTERN.test(payload.termsVersion) || !VERSION_PATTERN.test(payload.privacyVersion)) {
             throw new HttpsError("invalid-argument", "동의한 약관 버전 정보가 올바르지 않습니다.");
         }
 

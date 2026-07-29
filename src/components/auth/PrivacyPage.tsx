@@ -1,6 +1,10 @@
 import { useNavigate } from 'react-router-dom';
 import SEOHead from '../common/SEOHead';
 import useForceLightMode from '../../hooks/useForceLightMode';
+import { PRIVACY_VERSION, formatLegalVersion } from '../../lib/constants';
+
+/** 시행일 표기는 동의 기록에 남는 버전과 어긋나지 않도록 상수에서 파생한다. */
+const EFFECTIVE_DATE = formatLegalVersion(PRIVACY_VERSION);
 
 /**
  * 개인정보 처리 수탁자 목록 (제7조 위탁 / 제8조 국외 이전 공통 원본)
@@ -141,7 +145,7 @@ export default function PrivacyPage() {
                 <div className="bg-white dark:bg-surface-800 rounded-2xl shadow-soft p-6 md:p-8 space-y-8">
                     <div className="text-center border-b border-surface-100 dark:border-surface-700 pb-6">
                         <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-1">개인정보 처리방침</h1>
-                        <p className="text-sm text-surface-400 dark:text-surface-500">시행일: 2026년 8월 5일 (최초 시행: 2026년 2월 1일)</p>
+                        <p className="text-sm text-surface-400 dark:text-surface-500">시행일: {EFFECTIVE_DATE} (최초 시행: 2026년 2월 1일)</p>
                     </div>
 
                     {/*
@@ -198,7 +202,8 @@ export default function PrivacyPage() {
                                 </ul>
                                 <p className="text-xs text-surface-500 dark:text-surface-400">
                                     위탁 계약(이용약관 제9조)의 성립을 입증하기 위한 항목으로, 해당 기관 정보와 함께 보관되며
-                                    기관 삭제 시 제9조에 따라 함께 파기됩니다. 동의 시점의 IP 주소는 수집하지 않습니다.
+                                    기관 삭제 시 <strong>본 처리방침 제9조(파기)</strong>에 따릅니다.
+                                    동의 시점의 IP 주소는 수집하지 않습니다.
                                 </p>
                             </div>
 
@@ -322,6 +327,16 @@ export default function PrivacyPage() {
                         <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200">제7조 (개인정보 처리업무의 위탁)</h2>
                         <div className="text-sm text-surface-600 dark:text-surface-400 leading-relaxed space-y-3">
                             <p>서비스는 원활한 운영을 위하여 다음과 같이 개인정보 처리업무를 위탁하고 있습니다.</p>
+                            {/*
+                              2단 구조 안내 — 전문은 "서비스=수탁자"라고 선언하는데 본 조는 "서비스가 위탁한다"고
+                              서술하므로, 기관 관점에서 아래 사업자가 재수탁자임을 밝히지 않으면 같은 사업자를
+                              가리키는 용어가 두 문서에서 어긋난다(약관 제9조 ④는 이를 '재위탁'이라 부른다).
+                            */}
+                            <p className="text-xs">
+                                본 조의 위탁은 <strong>수탁자인 서비스 제공자가 업무 수행을 위해 다시 위탁하는 것</strong>이므로,
+                                개인정보처리자인 기관의 관점에서 아래 사업자는 <strong>재수탁자</strong>에 해당합니다.
+                                재위탁의 조건은 이용약관 제9조 ④에 정하고 있습니다.
+                            </p>
 
                             <div className="rounded-xl border border-surface-200 dark:border-surface-700 divide-y divide-surface-100 dark:divide-surface-700 overflow-hidden">
                                 {PROCESSORS.map((p) => (
@@ -506,9 +521,9 @@ export default function PrivacyPage() {
                     </section>
 
                     <div className="border-t border-surface-100 dark:border-surface-700 pt-4 space-y-2 text-center">
-                        <p className="text-xs text-surface-400 dark:text-surface-500">본 개인정보 처리방침은 2026년 8월 5일부터 시행됩니다.</p>
+                        <p className="text-xs text-surface-400 dark:text-surface-500">본 개인정보 처리방침은 {EFFECTIVE_DATE}부터 시행됩니다.</p>
                         <p className="text-xs text-surface-400 dark:text-surface-500">
-                            개정 이력 · 2026년 2월 1일 최초 시행 / 2026년 8월 5일 위탁·국외 이전·보호책임자 조항 신설,
+                            개정 이력 · 2026년 2월 1일 최초 시행 / {EFFECTIVE_DATE} 위탁·국외 이전·보호책임자 조항 신설,
                             개인정보처리자와 수탁자의 지위 명시
                         </p>
                     </div>

@@ -214,6 +214,11 @@ describe('submitOrgApplication — 동의 기록', () => {
         ['privacyVersion 빈 문자열', { privacyVersion: '' }],
         ['termsVersion 타입 불일치', { termsVersion: 20260805 }],
         ['privacyVersion 길이 초과', { privacyVersion: 'x'.repeat(21) }],
+        // 시행일 형식이 아닌 값 — 임의 문자열이 동의 기록에 남지 않게 막는다
+        ['형식 불일치(자유 문자열)', { termsVersion: 'latest' }],
+        ['형식 불일치(구분자 없음)', { privacyVersion: '20260805' }],
+        ['형식 불일치(월·일 자릿수)', { termsVersion: '2026-8-5' }],
+        ['형식 불일치(앞뒤 공백)', { privacyVersion: ' 2026-08-05 ' }],
     ])('%s → invalid-argument 거부', async (_label, overrides) => {
         await expect(
             capturedHandler(makeRequest(overrides as Record<string, unknown>))

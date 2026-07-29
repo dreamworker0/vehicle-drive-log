@@ -361,6 +361,28 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
 
     // 정상: 동의 기록을 건드리지 않는 다른 필드 수정은 허용
     await assertSucceeds(adminADb.collection('organizations').doc('org-A').update({ hipassEnabled: false }));
+
+    // 신청자 경로(status:'pending' + 본인 신청)도 consent를 건드리지 않으면 정상 동작해야 한다
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('organizations').doc('org-pending').set({
+        name: '신청중기관', applicantUid: 'applicant_1', status: 'pending',
+      });
+    });
+    const applicantDb = setupContext('applicant_1', { role: 'employee' }).firestore();
+    await assertSucceeds(applicantDb.collection('organizations').doc('org-pending').update({ address: '서울시' }));
+    await assertFails(applicantDb.collection('organizations').doc('org-pending').update({
+      consent: { terms: true, privacy: true, termsVersion: '2026-08-05', privacyVersion: '2026-08-05' },
+    }));
+
+    // create 경로로 임의 동의 기록을 심는 것도 차단 (update만 막으면 우회 가능)
+    await assertFails(superDb.collection('organizations').doc('org_new_evil').set({
+      name: '위조기관', applicantUid: 'super_1', status: 'pending',
+      consent: { terms: true, privacy: true, termsVersion: '2026-08-05', privacyVersion: '2026-08-05' },
+    }));
+    // consent 없는 정상 create는 계속 허용
+    await assertSucceeds(superDb.collection('organizations').doc('org_new_ok').set({
+      name: '정상기관', applicantUid: 'super_1', status: 'pending',
+    }));
   });
 
   it('11. 비밀 사용자 데이터(users/{uid}/private) — 본인·같은 기관 모두 접근 차단 (Functions 전용)', async () => {

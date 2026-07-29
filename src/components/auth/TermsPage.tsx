@@ -1,6 +1,10 @@
 import { useNavigate } from 'react-router-dom';
 import SEOHead from '../common/SEOHead';
 import useForceLightMode from '../../hooks/useForceLightMode';
+import { TERMS_VERSION, formatLegalVersion } from '../../lib/constants';
+
+/** 시행일 표기는 동의 기록에 남는 버전과 어긋나지 않도록 상수에서 파생한다. */
+const EFFECTIVE_DATE = formatLegalVersion(TERMS_VERSION);
 
 export default function TermsPage() {
     const navigate = useNavigate();
@@ -29,7 +33,7 @@ export default function TermsPage() {
                 <div className="bg-white dark:bg-surface-800 rounded-2xl shadow-soft p-6 md:p-8 space-y-8">
                     <div className="text-center border-b border-surface-100 dark:border-surface-700 pb-6">
                         <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-1">이용약관</h1>
-                        <p className="text-sm text-surface-400 dark:text-surface-500">시행일: 2026년 8월 5일 (최초 시행: 2026년 2월 1일)</p>
+                        <p className="text-sm text-surface-400 dark:text-surface-500">시행일: {EFFECTIVE_DATE} (최초 시행: 2026년 2월 1일)</p>
                     </div>
 
                     {/* 제1조 */}
@@ -159,7 +163,8 @@ export default function TermsPage() {
                                 <p className="text-blue-700 dark:text-blue-400 text-xs">
                                     서비스를 이용하는 <strong>기관이 소속 직원 개인정보의 개인정보처리자(위탁자)</strong>이며,
                                     서비스 제공자는 기관의 위탁을 받아 개인정보를 처리하는 <strong>수탁자</strong>입니다.
-                                    기관은 서비스 이용 신청으로써 본 조에 따라 개인정보 처리업무를 서비스 제공자에게 위탁합니다.
+                                    기관은 서비스 이용을 신청할 때 또는 본 조 신설 이후 별도로 안내되는 재동의 절차를 통해
+                                    본 조에 따라 개인정보 처리업무를 서비스 제공자에게 위탁합니다.
                                 </p>
                             </div>
 
@@ -193,11 +198,20 @@ export default function TermsPage() {
 
                             <div className="space-y-2">
                                 <p className="font-medium text-surface-700 dark:text-surface-300">④ 재위탁 제한</p>
-                                <p className="text-xs">
-                                    서비스 제공자는 기관의 동의 없이 위탁업무를 제3자에게 다시 위탁하지 않습니다.
-                                    서비스 제공에 필수적인 재위탁은 개인정보 처리방침 제7조에 공개된 범위로 한정하며,
-                                    변경 시 처리방침을 통해 지체 없이 공개합니다.
-                                </p>
+                                <ul className="list-disc list-inside space-y-1 ml-2 text-xs">
+                                    <li>
+                                        서비스 제공자는 위탁업무 수행에 필수적인 범위에서만 제3자에게 다시 위탁(재위탁)하며,
+                                        그 수탁자와 업무 범위를 개인정보 처리방침 제7조에 공개합니다.
+                                    </li>
+                                    <li>
+                                        기관은 본 조에 동의함으로써 <strong>처리방침 제7조에 공개된 범위의 재위탁에 동의</strong>합니다.
+                                        그 밖의 재위탁은 기관의 사전 동의 없이 하지 않습니다.
+                                    </li>
+                                    <li>
+                                        재위탁 대상이나 업무 내용이 변경되는 경우 처리방침을 통해 지체 없이 공개하며,
+                                        기관이 변경 내용에 동의하지 않는 경우 제7조에 따라 기관 삭제를 요청할 수 있습니다.
+                                    </li>
+                                </ul>
                             </div>
 
                             <div className="space-y-2">
@@ -237,9 +251,9 @@ export default function TermsPage() {
                     </section>
 
                     <div className="border-t border-surface-100 dark:border-surface-700 pt-4 space-y-2 text-center">
-                        <p className="text-xs text-surface-400 dark:text-surface-500">본 약관은 2026년 8월 5일부터 시행됩니다.</p>
+                        <p className="text-xs text-surface-400 dark:text-surface-500">본 약관은 {EFFECTIVE_DATE}부터 시행됩니다.</p>
                         <p className="text-xs text-surface-400 dark:text-surface-500">
-                            개정 이력 · 2026년 2월 1일 최초 시행 / 2026년 8월 5일 개인정보 처리의 위탁 조항 신설
+                            개정 이력 · 2026년 2월 1일 최초 시행 / {EFFECTIVE_DATE} 개인정보 처리의 위탁 조항 신설
                         </p>
                     </div>
                 </div>
