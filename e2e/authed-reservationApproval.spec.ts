@@ -36,6 +36,19 @@ function reservationRow(page: Page, destination: string) {
     return page.locator('div.group').filter({ hasText: destination });
 }
 
+/**
+ * 관리자 예약 화면으로 이동하고 **로딩이 끝난 것까지** 확인한다.
+ *
+ * ReservationCalendar는 loading 동안 스피너만 반환하므로, 로딩이 안 풀리면
+ * 예약 행 locator가 "element not found"로만 실패해 원인을 알 수 없다(공휴일
+ * 외부 API 폴백이 걸렸을 때 실제로 그랬다 — seed.ts의 seedHolidays 주석 참고).
+ * 제목을 먼저 단언해 "화면이 로딩을 끝내지 못함"과 "행이 없음"을 구분한다.
+ */
+async function openAdminReservations(page: Page) {
+    await page.goto('/admin/reservations');
+    await expect(page.getByRole('heading', { name: '차량 예약' })).toBeVisible({ timeout: 20000 });
+}
+
 test.describe('예약 승인/반려 여정 E2E (에뮬레이터)', () => {
     test('관리자가 승인 대기 예약을 승인하면 승인 토스트가 뜨고 목록에서 사라진다', async ({ page }) => {
         page.on('console', (msg) => {
@@ -48,7 +61,7 @@ test.describe('예약 승인/반려 여정 E2E (에뮬레이터)', () => {
 
         await signIn(page, TEST_ADMIN.email, TEST_ADMIN.password);
         await page.waitForURL(/\/admin/, { timeout: 25000 });
-        await page.goto('/admin/reservations');
+        await openAdminReservations(page);
 
         const row = reservationRow(page, DESTINATION);
         const approveBtn = row.getByRole('button', { name: '승인' });
@@ -70,7 +83,7 @@ test.describe('예약 승인/반려 여정 E2E (에뮬레이터)', () => {
 
         await signIn(page, TEST_ADMIN.email, TEST_ADMIN.password);
         await page.waitForURL(/\/admin/, { timeout: 25000 });
-        await page.goto('/admin/reservations');
+        await openAdminReservations(page);
 
         const row = reservationRow(page, DESTINATION);
         const rejectBtn = row.getByRole('button', { name: '반려' });
