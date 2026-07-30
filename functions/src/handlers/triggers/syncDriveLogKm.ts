@@ -267,11 +267,16 @@ export const onDriveLogUpdated = onDocumentUpdated(
                     const orgId = data.organizationId;
                     const vehId = data.vehicleId;
                     const tsRaw = data.timestamp;
-                    await afterSnap.ref.update({ [KM_SYNC_CONTINUE_FIELD]: false });
                     if (orgId && vehId && tsRaw && data.endKm != null) {
                         const chain = await syncNextLogStartKm(orgId, vehId, toDate(tsRaw), data.endKm);
                         await applyChainCurrentKm(orgId, vehId, chain);
                     }
+                    // 표시는 이어받기를 끝낸 **뒤에** 지운다.
+                    // 먼저 지우면 도중에 함수가 죽을 때(타임아웃·OOM) 표시가 사라져 1,000건 이후가
+                    // 조용히 남는다 — 이 트리거는 retry: false라 이벤트 재전달도 없다.
+                    // 반대로 남겨두면 재개 근거가 유지되고, 중복 실행은 멱등이라 해롭지 않다
+                    // (같은 값으로 수렴하고 두 번째 실행은 stoppedConsistent로 즉시 끝난다).
+                    await afterSnap.ref.update({ [KM_SYNC_CONTINUE_FIELD]: false });
                 }
                 return;
             }

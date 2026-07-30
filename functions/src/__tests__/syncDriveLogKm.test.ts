@@ -304,6 +304,30 @@ describe('onDriveLogUpdated — 연쇄 재발동 차단', () => {
         expect(db.__get('driveLogs', 'C')).toMatchObject({ startKm: 230, endKm: 290 });
     });
 
+    it('이어받기 표시는 재정합을 끝낸 뒤에 지운다 (중간에 죽어도 재개 근거가 남도록)', async () => {
+        // 먼저 지우면 도중 실패 시 표시가 사라져 남은 구간이 조용히 방치된다.
+        // 이 트리거는 retry: false라 이벤트 재전달도 없으므로 순서 자체가 안전장치다.
+        seedLogs([
+            { id: 'B', timestamp: d(15), startKm: 180, endKm: 230 },
+            { id: 'C', timestamp: d(20), startKm: 200, endKm: 260 },
+        ]);
+
+        await (onDriveLogUpdated as unknown as Function)(makeUpdateEvent(
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(15), startKm: 150, endKm: 200, [KM_SYNC_REV_FIELD]: 0 },
+            {
+                organizationId: ORG, vehicleId: VEH, timestamp: d(15), startKm: 180, endKm: 230,
+                [KM_SYNC_REV_FIELD]: 1, [KM_SYNC_CONTINUE_FIELD]: true,
+            },
+        ));
+
+        const order = db.__updates().map((u: { id: string; patch: Record<string, unknown> }) => ({
+            id: u.id,
+            clearsFlag: u.patch[KM_SYNC_CONTINUE_FIELD] === false,
+        }));
+        // C(남은 구간) 재정합이 먼저, B의 표시 해제가 나중
+        expect(order.map(o => `${o.id}${o.clearsFlag ? ':clear' : ''}`)).toEqual(['C', 'B:clear']);
+    });
+
     it('사람이 한 수정(kmSyncRev 동일)은 정상 경로로 처리한다', async () => {
         seedLogs([
             { id: 'B', timestamp: d(15), startKm: 150, endKm: 210 },
