@@ -408,6 +408,16 @@
 | **설명** | 기관 신청(pending)/승인(approved)/거절(rejected) 상태 변화 시 이메일 및 Discord 알림 발송 |
 | **인증** | 시스템 자동 실행 (Firestore 트리거) |
 
+### `auditDriveLogCreated` · `auditDriveLogUpdated` · `auditDriveLogDeleted` · `auditUserCreated` · `auditUserUpdated` · `auditUserDeleted`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/triggers/auditLog.ts` |
+| **설명** | 개인정보를 담는 컬렉션(`driveLogs`·`users`)의 생성·수정·삭제를 `auditLogs`에 기록한다. 고시 「개인정보의 안전성 확보조치 기준」 제16조(접속기록의 보관 및 점검) 대응. 수정은 **변경된 필드명만** 남기고 값은 남기지 않는다(로그가 개인정보 스냅샷이 되는 순환 방지). 기록 실패 시 throw하지 않고 ERROR 로그만 남긴다 — 감사 로그 실패가 원본 문서 처리를 되돌리면 안 된다. |
+| **인증** | 시스템 자동 실행 (Firestore 트리거, Admin SDK) |
+| **보관** | `expiresAt = at + 365일`. **TTL 정책을 콘솔에서 설정해야 자동 삭제된다** → [MONITORING_GUIDE](MONITORING_GUIDE.md) |
+| **한계** | Firestore 트리거는 호출자를 알 수 없다. 생성은 문서의 `createdByUid`로 추정하고, 수정·삭제는 `actorUid: null` + `actorSource: 'unknown'`이다. 행위자 식별은 열람 로그·세션 기록과 함께 후속 단계에서 처리한다. |
+
 ### `onReservationUpdated`
 
 | 항목 | 내용 |

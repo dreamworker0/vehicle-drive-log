@@ -205,6 +205,16 @@ service cloud.firestore {
       allow delete: if resource.data.targetUid == request.auth.uid || isSuperAdmin();
     }
 
+    // === 접속기록/변경 로그 ===
+    // 고시 「개인정보의 안전성 확보조치 기준」 제16조 ③은 접속기록의 위조·변조·도난·분실
+    // 방지를 요구한다. Cloud Functions(Admin SDK) 트리거만 기록하며, 클라이언트는
+    // 생성·수정·삭제를 전부 할 수 없다. 읽기는 점검 주체에게만 연다 —
+    // 개인정보처리자는 각 기관이므로(이용약관 제9조) 기관 관리자가 자기 기관 기록을 점검한다.
+    match /auditLogs/{logId} {
+      allow read: if isSuperAdmin() || isOrgAdmin(resource.data.organizationId);
+      allow write: if false;
+    }
+
     // === 즐겨찾기 ===
     match /favorites/{favoriteId} {
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isSuperAdmin());

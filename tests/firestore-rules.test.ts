@@ -330,6 +330,41 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     }));
   });
 
+  it('10-3. 접속기록(auditLogs) — 클라이언트 쓰기 전면 차단, 읽기는 점검 주체만', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('auditLogs').doc('log_A').set({
+        organizationId: 'org-A', action: 'update', targetType: 'driveLog',
+        targetId: 'dl_A', actorUid: null, actorSource: 'unknown', subjectUids: ['user_A'],
+      });
+    });
+
+    const adminADb = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+    const employeeADb = setupContext('user_A', { role: 'employee', orgId: 'org-A' }).firestore();
+    const adminBDb = setupContext('admin_B', { role: 'admin', orgId: 'org-B' }).firestore();
+    const superDb = setupContext('super_1', { role: 'superAdmin' }).firestore();
+
+    // 쓰기: 누구도 불가 (Admin SDK 트리거 전용)
+    await assertFails(adminADb.collection('auditLogs').doc('log_new').set({
+      organizationId: 'org-A', action: 'create', targetType: 'driveLog', targetId: 'x',
+    }));
+    await assertFails(superDb.collection('auditLogs').doc('log_new2').set({
+      organizationId: 'org-A', action: 'create', targetType: 'driveLog', targetId: 'x',
+    }));
+    // 기록 인멸 차단 — 수정·삭제 모두 불가
+    await assertFails(adminADb.collection('auditLogs').doc('log_A').update({ action: 'create' }));
+    await assertFails(superDb.collection('auditLogs').doc('log_A').update({ action: 'create' }));
+    await assertFails(adminADb.collection('auditLogs').doc('log_A').delete());
+    await assertFails(superDb.collection('auditLogs').doc('log_A').delete());
+
+    // 읽기: 해당 기관 관리자와 superAdmin만
+    await assertSucceeds(adminADb.collection('auditLogs').doc('log_A').get());
+    await assertSucceeds(superDb.collection('auditLogs').doc('log_A').get());
+    // 일반 직원은 자기 기관 기록도 볼 수 없다 (점검 주체가 아니다)
+    await assertFails(employeeADb.collection('auditLogs').doc('log_A').get());
+    // 타 기관 관리자는 차단 (멀티테넌트 격리)
+    await assertFails(adminBDb.collection('auditLogs').doc('log_A').get());
+  });
+
   it('11. 비밀 사용자 데이터(users/{uid}/private) — 본인·같은 기관 모두 접근 차단 (Functions 전용)', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await context.firestore().doc('users/user_A/private/oauth').set({
