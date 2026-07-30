@@ -95,6 +95,45 @@ export async function seedEmulator(): Promise<void> {
         status: 'active',
         createdAt: now,
     });
+
+    await seedHolidays(db);
+}
+
+/**
+ * `system/holidays`를 시드한다. **예약 화면 E2E의 필수 시드다.**
+ *
+ * fetchPublicHolidays는 이 문서를 먼저 읽고, 없으면 공공데이터 포털
+ * (apis.data.go.kr)로 폴백한다. 에뮬레이터 환경에는 VITE_HOLIDAY_API_KEY가 없고
+ * 이 문서도 없었기 때문에, 예약 화면을 열면 매번 외부 실서비스로 나갔다.
+ * useReservationData가 그 fetch를 Promise.all로 await하므로 응답이 늦으면
+ * loading이 풀리지 않고 ReservationCalendar가 스피너에서 멈춘다 —
+ * 승인/반려 목록이 아예 마운트되지 않아 CI에서 간헐 실패했다.
+ *
+ * 프로덕션은 monthlyBatch가 이 문서를 채우므로 Firestore 경로가 정상 경로다.
+ * 시드로 그 상태를 재현해 E2E를 외부 네트워크와 무관하게 만든다.
+ */
+async function seedHolidays(db: ReturnType<typeof getFirestore>): Promise<void> {
+    // 날짜가 고정된 공휴일만 쓴다 — 연도를 바꿔도 그대로 유효하다(설날·추석은 음력이라 제외).
+    const fixed: [string, string][] = [
+        ['01-01', '1월 1일'],
+        ['03-01', '삼일절'],
+        ['05-05', '어린이날'],
+        ['06-06', '현충일'],
+        ['08-15', '광복절'],
+        ['10-03', '개천절'],
+        ['10-09', '한글날'],
+        ['12-25', '기독탄신일'],
+    ];
+
+    // getHolidays()는 브라우저 로컬 시각의 연도를 조회한다. 러너는 UTC, 앱 사용자는 KST라
+    // 연말에 연도가 엇갈릴 수 있으므로 올해와 내년을 함께 심는다.
+    const year = new Date().getFullYear();
+    const byYear: Record<string, Record<string, string>> = {};
+    for (const y of [year, year + 1]) {
+        byYear[String(y)] = Object.fromEntries(fixed.map(([md, name]) => [`${y}-${md}`, name]));
+    }
+
+    await db.collection('system').doc('holidays').set(byYear, { merge: true });
 }
 
 /**
