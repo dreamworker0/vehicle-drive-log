@@ -107,9 +107,27 @@ export function extractFunctionExports(src: string): string[] {
     return out;
 }
 
-/** generate-functions-doc.ts 카탈로그의 함수 이름을 뽑는다. */
+/**
+ * generate-functions-doc.ts 카탈로그의 함수 이름을 뽑는다.
+ * 따옴표 스타일(작은/큰/백틱)에 의존하지 않는다 — 스타일이 바뀌면 파서가 빈 배열을 내고
+ * 13번 검사가 "전부 누락"으로 오탐해 CI를 잘못 막기 때문이다.
+ */
 export function extractCatalogNames(src: string): string[] {
-    return [...src.matchAll(/^\s*name:\s*'([A-Za-z0-9_]+)'/gm)].map((m) => m[1]);
+    return [...src.matchAll(/^\s*name:\s*['"`]([A-Za-z0-9_]+)['"`]/gm)].map((m) => m[1]);
+}
+
+/** 카탈로그 ↔ index.ts export 드리프트 판정 (13번 검사 본체가 그대로 쓰는 순수 함수). */
+export function diffCatalogNames(
+    exported: string[],
+    catalog: string[],
+): { missing: string[]; stale: string[]; duplicates: string[] } {
+    const catalogSet = new Set(catalog);
+    const exportedSet = new Set(exported);
+    return {
+        missing: exported.filter((n) => !catalogSet.has(n)),
+        stale: catalog.filter((n) => !exportedSet.has(n)),
+        duplicates: [...new Set(catalog.filter((n, i) => catalog.indexOf(n) !== i))],
+    };
 }
 
 // ── 검사 본체 ────────────────────────────────────────────────────────────────
@@ -321,21 +339,23 @@ export function runChecks(root: string = ROOT): { findings: Finding[]; checked: 
     checked++;
     const catalogNames = extractCatalogNames(read(join('scripts', 'generate-functions-doc.ts')));
     const exportedNames = extractFunctionExports(read(join('functions', 'src', 'index.ts')));
-    const catalogSet = new Set(catalogNames);
-    const exportedSet = new Set(exportedNames);
-    for (const name of exportedNames) {
-        if (!catalogSet.has(name)) {
+    // 파서가 통째로 실패하면(형식 변경 등) 전 함수 누락으로 오탐해 CI를 잘못 막는다 — 파서 고장으로 구분해 보고한다.
+    if (catalogNames.length === 0 || exportedNames.length === 0) {
+        err(
+            'scripts/check-harness.ts',
+            `13번 검사 파서가 아무것도 찾지 못함 (카탈로그 ${catalogNames.length}건 / export ${exportedNames.length}건) — 드리프트가 아니라 파서·파일 형식 문제`,
+        );
+    } else {
+        const { missing, stale, duplicates } = diffCatalogNames(exportedNames, catalogNames);
+        for (const name of missing) {
             err('scripts/generate-functions-doc.ts', `카탈로그에 없는 배포 함수: ${name} — 항목 추가 후 npx tsx scripts/generate-functions-doc.ts`);
         }
-    }
-    for (const name of catalogNames) {
-        if (!exportedSet.has(name)) {
+        for (const name of stale) {
             err('scripts/generate-functions-doc.ts', `index.ts에서 export되지 않는 카탈로그 항목: ${name} — 삭제된 함수라면 항목 제거`);
         }
-    }
-    const dupCatalog = catalogNames.filter((n, i) => catalogNames.indexOf(n) !== i);
-    if (dupCatalog.length) {
-        err('scripts/generate-functions-doc.ts', `카탈로그 중복 항목: ${[...new Set(dupCatalog)].join(', ')}`);
+        if (duplicates.length) {
+            err('scripts/generate-functions-doc.ts', `카탈로그 중복 항목: ${duplicates.join(', ')}`);
+        }
     }
     // 카탈로그를 고쳤지만 재생성을 잊은 경우 — 생성 문서의 총계가 어긋난다
     const refTotal = /총 함수 수: \*\*(\d+)개\*\*/.exec(read(join('docs', 'FUNCTIONS_REFERENCE.md')))?.[1];
