@@ -24,6 +24,21 @@ MIT 라이선스로 공개된 프로젝트입니다. 아래처럼 자유롭게 �
 
 > 한국 사회복지기관 환경(사업자번호 기반 기관 인증, 카카오 알림톡, 공휴일/티맵)에 맞춰져 있으나, 이 기능들을 끄면 **운행일지·예약·통계·출력·푸시** 등 핵심은 어느 지역에서든 동작합니다. 자세한 내용은 [셀프호스팅 가이드 §8](docs/SELF_HOSTING.md#8-한국-특화-기능-참고) 참고.
 
+### 떼어 쓸 수 있는 것
+
+전체를 fork하지 않아도, 아래는 **스택·도메인과 독립적으로** 가져갈 수 있는 부분입니다.
+
+| 무엇 | 어디를 보면 되나 | 왜 참고할 만한가 |
+|------|------------------|------------------|
+| **에이전트 하네스** | [.agent/](.agent/) · [scripts/check-harness.ts](scripts/check-harness.ts) · [scripts/skill-trigger-eval.json](scripts/skill-trigger-eval.json) | 스킬·워크플로·행동 규칙이 단일 원본이고 `.claude/`는 파생물이며 CI가 드리프트를 막습니다. 하네스 Doctor는 13개 영역 정합성을 검사해 **불일치 시 CI를 실패**시키고, eval 세트로 **에이전트 행동을 회귀 측정**합니다. 지침을 "문서에 적힌 약속"이 아니라 실행 가능한 게이트로 만드는 방식이라 어떤 언어·프레임워크에도 옮겨집니다 |
+| **멀티테넌트 격리** | [eslint-rules/require-organization-filter.js](eslint-rules/require-organization-filter.js) · [firestore.rules](firestore.rules) · [tests/firestore-rules.test.ts](tests/firestore-rules.test.ts) · `setCustomClaims` | 테넌트 필터 누락은 코드 리뷰로 막기 어려운 사고입니다. 여기서는 커스텀 ESLint 규칙 `local/require-organization-filter`가 쿼리의 `organizationId` 누락을 **정적으로 차단**하고, Rules 테스트와 Custom Claims 동기화 트리거가 서버 측을 이중으로 받칩니다. 기관 → 회사·학교·지점으로 이름만 바꾸면 그대로 쓰입니다 |
+| **무료 한도 비용 설계** | [docs/FIRESTORE_COST_ANALYSIS.md](docs/FIRESTORE_COST_ANALYSIS.md) · `dailyNightlyBatch`·`monthlyBatch` · [firestore-query-optimization](.agent/skills/firestore-query-optimization/SKILL.md) | 비영리 서비스의 실질 제약은 기능이 아니라 과금입니다. 개별 스케줄러를 야간·월간 배치로 통합해 잡 수를 줄이고, 주기를 업무 시간으로 좁히고(평일 08~18시), 집계 캐싱·쿨다운·페이지네이션으로 읽기를 줄인 결정과 실측이 남아 있습니다 |
+| **예약 + 사용대장 골격** | `createReservationSafe` · [src/components/common/ReservationCalendar.tsx](src/components/common/ReservationCalendar.tsx) · [data-export-pattern](.agent/skills/data-export-pattern/SKILL.md) | 차량이라는 명사를 빼면 남는 구조는 일반적입니다. `vehicles`=자원, `reservations`는 그대로, `driveLogs`=사용대장으로 두면 회의실·장비·공용 물품 대여가 됩니다. 트랜잭션 충돌 방지, 승인 흐름, 반복 예약(공휴일 제외), 공식 양식 PDF/Excel 출력은 도메인과 무관합니다 |
+| **개인정보 규제 대응** | `functions/src/handlers/triggers/auditLog.ts` · `PROCESSORS`(처리방침) | 접속기록을 클라이언트가 아니라 Firestore 트리거로 남기고, **무엇을 기록하지 않을지**를 화이트리스트로 정한 설계입니다. 처리방침의 위탁·국외이전 조항은 실제 연동 목록 단일 원본에서 파생시켜 두 조항이 구조적으로 어긋날 수 없게 했습니다. 법 문구는 각자 사실관계가 다르니 그대로 베끼지 말고 **구조만** 참고하세요 |
+| **의사결정 기록** | [docs/구현이력.md](docs/구현이력.md) | Phase 141개에 무엇을 했는지가 아니라 **왜 그렇게 했고 어떤 지적을 기각했는지**가 남아 있습니다(오진을 CI 아티팩트로 뒤집은 과정, 리뷰 지적의 반영·기각 분리). 알려진 제약과 열린 항목도 여기서 확인할 수 있습니다 |
+
+> 포크할 때 함께 상속되는 제약: **Firebase 종속**(Rules·Functions·클레임에 설계가 얽혀 있어 다른 백엔드로 옮기는 것은 재작성에 가깝습니다) · **한국어 전용**(UI·주석·문서, i18n 없음) · **커버리지 편중**(출력물·경로 계산 등 조용히 틀리는 영역은 두껍지만 전체 수치는 낮습니다).
+
 ---
 
 ## 시스템 구조
