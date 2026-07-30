@@ -3,9 +3,8 @@
  * 운행일지 관련 유틸리티 함수 — Firestore 직접 의존 없이 공통으로 사용되는 헬퍼
  */
 import {
-    doc, updateDoc,
     collection, query, where, getDocs,
-    orderBy, limit, serverTimestamp,
+    orderBy, limit,
     type QueryDocumentSnapshot,
     type SnapshotOptions
 } from 'firebase/firestore';
@@ -160,62 +159,6 @@ export const getVehicleEndKmBefore = async (orgId: string, vehicleId: string, be
     }
 };
 
-/**
- * 소급 입력/수정 시 같은 차량의 이후 모든 운행기록 startKm을 연쇄적으로 자동 업데이트
- * - 직전 기록의 endKm → 다음 기록의 startKm 으로 순차 갱신
- * - 최대 20개까지 연쇄 업데이트 (무한 루프 방지)
- * @returns {{ updated: boolean, logId?: string, oldStartKm?: number, newStartKm?: number, chainCount?: number }}
- */
-export const syncNextLogStartKm = async (orgId: string, vehicleId: string, afterDate: Date, newStartKm: number) => {
-    try {
-        let currentAfterDate = afterDate;
-        let carryKm = newStartKm; // 다음 기록에 전달할 startKm
-        let firstResult: { updated: boolean; logId?: string; oldStartKm?: number; newStartKm?: number } = { updated: false };
-        let chainCount = 0;
-        const MAX_CHAIN = 20;
-
-        while (chainCount < MAX_CHAIN) {
-            const q = query(
-                collection(db, 'driveLogs'),
-                where('organizationId', '==', orgId),
-                where('vehicleId', '==', vehicleId),
-                where('timestamp', '>', currentAfterDate),
-                orderBy('timestamp', 'asc'),
-                limit(1)
-            );
-            const snap = await getDocs(q);
-            if (snap.empty) break;
-
-            const nextDoc = snap.docs[0];
-            const nextData = nextDoc.data();
-            const oldStartKm = nextData.startKm;
-
-            // startKm이 이미 맞으면 연쇄 중단 (이후 기록도 영향 없음)
-            if (oldStartKm === carryKm) break;
-
-            await updateDoc(doc(db, 'driveLogs', nextDoc.id), {
-                startKm: carryKm,
-                editedAt: serverTimestamp(),
-            });
-
-            if (chainCount === 0) {
-                firstResult = { updated: true, logId: nextDoc.id, oldStartKm, newStartKm: carryKm };
-            }
-
-            // 다음 연쇄: 현재 기록의 endKm → 그 다음 기록의 startKm
-            carryKm = nextData.endKm ?? carryKm;
-            currentAfterDate = nextData.timestamp instanceof Date
-                ? nextData.timestamp
-                : (nextData.timestamp?.toDate ? nextData.timestamp.toDate() : new Date(nextData.timestamp));
-            chainCount++;
-        }
-
-        return { ...firstResult, chainCount };
-    } catch (error) {
-        captureError(error, { context: 'syncNextLogStartKm', orgId, vehicleId });
-        throw error;
-    }
-};
 
 /** 운행일지 중복 정리 (Cloud Function 호출) */
 export const cleanupDuplicateLogs = async (organizationId: string, { dryRun = true } = {}) => {

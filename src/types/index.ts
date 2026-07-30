@@ -7,7 +7,7 @@
 export type { FirestoreTimestamp, TimestampField, FirestoreDoc } from './common';
 export type { User, UserRole, CreateUserData } from './user';
 export type { Vehicle, VehicleType, VehicleRetired, VehicleMaintenance, CreateVehicleData } from './vehicle';
-export type { DriveLog, CreateDriveLogData, DriveLogPage, SyncResult, DriveLogFilters } from './driveLog';
+export type { DriveLog, CreateDriveLogData, DriveLogPage, DriveLogFilters } from './driveLog';
 export type { Reservation, ReservationStatus, CreateReservationData } from './reservation';
 export type { Organization, OrgStatus, CreateOrgData } from './organization';
 export type { AuditLog, AuditAction, AuditTargetType, AuditActorSource } from './auditLog';
