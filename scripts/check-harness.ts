@@ -356,13 +356,14 @@ export function runChecks(root: string = ROOT): { findings: Finding[]; checked: 
         if (duplicates.length) {
             err('scripts/generate-functions-doc.ts', `카탈로그 중복 항목: ${duplicates.join(', ')}`);
         }
-    }
-    // 카탈로그를 고쳤지만 재생성을 잊은 경우 — 생성 문서의 총계가 어긋난다
-    const refTotal = /총 함수 수: \*\*(\d+)개\*\*/.exec(read(join('docs', 'FUNCTIONS_REFERENCE.md')))?.[1];
-    if (refTotal === undefined) {
-        warn('docs/FUNCTIONS_REFERENCE.md', '총 함수 수 표기를 찾지 못함 — 생성기 출력 형식이 바뀐 것인지 확인');
-    } else if (Number(refTotal) !== catalogNames.length) {
-        err('docs/FUNCTIONS_REFERENCE.md', `문서 총계(${refTotal})와 카탈로그 항목 수(${catalogNames.length}) 불일치 — npx tsx scripts/generate-functions-doc.ts 재실행 필요`);
+        // 카탈로그를 고쳤지만 재생성을 잊은 경우 — 생성 문서의 총계가 어긋난다.
+        // 파서가 고장난 경우(위 분기)에는 검사하지 않는다 — 총계 0 대비로 어긋나 원인을 흐린다.
+        const refTotal = /총 함수 수: \*\*(\d+)개\*\*/.exec(read(join('docs', 'FUNCTIONS_REFERENCE.md')))?.[1];
+        if (refTotal === undefined) {
+            warn('docs/FUNCTIONS_REFERENCE.md', '총 함수 수 표기를 찾지 못함 — 생성기 출력 형식이 바뀐 것인지 확인');
+        } else if (Number(refTotal) !== catalogNames.length) {
+            err('docs/FUNCTIONS_REFERENCE.md', `문서 총계(${refTotal})와 카탈로그 항목 수(${catalogNames.length}) 불일치 — npx tsx scripts/generate-functions-doc.ts 재실행 필요`);
+        }
     }
 
     return { findings, checked };
