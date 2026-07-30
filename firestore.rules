@@ -206,10 +206,16 @@ service cloud.firestore {
     }
 
     // === 접속기록/변경 로그 ===
-    // 고시 「개인정보의 안전성 확보조치 기준」 제16조 ③은 접속기록의 위조·변조·도난·분실
-    // 방지를 요구한다. Cloud Functions(Admin SDK) 트리거만 기록하며, 클라이언트는
-    // 생성·수정·삭제를 전부 할 수 없다. 읽기는 점검 주체에게만 연다 —
-    // 개인정보처리자는 각 기관이므로(이용약관 제9조) 기관 관리자가 자기 기관 기록을 점검한다.
+    // Cloud Functions(Admin SDK) 트리거만 기록하며, 클라이언트는 생성·수정·삭제를 전부
+    // 할 수 없다. 읽기는 점검 주체에게만 연다 — 개인정보처리자는 각 기관이므로
+    // (이용약관 제9조) 기관 관리자가 자기 기관 기록을 점검한다.
+    //
+    // ⚠️ 이 블록이 막는 것은 **클라이언트의** 위조·변조다. Admin SDK는 Rules를 우회하므로
+    // 고시 제16조 ③(위조·변조·도난·분실 방지)을 이것만으로 충족한다고 볼 수 없다. 서버 측
+    // 불변성은 별도 수단(불변 버킷·Cloud Logging 싱크 등)이 필요하며 현재 범위 밖이다.
+    //
+    // organizationId가 '__system__'인 기록(기관 미소속 계정, 주로 superAdmin)은 실재하는
+    // 기관 ID가 아니므로 isOrgAdmin이 성립하지 않아 superAdmin만 읽는다.
     match /auditLogs/{logId} {
       allow read: if isSuperAdmin() || isOrgAdmin(resource.data.organizationId);
       allow write: if false;

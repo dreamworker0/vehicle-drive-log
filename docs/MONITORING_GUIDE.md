@@ -28,6 +28,23 @@ Firestore TTL 정책을 설정하면 이 스케줄러를 **제거하고 자동 �
 
 설정 후 GCP Console의 TTL 목록에서 상태가 "제공 중"으로 바뀌는지 확인한다(수 분 소요).
 
+### 감사 로그 기록 실패 알림 (필수)
+
+접속기록은 법정 기록이므로 손실이 조용히 지나가면 안 된다. `auditLog` 트리거는 실패 시
+`log('ERROR', 'auditLog', ...)`로 Sentry에 올린 뒤 다시 throw해 재전달을 받는다.
+**재시도까지 실패하면 그 기록은 영구 손실**이므로 별도 알림을 걸어 둔다.
+
+Cloud Logging 필터:
+
+```
+resource.type="cloud_function"
+resource.labels.function_name=~"^audit(DriveLog|User)"
+severity>=ERROR
+```
+
+- 빈도: **1시간 내 1건 이상** → 알림 발송 (재시도가 흡수하는 일시 오류까지 즉시 깨우지 않기 위함)
+- 대응: 원본 문서(`targetType`/`targetId`)를 확인하고, 손실된 기록은 수동 보정 여부를 판단한다.
+
 ---
 
 ## 2. Cloud Monitoring 대시보드

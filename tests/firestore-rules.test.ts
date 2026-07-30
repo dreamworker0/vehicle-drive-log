@@ -363,6 +363,18 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertFails(employeeADb.collection('auditLogs').doc('log_A').get());
     // 타 기관 관리자는 차단 (멀티테넌트 격리)
     await assertFails(adminBDb.collection('auditLogs').doc('log_A').get());
+
+    // 기관 미소속 계정(superAdmin)의 기록은 __system__으로 남는다 — superAdmin만 읽는다.
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('auditLogs').doc('log_sys').set({
+        organizationId: '__system__', action: 'update', targetType: 'user',
+        targetId: 'super_1', actorUid: null, actorSource: 'unknown', subjectUids: ['super_1'],
+        changedFields: ['role'],
+      });
+    });
+    await assertSucceeds(superDb.collection('auditLogs').doc('log_sys').get());
+    await assertFails(adminADb.collection('auditLogs').doc('log_sys').get());
+    await assertFails(adminBDb.collection('auditLogs').doc('log_sys').get());
   });
 
   it('11. 비밀 사용자 데이터(users/{uid}/private) — 본인·같은 기관 모두 접근 차단 (Functions 전용)', async () => {

@@ -1,5 +1,7 @@
 import { z } from 'zod';
-import { timestampSchema } from './index';
+// 배럴(./index)이 이 파일을 re-export하므로 './index'에서 가져오면 순환 참조가 된다.
+// 다른 스키마 파일(driveLog 등)과 같이 정의 파일에서 직접 가져온다.
+import { timestampSchema } from './vehicle';
 
 export const auditActionSchema = z.enum(['create', 'update', 'delete']);
 export const auditTargetTypeSchema = z.enum(['driveLog', 'user']);
@@ -11,6 +13,9 @@ export const auditActorSourceSchema = z.enum(['document', 'unknown']);
  * createZodConverter의 fromFirestore는 Zod가 모르는 키를 조용히 제거하므로,
  * 필드를 추가할 때 types/auditLog.ts와 반드시 함께 갱신해야 한다.
  * (organizations.consent를 스키마에 빠뜨려 저장은 되고 조회는 안 되는 결함을 겪었다.)
+ *
+ * at·expiresAt은 트리거가 **항상** 쓰므로 필수로 둔다. optional로 두면 AuditLog 타입과
+ * 상호 대입이 안 되어 조회 화면(Phase 3)에서 캐스팅이 끼어든다.
  */
 export const auditLogSchema = z.object({
     id: z.string().catch(''),
@@ -22,8 +27,8 @@ export const auditLogSchema = z.object({
     actorSource: auditActorSourceSchema.catch('unknown'),
     subjectUids: z.array(z.string()).catch([]),
     changedFields: z.array(z.string()).optional().catch(undefined),
-    at: timestampSchema.optional().catch(undefined),
-    expiresAt: timestampSchema.optional().catch(undefined),
+    at: timestampSchema,
+    expiresAt: timestampSchema,
 });
 
 export type AuditLogSchemaType = z.infer<typeof auditLogSchema>;
