@@ -363,3 +363,23 @@
 | **역할별 체감 변화 — 없다** | superAdmin·기관 관리자·직원 모두 화면 변경 0건. 관리자는 Rules상 읽기 권한만 생겼고 조회 화면은 Phase 3, 직원은 명시적 읽기 차단(점검 주체가 아니다). 트리거는 커밋 이후 비동기라 저장 체감 속도에도 영향이 없다. 달라진 것은 사용자 경험이 아니라 **기관의 법적 지위**다 |
 | **시한 표현 정정** | Phase 3 시한을 "2026-10-29"로 표현했으나, 정확히는 **월 1회 이상 점검 의무가 2026-10-30부로 폐지**되고 내부관리계획상 자율 주기로 바뀌는 날짜다. 그날까지 조회 화면이 없으면 위법이 되는 마감이 아니고, 이후엔 오히려 압박이 줄어든다 |
 | **남은 것 — Phase 2 범위 재조정** | 제16조가 요구하는 항목은 계정·일시·**접속지(IP)**·정보주체·수행업무인데 Phase 1은 일시·정보주체·수행업무만 채웠다(계정은 수정·삭제에서 공백, IP는 전무). 원래 계획한 **전면 열람 로그는 하지 않기로** 했다 — 로그가 원본보다 커지고 실질 위험은 개별 조회가 아니라 반출에 있다. 대신 ① **행위자 스탬프**: `lastEditedByUid` + Rules `request.resource.data.lastEditedByUid == request.auth.uid`로 **위조 불가하게 강제**(클라이언트가 심는 값인데도 인증 토큰과 일치를 Rules가 보장하므로 콜러블 이관·오프라인 큐 변경이 불필요) ② **세션 기록 콜러블**: 로그인 시 1회 uid·IP·UA(트리거는 IP를 볼 수 없다) ③ **반출 기록**: 엑셀·PDF 내보내기, 직원 목록 일괄 조회, superAdmin 타 기관 접근. ①② 2시간이면 항목 요건이 채워진다. 우선순위는 **#91~#93 머지(시행일 2026-08-05 고정) 이후** |
+
+---
+
+### Phase 124: 공개 문서 현행화 — README·셀프호스팅·Functions 레퍼런스 📄 (문서 전용)
+
+> 2026-07-30, "GitHub 저장소에 갱신할 게 있을까"라는 질문에서 출발해 공개 문서를 코드와 대조했다. 결과는 **낡음이 아니라 오류**였다 — 셀프호스터가 가이드를 그대로 따르면 티맵 경로 탐색이 안 되고, App Check를 켤 수 없고, `functions/.env`를 예시대로 채우면 **배포가 거부**된다. 문서를 사람이 손으로 쓰면 코드와 어긋난다는 일반론이 아니라, **어긋난 지점이 전부 "설정값"이라는 한 종류**였다는 게 이 회차의 발견이다.
+
+| 항목 | 내용 |
+|------|------|
+| **환경변수 이름 오류 (A급)** | README·SELF_HOSTING이 `VITE_TMAP_APP_KEY`를 요구하는데 코드는 `VITE_TMAP_API_KEY`를 읽는다. 이름이 다르면 값을 정확히 넣어도 앱 내 경로 탐색·톨비가 조용히 비활성 — 에러도 안 난다 |
+| **App Check 사이트 키 미기재** | `firebase.ts:73`이 `VITE_RECAPTCHA_SITE_KEY`로 `ReCaptchaV3Provider`를 초기화하는데 두 문서 어디에도 이 변수가 없었다. SELF_HOSTING §7은 "reCAPTCHA v3 등록"까지만 안내해, 등록하고 나서 **키를 넣을 곳을 모르는 상태**로 끝났다 |
+| **`functions/.env` 예시가 배포를 깨뜨렸다** | README가 `EMAILJS_PRIVATE_KEY`·`ALIMTALK_PROXY_TOKEN`을 `.env`에 쓰라고 안내했으나 둘은 `defineSecret`(Secret Manager) 대상이다. `params.ts` 주석대로 **같은 키가 `.env`에 남아 있으면 이름 충돌로 배포가 거부**된다. 예시를 따르는 것이 실패 조건이었다. Secret 8종(`GMAIL_APP_PASSWORD`·`EMAILJS_PRIVATE_KEY`·`ALIMTALK_PROXY_TOKEN`·Slack 5종) `functions:secrets:set` 절차를 신설하고, 선택 기능이라도 **시크릿 미등록 시 그 함수의 배포가 실패**한다는 경고를 SELF_HOSTING에 추가 |
+| **프론트 변수 목록 정정** | 미사용 `VITE_EMAILJS_*` 3종 제거(EmailJS는 Functions 전용으로 이관됨), 누락된 `VITE_FIREBASE_MEASUREMENT_ID` 추가, 개발 전용(`VITE_APPCHECK_DEBUG_TOKEN`·`VITE_USE_EMULATOR`)은 `.env.local`로 분리 명시 |
+| **Functions 레퍼런스가 22개를 몰랐다** | `generate-functions-doc.ts`의 카탈로그는 "자동 생성"이라는 머리말과 달리 **수동 배열**이라 47개에 멈춰 있었다. 누락 22개(Slack 8·감사로그 6·운행일지 트리거 3·`withdrawOrganization`·`deleteUserPermanently`·`backfillMonthlyStats`·`triggerOnDemandCalendarSync`·`dailyNightlyBatch`), 반대로 **존재하지 않는 7개**(`backupFirestore`·`autoPurgeOrgs`·`archiveDriveLogs`·`cleanupCertificateImages`·`verifyMileageConsistency` → 배치로 통합, `updateAggregatedStats` → `syncDriveLogKm`으로 흡수, `scheduledDiscordBriefing` → 제거)를 계속 문서화하고 있었다. 파일 경로도 전부 `handlers/` 이전 값이라 `functions/src/ocrDashboard.ts`처럼 **없는 경로**를 가리켰다 |
+| **스케줄 주기가 셋 다 틀렸다** | README는 `reservationReminder`·`syncCalendarToApp`을 "10분"으로, 카탈로그는 "15분"·"2시간"으로 적었다. 실제는 `0 8-18 * * 1-5`(평일 08~18시 매시)와 `0,30 6-22 * * 1-5`(평일 06~22시 30분). 비용 절감으로 주기를 늘린 변경이 문서에 반영되지 않은 것 |
+| **정합성 검증 방식** | `index.ts`의 export 이름 집합과 카탈로그 `name` 집합을 `comm`으로 대조해 **63 = 63 완전 일치** 확인. README의 종류별 개수(onCall 34·onRequest 4·onSchedule 5·Firestore 19·Auth 1)도 생성된 문서의 섹션 카운트와 맞췄다 |
+| **README 구조 변경** | 함수 4개 표(28개만 나열)를 종류별 요약 + [FUNCTIONS_REFERENCE.md](../FUNCTIONS_REFERENCE.md) 링크로 대체 — 같은 목록을 두 곳에서 손으로 유지하는 구조 자체가 낡음의 원인이었다. 배포 절에서 로컬 `firebase deploy` 안내를 CI 단일 경로로 교체(CLAUDE.md와 모순이었다), 셀프호스터용 경로는 별도 링크로 분리. `src/contexts/`(삭제됨) → `src/schemas/`, 주요 기능에 Slack·AI 도움말·보안 3행, 기술 스택에 App Check·Slack 2행 추가 |
+| **테스트 규모 실측 갱신** | 표기 49파일/357건 → **94파일/965건**, Functions 19 suites/172건 → **52 suites/548건**, Rules 1파일 → Firestore 16 + Storage 6건, E2E 18 → 24 spec. grep 근사치가 아니라 `npm test`·`test:functions`를 실제 실행해 얻은 값 |
+| **검증** | ESLint 0 · `tsc --noEmit` 0 · 하네스 Doctor 12영역 0오류. 생성기 재실행으로 문서 재생성(63개). 블록인용 머리말이 trailing space 두 칸에 의존해 줄바꿈되던 것을 `>` 빈 줄 분리로 바꿔 렌더링 깨짐 여지를 없앴다 |
+| **하지 않은 것** | 공개 전환(2026-07-18) 이전 내부 산출물(`progress.md`·`ORIGINAL_REQUEST.md`·`로그인문제해결계획서_v4.2.md`·`docs/2026-07-10코덱스평가*.md`·`docs/개선계획서_*.md`)의 정리·아카이빙은 보류 — 기능 영향이 없고, "실제 프로덕션 레퍼런스"라는 공개 목적에는 오히려 자료가 된다. 카탈로그 드리프트를 CI에서 막는 `index.ts` 대조 가드도 별건으로 남겼다(이번엔 수동 대조로 확인) |
