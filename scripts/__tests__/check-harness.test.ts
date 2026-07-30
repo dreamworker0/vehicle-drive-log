@@ -6,6 +6,8 @@ import {
     hashResults,
     findPwshChainingIssues,
     extractNpmRunScripts,
+    extractFunctionExports,
+    extractCatalogNames,
 } from '../check-harness';
 
 describe('parseFrontmatter', () => {
@@ -82,5 +84,77 @@ describe('extractNpmRunScripts', () => {
 
     it('npm test 등 run 없는 형태는 대상이 아니다', () => {
         expect(extractNpmRunScripts('npm test; npm install')).toEqual([]);
+    });
+});
+
+describe('extractFunctionExports', () => {
+    it('한 줄·여러 개·여러 줄 export를 모두 뽑는다', () => {
+        const src = [
+            '// 주석',
+            'export { ocrDashboard } from "./handlers/callable/ocrDashboard";',
+            'export { onReservationCreated, onReservationUpdated } from "./handlers/triggers/reservationTriggers";',
+            'export {',
+            '    auditUserCreated, auditUserUpdated,',
+            '} from "./handlers/triggers/auditLog";',
+        ].join('\n');
+        expect(extractFunctionExports(src)).toEqual([
+            'ocrDashboard',
+            'onReservationCreated',
+            'onReservationUpdated',
+            'auditUserCreated',
+            'auditUserUpdated',
+        ]);
+    });
+
+    it('as 별칭은 배포 이름(별칭 쪽)을 취한다', () => {
+        expect(extractFunctionExports('export { internalName as deployedName } from "./x";')).toEqual([
+            'deployedName',
+        ]);
+    });
+
+    it('import나 로컬 export는 함수 export로 세지 않는다', () => {
+        const src = 'import { getFirestore } from "firebase-admin/firestore";\nexport const NOT_A_FN = 1;';
+        expect(extractFunctionExports(src)).toEqual([]);
+    });
+});
+
+describe('extractCatalogNames', () => {
+    it('카탈로그 항목의 name만 뽑는다', () => {
+        const src = [
+            'const FUNCTIONS: FunctionEntry[] = [',
+            '  {',
+            "    name: 'ocrDashboard',",
+            "    type: 'onCall',",
+            "    file: 'handlers/callable/ocrDashboard.ts',",
+            "    description: '설명 안의 name: 가짜 표기',",
+            '  },',
+            '  {',
+            "    name: 'askAI',",
+            "    type: 'onCall',",
+            '  },',
+            '];',
+        ].join('\n');
+        expect(extractCatalogNames(src)).toEqual(['ocrDashboard', 'askAI']);
+    });
+});
+
+describe('카탈로그 드리프트 판정', () => {
+    // 13번 검사의 비교 규칙 자체를 고정한다 — 어느 방향의 누락이든 잡혀야 한다.
+    const diff = (exported: string[], catalog: string[]) => ({
+        missing: exported.filter((n) => !catalog.includes(n)),
+        stale: catalog.filter((n) => !exported.includes(n)),
+    });
+
+    it('배포됐지만 문서에 없는 함수를 잡는다', () => {
+        expect(diff(['a', 'b'], ['a']).missing).toEqual(['b']);
+    });
+
+    it('문서에만 남은 삭제된 함수를 잡는다', () => {
+        expect(diff(['a'], ['a', 'archiveDriveLogs']).stale).toEqual(['archiveDriveLogs']);
+    });
+
+    it('일치하면 양방향 모두 비어 있다', () => {
+        const r = diff(['a', 'b'], ['b', 'a']);
+        expect([r.missing, r.stale]).toEqual([[], []]);
     });
 });

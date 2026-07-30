@@ -91,6 +91,27 @@ export function extractNpmRunScripts(md: string): string[] {
     return out;
 }
 
+/**
+ * functions/src/index.ts의 export 이름을 뽑는다.
+ * `export { a } from "..."` / `export { a, b } from "..."` / 여러 줄 형태를 모두 처리하고,
+ * `x as y` 별칭은 실제 배포 이름인 `y`를 취한다.
+ */
+export function extractFunctionExports(src: string): string[] {
+    const out: string[] = [];
+    for (const m of src.matchAll(/export\s*\{([^}]*)\}\s*from/g)) {
+        for (const raw of m[1].split(',')) {
+            const name = raw.trim().split(/\s+as\s+/).pop()?.trim();
+            if (name) out.push(name);
+        }
+    }
+    return out;
+}
+
+/** generate-functions-doc.ts 카탈로그의 함수 이름을 뽑는다. */
+export function extractCatalogNames(src: string): string[] {
+    return [...src.matchAll(/^\s*name:\s*'([A-Za-z0-9_]+)'/gm)].map((m) => m[1]);
+}
+
 // ── 검사 본체 ────────────────────────────────────────────────────────────────
 
 function read(rel: string): string {
@@ -293,6 +314,35 @@ export function runChecks(root: string = ROOT): { findings: Finding[]; checked: 
                 err(rel.replace(/\\/g, '/'), `깨진 상대 링크: ${link}`);
             }
         }
+    }
+
+    // 13. Functions 레퍼런스 카탈로그 ↔ index.ts export 정합
+    // 카탈로그가 수동 배열이라 함수를 추가·삭제하면 문서가 조용히 낡는다(Phase 124에서 47 vs 63으로 벌어져 있었다).
+    checked++;
+    const catalogNames = extractCatalogNames(read(join('scripts', 'generate-functions-doc.ts')));
+    const exportedNames = extractFunctionExports(read(join('functions', 'src', 'index.ts')));
+    const catalogSet = new Set(catalogNames);
+    const exportedSet = new Set(exportedNames);
+    for (const name of exportedNames) {
+        if (!catalogSet.has(name)) {
+            err('scripts/generate-functions-doc.ts', `카탈로그에 없는 배포 함수: ${name} — 항목 추가 후 npx tsx scripts/generate-functions-doc.ts`);
+        }
+    }
+    for (const name of catalogNames) {
+        if (!exportedSet.has(name)) {
+            err('scripts/generate-functions-doc.ts', `index.ts에서 export되지 않는 카탈로그 항목: ${name} — 삭제된 함수라면 항목 제거`);
+        }
+    }
+    const dupCatalog = catalogNames.filter((n, i) => catalogNames.indexOf(n) !== i);
+    if (dupCatalog.length) {
+        err('scripts/generate-functions-doc.ts', `카탈로그 중복 항목: ${[...new Set(dupCatalog)].join(', ')}`);
+    }
+    // 카탈로그를 고쳤지만 재생성을 잊은 경우 — 생성 문서의 총계가 어긋난다
+    const refTotal = /총 함수 수: \*\*(\d+)개\*\*/.exec(read(join('docs', 'FUNCTIONS_REFERENCE.md')))?.[1];
+    if (refTotal === undefined) {
+        warn('docs/FUNCTIONS_REFERENCE.md', '총 함수 수 표기를 찾지 못함 — 생성기 출력 형식이 바뀐 것인지 확인');
+    } else if (Number(refTotal) !== catalogNames.length) {
+        err('docs/FUNCTIONS_REFERENCE.md', `문서 총계(${refTotal})와 카탈로그 항목 수(${catalogNames.length}) 불일치 — npx tsx scripts/generate-functions-doc.ts 재실행 필요`);
     }
 
     return { findings, checked };
