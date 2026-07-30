@@ -19,7 +19,6 @@ export {
     getLastVehicleDriveLog,
     getLastVehicleEndBattery,
     getVehicleEndKmBefore,
-    syncNextLogStartKm,
     cleanupDuplicateLogs,
     getAdjacentDriveLogs,
 } from './utils';

@@ -70,7 +70,6 @@ export {
     getVehicleDriveLogs,
     hasVehicleDriveLogs,
     cleanupDuplicateLogs,
-    syncNextLogStartKm,
     deleteDriveLog,
     getAdjacentDriveLogs,
 } from './driveLogs';
