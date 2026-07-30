@@ -26,16 +26,23 @@ test.describe('접근성 심화 검증', () => {
 
     test('인터랙티브 요소에 키보드 접근이 가능하다', async ({ page }) => {
         await page.goto('/');
-        await page.waitForTimeout(2000);
 
-        // Tab 키로 첫 번째 인터랙티브 요소에 포커스 이동
-        await page.keyboard.press('Tab');
-        const focused = await page.evaluate(() => {
-            const el = document.activeElement;
-            return el?.tagName?.toLowerCase();
-        });
-        // 포커스가 body가 아닌 인터랙티브 요소로 이동해야 함
-        expect(['a', 'button', 'input', 'select', 'textarea']).toContain(focused);
+        // 하이드레이션 전에 Tab을 누르면 포커스가 body에 머문다. 고정 대기(2s)는 커버리지·
+        // 에뮬레이터와 함께 도는 verify:full처럼 부하가 걸린 실행에서 부족해 실패했다.
+        // 포커스 가능한 요소가 실제로 붙을 때까지 기다린 뒤, 이동이 확정될 때까지 재시도한다.
+        // (같은 하이드레이션 레이스를 terms-privacy.spec.ts도 toPass로 처리한다.)
+        const interactive = page.locator('a, button, input, select, textarea');
+        await expect(interactive.first()).toBeVisible({ timeout: 10000 });
+
+        await expect(async () => {
+            // 재시도마다 포커스를 초기 상태로 되돌린다. 되돌리지 않으면 Tab이 누적되어
+            // "첫 Tab이 인터랙티브 요소로 가는가"가 "N번 누르면 가는가"로 약해진다.
+            await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+            await page.keyboard.press('Tab');
+            const focused = await page.evaluate(() => document.activeElement?.tagName?.toLowerCase());
+            // 포커스가 body가 아닌 인터랙티브 요소로 이동해야 함
+            expect(['a', 'button', 'input', 'select', 'textarea']).toContain(focused);
+        }).toPass({ timeout: 10000 });
     });
 
     test('html lang 속성이 설정되어 있다', async ({ page }) => {
