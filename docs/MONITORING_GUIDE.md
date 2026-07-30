@@ -16,6 +16,35 @@ Firestore TTL 정책을 설정하면 이 스케줄러를 **제거하고 자동 �
 
 > TTL 활성화 후 `index.ts`에서 `cleanupRateLimits` export를 제거하고 재배포하면 됨.
 
+### ⚠️ 배포 후 필수 작업 — `auditLogs` TTL 정책
+
+접속기록(변경 로그)은 고시 「개인정보의 안전성 확보조치 기준」 제16조에 따라 **1년 보관**한다.
+트리거가 `expiresAt`(= 기록 시각 + 365일)을 채우지만, **TTL 정책을 설정하지 않으면 문서가
+영구히 쌓인다** — 보관기간 경과분을 파기하지 않는 것 자체가 최소보관 원칙 위반이다.
+
+위 절차와 동일하게 설정한다.
+- 컬렉션 그룹: `auditLogs`
+- TTL 필드: `expiresAt`
+
+설정 후 GCP Console의 TTL 목록에서 상태가 "제공 중"으로 바뀌는지 확인한다(수 분 소요).
+
+### 감사 로그 기록 실패 알림 (필수)
+
+접속기록은 법정 기록이므로 손실이 조용히 지나가면 안 된다. `auditLog` 트리거는 실패 시
+`log('ERROR', 'auditLog', ...)`로 Sentry에 올린 뒤 다시 throw해 재전달을 받는다.
+**재시도까지 실패하면 그 기록은 영구 손실**이므로 별도 알림을 걸어 둔다.
+
+Cloud Logging 필터:
+
+```
+resource.type="cloud_function"
+resource.labels.function_name=~"^audit(DriveLog|User)"
+severity>=ERROR
+```
+
+- 빈도: **1시간 내 1건 이상** → 알림 발송 (재시도가 흡수하는 일시 오류까지 즉시 깨우지 않기 위함)
+- 대응: 원본 문서(`targetType`/`targetId`)를 확인하고, 손실된 기록은 수동 보정 여부를 판단한다.
+
 ---
 
 ## 2. Cloud Monitoring 대시보드

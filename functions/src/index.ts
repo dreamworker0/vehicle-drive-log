@@ -133,6 +133,12 @@ export { onUserDelete } from "./handlers/triggers/onUserDelete";
 // 운행일지 생성/수정/삭제 시 차량 주행거리 증분 및 자동 연쇄 동기화
 export { onDriveLogCreated, onDriveLogUpdated, onDriveLogDeleted } from "./handlers/triggers/syncDriveLogKm";
 
+// 접속기록/변경 로그 (고시 「개인정보의 안전성 확보조치 기준」 제16조)
+export {
+    auditDriveLogCreated, auditDriveLogUpdated, auditDriveLogDeleted,
+    auditUserCreated, auditUserUpdated, auditUserDeleted,
+} from "./handlers/triggers/auditLog";
+
 // 구글 캘린더 온디맨드 동기화 API
 export { triggerOnDemandCalendarSync } from "./handlers/callable/triggerOnDemandCalendarSync";
 
