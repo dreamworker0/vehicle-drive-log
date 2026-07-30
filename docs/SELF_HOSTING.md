@@ -81,6 +81,8 @@ VITE_FIREBASE_MESSAGING_SENDER_ID=...
 VITE_FIREBASE_APP_ID=...
 # 웹 푸시 (Cloud Messaging → 웹 푸시 인증서)
 VITE_FIREBASE_VAPID_KEY=...
+# App Check (§7에서 reCAPTCHA v3를 등록하면 발급되는 사이트 키)
+VITE_RECAPTCHA_SITE_KEY=...
 ```
 
 `functions/.env`:
@@ -94,11 +96,31 @@ GEMINI_API_KEY=...
 
 | 기능 | 변수 | 없으면 |
 |------|------|--------|
-| 길안내(티맵 경로·톨비) | `VITE_TMAP_APP_KEY` | 딥링크는 되지만 앱 내 경로 탐색 비활성 |
+| 길안내(티맵 경로·톨비) | `VITE_TMAP_API_KEY`, `functions` 쪽 `TMAP_API_KEY` | 딥링크는 되지만 앱 내 경로 탐색 비활성 |
 | 반복 예약 시 공휴일 제외 | `VITE_HOLIDAY_API_KEY`, `functions` 쪽 `HOLIDAY_API_KEY` | 공휴일 자동 제외 안 됨 |
 | 에러 모니터링 | `VITE_SENTRY_DSN` | Sentry 미전송 (기능엔 영향 없음) |
-| 승인/알림 이메일 | `VITE_EMAILJS_*`, `functions`의 `EMAILJS_*` | 이메일 발송 생략 |
-| 카카오 알림톡 | `functions`의 `ALIMTALK_PROXY_URL`, `ALIMTALK_PROXY_TOKEN` | 알림톡 미발송 (§7 한국 특화 참고) |
+| 승인/알림 이메일 | `functions`의 `EMAILJS_SERVICE_ID`·`EMAILJS_TEMPLATE_ID`·`EMAILJS_PUBLIC_KEY`·`GMAIL_USER` + 시크릿 `EMAILJS_PRIVATE_KEY`·`GMAIL_APP_PASSWORD` | 이메일 발송 생략 |
+| 카카오 알림톡 | `functions`의 `ALIMTALK_PROXY_URL` + 시크릿 `ALIMTALK_PROXY_TOKEN` | 알림톡 미발송 (§8 한국 특화 참고) |
+| Slack 어시스턴트 | 시크릿 `SLACK_CLIENT_ID`·`SLACK_CLIENT_SECRET`·`SLACK_SIGNING_SECRET`·`SLACK_STATE_SECRET`·`SLACK_TOKEN_ENC_KEY` | 설정 화면에서 "Slack 연결"이 실패 (다른 기능은 정상) |
+| 운영 알림(Discord) | `functions`의 `DISCORD_WEBHOOK_URL` | 관리자 Discord 알림 생략 |
+
+### 4-3. 크리덴셜은 Secret Manager로
+
+비밀값은 `functions/.env` 평문이 아니라 Secret Manager에 넣습니다. **같은 키가 `functions/.env`에도 남아 있으면 이름 충돌로 배포가 거부**됩니다. 목록은 [functions/src/core/params.ts](../functions/src/core/params.ts)가 원본입니다.
+
+> ⚠️ 선택 기능이라도 **시크릿이 등록되어 있지 않으면 그 시크릿을 선언한 함수의 배포가 실패**합니다. 쓰지 않을 기능은 빈 값이라도 등록하거나, `functions/src/index.ts`에서 해당 함수 export를 제거하세요.
+
+```bash
+firebase functions:secrets:set GMAIL_APP_PASSWORD    # 승인/거절 메일 (Gmail SMTP)
+firebase functions:secrets:set EMAILJS_PRIVATE_KEY   # 기관 자동 검증 메일
+firebase functions:secrets:set ALIMTALK_PROXY_TOKEN  # 카카오 알림톡 프록시
+# Slack을 쓸 때만
+firebase functions:secrets:set SLACK_CLIENT_ID
+firebase functions:secrets:set SLACK_CLIENT_SECRET
+firebase functions:secrets:set SLACK_SIGNING_SECRET
+firebase functions:secrets:set SLACK_STATE_SECRET    # openssl rand -base64 32
+firebase functions:secrets:set SLACK_TOKEN_ENC_KEY   # openssl rand -base64 32 (AES-256)
+```
 
 > `.env`·`functions/.env`는 `.gitignore`로 커밋되지 않습니다. 절대 저장소에 올리지 마세요.
 
@@ -146,7 +168,7 @@ firebase deploy --only firestore:indexes
 
 멀티테넌트 데이터는 Firestore 보안 규칙으로 보호되지만, App Check를 켜면 **정상 앱이 아닌 요청을 차단**해 남용을 추가로 막습니다.
 
-1. 콘솔 → App Check → 웹 앱에 **reCAPTCHA v3** 등록
+1. 콘솔 → App Check → 웹 앱에 **reCAPTCHA v3** 등록 → 발급된 **사이트 키를 `.env`의 `VITE_RECAPTCHA_SITE_KEY`** 에 넣습니다 (§4-1)
 2. 개발 중에는 디버그 토큰 사용 — [.env.local.example](../.env.local.example)의 `VITE_APPCHECK_DEBUG_TOKEN` 참고
 3. 관찰 기간을 두고 문제없으면 Firestore → Functions 순으로 **강제(enforce)** 로 전환
 
