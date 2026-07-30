@@ -1,0 +1,4 @@
+{
+  "excludeAuthors": ["dependabot[bot]"],
+  "ignorePatterns": "docs/**\n*.md\n.agent/**\n.claude/**"
+}
