@@ -6,8 +6,13 @@
 Firestore TTL 정책을 설정하면 이 스케줄러를 **제거하고 자동 삭제**로 전환 가능.
 
 ### 설정 방법
+
+> **직행 링크**: https://console.cloud.google.com/firestore/databases/-default-/ttl?project=vehicle-drive-log
+> 경로는 `/ttl`이다(`/time-to-live`가 아니다). `?project=`를 빼면 프로젝트 컨텍스트가 없어 "URL을 찾을 수 없음"이 뜬다.
+> Firebase 콘솔에는 TTL 탭이 **없다** — Cloud 콘솔 전용이며, Firebase 콘솔의 `Google Cloud의 추가 기능` 드롭다운으로도 갈 수 있다.
+
 1. [GCP Console](https://console.cloud.google.com/firestore) → Firestore
-2. 좌측 메뉴 → **TTL (Time-to-Live)** 선택
+2. 좌측 메뉴 → **TTL (수명)** 선택
 3. **정책 만들기** 클릭
 4. 설정:
    - 컬렉션 그룹: `_rateLimits`
