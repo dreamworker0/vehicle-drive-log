@@ -32,7 +32,7 @@ jobs:
 
     steps:
       # CI가 검증한 바로 그 커밋을 배포한다 (workflow_run 사이에 새 푸시가 끼어도 안전)
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
