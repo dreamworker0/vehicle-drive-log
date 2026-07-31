@@ -10,7 +10,7 @@ import {
     getReservationsByDateRange,
 } from '../../../lib/firestore';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
-import { findOverlappingReservation, findUserOverlappingReservation } from '../../utils/reservationUtils';
+import { findOverlappingReservation } from '../../utils/reservationUtils';
 import { isVehicleRestrictedForUser } from '../../../lib/vehicleUtils';
 import { generateRecurringDates, generateRecurringGroupId } from '../../utils/recurringUtils';
 import type { Reservation } from '../../../types/reservation';
@@ -64,19 +64,8 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
         return;
     }
 
-    // 같은 사용자가 같은 시간대에 다른 차량 예약이 있는지 검증 (첫째 날 기준)
-    const targetUid = form.reservedByUid || user.uid;
-    const userOverlap = findUserOverlappingReservation(reservations, {
-        reservedByUid: targetUid,
-        date: selectedDate,
-        startTime: form.startTime,
-        endTime: isMultiDay ? '23:59' : form.endTime,
-        excludeId: editingReservation?.id || null,
-    });
-    if (userOverlap && !isRecurring) {
-        showToast('같은 시간대에 2대의 차량을 예약할 수 없습니다.', 'warning');
-        return;
-    }
+    // 한 사람이 같은 시간대에 여러 대의 차량을 예약하는 것은 허용한다 (행사·대규모 외근 대응).
+    // 서버 코어(createReservationCore)도 차량 기준 겹침만 검사하므로 클라이언트에서도 막지 않는다.
 
     // 차량별 사용 가능 직원 제한 검증 (UI 비활성의 방어적 이중 체크, 서버 콜러블에서도 재검증됨)
     const selectedVehicle = vehicles.find(v => v.id === form.vehicleId);

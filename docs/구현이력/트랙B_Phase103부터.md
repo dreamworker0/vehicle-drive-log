@@ -425,3 +425,40 @@
 | **검증** | Functions 52 suites/**556건**(548 → +8) · 프론트 94파일/974건 · ESLint 0 · tsc 0(프론트·Functions) |
 | **남는 것 — 쓰기 건수 자체** | `startKm`이 앞 기록의 `endKm`을 비정규화해 들고 있으므로, 과거 km 정정이 뒤 기록 전부를 다시 쓰는 것은 모델상 불가피하다. 줄인 것은 **호출·조회·중복 파도**다. 동일 timestamp 형제 문서를 커서가 건너뛰는 기존 한계도 그대로다(문서 수 상한이 있어 폭주는 아니다) |
 | **배포 시 주의** | 배포 순간 구버전 호출이 남아 rev 없이 쓴 문서가 있으면 신버전 가드가 "사람 편집"으로 보고 연쇄를 한 번 더 돌린다. 결과는 동일 값으로 수렴하므로(멱등) 안전하다 |
+
+---
+
+### Phase 127: Google 로그인 계정 전환 불가 수정 — prompt=select_account 🔐 (커밋·PR)
+
+> 2026-07-31, 사용자 문의로 확인했다. 스마트폰에서 "다른 계정으로 로그인"을 눌러도 직전 구글 계정으로 다시 들어가진다는 신고였다. **버튼이 실제로 하는 일과 사용자가 기대하는 일이 어긋나 있었다.**
+
+| 항목 | 내용 |
+|------|------|
+| **증상** | 모바일에서 계정1로 로그인된 상태에서 계정2로 바꾸려고 "다른 계정으로 로그인"을 눌러도, 다시 계정1로 로그인된다 |
+| **원인 — 앱이 끊을 수 없는 세션** | `googleProvider`에 커스텀 파라미터가 없어 `prompt` 미지정 상태였다. 이러면 Google은 브라우저에 활성 세션이 **하나뿐일 때 계정 선택 화면을 건너뛰고** 그 계정으로 바로 인증시킨다. 앱의 `logout()`은 Firebase 세션·오프라인 큐·Firestore 캐시를 지우지만 **Google 쪽 브라우저 세션은 지울 수 없다**(권한도 범위도 밖). 그래서 [InviteCodePage](../../src/components/auth/InviteCodePage.tsx)의 "다른 계정으로 로그인" 버튼은 로그아웃까지만 하고, 이어지는 `signInWithRedirect`가 같은 계정을 조용히 되돌려놨다 |
+| **조치** | `googleProvider.setCustomParameters({ prompt: 'select_account' })` 한 줄. 활성 세션 수와 무관하게 매 로그인마다 계정 선택 화면을 강제한다. 로그인 진입점은 `src/lib/auth.ts` 하나뿐이고 popup/redirect 분기 모두 같은 provider를 쓰므로 한 곳만 고치면 된다 |
+| **부수 효과 — 오히려 이득** | 기관 공용 기기(차량 운행일지 특성상 흔하다)에서 직전 사용자 계정으로 무의식 재로그인되던 것도 함께 막힌다. 비용은 재로그인 시 계정 클릭 1회 |
+| **안 한 것** | `prompt: 'consent'`는 매번 권한 동의 화면까지 띄워 과하다(계정 선택만 필요). redirect/popup 분기, `handleRedirectResult` 경로는 그대로 뒀다 |
+| **설치형 PWA(standalone)** | 인증 경로에 display-mode 분기가 없어(standalone 참조는 InstallPrompt·useBackButton뿐) 설치형도 브라우저와 **같은 코드·같은 리다이렉트 흐름**을 탄다. 이 변경은 Google이 보여줄 화면만 바꾸므로 리다이렉트 복귀 메커니즘은 그대로다 — 계정 선택 화면이 한 번 더 뜰 뿐이다 |
+| **검증** | ESLint 0 · tsc 0 · 프론트 94파일/974건(tmap 1건은 병렬 워커 타임아웃 플레이크, 단독 재실행 11/11 통과) · 프로덕션 빌드 통과. Google 계정 선택 화면 자체는 외부 도메인이라 E2E로 덮을 수 없어 배포 후 실기기 확인이 남는다 |
+| **배포 전 문의자 안내** | 크롬 시크릿 탭으로 접속하거나, `accounts.google.com`에서 로그아웃 후 재로그인하면 계정 선택 화면이 나온다 |
+
+---
+
+### Phase 128: 한 사람의 동시 다중 차량 예약 차단 제거 — 클라이언트만 서버·FAQ와 어긋나 있었다 🚗 (수동 배포·PR)
+
+> 2026-07-31, 사용자가 화면 캡처와 함께 "이 문제는 해결이 된 것 아닌가"라고 물어왔다. **답은 둘 다였다** — 코드는 고쳐져 있었고, 커밋되지 않아 배포되지 않았다.
+
+| 항목 | 내용 |
+|------|------|
+| **증상** | 예약 화면에서 한 사람이 같은 시간대에 두 번째 차량을 예약하면 `같은 시간대에 2대의 차량을 예약할 수 없습니다.` 토스트로 차단 |
+| **1차 원인 — 세 곳의 정책이 어긋나 있었다** | 클라이언트 `handleSubmit`만 사용자 단위 겹침(`findUserOverlappingReservation`)을 검사했다. 서버 코어 `createReservationCore`는 `organizationId + vehicleId + date` 기준 겹침만 보고 `reservedByUid`는 판정에 쓰지 않으며(`modifyReservationCore`도 동일), [FAQ](../../shared/faqData.ts)의 `multiple-reservations-same-time` 항목은 "한 분이 같은 시간대에 각기 다른 여러 대의 차량을 동시에 예약하시는 것은 전혀 막지 않습니다"라고 **이미 안내 중**이었다. 행사·대규모 외근처럼 한 사람이 여러 대를 잡아야 하는 상황을 클라이언트가 단독으로 막고 있었다 |
+| **2차 원인 — 고친 코드가 배포되지 않았다** | 수정이 워킹트리에만 있었다. 커밋조차 없어 master에도, 프로덕션에도 반영되지 않은 상태였다. 사용자는 "고쳤다"고 기억했고 실제로 파일은 고쳐져 있었으므로, **로컬 수정과 배포 상태의 간극이 그대로 미해결 버그로 남아 있었다** |
+| **조치** | `handleSubmit`에서 사용자 단위 검사 호출과 차단 분기 제거. 차량 기준 겹침 검사(`findOverlappingReservation`)는 그대로 유지 |
+| **남는 방어선** | 생성 경로는 서버 트랜잭션 단일이다 — `createReservationSafe`는 콜러블 전용이고 직접 쓰기 폴백이 없으며, `firestore.rules`가 일반 사용자의 reservations 직접 create를 막는다. 서버는 차량 문서 락(`_lastReservationLock`) + 트랜잭션으로 차량 기준 겹침을 실제로 거부(`already-exists`)한다 |
+| **다일·반복 경로** | 제거된 블록은 원래 `if (userOverlap && !isRecurring)`이라 반복 예약에선 이미 무력이었다. `isMultiDay`·`isRecurring`·`editingReservation`은 계속 쓰이고, 함께 제거된 `targetUid`는 그 블록 전용 지역 변수였다 |
+| **테스트가 허수였다 — 리뷰 지적 반영** | 처음 쓴 "차단하지 않는다" 테스트는 `reservationUtils` 모듈이 통째로 mock돼 `findOverlappingReservation`이 항상 `null`을 반환하는 탓에, 넣은 예약 픽스처가 **로직에 도달조차 하지 않았다**(빈 배열로 바꿔도 통과 = 기존 "단일 예약 1건 생성"과 동일한 중복 테스트). 해당 케이스만 `vi.importActual`로 실제 구현을 주입하고 `createReservationSafe` 호출 인자까지 단언, 같은 차량이면 차단되는 **대조군**을 추가했다. 뮤테이션 실측 — 제거한 차단 로직을 되살리면 해당 테스트가 실패한다(1 failed / 9 passed) |
+| **배포 경로 — 예외 적용** | 사용자 요청으로 Hosting만 수동 선배포했다(CLAUDE.md 긴급 예외). 프론트엔드 전용 변경이라 Functions 동시 업데이트 충돌 위험이 없고, 진행 중인 CI Deploy가 없음을 확인 후 Node 22로 실행했다. **선배포는 master를 앞서게 만들므로**, 다음 CI 배포가 수정을 되돌리지 않도록 Phase 127과 한 PR로 묶어 master를 프로덕션과 한 번에 맞췄다 |
+| **검증** | ESLint 0 · tsc 0 · 프론트 94파일/976건(reservationSubmitActions 8 → **10건**) · 프로덕션 빌드 통과(번들 예산 이내) |
+| **안 한 것** | `findUserOverlappingReservation`([reservationUtils.ts](../../src/hooks/utils/reservationUtils.ts))은 이 변경으로 프로덕션 호출부가 0건이 됐지만(테스트 5건 + mock 1건만 참조) 스코프 밖이라 남겼다. Phase 126이 "고친 사본과 안 고친 사본을 함께 두면 재발한다"며 죽은 사본을 제거한 전례가 있어, **정리 대상으로 남는다** |
+| **범위 밖 관찰 — 확인 필요** | 리뷰 중 발견. 다일·반복 예약 **그룹 수정** 경로가 호출하는 `deleteReservationGroup`/`deleteRecurringGroup`은 클라이언트 `batch.delete()`인데 `firestore.rules`의 reservations delete는 `isSuperAdmin()` 한정이다. 정적으로는 일반 직원·기관 관리자가 다일 예약을 수정 저장하면 `permission-denied`로 실패하고 원본 그룹이 남는다. Rules 테스트에 reservations delete 케이스가 없어 회귀로도 안 잡힌다 — 에뮬레이터 재현 확인이 남는다 |
