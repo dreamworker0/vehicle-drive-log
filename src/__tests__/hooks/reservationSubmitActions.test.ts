@@ -12,7 +12,6 @@ vi.mock('@/lib/firestore', () => ({
 }));
 vi.mock('@/hooks/utils/reservationUtils', () => ({
     findOverlappingReservation: vi.fn(() => null),
-    findUserOverlappingReservation: vi.fn(() => null),
 }));
 vi.mock('@/lib/vehicleUtils', () => ({
     isVehicleRestrictedForUser: vi.fn(() => false),
@@ -27,7 +26,7 @@ vi.mock('@/hooks/useTodayDashboard', () => ({
 
 import { handleSubmit } from '@/hooks/reservationCalendar/actions/submitActions';
 import { createReservationSafe } from '@/lib/firestore';
-import { findOverlappingReservation, findUserOverlappingReservation } from '@/hooks/utils/reservationUtils';
+import { findOverlappingReservation } from '@/hooks/utils/reservationUtils';
 import { isVehicleRestrictedForUser } from '@/lib/vehicleUtils';
 import { generateRecurringDates } from '@/hooks/utils/recurringUtils';
 
@@ -71,7 +70,6 @@ describe('handleSubmit — 예약 제출', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         vi.mocked(findOverlappingReservation).mockReturnValue(null);
-        vi.mocked(findUserOverlappingReservation).mockReturnValue(null);
         vi.mocked(isVehicleRestrictedForUser).mockReturnValue(false);
         vi.mocked(generateRecurringDates).mockReturnValue([]);
     });
@@ -100,12 +98,15 @@ describe('handleSubmit — 예약 제출', () => {
         expect(createReservationSafe).not.toHaveBeenCalled();
     });
 
-    it('사용자 시간 중복이면 차단된다', async () => {
-        vi.mocked(findUserOverlappingReservation).mockReturnValue({ id: 'r9' } as never);
-        const deps = makeDeps();
+    it('같은 사용자가 같은 시간대에 다른 차량을 예약하는 것은 차단하지 않는다', async () => {
+        // 행사·대규모 외근 대응. FAQ(multiple-reservations-same-time) 및 서버 코어와 동일한 정책.
+        const deps = makeDeps({
+            reservations: [
+                { id: 'r9', vehicleId: 'v2', reservedByUid: 'u1', date: '2026-07-15', startTime: '10:00', endTime: '11:00', status: 'reserved' },
+            ] as unknown as ActionDeps['reservations'],
+        });
         await handleSubmit(fakeEvent(), deps);
-        expect(deps.showToast).toHaveBeenCalledWith('같은 시간대에 2대의 차량을 예약할 수 없습니다.', 'warning');
-        expect(createReservationSafe).not.toHaveBeenCalled();
+        expect(createReservationSafe).toHaveBeenCalledTimes(1);
     });
 
     it('업무시간 외 예약을 취소하면 쓰기를 하지 않는다', async () => {
