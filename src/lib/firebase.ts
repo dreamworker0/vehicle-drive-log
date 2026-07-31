@@ -326,6 +326,10 @@ export async function clearOfflineCache(): Promise<void> {
 }
 export const storage = getStorage(app);
 export const googleProvider = new GoogleAuthProvider();
+// 브라우저에 활성 Google 세션이 하나뿐이면 Google이 계정 선택 화면을 건너뛰고 그 계정으로
+// 바로 인증시킨다. 그 결과 "다른 계정으로 로그인"을 눌러도 직전 계정으로 재로그인된다.
+// prompt=select_account로 매번 계정 선택 화면을 강제한다 (공용 기기 오로그인 방지 효과도 있다).
+googleProvider.setCustomParameters({ prompt: 'select_account' });
 export const firebaseFunctions = getFunctions(app, 'asia-northeast3');
 // 에뮬레이터 모드: Functions 에뮬레이터(5001)에 연결
 if (USE_EMULATOR && typeof window !== 'undefined') {
