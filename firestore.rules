@@ -190,14 +190,16 @@ service cloud.firestore {
                         || (isOrgAdmin(resource.data.organizationId) && request.resource.data.organizationId == resource.data.organizationId)
                     ));
       // 다일·반복 예약 그룹 수정은 "기존 그룹 삭제 → 재생성" 경로라 삭제 권한이 필요하다.
-      // superAdmin 전용이던 탓에 직원·기관 관리자는 그룹 수정이 항상 permission-denied로
-      // 실패했다 (2026-07-31 에뮬레이터 재현). 범위는 update 규칙과 동일하게 소유자 본인과
-      // 소속 기관 관리자로 한정한다 — 타 기관·같은 기관 타인 예약 삭제는 계속 차단.
+      // superAdmin 전용이던 탓에 소유자 본인조차 그룹 수정이 항상 permission-denied로
+      // 실패했다 (2026-07-31 에뮬레이터 재현).
+      //
+      // 소유자 본인으로만 한정한다. 기관 관리자를 포함하지 않는 이유 — createReservationSafe가
+      // reservedByUid를 호출자로 강제하므로(createReservationCore), 관리자가 직원 그룹을
+      // 수정하면 재생성된 예약의 명의가 관리자로 조용히 넘어가 직원이 자기 예약 권한을 잃는다.
+      // 관리자 경로는 그 결함을 서버에서 먼저 고친 뒤 별도로 연다.
       allow delete: if isSuperAdmin()
-                    || (belongsToMyOrg() && (
-                        resource.data.reservedByUid == request.auth.uid
-                        || isOrgAdmin(resource.data.organizationId)
-                    ));
+                    || (belongsToMyOrg()
+                        && resource.data.reservedByUid == request.auth.uid);
     }
 
     // === 알림 ===
