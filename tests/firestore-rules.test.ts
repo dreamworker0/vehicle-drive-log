@@ -209,6 +209,32 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertSucceeds(adminADb.collection('reservations').doc('res_reserved').update({ status: 'reserved', reservedByName: 'x' }));
   });
 
+  it('5-2. 예약 삭제 — 소유자·기관 관리자만 허용, 타인·타 기관은 차단', async () => {
+    // 다일·반복 그룹 수정은 "기존 그룹 삭제 → 재생성" 경로라 삭제 권한이 필요하다.
+    // superAdmin 전용이던 시절 직원·기관 관리자의 그룹 수정이 항상 실패했다.
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      const base = { vehicleId: 'vehicle_A', status: 'reserved', groupId: 'grp_1', date: '2026-08-01' };
+      await db.collection('reservations').doc('res_own').set({ ...base, organizationId: 'org-A', reservedByUid: 'user_A' });
+      await db.collection('reservations').doc('res_admin').set({ ...base, organizationId: 'org-A', reservedByUid: 'user_A' });
+      await db.collection('reservations').doc('res_other').set({ ...base, organizationId: 'org-A', reservedByUid: 'user_other' });
+      await db.collection('reservations').doc('res_orgB').set({ ...base, organizationId: 'org-B', reservedByUid: 'user_B' });
+    });
+
+    const ownerDb = setupContext('user_A', { role: 'employee', orgId: 'org-A' }).firestore();
+    const adminDb = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+
+    // 같은 기관 타인 명의 예약 삭제 → 차단
+    await assertFails(ownerDb.collection('reservations').doc('res_other').delete());
+    // 타 기관 예약 삭제 → 차단 (기관 관리자여도)
+    await assertFails(adminDb.collection('reservations').doc('res_orgB').delete());
+
+    // 소유자 본인 예약 삭제 → 허용
+    await assertSucceeds(ownerDb.collection('reservations').doc('res_own').delete());
+    // 소속 기관 관리자의 기관 내 예약 삭제 → 허용
+    await assertSucceeds(adminDb.collection('reservations').doc('res_admin').delete());
+  });
+
   it('6. 비용 데이터(주유·하이패스·정비) 교차 조직 접근 차단', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const db = context.firestore();

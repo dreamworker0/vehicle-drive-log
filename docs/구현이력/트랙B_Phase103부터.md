@@ -461,4 +461,24 @@
 | **배포 경로 — 예외 적용** | 사용자 요청으로 Hosting만 수동 선배포했다(CLAUDE.md 긴급 예외). 프론트엔드 전용 변경이라 Functions 동시 업데이트 충돌 위험이 없고, 진행 중인 CI Deploy가 없음을 확인 후 Node 22로 실행했다. **선배포는 master를 앞서게 만들므로**, 다음 CI 배포가 수정을 되돌리지 않도록 Phase 127과 한 PR로 묶어 master를 프로덕션과 한 번에 맞췄다 |
 | **검증** | ESLint 0 · tsc 0 · 프론트 94파일/976건(reservationSubmitActions 8 → **10건**) · 프로덕션 빌드 통과(번들 예산 이내) |
 | **안 한 것** | `findUserOverlappingReservation`([reservationUtils.ts](../../src/hooks/utils/reservationUtils.ts))은 이 변경으로 프로덕션 호출부가 0건이 됐지만(테스트 5건 + mock 1건만 참조) 스코프 밖이라 남겼다. Phase 126이 "고친 사본과 안 고친 사본을 함께 두면 재발한다"며 죽은 사본을 제거한 전례가 있어, **정리 대상으로 남는다** |
-| **범위 밖 관찰 — 확인 필요** | 리뷰 중 발견. 다일·반복 예약 **그룹 수정** 경로가 호출하는 `deleteReservationGroup`/`deleteRecurringGroup`은 클라이언트 `batch.delete()`인데 `firestore.rules`의 reservations delete는 `isSuperAdmin()` 한정이다. 정적으로는 일반 직원·기관 관리자가 다일 예약을 수정 저장하면 `permission-denied`로 실패하고 원본 그룹이 남는다. Rules 테스트에 reservations delete 케이스가 없어 회귀로도 안 잡힌다 — 에뮬레이터 재현 확인이 남는다 |
+| **범위 밖 관찰 — 확인 필요** | 리뷰 중 발견. 다일·반복 예약 **그룹 수정** 경로가 호출하는 `deleteReservationGroup`/`deleteRecurringGroup`은 클라이언트 `batch.delete()`인데 `firestore.rules`의 reservations delete는 `isSuperAdmin()` 한정이다. 정적으로는 일반 직원·기관 관리자가 다일 예약을 수정 저장하면 `permission-denied`로 실패하고 원본 그룹이 남는다. Rules 테스트에 reservations delete 케이스가 없어 회귀로도 안 잡힌다 — 에뮬레이터 재현 확인이 남는다 → **Phase 129에서 재현·수정** |
+
+---
+
+### Phase 129: 다일·반복 예약 수정이 항상 실패하던 문제 — Rules delete 권한 불일치 🔐 (커밋·PR)
+
+> Phase 128 리뷰가 "범위 밖 관찰"로 남긴 의심을 에뮬레이터로 재현했다. **의심이 아니라 살아 있는 버그였다.**
+
+| 항목 | 내용 |
+|------|------|
+| **증상** | 다일 예약이나 반복 예약을 수정하면 무조건 실패한다. 사용자에게는 Firebase 원문 그대로 `Missing or insufficient permissions.` 영문 토스트가 뜨고([submitActions.ts](../../src/hooks/reservationCalendar/actions/submitActions.ts)의 `catch`가 `error.message`를 그대로 노출), 원본 그룹은 남는다 |
+| **원인 — 클라이언트 경로와 Rules 권한이 어긋나 있었다** | 그룹 수정은 "기존 그룹 삭제 → 재생성" 구조라 **삭제 권한이 필요**한데, `firestore.rules`의 reservations `delete`는 `isSuperAdmin()` 한정이었다. 즉 superAdmin 외 **전원**(직원·기관 관리자) 실패 |
+| **도달 경로 (전부 살아 있음)** | [ReservationCalendar.tsx:130](../../src/components/common/ReservationCalendar.tsx) `onEdit={handleEdit}` → [editActions.ts:61](../../src/hooks/reservationCalendar/actions/editActions.ts) `setEditingGroupId(res.groupId)` → [submitActions.ts:90](../../src/hooks/reservationCalendar/actions/submitActions.ts) `deleteReservationGroup()` → `batch.delete()` → Rules 차단 |
+| **에뮬레이터 재현** | `PERMISSION_DENIED: false for 'delete' @ L192` — 소유자 본인조차 자기 예약을 지울 수 없었다 |
+| **왜 신고가 없었나** | `allow delete: if isSuperAdmin()`은 Phase 30 무렵부터 있던 오래된 규칙이라 그룹 수정 기능은 사실상 도입 이후 계속 이 상태였을 가능성이 높다. 다일·반복 예약 **수정**(생성·취소가 아니라)이 드문 조작이라 묻혀 있었다 |
+| **조치 — update 규칙과 같은 모양으로 한정** | `allow delete`를 소유자 본인 + 소속 기관 관리자로 완화. 이미 `update`가 같은 범위를 허용하고 있어 새로 열리는 권한이 아니다(소유자는 어차피 자기 예약을 취소·수정할 수 있었다). 타 기관·같은 기관 타인 예약 삭제는 계속 차단 |
+| **양방향 뮤테이션 실측** | 규칙 하나에 허용·차단이 함께 걸려 있어 한 방향만 재면 반쪽이다. ① 원래대로 `isSuperAdmin()`만 → **허용 케이스 실패**(재현 그 자체) ② 반대로 `belongsToMyOrg()`만 → **차단 케이스 실패**(`Expected request to fail, but it succeeded`). 양쪽 다 잡히는 것을 확인하고 규칙을 확정했다 |
+| **테스트** | Rules 테스트에 reservations `delete` 케이스가 **아예 없었다**(그래서 회귀로도 안 잡혔다). 5-2 신설 — 소유자 허용 · 기관 관리자 허용 · 같은 기관 타인 차단 · 타 기관 차단 4방향. Firestore Rules 16 → **17건** |
+| **안 한 것 — 남는 비원자성** | 그룹 수정이 "삭제 → 재생성"인데 **트랜잭션이 아니다**. 삭제 후 재생성이 실패하면 예약이 통째로 사라진다. 지금까지는 삭제 단계에서 막혀 오히려 데이터가 보존되고 있었던 셈이라, 이 수정으로 **위험이 드러난다**. 근본 해결은 그룹 수정 전체를 콜러블(Admin SDK 트랜잭션)로 옮기는 것이고, 작업량이 커 별건으로 남긴다 |
+| **검증** | Firestore Rules 17건 통과(에뮬레이터) · ESLint 0 · tsc 0 |
+| **배포** | Rules는 CI Deploy가 `--only functions,firestore:rules,storage`로 배포하므로 머지만 하면 반영된다(수동 배포 불필요) |

@@ -189,7 +189,15 @@ service cloud.firestore {
                         // organizationId 불변 — admin의 타 기관 이전 차단 (2026-07-10 감사 #6)
                         || (isOrgAdmin(resource.data.organizationId) && request.resource.data.organizationId == resource.data.organizationId)
                     ));
-      allow delete: if isSuperAdmin();
+      // 다일·반복 예약 그룹 수정은 "기존 그룹 삭제 → 재생성" 경로라 삭제 권한이 필요하다.
+      // superAdmin 전용이던 탓에 직원·기관 관리자는 그룹 수정이 항상 permission-denied로
+      // 실패했다 (2026-07-31 에뮬레이터 재현). 범위는 update 규칙과 동일하게 소유자 본인과
+      // 소속 기관 관리자로 한정한다 — 타 기관·같은 기관 타인 예약 삭제는 계속 차단.
+      allow delete: if isSuperAdmin()
+                    || (belongsToMyOrg() && (
+                        resource.data.reservedByUid == request.auth.uid
+                        || isOrgAdmin(resource.data.organizationId)
+                    ));
     }
 
     // === 알림 ===
