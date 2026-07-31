@@ -100,6 +100,9 @@ describe('handleSubmit — 예약 제출', () => {
 
     it('같은 사용자가 같은 시간대에 다른 차량을 예약하는 것은 차단하지 않는다', async () => {
         // 행사·대규모 외근 대응. FAQ(multiple-reservations-same-time) 및 서버 코어와 동일한 정책.
+        // 겹침 검사를 실제 구현으로 되돌려야 픽스처가 로직에 도달한다 (기본 mock은 항상 null이라 무의미).
+        const actual = await vi.importActual<typeof import('@/hooks/utils/reservationUtils')>('@/hooks/utils/reservationUtils');
+        vi.mocked(findOverlappingReservation).mockImplementation(actual.findOverlappingReservation);
         const deps = makeDeps({
             reservations: [
                 { id: 'r9', vehicleId: 'v2', reservedByUid: 'u1', date: '2026-07-15', startTime: '10:00', endTime: '11:00', status: 'reserved' },
@@ -107,6 +110,24 @@ describe('handleSubmit — 예약 제출', () => {
         });
         await handleSubmit(fakeEvent(), deps);
         expect(createReservationSafe).toHaveBeenCalledTimes(1);
+        expect(vi.mocked(createReservationSafe).mock.calls[0][0]).toMatchObject({
+            vehicleId: 'v1',
+            startTime: '10:00',
+            endTime: '11:00',
+        });
+    });
+
+    it('같은 차량이면 실제 겹침 검사가 차단한다 (위 케이스의 대조군)', async () => {
+        // 위 테스트가 mock 때문에 항상 통과하는 허수가 아님을 보장한다.
+        const actual = await vi.importActual<typeof import('@/hooks/utils/reservationUtils')>('@/hooks/utils/reservationUtils');
+        vi.mocked(findOverlappingReservation).mockImplementation(actual.findOverlappingReservation);
+        const deps = makeDeps({
+            reservations: [
+                { id: 'r9', vehicleId: 'v1', reservedByUid: 'u2', date: '2026-07-15', startTime: '10:00', endTime: '11:00', status: 'reserved' },
+            ] as unknown as ActionDeps['reservations'],
+        });
+        await handleSubmit(fakeEvent(), deps);
+        expect(createReservationSafe).not.toHaveBeenCalled();
     });
 
     it('업무시간 외 예약을 취소하면 쓰기를 하지 않는다', async () => {
