@@ -23,3 +23,20 @@ updates:
     labels:
       - dependencies
       - functions
+
+  # GitHub Actions 버전 갱신. 액션이 오래되면 러너의 Node 지원 종료(예: Node 20 → 24
+  # 강제 실행 경고)로 언젠가 CI 전체가 깨진다. minor/patch는 묶어 노이즈를 줄이고,
+  # 실제로 중요한 메이저 상향(v4 → v5 등)은 개별 PR로 올라온다.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    labels:
+      - dependencies
+    groups:
+      actions-minor-and-patch:
+        update-types:
+          - minor
+          - patch
