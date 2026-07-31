@@ -144,7 +144,7 @@ jobs:
           key: firebase-emulators-${{ runner.os }}
 
       - name: Security Rules tests (Firestore + Storage emulator)
-        run: npx firebase-tools emulators:exec --only firestore,storage "npx vitest run --exclude='' tests/firestore-rules.test.ts tests/storage-rules.test.ts"
+        run: npx firebase-tools emulators:exec --only firestore,storage "npx vitest run tests/firestore-rules.test.ts tests/storage-rules.test.ts"
 
       # ── E2E ──
       - name: Get Playwright version

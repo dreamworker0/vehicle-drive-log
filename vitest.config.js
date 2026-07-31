@@ -22,6 +22,9 @@ export default defineConfig({
     },
     test: {
         env: {
+            // 예약·운행 시각 로직은 KST 전제 — 호스트 시간대(UTC 등)에 따라 결과가
+            // 달라지지 않도록 고정한다. CI 워크플로의 TZ와 동일하게 맞춘 값.
+            TZ: 'Asia/Seoul',
             VITE_FIREBASE_API_KEY: 'test-api-key',
             VITE_FIREBASE_AUTH_DOMAIN: 'test.firebaseapp.com',
             VITE_FIREBASE_PROJECT_ID: 'test-project',

@@ -1,51 +1,84 @@
 ---
-description: 프로젝트 초기 설정(의존성 설치, Husky 훅 설치, 로컬 환경변수 복사 등)을 수행하는 온보딩 자동화 스크립트
+description: 프로젝트 초기 설정(의존성 설치, 환경변수 템플릿 복사, Husky 훅 설치, 검증)을 수행하는 온보딩 자동화 스크립트
 ---
 
 # 프로젝트 환경 설정 스크립트 (Setup / Onboard)
 
-이 워크플로우는 처음 저장소를 클론받은 개발자나 로컬 환경 최신화가 필요할 때 실행합니다.
-다음 명령어들을 순차적으로 실행하여 즉시 개발에 투입될 수 있는 로컬 환경을 구성합니다.
+처음 저장소를 클론받았거나, 다른 컴퓨터·클라우드 세션에서 작업을 이어받을 때 실행한다.
+아래를 순서대로 실행하면 즉시 개발에 투입 가능한 상태가 된다.
 
-## 1. 패키지 의존성 설치
-```bash
-// turbo
-npm install
-```
-
-## 2. 필수 `.env` 파일 확인 및 복사
-> [!NOTE]
-> `.env.local` 파일이 존재하지 않는 경우 `.env.example` 템플릿으로부터 복사합니다.
-> **주의**: 로컬에서 프로덕션 빌드나 이메일 발송 기능을 테스트하려면 `SENTRY_AUTH_TOKEN`, `EMAILJS_PRIVATE_KEY` 등의 민감한 Secret이 `.env.local`에 반드시 채워져 있어야 합니다.
-```bash
-// turbo
-if (-not (Test-Path ".env.local")) { Copy-Item ".env.example" ".env.local" ; Write-Host ".env.local 파일이 생성되었습니다. 필요한 키를 입력해 주세요." } else { Write-Host ".env.local 파일이 이미 존재합니다." }
-```
-
-## 2.5. Node.js 환경 고정 (Node 22 LTS)
 > [!IMPORTANT]
-> 프로젝트의 호환성을 위해 반드시 Node 22 환경으로 강제 전환합니다.
+> 아래 명령은 Windows·macOS·Linux에서 동일하게 동작하도록 `node -e`를 사용한다.
+> 셸 전용 문법(PowerShell `Copy-Item` 등)을 쓰면 다른 OS에서 실패한다.
+
+## 1. Node 버전 확인 (Node 22 LTS 필수)
+
+Node 24는 Rollup 빌드가 실패한다. `.node-version`에 22가 고정되어 있어 fnm/nvm은 자동 인식한다.
+
 ```bash
 // turbo
-fnm env --use-on-cd --shell powershell | Out-String | Invoke-Expression; fnm use 22
+npm run check:node
 ```
 
-## 3. Husky 및 Pre-commit 훅 초기화
+실패하면 `fnm use 22` (또는 `nvm use 22`) 후 다시 실행한다.
+
+## 2. 패키지 의존성 설치
+
+루트와 `functions/`는 별도 패키지다. **둘 다** 설치해야 `type-check:functions`와 Functions 테스트가 동작한다.
+
+```bash
+// turbo
+npm ci
+```
+
+```bash
+// turbo
+npm ci --prefix functions
+```
+
 > [!NOTE]
-> /pre-commit 워크플로우에 기반하여 Husky를 현재 npm 환경에 연동합니다.
+> 락파일 고정을 위해 `npm install`이 아닌 `npm ci`를 쓴다 (CI와 동일).
+
+## 3. 환경변수 파일 준비
+
+`.env`(프론트엔드)와 `functions/.env`(Functions)를 템플릿에서 복사한다. 이미 있으면 건드리지 않는다.
+
+```bash
+// turbo
+node -e "const fs=require('fs');[['.env.example','.env'],['.env.local.example','.env.local'],['functions/.env.example','functions/.env']].forEach(([s,d])=>{if(!fs.existsSync(s))return console.log('templ 없음, 건너뜀: '+s);if(fs.existsSync(d))return console.log('이미 존재: '+d);fs.copyFileSync(s,d);console.log('생성됨: '+d+' — 값을 채워야 한다')})"
+```
+
+> [!IMPORTANT]
+> 복사만으로는 값이 비어 있다. **`.env`의 Firebase 필수 6개 키를 채우지 않으면 빌드가 중단되고,
+> `pre-push` 훅이 빌드를 돌리므로 푸시도 막힌다.** 값은 Firebase Console 또는 GitHub Secrets(`ENV_FILE`)에서 가져온다.
+> `VITE_` 접두사 값은 공개 번들에 박히므로 서버 전용 비밀은 절대 넣지 않는다.
+
+## 4. Husky 훅 초기화
+
 ```bash
 // turbo
 npm run prepare
 ```
 
-## 4. 로컬 빌드 검증
-> [!IMPORTANT]
-> 설치가 정상적인지 확인하기 위해 Lint, Type Check, 빌드를 1회 수행합니다.
+## 5. 설치 검증
+
+`verify:fast`가 Node 확인 + lint + 타입 검사(프론트/Functions)를 한 번에 수행한다.
+
 ```bash
 // turbo
-npm run lint && npm run type-check && npm run build
+npm run verify:fast
 ```
+
+```bash
+// turbo
+npm run build
+```
+
+> [!NOTE]
+> `npm run test:rules`와 에뮬레이터 기반 작업은 firebase CLI가 필요하다.
+> 없으면 `npx firebase-tools --version`으로 받아 쓸 수 있다 (CI도 npx 방식).
 
 ---
 > **완료 메세지**
-> 모든 설정이 완료되었습니다! `npm run dev`를 실행하여 개발 서버를 시작해 주세요.
+> 설정이 완료되었습니다! `npm run dev`로 개발 서버를 시작하세요.
+> 검증이 실패했다면 위 3번의 환경변수 값이 비어 있는지 먼저 확인하세요.
