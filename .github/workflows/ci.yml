@@ -132,7 +132,7 @@ jobs:
       # ── Firestore Rules 테스트 (멀티테넌트 격리의 유일한 자동 검증) ──
       # firebase-tools 15.x는 Java 21 미만을 지원하지 않는다 (17이면 에뮬레이터 기동 실패)
       - name: Setup Java (Firebase emulator)
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5.6.0
         with:
           distribution: temurin
           java-version: 21
