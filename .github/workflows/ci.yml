@@ -122,7 +122,7 @@ jobs:
 
       - name: Upload coverage summary
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: frontend-coverage-summary
           path: coverage/coverage-summary.json
@@ -180,7 +180,7 @@ jobs:
       # 실패 진단용 아티팩트 — E2E trace·screenshot·test-results. 성공 시에는 업로드하지 않는다.
       - name: Upload E2E failure artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-failure-artifacts
           path: |
