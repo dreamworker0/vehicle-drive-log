@@ -39,8 +39,10 @@ if (missing.length > 0) {
     process.exit(1);
 }
 
+// 치환값은 함수로 넘긴다. 문자열로 넘기면 값에 포함된 `$&`·`$'`·`` $` ``·`$n`이
+// 특수 패턴으로 해석되어 엉뚱한 문자열이 박힌다.
 const output = REQUIRED_KEYS.reduce(
-    (acc, [placeholder, envKey]) => acc.replace(placeholder, process.env[envKey] as string),
+    (acc, [placeholder, envKey]) => acc.replace(placeholder, () => process.env[envKey] as string),
     template
 );
 
