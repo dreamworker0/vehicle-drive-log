@@ -37,7 +37,7 @@ export interface User extends FirestoreDoc {
      * 서비스가 직원에게 직접 개인정보 동의를 받는 것은 처리자처럼 행동한 증거가 된다.
      *
      * joinOrganization(Admin SDK)만 기록하며 Rules가 클라이언트 변경을 차단한다.
-     * 2026-08-05 이전에 가입한 직원에게는 없다.
+     * 개정 약관 시행일(TERMS_VERSION) 이전에 가입한 직원에게는 없다 — ConsentGate가 재동의로 채운다.
      */
     consent?: {
         terms: boolean;
