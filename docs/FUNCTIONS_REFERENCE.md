@@ -2,9 +2,9 @@
 
 > **자동 생성 문서** — `scripts/generate-functions-doc.ts`로 생성됨
 >
-> 마지막 업데이트: 2026. 7. 30. PM 1:10:48
+> 마지막 업데이트: 2026. 8. 1. PM 12:13:11
 >
-> 총 함수 수: **63개**
+> 총 함수 수: **64개**
 
 ---
 
@@ -23,7 +23,7 @@
 
 ## 📞 onCall (클라이언트 직접 호출)
 
-> 총 34개
+> 총 35개
 
 ### `ocrDashboard`
 
@@ -96,9 +96,9 @@
 | 항목 | 내용 |
 |------|------|
 | **파일** | `functions/src/handlers/callable/joinOrganization.ts` |
-| **설명** | 초대 코드로 기관에 가입. 신규 사용자가 Custom Claims 미보유 시에도 정상 처리. 이용약관 동의를 함께 기록한다(개인정보 동의는 받지 않음 — 처리 근거가 기관의 업무 수행이므로). |
+| **설명** | 초대 코드로 기관에 가입. 신규 사용자가 Custom Claims 미보유 시에도 정상 처리. 이용약관 동의를 함께 기록한다(개인정보 동의는 받지 않음 — 처리 근거가 기관의 업무 수행이므로). `termsVersion`은 `YYYY-MM-DD` 형식. |
 | **인증** | 인증 필수 (익명 로그인 차단) |
-| **요청 파라미터** | `{ code: string, agreedTerms: true, termsVersion: string }` — `termsVersion`은 `YYYY-MM-DD` |
+| **요청 파라미터** | `{ code: string, agreedTerms: true, termsVersion: string }` |
 | **반환값** | `{ success: boolean, orgId: string, orgName: string, role: 'admin' \| 'employee' }` |
 
 ### `acceptCurrentTerms`
@@ -106,9 +106,9 @@
 | 항목 | 내용 |
 |------|------|
 | **파일** | `functions/src/handlers/callable/acceptCurrentTerms.ts` |
-| **설명** | 개정 약관·처리방침 재동의 기록. 동의 기록은 Rules가 클라이언트 쓰기를 차단하므로 이 함수만 기록한다. 기관 관리자는 기관 위탁 동의(`organizations.consent`)와 본인 약관 동의(`users.consent`)를 함께, 직원은 본인 약관 동의만 기록. |
+| **설명** | 개정 약관·처리방침 재동의 기록. 동의 기록은 Rules가 클라이언트 쓰기를 차단하므로 이 함수만 기록한다. 기관 관리자는 기관 위탁 동의(`organizations.consent`)와 본인 약관 동의(`users.consent`)를 함께, 직원은 본인 약관 동의만 기록. 관리자는 `agreedPrivacy`·`privacyVersion`이 필수. |
 | **인증** | 인증 필수 |
-| **요청 파라미터** | `{ agreedTerms: true, termsVersion: string, agreedPrivacy?: true, privacyVersion?: string }` — 관리자는 `agreedPrivacy`·`privacyVersion` 필수 |
+| **요청 파라미터** | `{ agreedTerms: true, termsVersion: string, agreedPrivacy?: true, privacyVersion?: string }` |
 | **반환값** | `{ success: boolean, orgRecorded: boolean }` |
 
 ### `disableUser`

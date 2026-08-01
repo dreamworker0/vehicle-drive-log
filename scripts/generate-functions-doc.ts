@@ -102,10 +102,20 @@ const FUNCTIONS: FunctionEntry[] = [
     name: 'joinOrganization',
     type: 'onCall',
     file: 'handlers/callable/joinOrganization.ts',
-    description: '초대 코드로 기관에 가입. 신규 사용자가 Custom Claims 미보유 시에도 정상 처리.',
+    description: '초대 코드로 기관에 가입. 신규 사용자가 Custom Claims 미보유 시에도 정상 처리. 이용약관 동의를 함께 기록한다(개인정보 동의는 받지 않음 — 처리 근거가 기관의 업무 수행이므로). `termsVersion`은 `YYYY-MM-DD` 형식.',
+    auth: '인증 필수 (익명 로그인 차단)',
+    params: '{ code: string, agreedTerms: true, termsVersion: string }',
+    // 표 셀 안의 파이프는 백틱으로 감싸도 셀이 쪼개지므로 이스케이프한다.
+    returns: "{ success: boolean, orgId: string, orgName: string, role: 'admin' \\| 'employee' }",
+  },
+  {
+    name: 'acceptCurrentTerms',
+    type: 'onCall',
+    file: 'handlers/callable/acceptCurrentTerms.ts',
+    description: '개정 약관·처리방침 재동의 기록. 동의 기록은 Rules가 클라이언트 쓰기를 차단하므로 이 함수만 기록한다. 기관 관리자는 기관 위탁 동의(`organizations.consent`)와 본인 약관 동의(`users.consent`)를 함께, 직원은 본인 약관 동의만 기록. 관리자는 `agreedPrivacy`·`privacyVersion`이 필수.',
     auth: '인증 필수',
-    params: '{ inviteCode: string }',
-    returns: '{ success: boolean, organizationId: string }',
+    params: '{ agreedTerms: true, termsVersion: string, agreedPrivacy?: true, privacyVersion?: string }',
+    returns: '{ success: boolean, orgRecorded: boolean }',
   },
   {
     name: 'disableUser',
