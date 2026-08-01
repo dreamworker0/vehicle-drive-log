@@ -209,6 +209,34 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertSucceeds(adminADb.collection('reservations').doc('res_reserved').update({ status: 'reserved', reservedByName: 'x' }));
   });
 
+  it('5-2. 예약 삭제 — 소유자 본인만 허용, 타인·타 기관·기관 관리자는 차단', async () => {
+    // 다일·반복 그룹 수정은 "기존 그룹 삭제 → 재생성" 경로라 삭제 권한이 필요한데
+    // superAdmin 전용이던 탓에 소유자 본인조차 그룹 수정이 항상 실패했다.
+    // 기관 관리자를 제외하는 이유 — createReservationSafe가 reservedByUid를 호출자로
+    // 강제하므로, 관리자가 직원 그룹을 수정하면 명의가 관리자로 넘어간다.
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      const base = { vehicleId: 'vehicle_A', status: 'reserved', groupId: 'grp_1', date: '2026-08-01' };
+      await db.collection('reservations').doc('res_own').set({ ...base, organizationId: 'org-A', reservedByUid: 'user_A' });
+      await db.collection('reservations').doc('res_admin').set({ ...base, organizationId: 'org-A', reservedByUid: 'user_A' });
+      await db.collection('reservations').doc('res_other').set({ ...base, organizationId: 'org-A', reservedByUid: 'user_other' });
+      await db.collection('reservations').doc('res_orgB').set({ ...base, organizationId: 'org-B', reservedByUid: 'user_B' });
+    });
+
+    const ownerDb = setupContext('user_A', { role: 'employee', orgId: 'org-A' }).firestore();
+    const adminDb = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+
+    // 같은 기관 타인 명의 예약 삭제 → 차단
+    await assertFails(ownerDb.collection('reservations').doc('res_other').delete());
+    // 타 기관 예약 삭제 → 차단
+    await assertFails(adminDb.collection('reservations').doc('res_orgB').delete());
+    // 기관 관리자의 소속 기관 타인 예약 삭제 → 차단 (명의 이전 방지, 서버 수정 후 별도 개방)
+    await assertFails(adminDb.collection('reservations').doc('res_admin').delete());
+
+    // 소유자 본인 예약 삭제 → 허용
+    await assertSucceeds(ownerDb.collection('reservations').doc('res_own').delete());
+  });
+
   it('6. 비용 데이터(주유·하이패스·정비) 교차 조직 접근 차단', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const db = context.firestore();
