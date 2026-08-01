@@ -6,6 +6,7 @@ import { useFontSizeStore } from './store/useFontSizeStore';
 import { lazyWithRetry } from './lib/lazyWithRetry';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
+import useSessionRecord from './hooks/useSessionRecord';
 import { useOrientationLock } from './hooks/useOrientationLock';
 import useThemeSync from './hooks/useThemeSync';
 import { AuthGuard } from './components/auth/AuthGuard';
@@ -172,6 +173,8 @@ function AppContent() {
   const { pathname } = useLocation();
   const isLegalRoute = LEGAL_PATHS.includes(pathname);
   useOrientationLock();
+  // 로그인 세션을 접속기록에 남긴다(고시 제16조의 접속지 정보). 실패해도 화면을 막지 않는다.
+  useSessionRecord();
   const theme = useThemeStore(state => state.theme);
   const setTheme = useThemeStore(state => state.setTheme);
 

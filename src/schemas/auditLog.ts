@@ -3,9 +3,9 @@ import { z } from 'zod';
 // 다른 스키마 파일(driveLog 등)과 같이 정의 파일에서 직접 가져온다.
 import { timestampSchema } from './vehicle';
 
-export const auditActionSchema = z.enum(['create', 'update', 'delete']);
-export const auditTargetTypeSchema = z.enum(['driveLog', 'user']);
-export const auditActorSourceSchema = z.enum(['document', 'unknown']);
+export const auditActionSchema = z.enum(['create', 'update', 'delete', 'login']);
+export const auditTargetTypeSchema = z.enum(['driveLog', 'user', 'session']);
+export const auditActorSourceSchema = z.enum(['stamp', 'auth', 'document', 'unknown']);
 
 /**
  * 접속기록/변경 로그 스키마
@@ -27,6 +27,9 @@ export const auditLogSchema = z.object({
     actorSource: auditActorSourceSchema.catch('unknown'),
     subjectUids: z.array(z.string()).catch([]),
     changedFields: z.array(z.string()).optional().catch(undefined),
+    /** 접속지 IP·접속 환경 — 로그인 세션 기록(recordSession)에만 있다 */
+    ip: z.string().nullable().optional().catch(undefined),
+    userAgent: z.string().optional().catch(undefined),
     at: timestampSchema,
     expiresAt: timestampSchema,
 });

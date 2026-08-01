@@ -118,6 +118,15 @@ const FUNCTIONS: FunctionEntry[] = [
     returns: '{ success: boolean, orgRecorded: boolean }',
   },
   {
+    name: 'recordSession',
+    type: 'onCall',
+    file: 'handlers/callable/recordSession.ts',
+    description: '로그인 세션 기록 — 고시 제16조의 접속지(IP)·계정·일시를 남긴다. 트리거는 IP를 볼 수 없어 콜러블로 받는다. `sessionId`는 브라우저 세션당 난수 1개이며 문서 ID에 쓰여 같은 세션의 재호출이 중복을 만들지 않는다. User-Agent는 브라우저/OS 수준으로 축약해 저장한다.',
+    auth: '인증 필수',
+    params: '{ sessionId: string }',
+    returns: '{ success: boolean }',
+  },
+  {
     name: 'disableUser',
     type: 'onCall',
     file: 'handlers/callable/disableUser.ts',

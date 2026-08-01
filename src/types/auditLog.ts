@@ -25,10 +25,10 @@
 import type { FirestoreDoc, TimestampField } from './common';
 
 /** 수행업무 (고시 제2조의 '수행업무'에 대응) */
-export type AuditAction = 'create' | 'update' | 'delete';
+export type AuditAction = 'create' | 'update' | 'delete' | 'login';
 
-/** 기록 대상 컬렉션 — 개인정보를 담는 컬렉션만 대상으로 한다 */
-export type AuditTargetType = 'driveLog' | 'user';
+/** 기록 대상 — 개인정보를 담는 컬렉션과 로그인 세션 */
+export type AuditTargetType = 'driveLog' | 'user' | 'session';
 
 /** 행위자를 어떻게 알아냈는지 — 기록의 신뢰 수준을 스스로 구분한다 */
 export type AuditActorSource =
@@ -37,6 +37,11 @@ export type AuditActorSource =
      * 강제하므로 타인 명의로는 위조할 수 없다 — 세 출처 중 신뢰 수준이 가장 높다.
      */
     | 'stamp'
+    /**
+     * 인증 토큰에서 직접 확인. 콜러블이 `request.auth.uid`로 받으므로 위조 불가하다.
+     * (세션 기록 전용 — 트리거는 인증 컨텍스트를 볼 수 없다.)
+     */
+    | 'auth'
     /** 문서 필드(createdByUid 등)에서 추정 */
     | 'document'
     /** 트리거가 알 수 없음 (서버 쓰기·삭제 등) */
@@ -78,6 +83,16 @@ export interface AuditLog extends FirestoreDoc {
      * 주입해 로그를 오염시키는 경로를 원천 차단하기 위한 것이다.
      */
     changedFields?: string[];
+    /**
+     * 접속지 IP (고시 제16조의 '접속지 정보') — 로그인 세션 기록에만 있다.
+     * 문서 변경 로그는 Firestore 트리거가 남기는데 트리거는 호출자의 IP를 볼 수 없다.
+     */
+    ip?: string | null;
+    /**
+     * 접속 환경 — `"Chrome / Android"`처럼 브라우저·OS 수준으로 축약한다.
+     * User-Agent 원문은 기기 지문에 가까워져 접속기록 자체가 과잉 수집이 된다.
+     */
+    userAgent?: string;
     at: TimestampField;
     /** TTL 정책 대상 필드 — at + 1년. 콘솔에서 auditLogs 컬렉션에 TTL을 설정해야 동작한다 */
     expiresAt: TimestampField;
