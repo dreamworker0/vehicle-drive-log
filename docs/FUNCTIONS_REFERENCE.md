@@ -2,9 +2,9 @@
 
 > **자동 생성 문서** — `scripts/generate-functions-doc.ts`로 생성됨
 >
-> 마지막 업데이트: 2026. 8. 1. PM 5:46:20
+> 마지막 업데이트: 2026. 8. 2. AM 8:02:47
 >
-> 총 함수 수: **66개**
+> 총 함수 수: **67개**
 
 ---
 
@@ -23,7 +23,7 @@
 
 ## 📞 onCall (클라이언트 직접 호출)
 
-> 총 37개
+> 총 38개
 
 ### `ocrDashboard`
 
@@ -130,6 +130,16 @@
 | **인증** | 인증 필수 |
 | **요청 파라미터** | `{ format: 'excel' \| 'pdf', dataset: string, recordCount: number, exportId: string }` |
 | **반환값** | `{ success: boolean }` |
+
+### `sendBroadcastNotice`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/callable/sendBroadcastNotice.ts` |
+| **설명** | 전체 기관의 관리자·직원에게 앱 내 알림 + 푸시를 일괄 발송. `sendAdminNotice`가 자기 기관 한정이라 서비스 전역 고지(약관 개정 등) 경로가 없어 신설. `dryRun: true`면 **대상 수만 반환하고 아무것도 보내지 않는다** — 화면이 이 값을 확인시킨 뒤에만 실제 발송한다. `noticeId`로 문서 ID를 고정해 재클릭·재시도가 알림을 중복 생성하지 않는다. 비활성 계정과 기관 미소속 계정은 제외. |
+| **인증** | 시스템 관리자(superAdmin) 전용 |
+| **요청 파라미터** | `{ title: string, message: string, noticeId: string, dryRun?: boolean }` |
+| **반환값** | `{ success: boolean, dryRun: boolean, recipientCount: number, pushSent?: number, pushFailed?: number }` |
 
 ### `disableUser`
 

@@ -27,6 +27,9 @@ export { monthlyBatch } from "./handlers/scheduled/monthlyBatch";
 // Admin Notice
 export { sendAdminNotice } from "./handlers/callable/sendAdminNotice";
 
+// 전체 기관 일괄 공지 (superAdmin 전용)
+export { sendBroadcastNotice } from "./handlers/callable/sendBroadcastNotice";
+
 // 예약 생성 (중복 방지 — Firestore Transaction)
 export { createReservationSafe } from "./handlers/callable/createReservationSafe";
 
