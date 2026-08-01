@@ -15,15 +15,23 @@ const DIST_DIR = path.resolve(__dirname, '..', 'dist', 'assets');
 // 예산 설정 (바이트).
 // 원시(raw)는 다운로드 후 파싱/실행 비용, gzip은 실제 전송량을 각각 대변한다.
 // 둘 다 하드 게이트 — 어느 하나라도 넘으면 빌드를 실패시켜 회귀를 막는다.
+//
+// ⚠️ 측정 조건: 예산은 반드시 `.env`의 VITE_SENTRY_DSN에 값이 있는 상태로 실측해야 한다.
+// DSN이 비면 Sentry SDK가 통째로 트리셰이킹되어 원시 기준 ~155KB 작게 나온다. CI는 secrets.ENV_FILE로
+// 실제 DSN을 넣고 빌드하므로, DSN 없는 로컬 실측으로 예산을 잡으면 CI에서만 초과하는 상황이 생긴다.
+// (2026-08-01 #107 머지 후 실제로 발생: 로컬 3092KB 통과 / CI 3249KB 초과)
 const BUDGETS = {
-    js: 3150 * 1024,        // JS 원시 전체: 3150KB (firebase 12.16 정식 마이너로 실측 ~3064KB. gzip은 여전히 예산 이내)
+    js: 3350 * 1024,        // JS 원시 전체: 3350KB (CI 실측 ~3253KB)
     css: 200 * 1024,        // CSS 원시 전체: 200KB
-    jsGzip: 970 * 1024,     // JS gzip 전체: 970KB (실사용자 다운로드 기준 게이트. master 실측 ~938KB.
+    jsGzip: 1050 * 1024,    // JS gzip 전체: 1050KB (실사용자 다운로드 기준 게이트. CI 실측 ~1010KB.
                             //   2026-07-25 950→970 상향: Dependabot minor·patch 20건 묶음(#62)이 +13KB로
                             //   1.1KB 초과해 막혔다. 이 예산의 목적은 '점진적 드리프트 감시'이므로 정상적인
-                            //   의존성 갱신을 1KB 차이로 막지 않는다. 기능 추가로 인한 증가는 여전히 게이트됨)
+                            //   의존성 갱신을 1KB 차이로 막지 않는다. 기능 추가로 인한 증가는 여전히 게이트됨.
+                            //   2026-08-01 970→1050 상향: #107(minor·patch 21건)의 firebase 12.14→12.16
+                            //   (+212KB 원시) · recharts 3.8→3.10(+30KB)으로 초과. 아래 '측정 조건' 참고)
     cssGzip: 35 * 1024,     // CSS gzip 전체: 35KB (실측 ~29KB)
-    largestJs: 600 * 1024,  // 단일 최대 JS 청크 원시: 600KB (firebase 12.16에서 firebase-db 청크 ~582KB로 증가)
+    largestJs: 600 * 1024,  // 단일 최대 JS 청크 원시: 600KB (firebase-db ~560KB. 2026-08-01 firestore/storage
+                            //   청크 분리로 582→560KB 확보 — 합쳐두면 다음 firebase 마이너에서 바로 터진다)
 };
 
 interface FileInfo {
