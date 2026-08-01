@@ -59,6 +59,8 @@ export const organizationSchema = z.object({
         termsVersion: z.string().catch(''),
         privacyVersion: z.string().catch(''),
         agreedAt: timestampSchema.optional().catch(undefined),
+        source: z.literal('reconsent').optional().catch(undefined),
+        agreedByUid: z.string().optional().catch(undefined),
     }).optional().catch(undefined),
     createdAt: timestampSchema.optional().catch(undefined),
     approvedAt: timestampSchema.optional().catch(undefined),

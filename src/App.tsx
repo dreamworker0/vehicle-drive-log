@@ -4,7 +4,7 @@ import { useConfirmStore } from './store/useConfirmStore';
 import { useThemeStore } from './store/useThemeStore';
 import { useFontSizeStore } from './store/useFontSizeStore';
 import { lazyWithRetry } from './lib/lazyWithRetry';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import { useOrientationLock } from './hooks/useOrientationLock';
 import useThemeSync from './hooks/useThemeSync';
@@ -17,6 +17,7 @@ const SuperAdminLayout = lazyWithRetry(() => import('./components/superAdmin/Sup
 const AdminLayout = lazyWithRetry(() => import('./components/admin/AdminLayout'));
 const EmployeeLayout = lazyWithRetry(() => import('./components/employee/EmployeeLayout'));
 const CancelReservationHandler = lazyWithRetry(() => import('./components/common/CancelReservationHandler'));
+const ConsentGate = lazyWithRetry(() => import('./components/common/ConsentGate'));
 
 // auth 페이지 (lazy 전환 — 번들 최적화)
 const LoginPage = lazyWithRetry(() => import('./components/auth/LoginPage'));
@@ -79,6 +80,9 @@ const legalRoutes = [
 
 
 import { notifyUser } from './lib/notify';
+
+/** 재동의 게이트를 띄우지 않는 경로 — 동의 대상 문서를 읽는 화면 자체는 막지 않는다. */
+const LEGAL_PATHS = ['/terms', '/privacy'];
 
 export default function App() {
 
@@ -165,6 +169,8 @@ export default function App() {
 
 function AppContent() {
   const { user, userData, loading } = useAuth();
+  const { pathname } = useLocation();
+  const isLegalRoute = LEGAL_PATHS.includes(pathname);
   useOrientationLock();
   const theme = useThemeStore(state => state.theme);
   const setTheme = useThemeStore(state => state.setTheme);
@@ -274,6 +280,16 @@ function AppContent() {
       {/* 캘린더 예약 취소 핸들러 (관리자, 직원 전용 UI 헬퍼) */}
       {(userData?.role === 'admin' || userData?.role === 'employee') && (
         <Suspense fallback={null}><CancelReservationHandler /></Suspense>
+      )}
+
+      {/*
+        개정 약관 재동의 게이트.
+        약관·처리방침 페이지에서는 띄우지 않는다 — 동의 화면의 링크는 새 탭으로 열리고
+        로그인 상태에서는 그 탭도 App을 렌더하므로, 제외하지 않으면 읽으려던 문서 위에
+        모달이 다시 덮여 동의도 열람도 못 하는 막다른 길이 된다.
+      */}
+      {!isLegalRoute && (
+        <Suspense fallback={null}><ConsentGate /></Suspense>
       )}
     </Suspense>
   );

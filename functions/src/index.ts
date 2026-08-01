@@ -81,6 +81,7 @@ export { setCustomClaims } from "./handlers/triggers/setCustomClaims";
 
 // 초대 코드로 기관 가입 (신규 사용자 Custom Claims 미보유 대응)
 export { joinOrganization } from "./handlers/callable/joinOrganization";
+export { acceptCurrentTerms } from "./handlers/callable/acceptCurrentTerms";
 
 // 첫 직원 등록 시점 추적
 export { trackFirstEmployee } from "./handlers/triggers/trackFirstEmployee";
