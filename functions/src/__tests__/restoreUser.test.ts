@@ -19,6 +19,8 @@ jest.mock('firebase-admin/auth', () => ({
 const mockCallerGet = jest.fn();
 const mockOrgGet = jest.fn();
 const mockUserSet = jest.fn().mockResolvedValue(undefined);
+/** 복원 대상 사용자 문서 — 동의 기록 이어받기 검증에 쓴다 */
+const mockTargetGet = jest.fn().mockResolvedValue({ exists: false });
 
 jest.mock('firebase-admin/firestore', () => ({
     getFirestore: () => ({
@@ -26,7 +28,7 @@ jest.mock('firebase-admin/firestore', () => ({
             doc: jest.fn((docId: string) => {
                 if (col === 'users' && docId === 'caller-uid') return { get: mockCallerGet };
                 if (col === 'organizations') return { get: mockOrgGet };
-                return { get: jest.fn().mockResolvedValue({ exists: false }), set: mockUserSet };
+                return { get: mockTargetGet, set: mockUserSet };
             }),
         })),
     }),
@@ -136,5 +138,42 @@ describe('restoreUser — 계정 복원', () => {
             organizationId: 'org1',
             role: 'employee',
         }));
+    });
+
+    // ── 이용약관 동의 기록 이어받기 ──
+    // merge 없는 set이므로 명시적으로 옮기지 않으면 동의 기록이 사라진다.
+    // joinOrganization은 미가입자 전용이고 Rules가 클라이언트 쓰기를 막아 재수집 경로가 없다.
+    it('기존 동의 기록(consent)을 복원 문서로 이어받는다', async () => {
+        const priorConsent = { terms: true, termsVersion: '2026-08-05', agreedAt: 'PRIOR_TS' };
+        mockCallerGet.mockResolvedValueOnce({ data: () => ({ role: 'superAdmin' }) });
+        mockOrgGet.mockResolvedValueOnce({ exists: true, data: () => ({ status: 'approved' }) });
+        mockGetUserByEmail.mockResolvedValueOnce({ uid: 'target-uid', disabled: true, displayName: '홍길동' });
+        mockUpdateUser.mockResolvedValueOnce(undefined);
+        mockTargetGet.mockResolvedValueOnce({ exists: true, data: () => ({ consent: priorConsent }) });
+
+        const req = {
+            auth: { uid: 'caller-uid', token: {} },
+            data: { email: 'disabled@test.com', organizationId: 'org1', name: '홍길동', role: 'employee' },
+        };
+        await handler(req);
+
+        expect(mockUserSet).toHaveBeenCalledWith(expect.objectContaining({ consent: priorConsent }));
+    });
+
+    it('기존 동의 기록이 없으면 consent 필드를 만들지 않는다', async () => {
+        mockCallerGet.mockResolvedValueOnce({ data: () => ({ role: 'superAdmin' }) });
+        mockOrgGet.mockResolvedValueOnce({ exists: true, data: () => ({ status: 'approved' }) });
+        mockGetUserByEmail.mockResolvedValueOnce({ uid: 'target-uid', disabled: true, displayName: '홍길동' });
+        mockUpdateUser.mockResolvedValueOnce(undefined);
+        mockTargetGet.mockResolvedValueOnce({ exists: true, data: () => ({}) });
+
+        const req = {
+            auth: { uid: 'caller-uid', token: {} },
+            data: { email: 'disabled@test.com', organizationId: 'org1', name: '홍길동', role: 'employee' },
+        };
+        await handler(req);
+
+        // 동의하지 않은 사용자에게 빈 동의 기록을 만들면 안 된다
+        expect(mockUserSet.mock.calls[0][0]).not.toHaveProperty('consent');
     });
 });

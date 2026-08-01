@@ -1,10 +1,11 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useCallback } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { logout } from '../../lib/auth';
 import { auth } from '../../lib/firebase';
 import { refreshTokenSilently } from '../../lib/tokenRefresh';
+import { TERMS_VERSION } from '../../lib/constants';
 
 export default function InviteCodePage() {
     const { user, userData } = useAuth();
@@ -26,18 +27,31 @@ export default function InviteCodePage() {
 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-    // 링크에 코드가 있으면 입력 화면 없이 자동으로 기관 연결을 시도한다.
-    // 코드가 없으면(직접 접속) 곧바로 입력 폼을 노출한다.
-    const [autoJoining, setAutoJoining] = useState(() => code.length === 6);
-    const autoTriedRef = useRef(false);
+    const [agreeTerms, setAgreeTerms] = useState(false);
+    /**
+     * 초대 링크로 유입됐는지 여부 — 안내 문구만 바꾼다.
+     *
+     * 종전에는 링크에 코드가 있으면 화면 없이 자동 가입했으나, 약관 동의를 기록하려면
+     * 사용자의 명시적 동의가 필요해 확인 단계를 거치도록 바꿨다. 자동 동의는
+     * 동의로 볼 수 없으므로 기록의 의미가 없어진다.
+     */
+    const [fromLink] = useState(() => code.length === 6);
+    /*
+     * 링크 유입 문구는 마운트 시점 판정만으로 고정하지 않는다. 코드가 틀려 실패한 뒤
+     * 사용자가 직접 수정하는 화면에서 "코드를 불러왔어요"가 남으면 어긋난다.
+     */
+    const showLinkCopy = fromLink && code.length === 6;
     const navigate = useNavigate();
 
-    // 코드 값을 성공적으로 불러왔다면, 더 이상 불필요하므로 정리
-    useEffect(() => {
-        if (code) {
-            localStorage.removeItem('pendingInviteCode');
-        }
-    }, [code]);
+    /*
+     * pendingInviteCode는 가입 성공 전까지 지우지 않는다.
+     *
+     * App이 URL의 ?code=를 localStorage로 옮기고 history.replaceState로 제거하므로,
+     * 여기서 지우면 코드는 React state에만 남는다. 자동 가입 시절에는 마운트 직후
+     * 소비돼 무해했지만, 이제는 사용자가 약관을 읽고 동의할 때까지 대기한다.
+     * 그 사이 약관 링크(_blank)로 외부 브라우저에 나갔다가 PWA가 콜드 재시작되면
+     * URL·localStorage·state가 모두 비어 링크만 받은 직원은 코드를 복구할 수 없다.
+     */
 
     const joinWithCode = useCallback(async (rawCode: string): Promise<boolean> => {
         const finalCode = rawCode.replace(/\s/g, '').toUpperCase();
@@ -52,13 +66,22 @@ export default function InviteCodePage() {
             return false;
         }
 
+        // 서버(joinOrganization)도 동일하게 검증하므로 우회 시에는 거부된다.
+        if (!agreeTerms) {
+            setError('이용약관에 동의해주세요.');
+            return false;
+        }
+
         setLoading(true);
         setError('');
 
         try {
             const functions = getFunctions(undefined, 'asia-northeast3');
             const joinOrg = httpsCallable(functions, 'joinOrganization');
-            await joinOrg({ code: finalCode });
+            await joinOrg({ code: finalCode, agreedTerms: agreeTerms, termsVersion: TERMS_VERSION });
+
+            // 가입이 확정된 뒤에야 보관된 초대 코드를 정리한다.
+            localStorage.removeItem('pendingInviteCode');
 
             // Custom Claims 갱신을 위해 토큰 강제 리프레시
             if (auth.currentUser) await refreshTokenSilently(auth.currentUser);
@@ -78,6 +101,10 @@ export default function InviteCodePage() {
                 setError('이미 기관에 소속되어 있습니다. 로그아웃 후 다시 로그인해 주세요.');
             } else if (message.includes('Google 계정')) {
                 setError('Google 계정으로 로그인 후 다시 시도해주세요.');
+            } else if (message.includes('이용약관에 동의') || message.includes('약관 버전')) {
+                // 서버 동의 검증 실패. 매핑이 없으면 원인 불명 메시지만 뜨고, 사용자가
+                // 재시도를 반복해 uid 기준 rate limit(시간당 5회)에 스스로 갇힌다.
+                setError('약관 동의 정보를 확인할 수 없습니다. 페이지를 새로고침한 뒤 다시 시도해주세요.');
             } else {
                 setError('오류가 발생했습니다. 다시 시도해주세요.');
             }
@@ -86,31 +113,7 @@ export default function InviteCodePage() {
         } finally {
             setLoading(false);
         }
-    }, [user, navigate]);
-
-    // 링크로 전달된 코드 자동 가입 처리
-    useEffect(() => {
-        if (!autoJoining || autoTriedRef.current) return;
-        if (!user) return; // 인증 정보 로딩 대기
-
-        // 이미 기관에 소속된 경우 자동 가입을 시도하지 않는다 (리다이렉트가 처리)
-        if (alreadyInOrg) {
-            setAutoJoining(false);
-            return;
-        }
-
-        // 로그인이 필요하거나 코드가 불완전하면 입력 폼으로 폴백
-        if (user.isAnonymous || code.length !== 6) {
-            setAutoJoining(false);
-            return;
-        }
-
-        autoTriedRef.current = true;
-        joinWithCode(code).then((ok) => {
-            // 실패(잘못된/만료된 코드 등) 시 입력 폼을 노출해 직접 수정하도록 한다.
-            if (!ok) setAutoJoining(false);
-        });
-    }, [autoJoining, user, code, joinWithCode, alreadyInOrg]);
+    }, [user, navigate, agreeTerms]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -122,23 +125,6 @@ export default function InviteCodePage() {
         return <Navigate to="/" replace />;
     }
 
-    // 링크 코드 자동 연결 중에는 입력 화면 대신 진행 상태만 보여준다.
-    if (autoJoining) {
-        return (
-            <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-surface-50 to-primary-50 px-4">
-                <div className="w-full max-w-sm animate-scale-in text-center">
-                    <div className="w-16 h-16 mx-auto mb-4 bg-primary-100 dark:bg-primary-900/40 rounded-2xl flex items-center justify-center">
-                        <div className="w-8 h-8 spinner text-primary-600 dark:text-primary-400" />
-                    </div>
-                    <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-1">기관에 연결 중...</h1>
-                    <p className="text-sm text-surface-500 dark:text-surface-400">
-                        초대 코드를 확인하고 기관에 자동으로 연결하고 있어요.
-                    </p>
-                </div>
-            </div>
-        );
-    }
-
     return (
         <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-surface-50 to-primary-50 px-4">
             <div className="w-full max-w-sm animate-scale-in">
@@ -148,9 +134,13 @@ export default function InviteCodePage() {
                             <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25z" />
                         </svg>
                     </div>
-                    <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-1">초대 코드 입력</h1>
+                    <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-1">
+                        {showLinkCopy ? '기관 참여 확인' : '초대 코드 입력'}
+                    </h1>
                     <p className="text-sm text-surface-500 dark:text-surface-400">
-                        기관에서 받은 6자리 코드를 입력하세요
+                        {showLinkCopy
+                            ? '초대 코드를 불러왔어요. 약관에 동의하면 참여가 완료됩니다.'
+                            : '기관에서 받은 6자리 코드를 입력하세요'}
                     </p>
                 </div>
 
@@ -180,13 +170,55 @@ export default function InviteCodePage() {
                             />
                         </div>
 
+                        {/*
+                          이용약관 동의 — 개인정보 동의가 아니다. 직원 개인정보의 처리 근거는
+                          기관의 업무 수행이고, 정보주체 고지는 위탁자인 기관의 책임이다.
+                          여기서 받는 것은 계정 개설과 약관 제4조(이용자의 의무)·제6조(면책)의 효력 근거다.
+                        */}
+                        <label className="flex items-start gap-3 cursor-pointer group min-h-[48px] py-2">
+                            <input
+                                id="agree-terms"
+                                type="checkbox"
+                                checked={agreeTerms}
+                                onChange={(e) => setAgreeTerms(e.target.checked)}
+                                className="mt-0.5 w-4 h-4 rounded border-surface-300 dark:border-surface-600 text-primary-600 dark:text-primary-400 focus:ring-primary-500"
+                            />
+                            <span className="text-sm text-surface-600 dark:text-surface-400 group-hover:text-surface-800 dark:group-hover:text-surface-200 transition-colors">
+                                <a
+                                    href="/terms"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-primary-600 dark:text-primary-400 underline underline-offset-2 font-medium hover:text-primary-700 dark:hover:text-primary-300"
+                                >
+                                    이용약관
+                                </a>
+                                에 동의합니다. <span className="text-red-500 dark:text-red-400">*</span>
+                            </span>
+                        </label>
+                        {/*
+                          약관 제9조 ⑦은 기관에 직원 고지 책임을 부과한다. 여기서는 (1) 서비스가
+                          수탁자로서 개인정보를 처리한다는 사실, (2) 위탁 계약의 당사자는 기관이므로
+                          이 동의가 위탁 동의가 아니라는 점, (3) 동의 기록이 남는다는 점을 밝힌다.
+                          (3)은 기관 신청 화면(OrgApplicationPage)과 대칭을 맞춘 것이다.
+                        */}
+                        <div className="text-xs text-surface-500 dark:text-surface-400 leading-relaxed space-y-1.5">
+                            <p>
+                                소속 기관이 개인정보처리자이며, 서비스 제공자는 기관의 위탁을 받아 개인정보를 처리하는
+                                수탁자입니다. 개인정보의 수집·이용에 관한 고지는 소속 기관이 담당합니다.
+                            </p>
+                            <p>
+                                위탁 계약(약관 제9조)의 당사자는 기관이므로, 위 동의는 서비스 계정 개설을 위한
+                                이용약관 동의입니다. 동의 사실과 동의한 문서의 시행일은 기록·보관됩니다.
+                            </p>
+                        </div>
+
                         {error && (
                             <p className="text-sm text-red-500 dark:text-red-400 animate-slide-down">{error}</p>
                         )}
 
                         <button
                             type="submit"
-                            disabled={loading || code.length !== 6}
+                            disabled={loading || code.length !== 6 || !agreeTerms}
                             className="btn-primary w-full min-h-[48px]"
                         >
                             {loading ? (

@@ -413,6 +413,51 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     }));
   });
 
+  it('10-2. 직원 이용약관 동의 기록(users.consent) 클라이언트 변경·주입 차단', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.collection('users').doc('user_A').set({
+        email: 'a@example.com', name: '직원A', role: 'employee', organizationId: 'org-A',
+        consent: { terms: true, termsVersion: '2026-08-05' },
+      });
+      // 동의 기록이 없는 레거시 직원
+      await db.collection('users').doc('user_L').set({
+        email: 'l@example.com', name: '직원L', role: 'employee', organizationId: 'org-A',
+      });
+    });
+
+    const ownerDb = setupContext('user_A', { role: 'employee', orgId: 'org-A' }).firestore();
+    const adminDb = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+    const superDb = setupContext('super_1', { role: 'superAdmin' }).firestore();
+    const legacyOwnerDb = setupContext('user_L', { role: 'employee', orgId: 'org-A' }).firestore();
+
+    // 본인·기관관리자·superAdmin 모두 동의 기록 변경 차단
+    await assertFails(ownerDb.collection('users').doc('user_A').update({
+      consent: { terms: true, termsVersion: '2099-01-01' },
+    }));
+    await assertFails(adminDb.collection('users').doc('user_A').update({
+      consent: { terms: false, termsVersion: 'x' },
+    }));
+    await assertFails(superDb.collection('users').doc('user_A').update({
+      consent: { terms: false, termsVersion: 'x' },
+    }));
+
+    // 동의하지 않은 레거시 직원이 스스로 동의 기록을 심는 것도 차단
+    await assertFails(legacyOwnerDb.collection('users').doc('user_L').update({
+      consent: { terms: true, termsVersion: '2026-08-05' },
+    }));
+
+    // 정상: 동의 기록을 건드리지 않는 본인 프로필 수정은 허용
+    await assertSucceeds(ownerDb.collection('users').doc('user_A').update({ phone: '010-1111-2222' }));
+
+    // 신규 가입 시 클라이언트 create로 동의 기록을 심는 것도 차단
+    const newUserDb = setupContext('user_new', { firebase: { sign_in_provider: 'google.com' } }).firestore();
+    await assertFails(newUserDb.collection('users').doc('user_new').set({
+      email: 'new@example.com', consent: { terms: true, termsVersion: '2026-08-05' },
+    }));
+    await assertSucceeds(newUserDb.collection('users').doc('user_new').set({ email: 'new@example.com' }));
+  });
+
   it('10-3. 접속기록(auditLogs) — 클라이언트 쓰기 전면 차단, 읽기는 점검 주체만', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await context.firestore().collection('auditLogs').doc('log_A').set({
