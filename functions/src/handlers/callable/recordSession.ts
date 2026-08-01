@@ -24,15 +24,9 @@
  * 정확한 버전·기기 모델은 접속기록의 목적(비정상 접근 탐지)에 필요하지 않다.
  */
 import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
-import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
 import { log, wrapHandler } from "../../utils/helpers";
 import { checkRateLimitByUid } from "../../utils/rateLimit";
-
-/** 보관 기간 — 변경 로그(auditLog 트리거)와 같은 1년 */
-const RETENTION_DAYS = 365;
-
-/** 기관에 속하지 않는 계정(주로 superAdmin) — auditLog 트리거와 같은 규약 */
-const SYSTEM_ORG_ID = "__system__";
+import { writeAuditEntry, resolveOrgId } from "../../services/audit/writeAuditEntry";
 
 /** 세션 식별자 형식 — 클라이언트가 생성하는 난수. 문서 ID에 들어가므로 좁게 제한한다. */
 const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
@@ -113,29 +107,22 @@ export const recordSession = onCall(
         // 같은 문서를 덮어쓰므로 쌓이지는 않고, 한도는 남용 방지용이다.
         await checkRateLimitByUid("recordSession", uid, 20, 3600);
 
-        const db = getFirestore();
-
         // 기관 식별자는 사용자 문서에서 읽는다 — 기관 관리자의 점검 조회 필터가 된다.
-        const userSnap = await db.collection("users").doc(uid).get();
-        const organizationId = (userSnap.data()?.organizationId as string | undefined) || SYSTEM_ORG_ID;
+        const organizationId = await resolveOrgId(uid);
 
-        const expiresAt = Timestamp.fromMillis(Date.now() + RETENTION_DAYS * 24 * 60 * 60 * 1000);
-
-        // 문서 ID를 세션 식별자로 고정해 같은 세션의 재호출이 중복을 만들지 않게 한다.
-        await db.collection("auditLogs").doc(`session_${uid}_${sessionId}`).set({
+        await writeAuditEntry({
+            // 문서 ID를 세션 식별자로 고정해 같은 세션의 재호출이 중복을 만들지 않게 한다.
+            docId: `session_${uid}_${sessionId}`,
             organizationId,
             action: "login",
             targetType: "session",
             targetId: sessionId,
             // 접속 계정은 곧 행위자다 — 인증 토큰에서 오므로 위조될 수 없다.
             actorUid: uid,
-            actorSource: "auth",
             // 로그인은 자기 계정에 대한 접근이므로 정보주체도 본인이다.
             subjectUids: [uid],
             ip: clientIp(request.rawRequest as never),
             userAgent: summarizeUserAgent(request.rawRequest?.headers?.["user-agent"]),
-            at: FieldValue.serverTimestamp(),
-            expiresAt,
         });
 
         log("INFO", "recordSession", "접속 기록", { uid, organizationId });

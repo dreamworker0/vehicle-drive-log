@@ -2,9 +2,9 @@
 
 > **자동 생성 문서** — `scripts/generate-functions-doc.ts`로 생성됨
 >
-> 마지막 업데이트: 2026. 8. 1. PM 5:27:47
+> 마지막 업데이트: 2026. 8. 1. PM 5:46:20
 >
-> 총 함수 수: **65개**
+> 총 함수 수: **66개**
 
 ---
 
@@ -23,7 +23,7 @@
 
 ## 📞 onCall (클라이언트 직접 호출)
 
-> 총 36개
+> 총 37개
 
 ### `ocrDashboard`
 
@@ -119,6 +119,16 @@
 | **설명** | 로그인 세션 기록 — 고시 제16조의 접속지(IP)·계정·일시를 남긴다. 트리거는 IP를 볼 수 없어 콜러블로 받는다. `sessionId`는 브라우저 세션당 난수 1개이며 문서 ID에 쓰여 같은 세션의 재호출이 중복을 만들지 않는다. User-Agent는 브라우저/OS 수준으로 축약해 저장한다. |
 | **인증** | 인증 필수 |
 | **요청 파라미터** | `{ sessionId: string }` |
+| **반환값** | `{ success: boolean }` |
+
+### `recordExport`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/callable/recordExport.ts` |
+| **설명** | 개인정보 반출(엑셀·PDF 내보내기) 기록 — 고시 제16조. 형식·대상·건수만 남기고 **반출된 데이터 내용과 검색 조건은 담지 않는다**. `format`·`dataset`은 화이트리스트로 제한해 임의 값 주입을 막는다. 브라우저에서 파일을 만들므로 클라이언트가 부르지 않으면 남지 않는 한계가 있다. |
+| **인증** | 인증 필수 |
+| **요청 파라미터** | `{ format: 'excel' \| 'pdf', dataset: string, recordCount: number, exportId: string }` |
 | **반환값** | `{ success: boolean }` |
 
 ### `disableUser`

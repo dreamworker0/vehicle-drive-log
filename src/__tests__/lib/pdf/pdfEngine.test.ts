@@ -48,6 +48,8 @@ function makeRecords(n: number): Row[] {
     }));
 }
 
+vi.mock('../../../lib/audit/recordExport', () => ({ recordExport: vi.fn() }));
+
 function baseConfig(records: Row[], overrides: Record<string, unknown> = {}) {
     return {
         title: '테스트 보고서',
@@ -55,6 +57,8 @@ function baseConfig(records: Row[], overrides: Record<string, unknown> = {}) {
         records,
         columns: COLUMNS,
         renderRow,
+        // 접속기록에 남길 반출 대상 — 엔진이 필수로 요구한다(리포트마다 반드시 선언)
+        auditDataset: 'maintenance' as const,
         ...overrides,
     };
 }

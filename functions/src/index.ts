@@ -83,6 +83,7 @@ export { setCustomClaims } from "./handlers/triggers/setCustomClaims";
 export { joinOrganization } from "./handlers/callable/joinOrganization";
 export { acceptCurrentTerms } from "./handlers/callable/acceptCurrentTerms";
 export { recordSession } from "./handlers/callable/recordSession";
+export { recordExport } from "./handlers/callable/recordExport";
 
 // 첫 직원 등록 시점 추적
 export { trackFirstEmployee } from "./handlers/triggers/trackFirstEmployee";

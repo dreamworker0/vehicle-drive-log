@@ -127,6 +127,16 @@ const FUNCTIONS: FunctionEntry[] = [
     returns: '{ success: boolean }',
   },
   {
+    name: 'recordExport',
+    type: 'onCall',
+    file: 'handlers/callable/recordExport.ts',
+    description: '개인정보 반출(엑셀·PDF 내보내기) 기록 — 고시 제16조. 형식·대상·건수만 남기고 **반출된 데이터 내용과 검색 조건은 담지 않는다**. `format`·`dataset`은 화이트리스트로 제한해 임의 값 주입을 막는다. 브라우저에서 파일을 만들므로 클라이언트가 부르지 않으면 남지 않는 한계가 있다.',
+    auth: '인증 필수',
+    // 표 셀 안의 파이프는 백틱으로 감싸도 셀이 쪼개지므로 이스케이프한다.
+    params: "{ format: 'excel' \\| 'pdf', dataset: string, recordCount: number, exportId: string }",
+    returns: '{ success: boolean }',
+  },
+  {
     name: 'disableUser',
     type: 'onCall',
     file: 'handlers/callable/disableUser.ts',

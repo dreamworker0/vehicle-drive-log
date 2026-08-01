@@ -76,6 +76,7 @@ export function downloadFuelLogPdf(
     } = {},
 ) {
     return printPdfReport<PdfFuelLogEntry>({
+        auditDataset: 'fuelLogs',
         title: '주유 / 충전 기록',
         orgName: options.orgName || '',
         records,
