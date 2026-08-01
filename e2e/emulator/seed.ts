@@ -7,6 +7,9 @@
 import { initializeApp, getApps } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { getFirestore } from 'firebase-admin/firestore';
+// 값을 복제하지 않고 원본을 가져온다 — 약관 개정으로 버전이 오르면 시드도 자동으로 따라가야
+// 재동의 게이트가 E2E를 막지 않는다. (constants.ts는 import가 없는 순수 상수 모듈이라 Node에서 안전)
+import { TERMS_VERSION, PRIVACY_VERSION } from '../../src/lib/constants';
 
 const PROJECT_ID =
     process.env.GCLOUD_PROJECT ||
@@ -64,22 +67,34 @@ export async function seedEmulator(): Promise<void> {
 
     // 2) Firestore 시드
     const now = new Date();
+    // consent는 재동의 게이트(useConsentGate)가 참조한다. 없으면 관리자에게 차단 모달이 떠
+    // 클릭을 가로채므로 인증 E2E 전체가 실패한다. 게이트 자체를 검증하는 테스트가 아니라면
+    // 시드 계정은 항상 현행 버전에 동의한 상태여야 한다.
     await db.collection('organizations').doc(TEST_ORG_ID).set({
         name: 'E2E 테스트 기관',
         status: 'approved',
         createdAt: now,
+        consent: {
+            terms: true,
+            privacy: true,
+            termsVersion: TERMS_VERSION,
+            privacyVersion: PRIVACY_VERSION,
+            agreedAt: now,
+        },
     }, { merge: true });
 
     await db.collection('users').doc(TEST_ADMIN.uid).set({
         uid: TEST_ADMIN.uid, name: TEST_ADMIN.name, email: TEST_ADMIN.email,
         role: 'admin', organizationId: TEST_ORG_ID, organizationStatus: 'approved',
         status: 'active', createdAt: now,
+        consent: { terms: true, termsVersion: TERMS_VERSION, agreedAt: now },
     }, { merge: true });
 
     await db.collection('users').doc(TEST_EMPLOYEE.uid).set({
         uid: TEST_EMPLOYEE.uid, name: TEST_EMPLOYEE.name, email: TEST_EMPLOYEE.email,
         role: 'employee', organizationId: TEST_ORG_ID, organizationStatus: 'approved',
         status: 'active', createdAt: now,
+        consent: { terms: true, termsVersion: TERMS_VERSION, agreedAt: now },
     }, { merge: true });
 
     // merge를 쓰지 않는다 — 과거 실행에서 남은 필드가 파싱/테스트 결과에 영향을 주지 않도록
