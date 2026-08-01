@@ -11,6 +11,10 @@ on:
       - '**.md'
   pull_request:
     branches: [master]
+    # 기본 타입(opened·synchronize·reopened)에 edited를 더한다 — 스택 PR의 base를 master로
+    # 바꿔도 CI가 돌지 않아 검증 없이 방치되는 문제가 있었다(#92·#93이 생성 이래 한 번도 실행 안 됨).
+    # base 변경은 synchronize가 아니라 edited로 발화하기 때문이다.
+    types: [opened, synchronize, reopened, edited]
 
 # 최소 권한 — CI는 코드 체크아웃만 필요하고 저장소에 쓰지 않는다.
 permissions:
@@ -27,6 +31,10 @@ jobs:
   # shared/**는 Functions에서도 소비(shared/faqData.ts → functions/src/utils/faqData.ts)하므로
   # 반드시 포함한다. 워크플로 자체 변경 시에는 안전하게 전체 실행.
   changes:
+    # edited는 제목·본문 수정에도 발화한다. 그때마다 전체 CI(~16분)를 돌리면 Actions 분량이 샌다.
+    # base가 실제로 바뀐 edited만 통과시킨다. push·opened·synchronize·reopened는 action이
+    # 'edited'가 아니므로 항상 통과한다. (changes가 스킵되면 functions-tests도 needs로 함께 스킵)
+    if: github.event.action != 'edited' || github.event.changes.base.ref.from != ''
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -74,6 +82,8 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
 
   ci:
+    # changes 잡과 동일한 가드 — 제목·본문만 고친 edited로는 돌지 않는다.
+    if: github.event.action != 'edited' || github.event.changes.base.ref.from != ''
     runs-on: ubuntu-latest
     # 게이트 스텝(Rules·인증 E2E·커버리지) 추가로 첫 실행(캐시 미적중) 기준 ~20분 소요
     timeout-minutes: 25
