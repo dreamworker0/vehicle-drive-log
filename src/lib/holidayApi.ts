@@ -11,6 +11,15 @@ import { getAuthHeaders } from './authFetch';
 
 const API_KEY = import.meta.env.VITE_HOLIDAY_API_KEY;
 
+/**
+ * 외부 공공데이터 API 폴백의 응답 대기 상한(ms).
+ *
+ * 이 fetch에는 원래 타임아웃이 없어 외부 서비스가 응답하지 않으면 무기한 대기했다.
+ * 호출부가 이 Promise를 await하고 있으면 화면이 그대로 인질이 된다(예약 화면 무한 스피너).
+ * 공휴일은 없어도 화면이 동작하는 부가 정보이므로, 기다리느니 비우고 진행하는 편이 낫다.
+ */
+const FALLBACK_TIMEOUT_MS = 5000;
+
 // 연도별 캐시
 const cache: Record<number, Record<string, string>> = {};
 
@@ -55,9 +64,19 @@ export const fetchPublicHolidays = async (year: number) => {
             // 프로덕션 환경: Cloud Function 프록시 사용
             url = `/api/holiday?solYear=${year}&numOfRows=50`;
         }
-        const res = await fetch(url, {
-            headers: import.meta.env.PROD ? await getAuthHeaders() : {},
-        });
+        // 응답이 없는 외부 API에 화면이 묶이지 않도록 상한을 둔다.
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), FALLBACK_TIMEOUT_MS);
+
+        let res: Response;
+        try {
+            res = await fetch(url, {
+                headers: import.meta.env.PROD ? await getAuthHeaders() : {},
+                signal: controller.signal,
+            });
+        } finally {
+            clearTimeout(timer);
+        }
 
         if (!res.ok) {
             console.error('공휴일 API 응답 오류:', res.status);
@@ -83,7 +102,11 @@ export const fetchPublicHolidays = async (year: number) => {
         // 메모리 캐시 저장
         cache[year] = map;
     } catch (err) {
-        console.error('공휴일 API 호출 실패:', err);
+        if ((err as Error)?.name === 'AbortError') {
+            console.warn(`공휴일 API ${FALLBACK_TIMEOUT_MS}ms 초과 — 공휴일 없이 진행합니다.`);
+        } else {
+            console.error('공휴일 API 호출 실패:', err);
+        }
     }
 
     return map;
