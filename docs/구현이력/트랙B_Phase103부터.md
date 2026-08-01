@@ -318,3 +318,171 @@
 | **검증** | `tsc --noEmit` 0, pre-commit(ESLint `--max-warnings=0` + `vitest related`) 통과. 처리방침 전용 테스트는 없으며 표시 로직만 바뀌고 `PROCESSORS` 구조는 불변이라 회귀 범위는 이 페이지 렌더링에 한정. CI 7체크(`ci`·CodeQL 2종·`changes`·`preview`·`functions-tests` skip·`Greptile Review`) 1회 통과 |
 | **커밋** | `30acd40`(squash) — 브랜치 `feat/privacy-consignment-notice` → PR #89. 내부 3커밋(`feat` 조항 신설 / `fix` 적대적 리뷰 6건 / `fix` Greptile 지적 1건). 총 293 insertions / 14 deletions, `PrivacyPage.tsx` 단일 파일 |
 | **남은 것** | ① **GitHub App이 계정 저장소 41개(공개 20·비공개 21) 전부에 붙어 있다** — 월 50리뷰는 계정 합산이라 쿼터가 분산되고, 비공개 저장소는 커밋 이력에 시크릿이 있으면 그것까지 인덱싱된다(해제해도 벤더 인덱스는 되돌릴 수 없음). 연결 **전** 시크릿 점검 후 범위 축소 필요 ② OSS 프로그램 신청(트라이얼 만료 전) ③ Dependabot PR 리뷰 제외 — 주 4~5건으로 쿼터 최대 소비자인데 의존성 버전업에 AI 리뷰는 무가치. Greptile이 접근하는 것은 소스 코드뿐이고 이용자 데이터에는 닿지 않으므로 **처리방침 수탁자 추가 대상은 아니다** |
+
+---
+
+### Phase 122: E2E 플레이크 2계열 제거 — 접근성 포커스 · 예약 화면 무한 스피너 🧪🔍 (CI 배포 완료)
+
+> 2026-07-30, PR을 반복 차단하던 E2E 실패 두 계열을 각각 근본 원인까지 파서 없앴다. 이 회차의 핵심은 수정 내용이 아니라 **진단 과정**이다 — ②에서 코드만 읽고 세운 가설이 틀렸고, CI 실패 아티팩트(trace·스크린샷·접근성 스냅샷)를 받아 보고서야 전혀 다른 원인이 드러났다. 로그가 아니라 **실패 시점의 화면 상태**가 답을 줬다.
+
+| 항목 | 내용 |
+|------|------|
+| **① 접근성 포커스 (#94)** | `accessibility-advanced.spec.ts`의 "인터랙티브 요소에 키보드 접근" 테스트가 `waitForTimeout(2000)` 후 `Tab`을 눌러, 느린 CI에서 하이드레이션이 안 끝나면 포커스가 `body`에 남아 실패. 고정 대기를 인터랙티브 요소 가시성 대기 + `expect().toPass()` 재시도로 교체하고, **재시도마다 `blur()`로 포커스를 초기 상태로 되돌린다** — 안 되돌리면 2회차 Tab이 이미 이동한 지점에서 출발해 재시도가 무의미해진다. 커밋 `5cfc051`, PR #94, 16 insertions |
+| **② 예약 승인 — 첫 진단이 틀렸다** | `authed-reservationApproval.spec.ts`가 CI에서 재시도까지 소진하며 실패. 코드만 보고 "`signIn`이 `void`로 완료를 안 기다린 뒤 하드 네비게이션 → Claims·리스너 준비 전 빈 목록"이라고 추정했으나 **오진**이었다. 앞서 `verify:full`을 파이프로 `tail`에 넘겨 **`tail`의 exit 0이 반환**되는 바람에 E2E 하드 실패를 통과로 오판한 사고도 있었다(이후 모든 검증 명령을 `> log 2>&1; echo "EXIT:$?"` 형태로 고정) |
+| **② 아티팩트로 확정** | `gh run download`로 `e2e-failure-artifacts`를 받아 확인: 로그인·Custom Claims·Firestore가 **전부 정상**이고 사이드바 배지(차량 1·직원 2)까지 채워진 상태에서 **본문만 스피너**였다. 접근성 스냅샷의 `main`에는 상단 버튼 4개뿐. 트레이스 네트워크 254건 중 4xx/5xx **0건** — 모듈은 `PendingReservationList.tsx`까지 다 로드됐다. 결정적 단서는 콘솔의 `Fetching holidays for 2026 from public API as fallback` |
+| **② 진짜 원인 (#96)** | `.env.emulator`에 `VITE_HOLIDAY_API_KEY`가 없고 `system/holidays`도 시드되지 않아 → `fetchPublicHolidays`가 **외부 실서비스**(`apis.data.go.kr`)로 Vite 프록시 폴백 → `useReservationData`가 그 fetch를 `Promise.all`로 **await** → `loading` 미해제 → `ReservationCalendar.tsx:49`가 스피너만 반환 → 승인/반려 목록이 **마운트조차 되지 않음**. CI 러너에서 공공데이터 API 응답이 늦으면 예약 화면이 영구 스피너였다 |
+| **② 조치** | `seedHolidays`로 `system/holidays`를 시드. 프로덕션은 `monthlyBatch`가 이 문서를 채우므로 **Firestore 경로가 정상 경로**이고, 시드는 그 상태를 재현해 E2E를 외부 네트워크와 무관하게 만드는 것이다. 음력 공휴일(설날·추석)은 제외하고 날짜 고정 8건만 심어 연도가 바뀌어도 유효하게 했고, 러너(UTC)와 사용자(KST)의 연말 연도 엇갈림을 피해 올해+내년을 함께 심는다. 추가로 `openAdminReservations` 헬퍼가 제목을 먼저 단언해 **"화면이 로딩을 끝내지 못함"과 "행이 없음"을 구분**한다 |
+| **② 검증** | `test:e2e:emulator` **11/11 통과(43.3s)**. 결정적 확인 — 예약 스펙만 재실행하며 브라우저 콘솔을 훑어 `Loaded holidays for 2026 from Firestore`를 확인(외부 폴백 **0회**), 2/2 통과(11.8s). 로컬 검증은 `git worktree` + node_modules 정션으로 격리 시도했으나 `.env.local`이 gitignore 대상이라 워크트리에 없어 Firebase 초기화가 실패했고(`__E2E_AUTH__` 미노출로 11건 전멸), 원인을 확인한 뒤 메인 트리에서 검증했다 |
+| **Greptile 지적 기각** | "heading이 레이아웃 래퍼에 있어 스피너 중에도 통과할 것"이라는 P2. **사실이 아니다** — `<h1>차량 예약</h1>`은 `if (loading) return <spinner>` **뒤**에 있고, 실패 스냅샷의 `main`에 heading이 없는 것이 직접 증거다. 사이드바의 "차량 예약"은 `role=link`라 `getByRole('heading')`에 걸리지 않는다. 근거를 PR에 회신하고 수정하지 않았다 |
+| **부수 발견 — 프로덕션 결함** | `system/holidays`에 해당 연도 데이터가 없는 **실사용자도 같은 무한 스피너**를 만난다(`Promise.all`이 외부 API를 무제한 대기). 이 PR 범위 밖으로 명시해 남겼다 |
+| **커밋** | `5cfc051`(PR #94, 접근성) · `a4e92f8`(PR #96, 공휴일 시드 — 2파일 54 insertions). 둘 다 CI 그린 후 squash 머지, Deploy 완료 |
+| **남은 것** | 위 프로덕션 무한 스피너(예약 화면이 외부 API 응답에 인질). Firestore 미스 시 폴백을 타임아웃·비차단으로 바꾸는 별건 |
+
+---
+
+### Phase 123: 접속기록 Phase 1 — 개인정보 변경 로그 서버 기록 🔐📋 (CI 배포 완료)
+
+> 2026-07-30, "변경사항 로그·개인정보 열람 로그를 해야 하는지"라는 질문에서 출발해 의무를 판정하고 1단계를 구현했다. 결론은 **필수**다(규모 예외 없음). 이 회차의 핵심은 트리거를 만든 것이 아니라, **적대적 리뷰가 16건을 내면서 "무엇을 기록하지 않을 것인가"가 설계의 본체임을 드러냈다**는 점이다 — 블랙리스트에서 화이트리스트로 뒤집은 한 변경이 서로 무관해 보였던 세 결함을 동시에 없앴다.
+
+| 항목 | 내용 |
+|------|------|
+| **의무 판정** | 법 제29조 + 시행령 제30조 → 고시 「개인정보의 안전성 확보조치 기준」 제16조(접속기록의 보관 및 점검). **규모 예외 없음** — 1만명 미만 소상공인·단체는 *내부관리계획*을 생략할 수 있으나 접속기록은 생략 대상이 아니다. 보관 **1년**(2년 요건인 정보주체 5만명·고유식별정보·민감정보 어디에도 해당하지 않음) |
+| **왜 트리거인가** | 클라이언트가 기록하면 로그를 남기지 않고 조작하는 우회가 가능하다. Firestore 트리거는 쓰기가 곧 이벤트이므로 클라이언트가 건너뛸 수 없고 Admin SDK로 쓰므로 위조도 못 한다. 기존 `syncDriveLogKm`에 얹지 않은 이유는 감사 쓰기 실패가 차량 누적 Km 동기화라는 핵심 로직까지 죽이기 때문 |
+| **화이트리스트 전환 — 한 변경이 세 결함을 없앴다** | 초안은 "메타 필드만 제외"하는 블랙리스트였다. `AUDITED_FIELDS`(개인정보 필드 + 접근 권한 필드)로 뒤집으니 ① **연쇄 증폭**(아래) ② **필드명 오염** — `driveLogs` create 규칙에 `hasOnly`가 없어 임의 이름의 필드를 넣을 수 있고 그 이름이 그대로 `changedFields`에 들어와, 필드명에 개인정보를 담아 **삭제 불가능한**(`allow write: if false`) 컬렉션에 1년간 박아 넣는 경로가 열려 있었다 ③ **UI 선호 기록** — 다크모드 토글·환영 배너 닫기·FCM 토큰 회전이 전부 감사 1건이었다(개인정보 처리 행위가 아니므로 최소수집에 반하고 점검 화면만 어지럽힌다). 세 개가 한 번에 사라졌다 |
+| **연쇄 증폭 발견 (기존 결함)** | `syncNextLogStartKm`의 `MAX_CHAIN = 20`은 **한 번의 호출만** 제한하고 연쇄를 막지 못한다. 20번째 문서의 `update`가 `onDriveLogUpdated`를 재발동하고, 그때 21번째 문서의 `startKm`은 아직 구 값이라 `oldStartKm === carryKm` break에 걸리지 않아 21~40을 또 쓴다 — 20건 단위 파도로 해당 차량 이후 전체에 전파된다. 기록 1,000건 차량의 km 1 정정이 쓰기 ~1,000건 + 호출 ~2,000회가 된다. PR이 근거로 든 "하루 1,000건"은 **사람의 행위 수**였다. km은 차량 자산 데이터이지 개인정보가 아니므로 화이트리스트에서 자연히 빠져 감사 로그는 이 증폭을 복제하지 않는다. **증폭 자체는 미수정 — 별도 PR로 이연** |
+| **유실 대책 — retry + 멱등** | v2 Firestore 트리거 기본값이 `retry: false`라 실패 이벤트가 폐기되는데, `catch`가 모든 실패를 삼켜 법정 기록이 조용히 사라졌다. 게다가 `add()`는 매번 새 ID라 retry를 켜면 중복이 생겨 **켤 수도 없는 구조**였다. 문서 ID를 `대상타입_대상ID_이벤트ID`로 고정하고 `retry: true`, 실패는 ERROR 로그 후 **다시 throw**해 재전달에 맡긴다. 트리거는 커밋 이후 실행되므로 원본 쓰기를 되돌리지 않는다 |
+| **superAdmin 감시 사각지대** | `organizationId`가 없으면 기록을 건너뛰었다 → **시스템 전체 권한 계정의 생성·권한 변경·삭제가 한 줄도 남지 않았다**. `'__system__'`으로 남긴다 — 실재하지 않는 기관 ID라 `isOrgAdmin`이 성립하지 않아 superAdmin만 조회한다(Rules 테스트로 기관 관리자 2명 차단 실증) |
+| **행위자 오기재 (restoreUser)** | 사용자 문서 생성을 무조건 본인 행위 + `actorSource: 'document'`로 확언했다. `restoreUser`는 관리자가 **타인** 문서를 재생성하므로 무고한 사용자에게 책임이 귀속되고, 이는 `unknown`보다 나쁘다 — 모른다고 남기는 게 아니라 **틀린 행위자를 확언**하는 것이다. `restoredAt`으로 두 경로를 가른다 |
+| **보관기간 근거 정정 (사실오인)** | 타입 주석에 "탑승자란에 이용자 이름을 기록하지 않으므로 1년"이라고 썼으나 `driveLogValidation.ts:146`이 **`passengerNames`를 실제로 저장**한다. 결론(1년)은 고유식별정보·민감정보 미수집 + 5만명 미달로 유지되지만 근거를 다시 썼다. 탑승자를 `subjectUids`에서 제외한 판단(uid 없이 이름만 저장돼 넣으면 감사 로그가 이름을 담게 된다)도 명시 |
+| **적대적 리뷰 16건 — 반영/기각** | 반영: 위 6건 + 배럴 미등록(`schemas/auditLog.ts`가 스스로 "스키마 누락 결함을 겪었다"고 경고하면서 정작 배럴에 없어 Phase 3에서 재발할 배치였다) · 스키마 `at`·`expiresAt` 필수화(`AuditLog` 타입과 상호 대입 불가) · `organizationId+at` 복합 인덱스 + `changedFields` 색인 면제 · Rules 주석 축소(Admin SDK는 Rules를 우회하므로 제16조 ③ 충족 주장은 과했다) · MONITORING_GUIDE 감사 실패 알림 룰. 기각·이연: `archiveDriveLogs` 대량 삭제 폭발(최초 커밋 2026-03이라 3년 초과 문서 없음) · MAX_CHAIN 증폭 자체(별건) · 서버 측 불변성(불변 버킷·Logging 싱크급, 범위 밖) |
+| **Greptile 지적** | P2 1건 — `auditDriveLogUpdated`의 `organizationId`가 `after`만 봐서 `auditUserUpdated`와 불일치. `orgIdOf(...candidates)`로 뽑아 통일. 반영분 재리뷰(5m43s)에서 추가 지적 없음 |
+| **테스트 14 → 30건** | 기존 테스트가 회귀를 못 잡던 지점을 메웠다: `expiresAt`이 `toBeDefined()`뿐이라 **`RETENTION_DAYS`를 1로 바꿔도 통과**했고(→ `Timestamp.fromMillis` 인자를 365일 범위로 단정), `index.ts` export를 지워도 전부 통과했고(→ 소스를 읽어 6개 이름 고정, CLAUDE.md 절대 규칙 #3), `toMatchObject`가 추가된 키를 못 잡았다(→ **키 집합 자체를 단정**해 값 필드가 끼어들면 실패). `capturedDocPaths`가 대입만 되고 단정이 없던 죽은 변수도 해소. 화이트리스트 동작(km 연쇄·UI 선호·임의 주입 필드 각각 미기록), superAdmin 경로 3건, 순환 참조 내성 추가 |
+| **검증** | `verify:full` 전체 통과 — 프론트 94파일/965건, **Functions 52 suites/548건**(518 → +30), Rules 16건, 비인증 E2E 67건, 에뮬레이터 E2E 11건. CI 7체크 통과(`ci` 5m24s · `functions-tests` 9m58s · CodeQL 2종 · `changes` · `preview` · `Greptile Review`) |
+| **배포·프로덕션 실증** | 커밋 `8203792`(PR #95, 12파일 953 insertions). Deploy 4m31s에 트리거 6개 전부 `asia-northeast3` create 성공. **10:41 배포 → 10:43:49 첫 기록** — 2분 만에 실사용 트래픽을 잡았다. 같은 일지의 create(10:46:59)/update(10:47:45) 쌍에서 `changedFields`가 **`["destination"]` 하나뿐** — 함께 쓰인 `editedAt`과 화이트리스트 밖 필드가 정확히 제외됐다. `expiresAt`은 `at` + 365일이 **초 단위까지 일치**(10:47:45 → 2027-07-30 10:47:45). update의 `actorUid`는 `null` + `actorSource: 'unknown'`으로, 46초 전 작성자와 동일인일 가능성이 압도적이지만 추정으로 채우지 않았다 |
+| **배포 후 수동 작업** | GCP 콘솔 TTL 정책 설정 완료(컬렉션 그룹 `auditLogs`, 필드 `expiresAt`). 정책 없이는 `expiresAt`이 채워져도 아무것도 삭제되지 않아 **보관기간 경과분 미파기 = 최소보관 원칙 위반**이 된다. 안내 URL을 `/time-to-live`로 잘못 적었던 것을 실제 경로 `/ttl`로 정정 |
+| **역할별 체감 변화 — 없다** | superAdmin·기관 관리자·직원 모두 화면 변경 0건. 관리자는 Rules상 읽기 권한만 생겼고 조회 화면은 Phase 3, 직원은 명시적 읽기 차단(점검 주체가 아니다). 트리거는 커밋 이후 비동기라 저장 체감 속도에도 영향이 없다. 달라진 것은 사용자 경험이 아니라 **기관의 법적 지위**다 |
+| **시한 표현 정정** | Phase 3 시한을 "2026-10-29"로 표현했으나, 정확히는 **월 1회 이상 점검 의무가 2026-10-30부로 폐지**되고 내부관리계획상 자율 주기로 바뀌는 날짜다. 그날까지 조회 화면이 없으면 위법이 되는 마감이 아니고, 이후엔 오히려 압박이 줄어든다 |
+| **남은 것 — Phase 2 범위 재조정** | 제16조가 요구하는 항목은 계정·일시·**접속지(IP)**·정보주체·수행업무인데 Phase 1은 일시·정보주체·수행업무만 채웠다(계정은 수정·삭제에서 공백, IP는 전무). 원래 계획한 **전면 열람 로그는 하지 않기로** 했다 — 로그가 원본보다 커지고 실질 위험은 개별 조회가 아니라 반출에 있다. 대신 ① **행위자 스탬프**: `lastEditedByUid` + Rules `request.resource.data.lastEditedByUid == request.auth.uid`로 **위조 불가하게 강제**(클라이언트가 심는 값인데도 인증 토큰과 일치를 Rules가 보장하므로 콜러블 이관·오프라인 큐 변경이 불필요) ② **세션 기록 콜러블**: 로그인 시 1회 uid·IP·UA(트리거는 IP를 볼 수 없다) ③ **반출 기록**: 엑셀·PDF 내보내기, 직원 목록 일괄 조회, superAdmin 타 기관 접근. ①② 2시간이면 항목 요건이 채워진다. 우선순위는 **#91~#93 머지(시행일 2026-08-05 고정) 이후** |
+
+---
+
+### Phase 124: 공개 문서 현행화 — README·셀프호스팅·Functions 레퍼런스 📄 (문서 전용)
+
+> 2026-07-30, "GitHub 저장소에 갱신할 게 있을까"라는 질문에서 출발해 공개 문서를 코드와 대조했다. 결과는 **낡음이 아니라 오류**였다 — 셀프호스터가 가이드를 그대로 따르면 티맵 경로 탐색이 안 되고, App Check를 켤 수 없고, `functions/.env`를 예시대로 채우면 **배포가 거부**된다. 문서를 사람이 손으로 쓰면 코드와 어긋난다는 일반론이 아니라, **어긋난 지점이 전부 "설정값"이라는 한 종류**였다는 게 이 회차의 발견이다.
+
+| 항목 | 내용 |
+|------|------|
+| **환경변수 이름 오류 (A급)** | README·SELF_HOSTING이 `VITE_TMAP_APP_KEY`를 요구하는데 코드는 `VITE_TMAP_API_KEY`를 읽는다. 이름이 다르면 값을 정확히 넣어도 앱 내 경로 탐색·톨비가 조용히 비활성 — 에러도 안 난다 |
+| **App Check 사이트 키 미기재** | `firebase.ts:73`이 `VITE_RECAPTCHA_SITE_KEY`로 `ReCaptchaV3Provider`를 초기화하는데 두 문서 어디에도 이 변수가 없었다. SELF_HOSTING §7은 "reCAPTCHA v3 등록"까지만 안내해, 등록하고 나서 **키를 넣을 곳을 모르는 상태**로 끝났다 |
+| **`functions/.env` 예시가 배포를 깨뜨렸다** | README가 `EMAILJS_PRIVATE_KEY`·`ALIMTALK_PROXY_TOKEN`을 `.env`에 쓰라고 안내했으나 둘은 `defineSecret`(Secret Manager) 대상이다. `params.ts` 주석대로 **같은 키가 `.env`에 남아 있으면 이름 충돌로 배포가 거부**된다. 예시를 따르는 것이 실패 조건이었다. Secret 8종(`GMAIL_APP_PASSWORD`·`EMAILJS_PRIVATE_KEY`·`ALIMTALK_PROXY_TOKEN`·Slack 5종) `functions:secrets:set` 절차를 신설하고, 선택 기능이라도 **시크릿 미등록 시 그 함수의 배포가 실패**한다는 경고를 SELF_HOSTING에 추가 |
+| **프론트 변수 목록 정정** | 미사용 `VITE_EMAILJS_*` 3종 제거(EmailJS는 Functions 전용으로 이관됨), 누락된 `VITE_FIREBASE_MEASUREMENT_ID` 추가, 개발 전용(`VITE_APPCHECK_DEBUG_TOKEN`·`VITE_USE_EMULATOR`)은 `.env.local`로 분리 명시 |
+| **Functions 레퍼런스가 22개를 몰랐다** | `generate-functions-doc.ts`의 카탈로그는 "자동 생성"이라는 머리말과 달리 **수동 배열**이라 47개에 멈춰 있었다. 누락 22개(Slack 8·감사로그 6·운행일지 트리거 3·`withdrawOrganization`·`deleteUserPermanently`·`backfillMonthlyStats`·`triggerOnDemandCalendarSync`·`dailyNightlyBatch`), 반대로 **존재하지 않는 7개**(`backupFirestore`·`autoPurgeOrgs`·`archiveDriveLogs`·`cleanupCertificateImages`·`verifyMileageConsistency` → 배치로 통합, `updateAggregatedStats` → `syncDriveLogKm`으로 흡수, `scheduledDiscordBriefing` → 제거)를 계속 문서화하고 있었다. 파일 경로도 전부 `handlers/` 이전 값이라 `functions/src/ocrDashboard.ts`처럼 **없는 경로**를 가리켰다 |
+| **스케줄 주기가 셋 다 틀렸다** | README는 `reservationReminder`·`syncCalendarToApp`을 "10분"으로, 카탈로그는 "15분"·"2시간"으로 적었다. 실제는 `0 8-18 * * 1-5`(평일 08~18시 매시)와 `0,30 6-22 * * 1-5`(평일 06~22시 30분). 비용 절감으로 주기를 늘린 변경이 문서에 반영되지 않은 것 |
+| **정합성 검증 방식** | `index.ts`의 export 이름 집합과 카탈로그 `name` 집합을 `comm`으로 대조해 **63 = 63 완전 일치** 확인. README의 종류별 개수(onCall 34·onRequest 4·onSchedule 5·Firestore 19·Auth 1)도 생성된 문서의 섹션 카운트와 맞췄다 |
+| **README 구조 변경** | 함수 4개 표(28개만 나열)를 종류별 요약 + [FUNCTIONS_REFERENCE.md](../FUNCTIONS_REFERENCE.md) 링크로 대체 — 같은 목록을 두 곳에서 손으로 유지하는 구조 자체가 낡음의 원인이었다. 배포 절에서 로컬 `firebase deploy` 안내를 CI 단일 경로로 교체(CLAUDE.md와 모순이었다), 셀프호스터용 경로는 별도 링크로 분리. `src/contexts/`(삭제됨) → `src/schemas/`, 주요 기능에 Slack·AI 도움말·보안 3행, 기술 스택에 App Check·Slack 2행 추가 |
+| **테스트 규모 실측 갱신** | 표기 49파일/357건 → **94파일/965건**, Functions 19 suites/172건 → **52 suites/548건**, Rules 1파일 → Firestore 16 + Storage 6건, E2E 18 → 24 spec. grep 근사치가 아니라 `npm test`·`test:functions`를 실제 실행해 얻은 값 |
+| **검증** | ESLint 0 · `tsc --noEmit` 0 · 하네스 Doctor 12영역 0오류. 생성기 재실행으로 문서 재생성(63개). 블록인용 머리말이 trailing space 두 칸에 의존해 줄바꿈되던 것을 `>` 빈 줄 분리로 바꿔 렌더링 깨짐 여지를 없앴다 |
+| **하지 않은 것** | 공개 전환(2026-07-18) 이전 내부 산출물(`progress.md`·`ORIGINAL_REQUEST.md`·`로그인문제해결계획서_v4.2.md`·`docs/2026-07-10코덱스평가*.md`·`docs/개선계획서_*.md`)의 정리·아카이빙은 보류 — 기능 영향이 없고, "실제 프로덕션 레퍼런스"라는 공개 목적에는 오히려 자료가 된다. 카탈로그 드리프트를 CI에서 막는 `index.ts` 대조 가드도 별건으로 남겼다(이번엔 수동 대조로 확인) |
+
+---
+
+### Phase 125: 카탈로그 드리프트 CI 가드 + 내부 문서 아카이브 🛡️📦 (문서·하네스)
+
+> 2026-07-30, Phase 124가 "별건으로 남긴다"고 적어둔 두 건을 이어서 처리했다. 핵심은 아카이빙이 아니라 **가드**다 — 124는 벌어진 격차(47 vs 63)를 손으로 메웠을 뿐이고, 같은 낡음이 재발하는 것을 막지는 못했다. 문서가 낡는 것을 **문서 규율이 아니라 실행 가능한 검사**로 옮겼다.
+
+| 항목 | 내용 |
+|------|------|
+| **드리프트 가드 (하네스 Doctor 13번)** | `scripts/check-harness.ts`에 검사 1개 추가 — `generate-functions-doc.ts` 카탈로그의 `name` 집합과 `functions/src/index.ts` export 집합을 **양방향** 대조한다. 배포되는데 문서에 없는 함수(추가 누락)와 문서에만 남은 함수(삭제 누락)를 각각 오류로 잡고, 중복 항목도 검사한다. `verify:harness`가 CI(`harness-ci.yml`)에서 돌므로 CLAUDE.md 절대 규칙 #3(`index.ts` 등록 필수)과 같은 층에서 강제된다 |
+| **"고치고 재생성 안 함"도 잡는다** | 카탈로그만 수정하고 생성기를 돌리지 않으면 배열은 맞는데 문서가 낡는다. 생성 문서의 `총 함수 수: **N개**` 표기와 배열 길이를 비교해 이 경우를 오류로 만든다. 형식 표기를 못 찾으면 경고(생성기 출력 형식 변경 감지) |
+| **파서를 순수 함수로 분리** | `extractFunctionExports`(한 줄·여러 개·여러 줄 `export {}` + `as` 별칭은 배포 이름 쪽을 취함) / `extractCatalogNames`(설명 문자열 안의 `name:` 가짜 표기를 `^\s*name:` 앵커로 배제)를 export해 단위 테스트 대상으로 만들었다. 이 파일의 기존 헬퍼 관례를 따른다 |
+| **가드 실효성 실측** | 카탈로그 항목 하나를 `askAI` → `askAI_TYPO`로 바꿔 뮤테이션 — **양방향 2건**("카탈로그에 없는 배포 함수: askAI" / "index.ts에서 export되지 않는 카탈로그 항목: askAI_TYPO")이 잡히고 exit 1. 원복 후 0건. Phase 119의 "revert해도 CI 그린이던 공백"을 반복하지 않기 위한 확인 |
+| **테스트 14 → 22건** | 파서 7건(여러 줄 export·별칭·import 오탐 방지·설명 안 가짜 `name:` 배제·따옴표 스타일) + 드리프트 판정 4건. 판정 자체를 테스트로 고정해 비교 방향 하나를 지워도 실패한다 |
+| **Greptile 지적 2건 — 둘 다 반영** | ① **따옴표 하드코딩**: `extractCatalogNames`가 작은따옴표만 받아, 카탈로그가 큰따옴표로 재포맷되면 파서가 빈 배열을 내고 **전 함수 누락으로 오탐해 CI를 잘못 막는다**. 가드가 차단기로 뒤집히는 실패 모드라 `['"\`]`로 확장하고 큰따옴표 변환 시뮬레이션으로 0오류 확인. 더해 파서가 통째로 실패하는 경우(양쪽 중 하나라도 0건)를 **드리프트가 아니라 파서 문제로 따로 보고**하게 했다 — 원인 오독을 막는다 ② **판정 테스트가 재구현을 검증**: 테스트가 로컬 클로저를 검사해 본체를 지워도 통과할 수 있었다(Phase 119와 같은 종류의 공백) → `diffCatalogNames`를 export해 13번 검사와 테스트가 **같은 함수**를 쓰게 했다 |
+| **내부 문서 아카이브** | 공개 전환(2026-07-18) 이전 산출물 8개를 `docs/archive/`로 이동: `ORIGINAL_REQUEST.md`·`PROJECT.md`·`로그인문제해결계획서_v4.2.md`(루트) + 코덱스평가 2건·개선계획서 3건(docs). 지우지 않은 이유는 당시 판단 근거로서의 가치이고, 옮긴 이유는 **저장소를 처음 보는 사람이 낡은 계획서를 현재 상태로 오독하는 것**을 막기 위해서다. `docs/archive/README.md`에 "지금 볼 곳" 표와 보관 문서별 성격을 두고, **잔여 항목이 있는 문서를 명시**했다(개선계획서_2026-07: Functions `enforceAppCheck` 단계 강제) — 아카이빙으로 열린 항목이 묻히는 것이 이 작업의 유일한 실질 위험이었다 |
+| **`progress.md`는 대상이 아니었다** | Phase 124 기록에 공개 노출 대상으로 적었으나 `.gitignore:109`에 있어 **애초에 공개되지 않는다**. 이동하지 않았다 |
+| **이동이 깨뜨린 링크 복구** | 상대 경로 기준이 바뀌므로 인바운드 5곳(구현계획서 1·security-reports 2·트랙B_Phase82-102 5개 링크)을 새 경로로 고치고, 아카이브 문서가 밖을 가리키던 링크 30곳을 스크립트로 복구(`../README.md` → `../../README.md` 등). 저장소 전체 마크다운 상대 링크를 스캔해 48건 → **6건**으로 줄였다. 남은 6건은 이번 변경과 무관한 기존 로트(`security-reports/2026-06-26.md` 5건, `트랙B_Phase49-81.md`의 `rules` 1건)로 손대지 않았다 |
+| **부수 수확** | 트랙B_Phase82-102의 `개선계획서_2026-07.md` 링크 4곳은 2026-07-25 이력 분할 때부터 **이미 깨져 있었다**(docs/구현이력/ 기준으로 해석돼 존재하지 않는 경로). 이동 대응 과정에서 함께 정상화 |
+| **검증** | 하네스 Doctor **13개 영역 0오류 0경고** · `check-harness.test.ts` 20건 통과 · ESLint 0 · tsc 0. 이동은 `git mv`라 이력이 보존된다 |
+
+---
+
+### Phase 126: km 연쇄 동기화 증폭 제거 — 가짜 상한을 실제 상한으로 🔧⚡ (커밋·PR)
+
+> 2026-07-30, Phase 123에서 발견해 "별건 이연"으로 남겨둔 결함을 처리했다. 핵심은 상한을 키운 것이 아니라 **연쇄가 트리거를 타고 번지던 경로를 끊은 것**이다. 그리고 그 경로를 끊자 **거기에 얹혀 우연히 동작하던 기능(차량 누적 km 보정)이 드러났다** — 이번 회차에서 가장 조심해야 했던 지점이다.
+
+| 항목 | 내용 |
+|------|------|
+| **문제 — 상한이 가짜였다** | `syncNextLogStartKm`은 문서 1건씩 `update`하며 `MAX_CHAIN = 20`에서 멈췄다. 그런데 그 update가 `onDriveLogUpdated`를 재발동하고, 20번째 문서의 트리거가 다시 21~40번째를 갱신하는 식으로 연쇄가 **트리거를 타고 계속됐다**. 상한은 한 호출만 제한했을 뿐 전체를 막지 못해, 기록 1,000건 차량의 km 1 정정이 쓰기 ~1,000건 + 함수 호출 ~2,000회가 됐다. 게다가 파도마다 같은 구간을 다시 조회하고, 문서마다 통계 핸들러·감사 트리거가 헛돌았다 |
+| **조치 ① 한 호출에서 끝까지** | 페이지(200건) 단위로 조회해 `WriteBatch`로 커밋하며 꼬리 끝까지 처리한다. 커밋 횟수가 문서 수만큼이 아니라 페이지 수만큼으로 줄어든다(22건 → 커밋 1회, 테스트로 고정) |
+| **조치 ② 재발동 차단** | 연쇄 쓰기에 `kmSyncRev`를 `increment(1)`로 올리고, `onDriveLogUpdated`는 이 값이 변한 update를 **즉시 반환**한다. 사람의 편집은 이 필드를 건드리지 않으므로 구분이 확실하다. 호출·조회가 O(N) → O(1)이 된다 |
+| **조치 ③ 상한은 실제 상한으로** | 이제 상한(1,000건)이 진짜 멈춘다는 뜻이라, 넘으면 데이터가 어긋난 채 남는다. 그래서 마지막 문서에 `kmSyncContinue`를 남기고 종료하고, 그 문서의 트리거가 이어받는다 — **완결성을 유지하면서** 이어받기 호출은 1,000건마다 1회뿐이다. 운행일지는 감사 대상 기록이므로 조용한 부분 반영은 선택지가 아니었다 |
+| **함정 — 이어받기 표시는 rev와 함께 올려야 한다** | 표시만 쓰면 `kmSyncRev`가 그대로여서 트리거가 "마일리지 필드 미변경"으로 조기 반환하고 **이어받기가 죽는다**. 표시 쓰기에 rev 증가를 함께 넣어 연쇄 분기로 들어가게 했다. 또 같은 배치에서 같은 문서를 두 번 쓰는 것에 의존하지 않도록 커밋 후 별도 1회 쓰기로 분리했다(1,000건당 1회) |
+| **끊고 나서 드러난 의존 — currentKm** | 예전에는 연쇄의 **마지막 문서 update가 "최신 기록 수정"으로 판정돼 차량 `currentKm`을 우연히 보정**했다. 재발동을 끊으면 그 경로가 사라져 소급 삽입·중간 삭제 후 누적 km이 틀어진다. `applyChainCurrentKm`으로 명시화 — 연쇄가 최신 기록까지 닿았을 때만(`reachedEnd`) 마지막 문서의 endKm 변화량으로 증분하고, 차량의 기관 소속을 검증한다(교차 테넌트 오염 차단). 최신 기록을 직접 수정한 경우는 기존 분기가 이미 증분하고 연쇄 대상이 없어 delta가 0이라 이중 계상되지 않는다 |
+| **죽은 사본 제거** | `src/lib/firestore/driveLogs/utils.ts`에 같은 이름·같은 결함의 클라이언트 구현이 있었고 배럴 3곳으로 export돼 있었으나 **호출부는 0건**이었다(`SyncResult` 타입도 미사용). 고친 사본과 안 고친 사본을 함께 두면 나중에 누가 후자를 불러 재발한다 — 함께 제거해 구현을 하나로 만들었다 |
+| **기존 테스트가 버그를 정답으로 고정하고 있었다** | `연쇄는 최대 20건까지만 전파한다(무한 루프 방지)`는 테스트가 있었다. 의도는 방어였지만 실제로는 **절단을 계약으로 굳혀** 놓은 것이라, 20건 초과 전파·상한 도달 시 이어받기로 교체했다. 이런 테스트는 통과할수록 문제를 가린다 |
+| **테스트 6 → 14건** | 전 구간 전파(22건, 커밋 1회) · rev 표시 동반 · 상한 도달 시 이어받기 표시 · 연쇄 update 무부수효과 · 이어받기 재개 및 표시 해제 · 사람 수정은 정상 경로 · 소급 삽입 currentKm +delta · 중간 삭제 currentKm −delta. **가드 뮤테이션 실측**: 재발동 차단 조건을 `false`로 바꾸면 2건 실패(원복 후 13/13) |
+| **Greptile 지적 반영 — 순서가 안전장치였다** | 이어받기 표시를 재정합 **전에** 지우고 있었다. 도중에 함수가 죽으면(타임아웃·OOM) 표시가 사라져 1,000건 이후가 조용히 방치되는데, 이 트리거는 `retry: false`라 이벤트 재전달도 없어 복구 근거가 아예 없어진다. 표시 해제를 재정합 **뒤로** 옮겼다 — 남겨두면 재개 근거가 유지되고, 중복 실행은 멱등이라 해롭지 않다(같은 값으로 수렴하고 두 번째는 `stoppedConsistent`로 즉시 종료). 순서 자체를 테스트로 고정했다(쓰기 순서가 `C` → `B:clear`) |
+| **검증** | Functions 52 suites/**556건**(548 → +8) · 프론트 94파일/974건 · ESLint 0 · tsc 0(프론트·Functions) |
+| **남는 것 — 쓰기 건수 자체** | `startKm`이 앞 기록의 `endKm`을 비정규화해 들고 있으므로, 과거 km 정정이 뒤 기록 전부를 다시 쓰는 것은 모델상 불가피하다. 줄인 것은 **호출·조회·중복 파도**다. 동일 timestamp 형제 문서를 커서가 건너뛰는 기존 한계도 그대로다(문서 수 상한이 있어 폭주는 아니다) |
+| **배포 시 주의** | 배포 순간 구버전 호출이 남아 rev 없이 쓴 문서가 있으면 신버전 가드가 "사람 편집"으로 보고 연쇄를 한 번 더 돌린다. 결과는 동일 값으로 수렴하므로(멱등) 안전하다 |
+
+---
+
+### Phase 127: Google 로그인 계정 전환 불가 수정 — prompt=select_account 🔐 (커밋·PR)
+
+> 2026-07-31, 사용자 문의로 확인했다. 스마트폰에서 "다른 계정으로 로그인"을 눌러도 직전 구글 계정으로 다시 들어가진다는 신고였다. **버튼이 실제로 하는 일과 사용자가 기대하는 일이 어긋나 있었다.**
+
+| 항목 | 내용 |
+|------|------|
+| **증상** | 모바일에서 계정1로 로그인된 상태에서 계정2로 바꾸려고 "다른 계정으로 로그인"을 눌러도, 다시 계정1로 로그인된다 |
+| **원인 — 앱이 끊을 수 없는 세션** | `googleProvider`에 커스텀 파라미터가 없어 `prompt` 미지정 상태였다. 이러면 Google은 브라우저에 활성 세션이 **하나뿐일 때 계정 선택 화면을 건너뛰고** 그 계정으로 바로 인증시킨다. 앱의 `logout()`은 Firebase 세션·오프라인 큐·Firestore 캐시를 지우지만 **Google 쪽 브라우저 세션은 지울 수 없다**(권한도 범위도 밖). 그래서 [InviteCodePage](../../src/components/auth/InviteCodePage.tsx)의 "다른 계정으로 로그인" 버튼은 로그아웃까지만 하고, 이어지는 `signInWithRedirect`가 같은 계정을 조용히 되돌려놨다 |
+| **조치** | `googleProvider.setCustomParameters({ prompt: 'select_account' })` 한 줄. 활성 세션 수와 무관하게 매 로그인마다 계정 선택 화면을 강제한다. 로그인 진입점은 `src/lib/auth.ts` 하나뿐이고 popup/redirect 분기 모두 같은 provider를 쓰므로 한 곳만 고치면 된다 |
+| **부수 효과 — 오히려 이득** | 기관 공용 기기(차량 운행일지 특성상 흔하다)에서 직전 사용자 계정으로 무의식 재로그인되던 것도 함께 막힌다. 비용은 재로그인 시 계정 클릭 1회 |
+| **안 한 것** | `prompt: 'consent'`는 매번 권한 동의 화면까지 띄워 과하다(계정 선택만 필요). redirect/popup 분기, `handleRedirectResult` 경로는 그대로 뒀다 |
+| **설치형 PWA(standalone)** | 인증 경로에 display-mode 분기가 없어(standalone 참조는 InstallPrompt·useBackButton뿐) 설치형도 브라우저와 **같은 코드·같은 리다이렉트 흐름**을 탄다. 이 변경은 Google이 보여줄 화면만 바꾸므로 리다이렉트 복귀 메커니즘은 그대로다 — 계정 선택 화면이 한 번 더 뜰 뿐이다 |
+| **검증** | ESLint 0 · tsc 0 · 프론트 94파일/974건(tmap 1건은 병렬 워커 타임아웃 플레이크, 단독 재실행 11/11 통과) · 프로덕션 빌드 통과. Google 계정 선택 화면 자체는 외부 도메인이라 E2E로 덮을 수 없어 배포 후 실기기 확인이 남는다 |
+| **배포 전 문의자 안내** | 크롬 시크릿 탭으로 접속하거나, `accounts.google.com`에서 로그아웃 후 재로그인하면 계정 선택 화면이 나온다 |
+
+---
+
+### Phase 128: 한 사람의 동시 다중 차량 예약 차단 제거 — 클라이언트만 서버·FAQ와 어긋나 있었다 🚗 (수동 배포·PR)
+
+> 2026-07-31, 사용자가 화면 캡처와 함께 "이 문제는 해결이 된 것 아닌가"라고 물어왔다. **답은 둘 다였다** — 코드는 고쳐져 있었고, 커밋되지 않아 배포되지 않았다.
+
+| 항목 | 내용 |
+|------|------|
+| **증상** | 예약 화면에서 한 사람이 같은 시간대에 두 번째 차량을 예약하면 `같은 시간대에 2대의 차량을 예약할 수 없습니다.` 토스트로 차단 |
+| **1차 원인 — 세 곳의 정책이 어긋나 있었다** | 클라이언트 `handleSubmit`만 사용자 단위 겹침(`findUserOverlappingReservation`)을 검사했다. 서버 코어 `createReservationCore`는 `organizationId + vehicleId + date` 기준 겹침만 보고 `reservedByUid`는 판정에 쓰지 않으며(`modifyReservationCore`도 동일), [FAQ](../../shared/faqData.ts)의 `multiple-reservations-same-time` 항목은 "한 분이 같은 시간대에 각기 다른 여러 대의 차량을 동시에 예약하시는 것은 전혀 막지 않습니다"라고 **이미 안내 중**이었다. 행사·대규모 외근처럼 한 사람이 여러 대를 잡아야 하는 상황을 클라이언트가 단독으로 막고 있었다 |
+| **2차 원인 — 고친 코드가 배포되지 않았다** | 수정이 워킹트리에만 있었다. 커밋조차 없어 master에도, 프로덕션에도 반영되지 않은 상태였다. 사용자는 "고쳤다"고 기억했고 실제로 파일은 고쳐져 있었으므로, **로컬 수정과 배포 상태의 간극이 그대로 미해결 버그로 남아 있었다** |
+| **조치** | `handleSubmit`에서 사용자 단위 검사 호출과 차단 분기 제거. 차량 기준 겹침 검사(`findOverlappingReservation`)는 그대로 유지 |
+| **남는 방어선** | 생성 경로는 서버 트랜잭션 단일이다 — `createReservationSafe`는 콜러블 전용이고 직접 쓰기 폴백이 없으며, `firestore.rules`가 일반 사용자의 reservations 직접 create를 막는다. 서버는 차량 문서 락(`_lastReservationLock`) + 트랜잭션으로 차량 기준 겹침을 실제로 거부(`already-exists`)한다 |
+| **다일·반복 경로** | 제거된 블록은 원래 `if (userOverlap && !isRecurring)`이라 반복 예약에선 이미 무력이었다. `isMultiDay`·`isRecurring`·`editingReservation`은 계속 쓰이고, 함께 제거된 `targetUid`는 그 블록 전용 지역 변수였다 |
+| **테스트가 허수였다 — 리뷰 지적 반영** | 처음 쓴 "차단하지 않는다" 테스트는 `reservationUtils` 모듈이 통째로 mock돼 `findOverlappingReservation`이 항상 `null`을 반환하는 탓에, 넣은 예약 픽스처가 **로직에 도달조차 하지 않았다**(빈 배열로 바꿔도 통과 = 기존 "단일 예약 1건 생성"과 동일한 중복 테스트). 해당 케이스만 `vi.importActual`로 실제 구현을 주입하고 `createReservationSafe` 호출 인자까지 단언, 같은 차량이면 차단되는 **대조군**을 추가했다. 뮤테이션 실측 — 제거한 차단 로직을 되살리면 해당 테스트가 실패한다(1 failed / 9 passed) |
+| **배포 경로 — 예외 적용** | 사용자 요청으로 Hosting만 수동 선배포했다(CLAUDE.md 긴급 예외). 프론트엔드 전용 변경이라 Functions 동시 업데이트 충돌 위험이 없고, 진행 중인 CI Deploy가 없음을 확인 후 Node 22로 실행했다. **선배포는 master를 앞서게 만들므로**, 다음 CI 배포가 수정을 되돌리지 않도록 Phase 127과 한 PR로 묶어 master를 프로덕션과 한 번에 맞췄다 |
+| **검증** | ESLint 0 · tsc 0 · 프론트 94파일/976건(reservationSubmitActions 8 → **10건**) · 프로덕션 빌드 통과(번들 예산 이내) |
+| **안 한 것** | `findUserOverlappingReservation`([reservationUtils.ts](../../src/hooks/utils/reservationUtils.ts))은 이 변경으로 프로덕션 호출부가 0건이 됐지만(테스트 5건 + mock 1건만 참조) 스코프 밖이라 남겼다. Phase 126이 "고친 사본과 안 고친 사본을 함께 두면 재발한다"며 죽은 사본을 제거한 전례가 있어, **정리 대상으로 남는다** |
+| **범위 밖 관찰 — 확인 필요** | 리뷰 중 발견. 다일·반복 예약 **그룹 수정** 경로가 호출하는 `deleteReservationGroup`/`deleteRecurringGroup`은 클라이언트 `batch.delete()`인데 `firestore.rules`의 reservations delete는 `isSuperAdmin()` 한정이다. 정적으로는 일반 직원·기관 관리자가 다일 예약을 수정 저장하면 `permission-denied`로 실패하고 원본 그룹이 남는다. Rules 테스트에 reservations delete 케이스가 없어 회귀로도 안 잡힌다 — 에뮬레이터 재현 확인이 남는다 → **Phase 129에서 재현·수정** |
+
+---
+
+### Phase 129: 다일·반복 예약 수정이 항상 실패하던 문제 — Rules delete 권한 불일치 🔐 (커밋·PR)
+
+> Phase 128 리뷰가 "범위 밖 관찰"로 남긴 의심을 에뮬레이터로 재현했다. **의심이 아니라 살아 있는 버그였다.**
+
+| 항목 | 내용 |
+|------|------|
+| **증상** | 다일 예약이나 반복 예약을 수정하면 무조건 실패한다. 사용자에게는 Firebase 원문 그대로 `Missing or insufficient permissions.` 영문 토스트가 뜨고([submitActions.ts](../../src/hooks/reservationCalendar/actions/submitActions.ts)의 `catch`가 `error.message`를 그대로 노출), 원본 그룹은 남는다 |
+| **원인 — 클라이언트 경로와 Rules 권한이 어긋나 있었다** | 그룹 수정은 "기존 그룹 삭제 → 재생성" 구조라 **삭제 권한이 필요**한데, `firestore.rules`의 reservations `delete`는 `isSuperAdmin()` 한정이었다. 즉 superAdmin 외 **전원**(직원·기관 관리자) 실패 |
+| **도달 경로 (전부 살아 있음)** | [ReservationCalendar.tsx:130](../../src/components/common/ReservationCalendar.tsx) `onEdit={handleEdit}` → [editActions.ts:61](../../src/hooks/reservationCalendar/actions/editActions.ts) `setEditingGroupId(res.groupId)` → [submitActions.ts:90](../../src/hooks/reservationCalendar/actions/submitActions.ts) `deleteReservationGroup()` → `batch.delete()` → Rules 차단 |
+| **에뮬레이터 재현** | `PERMISSION_DENIED: false for 'delete' @ L192` — 소유자 본인조차 자기 예약을 지울 수 없었다 |
+| **왜 신고가 없었나** | `allow delete: if isSuperAdmin()`은 Phase 30 무렵부터 있던 오래된 규칙이라 그룹 수정 기능은 사실상 도입 이후 계속 이 상태였을 가능성이 높다. 다일·반복 예약 **수정**(생성·취소가 아니라)이 드문 조작이라 묻혀 있었다 |
+| **조치 — 소유자 본인으로만 한정 완화** | `allow delete`에 소유자 본인 분기만 추가. `update`가 이미 소유자에게 같은 범위를 허용하고 있어 새로 열리는 권한이 아니다(소유자는 어차피 자기 예약을 취소·수정할 수 있었다). 타 기관·같은 기관 타인 삭제는 계속 차단 |
+| **기관 관리자를 뺀 이유 — 리뷰가 잡아낸 함정** | 처음에는 `update` 규칙과 같은 모양으로 기관 관리자까지 넣었는데, 적대적 리뷰가 **이 PR이 새로 만드는 데이터 오염**을 찾아냈다. [createReservationSafe](../../functions/src/handlers/callable/createReservationSafe.ts)는 `request.data`에서 `reservedByUid`를 **꺼내지 않고** [createReservationCore](../../functions/src/services/reservation/createReservationCore.ts)가 `reservedByUid: actorUid`로 호출자를 강제하는데, `reservedByName`은 클라이언트 값을 그대로 쓴다. [ReservationAccordion](../../src/components/common/ReservationAccordion.tsx)은 `isAdmin \|\| 본인`에게 수정 버튼을 노출한다. 즉 관리자가 직원 그룹을 수정하면 재생성분이 `reservedByUid = 관리자` · `reservedByName = 직원`이 되어 **직원이 자기 예약의 수정·취소·삭제 권한을 전부 잃고**(update·delete 둘 다 `reservedByUid` 기준), `getMyRecentReservations`에서도 빠지며, 본인에게 "본인이 예약했습니다" 푸시가 간다. 지금까진 삭제에서 막혀 아무 일도 안 일어났으므로, **관리자 분기를 넣는 순간 "실패"가 "조용한 오염"으로 바뀐다**. 관리자 경로는 서버에서 명의 지정을 먼저 고친 뒤 별도로 연다 |
+| **양방향 뮤테이션 실측** | 규칙 하나에 허용·차단이 함께 걸려 있어 한 방향만 재면 반쪽이다. ① 원래대로 `isSuperAdmin()`만 → **허용 케이스 실패**(재현 그 자체) ② 반대로 `belongsToMyOrg()`만 → **차단 케이스 실패**(`Expected request to fail, but it succeeded`). 양쪽 다 잡히는 것을 확인하고 규칙을 확정했다 |
+| **테스트** | Rules 테스트에 reservations `delete` 케이스가 **아예 없었다**(그래서 회귀로도 안 잡혔다). 5-2 신설 — 소유자 허용 · 같은 기관 타인 차단 · 타 기관 차단 · **기관 관리자의 타인 예약 차단**(명의 이전 방지 고정) 4방향. Firestore Rules 16 → **17건** |
+| **안 한 것 ① 남는 비원자성** | 그룹 수정이 "삭제 → 재생성"인데 **트랜잭션이 아니다**. 삭제 후 재생성이 실패하면 예약이 통째로 사라진다. 지금까지는 삭제 단계에서 막혀 오히려 데이터가 보존되고 있었던 셈이라, 이 수정으로 **위험이 드러난다**. 게다가 클라이언트 사전 겹침 검사는 [submitActions](../../src/hooks/reservationCalendar/actions/submitActions.ts)에서 `date: selectedDate` 즉 **첫날만** 보므로, 종료일을 늘리다 2일차 이후가 서버에서 `already-exists`로 걸리면 원본은 이미 지워진 뒤다 |
+| **안 한 것 ② `in_progress` 예약 하드 삭제** | [batchGroupAction](../../src/lib/firestore/reservations.ts)의 필터가 `cancelled`·`completed`만 제외해 `in_use`/`in_progress`도 삭제 대상이다. 3일 출장 1일차 운행 중에 그룹을 수정하면 해당 문서가 사라지고, 운행일지 저장 시 `updateReservationStatus`가 없는 문서에 걸려 `reservationId`가 끊긴 채 남는다 |
+| **안 한 것 ③ 관리자 그룹 수정** | 위 "기관 관리자를 뺀 이유" 참고. 서버가 명의를 지정받도록 고친 뒤에 열어야 한다 |
+| **근본 해결 방향** | ①~③ 모두 그룹 수정 전체를 콜러블(Admin SDK 트랜잭션 + 명의 지정 + 상태 검사)로 옮기면 한 번에 정리된다. 작업량이 커 별건으로 남긴다 |
+| **검증** | Firestore Rules 17건 통과(에뮬레이터) · ESLint 0 · tsc 0 |
+| **배포** | Rules는 CI Deploy가 `--only functions,firestore:rules,storage`로 배포하므로 머지만 하면 반영된다(수동 배포 불필요) |

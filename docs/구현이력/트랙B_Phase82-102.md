@@ -78,7 +78,7 @@
 
 ### Phase 87: firestore 도메인 데이터 접근 테스트 — vehicles·users 단위 테스트 신설 🧪 ✅
 
-> 2026-07-06, [개선계획서_2026-07](개선계획서_2026-07.md) §6주차~ 지속 트랙 1번(도메인 테스트, 주 1파일). 기존 `src/__tests__/lib/`는 순수 유틸 테스트뿐이고 `src/lib/firestore/`의 데이터 접근 함수(CRUD)에는 테스트가 없던 공백을 메꾸기 시작했다. Opus가 계획서(mock 하네스 설계·스코프 판단) 작성, **Fable 5가 실행**한 첫 분업 작업.
+> 2026-07-06, [개선계획서_2026-07](../archive/개선계획서_2026-07.md) §6주차~ 지속 트랙 1번(도메인 테스트, 주 1파일). 기존 `src/__tests__/lib/`는 순수 유틸 테스트뿐이고 `src/lib/firestore/`의 데이터 접근 함수(CRUD)에는 테스트가 없던 공백을 메꾸기 시작했다. Opus가 계획서(mock 하네스 설계·스코프 판단) 작성, **Fable 5가 실행**한 첫 분업 작업.
 
 | 항목 | 내용 |
 |------|------|
@@ -89,7 +89,7 @@
 
 ### Phase 88: 동작 줄이기(prefers-reduced-motion) 접근성 대응 ♿ (코드 완료·배포 대기)
 
-> 2026-07-06, [개선계획서_2026-07](개선계획서_2026-07.md) §6주차~ 지속 트랙 3번(접근성 마감). 랜딩 CTA `ctaBreathing`·`liveDot`·`pulseSoft` 등 무한 반복 애니메이션이 시스템 "동작 줄이기" 설정을 무시하던 것을 전역 미디어쿼리로 해소.
+> 2026-07-06, [개선계획서_2026-07](../archive/개선계획서_2026-07.md) §6주차~ 지속 트랙 3번(접근성 마감). 랜딩 CTA `ctaBreathing`·`liveDot`·`pulseSoft` 등 무한 반복 애니메이션이 시스템 "동작 줄이기" 설정을 무시하던 것을 전역 미디어쿼리로 해소.
 
 | 항목 | 내용 |
 |------|------|
@@ -110,7 +110,7 @@
 
 ### Phase 90: react-hot-toast 잔재 제거 — 죽은 토스트 커스텀 통일 + 패키지 제거 🧹 (코드 완료·배포 대기)
 
-> 2026-07-06, [개선계획서_2026-07](개선계획서_2026-07.md) §6주차~ 지속 트랙 4번. react-hot-toast의 `<Toaster>`가 앱 어디에도 마운트돼 있지 않아 `toast()` 호출이 **화면에 아무것도 표시하지 않는 죽은 코드**였던 잔재 2곳을 커스텀 토스트로 통일하고 패키지를 제거했다.
+> 2026-07-06, [개선계획서_2026-07](../archive/개선계획서_2026-07.md) §6주차~ 지속 트랙 4번. react-hot-toast의 `<Toaster>`가 앱 어디에도 마운트돼 있지 않아 `toast()` 호출이 **화면에 아무것도 표시하지 않는 죽은 코드**였던 잔재 2곳을 커스텀 토스트로 통일하고 패키지를 제거했다.
 
 | 항목 | 내용 |
 |------|------|
@@ -132,7 +132,7 @@
 
 ### Phase 92: firestore 예약·운행일지 쓰기 도메인 테스트 — 지속 트랙 1번 완결 🧪 (코드 완료·배포 대기)
 
-> 2026-07-06, [개선계획서_2026-07](개선계획서_2026-07.md) §6주차~ 지속 트랙 1번의 마지막 잔여분. Phase 87에서 신중 트랙으로 분리했던 고위험 2파일(`reservations.ts`·`driveLogs/mutations.ts`)을 Opus 계획서(mock 함정 선해결) + Fable 실행 분업 2회차로 처리. **35건 전부 첫 실행에 통과.**
+> 2026-07-06, [개선계획서_2026-07](../archive/개선계획서_2026-07.md) §6주차~ 지속 트랙 1번의 마지막 잔여분. Phase 87에서 신중 트랙으로 분리했던 고위험 2파일(`reservations.ts`·`driveLogs/mutations.ts`)을 Opus 계획서(mock 함정 선해결) + Fable 실행 분업 2회차로 처리. **35건 전부 첫 실행에 통과.**
 
 | 항목 | 내용 |
 |------|------|
@@ -144,7 +144,7 @@
 
 ### Phase 93: 외부 감사(GPT 5.6) 검증·조치 — 멀티테넌트 쓰기 격리·OAuth 토큰·비활성 차단 🔐 (코드 완료·배포 대기)
 
-> 2026-07-10, 사용자가 외부 모델에 보안 점검을 의뢰해 받은 8건 + 하드닝 3건을 지목 라인·실제 코드로 직접 대조 검증(환각 없음)한 뒤 실재 취약점을 배포 표면별(배치 A: rules / 배치 B: functions·client)로 분리 조치. 상세: [security-reports/2026-07-10](security-reports/2026-07-10.md).
+> 2026-07-10, 사용자가 외부 모델에 보안 점검을 의뢰해 받은 8건 + 하드닝 3건을 지목 라인·실제 코드로 직접 대조 검증(환각 없음)한 뒤 실재 취약점을 배포 표면별(배치 A: rules / 배치 B: functions·client)로 분리 조치. 상세: [security-reports/2026-07-10](../security-reports/2026-07-10.md).
 
 | 항목 | 내용 |
 |------|------|
@@ -185,7 +185,7 @@
 
 ### Phase 96: 캘린더 → 앱 동기화 UX — 수동 동기화 버튼·홈 트리거·예약자 폴백 📅 (코드 완료·배포 대기)
 
-> 2026-07-12, 사용자가 구글 캘린더(차량 캘린더)에 직접 등록한 일정(7/13 합정역)이 앱 예약에 반영되지 않는다는 보고. 조사 결과 기능 자체는 정상이나 폴링 pull 트리거의 구조적 사각지대(스케줄러 `0 6-22 * * 1-5` 평일 전용 + 온디맨드가 예약 캘린더 화면에만 트리거 + 홈 '내 예약'은 당일만 표시)가 원인. 실시간 Webhook(watch)은 1인 운영 규모에 과설계로 기각, [개선계획서_캘린더동기화_2026-07](개선계획서_캘린더동기화_2026-07.md) 확정 후 빠른 개선 3종 구현 (계획 Opus / 실행 Fable 분업).
+> 2026-07-12, 사용자가 구글 캘린더(차량 캘린더)에 직접 등록한 일정(7/13 합정역)이 앱 예약에 반영되지 않는다는 보고. 조사 결과 기능 자체는 정상이나 폴링 pull 트리거의 구조적 사각지대(스케줄러 `0 6-22 * * 1-5` 평일 전용 + 온디맨드가 예약 캘린더 화면에만 트리거 + 홈 '내 예약'은 당일만 표시)가 원인. 실시간 Webhook(watch)은 1인 운영 규모에 과설계로 기각, [개선계획서_캘린더동기화_2026-07](../archive/개선계획서_캘린더동기화_2026-07.md) 확정 후 빠른 개선 3종 구현 (계획 Opus / 실행 Fable 분업).
 
 | 항목 | 내용 |
 |------|------|
@@ -238,7 +238,7 @@
 | **C. Slack 어댑터** | `services/slack/` — `verifySlackSignature`(v0 HMAC+timestamp ±5분, `checkSlackSignature`가 실패 사유 반환), `slackApi`(fetch 기반: postMessage/**users.info(form-urlencoded)**/reactions.add/response_url), `resolveSlackUser`(이메일→`getUserByEmail`→uid 매핑+`slackUsers` 캐시, 소속·활성 매번 재검증). 수신 `handlers/https/slackEvents`(서명검증→`slackTasks` 문서 create→즉시 200, event_id 멱등), 워커 `handlers/triggers/onSlackTaskCreated`(신원→rate limit(fail-closed)→코어→응답). 3초 ack 제한을 task 문서+onCreate 트리거로 우회(`generateFeedbackDraft` 동형) |
 | **D. 오파싱 방지·UX** | 생성은 파싱 요약 + `[예약 확정][취소]` Block Kit 버튼 확인(`slackConfirmations` 10분 TTL, 클릭자==요청자 검증, 버튼도 task 위임 후 `response_url` replace). 메시지 접수 즉시 `eyes` 리액션으로 처리중 신호 |
 | **E. 보안·격리** | 봇은 admin SDK로 Rules 우회 → 신원 org == `integrations/slack_{teamId}` org == 예약 organizationId 3중 검증이 방어선. `SLACK_SIGNING_SECRET`·`SLACK_BOT_TOKEN` defineSecret, rate limit `slackAssistant`(10/10분)·`slackAssistantDailyOrg`(100/일). 신규 컬렉션(`integrations`/`slackUsers`/`slackTasks`/`slackConfirmations`) Rules 클라이언트 전면 차단 |
-| **디버깅 여정** | 배포 IAM 2건(새 시크릿 secretAccessor·새 공개 HTTP setIamPolicy → [troubleshoot-deployment §2.5](../.agent/skills/troubleshoot-deployment/SKILL.md)), 서명 시크릿 오등록(재설정), **`users.info` JSON 본문 미파싱으로 user_not_found**(읽기 API는 form-urlencoded 필수 — 핵심 수정 `fd9caf1`). 진단 로그(서명사유·신원·auth.test)로 원인 축차 규명 후 auth.test 진단 제거 |
+| **디버깅 여정** | 배포 IAM 2건(새 시크릿 secretAccessor·새 공개 HTTP setIamPolicy → [troubleshoot-deployment §2.5](../../.agent/skills/troubleshoot-deployment/SKILL.md)), 서명 시크릿 오등록(재설정), **`users.info` JSON 본문 미파싱으로 user_not_found**(읽기 API는 form-urlencoded 필수 — 핵심 수정 `fd9caf1`). 진단 로그(서명사유·신원·auth.test)로 원인 축차 규명 후 auth.test 진단 제거 |
 | **커밋** | `c2b3c94`(refactor 코어)·`6efd7a5`(feat 어시스턴트+어댑터)·`fd9caf1`(fix users.info form)·`810a809`(feat 리액션) + 진단 chore 3·test 1 |
 | **검증** | functions 단위 테스트(코어·서명·파싱·오케스트레이터·수신·워커) + 프로덕션 엔드투엔드 실증: 조회(예약 현황), 생성(소나타3333 09~10시 확인버튼→앱·캘린더 반영), 시간충돌 정상 거부. Node 22 |
 | **설계 결정** | 파일럿=단일 워크스페이스 고정 매핑(콘솔 `integrations` 문서 1건). 멀티테넌트 셀프서비스(OAuth 설치+워크스페이스별 토큰)·Google Chat 어댑터·운영현황 질의·멀티턴 대화 기억은 후속(코어/어댑터 경계로 재작업 최소화). 멀티턴은 단일 메시지로 충분해 실사용 관찰 후 판단 |
@@ -255,7 +255,7 @@
 | **C. 연결 설정 UI** | `settings/SlackIntegrationSection` — 미연결(예시 대화 말풍선 + 연결 전 확인 3가지, ⚠️ 직원 이메일 일치 강조) / 연결됨(워크스페이스·연결일 + **직원 준비 상태 진단** + 사용법 + 연결 테스트·2단계 해제). 콜러블 `getSlackConnectionStatus`(**안전 필드만**·토큰 미반환)·`disconnectSlack`(auth.revoke→`tokenCipher` 삭제)·`diagnoseSlackConnection`(`users.list` 이메일 대조 = 최다 실패 원인 사전 진단 + 연결 테스트 겸용). `useSlackIntegration` 훅(설치 URL 이동·`?slack=` 복귀 토스트). 커밋 `198b25d` |
 | **D. 정리** | `SLACK_BOT_TOKEN` defineSecret 제거(참조 0 확인, Secret Manager 폐기 대상). 기관 온보딩 가이드는 **인앱 카드 자체**가 수행 — 교육 스크립트는 "설정 → Slack 연결 → 허용" 한 줄 |
 | **보안·격리** | 봇 토큰=워크스페이스 탈취 → 저장 암호화(AAD 바인딩)·무로깅·클라 미반환·워커에서만 복호화(핵심 위협 "Firestore 덤프"는 키가 DB 밖 Secret Manager라 차단). OAuth state = 전용 `SLACK_STATE_SECRET` HMAC + 단기 TTL + nonce 1회성 + org 서버 mint. 모든 설정 콜러블 admin 게이트·org는 토큰 클레임. Phase 99의 신원 3중 검증 유지 |
-| **운영 IAM** | 새 시크릿 4개(`SLACK_TOKEN_ENC_KEY`/`SLACK_CLIENT_ID`/`SLACK_CLIENT_SECRET`/`SLACK_STATE_SECRET`) 모두 배포 전 compute SA에 `secretmanager.secretAccessor` 수동 부여 필요([§2.5](../.agent/skills/troubleshoot-deployment/SKILL.md) 재현 — 안 하면 배포가 setIamPolicy 403) |
+| **운영 IAM** | 새 시크릿 4개(`SLACK_TOKEN_ENC_KEY`/`SLACK_CLIENT_ID`/`SLACK_CLIENT_SECRET`/`SLACK_STATE_SECRET`) 모두 배포 전 compute SA에 `secretmanager.secretAccessor` 수동 부여 필요([§2.5](../../.agent/skills/troubleshoot-deployment/SKILL.md) 재현 — 안 하면 배포가 setIamPolicy 403) |
 | **검증** | 단위: crypto 8·oauthState 9·resolveSlackUser 6·콜백 6·설정 콜러블 15·워커 갱신·프론트 컴포넌트 6 (functions 전체 그린). 프로덕션 **E2E 실증**: 설정→[Slack 연결]→OAuth 허용(Socialprism)→연결됨 + 직원 준비 상태 진단(11명 중 3명 이메일 매칭) 표시. 무중단 전환·재연결 확인. Node 22 |
 | **후속** | Google Chat 어댑터(동일 셀프서비스 뼈대 + Chat OAuth/카드), 예약 취소/수정 intent, 운영현황 질의, 토큰 암호화 KMS 승격 |
 

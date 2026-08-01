@@ -51,7 +51,11 @@ export default defineConfig({
       output: {
         manualChunks: {
           'firebase-auth': ['firebase/app', 'firebase/auth'],
-          'firebase-db': ['firebase/firestore', 'firebase/storage'],
+          // firestore와 storage를 분리한다 — 합쳐두면 firebase 12.16 기준 단일 청크가 582KB로
+          // largestJs 예산(600KB)에 18KB만 남아 다음 마이너 업데이트에서 바로 게이트가 터진다.
+          // 증빙 업로드(storage)는 운행일지 작성 일부 경로에서만 쓰여 분리 시 지연 로딩 여지도 생긴다.
+          'firebase-db': ['firebase/firestore'],
+          'firebase-storage': ['firebase/storage'],
           'firebase-messaging': ['firebase/messaging'],
           // react-dom/client·jsx-runtime·scheduler 서브패스를 명시하지 않으면 렌더러 본체(~200KB)가
           // 앱 공유 청크로 흘러들어가 매 배포마다 재다운로드된다 (react-vendor는 버전 업 전까지 캐시 유지)

@@ -24,6 +24,21 @@ MIT 라이선스로 공개된 프로젝트입니다. 아래처럼 자유롭게 �
 
 > 한국 사회복지기관 환경(사업자번호 기반 기관 인증, 카카오 알림톡, 공휴일/티맵)에 맞춰져 있으나, 이 기능들을 끄면 **운행일지·예약·통계·출력·푸시** 등 핵심은 어느 지역에서든 동작합니다. 자세한 내용은 [셀프호스팅 가이드 §8](docs/SELF_HOSTING.md#8-한국-특화-기능-참고) 참고.
 
+### 떼어 쓸 수 있는 것
+
+전체를 fork하지 않아도, 아래는 **스택·도메인과 독립적으로** 가져갈 수 있는 부분입니다.
+
+| 무엇 | 어디를 보면 되나 | 왜 참고할 만한가 |
+|------|------------------|------------------|
+| **에이전트 하네스** | [.agent/](.agent/) · [scripts/check-harness.ts](scripts/check-harness.ts) · [scripts/skill-trigger-eval.json](scripts/skill-trigger-eval.json) | 스킬·워크플로·행동 규칙이 단일 원본이고 `.claude/`는 파생물이며 CI가 드리프트를 막습니다. 하네스 Doctor는 13개 영역 정합성을 검사해 **불일치 시 CI를 실패**시키고, eval 세트로 **에이전트 행동을 회귀 측정**합니다. 지침을 "문서에 적힌 약속"이 아니라 실행 가능한 게이트로 만드는 방식이라 어떤 언어·프레임워크에도 옮겨집니다 |
+| **멀티테넌트 격리** | [eslint-rules/require-organization-filter.js](eslint-rules/require-organization-filter.js) · [firestore.rules](firestore.rules) · [tests/firestore-rules.test.ts](tests/firestore-rules.test.ts) · `setCustomClaims` | 테넌트 필터 누락은 코드 리뷰로 막기 어려운 사고입니다. 여기서는 커스텀 ESLint 규칙 `local/require-organization-filter`가 쿼리의 `organizationId` 누락을 **정적으로 차단**하고, Rules 테스트와 Custom Claims 동기화 트리거가 서버 측을 이중으로 받칩니다. 기관 → 회사·학교·지점으로 이름만 바꾸면 그대로 쓰입니다 |
+| **무료 한도 비용 설계** | [docs/FIRESTORE_COST_ANALYSIS.md](docs/FIRESTORE_COST_ANALYSIS.md) · `dailyNightlyBatch`·`monthlyBatch` · [firestore-query-optimization](.agent/skills/firestore-query-optimization/SKILL.md) | 비영리 서비스의 실질 제약은 기능이 아니라 과금입니다. 개별 스케줄러를 야간·월간 배치로 통합해 잡 수를 줄이고, 주기를 업무 시간으로 좁히고(평일 08~18시), 집계 캐싱·쿨다운·페이지네이션으로 읽기를 줄인 결정과 실측이 남아 있습니다 |
+| **예약 + 사용대장 골격** | `createReservationSafe` · [src/components/common/ReservationCalendar.tsx](src/components/common/ReservationCalendar.tsx) · [data-export-pattern](.agent/skills/data-export-pattern/SKILL.md) | 차량이라는 명사를 빼면 남는 구조는 일반적입니다. `vehicles`=자원, `reservations`는 그대로, `driveLogs`=사용대장으로 두면 회의실·장비·공용 물품 대여가 됩니다. 트랜잭션 충돌 방지, 승인 흐름, 반복 예약(공휴일 제외), 공식 양식 PDF/Excel 출력은 도메인과 무관합니다 |
+| **개인정보 규제 대응** | `functions/src/handlers/triggers/auditLog.ts` · `PROCESSORS`(처리방침) | 접속기록을 클라이언트가 아니라 Firestore 트리거로 남기고, **무엇을 기록하지 않을지**를 화이트리스트로 정한 설계입니다. 처리방침의 위탁·국외이전 조항은 실제 연동 목록 단일 원본에서 파생시켜 두 조항이 구조적으로 어긋날 수 없게 했습니다. 법 문구는 각자 사실관계가 다르니 그대로 베끼지 말고 **구조만** 참고하세요 |
+| **의사결정 기록** | [docs/구현이력.md](docs/구현이력.md) | Phase 141개에 무엇을 했는지가 아니라 **왜 그렇게 했고 어떤 지적을 기각했는지**가 남아 있습니다(오진을 CI 아티팩트로 뒤집은 과정, 리뷰 지적의 반영·기각 분리). 알려진 제약과 열린 항목도 여기서 확인할 수 있습니다 |
+
+> 포크할 때 함께 상속되는 제약: **Firebase 종속**(Rules·Functions·클레임에 설계가 얽혀 있어 다른 백엔드로 옮기는 것은 재작성에 가깝습니다) · **한국어 전용**(UI·주석·문서, i18n 없음) · **커버리지 편중**(출력물·경로 계산 등 조용히 틀리는 영역은 두껍지만 전체 수치는 낮습니다).
+
 ---
 
 ## 시스템 구조
@@ -49,6 +64,9 @@ MIT 라이선스로 공개된 프로젝트입니다. 아래처럼 자유롭게 �
 | 📱 카카오 알림톡 | 기관 승인·리마인드 알림톡 자동 발송 (알리고 API) |
 | 🔧 차량 정비 관리 | 정비/수리 기록, 정비 중 차량 사용 차단 |
 | ⛽ 주유·하이패스 | 주유 기록, 하이패스 충전 관리, 통계 차트 |
+| 💬 Slack 어시스턴트 | 워크스페이스를 연결하면 대화로 예약 조회·생성. 기관이 직접 OAuth로 연결(기관별 토큰 암호화 보관) |
+| 🙋 AI 도움말·문의 | FAQ·매뉴얼 기반 질문 답변, 접수된 문의에 AI 답변 초안 자동 생성 |
+| 🔐 보안·개인정보 | App Check(reCAPTCHA v3), 기관 간 데이터 격리(Firestore Rules), 개인정보 변경 접속기록 서버 기록 |
 | 🌙 다크 모드 | 신규 사용자 기본 다크 모드 적용, 시스템/사용자 설정 기반 테마 지원, 글꼴 크기 3단계 조절 |
 
 ---
@@ -64,10 +82,12 @@ MIT 라이선스로 공개된 프로젝트입니다. 아래처럼 자유롭게 �
 | 인증 | Firebase Auth (Google 로그인 전용) |
 | 데이터베이스 | Cloud Firestore (실시간 구독 + 하이브리드 캐시) |
 | 서버리스 | Cloud Functions for Firebase (TypeScript ESM, Node.js 22) |
-| AI/OCR | Gemini 3.1 Flash Lite Preview (Cloud Functions 경유) |
+| AI/OCR | Gemini 3.1 Flash Lite (Cloud Functions 경유) |
 | 호스팅 | Firebase Hosting |
+| 보안 | Firebase App Check (reCAPTCHA v3) + Firestore/Storage Rules 멀티테넌트 격리 |
 | 모니터링 | Sentry (프론트엔드 에러 + Web Vitals) |
 | 알림톡 | 알리고 API + Cafe24 PHP 프록시 (카카오 알림톡) |
+| 봇 연동 | Slack OAuth (기관별 봇 토큰 암호화 저장) |
 
 ---
 
@@ -104,43 +124,58 @@ npx playwright install
 루트에 `.env` 파일 생성:
 
 ```env
-# Firebase
+# Firebase (프로젝트 설정 → 웹 앱의 firebaseConfig)
 VITE_FIREBASE_API_KEY=...
 VITE_FIREBASE_AUTH_DOMAIN=...
 VITE_FIREBASE_PROJECT_ID=...
 VITE_FIREBASE_STORAGE_BUCKET=...
 VITE_FIREBASE_MESSAGING_SENDER_ID=...
 VITE_FIREBASE_APP_ID=...
+VITE_FIREBASE_MEASUREMENT_ID=...
 
-# EmailJS (프론트 수동 이메일)
-VITE_EMAILJS_SERVICE_ID=...
-VITE_EMAILJS_TEMPLATE_ID=...
-VITE_EMAILJS_PUBLIC_KEY=...
+# FCM 웹 푸시 (Cloud Messaging → 웹 푸시 인증서)
+VITE_FIREBASE_VAPID_KEY=...
+
+# App Check (콘솔 → App Check → reCAPTCHA v3 사이트 키)
+VITE_RECAPTCHA_SITE_KEY=...
 
 # 티맵 API
-VITE_TMAP_APP_KEY=...
+VITE_TMAP_API_KEY=...
 
 # 공휴일 API
 VITE_HOLIDAY_API_KEY=...
 
 # Sentry
 VITE_SENTRY_DSN=...
-
-# FCM
-VITE_FIREBASE_VAPID_KEY=...
 ```
 
-`functions/.env` 파일:
+> 개발 전용 변수(`VITE_APPCHECK_DEBUG_TOKEN`, `VITE_USE_EMULATOR`)는 `.env.local`에 둡니다 — [.env.local.example](.env.local.example) 참고.
+
+`functions/.env` 파일 — 평문 보관이 가능한 값만 둡니다:
 
 ```env
 GEMINI_API_KEY=...
+TMAP_API_KEY=...
+HOLIDAY_API_KEY=...
 EMAILJS_SERVICE_ID=...
 EMAILJS_TEMPLATE_ID=...
 EMAILJS_PUBLIC_KEY=...
-EMAILJS_PRIVATE_KEY=...
-HOLIDAY_API_KEY=...
+GMAIL_USER=...
 ALIMTALK_PROXY_URL=...
-ALIMTALK_PROXY_TOKEN=...
+DISCORD_WEBHOOK_URL=...      # 선택 (운영 알림)
+```
+
+크리덴셜은 **Secret Manager**로 관리합니다([functions/src/core/params.ts](functions/src/core/params.ts)). `functions/.env`에 같은 키가 남아 있으면 **이름 충돌로 배포가 거부**됩니다.
+
+```bash
+firebase functions:secrets:set GMAIL_APP_PASSWORD      # 승인/거절 메일 발송(Gmail SMTP)
+firebase functions:secrets:set EMAILJS_PRIVATE_KEY     # 기관 자동 검증 메일
+firebase functions:secrets:set ALIMTALK_PROXY_TOKEN    # 카카오 알림톡 프록시
+firebase functions:secrets:set SLACK_SIGNING_SECRET    # Slack 요청 서명 검증
+firebase functions:secrets:set SLACK_CLIENT_ID         # Slack OAuth
+firebase functions:secrets:set SLACK_CLIENT_SECRET
+firebase functions:secrets:set SLACK_STATE_SECRET      # openssl rand -base64 32
+firebase functions:secrets:set SLACK_TOKEN_ENC_KEY     # openssl rand -base64 32 (AES-256)
 ```
 
 ---
@@ -154,8 +189,11 @@ ALIMTALK_PROXY_TOKEN=...
 | `npm run check:node` | Node 메이저 버전이 22인지 확인 (불일치 시 경고) |
 | `npm run lint` | ESLint 실행 (프론트엔드 + Cloud Functions) |
 | `npm run lint:functions` | Cloud Functions만 ESLint 실행 |
+| `npm run type-check` | 프론트엔드 타입 검사 (`tsc --noEmit`) |
 | `npm run type-check:functions` | Cloud Functions 타입 검사 (`tsc --noEmit`) |
 | `npm test` | 단위 테스트 (Vitest) |
+| `npm run test:coverage` | 단위 테스트 + 커버리지 리포트 |
+| `npm run test:rules` | Firestore Rules 테스트 (Firebase Emulator) |
 | `npm run test:e2e` | E2E 테스트 (Playwright, 사전에 `npx playwright install chromium` 필요) |
 | `npm run test:e2e:emulator` | Firebase Emulator 기반 인증 E2E 테스트 |
 | `npm run screenshots` | PWA 스크린샷 생성 (Playwright + sharp) |
@@ -165,25 +203,24 @@ ALIMTALK_PROXY_TOKEN=...
 | `npm run verify:fast` | 빠른 검증 (Node 확인 + lint + 타입 검사 프론트/Functions) |
 | `npm run verify:full` | 전체 게이트 (하네스 + fast + 커버리지 + Functions 테스트 + 빌드 + Rules + E2E) |
 | `npm run test:functions` | Cloud Functions 단위 테스트 (Jest) |
+| `npm run sync:agents` | `.agent/` → `.claude/` 브리지 재생성 (CI가 `--check`로 강제) |
 
 ---
 
 ## 배포
 
+이 저장소의 운영 배포는 **CI 단일 경로**입니다. `master`에 푸시되면 [Deploy 워크플로](.github/workflows/deploy.yml)가 빌드·검증 후 Hosting·Functions·Rules를 배포합니다. 로컬에서 `firebase deploy`를 병행하면 같은 함수를 동시에 업데이트해 충돌하므로 실행하지 않습니다.
+
 ```bash
-# 전체 배포 (프론트 + Functions + Rules)
+# 배포 전 로컬 검증
 fnm use 22
-npm run build
-firebase deploy
-
-# Cloud Functions만 배포
-firebase deploy --only functions
-
-# 보안 규칙만 배포
-firebase deploy --only firestore:rules,storage
+npm run verify:fast     # lint + 타입 검사
+npm run build           # 프로덕션 빌드 확인
 ```
 
-> ⚠️ 배포 전 반드시 Node 22 확인: `fnm use 22 && node --version`
+> ⚠️ Node 22 필수: `fnm use 22 && node --version` (Node 24는 Rollup 빌드 실패)
+
+**셀프호스터**는 자기 Firebase 프로젝트에 직접 배포하면 됩니다 — 명령과 순서는 [셀프호스팅 가이드 §5](docs/SELF_HOSTING.md#5-로컬-확인--배포) 참고.
 
 ---
 
@@ -206,7 +243,7 @@ firebase deploy --only firestore:rules,storage
 │   │   ├── employee/                 직원 화면 (모바일 최적화)
 │   │   └── common/                   공통 (알림, 달력, 에러, 오프라인)
 │   ├── store/                        Zustand 전역 상태 (테마, 폰트, Toast, 모달 등)
-│   ├── contexts/                     React 컨텍스트 (Zustand 래퍼 및 레거시 대응)
+│   ├── schemas/                      Zod 런타임 검증 스키마
 │   ├── types/                        TypeScript 타입 정의
 │   ├── hooks/                        커스텀 훅 (비즈니스 로직 분리)
 │   │   └── utils/                    훅에서 추출된 순수 함수
@@ -224,52 +261,27 @@ firebase deploy --only firestore:rules,storage
 
 ## Cloud Functions
 
-### 호출형 (onCall)
+전체 63개 함수(리전 `asia-northeast3`)의 파라미터·권한·트리거 경로는 **[Cloud Functions 레퍼런스](docs/FUNCTIONS_REFERENCE.md)** 에 정리되어 있습니다. 아래는 종류별 요약입니다.
 
-| 함수명 | 용도 |
-|--------|------|
-| `ocrDashboard` | 계기판 사진 → Gemini OCR → Km/배터리% 추출 |
-| `ocrDocument` | 고유번호증/사업자등록증 OCR 텍스트 추출 |
-| `createReservationSafe` | 서버사이드 예약 생성 (Firestore 트랜잭션, 동시성 안전) |
-| `sendAdminNotice` | 관리자 공지 FCM 전송 |
-| `sendApprovalEmail` | 기관 승인 이메일 발송 (서버사이드) |
-| `sendManualApprovalAlimtalk` | 수동 승인 시 알림톡 발송 |
-| `sendBulkReminder` | 미활성 기관 일괄 알림톡 발송 (superAdmin 전용) |
-| `disableUser` | 사용자 비활성화 (Firebase Auth + Firestore) |
-| `restoreUser` | 비활성화된 사용자 복원 |
-| `joinOrganization` | 초대 코드로 기관 가입 (서버사이드 권한 처리) |
-| `askAI` | FAQ·매뉴얼 기반 AI 챗봇 답변 생성 (Gemini) |
-
-### Firestore 트리거
-
-| 함수명 | 용도 |
-|--------|------|
-| `autoVerifyDocument` | 고유번호증 AI 분석 → 자동 승인/거절 → 이메일 |
-| `notifyNewApplication` | 신규 기관 신청 시 시스템 관리자 FCM 알림 |
-| `onReservationCreated` | 예약 생성 → 구글 캘린더 동기화 + FCM 알림 |
-| `onReservationUpdated` | 예약 수정/취소 → 캘린더 업데이트 |
-| `onReservationDeleted` | 예약 삭제 → 캘린더 이벤트 삭제 |
-| `setCustomClaims` | 사용자 문서 변경 시 Firebase Auth Custom Claims 자동 동기화 |
-| `trackFirstEmployee` | 첫 직원 가입 시점 추적 |
+| 종류 | 개수 | 대표 함수 |
+|------|------|-----------|
+| 호출형 (onCall) | 34 | `ocrDashboard`(계기판 OCR) · `createReservationSafe`(트랜잭션 예약 생성) · `joinOrganization`(초대 코드 가입) · `withdrawOrganization`(기관 해지) · `askAI`(FAQ 기반 답변) · `getSlackInstallUrl`·`diagnoseSlackConnection`(Slack 연결) |
+| HTTP (onRequest) | 4 | `tmapProxy`·`holidayProxy`(외부 API 프록시, 인증 + Rate Limit) · `slackEvents`(Slack 이벤트 수신) · `slackOauthCallback`(설치 콜백) |
+| 스케줄 (onSchedule) | 5 | 아래 표 참고 |
+| Firestore 트리거 | 19 | `autoVerifyDocument`(증빙서류 AI 심사) · `setCustomClaims`(권한 동기화) · `onReservation*`(캘린더·푸시) · `onDriveLog*`(주행거리·집계) · `audit*`(접속기록) · `onSlackTaskCreated`(Slack 워커) |
+| Auth 트리거 | 1 | `onUserDelete`(탈퇴 시 개인정보 익명화) |
 
 ### 스케줄 함수
 
-| 함수명 | 주기 | 용도 |
+| 함수명 | 주기 (Asia/Seoul) | 용도 |
 |--------|------|------|
-| `reservationReminder` | 10분 | 예약 10분 전 FCM + 일지 미작성/미출발 알림 |
-| `syncCalendarToApp` | 10분 | 구글 캘린더 → Firestore 역동기화 |
-| `dailyNightlyBatch` | 매일 02:00 | Firestore 백업, 기관/이미지 정리, 3년+ 운행 기록 아카이빙, 보험 만료 알림 |
+| `reservationReminder` | 평일 08~18시 매시 정각 | 예약 임박 FCM + 일지 미작성/미출발 알림 (OCR 워밍업 편승) |
+| `syncCalendarToApp` | 평일 06~22시 30분 주기 | 구글 캘린더 → Firestore 역동기화 |
+| `dailyNightlyBatch` | 매일 02:00 | 집계 캐싱, Firestore 백업, 기관/이미지 정리, 3년+ 운행 기록 아카이빙, 보험 만료 알림 |
 | `monthlyBatch` | 매월 1일 06:00 | 공휴일 캐시 동기화 + 주행거리 정합성 검증 |
 | `sendInactiveOrgAlimtalkScheduled` | 평일 14:00 | 미활성 기관 알림톡 발송 대상 점검 |
 
-### HTTP 함수
-
-| 함수명 | 용도 |
-|--------|------|
-| `holidayProxy` | 공휴일 API CORS 프록시 |
-| `tmapProxy` | 티맵 경로 탐색 프록시 |
-| `cleanupDuplicateLogs` | 중복 운행 기록 탐지 및 정리 |
-| `backfillOrgCoords` | 기존 기관 좌표 일괄 마이그레이션 (1회성) |
+> 스케줄 잡 수(=과금)를 줄이려고 개별 배치를 `dailyNightlyBatch`·`monthlyBatch`로 통합했습니다.
 
 ---
 
@@ -277,10 +289,12 @@ firebase deploy --only firestore:rules,storage
 
 | 종류 | 규모 | 도구 |
 |------|------|------|
-| 프론트 단위 테스트 | 49파일 / 357개 테스트 | Vitest |
-| Functions 단위 테스트 | 19개 suite / 172개 테스트 (emulator 테스트 제외) | Jest + ts-jest |
-| Firestore Rules 테스트 | 1파일 | Firebase Emulator + Vitest |
-| E2E 테스트 | 18개 spec 파일 (일부 인증/오프라인 시나리오 fixme) | Playwright |
+| 단위 테스트 (프론트 + 스크립트) | 94파일 / 965개 테스트 | Vitest |
+| Functions 단위 테스트 | 52개 suite / 548개 테스트 (emulator 테스트 제외) | Jest + ts-jest |
+| Rules 테스트 | Firestore 16개 + Storage 6개 테스트 | Firebase Emulator + Vitest |
+| E2E 테스트 | 24개 spec 파일 (일부 인증/오프라인 시나리오 fixme) | Playwright |
+
+> 2026-07-30 기준. `npm run verify:full`이 위 대부분을 한 번에 실행합니다 (Storage Rules는 `npm run test:rules:storage`로 별도 실행).
 
 ---
 
@@ -289,11 +303,13 @@ firebase deploy --only firestore:rules,storage
 | 문서 | 설명 |
 |------|------|
 | [셀프호스팅 가이드](docs/SELF_HOSTING.md) | 내 기관 Firebase에 직접 설치·배포하는 단계별 안내 |
-| [구현계획서](docs/차량운행일지_구현계획서.md) | 전체 설계 문서 (아키텍처, DB 스키마, API 명세, 시퀀스 다이어그램, Phase별 구현 이력) |
+| [구현계획서](docs/차량운행일지_구현계획서.md) | 전체 설계 문서 (아키텍처, DB 스키마, API 명세, 시퀀스 다이어그램) |
+| [구현이력](docs/구현이력.md) | Phase별 구현 이력 색인 (구간별 분할 파일로 연결) |
+| [Cloud Functions 레퍼런스](docs/FUNCTIONS_REFERENCE.md) | 함수별 트리거·권한·파라미터 (자동 생성) |
 | [OPERATIONS.md](OPERATIONS.md) | 시스템 관리자용 운영 매뉴얼 (백업, 장애 대응, 기관 관리) |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | 개발 참여 가이드 (코딩 컨벤션, PR 규칙, 브랜치 전략) |
-| [CHANGELOG.md](CHANGELOG.md) | Phase별 변경 이력 |
 | [API_FALLBACK.md](docs/API_FALLBACK.md) | 외부 API 장애 대응 매뉴얼 |
+| [CHANGELOG.md](CHANGELOG.md) | Phase 61(2026-06-14)까지의 변경 이력 — 이후는 위 구현이력으로 일원화 |
 
 ---
 

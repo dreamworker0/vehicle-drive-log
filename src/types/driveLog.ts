@@ -85,14 +85,6 @@ export interface DriveLogPage {
     hasMore: boolean;
 }
 
-/** syncNextLogStartKm 결과 */
-export interface SyncResult {
-    updated: boolean;
-    logId?: string;
-    oldStartKm?: number;
-    newStartKm?: number;
-}
-
 /** getDriveLogs 필터 옵션 */
 export interface DriveLogFilters {
     limit?: number;

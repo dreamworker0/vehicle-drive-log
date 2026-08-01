@@ -209,6 +209,34 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertSucceeds(adminADb.collection('reservations').doc('res_reserved').update({ status: 'reserved', reservedByName: 'x' }));
   });
 
+  it('5-2. 예약 삭제 — 소유자 본인만 허용, 타인·타 기관·기관 관리자는 차단', async () => {
+    // 다일·반복 그룹 수정은 "기존 그룹 삭제 → 재생성" 경로라 삭제 권한이 필요한데
+    // superAdmin 전용이던 탓에 소유자 본인조차 그룹 수정이 항상 실패했다.
+    // 기관 관리자를 제외하는 이유 — createReservationSafe가 reservedByUid를 호출자로
+    // 강제하므로, 관리자가 직원 그룹을 수정하면 명의가 관리자로 넘어간다.
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      const base = { vehicleId: 'vehicle_A', status: 'reserved', groupId: 'grp_1', date: '2026-08-01' };
+      await db.collection('reservations').doc('res_own').set({ ...base, organizationId: 'org-A', reservedByUid: 'user_A' });
+      await db.collection('reservations').doc('res_admin').set({ ...base, organizationId: 'org-A', reservedByUid: 'user_A' });
+      await db.collection('reservations').doc('res_other').set({ ...base, organizationId: 'org-A', reservedByUid: 'user_other' });
+      await db.collection('reservations').doc('res_orgB').set({ ...base, organizationId: 'org-B', reservedByUid: 'user_B' });
+    });
+
+    const ownerDb = setupContext('user_A', { role: 'employee', orgId: 'org-A' }).firestore();
+    const adminDb = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+
+    // 같은 기관 타인 명의 예약 삭제 → 차단
+    await assertFails(ownerDb.collection('reservations').doc('res_other').delete());
+    // 타 기관 예약 삭제 → 차단
+    await assertFails(adminDb.collection('reservations').doc('res_orgB').delete());
+    // 기관 관리자의 소속 기관 타인 예약 삭제 → 차단 (명의 이전 방지, 서버 수정 후 별도 개방)
+    await assertFails(adminDb.collection('reservations').doc('res_admin').delete());
+
+    // 소유자 본인 예약 삭제 → 허용
+    await assertSucceeds(ownerDb.collection('reservations').doc('res_own').delete());
+  });
+
   it('6. 비용 데이터(주유·하이패스·정비) 교차 조직 접근 차단', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const db = context.firestore();
@@ -383,6 +411,53 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertSucceeds(superDb.collection('organizations').doc('org_new_ok').set({
       name: '정상기관', applicantUid: 'super_1', status: 'pending',
     }));
+  });
+
+  it('10-3. 접속기록(auditLogs) — 클라이언트 쓰기 전면 차단, 읽기는 점검 주체만', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('auditLogs').doc('log_A').set({
+        organizationId: 'org-A', action: 'update', targetType: 'driveLog',
+        targetId: 'dl_A', actorUid: null, actorSource: 'unknown', subjectUids: ['user_A'],
+      });
+    });
+
+    const adminADb = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+    const employeeADb = setupContext('user_A', { role: 'employee', orgId: 'org-A' }).firestore();
+    const adminBDb = setupContext('admin_B', { role: 'admin', orgId: 'org-B' }).firestore();
+    const superDb = setupContext('super_1', { role: 'superAdmin' }).firestore();
+
+    // 쓰기: 누구도 불가 (Admin SDK 트리거 전용)
+    await assertFails(adminADb.collection('auditLogs').doc('log_new').set({
+      organizationId: 'org-A', action: 'create', targetType: 'driveLog', targetId: 'x',
+    }));
+    await assertFails(superDb.collection('auditLogs').doc('log_new2').set({
+      organizationId: 'org-A', action: 'create', targetType: 'driveLog', targetId: 'x',
+    }));
+    // 기록 인멸 차단 — 수정·삭제 모두 불가
+    await assertFails(adminADb.collection('auditLogs').doc('log_A').update({ action: 'create' }));
+    await assertFails(superDb.collection('auditLogs').doc('log_A').update({ action: 'create' }));
+    await assertFails(adminADb.collection('auditLogs').doc('log_A').delete());
+    await assertFails(superDb.collection('auditLogs').doc('log_A').delete());
+
+    // 읽기: 해당 기관 관리자와 superAdmin만
+    await assertSucceeds(adminADb.collection('auditLogs').doc('log_A').get());
+    await assertSucceeds(superDb.collection('auditLogs').doc('log_A').get());
+    // 일반 직원은 자기 기관 기록도 볼 수 없다 (점검 주체가 아니다)
+    await assertFails(employeeADb.collection('auditLogs').doc('log_A').get());
+    // 타 기관 관리자는 차단 (멀티테넌트 격리)
+    await assertFails(adminBDb.collection('auditLogs').doc('log_A').get());
+
+    // 기관 미소속 계정(superAdmin)의 기록은 __system__으로 남는다 — superAdmin만 읽는다.
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('auditLogs').doc('log_sys').set({
+        organizationId: '__system__', action: 'update', targetType: 'user',
+        targetId: 'super_1', actorUid: null, actorSource: 'unknown', subjectUids: ['super_1'],
+        changedFields: ['role'],
+      });
+    });
+    await assertSucceeds(superDb.collection('auditLogs').doc('log_sys').get());
+    await assertFails(adminADb.collection('auditLogs').doc('log_sys').get());
+    await assertFails(adminBDb.collection('auditLogs').doc('log_sys').get());
   });
 
   it('11. 비밀 사용자 데이터(users/{uid}/private) — 본인·같은 기관 모두 접근 차단 (Functions 전용)', async () => {

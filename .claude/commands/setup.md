@@ -1,5 +1,5 @@
 ---
-description: 프로젝트 초기 설정(의존성 설치, Husky 훅 설치, 로컬 환경변수 복사 등)을 수행하는 온보딩 자동화 스크립트
+description: 프로젝트 초기 설정(의존성 설치, 환경변수 템플릿 복사, Husky 훅 설치, 검증)을 수행하는 온보딩 자동화 스크립트
 ---
 
 <!-- AUTO-GENERATED — scripts/sync-claude-agents.ts가 .agent/workflows/setup.md에서 생성. 직접 수정 금지. -->

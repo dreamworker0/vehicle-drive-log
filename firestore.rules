@@ -194,7 +194,17 @@ service cloud.firestore {
                         // organizationId 불변 — admin의 타 기관 이전 차단 (2026-07-10 감사 #6)
                         || (isOrgAdmin(resource.data.organizationId) && request.resource.data.organizationId == resource.data.organizationId)
                     ));
-      allow delete: if isSuperAdmin();
+      // 다일·반복 예약 그룹 수정은 "기존 그룹 삭제 → 재생성" 경로라 삭제 권한이 필요하다.
+      // superAdmin 전용이던 탓에 소유자 본인조차 그룹 수정이 항상 permission-denied로
+      // 실패했다 (2026-07-31 에뮬레이터 재현).
+      //
+      // 소유자 본인으로만 한정한다. 기관 관리자를 포함하지 않는 이유 — createReservationSafe가
+      // reservedByUid를 호출자로 강제하므로(createReservationCore), 관리자가 직원 그룹을
+      // 수정하면 재생성된 예약의 명의가 관리자로 조용히 넘어가 직원이 자기 예약 권한을 잃는다.
+      // 관리자 경로는 그 결함을 서버에서 먼저 고친 뒤 별도로 연다.
+      allow delete: if isSuperAdmin()
+                    || (belongsToMyOrg()
+                        && resource.data.reservedByUid == request.auth.uid);
     }
 
     // === 알림 ===
@@ -208,6 +218,22 @@ service cloud.firestore {
       allow update: if resource.data.targetUid == request.auth.uid
                     && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'updatedAt']);
       allow delete: if resource.data.targetUid == request.auth.uid || isSuperAdmin();
+    }
+
+    // === 접속기록/변경 로그 ===
+    // Cloud Functions(Admin SDK) 트리거만 기록하며, 클라이언트는 생성·수정·삭제를 전부
+    // 할 수 없다. 읽기는 점검 주체에게만 연다 — 개인정보처리자는 각 기관이므로
+    // (이용약관 제9조) 기관 관리자가 자기 기관 기록을 점검한다.
+    //
+    // ⚠️ 이 블록이 막는 것은 **클라이언트의** 위조·변조다. Admin SDK는 Rules를 우회하므로
+    // 고시 제16조 ③(위조·변조·도난·분실 방지)을 이것만으로 충족한다고 볼 수 없다. 서버 측
+    // 불변성은 별도 수단(불변 버킷·Cloud Logging 싱크 등)이 필요하며 현재 범위 밖이다.
+    //
+    // organizationId가 '__system__'인 기록(기관 미소속 계정, 주로 superAdmin)은 실재하는
+    // 기관 ID가 아니므로 isOrgAdmin이 성립하지 않아 superAdmin만 읽는다.
+    match /auditLogs/{logId} {
+      allow read: if isSuperAdmin() || isOrgAdmin(resource.data.organizationId);
+      allow write: if false;
     }
 
     // === 즐겨찾기 ===

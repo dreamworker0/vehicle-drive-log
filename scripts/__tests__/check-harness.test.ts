@@ -6,6 +6,9 @@ import {
     hashResults,
     findPwshChainingIssues,
     extractNpmRunScripts,
+    extractFunctionExports,
+    extractCatalogNames,
+    diffCatalogNames,
 } from '../check-harness';
 
 describe('parseFrontmatter', () => {
@@ -82,5 +85,82 @@ describe('extractNpmRunScripts', () => {
 
     it('npm test 등 run 없는 형태는 대상이 아니다', () => {
         expect(extractNpmRunScripts('npm test; npm install')).toEqual([]);
+    });
+});
+
+describe('extractFunctionExports', () => {
+    it('한 줄·여러 개·여러 줄 export를 모두 뽑는다', () => {
+        const src = [
+            '// 주석',
+            'export { ocrDashboard } from "./handlers/callable/ocrDashboard";',
+            'export { onReservationCreated, onReservationUpdated } from "./handlers/triggers/reservationTriggers";',
+            'export {',
+            '    auditUserCreated, auditUserUpdated,',
+            '} from "./handlers/triggers/auditLog";',
+        ].join('\n');
+        expect(extractFunctionExports(src)).toEqual([
+            'ocrDashboard',
+            'onReservationCreated',
+            'onReservationUpdated',
+            'auditUserCreated',
+            'auditUserUpdated',
+        ]);
+    });
+
+    it('as 별칭은 배포 이름(별칭 쪽)을 취한다', () => {
+        expect(extractFunctionExports('export { internalName as deployedName } from "./x";')).toEqual([
+            'deployedName',
+        ]);
+    });
+
+    it('import나 로컬 export는 함수 export로 세지 않는다', () => {
+        const src = 'import { getFirestore } from "firebase-admin/firestore";\nexport const NOT_A_FN = 1;';
+        expect(extractFunctionExports(src)).toEqual([]);
+    });
+});
+
+describe('extractCatalogNames', () => {
+    it('카탈로그 항목의 name만 뽑는다', () => {
+        const src = [
+            'const FUNCTIONS: FunctionEntry[] = [',
+            '  {',
+            "    name: 'ocrDashboard',",
+            "    type: 'onCall',",
+            "    file: 'handlers/callable/ocrDashboard.ts',",
+            "    description: '설명 안의 name: 가짜 표기',",
+            '  },',
+            '  {',
+            "    name: 'askAI',",
+            "    type: 'onCall',",
+            '  },',
+            '];',
+        ].join('\n');
+        expect(extractCatalogNames(src)).toEqual(['ocrDashboard', 'askAI']);
+    });
+
+    it('따옴표 스타일이 바뀌어도 뽑는다', () => {
+        // 작은따옴표만 받으면 재포맷 시 빈 배열이 되고 13번 검사가 "전부 누락"으로 CI를 잘못 막는다.
+        const src = ["    name: 'single',", '    name: "double",', '    name: `backtick`,'].join('\n');
+        expect(extractCatalogNames(src)).toEqual(['single', 'double', 'backtick']);
+    });
+});
+
+describe('diffCatalogNames', () => {
+    // 13번 검사가 그대로 호출하는 함수를 직접 검증한다 (재구현 테스트는 본체를 지워도 통과한다).
+    it('배포됐지만 문서에 없는 함수를 잡는다', () => {
+        expect(diffCatalogNames(['a', 'b'], ['a']).missing).toEqual(['b']);
+    });
+
+    it('문서에만 남은 삭제된 함수를 잡는다', () => {
+        expect(diffCatalogNames(['a'], ['a', 'archiveDriveLogs']).stale).toEqual(['archiveDriveLogs']);
+    });
+
+    it('카탈로그 중복을 잡는다', () => {
+        expect(diffCatalogNames(['a'], ['a', 'a']).duplicates).toEqual(['a']);
+    });
+
+    it('일치하면 세 목록 모두 비어 있다', () => {
+        const r = diffCatalogNames(['a', 'b'], ['b', 'a']);
+        expect([r.missing, r.stale, r.duplicates]).toEqual([[], [], []]);
     });
 });
