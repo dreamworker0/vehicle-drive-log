@@ -358,6 +358,61 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     }));
   });
 
+  it('10-1. 기관 동의 기록(consent) 클라이언트 변경 차단 — 위탁 계약 입증 자료 보호', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('organizations').doc('org-A').set({
+        name: '기관A', applicantUid: 'admin_A', status: 'approved',
+        consent: { terms: true, privacy: true, termsVersion: '2026-08-05', privacyVersion: '2026-08-05' },
+      });
+      // 동의 기록이 없는 레거시 기관 — 클라이언트가 뒤늦게 심는 것도 막아야 한다
+      await context.firestore().collection('organizations').doc('org-legacy').set({
+        name: '레거시기관', applicantUid: 'admin_L', status: 'approved',
+      });
+    });
+
+    const adminADb = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+    const superDb = setupContext('super_1', { role: 'superAdmin' }).firestore();
+    const adminLDb = setupContext('admin_L', { role: 'admin', orgId: 'org-legacy' }).firestore();
+
+    // 기관 관리자·superAdmin 모두 동의 기록 변경·삭제 차단
+    await assertFails(adminADb.collection('organizations').doc('org-A').update({
+      consent: { terms: true, privacy: true, termsVersion: '2099-01-01', privacyVersion: '2099-01-01' },
+    }));
+    await assertFails(superDb.collection('organizations').doc('org-A').update({
+      consent: { terms: false, privacy: false, termsVersion: 'x', privacyVersion: 'x' },
+    }));
+
+    // 레거시 기관에 동의 기록을 클라이언트가 신설하는 것도 차단 (서버 경로만 허용)
+    await assertFails(adminLDb.collection('organizations').doc('org-legacy').update({
+      consent: { terms: true, privacy: true, termsVersion: '2026-08-05', privacyVersion: '2026-08-05' },
+    }));
+
+    // 정상: 동의 기록을 건드리지 않는 다른 필드 수정은 허용
+    await assertSucceeds(adminADb.collection('organizations').doc('org-A').update({ hipassEnabled: false }));
+
+    // 신청자 경로(status:'pending' + 본인 신청)도 consent를 건드리지 않으면 정상 동작해야 한다
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('organizations').doc('org-pending').set({
+        name: '신청중기관', applicantUid: 'applicant_1', status: 'pending',
+      });
+    });
+    const applicantDb = setupContext('applicant_1', { role: 'employee' }).firestore();
+    await assertSucceeds(applicantDb.collection('organizations').doc('org-pending').update({ address: '서울시' }));
+    await assertFails(applicantDb.collection('organizations').doc('org-pending').update({
+      consent: { terms: true, privacy: true, termsVersion: '2026-08-05', privacyVersion: '2026-08-05' },
+    }));
+
+    // create 경로로 임의 동의 기록을 심는 것도 차단 (update만 막으면 우회 가능)
+    await assertFails(superDb.collection('organizations').doc('org_new_evil').set({
+      name: '위조기관', applicantUid: 'super_1', status: 'pending',
+      consent: { terms: true, privacy: true, termsVersion: '2026-08-05', privacyVersion: '2026-08-05' },
+    }));
+    // consent 없는 정상 create는 계속 허용
+    await assertSucceeds(superDb.collection('organizations').doc('org_new_ok').set({
+      name: '정상기관', applicantUid: 'super_1', status: 'pending',
+    }));
+  });
+
   it('10-3. 접속기록(auditLogs) — 클라이언트 쓰기 전면 차단, 읽기는 점검 주체만', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await context.firestore().collection('auditLogs').doc('log_A').set({

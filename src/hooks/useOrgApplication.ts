@@ -6,6 +6,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { firebaseFunctions } from '../lib/firebase';
 import { useAuth } from './useAuth';
 import { httpsCallable } from 'firebase/functions';
+import { TERMS_VERSION, PRIVACY_VERSION } from '../lib/constants';
 
 // 허용 파일 타입
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
@@ -178,6 +179,13 @@ export default function useOrgApplication() {
             return;
         }
 
+        // 동의는 제출 버튼 disabled로도 막지만, 여기서 한 번 더 확인한다.
+        // 서버(submitOrgApplication)도 동일하게 검증하므로 우회 시에는 거부된다.
+        if (!agreeTerms || !agreePrivacy) {
+            setError('이용약관과 개인정보 처리방침에 동의해주세요.');
+            return;
+        }
+
         setLoading(true);
         setError('');
 
@@ -206,6 +214,12 @@ export default function useOrgApplication() {
                 message: form.message.trim(),
                 imageBase64: base64Data,
                 imageMimeType: finalMimeType,
+                // 위탁 계약(약관 제9조) 성립 근거 — 동의 사실과 동의한 문서 버전을 함께 보낸다.
+                // 동의 일시는 클라이언트 시각을 신뢰하지 않고 서버에서 기록한다.
+                agreedTerms: agreeTerms,
+                agreedPrivacy: agreePrivacy,
+                termsVersion: TERMS_VERSION,
+                privacyVersion: PRIVACY_VERSION,
             });
 
             // 완료
@@ -227,7 +241,7 @@ export default function useOrgApplication() {
             setLoading(false);
             setOcrStatus('');
         }
-    }, [form, imageFile]);
+    }, [form, imageFile, agreeTerms, agreePrivacy]);
 
     const handleGoBack = useCallback(async (navigate: (path: string) => void) => {
         navigate('/');

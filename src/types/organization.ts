@@ -75,6 +75,20 @@ export interface Organization extends FirestoreDoc {
         rejected?: boolean;
         reason?: string;
     };
+    /**
+     * 약관·처리방침 동의 기록 (위탁 계약 성립 근거 — 약관 제9조)
+     * submitOrgApplication이 서버에서만 기록하며, Firestore Rules가 클라이언트 변경을 차단한다.
+     * 2026-08-05 이전에 신청한 기관에는 없다(재동의로 채운다).
+     */
+    consent?: {
+        terms: boolean;
+        privacy: boolean;
+        /** 동의한 약관의 시행일 버전 */
+        termsVersion: string;
+        /** 동의한 처리방침의 시행일 버전 */
+        privacyVersion: string;
+        agreedAt?: TimestampField;
+    };
     createdAt?: TimestampField;
     approvedAt?: TimestampField;
     rejectedAt?: TimestampField;

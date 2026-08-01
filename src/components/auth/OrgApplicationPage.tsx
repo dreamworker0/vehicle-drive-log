@@ -226,6 +226,14 @@ export default function OrgApplicationPage() {
                                 <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-primary-600 dark:text-primary-400 underline underline-offset-2 font-medium hover:text-primary-700 dark:hover:text-primary-300">개인정보 처리방침</a>에 동의합니다. <span className="text-red-500 dark:text-red-400">*</span>
                             </span>
                         </label>
+                        {/*
+                          동의로 성립하는 관계를 신청 시점에 알린다. 이용약관 제9조가 위탁 계약이므로
+                          '무엇에 동의했는지'를 여기서 밝혀 두어야 동의 기록이 입증력을 갖는다.
+                        */}
+                        <p className="text-xs text-surface-500 dark:text-surface-400 leading-relaxed">
+                            동의 시 <strong>이용약관 제9조(개인정보 처리의 위탁)</strong>에 따라 기관이 개인정보처리자로서
+                            소속 직원 개인정보의 처리를 서비스에 위탁하게 됩니다. 동의 사실과 동의한 문서의 시행일은 기록·보관됩니다.
+                        </p>
                     </div>
 
                     <div className="flex gap-3 pt-2">

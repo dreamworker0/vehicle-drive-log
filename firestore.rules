@@ -88,9 +88,14 @@ service cloud.firestore {
       // 기관 생성은 서버(submitOrgApplication, Admin SDK) 또는 superAdmin 전용.
       // 과거 클라이언트 create는 status:'approved'·inviteCode를 임의 지정해 AI 검증·
       // superAdmin 승인 절차를 통째로 우회할 수 있었음 (2026-07-10 감사 #2).
-      allow create: if isSuperAdmin();
-      allow update: if isOrgAdmin(orgId) || isSuperAdmin()
-                    || (isSignedIn() && resource.data.status == 'pending' && resource.data.applicantUid == request.auth.uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'role']));
+      // create에서도 consent를 심을 수 없다 — 막지 않으면 superAdmin이 클라이언트에서
+      // 임의 동의 기록을 가진 기관을 만들 수 있어 update 차단이 무의미해진다.
+      allow create: if isSuperAdmin() && !('consent' in request.resource.data);
+      // 동의 기록(consent)은 위탁 계약 성립의 입증 자료이므로 어떤 클라이언트도 변경·삭제할 수 없다.
+      // submitOrgApplication(Admin SDK)만 기록하며, 규칙을 우회하는 서버 경로로만 갱신한다.
+      allow update: if (isOrgAdmin(orgId) || isSuperAdmin()
+                    || (isSignedIn() && resource.data.status == 'pending' && resource.data.applicantUid == request.auth.uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'role'])))
+                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['consent']);
       allow delete: if isSuperAdmin();
 
       // 커스텀 휴일 (서브컬렉션)

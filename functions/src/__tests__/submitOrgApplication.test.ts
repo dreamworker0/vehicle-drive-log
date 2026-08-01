@@ -69,6 +69,10 @@ describe('submitOrgApplication — MIME 화이트리스트', () => {
         message: '신청합니다',
         imageBase64: Buffer.from('dummy-image').toString('base64'),
         imageMimeType: 'image/jpeg',
+        agreedTerms: true,
+        agreedPrivacy: true,
+        termsVersion: '2026-08-05',
+        privacyVersion: '2026-08-05',
     };
 
     const makeRequest = (overrides: Record<string, unknown> = {}) => ({
@@ -141,5 +145,84 @@ describe('submitOrgApplication — MIME 화이트리스트', () => {
         const res = await capturedHandler(makeRequest());
         expect(res).not.toHaveProperty('uniqueNumberImageUrl');
         expect(res).toMatchObject({ success: true, orgId: 'org-test-1' });
+    });
+});
+
+// ── 약관·처리방침 동의 기록 (위탁 계약 성립 근거 — 약관 제9조) ──
+// 프론트의 버튼 disabled는 콜러블 직접 호출을 막지 못한다. 서버 검증이 빠지면
+// 동의 기록 없는 기관 문서가 만들어져 위탁 계약을 입증할 수 없다.
+describe('submitOrgApplication — 동의 기록', () => {
+    const basePayload = {
+        orgName: '테스트복지관',
+        applicantName: '홍길동',
+        applicantEmail: 'consent@example.com',
+        applicantPhone: '010-1234-5678',
+        message: '신청합니다',
+        imageBase64: Buffer.from('dummy-image').toString('base64'),
+        imageMimeType: 'image/jpeg',
+        agreedTerms: true,
+        agreedPrivacy: true,
+        termsVersion: '2026-08-05',
+        privacyVersion: '2026-08-05',
+    };
+
+    const makeRequest = (overrides: Record<string, unknown> = {}) => ({
+        auth: null,
+        rawRequest: { ip: '1.2.3.4', headers: {} },
+        data: { ...basePayload, ...overrides },
+    });
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    it('동의 사실·버전·서버 시각을 기관 문서에 저장한다', async () => {
+        await capturedHandler(makeRequest());
+        const savedDoc = mockOrgSet.mock.calls[0][0];
+        expect(savedDoc.consent).toEqual({
+            terms: true,
+            privacy: true,
+            termsVersion: '2026-08-05',
+            privacyVersion: '2026-08-05',
+            agreedAt: 'mock-timestamp',
+        });
+    });
+
+    it('동의 시점 IP는 저장하지 않는다 (최소수집)', async () => {
+        await capturedHandler(makeRequest());
+        const savedDoc = mockOrgSet.mock.calls[0][0];
+        expect(savedDoc.consent).not.toHaveProperty('agreedIp');
+        expect(JSON.stringify(savedDoc)).not.toContain('1.2.3.4');
+    });
+
+    it.each([
+        ['agreedTerms 누락', { agreedTerms: undefined }],
+        ['agreedPrivacy 누락', { agreedPrivacy: undefined }],
+        ['agreedTerms=false', { agreedTerms: false }],
+        ['agreedPrivacy=false', { agreedPrivacy: false }],
+        ['boolean이 아닌 truthy 값', { agreedTerms: 'yes' }],
+    ])('%s → invalid-argument 거부, 업로드·저장 미수행', async (_label, overrides) => {
+        await expect(
+            capturedHandler(makeRequest(overrides as Record<string, unknown>))
+        ).rejects.toMatchObject({ code: 'invalid-argument' });
+        expect(mockFileSave).not.toHaveBeenCalled();
+        expect(mockOrgSet).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ['termsVersion 누락', { termsVersion: undefined }],
+        ['privacyVersion 빈 문자열', { privacyVersion: '' }],
+        ['termsVersion 타입 불일치', { termsVersion: 20260805 }],
+        ['privacyVersion 길이 초과', { privacyVersion: 'x'.repeat(21) }],
+        // 시행일 형식이 아닌 값 — 임의 문자열이 동의 기록에 남지 않게 막는다
+        ['형식 불일치(자유 문자열)', { termsVersion: 'latest' }],
+        ['형식 불일치(구분자 없음)', { privacyVersion: '20260805' }],
+        ['형식 불일치(월·일 자릿수)', { termsVersion: '2026-8-5' }],
+        ['형식 불일치(앞뒤 공백)', { privacyVersion: ' 2026-08-05 ' }],
+    ])('%s → invalid-argument 거부', async (_label, overrides) => {
+        await expect(
+            capturedHandler(makeRequest(overrides as Record<string, unknown>))
+        ).rejects.toMatchObject({ code: 'invalid-argument' });
+        expect(mockOrgSet).not.toHaveBeenCalled();
     });
 });

@@ -1,6 +1,10 @@
 import { useNavigate } from 'react-router-dom';
 import SEOHead from '../common/SEOHead';
 import useForceLightMode from '../../hooks/useForceLightMode';
+import { TERMS_VERSION, formatLegalVersion } from '../../lib/constants';
+
+/** 시행일 표기는 동의 기록에 남는 버전과 어긋나지 않도록 상수에서 파생한다. */
+const EFFECTIVE_DATE = formatLegalVersion(TERMS_VERSION);
 
 export default function TermsPage() {
     const navigate = useNavigate();
@@ -29,7 +33,7 @@ export default function TermsPage() {
                 <div className="bg-white dark:bg-surface-800 rounded-2xl shadow-soft p-6 md:p-8 space-y-8">
                     <div className="text-center border-b border-surface-100 dark:border-surface-700 pb-6">
                         <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-1">이용약관</h1>
-                        <p className="text-sm text-surface-400 dark:text-surface-500">시행일: 2026년 2월 1일</p>
+                        <p className="text-sm text-surface-400 dark:text-surface-500">시행일: {EFFECTIVE_DATE} (최초 시행: 2026년 2월 1일)</p>
                     </div>
 
                     {/* 제1조 */}
@@ -144,8 +148,113 @@ export default function TermsPage() {
                         </p>
                     </section>
 
-                    <div className="border-t border-surface-100 dark:border-surface-700 pt-4 text-center">
-                        <p className="text-xs text-surface-400 dark:text-surface-500">본 약관은 2026년 2월 1일부터 시행됩니다.</p>
+                    {/*
+                      제9조 — 개인정보 보호법 제26조 제1항이 위탁 시 문서에 포함하도록 정한 항목을
+                      전부 담는다(목적 외 처리 금지 / 기술적·관리적 보호조치 / 목적과 범위 /
+                      재위탁 제한 / 접근 제한 등 안전성 확보조치 / 관리 현황 점검 등 감독 /
+                      손해배상 책임). 항목을 덜어내면 위탁 계약의 법정 요건을 잃는다.
+                      수탁자 목록·국외 이전은 처리방침 제7조·제8조가 단일 원본이므로 여기서 중복하지 않는다.
+                    */}
+                    <section className="space-y-2">
+                        <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200">제9조 (개인정보 처리의 위탁)</h2>
+                        <div className="text-sm text-surface-600 dark:text-surface-400 leading-relaxed space-y-3">
+                            <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 dark:bg-blue-900/20 dark:border-blue-800">
+                                <p className="font-medium text-blue-800 dark:text-blue-300 mb-2">🏢 개인정보처리자는 기관입니다</p>
+                                <p className="text-blue-700 dark:text-blue-400 text-xs">
+                                    서비스를 이용하는 <strong>기관이 소속 직원 개인정보의 개인정보처리자(위탁자)</strong>이며,
+                                    서비스 제공자는 기관의 위탁을 받아 개인정보를 처리하는 <strong>수탁자</strong>입니다.
+                                    기관은 서비스 이용을 신청할 때 또는 본 조 신설 이후 별도로 안내되는 재동의 절차를 통해
+                                    본 조에 따라 개인정보 처리업무를 서비스 제공자에게 위탁합니다.
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <p className="font-medium text-surface-700 dark:text-surface-300">① 위탁업무의 목적 및 범위</p>
+                                <ul className="list-disc list-inside space-y-1 ml-2 text-xs">
+                                    <li>제3조의 서비스 기능 제공 (운행일지·차량·예약·정비 기록의 저장·조회·출력, 통계 산출, 알림 발송)</li>
+                                    <li>이용자 인증 및 역할 기반 접근 권한 관리</li>
+                                    <li>서비스의 운영·유지보수, 장애 대응 및 문의 처리</li>
+                                    <li>서비스 개선을 위한 이용 현황 분석</li>
+                                    <li>위탁 대상 개인정보 항목은 개인정보 처리방침 제1조에 따릅니다.</li>
+                                </ul>
+                            </div>
+
+                            <div className="space-y-2">
+                                <p className="font-medium text-surface-700 dark:text-surface-300">② 목적 외 처리 금지</p>
+                                <p className="text-xs">
+                                    서비스 제공자는 위탁받은 개인정보를 제1항의 목적 범위를 넘어 이용하거나 제3자에게 제공하지 않습니다.
+                                    법령에 의한 요청이 있는 경우에만 관련 법률에 따라 제공될 수 있습니다.
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <p className="font-medium text-surface-700 dark:text-surface-300">③ 기술적·관리적 보호조치 및 접근 제한</p>
+                                <p className="text-xs">
+                                    서비스 제공자는 개인정보 처리방침 제11조에 정한 보호조치를 이행합니다.
+                                    기관별 데이터는 보안 규칙으로 격리되며, 개인정보에 접근할 수 있는 권한은
+                                    업무 수행에 필요한 최소한의 범위로 제한합니다.
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <p className="font-medium text-surface-700 dark:text-surface-300">④ 재위탁 제한</p>
+                                <ul className="list-disc list-inside space-y-1 ml-2 text-xs">
+                                    <li>
+                                        서비스 제공자는 위탁업무 수행에 필수적인 범위에서만 제3자에게 다시 위탁(재위탁)하며,
+                                        그 수탁자와 업무 범위를 개인정보 처리방침 제7조에 공개합니다.
+                                    </li>
+                                    <li>
+                                        기관은 본 조에 동의함으로써 <strong>처리방침 제7조에 공개된 범위의 재위탁에 동의</strong>합니다.
+                                        그 밖의 재위탁은 기관의 사전 동의 없이 하지 않습니다.
+                                    </li>
+                                    <li>
+                                        재위탁 대상이나 업무 내용이 변경되는 경우 처리방침을 통해 지체 없이 공개하며,
+                                        기관이 변경 내용에 동의하지 않는 경우 제7조에 따라 기관 삭제를 요청할 수 있습니다.
+                                    </li>
+                                </ul>
+                            </div>
+
+                            <div className="space-y-2">
+                                <p className="font-medium text-surface-700 dark:text-surface-300">⑤ 관리 현황 점검 등 감독</p>
+                                <ul className="list-disc list-inside space-y-1 ml-2 text-xs">
+                                    <li>기관은 서비스 제공자의 개인정보 처리 현황을 점검할 수 있으며, 서비스 제공자는 이에 성실히 협조합니다.</li>
+                                    <li>서비스 제공자는 기관의 요청 시 위탁업무와 관련한 개인정보 처리 현황을 제공합니다.</li>
+                                    <li>기관은 소속 직원의 서비스 내 접근 권한을 직접 부여·변경·말소할 수 있습니다.</li>
+                                </ul>
+                            </div>
+
+                            <div className="space-y-2">
+                                <p className="font-medium text-surface-700 dark:text-surface-300">⑥ 손해배상 책임</p>
+                                <p className="text-xs">
+                                    서비스 제공자가 본 조의 의무를 위반하여 개인정보가 분실·도난·유출·위조·변조 또는 훼손되어
+                                    기관 또는 정보주체에게 손해가 발생한 경우, 서비스 제공자는 그 범위에서 책임을 부담합니다.
+                                    다만 제6조(면책 조항)에 해당하는 사유로 인한 손해는 제외합니다.
+                                </p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <p className="font-medium text-surface-700 dark:text-surface-300">⑦ 기관(위탁자)의 의무</p>
+                                <ul className="list-disc list-inside space-y-1 ml-2 text-xs">
+                                    <li>기관은 소속 직원에게 개인정보의 수집·이용 및 본 위탁 사실을 고지할 책임이 있습니다.</li>
+                                    <li>
+                                        소속 직원의 개인정보 열람·정정·삭제 요구는 개인정보처리자인 기관이 처리하며,
+                                        서비스 제공자는 처리에 필요한 기술적 협조를 제공합니다.
+                                    </li>
+                                    <li>
+                                        개인정보 유출이 확인된 경우 정보주체 통지 및 관계 기관 신고는 기관이 수행하며,
+                                        서비스 제공자는 유출 사실을 인지한 즉시 기관에 통지하고 필요한 자료를 제공합니다.
+                                    </li>
+                                    <li>운행일지의 탑승자란에 서비스 이용자(클라이언트)의 이름을 기록하지 않아야 합니다.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </section>
+
+                    <div className="border-t border-surface-100 dark:border-surface-700 pt-4 space-y-2 text-center">
+                        <p className="text-xs text-surface-400 dark:text-surface-500">본 약관은 {EFFECTIVE_DATE}부터 시행됩니다.</p>
+                        <p className="text-xs text-surface-400 dark:text-surface-500">
+                            개정 이력 · 2026년 2월 1일 최초 시행 / {EFFECTIVE_DATE} 개인정보 처리의 위탁 조항 신설
+                        </p>
                     </div>
                 </div>
             </div>
