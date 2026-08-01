@@ -168,6 +168,11 @@ export {
     deleteHipassCard,
 } from './hipass';
 
+// 전체 공지 발송 이력 (Broadcasts) — superAdmin 전용 읽기, 전역 도메인
+export {
+    getRecentBroadcasts,
+} from './broadcasts';
+
 // 하이패스 충전 기록 (Hipass Charges)
 export {
     getAllHipassCharges,

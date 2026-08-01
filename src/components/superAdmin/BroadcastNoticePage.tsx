@@ -10,13 +10,16 @@
  * 본문을 고치면 확인 결과를 지워 다시 확인하게 한다 — 확인한 문안과 보내는 문안이
  * 달라지는 것이 이 화면에서 가장 위험한 실수다.
  */
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import { firebaseFunctions } from '../../lib/firebase';
 import { useToast } from '../../hooks/useToast';
 import { useConfirm } from '../../hooks/useConfirm';
 import { captureError } from '../../lib/sentry';
 import { TERMS_VERSION, formatLegalVersion } from '../../lib/constants';
+import { getRecentBroadcasts } from '../../lib/firestore';
+import type { Broadcast } from '../../types/broadcast';
+import { formatTimestampFull } from '../../lib/dateUtils';
 
 const MAX_TITLE = 100;
 const MAX_MESSAGE = 1000;
@@ -49,6 +52,19 @@ export default function BroadcastNoticePage() {
     const [message, setMessage] = useState(TEMPLATE_MESSAGE);
     const [preview, setPreview] = useState<PreviewResult | null>(null);
     const [busy, setBusy] = useState(false);
+    const [history, setHistory] = useState<Broadcast[] | null>(null);
+
+    /** 발송 이력을 다시 읽는다. 실패해도 발송 화면은 계속 쓸 수 있어야 한다. */
+    const loadHistory = useCallback(async () => {
+        try {
+            setHistory(await getRecentBroadcasts());
+        } catch (err) {
+            captureError(err, { context: 'BroadcastNoticePage.history' });
+            setHistory([]);
+        }
+    }, []);
+
+    useEffect(() => { void loadHistory(); }, [loadHistory]);
 
     const trimmedTitle = title.trim();
     const trimmedMessage = message.trim();
@@ -114,6 +130,7 @@ export default function BroadcastNoticePage() {
                 'success'
             );
             setPreview(null);
+            void loadHistory();
         } catch (err) {
             captureError(err, { context: 'BroadcastNoticePage.send' });
             showToast('공지 발송에 실패했습니다.', 'error');
@@ -216,6 +233,55 @@ export default function BroadcastNoticePage() {
                     발송하려면 먼저 [대상 확인]을 눌러 인원을 확인하세요.
                 </p>
             )}
+
+            <section className="border-t border-surface-100 dark:border-surface-700 pt-6">
+                <h2 className="text-base font-semibold text-surface-800 dark:text-surface-200 mb-3">
+                    최근 발송 이력
+                </h2>
+
+                {history === null && (
+                    <p className="text-sm text-surface-400 dark:text-surface-500">불러오는 중...</p>
+                )}
+
+                {history?.length === 0 && (
+                    <p className="text-sm text-surface-400 dark:text-surface-500">아직 발송한 공지가 없습니다.</p>
+                )}
+
+                {history && history.length > 0 && (
+                    <ul className="space-y-2">
+                        {history.map((b) => (
+                            <li
+                                key={b.id}
+                                className="rounded-xl border border-surface-100 bg-surface-50 px-4 py-3 dark:border-surface-700 dark:bg-surface-800"
+                            >
+                                <div className="flex items-start justify-between gap-3">
+                                    <p className="text-sm font-medium text-surface-800 dark:text-surface-200 break-all">
+                                        {b.title}
+                                    </p>
+                                    <span className="shrink-0 text-xs text-surface-400 dark:text-surface-500">
+                                        {formatTimestampFull(b.sentAt as never) ?? '-'}
+                                    </span>
+                                </div>
+                                <p className="mt-1 text-xs text-surface-500 dark:text-surface-400 line-clamp-2 break-all">
+                                    {b.message}
+                                </p>
+                                <p className="mt-2 text-xs text-surface-500 dark:text-surface-400">
+                                    수신 {b.recipientCount}명
+                                    {b.status === 'sent'
+                                        ? <> · 푸시 성공 {b.pushSent ?? 0}
+                                            {(b.pushFailed ?? 0) > 0 && <> · 실패 {b.pushFailed}</>}
+                                        </>
+                                        : (
+                                            // 함수가 푸시 도중 죽으면 이 상태로 남는다.
+                                            // "알림은 나갔고 푸시 결과만 모른다"는 뜻이라 재발송 판단의 근거가 된다.
+                                            <span className="text-amber-600 dark:text-amber-400"> · 푸시 결과 미확인</span>
+                                        )}
+                                </p>
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </section>
         </div>
     );
 }

@@ -140,7 +140,7 @@ const FUNCTIONS: FunctionEntry[] = [
     name: 'sendBroadcastNotice',
     type: 'onCall',
     file: 'handlers/callable/sendBroadcastNotice.ts',
-    description: "전체 기관의 관리자·직원에게 앱 내 알림 + 푸시를 일괄 발송. `sendAdminNotice`가 자기 기관 한정이라 서비스 전역 고지(약관 개정 등) 경로가 없어 신설. `dryRun: true`면 **대상 수만 반환하고 아무것도 보내지 않는다** — 화면이 이 값을 확인시킨 뒤에만 실제 발송한다. `noticeId`로 문서 ID를 고정해 재클릭·재시도가 알림을 중복 생성하지 않는다. 비활성 계정과 기관 미소속 계정은 제외.",
+    description: "전체 기관의 관리자·직원에게 앱 내 알림 + 푸시를 일괄 발송. `sendAdminNotice`가 자기 기관 한정이라 서비스 전역 고지(약관 개정 등) 경로가 없어 신설. `dryRun: true`면 **대상 수만 반환하고 아무것도 보내지 않는다** — 화면이 이 값을 확인시킨 뒤에만 실제 발송한다. `noticeId`로 문서 ID를 고정해 재클릭·재시도가 알림을 중복 생성하지 않는다. 비활성 계정과 기관 미소속 계정은 제외. 발송 사실은 `broadcasts/{noticeId}`에 남긴다 — 앱 내 알림 커밋 직후 `sending`으로 먼저 쓰고 푸시 결과를 `sent`로 덧쓴다(중간에 죽으면 `sending`으로 남아 「알림은 나갔고 푸시 결과만 모른다」를 뜻한다).",
     auth: '시스템 관리자(superAdmin) 전용',
     params: '{ title: string, message: string, noticeId: string, dryRun?: boolean }',
     returns: '{ success: boolean, dryRun: boolean, recipientCount: number, pushSent?: number, pushFailed?: number }',

@@ -548,6 +548,31 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     }));
   });
 
+
+  it('10-5. 전체 공지 이력(broadcasts) — 클라이언트 쓰기 전면 차단, 읽기는 운영자만', async () => {
+    // sendBroadcastNotice(Admin SDK)만 기록한다. 발송자 uid가 담기므로 읽기도 운영자 한정.
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('broadcasts').doc('bc_1').set({
+        title: '약관 개정 안내', message: '8월 10일 시행', actorUid: 'sa_1',
+        recipientCount: 812, status: 'sent',
+      });
+    });
+
+    const superAdmin = setupContext('sa_1', { role: 'superAdmin' }).firestore();
+    const adminA = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+    const memberA = setupContext('user_A', { role: 'member', orgId: 'org-A' }).firestore();
+
+    // (1) 운영자만 읽는다
+    await assertSucceeds(superAdmin.collection('broadcasts').doc('bc_1').get());
+    await assertFails(adminA.collection('broadcasts').doc('bc_1').get());
+    await assertFails(memberA.collection('broadcasts').doc('bc_1').get());
+
+    // (2) 운영자조차 쓸 수 없다 — 발송하지 않은 이력을 만들거나 지울 수 없어야 한다
+    await assertFails(superAdmin.collection('broadcasts').doc('bc_2').set({ title: '위조' }));
+    await assertFails(superAdmin.collection('broadcasts').doc('bc_1').update({ recipientCount: 0 }));
+    await assertFails(superAdmin.collection('broadcasts').doc('bc_1').delete());
+  });
+
   it('11. 비밀 사용자 데이터(users/{uid}/private) — 본인·같은 기관 모두 접근 차단 (Functions 전용)', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await context.firestore().doc('users/user_A/private/oauth').set({

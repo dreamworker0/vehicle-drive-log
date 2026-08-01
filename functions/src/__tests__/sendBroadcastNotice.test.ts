@@ -49,10 +49,23 @@ const makeBatch = () => {
     };
 };
 
+/** broadcasts 문서에 대한 set 호출 기록 (발송 이력) */
+const broadcastSets: { id: string; data: any; merge: boolean }[] = [];
+let broadcastSetFails = false;
+
 jest.mock('firebase-admin/firestore', () => ({
     getFirestore: () => ({
         collection: (name: string) => ({
-            doc: (id: string) => ({ __col: name, __id: id }),
+            doc: (id: string) => ({
+                __col: name,
+                __id: id,
+                set: async (data: any, opts?: any) => {
+                    if (name !== 'broadcasts') throw new Error(`예상하지 못한 직접 쓰기: ${name}`);
+                    if (broadcastSetFails) throw new Error('이력 쓰기 실패');
+                    broadcastSets.push({ id, data, merge: !!opts?.merge });
+                    callOrder.push(`broadcast:${data.status}`);
+                },
+            }),
             get: async () => {
                 if (name !== 'users') throw new Error(`예상하지 못한 컬렉션 조회: ${name}`);
                 return {
@@ -113,6 +126,8 @@ beforeEach(() => {
     batchSets.length = 0;
     commitCalls.length = 0;
     callOrder.length = 0;
+    broadcastSets.length = 0;
+    broadcastSetFails = false;
     userDocs = [activeUser('u1', 'tok1'), activeUser('u2', 'tok2')];
     mockSendEach.mockResolvedValue({ successCount: 2, failureCount: 0 });
 });
@@ -294,6 +309,76 @@ describe('sendBroadcastNotice — 푸시', () => {
 
         // 커밋 2회(500+100)가 모두 끝난 뒤에 푸시 2회가 나가야 한다.
         // 순서가 뒤집히면 푸시를 받은 사용자가 알림함을 열었을 때 아무것도 없을 수 있다.
-        expect(callOrder).toEqual(['commit', 'commit', 'push', 'push']);
+        // (이력 쓰기는 이 테스트의 관심사가 아니므로 걸러낸다 — 순서는 별도 테스트가 본다.)
+        expect(callOrder.filter((c) => !c.startsWith('broadcast:')))
+            .toEqual(['commit', 'commit', 'push', 'push']);
+    });
+});
+
+describe('sendBroadcastNotice — 발송 이력', () => {
+    it('dryRun은 이력을 남기지 않는다', async () => {
+        await call({ dryRun: true });
+        expect(broadcastSets).toHaveLength(0);
+    });
+
+    it('공지 식별자를 문서 ID로 써서 발송 1건당 이력 1건이 된다', async () => {
+        await call();
+        expect(broadcastSets.map((b) => b.id)).toEqual([NOTICE_ID, NOTICE_ID]);
+    });
+
+    it('앱 내 알림 커밋 직후 sending으로 먼저 남긴다', async () => {
+        await call();
+
+        // 푸시까지 끝난 뒤에 한 번만 쓰면, 그 사이 죽었을 때 알림은 나갔는데 이력이 없다.
+        expect(callOrder).toEqual(['commit', 'broadcast:sending', 'push', 'broadcast:sent']);
+        expect(broadcastSets[0].data).toMatchObject({
+            title: '약관 개정 안내',
+            actorUid: 'sa-1',
+            recipientCount: 2,
+            status: 'sending',
+        });
+        expect(broadcastSets[0].merge).toBe(false);
+    });
+
+    it('푸시 결과를 merge로 덧써 sent로 마감한다', async () => {
+        mockSendEach.mockResolvedValue({ successCount: 1, failureCount: 1 });
+        await call();
+
+        expect(broadcastSets[1]).toMatchObject({
+            merge: true,
+            data: { pushSent: 1, pushFailed: 1, status: 'sent' },
+        });
+    });
+
+    it('푸시가 전부 실패해도 이력은 sent로 마감하고 실패 수를 남긴다', async () => {
+        mockSendEach.mockRejectedValue(new Error('FCM 장애'));
+        await call();
+
+        expect(broadcastSets[1].data).toMatchObject({ pushSent: 0, pushFailed: 2, status: 'sent' });
+    });
+
+    it('이력 갱신이 실패해도 발송 자체는 성공으로 반환한다', async () => {
+        // 이력은 부수 기록이다 — 여기서 throw하면 이미 나간 알림을 되돌릴 수 없는데
+        // 호출자에게는 실패로 보여 재발송을 유도하게 된다.
+        let calls = 0;
+        const origPush = broadcastSets.push.bind(broadcastSets);
+        broadcastSets.push = ((...args: any[]) => {
+            calls += 1;
+            if (calls === 2) throw new Error('이력 갱신 실패');
+            return origPush(...args);
+        }) as never;
+
+        const res = await call();
+
+        expect(res).toMatchObject({ success: true, recipientCount: 2 });
+        expect(mockLog).toHaveBeenCalledWith('ERROR', 'sendBroadcastNotice', '발송 이력 갱신 실패', expect.any(Object));
+        broadcastSets.push = origPush;
+    });
+
+    it('시작 이력 쓰기가 실패하면 발송을 실패로 알린다 — 이력 없는 발송을 만들지 않는다', async () => {
+        broadcastSetFails = true;
+        await expect(call()).rejects.toThrow();
+        // 앱 내 알림은 이미 커밋됐지만 푸시는 나가지 않는다
+        expect(mockSendEach).not.toHaveBeenCalled();
     });
 });

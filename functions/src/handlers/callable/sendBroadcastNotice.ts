@@ -12,6 +12,8 @@
  *     허용해, 운영자가 "몇 명에게 가는지 모르고" 누르는 상황을 없앤다.
  *  2. `noticeId`로 문서 ID를 고정해 **재클릭·재시도가 알림을 중복 생성하지 않는다**.
  *     같은 사람에게 같은 공지가 두 번 뜨는 것은 오작동으로 읽힌다.
+ *  3. 발송 사실을 `broadcasts` 컬렉션에 남긴다. 로그에만 있으면 "언제 무엇을 몇 명에게
+ *     보냈는가"를 운영자가 화면에서 확인할 수 없다.
  *
  * ## 왜 sendPushToOrg/createInAppNotificationForOrg를 재사용하지 않는가
  * 두 헬퍼는 기관 단위라 200여 기관을 돌면 ① 기관 수만큼 users 쿼리가 반복되고
@@ -149,6 +151,49 @@ async function sendPushes(
     return { pushSent, pushFailed };
 }
 
+/**
+ * 발송 이력을 남긴다 — **되돌릴 수 없는 지점을 넘은 직후**에 기록한다.
+ *
+ * 푸시까지 끝난 뒤에 한 번만 쓰면, 그 사이 함수가 죽었을 때 알림은 나갔는데 이력은
+ * 없는 상태가 된다. 운영자는 보낸 적 없다고 판단해 다시 보내게 된다.
+ * 그래서 앱 내 알림 커밋 직후 `sending`으로 남기고, 푸시 결과를 나중에 덧쓴다.
+ * 중간에 죽으면 `sending`으로 남아 "알림은 나갔고 푸시 결과는 모른다"를 정직하게 말한다.
+ */
+async function recordBroadcastStart(
+    noticeId: string,
+    actorUid: string,
+    title: string,
+    message: string,
+    recipientCount: number
+): Promise<void> {
+    await getFirestore().collection("broadcasts").doc(noticeId).set({
+        title,
+        message,
+        actorUid,
+        recipientCount,
+        status: "sending",
+        sentAt: FieldValue.serverTimestamp(),
+    });
+}
+
+/** 푸시 결과를 덧쓴다. 실패해도 발송 자체를 되돌리지 않는다 — 이력은 부수 기록이다. */
+async function recordBroadcastResult(
+    noticeId: string,
+    pushSent: number,
+    pushFailed: number
+): Promise<void> {
+    try {
+        await getFirestore().collection("broadcasts").doc(noticeId).set(
+            { pushSent, pushFailed, status: "sent", completedAt: FieldValue.serverTimestamp() },
+            { merge: true }
+        );
+    } catch (err: unknown) {
+        log("ERROR", "sendBroadcastNotice", "발송 이력 갱신 실패", {
+            noticeId, error: (err as Error).message,
+        });
+    }
+}
+
 export const sendBroadcastNotice = onCall(
     {
         region: "asia-northeast3",
@@ -195,7 +240,11 @@ export const sendBroadcastNotice = onCall(
 
         // 앱 내 알림이 먼저다 — 푸시는 놓칠 수 있어도 알림함에는 남아야 한다.
         await writeInAppNotices(recipients, payload.noticeId, title, message);
+        // 되돌릴 수 없는 지점을 넘었다. 여기서 이력을 먼저 남긴다.
+        await recordBroadcastStart(payload.noticeId, uid, title, message, recipients.length);
+
         const { pushSent, pushFailed } = await sendPushes(recipients, title, message);
+        await recordBroadcastResult(payload.noticeId, pushSent, pushFailed);
 
         log("INFO", "sendBroadcastNotice", "전체 공지 발송", {
             actorUid: uid,

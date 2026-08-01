@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
     showToast: vi.fn(),
     confirm: vi.fn(),
     captureError: vi.fn(),
+    getRecentBroadcasts: vi.fn(),
 }));
 
 vi.mock('firebase/functions', () => ({ httpsCallable: () => mocks.callable }));
@@ -22,6 +23,7 @@ vi.mock('../../lib/firebase', () => ({ firebaseFunctions: {}, db: {}, auth: {} }
 vi.mock('../../hooks/useToast', () => ({ useToast: () => ({ showToast: mocks.showToast }) }));
 vi.mock('../../hooks/useConfirm', () => ({ useConfirm: () => ({ confirm: mocks.confirm }) }));
 vi.mock('../../lib/sentry', () => ({ captureError: mocks.captureError }));
+vi.mock('../../lib/firestore', () => ({ getRecentBroadcasts: mocks.getRecentBroadcasts }));
 
 import BroadcastNoticePage from '../../components/superAdmin/BroadcastNoticePage';
 
@@ -30,23 +32,47 @@ const sendOk = { data: { success: true, dryRun: false, recipientCount: 812, push
 
 const btn = (name: string) => screen.getByRole('button', { name });
 
+/**
+ * 렌더 후 초기 이력 로딩(비동기 useEffect)이 끝날 때까지 기다린다.
+ * 기다리지 않으면 테스트 종료 뒤 상태가 갱신돼 act() 경고가 나고,
+ * 이 저장소의 거짓 녹색 가드가 그것을 실패로 승격시킨다.
+ */
+async function renderSettled() {
+    render(<BroadcastNoticePage />);
+    await waitFor(() => expect(mocks.getRecentBroadcasts).toHaveBeenCalled());
+}
+
 beforeEach(() => {
     vi.clearAllMocks();
     mocks.confirm.mockResolvedValue(true);
     mocks.callable.mockResolvedValue(previewOk);
+    mocks.getRecentBroadcasts.mockResolvedValue([]);
+});
+
+const historyItem = (over: Record<string, unknown> = {}) => ({
+    id: 'bc1',
+    title: '이용약관 개정 안내',
+    message: '8월 10일부터 개정 시행됩니다.',
+    actorUid: 'sa-1',
+    recipientCount: 812,
+    pushSent: 630,
+    pushFailed: 10,
+    status: 'sent',
+    sentAt: new Date('2026-08-01T10:30:00+09:00'),
+    ...over,
 });
 
 describe('BroadcastNoticePage', () => {
-    it('약관 개정 공지 문안이 기본값으로 채워진다', () => {
-        render(<BroadcastNoticePage />);
+    it('약관 개정 공지 문안이 기본값으로 채워진다', async () => {
+        await renderSettled();
         expect(screen.getByLabelText('제목')).toHaveValue('이용약관 개정 안내');
         // 시행일은 상수에서 파생되므로 본문과 어긋날 수 없다
         expect((screen.getByLabelText('내용') as HTMLTextAreaElement).value)
             .toContain('2026년 8월 10일부터 개정 시행됩니다');
     });
 
-    it('대상을 확인하기 전에는 발송 버튼이 잠겨 있다', () => {
-        render(<BroadcastNoticePage />);
+    it('대상을 확인하기 전에는 발송 버튼이 잠겨 있다', async () => {
+        await renderSettled();
         expect(btn('발송')).toBeDisabled();
         expect(btn('대상 확인')).toBeEnabled();
     });
@@ -121,7 +147,7 @@ describe('BroadcastNoticePage', () => {
     });
 
     it('제목이 비면 대상 확인도 막는다', async () => {
-        render(<BroadcastNoticePage />);
+        await renderSettled();
 
         fireEvent.change(screen.getByLabelText('제목'), { target: { value: '' } });
 
@@ -140,5 +166,62 @@ describe('BroadcastNoticePage', () => {
 
         await waitFor(() => expect(mocks.showToast).toHaveBeenCalledWith('공지 발송에 실패했습니다.', 'error'));
         expect(mocks.captureError).toHaveBeenCalled();
+    });
+
+    it('발송 이력이 없으면 안내 문구를 보여준다', async () => {
+        render(<BroadcastNoticePage />);
+        await waitFor(() => expect(screen.getByText('아직 발송한 공지가 없습니다.')).toBeInTheDocument());
+    });
+
+    it('발송 이력을 제목·수신 인원·푸시 결과와 함께 보여준다', async () => {
+        mocks.getRecentBroadcasts.mockResolvedValue([historyItem()]);
+        render(<BroadcastNoticePage />);
+
+        await waitFor(() => expect(screen.getByText('최근 발송 이력')).toBeInTheDocument());
+        const list = screen.getByRole('list');
+        expect(list).toHaveTextContent('수신 812명');
+        expect(list).toHaveTextContent('푸시 성공 630');
+        expect(list).toHaveTextContent('실패 10');
+    });
+
+    it('푸시 실패가 0이면 실패 수를 표시하지 않는다', async () => {
+        mocks.getRecentBroadcasts.mockResolvedValue([historyItem({ pushFailed: 0 })]);
+        render(<BroadcastNoticePage />);
+
+        await waitFor(() => expect(screen.getByRole('list')).toHaveTextContent('푸시 성공 630'));
+        expect(screen.getByRole('list')).not.toHaveTextContent('실패');
+    });
+
+    it('sending 상태는 푸시 결과 미확인으로 표시한다', async () => {
+        // 함수가 푸시 도중 죽으면 이 상태로 남는다 — 재발송 판단의 근거가 되어야 한다
+        mocks.getRecentBroadcasts.mockResolvedValue([
+            historyItem({ status: 'sending', pushSent: undefined, pushFailed: undefined }),
+        ]);
+        render(<BroadcastNoticePage />);
+
+        await waitFor(() => expect(screen.getByRole('list')).toHaveTextContent('푸시 결과 미확인'));
+        expect(screen.getByRole('list')).not.toHaveTextContent('푸시 성공');
+    });
+
+    it('발송에 성공하면 이력을 다시 읽는다', async () => {
+        render(<BroadcastNoticePage />);
+        await waitFor(() => expect(mocks.getRecentBroadcasts).toHaveBeenCalledTimes(1));
+
+        fireEvent.click(btn('대상 확인'));
+        await waitFor(() => expect(btn('발송')).toBeEnabled());
+
+        mocks.callable.mockResolvedValue(sendOk);
+        fireEvent.click(btn('발송'));
+
+        await waitFor(() => expect(mocks.getRecentBroadcasts).toHaveBeenCalledTimes(2));
+    });
+
+    it('이력 조회가 실패해도 발송 화면은 계속 쓸 수 있다', async () => {
+        mocks.getRecentBroadcasts.mockRejectedValue(new Error('permission-denied'));
+        render(<BroadcastNoticePage />);
+
+        await waitFor(() => expect(mocks.captureError).toHaveBeenCalled());
+        expect(btn('대상 확인')).toBeEnabled();
+        expect(screen.getByText('아직 발송한 공지가 없습니다.')).toBeInTheDocument();
     });
 });

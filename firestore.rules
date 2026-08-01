@@ -261,6 +261,15 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // === 전체 공지 발송 이력 ===
+    // sendBroadcastNotice(Admin SDK)만 기록한다. 운영자가 "언제 무엇을 몇 명에게
+    // 보냈는가"를 화면에서 확인하기 위한 기록이므로 읽기도 superAdmin 한정이다.
+    // 본문에 기관·이용자 정보가 담기지 않으나, 발송자 uid가 있어 공개할 이유가 없다.
+    match /broadcasts/{broadcastId} {
+      allow read: if isSuperAdmin();
+      allow write: if false;
+    }
+
     // === 즐겨찾기 ===
     match /favorites/{favoriteId} {
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isSuperAdmin());
