@@ -35,10 +35,16 @@
  * 실패는 ERROR 로그(Sentry)로 남기고 **다시 throw해** 플랫폼 재시도에 맡긴다. 이 트리거의
  * 실패는 원본 문서 쓰기를 되돌리지 않는다 — Firestore 트리거는 커밋 이후에 실행된다.
  *
- * ## 행위자(actorUid) 한계
- * Firestore 트리거는 호출자를 알 수 없다. 문서가 스스로 드러내는 경우에만 채우고
- * 그 외에는 null + actorSource:'unknown'으로 남겨 신뢰 수준을 구분한다.
- * 수정·삭제 행위자 식별은 Phase 2(열람 로그·세션 기록)에서 처리한다.
+ * ## 행위자(actorUid) — 세 가지 신뢰 수준
+ * Firestore 트리거는 호출자를 알 수 없다. 그래서 출처를 그대로 남겨 구분한다.
+ *  - `stamp`    : 클라이언트가 심은 `lastEditedByUid`. Rules가 `request.auth.uid`와의
+ *                 일치를 강제하므로 **타인 명의 위조가 불가능**하다(Phase 2 ①).
+ *  - `document` : 문서가 스스로 드러내는 값(생성 시 createdByUid 등).
+ *  - `unknown`  : 알 수 없음. 추정으로 채우지 않는다.
+ *
+ * ⚠️ **삭제에는 스탬프를 쓰지 않는다.** 삭제된 문서에 남은 값은 마지막 '수정자'이지
+ * '삭제자'가 아니다. 이를 삭제자로 적으면 무고한 사용자에게 책임이 귀속되며, 그것은
+ * 모른다고 남기는 것보다 나쁘다. 삭제 행위자는 세션 기록(Phase 2 ②)과 대조해 좁힌다.
  */
 import { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
@@ -97,7 +103,7 @@ interface AuditEntry {
     targetType: AuditTargetType;
     targetId: string;
     actorUid: string | null;
-    actorSource: "document" | "unknown";
+    actorSource: "stamp" | "document" | "unknown";
     subjectUids: string[];
     changedFields?: string[];
 }
@@ -176,6 +182,18 @@ function driveLogSubjects(data: Record<string, unknown> | undefined): string[] {
     return [...subjects];
 }
 
+/**
+ * 클라이언트가 심은 행위자 스탬프를 읽는다 — **update 전용**.
+ *
+ * Rules의 `actorStampValid()`가 이 값과 `request.auth.uid`의 일치를 강제하므로
+ * 타인 명의 위조는 불가능하다. 서버(Admin SDK) 쓰기는 Rules를 우회하고 스탬프도
+ * 심지 않으므로 자연히 `unknown`으로 남는다 — 그 편이 정확하다.
+ */
+function stampedActor(data: Record<string, unknown> | undefined): string | null {
+    const uid = data?.lastEditedByUid;
+    return typeof uid === "string" && uid ? uid : null;
+}
+
 /** 기관 식별자를 정규화한다. 소속이 없으면 시스템 기관으로 남긴다(기록 누락 방지). */
 function orgIdOf(...candidates: unknown[]): string {
     for (const c of candidates) {
@@ -222,15 +240,16 @@ export const auditDriveLogUpdated = onDocumentUpdated(
         // 개인정보·권한 필드가 안 바뀐 쓰기는 기록하지 않는다 (km 연쇄 동기화 등).
         if (changedFields.length === 0) return;
 
+        const actorUid = stampedActor(after);
+
         await writeAuditLog({
             // 기관 이전은 이전 소속 기준으로 남긴다 — 그 기관의 점검 대상이다.
             organizationId: orgIdOf(before?.organizationId, after.organizationId),
             action: "update",
             targetType: "driveLog",
             targetId: event.params.logId,
-            // 수정자는 트리거가 알 수 없다 (Phase 2)
-            actorUid: null,
-            actorSource: "unknown",
+            actorUid,
+            actorSource: actorUid ? "stamp" : "unknown",
             subjectUids: driveLogSubjects(after),
             changedFields,
         }, event.id);
@@ -295,14 +314,16 @@ export const auditUserUpdated = onDocumentUpdated(
         const changedFields = diffFieldNames("user", before, after);
         if (changedFields.length === 0) return;
 
+        const actorUid = stampedActor(after);
+
         await writeAuditLog({
             // 기관 이전(탈퇴 후 재가입)은 이전 소속 기준으로 남긴다 — 그 기관의 점검 대상이다.
             organizationId: orgIdOf(before?.organizationId, after.organizationId),
             action: "update",
             targetType: "user",
             targetId: event.params.userId,
-            actorUid: null,
-            actorSource: "unknown",
+            actorUid,
+            actorSource: actorUid ? "stamp" : "unknown",
             subjectUids: [event.params.userId],
             changedFields,
         }, event.id);

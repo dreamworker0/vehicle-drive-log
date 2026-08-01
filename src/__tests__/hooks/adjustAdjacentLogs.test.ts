@@ -11,7 +11,8 @@ vi.mock('firebase/firestore', () => ({
     serverTimestamp: () => ({ __ts: true }),
 }));
 
-vi.mock('../../lib/firebase', () => ({ db: {} }));
+// actorStamp가 auth.currentUser를 읽는다 — 인접 기록 조정도 행위자를 남긴다
+vi.mock('../../lib/firebase', () => ({ db: {}, auth: { currentUser: { uid: 'editor-1' } } }));
 
 import { adjustAdjacentLogs } from '../../hooks/driveLogForm/adjustAdjacentLogs';
 import type { DriveLog } from '../../types/driveLog';
@@ -34,14 +35,14 @@ describe('adjustAdjacentLogs', () => {
     it('직전 기록 endKm이 현재 startKm과 다르면 조정한다', async () => {
         const msgs = await adjustAdjacentLogs({ lastDriveLog: log('a', 50, 90), nextDriveLog: null, startKm: 100, endKm: 200 });
         expect(mockUpdateDoc).toHaveBeenCalledTimes(1);
-        expect(mockUpdateDoc.mock.calls[0][1]).toMatchObject({ endKm: 100 });
+        expect(mockUpdateDoc.mock.calls[0][1]).toMatchObject({ endKm: 100, lastEditedByUid: 'editor-1' });
         expect(msgs[0]).toContain('직전 기록 도착 km');
     });
 
     it('직후 기록 startKm이 현재 endKm과 다르면 조정한다', async () => {
         const msgs = await adjustAdjacentLogs({ lastDriveLog: null, nextDriveLog: log('b', 250, 300), startKm: 100, endKm: 200 });
         expect(mockUpdateDoc).toHaveBeenCalledTimes(1);
-        expect(mockUpdateDoc.mock.calls[0][1]).toMatchObject({ startKm: 200 });
+        expect(mockUpdateDoc.mock.calls[0][1]).toMatchObject({ startKm: 200, lastEditedByUid: 'editor-1' });
         expect(msgs[0]).toContain('직후 기록 출발 km');
     });
 

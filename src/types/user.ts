@@ -18,6 +18,16 @@ export interface User extends FirestoreDoc {
     phone?: string;
     welcomeDismissed?: boolean;
     /**
+     * 마지막 수정자 uid — 접속기록의 '계정' 항목 (고시 제16조).
+     *
+     * 권한(role)·상태(status) 변경은 고시 제5조가 별도로 요구하는 기록 대상인데,
+     * 트리거가 호출자를 알 수 없어 "누가 권한을 올렸는가"가 공백이었다(Phase 123).
+     * Rules가 `request.auth.uid`와의 일치를 강제하므로 타인 명의 위조는 불가능하다.
+     *
+     * ⚠️ 삭제 행위자에는 쓸 수 없다 — 남은 값은 마지막 '수정자'이지 '삭제자'가 아니다.
+     */
+    lastEditedByUid?: string;
+    /**
      * 이용약관 동의 기록 (계정 개설·면책 근거)
      *
      * 개인정보 처리방침 동의는 일부러 받지 않는다. 직원 개인정보의 처리 근거는

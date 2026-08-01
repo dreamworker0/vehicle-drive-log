@@ -18,8 +18,9 @@
  * 한정한다(화이트리스트) — 근거는 functions/src/handlers/triggers/auditLog.ts 주석 참고.
  *
  * ⚠️ 행위자(actorUid) 한계 — Firestore 트리거는 호출자를 알 수 없다.
- * 문서가 스스로 드러내는 경우(생성 시 createdByUid 등)에만 채우고, 그 외에는 null이다.
- * 수정·삭제 행위자 식별은 Phase 2에서 열람 로그·세션 기록과 함께 처리한다.
+ * Phase 2 ①에서 클라이언트가 `lastEditedByUid`를 심고 Rules가 인증 토큰과의 일치를
+ * 강제하는 방식으로 **수정** 행위자를 확정했다(actorSource: 'stamp'). 남은 공백은
+ * **삭제** 행위자다 — 남은 스탬프는 마지막 수정자이지 삭제자가 아니므로 쓰지 않는다.
  */
 import type { FirestoreDoc, TimestampField } from './common';
 
@@ -31,9 +32,14 @@ export type AuditTargetType = 'driveLog' | 'user';
 
 /** 행위자를 어떻게 알아냈는지 — 기록의 신뢰 수준을 스스로 구분한다 */
 export type AuditActorSource =
+    /**
+     * 클라이언트가 심은 `lastEditedByUid`. Rules가 `request.auth.uid`와의 일치를
+     * 강제하므로 타인 명의로는 위조할 수 없다 — 세 출처 중 신뢰 수준이 가장 높다.
+     */
+    | 'stamp'
     /** 문서 필드(createdByUid 등)에서 추정 */
     | 'document'
-    /** 트리거가 알 수 없음 (수정·삭제) */
+    /** 트리거가 알 수 없음 (서버 쓰기·삭제 등) */
     | 'unknown';
 
 export interface AuditLog extends FirestoreDoc {

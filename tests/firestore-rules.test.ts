@@ -505,6 +505,49 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertFails(adminBDb.collection('auditLogs').doc('log_sys').get());
   });
 
+
+  it('10-4. 행위자 스탬프(lastEditedByUid) — 타인 명의 위조 차단, 생략은 허용', async () => {
+    // 접속기록의 '계정' 항목(고시 제16조). 클라이언트가 심되 Rules가 인증 토큰과의
+    // 일치를 강제하므로 타인 명의로는 심을 수 없다.
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.collection('vehicles').doc('v_A').set({ organizationId: 'org-A', plateNumber: '1', currentKm: 10 });
+      await db.collection('driveLogs').doc('log_A').set({
+        organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'user_A', createdByUid: 'user_A', startKm: 0, endKm: 10,
+      });
+      await db.collection('users').doc('user_A').set({ organizationId: 'org-A', name: '직원A', email: 'a@t.kr', role: 'employee' });
+      await db.collection('users').doc('user_T').set({ organizationId: 'org-A', name: '직원T', email: 't@t.kr', role: 'employee' });
+    });
+
+    const memberA = setupContext('user_A', { role: 'member', orgId: 'org-A' }).firestore();
+    const adminA = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+
+    // (1) 본인 uid로 스탬프 → 허용
+    await assertSucceeds(memberA.collection('driveLogs').doc('log_A').update({
+      destination: '용산구청', lastEditedByUid: 'user_A',
+    }));
+
+    // (2) 타인 uid로 스탬프 위조 → 차단. 이 한 줄이 스탬프를 신뢰할 수 있게 만든다.
+    await assertFails(memberA.collection('driveLogs').doc('log_A').update({
+      destination: '남산', lastEditedByUid: 'user_X',
+    }));
+
+    // (3) 스탬프 생략 → 허용. 모든 update에 요구하면 스탬프를 심지 않는 경로가
+    //     통째로 permission-denied가 된다(Phase 129의 함정). 누락은 감사 로그에
+    //     actorSource:'unknown'으로 드러나므로 조용히 묻히지 않는다.
+    await assertSucceeds(memberA.collection('driveLogs').doc('log_A').update({ destination: '이태원' }));
+
+    // (4) users 문서도 같은 규칙 — 관리자가 타인 권한을 바꿀 때 본인 명의로만 스탬프 가능
+    await assertSucceeds(adminA.collection('users').doc('user_T').update({
+      role: 'admin', lastEditedByUid: 'admin_A',
+    }));
+
+    // (5) 관리자가 피해자 명의로 스탬프를 심어 책임을 떠넘기는 시도 → 차단
+    await assertFails(adminA.collection('users').doc('user_T').update({
+      role: 'employee', lastEditedByUid: 'user_T',
+    }));
+  });
+
   it('11. 비밀 사용자 데이터(users/{uid}/private) — 본인·같은 기관 모두 접근 차단 (Functions 전용)', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await context.firestore().doc('users/user_A/private/oauth').set({

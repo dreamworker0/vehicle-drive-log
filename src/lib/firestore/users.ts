@@ -11,6 +11,7 @@ import { db } from '../firebase';
 import type { User } from '../../types/user';
 import { createZodConverter, userSchema } from '../../schemas';
 import { captureError } from '../sentry';
+import { actorStamp } from './actorStamp';
 
 const userConverter = createZodConverter(userSchema);
 
@@ -61,7 +62,7 @@ export const updateUser = async (uid: string, data: Partial<User>) => {
     // updateUser의 경우 data의 일부 필드만 수정될 수 있으므로 Converter를 씌우지 않거나, 
     // updateDoc 파라미터로 그대로 사용하되 타입 제한을 Partial<User>로 제한합니다.
     try {
-        await updateDoc(doc(db, 'users', uid), data);
+        await updateDoc(doc(db, 'users', uid), { ...data, ...actorStamp() });
     } catch (error) {
         captureError(error, { context: 'updateUser', uid, data });
         throw error;
@@ -131,7 +132,7 @@ export const getOrgMemberCounts = async (orgIds?: string[]): Promise<Record<stri
 // 사용자 계정 활성화 복원
 export const restoreUser = async (uid: string): Promise<void> => {
     try {
-        await updateDoc(doc(db, 'users', uid), { status: 'active', disabledAt: null });
+        await updateDoc(doc(db, 'users', uid), { status: 'active', disabledAt: null, ...actorStamp() });
     } catch (error) {
         captureError(error, { context: 'restoreUser', uid });
         throw error;
@@ -144,6 +145,7 @@ export const clearUserOrganization = async (uid: string): Promise<void> => {
         await updateDoc(doc(db, 'users', uid), {
             organizationId: null,
             role: 'employee',
+            ...actorStamp(),
         });
     } catch (error) {
         captureError(error, { context: 'clearUserOrganization', uid });

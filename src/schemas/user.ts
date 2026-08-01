@@ -27,6 +27,8 @@ export const userSchema = z.object({
         termsVersion: z.string().catch(''),
         agreedAt: timestampSchema.optional().catch(undefined),
     }).optional().catch(undefined),
+    /** 마지막 수정자 uid — Rules가 request.auth.uid와의 일치를 강제한다 */
+    lastEditedByUid: z.string().optional().catch(undefined),
     createdAt: timestampSchema.optional().catch(undefined),
     disabledAt: timestampSchema.optional().catch(undefined),
     promotedAt: timestampSchema.optional().catch(undefined),
