@@ -11,10 +11,17 @@ on:
       - '**.md'
   pull_request:
     branches: [master]
-    # 기본 타입(opened·synchronize·reopened)에 edited를 더한다 — 스택 PR의 base를 master로
-    # 바꿔도 CI가 돌지 않아 검증 없이 방치되는 문제가 있었다(#92·#93이 생성 이래 한 번도 실행 안 됨).
-    # base 변경은 synchronize가 아니라 edited로 발화하기 때문이다.
-    types: [opened, synchronize, reopened, edited]
+    # **edited는 여기 두지 않는다.** 스택 PR의 base 재지정(#92·#93)을 잡으려고 한때 넣었지만,
+    # edited는 제목·본문 수정에도 발화한다. 그걸 잡 `if`로 걸러 봐야 **잡이 건너뛰어져도
+    # 그 이름의 체크 런은 `skipped`로 생성되고, 필수 체크는 skipped를 성공으로 취급한다.**
+    # 즉 CI가 실패한 PR도 본문만 고치면 초록으로 보인다. base 재지정은 ci-retarget.yml이
+    # workflow_call로 이 워크플로를 불러 처리한다 — 거기서는 체크 이름이 달라 여기 결과를
+    # 덮어쓰지 못한다. (구현이력 Phase 136)
+    types: [opened, synchronize, reopened]
+
+  # ci-retarget.yml이 base 재지정 시 호출한다. github 컨텍스트는 호출자에서 상속되므로
+  # PR head 기준으로 정상 실행된다.
+  workflow_call:
 
 # 최소 권한 — CI는 코드 체크아웃만 필요하고 저장소에 쓰지 않는다.
 permissions:
@@ -22,6 +29,10 @@ permissions:
 
 # 연속 푸시가 겹치면 낡은 CI를 취소한다 — 마지막 푸시만 검증·배포된다.
 # (취소된 CI는 conclusion이 success가 아니므로 Deploy(workflow_run)로 이어지지 않아 안전)
+#
+# 이 워크플로에는 잡을 통째로 건너뛰는 실행이 없다. 그런 실행이 이 그룹에 들어오면
+# 진행 중이던 진짜 CI를 죽이고 자신은 skipped로 끝나 그 커밋에 게이트 결과가 하나도
+# 남지 않는다(2026-08-02 PR #115에서 실제로 발생). ci-retarget.yml은 별도 그룹을 쓴다.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -31,10 +42,6 @@ jobs:
   # shared/**는 Functions에서도 소비(shared/faqData.ts → functions/src/utils/faqData.ts)하므로
   # 반드시 포함한다. 워크플로 자체 변경 시에는 안전하게 전체 실행.
   changes:
-    # edited는 제목·본문 수정에도 발화한다. 그때마다 전체 CI(~16분)를 돌리면 Actions 분량이 샌다.
-    # base가 실제로 바뀐 edited만 통과시킨다. push·opened·synchronize·reopened는 action이
-    # 'edited'가 아니므로 항상 통과한다. (changes가 스킵되면 functions-tests도 needs로 함께 스킵)
-    if: github.event.action != 'edited' || github.event.changes.base.ref.from != ''
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -52,6 +59,34 @@ jobs:
               - 'functions/**'
               - 'shared/**'
               - '.github/workflows/ci.yml'
+
+  # 보안 감사 — **독립 잡**이며 npm ci에 의존하지 않는다.
+  #
+  # 원래 ci 잡의 마지막 스텝이었는데, 그 자리는 감사가 가장 필요한 상황에서 정확히
+  # 실행되지 않는 자리였다. 의존성 PR에서 앞 스텝이 깨지면(#85 npm ci ERESOLVE,
+  # #86 vite 8 빌드 실패) 뒤따르는 스텝이 전부 skipped가 되어 감사도 함께 건너뛰어졌고,
+  # 체크는 "설치 실패"로만 표시돼 **감사가 돌지 않았다는 사실 자체가 어디에도 남지 않았다**.
+  # 의존성을 올리는 PR이야말로 감사가 필요한 자리이므로 이 결합을 끊는다.
+  #
+  # npm ci를 하지 않는 이유: `npm audit`은 package-lock.json만으로 동작하고
+  # scripts/security-audit.ts는 Node 내장 모듈만 쓴다. 설치가 깨지는 PR에서도 감사는
+  # 돌아야 하므로 설치 단계를 아예 두지 않는다(Node 22의 네이티브 TS 실행 사용).
+  security-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TZ: "Asia/Seoul"
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      # tsx·devDependencies 설치 없이 실행한다 — 설치 실패가 감사를 막지 않게 하려는 것이 요점이다.
+      - name: Security audit (root + functions)
+        run: node --experimental-strip-types scripts/security-audit.ts
 
   # Functions 단위 테스트(pass/fail 게이트) — 메인 ci 잡과 병렬 실행해 전체 체감 시간을 줄인다.
   # 커버리지 계측은 이 러너에서 실행 시간을 +15분(11분→26분) 늘리는데 워커 수로는 못 줄여서
@@ -82,8 +117,6 @@ jobs:
           NODE_OPTIONS: --max-old-space-size=4096
 
   ci:
-    # changes 잡과 동일한 가드 — 제목·본문만 고친 edited로는 돌지 않는다.
-    if: github.event.action != 'edited' || github.event.changes.base.ref.from != ''
     runs-on: ubuntu-latest
     # 게이트 스텝(Rules·인증 E2E·커버리지) 추가로 첫 실행(캐시 미적중) 기준 ~20분 소요
     timeout-minutes: 25
@@ -91,6 +124,16 @@ jobs:
       TZ: "Asia/Seoul"
 
     steps:
+      # ── 게이트 마스킹 방지 ──
+      # 기본 동작은 "앞 스텝이 실패하면 뒤는 전부 skipped"다. 그러면 한 번에 하나씩만
+      # 드러나서, 16분짜리 CI를 실패 개수만큼 반복해야 한다(Actions 분량이 그만큼 샌다).
+      # 게다가 실패 원인과 무관한 게이트까지 함께 묻힌다 — 보안 감사가 의존성 PR에서
+      # 조용히 건너뛰어지던 것이 그 극단적인 사례였다(별도 잡으로 분리해 해소).
+      #
+      # 그래서 **실제 선행 산출물이 필요한 스텝만** 그 산출물의 성공에 묶고, 나머지는
+      # `!cancelled()`로 각자 결론을 내게 한다. 취소(concurrency 중단) 시에는 돌지 않는다.
+      #   - 설치만 있으면 되는 것 → steps.install.outcome == 'success'
+      #   - 빌드 산출물(dist/)이 필요한 것 → steps.build.outcome == 'success'
       - uses: actions/checkout@v7
 
       - name: Setup Node 22
@@ -100,34 +143,55 @@ jobs:
           cache: npm
 
       - name: Install dependencies
+        id: install
         run: npm ci
 
+      # functions는 별도 lockfile이라 루트 설치 실패와 무관하게 시도한다.
       - name: Install functions dependencies
+        id: install-functions
+        if: ${{ !cancelled() }}
         run: cd functions && npm ci
 
       - name: Lint
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run lint
 
       - name: Type check
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npx tsc --noEmit
 
       - name: Type check (functions)
+        if: ${{ !cancelled() && steps.install-functions.outcome == 'success' }}
         run: npm run type-check:functions
 
       - name: .agent ↔ .claude 동기화 검증
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run sync:agents -- --check
 
       - name: 하네스 Doctor (정합성 검사)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run verify:harness
 
       - name: Create .env file
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: echo "${{ secrets.ENV_FILE }}" > .env
 
       - name: Build
+        id: build
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run build
+
+      # 번들 예산 — 빌드 직후로 옮겼다. 원래는 E2E 뒤(끝에서 두 번째)라 **E2E 플레이크 한 번에
+      # 예산 초과가 통째로 묻혔다**. 이 저장소는 실제로 번들 예산 초과로 master가 막힌 적이 있고
+      # E2E 플레이크도 반복해 겪었으므로(Phase 115·122), 둘을 묶어 둘 이유가 없다.
+      # dist/가 필요하니 빌드 성공에만 묶는다.
+      - name: Bundle size check
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: npx tsx scripts/check-bundle-size.ts
 
       # --coverage로 vitest.config.js의 커버리지 임계치를 실제 게이트로 강제한다
       - name: Unit tests (+coverage gate)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npx vitest run --coverage
 
       - name: Upload coverage summary
@@ -142,50 +206,56 @@ jobs:
       # ── Firestore Rules 테스트 (멀티테넌트 격리의 유일한 자동 검증) ──
       # firebase-tools 15.x는 Java 21 미만을 지원하지 않는다 (17이면 에뮬레이터 기동 실패)
       - name: Setup Java (Firebase emulator)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         uses: actions/setup-java@v5.6.0
         with:
           distribution: temurin
           java-version: 21
 
       - name: Cache Firebase emulators
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         uses: actions/cache@v4
         with:
           path: ~/.cache/firebase/emulators
           key: firebase-emulators-${{ runner.os }}
 
+      # 멀티테넌트 격리의 유일한 자동 검증이다. 단위 테스트 실패에 묶여 건너뛰어지면
+      # 기관 간 데이터 격리 회귀가 그 실행에서 아예 검사되지 않는다 — 가장 묻히면 안 되는 게이트다.
       - name: Security Rules tests (Firestore + Storage emulator)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npx firebase-tools emulators:exec --only firestore,storage "npx vitest run tests/firestore-rules.test.ts tests/storage-rules.test.ts"
 
-      # ── E2E ──
+      # ── E2E ── (빌드 산출물이 필요하므로 빌드 성공에만 묶는다)
       - name: Get Playwright version
         id: pw-version
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
 
       - name: Cache Playwright browsers
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
 
       - name: Install Playwright browsers
+        id: pw-install
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: npx playwright install --with-deps chromium
 
       - name: E2E tests
+        if: ${{ !cancelled() && steps.pw-install.outcome == 'success' }}
         run: npx playwright test
         env:
           CI: true
 
       # 인증 E2E — 에뮬레이터(auth,firestore) 위에서 로그인·역할 리다이렉트·오프라인 동기화 검증
+      # 비인증 E2E와 검증 대상이 겹치지 않으므로 그쪽 실패에 묶지 않는다.
       - name: Authed E2E (emulator)
+        if: ${{ !cancelled() && steps.pw-install.outcome == 'success' }}
         run: npx firebase-tools emulators:exec --only auth,firestore "npx playwright test -c playwright.emulator.config.ts"
         env:
           CI: true
-
-      - name: Bundle size check
-        run: npx tsx scripts/check-bundle-size.ts
-
-      - name: Security audit
-        run: npm run audit
 
       # 실패 진단용 아티팩트 — E2E trace·screenshot·test-results. 성공 시에는 업로드하지 않는다.
       - name: Upload E2E failure artifacts
