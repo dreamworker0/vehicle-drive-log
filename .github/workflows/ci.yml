@@ -214,7 +214,7 @@ jobs:
 
       - name: Cache Firebase emulators
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/firebase/emulators
           key: firebase-emulators-${{ runner.os }}
@@ -233,7 +233,7 @@ jobs:
 
       - name: Cache Playwright browsers
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
