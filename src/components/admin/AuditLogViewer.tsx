@@ -10,18 +10,11 @@
  */
 import useAuditLogs, { AUDIT_LOG_DAY_OPTIONS, type AuditLogDays } from '../../hooks/useAuditLogs';
 import type { AuditLogKind } from '../../lib/firestore';
-import type { AuditAction, AuditLog, AuditTargetType } from '../../types/auditLog';
+import type { AuditAction, AuditLog } from '../../types/auditLog';
 import { formatTimestampFull } from '../../lib/dateUtils';
-
-/** 수행업무 표기 — 고시의 '수행업무'를 관리자가 읽는 말로 옮긴다 */
-const ACTION_LABEL: Record<AuditAction, string> = {
-    login: '접속',
-    create: '생성',
-    update: '수정',
-    delete: '삭제',
-    export: '반출',
-    read: '열람',
-};
+import {
+    ACTOR_SOURCE_NOTE, describeChangedFields, describeEvent, describeExportTarget,
+} from '../../lib/auditLogLabels';
 
 const ACTION_BADGE: Record<AuditAction, string> = {
     login: 'badge-primary',
@@ -30,57 +23,6 @@ const ACTION_BADGE: Record<AuditAction, string> = {
     delete: 'badge-danger',
     export: 'badge-warning',
     read: 'badge-neutral',
-};
-
-const TARGET_LABEL: Record<AuditTargetType, string> = {
-    driveLog: '운행일지',
-    user: '직원 정보',
-    session: '로그인',
-    export: '내보내기',
-    orgDocument: '기관 증빙서류',
-};
-
-/** 반출 대상 — 서버(recordExport)의 DATASETS 화이트리스트와 1:1 */
-const DATASET_LABEL: Record<string, string> = {
-    driveLogs: '운행일지',
-    dailyLogs: '일별 운행일지',
-    fuelLogs: '주유 기록',
-    hipassCharges: '하이패스 충전 기록',
-    maintenance: '정비 기록',
-};
-
-const FORMAT_LABEL: Record<string, string> = { excel: '엑셀', pdf: 'PDF' };
-
-/** 변경 필드 — 서버(AUDITED_FIELDS) 화이트리스트와 1:1. 없는 이름은 원문을 그대로 보여준다. */
-const FIELD_LABEL: Record<string, string> = {
-    organizationId: '소속 기관',
-    organizationStatus: '기관 상태',
-    driverUid: '운전자',
-    driverName: '운전자 이름',
-    createdByUid: '작성자',
-    coDriverUids: '공동운전자',
-    coDriverNames: '공동운전자 이름',
-    passengerNames: '탑승자',
-    date: '운행일',
-    startLocation: '출발지',
-    destination: '목적지',
-    purpose: '용무',
-    notes: '비고',
-    name: '이름',
-    email: '이메일',
-    phone: '연락처',
-    photoURL: '프로필 사진',
-    role: '권한',
-    status: '계정 상태',
-    consent: '약관 동의',
-};
-
-/** 행위자를 어떻게 알아냈는지 — 기록의 신뢰 수준을 숨기지 않고 그대로 보여준다 */
-const ACTOR_SOURCE_NOTE: Record<AuditLog['actorSource'], string> = {
-    stamp: '',              // 위조 불가 — 부연할 것이 없다
-    auth: '',               // 인증 토큰에서 확인 — 위조 불가
-    document: '문서 기록으로 추정',
-    unknown: '행위자 미확인',
 };
 
 /** 기간 표기 — 365일은 '1년'이라고 읽는 편이 보관기간(1년)과 바로 연결된다 */
@@ -126,15 +68,13 @@ function LogDetail({ log, nameOf }: { log: AuditLog; nameOf: (uid?: string | nul
     }
 
     if (log.action === 'export') {
-        const format = log.exportFormat ? FORMAT_LABEL[log.exportFormat] ?? log.exportFormat : '';
-        const dataset = log.exportDataset ? DATASET_LABEL[log.exportDataset] ?? log.exportDataset : '';
-        if (dataset || format) rows.push(['반출 대상', [dataset, format && `${format} 파일`].filter(Boolean).join(' · ')]);
+        const target = describeExportTarget(log);
+        if (target) rows.push(['반출 대상', target]);
         if (typeof log.recordCount === 'number') rows.push(['반출 건수', `${log.recordCount.toLocaleString()}건`]);
     }
 
-    if (log.changedFields?.length) {
-        rows.push(['바뀐 항목', log.changedFields.map((f) => FIELD_LABEL[f] ?? f).join(', ')]);
-    }
+    const changed = describeChangedFields(log.changedFields);
+    if (changed) rows.push(['바뀐 항목', changed]);
 
     if (log.subjectUids.length > 0) {
         rows.push(['대상 직원', log.subjectUids.map((uid) => nameOf(uid)).join(', ')]);
@@ -157,7 +97,8 @@ function LogDetail({ log, nameOf }: { log: AuditLog; nameOf: (uid?: string | nul
 export default function AuditLogViewer() {
     const {
         logs, loading, loadingMore, error, hasMore,
-        kind, setKind, days, setDays, loadMore, nameOf,
+        kind, setKind, days, setDays, range, setRange, rangeActive,
+        loadMore, nameOf, exportExcel, exporting,
     } = useAuditLogs();
 
     return (
@@ -173,12 +114,51 @@ export default function AuditLogViewer() {
             <div className="glass-card p-4 mb-4">
                 <p className="text-xs font-medium text-surface-400 dark:text-surface-500 mb-2">기간</p>
                 {/* 선택지가 4개라 좁은 화면에서는 2×2로 접는다 — 한 줄에 넣으면 글자가 줄바꿈된다 */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
                     {AUDIT_LOG_DAY_OPTIONS.map((option) => (
-                        <SegmentButton key={option} active={days === option} onClick={() => setDays(option as AuditLogDays)}>
+                        <SegmentButton
+                            key={option}
+                            // 직접 지정이 적용 중이면 프리셋 선택 표시를 끈다 — 둘 다 켜져 보이면
+                            // 지금 어느 기간으로 보고 있는지 알 수 없다
+                            active={!rangeActive && days === option}
+                            onClick={() => { setRange({ start: '', end: '' }); setDays(option as AuditLogDays); }}
+                        >
                             {DAY_LABEL[option]}
                         </SegmentButton>
                     ))}
+                </div>
+
+                {/*
+                  직접 지정 — 월 1회 점검은 "7월 1일~31일"처럼 달 경계로 보는 것이 자연스럽다.
+                  프리셋은 오늘 기준 역산이라 지난달을 정확히 잘라낼 수 없다.
+                */}
+                <div className="flex items-center gap-2 mb-4">
+                    <input
+                        type="date"
+                        aria-label="시작일"
+                        value={range.start}
+                        max={range.end || undefined}
+                        onChange={(e) => setRange({ start: e.target.value })}
+                        className="input flex-1 min-h-[48px]"
+                    />
+                    <span className="text-sm text-surface-400 dark:text-surface-500">~</span>
+                    <input
+                        type="date"
+                        aria-label="종료일"
+                        value={range.end}
+                        min={range.start || undefined}
+                        onChange={(e) => setRange({ end: e.target.value })}
+                        className="input flex-1 min-h-[48px]"
+                    />
+                    {rangeActive && (
+                        <button
+                            type="button"
+                            onClick={() => setRange({ start: '', end: '' })}
+                            className="btn-secondary min-h-[48px] px-3 text-sm flex-shrink-0"
+                        >
+                            초기화
+                        </button>
+                    )}
                 </div>
 
                 <p className="text-xs font-medium text-surface-400 dark:text-surface-500 mb-2">유형</p>
@@ -188,6 +168,26 @@ export default function AuditLogViewer() {
                             {tab.label}
                         </SegmentButton>
                     ))}
+                </div>
+
+                {/*
+                  내보내기 — 화면에 불러온 만큼이 아니라 **선택한 기간 전체**를 담는다.
+                  이 파일은 접속지 IP를 담으므로 이 내보내기 자체가 개인정보 반출이고,
+                  그 사실이 다시 접속기록에 남는다(점검 관점에서는 그래야 맞다).
+                */}
+                <div className="mt-4 pt-4 border-t border-surface-100 dark:border-surface-700">
+                    <button
+                        type="button"
+                        onClick={exportExcel}
+                        disabled={exporting || loading}
+                        className="btn-secondary w-full min-h-[48px] text-sm"
+                    >
+                        {exporting ? '내보내는 중...' : '엑셀로 내보내기'}
+                    </button>
+                    <p className="text-xs text-surface-400 dark:text-surface-500 mt-2 leading-relaxed">
+                        선택한 기간·유형의 기록 전체가 담깁니다. 접속지 IP가 포함되므로 파일 보관에 주의해 주세요 —
+                        내보낸 사실은 접속기록에 남습니다.
+                    </p>
                 </div>
             </div>
 
@@ -218,7 +218,7 @@ export default function AuditLogViewer() {
                             <li key={log.id} className="glass-card p-4">
                                 <div className="flex items-center justify-between gap-2 mb-1">
                                     <span className={ACTION_BADGE[log.action]}>
-                                        {TARGET_LABEL[log.targetType]} {ACTION_LABEL[log.action]}
+                                        {describeEvent(log)}
                                     </span>
                                     <span className="text-xs text-surface-400 dark:text-surface-500 flex-shrink-0">
                                         {formatTimestampFull(log.at) ?? '-'}

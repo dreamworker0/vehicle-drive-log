@@ -176,9 +176,13 @@ export {
 // 접속기록 (Audit Logs) — 기관 관리자 점검용 읽기 전용
 export {
     getAuditLogs,
+    getAuditLogsForExport,
     AUDIT_LOG_PAGE_SIZE,
+    AUDIT_LOG_EXPORT_MAX,
 } from './auditLogs';
-export type { AuditLogKind, AuditLogPage, AuditLogQueryOptions } from './auditLogs';
+export type {
+    AuditLogKind, AuditLogPage, AuditLogQueryOptions, AuditLogExportResult,
+} from './auditLogs';
 
 // 하이패스 충전 기록 (Hipass Charges)
 export {

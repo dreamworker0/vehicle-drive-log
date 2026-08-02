@@ -36,6 +36,10 @@ const DATASETS = new Set([
     "fuelLogs",         // 주유 기록
     "hipassCharges",    // 하이패스 충전
     "maintenance",      // 정비 기록
+    // 접속기록 자체의 반출(기관 관리자의 월 1회 점검 결과 보관). 접속기록은 IP를 담으므로
+    // 이 반출도 개인정보 반출이다 — 반출 사실이 다시 접속기록에 남는 자기 참조가 되는데,
+    // 점검 관점에서는 오히려 필요하다("점검 기록을 누가 가져갔는가"도 추적 대상이다).
+    "auditLogs",
 ]);
 
 interface RecordExportPayload {

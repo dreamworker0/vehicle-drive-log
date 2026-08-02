@@ -53,6 +53,11 @@ const setHook = (over: Partial<UseAuditLogsResult> = {}) => {
         setKind: vi.fn(),
         days: 30,
         setDays: vi.fn(),
+        range: { start: '', end: '' },
+        setRange: vi.fn(),
+        rangeActive: false,
+        exportExcel: vi.fn(),
+        exporting: false,
         loadMore: vi.fn(),
         nameOf: (uid) => (uid === 'u1' ? '김간사' : uid === 'u2' ? '이팀장' : '알 수 없음'),
         ...over,
@@ -145,6 +150,41 @@ describe('AuditLogViewer', () => {
 
         fireEvent.click(screen.getByRole('button', { name: '이전 기록 더 보기' }));
         expect(state.loadMore).toHaveBeenCalled();
+    });
+
+    it('내보내기 버튼이 기간 전체 내보내기를 호출하고, IP 포함 경고를 함께 보여준다', () => {
+        const state = setHook({ logs: [log({})] });
+        render(<AuditLogViewer />);
+
+        fireEvent.click(screen.getByRole('button', { name: '엑셀로 내보내기' }));
+        expect(state.exportExcel).toHaveBeenCalled();
+        expect(screen.getByText(/접속지 IP가 포함되므로/)).toBeInTheDocument();
+    });
+
+    it('내보내는 중에는 버튼을 잠근다', () => {
+        setHook({ exporting: true });
+        render(<AuditLogViewer />);
+        expect(screen.getByRole('button', { name: '내보내는 중...' })).toBeDisabled();
+    });
+
+    it('시작일·종료일을 직접 지정할 수 있다', () => {
+        const state = setHook();
+        render(<AuditLogViewer />);
+
+        fireEvent.change(screen.getByLabelText('시작일'), { target: { value: '2026-07-01' } });
+        expect(state.setRange).toHaveBeenCalledWith({ start: '2026-07-01' });
+
+        fireEvent.change(screen.getByLabelText('종료일'), { target: { value: '2026-07-31' } });
+        expect(state.setRange).toHaveBeenCalledWith({ end: '2026-07-31' });
+    });
+
+    it('직접 지정이 적용 중이면 프리셋 선택 표시를 끈다', () => {
+        // 둘 다 켜져 보이면 지금 어느 기간으로 보고 있는지 알 수 없다
+        setHook({ rangeActive: true, range: { start: '2026-07-01', end: '2026-07-31' }, days: 30 });
+        render(<AuditLogViewer />);
+
+        expect(screen.getByRole('button', { name: '최근 30일' })).toHaveAttribute('aria-pressed', 'false');
+        expect(screen.getByRole('button', { name: '초기화' })).toBeInTheDocument();
     });
 
     it('조회 실패 문구를 그대로 노출한다', () => {

@@ -13,16 +13,21 @@ import { renderHook, waitFor, act } from '@testing-library/react';
 
 const mocks = vi.hoisted(() => ({
     getAuditLogs: vi.fn(),
+    getAuditLogsForExport: vi.fn(),
     getOrganizationMembers: vi.fn(),
+    downloadAuditLogsExcel: vi.fn(),
     auth: { userData: null as { organizationId?: string | null } | null },
     captureError: vi.fn(),
 }));
 
 vi.mock('../../lib/firestore', () => ({
     getAuditLogs: mocks.getAuditLogs,
+    getAuditLogsForExport: mocks.getAuditLogsForExport,
     getOrganizationMembers: mocks.getOrganizationMembers,
     AUDIT_LOG_PAGE_SIZE: 50,
+    AUDIT_LOG_EXPORT_MAX: 5000,
 }));
+vi.mock('../../lib/excelExport', () => ({ downloadAuditLogsExcel: mocks.downloadAuditLogsExcel }));
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => mocks.auth }));
 vi.mock('../../lib/sentry', () => ({ captureError: mocks.captureError }));
 
@@ -42,6 +47,8 @@ beforeEach(() => {
         { id: 'u1', name: '김간사', email: 'kim@x.or.kr' },
         { id: 'u2', name: '', email: 'lee@x.or.kr' },
     ]);
+    mocks.getAuditLogsForExport.mockResolvedValue({ logs: page(['a1', 'a2']).logs, truncated: false });
+    mocks.downloadAuditLogsExcel.mockResolvedValue(true);
 });
 
 describe('useAuditLogs', () => {
@@ -150,6 +157,97 @@ describe('useAuditLogs', () => {
         await waitFor(() => expect(result.current.logs).toHaveLength(2));
         expect(result.current.error).toBe('');
         expect(mocks.captureError).toHaveBeenCalled();
+    });
+
+    describe('직접 지정 기간', () => {
+        it('시작·종료가 모두 채워지기 전에는 프리셋을 유지한다', async () => {
+            const { result } = renderHook(() => useAuditLogs());
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            act(() => result.current.setRange({ start: '2026-07-01' }));
+            await waitFor(() => expect(result.current.rangeActive).toBe(false));
+            // 한쪽만 입력된 중간 상태로 조회를 갈아치우면 타이핑 중에 목록이 몇 번씩 바뀐다
+            expect(mocks.getAuditLogs).toHaveBeenCalledTimes(1);
+        });
+
+        it('양쪽이 채워지면 그 범위로 조회하고 종료일 하루를 포함한다', async () => {
+            const { result } = renderHook(() => useAuditLogs());
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            act(() => result.current.setRange({ start: '2026-07-01', end: '2026-07-31' }));
+            await waitFor(() => expect(mocks.getAuditLogs).toHaveBeenCalledTimes(2));
+
+            const [, options] = mocks.getAuditLogs.mock.calls[1];
+            expect(result.current.rangeActive).toBe(true);
+            expect((options.since as Date).toISOString()).toBe(new Date('2026-07-01T00:00:00').toISOString());
+            // 종료일 23:59:59.999까지 — 마지막 날 기록이 빠지면 그 날은 점검에서 누락된다
+            expect((options.until as Date).toISOString()).toBe(new Date('2026-07-31T23:59:59.999').toISOString());
+        });
+
+        it('시작일이 종료일보다 늦으면 적용하지 않는다', async () => {
+            const { result } = renderHook(() => useAuditLogs());
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            act(() => result.current.setRange({ start: '2026-07-31', end: '2026-07-01' }));
+            await waitFor(() => expect(result.current.rangeActive).toBe(false));
+        });
+    });
+
+    describe('엑셀 내보내기', () => {
+        it('화면 목록이 아니라 기간 전체를 다시 읽어 내보낸다', async () => {
+            const { result } = renderHook(() => useAuditLogs());
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            act(() => result.current.exportExcel());
+            await waitFor(() => expect(mocks.downloadAuditLogsExcel).toHaveBeenCalledTimes(1));
+
+            const [orgId, options] = mocks.getAuditLogsForExport.mock.calls[0];
+            expect(orgId).toBe('org-1');
+            expect(options.kind).toBe('all');
+            // 파일명에 기간이 들어가야 여러 번 받은 파일을 구분할 수 있다
+            expect(mocks.downloadAuditLogsExcel.mock.calls[0][2]).toBe('접속기록_최근30일');
+        });
+
+        it('직접 지정 기간은 파일명에 시작·종료일을 쓴다', async () => {
+            const { result } = renderHook(() => useAuditLogs());
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            act(() => result.current.setRange({ start: '2026-07-01', end: '2026-07-31' }));
+            await waitFor(() => expect(result.current.rangeActive).toBe(true));
+
+            act(() => result.current.exportExcel());
+            await waitFor(() => expect(mocks.downloadAuditLogsExcel).toHaveBeenCalled());
+            expect(mocks.downloadAuditLogsExcel.mock.calls[0][2]).toBe('접속기록_2026-07-01_2026-07-31');
+        });
+
+        it('내보낼 기록이 없으면 파일을 만들지 않고 알린다', async () => {
+            mocks.getAuditLogsForExport.mockResolvedValue({ logs: [], truncated: false });
+            const { result } = renderHook(() => useAuditLogs());
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            act(() => result.current.exportExcel());
+            await waitFor(() => expect(result.current.error).toContain('내보낼 기록이 없습니다'));
+            expect(mocks.downloadAuditLogsExcel).not.toHaveBeenCalled();
+        });
+
+        it('상한에 걸려 잘리면 그 사실을 알린다', async () => {
+            mocks.getAuditLogsForExport.mockResolvedValue({ logs: page(['a1']).logs, truncated: true });
+            const { result } = renderHook(() => useAuditLogs());
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            act(() => result.current.exportExcel());
+            await waitFor(() => expect(result.current.error).toContain('5,000건만'));
+        });
+
+        it('내보내기 실패는 화면 문구로 알리고 Sentry에 보고한다', async () => {
+            mocks.getAuditLogsForExport.mockRejectedValue(new Error('permission-denied'));
+            const { result } = renderHook(() => useAuditLogs());
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            act(() => result.current.exportExcel());
+            await waitFor(() => expect(result.current.error).toContain('내보내기에 실패'));
+            expect(mocks.captureError).toHaveBeenCalled();
+        });
     });
 
     it('조회 실패는 빈 목록이 아니라 오류 문구로 알린다', async () => {

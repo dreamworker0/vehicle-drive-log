@@ -46,6 +46,8 @@ const KIND_ACTIONS: Record<Exclude<AuditLogKind, 'all'>, AuditAction[]> = {
 export interface AuditLogQueryOptions {
     /** 이 시각 이후의 기록만 (기간 필터) */
     since?: Date;
+    /** 이 시각 이전의 기록만 — 직접 지정한 종료일이 있을 때만 쓴다 */
+    until?: Date;
     kind?: AuditLogKind;
     /** 커서 — 이전 페이지의 `lastDoc` */
     startAfter?: unknown;
@@ -83,6 +85,9 @@ export const getAuditLogs = async (
         if (options.since) {
             constraints.push(where('at', '>=', Timestamp.fromDate(options.since)));
         }
+        if (options.until) {
+            constraints.push(where('at', '<=', Timestamp.fromDate(options.until)));
+        }
 
         constraints.push(orderBy('at', 'desc'), limit(pageSize));
 
@@ -107,4 +112,30 @@ export const getAuditLogs = async (
         captureError(error, { context: 'getAuditLogs', orgId, options });
         throw error;
     }
+};
+
+/**
+ * 내보내기 1회의 상한. 운행일지 내보내기(EXPORT_MAX_DOCS)와 같은 수준으로 맞춘다 —
+ * 상한이 없으면 1년치 전량이 한 번에 읽혀 읽기 비용과 브라우저 메모리를 함께 밀어붙인다.
+ */
+export const AUDIT_LOG_EXPORT_MAX = 5000;
+
+export interface AuditLogExportResult {
+    logs: AuditLog[];
+    /** 상한에 걸려 잘렸는지 — 화면이 사용자에게 알려야 한다(조용히 자르면 전량으로 오해한다) */
+    truncated: boolean;
+}
+
+/**
+ * 선택한 기간·유형의 기록을 내보내기용으로 한 번에 가져온다.
+ *
+ * 화면 목록과 달리 페이지를 나누지 않는다 — 점검 결과를 파일로 남기는 용도이므로
+ * "화면에 불러온 만큼"이 아니라 "기간 전체"가 담겨야 의미가 있다.
+ */
+export const getAuditLogsForExport = async (
+    orgId: string,
+    options: Omit<AuditLogQueryOptions, 'startAfter' | 'pageSize'> = {},
+): Promise<AuditLogExportResult> => {
+    const page = await getAuditLogs(orgId, { ...options, pageSize: AUDIT_LOG_EXPORT_MAX });
+    return { logs: page.logs, truncated: page.logs.length >= AUDIT_LOG_EXPORT_MAX };
 };

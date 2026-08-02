@@ -94,6 +94,20 @@ describe('recordExport — 입력 검증', () => {
         expect(mockSet).not.toHaveBeenCalled();
     });
 
+    it('접속기록 자체의 반출도 기록한다 — 점검 결과를 누가 가져갔는지도 추적 대상이다', async () => {
+        // 접속기록 파일은 접속지 IP를 담으므로 이 반출도 개인정보 반출이다.
+        await call({ format: 'excel', dataset: 'auditLogs', recordCount: 240 });
+
+        expect(mockSet).toHaveBeenCalled();
+        expect(mockSet.mock.calls[0][0]).toMatchObject({
+            action: 'export',
+            targetType: 'export',
+            exportDataset: 'auditLogs',
+            exportFormat: 'excel',
+            recordCount: 240,
+        });
+    });
+
     it('건수는 0 이상 정수만 허용한다', async () => {
         for (const bad of [-1, 1.5, '42', null, NaN]) {
             await expect(call({ recordCount: bad })).rejects.toMatchObject({ code: 'invalid-argument' });

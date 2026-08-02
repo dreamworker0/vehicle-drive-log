@@ -34,7 +34,9 @@ vi.mock('../../../lib/sentry', () => ({ captureError: vi.fn() }));
 
 import * as fs from 'firebase/firestore';
 import { captureError } from '../../../lib/sentry';
-import { getAuditLogs, AUDIT_LOG_PAGE_SIZE } from '../../../lib/firestore/auditLogs';
+import {
+    getAuditLogs, getAuditLogsForExport, AUDIT_LOG_PAGE_SIZE, AUDIT_LOG_EXPORT_MAX,
+} from '../../../lib/firestore/auditLogs';
 
 interface WhereConstraint { _type: string; field: string; op: string; value: unknown }
 
@@ -121,6 +123,42 @@ describe('firestore/auditLogs', () => {
         vi.mocked(fs.getDocs).mockResolvedValue(snapOf([{ id: 'a0', action: 'login' }]) as never);
         const page = await getAuditLogs('org-1', { pageSize: 2 });
         expect(page.hasMore).toBe(false);
+    });
+
+    it('종료일을 지정하면 at <= 로 뒤쪽도 자른다 (직접 지정 기간)', async () => {
+        const since = new Date('2026-07-01T00:00:00');
+        const until = new Date('2026-07-31T23:59:59.999');
+        await getAuditLogs('org-1', { since, until });
+
+        expect(whereOn('at')).toEqual([
+            { _type: 'where', field: 'at', op: '>=', value: { _type: 'ts', millis: since.getTime() } },
+            { _type: 'where', field: 'at', op: '<=', value: { _type: 'ts', millis: until.getTime() } },
+        ]);
+    });
+
+    describe('getAuditLogsForExport', () => {
+        it('페이지를 나누지 않고 상한까지 한 번에 읽는다 (기간 전체가 담겨야 증빙이 된다)', async () => {
+            await getAuditLogsForExport('org-1', { kind: 'access' });
+
+            expect(lastConstraints()).toContainEqual({ _type: 'limit', n: AUDIT_LOG_EXPORT_MAX });
+            expect(lastConstraints().some((c) => c._type === 'startAfter')).toBe(false);
+            expect(whereOn('organizationId')).toHaveLength(1);
+        });
+
+        it('상한에 걸리면 truncated로 알린다 (조용히 자르지 않는다)', async () => {
+            const rows = Array.from({ length: AUDIT_LOG_EXPORT_MAX }, (_, i) => ({ id: `a${i}`, action: 'login' }));
+            vi.mocked(fs.getDocs).mockResolvedValue(snapOf(rows) as never);
+
+            const result = await getAuditLogsForExport('org-1');
+            expect(result.logs).toHaveLength(AUDIT_LOG_EXPORT_MAX);
+            expect(result.truncated).toBe(true);
+        });
+
+        it('상한 미달이면 truncated=false', async () => {
+            vi.mocked(fs.getDocs).mockResolvedValue(snapOf([{ id: 'a0', action: 'login' }]) as never);
+            const result = await getAuditLogsForExport('org-1');
+            expect(result.truncated).toBe(false);
+        });
     });
 
     it('실패는 Sentry에 보고하고 그대로 던진다 (조용히 빈 목록을 만들지 않는다)', async () => {

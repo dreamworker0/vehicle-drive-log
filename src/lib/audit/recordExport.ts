@@ -21,7 +21,9 @@ export type ExportDataset =
     | 'dailyLogs'
     | 'fuelLogs'
     | 'hipassCharges'
-    | 'maintenance';
+    | 'maintenance'
+    /** 접속기록 자체의 반출 — 점검 결과 보관용. IP를 담으므로 이것도 개인정보 반출이다 */
+    | 'auditLogs';
 
 export type ExportFormat = 'excel' | 'pdf';
 
