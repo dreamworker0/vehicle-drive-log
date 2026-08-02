@@ -69,16 +69,17 @@ if ! write_env_from_var "${FUNCTIONS_ENV_FILE:-}" "functions/.env"; then
 fi
 
 # --- 3. 의존성 설치 (루트 + functions) ---
-# 컨테이너 상태가 캐시되므로, 이미 설치돼 있으면 증분 install로 빠르게 넘어간다.
+# 항상 npm ci를 쓴다. 이미 설치돼 있으면 `npm install`로 빠르게 넘어가던 분기가 있었는데,
+# install은 락파일을 **다시 쓴다**. 러너의 npm 버전이 저장소 락파일을 만든 버전과 다르면
+# 그 차이만큼 diff가 남는다. 실제로 npm 10.9.7이 @tailwindcss/oxide 리눅스 바이너리 4개에서
+# libc 필드(["glibc"] / ["musl"])를 걷어냈다. 의존성이 바뀐 게 아닌데 세션을 재개할 때마다
+# 워킹 트리가 더러워져 커밋 여부를 매번 판단해야 했고, 그대로 커밋하면 musl/glibc 환경에서
+# 잘못된 바이너리를 받을 수 있다. ci는 락파일을 읽기만 하므로 이 문제가 없다.
+# (설치 시간이 증분 대비 10~20초 늘지만, 락파일 오염과 바꿀 만한 값이 아니다.)
 install_deps() {
     local dir="$1" label="$2"
-    if [ ! -d "$dir/node_modules" ]; then
-        echo "$label 의존성 설치 (npm ci)"
-        npm ci --prefix "$dir" --no-audit --no-fund
-    else
-        echo "$label 의존성 확인 (증분)"
-        npm install --prefix "$dir" --no-audit --no-fund
-    fi
+    echo "$label 의존성 설치 (npm ci)"
+    npm ci --prefix "$dir" --no-audit --no-fund
 }
 
 install_deps "." "루트"
