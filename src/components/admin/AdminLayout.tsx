@@ -23,6 +23,7 @@ const ReservationCalendar = lazyWithRetry(() => import('../common/ReservationCal
 const Settings = lazyWithRetry(() => import('./Settings'));
 const AnalyticsDashboard = lazyWithRetry(() => import('./AnalyticsDashboard'));
 const HipassManager = lazyWithRetry(() => import('./HipassManager'));
+const AuditLogViewer = lazyWithRetry(() => import('./AuditLogViewer'));
 
 
 interface NavItemProps {
@@ -287,6 +288,8 @@ export default function AdminLayout() {
                             <Route path="maintenance" element={<MaintenanceLog />} />
                             <Route path="reservations" element={<ReservationCalendar isAdmin />} />
                             <Route path="settings" element={<Settings />} />
+                            {/* 접속기록 점검 — 설정에서 진입한다(월 1회 점검용이라 상단 메뉴에는 두지 않는다) */}
+                            <Route path="audit-logs" element={<AuditLogViewer />} />
                             <Route path="" element={<Navigate to="dashboard" replace />} />
                         </Routes>
                     </Suspense>

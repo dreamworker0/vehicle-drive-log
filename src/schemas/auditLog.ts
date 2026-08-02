@@ -3,8 +3,8 @@ import { z } from 'zod';
 // 다른 스키마 파일(driveLog 등)과 같이 정의 파일에서 직접 가져온다.
 import { timestampSchema } from './vehicle';
 
-export const auditActionSchema = z.enum(['create', 'update', 'delete', 'login']);
-export const auditTargetTypeSchema = z.enum(['driveLog', 'user', 'session']);
+export const auditActionSchema = z.enum(['create', 'update', 'delete', 'login', 'export', 'read']);
+export const auditTargetTypeSchema = z.enum(['driveLog', 'user', 'session', 'export', 'orgDocument']);
 export const auditActorSourceSchema = z.enum(['stamp', 'auth', 'document', 'unknown']);
 
 /**
@@ -30,6 +30,10 @@ export const auditLogSchema = z.object({
     /** 접속지 IP·접속 환경 — 로그인 세션 기록(recordSession)에만 있다 */
     ip: z.string().nullable().optional().catch(undefined),
     userAgent: z.string().optional().catch(undefined),
+    /** 반출 기록(recordExport)에만 있다 — 형식·대상·건수만 남기고 내용은 남기지 않는다 */
+    exportFormat: z.string().optional().catch(undefined),
+    exportDataset: z.string().optional().catch(undefined),
+    recordCount: z.number().optional().catch(undefined),
     at: timestampSchema,
     expiresAt: timestampSchema,
 });

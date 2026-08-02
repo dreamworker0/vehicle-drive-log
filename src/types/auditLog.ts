@@ -24,11 +24,21 @@
  */
 import type { FirestoreDoc, TimestampField } from './common';
 
-/** 수행업무 (고시 제2조의 '수행업무'에 대응) */
-export type AuditAction = 'create' | 'update' | 'delete' | 'login';
+/**
+ * 수행업무 (고시 제2조의 '수행업무'에 대응)
+ *
+ * `create`·`update`·`delete`는 Firestore 트리거(변경 로그), `login`은 세션 기록,
+ * `export`는 반출 기록, `read`는 superAdmin의 기관 증빙서류 열람이 쓴다.
+ *
+ * ⚠️ 서버가 쓰는 값을 하나라도 빠뜨리면 안 된다 — Zod 스키마가 `.catch('update')`로
+ * 알 수 없는 값을 삼키므로, 빠진 값은 조회 화면에서 **다른 수행업무로 표시된다**
+ * (반출 기록이 '수정'으로 보이는 식). 서버는 `services/audit/writeAuditEntry.ts`와
+ * `handlers/triggers/auditLog.ts` 두 곳에서만 쓰므로 그 둘과 함께 갱신한다.
+ */
+export type AuditAction = 'create' | 'update' | 'delete' | 'login' | 'export' | 'read';
 
-/** 기록 대상 — 개인정보를 담는 컬렉션과 로그인 세션 */
-export type AuditTargetType = 'driveLog' | 'user' | 'session';
+/** 기록 대상 — 개인정보를 담는 컬렉션, 로그인 세션, 반출, 기관 증빙서류 */
+export type AuditTargetType = 'driveLog' | 'user' | 'session' | 'export' | 'orgDocument';
 
 /** 행위자를 어떻게 알아냈는지 — 기록의 신뢰 수준을 스스로 구분한다 */
 export type AuditActorSource =
@@ -93,6 +103,13 @@ export interface AuditLog extends FirestoreDoc {
      * User-Agent 원문은 기기 지문에 가까워져 접속기록 자체가 과잉 수집이 된다.
      */
     userAgent?: string;
+    /**
+     * 반출 형식·대상·건수 — 반출 기록(`action: 'export'`)에만 있다.
+     * **반출된 데이터의 내용도, 검색 조건도 남기지 않는다**(recordExport 주석 참고).
+     */
+    exportFormat?: string;
+    exportDataset?: string;
+    recordCount?: number;
     at: TimestampField;
     /** TTL 정책 대상 필드 — at + 1년. 콘솔에서 auditLogs 컬렉션에 TTL을 설정해야 동작한다 */
     expiresAt: TimestampField;

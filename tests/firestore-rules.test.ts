@@ -506,6 +506,47 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
   });
 
 
+  it('10-3b. 접속기록 목록 조회 — 기관 필터가 있어야 통과한다 (점검 화면의 전제)', async () => {
+    // 문서 단건 get이 통과하는 것과 목록 조회(list)가 통과하는 것은 별개다.
+    // 점검 화면(getAuditLogs)은 list로 읽으므로, 기관 필터가 빠진 쿼리가 통째로
+    // 거부되는 것을 여기서 고정한다 — 필터를 지우면 화면이 조용히 비는 대신 이 테스트가 깨진다.
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.collection('auditLogs').doc('log_A1').set({
+        organizationId: 'org-A', action: 'login', targetType: 'session',
+        targetId: 'user_A', actorUid: 'user_A', actorSource: 'auth', subjectUids: ['user_A'],
+        at: new Date('2026-08-01T09:00:00Z'),
+      });
+      await db.collection('auditLogs').doc('log_B1').set({
+        organizationId: 'org-B', action: 'login', targetType: 'session',
+        targetId: 'user_B', actorUid: 'user_B', actorSource: 'auth', subjectUids: ['user_B'],
+        at: new Date('2026-08-01T09:00:00Z'),
+      });
+    });
+
+    const adminADb = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+    const employeeADb = setupContext('user_A', { role: 'employee', orgId: 'org-A' }).firestore();
+
+    // 자기 기관 필터 + 최신순 — 화면이 실제로 쓰는 쿼리 형태
+    await assertSucceeds(
+      adminADb.collection('auditLogs').where('organizationId', '==', 'org-A').orderBy('at', 'desc').limit(50).get()
+    );
+    // 유형 필터(action in) 조합도 같은 경계로 통과한다
+    await assertSucceeds(
+      adminADb.collection('auditLogs')
+        .where('organizationId', '==', 'org-A')
+        .where('action', 'in', ['create', 'update', 'delete'])
+        .orderBy('at', 'desc').limit(50).get()
+    );
+    // 기관 필터가 없으면 타 기관 문서가 섞이므로 쿼리 전체가 거부된다
+    await assertFails(adminADb.collection('auditLogs').orderBy('at', 'desc').limit(50).get());
+    // 타 기관을 지목한 조회도 거부
+    await assertFails(adminADb.collection('auditLogs').where('organizationId', '==', 'org-B').get());
+    // 직원은 점검 주체가 아니라 자기 기관 목록도 못 읽는다
+    await assertFails(employeeADb.collection('auditLogs').where('organizationId', '==', 'org-A').get());
+  });
+
+
   it('10-4. 행위자 스탬프(lastEditedByUid) — 타인 명의 위조 차단, 생략은 허용', async () => {
     // 접속기록의 '계정' 항목(고시 제16조). 클라이언트가 심되 Rules가 인증 토큰과의
     // 일치를 강제하므로 타인 명의로는 심을 수 없다.

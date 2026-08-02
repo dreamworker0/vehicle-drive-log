@@ -173,6 +173,13 @@ export {
     getRecentBroadcasts,
 } from './broadcasts';
 
+// 접속기록 (Audit Logs) — 기관 관리자 점검용 읽기 전용
+export {
+    getAuditLogs,
+    AUDIT_LOG_PAGE_SIZE,
+} from './auditLogs';
+export type { AuditLogKind, AuditLogPage, AuditLogQueryOptions } from './auditLogs';
+
 // 하이패스 충전 기록 (Hipass Charges)
 export {
     getAllHipassCharges,

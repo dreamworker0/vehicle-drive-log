@@ -2,6 +2,7 @@
  * Settings — 기관 설정 페이지
  * 로직은 useSettings 훅, 공휴일 관리는 HolidayManager 사용
  */
+import { useNavigate } from 'react-router-dom';
 import useSettings from '../../hooks/useSettings';
 import useSettingsModals from '../../hooks/useSettingsModals';
 
@@ -17,6 +18,7 @@ import AccountSection from './settings/AccountSection';
 import SlackIntegrationSection from './settings/SlackIntegrationSection';
 
 export default function Settings() {
+    const navigate = useNavigate();
     const {
         org, orgId, loading, saving, success, withdrawing,
         form, setForm,
@@ -113,6 +115,27 @@ export default function Settings() {
 
             {/* Slack 연결 (기관 셀프서비스) */}
             <SlackIntegrationSection />
+
+            {/* 접속기록 점검 — 고시 제16조 ②의 월 1회 점검 주체는 개인정보처리자인 기관이다 */}
+            <div className="glass-card p-6 mb-6">
+                <button
+                    onClick={() => navigate('/admin/audit-logs')}
+                    className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-surface-50 dark:hover:bg-surface-700 transition-colors text-left min-h-[48px]"
+                >
+                    <div className="w-10 h-10 bg-surface-100 dark:bg-surface-700 rounded-full flex items-center justify-center flex-shrink-0">
+                        <svg className="w-5 h-5 text-surface-500 dark:text-surface-300" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 0 1-1.043 3.296 3.745 3.745 0 0 1-3.296 1.043A3.745 3.745 0 0 1 12 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 0 1-3.296-1.043 3.745 3.745 0 0 1-1.043-3.296A3.745 3.745 0 0 1 3 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 0 1 1.043-3.296 3.746 3.746 0 0 1 3.296-1.043A3.746 3.746 0 0 1 12 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 0 1 3.296 1.043 3.746 3.746 0 0 1 1.043 3.296A3.745 3.745 0 0 1 21 12Z" />
+                        </svg>
+                    </div>
+                    <div className="flex-1">
+                        <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">접속기록</p>
+                        <p className="text-xs text-surface-400">개인정보 접속·변경·반출 기록 점검 (월 1회 권장)</p>
+                    </div>
+                    <svg className="w-4 h-4 text-surface-300" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                    </svg>
+                </button>
+            </div>
 
             {/* 앱 정보 섹션 */}
             <h2 className="text-sm font-semibold text-surface-400 dark:text-surface-500 uppercase tracking-wider mt-8 mb-3 px-1">앱 정보</h2>
