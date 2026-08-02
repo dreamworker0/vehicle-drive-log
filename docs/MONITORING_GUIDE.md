@@ -1,5 +1,14 @@
 # 운영 모니터링 가이드
 
+> **2026-08-03 갱신 — TTL 정책은 이제 코드로 관리된다.** 아래 콘솔 절차는 최초 설정 이력과
+> 수동 확인용으로 남긴다. 현재 운영 중인 TTL 3건(`_rateLimits.expiresAt`,
+> `assistantConversations.expiresAt`, `auditLogs.expiresAt`)은
+> [`firestore.indexes.json`](../firestore.indexes.json)의 `fieldOverrides`에 `"ttl": true`로 선언돼 있고,
+> master 배포 시 `Deploy Firestore Indexes` 스텝이 반영한다. **새 TTL은 콘솔이 아니라 이 파일에 추가한다.**
+>
+> 종전에는 콘솔에만 있어 파일과 어긋나 있었다 — 누가 `firebase deploy --only firestore:indexes --force`를
+> 실행하면 파일에 없는 TTL 정책이 삭제되고, 접속기록의 1년 자동 파기가 조용히 멈출 수 있는 상태였다.
+
 ## 1. Firestore TTL 정책 설정 (Rate Limit 자동 정리)
 
 현재 `cleanupRateLimits` 스케줄러가 매일 05:00에 만료 문서를 삭제하고 있음.
@@ -27,11 +36,8 @@ Firestore TTL 정책을 설정하면 이 스케줄러를 **제거하고 자동 �
 트리거가 `expiresAt`(= 기록 시각 + 365일)을 채우지만, **TTL 정책을 설정하지 않으면 문서가
 영구히 쌓인다** — 보관기간 경과분을 파기하지 않는 것 자체가 최소보관 원칙 위반이다.
 
-위 절차와 동일하게 설정한다.
-- 컬렉션 그룹: `auditLogs`
-- TTL 필드: `expiresAt`
-
-설정 후 GCP Console의 TTL 목록에서 상태가 "제공 중"으로 바뀌는지 확인한다(수 분 소요).
+**설정 완료**(Phase 123, 2026-07-30) — 현재는 `firestore.indexes.json`에 선언돼 있어 배포로 유지된다.
+콘솔에서 상태만 확인하면 된다(GCP Console → TTL 목록에서 "제공 중").
 
 ### 감사 로그 기록 실패 알림 (필수)
 
