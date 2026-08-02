@@ -23,6 +23,9 @@ export default defineConfig({
     // 전체 그래프)을 홀로 부담해 로그인→리다이렉트가 간헐적으로 25s를 초과한다(로컬은 앞선 테스트가
     // 서버를 예열해 통과). 제품 버그가 아닌 콜드스타트 타이밍이므로 CI에서만 1회 재시도로 흡수한다.
     retries: process.env.CI ? 1 : 0,
+    // 비인증 E2E와 출력 폴더를 분리한다 — 기본값을 공유하면 나중에 도는 쪽이
+    // 먼저 실패한 쪽의 증거를 지운다. 자세한 경위는 playwright.config.js 주석 참고.
+    outputDir: 'test-results/authed',
     globalSetup: './e2e/emulator/global-setup.ts',
     use: {
         baseURL: 'http://127.0.0.1:5174',
