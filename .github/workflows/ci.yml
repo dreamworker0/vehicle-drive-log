@@ -122,6 +122,16 @@ jobs:
       TZ: "Asia/Seoul"
 
     steps:
+      # ── 게이트 마스킹 방지 ──
+      # 기본 동작은 "앞 스텝이 실패하면 뒤는 전부 skipped"다. 그러면 한 번에 하나씩만
+      # 드러나서, 16분짜리 CI를 실패 개수만큼 반복해야 한다(Actions 분량이 그만큼 샌다).
+      # 게다가 실패 원인과 무관한 게이트까지 함께 묻힌다 — 보안 감사가 의존성 PR에서
+      # 조용히 건너뛰어지던 것이 그 극단적인 사례였다(별도 잡으로 분리해 해소).
+      #
+      # 그래서 **실제 선행 산출물이 필요한 스텝만** 그 산출물의 성공에 묶고, 나머지는
+      # `!cancelled()`로 각자 결론을 내게 한다. 취소(concurrency 중단) 시에는 돌지 않는다.
+      #   - 설치만 있으면 되는 것 → steps.install.outcome == 'success'
+      #   - 빌드 산출물(dist/)이 필요한 것 → steps.build.outcome == 'success'
       - uses: actions/checkout@v7
 
       - name: Setup Node 22
@@ -131,34 +141,55 @@ jobs:
           cache: npm
 
       - name: Install dependencies
+        id: install
         run: npm ci
 
+      # functions는 별도 lockfile이라 루트 설치 실패와 무관하게 시도한다.
       - name: Install functions dependencies
+        id: install-functions
+        if: ${{ !cancelled() }}
         run: cd functions && npm ci
 
       - name: Lint
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run lint
 
       - name: Type check
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npx tsc --noEmit
 
       - name: Type check (functions)
+        if: ${{ !cancelled() && steps.install-functions.outcome == 'success' }}
         run: npm run type-check:functions
 
       - name: .agent ↔ .claude 동기화 검증
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run sync:agents -- --check
 
       - name: 하네스 Doctor (정합성 검사)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run verify:harness
 
       - name: Create .env file
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: echo "${{ secrets.ENV_FILE }}" > .env
 
       - name: Build
+        id: build
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run build
+
+      # 번들 예산 — 빌드 직후로 옮겼다. 원래는 E2E 뒤(끝에서 두 번째)라 **E2E 플레이크 한 번에
+      # 예산 초과가 통째로 묻혔다**. 이 저장소는 실제로 번들 예산 초과로 master가 막힌 적이 있고
+      # E2E 플레이크도 반복해 겪었으므로(Phase 115·122), 둘을 묶어 둘 이유가 없다.
+      # dist/가 필요하니 빌드 성공에만 묶는다.
+      - name: Bundle size check
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        run: npx tsx scripts/check-bundle-size.ts
 
       # --coverage로 vitest.config.js의 커버리지 임계치를 실제 게이트로 강제한다
       - name: Unit tests (+coverage gate)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npx vitest run --coverage
 
       - name: Upload coverage summary
@@ -173,47 +204,56 @@ jobs:
       # ── Firestore Rules 테스트 (멀티테넌트 격리의 유일한 자동 검증) ──
       # firebase-tools 15.x는 Java 21 미만을 지원하지 않는다 (17이면 에뮬레이터 기동 실패)
       - name: Setup Java (Firebase emulator)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         uses: actions/setup-java@v5.6.0
         with:
           distribution: temurin
           java-version: 21
 
       - name: Cache Firebase emulators
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         uses: actions/cache@v4
         with:
           path: ~/.cache/firebase/emulators
           key: firebase-emulators-${{ runner.os }}
 
+      # 멀티테넌트 격리의 유일한 자동 검증이다. 단위 테스트 실패에 묶여 건너뛰어지면
+      # 기관 간 데이터 격리 회귀가 그 실행에서 아예 검사되지 않는다 — 가장 묻히면 안 되는 게이트다.
       - name: Security Rules tests (Firestore + Storage emulator)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npx firebase-tools emulators:exec --only firestore,storage "npx vitest run tests/firestore-rules.test.ts tests/storage-rules.test.ts"
 
-      # ── E2E ──
+      # ── E2E ── (빌드 산출물이 필요하므로 빌드 성공에만 묶는다)
       - name: Get Playwright version
         id: pw-version
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
 
       - name: Cache Playwright browsers
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         uses: actions/cache@v4
         with:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
 
       - name: Install Playwright browsers
+        id: pw-install
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
         run: npx playwright install --with-deps chromium
 
       - name: E2E tests
+        if: ${{ !cancelled() && steps.pw-install.outcome == 'success' }}
         run: npx playwright test
         env:
           CI: true
 
       # 인증 E2E — 에뮬레이터(auth,firestore) 위에서 로그인·역할 리다이렉트·오프라인 동기화 검증
+      # 비인증 E2E와 검증 대상이 겹치지 않으므로 그쪽 실패에 묶지 않는다.
       - name: Authed E2E (emulator)
+        if: ${{ !cancelled() && steps.pw-install.outcome == 'success' }}
         run: npx firebase-tools emulators:exec --only auth,firestore "npx playwright test -c playwright.emulator.config.ts"
         env:
           CI: true
-
-      - name: Bundle size check
-        run: npx tsx scripts/check-bundle-size.ts
 
       # 실패 진단용 아티팩트 — E2E trace·screenshot·test-results. 성공 시에는 업로드하지 않는다.
       - name: Upload E2E failure artifacts
