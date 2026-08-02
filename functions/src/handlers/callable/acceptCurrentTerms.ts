@@ -92,6 +92,13 @@ export const acceptCurrentTerms = onCall(
                     termsVersion: payload.termsVersion,
                     agreedAt: now,
                 },
+                // 행위자 스탬프 — 이것이 없으면 접속기록의 동의 이력이 '행위자 미확인'으로 남는다.
+                // 변경 로그를 남기는 Firestore 트리거는 호출자를 볼 수 없어 문서에 심긴
+                // lastEditedByUid에 의존하는데, 동의 기록은 Rules가 클라이언트 쓰기를 막아
+                // 이 콜러블만 쓴다 — 그래서 심는 주체도 여기여야 한다.
+                // 값의 출처는 콜러블의 인증 컨텍스트(request.auth.uid)이므로 위조될 수 없다
+                // (클라이언트가 심는 경로에서 Rules가 강제하는 것과 같은 수준의 보증).
+                lastEditedByUid: uid,
             },
             { merge: true }
         );

@@ -80,9 +80,20 @@ describe('acceptCurrentTerms — 재동의 기록', () => {
         expect(findBatchSet('organizations')).toBeUndefined();
         expect(findBatchSet('users')).toBeDefined();
         expect(findBatchSet('users')!.slice(1)).toEqual([
-            { consent: { terms: true, termsVersion: '2026-08-05', agreedAt: 'mock-timestamp' } },
+            {
+                consent: { terms: true, termsVersion: '2026-08-05', agreedAt: 'mock-timestamp' },
+                // 행위자 스탬프 — 없으면 접속기록의 동의 이력이 '행위자 미확인'으로 남는다
+                lastEditedByUid: 'user-001',
+            },
             { merge: true },
         ]);
+    });
+
+    it('동의 기록에 행위자 스탬프를 심는다 — 접속기록이 누구의 동의인지 확정할 수 있어야 한다', async () => {
+        // 변경 로그 트리거는 호출자를 볼 수 없어 문서의 lastEditedByUid에 의존한다.
+        // 이 스탬프가 빠지면 동의 이력의 행위자가 영구히 미확인으로 남는다(소급 불가).
+        await capturedHandler(makeRequest());
+        expect(findBatchSet('users')![1].lastEditedByUid).toBe('user-001');
     });
 
     it('직원: 개인정보 동의를 보내와도 기록하지 않는다', async () => {
