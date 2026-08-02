@@ -5,23 +5,28 @@ test.describe('접근성 심화 검증', () => {
     // 검증한다(src/__tests__/components/ConfirmModal.test.tsx). E2E에서는 초기 화면에 모달이
     // 없어 의미 있는 단언이 어려우므로 여기서는 다루지 않는다.
 
+    /*
+     * `count()`는 **재시도하지 않는 일회성 읽기**다. `toBeAttached()`로 요소가 붙는 것까지
+     * 기다려도, 그 다음 줄의 `count()`가 실행되는 순간 진입 직후 트리 교체(라우팅 판정)와
+     * 겹치면 0을 읽고 그대로 실패로 굳는다 — master CI에서 초기 시도와 재시도 2회가 모두
+     * 같은 지점에서 깨졌고(2026-08-03), 로컬 동일 조건에서는 재현되지 않았다.
+     * 웹 우선 단언(`toHaveCount`)은 같은 의도를 **재시도로** 검증하므로 이 창을 통과한다.
+     * 같은 계열을 `5cfc051`(키보드 포커스)·terms-privacy(toPass)에서 이미 한 번 걷어냈다.
+     */
     test('네비게이션에 aria-label이 있다', async ({ page }) => {
         await page.goto('/');
-        // 고정 대기(2s) 대신 렌더 완료를 폴링해 느린 CI에서의 레이스를 없앤다.
         const navs = page.locator('nav[aria-label]');
-        await expect(navs.first()).toBeAttached({ timeout: 10000 });
-        expect(await navs.count()).toBeGreaterThanOrEqual(1);
+        await expect(navs).not.toHaveCount(0, { timeout: 10000 });
     });
 
     test('aria-live 영역이 존재한다', async ({ page }) => {
         await page.goto('/');
-        await page.waitForTimeout(2000);
 
         // 토스트 라이브 리전(role="status" aria-live="polite")은 ToastProviderWrapper가
         // 비인증 경량 엔트리에도 상시 렌더링하므로 랜딩에서 최소 1개 존재해야 한다.
+        // 고정 대기(2s)는 부하가 걸린 CI에서 부족할 수 있어 재시도 단언으로 대체한다.
         const liveRegions = page.locator('[aria-live]');
-        await expect(liveRegions.first()).toBeAttached();
-        expect(await liveRegions.count()).toBeGreaterThanOrEqual(1);
+        await expect(liveRegions).not.toHaveCount(0, { timeout: 10000 });
     });
 
     test('인터랙티브 요소에 키보드 접근이 가능하다', async ({ page }) => {
