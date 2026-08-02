@@ -9,6 +9,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { captureError } from '../sentry';
+import { actorStamp } from './actorStamp';
 
 /** 전체 슈퍼관리자 목록 조회 */
 export const getSuperAdmins = async () => {
@@ -65,6 +66,7 @@ export const addSuperAdmin = async (email: string) => {
         await updateDoc(doc(db, 'users', user.id), {
             role: 'superAdmin',
             promotedAt: serverTimestamp(),
+            ...actorStamp(),
         });
         return user;
     } catch (error) {
@@ -79,6 +81,7 @@ export const removeSuperAdmin = async (uid: string, currentAdminCount: number) =
         if (currentAdminCount <= 1) throw new Error('최소 1명의 슈퍼관리자가 필요합니다.');
         await updateDoc(doc(db, 'users', uid), {
             role: 'employee',
+            ...actorStamp(),
         });
     } catch (error) {
         captureError(error as Error, { context: 'removeSuperAdmin', uid });

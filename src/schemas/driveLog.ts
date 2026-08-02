@@ -42,5 +42,7 @@ export const driveLogSchema = z.object({
     inputMethod: z.enum(['ocr', 'manual', 'favorite']).optional().catch(undefined),
     createdAt: timestampSchema.optional().catch(undefined),
     editedAt: timestampSchema.optional().catch(undefined),
+    /** 마지막 수정자 uid — Rules가 request.auth.uid와의 일치를 강제한다 */
+    lastEditedByUid: z.string().optional().catch(undefined),
     expiresAt: timestampSchema.optional().catch(undefined),
 });

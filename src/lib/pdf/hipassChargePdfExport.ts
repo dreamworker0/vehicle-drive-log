@@ -71,6 +71,7 @@ export function downloadHipassChargePdf(
     } = {},
 ) {
     return printPdfReport<PdfHipassChargeEntry>({
+        auditDataset: 'hipassCharges',
         title: '하 이 패 스 충 전 기 록',
         orgName: options.orgName || '',
         records,

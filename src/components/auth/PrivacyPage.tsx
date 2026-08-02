@@ -207,6 +207,21 @@ export default function PrivacyPage() {
                                 </p>
                             </div>
 
+                            <div className="bg-surface-50 dark:bg-surface-800 rounded-xl p-4 space-y-2">
+                                <p className="font-medium text-surface-700 dark:text-surface-300">접속기록 (법령상 의무 기록)</p>
+                                <ul className="list-disc list-inside space-y-1 ml-2">
+                                    <li>로그인 시 접속 계정·접속 일시·접속지 IP 주소·접속 환경(브라우저·운영체제 종류)</li>
+                                    <li>운행일지·직원 정보 등 개인정보에 해당하는 항목을 변경한 경우 그 계정·일시·변경한 항목명</li>
+                                </ul>
+                                <p className="text-xs text-surface-500 dark:text-surface-400">
+                                    「개인정보의 안전성 확보조치 기준」 제16조에 따라 <strong>법령상 반드시 보관해야 하는 기록</strong>으로,
+                                    동의를 근거로 수집하지 않으며 거부할 수 없습니다. 비정상적인 접근을 확인하는 목적 외에는 이용하지 않고,
+                                    <strong>1년간 보관 후 자동으로 파기</strong>됩니다.
+                                    변경 항목은 <strong>항목의 이름만</strong> 남기고 그 값은 남기지 않으며,
+                                    접속 환경은 <strong>&quot;Chrome / Android&quot;</strong>처럼 종류만 남기고 상세 버전·기기 모델은 저장하지 않습니다.
+                                </p>
+                            </div>
+
                             <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 dark:bg-blue-900/20 dark:border-blue-800">
                                 <p className="font-medium text-blue-800 dark:text-blue-300 mb-1">🔒 비밀번호 미저장</p>
                                 <p className="text-blue-700 dark:text-blue-400 text-xs">
@@ -227,6 +242,7 @@ export default function PrivacyPage() {
                                 <li>운행일지 작성자 기록</li>
                                 <li>차량 예약 관리</li>
                                 <li>서비스 운영 관련 공지 전달</li>
+                                <li>법령상 의무인 접속기록의 보관 및 비정상 접근 점검</li>
                             </ul>
                         </div>
                     </section>
@@ -524,7 +540,7 @@ export default function PrivacyPage() {
                         <p className="text-xs text-surface-400 dark:text-surface-500">본 개인정보 처리방침은 {EFFECTIVE_DATE}부터 시행됩니다.</p>
                         <p className="text-xs text-surface-400 dark:text-surface-500">
                             개정 이력 · 2026년 2월 1일 최초 시행 / {EFFECTIVE_DATE} 위탁·국외 이전·보호책임자 조항 신설,
-                            개인정보처리자와 수탁자의 지위 명시
+                            개인정보처리자와 수탁자의 지위 명시, 법령상 의무 기록인 접속기록 항목 명시
                         </p>
                     </div>
                 </div>

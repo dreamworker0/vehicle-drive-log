@@ -17,6 +17,7 @@ import {
 import { driveLogSchema } from '../../../schemas';
 import { invalidateCache } from '../cache';
 import { enqueue } from '../../offline/syncQueue';
+import { actorStamp } from '../actorStamp';
 
 export interface CreateDriveLogResult {
     id: string;
@@ -119,7 +120,13 @@ export const updateDriveLog = async (logId: string, data: Partial<DriveLog>): Pr
         // 수정 모드에서는 직전 기록 일치 강제 확인을 하지 않음
         // — 사용자가 의도적으로 km를 변경하는 것이므로 MileageInput의 경고 배너로 충분
 
-        const finalData = sanitizeUndefined({ ...data, editedAt: serverTimestamp() });
+        // 접속기록의 '계정' 항목 — 트리거는 호출자를 알 수 없으므로 여기서 심는다.
+        // Rules가 request.auth.uid와의 일치를 강제하므로 타인 명의 위조는 불가능하다.
+        const finalData = sanitizeUndefined({
+            ...data,
+            ...actorStamp(),
+            editedAt: serverTimestamp(),
+        });
         const promise = updateDoc(logRef, finalData);
 
         if (!isOffline) {

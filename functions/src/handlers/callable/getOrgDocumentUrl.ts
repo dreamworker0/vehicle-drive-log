@@ -8,6 +8,8 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
+import { writeAuditEntry } from "../../services/audit/writeAuditEntry";
+import { log } from "../../utils/helpers";
 
 /** 서명 URL 만료(ms) — 심사 화면 표시에 충분한 최소치 */
 const SIGNED_URL_TTL_MS = 5 * 60 * 1000;
@@ -82,6 +84,36 @@ export const getOrgDocumentUrl = onCall(
             action: "read",
             expires: Date.now() + SIGNED_URL_TTL_MS,
         });
+
+        // 접속기록 — superAdmin이 타 기관의 증빙서류(대표자명·기관 정보 포함)를 연 사실을 남긴다.
+        // 이 경로는 서버 콜러블이라 **클라이언트가 건너뛸 수 없다**. 엑셀·PDF 반출은
+        // 브라우저에서 만들어져 우회가 가능한 것과 대조된다(recordExport 주석 참고).
+        //
+        // 서명 URL 발급 **후에** 기록한다. 앞에 두면 권한·경로 검증에서 걸러질 요청까지
+        // 기록되고, 기록 실패가 정상 심사를 막는다. 기록 실패는 삼킨다 — 심사 화면이
+        // 감사 쓰기 때문에 멈추면 안 된다(단, ERROR 로그로 Sentry에는 남는다).
+        //
+        // 문서 ID에 발급 시각(분)을 넣어 연속 조회가 로그를 채우지 않게 하되,
+        // 시간대별 접근 사실은 보존한다.
+        const minuteBucket = new Date(Date.now()).toISOString().slice(0, 16).replace(/[:-]/g, "");
+        try {
+            await writeAuditEntry({
+                docId: `orgdoc_${request.auth.uid}_${orgId}_${minuteBucket}`,
+                // 심사 대상 기관 기준으로 남긴다 — 그 기관에 대한 접근 사실이기 때문이다.
+                organizationId: orgId,
+                action: "read",
+                targetType: "orgDocument",
+                targetId: orgId,
+                actorUid: request.auth.uid,
+                // 증빙서류의 정보주체는 기관 대표자·담당자로 uid가 없다. 이름을 넣으면
+                // 감사 로그가 이름을 담게 되므로 비운다(Phase 123의 탑승자 판단과 같다).
+                subjectUids: [],
+            });
+        } catch (err) {
+            log("ERROR", "getOrgDocumentUrl", "증빙서류 열람 기록 실패", {
+                uid: request.auth.uid, orgId, error: (err as Error).message,
+            });
+        }
 
         return { url };
     }

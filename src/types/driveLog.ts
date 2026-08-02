@@ -47,6 +47,18 @@ export interface DriveLog extends FirestoreDoc {
     inputMethod?: 'ocr' | 'manual' | 'favorite';
     createdAt?: TimestampField;
     editedAt?: TimestampField;
+    /**
+     * 마지막 수정자 uid — 접속기록의 '계정' 항목 (고시 제16조).
+     *
+     * Firestore 트리거는 호출자를 알 수 없어 수정 행위자가 공백이었다(Phase 123).
+     * 클라이언트가 심는 값이지만 Rules가 `request.auth.uid`와의 일치를 강제하므로
+     * **타인 명의로는 위조할 수 없다** — 콜러블 이관이나 오프라인 큐 변경 없이
+     * 행위자를 확정할 수 있는 지점이 여기다.
+     *
+     * ⚠️ 삭제 행위자에는 쓸 수 없다. 삭제된 문서에 남은 값은 마지막 '수정자'이지
+     * '삭제자'가 아니며, 이를 삭제자로 기록하면 무고한 사용자에게 책임이 귀속된다.
+     */
+    lastEditedByUid?: string;
     expiresAt?: Date | TimestampField;
 }
 

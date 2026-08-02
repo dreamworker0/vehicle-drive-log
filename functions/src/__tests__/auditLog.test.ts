@@ -240,10 +240,54 @@ describe('auditLog — 운행일지', () => {
         expect(mockSet).not.toHaveBeenCalled();
     });
 
-    it('수정: 행위자는 알 수 없음으로 남긴다 (트리거 한계)', async () => {
+    it('수정: 행위자 스탬프가 있으면 수정자로 기록한다 (Phase 2 ①)', async () => {
         await fireUpdate(DRIVE_LOG, { logId: 'dl-17' },
             { organizationId: 'org-1', destination: 'A' },
-            { organizationId: 'org-1', destination: 'B' },
+            { organizationId: 'org-1', destination: 'B', lastEditedByUid: 'editor-9' },
+        );
+        // Rules가 request.auth.uid와의 일치를 강제하므로 이 값은 위조될 수 없다
+        expect(lastEntry()).toMatchObject({ actorUid: 'editor-9', actorSource: 'stamp' });
+    });
+
+    it('수정: 스탬프가 없으면 추정하지 않고 unknown으로 남긴다', async () => {
+        // 서버(Admin SDK) 쓰기는 Rules를 우회하고 스탬프도 심지 않는다.
+        // 작성자(createdByUid)로 대체 추정하면 무고한 사용자에게 책임이 귀속된다.
+        await fireUpdate(DRIVE_LOG, { logId: 'dl-17b' },
+            { organizationId: 'org-1', destination: 'A', createdByUid: 'author-1' },
+            { organizationId: 'org-1', destination: 'B', createdByUid: 'author-1' },
+        );
+        expect(lastEntry()).toMatchObject({ actorUid: null, actorSource: 'unknown' });
+    });
+
+    it('수정: 스탬프가 빈 문자열이면 행위자로 인정하지 않는다', async () => {
+        await fireUpdate(DRIVE_LOG, { logId: 'dl-17c' },
+            { organizationId: 'org-1', destination: 'A' },
+            { organizationId: 'org-1', destination: 'B', lastEditedByUid: '' },
+        );
+        expect(lastEntry()).toMatchObject({ actorUid: null, actorSource: 'unknown' });
+    });
+
+    it('수정: 스탬프 자체는 변경 필드로 남지 않는다 (감사 노이즈 방지)', async () => {
+        await fireUpdate(DRIVE_LOG, { logId: 'dl-17d' },
+            { organizationId: 'org-1', destination: 'A', lastEditedByUid: 'old-editor' },
+            { organizationId: 'org-1', destination: 'B', lastEditedByUid: 'new-editor' },
+        );
+        expect(lastEntry().changedFields).toEqual(['destination']);
+    });
+
+    it('수정: 스탬프만 바뀐 쓰기는 아예 기록하지 않는다', async () => {
+        await fireUpdate(DRIVE_LOG, { logId: 'dl-17e' },
+            { organizationId: 'org-1', destination: 'A' },
+            { organizationId: 'org-1', destination: 'A', lastEditedByUid: 'editor-9' },
+        );
+        expect(mockSet).not.toHaveBeenCalled();
+    });
+
+    it('삭제: 남아 있는 스탬프를 삭제자로 적지 않는다', async () => {
+        // 삭제된 문서의 lastEditedByUid는 마지막 '수정자'이지 '삭제자'가 아니다.
+        // 이를 삭제자로 확언하면 무고한 사용자에게 책임이 귀속된다 — unknown보다 나쁘다.
+        await fireDelete(DRIVE_LOG, { logId: 'dl-17f' },
+            { organizationId: 'org-1', driverUid: 'driver-7', lastEditedByUid: 'editor-9' },
         );
         expect(lastEntry()).toMatchObject({ actorUid: null, actorSource: 'unknown' });
     });
@@ -309,6 +353,19 @@ describe('auditLog — 사용자', () => {
             { organizationId: 'org-1', theme: 'dark', welcomeDismissed: true, fcmToken: 'tok-2' },
         );
         expect(mockSet).not.toHaveBeenCalled();
+    });
+
+    it('수정: 관리자가 타인 권한을 바꾸면 관리자가 행위자로 남는다 (고시 제5조)', async () => {
+        await fireUpdate(USER, { userId: 'victim-1' },
+            { organizationId: 'org-1', role: 'employee' },
+            { organizationId: 'org-1', role: 'admin', lastEditedByUid: 'admin-1' },
+        );
+        expect(lastEntry()).toMatchObject({
+            actorUid: 'admin-1',
+            actorSource: 'stamp',
+            subjectUids: ['victim-1'],
+            changedFields: ['role'],
+        });
     });
 
     it('수정: 기관 이전은 이전 소속 기준으로 남긴다', async () => {

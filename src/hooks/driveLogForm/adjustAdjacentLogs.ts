@@ -8,6 +8,7 @@
 import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import type { DriveLog } from '../../types/driveLog';
+import { actorStamp } from '../../lib/firestore/actorStamp';
 
 interface AdjustParams {
     lastDriveLog: DriveLog | null;
@@ -33,6 +34,7 @@ export async function adjustAdjacentLogs({
         try {
             await updateDoc(doc(db, 'driveLogs', lastDriveLog.id), {
                 endKm: startKm,
+                ...actorStamp(),
                 editedAt: serverTimestamp(),
             });
             adjustMessages.push(`직전 기록 도착 km: ${lastDriveLog.endKm?.toLocaleString()} → ${startKm.toLocaleString()}`);
@@ -46,6 +48,7 @@ export async function adjustAdjacentLogs({
         try {
             await updateDoc(doc(db, 'driveLogs', nextDriveLog.id), {
                 startKm: endKm,
+                ...actorStamp(),
                 editedAt: serverTimestamp(),
             });
             adjustMessages.push(`직후 기록 출발 km: ${nextDriveLog.startKm?.toLocaleString()} → ${endKm.toLocaleString()}`);

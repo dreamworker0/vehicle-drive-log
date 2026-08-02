@@ -3,6 +3,7 @@
  * 공식 차량운행일지 양식을 브라우저 인쇄 기능으로 PDF 생성
  */
 import { getPdfStyles, formatDate, formatNumber, escapeHtml } from './pdfStyles';
+import { recordExport } from '../audit/recordExport';
 import {
     resolveStartKm, resolveEndKm, resolveDistance, resolveDateStr, resolveStartTime, resolveEndTime,
 } from '../driveLogExportFields';
@@ -87,6 +88,9 @@ export function downloadDriveLogsPdf(logs: PdfLogEntry[], options: { onError?: (
             printWindow.print();
         }, 300);
     };
+
+    // 접속기록 — 운행일지는 운전자·공동운전자·탑승자 이름을 담는 최대 반출 경로다.
+    recordExport('pdf', 'driveLogs', logs.length);
 }
 
 /**

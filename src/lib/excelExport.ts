@@ -7,6 +7,7 @@ import {
     resolveStartKm, resolveEndKm, resolveDistance, resolveDateStr, resolveStartTime, resolveEndTime,
 } from './driveLogExportFields';
 import { formatTimestampTime } from './dateUtils';
+import { recordExport } from './audit/recordExport';
 
 /**
  * 운행일지 데이터를 엑셀 파일로 다운로드
@@ -122,6 +123,9 @@ export async function downloadDriveLogsExcel(logs: ExcelDriveLog[], filename = '
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '운행일지');
     XLSX.writeFile(wb, `${filename}.xlsx`);
+
+    // 접속기록 — 반출 사실만 남긴다(형식·대상·건수). 데이터 내용은 담지 않는다.
+    recordExport('excel', 'driveLogs', logs.length);
 }
 
 /**
@@ -190,6 +194,9 @@ export async function downloadMaintenanceExcel(
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '정비기록');
     XLSX.writeFile(wb, `${filename}.xlsx`);
+
+    // 접속기록 — 반출 사실만 남긴다(형식·대상·건수). 데이터 내용은 담지 않는다.
+    recordExport('excel', 'maintenance', records.length);
 }
 
 /**
@@ -255,6 +262,9 @@ export async function downloadFuelLogsExcel(
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '주유충전기록');
     XLSX.writeFile(wb, `${filename}.xlsx`);
+
+    // 접속기록 — 반출 사실만 남긴다(형식·대상·건수). 데이터 내용은 담지 않는다.
+    recordExport('excel', 'fuelLogs', records.length);
 }
 
 /**
@@ -316,4 +326,7 @@ export async function downloadHipassChargesExcel(
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, '하이패스충전기록');
     XLSX.writeFile(wb, `${filename}.xlsx`);
+
+    // 접속기록 — 반출 사실만 남긴다(형식·대상·건수). 데이터 내용은 담지 않는다.
+    recordExport('excel', 'hipassCharges', records.length);
 }

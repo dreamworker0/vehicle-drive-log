@@ -4,6 +4,7 @@
  * 각 모듈은 컬럼 정의 + 행 변환 로직만 제공하고, 이 엔진이 HTML 조립·페이지 분할·인쇄를 처리.
  */
 import { formatDate, formatNumber, escapeHtml } from './pdfStyles';
+import { recordExport, type ExportDataset } from '../audit/recordExport';
 
 // ── 공통 타입 ──
 
@@ -36,6 +37,11 @@ interface PdfReportConfig<T> {
     onError?: (msg: string) => void;
     /** 추가 컬럼 CSS (colStyles에 커스텀 CSS 추가 가능) */
     extraStyles?: string;
+    /**
+     * 접속기록에 남길 반출 대상(고시 제16조).
+     * 엔진은 어떤 리포트인지 모르므로 호출부가 알려준다.
+     */
+    auditDataset: ExportDataset;
 }
 
 // ── 공통 유틸 ──
@@ -160,7 +166,7 @@ export function printPdfReport<T>(config: PdfReportConfig<T>): boolean {
         title, orgName, records, columns,
         renderRow, renderTotalRow, sorter,
         rowsPerPage = 25, approvalLine = [],
-        onError, extraStyles = '',
+        onError, extraStyles = '', auditDataset,
     } = config;
 
     if (!records || records.length === 0) {
@@ -247,6 +253,9 @@ export function printPdfReport<T>(config: PdfReportConfig<T>): boolean {
     printWindow.onload = () => {
         setTimeout(() => { printWindow.print(); }, 300);
     };
+
+    // 인쇄 창이 실제로 열린 뒤에만 반출로 기록한다(팝업 차단은 위에서 이미 반환됨).
+    recordExport('pdf', auditDataset, records.length);
 
     return true;
 }

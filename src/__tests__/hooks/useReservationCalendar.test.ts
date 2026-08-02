@@ -74,7 +74,6 @@ vi.mock('../../lib/tmap', () => ({
 vi.mock('../../hooks/utils/reservationUtils', () => ({
     calcEndTime: vi.fn((start: string) => start),
     findOverlappingReservation: vi.fn().mockReturnValue(null),
-    findUserOverlappingReservation: vi.fn().mockReturnValue(null),
 }));
 
 import useReservationCalendar from '../../hooks/useReservationCalendar';

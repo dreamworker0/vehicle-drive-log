@@ -2,9 +2,9 @@
 
 > **자동 생성 문서** — `scripts/generate-functions-doc.ts`로 생성됨
 >
-> 마지막 업데이트: 2026. 8. 1. PM 12:13:11
+> 마지막 업데이트: 2026. 8. 2. AM 8:26:43
 >
-> 총 함수 수: **64개**
+> 총 함수 수: **67개**
 
 ---
 
@@ -23,7 +23,7 @@
 
 ## 📞 onCall (클라이언트 직접 호출)
 
-> 총 35개
+> 총 38개
 
 ### `ocrDashboard`
 
@@ -110,6 +110,36 @@
 | **인증** | 인증 필수 |
 | **요청 파라미터** | `{ agreedTerms: true, termsVersion: string, agreedPrivacy?: true, privacyVersion?: string }` |
 | **반환값** | `{ success: boolean, orgRecorded: boolean }` |
+
+### `recordSession`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/callable/recordSession.ts` |
+| **설명** | 로그인 세션 기록 — 고시 제16조의 접속지(IP)·계정·일시를 남긴다. 트리거는 IP를 볼 수 없어 콜러블로 받는다. `sessionId`는 브라우저 세션당 난수 1개이며 문서 ID에 쓰여 같은 세션의 재호출이 중복을 만들지 않는다. User-Agent는 브라우저/OS 수준으로 축약해 저장한다. |
+| **인증** | 인증 필수 |
+| **요청 파라미터** | `{ sessionId: string }` |
+| **반환값** | `{ success: boolean }` |
+
+### `recordExport`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/callable/recordExport.ts` |
+| **설명** | 개인정보 반출(엑셀·PDF 내보내기) 기록 — 고시 제16조. 형식·대상·건수만 남기고 **반출된 데이터 내용과 검색 조건은 담지 않는다**. `format`·`dataset`은 화이트리스트로 제한해 임의 값 주입을 막는다. 브라우저에서 파일을 만들므로 클라이언트가 부르지 않으면 남지 않는 한계가 있다. |
+| **인증** | 인증 필수 |
+| **요청 파라미터** | `{ format: 'excel' \| 'pdf', dataset: string, recordCount: number, exportId: string }` |
+| **반환값** | `{ success: boolean }` |
+
+### `sendBroadcastNotice`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/callable/sendBroadcastNotice.ts` |
+| **설명** | 전체 기관의 관리자·직원에게 앱 내 알림 + 푸시를 일괄 발송. `sendAdminNotice`가 자기 기관 한정이라 서비스 전역 고지(약관 개정 등) 경로가 없어 신설. `dryRun: true`면 **대상 수만 반환하고 아무것도 보내지 않는다** — 화면이 이 값을 확인시킨 뒤에만 실제 발송한다. `noticeId`로 문서 ID를 고정해 재클릭·재시도가 알림을 중복 생성하지 않는다. 비활성 계정과 기관 미소속 계정은 제외. 발송 사실은 `broadcasts/{noticeId}`에 남긴다 — 앱 내 알림 커밋 직후 `sending`으로 먼저 쓰고 푸시 결과를 `sent`로 덧쓴다(중간에 죽으면 `sending`으로 남아 「알림은 나갔고 푸시 결과만 모른다」를 뜻한다). |
+| **인증** | 시스템 관리자(superAdmin) 전용 |
+| **요청 파라미터** | `{ title: string, message: string, noticeId: string, dryRun?: boolean }` |
+| **반환값** | `{ success: boolean, dryRun: boolean, recipientCount: number, pushSent?: number, pushFailed?: number }` |
 
 ### `disableUser`
 

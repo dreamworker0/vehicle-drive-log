@@ -59,24 +59,6 @@ export function findOverlappingReservation(reservations: Reservation[], { vehicl
 }
 
 /**
- * 같은 사용자가 같은 시간대에 다른 차량에 이미 예약이 있는지 검사한다.
- * @param {Array} reservations - 기존 예약 목록
- * @param {Object} params - { reservedByUid, date, startTime, endTime, excludeId? }
- * @returns {Object|null} 중복 예약이 있으면 해당 예약 반환, 없으면 null
- */
-export function findUserOverlappingReservation(reservations: Reservation[], { reservedByUid, date, startTime, endTime, excludeId = null }: { reservedByUid: string; date: string; startTime: string; endTime: string; excludeId?: string | null }) {
-    return reservations.find((r) => {
-        if (r.reservedByUid !== reservedByUid || r.date !== date || r.status === 'cancelled') return false;
-        if (excludeId && r.id === excludeId) return false;
-        
-        const effStart = (r.status === 'completed' && r.actualStartTime) ? r.actualStartTime : r.startTime;
-        const effEnd = (r.status === 'completed' && r.actualEndTime) ? r.actualEndTime : r.endTime;
-        
-        return startTime < effEnd && endTime > effStart;
-    }) || null;
-}
-
-/**
  * 시작시간 + 왕복 소요시간 + 여유 1시간으로 종료시간 계산
  * @param {string} startTime - HH:MM 형식
  * @param {number} durationMin - 편도 소요시간(분), 없으면 0

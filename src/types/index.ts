@@ -11,6 +11,7 @@ export type { DriveLog, CreateDriveLogData, DriveLogPage, DriveLogFilters } from
 export type { Reservation, ReservationStatus, CreateReservationData } from './reservation';
 export type { Organization, OrgStatus, CreateOrgData } from './organization';
 export type { AuditLog, AuditAction, AuditTargetType, AuditActorSource } from './auditLog';
+export type { Broadcast, BroadcastStatus } from './broadcast';
 export type { Notification } from './notification';
 export type { MaintenanceRecord, CreateMaintenanceData } from './maintenance';
 export type { Favorite } from './favorite';

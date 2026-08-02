@@ -4,6 +4,7 @@
  * A4 세로 (portrait)
  */
 import { formatNumber, escapeHtml } from './pdfStyles';
+import { recordExport } from '../audit/recordExport';
 
 interface DailyDriveEntry {
     driverName?: string;
@@ -69,6 +70,9 @@ export function downloadDailyLogPdf(
             printWindow.print();
         }, 300);
     };
+
+    // 접속기록 — 반출 건수는 운행일지 기준(주유는 부속 정보로 함께 실린다).
+    recordExport('pdf', 'dailyLogs', driveLogs.length);
 }
 
 function formatDateKorean(dateStr: string | undefined): string {

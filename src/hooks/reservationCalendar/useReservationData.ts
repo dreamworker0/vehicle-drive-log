@@ -58,18 +58,29 @@ export function useReservationData({
     useEffect(() => {
         if (!user || !userData?.organizationId) { setLoading(false); return; }
 
+        // 공휴일은 화면을 막지 않는다.
+        // Firestore(system/holidays)에 해당 연도가 없으면 외부 공공데이터 API로 폴백하는데,
+        // 이것을 아래 Promise.all에 넣어 await하면 외부 API가 늦을 때 예약 화면 전체가
+        // 스피너에 갇힌다. 공휴일은 달력의 부가 표시일 뿐이라 늦게 채워져도 무방하다.
+        let holidayCancelled = false;
+        getHolidays()
+            .then((hList) => { if (!holidayCancelled) setHolidays(hList as CustomHoliday[]); })
+            .catch((error) => {
+                // 실패해도 토스트를 띄우지 않는다 — 사용자가 할 수 있는 일이 없고,
+                // 공휴일 표시가 빠지는 것 외에 예약 기능에는 영향이 없다.
+                console.error('공휴일 로드 실패:', error);
+            });
+
         const fetchData = async () => {
             try {
                 setLoading(true);
-                const [vList, fList, hList, org] = await Promise.all([
+                const [vList, fList, org] = await Promise.all([
                     getVehicles(userData.organizationId!),
                     getFavorites(user.uid),
-                    getHolidays(),
                     getOrganization(userData.organizationId!)
                 ]);
                 setVehicles(vList as Vehicle[]);
                 setFavorites(fList as Favorite[]);
-                setHolidays(hList as CustomHoliday[]);
                 const orgData = org as unknown as { address?: string } | null;
                 if (orgData?.address) {
                     setOrgAddress(orgData.address);
@@ -88,6 +99,9 @@ export function useReservationData({
         };
 
         fetchData();
+
+        // 비차단으로 돌린 공휴일 로드가 언마운트 후 setState하지 않게 한다.
+        return () => { holidayCancelled = true; };
     }, [user, userData, isAdmin, showToast]);
 
     // 예약 목록 로드 함수 분리 (재사용 목적)

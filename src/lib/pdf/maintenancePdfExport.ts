@@ -80,6 +80,7 @@ export function downloadMaintenancePdf(
     } = {},
 ) {
     return printPdfReport<PdfMaintenanceEntry>({
+        auditDataset: 'maintenance',
         title: '차량 정비 기록',
         orgName: options.orgName || '',
         records,
