@@ -143,4 +143,12 @@ describe('AuditLogViewer', () => {
         render(<AuditLogViewer />);
         expect(screen.getByText('접속기록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.')).toBeInTheDocument();
     });
+
+    it("조회 실패를 '기록 없음'으로 오해시키지 않는다 — 빈 상태 안내를 함께 띄우지 않는다", () => {
+        // 인덱스 미생성(failed-precondition)으로 실패한 실제 화면에서 오류 문구와
+        // "선택한 기간에 기록이 없습니다"가 동시에 떠 실패가 '기록 없음'처럼 보였다.
+        setHook({ error: '접속기록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.' });
+        render(<AuditLogViewer />);
+        expect(screen.queryByText('선택한 기간에 기록이 없습니다.')).not.toBeInTheDocument();
+    });
 });

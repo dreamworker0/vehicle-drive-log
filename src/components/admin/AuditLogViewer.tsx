@@ -192,6 +192,10 @@ export default function AuditLogViewer() {
                 <div className="flex items-center justify-center py-20">
                     <div className="w-8 h-8 spinner" />
                 </div>
+            ) : error && logs.length === 0 ? (
+                // 조회가 실패한 것과 기간에 기록이 없는 것은 다른 상태다. 오류 문구 아래에
+                // "기록이 없습니다"를 함께 띄우면 실패를 '기록 없음'으로 오해하게 된다.
+                null
             ) : logs.length === 0 ? (
                 <div className="glass-card p-8 text-center">
                     <p className="text-sm text-surface-500 dark:text-surface-400">선택한 기간에 기록이 없습니다.</p>
