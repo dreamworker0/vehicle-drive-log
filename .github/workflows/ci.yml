@@ -53,6 +53,37 @@ jobs:
               - 'shared/**'
               - '.github/workflows/ci.yml'
 
+  # 보안 감사 — **독립 잡**이며 npm ci에 의존하지 않는다.
+  #
+  # 원래 ci 잡의 마지막 스텝이었는데, 그 자리는 감사가 가장 필요한 상황에서 정확히
+  # 실행되지 않는 자리였다. 의존성 PR에서 앞 스텝이 깨지면(#85 npm ci ERESOLVE,
+  # #86 vite 8 빌드 실패) 뒤따르는 스텝이 전부 skipped가 되어 감사도 함께 건너뛰어졌고,
+  # 체크는 "설치 실패"로만 표시돼 **감사가 돌지 않았다는 사실 자체가 어디에도 남지 않았다**.
+  # 의존성을 올리는 PR이야말로 감사가 필요한 자리이므로 이 결합을 끊는다.
+  #
+  # npm ci를 하지 않는 이유: `npm audit`은 package-lock.json만으로 동작하고
+  # scripts/security-audit.ts는 Node 내장 모듈만 쓴다. 설치가 깨지는 PR에서도 감사는
+  # 돌아야 하므로 설치 단계를 아예 두지 않는다(Node 22의 네이티브 TS 실행 사용).
+  security-audit:
+    # changes 잡과 같은 가드 — PR 제목·본문 수정(edited)만으로 감사를 다시 돌리지 않는다.
+    # base가 실제로 바뀐 edited와 push·opened·synchronize·reopened는 통과한다.
+    if: github.event.action != 'edited' || github.event.changes.base.ref.from != ''
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      TZ: "Asia/Seoul"
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      # tsx·devDependencies 설치 없이 실행한다 — 설치 실패가 감사를 막지 않게 하려는 것이 요점이다.
+      - name: Security audit (root + functions)
+        run: node --experimental-strip-types scripts/security-audit.ts
+
   # Functions 단위 테스트(pass/fail 게이트) — 메인 ci 잡과 병렬 실행해 전체 체감 시간을 줄인다.
   # 커버리지 계측은 이 러너에서 실행 시간을 +15분(11분→26분) 늘리는데 워커 수로는 못 줄여서
   # (병목=계측 자체), per-push에서는 커버리지 없이 빠르게 pass/fail만 본다. 커버리지 회귀 게이트는
@@ -183,9 +214,6 @@ jobs:
 
       - name: Bundle size check
         run: npx tsx scripts/check-bundle-size.ts
-
-      - name: Security audit
-        run: npm run audit
 
       # 실패 진단용 아티팩트 — E2E trace·screenshot·test-results. 성공 시에는 업로드하지 않는다.
       - name: Upload E2E failure artifacts

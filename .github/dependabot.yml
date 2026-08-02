@@ -13,6 +13,26 @@ updates:
         update-types:
           - minor
           - patch
+    # 아래 메이저는 업스트림·설정 제약으로 지금 올릴 수 없다. 열어 두면 매주 같은 PR이
+    # 되살아나 CI를 빨간 상태로 점유하고, 실패가 일상이 되면 진짜 실패를 못 알아본다.
+    # **차단은 영구가 아니라 재검토 조건이 붙은 보류다** — 조건이 충족되면 항목을 지운다.
+    ignore:
+      # eslint 10: eslint-plugin-jsx-a11y@6.10.2의 peer가 `^3 || ... || ^9`로 9에서 막혀
+      # npm ci가 ERESOLVE로 실패한다(PR #85). --legacy-peer-deps로 우회하면 lockfile 신뢰도가
+      # 떨어지므로 선택하지 않는다.
+      # 재검토: eslint-plugin-jsx-a11y가 eslint 10을 peer에 넣으면 이 항목 제거.
+      - dependency-name: eslint
+        update-types: ["version-update:semver-major"]
+      # vite 8: 번들러가 Rollup → Rolldown으로 바뀌어 `manualChunks` 객체 형식을 받지 않는다
+      # (PR #86, `TypeError: manualChunks is not a function`). vite.config의 청크 전략을
+      # 함수형 또는 advancedChunks로 재작성해야 하는 마이그레이션 작업이다.
+      # 재검토: 청크 전략 재작성을 별건으로 처리한 뒤 이 항목 제거.
+      - dependency-name: vite
+        update-types: ["version-update:semver-major"]
+      # @vitejs/plugin-react 6: vite 8을 peer로 요구해 위 항목과 한 묶음이다(PR #88).
+      # 재검토: vite 8 마이그레이션과 함께 해제.
+      - dependency-name: "@vitejs/plugin-react"
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directory: /functions
