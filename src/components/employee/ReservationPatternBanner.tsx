@@ -23,7 +23,9 @@ export default function ReservationPatternBanner({ anchorRef }: ReservationPatte
         return (
             <button
                 onClick={() => setIsDismissed(false)}
-                className="fixed bottom-[85px] right-4 z-[90] flex items-center justify-center w-12 h-12 min-w-[48px] min-h-[48px] bg-surface-100 dark:bg-surface-800/70 backdrop-blur-md text-primary-600 dark:text-primary-400 border border-surface-200/50 dark:border-surface-700/50 rounded-full shadow-sm hover:bg-surface-200/80 dark:hover:bg-surface-700/80 transition-all active:scale-95 animate-fade-in-up md:right-8"
+                // 펼침 배너와 같은 층(z-40). 하단 내비(z-30) 위, 헤더(z-45)·모달(z-50) 아래다.
+                // z-[90]이던 동안에는 이 작은 버튼이 알림 패널은 물론 모달까지 덮고 있었다.
+                className="fixed bottom-[85px] right-4 z-40 flex items-center justify-center w-12 h-12 min-w-[48px] min-h-[48px] bg-surface-100 dark:bg-surface-800/70 backdrop-blur-md text-primary-600 dark:text-primary-400 border border-surface-200/50 dark:border-surface-700/50 rounded-full shadow-sm hover:bg-surface-200/80 dark:hover:bg-surface-700/80 transition-all active:scale-95 animate-fade-in-up md:right-8"
                 title="추천 예약 켜기"
             >
                 <div className="relative">

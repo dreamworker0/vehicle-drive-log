@@ -95,8 +95,15 @@ export default function EmployeeLayout() {
 
     return (
         <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex flex-col">
-            {/* 상단 바 */}
-            <header className="sticky top-0 z-30 bg-white/80 dark:bg-surface-900/80 backdrop-blur-md border-b border-surface-100 dark:border-surface-700 px-4 h-14 flex items-center justify-between safe-top">
+            {/* 상단 바
+            z-[45] — 알림 패널이 하단 고정 배너에 가려지지 않게 하는 값이다.
+            이 헤더는 sticky+z-index로도, backdrop-filter로도 각각 stacking context를 만든다.
+            그래서 안에 든 .notification-dropdown의 z-50은 헤더 내부에서만 유효하고,
+            바깥에서 패널의 실질 높이는 헤더의 z가 된다. z-30이던 시절에는 원클릭 추천
+            예약 배너(z-40)와 약관 재동의 배너(z-40)가 알림 패널을 덮었다.
+            고정 배너(40)보다 위, 모달(50)보다 아래여야 하므로 그 사이 값을 쓴다.
+            */}
+            <header className="sticky top-0 z-[45] bg-white/80 dark:bg-surface-900/80 backdrop-blur-md border-b border-surface-100 dark:border-surface-700 px-4 h-14 flex items-center justify-between safe-top">
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-primary-100 dark:bg-primary-900/40 rounded-lg flex items-center justify-center">
                         <svg aria-hidden="true" className="w-4 h-4 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
