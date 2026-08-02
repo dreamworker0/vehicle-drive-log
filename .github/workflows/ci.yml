@@ -22,8 +22,16 @@ permissions:
 
 # 연속 푸시가 겹치면 낡은 CI를 취소한다 — 마지막 푸시만 검증·배포된다.
 # (취소된 CI는 conclusion이 success가 아니므로 Deploy(workflow_run)로 이어지지 않아 안전)
+#
+# 제목·본문만 고친 edited 실행은 모든 잡을 건너뛴다(아래 잡 가드 참고). 그런데 그 실행을
+# 같은 그룹에 두면 **진행 중이던 진짜 CI를 cancel-in-progress로 죽이고 자신은 전부
+# skipped로 끝나서, 그 커밋에 게이트 결과가 하나도 남지 않는다.** 2026-08-02 이 워크플로를
+# 고치던 PR #115에서 실제로 발생했다 — 커밋 푸시 40초 뒤 PR 본문을 고쳤더니 실행 465가
+# 취소되고 전부 skipped인 466이 그 자리를 차지했다. 게이트 마스킹을 걷어내는 작업이
+# 같은 방식으로 자기 검증을 잃은 것이라 그대로 둘 수 없다.
+# 메타 편집 실행을 별도 그룹으로 격리해, 진짜 실행과 서로 취소하지 않게 한다.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.ref }}-${{ (github.event.action == 'edited' && github.event.changes.base.ref.from == '') && 'meta' || 'code' }}
   cancel-in-progress: true
 
 jobs:
@@ -34,6 +42,13 @@ jobs:
     # edited는 제목·본문 수정에도 발화한다. 그때마다 전체 CI(~16분)를 돌리면 Actions 분량이 샌다.
     # base가 실제로 바뀐 edited만 통과시킨다. push·opened·synchronize·reopened는 action이
     # 'edited'가 아니므로 항상 통과한다. (changes가 스킵되면 functions-tests도 needs로 함께 스킵)
+    #
+    # 남은 위험: 잡을 `if`로 건너뛰어도 **그 이름의 체크 런은 skipped 상태로 생성된다.**
+    # 같은 커밋에서 앞선 실행이 이미 실패해 있었다면 skipped가 그 위에 덮이고, 필수 체크는
+    # skipped를 성공으로 취급한다. 즉 빨간 PR을 본문 수정만으로 초록으로 보이게 만들 수 있다.
+    # 깔끔한 해법은 edited 트리거를 ci.yml에서 빼고 base 변경만 따로 처리하는 것인데,
+    # GITHUB_TOKEN으로 한 close/reopen은 워크플로를 재발화시키지 않아(PAT 필요) 지금은 막혀 있다.
+    # 그래서 재검증이 필요한 상황에서는 빈 커밋이 아니라 **재푸시로 진짜 실행을 새로 만든다.**
     if: github.event.action != 'edited' || github.event.changes.base.ref.from != ''
     runs-on: ubuntu-latest
     timeout-minutes: 5
