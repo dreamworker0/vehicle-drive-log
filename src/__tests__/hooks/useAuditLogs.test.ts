@@ -93,6 +93,20 @@ describe('useAuditLogs', () => {
         expect(diffDays).toBeGreaterThan(89);
     });
 
+    it('1년(365일) 기간도 그대로 서버 필터로 넘긴다', async () => {
+        const { result } = renderHook(() => useAuditLogs());
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        act(() => result.current.setDays(365));
+        await waitFor(() => expect(mocks.getAuditLogs).toHaveBeenCalledTimes(2));
+
+        const [, options] = mocks.getAuditLogs.mock.calls[1];
+        const diffDays = (Date.now() - (options.since as Date).getTime()) / 86_400_000;
+        // 보관기간(1년)과 같은 범위까지 닿는지 고정한다
+        expect(diffDays).toBeGreaterThan(364);
+        expect(diffDays).toBeLessThan(367);
+    });
+
     it('더 보기는 커서로 이어 붙인다', async () => {
         mocks.getAuditLogs.mockResolvedValueOnce(page(['a1', 'a2'], true));
         const { result } = renderHook(() => useAuditLogs());

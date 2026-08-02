@@ -83,6 +83,14 @@ const ACTOR_SOURCE_NOTE: Record<AuditLog['actorSource'], string> = {
     unknown: '행위자 미확인',
 };
 
+/** 기간 표기 — 365일은 '1년'이라고 읽는 편이 보관기간(1년)과 바로 연결된다 */
+const DAY_LABEL: Record<AuditLogDays, string> = {
+    7: '최근 7일',
+    30: '최근 30일',
+    90: '최근 90일',
+    365: '최근 1년',
+};
+
 const KIND_TABS: Array<{ value: AuditLogKind; label: string }> = [
     { value: 'all', label: '전체' },
     { value: 'access', label: '접속' },
@@ -164,16 +172,17 @@ export default function AuditLogViewer() {
             {/* 기간 필터 */}
             <div className="glass-card p-4 mb-4">
                 <p className="text-xs font-medium text-surface-400 dark:text-surface-500 mb-2">기간</p>
-                <div className="flex gap-2 mb-4">
+                {/* 선택지가 4개라 좁은 화면에서는 2×2로 접는다 — 한 줄에 넣으면 글자가 줄바꿈된다 */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
                     {AUDIT_LOG_DAY_OPTIONS.map((option) => (
                         <SegmentButton key={option} active={days === option} onClick={() => setDays(option as AuditLogDays)}>
-                            최근 {option}일
+                            {DAY_LABEL[option]}
                         </SegmentButton>
                     ))}
                 </div>
 
                 <p className="text-xs font-medium text-surface-400 dark:text-surface-500 mb-2">유형</p>
-                <div className="flex gap-2">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {KIND_TABS.map((tab) => (
                         <SegmentButton key={tab.value} active={kind === tab.value} onClick={() => setKind(tab.value)}>
                             {tab.label}

@@ -130,6 +130,15 @@ describe('AuditLogViewer', () => {
         expect(state.setKind).toHaveBeenCalledWith('export');
     });
 
+    it('보관기간과 같은 1년까지 조회할 수 있다', () => {
+        // 보관은 1년인데 선택지가 90일까지면 91일~1년 기록은 보관돼 있으나 볼 수 없다.
+        const state = setHook();
+        render(<AuditLogViewer />);
+
+        fireEvent.click(screen.getByRole('button', { name: '최근 1년' }));
+        expect(state.setDays).toHaveBeenCalledWith(365);
+    });
+
     it('더 볼 기록이 있으면 더 보기 버튼을 노출한다', () => {
         const state = setHook({ logs: [log({})], hasMore: true });
         render(<AuditLogViewer />);

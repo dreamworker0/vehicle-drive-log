@@ -17,8 +17,13 @@ import type { AuditLogKind } from '../lib/firestore';
 import type { AuditLog } from '../types/auditLog';
 import { captureError } from '../lib/sentry';
 
-/** 기간 선택지 (일) — 월 1회 점검이 기본이라 30일을 기본값으로 둔다 */
-export const AUDIT_LOG_DAY_OPTIONS = [7, 30, 90] as const;
+/**
+ * 기간 선택지 (일) — 월 1회 점검이 기본이라 30일을 기본값으로 둔다.
+ *
+ * 365일이 있는 이유: 보관기간이 1년(고시 제16조)인데 선택지가 90일까지면 91일~1년 구간의
+ * 기록은 **보관돼 있는데 화면으로는 볼 수 없다.** 점검 주체가 볼 수 없는 보관은 의미가 없다.
+ */
+export const AUDIT_LOG_DAY_OPTIONS = [7, 30, 90, 365] as const;
 export type AuditLogDays = (typeof AUDIT_LOG_DAY_OPTIONS)[number];
 
 export interface UseAuditLogsResult {
