@@ -58,6 +58,9 @@ describe('createReservationTx (코어)', () => {
 
     beforeEach(() => {
         jest.clearAllMocks();
+        // clearAllMocks는 mockResolvedValueOnce 큐를 지우지 않는다. 검증에서 조기 종료해
+        // 큐가 남으면 **다음 테스트가 남의 스냅샷을 읽는다** — 순서 의존 실패의 원인이 된다.
+        mockTransactionGet.mockReset();
         jest.spyOn(console, 'error').mockImplementation();
     });
 
@@ -131,7 +134,7 @@ describe('createReservationTx (코어)', () => {
         await expect(createReservationTx(validInput)).rejects.toThrow('이미 예약되어 있습니다');
     });
 
-    it('allowedUserIds 제한은 actorUid 기준으로 검증한다', async () => {
+    it('allowedUserIds 제한은 명의자 기준으로 검증한다', async () => {
         mockTransactionGet.mockResolvedValue({
             exists: true,
             data: () => ({ organizationId: 'org1', allowedUserIds: ['other-user'] }),
@@ -140,6 +143,94 @@ describe('createReservationTx (코어)', () => {
 
         await expect(createReservationTx(validInput)).rejects.toThrow('지정된 직원만');
         expect(mockTransactionSet).not.toHaveBeenCalled();
+    });
+
+    // ── 대리 생성 (reservedByUid) — 관리자가 직원 예약을 대행·그룹 수정할 때 쓰인다 ──
+    describe('reservedByUid (명의 지정)', () => {
+        /** 대리 생성 경로의 get 순서: 차량 → 명의자 users 문서 → 기관 → 겹침 쿼리 */
+        const mockOnBehalfGets = (ownerDoc: unknown, vehicleData: Record<string, unknown> = { organizationId: 'org1' }) => {
+            mockTransactionGet
+                .mockResolvedValueOnce({ exists: true, data: () => vehicleData, docs: [] })
+                .mockResolvedValueOnce(ownerDoc)
+                .mockResolvedValueOnce({ exists: true, data: () => ({}), docs: [] })
+                .mockResolvedValueOnce({ exists: true, data: () => ({}), docs: [] });
+        };
+
+        it('관리자가 아니면 다른 직원 명의로 만들 수 없다', async () => {
+            await expect(
+                createReservationTx({ ...validInput, actorRole: 'employee', reservedByUid: 'user2' })
+            ).rejects.toThrow('기관 관리자만');
+            // 트랜잭션에 들어가기 전에 막는다
+            expect(mockRunTransaction).not.toHaveBeenCalled();
+        });
+
+        it('관리자는 직원 명의로 만들 수 있고 명의가 보존된다', async () => {
+            // 이 보존이 없으면 관리자가 직원 그룹을 수정할 때 예약이 관리자 명의로 넘어간다
+            mockOnBehalfGets({ exists: true, data: () => ({ organizationId: 'org1' }) });
+
+            await createReservationTx({ ...validInput, actorRole: 'admin', reservedByUid: 'user2' });
+
+            expect(mockTransactionSet).toHaveBeenCalledWith(
+                expect.anything(),
+                expect.objectContaining({ reservedByUid: 'user2' })
+            );
+        });
+
+        it('명의자가 타 기관 구성원이면 거부한다', async () => {
+            // Claims의 role만 믿으면 관리자가 임의 UID 명의로 예약을 심을 수 있다
+            mockOnBehalfGets({ exists: true, data: () => ({ organizationId: 'org-OTHER' }) });
+
+            await expect(
+                createReservationTx({ ...validInput, actorRole: 'admin', reservedByUid: 'user2' })
+            ).rejects.toThrow('같은 기관 구성원');
+            expect(mockTransactionSet).not.toHaveBeenCalled();
+        });
+
+        it('명의자 문서가 없으면 거부한다', async () => {
+            mockOnBehalfGets({ exists: false, data: () => undefined });
+
+            await expect(
+                createReservationTx({ ...validInput, actorRole: 'admin', reservedByUid: 'user2' })
+            ).rejects.toThrow('같은 기관 구성원');
+        });
+
+        it('차량 사용 제한은 호출자가 아니라 명의자로 판정한다', async () => {
+            // 실제 운행자는 명의자다. 관리자가 목록에 없어도 명의자가 있으면 통과해야 한다
+            mockOnBehalfGets(
+                { exists: true, data: () => ({ organizationId: 'org1' }) },
+                { organizationId: 'org1', allowedUserIds: ['user2'] },
+            );
+
+            await createReservationTx({ ...validInput, actorRole: 'admin', reservedByUid: 'user2' });
+
+            expect(mockTransactionSet).toHaveBeenCalledWith(
+                expect.anything(),
+                expect.objectContaining({ reservedByUid: 'user2' })
+            );
+        });
+
+        it('명의자가 제한 목록에 없으면 거부한다 (위 케이스의 대조군)', async () => {
+            mockOnBehalfGets(
+                { exists: true, data: () => ({ organizationId: 'org1' }) },
+                { organizationId: 'org1', allowedUserIds: ['user1'] }, // 호출자만 허용
+            );
+
+            await expect(
+                createReservationTx({ ...validInput, actorRole: 'admin', reservedByUid: 'user2' })
+            ).rejects.toThrow('지정된 직원만');
+        });
+
+        it('자기 명의를 명시적으로 넘기는 것은 대리 생성이 아니다', async () => {
+            // 클라이언트가 항상 reservedByUid를 채워 보내도 역할 검사에 걸리지 않아야 한다
+            mockTransactionGet.mockResolvedValue({ exists: true, data: () => ({ organizationId: 'org1' }), docs: [] });
+
+            await createReservationTx({ ...validInput, actorRole: 'employee', reservedByUid: 'user1' });
+
+            expect(mockTransactionSet).toHaveBeenCalledWith(
+                expect.anything(),
+                expect.objectContaining({ reservedByUid: 'user1' })
+            );
+        });
     });
 
     it('HttpsError가 아닌 내부 오류는 internal로 정규화한다', async () => {

@@ -237,6 +237,28 @@ describe('handleSubmit — 예약 제출', () => {
             expect(createReservationSafe).toHaveBeenCalledTimes(2);
         });
 
+        it('직원 명의를 그대로 넘긴다 — 관리자가 수정해도 명의가 넘어가지 않는다', async () => {
+            // 서버(createReservationCore)가 reservedByUid를 받아 명의를 보존한다.
+            // 이 값을 빼먹으면 재생성된 예약이 호출자(관리자) 명의가 되어 직원이 권한을 잃는다.
+            vi.mocked(generateRecurringDates).mockReturnValue(['2026-07-15']);
+            const deps = recurringDeps({
+                user: { uid: 'admin1', email: 'admin@test.local' },
+                userData: { organizationId: 'org1', name: '관리자', role: 'admin' } as never,
+                form: {
+                    vehicleId: 'v1', destination: '목적지', purpose: '업무',
+                    startTime: '10:00', endTime: '11:00',
+                    isRecurring: true, recurringDays: [1, 2, 3, 4, 5],
+                    reservedByUid: 'emp1', reservedByName: '황직원',
+                } as unknown as ReservationForm,
+            });
+            await handleSubmit(fakeEvent(), deps);
+
+            expect(vi.mocked(createReservationSafe).mock.calls[0][0]).toMatchObject({
+                reservedByUid: 'emp1',
+                reservedByName: '황직원',
+            });
+        });
+
         it('만들 날짜가 없으면 기존 그룹을 지우지 않는다', async () => {
             // 지우고 나서 알면 그룹만 사라지고 되돌릴 방법이 없다
             vi.mocked(generateRecurringDates).mockReturnValue([]);

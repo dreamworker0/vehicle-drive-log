@@ -223,13 +223,19 @@ service cloud.firestore {
       // superAdmin 전용이던 탓에 소유자 본인조차 그룹 수정이 항상 permission-denied로
       // 실패했다 (2026-07-31 에뮬레이터 재현).
       //
-      // 소유자 본인으로만 한정한다. 기관 관리자를 포함하지 않는 이유 — createReservationSafe가
-      // reservedByUid를 호출자로 강제하므로(createReservationCore), 관리자가 직원 그룹을
-      // 수정하면 재생성된 예약의 명의가 관리자로 조용히 넘어가 직원이 자기 예약 권한을 잃는다.
-      // 관리자 경로는 그 결함을 서버에서 먼저 고친 뒤 별도로 연다.
+      // 기관 관리자를 한동안 제외했던 이유는 명의 이전이었다 — createReservationSafe가
+      // reservedByUid를 호출자로 강제해서, 관리자가 직원 그룹을 수정하면 재생성된 예약의
+      // 명의가 관리자로 조용히 넘어갔다. **그 결함을 서버에서 먼저 고쳤으므로**
+      // (createReservationCore가 reservedByUid를 받아 기관 구성원 여부를 확인하고 명의를
+      // 보존한다) 이제 관리자 경로를 연다. 관리자는 이미 같은 기관 예약을 update로 수정할
+      // 수 있으니, 그룹 수정만 막혀 있는 것은 경계가 아니라 반쪽짜리 제약이었다.
+      //
+      // 타 기관은 belongsToMyOrg()·isOrgAdmin(resource.data.organizationId)로 계속 막힌다.
       allow delete: if isSuperAdmin()
-                    || (belongsToMyOrg()
-                        && resource.data.reservedByUid == request.auth.uid);
+                    || (belongsToMyOrg() && (
+                        resource.data.reservedByUid == request.auth.uid
+                        || isOrgAdmin(resource.data.organizationId)
+                    ));
     }
 
     // === 알림 ===
