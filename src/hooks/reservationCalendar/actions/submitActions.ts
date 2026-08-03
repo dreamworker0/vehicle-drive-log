@@ -5,8 +5,10 @@
 import {
     createReservationSafe,
     updateReservation,
+    detachFromRecurringGroup,
     deleteReservationGroup,
     deleteRecurringGroup,
+    cancelRecurringGroup,
     getReservationsByDateRange,
 } from '../../../lib/firestore';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
@@ -37,11 +39,12 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
     const effectiveEndDate = form.endDate || selectedDate;
     const isMultiDay = !isRecurring && effectiveEndDate > selectedDate;
 
-    // 반복 그룹 수정 중에 반복을 끄면 "다시 만들 대상"이 사라진다.
-    // 예전에는 이 상태로 제출하면 폼을 그대로 단건 저장하려다 undefined 필드로 실패했고,
-    // 그 뒤 그룹 재생성 블록이 빈 날짜 목록을 만나 **그룹만 지워질 수 있었다.**
-    if (editingRecurringGroupId && !isRecurring) {
-        showToast('반복 예약 수정 중에는 반복 설정을 끌 수 없습니다. 단건으로 바꾸려면 반복 예약을 취소하고 새로 예약해주세요.', 'warning');
+    // 반복 그룹 수정 중에 반복을 끄면 = 반복 → 단건 전환.
+    // 수정을 누른 그 회차만 남기고 나머지는 취소한다 (폼이 그 날짜를 명시한다).
+    const isRecurringToSingle = !!editingRecurringGroupId && !isRecurring;
+    if (isRecurringToSingle && !editingReservation) {
+        // 남길 회차를 특정할 수 없으면 진행하지 않는다 (도달 불가에 가깝지만 조용히 지우는 것보다 낫다)
+        showToast('전환할 예약을 찾을 수 없습니다. 목록에서 수정을 다시 눌러주세요.', 'warning');
         return;
     }
 
@@ -68,7 +71,9 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
     // 지난 시간으로 옮기는 것만 막는다. 이미 시작 시간이 지난 예약의 목적지·차량만 고치는 것은
     // 막을 이유가 없으므로, 시간을 실제로 바꿨을 때(또는 신규 생성일 때)만 판정한다.
     const startTimeChanged = !editingReservation || form.startTime !== editingReservation.startTime;
-    const firstTargetDate = isRecurring ? recurringDates[0] : selectedDate;
+    const firstTargetDate = isRecurringToSingle
+        ? editingReservation!.date          // 전환은 남길 회차의 날짜에서 일어난다
+        : isRecurring ? recurringDates[0] : selectedDate;
     if (startTimeChanged && firstTargetDate === getTodayStr() && form.startTime < getCurrentTimeStr()) {
         showToast(
             isRecurring
@@ -113,17 +118,36 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
         }
     } else {
         const vehicleOverlap = findOverlappingReservation(reservations, {
+            // 전환은 selectedDate(그룹 첫 날)가 아니라 남길 회차의 날짜를 검사한다
             vehicleId: form.vehicleId,
-            date: selectedDate,
+            date: isRecurringToSingle ? editingReservation!.date : selectedDate,
             startTime: form.startTime,
             endTime: isMultiDay ? '23:59' : form.endTime,
             excludeId: editingReservation?.id || null,
             excludeGroupId: editingGroupId,
+            // 나머지 회차는 전환과 함께 취소되므로 충돌로 보지 않는다
+            excludeRecurringGroupId: isRecurringToSingle ? editingRecurringGroupId : null,
         });
         if (vehicleOverlap) {
             showToast(`해당 차량은 ${vehicleOverlap.startTime} ~ ${vehicleOverlap.endTime}에 이미 예약되어 있습니다.`, 'warning');
             return;
         }
+    }
+
+    // 되돌릴 수 없는 전환이므로 남는 날짜와 취소 건수를 밝히고 확인을 받는다
+    if (isRecurringToSingle) {
+        const siblingCount = reservations.filter(r =>
+            r.recurringGroupId === editingRecurringGroupId
+            && r.status !== 'cancelled'
+            && r.id !== editingReservation!.id
+        ).length;
+        const isConfirmed = await confirm({
+            title: '단건 예약으로 전환',
+            message: `${editingReservation!.date} 예약만 남기고 나머지 ${siblingCount}건을 취소합니다.\n계속하시겠습니까?`,
+            confirmText: '전환',
+            confirmColor: 'danger',
+        });
+        if (!isConfirmed) return;
     }
 
     // 한 사람이 같은 시간대에 여러 대의 차량을 예약하는 것은 허용한다 (행사·대규모 외근 대응).
@@ -147,7 +171,35 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
             routeTollFee: routeInfo.tollFee || 0,
         } : {};
 
-        if (editingReservation && editingGroupId) {
+        if (isRecurringToSingle) {
+            // ── 반복 → 단건 전환 ──
+            // 순서가 중요하다. 먼저 나머지를 취소하고, 남길 회차를 마지막에 떼어낸다.
+            // 반대로 하면 떼어낸 뒤 취소가 실패했을 때 단건과 살아 있는 반복 회차가 함께 남아
+            // 사용자가 무엇이 유효한지 알 수 없다. 이 순서라면 두 번째가 실패해도 남는 것은
+            // "아직 그룹에 속한 예약 1건"이고, 다시 전환하면 된다.
+            //
+            // 삭제가 아니라 **취소**인 이유: Rules의 예약 delete는 소유자 본인만 허용한다.
+            // 기관 관리자가 직원의 반복 예약을 전환하는 경로를 막지 않으려면 update여야 한다.
+            // 취소는 기록이 남는다는 점에서도 이 작업에 더 맞다(무엇이 왜 사라졌는지 보인다).
+            const cancelled = await cancelRecurringGroup(
+                editingRecurringGroupId!,
+                userData.organizationId!,
+                editingReservation!.id,
+            );
+            await detachFromRecurringGroup(editingReservation!.id, {
+                vehicleId: form.vehicleId,
+                vehicleName,
+                destination: form.destination,
+                purpose: form.purpose,
+                startTime: form.startTime,
+                endTime: form.endTime,
+                reservedByUid: form.reservedByUid,
+                reservedByName: form.reservedByName,
+                organizationId: userData.organizationId,
+                ...routeData,
+            });
+            showToast(`${editingReservation!.date} 단건 예약으로 전환되었습니다. (반복 ${cancelled}건 취소)`);
+        } else if (editingReservation && editingGroupId) {
             // ── 다일 예약 그룹 수정: 기존 그룹 삭제 → 새 그룹 재생성 ──
             await deleteReservationGroup(editingGroupId, userData.organizationId!);
 
@@ -279,7 +331,8 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
         }
 
         // ── 반복 예약 그룹 수정 ──
-        if (editingRecurringGroupId) {
+        // 전환(반복 → 단건)은 위에서 이미 끝났으므로 여기 들어오면 안 된다.
+        if (editingRecurringGroupId && isRecurring) {
             // 삭제보다 검증이 **먼저**다. 지우고 나서 만들 날짜가 없다는 것을 알면
             // 그룹만 사라지고 아무것도 남지 않는다 (되돌릴 방법이 없다).
             if (recurringDates.length === 0) {

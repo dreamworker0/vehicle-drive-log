@@ -139,6 +139,19 @@ export default function ReservationSidePanel({
     // (handleSubmit — 안내와 함께 차단하고, 미리보기에서 오늘을 제외하면 통과한다).
     const effectiveMinTime = actualIsToday && !form.isRecurring ? getCurrentTimeStr() : '00:00';
 
+    /** 반복 그룹을 수정하다가 반복 체크를 끈 상태 = 단건 전환 (handleSubmit이 같은 조건으로 판정한다) */
+    const isRecurringToSingle = !!editingRecurringGroupId && !form.isRecurring && !!editingReservation;
+
+    // 반복 → 단건 전환 시 취소될 나머지 회차 수 (수정 중인 회차는 제외)
+    const recurringSiblingCount = useMemo(() => {
+        if (!editingRecurringGroupId || !editingReservation) return 0;
+        return allReservations.filter(r =>
+            r.recurringGroupId === editingRecurringGroupId
+            && r.status !== 'cancelled'
+            && r.id !== editingReservation.id
+        ).length;
+    }, [allReservations, editingRecurringGroupId, editingReservation]);
+
     if (!selectedDate) {
         return (
             <div className="glass-card p-8 text-center">
@@ -243,6 +256,19 @@ export default function ReservationSidePanel({
                             editingRecurringGroupId={editingRecurringGroupId}
                         />
 
+                        {/* 반복 → 단건 전환 안내
+                            무엇이 남고 무엇이 사라지는지 저장 전에 밝힌다. 반복 체크를 끄면
+                            패널이 사라지므로, 안내가 없으면 "그래서 어느 날짜가 남나"를 알 수 없다. */}
+                        {editingRecurringGroupId && !form.isRecurring && editingReservation && (
+                            <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 dark:bg-amber-900/20 dark:border-amber-800/40 animate-fade-in">
+                                <p className="text-xs font-semibold text-amber-800 dark:text-amber-300">📌 단건 예약으로 전환</p>
+                                <p className="mt-1 text-xs text-amber-700 dark:text-amber-400">
+                                    {new Date(editingReservation.date + 'T00:00').toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })} 예약만 남고,
+                                    같은 반복 그룹의 나머지 {recurringSiblingCount}건은 취소됩니다.
+                                </p>
+                            </div>
+                        )}
+
                         {/* 반복 예약 설정 패널 */}
                         {form.isRecurring && (
                             <RecurringReservationPanel
@@ -291,8 +317,8 @@ export default function ReservationSidePanel({
                         </div>
                         <button type="submit" disabled={submitting} className={`w-full btn-sm min-h-[48px] ${form.isRecurring ? 'bg-purple-500 hover:bg-purple-600 dark:hover:bg-purple-500 text-white rounded-xl py-2 font-semibold transition-colors disabled:opacity-50' : 'btn-primary'}`}>
                             {submitting
-                                ? (editingRecurringGroupId ? '반복 예약 수정 중...' : editingGroupId ? '다일 예약 수정 중...' : editingReservation ? '수정 중...' : form.isRecurring ? '반복 예약 생성 중...' : '예약 중...')
-                                : (editingRecurringGroupId ? '반복 예약 수정' : editingGroupId ? '다일 예약 수정' : editingReservation ? '예약 수정' : form.isRecurring ? '반복 예약 확정' : '예약 확정')}
+                                ? (isRecurringToSingle ? '전환 중...' : editingRecurringGroupId ? '반복 예약 수정 중...' : editingGroupId ? '다일 예약 수정 중...' : editingReservation ? '수정 중...' : form.isRecurring ? '반복 예약 생성 중...' : '예약 중...')
+                                : (isRecurringToSingle ? '단건 예약으로 전환' : editingRecurringGroupId ? '반복 예약 수정' : editingGroupId ? '다일 예약 수정' : editingReservation ? '예약 수정' : form.isRecurring ? '반복 예약 확정' : '예약 확정')}
                         </button>
                     </form>
                 </div>

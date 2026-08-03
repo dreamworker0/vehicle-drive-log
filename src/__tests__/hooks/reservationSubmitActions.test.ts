@@ -6,8 +6,10 @@ import type { ReservationForm } from '@/types/reservation';
 vi.mock('@/lib/firestore', () => ({
     createReservationSafe: vi.fn(() => Promise.resolve()),
     updateReservation: vi.fn(() => Promise.resolve()),
+    detachFromRecurringGroup: vi.fn(() => Promise.resolve()),
     deleteReservationGroup: vi.fn(() => Promise.resolve()),
     deleteRecurringGroup: vi.fn(() => Promise.resolve()),
+    cancelRecurringGroup: vi.fn(() => Promise.resolve(3)),
     getReservationsByDateRange: vi.fn(() => Promise.resolve([])),
 }));
 vi.mock('@/hooks/utils/reservationUtils', () => ({
@@ -29,7 +31,10 @@ vi.mock('@/hooks/useTodayDashboard', () => ({
 }));
 
 import { handleSubmit } from '@/hooks/reservationCalendar/actions/submitActions';
-import { createReservationSafe, updateReservation, deleteRecurringGroup } from '@/lib/firestore';
+import {
+    createReservationSafe, updateReservation, deleteRecurringGroup,
+    cancelRecurringGroup, detachFromRecurringGroup,
+} from '@/lib/firestore';
 import { findOverlappingReservation, getTodayStr, getCurrentTimeStr } from '@/hooks/utils/reservationUtils';
 import { isVehicleRestrictedForUser } from '@/lib/vehicleUtils';
 import { generateRecurringDates } from '@/hooks/utils/recurringUtils';
@@ -242,19 +247,79 @@ describe('handleSubmit — 예약 제출', () => {
             expect(deps.showToast).toHaveBeenCalledWith('반복 예약할 날짜가 없습니다.', 'warning');
         });
 
-        it('반복 설정을 끈 채 제출하면 안내하고 아무것도 건드리지 않는다', async () => {
-            const deps = recurringDeps({
+        describe('반복 → 단건 전환 (반복 체크를 끈 채 제출)', () => {
+            /** 수정을 누른 회차가 8/10, 같은 그룹에 8/3·8/17이 더 있는 상태 */
+            const convertDeps = (overrides: Partial<ActionDeps> = {}) => recurringDeps({
+                editingReservation: { id: 'r2', date: '2026-08-10', startTime: '10:00', endTime: '11:00' } as never,
                 form: {
                     vehicleId: 'v1', destination: '목적지', purpose: '업무',
                     startTime: '10:00', endTime: '11:00',
-                    isRecurring: false, recurringDays: undefined,
+                    // ReservationTypeSelector가 체크를 끄면 반복 필드는 undefined로 비워진다
+                    isRecurring: false, recurringDays: undefined, recurringEndDate: undefined,
                 } as unknown as ReservationForm,
+                reservations: [
+                    { id: 'r1', vehicleId: 'v1', recurringGroupId: 'rcr_1', date: '2026-08-03', startTime: '10:00', endTime: '11:00', status: 'reserved' },
+                    { id: 'r2', vehicleId: 'v1', recurringGroupId: 'rcr_1', date: '2026-08-10', startTime: '10:00', endTime: '11:00', status: 'reserved' },
+                    { id: 'r3', vehicleId: 'v1', recurringGroupId: 'rcr_1', date: '2026-08-17', startTime: '10:00', endTime: '11:00', status: 'reserved' },
+                ] as unknown as ActionDeps['reservations'],
+                ...overrides,
             });
-            await handleSubmit(fakeEvent(), deps);
 
-            expect(deleteRecurringGroup).not.toHaveBeenCalled();
-            expect(updateReservation).not.toHaveBeenCalled();
-            expect(createReservationSafe).not.toHaveBeenCalled();
+            it('수정을 누른 회차만 남기고 나머지를 취소한다', async () => {
+                const deps = convertDeps();
+                await handleSubmit(fakeEvent(), deps);
+
+                // 남길 회차를 exceptId로 넘겨야 자기 자신까지 취소되지 않는다
+                expect(cancelRecurringGroup).toHaveBeenCalledWith('rcr_1', 'org1', 'r2');
+                expect(detachFromRecurringGroup).toHaveBeenCalledTimes(1);
+                expect(vi.mocked(detachFromRecurringGroup).mock.calls[0][0]).toBe('r2');
+                // 지우고 다시 만들지 않는다 — 삭제 권한(소유자 한정)과 명의가 걸린다
+                expect(deleteRecurringGroup).not.toHaveBeenCalled();
+                expect(createReservationSafe).not.toHaveBeenCalled();
+            });
+
+            it('취소될 건수를 밝히고 확인을 받는다', async () => {
+                const deps = convertDeps();
+                await handleSubmit(fakeEvent(), deps);
+
+                expect(deps.confirm).toHaveBeenCalledTimes(1);
+                expect(vi.mocked(deps.confirm).mock.calls[0][0]).toMatchObject({
+                    message: expect.stringContaining('나머지 2건'),
+                });
+            });
+
+            it('확인을 취소하면 아무것도 건드리지 않는다', async () => {
+                const deps = convertDeps({ confirm: vi.fn(() => Promise.resolve(false)) });
+                await handleSubmit(fakeEvent(), deps);
+
+                expect(cancelRecurringGroup).not.toHaveBeenCalled();
+                expect(detachFromRecurringGroup).not.toHaveBeenCalled();
+            });
+
+            it('남길 회차의 날짜에 다른 예약이 있으면 전환하지 않는다', async () => {
+                const actual = await vi.importActual<typeof import('@/hooks/utils/reservationUtils')>('@/hooks/utils/reservationUtils');
+                vi.mocked(findOverlappingReservation).mockImplementation(actual.findOverlappingReservation);
+                const deps = convertDeps({
+                    reservations: [
+                        { id: 'r2', vehicleId: 'v1', recurringGroupId: 'rcr_1', date: '2026-08-10', startTime: '10:00', endTime: '11:00', status: 'reserved' },
+                        // 같은 차량·같은 날의 남의 예약 (그룹 밖)
+                        { id: 'x9', vehicleId: 'v1', date: '2026-08-10', startTime: '10:30', endTime: '12:00', status: 'reserved' },
+                    ] as unknown as ActionDeps['reservations'],
+                });
+                await handleSubmit(fakeEvent(), deps);
+
+                expect(cancelRecurringGroup).not.toHaveBeenCalled();
+                expect(detachFromRecurringGroup).not.toHaveBeenCalled();
+            });
+
+            it('같은 그룹의 다른 회차는 충돌로 보지 않는다 (전환과 함께 취소되므로)', async () => {
+                const actual = await vi.importActual<typeof import('@/hooks/utils/reservationUtils')>('@/hooks/utils/reservationUtils');
+                vi.mocked(findOverlappingReservation).mockImplementation(actual.findOverlappingReservation);
+                const deps = convertDeps();
+                await handleSubmit(fakeEvent(), deps);
+
+                expect(detachFromRecurringGroup).toHaveBeenCalledTimes(1);
+            });
         });
 
         it('수정 중인 그룹 자신은 충돌로 보지 않는다', async () => {
