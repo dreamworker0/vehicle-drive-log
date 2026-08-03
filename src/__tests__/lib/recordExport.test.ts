@@ -55,14 +55,32 @@ describe('recordExport (클라이언트)', () => {
             .toEqual(['dataset', 'exportId', 'format', 'recordCount']);
     });
 
-    it('호출이 거부돼도 throw하지 않는다 — 내보내기를 막으면 안 된다', () => {
-        mocks.callable.mockRejectedValue(new Error('permission-denied'));
+    it('호출이 거부돼도 throw하지 않는다 — 내보내기를 막으면 안 된다', async () => {
+        mocks.callable.mockRejectedValue(
+            Object.assign(new Error('반출 대상이 올바르지 않습니다.'), { code: 'functions/permission-denied' })
+        );
         expect(() => recordExport('excel', 'driveLogs', 1)).not.toThrow();
+
+        // 거부는 우리 코드의 결함이므로 Sentry로 보고한다 (재시도는 하지 않는다)
+        await vi.waitFor(() => expect(mocks.captureError).toHaveBeenCalled());
+        expect(mocks.callable).toHaveBeenCalledTimes(1);
     });
 
-    it('callable 생성 자체가 실패해도 throw하지 않는다', () => {
+    it('응답이 늦으면 같은 exportId로 다시 부른다 — 재시도가 두 번 반출로 기록되면 안 된다', async () => {
+        mocks.callable
+            .mockRejectedValueOnce(Object.assign(new Error('deadline-exceeded'), { code: 'functions/deadline-exceeded' }))
+            .mockResolvedValueOnce({ data: { success: true } });
+
+        recordExport('excel', 'driveLogs', 30);
+
+        await vi.waitFor(() => expect(mocks.callable).toHaveBeenCalledTimes(2), { timeout: 5000 });
+        expect(mocks.callable.mock.calls[1][0].exportId).toBe(mocks.callable.mock.calls[0][0].exportId);
+        expect(mocks.captureError).not.toHaveBeenCalled();
+    });
+
+    it('callable 생성 자체가 실패해도 throw하지 않는다', async () => {
         mocks.httpsCallable.mockImplementation(() => { throw new Error('functions 미초기화'); });
         expect(() => recordExport('excel', 'driveLogs', 1)).not.toThrow();
-        expect(mocks.captureError).toHaveBeenCalled();
+        await vi.waitFor(() => expect(mocks.captureError).toHaveBeenCalled());
     });
 });

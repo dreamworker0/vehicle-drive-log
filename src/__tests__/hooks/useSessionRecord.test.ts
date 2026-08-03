@@ -87,12 +87,30 @@ describe('useSessionRecord', () => {
     it('호출이 실패해도 throw하지 않고 Sentry로만 보고한다', async () => {
         mocks.auth.user = { uid: 'u1' };
         mocks.auth.userDocState = 'present';
-        mocks.callable.mockRejectedValue(new Error('unavailable'));
+        mocks.callable.mockRejectedValue(
+            Object.assign(new Error('세션 식별자가 올바르지 않습니다.'), { code: 'functions/invalid-argument' })
+        );
 
         renderHook(() => useSessionRecord());
 
         await waitFor(() => expect(mocks.captureError).toHaveBeenCalled());
         expect(mocks.captureError.mock.calls[0][1]).toMatchObject({ context: 'useSessionRecord', uid: 'u1' });
+    });
+
+    it('응답이 늦으면 같은 sessionId로 다시 부른다 — 서버가 같은 문서를 덮어쓴다', async () => {
+        mocks.auth.user = { uid: 'u1' };
+        mocks.auth.userDocState = 'present';
+        mocks.callable
+            // SDK가 시간 초과 시 던지는 것과 같은 모양
+            .mockRejectedValueOnce(Object.assign(new Error('deadline-exceeded'), { code: 'functions/deadline-exceeded' }))
+            .mockResolvedValueOnce({ data: { success: true } });
+
+        renderHook(() => useSessionRecord());
+
+        await waitFor(() => expect(mocks.callable).toHaveBeenCalledTimes(2), { timeout: 5000 });
+        expect(mocks.callable.mock.calls[1][0].sessionId).toBe(mocks.callable.mock.calls[0][0].sessionId);
+        // 재시도로 기록이 남았으므로 보고할 것이 없다
+        expect(mocks.captureError).not.toHaveBeenCalled();
     });
 
     it('sessionStorage를 쓸 수 없어도 호출을 포기하지 않는다', async () => {

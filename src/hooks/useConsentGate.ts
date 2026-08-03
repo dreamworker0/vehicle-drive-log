@@ -8,8 +8,7 @@
  * 동의 기록은 Rules가 클라이언트 쓰기를 차단하므로 acceptCurrentTerms 콜러블만 기록한다.
  */
 import { useState, useEffect, useCallback } from 'react';
-import { httpsCallable } from 'firebase/functions';
-import { firebaseFunctions } from '../lib/firebase';
+import { callWithRetry, isTransientCallableError } from '../lib/callableRetry';
 import { useAuth } from './useAuth';
 import { getOrganization } from '../lib/firestore';
 import { TERMS_VERSION, PRIVACY_VERSION } from '../lib/constants';
@@ -70,24 +69,33 @@ export default function useConsentGate() {
      * 재동의 기록. 성공 시 게이트를 닫는다.
      * userData의 onSnapshot이 갱신되면 판정도 자동으로 'none'이 되지만,
      * 갱신 지연 동안 모달이 남지 않도록 즉시 닫는다.
+     *
+     * 관리자에게는 차단 모달이라 실패가 곧 "앱을 못 씀"이다. 응답이 늦거나 끊기면
+     * 사용자가 버튼을 다시 누르기 전에 한 번 더 부른다 — merge 쓰기라 반복해도 결과가 같다.
+     * 다만 사용자가 스피너를 보고 있으므로 시도 횟수는 2회로 제한한다.
      */
     const accept = useCallback(async () => {
         setSubmitting(true);
         setError('');
         try {
-            const acceptFn = httpsCallable(firebaseFunctions, 'acceptCurrentTerms');
-            await acceptFn({
+            await callWithRetry('acceptCurrentTerms', {
                 agreedTerms: true,
                 termsVersion: TERMS_VERSION,
                 // 관리자만 처리방침 동의를 함께 보낸다(위탁 계약 성립 요건).
                 ...(requirement === 'admin'
                     ? { agreedPrivacy: true, privacyVersion: PRIVACY_VERSION }
                     : {}),
-            });
+            }, { attempts: 2 });
             setRequirement('none');
             return true;
         } catch (err) {
-            captureError(err, { context: 'useConsentGate.accept', requirement });
+            // 재시도까지 실패한 네트워크 문제도 보고한다 — 여기서의 실패는 관리자가
+            // 모달에 갇혀 앱을 쓰지 못한다는 뜻이라, 조치(문의 대응)로 이어지는 신호다.
+            captureError(err, {
+                context: 'useConsentGate.accept',
+                requirement,
+                transient: isTransientCallableError(err),
+            });
             setError('동의 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.');
             return false;
         } finally {

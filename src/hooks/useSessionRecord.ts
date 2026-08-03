@@ -11,11 +11,16 @@
  *
  * ## 실패해도 화면을 막지 않는다
  * 접속기록은 사용자가 손쓸 수 있는 것이 아니고, 기록 실패로 로그인을 막으면 가용성
- * 손실이 훨씬 크다. 조용히 삼키고 Sentry로만 보고한다.
+ * 손실이 훨씬 크다. 조용히 삼킨다.
+ *
+ * 대신 **놓치지 않으려고 다시 부른다.** 로그인 직후는 네트워크가 가장 불안정한 구간이고
+ * (부팅 요청이 몰리고, 모바일은 화면 전환으로 요청이 멈추기도 한다) 이 콜러블은 호출이
+ * 드물어 콜드 스타트가 겹치기 쉽다. 같은 sessionId로 같은 문서를 덮어쓰므로 재시도가
+ * 기록을 늘리지 않는다. 재시도까지 실패한 네트워크 문제는 Sentry로 올리지 않는다 —
+ * 조치로 이어지지 않는 보고는 진짜 결함을 덮는다.
  */
 import { useEffect, useRef } from 'react';
-import { httpsCallable } from 'firebase/functions';
-import { firebaseFunctions } from '../lib/firebase';
+import { callWithRetry, isTransientCallableError } from '../lib/callableRetry';
 import { useAuth } from './useAuth';
 import { captureError } from '../lib/sentry';
 
@@ -56,8 +61,11 @@ export default function useSessionRecord() {
         if (sentForUid.current === user.uid) return;
         sentForUid.current = user.uid;
 
-        const record = httpsCallable(firebaseFunctions, 'recordSession');
-        record({ sessionId: getSessionId() }).catch((err) => {
+        void callWithRetry('recordSession', { sessionId: getSessionId() }).catch((err) => {
+            if (isTransientCallableError(err)) {
+                console.warn('[useSessionRecord] 접속기록 실패 (네트워크)', err);
+                return;
+            }
             captureError(err, { context: 'useSessionRecord', uid: user.uid });
         });
     }, [user, userDocState]);
