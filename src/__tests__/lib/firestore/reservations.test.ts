@@ -190,6 +190,14 @@ describe('firestore/reservations', () => {
 
             expect(fs.updateDoc).toHaveBeenCalledWith(expect.anything(), { destination: '복지관' });
         });
+
+        it('updateReservation은 undefined 필드를 보내지 않는다', async () => {
+            // Firestore가 undefined를 거부해 "Unsupported field value: undefined"로
+            // 저장 전체가 실패한다 — 폼 상태를 통째로 넘기는 호출부가 있어 여기서 막는다
+            await updateReservation('r1', { destination: '복지관', recurringDays: undefined } as never);
+
+            expect(fs.updateDoc).toHaveBeenCalledWith(expect.anything(), { destination: '복지관' });
+        });
     });
 
     // ── updateReservationStatus 비-트랜잭션 경로 (트랜잭션 에러 경로는 firestore.test.ts 담당) ──

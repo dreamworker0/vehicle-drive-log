@@ -33,13 +33,18 @@ export default function RecurringReservationPanel({
     });
 
     // 충돌 검사
+    //
+    // 수정 중인 반복 그룹은 제외한다. 그룹 수정은 기존 예약을 지우고 다시 만드는 방식이라
+    // 자기 자신은 충돌이 아니다. 예전에는 예약 **문서 ID**(`r.id`)를 그룹 ID와 비교해서
+    // 어떤 예약도 걸러지지 않았고, 그 결과 반복 그룹을 수정하려고 열면 **모든 날짜가 충돌로
+    // 표시**됐다(20일 반복이면 "⚠️ 충돌 20건"). 비교 대상은 `r.recurringGroupId`다.
     const conflictMap = new Map<string, Reservation>();
     for (const dateStr of recurringDates) {
         const conflict = allReservations.find(r =>
             r.date === dateStr &&
             r.vehicleId === form.vehicleId &&
             r.status !== 'cancelled' &&
-            r.id !== editingRecurringGroupId &&
+            !(editingRecurringGroupId && r.recurringGroupId === editingRecurringGroupId) &&
             r.startTime < form.endTime &&
             r.endTime > form.startTime
         );
