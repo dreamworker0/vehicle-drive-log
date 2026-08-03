@@ -12,6 +12,10 @@ vi.mock('@/lib/firestore', () => ({
 }));
 vi.mock('@/hooks/utils/reservationUtils', () => ({
     findOverlappingReservation: vi.fn(() => null),
+    // 지난 시간 판정은 "오늘"에만 걸린다. 픽스처 날짜(2026-07-15)와 겹치지 않는 고정값을 줘서
+    // 테스트가 실행 시각에 따라 달라지지 않게 한다.
+    getTodayStr: vi.fn(() => '2000-01-01'),
+    getCurrentTimeStr: vi.fn(() => '12:00'),
 }));
 vi.mock('@/lib/vehicleUtils', () => ({
     isVehicleRestrictedForUser: vi.fn(() => false),
@@ -25,8 +29,8 @@ vi.mock('@/hooks/useTodayDashboard', () => ({
 }));
 
 import { handleSubmit } from '@/hooks/reservationCalendar/actions/submitActions';
-import { createReservationSafe } from '@/lib/firestore';
-import { findOverlappingReservation } from '@/hooks/utils/reservationUtils';
+import { createReservationSafe, updateReservation, deleteRecurringGroup } from '@/lib/firestore';
+import { findOverlappingReservation, getTodayStr, getCurrentTimeStr } from '@/hooks/utils/reservationUtils';
 import { isVehicleRestrictedForUser } from '@/lib/vehicleUtils';
 import { generateRecurringDates } from '@/hooks/utils/recurringUtils';
 
@@ -72,6 +76,8 @@ describe('handleSubmit — 예약 제출', () => {
         vi.mocked(findOverlappingReservation).mockReturnValue(null);
         vi.mocked(isVehicleRestrictedForUser).mockReturnValue(false);
         vi.mocked(generateRecurringDates).mockReturnValue([]);
+        vi.mocked(getTodayStr).mockReturnValue('2000-01-01');
+        vi.mocked(getCurrentTimeStr).mockReturnValue('12:00');
     });
 
     it('필수값이 누락되면 경고 토스트를 띄우고 쓰기를 하지 않는다', async () => {
@@ -171,6 +177,119 @@ describe('handleSubmit — 예약 제출', () => {
         expect(deps.showToast).toHaveBeenCalledWith('반복 예약할 날짜가 없습니다. 요일과 기간을 확인해주세요.', 'warning');
         expect(createReservationSafe).not.toHaveBeenCalled();
         expect(deps.setSubmitting).toHaveBeenLastCalledWith(false);
+    });
+
+    it('종료 시간이 시작 시간보다 이르면 차단한다 (입력 중이 아니라 제출 시점 판정)', async () => {
+        const deps = makeDeps({
+            form: { vehicleId: 'v1', destination: '목적지', purpose: '업무', startTime: '14:00', endTime: '13:00' } as unknown as ReservationForm,
+        });
+        await handleSubmit(fakeEvent(), deps);
+        expect(deps.showToast).toHaveBeenCalledWith('종료 시간은 시작 시간보다 늦어야 합니다.', 'warning');
+        expect(createReservationSafe).not.toHaveBeenCalled();
+    });
+
+    it('오늘 날짜에 이미 지난 시간으로는 예약하지 못한다', async () => {
+        vi.mocked(getTodayStr).mockReturnValue('2026-07-15'); // selectedDate와 같은 날 = 오늘
+        vi.mocked(getCurrentTimeStr).mockReturnValue('17:58');
+        const deps = makeDeps();  // 10:00 ~ 11:00
+        await handleSubmit(fakeEvent(), deps);
+        expect(deps.showToast).toHaveBeenCalledWith('이미 지난 시간으로는 예약할 수 없습니다.', 'warning');
+        expect(createReservationSafe).not.toHaveBeenCalled();
+    });
+
+    it('시작 시간을 바꾸지 않은 수정은 이미 지난 시간이어도 막지 않는다', async () => {
+        // 오늘 09:00 예약의 목적지만 고치는 경우까지 막으면 손댈 방법이 없어진다
+        vi.mocked(getTodayStr).mockReturnValue('2026-07-15');
+        vi.mocked(getCurrentTimeStr).mockReturnValue('17:58');
+        const deps = makeDeps({
+            editingReservation: { id: 'r1', startTime: '10:00', endTime: '11:00' } as never,
+        });
+        await handleSubmit(fakeEvent(), deps);
+        expect(updateReservation).toHaveBeenCalledTimes(1);
+    });
+
+    describe('반복 그룹 수정', () => {
+        const recurringDeps = (overrides: Partial<ActionDeps> = {}) => makeDeps({
+            editingReservation: { id: 'r1', startTime: '10:00', endTime: '11:00' } as never,
+            editingRecurringGroupId: 'rcr_1',
+            form: {
+                vehicleId: 'v1', destination: '목적지', purpose: '업무',
+                startTime: '10:00', endTime: '11:00',
+                isRecurring: true, recurringDays: [1, 2, 3, 4, 5],
+            } as unknown as ReservationForm,
+            ...overrides,
+        });
+
+        it('그룹째 다시 만들고 단건 저장은 하지 않는다', async () => {
+            // 단건 저장이 끼면 폼에 남은 반복 설정이 예약 문서로 새고,
+            // undefined 값이 섞이면 "Unsupported field value: undefined"로 저장이 통째로 실패한다
+            vi.mocked(generateRecurringDates).mockReturnValue(['2026-07-15', '2026-07-16']);
+            const deps = recurringDeps();
+            await handleSubmit(fakeEvent(), deps);
+
+            expect(updateReservation).not.toHaveBeenCalled();
+            expect(deleteRecurringGroup).toHaveBeenCalledWith('rcr_1', 'org1');
+            expect(createReservationSafe).toHaveBeenCalledTimes(2);
+        });
+
+        it('만들 날짜가 없으면 기존 그룹을 지우지 않는다', async () => {
+            // 지우고 나서 알면 그룹만 사라지고 되돌릴 방법이 없다
+            vi.mocked(generateRecurringDates).mockReturnValue([]);
+            const deps = recurringDeps();
+            await handleSubmit(fakeEvent(), deps);
+
+            expect(deleteRecurringGroup).not.toHaveBeenCalled();
+            expect(deps.showToast).toHaveBeenCalledWith('반복 예약할 날짜가 없습니다.', 'warning');
+        });
+
+        it('반복 설정을 끈 채 제출하면 안내하고 아무것도 건드리지 않는다', async () => {
+            const deps = recurringDeps({
+                form: {
+                    vehicleId: 'v1', destination: '목적지', purpose: '업무',
+                    startTime: '10:00', endTime: '11:00',
+                    isRecurring: false, recurringDays: undefined,
+                } as unknown as ReservationForm,
+            });
+            await handleSubmit(fakeEvent(), deps);
+
+            expect(deleteRecurringGroup).not.toHaveBeenCalled();
+            expect(updateReservation).not.toHaveBeenCalled();
+            expect(createReservationSafe).not.toHaveBeenCalled();
+        });
+
+        it('수정 중인 그룹 자신은 충돌로 보지 않는다', async () => {
+            // 그룹 수정은 지우고 다시 만드는 방식이라 자기 예약과의 겹침은 충돌이 아니다.
+            // 제외하지 않으면 시간을 바꾸려 할 때마다 "이미 예약되어 있습니다"로 막힌다.
+            const actual = await vi.importActual<typeof import('@/hooks/utils/reservationUtils')>('@/hooks/utils/reservationUtils');
+            vi.mocked(findOverlappingReservation).mockImplementation(actual.findOverlappingReservation);
+            vi.mocked(generateRecurringDates).mockReturnValue(['2026-07-15']);
+            const deps = recurringDeps({
+                reservations: [
+                    { id: 'r1', vehicleId: 'v1', recurringGroupId: 'rcr_1', date: '2026-07-15', startTime: '10:00', endTime: '11:00', status: 'reserved' },
+                ] as unknown as ActionDeps['reservations'],
+            });
+            await handleSubmit(fakeEvent(), deps);
+
+            expect(createReservationSafe).toHaveBeenCalledTimes(1);
+        });
+
+        it('다른 예약과 겹치면 그 날짜를 알려 주고 그룹을 지우지 않는다', async () => {
+            const actual = await vi.importActual<typeof import('@/hooks/utils/reservationUtils')>('@/hooks/utils/reservationUtils');
+            vi.mocked(findOverlappingReservation).mockImplementation(actual.findOverlappingReservation);
+            vi.mocked(generateRecurringDates).mockReturnValue(['2026-07-15', '2026-07-16']);
+            const deps = recurringDeps({
+                reservations: [
+                    { id: 'r9', vehicleId: 'v1', date: '2026-07-16', startTime: '10:30', endTime: '11:30', status: 'reserved' },
+                ] as unknown as ActionDeps['reservations'],
+            });
+            await handleSubmit(fakeEvent(), deps);
+
+            expect(deps.showToast).toHaveBeenCalledWith(
+                '2026-07-16에 해당 차량이 이미 예약되어 있습니다. 미리보기에서 그 날짜를 제외하거나 시간을 조정해주세요.',
+                'warning',
+            );
+            expect(deleteRecurringGroup).not.toHaveBeenCalled();
+        });
     });
 
     it('functions/already-exists 오류를 오류 토스트로 노출하고 setSubmitting(false)로 마감한다', async () => {

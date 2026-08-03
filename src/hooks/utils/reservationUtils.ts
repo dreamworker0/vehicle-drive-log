@@ -42,15 +42,33 @@ export const getMinStartTime = (isToday: boolean) => isToday ? getCurrentTimeStr
 
 /**
  * 예약 시간 중복 여부를 검사한다.
+ *
+ * 그룹(다일·반복) 수정은 기존 그룹을 지우고 다시 만드는 방식이라, 수정 중인 그룹 자신을
+ * 제외하지 않으면 **자기 예약과 겹친다는 이유로 시간을 바꿀 수 없다.** 단건 `excludeId`만으로는
+ * 그룹의 나머지 날짜가 그대로 남아 걸리므로 그룹 단위 제외를 함께 받는다.
+ *
  * @param {Array} reservations - 기존 예약 목록
- * @param {Object} params - { vehicleId, date, startTime, endTime, excludeId? }
+ * @param {Object} params - { vehicleId, date, startTime, endTime, excludeId?, excludeGroupId?, excludeRecurringGroupId? }
  * @returns {Object|null} 중복 예약이 있으면 해당 예약 반환, 없으면 null
  */
-export function findOverlappingReservation(reservations: Reservation[], { vehicleId, date, startTime, endTime, excludeId = null }: { vehicleId: string; date: string; startTime: string; endTime: string; excludeId?: string | null }) {
+export function findOverlappingReservation(
+    reservations: Reservation[],
+    { vehicleId, date, startTime, endTime, excludeId = null, excludeGroupId = null, excludeRecurringGroupId = null }: {
+        vehicleId: string;
+        date: string;
+        startTime: string;
+        endTime: string;
+        excludeId?: string | null;
+        excludeGroupId?: string | null;
+        excludeRecurringGroupId?: string | null;
+    },
+) {
     return reservations.find((r) => {
         if (r.vehicleId !== vehicleId || r.date !== date || r.status === 'cancelled') return false;
         if (excludeId && r.id === excludeId) return false;
-        
+        if (excludeGroupId && r.groupId === excludeGroupId) return false;
+        if (excludeRecurringGroupId && r.recurringGroupId === excludeRecurringGroupId) return false;
+
         const effStart = (r.status === 'completed' && r.actualStartTime) ? r.actualStartTime : r.startTime;
         const effEnd = (r.status === 'completed' && r.actualEndTime) ? r.actualEndTime : r.endTime;
         

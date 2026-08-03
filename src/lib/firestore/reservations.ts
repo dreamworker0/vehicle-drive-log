@@ -153,10 +153,21 @@ export const cancelReservation = async (reservationId: string) => {
     }
 };
 
-// 예약 정보 수정
+/**
+ * 예약 정보 수정
+ *
+ * `undefined` 필드는 보내지 않는다. Firestore updateDoc은 undefined를 거부하고
+ * "Unsupported field value: undefined (found in field …)"로 **저장 전체를 실패**시킨다.
+ * 호출부가 폼 상태를 통째로 넘기는 구조라(선택하지 않은 반복 설정 등이 undefined로 남는다)
+ * 값 하나 때문에 수정이 막히는 일이 실제로 있었다.
+ * 필드를 지우려면 undefined가 아니라 deleteField()를 명시적으로 넘긴다.
+ */
 export const updateReservation = async (reservationId: string, data: Partial<Reservation>) => {
     try {
-        await updateDoc(reservationDoc(reservationId), data);
+        const defined = Object.fromEntries(
+            Object.entries(data).filter(([, value]) => value !== undefined)
+        );
+        await updateDoc(reservationDoc(reservationId), defined);
     } catch (error) {
         captureError(error, { context: 'updateReservation', reservationId, data });
         throw error;

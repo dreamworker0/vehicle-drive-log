@@ -133,7 +133,11 @@ export default function ReservationSidePanel({
         return isToday;
     }, [isToday, form.isRecurring, form.recurringStartDate, selectedDate, form.recurringEndDate, form.recurringDays, holidays, form.excludeHolidays, form.excludedDates]);
 
-    const effectiveMinTime = actualIsToday ? getCurrentTimeStr() : '00:00';
+    // 반복 예약에는 하한을 걸지 않는다. 오늘이 반복 날짜에 포함돼 있다는 이유로 `min`을 현재
+    // 시각으로 잡으면, 내일 이후 날짜에 유효한 오전 시간대를 **브라우저 기본 검증이 막아**
+    // 폼 제출 자체가 되지 않는다. 오늘 회차가 이미 지난 경우는 제출 시점에 판정한다
+    // (handleSubmit — 안내와 함께 차단하고, 미리보기에서 오늘을 제외하면 통과한다).
+    const effectiveMinTime = actualIsToday && !form.isRecurring ? getCurrentTimeStr() : '00:00';
 
     if (!selectedDate) {
         return (
@@ -236,6 +240,7 @@ export default function ReservationSidePanel({
                             form={form}
                             setForm={setForm}
                             selectedDate={selectedDate}
+                            editingRecurringGroupId={editingRecurringGroupId}
                         />
 
                         {/* 반복 예약 설정 패널 */}
@@ -250,7 +255,12 @@ export default function ReservationSidePanel({
                             />
                         )}
 
-                        {/* 시작/종료 시간 */}
+                        {/* 시작/종료 시간
+                            입력 도중의 값으로 판정해 되돌리지 않는다. time 입력은 오전/오후·시·분을
+                            **한 칸씩** 바꾸며 그때마다 onChange를 부르는데, 중간값이 조건에 걸린다고
+                            state 갱신을 건너뛰면 입력이 곧바로 이전 값으로 되돌아간다. 그래서 오후
+                            11:30을 오전으로 바꾸거나 이른 시간으로 옮기는 것 자체가 불가능했다.
+                            유효성은 제출 시점(handleSubmit)에서 판정한다. */}
                         <div>
                             <label className="label text-sm font-medium mb-1">⏰ 운행 시간</label>
                             <div className="flex items-center gap-2 mt-1">
@@ -260,7 +270,7 @@ export default function ReservationSidePanel({
                                     min={effectiveMinTime}
                                     onChange={e => {
                                         const val = e.target.value;
-                                        if (actualIsToday && val < getCurrentTimeStr()) return;
+                                        if (!val) return; // 브라우저가 입력 중간에 보내는 빈 값은 무시
                                         const autoEnd = calcEndTime(val, routeInfo?.duration || 0);
                                         setForm({ ...form, startTime: val, endTime: autoEnd });
                                     }}
@@ -270,10 +280,9 @@ export default function ReservationSidePanel({
                                 <input
                                     type="time"
                                     value={form.endTime}
-                                    min={form.startTime}
                                     onChange={e => {
                                         const val = e.target.value;
-                                        if (val <= form.startTime) return;
+                                        if (!val) return;
                                         setForm({ ...form, endTime: val });
                                     }}
                                     className="input flex-1 text-base font-medium px-2 text-center min-h-[48px]"

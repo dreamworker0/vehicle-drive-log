@@ -136,6 +136,41 @@ describe('reservationUtils', () => {
             expect(result).toBeNull();
         });
 
+        it('수정 중인 반복 그룹 전체를 제외한다', () => {
+            // 그룹 수정은 지우고 다시 만드는 방식이라 자기 그룹은 충돌이 아니다.
+            // 제외하지 않으면 그룹의 나머지 날짜에 걸려 시간을 아예 바꿀 수 없다.
+            const group = [
+                { id: 'g1', vehicleId: 'v1', recurringGroupId: 'rcr_1', date: '2026-02-27', startTime: '09:00', endTime: '11:00', status: 'reserved' },
+            ] as Reservation[];
+            const result = findOverlappingReservation(group, {
+                vehicleId: 'v1', date: '2026-02-27', startTime: '09:30', endTime: '10:30',
+                excludeRecurringGroupId: 'rcr_1',
+            });
+            expect(result).toBeNull();
+        });
+
+        it('수정 중인 다일 그룹 전체를 제외한다', () => {
+            const group = [
+                { id: 'g1', vehicleId: 'v1', groupId: 'grp_1', date: '2026-02-27', startTime: '09:00', endTime: '11:00', status: 'reserved' },
+            ] as Reservation[];
+            const result = findOverlappingReservation(group, {
+                vehicleId: 'v1', date: '2026-02-27', startTime: '09:30', endTime: '10:30',
+                excludeGroupId: 'grp_1',
+            });
+            expect(result).toBeNull();
+        });
+
+        it('다른 그룹의 예약은 계속 충돌로 잡는다 (제외의 대조군)', () => {
+            const group = [
+                { id: 'g1', vehicleId: 'v1', recurringGroupId: 'rcr_2', date: '2026-02-27', startTime: '09:00', endTime: '11:00', status: 'reserved' },
+            ] as Reservation[];
+            const result = findOverlappingReservation(group, {
+                vehicleId: 'v1', date: '2026-02-27', startTime: '09:30', endTime: '10:30',
+                excludeRecurringGroupId: 'rcr_1',
+            });
+            expect(result!.id).toBe('g1');
+        });
+
         it('다른 날짜의 예약과는 겹치지 않는다', () => {
             const result = findOverlappingReservation(reservations, {
                 vehicleId: 'v1', date: '2026-02-28', startTime: '09:00', endTime: '11:00',
