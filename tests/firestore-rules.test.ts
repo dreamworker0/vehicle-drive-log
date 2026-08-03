@@ -209,11 +209,14 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertSucceeds(adminADb.collection('reservations').doc('res_reserved').update({ status: 'reserved', reservedByName: 'x' }));
   });
 
-  it('5-2. 예약 삭제 — 소유자 본인만 허용, 타인·타 기관·기관 관리자는 차단', async () => {
+  it('5-2. 예약 삭제 — 소유자 본인과 기관 관리자만 허용, 타 기관·타인(직원)은 차단', async () => {
     // 다일·반복 그룹 수정은 "기존 그룹 삭제 → 재생성" 경로라 삭제 권한이 필요한데
     // superAdmin 전용이던 탓에 소유자 본인조차 그룹 수정이 항상 실패했다.
-    // 기관 관리자를 제외하는 이유 — createReservationSafe가 reservedByUid를 호출자로
-    // 강제하므로, 관리자가 직원 그룹을 수정하면 명의가 관리자로 넘어간다.
+    //
+    // 기관 관리자를 한동안 제외했던 이유는 명의 이전이었다(createReservationSafe가
+    // reservedByUid를 호출자로 강제했다). 서버가 reservedByUid를 받아 명의를 보존하도록
+    // 고친 뒤 관리자 경로를 열었다 — 관리자는 이미 같은 기관 예약을 update로 고칠 수 있어,
+    // 그룹 수정만 막히는 것은 경계가 아니라 반쪽짜리 제약이었다.
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const db = context.firestore();
       const base = { vehicleId: 'vehicle_A', status: 'reserved', groupId: 'grp_1', date: '2026-08-01' };
@@ -225,16 +228,18 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
 
     const ownerDb = setupContext('user_A', { role: 'employee', orgId: 'org-A' }).firestore();
     const adminDb = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+    const otherOrgAdminDb = setupContext('admin_B', { role: 'admin', orgId: 'org-B' }).firestore();
 
-    // 같은 기관 타인 명의 예약 삭제 → 차단
+    // 직원이 같은 기관 타인 명의 예약을 삭제 → 차단 (관리자만 열렸다)
     await assertFails(ownerDb.collection('reservations').doc('res_other').delete());
-    // 타 기관 예약 삭제 → 차단
+    // 타 기관 예약 삭제 → 차단 (관리자여도)
     await assertFails(adminDb.collection('reservations').doc('res_orgB').delete());
-    // 기관 관리자의 소속 기관 타인 예약 삭제 → 차단 (명의 이전 방지, 서버 수정 후 별도 개방)
-    await assertFails(adminDb.collection('reservations').doc('res_admin').delete());
+    await assertFails(otherOrgAdminDb.collection('reservations').doc('res_other').delete());
 
     // 소유자 본인 예약 삭제 → 허용
     await assertSucceeds(ownerDb.collection('reservations').doc('res_own').delete());
+    // 기관 관리자의 소속 기관 직원 예약 삭제 → 허용 (그룹 수정 경로)
+    await assertSucceeds(adminDb.collection('reservations').doc('res_admin').delete());
   });
 
   it('6. 비용 데이터(주유·하이패스·정비) 교차 조직 접근 차단', async () => {
