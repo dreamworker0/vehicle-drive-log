@@ -181,6 +181,21 @@ describe('useConsentGate — 동의 기록', () => {
         });
     });
 
+    it('응답이 늦으면 한 번 더 부른다 — 관리자는 차단 모달에 갇히면 앱을 못 쓴다', async () => {
+        mockAcceptFn
+            // SDK가 시간 초과 시 던지는 것과 같은 모양
+            .mockRejectedValueOnce(Object.assign(new Error('deadline-exceeded'), { code: 'functions/deadline-exceeded' }))
+            .mockResolvedValueOnce({ data: { success: true } });
+        const { result } = renderHook(() => useConsentGate());
+        await waitFor(() => expect(result.current.requirement).toBe('employee'));
+
+        await act(async () => { await result.current.accept(); });
+
+        expect(mockAcceptFn).toHaveBeenCalledTimes(2);
+        expect(result.current.requirement).toBe('none');
+        expect(result.current.error).toBe('');
+    });
+
     it('기록 실패 시 게이트를 닫지 않고 오류를 표시한다', async () => {
         mockAcceptFn.mockRejectedValue(new Error('internal'));
         const { result } = renderHook(() => useConsentGate());
