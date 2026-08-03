@@ -2,7 +2,7 @@
  * Firestore — 차량 예약 (Reservations) 관련 함수
  */
 import {
-    doc, getDoc, updateDoc,
+    doc, getDoc, updateDoc, deleteField,
     collection, query, where, getDocs, addDoc,
     serverTimestamp, runTransaction, writeBatch, Timestamp,
 } from 'firebase/firestore';
@@ -174,6 +174,32 @@ export const updateReservation = async (reservationId: string, data: Partial<Res
     }
 };
 
+/**
+ * 반복 그룹에서 한 건을 떼어내 단건 예약으로 만든다 (반복 → 단건 전환).
+ *
+ * 그룹 링크(`recurringGroupId`)를 문서에서 **제거**한다. 남겨 두면 이 예약을 다시 열 때
+ * 1일짜리 반복 그룹으로 해석돼 단건이 된 것이 아니게 된다. 값을 undefined로 덮는 것은
+ * Firestore가 거부하므로 `deleteField()`를 쓴다.
+ *
+ * 새로 만들지 않고 기존 문서를 고치는 이유가 둘 있다.
+ *  (1) **삭제 권한** — Rules의 예약 delete는 소유자 본인(또는 superAdmin)만 허용한다.
+ *      새로 만들려면 그룹을 지워야 하는데, 그러면 기관 관리자가 직원의 반복 예약을
+ *      단건으로 바꿀 수 없다. update만 쓰면 관리자 경로도 그대로 동작한다.
+ *  (2) **명의 보존** — createReservationSafe는 reservedByUid를 호출자로 강제한다.
+ *      다시 만드는 방식은 관리자가 전환할 때 직원의 예약이 관리자 명의로 넘어간다.
+ */
+export const detachFromRecurringGroup = async (reservationId: string, data: Partial<Reservation>) => {
+    try {
+        const defined = Object.fromEntries(
+            Object.entries(data).filter(([, value]) => value !== undefined)
+        );
+        await updateDoc(reservationDoc(reservationId), { ...defined, recurringGroupId: deleteField() });
+    } catch (error) {
+        captureError(error, { context: 'detachFromRecurringGroup', reservationId, data });
+        throw error;
+    }
+};
+
 // 예약 상태 변경 (온라인 트랜잭션 또는 오프라인 큐 낙관적 업데이트)
 export const updateReservationStatus = async (
     reservationId: string, 
@@ -305,17 +331,23 @@ export const getReservationsByGroupId = async (groupId: string, orgId: string) =
 
 // ─── 그룹 일괄 액션 헬퍼 ───
 
-/** 그룹 내 활성 예약을 조회하여 일괄 batch 액션(update/delete)을 실행하는 공용 헬퍼 */
+/**
+ * 그룹 내 활성 예약을 조회하여 일괄 batch 액션(update/delete)을 실행하는 공용 헬퍼
+ * @param exceptId 이 예약은 건드리지 않는다 (반복 → 단건 전환에서 남길 회차)
+ */
 const batchGroupAction = async (
     fetchFn: (id: string, orgId: string) => Promise<Reservation[]>,
     action: 'cancel' | 'delete',
     id: string,
     orgId: string,
     context: string,
+    exceptId?: string,
 ) => {
     try {
         const reservations = await fetchFn(id, orgId);
-        const active = reservations.filter(r => r.status !== 'cancelled' && r.status !== 'completed');
+        const active = reservations.filter(r =>
+            r.status !== 'cancelled' && r.status !== 'completed' && r.id !== exceptId
+        );
         const batch = writeBatch(db);
         active.forEach(r => {
             if (action === 'cancel') {
@@ -387,9 +419,12 @@ export const getReservationsByRecurringGroupId = async (recurringGroupId: string
     }
 };
 
-// 반복 예약 그룹 일괄 취소
-export const cancelRecurringGroup = (recurringGroupId: string, orgId: string) =>
-    batchGroupAction(getReservationsByRecurringGroupId, 'cancel', recurringGroupId, orgId, 'cancelRecurringGroup');
+/**
+ * 반복 예약 그룹 일괄 취소
+ * @param exceptId 남길 회차 (반복 → 단건 전환에서 단건으로 살아남는 예약)
+ */
+export const cancelRecurringGroup = (recurringGroupId: string, orgId: string, exceptId?: string) =>
+    batchGroupAction(getReservationsByRecurringGroupId, 'cancel', recurringGroupId, orgId, 'cancelRecurringGroup', exceptId);
 
 // 반복 예약 그룹 삭제 (수정 전 기존 그룹 제거용)
 export const deleteRecurringGroup = (recurringGroupId: string, orgId: string) =>

@@ -31,6 +31,7 @@ vi.mock('firebase/firestore', () => ({
     addDoc: vi.fn(() => Promise.resolve({ id: 'new-id' })),
     setDoc: vi.fn(() => Promise.resolve()),
     updateDoc: vi.fn(() => Promise.resolve()),
+    deleteField: vi.fn(() => '__deleteField__'),
     deleteDoc: vi.fn(() => Promise.resolve()),
     runTransaction: vi.fn(),
     writeBatch: vi.fn(),
@@ -63,6 +64,7 @@ import {
     updateReservationStatus, rejectReservation,
     getTodayReservations, getWeekReservations, getMyRecentReservations,
     getReservationsByGroupId, cancelReservationGroup, deleteReservationGroup,
+    cancelRecurringGroup, detachFromRecurringGroup,
     createReservationSafe,
 } from '../../../lib/firestore/reservations';
 
@@ -318,6 +320,35 @@ describe('firestore/reservations', () => {
             expect(del).not.toHaveBeenCalled();
             expect(commit).toHaveBeenCalled();
             expect(count).toBe(1);
+        });
+    });
+
+    // ── 반복 → 단건 전환 ──
+    describe('cancelRecurringGroup(exceptId) / detachFromRecurringGroup', () => {
+        it('exceptId로 지정한 회차는 취소하지 않는다', async () => {
+            // 이 회차가 단건으로 살아남는다. 함께 취소되면 전환 결과가 아무것도 없는 상태가 된다
+            const update = vi.fn(), del = vi.fn(), commit = vi.fn().mockResolvedValue(undefined);
+            vi.mocked(fs.writeBatch).mockReturnValue({ update, delete: del, commit } as never);
+            vi.mocked(fs.getDocs).mockResolvedValue(docsSnap([
+                { id: 'a', status: 'reserved', date: '2026-08-03' },
+                { id: 'keep', status: 'reserved', date: '2026-08-10' },
+                { id: 'c', status: 'reserved', date: '2026-08-17' },
+            ]) as never);
+
+            const count = await cancelRecurringGroup('rcr_1', 'org1', 'keep');
+
+            expect(update).toHaveBeenCalledTimes(2);
+            expect(count).toBe(2);
+        });
+
+        it('detachFromRecurringGroup은 그룹 링크를 deleteField로 제거한다', async () => {
+            // undefined로 덮으면 Firestore가 거부하고, 남겨 두면 1일짜리 반복 그룹으로 해석된다
+            await detachFromRecurringGroup('r2', { destination: '복지관', purpose: undefined } as never);
+
+            expect(fs.updateDoc).toHaveBeenCalledWith(expect.anything(), {
+                destination: '복지관',
+                recurringGroupId: '__deleteField__',
+            });
         });
     });
 
