@@ -129,12 +129,16 @@ async function sendPushes(
         const chunk = tokens.slice(i, i + PUSH_CHUNK);
         try {
             const res = await messaging.sendEach(
+                // data-only — 표시·클릭 모두 서비스 워커가 맡는다.
+                // (이유는 services/alimtalk/sendNotification.ts의 주석 참고)
                 chunk.map((token) => ({
                     token,
-                    notification: { title: `공지: ${title}`, body: message },
-                    data: { click_action: "https://vehicle-drive-log.web.app" },
+                    data: {
+                        title: `공지: ${title}`,
+                        body: message,
+                        click_action: "https://vehicle-drive-log.web.app",
+                    },
                     android: { priority: "high" as const },
-                    webpush: { fcmOptions: { link: "https://vehicle-drive-log.web.app" } },
                 }))
             );
             pushSent += res.successCount;

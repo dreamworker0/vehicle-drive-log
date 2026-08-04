@@ -96,7 +96,13 @@ jobs:
     needs: changes
     if: needs.changes.outputs.functions == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 20분은 실측 대비 여유가 4분뿐이었다 — PR #140에서 테스트 스텝이 **953초(15.9분)**,
+    # 잡 전체 16분 10초를 썼다(689건 · `--maxWorkers=2`). 러너 변동이 조금만 커져도
+    # 타임아웃으로 죽고, master에서 죽으면 Deploy(workflow_run)까지 막힌다.
+    # 실측의 약 2배로 올린다. 진짜 hang을 무한정 방치하지 않는 선은 유지한다.
+    # (근본적으로 빠르게 하려면 maxWorkers 상향이지만 workerIdleMemoryLimit과 함께
+    #  OOM 위험을 다시 재보아야 해서 이번에는 건드리지 않았다.)
+    timeout-minutes: 35
     env:
       TZ: "Asia/Seoul"
     steps:

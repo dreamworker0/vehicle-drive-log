@@ -224,6 +224,11 @@ function AppContent() {
   }, []);
 
   // 서비스 워커의 알림 클릭 postMessage 수신 → 네비게이션
+  //
+  // 보내는 쪽은 public/firebase-messaging-sw.js다. 그 워커의 scope는
+  // `/firebase-cloud-messaging-push-scope`라서 앱 탭을 제어하지 않고, 제어하지 않는
+  // 클라이언트에는 navigate()가 거부되므로 이동을 여기에 맡긴다.
+  // (앱 SW인 src/sw.ts는 탭을 제어하므로 client.navigate로 직접 이동한다.)
   useEffect(() => {
     const handler = (event: MessageEvent) => {
       if (event.data?.type === 'NOTIFICATION_CLICK' && event.data?.url) {

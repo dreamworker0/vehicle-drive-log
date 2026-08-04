@@ -107,9 +107,13 @@ export default function useNotification() {
             if (!messaging) return;
             setIsSupported(true);
             unsubscribe = onMessage(messaging, (payload) => {
-                const { title, body } = payload.notification || {};
+                // 서버는 data-only로 보내므로 제목·본문은 data에 있다.
+                // payload.notification은 구버전 서버가 보낸 메시지를 위한 폴백이다.
+                const title = payload.notification?.title ?? payload.data?.title;
+                const body = payload.notification?.body ?? payload.data?.body;
                 if (title) {
-                    showToast(`${title}: ${body}`, 'info');
+                    // body가 없을 때 "제목: undefined"가 뜨지 않게 한다
+                    showToast(body ? `${title}: ${body}` : title, 'info');
                 }
             });
         })();
