@@ -163,6 +163,8 @@ Git 커밋 시 `Husky` + `lint-staged`가 스테이징 파일에 ESLint를 자�
 - [ ] 커밋 메시지 규칙 준수 → [commit-message](rules/commit-message.md)
 - [ ] 번들 크기 예산 확인 → [bundle-size-budget](rules/bundle-size-budget.md)
 - [ ] 이번 배포에 포함된 업데이트 소식, FAQ 변경사항 반영 (`src/lib/faqData.ts` 등)
+  - `npm run check:release-notes`로 **공지 누락을 기계로 확인**한다 → [release-notes 스킬](skills/release-notes/SKILL.md)
+    (체크리스트만으로 놓친 전례가 있다 — 다섯 건이 공지 없이 배포됐다)
 - [ ] `구현계획서.md` 체크리스트 및 히스토리 최신 상태로 갱신
 - [ ] Git 스테이징 → 커밋 → 푸시 (원격 백업)
 - [ ] Node.js 22 확인: `fnm use 22 && node --version`

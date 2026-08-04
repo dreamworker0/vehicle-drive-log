@@ -29,6 +29,7 @@
 | `npm run test:rules` | Firestore Rules (에뮬레이터) |
 | `npm run health` | Cloud Functions 상태 점검 |
 | `npm run audit` | 보안 감사 |
+| `npm run check:release-notes` | 업데이트 소식 누락 감지 (사용자 화면 변경이 공지 없이 배포되는 것 차단) |
 | `npm run verify:harness` | 하네스 Doctor (지침·스킬·워크플로·eval 정합성, CI에서도 실행) |
 | `npm run verify:fast` | 빠른 검증 (Node 확인 + lint + 타입 검사) |
 | `npm run verify:full` | 전체 게이트 (fast + 커버리지 + Functions + 빌드 + Rules + E2E) |
@@ -79,6 +80,7 @@
 | 배포 전 일괄 점검 | [pre-deploy-check](.agent/skills/pre-deploy-check/SKILL.md) |
 | Sentry 노이즈 에러 필터 | [sentry-noise-filter](.agent/skills/sentry-noise-filter/SKILL.md) |
 | FAQ 갱신 | [update-faq](.agent/skills/update-faq/SKILL.md) |
+| 업데이트 소식(공지) 작성 | [release-notes](.agent/skills/release-notes/SKILL.md) |
 | 설정 UI 추가 | [settings-ui](.agent/skills/settings-ui/SKILL.md) |
 | 차량 색상 표시 | [vehicle-color](.agent/skills/vehicle-color/SKILL.md) |
 | 대시보드 UI | [dashboard-ui-pattern](.agent/skills/dashboard-ui-pattern/SKILL.md) |

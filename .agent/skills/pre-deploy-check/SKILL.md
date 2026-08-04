@@ -75,7 +75,17 @@ git diff master -- src/ | grep -oE 'VITE_[A-Z_]+'
 
 `CHANGELOG.md`에 이번 배포 분 변경사항이 반영됐는지 확인. Phase 단위 작업이면 Phase 번호 포함. 누락 시 사용자에게 작성 의사 확인 후 진행 (자동으로 임의 작성 금지).
 
-### 8. Cloud Functions 헬스 체크 (선택)
+### 8. 업데이트 소식(공지) 누락 점검
+
+```bash
+npm run check:release-notes
+```
+
+`public/data/releaseNotes.json`을 마지막으로 건드린 커밋 이후의 **사용자 화면을 바꾼 feat/fix**를 나열한다. 후보가 있으면 [release-notes 스킬](../release-notes/SKILL.md) 규칙대로 항목을 추가한다. 알릴 내용이 아닌 변경이면 `-- --soft`로 확인만 하고 넘어간다 — 판단은 사람이 한다.
+
+기능이 나갔는데 공지가 없으면 사용자는 화면이 달라진 이유를 알 수 없다. 실제로 다섯 건이 공지 없이 배포된 전례가 있다.
+
+### 9. Cloud Functions 헬스 체크 (선택)
 
 ```bash
 npm run health
@@ -95,8 +105,9 @@ npm run health
 ✓ 빌드 성공 (번들 크기 임계치 내)
 ⚠ firestore.indexes.json — 새 쿼리 X건 검토 필요: <파일:라인>
 ✗ CHANGELOG.md — 이번 배포 분 항목 누락
+✗ 업데이트 소식 — 공지 미반영 후보 2건 (feat: … / fix: …)
 
-배포 가능 여부: 차단 (CHANGELOG 갱신 필요)
+배포 가능 여부: 차단 (CHANGELOG·업데이트 소식 갱신 필요)
 ```
 
 차단 항목이 있으면 사용자 확인 전까지 `firebase deploy` 제안하지 말 것.
@@ -107,3 +118,4 @@ npm run health
 - **firestore.rules 변경 후 룰 테스트 누락** — `npm run test:rules`는 별도로 돌려야 한다.
 - **PWA 캐시 무효화** — `public/sw.js`나 `index.html` cache-control 변경 없이 배포 시 구버전이 잔존. 최근 커밋(`14d59ac`)에서도 발생한 패턴.
 - **App Check 토큰 디버그 모드** — `b295455` 커밋처럼 프로덕션에 debug token이 새지 않는지 빌드 산출물 grep.
+- **업데이트 소식 누락** — 배포는 됐는데 공지가 그대로인 일이 반복된다(Phase 143~145에서 다섯 건). `npm run check:release-notes`가 기계로 잡아 주므로 반드시 돌린다.

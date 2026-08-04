@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "vite",
     "check:node": "tsx scripts/check-node-version.ts",
+    "check:release-notes": "tsx scripts/check-release-notes.ts",
     "prebuild": "tsx scripts/check-node-version.ts && tsx scripts/generate-sw-config.ts",
     "build": "vite build",
     "postbuild": "tsx scripts/check-bundle-size.ts && tsx scripts/generate-seo.ts",
