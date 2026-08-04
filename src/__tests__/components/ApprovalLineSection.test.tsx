@@ -23,6 +23,7 @@ function baseForm(overrides: Partial<SettingsForm> = {}): SettingsForm {
         passengerAllowList: true,
         passengerAllowSearch: true,
         passengerAllowCount: true,
+    reservationPassengerEnabled: false,
         driverAllowList: true,
         driverAllowSearch: true,
         ...overrides,

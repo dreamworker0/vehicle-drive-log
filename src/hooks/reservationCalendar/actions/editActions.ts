@@ -2,12 +2,27 @@
  * actions/editActions.ts
  * 예약 수정 준비 (handleEdit) — 폼 상태를 수정 모드로 세팅
  */
+import { resolveReservationPassengers } from '../../utils/reservationPassengers';
 import type { Reservation } from '../../../types/reservation';
 import type { EditDeps } from './types';
 
+/**
+ * 저장된 동승자(예정)를 폼 입력 형태로 되돌린다.
+ * 세 분기(반복·다일·단건)가 모두 같은 복원을 써야 "수정을 열었더니 적어 둔 동승자가
+ * 사라진" 상태가 생기지 않는다.
+ */
+function passengerFormFields(res: Reservation, members: EditDeps['members']) {
+    const { selected, externalNames, count } = resolveReservationPassengers(res, members || []);
+    return {
+        passengerUids: selected.map(m => m.id),
+        passengerExternalNames: externalNames.join(', '),
+        passengerCount: count,
+    };
+}
+
 export function handleEdit(res: Reservation, deps: EditDeps) {
     const {
-        reservations,
+        reservations, members,
         setEditingReservation, setEditingGroupId, setEditingRecurringGroupId,
         setSelectedDate, setForm, setShowForm,
     } = deps;
@@ -42,6 +57,7 @@ export function handleEdit(res: Reservation, deps: EditDeps) {
                 recurringEndDate: last.date,
                 excludeHolidays: true,
                 excludedDates: [],
+                ...passengerFormFields(first, members),
             });
             setShowForm(true);
             return;
@@ -69,6 +85,7 @@ export function handleEdit(res: Reservation, deps: EditDeps) {
                 endDate: last.date !== first.date ? last.date : '',
                 reservedByUid: first.reservedByUid,
                 reservedByName: first.reservedByName,
+                ...passengerFormFields(first, members),
             });
             setShowForm(true);
             return;
@@ -85,7 +102,8 @@ export function handleEdit(res: Reservation, deps: EditDeps) {
         startTime: res.startTime,
         endTime: res.endTime,
         reservedByUid: res.reservedByUid,
-        reservedByName: res.reservedByName
+        reservedByName: res.reservedByName,
+        ...passengerFormFields(res, members),
     });
     setShowForm(true);
 }

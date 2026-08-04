@@ -21,6 +21,8 @@ export interface FeatureToggleValues {
     passengerAllowList: boolean;
     passengerAllowSearch: boolean;
     passengerAllowCount: boolean;
+    /** 예약 화면 동승자 입력(기본 꺼짐) */
+    reservationPassengerEnabled: boolean;
     driverAllowList: boolean;
     driverAllowSearch: boolean;
 }
@@ -214,6 +216,19 @@ export default function FeatureToggleSection({ values, onChange }: FeatureToggle
                             checked={values.passengerAllowCount}
                             onChange={(next) => guard('passengerAllowCount', next, passengerOnCount)}
                             disabled={values.passengerAllowCount && passengerOnCount <= 1}
+                        />
+                    </MethodGroup>
+                )}
+                {/* 입력 '방식'이 아니라 입력 '위치'를 여는 항목이라 방식 그룹과 분리한다.
+                    다른 토글과 달리 기본값이 꺼짐이다 — 예약 화면은 전 직원이 매일 쓰는 자리라
+                    새 입력란이 예고 없이 나타나지 않게 기관이 켜서 쓴다(orgFeatures.ts 주석). */}
+                {values.passengerEnabled && (
+                    <MethodGroup caption="입력 위치">
+                        <MethodRow
+                            label="예약할 때도 미리 입력"
+                            desc="예약 폼에 동승자 입력을 추가합니다. 적어 두면 운행일지 작성 시 자동으로 채워지고, 실제 탑승은 운행일지에서 확정합니다."
+                            checked={values.reservationPassengerEnabled}
+                            onChange={(next) => onChange({ reservationPassengerEnabled: next })}
                         />
                     </MethodGroup>
                 )}

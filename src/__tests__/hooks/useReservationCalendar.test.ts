@@ -26,7 +26,9 @@ vi.mock('../../hooks/useRetry', () => ({
 
 const mockUser = { uid: 'testUser', displayName: '테스트', email: 'test@test.com' };
 const mockUserData = { organizationId: 'org1', name: '테스트', role: 'employee' };
-const mockAuthReturn = { user: mockUser, userData: mockUserData };
+// useAuth는 orgFeatures를 항상 준다(기본값 ALL_FEATURES_ON). 기관 문서가 없는 상태를
+// 그대로 재현해 예약 동승자 입력은 꺼진 채로 둔다(resolveOrgFeatures의 opt-in 규칙).
+const mockAuthReturn = { user: mockUser, userData: mockUserData, orgFeatures: resolveOrgFeatures(null) };
 vi.mock('../../hooks/useAuth', () => ({
     useAuth: () => mockAuthReturn,
 }));
@@ -77,6 +79,7 @@ vi.mock('../../hooks/utils/reservationUtils', () => ({
 }));
 
 import useReservationCalendar from '../../hooks/useReservationCalendar';
+import { resolveOrgFeatures } from '../../lib/orgFeatures';
 
 describe('useReservationCalendar', () => {
     beforeEach(() => {

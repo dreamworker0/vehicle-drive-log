@@ -1,5 +1,11 @@
+/**
+ * PassengerSection — 동승자 입력 (운행일지 · 예약 폼 공용)
+ *
+ * 원래 운행일지 전용이었으나 예약 폼에서도 같은 입력을 쓰게 되어 common으로 올렸다.
+ * 두 화면이 같은 컴포넌트를 쓰므로 기관 설정(허용 입력 방식)도 자동으로 함께 지켜진다.
+ */
 import { memo, useState, useEffect, useRef } from 'react';
-import type { User as UserDoc } from '../../../types/user';
+import type { User as UserDoc } from '../../types/user';
 
 interface PassengerSectionProps {
     /** 기관 설정: 직원 목록 직접 선택 허용(기본 true) */

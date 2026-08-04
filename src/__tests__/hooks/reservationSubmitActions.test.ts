@@ -519,6 +519,97 @@ describe('handleSubmit — 예약 제출', () => {
         });
     });
 
+    describe('동승자(예정)', () => {
+        const memberList = [
+            { id: 'u1', name: '홍길동' },
+            { id: 'u2', name: '김철수' },
+        ] as unknown as ActionDeps['members'];
+
+        it('단건 생성에 조직원·직접 입력·외부 인원이 함께 실린다', async () => {
+            const deps = makeDeps({
+                members: memberList,
+                form: {
+                    vehicleId: 'v1', destination: '목적지', purpose: '업무',
+                    startTime: '10:00', endTime: '11:00',
+                    passengerUids: ['u1'], passengerExternalNames: '박영희', passengerCount: 2,
+                } as unknown as ReservationForm,
+            });
+            await handleSubmit(fakeEvent(), deps);
+
+            expect(vi.mocked(createReservationSafe).mock.calls[0][0]).toMatchObject({
+                passengerUids: ['u1'],
+                passengerNames: ['홍길동', '박영희'],
+                passengerCount: 2,
+            });
+        });
+
+        it('반복 예약은 모든 회차에 같은 동승자가 실린다', async () => {
+            vi.mocked(generateRecurringDates).mockReturnValue(['2026-07-15', '2026-07-16']);
+            const deps = makeDeps({
+                members: memberList,
+                form: {
+                    vehicleId: 'v1', destination: '목적지', purpose: '업무',
+                    startTime: '10:00', endTime: '11:00',
+                    isRecurring: true, recurringDays: [1, 2, 3, 4, 5],
+                    passengerUids: ['u2'],
+                } as unknown as ReservationForm,
+            });
+            await handleSubmit(fakeEvent(), deps);
+
+            const created = vi.mocked(createReservationSafe).mock.calls.map(c => c[0]);
+            expect(created).toHaveLength(2);
+            created.forEach(c => expect(c).toMatchObject({ passengerUids: ['u2'], passengerNames: ['김철수'] }));
+        });
+
+        it('폼의 입력 보조 필드는 예약 문서로 새지 않는다', async () => {
+            // passengerExternalNames는 입력 원문일 뿐 저장 대상이 아니다.
+            // 폼을 통째로 넘기던 시절엔 반복 설정까지 문서에 섞여 들어갔다.
+            const deps = makeDeps({
+                members: memberList,
+                form: {
+                    vehicleId: 'v1', destination: '목적지', purpose: '업무',
+                    startTime: '10:00', endTime: '11:00',
+                    passengerExternalNames: '박영희', endDate: '',
+                } as unknown as ReservationForm,
+            });
+            await handleSubmit(fakeEvent(), deps);
+
+            const saved = vi.mocked(createReservationSafe).mock.calls[0][0] as Record<string, unknown>;
+            expect(saved).not.toHaveProperty('passengerExternalNames');
+            expect(saved).not.toHaveProperty('isRecurring');
+        });
+
+        it('수정에서 동승자를 모두 지우면 빈 값을 명시적으로 보낸다', async () => {
+            // undefined로 두면 updateReservation이 걸러 내 지운 동승자가 그대로 남는다
+            const deps = makeDeps({
+                members: memberList,
+                editingReservation: { id: 'r1', startTime: '10:00', endTime: '11:00' } as never,
+            });
+            await handleSubmit(fakeEvent(), deps);
+
+            expect(vi.mocked(updateReservation).mock.calls[0][1]).toMatchObject({
+                passengerUids: [],
+                passengerNames: [],
+                passengerCount: 0,
+            });
+        });
+
+        it('상한을 넘는 인원은 서버까지 가지 않고 차단된다', async () => {
+            const deps = makeDeps({
+                members: memberList,
+                form: {
+                    vehicleId: 'v1', destination: '목적지', purpose: '업무',
+                    startTime: '10:00', endTime: '11:00',
+                    passengerExternalNames: Array.from({ length: 51 }, (_, i) => `사람${i}`).join(', '),
+                } as unknown as ReservationForm,
+            });
+            await handleSubmit(fakeEvent(), deps);
+
+            expect(deps.showToast).toHaveBeenCalledWith('동승자는 최대 50명까지 지정할 수 있습니다.', 'warning');
+            expect(createReservationSafe).not.toHaveBeenCalled();
+        });
+    });
+
     it('functions/already-exists 오류를 오류 토스트로 노출하고 setSubmitting(false)로 마감한다', async () => {
         vi.mocked(createReservationSafe).mockRejectedValueOnce(
             { code: 'functions/already-exists', message: '이미 예약된 시간입니다.' } as never,

@@ -30,6 +30,7 @@ export const organizationSchema = z.object({
     passengerAllowList: z.boolean().optional().catch(undefined),
     passengerAllowSearch: z.boolean().optional().catch(undefined),
     passengerAllowCount: z.boolean().optional().catch(undefined),
+    reservationPassengerEnabled: z.boolean().optional().catch(undefined),
     driverAllowList: z.boolean().optional().catch(undefined),
     driverAllowSearch: z.boolean().optional().catch(undefined),
     status: orgStatusSchema.catch('pending'),
