@@ -104,3 +104,24 @@
 | **사용자가 겪을 반대급부를 공지에 적었다** | 탭을 오래 열어두면 이전 버전 화면이 잠시 더 보일 수 있다. 자동 리로드를 없앤 대가라 숨기지 않았다. 또 **이번 배포 시점에 열려 있던 탭은 한 번은 수동 새로고침이 필요하다** — 정책 변경 자체가 구버전 코드에 들어 있기 때문 |
 | **남은 것 — ①이 FCM 알림에는 적용되지 않는다** | 서버는 `notification` payload + `webpush.fcmOptions.link`로 보내고(`sendNotification.ts`·`sendBroadcastNotice.ts`), 그러면 `firebase-messaging-sw.js`의 `onBackgroundMessage`가 조기 반환해 **FCM SDK가 자동 표시**한다. 그 알림은 messaging SW 등록(scope `/firebase-cloud-messaging-push-scope`)이 띄운 것이므로 클릭도 **FCM SDK 기본 핸들러**가 처리한다 — `sw.ts`의 우선순위가 걸리지 않는다. 이번 수정이 실제로 덮는 것은 앱이 직접 띄우는 알림, 즉 `useDashboardActions`의 "🚗 운행 중"(`navigator.serviceWorker.ready`=앱 SW 등록)이다. data-only로 통일하거나 messaging SW에도 같은 핸들러를 두는 선택이 남았다 |
 | **남은 것 — 그 밖** | ① `App.tsx`의 `NOTIFICATION_CLICK` postMessage 수신부는 **보내는 쪽이 없는 dead code**로 남아 있다(SW가 `client.navigate`로 직접 처리). ② 보이는 탭이 없을 때의 폴백은 `matchAll`이 '최근 포커스 순'을 준다는 spec에 의존한다 — 브라우저별 실측은 하지 않았다 |
+
+### Phase 147: 서버발 알림에는 그 규칙이 걸리지 않았다 — FCM payload data-only 통일 🔔🗂️
+
+> 2026-08-04, Phase 146을 기록하려고 "그 핸들러가 실제로 어떤 알림에 걸리나"를 확인하다 발견했다. 사용자 제보가 아니라 **기록 과정이 잡은 결함**이다 — 고쳤다고 적기 전에 무엇이 고쳐졌는지 확인한 것이 값을 했다.
+
+| 항목 | 내용 |
+|------|------|
+| **알림은 그것을 표시한 registration에 속한다** | 이 한 가지 사실이 전부를 설명한다. 서버가 `notification` payload로 보내면 `firebase-messaging-sw.js`의 `onBackgroundMessage`가 조기 반환하고 **FCM SDK가 자동 표시**한다. 그 알림은 messaging SW 등록(scope `/firebase-cloud-messaging-push-scope`)의 것이므로 `notificationclick`도 거기서 발생하고 **SDK 기본 핸들러가 처리**한다. Phase 146이 고친 `sw.ts`의 우선순위는 앱이 직접 띄우는 알림(`useDashboardActions`의 "🚗 운행 중")에만 걸려 있었다 |
+| **data-only만으로는 부족했다** | payload를 바꿔도 **표시 주체는 여전히 messaging SW**다 — 클릭이 `sw.ts`로 오지 않는다. "payload만 고치면 우리 SW로 통일된다"는 첫 판단이 틀렸고, 규칙을 messaging SW에도 둬야 했다 |
+| **그 워커는 앱 탭을 제어하지 않는다** | scope가 `/firebase-cloud-messaging-push-scope`라 그 아래에 페이지가 없다. 제어하지 않는 클라이언트에는 `navigate()`가 **거부된다**(spec: TypeError). 그래서 이동을 직접 못 하고 `postMessage`로 앱에 위임한다 — **Phase 146에서 "보내는 쪽이 없는 dead code"로 적어 둔 `App.tsx`의 `NOTIFICATION_CLICK` 수신부가 여기서 살아났다** |
+| **서버에서 걷어낸 것** | `notification` · `webpush.notification` · `webpush.fcmOptions.link` · `android.notification`. **하나만 남아도** SDK 자동 표시와 기본 클릭이 되살아난다. 제목·본문은 `data`로 옮겼다. 이 앱은 웹(PWA) 전용이라 `android.notification`은 원래 쓰이지 않았다 — 네이티브를 붙이면 그때 다시 검토해야 한다 |
+| **"없어야 하는 필드"를 단언한다** | 표시 필드를 되살리는 변경은 **조용히 통과한다** — 알림은 여전히 뜨고 클릭도 되니까(엉뚱한 탭으로 갈 뿐). 그래서 `sendArg.notification` · `webpush.notification` · `webpush.fcmOptions` · `android.notification`이 `undefined`임을 테스트로 못 박았다 |
+| **중복을 받아들였다** | `firebase-messaging-sw.js`는 `scripts/generate-sw-config.ts`가 템플릿에서 만드는 순수 JS라 `sw.ts`에서 import할 수 없다. 같은 규칙이 두 곳에 있고, 주석에 "규칙을 고칠 때는 두 곳을 함께"를 명시했다. 진짜 단일화는 `getToken(messaging, { serviceWorkerRegistration })`로 FCM을 앱 SW에 붙여 messaging SW를 없애는 것인데, **기존 토큰의 푸시 구독이 무효화될 수 있어**(알림 전달이 끊긴다) 별건으로 미뤘다 |
+| **검토가 잡은 결함 ① 고정 `tag`** | `tag: 'vehicle-drive-log'`를 그대로 두면 **나중 알림이 앞 알림을 덮어써 하나만 남는다**. 그 코드는 그동안 **실행되지 않던 경로**였다(서버가 항상 `notification`을 보내 조기 반환됐다) — 아무도 겪지 않았고, data-only로 바꾸는 순간 회귀가 됐을 것이다. 기존 프로덕션 경로(SDK 자동 표시)에는 tag가 없었으므로 서버가 지정할 때만 쓴다 |
+| **검토가 잡은 결함 ② Promise 미반환** | `showNotification`의 Promise를 `onBackgroundMessage`에서 돌려주지 않으면 표시 완료 전에 워커가 종료될 수 있고, 브라우저가 "백그라운드에서 업데이트됨" 류의 대체 알림을 띄운다. 이것도 그동안 죽어 있던 경로라 드러나지 않았다 |
+| **포그라운드 토스트** | `payload.notification`이 사라지므로 `payload.data`에서 읽는다(구버전 메시지용 폴백 유지). `body`가 없을 때 "제목: undefined"가 뜨던 것도 함께 고쳤다 |
+| **양방향 호환을 갈라서 봤다** | 신버전 SW + 구버전 메시지 → `payload.notification` 폴백으로 **안전**. 반대(구버전 SW + data-only 메시지) → **알림은 뜨지만 클릭이 죽는다**(구버전엔 `notificationclick`도 `click_action` 전달도 없다). SW 갱신 한 번으로 해소되는 1회성 구간이라 받아들였고, 배포 직후 실제 알림 한 건으로 클릭까지 확인하는 것을 권고로 남겼다 |
+| **검증** | lint(템플릿·생성물 포함) · type-check(앱·functions) · Functions 688 → **689건**(data-only 회귀 1) · 프론트 1192건 · 빌드(gzip 978.5/1050KB). `dist/firebase-messaging-sw.js`에 표시·클릭 두 핸들러가 들어갔는지 직접 확인 |
+| **커밋·PR** | `704655a` |
+| **공지를 추가하지 않은 이유** | 8/4 항목에 이미 "이제 알림은 지금 보고 있는 탭에서 열립니다"라고 적혀 있다. Phase 146 시점에는 서버발 알림에 대해 **그 문장이 앞서 나간 것**이었고, 이 Phase가 사실로 만들었다. 새 약속이 아니라 기존 약속의 이행이므로 중복 공지를 만들지 않았다(`check:release-notes`는 후보를 세지만 판단하지 않는다) |
+| **남은 것** | ① 규칙 중복(위) — 단일화는 토큰 재구독 위험을 감수할 때 ② `App.tsx` 수신부는 `window.location.href`로 전체 재로딩한다. Router 안이므로 `useNavigate`로 바꾸면 소프트 내비게이션이 되지만 이번 범위 밖으로 뒀다 ③ 서버가 클릭 URL을 프로덕션 도메인으로 하드코딩해, **프리뷰 채널에서는 origin 불일치로 루트로 폴백**한다(외부 이동을 막는 쪽이라 안전하지만 의도된 설계는 아니다) |
