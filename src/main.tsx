@@ -53,17 +53,20 @@ function showBootError(err: unknown) {
 }
 
 // 기존 SW가 있으면 즉시 업데이트 체크 (구버전 캐시 방지)
+//
+// ## controllerchange로 자동 새로고침하지 않는다
+// sw.ts가 최상단에서 skipWaiting()을 부르므로 새 워커는 activate 시점에 이 등록에 딸린
+// **모든 클라이언트**의 컨트롤러를 교체하고, 탭마다 controllerchange가 발생한다.
+// 여기서 reload()를 걸면 열려 있는 탭이 전부 동시에 새로고침됐다. UpdatePrompt가 탭 복귀마다
+// reg.update()를 호출하므로 탭을 옮기는 순간 이 경로가 걸려, 보고 있지 않던 탭이 제멋대로
+// 다시 로드되고(작성 중이던 폼 유실) AuthGuard 리다이렉트까지 겹치면 다른 탭을 따라가는
+// 것처럼 보였다. vite-plugin-pwa의 autoUpdate 리로드와 중복이기도 했다.
+//
+// 새 버전은 sw.ts가 문서화한 정책대로 반영한다 — (a) 다음 내비게이션·재접속,
+// (b) 구버전 청크 요청이 실패한 탭만 lazyWithRetry가 리로드. 둘 다 그 탭에서만 일어난다.
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.ready.then((reg) => {
     reg.update().catch(() => { /* 네트워크 에러 무시 */ });
-  });
-  // 새 SW가 활성화되면 자동 새로고침 (배포 후 즉시 반영)
-  let refreshing = false;
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (!refreshing) {
-      refreshing = true;
-      window.location.reload();
-    }
   });
 }
 
