@@ -29,6 +29,7 @@
     { "id": 26, "prompt": "예약 카드에서 차량마다 아이콘 색이 제각각이야. 차량 색상 표시 방식을 통일해줘", "expected": "vehicle-color" },
     { "id": 27, "prompt": "README의 오타를 고쳐줘", "expected": "none" },
     { "id": 28, "prompt": "react를 19.3으로 업그레이드해줘", "expected": "none" },
-    { "id": 29, "prompt": "커밋 메시지 컨벤션이 뭐였지?", "expected": "none" }
+    { "id": 29, "prompt": "커밋 메시지 컨벤션이 뭐였지?", "expected": "none" },
+    { "id": 30, "prompt": "이번에 배포한 기능을 사용자한테 공지해야 해. 업데이트 소식에 추가해줘", "expected": "release-notes" }
   ]
 }

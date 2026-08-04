@@ -18,6 +18,15 @@ description: 문서 갱신·검증·커밋 후 master 푸시로 CI 배포를 트
      - **개발/프로젝트 문서**: `구현계획서.md`, `README.md` (마지막 수정 이후의 개선사항 요약 반영)
    - 작업 내용을 모두 갱신한 후 다음 단계로 넘어간다.
 
+1-1. 업데이트 소식 누락 확인 (기계 판정):
+   - 사용자 화면이 달라진 변경이 공지 없이 배포되는 것을 막는다. 후보가 나오면
+     [release-notes 스킬](../skills/release-notes/SKILL.md)의 규칙대로 `public/data/releaseNotes.json`에
+     항목을 추가하고 다시 실행한다. 알릴 내용이 아닌 변경이면 `-- --soft`로 확인만 하고 넘어간다.
+```powershell
+npm run check:release-notes
+```
+Working directory: `.`
+
 ### --- [STEP 1: 사전 검증 (Node 22 + 정적 검사 + 빌드)] ---
 
 > ⚠️ **반드시 Node 22 LTS.** Node 24에서는 Rollup 스택 오버플로우가 발생한다.
