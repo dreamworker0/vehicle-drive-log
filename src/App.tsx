@@ -31,8 +31,20 @@ const PrivacyPage = lazyWithRetry(() => import('./components/auth/PrivacyPage'))
 const ReleaseNotesPage = lazyWithRetry(() => import('./components/auth/ReleaseNotesPage'));
 const FAQPage = lazyWithRetry(() => import('./components/auth/FAQPage'));
 
-// 슈퍼관리자 테스트 모드: 기관 관리자·직원 UI 체험 (sessionStorage key)
+// 슈퍼관리자 테스트 모드: 기관 관리자·직원 UI 체험 (sessionStorage key — 탭마다 독립)
+//
+// localStorage였다가 sessionStorage로 옮겼다. localStorage는 탭 간 공유라 한 탭에서 역할을
+// 바꾸면 **다른 탭이 리로드되는 순간 그 역할로 끌려갔다**(AuthGuard가 렌더 시점에 이 값을
+// 읽어 리다이렉트한다). 직원 화면과 관리자 화면을 나란히 띄워 보는 것이 이 기능의 용도인데
+// 그게 불가능했다. sessionStorage는 탭 단위라 각 탭이 자기 역할을 유지한다.
 export const SA_TEST_ROLE_KEY = 'sa-test-role' as const;
+
+// 옮기기 전 localStorage에 남은 값을 1회 정리한다. 읽는 곳이 없어졌으므로 그냥 두면
+// 모든 슈퍼관리자 브라우저에 영구히 남고, 나중에 이 키를 다시 읽는 코드가 생기면
+// 옛 역할이 되살아난다.
+try {
+  localStorage.removeItem(SA_TEST_ROLE_KEY);
+} catch { /* 스토리지를 못 쓰는 환경(사파리 프라이빗 등) 무시 */ }
 
 export function LoadingScreen() {
   const [elapsed, setElapsed] = useState(0);

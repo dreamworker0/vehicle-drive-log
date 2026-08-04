@@ -224,7 +224,7 @@ export default function AdminLayout() {
                             <button
                                 onClick={() => {
                                     startTransition(() => {
-                                        localStorage.removeItem(SA_TEST_ROLE_KEY);
+                                        sessionStorage.removeItem(SA_TEST_ROLE_KEY);
                                         window.location.href = '/super-admin';
                                     });
                                 }}
@@ -237,7 +237,7 @@ export default function AdminLayout() {
                         <button
                             onClick={() => {
                                 if (isSuperAdmin) {
-                                    localStorage.setItem(SA_TEST_ROLE_KEY, 'employee');
+                                    sessionStorage.setItem(SA_TEST_ROLE_KEY, 'employee');
                                     startTransition(() => {
                                         window.location.href = '/employee';
                                     });

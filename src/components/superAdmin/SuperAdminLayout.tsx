@@ -265,13 +265,13 @@ export default function SuperAdminLayout() {
                     {/* 테스트 모드 버튼 (전체 화면) */}
                     <div className="flex items-center gap-1.5 mr-2">
                         <button
-                            onClick={() => { localStorage.setItem(SA_TEST_ROLE_KEY, 'admin'); window.location.href = '/admin'; }}
+                            onClick={() => { sessionStorage.setItem(SA_TEST_ROLE_KEY, 'admin'); window.location.href = '/admin'; }}
                             className="py-2 px-3 rounded-lg text-sm font-medium bg-primary-50 text-primary-700 active:bg-primary-100 dark:bg-primary-900/40 dark:text-primary-300 dark:active:bg-primary-900/60"
                         >
                             🏢 관리자
                         </button>
                         <button
-                            onClick={() => { localStorage.setItem(SA_TEST_ROLE_KEY, 'employee'); window.location.href = '/employee'; }}
+                            onClick={() => { sessionStorage.setItem(SA_TEST_ROLE_KEY, 'employee'); window.location.href = '/employee'; }}
                             className="py-2 px-3 rounded-lg text-sm font-medium badge-neutral active:bg-surface-200 dark:bg-surface-700 dark:text-surface-300 dark:active:bg-surface-600"
                         >
                             🙋 직원
