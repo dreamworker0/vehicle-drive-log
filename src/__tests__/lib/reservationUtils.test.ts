@@ -11,6 +11,7 @@ import {
     findOverlappingReservation,
     getAutoTimes,
     calcEndTime,
+    buildMultiDaySlots,
 } from '../../hooks/utils/reservationUtils';
 import type { Reservation } from '../../types/reservation';
 
@@ -202,6 +203,39 @@ describe('reservationUtils', () => {
 
         it('자정 직전 시작, 편도 0분 → 23:00 + 60 = 23:59 캡핑', () => {
             expect(calcEndTime('23:30', 0)).toBe('23:59');
+        });
+    });
+
+    describe('buildMultiDaySlots', () => {
+        it('첫날은 출발 시간부터, 중간 날은 하루 종일, 마지막 날은 반납 시간까지', () => {
+            // 검증(충돌 검사)과 실제 생성이 이 목록 하나를 함께 본다 —
+            // 어긋나면 "미리 확인은 통과했는데 중간 날짜에서 생성이 막히는" 상태가 된다.
+            expect(buildMultiDaySlots('2026-08-10', '2026-08-12', '09:00', '17:00')).toEqual([
+                { date: '2026-08-10', startTime: '09:00', endTime: '23:59' },
+                { date: '2026-08-11', startTime: '00:00', endTime: '23:59' },
+                { date: '2026-08-12', startTime: '00:00', endTime: '17:00' },
+            ]);
+        });
+
+        it('이틀짜리는 중간 날 없이 첫날·마지막 날만', () => {
+            expect(buildMultiDaySlots('2026-08-10', '2026-08-11', '09:00', '17:00')).toEqual([
+                { date: '2026-08-10', startTime: '09:00', endTime: '23:59' },
+                { date: '2026-08-11', startTime: '00:00', endTime: '17:00' },
+            ]);
+        });
+
+        it('종료일이 시작일과 같거나 비어 있으면 하루짜리 1건', () => {
+            expect(buildMultiDaySlots('2026-08-10', '2026-08-10', '09:00', '17:00')).toEqual([
+                { date: '2026-08-10', startTime: '09:00', endTime: '17:00' },
+            ]);
+            expect(buildMultiDaySlots('2026-08-10', '', '09:00', '17:00')).toEqual([
+                { date: '2026-08-10', startTime: '09:00', endTime: '17:00' },
+            ]);
+        });
+
+        it('월을 넘겨도 날짜가 끊기지 않는다', () => {
+            const slots = buildMultiDaySlots('2026-08-30', '2026-09-02', '09:00', '17:00');
+            expect(slots.map(s => s.date)).toEqual(['2026-08-30', '2026-08-31', '2026-09-01', '2026-09-02']);
         });
     });
 

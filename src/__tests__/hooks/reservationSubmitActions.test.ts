@@ -12,7 +12,10 @@ vi.mock('@/lib/firestore', () => ({
     cancelRecurringGroup: vi.fn(() => Promise.resolve(3)),
     getReservationsByDateRange: vi.fn(() => Promise.resolve([])),
 }));
-vi.mock('@/hooks/utils/reservationUtils', () => ({
+// 날짜 구간 계산(buildMultiDaySlots)은 실제 구현을 쓴다 — 여기서 흉내 내면
+// "검증과 생성이 같은 목록을 본다"는 계약 자체가 테스트에서 사라진다.
+vi.mock('@/hooks/utils/reservationUtils', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('@/hooks/utils/reservationUtils')>()),
     findOverlappingReservation: vi.fn(() => null),
     // 지난 시간 판정은 "오늘"에만 걸린다. 픽스처 날짜(2026-07-15)와 겹치지 않는 고정값을 줘서
     // 테스트가 실행 시각에 따라 달라지지 않게 한다.
@@ -341,6 +344,143 @@ describe('handleSubmit — 예약 제출', () => {
                 await handleSubmit(fakeEvent(), deps);
 
                 expect(detachFromRecurringGroup).toHaveBeenCalledTimes(1);
+            });
+        });
+
+        describe('반복 → 다일 전환 (다일 체크 후 제출)', () => {
+            /**
+             * 그룹의 첫 회차가 8/3(폼이 '시작일'로 보여 주는 selectedDate),
+             * 나머지가 8/10·8/17. 8/3~8/5 사흘짜리 연속 예약으로 바꾼다.
+             */
+            const toMultiDayDeps = (overrides: Partial<ActionDeps> = {}) => recurringDeps({
+                selectedDate: '2026-08-03',
+                editingReservation: { id: 'r1', date: '2026-08-03', startTime: '10:00', endTime: '11:00' } as never,
+                form: {
+                    vehicleId: 'v1', destination: '목적지', purpose: '업무',
+                    startTime: '10:00', endTime: '11:00',
+                    isRecurring: false, endDate: '2026-08-05',
+                } as unknown as ReservationForm,
+                reservations: [
+                    { id: 'r1', vehicleId: 'v1', recurringGroupId: 'rcr_1', date: '2026-08-03', startTime: '10:00', endTime: '11:00', status: 'reserved' },
+                    { id: 'r2', vehicleId: 'v1', recurringGroupId: 'rcr_1', date: '2026-08-10', startTime: '10:00', endTime: '11:00', status: 'reserved' },
+                    { id: 'r3', vehicleId: 'v1', recurringGroupId: 'rcr_1', date: '2026-08-17', startTime: '10:00', endTime: '11:00', status: 'reserved' },
+                ] as unknown as ActionDeps['reservations'],
+                ...overrides,
+            });
+
+            it('시작일 회차를 다일 그룹의 첫날로 옮기고 둘째 날부터를 만든다', async () => {
+                const deps = toMultiDayDeps();
+                await handleSubmit(fakeEvent(), deps);
+
+                // 첫날은 지우고 다시 만들지 않는다 — 삭제 권한(소유자 한정)과 명의가 걸린다
+                expect(cancelRecurringGroup).toHaveBeenCalledWith('rcr_1', 'org1', 'r1');
+                expect(deleteRecurringGroup).not.toHaveBeenCalled();
+
+                const [detachedId, detachedData] = vi.mocked(detachFromRecurringGroup).mock.calls[0];
+                expect(detachedId).toBe('r1');
+                expect(detachedData).toMatchObject({ startTime: '10:00', endTime: '23:59' });
+                expect(detachedData.groupId).toMatch(/^grp_/);
+
+                // 8/4(하루 종일) · 8/5(반납까지) 2건만 새로 만든다
+                const created = vi.mocked(createReservationSafe).mock.calls.map(c => c[0]);
+                expect(created).toHaveLength(2);
+                expect(created[0]).toMatchObject({ date: '2026-08-04', startTime: '00:00', endTime: '23:59' });
+                expect(created[1]).toMatchObject({ date: '2026-08-05', startTime: '00:00', endTime: '11:00' });
+                // 첫날과 같은 그룹으로 묶여야 한 건의 연속 예약이 된다
+                expect(created[0].groupId).toBe(detachedData.groupId);
+                expect(created[1].groupId).toBe(detachedData.groupId);
+            });
+
+            it('취소될 건수를 밝히고 확인을 받는다', async () => {
+                const deps = toMultiDayDeps();
+                await handleSubmit(fakeEvent(), deps);
+
+                expect(vi.mocked(deps.confirm).mock.calls[0][0]).toMatchObject({
+                    message: expect.stringContaining('3일간'),
+                });
+                expect(vi.mocked(deps.confirm).mock.calls[0][0].message).toContain('2건을 취소');
+            });
+
+            it('확인을 취소하면 아무것도 건드리지 않는다', async () => {
+                const deps = toMultiDayDeps({ confirm: vi.fn(() => Promise.resolve(false)) });
+                await handleSubmit(fakeEvent(), deps);
+
+                expect(cancelRecurringGroup).not.toHaveBeenCalled();
+                expect(detachFromRecurringGroup).not.toHaveBeenCalled();
+                expect(createReservationSafe).not.toHaveBeenCalled();
+            });
+
+            it('구간 중간 날짜에 남의 예약이 있으면 그룹을 취소하지 않는다', async () => {
+                // 첫날만 보고 시작하면 취소를 마친 뒤 중간에서 막혀 되돌릴 것이 없다
+                const actual = await vi.importActual<typeof import('@/hooks/utils/reservationUtils')>('@/hooks/utils/reservationUtils');
+                vi.mocked(findOverlappingReservation).mockImplementation(actual.findOverlappingReservation);
+                const deps = toMultiDayDeps({
+                    reservations: [
+                        { id: 'r1', vehicleId: 'v1', recurringGroupId: 'rcr_1', date: '2026-08-03', startTime: '10:00', endTime: '11:00', status: 'reserved' },
+                        // 같은 차량을 쓰는 그룹 밖 예약이 둘째 날에 있다
+                        { id: 'x9', vehicleId: 'v1', date: '2026-08-04', startTime: '09:00', endTime: '12:00', status: 'reserved' },
+                    ] as unknown as ActionDeps['reservations'],
+                });
+                await handleSubmit(fakeEvent(), deps);
+
+                expect(deps.showToast).toHaveBeenCalledWith(
+                    '2026-08-04에 해당 차량이 이미 예약되어 있습니다. 기간이나 시간을 조정해주세요.',
+                    'warning',
+                );
+                expect(cancelRecurringGroup).not.toHaveBeenCalled();
+                expect(createReservationSafe).not.toHaveBeenCalled();
+            });
+
+            it('전환 구간 안에 있는 같은 그룹의 회차는 충돌로 보지 않는다', async () => {
+                // 그 회차들은 전환과 함께 취소된다. 충돌로 보면 자기 그룹 때문에 전환이 막힌다.
+                const actual = await vi.importActual<typeof import('@/hooks/utils/reservationUtils')>('@/hooks/utils/reservationUtils');
+                vi.mocked(findOverlappingReservation).mockImplementation(actual.findOverlappingReservation);
+                const deps = toMultiDayDeps({
+                    reservations: [
+                        { id: 'r1', vehicleId: 'v1', recurringGroupId: 'rcr_1', date: '2026-08-03', startTime: '10:00', endTime: '11:00', status: 'reserved' },
+                        { id: 'r2', vehicleId: 'v1', recurringGroupId: 'rcr_1', date: '2026-08-04', startTime: '10:00', endTime: '11:00', status: 'reserved' },
+                    ] as unknown as ActionDeps['reservations'],
+                });
+                await handleSubmit(fakeEvent(), deps);
+
+                expect(cancelRecurringGroup).toHaveBeenCalledWith('rcr_1', 'org1', 'r1');
+                expect(createReservationSafe).toHaveBeenCalledTimes(2);
+            });
+
+            it('직원 명의를 그대로 넘긴다 — 관리자가 전환해도 명의가 넘어가지 않는다', async () => {
+                const deps = toMultiDayDeps({
+                    user: { uid: 'admin1', email: 'admin@test.local' },
+                    userData: { organizationId: 'org1', name: '관리자', role: 'admin' } as never,
+                    form: {
+                        vehicleId: 'v1', destination: '목적지', purpose: '업무',
+                        startTime: '10:00', endTime: '11:00',
+                        isRecurring: false, endDate: '2026-08-05',
+                        reservedByUid: 'emp1', reservedByName: '황직원',
+                    } as unknown as ReservationForm,
+                });
+                await handleSubmit(fakeEvent(), deps);
+
+                expect(vi.mocked(detachFromRecurringGroup).mock.calls[0][1]).toMatchObject({ reservedByUid: 'emp1' });
+                expect(vi.mocked(createReservationSafe).mock.calls[0][0]).toMatchObject({
+                    reservedByUid: 'emp1',
+                    reservedByName: '황직원',
+                });
+            });
+
+            it('시작일에 남은 회차가 없으면 전환하지 않는다', async () => {
+                // 첫날로 쓸 문서가 없는데 취소부터 하면 그룹만 사라진다
+                const deps = toMultiDayDeps({
+                    reservations: [
+                        { id: 'r2', vehicleId: 'v1', recurringGroupId: 'rcr_1', date: '2026-08-10', startTime: '10:00', endTime: '11:00', status: 'reserved' },
+                    ] as unknown as ActionDeps['reservations'],
+                });
+                await handleSubmit(fakeEvent(), deps);
+
+                expect(deps.showToast).toHaveBeenCalledWith(
+                    '전환할 시작일 예약을 찾을 수 없습니다. 목록에서 수정을 다시 눌러주세요.',
+                    'warning',
+                );
+                expect(cancelRecurringGroup).not.toHaveBeenCalled();
             });
         });
 

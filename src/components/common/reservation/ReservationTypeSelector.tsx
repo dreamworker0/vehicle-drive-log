@@ -8,17 +8,16 @@ interface Props {
     form: ReservationForm;
     setForm: React.Dispatch<React.SetStateAction<ReservationForm>>;
     selectedDate: string;
-    /** 반복 그룹을 수정 중인지 — 다일 전환만 막는다 (아래 주석 참고) */
+    /** 반복 그룹을 수정 중인지 — 체크박스 안내 문구가 '전환'으로 바뀐다 */
     editingRecurringGroupId?: string | null;
 }
 
 export default memo(function ReservationTypeSelector({ form, setForm, selectedDate, editingRecurringGroupId }: Props) {
-    // 반복 그룹 수정 중 **다일 예약**으로의 전환만 막는다.
-    // 반복 체크를 끄는 것은 "반복 → 단건 전환"으로 처리된다(수정을 누른 회차만 남기고 나머지
-    // 취소 — handleSubmit). 다일은 그에 해당하는 동작이 정의돼 있지 않아 열지 않는다.
-    const multiDayLocked = !!editingRecurringGroupId;
-    const multiDayLockedTitle = multiDayLocked
-        ? '반복 예약 수정 중에는 다일 예약으로 바꿀 수 없습니다. 반복 체크를 끄면 단건 예약으로 전환됩니다.'
+    // 반복 그룹 수정 중에는 두 체크박스가 **전환** 스위치가 된다 (handleSubmit이 같은 조건으로 판정).
+    //  · 반복 체크를 끄면 → 수정을 누른 회차만 남기는 단건 전환
+    //  · 다일을 체크하면 → 시작일~종료일 연속 예약으로 전환 (나머지 회차는 취소)
+    const multiDayTitle = editingRecurringGroupId
+        ? '체크하면 반복 예약을 시작일~종료일 연속(다일) 예약으로 전환합니다. 나머지 회차는 취소됩니다.'
         : undefined;
 
     return (
@@ -26,12 +25,11 @@ export default memo(function ReservationTypeSelector({ form, setForm, selectedDa
             {/* 다일 예약 / 반복 예약 체크박스 */}
             <div className="flex justify-end gap-3 pt-1">
                 <label
-                    title={multiDayLockedTitle}
-                    className={`flex items-center gap-2 select-none px-2 py-1.5 rounded-lg transition-colors ${multiDayLocked ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-800'}`}
+                    title={multiDayTitle}
+                    className="flex items-center gap-2 select-none px-2 py-1.5 rounded-lg transition-colors cursor-pointer hover:bg-surface-100 dark:hover:bg-surface-800"
                 >
                     <input
                         type="checkbox"
-                        disabled={multiDayLocked}
                         checked={!!(form.endDate && form.endDate > selectedDate)}
                         onChange={e => {
                             if (e.target.checked) {

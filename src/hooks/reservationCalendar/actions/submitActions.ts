@@ -12,7 +12,7 @@ import {
     getReservationsByDateRange,
 } from '../../../lib/firestore';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
-import { findOverlappingReservation, getCurrentTimeStr, getTodayStr } from '../../utils/reservationUtils';
+import { buildMultiDaySlots, findOverlappingReservation, getCurrentTimeStr, getTodayStr } from '../../utils/reservationUtils';
 import { isVehicleRestrictedForUser } from '../../../lib/vehicleUtils';
 import { generateRecurringDates, generateRecurringGroupId } from '../../utils/recurringUtils';
 import type { Reservation } from '../../../types/reservation';
@@ -39,14 +39,36 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
     const effectiveEndDate = form.endDate || selectedDate;
     const isMultiDay = !isRecurring && effectiveEndDate > selectedDate;
 
-    // 반복 그룹 수정 중에 반복을 끄면 = 반복 → 단건 전환.
-    // 수정을 누른 그 회차만 남기고 나머지는 취소한다 (폼이 그 날짜를 명시한다).
-    const isRecurringToSingle = !!editingRecurringGroupId && !isRecurring;
-    if (isRecurringToSingle && !editingReservation) {
-        // 남길 회차를 특정할 수 없으면 진행하지 않는다 (도달 불가에 가깝지만 조용히 지우는 것보다 낫다)
+    // 반복 그룹 수정 중에 반복을 끄면 = 전환. 다일 체크 여부로 목적지가 갈린다.
+    //  · 다일 체크 없음 → **단건 전환**: 수정을 누른 그 회차만 남기고 나머지는 취소 (폼이 그 날짜를 명시한다)
+    //  · 다일 체크 있음 → **다일 전환**: 그룹 전체를 시작일~종료일 연속 예약 한 건으로 바꾼다
+    const isRecurringToSingle = !!editingRecurringGroupId && !isRecurring && !isMultiDay;
+    const isRecurringToMultiDay = !!editingRecurringGroupId && !isRecurring && isMultiDay;
+    if ((isRecurringToSingle || isRecurringToMultiDay) && !editingReservation) {
+        // 대상 회차를 특정할 수 없으면 진행하지 않는다 (도달 불가에 가깝지만 조용히 지우는 것보다 낫다)
         showToast('전환할 예약을 찾을 수 없습니다. 목록에서 수정을 다시 눌러주세요.', 'warning');
         return;
     }
+
+    // 다일 전환의 첫날은 폼이 '시작일'로 보여 주는 selectedDate(= 그룹의 첫 회차)다.
+    // 그 회차 문서를 지우지 않고 첫날로 고쳐 쓰므로(실행부 주석 참고) 대상을 여기서 찾아 둔다.
+    // 이미 운행이 끝난(completed) 회차는 기록을 덮어쓰게 되므로 대상에서 뺀다.
+    const multiDayAnchor = isRecurringToMultiDay
+        ? (reservations.find(r =>
+            r.recurringGroupId === editingRecurringGroupId
+            && r.date === selectedDate
+            && r.status !== 'cancelled'
+            && r.status !== 'completed') ?? null)
+        : null;
+    if (isRecurringToMultiDay && !multiDayAnchor) {
+        showToast('전환할 시작일 예약을 찾을 수 없습니다. 목록에서 수정을 다시 눌러주세요.', 'warning');
+        return;
+    }
+
+    // 다일 전환이 만들 날짜별 구간 — 검증(충돌)과 실제 생성이 같은 목록을 봐야 한다
+    const multiDaySlots = isRecurringToMultiDay
+        ? buildMultiDaySlots(selectedDate, effectiveEndDate, form.startTime, form.endTime)
+        : [];
 
     // 반복 예약 대상 날짜 — 검증(지난 시간·충돌)과 실제 생성이 같은 목록을 봐야 한다
     const recurringStartDate = form.recurringStartDate || selectedDate;
@@ -116,6 +138,21 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
             showToast(`${conflictDate}에 해당 차량이 이미 예약되어 있습니다. 미리보기에서 그 날짜를 제외하거나 시간을 조정해주세요.`, 'warning');
             return;
         }
+    } else if (isRecurringToMultiDay) {
+        // 전환은 여러 날을 한꺼번에 만든다. 첫날만 보고 시작하면 중간 날짜에서 막히는데,
+        // 그때는 이미 반복 그룹을 취소한 뒤라 되돌릴 것이 없다. **전 구간을 먼저** 확인한다.
+        // 같은 그룹의 회차는 전환과 함께 취소되므로 충돌로 보지 않는다.
+        const conflictSlot = multiDaySlots.find(slot => findOverlappingReservation(reservations, {
+            vehicleId: form.vehicleId,
+            date: slot.date,
+            startTime: slot.startTime,
+            endTime: slot.endTime,
+            excludeRecurringGroupId: editingRecurringGroupId,
+        }));
+        if (conflictSlot) {
+            showToast(`${conflictSlot.date}에 해당 차량이 이미 예약되어 있습니다. 기간이나 시간을 조정해주세요.`, 'warning');
+            return;
+        }
     } else {
         const vehicleOverlap = findOverlappingReservation(reservations, {
             // 전환은 selectedDate(그룹 첫 날)가 아니라 남길 회차의 날짜를 검사한다
@@ -144,6 +181,21 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
         const isConfirmed = await confirm({
             title: '단건 예약으로 전환',
             message: `${editingReservation!.date} 예약만 남기고 나머지 ${siblingCount}건을 취소합니다.\n계속하시겠습니까?`,
+            confirmText: '전환',
+            confirmColor: 'danger',
+        });
+        if (!isConfirmed) return;
+    }
+
+    if (isRecurringToMultiDay) {
+        const siblingCount = reservations.filter(r =>
+            r.recurringGroupId === editingRecurringGroupId
+            && r.status !== 'cancelled'
+            && r.id !== multiDayAnchor!.id
+        ).length;
+        const isConfirmed = await confirm({
+            title: '다일 예약으로 전환',
+            message: `${selectedDate} ~ ${effectiveEndDate} (${multiDaySlots.length}일간) 연속 예약으로 바꾸고, 반복 예약 ${siblingCount}건을 취소합니다.\n계속하시겠습니까?`,
             confirmText: '전환',
             confirmColor: 'danger',
         });
@@ -199,6 +251,56 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
                 ...routeData,
             });
             showToast(`${editingReservation!.date} 단건 예약으로 전환되었습니다. (반복 ${cancelled}건 취소)`);
+        } else if (isRecurringToMultiDay) {
+            // ── 반복 → 다일 전환 ──
+            // 순서는 단건 전환과 같은 이유로 정해진다. 먼저 만들면 아직 살아 있는 반복 회차와
+            // 같은 차량·같은 날짜가 겹쳐 서버가 거부하므로, **취소가 반드시 앞**이다.
+            // 그다음 남긴 첫날 회차를 새 다일 그룹으로 옮기고, 둘째 날부터를 만든다.
+            const newGroupId = `grp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+            const cancelled = await cancelRecurringGroup(
+                editingRecurringGroupId!,
+                userData.organizationId!,
+                multiDayAnchor!.id,
+            );
+
+            // 첫날은 남긴 회차를 **고쳐 쓴다**. 지우고 다시 만들면 삭제 권한(소유자 한정)에 걸리고
+            // 명의가 호출자에게 넘어간다 — 단건 전환이 detach를 쓰는 것과 같은 이유다.
+            await detachFromRecurringGroup(multiDayAnchor!.id, {
+                vehicleId: form.vehicleId,
+                vehicleName,
+                destination: form.destination,
+                purpose: form.purpose,
+                startTime: multiDaySlots[0].startTime,
+                endTime: multiDaySlots[0].endTime,
+                reservedByUid: form.reservedByUid,
+                reservedByName: form.reservedByName,
+                organizationId: userData.organizationId,
+                groupId: newGroupId,
+                ...routeData,
+            });
+
+            const baseData = {
+                vehicleId: form.vehicleId,
+                vehicleName,
+                destination: form.destination,
+                purpose: form.purpose,
+                reservedByUid: form.reservedByUid || user.uid,
+                reservedByName: form.reservedByName || userData.name || user.email || '익명',
+                organizationId: userData.organizationId,
+                groupId: newGroupId,
+                ...routeData,
+                ...(reservationSource ? { source: reservationSource } : {}),
+            };
+
+            for (const slot of multiDaySlots.slice(1)) {
+                await createReservationSafe({
+                    ...baseData,
+                    date: slot.date,
+                    startTime: slot.startTime,
+                    endTime: slot.endTime,
+                });
+            }
+            showToast(`${multiDaySlots.length}일간 다일 예약으로 전환되었습니다. (반복 ${cancelled}건 취소)`);
         } else if (editingReservation && editingGroupId) {
             // ── 다일 예약 그룹 수정: 기존 그룹 삭제 → 새 그룹 재생성 ──
             await deleteReservationGroup(editingGroupId, userData.organizationId!);
