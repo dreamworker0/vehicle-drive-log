@@ -64,9 +64,28 @@ describe('sendNotification', () => {
             expect(mockSend).toHaveBeenCalledWith(
                 expect.objectContaining({
                     token: 'valid-token',
-                    notification: { title: '테스트', body: '알림' },
+                    data: expect.objectContaining({ title: '테스트', body: '알림' }),
                 })
             );
+        });
+
+        // data-only가 깨지면 FCM SDK가 알림을 자동 표시하고 클릭까지 가져가, 서비스 워커의
+        // '대상 탭 선정'이 조용히 우회된다(보고 있지 않던 탭이 끌려간다). 그래서 "없어야 하는
+        // 필드"를 단언한다 — 표시 필드를 되살리는 변경을 여기서 잡는다.
+        it('표시 필드를 싣지 않는다 (data-only — 표시·클릭은 서비스 워커가 맡는다)', async () => {
+            mockDocGet.mockResolvedValue({
+                exists: true,
+                data: () => ({ fcmToken: 'valid-token' }),
+            });
+            mockSend.mockResolvedValue('msg-id');
+
+            await sendPushToUser('user1', { title: '테스트', body: '알림' });
+
+            const sendArg = mockSend.mock.calls[0][0];
+            expect(sendArg.notification).toBeUndefined();
+            expect(sendArg.webpush?.notification).toBeUndefined();
+            expect(sendArg.webpush?.fcmOptions).toBeUndefined();
+            expect(sendArg.android?.notification).toBeUndefined();
         });
 
         it('사용자가 존재하지 않으면 전송하지 않는다', async () => {
@@ -117,7 +136,10 @@ describe('sendNotification', () => {
 
             const sendArg = mockSend.mock.calls[0][0];
             expect(sendArg.data.click_action).toBe('https://example.com/custom');
-            expect(sendArg.webpush.fcmOptions.link).toBe('https://example.com/custom');
+            // link는 data.click_action 한 곳에만 남는다 — fcmOptions.link를 함께 넣으면
+            // FCM SDK 기본 클릭 핸들러가 우선해 서비스 워커의 대상 탭 선정이 무력화된다.
+            expect(sendArg.webpush?.fcmOptions).toBeUndefined();
+            expect(sendArg.data.link).toBeUndefined();
         });
     });
 
