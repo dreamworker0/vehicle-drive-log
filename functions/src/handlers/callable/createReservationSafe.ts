@@ -33,6 +33,10 @@ export const createReservationSafe = onCall(
             // 명의자 지정 — 관리자가 직원 예약을 대행·수정할 때만 호출자와 달라진다.
             // 권한 판정은 코어(createReservationTx)가 한다.
             reservedByUid,
+            // 동승자(예정) — 검증(인원 상한·정수)은 코어가 한다
+            passengerUids,
+            passengerNames,
+            passengerCount,
         } = request.data;
 
         const { reservationId } = await createReservationTx({
@@ -52,6 +56,9 @@ export const createReservationSafe = onCall(
             recurringGroupId,
             source,
             reservedByUid,
+            passengerUids,
+            passengerNames,
+            passengerCount,
             actorUid: request.auth.uid,
             actorOrgId: request.auth.token.orgId,
             actorRole: request.auth.token.role,

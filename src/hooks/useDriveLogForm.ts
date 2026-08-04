@@ -135,12 +135,12 @@ export default function useDriveLogForm() {
         queryReservationId, resolvedReservationData, isElectric,
         form, showToast,
         setVehicles, setFavorites, setMembers, setLoading,
-        setForm, setSelectedPassengers, setExternalPassengerCount,
+        setForm, setSelectedPassengers, setExternalPassengerCount, setExternalPassengerNames,
         setSelectedCoDrivers, setExternalCoDriverNames,
         setResolvedReservationData, setLastEndBattery, setHipassCard,
         setLastDriveLog,
         setNextDriveLog,
-        vehicles
+        vehicles, members
     });
 
     // ── 하위 모듈 3: 핸들러 및 제출 ───────────────────────────

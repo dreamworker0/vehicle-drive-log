@@ -54,6 +54,11 @@ export interface Organization extends FirestoreDoc {
     passengerAllowSearch?: boolean;
     /** 동승자: 인원 숫자만 입력 */
     passengerAllowCount?: boolean;
+    /**
+     * 예약 화면에서도 동승자를 미리 입력 (미설정=**꺼짐**).
+     * 다른 플래그와 반대로 opt-in인 이유는 orgFeatures.ts 주석 참고.
+     */
+    reservationPassengerEnabled?: boolean;
     /** 운전자(대표·공동): 직원 목록에서 직접 선택 */
     driverAllowList?: boolean;
     /** 운전자(대표·공동): 검색으로 선택. 목록·검색 둘 다 켜지면 후보 8명 기준 자동 전환 */

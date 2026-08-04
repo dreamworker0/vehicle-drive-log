@@ -35,6 +35,8 @@ export interface SettingsForm {
     passengerAllowList: boolean;
     passengerAllowSearch: boolean;
     passengerAllowCount: boolean;
+    /** 예약 화면 동승자 입력(opt-in — 기본 꺼짐) */
+    reservationPassengerEnabled: boolean;
     driverAllowList: boolean;
     driverAllowSearch: boolean;
 }
@@ -72,6 +74,7 @@ export default function useSettings() {
         passengerAllowList: true,
         passengerAllowSearch: true,
         passengerAllowCount: true,
+        reservationPassengerEnabled: false,
         driverAllowList: true,
         driverAllowSearch: true,
     });
@@ -118,6 +121,7 @@ export default function useSettings() {
                         passengerAllowList: features.passengerAllowList,
                         passengerAllowSearch: features.passengerAllowSearch,
                         passengerAllowCount: features.passengerAllowCount,
+                        reservationPassengerEnabled: features.reservationPassenger,
                         driverAllowList: features.driverAllowList,
                         driverAllowSearch: features.driverAllowSearch,
                     });
@@ -194,6 +198,7 @@ export default function useSettings() {
                     passengerAllowList: targetData.passengerAllowList,
                     passengerAllowSearch: targetData.passengerAllowSearch,
                     passengerAllowCount: targetData.passengerAllowCount,
+                    reservationPassengerEnabled: targetData.reservationPassengerEnabled,
                     driverAllowList: targetData.driverAllowList,
                     driverAllowSearch: targetData.driverAllowSearch,
                 });

@@ -11,6 +11,7 @@ import RouteInfoPanel from './reservation/RouteInfoPanel';
 import RecurringReservationPanel from './reservation/RecurringReservationPanel';
 import ReservationTabContent from './reservation/ReservationTabContent';
 import ReservationTypeSelector from './reservation/ReservationTypeSelector';
+import ReservationPassengerField from './reservation/ReservationPassengerField';
 import type { Vehicle } from '../../types/vehicle';
 import type { Favorite } from '../../types/favorite';
 import type { Reservation, ReservationForm } from '../../types/reservation';
@@ -62,6 +63,11 @@ interface Props {
     allReservations?: Reservation[];
     /** 편집 중인 반복 그룹 ID */
     editingRecurringGroupId?: string | null;
+    /** 예약 시 동승자 미리 입력 사용 (기관 설정, 기본 꺼짐) */
+    passengerEnabled?: boolean;
+    passengerAllowList?: boolean;
+    passengerAllowSearch?: boolean;
+    passengerAllowCount?: boolean;
 }
 
 export default function ReservationSidePanel({
@@ -104,6 +110,10 @@ export default function ReservationSidePanel({
     holidays = [],
     allReservations = [],
     editingRecurringGroupId,
+    passengerEnabled = false,
+    passengerAllowList = true,
+    passengerAllowSearch = true,
+    passengerAllowCount = true,
 }: Props) {
     const destinationRef = useRef<HTMLInputElement>(null);
 
@@ -259,6 +269,19 @@ export default function ReservationSidePanel({
                                 placeholder="출장, 외근 등"
                             />
                         </div>
+
+                        {/* 동승자(예정) — 기관이 켠 경우에만. 기본은 접혀 있다.
+                            여기 값은 운행일지 작성 화면의 초기값이 될 뿐, 확정 기록은 운행일지다. */}
+                        {passengerEnabled && (
+                            <ReservationPassengerField
+                                form={form}
+                                setForm={setForm}
+                                members={members}
+                                allowList={passengerAllowList}
+                                allowSearch={passengerAllowSearch}
+                                allowCount={passengerAllowCount}
+                            />
+                        )}
 
                         {/* 다일/반복 예약 체크박스 + 다일 날짜 선택 */}
                         <ReservationTypeSelector

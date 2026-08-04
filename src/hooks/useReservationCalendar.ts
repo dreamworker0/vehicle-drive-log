@@ -15,7 +15,7 @@ import {
 import type { Reservation } from '../types/reservation';
 
 export default function useReservationCalendar({ isAdmin = false } = {}) {
-    const { user, userData } = useAuth();
+    const { user, userData, orgFeatures } = useAuth();
     const { showToast } = useToast();
     const { confirm } = useConfirm();
 
@@ -40,9 +40,13 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
         resetFormState,
     } = formHook;
 
+    // 예약 폼에서 동승자를 미리 입력하는 기관인지 (기관 설정, 기본 꺼짐)
+    const reservationPassengerOn = orgFeatures.passenger && orgFeatures.reservationPassenger;
+
     // ── Data loading (vehicles, reservations, holidays, members, favorites) ──
     const dataHook = useReservationData({
         user, userData, isAdmin, showToast, currentMonth,
+        needsMembers: reservationPassengerOn,
     });
     const {
         vehicles, reservations, setReservations, loading,
@@ -80,7 +84,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
             userData: userData!,
             form, selectedDate, currentMonth,
             vehicles, reservations, holidays,
-            routeInfo, reservationSource,
+            routeInfo, reservationSource, members,
             editingReservation, editingGroupId, editingRecurringGroupId,
             showToast, confirm,
             setSubmitting, setReservations, resetFormState, setRouteInfo,
@@ -88,7 +92,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
 
     const handleEdit = (res: Reservation) =>
         handleEditAction(res, {
-            reservations,
+            reservations, members,
             setEditingReservation, setEditingGroupId, setEditingRecurringGroupId,
             setSelectedDate, setForm, setShowForm,
         });
@@ -119,6 +123,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
         calendarDays, monthLabel, todayStr,
         selectedReservations, isPastDate, isToday,
         user, members,
+        reservationPassengerOn, orgFeatures,
         prevMonth, nextMonth,
         handleDateSelect,
         handleSubmit, handleEdit, handleCancel, handleSaveFavorite, handleOpenForm,

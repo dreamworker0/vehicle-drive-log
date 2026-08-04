@@ -25,6 +25,10 @@ export const reservationSchema = z.object({
     recurringGroupId: z.string().nullish().catch(null),
     isQuickDrive: z.boolean().nullish().catch(null),
     source: z.string().nullish().catch(null),
+    // 예약 시점에 미리 적어 두는 동승자(예정) — 확정 기록은 운행일지의 passengerNames다
+    passengerUids: z.array(z.string()).nullish().catch(null),
+    passengerNames: z.array(z.string()).nullish().catch(null),
+    passengerCount: z.coerce.number().nullable().optional().catch(null),
     createdAt: timestampSchema.optional().catch(undefined),
     expiresAt: timestampSchema.optional().catch(undefined),
 });

@@ -7,12 +7,13 @@
  * - 전기차 도착 배터리 조회
  * - 하이패스 카드 조회
  */
-import { useEffect } from 'react';
+import { useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getVehicles, getFavorites, getOrganizationMembers, getLastVehicleEndKm, getLastVehicleEndBattery, getReservationById, getHipassCards, getLastVehicleDriveLog, getAdjacentDriveLogs } from '../../lib/firestore';
 import { resolveStartKm } from './resolveStartKm';
 import { todayStr } from '../utils/driveLogValidation';
 import { captureError } from '../../lib/sentry';
+import { resolveReservationPassengers } from '../utils/reservationPassengers';
 import type { User } from 'firebase/auth';
 import type { Vehicle } from '../../types/vehicle';
 import type { Favorite } from '../../types/favorite';
@@ -50,6 +51,7 @@ export interface InitializerDeps {
     setForm: React.Dispatch<React.SetStateAction<DriveLogForm>>;
     setSelectedPassengers: React.Dispatch<React.SetStateAction<UserDoc[]>>;
     setExternalPassengerCount: (v: number) => void;
+    setExternalPassengerNames: (v: string) => void;
     setSelectedCoDrivers: React.Dispatch<React.SetStateAction<UserDoc[]>>;
     setExternalCoDriverNames: (v: string) => void;
     setResolvedReservationData: (v: LocationState | null) => void;
@@ -58,6 +60,8 @@ export interface InitializerDeps {
     setLastDriveLog: React.Dispatch<React.SetStateAction<DriveLog | null>>;
     setNextDriveLog: React.Dispatch<React.SetStateAction<DriveLog | null>>;
     vehicles: Vehicle[];
+    /** Effect 2(알림에서 진입)에서 동승자 uid·이름을 조직원과 맞추는 데 쓴다 */
+    members: UserDoc[];
 }
 
 /**
@@ -71,13 +75,31 @@ export function useDriveLogInitializer(deps: InitializerDeps) {
         queryReservationId, resolvedReservationData, isElectric,
         form, showToast,
         setVehicles, setFavorites, setMembers, setLoading,
-        setForm, setSelectedPassengers, setExternalPassengerCount,
+        setForm, setSelectedPassengers, setExternalPassengerCount, setExternalPassengerNames,
         setSelectedCoDrivers, setExternalCoDriverNames,
         setResolvedReservationData, setLastEndBattery, setHipassCard,
         setLastDriveLog,
         setNextDriveLog,
-        vehicles,
+        vehicles, members,
     } = deps;
+
+    /**
+     * 예약에 적어 둔 동승자(예정)를 운행일지 폼의 초기값으로 옮긴다.
+     *
+     * 여기서 채운 값은 **초안**이다 — 당일에 인원이 바뀌는 것은 흔한 일이라
+     * 사용자가 그대로 고칠 수 있어야 하고, 기록으로 남는 것은 운행일지 쪽 값이다.
+     * uid 우선 → 이름 폴백 → 남는 이름은 외부 인원. (resolveReservationPassengers)
+     */
+    const applyReservationPassengers = useCallback((
+        source: Pick<LocationState, 'passengerUids' | 'passengerNames' | 'passengerCount'>,
+        candidates: UserDoc[],
+    ) => {
+        const { selected, externalNames, count } = resolveReservationPassengers(source, candidates);
+        if (!selected.length && !externalNames.length && !count) return;
+        setSelectedPassengers(selected);
+        setExternalPassengerNames(externalNames.join(', '));
+        setExternalPassengerCount(count);
+    }, [setSelectedPassengers, setExternalPassengerNames, setExternalPassengerCount]);
 
     // ── Effect 1: 초기 데이터 로드 (차량, 즐겨찾기, 조직원) ──
     useEffect(() => {
@@ -140,6 +162,11 @@ export function useDriveLogInitializer(deps: InitializerDeps) {
                         destination: reservationData.destination || '',
                         startKm: km,
                     }));
+                    applyReservationPassengers({
+                        passengerUids: reservationData.passengerUids,
+                        passengerNames: reservationData.passengerNames,
+                        passengerCount: reservationData.passengerCount,
+                    }, otherMembers);
                 } else if (v.length === 1) {
                     const [km, lastLog] = await Promise.all([
                         resolveStartKm(orgId, v[0].id, { vehicle: v[0] }),
@@ -156,7 +183,7 @@ export function useDriveLogInitializer(deps: InitializerDeps) {
             }
         };
         fetch();
-    }, [orgId, reservationData?.vehicleId, reservationData?.vehicleName, reservationData?.purpose, reservationData?.destination, user, isEditMode, editLog, editLog?.id, editLog?.passengerNames, editLog?.vehicleId, setVehicles, setFavorites, setMembers, setSelectedPassengers, setExternalPassengerCount, setSelectedCoDrivers, setExternalCoDriverNames, setForm, setLoading, setLastDriveLog, setNextDriveLog]);
+    }, [orgId, reservationData?.vehicleId, reservationData?.vehicleName, reservationData?.purpose, reservationData?.destination, reservationData?.passengerUids, reservationData?.passengerNames, reservationData?.passengerCount, applyReservationPassengers, user, isEditMode, editLog, editLog?.id, editLog?.passengerNames, editLog?.vehicleId, setVehicles, setFavorites, setMembers, setSelectedPassengers, setExternalPassengerCount, setSelectedCoDrivers, setExternalCoDriverNames, setForm, setLoading, setLastDriveLog, setNextDriveLog]);
 
     // ── Effect 2: URL 쿼리 파라미터에서 reservationId로 예약 데이터 로드 (알림 클릭 시) ──
     useEffect(() => {
@@ -180,8 +207,12 @@ export function useDriveLogInitializer(deps: InitializerDeps) {
                         destination: res.destination || '',
                         actualStartTime: res.actualStartTime || '',
                         currentKm: res.currentKm || 0,
+                        passengerUids: res.passengerUids,
+                        passengerNames: res.passengerNames,
+                        passengerCount: res.passengerCount,
                     };
                     setResolvedReservationData(data);
+                    applyReservationPassengers(data, members);
 
                     // 폼에 예약 정보 반영
                     setForm(prev => ({
@@ -208,7 +239,7 @@ export function useDriveLogInitializer(deps: InitializerDeps) {
             }
         };
         loadReservation();
-    }, [queryReservationId, orgId, resolvedReservationData, showToast, navigate, form.startTime, setResolvedReservationData, setForm, setLastDriveLog]);
+    }, [queryReservationId, orgId, resolvedReservationData, showToast, navigate, form.startTime, members, applyReservationPassengers, setResolvedReservationData, setForm, setLastDriveLog]);
 
     // ── Effect 3: 차량/날짜 변경 시 startKm 및 인접 기록 자동 갱신 ──
     useEffect(() => {

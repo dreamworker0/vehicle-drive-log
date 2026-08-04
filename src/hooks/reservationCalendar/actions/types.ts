@@ -6,6 +6,7 @@ import type { Vehicle } from '../../../types/vehicle';
 import type { Reservation, ReservationForm } from '../../../types/reservation';
 import type { CustomHoliday } from '../../../types/holiday';
 import type { Favorite } from '../../../types/favorite';
+import type { User as UserDoc } from '../../../types/user';
 import type { RouteInfoData } from '../useRouteInfo';
 
 // ─── Shared dependency types ─────────────────────────────────────
@@ -24,6 +25,8 @@ export interface ActionDeps {
     editingReservation: Reservation | null;
     editingGroupId: string | null;
     editingRecurringGroupId: string | null;
+    /** 기관 구성원 — 동승자 선택·명의 표시에 쓴다 (동승자 입력이 꺼진 기관에서는 빈 배열) */
+    members?: UserDoc[];
     showToast: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
     confirm: (opts: {
         title?: string;
@@ -40,6 +43,8 @@ export interface ActionDeps {
 
 export interface EditDeps {
     reservations: Reservation[];
+    /** 기관 구성원 — 저장된 동승자 uid·이름을 폼 상태로 되돌릴 때 쓴다 */
+    members?: UserDoc[];
     setEditingReservation: (r: Reservation | null) => void;
     setEditingGroupId: (id: string | null) => void;
     setEditingRecurringGroupId: (id: string | null) => void;

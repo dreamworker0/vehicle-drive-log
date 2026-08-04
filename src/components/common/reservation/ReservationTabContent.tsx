@@ -6,6 +6,9 @@ import VehicleTimelineBar from '../VehicleTimelineBar';
 import type { Vehicle } from '../../../types/vehicle';
 import type { Reservation } from '../../../types/reservation';
 
+/** 예약에 적어 둔 동승 인원 (조직원 + 이름 없이 센 외부 인원) */
+const passengerTotal = (res: Reservation) => (res.passengerUids?.length || 0) + (res.passengerCount || 0);
+
 interface ReservationTabContentProps {
     sideTab: 'list' | 'completed';
     setSideTab: (tab: 'list' | 'completed') => void;
@@ -143,7 +146,14 @@ export default memo(function ReservationTabContent({
                                             </span>
                                         )}
                                     </p>
-                                    <p className="text-xs text-surface-400 dark:text-surface-500">{res.reservedByName}{res.purpose ? ` · ${res.purpose}` : ''}{res.destination ? ` → ${res.destination}` : ''}</p>
+                                    <p className="text-xs text-surface-400 dark:text-surface-500">
+                                        {res.reservedByName}{res.purpose ? ` · ${res.purpose}` : ''}{res.destination ? ` → ${res.destination}` : ''}
+                                        {/* 동승자는 **인원수만** 보여 준다. 예약 목록은 기관 전체가 상시 보는 자리라
+                                            이름까지 늘어놓지 않는다 (이름은 예약 수정 화면에서 확인). */}
+                                        {passengerTotal(res) > 0 && (
+                                            <span className="ml-1.5 text-surface-500 dark:text-surface-400">👥 {passengerTotal(res)}명</span>
+                                        )}
+                                    </p>
                                 </div>
                             ))}
                         </div>

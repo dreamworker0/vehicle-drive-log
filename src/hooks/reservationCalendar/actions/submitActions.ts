@@ -13,17 +13,53 @@ import {
 } from '../../../lib/firestore';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
 import { buildMultiDaySlots, findOverlappingReservation, getCurrentTimeStr, getTodayStr } from '../../utils/reservationUtils';
+import { composeReservationPassengers, MAX_PASSENGERS } from '../../utils/reservationPassengers';
 import { isVehicleRestrictedForUser } from '../../../lib/vehicleUtils';
 import { generateRecurringDates, generateRecurringGroupId } from '../../utils/recurringUtils';
 import type { Reservation } from '../../../types/reservation';
 import { invalidateDashboardCache } from '../../useTodayDashboard';
 import type { ActionDeps } from './types';
 
+/**
+ * 예약 문서에 공통으로 들어가는 필드를 한 곳에서 만든다.
+ *
+ * 저장 경로가 여섯 갈래(단건 생성·수정 · 다일 생성·수정 · 반복 생성·수정 · 전환)이고 각자
+ * 같은 조립을 반복하고 있었다. 필드를 하나 늘릴 때마다 여섯 번 복사해야 했고, 한 곳을
+ * 빠뜨리면 **그 경로에서만 값이 조용히 사라진다.**
+ *
+ * 폼 상태를 통째로(`...form`) 넘기지 않는 것도 의도다. 폼에는 저장 대상이 아닌 입력 보조
+ * 필드(반복 설정, 동승자 직접 입력 원문 등)가 섞여 있어 그대로 보내면 예약 문서를 오염시킨다.
+ */
+function buildReservationBaseData(
+    deps: ActionDeps,
+    { vehicleName, organizationId, routeData, passengers }: {
+        vehicleName: string;
+        /** 호출부에서 이미 존재를 확인한 값 (deps.userData는 null 허용 타입이라 여기서 다시 받는다) */
+        organizationId: string;
+        routeData: Partial<Pick<Reservation, 'routeDistance' | 'routeDuration' | 'routeTollFee'>>;
+        passengers: Partial<Reservation>;
+    },
+) {
+    const { form, user, userData, reservationSource } = deps;
+    return {
+        vehicleId: form.vehicleId,
+        vehicleName,
+        destination: form.destination,
+        purpose: form.purpose,
+        reservedByUid: form.reservedByUid || user.uid,
+        reservedByName: form.reservedByName || userData.name || user.email || '익명',
+        organizationId,
+        ...routeData,
+        ...passengers,
+        ...(reservationSource ? { source: reservationSource } : {}),
+    };
+}
+
 export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
     e.preventDefault();
     const {
         user, userData, form, selectedDate, currentMonth,
-        vehicles, reservations, holidays, routeInfo, reservationSource,
+        vehicles, reservations, holidays, routeInfo, members = [],
         editingReservation, editingGroupId, editingRecurringGroupId,
         showToast, confirm, setSubmitting, setReservations, resetFormState, setRouteInfo,
     } = deps;
@@ -205,6 +241,14 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
     // 한 사람이 같은 시간대에 여러 대의 차량을 예약하는 것은 허용한다 (행사·대규모 외근 대응).
     // 서버 코어(createReservationCore)도 차량 기준 겹침만 검사하므로 클라이언트에서도 막지 않는다.
 
+    // 동승자 인원 상한 (서버 createReservationCore도 같은 값으로 재검증한다)
+    const passengerTotal = (form.passengerUids?.length || 0)
+        + (form.passengerExternalNames ? form.passengerExternalNames.split(',').filter(n => n.trim()).length : 0);
+    if (passengerTotal > MAX_PASSENGERS) {
+        showToast(`동승자는 최대 ${MAX_PASSENGERS}명까지 지정할 수 있습니다.`, 'warning');
+        return;
+    }
+
     // 차량별 사용 가능 직원 제한 검증 (UI 비활성의 방어적 이중 체크, 서버 콜러블에서도 재검증됨)
     const selectedVehicle = vehicles.find(v => v.id === form.vehicleId);
     if (selectedVehicle && isVehicleRestrictedForUser(selectedVehicle, user.uid)) {
@@ -223,6 +267,17 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
             routeTollFee: routeInfo.tollFee || 0,
         } : {};
 
+        // 동승자(예정) — 생성은 값이 있을 때만 필드를 만들고, 수정은 빈 값도 명시적으로 보낸다.
+        // 수정에서 undefined로 두면 updateReservation이 걸러 내 **지운 동승자가 그대로 남는다.**
+        const passengers = composeReservationPassengers(form, members);
+        const passengersForUpdate = composeReservationPassengers(form, members, { clearWhenEmpty: true });
+        const baseData = buildReservationBaseData(deps, {
+            vehicleName,
+            organizationId: userData.organizationId!,
+            routeData,
+            passengers,
+        });
+
         if (isRecurringToSingle) {
             // ── 반복 → 단건 전환 ──
             // 순서가 중요하다. 먼저 나머지를 취소하고, 남길 회차를 마지막에 떼어낸다.
@@ -239,16 +294,10 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
                 editingReservation!.id,
             );
             await detachFromRecurringGroup(editingReservation!.id, {
-                vehicleId: form.vehicleId,
-                vehicleName,
-                destination: form.destination,
-                purpose: form.purpose,
+                ...baseData,
+                ...passengersForUpdate,
                 startTime: form.startTime,
                 endTime: form.endTime,
-                reservedByUid: form.reservedByUid,
-                reservedByName: form.reservedByName,
-                organizationId: userData.organizationId,
-                ...routeData,
             });
             showToast(`${editingReservation!.date} 단건 예약으로 전환되었습니다. (반복 ${cancelled}건 취소)`);
         } else if (isRecurringToMultiDay) {
@@ -266,35 +315,17 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
             // 첫날은 남긴 회차를 **고쳐 쓴다**. 지우고 다시 만들면 삭제 권한(소유자 한정)에 걸리고
             // 명의가 호출자에게 넘어간다 — 단건 전환이 detach를 쓰는 것과 같은 이유다.
             await detachFromRecurringGroup(multiDayAnchor!.id, {
-                vehicleId: form.vehicleId,
-                vehicleName,
-                destination: form.destination,
-                purpose: form.purpose,
+                ...baseData,
+                ...passengersForUpdate,
                 startTime: multiDaySlots[0].startTime,
                 endTime: multiDaySlots[0].endTime,
-                reservedByUid: form.reservedByUid,
-                reservedByName: form.reservedByName,
-                organizationId: userData.organizationId,
                 groupId: newGroupId,
-                ...routeData,
             });
-
-            const baseData = {
-                vehicleId: form.vehicleId,
-                vehicleName,
-                destination: form.destination,
-                purpose: form.purpose,
-                reservedByUid: form.reservedByUid || user.uid,
-                reservedByName: form.reservedByName || userData.name || user.email || '익명',
-                organizationId: userData.organizationId,
-                groupId: newGroupId,
-                ...routeData,
-                ...(reservationSource ? { source: reservationSource } : {}),
-            };
 
             for (const slot of multiDaySlots.slice(1)) {
                 await createReservationSafe({
                     ...baseData,
+                    groupId: newGroupId,
                     date: slot.date,
                     startTime: slot.startTime,
                     endTime: slot.endTime,
@@ -312,25 +343,13 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
             const days = eachDayOfInterval({ start: startD, end: endD });
             const totalDays = days.length;
 
-            const baseData = {
-                vehicleId: form.vehicleId,
-                vehicleName,
-                destination: form.destination,
-                purpose: form.purpose,
-                reservedByUid: form.reservedByUid || user.uid,
-                reservedByName: form.reservedByName || userData.name || user.email || '익명',
-                organizationId: userData.organizationId,
-                groupId: newGroupId,
-                ...routeData,
-                ...(reservationSource ? { source: reservationSource } : {}),
-            };
-
             for (let i = 0; i < totalDays; i++) {
                 const dayStr = format(days[i], 'yyyy-MM-dd');
                 const dayStartTime = i === 0 ? form.startTime : '00:00';
                 const dayEndTime = i === totalDays - 1 ? form.endTime : '23:59';
                 await createReservationSafe({
                     ...baseData,
+                    groupId: newGroupId,
                     date: dayStr,
                     startTime: dayStartTime,
                     endTime: dayEndTime,
@@ -342,10 +361,10 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
             // 이 분기가 그것까지 받아 단건 저장을 시도하면, 폼에 남은 반복 설정 필드가
             // 예약 문서에 섞여 들어가거나 undefined 값으로 저장이 실패한다.
             await updateReservation(editingReservation.id, {
-                ...form,
-                vehicleName,
-                ...routeData,
-                organizationId: userData.organizationId,
+                ...baseData,
+                ...passengersForUpdate,
+                startTime: form.startTime,
+                endTime: form.endTime,
             });
             showToast('예약이 수정되었습니다.');
         } else if (isMultiDay) {
@@ -356,25 +375,13 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
             const days = eachDayOfInterval({ start: startD, end: endD });
             const totalDays = days.length;
 
-            const baseData = {
-                vehicleId: form.vehicleId,
-                vehicleName,
-                destination: form.destination,
-                purpose: form.purpose,
-                reservedByUid: form.reservedByUid || user.uid,
-                reservedByName: form.reservedByName || userData.name || user.email || '익명',
-                organizationId: userData.organizationId,
-                groupId,
-                ...routeData,
-                ...(reservationSource ? { source: reservationSource } : {}),
-            };
-
             for (let i = 0; i < totalDays; i++) {
                 const dayStr = format(days[i], 'yyyy-MM-dd');
                 const dayStartTime = i === 0 ? form.startTime : '00:00';
                 const dayEndTime = i === totalDays - 1 ? form.endTime : '23:59';
                 await createReservationSafe({
                     ...baseData,
+                    groupId,
                     date: dayStr,
                     startTime: dayStartTime,
                     endTime: dayEndTime,
@@ -386,14 +393,10 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
             // 반복 예약은 아래 전용 블록에서 모든 날짜를 일괄 생성하므로 여기서 단일 생성하지 않는다.
             // (과거 이 분기가 selectedDate에 단일 예약을 먼저 만들어 반복 루프 첫 날짜와 409 충돌을 일으켰음)
             await createReservationSafe({
-                ...form,
-                vehicleName,
-                ...routeData,
+                ...baseData,
                 date: selectedDate,
-                reservedByUid: user.uid,
-                reservedByName: userData.name || user.email || '익명',
-                organizationId: userData.organizationId,
-                ...(reservationSource ? { source: reservationSource } : {}),
+                startTime: form.startTime,
+                endTime: form.endTime,
             });
             showToast('예약이 완료되었습니다.');
         }
@@ -407,25 +410,14 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
             }
 
             const rGroupId = generateRecurringGroupId();
-            const baseData = {
-                vehicleId: form.vehicleId,
-                vehicleName,
-                destination: form.destination,
-                purpose: form.purpose,
-                reservedByUid: form.reservedByUid || user.uid,
-                reservedByName: form.reservedByName || userData.name || user.email || '익명',
-                organizationId: userData.organizationId,
-                recurringGroupId: rGroupId,
-                startTime: form.startTime,
-                endTime: form.endTime,
-                ...routeData,
-                ...(reservationSource ? { source: reservationSource } : {}),
-            };
 
             // 충돌이 아닌 날짜만 생성 (사용자가 미리보기에서 확인함)
             for (const dateStr of recurringDates) {
                 await createReservationSafe({
                     ...baseData,
+                    recurringGroupId: rGroupId,
+                    startTime: form.startTime,
+                    endTime: form.endTime,
                     date: dateStr,
                 });
             }
@@ -446,23 +438,13 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
             await deleteRecurringGroup(editingRecurringGroupId, userData.organizationId!);
 
             const rGroupId = generateRecurringGroupId();
-            const baseData = {
-                vehicleId: form.vehicleId,
-                vehicleName,
-                destination: form.destination,
-                purpose: form.purpose,
-                reservedByUid: form.reservedByUid || user.uid,
-                reservedByName: form.reservedByName || userData.name || user.email || '익명',
-                organizationId: userData.organizationId,
-                recurringGroupId: rGroupId,
-                startTime: form.startTime,
-                endTime: form.endTime,
-                ...routeData,
-            };
 
             for (const dateStr of recurringDates) {
                 await createReservationSafe({
                     ...baseData,
+                    recurringGroupId: rGroupId,
+                    startTime: form.startTime,
+                    endTime: form.endTime,
                     date: dateStr,
                 });
             }

@@ -3,6 +3,8 @@
  *
  * organization 문서의 *Enabled 플래그는 "미설정(undefined)=켜짐, false만 꺼짐" 규칙이다.
  * (기존 기관은 플래그가 없으므로 전부 켜진 상태로 동작 → 회귀 없음)
+ *
+ * ⚠️ 예외: `reservationPassenger`만 **opt-in**(미설정=꺼짐)이다. 아래 주석 참고.
  */
 import type { Organization } from '../types/organization';
 
@@ -29,6 +31,8 @@ export interface OrgFeatures {
     passengerAllowSearch: boolean;
     /** 동승자: 인원 숫자 허용 */
     passengerAllowCount: boolean;
+    /** 예약 화면에서도 동승자를 미리 입력 (opt-in — 미설정이면 꺼짐) */
+    reservationPassenger: boolean;
     /** 운전자(대표·공동): 목록 직접 선택 허용 */
     driverAllowList: boolean;
     /** 운전자(대표·공동): 검색 선택 허용. 둘 다 켜지면 후보 8명 기준 자동 전환 */
@@ -48,6 +52,7 @@ export const ALL_FEATURES_ON: OrgFeatures = {
     passengerAllowList: true,
     passengerAllowSearch: true,
     passengerAllowCount: true,
+    reservationPassenger: true,
     driverAllowList: true,
     driverAllowSearch: true,
 };
@@ -56,7 +61,8 @@ type OrgFeatureFields = Pick<
     Organization,
     'hipassEnabled' | 'maintenanceEnabled' | 'maintenanceEmployeeAccess' | 'allowedUsersEnabled' | 'googleCalendarEnabled'
     | 'driverSelectionEnabled' | 'coDriverEnabled' | 'passengerEnabled'
-    | 'passengerAllowList' | 'passengerAllowSearch' | 'passengerAllowCount' | 'driverAllowList' | 'driverAllowSearch'
+    | 'passengerAllowList' | 'passengerAllowSearch' | 'passengerAllowCount' | 'reservationPassengerEnabled'
+    | 'driverAllowList' | 'driverAllowSearch'
 >;
 
 /**
@@ -76,6 +82,10 @@ export function resolveOrgFeatures(org?: Partial<OrgFeatureFields> | null): OrgF
         passengerAllowList: org?.passengerAllowList !== false,
         passengerAllowSearch: org?.passengerAllowSearch !== false,
         passengerAllowCount: org?.passengerAllowCount !== false,
+        // 이 한 줄만 `=== true`다. 나머지처럼 "미설정=켜짐"으로 두면 **모든 기관의 예약 폼에
+        // 새 입력란이 예고 없이 나타난다.** 예약 화면은 전 직원이 매일 쓰는 자리라,
+        // 켤지 말지는 기관이 정하게 한다.
+        reservationPassenger: org?.reservationPassengerEnabled === true,
         driverAllowList: org?.driverAllowList !== false,
         driverAllowSearch: org?.driverAllowSearch !== false,
     };

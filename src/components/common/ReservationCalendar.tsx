@@ -27,6 +27,7 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
         calendarDays, monthLabel, todayStr,
         selectedReservations, isPastDate, isToday,
         user, members,
+        reservationPassengerOn, orgFeatures,
         prevMonth, nextMonth,
         handleDateSelect,
         handleSubmit, handleEdit, handleCancel, handleSaveFavorite, handleOpenForm,
@@ -141,6 +142,10 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
                         allReservations={reservations}
                         editingRecurringGroupId={editingRecurringGroupId}
                         onSlotClick={handleSlotClick}
+                        passengerEnabled={reservationPassengerOn}
+                        passengerAllowList={orgFeatures.passengerAllowList}
+                        passengerAllowSearch={orgFeatures.passengerAllowSearch}
+                        passengerAllowCount={orgFeatures.passengerAllowCount}
                     />
                 </div>
             </div>

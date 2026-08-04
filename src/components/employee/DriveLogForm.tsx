@@ -11,7 +11,7 @@ import VehicleInfoSection from './driveLogFormLayout/VehicleInfoSection';
 import DateSection from './driveLogFormLayout/DateSection';
 import WaypointSection from './driveLogFormLayout/WaypointSection';
 import DriverSection from './driveLogFormLayout/DriverSection';
-import PassengerSection from './driveLogFormLayout/PassengerSection';
+import PassengerSection from '../common/PassengerSection';
 import VehicleStatusSection from './driveLogFormLayout/VehicleStatusSection';
 
 export default function DriveLogForm() {

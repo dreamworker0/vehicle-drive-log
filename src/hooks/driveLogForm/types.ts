@@ -33,6 +33,10 @@ export interface LocationState {
     actualStartTime?: string;
     currentKm?: number;
     editLog?: DriveLog & { passengerNames?: string[] };
+    /** 예약에 미리 적어 둔 동승자(예정) — 운행일지 폼의 초기값이 된다 */
+    passengerUids?: string[];
+    passengerNames?: string[];
+    passengerCount?: number;
     /** 예약 없이 과거 누락 건을 직접 소급 입력하는 진입점 여부 */
     retroactive?: boolean;
 }

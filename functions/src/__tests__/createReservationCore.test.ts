@@ -239,6 +239,58 @@ describe('createReservationTx (코어)', () => {
         await expect(createReservationTx(validInput)).rejects.toThrow('예약 생성에 실패했습니다');
     });
 
+    describe('동승자(예정)', () => {
+        it('전달한 동승자를 문서에 기록한다', async () => {
+            mockTransactionGet.mockResolvedValue({ exists: true, data: () => ({ organizationId: 'org1' }), docs: [] });
+
+            await createReservationTx({
+                ...validInput,
+                passengerUids: ['emp1'],
+                passengerNames: ['황직원', '박외부'],
+                passengerCount: 2,
+            });
+
+            expect(mockTransactionSet).toHaveBeenCalledWith(
+                expect.anything(),
+                expect.objectContaining({
+                    passengerUids: ['emp1'],
+                    passengerNames: ['황직원', '박외부'],
+                    passengerCount: 2,
+                })
+            );
+        });
+
+        it('동승자가 없으면 필드를 만들지 않는다 (문서를 키우지 않는다)', async () => {
+            mockTransactionGet.mockResolvedValue({ exists: true, data: () => ({ organizationId: 'org1' }), docs: [] });
+
+            await createReservationTx(validInput);
+
+            const saved = mockTransactionSet.mock.calls[0][1];
+            expect(saved).not.toHaveProperty('passengerUids');
+            expect(saved).not.toHaveProperty('passengerNames');
+            expect(saved).not.toHaveProperty('passengerCount');
+        });
+
+        it('상한(50명)을 넘는 명단은 거부한다 — 문서 크기·읽기 비용 방어', async () => {
+            const tooMany = Array.from({ length: 51 }, (_, i) => `사람${i}`);
+
+            await expect(
+                createReservationTx({ ...validInput, passengerNames: tooMany })
+            ).rejects.toThrow('최대 50명');
+            expect(mockTransactionSet).not.toHaveBeenCalled();
+        });
+
+        it('인원 수가 음수·소수면 거부한다', async () => {
+            await expect(
+                createReservationTx({ ...validInput, passengerCount: -1 })
+            ).rejects.toThrow('0 이상의 정수');
+            await expect(
+                createReservationTx({ ...validInput, passengerCount: 1.5 })
+            ).rejects.toThrow('0 이상의 정수');
+            expect(mockTransactionSet).not.toHaveBeenCalled();
+        });
+    });
+
     it('source 필드를 전달하면 문서에 기록한다 (봇 경유 식별)', async () => {
         mockTransactionGet.mockResolvedValue({ exists: true, data: () => ({ organizationId: 'org1' }), docs: [] });
 

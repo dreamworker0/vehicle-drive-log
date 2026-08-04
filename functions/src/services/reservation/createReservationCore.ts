@@ -45,7 +45,17 @@ export interface CreateReservationInput {
      * 삭제를 막아 온 이유가 이것이었다.
      */
     reservedByUid?: string;
+    /**
+     * 예약 시점에 미리 적어 두는 동승자(예정). 확정 기록은 운행일지이며,
+     * 여기 값은 운행일지 작성 화면의 초기값으로만 쓰인다.
+     */
+    passengerUids?: string[];
+    passengerNames?: string[];
+    passengerCount?: number;
 }
+
+/** 동승자 배열 길이 상한 — 클라이언트(reservationPassengers.ts)와 같은 값 */
+const MAX_PASSENGERS = 50;
 
 export interface CreateReservationResult {
     reservationId: string;
@@ -74,6 +84,9 @@ export async function createReservationTx(
         actorUid,
         actorRole,
         reservedByUid,
+        passengerUids,
+        passengerNames,
+        passengerCount,
     } = input;
 
     if (!organizationId || !vehicleId || !date || !startTime || !endTime) {
@@ -107,6 +120,18 @@ export async function createReservationTx(
             "invalid-argument",
             "시작 시간은 종료 시간보다 빨라야 합니다."
         );
+    }
+
+    // 동승자(예정) 정규화 — 길이 상한을 두는 이유는 문서 크기와 읽기 비용이다.
+    // 무제한 배열은 예약 목록을 읽는 모든 화면의 비용을 함께 키운다.
+    if ((passengerUids?.length || 0) > MAX_PASSENGERS || (passengerNames?.length || 0) > MAX_PASSENGERS) {
+        throw new HttpsError(
+            "invalid-argument",
+            `동승자는 최대 ${MAX_PASSENGERS}명까지 지정할 수 있습니다.`
+        );
+    }
+    if (passengerCount !== undefined && (!Number.isInteger(passengerCount) || passengerCount < 0)) {
+        throw new HttpsError("invalid-argument", "동승 인원은 0 이상의 정수여야 합니다.");
     }
 
     try {
@@ -197,6 +222,10 @@ export async function createReservationTx(
                 ...(groupId ? { groupId } : {}),
                 ...(recurringGroupId ? { recurringGroupId } : {}),
                 ...(source ? { source } : {}),
+                // 빈 값은 필드를 만들지 않는다 (문서를 불필요하게 키우지 않는다)
+                ...(passengerUids?.length ? { passengerUids } : {}),
+                ...(passengerNames?.length ? { passengerNames } : {}),
+                ...(passengerCount ? { passengerCount } : {}),
                 status,
                 createdAt: FieldValue.serverTimestamp(),
             });

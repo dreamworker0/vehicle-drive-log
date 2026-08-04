@@ -21,6 +21,8 @@ interface UseReservationDataParams {
     isAdmin: boolean;
     showToast: (msg: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
     currentMonth: Date;
+    /** 예약 동승자 입력이 켜진 기관인지 — 켜져 있으면 일반 직원도 직원 목록이 필요하다 */
+    needsMembers?: boolean;
 }
 
 export function useReservationData({
@@ -29,6 +31,7 @@ export function useReservationData({
     isAdmin,
     showToast,
     currentMonth,
+    needsMembers = false,
 }: UseReservationDataParams) {
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
     const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -86,7 +89,9 @@ export function useReservationData({
                     setOrgAddress(orgData.address);
                 }
 
-                if (isAdmin) {
+                // 관리자는 예약자 대리 지정에, 일반 직원은 동승자 선택에 직원 목록이 필요하다.
+                // 동승자 입력을 끈 기관에서는 이 읽기가 늘지 않는다.
+                if (isAdmin || needsMembers) {
                     const mList = await getOrganizationMembers(userData.organizationId!);
                     setMembers(mList as UserDoc[]);
                 }
@@ -102,7 +107,7 @@ export function useReservationData({
 
         // 비차단으로 돌린 공휴일 로드가 언마운트 후 setState하지 않게 한다.
         return () => { holidayCancelled = true; };
-    }, [user, userData, isAdmin, showToast]);
+    }, [user, userData, isAdmin, needsMembers, showToast]);
 
     // 예약 목록 로드 함수 분리 (재사용 목적)
     const fetchReservations = useCallback(() => {
