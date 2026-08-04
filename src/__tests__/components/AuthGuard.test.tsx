@@ -101,3 +101,55 @@ describe('AuthGuard — 사용자 문서 로딩 확정 전 라우팅 보류', ()
     expect(screen.getByText('LOGIN')).toBeInTheDocument();
   });
 });
+
+/**
+ * 슈퍼관리자 테스트 역할은 **탭마다 독립**이어야 한다(sessionStorage).
+ *
+ * localStorage로 두면 탭 간 공유라, 한 탭에서 역할을 바꾼 뒤 다른 탭이 리로드되는 순간
+ * 그 탭도 바뀐 역할로 끌려갔다 — 직원 화면과 관리자 화면을 나란히 띄워 보는 것이 이 기능의
+ * 용도인데 그게 불가능했다. 되돌림을 잡으려고 "localStorage에만 값이 있으면 무시한다"까지
+ * 단언한다(그게 없으면 두 스토리지를 모두 읽는 구현도 통과한다).
+ */
+describe('AuthGuard — 슈퍼관리자 테스트 역할은 탭 단위(sessionStorage)', () => {
+  beforeEach(() => {
+    sessionStorage.clear();
+    localStorage.clear();
+    mockAuth = {
+      user: { uid: 'sa1' },
+      userData: { role: 'superAdmin', organizationId: 'org1' },
+      userDocState: 'present',
+      isSuperAdmin: true,
+      orgDeleted: false,
+    };
+  });
+
+  it('sessionStorage의 테스트 역할을 반영한다 (employee로 지정하면 직원 라우트를 통과)', () => {
+    sessionStorage.setItem('sa-test-role', 'employee');
+    renderAt('/employee', (
+      <AuthGuard requireAuth requireOrgSetup allowedRoles={['employee']}>
+        <div>EMP_CONTENT</div>
+      </AuthGuard>
+    ));
+    expect(screen.getByText('EMP_CONTENT')).toBeInTheDocument();
+  });
+
+  it('localStorage에만 값이 있으면 무시한다 (탭 간 공유 회귀 차단)', () => {
+    localStorage.setItem('sa-test-role', 'employee');
+    // 지정이 없는 것과 같아야 하므로 effectiveRole은 superAdmin — 직원 전용 라우트는 막힌다
+    renderAt('/employee', (
+      <AuthGuard requireAuth requireOrgSetup allowedRoles={['employee']}>
+        <div>EMP_CONTENT</div>
+      </AuthGuard>
+    ));
+    expect(screen.queryByText('EMP_CONTENT')).not.toBeInTheDocument();
+  });
+
+  it('지정이 없으면 슈퍼관리자 그대로다 (직원 전용 라우트 접근 불가)', () => {
+    renderAt('/employee', (
+      <AuthGuard requireAuth requireOrgSetup allowedRoles={['employee']}>
+        <div>EMP_CONTENT</div>
+      </AuthGuard>
+    ));
+    expect(screen.queryByText('EMP_CONTENT')).not.toBeInTheDocument();
+  });
+});

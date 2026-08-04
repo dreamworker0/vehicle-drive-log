@@ -68,7 +68,8 @@ export function AuthGuard({
   requireOrgSetup = false,
 }: AuthGuardProps) {
   const { user, userData, userDocState, isSuperAdmin, orgDeleted } = useAuth();
-  const saTestRole = useMemo(() => (isSuperAdmin ? localStorage.getItem(SA_TEST_ROLE_KEY) : null), [isSuperAdmin]);
+  // sessionStorage — 탭마다 독립이라 직원 화면과 관리자 화면을 나란히 띄워도 서로 끌려가지 않는다.
+  const saTestRole = useMemo(() => (isSuperAdmin ? sessionStorage.getItem(SA_TEST_ROLE_KEY) : null), [isSuperAdmin]);
 
   // 0. 인증은 됐지만 사용자 문서 로딩이 아직 확정되지 않음(pending)
   //    userData=null을 '기관 미가입'으로 오인해 온보딩(/invite)으로 보내지 않도록 라우팅을 보류한다.
