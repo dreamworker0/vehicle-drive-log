@@ -9,16 +9,14 @@ export default function UpdatePrompt() {
         let intervalId: ReturnType<typeof setInterval> | undefined;
         let registration: ServiceWorkerRegistration | undefined;
 
-        const updateSW = registerSW({
-            onNeedRefresh() {
-                console.debug('[PWA] 새 버전 감지 → 자동 업데이트 적용');
-                // updateSW(true)는 Promise를 반환 — .catch()로 비동기 에러도 처리
-                Promise.resolve(updateSW(true)).catch(() => {
-                    // iOS Safari에서 newestWorker가 null인 경우
-                    // InvalidStateError 발생 — 페이지 새로고침으로 대체
-                    console.warn('[PWA] SW 업데이트 실패, 새로고침으로 대체');
-                    window.location.reload();
-                });
+        registerSW({
+            // 새 워커가 activate되면 vite-plugin-pwa는 기본적으로 window.location.reload()를
+            // 부른다(autoUpdate 모드). skipWaiting 때문에 activate는 열려 있는 모든 탭에서
+            // 동시에 관측되므로, 그 기본 동작은 탭 전부를 한꺼번에 새로고침한다.
+            // onNeedReload를 제공하면 그 자동 리로드를 우리가 가로챌 수 있다 — 여기서는
+            // 리로드하지 않고 다음 내비게이션에 맡긴다(main.tsx의 정책 주석 참고).
+            onNeedReload() {
+                console.debug('[PWA] 새 버전 활성화 — 다음 내비게이션에서 반영');
             },
             onOfflineReady() {
                 console.debug('[PWA] 오프라인 사용 준비 완료');
