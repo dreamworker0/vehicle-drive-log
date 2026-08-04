@@ -81,3 +81,26 @@
 | **검증** | lint · type-check(앱·functions) · 프론트 1153 → **1177건**(동승자 유틸 14 · 제출 5 · 수정 복원 4 · orgFeatures 1) · Functions 684 → **688건** · 빌드(gzip 978.4/1050KB) |
 | **커밋·PR** | `47cef53`(PR #136) — CI 배포 완료 |
 | **남은 것** | ① 동승자 알림·"내가 동승하는 운행" 목록 ② 통계·PDF/Excel 내보내기에 동승자 반영 ③ Google 캘린더 이벤트 설명에 동승자 표기 — 셋 다 SELECTIVE 스코프 밖으로 합의해 기록만 남긴다 |
+
+### Phase 146: 탭을 두 개 띄우면 서로 간섭했다 — 알림 클릭 대상 탭 · 전 탭 동시 리로드 🗂️🔄
+
+> 2026-08-04, 사용자 제보: "탭을 2개 띄워놨는데 하나의 탭에서 다른 페이지에 들어가면 다른 탭도 따라서 그 페이지로 바뀐다. 왜 그런거야?" 화면 스크린샷은 슈퍼관리자가 직원 테스트 모드로 `/employee/today`를 보고 있는 상태였다.
+
+| 항목 | 내용 |
+|------|------|
+| **먼저 없는 것을 확인했다** | 탭 간 라우트를 동기화하는 코드가 있는지부터 봤고 **전부 없었다** — `BroadcastChannel` · `storage` 이벤트 리스너 · `SharedWorker` · 경로를 공유 저장소에 쓰는 코드. 라우터도 평범한 `BrowserRouter`다. 의도된 기능이 아니라는 것이 확정되자 "다른 탭의 주소를 바꿀 수 있는 코드"로 범위가 좁혀졌고, 그건 서비스 워커의 `client.navigate` 한 곳뿐이었다. 여기서 원인이 둘로 갈렸다 |
+| **① `matchAll`의 첫 번째 탭을 끌고 갔다** | `notificationclick`이 배열 `[0]`을 조건 없이 `navigate` + `focus` 했다 — `client.focused` · `visibilityState`를 **보지 않았다**. 탭이 둘 이상이면 보고 있지 않던 탭의 주소가 바뀌고 포커스까지 그쪽으로 튄다. 우선순위를 명시했다: 이미 그 페이지인 탭 → 지금 보고 있는 탭 → 마지막으로 쓴 탭 |
+| **URL 비교가 언제나 불일치였다** | `click_action`은 상대 경로(`/employee/today`), `client.url`은 절대 URL. `!==`가 항상 참이라 **이미 그 화면을 보고 있는 탭도 매번 전체 재로딩**됐다(SPA 상태 유실). `new URL(raw, origin)`으로 정규화해 일치하면 `focus`만 한다 — 재로딩하지 않는 것이 이 분기의 요점이다 |
+| **폴백을 남긴 이유** | `includeUncontrolled: true`로 잡힌 탭은 이 워커가 제어하지 않아 `navigate`가 **거부된다**(spec: TypeError). 그때 `openWindow`로 폴백해 알림 클릭이 무반응이 되지 않게 했다. 외부 origin `click_action`은 루트로 대체한다(payload는 서버가 만들지만 방어) |
+| **② `skipWaiting`은 모든 탭의 컨트롤러를 바꾼다** | `clientsClaim`을 쓰지 않았으니 현재 탭을 가로채지 않는다고 본 것이 **오해였다.** `skipWaiting()` 후 activate는 그 등록에 딸린 **모든 클라이언트**의 active worker를 교체하고 탭마다 `controllerchange`를 발생시킨다(`clientsClaim`은 컨트롤러가 없던 첫 로드용). `main.tsx`가 거기에 무조건 `reload()`를 걸어 열린 탭이 전부 동시에 새로고침됐다 |
+| **탭을 옮기는 순간 터지는 구조였다** | `UpdatePrompt`가 `visibilitychange`마다 `reg.update()`를 부른다. 그래서 "탭을 옮겼더니 다른 탭이 바뀐다"는 제보와 증상이 맞아떨어진다. 리로드된 탭에 `AuthGuard` 리다이렉트가 겹치면(슈퍼관리자 테스트 역할 `SA_TEST_ROLE_KEY`는 **localStorage라 탭 간 공유**) 다른 탭을 따라간 것처럼 보인다 |
+| **리로드 경로가 두 군데였다** | `registerType: 'autoUpdate'`라서 `UpdatePrompt`의 `onNeedRefresh`는 **프로덕션에서 한 번도 불리지 않는 dead code**였다(`vite-plugin-pwa/dist/client/build/register.js`의 `auto === true` 분기에서 확인 — 그 안의 `updateSW(true)`도 auto 모드에서는 no-op). 실제 리로드는 플러그인이 workbox `activated`에서 걸고 있었다. `onNeedReload`를 제공해 가로챈다. **iOS Safari `InvalidStateError` 폴백으로 넣어둔 코드가 실은 죽어 있었다**는 뜻이다(그 에러는 `sentry.ts`가 따로 필터링 중) |
+| **정책은 새로 정하지 않았다** | `sw.ts`가 이미 적어 둔 것을 따랐다 — "현재 페이지 즉시 교체 대신 **다음 내비게이션에서 최신 반영**". 자동 전면 리로드를 없애고 (a) 다음 내비게이션·재접속 (b) 구버전 청크 요청이 실패한 탭만 `lazyWithRetry`가 리로드. 둘 다 **그 탭에서만** 일어난다 |
+| **주 경로가 된 안전망을 손봤다(스코프 한 칸 밖)** | `lazyWithRetry`의 `chunk-reload-retried`가 세션 내내 남아, 오래 열어둔 탭에서 **두 번째** 배포의 청크 실패가 리로드 없이 곧바로 에러 화면이 됐다. 로드 성공 시 해제한다. 리로드해도 계속 실패하면 성공이 없어 플래그가 남으므로 무한 리로드는 생기지 않는다 |
+| **`reg.update()`는 남겼다** | 새 워커를 미리 받아두는 것 자체는 무해하고, 다음 내비게이션에서 최신이 뜨는 근거다. 주기적(10분)·탭 복귀 체크 모두 유지 |
+| **SW를 단위 테스트로 고정** | workbox 4종을 모킹하고 `self.addEventListener`를 가로채 `notificationclick` 핸들러를 직접 호출한다(`swNotificationClick.test.ts`). **이전 구현으로는 "보고 있지 않던 탭은 건드리지 않는다"가 실패한다** — 진짜 회귀 테스트다. 커버리지 제외 목록에 있는 파일이라 그동안 테스트가 없었다 |
+| **검증** | lint · type-check(`src/sw.ts` 포함 확인) · 프론트 1182 → **1192건** · 빌드(gzip 978.5/1050KB) · 하네스 Doctor 오류 0건 · `check:release-notes` 통과. 빌드된 `dist/sw.js`에 새 분기가 들어갔는지, 앱 코드에서 `controllerchange`가 사라졌는지(남은 것은 workbox 라이브러리 내부) 직접 확인 |
+| **커밋·PR** | `3018666`·`c95cb6c`·`b58cb75`(PR #139, merge `3e82765`) — CI #512 · Deploy #312 배포 완료 |
+| **사용자가 겪을 반대급부를 공지에 적었다** | 탭을 오래 열어두면 이전 버전 화면이 잠시 더 보일 수 있다. 자동 리로드를 없앤 대가라 숨기지 않았다. 또 **이번 배포 시점에 열려 있던 탭은 한 번은 수동 새로고침이 필요하다** — 정책 변경 자체가 구버전 코드에 들어 있기 때문 |
+| **남은 것 — ①이 FCM 알림에는 적용되지 않는다** | 서버는 `notification` payload + `webpush.fcmOptions.link`로 보내고(`sendNotification.ts`·`sendBroadcastNotice.ts`), 그러면 `firebase-messaging-sw.js`의 `onBackgroundMessage`가 조기 반환해 **FCM SDK가 자동 표시**한다. 그 알림은 messaging SW 등록(scope `/firebase-cloud-messaging-push-scope`)이 띄운 것이므로 클릭도 **FCM SDK 기본 핸들러**가 처리한다 — `sw.ts`의 우선순위가 걸리지 않는다. 이번 수정이 실제로 덮는 것은 앱이 직접 띄우는 알림, 즉 `useDashboardActions`의 "🚗 운행 중"(`navigator.serviceWorker.ready`=앱 SW 등록)이다. data-only로 통일하거나 messaging SW에도 같은 핸들러를 두는 선택이 남았다 |
+| **남은 것 — 그 밖** | ① `App.tsx`의 `NOTIFICATION_CLICK` postMessage 수신부는 **보내는 쪽이 없는 dead code**로 남아 있다(SW가 `client.navigate`로 직접 처리). ② 보이는 탭이 없을 때의 폴백은 `matchAll`이 '최근 포커스 순'을 준다는 spec에 의존한다 — 브라우저별 실측은 하지 않았다 |
