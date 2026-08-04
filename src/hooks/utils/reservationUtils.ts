@@ -1,6 +1,7 @@
 /**
  * 예약 관련 유틸리티 — 순수 함수로 단위 테스트 가능
  */
+import { eachDayOfInterval, format } from 'date-fns';
 import type { Reservation } from '../../types/reservation';
 
 /**
@@ -74,6 +75,31 @@ export function findOverlappingReservation(
         
         return startTime < effEnd && endTime > effStart;
     }) || null;
+}
+
+/**
+ * 다일(연속) 예약이 만들 날짜별 시간 구간을 계산한다.
+ *
+ * 첫날은 시작 시간부터 자정 직전까지, 중간 날은 하루 전체, 마지막 날은 자정부터 종료 시간까지 —
+ * 연속 운행이라 중간에 차가 반납되지 않는다는 뜻이다. 검증(충돌 검사)과 실제 생성이
+ * **같은 목록**을 봐야 하므로 한 곳에서 만든다.
+ *
+ * @param startDate 시작일 (YYYY-MM-DD)
+ * @param endDate 종료일 (YYYY-MM-DD). 시작일 이하면 하루짜리 1건으로 본다.
+ */
+export function buildMultiDaySlots(startDate: string, endDate: string, startTime: string, endTime: string) {
+    if (!endDate || endDate <= startDate) return [{ date: startDate, startTime, endTime }];
+
+    const days = eachDayOfInterval({
+        start: new Date(startDate + 'T00:00'),
+        end: new Date(endDate + 'T00:00'),
+    });
+    const lastIndex = days.length - 1;
+    return days.map((day, i) => ({
+        date: format(day, 'yyyy-MM-dd'),
+        startTime: i === 0 ? startTime : '00:00',
+        endTime: i === lastIndex ? endTime : '23:59',
+    }));
 }
 
 /**

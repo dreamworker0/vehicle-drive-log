@@ -175,11 +175,14 @@ export const updateReservation = async (reservationId: string, data: Partial<Res
 };
 
 /**
- * 반복 그룹에서 한 건을 떼어내 단건 예약으로 만든다 (반복 → 단건 전환).
+ * 반복 그룹에서 한 건을 떼어낸다 (반복 → 단건 전환, 반복 → 다일 전환의 첫날).
  *
  * 그룹 링크(`recurringGroupId`)를 문서에서 **제거**한다. 남겨 두면 이 예약을 다시 열 때
  * 1일짜리 반복 그룹으로 해석돼 단건이 된 것이 아니게 된다. 값을 undefined로 덮는 것은
  * Firestore가 거부하므로 `deleteField()`를 쓴다.
+ *
+ * 다일 전환에서는 `data.groupId`로 새 다일 그룹을 함께 지정한다 — 반복 링크는 끊고
+ * 연속 예약 그룹에 붙이는 것이 한 번의 update로 끝난다.
  *
  * 새로 만들지 않고 기존 문서를 고치는 이유가 둘 있다.
  *  (1) **삭제 권한** — Rules의 예약 delete는 소유자 본인(또는 superAdmin)만 허용한다.
