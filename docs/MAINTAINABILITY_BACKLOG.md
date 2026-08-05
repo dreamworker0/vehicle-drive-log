@@ -9,7 +9,9 @@
 > 2차 정리(안전 우선·단계적, 특성화 테스트 동반): 아래 1~3의 저~중위험 부분을 분리 완료.
 >
 > 3차 정리: **Settings 결재라인 섹션 추출**과 **Functions ESLint 도입**까지 완료.
-> 현재 백로그의 코드 분리 과제는 모두 처리되었다(아래 각 항목 "완료" 참고).
+> 코드 분리 과제(1~3)는 모두 처리되었다(아래 각 항목 "완료" 참고).
+>
+> 미착수 과제는 **Functions 런타임 메이저 이관** 한 건이다(아래 별도 트랙).
 
 ---
 
@@ -64,6 +66,32 @@
   OAuth2 클라이언트는 `InstanceType<typeof google.auth.OAuth2>`, Storage 버킷은
   `ReturnType<...getStorage().bucket>`, 외부 API 응답은 최소 응답 인터페이스로 정의.
   현재 `npm run lint`는 functions 포함 **0 errors / 0 warnings**.
+
+---
+
+## 별도 트랙: Functions 런타임 메이저 이관 (firebase-admin 14 · firebase-functions 7) — 미착수
+
+`firebase-admin` 13→14와 `firebase-functions` 6→7은 **함께 올려야 하는 한 묶음**이다.
+functions 6의 peer가 `firebase-admin ^11 || ^12 || ^13`이라 admin 14 단독 상향은 `npm ci`가
+ERESOLVE로 실패하고(PR #116), functions 7은 peer에 `^14`를 포함하므로 상향 순서가 강제된다.
+둘을 함께 설치해 검증하면 `npm run type-check:functions`가 **8개 파일에서 22건** 실패한다
+(2026-08-05 실측). 그래서 dependabot은 두 메이저를 ignore에 등록해 보류 중이며
+([.github/dependabot.yml](../.github/dependabot.yml)), 이관 완료 시 **두 항목을 함께** 제거한다.
+
+- **(1) `admin.firestore` 네임스페이스 API 제거 (12건)** — firebase-admin 14가 네임스페이스
+  접근을 없앴다. 모듈러 API로 이관한다: `getFirestore()`·`FieldValue`를
+  `firebase-admin/firestore`에서 직접 import.
+  - `services/driveLog/updateDriveLogStats.ts` (8건 — 가장 큼)
+  - `scripts/cleanDuplicateCalendars.ts` (3건), `handlers/scheduled/verifyMileageConsistency.ts` (2건),
+    `handlers/https/submitPublicFeedback.ts` (1건)
+  - 위 중 2건은 `firestore` 타입 소실에 따른 파생 `implicitly any`라 원인 수정 시 함께 사라진다.
+- **(2) express 타입 5 계열 전환 (8건)** — firebase-functions 7이 번들하는 `@types/express`가
+  5로 올라가며 `Request`/`Response` named export가 사라졌다.
+  - `utils/helpers.ts`, `utils/createAuthenticatedProxy.ts`,
+    `handlers/https/slackEvents.ts`, `handlers/https/slackOauthCallback.ts` (각 2건)
+- **주의**: 집계 트리거(`updateDriveLogStats`)와 인증 프록시는 배포 즉시 프로덕션에 반영되는
+  경로다. `functions/src/__tests__/`의 기존 단위 테스트로 동작을 고정한 뒤 이관하고,
+  에뮬레이터에서 집계·Slack 웹훅 경로를 함께 확인한다.
 
 ---
 

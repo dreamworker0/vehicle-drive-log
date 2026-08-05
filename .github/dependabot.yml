@@ -43,6 +43,22 @@ updates:
     labels:
       - dependencies
       - functions
+    # 아래 두 메이저는 **함께 올려야 하는 한 묶음**이면서 코드 마이그레이션이 필요하다.
+    # firebase-functions@6의 peer가 `firebase-admin ^11 || ^12 || ^13`이라 admin 14 단독은
+    # npm ci가 ERESOLVE로 실패하고(PR #116), functions 7은 peer에 ^14를 포함하므로 상향 순서가
+    # 강제된다. 둘을 함께 올려 검증하면 `tsc --noEmit -p functions/tsconfig.json`이 8개 파일에서
+    # 22건 실패한다(2026-08-05 실측) — lockfile 교체가 아니라 별건 마이그레이션 작업이다.
+    #   (1) firebase-admin 14가 네임스페이스 API `admin.firestore`를 제거 — 12건.
+    #       updateDriveLogStats·verifyMileageConsistency·submitPublicFeedback·cleanDuplicateCalendars를
+    #       모듈러 API(`getFirestore`·`FieldValue` from 'firebase-admin/firestore')로 이관해야 한다.
+    #   (2) firebase-functions 7이 번들하는 @types/express가 5 계열로 올라가며 `Request`/`Response`
+    #       named export가 사라짐 — 8건. helpers·createAuthenticatedProxy·slackEvents·slackOauthCallback.
+    # 재검토: 위 두 이관을 별건으로 처리한 뒤 이 두 항목을 함께 제거한다(하나만 풀면 peer가 다시 막는다).
+    ignore:
+      - dependency-name: firebase-admin
+        update-types: ["version-update:semver-major"]
+      - dependency-name: firebase-functions
+        update-types: ["version-update:semver-major"]
 
   # GitHub Actions 버전 갱신. 액션이 오래되면 러너의 Node 지원 종료(예: Node 20 → 24
   # 강제 실행 경고)로 언젠가 CI 전체가 깨진다. minor/patch는 묶어 노이즈를 줄이고,
