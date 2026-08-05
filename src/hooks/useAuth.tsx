@@ -47,6 +47,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Custom Claims 토큰 갱신을 위한 이전 role/orgId 추적
     const prevClaimsRef = useRef<{ role?: string; orgId?: string }>({});
 
+    /**
+     * 인증이 한 번 확립된 뒤의 uid. **null 발화를 즉시 믿을지 판단하는 근거**다.
+     * 아직 로그인한 적이 없으면(최초 진입) null 발화는 진짜 비로그인이므로 유예 없이 처리한다.
+     */
+    const authedUidRef = useRef<string | null>(null);
+
     useEffect(() => {
         let cancelled = false;
 
@@ -65,6 +71,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         let pauseWatches: (() => void) | null = null;
         let resumeWatches: (() => void) | null = null;
 
+        /**
+         * 인증 확립 후 들어온 null을 확정하기까지의 유예.
+         *
+         * 탭을 두 개 띄워두면 한쪽에서 페이지를 옮길 때 다른 탭의 onAuthStateChanged가
+         * 순간적으로 null을 흘리는 일이 있었다(Auth가 탭 간 세션을 재확인하는 구간).
+         * 그걸 즉시 믿으면 AuthGuard가 `/login`으로, path="*"의 RouteFallback이 `/`(랜딩)으로
+         * 보내 **로그인 화면이 번쩍 뜬다.** 유예 안에 세션이 돌아오면 화면을 건드리지 않는다.
+         *
+         * 로그아웃이 늦어지지는 않는다 — logout()은 끝에서 `window.location.href = '/'`로
+         * 페이지를 떠나므로(lib/auth.ts) 이 타이머와 무관하다. 오히려 로그아웃이
+         * clearOfflineCache()를 기다리는 동안 뜨던 플래시도 함께 사라진다.
+         * 세션이 진짜로 끊긴 경우(만료·강제 무효화)는 유예가 지나면 그대로 확정된다.
+         */
+        const AUTH_DROP_GRACE_MS = 2000;
+        let dropTimer: ReturnType<typeof setTimeout> | null = null;
+
+        /** 로그아웃 상태를 화면에 확정 반영한다. */
+        const commitSignedOut = () => {
+            pauseWatches = null;
+            resumeWatches = null;
+            if (unsubscribeUser) { unsubscribeUser(); unsubscribeUser = null; }
+            if (unsubscribeOrg) { unsubscribeOrg(); unsubscribeOrg = null; }
+            authedUidRef.current = null;
+            setUser(null);
+            setUserData(null);
+            setUserDocState('pending');
+            setOrgDeleted(false);
+            setOrgFeatures(ALL_FEATURES_ON);
+            setLoading(false);
+            setSentryUser(null); // 로그아웃 시 Sentry 컨텍스트 해제
+        };
+
         // persistence 설정 완료 후 onAuthStateChanged 구독 시작
         // 이를 통해 새 탭에서도 localStorage의 기존 세션이 올바르게 복원된다.
         authReady.then(() => {
@@ -76,16 +114,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             });
 
             unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
+                // 익명 사용자는 OrgApplicationPage의 Storage 업로드 용도로만 사용되며,
+                // 앱 라우팅에서는 비로그인으로 취급한다.
+                const isAuthed = !!firebaseUser && !firebaseUser.isAnonymous;
+
+                // ── 인증 확립 후의 null은 유예를 두고 확정한다 ──
+                // 화면·리스너를 **건드리지 않고** 돌아간다. 세션이 돌아오면 아래 clearTimeout으로
+                // 취소되어 사용자는 아무 변화도 보지 않는다(플래시 없음).
+                if (!isAuthed && authedUidRef.current) {
+                    if (dropTimer) return; // 이미 유예 중 — 타이머를 뒤로 미루지 않는다
+                    dropTimer = setTimeout(() => {
+                        dropTimer = null;
+                        if (cancelled) return;
+                        // 유예가 지났는데도 세션이 없으면 진짜 로그아웃이다
+                        if (auth.currentUser && !auth.currentUser.isAnonymous) return;
+                        console.debug('[Auth] 세션이 유예 안에 돌아오지 않아 로그아웃으로 확정합니다');
+                        commitSignedOut();
+                    }, AUTH_DROP_GRACE_MS);
+                    return;
+                }
+
+                if (dropTimer) { clearTimeout(dropTimer); dropTimer = null; }
+
                 // 이전 리스너 해제
                 if (unsubscribeUser) { unsubscribeUser(); unsubscribeUser = null; }
                 if (unsubscribeOrg) { unsubscribeOrg(); unsubscribeOrg = null; }
 
-                // 익명 사용자는 OrgApplicationPage의 Storage 업로드 용도로만 사용되며,
-                // 앱 라우팅에서는 비로그인으로 취급한다.
-                if (firebaseUser && !firebaseUser.isAnonymous) {
+                if (isAuthed) {
+                    // 같은 세션이 다시 발화한 경우(유예 중 복귀·토큰 재확인)에는 라우팅 상태를
+                    // 되돌리지 않는다. setLoading(true)로 되돌리면 로그인 플래시가 스피너
+                    // 플래시로 바뀔 뿐이다 — 이미 판정된 화면을 그대로 두고 리스너만 다시 건다.
+                    const sameSession = authedUidRef.current === firebaseUser!.uid;
+                    authedUidRef.current = firebaseUser!.uid;
                     setUser(firebaseUser);
-                    setUserDocState('pending'); // 새 세션: 문서 로딩 확정 전까지 라우팅 보류
-                    setLoading(true); // Firestore 데이터를 가져오기 전까지 라우팅 판단을 대기시킴
+                    if (!sameSession) {
+                        setUserDocState('pending'); // 새 세션: 문서 로딩 확정 전까지 라우팅 보류
+                        setLoading(true); // Firestore 데이터를 가져오기 전까지 라우팅 판단을 대기시킴
+                    }
 
                     const startUserWatch = (retryCount = 0) => {
                         unsubscribeUser = onSnapshot(
@@ -239,15 +304,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         startUserWatch();
                     }
                 } else {
-                    pauseWatches = null;
-                    resumeWatches = null;
-                    setUser(null);
-                    setUserData(null);
-                    setUserDocState('pending');
-                    setOrgDeleted(false);
-                    setOrgFeatures(ALL_FEATURES_ON);
-                    setLoading(false);
-                    setSentryUser(null); // 로그아웃 시 Sentry 컨텍스트 해제
+                    // 로그인한 적 없는 상태의 null — 유예 없이 즉시 확정한다
+                    commitSignedOut();
                 }
             });
         });
@@ -268,6 +326,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return () => {
             cancelled = true;
             clearTimeout(timeout);
+            if (dropTimer) { clearTimeout(dropTimer); dropTimer = null; }
             document.removeEventListener('visibilitychange', handleVisibilityChange);
             if (unsubscribeAuth) unsubscribeAuth();
             if (unsubscribeUser) unsubscribeUser();
