@@ -780,4 +780,51 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
       organizationId: 'org-A', enabled: true,
     }));
   });
+
+  it('21. 도착 km < 출발 km — 불가능한 값을 서버에서 끊는다 (정상 경로는 열어 둔다)', async () => {
+    // 화면(validateDriveLogForm)이 이미 막지만 클라이언트를 우회하면 통과했다.
+    // 목적은 위조 차단이 아니라 정합성이다 — 내보내기가 음수 주행거리를 방어할 필요가 없어진다.
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.collection('vehicles').doc('v_A').set({ organizationId: 'org-A', plateNumber: '1', currentKm: 143 });
+      await db.collection('users').doc('user_A').set({ organizationId: 'org-A', name: '직원A', email: 'a@t.kr', role: 'employee' });
+      // 정상 기록
+      await db.collection('driveLogs').doc('log_ok').set({
+        organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'user_A', createdByUid: 'user_A', startKm: 100, endKm: 143,
+      });
+      // 규칙 도입 전에 들어간 '이미 어긋난' 기록 — 이걸 손볼 길이 막히면 안 된다
+      await db.collection('driveLogs').doc('log_broken').set({
+        organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'user_A', createdByUid: 'user_A', startKm: 143, endKm: 140,
+      });
+    });
+
+    const memberA = setupContext('user_A', { role: 'member', orgId: 'org-A' }).firestore();
+    const base = { organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'user_A', createdByUid: 'user_A' };
+
+    // (1) 생성: 도착 < 출발 → 차단
+    await assertFails(memberA.collection('driveLogs').doc('new_bad').set({ ...base, startKm: 143, endKm: 140 }));
+
+    // (2) 생성: 도착 >= 출발 → 허용 (같은 값도 허용 — 제자리 운행)
+    await assertSucceeds(memberA.collection('driveLogs').doc('new_ok').set({ ...base, startKm: 143, endKm: 143 }));
+
+    // (3) 생성: 도착 km가 아직 없는 기록 → 허용. 두 필드가 다 있을 때만 비교한다.
+    await assertSucceeds(memberA.collection('driveLogs').doc('new_partial').set({ ...base, startKm: 143 }));
+
+    // (4) 수정: 도착을 출발보다 작게 → 차단
+    await assertFails(memberA.collection('driveLogs').doc('log_ok').update({ endKm: 50 }));
+
+    // (5) 수정: 출발을 도착보다 크게 → 차단 (반대 방향도 막힌다)
+    await assertFails(memberA.collection('driveLogs').doc('log_ok').update({ startKm: 200 }));
+
+    // (6) 수정: 정상 범위 → 허용
+    await assertSucceeds(memberA.collection('driveLogs').doc('log_ok').update({ endKm: 150 }));
+
+    // (7) **이미 어긋난 기록의 다른 필드 수정 → 허용.** 이걸 막으면 그 기록을 아예
+    //     손볼 수 없게 된다(Phase 129·132의 함정). km를 건드릴 때만 순서를 검사한다.
+    await assertSucceeds(memberA.collection('driveLogs').doc('log_broken').update({ destination: '서울역' }));
+
+    // (8) 어긋난 기록을 바로잡는 수정 → 허용
+    await assertSucceeds(memberA.collection('driveLogs').doc('log_broken').update({ endKm: 145 }));
+  });
+
 });
