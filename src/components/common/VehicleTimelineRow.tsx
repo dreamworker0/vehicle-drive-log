@@ -5,7 +5,7 @@
  * 이 컴포넌트는 표시와 콜백 위임만 담당하는 순수 컴포넌트다.
  */
 import { getVehicleColor } from '../../lib/constants';
-import { getPercent, minutesToTime, resolveReservationBlock } from '../../lib/timelineUtils';
+import { getPercent, minutesToTime, resolveEffectiveTimes, resolveReservationBlock } from '../../lib/timelineUtils';
 import { isVehicleBlocked, isVehicleRestrictedForUser } from '../../lib/vehicleUtils';
 import ReservationAccordion from './ReservationAccordion';
 import type { DragOverlay } from '../../hooks/useTimelineDrag';
@@ -89,6 +89,8 @@ export default function VehicleTimelineRow({
                         const isPending = r.status === 'pending';
 
                         const { left, width } = resolveReservationBlock(r, dynamicStart);
+                        // 블록이 실제 운행 시간으로 그려지므로 툴팁도 같은 구간을 말해야 한다
+                        const { start: effStart, end: effEnd } = resolveEffectiveTimes(r);
 
                         const colorClass = getVehicleColor(vehicle.id);
                         const bgClass = isPending
@@ -100,7 +102,7 @@ export default function VehicleTimelineRow({
                                 key={r.id}
                                 className={`absolute top-0.5 bottom-0.5 rounded-sm ${bgClass} border border-white/40 dark:border-surface-500/30 cursor-pointer hover:opacity-100 dark:hover:opacity-80 transition-opacity`}
                                 style={{ left: `${left}%`, width: `${width}%` }}
-                                title={`${r.reservedByName}: ${r.startTime}~${r.endTime} ${r.purpose || ''}${isCompleted ? ' (운행완료)' : isPending ? ' (승인 대기)' : ''}`}
+                                title={`${r.reservedByName}: ${effStart}~${effEnd} ${r.purpose || ''}${isCompleted ? ' (운행완료)' : isPending ? ' (승인 대기)' : ''}`}
                                 onClick={() => toggleExpand(vehicle.id)}
                                 role="button"
                                 tabIndex={0}

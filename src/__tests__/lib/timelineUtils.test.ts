@@ -117,6 +117,41 @@ describe('getGaps', () => {
         const gaps = getGaps(reservations, true, nowSnapped);
         expect(gaps).toEqual([{ start: 720, end: 1380 }]);
     });
+
+    it('운행 완료로 일찍 반납하면 남는 시간이 gap으로 열린다', () => {
+        // 09:00~12:00 예약을 09:00~10:00만 타고 완료 → 10:00~12:00은 다른 직원이 예약 가능
+        const reservations = [
+            { status: 'completed', startTime: '09:00', endTime: '12:00', actualStartTime: '09:00', actualEndTime: '10:00' },
+        ];
+        const gaps = getGaps(reservations, false, 360);
+        expect(gaps).toEqual([
+            { start: 360, end: 540 },   // 06:00~09:00
+            { start: 600, end: 1380 },  // 10:00~23:00 (예약 종료 12:00이 아니라 실제 10:00부터)
+        ]);
+    });
+
+    it('완료되지 않은 예약은 실제 시각이 있어도 예약 시간을 점유한다', () => {
+        // 운행 중(actualStartTime만 기록)은 아직 반납 전이므로 예약 구간 전체를 막는다
+        const reservations = [
+            { status: 'reserved', startTime: '09:00', endTime: '12:00', actualStartTime: '09:00', actualEndTime: '10:00' },
+        ];
+        const gaps = getGaps(reservations, false, 360);
+        expect(gaps).toEqual([
+            { start: 360, end: 540 },
+            { start: 720, end: 1380 }, // 12:00~23:00
+        ]);
+    });
+
+    it('실제 시각이 뒤집혀 있으면 예약 시간으로 폴백', () => {
+        const reservations = [
+            { status: 'completed', startTime: '09:00', endTime: '12:00', actualStartTime: '11:00', actualEndTime: '10:00' },
+        ];
+        const gaps = getGaps(reservations, false, 360);
+        expect(gaps).toEqual([
+            { start: 360, end: 540 },
+            { start: 720, end: 1380 },
+        ]);
+    });
 });
 
 describe('getHourLabels', () => {
@@ -144,8 +179,8 @@ describe('resolveReservationBlock', () => {
         expect(width).toBe(1.5);
     });
 
-    it('completed + actualTime이 2시간 이내면 실제 시각 사용', () => {
-        // 예약 09:00~10:00, 실제 09:30~10:30 (30분 차 → 유효)
+    it('completed면 실제 운행 시각으로 그린다', () => {
+        // 예약 09:00~10:00, 실제 09:30~10:30
         const { left } = resolveReservationBlock(
             { status: 'completed', startTime: '09:00', endTime: '10:00', actualStartTime: '09:30', actualEndTime: '10:30' },
             RANGE_START,
@@ -154,13 +189,23 @@ describe('resolveReservationBlock', () => {
         expect(left).toBeCloseTo(20.588, 2);
     });
 
-    it('completed + actualTime이 2시간 초과로 벗어나면 예약 시각으로 폴백', () => {
-        // 예약 09:00~10:00, 실제 06:00 (180분 차 → 2시간 초과 → 무효, 폴백)
-        const { left } = resolveReservationBlock(
-            { status: 'completed', startTime: '09:00', endTime: '10:00', actualStartTime: '06:00', actualEndTime: '07:00' },
+    it('completed + 크게 일찍 반납해도 실제 시각으로 그린다 (gap·충돌 검사와 동일 기준)', () => {
+        // 예약 09:00~12:00, 실제 09:00~09:30 — 예약 종료보다 2시간 넘게 이르지만
+        // 서버 충돌 검사가 실제 시각을 쓰므로 블록도 실제 시각으로 그려야 어긋나지 않는다
+        const { left, width } = resolveReservationBlock(
+            { status: 'completed', startTime: '09:00', endTime: '12:00', actualStartTime: '09:00', actualEndTime: '09:30' },
             RANGE_START,
         );
-        // 폴백 09:00 → 17.647
+        expect(left).toBeCloseTo(17.647, 2);
+        // 30분 = 30/1020*100 ≈ 2.941 (최소 폭 1.5% 초과)
+        expect(width).toBeCloseTo(2.941, 2);
+    });
+
+    it('실제 시각이 없으면 예약 시각으로 폴백', () => {
+        const { left } = resolveReservationBlock(
+            { status: 'completed', startTime: '09:00', endTime: '10:00' },
+            RANGE_START,
+        );
         expect(left).toBeCloseTo(17.647, 2);
     });
 

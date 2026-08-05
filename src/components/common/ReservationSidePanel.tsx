@@ -206,8 +206,11 @@ export default function ReservationSidePanel({
                 )}
             </div>
 
-            {/* 예약 폼 (슬라이드다운) */}
-            {showForm && !isPastDate && (
+            {/* 예약 폼 (슬라이드다운)
+                지난 날짜에도 **수정 중일 때는** 폼을 연다. 지난 날짜에 새 예약을 만드는 길은
+                여전히 닫혀 있지만(위 '+ 예약' 버튼 숨김), 이미 있는 예약의 수정까지 막으면
+                목록의 '수정' 버튼이 눌러도 아무 일도 일어나지 않는 죽은 버튼이 된다. */}
+            {showForm && (!isPastDate || !!editingReservation) && (
                 <div className="mb-4 p-3 rounded-xl bg-primary-50/50 border border-primary-100 dark:bg-surface-700/50 dark:border-surface-600 animate-fade-in">
                     <form onSubmit={onSubmit} className="space-y-4">
                         <VehicleSelector
