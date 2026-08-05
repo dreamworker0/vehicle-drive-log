@@ -12,7 +12,7 @@ import {
     getReservationsByDateRange,
 } from '../../../lib/firestore';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
-import { buildMultiDaySlots, findOverlappingReservation, getCurrentTimeStr, getTodayStr } from '../../utils/reservationUtils';
+import { buildMultiDaySlots, findOverlappingReservation, findOwnerOverlappingReservation, getCurrentTimeStr, getTodayStr } from '../../utils/reservationUtils';
 import { composeReservationPassengers, MAX_PASSENGERS } from '../../utils/reservationPassengers';
 import { isVehicleRestrictedForUser } from '../../../lib/vehicleUtils';
 import { generateRecurringDates, generateRecurringGroupId } from '../../utils/recurringUtils';
@@ -238,8 +238,43 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
         if (!isConfirmed) return;
     }
 
-    // 한 사람이 같은 시간대에 여러 대의 차량을 예약하는 것은 허용한다 (행사·대규모 외근 대응).
-    // 서버 코어(createReservationCore)도 차량 기준 겹침만 검사하므로 클라이언트에서도 막지 않는다.
+    // 한 사람은 같은 시간에 차량 한 대만 예약한다 — 차량이 달라도 사람이 겹치면 막는다.
+    // 위 차량 검사와 **같은 제외 규칙**을 쓰므로, 수정 중인 자기 예약·그룹은 충돌이 아니다.
+    // 서버 코어(createReservationCore)가 같은 규칙으로 다시 판정한다.
+    const ownerUid = form.reservedByUid || user.uid;
+    const ownerName = form.reservedByName || userData.name || '해당 직원';
+    // 다일은 **전 구간**을 본다. 첫날만 보고 시작하면 중간 날짜에서 서버가 거부하는데,
+    // 그때는 앞 날짜 예약이 이미 만들어진 뒤라 반쪽짜리 그룹이 남는다.
+    const ownerConflictSlots = isRecurring
+        ? recurringDates.map(dateStr => ({ date: dateStr, startTime: form.startTime, endTime: form.endTime }))
+        : isRecurringToMultiDay
+            ? multiDaySlots
+            : isRecurringToSingle
+                ? [{ date: editingReservation!.date, startTime: form.startTime, endTime: form.endTime }]
+                : isMultiDay
+                    ? buildMultiDaySlots(selectedDate, effectiveEndDate, form.startTime, form.endTime)
+                    : [{ date: selectedDate, startTime: form.startTime, endTime: form.endTime }];
+
+    for (const slot of ownerConflictSlots) {
+        const ownerOverlap = findOwnerOverlappingReservation(reservations, {
+            reservedByUid: ownerUid,
+            date: slot.date,
+            startTime: slot.startTime,
+            endTime: slot.endTime,
+            excludeId: editingReservation?.id || null,
+            excludeGroupId: editingGroupId,
+            excludeRecurringGroupId: isRecurring || isRecurringToSingle || isRecurringToMultiDay
+                ? editingRecurringGroupId
+                : null,
+        });
+        if (ownerOverlap) {
+            showToast(
+                `${ownerName}님은 ${slot.date} ${ownerOverlap.startTime} ~ ${ownerOverlap.endTime}에 ${ownerOverlap.vehicleName || '다른 차량'} 예약이 있습니다. 한 사람은 같은 시간에 한 대만 예약할 수 있습니다.`,
+                'warning',
+            );
+            return;
+        }
+    }
 
     // 동승자 인원 상한 (서버 createReservationCore도 같은 값으로 재검증한다)
     const passengerTotal = (form.passengerUids?.length || 0)

@@ -52,27 +52,74 @@ export const getMinStartTime = (isToday: boolean) => isToday ? getCurrentTimeStr
  * @param {Object} params - { vehicleId, date, startTime, endTime, excludeId?, excludeGroupId?, excludeRecurringGroupId? }
  * @returns {Object|null} 중복 예약이 있으면 해당 예약 반환, 없으면 null
  */
+interface OverlapExclusions {
+    excludeId?: string | null;
+    excludeGroupId?: string | null;
+    excludeRecurringGroupId?: string | null;
+}
+
+/** 수정 중인 예약·그룹은 자기 자신과 충돌할 수 없다 (차량 검사와 사람 검사가 같은 규칙을 쓴다) */
+function isExcluded(r: Reservation, { excludeId, excludeGroupId, excludeRecurringGroupId }: OverlapExclusions) {
+    if (excludeId && r.id === excludeId) return true;
+    if (excludeGroupId && r.groupId === excludeGroupId) return true;
+    if (excludeRecurringGroupId && r.recurringGroupId === excludeRecurringGroupId) return true;
+    return false;
+}
+
+/** 예약이 실제로 시간을 점유하는 구간 — 운행을 마쳤으면 실제 운행 시간이 기준이다 */
+function effectiveRange(r: Reservation) {
+    return {
+        start: (r.status === 'completed' && r.actualStartTime) ? r.actualStartTime : r.startTime,
+        end: (r.status === 'completed' && r.actualEndTime) ? r.actualEndTime : r.endTime,
+    };
+}
+
 export function findOverlappingReservation(
     reservations: Reservation[],
-    { vehicleId, date, startTime, endTime, excludeId = null, excludeGroupId = null, excludeRecurringGroupId = null }: {
+    { vehicleId, date, startTime, endTime, ...exclusions }: {
         vehicleId: string;
         date: string;
         startTime: string;
         endTime: string;
-        excludeId?: string | null;
-        excludeGroupId?: string | null;
-        excludeRecurringGroupId?: string | null;
-    },
+    } & OverlapExclusions,
 ) {
     return reservations.find((r) => {
         if (r.vehicleId !== vehicleId || r.date !== date || r.status === 'cancelled') return false;
-        if (excludeId && r.id === excludeId) return false;
-        if (excludeGroupId && r.groupId === excludeGroupId) return false;
-        if (excludeRecurringGroupId && r.recurringGroupId === excludeRecurringGroupId) return false;
+        if (isExcluded(r, exclusions)) return false;
 
-        const effStart = (r.status === 'completed' && r.actualStartTime) ? r.actualStartTime : r.startTime;
-        const effEnd = (r.status === 'completed' && r.actualEndTime) ? r.actualEndTime : r.endTime;
-        
+        const { start: effStart, end: effEnd } = effectiveRange(r);
+
+        return startTime < effEnd && endTime > effStart;
+    }) || null;
+}
+
+/**
+ * 한 사람이 같은 시간대에 이미 잡아 둔 예약을 찾는다 (차량이 달라도 충돌이다).
+ *
+ * **한 사람은 같은 시간에 차량 한 대만 예약한다.** 한 사람이 두 대를 동시에 몰 수 없고,
+ * 여러 대를 잡아 두면 정작 필요한 사람이 예약하지 못한다. 여러 대가 필요한 행사라면
+ * 실제로 운전할 사람 명의로 각각 잡아야 한다.
+ *
+ * 제외 규칙(수정 중인 예약·그룹)은 차량 겹침 검사와 같다 — 그래서 차량 검사를 통과한
+ * 건이 사람 검사에서 자기 그룹 때문에 걸리는 일이 없다.
+ */
+export function findOwnerOverlappingReservation(
+    reservations: Reservation[],
+    { reservedByUid, date, startTime, endTime, ...exclusions }: {
+        reservedByUid: string;
+        date: string;
+        startTime: string;
+        endTime: string;
+    } & OverlapExclusions,
+) {
+    if (!reservedByUid) return null;
+
+    return reservations.find((r) => {
+        if (r.reservedByUid !== reservedByUid || r.date !== date || r.status === 'cancelled') return false;
+        if (isExcluded(r, exclusions)) return false;
+
+        const { start: effStart, end: effEnd } = effectiveRange(r);
+
         return startTime < effEnd && endTime > effStart;
     }) || null;
 }

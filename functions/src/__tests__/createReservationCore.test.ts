@@ -110,10 +110,11 @@ describe('createReservationTx (코어)', () => {
     });
 
     it('기관이 승인제(requireReservationApproval)면 pending으로 생성한다', async () => {
-        // 1st get: 차량, 2nd get: org, 3rd get: 예약 쿼리 — org 스냅샷에 승인제 플래그
+        // 1st get: 차량, 2nd get: org, 3rd get: 차량 겹침 쿼리, 4th get: 명의자 겹침 쿼리
         mockTransactionGet
             .mockResolvedValueOnce({ exists: true, data: () => ({ organizationId: 'org1' }), docs: [] })
             .mockResolvedValueOnce({ exists: true, data: () => ({ requireReservationApproval: true }), docs: [] })
+            .mockResolvedValueOnce({ exists: true, data: () => ({}), docs: [] })
             .mockResolvedValueOnce({ exists: true, data: () => ({}), docs: [] });
 
         const result = await createReservationTx(validInput);
@@ -134,6 +135,59 @@ describe('createReservationTx (코어)', () => {
         await expect(createReservationTx(validInput)).rejects.toThrow('이미 예약되어 있습니다');
     });
 
+    // ── 한 사람은 같은 시간에 한 대만 ──
+    describe('명의자 겹침 (한 사람 = 한 대)', () => {
+        /** 차량 → 기관 → 차량 겹침(비어 있음) → 명의자 겹침(주어진 docs) */
+        const mockOwnerOverlapGets = (ownerDocs: unknown[]) => {
+            mockTransactionGet
+                .mockResolvedValueOnce({ exists: true, data: () => ({ organizationId: 'org1' }), docs: [] })
+                .mockResolvedValueOnce({ exists: true, data: () => ({}), docs: [] })
+                .mockResolvedValueOnce({ exists: true, data: () => ({}), docs: [] })
+                .mockResolvedValueOnce({ exists: true, data: () => ({}), docs: ownerDocs });
+        };
+
+        it('같은 사람이 같은 시간에 다른 차량을 예약하면 already-exists를 던진다', async () => {
+            mockOwnerOverlapGets([
+                { data: () => ({ status: 'reserved', startTime: '10:00', endTime: '11:00', vehicleName: '카니발', reservedByName: '홍길동' }) },
+            ]);
+
+            await expect(createReservationTx(validInput)).rejects.toThrow('한 사람은 같은 시간에 한 대만');
+            expect(mockTransactionSet).not.toHaveBeenCalled();
+        });
+
+        it('시간이 겹치지 않으면 같은 사람의 다른 예약이 있어도 생성한다', async () => {
+            mockOwnerOverlapGets([
+                { data: () => ({ status: 'reserved', startTime: '13:00', endTime: '14:00', vehicleName: '카니발' }) },
+            ]);
+
+            await expect(createReservationTx(validInput)).resolves.toMatchObject({ status: 'reserved' });
+        });
+
+        it('취소된 예약은 명의자 겹침으로 보지 않는다', async () => {
+            mockOwnerOverlapGets([
+                { data: () => ({ status: 'cancelled', startTime: '10:00', endTime: '11:00', vehicleName: '카니발' }) },
+            ]);
+
+            await expect(createReservationTx(validInput)).resolves.toMatchObject({ status: 'reserved' });
+        });
+
+        it('일찍 반납해 운행이 끝난 예약은 실제 운행 시간만 점유한다', async () => {
+            // 09:00~12:00 예약을 09:00~09:30만 타고 완료 → 09:30부터는 본인도 다른 차를 잡을 수 있다
+            mockOwnerOverlapGets([
+                {
+                    data: () => ({
+                        status: 'completed', startTime: '09:00', endTime: '12:00',
+                        actualStartTime: '09:00', actualEndTime: '09:30', vehicleName: '카니발',
+                    }),
+                },
+            ]);
+
+            await expect(
+                createReservationTx({ ...validInput, startTime: '09:30', endTime: '12:00' })
+            ).resolves.toMatchObject({ status: 'reserved' });
+        });
+    });
+
     it('allowedUserIds 제한은 명의자 기준으로 검증한다', async () => {
         mockTransactionGet.mockResolvedValue({
             exists: true,
@@ -147,11 +201,12 @@ describe('createReservationTx (코어)', () => {
 
     // ── 대리 생성 (reservedByUid) — 관리자가 직원 예약을 대행·그룹 수정할 때 쓰인다 ──
     describe('reservedByUid (명의 지정)', () => {
-        /** 대리 생성 경로의 get 순서: 차량 → 명의자 users 문서 → 기관 → 겹침 쿼리 */
+        /** 대리 생성 경로의 get 순서: 차량 → 명의자 users 문서 → 기관 → 차량 겹침 → 명의자 겹침 */
         const mockOnBehalfGets = (ownerDoc: unknown, vehicleData: Record<string, unknown> = { organizationId: 'org1' }) => {
             mockTransactionGet
                 .mockResolvedValueOnce({ exists: true, data: () => vehicleData, docs: [] })
                 .mockResolvedValueOnce(ownerDoc)
+                .mockResolvedValueOnce({ exists: true, data: () => ({}), docs: [] })
                 .mockResolvedValueOnce({ exists: true, data: () => ({}), docs: [] })
                 .mockResolvedValueOnce({ exists: true, data: () => ({}), docs: [] });
         };
