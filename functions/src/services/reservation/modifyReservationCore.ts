@@ -7,6 +7,7 @@
  *   - 상태 가드 (pending/reserved만 수정 가능)
  *   - 차량 문서 잠금(_lastReservationLock)으로 생성/수정 동시성 방지
  *   - 같은 org+vehicle+date 시간 겹침 검사 (자기 자신 제외)
+ *   - 같은 org+명의자+date 시간 겹침 검사 — 한 사람은 같은 시간에 한 대만 (자기 자신 제외)
  *
  * 차량 변경은 지원하지 않는다(같은 차량의 날짜·시간만). 캘린더 이벤트 갱신·알림은
  * 기존 reservationTriggers(onReservationUpdated)가 자동 처리하므로 필드만 갱신한다.
@@ -113,6 +114,37 @@ export async function modifyReservationTx(
                 throw new HttpsError(
                     "already-exists",
                     `해당 차량은 ${effStart} ~ ${effEnd}에 이미 예약되어 있습니다.`
+                );
+            }
+
+            // 사람 기준 겹침 — 한 사람은 같은 시간에 차량 한 대만. 차량이 비어 있어도
+            // 본인이 그 시간에 다른 차를 잡아 두었으면 옮길 수 없다 (자기 자신 제외).
+            const ownerSnap = await transaction.get(
+                db.collection("reservations")
+                    .where("organizationId", "==", actorOrgId)
+                    .where("reservedByUid", "==", r.reservedByUid)
+                    .where("date", "==", date)
+            );
+
+            const ownerOverlapping = ownerSnap.docs.find((doc) => {
+                if (doc.id === reservationId) return false; // 자기 자신 제외
+                const other = doc.data();
+                if (other.status === "cancelled") return false;
+
+                const effStart = (other.status === "completed" && other.actualStartTime) ? other.actualStartTime : other.startTime;
+                const effEnd = (other.status === "completed" && other.actualEndTime) ? other.actualEndTime : other.endTime;
+
+                return startTime < effEnd && endTime > effStart;
+            });
+
+            if (ownerOverlapping) {
+                const other = ownerOverlapping.data();
+                const effStart = (other.status === "completed" && other.actualStartTime) ? other.actualStartTime : other.startTime;
+                const effEnd = (other.status === "completed" && other.actualEndTime) ? other.actualEndTime : other.endTime;
+                throw new HttpsError(
+                    "already-exists",
+                    `${effStart} ~ ${effEnd}에 ${other.vehicleName || "다른 차량"} 예약이 이미 있습니다. ` +
+                    "한 사람은 같은 시간에 한 대만 예약할 수 있습니다."
                 );
             }
 

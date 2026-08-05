@@ -45,11 +45,13 @@ const TARGET = {
     vehicleId: 'v1', vehicleName: '스타렉스', date: '2026-07-20', startTime: '09:00', endTime: '10:00',
 };
 
-/** 3단계 get(예약 → 차량 → 겹침 쿼리)을 순서대로 세팅 */
+/** 4단계 get(예약 → 차량 → 차량 겹침 쿼리 → 명의자 겹침 쿼리)을 순서대로 세팅 */
 function setup(opts: {
     reservation?: Record<string, unknown> | null;
     vehicle?: Record<string, unknown> | null;
     existing?: Array<{ id: string; data: () => Record<string, unknown> }>;
+    /** 명의자(본인) 기준 겹침 쿼리 결과 — 한 사람은 같은 시간에 한 대만 */
+    ownerExisting?: Array<{ id: string; data: () => Record<string, unknown> }>;
 } = {}) {
     const reservationSnap = opts.reservation === null
         ? { exists: false }
@@ -60,7 +62,8 @@ function setup(opts: {
     mockTransactionGet
         .mockResolvedValueOnce(reservationSnap)
         .mockResolvedValueOnce(vehicleSnap)
-        .mockResolvedValueOnce({ docs: opts.existing ?? [] });
+        .mockResolvedValueOnce({ docs: opts.existing ?? [] })
+        .mockResolvedValueOnce({ docs: opts.ownerExisting ?? [] });
 }
 
 describe('modifyReservationTx (코어)', () => {
@@ -120,13 +123,20 @@ describe('modifyReservationTx (코어)', () => {
         expect(mockTransactionUpdate).not.toHaveBeenCalled();
     });
 
-    it('겹침 검사에서 자기 자신은 제외한다 (같은 시간대로 남겨도 통과)', async () => {
-        // 자기 예약(r1)이 새 시간대와 겹쳐도 자신은 제외되어야 한다
+    it('본인이 같은 시간에 다른 차량을 잡아 두었으면 already-exists를 던진다 (한 사람 = 한 대)', async () => {
         setup({
-            existing: [
-                { id: 'r1', data: () => ({ status: 'reserved', startTime: '14:00', endTime: '16:00' }) },
+            ownerExisting: [
+                { id: 'r2', data: () => ({ status: 'reserved', startTime: '15:00', endTime: '17:00', vehicleName: '카니발' }) },
             ],
         });
+        await expect(modifyReservationTx(VALID)).rejects.toThrow('한 사람은 같은 시간에 한 대만');
+        expect(mockTransactionUpdate).not.toHaveBeenCalled();
+    });
+
+    it('겹침 검사에서 자기 자신은 제외한다 (같은 시간대로 남겨도 통과)', async () => {
+        // 자기 예약(r1)이 새 시간대와 겹쳐도 — 차량 기준이든 명의자 기준이든 — 제외되어야 한다
+        const self = { id: 'r1', data: () => ({ status: 'reserved', startTime: '14:00', endTime: '16:00' }) };
+        setup({ existing: [self], ownerExisting: [self] });
         await expect(modifyReservationTx(VALID)).resolves.toBeDefined();
         expect(mockTransactionUpdate).toHaveBeenCalledWith(
             expect.anything(),

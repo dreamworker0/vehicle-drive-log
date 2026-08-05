@@ -3,7 +3,6 @@ import { describe, it, expect, vi } from 'vitest';
 import ReservationAccordion from '../../components/common/ReservationAccordion';
 import type { Reservation } from '../../types/reservation';
 
-// 미래 예약(수정/취소 버튼 노출 조건) — 과거가 되지 않도록 먼 미래 날짜 사용
 const futureRes = {
     id: 'r1',
     vehicleId: 'v1',
@@ -54,6 +53,22 @@ describe('ReservationAccordion', () => {
         fireEvent.click(screen.getByText('취소'));
         expect(onEdit).toHaveBeenCalledWith(futureRes);
         expect(onCancel).toHaveBeenCalledWith('r1');
+    });
+
+    it('시간이 지난 예약도 소유자면 수정/취소할 수 있다', () => {
+        // 타지 않은 지난 예약을 지울 방법이 없으면 기록에 그대로 남는다
+        const pastRes = { ...futureRes, id: 'r-past', date: '2020-01-01' } as Reservation;
+        const onCancel = vi.fn();
+        render(
+            <ReservationAccordion
+                reservations={[pastRes]} isExpanded
+                user={{ uid: 'u1', id: 'u1' }} isAdmin={false}
+                onCancel={onCancel}
+            />,
+        );
+        expect(screen.getByText('수정')).toBeInTheDocument();
+        fireEvent.click(screen.getByText('취소'));
+        expect(onCancel).toHaveBeenCalledWith('r-past');
     });
 
     it('권한 없는 사용자(비관리자·비소유자)에겐 수정/취소 버튼이 없다', () => {

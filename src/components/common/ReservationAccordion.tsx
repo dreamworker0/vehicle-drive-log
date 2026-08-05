@@ -23,8 +23,6 @@ export default function ReservationAccordion({
     return (
         <div className="ml-[72px] pl-2 mt-1 mb-1 border-l-2 border-primary-300 dark:border-primary-700 animate-fade-in">
             {reservations.map(r => {
-                const resEndDateTime = new Date(`${r.date}T${r.endTime || '23:59'}`);
-                const isPastReservation = resEndDateTime < new Date();
                 return (
                     <div key={r.id} className="py-1.5 first:pt-0.5 last:pb-0.5">
                         <div className="flex items-center justify-between gap-1">
@@ -48,7 +46,10 @@ export default function ReservationAccordion({
                                         승인 대기
                                     </span>
                                 )}
-                                {(isAdmin || r.reservedByUid === user?.id || r.reservedByUid === user?.uid) && !isPastReservation && (
+                                {/* 시간이 지났다고 수정·취소를 감추지 않는다. 타지 않은 예약이
+                                    기록에 그대로 남아 "취소할 방법이 없다"는 문의가 반복됐다.
+                                    지난 시간으로 옮기는 것만 제출 시점에서 막는다(submitActions). */}
+                                {(isAdmin || r.reservedByUid === user?.id || r.reservedByUid === user?.uid) && (
                                     <>
                                         <button onClick={() => { onEdit?.(r); setShowForm?.(true); }} className="text-[11px] leading-none py-0.5 text-primary-500 dark:text-primary-400 hover:underline min-w-[48px] min-h-[48px] flex items-center justify-center">수정</button>
                                         <button onClick={() => onCancel?.(r.id)} className="text-[11px] leading-none py-0.5 text-red-500 dark:text-red-400 hover:underline min-w-[48px] min-h-[48px] flex items-center justify-center">취소</button>

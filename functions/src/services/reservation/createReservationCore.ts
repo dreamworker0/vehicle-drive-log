@@ -7,6 +7,7 @@
  *   - 차량별 사용 가능 직원 제한 (allowedUserIds)
  *   - 차량 문서 잠금(_lastReservationLock)으로 동시 생성 방지
  *   - 같은 org+vehicle+date 시간 겹침 검사
+ *   - 같은 org+명의자+date 시간 겹침 검사 (한 사람은 같은 시간에 한 대만)
  */
 import { HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
@@ -197,6 +198,41 @@ export async function createReservationTx(
                 throw new HttpsError(
                     "already-exists",
                     `해당 차량은 ${effStart} ~ ${effEnd}에 이미 예약되어 있습니다.`
+                );
+            }
+
+            // 사람 기준 겹침 — **한 사람은 같은 시간에 차량 한 대만** 예약한다.
+            // 한 사람이 두 대를 동시에 몰 수는 없고, 여러 대를 잡아 두면 정작 필요한
+            // 사람이 예약하지 못한다. 여러 대가 필요한 행사라면 실제로 운전할 사람
+            // 명의로 각각 잡는다.
+            //
+            // 그룹 수정(다일·반복)은 "지우고 다시 만들기" 경로라 재생성 시점에는 옛 회차가
+            // 이미 사라져 있다. 따라서 여기서 자기 그룹을 따로 제외할 필요가 없다.
+            const ownerSnap = await transaction.get(
+                db.collection("reservations")
+                    .where("organizationId", "==", organizationId)
+                    .where("reservedByUid", "==", ownerUid)
+                    .where("date", "==", date)
+            );
+
+            const ownerOverlapping = ownerSnap.docs.find((doc) => {
+                const r = doc.data();
+                if (r.status === "cancelled") return false;
+
+                const effStart = (r.status === "completed" && r.actualStartTime) ? r.actualStartTime : r.startTime;
+                const effEnd = (r.status === "completed" && r.actualEndTime) ? r.actualEndTime : r.endTime;
+
+                return startTime < effEnd && endTime > effStart;
+            });
+
+            if (ownerOverlapping) {
+                const r = ownerOverlapping.data();
+                const effStart = (r.status === "completed" && r.actualStartTime) ? r.actualStartTime : r.startTime;
+                const effEnd = (r.status === "completed" && r.actualEndTime) ? r.actualEndTime : r.endTime;
+                throw new HttpsError(
+                    "already-exists",
+                    `${r.reservedByName || "예약자"}님은 ${effStart} ~ ${effEnd}에 ${r.vehicleName || "다른 차량"} 예약이 있습니다. ` +
+                    "한 사람은 같은 시간에 한 대만 예약할 수 있습니다."
                 );
             }
 

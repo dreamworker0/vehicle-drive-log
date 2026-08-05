@@ -9,6 +9,7 @@ import {
     getTodayStr,
     getMinStartTime,
     findOverlappingReservation,
+    findOwnerOverlappingReservation,
     getAutoTimes,
     calcEndTime,
     buildMultiDaySlots,
@@ -159,6 +160,54 @@ describe('reservationUtils', () => {
                 excludeGroupId: 'grp_1',
             });
             expect(result).toBeNull();
+        });
+
+        it('한 사람이 같은 시간에 다른 차량을 잡아 두면 사람 기준 검사가 잡는다', () => {
+            // 차량 기준 검사는 v2를 보지 못한다 — 사람 기준 검사가 따로 필요한 이유
+            const mine = [
+                { id: 'm1', vehicleId: 'v2', reservedByUid: 'u1', date: '2026-02-27', startTime: '09:00', endTime: '11:00', status: 'reserved' },
+            ] as Reservation[];
+            expect(findOverlappingReservation(mine, {
+                vehicleId: 'v1', date: '2026-02-27', startTime: '09:30', endTime: '10:30',
+            })).toBeNull();
+            expect(findOwnerOverlappingReservation(mine, {
+                reservedByUid: 'u1', date: '2026-02-27', startTime: '09:30', endTime: '10:30',
+            })!.id).toBe('m1');
+        });
+
+        it('사람 기준 검사도 남의 예약·취소·시간 어긋남은 잡지 않는다', () => {
+            const others = [
+                { id: 'o1', vehicleId: 'v2', reservedByUid: 'u2', date: '2026-02-27', startTime: '09:00', endTime: '11:00', status: 'reserved' },
+                { id: 'o2', vehicleId: 'v3', reservedByUid: 'u1', date: '2026-02-27', startTime: '09:00', endTime: '11:00', status: 'cancelled' },
+                { id: 'o3', vehicleId: 'v4', reservedByUid: 'u1', date: '2026-02-27', startTime: '13:00', endTime: '14:00', status: 'reserved' },
+            ] as Reservation[];
+            expect(findOwnerOverlappingReservation(others, {
+                reservedByUid: 'u1', date: '2026-02-27', startTime: '09:30', endTime: '10:30',
+            })).toBeNull();
+        });
+
+        it('사람 기준 검사도 운행이 끝난 예약은 실제 운행 시간만 점유한 것으로 본다', () => {
+            // 09:00~12:00 예약을 09:00~09:30만 타고 완료 → 09:30부터는 본인도 다른 차를 잡을 수 있다
+            const mine = [
+                {
+                    id: 'm1', vehicleId: 'v2', reservedByUid: 'u1', date: '2026-02-27',
+                    startTime: '09:00', endTime: '12:00', status: 'completed',
+                    actualStartTime: '09:00', actualEndTime: '09:30',
+                },
+            ] as Reservation[];
+            expect(findOwnerOverlappingReservation(mine, {
+                reservedByUid: 'u1', date: '2026-02-27', startTime: '09:30', endTime: '12:00',
+            })).toBeNull();
+        });
+
+        it('사람 기준 검사도 수정 중인 자기 예약·그룹은 제외한다', () => {
+            const mine = [
+                { id: 'm1', vehicleId: 'v2', reservedByUid: 'u1', groupId: 'grp_1', date: '2026-02-27', startTime: '09:00', endTime: '11:00', status: 'reserved' },
+            ] as Reservation[];
+            expect(findOwnerOverlappingReservation(mine, {
+                reservedByUid: 'u1', date: '2026-02-27', startTime: '09:30', endTime: '10:30',
+                excludeGroupId: 'grp_1',
+            })).toBeNull();
         });
 
         it('다른 그룹의 예약은 계속 충돌로 잡는다 (제외의 대조군)', () => {
