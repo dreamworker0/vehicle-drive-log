@@ -38,7 +38,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v3
+        uses: github/codeql-action/init@v4
         with:
           languages: javascript-typescript
           # 보안 관련 쿼리 확장(security-extended)으로 기본셋보다 넓게 스캔
@@ -46,6 +46,6 @@ jobs:
 
       # JS/TS는 인터프리티드 언어라 빌드 불필요 — CodeQL이 소스를 직접 분석한다.
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v3
+        uses: github/codeql-action/analyze@v4
         with:
           category: '/language:javascript-typescript'
