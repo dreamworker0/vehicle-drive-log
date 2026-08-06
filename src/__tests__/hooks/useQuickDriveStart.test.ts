@@ -7,6 +7,8 @@ const mockOrgFeatures = {
     passengerAllowList: true,
     passengerAllowSearch: true,
     passengerAllowCount: true,
+    // '예약·바로 운행에서 미리 입력' — 바로 운행의 동승자도 이 토글을 따른다
+    reservationPassenger: true,
 };
 
 vi.mock('../../hooks/useAuth', () => ({
@@ -185,8 +187,11 @@ describe('useQuickDriveStart', () => {
         );
     });
 
-    it('동승자 기능이 꺼진 기관에서는 직원 목록을 읽지 않는다', async () => {
-        mockOrgFeatures.passenger = false;
+    it.each([
+        ['동승자 기능', 'passenger' as const],
+        ['미리 입력 위치 설정', 'reservationPassenger' as const],
+    ])('%s이 꺼진 기관에서는 동승자 입력이 없고 직원 목록도 읽지 않는다', async (_label, key) => {
+        mockOrgFeatures[key] = false;
         try {
             const { result } = renderHook(() => useQuickDriveStart());
 
@@ -196,7 +201,7 @@ describe('useQuickDriveStart', () => {
             expect(result.current.members).toHaveLength(0);
             expect(result.current.passengerOptions.enabled).toBe(false);
         } finally {
-            mockOrgFeatures.passenger = true;
+            mockOrgFeatures[key] = true;
         }
     });
 

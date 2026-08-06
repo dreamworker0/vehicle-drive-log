@@ -27,9 +27,10 @@ export default function useQuickDriveStart() {
 
     const recommendedVehicleId = location.state?.recommendedVehicleId || null;
 
-    // 동승자 입력은 운행일지와 같은 토글(passengerEnabled)을 따른다 —
-    // 바로 운행은 '지금 출발하는 운행'이라 예약 미리 입력(reservationPassenger)과는 다른 자리다.
-    const passengerEnabled = orgFeatures.passenger;
+    // 동승자를 '미리' 받는 자리(예약 · 바로 운행)는 같은 토글 하나로 함께 켜고 끈다.
+    // 기관 입장에서 둘은 "운행일지보다 앞서 인원을 적어 두는가"라는 하나의 결정이고,
+    // 따로 두면 설정 화면에서 예약만 켠 기관이 바로 운행에서 예상 못 한 입력란을 만난다.
+    const passengerEnabled = orgFeatures.passenger && orgFeatures.reservationPassenger;
 
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
     const [favorites, setFavorites] = useState<Favorite[]>([]);
