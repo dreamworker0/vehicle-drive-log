@@ -33,7 +33,7 @@
         "@types/node": "^22.0.0",
         "@types/nodemailer": "^8.0.1",
         "firebase-functions-test": "^3.1.0",
-        "jest": "^29.7.0",
+        "jest": "^30.4.2",
         "ts-jest": "^29.4.12",
         "typescript": "^5.7.0"
     },
