@@ -1,15 +1,18 @@
 /**
  * DestinationInput - 목적지 입력 + POI 드롭다운 + 즐겨찾기 + 최근 목적지 (태그 입력기 UX)
+ *
+ * 예약 폼과 바로 운행이 함께 쓴다. 폼 상태의 모양이 화면마다 달라
+ * `form`/`setForm` 대신 목적지 문자열과 변경 콜백만 주고받는다.
  */
 import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import { parseDestinations } from '../../../lib/tmap';
 import { usePoiSearch } from '../../../hooks/usePoiSearch';
 import type { Favorite } from '../../../types/favorite';
-import type { ReservationForm } from '../../../types/reservation';
 
 interface DestinationInputProps {
-    form: ReservationForm;
-    setForm: React.Dispatch<React.SetStateAction<ReservationForm>>;
+    /** 쉼표로 이어 붙인 목적지 원문 */
+    destination: string;
+    onChangeDestination: (next: string) => void;
     favorites: Favorite[];
     recentDestinations: string[];
     showFavSave: boolean;
@@ -22,8 +25,8 @@ interface DestinationInputProps {
 const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
     function DestinationInput(
         {
-            form,
-            setForm,
+            destination,
+            onChangeDestination,
             favorites,
             recentDestinations,
             showFavSave,
@@ -43,8 +46,8 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
         const { poiResults, poiLoading, showPoiDropdown, setShowPoiDropdown, clearPoiResults, suppressNext } =
             usePoiSearch(inputValue);
 
-        // form.destination 전체 문자열에서 쉼표 기준으로 확정된 목적지 목록 파싱
-        const destinationList = parseDestinations(form.destination);
+        // 목적지 원문에서 쉼표 기준으로 확정된 목적지 목록 파싱
+        const destinationList = parseDestinations(destination);
 
         // 부모 컴포넌트가 ref.current를 호출하면 내부 실제 input 인스턴스를 정상 반환하도록 노출
         useImperativeHandle(ref, () => internalInputRef.current as HTMLInputElement);
@@ -86,7 +89,7 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
 
             const newList = [...destinationList, trimmed];
             suppressNext();
-            setForm(prev => ({ ...prev, destination: newList.join(', ') }));
+            onChangeDestination(newList.join(', '));
             setInputValue('');
             clearPoiResults();
             setInputError('');
@@ -96,14 +99,13 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
         const handleRemoveDestination = (index: number) => {
             const newList = destinationList.filter((_, i) => i !== index);
             suppressNext();
-            setForm(prev => ({ ...prev, destination: newList.join(', ') }));
+            onChangeDestination(newList.join(', '));
             setInputError('');
         };
 
         const handleSelectPoi = (name: string, address: string) => {
             // "서울 강남구 테헤란로" 처럼 주소가 있으면 "이름 (주소)" 형태로 저장
-            const destination = address ? `${name} (${address})` : name;
-            handleAddDestination(destination);
+            handleAddDestination(address ? `${name} (${address})` : name);
         };
 
         // 키보드 단축 로직 핸들러

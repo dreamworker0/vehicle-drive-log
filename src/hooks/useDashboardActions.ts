@@ -126,6 +126,11 @@ export default function useDashboardActions({
                 vehicleType: vehicle?.vehicleType || '',
                 fuelType: vehicle?.fuelType || '',
                 actualStartTime: res.actualStartTime || '',
+                // 예약·바로 운행에서 미리 적어 둔 동승자를 운행일지 초기값으로 넘긴다.
+                // 넘기지 않으면 출발할 때 고른 동승자가 도착 화면에서 사라진다.
+                passengerUids: res.passengerUids,
+                passengerNames: res.passengerNames,
+                passengerCount: res.passengerCount,
             },
         });
     };

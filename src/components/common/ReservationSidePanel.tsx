@@ -2,7 +2,7 @@
  * ReservationSidePanel — 예약 사이드 패널 (예약 폼 + 예약 목록)
  * ReservationCalendar에서 추출된 서브 컴포넌트
  */
-import React, { useRef, useMemo } from 'react';
+import React, { useRef, useMemo, useCallback } from 'react';
 import { calcEndTime } from '../../hooks/utils/reservationUtils';
 import { generateRecurringDates } from '../../hooks/utils/recurringUtils';
 import VehicleSelector from './reservation/VehicleSelector';
@@ -14,7 +14,7 @@ import ReservationTypeSelector from './reservation/ReservationTypeSelector';
 import ReservationPassengerField from './reservation/ReservationPassengerField';
 import type { Vehicle } from '../../types/vehicle';
 import type { Favorite } from '../../types/favorite';
-import type { Reservation, ReservationForm } from '../../types/reservation';
+import type { Reservation, ReservationForm, PassengerFormValues } from '../../types/reservation';
 import type { User as UserDoc } from '../../types/user';
 
 interface Props {
@@ -117,6 +117,15 @@ export default function ReservationSidePanel({
 }: Props) {
     const destinationRef = useRef<HTMLInputElement>(null);
 
+    const handleDestinationChange = useCallback((destination: string) => {
+        setForm(prev => ({ ...prev, destination }));
+    }, [setForm]);
+
+    // 동승자 입력의 부분 갱신 — memo된 입력 컴포넌트가 매 렌더 리렌더되지 않도록 참조를 고정한다.
+    const handlePassengerChange = useCallback((patch: PassengerFormValues) => {
+        setForm(prev => ({ ...prev, ...patch }));
+    }, [setForm]);
+
     // 폐차 제외 + 사용 빈도순 정렬
     const sortedActiveVehicles = useMemo(() => {
         const filtered = vehicles.filter(v => !v.retired?.isRetired);
@@ -215,8 +224,8 @@ export default function ReservationSidePanel({
                     <form onSubmit={onSubmit} className="space-y-4">
                         <VehicleSelector
                             vehicles={sortedActiveVehicles}
-                            form={form}
-                            setForm={setForm}
+                            selectedVehicleId={form.vehicleId}
+                            onSelect={vehicleId => setForm(prev => ({ ...prev, vehicleId }))}
                             usageCounts={usageCounts}
                             destinationRef={destinationRef}
                         />
@@ -242,8 +251,8 @@ export default function ReservationSidePanel({
                         )}
                         <div>
                             <DestinationInput
-                                form={form}
-                                setForm={setForm}
+                                destination={form.destination}
+                                onChangeDestination={handleDestinationChange}
                                 ref={destinationRef}
                                 favorites={favorites}
                                 recentDestinations={recentDestinations}
@@ -277,12 +286,16 @@ export default function ReservationSidePanel({
                             여기 값은 운행일지 작성 화면의 초기값이 될 뿐, 확정 기록은 운행일지다. */}
                         {passengerEnabled && (
                             <ReservationPassengerField
-                                form={form}
-                                setForm={setForm}
+                                values={form}
+                                onChange={handlePassengerChange}
                                 members={members}
                                 allowList={passengerAllowList}
                                 allowSearch={passengerAllowSearch}
                                 allowCount={passengerAllowCount}
+                                hint={<>
+                                    예약 시점의 <strong>예정 인원</strong>입니다. 운행일지를 쓸 때 자동으로 채워지고, 실제 탑승은 그때 확정합니다.
+                                    {form.isRecurring && ' 반복 예약은 모든 회차에 같은 인원이 적용됩니다.'}
+                                </>}
                             />
                         )}
 
