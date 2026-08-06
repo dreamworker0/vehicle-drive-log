@@ -1,7 +1,14 @@
 // Gemini PR 리뷰어(gemini-pr-review.ts)의 순수 헬퍼 단위 테스트.
 // 규칙 선택·의존성 모드 판정·diff 상한은 프롬프트 비용과 리뷰 품질을 동시에 좌우하므로 고정한다.
 import { describe, it, expect } from 'vitest';
-import { collectRules, isDepsOnly, buildDiffSection, buildPrompt, type PrFile } from '../gemini-pr-review';
+import {
+    collectRules,
+    isDepsOnly,
+    touchesCiConfig,
+    buildDiffSection,
+    buildPrompt,
+    type PrFile,
+} from '../gemini-pr-review';
 
 /** 테스트용 PR 파일 한 건. patch 길이만 중요한 경우 내용은 채움 문자로 만든다. */
 function file(filename: string, patchLen = 10, status = 'modified'): PrFile {
@@ -53,8 +60,14 @@ describe('isDepsOnly', () => {
         expect(isDepsOnly([file('package.json'), file('package-lock.json')])).toBe(true);
     });
 
-    it('워크플로 액션 버전 범프도 의존성 모드다', () => {
-        expect(isDepsOnly([file('.github/workflows/ci.yml')])).toBe(true);
+    it('워크플로만 바뀌면 의존성 모드가 아니다 — 시크릿을 다루는 최고 권한 파일이라 코드 모드로 본다', () => {
+        // 액션 버전 범프처럼 보여도 의존성 모드로 넘기면 "이 PR은 의존성 변경"이라는 틀린
+        // 전제로 검토되고 코드 모드의 검사 목록이 빠진다.
+        expect(isDepsOnly([file('.github/workflows/ci.yml')])).toBe(false);
+    });
+
+    it('manifest와 워크플로가 함께 바뀌면 의존성 모드다', () => {
+        expect(isDepsOnly([file('package.json'), file('.github/workflows/ci.yml')])).toBe(true);
     });
 
     it('소스 변경이 섞이면 의존성 모드가 아니다', () => {
@@ -63,6 +76,17 @@ describe('isDepsOnly', () => {
 
     it('변경 파일이 없으면 의존성 모드가 아니다', () => {
         expect(isDepsOnly([])).toBe(false);
+    });
+});
+
+describe('touchesCiConfig', () => {
+    it('.github/ 변경을 감지한다', () => {
+        expect(touchesCiConfig([file('.github/workflows/deploy.yml')])).toBe(true);
+        expect(touchesCiConfig([file('.github/dependabot.yml')])).toBe(true);
+    });
+
+    it('.github/ 밖의 변경만이면 false', () => {
+        expect(touchesCiConfig([file('src/lib/notify.ts'), file('package.json')])).toBe(false);
     });
 });
 
@@ -147,5 +171,25 @@ describe('buildPrompt', () => {
     it('CLAUDE.md가 없으면 프롬프트가 깨지지 않는다', () => {
         const p = buildPrompt({ ...base, claudeMd: null, depsOnly: false });
         expect(p).toContain('(없음)');
+    });
+
+    it('.github/ 변경이면 head 체크아웃 회귀를 보라는 CI 초점을 붙인다', () => {
+        // 이 블록이 빠지면 pull_request_target에 head 체크아웃이 되살아나는 변경을
+        // 리뷰어가 그냥 통과시킨다 — 리뷰어 자신의 안전 조건이다.
+        const p = buildPrompt({ ...base, depsOnly: false, ciConfig: true });
+        expect(p).toContain('pull_request_target');
+        expect(p).toMatch(/head\.sha/);
+        expect(p).toContain('permissions:');
+    });
+
+    it('CI 초점은 의존성 모드에서도 붙는다 — 의존성 PR이 워크플로를 함께 건드릴 수 있다', () => {
+        const p = buildPrompt({ ...base, depsOnly: true, ciConfig: true });
+        expect(p).toMatch(/breaking change/);
+        expect(p).toContain('pull_request_target');
+    });
+
+    it('.github/ 변경이 없으면 CI 초점을 붙이지 않는다', () => {
+        const p = buildPrompt({ ...base, depsOnly: false, ciConfig: false });
+        expect(p).not.toContain('pull_request_target');
     });
 });

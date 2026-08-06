@@ -120,12 +120,25 @@ export function collectRules(paths: string[]): { name: string; text: string }[] 
     return out;
 }
 
-/** 의존성 버전만 움직이는 PR인가(dependabot 등). 이 경우 리뷰의 초점이 달라진다. */
+const isManifest = (name: string): boolean => /(^|\/)package(-lock)?\.json$/.test(name);
+const isCiConfig = (name: string): boolean => /^\.github\//.test(name);
+
+/**
+ * 의존성 버전만 움직이는 PR인가(dependabot 등). 이 경우 리뷰의 초점이 달라진다.
+ *
+ * **manifest 변경을 요구하는 이유**: 워크플로 파일만 바뀐 PR을 의존성 모드로 보면
+ * "이 PR은 의존성 버전 변경이다"라는 틀린 전제로 검토하게 되고, 코드 모드의 검사 목록이
+ * 빠진다. 워크플로는 시크릿을 다루는 최고 권한 파일이라 액션 버전 범프처럼 보여도
+ * 코드 모드로 검토해야 한다(아래 CI 초점 블록이 붙는다).
+ */
 export function isDepsOnly(files: PrFile[]): boolean {
-    if (files.length === 0) return false;
-    return files.every((f) =>
-        /(^|\/)package(-lock)?\.json$/.test(f.filename) || /^\.github\/workflows\//.test(f.filename),
-    );
+    if (!files.some((f) => isManifest(f.filename))) return false;
+    return files.every((f) => isManifest(f.filename) || isCiConfig(f.filename));
+}
+
+/** `.github/` 변경이 섞였는가 — 코드 모드에서 워크플로 전용 검사 항목을 추가할 조건. */
+export function touchesCiConfig(files: PrFile[]): boolean {
+    return files.some((f) => isCiConfig(f.filename));
 }
 
 export function buildDiffSection(files: PrFile[]): { text: string; notes: string[] } {
@@ -165,7 +178,20 @@ export function buildPrompt(opts: {
     claudeMd: string | null;
     rules: { name: string; text: string }[];
     depsOnly: boolean;
+    ciConfig?: boolean;
 }): string {
+    // 워크플로·CI 설정 변경은 이 저장소에서 가장 권한이 높은 파일 종류다. 특히 리뷰 워크플로
+    // 자신이 `pull_request_target`을 쓰므로, head 체크아웃이 되살아나면 임의 코드 실행이 열린다.
+    const ciFocus = [
+        '',
+        '이 PR은 `.github/` 설정을 건드린다. 다음을 반드시 확인하라.',
+        '- `pull_request_target` 워크플로에 PR head 체크아웃(`ref: ...head.sha`·`head.ref`)이',
+        '  추가되지 않았는가(추가되면 신뢰되지 않은 코드가 시크릿과 함께 실행된다)',
+        '- PR이 제어하는 텍스트(제목·본문·브랜치명)를 `${{ }}`로 `run:`에 끼워 넣지 않는가',
+        '- `permissions:`가 필요 이상으로 넓어지지 않았는가',
+        '- 새로 참조하는 `secrets.*`가 그 잡에 정말 필요한가',
+    ].join('\n');
+
     const focus = opts.depsOnly
         ? [
               '이 PR은 **의존성 버전 변경**이다. lockfile diff는 주어지지 않는다.',
@@ -182,6 +208,9 @@ export function buildPrompt(opts: {
               '- 역할 경계 침범(`src/components/`의 admin/employee/superAdmin 디렉터리 교차 참조)',
               '- `alert()` 사용(커스텀 토스트 `showToast`·`notifyUser`를 쓴다)',
           ].join('\n');
+
+    // CI 초점은 모드와 무관하게 붙인다 — 의존성 PR이 워크플로를 함께 건드리는 경우도 있다.
+    const fullFocus = opts.ciConfig ? `${focus}\n${ciFocus}` : focus;
 
     return [
         '너는 이 저장소의 코드 리뷰어다. 아래 **이 저장소의 규칙**을 근거로 PR diff를 검토하라.',
@@ -201,7 +230,7 @@ export function buildPrompt(opts: {
         '',
         '## 이 PR에서 특히 볼 것',
         '',
-        focus,
+        fullFocus,
         '',
         '## 저장소 규칙 — CLAUDE.md',
         '',
@@ -251,11 +280,24 @@ async function callGemini(prompt: string): Promise<string> {
     return text.trim();
 }
 
-/** 같은 PR에 코멘트를 쌓지 않고 이전 리뷰를 갈아쓴다. */
+/**
+ * 같은 PR에 코멘트를 쌓지 않고 이전 리뷰를 갈아쓴다.
+ *
+ * **작성자까지 확인하는 이유**: 마커는 보이지 않는 HTML 주석이라 누구나 자기 코멘트에 심을 수
+ * 있다. 마커만 보고 고르면 공개 저장소에서 PR을 연 사람이 PR 개설 직후 마커 코멘트를 하나
+ * 남겨 두는 것만으로 리뷰 대상을 자기 코멘트로 돌릴 수 있다(`pull-requests: write` 토큰은
+ * 남의 코멘트도 수정할 수 있고, find는 가장 먼저 매칭된 것을 고른다). 그렇게 되면 진짜 리뷰가
+ * 공격자가 다시 편집할 수 있는 코멘트에 실린다. 봇이 쓴 코멘트만 갈아쓰고, 없으면 새로 만든다.
+ */
 async function upsertComment(repo: string, pr: string, body: string): Promise<void> {
-    const res = await gh(`/repos/${repo}/issues/${pr}/comments?per_page=100`);
-    const comments = (await res.json()) as { id: number; body?: string }[];
-    const mine = comments.find((c) => c.body?.includes(MARKER));
+    const comments: { id: number; body?: string; user?: { type?: string } }[] = [];
+    for (let page = 1; page <= 5; page++) {
+        const res = await gh(`/repos/${repo}/issues/${pr}/comments?per_page=100&page=${page}`);
+        const batch = (await res.json()) as typeof comments;
+        comments.push(...batch);
+        if (batch.length < 100) break;
+    }
+    const mine = comments.find((c) => c.user?.type === 'Bot' && c.body?.includes(MARKER));
     if (mine) {
         await gh(`/repos/${repo}/issues/comments/${mine.id}`, {
             method: 'PATCH',
@@ -290,6 +332,7 @@ async function main(): Promise<void> {
     }
 
     const depsOnly = isDepsOnly(files);
+    const ciConfig = touchesCiConfig(files);
     const rules = collectRules(files.map((f) => f.filename));
     console.log(
         `파일 ${files.length}건 · diff ${diff.length}자 · 규칙 ${rules.length}개` +
@@ -305,6 +348,7 @@ async function main(): Promise<void> {
             claudeMd: readIfExists('CLAUDE.md'),
             rules,
             depsOnly,
+            ciConfig,
         }),
     );
 
@@ -325,8 +369,13 @@ async function main(): Promise<void> {
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
     main().catch((err: unknown) => {
         // 리뷰 실패로 CI를 빨갛게 만들지 않는다 — 게이트가 아니라 참고다.
-        console.warn(
-            `Gemini 리뷰 실패(무시하고 종료): ${err instanceof Error ? err.message : String(err)}`,
-        );
+        //
+        // 단, **조용히 넘기지도 않는다.** 모델 ID 오타나 API 형식 변경처럼 항상 실패하는 고장은
+        // exit 0만 하면 "리뷰가 원래 안 붙는 것"과 구별되지 않아 몇 달을 모르고 지나간다
+        // (이 저장소가 Phase 114에서 겪은 fail-open과 같은 함정이다). Actions 주석으로 남겨
+        // 실행 요약에 뜨게 하되 잡은 초록으로 끝낸다.
+        const msg = err instanceof Error ? err.message : String(err);
+        console.log(`::warning title=Gemini 리뷰 실패::${msg.replace(/\r?\n/g, ' ')}`);
+        console.warn(`Gemini 리뷰 실패(무시하고 종료): ${msg}`);
     });
 }
