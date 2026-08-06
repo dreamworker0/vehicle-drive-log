@@ -31,7 +31,11 @@ export interface OrgFeatures {
     passengerAllowSearch: boolean;
     /** 동승자: 인원 숫자 허용 */
     passengerAllowCount: boolean;
-    /** 예약 화면에서도 동승자를 미리 입력 (opt-in — 미설정이면 꺼짐) */
+    /**
+     * 운행일지보다 앞선 자리 — 예약 화면 · 바로 운행 — 에서도 동승자를 미리 입력
+     * (opt-in — 미설정이면 꺼짐). 이름에 reservation이 남은 것은 저장 필드
+     * `reservationPassengerEnabled`와 맞추기 위해서다.
+     */
     reservationPassenger: boolean;
     /** 운전자(대표·공동): 목록 직접 선택 허용 */
     driverAllowList: boolean;
@@ -82,8 +86,8 @@ export function resolveOrgFeatures(org?: Partial<OrgFeatureFields> | null): OrgF
         passengerAllowList: org?.passengerAllowList !== false,
         passengerAllowSearch: org?.passengerAllowSearch !== false,
         passengerAllowCount: org?.passengerAllowCount !== false,
-        // 이 한 줄만 `=== true`다. 나머지처럼 "미설정=켜짐"으로 두면 **모든 기관의 예약 폼에
-        // 새 입력란이 예고 없이 나타난다.** 예약 화면은 전 직원이 매일 쓰는 자리라,
+        // 이 한 줄만 `=== true`다. 나머지처럼 "미설정=켜짐"으로 두면 **모든 기관의 예약·바로 운행
+        // 화면에 새 입력란이 예고 없이 나타난다.** 둘 다 전 직원이 매일 쓰는 자리라,
         // 켤지 말지는 기관이 정하게 한다.
         reservationPassenger: org?.reservationPassengerEnabled === true,
         driverAllowList: org?.driverAllowList !== false,
