@@ -33,6 +33,14 @@ updates:
       # 재검토: vite 8 마이그레이션과 함께 해제.
       - dependency-name: "@vitejs/plugin-react"
         update-types: ["version-update:semver-major"]
+      # typescript 7(네이티브 포트): 린터가 아예 뜨지 않는다 — typescript-eslint가 import
+      # 시점에 `Error: typescript-eslint does not support TS 7.0`을 던져 `npm run lint`가
+      # 즉시 죽는다(PR #157, 2026-08-05 실측). 규칙 하나를 끄는 문제가 아니라 업스트림 차단이다.
+      # 부수적으로 tsconfig 마이그레이션도 필요하다 — TS 7이 `baseUrl`을 제거(TS5102)하고
+      # 비상대 `paths`를 금지(TS5090)하므로 `"@/*": ["src/*"]`를 `["./src/*"]`로 바꿔야 한다.
+      # 재검토: typescript-eslint가 TS 7을 지원하면 tsconfig 정리와 함께 해제(functions 쪽도 같이).
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directory: /functions
@@ -58,6 +66,11 @@ updates:
       - dependency-name: firebase-admin
         update-types: ["version-update:semver-major"]
       - dependency-name: firebase-functions
+        update-types: ["version-update:semver-major"]
+      # typescript 7: 루트와 같은 이유로 보류한다(PR #151). 루트 `npm run lint`가 functions까지
+      # 커버하므로 두 디렉터리의 typescript 버전이 갈라지면 린트 대상과 컴파일러가 어긋난다.
+      # 재검토: 루트 typescript 항목과 **함께** 제거한다.
+      - dependency-name: typescript
         update-types: ["version-update:semver-major"]
 
   # GitHub Actions 버전 갱신. 액션이 오래되면 러너의 Node 지원 종료(예: Node 20 → 24
