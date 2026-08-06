@@ -131,6 +131,10 @@ export default function TodayDashboard() {
                                             destination: alert.destination || '',
                                             currentKm: vehicle?.currentKm || 0,
                                             actualStartTime: alert.actualStartTime || '',
+                                            // 출발할 때 적어 둔 동승자를 그대로 초기값으로 넘긴다
+                                            passengerUids: alert.passengerUids,
+                                            passengerNames: alert.passengerNames,
+                                            passengerCount: alert.passengerCount,
                                         },
                                     });
                                 }}

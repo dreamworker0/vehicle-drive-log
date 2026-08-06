@@ -2,10 +2,18 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 
 // ── Mocks ──
+const mockOrgFeatures = {
+    passenger: true,
+    passengerAllowList: true,
+    passengerAllowSearch: true,
+    passengerAllowCount: true,
+};
+
 vi.mock('../../hooks/useAuth', () => ({
     useAuth: () => ({
         user: { uid: 'emp1', displayName: '김직원', email: 'emp@test.com', getIdToken: vi.fn().mockResolvedValue('fake-token') },
         userData: { organizationId: 'org1', name: '김직원', role: 'employee' },
+        orgFeatures: mockOrgFeatures,
     }),
 }));
 
@@ -29,9 +37,16 @@ const mockFavorites = [
     { id: 'fav1', name: '김OO 어르신 댁', address: '서울시 강남구 역삼동 123', userId: 'emp1' },
 ];
 
+const mockMembers = [
+    { id: 'emp1', name: '김직원', status: 'active' },   // 본인 — 동승자 후보에서 빠져야 한다
+    { id: 'emp2', name: '이동료', status: 'active' },
+    { id: 'emp3', name: '박퇴사', status: 'disabled' }, // 비활성 — 후보에서 빠져야 한다
+];
+
 const mockGetVehicles = vi.fn().mockResolvedValue(mockVehicles);
 const mockGetFavorites = vi.fn().mockResolvedValue(mockFavorites);
 const mockGetOrganization = vi.fn().mockResolvedValue({ address: '서울시 종로구 1' });
+const mockGetOrganizationMembers = vi.fn().mockResolvedValue(mockMembers);
 const mockCreateReservationSafe = vi.fn().mockResolvedValue('res1');
 const mockUpdateReservationStatus = vi.fn().mockResolvedValue({});
 
@@ -39,6 +54,7 @@ vi.mock('../../lib/firestore', () => ({
     getVehicles: (...args: unknown[]) => mockGetVehicles(...args),
     getFavorites: (...args: unknown[]) => mockGetFavorites(...args),
     getOrganization: (...args: unknown[]) => mockGetOrganization(...args),
+    getOrganizationMembers: (...args: unknown[]) => mockGetOrganizationMembers(...args),
     createReservationSafe: (...args: unknown[]) => mockCreateReservationSafe(...args),
     updateReservationStatus: (...args: unknown[]) => mockUpdateReservationStatus(...args),
 }));
@@ -91,16 +107,16 @@ describe('useQuickDriveStart', () => {
         expect(result.current.form.vehicleName).toBe('소나타');
     });
 
-    it('handleFavoriteSelect가 목적지를 설정한다', async () => {
+    it('handleDestinationChange가 목적지를 설정한다 (여러 곳은 쉼표로 이어진다)', async () => {
         const { result } = renderHook(() => useQuickDriveStart());
 
         await waitFor(() => expect(result.current.loading).toBe(false));
 
         act(() => {
-            result.current.handleFavoriteSelect(mockFavorites[0] as Parameters<typeof result.current.handleFavoriteSelect>[0]);
+            result.current.handleDestinationChange('서울시 강남구 역삼동 123, 서울역');
         });
 
-        expect(result.current.form.destination).toBe('서울시 강남구 역삼동 123');
+        expect(result.current.form.destination).toBe('서울시 강남구 역삼동 123, 서울역');
     });
 
     it('handleStart — 차량 미선택 시 경고', async () => {
@@ -129,6 +145,59 @@ describe('useQuickDriveStart', () => {
         });
 
         expect(mockShowToast).toHaveBeenCalledWith('목적지를 입력해주세요.', 'warning');
+    });
+
+    it('동승자 후보에서 본인과 비활성 계정을 제외한다', async () => {
+        const { result } = renderHook(() => useQuickDriveStart());
+
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        expect(result.current.members.map(m => m.id)).toEqual(['emp2']);
+        expect(result.current.passengerOptions.enabled).toBe(true);
+    });
+
+    it('선택한 동승자가 예약 생성 데이터에 포함된다', async () => {
+        const { result } = renderHook(() => useQuickDriveStart());
+
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        act(() => {
+            result.current.handleVehicleSelect('v1');
+            result.current.setForm(prev => ({ ...prev, destination: '서울역' }));
+        });
+
+        act(() => {
+            result.current.handlePassengerChange({ passengerUids: ['emp2'] });
+            result.current.handlePassengerChange({ passengerExternalNames: '홍길동', passengerCount: 2 });
+        });
+
+        await act(async () => {
+            await result.current.handleStart();
+        });
+
+        expect(mockCreateReservationSafe).toHaveBeenCalledWith(
+            expect.objectContaining({
+                isQuickDrive: true,
+                passengerUids: ['emp2'],
+                passengerNames: ['이동료', '홍길동'],
+                passengerCount: 2,
+            }),
+        );
+    });
+
+    it('동승자 기능이 꺼진 기관에서는 직원 목록을 읽지 않는다', async () => {
+        mockOrgFeatures.passenger = false;
+        try {
+            const { result } = renderHook(() => useQuickDriveStart());
+
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            expect(mockGetOrganizationMembers).not.toHaveBeenCalled();
+            expect(result.current.members).toHaveLength(0);
+            expect(result.current.passengerOptions.enabled).toBe(false);
+        } finally {
+            mockOrgFeatures.passenger = true;
+        }
     });
 
     it('selectedVehicle가 선택된 차량 객체를 반환한다', async () => {

@@ -57,7 +57,7 @@ export default function VehicleSelector({ vehicles, selectedVehicleId, onSelect,
                     >
                         {/* 사용 횟수 배지 */}
                         {count > 0 && !isDisabled && (
-                            <span className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-primary-50 dark:bg-primary-900/300 text-white text-[10px] font-bold flex items-center justify-center shadow-sm">
+                            <span title={`최근 사용: ${count}회`} className="absolute -top-1.5 -right-1.5 min-w-[18px] h-[18px] px-1 rounded-full bg-primary-500 dark:bg-primary-600 text-white text-[10px] font-bold flex items-center justify-center shadow-sm">
                                 {count}
                             </span>
                         )}

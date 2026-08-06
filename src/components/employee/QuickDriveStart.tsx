@@ -1,27 +1,44 @@
 /**
  * QuickDriveStart — 예약없는 출발 시작 페이지
- * 차량 선택, 목적지, 목적 입력 후 운행 시작
+ * 차량 선택, 목적지, 목적, 동승자 입력 후 운행 시작
+ *
+ * 입력 컴포넌트는 **예약 폼과 같은 것**을 쓴다(VehicleSelector · DestinationInput ·
+ * RouteInfoPanel · 동승자). 두 화면이 갈라지면 같은 일을 하는 자리가 서로 다르게 보이고,
+ * 목적지 여러 곳 입력처럼 한쪽에만 있는 기능이 생긴다.
  */
-import { useState } from 'react';
-import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
+import { useMemo, useRef } from 'react';
 import useQuickDriveStart from '../../hooks/useQuickDriveStart';
 import useVehiclePriority from '../../hooks/useVehiclePriority';
-import VehicleSelector from './VehicleSelector';
+import { useReservationPattern } from '../../hooks/useReservationPattern';
+import VehicleSelector from '../common/reservation/VehicleSelector';
+import DestinationInput from '../common/reservation/DestinationInput';
+import RouteInfoPanel from '../common/reservation/RouteInfoPanel';
+import ReservationPassengerField from '../common/reservation/ReservationPassengerField';
 
 export default function QuickDriveStart() {
     const {
         form, setForm,
-        vehicles, favorites,
+        vehicles, favorites, members,
         loading, submitting,
-        selectedVehicle,
         routeInfo, routeLoading,
         freeRoadRoute, freeRoadLoading, handleFetchFreeRoad,
         handleVehicleSelect,
-        handleFavoriteSelect,
+        handleDestinationChange,
+        handlePassengerChange,
         handleStart,
+        showFavSave, setShowFavSave, favName, setFavName, handleSaveFavorite,
+        passengerOptions,
     } = useQuickDriveStart();
     const { usageCounts } = useVehiclePriority();
-    const [showFreeRoad, setShowFreeRoad] = useState(false);
+    const { recentDestinations } = useReservationPattern();
+    const destinationRef = useRef<HTMLInputElement>(null);
+
+    // 폐차 제외 + 사용 빈도순 정렬 (예약 폼과 같은 기준)
+    const sortedActiveVehicles = useMemo(() => {
+        const filtered = vehicles.filter(v => !v.retired?.isRetired);
+        if (!usageCounts || usageCounts.size === 0) return filtered;
+        return [...filtered].sort((a, b) => (usageCounts.get(b.id) || 0) - (usageCounts.get(a.id) || 0));
+    }, [vehicles, usageCounts]);
 
     if (loading) {
         return (
@@ -36,143 +53,88 @@ export default function QuickDriveStart() {
             <h1 className="text-lg font-bold text-surface-900 dark:text-surface-100 mb-2">
                 운행 시작
             </h1>
-            <p className="text-sm text-surface-500 dark:text-surface-400 mb-6">
+            <p className="text-sm text-surface-500 dark:text-surface-400 mb-4">
                 차량과 운행 정보를 입력하세요
             </p>
 
-            <div className="space-y-5">
-                {/* 차량 선택 */}
-                <div>
-                    <label className="label">차량 선택 <span className="text-red-500 dark:text-red-400">*</span></label>
+            <div className="mb-4 p-3 rounded-xl bg-primary-50/50 border border-primary-100 dark:bg-surface-700/50 dark:border-surface-600">
+                <div className="space-y-4">
+                    {/* 차량 선택 */}
                     <VehicleSelector
-                        vehicles={vehicles}
+                        vehicles={sortedActiveVehicles}
                         selectedVehicleId={form.vehicleId}
                         onSelect={handleVehicleSelect}
                         usageCounts={usageCounts}
+                        destinationRef={destinationRef}
                     />
-                </div>
 
-                {/* 선택된 차량 표시 */}
-                {selectedVehicle && (
-                    <div className="glass-card p-4 flex items-center gap-3">
-                        <span className={`w-10 h-10 rounded-lg flex items-center justify-center text-xl ${getVehicleColor(form.vehicleId)}`}>
-                            {VEHICLE_TYPE_ICONS[selectedVehicle?.vehicleType ?? ''] || '🚗'}
-                        </span>
-                        <div>
-                            <p className="font-semibold text-surface-900 dark:text-surface-100">{form.vehicleName}</p>
-                            <p className="text-xs text-surface-400 dark:text-surface-500">선택된 차량</p>
-                        </div>
+                    {/* 목적지 (최대 5개 · POI 검색 · 즐겨찾기/최근) */}
+                    <div>
+                        <DestinationInput
+                            ref={destinationRef}
+                            destination={form.destination}
+                            onChangeDestination={handleDestinationChange}
+                            favorites={favorites}
+                            recentDestinations={recentDestinations}
+                            showFavSave={showFavSave}
+                            setShowFavSave={setShowFavSave}
+                            favName={favName}
+                            setFavName={setFavName}
+                            onSaveFavorite={handleSaveFavorite}
+                        />
+                        <RouteInfoPanel
+                            routeInfo={routeInfo}
+                            routeLoading={routeLoading}
+                            freeRoadRoute={freeRoadRoute}
+                            freeRoadLoading={freeRoadLoading}
+                            onFetchFreeRoad={handleFetchFreeRoad}
+                        />
                     </div>
-                )}
 
-                {/* 목적지 */}
-                <div>
-                    <label className="label">목적지 <span className="text-red-500 dark:text-red-400">*</span></label>
-                    <input
-                        type="text"
-                        value={form.destination}
-                        onChange={e => setForm({ ...form, destination: e.target.value })}
-                        className="input min-h-[48px]"
-                        placeholder="예: 강남역, 서울역 (여러 곳 운행은 쉼표로 구분)"
-                    />
-                    {/* 즐겨찾기 칩 */}
-                    {favorites.length > 0 && (
-                        <div className="flex flex-wrap gap-1.5 mt-2">
-                            {favorites.map((fav) => (
-                                <button
-                                    key={fav.id}
-                                    type="button"
-                                    onClick={() => handleFavoriteSelect(fav)}
-                                    className={`px-3 py-2 min-h-[48px] rounded-full text-xs font-medium border transition-all flex items-center justify-center ${form.destination === (fav.address || fav.name)
-                                        ? 'bg-amber-100 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400'
-                                        : 'bg-surface-50 dark:bg-surface-800 border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400 hover:border-amber-300 dark:hover:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20'
-                                        }`}
-                                >
-                                    ⭐ {fav.name}
-                                </button>
-                            ))}
-                        </div>
+                    {/* 목적 */}
+                    <div>
+                        <label className="label text-sm font-medium">📝 목적</label>
+                        <input
+                            type="text"
+                            value={form.purpose}
+                            onChange={e => setForm({ ...form, purpose: e.target.value })}
+                            className="input w-full mt-1 text-sm min-h-[48px]"
+                            placeholder="출장, 외근 등"
+                        />
+                    </div>
+
+                    {/* 동승자 — 예약 폼과 같은 입력. 기본은 접혀 있다.
+                        여기 값은 운행일지 작성 화면의 초기값이 되고, 확정 기록은 운행일지다. */}
+                    {passengerOptions.enabled && (
+                        <ReservationPassengerField
+                            values={form}
+                            onChange={handlePassengerChange}
+                            members={members}
+                            allowList={passengerOptions.allowList}
+                            allowSearch={passengerOptions.allowSearch}
+                            allowCount={passengerOptions.allowCount}
+                            hint="지금 함께 타는 인원입니다. 운행일지를 쓸 때 자동으로 채워지고, 도착 후 그때 확정합니다."
+                        />
                     )}
-                    {/* 경로 정보 */}
-                    {(routeLoading || routeInfo) && (
-                        <div className="mt-2">
-                            {routeLoading ? (
-                                <div className="flex items-center gap-2 text-xs text-surface-400 dark:text-surface-500 py-1">
-                                    <div className="w-3 h-3 spinner" />
-                                    경로 탐색 중...
-                                </div>
-                            ) : routeInfo && (
-                                <div className="p-2.5 rounded-lg bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:bg-blue-900/20 dark:border-blue-800/40 animate-fade-in space-y-1.5">
-                                    <div className="flex items-center gap-3 text-xs">
-                                        {routeInfo.hasToll && <span className="text-[11px] font-semibold text-blue-500 dark:text-blue-400 bg-blue-100 dark:bg-blue-800/40 px-1.5 py-0.5 rounded">고속</span>}
-                                        <span className="font-bold text-blue-700 dark:text-blue-300">🗺️ {'isMulti' in routeInfo && routeInfo.isMulti ? '총 ' : ''}{Math.floor(routeInfo.distance)}km</span>
-                                        <span className="font-bold text-blue-700 dark:text-blue-300">⏱ {'isMulti' in routeInfo && routeInfo.isMulti ? '총 ' : ''}{routeInfo.duration}분</span>
-                                        {(routeInfo.tollFee ?? 0) > 0 && (
-                                            <span className="text-blue-600 dark:text-blue-400">₩{(routeInfo.tollFee ?? 0).toLocaleString()}</span>
-                                        )}
-                                        {routeInfo.hasToll && (
-                                            <button
-                                                type="button"
-                                                onClick={() => {
-                                                    const next = !showFreeRoad;
-                                                    setShowFreeRoad(next);
-                                                    if (next && !freeRoadRoute && !freeRoadLoading) handleFetchFreeRoad();
-                                                }}
-                                                className="ml-auto flex-shrink-0 min-w-[48px] min-h-[48px] flex items-center justify-center rounded hover:bg-blue-100 dark:hover:bg-blue-800/40 transition-colors"
-                                                title="무료도로 경로 보기"
-                                            >
-                                                {freeRoadLoading && showFreeRoad
-                                                    ? <div className="w-3 h-3 spinner" />
-                                                    : <svg aria-hidden="true" className={`w-3.5 h-3.5 text-blue-500 dark:text-blue-400 transition-transform duration-200 ${showFreeRoad ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" /></svg>
-                                                }
-                                            </button>
-                                        )}
-                                    </div>
-                                    {showFreeRoad && freeRoadRoute && (
-                                        <div className="flex items-center gap-3 text-xs border-t border-blue-200/50 dark:border-blue-800/30 pt-1.5 animate-fade-in">
-                                            <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-800/40 px-1.5 py-0.5 rounded">무료</span>
-                                            <span className="font-bold text-emerald-700 dark:text-emerald-300">🗺️ {Math.floor(freeRoadRoute.distance)}km</span>
-                                            <span className="font-bold text-emerald-700 dark:text-emerald-300">⏱ {freeRoadRoute.duration}분</span>
-                                            {freeRoadRoute.tollFee > 0 && (
-                                                <span className="text-emerald-600 dark:text-emerald-400">₩{freeRoadRoute.tollFee.toLocaleString()}</span>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                    )}
+
+                    {/* 운행 시작 버튼 */}
+                    <button
+                        onClick={handleStart}
+                        disabled={submitting || !form.vehicleId || !form.destination.trim()}
+                        className="w-full btn-primary py-3 text-base font-bold min-h-[48px]"
+                    >
+                        {submitting ? (
+                            <span className="flex items-center justify-center gap-2">
+                                <div className="w-5 h-5 spinner" />
+                                시작 중...
+                            </span>
+                        ) : (
+                            <span className="flex items-center justify-center gap-2">
+                                🚗 운행 시작
+                            </span>
+                        )}
+                    </button>
                 </div>
-
-                {/* 목적 */}
-                <div>
-                    <label className="label">목적</label>
-                    <input
-                        type="text"
-                        value={form.purpose}
-                        onChange={e => setForm({ ...form, purpose: e.target.value })}
-                        className="input min-h-[48px]"
-                        placeholder="출장, 외근 등"
-                    />
-                </div>
-
-                {/* 운행 시작 버튼 */}
-                <button
-                    onClick={handleStart}
-                    disabled={submitting || !form.vehicleId || !form.destination.trim()}
-                    className="w-full btn-primary py-3 text-base font-bold min-h-[48px]"
-                >
-                    {submitting ? (
-                        <span className="flex items-center justify-center gap-2">
-                            <div className="w-5 h-5 spinner" />
-                            시작 중...
-                        </span>
-                    ) : (
-                        <span className="flex items-center justify-center gap-2">
-                            🚗 운행 시작
-                        </span>
-                    )}
-                </button>
             </div>
         </div>
     );

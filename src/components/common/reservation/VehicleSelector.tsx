@@ -1,25 +1,28 @@
 /**
- * VehicleSelector - 차량 그리드 선택기
+ * VehicleSelector - 차량 그리드 선택기 (예약 폼 · 바로 운행 공용)
+ *
+ * 폼 상태의 모양이 화면마다 달라 `form`/`setForm`을 통째로 받지 않고
+ * 선택된 차량 id와 선택 콜백만 받는다.
  */
 import React, { useMemo } from 'react';
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../../lib/constants';
 import { isVehicleBlocked, isVehicleRestrictedForUser } from '../../../lib/vehicleUtils';
 import { useAuth } from '../../../hooks/useAuth';
 import type { Vehicle } from '../../../types/vehicle';
-import type { ReservationForm } from '../../../types/reservation';
 
 interface VehicleSelectorProps {
     vehicles: Vehicle[];
-    form: ReservationForm;
-    setForm: React.Dispatch<React.SetStateAction<ReservationForm>>;
+    selectedVehicleId: string;
+    onSelect: (vehicleId: string) => void;
     usageCounts?: Map<string, number>;
-    destinationRef: React.RefObject<HTMLInputElement | null>;
+    /** 선택 직후 포커스를 옮길 입력(목적지). 없으면 포커스를 옮기지 않는다. */
+    destinationRef?: React.RefObject<HTMLInputElement | null>;
 }
 
 export default function VehicleSelector({
     vehicles,
-    form,
-    setForm,
+    selectedVehicleId,
+    onSelect,
     usageCounts,
     destinationRef,
 }: VehicleSelectorProps) {
@@ -42,11 +45,11 @@ export default function VehicleSelector({
                         <button
                             key={v.id}
                             type="button"
-                            onClick={() => { if (!isDisabled) { setForm({ ...form, vehicleId: v.id }); setTimeout(() => destinationRef.current?.focus(), 50); } }}
+                            onClick={() => { if (!isDisabled) { onSelect(v.id); setTimeout(() => destinationRef?.current?.focus(), 50); } }}
                             disabled={isDisabled}
                             className={`p-2.5 rounded-xl border text-left transition-all relative ${isDisabled
                                 ? 'border-surface-200 dark:border-surface-700 bg-surface-100 dark:bg-surface-800 opacity-50 cursor-not-allowed'
-                                : form.vehicleId === v.id
+                                : selectedVehicleId === v.id
                                     ? 'border-primary-500 bg-primary-50 dark:bg-primary-900/40 ring-1 ring-primary-500/50 shadow-md transform -translate-y-0.5'
                                     : 'border-surface-200 dark:border-surface-600 hover:border-surface-300 hover:bg-surface-50 bg-white dark:bg-surface-800 shadow-sm'
                                 }`}
