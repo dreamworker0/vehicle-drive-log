@@ -115,12 +115,37 @@ jobs:
           cache: npm
 
       - name: Install functions dependencies
+        id: install
         run: cd functions && npm ci
 
       - name: Functions unit tests
         run: cd functions && npx jest --testPathIgnorePatterns=emulator --maxWorkers=2 --workerIdleMemoryLimit=512MB
         env:
           NODE_OPTIONS: --max-old-space-size=4096
+
+      # ── Functions 에뮬레이터 통합 테스트 (~2분) ──
+      # 4개 스위트(joinOrganization·tmapProxy·setCustomClaims·computeDashboardStats,
+      # 약 800줄)가 한동안 어느 게이트에도 편입되지 않아 조용히 썩고 있었다 —
+      # jest 30의 --testPathPattern → --testPathPatterns 개명으로 스크립트 자체가
+      # 깨져 있었는데도 아무도 몰랐다. 단위 테스트 실패에 묶으면 이 게이트도 함께
+      # 묻히므로(게이트 마스킹, ci 잡의 원칙과 동일) 설치 성공에만 묶는다.
+      - name: Setup Java (Firebase emulator)
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        uses: actions/setup-java@v5.7.0
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Cache Firebase emulators
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}
+
+      - name: Functions emulator integration tests
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run test:functions:emulator
 
   ci:
     runs-on: ubuntu-latest

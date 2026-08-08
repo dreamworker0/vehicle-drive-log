@@ -8,7 +8,7 @@
         "type-check": "tsc --noEmit",
         "test": "jest --verbose --testPathIgnorePatterns=emulator",
         "test:coverage": "jest --coverage --testPathIgnorePatterns=emulator",
-        "test:emulator": "jest --verbose --runInBand --testPathPattern=\"emulator\\.test\"",
+        "test:emulator": "jest --verbose --runInBand --testPathPatterns=\"emulator\\.test\"",
         "serve": "npm run build && firebase emulators:start --only functions",
         "shell": "npm run build && firebase functions:shell",
         "start": "npm run shell",
