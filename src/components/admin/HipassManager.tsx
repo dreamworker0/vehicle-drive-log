@@ -6,6 +6,7 @@ import useHipassManager from '../../hooks/useHipassManager';
 import ConfirmModal from '../common/ConfirmModal';
 import { SkeletonCard, SkeletonBox } from '../common/Skeleton';
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
+import { stripNegative } from '../../hooks/utils/numberValidation';
 
 export default function HipassManager() {
     const {
@@ -104,7 +105,7 @@ export default function HipassManager() {
                                 <label className="label">현재 잔액 (원)</label>
                                 <input
                                     type="number" value={form.balance}
-                                    onChange={e => setForm({ ...form, balance: e.target.value })}
+                                    onChange={e => setForm({ ...form, balance: stripNegative(e.target.value) })}
                                     className="input min-h-[48px]" placeholder="0" min="0"
                                 />
                                 <p className="text-xs text-surface-400 mt-1">하이패스 카드의 현재 충전 잔액</p>

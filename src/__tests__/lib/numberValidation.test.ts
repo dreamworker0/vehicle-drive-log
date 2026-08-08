@@ -3,7 +3,33 @@
  * 음수 입력 차단 유틸(hooks/utils/numberValidation)을 검증한다.
  */
 import { describe, it, expect } from 'vitest';
-import { validateNonNegativeFields } from '../../hooks/utils/numberValidation';
+import { stripNegative, validateNonNegativeFields } from '../../hooks/utils/numberValidation';
+
+describe('stripNegative', () => {
+    it('마이너스 부호를 떼어낸다', () => {
+        expect(stripNegative('-13')).toBe('13');
+    });
+
+    it('소수점 음수도 부호만 떼어낸다', () => {
+        expect(stripNegative('-0.5')).toBe('0.5');
+    });
+
+    it('부호가 여러 개 붙어도 모두 떼어낸다', () => {
+        expect(stripNegative('--7')).toBe('7');
+    });
+
+    it('양수는 그대로 둔다', () => {
+        expect(stripNegative('45000')).toBe('45000');
+    });
+
+    it('빈 값은 그대로 둔다 (지우는 중인 입력을 방해하지 않는다)', () => {
+        expect(stripNegative('')).toBe('');
+    });
+
+    it('숫자 중간의 하이픈은 건드리지 않는다', () => {
+        expect(stripNegative('1-2')).toBe('1-2');
+    });
+});
 
 describe('validateNonNegativeFields', () => {
     it('0 이상의 값은 모두 통과한다', () => {

@@ -5,6 +5,7 @@
 import useHipassCharge from '../../hooks/useHipassCharge';
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
 import { SkeletonBox, SkeletonList } from '../common/Skeleton';
+import { stripNegative } from '../../hooks/utils/numberValidation';
 
 export default function HipassChargeTab() {
     const {
@@ -129,7 +130,7 @@ export default function HipassChargeTab() {
                                 <input
                                     type="number"
                                     value={form.chargeAmount}
-                                    onChange={e => setForm({ ...form, chargeAmount: e.target.value })}
+                                    onChange={e => setForm({ ...form, chargeAmount: stripNegative(e.target.value) })}
                                     className="input min-h-[48px]"
                                     placeholder="50000"
                                     min="1"

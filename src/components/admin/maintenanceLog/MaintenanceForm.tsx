@@ -3,6 +3,7 @@
  */
 import { memo } from 'react';
 import { MAINTENANCE_TYPES } from '../../../hooks/useMaintenanceLog';
+import { stripNegative } from '../../../hooks/utils/numberValidation';
 import type { Vehicle } from '../../../types/vehicle';
 
 interface FormData {
@@ -67,7 +68,7 @@ export default memo(function MaintenanceForm({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                     <label className="label">비용 (원)</label>
-                    <input type="number" min="0" value={form.cost} onChange={e => setForm({ ...form, cost: e.target.value })} className="input" placeholder="50000" />
+                    <input type="number" min="0" value={form.cost} onChange={e => setForm({ ...form, cost: stripNegative(e.target.value) })} className="input" placeholder="50000" />
                 </div>
                 <div>
                     <label className="label">정비소</label>
@@ -77,11 +78,11 @@ export default memo(function MaintenanceForm({
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                     <label className="label">현재 km</label>
-                    <input type="number" min="0" value={form.km} onChange={e => setForm({ ...form, km: e.target.value })} className="input" placeholder="45000" />
+                    <input type="number" min="0" value={form.km} onChange={e => setForm({ ...form, km: stripNegative(e.target.value) })} className="input" placeholder="45000" />
                 </div>
                 <div>
                     <label className="label">다음 정비 km</label>
-                    <input type="number" min="0" value={form.nextDueKm} onChange={e => setForm({ ...form, nextDueKm: e.target.value })} className="input" placeholder="50000" />
+                    <input type="number" min="0" value={form.nextDueKm} onChange={e => setForm({ ...form, nextDueKm: stripNegative(e.target.value) })} className="input" placeholder="50000" />
                 </div>
                 <div>
                     <label className="label">다음 정비일</label>

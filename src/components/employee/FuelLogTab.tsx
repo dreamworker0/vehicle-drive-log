@@ -12,6 +12,7 @@ import useVehiclePriority from '../../hooks/useVehiclePriority';
 import HipassChargeTab from './HipassChargeTab';
 import MaintenanceTab from './MaintenanceTab';
 import { isChargeableFuel } from '../../hooks/useVehicleManager';
+import { stripNegative } from '../../hooks/utils/numberValidation';
 
 type TabType = 'fuel' | 'charge' | 'maintenance';
 
@@ -186,7 +187,7 @@ export default function FuelLogTab() {
                                     type="number"
                                     min="0"
                                     value={form.meterReading}
-                                    onChange={e => setForm({ ...form, meterReading: e.target.value })}
+                                    onChange={e => setForm({ ...form, meterReading: stripNegative(e.target.value) })}
                                     className="input min-h-[48px]"
                                     placeholder="45000"
                                     required
@@ -234,7 +235,7 @@ export default function FuelLogTab() {
                                         step="0.01"
                                         min="0"
                                         value={form.fuelAmount}
-                                        onChange={e => setForm({ ...form, fuelAmount: e.target.value })}
+                                        onChange={e => setForm({ ...form, fuelAmount: stripNegative(e.target.value) })}
                                         className="input min-h-[48px]"
                                         placeholder={isChargeable ? '30.5' : '40.5'}
                                         required
@@ -246,7 +247,7 @@ export default function FuelLogTab() {
                                         type="number"
                                         min="0"
                                         value={form.fuelCost}
-                                        onChange={e => setForm({ ...form, fuelCost: e.target.value })}
+                                        onChange={e => setForm({ ...form, fuelCost: stripNegative(e.target.value) })}
                                         className="input min-h-[48px]"
                                         placeholder="65000"
                                         required

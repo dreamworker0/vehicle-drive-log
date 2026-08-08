@@ -4,6 +4,7 @@
  */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import React from 'react';
+import { stripNegative } from '../../hooks/utils/numberValidation';
 import type { DriveLog } from '../../types/driveLog';
 
 interface MileageForm {
@@ -147,7 +148,7 @@ export default function MileageInput({
                         type="number"
                         min={0}
                         value={form.startKm}
-                        onChange={e => onStartKmChange(e.target.value)}
+                        onChange={e => onStartKmChange(stripNegative(e.target.value))}
                         readOnly={!vehicleSelected}
                         className={`input min-h-[48px] ${!vehicleSelected ? 'bg-surface-50 dark:bg-surface-800 text-surface-500 dark:text-surface-400 cursor-not-allowed' : ''}`}
                         placeholder={vehicleSelected ? "출발 km 입력" : "차량 선택 시 자동 입력"}
@@ -171,7 +172,7 @@ export default function MileageInput({
                         type="number"
                         min={0}
                         value={form.endKm}
-                        onChange={e => onEndKmChange(e.target.value)}
+                        onChange={e => onEndKmChange(stripNegative(e.target.value))}
                         className="input min-h-[48px]"
                         placeholder="12400"
                         required
