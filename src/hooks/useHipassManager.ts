@@ -8,6 +8,7 @@ import type { HipassCard } from '../types/hipass';
 import type { Vehicle } from '../types/vehicle';
 import { getHipassCards, createHipassCard, updateHipassCard, deleteHipassCard, getVehicles } from '../lib/firestore';
 import { useToast } from './useToast';
+import { validateNonNegativeFields } from './utils/numberValidation';
 
 interface HipassModal {
     type: 'delete';
@@ -88,6 +89,14 @@ export default function useHipassManager() {
         const digits = form.cardNumber.replace(/\D/g, '');
         if (!digits || !form.vehicleId) {
             showToast('카드번호와 차량을 입력해주세요.', 'error');
+            return;
+        }
+        // 카드 잔액은 음수가 될 수 없다
+        const negativeError = validateNonNegativeFields([
+            { label: '현재 잔액', value: form.balance },
+        ]);
+        if (negativeError) {
+            showToast(negativeError, 'error');
             return;
         }
         setFormLoading(true);

@@ -93,6 +93,32 @@ describe('운행일지 폼 유효성 검증', () => {
             expect(result.message).toBe('배터리 값은 0~100% 사이여야 합니다.');
         });
     });
+
+    describe('하이패스 사용후 금액 검증', () => {
+        // 이 값은 저장 시 increment(-(사용전 - 사용후))로 카드 잔액에 반영되므로,
+        // 음수를 통과시키면 운행일지뿐 아니라 카드 잔액까지 어긋난다.
+        it('0 이상이면 통과한다', () => {
+            const result = validateDriveLogForm({ ...validForm, hipassBalanceAfter: '0' });
+            expect(result.valid).toBe(true);
+        });
+
+        it('음수이면 에러를 반환한다', () => {
+            const result = validateDriveLogForm({ ...validForm, hipassBalanceAfter: '-5000' });
+            expect(result.valid).toBe(false);
+            expect(result.message).toBe('하이패스 사용후 금액은 0 이상이어야 합니다.');
+        });
+
+        it('숫자가 아니면 에러를 반환한다', () => {
+            const result = validateDriveLogForm({ ...validForm, hipassBalanceAfter: 'abc' });
+            expect(result.valid).toBe(false);
+            expect(result.message).toBe('하이패스 사용후 금액이 올바르지 않습니다.');
+        });
+
+        it('미입력(빈 문자열)이면 검사하지 않는다', () => {
+            const result = validateDriveLogForm({ ...validForm, hipassBalanceAfter: '' });
+            expect(result.valid).toBe(true);
+        });
+    });
 });
 
 describe('buildDriveTimestamp', () => {

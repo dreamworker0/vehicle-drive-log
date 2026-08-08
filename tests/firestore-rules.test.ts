@@ -689,6 +689,74 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertSucceeds(empDb.collection('maintenanceRecords').doc('m_mine').delete());
   });
 
+  it('12-1. 금액·거리 필드의 음수 저장 차단 — 주유·충전·정비 기록', async () => {
+    // 화면(각 훅의 validateNonNegativeFields)이 먼저 막지만, 클라이언트를 우회한
+    // '불가능한 값'을 서버에서도 끊는다. driveLogs의 startKm >= 0과 같은 목적.
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.collection('hipassCards').doc('c_A').set({ organizationId: 'org-A', cardNumber: '1', balance: 10000 });
+      // 이미 음수가 박힌 옛 기록 — 다른 필드 수정 길이 막히지 않아야 한다
+      await db.collection('maintenanceRecords').doc('m_legacy').set({
+        organizationId: 'org-A', vehicleId: 'v_A', type: 'oil', blockVehicle: false,
+        createdByUid: 'emp_1', cost: -50000,
+      });
+    });
+
+    const empDb = setupContext('emp_1', { role: 'employee', orgId: 'org-A' }).firestore();
+
+    // ── 주유 기록 ──
+    await assertSucceeds(empDb.collection('fuelLogs').doc('f_ok').set({
+      organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'emp_1',
+      meterReading: 51000, fuelAmount: 40, fuelCost: 60000,
+    }));
+    await assertFails(empDb.collection('fuelLogs').doc('f_cost').set({
+      organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'emp_1',
+      meterReading: 51000, fuelAmount: 40, fuelCost: -60000,
+    }));
+    await assertFails(empDb.collection('fuelLogs').doc('f_amount').set({
+      organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'emp_1',
+      meterReading: 51000, fuelAmount: -40, fuelCost: 60000,
+    }));
+    await assertFails(empDb.collection('fuelLogs').doc('f_meter').set({
+      organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'emp_1',
+      meterReading: -51000, fuelAmount: 40, fuelCost: 60000,
+    }));
+    // 수정으로 음수를 밀어 넣는 것도 차단
+    await assertFails(empDb.collection('fuelLogs').doc('f_ok').update({ fuelCost: -1 }));
+
+    // ── 하이패스 충전 기록 ──
+    await assertSucceeds(empDb.collection('hipassCharges').doc('h_ok').set({
+      organizationId: 'org-A', cardId: 'c_A', chargerUid: 'emp_1', chargeAmount: 50000,
+    }));
+    await assertFails(empDb.collection('hipassCharges').doc('h_neg').set({
+      organizationId: 'org-A', cardId: 'c_A', chargerUid: 'emp_1', chargeAmount: -50000,
+    }));
+
+    // ── 정비 기록 ──
+    await assertSucceeds(empDb.collection('maintenanceRecords').doc('m_ok').set({
+      organizationId: 'org-A', vehicleId: 'v_A', createdByUid: 'emp_1', blockVehicle: false,
+      cost: 50000, km: 45000, nextDueKm: 50000,
+    }));
+    // 미입력(null)은 선택 항목이므로 통과해야 한다
+    await assertSucceeds(empDb.collection('maintenanceRecords').doc('m_null').set({
+      organizationId: 'org-A', vehicleId: 'v_A', createdByUid: 'emp_1', blockVehicle: false,
+      cost: null, km: null, nextDueKm: null,
+    }));
+    await assertFails(empDb.collection('maintenanceRecords').doc('m_cost').set({
+      organizationId: 'org-A', vehicleId: 'v_A', createdByUid: 'emp_1', blockVehicle: false,
+      cost: -50000,
+    }));
+    await assertFails(empDb.collection('maintenanceRecords').doc('m_km').set({
+      organizationId: 'org-A', vehicleId: 'v_A', createdByUid: 'emp_1', blockVehicle: false,
+      km: -100,
+    }));
+
+    // 이미 음수가 박힌 옛 기록의 **다른 필드** 수정은 여전히 허용 (Phase 129·132의 함정 회피)
+    await assertSucceeds(empDb.collection('maintenanceRecords').doc('m_legacy').update({ description: '설명만 수정' }));
+    // 같은 기록이라도 음수를 새로 밀어 넣는 수정은 차단
+    await assertFails(empDb.collection('maintenanceRecords').doc('m_legacy').update({ km: -1 }));
+  });
+
   it('9. 운행일지 대표 운전자 지정/수정 권한 (작성자·관리자, 구 데이터 폴백)', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const db = context.firestore();

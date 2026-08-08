@@ -34,6 +34,7 @@ vi.mock('../../lib/firestore', () => ({
     cancelVehicleReservations: vi.fn().mockResolvedValue(0),
 }));
 
+import { createMaintenanceRecord } from '../../lib/firestore';
 import useMaintenanceLog, { MAINTENANCE_TYPES } from '../../hooks/useMaintenanceLog';
 
 describe('useMaintenanceLog', () => {
@@ -108,6 +109,56 @@ describe('useMaintenanceLog', () => {
 
         await waitFor(() => {
             expect(result.current.showForm).toBe(true);
+        });
+    });
+
+    describe('음수 입력 차단', () => {
+        // 관리자 정비 폼은 min 속성조차 없었어서 음수 비용·km이 그대로 저장됐다.
+        const submitWith = async (overrides: Record<string, string>) => {
+            const { result } = renderHook(() => useMaintenanceLog());
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            act(() => {
+                result.current.setForm({
+                    ...result.current.form,
+                    vehicleId: 'v1',
+                    vehicleName: '1호차',
+                    date: '2026-03-06',
+                    type: 'oil',
+                    ...overrides,
+                });
+            });
+
+            await act(async () => {
+                await result.current.handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+            });
+        };
+
+        it('비용이 음수면 저장하지 않고 안내한다', async () => {
+            await submitWith({ cost: '-50000' });
+
+            expect(mockShowToast).toHaveBeenCalledWith('비용에 음수를 입력할 수 없습니다.', 'warning');
+            expect(createMaintenanceRecord).not.toHaveBeenCalled();
+        });
+
+        it('현재 km이 음수면 저장하지 않고 안내한다', async () => {
+            await submitWith({ km: '-100' });
+
+            expect(mockShowToast).toHaveBeenCalledWith('현재 km에 음수를 입력할 수 없습니다.', 'warning');
+            expect(createMaintenanceRecord).not.toHaveBeenCalled();
+        });
+
+        it('다음 정비 km이 음수면 저장하지 않고 안내한다', async () => {
+            await submitWith({ nextDueKm: '-5000' });
+
+            expect(mockShowToast).toHaveBeenCalledWith('다음 정비 km에 음수를 입력할 수 없습니다.', 'warning');
+            expect(createMaintenanceRecord).not.toHaveBeenCalled();
+        });
+
+        it('비어 있는 선택 항목(비용·km)은 통과시킨다', async () => {
+            await submitWith({ cost: '', km: '', nextDueKm: '' });
+
+            expect(createMaintenanceRecord).toHaveBeenCalledTimes(1);
         });
     });
 });

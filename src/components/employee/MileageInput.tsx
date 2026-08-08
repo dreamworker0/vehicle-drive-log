@@ -145,6 +145,7 @@ export default function MileageInput({
                     <label className="label text-xs">출발 km <span className="text-red-500 dark:text-red-400">*</span></label>
                     <input
                         type="number"
+                        min={0}
                         value={form.startKm}
                         onChange={e => onStartKmChange(e.target.value)}
                         readOnly={!vehicleSelected}
@@ -152,7 +153,12 @@ export default function MileageInput({
                         placeholder={vehicleSelected ? "출발 km 입력" : "차량 선택 시 자동 입력"}
                         required
                     />
-                    {lastDriveLog && form.startKm && Number(form.startKm) < (lastDriveLog.startKm || 0) && (
+                    {form.startKm && Number(form.startKm) < 0 && (
+                        <p className="text-[11px] text-red-500 dark:text-red-400 mt-1 font-medium leading-tight">
+                            ⚠️ 출발 km는 0 이상이어야 해요
+                        </p>
+                    )}
+                    {lastDriveLog && form.startKm && Number(form.startKm) >= 0 && Number(form.startKm) < (lastDriveLog.startKm || 0) && (
                         <p className="text-[11px] text-amber-600 dark:text-amber-500 mt-1 font-medium leading-tight">
                             ⚠️ 직전 출발({lastDriveLog.startKm?.toLocaleString()})보다 낮음
                         </p>
@@ -163,13 +169,19 @@ export default function MileageInput({
                     <input
                         ref={endKmRef}
                         type="number"
+                        min={0}
                         value={form.endKm}
                         onChange={e => onEndKmChange(e.target.value)}
                         className="input min-h-[48px]"
                         placeholder="12400"
                         required
                     />
-                    {form.startKm && form.endKm && Number(form.endKm) < Number(form.startKm) && (
+                    {form.endKm && Number(form.endKm) < 0 && (
+                        <p className="text-[11px] text-red-500 dark:text-red-400 mt-1 font-medium leading-tight">
+                            ⚠️ 도착 km는 0 이상이어야 해요
+                        </p>
+                    )}
+                    {form.startKm && form.endKm && Number(form.endKm) >= 0 && Number(form.endKm) < Number(form.startKm) && (
                         <p className="text-[11px] text-red-500 dark:text-red-400 mt-1 font-medium leading-tight">
                             ⚠️ 도착 km가 출발 km({Number(form.startKm).toLocaleString()})보다 작아요
                         </p>

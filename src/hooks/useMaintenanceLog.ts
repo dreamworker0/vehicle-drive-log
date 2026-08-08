@@ -10,6 +10,7 @@ import type { Vehicle } from '../types/vehicle';
 import type { MaintenanceRecord } from '../types/maintenance';
 import { getVehicles, getMaintenanceRecords, createMaintenanceRecord, deleteMaintenanceRecord, clearVehicleMaintenanceBlock, cancelVehicleReservations, updateMaintenanceRecord } from '../lib/firestore';
 import { toLocalDateStr } from '../lib/dateUtils';
+import { validateNonNegativeFields } from './utils/numberValidation';
 
 export const MAINTENANCE_TYPES = [
     { value: 'oil', label: '엔진오일', icon: '🛢️' },
@@ -103,6 +104,16 @@ export default function useMaintenanceLog() {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!form.vehicleId || !form.date || !form.type) return;
+        // 비용ㆍ주행거리ㆍ다음 정비 km는 음수가 될 수 없다
+        const negativeError = validateNonNegativeFields([
+            { label: '비용', value: form.cost },
+            { label: '현재 km', value: form.km },
+            { label: '다음 정비 km', value: form.nextDueKm },
+        ]);
+        if (negativeError) {
+            showToast(negativeError, 'warning');
+            return;
+        }
         setSaving(true);
         try {
             const data = {
