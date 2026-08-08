@@ -153,6 +153,9 @@ function toDateStr(ts: unknown): string {
     return Number.isNaN(d.getTime()) ? '?' : d.toISOString().slice(0, 10);
 }
 
+/** 전체 컬렉션에서 읽은 문서 수 — 0이면 엉뚱한 곳을 본 것이라 "이상 없음"으로 단정하면 안 된다 */
+let totalScanned = 0;
+
 /** 컬렉션 하나를 페이지 단위로 훑어 음수·NaN 필드를 모은다 */
 async function scan(spec: CollectionSpec): Promise<Finding[]> {
     const findings: Finding[] = [];
@@ -190,6 +193,7 @@ async function scan(spec: CollectionSpec): Promise<Finding[]> {
         }
 
         scanned += snap.docs.length;
+        totalScanned += snap.docs.length;
         last = snap.docs[snap.docs.length - 1];
         if (snap.docs.length < PAGE_SIZE) break;
     }
@@ -259,8 +263,23 @@ async function main() {
         findings.push(...(await scan(spec)));
     }
 
+    // 문서를 한 건도 못 읽었다면 데이터가 깨끗한 게 아니라 **엉뚱한 곳을 본 것**이다.
+    // 실제로 ADC의 기본 프로젝트(다른 프로젝트)를 조회해 에러 없이 0건이 나온 적이 있다 —
+    // 그때 "✅ 이상 없음"을 띄우면 점검을 마쳤다고 믿게 되므로 반드시 경고로 끊는다.
+    if (totalScanned === 0) {
+        console.error('\n⚠️  문서를 한 건도 읽지 못했습니다 — 점검이 이루어지지 않았습니다.\n');
+        console.error(`조회한 프로젝트: ${projectId ?? '(미지정)'}`);
+        if (orgFilter) console.error(`기관 한정: ${orgFilter}  ← 이 기관 ID가 맞는지 확인하세요`);
+        console.error('\n확인할 것:');
+        console.error('  1. 프로젝트가 맞는지 — 운영 데이터는 vehicle-drive-log에 있습니다.');
+        console.error('     PowerShell:  $env:GOOGLE_CLOUD_PROJECT = "vehicle-drive-log"');
+        console.error('     gcloud로 로그인하면 ADC의 기본 프로젝트가 다른 곳으로 잡혀 있을 수 있습니다.');
+        console.error('  2. 그 프로젝트의 Firestore 읽기 권한이 계정에 있는지.\n');
+        process.exit(1);
+    }
+
     if (findings.length === 0) {
-        console.log('\n✅ 음수로 저장된 기록이 없습니다.\n');
+        console.log(`\n✅ 음수로 저장된 기록이 없습니다. (문서 ${totalScanned.toLocaleString()}건 확인)\n`);
         return;
     }
 
