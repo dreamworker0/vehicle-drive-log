@@ -102,10 +102,16 @@ service cloud.firestore {
 
     // === 사용자 ===
     match /users/{userId} {
-      // 자기 자신 + superAdmin + 같은 기관 멤버만 읽기 가능
+      // 자기 자신 + superAdmin + 같은 기관 멤버만 읽기 가능.
+      // organizationId != null 조건이 없으면 "null == null"이 참이 되어, 기관 미소속
+      // (탈퇴·이동 대기, orgId 클레임 null) 계정끼리 서로의 문서(이메일·이름·연락처)를
+      // 읽을 수 있다 — 미소속 사용자는 어떤 기관의 멤버도 아니므로 본인 외 열람 불가.
       allow read: if isOwner(userId)
                   || isSuperAdmin()
-                  || (isSignedIn() && resource != null && resource.data.organizationId == userOrgId());
+                  || (isSignedIn()
+                      && resource != null
+                      && resource.data.organizationId != null
+                      && resource.data.organizationId == userOrgId());
       // consent(이용약관 동의 기록)는 joinOrganization(Admin SDK)만 기록한다.
       // 클라이언트가 심으면 동의하지 않은 계정에 동의 기록이 생겨 입증 자료가 무의미해진다.
       allow create: if isOwner(userId)

@@ -636,6 +636,39 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertFails(mateDb.doc('users/user_A/private/oauth').get());
   });
 
+  it('11-1. 기관 미소속(orgId null) 사용자 간 PII 상호 열람 차단 — "null == null" 우회 방지', async () => {
+    // 탈퇴·기관 이동 대기 계정은 organizationId가 null로 명시 저장되고
+    // 클레임의 orgId도 null이 된다(setCustomClaims). "같은 기관 멤버" 조건이
+    // null == null로 성립해 미소속 계정끼리 이메일·이름·연락처를 읽을 수 있었다.
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.collection('users').doc('orphan_A').set({
+        organizationId: null, name: '미소속A', email: 'a@t.kr', role: 'employee',
+      });
+      await db.collection('users').doc('orphan_B').set({
+        organizationId: null, name: '미소속B', email: 'b@t.kr', role: 'employee',
+      });
+      await db.collection('users').doc('user_C').set({
+        organizationId: 'org-C', name: '직원C', email: 'c@t.kr', role: 'employee',
+      });
+    });
+
+    const orphanADb = setupContext('orphan_A', { role: 'employee', orgId: null }).firestore();
+
+    // (1) 미소속끼리 상호 열람 차단
+    await assertFails(orphanADb.collection('users').doc('orphan_B').get());
+
+    // (2) 미소속 → 기관 소속 사용자 열람도 차단
+    await assertFails(orphanADb.collection('users').doc('user_C').get());
+
+    // (3) 본인 문서는 계속 읽을 수 있다 (회귀 가드 — 재가입 화면의 전제)
+    await assertSucceeds(orphanADb.collection('users').doc('orphan_A').get());
+
+    // (4) 기관 소속 멤버 간 열람은 계속 허용된다 (회귀 가드 — 정당한 접근 경로 보존)
+    const memberCDb = setupContext('user_C2', { role: 'employee', orgId: 'org-C' }).firestore();
+    await assertSucceeds(memberCDb.collection('users').doc('user_C').get());
+  });
+
   it('12. 직원의 정비 기록 작성 — 본인 것만 허용, 차량 차단(blockVehicle)은 금지', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const db = context.firestore();
