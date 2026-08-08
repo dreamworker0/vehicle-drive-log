@@ -12,6 +12,7 @@ import useVehiclePriority from '../../hooks/useVehiclePriority';
 import HipassChargeTab from './HipassChargeTab';
 import MaintenanceTab from './MaintenanceTab';
 import { isChargeableFuel } from '../../hooks/useVehicleManager';
+import { stripNegative } from '../../hooks/utils/numberValidation';
 
 type TabType = 'fuel' | 'charge' | 'maintenance';
 
@@ -184,8 +185,9 @@ export default function FuelLogTab() {
                                 </div>
                                 <input
                                     type="number"
+                                    min="0"
                                     value={form.meterReading}
-                                    onChange={e => setForm({ ...form, meterReading: e.target.value })}
+                                    onChange={e => setForm({ ...form, meterReading: stripNegative(e.target.value) })}
                                     className="input min-h-[48px]"
                                     placeholder="45000"
                                     required
@@ -195,7 +197,12 @@ export default function FuelLogTab() {
                                         📍 현재 누적: <span className="font-medium">{selectedVehicleKm.toLocaleString()} km</span>
                                     </p>
                                 )}
-                                {form.meterReading && selectedVehicleKm > 0 && parseInt(form.meterReading) < selectedVehicleKm && (
+                                {form.meterReading && Number(form.meterReading) < 0 && (
+                                    <p className="text-xs text-red-500 dark:text-red-400 mt-1">
+                                        ⚠️ 주유미터는 0 이상이어야 합니다
+                                    </p>
+                                )}
+                                {form.meterReading && Number(form.meterReading) >= 0 && selectedVehicleKm > 0 && parseInt(form.meterReading) < selectedVehicleKm && (
                                     <p className="text-xs text-amber-500 dark:text-amber-400 mt-1">
                                         ⚠️ 입력값이 현재 누적 km보다 작습니다
                                     </p>
@@ -228,7 +235,7 @@ export default function FuelLogTab() {
                                         step="0.01"
                                         min="0"
                                         value={form.fuelAmount}
-                                        onChange={e => setForm({ ...form, fuelAmount: e.target.value })}
+                                        onChange={e => setForm({ ...form, fuelAmount: stripNegative(e.target.value) })}
                                         className="input min-h-[48px]"
                                         placeholder={isChargeable ? '30.5' : '40.5'}
                                         required
@@ -240,7 +247,7 @@ export default function FuelLogTab() {
                                         type="number"
                                         min="0"
                                         value={form.fuelCost}
-                                        onChange={e => setForm({ ...form, fuelCost: e.target.value })}
+                                        onChange={e => setForm({ ...form, fuelCost: stripNegative(e.target.value) })}
                                         className="input min-h-[48px]"
                                         placeholder="65000"
                                         required

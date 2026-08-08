@@ -10,6 +10,7 @@ import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
 import { SkeletonBox, SkeletonList } from '../common/Skeleton';
 import VehicleSelector from './VehicleSelector';
 import useVehiclePriority from '../../hooks/useVehiclePriority';
+import { stripNegative } from '../../hooks/utils/numberValidation';
 
 const getTypeInfo = (type: string) =>
     MAINTENANCE_TYPES.find(t => t.value === type) || MAINTENANCE_TYPES[MAINTENANCE_TYPES.length - 1];
@@ -124,7 +125,7 @@ export default function MaintenanceTab() {
                                 type="number"
                                 min="0"
                                 value={form.cost}
-                                onChange={e => setForm({ ...form, cost: e.target.value })}
+                                onChange={e => setForm({ ...form, cost: stripNegative(e.target.value) })}
                                 className="input min-h-[48px]"
                                 placeholder="50000"
                             />
@@ -135,7 +136,7 @@ export default function MaintenanceTab() {
                                 type="number"
                                 min="0"
                                 value={form.km}
-                                onChange={e => setForm({ ...form, km: e.target.value })}
+                                onChange={e => setForm({ ...form, km: stripNegative(e.target.value) })}
                                 className="input min-h-[48px]"
                                 placeholder="45000"
                             />

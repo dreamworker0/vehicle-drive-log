@@ -53,6 +53,32 @@ service cloud.firestore {
              || request.resource.data.endKm >= request.resource.data.startKm;
     }
 
+    /**
+     * 금액·거리 필드가 음수로 저장되는 것을 막는다.
+     *
+     * 화면이 먼저 막지만(각 훅의 validateNonNegativeFields), driveLogs의 startKm과 같은 이유로
+     * 서버에도 둔다 — 클라이언트를 우회한 '불가능한 값'을 끊어 집계·내보내기가 음수를
+     * 방어하지 않아도 되게 만든다.
+     *
+     * **필드가 없거나 null이면 통과한다.** 비용·주행거리는 선택 항목이라 null로 저장되며,
+     * 이를 막으면 미입력 저장이 통째로 거부된다.
+     */
+    function fieldNonNegative(data, field) {
+      return !data.keys().hasAny([field])
+             || data.get(field, 0) == null
+             || data.get(field, 0) >= 0;
+    }
+
+    /**
+     * update에서는 **그 필드가 실제로 바뀔 때만** 부호를 검사한다.
+     * 모든 update에 요구하면 이미 음수가 박힌 옛 기록의 다른 필드(정비소 이름 등)를
+     * 고치는 것까지 permission-denied가 된다 — kmOrderValid와 같은 함정(Phase 129·132).
+     */
+    function fieldNonNegativeOnChange(field) {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny([field])
+             || fieldNonNegative(request.resource.data, field);
+    }
+
     function isOrgAdmin(orgId) {
       return isOrgMember(orgId)
         && request.auth.token.role == 'admin';
@@ -312,13 +338,20 @@ service cloud.firestore {
       allow read: if belongsToMyOrg() || isSuperAdmin();
       allow create: if newBelongsToMyOrg()
                     && request.resource.data.keys().hasAll(['organizationId', 'vehicleId', 'driverUid'])
-                    && request.resource.data.driverUid == request.auth.uid;
-      allow update: if isSuperAdmin()
+                    && request.resource.data.driverUid == request.auth.uid
+                    // 계기판·주유량·금액은 음수가 될 수 없다
+                    && fieldNonNegative(request.resource.data, 'meterReading')
+                    && fieldNonNegative(request.resource.data, 'fuelAmount')
+                    && fieldNonNegative(request.resource.data, 'fuelCost');
+      allow update: if (isSuperAdmin()
                     || (belongsToMyOrg() && (
                         (resource.data.driverUid == request.auth.uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['organizationId', 'vehicleId', 'driverUid']))
                         // organizationId 불변 — admin의 타 기관 이전 차단 (2026-07-10 감사 #6)
                         || (isOrgAdmin(resource.data.organizationId) && request.resource.data.organizationId == resource.data.organizationId)
-                    ));
+                    )))
+                    && fieldNonNegativeOnChange('meterReading')
+                    && fieldNonNegativeOnChange('fuelAmount')
+                    && fieldNonNegativeOnChange('fuelCost');
       allow delete: if (belongsToMyOrg()
                     && (resource.data.driverUid == request.auth.uid
                         || isOrgAdmin(resource.data.organizationId)))
@@ -330,13 +363,18 @@ service cloud.firestore {
       allow read: if belongsToMyOrg() || isSuperAdmin();
       allow create: if newBelongsToMyOrg()
                     && request.resource.data.keys().hasAll(['organizationId', 'cardId', 'chargerUid'])
-                    && request.resource.data.chargerUid == request.auth.uid;
-      allow update: if isSuperAdmin()
+                    && request.resource.data.chargerUid == request.auth.uid
+                    // 충전금액은 음수가 될 수 없다.
+                    // balanceBefore·balanceAfter는 카드의 현재 상태를 옮겨 적은 값이라 검사하지 않는다 —
+                    // 이미 음수가 된 카드에 충전 기록을 남기는 길까지 막히면 복구가 불가능해진다.
+                    && fieldNonNegative(request.resource.data, 'chargeAmount');
+      allow update: if (isSuperAdmin()
                     || (belongsToMyOrg() && (
                         (resource.data.chargerUid == request.auth.uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['organizationId', 'cardId', 'chargerUid']))
                         // organizationId 불변 — admin의 타 기관 이전 차단 (2026-07-10 감사 #6)
                         || (isOrgAdmin(resource.data.organizationId) && request.resource.data.organizationId == resource.data.organizationId)
-                    ));
+                    )))
+                    && fieldNonNegativeOnChange('chargeAmount');
       allow delete: if (belongsToMyOrg()
                     && (resource.data.chargerUid == request.auth.uid
                         || isOrgAdmin(resource.data.organizationId)))
@@ -346,14 +384,18 @@ service cloud.firestore {
     // === 정비 기록 ===
     match /maintenanceRecords/{recordId} {
       allow read: if belongsToMyOrg() || isSuperAdmin();
-      allow create: if isSuperAdmin()
+      allow create: if (isSuperAdmin()
                     || (newBelongsToMyOrg() && isOrgAdmin(request.resource.data.organizationId))
                     // 직원 본인 작성 — 차량 차단(blockVehicle) 권한은 관리자 전용이므로 false만 허용
                     || (newBelongsToMyOrg()
                         && request.resource.data.keys().hasAll(['organizationId', 'vehicleId', 'createdByUid'])
                         && request.resource.data.createdByUid == request.auth.uid
-                        && request.resource.data.blockVehicle == false);
-      allow update: if isSuperAdmin()
+                        && request.resource.data.blockVehicle == false))
+                    // 비용·주행거리는 음수가 될 수 없다 (미입력은 null이라 통과)
+                    && fieldNonNegative(request.resource.data, 'cost')
+                    && fieldNonNegative(request.resource.data, 'km')
+                    && fieldNonNegative(request.resource.data, 'nextDueKm');
+      allow update: if (isSuperAdmin()
                     // organizationId 불변 — admin의 타 기관 이전 차단 (2026-07-10 감사 #6)
                     || (isOrgAdmin(resource.data.organizationId)
                         && request.resource.data.organizationId == resource.data.organizationId)
@@ -363,7 +405,10 @@ service cloud.firestore {
                         && request.resource.data.createdByUid == resource.data.createdByUid
                         && request.resource.data.organizationId == resource.data.organizationId
                         && request.resource.data.vehicleId == resource.data.vehicleId
-                        && request.resource.data.blockVehicle == false);
+                        && request.resource.data.blockVehicle == false))
+                    && fieldNonNegativeOnChange('cost')
+                    && fieldNonNegativeOnChange('km')
+                    && fieldNonNegativeOnChange('nextDueKm');
       allow delete: if isOrgAdmin(resource.data.organizationId) || isSuperAdmin()
                     // 직원 본인 작성 건 삭제
                     || (belongsToMyOrg() && resource.data.createdByUid == request.auth.uid);

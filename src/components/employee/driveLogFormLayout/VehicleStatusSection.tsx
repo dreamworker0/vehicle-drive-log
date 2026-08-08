@@ -1,4 +1,5 @@
 import { memo, useState, useEffect } from 'react';
+import { stripNegative } from '../../../hooks/utils/numberValidation';
 import type { DriveLogForm } from '../../../hooks/driveLogForm/types';
 import type { HipassCard } from '../../../types/hipass';
 
@@ -54,7 +55,7 @@ const VehicleStatusSection = memo(function VehicleStatusSection({
                                 type="number"
                                 min="0" max="100"
                                 value={form.batteryStart}
-                                onChange={e => setForm({ ...form, batteryStart: e.target.value })}
+                                onChange={e => setForm({ ...form, batteryStart: stripNegative(e.target.value) })}
                                 className="input min-h-[48px]"
                                 placeholder={lastEndBattery != null ? `이전 도착: ${lastEndBattery}%` : '80'}
                             />
@@ -66,7 +67,7 @@ const VehicleStatusSection = memo(function VehicleStatusSection({
                                 type="number"
                                 min="0" max="100"
                                 value={form.batteryEnd}
-                                onChange={e => setForm({ ...form, batteryEnd: e.target.value })}
+                                onChange={e => setForm({ ...form, batteryEnd: stripNegative(e.target.value) })}
                                 className="input min-h-[48px]"
                                 placeholder="45"
                             />
@@ -110,7 +111,7 @@ const VehicleStatusSection = memo(function VehicleStatusSection({
                                         id="hipassAfter"
                                         type="number"
                                         value={form.hipassBalanceAfter}
-                                        onChange={e => setForm({ ...form, hipassBalanceAfter: e.target.value })}
+                                        onChange={e => setForm({ ...form, hipassBalanceAfter: stripNegative(e.target.value) })}
                                         className="input min-h-[48px]"
                                         placeholder={hipassCard.balance.toLocaleString()}
                                         min="0"

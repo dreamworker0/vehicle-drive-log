@@ -9,6 +9,7 @@ import type { User } from '../../types/user';
 import { FUEL_TYPES } from '../../types/vehicle';
 import VehicleCalendarSection from './VehicleCalendarSection';
 import { useAuth } from '../../hooks/useAuth';
+import { stripNegative } from '../../hooks/utils/numberValidation';
 
 interface VehicleFormData {
     displayName: string;
@@ -275,7 +276,7 @@ export default function VehicleForm({
                         <label className="label">현재 누적 km</label>
                         <input
                             type="number" min={0} value={form.currentKm}
-                            onChange={e => setForm({ ...form, currentKm: e.target.value })}
+                            onChange={e => setForm({ ...form, currentKm: stripNegative(e.target.value) })}
                             className="input" placeholder="0"
                         />
                         {form.currentKm !== '' && Number(form.currentKm) < 0 && (

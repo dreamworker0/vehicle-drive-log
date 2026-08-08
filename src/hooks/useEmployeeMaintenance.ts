@@ -10,6 +10,7 @@ import type { Vehicle } from '../types/vehicle';
 import type { MaintenanceRecord } from '../types/maintenance';
 import { getVehicles, getMaintenanceRecords, createMaintenanceRecord, updateMaintenanceRecord, deleteMaintenanceRecord } from '../lib/firestore';
 import { toLocalDateStr } from '../lib/dateUtils';
+import { validateNonNegativeFields } from './utils/numberValidation';
 
 const INITIAL_FORM = {
     vehicleId: '', vehicleName: '',
@@ -95,6 +96,15 @@ export default function useEmployeeMaintenance() {
         e.preventDefault();
         if (!form.vehicleId || !form.date || !form.type) {
             showToast('차량ㆍ날짜ㆍ유형은 필수입니다.', 'warning');
+            return;
+        }
+        // 비용ㆍ주행거리는 음수가 될 수 없다
+        const negativeError = validateNonNegativeFields([
+            { label: '비용', value: form.cost },
+            { label: '주행거리', value: form.km },
+        ]);
+        if (negativeError) {
+            showToast(negativeError, 'warning');
             return;
         }
         setSaving(true);

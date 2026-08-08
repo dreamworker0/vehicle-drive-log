@@ -14,6 +14,7 @@ import { toLocalDateStr } from '../lib/dateUtils';
 import { ocrDashboard } from '../lib/ocr';
 import type { Reservation } from '../types/reservation';
 import useBaseFuelLog from './base/useBaseFuelLog';
+import { validateNonNegativeFields } from './utils/numberValidation';
 
 const INITIAL_FORM = {
     vehicleId: '',
@@ -189,6 +190,17 @@ export default function useFuelLog() {
         e.preventDefault();
         if (!form.vehicleId || !form.date || !form.meterReading || !form.fuelAmount || !form.fuelCost) {
             showToast('모든 필수 항목을 입력해주세요.', 'warning');
+            return;
+        }
+
+        // 계기판·주유량·금액은 모두 음수가 될 수 없다
+        const negativeError = validateNonNegativeFields([
+            { label: '주유미터', value: form.meterReading },
+            { label: '주유량', value: form.fuelAmount },
+            { label: '주유금액', value: form.fuelCost },
+        ]);
+        if (negativeError) {
+            showToast(negativeError, 'warning');
             return;
         }
 

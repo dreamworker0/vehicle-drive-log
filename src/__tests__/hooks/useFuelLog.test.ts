@@ -162,4 +162,58 @@ describe('useFuelLog', () => {
 
         expect(result.current.enrichedRecords[0].vehicleType).toBe('sedan');
     });
+
+    describe('음수 입력 차단', () => {
+        // min="0"은 브라우저 기본 검증에만 걸리므로, 저장 직전 검사가 실제 방어선이다.
+        const submitWith = async (
+            overrides: Partial<{ meterReading: string; fuelAmount: string; fuelCost: string }>
+        ) => {
+            const { result } = renderHook(() => useFuelLog());
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            act(() => {
+                result.current.setForm({
+                    vehicleId: 'v1',
+                    vehicleName: '소나타',
+                    date: '2026-03-15',
+                    meterReading: '51000',
+                    fuelAmount: '40',
+                    fuelCost: '60000',
+                    notes: '',
+                    ...overrides,
+                });
+            });
+
+            await act(async () => {
+                await result.current.handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+            });
+        };
+
+        it('주유금액이 음수면 저장하지 않고 안내한다', async () => {
+            await submitWith({ fuelCost: '-60000' });
+
+            expect(mockShowToast).toHaveBeenCalledWith('주유금액에 음수를 입력할 수 없습니다.', 'warning');
+            expect(mockCreateFuelLog).not.toHaveBeenCalled();
+        });
+
+        it('주유량이 음수면 저장하지 않고 안내한다', async () => {
+            await submitWith({ fuelAmount: '-40' });
+
+            expect(mockShowToast).toHaveBeenCalledWith('주유량에 음수를 입력할 수 없습니다.', 'warning');
+            expect(mockCreateFuelLog).not.toHaveBeenCalled();
+        });
+
+        it('주유미터가 음수면 저장하지 않고 안내한다', async () => {
+            await submitWith({ meterReading: '-51000' });
+
+            expect(mockShowToast).toHaveBeenCalledWith('주유미터에 음수를 입력할 수 없습니다.', 'warning');
+            expect(mockCreateFuelLog).not.toHaveBeenCalled();
+        });
+
+        it('모두 0 이상이면 저장된다', async () => {
+            await submitWith({});
+
+            expect(mockCreateFuelLog).toHaveBeenCalledTimes(1);
+        });
+    });
 });

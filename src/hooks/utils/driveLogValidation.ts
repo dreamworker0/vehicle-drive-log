@@ -52,6 +52,19 @@ export function validateDriveLogForm(
         return { valid: false, message: '한 번의 운행에 10,000km 이상은 입력할 수 없습니다. 값을 확인해주세요.' };
     }
 
+    // 하이패스 사용후 금액 검증.
+    // 이 값은 저장 시 `increment(-(사용전 - 사용후))`로 카드 잔액에 반영되므로,
+    // 음수가 들어오면 실제 사용액보다 큰 금액이 차감되어 카드 잔액까지 망가진다.
+    if (form.hipassBalanceAfter) {
+        const balanceAfter = Number(form.hipassBalanceAfter);
+        if (!Number.isFinite(balanceAfter)) {
+            return { valid: false, message: '하이패스 사용후 금액이 올바르지 않습니다.' };
+        }
+        if (balanceAfter < 0) {
+            return { valid: false, message: '하이패스 사용후 금액은 0 이상이어야 합니다.' };
+        }
+    }
+
     // 배터리 범위 검증 (전기차만)
     if (isElectric) {
         const bs = form.batteryStart ? parseInt(form.batteryStart) : undefined;
