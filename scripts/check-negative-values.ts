@@ -9,16 +9,39 @@
  * `increment(-(사용전 - 사용후))`로 실제 통행료보다 딱 그 절댓값만큼 더 차감됐다.
  * 그래서 카드별 과차감 합계를 따로 계산해 준다 — 그 금액만큼 잔액을 올려주면 된다.
  *
- * 사용법 (프로젝트 루트에서, ADC/서비스계정 설정된 상태):
- *   fnm exec --using=22 npx tsx scripts/check-negative-values.ts
- *   fnm exec --using=22 npx tsx scripts/check-negative-values.ts --org=<organizationId>
- *   fnm exec --using=22 npx tsx scripts/check-negative-values.ts --csv=negatives.csv
+ * 사용법 (프로젝트 루트에서, Node 22):
+ *   npx tsx scripts/check-negative-values.ts
+ *   npx tsx scripts/check-negative-values.ts --org=<organizationId>
+ *   npx tsx scripts/check-negative-values.ts --csv=negatives.csv
+ *
+ * 실행 전 Google 인증(ADC)이 필요하다. 둘 중 하나:
+ *   gcloud auth application-default login          ← 키 파일이 남지 않아 이쪽을 권장
+ *   $env:GOOGLE_APPLICATION_CREDENTIALS = "<서비스계정.json 경로>"   (PowerShell)
+ * 인증이 없으면 실행 시 설정 방법을 안내하고 중단한다.
  */
-import { writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { initializeApp } from 'firebase-admin/app';
 import { getFirestore, type Query, type QueryDocumentSnapshot } from 'firebase-admin/firestore';
 
-initializeApp();
+/**
+ * 대상 프로젝트 ID.
+ *
+ * ADC에 프로젝트가 안 딸려 오는 경우(gcloud 로그인 등)가 흔해서, 환경변수가 없으면
+ * `.firebaserc`의 default를 쓴다 — 운영자가 프로젝트 ID를 따로 외우지 않아도 되게.
+ */
+function resolveProjectId(): string | undefined {
+    const fromEnv = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
+    if (fromEnv) return fromEnv;
+    try {
+        const rc = JSON.parse(readFileSync(new URL('../.firebaserc', import.meta.url), 'utf8'));
+        return rc?.projects?.default;
+    } catch {
+        return undefined;
+    }
+}
+
+const projectId = resolveProjectId();
+initializeApp(projectId ? { projectId } : undefined);
 const db = getFirestore();
 
 const args = process.argv.slice(2);
@@ -286,7 +309,41 @@ async function main() {
     console.log('해당 화면에서 기록을 열어 올바른 값으로 저장하거나, 잘못된 기록이면 삭제하세요.\n');
 }
 
-main().catch((err) => {
+/**
+ * 인증 실패는 이 스크립트에서 가장 흔한 실패다(운영자 PC에는 보통 ADC가 없다).
+ * Google SDK의 영문 스택을 그대로 뱉으면 무엇을 해야 할지 알 수 없어, 설정 방법을 안내한다.
+ */
+function isAuthError(err: unknown): boolean {
+    const msg = err instanceof Error ? `${err.message}` : String(err);
+    return (
+        msg.includes('Could not load the default credentials') ||
+        msg.includes('Could not refresh access token') ||
+        msg.includes('UNAUTHENTICATED') ||
+        msg.includes('invalid_grant')
+    );
+}
+
+function reportAndExit(err: unknown): never {
+    if (isAuthError(err)) {
+        console.error('\n❌ Google 인증 정보가 없어 Firestore에 접근하지 못했습니다.\n');
+        console.error('아래 둘 중 하나를 설정한 뒤 다시 실행하세요.\n');
+        console.error('  [1] gcloud CLI 사용 (권장 — 키 파일이 PC에 남지 않습니다)');
+        console.error('      gcloud auth application-default login\n');
+        console.error('  [2] 서비스 계정 키 파일 사용');
+        console.error('      Firebase Console → 프로젝트 설정 → 서비스 계정 → 새 비공개 키 생성');
+        console.error('      PowerShell:  $env:GOOGLE_APPLICATION_CREDENTIALS = "C:\\경로\\service-account.json"');
+        console.error('      macOS/Linux: export GOOGLE_APPLICATION_CREDENTIALS="/경로/service-account.json"');
+        console.error('      ⚠️ 키 파일은 저장소 폴더 밖에 두세요 (커밋되면 프로젝트 전체가 노출됩니다)\n');
+        console.error(`대상 프로젝트: ${projectId ?? '(확인 실패 — GOOGLE_CLOUD_PROJECT를 지정하세요)'}\n`);
+        process.exit(1);
+    }
     console.error(err);
     process.exit(1);
-});
+}
+
+// 인증 오류는 gRPC 내부에서 uncaught로 터져 main()의 catch를 우회하는 경로가 있다.
+// 프로세스 레벨에서도 같은 안내를 내보내야 영문 스택만 남고 끝나지 않는다.
+process.on('uncaughtException', reportAndExit);
+process.on('unhandledRejection', reportAndExit);
+
+main().catch(reportAndExit);
