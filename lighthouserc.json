@@ -1,0 +1,44 @@
+{
+  "//": "Lighthouse CI 설정 — 실행은 .github/workflows/lighthouse.yml(주 1회 + 수동). 근거는 그 워크플로 주석 참고.",
+  "//preset": "기본값(모바일: CPU 4배 스로틀 + 느린 4G)을 그대로 쓴다. 이 앱의 사용자는 현장에서 폰으로 쓰므로 데스크톱 프리셋(현재 점수 0.98)은 회귀가 일어나도 오래 눈치채지 못한다.",
+  "//thresholds": "아래 값은 목표가 아니라 후퇴 방지선이다. 2026-08-09 실측(3회): performance 0.74~0.76 / LCP 5042~5215ms / FCP 2995~3087ms / TBT 53~80ms / CLS 0. GitHub 러너는 로컬보다 느리므로 실측에 여유를 더해 잡았다.",
+  "//off": "끈 항목들: 정적 파일 서버로 재는 값이라 실제 배포(Firebase Hosting)의 헤더·HTTPS 설정과 무관하거나, 번들 예산 검사(scripts/check-bundle-size.ts)가 이미 담당하는 것들.",
+  "ci": {
+    "collect": {
+      "staticDistDir": "./dist",
+      "url": ["http://localhost/index.html"],
+      "numberOfRuns": 3,
+      "settings": {
+        "chromeFlags": "--no-sandbox --disable-dev-shm-usage"
+      }
+    },
+    "assert": {
+      "assertions": {
+        "categories:performance": ["error", { "minScore": 0.65 }],
+        "categories:accessibility": ["error", { "minScore": 0.9 }],
+        "categories:best-practices": ["warn", { "minScore": 0.9 }],
+        "categories:seo": ["warn", { "minScore": 0.9 }],
+
+        "largest-contentful-paint": ["error", { "maxNumericValue": 6500 }],
+        "cumulative-layout-shift": ["error", { "maxNumericValue": 0.1 }],
+        "total-blocking-time": ["error", { "maxNumericValue": 600 }],
+        "first-contentful-paint": ["warn", { "maxNumericValue": 4000 }],
+        "speed-index": ["warn", { "maxNumericValue": 4500 }],
+
+        "unused-javascript": "off",
+        "uses-long-cache-ttl": "off",
+        "csp-xss": "off",
+        "errors-in-console": "off",
+        "is-on-https": "off",
+        "redirects-http": "off",
+        "installable-manifest": "off",
+        "valid-source-maps": "off",
+        "bf-cache": "off"
+      }
+    },
+    "upload": {
+      "target": "filesystem",
+      "outputDir": ".lighthouseci"
+    }
+  }
+}
