@@ -114,7 +114,11 @@ firebase functions:log --only ocrDashboard,autoVerifyDocument
 ### 4.1 백업 확인
 
 - **자동 백업**: `dailyNightlyBatch` 함수(매일 02:00 KST)의 첫 단계에서 Firestore 전체 export 실행
-- **저장 위치**: Cloud Storage → `backups/firestore/YYYY-MM-DD/`
+- **저장 위치**: Cloud Storage **기본 버킷**(`vehicle-drive-log.firebasestorage.app`) → `backups/firestore/YYYY-MM-DD/`
+  - 대상 버킷은 코드에 하드코딩하지 않고 admin SDK 기본 버킷에서 받아온다. 한때
+    `${projectId}.appspot.com`으로 박혀 있었는데 이 프로젝트에는 그 버킷이 없어서
+    export가 `PERMISSION_DENIED`로 매일 실패했다
+    ([troubleshoot-deployment §2.6](.agent/skills/troubleshoot-deployment/SKILL.md)).
 - **포함 컬렉션**: **전체** (`collectionIds: []` — 특정 컬렉션 목록을 지정하지 않는다)
   - 한때 이 자리에 "organizations, users, vehicles, driveLogs, reservations, notifications" 6개가
     적혀 있었다. 실제보다 **좁게** 적힌 오기여서, 복구 시 "이 컬렉션은 백업에 없겠구나"라고
