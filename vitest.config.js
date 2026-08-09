@@ -54,15 +54,51 @@ export default defineConfig({
             provider: 'v8',
             // json-summary는 CI 아티팩트(coverage-summary.json) 업로드용
             reporter: ['text', 'text-summary', 'json', 'json-summary', 'lcov', 'html'],
-            // 실측(2026-07-25: lines 32.46/stmts 31.51/funcs 25.27/branches 22.37) 기준
+            // 실측(2026-08-09: lines 44.83/stmts 43.97/funcs 36.95/branches 35.35) 기준
             // 후퇴 방지선(안전 마진 ~1pp). 목표는 숫자가 아니라 회귀 차단 — 테스트 추가에 맞춰 단계 상향.
             // 2026-07-10 임계경로 테스트(syncQueue·auth·예약 제출) 추가로 하한 상향.
             // 2026-07-25 출력물·경로 계산 테스트(lib/pdf 5%→97%, lib/tmap 16%→97%) 추가로 재상향.
+            // 2026-08-09 UI 계층 테스트(예약 사이드 패널·차량 관리·운행일지 폼 훅) + 통계 계산
+            //            (analyticsCalc 비용/추천, monthlyReportCalc, reservationPatternCalc) 추가로 재상향.
+            //
+            // ── 전역 임계치만으로는 부족하다 ──
+            // 전역 평균만 보면 **커버리지 0%인 핵심 모듈이 있어도 통과한다.** 잘 덮인 순수 함수
+            // 모듈(lib/pdf·lib/tmap 97%)이 평균을 끌어올려 주기 때문이다. 그래서 사용자가 매일
+            // 지나가는 경로에는 아래 glob 하한을 따로 건다 — 그 경로의 테스트를 지우거나
+            // 테스트 없는 코드를 크게 덧붙이면 전역 평균과 무관하게 실패한다.
+            //
+            // glob 하한은 실측보다 3~6pp 낮게 잡는다. 리팩토링으로 분기 몇 개가 오가는 정도로는
+            // 깨지지 않되, 모듈 하나가 통째로 무방비가 되면 걸리는 선이다.
             thresholds: {
-                lines: 31,
-                statements: 30,
-                functions: 24,
-                branches: 21
+                lines: 44,
+                statements: 43,
+                functions: 36,
+                branches: 34,
+
+                // 운행일지 폼 — 서비스의 본체. 여기가 틀리면 기록 자체가 틀어진다 (실측 88/86/84/75)
+                'src/hooks/driveLogForm/**': {
+                    lines: 84, statements: 82, functions: 80, branches: 70,
+                },
+                // 통계·집계 계산 — 관리자가 결재에 올리는 숫자 (실측 97/94/97/81)
+                'src/hooks/utils/**': {
+                    lines: 92, statements: 90, functions: 92, branches: 76,
+                },
+                // 예약 캘린더 데이터 흐름 (실측 64/61/65/58)
+                'src/hooks/reservationCalendar/**': {
+                    lines: 60, statements: 57, functions: 60, branches: 54,
+                },
+                // 오프라인 큐 — 지하주차장에서 쓴 기록이 사라지지 않게 하는 유일한 장치 (실측 92/81/82/73)
+                'src/lib/offline/**': {
+                    lines: 87, statements: 77, functions: 77, branches: 68,
+                },
+                // Firestore 도메인 — organizationId 격리가 사는 자리 (실측 54/53/50/60)
+                'src/lib/firestore/**': {
+                    lines: 50, statements: 49, functions: 45, branches: 55,
+                },
+                // 문서 스키마 — 필드 누락이 조용한 데이터 유실로 이어지는 경계 (실측 100/100/100/67)
+                'src/schemas/**': {
+                    lines: 95, statements: 95, functions: 95, branches: 60,
+                },
             },
             include: ['src/**/*.{ts,tsx}'],
             exclude: [
