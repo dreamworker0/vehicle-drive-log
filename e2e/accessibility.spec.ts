@@ -38,21 +38,26 @@ test.describe('접근성 기본 검증', () => {
     test('버튼에 접근 가능한 텍스트가 있다', async ({ page }) => {
         await page.goto('/');
         const buttons = page.locator('button:visible');
-        // 고정 대기(2초)로 세던 것을 실제 조건 대기로 바꾼다 — WebKit이 CI 러너에서 더 느려
-        // 2초 안에 렌더가 끝나지 않으면 "버튼 0개"로 읽혀 실패했다(2026-08-09 flaky).
-        // 렌더 속도는 이 스펙이 볼 대상이 아니므로, 버튼이 나타난 뒤에 센다.
-        await expect(buttons.first()).toBeVisible({ timeout: 15000 });
-        const count = await buttons.count();
-        expect(count).toBeGreaterThan(0);
-        for (let i = 0; i < count; i++) {
-            const btn = buttons.nth(i);
-            const text = await btn.textContent();
-            const ariaLabel = await btn.getAttribute('aria-label');
-            const title = await btn.getAttribute('title');
-            // 텍스트, aria-label, title 중 최소 하나는 있어야 함
-            const hasLabel = (text && text.trim().length > 0) || ariaLabel || title;
-            expect(hasLabel).toBeTruthy();
-        }
+        // 라벨을 **한 번의 평가로** 모아서 본다.
+        //
+        // 예전에는 버튼 개수를 센 뒤 인덱스로 하나씩 되물었는데, 그 사이에 페이지가 한 번
+        // 다시 그려지면(첫 방문의 SW 설치 등) 방금 센 개수가 0이 되거나 요소가 떨어져 나가
+        // mobile-safari에서 간헐적으로 깨졌다(2026-08-09 CI). 개수와 라벨을 같은 시점의
+        // DOM에서 한꺼번에 읽으면 그 틈이 없어진다. 전체를 toPass로 감싸 일시적인 재렌더는
+        // 다시 시도로 흡수하되, **검사 내용은 그대로다** — 보이는 버튼이 하나 이상 있고,
+        // 그 전부가 텍스트·aria-label·title 중 하나를 가져야 한다.
+        await expect(async () => {
+            const labels = await buttons.evaluateAll((els) => els.map((el) => ({
+                text: (el.textContent ?? '').trim(),
+                ariaLabel: el.getAttribute('aria-label'),
+                title: el.getAttribute('title'),
+            })));
+
+            expect(labels.length).toBeGreaterThan(0);
+            for (const { text, ariaLabel, title } of labels) {
+                expect(text.length > 0 || ariaLabel || title).toBeTruthy();
+            }
+        }).toPass({ timeout: 15000 });
     });
 
     test('input 필드에 적절한 label이 있다', async ({ page }) => {
