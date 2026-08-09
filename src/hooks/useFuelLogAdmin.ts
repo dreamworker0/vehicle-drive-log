@@ -1,49 +1,30 @@
 /**
  * useFuelLogAdmin — 관리자용 주유 기록 관리 훅
  * FuelLogManager에서 사용하는 커스텀 훅
+ *
+ * 로드·삭제·합산은 useBaseFuelLog가 담당하고, 이 훅은 관리자 화면의 필터링만 얹는다.
+ * (useHipassChargeAdmin ↔ useBaseHipassCharge와 같은 구조다. base 훅의 주석은 처음부터
+ *  "일반 직원 훅과 관리자 훅에서 공통으로 사용"이라고 밝히고 있었지만 실제로는 직원 훅만
+ *  쓰고 있어, 관리자 쪽이 같은 로드·삭제 로직을 따로 구현해 두 벌로 갈라져 있었다.)
  */
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useAuth } from './useAuth';
-import { useToast } from './useToast';
-import { useConfirm } from './useConfirm';
-import type { Vehicle } from '../types/vehicle';
 import type { FuelLog } from '../types/fuelLog';
-import { getVehicles, getFuelLogs, deleteFuelLog } from '../lib/firestore';
+import useBaseFuelLog from './base/useBaseFuelLog';
 
 export default function useFuelLogAdmin() {
     const { userData } = useAuth();
-    const { showToast } = useToast();
-    const { confirm } = useConfirm();
-    const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-    const [records, setRecords] = useState<FuelLog[]>([]);
-    const [loading, setLoading] = useState(true);
+    const orgId = userData?.organizationId;
+
+    // organizationId는 기관 미소속 시 null이므로 undefined로 좁혀 넘긴다(base 훅이 스킵 처리).
+    const { vehicles, records, loading, calculateStats, handleDeleteBase } = useBaseFuelLog(orgId ?? undefined);
+
     const [filters, setFilters] = useState({
         search: '',
         vehicleId: '',
         startDate: '',
         endDate: '',
     });
-
-    const orgId = userData?.organizationId;
-
-    useEffect(() => {
-        if (!orgId) { setLoading(false); return; }
-        const fetch = async () => {
-            try {
-                const [v, r] = await Promise.all([
-                    getVehicles(orgId),
-                    getFuelLogs(orgId),
-                ]);
-                setVehicles(v as Vehicle[]);
-                setRecords(r as FuelLog[]);
-            } catch (err) {
-                console.error('주유 기록 로드 실패:', err);
-            } finally {
-                setLoading(false);
-            }
-        };
-        fetch();
-    }, [orgId]);
 
     const filteredRecords = useMemo(() => {
         return records
@@ -70,22 +51,16 @@ export default function useFuelLogAdmin() {
             });
     }, [records, filters, vehicles]);
 
-    const totalCost = useMemo(() => filteredRecords.reduce((sum, r) => sum + (r.fuelCost || 0), 0), [filteredRecords]);
-    const totalAmount = useMemo(() => filteredRecords.reduce((sum, r) => sum + (r.fuelAmount || 0), 0), [filteredRecords]);
+    // 합계는 필터링된 목록 기준이다 — 화면에 보이는 것과 숫자가 어긋나면 안 된다.
+    const { cost: totalCost, amount: totalAmount } = useMemo(
+        () => calculateStats(filteredRecords),
+        [filteredRecords, calculateStats],
+    );
 
     const resetFilters = () => setFilters({ search: '', vehicleId: '', startDate: '', endDate: '' });
 
-    const handleDelete = async (rec: FuelLog) => {
-        if (!await confirm({ message: '이 주유 기록을 삭제하시겠습니까?', confirmColor: 'danger' })) return;
-        try {
-            await deleteFuelLog(rec.id);
-            setRecords(prev => prev.filter(r => r.id !== rec.id));
-            showToast('주유 기록이 삭제되었습니다.', 'success');
-        } catch (err) {
-            console.error('삭제 실패:', err);
-            showToast('삭제에 실패했습니다.', 'error');
-        }
-    };
+    // 관리자는 기관 전체 기록을 삭제할 수 있으므로 본인 확인(checkingUid)을 넘기지 않는다.
+    const handleDelete = (rec: FuelLog) => handleDeleteBase(rec);
 
     return {
         vehicles, loading,
