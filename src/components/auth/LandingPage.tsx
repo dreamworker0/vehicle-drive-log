@@ -191,7 +191,8 @@ export default function LandingPage() {
                             src="https://www.youtube.com/embed/XdT5Wm_pd3s?rel=0&modestbranding=1"
                             title="차량 운행일지 사용법"
                             loading="lazy"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                            // compute-pressure: 유튜브 플레이어가 요청하는 기능. 위임하지 않으면 콘솔에 Permissions policy violation 경고가 남는다
+                            allow="accelerometer; autoplay; clipboard-write; compute-pressure; encrypted-media; gyroscope; picture-in-picture; web-share"
                             referrerPolicy="strict-origin-when-cross-origin"
                             allowFullScreen
                         />
