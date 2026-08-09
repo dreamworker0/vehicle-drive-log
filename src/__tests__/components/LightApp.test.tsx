@@ -1,58 +1,54 @@
 /**
  * LightApp — 비인증 화면의 라우팅 껍데기
  *
- * 고정하는 것은 **Suspense 경계의 분리**다.
+ * 고정하는 것은 **무엇을 지연 로딩하면 안 되는가**다.
  *
- * 안내 배너(UpdatePrompt·InstallPrompt)를 라우트와 같은 Suspense 경계에 넣었더니,
- * 이 둘이 지연 로딩되는 동안 React가 **경계 전체를** fallback으로 바꿔 이미 그려진 랜딩까지
- * 스피너로 덮였다. 화면이 떴다가 통째로 사라졌다 다시 나타나는 셈이라, 첫인상이 가장
- * 중요한 랜딩에서 특히 나쁘다(2026-08-09 모바일 E2E가 "버튼이 보였다가 사라진다"로 잡았다).
+ * 랜딩 LCP를 줄이려고 이 파일의 거의 모든 것을 지연 로딩으로 돌렸는데, 그때
+ * `UpdatePrompt`·`InstallPrompt`까지 같이 넘겼다. 둘은 화면을 그리지 않는(null 반환)
+ * 컴포넌트라 "첫 페인트에 필요 없다"로 보였지만, 실제로 하는 일은 **타이밍이 있는 부수효과**다.
+ *   - UpdatePrompt → `registerSW()` : 서비스 워커 등록(= 오프라인 캐시가 생기는 지점)
+ *   - InstallPrompt → `beforeinstallprompt` 리스너 : 이 이벤트는 한 번만, 이르게 온다
+ * 지연 로딩하면 청크가 도착할 때까지 둘 다 일어나지 않고, 청크를 못 받으면 아예 일어나지 않는다.
  *
- * 아래 테스트는 배너를 **영원히 로딩 중인 상태**로 만들어 두고 랜딩이 그대로 남아 있는지 본다.
- * 경계를 다시 합치면 이 테스트가 실패한다.
+ * 렌더 테스트로는 이 차이를 잡을 수 없어(둘 다 null을 반환하니 화면이 같다) 소스에서 고정한다.
  */
 import React from 'react';
 import { render, screen } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
+// 소스 자체를 읽는다 — 지연 로딩 여부는 렌더 결과에 드러나지 않는다(아래 주석 참고)
+import SOURCE from '../../LightApp.tsx?raw';
+
+describe('부수효과가 있는 컴포넌트는 지연 로딩하지 않는다', () => {
+    it.each([
+        ['UpdatePrompt', '서비스 워커 등록(registerSW)'],
+        ['InstallPrompt', 'beforeinstallprompt 리스너 등록'],
+    ])('%s는 정적으로 import한다 — %s이 청크 도착에 묶이면 안 된다', (name) => {
+        expect(SOURCE).toMatch(
+            new RegExp(`^import\\s+${name}\\s+from\\s+'\\./components/common/${name}';$`, 'm'),
+        );
+        // lazy/lazyWithRetry로 되돌아가지 않았는지도 함께 본다
+        expect(SOURCE).not.toMatch(new RegExp(`const\\s+${name}\\s*=\\s*lazy`));
+    });
+});
 
 vi.mock('../../components/auth/LandingPage', () => ({
     default: () => <div data-testid="landing">랜딩 본문</div>,
 }));
-
-// 렌더 시점에 영원히 대기하는 컴포넌트 — Suspense 경계를 계속 붙잡는다.
-// (vi.mock은 파일 상단으로 끌어올려지므로 팩토리 안에서 직접 만든다)
-vi.mock('../../components/common/UpdatePrompt', () => ({
-    default: () => { throw new Promise<void>(() => { /* 절대 resolve하지 않는다 */ }); },
-}));
-vi.mock('../../components/common/InstallPrompt', () => ({
-    default: () => { throw new Promise<void>(() => { /* 절대 resolve하지 않는다 */ }); },
-}));
+vi.mock('../../components/common/UpdatePrompt', () => ({ default: () => null }));
+vi.mock('../../components/common/InstallPrompt', () => ({ default: () => null }));
 
 import LightApp from '../../LightApp';
 
-describe('Suspense 경계 분리', () => {
-    it('안내 배너가 아직 로딩 중이어도 랜딩 본문은 그대로 남는다', async () => {
+describe('랜딩 렌더', () => {
+    it('랜딩 본문을 그리고, 라우트 자리표시자는 남기지 않는다', async () => {
         render(
             <MemoryRouter initialEntries={['/']}>
                 <LightApp />
             </MemoryRouter>,
         );
 
-        // 배너가 경계를 붙잡고 있어도 본문은 살아 있어야 한다
-        expect(await screen.findByTestId('landing')).toBeInTheDocument();
-        expect(screen.getByText('랜딩 본문')).toBeVisible();
-    });
-
-    it('배너가 로딩 중이라고 전체 화면 스피너를 띄우지 않는다', async () => {
-        render(
-            <MemoryRouter initialEntries={['/']}>
-                <LightApp />
-            </MemoryRouter>,
-        );
-
-        await screen.findByTestId('landing');
-        // 라우트 전환용 자리표시자는 라우트가 대기할 때만 나온다
+        expect(await screen.findByTestId('landing')).toBeVisible();
         expect(screen.queryByRole('status', { name: '페이지를 불러오는 중' })).not.toBeInTheDocument();
     });
 });

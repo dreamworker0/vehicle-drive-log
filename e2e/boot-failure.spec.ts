@@ -13,6 +13,16 @@ import { test, expect } from '@playwright/test';
 const ENTRY_CHUNK = /\/assets\/(lightEntry|LandingPage)-[^/]*\.js$/;
 
 test.describe('부팅 실패 처리', () => {
+    // 이 스펙은 브라우저별 차이를 타기 쉬운 자리다(청크 실패 → 리로드 → 복구). 실패했을 때
+    // 화면만 봐서는 리로드가 몇 번 일어났는지, 예외가 났는지 알 수 없어 CI 로그로 왕복해야
+    // 했으므로 그 둘은 남겨 둔다.
+    test.beforeEach(({ page }) => {
+        page.on('pageerror', (err) => console.log(`[pageerror] ${err.message}`));
+        page.on('framenavigated', (frame) => {
+            if (frame === page.mainFrame()) console.log(`[nav] ${frame.url()}`);
+        });
+    });
+
     test('엔트리 청크를 못 받으면 다시 시도 화면을 보여준다', async ({ page }) => {
         await page.route(ENTRY_CHUNK, (route) => route.abort('failed'));
 

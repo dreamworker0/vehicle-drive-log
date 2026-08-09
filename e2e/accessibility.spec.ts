@@ -1,6 +1,16 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('접근성 기본 검증', () => {
+    // 이 스펙은 "버튼이 보였다가 사라진다"로 WebKit에서만 깨진 적이 있다. 렌더 결과만 봐서는
+    // 리로드 때문인지 예외 때문인지 구분이 안 돼 CI 로그로 왕복해야 했으므로, 그 두 가지는
+    // 남겨 둔다(정상 실행에서는 최초 진입 1줄뿐이라 잡음이 되지 않는다).
+    test.beforeEach(({ page }) => {
+        page.on('pageerror', (err) => console.log(`[pageerror] ${err.message}`));
+        page.on('framenavigated', (frame) => {
+            if (frame === page.mainFrame()) console.log(`[nav] ${frame.url()}`);
+        });
+    });
+
     test.beforeEach(async ({ context, page }) => {
         await context.clearCookies();
         await context.clearPermissions();

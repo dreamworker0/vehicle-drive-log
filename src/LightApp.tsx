@@ -18,9 +18,26 @@ import { Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { lazyWithRetry } from './lib/lazyWithRetry';
 import InAppBrowserGuard from './components/common/InAppBrowserGuard';
+import LightErrorBoundary from './components/common/LightErrorBoundary';
 
 // 랜딩은 LCP를 결정하는 화면이라 정적으로 둔다 — 여기에 lazy를 걸면 청크 왕복이 하나 더 붙는다.
 import LandingPage from './components/auth/LandingPage';
+
+/*
+ * ## 이 둘은 지연 로딩하지 않는다 — 화면이 아니라 **타이밍이 있는 부수효과**다
+ *
+ * 처음엔 "첫 페인트에 필요 없다"는 이유로 둘 다 lazy로 돌렸는데, 그건 이 컴포넌트들이
+ * 무엇을 하는지 잘못 본 것이었다. 둘 다 화면에는 거의 아무것도 그리지 않는다.
+ *   - UpdatePrompt: `registerSW()`를 부르는 자리 — **서비스 워커 등록이 여기서 일어난다.**
+ *     오프라인 사용이 이 앱의 핵심 기능인데, 등록이 부가 청크에 실려 있으면 그 청크를
+ *     못 받는 회선에서는 오프라인 캐시가 아예 만들어지지 않는다.
+ *   - InstallPrompt: `beforeinstallprompt`를 잡는 자리. 이 이벤트는 **한 번만, 이르게**
+ *     오므로 리스너가 늦게 붙으면 안드로이드 설치 배너가 영영 뜨지 않는다.
+ * 무게 때문에 뺐던 것은 이들 자신이 아니라 `lib/firebase` 간선이었고, 그건 InstallPrompt
+ * 안에서 이미 끊었다(동적 import). 정적으로 되돌려도 임계 경로 비용은 사실상 없다.
+ */
+import UpdatePrompt from './components/common/UpdatePrompt';
+import InstallPrompt from './components/common/InstallPrompt';
 
 const LoginPage = lazyWithRetry(() => import('./components/auth/LoginPage'));
 // `/apply`만 AuthProvider(= Firestore)가 필요하다 — 그 래퍼째로 이 경로에서만 받는다.
@@ -29,10 +46,6 @@ const TermsPage = lazyWithRetry(() => import('./components/auth/TermsPage'));
 const PrivacyPage = lazyWithRetry(() => import('./components/auth/PrivacyPage'));
 const ReleaseNotesPage = lazyWithRetry(() => import('./components/auth/ReleaseNotesPage'));
 const FAQPage = lazyWithRetry(() => import('./components/auth/FAQPage'));
-// 설치·업데이트 안내는 첫 페인트에 필요 없다. InstallPrompt는 lib/firebase(Analytics)를
-// 끌어오므로 정적으로 두면 랜딩이 Firebase를 다시 물고 온다.
-const UpdatePrompt = lazyWithRetry(() => import('./components/common/UpdatePrompt'));
-const InstallPrompt = lazyWithRetry(() => import('./components/common/InstallPrompt'));
 
 /** 라우트 전환 중 잠깐 뜨는 자리표시자 */
 function RouteFallback() {
@@ -45,7 +58,10 @@ function RouteFallback() {
 
 export default function LightApp() {
     return (
-        <>
+        // 지연 로딩 라우트의 청크를 두 번 연속 못 받으면 예외가 여기까지 올라온다.
+        // 경계가 없으면 공개 화면 전체가 빈 흰 화면이 된다(경량 엔트리에는 ErrorBoundary가
+        // 없었다 — 라우트가 전부 정적이던 시절의 전제였다).
+        <LightErrorBoundary>
             <Suspense fallback={<RouteFallback />}>
                 <Routes>
                     <Route path="/" element={<LandingPage />} />
@@ -60,15 +76,9 @@ export default function LightApp() {
                 </Routes>
             </Suspense>
 
-            {/*
-                안내 배너는 **라우트와 다른 Suspense 경계**에 둔다.
-                같은 경계에 넣었더니 이 둘이 지연 로딩되는 동안 React가 **경계 전체를**
-                fallback으로 바꿔, 이미 그려진 랜딩까지 스피너로 덮였다(모바일 E2E가 잡았다 —
-                버튼이 보였다가 사라졌다). 화면 위에 겹쳐 뜨는 부가 UI가 본문을 가리면 안 되므로
-                각자 경계를 두고 fallback도 두지 않는다.
-            */}
-            <Suspense fallback={null}><UpdatePrompt /></Suspense>
-            <Suspense fallback={null}><InstallPrompt /></Suspense>
-        </>
+            {/* 둘 다 화면을 그리지 않는다(null 반환) — 위 import 주석 참고 */}
+            <UpdatePrompt />
+            <InstallPrompt />
+        </LightErrorBoundary>
     );
 }
