@@ -1,0 +1,73 @@
+name: Lighthouse — 주간 웹 성능 회귀 게이트
+
+# ## 왜 PR마다 돌리지 않는가
+# `web-vitals`가 src/lib/sentry.ts에서 Sentry로 값을 보내기만 하고 **회귀를 막는 임계치가
+# 없었다.** 번들 크기는 PR마다 게이트되지만(scripts/check-bundle-size.ts) LCP/INP/CLS는
+# 아무도 막지 않았다 — 이 워크플로가 그 자리를 메운다.
+#
+# 다만 PR 게이트로는 올리지 않는다. 세 가지 이유다:
+#  1) **측정 잡음.** 공유 러너에서 재는 LCP·TBT는 실행마다 흔들린다. PR마다 실패하면
+#     사람들이 곧 무시하게 되고, 그러면 게이트가 아니라 소음이 된다.
+#  2) **CI 시간.** 현재 CI는 약 18분(타임아웃 25분)이다. 빌드 + 3회 측정으로 2~3분을 더 얹으면
+#     여유가 사라진다. 이 저장소는 이미 같은 이유로 Functions 커버리지를 주간으로 뺐다
+#     (functions-coverage.yml).
+#  3) **회귀의 실제 경로.** 성능 회귀의 가장 흔한 원인인 번들 증가는 PR마다 이미 막고 있다.
+#     주간 측정은 그 그물을 빠져나간 것(렌더 블로킹, 레이아웃 이동, 메인 스레드 점유)을 잡는다.
+#
+# 임계치는 목표가 아니라 후퇴 방지선이며 근거는 lighthouserc.json 주석에 있다.
+# 실패하면 GitHub이 스케줄 실행 실패를 저장소 관리자에게 메일로 알린다.
+#
+# 손으로 돌려보려면: Actions 탭에서 workflow_dispatch, 또는 로컬에서 `npm run lighthouse`.
+
+on:
+  schedule:
+    # 매주 월요일 02:00 KST (일요일 17:00 UTC)
+    - cron: '0 17 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: lighthouse
+  cancel-in-progress: true
+
+jobs:
+  lighthouse:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      TZ: "Asia/Seoul"
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create .env file
+        run: echo "${{ secrets.ENV_FILE }}" > .env
+
+      - name: Build
+        run: npm run build
+
+      # @lhci/cli는 devDependencies에 넣지 않고 여기서만 받는다.
+      # 그 의존성 트리(inquirer → external-editor → tmp)에 미패치 high 권고가 있어
+      # lockfile에 올리면 `npm run audit`(CI 게이트)가 막힌다. 이 워크플로는 비대화형으로만
+      # 쓰므로 해당 경로(inquirer의 대화형 프롬프트)를 타지 않는다.
+      - name: Lighthouse CI (모바일 프리셋 · 3회 측정)
+        run: npx --yes @lhci/cli@0.15.1 autorun --config=lighthouserc.json
+
+      - name: Upload Lighthouse reports
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: lighthouse-reports
+          path: .lighthouseci/
+          if-no-files-found: ignore
+          retention-days: 30

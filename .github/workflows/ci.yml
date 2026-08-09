@@ -280,11 +280,24 @@ jobs:
       - name: Install Playwright browsers
         id: pw-install
         if: ${{ !cancelled() && steps.build.outcome == 'success' }}
-        run: npx playwright install --with-deps chromium
+        # webkit을 함께 설치한다 — 아래 E2E가 mobile-safari 프로젝트를 포함한다.
+        run: npx playwright install --with-deps chromium webkit
 
-      - name: E2E tests
+      # ── E2E (비인증) ──
+      # 오랫동안 **Chromium 데스크톱 단독**이었다. 이 앱은 PWA·오프라인·IndexedDB가 핵심인데
+      # 그 셋은 WebKit에서 동작이 가장 많이 갈리고, src/lib/sentry.ts의 무시 목록 상당수가
+      # iOS Safari IndexedDB 예외다 — 즉 그 공백은 프로덕션에서만 드러나고 있었다.
+      #
+      # PR 게이트에는 세 프로젝트만 올린다(`npm run test:e2e`가 이 조합을 고정한다):
+      #   - chromium      : 기존 동작 유지
+      #   - mobile-chrome : 안드로이드 폰 뷰포트. Chromium 바이너리를 공유해 추가 비용이 거의 없다
+      #   - mobile-safari : **이번 확장의 목적.** 실사용 환경(iPhone)에서만 나던 회귀를 여기서 잡는다
+      # 데스크톱 webkit(Safari on macOS)은 이 서비스의 사용자 비중이 낮아 PR마다 돌릴 값이
+      # 아니라고 보고 주간 워크플로(e2e-cross-browser.yml)로 넘겼다. CI 소요를 늘리지 않으면서
+      # 실제 공백만 메우기 위한 배분이다.
+      - name: E2E tests (chromium · mobile-chrome · mobile-safari)
         if: ${{ !cancelled() && steps.pw-install.outcome == 'success' }}
-        run: npx playwright test
+        run: npm run test:e2e
         env:
           CI: true
 

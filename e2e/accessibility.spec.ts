@@ -37,8 +37,11 @@ test.describe('접근성 기본 검증', () => {
 
     test('버튼에 접근 가능한 텍스트가 있다', async ({ page }) => {
         await page.goto('/');
-        await page.waitForTimeout(2000);
         const buttons = page.locator('button:visible');
+        // 고정 대기(2초)로 세던 것을 실제 조건 대기로 바꾼다 — WebKit이 CI 러너에서 더 느려
+        // 2초 안에 렌더가 끝나지 않으면 "버튼 0개"로 읽혀 실패했다(2026-08-09 flaky).
+        // 렌더 속도는 이 스펙이 볼 대상이 아니므로, 버튼이 나타난 뒤에 센다.
+        await expect(buttons.first()).toBeVisible({ timeout: 15000 });
         const count = await buttons.count();
         expect(count).toBeGreaterThan(0);
         for (let i = 0; i < count; i++) {

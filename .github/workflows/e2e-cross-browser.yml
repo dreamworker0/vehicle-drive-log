@@ -1,0 +1,75 @@
+name: E2E Cross-browser — 주간 전체 브라우저 검증
+
+# PR 게이트(ci.yml)는 chromium · mobile-chrome · mobile-safari 세 프로젝트만 돌린다.
+# 남는 것은 데스크톱 WebKit(macOS Safari)인데, 이 서비스의 사용자 비중이 낮아 PR마다
+# 돌릴 값은 아니지만 "전혀 검증하지 않는" 상태로 두기도 곤란하다. 그래서 주 1회 전체를
+# 돌린다 — Functions 커버리지를 주간으로 뺀 것(functions-coverage.yml)과 같은 배분이다.
+#
+# 실패하면 GitHub이 스케줄 실행 실패를 저장소 관리자에게 메일로 알린다.
+
+on:
+  schedule:
+    # 매주 월요일 01:00 KST (일요일 16:00 UTC) — functions-coverage(00:00 KST)와 겹치지 않게 한 시간 뒤
+    - cron: '0 16 * * 0'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-cross-browser
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      TZ: "Asia/Seoul"
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create .env file
+        run: echo "${{ secrets.ENV_FILE }}" > .env
+
+      - name: Build
+        run: npm run build
+
+      - name: Get Playwright version
+        id: pw-version
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium webkit
+
+      # 네 프로젝트 전부 (chromium · mobile-chrome · webkit · mobile-safari)
+      - name: E2E tests (all projects)
+        run: npm run test:e2e:all
+        env:
+          CI: true
+
+      - name: Upload E2E failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: e2e-cross-browser-artifacts
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7

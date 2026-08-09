@@ -78,6 +78,7 @@ functions/lib/
 test-results/
 playwright-report/
 coverage/
+.lighthouseci/
 
 # OS
 Thumbs.db

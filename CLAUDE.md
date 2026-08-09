@@ -25,7 +25,9 @@
 | `npm run type-check` | `tsc --noEmit` |
 | `npm run lint` | ESLint |
 | `npm test` | Vitest 단위 |
-| `npm run test:e2e` | Playwright |
+| `npm run test:e2e` | Playwright (chromium · mobile-chrome · mobile-safari) |
+| `npm run test:e2e:all` | Playwright 전체 브라우저 (+ 데스크톱 webkit) |
+| `npm run lighthouse` | Lighthouse CI — LCP/CLS/TBT 회귀 검사 (주간 워크플로와 동일 설정) |
 | `npm run test:rules` | Firestore Rules (에뮬레이터) |
 | `npm run health` | Cloud Functions 상태 점검 |
 | `npm run audit` | 보안 감사 |

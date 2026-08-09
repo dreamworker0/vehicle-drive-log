@@ -116,7 +116,7 @@ MIT 라이선스로 공개된 프로젝트입니다. 아래처럼 자유롭게 �
 ```bash
 npm install
 cd functions && npm install && cd ..
-npx playwright install
+npx playwright install chromium webkit
 ```
 
 ### 환경변수 설정
@@ -198,7 +198,9 @@ firebase functions:secrets:set SLACK_TOKEN_ENC_KEY     # openssl rand -base64 32
 | `npm test` | 단위 테스트 (Vitest) |
 | `npm run test:coverage` | 단위 테스트 + 커버리지 리포트 |
 | `npm run test:rules` | Firestore Rules 테스트 (Firebase Emulator) |
-| `npm run test:e2e` | E2E 테스트 (Playwright, 사전에 `npx playwright install chromium` 필요) |
+| `npm run test:e2e` | E2E 테스트 — chromium · mobile-chrome · mobile-safari (사전에 `npx playwright install chromium webkit` 필요) |
+| `npm run test:e2e:all` | E2E 전체 브라우저 (위 3종 + 데스크톱 webkit). 주간 워크플로가 쓰는 조합 |
+| `npm run lighthouse` | Lighthouse CI (모바일 프리셋 3회 측정 + 임계치 검증) |
 | `npm run test:e2e:emulator` | Firebase Emulator 기반 인증 E2E 테스트 |
 | `npm run screenshots` | PWA 스크린샷 생성 (Playwright + sharp) |
 | `npm run audit` | npm 보안 감사 리포트 |
