@@ -25,31 +25,28 @@ test.describe('부팅 실패 처리', () => {
     });
 
     /**
-     * ⚠️ WebKit(mobile-safari)에서는 건너뛴다 — **제품 버그가 아니라 하네스 한계다.**
+     * 회선 복구를 **가로채기 해제(unroute)** 로 표현한다.
      *
-     * 판단 근거(2026-08-09 CI 첫 WebKit 실행):
-     *  - 같은 파일의 다른 두 스펙은 WebKit에서 **통과한다.** 즉 WebKit에서도 실패 화면은
-     *    정상적으로 뜨고("앱을 불러오지 못했습니다"), 정상 회선에서는 랜딩이 정상적으로 뜬다.
-     *  - Chromium·mobile-chrome에서는 이 스펙도 통과한다. 앱의 재시도 로직 자체는 동작한다.
-     *  - 오직 "Playwright route로 막았다가 → 푸는" 시나리오에서만 WebKit이 실패했다.
-     *    재시도 3회 중 한 번은 클릭 도중 `element was detached from the DOM`이 떴다 —
-     *    리로드 타이밍이 Chromium과 다르고, abort된 스크립트 요청을 리로드 후에도
-     *    다시 받아오지 않는다(부정 캐시). 실제 네트워크 복구와는 다른 조건이다.
+     * 예전에는 플래그를 내리고 같은 핸들러에서 `route.continue()`로 흘려보냈는데,
+     * WebKit(mobile-safari)에서만 재시도 후 앱이 뜨지 않았다(2026-08-09 CI). 3회 시도 중
+     * 한 번은 클릭 도중 `element was detached from the DOM`까지 떴다 — 가로챈 요청을
+     * 리로드 경로에서 이어보내는 처리가 Chromium과 다르다는 뜻이다. 한동안 WebKit에서
+     * 이 스펙을 건너뛰었지만, 그러면 **iOS에서 "다시 시도" 복구가 되는지 아무도 확인하지
+     * 못한다** — 회선이 불안정한 현장이 정확히 이 앱의 사용 환경이라 그대로 둘 수 없었다.
      *
-     * 따라서 **WebKit에서 검증되지 않는 것은 "다시 시도 버튼을 누른 뒤의 복구" 한 가지**다.
-     * 이 공백을 메우려면 route 조작이 아니라 실제 오프라인 전환이 필요하며, 그건
-     * 인증 E2E의 오프라인 동기화 스펙(authed-offlineSync.spec.ts)이 다루는 영역이다.
+     * `unroute`는 가로채기 자체를 걷어내므로 리로드 요청이 서버로 곧장 간다. 실제 회선
+     * 복구에 더 가깝고, 브라우저별 인터셉션 차이를 타지 않는다.
      */
-    test('다시 시도를 누르면 재로드하고, 회선이 돌아오면 정상 진입한다', async ({ page, browserName }) => {
-        test.skip(browserName === 'webkit', 'WebKit은 abort된 청크를 리로드 후에도 다시 받아오지 않는다(위 주석 참고)');
-
-        let block = true;
-        await page.route(ENTRY_CHUNK, (route) => (block ? route.abort('failed') : route.continue()));
+    test('다시 시도를 누르면 재로드하고, 회선이 돌아오면 정상 진입한다', async ({ page }) => {
+        const block = (route: import('@playwright/test').Route) => route.abort('failed');
+        await page.route(ENTRY_CHUNK, block);
 
         await page.goto('/', { waitUntil: 'commit' });
         await expect(page.getByText('앱을 불러오지 못했습니다')).toBeVisible({ timeout: 15000 });
 
-        block = false;
+        // 회선 복구 — 가로채기를 완전히 해제한다(위 주석 참고)
+        await page.unroute(ENTRY_CHUNK, block);
+
         await page.getByRole('button', { name: '다시 시도' }).click();
 
         // 랜딩이 실제로 뜨는지 — 접근성 스펙이 보는 것과 같은 앵커를 쓴다
