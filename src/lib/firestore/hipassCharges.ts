@@ -10,6 +10,11 @@ import {
 import { db } from '../firebase';
 import { captureError } from '../sentry';
 import { toLocalDateStr } from '../dateUtils';
+import { createZodConverter, hipassChargeSchema } from '../../schemas';
+
+// 읽기 경로에 스키마 검증을 건다 (원시 캐스팅 대체 — fuelLogs와 동일한 이유).
+// 충전 금액·잔액은 카드 잔액 계산에 그대로 쓰이므로 숫자 계약이 특히 중요하다.
+const hipassChargesRef = () => collection(db, 'hipassCharges').withConverter(createZodConverter(hipassChargeSchema));
 
 // 기간(since/until) 조회 상한 — 월간 보고서가 운행일지 상한(EXPORT_MAX_DOCS=5000)과 같은
 // 수준으로 집계하도록 맞춘다. 기간 없는 화면 목록 조회는 기존대로 200건 유지.
@@ -31,25 +36,25 @@ export const getAllHipassCharges = async (orgId: string, options?: { since?: Dat
     }
     const hasRange = Boolean(options?.since || options?.until);
     constraints.push(orderBy('date', 'desc'), limit(hasRange ? RANGE_FETCH_MAX : LIST_FETCH_MAX));
-    const q = query(collection(db, 'hipassCharges'), ...constraints);
+    const q = query(hipassChargesRef(), ...constraints);
     const snap = await getDocs(q);
     if (hasRange && snap.docs.length >= RANGE_FETCH_MAX) {
         console.warn(`[getAllHipassCharges] 기간 조회가 상한 ${RANGE_FETCH_MAX}건에 도달 — 이후 충전 기록은 집계에서 누락될 수 있습니다.`);
     }
-    return snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) }));
+    return snap.docs.map(d => ({ ...d.data(), id: d.id }));
 };
 
 // 카드별 충전 기록 조회 (최신순, 최대 100건)
 export const getHipassCharges = async (orgId: string, cardId: string) => {
     const q = query(
-        collection(db, 'hipassCharges'),
+        hipassChargesRef(),
         where('organizationId', '==', orgId),
         where('cardId', '==', cardId),
         orderBy('createdAt', 'desc'),
         limit(100),
     );
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string });
+    return snap.docs.map(d => ({ ...d.data(), id: d.id }));
 };
 
 // 충전 기록 생성

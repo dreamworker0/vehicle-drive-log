@@ -43,7 +43,8 @@ export default function useBaseFuelLog(orgId: string | undefined) {
                     }
 
                     if (rReq.status === 'fulfilled') {
-                        setRecords(rReq.value as FuelLog[]);
+                        // getFuelLogs가 zod 컨버터로 검증한 값을 돌려주므로 캐스팅이 불필요하다.
+                        setRecords(rReq.value);
                     } else {
                         console.warn('주유 기록 로드 실패 (인덱스 빌드 중일 수 있음):', rReq.reason);
                         setRecords([]);
