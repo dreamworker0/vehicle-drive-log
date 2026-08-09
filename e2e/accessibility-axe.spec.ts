@@ -26,12 +26,26 @@ for (const path of PUBLIC_PATHS) {
         await page.waitForLoadState('domcontentloaded');
         await page.waitForTimeout(1500);
 
-        const result = await new AxeBuilder({ page })
+        const audit = () => new AxeBuilder({ page })
             .withTags(['wcag2a', 'wcag2aa', 'wcag21aa'])
             // 서드파티 iframe(랜딩 YouTube 임베드 등) 내부는 우리 통제 밖이라 검사에서 제외한다.
             // YouTube 플레이어의 button-name·aria-prohibited-attr 위반은 우리가 고칠 수 없다.
             .exclude('iframe')
             .analyze();
+
+        let result;
+        try {
+            result = await audit();
+        } catch (err) {
+            // 검사 도중 페이지가 스스로 한 번 리로드되는 경우가 있다(mobile-safari CI에서
+            // "Execution context was destroyed"로 관측, 2026-08-09). 첫 방문에는 SW 설치
+            // 완료 등 정당한 1회성 리로드 경로가 있고, 리로드 후 화면은 동일하므로
+            // 접근성 위반 검사의 대상은 달라지지 않는다 — 안정화 후 한 번만 다시 잰다.
+            if (!String(err).includes('Execution context was destroyed')) throw err;
+            await page.waitForLoadState('domcontentloaded');
+            await page.waitForTimeout(1500);
+            result = await audit();
+        }
 
         const seriousOrCritical = result.violations.filter(
             ({ impact }) => impact === 'serious' || impact === 'critical',

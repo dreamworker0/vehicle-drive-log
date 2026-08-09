@@ -30,17 +30,22 @@ test.describe('부팅 실패 처리', () => {
     });
 
     /**
-     * 회선 복구를 **가로채기 해제(unroute)** 로 표현한다.
+     * 회선 복구를 **가로채기를 유지한 채 직접 응답을 만들어 주는 것**으로 표현한다.
      *
-     * 예전에는 플래그를 내리고 같은 핸들러에서 `route.continue()`로 흘려보냈는데,
-     * WebKit(mobile-safari)에서만 재시도 후 앱이 뜨지 않았다(2026-08-09 CI). 3회 시도 중
-     * 한 번은 클릭 도중 `element was detached from the DOM`까지 떴다 — 가로챈 요청을
-     * 리로드 경로에서 이어보내는 처리가 Chromium과 다르다는 뜻이다. 한동안 WebKit에서
-     * 이 스펙을 건너뛰었지만, 그러면 **iOS에서 "다시 시도" 복구가 되는지 아무도 확인하지
-     * 못한다** — 회선이 불안정한 현장이 정확히 이 앱의 사용 환경이라 그대로 둘 수 없었다.
+     * 이렇게 돌아온 이유(전부 2026-08-09 CI, mobile-safari에서만):
+     *  1. 플래그 내리고 `route.continue()` — 재시도 후 앱이 안 뜨고, 클릭 도중
+     *     `element was detached from the DOM`까지 발생.
+     *  2. `unroute`/`unrouteAll`로 가로채기 해제 — 리로드는 정상(메인 프레임 이동 2회,
+     *     예외 없음)인데 청크 요청이 `Blocked by Web Inspector`로 계속 실패했다.
+     *     즉 WebKit에서는 **해제가 리로드된 페이지에 반영되지 않는다.** 제품이 아니라
+     *     Playwright×WebKit 인터셉션 계층의 한계임이 이 오류 문자열로 확정됐다.
      *
-     * `unroute`는 가로채기 자체를 걷어내므로 리로드 요청이 서버로 곧장 간다. 실제 회선
-     * 복구에 더 가깝고, 브라우저별 인터셉션 차이를 타지 않는다.
+     * 그래서 가로채기는 끝까지 유지하되, 복구 후에는 핸들러가 `route.fetch()`로 실제
+     * 응답을 받아 `fulfill`한다. 요청이 브라우저 네트워크 스택의 해제 반영에 의존하지
+     * 않으므로 브라우저별 차이를 타지 않고, 사용자 입장의 시나리오(같은 URL이 이번엔
+     * 성공한다)도 그대로다. WebKit에서 이 스펙을 건너뛰면 **iOS에서 "다시 시도" 복구가
+     * 되는지 아무도 확인하지 못한다** — 회선이 불안정한 현장이 정확히 이 앱의 사용
+     * 환경이라 공백으로 둘 수 없다.
      */
     test('다시 시도를 누르면 재로드하고, 회선이 돌아오면 정상 진입한다', async ({ page }) => {
         // 이 스펙은 브라우저마다 결과가 갈리는 자리라(청크 실패 → 리로드 → 복구),
@@ -63,18 +68,22 @@ test.describe('부팅 실패 처리', () => {
             }
         });
 
-        const block = (route: import('@playwright/test').Route) => route.abort('failed');
-        await page.route(ENTRY_CHUNK, block);
+        let online = false;
+        await page.route(ENTRY_CHUNK, async (route) => {
+            if (!online) {
+                await route.abort('failed');
+                return;
+            }
+            // 복구 후: 인터셉션 안에서 직접 요청을 수행해 그 응답으로 채운다(위 주석 참고)
+            const response = await route.fetch();
+            await route.fulfill({ response });
+        });
 
         await page.goto('/', { waitUntil: 'commit' });
         await expect(page.getByText('앱을 불러오지 못했습니다')).toBeVisible({ timeout: 15000 });
 
-        // 회선 복구 — 가로채기를 완전히 걷어낸다.
-        // `unroute(url, handler)`가 아니라 `unrouteAll`을 쓰는 이유: 전자는 이 핸들러만
-        // 목록에서 빼고, 진행 중인 핸들러가 끝나기를 기다리지 않는다. 브라우저별로
-        // 가로채기 해제가 다음 요청에 반영되는 시점이 갈릴 수 있어, 남은 것을 전부 걷고
-        // 진행 중인 것까지 정리하는 쪽을 쓴다.
-        await page.unrouteAll({ behavior: 'ignoreErrors' });
+        // 회선 복구
+        online = true;
 
         await page.getByRole('button', { name: '다시 시도' }).click();
 
