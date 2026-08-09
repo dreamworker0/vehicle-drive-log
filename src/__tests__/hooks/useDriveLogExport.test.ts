@@ -18,6 +18,7 @@ vi.mock('../../lib/firestore', () => ({
 }));
 
 import { useDriveLogExport, type ExportFilters } from '../../hooks/driveLogList/useDriveLogExport';
+import type { Organization } from '../../types/organization';
 
 const baseFilters: ExportFilters = {
     vehicleId: '',
@@ -27,9 +28,17 @@ const baseFilters: ExportFilters = {
     endDate: '2026-03-31',
 };
 
+// 내보내기 훅은 기관명·결재선만 읽지만 파라미터 타입은 Organization이라 필수 필드를 채운다
+const testOrg: Organization = {
+    id: 'org1',
+    name: '테스트기관',
+    applicantUid: 'admin1',
+    status: 'approved',
+};
+
 function setup(filters: Partial<ExportFilters> = {}) {
     return renderHook(() =>
-        useDriveLogExport('org1', { ...baseFilters, ...filters }, { name: '테스트기관' }),
+        useDriveLogExport('org1', { ...baseFilters, ...filters }, testOrg),
     );
 }
 

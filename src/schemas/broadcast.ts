@@ -1,8 +1,15 @@
 import { z } from 'zod';
 // 배럴(./index)이 이 파일을 re-export하므로 './index'에서 가져오면 순환 참조가 된다.
 // 다른 스키마 파일(auditLog 등)과 같이 정의 파일에서 직접 가져온다.
-import { timestampSchema } from './vehicle';
+import { timestampSchema } from './common';
 
+/**
+ * 발송 상태.
+ * - `sending`: 앱 내 알림은 커밋됐고 푸시 결과는 아직 기록되지 않았다.
+ *   함수가 푸시 도중 죽으면 이 상태로 남는다 — "보냈는지 모른다"가 아니라
+ *   "알림은 나갔고 푸시 결과만 모른다"를 뜻한다.
+ * - `sent`: 푸시까지 끝나 결과 수가 기록됐다.
+ */
 export const broadcastStatusSchema = z.enum(['sending', 'sent']);
 
 /**
@@ -16,10 +23,11 @@ export const broadcastStatusSchema = z.enum(['sending', 'sent']);
  * 상호 대입이 안 되어 목록 화면에서 캐스팅이 끼어든다.
  */
 export const broadcastSchema = z.object({
-    id: z.string().catch(''),
     title: z.string().catch(''),
     message: z.string().catch(''),
+    /** 발송한 운영자 uid */
     actorUid: z.string().catch(''),
+    /** 앱 내 알림을 받은 인원 */
     recipientCount: z.number().catch(0),
     /** 푸시 결과는 `sending` 상태에서 아직 없다 */
     pushSent: z.number().optional().catch(undefined),

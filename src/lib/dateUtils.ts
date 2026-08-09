@@ -33,6 +33,27 @@ export function toLocalMonthStr(date?: Date) {
 }
 
 /**
+ * Firestore Timestamp / Date / 문자열 → Date. 변환할 수 없으면 null.
+ *
+ * 운행일지의 `timestamp`는 문서에 따라 Timestamp일 수도 Date일 수도 있어(오프라인 큐가
+ * 심은 값은 Date다) 호출부마다 `log.timestamp?.toDate ? ... : ...` 같은 분기와
+ * 캐스팅이 흩어져 있었다. 판정은 여기 한 곳에서만 한다.
+ */
+export function toDateOrNull(ts: TimestampLike): Date | null {
+    if (!ts) return null;
+    if (ts instanceof Date) return isNaN(ts.getTime()) ? null : ts;
+    if (typeof ts === 'object' && 'toDate' in ts && typeof ts.toDate === 'function') {
+        const d = ts.toDate();
+        return d instanceof Date && !isNaN(d.getTime()) ? d : null;
+    }
+    if (typeof ts === 'string' || typeof ts === 'number') {
+        const d = new Date(ts);
+        return isNaN(d.getTime()) ? null : d;
+    }
+    return null;
+}
+
+/**
  * Firestore Timestamp → 'M월 D일 (요일)' 형식
  * VehicleHistory, MyRecords 등에서 사용
  */

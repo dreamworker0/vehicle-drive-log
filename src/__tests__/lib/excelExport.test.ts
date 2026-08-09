@@ -15,6 +15,7 @@ vi.mock('xlsx', () => ({
 
 import { downloadDriveLogsExcel } from '../../lib/excelExport';
 import * as XLSX from 'xlsx';
+import { Timestamp } from 'firebase/firestore';
 
 describe('downloadDriveLogsExcel', () => {
     it('빈 배열이면 onError를 호출하고 false를 반환해야 한다', async () => {
@@ -71,7 +72,7 @@ describe('downloadDriveLogsExcel', () => {
     it('Firestore timestamp 형식 로그도 처리해야 한다', async () => {
         const logs = [
             {
-                timestamp: { toDate: () => new Date('2026-03-05T09:00:00') },
+                timestamp: Timestamp.fromDate(new Date('2026-03-05T09:00:00')),
                 driverName: '테스트',
                 vehicleDisplayName: '스타렉스',
                 departureTime: '09:00',

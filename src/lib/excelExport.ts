@@ -9,6 +9,7 @@ import {
 import { formatTimestampTime, formatTimestampFull } from './dateUtils';
 import { recordExport } from './audit/recordExport';
 import type { AuditLog } from '../types/auditLog';
+import type { FirestoreTimestamp } from '../types/common';
 import {
     ACTOR_SOURCE_NOTE, describeChangedFields, describeEvent, describeExportTarget,
 } from './auditLogLabels';
@@ -20,7 +21,7 @@ import {
  */
 interface ExcelDriveLog {
     date?: string;
-    timestamp?: { toDate?: () => Date };
+    timestamp?: FirestoreTimestamp;
     driverName?: string;
     vehicleDisplayName?: string;
     vehicleName?: string;
@@ -42,7 +43,6 @@ interface ExcelDriveLog {
     hipassBalanceAfter?: number;
     fuelSummary?: string;
     notes?: string;
-    [key: string]: unknown;
 }
 
 export async function downloadDriveLogsExcel(logs: ExcelDriveLog[], filename = '운행일지', { onError, includeHipass = false, includePassengers = false, includeFuel = false }: { onError?: (msg: string) => void; includeHipass?: boolean; includePassengers?: boolean; includeFuel?: boolean } = {}) {

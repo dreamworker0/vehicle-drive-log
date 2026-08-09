@@ -7,11 +7,12 @@ import { recordExport } from '../audit/recordExport';
 import {
     resolveStartKm, resolveEndKm, resolveDistance, resolveDateStr, resolveStartTime, resolveEndTime,
 } from '../driveLogExportFields';
+import type { FirestoreTimestamp } from '../../types/common';
 
 /** PDF용 운행일지 행 */
 interface PdfLogEntry {
     date?: string;
-    timestamp?: { toDate?: () => Date };
+    timestamp?: FirestoreTimestamp;
     driverName?: string;
     vehicleDisplayName?: string;
     vehicleName?: string;

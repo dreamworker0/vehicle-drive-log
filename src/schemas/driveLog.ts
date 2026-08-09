@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { timestampSchema } from './vehicle';
+import { timestampSchema } from './common';
 
 export const driveLogSchema = z.object({
     organizationId: z.string().catch(''),

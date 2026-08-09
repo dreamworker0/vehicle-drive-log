@@ -6,12 +6,13 @@
  * 있어, 같은 거리 계산식이 네 곳에 흩어져 있었다. 단일 원본으로 모아 정렬·표시·합계가
  * 항상 동일한 규칙을 따르도록 한다.
  */
-import { toLocalDateStr } from './dateUtils';
+import { toLocalDateStr, toDateOrNull } from './dateUtils';
+import type { FirestoreTimestamp } from '../types/common';
 
 /** Excel/PDF 내보내기에서 공통으로 읽는 운행일지 필드의 최소 형태 */
 export interface ExportableDriveLog {
     date?: string;
-    timestamp?: { toDate?: () => Date };
+    timestamp?: FirestoreTimestamp;
     startTime?: string;
     endTime?: string;
     departureTime?: string;
@@ -40,7 +41,8 @@ export function resolveDistance(log: ExportableDriveLog): number {
 
 /** 날짜 문자열 (date 우선, 없으면 timestamp를 로컬 날짜로 변환). 둘 다 없으면 fallback. */
 export function resolveDateStr(log: ExportableDriveLog, fallback = ''): string {
-    return log.date || (log.timestamp?.toDate ? toLocalDateStr(log.timestamp.toDate()) : fallback);
+    const ts = toDateOrNull(log.timestamp);
+    return log.date || (ts ? toLocalDateStr(ts) : fallback);
 }
 
 /** 출발 시각 (startTime 우선, 없으면 departureTime). */

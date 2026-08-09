@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { timestampSchema } from './vehicle';
+import { timestampSchema } from './common';
 
 /**
  * 하이패스 충전 기록 스키마.
@@ -10,15 +10,25 @@ import { timestampSchema } from './vehicle';
  */
 export const hipassChargeSchema = z.object({
     organizationId: z.string().catch(''),
+    /** 하이패스 카드 ID */
     cardId: z.string().catch(''),
+    /** 카드번호 (표시용) */
     cardNumber: z.string().catch(''),
+    /** 연결된 차량 ID */
     vehicleId: z.string().catch(''),
+    /** 표시용 차량명 */
     vehicleName: z.string().optional().catch(undefined),
+    /** 충전한 사람 UID */
     chargerUid: z.string().catch(''),
+    /** 충전한 사람 이름 */
     chargerName: z.string().optional().catch(undefined),
+    /** 'YYYY-MM-DD' */
     date: z.string().catch(''),
+    /** 충전금액 (원) */
     chargeAmount: z.coerce.number().catch(0),
+    /** 충전 전 잔액 */
     balanceBefore: z.coerce.number().catch(0),
+    /** 충전 후 잔액 */
     balanceAfter: z.coerce.number().catch(0),
     createdAt: timestampSchema.optional(),
     updatedAt: timestampSchema.optional(),

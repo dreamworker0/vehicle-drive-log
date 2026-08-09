@@ -1,22 +1,14 @@
 /**
- * 하이패스 충전 기록 (HipassCharges) 타입 정의
+ * 하이패스 충전 기록 (HipassCharges) 타입
+ *
+ * 문서 모양의 원본은 `src/schemas/hipassCharge.ts`다 — 여기서는 파생만 한다.
+ * 필드 설명·주석도 스키마 쪽에 둔다(스키마를 고치면서 주석을 놓치는 일이 없도록).
  */
-import type { FirestoreDoc, TimestampField } from './common';
+import type { z } from 'zod';
+import type { hipassChargeSchema } from '../schemas/hipassCharge';
+import type { FirestoreDoc } from './common';
 
-export interface HipassCharge extends FirestoreDoc {
-    organizationId: string;
-    cardId: string;            // 하이패스 카드 ID
-    cardNumber: string;        // 카드번호 (표시용)
-    vehicleId: string;         // 연결된 차량 ID
-    vehicleName?: string;      // 표시용 차량명
-    chargerUid: string;        // 충전한 사람 UID
-    chargerName?: string;      // 충전한 사람 이름
-    date: string;              // 'YYYY-MM-DD'
-    chargeAmount: number;      // 충전금액 (원)
-    balanceBefore: number;     // 충전 전 잔액
-    balanceAfter: number;      // 충전 후 잔액
-    createdAt?: TimestampField;
-}
+export type HipassCharge = z.infer<typeof hipassChargeSchema> & FirestoreDoc;
 
 /** createHipassCharge에 전달할 데이터 */
 export type CreateHipassChargeData = Omit<HipassCharge, 'id' | 'createdAt'>;

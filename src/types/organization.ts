@@ -1,12 +1,16 @@
 /**
- * 기관 (Organizations) 타입 정의
+ * 기관 (Organizations) 타입
+ *
+ * 문서 모양의 원본은 `src/schemas/organization.ts`다 — 여기서는 파생만 한다.
  */
-import type { FirestoreDoc, TimestampField } from './common';
+import type { z } from 'zod';
+import type { organizationSchema, orgStatusSchema, withdrawReasonSchema } from '../schemas/organization';
+import type { FirestoreDoc } from './common';
 
-export type OrgStatus = 'pending' | 'approved' | 'rejected' | 'deleted';
+export type OrgStatus = z.infer<typeof orgStatusSchema>;
 
 /** 기관 탈퇴(서비스 해지) 사유 */
-export type WithdrawReason = 'no_longer_needed' | 'too_difficult' | 'missing_features' | 'other';
+export type WithdrawReason = z.infer<typeof withdrawReasonSchema>;
 
 /** 탈퇴 사유 코드 → 한글 라벨 */
 export const WITHDRAW_REASON_LABELS: Record<WithdrawReason, string> = {
@@ -16,105 +20,7 @@ export const WITHDRAW_REASON_LABELS: Record<WithdrawReason, string> = {
     other: '기타',
 };
 
-export interface Organization extends FirestoreDoc {
-    name: string;
-    address?: string;
-    phone?: string;
-    representativeName?: string;
-    adminEmail?: string;
-    applicantUid: string;
-    applicantEmail?: string;
-    applicantName?: string;
-    applicantPhone?: string;
-    message?: string;
-    approvalLine?: { title: string }[];
-    hideApprovalLine?: boolean;
-    requireReservationApproval?: boolean;
-    // ── 기능 사용 토글(미설정=켜짐). resolveOrgFeatures로 해석 ──
-    /** 하이패스 사용(운행일지 하이패스 입력 + 차량관리 하이패스 탭 + 관리자 하이패스 관리) */
-    hipassEnabled?: boolean;
-    /** 수리·정비 사용(차량관리 정비 탭 + 관리자 정비 기록) */
-    maintenanceEnabled?: boolean;
-    /** 수리·정비를 일반 직원도 사용(미설정=허용). 끄면 관리자만 정비 기록 */
-    maintenanceEmployeeAccess?: boolean;
-    /** 차량별 사용 가능 직원 지정(차량 등록 폼 노출, 미설정=사용) */
-    allowedUsersEnabled?: boolean;
-    /** Google 캘린더 연동(차량 등록 폼 노출, 미설정=사용) */
-    googleCalendarEnabled?: boolean;
-    /** 운행일지 대표 운전자 지정(변경) 사용 */
-    driverSelectionEnabled?: boolean;
-    /** 운행일지 공동 운전자 사용 */
-    coDriverEnabled?: boolean;
-    /** 운행일지 동승자 기록 사용 */
-    passengerEnabled?: boolean;
-    // ── 입력 방식 개별 활성화(미설정=켜짐). 최소 1개는 유지 ──
-    /** 동승자: 직원 목록에서 직접 선택 */
-    passengerAllowList?: boolean;
-    /** 동승자: 검색으로 선택(이름 직접 입력) */
-    passengerAllowSearch?: boolean;
-    /** 동승자: 인원 숫자만 입력 */
-    passengerAllowCount?: boolean;
-    /**
-     * 예약 화면에서도 동승자를 미리 입력 (미설정=**꺼짐**).
-     * 다른 플래그와 반대로 opt-in인 이유는 orgFeatures.ts 주석 참고.
-     */
-    reservationPassengerEnabled?: boolean;
-    /** 운전자(대표·공동): 직원 목록에서 직접 선택 */
-    driverAllowList?: boolean;
-    /** 운전자(대표·공동): 검색으로 선택. 목록·검색 둘 다 켜지면 후보 8명 기준 자동 전환 */
-    driverAllowSearch?: boolean;
-    status: OrgStatus;
-    inviteCode?: string;
-    uniqueNumber?: string;
-    /** @deprecated 레거시 — 토큰 포함 다운로드 URL. 신규 문서는 uniqueNumberImagePath 사용 (2026-07-18 P0-3) */
-    uniqueNumberImageUrl?: string;
-    /** 증빙서류 Storage 경로. 표시용 URL은 getOrgDocumentUrl 콜러블로 온디맨드 발급 */
-    uniqueNumberImagePath?: string;
-    aiVerified?: boolean;
-    aiVerifyDetail?: {
-        documentType?: string;
-        uniqueNumber?: string;
-        extractedName?: string;
-        nameMatch?: boolean;
-        address?: string;
-        rejected?: boolean;
-        reason?: string;
-    };
-    /**
-     * 약관·처리방침 동의 기록 (위탁 계약 성립 근거 — 약관 제9조)
-     * submitOrgApplication이 서버에서만 기록하며, Firestore Rules가 클라이언트 변경을 차단한다.
-     * 개정 약관 시행일(TERMS_VERSION) 이전에 신청한 기관에는 없다(재동의로 채운다).
-     */
-    consent?: {
-        terms: boolean;
-        privacy: boolean;
-        /** 동의한 약관의 시행일 버전 */
-        termsVersion: string;
-        /** 동의한 처리방침의 시행일 버전 */
-        privacyVersion: string;
-        agreedAt?: TimestampField;
-        /** 성립 경로 — 미설정은 기관 신청 시 동의, 'reconsent'는 개정 후 재동의 */
-        source?: 'reconsent';
-        /** 재동의로 성립한 경우 의사표시를 한 관리자 uid */
-        agreedByUid?: string;
-    };
-    createdAt?: TimestampField;
-    approvedAt?: TimestampField;
-    rejectedAt?: TimestampField;
-    deletedAt?: TimestampField | null;
-    /** 삭제(탈퇴) 주체 — 'admin'은 관리자 자발적 해지, 'superAdmin'은 운영자 정리 */
-    deletedBy?: 'admin' | 'superAdmin';
-    /** 자발적 탈퇴 사유 */
-    withdrawReason?: WithdrawReason;
-    /** 사유가 'other'일 때 자유 입력 상세 */
-    withdrawReasonDetail?: string;
-    firstEmployeeRegisteredAt?: TimestampField;
-    timeToFirstEmployeeDays?: number;
-    /** 지도 표시용 위도 */
-    lat?: number;
-    /** 지도 표시용 경도 */
-    lng?: number;
-}
+export type Organization = z.infer<typeof organizationSchema> & FirestoreDoc;
 
 /** createOrganization에 전달할 데이터 */
 export type CreateOrgData = Omit<Organization, 'id' | 'status' | 'createdAt' | 'approvedAt' | 'rejectedAt' | 'deletedAt' | 'inviteCode'>;

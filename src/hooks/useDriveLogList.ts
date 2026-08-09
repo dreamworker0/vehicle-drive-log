@@ -10,33 +10,15 @@ import { toLocalDateStr } from '../lib/dateUtils';
 import { matchesSearch } from './driveLogList/matchesSearch';
 import { useDriveLogExport } from './driveLogList/useDriveLogExport';
 import type { DocumentSnapshot } from 'firebase/firestore';
-import type { DriveLogEntry } from '../types/driveLog';
-
-interface VehicleEntry {
-    id: string;
-    displayName?: string;
-    [key: string]: unknown;
-}
-
-interface MemberEntry {
-    id: string;
-    name?: string;
-    email?: string;
-    role?: string;
-    [key: string]: unknown;
-}
+import type { DriveLog } from '../types/driveLog';
+import type { Vehicle } from '../types/vehicle';
+import type { User } from '../types/user';
+import type { Organization } from '../types/organization';
 
 interface DupResult {
     deleteCount: number;
     duplicateGroups: number;
     totalLogs: number;
-}
-
-interface OrgInfo {
-    name?: string;
-    hideApprovalLine?: boolean;
-    approvalLine?: { title: string }[];
-    [key: string]: unknown;
 }
 
 const PAGE_SIZE = 50;
@@ -45,14 +27,14 @@ export default function useDriveLogList() {
     const { userData } = useAuth();
     const { showToast } = useToast();
     const { confirm } = useConfirm();
-    const [logs, setLogs] = useState<DriveLogEntry[]>([]);
-    const [vehicles, setVehicles] = useState<VehicleEntry[]>([]);
-    const [members, setMembers] = useState<MemberEntry[]>([]);
+    const [logs, setLogs] = useState<DriveLog[]>([]);
+    const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+    const [members, setMembers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
     const [lastDoc, setLastDoc] = useState<DocumentSnapshot | null>(null);
     const [hasMore, setHasMore] = useState(false);
-    const [org, setOrg] = useState<OrgInfo | null>(null);
+    const [org, setOrg] = useState<Organization | null>(null);
     const [dupState, setDupState] = useState<'idle' | 'scanning' | 'result' | 'cleaning'>('idle');
     const [dupResult, setDupResult] = useState<DupResult | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -94,12 +76,12 @@ export default function useDriveLogList() {
                     getOrganization(orgId),
                 ]);
                 if (myRequestId !== requestIdRef.current) return; // stale 응답 폐기
-                setLogs(result.docs as unknown as DriveLogEntry[]);
+                setLogs(result.docs);
                 setLastDoc(result.lastDoc as DocumentSnapshot | null);
                 setHasMore(result.hasMore);
-                setVehicles(v as unknown as VehicleEntry[]);
-                setMembers((m as MemberEntry[]).filter(x => x.role !== 'superAdmin'));
-                setOrg(orgData as OrgInfo | null);
+                setVehicles(v);
+                setMembers(m.filter(x => x.role !== 'superAdmin'));
+                setOrg(orgData);
             } catch (err) {
                 if (myRequestId !== requestIdRef.current) return;
                 console.error('데이터 로드 실패:', err);
@@ -125,7 +107,7 @@ export default function useDriveLogList() {
                 endDate: filters.endDate || undefined
             });
             if (myRequestId !== requestIdRef.current) return; // 필터가 바뀌었으면 결과 폐기
-            setLogs(prev => [...prev, ...result.docs as unknown as DriveLogEntry[]]);
+            setLogs(prev => [...prev, ...result.docs]);
             setLastDoc(result.lastDoc as DocumentSnapshot | null);
             setHasMore(result.hasMore);
         } catch (err) {
@@ -199,11 +181,11 @@ export default function useDriveLogList() {
                 getVehicles(orgId!),
                 getOrganizationMembers(orgId!),
             ]);
-            setLogs(refreshed.docs as unknown as DriveLogEntry[]);
+            setLogs(refreshed.docs);
             setLastDoc(refreshed.lastDoc as DocumentSnapshot | null);
             setHasMore(refreshed.hasMore);
-            setVehicles(v as unknown as VehicleEntry[]);
-            setMembers((m as MemberEntry[]).filter(x => x.role !== 'superAdmin'));
+            setVehicles(v);
+            setMembers(m.filter(x => x.role !== 'superAdmin'));
             setLoading(false);
         } catch (err) {
             console.error('중복 정리 실패:', err);

@@ -12,18 +12,11 @@ import OrgEditForm from './orgCard/OrgEditForm';
 import OrgMemberTable from './orgCard/OrgMemberTable';
 import OrgRestoreForm from './orgCard/OrgRestoreForm';
 import type { Organization } from '../../types';
-
-interface OrgMember {
-    id: string;
-    name?: string;
-    email?: string;
-    role?: string;
-    [key: string]: unknown;
-}
+import type { User, UserRole } from '../../types/user';
 
 interface OrgCardProps {
     org: Organization;
-    members: OrgMember[];
+    members: User[];
     memberCount: number;
     isExpanded: boolean;
     changingRole: string | null;
@@ -31,8 +24,8 @@ interface OrgCardProps {
     onToggle: (orgId: string) => void;
     onDelete: (org: Organization) => void;
     onEditOrg: (orgId: string, updates: { name: string; address: string }) => Promise<void>;
-    onRoleChange: (member: OrgMember, orgId: string, newRole: string) => void;
-    onRemoveMember: (member: OrgMember, orgId: string) => void;
+    onRoleChange: (member: User, orgId: string, newRole: UserRole) => void;
+    onRemoveMember: (member: User, orgId: string) => void;
     onRestoreUser: (email: string, orgId: string, name: string) => Promise<void>;
 }
 

@@ -1,8 +1,9 @@
 import { useNavigate } from 'react-router-dom';
-import type { DriveLogEntry } from '../../../types/driveLog';
+import type { DriveLog } from '../../../types/driveLog';
+import { toDateOrNull } from '../../../lib/dateUtils';
 
 export interface DriveLogTableRowProps {
-    log: DriveLogEntry;
+    log: DriveLog;
     deletingId: string | null;
     onDelete: (logId: string, driverName: string) => void;
 }
@@ -57,8 +58,9 @@ const GRID_COLUMNS = '80px 60px 60px 70px 100px 1fr 100px 40px 80px 76px';
 
 export default function DriveLogTableRow({ log, deletingId, onDelete }: DriveLogTableRowProps) {
     const navigate = useNavigate();
-    const date = log.timestamp?.toDate
-        ? log.timestamp.toDate().toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })
+    const logDate = toDateOrNull(log.timestamp);
+    const date = logDate
+        ? logDate.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })
         : '-';
     const distance = (log.endKm - log.startKm) || 0;
     const isDeleting = deletingId === log.id;
