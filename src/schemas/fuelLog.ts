@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import type { FuelType } from '../types/vehicle';
-import { timestampSchema } from './vehicle';
+import { timestampSchema } from './common';
+import { fuelTypeSchema } from './vehicle';
 
 /**
  * 주유·충전 기록 스키마.
@@ -19,14 +19,19 @@ export const fuelLogSchema = z.object({
     vehicleName: z.string().optional().catch(undefined),
     driverUid: z.string().catch(''),
     driverName: z.string().optional().catch(undefined),
+    /** 'YYYY-MM-DD' */
     date: z.string().catch(''),
+    /** 주유 시 계기판 km */
     meterReading: z.coerce.number().catch(0),
-    // types/fuelLog.ts의 선언(`meterPhotoUrl?: string`)에 맞춘다 — null을 허용하면
-    // 타입과 스키마가 어긋나 호출부에서 다시 캐스팅이 필요해진다.
+    /** 계기판 촬영 사진 URL. null을 허용하지 않는다 — 없으면 undefined 하나로 표현한다 */
     meterPhotoUrl: z.string().optional().catch(undefined),
-    fuelType: z.custom<FuelType>().optional().catch(undefined),
+    /** 연료 유형 (미지정 시 기본 시스템 정책 따름) */
+    fuelType: fuelTypeSchema.optional().catch(undefined),
+    /** 주유량 (리터) 또는 충전량 (kWh/kg) */
     fuelAmount: z.coerce.number().catch(0),
+    /** 주유 금액 또는 충전 금액 (원) */
     fuelCost: z.coerce.number().catch(0),
+    /** 비고 (선택) */
     notes: z.string().optional().catch(undefined),
     createdAt: timestampSchema.optional(),
     updatedAt: timestampSchema.optional(),

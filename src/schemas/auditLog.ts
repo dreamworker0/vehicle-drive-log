@@ -1,7 +1,7 @@
 import { z } from 'zod';
 // 배럴(./index)이 이 파일을 re-export하므로 './index'에서 가져오면 순환 참조가 된다.
 // 다른 스키마 파일(driveLog 등)과 같이 정의 파일에서 직접 가져온다.
-import { timestampSchema } from './vehicle';
+import { timestampSchema } from './common';
 
 export const auditActionSchema = z.enum(['create', 'update', 'delete', 'login', 'export', 'read']);
 export const auditTargetTypeSchema = z.enum(['driveLog', 'user', 'session', 'export', 'orgDocument']);

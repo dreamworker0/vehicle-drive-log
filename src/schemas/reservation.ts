@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { timestampSchema } from './vehicle';
+import { timestampSchema } from './common';
 import type { ReservationStatus } from '../types/reservation';
 
 export const reservationSchema = z.object({

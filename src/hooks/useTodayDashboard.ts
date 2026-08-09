@@ -14,12 +14,12 @@ import { refreshTokenSilently } from '../lib/tokenRefresh';
 import type { Vehicle } from '../types/vehicle';
 import { isVehicleBlocked } from '../lib/vehicleUtils';
 import type { Reservation, ReservationStatus } from '../types/reservation';
-import type { FuelLog } from '../types/fuelLog';
+import type { DriveLog } from '../types/driveLog';
 import useDashboardActions from './useDashboardActions';
 
 const EMPTY_VEHICLES: Vehicle[] = [];
 const EMPTY_RESERVATIONS: Reservation[] = [];
-const EMPTY_LOGS: FuelLog[] = [];
+const EMPTY_LOGS: DriveLog[] = [];
 
 // React 19 Suspense 데이터 캐시
 let globalDashboardCache: { key: string, promise: Promise<unknown>, data?: unknown } | null = null;
@@ -33,12 +33,12 @@ function getDashboardData(orgId: string, uid: string, todayStr: string, weekEndD
     
     // 캐시 히트 시 반환
     if (globalDashboardCache?.key === key) {
-        if (globalDashboardCache.data) return globalDashboardCache.data as [Vehicle[], Reservation[], Reservation[], FuelLog[]];
+        if (globalDashboardCache.data) return globalDashboardCache.data as [Vehicle[], Reservation[], Reservation[], DriveLog[]];
         return globalDashboardCache.promise;
     }
     
     // 빈 데이터 Fallback (에러 시 사용)
-    const EMPTY_FALLBACK: [Vehicle[], Reservation[], Reservation[], FuelLog[]] = [[], [], [], []];
+    const EMPTY_FALLBACK: [Vehicle[], Reservation[], Reservation[], DriveLog[]] = [[], [], [], []];
 
     // 캐시 미스: 신규 페치
     const promise = Promise.all([
@@ -95,7 +95,7 @@ export default function useTodayDashboard() {
         void refreshTick; // 캐시 무효화 후 재페치를 강제하기 위한 의존성
         return (orgId && user?.uid) ? getDashboardData(orgId, user.uid, todayStr, weekEndDate) : null;
     }, [orgId, user, todayStr, weekEndDate, refreshTick]);
-    type DashboardData = [Vehicle[], Reservation[], Reservation[], FuelLog[]];
+    type DashboardData = [Vehicle[], Reservation[], Reservation[], DriveLog[]];
     const resolvedData = (dataOrPromise instanceof Promise ? use(dataOrPromise) : dataOrPromise) as DashboardData | null;
 
     const serverVehicles: Vehicle[] = resolvedData ? resolvedData[0] : EMPTY_VEHICLES;
@@ -120,7 +120,7 @@ export default function useTodayDashboard() {
     // 3. 파생 상태 연산
     const incompleteAlerts = useMemo(() => {
         if (!user?.uid) return [];
-        const logReservationIds = new Set(myLogs.filter((l: FuelLog) => l.reservationId).map((l: FuelLog) => l.reservationId));
+        const logReservationIds = new Set(myLogs.filter((l: DriveLog) => l.reservationId).map((l: DriveLog) => l.reservationId));
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         const yesterdayStr = toLocalDateStr(yesterday);

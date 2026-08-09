@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { timestampSchema } from './index';
+import { timestampSchema } from './common';
 
 export const userRoleSchema = z.enum(['employee', 'admin', 'superAdmin']);
 

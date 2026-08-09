@@ -220,7 +220,7 @@ export default function DailyLogView() {
                             </h3>
                             <div className="space-y-2">
                                 {fuelLogs.map((fuel, idx) => {
-                                    const isEV = (fuel as Record<string, unknown>).fuelType === 'electric' || selectedVehicle?.fuelType === 'electric';
+                                    const isEV = fuel.fuelType === 'electric' || selectedVehicle?.fuelType === 'electric';
                                     return (
                                     <div key={idx} className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
                                         <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg px-3 py-2">

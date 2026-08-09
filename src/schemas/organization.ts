@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { timestampSchema } from './index';
+import { timestampSchema } from './common';
 
 export const orgStatusSchema = z.enum(['pending', 'approved', 'rejected', 'deleted']);
 export const withdrawReasonSchema = z.enum(['no_longer_needed', 'too_difficult', 'missing_features', 'other']);

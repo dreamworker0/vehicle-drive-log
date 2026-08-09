@@ -2,6 +2,7 @@ import { z } from 'zod';
 import type { QueryDocumentSnapshot, DocumentData, FirestoreDataConverter } from 'firebase/firestore';
 import { captureError } from '../lib/sentry';
 
+export * from './common';
 export * from './vehicle';
 export * from './driveLog';
 export * from './reservation';
