@@ -45,20 +45,30 @@ function RouteFallback() {
 
 export default function LightApp() {
     return (
-        <Suspense fallback={<RouteFallback />}>
-            <Routes>
-                <Route path="/" element={<LandingPage />} />
-                {/* 인앱 브라우저에서는 외부 브라우저 안내로 대체 (랜딩 등 다른 라우트는 그대로 노출) */}
-                <Route path="/login" element={<InAppBrowserGuard><LoginPage /></InAppBrowserGuard>} />
-                <Route path="/apply" element={<OrgApplicationRoute />} />
-                <Route path="/terms" element={<TermsPage />} />
-                <Route path="/privacy" element={<PrivacyPage />} />
-                <Route path="/release-notes" element={<ReleaseNotesPage />} />
-                <Route path="/faq" element={<FAQPage />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
-            </Routes>
-            <UpdatePrompt />
-            <InstallPrompt />
-        </Suspense>
+        <>
+            <Suspense fallback={<RouteFallback />}>
+                <Routes>
+                    <Route path="/" element={<LandingPage />} />
+                    {/* 인앱 브라우저에서는 외부 브라우저 안내로 대체 (랜딩 등 다른 라우트는 그대로 노출) */}
+                    <Route path="/login" element={<InAppBrowserGuard><LoginPage /></InAppBrowserGuard>} />
+                    <Route path="/apply" element={<OrgApplicationRoute />} />
+                    <Route path="/terms" element={<TermsPage />} />
+                    <Route path="/privacy" element={<PrivacyPage />} />
+                    <Route path="/release-notes" element={<ReleaseNotesPage />} />
+                    <Route path="/faq" element={<FAQPage />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                </Routes>
+            </Suspense>
+
+            {/*
+                안내 배너는 **라우트와 다른 Suspense 경계**에 둔다.
+                같은 경계에 넣었더니 이 둘이 지연 로딩되는 동안 React가 **경계 전체를**
+                fallback으로 바꿔, 이미 그려진 랜딩까지 스피너로 덮였다(모바일 E2E가 잡았다 —
+                버튼이 보였다가 사라졌다). 화면 위에 겹쳐 뜨는 부가 UI가 본문을 가리면 안 되므로
+                각자 경계를 두고 fallback도 두지 않는다.
+            */}
+            <Suspense fallback={null}><UpdatePrompt /></Suspense>
+            <Suspense fallback={null}><InstallPrompt /></Suspense>
+        </>
     );
 }
