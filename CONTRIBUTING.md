@@ -16,7 +16,7 @@ npm install
 cd functions && npm install && cd ..
 
 # 3. E2E 브라우저 설치 (E2E 테스트를 돌릴 경우만)
-npx playwright install chromium
+npx playwright install chromium webkit
 
 # 4. 환경변수 설정
 # .env 파일 생성 (README.md 참고)
@@ -147,7 +147,7 @@ npm run test:watch   # 감시 모드
 
 ```bash
 # 최초 1회: 브라우저(Chromium) 설치 (네트워크 다운로드)
-npx playwright install chromium
+npx playwright install chromium webkit
 
 # 실행
 npm run test:e2e

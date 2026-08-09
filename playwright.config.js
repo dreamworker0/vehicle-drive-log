@@ -1,4 +1,4 @@
-import { defineConfig } from '@playwright/test';
+import { defineConfig, devices } from '@playwright/test';
 
 const isCI = !!process.env.CI;
 
@@ -27,4 +27,36 @@ export default defineConfig({
         port: isCI ? 4173 : 5173,
         reuseExistingServer: !isCI,
     },
+    // ── 브라우저·뷰포트 프로젝트 ──
+    // 여기 projects가 없어 **Chromium 데스크톱 단독**으로만 돌고 있었다. 이 앱은 PWA·오프라인·
+    // IndexedDB가 핵심인데 그 셋은 WebKit에서 동작이 가장 많이 갈리는 영역이고, 실제로
+    // src/lib/sentry.ts의 무시 목록 절반이 iOS Safari IndexedDB 예외다 — 프로덕션에서만
+    // 드러나던 공백이라는 뜻이다.
+    //
+    // ⚠️ 실행 비용 때문에 CI에서 프로젝트를 나눠 돌린다(ci.yml / e2e-cross-browser.yml 주석 참고).
+    //    로컬에서 `npx playwright test`를 그냥 돌리면 네 프로젝트가 모두 실행된다.
+    //    특정 브라우저만 보려면 `npx playwright test --project=mobile-safari`.
+    projects: [
+        {
+            // 지금까지의 유일한 실행 대상. 기본값이므로 동작이 달라지지 않는다.
+            name: 'chromium',
+            use: { ...devices['Desktop Chrome'] },
+        },
+        {
+            // 실제 이용자의 다수가 안드로이드 폰이다. Chromium 바이너리를 공유하므로
+            // 추가 다운로드 없이 뷰포트·터치·UA만 달라진다(가장 싼 프로젝트).
+            name: 'mobile-chrome',
+            use: { ...devices['Pixel 7'] },
+        },
+        {
+            name: 'webkit',
+            use: { ...devices['Desktop Safari'] },
+        },
+        {
+            // 이 프로젝트가 이번 확장의 핵심이다 — iOS Safari에서만 나던 오류를
+            // 배포 전에 잡을 수 있는 유일한 자리.
+            name: 'mobile-safari',
+            use: { ...devices['iPhone 14'] },
+        },
+    ],
 });
