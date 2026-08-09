@@ -39,6 +39,8 @@
 
 - `src/components/` — 역할별 분리: `auth/`, `superAdmin/`, `admin/`, `employee/`, `common/`. 역할 경계 넘기지 않기.
 - `src/lib/firestore/` — **도메인별 파일 분리**. 컴포넌트에서는 `index.ts`를 통해 import. → [firestore-model-pattern](.agent/skills/firestore-model-pattern/SKILL.md) 참고.
+- `src/schemas/` — **Firestore 문서 모양의 단일 원본**(Zod). `src/types/`의 도메인 타입은 `z.infer<typeof xSchema> & FirestoreDoc`로 파생되므로, 필드 추가·수정은 **스키마에서만** 한다. 스키마에 빠뜨린 필드는 컨버터가 조용히 제거해 저장은 되고 조회는 안 되는 상태가 된다.
+- `src/types/` — 파생 도메인 타입 + 문서가 아닌 화면·폼 타입. 여기서 문서 인터페이스를 새로 선언하지 않는다.
 - `src/hooks/` — 비즈니스 로직을 컴포넌트에서 분리. → [add-hook](.agent/skills/add-hook/SKILL.md) 참고.
 - `src/store/` — Zustand 글로벌 UI 상태. 도메인 데이터는 Zustand에 넣지 않는다.
 - `functions/src/` — Cloud Functions. → [add-cloud-function](.agent/skills/add-cloud-function/SKILL.md) 참고. `index.ts`에서 export 필수.

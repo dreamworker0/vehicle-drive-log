@@ -133,7 +133,7 @@ Git 커밋 시 `Husky` + `lint-staged`가 스테이징 파일에 ESLint를 자�
 - [ ] 모바일 뷰 우선 확인 → [pwa-mobile-first](rules/pwa-mobile-first.md)
 - [ ] 오프라인 지원 필요 여부 확인 → [offline-first](rules/offline-first.md)
 - [ ] Firestore 쿼리에 `organizationId` 포함 → D10
-- [ ] 타입 정의 (types/ 디렉토리)
+- [ ] Firestore 문서 필드는 `schemas/`에만 추가 (`types/`는 `z.infer`로 파생) → [firestore-model-pattern](skills/firestore-model-pattern/SKILL.md)
 - [ ] 에러 핸들링 패턴 확인 → [error-handling](rules/error-handling.md)
 - [ ] 인증 토큰 복원력 확인 → [token-auth-resilience](rules/token-auth-resilience.md)
 - [ ] 자동 교정 루프 실행 → §2

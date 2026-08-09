@@ -13,17 +13,27 @@ description: Firestore 데이터 스키마 정의(타입/필드 추가) 및 CRUD
 
 기존 컬렉션에 새 필드를 추가하거나 신규 데이터 타입을 정의할 때의 구조입니다.
 
-### 1.1 타입 정의 및 하위 호환성 (Optional 필수)
-*   **원칙**: 기존에 생성된 문서들에는 새 필드가 존재하지 않으므로, 데이터 정합성 깨짐을 방지하기 위해 **반드시 새 필드는 optional(`?`)로 선언**해야 합니다.
-*   **위치**: `src/types/` 디렉토리 하위의 도메인 파일.
+### 1.1 필드는 Zod 스키마에만 추가한다 (단일 원본)
+*   **위치**: `src/schemas/` 디렉토리 하위의 도메인 파일. **`src/types/`를 고치지 않는다.**
+*   `src/types/<도메인>.ts`의 도메인 타입은 `z.infer<typeof xSchema> & FirestoreDoc`으로 **파생**된다. 스키마에 추가하면 타입이 따라오고, 두 곳에 각각 선언하면 다시 어긋난다.
+*   **원칙**: 기존에 생성된 문서들에는 새 필드가 존재하지 않으므로, 데이터 정합성 깨짐을 방지하기 위해 **반드시 새 필드는 `.optional()`로 선언**해야 합니다.
 
 ```typescript
-// src/types/organization.ts 예시
-export interface Organization extends FirestoreDoc {
-    name: string;
-    message?: string;  // ← 새 필드는 항상 optional
-}
+// src/schemas/organization.ts 예시
+export const organizationSchema = z.object({
+    name: z.string().catch(''),
+    /** 신청 시 남긴 메시지 */
+    message: z.string().optional().catch(undefined),  // ← 새 필드는 항상 optional
+});
+
+// src/types/organization.ts — 손대지 않는다. 아래 한 줄이 위 스키마를 따라간다.
+// export type Organization = z.infer<typeof organizationSchema> & FirestoreDoc;
 ```
+
+> ⚠️ **스키마에 빠뜨리면 조용히 죽는다.** `createZodConverter`의 `fromFirestore`는 Zod가 모르는 키를 제거한다(`z.object` 기본 동작). 저장은 되는데 앱에서는 항상 `undefined`가 되어, 코드가 멀쩡한데 화면에만 안 나오는 상태가 된다. 실제로 차량 `currentBattery`(🔋 배지)와 예약 `syncSource`(📅 배지)가 이 방식으로 죽어 있었다. 회귀 방지는 `src/__tests__/schemas/schemaCoverage.test.ts`에 있으니 새 필드도 여기에 한 줄 추가한다.
+
+### 1.1.1 시각 필드
+읽기 타입은 `FieldValue`를 포함하지 않는다(`schemas/common.ts`의 `timestampSchema`). `serverTimestamp()`를 심는 쓰기 지점에서만 `WithServerTimestamps<T, 'createdAt'>`로 해당 필드를 넓힌다. Timestamp인지 Date인지 판정해야 하면 `toDateOrNull`(`lib/dateUtils`)을 쓴다 — 호출부에서 직접 `toDate` 유무를 분기하지 않는다.
 
 ### 1.2 UI 렌더링 시 하위 호환성 보장
 기존 문서에 해당 필드가 없는 경우를 위해 렌더링 시 옵셔널 체이닝(`?.`) 및 조건부 렌더링(`&&`)을 필수 적용합니다.
