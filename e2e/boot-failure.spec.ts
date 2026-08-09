@@ -71,7 +71,13 @@ test.describe('부팅 실패 처리', () => {
         let online = false;
         await page.route(ENTRY_CHUNK, async (route) => {
             if (!online) {
-                await route.abort('failed');
+                // `route.abort()`가 아니라 **503 응답**으로 끊는다.
+                // abort는 WebKit에 `Blocked by Web Inspector`로 기록되고, 그 뒤 리로드하면
+                // 브라우저가 **재요청 자체를 하지 않는다**(2026-08-09 CI: 리로드 후 청크 요청
+                // 이벤트 0건). 실패한 URL이 그대로 캐시에 남아 복구를 표현할 방법이 없어진다.
+                // 503은 실제 HTTP 응답이라 그 경로를 타지 않고, no-store로 캐시도 막는다.
+                // 서버가 잠깐 응답하지 못하는 상황이라 현장에서 더 흔한 실패 모양이기도 하다.
+                await route.fulfill({ status: 503, headers: { 'cache-control': 'no-store' }, body: '' });
                 return;
             }
             // 복구 후: 인터셉션 안에서 직접 요청을 수행해 그 응답으로 채운다(위 주석 참고)
