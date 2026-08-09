@@ -17,7 +17,9 @@ export const sendFeedbackReply = onCall(
     {
         region: "asia-northeast3",
         timeoutSeconds: 30,
-        enforceAppCheck: false,
+        // superAdmin 전용이고 관리자 화면에서만 호출된다 — 그 화면은 InAppBrowserGuard
+        // 안쪽이라 App Check가 초기화되지 않는 인앱 브라우저에서는 도달할 수 없다.
+        enforceAppCheck: true,
         secrets: [GMAIL_APP_PASSWORD],
     },
     async (request) => {
