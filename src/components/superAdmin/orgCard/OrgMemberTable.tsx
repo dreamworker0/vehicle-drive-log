@@ -2,22 +2,15 @@
  * OrgMemberTable — 기관 멤버 목록 테이블 (역할 변경·제거)
  */
 import { memo } from 'react';
-
-interface OrgMember {
-    id: string;
-    name?: string;
-    email?: string;
-    role?: string;
-    [key: string]: unknown;
-}
+import type { User, UserRole } from '../../../types/user';
 
 interface Props {
-    members: OrgMember[];
+    members: User[];
     orgId: string;
     changingRole: string | null;
     loadingMembers: boolean;
-    onRoleChange: (member: OrgMember, orgId: string, newRole: string) => void;
-    onRemoveMember: (member: OrgMember, orgId: string) => void;
+    onRoleChange: (member: User, orgId: string, newRole: UserRole) => void;
+    onRemoveMember: (member: User, orgId: string) => void;
 }
 
 export default memo(function OrgMemberTable({ members, orgId, changingRole, loadingMembers, onRoleChange, onRemoveMember }: Props) {
@@ -66,7 +59,7 @@ export default memo(function OrgMemberTable({ members, orgId, changingRole, load
                             <td className="py-2.5 px-5">
                                 <select
                                     value={member.role || 'employee'}
-                                    onChange={(e) => onRoleChange(member, orgId, e.target.value)}
+                                    onChange={(e) => onRoleChange(member, orgId, e.target.value as UserRole)}
                                     disabled={changingRole === member.id}
                                     className={`text-xs border border-surface-200 dark:border-surface-600 rounded-lg px-2 py-1 bg-white dark:bg-surface-800 text-surface-600 dark:text-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-500/30 cursor-pointer transition-colors ${changingRole === member.id ? 'opacity-50' : ''}`}
                                 >

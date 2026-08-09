@@ -3,6 +3,7 @@
  */
 import type { Organization } from '../../types';
 import { WITHDRAW_REASON_LABELS } from '../../types/organization';
+import { toDateOrNull } from '../../lib/dateUtils';
 
 interface DeletedOrgCardProps {
     org: Organization;
@@ -12,10 +13,8 @@ interface DeletedOrgCardProps {
 }
 
 function getDaysInfo(deletedAt: Organization['deletedAt']): { elapsed: number; remaining: number } {
-    if (!deletedAt) return { elapsed: 0, remaining: 30 };
-    const deletedDate = (typeof (deletedAt as unknown as { toDate?: () => Date }).toDate === 'function')
-        ? (deletedAt as { toDate: () => Date }).toDate()
-        : new Date(deletedAt as string | Date);
+    const deletedDate = toDateOrNull(deletedAt);
+    if (!deletedDate) return { elapsed: 0, remaining: 30 };
     const elapsed = Math.floor((Date.now() - deletedDate.getTime()) / (1000 * 60 * 60 * 24));
     return { elapsed, remaining: Math.max(0, 30 - elapsed) };
 }

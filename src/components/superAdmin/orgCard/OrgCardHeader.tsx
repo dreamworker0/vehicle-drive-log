@@ -3,7 +3,7 @@
  * 기관명, 뱃지(직원 수, 등록일, 경과일, 초대코드), 삭제 버튼
  */
 import { memo, useMemo, useState } from 'react';
-import { formatTimestampFull } from '../../../lib/dateUtils';
+import { formatTimestampFull, toDateOrNull } from '../../../lib/dateUtils';
 import type { Organization } from '../../../types';
 
 interface Props {
@@ -24,10 +24,9 @@ function getDaysBadgeStyle(days: number) {
 export default memo(function OrgCardHeader({ org, memberCount, isExpanded, editing, onToggle, onDelete }: Props) {
     const [now] = useState(() => Date.now());
     const daysSinceApproval = useMemo(() => {
-        if (memberCount > 0 || !org.approvedAt) return null;
-        const approved = 'toDate' in org.approvedAt
-            ? (org.approvedAt as { toDate: () => Date }).toDate()
-            : new Date(org.approvedAt as unknown as string);
+        if (memberCount > 0) return null;
+        const approved = toDateOrNull(org.approvedAt);
+        if (!approved) return null;
         return Math.floor((now - approved.getTime()) / (1000 * 60 * 60 * 24));
     }, [memberCount, org.approvedAt, now]);
 

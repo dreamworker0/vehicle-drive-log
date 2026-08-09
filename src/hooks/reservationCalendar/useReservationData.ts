@@ -84,9 +84,8 @@ export function useReservationData({
                 ]);
                 setVehicles(vList as Vehicle[]);
                 setFavorites(fList as Favorite[]);
-                const orgData = org as unknown as { address?: string } | null;
-                if (orgData?.address) {
-                    setOrgAddress(orgData.address);
+                if (org?.address) {
+                    setOrgAddress(org.address);
                 }
 
                 // 관리자는 예약자 대리 지정에, 일반 직원은 동승자 선택에 직원 목록이 필요하다.
