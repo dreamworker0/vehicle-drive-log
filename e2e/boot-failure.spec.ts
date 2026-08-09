@@ -52,8 +52,13 @@ test.describe('부팅 실패 처리', () => {
      * 실패 모양 그대로이고, 브라우저별 인터셉션 차이를 원천적으로 타지 않으므로
      * WebKit에서도 "복구 후 진입"까지 검증을 유지한다 — 회선이 불안정한 현장이 정확히
      * 이 앱의 사용 환경이라 iOS만 공백으로 둘 수 없다.
+     *
+     * 복구는 쿠키 삭제가 아니라 **서버 측 토글**(/__e2e/outage/off)로 표현한다.
+     * 쿠키 삭제만으로는 "브라우저가 리로드 요청에 쿠키 변경을 반영했는가"라는 또 하나의
+     * 브라우저 의존이 생긴다(5번째 시도가 이것으로 mobile-safari에서 실패했을 가능성).
+     * 서버가 토큰을 무시하게 만들면 쿠키가 남아 있어도 정상 응답한다.
      */
-    test('다시 시도를 누르면 재로드하고, 회선이 돌아오면 정상 진입한다', async ({ page, context, baseURL }) => {
+    test('다시 시도를 누르면 재로드하고, 회선이 돌아오면 정상 진입한다', async ({ page, context, baseURL }, testInfo) => {
         // 이 스펙은 브라우저마다 결과가 갈리는 자리라(청크 실패 → 리로드 → 복구),
         // "랜딩이 안 떴다"만으로는 리로드가 아예 없었는지·리로드는 됐는데 앱이 안 떴는지
         // 구분할 수 없다. CI 로그를 뒤지는 왕복을 없애려고 그 정보를 실패 메시지에 싣는다.
@@ -73,16 +78,26 @@ test.describe('부팅 실패 처리', () => {
                 chunkResults.push(`실패(${req.failure()?.errorText ?? '?'}) ${chunkName(req.url())}`);
             }
         });
+        // 리로드 후 import가 왜 실패했는지는 main.tsx의 console.error에만 남는다
+        const consoleErrors: string[] = [];
+        page.on('console', (msg) => {
+            if (msg.type() === 'error') consoleErrors.push(msg.text());
+        });
 
-        // 회선 단절 — 이 컨텍스트의 요청에만 쿠키가 실리므로 병렬 워커와 간섭하지 않는다
+        // 회선 단절 — 쿠키(값=토큰)는 이 컨텍스트의 요청에만 실리므로 병렬 워커와
+        // 간섭하지 않는다. 토큰은 서버 로그에서 이 테스트의 요청만 골라내는 데도 쓴다.
+        const startedAt = new Date().toISOString();
+        const outageToken = `w${testInfo.workerIndex}-r${testInfo.retry}`;
         await context.addCookies([
-            { name: 'vdl-e2e-outage', value: '1', url: baseURL ?? 'http://localhost:4173' },
+            { name: 'vdl-e2e-outage', value: outageToken, url: baseURL ?? 'http://localhost:4173' },
         ]);
 
         await page.goto('/', { waitUntil: 'commit' });
         await expect(page.getByText('앱을 불러오지 못했습니다')).toBeVisible({ timeout: 15000 });
 
-        // 회선 복구 — 쿠키가 사라지면 프리뷰 서버가 다시 정상 응답한다
+        // 회선 복구 — 서버가 이 토큰을 무시하게 만든다(위 주석 참고). 쿠키도 지워
+        // 실제 복구 상황(더 이상 아무 표식이 없는 평범한 요청)에 가깝게 둔다.
+        await page.request.get(`/__e2e/outage/off?token=${outageToken}`);
         await context.clearCookies();
 
         await page.getByRole('button', { name: '다시 시도' }).click();
@@ -97,11 +112,25 @@ test.describe('부팅 실패 처리', () => {
             const screenText = await page
                 .evaluate(() => document.body.innerText)
                 .catch(() => '(읽지 못함)');
+            // 서버 관점의 기록 — 브라우저 이벤트는 캐시 재사용과 미요청을 구분하지 못한다
+            const serverLog = await page.request
+                .get('/__e2e/outage/log')
+                .then(async (res) => {
+                    const all = (await res.json()) as { at: string; url: string; token: string | null; status: number }[];
+                    // 토큰 없는 항목은 병렬 테스트의 정상 요청일 수 있어 이 테스트 시작 이후로 좁힌다
+                    return all
+                        .filter((h) => h.token === outageToken || (h.token === null && h.at >= startedAt))
+                        .slice(-20)
+                        .map((h) => `${h.at} ${h.status} ${chunkName(h.url)} (token=${h.token ?? '없음'})`);
+                })
+                .catch((e) => [`(로그 조회 실패: ${(e as Error).message})`]);
             throw new Error(
                 `랜딩이 뜨지 않았다.\n`
                 + `  메인 프레임 이동 ${navigations.length}회: ${navigations.join(' → ') || '(없음)'}\n`
                 + `  페이지 예외: ${pageErrors.join(' / ') || '(없음)'}\n`
-                + `  엔트리 청크 요청: ${chunkResults.join(' / ') || '(없음)'}\n`
+                + `  엔트리 청크 요청(브라우저 관점): ${chunkResults.join(' / ') || '(없음)'}\n`
+                + `  엔트리 청크 요청(서버 관점):\n    ${serverLog.join('\n    ') || '(없음)'}\n`
+                + `  콘솔 에러: ${consoleErrors.join(' / ') || '(없음)'}\n`
                 + `  화면 텍스트: "${screenText.replace(/\s+/g, ' ').slice(0, 200)}"\n`
                 + `  원래 오류: ${(err as Error).message}`,
             );
