@@ -13,16 +13,6 @@ import { test, expect } from '@playwright/test';
 const ENTRY_CHUNK = /\/assets\/(lightEntry|LandingPage)-[^/]*\.js$/;
 
 test.describe('부팅 실패 처리', () => {
-    // 이 스펙은 브라우저별 차이를 타기 쉬운 자리다(청크 실패 → 리로드 → 복구). 실패했을 때
-    // 화면만 봐서는 리로드가 몇 번 일어났는지, 예외가 났는지 알 수 없어 CI 로그로 왕복해야
-    // 했으므로 그 둘은 남겨 둔다.
-    test.beforeEach(({ page }) => {
-        page.on('pageerror', (err) => console.log(`[pageerror] ${err.message}`));
-        page.on('framenavigated', (frame) => {
-            if (frame === page.mainFrame()) console.log(`[nav] ${frame.url()}`);
-        });
-    });
-
     test('엔트리 청크를 못 받으면 다시 시도 화면을 보여준다', async ({ page }) => {
         await page.route(ENTRY_CHUNK, (route) => route.abort('failed'));
 
@@ -48,6 +38,16 @@ test.describe('부팅 실패 처리', () => {
      * 복구에 더 가깝고, 브라우저별 인터셉션 차이를 타지 않는다.
      */
     test('다시 시도를 누르면 재로드하고, 회선이 돌아오면 정상 진입한다', async ({ page }) => {
+        // 이 스펙은 브라우저마다 결과가 갈리는 자리라(청크 실패 → 리로드 → 복구),
+        // "랜딩이 안 떴다"만으로는 리로드가 아예 없었는지·리로드는 됐는데 앱이 안 떴는지
+        // 구분할 수 없다. CI 로그를 뒤지는 왕복을 없애려고 그 정보를 실패 메시지에 싣는다.
+        const navigations: string[] = [];
+        const pageErrors: string[] = [];
+        page.on('framenavigated', (frame) => {
+            if (frame === page.mainFrame()) navigations.push(frame.url());
+        });
+        page.on('pageerror', (err) => pageErrors.push(err.message));
+
         const block = (route: import('@playwright/test').Route) => route.abort('failed');
         await page.route(ENTRY_CHUNK, block);
 
@@ -60,7 +60,20 @@ test.describe('부팅 실패 처리', () => {
         await page.getByRole('button', { name: '다시 시도' }).click();
 
         // 랜딩이 실제로 뜨는지 — 접근성 스펙이 보는 것과 같은 앵커를 쓴다
-        await expect(page.locator('nav[aria-label]').first()).toBeAttached({ timeout: 15000 });
+        try {
+            await expect(page.locator('nav[aria-label]').first()).toBeAttached({ timeout: 15000 });
+        } catch (err) {
+            const screenText = await page
+                .evaluate(() => document.body.innerText)
+                .catch(() => '(읽지 못함)');
+            throw new Error(
+                `랜딩이 뜨지 않았다.\n`
+                + `  메인 프레임 이동 ${navigations.length}회: ${navigations.join(' → ') || '(없음)'}\n`
+                + `  페이지 예외: ${pageErrors.join(' / ') || '(없음)'}\n`
+                + `  화면 텍스트: "${screenText.replace(/\s+/g, ' ').slice(0, 200)}"\n`
+                + `  원래 오류: ${(err as Error).message}`,
+            );
+        }
         await expect(page.getByText('앱을 불러오지 못했습니다')).toHaveCount(0);
     });
 
