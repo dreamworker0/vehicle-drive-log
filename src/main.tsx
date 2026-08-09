@@ -70,20 +70,55 @@ if ('serviceWorker' in navigator) {
   });
 }
 
-// Auth 상태 확인과 병렬로 appEntry 번들을 미리 로드 (추측적 프리로드)
-// 대부분(~80%)의 방문이 재방문(인증 사용자)이므로 높은 적중률 기대
-// import()는 최초 한 번만 네트워크 요청을 발생시키고, 이후 호출은 캐시에서 즉시 반환
-const appEntryPreload = import('./appEntry');
+/**
+ * 이전에 로그인한 적이 있는 브라우저인지 표시하는 힌트.
+ *
+ * appEntry 프리로드를 **누구에게 걸지** 정하는 데만 쓴다. 인증 판정은 여전히
+ * `onAuthStateChanged`가 하며, 이 값이 틀려도(로그아웃 뒤 남아 있거나 지워졌거나)
+ * 화면 동작은 달라지지 않는다 — 프리로드가 한 번 헛돌거나 한 번 늦을 뿐이다.
+ */
+const RETURNING_VISITOR_KEY = 'vdl:returning-visitor';
+
+function readReturningHint(): boolean {
+    try {
+        return localStorage.getItem(RETURNING_VISITOR_KEY) === '1';
+    } catch {
+        // 시크릿 모드·저장소 차단 환경 — 첫 방문으로 취급한다(더 가벼운 쪽)
+        return false;
+    }
+}
+
+function writeReturningHint(value: boolean) {
+    try {
+        if (value) localStorage.setItem(RETURNING_VISITOR_KEY, '1');
+        else localStorage.removeItem(RETURNING_VISITOR_KEY);
+    } catch { /* 저장소를 못 쓰면 힌트 없이 동작한다 */ }
+}
+
+/**
+ * Auth 상태 확인과 병렬로 appEntry 번들을 미리 로드 (추측적 프리로드).
+ *
+ * 예전에는 **무조건** 걸었다. 재방문(인증) 비중이 ~80%라는 근거였는데, 나머지 20%인
+ * 첫 방문자는 자기에게 필요 없는 appEntry(100KB + 의존성)를 내려받느라 정작 필요한
+ * lightEntry와 대역폭을 다퉜다. 느린 회선일수록 손해가 커지고, 기관 담당자가 링크를
+ * 처음 눌러 들어오는 순간이 정확히 그 경우다.
+ *
+ * 그래서 **이전에 로그인한 적이 있는 브라우저에만** 건다. 재방문자의 체감은 그대로이고
+ * (같은 시점에 같은 프리로드가 시작된다), 첫 방문자는 그만큼 덜 받는다.
+ * 힌트가 없는데 실제로는 인증 사용자인 경우(저장소 초기화 등)에도 아래에서 그때
+ * import하므로 동작은 같다 — 프리로드 이득만 한 번 놓친다.
+ */
+const appEntryPreload = readReturningHint() ? import('./appEntry') : null;
 // 비인증 사용자는 이 프리로드를 await하지 않으므로, 실패해도 unhandledrejection이
 // 뜨지 않게 여기서 한 번 받아 둔다. 원본 프라미스는 그대로라 아래 await는 정상적으로 던진다.
-appEntryPreload.catch(() => { /* 인증 경로의 await에서 처리한다 */ });
+appEntryPreload?.catch(() => { /* 인증 경로의 await에서 처리한다 */ });
 // persistence 설정 완료를 기다린 뒤 Auth 상태 확인
 authReady.then(() => {
     // 에뮬레이터(E2E) 모드: 항상 전체 앱을 로드한다.
     // 경량 entry(lightEntry)에는 AuthProvider와 __E2E_AUTH__ 로그인 헬퍼가 없어
     // 테스트에서 로그인 후 리다이렉트가 동작하지 않으므로, 전체 앱으로 고정한다.
     if (import.meta.env.VITE_USE_EMULATOR === 'true') {
-        appEntryPreload.then(({ renderFullApp }) => renderFullApp()).catch(showBootError);
+        (appEntryPreload ?? import('./appEntry')).then(({ renderFullApp }) => renderFullApp()).catch(showBootError);
         return;
     }
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
@@ -91,10 +126,14 @@ authReady.then(() => {
 
         try {
             if (user && !user.isAnonymous) {
-                // 인증 사용자 → 전체 앱 로드 (프리로드된 번들 즉시 사용)
-                const { renderFullApp } = await appEntryPreload;
+                // 다음 방문부터는 appEntry를 미리 받아 둔다
+                writeReturningHint(true);
+                // 인증 사용자 → 전체 앱 로드 (프리로드가 걸려 있으면 즉시 사용)
+                const { renderFullApp } = await (appEntryPreload ?? import('./appEntry'));
                 renderFullApp();
             } else {
+                // 로그아웃했거나 애초에 로그인한 적이 없는 브라우저 — 다음 방문도 가볍게 연다
+                writeReturningHint(false);
                 // 비인증 사용자 → 경량 앱 로드
                 const { renderLightApp } = await import('./lightEntry');
                 renderLightApp();

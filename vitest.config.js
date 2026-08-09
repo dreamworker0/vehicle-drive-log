@@ -60,6 +60,8 @@ export default defineConfig({
             // 2026-07-25 출력물·경로 계산 테스트(lib/pdf 5%→97%, lib/tmap 16%→97%) 추가로 재상향.
             // 2026-08-09 UI 계층 테스트(예약 사이드 패널·차량 관리·운행일지 폼 훅) + 통계 계산
             //            (analyticsCalc 비용/추천, monthlyReportCalc, reservationPatternCalc) 추가로 재상향.
+            // 2026-08-09 지도(OrgMapView)·차트(TrendCharts·ReportCharts) 추가로 재상향
+            //            (실측 lines 45.76/stmts 44.76/funcs 37.35/branches 35.84).
             //
             // ── 전역 임계치만으로는 부족하다 ──
             // 전역 평균만 보면 **커버리지 0%인 핵심 모듈이 있어도 통과한다.** 잘 덮인 순수 함수
@@ -70,10 +72,10 @@ export default defineConfig({
             // glob 하한은 실측보다 3~6pp 낮게 잡는다. 리팩토링으로 분기 몇 개가 오가는 정도로는
             // 깨지지 않되, 모듈 하나가 통째로 무방비가 되면 걸리는 선이다.
             thresholds: {
-                lines: 44,
-                statements: 43,
-                functions: 36,
-                branches: 34,
+                lines: 45,
+                statements: 44,
+                functions: 37,
+                branches: 35,
 
                 // 운행일지 폼 — 서비스의 본체. 여기가 틀리면 기록 자체가 틀어진다 (실측 88/86/84/75)
                 'src/hooks/driveLogForm/**': {
