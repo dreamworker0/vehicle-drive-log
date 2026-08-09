@@ -154,16 +154,20 @@ VITE_SENTRY_DSN=...
 `functions/.env` 파일 — 평문 보관이 가능한 값만 둡니다:
 
 ```env
+GMAIL_USER=...
+ALIMTALK_PROXY_URL=...
+ADMIN_NOTIFICATION_EMAIL=...
+SENTRY_DSN_FUNCTIONS=...     # 없으면 Functions 예외가 Sentry로 가지 않음
+DISCORD_WEBHOOK_URL=...      # 선택 (운영 알림)
 GEMINI_API_KEY=...
 TMAP_API_KEY=...
 HOLIDAY_API_KEY=...
-EMAILJS_SERVICE_ID=...
-EMAILJS_TEMPLATE_ID=...
-EMAILJS_PUBLIC_KEY=...
-GMAIL_USER=...
-ALIMTALK_PROXY_URL=...
-DISCORD_WEBHOOK_URL=...      # 선택 (운영 알림)
+ALLOW_TEST_WHITELIST=        # 운영에서는 비워 둔다
 ```
+
+> 이 목록은 `npm run check:functions-env`가 코드(`defineString`/`process.env`)와 대조합니다 —
+> [functions/.env.example](functions/.env.example)과 위 블록이 코드와 어긋나면 CI가 실패합니다.
+> EmailJS의 서비스·템플릿·공개 키는 환경변수가 아니라 코드 상수입니다([verifyHelpers.ts](functions/src/services/driveLog/verifyHelpers.ts)).
 
 크리덴셜은 **Secret Manager**로 관리합니다([functions/src/core/params.ts](functions/src/core/params.ts)). `functions/.env`에 같은 키가 남아 있으면 **이름 충돌로 배포가 거부**됩니다.
 
@@ -261,11 +265,13 @@ npm run build           # 프로덕션 빌드 확인
 
 ## Cloud Functions
 
-전체 63개 함수(리전 `asia-northeast3`)의 파라미터·권한·트리거 경로는 **[Cloud Functions 레퍼런스](docs/FUNCTIONS_REFERENCE.md)** 에 정리되어 있습니다. 아래는 종류별 요약입니다.
+전체 67개 함수(리전 `asia-northeast3`)의 파라미터·권한·트리거 경로는 **[Cloud Functions 레퍼런스](docs/FUNCTIONS_REFERENCE.md)** 에 정리되어 있습니다. 아래는 종류별 요약입니다.
+
+> 이 절의 숫자는 `npm run check:functions-catalog`가 `functions/src/index.ts`와 대조합니다 — 어긋나면 CI가 실패합니다.
 
 | 종류 | 개수 | 대표 함수 |
 |------|------|-----------|
-| 호출형 (onCall) | 34 | `ocrDashboard`(계기판 OCR) · `createReservationSafe`(트랜잭션 예약 생성) · `joinOrganization`(초대 코드 가입) · `withdrawOrganization`(기관 해지) · `askAI`(FAQ 기반 답변) · `getSlackInstallUrl`·`diagnoseSlackConnection`(Slack 연결) |
+| 호출형 (onCall) | 38 | `ocrDashboard`(계기판 OCR) · `createReservationSafe`(트랜잭션 예약 생성) · `joinOrganization`(초대 코드 가입) · `withdrawOrganization`(기관 해지) · `askAI`(FAQ 기반 답변) · `getSlackInstallUrl`·`diagnoseSlackConnection`(Slack 연결) |
 | HTTP (onRequest) | 4 | `tmapProxy`·`holidayProxy`(외부 API 프록시, 인증 + Rate Limit) · `slackEvents`(Slack 이벤트 수신) · `slackOauthCallback`(설치 콜백) |
 | 스케줄 (onSchedule) | 5 | 아래 표 참고 |
 | Firestore 트리거 | 19 | `autoVerifyDocument`(증빙서류 AI 심사) · `setCustomClaims`(권한 동기화) · `onReservation*`(캘린더·푸시) · `onDriveLog*`(주행거리·집계) · `audit*`(접속기록) · `onSlackTaskCreated`(Slack 워커) |

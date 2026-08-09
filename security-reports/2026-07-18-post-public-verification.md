@@ -90,7 +90,16 @@
 9. sendAdminNotice 정책 결정(7b)
 10. Secret Scanning 알림 #6 종결 처리
 11. CodeQL 워크플로 추가(공개=무료)
-12. F-01/F-02 보완: monthlyBatch에 정합성 배치 검사(위험 수용 유지)
+12. ~~F-01/F-02 보완: monthlyBatch에 정합성 배치 검사(위험 수용 유지)~~ → **완료 (2026-08-09)**
+    `verifyMileageConsistency`에 `findReferenceIssues`(driverUid·vehicleId의 실재·소속 대조)를
+    추가하고 위반 시 `captureWarning`으로 Sentry·Discord에 올린다. 위험 수용은 그대로 유지하되,
+    수용의 전제였던 **탐지 수단**이 이제 실제로 존재한다.
+
+    > 이 검사를 붙이며 드러난 사실: 기존 `verifyMileageConsistency`는
+    > `organizations/{orgId}/driveLogs`·`.../vehicles` **서브컬렉션**을 스캔하고 있었는데
+    > 그런 컬렉션은 없다(운행일지·차량은 최상위 컬렉션 + `organizationId` 필드).
+    > 즉 매달 빈 컬렉션을 돌며 "불일치 0건"을 보고하던 상태였고, 그 0건은 근거가 아니었다.
+    > 경로를 실제 구조로 고쳤다.
 
 ## 재검증에서 확인한 잘된 부분
 

@@ -11,8 +11,13 @@
 
 ## 1. Firestore TTL 정책 설정 (Rate Limit 자동 정리)
 
-현재 `cleanupRateLimits` 스케줄러가 매일 05:00에 만료 문서를 삭제하고 있음.
-Firestore TTL 정책을 설정하면 이 스케줄러를 **제거하고 자동 삭제**로 전환 가능.
+`_rateLimits`의 만료 문서는 **Firestore TTL 정책이 자동 삭제**한다. 정책은
+`firestore.indexes.json`의 `fieldOverrides`에 선언돼 있어 배포로 유지된다.
+
+> 이 절은 한때 "`cleanupRateLimits` 스케줄러가 매일 05:00에 삭제하고 있음"이라고
+> 적혀 있었다. 그 스케줄러는 2026-07-04에 제거됐고(`FIRESTORE_COST_ANALYSIS.md` §3),
+> `functions/src/index.ts`에 export가 없다 — 같은 폴더의 두 문서가 정반대를 말하던
+> 상태였다. 없는 함수를 운영 대상으로 적어두면 점검 때마다 헛도는 자리가 된다.
 
 ### 설정 방법
 
@@ -28,7 +33,7 @@ Firestore TTL 정책을 설정하면 이 스케줄러를 **제거하고 자동 �
    - TTL 필드: `expiresAt`
 5. **만들기** 클릭
 
-> TTL 활성화 후 `index.ts`에서 `cleanupRateLimits` export를 제거하고 재배포하면 됨.
+> 정책이 이미 파일에 선언돼 있으므로 콘솔에서는 상태("제공 중")만 확인하면 된다.
 
 ### ⚠️ 배포 후 필수 작업 — `auditLogs` TTL 정책
 
@@ -110,7 +115,9 @@ severity>=WARNING
 #### (2) 높은 지연 시간
 - **조건**: p95 `execution_times` > **10초** (5분 윈도우)
 - **심각도**: Warning
-- **대상 함수**: `reservationTriggers`, `archiveDriveLogs`, `sendNotification`
+- **대상 함수**: `dailyNightlyBatch`(백업·아카이빙 포함, 540초 타임아웃) · `monthlyBatch` · `onReservationCreated`/`onReservationUpdated`/`onReservationDeleted` · `ocrDashboard`(Gemini 호출)
+  - 과거 이 목록은 `archiveDriveLogs`·`sendNotification`을 가리켰지만 둘 다 export가 없다 —
+    아카이빙은 `dailyNightlyBatch`에 흡수됐고, 알림 발송은 예약 트리거가 담당한다.
 
 #### (3) 함수 크래시
 - **조건**: `execution_count(status=crash)` > **0** (1분 윈도우)
@@ -173,8 +180,8 @@ severity>=ERROR
 # 최근 에러 로그 확인
 gcloud functions logs read --min-log-level=ERROR --limit=20
 
-# 특정 함수 로그
-gcloud functions logs read archiveDriveLogs --limit=50
+# 특정 함수 로그 (야간 배치 — 백업·아카이빙·집계가 모두 여기 찍힌다)
+gcloud functions logs read dailyNightlyBatch --limit=50
 
 # 함수 상태 확인
 gcloud functions list --format="table(name,status,runtime)"

@@ -55,6 +55,15 @@ export const submitOrgApplication = onCall(
         region: "asia-northeast3",
         memory: "512MiB",
         timeoutSeconds: 60,
+        // **의도적으로 끈다.** 2026-07-18 보안 재점검이 App Check 적용을 권고했지만,
+        // 이 앱은 인앱 브라우저(카톡·네이버)에서 App Check를 **초기화하지 않는다**
+        // (src/lib/firebase.ts의 `!isInAppBrowser()` — Phase 61 reCAPTCHA 중복 렌더 충돌 회피).
+        // 그런데 /apply는 InAppBrowserGuard 바깥이라 인앱에서도 열린다(구글 로그인이
+        // 필요 없는 미가입자 경로이므로 의도된 설계다).
+        // 여기서 강제하면 카톡으로 링크를 받아 신청하는 기관이 전부 막힌다 — 국내
+        // 사회복지기관 대상 서비스에서 이는 신청 유입 자체를 끊는 비용이다.
+        // 대신 아래 이메일·IP Rate Limit과 superAdmin 심사가 방어선이다.
+        // 재검토 조건: 인앱에서도 App Check를 안전하게 초기화할 수 있게 되면 켠다.
         enforceAppCheck: false,
     },
     wrapHandler("submitOrgApplication", async (request: CallableRequest<Partial<SubmitApplicationPayload>>) => {

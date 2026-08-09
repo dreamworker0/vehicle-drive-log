@@ -45,23 +45,14 @@ interface AcceptedEntry {
     revisitWhen: string;
 }
 
-const KNOWN_ACCEPTED: AcceptedEntry[] = [
-    {
-        advisory: 'GHSA-qwww-vcr4-c8h2',
-        pkgs: ['react-router', 'react-router-dom'],
-        severity: 'high',
-        scope: '프론트엔드 (react-router 7.12.0~8.2.0, 현재 7.18.1)',
-        reason:
-            'RSC(React Server Components) 모드의 서버 액션이 400 응답 전에 실행되는 CSRF 우회. ' +
-            '이 앱은 순수 클라이언트 SPA(src/appEntry.tsx·lightEntry.tsx의 BrowserRouter + Vite 정적 빌드)로 ' +
-            'RSC·SSR·서버 액션을 전혀 쓰지 않아 취약 코드 경로가 존재하지 않는다. ' +
-            '업스트림 패치 버전이 없고 audit fix --force는 7.11.0 breaking 다운그레이드를 요구해 ' +
-            '라우팅 회귀 위험이 실익보다 크다(사용자 결정, 2026-07-25).',
-        revisitWhen:
-            '(1) react-router가 7.12+ 계열 패치 버전을 내면 즉시 상향하고 이 항목 제거, ' +
-            '(2) 이 앱이 RSC/SSR·서버 액션을 도입하면 수용 철회하고 재평가.',
-    },
-];
+// 현재 수용 중인 항목 없음.
+//
+// GHSA-qwww-vcr4-c8h2(react-router RSC CSRF 우회)는 2026-07-25에 수용했다가
+// 2026-08-09에 제거했다 — react-router-dom 7.18.2에서 권고가 더 이상 매칭되지 않고
+// `npm audit`도 취약점 0건을 보고한다. 등록부의 stale 항목은 그 자체가 위험이라
+// (해소된 권고에 대한 차감 규칙이 계속 살아 있어, 같은 GHSA가 재등장해도 조용히
+// 차감된다) 이 스크립트가 "매칭 0건" 경고로 알려준 즉시 지운다.
+const KNOWN_ACCEPTED: AcceptedEntry[] = [];
 
 /** GHSA ID 형식 — 오기입(빈 문자열·접두사만)으로 전체 권고가 차감되는 사고를 원천 차단 */
 const GHSA_RE = /^GHSA-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}$/;

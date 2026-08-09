@@ -1,8 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // Firebase 모듈 모킹 — limit 인자를 검증하기 위해 호출 인자를 그대로 보존한다.
+// collection()은 zod 컨버터를 붙일 수 있도록 withConverter를 가진 참조를 돌려준다
+// (fuelLogs·hipassCharges가 createZodConverter로 읽기 계약을 검증하므로 필수).
 vi.mock('firebase/firestore', () => ({
-    collection: vi.fn(),
+    collection: vi.fn(() => {
+        const ref: { label: string; withConverter: () => unknown } = {
+            label: 'collection-ref',
+            withConverter: () => ref,
+        };
+        return ref;
+    }),
     query: vi.fn(),
     where: vi.fn(),
     orderBy: vi.fn(),

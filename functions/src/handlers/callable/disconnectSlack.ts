@@ -21,6 +21,9 @@ export const disconnectSlack = onCall(
         timeoutSeconds: 30,
         memory: "256MiB",
         cors: true,
+        // 관리자 설정 화면에서만 호출된다. 그 화면은 InAppBrowserGuard 안쪽이라
+        // App Check가 초기화되지 않는 인앱 브라우저에서는 애초에 도달할 수 없다.
+        enforceAppCheck: true,
     },
     async (request) => {
         if (!request.auth) {

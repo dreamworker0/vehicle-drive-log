@@ -9,13 +9,17 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { captureError } from '../sentry';
+import { createZodConverter, maintenanceSchema } from '../../schemas';
+
+// 읽기 경로에 스키마 검증을 건다 (원시 캐스팅 대체 — fuelLogs와 동일한 이유).
+const maintenanceRef = () => collection(db, 'maintenanceRecords').withConverter(createZodConverter(maintenanceSchema));
 
 // 정비 기록 목록 조회
 export const getMaintenanceRecords = async (orgId: string, vehicleId: string | null = null) => {
     let q;
     if (vehicleId) {
         q = query(
-            collection(db, 'maintenanceRecords'),
+            maintenanceRef(),
             where('organizationId', '==', orgId),
             where('vehicleId', '==', vehicleId),
             orderBy('date', 'desc'),
@@ -23,14 +27,14 @@ export const getMaintenanceRecords = async (orgId: string, vehicleId: string | n
         );
     } else {
         q = query(
-            collection(db, 'maintenanceRecords'),
+            maintenanceRef(),
             where('organizationId', '==', orgId),
             orderBy('date', 'desc'),
             limit(100)
         );
     }
     const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...(d.data() as Record<string, unknown>) }));
+    return snap.docs.map(d => ({ ...d.data(), id: d.id }));
 };
 
 // 정비 기록 생성 (차량 차단 플래그 지원)

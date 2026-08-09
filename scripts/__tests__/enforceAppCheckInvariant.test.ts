@@ -36,27 +36,27 @@ const PUBLIC_EXEMPT: Record<string, string> = {
 
 /**
  * 인증 사용자만 호출하므로 강제가 **가능**하지만 아직 배치에 포함하지 않은 것.
- * 4차(2026-07-25)에서 비용·민감도가 높은 2종을 강제로 옮겼고, 남은 3종은 진단·동기화
- * 계열이라 실패 시 관리자가 원인을 못 찾는 부작용이 커서 다음 배치로 미룬다.
+ * 5차(2026-08-09)에서 sendFeedbackReply를 강제로 옮겼다 — superAdmin 전용이고
+ * 관리자 화면(InAppBrowserGuard 안쪽)에서만 호출돼 인앱 브라우저 부작용이 없다.
+ * 남은 2종은 캘린더 연결 진단·수동 동기화라, 강제가 실패하면 관리자가 연결 문제의
+ * 원인을 못 찾게 되는 부작용이 커서 계속 미룬다.
  */
 const PENDING_DECISION: Record<string, string> = {
-    'callable/sendFeedbackReply.ts': 'superAdmin 피드백 회신 — 같은 훅의 regenerateFeedbackDraft는 이미 강제',
     'callable/testCalendarAccess.ts': 'admin 캘린더 연결 진단 — 연결 문제 진단 도구라 강제가 진단을 막을 수 있다',
     'callable/triggerOnDemandCalendarSync.ts': 'admin 수동 동기화 — 위 진단과 같은 화면·같은 판단',
 };
 
 /**
- * 옵션을 **아예 선언하지 않아** 기본값(미강제)에 기대고 있는 것 — 방침이 결정된 적 없다.
- * Slack 멀티테넌트 배치에서 추가되며 App Check 판단이 누락됐다(3차 리뷰 가드가 발견).
- * 넷 다 `!request.auth` 검사가 있고 인증된 관리자 화면(`useSlackIntegration.ts`)에서만
- * 호출되므로 강제가 **가능**하다. 4차 배치에서 위 PENDING_DECISION과 함께 결정한다.
+ * 옵션을 **아예 선언하지 않아** 기본값(미강제)에 기대는 것 — 현재 없다.
+ *
+ * Slack 4종이 여기 있었고(멀티테넌트 배치에서 App Check 판단이 누락된 것을 3차 리뷰
+ * 가드가 발견) 5차 배치(2026-08-09)에서 전부 강제로 옮겼다. 넷 다 관리자 설정
+ * 화면(`useSlackIntegration.ts`)에서만 호출되는데 그 화면은 InAppBrowserGuard
+ * 안쪽이라, App Check가 초기화되지 않는 인앱 브라우저에서는 애초에 도달할 수 없다.
+ *
+ * **빈 목록을 유지하는 것 자체가 가드다** — 새 onCall이 방침 없이 추가되면 실패한다.
  */
-const MISSING_DECLARATION = [
-    'callable/diagnoseSlackConnection.ts',
-    'callable/disconnectSlack.ts',
-    'callable/getSlackConnectionStatus.ts',
-    'callable/getSlackInstallUrl.ts',
-];
+const MISSING_DECLARATION: string[] = [];
 
 const NOT_ENFORCED = { ...PUBLIC_EXEMPT, ...PENDING_DECISION };
 
@@ -78,6 +78,19 @@ const BATCH3_ENFORCED = [
 const BATCH4_ENFORCED = [
     'callable/sendAdminNotice.ts',
     'callable/getOrgDocumentUrl.ts',
+];
+
+/**
+ * 5차 배치(2026-08-09) — 관리자 화면 전용 경로. 전부 InAppBrowserGuard 안쪽에서만
+ * 호출되므로 인앱 브라우저에서 App Check가 없어 막히는 부작용이 없다.
+ * (같은 날 공개 폼 2종은 반대 판단으로 **끄기를 확정**했다 — PUBLIC_EXEMPT 참고.)
+ */
+const BATCH5_ENFORCED = [
+    'callable/sendFeedbackReply.ts',
+    'callable/diagnoseSlackConnection.ts',
+    'callable/disconnectSlack.ts',
+    'callable/getSlackConnectionStatus.ts',
+    'callable/getSlackInstallUrl.ts',
 ];
 
 /** handlers/ 하위 .ts 파일을 재귀 수집 (테스트 제외) */
@@ -146,6 +159,12 @@ describe('enforceAppCheck 불변식', () => {
 
     it('4차 배치 2종은 강제 상태를 유지한다', () => {
         for (const key of BATCH4_ENFORCED) {
+            expect(read(key), `${key}에 enforceAppCheck: true가 없다`).toMatch(/enforceAppCheck:\s*true/);
+        }
+    });
+
+    it('5차 배치 5종은 강제 상태를 유지한다', () => {
+        for (const key of BATCH5_ENFORCED) {
             expect(read(key), `${key}에 enforceAppCheck: true가 없다`).toMatch(/enforceAppCheck:\s*true/);
         }
     });

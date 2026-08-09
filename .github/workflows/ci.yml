@@ -195,6 +195,14 @@ jobs:
         if: ${{ !cancelled() && steps.install-functions.outcome == 'success' }}
         run: npm run type-check:functions
 
+      - name: functions 환경변수 문서 정합 검증
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run check:functions-env
+
+      - name: functions 카탈로그·문서 수치 정합 검증
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run check:functions-catalog
+
       - name: .agent ↔ .claude 동기화 검증
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run sync:agents -- --check
