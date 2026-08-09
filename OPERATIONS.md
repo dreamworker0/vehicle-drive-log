@@ -10,9 +10,17 @@
 
 | 항목 | 확인 방법 | 정상 기준 |
 |------|----------|----------|
-| Functions 에러 | `npm run health` 또는 Firebase Console → Functions → 로그 | ERROR 0건 |
+| Functions 에러 | `npm run health` 또는 Firebase Console → Functions → 로그 | ERROR 0건 (⚠️ 최근 로그 300줄 범위의 0건이다 — 그 구간에 로그가 없는 함수는 점검되지 않는다) |
 | Firestore 백업 | Cloud Storage → `backups/firestore/YYYY-MM-DD/` | 오늘 날짜 폴더 존재 |
 | Sentry 에러 | [Sentry 대시보드](https://sentry.io) | 새 이슈 없음 |
+
+> **관련 문서** — 이 매뉴얼은 진입점이고, 세부는 아래에 있습니다.
+> [모니터링·알림 정책](docs/MONITORING_GUIDE.md) · [아카이빙 정책](docs/ARCHIVE_POLICY.md) ·
+> [Firestore 비용 분석](docs/FIRESTORE_COST_ANALYSIS.md) · [롤백 절차](ROLLBACK.md) ·
+> [정기 점검 일정표](OPERATIONS_SCHEDULE.md) · [외부 API 폴백](docs/API_FALLBACK.md)
+>
+> 스케줄 함수의 생존 확인은 `npx tsx scripts/check-health-heartbeats.ts`가
+> `_health/*` 하트비트를 읽어 `apiHealthCheck`의 활성 창 판정을 그대로 재현합니다(읽기 전용).
 
 ### 주간 확인
 
@@ -107,7 +115,12 @@ firebase functions:log --only ocrDashboard,autoVerifyDocument
 
 - **자동 백업**: `dailyNightlyBatch` 함수(매일 02:00 KST)의 첫 단계에서 Firestore 전체 export 실행
 - **저장 위치**: Cloud Storage → `backups/firestore/YYYY-MM-DD/`
-- **포함 컬렉션**: organizations, users, vehicles, driveLogs, reservations, notifications
+- **포함 컬렉션**: **전체** (`collectionIds: []` — 특정 컬렉션 목록을 지정하지 않는다)
+  - 한때 이 자리에 "organizations, users, vehicles, driveLogs, reservations, notifications" 6개가
+    적혀 있었다. 실제보다 **좁게** 적힌 오기여서, 복구 시 "이 컬렉션은 백업에 없겠구나"라고
+    잘못 판단할 수 있었다.
+- **실패 시**: 백업 스텝이 실패하면 `captureError`가 Sentry·Discord로 알린다.
+  알림이 없는데 오늘 폴더가 비어 있으면 배치 자체가 안 돈 것이므로 함수 로그를 먼저 본다.
 
 ```bash
 # Firebase Console에서 확인
@@ -138,7 +151,7 @@ Firestore 백업에서 복구가 필요한 경우:
 |----|----------|----------|
 | `GEMINI_API_KEY` | API 키 변경 시 | `functions/.env` 수정 → `firebase deploy --only functions` |
 | `EMAILJS_*` | 키 만료 시 | EmailJS 대시보드에서 재발급 → `.env` 수정 |
-| `VITE_TMAP_APP_KEY` | 키 만료 시 | 티맵 개발자센터에서 재발급 → `.env` 수정 → 빌드+배포 |
+| `VITE_TMAP_API_KEY` | 키 만료 시 | 티맵 개발자센터에서 재발급 → `.env` 수정 → 빌드+배포 (⚠️ 이름이 `..._APP_KEY`가 아니다 — 틀리면 경로 탐색이 **에러 없이** 죽는다) |
 | `VITE_SENTRY_DSN` | 프로젝트 변경 시 | Sentry 대시보드 → `.env` 수정 → 빌드+배포 |
 
 ### 5.2 Firebase 보안 규칙

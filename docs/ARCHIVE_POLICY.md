@@ -1,30 +1,36 @@
 # 아카이빙 정책 문서
 
-> 최종 점검일: 2026-03-21
+> 최종 점검일: 2026-08-09 (코드 대조 완료)
 
 ## 현재 정책
 
-### `archiveDriveLogs` 스케줄 함수
-- **실행 주기**: 매일 04:30 KST (UTC 19:30)
+### 야간 배치의 아카이빙 스텝 (`dailyNightlyBatch` → `archiveLogs`)
+
+독립 스케줄 함수 `archiveDriveLogs`는 더 이상 없다 — 인프라 비용 절감을 위해
+`dailyNightlyBatch`(매일 02:00 KST)의 한 스텝으로 흡수됐다.
+구현: [functions/src/handlers/scheduled/dailyNightlyBatch.ts](../functions/src/handlers/scheduled/dailyNightlyBatch.ts)
+
+- **실행 주기**: 매일 **02:00 KST** (야간 배치에 편승)
 - **기준**: 3년 이상 된 운행 기록 (`timestamp < 3년 전`)
 - **배치 크기**: 1회 최대 500건
-- **재시도**: 1회 (`retryCount: 1`)
+- **재시도**: 1회 (`retryCount: 1`, 배치 함수 단위)
 - **처리 흐름**:
   1. `driveLogs` 컬렉션에서 3년 이상 된 문서 500건 조회
-  2. GCS에 JSON 파일로 저장 (`archives/driveLogs/{날짜}_{건수}records.json`)
+  2. JSON을 **gzip 압축**해 GCS에 저장 (`archives/driveLogs/{날짜}_{건수}records.json.gz`)
   3. Firestore에서 해당 문서 일괄 삭제 (batch)
 
 ### GCS 아카이브 파일 구조
 ```
 gs://{bucket}/archives/driveLogs/
-├── 2026-03-21_500records.json
-├── 2026-03-20_123records.json
+├── 2026-03-21_500records.json.gz
+├── 2026-03-20_123records.json.gz
 └── ...
 ```
 
 각 파일 메타데이터:
 - `archivedAt`: 아카이브 실행 시점 ISO 문자열
 - `recordCount`: 포함된 레코드 수
+- `originalSize` / `compressedSize`: 압축 전후 바이트 수
 
 ---
 
@@ -36,19 +42,20 @@ gs://{bucket}/archives/driveLogs/
 gsutil ls gs://{bucket}/archives/driveLogs/
 
 # 특정 날짜의 아카이브 다운로드
-gsutil cp gs://{bucket}/archives/driveLogs/2026-03-21_500records.json ./
+gsutil cp gs://{bucket}/archives/driveLogs/2026-03-21_500records.json.gz ./
 ```
 
 ### 2. 데이터 확인
 ```bash
-# 내용 미리보기
-cat 2026-03-21_500records.json | python -m json.tool | head -50
+# gzip이므로 압축을 풀어 미리보기 (원본을 남기려면 -k)
+gunzip -c 2026-03-21_500records.json.gz | python -m json.tool | head -50
 ```
 
 ### 3. Firestore 복원 (필요시)
 ```typescript
-// Node.js 스크립트로 복원
-const data = JSON.parse(fs.readFileSync('2026-03-21_500records.json'));
+// Node.js 스크립트로 복원 (gzip 해제 필요)
+import { gunzipSync } from 'node:zlib';
+const data = JSON.parse(gunzipSync(fs.readFileSync('2026-03-21_500records.json.gz')).toString());
 const batch = db.batch();
 data.forEach(doc => {
     batch.set(db.collection('driveLogs').doc(doc.id), doc);
