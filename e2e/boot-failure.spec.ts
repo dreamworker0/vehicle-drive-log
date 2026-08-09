@@ -12,6 +12,11 @@ import { test, expect } from '@playwright/test';
  */
 const ENTRY_CHUNK = /\/assets\/(lightEntry|LandingPage)-[^/]*\.js$/;
 
+/** 로그를 짧게 유지하려고 해시 앞부분만 남긴다 */
+function chunkName(url: string): string {
+    return url.split('/').pop() ?? url;
+}
+
 test.describe('부팅 실패 처리', () => {
     test('엔트리 청크를 못 받으면 다시 시도 화면을 보여준다', async ({ page }) => {
         await page.route(ENTRY_CHUNK, (route) => route.abort('failed'));
@@ -43,10 +48,20 @@ test.describe('부팅 실패 처리', () => {
         // 구분할 수 없다. CI 로그를 뒤지는 왕복을 없애려고 그 정보를 실패 메시지에 싣는다.
         const navigations: string[] = [];
         const pageErrors: string[] = [];
+        // 엔트리 청크 요청이 복구 후에도 실패하는지 = 회선 복구가 실제로 반영됐는지의 지표
+        const chunkResults: string[] = [];
         page.on('framenavigated', (frame) => {
             if (frame === page.mainFrame()) navigations.push(frame.url());
         });
         page.on('pageerror', (err) => pageErrors.push(err.message));
+        page.on('response', (res) => {
+            if (ENTRY_CHUNK.test(res.url())) chunkResults.push(`${res.status()} ${chunkName(res.url())}`);
+        });
+        page.on('requestfailed', (req) => {
+            if (ENTRY_CHUNK.test(req.url())) {
+                chunkResults.push(`실패(${req.failure()?.errorText ?? '?'}) ${chunkName(req.url())}`);
+            }
+        });
 
         const block = (route: import('@playwright/test').Route) => route.abort('failed');
         await page.route(ENTRY_CHUNK, block);
@@ -54,8 +69,12 @@ test.describe('부팅 실패 처리', () => {
         await page.goto('/', { waitUntil: 'commit' });
         await expect(page.getByText('앱을 불러오지 못했습니다')).toBeVisible({ timeout: 15000 });
 
-        // 회선 복구 — 가로채기를 완전히 해제한다(위 주석 참고)
-        await page.unroute(ENTRY_CHUNK, block);
+        // 회선 복구 — 가로채기를 완전히 걷어낸다.
+        // `unroute(url, handler)`가 아니라 `unrouteAll`을 쓰는 이유: 전자는 이 핸들러만
+        // 목록에서 빼고, 진행 중인 핸들러가 끝나기를 기다리지 않는다. 브라우저별로
+        // 가로채기 해제가 다음 요청에 반영되는 시점이 갈릴 수 있어, 남은 것을 전부 걷고
+        // 진행 중인 것까지 정리하는 쪽을 쓴다.
+        await page.unrouteAll({ behavior: 'ignoreErrors' });
 
         await page.getByRole('button', { name: '다시 시도' }).click();
 
@@ -70,6 +89,7 @@ test.describe('부팅 실패 처리', () => {
                 `랜딩이 뜨지 않았다.\n`
                 + `  메인 프레임 이동 ${navigations.length}회: ${navigations.join(' → ') || '(없음)'}\n`
                 + `  페이지 예외: ${pageErrors.join(' / ') || '(없음)'}\n`
+                + `  엔트리 청크 요청: ${chunkResults.join(' / ') || '(없음)'}\n`
                 + `  화면 텍스트: "${screenText.replace(/\s+/g, ' ').slice(0, 200)}"\n`
                 + `  원래 오류: ${(err as Error).message}`,
             );
