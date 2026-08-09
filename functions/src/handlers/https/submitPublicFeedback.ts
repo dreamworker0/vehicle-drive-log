@@ -7,6 +7,9 @@ export const submitPublicFeedback = onCall(
     { 
         region: "asia-northeast3", 
         timeoutSeconds: 30,
+        // 의도적으로 끈다 — 랜딩의 공개 문의 모달은 인앱 브라우저에서도 열리는데,
+        // 그 환경에서는 App Check가 초기화되지 않는다(submitOrgApplication의 주석 참고).
+        // 방어선은 아래 이메일 5회/시간 + IP 10회/시간 Rate Limit이다.
         enforceAppCheck: false,
     },
     async (request) => {
