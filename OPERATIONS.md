@@ -114,10 +114,19 @@ firebase functions:log --only ocrDashboard,autoVerifyDocument
 ### 4.1 백업 확인
 
 - **자동 백업**: `dailyNightlyBatch` 함수(매일 02:00 KST)의 첫 단계에서 Firestore 전체 export 실행
-- **저장 위치**: Cloud Storage **기본 버킷**(`vehicle-drive-log.firebasestorage.app`) → `backups/firestore/YYYY-MM-DD/`
-  - 대상 버킷은 코드에 하드코딩하지 않고 admin SDK 기본 버킷에서 받아온다. 한때
-    `${projectId}.appspot.com`으로 박혀 있었는데 이 프로젝트에는 그 버킷이 없어서
-    export가 `PERMISSION_DENIED`로 매일 실패했다
+- **저장 위치**: **백업 전용 버킷** `vehicle-drive-log-backups`(asia-northeast3) → `backups/firestore/YYYY-MM-DD/`
+  - ⚠️ **기본 버킷을 쓰면 안 된다.** Firestore 관리형 export는 데이터베이스와 **같은 위치의
+    버킷만** 받는데, Firestore는 `asia-northeast3`이고 Firebase 기본 버킷
+    (`vehicle-drive-log.firebasestorage.app`)은 **`us-east1`**이다. 기본 버킷으로 걸면
+    `400 ... is in location us-east1. This database can only operate on buckets spanning
+    location asia or asia-northeast3`로 즉시 실패한다. 버킷 위치는 생성 후 못 바꾼다.
+  - 버킷 이름은 `FIRESTORE_BACKUP_BUCKET` 환경변수로 덮어쓸 수 있고, 없으면
+    `{projectId}-backups`를 쓴다. 버킷이 없으면 export 전에 "백업 버킷이 없다"고
+    명시적으로 실패한다(PERMISSION_DENIED로 오독되지 않게).
+  - 같은 배치의 아카이빙·인증서 정리는 위치 제약이 없어 기본 버킷을 그대로 쓴다.
+  - 과거 이력: 한때 `${projectId}.appspot.com`이 박혀 있었는데 이 프로젝트에는 그 버킷이
+    아예 없어서 export가 `PERMISSION_DENIED`로 매일 실패했다. 그것을 기본 버킷으로
+    고쳤더니 이번엔 위치 불일치가 드러났다
     ([troubleshoot-deployment §2.6](.agent/skills/troubleshoot-deployment/SKILL.md)).
 - **포함 컬렉션**: **전체** (`collectionIds: []` — 특정 컬렉션 목록을 지정하지 않는다)
   - 한때 이 자리에 "organizations, users, vehicles, driveLogs, reservations, notifications" 6개가
