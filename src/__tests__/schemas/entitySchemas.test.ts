@@ -184,7 +184,7 @@ describe('핵심 엔티티 Zod 스키마 검증', () => {
             }
         });
 
-        it('예약 목적 필드 자료형 오류 시 기본값 null로 보정하고 필수 필드 타입 불일치 시 catch() 복원한다', () => {
+        it('예약 목적 필드 자료형 오류 시 기본값 undefined로 보정하고 필수 필드 타입 불일치 시 catch() 복원한다', () => {
             const corruptRes = {
                 organizationId: 999, // string에 number -> catch('')
                 vehicleId: 'veh-777',
@@ -192,14 +192,18 @@ describe('핵심 엔티티 Zod 스키마 검증', () => {
                 date: '2026-05-05',
                 startTime: '09:00',
                 endTime: '12:00',
-                purpose: 12345, // string에 number -> catch(null)
+                purpose: 12345, // string에 number -> catch(undefined)
             };
             const result = reservationSchema.safeParse(corruptRes);
-            
+
             expect(result.success).toBe(true);
             if (result.success) {
                 expect(result.data.organizationId).toBe('');
-                expect(result.data.purpose).toBeNull();
+                // 선택 필드의 "없음"은 undefined 하나로 표현한다 — null과 undefined를
+                // 섞어 쓰면 타입 선언(`purpose?: string`)과 어긋나 호출부에 캐스팅이 생긴다.
+                expect(result.data.purpose).toBeUndefined();
+                // 알 수 없는/누락된 상태는 '예약됨'으로 읽어 시간대를 계속 막는다(이중 배차 방지)
+                expect(result.data.status).toBe('reserved');
             }
         });
     });

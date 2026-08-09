@@ -1,51 +1,16 @@
 /**
- * 차량 예약 (Reservations) 타입 정의
+ * 차량 예약 (Reservations) 타입
+ *
+ * 문서 모양의 원본은 `src/schemas/reservation.ts`다 — 여기서는 파생만 한다.
+ * 아래 폼·캘린더 타입은 Firestore 문서가 아니라 화면 상태라 여기에 둔다.
  */
-import type { FirestoreDoc, TimestampField } from './common';
+import type { z } from 'zod';
+import type { reservationSchema, reservationStatusSchema } from '../schemas/reservation';
+import type { FirestoreDoc } from './common';
 
-export type ReservationStatus = 'pending' | 'reserved' | 'in_use' | 'in_progress' | 'completed' | 'cancelled' | 'rejected';
+export type ReservationStatus = z.infer<typeof reservationStatusSchema>;
 
-export interface Reservation extends FirestoreDoc {
-    organizationId: string;
-    vehicleId: string;
-    vehicleName?: string;
-    vehicleDisplayName?: string;
-    date: string;               // 'YYYY-MM-DD'
-    startTime: string;           // 'HH:MM'
-    endTime: string;             // 'HH:MM'
-    actualStartTime?: string;
-    actualEndTime?: string;
-    currentKm?: number;
-    purpose?: string;
-    destination?: string;
-    reservedByUid: string;
-    reservedByName?: string;
-    status: ReservationStatus;
-    rejectedReason?: string;
-    rejectedAt?: TimestampField;  // 반려 처리 시각
-    routeDistance?: number | null;
-    routeDuration?: number | null;
-    routeTollFee?: number | null;
-    groupId?: string;            // 다일 연속 예약 그룹 식별자
-    recurringGroupId?: string;   // 반복(정기) 예약 그룹 식별자
-    /**
-     * 예약 시점에 미리 적어 두는 동승자 — **예정이지 기록이 아니다.**
-     * 확정 기록은 운행일지(`driveLogs.passengerNames`)이며 통계·감사는 그쪽만 본다.
-     * 여기 값은 운행일지 작성 화면을 열 때 초기값으로 채워지고, 거기서 자유롭게 고칠 수 있다.
-     *
-     * uid와 이름을 함께 남기는 이유: uid는 동명이인·개명에도 정확히 복원하기 위해,
-     * 이름은 퇴사·계정 삭제 뒤에도 "누가 타기로 했었는지"가 사라지지 않게 하기 위해.
-     */
-    passengerUids?: string[];
-    passengerNames?: string[];
-    /** 조직원이 아닌 외부 동승 인원 수 (이름 없이 숫자만) */
-    passengerCount?: number;
-    isQuickDrive?: boolean;      // 바로 운행(예약 없이 출발) 여부 플래그
-    source?: 'recommendation' | string; // 예약 출처 (예: 추천 예약)
-    syncSource?: string;         // 예약 동기화 출처 (예: 'calendar')
-    createdAt?: TimestampField;
-    expiresAt?: Date | TimestampField;
-}
+export type Reservation = z.infer<typeof reservationSchema> & FirestoreDoc;
 
 /**
  * 동승자 입력 필드 묶음 — **예약 폼과 바로 운행 폼이 함께 쓴다.**
