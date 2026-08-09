@@ -28,28 +28,47 @@ const firestoreAdmin = require("@google-cloud/firestore");
 const gzipAsync = promisify(gzip);
 
 /**
+ * 백업 대상 GCS URI를 만든다.
+ *
+ * 버킷 이름은 **반드시 실제 기본 버킷에서 받아온다**. 예전에는 `${projectId}.appspot.com`을
+ * 하드코딩했는데, 2024-10 이후 만들어진 Firebase 프로젝트의 기본 버킷은
+ * `${projectId}.firebasestorage.app`이고 `.appspot.com` 버킷은 **존재하지 않는다**.
+ * 없는 버킷으로 export를 걸면 Firestore Admin API가
+ * `7 PERMISSION_DENIED: The caller does not have permission`으로 응답한다
+ * (존재 여부를 알려주지 않으려고 "없음"을 "권한 없음"으로 보고한다) — 그래서 매일 밤
+ * 백업 스텝만 조용히 실패하고 있었다.
+ */
+export function buildBackupUri(bucketName: string, dateStr: string): string {
+    return `gs://${bucketName}/backups/firestore/${dateStr}`;
+}
+
+/**
  * Step 0: Firestore 전체 백업 (기존 backupFirestore 로직 통합)
  */
-async function backupFirestoreData() {
+async function backupFirestoreData(bucketName: string) {
     console.log("[Batch] Starting backupFirestore...");
     const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT;
-    const bucket = `gs://${projectId}.appspot.com/backups/firestore`;
 
-    const now = new Date();
-    const dateStr = getKSTDateString(now);
-    const outputUri = `${bucket}/${dateStr}`;
+    const outputUri = buildBackupUri(bucketName, getKSTDateString(new Date()));
 
     const client = new firestoreAdmin.v1.FirestoreAdminClient();
     const databaseName = client.databasePath(projectId, "(default)");
 
-    const [response] = await client.exportDocuments({
-        name: databaseName,
-        outputUriPrefix: outputUri,
-        collectionIds: [],
-    });
+    try {
+        const [response] = await client.exportDocuments({
+            name: databaseName,
+            outputUriPrefix: outputUri,
+            collectionIds: [],
+        });
 
-    console.log(`Firestore backup started: ${outputUri}`);
-    console.log(`Operation: ${response.name}`);
+        console.log(`Firestore backup started: ${outputUri}`);
+        console.log(`Operation: ${response.name}`);
+    } catch (e: unknown) {
+        // 대상 URI를 에러 메시지에 실어야 Sentry만 보고도 버킷 오지정과 IAM 누락을 구분할 수 있다.
+        // (권한 문제라면 런타임 SA에 roles/datastore.importExportAdmin + 버킷 쓰기 권한이 필요하다.
+        //  troubleshoot-deployment 스킬 §2.6 참고)
+        throw new Error(`Firestore export 실패 (outputUriPrefix=${outputUri}): ${(e as Error).message}`, { cause: e });
+    }
 }
 
 async function purgeOrgs(db: FirebaseFirestore.Firestore) {
@@ -57,6 +76,9 @@ async function purgeOrgs(db: FirebaseFirestore.Firestore) {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
+    // orderBy를 쓰지 않으므로 Firestore가 부등호 필드 기준 **오름차순**을 암묵 적용한다.
+    // 화면(삭제된 기관 목록)이 쓰는 status+deletedAt DESC 인덱스로는 이 쿼리가 커버되지 않아
+    // firestore.indexes.json에 ASC 조합을 별도로 둔다. 지우면 매일 밤 FAILED_PRECONDITION.
     const deletedOrgsSnap = await db
         .collection("organizations")
         .where("status", "==", "deleted")
@@ -319,7 +341,7 @@ export const dailyNightlyBatch = onSchedule(
         // Step 0.5: superAdmin 대시보드 통계 캐시 재집계 — 매일 아침 수동 갱신 버튼 없이 최신 상태 유지
         await runStep(failed, "computeAllDashboardStats", () => computeAllDashboardStats());
         // Step 1: Firestore 백업 (기존 backupFirestore 통합)
-        await runStep(failed, "backupFirestore", () => backupFirestoreData());
+        await runStep(failed, "backupFirestore", () => backupFirestoreData(bucket.name));
         // Step 2: 기관 퍼지
         await runStep(failed, "purgeOrgs", () => purgeOrgs(db));
         // Step 3: 인증서 이미지 정리

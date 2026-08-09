@@ -5,6 +5,43 @@
  * Firestore mock chain은 모듈 캐시와 호이스팅 이슈가 복잡하므로
  * 핵심 날짜 조건 계산 로직만 별도로 검증한다.
  */
+// 모듈 로드 시 초기화되는 외부 의존성만 차단하고, 순수 함수(buildBackupUri)를 그대로 가져온다.
+jest.mock('firebase-admin/firestore', () => ({ getFirestore: jest.fn() }));
+jest.mock('firebase-admin/storage', () => ({ getStorage: jest.fn() }));
+jest.mock('firebase-functions/v2/scheduler', () => ({
+    onSchedule: (_opts: unknown, handler: Function) => handler,
+}));
+jest.mock('../utils/helpers', () => ({ log: jest.fn() }));
+jest.mock('../handlers/scheduled/dailyAggregation', () => ({ runDailyAggregation: jest.fn() }));
+jest.mock('../services/statistics/computeDashboardStats', () => ({ computeAllDashboardStats: jest.fn() }));
+jest.mock('../services/alimtalk/sendNotification', () => ({
+    createInAppNotification: jest.fn(),
+    sendPushToUser: jest.fn(),
+}));
+jest.mock('../core/sentry', () => ({ captureError: jest.fn() }));
+
+import { buildBackupUri } from '../handlers/scheduled/dailyNightlyBatch';
+
+describe('buildBackupUri — 백업 대상 GCS 경로', () => {
+    it('전달받은 버킷 이름을 그대로 쓴다', () => {
+        expect(buildBackupUri('vehicle-drive-log.firebasestorage.app', '2026-08-09'))
+            .toBe('gs://vehicle-drive-log.firebasestorage.app/backups/firestore/2026-08-09');
+    });
+
+    it('.appspot.com을 하드코딩하지 않는다 (없는 버킷 → PERMISSION_DENIED 회귀 방지)', () => {
+        expect(buildBackupUri('vehicle-drive-log.firebasestorage.app', '2026-08-09'))
+            .not.toContain('appspot.com');
+    });
+
+    it('레거시 .appspot.com 기본 버킷 프로젝트도 그대로 지원한다', () => {
+        expect(buildBackupUri('legacy-project.appspot.com', '2026-08-09'))
+            .toBe('gs://legacy-project.appspot.com/backups/firestore/2026-08-09');
+    });
+
+    it('OPERATIONS.md가 안내하는 backups/firestore/YYYY-MM-DD 구조를 유지한다', () => {
+        expect(buildBackupUri('b', '2026-01-02')).toMatch(/\/backups\/firestore\/\d{4}-\d{2}-\d{2}$/);
+    });
+});
 
 describe('dailyNightlyBatch — 날짜 조건 비즈니스 로직', () => {
     describe('purgeOrgs: 30일 경과 여부 판단', () => {

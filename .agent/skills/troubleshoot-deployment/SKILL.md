@@ -69,6 +69,46 @@ description: Cloud Functions, 프론트엔드 빌드 및 배포 시 발생하는
 - 순수 백그라운드 트리거(onDocumentCreated 등)는 공개 invoker가 아니므로 이 문제 없음. **공개 onRequest만** 해당.
 - 참고: 시크릿 값 갱신(`firebase functions:secrets:set`) 후에는 함수 재배포가 있어야 새 버전이 반영된다. 로컬 재배포 프롬프트(`Y/n`)는 **n**(로컬 배포 금지) 후 CI 재배포로 반영.
 
+### 2.6 Firestore 백업(export)이 `7 PERMISSION_DENIED: The caller does not have permission`
+**증상**: `dailyNightlyBatch`의 `backupFirestore` 스텝만 매일 밤 실패. Sentry 컨텍스트는
+`{ "context": "dailyNightlyBatch", "step": "backupFirestore" }`.
+
+**원인은 둘 중 하나이고, 에러 문구만으로는 구분되지 않는다.**
+
+1. **대상 버킷이 존재하지 않음** (실제 원인이었던 쪽). export 코드가
+   `gs://${projectId}.appspot.com/...`을 하드코딩하고 있었는데, **2024-10 이후 생성된 Firebase
+   프로젝트의 기본 버킷은 `${projectId}.firebasestorage.app`**이고 `.appspot.com` 버킷은 아예
+   없다. Firestore Admin API는 "없는 버킷"을 존재 여부 노출 방지 차원에서 **권한 거부로 보고**한다.
+   → 지금은 `getStorage().bucket().name`(= admin SDK 기본 버킷)을 쓰므로 재발하지 않는다.
+   버킷을 다시 하드코딩하지 말 것.
+2. **런타임 SA의 export 권한 누락**. Cloud Functions 런타임 SA
+   (`1066541065552-compute@developer.gserviceaccount.com`)에 export 권한과 대상 버킷 쓰기 권한이 필요하다.
+   ```bash
+   gcloud projects add-iam-policy-binding vehicle-drive-log \
+     --member="serviceAccount:1066541065552-compute@developer.gserviceaccount.com" \
+     --role="roles/datastore.importExportAdmin"
+
+   gcloud storage buckets add-iam-policy-binding gs://vehicle-drive-log.firebasestorage.app \
+     --member="serviceAccount:1066541065552-compute@developer.gserviceaccount.com" \
+     --role="roles/storage.admin"
+   ```
+
+**구분법**: 에러 메시지에 `outputUriPrefix=gs://...`가 붙어 있으므로 그 버킷이
+`firebase storage:buckets:list`(또는 Console → Storage) 목록에 있는지 먼저 본다. 있으면 2번(IAM),
+없으면 1번(버킷 오지정)이다.
+
+### 2.7 야간 배치 쿼리가 `9 FAILED_PRECONDITION: The query requires an index`
+**증상**: 스케줄 함수 로그/Sentry에 인덱스 생성 링크가 포함된 에러. 예: `organizations`의
+`status` + `deletedAt`.
+
+**원인**: `orderBy` 없이 부등호(`<=`, `<`)로 거르는 쿼리는 Firestore가 **부등호 필드 오름차순**을
+암묵 적용한다. 화면 쪽에 같은 필드 조합의 **내림차순** 인덱스가 이미 있어도 그것으로는 커버되지
+않는다(`purgeOrgs`가 정확히 이 함정에 걸렸다 — 화면은 `deletedAt desc`, 배치는 암묵 `asc`).
+
+**해결책**: 콘솔 링크로 즉석 생성하지 말고 **`firestore.indexes.json`에 추가**한 뒤 배포한다
+(콘솔에서만 만들면 다음 `firebase deploy --only firestore:indexes`에서 사라진다).
+방향은 쿼리 그대로 — 배치용은 `ASCENDING`, 화면 목록용은 `DESCENDING`으로 **둘 다** 둔다.
+
 ## 3. 롤백 전략 (긴급 복구 시)
 앱 배포 직후 치명적인 오류(예: App Check 적용 후 대량 인증 실패)가 발생하면, 즉각적인 문제 분석보다 **원복(Rollback)**이 우선입니다.
 - **프론트엔드 롤백**: `firebase hosting:rollback` 명령 실행
