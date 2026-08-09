@@ -2,16 +2,29 @@ import 'fake-indexeddb/auto';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // firebase/firestore 쓰기와 db 인스턴스를 목으로 대체 — flushQueue의 큐 처리 계약만 검증한다.
-vi.mock('firebase/firestore', () => ({
-    doc: vi.fn((_db: unknown, collection: string, id: string) => ({ collection, id })),
-    setDoc: vi.fn(() => Promise.resolve()),
-    updateDoc: vi.fn(() => Promise.resolve()),
-    deleteDoc: vi.fn(() => Promise.resolve()),
-}));
+// FieldValue/Timestamp는 instanceof 판별에 쓰이므로 실제 클래스 형태로 목을 만든다.
+vi.mock('firebase/firestore', () => {
+    class FieldValue {
+        constructor(public _methodName: string) {}
+    }
+    class Timestamp {
+        constructor(public seconds: number, public nanoseconds: number) {}
+        toDate() { return new Date(this.seconds * 1000); }
+    }
+    return {
+        doc: vi.fn((_db: unknown, collection: string, id: string) => ({ collection, id })),
+        setDoc: vi.fn(() => Promise.resolve()),
+        updateDoc: vi.fn(() => Promise.resolve()),
+        deleteDoc: vi.fn(() => Promise.resolve()),
+        serverTimestamp: vi.fn(() => new FieldValue('serverTimestamp')),
+        FieldValue,
+        Timestamp,
+    };
+});
 vi.mock('@/lib/firebase', () => ({ db: {} }));
 
-import { enqueue, clearQueue, flushQueue, getSyncDB } from '@/lib/offline/syncQueue';
-import { setDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { enqueue, clearQueue, flushQueue, getSyncDB, SERVER_TIMESTAMP_MARKER } from '@/lib/offline/syncQueue';
+import { setDoc, updateDoc, deleteDoc, serverTimestamp, FieldValue, Timestamp } from 'firebase/firestore';
 
 async function allDocIds(): Promise<string[]> {
     const database = await getSyncDB();
@@ -64,5 +77,62 @@ describe('offline syncQueue', () => {
         await enqueue('CREATE', 'driveLogs', 'nodata', null);
         await flushQueue();
         expect(setDoc).not.toHaveBeenCalled();
+    });
+
+    it('serverTimestamp 센티널은 마커로 저장되고 flush 시 센티널로 복원된다', async () => {
+        // FieldValue 인스턴스를 그대로 structuredClone하면 프로토타입이 소실되어
+        // flush 재생 시 빈 맵 필드로 기록되는 결함의 회귀 가드.
+        await enqueue('CREATE', 'driveLogs', 'ts1', {
+            distance: 5,
+            createdAt: serverTimestamp(),
+            nested: { editedAt: serverTimestamp() },
+        });
+
+        // 저장 형태: 센티널이 아니라 마커 문자열이어야 한다
+        const database = await getSyncDB();
+        const [stored] = await database.getAll('sync-store');
+        expect(stored.data?.createdAt).toBe(SERVER_TIMESTAMP_MARKER);
+        expect((stored.data?.nested as Record<string, unknown>).editedAt).toBe(SERVER_TIMESTAMP_MARKER);
+
+        await flushQueue();
+
+        // 재생 형태: setDoc에는 복원된 FieldValue 센티널이 전달되어야 한다
+        const payload = vi.mocked(setDoc).mock.calls[0][1] as Record<string, unknown>;
+        expect(payload.createdAt).toBeInstanceOf(FieldValue);
+        expect((payload.nested as Record<string, unknown>).editedAt).toBeInstanceOf(FieldValue);
+        expect(payload.distance).toBe(5);
+    });
+
+    it('Firestore Timestamp는 저장 시 Date로 변환된다', async () => {
+        await enqueue('CREATE', 'driveLogs', 'ts2', { timestamp: new Timestamp(1_700_000_000, 0) });
+
+        const database = await getSyncDB();
+        const [stored] = await database.getAll('sync-store');
+        expect(stored.data?.timestamp).toBeInstanceOf(Date);
+        expect((stored.data?.timestamp as Date).getTime()).toBe(1_700_000_000_000);
+    });
+
+    it('영구 오류(permission-denied)는 재시도 없이 즉시 폐기한다', async () => {
+        await enqueue('UPDATE', 'driveLogs', 'denied', { distance: 1 });
+        const permErr = Object.assign(new Error('denied'), { code: 'permission-denied' });
+        vi.mocked(updateDoc).mockRejectedValue(permErr);
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        await flushQueue();
+
+        expect(await allDocIds()).toEqual([]);
+    });
+
+    it('일시 오류는 재시도 상한(5회) 도달 시 폐기한다 — poison message 방지', async () => {
+        await enqueue('UPDATE', 'driveLogs', 'poison', { distance: 1 });
+        vi.mocked(updateDoc).mockRejectedValue(new Error('unavailable'));
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        for (let i = 0; i < 4; i++) {
+            await flushQueue();
+            expect(await allDocIds()).toEqual(['poison']);
+        }
+        await flushQueue(); // 5번째 실패에서 폐기
+        expect(await allDocIds()).toEqual([]);
     });
 });

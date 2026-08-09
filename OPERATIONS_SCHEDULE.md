@@ -65,7 +65,7 @@
 ### 5. 반기 (Half-Yearly - 약 1시간 소요)
 *6개월마다 진행하는 중점 인프라 점검*
 - [ ] **데이터 실제 복원 테스트 (DR Test)**:
-  - 백업된 Firestore JSON 데이터의 일부를 로컬 에뮬레이터 환경에 임포트(`npm run db:seed` 응용)하여, 데이터 무결성이 깨지지 않고 제대로 정상 복구되는지 검증.
+  - 백업된 Firestore JSON 데이터의 일부를 로컬 에뮬레이터 환경에 임포트하여, 데이터 무결성이 깨지지 않고 제대로 정상 복구되는지 검증. (Claude Code의 `/db-seed` 워크플로우 절차 응용 — npm 스크립트가 아니다)
 - [ ] **GCP / Firebase 액세스 권한 일제 점검**:
   - Firebase 프로젝트 협업자에 퇴사한 사람이나 불필요한 계정이 그대로 남아있는지 권한 권고 확인 및 정리.
 
@@ -73,14 +73,16 @@
 
 ## 🛠️ 1인 관리자를 위한 긴급 장애 대처 치트시트
 
-장애 상황 시 당황하지 않고 터미널에서 실행할 3대 핵심 워크플로우 명령어입니다.
+장애 상황 시 당황하지 않고 터미널에서 실행할 3대 핵심 명령어입니다.
+(⚠️ `/rollback`·`/db-seed` 같은 슬래시 커맨드는 **Claude Code 워크플로우**이지 npm 스크립트가 아니다 — `npm run rollback`은 존재하지 않는다.)
 
 ### ① 긴급 롤백 (최근 정상 배포 버전 복원)
-서비스 배포 직후 치명적 오류가 발견되면 지체 없이 아래 명령어를 제안하고 실행합니다.
+서비스 배포 직후 치명적 오류가 발견되면 지체 없이 실행합니다. 화면(UI) 문제는 아래 한 줄로 직전 Hosting 버전이 즉시 원복됩니다.
 ```bash
-# 이전 정상 상태 빌드로 즉시 Hosting 및 Rules 원복
-npm run rollback
+# 프론트엔드(Hosting)를 직전 배포 버전으로 즉시 원복
+firebase hosting:rollback --project vehicle-drive-log
 ```
+Functions·Rules까지 되돌려야 하면 [ROLLBACK.md](ROLLBACK.md)의 순서(Rules → Functions → Hosting)를 따르거나, Claude Code에서 `/rollback` 워크플로우를 실행합니다.
 
 ### ② 긴급 시스템 상태 및 에러 로그 조회
 서버가 죽거나 이상 동작할 때, 최근 50줄의 에러 로그와 헬스 체크 결과를 확인합니다.

@@ -19,6 +19,10 @@ import InstallPrompt from './components/common/InstallPrompt';
 // Sentry 지연 초기화
 import('./lib/sentry').then(m => m.initSentry()).catch(() => { });
 
+// iOS 등 Background Sync 미지원 브라우저용 오프라인 큐 flush 폴백
+import { registerReconnectFlush } from './lib/offline/syncQueue';
+registerReconnectFlush();
+
 export function renderFullApp() {
     const root = document.getElementById('root')!;
     createRoot(root).render(

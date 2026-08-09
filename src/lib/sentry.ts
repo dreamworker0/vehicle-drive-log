@@ -99,7 +99,8 @@ function initSentryWithModule(Sentry: SentryModule) {
             // iOS Safari(WebKit) IndexedDB 트랜잭션 조기 커밋 에러.
             // Firebase 영속성 레이어가 WebKit의 트랜잭션 auto-commit과 경합할 때 발생하는
             // unhandledrejection 노이즈다(스택 프레임이 없어 firebase-* 번들 필터를 우회한다).
-            // iOS는 Background Sync 미지원('SyncManager' 부재)이라 자체 flushQueue 경로는 실행되지 않는다 — 앱 버그 아님.
+            // iOS는 Background Sync 미지원('SyncManager' 부재)이라 SW의 flushQueue 경로는 실행되지 않는다
+            // (페이지 컨텍스트의 registerReconnectFlush 폴백이 대신 처리) — 앱 버그 아님.
             //
             // **동작(verb)만 다른 변종이 계속 올라온다** — 처음엔 `delete range`만 막았는데
             // `UnknownError: Attempt to get a record from database ...`(iOS 18.7 Mobile Safari,

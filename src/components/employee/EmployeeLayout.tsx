@@ -191,6 +191,9 @@ export default function EmployeeLayout() {
                                     key={item.to}
                                     to={item.to}
                                     onClick={handleNavClick}
+                                    // 아이콘만 있는 링크라 접근 가능한 이름이 없다 — 스크린리더에는
+                                    // "링크"로만 읽힌다 (axe link-name serious 위반, authed-accessibility가 게이트)
+                                    aria-label={item.label}
                                     className={({ isActive }) =>
                                         `absolute left-1/2 -translate-x-1/2 -top-5 flex flex-col items-center justify-center w-14 h-14 rounded-full shadow-lg transition-all duration-300 transform hover:scale-105 active:scale-95 ${isActive
                                             ? 'bg-primary-600 dark:bg-primary-500 text-white ring-4 ring-white/50 dark:ring-surface-900/50'
