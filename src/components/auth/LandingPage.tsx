@@ -1,12 +1,17 @@
 /**
  * LandingPage — 서비스 소개 (비로그인 첫 화면)
  */
-import { useState } from 'react';
+import { Suspense, lazy, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useForceLightMode from '../../hooks/useForceLightMode';
 import SEOHead from '../common/SEOHead';
 import PublicNav from '../common/PublicNav';
-import PublicFeedbackModal from '../common/PublicFeedbackModal';
+/**
+ * 문의 모달은 **열기 전까지 필요 없다.** 정적으로 두면 이 모달이 끌어오는 `lib/firebase`
+ * 때문에 Firestore SDK(전송 164KB)가 랜딩 첫 화면의 임계 경로에 얹힌다 —
+ * 랜딩만 보고 나가는 사람이 쓰지도 않을 것을 내려받는 셈이다(2026-08-09 Lighthouse 측정).
+ */
+const PublicFeedbackModal = lazy(() => import('../common/PublicFeedbackModal'));
 
 interface Feature {
     icon: string;
@@ -261,11 +266,15 @@ export default function LandingPage() {
                 </nav>
                 <p>© 2026 차량 운행일지. All rights reserved.</p>
             </footer>
-            {/* 피드백(문의하기) 모달 */}
-            <PublicFeedbackModal 
-                isOpen={isFeedbackModalOpen} 
-                onClose={() => setIsFeedbackModalOpen(false)} 
-            />
+            {/* 피드백(문의하기) 모달 — 열릴 때 받아온다 */}
+            {isFeedbackModalOpen && (
+                <Suspense fallback={null}>
+                    <PublicFeedbackModal
+                        isOpen={isFeedbackModalOpen}
+                        onClose={() => setIsFeedbackModalOpen(false)}
+                    />
+                </Suspense>
+            )}
         </div>
     );
 }

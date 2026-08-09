@@ -1,5 +1,4 @@
 import { useState, useEffect, useRef } from 'react';
-import { getAnalyticsInstance } from '../../lib/firebase';
 
 /**
  * PWA 설치 유도 배너 (안드로이드 Chrome 전용).
@@ -16,14 +15,20 @@ import { getAnalyticsInstance } from '../../lib/firebase';
 const DISMISS_KEY = 'pwa-install-dismissed-at';
 const TWO_WEEKS_MS = 14 * 24 * 60 * 60 * 1000; // 2주(밀리초)
 
-/** Analytics에 이벤트를 안전하게 전송 (인스턴스 미초기화 시 무시) */
-function logPwaEvent(name: string) {
+/**
+ * Analytics에 이벤트를 안전하게 전송 (인스턴스 미초기화 시 무시).
+ *
+ * `lib/firebase`를 **정적으로 가져오지 않는다.** 그 모듈은 Firestore·Storage·Functions를
+ * 함께 초기화하므로, 정적 간선이 하나만 있어도 비인증 랜딩 화면이 Firestore SDK(전송 164KB)를
+ * 끌고 온다 — 설치 배너는 이벤트를 보낼 때 말고는 Firebase가 필요 없다(2026-08-09 측정).
+ */
+async function logPwaEvent(name: string) {
     try {
+        const { getAnalyticsInstance } = await import('../../lib/firebase');
         const analytics = getAnalyticsInstance();
         if (!analytics) return;
-        import('firebase/analytics').then(({ logEvent }) => {
-            logEvent(analytics, name);
-        });
+        const { logEvent } = await import('firebase/analytics');
+        logEvent(analytics, name);
     } catch { /* Analytics 미사용 환경 무시 */ }
 }
 
