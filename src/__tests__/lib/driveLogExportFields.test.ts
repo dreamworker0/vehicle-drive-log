@@ -7,6 +7,7 @@ import {
     attachFuelSummary,
 } from '../../lib/driveLogExportFields';
 import { toLocalDateStr } from '../../lib/dateUtils';
+import { Timestamp } from 'firebase/firestore';
 
 describe('resolveStartKm / resolveEndKm', () => {
     it('신 필드(departureKm/arrivalKm)를 우선한다', () => {
@@ -51,9 +52,15 @@ describe('resolveDateStr', () => {
         expect(resolveDateStr({ date: '2026-03-05' })).toBe('2026-03-05');
     });
 
-    it('date가 없으면 timestamp를 로컬 날짜로 변환한다', () => {
+    it('date가 없으면 timestamp를 로컬 날짜로 변환한다 (Firestore Timestamp)', () => {
         const d = new Date('2026-03-05T09:00:00');
-        expect(resolveDateStr({ timestamp: { toDate: () => d } })).toBe(toLocalDateStr(d));
+        expect(resolveDateStr({ timestamp: Timestamp.fromDate(d) })).toBe(toLocalDateStr(d));
+    });
+
+    // 오프라인 큐가 심은 기록은 Timestamp가 아니라 Date로 저장된다
+    it('timestamp가 Date여도 로컬 날짜로 변환한다', () => {
+        const d = new Date('2026-03-05T09:00:00');
+        expect(resolveDateStr({ timestamp: d })).toBe(toLocalDateStr(d));
     });
 
     it('둘 다 없으면 fallback을 반환한다', () => {
@@ -82,7 +89,7 @@ describe('resolveStartTime / resolveEndTime', () => {
 type FuelTestLog = {
     vehicleId?: string;
     date?: string;
-    timestamp?: { toDate: () => Date };
+    timestamp?: Date;
     startTime?: string;
     fuelSummary?: string;
 };
@@ -116,7 +123,7 @@ describe('attachFuelSummary', () => {
 
     it('date 대신 timestamp를 쓰는 운행일지도 주유 date와 매칭한다', () => {
         const d = new Date('2026-03-05T09:00:00');
-        const logs: FuelTestLog[] = [{ vehicleId: 'v1', timestamp: { toDate: () => d }, startTime: '09:00' }];
+        const logs: FuelTestLog[] = [{ vehicleId: 'v1', timestamp: d, startTime: '09:00' }];
         attachFuelSummary(logs, [{ vehicleId: 'v1', date: toLocalDateStr(d), fuelType: 'gasoline', fuelAmount: 10, fuelCost: 15000 }]);
         expect(logs[0].fuelSummary).toBe('15,000(10L)');
     });

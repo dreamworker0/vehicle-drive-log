@@ -3,9 +3,9 @@
  * 화면 필터(useDriveLogList)와 내보내기 필터(useDriveLogExport)가
  * 동일한 기준을 쓰도록 단일 모듈로 공유한다.
  */
-import type { DriveLogEntry } from '../../types/driveLog';
+import type { DriveLog } from '../../types/driveLog';
 
-export const matchesSearch = (log: DriveLogEntry, search: string): boolean => {
+export const matchesSearch = (log: DriveLog, search: string): boolean => {
     const s = search.toLowerCase();
     return Boolean(
         log.driverName?.toLowerCase().includes(s) ||

@@ -8,7 +8,7 @@ import { useToast } from '../useToast';
 import { getAllDriveLogsForExport, getFuelLogs } from '../../lib/firestore';
 import { attachFuelSummary } from '../../lib/driveLogExportFields';
 import { matchesSearch } from './matchesSearch';
-import type { DriveLogEntry } from '../../types/driveLog';
+import type { Organization } from '../../types/organization';
 
 export interface ExportFilters {
     vehicleId: string;
@@ -18,17 +18,10 @@ export interface ExportFilters {
     endDate: string;
 }
 
-export interface ExportOrgInfo {
-    name?: string;
-    hideApprovalLine?: boolean;
-    approvalLine?: { title: string }[];
-    [key: string]: unknown;
-}
-
 export function useDriveLogExport(
     orgId: string | null | undefined,
     filters: ExportFilters,
-    org: ExportOrgInfo | null,
+    org: Organization | null,
 ) {
     const { showToast } = useToast();
     const [includeHipass, setIncludeHipass] = useState(false);
@@ -66,8 +59,8 @@ export function useDriveLogExport(
                 endDate: filters.endDate || undefined
             });
             const finalLogs = filters.search
-                ? (allLogs as unknown as DriveLogEntry[]).filter(log => matchesSearch(log, filters.search))
-                : (allLogs as unknown as DriveLogEntry[]);
+                ? allLogs.filter(log => matchesSearch(log, filters.search))
+                : allLogs;
             if (finalLogs.length === 0) {
                 showToast('추출할 데이터가 없습니다.', 'warning');
                 return;

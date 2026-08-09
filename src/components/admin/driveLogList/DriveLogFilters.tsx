@@ -1,16 +1,5 @@
-interface VehicleEntry {
-    id: string;
-    displayName?: string;
-    [key: string]: unknown;
-}
-
-interface MemberEntry {
-    id: string;
-    name?: string;
-    email?: string;
-    role?: string;
-    [key: string]: unknown;
-}
+import type { Vehicle } from '../../../types/vehicle';
+import type { User } from '../../../types/user';
 
 interface Filters {
     vehicleId: string;
@@ -23,8 +12,8 @@ interface Filters {
 export interface DriveLogFiltersProps {
     filters: Filters;
     onFiltersChange: (filters: Filters) => void;
-    vehicles: VehicleEntry[];
-    members: MemberEntry[];
+    vehicles: Vehicle[];
+    members: User[];
 }
 
 export default function DriveLogFilters({ filters, onFiltersChange, vehicles, members }: DriveLogFiltersProps) {

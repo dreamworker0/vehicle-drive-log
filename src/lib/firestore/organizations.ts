@@ -8,6 +8,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { Organization } from '../../types/organization';
+import type { WithServerTimestamps } from '../../types/common';
 import { createZodConverter, organizationSchema } from '../../schemas';
 import { captureError } from '../sentry';
 
@@ -68,7 +69,8 @@ export const createOrganization = async (data: Partial<Organization>) => {
         const inviteCode = isNonProfit ? generateInviteCode() : undefined;
         const approvedAt = isNonProfit ? serverTimestamp() : undefined;
 
-        const docData: Partial<Organization> = {
+        // 쓰기 페이로드라 서버 시각(FieldValue)을 담을 수 있게 넓힌다 — 읽기 타입에는 없는 값이다
+        const docData: WithServerTimestamps<Partial<Organization>, 'createdAt' | 'approvedAt'> = {
             ...data,
             status,
             createdAt: serverTimestamp(),
