@@ -49,7 +49,11 @@ function getSentry(): SentryLike | null {
  * DSN이 설정되지 않거나 테스트 환경이면 아무것도 하지 않는다.
  */
 export function captureError(error: unknown, context: Record<string, unknown> = {}): void {
-    if (DSN && !IS_TEST) {
+    // Discord는 Sentry와 독립된 알림 경로다. 과거 이 조건이 `DSN && !IS_TEST`였는데,
+    // 그러면 SENTRY_DSN_FUNCTIONS가 비어 있을 때 DISCORD_WEBHOOK_URL을 정확히 넣어도
+    // 알림이 한 건도 나가지 않고 "URL 누락" 경고조차 뜨지 않는다(URL은 있으니까).
+    // 두 경로를 분리한다 — URL 미설정 방어는 sendDiscordAlert가 이미 한다.
+    if (!IS_TEST) {
         const message = error instanceof Error ? error.message : String(error);
         sendDiscordAlert({
             title: "🚨 Cloud Functions Exception",

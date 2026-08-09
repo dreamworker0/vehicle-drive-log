@@ -18,6 +18,7 @@ import { getKSTDateString } from "../../utils/kstDate";
 import { runDailyAggregation } from "./dailyAggregation";
 import { computeAllDashboardStats } from "../../services/statistics/computeDashboardStats";
 import { createInAppNotification, sendPushToUser } from "../../services/alimtalk/sendNotification";
+import { captureError } from "../../core/sentry";
 import { gzip } from "node:zlib";
 import { promisify } from "node:util";
 
@@ -278,6 +279,27 @@ export async function checkInsuranceExpiry(db: FirebaseFirestore.Firestore) {
     console.log(`Insurance expiry check complete: ${notified} vehicles notified.`);
 }
 
+/**
+ * 배치 스텝 하나를 실행한다. 실패해도 다음 스텝으로 넘어가되, **조용히 넘어가지는 않는다.**
+ *
+ * 이전에는 각 스텝의 catch가 console.error만 남겼다. 그러면 어디로도 알림이 가지 않아,
+ * 특히 Firestore 백업 실패가 "매일 눈으로 확인"(OPERATIONS.md)에만 의존하게 된다 —
+ * 백업은 실패한 사실 자체를 놓치면 복구 시점에야 알게 되는 항목이다.
+ * captureError로 승격해 Sentry·Discord로 즉시 드러나게 한다.
+ *
+ * 스텝 단위로만 승격하는 것이 요점이다. 기관별 루프 내부(purgeOrgs 등)의 개별 실패까지
+ * 올리면 한 번의 배치가 알림 수십 건을 쏟아낸다 — 그쪽은 console.error로 남긴다.
+ */
+async function runStep(failed: string[], name: string, fn: () => Promise<unknown>): Promise<void> {
+    try {
+        await fn();
+    } catch (e: unknown) {
+        console.error(`Error in ${name}:`, (e as Error).message);
+        captureError(e, { context: "dailyNightlyBatch", step: name });
+        failed.push(name);
+    }
+}
+
 export const dailyNightlyBatch = onSchedule(
     {
         schedule: "0 2 * * *", // KST 02:00 (집계 + 백업 + 야간 배치 통합)
@@ -290,56 +312,28 @@ export const dailyNightlyBatch = onSchedule(
         const db = getFirestore();
         const bucket = getStorage().bucket();
 
+        const failed: string[] = [];
+
         // Step 0: 월간 집계 통계 캐싱 (기존 dailyAggregation 통합, 02:00 실행 전제)
-        try {
-            await runDailyAggregation();
-        } catch (e: unknown) {
-            console.error("Error in dailyAggregation:", (e as Error).message);
-        }
-
+        await runStep(failed, "dailyAggregation", () => runDailyAggregation());
         // Step 0.5: superAdmin 대시보드 통계 캐시 재집계 — 매일 아침 수동 갱신 버튼 없이 최신 상태 유지
-        try {
-            await computeAllDashboardStats();
-        } catch (e: unknown) {
-            console.error("Error in computeAllDashboardStats:", (e as Error).message);
-        }
-
+        await runStep(failed, "computeAllDashboardStats", () => computeAllDashboardStats());
         // Step 1: Firestore 백업 (기존 backupFirestore 통합)
-        try {
-            await backupFirestoreData();
-        } catch (e: unknown) {
-            console.error("Error in backupFirestore:", (e as Error).message);
-        }
+        await runStep(failed, "backupFirestore", () => backupFirestoreData());
+        // Step 2: 기관 퍼지
+        await runStep(failed, "purgeOrgs", () => purgeOrgs(db));
+        // Step 3: 인증서 이미지 정리
+        await runStep(failed, "cleanupImages", () => cleanupImages(db, bucket));
+        // Step 4: 운행 기록 아카이빙
+        await runStep(failed, "archiveLogs", () => archiveLogs(db, bucket));
+        // Step 5: 차량 보험 만료 임박 알림
+        await runStep(failed, "checkInsuranceExpiry", () => checkInsuranceExpiry(db));
 
-        // Step 1: 기관 퍼지
-        try {
-            await purgeOrgs(db);
-        } catch (e: unknown) {
-            console.error("Error in purgeOrgs:", (e as Error).message);
+        if (failed.length > 0) {
+            console.error(`[Batch] dailyNightlyBatch completed with ${failed.length} failed step(s): ${failed.join(", ")}`);
+        } else {
+            console.log("[Batch] dailyNightlyBatch completed.");
         }
-
-        // Step 2: 인증서 이미지 정리
-        try {
-            await cleanupImages(db, bucket);
-        } catch (e: unknown) {
-            console.error("Error in cleanupImages:", (e as Error).message);
-        }
-
-        // Step 3: 운행 기록 아카이빙
-        try {
-            await archiveLogs(db, bucket);
-        } catch (e: unknown) {
-            console.error("Error in archiveLogs:", (e as Error).message);
-        }
-
-        // Step 4: 차량 보험 만료 임박 알림
-        try {
-            await checkInsuranceExpiry(db);
-        } catch (e: unknown) {
-            console.error("Error in checkInsuranceExpiry:", (e as Error).message);
-        }
-
-        console.log("[Batch] dailyNightlyBatch completed.");
     }
 );
 
