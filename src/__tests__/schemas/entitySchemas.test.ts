@@ -32,7 +32,7 @@ describe('핵심 엔티티 Zod 스키마 검증', () => {
 
         it('중요 필드가 누락되거나 자료형이 맞지 않는 경우 catch() 기능이 안전한 기본값으로 자동 교정한다', () => {
             const invalidUser = {
-                id: 12345, // string에 number 주입 -> catch('')
+                // id는 스키마가 아니라 컨버터가 snapshot.id로 부여한다 — 문서 필드가 아니다
                 name: 12345, // string에 number 주입 -> catch('-')
                 email: 12345, // string에 number 주입 -> catch('')
                 role: 'super_ultra_admin', // enum에 없는 권한 주입 -> catch('employee')
@@ -43,7 +43,6 @@ describe('핵심 엔티티 Zod 스키마 검증', () => {
             const result = userSchema.safeParse(invalidUser);
             expect(result.success).toBe(true); // catch()가 모든 타입 에러를 가로채 기본값으로 복구하므로 success는 true임
             if (result.success) {
-                expect(result.data.id).toBe(''); // id 에러 -> 기본값 ''
                 expect(result.data.name).toBe('-'); // name 에러 -> 기본값 '-'
                 expect(result.data.email).toBe(''); // email 에러 -> 기본값 ''
                 expect(result.data.role).toBe('employee'); // 잘못된 role -> 기본값 'employee'
