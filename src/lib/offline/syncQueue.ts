@@ -27,7 +27,9 @@ export interface FailedRecord extends SyncData {
 interface SyncDB extends DBSchema {
     'sync-store': {
         key: number;
-        value: SyncData & { id?: number; timestamp: number; retryCount?: number };
+        // lastAttemptAt은 **적재 시각(timestamp)과 다르다** — 마지막으로 전송을 시도한 시각이며
+        // 재시도 냉각(retryCooldownMs) 판정에만 쓴다.
+        value: SyncData & { id?: number; timestamp: number; retryCount?: number; lastAttemptAt?: number };
         indexes: { 'by-timestamp': number };
     };
     // 폐기된 항목의 무덤. flushQueue는 서비스워커에서도 돌기 때문에 폐기 사실을
@@ -77,6 +79,25 @@ const PERMANENT_ERROR_CODES = new Set(['permission-denied', 'invalid-argument', 
 
 // 일시 오류 재시도 상한 — 초과 시 폐기해 poison message가 큐를 영원히 점유하지 않게 한다.
 const MAX_RETRIES = 5;
+
+/**
+ * 재시도 냉각 시간 — **횟수만 세면 안 되는 이유가 있다.**
+ *
+ * flush는 `online` 이벤트마다 돈다. 지하철·엘리베이터처럼 연결이 몇 초 단위로 끊겼다 붙는
+ * 환경에서는 1~2분 안에 5회가 소진되어, 조금 더 기다리면 올라갈 수 있었던 기록이 폐기된다.
+ * "5번이나 시도했는데 안 되면 포기"라는 의도가 실제로는 "연결이 5번 깜빡이면 포기"로 동작했다.
+ *
+ * 그래서 실패한 항목은 다음 시도까지 **점점 길어지는 냉각 시간**을 둔다
+ * (1·2·4·8·16분 → 폐기까지 총 약 31분). 출퇴근 이동 한 구간을 버티는 길이다.
+ * 냉각 중에 건너뛴 것은 시도로 세지 않는다 — 그래야 대기가 횟수를 소모하지 않는다.
+ */
+const RETRY_BASE_COOLDOWN_MS = 60_000;
+const RETRY_MAX_COOLDOWN_MS = 30 * 60_000;
+
+export function retryCooldownMs(retryCount: number): number {
+    if (retryCount <= 0) return 0;
+    return Math.min(RETRY_BASE_COOLDOWN_MS * 2 ** (retryCount - 1), RETRY_MAX_COOLDOWN_MS);
+}
 
 /**
  * IndexedDB에 안전하게 저장 가능한 형태로 변환한다.
@@ -187,6 +208,13 @@ async function runFlush(): Promise<void> {
     if (allRecords.length === 0) return;
 
     for (const record of allRecords) {
+        // 냉각 중인 항목은 건너뛴다. 이 continue는 시도로 세지 않으므로 retryCount가 줄지 않고,
+        // 연결이 깜빡이는 동안 재시도 횟수가 헛되게 소모되지 않는다.
+        const cooldown = retryCooldownMs(record.retryCount ?? 0);
+        if (cooldown > 0 && record.lastAttemptAt !== undefined && Date.now() - record.lastAttemptAt < cooldown) {
+            continue;
+        }
+
         try {
             const docRef = doc(db, record.collection, record.docId);
             const payload = record.data ? (fromStorable(record.data) as Record<string, unknown>) : null;
@@ -231,8 +259,12 @@ async function runFlush(): Promise<void> {
                 }
                 await database.delete('sync-store', record.id as number);
             } else {
-                console.error(`[SyncQueue] flush 실패, 재시도 예정 (${retryCount}/${MAX_RETRIES}) — ${record.docId}`, error);
-                await database.put('sync-store', { ...record, retryCount });
+                const waitMin = Math.round(retryCooldownMs(retryCount) / 60_000);
+                console.error(
+                    `[SyncQueue] flush 실패, ${waitMin}분 후 재시도 (${retryCount}/${MAX_RETRIES}) — ${record.docId}`,
+                    error,
+                );
+                await database.put('sync-store', { ...record, retryCount, lastAttemptAt: Date.now() });
             }
         }
     }
