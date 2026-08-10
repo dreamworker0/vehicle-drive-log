@@ -1,5 +1,5 @@
 ---
-description: Cloud Storage의 임시 폴더에 쌓이는 데이터에 수명 주기를 설정하여 비용을 절감하는 워크플로우 파일
+description: Cloud Storage 버킷에 수명 주기(자동 삭제) 규칙을 적용해 보관 요금을 억제하는 워크플로우 파일
 ---
 
 <!-- AUTO-GENERATED — scripts/sync-claude-agents.ts가 .agent/workflows/storage-lifecycle.md에서 생성. 직접 수정 금지. -->

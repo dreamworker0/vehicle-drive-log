@@ -12,10 +12,22 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 export const RETRY_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24시간
 export const MAX_FAIL_COUNT = 10; // 10회 이상 실패 시 영구 제외 (수동 리셋 필요)
 
-/** Google Calendar API의 캘린더 부재/권한 오류(404·403) 여부 */
+/**
+ * Google Calendar API의 캘린더 부재/권한 오류(404·403) 여부.
+ *
+ * **상태 코드를 먼저 본다.** 예전에는 메시지 문자열만 검사했는데(`"404"`·`"403"`·`"Not Found"`),
+ * googleapis가 던지는 오류의 message가 숫자 없는 사유 문구(`"Forbidden"`)일 때가 있어
+ * 그 경우 이 함수가 false를 반환했다. 그러면 recordCalendarFailure가 호출되지 않아
+ * failCount가 0에 머물고, shouldSkipVehicleCalendar의 쿨다운·영구제외가 영영 발동하지 않는다 —
+ * 공유가 깨진 차량이 예약이 바뀔 때마다 같은 403을 내고 Sentry에 무한 축적됐다.
+ * 코드베이스의 다른 지점(calendarSync·testCalendarAccess)은 이미 숫자 `code`를 본다.
+ */
 export function isCalendarAuthError(err: unknown): boolean {
+    const e = err as { code?: unknown; status?: unknown; response?: { status?: unknown } } | null;
+    const status = Number(e?.response?.status ?? e?.status ?? e?.code);
+    if (status === 403 || status === 404) return true;
     const msg = (err as Error)?.message || "";
-    return msg.includes("Not Found") || msg.includes("404") || msg.includes("403");
+    return msg.includes("Not Found") || msg.includes("Forbidden") || msg.includes("404") || msg.includes("403");
 }
 
 /**

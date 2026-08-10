@@ -53,6 +53,35 @@ async function isNotifiableOrgMember(uid: string | undefined | null, orgId: stri
 }
 
 /**
+ * 캘린더 호출 실패 처리 — 모든 캘린더 분기가 공유하는 단일 정책.
+ *
+ * 공유 끊김·캘린더 삭제(403·404)는 **기관 설정 오류이지 서버 장애가 아니다.**
+ * triggerOnDemandCalendarSync가 이미 같은 판단을 하고 있다("500으로 던지면 모니터링에
+ * 서버 장애처럼 노이즈가 쌓인다"). 트리거만 그 정책 밖에 있어서, 공유가 끊긴 차량 하나가
+ * 예약이 바뀔 때마다 Sentry에 Exception을 쌓고 있었다.
+ *
+ * 그래서 설정 오류는 Sentry로 올리지 않고 실패 카운터만 올린다. 재시도는 백오프에 맡긴다 —
+ * 3회 실패 후에는 24시간 쿨다운(= 다음 날 한 번만 재시도), 10회 후에는 영구 제외.
+ * 관리자 화면의 '동기화 실패' 배지로 드러나고, 공유를 고친 뒤 "🔄 동기화 리셋"으로 복구한다.
+ * 그 외 예상 밖 오류만 기존대로 Sentry로 올린다.
+ */
+async function handleCalendarError(
+    err: unknown,
+    context: string,
+    reservationId: string,
+    vehicleId: string,
+    failCount: number,
+): Promise<void> {
+    console.error("Reservation " + reservationId + ": " + context + " failed", (err as Error).message);
+    if (isCalendarAuthError(err)) {
+        await recordCalendarFailure(vehicleId, failCount);
+        return;
+    }
+    const { captureError } = await import("../../core/sentry");
+    captureError(err, { context, reservationId, vehicleId });
+}
+
+/**
  * 예약 생성 시 -> 캘린더 이벤트 생성
  */
 export const onReservationCreated = onDocumentCreated("reservations/{reservationId}", async (event) => {
@@ -112,11 +141,7 @@ export const onReservationCreated = onDocumentCreated("reservations/{reservation
 
                 console.log("Reservation " + reservationId + ": calendar event created (" + eventId + ")");
             } catch (err: unknown) {
-                const { captureError } = await import("../../core/sentry");
-                captureError(err, { context: "officialCalendarSync_created", reservationId, vehicleId: reservation.vehicleId });
-                console.error("Reservation " + reservationId + ": calendar event creation failed", (err as Error).message);
-                // 캘린더 부재/권한 오류(404·403)면 실패 카운트 증가 → 쿨다운/영구제외로 자동 백오프
-                if (isCalendarAuthError(err)) await recordCalendarFailure(reservation.vehicleId, vc.failCount);
+                await handleCalendarError(err, "officialCalendarSync_created", reservationId, reservation.vehicleId, vc.failCount);
             }
         }
     } else {
@@ -222,10 +247,7 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
                     });
                     if (calendarFailCount > 0) await resetCalendarFailure(after.vehicleId);
                 } catch(e: unknown) {
-                    const { captureError } = await import("../../core/sentry");
-                    captureError(e, { context: "officialCalendarSync_approval_created", reservationId, vehicleId: after.vehicleId });
-                    console.error("Calendar creation failed on approval:", (e as Error).message);
-                    if (isCalendarAuthError(e)) await recordCalendarFailure(after.vehicleId, calendarFailCount);
+                    await handleCalendarError(e, "officialCalendarSync_approval_created", reservationId, after.vehicleId, calendarFailCount);
                 }
             }
 
@@ -241,8 +263,15 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
         // 취소된 경우 -> 이벤트 삭제 + 알림
         if (after.status === "cancelled" && before.status !== "cancelled") {
             if (calendarId && eventId) {
-                await deleteCalendarEvent(calendarId, eventId);
-                console.log("Reservation " + reservationId + ": cancelled -> calendar event deleted");
+                // 캘린더 실패가 아래 취소 알림을 삼키지 않도록 격리한다 (생성·승인 분기와 동일한 형태).
+                // 공유가 끊긴 차량이 403을 내면 예약자가 취소 통보를 못 받는 것이 예전 동작이었다.
+                try {
+                    await deleteCalendarEvent(calendarId, eventId);
+                    if (calendarFailCount > 0) await resetCalendarFailure(after.vehicleId);
+                    console.log("Reservation " + reservationId + ": cancelled -> calendar event deleted");
+                } catch (e: unknown) {
+                    await handleCalendarError(e, "officialCalendarSync_cancelled", reservationId, after.vehicleId, calendarFailCount);
+                }
             }
 
             // 예약자에게 취소 알림 (취소한 본인이 아닌 경우) — 대상이 예약 org 소속일 때만
@@ -268,9 +297,15 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
 
         if (changed) {
             if (calendarId && eventId) {
-                await updateCalendarEvent(calendarId, eventId, after as Parameters<typeof updateCalendarEvent>[2]);
-                if (calendarFailCount > 0) await resetCalendarFailure(after.vehicleId);
-                console.log("Reservation " + reservationId + ": calendar event updated");
+                // 캘린더 실패가 아래 변경 알림을 삼키지 않도록 격리한다 (생성·승인 분기와 동일한 형태).
+                // 공유가 끊긴 차량이 403을 내면 예약자가 변경 통보를 못 받는 것이 예전 동작이었다.
+                try {
+                    await updateCalendarEvent(calendarId, eventId, after as Parameters<typeof updateCalendarEvent>[2]);
+                    if (calendarFailCount > 0) await resetCalendarFailure(after.vehicleId);
+                    console.log("Reservation " + reservationId + ": calendar event updated");
+                } catch (e: unknown) {
+                    await handleCalendarError(e, "officialCalendarSync_updated", reservationId, after.vehicleId, calendarFailCount);
+                }
             }
 
             // 예약자에게 변경 알림 — 대상이 예약 org 소속일 때만
@@ -300,11 +335,12 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
             }
         }
     } catch (err: unknown) {
+        // 캘린더 호출은 위에서 각각 격리했으므로 여기 남는 것은 알림·Firestore 갱신 등
+        // **캘린더가 아닌** 실패다. 컨텍스트 이름을 그에 맞게 둔다 —
+        // officialCalendarSync_updated로 두면 캘린더 문제로 오독하게 된다.
         const { captureError } = await import("../../core/sentry");
-        captureError(err, { context: "officialCalendarSync_updated", reservationId, vehicleId: after.vehicleId });
-        console.error("Reservation " + reservationId + ": calendar event update failed", (err as Error).message);
-        // 캘린더 부재/권한 오류(404·403)면 실패 카운트 증가 → 쿨다운/영구제외로 자동 백오프
-        if (vc && isCalendarAuthError(err)) await recordCalendarFailure(after.vehicleId, calendarFailCount);
+        captureError(err, { context: "onReservationUpdated", reservationId, vehicleId: after.vehicleId });
+        console.error("Reservation " + reservationId + ": update trigger failed", (err as Error).message);
     }
 });
 
@@ -315,23 +351,21 @@ export const onReservationDeleted = onDocumentDeleted("reservations/{reservation
     const reservation = event.data!.data();
     const reservationId = event.params.reservationId;
 
+    if (!reservation.calendarEventId) return;
+
+    const vc = await getVehicleCalendar(reservation.vehicleId, reservation.organizationId);
+    if (!vc) return;
+    // 실패 누적(쿨다운/영구제외) 차량은 삭제 호출도 건너뜀 (어차피 404 반복)
+    if (vc.skip) {
+        console.log("Vehicle " + reservation.vehicleId + ": calendar sync disabled (failCount=" + vc.failCount + "), skip delete");
+        return;
+    }
+
     try {
-        if (!reservation.calendarEventId) return;
-
-        const vc = await getVehicleCalendar(reservation.vehicleId, reservation.organizationId);
-        if (!vc) return;
-        // 실패 누적(쿨다운/영구제외) 차량은 삭제 호출도 건너뜀 (어차피 404 반복)
-        if (vc.skip) {
-            console.log("Vehicle " + reservation.vehicleId + ": calendar sync disabled (failCount=" + vc.failCount + "), skip delete");
-            return;
-        }
-
         await deleteCalendarEvent(vc.calendarId, reservation.calendarEventId);
         if (vc.failCount > 0) await resetCalendarFailure(reservation.vehicleId);
         console.log("Reservation " + reservationId + ": deleted -> calendar event deleted");
     } catch (err: unknown) {
-        const { captureError } = await import("../../core/sentry");
-        captureError(err, { context: "officialCalendarSync_deleted", reservationId, vehicleId: reservation.vehicleId });
-        console.error("Reservation " + reservationId + ": calendar event delete failed", (err as Error).message);
+        await handleCalendarError(err, "officialCalendarSync_deleted", reservationId, reservation.vehicleId, vc.failCount);
     }
 });

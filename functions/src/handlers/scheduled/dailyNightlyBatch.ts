@@ -28,15 +28,31 @@ const firestoreAdmin = require("@google-cloud/firestore");
 const gzipAsync = promisify(gzip);
 
 /**
+ * 백업 전용 버킷 이름.
+ *
+ * **기본 버킷(`getStorage().bucket()`)을 쓰면 안 된다.** Firestore 관리형 export는
+ * 데이터베이스와 **같은 위치의 버킷만** 받는데, 이 프로젝트의 Firestore는 `asia-northeast3`이고
+ * Firebase 기본 버킷(`vehicle-drive-log.firebasestorage.app`)은 `us-east1`이다. 그래서
+ * 기본 버킷으로 걸면 실행 즉시 이 400이 난다:
+ *
+ *   Bucket ...firebasestorage.app is in location us-east1.
+ *   This database can only operate on buckets spanning location asia or asia-northeast3.
+ *
+ * 버킷 위치는 생성 후 변경할 수 없으므로 Firestore와 같은 리전에 백업 전용 버킷을 따로 둔다.
+ * 이름은 `FIRESTORE_BACKUP_BUCKET`으로 덮어쓸 수 있고, 없으면 `{projectId}-backups`를 쓴다.
+ * (같은 배치의 아카이빙·인증서 정리는 위치 제약이 없는 평범한 GCS 조작이라 기본 버킷 그대로 쓴다.)
+ */
+export function resolveBackupBucket(projectId: string | undefined): string {
+    return process.env.FIRESTORE_BACKUP_BUCKET || `${projectId}-backups`;
+}
+
+/**
  * 백업 대상 GCS URI를 만든다.
  *
- * 버킷 이름은 **반드시 실제 기본 버킷에서 받아온다**. 예전에는 `${projectId}.appspot.com`을
- * 하드코딩했는데, 2024-10 이후 만들어진 Firebase 프로젝트의 기본 버킷은
- * `${projectId}.firebasestorage.app`이고 `.appspot.com` 버킷은 **존재하지 않는다**.
- * 없는 버킷으로 export를 걸면 Firestore Admin API가
- * `7 PERMISSION_DENIED: The caller does not have permission`으로 응답한다
- * (존재 여부를 알려주지 않으려고 "없음"을 "권한 없음"으로 보고한다) — 그래서 매일 밤
- * 백업 스텝만 조용히 실패하고 있었다.
+ * 버킷 이름은 **절대 하드코딩하지 않는다**. 예전에는 `${projectId}.appspot.com`을 박아 뒀는데,
+ * 2024-10 이후 만들어진 Firebase 프로젝트에는 그 버킷이 아예 없어서, 없는 버킷에 export를 건
+ * 결과가 `7 PERMISSION_DENIED: The caller does not have permission`이었다
+ * (존재 여부를 노출하지 않으려고 "없음"을 "권한 없음"으로 보고한다).
  */
 export function buildBackupUri(bucketName: string, dateStr: string): string {
     return `gs://${bucketName}/backups/firestore/${dateStr}`;
@@ -45,9 +61,21 @@ export function buildBackupUri(bucketName: string, dateStr: string): string {
 /**
  * Step 0: Firestore 전체 백업 (기존 backupFirestore 로직 통합)
  */
-async function backupFirestoreData(bucketName: string) {
+async function backupFirestoreData() {
     console.log("[Batch] Starting backupFirestore...");
     const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT;
+    const bucketName = resolveBackupBucket(projectId);
+
+    // 버킷 부재를 먼저 확인한다. 이 검사가 없으면 export가 PERMISSION_DENIED로 떨어져
+    // "권한 문제"로 오독하게 된다 — 실제로 그 오독 때문에 원인 규명이 늦어졌다.
+    const [bucketExists] = await getStorage().bucket(bucketName).exists();
+    if (!bucketExists) {
+        throw new Error(
+            `백업 버킷 gs://${bucketName} 이(가) 없다. Firestore와 같은 리전(asia-northeast3)에 ` +
+            `생성하거나 FIRESTORE_BACKUP_BUCKET 환경변수로 다른 이름을 지정할 것. ` +
+            `(기본 버킷은 us-east1이라 Firestore export 대상이 될 수 없다 — OPERATIONS.md §4.1)`
+        );
+    }
 
     const outputUri = buildBackupUri(bucketName, getKSTDateString(new Date()));
 
@@ -64,9 +92,9 @@ async function backupFirestoreData(bucketName: string) {
         console.log(`Firestore backup started: ${outputUri}`);
         console.log(`Operation: ${response.name}`);
     } catch (e: unknown) {
-        // 대상 URI를 에러 메시지에 실어야 Sentry만 보고도 버킷 오지정과 IAM 누락을 구분할 수 있다.
-        // (권한 문제라면 런타임 SA에 roles/datastore.importExportAdmin + 버킷 쓰기 권한이 필요하다.
-        //  troubleshoot-deployment 스킬 §2.6 참고)
+        // 대상 URI를 에러 메시지에 실어야 Sentry만 보고도 버킷 오지정·위치 불일치·IAM 누락을 구분할 수 있다.
+        // (권한 문제라면 export 실행 계정 service-{projectNumber}@gcp-sa-firestore.iam.gserviceaccount.com에
+        //  버킷 쓰기 권한이 필요하다. troubleshoot-deployment 스킬 §2.6 참고)
         throw new Error(`Firestore export 실패 (outputUriPrefix=${outputUri}): ${(e as Error).message}`, { cause: e });
     }
 }
@@ -341,7 +369,7 @@ export const dailyNightlyBatch = onSchedule(
         // Step 0.5: superAdmin 대시보드 통계 캐시 재집계 — 매일 아침 수동 갱신 버튼 없이 최신 상태 유지
         await runStep(failed, "computeAllDashboardStats", () => computeAllDashboardStats());
         // Step 1: Firestore 백업 (기존 backupFirestore 통합)
-        await runStep(failed, "backupFirestore", () => backupFirestoreData(bucket.name));
+        await runStep(failed, "backupFirestore", () => backupFirestoreData());
         // Step 2: 기관 퍼지
         await runStep(failed, "purgeOrgs", () => purgeOrgs(db));
         // Step 3: 인증서 이미지 정리

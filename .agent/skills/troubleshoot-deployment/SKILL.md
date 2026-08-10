@@ -73,29 +73,47 @@ description: Cloud Functions, 프론트엔드 빌드 및 배포 시 발생하는
 **증상**: `dailyNightlyBatch`의 `backupFirestore` 스텝만 매일 밤 실패. Sentry 컨텍스트는
 `{ "context": "dailyNightlyBatch", "step": "backupFirestore" }`.
 
-**원인은 둘 중 하나이고, 에러 문구만으로는 구분되지 않는다.**
+**원인은 셋 중 하나다. 에러 문구만으로는 1·3을 구분할 수 없다.**
 
-1. **대상 버킷이 존재하지 않음** (실제 원인이었던 쪽). export 코드가
-   `gs://${projectId}.appspot.com/...`을 하드코딩하고 있었는데, **2024-10 이후 생성된 Firebase
-   프로젝트의 기본 버킷은 `${projectId}.firebasestorage.app`**이고 `.appspot.com` 버킷은 아예
-   없다. Firestore Admin API는 "없는 버킷"을 존재 여부 노출 방지 차원에서 **권한 거부로 보고**한다.
-   → 지금은 `getStorage().bucket().name`(= admin SDK 기본 버킷)을 쓰므로 재발하지 않는다.
-   버킷을 다시 하드코딩하지 말 것.
-2. **런타임 SA의 export 권한 누락**. Cloud Functions 런타임 SA
-   (`1066541065552-compute@developer.gserviceaccount.com`)에 export 권한과 대상 버킷 쓰기 권한이 필요하다.
+1. **대상 버킷이 존재하지 않음.** export 코드가 `gs://${projectId}.appspot.com/...`을
+   하드코딩하고 있었는데, **2024-10 이후 생성된 Firebase 프로젝트의 기본 버킷은
+   `${projectId}.firebasestorage.app`**이고 `.appspot.com` 버킷은 아예 없다. Firestore Admin API는
+   "없는 버킷"을 존재 여부 노출 방지 차원에서 **권한 거부로 보고**한다.
+   → 지금은 export 전에 `bucket.exists()`로 먼저 확인해 "백업 버킷이 없다"고 명시적으로 실패한다.
+   버킷 이름을 다시 하드코딩하지 말 것.
+2. **버킷 위치 불일치** — 1번을 고치자 드러난 진짜 벽. Firestore 관리형 export는 **데이터베이스와
+   같은 위치의 버킷만** 받는다. 이 프로젝트의 Firestore는 `asia-northeast3`인데 Firebase 기본
+   버킷은 **`us-east1`**이라, 기본 버킷을 쓰면 PERMISSION_DENIED가 아니라 이 400이 난다:
+   ```
+   Bucket ...firebasestorage.app is in location us-east1.
+   This database can only operate on buckets spanning location asia or asia-northeast3.
+   ```
+   버킷 위치는 생성 후 변경할 수 없다. → **Firestore와 같은 리전에 백업 전용 버킷**
+   (`{projectId}-backups`)을 두고, `FIRESTORE_BACKUP_BUCKET`으로 덮어쓸 수 있게 했다.
+   기본 버킷을 export 대상으로 되돌리지 말 것. (아카이빙·이미지 정리는 위치 제약이 없어 기본 버킷 사용.)
+3. **export 실행 계정의 버킷 쓰기 권한 누락.** export는 런타임 SA가 아니라 **Firestore 서비스 에이전트**
+   `service-{projectNumber}@gcp-sa-firestore.iam.gserviceaccount.com`로 실행된다
+   (Console → Firestore → 가져오기/내보내기 화면 상단에 표시). 같은 프로젝트 버킷이면 보통 자동으로
+   되지만, 안 되면 그 계정에 버킷 쓰기를 준다.
+   ```bash
+   gcloud storage buckets add-iam-policy-binding gs://vehicle-drive-log-backups \
+     --member="serviceAccount:service-1066541065552@gcp-sa-firestore.iam.gserviceaccount.com" \
+     --role="roles/storage.admin"
+   ```
+   호출을 거는 런타임 SA(`1066541065552-compute@developer.gserviceaccount.com`)에는 export 권한이 필요하다.
    ```bash
    gcloud projects add-iam-policy-binding vehicle-drive-log \
      --member="serviceAccount:1066541065552-compute@developer.gserviceaccount.com" \
      --role="roles/datastore.importExportAdmin"
-
-   gcloud storage buckets add-iam-policy-binding gs://vehicle-drive-log.firebasestorage.app \
-     --member="serviceAccount:1066541065552-compute@developer.gserviceaccount.com" \
-     --role="roles/storage.admin"
    ```
 
-**구분법**: 에러 메시지에 `outputUriPrefix=gs://...`가 붙어 있으므로 그 버킷이
-`firebase storage:buckets:list`(또는 Console → Storage) 목록에 있는지 먼저 본다. 있으면 2번(IAM),
-없으면 1번(버킷 오지정)이다.
+**구분법**: 에러 메시지에 `outputUriPrefix=gs://...`가 붙는다.
+- `... is in location ...` 문구가 있으면 **2번**(위치) — 리전 맞는 버킷을 새로 만든다.
+- "백업 버킷이 ... 없다"면 **1번**(버킷 부재).
+- 버킷이 존재하고 리전도 맞는데 PERMISSION_DENIED면 **3번**(IAM).
+
+**진단 지름길**: Console → Firestore → 가져오기/내보내기에서 수동 export를 한 번 돌려 보면
+세 원인이 즉시 갈린다. 스케줄러를 하루 기다릴 필요가 없다.
 
 ### 2.7 야간 배치 쿼리가 `9 FAILED_PRECONDITION: The query requires an index`
 **증상**: 스케줄 함수 로그/Sentry에 인덱스 생성 링크가 포함된 에러. 예: `organizations`의

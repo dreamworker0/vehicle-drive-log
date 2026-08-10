@@ -20,7 +20,31 @@ jest.mock('../services/alimtalk/sendNotification', () => ({
 }));
 jest.mock('../core/sentry', () => ({ captureError: jest.fn() }));
 
-import { buildBackupUri } from '../handlers/scheduled/dailyNightlyBatch';
+import { buildBackupUri, resolveBackupBucket } from '../handlers/scheduled/dailyNightlyBatch';
+
+describe('resolveBackupBucket — 백업 전용 버킷 선택', () => {
+    const original = process.env.FIRESTORE_BACKUP_BUCKET;
+    afterEach(() => {
+        if (original === undefined) delete process.env.FIRESTORE_BACKUP_BUCKET;
+        else process.env.FIRESTORE_BACKUP_BUCKET = original;
+    });
+
+    it('환경변수가 없으면 {projectId}-backups를 쓴다', () => {
+        delete process.env.FIRESTORE_BACKUP_BUCKET;
+        expect(resolveBackupBucket('vehicle-drive-log')).toBe('vehicle-drive-log-backups');
+    });
+
+    it('환경변수로 덮어쓸 수 있다', () => {
+        process.env.FIRESTORE_BACKUP_BUCKET = 'custom-backup-bucket';
+        expect(resolveBackupBucket('vehicle-drive-log')).toBe('custom-backup-bucket');
+    });
+
+    it('기본 버킷(.firebasestorage.app)을 절대 쓰지 않는다 — us-east1이라 export 대상이 될 수 없다', () => {
+        delete process.env.FIRESTORE_BACKUP_BUCKET;
+        expect(resolveBackupBucket('vehicle-drive-log')).not.toContain('firebasestorage.app');
+        expect(resolveBackupBucket('vehicle-drive-log')).not.toContain('appspot.com');
+    });
+});
 
 describe('buildBackupUri — 백업 대상 GCS 경로', () => {
     it('전달받은 버킷 이름을 그대로 쓴다', () => {

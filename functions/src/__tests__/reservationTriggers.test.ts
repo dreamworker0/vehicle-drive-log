@@ -34,6 +34,12 @@ jest.mock('../services/alimtalk/sendNotification', () => ({
     createInAppNotification: (...args: unknown[]) => mockCreateInAppNotification(...args),
 }));
 
+// Sentry — 설정 오류가 여기로 올라오지 않는지 검증하기 위해 mock
+const mockCaptureError = jest.fn();
+jest.mock('../core/sentry', () => ({
+    captureError: (...args: unknown[]) => mockCaptureError(...args),
+}));
+
 // firebase-functions v2 트리거를 단순 래퍼로 mock
 jest.mock('firebase-functions/v2/firestore', () => ({
     onDocumentCreated: (_path: string, handler: Function) => handler,
@@ -222,6 +228,72 @@ describe('reservationTriggers', () => {
             expect(mockDeleteCalendarEvent).not.toHaveBeenCalled();
             expect(mockCreateInAppNotification).not.toHaveBeenCalled();
             expect(mockSendPushToUser).not.toHaveBeenCalled();
+        });
+
+        // ── 캘린더 실패가 알림을 삼키지 않는다 + 설정 오류는 Sentry로 올리지 않는다 ──
+        describe('캘린더 실패 격리', () => {
+            const withCalendar = () => mockGet.mockResolvedValue({
+                exists: true,
+                data: () => ({ googleCalendarId: 'cal@group.calendar.google.com', organizationId: 'org1' }),
+            });
+
+            const changeEvent = () => makeUpdateEvent(
+                { status: 'confirmed', vehicleId: 'v1', calendarEventId: 'ev1', date: '2026-01-01', startTime: '09:00' },
+                { status: 'confirmed', vehicleId: 'v1', calendarEventId: 'ev1', userId: 'user1', organizationId: 'org1', date: '2026-01-02', startTime: '09:00' }
+            );
+
+            it('캘린더 수정이 403으로 실패해도 예약 변경 알림은 전송된다', async () => {
+                withCalendar();
+                mockUpdateCalendarEvent.mockRejectedValue(new Error('Forbidden'));
+
+                await (onReservationUpdated as Function)(changeEvent());
+
+                // 예전에는 캘린더 예외가 바깥 catch로 튀어 이 알림이 통째로 누락됐다
+                expect(mockCreateInAppNotification).toHaveBeenCalledWith(
+                    'user1', 'reservation_changed', expect.any(String), expect.any(String), 'org1'
+                );
+                expect(mockSendPushToUser).toHaveBeenCalled();
+            });
+
+            it('설정 오류(403)는 Sentry로 올리지 않고 실패 카운터만 올린다', async () => {
+                withCalendar();
+                mockUpdateCalendarEvent.mockRejectedValue(new Error('Forbidden'));
+
+                await (onReservationUpdated as Function)(changeEvent());
+
+                expect(mockCaptureError).not.toHaveBeenCalled();
+                expect(mockUpdate).toHaveBeenCalledWith(
+                    expect.objectContaining({ calendarSyncFailCount: 1 })
+                );
+            });
+
+            it('설정 오류가 아닌 실제 장애는 Sentry로 올린다', async () => {
+                withCalendar();
+                mockUpdateCalendarEvent.mockRejectedValue(new Error('Internal Server Error'));
+
+                await (onReservationUpdated as Function)(changeEvent());
+
+                expect(mockCaptureError).toHaveBeenCalledWith(
+                    expect.any(Error),
+                    expect.objectContaining({ context: 'officialCalendarSync_updated', vehicleId: 'v1' })
+                );
+            });
+
+            it('취소 시 캘린더 삭제가 실패해도 취소 알림은 전송된다', async () => {
+                withCalendar();
+                mockDeleteCalendarEvent.mockRejectedValue(new Error('Forbidden'));
+
+                const event = makeUpdateEvent(
+                    { status: 'confirmed', vehicleId: 'v1', calendarEventId: 'ev1', date: '2026-01-01', startTime: '09:00' },
+                    { status: 'cancelled', vehicleId: 'v1', calendarEventId: 'ev1', userId: 'user1', organizationId: 'org1', date: '2026-01-01', startTime: '09:00' }
+                );
+                await (onReservationUpdated as Function)(event);
+
+                expect(mockCreateInAppNotification).toHaveBeenCalledWith(
+                    'user1', 'reservation_cancelled', expect.any(String), expect.any(String), 'org1'
+                );
+                expect(mockCaptureError).not.toHaveBeenCalled();
+            });
         });
     });
 
