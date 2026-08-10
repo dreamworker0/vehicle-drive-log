@@ -195,6 +195,33 @@ firebase deploy --only firestore:rules,storage
 | GitHub Actions | CI/CD 파이프라인 상태 | GitHub → Actions 탭 |
 | Cloud Storage | 백업 데이터 | Firebase Console → Storage |
 
+### 6.1 TMAP 캐시 적중률 확인
+
+메신저 봇이 예약 종료 시간을 자동 계산할 때 쓰는 TMAP 호출은 2단 캐시(인스턴스 메모리 → Firestore `tmapCache`)를 탄다. **캐시가 실제로 값을 하는지는 추정 1회마다 남는 로그로 집계한다.** 인스턴스 메모리 카운터는 인스턴스가 재활용되면 사라지고, 그 재활용 빈도가 애초에 알고 싶은 값이라 쓸 수 없다.
+
+Cloud Logging(Firebase Console → Functions → 로그, 또는 Logs Explorer)에서:
+
+```
+jsonPayload.function="routeEstimate"
+```
+
+각 로그의 필드가 그 호출이 어디서 답을 받았는지 말한다.
+
+| 필드 | 값 | 뜻 |
+|---|---|---|
+| `origin` | `coord` | 기관 문서의 `lat`/`lng`를 써서 출발지 조회를 아예 건너뜀 (정상 상태) |
+| | `l1` / `l2` / `api` | 좌표가 없는 기관이라 주소로 조회 — 각각 메모리·Firestore·TMAP |
+| `destination` | `l1` / `l2` / `api` | 목적지 좌표를 받은 곳 |
+| `route` | `l1` / `l2` / `api` | 경로 소요시간을 받은 곳 |
+| `tmapCalls` | 숫자 | **그 추정이 실제로 쓴 TMAP 호출 수.** 이 값의 평균이 절감 효과다 |
+
+보는 법:
+- `route`·`destination`이 `api`인 비율이 곧 미스율이다. 캐시가 없다면 추정마다 `tmapCalls`가 3(좌표 없는 기관은 지오코딩 폴백까지 4)이다.
+- **`l2` 비율이 L2의 존재 가치다.** 이 값이 0에 가깝다면 인스턴스가 계속 웜이라는 뜻이므로 L2를 걷어내도 된다. 반대로 높다면 콜드 스타트가 잦아 L2가 실제로 사이를 잇고 있다.
+- `origin`이 `coord`가 아닌 기관이 보이면 그 기관에 좌표가 없다는 신호다 — `backfillOrgCoords` 콜러블로 채운다.
+
+주소·목적지 문자열은 로그에 남기지 않는다(기관 주소·방문지는 개인정보에 준해 다룬다). 그래서 "어느 기관이 미스를 내는지"는 이 로그로 알 수 없고, 분포만 본다.
+
 ---
 
 ## 7. 유용한 명령어 모음

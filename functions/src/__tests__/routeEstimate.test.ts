@@ -22,7 +22,17 @@ jest.mock('firebase-admin/firestore', () => ({
     }),
 }));
 
+// 적중률 측정용 구조화 로그를 여기서 검증한다 — 이 로그가 측정 수단 자체다.
+const mockLog = jest.fn();
+jest.mock('../utils/helpers', () => ({ log: (...args: unknown[]) => mockLog(...args) }));
+
 import { estimateOneWayDurationMin, calcEndTimeFromDuration, __resetRouteEstimateCache } from '../services/tmap/routeEstimate';
+
+/** 마지막 추정 로그의 extra(출처·호출 수) */
+function lastTrace(): Record<string, unknown> {
+    const calls = mockLog.mock.calls.filter((c) => c[1] === 'routeEstimate');
+    return calls[calls.length - 1]?.[3] as Record<string, unknown>;
+}
 
 function res(ok: boolean, body: unknown) {
     return { ok, text: async () => (typeof body === 'string' ? body : JSON.stringify(body)) };
@@ -192,6 +202,50 @@ describe('estimateOneWayDurationMin', () => {
             .mockResolvedValueOnce(res(true, ROUTE(1800)));
 
         expect(await estimateOneWayDurationMin('서울시 중구', '서울역')).toBe(30);
+    });
+
+    it('캐시 출처와 실제 TMAP 호출 수를 로그로 남긴다 — 적중률을 이 로그로 집계한다', async () => {
+        // 캐시를 넣었으면 값을 하는지도 봐야 한다. 인스턴스 카운터로는 재활용 시 사라지므로
+        // 호출마다 구조화 로그를 남기고 집계는 Cloud Logging에 맡긴다.
+        mockFetch
+            .mockResolvedValueOnce(res(true, POI('37.51', '127.06')))
+            .mockResolvedValueOnce(res(true, ROUTE(1800)));
+
+        // 1회차: 좌표 재사용 + 목적지·경로는 API
+        await estimateOneWayDurationMin({ address: '서울시 중구', lat: 37.55, lng: 126.97 }, '서울역');
+        expect(lastTrace()).toEqual({ origin: 'coord', destination: 'api', route: 'api', tmapCalls: 2 });
+
+        // 2회차: 같은 인스턴스이므로 L1이 받는다 — TMAP 호출 0
+        await estimateOneWayDurationMin({ address: '서울시 중구', lat: 37.55, lng: 126.97 }, '서울역');
+        expect(lastTrace()).toEqual({ origin: 'coord', destination: 'l1', route: 'l1', tmapCalls: 0 });
+
+        // 3회차: 인스턴스 재활용 후 — L2가 받는다. 이 줄이 L2의 존재 가치를 보여주는 값이다.
+        __resetRouteEstimateCache();
+        await estimateOneWayDurationMin({ address: '서울시 중구', lat: 37.55, lng: 126.97 }, '서울역');
+        expect(lastTrace()).toEqual({ origin: 'coord', destination: 'l2', route: 'l2', tmapCalls: 0 });
+    });
+
+    it('실패한 추정도 로그를 남긴다 — 실패분을 빼면 적중률이 실제보다 좋아 보인다', async () => {
+        mockFetch
+            .mockResolvedValueOnce(res(true, { searchPoiInfo: { pois: {} } }))
+            .mockResolvedValueOnce(res(true, { coordinateInfo: {} }));
+
+        expect(await estimateOneWayDurationMin('알수없는주소', '서울역')).toBeNull();
+
+        // 지오코딩 폴백까지 2회가 실측으로 잡힌다(POI + fullAddrGeo)
+        expect(lastTrace()).toMatchObject({ origin: 'api', tmapCalls: 2 });
+    });
+
+    it('주소·목적지 문자열은 로그에 넣지 않는다 — 기관 주소와 방문지는 그렇게 다룬다', async () => {
+        mockFetch
+            .mockResolvedValueOnce(res(true, POI('37.51', '127.06')))
+            .mockResolvedValueOnce(res(true, ROUTE(1800)));
+
+        await estimateOneWayDurationMin({ address: '서울시 중구 세종대로 110', lat: 37.55, lng: 126.97 }, '국립중앙의료원');
+
+        const serialized = JSON.stringify(mockLog.mock.calls);
+        expect(serialized).not.toContain('세종대로');
+        expect(serialized).not.toContain('국립중앙의료원');
     });
 
     it('지오코딩 실패도 캐시한다 — 오타 주소를 매번 두 번씩 다시 묻지 않는다', async () => {
