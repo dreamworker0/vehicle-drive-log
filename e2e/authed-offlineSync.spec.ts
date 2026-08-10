@@ -19,11 +19,17 @@ async function signIn(page: Page, email: string, password: string) {
     ).catch(() => { /* 네비게이션으로 인한 컨텍스트 파괴 무시 */ });
 }
 
-/** 오프라인 쓰기 큐(sync-db/sync-store)의 현재 항목 수. 스토어 미존재 시 -1. */
+/**
+ * 오프라인 쓰기 큐(sync-db/sync-store)의 현재 항목 수. 스토어 미존재 시 -1.
+ *
+ * **버전을 지정하지 않고 연다.** 앱보다 낮은 버전을 지정하면 VersionError로 열기 자체가
+ * 실패한다(v1 고정으로 두었다가 앱이 v2로 올라가며 실제로 깨졌다). 버전 없이 열면
+ * 존재하는 버전을 그대로 열고, 여기서 스키마를 만들 일도 없다 — 관찰만 하는 헬퍼다.
+ */
 async function queueCount(page: Page): Promise<number> {
     return page.evaluate(async () => {
         return new Promise<number>((resolve) => {
-            const req = window.indexedDB.open('sync-db', 1);
+            const req = window.indexedDB.open('sync-db');
             req.onsuccess = (e: Event) => {
                 const db = (e.target as IDBOpenDBRequest).result;
                 if (!db.objectStoreNames.contains('sync-store')) {

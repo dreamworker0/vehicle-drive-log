@@ -471,5 +471,8 @@ service cloud.firestore {
     match /slackOauthStates/{docId} {
       allow read, write: if false; // OAuth 설치 nonce(1회성) (TTL 자동 정리)
     }
+    match /tmapCache/{docId} {
+      allow read, write: if false; // TMAP 지오코딩·경로 결과 캐시 (TTL 자동 정리)
+    }
   }
 }

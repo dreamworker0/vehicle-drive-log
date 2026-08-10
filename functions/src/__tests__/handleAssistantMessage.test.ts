@@ -166,9 +166,22 @@ describe('handleAssistantMessage', () => {
 
             const result = await handleAssistantMessage('내일 14시 스타렉스로 서울역', ACTOR);
 
-            expect(mockEstimate).toHaveBeenCalledWith('서울시 중구', '서울역');
+            expect(mockEstimate).toHaveBeenCalledWith({ address: '서울시 중구', lat: undefined, lng: undefined }, '서울역');
             expect(result.proposal?.endTime).toBe('16:00');
             expect(result.proposal?.destination).toBe('서울역');
+        });
+
+        it('기관에 저장된 좌표를 그대로 넘긴다 — 출발지 지오코딩 호출을 아끼기 위해', async () => {
+            mockConvoGet.mockResolvedValue({
+                exists: true,
+                data: () => ({ address: '서울시 중구', lat: 37.55, lng: 126.97 }),
+            });
+            mockParseIntent.mockResolvedValue({ ...CREATE });
+            mockEstimate.mockResolvedValue(30);
+
+            await handleAssistantMessage('내일 14시 스타렉스로 서울역', ACTOR);
+
+            expect(mockEstimate).toHaveBeenCalledWith({ address: '서울시 중구', lat: 37.55, lng: 126.97 }, '서울역');
         });
 
         it('TMAP 계산 실패면 종료 시간을 되묻고 슬롯을 저장한다', async () => {

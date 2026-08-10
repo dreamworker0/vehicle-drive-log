@@ -1,0 +1,22 @@
+{
+    // 테스트(ts-jest) 전용 컴파일 설정 — 배포 빌드(tsconfig.json)는 건드리지 않는다.
+    //
+    // isolatedModules: true는 ts-jest를 파일 단위 transpile 모드로 돌린다. 기본 모드는
+    // TypeScript LanguageService로 **프로그램 전체**를 들고 파일마다 타입 정보를 만드는데,
+    // 그게 워커 메모리를 GB 단위로 부풀리는 주범이다(그 메모리 때문에 CI가 워커를 계속
+    // 재시작시켰고, 재시작 비용이 스위트 시간을 15배로 키웠다).
+    //
+    // 타입 검사를 포기하는 것이 아니다 — `npm run type-check:functions`가 tsconfig.json으로
+    // 전체를 따로 검사하고 CI에서 별도 스텝으로 돈다. 테스트는 실행만 하면 된다.
+    "extends": "./tsconfig.json",
+    "compilerOptions": {
+        "isolatedModules": true,
+        // transpile 모드에서는 선언·소스맵 산출물이 쓰이지 않는다
+        "declaration": false,
+        "declarationMap": false
+    },
+    "include": [
+        "src",
+        "../shared"
+    ]
+}
