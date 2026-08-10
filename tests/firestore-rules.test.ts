@@ -859,6 +859,7 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
       await db.collection('slackUsers').doc('T123_U1').set({ uid: 'user_A', email: 'a@x.com' });
       await db.collection('slackTasks').doc('Ev1').set({ kind: 'message', teamId: 'T123' });
       await db.collection('slackConfirmations').doc('conf1').set({ slackUserId: 'U1', status: 'pending' });
+      await db.collection('tmapCache').doc('hash1').set({ value: { lat: 37.5, lon: 127 }, expiresAt: new Date() });
     });
 
     // 슈퍼관리자조차 접근 불가 (전면 false)
@@ -871,6 +872,9 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertFails(memberDb.collection('integrations').doc('slack_T123').get());
     await assertFails(memberDb.collection('slackUsers').doc('T123_U1').get());
     await assertFails(memberDb.collection('slackConfirmations').doc('conf1').get());
+    // TMAP 캐시 — 기관 주소·목적지 좌표가 담기므로 클라이언트가 훑어볼 수 있으면 안 된다
+    await assertFails(memberDb.collection('tmapCache').doc('hash1').get());
+    await assertFails(memberDb.collection('tmapCache').doc('hash2').set({ value: null, expiresAt: new Date() }));
 
     // 특히 예약 확인 문서를 임의 생성해 예약을 밀어넣는 우회 시도 → 차단
     await assertFails(memberDb.collection('slackConfirmations').doc('conf_evil').set({
