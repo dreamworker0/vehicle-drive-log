@@ -96,13 +96,14 @@ jobs:
     needs: changes
     if: needs.changes.outputs.functions == 'true'
     runs-on: ubuntu-latest
-    # 20분은 실측 대비 여유가 4분뿐이었다 — PR #140에서 테스트 스텝이 **953초(15.9분)**,
-    # 잡 전체 16분 10초를 썼다(689건 · `--maxWorkers=2`). 러너 변동이 조금만 커져도
-    # 타임아웃으로 죽고, master에서 죽으면 Deploy(workflow_run)까지 막힌다.
-    # 실측의 약 2배로 올린다. 진짜 hang을 무한정 방치하지 않는 선은 유지한다.
-    # (근본적으로 빠르게 하려면 maxWorkers 상향이지만 workerIdleMemoryLimit과 함께
-    #  OOM 위험을 다시 재보아야 해서 이번에는 건드리지 않았다.)
-    timeout-minutes: 35
+    # 한때 이 잡이 CI 전체의 임계경로였다(테스트 스텝 953초 = 15.9분). 원인은 테스트 양이
+    # 아니라 ts-jest 기본 모드였다 — 워커마다 TypeScript 프로그램 전체를 들고 있느라
+    # (googleapis 등 거대한 .d.ts 포함) 워커 하나가 GB 단위로 부풀었고, 그걸 누르려고 건
+    # `--workerIdleMemoryLimit=512MB`가 **파일마다 워커를 재시작**시켜 시간을 15배로 키웠다.
+    # 테스트 전용 tsconfig(functions/tsconfig.test.json)로 transpile 모드로 돌리자
+    # 같은 733건이 로컬 실측 874초 → 5초, 워커 메모리 합계 9.1GB → 0.8GB가 됐다.
+    # 타임아웃은 실측 대비 넉넉히 두되(에뮬레이터 통합까지 포함) hang은 잡히는 선으로 낮춘다.
+    timeout-minutes: 15
     env:
       TZ: "Asia/Seoul"
     steps:
@@ -118,8 +119,11 @@ jobs:
         id: install
         run: cd functions && npm ci
 
+      # --workerIdleMemoryLimit은 두지 않는다. 워커가 부풀던 원인(ts-jest 프로그램 전체 로드)을
+      # tsconfig.test.json에서 없앴으므로 제한이 필요 없고, 제한이 있으면 워커가 매 파일마다
+      # 재시작되어 오히려 15배 느려진다. maxWorkers는 package.json의 "50%"를 따른다.
       - name: Functions unit tests
-        run: cd functions && npx jest --testPathIgnorePatterns=emulator --maxWorkers=2 --workerIdleMemoryLimit=512MB
+        run: cd functions && npx jest --testPathIgnorePatterns=emulator
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
