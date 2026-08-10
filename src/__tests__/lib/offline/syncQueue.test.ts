@@ -23,7 +23,7 @@ vi.mock('firebase/firestore', () => {
 });
 vi.mock('@/lib/firebase', () => ({ db: {} }));
 
-import { enqueue, clearQueue, flushQueue, getSyncDB, SERVER_TIMESTAMP_MARKER } from '@/lib/offline/syncQueue';
+import { enqueue, clearQueue, flushQueue, getSyncDB, drainFailedRecords, SERVER_TIMESTAMP_MARKER } from '@/lib/offline/syncQueue';
 import { setDoc, updateDoc, deleteDoc, serverTimestamp, FieldValue, Timestamp } from 'firebase/firestore';
 
 async function allDocIds(): Promise<string[]> {
@@ -120,6 +120,54 @@ describe('offline syncQueue', () => {
 
         await flushQueue();
 
+        expect(await allDocIds()).toEqual([]);
+    });
+
+    it('폐기된 항목은 유실 기록으로 남아 사용자에게 알릴 수 있다 — 영구 오류', async () => {
+        // 폐기가 콘솔에만 남으면 운전자는 오프라인에서 쓴 기록이 사라진 걸 모른다.
+        await enqueue('UPDATE', 'driveLogs', 'denied', { distance: 1 });
+        vi.mocked(updateDoc).mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }));
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        await flushQueue();
+
+        const failed = await drainFailedRecords();
+        expect(failed).toHaveLength(1);
+        expect(failed[0]).toMatchObject({ docId: 'denied', collection: 'driveLogs', reason: 'permanent', code: 'permission-denied' });
+        // 한 번 알린 유실은 다시 알리지 않는다(drain은 읽으면서 비운다)
+        expect(await drainFailedRecords()).toEqual([]);
+    });
+
+    it('폐기된 항목은 유실 기록으로 남는다 — 재시도 소진', async () => {
+        await enqueue('UPDATE', 'driveLogs', 'poison', { distance: 1 });
+        vi.mocked(updateDoc).mockRejectedValue(new Error('unavailable'));
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        for (let i = 0; i < 5; i++) await flushQueue();
+
+        const failed = await drainFailedRecords();
+        expect(failed).toHaveLength(1);
+        expect(failed[0]).toMatchObject({ docId: 'poison', reason: 'retry-exhausted' });
+    });
+
+    it('clearQueue는 유실 기록도 비운다 — 공용 기기에서 남의 유실 안내가 뜨면 안 된다', async () => {
+        await enqueue('UPDATE', 'driveLogs', 'denied', { distance: 1 });
+        vi.mocked(updateDoc).mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }));
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        await flushQueue();
+
+        await clearQueue();
+
+        expect(await drainFailedRecords()).toEqual([]);
+    });
+
+    it('겹친 flush 호출은 같은 실행을 공유한다 — 폐기 안내가 빈 큐를 보지 않도록', async () => {
+        await enqueue('CREATE', 'driveLogs', 'once', { distance: 1 });
+
+        await Promise.all([flushQueue(), flushQueue()]);
+
+        // 두 번째 호출이 즉시 반환해 버리면 호출자는 아직 시작도 안 한 flush를 끝난 것으로 본다.
+        expect(setDoc).toHaveBeenCalledTimes(1);
         expect(await allDocIds()).toEqual([]);
     });
 

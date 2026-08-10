@@ -14,7 +14,7 @@ import { findCancelCandidates, type CancelCandidate } from "./cancelReservation"
 import { createReservationTx } from "../reservation/createReservationCore";
 import { cancelReservationTx } from "../reservation/cancelReservationCore";
 import { modifyReservationTx } from "../reservation/modifyReservationCore";
-import { estimateOneWayDurationMin, calcEndTimeFromDuration } from "../tmap/routeEstimate";
+import { estimateOneWayDurationMin, calcEndTimeFromDuration, type OriginInput } from "../tmap/routeEstimate";
 
 const db = getFirestore();
 
@@ -206,10 +206,20 @@ async function getAssistantVehicles(orgId: string): Promise<Array<AssistantVehic
         }));
 }
 
-/** 기관 주소 조회 (TMAP 출발지). 미등록이면 undefined → 종료 시간 되묻기로 폴백 */
-async function getOrgAddress(orgId: string): Promise<string | undefined> {
+/**
+ * 기관 출발지 조회 (TMAP 출발지). 주소와 함께 저장된 좌표도 같이 넘겨
+ * 출발지 지오코딩 호출을 건너뛰게 한다(좌표는 backfillOrgCoords/기관 등록 시 채워진다).
+ * 둘 다 없으면 빈 값 → 종료 시간 되묻기로 폴백.
+ */
+async function getOrgOrigin(orgId: string): Promise<OriginInput> {
     const snap = await db.collection("organizations").doc(orgId).get();
-    return snap.exists ? (snap.data()?.address as string | undefined) : undefined;
+    if (!snap.exists) return {};
+    const data = snap.data();
+    return {
+        address: data?.address as string | undefined,
+        lat: data?.lat as number | undefined,
+        lng: data?.lng as number | undefined,
+    };
 }
 
 /** 예약 제안 요약 텍스트 (확인 UI에 표시) */
@@ -373,8 +383,8 @@ async function completeCreate(
     // 계산 실패(기관 주소 미등록·지오코딩 실패·TMAP 오류) 시 종료 시간을 되묻는다.
     let endTime = slots.endTime;
     if (!endTime) {
-        const orgAddress = await getOrgAddress(actor.orgId);
-        const durationMin = await estimateOneWayDurationMin(orgAddress, slots.destination);
+        const orgOrigin = await getOrgOrigin(actor.orgId);
+        const durationMin = await estimateOneWayDurationMin(orgOrigin, slots.destination);
         if (durationMin != null) {
             endTime = calcEndTimeFromDuration(slots.startTime!, durationMin);
         } else {
