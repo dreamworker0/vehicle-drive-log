@@ -58,6 +58,46 @@ export function buildBackupUri(bucketName: string, dateStr: string): string {
     return `gs://${bucketName}/backups/firestore/${dateStr}`;
 }
 
+/** gRPC PERMISSION_DENIED(코드 7) 판별 */
+function isPermissionDenied(e: unknown): boolean {
+    const err = e as { code?: number | string; message?: string } | null;
+    return err?.code === 7 || /PERMISSION_DENIED/.test(err?.message ?? "");
+}
+
+/**
+ * export 실패를 **행동 가능한** 메시지로 바꾼다.
+ *
+ * 이 알림은 매일 밤 Sentry·Discord로 나가는데, 원문(`7 PERMISSION_DENIED: The caller does not
+ * have permission`)만으로는 받는 사람이 문서를 뒤져야 한다. 그런데 여기까지 왔다는 것은 이미
+ * **원인이 하나로 좁혀졌다는 뜻**이다 — 버킷 부재는 앞의 `exists()`에서 걸리고, 리전 불일치는
+ * PERMISSION_DENIED가 아니라 `... is in location ...` 400으로 온다. 남는 것은 IAM뿐이다.
+ * 그 판정과 조치 명령을 메시지에 함께 실어, 알림 하나로 끝낼 수 있게 한다.
+ *
+ * SA 이메일을 코드에 박지 않는다 — 프로젝트 번호는 런타임 환경에 없고, 박아 두면 문서와
+ * 갈라져 낡는다. 자리표시자로 형태만 보여주고 구체값은 문서(§2.6)에 둔다.
+ *
+ * **명령은 한 줄로 낸다.** 줄바꿈에 `\`를 쓰면 bash에서는 되지만 PowerShell에서는
+ * "단항 연산자 '--' 뒤에 식이 없습니다"로 깨진다. 이 서비스의 운영자는 Windows에서 조치하므로
+ * (2026-08-10에 실제로 이 형태로 붙여 넣어 실패했다) 두 셸에서 모두 되는 한 줄 형태만 쓴다.
+ */
+export function describeExportFailure(e: unknown, outputUri: string, projectId: string | undefined, bucketName: string): string {
+    const base = `Firestore export 실패 (outputUriPrefix=${outputUri}): ${(e as Error).message}`;
+    if (!isPermissionDenied(e)) return base;
+
+    const project = projectId ?? "<projectId>";
+    return [
+        base,
+        "",
+        `버킷 gs://${bucketName} 은(는) 존재가 확인된 뒤 거부됐다 → 남는 원인은 IAM뿐이다.`,
+        "export는 장기 실행 작업이라 호출 즉시 나는 거부는 대개 **호출자(런타임 SA) 권한**이다. 이 순서로 확인:",
+        "  1) 런타임 SA에 export 권한",
+        `     gcloud projects add-iam-policy-binding ${project} --member="serviceAccount:<projectNumber>-compute@developer.gserviceaccount.com" --role="roles/datastore.importExportAdmin"`,
+        "  2) 그래도 나면 Firestore 서비스 에이전트에 버킷 쓰기",
+        `     gcloud storage buckets add-iam-policy-binding gs://${bucketName} --member="serviceAccount:service-<projectNumber>@gcp-sa-firestore.iam.gserviceaccount.com" --role="roles/storage.admin"`,
+        "구체적인 계정 값과 진단 지름길: .agent/skills/troubleshoot-deployment/SKILL.md §2.6",
+    ].join("\n");
+}
+
 /**
  * Step 0: Firestore 전체 백업 (기존 backupFirestore 로직 통합)
  */
@@ -93,9 +133,8 @@ async function backupFirestoreData() {
         console.log(`Operation: ${response.name}`);
     } catch (e: unknown) {
         // 대상 URI를 에러 메시지에 실어야 Sentry만 보고도 버킷 오지정·위치 불일치·IAM 누락을 구분할 수 있다.
-        // (권한 문제라면 export 실행 계정 service-{projectNumber}@gcp-sa-firestore.iam.gserviceaccount.com에
-        //  버킷 쓰기 권한이 필요하다. troubleshoot-deployment 스킬 §2.6 참고)
-        throw new Error(`Firestore export 실패 (outputUriPrefix=${outputUri}): ${(e as Error).message}`, { cause: e });
+        // PERMISSION_DENIED면 원인이 IAM 하나로 좁혀지므로 조치 명령까지 함께 싣는다.
+        throw new Error(describeExportFailure(e, outputUri, projectId, bucketName), { cause: e });
     }
 }
 
