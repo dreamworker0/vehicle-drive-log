@@ -132,6 +132,22 @@ export async function clearQueue() {
 }
 
 /**
+ * 아직 서버에 올라가지 못한 항목 수. 화면에 "미전송 N건"을 띄우는 데만 쓴다.
+ *
+ * IDB를 열지 못하는 환경(사파리 프라이빗 모드 등)에서는 0을 돌려준다 — 표시용 값이라
+ * 실패를 위로 던져 배너를 깨뜨릴 이유가 없다.
+ */
+export async function getPendingCount(): Promise<number> {
+    try {
+        const database = await getSyncDB();
+        if (!database) return 0;
+        return await database.count('sync-store');
+    } catch {
+        return 0;
+    }
+}
+
+/**
  * 폐기 기록을 읽어내고 비운다(한 번 알린 유실을 다시 알리지 않기 위해 읽기와 삭제를 묶는다).
  * 페이지 컨텍스트의 안내 모듈만 호출한다.
  */

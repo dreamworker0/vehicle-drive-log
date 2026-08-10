@@ -23,7 +23,7 @@ vi.mock('firebase/firestore', () => {
 });
 vi.mock('@/lib/firebase', () => ({ db: {} }));
 
-import { enqueue, clearQueue, flushQueue, getSyncDB, drainFailedRecords, SERVER_TIMESTAMP_MARKER } from '@/lib/offline/syncQueue';
+import { enqueue, clearQueue, flushQueue, getSyncDB, drainFailedRecords, getPendingCount, SERVER_TIMESTAMP_MARKER } from '@/lib/offline/syncQueue';
 import { setDoc, updateDoc, deleteDoc, serverTimestamp, FieldValue, Timestamp } from 'firebase/firestore';
 
 async function allDocIds(): Promise<string[]> {
@@ -58,6 +58,28 @@ describe('offline syncQueue', () => {
         expect(updateDoc).toHaveBeenCalledTimes(1);
         expect(deleteDoc).toHaveBeenCalledTimes(1);
         expect(await allDocIds()).toEqual([]);
+    });
+
+    it('getPendingCount는 아직 못 올린 항목만 센다', async () => {
+        expect(await getPendingCount()).toBe(0);
+
+        await enqueue('CREATE', 'driveLogs', 'a', { distance: 1 });
+        await enqueue('CREATE', 'driveLogs', 'b', { distance: 2 });
+        expect(await getPendingCount()).toBe(2);
+
+        await flushQueue();
+        expect(await getPendingCount()).toBe(0); // 올라간 것은 세지 않는다
+    });
+
+    it('getPendingCount는 폐기된 항목을 세지 않는다 — 유실은 "전송 대기"가 아니다', async () => {
+        await enqueue('UPDATE', 'driveLogs', 'denied', { distance: 1 });
+        vi.mocked(updateDoc).mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }));
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        await flushQueue();
+
+        expect(await getPendingCount()).toBe(0);
+        expect(await drainFailedRecords()).toHaveLength(1);
     });
 
     it('flush 실패 항목은 보존하고 성공 항목만 제거한다', async () => {

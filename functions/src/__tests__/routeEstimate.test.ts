@@ -1,9 +1,25 @@
 /**
  * routeEstimate.test.ts — TMAP 편도 소요시간 추정 + 종료시간 계산
- * TMAP HTTP 호출은 global.fetch mock으로 대체.
+ * TMAP HTTP 호출은 global.fetch mock으로, L2 캐시(Firestore)는 인메모리 문서 맵으로 대체.
  */
 jest.mock('firebase-functions/params', () => ({
     defineString: () => ({ value: () => 'test-key' }),
+}));
+
+// ── L2 캐시(tmapCache) Firestore mock ──
+// 문서 ID → 저장된 데이터. 실제 Firestore 대신 이 맵이 캐시 역할을 한다.
+const l2Docs = new Map<string, Record<string, unknown>>();
+const mockDocGet = jest.fn();
+const mockDocSet = jest.fn();
+jest.mock('firebase-admin/firestore', () => ({
+    getFirestore: () => ({
+        collection: (name: string) => ({
+            doc: (id: string) => ({
+                get: async () => mockDocGet(name, id),
+                set: async (data: Record<string, unknown>) => mockDocSet(name, id, data),
+            }),
+        }),
+    }),
 }));
 
 import { estimateOneWayDurationMin, calcEndTimeFromDuration, __resetRouteEstimateCache } from '../services/tmap/routeEstimate';
@@ -21,6 +37,15 @@ describe('estimateOneWayDurationMin', () => {
         jest.clearAllMocks();
         // 캐시는 모듈 스코프라 케이스 간 결과가 새어 나간다 — 호출 횟수 검증이 무의미해지지 않도록 비운다.
         __resetRouteEstimateCache();
+        l2Docs.clear();
+        // 기본 L2는 진짜 캐시처럼 동작한다(쓴 것이 읽힌다). 미스·오류는 개별 케이스에서 덮어쓴다.
+        mockDocGet.mockImplementation(async (_c: string, id: string) => ({
+            exists: l2Docs.has(id),
+            data: () => l2Docs.get(id),
+        }));
+        mockDocSet.mockImplementation(async (_c: string, id: string, data: Record<string, unknown>) => {
+            l2Docs.set(id, data);
+        });
         (global as unknown as { fetch: unknown }).fetch = mockFetch;
     });
 
@@ -109,6 +134,64 @@ describe('estimateOneWayDurationMin', () => {
 
         expect(await estimateOneWayDurationMin('서울시 중구', '서울역')).toBe(30);
         expect(mockFetch).toHaveBeenCalledTimes(3); // 늘지 않는다
+    });
+
+    it('인스턴스가 바뀌어도 L2(Firestore)에 남아 있으면 TMAP을 다시 부르지 않는다', async () => {
+        // 봇 트래픽은 띄엄띄엄해 콜드 스타트가 잦다. L1만 있으면 그때마다 캐시가 통째로 날아간다.
+        mockFetch
+            .mockResolvedValueOnce(res(true, POI('37.55', '126.97')))
+            .mockResolvedValueOnce(res(true, POI('37.51', '127.06')))
+            .mockResolvedValueOnce(res(true, ROUTE(1800)));
+
+        expect(await estimateOneWayDurationMin('서울시 중구', '서울역')).toBe(30);
+        expect(mockFetch).toHaveBeenCalledTimes(3);
+
+        __resetRouteEstimateCache(); // 인스턴스 재활용 — L1만 날아가고 L2는 남는다
+
+        expect(await estimateOneWayDurationMin('서울시 중구', '서울역')).toBe(30);
+        expect(mockFetch).toHaveBeenCalledTimes(3);
+    });
+
+    it('L2에 만료 시각을 함께 적는다 — TTL 정책이 그 필드를 보고 지운다', async () => {
+        mockFetch
+            .mockResolvedValueOnce(res(true, POI('37.55', '126.97')))
+            .mockResolvedValueOnce(res(true, POI('37.51', '127.06')))
+            .mockResolvedValueOnce(res(true, ROUTE(1800)));
+
+        await estimateOneWayDurationMin('서울시 중구', '서울역');
+
+        expect(mockDocSet).toHaveBeenCalled();
+        for (const [collection, , data] of mockDocSet.mock.calls) {
+            expect(collection).toBe('tmapCache');
+            // Date로 써야 Firestore가 timestamp로 저장하고 TTL 정책이 인식한다
+            expect((data as { expiresAt: unknown }).expiresAt).toBeInstanceOf(Date);
+            expect((data as { expiresAt: Date }).expiresAt.getTime()).toBeGreaterThan(Date.now());
+        }
+    });
+
+    it('L2 문서가 만료됐으면 무시하고 다시 조회한다', async () => {
+        mockDocGet.mockImplementation(async () => ({
+            exists: true,
+            data: () => ({ value: { lat: 1, lon: 1 }, expiresAt: new Date(Date.now() - 1000) }),
+        }));
+        mockFetch
+            .mockResolvedValueOnce(res(true, POI('37.55', '126.97')))
+            .mockResolvedValueOnce(res(true, POI('37.51', '127.06')))
+            .mockResolvedValueOnce(res(true, ROUTE(1800)));
+
+        expect(await estimateOneWayDurationMin('서울시 중구', '서울역')).toBe(30);
+        expect(mockFetch).toHaveBeenCalledTimes(3); // 만료분을 쓰지 않았다
+    });
+
+    it('L2가 죽어도 추정은 계속된다 — 캐시는 있으면 좋은 것이지 필수가 아니다', async () => {
+        mockDocGet.mockRejectedValue(new Error('firestore 불가'));
+        mockDocSet.mockRejectedValue(new Error('firestore 불가'));
+        mockFetch
+            .mockResolvedValueOnce(res(true, POI('37.55', '126.97')))
+            .mockResolvedValueOnce(res(true, POI('37.51', '127.06')))
+            .mockResolvedValueOnce(res(true, ROUTE(1800)));
+
+        expect(await estimateOneWayDurationMin('서울시 중구', '서울역')).toBe(30);
     });
 
     it('지오코딩 실패도 캐시한다 — 오타 주소를 매번 두 번씩 다시 묻지 않는다', async () => {
