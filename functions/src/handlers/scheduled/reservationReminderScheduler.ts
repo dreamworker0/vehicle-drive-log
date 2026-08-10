@@ -8,12 +8,18 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { checkReservationReminders } from "../../services/alimtalk/reservationReminder";
 import { warmupOcrFunction } from "../../services/ocr/warmupOcr";
 import { recordHeartbeat } from "../../utils/helpers";
+import { SLACK_TOKEN_ENC_KEY } from "../../core/params";
 
 export const reservationReminder = onSchedule(
     {
         schedule: "0 8-18 * * 1-5",
         timeZone: "Asia/Seoul",
         retryCount: 0,
+        // 리마인더는 Slack DM 채널도 태운다(checkReservationReminders → resolveOrgSlackBotToken →
+        // getSlackIntegration → decryptSlackToken). 시크릿을 선언하지 않으면 .value()가 빈 문자열이라
+        // 복호화가 "암호화 키가 비어 있습니다."로 죽고, Slack DM만 매시간 조용히 누락된다.
+        // (tokenCrypto 상단 규칙: 이 래퍼를 쓰는 함수는 secrets에 선언해야 한다)
+        secrets: [SLACK_TOKEN_ENC_KEY],
     },
     async function () {
         // 주말(토/일)에는 스킵 (비용 절감)
