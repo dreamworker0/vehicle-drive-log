@@ -20,7 +20,7 @@ jest.mock('../services/alimtalk/sendNotification', () => ({
 }));
 jest.mock('../core/sentry', () => ({ captureError: jest.fn() }));
 
-import { buildBackupUri, resolveBackupBucket } from '../handlers/scheduled/dailyNightlyBatch';
+import { buildBackupUri, resolveBackupBucket, describeExportFailure } from '../handlers/scheduled/dailyNightlyBatch';
 
 describe('resolveBackupBucket — 백업 전용 버킷 선택', () => {
     const original = process.env.FIRESTORE_BACKUP_BUCKET;
@@ -229,5 +229,46 @@ describe('dailyNightlyBatch — 날짜 조건 비즈니스 로직', () => {
             const v: V = { insurance: { expiryDate: '2026-06-10' } };
             expect(shouldNotify(v, daysLeft('2026-06-17', '2026-06-10'))).toBe(false);
         });
+    });
+});
+
+describe('describeExportFailure — 매일 밤 나가는 알림이 조치까지 담는가', () => {
+    const URI = 'gs://vehicle-drive-log-backups/backups/firestore/2026-08-11';
+    const denied = Object.assign(new Error('7 PERMISSION_DENIED: The caller does not have permission'), { code: 7 });
+
+    it('PERMISSION_DENIED면 원인을 IAM으로 특정하고 조치 명령을 싣는다', () => {
+        const msg = describeExportFailure(denied, URI, 'vehicle-drive-log', 'vehicle-drive-log-backups');
+
+        // 여기까지 온 시점에 버킷 부재·리전 불일치는 이미 배제돼 있다 — 그 판정을 메시지가 말해야 한다
+        expect(msg).toContain('남는 원인은 IAM뿐이다');
+        expect(msg).toContain('roles/datastore.importExportAdmin');
+        expect(msg).toContain('gcp-sa-firestore.iam.gserviceaccount.com');
+        expect(msg).toContain('§2.6');
+    });
+
+    it('원문 메시지와 대상 URI는 그대로 남긴다 — 진단의 출발점이다', () => {
+        const msg = describeExportFailure(denied, URI, 'vehicle-drive-log', 'vehicle-drive-log-backups');
+        expect(msg).toContain(`outputUriPrefix=${URI}`);
+        expect(msg).toContain('The caller does not have permission');
+    });
+
+    it('메시지에 code 없이 PERMISSION_DENIED 문구만 있어도 인식한다', () => {
+        const msg = describeExportFailure(new Error('PERMISSION_DENIED: nope'), URI, 'p', 'b');
+        expect(msg).toContain('남는 원인은 IAM뿐이다');
+    });
+
+    it('권한 외 오류에는 추측을 덧붙이지 않는다', () => {
+        const other = new Error('Bucket x is in location us-east1. This database can only operate on buckets spanning location asia');
+        const msg = describeExportFailure(other, URI, 'vehicle-drive-log', 'vehicle-drive-log-backups');
+
+        expect(msg).toContain('is in location us-east1');
+        expect(msg).not.toContain('IAM');
+        expect(msg).not.toContain('add-iam-policy-binding');
+    });
+
+    it('SA 이메일을 코드에 박지 않는다 — 프로젝트 번호는 문서가 단일 원본이다', () => {
+        const msg = describeExportFailure(denied, URI, 'vehicle-drive-log', 'vehicle-drive-log-backups');
+        expect(msg).toContain('<projectNumber>');
+        expect(msg).not.toMatch(/\d{10,}/);
     });
 });

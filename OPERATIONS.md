@@ -132,8 +132,12 @@ firebase functions:log --only ocrDashboard,autoVerifyDocument
   - 한때 이 자리에 "organizations, users, vehicles, driveLogs, reservations, notifications" 6개가
     적혀 있었다. 실제보다 **좁게** 적힌 오기여서, 복구 시 "이 컬렉션은 백업에 없겠구나"라고
     잘못 판단할 수 있었다.
-- **실패 시**: 백업 스텝이 실패하면 `captureError`가 Sentry·Discord로 알린다.
-  알림이 없는데 오늘 폴더가 비어 있으면 배치 자체가 안 돈 것이므로 함수 로그를 먼저 본다.
+- **실패 시**: 백업 스텝이 실패하면 `captureError`가 Sentry·Discord로 알린다. `PERMISSION_DENIED`면
+  알림 본문에 원인 판정(IAM)과 조치 명령이 함께 실린다(`describeExportFailure`).
+  - ⚠️ **알림이 없다고 백업이 있는 것은 아니다.** 코드는 export를 걸고 "시작됨"만 남긴 뒤 끝난다
+    (장기 실행 작업의 완료를 기다리지 않는다). 작업이 시작된 **뒤** 실패하면 아무 알림도 나가지
+    않는다. 그래서 **오늘 폴더가 비어 있으면** 두 가지가 모두 가능하다 — 배치가 안 돌았거나,
+    걸린 export가 나중에 실패했거나. 함수 로그에 `Firestore backup started`가 있으면 후자다.
 
 ```bash
 # Firebase Console에서 확인
