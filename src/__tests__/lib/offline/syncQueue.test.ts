@@ -23,7 +23,7 @@ vi.mock('firebase/firestore', () => {
 });
 vi.mock('@/lib/firebase', () => ({ db: {} }));
 
-import { enqueue, clearQueue, flushQueue, getSyncDB, SERVER_TIMESTAMP_MARKER } from '@/lib/offline/syncQueue';
+import { enqueue, clearQueue, flushQueue, getSyncDB, drainFailedRecords, getPendingCount, retryCooldownMs, SERVER_TIMESTAMP_MARKER } from '@/lib/offline/syncQueue';
 import { setDoc, updateDoc, deleteDoc, serverTimestamp, FieldValue, Timestamp } from 'firebase/firestore';
 
 async function allDocIds(): Promise<string[]> {
@@ -58,6 +58,28 @@ describe('offline syncQueue', () => {
         expect(updateDoc).toHaveBeenCalledTimes(1);
         expect(deleteDoc).toHaveBeenCalledTimes(1);
         expect(await allDocIds()).toEqual([]);
+    });
+
+    it('getPendingCount는 아직 못 올린 항목만 센다', async () => {
+        expect(await getPendingCount()).toBe(0);
+
+        await enqueue('CREATE', 'driveLogs', 'a', { distance: 1 });
+        await enqueue('CREATE', 'driveLogs', 'b', { distance: 2 });
+        expect(await getPendingCount()).toBe(2);
+
+        await flushQueue();
+        expect(await getPendingCount()).toBe(0); // 올라간 것은 세지 않는다
+    });
+
+    it('getPendingCount는 폐기된 항목을 세지 않는다 — 유실은 "전송 대기"가 아니다', async () => {
+        await enqueue('UPDATE', 'driveLogs', 'denied', { distance: 1 });
+        vi.mocked(updateDoc).mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }));
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        await flushQueue();
+
+        expect(await getPendingCount()).toBe(0);
+        expect(await drainFailedRecords()).toHaveLength(1);
     });
 
     it('flush 실패 항목은 보존하고 성공 항목만 제거한다', async () => {
@@ -123,16 +145,134 @@ describe('offline syncQueue', () => {
         expect(await allDocIds()).toEqual([]);
     });
 
-    it('일시 오류는 재시도 상한(5회) 도달 시 폐기한다 — poison message 방지', async () => {
-        await enqueue('UPDATE', 'driveLogs', 'poison', { distance: 1 });
-        vi.mocked(updateDoc).mockRejectedValue(new Error('unavailable'));
+    it('폐기된 항목은 유실 기록으로 남아 사용자에게 알릴 수 있다 — 영구 오류', async () => {
+        // 폐기가 콘솔에만 남으면 운전자는 오프라인에서 쓴 기록이 사라진 걸 모른다.
+        await enqueue('UPDATE', 'driveLogs', 'denied', { distance: 1 });
+        vi.mocked(updateDoc).mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }));
         vi.spyOn(console, 'error').mockImplementation(() => {});
 
-        for (let i = 0; i < 4; i++) {
-            await flushQueue();
-            expect(await allDocIds()).toEqual(['poison']);
+        await flushQueue();
+
+        const failed = await drainFailedRecords();
+        expect(failed).toHaveLength(1);
+        expect(failed[0]).toMatchObject({ docId: 'denied', collection: 'driveLogs', reason: 'permanent', code: 'permission-denied' });
+        // 한 번 알린 유실은 다시 알리지 않는다(drain은 읽으면서 비운다)
+        expect(await drainFailedRecords()).toEqual([]);
+    });
+
+    it('폐기된 항목은 유실 기록으로 남는다 — 재시도 소진', async () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        try {
+            await enqueue('UPDATE', 'driveLogs', 'poison', { distance: 1 });
+            vi.mocked(updateDoc).mockRejectedValue(new Error('unavailable'));
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+
+            // 냉각을 넘겨 가며 5회 시도한다(즉시 5번 돌리면 냉각에 막혀 폐기되지 않는다)
+            for (let i = 1; i <= 5; i++) {
+                await flushQueue();
+                vi.setSystemTime(Date.now() + retryCooldownMs(i) + 1);
+            }
+
+            const failed = await drainFailedRecords();
+            expect(failed).toHaveLength(1);
+            expect(failed[0]).toMatchObject({ docId: 'poison', reason: 'retry-exhausted' });
+        } finally {
+            vi.useRealTimers();
         }
-        await flushQueue(); // 5번째 실패에서 폐기
+    });
+
+    it('clearQueue는 유실 기록도 비운다 — 공용 기기에서 남의 유실 안내가 뜨면 안 된다', async () => {
+        await enqueue('UPDATE', 'driveLogs', 'denied', { distance: 1 });
+        vi.mocked(updateDoc).mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }));
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        await flushQueue();
+
+        await clearQueue();
+
+        expect(await drainFailedRecords()).toEqual([]);
+    });
+
+    it('겹친 flush 호출은 같은 실행을 공유한다 — 폐기 안내가 빈 큐를 보지 않도록', async () => {
+        await enqueue('CREATE', 'driveLogs', 'once', { distance: 1 });
+
+        await Promise.all([flushQueue(), flushQueue()]);
+
+        // 두 번째 호출이 즉시 반환해 버리면 호출자는 아직 시작도 안 한 flush를 끝난 것으로 본다.
+        expect(setDoc).toHaveBeenCalledTimes(1);
         expect(await allDocIds()).toEqual([]);
+    });
+
+    it('일시 오류는 재시도 상한(5회) 도달 시 폐기한다 — poison message 방지', async () => {
+        // 냉각 시간이 있으므로 시도 사이에 시계를 넘겨야 실제로 재시도가 일어난다.
+        // (Date만 가짜로 만든다 — setTimeout까지 가짜면 fake-indexeddb가 멈춘다)
+        vi.useFakeTimers({ toFake: ['Date'] });
+        try {
+            await enqueue('UPDATE', 'driveLogs', 'poison', { distance: 1 });
+            vi.mocked(updateDoc).mockRejectedValue(new Error('unavailable'));
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+
+            for (let i = 1; i <= 4; i++) {
+                await flushQueue();
+                expect(await allDocIds()).toEqual(['poison']);
+                vi.setSystemTime(Date.now() + retryCooldownMs(i) + 1);
+            }
+            await flushQueue(); // 5번째 실패에서 폐기
+            expect(await allDocIds()).toEqual([]);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('연결이 깜빡여도 재시도 횟수를 소모하지 않는다 — 냉각 중에는 건너뛴다', async () => {
+        // 지하철·엘리베이터에서 online 이벤트가 연달아 나면 flush도 연달아 돈다. 냉각이 없으면
+        // 1~2분 안에 5회가 소진돼, 조금 더 기다리면 올라갈 수 있었던 기록이 폐기됐다.
+        vi.useFakeTimers({ toFake: ['Date'] });
+        try {
+            await enqueue('UPDATE', 'driveLogs', 'flaky', { distance: 1 });
+            vi.mocked(updateDoc).mockRejectedValue(new Error('unavailable'));
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+
+            await flushQueue();                       // 1회 실패 → 1분 냉각
+            expect(vi.mocked(updateDoc)).toHaveBeenCalledTimes(1);
+
+            for (let i = 0; i < 20; i++) {
+                vi.setSystemTime(Date.now() + 2000);  // 2초마다 연결이 깜빡인다
+                await flushQueue();
+            }
+
+            // 냉각 중이라 재시도가 아예 일어나지 않았다 — 호출 수도, 항목도 그대로다
+            expect(vi.mocked(updateDoc)).toHaveBeenCalledTimes(1);
+            expect(await allDocIds()).toEqual(['flaky']);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('냉각이 끝나면 다시 시도한다', async () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        try {
+            await enqueue('UPDATE', 'driveLogs', 'later', { distance: 1 });
+            vi.mocked(updateDoc).mockRejectedValueOnce(new Error('unavailable'));
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+
+            await flushQueue();
+            expect(await allDocIds()).toEqual(['later']);
+
+            vi.setSystemTime(Date.now() + retryCooldownMs(1) + 1);
+            vi.mocked(updateDoc).mockResolvedValueOnce(undefined); // 이번엔 성공
+            await flushQueue();
+
+            expect(await allDocIds()).toEqual([]);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('냉각은 실패할수록 길어지고 상한을 넘지 않는다', () => {
+        expect(retryCooldownMs(0)).toBe(0);          // 첫 시도는 즉시
+        expect(retryCooldownMs(1)).toBe(60_000);     // 1분
+        expect(retryCooldownMs(2)).toBe(120_000);
+        expect(retryCooldownMs(4)).toBe(480_000);
+        expect(retryCooldownMs(50)).toBe(30 * 60_000); // 상한
     });
 });

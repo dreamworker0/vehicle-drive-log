@@ -88,21 +88,21 @@ jobs:
       - name: Security audit (root + functions)
         run: node --experimental-strip-types scripts/security-audit.ts
 
-  # Functions 단위 테스트(pass/fail 게이트) — 메인 ci 잡과 병렬 실행해 전체 체감 시간을 줄인다.
-  # 커버리지 계측은 이 러너에서 실행 시간을 +15분(11분→26분) 늘리는데 워커 수로는 못 줄여서
-  # (병목=계측 자체), per-push에서는 커버리지 없이 빠르게 pass/fail만 본다. 커버리지 회귀 게이트는
-  # 별도 스케줄 워크플로(functions-coverage.yml)가 주 1회 자동 검사한다.
+  # Functions 테스트 + 커버리지 게이트 — 메인 ci 잡과 병렬 실행해 전체 체감 시간을 줄인다.
+  # 한때 커버리지 계측이 +15분(11분→26분)이라 주간 워크플로로 떼어냈지만, ts-jest transpile
+  # 모드 전환 후 커버리지를 포함해도 전체가 22초여서 다시 여기로 들였다.
   functions-tests:
     needs: changes
     if: needs.changes.outputs.functions == 'true'
     runs-on: ubuntu-latest
-    # 20분은 실측 대비 여유가 4분뿐이었다 — PR #140에서 테스트 스텝이 **953초(15.9분)**,
-    # 잡 전체 16분 10초를 썼다(689건 · `--maxWorkers=2`). 러너 변동이 조금만 커져도
-    # 타임아웃으로 죽고, master에서 죽으면 Deploy(workflow_run)까지 막힌다.
-    # 실측의 약 2배로 올린다. 진짜 hang을 무한정 방치하지 않는 선은 유지한다.
-    # (근본적으로 빠르게 하려면 maxWorkers 상향이지만 workerIdleMemoryLimit과 함께
-    #  OOM 위험을 다시 재보아야 해서 이번에는 건드리지 않았다.)
-    timeout-minutes: 35
+    # 한때 이 잡이 CI 전체의 임계경로였다(테스트 스텝 953초 = 15.9분). 원인은 테스트 양이
+    # 아니라 ts-jest 기본 모드였다 — 워커마다 TypeScript 프로그램 전체를 들고 있느라
+    # (googleapis 등 거대한 .d.ts 포함) 워커 하나가 GB 단위로 부풀었고, 그걸 누르려고 건
+    # `--workerIdleMemoryLimit=512MB`가 **파일마다 워커를 재시작**시켜 시간을 15배로 키웠다.
+    # 테스트 전용 tsconfig(functions/tsconfig.test.json)로 transpile 모드로 돌리자
+    # 같은 733건이 로컬 실측 874초 → 5초, 워커 메모리 합계 9.1GB → 0.8GB가 됐다.
+    # 타임아웃은 실측 대비 넉넉히 두되(에뮬레이터 통합까지 포함) hang은 잡히는 선으로 낮춘다.
+    timeout-minutes: 15
     env:
       TZ: "Asia/Seoul"
     steps:
@@ -118,8 +118,13 @@ jobs:
         id: install
         run: cd functions && npm ci
 
-      - name: Functions unit tests
-        run: cd functions && npx jest --testPathIgnorePatterns=emulator --maxWorkers=2 --workerIdleMemoryLimit=512MB
+      # --workerIdleMemoryLimit은 두지 않는다. 워커가 부풀던 원인(ts-jest 프로그램 전체 로드)을
+      # tsconfig.test.json에서 없앴으므로 제한이 필요 없고, 제한이 있으면 워커가 매 파일마다
+      # 재시작되어 오히려 15배 느려진다. maxWorkers는 package.json의 "50%"를 따른다.
+      # **커버리지 게이트를 여기서 함께 돈다.** 계측 비용이 사라졌으므로 주간으로 떼어 둘
+      # 이유가 없다. 주간이면 커버리지 회귀가 최대 7일간 방치되므로 매 푸시에서 막는다.
+      - name: Functions unit tests (+coverage gate)
+        run: cd functions && npx jest --coverage --testPathIgnorePatterns=emulator
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
@@ -149,8 +154,8 @@ jobs:
 
   ci:
     runs-on: ubuntu-latest
-    # 게이트 스텝(Rules·인증 E2E·커버리지) 추가로 첫 실행(캐시 미적중) 기준 ~20분 소요
-    timeout-minutes: 25
+    # E2E를 별도 잡(e2e)으로 떼어낸 뒤 실측 ~5분. 캐시 미적중·러너 변동을 감안해 15분.
+    timeout-minutes: 15
     env:
       TZ: "Asia/Seoul"
 
@@ -264,6 +269,58 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npx firebase-tools emulators:exec --only firestore,storage "npx vitest run tests/firestore-rules.test.ts tests/storage-rules.test.ts"
 
+  # ── E2E (별도 잡) ──
+  # 한때 이 스텝들은 ci 잡 안에 있었고 그때는 그게 맞았다 — 임계경로가 functions 단위 테스트
+  # (15.9분)였으므로 E2E를 떼어내도 전체 시간이 줄지 않았다. transpile 전환으로 그쪽이 45초가
+  # 되자 ci 잡(11.5분, 그중 E2E 7분)이 유일한 임계경로가 됐고, 이제는 분리가 값을 한다.
+  # 실측 기준 벽시계 11.5분 → 약 8분(ci 약 5분과 병렬).
+  #
+  # ⚠️ **브랜치 보호의 필수 체크 목록에 `e2e`를 추가해야 한다.** 이 잡은 ci와 별개 체크 런이라,
+  # 넣지 않으면 E2E가 빨강이어도 머지가 막히지 않는다 — 이 파일 상단이 경계하는
+  # "게이트가 조용히 비는" 상황과 같은 종류다.
+  #
+  # 자체 설치·빌드를 한다: 비인증 E2E는 dist/를 vite preview로 서빙하고, 인증 E2E는
+  # 에뮬레이터(Java)를 쓴다. 중복 설치 약 1분은 functions에서 회수한 15분에 비하면 작다.
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      TZ: "Asia/Seoul"
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Setup Node 22
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        id: install
+        run: npm ci
+
+      - name: Create .env file
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: echo "${{ secrets.ENV_FILE }}" > .env
+
+      - name: Build
+        id: build
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
+        run: npm run build
+
+      - name: Setup Java (Firebase emulator)
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        uses: actions/setup-java@v5.7.0
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Cache Firebase emulators
+        if: ${{ !cancelled() && steps.build.outcome == 'success' }}
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/firebase/emulators
+          key: firebase-emulators-${{ runner.os }}
       # ── E2E ── (빌드 산출물이 필요하므로 빌드 성공에만 묶는다)
       - name: Get Playwright version
         id: pw-version

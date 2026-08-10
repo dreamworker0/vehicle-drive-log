@@ -132,8 +132,12 @@ firebase functions:log --only ocrDashboard,autoVerifyDocument
   - 한때 이 자리에 "organizations, users, vehicles, driveLogs, reservations, notifications" 6개가
     적혀 있었다. 실제보다 **좁게** 적힌 오기여서, 복구 시 "이 컬렉션은 백업에 없겠구나"라고
     잘못 판단할 수 있었다.
-- **실패 시**: 백업 스텝이 실패하면 `captureError`가 Sentry·Discord로 알린다.
-  알림이 없는데 오늘 폴더가 비어 있으면 배치 자체가 안 돈 것이므로 함수 로그를 먼저 본다.
+- **실패 시**: 백업 스텝이 실패하면 `captureError`가 Sentry·Discord로 알린다. `PERMISSION_DENIED`면
+  알림 본문에 원인 판정(IAM)과 조치 명령이 함께 실린다(`describeExportFailure`).
+  - ⚠️ **알림이 없다고 백업이 있는 것은 아니다.** 코드는 export를 걸고 "시작됨"만 남긴 뒤 끝난다
+    (장기 실행 작업의 완료를 기다리지 않는다). 작업이 시작된 **뒤** 실패하면 아무 알림도 나가지
+    않는다. 그래서 **오늘 폴더가 비어 있으면** 두 가지가 모두 가능하다 — 배치가 안 돌았거나,
+    걸린 export가 나중에 실패했거나. 함수 로그에 `Firestore backup started`가 있으면 후자다.
 
 ```bash
 # Firebase Console에서 확인
@@ -194,6 +198,33 @@ firebase deploy --only firestore:rules,storage
 | Sentry | 프론트엔드 런타임 에러 | Sentry 프로젝트 대시보드 |
 | GitHub Actions | CI/CD 파이프라인 상태 | GitHub → Actions 탭 |
 | Cloud Storage | 백업 데이터 | Firebase Console → Storage |
+
+### 6.1 TMAP 캐시 적중률 확인
+
+메신저 봇이 예약 종료 시간을 자동 계산할 때 쓰는 TMAP 호출은 2단 캐시(인스턴스 메모리 → Firestore `tmapCache`)를 탄다. **캐시가 실제로 값을 하는지는 추정 1회마다 남는 로그로 집계한다.** 인스턴스 메모리 카운터는 인스턴스가 재활용되면 사라지고, 그 재활용 빈도가 애초에 알고 싶은 값이라 쓸 수 없다.
+
+Cloud Logging(Firebase Console → Functions → 로그, 또는 Logs Explorer)에서:
+
+```
+jsonPayload.function="routeEstimate"
+```
+
+각 로그의 필드가 그 호출이 어디서 답을 받았는지 말한다.
+
+| 필드 | 값 | 뜻 |
+|---|---|---|
+| `origin` | `coord` | 기관 문서의 `lat`/`lng`를 써서 출발지 조회를 아예 건너뜀 (정상 상태) |
+| | `l1` / `l2` / `api` | 좌표가 없는 기관이라 주소로 조회 — 각각 메모리·Firestore·TMAP |
+| `destination` | `l1` / `l2` / `api` | 목적지 좌표를 받은 곳 |
+| `route` | `l1` / `l2` / `api` | 경로 소요시간을 받은 곳 |
+| `tmapCalls` | 숫자 | **그 추정이 실제로 쓴 TMAP 호출 수.** 이 값의 평균이 절감 효과다 |
+
+보는 법:
+- `route`·`destination`이 `api`인 비율이 곧 미스율이다. 캐시가 없다면 추정마다 `tmapCalls`가 3(좌표 없는 기관은 지오코딩 폴백까지 4)이다.
+- **`l2` 비율이 L2의 존재 가치다.** 이 값이 0에 가깝다면 인스턴스가 계속 웜이라는 뜻이므로 L2를 걷어내도 된다. 반대로 높다면 콜드 스타트가 잦아 L2가 실제로 사이를 잇고 있다.
+- `origin`이 `coord`가 아닌 기관이 보이면 그 기관에 좌표가 없다는 신호다 — `backfillOrgCoords` 콜러블로 채운다.
+
+주소·목적지 문자열은 로그에 남기지 않는다(기관 주소·방문지는 개인정보에 준해 다룬다). 그래서 "어느 기관이 미스를 내는지"는 이 로그로 알 수 없고, 분포만 본다.
 
 ---
 

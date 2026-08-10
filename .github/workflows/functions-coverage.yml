@@ -23,7 +23,9 @@ concurrency:
 jobs:
   coverage:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    # ci.yml의 functions-tests와 같은 이유로 짧아졌다 — ts-jest transpile 모드(tsconfig.test.json)
+    # 전환 후 커버리지 포함 실측이 22초다(이전에는 단위 테스트만 16분).
+    timeout-minutes: 15
     env:
       TZ: "Asia/Seoul"
     steps:
@@ -41,7 +43,7 @@ jobs:
       # --coverage로 functions/package.json jest 설정의 coverageThreshold를 게이트로 강제한다.
       # 하한선(43/74/46/43) 미달 시 실패 → 커버리지 회귀 감지.
       - name: Functions coverage gate
-        run: cd functions && npx jest --coverage --testPathIgnorePatterns=emulator --maxWorkers=2 --workerIdleMemoryLimit=512MB
+        run: cd functions && npx jest --coverage --testPathIgnorePatterns=emulator
         env:
           NODE_OPTIONS: --max-old-space-size=4096
 
