@@ -52,7 +52,7 @@ jobs:
         id: filter
         # 서드파티 액션은 커밋 SHA로 고정한다 — 태그는 이동 가능하므로 공급망 변조(태그 재지정) 방어.
         # 공식 actions/*는 GitHub 관리(+Dependabot)라 메이저 태그를 유지한다. (2026-07-18 보안 재점검 G)
-        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+        uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
         with:
           filters: |
             functions:
