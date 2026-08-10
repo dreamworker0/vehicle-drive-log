@@ -8,6 +8,8 @@
  * 단순화(파일럿): 단일 목적지, carType='0'(승용 기본). 다중 경유지·차종별 통행료는 앱에서.
  */
 import { defineString } from "firebase-functions/params";
+import { getFirestore } from "firebase-admin/firestore";
+import { createHash } from "node:crypto";
 
 const TMAP_API_KEY = defineString("TMAP_API_KEY");
 const TMAP_BASE = "https://apis.openapi.sk.com";
@@ -27,14 +29,17 @@ export interface OriginInput {
 // ── 호출 캐시 ────────────────────────────────────────────────────────────────
 // TMAP은 일일 호출 한도가 있는 외부 유료 API인데, 봇 대화는 같은 기관·같은 목적지를
 // 반복해서 묻는다("내일도 시청", "다음 주도 시청"). 앱 쪽은 이미 localStorage에
-// 같은 성격의 캐시를 두고 있다(src/lib/tmap/core.ts). 서버에는 그게 없어 매번 새로 호출했다.
+// 같은 성격의 캐시를 두고 있다(src/lib/tmap/core.ts).
 //
-// 인스턴스 메모리에만 둔다 — Firestore 캐시 컬렉션을 새로 만들면 TTL 정리 주기와
-// 규칙까지 따라붙는데, 파일럿 규모의 봇 트래픽에는 그만한 값이 없다. 인스턴스가
-// 재활용되는 동안(웜) 반복 호출만 걷어내도 호출량은 눈에 띄게 준다.
+// **2단이다.** L1은 인스턴스 메모리, L2는 Firestore(`tmapCache`).
+// L1만 두면 인스턴스가 재활용될 때마다 캐시가 통째로 날아간다 — 봇 트래픽은 띄엄띄엄해
+// 콜드 스타트가 잦고, 그래서 적중률이 낮다. L2는 그 사이를 잇는다. Firestore 읽기 1회는
+// TMAP 호출 1회보다 훨씬 싸고, 만료 정리는 이 저장소가 이미 쓰는 방식(firestore.indexes.json의
+// `expiresAt` TTL 정책)에 그대로 얹으므로 정리용 스케줄 함수를 새로 만들 필요가 없다.
 const GEO_CACHE_TTL_MS = 24 * 60 * 60 * 1000;   // 주소→좌표는 사실상 불변
 const ROUTE_CACHE_TTL_MS = 3 * 60 * 60 * 1000;  // 소요시간은 교통량 따라 변하므로 짧게
 const CACHE_MAX_ENTRIES = 200;                   // 인스턴스 메모리 상한(주소 문자열 기준 수십 KB)
+const CACHE_COLLECTION = "tmapCache";
 
 interface CacheEntry<T> {
     value: T;
@@ -64,7 +69,51 @@ function cacheSet<T>(cache: Map<string, CacheEntry<T>>, key: string, value: T, t
     cache.set(key, { value, expiresAt: now + ttlMs });
 }
 
-/** 테스트 전용 — 케이스 간 캐시 격리 */
+/**
+ * 문서 ID — 키를 해시한다. 주소에는 `/`가 들어갈 수 있어 그대로 쓰면 문서 경로가 깨지고,
+ * 길이 상한(1500바이트)도 걸린다. 해시면 둘 다 신경 쓸 필요가 없다.
+ */
+function cacheDocId(kind: string, key: string): string {
+    return createHash("sha1").update(`${kind}:${key}`).digest("hex");
+}
+
+/**
+ * L2 조회. **캐시는 있으면 좋은 것이지 있어야 하는 것이 아니다** — Firestore가 느리거나
+ * 실패해도 추정 자체는 TMAP 호출로 진행되어야 하므로 모든 오류를 삼키고 미스로 취급한다.
+ *
+ * TTL 정책의 삭제는 만료 후 최대 24시간까지 늦어질 수 있어 만료 판정을 여기서 다시 한다.
+ */
+async function l2Get<T>(kind: string, key: string, now: number): Promise<{ value: T } | undefined> {
+    try {
+        const snap = await getFirestore().collection(CACHE_COLLECTION).doc(cacheDocId(kind, key)).get();
+        if (!snap.exists) return undefined;
+        const data = snap.data() as { value?: T; expiresAt?: { toMillis?: () => number } | Date } | undefined;
+        if (!data || data.value === undefined) return undefined;
+        const expiresAt = data.expiresAt;
+        const expiresMs = expiresAt instanceof Date
+            ? expiresAt.getTime()
+            : (typeof expiresAt?.toMillis === "function" ? expiresAt.toMillis() : 0);
+        if (expiresMs <= now) return undefined;
+        return { value: data.value };
+    } catch {
+        return undefined;
+    }
+}
+
+/** L2 기록. 실패해도 무시한다 — 다음 호출이 다시 채우면 된다. */
+async function l2Set<T>(kind: string, key: string, value: T, ttlMs: number, now: number): Promise<void> {
+    try {
+        await getFirestore().collection(CACHE_COLLECTION).doc(cacheDocId(kind, key)).set({
+            value: value ?? null,
+            // Date로 쓰면 Firestore가 timestamp로 저장한다 — TTL 정책이 요구하는 타입이다.
+            expiresAt: new Date(now + ttlMs),
+        });
+    } catch {
+        /* 캐시 기록 실패는 추정 결과에 영향을 주지 않는다 */
+    }
+}
+
+/** 테스트 전용 — 케이스 간 L1 격리 (L2는 Firestore mock이 담당) */
 export function __resetRouteEstimateCache(): void {
     geoCache.clear();
     routeCache.clear();
@@ -90,11 +139,19 @@ async function geocode(query: string, apiKey: string): Promise<Coord | null> {
 
     // 실패(null)도 캐시한다 — 오타·미등록 주소를 매번 두 번씩(POI+주소) 다시 물어보지 않기 위해서다.
     const now = Date.now();
-    const cached = cacheGet(geoCache, trimmed, now);
-    if (cached !== undefined) return cached;
+    const hit = cacheGet(geoCache, trimmed, now);
+    if (hit !== undefined) return hit;
+
+    const stored = await l2Get<Coord | null>("geo", trimmed, now);
+    if (stored) {
+        // L2에서 올라온 값은 L1에도 채워, 같은 인스턴스의 다음 호출은 Firestore도 안 간다.
+        cacheSet(geoCache, trimmed, stored.value, GEO_CACHE_TTL_MS, now);
+        return stored.value;
+    }
 
     const result = await geocodeUncached(trimmed, apiKey);
     cacheSet(geoCache, trimmed, result, GEO_CACHE_TTL_MS, now);
+    await l2Set("geo", trimmed, result, GEO_CACHE_TTL_MS, now);
     return result;
 }
 
@@ -137,11 +194,18 @@ async function routeDurationMin(start: Coord, end: Coord, apiKey: string): Promi
     // 캐시가 빗나가지 않게 하기 위해서다.
     const key = `${start.lon.toFixed(5)},${start.lat.toFixed(5)}-${end.lon.toFixed(5)},${end.lat.toFixed(5)}`;
     const now = Date.now();
-    const cached = cacheGet(routeCache, key, now);
-    if (cached !== undefined) return cached;
+    const hit = cacheGet(routeCache, key, now);
+    if (hit !== undefined) return hit;
+
+    const stored = await l2Get<number | null>("route", key, now);
+    if (stored) {
+        cacheSet(routeCache, key, stored.value, ROUTE_CACHE_TTL_MS, now);
+        return stored.value;
+    }
 
     const result = await routeDurationMinUncached(start, end, apiKey);
     cacheSet(routeCache, key, result, ROUTE_CACHE_TTL_MS, now);
+    await l2Set("route", key, result, ROUTE_CACHE_TTL_MS, now);
     return result;
 }
 
