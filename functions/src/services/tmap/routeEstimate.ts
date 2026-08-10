@@ -10,6 +10,7 @@
 import { defineString } from "firebase-functions/params";
 import { getFirestore } from "firebase-admin/firestore";
 import { createHash } from "node:crypto";
+import { log } from "../../utils/helpers";
 
 const TMAP_API_KEY = defineString("TMAP_API_KEY");
 const TMAP_BASE = "https://apis.openapi.sk.com";
@@ -119,8 +120,50 @@ export function __resetRouteEstimateCache(): void {
     routeCache.clear();
 }
 
+// ── 적중 추적 ────────────────────────────────────────────────────────────────
+// 캐시를 넣었으면 그것이 값을 하는지도 볼 수 있어야 한다. 특히 L2는 "콜드 스타트 사이를
+// 잇는다"는 가정 위에 있는데, 그 가정이 맞는지는 적중 출처를 남겨 두지 않으면 확인할 수 없다.
+//
+// 인스턴스 메모리 카운터로는 안 된다 — 인스턴스가 재활용되면 사라지고, 애초에 재활용 빈도가
+// 알고 싶은 값이다. 그래서 **호출마다 구조화 로그 한 줄**을 남기고 집계는 Cloud Logging에
+// 맡긴다. 로그는 이 정도 트래픽에서 사실상 무료이고, 인스턴스 수명과 무관하게 남는다.
+//
+// 집계 예: jsonPayload.function="routeEstimate" 로 필터한 뒤 route/destination 필드의
+// l1·l2·api 분포를 보면 각 단의 적중률이 나온다. tmapCalls 평균이 실제 절감액이다.
+
+/** 값이 어디서 왔는지. coord = 기관 좌표 재사용으로 조회 자체를 건너뜀 */
+type LookupSource = "l1" | "l2" | "api" | "coord";
+
+interface EstimateTrace {
+    origin: LookupSource;
+    destination: LookupSource;
+    route: LookupSource;
+    /** 실제로 나간 TMAP HTTP 호출 수 (지오코딩 폴백까지 포함한 실측) */
+    tmapCalls: number;
+}
+
+function newTrace(): EstimateTrace {
+    return { origin: "api", destination: "api", route: "api", tmapCalls: 0 };
+}
+
+/**
+ * 추정 1회의 캐시 출처를 구조화 로그로 남긴다.
+ *
+ * 주소·목적지 문자열은 넣지 않는다 — 기관 주소와 방문지는 개인정보에 준해 다루는 값이고
+ * (utils/mask의 전제와 같다), 적중률 집계에는 출처와 호출 수만 있으면 된다.
+ */
+function logEstimate(trace: EstimateTrace): void {
+    log("INFO", "routeEstimate", "TMAP 추정 캐시 출처", {
+        origin: trace.origin,
+        destination: trace.destination,
+        route: trace.route,
+        tmapCalls: trace.tmapCalls,
+    });
+}
+
 /** TMAP GET 요청 → JSON (실패 시 null) */
-async function tmapGetJson(pathWithQuery: string, apiKey: string): Promise<Record<string, unknown> | null> {
+async function tmapGetJson(pathWithQuery: string, apiKey: string, trace: EstimateTrace): Promise<Record<string, unknown> | null> {
+    trace.tmapCalls += 1;
     const res = await fetch(`${TMAP_BASE}${pathWithQuery}`, { headers: { appKey: apiKey } });
     if (!res.ok) return null;
     const text = await res.text();
@@ -133,29 +176,39 @@ async function tmapGetJson(pathWithQuery: string, apiKey: string): Promise<Recor
 }
 
 /** 주소·장소명 → 좌표 (POI 검색 우선, 실패 시 fullAddrGeo). 앱 geocode() 동형 */
-async function geocode(query: string, apiKey: string): Promise<Coord | null> {
+async function geocode(
+    query: string,
+    apiKey: string,
+    trace: EstimateTrace,
+    slot: "origin" | "destination",
+): Promise<Coord | null> {
     const trimmed = query.trim();
     if (trimmed.length < 2) return null;
 
     // 실패(null)도 캐시한다 — 오타·미등록 주소를 매번 두 번씩(POI+주소) 다시 물어보지 않기 위해서다.
     const now = Date.now();
     const hit = cacheGet(geoCache, trimmed, now);
-    if (hit !== undefined) return hit;
+    if (hit !== undefined) {
+        trace[slot] = "l1";
+        return hit;
+    }
 
     const stored = await l2Get<Coord | null>("geo", trimmed, now);
     if (stored) {
         // L2에서 올라온 값은 L1에도 채워, 같은 인스턴스의 다음 호출은 Firestore도 안 간다.
         cacheSet(geoCache, trimmed, stored.value, GEO_CACHE_TTL_MS, now);
+        trace[slot] = "l2";
         return stored.value;
     }
 
-    const result = await geocodeUncached(trimmed, apiKey);
+    trace[slot] = "api";
+    const result = await geocodeUncached(trimmed, apiKey, trace);
     cacheSet(geoCache, trimmed, result, GEO_CACHE_TTL_MS, now);
     await l2Set("geo", trimmed, result, GEO_CACHE_TTL_MS, now);
     return result;
 }
 
-async function geocodeUncached(trimmed: string, apiKey: string): Promise<Coord | null> {
+async function geocodeUncached(trimmed: string, apiKey: string, trace: EstimateTrace): Promise<Coord | null> {
     // 괄호 내 실제 주소 추출: "서울역 (서울 용산구 …)" → "서울 용산구 …"
     const m = trimmed.match(/\(([^)]+)\)/);
     const clean = m ? m[1].trim() : trimmed;
@@ -164,6 +217,7 @@ async function geocodeUncached(trimmed: string, apiKey: string): Promise<Coord |
     const poiData = await tmapGetJson(
         `/tmap/pois?version=1&format=json&searchKeyword=${encodeURIComponent(clean)}&resCoordType=WGS84GEO&reqCoordType=WGS84GEO&count=1`,
         apiKey,
+        trace,
     );
     const poi = (poiData as { searchPoiInfo?: { pois?: { poi?: Array<Record<string, string>> } } })
         ?.searchPoiInfo?.pois?.poi?.[0];
@@ -177,6 +231,7 @@ async function geocodeUncached(trimmed: string, apiKey: string): Promise<Coord |
     const geoData = await tmapGetJson(
         `/tmap/geo/fullAddrGeo?version=1&format=json&coordType=WGS84GEO&fullAddr=${encodeURIComponent(clean)}`,
         apiKey,
+        trace,
     );
     const item = (geoData as { coordinateInfo?: { coordinate?: Array<Record<string, string>> } })
         ?.coordinateInfo?.coordinate?.[0];
@@ -189,27 +244,33 @@ async function geocodeUncached(trimmed: string, apiKey: string): Promise<Coord |
 }
 
 /** 좌표 간 자동차 경로의 소요시간(분). 실패 시 null */
-async function routeDurationMin(start: Coord, end: Coord, apiKey: string): Promise<number | null> {
+async function routeDurationMin(start: Coord, end: Coord, apiKey: string, trace: EstimateTrace): Promise<number | null> {
     // 앱(routing.ts)과 같이 좌표를 소수점 5자리로 끊어 키를 만든다 — 미터 단위 흔들림으로
     // 캐시가 빗나가지 않게 하기 위해서다.
     const key = `${start.lon.toFixed(5)},${start.lat.toFixed(5)}-${end.lon.toFixed(5)},${end.lat.toFixed(5)}`;
     const now = Date.now();
     const hit = cacheGet(routeCache, key, now);
-    if (hit !== undefined) return hit;
+    if (hit !== undefined) {
+        trace.route = "l1";
+        return hit;
+    }
 
     const stored = await l2Get<number | null>("route", key, now);
     if (stored) {
         cacheSet(routeCache, key, stored.value, ROUTE_CACHE_TTL_MS, now);
+        trace.route = "l2";
         return stored.value;
     }
 
-    const result = await routeDurationMinUncached(start, end, apiKey);
+    trace.route = "api";
+    const result = await routeDurationMinUncached(start, end, apiKey, trace);
     cacheSet(routeCache, key, result, ROUTE_CACHE_TTL_MS, now);
     await l2Set("route", key, result, ROUTE_CACHE_TTL_MS, now);
     return result;
 }
 
-async function routeDurationMinUncached(start: Coord, end: Coord, apiKey: string): Promise<number | null> {
+async function routeDurationMinUncached(start: Coord, end: Coord, apiKey: string, trace: EstimateTrace): Promise<number | null> {
+    trace.tmapCalls += 1;
     const res = await fetch(`${TMAP_BASE}/tmap/routes?version=1&format=json`, {
         method: "POST",
         headers: { "Content-Type": "application/json", appKey: apiKey },
@@ -258,16 +319,25 @@ export async function estimateOneWayDurationMin(
         && Number.isFinite(originInput.lat) && Number.isFinite(originInput.lng);
     if (!hasCoord && !originInput.address?.trim()) return null;
 
+    const trace = newTrace();
     try {
-        const start: Coord | null = hasCoord
-            ? { lat: originInput.lat as number, lon: originInput.lng as number }
-            : await geocode(originInput.address as string, apiKey);
+        let start: Coord | null;
+        if (hasCoord) {
+            start = { lat: originInput.lat as number, lon: originInput.lng as number };
+            trace.origin = "coord";
+        } else {
+            start = await geocode(originInput.address as string, apiKey, trace, "origin");
+        }
         if (!start) return null;
-        const dest = await geocode(destination, apiKey);
+        const dest = await geocode(destination, apiKey, trace, "destination");
         if (!dest) return null;
-        return await routeDurationMin(start, dest, apiKey);
+        return await routeDurationMin(start, dest, apiKey, trace);
     } catch {
         return null;
+    } finally {
+        // 성공·실패·예외 어느 쪽으로 끝나도 남긴다. 실패한 호출만 캐시를 못 타는 패턴이
+        // 있을 수 있어, 실패분을 빼고 집계하면 적중률이 실제보다 좋아 보인다.
+        logEstimate(trace);
     }
 }
 
