@@ -23,6 +23,10 @@ import('./lib/sentry').then(m => m.initSentry()).catch(() => { });
 import { registerReconnectFlush } from './lib/offline/syncQueue';
 registerReconnectFlush();
 
+// 오프라인 큐에서 폐기된(서버에 반영되지 못한) 기록을 사용자에게 알린다
+import { registerSyncFailureNotice } from './lib/offline/syncFailureNotice';
+registerSyncFailureNotice();
+
 export function renderFullApp() {
     const root = document.getElementById('root')!;
     createRoot(root).render(
