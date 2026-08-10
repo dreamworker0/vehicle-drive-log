@@ -266,6 +266,23 @@ describe('describeExportFailure — 매일 밤 나가는 알림이 조치까지 
         expect(msg).not.toContain('add-iam-policy-binding');
     });
 
+    it('명령은 한 줄로 낸다 — PowerShell에서 bash식 줄바꿈(\\)은 파싱 에러가 된다', () => {
+        // 이 서비스의 조치는 Windows PowerShell에서 이뤄진다. 알림에 담긴 명령이 그대로
+        // 붙여넣기로 돌아가야 하므로 줄 끝 백슬래시를 쓰지 않는다(2026-08-10에 실제로 깨졌다).
+        const msg = describeExportFailure(denied, URI, 'vehicle-drive-log', 'vehicle-drive-log-backups');
+
+        for (const line of msg.split('\n')) {
+            expect(line.trimEnd().endsWith('\\')).toBe(false);
+        }
+        // 각 gcloud 명령은 한 줄에 --member와 --role을 모두 갖는다
+        const cmds = msg.split('\n').filter((l) => l.includes('gcloud '));
+        expect(cmds).toHaveLength(2);
+        for (const c of cmds) {
+            expect(c).toContain('--member=');
+            expect(c).toContain('--role=');
+        }
+    });
+
     it('SA 이메일을 코드에 박지 않는다 — 프로젝트 번호는 문서가 단일 원본이다', () => {
         const msg = describeExportFailure(denied, URI, 'vehicle-drive-log', 'vehicle-drive-log-backups');
         expect(msg).toContain('<projectNumber>');

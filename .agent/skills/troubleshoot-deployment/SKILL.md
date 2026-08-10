@@ -54,16 +54,12 @@ description: Cloud Functions, 프론트엔드 빌드 및 배포 시 발생하는
 
 **해결책** (프로젝트 소유자가 1회 부여, 이후 영구히 자동 처리):
 - **새 시크릿**: 런타임 SA에 시크릿별 읽기 권한을 미리 부여하면, 배포 시 CLI가 "이미 있음"을 확인하고 setIamPolicy 호출을 건너뛴다.
-  ```bash
-  gcloud secrets add-iam-policy-binding <SECRET_NAME> \
-    --member="serviceAccount:1066541065552-compute@developer.gserviceaccount.com" \
-    --role="roles/secretmanager.secretAccessor" --project=vehicle-drive-log
+  ```powershell
+  gcloud secrets add-iam-policy-binding <SECRET_NAME> --member="serviceAccount:1066541065552-compute@developer.gserviceaccount.com" --role="roles/secretmanager.secretAccessor" --project=vehicle-drive-log
   ```
 - **새 공개 HTTP 함수**: 배포 SA에 Cloud Functions Admin 역할 부여(`cloudfunctions.functions.setIamPolicy` 포함). 이미 있는 Editor에 더해지는 것이라 실질 확장은 setIamPolicy뿐.
-  ```bash
-  gcloud projects add-iam-policy-binding vehicle-drive-log \
-    --member="serviceAccount:firebase-adminsdk-fbsvc@vehicle-drive-log.iam.gserviceaccount.com" \
-    --role="roles/cloudfunctions.admin"
+  ```powershell
+  gcloud projects add-iam-policy-binding vehicle-drive-log --member="serviceAccount:firebase-adminsdk-fbsvc@vehicle-drive-log.iam.gserviceaccount.com" --role="roles/cloudfunctions.admin"
   ```
 - 권한 부여 후 실패한 배포를 재실행: `gh run rerun <deploy_run_id> --failed`.
 - 순수 백그라운드 트리거(onDocumentCreated 등)는 공개 invoker가 아니므로 이 문제 없음. **공개 onRequest만** 해당.
@@ -95,17 +91,20 @@ description: Cloud Functions, 프론트엔드 빌드 및 배포 시 발생하는
    `service-{projectNumber}@gcp-sa-firestore.iam.gserviceaccount.com`로 실행된다
    (Console → Firestore → 가져오기/내보내기 화면 상단에 표시). 같은 프로젝트 버킷이면 보통 자동으로
    되지만, 안 되면 그 계정에 버킷 쓰기를 준다.
-   ```bash
-   gcloud storage buckets add-iam-policy-binding gs://vehicle-drive-log-backups \
-     --member="serviceAccount:service-1066541065552@gcp-sa-firestore.iam.gserviceaccount.com" \
-     --role="roles/storage.admin"
+   ```powershell
+   gcloud storage buckets add-iam-policy-binding gs://vehicle-drive-log-backups --member="serviceAccount:service-1066541065552@gcp-sa-firestore.iam.gserviceaccount.com" --role="roles/storage.admin"
    ```
    호출을 거는 런타임 SA(`1066541065552-compute@developer.gserviceaccount.com`)에는 export 권한이 필요하다.
-   ```bash
-   gcloud projects add-iam-policy-binding vehicle-drive-log \
-     --member="serviceAccount:1066541065552-compute@developer.gserviceaccount.com" \
-     --role="roles/datastore.importExportAdmin"
+   **`roles/editor`로는 안 된다** — Editor에는 Firestore import/export 권한이 빠져 있고, 그래서
+   `datastore.importExportAdmin`이 별도 역할로 존재한다(2026-08-10에 런타임 SA가 Editor를
+   갖고 있는데도 export가 거부되던 상태가 이것이었다).
+   ```powershell
+   gcloud projects add-iam-policy-binding vehicle-drive-log --member="serviceAccount:1066541065552-compute@developer.gserviceaccount.com" --role="roles/datastore.importExportAdmin"
    ```
+
+   > ⚠️ **명령은 한 줄로 쓴다.** 이 서비스의 조치는 Windows PowerShell에서 이뤄지는데,
+   > bash식 줄바꿈(`\`)을 그대로 붙여 넣으면 `단항 연산자 '--' 뒤에 식이 없습니다`로 깨진다
+   > (실제로 그렇게 한 번 실패했다). PowerShell의 연결 문자는 백틱(`` ` ``)이다.
 
 **구분법**: 에러 메시지에 `outputUriPrefix=gs://...`가 붙는다.
 - `... is in location ...` 문구가 있으면 **2번**(위치) — 리전 맞는 버킷을 새로 만든다.
@@ -124,8 +123,17 @@ have permission"이라는 문구도 호출자를 가리킨다). 서비스 에이
 > "backup started"만 남긴 뒤 끝난다(장기 실행 작업의 완료를 기다리지 않는다). 즉 **알림이
 > 없는데도 백업이 없을 수 있다** — 확인은 버킷의 오늘 폴더를 직접 보는 것뿐이다.
 
-**진단 지름길**: Console → Firestore → 가져오기/내보내기에서 수동 export를 한 번 돌려 보면
-세 원인이 즉시 갈린다. 스케줄러를 하루 기다릴 필요가 없다.
+**진단 지름길**: 수동 export를 한 번 돌려 보면 세 원인이 즉시 갈린다. 스케줄러를 하루 기다릴 필요가 없다.
+작은 컬렉션만 지정하면 비용도 거의 들지 않는다.
+
+```powershell
+gcloud firestore export gs://vehicle-drive-log-backups/backups/firestore/manual-test --collection-ids=system --project vehicle-drive-log
+```
+
+**이 명령은 사람(Owner) 자격으로 돌기 때문에 두 원인을 갈라 준다.**
+- 성공 → 서비스 에이전트는 버킷을 쓸 수 있다. 남은 변수는 호출자(런타임 SA) 권한뿐이므로
+  3번의 두 번째 명령만 걸면 된다.
+- `PERMISSION_DENIED` → 서비스 에이전트의 버킷 쓰기가 막힌 것이다. 3번의 첫 번째 명령을 건다.
 
 ### 2.7 야간 배치 쿼리가 `9 FAILED_PRECONDITION: The query requires an index`
 **증상**: 스케줄 함수 로그/Sentry에 인덱스 생성 링크가 포함된 에러. 예: `organizations`의
