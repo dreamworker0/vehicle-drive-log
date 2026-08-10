@@ -3,7 +3,7 @@
  *
  * 큐(syncQueue)와 토스트(notify)는 목으로 대체하고, "폐기분을 빠짐없이·중복 없이 알리는가"만 검증한다.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 
 vi.mock('@/lib/offline/syncQueue', () => ({
     drainFailedRecords: vi.fn(),
@@ -11,8 +11,8 @@ vi.mock('@/lib/offline/syncQueue', () => ({
 }));
 vi.mock('@/lib/notify', () => ({ notifyUser: vi.fn() }));
 
-import { buildFailureMessage, reportFailedSync } from '@/lib/offline/syncFailureNotice';
-import { drainFailedRecords, type FailedRecord } from '@/lib/offline/syncQueue';
+import { buildFailureMessage, reportFailedSync, registerSyncFailureNotice } from '@/lib/offline/syncFailureNotice';
+import { drainFailedRecords, flushQueue, type FailedRecord } from '@/lib/offline/syncQueue';
 import { notifyUser } from '@/lib/notify';
 
 const mockDrain = vi.mocked(drainFailedRecords);
@@ -85,5 +85,77 @@ describe('reportFailedSync', () => {
 
         expect(await reportFailedSync()).toBe(0);
         expect(mockNotify).not.toHaveBeenCalled();
+    });
+});
+
+describe('registerSyncFailureNotice', () => {
+    // 등록은 모듈 스코프 플래그로 1회만 일어난다. 케이스마다 다시 등록하면 이전 등록의
+    // 리스너가 window/document에 그대로 남아 호출 수가 누적되므로, **한 번만 등록하고
+    // 그때 붙은 핸들러를 붙잡아 직접 호출한다.** 실제 이벤트 발화와 같은 경로다.
+    const handlers = new Map<string, EventListener>();
+    let windowAdd: ReturnType<typeof vi.spyOn>;
+    let documentAdd: ReturnType<typeof vi.spyOn>;
+
+    beforeAll(() => {
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        mockDrain.mockResolvedValue([]);
+        windowAdd = vi.spyOn(window, 'addEventListener').mockImplementation((type, handler) => {
+            handlers.set(`window:${type}`, handler as EventListener);
+        });
+        documentAdd = vi.spyOn(document, 'addEventListener').mockImplementation((type, handler) => {
+            handlers.set(`document:${type}`, handler as EventListener);
+        });
+        registerSyncFailureNotice();
+    });
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockDrain.mockResolvedValue([]);
+        vi.mocked(flushQueue).mockResolvedValue(undefined);
+    });
+
+    const fire = (key: string) => handlers.get(key)!(new Event(key.split(':')[1]));
+
+    it('세 시점(앱 시작·온라인 복귀·화면 복귀)에 모두 걸어 둔다', () => {
+        expect(handlers.has('window:online')).toBe(true);
+        expect(handlers.has('document:visibilitychange')).toBe(true);
+        // 앱 시작분은 등록 시점에 이미 확인했다(beforeAll에서 1회 호출)
+    });
+
+    it('온라인 복귀 시 flush가 끝난 뒤에 확인한다', async () => {
+        // flush 완료 전에 확인하면 방금 폐기될 항목을 놓친다 — 순서가 계약이다.
+        let resolveFlush: () => void = () => {};
+        vi.mocked(flushQueue).mockReturnValueOnce(new Promise<void>((r) => { resolveFlush = r; }));
+        mockDrain.mockResolvedValueOnce([record()]);
+
+        fire('window:online');
+        expect(mockDrain).not.toHaveBeenCalled(); // flush 진행 중에는 아직 보지 않는다
+
+        resolveFlush();
+        await vi.waitFor(() => expect(mockNotify).toHaveBeenCalledTimes(1));
+    });
+
+    it('화면 복귀 시 백그라운드 중 폐기된 건을 확인한다', async () => {
+        mockDrain.mockResolvedValueOnce([record()]);
+        vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible');
+
+        fire('document:visibilitychange');
+
+        await vi.waitFor(() => expect(mockNotify).toHaveBeenCalledTimes(1));
+    });
+
+    it('화면이 가려질 때는 확인하지 않는다', () => {
+        vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('hidden');
+
+        fire('document:visibilitychange');
+
+        expect(mockDrain).not.toHaveBeenCalled();
+    });
+
+    it('두 번 등록해도 리스너가 겹치지 않는다', () => {
+        registerSyncFailureNotice(); // 두 번째 호출은 무시되어야 한다
+
+        expect(windowAdd).not.toHaveBeenCalled();
+        expect(documentAdd).not.toHaveBeenCalled();
     });
 });
