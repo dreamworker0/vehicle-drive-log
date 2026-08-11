@@ -12,6 +12,8 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 const mocks = vi.hoisted(() => ({
     callable: vi.fn(),
     httpsCallable: vi.fn(),
+    refreshTokenSilently: vi.fn<(user: unknown) => Promise<void>>(),
+    currentUser: { uid: 'u1' } as { uid: string } | null,
 }));
 
 vi.mock('firebase/functions', () => ({
@@ -20,19 +22,32 @@ vi.mock('firebase/functions', () => ({
         return mocks.callable;
     },
 }));
-vi.mock('../../lib/firebase', () => ({ firebaseFunctions: {} }));
+vi.mock('../../lib/firebase', () => ({
+    firebaseFunctions: {},
+    auth: { get currentUser() { return mocks.currentUser; } },
+}));
+vi.mock('../../lib/tokenRefresh', () => ({
+    refreshTokenSilently: (user: unknown) => mocks.refreshTokenSilently(user),
+}));
 
-import { callWithRetry, isTransientCallableError, DEFAULT_CALL_TIMEOUT_MS } from '../../lib/callableRetry';
+import { callWithRetry, isTransientCallableError, isAuthExpiredError, DEFAULT_CALL_TIMEOUT_MS } from '../../lib/callableRetry';
 
 /** SDK가 시간 초과 시 던지는 것과 같은 모양 (code·message 모두 'deadline-exceeded') */
 function deadlineExceeded() {
     return Object.assign(new Error('deadline-exceeded'), { code: 'functions/deadline-exceeded' });
 }
 
+/** Functions 인프라가 우리 핸들러 앞에서 거부할 때의 모양 (메시지가 'Unauthenticated' 한 단어) */
+function unauthenticated() {
+    return Object.assign(new Error('Unauthenticated'), { code: 'functions/unauthenticated' });
+}
+
 beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
     mocks.callable.mockResolvedValue({ data: { success: true } });
+    mocks.refreshTokenSilently.mockResolvedValue(undefined);
+    mocks.currentUser = { uid: 'u1' };
 });
 
 afterEach(() => {
@@ -61,6 +76,66 @@ describe('isTransientCallableError', () => {
         expect(isTransientCallableError(new Error('network error'))).toBe(true);
         expect(isTransientCallableError(new Error('그 밖의 오류'))).toBe(false);
         expect(isTransientCallableError(null)).toBe(false);
+    });
+});
+
+describe('isAuthExpiredError', () => {
+    it('토큰 만료 거부를 코드와 메시지 양쪽으로 알아본다', () => {
+        expect(isAuthExpiredError(unauthenticated())).toBe(true);
+        expect(isAuthExpiredError({ code: 'unauthenticated' })).toBe(true);
+        // 인프라가 커스텀 메시지 없이 한 단어만 보내는 경우
+        expect(isAuthExpiredError(new Error('Unauthenticated'))).toBe(true);
+    });
+
+    it('다른 거부·일시 실패와 섞이지 않는다', () => {
+        expect(isAuthExpiredError({ code: 'functions/permission-denied' })).toBe(false);
+        expect(isAuthExpiredError(deadlineExceeded())).toBe(false);
+        expect(isAuthExpiredError(null)).toBe(false);
+        // 우리 HttpsError는 한국어 메시지를 실어 보낸다 — 그건 서버 판정이므로 갱신 대상이 아니다
+        expect(isAuthExpiredError(new Error('로그인이 필요합니다.'))).toBe(false);
+    });
+
+    it('토큰 만료는 일시적 실패로 분류하지 않는다 — 처방이 다르다', () => {
+        // TRANSIENT_CODES에 넣으면 만료된 토큰을 그대로 다시 보내며 백오프만 쓴다
+        expect(isTransientCallableError(unauthenticated())).toBe(false);
+    });
+});
+
+describe('callWithRetry — 토큰 만료 복구', () => {
+    it('토큰을 갱신하고 다시 불러 성공시킨다', async () => {
+        mocks.callable
+            .mockRejectedValueOnce(unauthenticated())
+            .mockResolvedValueOnce({ data: { ok: true } });
+
+        const result = await callWithRetry('recordSession', { sessionId: 'abcdefgh' });
+
+        expect(mocks.refreshTokenSilently).toHaveBeenCalledTimes(1);
+        expect(result).toEqual({ ok: true });
+    });
+
+    it('갱신 후에도 거부되면 마지막 에러를 던진다 — 진짜 로그아웃 상태다', async () => {
+        mocks.callable.mockRejectedValue(unauthenticated());
+
+        await expect(callWithRetry('recordSession', { sessionId: 'abcdefgh' })).rejects.toThrow('Unauthenticated');
+        // 갱신은 딱 한 번 — 무한 갱신·재시도 루프를 만들지 않는다
+        expect(mocks.refreshTokenSilently).toHaveBeenCalledTimes(1);
+    });
+
+    it('로그인 사용자가 없으면 갱신을 시도하지 않는다', async () => {
+        mocks.currentUser = null;
+        mocks.callable.mockRejectedValue(unauthenticated());
+
+        await expect(callWithRetry('recordSession', { sessionId: 'abcdefgh' })).rejects.toThrow('Unauthenticated');
+        expect(mocks.refreshTokenSilently).not.toHaveBeenCalled();
+    });
+
+    it('갱신 재시도에는 백오프를 두지 않는다 — 기다려서 나아지는 문제가 아니다', async () => {
+        mocks.callable
+            .mockRejectedValueOnce(unauthenticated())
+            .mockResolvedValueOnce({ data: { ok: true } });
+
+        // 타이머를 진행시키지 않아도 완료된다(백오프 대기가 없다)
+        await expect(callWithRetry('recordSession', { sessionId: 'x' })).resolves.toEqual({ ok: true });
     });
 });
 
