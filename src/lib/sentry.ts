@@ -113,6 +113,17 @@ function initSentryWithModule(Sentry: SentryModule) {
             // 그 순간 아직 진행 중이던 리스너/쿼리가 "Firestore shutting down"으로 reject되며 나는
             // teardown 레이스다. handled=yes이고 리로드 후 새 인스턴스로 정상 동작 — 앱 버그 아님.
             /Firestore shutting down/i,
+            // 위 teardown 레이스의 Chromium(Edge/Chrome) 판이다.
+            // `UnknownError: Connection is closing.`은 Blink IndexedDB가 **닫히는 중인 커넥션**에
+            // 요청이 들어올 때 던지는 DOMException으로, 페이지 이탈·탭 종료나 우리가 의도적으로
+            // 커넥션을 닫는 경로(logout→clearOfflineCache의 terminate+clearIndexedDbPersistence,
+            // attemptCacheRecovery)에서 Firestore 영속성 레이어의 잔여 IDB 요청이 뒤늦게 도착하며 난다.
+            // 스택 프레임이 없는 unhandledrejection이라 firebase-* 번들 필터를 우회한다
+            // (앱 쪽 억제는 firebase.ts의 isFirestorePersistenceError가 'UnknownError'로 이미 한다 —
+            //  여기는 Sentry 전용이다. Sentry 글로벌 핸들러가 먼저 잡아 preventDefault로는 안 막힌다).
+            // DOMException으로 직접 보고되면 값이 "Connection is closing."뿐이라 `UnknownError:`
+            // 접두사에 의존하지 않고 이 문구로 잡는다 — 앱 버그 아님.
+            /Connection is closing/,
             // Firestore IndexedDB 내부 캐시 손상 (Firebase SDK 버그, 앱 버그 아님)
             /INTERNAL ASSERTION FAILED/,
             /Unexpected state/,
