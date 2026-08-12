@@ -67,6 +67,13 @@ export interface AuditLogPage {
  * 인덱스: `all`은 `(organizationId, at desc)`, 유형 필터는 `(organizationId, action, at desc)`를
  * 쓴다(둘 다 firestore.indexes.json에 있다). `action`을 `in`으로 묶어도 같은 인덱스로 처리되므로
  * 유형이 늘어도 인덱스를 더 만들지 않는다.
+ *
+ * **`(action, organizationId, at desc)`도 파일에 있고, 중복처럼 보여도 지우지 않는다.**
+ * Firestore가 이 쿼리에 대해 실제로 요구한 순서가 그것이다 — 프로덕션 에러의 `create_composite`
+ * 링크가 지목한 조합이 `action → organizationId → at`이었다(Sentry JAVASCRIPT-REACT-5F,
+ * 2026-08-02). 동등 필터 두 개의 순서가 바뀐 것뿐이라 중복으로 보고 #176에서 파일에서 지웠는데,
+ * 프로덕션에는 남아 있어(인덱스 배포는 `--force` 없이는 삭제하지 않는다) 화면은 계속 동작했다.
+ * 즉 파일만 프로덕션과 어긋난 상태였다. 정리하려면 순서 무관성을 먼저 확인해야 한다.
  */
 export const getAuditLogs = async (
     orgId: string,
