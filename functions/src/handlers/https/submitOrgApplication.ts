@@ -1,9 +1,10 @@
 import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
-import { log, wrapHandler } from "../../utils/helpers";
+import { log, wrapHandler, sanitizePromptValue } from "../../utils/helpers";
 import { checkRateLimitByUid, checkRateLimitByIp } from "../../utils/rateLimit";
 import { maskEmail } from "../../utils/mask";
+import { screenDocument, getScreenRejection, ScreenResult } from "../../services/driveLog/documentScreen";
 
 /**
  * 업로드 허용 MIME 화이트리스트 (2026-07-10 코덱스 평가 대응 — 작업 3).
@@ -99,9 +100,14 @@ export const submitOrgApplication = onCall(
 
         const email = payload.applicantEmail.trim().toLowerCase();
 
-        // 2. Rate Limit 검사: 동일 이메일로 1시간에 3회 이상 신청 불가 (무단 반복 요청 방지)
+        // 2. Rate Limit 검사: 동일 이메일로 1시간에 6회 이상 신청 불가 (무단 반복 요청 방지)
         // checkRateLimitByUid는 원래 uid 기반이지만, 이메일을 uid처럼 활용하여 제한
-        await checkRateLimitByUid("submitOrgApplication", email, 3, 3600, "closed");
+        //
+        // 상한이 3회가 아닌 6회인 이유: 아래 프리스크린이 부적합 서류를 접수 전에 반려하므로,
+        // 정상 기관도 "잘못 올림 → 다시 올림"으로 시도를 여러 번 쓴다. 3회면 서류를 두 번
+        // 틀린 기관이 한 시간 동안 신청 자체를 못 하게 된다. 프리스크린 1회당 Gemini 1회가
+        // 나가므로 이 상한이 곧 비용 상한이기도 하다 (ocr-cost-security §1).
+        await checkRateLimitByUid("submitOrgApplication", email, 6, 3600, "closed");
 
         // 2-1. IP 기반 상한 — 이메일을 회전시켜 이메일 키 제한을 우회하는 무제한 익명 쓰기 차단 (2026-07-04 감사 N4)
         const clientIp = request.rawRequest?.ip
@@ -136,6 +142,28 @@ export const submitOrgApplication = onCall(
                 throw new HttpsError("out-of-range", "파일 크기는 5MB를 초과할 수 없습니다.");
             }
 
+            // 4-1. 증빙서류 프리스크린 — **저장 전에** 비영리 증빙인지 판별한다.
+            //
+            // 예전에는 무조건 접수한 뒤 트리거가 사후 판정했다. 그래서 신분증·시설신고증 같은
+            // 엉뚱한 파일도 일단 pending 기관 문서와 서류 파일을 만들었고, 신청자는 접수된 줄
+            // 알고 기다리다 나중에 거절 메일을 받거나 수동 심사 대기줄에 남았다.
+            // 여기서 막으면 기관 문서도 파일도 생기지 않고, 신청자는 그 자리에서 다시 올린다.
+            const screen = await prescreenDocument(
+                payload.orgName.trim(),
+                { mimeType: payload.imageMimeType, base64: fileBuffer.toString("base64") },
+                { email, orgId }
+            );
+            if (screen) {
+                const rejection = getScreenRejection(screen.documentType);
+                if (rejection) {
+                    log("INFO", "submitOrgApplication", "프리스크린 반려 — 접수하지 않음", {
+                        email: maskEmail(email), orgId, documentType: screen.documentType, code: rejection.code,
+                    });
+                    // details는 프론트에서 안내 문구를 분기하는 데 쓴다 (메시지는 서버가 확정).
+                    throw new HttpsError("failed-precondition", rejection.message, { screenCode: rejection.code });
+                }
+            }
+
             const ext = ALLOWED_MIME_TYPES[payload.imageMimeType];
             const filePath = `organizations/${orgId}/uniqueNumberImage.${ext}`;
             const file = bucket.file(filePath);
@@ -163,6 +191,9 @@ export const submitOrgApplication = onCall(
                 status: "pending",
                 aiVerified: false,
                 uniqueNumberImagePath: filePath,
+                // 접수 단계에서 판별한 결과 — autoVerifyDocument가 이 값을 재사용해 Gemini를
+                // 다시 부르지 않는다. 없으면(프리스크린 실패) 트리거가 직접 OCR을 돌린다.
+                ...(screen ? { ocrPrescreen: { ...screen, screenedAt: now } } : {}),
                 // 위탁 계약 성립 근거 — 어느 버전에 언제 동의했는지를 기관 문서와 함께 보관한다.
                 // 동의 일시는 서버 시각으로 기록하며, 동의 시점 IP는 수집하지 않는다
                 // (신청자 이메일·전화번호로 동의 주체가 특정되므로 최소수집 원칙을 따른다).
@@ -184,6 +215,9 @@ export const submitOrgApplication = onCall(
                 orgId,
             };
         } catch (err: unknown) {
+            // 우리가 의도적으로 던진 거부(프리스크린 반려·용량 초과 등)는 사유를 그대로 전달한다.
+            // 여기서 internal로 뭉개면 신청자는 "시스템 오류"만 보고 무엇을 고쳐야 할지 모른다.
+            if (err instanceof HttpsError) throw err;
             log("ERROR", "submitOrgApplication", "업로드 또는 저장 처리 중 시스템 오류", {
                 email: maskEmail(email),
                 error: (err as Error).message,
@@ -193,3 +227,26 @@ export const submitOrgApplication = onCall(
         }
     })
 );
+
+/**
+ * 프리스크린 실행 — 판별 결과를 돌려주고, 판별 자체가 실패하면 null을 돌려준다(fail-open).
+ *
+ * **왜 fail-open인가**: Gemini 장애·쿼터 소진 때 접수를 막으면 정상 기관의 신청 유입이 통째로
+ * 끊긴다. 그 손실이 부적합 서류 몇 건이 접수되는 것보다 크다. 판별하지 못한 건은 지금까지와
+ * 똑같이 autoVerifyDocument와 superAdmin 심사가 이어받는다.
+ */
+async function prescreenDocument(
+    orgName: string,
+    file: { mimeType: string; base64: string },
+    ctx: { email: string; orgId: string }
+): Promise<ScreenResult | null> {
+    try {
+        // 기관명은 프롬프트에 보간되므로 위생 처리한다 (따옴표·개행 제거 + 60자 절단).
+        return await screenDocument(sanitizePromptValue(orgName, 60), file);
+    } catch (err: unknown) {
+        log("WARNING", "submitOrgApplication", "프리스크린 실패 — 접수를 허용하고 사후 검증에 맡김", {
+            email: maskEmail(ctx.email), orgId: ctx.orgId, error: (err as Error).message,
+        });
+        return null;
+    }
+}

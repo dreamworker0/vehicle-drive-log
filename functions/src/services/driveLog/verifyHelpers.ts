@@ -15,39 +15,9 @@ import { maskEmail } from "../../utils/mask";
 export { maskName, maskEmail } from "../../utils/mask";
 
 // ── 비영리 판별 ──
-
-/**
- * 사업자번호 중간 2자리 + 키워드 기반 비영리 판별
- */
-export function classifyByBizNumber(bizNumber: string | null, orgName: string | null, documentType: string): { score: number; result?: string } {
-    let score = 0;
-
-    if (documentType === "고유번호증") {
-        return { score: 100, result: "비영리 확정" };
-    }
-
-    if (bizNumber) {
-        const bizMatch = bizNumber.match(/\d{3}-(\d{2})-\d{5}/);
-        const mid = bizMatch ? bizMatch[1] : null;
-        if (mid === "82") score += 40;
-        else if (mid === "81") score -= 40;
-        else if (mid === "80") score -= 30;
-    }
-
-    const name = (orgName || "").toLowerCase();
-    if (name.includes("사단법인")) score += 30;
-    if (name.includes("재단법인")) score += 30;
-    if (name.includes("사회복지")) score += 40;
-    if (name.includes("비영리")) score += 30;
-    if (name.includes("복지관")) score += 20;
-    if (name.includes("복지센터")) score += 20;
-    if (name.includes("사회적협동조합")) score += 40;
-    else if (name.includes("협동조합")) score += 20;
-    if (name.includes("주식회사") || name.includes("(주)")) score -= 50;
-    if (name.includes("유한회사") || name.includes("유한책임")) score -= 40;
-
-    return { score };
-}
+// 구현은 documentScreen.ts로 이관됨 (접수 프리스크린과 공용 — 접수 경로가 이메일 발송
+// 모듈까지 끌어오지 않도록 분리). 기존 import 경로 호환을 위해 re-export 유지.
+export { classifyByBizNumber } from "./documentScreen";
 
 // ── 파일 유틸리티 ──
 

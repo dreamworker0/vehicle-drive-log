@@ -290,7 +290,7 @@ const FUNCTIONS: FunctionEntry[] = [
     name: 'submitOrgApplication',
     type: 'onCall',
     file: 'handlers/https/submitOrgApplication.ts',
-    description: '익명(비로그인) 사용자가 기관 신청서를 제출하는 엔드포인트',
+    description: '익명(비로그인) 사용자가 기관 신청서를 제출하는 엔드포인트. 저장 전에 증빙서류를 판별해(프리스크린) 비영리 증빙이 아니면 접수하지 않는다',
     auth: '없음 (공개 — App Check 보호)',
   },
   {
