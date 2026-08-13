@@ -160,17 +160,30 @@ export const getVehicleEndKmBefore = async (orgId: string, vehicleId: string, be
 };
 
 
-/** 운행일지 중복 정리 (Cloud Function 호출) */
-export const cleanupDuplicateLogs = async (organizationId: string, { dryRun = true } = {}) => {
+/**
+ * 운행일지 중복 정리 (Cloud Function 호출)
+ *
+ * 대기 시간을 서버 제한(120초)보다 **길게** 잡는다. 둘이 같으면 서버가 한계에 닿는
+ * 순간 클라이언트도 함께 끊겨, 서버가 남기려던 진짜 오류 대신 `deadline-exceeded`만
+ * 남는다 — 프로덕션에서 실제로 그렇게 원인이 가려졌다(Sentry JAVASCRIPT-REACT-5V).
+ * 30초의 여유는 서버 응답이 돌아올 시간이지 작업 시간을 늘리는 것이 아니다.
+ */
+const CLEANUP_CALL_TIMEOUT_MS = 150_000;
+
+export const cleanupDuplicateLogs = async (
+    organizationId: string,
+    { dryRun = true, months }: { dryRun?: boolean; months?: number } = {},
+) => {
     try {
         const { getFunctions, httpsCallable } = await import('firebase/functions');
         const functions = getFunctions(undefined, 'asia-northeast3');
-        const callable = httpsCallable(functions, 'cleanupDuplicateLogs', { timeout: 120000 });
-        const result = await callable({ organizationId, dryRun });
+        const callable = httpsCallable(functions, 'cleanupDuplicateLogs', { timeout: CLEANUP_CALL_TIMEOUT_MS });
+        // months를 넘기지 않으면 서버 기본값(최근 6개월)을 쓴다
+        const result = await callable({ organizationId, dryRun, ...(months ? { months } : {}) });
         return result.data;
     } catch (error) {
         const { captureError } = await import('../../sentry');
-        captureError(error, { context: 'cleanupDuplicateLogs', organizationId, dryRun });
+        captureError(error, { context: 'cleanupDuplicateLogs', organizationId, dryRun, months });
         throw error;
     }
 };

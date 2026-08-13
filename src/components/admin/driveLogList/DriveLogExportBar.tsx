@@ -4,6 +4,8 @@ interface DupResult {
     deleteCount: number;
     duplicateGroups: number;
     totalLogs: number;
+    /** 서버가 실제로 훑은 범위(개월) */
+    scanMonths: number;
 }
 
 export interface DriveLogExportBarProps {
@@ -163,7 +165,7 @@ export default function DriveLogExportBar({
                                     중복 {dupResult.duplicateGroups}개 그룹, <span className="text-red-600 dark:text-red-400">{dupResult.deleteCount}건</span> 삭제 예정
                                 </p>
                                 <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
-                                    총 {dupResult.totalLogs}건 중 가장 먼저 생성된 1건만 남기고 나머지를 삭제합니다.
+                                    최근 {dupResult.scanMonths}개월 {dupResult.totalLogs}건 중 가장 먼저 생성된 1건만 남기고 나머지를 삭제합니다.
                                 </p>
                             </div>
                         </div>

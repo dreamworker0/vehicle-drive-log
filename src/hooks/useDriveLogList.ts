@@ -19,6 +19,8 @@ interface DupResult {
     deleteCount: number;
     duplicateGroups: number;
     totalLogs: number;
+    /** 서버가 실제로 훑은 범위(개월). 전량이 아니므로 화면이 밝혀야 한다. */
+    scanMonths: number;
 }
 
 const PAGE_SIZE = 50;
@@ -155,7 +157,8 @@ export default function useDriveLogList() {
             setDupResult(result as DupResult);
             setDupState((result as DupResult).deleteCount > 0 ? 'result' : 'idle');
             if ((result as DupResult).deleteCount === 0) {
-                showToast('중복 데이터가 없습니다.', 'success');
+                // 검사 범위를 함께 알린다 — "없습니다"만 띄우면 전량 무결로 오해한다
+                showToast(`최근 ${(result as DupResult).scanMonths}개월 기록에는 중복 데이터가 없습니다.`, 'success');
             }
         } catch (err) {
             console.error('중복 검사 실패:', err);
