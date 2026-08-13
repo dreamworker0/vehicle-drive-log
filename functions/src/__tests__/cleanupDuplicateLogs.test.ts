@@ -9,17 +9,28 @@ const mockQueryGet = jest.fn();
 const mockBatchDelete = jest.fn();
 const mockBatchCommit = jest.fn().mockResolvedValue(undefined);
 const mockBatch = jest.fn(() => ({ delete: mockBatchDelete, commit: mockBatchCommit }));
+/** 쿼리에 걸린 where 절을 기록한다 — 조회 범위 상한이 실제로 붙는지 검증용 */
+const mockWhere = jest.fn();
 
 jest.mock('firebase-admin/firestore', () => ({
-    getFirestore: () => ({
-        collection: jest.fn(() => ({
-            where: jest.fn(() => ({
-                orderBy: jest.fn(() => ({ get: mockQueryGet })),
+    getFirestore: () => {
+        // where는 몇 번이든 체이닝될 수 있어야 한다(organizationId + createdAt 범위)
+        const chain: Record<string, unknown> = {
+            where: (...args: unknown[]) => {
+                mockWhere(...args);
+                return chain;
+            },
+            orderBy: () => chain,
+            get: () => mockQueryGet(),
+        };
+        return {
+            collection: jest.fn(() => ({
+                ...chain,
+                doc: jest.fn((id: string) => ({ _id: id })),
             })),
-            doc: jest.fn((id: string) => ({ _id: id })),
-        })),
-        batch: mockBatch,
-    }),
+            batch: mockBatch,
+        };
+    },
 }));
 
 jest.mock('firebase-functions/v2/https', () => ({
@@ -38,7 +49,13 @@ jest.mock('../utils/kstDate', () => ({
     getKSTDateString: () => '2026-07-01',
 }));
 
-import { cleanupDuplicateLogs } from "../handlers/callable/cleanupDuplicateLogs";
+import {
+    cleanupDuplicateLogs,
+    resolveScanMonths,
+    getScanCutoff,
+    DEFAULT_SCAN_MONTHS,
+    MAX_SCAN_MONTHS,
+} from "../handlers/callable/cleanupDuplicateLogs";
 
 const handler = cleanupDuplicateLogs as unknown as (req: Record<string, unknown>) => Promise<{
     success: boolean;
@@ -46,6 +63,8 @@ const handler = cleanupDuplicateLogs as unknown as (req: Record<string, unknown>
     duplicateGroups: number;
     deleteCount: number;
     dryRun: boolean;
+    scanMonths: number;
+    since: string;
 }>;
 
 /** 스냅샷 목: 각 문서는 forEach 콜백에 { id, data() } 형태로 전달된다 */
@@ -144,5 +163,61 @@ describe('cleanupDuplicateLogs — 운행일지 중복 정리', () => {
         expect(result).toMatchObject({ success: true, deleteCount: 1 });
         expect(mockBatchDelete).toHaveBeenCalledWith({ _id: 'log-dup' });
         expect(mockBatchCommit).toHaveBeenCalledTimes(1);
+    });
+});
+
+/**
+ * 조회 범위 상한 — 전량 스캔이 120초 제한에 닿아 deadline-exceeded로 실패했던
+ * 회귀를 고정한다(Sentry JAVASCRIPT-REACT-5V).
+ */
+describe('cleanupDuplicateLogs — 조회 범위 상한', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+        mockBatchCommit.mockResolvedValue(undefined);
+    });
+
+    it('resolveScanMonths: 미지정·숫자 아님·1 미만은 기본값으로 떨어진다', () => {
+        expect(resolveScanMonths(undefined)).toBe(DEFAULT_SCAN_MONTHS);
+        expect(resolveScanMonths('12')).toBe(DEFAULT_SCAN_MONTHS);
+        expect(resolveScanMonths(0)).toBe(DEFAULT_SCAN_MONTHS);
+        expect(resolveScanMonths(-3)).toBe(DEFAULT_SCAN_MONTHS);
+        expect(resolveScanMonths(NaN)).toBe(DEFAULT_SCAN_MONTHS);
+    });
+
+    it('resolveScanMonths: 유효 값은 그대로, 상한을 넘으면 잘린다', () => {
+        expect(resolveScanMonths(12)).toBe(12);
+        expect(resolveScanMonths(3.7)).toBe(3);
+        expect(resolveScanMonths(MAX_SCAN_MONTHS + 100)).toBe(MAX_SCAN_MONTHS);
+    });
+
+    it('getScanCutoff: 지정한 개월 수만큼 과거를 가리킨다', () => {
+        const now = new Date('2026-08-13T00:00:00.000Z');
+        expect(getScanCutoff(6, now).getTime()).toBeLessThan(now.getTime());
+        expect(getScanCutoff(1, now).getTime()).toBeGreaterThan(getScanCutoff(6, now).getTime());
+    });
+
+    it('쿼리에 createdAt 하한이 붙는다 (전량 스캔 금지)', async () => {
+        mockQueryGet.mockResolvedValueOnce(makeSnap(DUP_DOCS));
+        await handler({
+            auth: { uid: 'u1', token: { role: 'admin', orgId: 'org1' } },
+            data: { organizationId: 'org1' },
+        });
+
+        expect(mockWhere).toHaveBeenCalledWith('organizationId', '==', 'org1');
+        const rangeCall = mockWhere.mock.calls.find((c) => c[0] === 'createdAt');
+        expect(rangeCall).toBeDefined();
+        expect(rangeCall![1]).toBe('>=');
+        expect(rangeCall![2]).toBeInstanceOf(Date);
+    });
+
+    it('검사한 범위를 응답에 실어 화면이 전량으로 오해하지 않게 한다', async () => {
+        mockQueryGet.mockResolvedValueOnce(makeSnap(DUP_DOCS));
+        const result = await handler({
+            auth: { uid: 'u1', token: { role: 'admin', orgId: 'org1' } },
+            data: { organizationId: 'org1', months: 12 },
+        });
+
+        expect(result.scanMonths).toBe(12);
+        expect(typeof result.since).toBe('string');
     });
 });
