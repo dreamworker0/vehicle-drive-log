@@ -75,6 +75,7 @@ export default function OrgApplicationPage() {
                         <ul className="list-disc list-inside space-y-0.5">
                             <li>본 서비스는 <strong>사회복지기관, 비영리단체</strong>를 대상으로 <strong>무료</strong>로 제공됩니다.</li>
                             <li>영리 기업 및 종교단체, 학교, 병원은 신청이 <strong>반려</strong>될 수 있습니다.</li>
+                            <li>업로드한 서류가 비영리 증빙으로 확인되지 않으면 <strong>접수되지 않습니다.</strong> 신청 버튼을 누르면 AI가 서류를 먼저 확인합니다.</li>
                         </ul>
                     </div>
 
@@ -174,6 +175,7 @@ export default function OrgApplicationPage() {
                             />
                             <p className="text-xs text-surface-400 dark:text-surface-500 mt-2">
                                 ※ 사회복지시설신고증은 증빙서류로 인정되지 않습니다. 고유번호증 또는 사업자등록증을 업로드해주세요.
+                                <br />※ 글자가 흐리거나 서류 일부만 찍히면 확인이 되지 않습니다. 밝은 곳에서 서류 전체가 나오도록 촬영하거나 발급받은 PDF 원본을 올려주세요.
                             </p>
                         </div>
 

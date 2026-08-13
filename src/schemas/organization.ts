@@ -69,6 +69,20 @@ export const organizationSchema = z.object({
         reason: z.string().optional().catch(undefined),
     }).optional().catch(undefined),
     /**
+     * 접수 단계(submitOrgApplication)에서 판별한 증빙서류 결과.
+     * 비영리 증빙으로 확인된 신청만 문서가 만들어지므로, 여기 남는 값은 통과한 판별 결과다.
+     * autoVerifyDocument가 이 값을 재사용해 같은 서류를 두 번 OCR하지 않는다.
+     */
+    ocrPrescreen: z.object({
+        documentType: z.string().optional().catch(undefined),
+        uniqueNumber: z.string().nullable().optional().catch(undefined),
+        extractedName: z.string().nullable().optional().catch(undefined),
+        address: z.string().nullable().optional().catch(undefined),
+        nameMatch: z.boolean().optional().catch(undefined),
+        bizScore: z.number().optional().catch(undefined),
+        screenedAt: timestampSchema.optional().catch(undefined),
+    }).optional().catch(undefined),
+    /**
      * 약관·처리방침 동의 기록 (위탁 계약 성립 근거 — 약관 제9조).
      * 여기서 빠지면 createZodConverter의 fromFirestore가 unknown key를 조용히 제거해
      * (Zod z.object 기본 동작) Firestore에 저장돼 있어도 앱에서는 항상 undefined가 된다.

@@ -202,10 +202,11 @@ export default function useOrgApplication() {
 
             const base64Data = await fileToBase64(fileToUpload);
 
-            // 2. Cloud Functions Callable 호출 (기관 생성 + Storage 업로드)
-            setOcrStatus('uploading');
+            // 2. Cloud Functions Callable 호출
+            // (서버가 서류를 먼저 판별하고, 비영리 증빙으로 확인돼야 기관 생성 + Storage 업로드로 넘어간다)
+            setOcrStatus('analyzing');
             const submitAppFn = httpsCallable(firebaseFunctions, 'submitOrgApplication');
-            
+
             await submitAppFn({
                 orgName: form.orgName.trim(),
                 applicantName: form.applicantName.trim(),
@@ -226,9 +227,18 @@ export default function useOrgApplication() {
             setOcrStatus('done');
             setSuccess(true);
         } catch (err: unknown) {
+            const code = (err as { code?: string })?.code ?? '';
             if (err instanceof Error) {
                 const errorMsg = err.message;
-                if (errorMsg.includes('resource-exhausted') || errorMsg.includes('요청이 너무 많습니다')) {
+                if (code === 'functions/failed-precondition') {
+                    // 증빙서류 판별에서 반려된 경우 — 서버가 확정한 사유를 그대로 보여주고
+                    // 파일을 비워 다시 올리게 한다. 기관 신청 자체는 접수되지 않았다.
+                    setError(errorMsg);
+                    setImageFile(null);
+                    setImagePreview(null);
+                    if (fileInputRef.current) fileInputRef.current.value = '';
+                } else if (code === 'functions/resource-exhausted'
+                    || errorMsg.includes('resource-exhausted') || errorMsg.includes('요청이 너무 많습니다')) {
                     setError('요청 횟수를 초과했습니다. 나중에 다시 시도해주세요.');
                 } else {
                     setError('신청 중 오류가 발생했습니다. 다시 시도해주세요.');
