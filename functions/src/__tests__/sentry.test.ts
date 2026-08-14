@@ -73,9 +73,71 @@ describe('captureError — Sentry와 Discord는 독립된 경로다', () => {
         delete process.env.SENTRY_DSN_FUNCTIONS;
         const sendDiscordAlert = jest.fn().mockRejectedValue(new Error('webhook down'));
         jest.doMock('../core/discord', () => ({ sendDiscordAlert }));
-         
+
         const { captureError } = require('../core/sentry');
 
         expect(() => captureError(new Error('boom'))).not.toThrow();
+    });
+});
+
+describe('captureWarning — 경고도 Discord까지 가되, 장애처럼 보이지는 않는다', () => {
+    const OLD_ENV = process.env;
+
+    beforeEach(() => {
+        jest.resetModules();
+        process.env = { ...OLD_ENV, NODE_ENV: 'production' };
+    });
+
+    afterEach(() => {
+        process.env = OLD_ENV;
+        jest.restoreAllMocks();
+    });
+
+    function load() {
+        const sendDiscordAlert = jest.fn().mockResolvedValue(undefined);
+        jest.doMock('../core/discord', () => ({ sendDiscordAlert }));
+
+        const mod = require('../core/sentry');
+        return { sendDiscordAlert, captureWarning: mod.captureWarning as (m: string, c?: Record<string, unknown>) => void };
+    }
+
+    it('Sentry DSN이 없어도 Discord로 나간다 — 운영자가 실제로 보는 곳은 Discord다', () => {
+        delete process.env.SENTRY_DSN_FUNCTIONS;
+        const { sendDiscordAlert, captureWarning } = load();
+
+        captureWarning('야간 배치가 같은 날 두 번 실행됨', { context: 'dailyNightlyBatch' });
+
+        expect(sendDiscordAlert).toHaveBeenCalledTimes(1);
+        expect(sendDiscordAlert.mock.calls[0][0].description).toContain('두 번 실행');
+        expect(sendDiscordAlert.mock.calls[0][0].description).toContain('dailyNightlyBatch');
+    });
+
+    it('Exception과 다른 제목·색을 쓴다 — 경고가 장애로 보이면 진짜 장애 알림이 무뎌진다', () => {
+        const { sendDiscordAlert, captureWarning } = load();
+
+        captureWarning('경고');
+
+        const arg = sendDiscordAlert.mock.calls[0][0];
+        expect(arg.title).toContain('Warning');
+        expect(arg.title).not.toContain('Exception');
+        expect(arg.color).not.toBe(16711680); // Exception의 빨강과 같으면 안 된다
+    });
+
+    it('Discord 발송이 실패해도 예외를 던지지 않는다', () => {
+        const sendDiscordAlert = jest.fn().mockRejectedValue(new Error('webhook down'));
+        jest.doMock('../core/discord', () => ({ sendDiscordAlert }));
+
+        const { captureWarning } = require('../core/sentry');
+
+        expect(() => captureWarning('경고')).not.toThrow();
+    });
+
+    it('테스트 환경에서는 발송하지 않는다', () => {
+        process.env.NODE_ENV = 'test';
+        const { sendDiscordAlert, captureWarning } = load();
+
+        captureWarning('경고');
+
+        expect(sendDiscordAlert).not.toHaveBeenCalled();
     });
 });

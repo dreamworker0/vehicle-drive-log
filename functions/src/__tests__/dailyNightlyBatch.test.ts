@@ -18,7 +18,7 @@ jest.mock('../services/alimtalk/sendNotification', () => ({
     createInAppNotification: jest.fn(),
     sendPushToUser: jest.fn(),
 }));
-jest.mock('../core/sentry', () => ({ captureError: jest.fn() }));
+jest.mock('../core/sentry', () => ({ captureError: jest.fn(), captureWarning: jest.fn() }));
 // export 호출 자체를 검증해야 하므로 Admin 클라이언트를 통째로 갈아 끼운다.
 jest.mock('@google-cloud/firestore', () => {
     const exportDocuments = jest.fn();
@@ -32,6 +32,7 @@ jest.mock('@google-cloud/firestore', () => {
 });
 
 import { getStorage } from 'firebase-admin/storage';
+import { captureWarning } from '../core/sentry';
 import {
     buildBackupUri,
     buildBackupPrefix,
@@ -154,6 +155,40 @@ describe('backupFirestoreData — 하루 한 번만 export를 건다', () => {
 
         await expect(backupFirestoreData()).resolves.toBeUndefined();
         expect(exportDocumentsMock).not.toHaveBeenCalled();
+    });
+
+    // OOM·타임아웃은 인스턴스를 죽여 스스로를 신고하지 못한다. 스킵 경고가 유일한 탐지 수단이므로
+    // 이 두 케이스는 "조용히 넘어가지 않는다"를 못박아 둔다 — 지워지면 다음 OOM은 아무도 모른다.
+    it('스킵을 조용히 넘기지 않고 경고로 올린다 — 배치가 두 번 돌았다는 신호다', async () => {
+        stubBucket({ files: [{ name: 'backups/firestore/2026-08-15/output-0' }] });
+
+        await backupFirestoreData();
+
+        expect(captureWarning).toHaveBeenCalledTimes(1);
+        const [message, ctx] = (captureWarning as jest.Mock).mock.calls[0];
+        expect(message).toContain('같은 날 두 번 실행');
+        expect(ctx).toMatchObject({ context: 'dailyNightlyBatch', step: 'backupFirestore' });
+        // 받는 사람이 바로 로그를 열 수 있도록 조사 지점을 싣는다
+        expect(JSON.stringify(ctx)).toContain('Memory limit');
+    });
+
+    it('경합으로 스킵한 경우에도 경고를 올린다', async () => {
+        stubBucket({ files: [] });
+        exportDocumentsMock.mockRejectedValue(
+            Object.assign(new Error('3 INVALID_ARGUMENT: Path already exists: /b/backups/firestore/2026-08-15/2026-08-15.overall_export_metadata'), { code: 3 })
+        );
+
+        await backupFirestoreData();
+
+        expect(captureWarning).toHaveBeenCalledTimes(1);
+    });
+
+    it('정상 백업에는 경고를 내지 않는다 — 매일 뜨면 이 채널도 무뎌진다', async () => {
+        stubBucket({ files: [] });
+
+        await backupFirestoreData();
+
+        expect(captureWarning).not.toHaveBeenCalled();
     });
 
     it('사전 확인을 통과한 뒤 경합으로 "Path already exists"가 나도 실패로 올리지 않는다', async () => {

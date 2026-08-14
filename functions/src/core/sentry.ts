@@ -76,9 +76,25 @@ export function captureError(error: unknown, context: Record<string, unknown> = 
 }
 
 /**
- * Sentry에 경고 메시지를 전송한다.
+ * 경고를 Sentry와 Discord로 전송한다.
+ *
+ * captureError와 같은 두 경로를 쓰되 **색과 제목으로 심각도를 구분한다**. 예전에는 Sentry로만
+ * 보냈는데, 이 서비스의 운영자가 실제로 보는 곳은 Discord라서 경고가 사실상 아무에게도 닿지
+ * 않았다. 그렇다고 captureError로 올리면 장애가 아닌 것이 빨간 "Exception"으로 떠서, 진짜
+ * 장애 알림의 신뢰도를 갉아먹는다 — 2026-08-15의 백업 오알림이 정확히 그 문제였다.
+ *
+ * 그래서 경고는 **경고로 보이게** 보낸다. 호출부는 "사람이 알아야 하지만 실패는 아닌 것"에만
+ * 쓴다 — 매번 뜨는 상태 보고에 쓰면 이 채널도 같은 이유로 무뎌진다.
  */
 export function captureWarning(message: string, context: Record<string, unknown> = {}): void {
+    if (!IS_TEST) {
+        sendDiscordAlert({
+            title: "⚠️ Cloud Functions Warning",
+            description: `**Warning:** ${message}\n\n**Context:**\n\`\`\`json\n${JSON.stringify(context, null, 2)}\n\`\`\``.substring(0, 3999),
+            color: 16753920, // 주황(0xFFA500) — 빨강(Exception)과 한눈에 구분된다
+        }).catch(() => {});
+    }
+
     const sentry = getSentry();
     if (!sentry) return;
     sentry.captureMessage(message, {
