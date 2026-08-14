@@ -172,4 +172,57 @@ describe('useEmployeeManager', () => {
             expect(mockShowToast).not.toHaveBeenCalled();
         });
     });
+
+    describe('이미 사라진 직원 행(낡은 목록) 처리', () => {
+        const notFound = () =>
+            Object.assign(new Error('사용자를 찾을 수 없습니다.'), { code: 'functions/not-found' });
+
+        it('비활성화가 not-found로 거부되면 안내 후 목록을 다시 불러온다', async () => {
+            mockCallable.mockRejectedValue(notFound());
+            const { result } = renderHook(() => useEmployeeManager());
+            await waitFor(() => expect(result.current.loading).toBe(false));
+            expect(mockGetOrganizationMembers).toHaveBeenCalledTimes(1);
+
+            await act(async () => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                await result.current.handleDeleteEmployee({ id: 'u1', name: '김직원' } as any);
+            });
+
+            expect(mockShowToast).toHaveBeenCalledWith('이미 탈퇴하거나 삭제된 직원입니다. 목록을 새로 고칩니다.', 'warning');
+            // 사라진 행이 남지 않도록 목록을 다시 읽는다
+            await waitFor(() => expect(mockGetOrganizationMembers).toHaveBeenCalledTimes(2));
+            // 서버 원문("사용자를 찾을 수 없습니다.")을 그대로 띄우지 않는다
+            expect(mockShowToast).not.toHaveBeenCalledWith('사용자를 찾을 수 없습니다.', 'error');
+        });
+
+        it('완전 삭제가 not-found로 거부되면 안내 후 목록을 다시 불러온다', async () => {
+            mockConfirm.mockResolvedValue('퇴사직원');
+            mockCallable.mockRejectedValue(notFound());
+            const { result } = renderHook(() => useEmployeeManager());
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            await act(async () => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                await result.current.handleDeletePermanently({ id: 'u9', name: '퇴사직원', status: 'disabled' } as any);
+            });
+
+            expect(mockShowToast).toHaveBeenCalledWith('이미 탈퇴하거나 삭제된 직원입니다. 목록을 새로 고칩니다.', 'warning');
+            await waitFor(() => expect(mockGetOrganizationMembers).toHaveBeenCalledTimes(2));
+        });
+
+        it('not-found가 아닌 거부는 서버 메시지를 그대로 안내한다', async () => {
+            mockCallable.mockRejectedValue(
+                Object.assign(new Error('다른 기관의 직원을 비활성화할 수 없습니다.'), { code: 'functions/permission-denied' })
+            );
+            const { result } = renderHook(() => useEmployeeManager());
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            await act(async () => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                await result.current.handleDeleteEmployee({ id: 'u1', name: '김직원' } as any);
+            });
+
+            expect(mockShowToast).toHaveBeenCalledWith('다른 기관의 직원을 비활성화할 수 없습니다.', 'error');
+        });
+    });
 });
