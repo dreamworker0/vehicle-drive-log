@@ -19,8 +19,31 @@ jest.mock('../services/alimtalk/sendNotification', () => ({
     sendPushToUser: jest.fn(),
 }));
 jest.mock('../core/sentry', () => ({ captureError: jest.fn() }));
+// export 호출 자체를 검증해야 하므로 Admin 클라이언트를 통째로 갈아 끼운다.
+jest.mock('@google-cloud/firestore', () => {
+    const exportDocuments = jest.fn();
+    class FirestoreAdminClient {
+        databasePath(projectId: string, database: string) {
+            return `projects/${projectId}/databases/${database}`;
+        }
+        exportDocuments = exportDocuments;
+    }
+    return { v1: { FirestoreAdminClient }, __exportDocuments: exportDocuments };
+});
 
-import { buildBackupUri, resolveBackupBucket, describeExportFailure } from '../handlers/scheduled/dailyNightlyBatch';
+import { getStorage } from 'firebase-admin/storage';
+import {
+    buildBackupUri,
+    buildBackupPrefix,
+    resolveBackupBucket,
+    describeExportFailure,
+    isPathAlreadyExists,
+    backupFirestoreData,
+} from '../handlers/scheduled/dailyNightlyBatch';
+import { getKSTDateString } from '../utils/kstDate';
+
+const { __exportDocuments: exportDocumentsMock } =
+    jest.requireMock('@google-cloud/firestore') as { __exportDocuments: jest.Mock };
 
 describe('resolveBackupBucket — 백업 전용 버킷 선택', () => {
     const original = process.env.FIRESTORE_BACKUP_BUCKET;
@@ -64,6 +87,106 @@ describe('buildBackupUri — 백업 대상 GCS 경로', () => {
 
     it('OPERATIONS.md가 안내하는 backups/firestore/YYYY-MM-DD 구조를 유지한다', () => {
         expect(buildBackupUri('b', '2026-01-02')).toMatch(/\/backups\/firestore\/\d{4}-\d{2}-\d{2}$/);
+    });
+
+    it('존재 확인용 접두사는 export 대상과 같은 경로 + 끝 슬래시다 (다른 날짜가 섞이지 않게)', () => {
+        expect(buildBackupPrefix('2026-08-15')).toBe('backups/firestore/2026-08-15/');
+        expect(buildBackupUri('b', '2026-08-15')).toBe(`gs://b/backups/firestore/2026-08-15`);
+    });
+});
+
+describe('isPathAlreadyExists — 같은 날 두 번째 실행 판별', () => {
+    it('export가 거절한 "Path already exists"를 알아본다', () => {
+        const e = Object.assign(
+            new Error('3 INVALID_ARGUMENT: Path already exists: /vehicle-drive-log-backups/backups/firestore/2026-08-15/2026-08-15.overall_export_metadata'),
+            { code: 3 }
+        );
+        expect(isPathAlreadyExists(e)).toBe(true);
+    });
+
+    it('권한·위치 실패는 "이미 있음"으로 삼키지 않는다', () => {
+        expect(isPathAlreadyExists(new Error('7 PERMISSION_DENIED: The caller does not have permission'))).toBe(false);
+        expect(isPathAlreadyExists(new Error('Bucket x is in location us-east1.'))).toBe(false);
+        expect(isPathAlreadyExists(null)).toBe(false);
+    });
+});
+
+describe('backupFirestoreData — 하루 한 번만 export를 건다', () => {
+    const originalProject = process.env.GCLOUD_PROJECT;
+
+    /** 백업 버킷 스텁. files는 오늘 접두사 아래에 이미 있는 객체 목록. */
+    function stubBucket({ exists = true, files = [] as unknown[] } = {}) {
+        const bucket = {
+            exists: jest.fn().mockResolvedValue([exists]),
+            getFiles: jest.fn().mockResolvedValue([files]),
+        };
+        (getStorage as jest.Mock).mockReturnValue({ bucket: jest.fn().mockReturnValue(bucket) });
+        return bucket;
+    }
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        process.env.GCLOUD_PROJECT = 'vehicle-drive-log';
+        delete process.env.FIRESTORE_BACKUP_BUCKET;
+        exportDocumentsMock.mockResolvedValue([{ name: 'operations/abc' }]);
+    });
+
+    afterAll(() => {
+        if (originalProject === undefined) delete process.env.GCLOUD_PROJECT;
+        else process.env.GCLOUD_PROJECT = originalProject;
+    });
+
+    it('오늘 백업이 없으면 오늘 날짜 경로로 export를 건다', async () => {
+        const bucket = stubBucket({ files: [] });
+
+        await backupFirestoreData();
+
+        expect(bucket.getFiles).toHaveBeenCalledWith({ prefix: buildBackupPrefix(getKSTDateString()), maxResults: 1 });
+        expect(exportDocumentsMock).toHaveBeenCalledTimes(1);
+        expect(exportDocumentsMock.mock.calls[0][0]).toMatchObject({
+            outputUriPrefix: buildBackupUri('vehicle-drive-log-backups', getKSTDateString()),
+            collectionIds: [],
+        });
+    });
+
+    it('오늘 폴더에 이미 객체가 있으면 export를 걸지 않는다 — 중복 사본은 읽기 비용만 두 배다', async () => {
+        stubBucket({ files: [{ name: 'backups/firestore/2026-08-15/output-0' }] });
+
+        await expect(backupFirestoreData()).resolves.toBeUndefined();
+        expect(exportDocumentsMock).not.toHaveBeenCalled();
+    });
+
+    it('사전 확인을 통과한 뒤 경합으로 "Path already exists"가 나도 실패로 올리지 않는다', async () => {
+        stubBucket({ files: [] });
+        exportDocumentsMock.mockRejectedValue(
+            Object.assign(new Error('3 INVALID_ARGUMENT: Path already exists: /b/backups/firestore/2026-08-15/2026-08-15.overall_export_metadata'), { code: 3 })
+        );
+
+        await expect(backupFirestoreData()).resolves.toBeUndefined();
+    });
+
+    it('진짜 실패(IAM)는 그대로 올린다 — 알림이 사라지면 안 된다', async () => {
+        stubBucket({ files: [] });
+        exportDocumentsMock.mockRejectedValue(
+            Object.assign(new Error('7 PERMISSION_DENIED: The caller does not have permission'), { code: 7 })
+        );
+
+        await expect(backupFirestoreData()).rejects.toThrow('남는 원인은 IAM뿐이다');
+    });
+
+    it('존재 확인이 실패해도 백업은 포기하지 않는다 — 중복 방지는 편의, 백업이 본론이다', async () => {
+        const bucket = stubBucket({ files: [] });
+        bucket.getFiles.mockRejectedValue(new Error('403 does not have storage.objects.list access'));
+
+        await expect(backupFirestoreData()).resolves.toBeUndefined();
+        expect(exportDocumentsMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('버킷 자체가 없으면 export 전에 명시적으로 실패한다', async () => {
+        stubBucket({ exists: false });
+
+        await expect(backupFirestoreData()).rejects.toThrow('백업 버킷 gs://vehicle-drive-log-backups 이(가) 없다');
+        expect(exportDocumentsMock).not.toHaveBeenCalled();
     });
 });
 

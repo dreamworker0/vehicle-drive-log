@@ -135,6 +135,17 @@ gcloud firestore export gs://vehicle-drive-log-backups/backups/firestore/manual-
   3번의 두 번째 명령만 걸면 된다.
 - `PERMISSION_DENIED` → 서비스 에이전트의 버킷 쓰기가 막힌 것이다. 3번의 첫 번째 명령을 건다.
 
+**같은 스텝의 다른 문구 — `3 INVALID_ARGUMENT: Path already exists: .../<날짜>.overall_export_metadata`**
+는 위 셋 중 어느 것도 아니다. **백업은 이미 있고**, 배치가 같은 날 두 번 돈 것이다. export는
+`outputUriPrefix`의 마지막 조각으로 완료 표식을 만드는데 대상 경로가 날짜로 고정돼 있어,
+두 번째 실행이 그 표식과 부딪힌다. 배치가 하루 두 번 도는 경로는 세 가지다 — 스케줄 함수의
+Pub/Sub 전달이 at-least-once, `retryCount: 1`(핸들러가 타임아웃 등으로 던지면 1회 재실행),
+운영자의 수동 재실행. 셋 다 정상 동작이라 막을 대상이 아니다.
+→ 지금은 export 전에 오늘 접두사 아래 객체가 있는지 보고 있으면 건너뛴다(`backupFirestoreData`).
+사전 확인과 호출 사이의 경합으로 이 에러가 나도 실패로 올리지 않는다. **이 문구가 다시 보이면
+스킵 로직이 지워진 것**이니 IAM을 뒤지지 말고 그쪽을 먼저 본다. 중복 export를 "그냥 하나 더
+만들면 되지"로 풀지 말 것 — 관리형 export는 전체 문서를 읽어 읽기 비용이 그대로 청구된다.
+
 ### 2.7 야간 배치 쿼리가 `9 FAILED_PRECONDITION: The query requires an index`
 **증상**: 스케줄 함수 로그/Sentry에 인덱스 생성 링크가 포함된 에러. 예: `organizations`의
 `status` + `deletedAt`.
