@@ -26,6 +26,7 @@
 import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
 import { log, wrapHandler } from "../../utils/helpers";
 import { checkRateLimitByUid } from "../../utils/rateLimit";
+import { resolveClientIp } from "../../utils/clientIp";
 import { writeAuditEntry, resolveOrgId } from "../../services/audit/writeAuditEntry";
 
 /** 세션 식별자 형식 — 클라이언트가 생성하는 난수. 문서 ID에 들어가므로 좁게 제한한다. */
@@ -42,18 +43,16 @@ interface RecordSessionPayload {
 /**
  * 접속지 IP를 뽑는다.
  *
- * Cloud Run(2세대 Functions) 앞단에 프록시가 있어 `x-forwarded-for`의 **첫 번째** 값이
- * 원 클라이언트다. 뒤쪽 값은 프록시 체인이므로 쓰지 않는다.
+ * **첫 번째 값을 쓰면 안 된다.** 구글 프런트엔드는 클라이언트가 보낸 `x-forwarded-for`를
+ * 지우지 않고 뒤에 덧붙이므로, 맨 앞 값은 신청자가 아니라 **호출자가 적어 넣은 문자열**이다.
+ * 그대로 담으면 접속기록의 '접속지 정보'(고시 제16조)가 위조 가능해진다
+ * (2026-08-14 감사 부록 4). 신뢰 가능한 자리는 오른쪽에서 두 번째이며,
+ * 그 판정은 `resolveClientIp` 한 곳에 모아 뒀다.
  */
 function clientIp(req: { headers: Record<string, unknown>; ip?: string } | undefined): string | null {
     if (!req) return null;
-    const forwarded = req.headers?.["x-forwarded-for"];
-    const raw = Array.isArray(forwarded) ? forwarded[0] : forwarded;
-    if (typeof raw === "string" && raw.trim()) {
-        const first = raw.split(",")[0].trim();
-        if (first) return first;
-    }
-    return typeof req.ip === "string" && req.ip ? req.ip : null;
+    const resolved = resolveClientIp(req);
+    return resolved === "unknown" ? null : resolved;
 }
 
 /**

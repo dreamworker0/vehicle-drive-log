@@ -49,6 +49,7 @@ jest.mock('firebase-admin/storage', () => ({
 jest.mock('../utils/rateLimit', () => ({
     checkRateLimitByUid: jest.fn().mockResolvedValue(undefined),
     checkRateLimitByIp: jest.fn().mockResolvedValue(false),
+    checkGlobalBudget: jest.fn().mockResolvedValue(false),
 }));
 
 // helpers는 sentry 의존이 있어 로깅·래퍼만 통과시키는 mock으로 대체
@@ -345,5 +346,51 @@ describe('submitOrgApplication — 증빙서류 프리스크린', () => {
         const savedDoc = mockOrgSet.mock.calls[0][0];
         expect(savedDoc).not.toHaveProperty('ocrPrescreen');
         expect(savedDoc.aiVerified).toBe(false);
+    });
+});
+
+/**
+ * 이 경로는 **비인증인데 요청 1건이 Gemini 1회를 태운다.** 주체 키(이메일·IP)는 둘 다
+ * 호출자가 정하는 값이라 회전시키면 상한이 사라지므로, 주체와 무관한 전역 예산이
+ * 마지막 방어선이다 (2026-08-14 감사 발견 2 / ocr-cost-security §1.4).
+ */
+describe('submitOrgApplication — 전역 예산', () => {
+    const { checkGlobalBudget } = jest.requireMock('../utils/rateLimit') as { checkGlobalBudget: jest.Mock };
+
+    const makeRequest = () => ({
+        auth: null,
+        rawRequest: { ip: '1.2.3.4', headers: {} },
+        data: {
+            orgName: '행복복지관',
+            applicantName: '홍길동',
+            applicantEmail: 'test@example.com',
+            applicantPhone: '010-1234-5678',
+            message: '',
+            imageBase64: Buffer.from('fake').toString('base64'),
+            imageMimeType: 'image/jpeg',
+            agreedTerms: true,
+            agreedPrivacy: true,
+            termsVersion: '2026-08-05',
+            privacyVersion: '2026-08-05',
+        },
+    });
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+    });
+
+    it('예산이 남아 있으면 통과한다', async () => {
+        await expect(capturedHandler(makeRequest())).resolves.toMatchObject({ success: true });
+        expect(checkGlobalBudget).toHaveBeenCalledWith('submitOrgApplication', expect.any(Number), expect.any(Number));
+    });
+
+    it('예산이 소진되면 Gemini를 부르기 전에 거절한다', async () => {
+        checkGlobalBudget.mockResolvedValueOnce(true);
+
+        await expect(capturedHandler(makeRequest())).rejects.toMatchObject({ code: 'resource-exhausted' });
+
+        // 접수 거절이 아니라 "비용이 나가지 않는 것"이 이 테스트의 요지다.
+        expect(mockGenerateAiContent).not.toHaveBeenCalled();
+        expect(mockOrgSet).not.toHaveBeenCalled();
     });
 });

@@ -118,6 +118,11 @@ export async function checkDailyOcrQuota(
 /**
  * Rate Limit 검사 (onRequest 함수용 — IP 기반)
  *
+ * ⚠️ **IP는 최선의 추정치일 뿐이다.** 반드시 `resolveClientIp`(utils/clientIp.ts)가 돌려준
+ * 값을 넘긴다 — `req.ip`나 XFF 맨 앞 값은 클라이언트가 정할 수 있어 상한이 무의미해진다
+ * (2026-08-14 감사 발견 2). 인증이 선행하는 경로라면 `checkRateLimitBySubject`에 uid를
+ * 넘기는 쪽이 항상 낫고, 비용이 걸린 비인증 경로는 `checkGlobalBudget`을 함께 건다.
+ *
  * @param functionName 함수 이름 (예: "tmapProxy")
  * @param ip 클라이언트 IP
  * @param maxRequests 윈도우 내 최대 요청 수
@@ -132,9 +137,45 @@ export async function checkRateLimitByIp(
     windowSeconds: number,
     failMode: RateLimitFailMode = "open"
 ): Promise<boolean> {
+    return checkRateLimitBySubject(functionName, ip, maxRequests, windowSeconds, failMode);
+}
+
+/**
+ * 전역 예산 — **주체를 특정할 수 없는 비인증 경로의 비용 상한**.
+ *
+ * IP·이메일 같은 주체 키는 전부 호출자가 정하는 값이라(이메일은 미검증 문자열, IP는 헤더로
+ * 조작 가능) 회전시키면 상한이 사라진다. 그래서 비용이 발생하는 비인증 경로에는 주체와
+ * 무관한 단일 카운터를 하나 더 건다. 이 값이 곧 그 경로의 **시간당 최대 청구액**이다.
+ *
+ * 정상 사용량의 10배 이상으로 잡되 fail-closed로 둔다 — 확인조차 못 하는 상황에서
+ * 비용이 새는 것보다 잠시 거절하는 편이 낫다.
+ *
+ * @returns true면 예산 소진(요청 거부), false면 통과
+ */
+export async function checkGlobalBudget(
+    budgetName: string,
+    maxRequests: number,
+    windowSeconds: number
+): Promise<boolean> {
+    return checkRateLimitBySubject(budgetName, "__global__", maxRequests, windowSeconds, "closed");
+}
+
+/**
+ * Rate Limit 검사 (임의 주체 키 기반 — IP·uid·전역 카운터의 공통 구현)
+ *
+ * @param subject 카운터를 나눌 키 (IP·uid·"__global__" 등)
+ * @returns true면 초과(또는 failMode "closed"에서 확인 실패), false면 통과
+ */
+export async function checkRateLimitBySubject(
+    functionName: string,
+    subject: string,
+    maxRequests: number,
+    windowSeconds: number,
+    failMode: RateLimitFailMode = "open"
+): Promise<boolean> {
     const windowKey = getWindowKey(windowSeconds);
-    // IP에 포함된 특수문자(콜론, 점)를 안전한 문자로 치환
-    const safeIp = ip.replace(/[.:]/g, "_");
+    // 키에 포함된 특수문자(콜론, 점)를 안전한 문자로 치환 — 문서 ID로 쓰이기 때문
+    const safeIp = subject.replace(/[.:/]/g, "_");
     const docId = `${functionName}:${safeIp}:${windowKey}`;
 
     const db = getFirestore();

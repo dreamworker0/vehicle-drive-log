@@ -108,12 +108,20 @@ describe('recordSession — 인증·입력 검증', () => {
 });
 
 describe('recordSession — 접속지 IP', () => {
-    it('x-forwarded-for의 첫 번째 값을 원 클라이언트로 본다 (뒤는 프록시 체인)', async () => {
-        await call({ rawRequest: { headers: { 'x-forwarded-for': '198.51.100.7, 10.0.0.1, 10.0.0.2' }, ip: '10.0.0.2' } });
+    // 구글 프런트엔드는 클라이언트가 보낸 x-forwarded-for를 지우지 않고 뒤에
+    // `<실제 클라이언트>, <로드밸런서>`를 덧붙인다. 그래서 신뢰할 수 있는 자리는
+    // 맨 앞이 아니라 **오른쪽에서 두 번째**다 (2026-08-14 감사 부록 4).
+    it('x-forwarded-for의 오른쪽에서 두 번째 값을 원 클라이언트로 본다', async () => {
+        await call({ rawRequest: { headers: { 'x-forwarded-for': '198.51.100.7, 10.0.0.1' }, ip: '198.51.100.7' } });
         expect(lastEntry().ip).toBe('198.51.100.7');
     });
 
-    it('헤더 배열로 들어와도 첫 값을 쓴다', async () => {
+    it('호출자가 앞에 가짜 IP를 끼워 넣어도 접속지가 위조되지 않는다', async () => {
+        await call({ rawRequest: { headers: { 'x-forwarded-for': '1.1.1.1, 198.51.100.7, 10.0.0.1' }, ip: '1.1.1.1' } });
+        expect(lastEntry().ip).toBe('198.51.100.7');
+    });
+
+    it('헤더 배열로 들어와도 같은 자리를 고른다', async () => {
         await call({ rawRequest: { headers: { 'x-forwarded-for': ['198.51.100.8, 10.0.0.1'] }, ip: '10.0.0.2' } });
         expect(lastEntry().ip).toBe('198.51.100.8');
     });

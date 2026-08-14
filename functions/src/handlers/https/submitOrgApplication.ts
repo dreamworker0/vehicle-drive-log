@@ -2,7 +2,9 @@ import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { log, wrapHandler, sanitizePromptValue } from "../../utils/helpers";
-import { checkRateLimitByUid, checkRateLimitByIp } from "../../utils/rateLimit";
+import { checkRateLimitByUid, checkRateLimitByIp, checkGlobalBudget } from "../../utils/rateLimit";
+import { resolveClientIp } from "../../utils/clientIp";
+import { GLOBAL_BUDGETS } from "../../utils/constants";
 import { maskEmail } from "../../utils/mask";
 import { screenDocument, getScreenRejection, ScreenResult } from "../../services/driveLog/documentScreen";
 
@@ -110,11 +112,27 @@ export const submitOrgApplication = onCall(
         await checkRateLimitByUid("submitOrgApplication", email, 6, 3600, "closed");
 
         // 2-1. IP 기반 상한 — 이메일을 회전시켜 이메일 키 제한을 우회하는 무제한 익명 쓰기 차단 (2026-07-04 감사 N4)
-        const clientIp = request.rawRequest?.ip
-            || (request.rawRequest?.headers["x-forwarded-for"] as string)
-            || "unknown";
-        if (await checkRateLimitByIp("submitOrgApplication", clientIp, 10, 3600, "closed")) {
+        //
+        // IP는 `resolveClientIp`로 뽑는다. `rawRequest.ip`를 그대로 쓰면 X-Forwarded-For 맨 앞
+        // 값(= 클라이언트가 정한 문자열)이라 헤더 한 줄로 이 상한이 사라졌다(2026-08-14 감사 발견 2).
+        // 상한을 10 → 30으로 올린 것은 완화가 아니다: 프런트엔드 홉 수가 경로마다 다를 수 있어
+        // 최악의 경우 여러 신청자가 한 버킷을 공유할 수 있는데, 그때 정상 신청이 막히면 안 된다.
+        // 진짜 비용 상한은 바로 아래 전역 예산이 맡는다.
+        const clientIp = resolveClientIp(request.rawRequest);
+        if (await checkRateLimitByIp("submitOrgApplication", clientIp, 30, 3600, "closed")) {
             throw new HttpsError("resource-exhausted", "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.");
+        }
+
+        // 2-2. 전역 예산 — 주체 키(이메일·IP)를 모두 회전시켜도 남는 마지막 비용 상한.
+        // 이 경로는 **비인증**이면서 요청 1건당 Gemini 프리스크린 1회를 태우므로, 주체를
+        // 특정할 수 없다는 사실 자체가 위험이다. 실사용은 하루 몇 건이라 시간당 40건이면
+        // 정상 신청은 절대 닿지 않는다 (ocr-cost-security §1.4).
+        const budget = GLOBAL_BUDGETS.submitOrgApplication;
+        if (await checkGlobalBudget("submitOrgApplication", budget.max, budget.windowSec)) {
+            log("WARNING", "submitOrgApplication", "전역 예산 소진 — 접수를 일시 거절", {
+                email: maskEmail(email), max: budget.max, windowSec: budget.windowSec,
+            });
+            throw new HttpsError("resource-exhausted", "지금은 신청이 몰려 접수를 받을 수 없습니다. 잠시 후 다시 시도해주세요.");
         }
 
         try {
