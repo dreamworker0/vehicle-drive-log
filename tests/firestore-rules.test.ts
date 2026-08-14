@@ -932,4 +932,53 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertSucceeds(memberA.collection('driveLogs').doc('log_broken').update({ endKm: 145 }));
   });
 
+  /**
+   * 의견(feedbacks) 생성이 **서버 비용을 부르는 쓰기**라는 점을 규칙으로 못박는다.
+   *
+   * 이 컬렉션의 onCreate(generateFeedbackDraft)는 Discord 웹훅·첨부 다운로드·Gemini 호출을
+   * 연쇄로 실행한다. 규칙이 `isSignedIn()` 하나였을 때는 로그인한 누구나 타인 명의로,
+   * 첨부 개수·본문 길이 제한 없이 그 연쇄를 무제한 유발할 수 있었다 (2026-08-14 감사 발견 1).
+   *
+   * 호출 '횟수' 상한은 Rules로 표현할 수 없어 트리거 안의 일일 쿼터가 맡는다. 여기서는
+   * 한 번의 쓰기가 시킬 수 있는 일의 크기와 명의를 검증한다.
+   */
+  it('11. 의견 생성 — 명의 위조·첨부 과다·AI 필드 선점 차단', async () => {
+    const author = setupContext('user_A', { role: 'member', orgId: 'org-A' }).firestore();
+    const base = {
+      message: '건의드립니다',
+      imageUrls: [] as string[],
+      userEmail: 'a@example.com',
+      userName: '사용자A',
+      organizationId: 'org-A',
+      authorUid: 'user_A',
+      status: 'unread',
+    };
+
+    // (1) 정상 경로(FeedbackForm이 보내는 모양) → 허용. 이게 막히면 의견 기능이 죽는다.
+    await assertSucceeds(author.collection('feedbacks').doc('fb_ok').set(base));
+
+    // (2) 첨부 3개까지 → 허용 (트리거 fetchPromptImages의 maxImages와 같은 값)
+    await assertSucceeds(author.collection('feedbacks').doc('fb_img3').set({
+      ...base, imageUrls: ['https://a/1.jpg', 'https://a/2.jpg', 'https://a/3.jpg'],
+    }));
+
+    // (3) 타인 명의로 심기 → 차단
+    await assertFails(author.collection('feedbacks').doc('fb_forged').set({ ...base, authorUid: 'user_B' }));
+
+    // (4) 첨부 4개 이상 → 차단 (쓰기 1건이 시키는 다운로드·토큰 비용의 상한)
+    await assertFails(author.collection('feedbacks').doc('fb_img4').set({
+      ...base, imageUrls: ['https://a/1.jpg', 'https://a/2.jpg', 'https://a/3.jpg', 'https://a/4.jpg'],
+    }));
+
+    // (5) 본문 길이 상한 초과 → 차단
+    await assertFails(author.collection('feedbacks').doc('fb_long').set({ ...base, message: 'x'.repeat(5001) }));
+
+    // (6) AI·답변 필드 선점 → 차단 (답변 이력이 사용자 입력으로 오염되는 것을 막는다)
+    await assertFails(author.collection('feedbacks').doc('fb_ai').set({ ...base, aiDraft: '내가 쓴 초안' }));
+    await assertFails(author.collection('feedbacks').doc('fb_reply').set({ ...base, reply: '처리 완료' }));
+
+    // (7) 읽기는 여전히 superAdmin 전용 — 작성자 본인도 못 읽는다
+    await assertFails(author.collection('feedbacks').doc('fb_ok').get());
+  });
+
 });

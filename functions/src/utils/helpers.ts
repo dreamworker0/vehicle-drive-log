@@ -188,9 +188,44 @@ export function escapeHtml(value: unknown): string {
 }
 
 /**
- * 프롬프트 첨부 이미지 다운로드 — Gemini 비용 증폭 방어(개수·크기 상한).
+ * 프롬프트 첨부 이미지로 허용하는 호스트.
+ *
+ * 이 앱이 첨부로 다루는 이미지는 **전부 자기 Firebase Storage에 올린 것**이다
+ * (FeedbackForm·useDriveLogOcr가 uploadBytes 후 getDownloadURL로 받은 주소).
+ * 그 밖의 주소를 가져올 이유가 없다.
+ */
+const ALLOWED_IMAGE_HOSTS = new Set([
+    "firebasestorage.googleapis.com",
+    "storage.googleapis.com",
+]);
+
+/**
+ * 서버가 가져와도 되는 주소인가.
+ *
+ * 화이트리스트가 없으면 **클라이언트가 적어 넣은 임의 주소를 서버가 대신 요청**하게 된다
+ * (`imageUrls`는 사용자가 만든 Firestore 문서의 필드다). 내부망·메타데이터·제3자 서버로
+ * 향하는 SSRF 통로이자, URL당 5MB를 문서마다 내려받는 대역폭 증폭 통로였다
+ * (2026-08-14 감사 발견 3).
+ */
+export function isAllowedPromptImageUrl(raw: string): boolean {
+    let parsed: URL;
+    try {
+        parsed = new URL(raw);
+    } catch {
+        return false;
+    }
+    // http·file·gs 등은 전부 거절 — 정상 첨부는 항상 https다.
+    if (parsed.protocol !== "https:") return false;
+    if (ALLOWED_IMAGE_HOSTS.has(parsed.hostname)) return true;
+    // 신규 기본 버킷 도메인 (예: my-app.firebasestorage.app)
+    return parsed.hostname.endsWith(".firebasestorage.app");
+}
+
+/**
+ * 프롬프트 첨부 이미지 다운로드 — Gemini 비용 증폭 방어(개수·크기 상한) + SSRF 차단.
  * 사용자가 대용량·다수 이미지 URL로 LLM 호출 비용을 폭증시키는 것을 막는다.
  * 개수는 maxImages로 절단하고, 개별 이미지가 maxBytes를 넘으면 건너뛴다.
+ * 호스트가 허용 목록 밖이면 요청 자체를 보내지 않는다.
  */
 export async function fetchPromptImages(
     imageUrls: unknown,
@@ -203,6 +238,13 @@ export async function fetchPromptImages(
 
     for (const url of urls) {
         if (typeof url !== "string") continue;
+        if (!isAllowedPromptImageUrl(url)) {
+            log("WARNING", opts.logName, "허용되지 않은 이미지 호스트 — 건너뜀", {
+                // 주소 원문을 그대로 남기면 로그가 공격자 문자열의 저장소가 된다. 호스트만 남긴다.
+                host: (() => { try { return new URL(url).hostname; } catch { return "(파싱 불가)"; } })(),
+            });
+            continue;
+        }
         try {
             const res = await fetch(url);
             if (!res.ok) continue;

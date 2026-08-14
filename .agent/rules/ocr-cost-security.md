@@ -25,6 +25,35 @@ Gemini API 호출은 종량제 비용이 발생하므로, 악의적이거나 비
 ### 1.2 프론트엔드 중복 클릭 방지 (Debounce/Throttle)
 *   **규칙**: 프론트엔드에서 이미지 업로드 및 분석 버튼을 누른 후, 응답이 올 때까지 버튼을 비활성화(`disabled`)하고 스피너를 보여주어 중복 API 호출을 원천 차단해야 합니다.
 
+### 1.4 전역 예산 — 주체를 특정할 수 없는 경로 (구현됨 — 2026-08-14)
+
+주체별 상한(uid·이메일·IP)은 **주체를 회전시킬 수 있으면 상한이 아니다.** 비인증 경로에서 이메일은 미검증 문자열이고 IP는 헤더로 조작 가능하므로(§1.5), 회전으로 전부 무력화된다.
+
+*   **규칙**: 비인증이거나 주체를 무한히 만들 수 있는 경로가 Gemini를 부르면, 주체와 무관한 **단일 카운터(전역 예산)를 fail-closed로** 하나 더 건다. 이 값이 그 경로의 시간당(또는 일일) 최대 청구액이다.
+*   **기준값**: `functions/src/utils/constants.ts`의 `GLOBAL_BUDGETS`. 정상 사용량의 10배 이상으로 잡되 무한대는 아니게 한다.
+*   **Remote Config로 조율하지 않는다** — 조율 경로가 장애나면 상한 자체가 사라지기 때문에 배포된 코드에 고정한다.
+*   **구현**: `checkGlobalBudget(name, max, windowSec)` (`utils/rateLimit.ts`).
+
+### 1.5 IP를 레이트리밋 키로 쓸 때 (필수 — 2026-08-14 감사 발견 2)
+
+*   **규칙**: `req.ip`나 `headers['x-forwarded-for']`를 **그대로 쓰지 않는다.** 반드시 `resolveClientIp()`(`functions/src/utils/clientIp.ts`)를 거친다.
+*   **이유**: Cloud Functions 2세대 런타임은 Express에 `trust proxy`를 켜 두어 `req.ip`가 X-Forwarded-For의 맨 앞 값이 된다. 구글 프런트엔드는 클라이언트가 보낸 XFF를 지우지 않고 뒤에 덧붙이므로, 맨 앞은 **호출자가 적어 넣은 문자열**이다. 그대로 키로 쓰면 헤더 한 줄로 매 요청 새 버킷이 생겨 상한이 사라진다.
+*   **인증이 선행하는 엔드포인트는 IP가 아니라 uid로 키를 잡는다** — 위조도, 같은 프록시 뒤 사용자들이 한 버킷을 공유하는 문제도 없다 (`createAuthenticatedProxy` 참고).
+*   **회귀 방지**: `functions/src/__tests__/clientIp.test.ts`의 스푸핑 케이스.
+
+### 1.6 Firestore 트리거가 Gemini를 부를 때 (필수 — 2026-08-14 감사 발견 1)
+
+*   **규칙**: 트리거의 방아쇠가 **클라이언트가 생성할 수 있는 문서**라면, 호출 횟수 상한을 **트리거 안에** 둔다. 콜러블용 rate limit은 트리거에 닿지 않고, Security Rules는 "한 번에 얼마나 큰 일을 시키는가"는 막아도 "몇 번 시키는가"는 표현하지 못한다.
+*   **짝을 이뤄야 한다**:
+    1.  Rules — 작성자 명의 강제, 첨부 개수·본문 길이 상한 (쓰기 1건의 크기)
+    2.  트리거 — 작성자별 + 전역 일일 쿼터, 둘 다 fail-closed (쓰기 횟수)
+*   **구현 예**: `feedbacks` → `generateFeedbackDraft`의 `consumeAiDraftQuota`, `firestore.rules`의 feedbacks create, `tests/firestore-rules.test.ts` 11번 케이스.
+
+### 1.7 서버가 대신 가져오는 URL (필수 — 2026-08-14 감사 발견 3)
+
+*   **규칙**: 프롬프트에 붙일 이미지를 URL로 받아 서버가 fetch할 때는 **스킴(https)과 호스트를 화이트리스트로 강제**한다. 사용자 문서의 필드를 그대로 fetch하면 내부망·제3자로 향하는 SSRF 통로이자 대역폭 증폭 통로가 된다.
+*   **구현**: `isAllowedPromptImageUrl()` / `fetchPromptImages()` (`utils/helpers.ts`), 회귀 방지 `functions/src/__tests__/promptImageUrl.test.ts`.
+
 ---
 
 ## 2. Storage 업로드 보안 규칙 (Security Rules)

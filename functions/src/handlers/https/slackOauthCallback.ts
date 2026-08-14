@@ -17,6 +17,7 @@ import { verifyState } from "../../services/slack/oauthState";
 import { encryptSlackToken } from "../../services/slack/tokenCrypto";
 import { wrapHttps, log } from "../../utils/helpers";
 import { checkRateLimitByIp } from "../../utils/rateLimit";
+import { resolveClientIp } from "../../utils/clientIp";
 
 const db = getFirestore();
 
@@ -35,7 +36,8 @@ async function handler(req: Request, res: Response): Promise<void> {
     }
 
     // 코드 추측 완화용 IP rate limit (fail-open — 정상 설치를 막지 않음)
-    const ip = req.ip || "unknown";
+    // XFF 맨 앞은 클라이언트가 정하는 값이라 상한 키로 못 쓴다 (2026-08-14 감사 발견 2)
+    const ip = resolveClientIp(req);
     const exceeded = await checkRateLimitByIp("slackOauthCallback", ip, 30, 600).catch(() => false);
     if (exceeded) {
         res.status(429).send("Too Many Requests");

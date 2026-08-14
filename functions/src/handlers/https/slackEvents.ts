@@ -15,6 +15,7 @@ import { SLACK_SIGNING_SECRET } from "../../core/params";
 import { checkSlackSignature } from "../../services/slack/verifySlackSignature";
 import { wrapHttps, log } from "../../utils/helpers";
 import { checkRateLimitByIp } from "../../utils/rateLimit";
+import { resolveClientIp } from "../../utils/clientIp";
 
 const db = getFirestore();
 
@@ -71,7 +72,8 @@ async function handler(req: Request, res: Response): Promise<void> {
         rawBody,
     });
     if (!sigCheck.valid) {
-        const ip = req.ip || "unknown";
+        // XFF 맨 앞은 클라이언트가 정하는 값이라 상한 키로 못 쓴다 (2026-08-14 감사 발견 2)
+        const ip = resolveClientIp(req);
         const exceeded = await checkRateLimitByIp("slackEvents", ip, 30, 600);
         // 진단용: 실패 사유·본문 길이·헤더 존재 여부만 기록 (시크릿·본문 내용은 남기지 않음)
         log("WARNING", "slackEvents", "서명 검증 실패", {

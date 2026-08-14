@@ -9,8 +9,48 @@ import { getFirestore } from "firebase-admin/firestore";
 import { generateAiContent } from "../../core/gemini";
 import { buildFaqPromptText } from "../../utils/faqData";
 import { sendDiscordAlert } from "../../core/discord";
-import { sanitizePromptValue, fetchPromptImages } from "../../utils/helpers";
+import { sanitizePromptValue, fetchPromptImages, log } from "../../utils/helpers";
+import { checkRateLimitBySubject } from "../../utils/rateLimit";
+import { GLOBAL_BUDGETS } from "../../utils/constants";
 const db = getFirestore();
+
+/** 초안 생성이 막혔을 때 대신 저장하는 문구 — 의견 접수 자체는 정상이라는 신호다. */
+const FALLBACK_DRAFT =
+    "안녕하세요. 김종원입니다. 초안은 인공지능이 작성합니다.\n\n소중한 의견 감사합니다. 검토 후 답변드리겠습니다.";
+
+/**
+ * AI 초안 생성 쿼터를 소비한다 (통과 시 true).
+ *
+ * **왜 트리거 안에 두는가**: 이 함수의 방아쇠는 Firestore 쓰기라 콜러블용 rate limit이
+ * 닿지 않는다. Rules는 "한 번에 얼마나 큰 일을 시킬 수 있는가"는 막아도 "몇 번 시킬 수
+ * 있는가"는 표현하지 못한다. 그래서 호출 횟수 상한은 반드시 여기 있어야 한다
+ * (2026-08-14 감사 발견 1 — 그전에는 이 경로에만 어떤 상한도 없었다).
+ *
+ * 작성자별·전역 두 겹인 이유: 작성자별만 두면 계정을 늘려 우회하고, 전역만 두면 한 사람이
+ * 예산을 태워 다른 사람의 초안을 막는다. 둘 다 fail-closed다 — 확인조차 못 하는 상황에서
+ * Gemini를 부르는 것이 초안 하나를 거르는 것보다 나쁘다.
+ */
+async function consumeAiDraftQuota(authorUid: string): Promise<boolean> {
+    const perAuthor = GLOBAL_BUDGETS.feedbackAiDraftPerAuthor;
+    const global = GLOBAL_BUDGETS.feedbackAiDraft;
+
+    const authorExceeded = await checkRateLimitBySubject(
+        "feedbackAiDraft", `uid_${authorUid || "unknown"}`, perAuthor.max, perAuthor.windowSec, "closed",
+    );
+    if (authorExceeded) {
+        log("WARNING", "generateFeedbackDraft", "작성자 일일 초안 한도 초과 — AI 호출 생략", { authorUid });
+        return false;
+    }
+
+    const globalExceeded = await checkRateLimitBySubject(
+        "feedbackAiDraftGlobal", "__global__", global.max, global.windowSec, "closed",
+    );
+    if (globalExceeded) {
+        log("WARNING", "generateFeedbackDraft", "전역 일일 초안 예산 소진 — AI 호출 생략", { authorUid });
+        return false;
+    }
+    return true;
+}
 
 /**
  * 최근 답변 완료된 피드백을 조회하여 few-shot example 텍스트 생성.
@@ -77,6 +117,19 @@ export const generateFeedbackDraft = onDocumentCreated(
 
         if (!message.trim()) {
             console.log("[generateFeedbackDraft] 빈 의견 — 초안 생성 건너뜀");
+            return;
+        }
+
+        // --- 호출 한도 ---
+        // 한도를 넘으면 **디스코드 알림까지 함께 생략한다.** 남용 상황에서 운영 채널이 도배되면
+        // 진짜 의견이 묻히기 때문이다. 의견 문서 자체는 그대로 남아 심사 화면에서 볼 수 있다.
+        if (!await consumeAiDraftQuota((data.authorUid as string) || "")) {
+            await snap.ref.update({
+                aiDraft: FALLBACK_DRAFT,
+                aiMatchedFaqId: null,
+                aiMatchedFaqIndex: null,
+                aiConfidence: 0,
+            });
             return;
         }
 
@@ -190,7 +243,7 @@ ${pastExamples}
 
             // 실패해도 기본 초안은 저장
             await snap.ref.update({
-                aiDraft: "안녕하세요. 김종원입니다. 초안은 인공지능이 작성합니다.\n\n소중한 의견 감사합니다. 검토 후 답변드리겠습니다.",
+                aiDraft: FALLBACK_DRAFT,
                 aiMatchedFaqId: null,
                 aiMatchedFaqIndex: null,
                 aiConfidence: 0,

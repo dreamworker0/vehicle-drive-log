@@ -23,6 +23,28 @@ export const DEFAULT_RATE_LIMITS = {
 } as const;
 
 export type RateLimitKey = keyof typeof DEFAULT_RATE_LIMITS;
+
+/**
+ * === 전역 예산 (ocr-cost-security §1.4) ===
+ *
+ * 주체 키(IP·이메일·uid)로 나누지 않는 **단일 카운터**다. 비인증이거나 주체를 무한히
+ * 회전시킬 수 있는 경로에서, 주체별 상한이 뚫려도 남는 마지막 비용 상한선이다.
+ * 값은 곧 "그 경로가 낼 수 있는 시간당(또는 일일) 최대 청구액"이므로, 정상 사용량의
+ * 10배 이상으로 넉넉히 잡되 무한대는 아니게 둔다. 전부 fail-closed.
+ *
+ * Remote Config로 조율하지 않는다 — 조율 경로 자체가 장애나면 상한이 사라지기 때문에,
+ * 이 값만은 배포된 코드에 고정한다.
+ */
+export const GLOBAL_BUDGETS = {
+    /** 기관 신청 접수 — 요청 1건당 Gemini 프리스크린 1회. 실사용은 하루 몇 건 수준이다. */
+    submitOrgApplication: { max: 40, windowSec: 3600 },
+    /** 랜딩 공개 문의 — 접수 자체는 싸지만 generateFeedbackDraft가 뒤따른다. */
+    submitPublicFeedback: { max: 60, windowSec: 3600 },
+    /** 의견 AI 초안(트리거) — 전 사용자 합산 일일 상한 */
+    feedbackAiDraft: { max: 200, windowSec: 86400 },
+    /** 의견 AI 초안 — 작성자 1인당 일일 상한 */
+    feedbackAiDraftPerAuthor: { max: 20, windowSec: 86400 },
+} as const;
 type RateLimitConfig = { max: number; windowSec: number };
 
 // === 인메모리 캐시 (5분 TTL) ===

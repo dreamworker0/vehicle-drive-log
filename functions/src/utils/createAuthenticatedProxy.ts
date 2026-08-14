@@ -8,7 +8,7 @@
 import type { Request, Response } from "firebase-functions/node_modules/@types/express";
 import { onRequest } from "firebase-functions/v2/https";
 import { wrapHttps, verifyAuthToken } from "../utils/helpers";
-import { checkRateLimitByIp } from "../utils/rateLimit";
+import { checkRateLimitBySubject } from "../utils/rateLimit";
 import { getRateLimits, type RateLimitKey } from "../utils/constants";
 
 /** 인증 완료 후 실행되는 핸들러 (uid가 보장됨) */
@@ -46,15 +46,16 @@ export function createAuthenticatedProxy(
                 return;
             }
 
-            // 2. IP 기반 Rate Limit (Remote Config에서 실시간 조회)
+            // 2. 호출자(uid) 기반 Rate Limit (Remote Config에서 실시간 조회)
+            //
+            // 예전에는 IP로 키를 잡았는데, `req.ip`는 X-Forwarded-For 맨 앞 값이라
+            // 헤더 한 줄로 매번 새 버킷을 만들 수 있었다(2026-08-14 감사 발견 2).
+            // 이 팩토리는 **인증을 이미 통과한 뒤**라 uid를 쥐고 있다 — 위조도, 프록시
+            // 뒤 사용자들이 한 버킷을 공유하는 문제도 없는 더 정확한 키다.
             const rateLimit = await getRateLimits(name);
-            const clientIp =
-                req.ip ||
-                (req.headers["x-forwarded-for"] as string) ||
-                "unknown";
-            const exceeded = await checkRateLimitByIp(
+            const exceeded = await checkRateLimitBySubject(
                 name,
-                clientIp,
+                `uid_${uid}`,
                 rateLimit.max,
                 rateLimit.windowSec
             );

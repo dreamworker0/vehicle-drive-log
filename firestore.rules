@@ -421,9 +421,34 @@ service cloud.firestore {
     }
 
     // === 피드백 ===
+    //
+    // create가 `isSignedIn()` 하나였을 때, 로그인한 누구나 이 컬렉션에 문서를 무제한으로
+    // 밀어 넣을 수 있었다. 그런데 이 컬렉션의 onCreate(generateFeedbackDraft)는 Discord
+    // 웹훅·첨부 이미지 다운로드·**Gemini 호출**을 연쇄로 실행한다 — 즉 클라이언트 쓰기가
+    // 곧 서버 비용이었다 (2026-08-14 감사 발견 1).
+    //
+    // 여기서 막는 것은 "한 번의 쓰기가 얼마나 큰 일을 시킬 수 있는가"다(작성자 위조 금지,
+    // 첨부 개수·본문 길이 상한). **호출 횟수 자체의 상한은 Rules로 표현할 수 없으므로**
+    // 트리거 안의 일일 쿼터(GLOBAL_BUDGETS.feedbackAiDraft*)가 짝을 이룬다. 둘 중 하나만
+    // 있으면 반쪽이다.
     match /feedbacks/{feedbackId} {
       allow read: if isSuperAdmin();
-      allow create: if isSignedIn();
+      allow create: if isSignedIn()
+                    // 타인 명의로 의견을 심을 수 없다 (서버 경로인 submitPublicFeedback은
+                    // Admin SDK라 Rules를 우회하므로 'public-inquiry' 표기에 영향 없음).
+                    && request.resource.data.authorUid == request.auth.uid
+                    // 본문 길이 — submitPublicFeedback의 상한(5000자)과 같은 기준.
+                    && request.resource.data.get('message', '') is string
+                    && request.resource.data.get('message', '').size() <= 5000
+                    && request.resource.data.get('content', '') is string
+                    && request.resource.data.get('content', '').size() <= 5000
+                    // 첨부는 최대 3개 — 트리거의 fetchPromptImages maxImages와 같은 값.
+                    && (!request.resource.data.keys().hasAny(['imageUrls'])
+                        || (request.resource.data.imageUrls is list
+                            && request.resource.data.imageUrls.size() <= 3))
+                    // AI·답변 필드는 서버(트리거·superAdmin)만 채운다. 클라이언트가 미리
+                    // 심으면 답변 이력이 사용자 입력으로 오염된다.
+                    && !request.resource.data.keys().hasAny(['aiDraft', 'aiConfidence', 'reply', 'repliedAt', 'repliedBy']);
       allow update: if isSuperAdmin();
       allow delete: if isSuperAdmin();
     }
