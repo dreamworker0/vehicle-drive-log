@@ -138,9 +138,12 @@ gcloud firestore export gs://vehicle-drive-log-backups/backups/firestore/manual-
 **같은 스텝의 다른 문구 — `3 INVALID_ARGUMENT: Path already exists: .../<날짜>.overall_export_metadata`**
 는 위 셋 중 어느 것도 아니다. **백업은 이미 있고**, 배치가 같은 날 두 번 돈 것이다. export는
 `outputUriPrefix`의 마지막 조각으로 완료 표식을 만드는데 대상 경로가 날짜로 고정돼 있어,
-두 번째 실행이 그 표식과 부딪힌다. 배치가 하루 두 번 도는 경로는 세 가지다 — 스케줄 함수의
-Pub/Sub 전달이 at-least-once, `retryCount: 1`(핸들러가 타임아웃 등으로 던지면 1회 재실행),
-운영자의 수동 재실행. 셋 다 정상 동작이라 막을 대상이 아니다.
+두 번째 실행이 그 표식과 부딪힌다. 배치가 하루 두 번 도는 경로는 셋이다 — 스케줄 함수의
+Pub/Sub 전달이 at-least-once, `retryCount: 1` 재실행, 운영자의 수동 재실행.
+
+> **2026-08-15에 실제로 관측된 것은 OOM발 재실행이었다**(§2.8). 이 문구를 봤다면 Pub/Sub 중복을
+> 넘겨짚기 전에 **같은 시각 로그에 `Memory limit ... exceeded`가 있는지부터** 본다. 백업이 두 번
+> 걸렸다는 것은 1차 실행이 **끝을 못 봤다**는 신호일 수 있고, 그러면 진짜 문제는 백업이 아니다.
 → 지금은 export 전에 오늘 접두사 아래 객체가 있는지 보고 있으면 건너뛴다(`backupFirestoreData`).
 사전 확인과 호출 사이의 경합으로 이 에러가 나도 실패로 올리지 않는다. **이 문구가 다시 보이면
 스킵 로직이 지워진 것**이니 IAM을 뒤지지 말고 그쪽을 먼저 본다. 중복 export를 "그냥 하나 더
@@ -157,6 +160,25 @@ Pub/Sub 전달이 at-least-once, `retryCount: 1`(핸들러가 타임아웃 등�
 **해결책**: 콘솔 링크로 즉석 생성하지 말고 **`firestore.indexes.json`에 추가**한 뒤 배포한다
 (콘솔에서만 만들면 다음 `firebase deploy --only firestore:indexes`에서 사라진다).
 방향은 쿼리 그대로 — 배치용은 `ASCENDING`, 화면 목록용은 `DESCENDING`으로 **둘 다** 둔다.
+
+### 2.8 야간 배치가 `Memory limit of 512 MiB exceeded` 로 죽고 하루 두 번 돈다
+**증상**: 로그에 `E ... 'Memory limit of N MiB exceeded with N MiB used'`가 찍히고, 곧바로
+`Starting new instance`와 함께 **배치 전체가 처음부터 다시 돈다**. 정상 종료 로그
+(`[Batch] dailyNightlyBatch completed`)는 1차 실행에 없다.
+
+**원인**: 통합 배치는 전 기관 집계(`dailyAggregation`)와 대시보드 통계
+(`computeAllDashboardStats`)가 문서 수만 건을 **한 프로세스에 올린 상태**로 다음 스텝에 넘어간다.
+그 위에서 백업이 gRPC Admin 클라이언트를 새로 만들며 한도를 넘겼다(2026-08-15, 512MiB).
+데이터가 늘면서 서서히 다가온 벽이라 어느 날 갑자기 시작되고, **그 뒤로는 매일 재발한다.**
+
+**왜 그냥 두면 안 되나**: OOM은 인스턴스를 통째로 죽이므로 핸들러의 스텝별 `try/catch`가 잡지
+못한다. `retryCount: 1`이 배치를 처음부터 재실행하니 집계·통계를 **한 번 더 돌려 읽기·쓰기 비용이
+두 배**가 되고, 재실행마저 OOM이면 그날 뒷 스텝은 아예 실행되지 않는다.
+
+**해결책**: `memory`를 올린다. 하루 한 번 ~60초 도는 함수라 512MiB→1GiB의 실제 비용은 월
+2천 GB-초 수준으로 무료 한도에 한참 못 미친다. rules/cloud-functions.md §3.2도 백업·아카이빙
+함수는 `1GiB`로 규정한다. 피크 자체를 낮추는 최적화(집계 스트리밍·페이지네이션)는 별도 과제다 —
+데이터가 더 늘면 그때는 그쪽이 답이지만, 한도 초과를 당장 멈추는 것이 먼저다.
 
 ## 3. 롤백 전략 (긴급 복구 시)
 앱 배포 직후 치명적인 오류(예: App Check 적용 후 대량 인증 실패)가 발생하면, 즉각적인 문제 분석보다 **원복(Rollback)**이 우선입니다.
