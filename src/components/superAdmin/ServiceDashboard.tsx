@@ -29,6 +29,7 @@ export default function ServiceDashboard() {
 
     const {
         loading,
+        loadError,
         summary,
         timeSeries,
         rankings,
@@ -88,6 +89,28 @@ export default function ServiceDashboard() {
                     )}
                 </div>
             </div>
+
+            {/* ── 통계 로드 실패 안내 ──
+                실패를 빈 차트로 두면 "집계가 0건"으로 보여 원인을 찾을 수 없다.
+                권한 문제는 토큰 갱신 재시도까지 소진한 경우이므로 새로고침을 안내한다. */}
+            {loadError && (
+                <div className="glass-card p-5 border border-red-200 dark:border-red-800 bg-red-50/60 dark:bg-red-900/20">
+                    <p className="font-semibold text-red-700 dark:text-red-300 flex items-center gap-2">
+                        <span className="text-xl">⚠️</span> 통계를 불러오지 못했습니다
+                    </p>
+                    <p className="mt-1 text-sm text-red-700/90 dark:text-red-200/90">
+                        {loadError === 'permission'
+                            ? '권한 정보(슈퍼관리자 인증)가 아직 반영되지 않았습니다. 다시 시도하거나 페이지를 새로고침해 주세요.'
+                            : '네트워크 또는 서버 문제로 통계 캐시를 읽지 못했습니다. 잠시 후 다시 시도해 주세요.'}
+                    </p>
+                    <button
+                        onClick={() => actions.loadAllStats(false)}
+                        className="btn-secondary mt-3 text-sm min-h-[48px] px-4"
+                    >
+                        다시 시도
+                    </button>
+                </div>
+            )}
 
             {/* ── 탭 네비게이션 ── */}
             <div className="flex space-x-1 bg-surface-100 dark:bg-surface-800 p-1.5 rounded-xl glass-card overflow-x-auto hide-scrollbar">

@@ -119,6 +119,23 @@ describe('firestore/users', () => {
             expect(fs.doc).toHaveBeenCalledWith(expect.anything(), 'users', 'u1');
             expect(fs.updateDoc).toHaveBeenCalledWith(expect.anything(), { name: '새이름' });
         });
+
+        it('대상 문서가 없으면(not-found) 보고 없이 에러만 재던진다', async () => {
+            // 본인이 기관을 나가면 users 문서가 삭제되므로, 낡은 목록에서 오는 예상된 실패다.
+            const err = Object.assign(new Error('No document to update'), { code: 'not-found' });
+            vi.mocked(fs.updateDoc).mockRejectedValue(err as never);
+
+            await expect(updateUser('u1', { name: '새이름' })).rejects.toThrow('No document to update');
+            expect(captureError).not.toHaveBeenCalled();
+        });
+
+        it('그 외 실패는 예전처럼 captureError로 보고한다', async () => {
+            const err = Object.assign(new Error('denied'), { code: 'permission-denied' });
+            vi.mocked(fs.updateDoc).mockRejectedValue(err as never);
+
+            await expect(updateUser('u1', { name: '새이름' })).rejects.toThrow('denied');
+            expect(captureError).toHaveBeenCalled();
+        });
     });
 
     describe('leaveOrganization', () => {
@@ -142,6 +159,14 @@ describe('firestore/users', () => {
                 expect.anything(),
                 { status: 'active', disabledAt: null },
             );
+        });
+
+        it('대상 문서가 없으면(not-found) 보고 없이 에러만 재던진다', async () => {
+            const err = Object.assign(new Error('No document to update'), { code: 'not-found' });
+            vi.mocked(fs.updateDoc).mockRejectedValue(err as never);
+
+            await expect(restoreUser('u1')).rejects.toThrow('No document to update');
+            expect(captureError).not.toHaveBeenCalled();
         });
     });
 

@@ -12,6 +12,14 @@ interface RetryRunOptions {
     onError?: (err: unknown) => boolean | void;
     /** 실행 타임아웃 (밀리초). 지정하지 않으면 대기(pending)합니다. */
     timeoutMs?: number;
+    /**
+     * Sentry 보고 여부를 호출부가 판단한다. false를 반환하면 보고를 생략한다(기본: 보고).
+     *
+     * **예상된 결과를 걸러내는 용도다.** 서버가 규칙대로 거부한 것(이미 삭제된 대상,
+     * 중복 요청 등)은 코드 결함이 아니라 사용자에게 안내할 상태다. 그런 건까지 error로
+     * 올리면 진짜 실패가 그 사이에 묻힌다. 반대로 판단이 서지 않는 실패는 반드시 보고한다.
+     */
+    shouldReport?: (err: unknown) => boolean;
 }
 
 /**
@@ -76,6 +84,9 @@ export default function useRetry({ maxRetries = 2, retryLabel = '재시도' } = 
             const isTimeoutOrDuplicate = err instanceof Error && (err.message.includes('TIMEOUT') || err.message.includes('중복'));
             if (isTimeoutOrDuplicate) {
                 console.warn(`[useRetry:${key}] ${err.message}`);
+            } else if (opts.shouldReport && !opts.shouldReport(err)) {
+                // 호출부가 예상된 결과로 판정 — 콘솔에는 남기고 Sentry로는 올리지 않는다.
+                console.warn(`[useRetry:${key}] 예상된 실패로 보고를 생략합니다:`, err);
             } else {
                 console.error(`[useRetry:${key}]`, err);
                 captureError(err, { key, retryCount: retryCountRef.current.get(key) || 0, context: 'useRetry' });

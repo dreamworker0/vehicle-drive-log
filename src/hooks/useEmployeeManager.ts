@@ -13,6 +13,24 @@ import type { Organization } from '../types/organization';
 import { captureError } from '../lib/sentry';
 import { APP_URL } from '../lib/constants';
 
+/**
+ * 콜러블이 "대상 사용자 문서가 없다"고 거부한 경우인지 판별한다.
+ *
+ * 직원 목록은 마운트 시 한 번만 읽어 오므로(실시간 구독이 아니다), 화면을 열어 둔 사이에
+ * 직원이 스스로 기관을 탈퇴하거나(users 문서 삭제) 다른 관리자가 계정을 지우면 **이미 사라진
+ * 계정의 행이 남는다.** 그 행에서 비활성화·완전 삭제를 누르면 서버가 규칙대로 not-found로
+ * 거부한다 — 코드 결함이 아니라 목록이 낡았다는 신호다.
+ *
+ * 메시지가 아니라 **코드로 판별한다.** 같은 한국어 문구를 sendAdminNotice는
+ * permission-denied(호출자 문서 없음)로도 던지는데, 그건 성격이 다른 실패라 함께 묶으면
+ * 진짜 문제를 예상된 결과로 오인한다.
+ */
+function isTargetUserMissing(err: unknown): boolean {
+    const code = (err as { code?: unknown })?.code;
+    if (typeof code !== 'string') return false;
+    return code === 'not-found' || code === 'functions/not-found';
+}
+
 export default function useEmployeeManager() {
     const { userData } = useAuth();
     const { showToast } = useToast();
@@ -115,12 +133,44 @@ export default function useEmployeeManager() {
         setEditForm({ name: emp.name || '', email: emp.email || '' });
     };
 
+    /**
+     * 이미 사라진 직원 행에서 실패했을 때의 공통 처리.
+     *
+     * 안내 문구를 띄우고 목록을 다시 읽어 유령 행을 걷어낸다. Sentry 보고도 생략한다 —
+     * 서버가 규칙대로 거부한 예상된 결과이지 코드 결함이 아니다(isTargetUserMissing 주석 참고).
+     *
+     * @param onOtherError not-found가 아닌 실패의 처리. 직접 처리했으면 true를 반환한다.
+     */
+    const staleRowGuard = (onOtherError?: (err: unknown) => boolean | void) => ({
+        shouldReport: (err: unknown) => !isTargetUserMissing(err),
+        onError: (err: unknown) => {
+            if (isTargetUserMissing(err)) {
+                showToast('이미 탈퇴하거나 삭제된 직원입니다. 목록을 새로 고칩니다.', 'warning');
+                fetchData(); // 사라진 행을 목록에서 걷어낸다 — 그대로 두면 같은 실패를 반복한다
+                return true;
+            }
+            return onOtherError?.(err);
+        },
+    });
+
+    /**
+     * 콜러블이 규칙대로 거부한 사유(다른 기관 직원·상위 권한 계정 등)는 서버 문구가 가장
+     * 정확하므로 그대로 보여준다. 네트워크 실패는 useRetry의 재시도 흐름에 맡긴다.
+     */
+    const showServerMessage = (err: unknown) => {
+        const message = err instanceof Error ? err.message : null;
+        if (message && !message.toLowerCase().includes('network')) {
+            showToast(message, 'error');
+            return true;
+        }
+    };
+
     const handleSaveEdit = async (empId: string) => {
         await runWithRetry(`save-edit-${empId}`, async () => {
             await updateUser(empId, { name: editForm.name.trim() });
             setEditingId(null);
             await fetchData();
-        }, { errorMessage: '수정에 실패했습니다.' });
+        }, { errorMessage: '수정에 실패했습니다.', ...staleRowGuard() });
     };
 
     const handleDeleteEmployee = async (emp: User) => {
@@ -146,13 +196,7 @@ export default function useEmployeeManager() {
         }, {
             errorMessage: '비활성화에 실패했습니다.',
             useBackoff: true,
-            onError: (err: unknown) => {
-                const message = err instanceof Error ? err.message : null;
-                if (message && !message.toLowerCase().includes('network')) {
-                    showToast(message, 'error');
-                    return true;
-                }
-            }
+            ...staleRowGuard(showServerMessage),
         });
     };
 
@@ -187,13 +231,7 @@ export default function useEmployeeManager() {
             await fetchData();
         }, {
             errorMessage: '완전 삭제에 실패했습니다.',
-            onError: (err: unknown) => {
-                const message = err instanceof Error ? err.message : null;
-                if (message && !message.toLowerCase().includes('network')) {
-                    showToast(message, 'error');
-                    return true;
-                }
-            }
+            ...staleRowGuard(showServerMessage),
         });
     };
 
@@ -203,7 +241,7 @@ export default function useEmployeeManager() {
             await restoreUser(emp.id);
             showToast('직원이 활성화되었습니다.', 'success');
             await fetchData();
-        }, { errorMessage: '활성화에 실패했습니다.' });
+        }, { errorMessage: '활성화에 실패했습니다.', ...staleRowGuard() });
     };
 
     const handleChangeRole = async (emp: User, newRole: UserRole) => {
@@ -225,7 +263,7 @@ export default function useEmployeeManager() {
         await runWithRetry(`change-role-${emp.id}`, async () => {
             await updateUser(emp.id, { role: newRole });
             await fetchData();
-        }, { errorMessage: '역할 변경에 실패했습니다.' });
+        }, { errorMessage: '역할 변경에 실패했습니다.', ...staleRowGuard() });
     };
 
     const handleDeletePreRegistered = async (preRegId: string) => {

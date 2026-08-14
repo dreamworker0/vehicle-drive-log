@@ -7,6 +7,11 @@ vi.mock('../../hooks/useToast', () => ({
     useToast: () => ({ showToast: mockShowToast }),
 }));
 
+const mockCaptureError = vi.fn();
+vi.mock('../../lib/sentry', () => ({
+    captureError: (...args: unknown[]) => mockCaptureError(...args),
+}));
+
 import useRetry from '../../hooks/useRetry';
 
 describe('useRetry', () => {
@@ -85,6 +90,35 @@ describe('useRetry', () => {
         });
 
         expect(onError).toHaveBeenCalledWith(expect.any(Error));
+    });
+
+    it('shouldReport가 false를 반환하면 Sentry에 보고하지 않는다', async () => {
+        const { result } = renderHook(() => useRetry());
+        const err = Object.assign(new Error('이미 없는 대상'), { code: 'functions/not-found' });
+        const asyncFn = vi.fn().mockRejectedValue(err);
+
+        await act(async () => {
+            await result.current.runWithRetry('test-key', asyncFn, {
+                shouldReport: (e) => (e as { code?: string })?.code !== 'functions/not-found',
+            });
+        });
+
+        expect(mockCaptureError).not.toHaveBeenCalled();
+    });
+
+    it('shouldReport를 주지 않거나 true면 기존대로 Sentry에 보고한다', async () => {
+        const { result } = renderHook(() => useRetry());
+        const asyncFn = vi.fn().mockRejectedValue(new Error('진짜 실패'));
+
+        await act(async () => {
+            await result.current.runWithRetry('report-default', asyncFn);
+        });
+        expect(mockCaptureError).toHaveBeenCalledTimes(1);
+
+        await act(async () => {
+            await result.current.runWithRetry('report-true', asyncFn, { shouldReport: () => true });
+        });
+        expect(mockCaptureError).toHaveBeenCalledTimes(2);
     });
 
     it('resetRetry로 특정 키나 전체 카운터를 초기화한다', async () => {
