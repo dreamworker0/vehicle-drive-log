@@ -132,6 +132,12 @@ firebase functions:log --only ocrDashboard,autoVerifyDocument
   - 한때 이 자리에 "organizations, users, vehicles, driveLogs, reservations, notifications" 6개가
     적혀 있었다. 실제보다 **좁게** 적힌 오기여서, 복구 시 "이 컬렉션은 백업에 없겠구나"라고
     잘못 판단할 수 있었다.
+- **하루 한 번만 건다**: export 전에 오늘 폴더(`backups/firestore/YYYY-MM-DD/`)에 객체가 있는지
+  보고, 있으면 건너뛴다. 배치는 같은 날 두 번 돌 수 있는데(스케줄 함수의 Pub/Sub 전달이
+  at-least-once, `retryCount: 1` 재실행, 수동 재실행) 대상 경로가 날짜로 고정돼 있어 두 번째
+  export가 `3 INVALID_ARGUMENT: Path already exists`로 떨어졌고, 그 실패가 매일 밤 알림으로
+  나갔다(2026-08-15). 중복 사본을 만들지 않는 쪽으로 푼 것은 관리형 export가 전체 문서를 읽어
+  **읽기 비용이 그대로 청구**되기 때문이다.
 - **실패 시**: 백업 스텝이 실패하면 `captureError`가 Sentry·Discord로 알린다. `PERMISSION_DENIED`면
   알림 본문에 원인 판정(IAM)과 조치 명령이 함께 실린다(`describeExportFailure`).
   - ⚠️ **알림이 없다고 백업이 있는 것은 아니다.** 코드는 export를 걸고 "시작됨"만 남긴 뒤 끝난다

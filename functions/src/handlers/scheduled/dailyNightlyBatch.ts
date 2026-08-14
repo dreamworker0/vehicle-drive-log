@@ -58,6 +58,23 @@ export function buildBackupUri(bucketName: string, dateStr: string): string {
     return `gs://${bucketName}/backups/firestore/${dateStr}`;
 }
 
+/** 오늘 백업이 놓이는 버킷 내부 경로(접두사). 존재 확인용이라 끝에 `/`를 붙인다. */
+export function buildBackupPrefix(dateStr: string): string {
+    return `backups/firestore/${dateStr}/`;
+}
+
+/**
+ * "이미 오늘 export가 걸려 있다"는 신호인지 판별한다.
+ *
+ * Firestore export는 `outputUriPrefix`의 마지막 경로 조각으로
+ * `<prefix>/<날짜>.overall_export_metadata`를 만드는데, 그 객체가 이미 있으면 요청 자체를
+ * `3 INVALID_ARGUMENT: Path already exists: ...`로 거절한다. 즉 이 에러는 **실패가 아니라
+ * 같은 날 두 번째 실행**이라는 뜻이다.
+ */
+export function isPathAlreadyExists(e: unknown): boolean {
+    return /Path already exists/i.test((e as { message?: string } | null)?.message ?? "");
+}
+
 /** gRPC PERMISSION_DENIED(코드 7) 판별 */
 function isPermissionDenied(e: unknown): boolean {
     const err = e as { code?: number | string; message?: string } | null;
@@ -100,15 +117,28 @@ export function describeExportFailure(e: unknown, outputUri: string, projectId: 
 
 /**
  * Step 0: Firestore 전체 백업 (기존 backupFirestore 로직 통합)
+ *
+ * **하루에 한 번만 export를 건다.** 이 배치는 하루 한 번 도는 것을 전제로 짜여 있지만 실제로는
+ * 같은 날 두 번 실행될 수 있다 — 스케줄 함수는 Pub/Sub 기반이라 전달이 at-least-once이고,
+ * `retryCount: 1`이 붙어 있어 핸들러가 타임아웃 등으로 던지면 한 번 더 돌며, 운영자가 수동으로
+ * 재실행하기도 한다. 다른 스텝은 두 번 돌아도 문제가 없지만(퍼지·정리·집계는 멱등, 알림은
+ * 발송 여부 플래그로 막힘) export만은 대상 경로가 날짜로 고정돼 있어 두 번째 실행이
+ * `3 INVALID_ARGUMENT: Path already exists`로 떨어졌고, 그 실패가 매일 밤 Sentry·Discord
+ * 알림으로 나갔다(2026-08-15).
+ *
+ * 그래서 오늘 폴더에 이미 무언가 있으면 export를 걸지 않고 넘어간다. 알림을 줄이려는 것만이
+ * 아니다 — 관리형 export는 전체 문서를 읽어 **읽기 비용이 청구**되므로, 같은 날 두 번째 export는
+ * 만들어져도 비용만 두 배가 되는 중복 사본이다.
  */
-async function backupFirestoreData() {
+export async function backupFirestoreData() {
     console.log("[Batch] Starting backupFirestore...");
     const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT;
     const bucketName = resolveBackupBucket(projectId);
+    const backupBucket = getStorage().bucket(bucketName);
 
     // 버킷 부재를 먼저 확인한다. 이 검사가 없으면 export가 PERMISSION_DENIED로 떨어져
     // "권한 문제"로 오독하게 된다 — 실제로 그 오독 때문에 원인 규명이 늦어졌다.
-    const [bucketExists] = await getStorage().bucket(bucketName).exists();
+    const [bucketExists] = await backupBucket.exists();
     if (!bucketExists) {
         throw new Error(
             `백업 버킷 gs://${bucketName} 이(가) 없다. Firestore와 같은 리전(asia-northeast3)에 ` +
@@ -117,7 +147,27 @@ async function backupFirestoreData() {
         );
     }
 
-    const outputUri = buildBackupUri(bucketName, getKSTDateString(new Date()));
+    const dateStr = getKSTDateString(new Date());
+    const outputUri = buildBackupUri(bucketName, dateStr);
+
+    // 완료 표식(`.overall_export_metadata`)만 보지 않고 **접두사 아래 객체 하나라도** 있는지 본다.
+    // 그 표식은 export가 끝날 때 쓰이므로, 앞선 실행이 아직 진행 중이면 표식은 없고 출력 파일만
+    // 쌓여 있는 상태가 된다. 그때도 중복 export를 걸지 않아야 한다. (maxResults: 1 — 목록 1건만)
+    //
+    // 이 확인이 실패하면(예: 런타임 SA의 객체 목록 권한 누락) **백업을 포기하지 않고 그대로 진행한다.**
+    // 중복 방지는 편의고 백업은 본론이다 — 확인 한 번 못 했다고 그날 백업이 통째로 없어지면 안 된다.
+    // 진행했다가 정말 중복이면 아래 catch의 "Path already exists"가 받아낸다.
+    let alreadyBackedUp = false;
+    try {
+        const [existing] = await backupBucket.getFiles({ prefix: buildBackupPrefix(dateStr), maxResults: 1 });
+        alreadyBackedUp = existing.length > 0;
+    } catch (e: unknown) {
+        console.warn(`오늘 백업 존재 확인 실패 — 중복 검사 없이 export를 진행한다: ${(e as Error).message}`);
+    }
+    if (alreadyBackedUp) {
+        console.log(`Firestore backup skipped: ${outputUri} 에 오늘 백업이 이미 있다 (중복 export 방지).`);
+        return;
+    }
 
     const client = new firestoreAdmin.v1.FirestoreAdminClient();
     const databaseName = client.databasePath(projectId, "(default)");
@@ -132,6 +182,12 @@ async function backupFirestoreData() {
         console.log(`Firestore backup started: ${outputUri}`);
         console.log(`Operation: ${response.name}`);
     } catch (e: unknown) {
+        // 위 사전 확인과 이 호출 사이에 다른 실행이 먼저 export를 건 경우(동시 실행 경합).
+        // 백업은 이미 있으므로 실패가 아니다 — 알림으로 올리지 않는다.
+        if (isPathAlreadyExists(e)) {
+            console.log(`Firestore backup skipped: ${outputUri} 에 다른 실행이 이미 export를 걸었다.`);
+            return;
+        }
         // 대상 URI를 에러 메시지에 실어야 Sentry만 보고도 버킷 오지정·위치 불일치·IAM 누락을 구분할 수 있다.
         // PERMISSION_DENIED면 원인이 IAM 하나로 좁혀지므로 조치 명령까지 함께 싣는다.
         throw new Error(describeExportFailure(e, outputUri, projectId, bucketName), { cause: e });
