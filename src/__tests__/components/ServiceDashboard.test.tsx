@@ -160,6 +160,28 @@ describe('ServiceDashboard', () => {
         expect(emptyTexts.length).toBeGreaterThan(0);
     });
 
+    it('통계 로드가 권한 문제로 실패하면 빈 차트가 아니라 원인과 재시도를 안내한다', async () => {
+        const loadAllStats = vi.fn();
+        (useServiceDashboard as ReturnType<typeof vi.fn>).mockReturnValue({
+            ...mockData,
+            loadError: 'permission',
+            actions: { ...mockData.actions, loadAllStats }
+        });
+
+        render(<ServiceDashboard />);
+        expect(await screen.findByText('통계를 불러오지 못했습니다')).toBeInTheDocument();
+        expect(screen.getByText(/권한 정보/)).toBeInTheDocument();
+
+        fireEvent.click(screen.getByText('다시 시도'));
+        expect(loadAllStats).toHaveBeenCalledWith(false);
+    });
+
+    it('정상 로드 시에는 실패 안내를 띄우지 않는다', async () => {
+        render(<ServiceDashboard />);
+        expect(await screen.findByText('서비스 운영 대시보드')).toBeInTheDocument();
+        expect(screen.queryByText('통계를 불러오지 못했습니다')).not.toBeInTheDocument();
+    });
+
     it('기관 활성도 섹션이 렌더링된다', async () => {
         render(<ServiceDashboard />);
         fireEvent.click(screen.getByText('운영 요약'));
