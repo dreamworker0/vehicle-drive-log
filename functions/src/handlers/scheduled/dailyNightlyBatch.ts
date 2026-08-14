@@ -450,7 +450,13 @@ export const dailyNightlyBatch = onSchedule(
         schedule: "0 2 * * *", // KST 02:00 (집계 + 백업 + 야간 배치 통합)
         timeZone: "Asia/Seoul",
         retryCount: 1,
-        memory: "512MiB",
+        // 512MiB로는 부족하다. 2026-08-15 02:00 실행이 백업을 건 직후
+        // `Memory limit of 512 MiB exceeded with 512 MiB used`로 인스턴스째 죽었고,
+        // 그 강제 종료가 retryCount 재실행을 불러 배치가 하루 두 번 돌았다.
+        // 앞선 두 스텝(전 기관 집계 + 대시보드 통계)이 문서 수만 건을 한 프로세스에 올린 상태에서
+        // 백업이 gRPC Admin 클라이언트를 새로 만들며 한도를 넘긴다. 데이터가 늘수록 재발한다.
+        // rules/cloud-functions.md §3.2도 백업·아카이빙 함수는 1GiB로 규정한다 — 그쪽이 맞다.
+        memory: "1GiB",
         timeoutSeconds: 540,
     },
     async function () {
