@@ -133,12 +133,44 @@ export default function useEmployeeManager() {
         setEditForm({ name: emp.name || '', email: emp.email || '' });
     };
 
+    /**
+     * 이미 사라진 직원 행에서 실패했을 때의 공통 처리.
+     *
+     * 안내 문구를 띄우고 목록을 다시 읽어 유령 행을 걷어낸다. Sentry 보고도 생략한다 —
+     * 서버가 규칙대로 거부한 예상된 결과이지 코드 결함이 아니다(isTargetUserMissing 주석 참고).
+     *
+     * @param onOtherError not-found가 아닌 실패의 처리. 직접 처리했으면 true를 반환한다.
+     */
+    const staleRowGuard = (onOtherError?: (err: unknown) => boolean | void) => ({
+        shouldReport: (err: unknown) => !isTargetUserMissing(err),
+        onError: (err: unknown) => {
+            if (isTargetUserMissing(err)) {
+                showToast('이미 탈퇴하거나 삭제된 직원입니다. 목록을 새로 고칩니다.', 'warning');
+                fetchData(); // 사라진 행을 목록에서 걷어낸다 — 그대로 두면 같은 실패를 반복한다
+                return true;
+            }
+            return onOtherError?.(err);
+        },
+    });
+
+    /**
+     * 콜러블이 규칙대로 거부한 사유(다른 기관 직원·상위 권한 계정 등)는 서버 문구가 가장
+     * 정확하므로 그대로 보여준다. 네트워크 실패는 useRetry의 재시도 흐름에 맡긴다.
+     */
+    const showServerMessage = (err: unknown) => {
+        const message = err instanceof Error ? err.message : null;
+        if (message && !message.toLowerCase().includes('network')) {
+            showToast(message, 'error');
+            return true;
+        }
+    };
+
     const handleSaveEdit = async (empId: string) => {
         await runWithRetry(`save-edit-${empId}`, async () => {
             await updateUser(empId, { name: editForm.name.trim() });
             setEditingId(null);
             await fetchData();
-        }, { errorMessage: '수정에 실패했습니다.' });
+        }, { errorMessage: '수정에 실패했습니다.', ...staleRowGuard() });
     };
 
     const handleDeleteEmployee = async (emp: User) => {
@@ -164,19 +196,7 @@ export default function useEmployeeManager() {
         }, {
             errorMessage: '비활성화에 실패했습니다.',
             useBackoff: true,
-            shouldReport: (err) => !isTargetUserMissing(err),
-            onError: (err: unknown) => {
-                if (isTargetUserMissing(err)) {
-                    showToast('이미 탈퇴하거나 삭제된 직원입니다. 목록을 새로 고칩니다.', 'warning');
-                    fetchData(); // 사라진 행을 목록에서 걷어낸다 — 그대로 두면 같은 실패를 반복한다
-                    return true;
-                }
-                const message = err instanceof Error ? err.message : null;
-                if (message && !message.toLowerCase().includes('network')) {
-                    showToast(message, 'error');
-                    return true;
-                }
-            }
+            ...staleRowGuard(showServerMessage),
         });
     };
 
@@ -211,19 +231,7 @@ export default function useEmployeeManager() {
             await fetchData();
         }, {
             errorMessage: '완전 삭제에 실패했습니다.',
-            shouldReport: (err) => !isTargetUserMissing(err),
-            onError: (err: unknown) => {
-                if (isTargetUserMissing(err)) {
-                    showToast('이미 탈퇴하거나 삭제된 직원입니다. 목록을 새로 고칩니다.', 'warning');
-                    fetchData();
-                    return true;
-                }
-                const message = err instanceof Error ? err.message : null;
-                if (message && !message.toLowerCase().includes('network')) {
-                    showToast(message, 'error');
-                    return true;
-                }
-            }
+            ...staleRowGuard(showServerMessage),
         });
     };
 
@@ -233,7 +241,7 @@ export default function useEmployeeManager() {
             await restoreUser(emp.id);
             showToast('직원이 활성화되었습니다.', 'success');
             await fetchData();
-        }, { errorMessage: '활성화에 실패했습니다.' });
+        }, { errorMessage: '활성화에 실패했습니다.', ...staleRowGuard() });
     };
 
     const handleChangeRole = async (emp: User, newRole: UserRole) => {
@@ -255,7 +263,7 @@ export default function useEmployeeManager() {
         await runWithRetry(`change-role-${emp.id}`, async () => {
             await updateUser(emp.id, { role: newRole });
             await fetchData();
-        }, { errorMessage: '역할 변경에 실패했습니다.' });
+        }, { errorMessage: '역할 변경에 실패했습니다.', ...staleRowGuard() });
     };
 
     const handleDeletePreRegistered = async (preRegId: string) => {

@@ -210,6 +210,35 @@ describe('useEmployeeManager', () => {
             await waitFor(() => expect(mockGetOrganizationMembers).toHaveBeenCalledTimes(2));
         });
 
+        it('역할 변경·이름 수정·재활성화도 not-found면 같은 안내와 목록 갱신을 한다', async () => {
+            // Firestore updateDoc은 문서가 없으면 code 'not-found'로 거부한다
+            const fsNotFound = () => Object.assign(new Error('No document to update'), { code: 'not-found' });
+            mockUpdateUser.mockRejectedValue(fsNotFound());
+            mockRestoreUser.mockRejectedValue(fsNotFound());
+
+            const { result } = renderHook(() => useEmployeeManager());
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            for (const run of [
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                () => result.current.handleChangeRole({ id: 'u1', name: '김직원', role: 'employee' } as any, 'admin'),
+                () => result.current.handleSaveEdit('u1'),
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                () => result.current.handleRestoreEmployee({ id: 'u9', name: '퇴사직원' } as any),
+            ]) {
+                mockShowToast.mockClear();
+                await act(async () => { await run(); });
+                expect(mockShowToast).toHaveBeenCalledWith('이미 탈퇴하거나 삭제된 직원입니다. 목록을 새로 고칩니다.', 'warning');
+                // 일반 실패 문구로 덮이지 않는다
+                expect(mockShowToast).not.toHaveBeenCalledWith('역할 변경에 실패했습니다.', 'error');
+                expect(mockShowToast).not.toHaveBeenCalledWith('수정에 실패했습니다.', 'error');
+                expect(mockShowToast).not.toHaveBeenCalledWith('활성화에 실패했습니다.', 'error');
+            }
+
+            // 세 동작 모두 목록을 다시 읽었다 (초기 1회 + 3회)
+            await waitFor(() => expect(mockGetOrganizationMembers).toHaveBeenCalledTimes(4));
+        });
+
         it('not-found가 아닌 거부는 서버 메시지를 그대로 안내한다', async () => {
             mockCallable.mockRejectedValue(
                 Object.assign(new Error('다른 기관의 직원을 비활성화할 수 없습니다.'), { code: 'functions/permission-denied' })

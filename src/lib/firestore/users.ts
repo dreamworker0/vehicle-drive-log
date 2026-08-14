@@ -15,6 +15,25 @@ import { actorStamp } from './actorStamp';
 
 const userConverter = createZodConverter(userSchema);
 
+/**
+ * 갱신 실패를 보고한다 — 단, **대상 문서가 이미 없는 경우(not-found)는 제외**한다.
+ *
+ * users 문서는 본인이 기관을 나가면 삭제된다(leaveOrganization). 관리자·슈퍼관리자 화면의
+ * 목록은 한 번 읽어 온 스냅샷이라, 그 사이 사라진 계정의 행이 남고 거기서 수정·역할 변경·
+ * 재활성화를 누르면 not-found가 온다. **화면이 판단해 안내할 상태이지 코드 결함이 아니다.**
+ *
+ * 코드가 잘못된 id를 넘긴 경우도 같은 코드로 오지만, 그 실패는 화면에서 매번 재현되고
+ * 여기서 삼켜도 콘솔 경고와 호출부의 보고 경로(useRetry의 기본 동작)에 그대로 남는다.
+ * 나머지 코드는 예전처럼 전부 보고한다 — 판단이 서지 않는 실패를 조용히 넘기지 않는다.
+ */
+function reportUnlessMissing(error: unknown, context: Record<string, unknown>) {
+    if ((error as { code?: string })?.code === 'not-found') {
+        console.warn(`[${context.context}] 대상 문서가 이미 없습니다 — 호출부에서 처리합니다.`, context);
+        return;
+    }
+    captureError(error, context);
+}
+
 // 사용자 조회
 export const getUser = async (uid: string) => {
     try {
@@ -64,7 +83,7 @@ export const updateUser = async (uid: string, data: Partial<User>) => {
     try {
         await updateDoc(doc(db, 'users', uid), { ...data, ...actorStamp() });
     } catch (error) {
-        captureError(error, { context: 'updateUser', uid, data });
+        reportUnlessMissing(error, { context: 'updateUser', uid, data });
         throw error;
     }
 };
@@ -134,7 +153,7 @@ export const restoreUser = async (uid: string): Promise<void> => {
     try {
         await updateDoc(doc(db, 'users', uid), { status: 'active', disabledAt: null, ...actorStamp() });
     } catch (error) {
-        captureError(error, { context: 'restoreUser', uid });
+        reportUnlessMissing(error, { context: 'restoreUser', uid });
         throw error;
     }
 };
