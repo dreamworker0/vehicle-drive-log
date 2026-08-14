@@ -166,6 +166,12 @@ Pub/Sub 전달이 at-least-once, `retryCount: 1` 재실행, 운영자의 수동 
 `Starting new instance`와 함께 **배치 전체가 처음부터 다시 돈다**. 정상 종료 로그
 (`[Batch] dailyNightlyBatch completed`)는 1차 실행에 없다.
 
+**어떻게 알게 되나**: OOM은 인스턴스를 통째로 죽이므로 `captureError`가 실행될 기회조차 없다 —
+**Sentry·Discord에 스스로를 신고하지 못한다.** 그래서 재실행이 백업을 건너뛸 때 나가는
+주황색 `⚠️ 야간 배치가 같은 날 두 번 실행됨` 경고가 사실상 **유일한 탐지 수단**이다
+(`warnDuplicateRun`). 이 경고를 노이즈로 보고 지우면 다음 OOM은 아무도 모르는 채
+집계·통계 비용만 두 배로 나간다. 경고를 받으면 여기부터 확인한다.
+
 **원인**: 통합 배치는 전 기관 집계(`dailyAggregation`)와 대시보드 통계
 (`computeAllDashboardStats`)가 문서 수만 건을 **한 프로세스에 올린 상태**로 다음 스텝에 넘어간다.
 그 위에서 백업이 gRPC Admin 클라이언트를 새로 만들며 한도를 넘겼다(2026-08-15, 512MiB).

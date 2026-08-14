@@ -18,7 +18,7 @@ import { getKSTDateString } from "../../utils/kstDate";
 import { runDailyAggregation } from "./dailyAggregation";
 import { computeAllDashboardStats } from "../../services/statistics/computeDashboardStats";
 import { createInAppNotification, sendPushToUser } from "../../services/alimtalk/sendNotification";
-import { captureError } from "../../core/sentry";
+import { captureError, captureWarning } from "../../core/sentry";
 import { gzip } from "node:zlib";
 import { promisify } from "node:util";
 
@@ -116,6 +116,30 @@ export function describeExportFailure(e: unknown, outputUri: string, projectId: 
 }
 
 /**
+ * 백업 스킵을 **경고로 올린다.** 스킵 자체는 정상 동작이지만, 스킵이 일어났다는 사실은
+ * "오늘 배치가 두 번 돌았다"는 뜻이고 그건 정상이 아니다.
+ *
+ * 이 알림이 필요한 이유는 **OOM·타임아웃이 스스로를 신고하지 못하기 때문**이다. 인스턴스가
+ * 통째로 죽으면 `runStep`의 catch도 `captureError`도 실행될 기회가 없어 Sentry·Discord에
+ * 아무것도 남지 않는다. 2026-08-15의 OOM을 우리가 알아챈 유일한 경로는 재실행이 낸
+ * "Path already exists" 오알림이었는데, 그 오알림을 없애면서 **유일한 탐지 수단까지 사라졌다.**
+ * 그 자리를 이 경고가 대신한다 — 없으면 다음 OOM은 아무도 모르는 채 집계·통계 비용만 두 배로 나간다.
+ *
+ * 경고에는 다음 조사 지점을 함께 싣는다. 받는 사람이 문서를 뒤지지 않고 바로 로그를 열 수 있어야 한다.
+ */
+function warnDuplicateRun(reason: string, outputUri: string): void {
+    captureWarning(`야간 배치가 같은 날 두 번 실행됨 — ${reason}`, {
+        context: "dailyNightlyBatch",
+        step: "backupFirestore",
+        outputUri,
+        의미: "백업은 정상. 다만 배치가 오늘 두 번 돌았다는 뜻이라 1차 실행이 끝을 못 봤을 수 있다.",
+        확인: "함수 로그에서 'Memory limit ... exceeded'(OOM) 또는 'finished with status: timeout'을 찾을 것. " +
+            "1차 실행에 '[Batch] dailyNightlyBatch completed'가 없으면 죽은 것이다.",
+        참고: ".agent/skills/troubleshoot-deployment/SKILL.md §2.8",
+    });
+}
+
+/**
  * Step 0: Firestore 전체 백업 (기존 backupFirestore 로직 통합)
  *
  * **하루에 한 번만 export를 건다.** 이 배치는 하루 한 번 도는 것을 전제로 짜여 있지만 실제로는
@@ -166,6 +190,7 @@ export async function backupFirestoreData() {
     }
     if (alreadyBackedUp) {
         console.log(`Firestore backup skipped: ${outputUri} 에 오늘 백업이 이미 있다 (중복 export 방지).`);
+        warnDuplicateRun("오늘 백업이 이미 있어 export를 건너뜀", outputUri);
         return;
     }
 
@@ -186,6 +211,7 @@ export async function backupFirestoreData() {
         // 백업은 이미 있으므로 실패가 아니다 — 알림으로 올리지 않는다.
         if (isPathAlreadyExists(e)) {
             console.log(`Firestore backup skipped: ${outputUri} 에 다른 실행이 이미 export를 걸었다.`);
+            warnDuplicateRun("다른 실행이 이미 export를 걸어 건너뜀", outputUri);
             return;
         }
         // 대상 URI를 에러 메시지에 실어야 Sentry만 보고도 버킷 오지정·위치 불일치·IAM 누락을 구분할 수 있다.

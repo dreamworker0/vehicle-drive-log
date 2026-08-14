@@ -138,6 +138,10 @@ firebase functions:log --only ocrDashboard,autoVerifyDocument
   export가 `3 INVALID_ARGUMENT: Path already exists`로 떨어졌고, 그 실패가 매일 밤 알림으로
   나갔다(2026-08-15). 중복 사본을 만들지 않는 쪽으로 푼 것은 관리형 export가 전체 문서를 읽어
   **읽기 비용이 그대로 청구**되기 때문이다.
+  - 대신 스킵할 때 **주황색 `⚠️ Cloud Functions Warning`**을 보낸다. 백업은 정상이라는 뜻이지만,
+    배치가 하루 두 번 돌았다는 신호이므로 조용히 넘기지 않는다. 원인은 대개 1차 실행이 OOM이나
+    타임아웃으로 죽은 것이다([troubleshoot-deployment §2.8](.agent/skills/troubleshoot-deployment/SKILL.md)).
+    빨간 `🚨 Cloud Functions Exception`과 달리 **즉시 조치가 필요한 장애는 아니다.**
 - **실패 시**: 백업 스텝이 실패하면 `captureError`가 Sentry·Discord로 알린다. `PERMISSION_DENIED`면
   알림 본문에 원인 판정(IAM)과 조치 명령이 함께 실린다(`describeExportFailure`).
   - ⚠️ **알림이 없다고 백업이 있는 것은 아니다.** 코드는 export를 걸고 "시작됨"만 남긴 뒤 끝난다
