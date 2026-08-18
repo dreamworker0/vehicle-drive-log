@@ -184,6 +184,56 @@ describe('handleAssistantMessage', () => {
             expect(mockEstimate).toHaveBeenCalledWith({ address: '서울시 중구', lat: 37.55, lng: 126.97 }, '서울역');
         });
 
+        // 분관 차량은 분관에서 출발한다 — 본관 주소로 계산하면 앱과 다른 종료 시간을 제안하게 된다.
+        it('분관에 세워 둔 차량이면 분관 주소를 출발지로 쓴다', async () => {
+            vehicleDocs = [vehicle('v1', { name: '스타렉스', siteId: 'site_a' })];
+            mockConvoGet.mockResolvedValue({
+                exists: true,
+                data: () => ({
+                    address: '서울시 중구', lat: 37.55, lng: 126.97,
+                    sites: [{ id: 'site_a', name: '제2분관', address: '경기도 분관로 2' }],
+                }),
+            });
+            mockParseIntent.mockResolvedValue({ ...CREATE });
+            mockEstimate.mockResolvedValue(30);
+
+            await handleAssistantMessage('내일 14시 스타렉스로 서울역', ACTOR);
+
+            // 본관 좌표를 끌고 가면 안 된다 — 분관 주소와 짝이 맞지 않는 좌표다
+            expect(mockEstimate).toHaveBeenCalledWith({ address: '경기도 분관로 2' }, '서울역');
+        });
+
+        it('분관에 주소를 안 적었으면 본관 주소·좌표로 되돌아간다', async () => {
+            vehicleDocs = [vehicle('v1', { name: '스타렉스', siteId: 'site_a' })];
+            mockConvoGet.mockResolvedValue({
+                exists: true,
+                data: () => ({
+                    address: '서울시 중구', lat: 37.55, lng: 126.97,
+                    sites: [{ id: 'site_a', name: '제2분관', address: '' }],
+                }),
+            });
+            mockParseIntent.mockResolvedValue({ ...CREATE });
+            mockEstimate.mockResolvedValue(30);
+
+            await handleAssistantMessage('내일 14시 스타렉스로 서울역', ACTOR);
+
+            expect(mockEstimate).toHaveBeenCalledWith({ address: '서울시 중구', lat: 37.55, lng: 126.97 }, '서울역');
+        });
+
+        it('이미 지워진 분관을 가리키는 차량도 본관에서 출발한다', async () => {
+            vehicleDocs = [vehicle('v1', { name: '스타렉스', siteId: 'site_deleted' })];
+            mockConvoGet.mockResolvedValue({
+                exists: true,
+                data: () => ({ address: '서울시 중구', lat: 37.55, lng: 126.97, sites: [] }),
+            });
+            mockParseIntent.mockResolvedValue({ ...CREATE });
+            mockEstimate.mockResolvedValue(30);
+
+            await handleAssistantMessage('내일 14시 스타렉스로 서울역', ACTOR);
+
+            expect(mockEstimate).toHaveBeenCalledWith({ address: '서울시 중구', lat: 37.55, lng: 126.97 }, '서울역');
+        });
+
         it('TMAP 계산 실패면 종료 시간을 되묻고 슬롯을 저장한다', async () => {
             mockConvoGet.mockResolvedValue({ exists: false });
             mockParseIntent.mockResolvedValue({ ...CREATE });
