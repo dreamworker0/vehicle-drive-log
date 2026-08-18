@@ -6,6 +6,7 @@ import { getStorage } from 'firebase/storage';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 import { initializeAppCheck, ReCaptchaV3Provider, onTokenChanged } from 'firebase/app-check';
 import { isInAppBrowser } from './inAppBrowser';
+import { markFirestoreTerminated } from './firestoreLifecycle';
 import { notifyUser } from './notify';
 // firebase/analytics, firebase/messaging은 동적 import (번들 최적화)
 
@@ -317,6 +318,9 @@ export { db };
  * 다중 탭이 캐시를 점유 중이면 실패할 수 있으나, 로그아웃 흐름은 계속 진행한다.
  */
 export async function clearOfflineCache(): Promise<void> {
+    // terminate() 이후 살아남은 타이머·이벤트 핸들러가 새 구독을 걸면 SDK가 동기 throw를 낸다.
+    // 종료를 기다리는 동안에도 이미 종료 의도가 확정이므로 호출 직전에 표시한다.
+    markFirestoreTerminated();
     try {
         await terminate(db);
         await clearIndexedDbPersistence(db);
