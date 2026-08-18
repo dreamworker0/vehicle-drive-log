@@ -126,6 +126,29 @@ describe('스키마가 앱이 실제로 쓰는 필드를 모두 담는다', () =
         expect(result.lng).toBeCloseTo(126.978);
     });
 
+    it('기관: 출발지(분관) 목록이 컨버터를 통과한다', () => {
+        const result = readThrough(organizationSchema, {
+            name: '테스트기관',
+            applicantUid: 'u1',
+            status: 'approved',
+            sites: [{ id: 'site_1', name: '제2분관', address: '서울시 ○○구 ○○로 12' }],
+        });
+
+        expect(result.sites).toEqual([{ id: 'site_1', name: '제2분관', address: '서울시 ○○구 ○○로 12' }]);
+    });
+
+    it('차량: 출발지 지정(siteId)이 컨버터를 통과한다', () => {
+        const result = readThrough(vehicleSchema, {
+            organizationId: 'org1',
+            name: '스타렉스',
+            plateNumber: '12가 3456',
+            currentKm: 1000,
+            siteId: 'site_1',
+        });
+
+        expect(result.siteId).toBe('site_1');
+    });
+
     it('컨버터는 스키마에 없는 키를 조용히 제거한다 — 이 테스트들이 필요한 이유', () => {
         const result = readThrough(userSchema, {
             name: '홍길동',

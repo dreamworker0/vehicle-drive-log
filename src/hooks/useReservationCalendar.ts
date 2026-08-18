@@ -15,7 +15,7 @@ import {
 import type { Reservation } from '../types/reservation';
 
 export default function useReservationCalendar({ isAdmin = false } = {}) {
-    const { user, userData, orgFeatures } = useAuth();
+    const { user, userData, orgFeatures, orgSites } = useAuth();
     const { showToast } = useToast();
     const { confirm } = useConfirm();
 
@@ -55,8 +55,8 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
     } = dataHook;
 
     // ── Route info (tmap debounce, auto end-time) ──
-    const { routeInfo, setRouteInfo, routeLoading, freeRoadRoute, freeRoadLoading, handleFetchFreeRoad } = useRouteInfo({
-        form, setForm, orgAddress, vehicles,
+    const { routeInfo, setRouteInfo, routeLoading, freeRoadRoute, freeRoadLoading, handleFetchFreeRoad, departureSiteName } = useRouteInfo({
+        form, setForm, orgAddress, orgSites, vehicles,
     });
 
     // ── Derived values ──
@@ -118,6 +118,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
         sideTab, setSideTab,
         submitting, editingReservation, editingGroupId, editingRecurringGroupId,
         favorites, routeInfo, routeLoading, freeRoadRoute, freeRoadLoading, handleFetchFreeRoad,
+        departureSiteName,
         showFavSave, setShowFavSave,
         favName, setFavName,
         calendarDays, monthLabel, todayStr,

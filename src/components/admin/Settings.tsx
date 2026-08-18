@@ -12,6 +12,7 @@ import FeedbackForm from '../common/FeedbackForm';
 import UserManual from '../common/UserManual';
 import AskAIModal from '../common/AskAIModal';
 import OrgInfoSection from './settings/OrgInfoSection';
+import OrgSitesSection from './settings/OrgSitesSection';
 import FeatureToggleSection from './settings/FeatureToggleSection';
 import ApprovalLineSection from './settings/ApprovalLineSection';
 import AccountSection from './settings/AccountSection';
@@ -27,6 +28,7 @@ export default function Settings() {
         addingHoliday, publicHolidays,
         filteredCustomHolidays,
         handleSave, handlePhoneChange, handleAddHoliday, handleDeleteHoliday, handleWithdraw,
+        handleAddSite, handleSiteChange, handleRemoveSite, handleSaveSites,
     } = useSettings();
 
     const {
@@ -69,6 +71,16 @@ export default function Settings() {
                 handleSave={handleSave}
                 saving={saving}
                 onRequestFeedback={() => setShowFeedback(true)}
+            />
+
+            {/* 출발지(분관) — 기관 정보 바로 아래. 본관 주소만으로는 분관 차량의 거리가 맞지 않는다 */}
+            <OrgSitesSection
+                form={form}
+                onAddSite={handleAddSite}
+                onSiteChange={handleSiteChange}
+                onRemoveSite={handleRemoveSite}
+                onSaveSites={handleSaveSites}
+                saving={saving}
             />
 
             {/* 기능 사용 설정 */}

@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { resolveOrgSites } from '../../lib/orgSites';
 import { renderHook, act, waitFor } from '@testing-library/react';
 
 // ── Mocks ──
@@ -40,7 +41,7 @@ vi.mock('../../hooks/useDriveLogOcr', () => ({
 
 const mockUser = { uid: 'testUser', displayName: '테스트', email: 'test@test.com' };
 const mockUserData = { organizationId: 'org1', name: '테스트', role: 'employee' };
-const mockAuthReturn = { user: mockUser, userData: mockUserData };
+const mockAuthReturn = { user: mockUser, userData: mockUserData, orgSites: resolveOrgSites(null) };
 vi.mock('../../hooks/useAuth', () => ({
     useAuth: () => mockAuthReturn,
 }));

@@ -85,6 +85,8 @@ export default function DriveLogTableRow({ log, deletingId, onDelete }: DriveLog
                 <div className="flex items-center gap-2 text-xs text-surface-500 dark:text-surface-400">
                     <span>{log.vehicleName}</span>
                     <span>·</span>
+                    {/* 분관을 등록한 기관에서만 값이 있다 — 어디서 출발한 차인지 목록에서 바로 구분된다 */}
+                    {log.startLocation && <span className="text-surface-400 dark:text-surface-500">🚩 {log.startLocation} →</span>}
                     <span>{log.destination || '-'}</span>
                     {(log.startTime || log.endTime) && (
                         <span className="text-surface-400 dark:text-surface-500">({log.startTime || '?'} ~ {log.endTime || '?'})</span>
@@ -114,7 +116,10 @@ export default function DriveLogTableRow({ log, deletingId, onDelete }: DriveLog
                     <p className="text-sm text-surface-700 dark:text-surface-300 truncate">{log.vehicleName}</p>
                 </div>
                 <div className="min-w-0">
-                    <p className="text-sm text-surface-600 dark:text-surface-400 truncate" title={log.destination || ''}>{log.destination || '-'}</p>
+                    <p className="text-sm text-surface-600 dark:text-surface-400 truncate" title={log.startLocation ? `${log.startLocation} → ${log.destination || '-'}` : (log.destination || '')}>
+                        {log.startLocation && <span className="text-xs text-surface-400 dark:text-surface-500">🚩 {log.startLocation} → </span>}
+                        {log.destination || '-'}
+                    </p>
                 </div>
                 <div>
                     <p className="text-xs font-mono text-surface-500 dark:text-surface-400">

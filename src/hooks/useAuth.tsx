@@ -10,6 +10,7 @@ import { setSentryUser } from '../lib/sentry';
 import { useToastStore } from '../store/useToastStore';
 import type { User as UserDoc } from '../types/user';
 import { resolveOrgFeatures, ALL_FEATURES_ON, type OrgFeatures } from '../lib/orgFeatures';
+import { resolveOrgSites, type OrgSite } from '../lib/orgSites';
 
 /**
  * 사용자 Firestore 문서의 로딩 확정 상태.
@@ -31,6 +32,8 @@ interface AuthContextType {
     orgDeleted: boolean;
     /** 기관별 기능 사용 토글(실시간). 기본값 전부 켜짐. */
     orgFeatures: OrgFeatures;
+    /** 기관의 출발지(본관 + 분관, 실시간). 분관을 등록하지 않은 기관은 본관 한 개뿐. */
+    orgSites: OrgSite[];
     /** @deprecated onSnapshot이 자동 처리. 호환성을 위해 유지. */
     refreshUserData: () => Promise<void>;
 }
@@ -43,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [userDocState, setUserDocState] = useState<UserDocState>('pending');
     const [orgDeleted, setOrgDeleted] = useState(false);
     const [orgFeatures, setOrgFeatures] = useState<OrgFeatures>(ALL_FEATURES_ON);
+    const [orgSites, setOrgSites] = useState<OrgSite[]>(() => resolveOrgSites(null));
     const [loading, setLoading] = useState(true);
 
     // Custom Claims 토큰 갱신을 위한 이전 role/orgId 추적
@@ -216,9 +220,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                                                         if (orgSnap.exists()) {
                                                             if (!isSuper) setOrgDeleted(orgSnap.data().status === 'deleted');
                                                             setOrgFeatures(resolveOrgFeatures(orgSnap.data()));
+                                                            setOrgSites(resolveOrgSites(orgSnap.data()));
                                                         } else {
                                                             if (!isSuper) setOrgDeleted(true);
                                                             setOrgFeatures(ALL_FEATURES_ON);
+                                                            setOrgSites(resolveOrgSites(null));
                                                         }
                                                     },
                                                     (err) => {
@@ -386,6 +392,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isSuperAdmin,
         orgDeleted,
         orgFeatures,
+        orgSites,
         refreshUserData,
     };
 
