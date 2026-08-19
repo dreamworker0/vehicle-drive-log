@@ -23,6 +23,15 @@ interface OrgSitesSectionProps {
     saving: boolean;
 }
 
+/**
+ * 본관 줄과 분관 줄은 **같은 행**이다 — 읽기전용 카드 행 패턴(settings-ui §4-2):
+ * 왼쪽 레이블(이름) · 오른쪽 값(주소). 분관만 [수정]·[삭제]가 값 뒤에 붙는다.
+ * `min-h`로 두 줄의 높이를 맞추고, 버튼은 음수 마진으로 행 안에 넣어 48px 터치 영역을
+ * 지키면서도 행이 혼자 두꺼워지지 않게 한다.
+ */
+const ROW = 'flex justify-between items-center gap-3 p-3 min-h-[56px] bg-surface-50 dark:bg-surface-800 rounded-xl';
+const ROW_ACTION = 'flex-shrink-0 -my-2 px-3 min-h-[48px] rounded-lg text-sm font-medium transition-colors';
+
 export default function OrgSitesSection({
     form, onAddSite, onSiteChange, onRemoveSite, onSaveSites, saving,
 }: OrgSitesSectionProps) {
@@ -65,9 +74,9 @@ export default function OrgSitesSection({
             </p>
 
             {/* 본관은 편집 대상이 아니라는 것을 화면으로 보여 준다 */}
-            <div className="flex justify-between items-center p-3 mb-3 bg-surface-50 dark:bg-surface-800 rounded-xl">
-                <span className="text-sm text-surface-500 dark:text-surface-400">본관 (기관 주소)</span>
-                <span className="text-sm text-surface-600 dark:text-surface-300 truncate ml-3">
+            <div className={`${ROW} mb-3`}>
+                <span className="text-sm text-surface-500 dark:text-surface-400 flex-shrink-0">본관 (기관 주소)</span>
+                <span className="text-sm text-surface-600 dark:text-surface-300 text-right break-keep">
                     {form.address || '주소 미입력'}
                 </span>
             </div>
@@ -102,20 +111,18 @@ export default function OrgSitesSection({
                         />
                     </div>
                 ) : (
-                    <div key={site.id} className="flex justify-between items-center gap-3 p-3 bg-surface-50 dark:bg-surface-800 rounded-xl">
-                        <div className="min-w-0">
-                            <p className="text-sm font-medium text-surface-700 dark:text-surface-200 truncate">
-                                {site.name || '이름 없음'}
-                            </p>
-                            <p className="text-xs text-surface-500 dark:text-surface-400 truncate">
+                    <div key={site.id} className={ROW}>
+                        <span className="text-sm text-surface-500 dark:text-surface-400 flex-shrink-0">
+                            {site.name || '이름 없음'}
+                        </span>
+                        <div className="flex items-center gap-1 min-w-0">
+                            <span className="text-sm text-surface-600 dark:text-surface-300 text-right break-keep">
                                 {site.address || '주소 미입력'}
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-1 shrink-0">
+                            </span>
                             <button
                                 type="button"
                                 onClick={() => startEdit(site)}
-                                className="px-3 min-h-[44px] rounded-xl text-sm text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors"
+                                className={`${ROW_ACTION} ml-2 text-primary-600 dark:text-primary-400 hover:bg-primary-100 dark:hover:bg-primary-900/30`}
                                 aria-label={`${site.name || '이름 없는 출발지'} 수정`}
                             >
                                 수정
@@ -123,7 +130,7 @@ export default function OrgSitesSection({
                             <button
                                 type="button"
                                 onClick={() => onRemoveSite(site.id)}
-                                className="px-3 min-h-[44px] rounded-xl text-sm text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors"
+                                className={`${ROW_ACTION} text-red-500 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30`}
                                 aria-label={`${site.name || '이름 없는 출발지'} 삭제`}
                             >
                                 삭제
