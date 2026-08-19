@@ -15,11 +15,13 @@ let vehicleDocs: Array<{ id: string; data: () => Record<string, unknown> }> = []
 const mockConvoGet = jest.fn(async () => ({ exists: false }));
 const mockConvoSet = jest.fn().mockResolvedValue(undefined);
 const mockConvoDelete = jest.fn().mockResolvedValue(undefined);
+/** 차량 컬렉션 쿼리 — 캐시가 실제로 읽기를 줄이는지 세기 위해 하나로 고정한다 */
+const mockVehicleQuery = jest.fn(async () => ({ docs: vehicleDocs }));
 jest.mock('firebase-admin/firestore', () => ({
     getFirestore: () => ({
         collection: jest.fn(() => ({
             where: jest.fn().mockReturnThis(),
-            get: jest.fn(async () => ({ docs: vehicleDocs })),
+            get: mockVehicleQuery,
             doc: jest.fn(() => ({ get: mockConvoGet, set: mockConvoSet, delete: mockConvoDelete })),
         })),
     }),
@@ -78,6 +80,7 @@ jest.mock('../services/tmap/routeEstimate', () => ({
 }));
 
 import { handleAssistantMessage, executeReservationProposal, executeCancelProposal, executeModifyProposal } from "../services/assistant/handleAssistantMessage";
+import { __resetAssistantVehicleCache } from "../services/assistant/vehicleCache";
 
 const ACTOR = { uid: 'user1', orgId: 'org1', displayName: '홍길동' };
 
@@ -88,6 +91,8 @@ function vehicle(id: string, data: Record<string, unknown>) {
 describe('handleAssistantMessage', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        // 캐시가 케이스 사이를 넘어가면 앞 케이스의 차량 목록으로 판정된다
+        __resetAssistantVehicleCache();
         vehicleDocs = [
             vehicle('v1', { name: '스타렉스' }),
             vehicle('v2', { name: '소나타', retired: { isRetired: true } }),
@@ -103,6 +108,72 @@ describe('handleAssistantMessage', () => {
 
         expect(mockBuildSummary).toHaveBeenCalledWith('org1', '2026-07-18');
         expect(result.replyText).toBe('📅 요약');
+        expect(result.proposal).toBeUndefined();
+    });
+
+    // 메시지마다 기관 전 차량을 읽던 자리다. 캐시가 그 반복을 없애는지 직접 센다.
+    describe('차량 목록 캐시', () => {
+        it('같은 기관의 두 번째 메시지는 차량 컬렉션을 다시 읽지 않는다', async () => {
+            mockParseIntent.mockResolvedValue({ intent: 'unknown', needsClarification: false });
+
+            await handleAssistantMessage('안녕', ACTOR);
+            await handleAssistantMessage('안녕', ACTOR);
+            await handleAssistantMessage('안녕', ACTOR);
+
+            // 차량 쿼리는 첫 메시지에서 1회뿐 (나머지는 캐시)
+            expect(mockVehicleQuery).toHaveBeenCalledTimes(1);
+            // 캐시를 타도 차량 목록 자체는 그대로 넘어간다
+            const vehicles = mockParseIntent.mock.calls[2][1] as Array<{ id: string }>;
+            expect(vehicles.map((v) => v.id)).toEqual(['v1', 'v3']);
+        });
+
+        it('캐시를 비우면 다시 읽는다 — 목록 변경이 결국 반영된다', async () => {
+            mockParseIntent.mockResolvedValue({ intent: 'unknown', needsClarification: false });
+
+            await handleAssistantMessage('안녕', ACTOR);
+            __resetAssistantVehicleCache();
+            vehicleDocs = [vehicle('v9', { name: '신규차량' })];
+            await handleAssistantMessage('안녕', ACTOR);
+
+            expect(mockVehicleQuery).toHaveBeenCalledTimes(2);
+            const vehicles = mockParseIntent.mock.calls[1][1] as Array<{ id: string }>;
+            expect(vehicles.map((v) => v.id)).toEqual(['v9']);
+        });
+    });
+
+    // 화면(isVehicleBlocked)은 endDate 당일까지만 막는다. 봇만 플래그를 봐서
+    // 정비가 끝난 차량을 계속 거절하던 자리다.
+    it('정비 종료일이 지난 차량은 차단으로 보지 않는다', async () => {
+        vehicleDocs = [vehicle('v1', {
+            name: '스타렉스',
+            maintenance: { isBlocked: true, endDate: seoulDateStr(-1) },
+        })];
+        mockParseIntent.mockResolvedValue({
+            intent: 'create', needsClarification: false,
+            date: seoulDateStr(1), startTime: '14:00', endTime: '16:00',
+            vehicleId: 'v1', purpose: '', destination: '',
+        });
+
+        const result = await handleAssistantMessage('내일 14~16시 스타렉스', ACTOR);
+
+        expect(result.replyText).not.toContain('정비 중');
+        expect(result.proposal?.vehicleId).toBe('v1');
+    });
+
+    it('정비 종료일이 오늘이면 아직 차단이다', async () => {
+        vehicleDocs = [vehicle('v1', {
+            name: '스타렉스',
+            maintenance: { isBlocked: true, endDate: seoulDateStr(0) },
+        })];
+        mockParseIntent.mockResolvedValue({
+            intent: 'create', needsClarification: false,
+            date: seoulDateStr(1), startTime: '14:00', endTime: '16:00',
+            vehicleId: 'v1', purpose: '', destination: '',
+        });
+
+        const result = await handleAssistantMessage('내일 14~16시 스타렉스', ACTOR);
+
+        expect(result.replyText).toContain('정비 중');
         expect(result.proposal).toBeUndefined();
     });
 

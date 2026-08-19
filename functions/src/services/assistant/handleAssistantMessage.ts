@@ -16,6 +16,8 @@ import { cancelReservationTx } from "../reservation/cancelReservationCore";
 import { modifyReservationTx } from "../reservation/modifyReservationCore";
 import { estimateOneWayDurationMin, calcEndTimeFromDuration, type OriginInput } from "../tmap/routeEstimate";
 import { resolveOrgSites, resolveVehicleSite, MAIN_SITE_ID, type OrgSiteFields } from "../../utils/orgSites";
+import { isVehicleBlockedOn, isVehicleRetired, seoulTodayStr } from "../../utils/vehicleStatus";
+import { getCachedVehicles } from "./vehicleCache";
 
 const db = getFirestore();
 
@@ -199,20 +201,33 @@ export const ASSISTANT_HELP_TEXT =
     "• 자유 질문 — 예: \"홍길동이 예약한 차\", \"이번주 예약 누가 했어\", \"우리 기관 차량 뭐 있어\"";
 
 /** 기관의 예약 가능 차량 목록 조회 (퇴역 차량 제외) */
+/**
+ * 어시스턴트가 쓰는 차량 목록.
+ *
+ * 메시지마다 기관 전 차량을 읽던 자리라 캐시를 앞에 둔다(vehicleCache 주석 참고).
+ * 오래된 목록으로 예약이 새지 않는 이유는 예약 생성 트랜잭션이 차량 문서를 다시 읽어
+ * 퇴역·정비·사용 제한을 재검증하기 때문이다.
+ */
 async function getAssistantVehicles(orgId: string): Promise<AssistantVehicleRow[]> {
-    const snap = await db.collection("vehicles")
-        .where("organizationId", "==", orgId)
-        .get();
+    return getCachedVehicles(orgId, async () => {
+        const snap = await db.collection("vehicles")
+            .where("organizationId", "==", orgId)
+            .get();
 
-    return snap.docs
-        .filter((doc) => doc.data().retired?.isRetired !== true)
-        .map((doc) => ({
-            id: doc.id,
-            name: doc.data().displayName || doc.data().name || "이름 없음",
-            isBlocked: doc.data().maintenance?.isBlocked === true,
-            // 분관에 세워 둔 차량은 그 분관에서 출발한다 — 종료 시간 추정의 출발지가 달라진다
-            siteId: doc.data().siteId as string | undefined,
-        }));
+        // 정비 판정은 화면·예약 트랜잭션과 같은 규칙을 쓴다(shared/vehicleStatus).
+        // 예전에는 `isBlocked` 플래그만 봐서, 정비 종료일이 지났는데 플래그가 남은 차량을
+        // 화면에서는 예약할 수 있는데 봇만 계속 막았다.
+        const today = seoulTodayStr();
+        return snap.docs
+            .filter((doc) => !isVehicleRetired(doc.data().retired))
+            .map((doc) => ({
+                id: doc.id,
+                name: doc.data().displayName || doc.data().name || "이름 없음",
+                isBlocked: isVehicleBlockedOn(doc.data().maintenance, today),
+                // 분관에 세워 둔 차량은 그 분관에서 출발한다 — 종료 시간 추정의 출발지가 달라진다
+                siteId: doc.data().siteId as string | undefined,
+            }));
+    });
 }
 
 /**
