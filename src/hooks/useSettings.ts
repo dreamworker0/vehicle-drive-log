@@ -56,6 +56,13 @@ export default function useSettings() {
     const [org, setOrg] = useState<Organization | null>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+    /**
+     * 출발지 카드 전용 저장 상태.
+     *
+     * 기관 정보 카드와 `saving`을 공유했더니 출발지를 저장할 때 **위쪽 [변경사항 저장]
+     * 버튼이 대신 돌았다** — 누른 자리에는 아무 반응이 없고 엉뚱한 버튼이 반응하는 상태였다.
+     */
+    const [savingSites, setSavingSites] = useState(false);
     const [success, setSuccess] = useState(false);
     const [withdrawing, setWithdrawing] = useState(false);
     const [form, setForm] = useState<SettingsForm>({
@@ -305,19 +312,45 @@ export default function useSettings() {
         }));
     }, []);
 
+    /**
+     * 출발지 목록을 저장한다.
+     *
+     * 기관 정보 폼(handleSave)에 얹지 않고 따로 두는 이유는 **피드백이 누른 자리에 있어야**
+     * 하기 때문이다. handleSave는 페이지 최상단 배너로만 성공을 알리는데, 출발지 카드는
+     * 스크롤을 내려야 보이는 위치라 모바일에서는 사실상 아무 반응이 없다. 여기서는 토스트로
+     * 알리고, 실패하면 화면의 목록을 이전 값으로 되돌린다.
+     */
+    const persistSites = async (next: OrgSite[], successMessage: string) => {
+        if (!orgId) return;
+        const prevSites = form.sites;
+        setSavingSites(true);
+        setForm(prev => ({ ...prev, sites: next }));
+        try {
+            await updateOrganization(orgId, { sites: next });
+            showToast(successMessage, 'success');
+        } catch (err) {
+            console.error('출발지 저장 실패:', err);
+            // 저장이 안 됐는데 화면만 바뀐 채로 두면, 새로고침에서 되살아나 사용자를 속인다.
+            setForm(prev => ({ ...prev, sites: prevSites }));
+            showToast('출발지 저장에 실패했습니다.', 'error');
+        } finally {
+            setSavingSites(false);
+        }
+    };
+
     /** 저장까지 함께 한다 — 삭제만 로컬에 남으면 새로고침에 되살아나 지운 줄 알았던 출발지가 돌아온다. */
     const handleRemoveSite = async (id: string) => {
         const target = form.sites.find(site => site.id === id);
-        // 저장 전에 추가만 해 둔 빈 줄은 확인 없이 지운다.
-        if (target && (target.name.trim() || target.address.trim())) {
-            if (!await confirm({
-                message: '이 출발지를 삭제하시겠습니까?\n이 출발지로 지정된 차량은 본관에서 출발하는 것으로 되돌아갑니다.',
-                confirmColor: 'danger',
-            })) return;
+        // 저장 전에 추가만 해 둔 빈 줄은 확인 없이 지운다(저장도 필요 없다).
+        if (!target || (!target.name.trim() && !target.address.trim())) {
+            setForm(prev => ({ ...prev, sites: prev.sites.filter(site => site.id !== id) }));
+            return;
         }
-        const next = form.sites.filter(site => site.id !== id);
-        setForm(prev => ({ ...prev, sites: next }));
-        await handleSave(null, { sites: next });
+        if (!await confirm({
+            message: '이 출발지를 삭제하시겠습니까?\n이 출발지로 지정된 차량은 본관에서 출발하는 것으로 되돌아갑니다.',
+            confirmColor: 'danger',
+        })) return;
+        await persistSites(form.sites.filter(site => site.id !== id), '출발지를 삭제했습니다.');
     };
 
     const handleSaveSites = async () => {
@@ -328,12 +361,11 @@ export default function useSettings() {
             showToast('출발지 이름을 입력해주세요.', 'warning');
             return;
         }
-        setForm(prev => ({ ...prev, sites: cleaned }));
-        await handleSave(null, { sites: cleaned });
+        await persistSites(cleaned, '출발지를 저장했습니다.');
     };
 
     return {
-        org, orgId, loading, saving, success, withdrawing,
+        org, orgId, loading, saving, savingSites, success, withdrawing,
         form, setForm,
         // 공휴일
         holidayYear, setHolidayYear,

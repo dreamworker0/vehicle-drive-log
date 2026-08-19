@@ -150,3 +150,73 @@ describe('useSettings', () => {
         expect(mockShowToast).toHaveBeenCalledWith('저장에 실패했습니다.', 'error');
     });
 });
+
+describe('useSettings — 출발지(분관) 저장', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('추가한 출발지를 저장하면 updateOrganization에 sites가 실린다', async () => {
+        const { result } = renderHook(() => useSettings());
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        act(() => { result.current.handleAddSite(); });
+        const id = result.current.form.sites[0].id;
+        act(() => { result.current.handleSiteChange(id, { name: '제2분관', address: '경기도 분관로 2' }); });
+
+        await act(async () => { await result.current.handleSaveSites(); });
+
+        expect(updateOrganization).toHaveBeenCalledWith('org-1', {
+            sites: [{ id, name: '제2분관', address: '경기도 분관로 2' }],
+        });
+    });
+
+    // 출발지 카드는 스크롤을 내려야 보이는 자리다. 최상단 배너로만 알리면 누른 자리에는
+    // 아무 반응이 없고, 공유 상태를 쓰면 위쪽 [변경사항 저장] 버튼이 대신 돈다.
+    it('저장 성공을 토스트로 알린다 (배너는 화면 밖이다)', async () => {
+        const { result } = renderHook(() => useSettings());
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        act(() => { result.current.handleAddSite(); });
+        const id = result.current.form.sites[0].id;
+        act(() => { result.current.handleSiteChange(id, { name: '제2분관' }); });
+
+        await act(async () => { await result.current.handleSaveSites(); });
+
+        expect(mockShowToast).toHaveBeenCalledWith('출발지를 저장했습니다.', 'success');
+        // 기관 정보 카드의 저장 상태는 건드리지 않는다
+        expect(result.current.saving).toBe(false);
+        expect(result.current.savingSites).toBe(false);
+    });
+
+    it('삭제가 실패하면 지운 출발지를 목록에 되돌린다', async () => {
+        const { result } = renderHook(() => useSettings());
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        act(() => { result.current.handleAddSite(); });
+        const id = result.current.form.sites[0].id;
+        act(() => { result.current.handleSiteChange(id, { name: '제2분관', address: '경기도 분관로 2' }); });
+        await act(async () => { await result.current.handleSaveSites(); });
+
+        vi.mocked(updateOrganization).mockRejectedValueOnce(new Error('permission-denied'));
+        await act(async () => { await result.current.handleRemoveSite(id); });
+
+        // 서버에서 안 지워졌는데 화면에서만 사라지면, 새로고침에 되살아나 사용자를 속인다
+        expect(result.current.form.sites).toEqual([{ id, name: '제2분관', address: '경기도 분관로 2' }]);
+        expect(mockShowToast).toHaveBeenCalledWith('출발지 저장에 실패했습니다.', 'error');
+    });
+
+    it('이름 없이 주소만 있으면 저장하지 않고 안내한다', async () => {
+        const { result } = renderHook(() => useSettings());
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        act(() => { result.current.handleAddSite(); });
+        const id = result.current.form.sites[0].id;
+        act(() => { result.current.handleSiteChange(id, { address: '주소만 입력' }); });
+
+        await act(async () => { await result.current.handleSaveSites(); });
+
+        expect(updateOrganization).not.toHaveBeenCalled();
+        expect(mockShowToast).toHaveBeenCalledWith('출발지 이름을 입력해주세요.', 'warning');
+    });
+});
