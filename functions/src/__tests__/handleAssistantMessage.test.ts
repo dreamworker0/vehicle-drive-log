@@ -305,6 +305,79 @@ describe('handleAssistantMessage', () => {
             expect(mockEstimate).toHaveBeenCalledWith({ address: '서울시 중구', lat: 37.55, lng: 126.97 }, '서울역');
         });
 
+        // 확인 메시지는 "이 차를 어디서 타는가"까지 보여 줘야 분관 기관에서 오해가 없다.
+        it('분관 차량이면 확인 메시지에 출발지를 적는다', async () => {
+            vehicleDocs = [vehicle('v1', { name: '스타렉스', siteId: 'site_a' })];
+            mockConvoGet.mockResolvedValue({
+                exists: true,
+                data: () => ({
+                    address: '서울시 중구', lat: 37.55, lng: 126.97,
+                    sites: [{ id: 'site_a', name: '제2분관', address: '경기도 분관로 2' }],
+                }),
+            });
+            mockParseIntent.mockResolvedValue({ ...CREATE });
+            mockEstimate.mockResolvedValue(30);
+
+            const result = await handleAssistantMessage('내일 14시 스타렉스로 서울역', ACTOR);
+
+            expect(result.proposal?.startLocation).toBe('제2분관');
+            expect(result.replyText).toContain('🚩 출발: 제2분관');
+            // 차량 바로 다음 줄에 온다 — "어느 차를 어디서 타는가"가 한 덩어리로 읽혀야 한다
+            const lines = result.replyText.split('\n');
+            expect(lines[1]).toContain('스타렉스');
+            expect(lines[2]).toBe('🚩 출발: 제2분관');
+        });
+
+        it('분관이 없는 기관의 확인 메시지에는 출발지 줄이 없다', async () => {
+            mockConvoGet.mockResolvedValue({
+                exists: true,
+                data: () => ({ address: '서울시 중구', lat: 37.55, lng: 126.97 }),
+            });
+            mockParseIntent.mockResolvedValue({ ...CREATE });
+            mockEstimate.mockResolvedValue(30);
+
+            const result = await handleAssistantMessage('내일 14시 스타렉스로 서울역', ACTOR);
+
+            expect(result.proposal?.startLocation).toBeUndefined();
+            expect(result.replyText).not.toContain('출발:');
+        });
+
+        it('종료 시간을 직접 줘도 출발지는 표시한다 (TMAP은 부르지 않는다)', async () => {
+            vehicleDocs = [vehicle('v1', { name: '스타렉스', siteId: 'site_a' })];
+            mockConvoGet.mockResolvedValue({
+                exists: true,
+                data: () => ({
+                    address: '서울시 중구',
+                    sites: [{ id: 'site_a', name: '제2분관', address: '경기도 분관로 2' }],
+                }),
+            });
+            mockParseIntent.mockResolvedValue({ ...CREATE, endTime: '16:00' });
+
+            const result = await handleAssistantMessage('내일 14~16시 스타렉스로 서울역', ACTOR);
+
+            expect(mockEstimate).not.toHaveBeenCalled();
+            expect(result.replyText).toContain('🚩 출발: 제2분관');
+        });
+
+        it('분관 주소가 비어 본관으로 계산해도 이름은 그 분관으로 보여 준다', async () => {
+            vehicleDocs = [vehicle('v1', { name: '스타렉스', siteId: 'site_a' })];
+            mockConvoGet.mockResolvedValue({
+                exists: true,
+                data: () => ({
+                    address: '서울시 중구', lat: 37.55, lng: 126.97,
+                    sites: [{ id: 'site_a', name: '제2분관', address: '' }],
+                }),
+            });
+            mockParseIntent.mockResolvedValue({ ...CREATE });
+            mockEstimate.mockResolvedValue(30);
+
+            const result = await handleAssistantMessage('내일 14시 스타렉스로 서울역', ACTOR);
+
+            // 계산은 본관 주소로 대신하지만, 사용자가 아는 것은 "그 차가 어디 서 있는가"다
+            expect(mockEstimate).toHaveBeenCalledWith({ address: '서울시 중구', lat: 37.55, lng: 126.97 }, '서울역');
+            expect(result.replyText).toContain('🚩 출발: 제2분관');
+        });
+
         it('TMAP 계산 실패면 종료 시간을 되묻고 슬롯을 저장한다', async () => {
             mockConvoGet.mockResolvedValue({ exists: false });
             mockParseIntent.mockResolvedValue({ ...CREATE });
