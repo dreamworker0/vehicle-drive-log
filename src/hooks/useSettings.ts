@@ -298,11 +298,14 @@ export default function useSettings() {
 
     // ── 출발지(분관) 관리 ─────────────────────────────────────────
     // 본관은 목록에 없다 — 기관 주소가 곧 본관이고 증빙서류에서 온 값이라 여기서 고치지 않는다.
+    /** 새 줄의 id를 돌려준다 — 화면이 그 줄만 편집 상태로 열기 위해 필요하다. */
     const handleAddSite = useCallback(() => {
+        const id = createSiteId();
         setForm(prev => ({
             ...prev,
-            sites: [...prev.sites, { id: createSiteId(), name: '', address: '' }],
+            sites: [...prev.sites, { id, name: '', address: '' }],
         }));
+        return id;
     }, []);
 
     const handleSiteChange = useCallback((id: string, patch: Partial<Omit<OrgSite, 'id'>>) => {
@@ -320,19 +323,21 @@ export default function useSettings() {
      * 스크롤을 내려야 보이는 위치라 모바일에서는 사실상 아무 반응이 없다. 여기서는 토스트로
      * 알리고, 실패하면 화면의 목록을 이전 값으로 되돌린다.
      */
-    const persistSites = async (next: OrgSite[], successMessage: string) => {
-        if (!orgId) return;
+    const persistSites = async (next: OrgSite[], successMessage: string): Promise<boolean> => {
+        if (!orgId) return false;
         const prevSites = form.sites;
         setSavingSites(true);
         setForm(prev => ({ ...prev, sites: next }));
         try {
             await updateOrganization(orgId, { sites: next });
             showToast(successMessage, 'success');
+            return true;
         } catch (err) {
             console.error('출발지 저장 실패:', err);
             // 저장이 안 됐는데 화면만 바뀐 채로 두면, 새로고침에서 되살아나 사용자를 속인다.
             setForm(prev => ({ ...prev, sites: prevSites }));
             showToast('출발지 저장에 실패했습니다.', 'error');
+            return false;
         } finally {
             setSavingSites(false);
         }
@@ -353,15 +358,16 @@ export default function useSettings() {
         await persistSites(form.sites.filter(site => site.id !== id), '출발지를 삭제했습니다.');
     };
 
-    const handleSaveSites = async () => {
+    /** 저장에 성공했는지 돌려준다 — 화면은 이 값으로 편집칸을 접을지 정한다. */
+    const handleSaveSites = async (): Promise<boolean> => {
         const cleaned = form.sites
             .map(site => ({ id: site.id, name: site.name.trim(), address: site.address.trim() }))
             .filter(site => site.name || site.address);
         if (cleaned.some(site => !site.name)) {
             showToast('출발지 이름을 입력해주세요.', 'warning');
-            return;
+            return false;
         }
-        await persistSites(cleaned, '출발지를 저장했습니다.');
+        return persistSites(cleaned, '출발지를 저장했습니다.');
     };
 
     return {
