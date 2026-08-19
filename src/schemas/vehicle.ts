@@ -57,6 +57,11 @@ export const vehicleSchema = z.object({
     googleCalendarId: z.string().optional().nullable().catch(null),
     calendarSyncFailCount: z.coerce.number().optional().catch(0),
     calendarSyncLastFailAt: timestampSchema.optional().catch(undefined),
+    /**
+     * 차량이 서 있는 출발지(차고지) id — `organization.sites[].id`.
+     * 미설정·빈 값이면 본관(기관 주소)에서 출발하는 것으로 본다.
+     */
+    siteId: z.string().optional().catch(undefined),
     /** 사용 가능 직원 uid 목록. undefined 또는 빈 배열 = 전체 허용 */
     allowedUserIds: z.array(z.string()).optional().catch(undefined),
     retired: vehicleRetiredSchema.nullable().optional().catch(null),

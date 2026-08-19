@@ -26,6 +26,7 @@ function baseForm(overrides: Partial<SettingsForm> = {}): SettingsForm {
     reservationPassengerEnabled: false,
         driverAllowList: true,
         driverAllowSearch: true,
+        sites: [],
         ...overrides,
     };
 }

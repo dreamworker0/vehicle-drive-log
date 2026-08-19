@@ -30,6 +30,8 @@ interface ExcelDriveLog {
     departureTime?: string;
     arrivalTime?: string;
     destination?: string;
+    /** 출발지 이름 — 분관을 등록한 기관의 기록에만 있다 */
+    startLocation?: string;
     purpose?: string;
     departureKm?: number;
     arrivalKm?: number;
@@ -51,6 +53,9 @@ export async function downloadDriveLogsExcel(logs: ExcelDriveLog[], filename = '
         return false;
     }
 
+    // 출발지 열은 **기록에 있을 때만** 넣는다 — 분관을 쓰지 않는 기관의 파일은 예전 그대로다.
+    const includeStartLocation = logs.some(log => (log.startLocation || '').trim() !== '');
+
     // xlsx 라이브러리 동적 로드
     const XLSX = await import('xlsx');
 
@@ -64,6 +69,7 @@ export async function downloadDriveLogsExcel(logs: ExcelDriveLog[], filename = '
             '도착시각': resolveEndTime(log),
             '운전자': log.driverName || '',
             '차량': log.vehicleDisplayName || log.vehicleName || '',
+            ...(includeStartLocation ? { '출발지': log.startLocation || '' } : {}),
             '목적지': log.destination || '',
             '사용목적': log.purpose || '',
             '출발Km': resolveStartKm(log) ?? '',
@@ -101,6 +107,7 @@ export async function downloadDriveLogsExcel(logs: ExcelDriveLog[], filename = '
         { wch: 6 },   // 도착시각
         { wch: 10 },  // 운전자
         { wch: 14 },  // 차량
+        ...(includeStartLocation ? [{ wch: 14 }] : []),  // 출발지
         { wch: 28 },  // 목적지
         { wch: 22 },  // 사용목적
         { wch: 8 },   // 출발Km

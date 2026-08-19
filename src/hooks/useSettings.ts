@@ -12,6 +12,7 @@ import { fetchPublicHolidays, groupHolidaysByMonth } from '../lib/holidayApi';
 import { formatDateKr } from '../lib/dateUtils';
 import { formatPhoneNumber } from './useOrgApplication';
 import { resolveOrgFeatures } from '../lib/orgFeatures';
+import { createSiteId, type OrgSite } from '../lib/orgSites';
 import type { Organization, WithdrawReason } from '../types/organization';
 import type { CustomHoliday } from '../types/holiday';
 
@@ -39,6 +40,8 @@ export interface SettingsForm {
     reservationPassengerEnabled: boolean;
     driverAllowList: boolean;
     driverAllowSearch: boolean;
+    /** 분관·별관 등 추가 출발지(차고지). 본관(기관 주소)은 포함하지 않는다. */
+    sites: OrgSite[];
 }
 
 interface HolidayForm {
@@ -77,6 +80,7 @@ export default function useSettings() {
         reservationPassengerEnabled: false,
         driverAllowList: true,
         driverAllowSearch: true,
+        sites: [],
     });
 
     // 공휴일 관리 상태
@@ -124,6 +128,7 @@ export default function useSettings() {
                         reservationPassengerEnabled: features.reservationPassenger,
                         driverAllowList: features.driverAllowList,
                         driverAllowSearch: features.driverAllowSearch,
+                        sites: orgData.sites ? orgData.sites.map(site => ({ ...site })) : [],
                     });
                 }
                 setCustomHolidays(holidays as CustomHoliday[]);
@@ -201,6 +206,7 @@ export default function useSettings() {
                     reservationPassengerEnabled: targetData.reservationPassengerEnabled,
                     driverAllowList: targetData.driverAllowList,
                     driverAllowSearch: targetData.driverAllowSearch,
+                    sites: targetData.sites,
                 });
             }
             setSuccess(true);
@@ -283,6 +289,49 @@ export default function useSettings() {
         }
     };
 
+    // ── 출발지(분관) 관리 ─────────────────────────────────────────
+    // 본관은 목록에 없다 — 기관 주소가 곧 본관이고 증빙서류에서 온 값이라 여기서 고치지 않는다.
+    const handleAddSite = useCallback(() => {
+        setForm(prev => ({
+            ...prev,
+            sites: [...prev.sites, { id: createSiteId(), name: '', address: '' }],
+        }));
+    }, []);
+
+    const handleSiteChange = useCallback((id: string, patch: Partial<Omit<OrgSite, 'id'>>) => {
+        setForm(prev => ({
+            ...prev,
+            sites: prev.sites.map(site => site.id === id ? { ...site, ...patch } : site),
+        }));
+    }, []);
+
+    /** 저장까지 함께 한다 — 삭제만 로컬에 남으면 새로고침에 되살아나 지운 줄 알았던 출발지가 돌아온다. */
+    const handleRemoveSite = async (id: string) => {
+        const target = form.sites.find(site => site.id === id);
+        // 저장 전에 추가만 해 둔 빈 줄은 확인 없이 지운다.
+        if (target && (target.name.trim() || target.address.trim())) {
+            if (!await confirm({
+                message: '이 출발지를 삭제하시겠습니까?\n이 출발지로 지정된 차량은 본관에서 출발하는 것으로 되돌아갑니다.',
+                confirmColor: 'danger',
+            })) return;
+        }
+        const next = form.sites.filter(site => site.id !== id);
+        setForm(prev => ({ ...prev, sites: next }));
+        await handleSave(null, { sites: next });
+    };
+
+    const handleSaveSites = async () => {
+        const cleaned = form.sites
+            .map(site => ({ id: site.id, name: site.name.trim(), address: site.address.trim() }))
+            .filter(site => site.name || site.address);
+        if (cleaned.some(site => !site.name)) {
+            showToast('출발지 이름을 입력해주세요.', 'warning');
+            return;
+        }
+        setForm(prev => ({ ...prev, sites: cleaned }));
+        await handleSave(null, { sites: cleaned });
+    };
+
     return {
         org, orgId, loading, saving, success, withdrawing,
         form, setForm,
@@ -294,6 +343,8 @@ export default function useSettings() {
         // 핸들러
         handleSave, handleRegenCode, handlePhoneChange, handleWithdraw,
         handleAddHoliday, handleDeleteHoliday,
+        // 출발지(분관)
+        handleAddSite, handleSiteChange, handleRemoveSite, handleSaveSites,
         formatDate: formatDateKr,
     };
 }
