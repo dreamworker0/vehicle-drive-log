@@ -21,7 +21,7 @@ import SlackIntegrationSection from './settings/SlackIntegrationSection';
 export default function Settings() {
     const navigate = useNavigate();
     const {
-        org, orgId, loading, saving, success, withdrawing,
+        org, orgId, loading, saving, savingSites, success, withdrawing,
         form, setForm,
         holidayYear, setHolidayYear,
         holidayForm, setHolidayForm,
@@ -80,7 +80,7 @@ export default function Settings() {
                 onSiteChange={handleSiteChange}
                 onRemoveSite={handleRemoveSite}
                 onSaveSites={handleSaveSites}
-                saving={saving}
+                saving={savingSites}
             />
 
             {/* 기능 사용 설정 */}
