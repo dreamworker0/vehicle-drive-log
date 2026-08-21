@@ -9,6 +9,7 @@ import type { User } from '../../types/user';
 import { FUEL_TYPES } from '../../types/vehicle';
 import VehicleCalendarSection from './VehicleCalendarSection';
 import { useAuth } from '../../hooks/useAuth';
+import { hasBranchSites, MAIN_SITE_ID } from '../../lib/orgSites';
 import { stripNegative } from '../../hooks/utils/numberValidation';
 
 interface VehicleFormData {
@@ -23,6 +24,8 @@ interface VehicleFormData {
     insurancePhone: string;
     insuranceExpiryDate: string;
     allowedUserIds: string[];
+    /** 출발지(차고지) id. 빈 값 = 본관 */
+    siteId: string;
 }
 
 interface Props {
@@ -81,7 +84,9 @@ export default function VehicleForm({
     onSubmit, onCancel, onModelNameChange, modelSuggestions,
     members, onCalendarTestResult, initialCalendarError,
 }: Props) {
-    const { orgFeatures } = useAuth();
+    const { orgFeatures, orgSites } = useAuth();
+    // 분관을 등록하지 않은 기관에는 고를 것이 없다 — 선택지 하나짜리 UI를 띄우지 않는다.
+    const showSiteSelect = hasBranchSites(orgSites);
     const toggleAllowedUser = (uid: string) => {
         setForm(prev => ({
             ...prev,
@@ -272,6 +277,31 @@ export default function VehicleForm({
                             ))}
                         </div>
                     </div>
+                    {showSiteSelect && (
+                    <div>
+                        <label className="label">출발지</label>
+                        <div className="grid grid-cols-2 gap-2">
+                            {orgSites.map(site => {
+                                const selected = (form.siteId || MAIN_SITE_ID) === site.id;
+                                return (
+                                    <button
+                                        key={site.id} type="button"
+                                        onClick={() => setForm({ ...form, siteId: site.id === MAIN_SITE_ID ? '' : site.id })}
+                                        className={`px-3 py-2.5 min-h-[48px] rounded-xl text-sm font-medium border transition-all ${selected
+                                            ? 'border-primary-500 bg-primary-50 text-primary-700 dark:bg-primary-900/30 dark:text-primary-300 dark:border-primary-400'
+                                            : 'border-surface-200 dark:border-surface-600 text-surface-500 dark:text-surface-400 hover:border-surface-300 dark:hover:border-surface-500'
+                                            }`}
+                                    >
+                                        {site.name}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
+                            이 차량이 세워져 있는 곳 · 예약·바로 운행의 거리와 소요시간이 이 주소에서 출발하는 기준으로 계산됩니다
+                        </p>
+                    </div>
+                    )}
                     <div>
                         <label className="label">현재 누적 km</label>
                         <input

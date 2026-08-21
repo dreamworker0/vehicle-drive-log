@@ -21,11 +21,12 @@ import type { DriveLog } from '../types/driveLog';
 export type { DriveLogForm, LocationState };
 
 // 하이 레벨에서 분리된 훅들 임포트
+import { resolveStartLocationLabel } from '../lib/orgSites';
 import { useDriveLogInitializer } from './driveLogForm/useDriveLogInitializer';
 import { useDriveLogSubmit } from './driveLogForm/useDriveLogSubmit';
 
 export default function useDriveLogForm() {
-    const { user, userData } = useAuth();
+    const { user, userData, orgSites } = useAuth();
     const location = useLocation();
     const { showToast } = useToast();
     const { runWithRetry } = useRetry();
@@ -165,7 +166,8 @@ export default function useDriveLogForm() {
         setFavorites, setShowFavSave, setFavName, setSuccess,
         isElectric, isRetroactive, isEditMode, editLog, reservationData, hipassCard, favName,
         showToast, runWithRetry, startTransition, ocrSuccess: ocr.ocrSuccess,
-        lastDriveLog, nextDriveLog, setLastDriveLog
+        lastDriveLog, nextDriveLog, setLastDriveLog,
+        startLocation: resolveStartLocationLabel(orgSites, selectedVehicle),
     });
 
     // ── 공개 API ──────────────────────────────────────────────────

@@ -20,7 +20,7 @@ export default function QuickDriveStart() {
         form, setForm,
         vehicles, favorites, members,
         loading, submitting,
-        routeInfo, routeLoading,
+        routeInfo, routeLoading, departureSiteName,
         freeRoadRoute, freeRoadLoading, handleFetchFreeRoad,
         handleVehicleSelect,
         handleDestinationChange,
@@ -88,6 +88,7 @@ export default function QuickDriveStart() {
                             freeRoadRoute={freeRoadRoute}
                             freeRoadLoading={freeRoadLoading}
                             onFetchFreeRoad={handleFetchFreeRoad}
+                            departureSiteName={departureSiteName}
                         />
                     </div>
 

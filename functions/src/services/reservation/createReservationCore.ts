@@ -4,6 +4,7 @@
  * createReservationSafe 콜러블에서 추출한 트랜잭션 본문.
  * 호출 경로(콜러블·Slack 어시스턴트 등)와 무관하게 동일한 검증을 강제한다:
  *   - 조직 격리 (actorOrgId === organizationId, 차량 문서 org 일치)
+ *   - 차량 상태 (퇴역·정비 차단)
  *   - 차량별 사용 가능 직원 제한 (allowedUserIds)
  *   - 차량 문서 잠금(_lastReservationLock)으로 동시 생성 방지
  *   - 같은 org+vehicle+date 시간 겹침 검사
@@ -11,6 +12,7 @@
  */
 import { HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import { isVehicleBlockedOn, isVehicleRetired, seoulTodayStr } from "../../utils/vehicleStatus";
 
 const db = getFirestore();
 
@@ -157,6 +159,22 @@ export async function createReservationTx(
                         "같은 기관 구성원 명의로만 예약할 수 있습니다."
                     );
                 }
+            }
+
+            // 퇴역·정비 차단 차량 거부.
+            //
+            // 화면과 어시스턴트가 이미 걸러 주지만 그건 **읽은 시점의 상태**다. 목록을 읽은 뒤
+            // 예약을 확정하기까지 사이에 관리자가 차량을 정비 등록·폐차하면 그 창으로 예약이
+            // 들어온다(어시스턴트는 대화 내내 같은 목록을 들고 있어 창이 더 넓다).
+            // 예약을 실제로 만드는 자리에서 한 번 더 본다.
+            //
+            // 정비 판정은 `endDate` 당일까지만 차단하는 화면과 **같은 규칙**을 쓴다
+            // (shared/vehicleStatus) — 규칙이 다르면 화면에서 풀린 차량이 여기서 거부된다.
+            if (isVehicleRetired(vehicleSnap.data()?.retired)) {
+                throw new HttpsError("failed-precondition", "폐차·매각된 차량은 예약할 수 없습니다.");
+            }
+            if (isVehicleBlockedOn(vehicleSnap.data()?.maintenance, seoulTodayStr())) {
+                throw new HttpsError("failed-precondition", "정비 중인 차량은 예약할 수 없습니다.");
             }
 
             // 차량별 사용 가능 직원 제한 검증 (allowedUserIds 없거나 빈 배열 = 전체 허용, 역할 무관 목록 기준)

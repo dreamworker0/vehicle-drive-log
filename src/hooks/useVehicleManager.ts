@@ -29,6 +29,8 @@ const INITIAL_FORM = {
     currentKm: '', googleCalendarId: '',
     insuranceCompany: '', insurancePhone: '', insuranceExpiryDate: '',
     allowedUserIds: [] as string[],
+    // 출발지(차고지) id. 빈 값 = 본관(기관 주소) — 분관을 등록하지 않은 기관은 계속 빈 값이다.
+    siteId: '',
 };
 
 export default function useVehicleManager() {
@@ -134,6 +136,7 @@ export default function useVehicleManager() {
             insurancePhone: vehicle.insurance?.phone || '',
             insuranceExpiryDate: vehicle.insurance?.expiryDate || '',
             allowedUserIds: vehicle.allowedUserIds || [],
+            siteId: vehicle.siteId || '',
         });
         setEditingVehicle(vehicle);
         setOpenWithCalendarError(calendarError);
@@ -193,6 +196,8 @@ export default function useVehicleManager() {
                     organizationId: orgId!,
                     // 전부 해제 시 빈 배열 저장으로 제한이 풀려야 하므로 항상 포함
                     allowedUserIds: form.allowedUserIds,
+                    // 본관으로 되돌린 경우도 빈 값으로 덮어써야 하므로 항상 포함
+                    siteId: form.siteId,
                     insurance: {
                         company: form.insuranceCompany.trim(),
                         phone: form.insurancePhone.trim(),

@@ -6,6 +6,7 @@ import React, { useMemo, useCallback } from 'react';
 import useDailyLog from '../../hooks/useDailyLog';
 import { useToast } from '../../hooks/useToast';
 import { SkeletonBox } from '../common/Skeleton';
+import { resolveOrgSites, resolveStartLocationLabel } from '../../lib/orgSites';
 import type { DriveLog } from '../../types/driveLog';
 
 const DriveLogMobileCard = React.memo(({ log }: { log: DriveLog }) => {
@@ -89,6 +90,8 @@ export default function DailyLogView() {
         downloadDailyLogPdf(driveLogs, fuelLogs, {
             orgName: org?.name || '',
             vehicleName: selectedVehicle?.displayName || selectedVehicle?.name || '',
+            // 분관을 등록하지 않은 기관에서는 undefined라 인쇄물에 나오지 않는다
+            startLocation: resolveStartLocationLabel(resolveOrgSites(org), selectedVehicle),
             date: selectedDate,
             todayDistance: summary.todayDistance,
             previousEndKm: summary.previousEndKm,
@@ -96,7 +99,7 @@ export default function DailyLogView() {
             approvalLine: useApproval,
             onError: (msg) => showToast(msg, 'error'),
         });
-    }, [driveLogs, fuelLogs, org?.name, selectedVehicle?.displayName, selectedVehicle?.name, selectedDate, summary, useApproval, loadingData, showToast]);
+    }, [driveLogs, fuelLogs, org, selectedVehicle, selectedDate, summary, useApproval, loadingData, showToast]);
 
     if (loading) {
         return (

@@ -35,6 +35,8 @@ interface SubmitContext {
     hipassCard: HipassCard | null;
     isManuallyCorrected?: boolean;
     originalStartKm?: number;
+    /** 출발지 이름(분관 등록 기관만). 분관 차량이 어디서 출발했는지 기록에 남긴다. */
+    startLocation?: string;
 }
 
 interface SubmitResult {
@@ -63,14 +65,14 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
         selectedPassengers, externalPassengerCount, externalPassengerNames,
         selectedCoDrivers, externalCoDriverNames, isRetroactive,
         ocrUsed, favoriteUsed, isEditMode, editLog, reservationData,
-        hipassCard, isManuallyCorrected, originalStartKm,
+        hipassCard, isManuallyCorrected, originalStartKm, startLocation,
     } = ctx;
 
     const logData = buildLogData(form, {
         orgId: orgId || undefined, user, userData, selectedVehicle,
         selectedPassengers, externalPassengerCount, externalPassengerNames,
         coDrivers: selectedCoDrivers, externalCoDriverNames,
-        isRetroactive, ocrUsed, favoriteUsed,
+        isRetroactive, ocrUsed, favoriteUsed, startLocation,
     });
 
     if (isManuallyCorrected !== undefined) {
