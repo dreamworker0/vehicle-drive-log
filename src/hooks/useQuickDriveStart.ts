@@ -206,7 +206,7 @@ export default function useQuickDriveStart() {
                 organizationId: orgId || '',
             });
             showToast('즐겨찾기에 저장되었습니다.');
-            setFavorites(await getFavorites(user.uid) as Favorite[]);
+            setFavorites(await getFavorites(user.uid));
             setShowFavSave(false);
             setFavName('');
         } catch {

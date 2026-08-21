@@ -3,7 +3,6 @@
  * 즐겨찾기 저장 (handleSaveFavorite)
  */
 import { getFavorites, createFavorite } from '../../../lib/firestore';
-import type { Favorite } from '../../../types/favorite';
 import type { SaveFavoriteDeps } from './types';
 
 export async function handleSaveFavorite(deps: SaveFavoriteDeps) {
@@ -17,8 +16,7 @@ export async function handleSaveFavorite(deps: SaveFavoriteDeps) {
             organizationId: userData?.organizationId || ''
         });
         showToast('즐겨찾기에 저장되었습니다.');
-        const fList = await getFavorites(user.uid);
-        setFavorites(fList as Favorite[]);
+        setFavorites(await getFavorites(user.uid));
         setShowFavSave(false);
         setFavName('');
     } catch {

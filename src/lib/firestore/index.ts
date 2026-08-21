@@ -112,6 +112,7 @@ export {
     createFavorite,
     deleteFavorite,
 } from './favorites';
+export type { FavoriteInput } from './favorites';
 
 // 커스텀 휴일 (Custom Holidays)
 export {
