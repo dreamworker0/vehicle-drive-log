@@ -110,7 +110,11 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
     }, [orgId, form.driveDate, form.startTime, vehicles, isEditMode, editLog, setForm, setLastDriveLog]);
 
     const handleFavoriteSelect = useCallback((fav: Favorite) => {
-        setForm(prev => ({ ...prev, destination: fav.address || fav.destination }));
+        // 즐겨찾기는 저장 경로마다 채우는 필드가 다르다 — 즐겨찾기 관리 화면은 주소 없이 별칭만으로도
+        // 저장하고(address=''), 그 문서에는 destination이 아예 없다. 그대로 폼에 넣으면 undefined가
+        // 들어가 다음 렌더의 form.destination.trim()에서 화면이 통째로 죽었다.
+        // 다른 화면(DestinationInput)과 같은 규칙으로 별칭까지 폴백한다.
+        setForm(prev => ({ ...prev, destination: fav.address || fav.destination || fav.name || '' }));
     }, [setForm]);
 
     const handleSaveFavorite = useCallback(async () => {

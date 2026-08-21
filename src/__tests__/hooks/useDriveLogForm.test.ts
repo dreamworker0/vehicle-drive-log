@@ -137,6 +137,36 @@ describe('useDriveLogForm', () => {
         expect(result.current.form.destination).toBe('서울특별시 용산구');
     });
 
+    it('주소 없이 별칭만 저장된 즐겨찾기를 골라도 목적지가 undefined가 되지 않는다', async () => {
+        // 즐겨찾기 관리 화면은 주소 없이(address='') 저장하고 destination 필드를 남기지 않는다.
+        // 예전에는 그 값이 그대로 폼에 들어가 다음 렌더의 trim()에서 화면이 죽었다.
+        const { result } = renderHook(() => useDriveLogForm());
+
+        await waitFor(() => {
+            expect(result.current.loading).toBe(false);
+        });
+
+        act(() => {
+            result.current.handleFavoriteSelect({ name: '김OO 어르신 댁', address: '' } as Parameters<typeof result.current.handleFavoriteSelect>[0]);
+        });
+
+        expect(result.current.form.destination).toBe('김OO 어르신 댁');
+    });
+
+    it('별칭·주소가 모두 빈 즐겨찾기를 골라도 목적지는 빈 문자열이다', async () => {
+        const { result } = renderHook(() => useDriveLogForm());
+
+        await waitFor(() => {
+            expect(result.current.loading).toBe(false);
+        });
+
+        act(() => {
+            result.current.handleFavoriteSelect({} as Parameters<typeof result.current.handleFavoriteSelect>[0]);
+        });
+
+        expect(result.current.form.destination).toBe('');
+    });
+
     it('togglePassenger로 동승자를 추가/제거한다', async () => {
         mockGetOrganizationMembers.mockResolvedValueOnce([
             { id: 'member1', name: '김철수' },

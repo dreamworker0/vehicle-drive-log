@@ -32,6 +32,10 @@ const WaypointSection = memo(function WaypointSection({
     // 예약 데이터가 있거나 수정 모드이더라도 운행 목적과 행선지를 직접 입력해야 할 때 표시
     if (reservationData?.vehicleId && !isEditMode) return null;
 
+    // 행선지는 즐겨찾기 선택 등 외부 경로로 채워지므로 빈 값을 방어한다 — 렌더 중 trim()이
+    // 터지면 폼 전체가 사라져 운행일지를 아예 쓸 수 없게 된다.
+    const destination = form.destination || '';
+
     return (
         <div className="space-y-4">
             <div>
@@ -51,13 +55,13 @@ const WaypointSection = memo(function WaypointSection({
                     <input
                         id="destination"
                         type="text"
-                        value={form.destination}
+                        value={destination}
                         onChange={e => setForm({ ...form, destination: e.target.value })}
                         className="input min-h-[48px] flex-1"
                         placeholder="서울시청"
                     />
                     {/* 즐겨찾기 저장 아이콘 버튼 */}
-                    {form.destination.trim() && !favorites.some((f: Favorite) => f.address === form.destination.trim() || f.name === form.destination.trim()) && (
+                    {destination.trim() && !favorites.some((f: Favorite) => f.address === destination.trim() || f.name === destination.trim()) && (
                         <button
                             type="button"
                             onClick={() => setShowFavSave(!showFavSave)}
@@ -101,7 +105,7 @@ const WaypointSection = memo(function WaypointSection({
                                 key={fav.id}
                                 type="button"
                                 onClick={() => handleFavoriteSelect(fav)}
-                                className={`px-3 py-2 min-h-[48px] rounded-full text-xs font-medium border transition-all flex items-center justify-center ${form.destination === (fav.address || fav.name)
+                                className={`px-3 py-2 min-h-[48px] rounded-full text-xs font-medium border transition-all flex items-center justify-center ${destination === (fav.address || fav.name)
                                     ? 'bg-amber-100 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400'
                                     : 'bg-surface-50 dark:bg-surface-800 border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400 hover:border-amber-300 dark:hover:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20'
                                     }`}
