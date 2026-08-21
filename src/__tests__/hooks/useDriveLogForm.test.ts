@@ -167,6 +167,28 @@ describe('useDriveLogForm', () => {
         expect(result.current.form.destination).toBe('');
     });
 
+    // 저장 모양은 네 화면이 공유한다 — 운행일지 폼만 destination에 넣고 address를 비워 두던 탓에
+    // 즐겨찾기 관리 화면·예약 폼에서 읽던 주소가 비어 보였다. 정규화는 createFavorite이 한다.
+    it('handleSaveFavorite은 별칭과 주소를 함께 넘긴다', async () => {
+        const { result } = renderHook(() => useDriveLogForm());
+
+        await waitFor(() => {
+            expect(result.current.loading).toBe(false);
+        });
+
+        act(() => {
+            result.current.setForm(prev => ({ ...prev, destination: '  서울시청  ' }));
+        });
+        await act(async () => {
+            await result.current.handleSaveFavorite();
+        });
+
+        expect(mockCreateFavorite).toHaveBeenCalledWith(expect.objectContaining({
+            name: '서울시청',
+            address: '서울시청',
+        }));
+    });
+
     it('togglePassenger로 동승자를 추가/제거한다', async () => {
         mockGetOrganizationMembers.mockResolvedValueOnce([
             { id: 'member1', name: '김철수' },

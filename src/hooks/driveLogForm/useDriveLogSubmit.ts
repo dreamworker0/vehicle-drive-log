@@ -110,11 +110,11 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
     }, [orgId, form.driveDate, form.startTime, vehicles, isEditMode, editLog, setForm, setLastDriveLog]);
 
     const handleFavoriteSelect = useCallback((fav: Favorite) => {
-        // 즐겨찾기는 저장 경로마다 채우는 필드가 다르다 — 즐겨찾기 관리 화면은 주소 없이 별칭만으로도
-        // 저장하고(address=''), 그 문서에는 destination이 아예 없다. 그대로 폼에 넣으면 undefined가
-        // 들어가 다음 렌더의 form.destination.trim()에서 화면이 통째로 죽었다.
-        // 다른 화면(DestinationInput)과 같은 규칙으로 별칭까지 폴백한다.
-        setForm(prev => ({ ...prev, destination: fav.address || fav.destination || fav.name || '' }));
+        // 폼에 채울 값은 `destination` 하나다 — getFavorites가 옛 문서(주소만·별칭만 있던 문서)까지
+        // 보정해서 돌려준다. 뒤의 폴백은 그 보정을 거치지 않은 값이 들어오는 경우의 방어선이다.
+        // 예전에는 `fav.address || fav.destination`이라 주소 없이 별칭만 저장한 즐겨찾기에서
+        // undefined가 들어가, 다음 렌더의 form.destination.trim()에서 화면이 통째로 죽었다.
+        setForm(prev => ({ ...prev, destination: fav.destination || fav.address || fav.name || '' }));
     }, [setForm]);
 
     const handleSaveFavorite = useCallback(async () => {
@@ -123,11 +123,10 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
             await createFavorite({
                 userId: user.uid,
                 name: (favName || '').trim() || (form.destination || '').trim(),
-                destination: (form.destination || '').trim(),
+                address: (form.destination || '').trim(),
                 organizationId: orgId || '',
             });
-            const updated = await getFavorites(user.uid);
-            setFavorites(updated as Favorite[]);
+            setFavorites(await getFavorites(user.uid));
             setShowFavSave(false);
             setFavName('');
             showToast('즐겨찾기에 저장되었습니다.', 'success');

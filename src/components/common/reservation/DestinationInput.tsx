@@ -293,7 +293,8 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
                     <div className="flex flex-wrap gap-1.5 mt-2">
                         {/* 즐겨찾기 */}
                         {favorites.map(fav => {
-                            const targetAddr = fav.address || fav.name;
+                            // 주소를 안 적은 즐겨찾기는 별칭이 목적지다 — 그 보정은 getFavorites가 한다
+                            const targetAddr = fav.destination;
                             const isSelected = destinationList.includes(targetAddr);
                             return (
                                 <button

@@ -61,7 +61,7 @@ const WaypointSection = memo(function WaypointSection({
                         placeholder="서울시청"
                     />
                     {/* 즐겨찾기 저장 아이콘 버튼 */}
-                    {destination.trim() && !favorites.some((f: Favorite) => f.address === destination.trim() || f.name === destination.trim()) && (
+                    {destination.trim() && !favorites.some((f: Favorite) => f.destination === destination.trim() || f.name === destination.trim()) && (
                         <button
                             type="button"
                             onClick={() => setShowFavSave(!showFavSave)}
@@ -105,7 +105,7 @@ const WaypointSection = memo(function WaypointSection({
                                 key={fav.id}
                                 type="button"
                                 onClick={() => handleFavoriteSelect(fav)}
-                                className={`px-3 py-2 min-h-[48px] rounded-full text-xs font-medium border transition-all flex items-center justify-center ${destination === (fav.address || fav.name)
+                                className={`px-3 py-2 min-h-[48px] rounded-full text-xs font-medium border transition-all flex items-center justify-center ${destination === fav.destination
                                     ? 'bg-amber-100 dark:bg-amber-900/30 border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400'
                                     : 'bg-surface-50 dark:bg-surface-800 border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400 hover:border-amber-300 dark:hover:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20'
                                     }`}

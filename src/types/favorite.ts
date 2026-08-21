@@ -1,14 +1,10 @@
 /**
- * 즐겨찾기 (Favorites) 타입 정의
+ * 즐겨찾기 (Favorites) 타입
+ *
+ * 문서 모양의 원본은 `src/schemas/favorite.ts`다 — 여기서는 파생만 한다.
  */
-import type { FirestoreDoc, TimestampField } from './common';
+import type { z } from 'zod';
+import type { favoriteSchema } from '../schemas/favorite';
+import type { FirestoreDoc } from './common';
 
-export interface Favorite extends FirestoreDoc {
-    userId: string;
-    name: string;        // 추가
-    destination: string;
-    address?: string;
-    purpose?: string;
-    organizationId?: string; // 추가
-    createdAt?: TimestampField;
-}
+export type Favorite = z.infer<typeof favoriteSchema> & FirestoreDoc;
