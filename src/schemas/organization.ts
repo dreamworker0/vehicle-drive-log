@@ -109,6 +109,21 @@ export const organizationSchema = z.object({
     withdrawReasonDetail: z.string().optional().catch(undefined),
     firstEmployeeRegisteredAt: timestampSchema.optional().catch(undefined),
     timeToFirstEmployeeDays: z.number().optional().catch(undefined),
+    /**
+     * 분관·별관 등 **추가 출발지(차고지)** 목록.
+     *
+     * 기관 주소(`address`)는 고유번호증에서 읽은 본관 주소라 관리자가 고칠 수 없고, 그 하나가
+     * 예약·바로 운행의 경로 계산 출발지로 고정돼 있었다. 분관에 세워 둔 차량은 실제 출발지가
+     * 다른데도 본관 기준으로 거리·소요시간·통행료가 잡혀 값이 전부 어긋난다.
+     * 여기에는 **본관을 넣지 않는다** — 본관은 `address`가 그대로 첫 출발지가 된다
+     * (`src/lib/orgSites.ts`의 `resolveOrgSites`).
+     */
+    sites: z.array(z.object({
+        /** 기관 안에서만 유일하면 되는 식별자. 차량 문서의 `siteId`가 이 값을 가리킨다 */
+        id: z.string().catch(''),
+        name: z.string().catch(''),
+        address: z.string().catch(''),
+    })).optional().catch(undefined),
     /** 지도 표시용 위도 */
     lat: z.coerce.number().optional().catch(undefined),
     /** 지도 표시용 경도 */

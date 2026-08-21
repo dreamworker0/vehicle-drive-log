@@ -5,6 +5,7 @@ import { captureError } from '../lib/sentry';
 export * from './common';
 export * from './vehicle';
 export * from './driveLog';
+export * from './favorite';
 export * from './reservation';
 export * from './user';
 export * from './organization';

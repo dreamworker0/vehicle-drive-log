@@ -69,30 +69,84 @@ describe('firestore/favorites', () => {
                 { id: 'f2', destination: '보건소' },
             ]);
         });
+
+        // destination을 기록하지 않던 시절의 문서(관리 화면·예약 폼·바로 운행 경로)를
+        // 읽기 입구에서 보정한다 — 이 값이 비면 폼에 undefined가 들어가 화면이 죽었다.
+        it('destination 없이 저장된 옛 문서는 주소로, 주소도 없으면 별칭으로 채워 준다', async () => {
+            vi.mocked(fs.getDocs).mockResolvedValue(docsSnapWithId([
+                { id: 'f1', name: '시청', address: '서울시 중구 세종대로 110' },
+                { id: 'f2', name: '김OO 어르신 댁', address: '' },
+                { id: 'f3', name: '보건소' },
+            ]) as never);
+
+            const result = await getFavorites('u1');
+
+            expect(result[0].destination).toBe('서울시 중구 세종대로 110');
+            expect(result[1].destination).toBe('김OO 어르신 댁');
+            expect(result[2].destination).toBe('보건소');
+        });
     });
 
     describe('createFavorite', () => {
+        /** 마지막 addDoc 호출의 페이로드 */
+        const lastPayload = () => {
+            const calls = vi.mocked(fs.addDoc).mock.calls;
+            return calls[calls.length - 1][1] as Record<string, unknown>;
+        };
+
         it('serverTimestamp를 포함해 addDoc를 호출하고 docRef를 반환한다', async () => {
             const docRef = { id: 'f-new' };
             vi.mocked(fs.addDoc).mockResolvedValue(docRef as never);
 
-            const result = await createFavorite({ destination: '시청', userId: 'u1' });
+            const result = await createFavorite({ userId: 'u1', name: '시청', address: '서울시 중구 세종대로 110' });
 
             expect(result).toBe(docRef);
             expect(fs.addDoc).toHaveBeenCalledWith(
                 expect.anything(),
                 expect.objectContaining({
-                    destination: '시청',
                     userId: 'u1',
+                    name: '시청',
+                    address: '서울시 중구 세종대로 110',
+                    destination: '서울시 중구 세종대로 110',
                     createdAt: '__serverTimestamp__',
                 }),
             );
         });
 
+        // 쓰기 경로가 네 곳이라 저장 모양이 갈라져 있었다 — 정규화를 여기 한 곳에 모은다.
+        it('주소를 안 적으면 별칭이 목적지가 되고 빈 address 필드는 저장하지 않는다', async () => {
+            vi.mocked(fs.addDoc).mockResolvedValue({ id: 'f-new' } as never);
+
+            await createFavorite({ userId: 'u1', name: '  김OO 어르신 댁  ', address: '   ' });
+
+            const payload = lastPayload();
+            expect(payload.name).toBe('김OO 어르신 댁');
+            expect(payload.destination).toBe('김OO 어르신 댁');
+            expect(payload).not.toHaveProperty('address');
+        });
+
+        it('destination을 직접 넘기면 그 값을 쓴다', async () => {
+            vi.mocked(fs.addDoc).mockResolvedValue({ id: 'f-new' } as never);
+
+            await createFavorite({ userId: 'u1', name: '별칭', destination: '보건소' });
+
+            expect(lastPayload().destination).toBe('보건소');
+        });
+
+        // Firestore는 undefined 값을 거부한다 — 소속 없는 계정(organizationId=null)에서
+        // 즐겨찾기 저장이 통째로 실패하지 않게 키를 아예 빼고 보낸다.
+        it('organizationId가 없거나 null이면 필드를 넣지 않는다', async () => {
+            vi.mocked(fs.addDoc).mockResolvedValue({ id: 'f-new' } as never);
+
+            await createFavorite({ userId: 'u1', name: '시청', organizationId: null });
+
+            expect(lastPayload()).not.toHaveProperty('organizationId');
+        });
+
         it('실패 시 captureError로 보고하고 에러를 재던진다', async () => {
             vi.mocked(fs.addDoc).mockRejectedValue(new Error('addDoc 실패') as never);
 
-            await expect(createFavorite({ destination: 'x' })).rejects.toThrow('addDoc 실패');
+            await expect(createFavorite({ userId: 'u1', name: 'x' })).rejects.toThrow('addDoc 실패');
             expect(captureError).toHaveBeenCalled();
         });
     });

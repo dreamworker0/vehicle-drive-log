@@ -16,11 +16,12 @@ import type { Vehicle } from '../types/vehicle';
 import type { User as UserDoc } from '../types/user';
 import type { PassengerFormValues } from '../types/reservation';
 import { isVehicleBlocked, isVehicleRestrictedForUser } from '../lib/vehicleUtils';
+import { resolveDepartureAddress, resolveVehicleSite, hasBranchSites } from '../lib/orgSites';
 import type { Organization } from '../types/organization';
 import { invalidateDashboardCache } from './useTodayDashboard';
 
 export default function useQuickDriveStart() {
-    const { user, userData, orgFeatures } = useAuth();
+    const { user, userData, orgFeatures, orgSites } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
     const { showToast } = useToast();
@@ -125,18 +126,22 @@ export default function useQuickDriveStart() {
         setRouteInfo(null);
         setFreeRoadRoute(null);
 
-        if (!form.destination.trim() || !orgAddress || !isTmapAvailable()) return;
+        // 출발지는 차량이 세워져 있는 곳이다 — 분관 차량을 본관 주소에서 출발시키면
+        // 거리·소요시간·통행료가 전부 어긋난다. 분관 주소가 비어 있으면 본관으로 되돌아간다.
+        const selectedV = vehicles.find(v => v.id === form.vehicleId);
+        const origin = resolveDepartureAddress(orgSites, selectedV) || orgAddress;
+
+        if (!form.destination.trim() || !origin || !isTmapAvailable()) return;
 
         routeTimerRef.current = setTimeout(async () => {
             setRouteLoading(true);
             try {
-                const selectedV = vehicles.find(v => v.id === form.vehicleId);
                 const carType = VEHICLE_TYPE_TO_CAR_TYPE[selectedV?.vehicleType ?? ''] || '0';
 
-                const result = await getMultiRouteWithFreeRoad(orgAddress, form.destination.trim(), { carType });
+                const result = await getMultiRouteWithFreeRoad(origin, form.destination.trim(), { carType });
                 if (result) {
                     setRouteInfo({ distance: result.distance, duration: result.duration, tollFee: result.tollFee, hasToll: result.hasToll, isMulti: result.isMulti });
-                    lastRouteParamsRef.current = { origin: orgAddress, destination: form.destination.trim(), carType };
+                    lastRouteParamsRef.current = { origin, destination: form.destination.trim(), carType };
                 } else {
                     setRouteInfo(null);
                     lastRouteParamsRef.current = null;
@@ -152,7 +157,7 @@ export default function useQuickDriveStart() {
         return () => {
             if (routeTimerRef.current) clearTimeout(routeTimerRef.current);
         };
-    }, [form.destination, form.vehicleId, orgAddress, vehicles]);
+    }, [form.destination, form.vehicleId, orgAddress, orgSites, vehicles]);
 
     // 무료도로 경로 on-demand 조회 (펼치기 버튼 클릭 시 호출)
     const handleFetchFreeRoad = useCallback(async () => {
@@ -171,6 +176,10 @@ export default function useQuickDriveStart() {
     }, [freeRoadLoading]);
 
     const selectedVehicle = vehicles.find(v => v.id === form.vehicleId);
+    // 분관을 등록한 기관에서만 화면에 출발지를 알린다(본관뿐이면 새 정보가 없다).
+    const departureSiteName = hasBranchSites(orgSites)
+        ? resolveVehicleSite(orgSites, selectedVehicle).name
+        : '';
 
     const handleVehicleSelect = (vehicleId: string) => {
         const v = vehicles.find(veh => veh.id === vehicleId);
@@ -197,7 +206,7 @@ export default function useQuickDriveStart() {
                 organizationId: orgId || '',
             });
             showToast('즐겨찾기에 저장되었습니다.');
-            setFavorites(await getFavorites(user.uid) as Favorite[]);
+            setFavorites(await getFavorites(user.uid));
             setShowFavSave(false);
             setFavName('');
         } catch {
@@ -280,6 +289,8 @@ export default function useQuickDriveStart() {
         vehicles, favorites, members,
         loading, submitting,
         selectedVehicle,
+        /** 선택한 차량의 출발지 이름 — 분관이 없는 기관에서는 빈 문자열 */
+        departureSiteName,
         routeInfo, routeLoading,
         freeRoadRoute, freeRoadLoading, handleFetchFreeRoad,
         handleVehicleSelect,

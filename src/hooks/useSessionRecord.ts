@@ -20,8 +20,9 @@
  * 조치로 이어지지 않는 보고는 진짜 결함을 덮는다.
  */
 import { useEffect, useRef } from 'react';
-import { callWithRetry, isTransientCallableError } from '../lib/callableRetry';
+import { callWithRetry, isTransientCallableError, isAuthExpiredError } from '../lib/callableRetry';
 import { useAuth } from './useAuth';
+import { auth } from '../lib/firebase';
 import { captureError } from '../lib/sentry';
 
 const SESSION_KEY = 'auditSessionId';
@@ -64,6 +65,14 @@ export default function useSessionRecord() {
         void callWithRetry('recordSession', { sessionId: getSessionId() }).catch((err) => {
             if (isTransientCallableError(err)) {
                 console.warn('[useSessionRecord] 접속기록 실패 (네트워크)', err);
+                return;
+            }
+            // 토큰 만료(`Unauthenticated`)로 거부됐는데 그 사이 로그인 세션 자체가 사라진 경우다.
+            // callWithRetry가 이미 토큰을 갱신해 한 번 더 시도한 뒤이므로, 여기 남는 것은
+            // "다시 부를 사용자가 없다"는 상태 — 로그아웃·세션 만료의 꼬리이지 앱 결함이 아니다.
+            // **로그인 중인데도 거부되면 그건 그대로 보고한다**(진짜 권한 문제일 수 있다).
+            if (isAuthExpiredError(err) && !auth.currentUser) {
+                console.warn('[useSessionRecord] 접속기록 실패 (이미 로그아웃된 세션)', err);
                 return;
             }
             captureError(err, { context: 'useSessionRecord', uid: user.uid });

@@ -3,12 +3,14 @@ import { useState, useEffect, useRef, createContext, useContext, ReactNode } fro
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { doc, onSnapshot, Unsubscribe } from 'firebase/firestore';
 import { auth, db, authReady } from '../lib/firebase';
+import { isFirestoreTerminated } from '../lib/firestoreLifecycle';
 import { refreshTokenSilently, refreshToken } from '../lib/tokenRefresh';
 import { handleRedirectResult } from '../lib/auth';
 import { setSentryUser } from '../lib/sentry';
 import { useToastStore } from '../store/useToastStore';
 import type { User as UserDoc } from '../types/user';
 import { resolveOrgFeatures, ALL_FEATURES_ON, type OrgFeatures } from '../lib/orgFeatures';
+import { resolveOrgSites, type OrgSite } from '../lib/orgSites';
 
 /**
  * 사용자 Firestore 문서의 로딩 확정 상태.
@@ -30,6 +32,8 @@ interface AuthContextType {
     orgDeleted: boolean;
     /** 기관별 기능 사용 토글(실시간). 기본값 전부 켜짐. */
     orgFeatures: OrgFeatures;
+    /** 기관의 출발지(본관 + 분관, 실시간). 분관을 등록하지 않은 기관은 본관 한 개뿐. */
+    orgSites: OrgSite[];
     /** @deprecated onSnapshot이 자동 처리. 호환성을 위해 유지. */
     refreshUserData: () => Promise<void>;
 }
@@ -42,6 +46,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const [userDocState, setUserDocState] = useState<UserDocState>('pending');
     const [orgDeleted, setOrgDeleted] = useState(false);
     const [orgFeatures, setOrgFeatures] = useState<OrgFeatures>(ALL_FEATURES_ON);
+    const [orgSites, setOrgSites] = useState<OrgSite[]>(() => resolveOrgSites(null));
     const [loading, setLoading] = useState(true);
 
     // Custom Claims 토큰 갱신을 위한 이전 role/orgId 추적
@@ -86,6 +91,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
          */
         const AUTH_DROP_GRACE_MS = 2000;
         let dropTimer: ReturnType<typeof setTimeout> | null = null;
+
+        /**
+         * Firestore 구독을 새로 걸어도 되는 상태인지.
+         *
+         * **왜 필요한가.** 로그아웃은 clearOfflineCache()로 Firestore를 terminate하고 페이지를
+         * 떠나는데(lib/auth.ts), 떠나기 전까지 페이지는 살아 있다. 종료된 인스턴스에
+         * onSnapshot을 걸면 SDK가 그 자리에서 동기 throw를 낸다
+         * ("The client has already been terminated."). 아래 재시도 타이머에서 나면 잡아줄 곳이
+         * 없어 uncaught로 Sentry까지 올라갔다(JAVASCRIPT-REACT-60, /admin/dashboard).
+         */
+        const canWatch = () => !cancelled && !isFirestoreTerminated();
+
+        /**
+         * permission-denied 재시도 타이머.
+         *
+         * 깨어난 시점에 **아직 같은 세션인지** 다시 본다. 로그아웃도 permission-denied를 낳으므로
+         * (세션이 끊긴 리스너가 규칙에 막힌다) 그때의 재시도는 어차피 또 거부되고, 종료 직후라면
+         * 위의 동기 throw로 이어진다. 세션이 유예 안에 돌아온 경우에는 onAuthStateChanged가
+         * 다시 발화해 구독을 새로 걸어주므로 여기서 포기해도 복구를 잃지 않는다.
+         */
+        const scheduleWatchRetry = (uid: string, waitMs: number, restart: () => void) => {
+            setTimeout(() => {
+                if (!canWatch() || auth.currentUser?.uid !== uid) return;
+                restart();
+            }, waitMs);
+        };
 
         /** 로그아웃 상태를 화면에 확정 반영한다. */
         const commitSignedOut = () => {
@@ -153,6 +184,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     }
 
                     const startUserWatch = (retryCount = 0) => {
+                        if (!canWatch()) return;
                         unsubscribeUser = onSnapshot(
                             doc(db, 'users', firebaseUser.uid),
                             (docSnap) => {
@@ -181,15 +213,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                                             const isSuper = data.role === 'superAdmin';
 
                                             const startOrgWatch = (orgRetryCount = 0) => {
+                                                if (!canWatch()) return;
                                                 unsubscribeOrg = onSnapshot(
                                                     doc(db, 'organizations', data.organizationId!),
                                                     (orgSnap) => {
                                                         if (orgSnap.exists()) {
                                                             if (!isSuper) setOrgDeleted(orgSnap.data().status === 'deleted');
                                                             setOrgFeatures(resolveOrgFeatures(orgSnap.data()));
+                                                            setOrgSites(resolveOrgSites(orgSnap.data()));
                                                         } else {
                                                             if (!isSuper) setOrgDeleted(true);
                                                             setOrgFeatures(ALL_FEATURES_ON);
+                                                            setOrgSites(resolveOrgSites(null));
                                                         }
                                                     },
                                                     (err) => {
@@ -200,7 +235,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                                                             const waitMs = 1000 * 2 ** orgRetryCount;
                                                             refreshToken(firebaseUser)
                                                                 .catch(() => {}) // 토큰 갱신 실패해도 재시도
-                                                                .then(() => setTimeout(() => startOrgWatch(orgRetryCount + 1), waitMs));
+                                                                .then(() => scheduleWatchRetry(firebaseUser.uid, waitMs, () => startOrgWatch(orgRetryCount + 1)));
                                                         } else if (errCode === 'permission-denied') {
                                                             console.warn('[Auth] 기관 상태 감시 — 권한 오류 발생. 세션 유지 및 데이터 로딩 보류');
                                                             useToastStore.getState().showToast('데이터 접근 권한이 없거나 오프라인 상태입니다. (페이지 새로고침 요망)', 'warning');
@@ -268,12 +303,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                                     console.debug(`[Auth] 사용자 데이터 접근 권한 없음 — 토큰 갱신 후 재시도 (${retryCount + 1}/2)`);
                                     if (unsubscribeUser) { unsubscribeUser(); unsubscribeUser = null; }
                                     const waitMs = 1000 * 2 ** retryCount;
+                                    const retryUserWatch = () => scheduleWatchRetry(
+                                        firebaseUser.uid,
+                                        waitMs,
+                                        () => startUserWatch(retryCount + 1),
+                                    );
                                     refreshToken(firebaseUser)
-                                        .then(() => { setTimeout(() => startUserWatch(retryCount + 1), waitMs); })
-                                        .catch(() => {
-                                            // 토큰 갱신 실패해도 재시도
-                                            setTimeout(() => startUserWatch(retryCount + 1), waitMs);
-                                        });
+                                        .then(retryUserWatch)
+                                        .catch(retryUserWatch); // 토큰 갱신 실패해도 재시도
                                 } else if (err?.code === 'permission-denied') {
                                     // 재시도 소진 시 강제 로그아웃(무한루프) 방지. 대신 세션 유지하고 데이터만 null 처리.
                                     console.error('[Auth] 사용자 데이터 접근 권한 오류 — 갱신 실패. 관리자에게 문의하세요.', err);
@@ -355,6 +392,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isSuperAdmin,
         orgDeleted,
         orgFeatures,
+        orgSites,
         refreshUserData,
     };
 

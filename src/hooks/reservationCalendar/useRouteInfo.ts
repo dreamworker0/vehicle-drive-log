@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { getMultiRouteWithFreeRoad, getFreeRoadRoute, isTmapAvailable, VEHICLE_TYPE_TO_CAR_TYPE } from '../../lib/tmap';
 import { calcEndTime } from '../utils/reservationUtils';
+import { resolveDepartureAddress, resolveVehicleSite, hasBranchSites, type OrgSite } from '../../lib/orgSites';
 import type { Vehicle } from '../../types/vehicle';
 import type { ReservationForm } from '../../types/reservation';
 
@@ -16,10 +17,12 @@ interface UseRouteInfoParams {
     form: ReservationForm;
     setForm: React.Dispatch<React.SetStateAction<ReservationForm>>;
     orgAddress: string;
+    /** 기관의 출발지 목록(본관 + 분관) */
+    orgSites: OrgSite[];
     vehicles: Vehicle[];
 }
 
-export function useRouteInfo({ form, setForm, orgAddress, vehicles }: UseRouteInfoParams) {
+export function useRouteInfo({ form, setForm, orgAddress, orgSites, vehicles }: UseRouteInfoParams) {
     const [routeInfo, setRouteInfo] = useState<RouteInfoData | null>(null);
     const [routeLoading, setRouteLoading] = useState(false);
     const [freeRoadRoute, setFreeRoadRoute] = useState<{ distance: number; duration: number; tollFee: number } | null>(null);
@@ -28,16 +31,19 @@ export function useRouteInfo({ form, setForm, orgAddress, vehicles }: UseRouteIn
     // 마지막 경로 탐색에 사용한 파라미터를 ref로 보관 (on-demand 재사용)
     const lastRouteParamsRef = useRef<{ origin: string; destination: string; carType: string } | null>(null);
 
-    // 경로 정보 업데이트 (기관 주소 → 목적지 경로 탐색)
+    // 경로 정보 업데이트 (차량이 세워져 있는 출발지 → 목적지 경로 탐색)
     useEffect(() => {
-        if (!form.destination.trim() || !orgAddress || !isTmapAvailable()) {
+        // 선택된 차량의 출발지·carType 결정. 분관 차량은 분관 주소에서 출발한다 —
+        // 본관 주소로 계산하면 거리·소요시간·통행료가 전부 어긋난다.
+        const selectedVehicle = vehicles.find(v => v.id === form.vehicleId);
+        const origin = resolveDepartureAddress(orgSites, selectedVehicle) || orgAddress;
+
+        if (!form.destination.trim() || !origin || !isTmapAvailable()) {
             setRouteInfo(null);
             setFreeRoadRoute(null);
             return;
         }
 
-        // 선택된 차량의 carType 결정
-        const selectedVehicle = vehicles.find(v => v.id === form.vehicleId);
         const carType = selectedVehicle?.vehicleType
             ? VEHICLE_TYPE_TO_CAR_TYPE[selectedVehicle.vehicleType] || '0'
             : '0';
@@ -48,7 +54,7 @@ export function useRouteInfo({ form, setForm, orgAddress, vehicles }: UseRouteIn
         const timer = setTimeout(async () => {
             setRouteLoading(true);
             try {
-                const result = await getMultiRouteWithFreeRoad(orgAddress, form.destination.trim(), { carType });
+                const result = await getMultiRouteWithFreeRoad(origin, form.destination.trim(), { carType });
                 if (result) {
                     setRouteInfo({
                         distance: result.distance,
@@ -56,7 +62,7 @@ export function useRouteInfo({ form, setForm, orgAddress, vehicles }: UseRouteIn
                         tollFee: result.tollFee,
                         hasToll: result.hasToll,
                     });
-                    lastRouteParamsRef.current = { origin: orgAddress, destination: form.destination.trim(), carType };
+                    lastRouteParamsRef.current = { origin, destination: form.destination.trim(), carType };
                 } else {
                     setRouteInfo(null);
                     lastRouteParamsRef.current = null;
@@ -71,7 +77,7 @@ export function useRouteInfo({ form, setForm, orgAddress, vehicles }: UseRouteIn
 
         return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [form.destination, form.vehicleId, orgAddress]);
+    }, [form.destination, form.vehicleId, orgAddress, orgSites]);
 
     // 무료도로 경로 on-demand 조회 (펼치기 버튼 클릭 시 호출)
     const handleFetchFreeRoad = useCallback(async () => {
@@ -97,7 +103,15 @@ export function useRouteInfo({ form, setForm, orgAddress, vehicles }: UseRouteIn
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [form.startTime, routeInfo?.duration]);
 
+    // 분관을 등록한 기관에서만 출발지를 화면에 알린다(본관뿐이면 새 정보가 없다).
+    const selectedVehicle = vehicles.find(v => v.id === form.vehicleId);
+    const departureSiteName = hasBranchSites(orgSites)
+        ? resolveVehicleSite(orgSites, selectedVehicle).name
+        : '';
+
     return {
+        /** 선택한 차량의 출발지 이름 — 분관이 없는 기관에서는 빈 문자열 */
+        departureSiteName,
         routeInfo,
         setRouteInfo,
         routeLoading,

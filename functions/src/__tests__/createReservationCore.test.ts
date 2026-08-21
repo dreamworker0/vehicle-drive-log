@@ -188,6 +188,41 @@ describe('createReservationTx (코어)', () => {
         });
     });
 
+    // 화면·봇이 이미 걸러 주지만 그건 "읽은 시점"의 상태다. 목록을 읽은 뒤 확정하기까지
+    // 사이에 정비 등록·폐차가 되면 그 창으로 예약이 들어온다(어시스턴트는 캐시된 목록을
+    // 최대 5분 들고 있어 창이 더 넓다). 만드는 자리에서 한 번 더 본다.
+    describe('차량 상태 재검증', () => {
+        const mockVehicleDoc = (data: Record<string, unknown>) => {
+            mockTransactionGet.mockResolvedValue({
+                exists: true,
+                data: () => ({ organizationId: 'org1', ...data }),
+                docs: [],
+            });
+        };
+
+        it('폐차된 차량은 예약되지 않는다', async () => {
+            mockVehicleDoc({ retired: { isRetired: true } });
+
+            await expect(createReservationTx(validInput)).rejects.toThrow('폐차·매각');
+            expect(mockTransactionSet).not.toHaveBeenCalled();
+        });
+
+        it('정비 차단 중인 차량은 예약되지 않는다', async () => {
+            mockVehicleDoc({ maintenance: { isBlocked: true } });
+
+            await expect(createReservationTx(validInput)).rejects.toThrow('정비 중');
+            expect(mockTransactionSet).not.toHaveBeenCalled();
+        });
+
+        it('정비 종료일이 지났으면 예약된다 — 화면과 같은 규칙(endDate 당일까지 차단)', async () => {
+            const yesterday = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Seoul' })
+                .format(new Date(Date.now() - 86400_000));
+            mockVehicleDoc({ maintenance: { isBlocked: true, endDate: yesterday } });
+
+            await expect(createReservationTx(validInput)).resolves.toMatchObject({ status: 'reserved' });
+        });
+    });
+
     it('allowedUserIds 제한은 명의자 기준으로 검증한다', async () => {
         mockTransactionGet.mockResolvedValue({
             exists: true,

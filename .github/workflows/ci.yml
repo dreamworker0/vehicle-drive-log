@@ -283,7 +283,12 @@ jobs:
   # 에뮬레이터(Java)를 쓴다. 중복 설치 약 1분은 functions에서 회수한 15분에 비하면 작다.
   e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    # 25분이었다가 40분으로 올렸다. 실제 소요는 9~12분인데, `playwright install --with-deps`가
+    # apt에서 OS 의존성을 받아오는 구간이 러너 미러 상태에 따라 20분을 넘긴 적이 있다
+    # (#207에서 두 번 연속 그 지점에서 25분 제한에 걸려 cancelled — 테스트는 한 줄도 못 돌았다).
+    # 브라우저 바이너리는 아래 actions/cache가 재사용하지만 **OS 패키지는 그 캐시 밖**이라
+    # 매번 apt를 탄다. 상한을 없애지는 않는다 — 진짜로 멈춘 잡은 여전히 잘려야 한다.
+    timeout-minutes: 40
     env:
       TZ: "Asia/Seoul"
     steps:

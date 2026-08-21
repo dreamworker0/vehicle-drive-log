@@ -34,6 +34,8 @@ interface Props {
     editingReservation: Reservation | null;
     editingGroupId?: string | null;
     routeInfo: { distance: number; duration: number; tollFee?: number; hasToll?: boolean; isMulti?: boolean } | null;
+    /** 선택한 차량의 출발지 이름 — 분관이 없는 기관에서는 빈 문자열 */
+    departureSiteName?: string;
     routeLoading: boolean;
     freeRoadRoute?: { distance: number; duration: number; tollFee: number } | null;
     freeRoadLoading?: boolean;
@@ -87,6 +89,7 @@ export default function ReservationSidePanel({
     editingReservation,
     editingGroupId,
     routeInfo,
+    departureSiteName = '',
     routeLoading,
     freeRoadRoute,
     freeRoadLoading,
@@ -269,6 +272,7 @@ export default function ReservationSidePanel({
                                 freeRoadRoute={freeRoadRoute}
                                 freeRoadLoading={freeRoadLoading}
                                 onFetchFreeRoad={onFetchFreeRoad}
+                                departureSiteName={departureSiteName}
                             />
                         </div>
                         <div>

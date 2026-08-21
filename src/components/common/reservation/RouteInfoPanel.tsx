@@ -17,6 +17,11 @@ interface RouteInfoPanelProps {
     freeRoadRoute?: { distance: number; duration: number; tollFee: number } | null;
     freeRoadLoading?: boolean;
     onFetchFreeRoad?: () => void;
+    /**
+     * 출발지 이름(분관을 등록한 기관에서만 들어온다). 어느 주소를 기준으로 계산한 거리인지
+     * 보이지 않으면, 분관 차량인데 값이 이상하다는 신고가 들어와도 원인을 알 수 없다.
+     */
+    departureSiteName?: string;
 }
 
 export default function RouteInfoPanel({
@@ -25,6 +30,7 @@ export default function RouteInfoPanel({
     freeRoadRoute,
     freeRoadLoading = false,
     onFetchFreeRoad,
+    departureSiteName = '',
 }: RouteInfoPanelProps) {
     const [showFreeRoad, setShowFreeRoad] = useState(false);
 
@@ -49,6 +55,11 @@ export default function RouteInfoPanel({
             ) : routeInfo && (
                 <div className="p-2.5 rounded-lg bg-blue-50 border border-blue-200 dark:bg-blue-900/20 dark:border-blue-800/40 animate-fade-in space-y-1.5">
                     <div className="flex items-center gap-3 text-xs">
+                        {departureSiteName && (
+                            <span className="text-[11px] font-semibold text-surface-500 dark:text-surface-400 bg-surface-100 dark:bg-surface-700 px-1.5 py-0.5 rounded">
+                                🚩 {departureSiteName} 출발
+                            </span>
+                        )}
                         {routeInfo.hasToll && <span className="text-[11px] font-semibold text-blue-500 dark:text-blue-400 bg-blue-100 dark:bg-blue-800/40 px-1.5 py-0.5 rounded">고속</span>}
                         <span className="font-bold text-blue-700 dark:text-blue-300">🗺️ {routeInfo.isMulti ? '총 ' : ''}{Math.floor(routeInfo.distance)}km</span>
                         <span className="font-bold text-blue-700 dark:text-blue-300">⏱ {routeInfo.isMulti ? '총 ' : ''}{routeInfo.duration}분</span>

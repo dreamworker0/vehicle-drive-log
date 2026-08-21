@@ -17,6 +17,8 @@ interface PdfLogEntry {
     vehicleDisplayName?: string;
     vehicleName?: string;
     destination?: string;
+    /** 출발지 이름 — 분관을 등록한 기관의 기록에만 있다 */
+    startLocation?: string;
     purpose?: string;
     startTime?: string;
     departureTime?: string;
@@ -43,6 +45,11 @@ interface ApprovalEntry {
 // 페이지당 행 수
 const ROWS_PER_PAGE = 19;
 
+/** 출발지가 기록된 행이 하나라도 있는가 (분관을 등록한 기관에서만 true) */
+function hasStartLocation(logs: PdfLogEntry[]) {
+    return logs.some(log => (log.startLocation || '').trim() !== '');
+}
+
 /**
  * 운행일지 데이터를 PDF로 내보내기 (브라우저 인쇄 → PDF 저장)
  * @param {Array} logs - 운행일지 배열
@@ -58,6 +65,10 @@ export function downloadDriveLogsPdf(logs: PdfLogEntry[], options: { onError?: (
 
     const { orgName = '', period = '', approvalLine = [], includeHipass = false, includePassengers = false, includeFuel = false } = options;
 
+    // 출발지 열은 **기록에 있을 때만** 넣는다. 분관을 쓰지 않는 기관의 출력물은 예전과 한 칸도
+    // 달라지지 않아야 한다(관공서에 그대로 제출하는 서식이다).
+    const includeStartLocation = hasStartLocation(logs);
+
     // 날짜순 정렬 (오래된 순), 같은 날짜 내 출발 시간 오름차순
     const sorted = [...logs].sort((a, b) => {
         const dateCmp = resolveDateStr(a).localeCompare(resolveDateStr(b));
@@ -71,7 +82,7 @@ export function downloadDriveLogsPdf(logs: PdfLogEntry[], options: { onError?: (
         pages.push(sorted.slice(i, i + ROWS_PER_PAGE));
     }
 
-    const htmlContent = buildPdfHtml(pages, { orgName, period, approvalLine, includeHipass, includePassengers, includeFuel });
+    const htmlContent = buildPdfHtml(pages, { orgName, period, approvalLine, includeHipass, includePassengers, includeFuel, includeStartLocation });
 
     // 새 창에서 인쇄
     const printWindow = window.open('', '_blank', 'width=1100,height=800');
@@ -97,7 +108,7 @@ export function downloadDriveLogsPdf(logs: PdfLogEntry[], options: { onError?: (
 /**
  * 운행일지 데이터 행을 HTML TR로 변환
  */
-function buildLogRow(log: PdfLogEntry, idx: number, pageIdx: number, includeHipass = false, includePassengers = false, includeFuel = false) {
+function buildLogRow(log: PdfLogEntry, idx: number, pageIdx: number, includeHipass = false, includePassengers = false, includeFuel = false, includeStartLocation = false) {
     const date = resolveDateStr(log, '-');
     const distance = resolveDistance(log);
 
@@ -121,6 +132,7 @@ function buildLogRow(log: PdfLogEntry, idx: number, pageIdx: number, includeHipa
             <td class="center">${escapeHtml(resolveEndTime(log))}</td>
             <td class="center">${escapeHtml(log.driverName || '')}</td>
             <td class="center">${escapeHtml(log.vehicleDisplayName || log.vehicleName || '')}</td>
+            ${includeStartLocation ? `<td>${escapeHtml(log.startLocation || '')}</td>` : ''}
             <td>${escapeHtml(log.destination || '')}</td>
             <td>${escapeHtml(log.purpose || '')}</td>
             <td class="right">${formatNumber(resolveStartKm(log))}</td>
@@ -136,14 +148,18 @@ function buildLogRow(log: PdfLogEntry, idx: number, pageIdx: number, includeHipa
 
 /**
  * 빈 행 HTML (19행 맞추기)
+ *
+ * 칸이 전부 비어 있으므로 조건부 열을 어느 위치에 넣든 인쇄 결과는 같다 — **개수만** 헤더와
+ * 맞으면 된다(열 너비는 헤더의 class가 정한다).
  */
-function buildEmptyRows(count: number, includePassengers = false, includeFuel = false) {
+function buildEmptyRows(count: number, includePassengers = false, includeFuel = false, includeStartLocation = false) {
     return Array(count).fill(null).map(() => `
         <tr>
             <td class="center">&nbsp;</td>
             <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
             <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
             <td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td>
+            ${includeStartLocation ? '<td>&nbsp;</td>' : ''}
             ${includeFuel ? '<td>&nbsp;</td>' : ''}
             ${includePassengers ? '<td>&nbsp;</td>' : ''}
             <td>&nbsp;</td>
@@ -172,12 +188,14 @@ function buildApprovalHtml(approvalLine: ApprovalEntry[]) {
 /**
  * 단일 페이지 HTML 생성
  */
-function buildPageHtml(pageRows: PdfLogEntry[], pageIdx: number, totalPages: number, { orgName, period, approvalLine, includeHipass = false, includePassengers = false, includeFuel = false, totalAllDistance = 0 }: { orgName: string; period: string; approvalLine: ApprovalEntry[]; includeHipass?: boolean; includePassengers?: boolean; includeFuel?: boolean; totalAllDistance?: number }) {
+function buildPageHtml(pageRows: PdfLogEntry[], pageIdx: number, totalPages: number, { orgName, period, approvalLine, includeHipass = false, includePassengers = false, includeFuel = false, includeStartLocation = false, totalAllDistance = 0 }: { orgName: string; period: string; approvalLine: ApprovalEntry[]; includeHipass?: boolean; includePassengers?: boolean; includeFuel?: boolean; includeStartLocation?: boolean; totalAllDistance?: number }) {
     const pageNum = pageIdx + 1;
     const pageTotalDistance = pageRows.reduce((sum, log) => sum + resolveDistance(log), 0);
 
-    const rowsHtml = pageRows.map((log: PdfLogEntry, idx: number) => buildLogRow(log, idx, pageIdx, includeHipass, includePassengers, includeFuel)).join('');
-    const emptyRowsHtml = buildEmptyRows(ROWS_PER_PAGE - pageRows.length, includePassengers, includeFuel);
+    const rowsHtml = pageRows.map((log: PdfLogEntry, idx: number) => buildLogRow(log, idx, pageIdx, includeHipass, includePassengers, includeFuel, includeStartLocation)).join('');
+    const emptyRowsHtml = buildEmptyRows(ROWS_PER_PAGE - pageRows.length, includePassengers, includeFuel, includeStartLocation);
+    // 소계·합계 라벨이 덮는 칸 수 — 출발지 열이 붙으면 한 칸 늘어난다(안 늘리면 주행거리 합계가 밀린다)
+    const totalLabelSpan = 10 + (includeStartLocation ? 1 : 0);
     const approvalHtml = buildApprovalHtml(approvalLine);
 
     return `
@@ -205,6 +223,7 @@ function buildPageHtml(pageRows: PdfLogEntry[], pageIdx: number, totalPages: num
                         <th colspan="2">시각</th>
                         <th rowspan="2" class="col-driver">운전자</th>
                         <th rowspan="2" class="col-vehicle">차량</th>
+                        ${includeStartLocation ? '<th rowspan="2" class="col-dest">출발지</th>' : ''}
                         <th rowspan="2" class="col-dest">목적지</th>
                         <th rowspan="2" class="col-purpose">사용목적</th>
                         <th colspan="3">주행거리 (km)</th>
@@ -225,7 +244,7 @@ function buildPageHtml(pageRows: PdfLogEntry[], pageIdx: number, totalPages: num
                     ${rowsHtml}
                     ${emptyRowsHtml}
                     <tr class="total-row">
-                        <td colspan="10" class="center total-label">소 계</td>
+                        <td colspan="${totalLabelSpan}" class="center total-label">소 계</td>
                         <td class="right total-value">${pageTotalDistance > 0 ? pageTotalDistance.toLocaleString() : ''}</td>
                         <td></td>
                         ${includeFuel ? '<td></td>' : ''}
@@ -234,7 +253,7 @@ function buildPageHtml(pageRows: PdfLogEntry[], pageIdx: number, totalPages: num
                     </tr>
                     ${pageIdx === totalPages - 1 ? `
                     <tr class="total-row" style="font-weight:bold; background:#e8f0fe;">
-                        <td colspan="10" class="center total-label">합 계</td>
+                        <td colspan="${totalLabelSpan}" class="center total-label">합 계</td>
                         <td class="right total-value">${totalAllDistance > 0 ? totalAllDistance.toLocaleString() : ''}</td>
                         <td></td>
                         ${includeFuel ? '<td></td>' : ''}
@@ -250,7 +269,7 @@ function buildPageHtml(pageRows: PdfLogEntry[], pageIdx: number, totalPages: num
 /**
  * 전체 HTML 문서 생성
  */
-function buildPdfHtml(pages: PdfLogEntry[][], options: { orgName: string; period: string; approvalLine: ApprovalEntry[]; includeHipass?: boolean; includePassengers?: boolean; includeFuel?: boolean }) {
+function buildPdfHtml(pages: PdfLogEntry[][], options: { orgName: string; period: string; approvalLine: ApprovalEntry[]; includeHipass?: boolean; includePassengers?: boolean; includeFuel?: boolean; includeStartLocation?: boolean }) {
     const totalPages = pages.length;
     // 전체 페이지에 걸친 총 주행거리 합계
     const totalAllDistance = pages.flat().reduce((sum, log) => sum + resolveDistance(log), 0);
