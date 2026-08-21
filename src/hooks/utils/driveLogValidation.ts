@@ -109,12 +109,17 @@ interface BuildLogContext {
     isRetroactive: boolean;
     ocrUsed?: boolean;
     favoriteUsed?: boolean;
+    /**
+     * 출발지 이름(분관을 등록한 기관만). 분관이 없으면 넘어오지 않으며, 그때는 필드를 만들지 않는다 —
+     * 모든 기록에 "본관"이 붙어 봐야 읽는 사람에게 새 정보가 없다.
+     */
+    startLocation?: string;
 }
 
 /**
  * 폼 데이터로 저장용 logData 객체를 구성한다.
  */
-export function buildLogData(form: DriveLogForm, { orgId, user, userData, selectedVehicle, selectedPassengers, externalPassengerCount = 0, externalPassengerNames = '', coDrivers = [], externalCoDriverNames = '', isRetroactive, ocrUsed = false, favoriteUsed = false }: BuildLogContext) {
+export function buildLogData(form: DriveLogForm, { orgId, user, userData, selectedVehicle, selectedPassengers, externalPassengerCount = 0, externalPassengerNames = '', coDrivers = [], externalCoDriverNames = '', isRetroactive, ocrUsed = false, favoriteUsed = false, startLocation }: BuildLogContext) {
     const startKm = parseInt(form.startKm);
     const endKm = parseInt(form.endKm);
     const driveTimestamp = buildDriveTimestamp(form.driveDate, form.endTime, form.startTime);
@@ -163,6 +168,8 @@ export function buildLogData(form: DriveLogForm, { orgId, user, userData, select
         externalPassengerCount,
         externalPassengerNames,
         inputMethod: ocrUsed ? 'ocr' : (favoriteUsed ? 'favorite' : 'manual'),
+        // 분관을 등록한 기관에서만 값이 있다(그 외에는 undefined → sanitizeUndefined가 필드를 만들지 않는다)
+        startLocation: startLocation || undefined,
     };
 
     if (!isNaN(startKm) && !isNaN(endKm)) {

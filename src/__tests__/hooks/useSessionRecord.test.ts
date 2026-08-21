@@ -14,12 +14,14 @@ const mocks = vi.hoisted(() => ({
     callable: vi.fn(),
     auth: { user: null as { uid: string } | null, userDocState: 'pending' as string },
     captureError: vi.fn(),
+    /** Firebase Auth의 현재 사용자 — 보고 시점에 세션이 남아 있는지 판정하는 값 */
+    firebaseAuth: { currentUser: null as { uid: string } | null },
 }));
 
 vi.mock('firebase/functions', () => ({
     httpsCallable: () => mocks.callable,
 }));
-vi.mock('../../lib/firebase', () => ({ firebaseFunctions: {}, db: {}, auth: {} }));
+vi.mock('../../lib/firebase', () => ({ firebaseFunctions: {}, db: {}, auth: mocks.firebaseAuth }));
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => mocks.auth }));
 vi.mock('../../lib/sentry', () => ({ captureError: mocks.captureError }));
 
@@ -31,6 +33,7 @@ beforeEach(() => {
     mocks.callable.mockResolvedValue({ data: { success: true } });
     mocks.auth.user = null;
     mocks.auth.userDocState = 'pending';
+    mocks.firebaseAuth.currentUser = null;
 });
 
 describe('useSessionRecord', () => {
@@ -89,6 +92,36 @@ describe('useSessionRecord', () => {
         mocks.auth.userDocState = 'present';
         mocks.callable.mockRejectedValue(
             Object.assign(new Error('세션 식별자가 올바르지 않습니다.'), { code: 'functions/invalid-argument' })
+        );
+
+        renderHook(() => useSessionRecord());
+
+        await waitFor(() => expect(mocks.captureError).toHaveBeenCalled());
+        expect(mocks.captureError.mock.calls[0][1]).toMatchObject({ context: 'useSessionRecord', uid: 'u1' });
+    });
+
+    // 로그아웃·세션 만료의 꼬리에서 나는 `Unauthenticated`는 앱 결함이 아니다.
+    // (Sentry에 JAVASCRIPT-REACT로 올라오던 건 — 조치할 것이 없는 보고는 진짜 결함을 덮는다)
+    it('이미 로그아웃된 세션의 Unauthenticated는 보고하지 않는다', async () => {
+        mocks.auth.user = { uid: 'u1' };
+        mocks.auth.userDocState = 'present';
+        mocks.firebaseAuth.currentUser = null; // 보고 시점에 세션이 사라진 상태
+        mocks.callable.mockRejectedValue(
+            Object.assign(new Error('Unauthenticated'), { code: 'functions/unauthenticated' })
+        );
+
+        renderHook(() => useSessionRecord());
+
+        await waitFor(() => expect(mocks.callable).toHaveBeenCalledTimes(1));
+        expect(mocks.captureError).not.toHaveBeenCalled();
+    });
+
+    it('로그인 중인데도 Unauthenticated면 그대로 보고한다 (진짜 권한 문제일 수 있다)', async () => {
+        mocks.auth.user = { uid: 'u1' };
+        mocks.auth.userDocState = 'present';
+        mocks.firebaseAuth.currentUser = { uid: 'u1' };
+        mocks.callable.mockRejectedValue(
+            Object.assign(new Error('Unauthenticated'), { code: 'functions/unauthenticated' })
         );
 
         renderHook(() => useSessionRecord());

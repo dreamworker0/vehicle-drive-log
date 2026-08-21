@@ -1,3 +1,5 @@
+import { isFirestoreTerminated } from './firestoreLifecycle';
+
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
 
 // @sentry/react(~139KB)를 정적 import하지 않고 initSentry 시점에 동적 로드한다.
@@ -209,6 +211,17 @@ function initSentryWithModule(Sentry: SentryModule) {
             // - Safari/iOS:     "The object can not be found here"
             const errorMsg = event.exception?.values?.[0]?.value || '';
             if (/removeChild|The node to be removed is not a child|The object can not be found here/i.test(errorMsg)) {
+                return null;
+            }
+
+            // 로그아웃 teardown 레이스: 우리가 의도적으로 terminate한 Firestore 인스턴스에
+            // 뒤늦게 도착한 호출이 내는 동기 throw다(JAVASCRIPT-REACT-60).
+            // **isFirestoreTerminated()가 true일 때만** 억제한다 — 종료를 지시한 적이 없는데
+            // 이 에러가 났다면 그건 진짜 앱 버그이므로 그대로 보고돼야 한다.
+            // (앱 쪽 재구독 차단은 useAuth의 canWatch/scheduleWatchRetry가 이미 한다 —
+            //  여기는 남은 경로가 uncaught로 새는 것만 막는 안전망이다. setTimeout 래퍼가
+            //  잡아 rethrow하는 형태라 ignoreErrors·preventDefault로는 걸러지지 않는다.)
+            if (isFirestoreTerminated() && /client has already been terminated/.test(errorMsg)) {
                 return null;
             }
 

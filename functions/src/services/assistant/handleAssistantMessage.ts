@@ -15,8 +15,17 @@ import { createReservationTx } from "../reservation/createReservationCore";
 import { cancelReservationTx } from "../reservation/cancelReservationCore";
 import { modifyReservationTx } from "../reservation/modifyReservationCore";
 import { estimateOneWayDurationMin, calcEndTimeFromDuration, type OriginInput } from "../tmap/routeEstimate";
+import { resolveOrgSites, resolveVehicleSite, hasBranchSites, MAIN_SITE_ID, type OrgSiteFields } from "../../utils/orgSites";
+import { isVehicleBlockedOn, isVehicleRetired, seoulTodayStr } from "../../utils/vehicleStatus";
+import { getCachedVehicles } from "./vehicleCache";
 
 const db = getFirestore();
+
+/**
+ * 대화 처리 중 들고 다니는 차량 한 대.
+ * `AssistantVehicle`(파싱용 최소 정보)에 예약 가능 판정과 출발지가 붙는다.
+ */
+type AssistantVehicleRow = AssistantVehicle & { isBlocked: boolean; siteId?: string };
 
 /** 멀티턴 대화 상태 유효기간 — 초과 시 진행 중 예약을 폐기 (TTL 정책으로 자동 삭제) */
 const CONVERSATION_TTL_MS = 10 * 60 * 1000;
@@ -144,6 +153,12 @@ export interface ReservationProposal {
     destination: string;
     actorUid: string;
     reservedByName: string;
+    /**
+     * 출발지 이름 — 분관을 등록한 기관에서만 채워진다(확인 메시지 표시 전용).
+     * 예약 문서에는 저장하지 않는다. 차량이 어디 서 있는지는 vehicle.siteId가 원본이고,
+     * 여기에 복사해 두면 나중에 차고지를 옮겼을 때 옛 값이 남는다.
+     */
+    startLocation?: string;
 }
 
 /** 사용자 확인 후 실행할 예약 취소 제안 — cancelReservationTx 입력 + 표시용 필드 */
@@ -192,33 +207,78 @@ export const ASSISTANT_HELP_TEXT =
     "• 자유 질문 — 예: \"홍길동이 예약한 차\", \"이번주 예약 누가 했어\", \"우리 기관 차량 뭐 있어\"";
 
 /** 기관의 예약 가능 차량 목록 조회 (퇴역 차량 제외) */
-async function getAssistantVehicles(orgId: string): Promise<Array<AssistantVehicle & { isBlocked: boolean }>> {
-    const snap = await db.collection("vehicles")
-        .where("organizationId", "==", orgId)
-        .get();
+/**
+ * 어시스턴트가 쓰는 차량 목록.
+ *
+ * 메시지마다 기관 전 차량을 읽던 자리라 캐시를 앞에 둔다(vehicleCache 주석 참고).
+ * 오래된 목록으로 예약이 새지 않는 이유는 예약 생성 트랜잭션이 차량 문서를 다시 읽어
+ * 퇴역·정비·사용 제한을 재검증하기 때문이다.
+ */
+async function getAssistantVehicles(orgId: string): Promise<AssistantVehicleRow[]> {
+    return getCachedVehicles(orgId, async () => {
+        const snap = await db.collection("vehicles")
+            .where("organizationId", "==", orgId)
+            .get();
 
-    return snap.docs
-        .filter((doc) => doc.data().retired?.isRetired !== true)
-        .map((doc) => ({
-            id: doc.id,
-            name: doc.data().displayName || doc.data().name || "이름 없음",
-            isBlocked: doc.data().maintenance?.isBlocked === true,
-        }));
+        // 정비 판정은 화면·예약 트랜잭션과 같은 규칙을 쓴다(shared/vehicleStatus).
+        // 예전에는 `isBlocked` 플래그만 봐서, 정비 종료일이 지났는데 플래그가 남은 차량을
+        // 화면에서는 예약할 수 있는데 봇만 계속 막았다.
+        const today = seoulTodayStr();
+        return snap.docs
+            .filter((doc) => !isVehicleRetired(doc.data().retired))
+            .map((doc) => ({
+                id: doc.id,
+                name: doc.data().displayName || doc.data().name || "이름 없음",
+                isBlocked: isVehicleBlockedOn(doc.data().maintenance, today),
+                // 분관에 세워 둔 차량은 그 분관에서 출발한다 — 종료 시간 추정의 출발지가 달라진다
+                siteId: doc.data().siteId as string | undefined,
+            }));
+    });
 }
 
 /**
- * 기관 출발지 조회 (TMAP 출발지). 주소와 함께 저장된 좌표도 같이 넘겨
- * 출발지 지오코딩 호출을 건너뛰게 한다(좌표는 backfillOrgCoords/기관 등록 시 채워진다).
- * 둘 다 없으면 빈 값 → 종료 시간 되묻기로 폴백.
+ * 출발지 조회 (TMAP 출발지) — **차량이 세워져 있는 곳**이다.
+ *
+ * 본관은 주소와 함께 저장된 좌표도 넘겨 지오코딩 호출을 건너뛴다
+ * (좌표는 backfillOrgCoords/기관 등록 시 채워진다). 분관은 좌표를 갖지 않으므로 주소만
+ * 넘기고 지오코딩에 맡긴다 — 주소→좌표는 사실상 불변이라 routeEstimate의 24시간 캐시(L1·L2)가
+ * 받아내며, 분관 하나당 하루 한 번꼴이다.
+ *
+ * 앱의 예약 화면과 **같은 규칙**(shared/orgSites)을 쓴다. 규칙이 갈라지면 같은 차량인데
+ * 앱과 Slack이 서로 다른 종료 시간을 제안하게 된다.
+ * 주소가 하나도 없으면 빈 값 → 종료 시간 되묻기로 폴백.
  */
-async function getOrgOrigin(orgId: string): Promise<OriginInput> {
+interface VehicleDeparture {
+    /** TMAP 경로 탐색에 넘길 출발지 */
+    origin: OriginInput;
+    /**
+     * 확인 메시지에 적을 출발지 이름. **분관을 등록한 기관에서만** 값이 있다 —
+     * 분관이 없으면 모든 예약에 "본관"이 붙어 봐야 읽는 사람에게 새 정보가 없다.
+     */
+    siteLabel?: string;
+}
+
+async function loadVehicleDeparture(orgId: string, siteId?: string): Promise<VehicleDeparture> {
     const snap = await db.collection("organizations").doc(orgId).get();
-    if (!snap.exists) return {};
-    const data = snap.data();
+    if (!snap.exists) return { origin: {} };
+    const data = snap.data() as OrgSiteFields | undefined;
+    const sites = resolveOrgSites(data);
+    const site = resolveVehicleSite(sites, { siteId });
+    const siteLabel = hasBranchSites(sites) ? site.name : undefined;
+
+    // 분관에 주소를 안 적었으면 resolveVehicleSite/resolveDepartureAddress 규칙대로 본관으로 되돌아간다.
+    // 이때도 이름은 그 분관 그대로 보여 준다 — 사용자가 아는 것은 "그 차가 어디 서 있는가"이고,
+    // 주소가 비어 계산만 본관으로 대신했다는 사정은 화면에 드러낼 값이 아니다.
+    if (site.id !== MAIN_SITE_ID && site.address) {
+        return { origin: { address: site.address }, siteLabel };
+    }
     return {
-        address: data?.address as string | undefined,
-        lat: data?.lat as number | undefined,
-        lng: data?.lng as number | undefined,
+        origin: {
+            address: sites[0]?.address || undefined,
+            lat: (data as { lat?: number } | undefined)?.lat,
+            lng: (data as { lng?: number } | undefined)?.lng,
+        },
+        siteLabel,
     };
 }
 
@@ -227,7 +287,10 @@ export function formatProposalSummary(p: ReservationProposal): string {
     const extra = [p.destination && `목적지: ${p.destination}`, p.purpose && `용도: ${p.purpose}`]
         .filter(Boolean)
         .join(" / ");
-    return `아래 내용으로 예약할까요?\n🚗 ${p.vehicleName}\n📅 ${p.date} ${p.startTime}~${p.endTime}\n👤 ${p.reservedByName}${extra ? `\n📝 ${extra}` : ""}`;
+    // 출발지는 차량 바로 아래에 붙인다 — "어느 차를 어디서 타는가"가 한 덩어리로 읽힌다.
+    // 분관을 등록하지 않은 기관에서는 값이 없어 줄 자체가 생기지 않는다.
+    const departure = p.startLocation ? `\n🚩 출발: ${p.startLocation}` : "";
+    return `아래 내용으로 예약할까요?\n🚗 ${p.vehicleName}${departure}\n📅 ${p.date} ${p.startTime}~${p.endTime}\n👤 ${p.reservedByName}${extra ? `\n📝 ${extra}` : ""}`;
 }
 
 /** 취소 제안 요약 텍스트 (확인 UI에 표시) */
@@ -275,7 +338,7 @@ function buildModifyResult(
     target: CancelCandidate,
     nv: ModifyNewValues,
     actor: AssistantActor,
-    vehicles: Array<AssistantVehicle & { isBlocked: boolean }>,
+    vehicles: AssistantVehicleRow[],
 ): AssistantResult {
     // 차량 자체를 바꾸는 요청은 채팅 미지원(캘린더 크로스무브 등) — 앱으로 안내.
     // 대상과 다른 차량을 지목한 경우에만 우회한다(오파싱 오탐 방지).
@@ -343,7 +406,7 @@ async function completeCreate(
     slots: PendingSlots,
     actor: AssistantActor,
     key: string | undefined,
-    vehicles: Array<AssistantVehicle & { isBlocked: boolean }>,
+    vehicles: AssistantVehicleRow[],
 ): Promise<AssistantResult> {
     // 방어: 날짜·시작 시간이 없으면 완결 불가 → 슬롯 보존 후 되묻는다.
     // 정상 create 경로는 parseIntent 재검증(needsClarification)이 date·startTime을 이미 보장하므로
@@ -379,12 +442,15 @@ async function completeCreate(
         };
     }
 
+    // 출발지는 그 차량이 세워져 있는 곳이다(분관 차량이면 분관 주소). 기관 문서를 한 번만 읽어
+    // 경로 계산의 출발지와 확인 메시지에 적을 이름을 함께 얻는다.
+    const departure = await loadVehicleDeparture(actor.orgId, vehicle.siteId);
+
     // 종료 시간 결정: 사용자가 명시했으면 사용, 없으면 목적지 기반 TMAP 이동시간으로 자동 계산.
-    // 계산 실패(기관 주소 미등록·지오코딩 실패·TMAP 오류) 시 종료 시간을 되묻는다.
+    // 계산 실패(주소 미등록·지오코딩 실패·TMAP 오류) 시 종료 시간을 되묻는다.
     let endTime = slots.endTime;
     if (!endTime) {
-        const orgOrigin = await getOrgOrigin(actor.orgId);
-        const durationMin = await estimateOneWayDurationMin(orgOrigin, slots.destination);
+        const durationMin = await estimateOneWayDurationMin(departure.origin, slots.destination);
         if (durationMin != null) {
             endTime = calcEndTimeFromDuration(slots.startTime!, durationMin);
         } else {
@@ -406,6 +472,7 @@ async function completeCreate(
         destination: slots.destination,
         actorUid: actor.uid,
         reservedByName: actor.displayName,
+        ...(departure.siteLabel ? { startLocation: departure.siteLabel } : {}),
     };
     return { replyText: formatProposalSummary(proposal), proposal };
 }

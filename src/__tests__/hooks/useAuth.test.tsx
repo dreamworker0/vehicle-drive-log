@@ -34,9 +34,17 @@ vi.mock('../../lib/auth', () => ({
 vi.mock('../../lib/sentry', () => ({
     setSentryUser: vi.fn(),
 }));
+// Firestore 종료 상태는 테스트가 직접 뒤집는다 (로그아웃 teardown 재현)
+let firestoreTerminated = false;
+vi.mock('../../lib/firestoreLifecycle', () => ({
+    isFirestoreTerminated: () => firestoreTerminated,
+    markFirestoreTerminated: () => { firestoreTerminated = true; },
+}));
 
 // useAuth를 import하기 전에 mock 설정 완료
 import { AuthProvider, useAuth } from '../../hooks/useAuth';
+import { auth } from '../../lib/firebase';
+import { refreshToken } from '../../lib/tokenRefresh';
 
 function createWrapper() {
     return function Wrapper({ children }: { children: ReactNode }) {
@@ -163,5 +171,103 @@ describe('useAuth — 인증 확립 후 null 발화 유예', () => {
         await act(async () => { await vi.advanceTimersByTimeAsync(2500); });
         expect(result.current.user).toBeNull();
         expect(result.current.loading).toBe(false);
+    });
+});
+
+/**
+ * 로그아웃은 clearOfflineCache()로 Firestore를 terminate하고 페이지를 떠나는데, 떠나기 전까지
+ * 페이지는 살아 있다. 세션이 끊긴 리스너는 permission-denied를 받고 재시도 타이머를 걸어두므로,
+ * 그 타이머가 종료된 인스턴스에 onSnapshot을 다시 걸면 SDK가 동기 throw를 낸다
+ * ("The client has already been terminated." — setTimeout 콜백이라 잡히지 않고 Sentry로 샜다).
+ */
+describe('useAuth — 종료·세션 이탈 후 재구독 차단', () => {
+    const authedUser = {
+        uid: 'u1',
+        isAnonymous: false,
+        getIdTokenResult: vi.fn().mockResolvedValue({ claims: {} }),
+    };
+
+    /** permission-denied를 흘려보낼 onSnapshot 에러 콜백을 잡는다. */
+    function captureSnapshotError() {
+        let onError: ((err: { code?: string }) => void) | undefined;
+        mockOnSnapshot.mockImplementation((_ref: unknown, _next: unknown, err: (e: { code?: string }) => void) => {
+            onError = err;
+            return vi.fn();
+        });
+        return () => onError!;
+    }
+
+    function captureAuthCallback() {
+        let cb: ((u: unknown) => void) | undefined;
+        mockOnAuthStateChanged.mockImplementation((_a: unknown, callback: (u: unknown) => void) => {
+            cb = callback;
+            return vi.fn();
+        });
+        return () => cb!;
+    }
+
+    beforeEach(() => {
+        vi.useFakeTimers();
+        firestoreTerminated = false;
+        (auth as { currentUser: unknown }).currentUser = authedUser;
+        vi.mocked(refreshToken).mockResolvedValue(undefined);
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+        firestoreTerminated = false;
+        (auth as { currentUser: unknown }).currentUser = null;
+    });
+
+    it('terminate된 뒤 깨어난 재시도 타이머는 구독을 다시 걸지 않는다', async () => {
+        const getCb = captureAuthCallback();
+        const getOnError = captureSnapshotError();
+        renderHook(() => useAuth(), { wrapper: createWrapper() });
+
+        await vi.advanceTimersByTimeAsync(0);
+        await act(async () => { getCb()(authedUser); });
+        expect(mockOnSnapshot).toHaveBeenCalledTimes(1); // 최초 구독
+
+        // 세션이 끊겨 규칙에 막힌다 → 토큰 갱신 후 재시도 타이머가 걸린다
+        await act(async () => { getOnError()({ code: 'permission-denied' }); });
+        // 그 사이 로그아웃이 Firestore를 종료한다
+        firestoreTerminated = true;
+
+        await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+
+        // 재구독이 없어야 한다 (있었다면 SDK가 동기 throw를 냈다)
+        expect(mockOnSnapshot).toHaveBeenCalledTimes(1);
+    });
+
+    it('세션이 이미 떠난 뒤에는 재시도 타이머가 구독을 다시 걸지 않는다', async () => {
+        const getCb = captureAuthCallback();
+        const getOnError = captureSnapshotError();
+        renderHook(() => useAuth(), { wrapper: createWrapper() });
+
+        await vi.advanceTimersByTimeAsync(0);
+        await act(async () => { getCb()(authedUser); });
+        expect(mockOnSnapshot).toHaveBeenCalledTimes(1);
+
+        await act(async () => { getOnError()({ code: 'permission-denied' }); });
+        (auth as { currentUser: unknown }).currentUser = null; // signOut 완료
+
+        await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+
+        expect(mockOnSnapshot).toHaveBeenCalledTimes(1);
+    });
+
+    it('세션이 그대로면 재시도 타이머가 구독을 다시 건다 (가드가 정상 복구를 막지 않는다)', async () => {
+        const getCb = captureAuthCallback();
+        const getOnError = captureSnapshotError();
+        renderHook(() => useAuth(), { wrapper: createWrapper() });
+
+        await vi.advanceTimersByTimeAsync(0);
+        await act(async () => { getCb()(authedUser); });
+        expect(mockOnSnapshot).toHaveBeenCalledTimes(1);
+
+        await act(async () => { getOnError()({ code: 'permission-denied' }); });
+        await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+
+        expect(mockOnSnapshot).toHaveBeenCalledTimes(2);
     });
 });

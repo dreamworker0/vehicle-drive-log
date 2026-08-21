@@ -3,22 +3,22 @@
  */
 import type { Vehicle, VehicleMaintenance } from '../types/vehicle';
 import { toLocalDateStr } from './dateUtils';
+import { isVehicleBlockedOn } from '../../shared/vehicleStatus';
+
+export { isVehicleRetired } from '../../shared/vehicleStatus';
 
 /**
- * 차량이 현재 정비 차단 상태인지 판별한다.
- * - isBlocked가 true여야 함
- * - endDate가 설정된 경우, 오늘이 endDate를 초과하면 차단 해제로 간주
- *   (endDate는 "마지막 차단일"로, endDate 당일까지 차단)
+ * 차량이 **오늘** 정비 차단 상태인지 판별한다.
+ *
+ * 판정 규칙 자체는 shared/vehicleStatus.ts에 있다 — 예약 생성 트랜잭션과 Slack 어시스턴트가
+ * 같은 규칙을 써야 화면에서 막힌 차량이 다른 경로로 예약되는 일이 없다.
+ * 여기서는 브라우저 로컬 기준의 '오늘'만 주입한다.
+ *
  * @param maintenance 차량의 maintenance 필드
  * @returns true면 현재 차단 중
  */
 export function isVehicleBlocked(maintenance: VehicleMaintenance | null | undefined): boolean {
-    if (!maintenance?.isBlocked) return false;
-    // endDate가 없으면 무기한 차단 (수동 해제 필요)
-    if (!maintenance.endDate) return true;
-    // endDate 당일까지 차단, 그 다음 날부터 자동 해제
-    const today = toLocalDateStr();
-    return today <= maintenance.endDate;
+    return isVehicleBlockedOn(maintenance, toLocalDateStr());
 }
 
 /**

@@ -3,14 +3,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { getFavorites, createFavorite, deleteFavorite } from '../../lib/firestore';
 import { useToast } from '../../hooks/useToast';
 import { useConfirm } from '../../hooks/useConfirm';
-
-interface Favorite {
-    id: string;
-    name: string;
-    address?: string;
-    userId: string;
-    organizationId?: string;
-}
+import type { Favorite } from '../../types/favorite';
 
 export default function FavoritesManager() {
     const { user, userData } = useAuth();
@@ -25,8 +18,7 @@ export default function FavoritesManager() {
 
     const loadFavorites = useCallback(async () => {
         try {
-            const data = await getFavorites(user!.uid);
-            setFavorites(data as Favorite[]);
+            setFavorites(await getFavorites(user!.uid));
         } catch (err) {
             console.error('즐겨찾기 로드 실패:', err);
         } finally {
@@ -143,7 +135,9 @@ export default function FavoritesManager() {
                             </div>
                             <div className="flex-1 min-w-0">
                                 <p className="font-medium text-sm text-surface-900 dark:text-surface-100 truncate">{fav.name}</p>
-                                {fav.address && (
+                                {/* 다른 화면에서 저장한 즐겨찾기는 별칭 없이 주소를 그대로 별칭으로 쓴다 —
+                                    같은 값을 두 줄로 반복하지 않는다 */}
+                                {fav.address && fav.address !== fav.name && (
                                     <p className="text-xs text-surface-400 dark:text-surface-500 truncate">{fav.address}</p>
                                 )}
                             </div>

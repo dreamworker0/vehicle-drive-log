@@ -70,6 +70,8 @@ export interface SubmitDeps {
     ) => Promise<T | undefined>;
     startTransition: (scope: () => Promise<void>) => void;
     ocrSuccess: boolean;
+    /** 운행일지에 남길 출발지 이름 — 분관을 등록하지 않은 기관에서는 undefined */
+    startLocation?: string;
 }
 
 export function useDriveLogSubmit(deps: SubmitDeps) {
@@ -82,7 +84,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
         setFavorites, setShowFavSave, setFavName, setSuccess,
         isElectric, isRetroactive, isEditMode, editLog, reservationData, hipassCard, favName,
         lastDriveLog, nextDriveLog, setLastDriveLog,
-        showToast, runWithRetry, startTransition, ocrSuccess
+        showToast, runWithRetry, startTransition, ocrSuccess, startLocation
     } = deps;
 
     const [confirmStartKm, setConfirmStartKm] = useState<{ original: number, suggested: number } | null>(null);
@@ -108,7 +110,11 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
     }, [orgId, form.driveDate, form.startTime, vehicles, isEditMode, editLog, setForm, setLastDriveLog]);
 
     const handleFavoriteSelect = useCallback((fav: Favorite) => {
-        setForm(prev => ({ ...prev, destination: fav.address || fav.destination }));
+        // 폼에 채울 값은 `destination` 하나다 — getFavorites가 옛 문서(주소만·별칭만 있던 문서)까지
+        // 보정해서 돌려준다. 뒤의 폴백은 그 보정을 거치지 않은 값이 들어오는 경우의 방어선이다.
+        // 예전에는 `fav.address || fav.destination`이라 주소 없이 별칭만 저장한 즐겨찾기에서
+        // undefined가 들어가, 다음 렌더의 form.destination.trim()에서 화면이 통째로 죽었다.
+        setForm(prev => ({ ...prev, destination: fav.destination || fav.address || fav.name || '' }));
     }, [setForm]);
 
     const handleSaveFavorite = useCallback(async () => {
@@ -117,11 +123,10 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
             await createFavorite({
                 userId: user.uid,
                 name: (favName || '').trim() || (form.destination || '').trim(),
-                destination: (form.destination || '').trim(),
+                address: (form.destination || '').trim(),
                 organizationId: orgId || '',
             });
-            const updated = await getFavorites(user.uid);
-            setFavorites(updated as Favorite[]);
+            setFavorites(await getFavorites(user.uid));
             setShowFavSave(false);
             setFavName('');
             showToast('즐겨찾기에 저장되었습니다.', 'success');
@@ -242,6 +247,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
                         reservationData, hipassCard,
                         isManuallyCorrected,
                         originalStartKm: isManuallyCorrected ? suggestedStartKm : undefined,
+                        startLocation,
                     }),
                     {
                         timeoutMs: 8000,
@@ -305,7 +311,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
         form, isElectric, showToast, startTransition, runWithRetry,
         orgId, user, userData, selectedVehicle, selectedPassengers, externalPassengerCount,
         externalPassengerNames, selectedCoDrivers, externalCoDriverNames, isRetroactive,
-        ocrSuccess, isEditMode, editLog,
+        ocrSuccess, isEditMode, editLog, startLocation,
         reservationData, hipassCard, handleSubmitError, setSuccess, navigate, resetInputs,
         lastDriveLog, nextDriveLog
     ]);

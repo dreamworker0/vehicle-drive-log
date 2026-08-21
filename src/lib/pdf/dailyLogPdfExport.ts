@@ -31,6 +31,12 @@ interface ApprovalEntry {
 interface DailyLogPdfOptions {
     orgName?: string;
     vehicleName?: string;
+    /**
+     * 출발지 이름 — 분관을 등록한 기관에서만 들어온다.
+     * 일별일지는 차량 하나·하루치라 출발지가 행마다 같다. 그래서 열을 만들지 않고
+     * 차량명 옆에 한 번만 적는다(관공서에 제출하는 서식의 칸 수를 건드리지 않는다).
+     */
+    startLocation?: string;
     date?: string;
     todayDistance?: number;
     previousEndKm?: number | null;
@@ -178,7 +184,7 @@ function buildDailyPdfHtml(
     options: DailyLogPdfOptions,
 ) {
     const {
-        orgName = '', vehicleName = '', date = '',
+        orgName = '', vehicleName = '', startLocation = '', date = '',
         todayDistance = 0, previousEndKm = null, todayEndKm = null,
         approvalLine = [],
     } = options;
@@ -207,7 +213,7 @@ function buildDailyPdfHtml(
         </div>
 
         <div class="date-org-row">
-            <span class="date-text">날짜 &nbsp; <strong>${escapeHtml(formatDateKorean(date))}</strong> &nbsp;&nbsp;&nbsp; 차량 &nbsp; <strong>${escapeHtml(vehicleName)}</strong></span>
+            <span class="date-text">날짜 &nbsp; <strong>${escapeHtml(formatDateKorean(date))}</strong> &nbsp;&nbsp;&nbsp; 차량 &nbsp; <strong>${escapeHtml(vehicleName)}</strong>${startLocation ? ` &nbsp;&nbsp;&nbsp; 출발지 &nbsp; <strong>${escapeHtml(startLocation)}</strong>` : ''}</span>
             <span class="org-text">기관명 &nbsp; <strong>${escapeHtml(orgName)}</strong></span>
         </div>
 

@@ -26,6 +26,7 @@ interface Log {
     vehicleName?: string;
     vehicleDisplayName?: string;
     destination?: string;
+    startLocation?: string;
     purpose?: string;
     startKm?: number;
     endKm?: number;
@@ -304,6 +305,43 @@ describe('downloadDriveLogsPdf — 조건부 컬럼 정합성', () => {
         const doc = stub.doc();
         expect(doc.querySelector('th.col-passengers')).not.toBeNull();
         expect(cellsOf(dataRows(doc)[0])[12]).toBe('김직원, 이직원');
+    });
+
+    // 출발지 열은 옵션이 아니라 **데이터가 정한다** — 분관을 등록한 기관의 기록에만 값이 있다.
+    it('기록에 출발지가 있으면 열이 늘고 모든 행의 열 수가 맞는다', () => {
+        const stub = stubPrintWindow();
+        downloadDriveLogsPdf([
+            log({ startLocation: '제2분관' }),
+            log({ date: '2026-07-02', startLocation: '본관' }),
+        ]);
+
+        const table = pageTables(stub.doc())[0];
+        expect(columnCount(table)).toBe(14);
+        // 소계·합계의 colspan까지 함께 늘지 않으면 주행거리 합계 칸이 밀린다
+        expectUniformColumns(table, '운행일지 표');
+    });
+
+    it('출발지가 한 건에만 있어도 열을 만들고 나머지는 공란으로 둔다', () => {
+        const stub = stubPrintWindow();
+        downloadDriveLogsPdf([
+            log({ startLocation: '제2분관' }),
+            log({ date: '2026-07-02' }),
+        ]);
+
+        const doc = stub.doc();
+        expect(cellsOf(dataRows(doc)[0])[6]).toBe('제2분관');
+        expect(cellsOf(dataRows(doc)[1])[6]).toBe('');
+        expectUniformColumns(pageTables(doc)[0], '운행일지 표');
+    });
+
+    it('분관을 쓰지 않는 기관의 출력물은 예전 그대로다 (출발지 열 없음)', () => {
+        const stub = stubPrintWindow();
+        downloadDriveLogsPdf([log()]);
+
+        const doc = stub.doc();
+        const headers = Array.from(doc.querySelectorAll('thead th')).map(th => th.textContent?.trim());
+        expect(headers).not.toContain('출발지');
+        expect(columnCount(pageTables(doc)[0])).toBe(13);
     });
 
     it('컬럼을 끄면 헤더 자체가 없다', () => {

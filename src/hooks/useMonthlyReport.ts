@@ -186,13 +186,16 @@ export default function useMonthlyReport() {
 
         const XLSX = await import('xlsx');
 
-        const headers = ['날짜', '운전자', '차량', '도착지', '출발(km)', '도착(km)', '주행거리(km)', '목적', '출발시간', '도착시간'];
+        // 출발지는 기록에 있을 때만 열을 만든다 — 분관을 쓰지 않는 기관의 파일은 예전 그대로다.
+        const includeStartLocation = filteredLogs.some(l => (l.startLocation || '').trim() !== '');
+        const headers = ['날짜', '운전자', '차량', ...(includeStartLocation ? ['출발지'] : []), '도착지', '출발(km)', '도착(km)', '주행거리(km)', '목적', '출발시간', '도착시간'];
         const rows = filteredLogs.map(l => {
             const ts = (l.timestamp as { toDate?: () => Date })?.toDate?.();
             return [
             l.date || (ts ? toLocalDateStr(ts) : ''),
             l.driverName || '',
             l.vehicleDisplayName || l.vehicleName || '',
+            ...(includeStartLocation ? [l.startLocation || ''] : []),
             l.destination || '',
             l.startKm || 0,
             l.endKm || 0,
@@ -211,6 +214,7 @@ export default function useMonthlyReport() {
             { wch: 12 }, // 날짜
             { wch: 10 }, // 운전자
             { wch: 14 }, // 차량
+            ...(includeStartLocation ? [{ wch: 14 }] : []), // 출발지
             { wch: 16 }, // 도착지
             { wch: 10 }, // 출발(km)
             { wch: 10 }, // 도착(km)
