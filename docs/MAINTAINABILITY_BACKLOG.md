@@ -74,24 +74,36 @@
 `firebase-admin` 13→14와 `firebase-functions` 6→7은 **함께 올려야 하는 한 묶음**이다.
 functions 6의 peer가 `firebase-admin ^11 || ^12 || ^13`이라 admin 14 단독 상향은 `npm ci`가
 ERESOLVE로 실패하고(PR #116), functions 7은 peer에 `^14`를 포함하므로 상향 순서가 강제된다.
-둘을 함께 설치해 검증하면 `npm run type-check:functions`가 **8개 파일에서 22건** 실패한다
-(2026-08-05 실측). 그래서 dependabot은 두 메이저를 ignore에 등록해 보류 중이며
+둘을 함께 설치해 검증하면 `npm run type-check:functions`가 **8개 파일에서 22건** 실패했다
+(2026-08-05 실측). 이 수치는 `updateDriveLogStats.ts` 삭제 **이전** 값이므로, 그 파일이
+들고 있던 8건이 빠진 현재는 더 적다 — 정확한 수는 두 메이저를 실제로 설치해 재측정해야 한다.
+그래서 dependabot은 두 메이저를 ignore에 등록해 보류 중이며
 ([.github/dependabot.yml](../.github/dependabot.yml)), 이관 완료 시 **두 항목을 함께** 제거한다.
 
-- **(1) `admin.firestore` 네임스페이스 API 제거 (12건)** — firebase-admin 14가 네임스페이스
+- **(1) `admin.firestore` 네임스페이스 API 제거 (12건 → 4건)** — firebase-admin 14가 네임스페이스
   접근을 없앴다. 모듈러 API로 이관한다: `getFirestore()`·`FieldValue`를
   `firebase-admin/firestore`에서 직접 import.
-  - `services/driveLog/updateDriveLogStats.ts` (8건 — 가장 큼)
-  - `scripts/cleanDuplicateCalendars.ts` (3건), `handlers/scheduled/verifyMileageConsistency.ts` (2건),
+  - ~~`services/driveLog/updateDriveLogStats.ts` (8건 — 가장 큼)~~ → **파일 삭제로 해소**.
+    죽은 코드였다: `index.ts`에 export가 없어 배포된 적이 없고, 트리거 경로
+    `organizations/{orgId}/driveLogs/{logId}`는 데이터 모델에 없으며(`driveLogs`는 최상위),
+    쓰는 대상 `organizations/{orgId}/monthlyStats`를 읽는 코드도 없었다. 실제 집계는
+    `syncDriveLogKm` → `updateAggregatedStats`가 담당한다. 재발 방지로
+    `check:functions-catalog`에 **고아 함수 파일 검사**를 추가했다(정의했으면 index.ts에 등록).
+  - 남은 것: `scripts/cleanDuplicateCalendars.ts` (2건),
+    `handlers/scheduled/verifyMileageConsistency.ts` (1건),
     `handlers/https/submitPublicFeedback.ts` (1건)
-  - 위 중 2건은 `firestore` 타입 소실에 따른 파생 `implicitly any`라 원인 수정 시 함께 사라진다.
 - **(2) express 타입 5 계열 전환 (8건)** — firebase-functions 7이 번들하는 `@types/express`가
   5로 올라가며 `Request`/`Response` named export가 사라졌다.
   - `utils/helpers.ts`, `utils/createAuthenticatedProxy.ts`,
     `handlers/https/slackEvents.ts`, `handlers/https/slackOauthCallback.ts` (각 2건)
-- **주의**: 집계 트리거(`updateDriveLogStats`)와 인증 프록시는 배포 즉시 프로덕션에 반영되는
-  경로다. `functions/src/__tests__/`의 기존 단위 테스트로 동작을 고정한 뒤 이관하고,
-  에뮬레이터에서 집계·Slack 웹훅 경로를 함께 확인한다.
+- **주의**: 인증 프록시(`createAuthenticatedProxy`)는 `holidayProxy`·`tmapProxy`의 공통 관문이라
+  배포 즉시 프로덕션에 반영된다. 커버리지가 0%였으므로 이관 전제로
+  `functions/src/__tests__/createAuthenticatedProxy.test.ts`를 먼저 붙였다(401·429·uid 전달·
+  rate limit 키가 IP가 아니라 uid라는 점까지 고정). 이관 시 에뮬레이터에서 Slack 웹훅
+  경로를 함께 확인한다.
+  - 과거 이 항목이 "집계 트리거(`updateDriveLogStats`)" 위험을 함께 들고 있었으나, 그 함수는
+    배포되지 않는 죽은 코드였다(위 (1) 참고). 이관의 최대 난관으로 계산돼 있던 것이
+    실제로는 위험이 아니었다 — 남은 위험은 인증 프록시와 express 타입뿐이다.
 
 ---
 

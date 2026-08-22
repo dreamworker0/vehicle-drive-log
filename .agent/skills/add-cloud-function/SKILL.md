@@ -49,7 +49,6 @@ functions/
 │   ├── dailyNightlyBatch.ts         ← Schedule (야간 데이터 정리 및 백그라운드 통합 배치)
 │   ├── cleanupDuplicateLogs.ts      ← HTTP (중복 운행일지 검출 및 보정 자동화)
 │   ├── syncDriveLogKm.ts            ← HTTP / onCall (전체 운행일지 누적거리 오차 보정 동기화)
-│   ├── updateDriveLogStats.ts       ← Firestore 트리거 (운행일지 등록 시 통계 실시간 집계)
 │   │
 │   ├── disableUser.ts               ← onCall (유저 계정 비활성화 처리)
 │   ├── restoreUser.ts               ← onCall (유저 계정 복원 처리)

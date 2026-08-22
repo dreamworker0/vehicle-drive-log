@@ -80,32 +80,51 @@ export async function checkReservationReminders(): Promise<void> {
             .get();
 
         let missedCount = 0;
-        for (const doc of completedSnap.docs) {
+
+        // 알림 대상 후보를 먼저 고른다 — 운행일지 존재 확인은 아래에서 한 번에 묶어서 한다.
+        const missedCandidates = completedSnap.docs.filter((doc) => {
             const res = doc.data();
-            if (res.endTime && res.endTime > currentTime) continue;
-            if (res.driveLogReminderSent) continue;
+            if (res.endTime && res.endTime > currentTime) return false;
+            if (res.driveLogReminderSent) return false;
+            return Boolean(res.reservedByUid || res.userId);
+        });
 
-            const targetUid = res.reservedByUid || res.userId;
-            if (targetUid) {
-                const logsSnap = await db.collection("driveLogs")
-                    .where("reservationId", "==", doc.id)
-                    .limit(1)
-                    .get();
-
-                if (logsSnap.empty) {
-                    const title = "📝 운행일지 작성 알림";
-                    const body = `${res.vehicleDisplayName || "차량"} 운행이 종료되었습니다. 운행일지를 작성해주세요.`;
-
-                    await sendPushToUser(targetUid, { title, body });
-                    await createInAppNotification(targetUid, "drive_log_reminder", title, body, res.organizationId);
-
-                    await db.collection("reservations").doc(doc.id).update({
-                        driveLogReminderSent: true,
-                    });
-
-                    missedCount++;
-                }
+        // 운행일지 존재 여부를 **후보 전체에 대해 한 번에** 조회한다.
+        //
+        // 예전에는 후보마다 `where(reservationId,==,id).limit(1)`을 따로 던졌다. Firestore는
+        // **결과가 없는 쿼리에도 읽기 1건을 최소 과금**하므로, 일지를 아직 안 쓴 후보(= 알림을
+        // 보내야 하는 바로 그 후보)가 많을수록 후보 수만큼 읽기가 그대로 청구됐다.
+        // 묶으면 청크당 1회 왕복 + 실제로 존재하는 일지 수만큼만 읽는다.
+        // 이 스케줄러는 평일 08~18시 매시(하루 11회) 돌아 예약 건수에 비례해 누적된다.
+        const loggedReservationIds = new Set<string>();
+        const IN_CHUNK = 30; // Firestore `in` 절의 값 상한
+        for (let i = 0; i < missedCandidates.length; i += IN_CHUNK) {
+            const ids = missedCandidates.slice(i, i + IN_CHUNK).map((doc) => doc.id);
+            const logsSnap = await db.collection("driveLogs")
+                .where("reservationId", "in", ids)
+                .get();
+            for (const logDoc of logsSnap.docs) {
+                const reservationId = logDoc.data().reservationId;
+                if (typeof reservationId === "string") loggedReservationIds.add(reservationId);
             }
+        }
+
+        for (const doc of missedCandidates) {
+            if (loggedReservationIds.has(doc.id)) continue; // 이미 작성됨
+
+            const res = doc.data();
+            const targetUid = (res.reservedByUid || res.userId) as string;
+            const title = "📝 운행일지 작성 알림";
+            const body = `${res.vehicleDisplayName || "차량"} 운행이 종료되었습니다. 운행일지를 작성해주세요.`;
+
+            await sendPushToUser(targetUid, { title, body });
+            await createInAppNotification(targetUid, "drive_log_reminder", title, body, res.organizationId);
+
+            await db.collection("reservations").doc(doc.id).update({
+                driveLogReminderSent: true,
+            });
+
+            missedCount++;
         }
 
         // === 3. 미출발(No-show) 알림 ===

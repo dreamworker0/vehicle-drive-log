@@ -159,14 +159,15 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
 
     if (success) {
         return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClose(); }}>
-                <div className="bg-white dark:bg-surface-800 rounded-2xl p-8 max-w-sm mx-4 text-center animate-scale-in" onClick={e => e.stopPropagation()} role="presentation" onKeyDown={(e) => e.stopPropagation()}>
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose} role="presentation">
+                {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */}
+                <div className="bg-white dark:bg-surface-800 rounded-2xl p-8 max-w-sm mx-4 text-center animate-scale-in" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="feedback-success-title">
                     <div className="w-16 h-16 mx-auto mb-4 bg-accent-100 dark:bg-accent-900/40 rounded-full flex items-center justify-center">
                         <svg aria-hidden="true" className="w-8 h-8 text-accent-600 dark:text-accent-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                         </svg>
                     </div>
-                    <h3 className="text-lg font-bold text-surface-900 dark:text-surface-100 mb-1">건의가 전송되었습니다!</h3>
+                    <h3 id="feedback-success-title" className="text-lg font-bold text-surface-900 dark:text-surface-100 mb-1">건의가 전송되었습니다!</h3>
                     <p className="text-sm text-surface-500 dark:text-surface-400">소중한 의견 감사합니다.</p>
                 </div>
             </div>
@@ -174,16 +175,18 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose} role="button" tabIndex={0} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClose(); }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose} role="presentation">
+            {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */}
             <div
                 className="bg-white dark:bg-surface-800 rounded-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto animate-scale-in"
                 onClick={e => e.stopPropagation()}
-                role="presentation"
-                onKeyDown={(e) => e.stopPropagation()}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="feedback-form-title"
             >
                 {/* 헤더 */}
                 <div className="flex items-center justify-between p-5 border-b border-surface-100 dark:border-surface-700">
-                    <h2 className="text-lg font-bold text-surface-900 dark:text-surface-100">개발자에게 건의하기</h2>
+                    <h2 id="feedback-form-title" className="text-lg font-bold text-surface-900 dark:text-surface-100">개발자에게 건의하기</h2>
                     <button onClick={onClose} aria-label="닫기" className="btn-icon text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 dark:text-surface-400 min-w-[48px] min-h-[48px] flex items-center justify-center">
                         <svg aria-hidden="true" className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
