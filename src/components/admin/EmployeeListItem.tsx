@@ -3,17 +3,7 @@
  * EmployeeManager에서 분리된 서브 컴포넌트
  */
 import React from 'react';
-import type { UserRole } from '../../types';
-
-/** 통합 직원 목록 항목 타입 (EmployeeManager에서 가져온 형태와 일치해야 함) */
-export interface UnifiedMember {
-    id: string;
-    memberStatus: 'active' | 'pending' | 'disabled';
-    name?: string;
-    email?: string;
-    role?: string;
-    original?: any; // eslint-disable-line @typescript-eslint/no-explicit-any
-}
+import type { User, UserRole, UnifiedMember } from '../../types';
 
 interface Props {
     member: UnifiedMember;
@@ -21,14 +11,14 @@ interface Props {
     editingId: string | null;
     editForm: { name: string; email: string };
     setEditForm: React.Dispatch<React.SetStateAction<{ name: string; email: string }>>;
-    onEdit: (member: any) => void; // eslint-disable-line @typescript-eslint/no-explicit-any
+    onEdit: (member: User) => void;
     onSaveEdit: (uid: string) => void;
     onCancelEdit: () => void;
-    onDelete: (member: any) => void; // eslint-disable-line @typescript-eslint/no-explicit-any
-    onChangeRole: (member: any, role: UserRole) => void; // eslint-disable-line @typescript-eslint/no-explicit-any
+    onDelete: (member: User) => void;
+    onChangeRole: (member: User, role: UserRole) => void;
     onDeletePreRegistered: (id: string) => void;
-    onRestore: (member: any) => void; // eslint-disable-line @typescript-eslint/no-explicit-any
-    onDeletePermanently: (member: any) => void; // eslint-disable-line @typescript-eslint/no-explicit-any
+    onRestore: (member: User) => void;
+    onDeletePermanently: (member: User) => void;
 }
 
 export default function EmployeeListItem({

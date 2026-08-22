@@ -251,4 +251,92 @@ describe('checkReservationReminders', () => {
         );
         expect(mockUpdate).toHaveBeenCalledWith({ noShowReminderSent: true });
     });
+    // ── 운행일지 존재 확인 배치화 ──
+    // 예전에는 후보마다 driveLogs 쿼리를 따로 던졌다. Firestore는 결과가 없는 쿼리에도
+    // 읽기 1건을 최소 과금하므로, 일지를 안 쓴 후보가 많을수록(= 알림 대상이 많을수록)
+    // 후보 수만큼 읽기가 청구됐다. 아래 세 건이 "묶어서 한 번"을 고정한다.
+
+    function completedRes(id: string, user: string, vehicle: string) {
+        return {
+            id,
+            data: () => ({
+                userId: user,
+                vehicleDisplayName: vehicle,
+                endTime: '09:30',
+                driveLogReminderSent: false,
+                status: 'completed',
+            }),
+        };
+    }
+
+    it('후보가 여러 건이어도 driveLogs 조회는 한 번이다', async () => {
+        const candidates = [
+            completedRes('resA', 'userA', '스타렉스'),
+            completedRes('resB', 'userB', '카니발'),
+            completedRes('resC', 'userC', '아이오닉5'),
+        ];
+
+        mockGet
+            .mockResolvedValueOnce({ docs: [] })            // 1) 임박 알림
+            .mockResolvedValueOnce({ docs: candidates })    // 2) 종료 예약
+            .mockResolvedValueOnce({ docs: [] })            // 3) driveLogs 배치 — 아무도 안 씀
+            .mockResolvedValueOnce({ docs: [] });           // 4) no-show
+
+        await checkReservationReminders();
+
+        // driveLogs 쿼리가 후보 수(3)만큼이 아니라 1회만 나갔다 → 전체 get 호출은 4회
+        expect(mockGet).toHaveBeenCalledTimes(4);
+        // in 절에 후보 id가 한 번에 실렸다
+        expect(mockWhere).toHaveBeenCalledWith('reservationId', 'in', ['resA', 'resB', 'resC']);
+        // 세 명 모두에게 알림
+        expect(mockSendPushToUser).toHaveBeenCalledTimes(3);
+        expect(mockUpdate).toHaveBeenCalledTimes(3);
+    });
+
+    it('이미 일지를 쓴 예약만 골라 건너뛴다', async () => {
+        const candidates = [
+            completedRes('resA', 'userA', '스타렉스'),
+            completedRes('resB', 'userB', '카니발'),
+        ];
+        // resB는 이미 작성됨 — 배치 결과로 판별한다
+        const logs = [{ id: 'log1', data: () => ({ reservationId: 'resB' }) }];
+
+        mockGet
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: candidates })
+            .mockResolvedValueOnce({ docs: logs })
+            .mockResolvedValueOnce({ docs: [] });
+
+        await checkReservationReminders();
+
+        expect(mockSendPushToUser).toHaveBeenCalledTimes(1);
+        expect(mockSendPushToUser).toHaveBeenCalledWith('userA', {
+            title: '📝 운행일지 작성 알림',
+            body: '스타렉스 운행이 종료되었습니다. 운행일지를 작성해주세요.',
+        });
+    });
+
+    it('후보가 없으면 driveLogs를 아예 조회하지 않는다', async () => {
+        // 종료 예약이 있어도 전부 이미 알림 발송(driveLogReminderSent)이면 조회할 이유가 없다
+        const alreadySent = {
+            id: 'resX',
+            data: () => ({
+                userId: 'userX',
+                endTime: '09:30',
+                driveLogReminderSent: true,
+                status: 'completed',
+            }),
+        };
+
+        mockGet
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [alreadySent] })
+            .mockResolvedValueOnce({ docs: [] });  // no-show (driveLogs 조회 없음)
+
+        await checkReservationReminders();
+
+        expect(mockGet).toHaveBeenCalledTimes(3); // driveLogs 쿼리가 끼지 않았다
+        expect(mockWhere).not.toHaveBeenCalledWith('reservationId', 'in', expect.anything());
+        expect(mockSendPushToUser).not.toHaveBeenCalled();
+    });
 });

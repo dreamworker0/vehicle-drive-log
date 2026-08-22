@@ -10,6 +10,49 @@
 > 수를 직접 세려면: `node -e "console.log(require('./firestore.indexes.json').indexes.length)"`
 > (이 숫자를 손으로 갱신하다 25개에서 멈춰 실제 37개와 12개 어긋나 있었다.)
 
+### 🔍 코드 대조 재검증 (2026-08-22, 39개 전수)
+
+`firestore.indexes.json`의 39개를 `src/`·`functions/`의 실제 쿼리(`where`/`orderBy`/집계)와
+1:1로 대조했다. 아래 표가 **정적 대조 결과**이며, 삭제 판정은 GCP Console의 히트 수로
+확정한다 — 쓰이는 인덱스를 지우면 해당 화면이 즉시 `FAILED_PRECONDITION`으로 깨진다.
+
+#### 삭제 후보 (코드에 대응 쿼리가 없음 — 확신 높음)
+
+| 컬렉션 | 필드 | 근거 |
+|---|---|---|
+| `users` | `organizationId + name` | `orderBy('name')`이 코드 전체에 없다. 이름 정렬은 **메모리에서** 한다 (`useEmployeeManager.ts:70,74`의 `localeCompare`). |
+| `notifications` | `organizationId + createdAt` | `notifications` 쿼리는 `targetUid`·`read`·`createdAt`만 쓴다. `organizationId`로 필터하는 경로가 없다 (기관 팬아웃은 `users`를 조회해 uid별로 쓴다). |
+
+#### 중복 후보 (같은 필드 집합이 두 번)
+
+| 컬렉션 | 필드 | 근거 |
+|---|---|---|
+| `driveLogs` | `organizationId+vehicleId+driverUid+timestamp` ↔ `driverUid+organizationId+vehicleId+timestamp` | 필드 **집합이 같다**. 등호 필터 3개 + `timestamp` 정렬 구조에서 등호 필드의 상대 순서는 인덱스 선택에 영향을 주지 않으므로 한쪽이 잉여로 보인다. 다만 이 판단은 Firestore의 인덱스 선택 규칙에 의존하므로 Console 히트 수로 확인한 뒤 지운다. |
+
+#### ⚠️ 기존 문서의 "미사용 의심" 판정 정정 — 셋 다 실제로 쓰인다
+
+아래 세 건은 이 문서의 옛 표(#20·#21·#22)가 "미사용 가능성 높음/불명확"으로 적어 두었으나,
+**대조 결과 모두 사용 중**이다. 추측만으로 지웠다면 화면이 깨졌을 항목이다.
+
+| 컬렉션 | 필드 | 실제 사용처 |
+|---|---|---|
+| `fuelLogs` | `date + fuelCost` | 집계 쿼리 `sum('fuelCost')` + `date` 범위 — `src/hooks/serviceDashboard/loadFuelHipassStats.ts:51,53`, `functions/.../computeDashboardStats.ts:75` |
+| `hipassCharges` | `date + chargeAmount` | 집계 쿼리 `sum('chargeAmount')` + `date` 범위 — 같은 파일 52·54행, `computeDashboardStats.ts:77` |
+| `hipassCharges` | `cardId + organizationId + createdAt` | `src/lib/firestore/hipassCharges.ts:51-53` (`organizationId`+`cardId` 등호 + `createdAt` 정렬) |
+
+> 교훈: 집계 쿼리(`sum`/`count`)도 인덱스를 쓴다. "이 필드 조합으로 `where`를 부르는 코드가
+> 안 보인다"만으로 미사용 판정을 내리면 집계 경로를 놓친다.
+
+#### 확인된 사용 중 (나머지 34개)
+
+`driveLogs` 8개(위 중복 후보 1건 제외), `favorites` 1, `fuelLogs` 2, `maintenanceRecords` 2,
+`notifications` 2, `organizations` 7, `vehicles` 1, `hipassCharges` 3, `reservations` 4,
+`auditLogs` 3, `feedbacks` 1 — 전부 대응 쿼리를 확인했다. `auditLogs`의
+`action+organizationId+at`은 #193에서 복원한 것으로, `KIND_ACTIONS` 필터
+(`where('action','in',...)`) 경로가 쓴다.
+
+---
+
 ### ✅ 사용 중인 인덱스 (2026-03 기준 16개)
 
 | # | 컬렉션 | 필드 | 사용 위치 |
@@ -83,7 +126,10 @@
 2. ~~**`reservationReminder` 주기 조정**~~ → 완료. 5분 → 평일 근무시간 매시(1시간)로 축소, OCR 워밍업도 이 cron에 편승
 
 ### 검토 대기
-3. **인덱스 38개 전수 재검증** — GCP Console 실제 히트 수로 미사용 인덱스 판정 후 제거 (§1 참조)
+3. **인덱스 39개 전수 재검증** — 코드 대조는 완료(§1의 "코드 대조 재검증", 2026-08-22).
+   삭제 후보 2개(`users organizationId+name`, `notifications organizationId+createdAt`) +
+   중복 후보 1개(`driveLogs` 4필드 인덱스 둘 중 하나)가 남았다. **Console 히트 수 확인 후 제거**.
+   미사용 인덱스는 쓰기마다 갱신되므로 제거하면 쓰기 비용이 줄어든다.
 4. **야간 배치의 아카이빙 배치 크기** — 500건 제한은 적절, 다만 3년 이상 데이터가 많아지면 반복 실행 필요
    (독립 함수 `archiveDriveLogs`는 없다 — `dailyNightlyBatch`의 스텝이다)
 

@@ -8,7 +8,7 @@ import { useToast } from './useToast';
 import { useConfirm } from './useConfirm';
 import useRetry from './useRetry';
 import { getOrganizationMembers, getOrganization, regenerateInviteCode, updateUser, restoreUser, getPreRegisteredEmployees, addPreRegisteredEmployee, deletePreRegisteredEmployee } from '../lib/firestore';
-import type { User, UserRole } from '../types/user';
+import type { User, UserRole, MemberStatus, UnifiedMember } from '../types/user';
 import type { Organization } from '../types/organization';
 import { captureError } from '../lib/sentry';
 import { APP_URL } from '../lib/constants';
@@ -286,15 +286,7 @@ export default function useEmployeeManager() {
     const regularEmployees = employees.filter(e => e.role === 'employee');
 
     // ── 통합 목록: 활성 + 가입대기 + 비활성 ──
-    type MemberStatus = 'active' | 'pending' | 'disabled';
-    interface UnifiedMember {
-        id: string;
-        name: string;
-        email: string;
-        role?: string;
-        memberStatus: MemberStatus;
-        original: User; // 원본 데이터 참조 (가입대기는 사용하지 않음)
-    }
+    // 타입은 src/types/user.ts가 단일 원본이다 (EmployeeListItem과 공유).
 
     const unifiedList: UnifiedMember[] = [
         // 1) 활성 직원 — 관리자 먼저, 이름순

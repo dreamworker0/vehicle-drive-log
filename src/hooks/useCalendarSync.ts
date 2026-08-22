@@ -86,6 +86,15 @@ export function useCalendarSync() {
                     return true;
                 }
 
+                // 서버가 호출 빈도 상한으로 건너뛴 경우 — 재시도하면 상한을 더 소모할 뿐이다.
+                // 쿨다운을 적용해 조용히 멈춘다. 놓친 변경은 30분 주기 스케줄러가 따라잡는다.
+                if (response.data && response.data.errorType === 'rate-limited') {
+                    devLog(`[useCalendarSync] Server rate limit hit for vehicle ${vehicleId}. Stopping retries.`);
+                    updateSyncTime(vehicleId);
+                    setLoading(false);
+                    return false;
+                }
+
                 // 캘린더 미존재/공유 권한 누락은 설정 오류이므로 재시도 무의미 → 쿨다운 적용 후 조용히 중단
                 if (response.data && response.data.errorType === 'calendar-not-found') {
                     devLog(`[useCalendarSync] Calendar not found or unlinked for vehicle ${vehicleId}. Stopping retries.`);

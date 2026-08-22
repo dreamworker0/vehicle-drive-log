@@ -2,7 +2,8 @@ import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { sendDiscordAlert } from "../../core/discord";
 
 export const notifyRoleChange = onDocumentWritten(
-    "users/{uid}",
+    // cloud-functions.md §3.2의 기본값(256MiB). 문서 1건만 처리한다.
+    { document: "users/{uid}", memory: "256MiB" },
     async (event) => {
         const before = event.data?.before.data();
         const after = event.data?.after.data();

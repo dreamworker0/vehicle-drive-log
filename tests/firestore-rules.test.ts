@@ -981,4 +981,144 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertFails(author.collection('feedbacks').doc('fb_ok').get());
   });
 
+  it('22. 기관 신청서(orgApplications) — 남의 신청서를 이메일 위조로 열지 못한다', async () => {
+    // 이 컬렉션은 신청자 이메일·연락처가 담긴 개인정보다. 조건이 단순 소유권(uid)이 아니라
+    // **토큰의 email과 문서의 applicantEmail 일치**라 실수 여지가 커서 따로 고정한다.
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('orgApplications').doc('app_kim').set({
+        applicantEmail: 'kim@a.or.kr',
+        orgName: '가나복지관',
+        phone: '010-1111-2222',
+        status: 'pending',
+      });
+    });
+
+    const kim = setupContext('uid_kim', { email: 'kim@a.or.kr' }).firestore();
+    const lee = setupContext('uid_lee', { email: 'lee@b.or.kr' }).firestore();
+    const superAdmin = setupContext('uid_root', { role: 'superAdmin' }).firestore();
+
+    // (1) 본인 신청서는 읽을 수 있다
+    await assertSucceeds(kim.collection('orgApplications').doc('app_kim').get());
+    // (2) 남의 신청서는 못 읽는다 — 개인정보 노출 경로
+    await assertFails(lee.collection('orgApplications').doc('app_kim').get());
+    // (3) superAdmin은 심사해야 하므로 읽는다
+    await assertSucceeds(superAdmin.collection('orgApplications').doc('app_kim').get());
+
+    // (4) 생성은 본인 이메일 명의만 — 남의 이메일로 접수할 수 없다
+    await assertSucceeds(kim.collection('orgApplications').doc('app_new').set({
+      applicantEmail: 'kim@a.or.kr', orgName: '새복지관', status: 'pending',
+    }));
+    await assertFails(lee.collection('orgApplications').doc('app_forge').set({
+      applicantEmail: 'kim@a.or.kr', orgName: '위조', status: 'pending',
+    }));
+
+    // (5) 심사 결과 변경(update)·삭제는 superAdmin만 — 신청자가 스스로 승인할 수 없다
+    await assertFails(kim.collection('orgApplications').doc('app_kim').update({ status: 'approved' }));
+    await assertSucceeds(superAdmin.collection('orgApplications').doc('app_kim').update({ status: 'approved' }));
+    await assertFails(kim.collection('orgApplications').doc('app_kim').delete());
+    await assertSucceeds(superAdmin.collection('orgApplications').doc('app_kim').delete());
+  });
+
+  it('23. users/{uid}/private — superAdmin도 예외가 아니다 (11번 보완)', async () => {
+    // 11번이 본인·같은 기관 멤버 차단을 이미 고정한다. 여기서 더하는 것은 **superAdmin**이다 —
+    // 전체 데이터 읽기 권한을 가진 역할이라 "관리자니까 열어 준다"로 뚫리기 쉬운 자리인데,
+    // 이 컬렉션은 Google OAuth 리프레시 토큰이라 열리면 계정 임퍼소네이션이 된다
+    // (2026-07-10 감사 #4). 부모 문서 읽기가 정상임도 함께 고정해, private만 닫힌 것임을 밝힌다.
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.collection('users').doc('uid_owner').set({ email: 'o@a.or.kr', organizationId: 'org-A' });
+      await db.collection('users').doc('uid_owner').collection('private').doc('googleOauth').set({
+        refreshToken: 'SECRET',
+      });
+    });
+
+    const owner = setupContext('uid_owner', { orgId: 'org-A' }).firestore();
+    const sameOrg = setupContext('uid_peer', { orgId: 'org-A' }).firestore();
+    const superAdmin = setupContext('uid_root', { role: 'superAdmin' }).firestore();
+
+    const path = (db: typeof owner) =>
+      db.collection('users').doc('uid_owner').collection('private').doc('googleOauth');
+
+    // 본인조차 읽을 수 없다 — 토큰은 서버만 만진다
+    await assertFails(path(owner).get());
+    await assertFails(path(sameOrg).get());
+    await assertFails(path(superAdmin).get());
+
+    // 쓰기도 전면 차단 (본인 명의로도 심을 수 없다)
+    await assertFails(path(owner).set({ refreshToken: 'INJECTED' }));
+    await assertFails(path(superAdmin).set({ refreshToken: 'INJECTED' }));
+
+    // 부모 문서 읽기는 여전히 정상 — private만 닫힌 것이다
+    await assertSucceeds(owner.collection('users').doc('uid_owner').get());
+  });
+
+  it('24. organizations 하위 컬렉션 — 읽기는 멤버, 쓰기는 관리자(stats는 서버 전용)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.collection('organizations').doc('org-A').set({ name: '가나복지관', status: 'approved' });
+      await db.collection('organizations').doc('org-A').collection('customHolidays').doc('h1').set({ date: '2026-09-01' });
+      await db.collection('organizations').doc('org-A').collection('preRegistered').doc('p1').set({ email: 'new@a.or.kr' });
+      await db.collection('organizations').doc('org-A').collection('stats').doc('s1').set({ totalLogs: 10 });
+    });
+
+    const employee = setupContext('uid_emp', { orgId: 'org-A', role: 'employee' }).firestore();
+    const orgAdmin = setupContext('uid_adm', { orgId: 'org-A', role: 'admin' }).firestore();
+    const otherOrg = setupContext('uid_out', { orgId: 'org-B', role: 'admin' }).firestore();
+    const sub = (db: typeof employee, name: string, id: string) =>
+      db.collection('organizations').doc('org-A').collection(name).doc(id);
+
+    // 커스텀 휴일 — 멤버 읽기, 관리자 쓰기
+    await assertSucceeds(sub(employee, 'customHolidays', 'h1').get());
+    await assertFails(sub(otherOrg, 'customHolidays', 'h1').get());
+    await assertFails(sub(employee, 'customHolidays', 'h2').set({ date: '2026-09-02' }));
+    await assertSucceeds(sub(orgAdmin, 'customHolidays', 'h2').set({ date: '2026-09-02' }));
+
+    // 사전 등록 — 직원 이메일이 담기므로 타 기관 차단
+    await assertSucceeds(sub(employee, 'preRegistered', 'p1').get());
+    await assertFails(sub(otherOrg, 'preRegistered', 'p1').get());
+    await assertSucceeds(sub(orgAdmin, 'preRegistered', 'p2').set({ email: 'x@a.or.kr' }));
+    await assertFails(sub(employee, 'preRegistered', 'p3').set({ email: 'y@a.or.kr' }));
+
+    // 집계 통계 — 읽기는 멤버, 쓰기는 아무도 못 한다(Cloud Functions 전용)
+    await assertSucceeds(sub(employee, 'stats', 's1').get());
+    await assertFails(sub(otherOrg, 'stats', 's1').get());
+    await assertFails(sub(orgAdmin, 'stats', 's1').update({ totalLogs: 999 }));
+  });
+
+  it('25. 즐겨찾기·월별 집계·시스템 문서 — 소유자/멤버 경계와 서버 전용 쓰기', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.collection('favorites').doc('f_mine').set({ userId: 'uid_me', label: '집' });
+      await db.collection('orgStats').doc('org-A').collection('monthly').doc('2026-08').set({ logs: 5 });
+      await db.collection('system').doc('holidays').set({ '2026-09-01': '임시공휴일' });
+      await db.collection('system').doc('secretConfig').set({ token: 'SECRET' });
+    });
+
+    const me = setupContext('uid_me', { orgId: 'org-A' }).firestore();
+    const other = setupContext('uid_other', { orgId: 'org-A' }).firestore();
+    const superAdmin = setupContext('uid_root', { role: 'superAdmin' }).firestore();
+
+    // 즐겨찾기 — 같은 기관이어도 남의 것은 못 읽고 못 지운다 (주소는 개인 정보다)
+    await assertSucceeds(me.collection('favorites').doc('f_mine').get());
+    await assertFails(other.collection('favorites').doc('f_mine').get());
+    await assertFails(other.collection('favorites').doc('f_mine').delete());
+    await assertSucceeds(me.collection('favorites').doc('f_mine').delete());
+    // 명의 위조 생성 차단
+    await assertFails(other.collection('favorites').doc('f_forge').set({ userId: 'uid_me', label: '위조' }));
+
+    // 월별 집계 — 멤버 읽기 가능, 클라이언트 쓰기는 전면 차단
+    await assertSucceeds(me.collection('orgStats').doc('org-A').collection('monthly').doc('2026-08').get());
+    await assertFails(me.collection('orgStats').doc('org-A').collection('monthly').doc('2026-08').update({ logs: 99 }));
+    // 타 기관 집계는 못 읽는다
+    const outsider = setupContext('uid_b', { orgId: 'org-B' }).firestore();
+    await assertFails(outsider.collection('orgStats').doc('org-A').collection('monthly').doc('2026-08').get());
+
+    // system — holidays만 로그인 사용자에게 열려 있고, 나머지 문서는 superAdmin 전용
+    await assertSucceeds(me.collection('system').doc('holidays').get());
+    await assertFails(me.collection('system').doc('secretConfig').get());
+    await assertSucceeds(superAdmin.collection('system').doc('secretConfig').get());
+    // 공휴일도 클라이언트가 고칠 수는 없다
+    await assertFails(superAdmin.collection('system').doc('holidays').update({ hacked: true }));
+  });
+
 });

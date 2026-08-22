@@ -18,11 +18,25 @@
  *   1. 카탈로그 ↔ functions/src/index.ts export  (1:1)
  *   2. README의 "전체 N개 함수"           ↔ 카탈로그 총계
  *   3. README 종류별 표의 개수            ↔ 카탈로그 타입별 집계
+ *   4. 배포 가능한 함수를 정의하지만 index.ts에 export되지 않은 **고아 파일**
+ *
+ * ## 4번을 뒤늦게 추가한 이유
+ *
+ * 1~3번은 전부 index.ts를 기준으로 삼는다. 그래서 **index.ts에 아예 없는 함수 파일은
+ * 어떤 검사에도 걸리지 않았다.** `services/driveLog/updateDriveLogStats.ts`가 그렇게
+ * 남아 있었다 — 존재하지 않는 경로(`organizations/{orgId}/driveLogs/{logId}`)를 듣고
+ * 아무도 읽지 않는 경로에 쓰는 v1 트리거였는데, export가 없어 배포된 적이 없다.
+ * 그러면서 문서(백로그·구현이력)에는 "집계 트리거, 배포 즉시 프로덕션 반영"으로
+ * 적혀 있어 런타임 메이저 이관의 최대 난관(네임스페이스 API 12건 중 8건)으로
+ * 계산되고 있었다. 죽은 코드가 살아 있는 위험으로 문서화된 셈이다.
+ *
+ * 배포되지 않는 함수는 잊히지만 lint·type-check·이관 대상 집계에는 계속 잡힌다.
+ * 그래서 "정의했으면 등록하라"를 기계로 강제한다 (CLAUDE.md 절대규칙 #3).
  *
  * 실행: npx tsx scripts/check-functions-catalog.ts
  */
-import { readFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { readFileSync, readdirSync } from 'node:fs';
+import { join, resolve, relative, sep } from 'node:path';
 
 const ROOT = resolve(import.meta.dirname, '..');
 const INDEX_TS = join(ROOT, 'functions/src/index.ts');
@@ -56,7 +70,49 @@ const onlyCatalog = [...catalog].filter((n) => !exported.has(n)).sort();
 for (const n of onlyIndex) problems.push(`   카탈로그 누락: ${n} (index.ts에는 export되어 있음 → 레퍼런스에 안 나옴)`);
 for (const n of onlyCatalog) problems.push(`   존재하지 않는 함수: ${n} (카탈로그에만 있음 → index.ts에 export 없음)`);
 
-// ── 3. README 수치 대조 ──
+// ── 3. 고아 함수 파일 탐지 ──
+// 배포 가능한 트리거·콜러블을 정의하면서 index.ts에 export되지 않은 파일을 찾는다.
+const DEPLOYABLE = /\b(onCall|onRequest|onSchedule|onDocumentCreated|onDocumentUpdated|onDocumentDeleted|onDocumentWritten)\s*\(/;
+// v1 잔존 함수(functions.region(...).firestore.document(...) 형태)도 같이 본다.
+const DEPLOYABLE_V1 = /functions\s*[\r\n\s]*\.\s*region|\.firestore\s*\.\s*document\s*\(|\.auth\s*\.\s*user\s*\(/;
+
+/**
+ * 핸들러를 **만들어 주는** 헬퍼는 자신이 배포 단위가 아니다.
+ * (createAuthenticatedProxy는 holidayProxy·tmapProxy가 감싸 쓰는 팩토리다.)
+ */
+const FACTORY_ALLOWLIST = new Set(['utils/createAuthenticatedProxy.ts']);
+
+function collectTsFiles(dir: string): string[] {
+    const out: string[] = [];
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+        if (entry.isDirectory()) {
+            if (entry.name === '__tests__') continue;
+            out.push(...collectTsFiles(join(dir, entry.name)));
+        } else if (entry.name.endsWith('.ts') && entry.name !== 'index.ts') {
+            out.push(join(dir, entry.name));
+        }
+    }
+    return out;
+}
+
+const FUNCTIONS_SRC = join(ROOT, 'functions/src');
+for (const file of collectTsFiles(FUNCTIONS_SRC)) {
+    const rel = relative(FUNCTIONS_SRC, file).split(sep).join('/');
+    if (FACTORY_ALLOWLIST.has(rel)) continue;
+
+    const src = readFileSync(file, 'utf8');
+    if (!DEPLOYABLE.test(src) && !DEPLOYABLE_V1.test(src)) continue;
+
+    const declared = [...src.matchAll(/export\s+const\s+(\w+)/g)].map((m) => m[1]);
+    if (declared.length === 0) continue; // 팩토리·헬퍼 (export const 형태가 아님)
+    if (declared.some((n) => exported.has(n))) continue; // 하나라도 등록돼 있으면 통과
+
+    problems.push(
+        `   고아 함수 파일: functions/src/${rel} — ${declared.join(', ')}를 정의하지만 index.ts에 export가 없습니다 (배포되지 않는 코드).`,
+    );
+}
+
+// ── 4. README 수치 대조 ──
 const readme = readFileSync(README, 'utf8');
 const total = entries.length;
 
