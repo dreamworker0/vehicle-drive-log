@@ -62,6 +62,9 @@ export default defineConfig({
             //            (analyticsCalc 비용/추천, monthlyReportCalc, reservationPatternCalc) 추가로 재상향.
             // 2026-08-09 지도(OrgMapView)·차트(TrendCharts·ReportCharts) 추가로 재상향
             //            (실측 lines 45.76/stmts 44.76/funcs 37.35/branches 35.84).
+            // 2026-08-22 커버리지 0%였던 훅 2종(useDriveLogList·useDailyLog)과 온디맨드 동기화
+            //            (useCalendarSync)·건의 모달 접근성 테스트 추가로 재상향
+            //            (실측 lines 49.56/stmts 48.46/funcs 40.57/branches 38.18).
             //
             // ── 전역 임계치만으로는 부족하다 ──
             // 전역 평균만 보면 **커버리지 0%인 핵심 모듈이 있어도 통과한다.** 잘 덮인 순수 함수
@@ -72,10 +75,10 @@ export default defineConfig({
             // glob 하한은 실측보다 3~6pp 낮게 잡는다. 리팩토링으로 분기 몇 개가 오가는 정도로는
             // 깨지지 않되, 모듈 하나가 통째로 무방비가 되면 걸리는 선이다.
             thresholds: {
-                lines: 45,
-                statements: 44,
-                functions: 37,
-                branches: 35,
+                lines: 48,
+                statements: 47,
+                functions: 39,
+                branches: 37,
 
                 // 운행일지 폼 — 서비스의 본체. 여기가 틀리면 기록 자체가 틀어진다 (실측 88/86/84/75)
                 'src/hooks/driveLogForm/**': {
@@ -100,6 +103,24 @@ export default defineConfig({
                 // 문서 스키마 — 필드 누락이 조용한 데이터 유실로 이어지는 경계 (실측 100/100/100/67)
                 'src/schemas/**': {
                     lines: 95, statements: 95, functions: 95, branches: 60,
+                },
+                // 운행일지 목록 — 관리자가 기록을 확인하고 지우는 화면. 필터를 빠르게 바꿀 때
+                // 이전 요청의 늦은 응답이 최신 목록을 덮는 경합(requestIdRef)이 여기 있고,
+                // 그 회귀는 테스트 없이는 알아챌 방법이 사실상 없다 (실측 90/87/94/72)
+                'src/hooks/useDriveLogList.ts': {
+                    lines: 85, statements: 82, functions: 88, branches: 66,
+                },
+                // 일별일지 — 누계 주행거리를 만드는 계산. 금일 거리는 음수 구간을 버리고,
+                // 금일 누계는 합이 아니라 최댓값이다. 이 숫자가 대외 보고 자료가 된다
+                // (실측 100/98/100/81)
+                'src/hooks/useDailyLog.ts': {
+                    lines: 94, statements: 92, functions: 94, branches: 74,
+                },
+                // 온디맨드 캘린더 동기화 — 예약 화면을 열 때마다 백그라운드로 호출되므로
+                // "실패했을 때 몇 번 더 부르는가"가 곧 비용이다. 서버 빈도 상한 응답에
+                // 재시도하지 않는 계약을 고정한다 (실측 66/65/50/60)
+                'src/hooks/useCalendarSync.ts': {
+                    lines: 60, statements: 59, functions: 45, branches: 54,
                 },
             },
             include: ['src/**/*.{ts,tsx}'],
