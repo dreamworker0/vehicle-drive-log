@@ -207,11 +207,34 @@ async function runFlush(): Promise<void> {
 
     if (allRecords.length === 0) return;
 
+    // 이번 flush에서 **뒤 항목까지 붙잡아 둘** 문서들. autoIncrement 키 순서 = 적재 순서이므로
+    // getAll은 사용자가 쓴 순서를 그대로 돌려주는데, 선행 항목을 건너뛰고 후속만 보내면
+    // 그 순서가 깨진다 (아래 blockKey 주석 참고).
+    const blocked = new Set<string>();
+    const docKey = (r: { collection: string; docId: string }) => `${r.collection}/${r.docId}`;
+
     for (const record of allRecords) {
+        // 같은 문서의 선행 항목이 아직 큐에 남아 있으면 이 항목도 보내지 않는다.
+        //
+        // **왜 필요한가.** 오프라인에서 운행일지를 만들고(CREATE) 도착 km를 채우면(UPDATE)
+        // 두 항목이 순서대로 쌓인다. CREATE가 일시 오류로 냉각에 들어간 채 UPDATE만 전송되면
+        // 아직 없는 문서를 고치려는 셈이라 not-found가 나고, not-found는 PERMANENT_ERROR_CODES에
+        // 있어 **재시도 없이 폐기**된다. 잠시 뒤 CREATE는 성공한다 — 결과는 '도착 km가 비어 있는
+        // 운행일지'다. Rules(kmOrderValid)까지 만들어 지키려던 정합성이 여기서 깨진다.
+        // DELETE도 같다: 냉각 중인 CREATE를 앞질러 DELETE가 성공하면, 뒤늦게 올라간 CREATE가
+        // 지운 문서를 되살린다.
+        //
+        // 이 continue도 냉각 건너뛰기와 마찬가지로 **시도로 세지 않는다** — 남을 기다린 것이
+        // 자기 재시도 횟수를 깎으면 안 된다.
+        if (blocked.has(docKey(record))) {
+            continue;
+        }
+
         // 냉각 중인 항목은 건너뛴다. 이 continue는 시도로 세지 않으므로 retryCount가 줄지 않고,
         // 연결이 깜빡이는 동안 재시도 횟수가 헛되게 소모되지 않는다.
         const cooldown = retryCooldownMs(record.retryCount ?? 0);
         if (cooldown > 0 && record.lastAttemptAt !== undefined && Date.now() - record.lastAttemptAt < cooldown) {
+            blocked.add(docKey(record));
             continue;
         }
 
@@ -258,6 +281,9 @@ async function runFlush(): Promise<void> {
                     console.error('[SyncQueue] 폐기 기록 저장 실패', writeError);
                 }
                 await database.delete('sync-store', record.id as number);
+                // 폐기한 문서는 blocked에 넣지 않는다 — 선행 항목이 영영 반영되지 않으면
+                // 후속 항목도 닿을 곳이 없다. 그때는 붙잡아 두고 재시도 상한(약 31분)을
+                // 태우기보다 지금 같이 폐기해, 사용자에게 '유실'을 정확한 사유로 즉시 알린다.
             } else {
                 const waitMin = Math.round(retryCooldownMs(retryCount) / 60_000);
                 console.error(
@@ -265,6 +291,8 @@ async function runFlush(): Promise<void> {
                     error,
                 );
                 await database.put('sync-store', { ...record, retryCount, lastAttemptAt: Date.now() });
+                // 큐에 남겨 재시도할 항목이므로 같은 문서의 후속은 이번 회차에 보내지 않는다.
+                blocked.add(docKey(record));
             }
         }
     }

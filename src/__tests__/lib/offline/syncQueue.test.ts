@@ -268,6 +268,96 @@ describe('offline syncQueue', () => {
         }
     });
 
+    // ── 문서 단위 순서 보존 ──
+    // getAll은 autoIncrement 키 순서(= 적재 순서)로 돌려주지만, 선행 항목을 건너뛰고 후속만
+    // 보내면 그 순서가 깨진다. 아래 4건이 "선행이 큐에 남아 있는 동안 후속을 보내지 않는다"를 고정한다.
+
+    it('선행 CREATE가 냉각 중이면 같은 문서의 UPDATE를 보내지 않는다 — 도착 km 유실 방지', async () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        try {
+            // 오프라인에서 운행일지 생성 → 도착 km 입력. 두 항목이 순서대로 쌓인다.
+            await enqueue('CREATE', 'driveLogs', 'LOG1', { startKm: 100 });
+            await enqueue('UPDATE', 'driveLogs', 'LOG1', { endKm: 150 });
+
+            // 신호가 깜빡이는 지점: CREATE는 일시 오류, UPDATE는 아직 없는 문서라 not-found
+            vi.mocked(setDoc).mockRejectedValue(Object.assign(new Error('offline'), { code: 'unavailable' }));
+            vi.mocked(updateDoc).mockRejectedValue(Object.assign(new Error('missing'), { code: 'not-found' }));
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+
+            await flushQueue();
+
+            // UPDATE는 전송 시도조차 하지 않는다 — not-found로 즉시 폐기되던 경로가 막혔다
+            expect(vi.mocked(updateDoc)).not.toHaveBeenCalled();
+            expect(await drainFailedRecords()).toEqual([]);   // 유실 없음
+            expect(await allDocIds()).toEqual(['LOG1', 'LOG1']); // 둘 다 큐에 보존
+
+            // 냉각이 끝나고 연결이 회복되면 순서대로 올라간다
+            vi.setSystemTime(Date.now() + retryCooldownMs(1) + 1);
+            vi.mocked(setDoc).mockResolvedValue(undefined);
+            vi.mocked(updateDoc).mockResolvedValue(undefined);
+            await flushQueue();
+
+            expect(vi.mocked(updateDoc)).toHaveBeenCalledTimes(1);
+            expect(await allDocIds()).toEqual([]);
+            expect(await getPendingCount()).toBe(0);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('선행 CREATE가 냉각 중이면 같은 문서의 DELETE도 보내지 않는다 — 지운 문서가 되살아나지 않게', async () => {
+        vi.useFakeTimers({ toFake: ['Date'] });
+        try {
+            await enqueue('CREATE', 'driveLogs', 'LOG2', { startKm: 10 });
+            await enqueue('DELETE', 'driveLogs', 'LOG2', null);
+
+            vi.mocked(setDoc).mockRejectedValue(Object.assign(new Error('offline'), { code: 'unavailable' }));
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+
+            await flushQueue();
+
+            // DELETE는 없는 문서에도 성공하므로, 앞질러 보내면 큐에서 사라진 뒤
+            // 뒤늦게 올라간 CREATE가 문서를 되살린다
+            expect(vi.mocked(deleteDoc)).not.toHaveBeenCalled();
+            expect(await allDocIds()).toEqual(['LOG2', 'LOG2']);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it('다른 문서는 서로를 막지 않는다 — 한 건이 냉각이어도 나머지는 올라간다', async () => {
+        await enqueue('CREATE', 'driveLogs', 'STUCK', { startKm: 1 });
+        await enqueue('CREATE', 'driveLogs', 'OTHER', { startKm: 2 });
+
+        vi.mocked(setDoc)
+            .mockRejectedValueOnce(Object.assign(new Error('offline'), { code: 'unavailable' }))
+            .mockResolvedValueOnce(undefined);
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        await flushQueue();
+
+        // 막힌 문서만 남는다
+        expect(await allDocIds()).toEqual(['STUCK']);
+    });
+
+    it('선행이 영구 오류로 폐기되면 후속도 같이 폐기한다 — 닿을 곳 없는 항목을 31분간 붙잡지 않는다', async () => {
+        await enqueue('CREATE', 'driveLogs', 'DENIED', { startKm: 1 });
+        await enqueue('UPDATE', 'driveLogs', 'DENIED', { endKm: 2 });
+
+        vi.mocked(setDoc).mockRejectedValue(Object.assign(new Error('denied'), { code: 'permission-denied' }));
+        vi.mocked(updateDoc).mockRejectedValue(Object.assign(new Error('missing'), { code: 'not-found' }));
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+
+        await flushQueue();
+
+        // 선행이 영영 반영되지 않으므로 후속도 즉시 폐기 — 사용자에게 정확한 사유로 바로 알린다
+        expect(await allDocIds()).toEqual([]);
+        const failed = await drainFailedRecords();
+        expect(failed).toHaveLength(2);
+        expect(failed.map((f) => f.type)).toEqual(['CREATE', 'UPDATE']);
+        expect(failed.every((f) => f.reason === 'permanent')).toBe(true);
+    });
+
     it('냉각은 실패할수록 길어지고 상한을 넘지 않는다', () => {
         expect(retryCooldownMs(0)).toBe(0);          // 첫 시도는 즉시
         expect(retryCooldownMs(1)).toBe(60_000);     // 1분
