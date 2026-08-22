@@ -5,7 +5,7 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { listCalendarEvents, parseEventToReservation } from "../../services/calendar/calendarSync";
-import { isGoogleCalendarEnabled } from "../../services/calendar/calendarFeature";
+import { isGoogleCalendarEnabled, type OrgCalendarFlagCache } from "../../services/calendar/calendarFeature";
 import { RETRY_COOLDOWN_MS, MAX_FAIL_COUNT, isCalendarAuthError, recordCalendarFailure, resetCalendarFailure } from "../../services/calendar/calendarFailTracking";
 import { sendDiscordAlert } from "../../core/discord";
 import { recordHeartbeat } from "../../utils/helpers";
@@ -81,6 +81,9 @@ export const syncCalendarToApp = onSchedule(
             let totalSkippedPermanent = 0;
 
             const globalProcessedEventIds = new Set<string>();
+            // 이 실행에서만 유효한 기관 플래그 캐시 — 한 기관에 차량이 여러 대여도
+            // organizations 문서를 한 번만 읽는다 (하루 34회 × 차량 대수만큼 절약).
+            const orgFlagCache: OrgCalendarFlagCache = new Map();
 
             for (let i = 0; i < vehiclesSnap.docs.length; i++) {
                 const vehicleDoc = vehiclesSnap.docs[i];
@@ -115,7 +118,7 @@ export const syncCalendarToApp = onSchedule(
 
                 try {
                     // 개별 차량 동기화 로직 호출
-                    const result = await syncSingleVehicleCalendar(vehicleId, vehicle, globalProcessedEventIds);
+                    const result = await syncSingleVehicleCalendar(vehicleId, vehicle, globalProcessedEventIds, orgFlagCache);
                     
                     totalCreated += result.created;
                     totalUpdated += result.updated;
@@ -166,7 +169,10 @@ export const syncCalendarToApp = onSchedule(
 export async function syncSingleVehicleCalendar(
     vehicleId: string,
     vehicleData: FirebaseFirestore.DocumentData,
-    globalProcessedEventIds: Set<string> = new Set<string>()
+    globalProcessedEventIds: Set<string> = new Set<string>(),
+    // 차량 순회 호출자가 실행 단위 Map을 넘기면 같은 기관의 문서를 한 번만 읽는다.
+    // 단일 차량 호출(온디맨드 동기화)에서는 중복이 없으므로 넘기지 않아도 된다.
+    orgFlagCache?: OrgCalendarFlagCache
 ): Promise<{
     created: number;
     updated: number;
@@ -182,7 +188,7 @@ export async function syncSingleVehicleCalendar(
     let cancelled = 0;
     let skippedDup = 0;
 
-    if (!await isGoogleCalendarEnabled(organizationId)) {
+    if (!await isGoogleCalendarEnabled(organizationId, orgFlagCache)) {
         console.log("Vehicle " + vehicleName + "(" + vehicleId + "): organization calendar feature disabled, skip");
         return { created, updated, cancelled, skippedDup };
     }

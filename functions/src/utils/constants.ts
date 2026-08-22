@@ -20,6 +20,12 @@ export const DEFAULT_RATE_LIMITS = {
     askAI: { max: 5, windowSec: 60 },               // uid당 분당 5회
     slackAssistant: { max: 10, windowSec: 600 },    // Slack 사용자당 10분당 10회 (Gemini 비용 방어, fail-closed)
     slackAssistantDailyOrg: { max: 100, windowSec: 86400 }, // Slack 기관당 일일 누적
+    // 온디맨드 캘린더 동기화 — 호출 1건당 Google Calendar API 조회 + 예약 범위 쿼리가 돈다.
+    // 30분 쿨다운이 클라이언트(useCalendarSync의 COOLDOWN_MS)에만 있어 우회 가능했다.
+    // 차량 키로 그 쿨다운을 서버에 옮기고(§1.1의 이중 키), uid 키로 기관 차량을
+    // 돌려가며 호출하는 것까지 막는다. 6은 클라이언트 재시도 3회를 삼키고도 남는 값이다.
+    onDemandCalendarSync: { max: 6, windowSec: 1800 },        // uid당 30분당 6회
+    onDemandCalendarSyncVehicle: { max: 6, windowSec: 1800 }, // 차량당 30분당 6회
 } as const;
 
 export type RateLimitKey = keyof typeof DEFAULT_RATE_LIMITS;

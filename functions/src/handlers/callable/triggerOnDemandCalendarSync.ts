@@ -2,6 +2,8 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore } from "firebase-admin/firestore";
 import { syncSingleVehicleCalendar } from "../scheduled/calendarSchedule";
 import { isCalendarAuthError, recordCalendarFailure, resetCalendarFailure, shouldSkipVehicleCalendar, MAX_FAIL_COUNT } from "../../services/calendar/calendarFailTracking";
+import { checkRateLimitBySubject } from "../../utils/rateLimit";
+import { getRateLimits } from "../../utils/constants";
 
 const db = getFirestore();
 
@@ -10,6 +12,10 @@ export const triggerOnDemandCalendarSync = onCall(
         region: "asia-northeast3",
         timeoutSeconds: 60,
         memory: "512MiB",
+        // App Check는 의도적으로 강제하지 않는다 — 이 함수는 캘린더 연결 문제를
+        // 진단·복구하는 경로라, App Check 실패가 원인을 가리는 부작용이 더 크다.
+        // (근거와 함께 scripts/__tests__/enforceAppCheckInvariant.test.ts의
+        //  PENDING_DECISION에 고정돼 있다.) 남용·비용 방어는 아래 3-2의 빈도 제한이 맡는다.
         enforceAppCheck: false,
         cors: [
             "https://vehicle-drive-log.web.app",
@@ -104,6 +110,48 @@ export const triggerOnDemandCalendarSync = onCall(
                 message: failCount >= MAX_FAIL_COUNT
                     ? "캘린더 동기화가 반복 실패로 중단된 차량입니다. 공유 설정을 정정한 뒤 헬스 체크에서 '동기화 리셋'을 해주세요."
                     : "캘린더 동기화가 일시 중단(쿨다운) 상태입니다. 잠시 후 다시 시도됩니다.",
+            };
+        }
+
+        // 3-2. 호출 빈도 제한 — 이 콜러블은 예약 캘린더를 열 때마다 백그라운드로 자동
+        // 호출된다(위 3-1 주석). 30분 쿨다운이 useCalendarSync의 브라우저 저장소에만
+        // 있었으므로, 기기·사용자가 늘면 같은 차량의 캘린더를 30분 안에 몇 번이고
+        // 다시 긁었다(호출 1건 = Google Calendar API 조회 + 예약 범위 쿼리).
+        //
+        // 두 키를 함께 본다 (ocr-cost-security §1.1의 이중 키):
+        //   차량 키 — 클라이언트 쿨다운을 서버로 옮긴다. 한 기관 직원 열 명이 동시에
+        //             예약 화면을 열어도 그 차량 동기화는 창당 상한까지만 돈다.
+        //   uid 키 — 자기 기관 차량을 돌려가며 호출하는 경로를 막는다.
+        //
+        // 초과 시 **예외를 던지지 않는다.** 던지면 useCalendarSync가 3회 재시도해
+        // 호출이 오히려 늘어난다. 3-1과 같은 소프트 스킵을 돌려주어 클라이언트가
+        // 쿨다운을 적용하고 조용히 멈추게 한다 — 자동 호출 경로라 사용자에게
+        // 보일 이유도 없다. 놓친 변경은 30분 주기 스케줄러가 따라잡는다.
+        const rateLimited = async (): Promise<string | null> => {
+            // 차량 키를 먼저 본다. 여기서 막히면 uid 카운터는 올리지 않는다 —
+            // 이미 거절할 요청에 _rateLimits 트랜잭션을 한 번 더 쓸 이유가 없다.
+            const vehicleLimit = await getRateLimits("onDemandCalendarSyncVehicle");
+            if (await checkRateLimitBySubject(
+                "triggerOnDemandCalendarSync:vehicle", vehicleId, vehicleLimit.max, vehicleLimit.windowSec, "closed",
+            )) return "vehicle";
+
+            // checkRateLimitByUid가 아니라 공통 구현을 쓴다 — 전자는 초과 시
+            // HttpsError를 던지는데, 여기서는 던지면 안 된다(클라이언트가 재시도한다).
+            const uidLimit = await getRateLimits("onDemandCalendarSync");
+            if (await checkRateLimitBySubject(
+                "triggerOnDemandCalendarSync", uid, uidLimit.max, uidLimit.windowSec, "closed",
+            )) return "uid";
+
+            return null;
+        };
+
+        const limitedBy = await rateLimited();
+        if (limitedBy) {
+            console.log(`[OnDemandSync] Vehicle ${vehicleId}: rate limited by ${limitedBy}, skip`);
+            return {
+                success: false,
+                errorType: "rate-limited",
+                message: "최근에 동기화했습니다. 잠시 후 자동으로 다시 반영됩니다.",
             };
         }
 

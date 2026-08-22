@@ -13,6 +13,8 @@ export const trackFirstEmployee = onDocumentCreated(
     {
         document: "users/{uid}",
         region: "asia-northeast3",
+        // cloud-functions.md §3.2의 기본값(256MiB). 문서 1건만 처리한다.
+        memory: "256MiB",
     },
     async (event) => {
         const userData = event.data?.data();

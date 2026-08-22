@@ -84,7 +84,10 @@ async function handleCalendarError(
 /**
  * 예약 생성 시 -> 캘린더 이벤트 생성
  */
-export const onReservationCreated = onDocumentCreated("reservations/{reservationId}", async (event) => {
+// cloud-functions.md §3.2의 기본값(256MiB). 문서 1건만 처리한다. 예약 쓰기마다 도는 트리거라 절감폭이 가장 크다.
+export const onReservationCreated = onDocumentCreated(
+    { document: "reservations/{reservationId}", memory: "256MiB" },
+    async (event) => {
     const reservation = event.data!.data();
     const reservationId = event.params.reservationId;
 
@@ -170,7 +173,10 @@ export const onReservationCreated = onDocumentCreated("reservations/{reservation
 /**
  * 예약 수정 시 -> 캘린더 이벤트 수정 또는 삭제 + 알림 전송
  */
-export const onReservationUpdated = onDocumentUpdated("reservations/{reservationId}", async (event) => {
+// cloud-functions.md §3.2의 기본값(256MiB). 문서 1건만 처리한다. 예약 쓰기마다 도는 트리거라 절감폭이 가장 크다.
+export const onReservationUpdated = onDocumentUpdated(
+    { document: "reservations/{reservationId}", memory: "256MiB" },
+    async (event) => {
     const before = event.data!.before.data();
     const after = event.data!.after.data();
     const reservationId = event.params.reservationId;
@@ -347,7 +353,10 @@ export const onReservationUpdated = onDocumentUpdated("reservations/{reservation
 /**
  * 예약 삭제 시 -> 캘린더 이벤트 삭제
  */
-export const onReservationDeleted = onDocumentDeleted("reservations/{reservationId}", async (event) => {
+// cloud-functions.md §3.2의 기본값(256MiB). 문서 1건만 처리한다. 예약 쓰기마다 도는 트리거라 절감폭이 가장 크다.
+export const onReservationDeleted = onDocumentDeleted(
+    { document: "reservations/{reservationId}", memory: "256MiB" },
+    async (event) => {
     const reservation = event.data!.data();
     const reservationId = event.params.reservationId;
 

@@ -8,7 +8,8 @@ import { escapeHtml } from "../../utils/helpers";
 import { GMAIL_APP_PASSWORD } from "../../core/params";
 
 export const notifyNewApplication = onDocumentWritten(
-    { document: "organizations/{orgId}", secrets: [GMAIL_APP_PASSWORD] },
+    // cloud-functions.md §3.2의 기본값(256MiB). 문서 1건만 처리한다.
+    { document: "organizations/{orgId}", secrets: [GMAIL_APP_PASSWORD], memory: "256MiB" },
     async (event) => {
         const before = event.data?.before.data();
         const after = event.data?.after.data();
