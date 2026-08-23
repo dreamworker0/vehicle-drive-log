@@ -55,6 +55,22 @@ const alertedConflicts = new Set<string>();
 /** 알림 기록 상한 — 비정상 상황에서 이 Set이 메모리를 먹지 않게 한다(넘으면 비우고 다시 센다). */
 const ALERTED_CONFLICTS_MAX = 500;
 
+/**
+ * 캘린더 ID로 쓰일 수 없는 주소 — **서비스 계정 이메일**.
+ *
+ * FAQ는 "캘린더를 이 서비스 계정과 *공유*하라"고 안내하는데(shared/faqData.ts), 그 주소를
+ * 캘린더 ID 칸에 그대로 붙여 넣은 기관이 실제로 있었다 — 2026-08-23 시딩에서 3개 기관·차량
+ * 8대가 같은 서비스 계정 주소를 가리키고 있었다.
+ *
+ * 이 값은 **어느 기관의 캘린더도 아니면서 모든 기관이 같은 곳을 가리키게 만든다.** 즉 사고로
+ * 만들어진 공유 버킷이고, 접근이 되는 순간 A기관 예약이 거기 쓰이고 B기관이 그것을 읽어온다
+ * (이 파일이 막으려는 바로 그 경로). 선점 등록의 대상으로도 삼지 않는다 — 한 기관에 귀속시키면
+ * 나머지 기관이 "남의 캘린더"로 차단될 뿐 원인(잘못된 입력)은 그대로 남는다.
+ */
+function isServiceAccountAddress(normalized: string): boolean {
+    return normalized.endsWith(".gserviceaccount.com");
+}
+
 /** 캘린더 ID 정규화 — 공백·대소문자 차이로 같은 캘린더가 다른 바인딩이 되지 않게 한다. */
 export function normalizeCalendarId(calendarId: string): string {
     return calendarId.trim().toLowerCase();
@@ -97,6 +113,18 @@ export async function isCalendarBoundToOrg(
     if (!calendarId || !organizationId) return false;
 
     const normalized = normalizeCalendarId(calendarId);
+
+    // 서비스 계정 주소는 어느 기관의 캘린더도 아니다 — 바인딩 조회 없이 즉시 거절한다.
+    if (isServiceAccountAddress(normalized)) {
+        console.error(JSON.stringify({
+            severity: "ERROR",
+            functionName: ctx.logName,
+            message: "캘린더 ID 칸에 서비스 계정 주소가 들어와 있다 — 동기화 차단 (공유 대상 주소를 잘못 입력한 설정 오류)",
+            requestedBy: organizationId,
+        }));
+        return false;
+    }
+
     const key = calendarBindingKey(normalized);
     const cacheKey = `${key}:${organizationId}`;
 

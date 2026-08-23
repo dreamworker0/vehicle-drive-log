@@ -94,6 +94,29 @@ describe('isCalendarBoundToOrg', () => {
         ).resolves.toBe(false);
     });
 
+    it('서비스 계정 주소는 바인딩 조회 없이 거절한다 (2026-08-23 시딩 발견)', async () => {
+        // FAQ가 "이 주소와 공유하라"고 안내하는 서비스 계정 이메일을 캘린더 ID 칸에 넣은
+        // 기관이 실제로 3곳 있었다. 어느 기관의 캘린더도 아니면서 모두가 같은 곳을 가리키게
+        // 만드는 값이라, 선점 등록 대상으로도 삼지 않는다.
+        await expect(
+            isCalendarBoundToOrg('1066541065552-compute@developer.gserviceaccount.com', 'org-1', { logName: 't' })
+        ).resolves.toBe(false);
+        await expect(
+            isCalendarBoundToOrg('my-app@appspot.gserviceaccount.com', 'org-1', { logName: 't' })
+        ).resolves.toBe(false);
+        // 조회도 등록도 하지 않는다
+        expect(mockGet).not.toHaveBeenCalled();
+        expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    it('비슷하지만 다른 도메인은 정상 캘린더로 다룬다 (과차단 방지)', async () => {
+        mockGet.mockResolvedValue(bindingSnap('org-1'));
+        // gserviceaccount.com이 아닌 주소는 막지 않는다
+        await expect(
+            isCalendarBoundToOrg('car@gserviceaccount.com.example.or.kr', 'org-1', { logName: 't' })
+        ).resolves.toBe(true);
+    });
+
     it('조회가 실패하면 열지 않는다 (fail-closed)', async () => {
         mockGet.mockRejectedValue(new Error('Firestore unavailable'));
         await expect(

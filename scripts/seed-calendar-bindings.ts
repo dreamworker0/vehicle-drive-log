@@ -125,8 +125,17 @@ async function seed() {
     let created = 0;
     let alreadyBound = 0;
     const conflicts: string[] = [];
+    const serviceAccountMisuse: string[] = [];
 
     for (const [key, entry] of owners) {
+        // 서비스 계정 주소는 어느 기관의 캘린더도 아니다 — FAQ의 "공유 대상"을 ID 칸에
+        // 넣은 설정 오류다. 소유 기관을 고르는 문제가 아니므로 충돌과 따로 안내한다.
+        if (entry.normalized.endsWith(".gserviceaccount.com")) {
+            serviceAccountMisuse.push(
+                `  ⚠️  ${entry.normalized}\n     기관 ${[...entry.orgIds].join(", ")}\n     차량 ${entry.vehicleIds.join(", ")}`
+            );
+            continue;
+        }
         if (entry.orgIds.size > 1) {
             conflicts.push(
                 `  ⚠️  ${entry.normalized} — 기관 ${[...entry.orgIds].join(", ")} (차량 ${entry.vehicleIds.join(", ")})`
@@ -160,6 +169,14 @@ async function seed() {
     console.log(`캘린더를 쓰는 차량이 가리키는 고유 캘린더: ${owners.size}개`);
     console.log(`  ${isDryRun ? "등록 예정" : "등록"}: ${created}개`);
     console.log(`  이미 등록됨(스킵): ${alreadyBound}개`);
+    if (serviceAccountMisuse.length > 0) {
+        console.log(`\n설정 오류 — 캘린더 ID 칸에 '공유 대상' 서비스 계정 주소가 들어가 있습니다 (${serviceAccountMisuse.length}건):`);
+        serviceAccountMisuse.forEach((c) => console.log(c));
+        console.log(`\n이 값은 어느 기관의 캘린더도 아니고, 여러 기관이 같은 곳을 가리키게 만듭니다.`);
+        console.log(`바인딩을 만들지 않았습니다(서버도 이 값으로는 동기화하지 않습니다).`);
+        console.log(`조치: 해당 차량들의 '캘린더 ID'를 비우고, 각 기관에 구글 캘린더 설정 →`);
+        console.log(`      캘린더 통합의 '캘린더 ID'를 입력하도록 안내하세요.`);
+    }
     if (conflicts.length > 0) {
         console.log(`\n확인 필요 (등록하지 않음) — ${conflicts.length}건:`);
         conflicts.forEach((c) => console.log(c));
