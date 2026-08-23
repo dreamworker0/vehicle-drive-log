@@ -37,6 +37,27 @@ const isDryRun = process.argv.includes("--dry-run");
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 
 /**
+ * 대상 프로젝트 ID.
+ *
+ * ADC에 프로젝트가 안 딸려 오는 경우(gcloud 로그인 등)가 흔하고, 그때 ADC의 **기본
+ * 프로젝트**(다른 프로젝트)를 조회해 **에러 없이 0건**이 나온다. 그러면 운영자는 등록할
+ * 것이 없다고 믿고 넘어가는데 실제로는 선점 창이 그대로 열려 있다. check-negative-values.ts가
+ * 같은 함정을 겪고 남긴 처방을 그대로 따른다 — 환경변수가 없으면 `.firebaserc`의 default.
+ */
+function resolveProjectId(): string | undefined {
+    const fromEnv = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
+    if (fromEnv) return fromEnv;
+    try {
+        const rc = JSON.parse(readFileSync(resolve(scriptDir, "../.firebaserc"), "utf8"));
+        return rc?.projects?.default;
+    } catch {
+        return undefined;
+    }
+}
+
+const projectId = resolveProjectId();
+
+/**
  * Firebase Admin 초기화 — 서비스 계정 키 파일이 있으면 그것을, 없으면 기본 인증
  * (GOOGLE_APPLICATION_CREDENTIALS 또는 gcloud ADC)을 쓴다.
  * 키 파일 위치는 저장소의 두 선례를 모두 본다(functions/ 아래와 루트).
@@ -49,29 +70,13 @@ function initAdmin() {
     ]) {
         if (candidate && existsSync(candidate)) {
             const sa = JSON.parse(readFileSync(candidate, "utf-8")) as ServiceAccount;
-            return initializeApp({ credential: cert(sa) });
+            return initializeApp({ credential: cert(sa), ...(projectId ? { projectId } : {}) });
         }
     }
-    return initializeApp();
+    return initializeApp(projectId ? { projectId } : undefined);
 }
 
-const app = initAdmin();
-const db = getFirestore(app);
-
-/**
- * 어느 프로젝트를 읽고 있는지 최선으로 판별한다.
- *
- * 이 스크립트가 0건을 보고했을 때 "연동 차량이 없다"와 "엉뚱한 프로젝트를 읽었다"를
- * 구분할 수 없으면, 운영자는 선점 창이 닫혔다고 오인한 채 넘어간다. 판별 근거를 항상 찍는다.
- */
-function describeTarget(): string {
-    const fromOptions = app.options.projectId;
-    const fromEnv = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
-    const emulator = process.env.FIRESTORE_EMULATOR_HOST;
-    const parts = [`프로젝트: ${fromOptions || fromEnv || "(확인 불가 — ADC가 내부적으로 결정)"}`];
-    if (emulator) parts.push(`⚠️ 에뮬레이터 접속 중(FIRESTORE_EMULATOR_HOST=${emulator}) — 프로덕션이 아니다`);
-    return parts.join("\n");
-}
+const db = getFirestore(initAdmin());
 
 /** functions/src/services/calendar/calendarBinding.ts와 같은 규칙이어야 한다 */
 function normalizeCalendarId(calendarId: string): string {
@@ -84,7 +89,11 @@ function calendarBindingKey(calendarId: string): string {
 async function seed() {
     console.log(`=== 캘린더 바인딩 시딩 시작 ${isDryRun ? "(DRY-RUN)" : ""} ===\n`);
 
-    console.log(describeTarget() + "\n");
+    console.log(`대상 프로젝트: ${projectId ?? "(미지정 — ADC 기본값을 씁니다)"}`);
+    if (process.env.FIRESTORE_EMULATOR_HOST) {
+        console.log(`⚠️  에뮬레이터 접속 중(FIRESTORE_EMULATOR_HOST=${process.env.FIRESTORE_EMULATOR_HOST}) — 프로덕션이 아닙니다`);
+    }
+    console.log("");
 
     const snap = await db.collection("vehicles").get();
 
@@ -158,10 +167,16 @@ async function seed() {
         console.log(`calendarBindings 문서를 직접 만들고, 잘못 등록된 차량의 캘린더 ID를 비워주세요.`);
     }
     if (snap.size === 0) {
-        console.log(`\n⚠️  차량 문서를 한 건도 읽지 못했습니다.`);
-        console.log(`   "연동 차량이 없음"이 아니라 **다른 프로젝트를 읽었거나 권한이 없는** 상태일 수 있습니다.`);
-        console.log(`   위의 '프로젝트:' 값이 운영 프로젝트인지 확인하세요.`);
-        console.log(`   (gcloud config get-value project / firebase use / GOOGLE_CLOUD_PROJECT 환경변수)`);
+        // 0건은 "등록할 것이 없음"이 아니라 **시딩이 이루어지지 않은 것**이다.
+        // 성공으로 보이면 선점 창이 열린 채 넘어가므로 종료 코드로 끊는다.
+        console.error(`\n⚠️  차량 문서를 한 건도 읽지 못했습니다 — 시딩이 이루어지지 않았습니다.\n`);
+        console.error(`조회한 프로젝트: ${projectId ?? "(미지정)"}`);
+        console.error(`\n확인할 것:`);
+        console.error(`  1. 프로젝트가 맞는지 — 운영 데이터는 .firebaserc의 default 프로젝트에 있습니다.`);
+        console.error(`     PowerShell:  $env:GOOGLE_CLOUD_PROJECT = "vehicle-drive-log"`);
+        console.error(`     gcloud로 로그인하면 ADC의 기본 프로젝트가 다른 곳으로 잡혀 있을 수 있습니다.`);
+        console.error(`  2. 그 프로젝트의 Firestore 읽기 권한이 계정에 있는지.\n`);
+        process.exit(1);
     } else if (owners.size === 0) {
         console.log(`\n차량은 ${snap.size}대 읽었지만 캘린더를 연동한 차량이 없습니다 — 등록할 바인딩이 없는 정상 상태입니다.`);
         console.log(`(앞으로 어느 기관이 캘린더를 연동하면 그 시점에 자동으로 선점 등록됩니다.)`);
