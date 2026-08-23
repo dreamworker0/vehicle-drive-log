@@ -14,6 +14,8 @@ const mockReservationsQueryGet = jest.fn();
 const mockDoubleCheckGet = jest.fn();
 const mockUserProfileGet = jest.fn();
 const mockOrganizationGet = jest.fn();
+const mockCalendarBindingGet = jest.fn();
+const mockCalendarBindingCreate = jest.fn();
 
 jest.mock('firebase-admin/firestore', () => ({
     getFirestore: () => ({
@@ -23,6 +25,9 @@ jest.mock('firebase-admin/firestore', () => ({
             }
             if (name === 'organizations') {
                 return { doc: () => ({ get: mockOrganizationGet }) };
+            }
+            if (name === 'calendarBindings') {
+                return { doc: () => ({ get: mockCalendarBindingGet, create: mockCalendarBindingCreate }) };
             }
             // reservations: 기간 쿼리(3중 where) / 더블체크(where+limit) / doc().set·update
             const q: Record<string, unknown> = { _limited: false };
@@ -140,6 +145,8 @@ describe('syncSingleVehicleCalendar — reservedByName 폴백 체인', () => {
         mockDoubleCheckGet.mockResolvedValue({ docs: [], empty: true });
         mockListCalendarEvents.mockResolvedValue([makeEvent()]);
         mockOrganizationGet.mockResolvedValue({ exists: true, data: () => ({}) });
+        // 캘린더는 이 차량의 기관에 귀속돼 있다 (정상 경로)
+        mockCalendarBindingGet.mockResolvedValue({ exists: true, data: () => ({ organizationId: 'org-1' }) });
     });
     afterEach(() => jest.restoreAllMocks());
 
@@ -190,6 +197,31 @@ describe('syncSingleVehicleCalendar — reservedByName 폴백 체인', () => {
         expect(mockSet).toHaveBeenCalledWith(expect.objectContaining({
             reservedByName: '김종원',
         }));
+    });
+
+    it('다른 기관에 귀속된 캘린더면 이벤트 조회조차 하지 않는다 (2026-08-23 감사 발견 1)', async () => {
+        // 관리자가 차량에 남의 캘린더 ID를 적어 넣은 상황. 이 검사가 없으면 그 기관의
+        // 일정이 우리 예약으로 저장된다(정보 유출) — 유입 지점에서 끊는다.
+        mockCalendarBindingGet.mockResolvedValue({
+            exists: true,
+            data: () => ({ organizationId: 'victim-org' }),
+        });
+
+        const result = await syncSingleVehicleCalendar('veh-1', VEHICLE);
+
+        expect(result).toEqual({ created: 0, updated: 0, cancelled: 0, skippedDup: 0 });
+        // 캘린더 API 호출 자체가 없어야 한다 (요청을 보내면 이미 늦다)
+        expect(mockListCalendarEvents).not.toHaveBeenCalled();
+        expect(mockSet).not.toHaveBeenCalled();
+    });
+
+    it('바인딩 조회가 실패하면 동기화하지 않는다 (fail-closed)', async () => {
+        mockCalendarBindingGet.mockRejectedValue(new Error('Firestore unavailable'));
+
+        const result = await syncSingleVehicleCalendar('veh-1', VEHICLE);
+
+        expect(result).toEqual({ created: 0, updated: 0, cancelled: 0, skippedDup: 0 });
+        expect(mockListCalendarEvents).not.toHaveBeenCalled();
     });
 
     it('기관이 Google 캘린더 기능을 끄면 역동기화를 시작하지 않는다', async () => {

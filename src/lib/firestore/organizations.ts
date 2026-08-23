@@ -18,9 +18,28 @@ const orgConverter = createZodConverter(organizationSchema);
 // 초대 코드
 // ========================
 
-// 초대 코드 생성 (6자리 영숫자)
+/**
+ * 초대 코드 생성 (6자리, 암호학적 난수)
+ *
+ * 초대 코드는 기관 데이터 전체를 여는 사실상 단일 자격증명이다(합류 즉시 운행일지·직원
+ * 연락처 열람, 관리자 없는 기관이면 admin 획득). `Math.random()`은 예측 가능한 PRNG라
+ * 자격증명에 쓰지 않는다 — 2026-08-23 감사 부록 1.
+ *
+ * 알파벳은 서버 쪽 정본(`functions/src/utils/inviteCode.ts`)과 같아야 한다: 전화·문자로
+ * 받아 적는 코드라 혼동 문자(0/O, 1/I)를 뺀 32자를 쓰고, 32는 2의 거듭제곱이라
+ * 5비트 슬라이스(`& 31`)에 모듈로 편향이 없다.
+ */
+const INVITE_CODE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
+const INVITE_CODE_LENGTH = 6;
+
 export const generateInviteCode = () => {
-    return Math.random().toString(36).substring(2, 8).toUpperCase();
+    const bytes = new Uint8Array(INVITE_CODE_LENGTH);
+    crypto.getRandomValues(bytes);
+    let code = '';
+    for (let i = 0; i < INVITE_CODE_LENGTH; i++) {
+        code += INVITE_CODE_ALPHABET[bytes[i] & 31];
+    }
+    return code;
 };
 
 // 초대 코드로 기관 찾기

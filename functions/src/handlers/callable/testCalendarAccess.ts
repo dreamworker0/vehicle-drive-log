@@ -6,6 +6,9 @@
  */
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { google } from "googleapis";
+import { getCalendarBindingOwner } from "../../services/calendar/calendarBinding";
+import { checkRateLimitByUid } from "../../utils/rateLimit";
+import { getRateLimits } from "../../utils/constants";
 
 /** 에러 유형별 사용자 친화적 메시지 */
 const ERROR_MESSAGES: Record<string, { type: string; title: string; message: string }> = {
@@ -44,6 +47,31 @@ export const testCalendarAccess = onCall(
         const calendarId = request.data?.calendarId as string;
         if (!calendarId || !calendarId.trim()) {
             throw new HttpsError("invalid-argument", "캘린더 ID가 필요합니다.");
+        }
+
+        // 이 함수는 임의의 캘린더 ID에 대해 "서비스 계정이 접근할 수 있는가"를 알려준다.
+        // 그 대답은 진단에 필요하지만, 상한이 없으면 **후보 ID를 훑는 오라클**이 된다
+        // (2026-08-23 감사 발견 1의 정찰 도구). 정상 진단은 몇 번 눌러 끝나므로
+        // 시간당 상한으로 열거만 잘라낸다. fail-open 기본값 — 진단 도구를 한도 조회
+        // 실패로 막지 않는다(남용 방어의 본선은 아래 바인딩 검사다).
+        const limit = await getRateLimits("testCalendarAccess");
+        await checkRateLimitByUid("testCalendarAccess", request.auth.uid, limit.max, limit.windowSec);
+
+        // 이미 다른 기관에 귀속된 캘린더는 접근 여부를 알려주지 않는다. 알려주면 그 자체로
+        // "이 ID는 이 서비스가 읽을 수 있다"는 확인이 되고, 등록해도 동기화는 어차피 막힌다.
+        //
+        // superAdmin은 예외다 — 기관을 대신해 연동 문제를 진단하는 운영자이고, orgId 클레임이
+        // 없어서(기관 미소속) 이 검사를 그대로 적용하면 **모든 등록된 캘린더**를 진단할 수
+        // 없게 된다. 진단 대상 기관을 고르는 화면 자체가 superAdmin 전용이다.
+        const callerOrgId = (request.auth.token.orgId || request.auth.token.organizationId) as string | undefined;
+        const owner = role === "superAdmin" ? null : await getCalendarBindingOwner(calendarId);
+        if (owner && owner !== callerOrgId) {
+            return {
+                success: false,
+                errorType: "BOUND_TO_OTHER_ORG",
+                errorTitle: "다른 기관이 사용 중인 캘린더",
+                message: "이미 다른 기관에 등록된 캘린더 ID입니다. 우리 기관 전용 캘린더 ID를 입력해주세요.",
+            };
         }
 
         try {

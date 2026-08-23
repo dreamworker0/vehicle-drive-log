@@ -502,5 +502,18 @@ service cloud.firestore {
     match /tmapCache/{docId} {
       allow read, write: if false; // TMAP 지오코딩·경로 결과 캐시 (TTL 자동 정리)
     }
+
+    // === 캘린더 ID ↔ 기관 바인딩 — 서버 전용 ===
+    //
+    // 캘린더 동기화는 모든 기관이 같은 서비스 계정에 자기 캘린더를 공유하는 구조라,
+    // 차량 문서의 googleCalendarId(관리자 자유 입력)가 유일한 선택자였다. 다른 기관의
+    // 캘린더 ID를 적으면 그 기관의 일정이 우리 예약으로 유입되고, 우리가 그 예약을
+    // 지우면 원본 일정이 지워졌다 (2026-08-23 감사 발견 1).
+    //
+    // 이 컬렉션이 "이 캘린더는 어느 기관 것인가"의 서버 소유 정본이다. 클라이언트가
+    // 쓸 수 있으면 그 정본이 다시 클라이언트 입력이 되어 의미가 없다.
+    match /calendarBindings/{docId} {
+      allow read, write: if false;
+    }
   }
 }
