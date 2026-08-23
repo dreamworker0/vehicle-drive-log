@@ -23,28 +23,39 @@
  * 필요 환경변수:
  *   GOOGLE_APPLICATION_CREDENTIALS — Firebase Admin SDK 서비스 계정 키 경로
  */
-import { initializeApp, cert, ServiceAccount } from "firebase-admin/app";
+import { initializeApp, cert, type ServiceAccount } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { createHash } from "node:crypto";
-import * as path from "path";
-import * as fs from "fs";
+import { readFileSync, existsSync } from "fs";
+import { dirname, resolve } from "path";
+import { fileURLToPath } from "url";
 
 const isDryRun = process.argv.includes("--dry-run");
 
-const keyPath =
-    process.env.GOOGLE_APPLICATION_CREDENTIALS ||
-    path.resolve(__dirname, "../serviceAccountKey.json");
+// ESM 스코프에는 __dirname이 없다(루트 package.json이 "type": "module").
+// 스크립트 파일 위치 기준으로 경로를 계산한다 (migrateGoogleOauthToPrivate.ts와 같은 방식).
+const scriptDir = dirname(fileURLToPath(import.meta.url));
 
-let app;
-try {
-    const serviceAccountStr = fs.readFileSync(keyPath, "utf-8");
-    const serviceAccount = JSON.parse(serviceAccountStr) as ServiceAccount;
-    app = initializeApp({ credential: cert(serviceAccount) });
-} catch {
-    app = initializeApp();
+/**
+ * Firebase Admin 초기화 — 서비스 계정 키 파일이 있으면 그것을, 없으면 기본 인증
+ * (GOOGLE_APPLICATION_CREDENTIALS 또는 gcloud ADC)을 쓴다.
+ * 키 파일 위치는 저장소의 두 선례를 모두 본다(functions/ 아래와 루트).
+ */
+function initAdmin() {
+    for (const candidate of [
+        process.env.GOOGLE_APPLICATION_CREDENTIALS,
+        resolve(scriptDir, "../functions/serviceAccountKey.json"),
+        resolve(scriptDir, "../serviceAccountKey.json"),
+    ]) {
+        if (candidate && existsSync(candidate)) {
+            const sa = JSON.parse(readFileSync(candidate, "utf-8")) as ServiceAccount;
+            return initializeApp({ credential: cert(sa) });
+        }
+    }
+    return initializeApp();
 }
 
-const db = getFirestore(app);
+const db = getFirestore(initAdmin());
 
 /** functions/src/services/calendar/calendarBinding.ts와 같은 규칙이어야 한다 */
 function normalizeCalendarId(calendarId: string): string {
