@@ -26,6 +26,9 @@ export const DEFAULT_RATE_LIMITS = {
     // 돌려가며 호출하는 것까지 막는다. 6은 클라이언트 재시도 3회를 삼키고도 남는 값이다.
     onDemandCalendarSync: { max: 6, windowSec: 1800 },        // uid당 30분당 6회
     onDemandCalendarSyncVehicle: { max: 6, windowSec: 1800 }, // 차량당 30분당 6회
+    // 캘린더 연결 진단 — 임의 캘린더 ID의 접근 가능 여부를 되돌려 주는 경로라, 상한이 없으면
+    // 후보 ID를 훑는 오라클이 된다(2026-08-23 감사 발견 1). 정상 진단은 몇 번으로 끝난다.
+    testCalendarAccess: { max: 20, windowSec: 3600 },         // uid당 시간당 20회
 } as const;
 
 export type RateLimitKey = keyof typeof DEFAULT_RATE_LIMITS;

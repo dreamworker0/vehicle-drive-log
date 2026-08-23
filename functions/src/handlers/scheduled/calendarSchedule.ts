@@ -6,6 +6,7 @@ import { getAuth } from "firebase-admin/auth";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { listCalendarEvents, parseEventToReservation } from "../../services/calendar/calendarSync";
 import { isGoogleCalendarEnabled, type OrgCalendarFlagCache } from "../../services/calendar/calendarFeature";
+import { isCalendarBoundToOrg, type CalendarBindingCache } from "../../services/calendar/calendarBinding";
 import { RETRY_COOLDOWN_MS, MAX_FAIL_COUNT, isCalendarAuthError, recordCalendarFailure, resetCalendarFailure } from "../../services/calendar/calendarFailTracking";
 import { sendDiscordAlert } from "../../core/discord";
 import { recordHeartbeat } from "../../utils/helpers";
@@ -84,6 +85,8 @@ export const syncCalendarToApp = onSchedule(
             // 이 실행에서만 유효한 기관 플래그 캐시 — 한 기관에 차량이 여러 대여도
             // organizations 문서를 한 번만 읽는다 (하루 34회 × 차량 대수만큼 절약).
             const orgFlagCache: OrgCalendarFlagCache = new Map();
+            // 캘린더 바인딩 판정도 실행 단위로 모은다 (한 기관이 여러 차량에 같은 캘린더를 쓴다).
+            const bindingCache: CalendarBindingCache = new Map();
 
             for (let i = 0; i < vehiclesSnap.docs.length; i++) {
                 const vehicleDoc = vehiclesSnap.docs[i];
@@ -118,7 +121,7 @@ export const syncCalendarToApp = onSchedule(
 
                 try {
                     // 개별 차량 동기화 로직 호출
-                    const result = await syncSingleVehicleCalendar(vehicleId, vehicle, globalProcessedEventIds, orgFlagCache);
+                    const result = await syncSingleVehicleCalendar(vehicleId, vehicle, globalProcessedEventIds, orgFlagCache, bindingCache);
                     
                     totalCreated += result.created;
                     totalUpdated += result.updated;
@@ -172,7 +175,10 @@ export async function syncSingleVehicleCalendar(
     globalProcessedEventIds: Set<string> = new Set<string>(),
     // 차량 순회 호출자가 실행 단위 Map을 넘기면 같은 기관의 문서를 한 번만 읽는다.
     // 단일 차량 호출(온디맨드 동기화)에서는 중복이 없으므로 넘기지 않아도 된다.
-    orgFlagCache?: OrgCalendarFlagCache
+    orgFlagCache?: OrgCalendarFlagCache,
+    // 캘린더 바인딩 판정 캐시 — 한 기관이 모든 차량에 같은 캘린더를 쓰는 경우가 많아
+    // orgFlagCache와 같은 이유로 실행 단위 Map을 받는다.
+    bindingCache?: CalendarBindingCache
 ): Promise<{
     created: number;
     updated: number;
@@ -196,6 +202,17 @@ export async function syncSingleVehicleCalendar(
     // 유효하지 않은 캘린더 ID 건너뛰기 (@ 포함 필수)
     if (!calendarId || !calendarId.includes("@")) {
         console.log("Vehicle " + vehicleName + "(" + vehicleId + "): invalid calendar ID, skip");
+        return { created, updated, cancelled, skippedDup };
+    }
+
+    // 이 캘린더가 이 기관에 귀속된 것인지 확인한다. 이 검사가 없으면 관리자가 적어 넣은
+    // 남의 캘린더 ID로 그 기관의 일정이 우리 예약으로 유입된다 (2026-08-23 감사 발견 1).
+    // 캘린더 API 호출 **앞에** 둔다 — 막을 요청은 보내지도 않는다.
+    if (!await isCalendarBoundToOrg(calendarId, organizationId, {
+        logName: "syncCalendarToApp",
+        cache: bindingCache,
+    })) {
+        console.log("Vehicle " + vehicleName + "(" + vehicleId + "): calendar not bound to this organization, skip");
         return { created, updated, cancelled, skippedDup };
     }
 

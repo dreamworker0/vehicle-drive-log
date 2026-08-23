@@ -7,6 +7,7 @@ import { defineString } from "firebase-functions/params";
 import { getFirestore } from "firebase-admin/firestore";
 import { sendApprovalAlimtalk } from "../../services/alimtalk/sendAlimtalk";
 import { sanitizePromptValue } from "../../utils/helpers";
+import { generateInviteCode } from "../../utils/inviteCode";
 import { GMAIL_APP_PASSWORD, EMAILJS_PRIVATE_KEY, ALIMTALK_PROXY_TOKEN } from "../../core/params";
 import {
     maskName, maskEmail,
@@ -84,7 +85,7 @@ export const autoVerifyDocument = onDocumentWritten(
         if (whitelistMatch) {
             console.log(`[AutoVerify] ✅ 화이트리스트 기관 감지: ${orgName} (${orgId})`);
             const db = getFirestore();
-            const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+            const inviteCode = generateInviteCode();
             await db.doc(`organizations/${orgId}`).update({
                 aiVerified: true,
                 aiVerifyDetail: {
@@ -273,7 +274,7 @@ export const autoVerifyDocument = onDocumentWritten(
 
             // AI 검증 통과 시 자동 승인
             if (aiVerified && updateData.status !== "rejected") {
-                const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+                const inviteCode = generateInviteCode();
                 updateData.status = "approved";
                 updateData.approvedAt = new Date();
                 updateData.inviteCode = inviteCode;

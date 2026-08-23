@@ -5,6 +5,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent } from "../../services/calendar/calendarSync";
 import { isGoogleCalendarEnabled } from "../../services/calendar/calendarFeature";
+import { isCalendarBoundToOrg } from "../../services/calendar/calendarBinding";
 import { isCalendarAuthError, shouldSkipVehicleCalendar, recordCalendarFailure, resetCalendarFailure } from "../../services/calendar/calendarFailTracking";
 import { sendPushToOrg, sendPushToUser, createInAppNotification } from "../../services/alimtalk/sendNotification";
 import { checkReservationTimeConflict, resolveReservationConflict } from "../sync/conflictResolver";
@@ -33,6 +34,10 @@ async function getVehicleCalendar(
     const calendarId = (data.googleCalendarId as string) || null;
     // 유효하지 않은 캘린더 ID 필터링 (@ 포함 필수)
     if (!calendarId || !calendarId.includes("@")) return null;
+    // 이 캘린더가 이 기관에 귀속된 것인지 확인한다. 없으면 예약 생성·수정·삭제가 그대로
+    // 남의 캘린더에 이벤트를 심고 남의 일정을 지운다 (2026-08-23 감사 발견 1).
+    const orgId = (expectedOrgId || data.organizationId) as string | undefined;
+    if (!await isCalendarBoundToOrg(calendarId, orgId, { logName: "reservationTriggers" })) return null;
     return {
         calendarId,
         failCount: (data.calendarSyncFailCount as number) || 0,
