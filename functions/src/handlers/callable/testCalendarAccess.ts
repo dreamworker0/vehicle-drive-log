@@ -63,6 +63,17 @@ export const testCalendarAccess = onCall(
         // superAdmin은 예외다 — 기관을 대신해 연동 문제를 진단하는 운영자이고, orgId 클레임이
         // 없어서(기관 미소속) 이 검사를 그대로 적용하면 **모든 등록된 캘린더**를 진단할 수
         // 없게 된다. 진단 대상 기관을 고르는 화면 자체가 superAdmin 전용이다.
+        // 공유 대상인 서비스 계정 주소를 캘린더 ID로 넣는 오독이 실제로 있었다(2026-08-23 시딩에서
+        // 3개 기관 발견). 접근 테스트를 돌리기 전에 원인을 그대로 알려 준다.
+        if (calendarId.trim().toLowerCase().endsWith(".gserviceaccount.com")) {
+            return {
+                success: false,
+                errorType: "SERVICE_ACCOUNT_ADDRESS",
+                errorTitle: "캘린더 ID가 아니라 공유 대상 주소입니다",
+                message: "입력한 값은 캘린더를 공유해 줄 서비스 계정 주소입니다. 그 주소는 '공유' 대상에만 넣고, 이 칸에는 구글 캘린더 설정 → 캘린더 통합에 있는 '캘린더 ID'를 넣어주세요.",
+            };
+        }
+
         const callerOrgId = (request.auth.token.orgId || request.auth.token.organizationId) as string | undefined;
         const owner = role === "superAdmin" ? null : await getCalendarBindingOwner(calendarId);
         if (owner && owner !== callerOrgId) {
