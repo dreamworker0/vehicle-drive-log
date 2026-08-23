@@ -166,6 +166,10 @@ async function seed() {
 
     console.log(`읽은 차량 문서: ${snap.size}대`);
     console.log(`  캘린더 ID 없음: ${noCalendarId}대 · 형식 부적합(@ 없음): ${invalidFormat}대 · 기관 ID 없음: ${noOrgId}대`);
+    if (invalidFormat > 0) {
+        // 동기화가 애초에 건너뛰는 값이라 보안 위험은 없지만, 화면에는 '연동됨'으로 보인다.
+        console.log(`  └ 형식 부적합 차량 목록·정리: npx tsx scripts/clear-invalid-calendar-ids.ts`);
+    }
     console.log(`캘린더를 쓰는 차량이 가리키는 고유 캘린더: ${owners.size}개`);
     console.log(`  ${isDryRun ? "등록 예정" : "등록"}: ${created}개`);
     console.log(`  이미 등록됨(스킵): ${alreadyBound}개`);
@@ -174,8 +178,9 @@ async function seed() {
         serviceAccountMisuse.forEach((c) => console.log(c));
         console.log(`\n이 값은 어느 기관의 캘린더도 아니고, 여러 기관이 같은 곳을 가리키게 만듭니다.`);
         console.log(`바인딩을 만들지 않았습니다(서버도 이 값으로는 동기화하지 않습니다).`);
-        console.log(`조치: 해당 차량들의 '캘린더 ID'를 비우고, 각 기관에 구글 캘린더 설정 →`);
-        console.log(`      캘린더 통합의 '캘린더 ID'를 입력하도록 안내하세요.`);
+        console.log(`조치: npx tsx scripts/clear-invalid-calendar-ids.ts (조회) → --apply (적용)`);
+        console.log(`      비운 뒤 각 기관에 구글 캘린더 설정 → 캘린더 통합의 '캘린더 ID'를`);
+        console.log(`      입력하도록 안내하세요(서비스 계정 주소는 '공유' 대상 칸에만).`);
     }
     if (conflicts.length > 0) {
         console.log(`\n확인 필요 (등록하지 않음) — ${conflicts.length}건:`);
