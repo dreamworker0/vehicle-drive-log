@@ -68,6 +68,19 @@ registerRoute(
     })
 );
 
+// 자체 호스팅 폰트 캐싱 (프리캐시 대신 런타임 — vite.config.js의 globIgnores 참고)
+// 실제로 쓰인 서브셋 조각만 담기므로 지하 주차장 등 오프라인에서도 같은 서체로 보인다.
+// 경로에 버전이 박혀 있어 갱신 시 URL이 바뀌므로 CacheFirst로 둔다.
+registerRoute(
+    ({ url }) => url.origin === self.location.origin && url.pathname.startsWith('/fonts/'),
+    new CacheFirst({
+        cacheName: 'self-hosted-fonts',
+        plugins: [
+            new ExpirationPlugin({ maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 * 365 }),
+        ],
+    })
+);
+
 // Firebase Storage 캐싱 (차량 사진, OCR 등)
 registerRoute(
     /^https:\/\/firebasestorage\.googleapis\.com\/.*/i,
