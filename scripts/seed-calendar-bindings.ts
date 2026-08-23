@@ -55,7 +55,23 @@ function initAdmin() {
     return initializeApp();
 }
 
-const db = getFirestore(initAdmin());
+const app = initAdmin();
+const db = getFirestore(app);
+
+/**
+ * 어느 프로젝트를 읽고 있는지 최선으로 판별한다.
+ *
+ * 이 스크립트가 0건을 보고했을 때 "연동 차량이 없다"와 "엉뚱한 프로젝트를 읽었다"를
+ * 구분할 수 없으면, 운영자는 선점 창이 닫혔다고 오인한 채 넘어간다. 판별 근거를 항상 찍는다.
+ */
+function describeTarget(): string {
+    const fromOptions = app.options.projectId;
+    const fromEnv = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
+    const emulator = process.env.FIRESTORE_EMULATOR_HOST;
+    const parts = [`프로젝트: ${fromOptions || fromEnv || "(확인 불가 — ADC가 내부적으로 결정)"}`];
+    if (emulator) parts.push(`⚠️ 에뮬레이터 접속 중(FIRESTORE_EMULATOR_HOST=${emulator}) — 프로덕션이 아니다`);
+    return parts.join("\n");
+}
 
 /** functions/src/services/calendar/calendarBinding.ts와 같은 규칙이어야 한다 */
 function normalizeCalendarId(calendarId: string): string {
@@ -68,17 +84,26 @@ function calendarBindingKey(calendarId: string): string {
 async function seed() {
     console.log(`=== 캘린더 바인딩 시딩 시작 ${isDryRun ? "(DRY-RUN)" : ""} ===\n`);
 
+    console.log(describeTarget() + "\n");
+
     const snap = await db.collection("vehicles").get();
 
     // 캘린더 ID → 그 ID를 쓰는 기관 집합 (충돌 판별용)
     const owners = new Map<string, { normalized: string; orgIds: Set<string>; vehicleIds: string[] }>();
+
+    // 제외 사유별 집계 — "0개"의 뜻을 읽을 수 있게 한다
+    let noCalendarId = 0;
+    let invalidFormat = 0;
+    let noOrgId = 0;
 
     for (const doc of snap.docs) {
         const data = doc.data();
         const raw = data.googleCalendarId as string | undefined;
         const orgId = data.organizationId as string | undefined;
         // 동기화가 요구하는 최소 형식(@ 포함)을 만족하지 않는 값은 애초에 쓰이지 않는다
-        if (!raw || !raw.includes("@") || !orgId) continue;
+        if (!raw) { noCalendarId++; continue; }
+        if (!raw.includes("@")) { invalidFormat++; continue; }
+        if (!orgId) { noOrgId++; continue; }
 
         const normalized = normalizeCalendarId(raw);
         const key = calendarBindingKey(normalized);
@@ -121,6 +146,8 @@ async function seed() {
         created++;
     }
 
+    console.log(`읽은 차량 문서: ${snap.size}대`);
+    console.log(`  캘린더 ID 없음: ${noCalendarId}대 · 형식 부적합(@ 없음): ${invalidFormat}대 · 기관 ID 없음: ${noOrgId}대`);
     console.log(`캘린더를 쓰는 차량이 가리키는 고유 캘린더: ${owners.size}개`);
     console.log(`  ${isDryRun ? "등록 예정" : "등록"}: ${created}개`);
     console.log(`  이미 등록됨(스킵): ${alreadyBound}개`);
@@ -129,6 +156,15 @@ async function seed() {
         conflicts.forEach((c) => console.log(c));
         console.log(`\n한 캘린더를 둘 이상의 기관이 가리키고 있습니다. 정당한 소유 기관을 확인한 뒤`);
         console.log(`calendarBindings 문서를 직접 만들고, 잘못 등록된 차량의 캘린더 ID를 비워주세요.`);
+    }
+    if (snap.size === 0) {
+        console.log(`\n⚠️  차량 문서를 한 건도 읽지 못했습니다.`);
+        console.log(`   "연동 차량이 없음"이 아니라 **다른 프로젝트를 읽었거나 권한이 없는** 상태일 수 있습니다.`);
+        console.log(`   위의 '프로젝트:' 값이 운영 프로젝트인지 확인하세요.`);
+        console.log(`   (gcloud config get-value project / firebase use / GOOGLE_CLOUD_PROJECT 환경변수)`);
+    } else if (owners.size === 0) {
+        console.log(`\n차량은 ${snap.size}대 읽었지만 캘린더를 연동한 차량이 없습니다 — 등록할 바인딩이 없는 정상 상태입니다.`);
+        console.log(`(앞으로 어느 기관이 캘린더를 연동하면 그 시점에 자동으로 선점 등록됩니다.)`);
     }
     console.log(`\n=== 시딩 완료 ===`);
 }
