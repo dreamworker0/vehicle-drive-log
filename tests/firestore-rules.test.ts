@@ -981,9 +981,12 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertFails(author.collection('feedbacks').doc('fb_ok').get());
   });
 
-  it('22. 기관 신청서(orgApplications) — 남의 신청서를 이메일 위조로 열지 못한다', async () => {
-    // 이 컬렉션은 신청자 이메일·연락처가 담긴 개인정보다. 조건이 단순 소유권(uid)이 아니라
-    // **토큰의 email과 문서의 applicantEmail 일치**라 실수 여지가 커서 따로 고정한다.
+  it('22. 기관 신청서(orgApplications) — 클라이언트에는 열려 있지 않다', async () => {
+    // 이 컬렉션은 신청자 이메일·연락처가 담긴 개인정보인데, 규칙이
+    // `applicantEmail == request.auth.token.email`이었다. 그 조건은 **토큰에 email이 없으면
+    // null == null로 통과**하고(익명 로그인이 켜져 있던 동안 그런 토큰을 발급할 수 있었다),
+    // 정작 쓰는 곳이 없다 — 접수는 비인증 콜러블(Admin SDK)이 하고 심사 화면도 읽지 않는다.
+    // 그래서 클라이언트 경로를 닫았다. 다시 열리면 이 테스트가 실패한다.
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await context.firestore().collection('orgApplications').doc('app_kim').set({
         applicantEmail: 'kim@a.or.kr',
@@ -994,29 +997,29 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     });
 
     const kim = setupContext('uid_kim', { email: 'kim@a.or.kr' }).firestore();
-    const lee = setupContext('uid_lee', { email: 'lee@b.or.kr' }).firestore();
+    const noEmail = setupContext('uid_noemail', {}).firestore();
     const superAdmin = setupContext('uid_root', { role: 'superAdmin' }).firestore();
 
-    // (1) 본인 신청서는 읽을 수 있다
-    await assertSucceeds(kim.collection('orgApplications').doc('app_kim').get());
-    // (2) 남의 신청서는 못 읽는다 — 개인정보 노출 경로
-    await assertFails(lee.collection('orgApplications').doc('app_kim').get());
-    // (3) superAdmin은 심사해야 하므로 읽는다
+    // (1) 본인 이메일이 일치해도 읽지 못한다 — 클라이언트가 쓰지 않는 경로다
+    await assertFails(kim.collection('orgApplications').doc('app_kim').get());
+    // (2) email 클레임이 없는 토큰도 못 읽는다 (null == null 통과 경로 차단)
+    await assertFails(noEmail.collection('orgApplications').doc('app_kim').get());
+    // (3) 심사는 superAdmin이 하므로 읽기는 남긴다
     await assertSucceeds(superAdmin.collection('orgApplications').doc('app_kim').get());
 
-    // (4) 생성은 본인 이메일 명의만 — 남의 이메일로 접수할 수 없다
-    await assertSucceeds(kim.collection('orgApplications').doc('app_new').set({
+    // (4) 생성은 아무도 못 한다 — 접수는 Admin SDK(submitOrgApplication) 경로뿐이다
+    await assertFails(kim.collection('orgApplications').doc('app_new').set({
       applicantEmail: 'kim@a.or.kr', orgName: '새복지관', status: 'pending',
     }));
-    await assertFails(lee.collection('orgApplications').doc('app_forge').set({
-      applicantEmail: 'kim@a.or.kr', orgName: '위조', status: 'pending',
+    // email 없는 토큰이 applicantEmail을 비워 밀어 넣는 경로도 막힌다
+    await assertFails(noEmail.collection('orgApplications').doc('app_null').set({
+      orgName: '이메일없음', status: 'pending',
     }));
 
-    // (5) 심사 결과 변경(update)·삭제는 superAdmin만 — 신청자가 스스로 승인할 수 없다
+    // (5) 심사 결과 변경·삭제도 클라이언트에서는 불가 — superAdmin도 Admin SDK로 한다
     await assertFails(kim.collection('orgApplications').doc('app_kim').update({ status: 'approved' }));
-    await assertSucceeds(superAdmin.collection('orgApplications').doc('app_kim').update({ status: 'approved' }));
-    await assertFails(kim.collection('orgApplications').doc('app_kim').delete());
-    await assertSucceeds(superAdmin.collection('orgApplications').doc('app_kim').delete());
+    await assertFails(superAdmin.collection('orgApplications').doc('app_kim').update({ status: 'approved' }));
+    await assertFails(superAdmin.collection('orgApplications').doc('app_kim').delete());
   });
 
   it('23. users/{uid}/private — superAdmin도 예외가 아니다 (11번 보완)', async () => {
@@ -1105,6 +1108,29 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertSucceeds(me.collection('favorites').doc('f_mine').delete());
     // 명의 위조 생성 차단
     await assertFails(other.collection('favorites').doc('f_forge').set({ userId: 'uid_me', label: '위조' }));
+
+    // --- 저장 모양 상한 ---
+    // 로그인만 하면 자기 uid로 문서를 만들 수 있는 유일한 컬렉션이라, 한 문서가 얼마나
+    // 커질 수 있는지를 못박는다(개수 상한은 Rules로 표현할 수 없다).
+    const ok = { userId: 'uid_me', name: '김OO 어르신 댁', destination: '서울시 중구 세종대로 110', createdAt: new Date() };
+    // (1) 정상 저장은 통과한다 — 상한이 정상 입력을 막으면 안 된다
+    await assertSucceeds(me.collection('favorites').doc('f_ok').set(ok));
+    await assertSucceeds(me.collection('favorites').doc('f_ok2').set({
+      ...ok, address: '서울시 중구 세종대로 110', purpose: '가정방문', organizationId: 'org-A',
+    }));
+    // (2) 열거에 없는 필드는 거부 — 즐겨찾기를 임의 데이터 보관함으로 쓰지 못한다
+    await assertFails(me.collection('favorites').doc('f_extra').set({ ...ok, blob: 'x'.repeat(1000) }));
+    // (3) 과대 문자열 거부 (문서 하나에 1MB를 담는 경로)
+    await assertFails(me.collection('favorites').doc('f_big').set({ ...ok, destination: 'x'.repeat(501) }));
+    await assertFails(me.collection('favorites').doc('f_big2').set({ ...ok, name: 'x'.repeat(501) }));
+    await assertFails(me.collection('favorites').doc('f_big3').set({ ...ok, address: 'x'.repeat(501) }));
+    // (4) 타입 위조 거부
+    await assertFails(me.collection('favorites').doc('f_type').set({ ...ok, name: 12345 }));
+
+    // (5) 남의 목록으로 항목을 옮기지 못한다 — 이전에는 기존 문서의 userId만 봐서,
+    //     자기 즐겨찾기의 userId를 남의 uid로 바꿔 그 사람 목록에 심을 수 있었다
+    await assertFails(me.collection('favorites').doc('f_ok').update({ userId: 'uid_other' }));
+    await assertSucceeds(me.collection('favorites').doc('f_ok').update({ name: '이름만 수정' }));
 
     // 월별 집계 — 멤버 읽기 가능, 클라이언트 쓰기는 전면 차단
     await assertSucceeds(me.collection('orgStats').doc('org-A').collection('monthly').doc('2026-08').get());
