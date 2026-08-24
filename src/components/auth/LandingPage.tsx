@@ -96,6 +96,14 @@ const SUB_FEATURES: SubFeature[] = [
 
 export default function LandingPage() {
     const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
+    /**
+     * 사용법 영상은 **누를 때** 불러온다. 유튜브 iframe은 붙는 순간 플레이어 스크립트와
+     * 부속 요청을 줄줄이 끌어오고, 그 대역폭이 랜딩의 CSR 렌더와 경쟁한다 — 러너 실측에서
+     * LCP가 첫 페인트보다 4.2초 늦었고(로컬 1.1초) 그 차이가 여기서 났다. `loading="lazy"`는
+     * 뷰포트 근처면 그대로 받으므로 이 구간을 막지 못한다. 눌러야 받는 구조라야 확실하다.
+     * 부수 효과로, 영상을 보지 않는 방문자는 유튜브에 아무 요청도 남기지 않는다.
+     */
+    const [isVideoLoaded, setIsVideoLoaded] = useState(false);
     useForceLightMode();
     const navigate = useNavigate();
 
@@ -186,16 +194,35 @@ export default function LandingPage() {
                         영상으로 쉽고 빠르게 사용법을 알아보세요.
                     </p>
                     <div className="relative w-full overflow-hidden rounded-xl" style={{ paddingBottom: '56.25%' }}>
-                        <iframe
-                            className="absolute top-0 left-0 w-full h-full"
-                            src="https://www.youtube.com/embed/XdT5Wm_pd3s?rel=0&modestbranding=1"
-                            title="차량 운행일지 사용법"
-                            loading="lazy"
-                            // compute-pressure: 유튜브 플레이어가 요청하는 기능. 위임하지 않으면 콘솔에 Permissions policy violation 경고가 남는다
-                            allow="accelerometer; autoplay; clipboard-write; compute-pressure; encrypted-media; gyroscope; picture-in-picture; web-share"
-                            referrerPolicy="strict-origin-when-cross-origin"
-                            allowFullScreen
-                        />
+                        {isVideoLoaded ? (
+                            <iframe
+                                className="absolute top-0 left-0 w-full h-full"
+                                src="https://www.youtube.com/embed/XdT5Wm_pd3s?rel=0&modestbranding=1&autoplay=1"
+                                title="차량 운행일지 사용법"
+                                // compute-pressure: 유튜브 플레이어가 요청하는 기능. 위임하지 않으면 콘솔에 Permissions policy violation 경고가 남는다
+                                allow="accelerometer; autoplay; clipboard-write; compute-pressure; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                referrerPolicy="strict-origin-when-cross-origin"
+                                allowFullScreen
+                            />
+                        ) : (
+                            /*
+                             * 미리보기 이미지도 유튜브(i.ytimg.com)에서 받지 않는다 — 요청을 없애려고 만든
+                             * 자리에 다시 제3자 요청을 넣을 이유가 없다. 카드는 랜딩 배색으로만 그린다.
+                             */
+                            <button
+                                type="button"
+                                onClick={() => setIsVideoLoaded(true)}
+                                className="absolute top-0 left-0 w-full h-full flex flex-col items-center justify-center gap-3 bg-gradient-to-br from-primary-800 to-primary-900 border border-white/15 transition-colors hover:from-primary-700 hover:to-primary-800 focus:outline-none focus:ring-2 focus:ring-white/60"
+                            >
+                                <span className="w-16 h-16 rounded-full bg-white/15 backdrop-blur-sm flex items-center justify-center" aria-hidden="true">
+                                    <svg className="w-7 h-7 ml-1 text-white" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M8 5.14v13.72a1 1 0 0 0 1.53.85l10.66-6.86a1 1 0 0 0 0-1.7L9.53 4.29A1 1 0 0 0 8 5.14Z" />
+                                    </svg>
+                                </span>
+                                <span className="text-white font-medium">사용법 영상 보기</span>
+                                <span className="text-primary-200/70 text-xs">누르면 유튜브에서 영상을 불러옵니다</span>
+                            </button>
+                        )}
                     </div>
                 </div>
             </section>
