@@ -23,6 +23,9 @@
 
 import { initializeApp, applicationDefault } from 'firebase-admin/app';
 import { getFirestore, Timestamp } from 'firebase-admin/firestore';
+import { readFileSync } from 'fs';
+import { dirname, resolve } from 'path';
+import { fileURLToPath } from 'url';
 
 // --- 설정 ---
 const LIMIT = parseInt(process.argv.find(a => a.startsWith('--limit='))?.split('=')[1] || '30', 10);
@@ -30,9 +33,33 @@ const SEARCH = process.argv.find(a => a.startsWith('--search='))?.split('=')[1] 
 const SINCE = process.argv.find(a => a.startsWith('--since='))?.split('=')[1] || '';
 const FULL = process.argv.includes('--full');
 
+/**
+ * 대상 프로젝트 ID — 환경변수가 없으면 `.firebaserc`의 default.
+ *
+ * **고정하지 않으면 조용히 틀린다.** ADC(`gcloud auth application-default login`)는 그 PC에
+ * 마지막으로 잡힌 quota project를 딸려 보내는데, 그것이 이 프로젝트가 아닐 수 있다. 그러면
+ * 엉뚱한 프로젝트의 Firestore를 조회해 **에러 없이 0건**이 나오고, 운영자는 "문의가 없다"고
+ * 믿게 된다. 2026-08-24에 실제로 발생했다 — quota project가 다른 프로젝트로 잡힌 PC에서
+ * 이 스크립트가 "등록된 피드백이 없습니다"를 출력했다. seed-calendar-bindings.ts가 같은
+ * 함정을 겪고 남긴 처방을 그대로 따르고, 조회한 프로젝트를 첫 줄에 찍어 눈으로 확인되게 한다.
+ */
+function resolveProjectId(): string | undefined {
+    const fromEnv = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
+    if (fromEnv) return fromEnv;
+    try {
+        const scriptDir = dirname(fileURLToPath(import.meta.url));
+        const rc = JSON.parse(readFileSync(resolve(scriptDir, '../.firebaserc'), 'utf8'));
+        return rc?.projects?.default;
+    } catch {
+        return undefined;
+    }
+}
+
+const PROJECT_ID = resolveProjectId();
+
 // Firebase Admin 초기화
 try {
-    initializeApp({ credential: applicationDefault() });
+    initializeApp({ credential: applicationDefault(), ...(PROJECT_ID ? { projectId: PROJECT_ID } : {}) });
 } catch {
     console.error('❌ Firebase 인증 실패. GOOGLE_APPLICATION_CREDENTIALS를 설정하거나 gcloud auth로 인증하세요.');
     process.exit(1);
@@ -43,13 +70,16 @@ const db = getFirestore();
 async function main(): Promise<void> {
     console.log('\n📋 피드백 조회 리포트');
     console.log('─'.repeat(50));
+    // 조회 대상을 먼저 찍는다 — 0건이 "없음"인지 "엉뚱한 곳을 봤음"인지 여기서 갈린다.
+    console.log(`대상 프로젝트: ${PROJECT_ID ?? '(미지정 — ADC 기본값. 결과를 믿지 말 것)'}`);
 
     // 전체 통계
     const allSnap = await db.collection('feedbacks').get();
     const allDocs = allSnap.docs.map(d => ({ id: d.id, ...d.data() } as Record<string, unknown>));
 
     if (allDocs.length === 0) {
-        console.log('\n✅ 등록된 피드백이 없습니다.\n');
+        console.log('\n✅ 등록된 피드백이 없습니다.');
+        console.log('   (위 대상 프로젝트가 맞는지 먼저 확인할 것 — 엉뚱한 프로젝트를 조회해도 0건이 나온다)\n');
         return;
     }
 
