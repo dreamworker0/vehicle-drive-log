@@ -332,10 +332,54 @@ service cloud.firestore {
     }
 
     // === 즐겨찾기 ===
+    //
+    // 이 컬렉션은 **로그인만 하면 자기 uid로 문서를 만들 수 있는 유일한 곳**이다(나머지
+    // tenant-scoped 컬렉션은 기관 소속·역할을 요구한다). 그래서 필드 길이에 상한이 없으면
+    // 문서 하나에 1MB까지 담아 무료 저장소로 쓸 수 있고, 대시보드 통계
+    // (computeDashboardStats)가 이 컬렉션을 전량 읽으므로 쓰레기 문서는 읽기 비용으로도
+    // 돌아온다.
+    //
+    // **개수 상한은 Rules로 표현할 수 없다** — 집계를 조건에 쓸 수 없다. 여기서 막는 것은
+    // "한 문서가 얼마나 클 수 있는가"이고, "몇 개까지 만들 수 있는가"는 계정 발급 자체를
+    // 막는 쪽(익명 로그인 제공자 비활성화, 2026-08-24)이 짝을 이룬다.
     match /favorites/{favoriteId} {
+      /**
+       * 저장 모양 검사.
+       *
+       * 키 목록의 원본은 normalizeFavorite(src/lib/firestore/favorites.ts)이다 — 쓰기 경로
+       * 네 곳(즐겨찾기 관리·예약 폼·바로 운행·운행일지 폼)이 모두 그 함수를 지나므로 여기서
+       * 열거할 수 있다. **필드를 추가하면 이 목록도 함께 늘려야 한다** (빠뜨리면 저장이
+       * permission-denied로 조용히 거부된다).
+       *
+       * 길이 상한은 실제 저장 값보다 넉넉하게 잡았다(한글 주소는 100자 안쪽이고, 별칭은
+       * 비워 두면 목적지 문자열이 그대로 들어온다). 좁게 잡아 정상 입력을 막는 쪽이 훨씬
+       * 나쁜 실패다 — 화면에서는 원인이 드러나지 않는다.
+       */
+      function shapeValid() {
+        return request.resource.data.keys().hasOnly(
+                 ['userId', 'name', 'destination', 'address', 'purpose', 'organizationId', 'createdAt'])
+               && request.resource.data.name is string
+               && request.resource.data.name.size() <= 500
+               && request.resource.data.destination is string
+               && request.resource.data.destination.size() <= 500
+               && (!request.resource.data.keys().hasAny(['address'])
+                   || (request.resource.data.address is string
+                       && request.resource.data.address.size() <= 500))
+               && (!request.resource.data.keys().hasAny(['purpose'])
+                   || (request.resource.data.purpose is string
+                       && request.resource.data.purpose.size() <= 500))
+               && (!request.resource.data.keys().hasAny(['organizationId'])
+                   || (request.resource.data.organizationId is string
+                       && request.resource.data.organizationId.size() <= 100));
+      }
       allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isSuperAdmin());
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid && shapeValid();
+      // update에는 모양 검사를 걸지 않는다 — 열거에 없는 필드(옛 `label` 등)를 가진 문서가
+      // 남아 있고, update는 병합 결과로 판정되므로 그 문서의 수정이 통째로 막힌다.
+      // 대신 **바뀐 뒤의 userId까지** 본다. 이전에는 기존 문서의 userId만 봐서, 자기
+      // 즐겨찾기의 userId를 남의 uid로 바꿔 그 사람 목록에 항목을 심을 수 있었다.
+      allow update: if isSignedIn() && resource.data.userId == request.auth.uid
+                    && request.resource.data.userId == request.auth.uid;
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
@@ -454,13 +498,19 @@ service cloud.firestore {
     }
 
     // === 기관 신청 ===
+    //
+    // 클라이언트 경로가 없다. 접수는 **비인증 콜러블** submitOrgApplication(Admin SDK)이
+    // 처리하므로 신청자는 로그인하지 않고, 심사 화면도 이 컬렉션을 읽지 않는다(`src/`
+    // 전수 grep에 사용처 없음. 서버 참조는 computeDashboardStats의 count 하나이고 Admin
+    // SDK라 Rules를 지나지 않는다).
+    //
+    // 그런데 규칙은 `applicantEmail == request.auth.token.email`로 열려 있었다. 이 조건은
+    // 이메일 클레임이 검증됐다는 전제에 기대고, **토큰에 email이 없으면 null == null로
+    // 통과**한다 — 익명 로그인 제공자가 켜져 있던 동안 실제로 그런 토큰을 발급할 수 있었다.
+    // 쓰지 않는 문을 그 전제 위에 열어 둘 이유가 없다. 2026-08-23 감사 부록 2.
     match /orgApplications/{appId} {
-      allow read: if isSuperAdmin()
-                  || (isSignedIn() && resource.data.applicantEmail == request.auth.token.email);
-      allow create: if isSignedIn()
-                    && request.resource.data.applicantEmail == request.auth.token.email;
-      allow update: if isSuperAdmin();
-      allow delete: if isSuperAdmin();
+      allow read: if isSuperAdmin();
+      allow write: if false; // 접수·심사 모두 Admin SDK 경로다
     }
 
     // === 통계 컬렉션 ===
