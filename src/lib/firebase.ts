@@ -1,8 +1,6 @@
 import { initializeApp } from 'firebase/app';
-import { GoogleAuthProvider, connectAuthEmulator } from 'firebase/auth';
-// auth 인스턴스는 firebaseAuth.ts가 소유한다 — 여기서 getAuth()를 부르면 먼저 평가되는
-// 쪽이 설정을 결정해 리다이렉트 리졸버 유무가 로드 순서에 좌우된다(그 근거는 그 파일 주석).
-import { auth, authReady as _authReady } from './firebaseAuth';
+import { getAuth, GoogleAuthProvider, connectAuthEmulator } from 'firebase/auth';
+import { authReady as _authReady } from './firebaseAuth';
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, memoryLocalCache, getFirestore, clearIndexedDbPersistence, terminate, connectFirestoreEmulator } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
@@ -119,7 +117,7 @@ scheduleIdle(() => {
     initAnalyticsLazy();
 });
 
-export { auth };
+export const auth = getAuth(app);
 // 에뮬레이터 모드: Auth 에뮬레이터(9099)에 연결 (E2E 인증 세션용).
 // firebaseAuth.ts에서 이미 연결됐을 수 있으므로 emulatorConfig 유무로 중복 연결을 가드한다.
 if (USE_EMULATOR && typeof window !== 'undefined' && !(auth as unknown as { emulatorConfig?: unknown }).emulatorConfig) {

@@ -14,7 +14,7 @@
  * iOS Safari ITP 대응도 이 호출로 처리된다.
  */
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { initializeAuth, browserLocalPersistence, browserSessionPersistence, indexedDBLocalPersistence, setPersistence, connectAuthEmulator } from 'firebase/auth';
+import { getAuth, initializeAuth, browserLocalPersistence, indexedDBLocalPersistence, setPersistence, connectAuthEmulator } from 'firebase/auth';
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -28,29 +28,12 @@ const firebaseConfig = {
 
 // 이미 초기화된 앱이 있으면 재사용 (appEntry에서 firebase.ts 로드 시 충돌 방지)
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-// ## getAuth()를 쓰지 않는 이유 — 리다이렉트 리졸버가 랜딩에서 gapi를 끌어온다
-//
-// `getAuth()`는 `popupRedirectResolver: browserPopupRedirectResolver`를 기본으로 붙이고,
-// 그 리졸버는 초기화 시점에 **apis.google.com/js/api.js와 숨은 iframe을 페이지 로드 중에**
-// 받아 온다(리다이렉트 결과가 대기 중인지 확인하기 위해). 그런데 이 모듈은 랜딩·로그인
-// 화면(lightEntry)의 임계 경로에 있고, 랜딩 방문자는 대부분 로그인하지 않는다.
-// 2026-08-24 러너 실측에서 랜딩에 남은 마지막 제3자 요청이 이것이었다(2회 로드).
-//
-// 그래서 리졸버 없이 초기화하고, 실제로 필요한 세 곳(lib/auth.ts의 signInWithPopup ·
-// signInWithRedirect · getRedirectResult)에서 `browserPopupRedirectResolver`를 인자로
-// 직접 넘긴다. 리졸버를 넘기지 않고 그 함수들을 부르면 auth/argument-error가 나므로,
-// 새 로그인 경로를 추가할 때도 같이 넘겨야 한다(회귀 테스트가 세 곳을 고정한다).
-//
-// persistence 스택은 `getAuth()`의 기본값과 **같게** 둔다 — 저장 위치가 바뀌면 기존
-// 사용자가 1회 로그아웃될 수 있다. 달라지는 것은 리졸버뿐이다.
-//
-// window 없는 컨텍스트(Service Worker 등)는 browserLocalPersistence가 localStorage
-// 폴러를 돌려 ReferenceError를 반복 발생시키므로 indexedDB 전용으로 둔다(공식 SW 패턴).
+// Service Worker 등 window 없는 컨텍스트: getAuth 기본 persistence 스택의
+// browserLocalPersistence가 window.localStorage 폴러를 돌려 ReferenceError를
+// 반복 발생시키므로, indexedDB 전용으로 초기화한다 (Firebase 공식 SW 패턴)
 const isWindowContext = typeof window !== 'undefined';
 export const auth = isWindowContext
-    ? initializeAuth(app, {
-        persistence: [indexedDBLocalPersistence, browserLocalPersistence, browserSessionPersistence],
-    })
+    ? getAuth(app)
     : initializeAuth(app, { persistence: indexedDBLocalPersistence });
 // 에뮬레이터 모드(E2E): 경량 경로(main.tsx)에서도 auth가 가장 먼저 사용되므로
 // 여기서 에뮬레이터에 연결해야 onAuthStateChanged가 에뮬레이터 세션을 본다.
@@ -67,7 +50,7 @@ if (
 //
 // ## authStateReady()를 이어 붙인 이유 — 이전(migration) 구간을 관측하지 않게 한다
 //
-// auth는 기본 persistence 스택 `[IndexedDB, localStorage, sessionStorage]`로 초기화된다
+// `getAuth()`는 기본 persistence 스택 `[IndexedDB, localStorage, sessionStorage]`로 초기화된다
 // (IndexedDB가 1순위). 그 뒤에 부르는 `setPersistence(browserLocalPersistence)`는 단순 설정
 // 변경이 아니라 **이전**이다 — 세션이 IndexedDB에 있으면 읽어서 **지우고**(removeCurrentUser)
 // localStorage에 다시 쓴다. 프로덕션 스택 트레이스로 확인했다:

@@ -1,4 +1,4 @@
-import { signInWithPopup, signInWithRedirect, signOut, getRedirectResult, browserPopupRedirectResolver } from 'firebase/auth';
+import { signInWithPopup, signInWithRedirect, signOut, getRedirectResult } from 'firebase/auth';
 import type { AuthError } from 'firebase/auth';
 import { auth, googleProvider, clearOfflineCache } from './firebase';
 import { clearQueue } from './offline/syncQueue';
@@ -12,19 +12,15 @@ const isLocalhost = window.location.hostname === 'localhost' || window.location.
  * - 개발 환경(localhost): signInWithPopup 사용
  *   → signInWithRedirect는 authDomain(vehicle-drive-log.web.app)과 localhost 간
  *     cross-origin storage 문제로 인증 상태가 유실됨
- *
- * `browserPopupRedirectResolver`를 **인자로 직접 넘긴다.** auth 인스턴스는 리졸버 없이
- * 초기화되어 있다(랜딩에서 gapi를 받지 않기 위해 — firebaseAuth.ts 주석 참고). 넘기지
- * 않으면 auth/argument-error가 난다.
  */
 export const signInWithGoogle = async () => {
     try {
         if (isLocalhost) {
             console.info('[Auth] Google 로그인 - signInWithPopup 시도 (localhost)');
-            await signInWithPopup(auth, googleProvider, browserPopupRedirectResolver);
+            await signInWithPopup(auth, googleProvider);
         } else {
             console.info('[Auth] Google 로그인 - signInWithRedirect 시도');
-            await signInWithRedirect(auth, googleProvider, browserPopupRedirectResolver);
+            await signInWithRedirect(auth, googleProvider);
         }
     } catch (error) {
         const authErr = error as AuthError;
@@ -40,7 +36,7 @@ export const signInWithGoogle = async () => {
  */
 export const handleRedirectResult = async () => {
     try {
-        const result = await getRedirectResult(auth, browserPopupRedirectResolver);
+        const result = await getRedirectResult(auth);
         return result?.user ?? null;
     } catch (error) {
         // redirect 인증을 사용하지 않은 환경에서 getRedirectResult 호출 시
