@@ -54,29 +54,48 @@ function stripComments(source: string): string {
         .join('\n');
 }
 
-/** Admin 앱을 초기화하는 스크립트 목록 (파일 경로 → 주석을 걷어낸 원문) */
-const initializers = collectTsFiles(SCRIPTS)
+/** scripts/ 아래 모든 .ts (헬퍼 자신 제외) — 주석을 걷어낸 원문 */
+const files = collectTsFiles(SCRIPTS)
     .filter(f => f !== HELPER)
-    .map(f => ({ path: relative(SCRIPTS, f), source: stripComments(readFileSync(f, 'utf8')) }))
-    .filter(f => /initializeApp\s*\(/.test(f.source));
+    .map(f => ({ path: relative(SCRIPTS, f), source: stripComments(readFileSync(f, 'utf8')) }));
+
+/** Admin을 초기화하는 스크립트 — 헬퍼 경유든 직접 호출이든 */
+const adminScripts = files.filter(f => /initializeApp\s*\(|initAdminApp\s*\(/.test(f.source));
+
+/**
+ * `initializeApp`을 **직접** 부르는 스크립트.
+ *
+ * 헬퍼를 쓰지 않는 예외이며, 그 경우 `projectId`를 스스로 넘겨야 한다. 예외를 남겨 두는
+ * 이유는 초기화에 다른 값이 함께 필요한 경우가 있기 때문이다 — migrateOrgDocTokens는
+ * Storage 버킷 이름을 서비스 계정 키의 project_id로 조합해야 한다.
+ */
+const directInit = files.filter(f => /initializeApp\s*\(/.test(f.source));
 
 describe('운영 스크립트의 Admin 초기화', () => {
-    it('Admin을 초기화하는 스크립트가 하나 이상 잡힌다 (탐색 자체가 깨지면 이 테스트가 무의미해진다)', () => {
-        expect(initializers.length).toBeGreaterThan(5);
+    it('Admin을 초기화하는 스크립트가 여러 개 잡힌다 (탐색 자체가 깨지면 이 테스트가 무의미해진다)', () => {
+        // 통합 이후 대부분이 헬퍼를 지나므로 initializeApp 직접 호출만 세면 안 된다 —
+        // 실제로 그렇게 셌다가 통합 직후 2개로 줄어 이 검사가 헛돌았다.
+        expect(adminScripts.length).toBeGreaterThan(10);
     });
 
     it('맨손 initializeApp() 이 없다 — ADC 기본 프로젝트를 따라가는 유일한 경로다', () => {
-        const offenders = initializers
+        const offenders = files
             .filter(f => /initializeApp\s*\(\s*\)/.test(f.source))
             .map(f => f.path);
         expect(offenders).toEqual([]);
     });
 
-    it('모든 초기화가 프로젝트를 고정한다 (initAdminApp 사용 또는 projectId 직접 전달)', () => {
-        const offenders = initializers
-            .filter(f => !/from ['"]\.{1,2}\/(?:lib\/)?adminApp['"]/.test(f.source) && !/projectId/.test(f.source))
+    it('헬퍼를 쓰지 않는 초기화는 projectId를 직접 넘긴다', () => {
+        const offenders = directInit
+            .filter(f => !/projectId/.test(f.source))
             .map(f => f.path);
         expect(offenders).toEqual([]);
+    });
+
+    it('초기화는 헬퍼 경유가 기본이다 (직접 호출은 예외적으로 소수여야 한다)', () => {
+        // 숫자 자체가 목적은 아니다. 직접 호출이 늘어나면 프로젝트 고정 규칙이 다시 여러 곳에
+        // 복사되기 시작했다는 신호이므로, 그때 이 테스트가 눈에 걸리게 한다.
+        expect(directInit.length).toBeLessThanOrEqual(2);
     });
 
     it('헬퍼는 .firebaserc로 프로젝트를 정하고, 못 찾으면 경고한다', () => {

@@ -59,49 +59,17 @@
  *   GOOGLE_APPLICATION_CREDENTIALS — Firebase Admin SDK 서비스 계정 키 경로
  *   (또는 gcloud ADC. 키 파일은 functions/ 아래와 루트를 함께 본다)
  */
-import { initializeApp, cert, type ServiceAccount } from "firebase-admin/app";
 import { getAuth, type UserRecord } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
-import { readFileSync, existsSync } from "fs";
-import { dirname, resolve } from "path";
-import { fileURLToPath } from "url";
+import { initAdminApp, resolveProjectId } from "./lib/adminApp";
 
 const isApply = process.argv.includes("--apply");
 const includeReferenced = process.argv.includes("--include-referenced");
 
-// ESM 스코프에는 __dirname이 없다(루트 package.json이 "type": "module").
-const scriptDir = dirname(fileURLToPath(import.meta.url));
-
-/** 대상 프로젝트 ID — 환경변수가 없으면 `.firebaserc`의 default (안전 장치 3번) */
-function resolveProjectId(): string | undefined {
-    const fromEnv = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
-    if (fromEnv) return fromEnv;
-    try {
-        const rc = JSON.parse(readFileSync(resolve(scriptDir, "../.firebaserc"), "utf8"));
-        return rc?.projects?.default;
-    } catch {
-        return undefined;
-    }
-}
-
+// 프로젝트 고정(안전 장치 3번)과 자격증명 탐색은 lib/adminApp이 맡는다.
+// projectId를 따로 들고 있는 것은 아래 배너에서 쓰기 때문이다.
 const projectId = resolveProjectId();
-
-/** 서비스 계정 키가 있으면 그것을, 없으면 기본 인증(ADC)을 쓴다 */
-function initAdmin() {
-    for (const candidate of [
-        process.env.GOOGLE_APPLICATION_CREDENTIALS,
-        resolve(scriptDir, "../functions/serviceAccountKey.json"),
-        resolve(scriptDir, "../serviceAccountKey.json"),
-    ]) {
-        if (candidate && existsSync(candidate)) {
-            const sa = JSON.parse(readFileSync(candidate, "utf-8")) as ServiceAccount;
-            return initializeApp({ credential: cert(sa), ...(projectId ? { projectId } : {}) });
-        }
-    }
-    return initializeApp(projectId ? { projectId } : undefined);
-}
-
-const app = initAdmin();
+const app = initAdminApp({ quiet: true });
 const auth = getAuth(app);
 const db = getFirestore(app);
 

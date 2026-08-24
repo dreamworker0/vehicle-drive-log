@@ -19,29 +19,14 @@
  *   $env:GOOGLE_APPLICATION_CREDENTIALS = "<서비스계정.json 경로>"   (PowerShell)
  * 인증이 없으면 실행 시 설정 방법을 안내하고 중단한다.
  */
-import { readFileSync, writeFileSync } from 'node:fs';
-import { initializeApp } from 'firebase-admin/app';
+import { writeFileSync } from 'node:fs';
 import { getFirestore, type Query, type QueryDocumentSnapshot } from 'firebase-admin/firestore';
+import { initAdminApp, resolveProjectId } from './lib/adminApp';
 
-/**
- * 대상 프로젝트 ID.
- *
- * ADC에 프로젝트가 안 딸려 오는 경우(gcloud 로그인 등)가 흔해서, 환경변수가 없으면
- * `.firebaserc`의 default를 쓴다 — 운영자가 프로젝트 ID를 따로 외우지 않아도 되게.
- */
-function resolveProjectId(): string | undefined {
-    const fromEnv = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
-    if (fromEnv) return fromEnv;
-    try {
-        const rc = JSON.parse(readFileSync(new URL('../.firebaserc', import.meta.url), 'utf8'));
-        return rc?.projects?.default;
-    } catch {
-        return undefined;
-    }
-}
-
+// 대상 프로젝트 고정의 근거는 lib/adminApp.ts에 있다.
+// projectId는 아래 오류 안내에서 쓴다.
 const projectId = resolveProjectId();
-initializeApp(projectId ? { projectId } : undefined);
+initAdminApp({ quiet: true });
 const db = getFirestore();
 
 const args = process.argv.slice(2);

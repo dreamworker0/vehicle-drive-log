@@ -39,12 +39,9 @@
  *   GOOGLE_APPLICATION_CREDENTIALS — 서비스 계정 키 경로 (없으면 gcloud ADC)
  *   GOOGLE_CLOUD_PROJECT           — 대상 프로젝트 (없으면 .firebaserc의 default)
  */
-import { initializeApp, cert, type ServiceAccount } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
-import { readFileSync, existsSync } from "fs";
-import { dirname, resolve } from "path";
-import { fileURLToPath } from "url";
 import { calendarIdFromUrl } from "./lib/calendarIdFromUrl";
+import { initAdminApp, resolveProjectId } from "./lib/adminApp";
 
 const args = process.argv.slice(2);
 const isApply = args.includes("--apply");
@@ -55,40 +52,10 @@ if (only && !(ONLY_VALUES as readonly string[]).includes(only)) {
     process.exit(1);
 }
 
-const scriptDir = dirname(fileURLToPath(import.meta.url));
-
-/**
- * 대상 프로젝트 ID — seed-calendar-bindings.ts와 같은 규칙.
- * ADC의 기본 프로젝트를 조회해 **에러 없이 0건**이 나오는 함정을 막는다.
- */
-function resolveProjectId(): string | undefined {
-    const fromEnv = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
-    if (fromEnv) return fromEnv;
-    try {
-        const rc = JSON.parse(readFileSync(resolve(scriptDir, "../.firebaserc"), "utf8"));
-        return rc?.projects?.default;
-    } catch {
-        return undefined;
-    }
-}
-
+// 대상 프로젝트를 고정하는 이유는 lib/adminApp.ts에 있다.
+// projectId는 아래 출력·오류 안내에서 쓴다.
 const projectId = resolveProjectId();
-
-function initAdmin() {
-    for (const candidate of [
-        process.env.GOOGLE_APPLICATION_CREDENTIALS,
-        resolve(scriptDir, "../functions/serviceAccountKey.json"),
-        resolve(scriptDir, "../serviceAccountKey.json"),
-    ]) {
-        if (candidate && existsSync(candidate)) {
-            const sa = JSON.parse(readFileSync(candidate, "utf-8")) as ServiceAccount;
-            return initializeApp({ credential: cert(sa), ...(projectId ? { projectId } : {}) });
-        }
-    }
-    return initializeApp(projectId ? { projectId } : undefined);
-}
-
-const db = getFirestore(initAdmin());
+const db = getFirestore(initAdminApp({ quiet: true }));
 
 type Reason = "service-account" | "url" | "malformed";
 
