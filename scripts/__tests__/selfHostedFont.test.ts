@@ -27,17 +27,17 @@ const appCss = readFileSync(resolve(ROOT, 'src', 'index.css'), 'utf8');
 const webFontTs = readFileSync(resolve(ROOT, 'src', 'lib', 'webFont.ts'), 'utf8');
 const appEntry = readFileSync(resolve(ROOT, 'src', 'appEntry.tsx'), 'utf8');
 
-/** index.html의 `<link rel="stylesheet" href="...">` 목록 (주석 안은 제외) */
+/**
+ * index.html의 `<link rel="stylesheet" href="...">` 목록.
+ *
+ * 정규식으로 태그를 긁지 않고 실제 파서에 맡긴다 — 주석 안의 예시 태그를 정규식으로
+ * 걸러내려는 시도는 그 자체가 불완전한 처리이고(CodeQL js/incomplete-sanitization),
+ * 파서는 주석·속성 순서·따옴표 종류를 이미 정확히 다룬다.
+ */
 function stylesheetHrefs(html: string): string[] {
-    const withoutComments = html.replace(/<!--[\s\S]*?-->/g, '');
-    const hrefs: string[] = [];
-    for (const m of withoutComments.matchAll(/<link\b[^>]*>/g)) {
-        const tag = m[0];
-        if (!/rel\s*=\s*["']stylesheet["']/.test(tag)) continue;
-        const href = tag.match(/href\s*=\s*["']([^"']+)["']/);
-        if (href) hrefs.push(href[1]);
-    }
-    return hrefs;
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+    return [...doc.querySelectorAll('link[rel="stylesheet"]')]
+        .map(link => link.getAttribute('href') ?? '');
 }
 
 /** webFont.ts가 선언한 폰트 CSS 경로 */
