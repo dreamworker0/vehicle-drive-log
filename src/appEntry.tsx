@@ -16,6 +16,10 @@ import App from './App';
 import UpdatePrompt from './components/common/UpdatePrompt';
 import InstallPrompt from './components/common/InstallPrompt';
 
+// 본 웹 폰트는 이 엔트리에서만 붙인다 (공개 랜딩은 폴백 서체로 빠르게 — 근거는 webFont.ts)
+import { loadWebFont } from './lib/webFont';
+loadWebFont();
+
 // Sentry 지연 초기화
 import('./lib/sentry').then(m => m.initSentry()).catch(() => { });
 

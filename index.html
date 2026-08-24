@@ -5,13 +5,15 @@
   <meta charset="UTF-8" />
   <meta name="google-site-verification" content="zBYvbruFkJzwSnDU87N57eEe6D62376vIsGFy6tyVAw" />
   <!-- preconnect: DNS/TLS 사전 연결로 초기 로딩 성능 향상 -->
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="preconnect" href="https://firestore.googleapis.com" />
   <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com" />
   <link rel="dns-prefetch" href="https://firebasestorage.googleapis.com" />
-  <!-- 본 웹 폰트 로드 (@import 대체로 LCP 성능 최적화) -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" />
+  <!--
+    본 웹 폰트(Pretendard)는 여기서 걸지 않는다. 폰트 스타일시트는 렌더 블로킹이고,
+    한글 동적 서브셋은 한 화면에 약 320KB가 붙어 느린 4G에서 첫 페인트가 2초 밀린다
+    (실측·판단 근거는 src/lib/webFont.ts). 공개 랜딩은 폴백 서체로 띄우고, 로그인한
+    사용자용 앱(appEntry)에서만 자체 호스팅 폰트를 붙인다.
+  -->
   <link rel="icon"
     href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚗</text></svg>" />
   <meta name="viewport"

@@ -3,7 +3,13 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --font-sans: Pretendard, Inter, -apple-system, BlinkMacSystemFont, sans-serif;
+  /*
+   * 'Pretendard Variable'을 맨 앞에 둔다 — index.html이 불러오는 @font-face의 family 이름이
+   * 그것이다(pretendardvariable-dynamic-subset.css). 여기에 'Pretendard'만 적혀 있어서
+   * 그동안 내려받은 웹 폰트가 실제로 적용되지 않았다(family 이름은 정확히 일치해야 한다).
+   * 뒤의 'Pretendard'는 기기에 정식 설치된 사용자를 위한 폴백으로 남긴다.
+   */
+  --font-sans: 'Pretendard Variable', Pretendard, Inter, -apple-system, BlinkMacSystemFont, sans-serif;
 
   --text-xs: 0.8125rem;
   --text-xs--line-height: 1.125rem;

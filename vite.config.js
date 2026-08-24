@@ -90,6 +90,10 @@ export default defineConfig({
       filename: 'sw.ts',
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2,webp}'],
+        // 자체 호스팅 폰트는 프리캐시에서 제외한다. Pretendard 동적 서브셋은 조각이 92개(3.1MB)라
+        // 프리캐시에 넣으면 설치 즉시 전부 내려받는다 — 현장 저사양 폰의 데이터·용량을 쓸 이유가 없다.
+        // 실제로 필요한 조각은 unicode-range에 따라 몇 개뿐이고, 그것만 sw.ts의 런타임 캐시가 담는다.
+        globIgnores: ['fonts/**'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },
     }),
