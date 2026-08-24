@@ -16,11 +16,11 @@
  *   3) organizationId 가 비어 있으면 복구 불가 → 안내만 하고 중단(수동 확인 필요)
  *   4) Custom Claims(role, orgId)를 문서와 일치시키고 토큰 무효화(revoke)
  */
-import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { getAuth } from 'firebase-admin/auth';
+import { initAdminApp } from './lib/adminApp';
 
-initializeApp();
+initAdminApp();
 const db = getFirestore();
 const authAdmin = getAuth();
 

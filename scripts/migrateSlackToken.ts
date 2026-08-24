@@ -23,8 +23,8 @@
  *   SLACK_TOKEN_ENC_KEY            — base64 32바이트 마스터 키 (배포 시크릿과 동일)
  *   GOOGLE_APPLICATION_CREDENTIALS — Firebase Admin SDK 서비스 계정 키 경로
  */
-import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
+import { initAdminApp } from "./lib/adminApp";
 import { encryptSecret, decryptSecret } from "../functions/src/core/crypto";
 
 const isDryRun = process.argv.includes("--dry-run");
@@ -36,10 +36,9 @@ if (!botToken || !encKey) {
     process.exit(1);
 }
 
-// 자격증명은 firebase-admin 기본 탐색에 위임한다:
-// GOOGLE_APPLICATION_CREDENTIALS(서비스계정 키) → ADC(gcloud auth application-default login) 순.
-// 프로젝트는 GOOGLE_CLOUD_PROJECT 환경변수 또는 ADC 기본값을 따른다.
-const app = initializeApp();
+// 자격증명은 서비스 계정 키 → ADC 순으로 찾고, **프로젝트는 .firebaserc로 고정한다**
+// (ADC 기본값을 따르면 남의 프로젝트를 조용히 마이그레이션할 수 있다 — lib/adminApp 참고).
+const app = initAdminApp();
 const db = getFirestore(app);
 
 async function migrate() {

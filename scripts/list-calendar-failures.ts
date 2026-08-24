@@ -9,12 +9,12 @@
  * 인증은 GOOGLE_APPLICATION_CREDENTIALS(ADC)를 사용한다. 쓰기 없음.
  * 실행: fnm exec --using=22 npx tsx scripts/list-calendar-failures.ts
  */
-import { initializeApp, applicationDefault } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
 import { writeFileSync } from 'fs';
 import { resolve } from 'path';
+import { initAdminApp } from './lib/adminApp';
 
-initializeApp({ credential: applicationDefault() });
+initAdminApp();
 const db = getFirestore();
 
 interface Row {

@@ -13,25 +13,15 @@
  * 필요 환경변수:
  *   GOOGLE_APPLICATION_CREDENTIALS — Firebase Admin SDK 서비스 계정 키 경로
  */
-import { initializeApp, cert, ServiceAccount } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
-import * as path from "path";
-import * as fs from "fs";
+import { initAdminApp } from "./lib/adminApp";
 
 const isDryRun = process.argv.includes("--dry-run");
 
-const keyPath =
-    process.env.GOOGLE_APPLICATION_CREDENTIALS ||
-    path.resolve(__dirname, "../serviceAccountKey.json");
-
-let app;
-try {
-    const serviceAccountStr = fs.readFileSync(keyPath, "utf-8");
-    const serviceAccount = JSON.parse(serviceAccountStr) as ServiceAccount;
-    app = initializeApp({ credential: cert(serviceAccount) });
-} catch {
-    app = initializeApp();
-}
+// 자격증명(서비스 계정 키 → ADC)과 **대상 프로젝트 고정**은 lib/adminApp이 맡는다.
+// 예전에는 키 파일 읽기가 실패하면 맨손 initializeApp()으로 넘어가, ADC 기본 프로젝트를
+// 상대로 **백필을 실행**할 수 있었다.
+const app = initAdminApp();
 
 const db = getFirestore(app);
 

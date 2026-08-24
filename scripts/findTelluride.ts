@@ -1,19 +1,7 @@
-import { initializeApp, cert, type ServiceAccount } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
-import { readFileSync, existsSync } from "fs";
-import { resolve, dirname } from "path";
-import { fileURLToPath } from "url";
+import { initAdminApp } from "./lib/adminApp";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
-const saPath = resolve(__dirname, "../functions/serviceAccountKey.json");
-if (existsSync(saPath)) {
-    const sa = JSON.parse(readFileSync(saPath, "utf-8")) as ServiceAccount;
-    initializeApp({ credential: cert(sa) });
-} else {
-    initializeApp();
-}
+initAdminApp();
 
 const db = getFirestore();
 

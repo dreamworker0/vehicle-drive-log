@@ -1,14 +1,10 @@
-import { initializeApp, cert } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
-import { readFileSync } from 'fs';
-import { resolve } from 'path';
+import { initAdminApp } from './lib/adminApp';
 
-// 임시 스크립트로 Firestore 문서 확인
-const serviceAccount = JSON.parse(readFileSync(resolve('./serviceAccountKey.json'), 'utf8'));
-
-initializeApp({
-  credential: cert(serviceAccount)
-});
+// 자격증명(서비스 계정 키 → ADC)과 **대상 프로젝트 고정**은 lib/adminApp이 맡는다.
+// 예전에는 실행 디렉터리의 serviceAccountKey.json만 봐서, 저장소 루트가 아닌 곳에서
+// 실행하면 조회 자체가 불가능했다.
+initAdminApp();
 
 const db = getFirestore();
 
