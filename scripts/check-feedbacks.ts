@@ -6,7 +6,15 @@
  * 최근 피드백을 조회하고 타입별/상태별 요약을 출력합니다.
  *
  * 사용법:
- *   node scripts/check-feedbacks.js [--limit=30]
+ *   npx tsx scripts/check-feedbacks.ts [--limit=30]
+ *   npx tsx scripts/check-feedbacks.ts --search=신청           # 본문에 이 낱말이 든 것만
+ *   npx tsx scripts/check-feedbacks.ts --since=2026-07-01      # 이 날짜 이후만
+ *   npx tsx scripts/check-feedbacks.ts --search=신청 --full    # 본문을 자르지 않고 전체
+ *
+ * `--search`·`--since`를 두는 이유: 기본 출력은 최근 것을 통째로 쏟아내므로, 특정 증상을
+ * 확인하려면 관계없는 문의의 개인정보까지 화면에 남는다. 조사 목적이 정해져 있을 때는
+ * 필요한 범위만 뽑는다. 키워드는 Firestore가 부분 문자열을 검색하지 못하므로 받아온 뒤
+ * 메모리에서 거른다(이 컬렉션은 이미 전량을 읽어 통계를 낸다).
  *
  * 환경:
  *   GOOGLE_APPLICATION_CREDENTIALS 환경변수에 서비스 계정 키 경로 필요
@@ -18,6 +26,9 @@ import { getFirestore, Timestamp } from 'firebase-admin/firestore';
 
 // --- 설정 ---
 const LIMIT = parseInt(process.argv.find(a => a.startsWith('--limit='))?.split('=')[1] || '30', 10);
+const SEARCH = process.argv.find(a => a.startsWith('--search='))?.split('=')[1] || '';
+const SINCE = process.argv.find(a => a.startsWith('--since='))?.split('=')[1] || '';
+const FULL = process.argv.includes('--full');
 
 // Firebase Admin 초기화
 try {
@@ -65,18 +76,43 @@ async function main(): Promise<void> {
         console.log(`    ${emoji} ${status}: ${count}건`);
     });
 
-    // 최근 피드백 목록
-    const recentSnap = await db.collection('feedbacks')
-        .orderBy('createdAt', 'desc')
-        .limit(LIMIT)
-        .get();
+    // 목록 — 날짜·키워드로 좁힐 수 있다
+    let query = db.collection('feedbacks').orderBy('createdAt', 'desc');
+    if (SINCE) {
+        const since = new Date(`${SINCE}T00:00:00+09:00`);
+        if (Number.isNaN(since.getTime())) {
+            console.error(`❌ --since 날짜를 읽을 수 없습니다: ${SINCE} (형식: YYYY-MM-DD)`);
+            process.exit(1);
+        }
+        // createdAt 한 필드의 범위 + 같은 필드 정렬이므로 복합 인덱스가 필요하지 않다.
+        query = query.where('createdAt', '>=', Timestamp.fromDate(since));
+    }
+    // 키워드는 메모리에서 거르므로, 거르기 전 표본을 넉넉히 받는다.
+    const snap = await query.limit(SEARCH ? Math.max(LIMIT * 20, 500) : LIMIT).get();
 
-    console.log(`\n📝 최근 피드백 (최대 ${LIMIT}건)`);
+    const matched = SEARCH
+        ? snap.docs.filter(d => {
+            const fb = d.data();
+            const text = `${fb.message || ''} ${fb.content || ''} ${fb.title || ''}`;
+            return text.includes(SEARCH);
+        }).slice(0, LIMIT)
+        : snap.docs;
+
+    const scope = [
+        SINCE ? `${SINCE} 이후` : null,
+        SEARCH ? `'${SEARCH}' 포함` : null,
+    ].filter(Boolean).join(' · ');
+    console.log(`\n📝 ${scope || '최근'} 피드백 — ${matched.length}건${scope ? ` (조회 범위 ${snap.size}건 중)` : ` (최대 ${LIMIT}건)`}`);
     console.log('─'.repeat(50));
 
-    recentSnap.docs.forEach((doc, i) => {
+    if (matched.length === 0) {
+        console.log('\n  해당하는 문의가 없습니다.');
+    }
+
+    matched.forEach((doc, i) => {
         const fb = doc.data();
-        const date = fb.createdAt?.toDate?.()?.toISOString?.()?.slice(0, 10) || '날짜 없음';
+        // 분까지 보여 준다 — 같은 날 여러 건이 몰린 경우 시각이 판정의 근거가 된다.
+        const date = fb.createdAt?.toDate?.()?.toISOString?.()?.slice(0, 16).replace('T', ' ') || '날짜 없음';
         const type = fb.type || 'other';
         const status = fb.status || 'pending';
         const statusEmoji = status === 'pending' ? '⏳' : status === 'resolved' ? '✅' : '🔄';
@@ -84,7 +120,8 @@ async function main(): Promise<void> {
 
         console.log(`\n  ${i + 1}. [${statusEmoji} ${status}] ${typeEmoji} ${type}`);
         console.log(`     날짜: ${date}`);
-        console.log(`     내용: ${(fb.message || fb.content || '').slice(0, 100)}`);
+        const body = String(fb.message || fb.content || '');
+        console.log(`     내용: ${FULL ? body : body.slice(0, 100)}`);
         if (fb.email) console.log(`     작성자: ${fb.email}`);
     });
 
