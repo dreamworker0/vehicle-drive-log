@@ -7,21 +7,13 @@
  * 이 스크립트는 setCustomClaims Cloud Function 배포 후 1회 실행합니다.
  * 이후 새 사용자는 Firestore 트리거가 자동 처리합니다.
  */
-import { initializeApp, cert, type ServiceAccount } from "firebase-admin/app";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore } from "firebase-admin/firestore";
-import { readFileSync, existsSync } from "fs";
-import { resolve } from "path";
+import { initAdminApp } from "./lib/adminApp";
 
-// Firebase Admin 초기화 (서비스 계정 키 파일 또는 기본 인증)
-const saPath = resolve(__dirname, "../functions/serviceAccountKey.json");
-if (existsSync(saPath)) {
-    const sa = JSON.parse(readFileSync(saPath, "utf-8")) as ServiceAccount;
-    initializeApp({ credential: cert(sa) });
-} else {
-    // GOOGLE_APPLICATION_CREDENTIALS 환경변수 또는 gcloud 기본 인증 사용
-    initializeApp();
-}
+// 자격증명(서비스 계정 키 → ADC)과 **대상 프로젝트 고정**은 lib/adminApp이 맡는다.
+// 이 스크립트는 Custom Claims를 쓰므로, 프로젝트가 어긋나면 남의 계정에 권한을 심는다.
+initAdminApp();
 
 const db = getFirestore();
 const auth = getAuth();

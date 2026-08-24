@@ -14,26 +14,12 @@
  *
  * 멱등(idempotent): 이미 이전된 문서는 필드가 없으므로 자동 스킵된다.
  */
-import { initializeApp, cert, type ServiceAccount } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import { readFileSync, existsSync } from "fs";
-import { dirname, resolve } from "path";
-import { fileURLToPath } from "url";
 import { parseMigrationMode, shouldMoveOauth, type MigrationMode } from "./lib/googleOauthMigration";
+import { initAdminApp } from "./lib/adminApp";
 
-// ESM 스코프에는 __dirname이 없다(루트 package.json이 "type": "module").
-// 스크립트 파일 위치 기준으로 경로를 계산한다.
-const scriptDir = dirname(fileURLToPath(import.meta.url));
-
-// Firebase Admin 초기화 (서비스 계정 키 파일 또는 기본 인증)
-const saPath = resolve(scriptDir, "../functions/serviceAccountKey.json");
-if (existsSync(saPath)) {
-    const sa = JSON.parse(readFileSync(saPath, "utf-8")) as ServiceAccount;
-    initializeApp({ credential: cert(sa) });
-} else {
-    // GOOGLE_APPLICATION_CREDENTIALS 환경변수 또는 gcloud 기본 인증 사용
-    initializeApp();
-}
+// 자격증명(서비스 계정 키 → ADC)과 **대상 프로젝트 고정**은 lib/adminApp이 맡는다.
+initAdminApp();
 
 const db = getFirestore();
 

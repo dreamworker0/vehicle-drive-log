@@ -18,11 +18,12 @@
  *   GOOGLE_APPLICATION_CREDENTIALS — Firebase Admin SDK 서비스 계정 키 경로
  *   FIREBASE_STORAGE_BUCKET        — (선택) 기본값 `${projectId}.firebasestorage.app`
  */
-import { initializeApp, cert, ServiceAccount } from "firebase-admin/app";
+import { initializeApp, cert, applicationDefault, ServiceAccount } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import * as path from "path";
 import * as fs from "fs";
+import { resolveProjectId } from "./lib/adminApp";
 
 const isDryRun = process.argv.includes("--dry-run");
 
@@ -43,7 +44,15 @@ try {
         storageBucket: process.env.FIREBASE_STORAGE_BUCKET || `${projectId}.firebasestorage.app`,
     });
 } catch {
-    app = initializeApp();
+    // 키 파일을 읽지 못했을 때도 **프로젝트를 고정한다.** 맨손 initializeApp()은 ADC 기본
+    // 프로젝트를 따라가므로, 남의 프로젝트를 상대로 마이그레이션을 돌릴 수 있었다
+    // (scripts/lib/adminApp.ts 주석 참고). 아래 guard가 projectId도 버킷도 없으면 끊는다.
+    projectId = resolveProjectId();
+    app = initializeApp({
+        credential: applicationDefault(),
+        ...(projectId ? { projectId } : {}),
+        storageBucket: process.env.FIREBASE_STORAGE_BUCKET || `${projectId}.firebasestorage.app`,
+    });
 }
 
 if (!projectId && !process.env.FIREBASE_STORAGE_BUCKET) {

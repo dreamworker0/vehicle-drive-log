@@ -3,10 +3,10 @@
  *
  * 사용법: fnm exec --using=22 npx tsx scripts/find-org-by-code.ts <초대코드>
  */
-import { initializeApp } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { initAdminApp } from './lib/adminApp';
 
-initializeApp();
+initAdminApp();
 const db = getFirestore();
 
 const code = (process.argv[2] || '').toUpperCase();

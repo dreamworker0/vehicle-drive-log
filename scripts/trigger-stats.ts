@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-import { initializeApp, applicationDefault } from 'firebase-admin/app';
+import { initAdminApp } from './lib/adminApp';
 
 try {
-    initializeApp({ credential: applicationDefault() });
+    initAdminApp();
 } catch (e) {
     console.error('❌ Firebase 인증 실패', e);
     process.exit(1);

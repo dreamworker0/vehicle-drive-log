@@ -5,10 +5,10 @@
  * KST 시각과, apiHealthCheck의 새 판정(활성 창 기준)이 ok/error 중 무엇이어야 하는지 출력한다.
  * ADC(GOOGLE_APPLICATION_CREDENTIALS) 인증, 쓰기 없음.
  */
-import { initializeApp, applicationDefault } from 'firebase-admin/app';
 import { getFirestore } from 'firebase-admin/firestore';
+import { initAdminApp } from './lib/adminApp';
 
-initializeApp({ credential: applicationDefault() });
+initAdminApp();
 const db = getFirestore();
 
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;

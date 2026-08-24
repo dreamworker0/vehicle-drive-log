@@ -15,15 +15,8 @@
  *   - functions/serviceAccountKey.json 이 있으면 자동 사용
  *   - 없으면 GOOGLE_APPLICATION_CREDENTIALS 환경변수 또는 gcloud 기본 인증 사용
  */
-import { initializeApp, cert, type ServiceAccount } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
-import { readFileSync, existsSync } from "fs";
-import { resolve, dirname } from "path";
-import { fileURLToPath } from "url";
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-
+import { initAdminApp } from "./lib/adminApp";
 // ─────────────────────────────────────────────────────────────
 // 표준 차량 모델명 목록 (useVehicleManager.ts 의 VEHICLE_MODEL_SUGGESTIONS 와 동기화)
 // ─────────────────────────────────────────────────────────────
@@ -103,13 +96,8 @@ const ALIAS_MAP: Record<string, string> = {
 // ─────────────────────────────────────────────────────────────
 // Firebase Admin 초기화
 // ─────────────────────────────────────────────────────────────
-const saPath = resolve(__dirname, "../functions/serviceAccountKey.json");
-if (existsSync(saPath)) {
-    const sa = JSON.parse(readFileSync(saPath, "utf-8")) as ServiceAccount;
-    initializeApp({ credential: cert(sa) });
-} else {
-    initializeApp();
-}
+// 자격증명(서비스 계정 키 → ADC)과 **대상 프로젝트 고정**은 lib/adminApp이 맡는다.
+initAdminApp();
 
 const db = getFirestore();
 const IS_DRY_RUN = !process.argv.includes("--apply");
