@@ -23,60 +23,21 @@
  * 필요 환경변수:
  *   GOOGLE_APPLICATION_CREDENTIALS — Firebase Admin SDK 서비스 계정 키 경로
  */
-import { initializeApp, cert, type ServiceAccount } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { createHash } from "node:crypto";
-import { readFileSync, existsSync } from "fs";
-import { dirname, resolve } from "path";
-import { fileURLToPath } from "url";
+import { initAdminApp, resolveProjectId } from "./lib/adminApp";
 
 const isDryRun = process.argv.includes("--dry-run");
 
-// ESM 스코프에는 __dirname이 없다(루트 package.json이 "type": "module").
-// 스크립트 파일 위치 기준으로 경로를 계산한다 (migrateGoogleOauthToPrivate.ts와 같은 방식).
-const scriptDir = dirname(fileURLToPath(import.meta.url));
-
 /**
- * 대상 프로젝트 ID.
+ * 대상 프로젝트를 고정하는 이유는 lib/adminApp.ts에 있다. 이 스크립트에 특별한 것은
+ * **0건의 뜻**이다 — 여기서 0건은 "등록할 것이 없음"이 아니라 "시딩이 이루어지지 않음"일
+ * 수 있고, 그 상태로 넘어가면 캘린더 ID 선점 창이 그대로 열려 있다.
  *
- * ADC에 프로젝트가 안 딸려 오는 경우(gcloud 로그인 등)가 흔하고, 그때 ADC의 **기본
- * 프로젝트**(다른 프로젝트)를 조회해 **에러 없이 0건**이 나온다. 그러면 운영자는 등록할
- * 것이 없다고 믿고 넘어가는데 실제로는 선점 창이 그대로 열려 있다. check-negative-values.ts가
- * 같은 함정을 겪고 남긴 처방을 그대로 따른다 — 환경변수가 없으면 `.firebaserc`의 default.
+ * projectId를 따로 들고 있는 것은 아래 출력·오류 안내에서 쓰기 때문이다.
  */
-function resolveProjectId(): string | undefined {
-    const fromEnv = process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT;
-    if (fromEnv) return fromEnv;
-    try {
-        const rc = JSON.parse(readFileSync(resolve(scriptDir, "../.firebaserc"), "utf8"));
-        return rc?.projects?.default;
-    } catch {
-        return undefined;
-    }
-}
-
 const projectId = resolveProjectId();
-
-/**
- * Firebase Admin 초기화 — 서비스 계정 키 파일이 있으면 그것을, 없으면 기본 인증
- * (GOOGLE_APPLICATION_CREDENTIALS 또는 gcloud ADC)을 쓴다.
- * 키 파일 위치는 저장소의 두 선례를 모두 본다(functions/ 아래와 루트).
- */
-function initAdmin() {
-    for (const candidate of [
-        process.env.GOOGLE_APPLICATION_CREDENTIALS,
-        resolve(scriptDir, "../functions/serviceAccountKey.json"),
-        resolve(scriptDir, "../serviceAccountKey.json"),
-    ]) {
-        if (candidate && existsSync(candidate)) {
-            const sa = JSON.parse(readFileSync(candidate, "utf-8")) as ServiceAccount;
-            return initializeApp({ credential: cert(sa), ...(projectId ? { projectId } : {}) });
-        }
-    }
-    return initializeApp(projectId ? { projectId } : undefined);
-}
-
-const db = getFirestore(initAdmin());
+const db = getFirestore(initAdminApp({ quiet: true }));
 
 /** functions/src/services/calendar/calendarBinding.ts와 같은 규칙이어야 한다 */
 function normalizeCalendarId(calendarId: string): string {
