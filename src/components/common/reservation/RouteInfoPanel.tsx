@@ -54,17 +54,20 @@ export default function RouteInfoPanel({
                 </div>
             ) : routeInfo && (
                 <div className="p-2.5 rounded-lg bg-blue-50 border border-blue-200 dark:bg-blue-900/20 dark:border-blue-800/40 animate-fade-in space-y-1.5">
-                    <div className="flex items-center gap-3 text-xs">
+                    {/* 좁은 화면·큰 글씨 설정에서는 한 줄에 다 들어가지 않는다. 줄바꿈을 허용하고
+                        각 값은 nowrap으로 묶어, 글자가 한 자씩 세로로 쪼개지지 않게 한다. */}
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
                         {departureSiteName && (
-                            <span className="text-[11px] font-semibold text-surface-500 dark:text-surface-400 bg-surface-100 dark:bg-surface-700 px-1.5 py-0.5 rounded">
+                            /* 분관 이름은 길 수 있다 — 쪼개지 않고 말줄임으로 넘긴다 */
+                            <span className="text-[11px] font-semibold text-surface-500 dark:text-surface-400 bg-surface-100 dark:bg-surface-700 px-1.5 py-0.5 rounded min-w-0 max-w-full truncate">
                                 🚩 {departureSiteName} 출발
                             </span>
                         )}
-                        {routeInfo.hasToll && <span className="text-[11px] font-semibold text-blue-500 dark:text-blue-400 bg-blue-100 dark:bg-blue-800/40 px-1.5 py-0.5 rounded">고속</span>}
-                        <span className="font-bold text-blue-700 dark:text-blue-300">🗺️ {routeInfo.isMulti ? '총 ' : ''}{Math.floor(routeInfo.distance)}km</span>
-                        <span className="font-bold text-blue-700 dark:text-blue-300">⏱ {routeInfo.isMulti ? '총 ' : ''}{routeInfo.duration}분</span>
+                        {routeInfo.hasToll && <span className="text-[11px] font-semibold text-blue-500 dark:text-blue-400 bg-blue-100 dark:bg-blue-800/40 px-1.5 py-0.5 rounded whitespace-nowrap shrink-0">고속</span>}
+                        <span className="font-bold text-blue-700 dark:text-blue-300 whitespace-nowrap shrink-0">🗺️ {routeInfo.isMulti ? '총 ' : ''}{Math.floor(routeInfo.distance)}km</span>
+                        <span className="font-bold text-blue-700 dark:text-blue-300 whitespace-nowrap shrink-0">⏱ {routeInfo.isMulti ? '총 ' : ''}{routeInfo.duration}분</span>
                         {(routeInfo.tollFee ?? 0) > 0 && (
-                            <span className="text-blue-600 dark:text-blue-400">₩{(routeInfo.tollFee ?? 0).toLocaleString()}</span>
+                            <span className="text-blue-600 dark:text-blue-400 whitespace-nowrap shrink-0">₩{(routeInfo.tollFee ?? 0).toLocaleString()}</span>
                         )}
                         {/* 통행료 있을 때만 펼치기 버튼 표시 */}
                         {routeInfo.hasToll && onFetchFreeRoad && (
@@ -82,12 +85,12 @@ export default function RouteInfoPanel({
                         )}
                     </div>
                     {showFreeRoad && freeRoadRoute && (
-                        <div className="flex items-center gap-3 text-xs border-t border-blue-200/50 dark:border-blue-800/30 pt-1.5 animate-fade-in">
-                            <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-800/40 px-1.5 py-0.5 rounded">무료</span>
-                            <span className="font-bold text-emerald-700 dark:text-emerald-300">🗺️ {Math.floor(freeRoadRoute.distance)}km</span>
-                            <span className="font-bold text-emerald-700 dark:text-emerald-300">⏱ {freeRoadRoute.duration}분</span>
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs border-t border-blue-200/50 dark:border-blue-800/30 pt-1.5 animate-fade-in">
+                            <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-800/40 px-1.5 py-0.5 rounded whitespace-nowrap shrink-0">무료</span>
+                            <span className="font-bold text-emerald-700 dark:text-emerald-300 whitespace-nowrap shrink-0">🗺️ {Math.floor(freeRoadRoute.distance)}km</span>
+                            <span className="font-bold text-emerald-700 dark:text-emerald-300 whitespace-nowrap shrink-0">⏱ {freeRoadRoute.duration}분</span>
                             {freeRoadRoute.tollFee > 0 && (
-                                <span className="text-emerald-600 dark:text-emerald-400">₩{freeRoadRoute.tollFee.toLocaleString()}</span>
+                                <span className="text-emerald-600 dark:text-emerald-400 whitespace-nowrap shrink-0">₩{freeRoadRoute.tollFee.toLocaleString()}</span>
                             )}
                         </div>
                     )}
