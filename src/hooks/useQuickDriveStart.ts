@@ -219,12 +219,18 @@ export default function useQuickDriveStart() {
         setForm(prev => ({ ...prev, ...patch }));
     }, []);
 
-    const handleStart = async () => {
+    /**
+     * 운행 시작.
+     * `destinationOverride`는 목적지 입력창에 아직 칩으로 확정되지 않은 텍스트가 남아 있을 때
+     * 화면이 합쳐서 넘겨준다 — Enter를 누르지 않고 바로 버튼을 눌러도 입력한 곳으로 시작된다.
+     */
+    const handleStart = async (destinationOverride?: string) => {
+        const destination = (destinationOverride ?? form.destination).trim();
         if (!form.vehicleId) {
             showToast('차량을 선택해주세요.', 'warning');
             return;
         }
-        if (!form.destination.trim()) {
+        if (!destination) {
             showToast('목적지를 입력해주세요.', 'warning');
             return;
         }
@@ -255,7 +261,7 @@ export default function useQuickDriveStart() {
                 startTime: actualStartTime,
                 endTime: calcEndTime(actualStartTime, routeInfo?.duration || 0),
                 purpose: form.purpose.trim(),
-                destination: form.destination.trim(),
+                destination,
                 routeDistance: routeInfo?.distance ?? undefined,
                 routeDuration: routeInfo?.duration ?? undefined,
                 routeTollFee: routeInfo?.tollFee ?? undefined,
