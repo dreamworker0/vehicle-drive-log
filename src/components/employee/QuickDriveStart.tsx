@@ -6,8 +6,9 @@
  * RouteInfoPanel · 동승자). 두 화면이 갈라지면 같은 일을 하는 자리가 서로 다르게 보이고,
  * 목적지 여러 곳 입력처럼 한쪽에만 있는 기능이 생긴다.
  */
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import useQuickDriveStart from '../../hooks/useQuickDriveStart';
+import { mergePendingDestination } from '../../lib/tmap';
 import useVehiclePriority from '../../hooks/useVehiclePriority';
 import { useReservationPattern } from '../../hooks/useReservationPattern';
 import VehicleSelector from '../common/reservation/VehicleSelector';
@@ -32,6 +33,10 @@ export default function QuickDriveStart() {
     const { usageCounts } = useVehiclePriority();
     const { recentDestinations } = useReservationPattern();
     const destinationRef = useRef<HTMLInputElement>(null);
+    // 목적지 입력창에 아직 칩으로 확정되지 않은 텍스트. 직원들이 Enter를 누르지 않고
+    // 바로 "운행 시작"을 누르는 일이 잦아, 이 값도 목적지로 인정한다.
+    const [pendingDestination, setPendingDestination] = useState('');
+    const effectiveDestination = mergePendingDestination(form.destination, pendingDestination);
 
     // 폐차 제외 + 사용 빈도순 정렬 (예약 폼과 같은 기준)
     const sortedActiveVehicles = useMemo(() => {
@@ -81,6 +86,7 @@ export default function QuickDriveStart() {
                             favName={favName}
                             setFavName={setFavName}
                             onSaveFavorite={handleSaveFavorite}
+                            onPendingChange={setPendingDestination}
                         />
                         <RouteInfoPanel
                             routeInfo={routeInfo}
@@ -120,8 +126,8 @@ export default function QuickDriveStart() {
 
                     {/* 운행 시작 버튼 */}
                     <button
-                        onClick={handleStart}
-                        disabled={submitting || !form.vehicleId || !form.destination.trim()}
+                        onClick={() => handleStart(effectiveDestination)}
+                        disabled={submitting || !form.vehicleId || !effectiveDestination.trim()}
                         className="w-full btn-primary py-3 text-base font-bold min-h-[48px]"
                     >
                         {submitting ? (

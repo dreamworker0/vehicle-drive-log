@@ -155,6 +155,26 @@ describe('parseDestinations', () => {
     });
 });
 
+describe('mergePendingDestination (미확정 입력 합치기)', () => {
+    it('입력창에 남은 텍스트를 목적지로 덧붙인다', () => {
+        expect(core.mergePendingDestination('', '사천동 일대')).toBe('사천동 일대');
+        expect(core.mergePendingDestination('서울시청', '사천동 일대')).toBe('서울시청, 사천동 일대');
+    });
+
+    it('빈 입력이면 원문을 그대로 둔다', () => {
+        expect(core.mergePendingDestination('서울시청', '   ')).toBe('서울시청');
+        expect(core.mergePendingDestination('서울시청', '')).toBe('서울시청');
+    });
+
+    it('이미 등록된 목적지는 중복으로 넣지 않는다', () => {
+        expect(core.mergePendingDestination('서울시청, 강남역', '강남역')).toBe('서울시청, 강남역');
+    });
+
+    it('상한(5곳)에 도달하면 더 넣지 않는다', () => {
+        expect(core.mergePendingDestination('A,B,C,D,E', 'F')).toBe('A,B,C,D,E');
+    });
+});
+
 describe('캐시 영속화', () => {
     it('geoCache에 넣으면 localStorage에 기록된다', () => {
         core.geoCache.set('서울시청', { lat: 37.5, lon: 127.0, name: '서울시청' });

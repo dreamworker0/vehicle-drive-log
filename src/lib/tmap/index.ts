@@ -5,6 +5,7 @@ export {
     isTmapAvailable,
     MAX_DESTINATIONS,
     parseDestinations,
+    mergePendingDestination,
 } from './core';
 
 export { searchPOI, searchPOIList, geocode } from './geocoding';

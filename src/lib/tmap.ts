@@ -10,6 +10,7 @@ export {
     isTmapAvailable,
     MAX_DESTINATIONS,
     parseDestinations,
+    mergePendingDestination,
 } from './tmap/core';
 
 export { searchPOI, geocode } from './tmap/geocoding';

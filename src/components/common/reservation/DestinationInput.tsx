@@ -20,6 +20,11 @@ interface DestinationInputProps {
     favName: string;
     setFavName: (name: string) => void;
     onSaveFavorite: () => Promise<void>;
+    /**
+     * 아직 칩으로 확정되지 않은 입력값 알림. 부모가 제출 버튼 활성 여부를 판단하고
+     * 제출 시 이 값을 목적지에 합치는 데 쓴다(Enter를 누르지 않아도 진행되게).
+     */
+    onPendingChange?: (pending: string) => void;
 }
 
 const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
@@ -34,13 +39,20 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
             favName,
             setFavName,
             onSaveFavorite,
+            onPendingChange,
         },
         ref
     ) {
         const dropdownRef = useRef<HTMLDivElement>(null);
+        const boxRef = useRef<HTMLDivElement>(null);
         const internalInputRef = useRef<HTMLInputElement | null>(null);
         const [inputValue, setInputValue] = useState('');
         const [inputError, setInputError] = useState('');
+        const [isFocused, setIsFocused] = useState(false);
+        /** 드롭다운 강조 위치. -1 = "입력한 그대로 사용" 행(기본값), 0 이상 = 검색 결과 인덱스 */
+        const [highlightIndex, setHighlightIndex] = useState(-1);
+        /** 미확정 입력 확정 함수의 최신 참조 (문서 mousedown 리스너에서 호출) */
+        const commitPendingRef = useRef<() => void>(() => { });
 
         // 실시간 타이핑 중인 inputValue로 POI 드롭다운 검색 수행
         const { poiResults, poiLoading, showPoiDropdown, setShowPoiDropdown, clearPoiResults, suppressNext } =
@@ -48,25 +60,38 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
 
         // 목적지 원문에서 쉼표 기준으로 확정된 목적지 목록 파싱
         const destinationList = parseDestinations(destination);
+        /** 아직 칩으로 확정되지 않은 입력이 있는지 */
+        const hasPending = inputValue.trim().length > 0;
 
         // 부모 컴포넌트가 ref.current를 호출하면 내부 실제 input 인스턴스를 정상 반환하도록 노출
         useImperativeHandle(ref, () => internalInputRef.current as HTMLInputElement);
 
-        // 드롭다운 외부 클릭 시 닫기
+        // 입력 영역 바깥을 누르면 드롭다운을 닫고, 미확정 입력은 목적지로 확정한다.
+        // (mousedown은 click보다 먼저 도착하므로, "운행 시작"을 바로 눌러도 확정이 선행된다)
         useEffect(() => {
             const handleClickOutside = (e: MouseEvent) => {
-                if (
-                    dropdownRef.current &&
-                    !dropdownRef.current.contains(e.target as Node) &&
-                    internalInputRef.current &&
-                    !internalInputRef.current.contains(e.target as Node)
-                ) {
+                const target = e.target as Node;
+                const insideDropdown = dropdownRef.current?.contains(target);
+                const insideBox = boxRef.current?.contains(target);
+                if (!insideDropdown && !insideBox) {
                     setShowPoiDropdown(false);
+                    commitPendingRef.current();
                 }
             };
             document.addEventListener('mousedown', handleClickOutside);
             return () => document.removeEventListener('mousedown', handleClickOutside);
         }, [setShowPoiDropdown]);
+
+        // 미확정 입력을 부모에 알린다 (제출 버튼 활성 판단용)
+        useEffect(() => {
+            onPendingChange?.(inputValue);
+        }, [inputValue, onPendingChange]);
+
+        // 입력이 바뀌면 강조는 "그대로 사용" 행으로 되돌린다 —
+        // 직원이 방향키로 직접 고르지 않는 한 Enter는 항상 입력한 그대로를 넣는다.
+        useEffect(() => {
+            setHighlightIndex(-1);
+        }, [inputValue]);
 
         // 목적지 목록에 새로운 목적지 추가
         const handleAddDestination = (newDest: string) => {
@@ -108,16 +133,36 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
             handleAddDestination(address ? `${name} (${address})` : name);
         };
 
+        /**
+         * 입력창에 남아 있는 미확정 텍스트를 목적지로 확정한다.
+         * "사천동 일대"처럼 검색으로 안 잡히는 곳을 쳐 놓고 Enter 없이 다른 곳을 눌러도
+         * 입력이 사라지지 않게 하는 안전장치다.
+         */
+        const commitPending = () => {
+            if (inputValue.trim()) handleAddDestination(inputValue);
+        };
+        commitPendingRef.current = commitPending;
+
         // 키보드 단축 로직 핸들러
         const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-            if (e.key === 'Enter') {
+            if (e.key === 'ArrowDown') {
+                if (poiResults.length === 0) return;
                 e.preventDefault();
-                if (showPoiDropdown && poiResults.length > 0) {
-                    // 검색 결과가 있으면 첫 번째 항목 선택
-                    const firstPoi = poiResults[0];
-                    handleSelectPoi(firstPoi.name, firstPoi.address);
+                setShowPoiDropdown(true);
+                setHighlightIndex(prev => Math.min(prev + 1, poiResults.length - 1));
+            } else if (e.key === 'ArrowUp') {
+                if (poiResults.length === 0) return;
+                e.preventDefault();
+                setHighlightIndex(prev => Math.max(prev - 1, -1));
+            } else if (e.key === 'Enter') {
+                e.preventDefault();
+                const highlighted = highlightIndex >= 0 ? poiResults[highlightIndex] : undefined;
+                if (highlighted) {
+                    // 방향키로 검색 결과를 직접 고른 경우에만 그 장소를 넣는다.
+                    // (예전에는 결과가 뜨기만 하면 첫 항목이 들어가 엉뚱한 곳이 기록됐다)
+                    handleSelectPoi(highlighted.name, highlighted.address);
                 } else if (inputValue.trim()) {
-                    // 검색 결과가 없는 일반 타이핑 값 바로 추가
+                    // 기본 동작: 입력한 그대로 목적지로 등록
                     handleAddDestination(inputValue);
                 }
             } else if (e.key === 'Backspace' && !inputValue && destinationList.length > 0) {
@@ -132,6 +177,7 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
                 <div className="relative mt-1">
                     {/* 태그 입력창 컨테이너 */}
                     <div
+                        ref={boxRef}
                         onClick={() => internalInputRef.current?.focus()}
                         role="button"
                         tabIndex={0}
@@ -183,10 +229,16 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
                                 }}
                                 onKeyDown={handleKeyDown}
                                 onFocus={() => {
+                                    setIsFocused(true);
                                     if (poiResults.length > 0) setShowPoiDropdown(true);
                                 }}
+                                onBlur={() => {
+                                    setIsFocused(false);
+                                    // 키보드를 내리거나 다른 입력으로 이동해도 입력한 목적지는 지켜준다
+                                    commitPending();
+                                }}
                                 className="flex-1 bg-transparent border-0 outline-none p-0 text-sm focus:ring-0 focus:ring-offset-0 min-w-[100px] dark:text-surface-100"
-                                placeholder={destinationList.length === 0 ? '장소 검색 또는 직접 입력 후 Enter (최대 5개)' : '추가 목적지 입력...'}
+                                placeholder={destinationList.length === 0 ? '장소 검색 또는 직접 입력 (예: 사천동 일대)' : '추가 목적지 입력...'}
                                 required={destinationList.length === 0}
                                 autoComplete="off"
                             />
@@ -200,8 +252,11 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
                         {inputValue.trim() && destinationList.length <= 1 && !favorites.some(f => f.address === inputValue.trim() || f.name === inputValue.trim()) && (
                             <button
                                 type="button"
+                                onMouseDown={(e) => e.preventDefault()}
                                 onClick={(e) => {
                                     e.stopPropagation();
+                                    // 즐겨찾기는 확정된 목적지를 저장하므로 미확정 입력을 먼저 확정한다
+                                    commitPending();
                                     setShowFavSave(!showFavSave);
                                 }}
                                 className={`flex-shrink-0 w-8 h-8 rounded-lg flex items-center justify-center transition-all ml-auto ${showFavSave
@@ -222,12 +277,36 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
                         </p>
                     )}
 
-                    {/* POI 검색 결과 드롭다운 */}
-                    {(showPoiDropdown || poiLoading) && (
+                    {/* POI 검색 결과 드롭다운 — 검색이 안 잡혀도 "그대로 사용" 행은 항상 보인다 */}
+                    {(showPoiDropdown || poiLoading || (isFocused && hasPending)) && (
                         <div
                             ref={dropdownRef}
                             className="absolute z-50 left-0 right-0 top-full mt-1 rounded-xl border border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-800 shadow-xl max-h-[280px] overflow-y-auto scrollbar-thin scrollbar-thumb-surface-200 dark:scrollbar-thumb-surface-700 animate-fade-in"
                         >
+                            {/* 입력한 그대로 사용 — 검색에 의존하지 않는 기본 선택지 */}
+                            {hasPending && destinationList.length < 5 && (
+                                <button
+                                    type="button"
+                                    onMouseDown={e => {
+                                        e.preventDefault(); // onBlur보다 먼저 실행되도록
+                                        handleAddDestination(inputValue);
+                                    }}
+                                    className={`w-full text-left px-3 py-2.5 flex items-start gap-2.5 transition-colors border-b border-surface-100 dark:border-surface-700 ${highlightIndex === -1
+                                        ? 'bg-primary-50 dark:bg-primary-900/20'
+                                        : 'hover:bg-primary-50 dark:hover:bg-primary-900/20'
+                                        }`}
+                                >
+                                    <span className="mt-0.5 text-primary-500 dark:text-primary-400 text-sm flex-shrink-0">✏️</span>
+                                    <div className="min-w-0">
+                                        <p className="text-sm font-medium text-surface-900 dark:text-surface-100 truncate">
+                                            &lsquo;{inputValue.trim()}&rsquo; 그대로 사용
+                                        </p>
+                                        <p className="text-xs text-surface-400 dark:text-surface-500 truncate mt-0.5">
+                                            검색되지 않는 곳도 입력한 대로 기록됩니다
+                                        </p>
+                                    </div>
+                                </button>
+                            )}
                             {poiLoading && (
                                 <div className="flex items-center gap-2 px-3 py-2.5 text-xs text-surface-400 dark:text-surface-500">
                                     <span className="inline-block w-3 h-3 border-2 border-primary-400 border-t-transparent rounded-full animate-spin" />
@@ -242,7 +321,10 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
                                         e.preventDefault(); // onBlur보다 먼저 실행되도록
                                         handleSelectPoi(poi.name, poi.address);
                                     }}
-                                    className="w-full text-left px-3 py-2.5 flex items-start gap-2.5 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors border-b border-surface-100 dark:border-surface-700 last:border-0"
+                                    className={`w-full text-left px-3 py-2.5 flex items-start gap-2.5 transition-colors border-b border-surface-100 dark:border-surface-700 last:border-0 ${highlightIndex === i
+                                        ? 'bg-primary-50 dark:bg-primary-900/20'
+                                        : 'hover:bg-primary-50 dark:hover:bg-primary-900/20'
+                                        }`}
                                 >
                                     <span className="mt-0.5 text-primary-500 dark:text-primary-400 text-sm flex-shrink-0">📍</span>
                                     <div className="min-w-0">
@@ -257,9 +339,10 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
                                     </div>
                                 </button>
                             ))}
-                            {!poiLoading && poiResults.length === 0 && showPoiDropdown && (
+                            {/* 두 글자 이상부터 검색하므로, 그 전에는 "없다"고 말하지 않는다 */}
+                            {!poiLoading && poiResults.length === 0 && inputValue.trim().length >= 2 && (
                                 <div className="px-3 py-2.5 text-xs text-surface-400 dark:text-surface-500">
-                                    검색 결과가 없습니다.
+                                    검색된 장소가 없습니다. 입력한 그대로 사용하셔도 됩니다.
                                 </div>
                             )}
                         </div>

@@ -152,3 +152,18 @@ export const parseDestinations = (text: string) => {
     if (!text?.trim()) return [];
     return text.split(',').map(s => s.trim()).filter(Boolean).slice(0, MAX_DESTINATIONS);
 };
+
+/**
+ * 아직 칩(태그)으로 확정되지 않은 입력값을 목적지 문자열에 합친다.
+ *
+ * 목적지 입력창은 Enter·쉼표·검색결과 선택으로만 값이 확정된다. 직원이 글자만 쳐 놓고
+ * 바로 제출을 누르는 경우가 잦으므로, 제출 시점에 남아 있는 입력을 목적지로 인정한다.
+ * 이미 같은 목적지가 있거나 개수 상한이면 원문을 그대로 돌려준다.
+ */
+export const mergePendingDestination = (destination: string, pending: string) => {
+    const trimmed = pending?.trim() ?? '';
+    if (!trimmed) return destination;
+    const list = parseDestinations(destination);
+    if (list.includes(trimmed) || list.length >= MAX_DESTINATIONS) return destination;
+    return [...list, trimmed].join(', ');
+};
