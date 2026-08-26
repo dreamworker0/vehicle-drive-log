@@ -144,7 +144,14 @@ export const clearVehicleMaintenanceBlock = async (vehicleId: string) => {
     }
 };
 
-// 차량 정비 차단 시 기존 예약 일괄 취소 + 예약자 알림
+/**
+ * 차량 정비 차단·폐차 시 기존 예약 일괄 취소 + 예약자 알림
+ *
+ * 인덱스: `reservations (organizationId, vehicleId, status, date)`가 필요하다.
+ * 동등 필터 3개 뒤에 `date` 범위가 붙어 단일 필드 인덱스 병합으로는 처리되지 않는다.
+ * 인덱스가 없으면 조회가 통째로 실패해 **정비 기록은 저장됐는데 예약은 그대로 남고**
+ * 화면에는 "저장에 실패했습니다"만 뜬다 (Sentry JAVASCRIPT-REACT-5F, 2026-08-26).
+ */
 export const cancelVehicleReservations = async (orgId: string, vehicleId: string, vehicleName: string, startDate: string, endDate: string | null, reason: string) => {
     try {
         const constraints = [

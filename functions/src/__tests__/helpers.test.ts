@@ -1,3 +1,4 @@
+import { HttpsError } from "firebase-functions/v2/https";
 import { log, wrapHttps, wrapHandler, sanitizePromptValue } from "../utils/helpers";
 
 describe('helpers — 공통 유틸리티', () => {
@@ -111,6 +112,46 @@ describe('helpers — 공통 유틸리티', () => {
 
             await expect(wrapped()).rejects.toThrow('fail');
             expect(console.error).toHaveBeenCalled();
+            jest.restoreAllMocks();
+        });
+
+        it('의도적인 거부(HttpsError)는 ERROR가 아닌 WARNING으로 남긴다', async () => {
+            jest.spyOn(console, 'error').mockImplementation();
+            jest.spyOn(console, 'warn').mockImplementation();
+            const rejection = new HttpsError('failed-precondition', '영리 사업자등록증은 접수할 수 없습니다.');
+            const handler = jest.fn(async () => { throw rejection; });
+            const wrapped = wrapHandler('submitOrgApplication', handler);
+
+            await expect(wrapped()).rejects.toBe(rejection);
+            // ERROR로 찍히면 captureError → Sentry·Discord 알림이 나간다
+            expect(console.error).not.toHaveBeenCalled();
+            const entry = JSON.parse((console.warn as jest.Mock).mock.calls[0][0]);
+            expect(entry.severity).toBe('WARNING');
+            expect(entry.code).toBe('failed-precondition');
+            jest.restoreAllMocks();
+        });
+
+        it.each(['invalid-argument', 'resource-exhausted', 'permission-denied', 'out-of-range'] as const)(
+            '%s 거부도 알림 대상이 아니다',
+            async (code) => {
+                jest.spyOn(console, 'error').mockImplementation();
+                jest.spyOn(console, 'warn').mockImplementation();
+                const wrapped = wrapHandler('testFn', async () => { throw new HttpsError(code, '거부'); });
+
+                await expect(wrapped()).rejects.toThrow('거부');
+                expect(console.error).not.toHaveBeenCalled();
+                expect(console.warn).toHaveBeenCalled();
+                jest.restoreAllMocks();
+            }
+        );
+
+        it('internal HttpsError는 장애로 보고 ERROR로 남긴다', async () => {
+            jest.spyOn(console, 'error').mockImplementation();
+            const wrapped = wrapHandler('testFn', async () => { throw new HttpsError('internal', '시스템 오류'); });
+
+            await expect(wrapped()).rejects.toThrow('시스템 오류');
+            const entry = JSON.parse((console.error as jest.Mock).mock.calls[0][0]);
+            expect(entry.severity).toBe('ERROR');
             jest.restoreAllMocks();
         });
     });
