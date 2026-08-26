@@ -13,9 +13,10 @@ import { sendDiscordAlert } from "./discord";
 
 const DSN = process.env.SENTRY_DSN_FUNCTIONS || "";
 const IS_TEST = process.env.NODE_ENV === "test";
+const RELEASE = process.env.SENTRY_RELEASE || "";
 
 interface SentryLike {
-    init(options: { dsn: string; environment: string; tracesSampleRate: number }): void;
+    init(options: { dsn: string; environment: string; tracesSampleRate: number; release?: string }): void;
     captureException(error: unknown, options?: { extra?: Record<string, unknown> }): void;
     captureMessage(message: string, options?: { level?: string; extra?: Record<string, unknown> }): void;
     flush(timeoutMs?: number): Promise<boolean>;
@@ -36,6 +37,10 @@ function getSentry(): SentryLike | null {
                 dsn: DSN,
                 environment: "cloud-functions",
                 tracesSampleRate: 0,
+                // 릴리즈(배포 커밋 SHA) — 배포 워크플로가 functions/.env에 넣는다.
+                // 없으면 "이 에러가 어느 배포에서 나왔는지"를 알 수 없고 Sentry의
+                // "Resolved in next release"도 쓸 수 없다. 로컬·에뮬레이터에서는 비어 있다.
+                ...(RELEASE ? { release: RELEASE } : {}),
             });
         } catch {
             // @sentry/node 로드 실패 시 무시

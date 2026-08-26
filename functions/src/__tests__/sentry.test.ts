@@ -51,6 +51,40 @@ describe('captureError — Sentry와 Discord는 독립된 경로다', () => {
         expect(sendDiscordAlert).toHaveBeenCalledTimes(1);
     });
 
+    /**
+     * 릴리즈(배포 커밋 SHA)가 붙어야 Sentry에서 "이 에러가 어느 배포에서 났는지"를 알 수 있고
+     * 이슈를 "Resolved in next release"로 닫을 수 있다. 배포 워크플로가 functions/.env에
+     * SENTRY_RELEASE를 넣어 주는데, init에서 이 값을 흘리면 그 연결이 통째로 끊긴다.
+     */
+    it('SENTRY_RELEASE가 있으면 init에 release로 전달한다', () => {
+        process.env.SENTRY_DSN_FUNCTIONS = 'https://examplePublicKey@o0.ingest.sentry.io/0';
+        process.env.SENTRY_RELEASE = 'abc123def456';
+        const init = jest.fn();
+        jest.doMock('@sentry/node', () => ({ init, captureException: jest.fn(), captureMessage: jest.fn(), flush: jest.fn() }));
+        jest.doMock('../core/discord', () => ({ sendDiscordAlert: jest.fn().mockResolvedValue(undefined) }));
+
+         
+        const { captureError } = require('../core/sentry');
+        captureError(new Error('boom'));
+
+        expect(init).toHaveBeenCalledWith(expect.objectContaining({ release: 'abc123def456' }));
+    });
+
+    it('SENTRY_RELEASE가 없으면 release 키를 넘기지 않는다 (SDK 기본 동작 유지)', () => {
+        process.env.SENTRY_DSN_FUNCTIONS = 'https://examplePublicKey@o0.ingest.sentry.io/0';
+        delete process.env.SENTRY_RELEASE;
+        const init = jest.fn();
+        jest.doMock('@sentry/node', () => ({ init, captureException: jest.fn(), captureMessage: jest.fn(), flush: jest.fn() }));
+        jest.doMock('../core/discord', () => ({ sendDiscordAlert: jest.fn().mockResolvedValue(undefined) }));
+
+         
+        const { captureError } = require('../core/sentry');
+        captureError(new Error('boom'));
+
+        expect(init).toHaveBeenCalledTimes(1);
+        expect(init.mock.calls[0][0]).not.toHaveProperty('release');
+    });
+
     it('테스트 환경(NODE_ENV=test)에서는 어떤 알림도 보내지 않는다', () => {
         process.env = { ...OLD_ENV, NODE_ENV: 'test' };
         const { sendDiscordAlert, captureError } = loadWithMockedDiscord();

@@ -180,6 +180,28 @@ Firestore 백업에서 복구가 필요한 경우:
 | `EMAILJS_*` | 키 만료 시 | EmailJS 대시보드에서 재발급 → `.env` 수정 |
 | `VITE_TMAP_API_KEY` | 키 만료 시 | 티맵 개발자센터에서 재발급 → `.env` 수정 → 빌드+배포 (⚠️ 이름이 `..._APP_KEY`가 아니다 — 틀리면 경로 탐색이 **에러 없이** 죽는다) |
 | `VITE_SENTRY_DSN` | 프로젝트 변경 시 | Sentry 대시보드 → `.env` 수정 → 빌드+배포 |
+| `SENTRY_AUTH_TOKEN` | 토큰 만료 시 | Sentry → Settings → Auth Tokens에서 `project:releases` 권한으로 재발급 → GitHub Secrets 갱신 |
+
+### 5.1.1 Sentry 릴리즈 추적
+
+배포 워크플로가 **배포 커밋 SHA를 릴리즈 버전으로** 삼아 프런트(`VITE_SENTRY_RELEASE`)와
+Functions(`functions/.env`의 `SENTRY_RELEASE`)에 같은 값을 넣는다. 그래서 Sentry의 각 이슈에
+"어느 배포에서 났는지"가 붙고, 이슈를 **Resolved in next release**로 닫을 수 있다.
+
+> ⚠️ 릴리즈가 하나도 없는 프로젝트에서는 "Resolved in next release"가 `Unable to update issues`로
+> 실패한다. 2026-08-26에 실제로 겪은 문제이고, 이 파이프라인이 그 원인을 없앤다.
+
+추가로 GitHub Secret `SENTRY_AUTH_TOKEN`이 있으면 배포 성공 후 소스맵 업로드와 커밋 연결까지 한다.
+
+| 설정 | 종류 | 없으면 |
+|---|---|---|
+| `SENTRY_AUTH_TOKEN` | Secret (필수: 소스맵·커밋 연결) | 릴리즈 태깅은 그대로 동작(이벤트로 자동 생성), 스택트레이스는 압축된 번들 그대로 |
+| `SENTRY_ORG` | Variable (기본 `socialprism`) | 기본값 사용 |
+| `SENTRY_PROJECT` | Variable (기본 `javascript-react`) | 기본값 사용 |
+| `SENTRY_PROJECT_FUNCTIONS` | Variable (선택) | Functions가 프런트와 같은 프로젝트로 보고한다고 가정 |
+
+소스맵은 `sourcemap: 'hidden'`으로 만들어 Sentry에만 올리고, `firebase.json`의 `hosting.ignore`가
+`**/*.map`을 제외해 **프로덕션에는 배포되지 않는다**(원본 코드가 공개되지 않는다).
 
 ### 5.2 Firebase 보안 규칙
 

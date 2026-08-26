@@ -113,6 +113,12 @@ export default defineConfig({
     },
   },
   build: {
+    // 소스맵은 **배포 워크플로에서만** 켠다(SENTRY_SOURCEMAPS=1).
+    // 'hidden'이라 번들에 sourceMappingURL 주석이 남지 않고, .map 파일은
+    // firebase.json의 hosting.ignore가 제외해 프로덕션으로 나가지 않는다 —
+    // Sentry에만 업로드되어 스택트레이스가 원본 코드로 풀린다.
+    // 로컬·CI 빌드에서 켜면 빌드 시간과 디스크만 늘어나므로 기본은 끈다.
+    sourcemap: process.env.SENTRY_SOURCEMAPS === '1' ? 'hidden' : false,
     reportCompressedSize: true,
     chunkSizeWarningLimit: 500,
     rollupOptions: {

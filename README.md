@@ -147,6 +147,8 @@ VITE_HOLIDAY_API_KEY=...
 
 # Sentry
 VITE_SENTRY_DSN=...
+# VITE_SENTRY_RELEASE — 직접 넣지 않습니다. 배포 워크플로가 배포 커밋 SHA로 주입해
+# 에러가 어느 배포에서 났는지 추적하고 "Resolved in next release"를 쓸 수 있게 합니다.
 ```
 
 > 개발 전용 변수(`VITE_APPCHECK_DEBUG_TOKEN`, `VITE_USE_EMULATOR`)는 `.env.local`에 둡니다 — [.env.local.example](.env.local.example) 참고.
@@ -164,6 +166,7 @@ GEMINI_API_KEY=...
 TMAP_API_KEY=...
 HOLIDAY_API_KEY=...
 ALLOW_TEST_WHITELIST=        # 운영에서는 비워 둔다
+SENTRY_RELEASE=              # 비워 둔다. 배포 워크플로가 배포 커밋 SHA로 채운다
 ```
 
 > 이 목록은 `npm run check:functions-env`가 코드(`defineString`/`process.env`)와 대조합니다 —
