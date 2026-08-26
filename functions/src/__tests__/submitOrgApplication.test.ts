@@ -71,6 +71,12 @@ jest.mock('../core/gemini', () => ({
 }));
 jest.mock('firebase-functions/params', () => ({ defineString: jest.fn(() => ({ value: jest.fn(() => 'mock-key') })) }));
 
+// 운영자 알림(Discord)은 실제로 보내지 않고 호출만 검증한다
+const mockSendDiscordAlert = jest.fn().mockResolvedValue(undefined);
+jest.mock('../core/discord', () => ({
+    sendDiscordAlert: (...args: unknown[]) => mockSendDiscordAlert(...args),
+}));
+
 const screenResponse = (fields: Record<string, unknown> = {}) => JSON.stringify({
     documentType: '고유번호증', uniqueNumber: '123-82-12345', extractedName: '행복복지관',
     address: '서울시 중구', nameMatch: true, ...fields,
@@ -292,6 +298,43 @@ describe('submitOrgApplication — 증빙서류 프리스크린', () => {
 
         expect(mockFileSave).not.toHaveBeenCalled();
         expect(mockOrgSet).not.toHaveBeenCalled();
+    });
+
+    // 접수 전 반려는 기관 문서를 만들지 않아 notifyNewApplication 트리거가 돌지 않는다.
+    // 여기서 알리지 않으면 운영자는 반려 사실 자체를 모른다 — 그리고 이건 장애가 아니라
+    // 접수 현황이므로 예외 알림이 아닌 정식 알림 카드로 나가야 한다.
+    it('반려 시 운영자에게 정식 알림 카드를 보낸다 (예외 알림이 아님)', async () => {
+        mockGenerateAiContent.mockResolvedValue(screenResponse({
+            documentType: '사업자등록증(영리)', extractedName: '주식회사 행복', uniqueNumber: '123-81-12345',
+        }));
+
+        await expect(capturedHandler(makeRequest())).rejects.toMatchObject({ code: 'failed-precondition' });
+
+        expect(mockSendDiscordAlert).toHaveBeenCalledTimes(1);
+        const alert = mockSendDiscordAlert.mock.calls[0][0];
+        expect(alert.title).toContain('기관 신청 반려');
+        expect(alert.title).not.toContain('Exception');
+        expect(alert.description).toContain('행복복지관');
+        expect(alert.fields).toEqual(expect.arrayContaining([
+            expect.objectContaining({ name: '신청자', value: '홍길동' }),
+            // 이메일은 마스킹해서 남긴다
+            expect.objectContaining({ name: '기관 이메일', value: expect.stringContaining('**') }),
+            expect.objectContaining({ name: '판별 결과', value: expect.stringContaining('사업자등록증(영리)') }),
+        ]));
+    });
+
+    it('정상 접수 건에는 반려 알림을 보내지 않는다', async () => {
+        await expect(capturedHandler(makeRequest())).resolves.toMatchObject({ success: true });
+        expect(mockSendDiscordAlert).not.toHaveBeenCalled();
+    });
+
+    it('알림 전송이 실패해도 반려 응답은 그대로 전달된다', async () => {
+        mockGenerateAiContent.mockResolvedValue(screenResponse({ documentType: '판독불가' }));
+        mockSendDiscordAlert.mockRejectedValueOnce(new Error('webhook down'));
+        jest.spyOn(console, 'error').mockImplementation();
+
+        await expect(capturedHandler(makeRequest())).rejects.toMatchObject({ code: 'failed-precondition' });
+        jest.restoreAllMocks();
     });
 
     it('반려 사유는 신청자에게 그대로 전달된다 (내부 오류로 뭉개지 않음)', async () => {

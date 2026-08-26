@@ -76,7 +76,27 @@ export function wrapHttps(functionName: string, handler: (req: Request, res: Res
 }
 
 /**
+ * 서버 장애로 취급할 HttpsError 코드.
+ *
+ * 나머지 코드(invalid-argument·failed-precondition·resource-exhausted·permission-denied 등)는
+ * **핸들러가 의도적으로 던진 거부**다. 잘못된 입력이나 업무 규칙 위반을 신청자에게 알려주는
+ * 정상 응답이지 장애가 아니다.
+ */
+const SERVER_FAILURE_CODES = new Set<string>(["internal", "unknown"]);
+
+function isServerFailure(err: unknown): boolean {
+    return !(err instanceof HttpsError) || SERVER_FAILURE_CODES.has(err.code);
+}
+
+/**
  * onCall / onDocumentCreated 등 비-HTTP 핸들러용 에러 래퍼
+ *
+ * 의도적으로 던진 HttpsError 거부는 ERROR로 올리지 않는다. 예전에는 전부 ERROR로 찍었는데,
+ * `log("ERROR", ...)`가 곧 `captureError`라서 "영리 사업자등록증이라 접수할 수 없습니다" 같은
+ * **정상 반려**가 Discord·Sentry에 빨간 "Cloud Functions Exception"으로 떴다(2026-08-26).
+ * 이런 알림이 쌓이면 진짜 장애 알림이 묻힌다.
+ * 거부는 WARNING으로 남겨 Cloud Logging에서는 그대로 추적되게 하되 알림은 보내지 않는다.
+ * (wrapCallableHandler와 동일한 기준)
  */
 export function wrapHandler<T extends unknown[], R>(functionName: string, handler: (...args: T) => Promise<R>): (...args: T) => Promise<R> {
     return async (...args: T) => {
@@ -84,6 +104,10 @@ export function wrapHandler<T extends unknown[], R>(functionName: string, handle
             return await handler(...args);
         } catch (err: unknown) {
             const error = err as Error;
+            if (!isServerFailure(err)) {
+                log("WARNING", functionName, error.message, { code: (err as HttpsError).code });
+                throw err; // 거부 사유를 그대로 호출자에게 전달
+            }
             log("ERROR", functionName, error.message, { stack: error.stack });
             await flushSentry();
             throw err; // 호출자에게 에러 전파
@@ -144,9 +168,11 @@ export function wrapCallableHandler<T, R>(
             return await handler(request);
         } catch (err: unknown) {
             if (err instanceof HttpsError) {
-                if (err.code === "internal" || err.code === "unknown") {
+                if (isServerFailure(err)) {
                     log("ERROR", functionName, err.message, { stack: err.stack });
                     await flushSentry();
+                } else {
+                    log("WARNING", functionName, err.message, { code: err.code });
                 }
                 throw err;
             }

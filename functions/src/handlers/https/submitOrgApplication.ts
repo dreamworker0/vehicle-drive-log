@@ -6,7 +6,8 @@ import { checkRateLimitByUid, checkRateLimitByIp, checkGlobalBudget } from "../.
 import { resolveClientIp } from "../../utils/clientIp";
 import { GLOBAL_BUDGETS } from "../../utils/constants";
 import { maskEmail } from "../../utils/mask";
-import { screenDocument, getScreenRejection, ScreenResult } from "../../services/driveLog/documentScreen";
+import { screenDocument, getScreenRejection, ScreenResult, ScreenRejection } from "../../services/driveLog/documentScreen";
+import { sendDiscordAlert } from "../../core/discord";
 
 /**
  * 업로드 허용 MIME 화이트리스트 (2026-07-10 코덱스 평가 대응 — 작업 3).
@@ -177,6 +178,11 @@ export const submitOrgApplication = onCall(
                     log("INFO", "submitOrgApplication", "프리스크린 반려 — 접수하지 않음", {
                         email: maskEmail(email), orgId, documentType: screen.documentType, code: rejection.code,
                     });
+                    // 운영자에게는 **접수 현황 알림**으로 남긴다. 이 건은 기관 문서를 만들지 않아
+                    // notifyNewApplication 트리거가 돌지 않으므로, 여기서 보내지 않으면 "영리 서류로
+                    // 신청했다가 반려된 기관"이 운영자 쪽에 아무 흔적도 남지 않는다.
+                    // (장애 알림이 아니므로 captureError 경로는 쓰지 않는다 — helpers.wrapHandler 주석 참고)
+                    await notifyPrescreenRejection(payload.orgName.trim(), payload.applicantName.trim(), email, screen, rejection);
                     // details는 프론트에서 안내 문구를 분기하는 데 쓴다 (메시지는 서버가 확정).
                     throw new HttpsError("failed-precondition", rejection.message, { screenCode: rejection.code });
                 }
@@ -267,4 +273,29 @@ async function prescreenDocument(
         });
         return null;
     }
+}
+
+/**
+ * 접수 전 반려를 운영자 알림 채널(Discord)에 **정식 알림**으로 보낸다.
+ *
+ * 승인/보류(notifyNewApplication)와 같은 카드 형식을 쓴다. 실패해도 신청 처리 흐름에는
+ * 영향을 주지 않는다 — 알림이 안 나갔다고 반려 응답까지 실패시킬 이유는 없다.
+ */
+async function notifyPrescreenRejection(
+    orgName: string,
+    applicantName: string,
+    email: string,
+    screen: ScreenResult,
+    rejection: ScreenRejection
+): Promise<void> {
+    await sendDiscordAlert({
+        title: "⛔ 🏢 기관 신청 반려(접수 전 서류 판별)",
+        description: `**${orgName}** 기관의 신청이 서류 판별 단계에서 반려되어 접수되지 않았습니다.\n\n**사유**: ${rejection.message}`,
+        color: 15158332, // 빨간색 계열 — 기존 "기관 신청 보류(거절)" 카드와 동일
+        fields: [
+            { name: "신청자", value: applicantName || "이름 없음", inline: true },
+            { name: "기관 이메일", value: maskEmail(email), inline: true },
+            { name: "판별 결과", value: `${screen.documentType} (${rejection.code})`, inline: true },
+        ],
+    }).catch((e) => console.error("Discord alert error:", e));
 }
