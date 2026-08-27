@@ -37,6 +37,12 @@ function initSentryWithModule(Sentry: SentryModule) {
     Sentry.init({
         dsn: SENTRY_DSN,
         environment: import.meta.env.MODE,
+        // 이 앱이 보낸 이벤트임을 표시한다 — 같은 Sentry 프로젝트를 다른 앱과 공유하고 있어
+        // 태그가 없으면 남의 앱 에러를 우리 것으로 오인한 채 트리아지하게 된다
+        // (성과관리 앱의 ApiError가 우리 이슈로 올라온 사례). 이슈 검색에서 `app:vehicle-drive-log`로 거른다.
+        // 로그인 여부와 무관한 값이라 로그아웃 때 정리되는 user.role·organizationId와 달리
+        // 스코프에 처음부터 심어 둔다 — 비로그인 화면에서 난 에러에도 붙어야 한다.
+        initialScope: { tags: { app: 'vehicle-drive-log' } },
         // 프로덕션 30% 샘플링 (주간 ~5k 샘플 확보, 비용·오버헤드 절감), 개발 시 0%
         tracesSampleRate: import.meta.env.PROD ? 0.3 : 0,
         // 자체 도메인만 트레이스 전파 (외부 API로의 불필요한 헤더 전송 차단)
