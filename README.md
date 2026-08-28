@@ -286,11 +286,16 @@ npm run build           # 프로덕션 빌드 확인
 |--------|------|------|
 | `reservationReminder` | 평일 08~18시 매시 정각 | 예약 임박 FCM + 일지 미작성/미출발 알림 (OCR 워밍업 편승) |
 | `syncCalendarToApp` | 평일 06~22시 30분 주기 | 구글 캘린더 → Firestore 역동기화 |
-| `dailyNightlyBatch` | 매일 02:00 | 집계 캐싱, Firestore 백업, 기관/이미지 정리, 3년+ 운행 기록 아카이빙, 보험 만료 알림 |
+| `nightlyStatsBatch` | 매일 02:00 | 기관 월간 집계 캐싱 + superAdmin 대시보드 통계 캐시 |
+| `dailyNightlyBatch` | 매일 02:20 | Firestore 백업 export + 차량 보험 만료 알림 |
+| `weeklyMaintenanceBatch` | 매주 일 03:00 | 기관 퍼지, 증빙 이미지 정리, 3년+ 운행 기록 아카이빙 |
 | `monthlyBatch` | 매월 1일 06:00 | 공휴일 캐시 동기화 + 주행거리 정합성 검증 |
 | `sendInactiveOrgAlimtalkScheduled` | 평일 14:00 | 미활성 기관 알림톡 발송 대상 점검 |
 
-> 스케줄 잡 수(=과금)를 줄이려고 개별 배치를 `dailyNightlyBatch`·`monthlyBatch`로 통합했습니다.
+> 스케줄 잡 수(=과금)를 줄이려고 개별 배치를 야간·월간 배치로 통합했습니다. 다만 통합에도 한계선이 있습니다 —
+> 성격이 다른 일곱 스텝을 한 함수에 몰아넣었더니 메모리를 가장 무거운 스텝에 맞춰야 했고(1GiB), 한 스텝이 죽으면
+> 재시도가 나머지 여섯까지 다시 돌렸습니다. 2026-08-28 Cloud Run 비용 점검에서 이 함수가 청구 시간 1위로 나와
+> **집계 · 백업 · 주간 유지보수** 셋으로 다시 갈랐습니다.
 
 ---
 

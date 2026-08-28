@@ -1,24 +1,30 @@
 /**
- * dailyNightlyBatch — 매일 02:00(KST) 통합 야간 배치 작업
+ * dailyNightlyBatch — 매일 02:20(KST) 야간 배치 (백업 + 보험 만료 알림)
  *
- * 기존 개별 스케줄러들을 통합하여 인프라 비용 절감:
- * 0. dailyAggregation: 전체 기관 월간 집계 통계 캐싱 (02:00 실행 전제)
- * 0.5. computeAllDashboardStats: superAdmin 대시보드 통계 캐시 재집계
  * 1. backupFirestore: Firestore 전체 백업 (GCS)
- * 2. autoPurgeOrgs: soft-deleted 기관 30일 후 영구 삭제
- * 3. cleanupCertificateImages: 승인 후 30일 경과 기관 인증서 스토리지 삭제
- * 4. archiveDriveLogs: 3년 이상 된 운행 기록을 GCS 아카이빙 후 삭제
- * 5. checkInsuranceExpiry: 차량 보험 만료 15일 이내 시 기관 관리자에게 알림 + 푸시
+ * 2. checkInsuranceExpiry: 차량 보험 만료 15일 이내 시 기관 관리자에게 알림 + 푸시
+ *
+ * ## 이 파일이 담는 것과 담지 않는 것
+ * 예전에는 성격이 다른 일곱 스텝을 한 함수에 몰아넣고 1GiB·540초로 돌렸다. 2026-08-28
+ * Cloud Run 비용 점검에서 이 함수가 **청구 대상 인스턴스 시간 1위**(2위 그룹의 5배)로 나와
+ * 성격별로 셋으로 쪼갰다. 스텝 구현은 이 파일에 그대로 두고 진입점만 나눈다.
+ *
+ *  - 집계 2종  → [nightlyStatsBatch](./nightlyStatsBatch.ts)      매일 02:00
+ *  - 백업·보험 → **이 함수**                                       매일 02:20
+ *  - 유지보수 3종 → [weeklyMaintenanceBatch](./weeklyMaintenanceBatch.ts) 매주 일 03:00
+ *
+ * 쪼개면서 얻는 것은 메모리만이 아니다. 예전 구조에서는 어느 한 스텝이 죽어 인스턴스가
+ * 강제 종료되면 `retryCount` 재실행이 **일곱 스텝 전부**를 처음부터 다시 돌렸다
+ * (2026-08-15 OOM에서 실제로 발생). 이제 재실행 범위가 해당 배치 안으로 제한된다.
  */
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { log } from "../../utils/helpers";
 import { getKSTDateString } from "../../utils/kstDate";
-import { runDailyAggregation } from "./dailyAggregation";
-import { computeAllDashboardStats } from "../../services/statistics/computeDashboardStats";
 import { createInAppNotification, sendPushToUser } from "../../services/alimtalk/sendNotification";
-import { captureError, captureWarning } from "../../core/sentry";
+import { captureWarning } from "../../core/sentry";
+import { runStep, logBatchResult } from "../../utils/batchStep";
 import { gzip } from "node:zlib";
 import { promisify } from "node:util";
 
@@ -220,7 +226,7 @@ export async function backupFirestoreData() {
     }
 }
 
-async function purgeOrgs(db: FirebaseFirestore.Firestore) {
+export async function purgeOrgs(db: FirebaseFirestore.Firestore) {
     console.log("[Batch] Starting autoPurgeOrgs...");
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -266,7 +272,7 @@ async function purgeOrgs(db: FirebaseFirestore.Firestore) {
     console.log(`Auto-purge complete: ${totalPurged} organizations permanently deleted.`);
 }
 
-async function cleanupImages(db: FirebaseFirestore.Firestore, bucket: ReturnType<ReturnType<typeof getStorage>["bucket"]>) {
+export async function cleanupImages(db: FirebaseFirestore.Firestore, bucket: ReturnType<ReturnType<typeof getStorage>["bucket"]>) {
     console.log("[Batch] Starting cleanupCertificateImages...");
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
@@ -450,67 +456,29 @@ export async function checkInsuranceExpiry(db: FirebaseFirestore.Firestore) {
     console.log(`Insurance expiry check complete: ${notified} vehicles notified.`);
 }
 
-/**
- * 배치 스텝 하나를 실행한다. 실패해도 다음 스텝으로 넘어가되, **조용히 넘어가지는 않는다.**
- *
- * 이전에는 각 스텝의 catch가 console.error만 남겼다. 그러면 어디로도 알림이 가지 않아,
- * 특히 Firestore 백업 실패가 "매일 눈으로 확인"(OPERATIONS.md)에만 의존하게 된다 —
- * 백업은 실패한 사실 자체를 놓치면 복구 시점에야 알게 되는 항목이다.
- * captureError로 승격해 Sentry·Discord로 즉시 드러나게 한다.
- *
- * 스텝 단위로만 승격하는 것이 요점이다. 기관별 루프 내부(purgeOrgs 등)의 개별 실패까지
- * 올리면 한 번의 배치가 알림 수십 건을 쏟아낸다 — 그쪽은 console.error로 남긴다.
- */
-async function runStep(failed: string[], name: string, fn: () => Promise<unknown>): Promise<void> {
-    try {
-        await fn();
-    } catch (e: unknown) {
-        console.error(`Error in ${name}:`, (e as Error).message);
-        captureError(e, { context: "dailyNightlyBatch", step: name });
-        failed.push(name);
-    }
-}
+const CONTEXT = "dailyNightlyBatch";
 
 export const dailyNightlyBatch = onSchedule(
     {
-        schedule: "0 2 * * *", // KST 02:00 (집계 + 백업 + 야간 배치 통합)
+        // 02:20 — 같은 시각에 두 배치가 겹치지 않도록 nightlyStatsBatch(02:00) 뒤로 물린다.
+        schedule: "20 2 * * *",
         timeZone: "Asia/Seoul",
+        // 백업은 하루 놓치면 그날치가 영영 없다. 두 스텝 모두 멱등하므로(백업은 오늘 폴더
+        // 존재 확인으로, 보험 알림은 insuranceExpiryNotifiedFor 플래그로) 재실행이 안전하다.
         retryCount: 1,
-        // 512MiB로는 부족하다. 2026-08-15 02:00 실행이 백업을 건 직후
-        // `Memory limit of 512 MiB exceeded with 512 MiB used`로 인스턴스째 죽었고,
-        // 그 강제 종료가 retryCount 재실행을 불러 배치가 하루 두 번 돌았다.
-        // 앞선 두 스텝(전 기관 집계 + 대시보드 통계)이 문서 수만 건을 한 프로세스에 올린 상태에서
-        // 백업이 gRPC Admin 클라이언트를 새로 만들며 한도를 넘긴다. 데이터가 늘수록 재발한다.
-        // rules/cloud-functions.md §3.2도 백업·아카이빙 함수는 1GiB로 규정한다 — 그쪽이 맞다.
-        memory: "1GiB",
+        // 집계 2스텝을 nightlyStatsBatch로 분리해 문서 수만 건이 이 프로세스에 없다.
+        // 2026-08-15 OOM의 전제가 사라졌으므로 규칙(§3.2)의 백업 기본값으로 되돌린다.
+        memory: "512MiB",
         timeoutSeconds: 540,
     },
     async function () {
         const db = getFirestore();
-        const bucket = getStorage().bucket();
 
         const failed: string[] = [];
 
-        // Step 0: 월간 집계 통계 캐싱 (기존 dailyAggregation 통합, 02:00 실행 전제)
-        await runStep(failed, "dailyAggregation", () => runDailyAggregation());
-        // Step 0.5: superAdmin 대시보드 통계 캐시 재집계 — 매일 아침 수동 갱신 버튼 없이 최신 상태 유지
-        await runStep(failed, "computeAllDashboardStats", () => computeAllDashboardStats());
-        // Step 1: Firestore 백업 (기존 backupFirestore 통합)
-        await runStep(failed, "backupFirestore", () => backupFirestoreData());
-        // Step 2: 기관 퍼지
-        await runStep(failed, "purgeOrgs", () => purgeOrgs(db));
-        // Step 3: 인증서 이미지 정리
-        await runStep(failed, "cleanupImages", () => cleanupImages(db, bucket));
-        // Step 4: 운행 기록 아카이빙
-        await runStep(failed, "archiveLogs", () => archiveLogs(db, bucket));
-        // Step 5: 차량 보험 만료 임박 알림
-        await runStep(failed, "checkInsuranceExpiry", () => checkInsuranceExpiry(db));
+        await runStep(failed, CONTEXT, "backupFirestore", () => backupFirestoreData());
+        await runStep(failed, CONTEXT, "checkInsuranceExpiry", () => checkInsuranceExpiry(db));
 
-        if (failed.length > 0) {
-            console.error(`[Batch] dailyNightlyBatch completed with ${failed.length} failed step(s): ${failed.join(", ")}`);
-        } else {
-            console.log("[Batch] dailyNightlyBatch completed.");
-        }
+        logBatchResult(CONTEXT, failed);
     }
 );
-

@@ -101,7 +101,9 @@
 
 | 함수 | 주기 | Firestore 접근 | 비용 영향 |
 |---|---|---|---|
-| `dailyNightlyBatch` | 매일 02:00 KST | 백업 export + 아카이빙 + 퍼지 + 이미지 정리 통합 | **고정** — 야간 트래픽 없는 시간대 |
+| `nightlyStatsBatch` | 매일 02:00 KST | 기관 월간 집계 + 대시보드 통계 캐시 | **중간** — 기관·운행일지 수에 비례 |
+| `dailyNightlyBatch` | 매일 02:20 KST | 백업 export + 보험 만료 알림 | **고정** — 야간 트래픽 없는 시간대 |
+| `weeklyMaintenanceBatch` | 매주 일 03:00 KST | 퍼지 + 이미지 정리 + 아카이빙 | **최소** — 주 1회 |
 | `monthlyBatch` | 매월 1일 06:00 | 공휴일 동기화 + 마일리지 검증 | **최소** |
 | `reservationReminder` | 평일 08~18시 매시 | 예약 + 운행일지 읽기 (OCR 워밍업 편승) | **중간** — 예약 건수에 비례 |
 | `syncCalendarToApp` | 평일 06~22시 매시 | 예약 읽기/쓰기 | **중간** — 캘린더 연동 기관 수에 비례 |
@@ -131,7 +133,7 @@
    중복 후보 1개(`driveLogs` 4필드 인덱스 둘 중 하나)가 남았다. **Console 히트 수 확인 후 제거**.
    미사용 인덱스는 쓰기마다 갱신되므로 제거하면 쓰기 비용이 줄어든다.
 4. **야간 배치의 아카이빙 배치 크기** — 500건 제한은 적절, 다만 3년 이상 데이터가 많아지면 반복 실행 필요
-   (독립 함수 `archiveDriveLogs`는 없다 — `dailyNightlyBatch`의 스텝이다)
+   (독립 함수 `archiveDriveLogs`는 없다 — `weeklyMaintenanceBatch`의 스텝이다)
 
 ### 장기 모니터링
 5. **GCP Console → Firestore → 사용량 탭**에서 월간 읽기/쓰기/삭제 추세 확인 권장

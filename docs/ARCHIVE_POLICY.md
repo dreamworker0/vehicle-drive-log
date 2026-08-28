@@ -1,19 +1,23 @@
 # 아카이빙 정책 문서
 
-> 최종 점검일: 2026-08-09 (코드 대조 완료)
+> 최종 점검일: 2026-08-28 (코드 대조 완료)
 
 ## 현재 정책
 
-### 야간 배치의 아카이빙 스텝 (`dailyNightlyBatch` → `archiveLogs`)
+### 주간 유지보수 배치의 아카이빙 스텝 (`weeklyMaintenanceBatch` → `archiveLogs`)
 
-독립 스케줄 함수 `archiveDriveLogs`는 더 이상 없다 — 인프라 비용 절감을 위해
-`dailyNightlyBatch`(매일 02:00 KST)의 한 스텝으로 흡수됐다.
-구현: [functions/src/handlers/scheduled/dailyNightlyBatch.ts](../functions/src/handlers/scheduled/dailyNightlyBatch.ts)
+독립 스케줄 함수 `archiveDriveLogs`는 더 이상 없다 — 인프라 비용 절감을 위해 배치의 한 스텝으로
+흡수됐다. 2026-08-28 Cloud Run 비용 점검에서 야간 배치를 셋으로 가르면서 **주간 배치로 옮겼다**
+(판정 기준이 3년이라 하루 늦게 처리해도 영향이 없다).
+스텝 구현은 [dailyNightlyBatch.ts](../functions/src/handlers/scheduled/dailyNightlyBatch.ts)에 그대로 있고,
+호출은 [weeklyMaintenanceBatch.ts](../functions/src/handlers/scheduled/weeklyMaintenanceBatch.ts)가 한다.
 
-- **실행 주기**: 매일 **02:00 KST** (야간 배치에 편승)
+- **실행 주기**: 매주 **일요일 03:00 KST** (주간 유지보수 배치에 편승)
 - **기준**: 3년 이상 된 운행 기록 (`timestamp < 3년 전`)
 - **배치 크기**: 1회 최대 500건
-- **재시도**: 1회 (`retryCount: 1`, 배치 함수 단위)
+  - ⚠️ 매일 → 주 1회로 바뀌었으므로 소진 속도도 하루 500건 → **주 500건**이다. 3년 경과 기록이
+    대량으로 밀려 있다면 스케줄을 일시적으로 매일로 되돌리거나 limit을 올릴 것.
+- **재시도**: 없음 (`retryCount: 0`, 대상이 남으면 다음 주에 다시 처리)
 - **처리 흐름**:
   1. `driveLogs` 컬렉션에서 3년 이상 된 문서 500건 조회
   2. JSON을 **gzip 압축**해 GCS에 저장 (`archives/driveLogs/{날짜}_{건수}records.json.gz`)
