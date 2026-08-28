@@ -2,9 +2,9 @@
 
 > **자동 생성 문서** — `scripts/generate-functions-doc.ts`로 생성됨
 >
-> 마지막 업데이트: 2026. 8. 13. PM 1:35:06
+> 마지막 업데이트: 2026. 8. 29. AM 8:00:16
 >
-> 총 함수 수: **67개**
+> 총 함수 수: **69개**
 
 ---
 
@@ -414,7 +414,7 @@
 
 ## ⏰ onSchedule (스케줄)
 
-> 총 5개
+> 총 7개
 
 ### `reservationReminder`
 
@@ -434,14 +434,32 @@
 | **인증** | 시스템 자동 실행 |
 | **비고** | schedule: "0,30 6-22 * * 1-5" — 평일 06~22시 30분 주기, 실패 누적 캘린더 자동 제외 |
 
+### `nightlyStatsBatch`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/scheduled/nightlyStatsBatch.ts` |
+| **설명** | 야간 통계 집계: 전체 기관 × 최근 2개월 월간 집계 캐싱 → superAdmin 대시보드 통계 캐시 재집계 |
+| **인증** | 시스템 자동 실행 |
+| **비고** | schedule: "0 2 * * *" (KST 02:00). dailyAggregation이 실행 시각 -3h를 기준월로 삼으므로 이 시각은 바꾸지 말 것 |
+
 ### `dailyNightlyBatch`
 
 | 항목 | 내용 |
 |------|------|
 | **파일** | `functions/src/handlers/scheduled/dailyNightlyBatch.ts` |
-| **설명** | 통합 야간 배치: 월간 집계 캐싱 → 대시보드 통계 재집계 → Firestore 백업(GCS) → soft-delete 기관 30일 후 영구 삭제 → 인증서 이미지 정리 → 3년 이상 운행기록 아카이빙 → 차량 보험 만료 알림 |
+| **설명** | 야간 배치: Firestore 백업(GCS export) → 차량 보험 만료 15일 이내 알림 |
 | **인증** | 시스템 자동 실행 |
-| **비고** | schedule: "0 2 * * *" (KST 02:00). 개별 스케줄러(backupFirestore·autoPurgeOrgs·archiveDriveLogs·cleanupCertificateImages)를 통합해 Cloud Scheduler 잡 수를 줄인 것 |
+| **비고** | schedule: "20 2 * * *" (KST 02:20). 2026-08-28 Cloud Run 비용 점검에서 일곱 스텝 통합 배치를 집계·백업·주간 유지보수 셋으로 분리(1GiB→512MiB, 재시도 범위 축소) |
+
+### `weeklyMaintenanceBatch`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/scheduled/weeklyMaintenanceBatch.ts` |
+| **설명** | 주간 유지보수: soft-delete 기관 30일 후 영구 삭제 → 증빙 이미지 정리 → 3년 이상 운행기록 GCS 아카이빙 |
+| **인증** | 시스템 자동 실행 |
+| **비고** | schedule: "0 3 * * 0" (KST 일요일 03:00). 판정 기준이 30일·3년이라 매일 돌 이유가 없어 주 1회로 옮긴 것 |
 
 ### `monthlyBatch`
 

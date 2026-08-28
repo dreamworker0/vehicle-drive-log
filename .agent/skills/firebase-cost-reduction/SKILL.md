@@ -56,6 +56,36 @@ PR 프리뷰/임시 배포 채널은 만료 설정 없이 두면 Storage·Hostin
 
 Sentry 이벤트 한도도 비용/쿼터 요인이다. 노이즈 에러가 한도를 잠식하지 않도록 [sentry-noise-filter](../sentry-noise-filter/SKILL.md)로 필터링한다.
 
+## 6. 콜드스타트 번들 비용 — 무거운 패키지는 최상단에서 import하지 않는다
+
+Cloud Functions v2는 Cloud Run으로 과금되고, **인스턴스 기동 시간도 vCPU-초로 청구된다.** 그런데 `index.ts` 하나가 모든 함수를 한 번들로 묶으므로 **어떤 함수가 콜드스타트하든 index.ts가 끌어오는 모든 모듈을 전부 로드한다.** 두 함수만 쓰는 패키지의 로드 비용을 나머지 함수 전부가 매 콜드스타트마다 대신 낸다.
+
+측정(2026-08-28, Node 22 기준 `require` 시간):
+
+| 패키지 | 로드 시간 | 실제 사용 함수 |
+|---|---|---|
+| `googleapis` | **874 ms** | 캘린더 관련 2곳 |
+| `@sentry/node` | 316 ms | 전역(필요) |
+| `firebase-functions` | 264 ms | 전역(필요) |
+| `@google/genai` | 99 ms | Gemini 계열 소수 |
+
+`googleapis`를 지연 로드로 돌린 것만으로 `index.js` 전체 로드가 **1,190 ms → 445 ms**로 줄었다.
+
+```typescript
+// ❌ 최상단 import — 캘린더와 무관한 함수까지 매 콜드스타트마다 0.9초를 문다
+import { google, calendar_v3 } from 'googleapis';
+
+// ✅ 타입은 컴파일 시 지워지고(import type), 런타임 객체는 호출 시점에만 로드한다
+import type { calendar_v3 } from 'googleapis';
+
+async function getCalendarClient(): Promise<calendar_v3.Calendar> {
+  const { google } = await import('googleapis');   // Node 모듈 캐시가 2회차부터 받아 준다
+  ...
+}
+```
+
+판단 기준: **`index.ts`에서 export되는 함수 중 소수만 쓰는 무거운 의존성**(googleapis·SDK류)은 `await import()`로 내린다. 전 함수가 쓰는 것(firebase-admin, firebase-functions, Sentry)은 그대로 둔다.
+
 ## 체크리스트 (비용 영향 작업 시)
 
 - [ ] 새 스케줄 함수의 빈도가 최소인가? 트리거로 대체 가능한가?
@@ -63,3 +93,4 @@ Sentry 이벤트 한도도 비용/쿼터 요인이다. 노이즈 에러가 한�
 - [ ] 모든 데이터 쿼리에 기간 제한이 있는가? (→ firestore-query-optimization §2)
 - [ ] 프리뷰/임시 채널에 만료가 설정됐는가?
 - [ ] 새 외부 API(OCR 등) 호출에 캐시·중복 방지가 있는가?
+- [ ] 새로 추가한 무거운 패키지를 함수 파일 최상단에서 import하고 있지 않은가? (→ §6)

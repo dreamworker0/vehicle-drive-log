@@ -268,7 +268,7 @@ npm run build           # 프로덕션 빌드 확인
 
 ## Cloud Functions
 
-전체 67개 함수(리전 `asia-northeast3`)의 파라미터·권한·트리거 경로는 **[Cloud Functions 레퍼런스](docs/FUNCTIONS_REFERENCE.md)** 에 정리되어 있습니다. 아래는 종류별 요약입니다.
+전체 69개 함수(리전 `asia-northeast3`)의 파라미터·권한·트리거 경로는 **[Cloud Functions 레퍼런스](docs/FUNCTIONS_REFERENCE.md)** 에 정리되어 있습니다. 아래는 종류별 요약입니다.
 
 > 이 절의 숫자는 `npm run check:functions-catalog`가 `functions/src/index.ts`와 대조합니다 — 어긋나면 CI가 실패합니다.
 
@@ -276,7 +276,7 @@ npm run build           # 프로덕션 빌드 확인
 |------|------|-----------|
 | 호출형 (onCall) | 38 | `ocrDashboard`(계기판 OCR) · `createReservationSafe`(트랜잭션 예약 생성) · `joinOrganization`(초대 코드 가입) · `withdrawOrganization`(기관 해지) · `askAI`(FAQ 기반 답변) · `getSlackInstallUrl`·`diagnoseSlackConnection`(Slack 연결) |
 | HTTP (onRequest) | 4 | `tmapProxy`·`holidayProxy`(외부 API 프록시, 인증 + Rate Limit) · `slackEvents`(Slack 이벤트 수신) · `slackOauthCallback`(설치 콜백) |
-| 스케줄 (onSchedule) | 5 | 아래 표 참고 |
+| 스케줄 (onSchedule) | 7 | 아래 표 참고 |
 | Firestore 트리거 | 19 | `autoVerifyDocument`(증빙서류 AI 심사) · `setCustomClaims`(권한 동기화) · `onReservation*`(캘린더·푸시) · `onDriveLog*`(주행거리·집계) · `audit*`(접속기록) · `onSlackTaskCreated`(Slack 워커) |
 | Auth 트리거 | 1 | `onUserDelete`(탈퇴 시 개인정보 익명화) |
 
@@ -286,11 +286,16 @@ npm run build           # 프로덕션 빌드 확인
 |--------|------|------|
 | `reservationReminder` | 평일 08~18시 매시 정각 | 예약 임박 FCM + 일지 미작성/미출발 알림 (OCR 워밍업 편승) |
 | `syncCalendarToApp` | 평일 06~22시 30분 주기 | 구글 캘린더 → Firestore 역동기화 |
-| `dailyNightlyBatch` | 매일 02:00 | 집계 캐싱, Firestore 백업, 기관/이미지 정리, 3년+ 운행 기록 아카이빙, 보험 만료 알림 |
+| `nightlyStatsBatch` | 매일 02:00 | 기관 월간 집계 캐싱 + superAdmin 대시보드 통계 캐시 |
+| `dailyNightlyBatch` | 매일 02:20 | Firestore 백업 export + 차량 보험 만료 알림 |
+| `weeklyMaintenanceBatch` | 매주 일 03:00 | 기관 퍼지, 증빙 이미지 정리, 3년+ 운행 기록 아카이빙 |
 | `monthlyBatch` | 매월 1일 06:00 | 공휴일 캐시 동기화 + 주행거리 정합성 검증 |
 | `sendInactiveOrgAlimtalkScheduled` | 평일 14:00 | 미활성 기관 알림톡 발송 대상 점검 |
 
-> 스케줄 잡 수(=과금)를 줄이려고 개별 배치를 `dailyNightlyBatch`·`monthlyBatch`로 통합했습니다.
+> 스케줄 잡 수(=과금)를 줄이려고 개별 배치를 야간·월간 배치로 통합했습니다. 다만 통합에도 한계선이 있습니다 —
+> 성격이 다른 일곱 스텝을 한 함수에 몰아넣었더니 메모리를 가장 무거운 스텝에 맞춰야 했고(1GiB), 한 스텝이 죽으면
+> 재시도가 나머지 여섯까지 다시 돌렸습니다. 2026-08-28 Cloud Run 비용 점검에서 이 함수가 청구 시간 1위로 나와
+> **집계 · 백업 · 주간 유지보수** 셋으로 다시 갈랐습니다.
 
 ---
 

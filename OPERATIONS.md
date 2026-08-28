@@ -113,7 +113,7 @@ firebase functions:log --only ocrDashboard,autoVerifyDocument
 
 ### 4.1 백업 확인
 
-- **자동 백업**: `dailyNightlyBatch` 함수(매일 02:00 KST)의 첫 단계에서 Firestore 전체 export 실행
+- **자동 백업**: `dailyNightlyBatch` 함수(매일 02:20 KST)의 첫 단계에서 Firestore 전체 export 실행
 - **저장 위치**: **백업 전용 버킷** `vehicle-drive-log-backups`(asia-northeast3) → `backups/firestore/YYYY-MM-DD/`
   - ⚠️ **기본 버킷을 쓰면 안 된다.** Firestore 관리형 export는 데이터베이스와 **같은 위치의
     버킷만** 받는데, Firestore는 `asia-northeast3`이고 Firebase 기본 버킷
@@ -156,7 +156,7 @@ firebase functions:log --only ocrDashboard,autoVerifyDocument
 
 ### 4.2 데이터 아카이빙
 
-- `dailyNightlyBatch` 함수(매일 02:00 KST)의 아카이빙 단계에서 실행
+- `weeklyMaintenanceBatch` 함수(매주 일요일 03:00 KST)의 아카이빙 단계에서 실행
 - 3년 이상 된 운행 기록 → Cloud Storage로 이동 후 Firestore에서 삭제
 - 아카이빙된 데이터 위치: Cloud Storage → `archives/driveLogs/`
 

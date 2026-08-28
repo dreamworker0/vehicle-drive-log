@@ -18,8 +18,14 @@ export { holidayProxy } from "./handlers/https/holidayProxy";
 // Tmap Proxy (프로덕션 CORS 해결)
 export { tmapProxy } from "./handlers/https/tmapProxy";
 
-// 통합 야간 배치 (집계 + 백업 + 퍼지/아카이빙/클린업, 매일 02:00)
+// 야간 통계 집계 (기관 월간 집계 + 대시보드 통계 캐시, 매일 02:00)
+export { nightlyStatsBatch } from "./handlers/scheduled/nightlyStatsBatch";
+
+// 야간 배치 (Firestore 백업 + 차량 보험 만료 알림, 매일 02:20)
 export { dailyNightlyBatch } from "./handlers/scheduled/dailyNightlyBatch";
+
+// 주간 유지보수 (기관 퍼지 + 증빙 이미지 정리 + 운행기록 아카이빙, 매주 일 03:00)
+export { weeklyMaintenanceBatch } from "./handlers/scheduled/weeklyMaintenanceBatch";
 
 // 통합 월배치 (공휴일 동기화 + 마일리지 검증, 매월 1일 06:00)
 export { monthlyBatch } from "./handlers/scheduled/monthlyBatch";

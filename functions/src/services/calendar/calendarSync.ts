@@ -4,7 +4,11 @@
  * Firebase 기본 서비스 계정(ADC)으로 인증합니다.
  */
 
-import { google, calendar_v3 } from "googleapis";
+// googleapis는 require에만 ~0.9초가 드는 초대형 패키지다. index.ts가 모든 함수를 한 번들로
+// 묶으므로 최상단에서 import하면 캘린더와 무관한 함수까지 콜드스타트마다 그 비용을 낸다.
+// 타입은 컴파일 시 지워지는 `import type`으로, 런타임 객체는 실제 호출 시점에 동적 import로 가져온다.
+// (2026-08-28 Cloud Run 비용 점검)
+import type { calendar_v3 } from "googleapis";
 
 interface ReservationData {
     date: string;
@@ -29,7 +33,9 @@ interface CalendarEvent {
 }
 
 // ADC(Application Default Credentials)로 인증된 캘린더 클라이언트 생성
+// googleapis 로드는 Node 모듈 캐시가 받아 주므로 두 번째 호출부터는 비용이 없다.
 async function getCalendarClient(): Promise<calendar_v3.Calendar> {
+    const { google } = await import("googleapis");
     const auth = new google.auth.GoogleAuth({
         scopes: ["https://www.googleapis.com/auth/calendar"],
     });
