@@ -5,7 +5,6 @@
  * 기관 관리자가 캘린더 공유 설정을 올바르게 했는지 즉시 확인할 수 있습니다.
  */
 import { onCall, HttpsError } from "firebase-functions/v2/https";
-import { google } from "googleapis";
 import { getCalendarBindingOwner } from "../../services/calendar/calendarBinding";
 import { checkRateLimitByUid } from "../../utils/rateLimit";
 import { getRateLimits } from "../../utils/constants";
@@ -87,6 +86,8 @@ export const testCalendarAccess = onCall(
 
         try {
             // ADC(Application Default Credentials)로 인증
+            // googleapis는 콜드스타트 비용이 커서 호출 시점에만 불러온다 (calendarSync.ts 주석 참고)
+            const { google } = await import("googleapis");
             const auth = new google.auth.GoogleAuth({
                 scopes: ["https://www.googleapis.com/auth/calendar.readonly"],
             });
