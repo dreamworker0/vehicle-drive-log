@@ -12,7 +12,8 @@ import { getKSTMonthKey } from "../../utils/kstDate";
  *   await fn({ organizationId: 'xxx' }); // 특정 기관만
  */
 export const recalculateAggregatedStats = onCall(
-    { region: "asia-northeast3", timeoutSeconds: 300, enforceAppCheck: true },
+    // 전체 기관 × 전체 운행일지를 순회하며 집계한다 (규칙 §3.2 "무거운 작업")
+    { region: "asia-northeast3", timeoutSeconds: 300, memory: "512MiB", enforceAppCheck: true },
     async (request) => {
         // 인증 확인
         if (!request.auth) {

@@ -53,7 +53,8 @@ function parseAiResponse(text: string): {
 }
 
 export const regenerateFeedbackDraft = onCall(
-    { region: "asia-northeast3", timeoutSeconds: 60, enforceAppCheck: true },
+    // 첨부 이미지를 버퍼로 들고 Gemini를 호출한다 (규칙 §3.2 "OCR/AI 함수")
+    { region: "asia-northeast3", timeoutSeconds: 60, memory: "512MiB", enforceAppCheck: true },
     wrapCallableHandler("regenerateFeedbackDraft", {}, async (request) => {
         // superAdmin 권한 확인 (관리자만 다시 생성 가능)
         requireSuperAdmin(request);

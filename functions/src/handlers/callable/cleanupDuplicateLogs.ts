@@ -47,6 +47,8 @@ export const cleanupDuplicateLogs = onCall(
     {
         region: "asia-northeast3",
         timeoutSeconds: 120,
+        // 기관의 운행일지를 전부 메모리에 올려 중복 그룹을 만든다 (규칙 §3.2 "무거운 작업")
+        memory: "512MiB",
         enforceAppCheck: true,
     },
     async (request) => {
