@@ -25,7 +25,6 @@ CLAUDE.md                  ← Claude Code 진입점 (.agent/를 가리키는 �
 .agents/                   ← Antigravity 서브에이전트 작업 이력 (gitignore됨, 커밋 안 함)
 ```
 
-> ℹ️ Claude Code 서브에이전트는 `.claude/agents/`에 둔다(현재 미사용).
 > `.agents/`(끝에 s)는 Antigravity 전용 작업 스크래치이며 Claude Code의 "Goal 모드"와 무관하다.
 
 ### 브리지 자동 생성 (`.agent/` → `.claude/`)

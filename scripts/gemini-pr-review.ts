@@ -52,6 +52,8 @@ const RULE_MAP: { test: RegExp; rules: string[] }[] = [
     { test: /(sw|serviceWorker|offline|Offline)/, rules: ['offline-first.md'] },
     { test: /([Aa]uth|token|Token)/, rules: ['token-auth-resilience.md', 'role-based-access.md'] },
     { test: /([Oo]cr|OCR|[Gg]emini)/, rules: ['ocr-cost-security.md'] },
+    // 약관·동의·감사기록 — 수탁자 지위 근거 규칙. 위반 시 법적 리스크라 리뷰 주입이 특히 중요하다.
+    { test: /([Cc]onsent|Terms|Privacy|legalVersions|AuditLog|src\/lib\/audit\/)/, rules: ['legal-consent.md'] },
     { test: /^\.github\/workflows\//, rules: ['ci-cd.md'] },
     { test: /(vite\.config|(^|\/)package\.json$)/, rules: ['bundle-size-budget.md'] },
 ];
