@@ -40,7 +40,7 @@ export default defineConfig([
   },
   {
     files: ['**/*.{ts,tsx}'],
-    // functions/는 Node/ESM 백엔드라 브라우저·React 규칙 대상에서 제외하고 아래 별도 블록에서 린트.
+    // functions/는 Node 백엔드라 브라우저·React 규칙 대상에서 제외하고 아래 별도 블록에서 린트.
     ignores: ['functions/**'],
     extends: [
       js.configs.recommended,
@@ -97,7 +97,7 @@ export default defineConfig([
     },
   },
   {
-    // Cloud Functions (Node, ESM TypeScript). 루트가 functions 전체를 ignore하던 것을 해제하고
+    // Cloud Functions (Node, TypeScript → CommonJS). 루트가 functions 전체를 ignore하던 것을 해제하고
     // 프론트(브라우저/React) 규칙과 분리된 별도 규칙으로 린트한다. 컴파일 산출물(functions/lib)은
     // globalIgnores에서 제외된다.
     files: ['functions/**/*.ts'],

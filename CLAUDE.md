@@ -14,7 +14,7 @@
 - React 19 + Vite 7 + TypeScript / TailwindCSS v4 / Zustand
 - Firebase (Auth + Firestore + Functions + Hosting + FCM) / Sentry / Gemini OCR
 - **Node 22 LTS 필수**. Node 24는 Rollup 빌드 실패. `fnm use 22` 후 작업.
-- Cloud Functions는 ESM, Node 22.
+- Cloud Functions는 Node 22. 소스는 `import`/`export`로 쓰지만 컴파일 결과는 CommonJS다 (`module: "commonjs"`) — ESM 전용 구문 금지. → [cloud-functions.md](.agent/rules/cloud-functions.md) §1
 
 ## 명령어
 

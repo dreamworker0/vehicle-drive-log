@@ -81,7 +81,7 @@ MIT 라이선스로 공개된 프로젝트입니다. 아래처럼 자유롭게 �
 | 언어 | TypeScript (프론트엔드 + Cloud Functions + 테스트 + 스크립트) |
 | 인증 | Firebase Auth (Google 로그인 전용) |
 | 데이터베이스 | Cloud Firestore (실시간 구독 + 하이브리드 캐시) |
-| 서버리스 | Cloud Functions for Firebase (TypeScript ESM, Node.js 22) |
+| 서버리스 | Cloud Functions for Firebase (TypeScript → CommonJS, Node.js 22) |
 | AI/OCR | Gemini 3.1 Flash Lite (Cloud Functions 경유) |
 | 호스팅 | Firebase Hosting |
 | 보안 | Firebase App Check (reCAPTCHA v3) + Firestore/Storage Rules 멀티테넌트 격리 |
@@ -257,7 +257,7 @@ npm run build           # 프로덕션 빌드 확인
 │   ├── lib/                          유틸리티 (Firestore, 티맵, OCR, PDF/Excel)
 │   │   └── firestore/                Firestore CRUD (도메인별 분리)
 │   └── __tests__/                    단위 테스트 (Vitest)
-├── functions/                        Cloud Functions (TypeScript ESM)
+├── functions/                        Cloud Functions (TypeScript → CommonJS)
 │   └── src/                          소스 (빌드 → functions/lib/)
 ├── e2e/                              E2E 테스트 (Playwright)
 ├── scripts/                          빌드/운영 스크립트
