@@ -9,6 +9,10 @@ import {
     extractFunctionExports,
     extractCatalogNames,
     diffCatalogNames,
+    extractInlineCodePaths,
+    extractScriptCommandPaths,
+    extractQuotedMdRefs,
+    extractHookScriptPaths,
 } from '../check-harness';
 
 describe('parseFrontmatter', () => {
@@ -162,5 +166,85 @@ describe('diffCatalogNames', () => {
     it('일치하면 세 목록 모두 비어 있다', () => {
         const r = diffCatalogNames(['a', 'b'], ['b', 'a']);
         expect([r.missing, r.stale, r.duplicates]).toEqual([[], [], []]);
+    });
+});
+
+describe('extractInlineCodePaths', () => {
+    it('알려진 루트로 시작하는 인라인 백틱 경로만 뽑는다', () => {
+        const md = '정본은 `src/lib/sentry.ts`다. `notifyUser`는 경로가 아니다. `handlers/callable/x.ts`는 루트 밖 조각.';
+        expect(extractInlineCodePaths(md)).toEqual(['src/lib/sentry.ts']);
+    });
+
+    it('펜스 코드 블록 안의 경로는 예시로 보고 제외한다', () => {
+        const md = '```\n`src/fake/example.ts`\nsrc/other.ts\n```\n본문 `functions/src/index.ts`';
+        expect(extractInlineCodePaths(md)).toEqual(['functions/src/index.ts']);
+    });
+
+    it('글롭·플레이스홀더·줄번호 꼬리·후행 슬래시를 처리한다', () => {
+        const md = [
+            '`scripts/migrate*.ts` `functions/src/{handlers,utils}/` `src/components/<role>/`',
+            '`src/lib/sentry.ts:295` `.agent/rules/` `docs/security-reports/YYYY-MM-DD.md`',
+        ].join('\n');
+        expect(extractInlineCodePaths(md)).toEqual(['src/lib/sentry.ts', '.agent/rules']);
+    });
+
+    it('gitignore 대상(.env 계열, settings.local.json)은 검사하지 않는다', () => {
+        const md = '`functions/.env` `src/.env.local` `.claude/settings.local.json` `.claude/settings.json`';
+        expect(extractInlineCodePaths(md)).toEqual(['.claude/settings.json']);
+    });
+});
+
+describe('extractScriptCommandPaths', () => {
+    it('tsx/node 실행 명령의 스크립트 경로를 펜스 안까지 뽑는다', () => {
+        const md = [
+            '```bash',
+            'npx tsx scripts/test-calendar-sync.ts --uid={test-uid}',
+            'node scripts/hooks/lint-changed.mjs',
+            '```',
+            '본문에서 tsx scripts/run-eval.ts 언급',
+        ].join('\n');
+        expect(extractScriptCommandPaths(md)).toEqual([
+            'scripts/test-calendar-sync.ts',
+            'scripts/run-eval.ts',
+            'scripts/hooks/lint-changed.mjs',
+        ]);
+    });
+
+    it('스크립트 실행이 아닌 언급은 뽑지 않는다', () => {
+        expect(extractScriptCommandPaths('`scripts/foo.ts` 파일과 node_modules 이야기')).toEqual([]);
+    });
+});
+
+describe('extractQuotedMdRefs', () => {
+    it('따옴표로 감싼 소문자 케밥 규칙 파일명만 뽑고 중복을 제거한다', () => {
+        const src = "rules: ['cloud-functions.md', 'error-handling.md']; x = 'cloud-functions.md'; readIfExists('CLAUDE.md')";
+        expect(extractQuotedMdRefs(src)).toEqual(['cloud-functions.md', 'error-handling.md']);
+    });
+});
+
+describe('extractHookScriptPaths', () => {
+    it('훅 명령에서 로컬 스크립트 경로를 뽑고 $CLAUDE_PROJECT_DIR 접두를 벗긴다', () => {
+        const settings = JSON.stringify({
+            hooks: {
+                SessionStart: [{ hooks: [{ type: 'command', command: 'bash "$CLAUDE_PROJECT_DIR/.claude/hooks/session-start.sh"' }] }],
+                PostToolUse: [
+                    {
+                        matcher: 'Edit|Write',
+                        hooks: [
+                            { type: 'command', command: 'node scripts/hooks/lint-changed.mjs' },
+                            { type: 'command', command: 'echo no-path-here' },
+                        ],
+                    },
+                ],
+            },
+        });
+        expect(extractHookScriptPaths(settings)).toEqual([
+            '.claude/hooks/session-start.sh',
+            'scripts/hooks/lint-changed.mjs',
+        ]);
+    });
+
+    it('hooks가 없으면 빈 배열', () => {
+        expect(extractHookScriptPaths('{"permissions":{}}')).toEqual([]);
     });
 });

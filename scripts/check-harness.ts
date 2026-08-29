@@ -15,9 +15,17 @@
  *  7. .agent ↔ .claude 브리지 동기화 (sync-claude-agents.ts --check)
  *  8. trigger eval — 전체 스킬 포함, id 중복, expected 유효성
  *  9. eval 베이스라인 구조 + provenance(측정일·모델·SHA·케이스 수·결과 해시)
- * 10. 워크플로 문서의 위험/구식 명령 패턴 (`npm test run`, PowerShell `&&`, 미존재 npm 스크립트)
+ *     + 신선도(측정 60일 경과 / 측정 커밋 이후 관련 원본 변경 — 경고)
+ * 10. 워크플로 문서의 위험/구식 명령 패턴 (`npm test run`, PowerShell `&&`, 미존재 npm 스크립트,
+ *     미존재 tsx/node 스크립트 경로) + frontmatter description 필수
  * 11. 추적되면 안 되는 개인 설정 파일 (.claude/settings.local.json 등)
  * 12. 하네스 문서의 깨진 상대 링크
+ * 13. Functions 레퍼런스 카탈로그 ↔ functions/src/index.ts export 정합 + 문서 총계
+ * 14. 하네스 문서 본문의 인라인 백틱 경로 실존 — 규칙·스킬이 코드 리팩터를 못 따라가
+ *     조용히 낡는 것을 막는다 (Phase 180에서 stale 경로 40여 건이 이 부재로 살아남았다)
+ * 15. gemini-pr-review.ts RULE_MAP ↔ .agent/rules/ 정합 — 리네임 시 리뷰 주입에서
+ *     조용히 빠지는 것(오류) + 어디에도 매핑되지 않은 규칙(경고)
+ * 16. .claude/settings.json 훅 배선 실존 — 경로 오타 시 훅이 조용히 죽는 것을 막는다
  *
  * 단위 테스트: scripts/__tests__/check-harness.test.ts (파서·판정 함수)
  */
@@ -87,6 +95,71 @@ export function extractNpmRunScripts(md: string): string[] {
     const out: string[] = [];
     for (const m of md.matchAll(/npm(?:\.cmd)?\s+run\s+([A-Za-z0-9:._-]+)/g)) {
         out.push(m[1]);
+    }
+    return out;
+}
+
+/** 14번 검사가 경로로 인정하는 저장소 루트 디렉터리. 이 밖의 토큰은 경로로 판정하지 않는다. */
+const PATH_ROOTS = /^(?:src|functions|scripts|tests|docs|shared|public|e2e|\.agent|\.claude|\.github|\.husky)\//;
+
+/** 실존 검사에서 제외할 경로 — gitignore 대상(CI 체크아웃에 없음)과 날짜 플레이스홀더. */
+const PATH_CHECK_SKIP = [/(^|\/)\.env(\.|$)/, /settings\.local\.json$/, /YYYY/];
+
+/**
+ * 마크다운 본문의 인라인 백틱 코드에서 저장소 루트 기준 경로로 보이는 토큰을 뽑는다.
+ * 펜스 코드 블록(```)은 가상의 예시 경로가 흔해 제외한다 — 실행 명령은 extractScriptCommandPaths가 본다.
+ * `path.ts:12` 식 줄 번호 꼬리는 벗기고, 글롭·플레이스홀더(`*`·`{}`·`<>`)가 섞인 토큰은 경로로 보지 않는다.
+ */
+export function extractInlineCodePaths(md: string): string[] {
+    const out: string[] = [];
+    const withoutFences = md.replace(/```[\s\S]*?```/g, '');
+    for (const m of withoutFences.matchAll(/`([^`\n]+)`/g)) {
+        const token = m[1].trim().replace(/:\d+(?:[-–~:]\d+)?$/, '');
+        if (!PATH_ROOTS.test(token)) continue;
+        if (/[*{}<>()$'"\\|\s]/.test(token)) continue;
+        if (PATH_CHECK_SKIP.some((re) => re.test(token))) continue;
+        out.push(token.replace(/\/+$/, ''));
+    }
+    return out;
+}
+
+/**
+ * 문서의 tsx/node 실행 명령에서 대상 스크립트 경로를 뽑는다.
+ * 인라인 경로(14번)와 달리 펜스 코드 블록도 본다 — 워크플로의 명령 블록은 예시가 아니라 실행 지시다.
+ * (Phase 180 감사에서 존재하지 않는 scripts/test-calendar-sync.ts 실행 지시가 이 검사 부재로 통과했다)
+ */
+export function extractScriptCommandPaths(md: string): string[] {
+    const out: string[] = [];
+    for (const m of md.matchAll(/(?:npx\s+)?\btsx\s+((?:scripts|functions)\/[\w./-]+\.ts)\b/g)) out.push(m[1]);
+    for (const m of md.matchAll(/\bnode\s+((?:scripts|\.claude)\/[\w./-]+\.(?:mjs|cjs|js))\b/g)) out.push(m[1]);
+    return out;
+}
+
+/**
+ * 소스에서 따옴표로 감싼 규칙 파일 참조를 뽑는다 (gemini-pr-review.ts RULE_MAP 정합 검사용).
+ * 규칙 파일명은 소문자 케밥 컨벤션이다 — CLAUDE.md 같은 비규칙 문서 참조는 제외한다.
+ */
+export function extractQuotedMdRefs(src: string): string[] {
+    return [...new Set([...src.matchAll(/['"]([a-z][a-z0-9-]*\.md)['"]/g)].map((m) => m[1]))];
+}
+
+/** .claude/settings.json의 훅 명령 문자열에서 로컬 스크립트 경로를 뽑는다. */
+export function extractHookScriptPaths(settingsJson: string): string[] {
+    const out: string[] = [];
+    const settings = JSON.parse(settingsJson) as {
+        hooks?: Record<string, { hooks?: { command?: string }[] }[]>;
+    };
+    for (const groups of Object.values(settings.hooks ?? {})) {
+        for (const group of groups) {
+            for (const h of group.hooks ?? []) {
+                if (!h.command) continue;
+                for (const m of h.command.matchAll(
+                    /(?:\$CLAUDE_PROJECT_DIR\/)?((?:scripts|\.claude)\/[\w./-]+\.(?:mjs|cjs|js|sh))/g,
+                )) {
+                    out.push(m[1]);
+                }
+            }
+        }
     }
     return out;
 }
@@ -265,6 +338,36 @@ export function runChecks(root: string = ROOT): { findings: Finding[]; checked: 
             if (prov.caseCount !== Object.keys(base.results).length) {
                 warn('scripts/eval-baselines.json', `${kind} provenance caseCount(${prov.caseCount})와 results 수(${Object.keys(base.results).length}) 불일치`);
             }
+            // 신선도 — 베이스라인은 회귀 기준선이라 낡아도 아무도 알려주지 않는다. 두 신호로 경고한다:
+            // (a) 측정일이 60일 경과, (b) 측정 커밋 이후 판정에 영향을 주는 원본이 변경됨.
+            const measuredAt = String(prov.measuredAt);
+            const ageDays = Math.floor((Date.now() - Date.parse(measuredAt)) / 86_400_000);
+            if (Number.isFinite(ageDays) && ageDays > 60) {
+                warn('scripts/eval-baselines.json', `${kind} 베이스라인 측정 후 ${ageDays}일 경과 — 재측정 권장 (npm run eval:${kind})`);
+            }
+            const watchPaths =
+                kind === 'trigger'
+                    ? ['.agent/skills', 'scripts/skill-trigger-eval.json']
+                    : ['.agent/rules', '.agent/agents.md', 'scripts/behavior-rule-eval.json'];
+            try {
+                // 얕은 클론 등으로 측정 커밋이 로컬에 없으면 이 신호는 조용히 생략한다 (날짜 경고가 하한선).
+                execFileSync('git', ['cat-file', '-e', `${String(prov.commitSha)}^{commit}`], { cwd: root, stdio: 'pipe' });
+                const changed = execFileSync(
+                    'git',
+                    ['diff', '--name-only', String(prov.commitSha), 'HEAD', '--', ...watchPaths],
+                    { cwd: root, encoding: 'utf-8' },
+                )
+                    .split(/\r?\n/)
+                    .filter(Boolean);
+                if (changed.length) {
+                    warn(
+                        'scripts/eval-baselines.json',
+                        `${kind} 측정(${measuredAt}, ${String(prov.commitSha).slice(0, 7)}) 이후 관련 원본 ${changed.length}개 변경 — 재측정 권장 (npm run eval:${kind})`,
+                    );
+                }
+            } catch {
+                /* 측정 커밋 미해석·git 부재 — 변경 감지 생략 */
+            }
         }
         if (kind === 'trigger') {
             const caseIds = new Set(ids.map(String));
@@ -278,7 +381,7 @@ export function runChecks(root: string = ROOT): { findings: Finding[]; checked: 
         }
     }
 
-    // 10. 워크플로 문서의 위험/구식 명령 패턴
+    // 10. 워크플로 문서의 위험/구식 명령 패턴 + frontmatter
     checked++;
     const rootScripts = new Set(Object.keys(pkg.scripts ?? {}));
     for (const wf of workflowNames) {
@@ -292,6 +395,12 @@ export function runChecks(root: string = ROOT): { findings: Finding[]; checked: 
         for (const script of extractNpmRunScripts(md)) {
             if (!rootScripts.has(script)) warn(rel, `package.json에 없는 npm 스크립트 참조: ${script}`);
         }
+        // 실행 지시된 tsx/node 스크립트가 실제로 있어야 한다 — 없는 스크립트 실행 지시는 즉시 깨진다
+        for (const scriptPath of extractScriptCommandPaths(md)) {
+            if (!existsSync(join(root, scriptPath))) err(rel, `존재하지 않는 스크립트 실행 지시: ${scriptPath}`);
+        }
+        // description이 없으면 브리지가 H1 제목으로 조용히 대체해 슬래시 커맨드 품질 저하가 드러나지 않는다
+        if (!parseFrontmatter(md).description) err(rel, 'frontmatter description 없음 — 슬래시 커맨드 안내가 H1 폴백으로 조용히 대체됨');
     }
 
     // 11. 추적되면 안 되는 개인 설정 파일
@@ -332,6 +441,55 @@ export function runChecks(root: string = ROOT): { findings: Finding[]; checked: 
                 err(rel.replace(/\\/g, '/'), `깨진 상대 링크: ${link}`);
             }
         }
+    }
+
+    // 14. 하네스 문서 본문의 인라인 백틱 경로 실존
+    // 규칙·스킬 본문이 가리키는 경로가 리팩터로 사라져도 링크 검사(12)는 침묵한다 —
+    // Phase 180 감사에서 stale 경로 40여 건이 전부 이 부재로 살아남았다.
+    checked++;
+    for (const rel of mdFiles) {
+        for (const token of extractInlineCodePaths(read(rel))) {
+            if (!existsSync(join(root, token))) {
+                err(rel.replace(/\\/g, '/'), `본문이 가리키는 경로가 존재하지 않음: \`${token}\` — 리팩터를 따라가지 못한 서술이거나 오타`);
+            }
+        }
+    }
+
+    // 15. gemini-pr-review.ts RULE_MAP ↔ .agent/rules/ 정합
+    // RULE_MAP은 규칙 파일명을 문자열로 참조한다 — 리네임하면 리뷰 프롬프트에서 조용히 빠진다.
+    checked++;
+    const reviewSrc = read(join('scripts', 'gemini-pr-review.ts'));
+    const ruleRefs = extractQuotedMdRefs(reviewSrc);
+    const ruleFiles = readdirSync(join(root, '.agent', 'rules')).filter((f) => f.endsWith('.md'));
+    if (ruleRefs.length === 0) {
+        // 파서가 통째로 실패하면(형식 변경) 전부 미매핑으로 오탐한다 — 파서 고장으로 구분해 보고 (13번과 동일 원칙)
+        err('scripts/check-harness.ts', '15번 검사 파서가 RULE_MAP에서 규칙 참조를 하나도 찾지 못함 — 드리프트가 아니라 파서·파일 형식 문제');
+    } else {
+        for (const ref of ruleRefs) {
+            if (!ruleFiles.includes(ref)) {
+                err('scripts/gemini-pr-review.ts', `RULE_MAP이 존재하지 않는 규칙을 참조: ${ref} — 규칙 리네임 시 여기도 함께 고쳐야 리뷰 주입이 유지됨`);
+            }
+        }
+        // 프로세스·메타 규칙은 PR diff 경로에 대응물이 없어 의도적으로 미매핑이다.
+        const UNMAPPED_OK = new Set(['commit-message.md', 'pre-commit.md', 'multi-agent-coordination.md', 'planning-scope-review.md']);
+        for (const f of ruleFiles) {
+            if (!ruleRefs.includes(f) && !UNMAPPED_OK.has(f)) {
+                warn('scripts/gemini-pr-review.ts', `어떤 변경 경로에도 매핑되지 않은 규칙: ${f} — RULE_MAP에 추가하거나, 의도적이면 check-harness.ts의 UNMAPPED_OK에 등록`);
+            }
+        }
+    }
+
+    // 16. .claude/settings.json 훅 배선 실존 — 경로 오타 시 훅이 조용히 죽는다
+    checked++;
+    try {
+        for (const hookPath of extractHookScriptPaths(read(join('.claude', 'settings.json')))) {
+            if (!existsSync(join(root, hookPath))) {
+                err('.claude/settings.json', `훅이 가리키는 스크립트가 존재하지 않음: ${hookPath}`);
+            }
+        }
+    } catch (e) {
+        // 파일이 깨진 JSON(BOM 등)이면 스택트레이스로 죽는 대신 파서 고장으로 보고한다 (13·15번과 동일 원칙)
+        err('.claude/settings.json', `16번 검사가 settings.json을 파싱하지 못함 — ${e instanceof Error ? e.message : String(e)}`);
     }
 
     // 13. Functions 레퍼런스 카탈로그 ↔ index.ts export 정합
