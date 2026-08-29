@@ -8,77 +8,24 @@ description: functions/src/ 디렉터리에 새 Cloud Function을 추가하고 i
 ## functions/src/ 디렉터리 구조
 
 ```
-functions/
-├── src/
-│   ├── index.ts                     ← 엔트리 (모든 Cloud Function을 re-export)
-│   ├── helpers.ts                   ← 공통 유틸 (severity 로깅, 에러 자동 래퍼)
-│   ├── verifyHelpers.ts             ← AI 문서 검증 및 OCR 관련 종합 복합 헬퍼
-│   ├── constants.ts                 ← Remote Config 및 시스템 공통 상수
-│   │
-│   ├── ocrDashboard.ts              ← onCall (계기판 사진 OCR 분석)
-│   ├── ocrDocument.ts               ← onCall / Helper (고유번호증 OCR 분석)
-│   ├── autoVerifyDocument.ts        ← Firestore 트리거 (기관 신청 시 AI 자동 증빙 검증)
-│   ├── askAI.ts                     ← onCall (AI 질의 비서 응답 처리)
-│   ├── generateFeedbackDraft.ts     ← onCall (사용자 피드백 AI 답변 초안 자동 생성)
-│   ├── regenerateFeedbackDraft.ts   ← onCall (AI 답변 초안 재생성)
-│   │
-│   ├── createReservationSafe.ts     ← onCall (동시성 중복 예약 차단 생성)
-│   ├── sendAdminNotice.ts           ← onCall (관리자 공지 및 전체 FCM 푸시 발송)
-│   ├── sendAlimtalk.ts              ← Helper (카카오 알림톡 전송 외부 API 연동)
-│   ├── sendManualApprovalAlimtalk.ts← onCall (수동 승인/반려 알림톡 발송)
-│   ├── sendNotification.ts          ← Helper (FCM 알림 푸시 전송 핵심 모듈)
-│   ├── notifyNewApplication.ts      ← Firestore 트리거 (신규 신청서 등록 시 슈퍼관리자 알림)
-│   ├── notifyRoleChange.ts          ← Firestore 트리거 (유저 권한/역할 변경 알림)
-│   ├── sendApprovalEmail.ts         ← Helper (기관 신청 승인 메일 발송)
-│   ├── sendRejectionEmail.ts        ← Helper (기관 신청 반려 메일 발송)
-│   ├── sendFeedbackReply.ts         ← onCall (피드백 답변 완료 알림 발송)
-│   │
-│   ├── calendarSync.ts              ← Helper (Google Calendar 단방향/양방향 연동 헬퍼)
-│   ├── calendarSchedule.ts          ← Schedule (Google Calendar 10분 주기 역동기화)
-│   ├── testCalendarAccess.ts        ← onCall (캘린더 연동 디버깅 및 API 테스트)
-│   ├── triggerOnDemandCalendarSync.ts← onCall (수동 즉시 캘린더 동기화 요청)
-│   ├── reservationTriggers.ts       ← Firestore 트리거 (예약 생성/수정/삭제 시 연동 처리)
-│   ├── reservationReminder.ts       ← Schedule (예약 시작 임박 리마인더 알림 배치)
-│   │
-│   ├── holidayProxy.ts              ← HTTP (공공 휴일 Open API 프록시)
-│   ├── tmapProxy.ts                 ← HTTP (Tmap API 경로/거리 계산 프록시)
-│   ├── syncHolidays.ts              ← Schedule (매년 공휴일 자동 동기화 배치)
-│   ├── warmupOcr.ts                 ← Helper (OCR 웜업 — reservationReminder 스케줄러에 편승 호출)
-│   │
-│   ├── backupFirestore.ts           ← Schedule (Firestore 스토리지 일일 백업 배치)
-│   ├── dailyNightlyBatch.ts         ← Schedule (야간 데이터 정리 및 백그라운드 통합 배치)
-│   ├── cleanupDuplicateLogs.ts      ← HTTP (중복 운행일지 검출 및 보정 자동화)
-│   ├── syncDriveLogKm.ts            ← HTTP / onCall (전체 운행일지 누적거리 오차 보정 동기화)
-│   │
-│   ├── disableUser.ts               ← onCall (유저 계정 비활성화 처리)
-│   ├── restoreUser.ts               ← onCall (유저 계정 복원 처리)
-│   ├── onUserDelete.ts              ← Firestore 트리거 (유저 정보 영구 삭제 시 리소스 연쇄 정리)
-│   ├── setCustomClaims.ts           ← Firestore 트리거 (유저 Auth Claims 권한 실시간 동기화)
-│   ├── joinOrganization.ts          ← onCall (기관 초대 코드 서버사이드 검증 및 소속 승인)
-│   ├── submitOrgApplication.ts      ← onCall (신규 기관 가입 신청 양식 검증 제출)
-│   ├── submitPublicFeedback.ts      ← onCall (비로그인 사용자 피드백 접수 검증)
-│   ├── trackFirstEmployee.ts        ← Firestore 트리거 (최초 가입 직원 판별 및 관리자 알림)
-│   │
-│   ├── rateLimit.ts                 ← Helper (API 레이트 리밋 스로틀링 모듈)
-│   ├── discord.ts                   ← Helper (디스코드 웹훅 알림 송신 유틸)
-│   ├── discordScheduler.ts          ← Schedule (디스코드 시스템 상태 주기 요약 리포트 배치)
-│   ├── apiHealthCheck.ts            ← onCall / HTTP (외부 API 모니터링 및 헬스 체크)
-│   ├── sendInactiveOrgAlimtalkScheduled.ts← Schedule (장기 미사용 기관 리마인드 알림 배치)
-│   │
-│   ├── caching/                     ← 캐싱 관련 서브 모듈
-│   ├── scheduler/                   ← 스케줄러 래퍼 및 설정 모듈
-│   ├── scripts/                     ← 서버 관리 및 마이그레이션 배치 스크립트
-│   └── __tests__/                   ← Cloud Functions 단위/통합 테스트
-├── package.json                     ← Node 22, firebase-functions v6, TypeScript
-└── tsconfig.json
+functions/src/
+├── index.ts        ← 엔트리 (모든 Cloud Function을 re-export — 여기 없으면 배포 안 됨)
+├── core/           ← 횡단 인프라 (sentry, mailer, discord, gemini, params 등)
+├── handlers/       ← 함수 진입점 — callable/ · https/ · scheduled/ · sync/ · triggers/
+├── services/       ← 도메인 비즈니스 로직 (driveLog, calendar, alimtalk 등)
+├── utils/          ← 순수 유틸 (constants, helpers, rateLimit, clientIp 등)
+├── scripts/        ← 서버 관리·마이그레이션 배치
+└── __tests__/      ← 단위/통합 테스트
 ```
+
+개별 파일 목록은 여기 적지 않는다 — **같은 유형의 기존 함수를 Glob/`ls`로 찾아 그 파일을 본뜬다.** 새 onCall이면 `handlers/callable/`의 기존 파일 옆에, 새 스케줄이면 `handlers/scheduled/` 옆에 만든다. 공용 로직은 `services/`·`core/`·`utils/`에서 먼저 찾는다.
 
 ## 함수 유형별 템플릿
 
 ### 1. onCall 함수
 
 ```ts
-// newFunction.ts
+// handlers/callable/newFunction.ts
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore } from "firebase-admin/firestore";
 
@@ -111,9 +58,9 @@ export const myFunction = onCall(
 ### 2. HTTP 함수 (onRequest)
 
 ```ts
-// newFunction.ts
+// handlers/https/newFunction.ts
 import { onRequest } from "firebase-functions/v2/https";
-import { wrapHttps } from "./helpers";
+import { wrapHttps } from "../../utils/helpers";
 
 export const myFunction = onRequest(
     {
@@ -180,17 +127,17 @@ export const onItemCreated = onDocumentCreated(
 ```ts
 // 섹션 주석으로 그룹핑
 // 새 기능 이름
-export { myFunction } from "./newFunction";
+export { myFunction } from "./handlers/callable/newFunction";
 ```
 
 > ⚠️ `index.ts`에서 export하지 않으면 배포되지 않는다.
 
-## helpers.ts 활용
+## utils/helpers.ts 활용
 
-공통 유틸리티를 적극 활용한다:
+공통 유틸리티(`functions/src/utils/helpers.ts`)를 적극 활용한다:
 
 ```ts
-import { log, wrapHttps, wrapHandler } from "./helpers";
+import { log, wrapHttps, wrapHandler } from "../../utils/helpers";
 
 // 구조화 로깅 (Cloud Logging severity 기반 필터링)
 log("INFO", "myFunction", "처리 시작", { userId: "abc" });
@@ -230,10 +177,9 @@ const apiKey = process.env.MY_API_KEY;
 
 ## 배포 및 검증
 
-```bash
-# Functions만 배포 (/deploy-functions 워크플로우 사용)
-firebase deploy --only functions
+배포는 로컬에서 직접 하지 않는다 — master 푸시 시 CI(Deploy 워크플로)가 수행한다. 긴급 시에만 `/deploy-functions` 워크플로우를 따른다.
 
+```bash
 # 로그 확인 (/logs 워크플로우 사용)
 firebase functions:log --limit 50
 ```

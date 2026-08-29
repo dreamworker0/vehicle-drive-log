@@ -107,48 +107,44 @@ match /{document=**} {
 
 ## 4. Storage Rules
 
-`storage.rules` 파일의 기본 구조:
+`storage.rules`는 **기본 거부**다 — 와일드카드(`match /{allPaths=**}`) 허용 규칙을 두지 않고, 필요한 경로만 단일 파일 수준(`{fileName}`)으로 좁게 연다. 현재 열린 경로는 세 곳뿐이다:
+
+| 경로 | read | write |
+|------|------|-------|
+| `organizations/{orgId}/{fileName}` (기관 고유번호증 PII) | `isSuperAdmin()` | `false` (Admin SDK 전용) |
+| `feedbacks/ocr-report/{userId}/{fileName}` | 본인 또는 superAdmin | 본인 + 5MB + `image/*` |
+| `feedbacks/{userId}/{fileName}` | 본인 또는 superAdmin | 본인 + 5MB + `image/*` |
+
+새 업로드 경로 추가 시 패턴 (소유자 검증 + 크기 + contentType 전부 필수):
 
 ```
-rules_version = '2';
-service firebase.storage {
-    match /b/{bucket}/o {
-        match /{allPaths=**} {
-            // 인증된 사용자만 읽기/쓰기
-            allow read, write: if request.auth != null;
-        }
-    }
-}
-```
-
-### 파일 업로드 제한 시 패턴:
-
-```
-match /uploads/{orgId}/{allPaths=**} {
-    allow read: if request.auth != null;
+match /uploads/{userId}/{fileName} {
+    allow read: if request.auth != null && request.auth.uid == userId;
     allow write: if request.auth != null
-                 && request.resource.size < 10 * 1024 * 1024  // 10MB 제한
-                 && request.resource.contentType.matches('image/.*|application/pdf');
+                 && request.auth.uid == userId
+                 && request.resource.size < 5 * 1024 * 1024
+                 && request.resource.contentType.matches('image/.*');
 }
 ```
+
+> ⚠️ `organizations/` PII 경로의 org 멤버 읽기는 2026-07-18 보안 재점검 B에서 **의도적으로 제거된 표면**이다. 다시 열지 않는다. 배경은 [ocr-cost-security §2](ocr-cost-security.md) 참고.
 
 ---
 
 ## 5. 수정 후 검증
 
-### 5.1 문법 검증
+### 5.1 에뮬레이터 테스트 (필수)
 
 ```bash
-# Firebase CLI로 규칙 유효성 검사
-firebase deploy --only firestore:rules --dry-run
+npm run test:rules
 ```
+
+Firestore Rules 변경은 에뮬레이터 테스트(`tests/firestore-rules.test.ts`)가 PR 머지 조건이다.
+`storage.rules`(§4)를 고쳤다면 `npm run test:rules:storage`(`tests/storage-rules.test.ts`)도 함께 돌린다.
 
 ### 5.2 배포
 
-```bash
-# Firestore + Storage 규칙만 배포 (/deploy-rules 워크플로우)
-firebase deploy --only firestore:rules,storage
-```
+로컬에서 `firebase deploy`를 직접 실행하지 않는다 — **master 푸시 시 CI(Deploy 워크플로)가 배포한다.** 긴급 시에만 [/deploy-rules 워크플로우](../workflows/deploy-rules.md)를 따른다.
 
 ### 5.3 테스트 권장 사항
 

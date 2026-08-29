@@ -104,7 +104,8 @@ import { getDomainItems } from '../../lib/firestore';
 
 ## 4. 데이터 추가/수정 시 체크리스트
 
-- [ ] `src/types/` 인터페이스 파일에 optional(`?`) 필드 추가 완료
+- [ ] `src/schemas/` 도메인 스키마에 `.optional()` 필드 추가 완료 (§1.1 — `src/types/`는 손대지 않는다)
+- [ ] `src/__tests__/schemas/schemaCoverage.test.ts`에 새 필드 한 줄 추가 (§1.1 회귀 방지)
 - [ ] 쿼리 시 멀티테넌트 방어를 위해 `organizationId` 필터링이 적용되었는지 확인
 - [ ] 복합 쿼리를 사용하는 경우 `firestore.indexes.json`에 복합 인덱스 등록
 - [ ] `tsc --noEmit`을 실행하여 타입 컴파일 에러 유무 확인

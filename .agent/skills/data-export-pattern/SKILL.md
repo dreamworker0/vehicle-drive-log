@@ -14,8 +14,11 @@ description: PDF(인쇄 레이아웃) 및 Excel(xlsx 동적 로딩) 파일 내�
 브라우저의 인쇄 기능(`window.print()`)을 활용해 A4 가로(Landscape)에 딱 맞춰 테이블을 인쇄/저장하는 HTML/CSS 기반 PDF 생성 패턴을 따릅니다.
 
 ### 1.1 디렉토리 및 모듈 구성
-*   `src/lib/pdfStyles.ts`: 공통 폰트 설정, CSS 및 데이터 포맷팅 유틸 (`formatDate`, `formatNumber`)
-*   `src/lib/{Domain}PdfExport.ts`: 도메인별 전용 PDF 파일 (예: `dailyLogPdfExport.ts`, `maintenancePdfExport.ts` 등)
+
+PDF 관련 모듈은 전부 `src/lib/pdf/` 디렉토리에 모여 있다:
+*   `src/lib/pdf/pdfStyles.ts`: 공통 폰트 설정, CSS 및 데이터 포맷팅 유틸 (`formatDate`, `formatNumber`)
+*   `src/lib/pdf/pdfEngine.ts` · `pdfExport.ts`: 공통 조립/출력 엔진
+*   `src/lib/pdf/{domain}PdfExport.ts`: 도메인별 전용 PDF 파일 (예: `dailyLogPdfExport.ts`, `maintenancePdfExport.ts`)
 
 ### 1.2 주요 구현 패턴 및 함수 구조
 1.  **용지 사양**: A4 가로 크기 기준 1페이지에 출력할 테이블 행 수(`ROWS_PER_PAGE`)를 설정합니다. (보통 19 ~ 25행 권장)
@@ -34,7 +37,7 @@ interface PdfEntry {
 // 2. 메인 다운로드 함수
 export function downloadVehiclePdf(
     records: PdfEntry[],
-    options: { orgName?: string; approvalLine?: { title: string }[] } = {}
+    options: { orgName?: string; approvalLine?: { title: string }[]; onError?: (msg: string) => void } = {}
 ) {
     if (!records || records.length === 0) return;
     
@@ -49,7 +52,8 @@ export function downloadVehiclePdf(
     const htmlContent = buildPdfHtml(pages, options);
     const printWindow = window.open('', '_blank', 'width=1100,height=800');
     if (!printWindow) {
-        alert("팝업이 차단되었습니다. 팝업 허용 후 다시 시도해 주세요.");
+        // alert() 금지(D1) — §3.1처럼 onError 콜백으로 UI에 위임한다 (실제 코드: pdfEngine.ts)
+        options.onError?.('팝업이 차단되었습니다. 팝업 허용 후 다시 시도해 주세요.');
         return;
     }
     
