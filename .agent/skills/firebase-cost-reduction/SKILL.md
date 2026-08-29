@@ -86,6 +86,51 @@ async function getCalendarClient(): Promise<calendar_v3.Calendar> {
 
 판단 기준: **`index.ts`에서 export되는 함수 중 소수만 쓰는 무거운 의존성**(googleapis·SDK류)은 `await import()`로 내린다. 전 함수가 쓰는 것(firebase-admin, firebase-functions, Sentry)은 그대로 둔다.
 
+## 7. CPU 할당 — v2의 기본값 1 vCPU를 그대로 두지 않는다
+
+Cloud Run 요금은 **vCPU-초가 GiB-초보다 약 10배 비싸다.** 그런데 firebase-functions v2는 메모리와 무관하게 모든 함수에 **1 vCPU를 통째로** 붙인다. 라이브러리 타입 정의에 그대로 적혀 있다:
+
+```
+// firebase-functions/lib/v2/options.d.ts
+/** Fractional number of CPUs to allocate to a function.
+ *  Defaults to 1 for functions with <= 2GB RAM and increases for larger memory sizes.
+ *  This is different from the defaults when using the gcloud utility and is different
+ *  from the fixed amount assigned in Cloud Functions (1st gen).
+ *  To revert to the CPU amounts used in gcloud or in Cloud Functions (1st gen),
+ *  set this to the value "gcf_gen1" */
+cpu?: number | "gcf_gen1";
+```
+
+즉 메모리를 256MiB로 낮춰도 CPU는 1 vCPU 그대로다 — **메모리만 줄이는 절감은 요금의 10% 남짓만 건드린다.** `cpu: "gcf_gen1"`은 gen1의 분수 CPU(256MiB → 0.167, 512MiB → 0.333, 1GiB → 0.583)로 되돌려 vCPU-초를 3~6배 줄인다.
+
+### 적용 판단 — 셋 다 만족할 때만
+
+1. **대기 시간이 대부분인가** (외부 API·Firestore 응답 대기). CPU-bound 작업이면 소요가 그만큼 늘어 절감이 상쇄되고, 심하면 타임아웃으로 통째로 실패한다.
+2. **concurrency 1이어도 되는가.** `cpu < 1`이면 concurrency는 1이어야 한다. 스케줄 함수는 한 번에 한 번만 도니 무해하지만, **콜러블·HTTP는 동시 요청이 maxInstances(10)만큼으로 제한**되어 사용자 지연으로 돌아온다.
+3. **타임아웃에 여유가 있는가.** 상한 근처에서 도는 배치는 제외한다.
+
+### ⚠️ concurrency를 반드시 함께 명시한다
+
+`cpu < 1` + `concurrency > 1`은 **정의 시점에 검증되지 않는다.** 전역 옵션의 concurrency가 그대로 얹힌 채 배포로 넘어가 거기서 거부된다 — 프로덕션 배포가 깨지기 전까지 아무도 모른다. 실측:
+
+```
+onSchedule({ cpu: "gcf_gen1", concurrency: 80, ... })
+→ 통과함: {"cpu":"gcf_gen1","concurrency":80}   ← 던지지 않는다
+```
+
+```typescript
+// ✅ 짝으로 명시한다
+export const syncCalendarToApp = onSchedule({
+  schedule: '0,30 6-22 * * 1-5',
+  memory: '512MiB',
+  cpu: 'gcf_gen1',   // 0.333 vCPU
+  concurrency: 1,    // cpu<1이면 필수 — 빠뜨리면 전역값(80)이 얹혀 배포가 거부된다
+  timeoutSeconds: 300, // CPU를 줄인 만큼 상한에 여유를 둔다 (실제 실행 시간만 과금되므로 여유는 공짜)
+}, handler);
+```
+
+적용 이력(2026-08-29): 가벼운 스케줄러 4종(`syncCalendarToApp`·`reservationReminder`·`monthlyBatch`·`sendInactiveOrgAlimtalkScheduled`)에만 적용했다. 야간 배치 3종은 540초 상한에 여유가 없어 제외했고, 콜러블·HTTP는 동시성 제약 때문에 제외했다. 회귀는 `functions/src/__tests__/schedulerCpuOptions.test.ts`가 지킨다.
+
 ## 체크리스트 (비용 영향 작업 시)
 
 - [ ] 새 스케줄 함수의 빈도가 최소인가? 트리거로 대체 가능한가?
@@ -94,3 +139,5 @@ async function getCalendarClient(): Promise<calendar_v3.Calendar> {
 - [ ] 프리뷰/임시 채널에 만료가 설정됐는가?
 - [ ] 새 외부 API(OCR 등) 호출에 캐시·중복 방지가 있는가?
 - [ ] 새로 추가한 무거운 패키지를 함수 파일 최상단에서 import하고 있지 않은가? (→ §6)
+- [ ] 대기 시간이 대부분인 스케줄 함수에 1 vCPU를 그대로 붙이고 있지 않은가? (→ §7)
+- [ ] `cpu`를 내렸다면 `concurrency: 1`을 함께 명시했는가? (→ §7, 빠뜨리면 배포가 거부된다)
