@@ -1,11 +1,12 @@
-import * as admin from 'firebase-admin';
+import { initializeApp } from 'firebase-admin/app';
+import { getFirestore, type QueryDocumentSnapshot } from 'firebase-admin/firestore';
 
 // ADC(Application Default Credentials)를 사용해 초기화
-admin.initializeApp({
+initializeApp({
   projectId: 'vehicle-drive-log',
 });
 
-const db = admin.firestore();
+const db = getFirestore();
 
 async function cleanDuplicateCalendarEvents() {
   console.log('중복 캘린더 이벤트 정리 시작...');
@@ -21,7 +22,7 @@ async function cleanDuplicateCalendarEvents() {
   }
 
   // calendarEventId 기준으로 예약 문서를 매칭
-  const eventsByCalendarId: Record<string, admin.firestore.QueryDocumentSnapshot[]> = {};
+  const eventsByCalendarId: Record<string, QueryDocumentSnapshot[]> = {};
   
   snapshot.docs.forEach(doc => {
     const data = doc.data();

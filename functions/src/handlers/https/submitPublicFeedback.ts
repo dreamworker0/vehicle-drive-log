@@ -1,6 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
-import { getFirestore } from "firebase-admin/firestore";
-import * as admin from 'firebase-admin';
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { checkRateLimitByUid, checkRateLimitByIp, checkGlobalBudget } from "../../utils/rateLimit";
 import { resolveClientIp } from "../../utils/clientIp";
 import { GLOBAL_BUDGETS } from "../../utils/constants";
@@ -64,7 +63,7 @@ export const submitPublicFeedback = onCall(
                 message: message.trim(),
                 content: message.trim(), // 호환성을 위해 둘 다 저장
                 status: 'unread',
-                createdAt: admin.firestore.FieldValue.serverTimestamp(),
+                createdAt: FieldValue.serverTimestamp(),
             });
 
             return { success: true };

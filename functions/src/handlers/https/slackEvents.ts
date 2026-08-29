@@ -10,7 +10,8 @@
  */
 import { onRequest } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import type { Request, Response } from "firebase-functions/node_modules/@types/express";
+import type { Response } from "express";
+import type { Request } from "firebase-functions/v2/https";
 import { SLACK_SIGNING_SECRET } from "../../core/params";
 import { checkSlackSignature } from "../../services/slack/verifySlackSignature";
 import { wrapHttps, log } from "../../utils/helpers";
