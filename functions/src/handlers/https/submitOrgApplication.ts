@@ -195,8 +195,9 @@ export const submitOrgApplication = onCall(
             log("INFO", "submitOrgApplication", "Uploading image", { email: maskEmail(email), orgId, size: fileBuffer.byteLength });
 
             // 증빙서류는 민감정보이므로 영구 다운로드 토큰(firebaseStorageDownloadTokens)을 심지 않는다.
-            // 접근은 Storage 보안 규칙(superAdmin/기관 멤버 read)과 심사 시 발급하는 단기 서명 URL
-            // (getOrgDocumentUrl 콜러블)로만 통제한다. (2026-07-18 보안 재검증 P0-3)
+            // 접근은 Storage 보안 규칙(superAdmin 전용 read — 기관 멤버 read는 2026-07-18 보안 재점검 B에서
+            // 제거)과 심사 시 발급하는 단기 서명 URL(getOrgDocumentUrl 콜러블)로만 통제한다.
+            // (2026-07-18 보안 재검증 P0-3)
             await file.save(fileBuffer, {
                 metadata: {
                     contentType: payload.imageMimeType,
