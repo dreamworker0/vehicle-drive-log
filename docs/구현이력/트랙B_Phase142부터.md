@@ -647,3 +647,23 @@
 | **검증** | 새 파서 4종을 순수 함수로 export + 단위 테스트 11건(31/31) · lint · type-check · Doctor 16영역 0오류/0경고 · sync:agents(커맨드 26→24). 베이스라인 재저장으로 history(최근 5개 유지)에서 pre-provenance 시대의 최고(最古) trigger 22/22 엔트리가 회전 삭제됐다 — `saveBaseline`의 설계된 동작 |
 | **커밋·PR** | (아래 커밋 참조) |
 | **남는 것** | ① 14번은 인라인 백틱만 본다 — 펜스 안 경로는 가상 예시와 구분할 수 없어 의도적으로 제외했고, 실행 명령만 10번이 펜스 안까지 본다. 펜스 안 stale 서술은 여전히 사람 몫 ② 신선도 경고의 SHA 비교는 CI 얕은 클론에서 생략된다 — 로컬 Doctor 실행이 이 신호의 주 소비처 ③ 행동 eval 실행 에이전트에게 "파일은 수정하지 말라"는 제약을 걸었다 — 실제 편집 경로(훅·자동 교정 루프)까지 통과하는 측정은 아니다 ④ 3주차 백로그(규칙 축약·혼동쌍 케이스·description 소급)는 그대로 |
+
+### Phase 182: 상시 주입되는 규칙이 리뷰마다 틀린 전제를 심고 있었다 — coding-conventions 352→147줄 ✂️📐
+
+> 2026-08-29. Phase 180이 남긴 3주차 백로그 중 유일한 잔여 **위험** 항목. `coding-conventions.md`는 `scripts/gemini-pr-review.ts`의 `ALWAYS_RULES`라 **모든 PR 리뷰 프롬프트에 무조건 실린다** — 다른 규칙처럼 경로 매칭으로 걸러지지 않는다. 그래서 이 파일의 틀린 한 줄은 다른 규칙의 틀린 한 줄보다 비싸다. 그런데 문제 구간 대부분이 펜스 코드 블록 안이라, Phase 181에서 넣은 Doctor 14번 검사(인라인 백틱만)의 **설계된 사각지대**에 정확히 들어앉아 있었다.
+
+| 항목 | 내용 |
+|------|------|
+| **없는 디렉터리를 리뷰마다 가르치고 있었다** | §1 트리의 `src/contexts/`는 존재하지 않는다 — ConfirmContext·ThemeContext·FontSizeContext는 Zustand로 이관됐고(`src/store/useConfirmStore.ts` 등) §5.4의 `import { useConfirm } from '../../contexts/ConfirmContext'`는 **그대로 따라 쓰면 실패하는 import**였다. `lib/offlineQueue.ts`도 부재(`src/lib/offline/`로 대체), PDF 6개는 `src/lib/pdf/`로 이동(Phase 180에서 확인된 이동), `schemas/`·`store/`·`types/`·`sw.ts`·`LightApp.tsx`는 트리에 아예 없었다 |
+| **없는 훅 3개를 "주요 훅"으로 소개** | §1.1의 `useReservations`·`useVehicles`·`useOrganizations`는 실존하지 않는다. 게다가 훅 목록이 §1.1과 "주요 커스텀 훅 목록" 표로 **두 번** 실려 있었다 |
+| **제목과 예시가 서로 모순** | §2.1 제목은 "함수 컴포넌트 + named export"인데 ✅ 예시는 default export였다. 실제 관행을 세어 보고(선언형 default 111 / memo·forwardRef 래핑 40 / 진짜 화살표 안티패턴 1) **함수 선언형 default export**로 제목·예시를 일치시켰다 |
+| **Zustand 도입 이전의 상태관리 서술** | §2.3 "전역 상태 = `useAuth` 컨텍스트 / 서버 데이터 = `useEffect`+`useState` 직접 fetch". 확인해 보니 `useAuth`는 지금도 React Context가 맞고(이관 아님) `useEffect` 기본도 맞았다 — **틀린 게 아니라 빠진 것**이었다. 전역 UI 상태 4종이 `src/store/`로 옮겨간 사실과 "도메인 데이터는 Zustand에 넣지 않는다"가 통째로 없었다 |
+| **낡은 목록이 부패의 주범이었다** | 그래서 원칙을 문서 머리에 박았다 — **파일 목록·디렉터리 트리를 규칙 문서에 넣지 않는다. "어디를 보라"까지만 적고 "무엇이 있나"는 코드가 답한다.** §1 트리는 CLAUDE.md '디렉토리 컨벤션'에, §1.1 훅 목록은 `src/hooks/` 디렉터리에, §6 차량 상수(design-system §5·vehicle-color 스킬과 **3중복**)는 스킬에 위임 |
+| **부수 효과: 사각지대에서 걸어 나왔다** | 서술을 펜스 코드 블록 밖 인라인 백틱으로 옮기면서 **Doctor 14번 검사의 감시 범위 안으로 들어왔다.** 같은 종류의 부패가 다음엔 CI에서 잡힌다 — 문서를 짧게 만든 것보다 이쪽이 더 큰 소득 |
+| **절 번호는 계약이라 유지했다** | `agents.md`가 D9→§3.1, D10→§3.3, D15→§8, D17→§7, 체크리스트→§1로 **절 번호를 링크에 박아** 참조하고 `behavior-rule-eval.json`도 §3.1을 인용한다. §6을 삭제하면 §7·§8이 밀려 D15·D17 참조가 조용히 어긋나므로, §6은 "차량 표시 상수 → 위임" 한 줄짜리 절로 남겨 1~8 번호를 보존했다 |
+| **적대적 리뷰가 정정 커밋의 새 부정확을 3건 잡았다** | 머지 전 독립 에이전트에게 **"새 서술이 실제 코드와 맞는가"를 코드 대조로** 검증시켰다(전 인라인 토큰 88개 대조). ① §7에 "Cloud Functions도 Node 22 + **ESM**"을 그대로 옮겨 적었는데 `functions/tsconfig.json`이 `module: "commonjs"`이고 `functions/package.json`에 `type: "module"`이 없다 — 산출물은 CommonJS이고 `core/sentry.ts`가 실제로 `require`를 쓴다. 따랐다면 정당한 `require`를 오탐하고 top-level await를 승인해 빌드를 깼을 것 ② §3.1의 "단발성 `getDoc` 1회는 허용" 예외를 보존했는데, `behavior-rule-eval`의 D9 케이스가 **"간단하니까 컴포넌트에서 바로"를 함정으로 잡는다** — 규칙이 eval의 함정을 허가하고 있었다(실제 컴포넌트의 직접 호출은 0건이라 예외의 근거도 없다) ③ 삭제한 트리에만 있던 **appEntry/lightEntry 이중 진입점**이 CLAUDE.md·README·CONTRIBUTING 어디에도 없어 "위임"이 성립하지 않았다 — 횡단 가드를 한쪽에만 넣는 회귀가 상시 규칙에서 사라질 뻔했다 |
+| **작은 지적 4건도 반영** | memo·forwardRef 래핑 예외 명시 · 한국어는 commitlint가 강제하지 않는다(형식만) · 역할 문자열은 상수가 아니라 `UserRole` 타입으로 좁히는 것이 실제 구조 · §4 예시 `setTodayReservations`는 **존재하지 않는 식별자**(구 문서에서 그대로 옮겨온 것)라 `setVehicles`로 교체 |
+| **삭제 판단** | §7의 `useActionState`/`useFormStatus` 권장은 코드베이스 사용 **0건**이면서 함께 붙은 "무분별한 로컬 비동기 제출 플래그 금지"가 실존 코드를 상시 오탐하는 구조라 삭제했다. §8의 하드코딩 예시에서 실주소 이메일은 빼되, `agents.md` D12는 `.agent/rules/`가 아니라 **리뷰 프롬프트에 주입되지 않으므로** "연락처 이메일"을 일반형으로 되살렸다 |
+| **검증** | 하네스 Doctor 16영역 **0오류** · CI 전 체크 초록(ci·e2e·harness·preview·security-audit) · 문서 전용이라 배포는 건너뜀 · 새로 적은 경로·식별자는 전부 grep/ls로 실존 확인 후 기재(Phase 180의 교훈 — **정정한다면서 또 틀리면 최악**) |
+| **커밋·PR** | (아래 커밋 참조) |
+| **남는 것** | ① **`cloud-functions.md` §1("모듈 시스템: TypeScript ESM")과 CLAUDE.md("Cloud Functions는 ESM")가 같은 오류를 공유한다** — 이번엔 위임만 하고 단정을 피했을 뿐 원본은 그대로다. `functions/` 경로 PR에는 `cloud-functions.md`가 주입되므로 우선순위가 낮지 않다 ② Doctor가 `behavior` 베이스라인 신선도 경고를 낸다(D9 근거 절인 §3.1을 재작성했으므로 진짜 신호) — `npm run eval:behavior` 재측정 필요 ③ 3주차 백로그 잔여(규칙 17→10 축약·trigger eval 혼동쌍·description 소급)는 그대로. 이번 Phase로 **위험 항목은 소진**됐고 남은 것은 전부 개선 항목이다 |
