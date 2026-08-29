@@ -1,0 +1,19 @@
+# 줄바꿈 정규화 — 저장소도 워킹트리도 LF로 통일한다.
+#
+# 왜 두는가: Git for Windows의 전역 기본값 `core.autocrlf=true`가 체크아웃할 때
+# LF를 CRLF로 바꾼다. 저장소 blob은 LF인데 Windows 워킹트리만 CRLF가 되므로,
+# 줄바꿈을 `\n`으로 가정한 스크립트가 **로컬에서만** 실패한다. CI는 Linux(LF)라
+# 통과하기 때문에 이 어긋남은 PR에서 드러나지 않고 각자 PC에서만 터진다.
+#
+# 실제 사례(2026-08-29): scripts/check-functions-env.ts가 README의 ```env 블록을
+# 찾지 못해 `npm run verify:fast`가 Windows에서 항상 멈췄다. 문서에는 아무 문제가
+# 없었고 원인은 CRLF뿐이었다. 스크립트마다 `\r?\n`을 덧대는 대신 여기서 한 번 막는다.
+#
+# CRLF가 필요한 파일(.bat/.cmd 등)은 현재 이 저장소에 없다. 추가한다면 그 확장자에만
+# `eol=crlf`를 명시할 것 — 그 파일들은 CRLF가 아니면 Windows에서 실행이 깨진다.
+* text=auto eol=lf
+
+# 바이너리 — 자동 판별에 맡기지 않고 명시한다. 잘못 텍스트로 잡히면 파일이 손상된다.
+*.woff2 binary
+*.png   binary
+*.webp  binary

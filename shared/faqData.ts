@@ -575,4 +575,4 @@ export function buildFaqPromptText(): string {
     return FAQ_ITEMS.map((item) =>
         `[FAQ ID: ${item.id}]\nQ: ${item.question}\nA: ${item.answer.join(" ")}`
     ).join("\n\n");
-}
+}
