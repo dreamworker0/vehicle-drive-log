@@ -20,6 +20,18 @@ export const reservationReminder = onSchedule(
         // 복호화가 "암호화 키가 비어 있습니다."로 죽고, Slack DM만 매시간 조용히 누락된다.
         // (tokenCrypto 상단 규칙: 이 래퍼를 쓰는 함수는 secrets에 선언해야 한다)
         secrets: [SLACK_TOKEN_ENC_KEY],
+        // CPU 분수 할당 — firebase-functions v2는 메모리와 무관하게 모든 함수에 1 vCPU를 붙인다
+        // (options.d.ts: "Defaults to 1 for functions with <= 2GB RAM"). Cloud Run 요금은 vCPU-초가
+        // GiB-초보다 약 10배 비싸므로 여기가 실질 지렛대다. gcf_gen1은 gen1의 분수 CPU로 되돌린다.
+        // 이 함수는 외부 API·Firestore 응답을 기다리는 시간이 대부분이라 CPU를 줄여도 소요가 그만큼
+        // 늘지 않는다. concurrency는 cpu<1이면 1이어야 하는데, 스케줄 함수는 한 번에 한 번만 도니
+        // 손해가 없다. **전역 concurrency(80)를 그대로 두면 배포가 거부되므로 반드시 명시한다.**
+        // (2026-08-29 Cloud Run 비용 점검 — 야간 배치 3종은 타임아웃 여유가 없어 제외했다)
+        cpu: "gcf_gen1",
+        concurrency: 1,
+        // CPU를 1/3로 줄이는 만큼 상한에 여유를 둔다. Cloud Run은 실제 실행 시간만 과금하므로
+        // 여유 자체에는 비용이 없고, 늘어난 소요가 상한에 닿아 통째로 실패하는 쪽이 훨씬 나쁘다.
+        timeoutSeconds: 300,
     },
     async function () {
         // 주말(토/일)에는 스킵 (비용 절감)
