@@ -57,7 +57,8 @@ Working directory: `.`
 ### --- [STEP 2: 커밋 & 푸시 → CI 배포 트리거] ---
 
 5. Commit & Push:
-   - **지시사항**: 모든 변경점을 스테이징·커밋한 뒤 master로 푸시한다. 푸시 즉시 Deploy 워크플로가 트리거된다.
+   - **지시사항**: 모든 변경점을 스테이징·커밋한 뒤 master로 푸시한다. 푸시하면 CI가 돌고, **CI가 성공해야** Deploy 워크플로가 이어진다(Deploy는 `workflow_run` 트리거라 푸시가 직접 부르지 않는다).
+   - ⚠️ **문서(`docs/**`·`**.md`)만 바뀐 푸시는 CI가 건너뛰어져 배포도 일어나지 않는다.** master에 워크플로 실행이 하나도 생기지 않는 것이 정상이므로 배포를 기다리지 말 것 — [ci-cd 규칙 §1.2](../rules/ci-cd.md).
 ```powershell
 git add . ; git commit -m "chore: 배포 전 문서 및 환경 갱신 완료" ; git push origin master
 ```
