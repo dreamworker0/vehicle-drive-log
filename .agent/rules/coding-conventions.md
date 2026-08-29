@@ -26,13 +26,15 @@ description: 차량 운행일지 앱 코딩 컨벤션 및 에이전트 행동 �
 
 > ✅ 새 훅·컴포넌트를 만들기 전에 **기존과 역할이 겹치지 않는지** 먼저 확인한다. 훅이 많아 중복 생성이 흔하다 — 목록은 `src/hooks/` 디렉터리가 답한다.
 
+> ⚠️ 렌더 진입점은 `src/main.tsx`가 인증 여부로 `src/appEntry.tsx`(로그인)와 `src/lightEntry.tsx`(비로그인)로 분기한다. 라우팅 가드·프로바이더 같은 **횡단 관심사는 반드시 양쪽 모두**에 반영한다 — 한쪽만 고치면 비로그인 경로에서 조용히 빠진다.
+
 ---
 
 ## 2. 컴포넌트 작성 규칙
 
 ### 2.1 함수 선언형 default export
 
-컴포넌트는 `export default function ComponentName() { ... }` 형태로 선언한다. 화살표 함수를 변수에 담아 `export default`하는 형태는 지양한다.
+컴포넌트는 `export default function ComponentName() { ... }` 형태로 선언한다. 화살표 함수를 변수에 담아 `export default`하는 형태는 지양한다 (`memo`·`forwardRef` 래핑은 예외).
 
 순서 — 파일: import → 상수 → 헬퍼 함수 → 메인 컴포넌트 → 보조 컴포넌트. 컴포넌트 내부: 훅 → 파생 상태(`useMemo`) → 이벤트 핸들러 → 로딩 early return → JSX.
 
@@ -54,7 +56,7 @@ description: 차량 운행일지 앱 코딩 컨벤션 및 에이전트 행동 �
 // ✅ 도메인 파일에서 export → index.ts에서 re-export → 컴포넌트는 index에서 import
 import { getVehicles, createReservation } from '../../lib/firestore';
 
-// ❌ 컴포넌트에서 직접 Firestore 호출 (단, 단발성 getDoc 1회는 허용)
+// ❌ 컴포넌트에서 직접 Firestore 호출 — "한 건만 읽으니까"도 예외가 아니다
 ```
 
 ### 3.2 데이터 비정규화
@@ -86,7 +88,7 @@ try {
 |------|------|------|
 | 컴포넌트 파일·함수 | PascalCase | `TodayDashboard.tsx` / `function TodayDashboard()` |
 | 이벤트 핸들러 | `handle` + 동사 | `handleStartDrive`, `handleSubmit` |
-| 상태 setter | `set` + 변수명 | `setLoading`, `setTodayReservations` |
+| 상태 setter | `set` + 변수명 | `setLoading`, `setVehicles` |
 | 상수 | UPPER_SNAKE_CASE | `VEHICLE_COLORS`, `VEHICLE_TYPE_ICONS` |
 | Firestore 함수 | 동사 + 명사 | `getVehicles`, `createReservation` |
 | CSS 커스텀 클래스 | kebab-case | `glass-card`, `btn-primary` |
@@ -133,15 +135,15 @@ if (!ok) return;
 - **라우팅**: React Router v7 (`Routes`, `Route`, `NavLink`, `useNavigate`, `useLocation`).
 - **Firebase**: v9+ Modular SDK (`import { ... } from 'firebase/firestore'`).
 - **빌드**: Vite 7 (HMR, ESM).
-- **Node.js**: v22 고정. Cloud Functions도 Node 22 + ESM이라 `require` 대신 `import`/`export`를 쓴다.
+- **Node.js**: v22 고정 (루트·Functions 공통). Functions의 모듈 시스템·배포 규칙은 [cloud-functions.md](cloud-functions.md)가 단일 원본이다.
 
 ---
 
 ## 8. 코드 품질 규칙
 
 1. **불필요한 의존성 금지** — 이미 쓰는 라이브러리로 해결되면 새 패키지를 추가하지 않는다.
-2. **한글 커밋 메시지** — Conventional Commits + 한국어 (commitlint 강제).
+2. **커밋 메시지** — Conventional Commits 형식(commitlint가 강제) + 한국어 본문(관례).
 3. **console.error에 한글 설명 포함** — `console.error('로드 실패:', err)`.
 4. **JSX 중복 최소화** — 반복 UI는 함수나 서브 컴포넌트로 추출한다.
-5. **하드코딩 금지** — 역할명(`'admin'`, `'employee'`)·매직 넘버는 상수로 관리한다.
+5. **하드코딩 금지** — 매직 넘버·반복되는 문자열(연락처 이메일 등)은 상수로 뺀다. 역할 문자열은 상수 대신 `src/schemas/user.ts`에서 파생된 `UserRole` 타입으로 좁힌다.
 6. **외부 API 호출 절약** — TMap 등은 `429` 방지와 비용 절감을 위해 캐싱(localStorage·인메모리)이나 큐 패턴으로 호출을 최소화한다.
