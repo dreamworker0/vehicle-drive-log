@@ -481,10 +481,15 @@ export function runChecks(root: string = ROOT): { findings: Finding[]; checked: 
 
     // 16. .claude/settings.json 훅 배선 실존 — 경로 오타 시 훅이 조용히 죽는다
     checked++;
-    for (const hookPath of extractHookScriptPaths(read(join('.claude', 'settings.json')))) {
-        if (!existsSync(join(root, hookPath))) {
-            err('.claude/settings.json', `훅이 가리키는 스크립트가 존재하지 않음: ${hookPath}`);
+    try {
+        for (const hookPath of extractHookScriptPaths(read(join('.claude', 'settings.json')))) {
+            if (!existsSync(join(root, hookPath))) {
+                err('.claude/settings.json', `훅이 가리키는 스크립트가 존재하지 않음: ${hookPath}`);
+            }
         }
+    } catch (e) {
+        // 파일이 깨진 JSON(BOM 등)이면 스택트레이스로 죽는 대신 파서 고장으로 보고한다 (13·15번과 동일 원칙)
+        err('.claude/settings.json', `16번 검사가 settings.json을 파싱하지 못함 — ${e instanceof Error ? e.message : String(e)}`);
     }
 
     // 13. Functions 레퍼런스 카탈로그 ↔ index.ts export 정합

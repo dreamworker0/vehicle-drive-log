@@ -644,6 +644,6 @@
 | **10 확장: 실행 지시 스크립트 실존 + frontmatter 필수 (오류)** | 워크플로의 `tsx`/`node` 실행 명령이 가리키는 스크립트 실존 검사(명령 블록은 예시가 아니라 실행 지시이므로 펜스 안까지 본다) + frontmatter description 없으면 브리지가 H1 폴백으로 조용히 대체하므로 오류로 승격 |
 | **죽은 워크플로 2종 삭제** | 새 검사가 잡을 대상을 선제 정리: `db-export`(실행 가능한 명령 0개 — 참조하는 scripts/db-export.ts·seeds/·backup_data/ 전부 부재), `sync-calendar`(**삭제된 사용자 OAuth 흐름 검증을 지시** — /oauthCallback·users/{uid}/secure/oauth 조회, Phase 180에서 삭제한 add-calendar-integration과 같은 부류). 캘린더 로컬 검증 워크플로는 현행 ADC 구조 기준으로 필요해질 때 재작성한다 |
 | **Doctor의 자기 문서 드리프트 수정** | check-harness.ts 헤더 주석의 검사 목록이 13번(Functions 카탈로그)을 빠뜨리고 있었다 — 1~16 전체로 갱신 |
-| **검증** | 새 파서 4종을 순수 함수로 export + 단위 테스트 11건(31/31) · lint · type-check · Doctor 16영역 0오류/0경고 · sync:agents(커맨드 26→24) |
+| **검증** | 새 파서 4종을 순수 함수로 export + 단위 테스트 11건(31/31) · lint · type-check · Doctor 16영역 0오류/0경고 · sync:agents(커맨드 26→24). 베이스라인 재저장으로 history(최근 5개 유지)에서 pre-provenance 시대의 최고(最古) trigger 22/22 엔트리가 회전 삭제됐다 — `saveBaseline`의 설계된 동작 |
 | **커밋·PR** | (아래 커밋 참조) |
 | **남는 것** | ① 14번은 인라인 백틱만 본다 — 펜스 안 경로는 가상 예시와 구분할 수 없어 의도적으로 제외했고, 실행 명령만 10번이 펜스 안까지 본다. 펜스 안 stale 서술은 여전히 사람 몫 ② 신선도 경고의 SHA 비교는 CI 얕은 클론에서 생략된다 — 로컬 Doctor 실행이 이 신호의 주 소비처 ③ 행동 eval 실행 에이전트에게 "파일은 수정하지 말라"는 제약을 걸었다 — 실제 편집 경로(훅·자동 교정 루프)까지 통과하는 측정은 아니다 ④ 3주차 백로그(규칙 축약·혼동쌍 케이스·description 소급)는 그대로 |
