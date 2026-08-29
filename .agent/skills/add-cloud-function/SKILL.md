@@ -166,7 +166,7 @@ const apiKey = process.env.MY_API_KEY;
 
 ## 주의사항
 
-1. **TypeScript ESM**: `import/export` 사용 (CommonJS 아님)
+1. **모듈 문법**: 소스는 `import`/`export`로 쓴다. 다만 컴파일 결과는 CommonJS이므로 top-level await·`import.meta`는 쓸 수 없다 (`functions/tsconfig.json`의 `module: "commonjs"`)
 2. **리전**: `asia-northeast3` (서울) 고정
 3. **Node 버전**: 22 (package.json `engines.node`로 지정)
 4. **Firebase Admin**: `index.ts`에서 한 번만 `initializeApp()`. 개별 모듈에서는 `getFirestore()`, `getAuth()` 등만 호출

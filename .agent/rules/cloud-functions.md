@@ -13,7 +13,7 @@ description: Cloud Functions 코딩 컨벤션. functions/ 디렉터리의 코드
 ## 1. 기술 스택
 
 - **런타임**: Node.js 22 (`engines.node: "22"`)
-- **모듈 시스템**: TypeScript ESM (`import` / `export`)
+- **모듈 시스템**: 소스는 `import`/`export`로 쓰지만 **빌드 산출물과 런타임은 CommonJS**다 (`functions/tsconfig.json`의 `module: "commonjs"`, `functions/package.json`에 `type: "module"` 없음, `main`이 `lib/functions/src/index.js`). 따라서 ESM 전용 구문(top-level await·`import.meta`·확장자 명시 상대 import)은 쓸 수 없고, 지연 로딩용 `require()`는 정당한 예외다 (`functions/src/core/sentry.ts`)
 - **Firebase**: `firebase-admin`, `firebase-functions` v6 (2nd gen)
 - **주요 라이브러리**: `googleapis`, `@google/genai`, `@emailjs/nodejs`, `@sentry/node`
 
