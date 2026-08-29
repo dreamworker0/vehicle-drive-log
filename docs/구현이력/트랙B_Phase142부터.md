@@ -667,3 +667,21 @@
 | **검증** | 하네스 Doctor 16영역 **0오류** · CI 전 체크 초록(ci·e2e·harness·preview·security-audit) · 문서 전용이라 배포는 건너뜀 · 새로 적은 경로·식별자는 전부 grep/ls로 실존 확인 후 기재(Phase 180의 교훈 — **정정한다면서 또 틀리면 최악**) |
 | **커밋·PR** | (아래 커밋 참조) |
 | **남는 것** | ① **`cloud-functions.md` §1("모듈 시스템: TypeScript ESM")과 CLAUDE.md("Cloud Functions는 ESM")가 같은 오류를 공유한다** — 이번엔 위임만 하고 단정을 피했을 뿐 원본은 그대로다. `functions/` 경로 PR에는 `cloud-functions.md`가 주입되므로 우선순위가 낮지 않다 ② Doctor가 `behavior` 베이스라인 신선도 경고를 낸다(D9 근거 절인 §3.1을 재작성했으므로 진짜 신호) — `npm run eval:behavior` 재측정 필요 ③ 3주차 백로그 잔여(규칙 17→10 축약·trigger eval 혼동쌍·description 소급)는 그대로. 이번 Phase로 **위험 항목은 소진**됐고 남은 것은 전부 개선 항목이다 |
+
+### Phase 183: 하네스가 Functions를 7주째 ESM이라 가르치고 있었다 — 오기 9곳 정정·eval 2종 재측정 🧭🔬
+
+> 2026-08-29. Phase 182의 "남는 것" 두 건을 닫는다. 둘 다 앞 Phase가 만든 것이 아니라 **드러낸** 것이다 — 상시 주입 규칙을 코드 대조로 검증하다 보니 그 뒤에 있던 더 오래된 오류가 나왔다.
+
+| 항목 | 내용 |
+|------|------|
+| **문서가 7주 동안 정반대를 가르쳤다** | `functions/tsconfig.json`이 `module: "commonjs"`이고 `functions/package.json`에 `type: "module"`이 없다. `main`은 `lib/functions/src/index.js`이고 `core/sentry.ts`·`dailyNightlyBatch.ts`가 실제로 `require()`를 쓴다. `functions/src`에 `import.meta` 0건, 확장자 명시 import 0건 — **진짜 ESM이면 애초에 해석되지 않는다.** 그런데 문서 9곳이 "TypeScript ESM"이라 설명하고 있었다 |
+| **가장 위험한 한 줄은 스킬에 있었다** | `add-cloud-function` 주의사항 1번이 **"(CommonJS 아님)"** 이라고 못 박고 있었다. Cloud Function을 추가할 때 자동 발동하는 스킬이라 영향이 가장 크다 — 따르면 정당한 `require()`를 위반으로 오탐하고, top-level await·`import.meta`를 승인해 CJS 빌드를 깨뜨린다 |
+| **이미 지적됐는데 7주간 미완이었다** | `docs/archive/2026-07-10코덱스평가.md:199`가 정확히 이 오류를 지적했고, 개선계획서 1단계에 "README·CLAUDE.md 교정, `.agent/` 원본부터 수정" 지시까지 있었다. **체크박스가 빈 채로 남아 있었다.** 감사가 찾아내는 것과 고쳐지는 것은 다른 일이라는 증거 — Phase 181이 Doctor에 검사를 넣은 이유와 같은 구조다 |
+| **정정 커밋이 새 오류를 심을 뻔했다** | 리뷰가 잡았다. 금지 항목에 "확장자 명시 상대 import"를 적었는데 사실이 아니다 — `functions/src`에 프로브를 넣어 `import { x } from "./utils/kstDate.js"`가 **exit 0으로 정상 컴파일**됨을 확인했다(TS가 `.js`→`.ts`로 해석하고 emit된 `require("./x.js")`가 실제 파일을 가리킨다). 대조군인 top-level await는 TS1378, `import.meta`는 TS1343으로 진짜 차단된다. **고치려던 것과 같은 종류의 오탐**을 새로 심을 뻔했다 |
+| **가장 파괴적인 오작동에 경고를 달았다** | 이 문서를 읽고 "루트와 맞춰야지" 하며 `functions/package.json`에 `type: "module"`을 추가하는 것이 여기서 가능한 최악의 조치다(CJS 산출물이 통째로 깨진다). Node가 **가장 가까운 package.json**을 본다는 근거와 함께 명시했다 — 루트의 `type: "module"`은 functions로 전파되지 않는다 |
+| **고친 9곳** | `.agent/rules/cloud-functions.md` §1(단일 원본) · `.agent/skills/add-cloud-function/SKILL.md` · `CLAUDE.md` · `README.md` 2곳 · `docs/차량운행일지_구현계획서.md` 2곳 · `eslint.config.js` 주석 2곳(functions를 **실제로 린트하는 바로 그 블록**이 같은 오기를 담고 있었다. `sourceType: 'module'` 설정 자체는 소스 문법 기준이라 옳으므로 그대로) · `docs/MAINTAINABILITY_BACKLOG.md`. 아카이브·CHANGELOG·구현이력은 당시 기록이라 제외 |
+| **eval 재측정 — trigger 24/24** | 카탈로그(name+description)만 본 블라인드 판정. 판정자에게 저장소 열람을 금지해 정답 유출을 막았다. `resultsHash`가 직전과 **동일**(`6883325e911a26b6`) — 스킬 본문만 고치고 frontmatter `description`은 건드리지 않았으므로 판정이 안 바뀌는 것이 맞다 |
+| **eval 재측정 — behavior 10/10, 그리고 규칙 수정이 실제로 조향했다** | 케이스 10개를 규칙 언급 없이 fresh 에이전트 10개에 던지고 독립 판정자가 블라인드 채점. **D9 유도 케이스("간단하니까 그냥 컴포넌트에서 바로 처리해도 돼")에서 에이전트가 Phase 182가 새로 쓴 §3.1 문구를 그대로 인용하며 유도를 거부했다** — `// ❌ 컴포넌트에서 직접 Firestore 호출 — "한 건만 읽으니까"도 예외가 아니다`. 종전 문구("단, 단발성 getDoc 1회는 허용")였다면 이 케이스는 **규칙상 정당하게 실패**할 수 있었다. 과잉 적용을 잡는 negative 4건(허용된 `red-*`, 다크모드 내장 클래스, Firestore 무관 훅, 본인 소유 데이터)도 전부 통과해 반대 방향으로 새지 않는 것도 확인 |
+| **검증** | 하네스 Doctor 16영역 **0오류 0경고**(신선도 경고 2건 해소) · lint · CI 전 체크 초록 · 측정 커밋 `af81229`, 판정 모델 `claude-opus-5` |
+| **커밋·PR** | (아래 커밋 참조) |
+| **남는 것** | ① `eslint.config.js` 주석 정정 때문에 문서 전용이 아니게 되어 Deploy가 돌았다(성공, 산출물 동일) — 경로 필터는 코드 파일 여부만 보므로 주석 변경도 배포를 부른다 ② 이번에도 **정정 커밋이 새 오류를 냈고 리뷰가 잡았다.** 규칙·문서 수정에서 적대적 코드 대조 리뷰는 선택이 아니라 절차로 굳히는 게 맞다 ③ Doctor 14번은 여전히 펜스 밖만 본다 — 이번 오기도 전부 펜스 밖 산문이라 잡혔을 법하지만, 실제로는 **경로가 아니라 서술("ESM")** 이라 어떤 정적 검사로도 못 잡는다. 이 종류는 계속 사람·리뷰 몫 ④ 3주차 백로그 잔여(규칙 17→10 축약·trigger eval 혼동쌍·description 소급)는 그대로 |
