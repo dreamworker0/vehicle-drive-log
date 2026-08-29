@@ -25,7 +25,7 @@ functions/src/
 ### 1. onCall 함수
 
 ```ts
-// newFunction.ts
+// handlers/callable/newFunction.ts
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore } from "firebase-admin/firestore";
 
@@ -127,7 +127,7 @@ export const onItemCreated = onDocumentCreated(
 ```ts
 // 섹션 주석으로 그룹핑
 // 새 기능 이름
-export { myFunction } from "./newFunction";
+export { myFunction } from "./handlers/callable/newFunction";
 ```
 
 > ⚠️ `index.ts`에서 export하지 않으면 배포되지 않는다.

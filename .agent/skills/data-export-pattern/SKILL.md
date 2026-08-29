@@ -37,7 +37,7 @@ interface PdfEntry {
 // 2. 메인 다운로드 함수
 export function downloadVehiclePdf(
     records: PdfEntry[],
-    options: { orgName?: string; approvalLine?: { title: string }[] } = {}
+    options: { orgName?: string; approvalLine?: { title: string }[]; onError?: (msg: string) => void } = {}
 ) {
     if (!records || records.length === 0) return;
     
@@ -52,8 +52,8 @@ export function downloadVehiclePdf(
     const htmlContent = buildPdfHtml(pages, options);
     const printWindow = window.open('', '_blank', 'width=1100,height=800');
     if (!printWindow) {
-        // alert() 금지(D1) — 비-React 모듈에서는 notifyUser(src/lib/notify.ts) 사용
-        notifyUser('팝업이 차단되었습니다. 팝업 허용 후 다시 시도해 주세요.');
+        // alert() 금지(D1) — §3.1처럼 onError 콜백으로 UI에 위임한다 (실제 코드: pdfEngine.ts)
+        options.onError?.('팝업이 차단되었습니다. 팝업 허용 후 다시 시도해 주세요.');
         return;
     }
     

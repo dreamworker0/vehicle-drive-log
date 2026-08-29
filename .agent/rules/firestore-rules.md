@@ -140,6 +140,7 @@ npm run test:rules
 ```
 
 Firestore Rules 변경은 에뮬레이터 테스트(`tests/firestore-rules.test.ts`)가 PR 머지 조건이다.
+`storage.rules`(§4)를 고쳤다면 `npm run test:rules:storage`(`tests/storage-rules.test.ts`)도 함께 돌린다.
 
 ### 5.2 배포
 
