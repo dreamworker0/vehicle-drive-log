@@ -4,212 +4,79 @@ description: 차량 운행일지 앱 코딩 컨벤션 및 에이전트 행동 �
 
 # 🤖 코딩 컨벤션 & 에이전트 규칙
 
-이 문서는 에이전트가 차량 운행일지 앱의 코드를 작성할 때 따라야 할 규칙이다.
+차량 운행일지 앱의 코드를 작성·수정할 때 따르는 규칙. `scripts/gemini-pr-review.ts`의 ALWAYS_RULES라 **모든 PR 리뷰 프롬프트에 항상 주입**된다.
+
+> **이 문서의 원칙** — 파일 목록·디렉터리 트리를 여기에 적지 않는다. "어디를 보라"까지만 적고 "무엇이 있나"는 코드가 답한다. 목록은 반드시 낡고, 낡은 목록은 리뷰마다 틀린 전제를 주입한다.
 
 ---
 
-## 1. 프로젝트 구조
+## 1. 파일 위치 결정
 
-```
-src/
-├── components/
-│   ├── auth/           ← 인증 관련 (LoginPage, InviteCodePage 등)
-│   ├── superAdmin/     ← 슈퍼관리자 전용 화면
-│   ├── admin/          ← 기관관리자 전용 화면
-│   ├── employee/       ← 직원 전용 화면
-│   └── common/         ← 역할 공용 컴포넌트
-├── hooks/              ← React 커스텀 훅 (아래 주요 훅 목록 참고)
-├── lib/                ← 유틸리티 & 서비스
-│   ├── firebase.ts     ← Firebase 초기화 (app, auth, db, storage)
-│   ├── firebaseAuth.ts ← Firebase Auth 헬퍼 (토큰 재발급 등)
-│   ├── firestore/      ← Firestore CRUD 함수 (도메인별 분리)
-│   ├── auth.ts         ← 인증 유틸리티
-│   ├── authFetch.ts    ← 인증된 fetch 래퍼 (토큰 자동 첨부)
-│   ├── constants.ts    ← 공유 상수 (차량 아이콘, 색상 등)
-│   ├── dateUtils.ts    ← 날짜 포맷·계산 헬퍼
-│   ├── tmap.ts         ← Tmap API 연동
-│   ├── ocr.ts          ← OCR Cloud Function 호출
-│   ├── pdfExport.ts    ← 운행일지 PDF 내보내기
-│   ├── pdfStyles.ts    ← PDF 공통 스타일
-│   ├── dailyLogPdfExport.ts ← 일일 운행일지 PDF
-│   ├── fuelLogPdfExport.ts  ← 주유 기록 PDF
-│   ├── hipassChargePdfExport.ts ← 하이패스 충전 PDF
-│   ├── maintenancePdfExport.ts  ← 정비 기록 PDF
-│   ├── excelExport.ts  ← Excel 내보내기
-│   ├── emailService.ts ← EmailJS 연동
-│   ├── holidayApi.ts   ← 공휴일 API
-│   ├── holiday.ts      ← 공휴일 헬퍼
-│   ├── inAppBrowser.ts ← 인앱 브라우저 감지·안내
-│   ├── sentry.ts       ← Sentry 초기화
-│   ├── lazyWithRetry.ts← Lazy loading 재시도 유틸
-│   ├── offlineQueue.ts ← 오프라인 큐 (PWA 지원)
-│   ├── tokenRefresh.ts ← 토큰 갱신 유틸
-│   ├── vehicleUtils.ts ← 차량 유틸리티
-│   ├── timelineUtils.ts← 타임라인 유틸리티
-│   ├── faqData.ts      ← FAQ 데이터
-│   ├── manualSections.ts← 사용 설명서 섹션 데이터
-│   └── releaseNotes.ts ← 릴리스 노트 데이터
-├── contexts/           ← React Context (ConfirmContext, ThemeContext, FontSizeContext)
-├── index.css           ← TailwindCSS + 커스텀 스타일
-├── App.tsx             ← 역할별 라우팅 (로그인 사용자: appEntry 경유)
-├── appEntry.tsx        ← 로그인 사용자용 전체 앱 엔트리 (App.tsx 렌더)
-├── lightEntry.tsx      ← 비로그인 사용자용 경량 엔트리 (랜딩/로그인만)
-└── main.tsx            ← React 엔트리 (인증 여부로 appEntry/lightEntry 분기)
-```
+디렉터리별 역할은 [CLAUDE.md](../../CLAUDE.md)의 '디렉토리 컨벤션' 절이 단일 원본이다. 새 파일의 위치는 다음 기준으로 정한다.
 
-### 파일 위치 결정 기준
-- **역할 전용 화면** → `components/{role}/`에 생성
-- **2개 이상 역할에서 사용** → `components/common/`
-- **데이터 접근 함수** → `lib/firestore/해당도메인.ts`에 추가
-- **새 커스텀 훅** → `hooks/`에 생성
-- **외부 API 연동** → `lib/`에 별도 파일
-
-### 1.1 커스텀 훅(Custom Hooks) 사용 기준
-
-- 컴포넌트 내 상태(State) 로직이 복잡해질 경우, 반드시 `src/hooks/` 내부의 커스텀 훅으로 분리한다.
-- 현재 정의되어 있는 주요 훅 목록 및 용도:
-  - `useAuth`: 현재 사용자 정보(Current User) 및 인증 상태(Authentication State) 관리.
-  - `useToast`: 공통 Toast 메시지 팝업 트리거 및 상태 관리.
-  - `useReservations`: Firestore 예약 데이터 구독 및 조회 (현재 로그인한 사용자 관련 데이터 위주).
-  - `useVehicles`: 전체/소속 기관(Organization)의 차량 정보 로드 및 상태 관리.
-  - `useOrganizations`: 사용자 소속 기관 목록 및 활성 기관 상태 관리.
-  - `useReservationCalendar`: 예약 달력, 월별 탐색 및 캘린더 UI 렌더링 상태 분리.
-  - `useNotification`: 알림(Notification) 읽음 처리 및 상태 관리.
-
-- **규칙**: 컴포넌트에서는 UI 렌더링에 집중하고, 복잡한 데이터 로딩이나 변환 로직은 위 훅들을 재사용하거나 신규 훅을 생성하여 위임한다.
-
-### 주요 커스텀 훅 목록
-| 훅 | 역할 |
+| 무엇을 추가하나 | 어디에 |
 |---|---|
-| `useAuth` | 인증 상태 + 사용자 정보 (전역 Context) |
-| `useToast` | 토스트 알림 표시 (전역 Context) |
-| `useAdminBadges` | 관리자 사이드바 배지 실시간 구독 |
-| `useTodayDashboard` | 오늘 대시보드 데이터 (예약·운행 현황) |
-| `useReservationCalendar` | 예약 캘린더 로직 |
-| `useDriveLogForm` | 운행일지 작성 폼 로직 |
-| `useDriveLogOcr` | 운행일지 OCR 관련 로직 |
-| `useMonthlyReport` | 월간 보고서 데이터 |
-| `useAnalytics` | 분석 대시보드 데이터 |
-| `useVehicleManager` | 차량 관리 CRUD |
-| `useVehicleHistory` | 차량별 이용 내역 조회 |
-| `useEmployeeManager` | 직원 관리 CRUD |
-| `useMaintenanceLog` | 차량 정비 기록 |
-| `useSettings` | 기관 설정 관리 |
-| `useNotification` | FCM 푸시 알림 토큰 관리 |
-| `useOrgApplication` | 기관 신청 폼 로직 |
-| `useQuickDriveStart` | 예약 없이 바로 운행 시작 |
-| `useBackButton` | 모바일 뒤로가기 처리 |
-| `useForceLightMode` | 랜딩/인증 페이지 강제 라이트 모드 |
-| `useOrientationLock` | 화면 회전 잠금 (PDF 출력 시 가로 모드) |
-| `useRetry` | 재시도 로직 (에러 시 자동 재시도) |
-| `useTimelineDrag` | 타임라인 드래그 로직 |
-| `useDailyLog` | 일일 운행일지 관리 |
-| `useFuelLog` | 주유 기록 관리 |
-| `useFuelLogAdmin` | 주유 기록 관리자 기능 |
-| `useHipassCharge` | 하이패스 충전 기록 관리 |
-| `useHipassChargeAdmin` | 하이패스 충전 관리자 기능 |
-| `useHipassManager` | 하이패스 단말기 관리 CRUD |
-| `useVehiclePriority` | 차량 우선순위 관리 |
+| 역할 전용 화면 | `src/components/` 아래 역할 디렉터리 — 역할 경계를 넘지 않는다 |
+| 2개 이상 역할이 쓰는 컴포넌트 | `src/components/common/` |
+| 데이터 접근 함수 | `src/lib/firestore/`의 해당 도메인 파일 (§3.1) |
+| Firestore 문서 필드 | `src/schemas/` (Zod 단일 원본) — `src/types/`에서 문서 인터페이스를 새로 선언하지 않는다 |
+| 커스텀 훅 | `src/hooks/` |
+| 외부 API 연동 | `src/lib/`에 별도 파일 |
+| 전역 UI 상태 | `src/store/` (Zustand) |
 
-> ✅ 새 기능 추가 시 **기존 훅과 역할이 겹치지 않는지** 먼저 확인한다.
+> ✅ 새 훅·컴포넌트를 만들기 전에 **기존과 역할이 겹치지 않는지** 먼저 확인한다. 훅이 많아 중복 생성이 흔하다 — 목록은 `src/hooks/` 디렉터리가 답한다.
 
 ---
 
 ## 2. 컴포넌트 작성 규칙
 
-### 2.1 함수 컴포넌트 + named export
-```jsx
-// ✅ 권장
-export default function ComponentName() { ... }
+### 2.1 함수 선언형 default export
 
-// ❌ 비권장
-const ComponentName = () => { ... };
-export default ComponentName;
-```
+컴포넌트는 `export default function ComponentName() { ... }` 형태로 선언한다. 화살표 함수를 변수에 담아 `export default`하는 형태는 지양한다.
 
-### 2.2 파일 내 구조 순서
-```jsx
-// 1. import
-import { useState, useEffect } from 'react';
-import { useAuth } from '../../hooks/useAuth';
-import { getData } from '../../lib/firestore';
+순서 — 파일: import → 상수 → 헬퍼 함수 → 메인 컴포넌트 → 보조 컴포넌트. 컴포넌트 내부: 훅 → 파생 상태(`useMemo`) → 이벤트 핸들러 → 로딩 early return → JSX.
 
-// 2. 상수 (파일 최상단, 컴포넌트 밖)
-const CONSTANTS = [...];
+### 2.2 상태 관리
 
-// 3. 헬퍼 함수 (컴포넌트 밖)
-const helperFunction = (param) => { ... };
-
-// 4. 메인 컴포넌트
-export default function MainComponent() {
-    // 4a. hooks (useAuth, useNavigate, useState, useEffect 순)
-    // 4b. 파생 상태 (useMemo, computed values)
-    // 4c. 이벤트 핸들러 (handle~, on~)
-    // 4d. 로딩 상태 early return
-    // 4e. JSX return
-}
-
-// 5. 보조 컴포넌트 (같은 파일 내)
-function SubComponent({ props }) { ... }
-```
-
-### 2.3 상태 관리
-- **전역 상태**: `useAuth` 컨텍스트 (인증 + 사용자 정보)
-- **로컬 상태**: `useState` (컴포넌트별 UI 상태)
-- **서버 데이터**: `useEffect` + `useState`로 직접 fetch
-- **실시간 구독**: `onSnapshot` 사용 시 반드시 cleanup 반환
-```jsx
-useEffect(() => {
-    const unsubscribe = onSnapshot(query, (snap) => { ... });
-    return () => unsubscribe();
-}, [dependencies]);
-```
+- **인증·사용자 정보**: `useAuth` (React Context)
+- **전역 UI 상태**(토스트·확인 모달·테마·글자 크기): `src/store/`의 Zustand 스토어. **도메인 데이터는 Zustand에 넣지 않는다.**
+- **서버 데이터**: `src/hooks/`의 커스텀 훅이 `src/lib/firestore` 함수를 호출해 로드한다 (`useEffect` + `useState`가 기본). 컴포넌트는 렌더링에 집중하고 로딩·변환 로직은 훅에 위임한다.
+- **로컬 상태**: `useState`
+- **실시간 구독**: `onSnapshot`을 쓰면 `useEffect`에서 반드시 unsubscribe를 cleanup으로 반환한다.
 
 ---
 
 ## 3. Firestore 사용 패턴
 
-### 3.1 CRUD 함수는 `lib/firestore/` 도메인별 파일에 집중
+### 3.1 CRUD 함수는 `src/lib/firestore/` 도메인별 파일에 집중
+
 ```ts
-// ✅ 도메인 파일에서 export (e.g. firestore/vehicles.ts)
-export const getVehicles = async (orgId: string) => { ... };
-export const createReservation = async (data: Record<string, unknown>) => { ... };
-
-// ✅ index.ts에서 re-export
-export { getVehicles } from './vehicles';
-export { createReservation } from './reservations';
-
-// ✅ 컴포넌트에서 import
+// ✅ 도메인 파일에서 export → index.ts에서 re-export → 컴포넌트는 index에서 import
 import { getVehicles, createReservation } from '../../lib/firestore';
 
-// ❌ 컴포넌트에서 직접 Firestore 호출 (지양)
-// (단, 간단한 getDoc 1회 호출은 컴포넌트에서 허용)
+// ❌ 컴포넌트에서 직접 Firestore 호출 (단, 단발성 getDoc 1회는 허용)
 ```
 
 ### 3.2 데이터 비정규화
-- `driveLogs`에는 `driverName`, `vehicleDisplayName` 저장 (JOIN 방지)
-- `reservations`에는 `reservedByName`, `vehicleName` 저장
-- 비정규화된 필드는 원본 변경 시 함께 업데이트
+
+`driveLogs`에 `driverName`·`vehicleDisplayName`, `reservations`에 `reservedByName`·`vehicleName`을 저장해 JOIN을 피한다. 비정규화된 필드는 **원본 변경 시 함께 업데이트**한다.
 
 ### 3.3 조직 격리
-- **모든 쿼리**에 `organizationId` 조건 포함
-- 함수 첫 파라미터로 `orgId` 전달
-- **정적 강제**: tenant-scoped 도메인 파일(`reservations`, `vehicles`, `fuelLogs`, `maintenance`, `hipass`, `hipassCharges`, `dailyLogQueries`, `driveLogs/`)은 커스텀 ESLint 규칙 `local/require-organization-filter`(→ [eslint-rules/require-organization-filter.js](../../eslint-rules/require-organization-filter.js))가 `query()` 함수 본문에 `where('organizationId', ...)`가 없으면 CI lint 게이트에서 차단한다. 의도된 전역 쿼리는 `// eslint-disable-next-line local/require-organization-filter -- <사유>`로 예외 처리.
-- 전역 도메인(`organizations`, `users`, `favorites`, `feedbacks`, `notifications`, `superAdmin`, `statistics` 등)은 조직 격리 대상이 아니므로 규칙 적용 제외.
+
+- **모든 쿼리**에 `organizationId` 조건을 포함하고, 함수 첫 파라미터로 `orgId`를 받는다.
+- **정적 강제**: tenant-scoped 도메인 파일은 커스텀 ESLint 규칙 `local/require-organization-filter`(→ [eslint-rules/require-organization-filter.js](../../eslint-rules/require-organization-filter.js))가 `query()`가 속한 함수 본문에 `where('organizationId', ...)`가 없으면 CI lint 게이트에서 차단한다. **대상 파일 목록의 단일 원본은 `eslint.config.js`의 해당 `files` 글롭**이다.
+- 전역 도메인(기관·사용자·알림 등)은 조직 격리 대상이 아니라 규칙에서 제외된다. 의도된 전역 쿼리는 `// eslint-disable-next-line local/require-organization-filter -- <사유>`로 예외 처리한다.
 
 ### 3.4 에러 처리
-```jsx
-import { useToast } from '../../hooks/useToast';
-const { showToast } = useToast();
 
+```ts
 try {
     await someFirestoreOp();
 } catch (err) {
-    console.error('한글 설명:', err);
+    console.error('한글 설명:', err);   // 로깅은 한글 설명 + err
     showToast('사용자 친화적 에러 메시지', 'error');
 }
 ```
-> ⚠️ 사용자 알림은 `useToast` 훅을 사용한다 (§5.4~5.5 참고).
 
 ---
 
@@ -217,136 +84,64 @@ try {
 
 | 대상 | 규칙 | 예시 |
 |------|------|------|
-| 컴포넌트 파일 | PascalCase | `TodayDashboard.tsx` |
-| 유틸 파일 | camelCase | `firestore.ts`, `holidayApi.ts` |
-| 컴포넌트 함수 | PascalCase | `function TodayDashboard()` |
+| 컴포넌트 파일·함수 | PascalCase | `TodayDashboard.tsx` / `function TodayDashboard()` |
 | 이벤트 핸들러 | `handle` + 동사 | `handleStartDrive`, `handleSubmit` |
-| 상태 변수 | camelCase | `loading`, `todayReservations` |
 | 상태 setter | `set` + 변수명 | `setLoading`, `setTodayReservations` |
 | 상수 | UPPER_SNAKE_CASE | `VEHICLE_COLORS`, `VEHICLE_TYPE_ICONS` |
 | Firestore 함수 | 동사 + 명사 | `getVehicles`, `createReservation` |
-| CSS 클래스 (커스텀) | kebab-case | `glass-card`, `btn-primary`, `driving-badge` |
-| 한글 주석 | 용도 설명 | `// 운행 시작 (예약에서)` |
+| CSS 커스텀 클래스 | kebab-case | `glass-card`, `btn-primary` |
+| 주석 | 한글, 용도 설명 | `// 운행 시작 (예약에서)` |
 
 ---
 
-## 5. 공통 패턴
+## 5. 사용자 상호작용
 
-### 5.1 페이지 구조
-```jsx
-return (
-    <div className="max-w-4xl mx-auto animate-fade-in"> {/* 또는 max-w-lg */}
-        {/* 헤더 영역 */}
-        <div className="flex items-center justify-between mb-6">
-            <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100">페이지 제목</h1>
-            <button className="btn-primary btn-sm">액션 버튼</button>
-        </div>
+### 5.1 확인 다이얼로그 — `useConfirm`
 
-        {/* 콘텐츠 */}
-        <div className="glass-card p-5">
-            ...
-        </div>
-    </div>
-);
-```
-
-### 5.2 로딩 상태
-```jsx
-if (loading) {
-    return (
-        <div className="flex items-center justify-center py-20">
-            <div className="w-8 h-8 spinner" />
-        </div>
-    );
-}
-```
-
-### 5.3 빈 상태
-```jsx
-<div className="glass-card p-8 text-center">
-    <div className="text-4xl mb-3">📋</div>
-    <p className="text-surface-500 dark:text-surface-400 mb-2">데이터가 없습니다</p>
-    <button className="btn-sm btn-primary">생성하기</button>
-</div>
-```
-
-### 5.4 확인 다이얼로그 (useConfirm 훅)
 ```tsx
-import { useConfirm } from '../../contexts/ConfirmContext';
+import { useConfirm } from '../../hooks/useConfirm';
 
 const { confirm } = useConfirm();
-
-// 확인/취소
-const ok = await confirm({
-    message: '정말 삭제하시겠습니까?',
-    title: '삭제 확인',              // 선택
-    confirmText: '삭제',             // 선택 (기본: '확인')
-    confirmColor: 'danger',          // 'primary' | 'danger' | 'warning'
-});
+const ok = await confirm({ message: '정말 삭제하시겠습니까?', confirmColor: 'danger' });
 if (!ok) return;
-
-// ... 삭제 로직 실행
 ```
-> ⛔ **`window.confirm()`, `window.alert()`, `window.prompt()` 절대 사용 금지**
-> - ESLint `no-restricted-globals` 규칙으로 자동 감지됨
-> - 확인/취소 → `useConfirm().confirm()` 훅 사용
-> - 알림 → `useToast().showToast()` 사용
-> - 텍스트 입력 → 별도 모달 또는 폼 UI 구성
 
-### 5.5 알림/토스트
-```ts
-import { useToast } from '../../hooks/useToast';
-const { showToast } = useToast();
-showToast('저장되었습니다', 'success');  // type: 'success' | 'error' | 'info'
-```
-- 커스텀 훅 `useToast`를 사용 (`hooks/useToast.tsx`)
-- `window.alert/confirm/prompt` 금지 — §5.4 참고
+옵션(`title`·`confirmText`·`confirmColor`, 텍스트 입력용 `type: 'input'` 등)의 단일 원본은 `src/store/useConfirmStore.ts`의 `ConfirmOptions`다.
+
+> ⛔ **`window.confirm()`·`window.alert()`·`window.prompt()` 절대 사용 금지** — ESLint `no-restricted-globals`로 차단된다.
+> 확인/취소 → `useConfirm().confirm()` · 알림 → `useToast().showToast()` · 텍스트 입력 → `confirm({ type: 'input' })` 또는 별도 폼 UI.
+
+### 5.2 알림/토스트 — `useToast`
+
+- 컴포넌트: `src/hooks/useToast.ts`의 `useToast().showToast(message, type)` — type은 `'info' | 'success' | 'warning' | 'error'`.
+- 비-React 모듈: `src/lib/notify.ts`의 `notifyUser`.
+- `alert()`·react-hot-toast 금지 (패키지 제거됨).
 
 ---
 
-## 6. 차량 관련 상수 (공유)
+## 6. 차량 표시 상수
 
-프로젝트 전체에서 반복되는 상수들. 새 컴포넌트에서 차량을 표시할 때 동일하게 사용한다:
-
-```js
-const VEHICLE_TYPE_ICONS = { compact: '🚙', sedan: '🚗', van: '🚐', bus: '🚌' };
-
-const VEHICLE_COLORS = [
-    'bg-red-200', 'bg-blue-200', 'bg-yellow-200', 'bg-green-200', 'bg-purple-200',
-    'bg-orange-300', 'bg-cyan-200', 'bg-pink-300', 'bg-indigo-300', 'bg-lime-300',
-];
-
-const getVehicleColor = (id) => {
-    let hash = 0;
-    for (let i = 0; i < id.length; i++) hash = ((hash << 5) - hash) + id.charCodeAt(i);
-    return VEHICLE_COLORS[Math.abs(hash) % VEHICLE_COLORS.length];
-};
-```
-
-> ✅ 이 상수들은 `lib/constants.ts`에 통합되어 있다. 새 컴포넌트에서는 반드시 여기서 import한다.
-> ```js
-> import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
-> ```
+차량 아이콘·색상은 `src/lib/constants.ts`에서 import하고 직접 재정의하지 않는다. 사용 규칙은 [vehicle-color 스킬](../skills/vehicle-color/SKILL.md), 시각 규격은 [design-system §5](design-system.md)가 단일 원본이다.
 
 ---
 
 ## 7. 기술 스택 제약사항
 
-- **React**: 함수 컴포넌트 + Hooks만 사용 (클래스 컴포넌트 금지). React 19 아키텍처에 따라 비동기 폼(Form) 상태 제어 시 `useActionState` 및 `useFormStatus` API의 활용을 권장하며, 무분별한 로컬 비동기 제출 플래그 작성을 금지합니다.
-- **TypeScript**: `any` 타입 사용을 엄격히 금지한다. 타입을 구체적으로 정의하거나 `unknown`을 사용 후 타입 단언/타입 가드를 이용해 처리한다 (`@typescript-eslint/no-explicit-any` 경고 제로화 유지).
-- **TailwindCSS v4**: CSS 기반 설정 사용 (`@import "tailwindcss"`, `@theme`, `@custom-variant`). `@apply`·`@layer`도 사용 가능. v3식 `tailwind.config.js` 신설 금지(설정은 `src/index.css`의 `@theme`로 관리)
-- **라우팅**: React Router v6 (`Routes`, `Route`, `NavLink`, `useNavigate`, `useLocation`)
-- **Firebase**: v9+ Modular SDK (`import { ... } from 'firebase/firestore'`)
-- **빌드**: Vite 7 (HMR, ESM)
-- **Node.js**: v22 필수 (Firebase Functions 호환성 및 ESM 모듈 사용 필수). Cloud Functions(Node 22)에서는 ESM 방식을 준수하여 `import`/`export` 문법을 강제하며, CommonJS(`require`)를 사용하지 않습니다.
+- **React 19**: 함수 컴포넌트 + Hooks만 사용 (클래스 컴포넌트 금지).
+- **TypeScript**: `any` 금지. 구체 타입을 정의하거나 `unknown` + 타입 가드로 처리한다 (`@typescript-eslint/no-explicit-any` 경고 제로 유지).
+- **TailwindCSS v4**: CSS 기반 설정 (`@import "tailwindcss"`, `@theme`, `@custom-variant`). `@apply`·`@layer`도 사용 가능. **v3식 `tailwind.config.js` 신설 금지** — 설정은 `src/index.css`의 `@theme`로 관리한다.
+- **라우팅**: React Router v7 (`Routes`, `Route`, `NavLink`, `useNavigate`, `useLocation`).
+- **Firebase**: v9+ Modular SDK (`import { ... } from 'firebase/firestore'`).
+- **빌드**: Vite 7 (HMR, ESM).
+- **Node.js**: v22 고정. Cloud Functions도 Node 22 + ESM이라 `require` 대신 `import`/`export`를 쓴다.
 
 ---
 
 ## 8. 코드 품질 규칙
 
-1. **불필요한 의존성 금지**: 이미 사용 중인 라이브러리로 해결 가능하면 새 라이브러리를 추가하지 않는다
-2. **한글 커밋 메시지**: 의미 있는 한글로 작성
-3. **console.error**: 에러 로깅 시 한글 설명 포함 (`console.error('로드 실패:', err)`)
-4. **JSX 중복 최소화**: 반복되는 UI 패턴은 함수 또는 서브 컴포넌트로 추출
-5. **하드코딩 금지**: 역할명(`'admin'`, `'employee'`), 이메일(`'ehsheh@gmail.com'`) 등은 상수로 관리
-6. **외부 API (Rate Limit & 캐싱)**: TMap 등 외부 API를 호출할 때는 `429 Too Many Requests` 에러를 방지하고 비용을 절감하기 위해 불필요한 호출을 최소화해야 한다. `localStorage`, 인메모리 캐싱 또는 큐(Queue) 패턴을 적용하여 안정성을 확보한다.
+1. **불필요한 의존성 금지** — 이미 쓰는 라이브러리로 해결되면 새 패키지를 추가하지 않는다.
+2. **한글 커밋 메시지** — Conventional Commits + 한국어 (commitlint 강제).
+3. **console.error에 한글 설명 포함** — `console.error('로드 실패:', err)`.
+4. **JSX 중복 최소화** — 반복 UI는 함수나 서브 컴포넌트로 추출한다.
+5. **하드코딩 금지** — 역할명(`'admin'`, `'employee'`)·매직 넘버는 상수로 관리한다.
+6. **외부 API 호출 절약** — TMap 등은 `429` 방지와 비용 절감을 위해 캐싱(localStorage·인메모리)이나 큐 패턴으로 호출을 최소화한다.
