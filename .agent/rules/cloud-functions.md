@@ -190,16 +190,7 @@ ALIMTALK_PROXY_TOKEN=your-api-token
 
 ## 8. 배포 및 빌드 최적화
 
-```bash
-# 로컬에서 트랜스파일링 수행
-cd functions && npm run build && cd ..
-
-# Functions만 배포
-firebase deploy --only functions
-
-# 특정 함수만 배포
-firebase deploy --only functions:functionName
-```
+배포는 로컬에서 직접 하지 않는다 — **master 푸시 시 CI(Deploy 워크플로)가 수행한다.** 로컬 `firebase deploy`를 병행하면 동일 함수 동시 업데이트 충돌이 발생한다. 긴급 시에만 CI 미실행을 확인하고 [/deploy-functions 워크플로우](../workflows/deploy-functions.md)를 따른다 (Node 22 필수).
 
 ### 8.1 빌드 최적화 규칙
 Cloud Build에서의 이중 빌드로 인한 메모리 부족(OOM) 및 스택 오버플로우를 막기 위해 다음 규칙을 준수한다.

@@ -65,18 +65,17 @@
 |---|---|
 | Firestore 함수 추가 | [firestore-model-pattern](.agent/skills/firestore-model-pattern/SKILL.md) |
 | Cloud Function 추가 (스케줄 포함) | [add-cloud-function](.agent/skills/add-cloud-function/SKILL.md) |
-| Firestore 필드 추가/마이그레이션 | [firestore-model-pattern](.agent/skills/firestore-model-pattern/SKILL.md), [data-migration-script](.agent/skills/data-migration-script/SKILL.md) |
+| Firestore 필드 추가/마이그레이션 | [firestore-model-pattern](.agent/skills/firestore-model-pattern/SKILL.md) (일괄 마이그레이션은 `scripts/migrate*.ts` 실물 스크립트를 본뜬다) |
 | 커스텀 훅 추가 | [add-hook](.agent/skills/add-hook/SKILL.md) |
 | 컴포넌트 추가 | [add-component](.agent/skills/add-component/SKILL.md) |
 | 토글/스위치 등 공용 컨트롤 | [shared-ui-controls](.agent/skills/shared-ui-controls/SKILL.md) |
-| Zod 스키마 추가 | [add-zod-validation](.agent/skills/add-zod-validation/SKILL.md) |
+| Zod 스키마 추가 | [firestore-model-pattern](.agent/skills/firestore-model-pattern/SKILL.md) (문서 스키마는 `src/schemas/`가 단일 원본) |
 | PDF/Excel 내보내기 | [data-export-pattern](.agent/skills/data-export-pattern/SKILL.md) |
-| 카카오 알림톡 | [add-alimtalk](.agent/skills/add-alimtalk/SKILL.md) |
 | 이메일 알림 | [add-email-notification](.agent/skills/add-email-notification/SKILL.md) |
-| 캘린더 연동 | [add-calendar-integration](.agent/skills/add-calendar-integration/SKILL.md) |
+| 카카오 알림톡 | `functions/src/services/alimtalk/` 실물 코드를 본뜬다 (Cafe24 프록시 구조) |
+| 캘린더 연동 | `functions/src/services/calendar/` 실물 코드를 본뜬다 (ADC 인증) |
 | 쿼리 성능 최적화 | [firestore-query-optimization](.agent/skills/firestore-query-optimization/SKILL.md) |
 | Firebase 운영 비용 절감 | [firebase-cost-reduction](.agent/skills/firebase-cost-reduction/SKILL.md) |
-| 분석 이벤트 트래킹 | [add-analytics-tracking](.agent/skills/add-analytics-tracking/SKILL.md) |
 | PWA 기능 추가 | [add-pwa-feature](.agent/skills/add-pwa-feature/SKILL.md) |
 | 다크모드 점검 | [dark-mode-audit](.agent/skills/dark-mode-audit/SKILL.md) |
 | 테스트 작성 | [write-test](.agent/skills/write-test/SKILL.md) |
@@ -87,7 +86,6 @@
 | 업데이트 소식(공지) 작성 | [release-notes](.agent/skills/release-notes/SKILL.md) |
 | 설정 UI 추가 | [settings-ui](.agent/skills/settings-ui/SKILL.md) |
 | 차량 색상 표시 | [vehicle-color](.agent/skills/vehicle-color/SKILL.md) |
-| 대시보드 UI | [dashboard-ui-pattern](.agent/skills/dashboard-ui-pattern/SKILL.md) |
 | 코드 정리 (미사용 코드·패키지) | [code-cleanup](.agent/skills/code-cleanup/SKILL.md) |
 | Gemini OCR 연동 | [gemini-ocr-integration](.agent/skills/gemini-ocr-integration/SKILL.md) |
 

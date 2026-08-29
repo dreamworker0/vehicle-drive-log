@@ -58,29 +58,14 @@ Gemini API 호출은 종량제 비용이 발생하므로, 악의적이거나 비
 
 ## 2. Storage 업로드 보안 규칙 (Security Rules)
 
-사용자가 계기판이나 증빙서류를 업로드할 때, 타 조직 사용자에게 개인정보 및 민감 데이터가 유출되지 않도록 Firebase Storage 경로와 규칙을 강력하게 제한합니다.
+> 정본은 `storage.rules`다. 수정 절차는 [firestore-rules §4](firestore-rules.md) 참고.
 
-### 2.1 디렉토리 격리 구조
-모든 OCR 대상 이미지는 아래와 같이 **조직 ID를 포함하는 격리 경로**에만 업로드될 수 있습니다.
-*   **계기판 이미지**: `organizations/{orgId}/vehicles/{vehicleId}/dashboard_ocr/{fileName}`
-*   **고유번호증/증빙 서류**: `organizations/{orgId}/verifications/{fileName}`
-
-### 2.2 Storage Security Rules 작성 지침
-`storage.rules`에서 타 조직의 사용자가 격리 폴더에 접근하는 것을 완벽히 제한합니다.
-
-```javascript
-rules_version = '2';
-service firebase.storage {
-  match /b/{bucket}/o {
-    // 조직 격리 폴더 규칙
-    match /organizations/{orgId}/{allPaths=**} {
-      // 로그인된 사용자이고, 토큰의 organizationId가 해당 경로의 orgId와 일치하는 경우에만 허용
-      allow read, write: if request.auth != null && 
-                          request.auth.token.organizationId == orgId;
-    }
-  }
-}
-```
+*   **OCR 계기판 이미지는 Storage를 거치지 않는다** — base64로 `ocrDashboard` 콜러블에 직접 전달된다(`src/hooks/useDriveLogOcr.ts`). Storage에 올라가는 것은 OCR 인식 오류 **신고** 이미지뿐이다.
+*   현재 열려 있는 경로는 세 곳뿐이며, 전부 단일 파일 수준(`{fileName}`)으로 좁게 매치한다. 와일드카드(`{allPaths=**}`) 허용 매치는 없다:
+    *   `organizations/{orgId}/{fileName}` — 기관 고유번호증 사본(정부 발급 PII). **읽기는 superAdmin 전용, 클라이언트 쓰기는 전면 차단**(`write: if false`). 업로드는 Admin SDK(`submitOrgApplication`)가, 표시는 단기 서명 URL(`getOrgDocumentUrl`)이 담당한다. org 멤버 직접 읽기는 불필요한 PII 노출 표면이라 **의도적으로 제거됐다 (2026-07-18 보안 재점검 B). 다시 열지 않는다.**
+    *   `feedbacks/ocr-report/{userId}/{fileName}` — OCR 오류 신고 이미지. 본인 폴더만 read/write, 5MB·`image/*` 제한.
+    *   `feedbacks/{userId}/{fileName}` — 일반 피드백 이미지. 동일 제한.
+*   새 업로드 경로가 필요하면 feedbacks 패턴처럼 **소유자 검증 + 크기 + contentType 제한**을 전부 갖춘 좁은 매치로 추가한다.
 
 ---
 

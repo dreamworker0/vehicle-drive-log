@@ -613,3 +613,20 @@
 | **검증** | 전체 빌드(postbuild 게이트 포함) · verify:fast · 하네스 Doctor 0/0 · CI 실측이 로컬과 일치함을 #243 로그로 대조(3338.3 vs 3338.5) |
 | **커밋·PR** | (아래 커밋 참조) |
 | **남는 것** | ① 첫 로드가 좁은 것은 lightEntry/appEntry 분리 덕이다(Phase 169). 그 구조가 무너지면 이 게이트가 먼저 운다 — 의도한 동작이다 ② CSS는 사실상 전량이 첫 로드라 층을 나누지 않았다(라우트 전용은 OrgMapView 15.2KB 하나). 라우트별 CSS가 늘면 다시 봐야 한다 ③ 총량 예산은 이제 회귀 게이트가 아니므로, 코드량이 실제로 문제가 되는지는 별도 지표로 봐야 한다 |
+
+### Phase 180: 하네스가 에이전트를 사고로 유도하고 있었다 — 유해 규칙 4곳 정정·창작 스킬 6종 삭제 🧹🛡️
+
+> 2026-08-29. 하네스 전면 감사(규칙 17개·스킬 27개·인프라를 독립 에이전트 3개로 병렬 조사)에서 "형식은 Doctor가 지키는데 내용은 아무도 안 지킨다"가 드러났다. 6~7월의 `functions/src/` 재편(`core/handlers/services/utils/`)·`shared/` 신설·`src/lib/pdf/` 분리를 규칙·스킬이 못 따라갔고, 일부는 **보안 점검으로 닫은 표면을 다시 열라고 지시**하는 지경이었다. 이번 Phase는 그중 "따르면 사고가 나는" 구간만 제거했다.
+
+| 항목 | 내용 |
+|------|------|
+| **규칙이 보안 표면을 다시 열라 하고 있었다** | `ocr-cost-security` §2와 `firestore-rules` §4가 각각 다른(그리고 둘 다 틀린) storage.rules 구조를 제시했다 — 후자는 "기본 구조"로 `match /{allPaths=**} { allow read, write: if request.auth != null }`를 제시해, 따르면 버킷 전체가 인증 사용자에게 열린다. 실제 `storage.rules`는 기본 거부 + 좁은 경로 3곳뿐이고, `organizations/` PII 경로의 org 멤버 읽기는 **2026-07-18 보안 재점검 B에서 의도적으로 제거된 표면**이다. 두 규칙 모두 실제 구조 요약 + "다시 열지 않는다" 경고로 교체 |
+| **규칙 둘이 서로를 깨고 있었다** | `error-handling` §3이 코드베이스에서 사용 0건인 `Sentry.withScope` + `@sentry/react` **정적 import**를 권장 패턴으로 제시 — 따르면 `src/lib/sentry.ts`의 지연 로딩 설계와 `bundle-size-budget`의 첫 로드 게이트(Phase 179)가 동시에 깨진다. 실제 컨벤션인 `captureError(error, context)` 래퍼(프론트 `src/lib/sentry.ts`·Functions `functions/src/core/sentry.ts`)로 교체 |
+| **존재하지 않는 인프라를 지시** | `design-system` §9.2~9.3이 CSS 변수 4종(`--chart-grid` 등)을 쓰라고 지시했는데 **넷 다 src 전체 grep 0건**. 실제 차트는 컴포넌트별 hex 팔레트 상수다 — 현실을 기술하고 "기존 팔레트 재사용" 규칙으로 교체 |
+| **창작 스킬 6종 삭제** | 코드베이스에 없는 API를 가르치던 스킬을 제거했다(−6): `add-calendar-integration`(2026-07-10 보안 감사로 **삭제된** 사용자별 OAuth의 사용법·제거된 토큰 경로 조회를 지시 — 가장 위험), `add-alimtalk`(실제 Cafe24 프록시와 무관한 가상 빌더), `add-analytics-tracking`(참조 대상 전부 부재), `add-zod-validation`(`firestore-model-pattern`과 정면 충돌하며 틀린 쪽 — PascalCase·`src/types/` 수정 허용), `dashboard-ui-pattern`(참조 파일 부재+일반론), `data-migration-script`(`scripts/migrate*.ts` 4종 실물이 더 나은 레퍼런스). CLAUDE.md 테이블은 실물 코드 포인터로 교체 |
+| **스킬 자기모순·정본 파괴 유도 수정** | ① `firestore-model-pattern` §4 체크리스트 첫 줄이 "`src/types/`에 필드 추가"였다 — §1.1이 금지한 바로 그 행동. `src/schemas/` + `schemaCoverage.test.ts`로 교체 ② `update-faq` §2가 "두 파일 동일 수정"을 강조했는데 실제로는 `shared/faqData.ts` 단일 정본 + re-export 껍데기 2개라, 따르면 정본이 깨진다 ③ `add-email-notification`이 원시 `createTransport` 복붙(+틀린 환경변수명 `SMTP_*`)을 가르쳤다 — 단일화된 `createGmailTransporter()`(`core/mailer.ts`)와 `GMAIL_*`로 교체 ④ `add-cloud-function`의 65줄 디렉터리 트리는 40여 경로 전부 무효 — 7줄 구조 요약 + "기존 파일을 본떠라"로 교체 ⑤ `data-export-pattern` 경로를 `src/lib/pdf/`로 정정, 예시의 `alert()`(D1 위반)를 `notifyUser`로 |
+| **로컬 배포 충돌 해소** | `cloud-functions` §8·`firestore-rules` §5.2·`update-faq` §4·`add-cloud-function` 배포 절이 금지된 로컬 `firebase deploy`를 단서 없이 정상 절차로 제시하고 있었다 — CI 단일 경로 + 긴급 워크플로 링크로 통일 |
+| **eval 정합** | 삭제 스킬의 트리거 케이스 6건 제거(30→24). 베이스라인은 손으로 고치지 않고 **정식 절차로 재측정** — fresh 블라인드 에이전트 판정 24/24, `npm run eval:trigger -- baseline --model=claude-fable-5`로 저장(이전 베이스라인은 history 보존, resultsHash 정합) |
+| **검증** | 하네스 Doctor 13영역 0/0 · `sync:agents` 재생성(스킬 27→21, `.claude/` 포인터 stale 6건 자동 삭제) · 삭제 스킬 참조 전수 grep(코드·테스트 0건) |
+| **커밋·PR** | (아래 커밋 참조) |
+| **남는 것** | ① 이번 부패의 재발 방지는 **Doctor에 본문 백틱 경로 실존 검사를 추가**하는 것이다 — 이번에 찾은 stale 경로 대부분이 그 한 검사로 CI에서 잡혔을 것 ② 감사에서 나온 나머지 권고(규칙 17→10안팎 축약·`coding-conventions` 352→120줄·trigger eval 혼동쌍 케이스·description 트리거 문구 소급)는 별도 Phase ③ 알림톡·캘린더는 이제 스킬 없이 실물 코드 포인터만 남았다 — 패턴이 안정화되면 실패 이력 기반의 새 스킬로 재작성할 가치가 있다 |

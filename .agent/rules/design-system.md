@@ -248,54 +248,13 @@ const VEHICLE_COLORS = [
 
 ### 9.1 차트 색상
 
-커스텀 색상 토큰과 일관되게 사용한다:
+차트 전용 CSS 변수나 공용 팔레트 상수는 **아직 없다.** 각 차트 컴포넌트가 hex 팔레트를 파일 상단 상수로 정의해 쓴다(예: `src/components/admin/TrendCharts.tsx`의 `COLORS`). 새 차트를 추가할 때는:
 
-```js
-const CHART_COLORS = {
-    primary: '#2563eb',    // primary-600 — 주 데이터, 운행 건수 등
-    accent: '#16a34a',     // accent-600 — 긍정 지표, 효율 등
-    amber: '#d97706',      // amber-600 — 경고, 비용 등
-    red: '#dc2626',        // red-600 — 위험, 이상치 등
-    purple: '#9333ea',     // purple-600 — 보조 데이터
-    surface: '#94a3b8',    // surface-400 — 비활성, 그리드 라인
-};
-```
+- **기존 차트 컴포넌트(`TrendCharts.tsx`, `ReportCharts.tsx`)의 팔레트를 복사해 재사용**한다 — 화면마다 다른 색 체계를 만들지 않는다.
+- 시리즈 의미는 기존 관행을 따른다: 파랑(주 데이터), 초록(긍정/효율), 앰버(비용/경고), 빨강(위험/이상치), 보라(보조).
+- 그리드 라인은 `stroke="#e2e8f0"` 관행을 따른다.
 
-### 9.2 차트 공통 설정
-
-```jsx
-<ResponsiveContainer width="100%" height={280}>
-    <BarChart data={data}>
-        <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" />
-        <XAxis
-            dataKey="name"
-            tick={{ fontSize: 12, fill: 'var(--chart-text)' }}
-        />
-        <YAxis tick={{ fontSize: 12, fill: 'var(--chart-text)' }} />
-        <Tooltip
-            contentStyle={{
-                backgroundColor: 'var(--chart-tooltip-bg)',
-                border: '1px solid var(--chart-tooltip-border)',
-                borderRadius: '12px',
-                fontSize: '13px',
-            }}
-        />
-    </BarChart>
-</ResponsiveContainer>
-```
-
-### 9.3 다크 모드 대응
-
-차트는 CSS 변수를 활용하여 다크 모드를 처리한다. `index.css`에 정의된 CSS 변수를 사용한다:
-
-| CSS 변수 | 라이트 | 다크 | 용도 |
-|----------|--------|------|------|
-| `--chart-grid` | `#e2e8f0` | `#334155` | 그리드 라인 |
-| `--chart-text` | `#64748b` | `#94a3b8` | 축 레이블 |
-| `--chart-tooltip-bg` | `white` | `#1e293b` | 툴팁 배경 |
-| `--chart-tooltip-border` | `#e2e8f0` | `#334155` | 툴팁 보더 |
-
-### 9.4 차트 높이 규칙
+### 9.2 차트 높이 규칙
 
 | 컨텍스트 | 높이 |
 |---------|------|

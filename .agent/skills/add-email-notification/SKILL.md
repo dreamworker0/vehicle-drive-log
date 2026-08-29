@@ -9,61 +9,35 @@ description: EmailJS 또는 Nodemailer를 이용해 Cloud Functions에서 이메
 
 ## 1. 라이브러리 선택 기준
 
-- **EmailJS (`@emailjs/nodejs`)**: 템플릿 관리가 외부 UI에서 필요하거나 클라이언트 측 로직과 유사한 연동이 필요할 때 사용 (예: 기관 신청 승인/거절).
-- **Nodemailer (`nodemailer`)**: 단순 텍스트 기반 이메일, 첨부파일 포함 전송, GMail SMTP 등 백엔드 주도적인 이메일 발송이 필요할 때 사용.
+- **Nodemailer + Gmail (기본)**: 새 이메일 발송은 이쪽이다. **직접 `nodemailer.createTransport`를 쓰지 않고** 공용 헬퍼 `createGmailTransporter()`(`functions/src/core/mailer.ts`)를 재사용한다 — 과거 같은 복붙이 5곳에 흩어져 있던 것을 단일화한 것이다.
+- **EmailJS (`@emailjs/nodejs`)**: 기존 사용처는 기관 자동 검증 승인 메일(`functions/src/services/driveLog/verifyHelpers.ts`) 한 곳뿐이다. 외부 UI에서 관리되는 템플릿이 꼭 필요할 때만 고려한다.
 
 ## 2. 구현 패턴
 
-### 2.1 EmailJS 패턴 (`sendRejectionEmail.ts` 등 참조)
+### 2.1 Gmail 패턴 (기본 — `sendRejectionEmail.ts`, `sendFeedbackReply.ts` 등 참조)
 ```typescript
-import emailjs from '@emailjs/nodejs';
+import { createGmailTransporter, isGmailConfigured, systemMailFrom } from "../../core/mailer";
 
-const serviceId = process.env.EMAILJS_SERVICE_ID!;
-const templateId = process.env.EMAILJS_REJECTION_TEMPLATE_ID!;
-const publicKey = process.env.EMAILJS_PUBLIC_KEY!;
-const privateKey = process.env.EMAILJS_PRIVATE_KEY!;
-
-// 이메일 발송
-await emailjs.send(
-    serviceId,
-    templateId,
-    {
-        user_name: '사용자명',
-        user_email: 'target@example.com',
-        rejection_reason: '반려 사유 내용'
-    },
-    {
-        publicKey,
-        privateKey,
-    }
-);
+if (isGmailConfigured()) {
+    const transporter = createGmailTransporter();
+    await transporter.sendMail({
+        from: systemMailFrom(),           // "차량운행일지 시스템" <GMAIL_USER>
+        to: 'target@example.com',
+        subject: '이메일 제목',
+        text: '텍스트 본문',
+        html: '<b>HTML 본문</b>',
+    });
+}
 ```
 
-### 2.2 Nodemailer 패턴
-```typescript
-import * as nodemailer from 'nodemailer';
-
-const transporter = nodemailer.createTransport({
-    service: 'gmail',
-    auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS, // 앱 비밀번호
-    },
-});
-
-await transporter.sendMail({
-    from: '"차량운행일지" <noreply@example.com>',
-    to: 'target@example.com',
-    subject: '이메일 제목',
-    text: '텍스트 본문',
-    html: '<b>HTML 본문</b>',
-});
-```
+### 2.2 EmailJS 패턴 (`verifyHelpers.ts` 참조)
+`EMAILJS_PRIVATE_KEY`는 `defineSecret`(`functions/src/core/params.ts`)으로 주입된다. 새 EmailJS 사용처를 추가하려면 verifyHelpers.ts의 `emailjs.send` 호출을 본뜬다.
 
 ## 3. 환경변수 등록
 
-이메일 연동은 무조건 민감 키(Secret)를 사용하므로 로컬 `.env` 파일과 Cloud Functions 배포 환경 변수에 모두 키를 설정해야 합니다.
-- **예시**: `EMAILJS_SERVICE_ID`, `SMTP_PASS` 등
+이메일 연동은 무조건 민감 키(Secret)를 사용하므로 로컬 `functions/.env`와 배포 환경 양쪽에 키를 설정해야 합니다.
+- **Gmail**: `GMAIL_USER`, `GMAIL_APP_PASSWORD` (앱 비밀번호)
+- **EmailJS**: `EMAILJS_PRIVATE_KEY` (Secret Manager, `defineSecret`)
 - GitHub 배포를 위해 Repository Secrets에도 등록되었는지 확인하세요.
 
 ## 4. 에러 핸들링
