@@ -2,7 +2,8 @@
  * helpers — Cloud Functions 공통 유틸리티
  * 구조화 로깅, HTTP 에러 래퍼, Callable 에러 래퍼
  */
-import type { Request, Response } from "firebase-functions/node_modules/@types/express";
+import type { Response } from "express";
+import type { Request } from "firebase-functions/v2/https";
 import { getAuth } from "firebase-admin/auth";
 import { HttpsError, CallableRequest } from "firebase-functions/v2/https";
 import { captureError, flushSentry } from "../core/sentry";

@@ -5,7 +5,8 @@
  * 자동 처리: region, CORS, wrapHttps, Firebase Auth 인증, IP Rate Limit
  * Rate Limit 값은 Remote Config에서 실시간 조회 (fallback: 기본값)
  */
-import type { Request, Response } from "firebase-functions/node_modules/@types/express";
+import type { Response } from "express";
+import type { Request } from "firebase-functions/v2/https";
 import { onRequest } from "firebase-functions/v2/https";
 import { wrapHttps, verifyAuthToken } from "../utils/helpers";
 import { checkRateLimitBySubject } from "../utils/rateLimit";

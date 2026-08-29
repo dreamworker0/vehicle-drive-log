@@ -10,7 +10,8 @@
  */
 import { onRequest } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import type { Request, Response } from "firebase-functions/node_modules/@types/express";
+import type { Response } from "express";
+import type { Request } from "firebase-functions/v2/https";
 import { SLACK_CLIENT_ID, SLACK_CLIENT_SECRET, SLACK_STATE_SECRET, SLACK_TOKEN_ENC_KEY } from "../../core/params";
 import { oauthV2Access } from "../../services/slack/slackApi";
 import { verifyState } from "../../services/slack/oauthState";

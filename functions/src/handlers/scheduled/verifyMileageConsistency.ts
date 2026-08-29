@@ -1,4 +1,4 @@
-import * as admin from 'firebase-admin';
+import { getFirestore } from 'firebase-admin/firestore';
 import { toKSTDate } from '../../utils/kstDate';
 import { captureWarning } from '../../core/sentry';
 
@@ -105,7 +105,7 @@ export function countMileageGaps(logs: DriveLogLite[]): number {
 }
 
 export async function verifyMileageConsistency(): Promise<void> {
-    const db = admin.firestore();
+    const db = getFirestore();
 
     // 지난달 1일 00:00 (KST) ~ 이번달 1일 00:00 (KST)
     const now = toKSTDate();
