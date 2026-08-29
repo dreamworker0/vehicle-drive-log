@@ -53,7 +53,7 @@
 
 ## 별도 트랙: Functions ESLint 도입 — 완료
 
-루트 `eslint.config.js`에서 `functions`를 통째로 ignore하던 것을 해제하고, Node/ESM 백엔드
+루트 `eslint.config.js`에서 `functions`를 통째로 ignore하던 것을 해제하고, Node 백엔드
 전용 블록을 추가했다(`npm run lint`가 functions까지 커버, `npm run lint:functions`로 단독 실행).
 
 - **규칙 방침(프로젝트 규모 적합)**: `typescript-eslint` recommended 기반.
