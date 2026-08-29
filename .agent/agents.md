@@ -136,6 +136,7 @@ Git 커밋 시 `Husky` + `lint-staged`가 스테이징 파일에 ESLint를 자�
 - [ ] Firestore 문서 필드는 `schemas/`에만 추가 (`types/`는 `z.infer`로 파생) → [firestore-model-pattern](skills/firestore-model-pattern/SKILL.md)
 - [ ] 에러 핸들링 패턴 확인 → [error-handling](rules/error-handling.md)
 - [ ] 인증 토큰 복원력 확인 → [token-auth-resilience](rules/token-auth-resilience.md)
+- [ ] 되돌릴 수 없는 대량 발송이면 순서·2단계 확인 → [cloud-functions §3.5](rules/cloud-functions.md)
 - [ ] 자동 교정 루프 실행 → §2
 
 ### UI 수정 시
@@ -146,6 +147,14 @@ Git 커밋 시 `Husky` + `lint-staged`가 스테이징 파일에 ESLint를 자�
 - [ ] 터치 타겟 최소 48px → D16
 - [ ] 차량 표시 시 → [vehicle-color 스킬](skills/vehicle-color/SKILL.md)
 - [ ] 자동 교정 루프 실행 → §2
+
+### 약관·동의·감사기록 건드릴 때
+
+- [ ] [legal-consent](rules/legal-consent.md) 먼저 읽기 — 이 서비스는 **수탁자**이고, 그 지위가 규칙 대부분의 근거다
+- [ ] 약관·처리방침은 **두 시행일을 함께** 올린다 (`legalVersions.test.ts`가 강제) → [legal-consent §1](rules/legal-consent.md)
+- [ ] 직원에게 개인정보 동의를 받지 않는다 (처리 근거가 동의가 아니다) → [legal-consent §2](rules/legal-consent.md)
+- [ ] 동의 버전값은 **형식만** 검증 — 현행 일치를 강제하면 캐시된 PWA가 가입을 못 한다 → [legal-consent §2.1](rules/legal-consent.md)
+- [ ] 감사·접속기록은 **소급 수정하지 않는다**. 삭제자는 확언하지 않는다 → [legal-consent §3](rules/legal-consent.md)
 
 ### Cloud Functions 추가/수정 시
 

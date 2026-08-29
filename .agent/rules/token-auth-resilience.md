@@ -65,3 +65,18 @@ Cloud Functions 등 백엔드 API를 호출하기 직전에 토큰 만료 여부
 되살리려면 복귀 시점에 `getRedirectResult(auth, browserPopupRedirectResolver)`를 부르는
 주체를 `lightEntry` 경로에 명시적으로 두고(리다이렉트 시작 시 세션 저장소에 표식, 부팅 시
 소비), 프로덕션 왕복을 확인한 뒤 머지한다.
+
+## 7. 구글 로그인은 `prompt: 'select_account'`를 고정한다
+
+`googleProvider`에 `prompt`를 지정하지 않으면, 브라우저에 활성 Google 세션이 **하나뿐일 때 Google이 계정 선택 화면을 건너뛰고** 그 계정으로 바로 인증시킨다. 앱의 `logout()`은 Firebase 세션·오프라인 큐·Firestore 캐시를 지우지만 **Google 쪽 브라우저 세션은 권한 밖이라 지울 수 없다** — 그래서 "다른 계정으로 로그인" 버튼이 실질적으로 동작하지 않았다(구현이력 Phase 127).
+
+```ts
+googleProvider.setCustomParameters({ prompt: 'select_account' });
+```
+
+- `googleProvider`는 `src/lib/firebase.ts`에서 한 번만 만들어지고, `src/lib/auth.ts`의 popup/redirect 분기가 **같은 provider를 공유**하므로 이 한 줄로 양쪽이 함께 덮인다
+- 부수 효과로 **기관 공용 기기**에서 직전 사용자 계정으로 무의식 재로그인되던 것도 막힌다(비용은 재로그인 시 클릭 1회)
+- **`prompt: 'consent'`는 쓰지 않는다** — 매번 동의 화면까지 띄워 과하다
+- 이 설정은 Google이 띄우는 화면만 바꾸므로 리다이렉트 복귀 메커니즘에는 영향이 없다
+- ⚠️ 계정 선택 화면은 **외부 도메인이라 E2E로 검증할 수 없다.** §6과 같은 이유로 실기기 확인이 필요하다
+
