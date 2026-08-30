@@ -10,6 +10,7 @@ import {
 import { db } from '../firebase';
 import { captureError } from '../sentry';
 import { createZodConverter, maintenanceSchema } from '../../schemas';
+import { invalidateCache } from './cache';
 
 // 읽기 경로에 스키마 검증을 건다 (원시 캐스팅 대체 — fuelLogs와 동일한 이유).
 const maintenanceRef = () => collection(db, 'maintenanceRecords').withConverter(createZodConverter(maintenanceSchema));
@@ -59,6 +60,7 @@ export const createMaintenanceRecord = async (data: Record<string, unknown>) => 
                     blockedAt: serverTimestamp(),
                 },
             });
+            invalidateCache('vehicles'); // 차단 상태가 5분 TTL 캐시에 남지 않도록 즉시 무효화
         }
 
         return docRef;
@@ -103,6 +105,7 @@ export const updateMaintenanceRecord = async (recordId: string, data: Record<str
                     }
                 }
             }
+            invalidateCache('vehicles'); // 차단 상태 변경이 5분 TTL 캐시에 남지 않도록 즉시 무효화
         }
     } catch (error) {
         captureError(error as Error, { context: 'updateMaintenanceRecord', recordId, data });
@@ -122,6 +125,7 @@ export const deleteMaintenanceRecord = async (recordId: string, vehicleId: strin
                     await updateDoc(doc(db, 'vehicles', vehicleId), {
                         maintenance: null,
                     });
+                    invalidateCache('vehicles');
                 }
             }
         }
@@ -138,6 +142,7 @@ export const clearVehicleMaintenanceBlock = async (vehicleId: string) => {
         await updateDoc(doc(db, 'vehicles', vehicleId), {
             maintenance: null,
         });
+        invalidateCache('vehicles');
     } catch (error) {
         captureError(error as Error, { context: 'clearVehicleMaintenanceBlock', vehicleId });
         throw error;

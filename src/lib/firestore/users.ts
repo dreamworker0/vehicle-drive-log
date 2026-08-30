@@ -12,6 +12,7 @@ import type { User } from '../../types/user';
 import { createZodConverter, userSchema } from '../../schemas';
 import { captureError } from '../sentry';
 import { actorStamp } from './actorStamp';
+import { cachedQuery, invalidateCache } from './cache';
 
 const userConverter = createZodConverter(userSchema);
 
@@ -70,6 +71,7 @@ export const createUser = async (uid: string, data: Partial<User>) => {
 export const leaveOrganization = async (uid: string) => {
     try {
         await deleteDoc(doc(db, 'users', uid));
+        invalidateCache('members');
     } catch (error) {
         captureError(error, { context: 'leaveOrganization', uid });
         throw error;
@@ -82,21 +84,26 @@ export const updateUser = async (uid: string, data: Partial<User>) => {
     // updateDoc 파라미터로 그대로 사용하되 타입 제한을 Partial<User>로 제한합니다.
     try {
         await updateDoc(doc(db, 'users', uid), { ...data, ...actorStamp() });
+        invalidateCache('members');
     } catch (error) {
         reportUnlessMissing(error, { context: 'updateUser', uid, data });
         throw error;
     }
 };
 
-// 기관 소속 직원 목록 조회
+// 기관 소속 직원 목록 조회 (TTL 5분 캐시 — 11곳에서 독립 호출되어 화면 전환마다
+// 직원 수만큼 read가 반복되던 것을 병합한다. 클라이언트발 변경은 updateUser 등에서
+// invalidateCache('members')로 즉시 무효화되고, 직원 관리 화면은 fetchData가 직접 무효화한다.)
 export const getOrganizationMembers = async (orgId: string) => {
     try {
-        const q = query(
-            collection(db, 'users').withConverter(userConverter),
-            where('organizationId', '==', orgId)
-        );
-        const snap = await getDocs(q);
-        return snap.docs.map(d => d.data());
+        return await cachedQuery(`members:${orgId}`, async () => {
+            const q = query(
+                collection(db, 'users').withConverter(userConverter),
+                where('organizationId', '==', orgId)
+            );
+            const snap = await getDocs(q);
+            return snap.docs.map(d => d.data());
+        }, 300_000);
     } catch (error) {
         captureError(error, { context: 'getOrganizationMembers', orgId });
         throw error;
@@ -152,6 +159,7 @@ export const getOrgMemberCounts = async (orgIds?: string[]): Promise<Record<stri
 export const restoreUser = async (uid: string): Promise<void> => {
     try {
         await updateDoc(doc(db, 'users', uid), { status: 'active', disabledAt: null, ...actorStamp() });
+        invalidateCache('members');
     } catch (error) {
         reportUnlessMissing(error, { context: 'restoreUser', uid });
         throw error;
@@ -166,6 +174,7 @@ export const clearUserOrganization = async (uid: string): Promise<void> => {
             role: 'employee',
             ...actorStamp(),
         });
+        invalidateCache('members');
     } catch (error) {
         captureError(error, { context: 'clearUserOrganization', uid });
         throw error;

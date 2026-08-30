@@ -17,6 +17,9 @@ export const NOTIF_TYPE_LABELS: Record<string, string> = {
     reservation_cancelled: '예약 취소',
     reservation_changed: '예약 변경',
     reservation_cancelled_maintenance: '정비 취소',
+    reservation_approved: '예약 승인',
+    reservation_rejected: '예약 거절',
+    insurance_expiry_warning: '보험 만료',
     drive_log_reminder: '운행일지 알림',
     no_show_reminder: '노쇼 알림',
     approval: '승인',
@@ -24,6 +27,7 @@ export const NOTIF_TYPE_LABELS: Record<string, string> = {
     maintenance: '정비 알림',
     drive: '운행 알림',
     system: '시스템',
+    other: '기타', // 서버 캐시가 타입별 count 집계로 전환되면서 미등록 타입은 'other'로 귀속됨
 };
 
 export const NOTIF_TYPE_COLORS: Record<string, string> = {
@@ -34,6 +38,9 @@ export const NOTIF_TYPE_COLORS: Record<string, string> = {
     reservation_cancelled: '#ef4444',
     reservation_changed: '#f97316',
     reservation_cancelled_maintenance: '#dc2626',
+    reservation_approved: '#16a34a',
+    reservation_rejected: '#f43f5e',
+    insurance_expiry_warning: '#d946ef',
     drive_log_reminder: '#10b981',
     no_show_reminder: '#3b82f6',
     approval: '#6b7280',
@@ -41,6 +48,7 @@ export const NOTIF_TYPE_COLORS: Record<string, string> = {
     maintenance: '#eab308',
     drive: '#22c55e',
     system: '#64748b',
+    other: '#94a3b8',
 };
 
 /* ── 헬퍼 함수 ── */

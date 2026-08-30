@@ -1,7 +1,7 @@
 /**
  * refreshDashboardStats.test.ts
  * - 대시보드 통계 수동 갱신 onCall 함수 단위 테스트
- * - 핵심 회귀 대상: 5분 쿨다운(연타·다중 superAdmin 동시 클릭 → 수만 read 풀스캔 중복 방지),
+ * - 핵심 회귀 대상: 30분 쿨다운(연타·다중 superAdmin 동시 클릭 → 대량 read 풀스캔 중복 방지),
  *   시계 스큐·잘못된 값에서의 fail-open(재집계 허용)
  * - Firebase Admin Firestore·재집계 서비스는 mock 처리
  */
@@ -78,24 +78,24 @@ describe('refreshDashboardStats — 대시보드 수동 갱신 쿨다운', () =>
         expect(result).toEqual({ success: true, skipped: false });
     });
 
-    it('쿨다운(5분) 내 재요청이면 재집계를 생략하고 남은 대기 시간을 반환한다', async () => {
-        const twoMinAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-        mockStatsGet.mockResolvedValue(statsSnap(twoMinAgo));
+    it('쿨다운(30분) 내 재요청이면 재집계를 생략하고 남은 대기 시간을 반환한다', async () => {
+        const tenMinAgo = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+        mockStatsGet.mockResolvedValue(statsSnap(tenMinAgo));
 
         const result = await handler(SUPER_ADMIN_REQ);
 
         expect(mockCompute).not.toHaveBeenCalled();
         expect(result.success).toBe(true);
         expect(result.skipped).toBe(true);
-        expect(result.lastUpdatedAt).toBe(twoMinAgo);
-        // 5분 - 2분 경과 = 약 3분(±수 초) 남음
-        expect(result.retryAfterSec).toBeGreaterThan(170);
-        expect(result.retryAfterSec).toBeLessThanOrEqual(180);
+        expect(result.lastUpdatedAt).toBe(tenMinAgo);
+        // 30분 - 10분 경과 = 약 20분(±수 초) 남음
+        expect(result.retryAfterSec).toBeGreaterThan(1190);
+        expect(result.retryAfterSec).toBeLessThanOrEqual(1200);
     });
 
     it('쿨다운이 지났으면 재집계를 수행한다', async () => {
-        const sixMinAgo = new Date(Date.now() - 6 * 60 * 1000).toISOString();
-        mockStatsGet.mockResolvedValue(statsSnap(sixMinAgo));
+        const thirtyOneMinAgo = new Date(Date.now() - 31 * 60 * 1000).toISOString();
+        mockStatsGet.mockResolvedValue(statsSnap(thirtyOneMinAgo));
 
         const result = await handler(SUPER_ADMIN_REQ);
 

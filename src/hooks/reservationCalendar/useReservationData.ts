@@ -45,6 +45,12 @@ export function useReservationData({
 
     const { syncVehicleOnDemand, checkCooldown, getLastSyncTime } = useCalendarSync();
 
+    // userData는 useAuth의 onSnapshot이 매 스냅샷마다 새 객체로 갈아끼운다(테마 변경 등 무관한
+    // 필드 쓰기 포함). 객체 자체를 effect 의존성에 두면 그때마다 차량/즐겨찾기/기관/직원 목록을
+    // 통째로 재조회하므로, 실제로 필요한 원시값(uid, organizationId)만 뽑아 의존한다.
+    const uid = user?.uid;
+    const orgId = userData?.organizationId;
+
     // 캘린더 연동 차량 목록 (유효한 구글 캘린더 ID 보유)
     const calendarLinkedVehicles = useMemo(
         () => vehicles.filter(v => v.googleCalendarId && v.googleCalendarId.includes('@')),
@@ -59,7 +65,7 @@ export function useReservationData({
 
     // 초기 데이터 로드
     useEffect(() => {
-        if (!user || !userData?.organizationId) { setLoading(false); return; }
+        if (!uid || !orgId) { setLoading(false); return; }
 
         // 공휴일은 화면을 막지 않는다.
         // Firestore(system/holidays)에 해당 연도가 없으면 외부 공공데이터 API로 폴백하는데,
@@ -78,9 +84,9 @@ export function useReservationData({
             try {
                 setLoading(true);
                 const [vList, fList, org] = await Promise.all([
-                    getVehicles(userData.organizationId!),
-                    getFavorites(user.uid),
-                    getOrganization(userData.organizationId!)
+                    getVehicles(orgId),
+                    getFavorites(uid),
+                    getOrganization(orgId)
                 ]);
                 setVehicles(vList as Vehicle[]);
                 setFavorites(fList as Favorite[]);
@@ -91,7 +97,7 @@ export function useReservationData({
                 // 관리자는 예약자 대리 지정에, 일반 직원은 동승자 선택에 직원 목록이 필요하다.
                 // 동승자 입력을 끈 기관에서는 이 읽기가 늘지 않는다.
                 if (isAdmin || needsMembers) {
-                    const mList = await getOrganizationMembers(userData.organizationId!);
+                    const mList = await getOrganizationMembers(orgId);
                     setMembers(mList as UserDoc[]);
                 }
             } catch (error) {
@@ -106,19 +112,19 @@ export function useReservationData({
 
         // 비차단으로 돌린 공휴일 로드가 언마운트 후 setState하지 않게 한다.
         return () => { holidayCancelled = true; };
-    }, [user, userData, isAdmin, needsMembers, showToast]);
+    }, [uid, orgId, isAdmin, needsMembers, showToast]);
 
     // 예약 목록 로드 함수 분리 (재사용 목적)
     const fetchReservations = useCallback(() => {
-        if (!userData?.organizationId) return;
+        if (!orgId) return;
 
         const start = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
         const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
 
-        getReservationsByDateRange(userData.organizationId, start, end)
+        getReservationsByDateRange(orgId, start, end)
             .then(res => setReservations(res as Reservation[]))
             .catch(err => console.error('Reservation fetch error:', err));
-    }, [currentMonth, userData]);
+    }, [currentMonth, orgId]);
 
     // 예약 목록 로드 (월 변경 시)
     useEffect(() => {

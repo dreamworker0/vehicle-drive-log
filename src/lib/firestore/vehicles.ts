@@ -9,7 +9,9 @@ import type { Vehicle } from '../../types/vehicle';
 import { createZodConverter, vehicleSchema } from '../../schemas';
 import { captureError } from '../sentry';
 
-// 기관 소속 차량 목록 조회 (TTL 30초 캐시 적용)
+// 기관 소속 차량 목록 조회 (TTL 5분 캐시 — 차량은 거의 변하지 않고, 클라이언트발 변경은
+// create/update/delete/retire/restore가 모두 invalidateCache('vehicles')로 즉시 무효화한다.
+// 15곳 이상에서 독립 호출되므로 짧은 TTL은 화면 전환마다 재조회로 이어진다.)
 export const getVehicles = async (orgId: string): Promise<Vehicle[]> => {
     return cachedQuery<Vehicle[]>(`vehicles:${orgId}`, async () => {
         const q = query(
@@ -20,7 +22,7 @@ export const getVehicles = async (orgId: string): Promise<Vehicle[]> => {
         const snap = await getDocs(q);
         // Converter를 통해 검증된 데이터를 바로 반환합니다.
         return snap.docs.map(d => d.data() as Vehicle); // Vehicle 타입과 Zod 스키마의 오차를 보정하기 위해 as Vehicle 하나는 허용하지만, 기존처럼 d.data()에 빈 매핑이 아닙니다. 엄격히는 d.data() 자체를 리턴.
-    });
+    }, 300_000);
 };
 
 // 차량 등록

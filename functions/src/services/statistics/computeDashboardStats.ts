@@ -10,7 +10,7 @@ import {
     computeFunnelData, computeOrgSizeDistribution,
     assembleFuelTypeStats, assembleVehicleTypeStats, assembleModelStats,
     computeReservationStats,
-    computeFuelHipassDaily, computeNotificationStats,
+    computeFuelHipassDaily, computeNotificationStats, KNOWN_NOTIF_TYPES,
 } from "./dashboardSections";
 
 /**
@@ -39,29 +39,57 @@ export async function computeAllDashboardStats(): Promise<void> {
     const sevenDaysAgo = new Date(Date.now() - 6 * 24 * 60 * 60 * 1000);
     const prevMonth = month === 0 ? 11 : month - 1;
     const prevYear = month === 0 ? year - 1 : year;
-    // 전달 1일: 현재월·전월 비교 통계를 커버하는 최소 범위 (~45일)
-    const prevMonthStart = new Date(prevYear, prevMonth, 1);
     // 당월/전월 경계 (date 문자열 비교용 — loadFuelHipassStats와 동일 규약)
     const curMonthStartStr = `${year}-${String(month + 1).padStart(2, "0")}-01`;
     const curMonthEndStr = `${year}-${String(month + 1).padStart(2, "0")}-31`;
     const prevMonthStartStr = `${prevYear}-${String(prevMonth + 1).padStart(2, "0")}-01`;
     const prevMonthEndStr = `${prevYear}-${String(prevMonth + 1).padStart(2, "0")}-31`;
+    // driveLogs 스캔 시작점: 30일 차트와 당월 통계를 모두 커버하는 최소 창 (~30-31일).
+    // 전월 통계는 원본 재스캔 대신 dailyAggregation의 월간 캐시(orgStats/{orgId}/monthly)에서
+    // 읽으므로, 종전 "전월 1일부터"(최대 ~60일) 스캔 대비 read가 절반 이하로 줄어든다.
+    const curMonthStartInstant = new Date(`${curMonthStartStr}T00:00:00+09:00`);
+    const logScanStart = thirtyDaysAgoInstant < curMonthStartInstant ? thirtyDaysAgoInstant : curMonthStartInstant;
+
+    // 알림 30일 일별 창(KST) — 원본 문서 스캔 대신 창별 count() 집계쿼리로 대체한다.
+    // (집계쿼리는 인덱스 엔트리 1,000개당 1 read — 수천 문서 스캔을 ~80 read로 줄인다)
+    const dayWindows: { key: string; start: Date; end: Date }[] = [];
+    for (let i = 0; i < 30; i++) {
+        const d = new Date(thirtyDaysAgo);
+        d.setDate(d.getDate() + i);
+        const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+        const start = new Date(`${dateStr}T00:00:00+09:00`);
+        dayWindows.push({ key: `${d.getMonth() + 1}/${d.getDate()}`, start, end: new Date(start.getTime() + 24 * 60 * 60 * 1000) });
+    }
 
     // 1. 컬렉션 병렬 조회 (driveLogs는 count + 최근 필터로 분리)
     const fuelCol = db.collection("fuelLogs");
     const hipassChargeCol = db.collection("hipassCharges");
     const notifCol = db.collection("notifications");
+
+    // 알림 일별(발송/읽음)·타입별 count 집계쿼리 — 아래 메인 Promise.all과 병렬 실행된다.
+    const dailyNotifPromise = Promise.all(dayWindows.map(async w => {
+        const [sentAgg, readAgg] = await Promise.all([
+            notifCol.where("createdAt", ">=", w.start).where("createdAt", "<", w.end).count().get(),
+            notifCol.where("read", "==", true).where("createdAt", ">=", w.start).where("createdAt", "<", w.end).count().get(),
+        ]);
+        return { date: w.key, sent: sentAgg.data().count, read: readAgg.data().count };
+    }));
+    const typeNotifPromise = Promise.all(KNOWN_NOTIF_TYPES.map(async t => {
+        const agg = await notifCol.where("type", "==", t).where("createdAt", ">=", thirtyDaysAgoInstant).count().get();
+        return { type: t, count: agg.data().count };
+    }));
+
     const [
         orgSnap, userSnap, logCountSnap, recentLogSnap, vehicleSnap, hipassCardSnap, favoriteSnap, pendingAppSnap, reservationSnap,
-        // ALL 스코프 캐시 이관: 주유/하이패스/알림 — 30일 원본 + 요약 집계쿼리 (열람 시 라이브 스캔 대체)
-        fuelRecentSnap, hipassRecentSnap, notifRecentSnap,
+        // ALL 스코프 캐시 이관: 주유/하이패스 — 30일 원본 + 요약 집계쿼리 (열람 시 라이브 스캔 대체)
+        fuelRecentSnap, hipassRecentSnap,
         fuelAllAgg, hipassAllAgg, fuelMonthAgg, hipassMonthAgg, fuelPrevMonthAgg, hipassPrevMonthAgg,
         notifTotalAgg, notifReadAgg,
     ] = await Promise.all([
         db.collection("organizations").get(),
         db.collection("users").get(),
         db.collection("driveLogs").count().get(),
-        db.collection("driveLogs").where("timestamp", ">=", prevMonthStart).get(),
+        db.collection("driveLogs").where("timestamp", ">=", logScanStart).get(),
         db.collection("vehicles").get(),
         db.collection("hipassCards").get(),
         db.collection("favorites").get(),
@@ -69,7 +97,6 @@ export async function computeAllDashboardStats(): Promise<void> {
         db.collection("reservations").where("date", ">=", thirtyDaysAgoStr).get(),
         fuelCol.where("date", ">=", thirtyDaysAgoStr).get(),
         hipassChargeCol.where("date", ">=", thirtyDaysAgoStr).get(),
-        notifCol.where("createdAt", ">=", thirtyDaysAgoInstant).get(),
         fuelCol.aggregate({ totalCount: AggregateField.count(), totalCost: AggregateField.sum("fuelCost") }).get(),
         hipassChargeCol.aggregate({ totalCount: AggregateField.count(), totalAmount: AggregateField.sum("chargeAmount") }).get(),
         fuelCol.where("date", ">=", curMonthStartStr).where("date", "<=", curMonthEndStr)
@@ -83,6 +110,28 @@ export async function computeAllDashboardStats(): Promise<void> {
         notifCol.count().get(),
         notifCol.where("read", "==", true).count().get(),
     ]);
+
+    // 1.2. 전월 통계 — driveLogs 원본 재스캔 대신 dailyAggregation이 매일 갱신하는
+    // 월간 캐시(orgStats/{orgId}/monthly/{YYYY-MM})를 기관당 1 read로 읽는다.
+    // 전월은 마감된 달이라 캐시가 최종본이며, 문서가 없는 기관(신규·미집계)은 0으로 취급한다.
+    const prevMonthKey = `${prevYear}-${String(prevMonth + 1).padStart(2, "0")}`;
+    const monthlyRefs = orgSnap.docs.map(d => db.doc(`orgStats/${d.id}/monthly/${prevMonthKey}`));
+    const monthlySnaps = monthlyRefs.length > 0 ? await db.getAll(...monthlyRefs) : [];
+    const prevMonthByOrg: Record<string, { logs: number; distance: number; driverUids: string[] }> = {};
+    monthlySnaps.forEach((snap, i) => {
+        if (!snap.exists) return;
+        const data = snap.data() as {
+            monthlyTotal?: { count?: number; distance?: number };
+            driverStats?: Record<string, unknown>;
+        };
+        prevMonthByOrg[orgSnap.docs[i].id] = {
+            logs: data.monthlyTotal?.count || 0,
+            distance: data.monthlyTotal?.distance || 0,
+            driverUids: Object.keys(data.driverStats || {}),
+        };
+    });
+
+    const [dailyNotifStatsAll, knownTypeCounts] = await Promise.all([dailyNotifPromise, typeNotifPromise]);
 
     // 1.5. 사전 분류 (O(N+M) 최적화를 위해 기관별로 문서 분배)
     const userByOrg = groupByOrg(userSnap.docs);
@@ -110,7 +159,6 @@ export async function computeAllDashboardStats(): Promise<void> {
         const { userFavoritesMap, withFavCount } = computeFavoriteUsers(favoriteSnap, currentUserDocs, orgFilterId);
 
         // ── 5. 운행일지 집계 (메인 루프) ──
-        let totalDistance = 0;
         const dailyInputMap: Record<string, { ocr: number; manual: number }> = {};
         const dailyDriveMap: Record<string, number> = {};
         const dailyActiveUserMap: Record<string, Set<string>> = {};
@@ -121,9 +169,16 @@ export async function computeAllDashboardStats(): Promise<void> {
         const heatGrid = Array.from({ length: 7 }, () => Array(24).fill(0) as number[]);
         const wauSet = new Set<string>();
 
-        let monthLogs = 0, monthDistance = 0, prevLogs = 0, prevDistance = 0;
+        let monthLogs = 0, monthDistance = 0;
         const monthActiveUsers = new Set<string>();
-        const prevMonthActiveUsers = new Set<string>();
+
+        // 전월 통계는 스캔이 아니라 월간 캐시에서 합산 (ALL 스코프는 전 기관 합, 기관 필터는 해당 기관만)
+        const prevEntries = orgFilterId
+            ? (prevMonthByOrg[orgFilterId] ? [prevMonthByOrg[orgFilterId]] : [])
+            : Object.values(prevMonthByOrg);
+        const prevLogs = prevEntries.reduce((s, e) => s + e.logs, 0);
+        const prevDistance = prevEntries.reduce((s, e) => s + e.distance, 0);
+        const prevMonthActiveUsers = new Set(prevEntries.flatMap(e => e.driverUids));
 
         const dateKeys: string[] = [];
         for (let i = 0; i < 30; i++) {
@@ -147,7 +202,6 @@ export async function computeAllDashboardStats(): Promise<void> {
             const data = doc.data();
             if (orgFilterId && data.organizationId !== orgFilterId) return;
             const dist = computeDistance(data);
-            totalDistance += dist;
 
             if (data.organizationId && approvedOrgMap[data.organizationId]) {
                 const org = approvedOrgMap[data.organizationId];
@@ -170,10 +224,8 @@ export async function computeAllDashboardStats(): Promise<void> {
                 if (kstTsMonth.getFullYear() === year && kstTsMonth.getMonth() === month) {
                     monthLogs++; monthDistance += dist;
                     if (data.driverUid) monthActiveUsers.add(data.driverUid);
-                } else if (kstTsMonth.getFullYear() === prevYear && kstTsMonth.getMonth() === prevMonth) {
-                    prevLogs++; prevDistance += dist;
-                    if (data.driverUid) prevMonthActiveUsers.add(data.driverUid);
                 }
+                // 전월 문서는 여기서 세지 않는다 — 전월치는 월간 캐시(prevMonthByOrg)가 단일 출처
             }
 
             if (!ts || ts < thirtyDaysAgoInstant) return;
@@ -293,7 +345,8 @@ export async function computeAllDashboardStats(): Promise<void> {
         return {
             dashboardStats: {
                 approvedOrgs, totalUsers: userStats.totalUsers, adminCount: userStats.adminCount, employeeCount: userStats.employeeCount,
-                totalLogs: logCountSnap.data().count, totalDistance: Math.round(totalDistance),
+                // totalDistance: 전월 1일 이후 주행거리(당월 스캔 합 + 전월 월간 캐시 합) — 종전 60일 스캔과 동일 범위
+                totalLogs: logCountSnap.data().count, totalDistance: Math.round(monthDistance + prevDistance),
                 pendingApps: orgFilterId ? 0 : pendingAppSnap.data().count,
                 calendarSyncOrgs: vehicleResult.calendarSyncOrgSet.size, calendarSyncVehicles: vehicleResult.calendarSyncCount,
                 calendarNotSyncVehicles: vehicleResult.calendarNotSyncCount,
@@ -334,10 +387,9 @@ export async function computeAllDashboardStats(): Promise<void> {
     // ── ALL 스코프 전용: 주유/하이패스/알림 사전집계 (기관별 변형 문서에는 넣지 않음 — 기관 필터는 라이브 로더 유지) ──
     const { dailyFuelCost, dailyHipassAmount } = computeFuelHipassDaily(fuelRecentSnap.docs, hipassRecentSnap.docs, thirtyDaysAgoStr, null);
     const { notifSummary, dailyNotifStats, notifTypeCounts } = computeNotificationStats(
-        notifRecentSnap.docs,
+        dailyNotifStatsAll,
+        knownTypeCounts,
         { total: notifTotalAgg.data().count, read: notifReadAgg.data().count },
-        thirtyDaysAgoStr,
-        null,
     );
     const fuelStats = {
         totalCount: fuelAllAgg.data().totalCount,
@@ -377,5 +429,5 @@ export async function computeAllDashboardStats(): Promise<void> {
     }
 
     const elapsed = Date.now() - startTime;
-    console.log(`[computeDashboardStats] 완료: ${elapsed}ms, orgs=${allStats.dashboardStats.approvedOrgs}, logs=${allStats.dashboardStats.totalLogs}(count), recentLogs=${recentLogSnap.size}, users=${allStats.dashboardStats.totalUsers}, fuelDocs=${fuelRecentSnap.size}, hipassDocs=${hipassRecentSnap.size}, notifDocs=${notifRecentSnap.size}, dbWrites=${writeChunks.length}`);
+    console.log(`[computeDashboardStats] 완료: ${elapsed}ms, orgs=${allStats.dashboardStats.approvedOrgs}, logs=${allStats.dashboardStats.totalLogs}(count), recentLogs=${recentLogSnap.size}, users=${allStats.dashboardStats.totalUsers}, fuelDocs=${fuelRecentSnap.size}, hipassDocs=${hipassRecentSnap.size}, prevMonthlyDocs=${monthlySnaps.length}, dbWrites=${writeChunks.length}`);
 }
