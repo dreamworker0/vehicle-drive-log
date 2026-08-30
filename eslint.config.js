@@ -120,6 +120,20 @@ export default defineConfig([
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-empty-object-type': 'off',
       'no-unused-vars': 'off',
+      // firebase-admin 네임스페이스 import 차단.
+      // admin.firestore()·admin.firestore.FieldValue 같은 네임스페이스 접근은 firebase-admin 14가
+      // 제거한다. #253에서 마지막 4곳을 모듈러 API로 옮겨 0건이 됐는데, 다시 스며들면 메이저
+      // 이관이 또 막히므로 그 상태를 정적으로 고정한다.
+      // 서브경로(firebase-admin/app·/firestore·/auth 등)는 정상 경로라 막지 않는다 —
+      // no-restricted-imports의 paths는 정확히 일치하는 specifier만 본다.
+      // 한계: CJS require는 이 규칙이 보지 않는다(소스는 no-require-imports가 이미 막고,
+      // 테스트·스크립트 블록은 그 규칙을 끄므로 거기서는 bare require가 통과한다).
+      'no-restricted-imports': ['error', {
+        paths: [{
+          name: 'firebase-admin',
+          message: "네임스페이스 import 금지 — 'firebase-admin/app'·'firebase-admin/firestore' 등 서브경로 모듈러 API를 쓴다 (firebase-admin 14가 admin.firestore() 네임스페이스 접근을 제거한다).",
+        }],
+      }],
     },
   },
   {
