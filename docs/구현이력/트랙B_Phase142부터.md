@@ -706,3 +706,20 @@
 | **검증** | #253: type-check 0건 · lint · functions 906 테스트 · 산출물 대조 · 프로덕션 배포 성공 후 health 로그 에러 0건 / #254: 프로브 3종 / #255: 이 커밋 자체가 code 분기 검증(`.github/` 변경 → e2e 정상 실행 확인). **이 Phase 기록 PR이 docs-only 분기의 검증**이다 |
 | **커밋·PR** | (아래 커밋 참조) |
 | **남는 것** | ① 메이저 상향 자체는 여전히 막혀 있다 — `firebase-functions-test` peer와 Jest × jose. 업스트림 대응을 기다리거나 `--legacy-peer-deps`·Jest ESM 설정을 감수할지는 별도 판단 ② `.github/dependabot.yml`과 `MAINTAINABILITY_BACKLOG.md`의 (1)·(2) 항목은 이번에 해소됐지만, dependabot 주석 스스로 "이관이 끝날 때 두 항목을 함께 제거한다"고 적어 뒀으므로 그때 정리한다 ③ `ci` 잡(3~4분)은 문서 PR에서도 그대로 돈다 — lint·빌드까지 건너뛰면 판단할 위험이 늘어 이번엔 e2e만 잘랐다 ④ CJS `require('firebase-admin')`는 #254의 규칙이 보지 않는다(소스는 `no-require-imports`가 막지만 테스트·스크립트 블록은 그 규칙을 꺼둔다) |
+
+### Phase 185: 브랜치를 지우려다 3주 묻혀 있던 기능을 찾았다 — 42→0 정리·Sentry 릴리즈 복구 🔍♻️
+
+> 2026-08-30. 원격에 쌓인 브랜치 42개를 정리하려다, **머지 판정 방식 때문에 하마터면 200줄짜리 기능을 조용히 지울 뻔했다.** 정리 자체보다 그 발견이 이 Phase의 내용이다.
+
+| 항목 | 내용 |
+|------|------|
+| **`--merged`를 믿었으면 지웠다** | 이 저장소는 스쿼시 머지라 `git branch --merged`로는 **이미 반영된 브랜치도 전부 "미머지"로 보인다**. 반대로 그 검사를 포기하고 "PR이 있으면 삭제"로 갔다면 위험했다. 그래서 **PR 머지 여부 + 브랜치 마지막 커밋이 머지 시각보다 뒤인지**로 판정했다 — 이 두 번째 조건이 이번 발견을 만들었다 |
+| **1건이 걸렸다** | `claude/cloud-functions-exception-v2mfo4`에 PR #235 머지 **1시간 44분 뒤** 푸시된 커밋 `87e28b3`이 있었다. 별도 PR을 받지 못한 채 3주간 남아 있었고, 10개 파일 200줄에 테스트까지 포함된 완성된 작업이었다. master에 그 기능이 정말 없는지(`release` 설정 grep) 확인한 뒤 보존 대상으로 뺐다 |
+| **나머지 41개의 근거** | 40개는 머지된 PR이 있고 마지막 커밋이 머지 시각보다 앞섬(= 이후 작업 없음). 1개(`claude/app-changes-review-y4jqx9`)는 PR이 없지만 **master의 조상**이라 고유 커밋 0개. 삭제 전 41개의 SHA를 기록해 복구 경로(`git push origin <sha>:refs/heads/<name>`)를 남겼다 |
+| **살린 것 — Sentry 릴리즈 추적(#257)** | Sentry에 릴리즈가 하나도 없어 이슈를 "Resolved in next release"로 닫으려 하면 `Unable to update issues`로 실패했고, 에러가 어느 배포에서 났는지도 알 수 없던 문제다. 프런트·Functions가 **같은 배포 커밋 SHA**를 `release`로 쓰고, 배포 성공 후에만 릴리즈를 남긴다. 소스맵은 배포 빌드에서만 `hidden`으로 만들고 `firebase.json`이 `**/*.map`을 제외한다 |
+| **충돌 1건은 둘 다 살렸다** | `src/lib/sentry.ts`에서 master가 그동안 추가한 `initialScope`(앱 태그)와 이 커밋의 `release`가 같은 자리에서 충돌 — 서로 독립적인 추가라 병합했다 |
+| **배포 후 실측으로 닫았다** | 통과만 보고 넘어가지 않았다. 배포된 번들 `sentry-BvHjkpv3.js`에서 릴리즈 SHA `786e398…`을 **실제로 찾았고**, `sourceMappingURL` 주석 0건, Sentry CLI 스텝은 토큰 미설정이라 설계대로 `skipped`였다. `.map` 요청이 HTTP 200을 반환해 잠깐 유출로 보였으나 **content-type이 `text/html`** — SPA 리라이트가 index.html을 돌려준 것이고 소스맵은 배포되지 않았다. **상태 코드만 봤으면 오판했을 지점** |
+| **토큰은 사용자가 등록했다** | `SENTRY_AUTH_TOKEN`은 에이전트가 다룰 수 없는 값이라 발급·등록 절차만 안내했다. org(`socialprism`)·project(`javascript-react`) 슬러그는 워크플로 기본값과 일치했고, 특히 **Project ID `4510929633869824`가 DSN이 가리키는 프로젝트와 같음**을 확인했다 — 이게 어긋나면 소스맵을 올려도 스택트레이스가 풀리지 않는다 |
+| **검증** | lint · type-check(프런트·functions) · 프런트 1774 · functions 908(새 회귀 2건 포함) · 배포 동일 조건 빌드(소스맵 on)에서 번들 예산 통과·`.map` 145개 생성·`sourceMappingURL` 0건 · 프로덕션 배포 성공 |
+| **커밋·PR** | (아래 커밋 참조) |
+| **남는 것** | ① **Sentry CLI 스텝은 아직 한 번도 성공 실행되지 않았다.** 토큰 등록 후 첫 코드 배포에서 확인해야 한다 — `ci.yml`의 `paths-ignore`(`docs/**`·`**.md`)로 문서 전용 푸시는 CI·배포가 아예 안 뜨므로 회고 문서로는 확인되지 않는다. 수동 배포는 "긴급 우회 경로"라 테스트 용도로 쓰지 않기로 했다 ② Functions가 어느 Sentry 프로젝트로 보고하는지는 `FUNCTIONS_ENV_FILE` 시크릿 안이라 미확인 — 다른 프로젝트면 `SENTRY_PROJECT_FUNCTIONS` 변수가 필요하다. 이번 워크플로는 프런트 `dist/assets`만 업로드하므로 급하지 않다 ③ 브랜치가 다시 쌓이는 것을 막는 장치는 없다. PR 머지 시 자동 삭제(저장소 설정)를 켜면 근본 해결이지만 이번 범위 밖 |
