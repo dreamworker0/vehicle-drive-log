@@ -29,6 +29,14 @@ jobs:
     timeout-minutes: 15
     env:
       TZ: "Asia/Seoul"
+      # 배포되는 커밋 SHA = Sentry 릴리즈 버전. 프런트(VITE_SENTRY_RELEASE)와
+      # Functions(functions/.env의 SENTRY_RELEASE)가 **같은 값**을 써야 한 배포가
+      # Sentry에서 하나의 릴리즈로 묶인다.
+      SENTRY_RELEASE_VERSION: ${{ github.event.workflow_run.head_sha || github.sha }}
+      # 토큰 값 자체가 아니라 '설정 여부'만 노출한다 — 스텝 `if`에서는 secrets 컨텍스트를
+      # 쓸 수 없고, 토큰을 잡(job) 전역 env로 두면 모든 스텝에 불필요하게 퍼진다.
+      # 시크릿 미설정 저장소(포크 등)에서는 아래 Sentry 스텝만 조용히 건너뛴다.
+      SENTRY_ENABLED: ${{ secrets.SENTRY_AUTH_TOKEN != '' && 'true' || 'false' }}
 
     steps:
       # CI가 검증한 바로 그 커밋을 배포한다 (workflow_run 사이에 새 푸시가 끼어도 안전)
@@ -52,8 +60,17 @@ jobs:
         run: |
           echo "${{ secrets.ENV_FILE }}" > .env
           echo "${{ secrets.FUNCTIONS_ENV_FILE }}" > functions/.env
+          # Functions 런타임에 릴리즈를 알린다 (functions/src/core/sentry.ts가 읽는다).
+          # 시크릿 파일에 넣지 않고 여기서 덧붙이는 이유: 값이 배포마다 달라진다.
+          echo "SENTRY_RELEASE=${SENTRY_RELEASE_VERSION}" >> functions/.env
 
       - name: Build
+        env:
+          # 프런트 번들에 릴리즈를 새긴다. Vite는 VITE_ 접두사 process.env를 .env보다
+          # 우선해 읽으므로 secrets.ENV_FILE을 건드리지 않고 주입된다.
+          VITE_SENTRY_RELEASE: ${{ env.SENTRY_RELEASE_VERSION }}
+          # 소스맵(hidden) 생성 — Sentry 업로드용. Hosting에는 나가지 않는다(firebase.json ignore).
+          SENTRY_SOURCEMAPS: "1"
         run: npm run build
 
       # CI 성공이 하드 게이트이므로 CI 경유(workflow_run) 배포에선 중복 검증을 생략한다 (~1.5분 절감).
@@ -116,3 +133,39 @@ jobs:
             exit 0
           fi
           exit $CODE
+
+      # 배포가 **성공한 뒤에만** Sentry에 릴리즈를 남긴다. 실패한 배포까지 릴리즈로 잡히면
+      # "이 릴리즈부터 고쳐졌다"는 판단(Resolved in next release)이 어긋난다.
+      #
+      # 이 스텝이 없으면(=토큰 미설정) 이벤트에 실린 release 값으로 Sentry가 릴리즈를
+      # 자동 생성하므로 "다음 릴리즈에서 해결" 자체는 동작한다. 여기서 더 얻는 것은
+      # **소스맵(원본 코드 스택트레이스)**과 **커밋 연결(누가 어떤 변경으로 냈는지)**이다.
+      - name: Sentry 릴리즈 등록 (소스맵·커밋 연결)
+        if: env.SENTRY_ENABLED == 'true'
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG || 'socialprism' }}
+          SENTRY_PROJECT: ${{ vars.SENTRY_PROJECT || 'javascript-react' }}
+          # Functions가 다른 Sentry 프로젝트로 보고한다면 저장소 변수로 지정한다(선택).
+          SENTRY_PROJECT_FUNCTIONS: ${{ vars.SENTRY_PROJECT_FUNCTIONS }}
+        run: |
+          set -e
+          VERSION="$SENTRY_RELEASE_VERSION"
+          CLI="npx --yes @sentry/cli@2"
+          PROJECTS="-p $SENTRY_PROJECT"
+          if [ -n "$SENTRY_PROJECT_FUNCTIONS" ]; then
+            PROJECTS="$PROJECTS -p $SENTRY_PROJECT_FUNCTIONS"
+          fi
+
+          $CLI releases new "$VERSION" $PROJECTS
+
+          # 커밋 연결은 Sentry의 GitHub 연동이 있어야 한다. 없으면 실패하지만 릴리즈 자체는
+          # 이미 만들어졌으므로 배포를 실패시키지 않는다(경고만 남긴다).
+          $CLI releases set-commits "$VERSION" --auto --ignore-missing \
+            || echo "::warning::Sentry 커밋 연결 실패 — GitHub 연동이 없어도 릴리즈·소스맵은 정상 등록됩니다"
+
+          # 번들 URL은 https://<host>/assets/*.js 이므로 아티팩트 이름을 ~/assets/*로 맞춘다.
+          $CLI sourcemaps upload --release "$VERSION" --url-prefix '~/assets' dist/assets
+
+          $CLI releases finalize "$VERSION"
+          $CLI deploys new -r "$VERSION" -e production

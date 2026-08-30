@@ -2,6 +2,15 @@ import { isFirestoreTerminated } from './firestoreLifecycle';
 
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
 
+/**
+ * 릴리즈(배포 커밋 SHA) — 배포 워크플로가 빌드 시 `VITE_SENTRY_RELEASE`로 넣는다.
+ *
+ * 이 값이 없으면 Sentry에 릴리즈 개념이 없어 **"Resolved in next release"가 동작하지 않고**
+ * (릴리즈 미등록 프로젝트에서는 `Unable to update issues`로 실패한다), 에러가 어느 배포에서
+ * 생겼는지도 알 수 없다. 로컬 개발 빌드에서는 비어 있는 게 정상이다.
+ */
+const SENTRY_RELEASE = import.meta.env.VITE_SENTRY_RELEASE;
+
 // @sentry/react(~139KB)를 정적 import하지 않고 initSentry 시점에 동적 로드한다.
 // lightEntry(비로그인) 경로는 initSentry를 호출하지 않으므로 SDK 다운로드 자체가 생략되고,
 // appEntry의 지연 초기화(import('./lib/sentry').then(m => m.initSentry()))가 실제로 지연 효과를 갖는다.
@@ -43,6 +52,8 @@ function initSentryWithModule(Sentry: SentryModule) {
         // 로그인 여부와 무관한 값이라 로그아웃 때 정리되는 user.role·organizationId와 달리
         // 스코프에 처음부터 심어 둔다 — 비로그인 화면에서 난 에러에도 붙어야 한다.
         initialScope: { tags: { app: 'vehicle-drive-log' } },
+        // 값이 없을 때 release: undefined를 넘기지 않도록 조건부로 편다 (SDK 기본 동작 유지)
+        ...(SENTRY_RELEASE ? { release: SENTRY_RELEASE } : {}),
         // 프로덕션 30% 샘플링 (주간 ~5k 샘플 확보, 비용·오버헤드 절감), 개발 시 0%
         tracesSampleRate: import.meta.env.PROD ? 0.3 : 0,
         // 자체 도메인만 트레이스 전파 (외부 API로의 불필요한 헤더 전송 차단)
