@@ -8,6 +8,7 @@ import { useToast } from './useToast';
 import { useConfirm } from './useConfirm';
 import useRetry from './useRetry';
 import { getOrganizationMembers, getOrganization, regenerateInviteCode, updateUser, restoreUser, getPreRegisteredEmployees, addPreRegisteredEmployee, deletePreRegisteredEmployee } from '../lib/firestore';
+import { invalidateCache } from '../lib/firestore/cache';
 import type { User, UserRole, MemberStatus, UnifiedMember } from '../types/user';
 import type { Organization } from '../types/organization';
 import { captureError } from '../lib/sentry';
@@ -55,6 +56,9 @@ export default function useEmployeeManager() {
         if (!orgId) return;
         setLoading(true);
         try {
+            // 직원 관리 화면은 비활성화/영구삭제(Cloud Function 경유) 직후에도 최신 목록이
+            // 보여야 하므로, 5분 TTL 캐시를 무효화하고 항상 서버에서 새로 읽는다.
+            invalidateCache(`members:${orgId}`);
             const [members, org, preReg] = await Promise.all([
                 getOrganizationMembers(orgId),
                 getOrganization(orgId),

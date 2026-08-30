@@ -44,7 +44,7 @@ export default function ServiceDashboard() {
         try {
             const { skipped, retryAfterSec } = await actions.refreshServerStats();
             if (skipped) {
-                const min = retryAfterSec ? Math.ceil(retryAfterSec / 60) : 5;
+                const min = retryAfterSec ? Math.ceil(retryAfterSec / 60) : 30;
                 showToast(`이미 최근에 갱신했습니다. 약 ${min}분 후 다시 시도할 수 있어요.`, 'info');
             } else {
                 showToast('전체 통계를 갱신했습니다.', 'success');

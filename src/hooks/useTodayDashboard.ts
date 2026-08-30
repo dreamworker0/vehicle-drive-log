@@ -7,7 +7,7 @@
 
 import { useState, useMemo, useCallback, use } from 'react';
 import { useAuth } from './useAuth';
-import { getVehicles, getTodayReservations, getWeekReservations, getMyDriveLogs } from '../lib/firestore';
+import { getVehicles, getWeekReservations, getMyDriveLogs } from '../lib/firestore';
 import { toLocalDateStr } from '../lib/dateUtils';
 import { auth as firebaseAuth } from '../lib/firebase';
 import { refreshTokenSilently } from '../lib/tokenRefresh';
@@ -41,12 +41,15 @@ function getDashboardData(orgId: string, uid: string, todayStr: string, weekEndD
     const EMPTY_FALLBACK: [Vehicle[], Reservation[], Reservation[], DriveLog[]] = [[], [], [], []];
 
     // 캐시 미스: 신규 페치
+    // 오늘 예약은 주간(오늘~+7일) 결과의 부분집합이므로 별도 쿼리 없이 파생한다 (read 중복 제거).
+    // 두 함수의 취소 제외 필터가 동일해 getTodayReservations와 결과가 같다.
     const promise = Promise.all([
         getVehicles(orgId),
-        getTodayReservations(orgId, todayStr),
         getWeekReservations(orgId, todayStr, weekEndDate),
         getMyDriveLogs(orgId, uid, 50),
-    ]).then(async (res) => {
+    ]).then(async ([vehicles, week, logs]) => {
+        const today = week.filter(r => r.date === todayStr);
+        const res: [Vehicle[], Reservation[], Reservation[], DriveLog[]] = [vehicles, today, week, logs];
         globalDashboardCache!.data = res;
         return res;
     }).catch(async (err) => {

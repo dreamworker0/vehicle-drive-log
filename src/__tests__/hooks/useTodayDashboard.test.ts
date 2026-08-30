@@ -32,15 +32,14 @@ const mockTodayReservations = [
 ];
 
 const mockGetVehicles = vi.fn().mockResolvedValue(mockVehicles);
-const mockGetTodayReservations = vi.fn().mockResolvedValue(mockTodayReservations);
-const mockGetWeekReservations = vi.fn().mockResolvedValue([]);
+// 오늘 예약은 주간(오늘~+7일) 조회 결과에서 date === 오늘로 파생되므로 주간 목에 함께 넣는다
+const mockGetWeekReservations = vi.fn().mockResolvedValue(mockTodayReservations);
 const mockGetMyDriveLogs = vi.fn().mockResolvedValue([]);
 const mockUpdateReservationStatus = vi.fn().mockResolvedValue({});
 const mockCancelReservation = vi.fn().mockResolvedValue({});
 
 vi.mock('../../lib/firestore', () => ({
     getVehicles: vi.fn().mockImplementation((...args: unknown[]) => mockGetVehicles(...args)),
-    getTodayReservations: vi.fn().mockImplementation((...args: unknown[]) => mockGetTodayReservations(...args)),
     getWeekReservations: vi.fn().mockImplementation((...args: unknown[]) => mockGetWeekReservations(...args)),
     updateReservationStatus: vi.fn().mockImplementation((...args: unknown[]) => mockUpdateReservationStatus(...args)),
     cancelReservation: vi.fn().mockImplementation((...args: unknown[]) => mockCancelReservation(...args)),
@@ -82,7 +81,6 @@ describe('useTodayDashboard', () => {
         });
 
         expect(mockGetVehicles).toHaveBeenCalledWith('org1');
-        expect(mockGetTodayReservations).toHaveBeenCalled();
         expect(mockGetWeekReservations).toHaveBeenCalled();
         expect(result.current?.vehicles).toHaveLength(2);
     });
@@ -110,7 +108,7 @@ describe('useTodayDashboard', () => {
     });
 
     it('운행 중인 예약이 있으면 hasActiveDrive는 true이다', async () => {
-        mockGetTodayReservations.mockResolvedValueOnce([
+        mockGetWeekReservations.mockResolvedValueOnce([
             { id: 'res1', vehicleId: 'v1', reservedByUid: 'testUser', status: 'in_progress', startTime: '09:00', endTime: '12:00', date: '2026-03-04' },
         ]);
 

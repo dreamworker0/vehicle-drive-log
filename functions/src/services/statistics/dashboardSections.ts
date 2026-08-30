@@ -11,7 +11,6 @@ import {
     FIRST_EMPLOYEE_BUCKETS,
     type OrgInfo, type ApprovedOrgData,
 } from "./dashboardHelpers";
-import { getKSTDateString } from "../../utils/kstDate";
 
 // ── 2. 기관 기초 데이터 ──
 
@@ -504,6 +503,21 @@ export function computeFuelHipassDaily(
 
 // ── 11. 알림 집계 (ALL 스코프 캐시 이관) ──
 
+/**
+ * 알림 타입별 count 집계쿼리 대상 목록 — 서버·클라이언트가 생성하는 type 값의 합집합.
+ * 원본 문서를 스캔하지 않으므로 여기 없는 타입은 개별 분류되지 않고,
+ * (30일 발송 총량 − 알려진 타입 합)이 'other'로 귀속된다. 새 타입 추가 시 여기에도 등록할 것.
+ */
+export const KNOWN_NOTIF_TYPES = [
+    "admin_notice", "notice", "system",
+    "reservation_confirmed", "reservation_reminder", "reservation_cancelled",
+    "reservation_changed", "reservation_cancelled_maintenance",
+    "reservation_approved", "reservation_rejected",
+    "drive_log_reminder", "no_show_reminder",
+    "approval", "rejection", "maintenance", "drive",
+    "insurance_expiry_warning",
+] as const;
+
 export interface NotificationStatsResult {
     notifSummary: { total: number; read: number; unread: number; readRate: number };
     dailyNotifStats: { date: string; sent: number; read: number }[];
@@ -512,37 +526,21 @@ export interface NotificationStatsResult {
 }
 
 /**
- * 알림 요약·일별·타입별 집계 (최근 30일, 'M/D' 키).
- * totals(전체/읽음 수)는 호출자가 count 집계쿼리로 구해 주입한다(원본 전체 스캔 방지).
- * createdAt은 Timestamp라 getKSTDateString으로 KST 날짜에 버킷팅 — loadNotificationStats와 패리티.
+ * 알림 요약·일별·타입별 통계 조립 (최근 30일, 'M/D' 키).
+ * 원본 문서 스캔 없이 호출자가 count 집계쿼리로 구한 수치를 조립만 한다:
+ * - dailyNotifStats: KST 일별 창의 발송/읽음 count 결과 (30개, 'M/D' 키)
+ * - typeCounts: KNOWN_NOTIF_TYPES별 30일 count 결과 — 미등록 타입은 'other'로 잔여 귀속
+ * - totals: 전체/읽음 count 집계쿼리 결과
  */
 export function computeNotificationStats(
-    notifDocs: FirebaseFirestore.QueryDocumentSnapshot[],
+    dailyNotifStats: { date: string; sent: number; read: number }[],
+    typeCounts: { type: string; count: number }[],
     totals: { total: number; read: number },
-    thirtyDaysAgoStr: string,
-    orgFilterId: string | null,
 ): NotificationStatsResult {
-    const { map: dailyMap } = buildDailyKeyMap(thirtyDaysAgoStr, () => ({ sent: 0, read: 0 }));
-    const typeMap: Record<string, number> = {};
-
-    notifDocs.forEach(doc => {
-        const data = doc.data();
-        if (orgFilterId && data.organizationId !== orgFilterId) return;
-
-        const t = (data.type as string) || "system";
-        typeMap[t] = (typeMap[t] || 0) + 1;
-
-        const ts = toDate(data.createdAt);
-        if (!ts) return;
-        const kstStr = getKSTDateString(ts);
-        if (kstStr < thirtyDaysAgoStr) return;
-        const [, m, dd] = kstStr.split("-").map(Number);
-        const key = `${m}/${dd}`;
-        if (dailyMap[key]) {
-            dailyMap[key].sent++;
-            if (data.read) dailyMap[key].read++;
-        }
-    });
+    const windowTotal = dailyNotifStats.reduce((s, d) => s + d.sent, 0);
+    const knownSum = typeCounts.reduce((s, t) => s + t.count, 0);
+    const otherCount = Math.max(0, windowTotal - knownSum);
+    const merged = otherCount > 0 ? [...typeCounts, { type: "other", count: otherCount }] : typeCounts;
 
     const { total, read } = totals;
     return {
@@ -551,9 +549,9 @@ export function computeNotificationStats(
             unread: total - read,
             readRate: total > 0 ? Math.round((read / total) * 100) : 0,
         },
-        dailyNotifStats: Object.entries(dailyMap).map(([date, counts]) => ({ date, ...counts })),
-        notifTypeCounts: Object.entries(typeMap)
-            .map(([type, count]) => ({ type, count }))
+        dailyNotifStats,
+        notifTypeCounts: merged
+            .filter(t => t.count > 0)
             .sort((a, b) => b.count - a.count),
     };
 }
