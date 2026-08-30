@@ -46,6 +46,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       functions: ${{ steps.filter.outputs.functions }}
+      code: ${{ steps.filter.outputs.code }}
     steps:
       - uses: actions/checkout@v7
       - name: 변경 경로 감지
@@ -59,6 +60,18 @@ jobs:
               - 'functions/**'
               - 'shared/**'
               - '.github/workflows/ci.yml'
+            # 문서 전용 변경 판별 — **denylist**로 짠다.
+            # "코드가 안 바뀐 것 같으면 건너뛴다"(allowlist)가 아니라 "마크다운만 바뀐 경우에만
+            # 건너뛴다"여야 한다. 전자는 새 코드 디렉터리가 생기면 조용히 미분류되어 E2E 없이
+            # 배포되는 사고를 낸다. 아래 한 줄은 .md가 아닌 파일이 하나라도 바뀌면 code=true가
+            # 되므로, 분류되지 않은 경로·새 확장자가 항상 코드 쪽으로 떨어지는 fail-closed다.
+            # (docs/의 이미지, .agent/의 비-md 파일도 코드로 분류된다 — 안전한 쪽 오분류다.)
+            #
+            # 패턴이 한 줄인 데는 이유가 있다. 필터는 규칙들을 OR로 합치므로
+            # `- '**'` + `- '!**/*.md'`처럼 쓰면 '**'가 모든 파일에 걸려 부정이 상쇄되고
+            # code는 항상 true가 된다(picomatch로 실측 확인). 부정 패턴 하나만 둬야 한다.
+            code:
+              - '!**/*.md'
 
   # 보안 감사 — **독립 잡**이며 npm ci에 의존하지 않는다.
   #
@@ -282,6 +295,15 @@ jobs:
   # 자체 설치·빌드를 한다: 비인증 E2E는 dist/를 vite preview로 서빙하고, 인증 E2E는
   # 에뮬레이터(Java)를 쓴다. 중복 설치 약 1분은 functions에서 회수한 15분에 비하면 작다.
   e2e:
+    needs: changes
+    # 문서만 바뀐 PR에서는 건너뛴다. E2E는 브라우저를 띄워 화면을 검증하는 잡이라
+    # .md·docs/·.agent/ 변경으로는 결과가 달라질 수 없는데 매번 8분을 쓰고 있었다
+    # (2026-08-29 문서 PR 4건에서 e2e에만 33분). `.agent/` 변경의 정합성은 별도
+    # harness 워크플로가 검사하므로 여기서 빠져도 무방하다.
+    #
+    # 조건이 거짓이면 잡은 'skipped'로 보고되고, 브랜치 보호는 skipped를 통과로 본다
+    # — 위 functions-tests가 이미 같은 방식으로 동작한다(문서 PR에서 skipping 표시).
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     # 25분이었다가 40분으로 올렸다. 실제 소요는 9~12분인데, `playwright install --with-deps`가
     # apt에서 OS 의존성을 받아오는 구간이 러너 미러 상태에 따라 20분을 넘긴 적이 있다
