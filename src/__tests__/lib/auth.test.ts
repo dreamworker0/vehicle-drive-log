@@ -73,3 +73,55 @@ describe('logout (2026-07-10 감사 #8 — 공용 기기 잔존 데이터 폐기
         expect(clearOfflineCache).not.toHaveBeenCalled();
     });
 });
+
+/**
+ * 화면에서 보면 "의도한 로그아웃"과 "세션이 저 혼자 사라진 것"이 똑같다 —
+ * 둘 다 onAuthStateChanged(null) 하나로 도착한다. useAuth는 이 표시로 갈라서
+ * 후자만 Sentry에 보고한다(전자까지 보고하면 매 로그아웃마다 이슈가 쌓인다).
+ *
+ * 표시는 모듈 변수 + localStorage 두 겹이라 테스트마다 모듈을 새로 들여온다
+ * (resetModules 없이는 앞 테스트의 표시가 10초 창 안에서 그대로 살아 있다).
+ */
+describe('의도적 로그아웃 표시', () => {
+    beforeEach(() => {
+        vi.resetModules();
+        localStorage.clear();
+        Object.defineProperty(window, 'location', {
+            configurable: true,
+            writable: true,
+            value: { href: '' },
+        });
+    });
+
+    it('표시가 없으면 의도적 로그아웃이 아니다', async () => {
+        const { wasIntentionalLogout } = await import('@/lib/auth');
+        expect(wasIntentionalLogout()).toBe(false);
+    });
+
+    it('logout()은 signOut보다 먼저 표시한다 (발화가 await보다 앞설 수 있다)', async () => {
+        const authModule = await import('@/lib/auth');
+        const { signOut: freshSignOut } = await import('firebase/auth');
+
+        let markedWhenSignOutCalled = false;
+        vi.mocked(freshSignOut).mockImplementationOnce(() => {
+            markedWhenSignOutCalled = authModule.wasIntentionalLogout();
+            return Promise.resolve();
+        });
+
+        await authModule.logout();
+
+        expect(markedWhenSignOutCalled).toBe(true);
+    });
+
+    it('다른 탭이 볼 수 있도록 스토리지에도 남긴다 (한 탭의 로그아웃이 다른 탭을 끌고 간다)', async () => {
+        const { markIntentionalLogout } = await import('@/lib/auth');
+        markIntentionalLogout();
+        expect(localStorage.getItem('vdl:intentional-logout')).not.toBeNull();
+    });
+
+    it('창을 벗어난 옛 표시는 무시한다 (나중의 진짜 세션 소멸을 덮지 않게)', async () => {
+        localStorage.setItem('vdl:intentional-logout', String(Date.now() - 60_000));
+        const { wasIntentionalLogout } = await import('@/lib/auth');
+        expect(wasIntentionalLogout()).toBe(false);
+    });
+});

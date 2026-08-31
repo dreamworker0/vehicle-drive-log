@@ -26,13 +26,16 @@ vi.mock('firebase/firestore', () => ({
 vi.mock('../../lib/tokenRefresh', () => ({
     refreshTokenSilently: vi.fn(),
     refreshToken: vi.fn(),
+    getLastTokenRefreshFailure: vi.fn(() => null),
 }));
 vi.mock('../../lib/auth', () => ({
     handleRedirectResult: vi.fn().mockResolvedValue(null),
     logout: vi.fn(),
+    wasIntentionalLogout: vi.fn(() => false),
 }));
 vi.mock('../../lib/sentry', () => ({
     setSentryUser: vi.fn(),
+    captureError: vi.fn(),
 }));
 // Firestore 종료 상태는 테스트가 직접 뒤집는다 (로그아웃 teardown 재현)
 let firestoreTerminated = false;
@@ -44,7 +47,10 @@ vi.mock('../../lib/firestoreLifecycle', () => ({
 // useAuth를 import하기 전에 mock 설정 완료
 import { AuthProvider, useAuth } from '../../hooks/useAuth';
 import { auth } from '../../lib/firebase';
-import { refreshToken } from '../../lib/tokenRefresh';
+import { refreshToken, getLastTokenRefreshFailure } from '../../lib/tokenRefresh';
+import { wasIntentionalLogout } from '../../lib/auth';
+import { captureError } from '../../lib/sentry';
+import { useToastStore } from '../../store/useToastStore';
 
 function createWrapper() {
     return function Wrapper({ children }: { children: ReactNode }) {
@@ -269,5 +275,83 @@ describe('useAuth — 종료·세션 이탈 후 재구독 차단', () => {
         await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
 
         expect(mockOnSnapshot).toHaveBeenCalledTimes(2);
+    });
+});
+
+/**
+ * 세션이 앱의 지시 없이 사라지는 일이 실제로 있었다(2026-08-31 제보 — 슈퍼관리자 대시보드에서
+ * 로그인 화면으로 튕김). 그때 콘솔에 남은 것은 Firestore의 `permission-denied` 하나뿐이었는데
+ * **그건 세션이 사라진 결과**라 원인을 지목하지 못한다. 유예 확정 지점에서 판별 근거를
+ * 보고하도록 했고, 아래 두 케이스가 그 양면을 고정한다 — 예기치 않은 종료는 보고하고,
+ * 사용자가 스스로 한 로그아웃은 보고하지 않는다(매 로그아웃마다 이슈가 쌓인다).
+ */
+describe('useAuth — 예기치 않은 세션 종료 보고', () => {
+    const authedUser = {
+        uid: 'u1',
+        isAnonymous: false,
+        getIdTokenResult: vi.fn().mockResolvedValue({ claims: {} }),
+    };
+
+    function captureAuthCallback() {
+        let cb: ((u: unknown) => void) | undefined;
+        mockOnAuthStateChanged.mockImplementation((_a: unknown, callback: (u: unknown) => void) => {
+            cb = callback;
+            return vi.fn();
+        });
+        return () => cb!;
+    }
+
+    beforeEach(() => {
+        vi.useFakeTimers();
+        useToastStore.setState({ toasts: [] });
+        vi.mocked(wasIntentionalLogout).mockReturnValue(false);
+        vi.mocked(getLastTokenRefreshFailure).mockReturnValue(null);
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+        useToastStore.setState({ toasts: [] });
+    });
+
+    it('유예가 지나 로그아웃이 확정되면 원인 판별 근거와 함께 보고하고 안내한다', async () => {
+        vi.mocked(getLastTokenRefreshFailure).mockReturnValue({
+            code: 'auth/user-token-expired',
+            fatal: true,
+            at: Date.now(),
+        });
+        const getCb = captureAuthCallback();
+        renderHook(() => useAuth(), { wrapper: createWrapper() });
+
+        await vi.advanceTimersByTimeAsync(0);
+        await act(async () => { getCb()(authedUser); });
+        await act(async () => { getCb()(null); });
+        await act(async () => { await vi.advanceTimersByTimeAsync(2500); });
+
+        expect(captureError).toHaveBeenCalledTimes(1);
+        const [err, ctx] = vi.mocked(captureError).mock.calls[0] as [Error, Record<string, unknown>];
+        expect(err.message).toContain('예기치 않은 세션 종료');
+        expect(ctx.uid).toBe('u1');
+        // 토큰이 무효화된 실패는 그 자체가 로그아웃의 직접 원인이므로 반드시 실려야 한다
+        expect(ctx.tokenRefreshFailure).toMatchObject({ code: 'auth/user-token-expired', fatal: true });
+
+        // 지금까지는 아무 설명 없이 로그인 화면만 떴다
+        expect(useToastStore.getState().toasts).toHaveLength(1);
+        expect(useToastStore.getState().toasts[0].message).toContain('세션이 만료되어');
+    });
+
+    it('사용자가 스스로 로그아웃한 경우에는 보고하지 않는다', async () => {
+        vi.mocked(wasIntentionalLogout).mockReturnValue(true);
+        const getCb = captureAuthCallback();
+        const { result } = renderHook(() => useAuth(), { wrapper: createWrapper() });
+
+        await vi.advanceTimersByTimeAsync(0);
+        await act(async () => { getCb()(authedUser); });
+        await act(async () => { getCb()(null); });
+        await act(async () => { await vi.advanceTimersByTimeAsync(2500); });
+
+        // 로그아웃 자체는 그대로 확정된다 — 보고와 안내만 하지 않는다
+        expect(result.current.user).toBeNull();
+        expect(captureError).not.toHaveBeenCalled();
+        expect(useToastStore.getState().toasts).toHaveLength(0);
     });
 });
