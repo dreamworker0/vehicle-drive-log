@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import { registerSW } from 'virtual:pwa-register';
+import { checkForSwUpdate } from '../../lib/swUpdate';
 
 /** SW 업데이트 체크 간격 (10분) */
 const SW_CHECK_INTERVAL = 10 * 60 * 1000;
@@ -26,7 +27,7 @@ export default function UpdatePrompt() {
                 if (reg) {
                     // 10분마다 주기적 업데이트 체크
                     intervalId = setInterval(() => {
-                        reg.update();
+                        checkForSwUpdate(reg);
                     }, SW_CHECK_INTERVAL);
                 }
             },
@@ -36,7 +37,7 @@ export default function UpdatePrompt() {
         const handleVisibilityChange = () => {
             if (document.visibilityState === 'visible' && registration) {
                 console.debug('[PWA] 탭 복귀 → SW 업데이트 체크');
-                registration.update();
+                checkForSwUpdate(registration);
             }
         };
         document.addEventListener('visibilitychange', handleVisibilityChange);

@@ -4,9 +4,9 @@ import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { doc, onSnapshot, Unsubscribe } from 'firebase/firestore';
 import { auth, db, authReady } from '../lib/firebase';
 import { isFirestoreTerminated } from '../lib/firestoreLifecycle';
-import { refreshTokenSilently, refreshToken } from '../lib/tokenRefresh';
-import { handleRedirectResult } from '../lib/auth';
-import { setSentryUser } from '../lib/sentry';
+import { refreshTokenSilently, refreshToken, getLastTokenRefreshFailure } from '../lib/tokenRefresh';
+import { handleRedirectResult, wasIntentionalLogout } from '../lib/auth';
+import { setSentryUser, captureError } from '../lib/sentry';
 import { useToastStore } from '../store/useToastStore';
 import type { User as UserDoc } from '../types/user';
 import { resolveOrgFeatures, ALL_FEATURES_ON, type OrgFeatures } from '../lib/orgFeatures';
@@ -57,6 +57,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
      * 아직 로그인한 적이 없으면(최초 진입) null 발화는 진짜 비로그인이므로 유예 없이 처리한다.
      */
     const authedUidRef = useRef<string | null>(null);
+
+    /** 세션이 확립된 시각. 예기치 않은 종료를 보고할 때 "얼마나 버텼는지"가 원인을 좁힌다. */
+    const sessionStartedAtRef = useRef<number | null>(null);
+    /** 마지막으로 규칙에 막힌 구독. 세션 소멸과 권한 오류 중 무엇이 먼저였는지 판별에 쓴다. */
+    const lastDeniedRef = useRef<{ scope: 'user' | 'org'; at: number } | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -118,6 +123,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }, waitMs);
         };
 
+        /**
+         * 앱이 지시하지 않은 세션 소멸을 보고하고 사용자에게 알린다.
+         *
+         * **왜 필요한가.** 지금까지 이 구간에 남는 것은 `console.debug` 한 줄뿐이었고
+         * DevTools 기본 수준에서는 그마저 숨겨진다. 그래서 "갑자기 로그아웃됐다"는 제보가
+         * 와도 (a) 토큰이 무효화돼 SDK가 로그아웃시킨 것인지 (b) 브라우저에 저장된 세션이
+         * 밖에서 지워진 것인지 가릴 근거가 없었다. 남는 것은 Firestore의
+         * `permission-denied` 뿐인데 **그건 세션이 사라진 결과**라 원인을 지목하지 못한다.
+         *
+         * 그래서 그 판별에 필요한 것만 함께 실어 보낸다 — 직전 토큰 갱신 실패(fatal 여부),
+         * 세션 지속 시간, 마지막으로 규칙에 막힌 구독, 탭 가시성·온라인 여부.
+         * 의도적 로그아웃은 보고하지 않는다(정상 경로이고, 매 로그아웃마다 이슈가 쌓인다).
+         */
+        const reportUnexpectedSignOut = (uid: string) => {
+            if (wasIntentionalLogout()) return;
+
+            const now = Date.now();
+            const failure = getLastTokenRefreshFailure();
+            const denied = lastDeniedRef.current;
+            const context = {
+                uid,
+                sessionAgeMs: sessionStartedAtRef.current ? now - sessionStartedAtRef.current : null,
+                // fatal이면 이 실패가 로그아웃의 직접 원인이다(SDK가 스스로 signOut 한다).
+                tokenRefreshFailure: failure
+                    ? { code: failure.code, fatal: failure.fatal, agoMs: now - failure.at }
+                    : null,
+                lastPermissionDenied: denied
+                    ? { scope: denied.scope, agoMs: now - denied.at }
+                    : null,
+                visibility: typeof document !== 'undefined' ? document.visibilityState : 'unknown',
+                online: typeof navigator !== 'undefined' ? navigator.onLine : null,
+                hasCurrentUser: !!auth.currentUser,
+            };
+            // captureError는 Error만 콘솔에 찍는다 — 제보자가 콘솔을 보내 주는 경우가 많으므로
+            // 판별 근거도 콘솔에 남긴다(error 수준이라 DevTools 기본 수준에서 보인다).
+            console.error('[Auth] 예기치 않은 세션 종료 — 판별 근거:', context);
+            captureError(new Error('[Auth] 예기치 않은 세션 종료'), context);
+
+            // 지금까지는 아무 설명 없이 로그인 화면만 떴다. 무엇이 일어났는지는 알려 준다.
+            useToastStore.getState().showToast(
+                '세션이 만료되어 로그아웃되었습니다. 다시 로그인해 주세요.',
+                'warning',
+                6000,
+            );
+        };
+
         /** 로그아웃 상태를 화면에 확정 반영한다. */
         const commitSignedOut = () => {
             pauseWatches = null;
@@ -125,6 +176,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (unsubscribeUser) { unsubscribeUser(); unsubscribeUser = null; }
             if (unsubscribeOrg) { unsubscribeOrg(); unsubscribeOrg = null; }
             authedUidRef.current = null;
+            sessionStartedAtRef.current = null;
             setUser(null);
             setUserData(null);
             setUserDocState('pending');
@@ -154,12 +206,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 // 취소되어 사용자는 아무 변화도 보지 않는다(플래시 없음).
                 if (!isAuthed && authedUidRef.current) {
                     if (dropTimer) return; // 이미 유예 중 — 타이머를 뒤로 미루지 않는다
+                    const droppedUid = authedUidRef.current;
                     dropTimer = setTimeout(() => {
                         dropTimer = null;
                         if (cancelled) return;
                         // 유예가 지났는데도 세션이 없으면 진짜 로그아웃이다
                         if (auth.currentUser && !auth.currentUser.isAnonymous) return;
                         console.debug('[Auth] 세션이 유예 안에 돌아오지 않아 로그아웃으로 확정합니다');
+                        // 확정 전에 보고한다 — commitSignedOut이 uid·세션 시각을 지운다.
+                        reportUnexpectedSignOut(droppedUid);
                         commitSignedOut();
                     }, AUTH_DROP_GRACE_MS);
                     return;
@@ -177,6 +232,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     // 플래시로 바뀔 뿐이다 — 이미 판정된 화면을 그대로 두고 리스너만 다시 건다.
                     const sameSession = authedUidRef.current === firebaseUser!.uid;
                     authedUidRef.current = firebaseUser!.uid;
+                    if (!sameSession) sessionStartedAtRef.current = Date.now();
                     setUser(firebaseUser);
                     if (!sameSession) {
                         setUserDocState('pending'); // 새 세션: 문서 로딩 확정 전까지 라우팅 보류
@@ -230,6 +286,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                                                     (err) => {
                                                         console.error('기관 상태 감시 실패:', err);
                                                         const errCode = (err as { code?: string })?.code;
+                                                        // 세션 소멸도 permission-denied를 낳는다 — 어느 쪽이 먼저였는지
+                                                        // 판별하려면 시점이 필요하다(예기치 않은 종료 보고에 실린다).
+                                                        if (errCode === 'permission-denied') {
+                                                            lastDeniedRef.current = { scope: 'org', at: Date.now() };
+                                                        }
                                                         if (errCode === 'permission-denied' && orgRetryCount < 2) {
                                                             if (unsubscribeOrg) { unsubscribeOrg(); unsubscribeOrg = null; }
                                                             const waitMs = 1000 * 2 ** orgRetryCount;
@@ -298,6 +359,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                                 }
                             },
                             (err: { code?: string }) => {
+                                if (err?.code === 'permission-denied') {
+                                    lastDeniedRef.current = { scope: 'user', at: Date.now() };
+                                }
                                 if (err?.code === 'permission-denied' && retryCount < 2) {
                                     // 캐시된 세션의 낡은 토큰일 수 있음 → 토큰 갱신 후 재시도
                                     console.debug(`[Auth] 사용자 데이터 접근 권한 없음 — 토큰 갱신 후 재시도 (${retryCount + 1}/2)`);
