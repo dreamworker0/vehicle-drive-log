@@ -176,9 +176,18 @@ Dependabot이 생성한 PR은 저장소의 Repository Secrets에 직접 접근�
 | `SENTRY_PROJECT` | Variable | 기본값 `javascript-react` |
 | `SENTRY_PROJECT_FUNCTIONS` | Variable (선택) | Functions가 프런트와 같은 Sentry 프로젝트로 보고한다고 가정 |
 
-### 4.3 함정 — 빈 시크릿은 조용히 건너뛴다
+### 4.3 함정 — 빈 값으로 등록된 시크릿
 
-스텝 게이트는 잡 레벨 env `SENTRY_ENABLED: ${{ secrets.SENTRY_AUTH_TOKEN != '' && 'true' || 'false' }}`다. 시크릿을 **빈 값으로 등록**하면 목록에는 이름이 보이는데 게이트가 `false`가 되어 스텝이 `skipped`로 지나간다. 배포는 초록이라 눈치채기 어렵다(2026-08-30~31 배포 3건에서 실제로 발생).
+`gh secret list`와 웹 UI는 **이름만 보여 준다.** 값이 비어 있어도 목록에는 정상으로 보이고, `gh secret set`의 마스킹 프롬프트는 빈 입력을 그대로 저장하면서 `✓ Set`을 찍는다. 그래서 "등록했는데 안 된다"가 성립한다 — 2026-08-30~31에 배포 4건이 이 상태로 지나갔다.
+
+- **등록은 웹 UI에서 한다.** Settings → Secrets and variables → Actions의 입력 칸은 값이 그대로 보이므로 붙여넣기 실패를 눈으로 잡을 수 있다. CLI로 해야 하면 `Read-Host`로 먼저 길이를 확인한 뒤 `--body`로 넘긴다.
+- **값은 누구도 다시 읽을 수 없다.** 대신 갱신 시각으로 "새로 썼는지"는 확인된다.
+
+```bash
+gh secret list
+```
+
+게이트는 `Sentry 릴리즈 게이트 판정` 스텝이 토큰 유무를 보고 output으로 내며, **없으면 `::warning`을 실행 요약에 남긴다.** 잡 레벨 env로 판정하던 시절에는 시크릿 미설정과 빈 값이 똑같이 조용한 `skipped`로 끝나 배포가 초록인 채 소스맵만 계속 빠졌다.
 
 최근 배포에서 이 스텝이 돌았는지 확인한다. `✓`면 성공, `-`면 skipped다.
 
@@ -191,13 +200,6 @@ gh run view <실행ID> -v
 ```
 
 > 파이프·`grep`을 쓰지 않는 형태다. 이 저장소의 주 셸인 PowerShell에는 `grep`이 없고(`Select-String`),
-> `gh run view`에는 `--workflow` 플래그가 없다(그건 `gh run list`용). 잡 로그에서 게이트 값을 직접
-> 봐야 할 때만 `gh run view <실행ID> --log`로 받아 `SENTRY_ENABLED`를 찾는다.
-
-skipped면 토큰을 다시 넣는다. 프롬프트가 값을 마스킹하고 셸 히스토리에도 남지 않는다.
-
-```bash
-gh secret set SENTRY_AUTH_TOKEN
-```
+> `gh run view`에는 `--workflow` 플래그가 없다(그건 `gh run list`용).
 
 토큰 발급·갱신 절차는 [OPERATIONS.md](../../OPERATIONS.md) §5.1.1 참고.
