@@ -11,6 +11,14 @@ export const userSchema = z.object({
     organizationId: z.string().nullable().catch(null),
     organizationStatus: z.string().optional().catch(''),
     theme: z.enum(['light', 'dark']).optional().catch(undefined),
+    /**
+     * 계정 상태. **값을 늘릴 때는 이 enum을 먼저 고친다.**
+     *
+     * `.catch('active')`는 열거에 없는 값을 에러가 아니라 'active'로 **조용히 되돌린다**.
+     * 예컨대 승인 대기 기능을 붙이면서 enum을 안 고치고 status:'pending'을 저장하면,
+     * 저장은 되는데 조회하면 전부 'active'라서 대기자가 활성 사용자로 보인다.
+     * (AuthGuard도 'disabled'만 막으므로 진입 차단까지 함께 무너진다.)
+     */
     status: z.enum(['active', 'disabled']).optional().catch('active'),
     photoURL: z.string().optional().catch(''),
     phone: z.string().optional().catch(''),
