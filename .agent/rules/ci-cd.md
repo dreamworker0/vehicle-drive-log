@@ -151,8 +151,53 @@ Dependabot이 생성한 PR은 저장소의 Repository Secrets에 직접 접근�
 
 ---
 
-## 4. Sentry 소스맵 업로드 (현재 미구성)
+## 4. Sentry 릴리즈 · 소스맵 업로드
 
-프론트엔드 Sentry는 런타임 에러 수집만 구성되어 있고, **빌드 시 소스맵 자동 업로드는 배선되어 있지 않다** (`@sentry/vite-plugin` 미도입).
-- 스택트레이스 원본 매핑이 필요해지면 `@sentry/vite-plugin`을 도입하고 `SENTRY_AUTH_TOKEN`을 CI 시크릿에 등록해야 한다.
-- 그 전까지는 이 섹션이 향후 도입 대상일 뿐, 현재 배포 파이프라인에는 소스맵 업로드 단계가 없다.
+배포 워크플로([.github/workflows/deploy.yml](../../.github/workflows/deploy.yml))가 **배포가 성공한 뒤에만** `@sentry/cli`로 릴리즈를 등록한다. `@sentry/vite-plugin`은 쓰지 않는다 — 빌드 실패가 곧 배포 실패가 되는 것을 피하고, 실패한 배포가 릴리즈로 잡히지 않게 하려고 업로드를 배포 이후 단계로 분리했다.
+
+### 4.1 파이프라인
+
+| 단계 | 무엇을 하나 |
+|---|---|
+| 릴리즈 버전 | 배포 커밋 SHA (`SENTRY_RELEASE_VERSION`). 프런트는 `VITE_SENTRY_RELEASE`, Functions는 `functions/.env`의 `SENTRY_RELEASE`로 **같은 값**을 받아 한 배포가 하나의 릴리즈로 묶인다 |
+| 소스맵 생성 | `SENTRY_SOURCEMAPS=1`일 때만 [vite.config.js](../../vite.config.js)이 `sourcemap: 'hidden'`으로 만든다. 평소 빌드에는 소스맵이 없다 |
+| 업로드 | `sentry-cli sourcemaps upload --url-prefix '~/assets' dist/assets` — 번들 URL이 `https://<host>/assets/*.js`이므로 접두어를 맞춰야 매칭된다 |
+| 커밋 연결 | `releases set-commits --auto`. Sentry의 GitHub 연동이 없으면 이 단계만 경고를 남기고 넘어간다(배포는 실패하지 않는다) |
+| 마감 | `releases finalize` + `deploys new -e production` |
+
+소스맵은 `firebase.json`의 `hosting.ignore`가 `**/*.map`을 제외해 **프로덕션에 배포되지 않는다**(원본 코드 비공개 유지).
+
+### 4.2 필요한 저장소 설정
+
+| 이름 | 종류 | 없으면 |
+|---|---|---|
+| `SENTRY_AUTH_TOKEN` | Secret | 이 스텝만 건너뛴다. 릴리즈 태깅 자체는 이벤트의 `release` 값으로 Sentry가 자동 생성하므로 동작하고, 스택트레이스만 압축된 번들 그대로 남는다 |
+| `SENTRY_ORG` | Variable | 기본값 `socialprism` |
+| `SENTRY_PROJECT` | Variable | 기본값 `javascript-react` |
+| `SENTRY_PROJECT_FUNCTIONS` | Variable (선택) | Functions가 프런트와 같은 Sentry 프로젝트로 보고한다고 가정 |
+
+### 4.3 함정 — 빈 시크릿은 조용히 건너뛴다
+
+스텝 게이트는 잡 레벨 env `SENTRY_ENABLED: ${{ secrets.SENTRY_AUTH_TOKEN != '' && 'true' || 'false' }}`다. 시크릿을 **빈 값으로 등록**하면 목록에는 이름이 보이는데 게이트가 `false`가 되어 스텝이 `skipped`로 지나간다. 배포는 초록이라 눈치채기 어렵다(2026-08-30~31 배포 3건에서 실제로 발생).
+
+최근 배포에서 이 스텝이 돌았는지 확인한다. `✓`면 성공, `-`면 skipped다.
+
+```bash
+gh run list --workflow=deploy.yml --limit 1
+```
+
+```bash
+gh run view <실행ID> -v
+```
+
+> 파이프·`grep`을 쓰지 않는 형태다. 이 저장소의 주 셸인 PowerShell에는 `grep`이 없고(`Select-String`),
+> `gh run view`에는 `--workflow` 플래그가 없다(그건 `gh run list`용). 잡 로그에서 게이트 값을 직접
+> 봐야 할 때만 `gh run view <실행ID> --log`로 받아 `SENTRY_ENABLED`를 찾는다.
+
+skipped면 토큰을 다시 넣는다. 프롬프트가 값을 마스킹하고 셸 히스토리에도 남지 않는다.
+
+```bash
+gh secret set SENTRY_AUTH_TOKEN
+```
+
+토큰 발급·갱신 절차는 [OPERATIONS.md](../../OPERATIONS.md) §5.1.1 참고.
