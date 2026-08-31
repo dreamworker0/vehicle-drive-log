@@ -41,6 +41,13 @@ interface Log {
     notes?: string;
 }
 
+/**
+ * 실측이 불가능할 때의 되돌림 값 (pdfExport.ts의 FALLBACK_ROWS_PER_PAGE)
+ *
+ * 브라우저에서는 실제 행 높이를 재서 나누므로 페이지당 행 수가 내용에 따라 달라진다.
+ * jsdom은 레이아웃이 없어 측정이 실패하고 이 값으로 되돌아가므로, 아래 페이지 분할
+ * 테스트는 **되돌림 경로**를 고정한다. 분할 계산 자체는 pageFit.test.ts가 검증한다.
+ */
 const ROWS_PER_PAGE = 19;
 
 function log(overrides: Log = {}): Log {
@@ -146,15 +153,15 @@ describe('downloadDriveLogsPdf — 정렬', () => {
     });
 });
 
-describe('downloadDriveLogsPdf — 페이지 분할', () => {
-    it('19행마다 페이지를 나눈다', () => {
+describe('downloadDriveLogsPdf — 페이지 분할 (실측 불가 시 되돌림)', () => {
+    it('실측이 안 되면 19행마다 페이지를 나눈다', () => {
         const stub = stubPrintWindow();
         downloadDriveLogsPdf(Array.from({ length: ROWS_PER_PAGE * 2 + 1 }, () => log()));
 
         expect(stub.doc().querySelectorAll('div.page')).toHaveLength(3);
     });
 
-    it('19행 정확히면 한 페이지다', () => {
+    it('되돌림 기준 19행 정확히면 한 페이지다', () => {
         const stub = stubPrintWindow();
         downloadDriveLogsPdf(Array.from({ length: ROWS_PER_PAGE }, () => log()));
 
