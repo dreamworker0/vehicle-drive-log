@@ -3,6 +3,7 @@
  * 공식 차량운행일지 양식을 브라우저 인쇄 기능으로 PDF 생성
  */
 import { getPdfStyles, formatDate, formatNumber, escapeHtml } from './pdfStyles';
+import { measurePageMetrics, paginateByHeight } from './pageFit';
 import { recordExport } from '../audit/recordExport';
 import {
     resolveStartKm, resolveEndKm, resolveDistance, resolveDateStr, resolveStartTime, resolveEndTime,
@@ -42,8 +43,22 @@ interface ApprovalEntry {
     title: string;
 }
 
-// 페이지당 행 수
-const ROWS_PER_PAGE = 19;
+/**
+ * 실측이 불가능할 때만 쓰는 되돌림 값 (페이지당 행 수)
+ *
+ * 평소에는 pageFit.ts가 실제 행 높이를 재서 나눈다. 이 값은 레이아웃을 잴 수 없는
+ * 환경(테스트 등)에서만 쓰이며, 모든 행이 1줄일 때를 가정한 수치다.
+ */
+const FALLBACK_ROWS_PER_PAGE = 19;
+
+/** 한 페이지에 담기는 내용 */
+interface PageContent {
+    rows: PdfLogEntry[];
+    /** 전체 정렬 배열에서의 시작 인덱스 — 일련번호가 페이지를 넘어 이어지게 한다 */
+    start: number;
+    /** 아래를 채울 빈 행 수 */
+    emptyCount: number;
+}
 
 /** 출발지가 기록된 행이 하나라도 있는가 (분관을 등록한 기관에서만 true) */
 function hasStartLocation(logs: PdfLogEntry[]) {
@@ -76,13 +91,12 @@ export function downloadDriveLogsPdf(logs: PdfLogEntry[], options: { onError?: (
         return resolveStartTime(a).localeCompare(resolveStartTime(b));
     });
 
-    // 페이지 분할
-    const pages: PdfLogEntry[][] = [];
-    for (let i = 0; i < sorted.length; i += ROWS_PER_PAGE) {
-        pages.push(sorted.slice(i, i + ROWS_PER_PAGE));
-    }
+    const layout = { orgName, period, approvalLine, includeHipass, includePassengers, includeFuel, includeStartLocation };
 
-    const htmlContent = buildPdfHtml(pages, { orgName, period, approvalLine, includeHipass, includePassengers, includeFuel, includeStartLocation });
+    // 페이지 분할 — 행 높이가 내용에 따라 달라지므로 실제로 재서 나눈다 (pageFit.ts)
+    const pages = splitPages(sorted, layout);
+
+    const htmlContent = buildPdfHtml(pages, layout);
 
     // 새 창에서 인쇄
     const printWindow = window.open('', '_blank', 'width=1100,height=800');
@@ -108,7 +122,7 @@ export function downloadDriveLogsPdf(logs: PdfLogEntry[], options: { onError?: (
 /**
  * 운행일지 데이터 행을 HTML TR로 변환
  */
-function buildLogRow(log: PdfLogEntry, idx: number, pageIdx: number, includeHipass = false, includePassengers = false, includeFuel = false, includeStartLocation = false) {
+function buildLogRow(log: PdfLogEntry, rowNo: number, includeHipass = false, includePassengers = false, includeFuel = false, includeStartLocation = false) {
     const date = resolveDateStr(log, '-');
     const distance = resolveDistance(log);
 
@@ -126,7 +140,7 @@ function buildLogRow(log: PdfLogEntry, idx: number, pageIdx: number, includeHipa
 
     return `
         <tr>
-            <td class="center">${idx + 1 + (pageIdx * ROWS_PER_PAGE)}</td>
+            <td class="center">${rowNo}</td>
             <td class="center">${formatDate(date)}</td>
             <td class="center">${escapeHtml(resolveStartTime(log))}</td>
             <td class="center">${escapeHtml(resolveEndTime(log))}</td>
@@ -147,7 +161,7 @@ function buildLogRow(log: PdfLogEntry, idx: number, pageIdx: number, includeHipa
 }
 
 /**
- * 빈 행 HTML (19행 맞추기)
+ * 빈 행 HTML (페이지 아래를 채워 양식 높이를 유지한다)
  *
  * 칸이 전부 비어 있으므로 조건부 열을 어느 위치에 넣든 인쇄 결과는 같다 — **개수만** 헤더와
  * 맞으면 된다(열 너비는 헤더의 class가 정한다).
@@ -188,12 +202,12 @@ function buildApprovalHtml(approvalLine: ApprovalEntry[]) {
 /**
  * 단일 페이지 HTML 생성
  */
-function buildPageHtml(pageRows: PdfLogEntry[], pageIdx: number, totalPages: number, { orgName, period, approvalLine, includeHipass = false, includePassengers = false, includeFuel = false, includeStartLocation = false, totalAllDistance = 0 }: { orgName: string; period: string; approvalLine: ApprovalEntry[]; includeHipass?: boolean; includePassengers?: boolean; includeFuel?: boolean; includeStartLocation?: boolean; totalAllDistance?: number }) {
+function buildPageHtml(page: PageContent, pageIdx: number, totalPages: number, { orgName, period, approvalLine, includeHipass = false, includePassengers = false, includeFuel = false, includeStartLocation = false, totalAllDistance = 0 }: { orgName: string; period: string; approvalLine: ApprovalEntry[]; includeHipass?: boolean; includePassengers?: boolean; includeFuel?: boolean; includeStartLocation?: boolean; totalAllDistance?: number }) {
     const pageNum = pageIdx + 1;
-    const pageTotalDistance = pageRows.reduce((sum, log) => sum + resolveDistance(log), 0);
+    const pageTotalDistance = page.rows.reduce((sum, log) => sum + resolveDistance(log), 0);
 
-    const rowsHtml = pageRows.map((log: PdfLogEntry, idx: number) => buildLogRow(log, idx, pageIdx, includeHipass, includePassengers, includeFuel, includeStartLocation)).join('');
-    const emptyRowsHtml = buildEmptyRows(ROWS_PER_PAGE - pageRows.length, includePassengers, includeFuel, includeStartLocation);
+    const rowsHtml = page.rows.map((log: PdfLogEntry, idx: number) => buildLogRow(log, page.start + idx + 1, includeHipass, includePassengers, includeFuel, includeStartLocation)).join('');
+    const emptyRowsHtml = buildEmptyRows(page.emptyCount, includePassengers, includeFuel, includeStartLocation);
     // 소계·합계 라벨이 덮는 칸 수 — 출발지 열이 붙으면 한 칸 늘어난다(안 늘리면 주행거리 합계가 밀린다)
     const totalLabelSpan = 10 + (includeStartLocation ? 1 : 0);
     const approvalHtml = buildApprovalHtml(approvalLine);
@@ -267,14 +281,43 @@ function buildPageHtml(pageRows: PdfLogEntry[], pageIdx: number, totalPages: num
 }
 
 /**
+ * 실제 행 높이를 재서 페이지를 나눈다.
+ *
+ * 목적지 주소가 길면 행이 2~3줄로 자라 고정 행 수 분할이 용지를 넘긴다(pageFit.ts 주석 참고).
+ * 전체 행을 한 페이지에 담은 측정용 문서를 숨은 iframe에 그려 행별 높이를 재고, 남은
+ * 높이만큼만 담는다. 측정이 불가능한 환경에서는 예전처럼 고정 행 수로 나눈다.
+ */
+function splitPages(sorted: PdfLogEntry[], layout: { orgName: string; period: string; approvalLine: ApprovalEntry[]; includeHipass?: boolean; includePassengers?: boolean; includeFuel?: boolean; includeStartLocation?: boolean }): PageContent[] {
+    // 측정용: 전체 행 + 빈 행 1개(기준 높이) + 소계 + 합계가 한 페이지에 담긴 문서
+    const probe = buildPdfHtml([{ rows: sorted, start: 0, emptyCount: 1 }], layout);
+    const metrics = measurePageMetrics(probe, sorted.length);
+    const slices = metrics ? paginateByHeight(metrics) : [];
+
+    if (slices.length > 0) {
+        return slices.map(slice => ({
+            rows: sorted.slice(slice.start, slice.start + slice.count),
+            start: slice.start,
+            emptyCount: slice.emptyCount,
+        }));
+    }
+
+    const pages: PageContent[] = [];
+    for (let i = 0; i < sorted.length; i += FALLBACK_ROWS_PER_PAGE) {
+        const rows = sorted.slice(i, i + FALLBACK_ROWS_PER_PAGE);
+        pages.push({ rows, start: i, emptyCount: FALLBACK_ROWS_PER_PAGE - rows.length });
+    }
+    return pages;
+}
+
+/**
  * 전체 HTML 문서 생성
  */
-function buildPdfHtml(pages: PdfLogEntry[][], options: { orgName: string; period: string; approvalLine: ApprovalEntry[]; includeHipass?: boolean; includePassengers?: boolean; includeFuel?: boolean; includeStartLocation?: boolean }) {
+function buildPdfHtml(pages: PageContent[], options: { orgName: string; period: string; approvalLine: ApprovalEntry[]; includeHipass?: boolean; includePassengers?: boolean; includeFuel?: boolean; includeStartLocation?: boolean }) {
     const totalPages = pages.length;
     // 전체 페이지에 걸친 총 주행거리 합계
-    const totalAllDistance = pages.flat().reduce((sum, log) => sum + resolveDistance(log), 0);
-    const pagesHtml = pages.map((pageRows, pageIdx) =>
-        buildPageHtml(pageRows, pageIdx, totalPages, { ...options, totalAllDistance })
+    const totalAllDistance = pages.flatMap(p => p.rows).reduce((sum, log) => sum + resolveDistance(log), 0);
+    const pagesHtml = pages.map((page, pageIdx) =>
+        buildPageHtml(page, pageIdx, totalPages, { ...options, totalAllDistance })
     ).join('');
 
     return `
