@@ -33,10 +33,6 @@ jobs:
       # Functions(functions/.env의 SENTRY_RELEASE)가 **같은 값**을 써야 한 배포가
       # Sentry에서 하나의 릴리즈로 묶인다.
       SENTRY_RELEASE_VERSION: ${{ github.event.workflow_run.head_sha || github.sha }}
-      # 토큰 값 자체가 아니라 '설정 여부'만 노출한다 — 스텝 `if`에서는 secrets 컨텍스트를
-      # 쓸 수 없고, 토큰을 잡(job) 전역 env로 두면 모든 스텝에 불필요하게 퍼진다.
-      # 시크릿 미설정 저장소(포크 등)에서는 아래 Sentry 스텝만 조용히 건너뛴다.
-      SENTRY_ENABLED: ${{ secrets.SENTRY_AUTH_TOKEN != '' && 'true' || 'false' }}
 
     steps:
       # CI가 검증한 바로 그 커밋을 배포한다 (workflow_run 사이에 새 푸시가 끼어도 안전)
@@ -134,6 +130,25 @@ jobs:
           fi
           exit $CODE
 
+      # 토큰 유무를 **스텝 안에서** 판정한다. 잡 레벨 env에 두면 시크릿이 없는 것과
+      # **빈 값으로 등록된 것**이 똑같이 조용한 skip으로 끝나고, 배포는 초록이라
+      # 소스맵이 몇 번이나 누락된 뒤에야 발견된다(2026-08-30~31 배포 4건에서 실제로 발생).
+      # 스텝 env로 받는 시크릿은 값이 확실히 실리는 자리이므로 판정도 여기서 한다.
+      #
+      # 앞 스텝(배포)이 실패하면 이 스텝부터 실행되지 않아 outputs가 비고, 이어지는
+      # Sentry 스텝도 자동으로 건너뛴다 — "성공한 배포만 릴리즈로 남긴다"가 유지된다.
+      - name: Sentry 릴리즈 게이트 판정
+        id: sentry_gate
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: |
+          if [ -n "$SENTRY_AUTH_TOKEN" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Sentry 릴리즈 건너뜀::SENTRY_AUTH_TOKEN이 비어 있거나 없습니다 — 릴리즈 태깅은 이벤트로 자동 생성되지만 소스맵·커밋 연결이 빠집니다. 저장소 Settings → Secrets and variables → Actions에서 값을 확인하세요."
+          fi
+
       # 배포가 **성공한 뒤에만** Sentry에 릴리즈를 남긴다. 실패한 배포까지 릴리즈로 잡히면
       # "이 릴리즈부터 고쳐졌다"는 판단(Resolved in next release)이 어긋난다.
       #
@@ -141,7 +156,7 @@ jobs:
       # 자동 생성하므로 "다음 릴리즈에서 해결" 자체는 동작한다. 여기서 더 얻는 것은
       # **소스맵(원본 코드 스택트레이스)**과 **커밋 연결(누가 어떤 변경으로 냈는지)**이다.
       - name: Sentry 릴리즈 등록 (소스맵·커밋 연결)
-        if: env.SENTRY_ENABLED == 'true'
+        if: steps.sentry_gate.outputs.enabled == 'true'
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
           SENTRY_ORG: ${{ vars.SENTRY_ORG || 'socialprism' }}
