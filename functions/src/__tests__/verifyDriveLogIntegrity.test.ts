@@ -22,33 +22,68 @@ describe('findReferenceIssues — 참조 무결성 (F-01/F-02 탐지)', () => {
         const logs: DriveLogLite[] = [
             { id: 'l1', organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'u_A' },
         ];
-        expect(findReferenceIssues(logs, vehicleOrg, userOrg)).toEqual([]);
+        expect(findReferenceIssues(logs, vehicleOrg, userOrg)).toEqual({ violations: [], transfers: [] });
     });
 
     it('타 기관 차량을 참조하면 위반으로 잡는다 (F-02)', () => {
         const logs: DriveLogLite[] = [
             { id: 'l2', organizationId: 'org-A', vehicleId: 'v_B', driverUid: 'u_A' },
         ];
-        const issues = findReferenceIssues(logs, vehicleOrg, userOrg);
+        const { violations: issues } = findReferenceIssues(logs, vehicleOrg, userOrg);
         expect(issues).toHaveLength(1);
         expect(issues[0]).toContain('타 기관 차량');
         expect(issues[0]).toContain('l2');
     });
 
-    it('타 기관 사용자를 운전자로 지정하면 위반으로 잡는다 (F-01)', () => {
+    it('타인이 타 기관 사용자를 운전자로 지정하면 위반으로 잡는다 (F-01)', () => {
         const logs: DriveLogLite[] = [
-            { id: 'l3', organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'u_B' },
+            { id: 'l3', organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'u_B', createdByUid: 'u_A' },
         ];
-        const issues = findReferenceIssues(logs, vehicleOrg, userOrg);
+        const { violations: issues } = findReferenceIssues(logs, vehicleOrg, userOrg);
         expect(issues).toHaveLength(1);
         expect(issues[0]).toContain('타 기관 사용자');
+        expect(issues[0]).toContain('작성자=u_A');
+    });
+
+    // 사용자 소속은 clearUserOrganization → joinOrganization으로 바뀐다. 그때 과거 기관의
+    // 기록이 남는 것은 정상이므로 위반으로 올리면 이동 한 번마다 경고가 뜬다.
+    it('본인이 작성한 기록이면 소속 불일치를 기관 이동으로 분류한다', () => {
+        const logs: DriveLogLite[] = [
+            { id: 'l7', organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'u_B', createdByUid: 'u_B' },
+        ];
+        const { violations, transfers } = findReferenceIssues(logs, vehicleOrg, userOrg);
+        expect(violations).toEqual([]);
+        expect(transfers).toHaveLength(1);
+        expect(transfers[0]).toContain('기관 이동');
+        expect(transfers[0]).toContain('org-A');
+        expect(transfers[0]).toContain('org-B');
+    });
+
+    it('작성자를 모르는 구 기록은 보수적으로 위반에 남긴다', () => {
+        const logs: DriveLogLite[] = [
+            { id: 'l8', organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'u_B' },
+        ];
+        const { violations, transfers } = findReferenceIssues(logs, vehicleOrg, userOrg);
+        expect(transfers).toEqual([]);
+        expect(violations).toHaveLength(1);
+        expect(violations[0]).toContain('작성자=미상');
+    });
+
+    it('차량 소속 불일치는 본인 작성이어도 위반이다 (차량은 기관 이동 경로가 없다)', () => {
+        const logs: DriveLogLite[] = [
+            { id: 'l9', organizationId: 'org-A', vehicleId: 'v_B', driverUid: 'u_A', createdByUid: 'u_A' },
+        ];
+        const { violations, transfers } = findReferenceIssues(logs, vehicleOrg, userOrg);
+        expect(transfers).toEqual([]);
+        expect(violations).toHaveLength(1);
+        expect(violations[0]).toContain('타 기관 차량');
     });
 
     it('존재하지 않는 차량·운전자도 각각 위반으로 잡는다', () => {
         const logs: DriveLogLite[] = [
             { id: 'l4', organizationId: 'org-A', vehicleId: 'ghost', driverUid: 'nobody' },
         ];
-        const issues = findReferenceIssues(logs, vehicleOrg, userOrg);
+        const { violations: issues } = findReferenceIssues(logs, vehicleOrg, userOrg);
         expect(issues).toHaveLength(2);
         expect(issues.join()).toContain('없는 차량');
         expect(issues.join()).toContain('없는 사용자');
@@ -59,7 +94,7 @@ describe('findReferenceIssues — 참조 무결성 (F-01/F-02 탐지)', () => {
         // 실재하는 차량을 "없는 차량"으로 오분류한다.
         const orphanVehicles = new Map<string, string | undefined>([['v_orphan', undefined]]);
         const logs: DriveLogLite[] = [{ id: 'l5', organizationId: 'org-A', vehicleId: 'v_orphan' }];
-        const issues = findReferenceIssues(logs, orphanVehicles, userOrg);
+        const { violations: issues } = findReferenceIssues(logs, orphanVehicles, userOrg);
         expect(issues).toHaveLength(1);
         expect(issues[0]).toContain('타 기관 차량');
         expect(issues[0]).not.toContain('없는 차량');
@@ -67,7 +102,7 @@ describe('findReferenceIssues — 참조 무결성 (F-01/F-02 탐지)', () => {
 
     it('organizationId가 없는 기록은 판정 대상에서 제외한다', () => {
         const logs: DriveLogLite[] = [{ id: 'l6', vehicleId: 'v_B', driverUid: 'u_B' }];
-        expect(findReferenceIssues(logs, vehicleOrg, userOrg)).toEqual([]);
+        expect(findReferenceIssues(logs, vehicleOrg, userOrg)).toEqual({ violations: [], transfers: [] });
     });
 });
 
