@@ -29,12 +29,13 @@ const COLUMNS: PdfColumn[] = [
     { header: '충전후잔액', className: 'col-after', width: '80px' },
 ];
 
+/** 실측 분할이 불가능한 환경에서만 쓰이는 되돌림 값 (pdfEngine.splitPages) */
 const ROWS_PER_PAGE = 25;
 
-function renderRow(rec: PdfHipassChargeEntry, idx: number, pageIdx: number, rowsPerPage: number): string {
+function renderRow(rec: PdfHipassChargeEntry, rowNumber: number): string {
     return `
         <tr>
-            <td class="center">${idx + 1 + (pageIdx * rowsPerPage)}</td>
+            <td class="center">${rowNumber}</td>
             <td class="center">${formatDate(rec.date || '')}</td>
             <td class="center">${getTimeStr(rec.createdAt)}</td>
             <td class="center">${escapeHtml(rec.vehicleName || '')}</td>

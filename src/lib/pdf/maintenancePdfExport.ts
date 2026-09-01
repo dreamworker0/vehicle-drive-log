@@ -33,14 +33,15 @@ const COLUMNS: PdfColumn[] = [
     { header: '차단', className: 'col-block', width: '32px' },
 ];
 
+/** 실측 분할이 불가능한 환경에서만 쓰이는 되돌림 값 (pdfEngine.splitPages) */
 const ROWS_PER_PAGE = 22;
 
 function createRenderRow(typeLabels: Record<string, string>) {
-    return (rec: PdfMaintenanceEntry, idx: number, pageIdx: number, rowsPerPage: number): string => {
+    return (rec: PdfMaintenanceEntry, rowNumber: number): string => {
         const typeLabel = typeLabels[rec.type || ''] || rec.type || '';
         return `
             <tr>
-                <td class="center">${idx + 1 + (pageIdx * rowsPerPage)}</td>
+                <td class="center">${rowNumber}</td>
                 <td class="center">${formatDate(rec.date || '')}</td>
                 <td class="center">${escapeHtml(rec.vehicleName || '')}</td>
                 <td class="center">${escapeHtml(typeLabel)}</td>

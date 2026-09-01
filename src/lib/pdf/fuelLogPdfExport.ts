@@ -30,15 +30,16 @@ const COLUMNS: PdfColumn[] = [
     { header: '비고', className: 'col-notes', width: 'auto' },
 ];
 
+/** 실측 분할이 불가능한 환경에서만 쓰이는 되돌림 값 (pdfEngine.splitPages) */
 const ROWS_PER_PAGE = 25;
 
-function renderRow(rec: PdfFuelLogEntry, idx: number, pageIdx: number, rowsPerPage: number): string {
+function renderRow(rec: PdfFuelLogEntry, rowNumber: number): string {
     const unit = ['electric', 'hydrogen'].includes(rec.fuelType || '')
         ? (rec.fuelType === 'hydrogen' ? 'kg' : 'kWh')
         : 'L';
     return `
         <tr>
-            <td class="center">${idx + 1 + (pageIdx * rowsPerPage)}</td>
+            <td class="center">${rowNumber}</td>
             <td class="center">${formatDate(rec.date || '')}</td>
             <td class="center">${getTimeStr(rec.createdAt)}</td>
             <td class="center">${escapeHtml(rec.vehicleName || '')}</td>
