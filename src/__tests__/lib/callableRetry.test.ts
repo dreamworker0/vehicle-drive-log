@@ -30,7 +30,7 @@ vi.mock('../../lib/tokenRefresh', () => ({
     refreshTokenSilently: (user: unknown) => mocks.refreshTokenSilently(user),
 }));
 
-import { callWithRetry, isTransientCallableError, isAuthExpiredError, DEFAULT_CALL_TIMEOUT_MS } from '../../lib/callableRetry';
+import { callWithRetry, isTransientCallableError, isAuthExpiredError, isRateLimitedError, DEFAULT_CALL_TIMEOUT_MS } from '../../lib/callableRetry';
 
 /** SDK가 시간 초과 시 던지는 것과 같은 모양 (code·message 모두 'deadline-exceeded') */
 function deadlineExceeded() {
@@ -98,6 +98,32 @@ describe('isAuthExpiredError', () => {
     it('토큰 만료는 일시적 실패로 분류하지 않는다 — 처방이 다르다', () => {
         // TRANSIENT_CODES에 넣으면 만료된 토큰을 그대로 다시 보내며 백오프만 쓴다
         expect(isTransientCallableError(unauthenticated())).toBe(false);
+    });
+});
+
+describe('isRateLimitedError', () => {
+    /** 서버가 시간당 상한으로 거부했을 때의 모양 (SDK가 HTTP 429를 옮기며 메시지 끝에 [429]를 붙인다) */
+    const rateLimited = () => Object.assign(
+        new Error('요청이 너무 많습니다. 1시간 후 다시 시도해주세요. [429]'),
+        { code: 'functions/resource-exhausted' },
+    );
+
+    it('상한 초과 거부를 알아본다', () => {
+        expect(isRateLimitedError(rateLimited())).toBe(true);
+        // Firestore 에러는 서비스 접두사 없이 온다
+        expect(isRateLimitedError({ code: 'resource-exhausted' })).toBe(true);
+    });
+
+    it('다른 거부·일시 실패와 섞이지 않는다', () => {
+        expect(isRateLimitedError(deadlineExceeded())).toBe(false);
+        expect(isRateLimitedError(unauthenticated())).toBe(false);
+        expect(isRateLimitedError(null)).toBe(false);
+        // 메시지만 보고 판정하지 않는다 — 한국어 문구는 다른 에러에도 실릴 수 있다
+        expect(isRateLimitedError(new Error('요청이 너무 많습니다.'))).toBe(false);
+    });
+
+    it('상한 초과는 일시적 실패로 분류하지 않는다 — 다시 불러도 같은 답이고 한도만 깎는다', () => {
+        expect(isTransientCallableError(rateLimited())).toBe(false);
     });
 });
 

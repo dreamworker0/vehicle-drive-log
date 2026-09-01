@@ -93,6 +93,28 @@ export function isAuthExpiredError(err: unknown): boolean {
     return typeof e.message === 'string' && e.message.trim().toLowerCase() === 'unauthenticated';
 }
 
+/**
+ * 서버의 남용 방지 상한(`resource-exhausted`)에 걸려 거부된 경우인지 판별한다.
+ *
+ * **거부이긴 하지만 앱 결함이 아니다.** 서버가 의도적으로 돌려준 답이고, 다시 불러도
+ * 창이 넘어가기 전까지는 같은 답이 온다(그래서 TRANSIENT_CODES에도 넣지 않는다).
+ * 사용자가 손쓸 수 있는 것도 없다 — 기다리는 것 말고는.
+ *
+ * 판별을 따로 두는 이유는 **보고 여부를 가르기 위해서**다. 화면을 막는 경로(동의 게이트 등)는
+ * 이 거부도 사용자가 갇힌다는 뜻이라 그대로 보고해야 하지만, 실패해도 화면을 막지 않는
+ * 베스트에포트 경로(접속기록 등)에서는 조치로 이어지지 않는 보고가 되어 진짜 결함을 덮는다
+ * (JAVASCRIPT-REACT-65 — `recordSession`의 시간당 상한이 Sentry 이슈로 올라왔다).
+ *
+ * SDK는 HTTP 429를 `functions/resource-exhausted`로 옮기고 메시지 끝에 `[429]`를 붙인다.
+ */
+export function isRateLimitedError(err: unknown): boolean {
+    if (!err) return false;
+    const e = err as { code?: unknown };
+    if (typeof e.code !== 'string') return false;
+    const bare = e.code.includes('/') ? e.code.slice(e.code.lastIndexOf('/') + 1) : e.code;
+    return bare === 'resource-exhausted';
+}
+
 const delay = (ms: number) => new Promise<void>((res) => setTimeout(res, ms));
 
 /**
