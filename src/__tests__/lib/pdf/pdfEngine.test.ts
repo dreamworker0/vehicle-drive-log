@@ -31,9 +31,9 @@ const COLUMNS: PdfColumn[] = [
     { header: '금액', className: 'col-amount', width: '80px' },
 ];
 
-const renderRow = (rec: Row, idx: number, pageIdx: number, rowsPerPage: number) => `
+const renderRow = (rec: Row, rowNumber: number) => `
     <tr>
-        <td class="center">${idx + 1 + pageIdx * rowsPerPage}</td>
+        <td class="center">${rowNumber}</td>
         <td class="center">${rec.date}</td>
         <td>${rec.name}</td>
         <td class="right">${rec.amount}</td>
@@ -225,7 +225,11 @@ describe('printPdfReport — 표 구조', () => {
         expectUniformColumns(table, '엔진 기본 표');
     });
 
-    it('renderTotalRow는 해당 페이지의 행만 받는다', () => {
+    /**
+     * 첫 호출은 **높이 측정용 문서**다 — 전체 행을 한 페이지에 담아 소계 행 높이까지 재고,
+     * 그 실측값으로 페이지를 나눈다(pageFit). 그 뒤 호출이 실제 페이지들이다.
+     */
+    it('renderTotalRow는 측정 1회(전체 행) 뒤 페이지별로 해당 페이지 행만 받는다', () => {
         stubPrintWindow();
         const seen: number[] = [];
         printPdfReport(baseConfig(makeRecords(7), {
@@ -233,7 +237,8 @@ describe('printPdfReport — 표 구조', () => {
             renderTotalRow: (rows: Row[]) => { seen.push(rows.length); return '<tr><td colspan="4"></td></tr>'; },
         }));
 
-        expect(seen).toEqual([5, 2]);
+        expect(seen[0]).toBe(7);
+        expect(seen.slice(1)).toEqual([5, 2]);
     });
 
     it('컬럼 정의의 width가 CSS로 반영된다', () => {

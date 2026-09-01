@@ -30,6 +30,18 @@ export interface PageMetrics {
     emptyRowHeight: number;
 }
 
+/**
+ * 측정용 문서 tbody의 **꼬리 행 구성** — 데이터 행 뒤에는 빈 행 1개(기준 높이)가 오고,
+ * 그 뒤에 붙는 합계 행은 문서 종류마다 다르다. 운행일지는 소계(모든 장) + 합계(마지막 장)이고,
+ * pdfEngine 계열 보고서(주유·하이패스·정비)는 페이지 소계만 있다.
+ */
+export interface TrailingRowSpec {
+    /** 모든 페이지에 붙는 합계 행(소계)이 있는지 */
+    subtotal: boolean;
+    /** 마지막 페이지에만 붙는 합계 행(총 합계)이 있는지 */
+    total: boolean;
+}
+
 /** 한 페이지에 담을 범위 */
 export interface PageSlice {
     /** 전체 정렬 배열에서의 시작 인덱스 (일련번호가 페이지를 넘어 이어지게 한다) */
@@ -104,10 +116,15 @@ export function paginateByHeight(metrics: PageMetrics): PageSlice[] {
  *
  * 잴 수 없는 환경(jsdom, iframe 차단 등)에서는 `null`을 돌려 호출부가 고정 분할로 되돌아간다.
  *
- * @param docHtml 측정용 문서 — 전체 행을 한 페이지에 담고, 빈 행 1개·소계·합계가 뒤따라야 한다
+ * @param docHtml 측정용 문서 — 전체 행을 한 페이지에 담고, 빈 행 1개와 `trailing`이 선언한 합계 행이 뒤따라야 한다
  * @param dataRowCount 데이터 행 수 (tbody에서 데이터 행과 부속 행을 가르는 기준)
+ * @param trailing 데이터 행 뒤 합계 행 구성 (기본: 운행일지 — 소계 + 합계)
  */
-export function measurePageMetrics(docHtml: string, dataRowCount: number): PageMetrics | null {
+export function measurePageMetrics(
+    docHtml: string,
+    dataRowCount: number,
+    trailing: TrailingRowSpec = { subtotal: true, total: true },
+): PageMetrics | null {
     if (typeof document === 'undefined' || !document.body) return null;
 
     let frame: HTMLIFrameElement | null = null;
@@ -137,8 +154,11 @@ export function measurePageMetrics(docHtml: string, dataRowCount: number): PageM
         const body = table?.tBodies?.[0];
         if (!page || !table || !thead || !body) return null;
 
-        // 데이터 행 + 빈 행 1 + 소계 + 합계
-        if (body.rows.length !== dataRowCount + 3) return null;
+        // 데이터 행 + 빈 행 1 + (소계) + (합계)
+        const subtotalIdx = dataRowCount + 1;
+        const totalIdx = subtotalIdx + (trailing.subtotal ? 1 : 0);
+        const expectedRows = dataRowCount + 1 + (trailing.subtotal ? 1 : 0) + (trailing.total ? 1 : 0);
+        if (body.rows.length !== expectedRows) return null;
 
         const heightOf = (el: Element) => el.getBoundingClientRect().height;
         const rowHeights = Array.from({ length: dataRowCount }, (_, i) => heightOf(body.rows[i]));
@@ -154,8 +174,8 @@ export function measurePageMetrics(docHtml: string, dataRowCount: number): PageM
             overhead: beforeTable + theadHeight,
             rowHeights,
             emptyRowHeight: heightOf(body.rows[dataRowCount]),
-            subtotalHeight: heightOf(body.rows[dataRowCount + 1]),
-            totalHeight: heightOf(body.rows[dataRowCount + 2]),
+            subtotalHeight: trailing.subtotal ? heightOf(body.rows[subtotalIdx]) : 0,
+            totalHeight: trailing.total ? heightOf(body.rows[totalIdx]) : 0,
         };
     } catch {
         // 측정은 부가 기능이다 — 실패해도 내보내기 자체는 계속돼야 한다

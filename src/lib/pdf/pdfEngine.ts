@@ -4,6 +4,7 @@
  * 각 모듈은 컬럼 정의 + 행 변환 로직만 제공하고, 이 엔진이 HTML 조립·페이지 분할·인쇄를 처리.
  */
 import { formatDate, formatNumber, escapeHtml } from './pdfStyles';
+import { measurePageMetrics, paginateByHeight } from './pageFit';
 import { recordExport, type ExportDataset } from '../audit/recordExport';
 
 // ── 공통 타입 ──
@@ -26,12 +27,18 @@ interface PdfReportConfig<T> {
     orgName: string;
     records: T[];
     columns: PdfColumn[];
-    /** 각 레코드를 테이블 행(<td> 배열)으로 변환 */
-    renderRow: (record: T, idx: number, pageIdx: number, rowsPerPage: number) => string;
-    /** 소계 행 (선택사항) */
+    /**
+     * 각 레코드를 테이블 행(<td> 배열)으로 변환.
+     *
+     * `rowNumber`는 **페이지를 넘어 이어지는 1-based 일련번호**다. 실측 분할로 페이지당 행 수가
+     * 페이지마다 달라지므로 `pageIdx * rowsPerPage`로는 계산할 수 없어 엔진이 계산해 넘긴다.
+     */
+    renderRow: (record: T, rowNumber: number) => string;
+    /** 페이지 소계 행 (선택사항) — 모든 페이지에 붙는다 */
     renderTotalRow?: (pageRows: T[]) => string;
     /** 정렬 비교 함수 (기본: date 최신순) */
     sorter?: (a: T, b: T) => number;
+    /** 실측이 불가능한 환경(jsdom 등)에서 되돌아갈 고정 행 수 */
     rowsPerPage?: number;
     approvalLine?: ApprovalEntry[];
     onError?: (msg: string) => void;
@@ -42,6 +49,15 @@ interface PdfReportConfig<T> {
      * 엔진은 어떤 리포트인지 모르므로 호출부가 알려준다.
      */
     auditDataset: ExportDataset;
+}
+
+/** 한 페이지에 담을 내용 — 실측 분할(pageFit)이나 고정 행 수 되돌림이 정한다 */
+interface ReportPage<T> {
+    rows: T[];
+    /** 전체 정렬 배열에서의 시작 인덱스 — 일련번호가 페이지를 넘어 이어지게 한다 */
+    start: number;
+    /** 아래를 채울 빈 행 수 — 양식 높이를 유지한다 */
+    emptyCount: number;
 }
 
 // ── 공통 유틸 ──
@@ -190,24 +206,12 @@ export function printPdfReport<T>(config: PdfReportConfig<T>): boolean {
     };
     const sorted = [...records].sort(sorter || defaultSorter);
 
-    // 페이지 분할
-    const pages: T[][] = [];
-    for (let i = 0; i < sorted.length; i += rowsPerPage) {
-        pages.push(sorted.slice(i, i + rowsPerPage));
-    }
-
     // 컬럼 CSS
     const colStyles = columns.map(c => `.${c.className} { width: ${c.width}; }`).join('\n');
     const styles = getLandscapePdfStyles(colStyles, extraStyles);
 
-    // 페이지 HTML
-    const totalPages = pages.length;
-    const pagesHtml = pages.map((pageRows, pageIdx) => {
-        const rowsHtml = pageRows.map((rec, idx) => renderRow(rec, idx, pageIdx, rowsPerPage)).join('');
-        const emptyHtml = buildEmptyRows(columns.length, rowsPerPage - pageRows.length);
-        const totalHtml = renderTotalRow ? renderTotalRow(pageRows) : '';
-
-        return `
+    /** 한 페이지 HTML — 측정용 문서와 실제 인쇄물이 **같은 마크업**을 써야 실측이 의미를 갖는다 */
+    const buildPage = (page: ReportPage<T>, pageIdx: number, totalPages: number) => `
             <div class="page">
                 <div class="header-area">
                     <h1 class="title">${title}</h1>
@@ -227,17 +231,15 @@ export function printPdfReport<T>(config: PdfReportConfig<T>): boolean {
                         <tr>${columns.map(c => `<th class="${c.className}">${c.header}</th>`).join('')}</tr>
                     </thead>
                     <tbody>
-                        ${rowsHtml}
-                        ${emptyHtml}
-                        ${totalHtml}
+                        ${page.rows.map((rec, idx) => renderRow(rec, page.start + idx + 1)).join('')}
+                        ${buildEmptyRows(columns.length, page.emptyCount)}
+                        ${renderTotalRow ? renderTotalRow(page.rows) : ''}
                     </tbody>
                 </table>
             </div>
         `;
-    }).join('');
 
-    // 전체 HTML 문서
-    const html = `
+    const buildDoc = (pages: ReportPage<T>[]) => `
 <!DOCTYPE html>
 <html lang="ko">
 <head>
@@ -245,8 +247,38 @@ export function printPdfReport<T>(config: PdfReportConfig<T>): boolean {
     <title>${title} - ${escapeHtml(orgName)}</title>
     <style>${styles}</style>
 </head>
-<body>${pagesHtml}</body>
+<body>${pages.map((page, pageIdx) => buildPage(page, pageIdx, pages.length)).join('')}</body>
 </html>`;
+
+    /**
+     * 페이지 분할 — 고정 행 수는 셀이 줄바꿈되는 표에서 용지를 넘긴다(운행일지에서 21건이 3장으로
+     * 나갔던 그 문제). 전체 행을 한 페이지에 담은 측정용 문서를 숨은 iframe에 그려 실제 높이를 재고
+     * 남은 높이만큼만 담는다. 측정 불가 환경(jsdom 등)에서는 예전처럼 고정 행 수로 되돌린다.
+     */
+    const splitPages = (): ReportPage<T>[] => {
+        // 측정용: 전체 행 + 빈 행 1개(기준 높이) + 소계가 한 페이지에 담긴 문서
+        const probe = buildDoc([{ rows: sorted, start: 0, emptyCount: 1 }]);
+        // 이 계열 보고서는 페이지 소계만 있고 마지막 장에만 붙는 총 합계 행이 없다
+        const metrics = measurePageMetrics(probe, sorted.length, { subtotal: !!renderTotalRow, total: false });
+        const slices = metrics ? paginateByHeight(metrics) : [];
+
+        if (slices.length > 0) {
+            return slices.map(slice => ({
+                rows: sorted.slice(slice.start, slice.start + slice.count),
+                start: slice.start,
+                emptyCount: slice.emptyCount,
+            }));
+        }
+
+        const fallback: ReportPage<T>[] = [];
+        for (let i = 0; i < sorted.length; i += rowsPerPage) {
+            const rows = sorted.slice(i, i + rowsPerPage);
+            fallback.push({ rows, start: i, emptyCount: rowsPerPage - rows.length });
+        }
+        return fallback;
+    };
+
+    const html = buildDoc(splitPages());
 
     // 새 창에서 인쇄
     const printWindow = window.open('', '_blank', 'width=1100,height=800');

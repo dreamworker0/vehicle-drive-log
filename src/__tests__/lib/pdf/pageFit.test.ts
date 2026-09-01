@@ -114,6 +114,25 @@ describe('paginateByHeight — 극단값', () => {
         expect(slices.reduce((sum, s) => sum + s.count, 0)).toBe(2);
     });
 
+    /**
+     * pdfEngine 계열 보고서(주유·하이패스·정비)는 **페이지 소계만** 있고 마지막 장에만 붙는
+     * 총 합계 행이 없다 — 그 형태(`totalHeight: 0`)에서도 같은 불변식이 지켜져야 한다.
+     */
+    it('소계만 있는 보고서(총 합계 없음)도 용지를 넘지 않는다', () => {
+        const heights = Array.from({ length: 60 }, (_, i) => [22, 31, 44, 31, 22, 44][i % 6]);
+        const m: PageMetrics = { ...metrics(heights), totalHeight: 0 };
+
+        const slices = paginateByHeight(m);
+
+        expect(slices.length).toBeGreaterThan(1);
+        slices.forEach((slice, i) => {
+            expect(usedHeight(m, slice, i === slices.length - 1)).toBeLessThanOrEqual(availableHeight());
+        });
+        // 합계 행이 없으므로 마지막 페이지에서 행을 뒤로 넘길 이유가 없다
+        expect(slices[slices.length - 1].count).toBeGreaterThan(0);
+        expect(slices.reduce((sum, s) => sum + s.count, 0)).toBe(heights.length);
+    });
+
     it('머리글만으로 용지를 넘기면 분할을 포기한다', () => {
         // 호출부가 고정 행 수 분할로 되돌린다
         expect(paginateByHeight(metrics([22, 22], PAGE_CONTENT_PX))).toEqual([]);
