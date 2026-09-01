@@ -259,7 +259,7 @@ export function printPdfReport<T>(config: PdfReportConfig<T>): boolean {
         // 측정용: 전체 행 + 빈 행 1개(기준 높이) + 소계가 한 페이지에 담긴 문서
         const probe = buildDoc([{ rows: sorted, start: 0, emptyCount: 1 }]);
         // 이 계열 보고서는 페이지 소계만 있고 마지막 장에만 붙는 총 합계 행이 없다
-        const metrics = measurePageMetrics(probe, sorted.length, { subtotal: !!renderTotalRow, total: false });
+        const metrics = measurePageMetrics(probe, sorted.length, { trailing: { subtotal: !!renderTotalRow, total: false } });
         const slices = metrics ? paginateByHeight(metrics) : [];
 
         if (slices.length > 0) {
