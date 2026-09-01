@@ -278,14 +278,20 @@ describe('printPdfReport — 결재란', () => {
         expect(approval.querySelectorAll('.approval-sign')).toHaveLength(3);
     });
 
-    it('결재란은 모든 페이지에 반복된다', () => {
+    /**
+     * 결재란은 첫 장에만 찍는다 — 둘째 장부터 반복되면 결재 도장을 어디에 찍을지 모호해진다.
+     * 다만 자리까지 없애면 표가 시작되는 높이가 장마다 어긋나므로 자리는 남긴다.
+     */
+    it('둘째 장부터는 결재란을 감추고 자리만 남긴다', () => {
         const stub = stubPrintWindow();
         printPdfReport(baseConfig(makeRecords(7), {
             rowsPerPage: 5,
             approvalLine: [{ title: '원장' }],
         }));
 
-        expect(stub.doc().querySelectorAll('table.approval-table')).toHaveLength(2);
+        const approvals = Array.from(stub.doc().querySelectorAll('table.approval-table'));
+        expect(approvals.map(el => el.classList.contains('approval-hidden'))).toEqual([false, true]);
+        expect(stub.html()).toContain('.approval-table.approval-hidden');
     });
 });
 

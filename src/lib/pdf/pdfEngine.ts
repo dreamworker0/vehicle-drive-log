@@ -59,11 +59,17 @@ export function getTimeStr(createdAt: unknown): string {
 
 // ── 공통 HTML 빌더 ──
 
-/** 결재란 HTML 생성 */
-export function buildApprovalHtml(approvalLine: ApprovalEntry[]): string {
+/**
+ * 결재란 HTML 생성
+ *
+ * @param hidden 자리는 그대로 두고 표만 감춘다 — 결재란은 첫 장에만 찍는다(둘째 장부터 반복되면
+ *               결재 도장을 어디에 찍어야 하는지 모호해진다). 다만 자리까지 없애면 표가 시작되는
+ *               높이가 장마다 달라져 양식이 어긋나므로, 둘째 장부터는 `visibility: hidden`으로 비운다.
+ */
+export function buildApprovalHtml(approvalLine: ApprovalEntry[], hidden = false): string {
     if (!approvalLine || approvalLine.length === 0) return '';
     return `
-        <table class="approval-table">
+        <table class="approval-table${hidden ? ' approval-hidden' : ''}"${hidden ? ' aria-hidden="true"' : ''}>
             <tr>
                 <th class="approval-header" rowspan="2">결<br/>재</th>
                 ${approvalLine.map(a => `<td class="approval-title">${escapeHtml(a.title || '')}</td>`).join('')}
@@ -138,6 +144,8 @@ function getLandscapePdfStyles(columnStyles: string, extraStyles = ''): string {
             min-width: 52px; height: 18px;
         }
         .approval-sign { height: 40px; min-width: 52px; }
+        /* 둘째 장 이후: 결재란은 감추고 자리(표 시작 높이)만 유지한다 */
+        .approval-table.approval-hidden { visibility: hidden; }
         .total-row { background: #f5f5f5; font-weight: 700; }
         .total-label { font-size: 10px; }
         .total-value { font-size: 10px; }
@@ -203,7 +211,7 @@ export function printPdfReport<T>(config: PdfReportConfig<T>): boolean {
             <div class="page">
                 <div class="header-area">
                     <h1 class="title">${title}</h1>
-                    ${buildApprovalHtml(approvalLine)}
+                    ${buildApprovalHtml(approvalLine, pageIdx > 0)}
                 </div>
                 <div class="info-row">
                     <div class="info-left">
