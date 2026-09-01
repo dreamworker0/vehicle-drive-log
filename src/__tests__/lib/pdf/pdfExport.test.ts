@@ -445,16 +445,32 @@ describe('downloadDriveLogsPdf — 표시 규칙', () => {
         expect(cellsOf(dataRows(stub.doc())[0])[11]).toBe('');
     });
 
-    it('결재라인을 지정하면 모든 페이지에 결재란을 넣는다', () => {
+    it('결재라인을 지정하면 첫 장에 결재란을 넣는다', () => {
+        const stub = stubPrintWindow();
+        downloadDriveLogsPdf([log()], {
+            approvalLine: [{ title: '담당' }, { title: '원장' }],
+        });
+
+        const doc = stub.doc();
+        const approval = doc.querySelector('table.approval-table')!;
+        expect(approval.classList.contains('approval-hidden')).toBe(false);
+        expect(Array.from(approval.querySelectorAll('.approval-title')).map(e => e.textContent))
+            .toEqual(['담당', '원장']);
+    });
+
+    /**
+     * 결재란은 첫 장에만 찍는다 — 둘째 장부터 반복되면 결재 도장을 어디에 찍을지 모호해진다.
+     * 다만 자리까지 없애면 표가 시작되는 높이가 장마다 어긋나므로 자리는 남긴다.
+     */
+    it('둘째 장부터는 결재란을 감추고 자리만 남긴다', () => {
         const stub = stubPrintWindow();
         downloadDriveLogsPdf(Array.from({ length: ROWS_PER_PAGE + 1 }, () => log()), {
             approvalLine: [{ title: '담당' }, { title: '원장' }],
         });
 
-        const doc = stub.doc();
-        expect(doc.querySelectorAll('table.approval-table')).toHaveLength(2);
-        expect(Array.from(doc.querySelectorAll('.approval-title')).map(e => e.textContent))
-            .toEqual(['담당', '원장', '담당', '원장']);
+        const approvals = Array.from(stub.doc().querySelectorAll('table.approval-table'));
+        expect(approvals.map(el => el.classList.contains('approval-hidden'))).toEqual([false, true]);
+        expect(stub.html()).toContain('.approval-table.approval-hidden');
     });
 });
 

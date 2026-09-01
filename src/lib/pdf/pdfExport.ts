@@ -183,11 +183,15 @@ function buildEmptyRows(count: number, includePassengers = false, includeFuel = 
 
 /**
  * 결재란 HTML 생성
+ *
+ * @param hidden 자리는 그대로 두고 표만 감춘다 — 결재란은 첫 장에만 찍는다(둘째 장부터 반복되면
+ *               결재 도장을 어디에 찍어야 하는지 모호해진다). 다만 자리까지 없애면 표가 시작되는
+ *               높이가 장마다 달라져 양식이 어긋나므로, 둘째 장부터는 `visibility: hidden`으로 비운다.
  */
-function buildApprovalHtml(approvalLine: ApprovalEntry[]) {
+function buildApprovalHtml(approvalLine: ApprovalEntry[], hidden = false) {
     if (!approvalLine || approvalLine.length === 0) return '';
     return `
-        <table class="approval-table">
+        <table class="approval-table${hidden ? ' approval-hidden' : ''}"${hidden ? ' aria-hidden="true"' : ''}>
             <tr>
                 <th class="approval-header" rowspan="2">결<br/>재</th>
                 ${approvalLine.map(a => `<td class="approval-title">${escapeHtml(a.title || '')}</td>`).join('')}
@@ -210,7 +214,7 @@ function buildPageHtml(page: PageContent, pageIdx: number, totalPages: number, {
     const emptyRowsHtml = buildEmptyRows(page.emptyCount, includePassengers, includeFuel, includeStartLocation);
     // 소계·합계 라벨이 덮는 칸 수 — 출발지 열이 붙으면 한 칸 늘어난다(안 늘리면 주행거리 합계가 밀린다)
     const totalLabelSpan = 10 + (includeStartLocation ? 1 : 0);
-    const approvalHtml = buildApprovalHtml(approvalLine);
+    const approvalHtml = buildApprovalHtml(approvalLine, pageIdx > 0);
 
     return `
         <div class="page">

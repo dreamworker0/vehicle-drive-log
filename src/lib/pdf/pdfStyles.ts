@@ -82,6 +82,11 @@ export function getPdfStyles() {
             min-width: 52px;
         }
 
+        /* 둘째 장 이후: 결재란은 감추고 자리(표 시작 높이)만 유지한다 */
+        .approval-table.approval-hidden {
+            visibility: hidden;
+        }
+
         .approval-name {
             font-size: 9px;
             height: 18px;
