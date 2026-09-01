@@ -94,10 +94,16 @@ describe("computeAllDashboardStats — 주유/하이패스/알림 캐시 이관 
         });
 
         // ── 하이패스 요약 ──
+        // 하이패스만 '어제' 날짜로 심는다 — 아래 일별 시계열에서 오늘이 아닌 버킷도
+        // 채워지는지 보기 위해서다. 그래서 **매월 1일에는 어제가 지난달**이 되어 같은
+        // 5,000원이 monthAmount가 아니라 prevMonthAmount로 잡힌다. 고정값으로 두면
+        // 월초에만 CI가 깨진다(2026-09-01 KST에 실제로 깨졌다).
+        const yesterdayIsThisMonth = kstDateStr(-1).slice(0, 7) === kstDateStr(0).slice(0, 7);
         expect(stats.hipassStats).toEqual({
             totalCount: 1, totalAmount: 5000,
-            monthCount: 1, monthAmount: 5000,
-            prevMonthAmount: 0,
+            monthCount: yesterdayIsThisMonth ? 1 : 0,
+            monthAmount: yesterdayIsThisMonth ? 5000 : 0,
+            prevMonthAmount: yesterdayIsThisMonth ? 0 : 5000,
         });
 
         // ── 알림 요약 (총 3, 읽음 1 → 33%) ──
