@@ -11,6 +11,7 @@ vi.mock('../../lib/firebase', () => ({
     auth: { currentUser: null },
     db: {},
     authReady: Promise.resolve(),
+    getAppCheckBlock: vi.fn(() => null),
 }));
 vi.mock('firebase/auth', () => ({
     getAuth: vi.fn(() => ({ currentUser: null })),
@@ -46,7 +47,7 @@ vi.mock('../../lib/firestoreLifecycle', () => ({
 
 // useAuth를 import하기 전에 mock 설정 완료
 import { AuthProvider, useAuth } from '../../hooks/useAuth';
-import { auth } from '../../lib/firebase';
+import { auth, getAppCheckBlock } from '../../lib/firebase';
 import { refreshToken, getLastTokenRefreshFailure } from '../../lib/tokenRefresh';
 import { wasIntentionalLogout } from '../../lib/auth';
 import { captureError } from '../../lib/sentry';
@@ -353,5 +354,105 @@ describe('useAuth — 예기치 않은 세션 종료 보고', () => {
         expect(result.current.user).toBeNull();
         expect(captureError).not.toHaveBeenCalled();
         expect(useToastStore.getState().toasts).toHaveLength(0);
+    });
+});
+
+
+/**
+ * App Check가 막히면 Firestore가 통째로 거부된다 — 콘솔에는 permission-denied만 남는다.
+ *
+ * 2026-09-01 Firefox 모바일에서 실제로 났다. reCAPTCHA 검증이 403으로 거부되자 SDK가
+ * 24시간 스로틀에 들어갔고(`appCheck/throttled`), Firestore·Storage·콜러블 32/34가
+ * '적용됨'이라 그 클라이언트는 하루 동안 앱을 못 썼다. 그런데 화면 안내는
+ * "페이지 새로고침 요망"이었다 — 새로고침으로는 절대 풀리지 않는 상태다.
+ */
+describe('useAuth — App Check 차단 시 안내와 보고', () => {
+    const authedUser = {
+        uid: 'u1',
+        isAnonymous: false,
+        getIdTokenResult: vi.fn().mockResolvedValue({ claims: {} }),
+    };
+
+    function captureSnapshotError() {
+        let onError: ((err: { code?: string }) => void) | undefined;
+        mockOnSnapshot.mockImplementation((_ref: unknown, _next: unknown, err: (e: { code?: string }) => void) => {
+            onError = err;
+            return vi.fn();
+        });
+        return () => onError!;
+    }
+
+    function captureAuthCallback() {
+        let cb: ((u: unknown) => void) | undefined;
+        mockOnAuthStateChanged.mockImplementation((_a: unknown, callback: (u: unknown) => void) => {
+            cb = callback;
+            return vi.fn();
+        });
+        return () => cb!;
+    }
+
+    /** 재시도(최대 2회)를 모두 소진시켜 최종 안내 분기까지 밀어붙인다. */
+    async function exhaustRetries(getOnError: () => (e: { code?: string }) => void) {
+        await act(async () => { getOnError()({ code: 'permission-denied' }); });
+        await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+        await act(async () => { getOnError()({ code: 'permission-denied' }); });
+        await act(async () => { await vi.advanceTimersByTimeAsync(2000); });
+        await act(async () => { getOnError()({ code: 'permission-denied' }); });
+    }
+
+    beforeEach(() => {
+        vi.useFakeTimers();
+        firestoreTerminated = false;
+        (auth as { currentUser: unknown }).currentUser = authedUser;
+        vi.mocked(refreshToken).mockResolvedValue(undefined);
+        vi.mocked(getAppCheckBlock).mockReturnValue(null);
+        useToastStore.setState({ toasts: [] });
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+        firestoreTerminated = false;
+        (auth as { currentUser: unknown }).currentUser = null;
+        useToastStore.setState({ toasts: [] });
+    });
+
+    it('App Check가 정상이면 기존 권한·네트워크 안내를 그대로 낸다', async () => {
+        const getCb = captureAuthCallback();
+        const getOnError = captureSnapshotError();
+        renderHook(() => useAuth(), { wrapper: createWrapper() });
+
+        await vi.advanceTimersByTimeAsync(0);
+        await act(async () => { getCb()(authedUser); });
+        await exhaustRetries(getOnError);
+
+        const messages = useToastStore.getState().toasts.map(t => t.message).join(' ');
+        expect(messages).toContain('네트워크 설정 문제');
+        expect(messages).not.toContain('새로고침으로는 해결되지 않으니');
+    });
+
+    it('App Check가 막혀 있으면 새로고침이 답이 아니라고 알리고, 세션당 한 번만 보고한다', async () => {
+        vi.mocked(getAppCheckBlock).mockReturnValue({ code: 'appCheck/throttled', at: Date.now() - 5000 });
+        const getCb = captureAuthCallback();
+        const getOnError = captureSnapshotError();
+        renderHook(() => useAuth(), { wrapper: createWrapper() });
+
+        await vi.advanceTimersByTimeAsync(0);
+        await act(async () => { getCb()(authedUser); });
+        await exhaustRetries(getOnError);
+
+        const messages = useToastStore.getState().toasts.map(t => t.message).join(' ');
+        expect(messages).toContain('새로고침으로는 해결되지 않으니');
+        expect(messages).not.toContain('페이지 새로고침 요망');
+
+        const appCheckReports = vi.mocked(captureError).mock.calls
+            .filter(([err]) => (err as Error)?.message?.includes('[AppCheck]'));
+        expect(appCheckReports).toHaveLength(1);
+        expect(appCheckReports[0][1]).toMatchObject({ appCheckCode: 'appCheck/throttled', scope: 'user' });
+
+        // 원인이 하나인데 반복 보고하면 노이즈다 — 같은 세션에서 다시 겪어도 1회다.
+        await exhaustRetries(getOnError);
+        const after = vi.mocked(captureError).mock.calls
+            .filter(([err]) => (err as Error)?.message?.includes('[AppCheck]'));
+        expect(after).toHaveLength(1);
     });
 });

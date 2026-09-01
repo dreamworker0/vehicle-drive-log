@@ -28,6 +28,26 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
+/**
+ * App Check 토큰 발급이 막힌 상태 (막혔으면 코드와 시각, 아니면 null)
+ *
+ * **왜 상태를 들고 있나.** reCAPTCHA 검증이 403으로 거부되면 SDK가 최대 24시간
+ * 스로틀에 들어가고(`appCheck/throttled`), 그동안 이 클라이언트는 App Check를 강제하는
+ * 모든 제품에서 거부된다 — Firestore·Storage(둘 다 '적용됨')와 콜러블 34개 중 32개다.
+ * 즉 화면에는 `permission-denied`만 보이지만 원인은 권한도 네트워크도 아니고,
+ * **새로고침으로는 풀리지 않는다.**
+ *
+ * 그런데 App Check 경고는 sentry.ts·이 파일의 console.warn 후킹에서 의도적으로 걸러진다
+ * (노이즈라서). 그래서 원인이 화면에도 Sentry에도 남지 않아, 사용자는 "새로고침 하세요"
+ * 안내를 받고 하루 종일 새로고침만 반복하게 된다. 그 오안내를 막으려고 상태를 남긴다.
+ */
+let appCheckBlock: { code: string; at: number } | null = null;
+
+/** App Check 토큰이 막혀 있으면 그 코드와 시각, 아니면 null */
+export function getAppCheckBlock(): { code: string; at: number } | null {
+    return appCheckBlock;
+}
+
 // === App Check 초기화 (initializeApp 직후, 다른 서비스보다 먼저) ===
 // 개발 환경: VITE_APPCHECK_DEBUG_TOKEN으로 에뮬레이터/로컬 통과
 // 프로덕션: reCAPTCHA v3 토큰 자동 발급
@@ -84,9 +104,15 @@ if (typeof window !== 'undefined' && !USE_EMULATOR && !isInAppBrowser()) {
     // App Check 내부 에러(500 에러 등) — 동일 errorCode 기준 60초 윈도우에 1회만 출력
     const appCheckWarnDedup = new Map<string, number>();
     onTokenChanged(appCheck, {
-        next: () => { /* 정상 토큰 발급 시 무시 */ },
+        next: () => {
+            // 토큰이 다시 나오면 막힘이 풀린 것이다.
+            appCheckBlock = null;
+        },
         error: (err) => {
             const code = (err as { code?: string })?.code || 'unknown';
+            // 안내를 가르기 위해 **먼저** 상태를 남긴다 — 아래 60초 dedup은 콘솔 출력만 줄이는
+            // 장치라서, 그 뒤에 두면 같은 코드가 연달아 날 때 상태가 갱신되지 않는다.
+            appCheckBlock = { code, at: Date.now() };
             const now = Date.now();
             const last = appCheckWarnDedup.get(code) ?? 0;
             if (now - last < 60_000) return;
