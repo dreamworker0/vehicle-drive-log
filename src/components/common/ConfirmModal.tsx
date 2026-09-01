@@ -99,10 +99,16 @@ export default function ConfirmModal({
         if (e.key === 'Enter') handleConfirm();
     };
 
+    // danger·warning은 btn-* 공용 클래스를 쓰지 않는다 — 앱 전반이 이 두 색을 인라인 +
+    // dark: 페어링으로 쓰고 있어(CancelReservationHandler 등) 그 관행을 따른다. 대신
+    // **포커스 링을 직접 얹는다.** primary(btn-primary)에는 focus:ring이 들어 있는데
+    // 이 둘에는 없어서, 이 모달만 브라우저 기본 아웃라인이 떴다. 특히 이 모달은 열릴 때
+    // 확인 버튼을 자동 포커스하므로(위 useEffect) 포커스 표시가 가장 잘 보이는 자리다.
+    const focusRing = 'focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-surface-900';
     const btnColors = {
         primary: 'btn-primary',
-        danger: 'bg-red-500 hover:bg-red-600 text-white dark:bg-red-600 dark:hover:bg-red-700',
-        warning: 'bg-amber-500 hover:bg-amber-600 text-white dark:bg-amber-600 dark:hover:bg-amber-700',
+        danger: `bg-red-500 hover:bg-red-600 text-white dark:bg-red-600 dark:hover:bg-red-700 ${focusRing} focus:ring-red-400`,
+        warning: `bg-amber-500 hover:bg-amber-600 text-white dark:bg-amber-600 dark:hover:bg-amber-700 ${focusRing} focus:ring-amber-400`,
     };
 
     return (
