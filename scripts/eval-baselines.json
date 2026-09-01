@@ -3,9 +3,9 @@
   "trigger": {
     "score": "24/24",
     "provenance": {
-      "measuredAt": "2026-08-29",
+      "measuredAt": "2026-08-31",
       "model": "claude-opus-5",
-      "commitSha": "af8122963e6cca06f86864e1c33e0164f6387129",
+      "commitSha": "eb667be4bc5c382c6dbb150948b477c1fa7635df",
       "caseCount": 24,
       "resultsHash": "6883325e911a26b6"
     },
@@ -39,9 +39,9 @@
   "behavior": {
     "score": "10/10",
     "provenance": {
-      "measuredAt": "2026-08-29",
+      "measuredAt": "2026-08-31",
       "model": "claude-opus-5",
-      "commitSha": "af8122963e6cca06f86864e1c33e0164f6387129",
+      "commitSha": "eb667be4bc5c382c6dbb150948b477c1fa7635df",
       "caseCount": 10,
       "resultsHash": "7921734135b4eddf"
     },
@@ -59,86 +59,6 @@
     }
   },
   "history": [
-    {
-      "kind": "trigger",
-      "score": "30/30",
-      "provenance": {
-        "measuredAt": "2026-08-05",
-        "model": "claude-fable-5",
-        "commitSha": "8a549334aad73521c205540c27567535cbfb04b9",
-        "caseCount": 30,
-        "resultsHash": "d4bb10c39a202faf"
-      },
-      "results": {
-        "1": "firestore-model-pattern",
-        "2": "firestore-query-optimization",
-        "3": "firebase-cost-reduction",
-        "4": "add-cloud-function",
-        "5": "add-alimtalk",
-        "6": "add-email-notification",
-        "7": "add-calendar-integration",
-        "8": "add-component",
-        "9": "settings-ui",
-        "10": "dark-mode-audit",
-        "11": "shared-ui-controls",
-        "12": "dashboard-ui-pattern",
-        "13": "data-export-pattern",
-        "14": "data-migration-script",
-        "15": "add-zod-validation",
-        "16": "gemini-ocr-integration",
-        "17": "write-test",
-        "18": "pre-deploy-check",
-        "19": "sentry-noise-filter",
-        "20": "code-cleanup",
-        "21": "troubleshoot-deployment",
-        "22": "add-pwa-feature",
-        "23": "add-analytics-tracking",
-        "24": "add-hook",
-        "25": "update-faq",
-        "26": "vehicle-color",
-        "27": "none",
-        "28": "none",
-        "29": "none",
-        "30": "release-notes"
-      }
-    },
-    {
-      "kind": "trigger",
-      "score": "24/24",
-      "provenance": {
-        "measuredAt": "2026-08-29",
-        "model": "claude-fable-5",
-        "commitSha": "43cfdfb378bd8929df7d003f305e2aadb37c00e6",
-        "caseCount": 24,
-        "resultsHash": "6883325e911a26b6"
-      },
-      "results": {
-        "1": "firestore-model-pattern",
-        "2": "firestore-query-optimization",
-        "3": "firebase-cost-reduction",
-        "4": "add-cloud-function",
-        "6": "add-email-notification",
-        "8": "add-component",
-        "9": "settings-ui",
-        "10": "dark-mode-audit",
-        "11": "shared-ui-controls",
-        "13": "data-export-pattern",
-        "16": "gemini-ocr-integration",
-        "17": "write-test",
-        "18": "pre-deploy-check",
-        "19": "sentry-noise-filter",
-        "20": "code-cleanup",
-        "21": "troubleshoot-deployment",
-        "22": "add-pwa-feature",
-        "24": "add-hook",
-        "25": "update-faq",
-        "26": "vehicle-color",
-        "27": "none",
-        "28": "none",
-        "29": "none",
-        "30": "release-notes"
-      }
-    },
     {
       "kind": "behavior",
       "score": "10/10",
@@ -206,6 +126,66 @@
         "measuredAt": "2026-08-29",
         "model": "claude-fable-5",
         "commitSha": "7b20bb4ad390c9beef47e20c5df6c4ca17913459",
+        "caseCount": 10,
+        "resultsHash": "7921734135b4eddf"
+      },
+      "results": {
+        "1": "pass",
+        "2": "pass",
+        "3": "pass",
+        "4": "pass",
+        "5": "pass",
+        "6": "pass",
+        "7": "pass",
+        "8": "pass",
+        "9": "pass",
+        "10": "pass"
+      }
+    },
+    {
+      "kind": "trigger",
+      "score": "24/24",
+      "provenance": {
+        "measuredAt": "2026-08-29",
+        "model": "claude-opus-5",
+        "commitSha": "af8122963e6cca06f86864e1c33e0164f6387129",
+        "caseCount": 24,
+        "resultsHash": "6883325e911a26b6"
+      },
+      "results": {
+        "1": "firestore-model-pattern",
+        "2": "firestore-query-optimization",
+        "3": "firebase-cost-reduction",
+        "4": "add-cloud-function",
+        "6": "add-email-notification",
+        "8": "add-component",
+        "9": "settings-ui",
+        "10": "dark-mode-audit",
+        "11": "shared-ui-controls",
+        "13": "data-export-pattern",
+        "16": "gemini-ocr-integration",
+        "17": "write-test",
+        "18": "pre-deploy-check",
+        "19": "sentry-noise-filter",
+        "20": "code-cleanup",
+        "21": "troubleshoot-deployment",
+        "22": "add-pwa-feature",
+        "24": "add-hook",
+        "25": "update-faq",
+        "26": "vehicle-color",
+        "27": "none",
+        "28": "none",
+        "29": "none",
+        "30": "release-notes"
+      }
+    },
+    {
+      "kind": "behavior",
+      "score": "10/10",
+      "provenance": {
+        "measuredAt": "2026-08-29",
+        "model": "claude-opus-5",
+        "commitSha": "af8122963e6cca06f86864e1c33e0164f6387129",
         "caseCount": 10,
         "resultsHash": "7921734135b4eddf"
       },
