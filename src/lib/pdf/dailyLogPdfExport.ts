@@ -4,6 +4,7 @@
  * A4 세로 (portrait)
  */
 import { formatNumber, escapeHtml } from './pdfStyles';
+import { measurePageMetrics, paginateByHeight, A4_PORTRAIT_DAILY_BOX } from './pageFit';
 import { recordExport } from '../audit/recordExport';
 
 interface DailyDriveEntry {
@@ -45,6 +46,7 @@ interface DailyLogPdfOptions {
     onError?: (msg: string) => void;
 }
 
+/** 종이 양식의 칸 수 — 페이지당 데이터 행의 **상한**이자 빈 칸을 채우는 기준 */
 const MAX_ROWS = 12;
 
 /**
@@ -88,10 +90,16 @@ function formatDateKorean(dateStr: string | undefined): string {
     return `${parts[0]}년 ${parseInt(parts[1])}월 ${parseInt(parts[2])}일`;
 }
 
-function buildApprovalHtml(approvalLine: ApprovalEntry[]) {
+/**
+ * 결재란 HTML 생성
+ *
+ * @param hidden 자리는 두고 표만 감춘다 — 결재란은 첫 장에만 찍고(도장을 어디에 찍을지
+ *               모호해진다), 자리를 없애면 표 시작 높이가 장마다 달라져 양식이 어긋난다.
+ */
+function buildApprovalHtml(approvalLine: ApprovalEntry[], hidden = false) {
     if (!approvalLine || approvalLine.length === 0) return '';
     return `
-        <table class="approval-table">
+        <table class="approval-table${hidden ? ' approval-hidden' : ''}"${hidden ? ' aria-hidden="true"' : ''}>
             <tr>
                 <th class="approval-header" rowspan="2">결<br/>재</th>
                 ${approvalLine.map(a => `<td class="approval-title">${escapeHtml(a.title || '')}</td>`).join('')}
@@ -178,6 +186,13 @@ function buildEmptyRows(count: number) {
     `).join('');
 }
 
+/** 한 장에 담을 내용 — 실측 분할이 정한다 */
+interface DailyPage {
+    logs: DailyDriveEntry[];
+    /** 아래를 채울 빈 행 수 — 양식 칸 수(12)를 유지한다 */
+    emptyCount: number;
+}
+
 function buildDailyPdfHtml(
     driveLogs: DailyDriveEntry[],
     fuelLogs: DailyFuelEntry[],
@@ -189,32 +204,20 @@ function buildDailyPdfHtml(
         approvalLine = [],
     } = options;
 
-    const approvalHtml = buildApprovalHtml(approvalLine);
     const fuel = fuelLogs.length > 0 ? fuelLogs[0] : null;
     const summaryHtml = buildSummaryHtml(todayDistance, previousEndKm, todayEndKm, fuel);
 
-    const rowsHtml = driveLogs.map(log => buildDriveRow(log)).join('');
-    const emptyCount = Math.max(0, MAX_ROWS - driveLogs.length);
-    const emptyRowsHtml = buildEmptyRows(emptyCount);
-
-    return `
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <title>차량운행일지 - ${escapeHtml(orgName)} - ${escapeHtml(date)}</title>
-    <style>${getDailyPdfStyles()}</style>
-</head>
-<body>
+    /** 한 장 HTML — 측정용 문서와 실제 인쇄물이 같은 마크업을 써야 실측이 의미를 갖는다 */
+    const buildPage = (page: DailyPage, pageIdx: number, totalPages: number) => `
     <div class="page">
         <div class="header-area">
             <h1 class="title">일 별 차 량 운 행 일 지</h1>
-            ${approvalHtml}
+            ${buildApprovalHtml(approvalLine, pageIdx > 0)}
         </div>
 
         <div class="date-org-row">
             <span class="date-text">날짜 &nbsp; <strong>${escapeHtml(formatDateKorean(date))}</strong> &nbsp;&nbsp;&nbsp; 차량 &nbsp; <strong>${escapeHtml(vehicleName)}</strong>${startLocation ? ` &nbsp;&nbsp;&nbsp; 출발지 &nbsp; <strong>${escapeHtml(startLocation)}</strong>` : ''}</span>
-            <span class="org-text">기관명 &nbsp; <strong>${escapeHtml(orgName)}</strong></span>
+            <span class="org-text">기관명 &nbsp; <strong>${escapeHtml(orgName)}</strong>${totalPages > 1 ? ` &nbsp; <span class="page-num">(${pageIdx + 1} / ${totalPages})</span>` : ''}</span>
         </div>
 
         ${summaryHtml}
@@ -233,14 +236,60 @@ function buildDailyPdfHtml(
                 </tr>
             </thead>
             <tbody>
-                ${rowsHtml}
-                ${emptyRowsHtml}
+                ${page.logs.map(log => buildDriveRow(log)).join('')}
+                ${buildEmptyRows(page.emptyCount)}
             </tbody>
         </table>
-    </div>
+    </div>`;
+
+    const buildDoc = (pages: DailyPage[]) => `
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>차량운행일지 - ${escapeHtml(orgName)} - ${escapeHtml(date)}</title>
+    <style>${getDailyPdfStyles()}</style>
+</head>
+<body>
+${pages.map((page, pageIdx) => buildPage(page, pageIdx, pages.length)).join('\n')}
 </body>
 </html>
     `;
+
+    /**
+     * 페이지 분할 — 한 장에 들어가는 높이만큼 담는다.
+     *
+     * 예전에는 `MAX_ROWS - driveLogs.length`로 빈 칸만 채우고 13건부터는 행을 그대로 다 찍었다.
+     * 실측하면 짧은 목적지로도 30건에서 1,087px, 목적지·용무가 긴 하루는 **20건에서 1,867px**로
+     * 한 장(1,020px)을 넘긴다. 넘친 장에는 제목도 결재란도 표 머리글도 없다.
+     *
+     * 12칸(`MAX_ROWS`)은 **빈 칸을 채우는 기준으로만** 쓴다 — 상한으로 두면 13건짜리 하루가
+     * 한 장에 다 들어가는데도 두 장으로 나뉜다. 그래서 지금까지 잘 나오던 하루(1~29건, 짧은
+     * 목적지)는 결과가 그대로이고, 넘치던 하루만 나뉜다.
+     */
+    const splitPages = (): DailyPage[] => {
+        // 측정용: 전체 행 + 빈 행 1개(기준 높이)가 한 장에 담긴 문서. 합계 행은 이 양식에 없다.
+        const probe = buildDoc([{ logs: driveLogs, emptyCount: 1 }]);
+        const metrics = measurePageMetrics(probe, driveLogs.length, {
+            trailing: { subtotal: false, total: false },
+            box: A4_PORTRAIT_DAILY_BOX,
+        });
+        const slices = metrics
+            ? paginateByHeight(metrics, { box: A4_PORTRAIT_DAILY_BOX, fillTo: MAX_ROWS })
+            : [];
+
+        if (slices.length > 0) {
+            return slices.map(slice => ({
+                logs: driveLogs.slice(slice.start, slice.start + slice.count),
+                emptyCount: slice.emptyCount,
+            }));
+        }
+
+        // 측정 불가 환경(jsdom 등): 예전처럼 전부 한 장에 담고 12칸까지 빈 칸을 채운다
+        return [{ logs: driveLogs, emptyCount: Math.max(0, MAX_ROWS - driveLogs.length) }];
+    };
+
+    return buildDoc(splitPages());
 }
 
 function getDailyPdfStyles() {
@@ -259,7 +308,8 @@ function getDailyPdfStyles() {
             background: #fff;
         }
 
-        .page { width: 100%; }
+        .page { width: 100%; page-break-after: always; }
+        .page:last-child { page-break-after: auto; }
 
         /* ── 헤더 ── */
         .header-area {
@@ -294,6 +344,8 @@ function getDailyPdfStyles() {
             font-weight: 600; min-width: 52px; height: 18px;
         }
         .approval-sign { height: 40px; min-width: 52px; }
+        /* 둘째 장 이후: 결재란은 감추고 자리(표 시작 높이)만 유지한다 */
+        .approval-table.approval-hidden { visibility: hidden; }
 
         /* ── 날짜 / 기관 줄 ── */
         .date-org-row {
@@ -305,6 +357,7 @@ function getDailyPdfStyles() {
         }
         .date-text { font-size: 13px; }
         .org-text { font-size: 11px; }
+        .page-num { font-size: 10px; color: #666; }
 
         /* ── 운행상황 + 주유 요약 테이블 ── */
         .summary-table {
@@ -412,7 +465,7 @@ function getDailyPdfStyles() {
                 padding: 28px 32px;
                 box-shadow: 0 2px 12px rgba(0,0,0,0.18);
                 max-width: 700px;
-                margin: 0 auto;
+                margin: 0 auto 20px;
             }
         }
     `;

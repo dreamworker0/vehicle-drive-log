@@ -133,6 +133,34 @@ describe('paginateByHeight — 극단값', () => {
         expect(slices.reduce((sum, s) => sum + s.count, 0)).toBe(heights.length);
     });
 
+    /**
+     * 일별 운행일지는 **종이 양식의 칸 수(12)**까지만 빈 칸을 채운다 — 높이가 남아도 그 아래를
+     * 빈 칸으로 메우지 않는다. 다만 높이가 부족하면 12칸보다 적게 채운다(양식 모양보다
+     * 용지 넘침 방지가 먼저다).
+     */
+    it('fillTo를 주면 빈 행을 그 칸 수까지만 채운다', () => {
+        const m: PageMetrics = { ...metrics(Array.from({ length: 5 }, () => 28)), subtotalHeight: 0, totalHeight: 0 };
+
+        const [slice] = paginateByHeight(m, { fillTo: 12 });
+
+        expect(slice.count).toBe(5);
+        expect(slice.emptyCount).toBe(7); // 5 + 7 = 12칸
+    });
+
+    it('fillTo가 남은 높이보다 크면 높이에 맞춰 줄인다', () => {
+        // 남은 높이로는 12칸을 채울 수 없는 상황 — overhead를 키워 만든다
+        const m: PageMetrics = {
+            ...metrics(Array.from({ length: 3 }, () => 28), PAGE_CONTENT_PX - 200),
+            subtotalHeight: 0, totalHeight: 0,
+        };
+
+        const [slice] = paginateByHeight(m, { fillTo: 12 });
+
+        expect(slice.count).toBe(3);
+        expect(slice.emptyCount).toBeLessThan(9);
+        expect(usedHeight(m, slice, true)).toBeLessThanOrEqual(availableHeight(PAGE_CONTENT_PX - 200));
+    });
+
     it('머리글만으로 용지를 넘기면 분할을 포기한다', () => {
         // 호출부가 고정 행 수 분할로 되돌린다
         expect(paginateByHeight(metrics([22, 22], PAGE_CONTENT_PX))).toEqual([]);
