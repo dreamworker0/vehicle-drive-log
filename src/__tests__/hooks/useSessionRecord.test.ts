@@ -5,7 +5,9 @@
  *  (1) 사용자 문서가 확정되기 전에는 부르지 않는다 (기관이 __system__으로 잘못 남는다)
  *  (2) 리렌더·재마운트로 중복 호출하지 않는다
  *  (3) 같은 브라우저 세션은 같은 sessionId를 재사용한다 (서버 문서 ID가 된다)
- *  (4) 실패해도 throw하지 않는다 — 접속기록 실패가 화면을 막으면 안 된다
+ *  (4) 기록에 성공한 세션은 다시 부팅돼도 호출하지 않는다 (JAVASCRIPT-REACT-65)
+ *  (5) 실패한 세션은 다음 부팅에서 한 번 더 시도한다 — 기록을 유실하지 않는다
+ *  (6) 실패해도 throw하지 않는다 — 접속기록 실패가 화면을 막으면 안 된다
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, waitFor } from '@testing-library/react';
@@ -72,7 +74,10 @@ describe('useSessionRecord', () => {
         expect(mocks.callable).toHaveBeenCalledTimes(1);
     });
 
-    it('같은 브라우저 세션에서 재마운트하면 같은 sessionId를 재사용한다', async () => {
+    // 안드로이드가 백그라운드 PWA를 회수했다가 복귀시키면 페이지가 통째로 다시 부팅된다.
+    // 그때마다 부르면 남는 기록은 그대로인 채 서버의 시간당 상한만 깎여 429가 난다
+    // (JAVASCRIPT-REACT-65 — Samsung Internet 30 / Android 10, /employee/today).
+    it('기록에 성공한 세션은 재부팅해도 다시 부르지 않는다', async () => {
         mocks.auth.user = { uid: 'u1' };
         mocks.auth.userDocState = 'present';
 
@@ -80,11 +85,59 @@ describe('useSessionRecord', () => {
         await waitFor(() => expect(mocks.callable).toHaveBeenCalledTimes(1));
         first.unmount();
 
+        // 같은 브라우저 세션(sessionStorage 유지)에서의 재부팅
+        renderHook(() => useSessionRecord());
+        await Promise.resolve();
+        expect(mocks.callable).toHaveBeenCalledTimes(1);
+    });
+
+    it('계정이 바뀌면 같은 브라우저 세션이라도 새로 기록한다', async () => {
+        mocks.auth.user = { uid: 'u1' };
+        mocks.auth.userDocState = 'present';
+
+        const first = renderHook(() => useSessionRecord());
+        await waitFor(() => expect(mocks.callable).toHaveBeenCalledTimes(1));
+        first.unmount();
+
+        mocks.auth.user = { uid: 'u2' };
         renderHook(() => useSessionRecord());
         await waitFor(() => expect(mocks.callable).toHaveBeenCalledTimes(2));
-
-        // 서버가 같은 문서를 덮어쓰므로 로그가 쌓이지 않는다
+        // 브라우저 세션이 같으므로 sessionId는 그대로 — 계정만 다른 별개의 접속이다
         expect(mocks.callable.mock.calls[1][0].sessionId).toBe(mocks.callable.mock.calls[0][0].sessionId);
+    });
+
+    it('기록에 실패한 세션은 다음 부팅에서 한 번 더 시도한다', async () => {
+        mocks.auth.user = { uid: 'u1' };
+        mocks.auth.userDocState = 'present';
+        mocks.callable.mockRejectedValue(
+            Object.assign(new Error('요청이 너무 많습니다. 1시간 후 다시 시도해주세요. [429]'), { code: 'functions/resource-exhausted' })
+        );
+
+        const first = renderHook(() => useSessionRecord());
+        await waitFor(() => expect(mocks.callable).toHaveBeenCalledTimes(1));
+        first.unmount();
+
+        mocks.callable.mockResolvedValue({ data: { success: true } });
+        renderHook(() => useSessionRecord());
+        await waitFor(() => expect(mocks.callable).toHaveBeenCalledTimes(2));
+        // 표식은 성공한 뒤에만 남으므로 같은 문서를 다시 채울 기회가 있다
+        expect(mocks.callable.mock.calls[1][0].sessionId).toBe(mocks.callable.mock.calls[0][0].sessionId);
+    });
+
+    // 서버가 의도적으로 돌려준 거부다. 사용자가 손쓸 것도 없고 앱 결함도 아니라
+    // 보고해도 조치로 이어지지 않는다 — 조치 없는 보고는 진짜 결함을 덮는다.
+    it('서버 상한 초과(429)는 보고하지 않는다', async () => {
+        mocks.auth.user = { uid: 'u1' };
+        mocks.auth.userDocState = 'present';
+        mocks.firebaseAuth.currentUser = { uid: 'u1' };
+        mocks.callable.mockRejectedValue(
+            Object.assign(new Error('요청이 너무 많습니다. 1시간 후 다시 시도해주세요. [429]'), { code: 'functions/resource-exhausted' })
+        );
+
+        renderHook(() => useSessionRecord());
+
+        await waitFor(() => expect(mocks.callable).toHaveBeenCalledTimes(1));
+        expect(mocks.captureError).not.toHaveBeenCalled();
     });
 
     it('호출이 실패해도 throw하지 않고 Sentry로만 보고한다', async () => {

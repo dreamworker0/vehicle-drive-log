@@ -104,7 +104,15 @@ export const recordSession = onCall(
 
         // 세션당 1회가 정상이나 재시도·탭 복원으로 몇 번 더 올 수 있다.
         // 같은 문서를 덮어쓰므로 쌓이지는 않고, 한도는 남용 방지용이다.
-        await checkRateLimitByUid("recordSession", uid, 20, 3600);
+        //
+        // 20이었다가 60으로 올렸다(JAVASCRIPT-REACT-65). 20은 **정상 사용을 거부했다** —
+        // 안드로이드는 백그라운드 PWA·웹뷰를 자주 회수하고 복귀 때마다 페이지를 다시
+        // 부팅시키는데, 그 부팅 하나가 호출 1건이고 응답이 늦으면 클라이언트가 최대 3번까지
+        // 다시 부른다(callableRetry). 정상 사용자도 시간당 7세션이면 상한에 닿았고, 실제로
+        // 그 429가 Sentry 이슈로 올라왔다(Samsung Internet 30 / Android 10).
+        // 호출 쪽은 세션당 1회로 줄였고(useSessionRecord의 기록 표식), 여기서는 남용 방지선을
+        // 유지하되 정상 사용과 겹치지 않는 자리로 옮긴다 — 감사 문서 1건 쓰기는 값싸다.
+        await checkRateLimitByUid("recordSession", uid, 60, 3600);
 
         // 기관 식별자는 사용자 문서에서 읽는다 — 기관 관리자의 점검 조회 필터가 된다.
         const organizationId = await resolveOrgId(uid);

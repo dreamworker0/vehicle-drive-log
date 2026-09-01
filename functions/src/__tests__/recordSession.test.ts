@@ -103,7 +103,7 @@ describe('recordSession — 인증·입력 검증', () => {
 
     it('남용 방지 한도를 적용한다', async () => {
         await call();
-        expect(mockCheckRateLimit).toHaveBeenCalledWith('recordSession', 'user-1', 20, 3600);
+        expect(mockCheckRateLimit).toHaveBeenCalledWith('recordSession', 'user-1', 60, 3600);
     });
 });
 

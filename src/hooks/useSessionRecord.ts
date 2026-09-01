@@ -4,10 +4,21 @@
  * 변경 로그는 Firestore 트리거가 남기지만 트리거는 호출자의 IP를 볼 수 없다.
  * 그래서 IP·접속 환경은 콜러블(recordSession)이 서버에서 직접 읽어 기록한다.
  *
- * ## 브라우저 세션당 1회
+ * ## 브라우저 세션당 1회 — 그리고 **정말로 1회만 부른다**
  * 세션 식별자를 sessionStorage에 두고 그 값을 서버 문서 ID로 쓴다. 탭 복원·리렌더로
  * 여러 번 불려도 같은 문서를 덮어쓰므로 로그가 쌓이지 않는다. 탭을 닫으면
  * sessionStorage가 비워져 다음 접속은 새 기록이 된다 — 접속 단위와 잘 맞는다.
+ *
+ * 다만 **"쌓이지 않는다"와 "불러도 된다"는 다르다.** 기록에 성공했다는 표식까지
+ * sessionStorage에 남겨, 같은 브라우저 세션이 다시 부팅될 때는 호출 자체를 건너뛴다.
+ * 안드로이드는 백그라운드로 내려간 PWA·웹뷰를 자주 회수하고, 돌아올 때마다 페이지가
+ * 통째로 다시 로드된다(Samsung Internet에서 특히 잦다). 표식이 없으면 그 재부팅
+ * 하나하나가 **같은 문서를 다시 쓰는 호출**이 되어, 남는 기록은 그대로인 채 서버의
+ * 시간당 상한(recordSession)만 깎는다. 실제로 그 상한에 걸린 429가 Sentry 이슈로
+ * 올라왔다(JAVASCRIPT-REACT-65 — Samsung Internet 30 / Android 10, `/employee/today`).
+ *
+ * 표식은 **성공한 뒤에만** 남긴다. 실패한 세션은 다음 부팅에서 한 번 더 시도해야
+ * 기록이 유실되지 않는다.
  *
  * ## 실패해도 화면을 막지 않는다
  * 접속기록은 사용자가 손쓸 수 있는 것이 아니고, 기록 실패로 로그인을 막으면 가용성
@@ -20,12 +31,14 @@
  * 조치로 이어지지 않는 보고는 진짜 결함을 덮는다.
  */
 import { useEffect, useRef } from 'react';
-import { callWithRetry, isTransientCallableError, isAuthExpiredError } from '../lib/callableRetry';
+import { callWithRetry, isTransientCallableError, isAuthExpiredError, isRateLimitedError } from '../lib/callableRetry';
 import { useAuth } from './useAuth';
 import { auth } from '../lib/firebase';
 import { captureError } from '../lib/sentry';
 
 const SESSION_KEY = 'auditSessionId';
+/** 이 브라우저 세션의 접속기록이 서버에 남았다는 표식. 값은 기록된 `uid:sessionId`. */
+const RECORDED_KEY = 'auditSessionRecorded';
 
 /** 서버의 SESSION_ID_PATTERN(`[A-Za-z0-9_-]{8,64}`)을 만족하는 난수를 만든다. */
 function newSessionId(): string {
@@ -51,6 +64,24 @@ function getSessionId(): string {
     }
 }
 
+/** 이미 기록된 세션인지 확인한다. 스토리지를 못 읽으면 "모른다"로 보고 한 번 더 부른다. */
+function isAlreadyRecorded(mark: string): boolean {
+    try {
+        return sessionStorage.getItem(RECORDED_KEY) === mark;
+    } catch {
+        return false;
+    }
+}
+
+/** 기록 성공 표식을 남긴다. 못 남겨도 동작에는 영향이 없다 — 다음 부팅에서 한 번 더 부를 뿐이다. */
+function markRecorded(mark: string): void {
+    try {
+        sessionStorage.setItem(RECORDED_KEY, mark);
+    } catch {
+        /* 스토리지를 못 쓰는 환경 — 무시한다 */
+    }
+}
+
 export default function useSessionRecord() {
     const { user, userDocState } = useAuth();
     /** StrictMode의 이중 마운트·리렌더로 중복 호출하지 않도록 uid별로 한 번만 보낸다. */
@@ -62,7 +93,15 @@ export default function useSessionRecord() {
         if (sentForUid.current === user.uid) return;
         sentForUid.current = user.uid;
 
-        void callWithRetry('recordSession', { sessionId: getSessionId() }).catch((err) => {
+        const sessionId = getSessionId();
+        // 계정이 바뀌면 접속기록도 새로 남아야 하므로 표식에 uid를 함께 담는다.
+        const mark = `${user.uid}:${sessionId}`;
+        // 이 세션의 기록은 이미 서버에 있다 — 다시 불러도 같은 문서를 덮어쓸 뿐이다.
+        if (isAlreadyRecorded(mark)) return;
+
+        void callWithRetry('recordSession', { sessionId }).then(() => {
+            markRecorded(mark);
+        }).catch((err) => {
             if (isTransientCallableError(err)) {
                 console.warn('[useSessionRecord] 접속기록 실패 (네트워크)', err);
                 return;
@@ -73,6 +112,13 @@ export default function useSessionRecord() {
             // **로그인 중인데도 거부되면 그건 그대로 보고한다**(진짜 권한 문제일 수 있다).
             if (isAuthExpiredError(err) && !auth.currentUser) {
                 console.warn('[useSessionRecord] 접속기록 실패 (이미 로그아웃된 세션)', err);
+                return;
+            }
+            // 서버의 시간당 상한에 걸린 거부(429)다. 서버가 의도한 답이고 사용자가 손쓸 것도
+            // 없으며, 이미 같은 시간대에 이 계정의 접속기록이 남아 있다는 뜻이기도 하다.
+            // 보고해도 조치로 이어지지 않으므로 콘솔까지만 남긴다(JAVASCRIPT-REACT-65).
+            if (isRateLimitedError(err)) {
+                console.warn('[useSessionRecord] 접속기록 실패 (서버 상한 초과)', err);
                 return;
             }
             captureError(err, { context: 'useSessionRecord', uid: user.uid });
