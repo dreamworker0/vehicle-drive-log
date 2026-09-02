@@ -91,7 +91,7 @@ Gemini API 키는 평문 `.env`가 아니라 **Secret Manager**에 넣습니다 
 firebase functions:secrets:set GEMINI_API_KEY
 ```
 
-로컬 에뮬레이터에서는 `functions/.secret.local`에 `GEMINI_API_KEY=...`로 둡니다(git 제외 대상). `functions/.env`에 같은 키가 있으면 이름 충돌로 배포가 거부됩니다.
+로컬 에뮬레이터에서는 `functions/.secret.local`에 `GEMINI_API_KEY=...`로 둡니다(git 제외 대상). `functions/.env`에 같은 키가 있으면 이름 충돌로 배포가 거부됩니다. GitHub Actions로 배포한다면 `FUNCTIONS_ENV_FILE` 시크릿에 남은 줄도 같은 충돌을 일으키는데, 배포 워크플로가 `core/params.ts`의 `defineSecret` 키 목록을 뽑아 `functions/.env` 생성 시 걸러내므로 시크릿을 손보지 않아도 배포가 막히지 않습니다 — 다만 값이 시크릿 안에 남아 있으니 정리하는 편이 좋습니다.
 
 ### 4-2. 선택 (해당 기능을 쓸 때만)
 
