@@ -332,8 +332,11 @@ export default function DashboardApiHealth() {
                 </>
             )}
 
-            {/* 캘린더 연동 진단 — 리셋 판단의 근거를 여기서 만든다 */}
-            {hasCalendarIssue && <DashboardCalendarProbe />}
+            {/* 캘린더 연동 진단 — 리셋 판단의 근거를 여기서 만든다.
+                헬스가 ok일 때도 보여준다: 리셋 직후에는 카운터가 0이라 헬스가 ok로 바뀌는데,
+                그때 패널이 사라지면 **리셋이 실제로 복구로 이어졌는지 같은 화면에서 확인할
+                방법이 없다.** 실행은 버튼을 눌러야만 일어나므로 상시 노출 비용은 없다. */}
+            <DashboardCalendarProbe />
 
             {/* 안내 메시지 */}
             <p className="mt-3 text-xs text-surface-400 dark:text-surface-500">

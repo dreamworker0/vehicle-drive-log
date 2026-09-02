@@ -23,11 +23,27 @@ export const MAX_FAIL_COUNT = 10; // 10회 이상 실패 시 영구 제외 (수�
  * 코드베이스의 다른 지점(calendarSync·testCalendarAccess)은 이미 숫자 `code`를 본다.
  */
 export function isCalendarAuthError(err: unknown): boolean {
+    const status = calendarErrorStatus(err);
+    return status === 403 || status === 404;
+}
+
+/**
+ * 캘린더 오류에서 HTTP 상태 코드를 뽑는다 (판별 불가면 null).
+ *
+ * `isCalendarAuthError`의 판정 근거를 그대로 노출하는 단일 원본이다. 진단 도구
+ * (`probeCalendarAccess`)가 자체 추출기를 두면 **운영 경로가 실패로 세어 failCount를
+ * 10까지 올린 바로 그 오류를 진단은 "기타 오류"로 분류하는** 어긋남이 생긴다.
+ * 숫자 코드가 없고 사유 문구만 오는 형태(`"Forbidden"`)까지 여기서 함께 흡수한다.
+ */
+export function calendarErrorStatus(err: unknown): number | null {
     const e = err as { code?: unknown; status?: unknown; response?: { status?: unknown } } | null;
-    const status = Number(e?.response?.status ?? e?.status ?? e?.code);
-    if (status === 403 || status === 404) return true;
+    const raw = Number(e?.response?.status ?? e?.status ?? e?.code);
+    if (raw === 403 || raw === 404) return raw;
+    // 숫자 코드가 없거나 설정 오류를 가리키지 않을 때만 메시지를 본다.
     const msg = (err as Error)?.message || "";
-    return msg.includes("Not Found") || msg.includes("Forbidden") || msg.includes("404") || msg.includes("403");
+    if (msg.includes("Not Found") || msg.includes("404")) return 404;
+    if (msg.includes("Forbidden") || msg.includes("403")) return 403;
+    return Number.isFinite(raw) && raw > 0 ? raw : null;
 }
 
 /**

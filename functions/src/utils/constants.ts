@@ -29,6 +29,11 @@ export const DEFAULT_RATE_LIMITS = {
     // 캘린더 연결 진단 — 임의 캘린더 ID의 접근 가능 여부를 되돌려 주는 경로라, 상한이 없으면
     // 후보 ID를 훑는 오라클이 된다(2026-08-23 감사 발견 1). 정상 진단은 몇 번으로 끝난다.
     testCalendarAccess: { max: 20, windowSec: 3600 },         // uid당 시간당 20회
+    // 연동 캘린더 일괄 진단 — 한 번에 수십 개 캘린더를 훑으므로 반복 호출이 곧 Calendar
+    // 쿼터 소모다. 쿼터가 마르면 운영 동기화가 403(rateLimitExceeded)을 맞고, 그 403은
+    // isCalendarAuthError를 타고 **멀쩡한 차량의 failCount를 올린다** — 진단이 장애를
+    // 만드는 경로다. 정상 운영은 조치 전후로 몇 번이면 끝난다.
+    probeCalendarAccess: { max: 6, windowSec: 3600 },          // uid당 시간당 6회
     // 초대 코드 재발급 — 정상 사용은 기관당 몇 달에 한 번. 상한은 코드를 계속 돌려
     // 직원 가입을 방해하는 남용만 막으면 된다 (2026-09-02, Rules에서 클라이언트 쓰기를 닫고 서버로 이관).
     regenerateInviteCode: { max: 5, windowSec: 3600 },        // uid당 시간당 5회
