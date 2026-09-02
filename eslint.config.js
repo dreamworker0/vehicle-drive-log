@@ -8,7 +8,12 @@ import jsxA11y from 'eslint-plugin-jsx-a11y'
 import requireOrganizationFilter from './eslint-rules/require-organization-filter.js'
 
 export default defineConfig([
-  globalIgnores(['dist', 'coverage', 'test-results', 'playwright-report', 'functions/lib', 'functions/coverage', 'scratch']),
+  // '.claude/worktrees'는 백그라운드 작업이 만드는 저장소 사본이다. 무시하지 않으면 lint가
+  // 그 안의 functions/ 사본까지 훑는데, 경로가 'functions/**'가 아니라
+  // '.claude/worktrees/<이름>/functions/**'라 아래 블록의 ignore에 걸리지 않아
+  // 프론트 규칙(브라우저 전역)으로 검사되면서 no-undef 수백 건이 쏟아진다 —
+  // 작업 중인 코드와 무관한 실패라 pre-push가 막힌다(2026-09-03).
+  globalIgnores(['dist', 'coverage', 'test-results', 'playwright-report', 'functions/lib', 'functions/coverage', 'scratch', '.claude/worktrees']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [

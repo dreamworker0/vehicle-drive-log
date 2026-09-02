@@ -33,6 +33,27 @@ const DEGRADED_THRESHOLD_MS = 3000;
 const PING_TIMEOUT_MS = 5000;
 
 /**
+ * AbortSignal.timeout으로 끊긴 실패인지 판별한다.
+ * Node의 fetch는 이 경우 DOMException(name: "TimeoutError")으로 거부하는데,
+ * 런타임에 따라 다른 에러의 cause에 실려 오기도 해서 두 자리를 모두 본다.
+ */
+function isTimeoutError(err: unknown): boolean {
+    const e = err as { name?: string; cause?: { name?: string } } | null;
+    return e?.name === "TimeoutError" || e?.cause?.name === "TimeoutError";
+}
+
+/**
+ * 핑 실패를 error로 볼지 degraded로 볼지 정한다.
+ *
+ * 기본은 error다. `degradeOnTimeout`은 **응답이 늦은 것이 사용자에게 장애가 아닌 경로**에만 쓴다 —
+ * 지금은 공공데이터포털 하나다(사유는 pingHoliday 주석). 응답이 왔는데 상태 코드가 틀린 경우는
+ * 키·엔드포인트 문제라 조치가 필요하므로 여기서도 error로 남는다.
+ */
+export function resolveFailureStatus(err: unknown, degradeOnTimeout: boolean): "error" | "degraded" {
+    return degradeOnTimeout && isTimeoutError(err) ? "degraded" : "error";
+}
+
+/**
  * 응답 시간과 성공 여부로 status 판정
  */
 function judgeStatus(ok: boolean, latencyMs: number): "ok" | "degraded" | "error" {
@@ -47,7 +68,8 @@ function judgeStatus(ok: boolean, latencyMs: number): "ok" | "degraded" | "error
 async function pingApi(
     name: string,
     displayName: string,
-    fn: () => Promise<void>
+    fn: () => Promise<void>,
+    opts: { degradeOnTimeout?: boolean } = {}
 ): Promise<ApiHealthResult> {
     const start = Date.now();
     try {
@@ -66,7 +88,7 @@ async function pingApi(
         return {
             name,
             displayName,
-            status: "error",
+            status: resolveFailureStatus(err, opts.degradeOnTimeout === true),
             latencyMs,
             error: errorMsg.substring(0, 200),
             checkedAt: new Date().toISOString(),
@@ -106,7 +128,15 @@ async function pingGemini(): Promise<void> {
     }
 }
 
-/** 공공데이터포털 API 핑 — 올해 공휴일 1건만 조회 */
+/**
+ * 공공데이터포털 API 핑 — 올해 공휴일 1건만 조회
+ *
+ * 이 API는 평소에도 느려 5초 핑에 자주 걸린다. 그런데 **사용자 화면은 이 API를 실시간으로
+ * 부르지 않는다** — 프런트(src/lib/holidayApi.ts)는 Firestore `system/holidays`를 먼저 읽고,
+ * 그 문서는 월배치 syncHolidays가 채운다. 배치의 fetch에는 타임아웃이 없어 느려도 성공한다.
+ * 그래서 여기서의 타임아웃은 "느리다"는 정보이지 장애가 아니다 — 상시 빨강으로 두면
+ * 진짜 장애를 놓치게 되므로 degraded로 낮춘다(2026-09-03).
+ */
 async function pingHoliday(): Promise<void> {
     const apiKey = HOLIDAY_API_KEY.value();
     if (!apiKey) throw new Error("HOLIDAY_API_KEY 미설정");
@@ -368,7 +398,8 @@ export const apiHealthCheck = onCall(
         const externalResults = await Promise.all([
             pingApi("tmap", "T맵", pingTmap),
             pingApi("gemini", "Gemini AI", pingGemini),
-            pingApi("holiday", "공공데이터포털", pingHoliday),
+            // 타임아웃은 degraded로 낮춘다 — 사용자 화면은 이 API를 실시간으로 부르지 않는다(pingHoliday 주석)
+            pingApi("holiday", "공공데이터포털", pingHoliday, { degradeOnTimeout: true }),
             pingApi("alimtalk", "알림톡 (Cafe24)", pingAlimtalk),
             pingApi("discord", "Discord", pingDiscord),
         ]);

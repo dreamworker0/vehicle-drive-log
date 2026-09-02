@@ -1,4 +1,4 @@
-import { getLastScheduledTick, evaluateSchedulerStatus } from "../handlers/https/apiHealthCheck";
+import { getLastScheduledTick, evaluateSchedulerStatus, resolveFailureStatus } from "../handlers/https/apiHealthCheck";
 
 // 평일 08~18시 매시 정각 (예약 알림과 동일)
 const WEEKDAY_BIZ = { days: [1, 2, 3, 4, 5], startHour: 8, endHour: 18 };
@@ -79,5 +79,38 @@ describe("apiHealthCheck — 스케줄러 상태 판정", () => {
             const lastRun = now - 40 * 24 * 60 * 60 * 1000; // 40일 전
             expect(evaluateSchedulerStatus(lastRun, now, cfg)).toBe("error");
         });
+    });
+});
+
+describe("apiHealthCheck — 핑 실패 등급 판정", () => {
+    /** AbortSignal.timeout이 만드는 것과 같은 모양의 에러 */
+    const timeoutErr = Object.assign(new Error("The operation was aborted due to timeout"), {
+        name: "TimeoutError",
+    });
+
+    it("degradeOnTimeout이 켜져 있으면 타임아웃은 degraded로 낮춘다", () => {
+        expect(resolveFailureStatus(timeoutErr, true)).toBe("degraded");
+    });
+
+    it("런타임이 cause에 실어 보내도 타임아웃으로 본다", () => {
+        const wrapped = Object.assign(new Error("fetch failed"), { cause: { name: "TimeoutError" } });
+        expect(resolveFailureStatus(wrapped, true)).toBe("degraded");
+    });
+
+    it("degradeOnTimeout이 꺼져 있으면 타임아웃도 error다", () => {
+        // 사용자 경로가 실시간 호출에 걸린 API(T맵·Gemini 등)는 느린 것도 장애다
+        expect(resolveFailureStatus(timeoutErr, false)).toBe("error");
+    });
+
+    it("타임아웃이 아닌 실패는 낮추지 않는다", () => {
+        // 상태 코드 에러는 키·엔드포인트 문제라 조치가 필요하다
+        expect(resolveFailureStatus(new Error("HTTP 401"), true)).toBe("error");
+        expect(resolveFailureStatus(new Error("HOLIDAY_API_KEY 미설정"), true)).toBe("error");
+    });
+
+    it("에러가 아닌 값이 와도 터지지 않고 error로 본다", () => {
+        expect(resolveFailureStatus(null, true)).toBe("error");
+        expect(resolveFailureStatus(undefined, true)).toBe("error");
+        expect(resolveFailureStatus("timeout", true)).toBe("error");
     });
 });
