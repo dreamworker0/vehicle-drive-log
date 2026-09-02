@@ -1,5 +1,5 @@
 import { useState, useEffect, Suspense, type ReactNode } from 'react';
-import { Routes, Route, NavLink, Navigate } from 'react-router-dom';
+import { Routes, Route, NavLink, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { logout } from '../../lib/auth';
 import { getApprovedOrganizations } from '../../lib/firestore/organizations';
@@ -51,6 +51,7 @@ function NavItem({ to, icon, label, badge }: NavItemProps) {
 
 export default function SuperAdminLayout() {
     const { user, userData } = useAuth();
+    const location = useLocation();
     const [sidebarOpen, setSidebarOpen] = useState(false);
     const [pendingCount, setPendingCount] = useState(0);
     const [activeOrgCount, setActiveOrgCount] = useState(0);
@@ -284,8 +285,9 @@ export default function SuperAdminLayout() {
                 {/* 페이지 콘텐츠 */}
                 <div className="flex-1 p-4 lg:p-6 overflow-y-auto">
                     <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-10 h-10 spinner" /></div>}>
-                        {/* 라우트 단위 경계 — 한 화면(예: 차트)의 크래시가 관리자 화면 전체를 비우지 않게 한다. EmployeeLayout과 같은 구조 (2026-09-02) */}
-                        <ErrorBoundary>
+                        {/* 라우트 단위 경계 — 한 화면(예: 차트)의 크래시가 관리자 화면 전체를 비우지 않게 한다 (2026-09-02).
+                            key를 경로로 두어 다른 메뉴로 이동하면 경계가 새로 마운트돼 폴백에서 벗어난다 — 없으면 hasError가 남아 모든 메뉴가 계속 폴백만 보인다. */}
+                        <ErrorBoundary key={location.pathname}>
                             <Routes>
                                 <Route path="dashboard" element={<ServiceDashboard />} />
                                 <Route path="applications" element={<OrgApplicationList />} />

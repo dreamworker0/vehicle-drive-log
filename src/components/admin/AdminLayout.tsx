@@ -277,8 +277,9 @@ export default function AdminLayout() {
 
                 <div className="flex-1 p-4 lg:p-6 overflow-y-auto">
                     <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-8 h-8 spinner" /></div>}>
-                        {/* 라우트 단위 경계 — 한 화면(예: 차트)의 크래시가 관리자 화면 전체를 비우지 않게 한다. EmployeeLayout과 같은 구조 (2026-09-02) */}
-                        <ErrorBoundary>
+                        {/* 라우트 단위 경계 — 한 화면(예: 차트)의 크래시가 관리자 화면 전체를 비우지 않게 한다 (2026-09-02).
+                            key를 경로로 두어 다른 메뉴로 이동하면 경계가 새로 마운트돼 폴백에서 벗어난다 — 없으면 hasError가 남아 모든 메뉴가 계속 폴백만 보인다. */}
+                        <ErrorBoundary key={location.pathname}>
                             <Routes>
                                 <Route path="dashboard" element={<AdminDashboard />} />
                                 <Route path="employees" element={<EmployeeManager />} />

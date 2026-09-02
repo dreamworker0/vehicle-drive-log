@@ -1,5 +1,5 @@
 import { useState, useEffect, Suspense, startTransition } from 'react';
-import { Routes, Route, NavLink, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, NavLink, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { lazyWithRetry } from '../../lib/lazyWithRetry';
 import { getOrganization } from '../../lib/firestore';
@@ -81,6 +81,7 @@ const navItems: NavItem[] = [
 
 export default function EmployeeLayout() {
     const { userData, isSuperAdmin } = useAuth();
+    const location = useLocation();
     const navigate = useNavigate();
     const [orgName, setOrgName] = useState('');
     const { hasNew: hasNewReleaseNotes } = useReleaseNotesStatus();
@@ -152,7 +153,8 @@ export default function EmployeeLayout() {
 
             {/* 메인 콘텐츠 */}
             <main className="flex-1 p-4 overflow-y-auto" style={{ paddingBottom: 'calc(5rem + env(safe-area-inset-bottom, 0px))' }}>
-                <ErrorBoundary>
+                {/* key를 경로로 두어 다른 메뉴로 이동하면 폴백에서 벗어난다 (2026-09-02, Admin·SuperAdmin과 동일) */}
+                <ErrorBoundary key={location.pathname}>
                 <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-8 h-8 spinner" /></div>}>
                     <Routes>
                         <Route path="today" element={<TodayDashboard />} />

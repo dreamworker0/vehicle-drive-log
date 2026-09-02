@@ -40,7 +40,7 @@ export const sendApprovalEmail = onCall(
         }
 
         const displayName = applicantName || orgName;
-        const serviceUrl = `${SERVICE_URL}?code=${inviteCode}`;
+        const serviceUrl = `${SERVICE_URL}?code=${encodeURIComponent(inviteCode)}`;
 
         const mailOptions = {
             from: systemMailFrom(),
@@ -56,11 +56,11 @@ export const sendApprovalEmail = onCall(
                         <p style="color: #475569;"><strong>${escapeHtml(orgName)}</strong> 기관의 신청이 승인되었습니다.</p>
                         <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; margin: 16px 0; text-align: center;">
                             <p style="color: #64748B; font-size: 14px; margin: 0 0 8px;">초대 코드</p>
-                            <p style="color: #1E293B; font-size: 24px; font-weight: 700; margin: 0; letter-spacing: 2px;">${inviteCode}</p>
+                            <p style="color: #1E293B; font-size: 24px; font-weight: 700; margin: 0; letter-spacing: 2px;">${escapeHtml(inviteCode)}</p>
                         </div>
                         <p style="color: #475569; font-size: 14px;">위 초대 코드를 직원들에게 공유하여 기관에 가입하도록 안내해 주세요.</p>
                         <div style="margin-top: 20px; text-align: center;">
-                            <a href="${serviceUrl}"
+                            <a href="${escapeHtml(serviceUrl)}"
                                style="display: inline-block; background: #3B82F6; color: white; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
                                 서비스 바로가기
                             </a>
