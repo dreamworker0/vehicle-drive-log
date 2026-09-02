@@ -10,6 +10,7 @@ export {
     setUser,
     setTag,
     captureException,
+    captureMessage,
     setMeasurement,
     browserTracingIntegration,
 } from '@sentry/react';

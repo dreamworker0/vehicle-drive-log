@@ -867,3 +867,20 @@
 | **이번에 하지 않은 것** | ① Gemini·TMAP·공휴일 키·Discord 웹훅의 `defineSecret` 이관 — 코드는 한 줄이지만 **머지 전에 Secret Manager에 값이 있어야** 배포가 서므로 사용자가 `firebase functions:secrets:set`을 실행한 뒤 머지할 **별도 PR**로 뺀다. ② Modal 공용 프리미티브(17개 모달 중 dialog 역할 4개·포커스 트랩 1개), ③ 변경형 콜러블 6개의 `wrapCallableHandler` 이관(37개 중 4개만 사용), ④ Functions 런타임 메이저 이관(백로그) — 회귀 위험이 있는 구조 변경이라 각각 별건. ⑤ 이 이력 파일이 215KB로 분할 기준(200KB)을 넘었다 — 다음 Phase 전에 `트랙B_Phase142-180.md`로 닫고 새 열린 구간을 만들 것 |
 | **머지 전 리뷰 반영** | 독립 에이전트 적대적 리뷰 판정 "머지 가능" + should-fix 1건: 새로 감싼 `ErrorBoundary`는 `hasError`를 스스로 되돌리지 않아(유일한 리셋은 새로고침) **한 메뉴가 죽으면 다른 메뉴로 이동해도 계속 폴백만 보인다** — 업데이트 소식의 "나머지 메뉴는 그대로 쓸 수 있다"가 과장이 되는 상태였다. 세 레이아웃 모두 `key={location.pathname}`으로 경로가 바뀌면 경계를 새로 마운트하고, 소식 문구는 실제 동작으로 정정. nit 반영 1건: 승인 메일의 초대코드·링크 이스케이프. **기각 2건**(후속): 훅 계층 `captureError`가 firestore 계층과 이중 보고(Sentry Dedupe가 걸러 실해 작음) · superAdmin 승인 경로의 클라이언트 난수 초대코드(신뢰 역할). Rules 회귀 전수 점검·클레임 키·모달 호스트 마운트·sw-purge 논리는 이상 없음으로 확인됨 |
 | **검증** | lint·tsc(프론트·Functions) 0 · Vitest 159/**1,839**(+30) · Jest 70/**923**(+11) · Rules 37(+3) · 빌드·번들 예산(첫 로드 gzip 32.1/42KB) · 하네스 Doctor 16영역 0 · 함수 카탈로그 70개 일치. 머지 전 독립 에이전트 적대적 리뷰 → 지적 반영 → 사용자 승인 후 머지 |
+| **커밋·PR** | #289 |
+
+### Phase 194: 알림은 울렸는데 할 일이 없었다 — 세션 종료 보고를 원인별로 가른다 🔐🔇
+
+> 2026-09-02, Sentry 고우선 알림 메일: `[Auth] 예기치 않은 세션 종료` (`/employee/today`, Samsung Internet 30·Android 10, 릴리즈 `c92e2b5`). 이것은 Phase 185 즈음 넣은 **진단 계측이 첫 실제 사례를 잡은 것**이다. 문제는 잡힌 뒤였다 — 메일에는 메시지 한 줄뿐이고, 로컬에는 Sentry 토큰이 없어 동봉한 판별 근거를 볼 수 없었으며, 무엇보다 **원인이 무엇이든 전부 같은 error 이슈로 올라간다**는 구조가 드러났다.
+
+| 항목 | 내용 |
+|------|------|
+| **계측의 사각지대 두 곳** | ① `tokenRefresh.ts`의 실패 기록은 **우리가 부른** `refreshToken()`만 남긴다. SDK가 스스로 도는 갱신(Firestore의 토큰 요청·주기 갱신)이 `auth/user-disabled` 같은 무효화 코드로 실패해 `_logoutIfInvalidated`로 signOut 하면 기록에는 아무것도 없다 — 즉 관리자가 `disableUser`(Auth disabled + 리프레시 토큰 폐기)를 눌러 끊긴 세션이 "예기치 않은 종료"로 보인다. ② 확정 뒤 같은 세션이 곧바로 돌아오는 경우를 잡지 않았다. SDK는 탭 간 동기화를 위해 IndexedDB를 주기적으로 읽는데, 느린 기기에서 그 읽기가 빈손으로 돌아오면 "다른 탭이 로그아웃했다"로 해석해 null을 흘리고 다음 읽기에서 되살린다. 왕복이 유예 2초보다 길면 진짜 로그아웃으로 확정된다 — 그런데 되살아난 사실은 어디에도 남지 않아 진짜 소멸과 구분할 수 없었다 |
+| **원인 분류 — 가진 증거로 갈라 error는 하나만** | `classifySignOut()`: 우리 갱신 실패가 fatal이면 `token-invalidated` · 마지막으로 본 사용자 문서가 `status: 'disabled'`면 `account-disabled`(위 ①의 유일한 증거) · 문서가 확정적으로 없었으면 `account-removed`(기관 삭제·탈퇴) · 그 외 `unknown`. **unknown만 error**로 올리고 나머지는 새 `captureWarning`(Sentry `captureMessage` level warning)으로 남긴다 — 발생 사실은 남아야 한다(빈도가 근거다). 이슈 제목에 원인이 박히므로(`[Auth] 세션 종료 — account-disabled`) Sentry에서 자동 분리된다 |
+| **안내 문구도 조치가 다르다** | 비활성화 → "계정이 비활성화되어 로그아웃되었습니다. 기관 관리자에게 문의해 주세요" · 소속 정리 → "소속 정보가 변경되어…" · 토큰 무효화 → "보안을 위해 세션이 종료되었습니다" · unknown → 종전 "세션이 만료되어…". 종전에는 넷이 전부 "세션이 만료되어"였다 |
+| **복귀 감지 — 가설을 데이터로 판정하게 한다** | 확정 시 `recentDropRef`에 uid·시각을 남기고, 30초 안에 같은 uid가 다시 발화하면 `[Auth] 로그아웃 확정 후 같은 세션이 복귀`(warning, `gapMs` 동봉)를 남긴다. 이 기록이 쌓이면 유예 2초를 늘릴 근거가 되고, 없으면 "저장소 일시 장애" 가설을 접을 근거가 된다. **지금 유예를 늘리지 않은 이유**: 증거 없이 바꾸면 진짜 로그아웃의 로그인 화면 전환만 늦어진다 |
+| **판별 근거 추가** | 보고 컨텍스트에 `cause`·`detail`·`lastUserDoc`·`indexedDBAvailable`(없으면 SDK가 localStorage로 내려간다) 추가. 다음 사례에서는 메일이 아니라 Sentry 이슈 화면의 Additional Data로 이 값을 읽는다 |
+| **이번 사례의 원인은 확정하지 못했다** | 메일에는 판별 근거가 실리지 않고 로컬에 Sentry 토큰이 없다. 운영자가 이슈 `b0ab2728…`의 Additional Data에서 `tokenRefreshFailure`·`sessionAgeMs`·`online`·`visibility`를 보면 좁혀진다: fatal 실패가 있으면 토큰 무효화, `sessionAgeMs`가 길고 `online: false`면 네트워크 끊김 중 갱신 실패, 둘 다 아니면 저장소 소멸 후보(Samsung Internet은 IndexedDB 안정성이 낮은 편). 이번 변경 뒤에는 같은 사례가 오면 제목만으로 갈린다 |
+| **테스트** | `useAuth.test.tsx` 보고 스위트 2 → **7건**: unknown은 error + 근거 동봉 · token-invalidated/account-disabled/account-removed는 warning + 각 문구 · 30초 안 복귀는 짝 기록 · 60초 뒤 재로그인은 복귀로 안 봄. 기존 "fatal 실패 → error" 단언은 이번 설계 변경에 맞춰 warning으로 바꿨다(의도된 변경) |
+| **검증** | lint·tsc 0 · 관련 테스트 19건 · (PR CI에서 전체 게이트) |
+| **커밋·PR** | #291 |

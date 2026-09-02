@@ -312,6 +312,21 @@ export function captureError(error: unknown, context: Record<string, unknown> = 
 }
 
 /**
+ * 경고 수준 기록 — **원인이 설명되는 사건**에 쓴다.
+ *
+ * error 수준은 Sentry의 고우선 알림 규칙에 걸려 운영자에게 메일이 간다. 계정 비활성화로
+ * 세션이 끊긴 것처럼 서버가 의도한 결과까지 error로 올리면 알림은 울리는데 할 일은 없는
+ * 사건이 쌓여 진짜 결함이 묻힌다(2026-09-02 `[Auth] 예기치 않은 세션 종료` 사례).
+ * 발생 사실은 남겨야 하므로(빈도가 곧 근거다) 수준만 낮춘다.
+ */
+export function captureWarning(message: string, context: Record<string, unknown> = {}) {
+    if (SENTRY_DSN && sentryLoading) {
+        sentryLoading.then((Sentry) => Sentry?.captureMessage(message, { level: 'warning', extra: context }));
+    }
+    console.warn(message, context);
+}
+
+/**
  * Web Vitals(LCP, FID, CLS, FCP, TTFB) 수집 → Sentry Custom Measurements
  */
 function reportWebVitals(Sentry: SentryModule) {
