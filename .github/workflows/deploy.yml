@@ -57,9 +57,9 @@ jobs:
           echo "${{ secrets.ENV_FILE }}" > .env
           # Secret Manager(defineSecret)로 관리하는 키는 functions/.env에서 걸러낸다 —
           # 같은 이름이 .env에 있으면 Firebase가 이름 충돌로 배포를 거부한다.
-          # 목록은 params.ts에서 뽑아 단일 원본을 유지한다: 새 키를 시크릿으로 옮길 때
+          # 목록은 params.ts의 export 선언에서 뽑아 단일 원본을 유지한다: 새 키를 시크릿으로 옮길 때
           # GitHub Secret(FUNCTIONS_ENV_FILE)의 옛 줄을 지우는 것을 잊어도 배포가 서지 않는다.
-          SECRET_KEYS=$(grep -oE 'defineSecret\("[A-Z0-9_]+"' functions/src/core/params.ts | grep -oE '"[A-Z0-9_]+"' | tr -d '"' | paste -sd'|' -)
+          SECRET_KEYS=$(grep -oE '^export const [A-Z0-9_]+ = defineSecret\("[A-Z0-9_]+"\)' functions/src/core/params.ts | grep -oE '\("[A-Z0-9_]+"\)' | tr -d '(")' | paste -sd'|' -)
           if [ -z "$SECRET_KEYS" ]; then
             echo "::error::params.ts에서 defineSecret 키를 찾지 못했다 — 필터가 비면 이름 충돌을 놓친다"
             exit 1
