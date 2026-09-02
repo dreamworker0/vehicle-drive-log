@@ -5,7 +5,6 @@ import {
     doc, deleteDoc,
     collection, query, where, orderBy, getDocs, addDoc,
     serverTimestamp, limit,
-    type DocumentData,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { captureError } from '../sentry';

@@ -77,12 +77,6 @@ export function validateDriveLogForm(
     return { valid: true, message: null };
 }
 
-interface BuildTimestampParams {
-    driveDate: string;
-    endTime: string;
-    startTime: string;
-}
-
 /**
  * 운행 날짜 기반 timestamp를 생성한다.
  */

@@ -7,7 +7,7 @@ import type { DriveLog } from '../../types/driveLog';
 import type { FuelLog } from '../../types/fuelLog';
 import type { HipassCharge } from '../../types/hipassCharge';
 
-import { extractDateStr, calcChangeRate, filterLogsByDateRange, type BaseLog } from './aggregationUtils';
+import { extractDateStr, calcChangeRate, filterLogsByDateRange } from './aggregationUtils';
 
 // ── 메인 통계 ──
 

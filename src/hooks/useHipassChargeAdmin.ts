@@ -4,7 +4,6 @@
  */
 import { useState, useMemo } from 'react';
 import { useAuth } from './useAuth';
-import type { Vehicle } from '../types/vehicle';
 import type { HipassCharge } from '../types/hipassCharge';
 import useBaseHipassCharge from './base/useBaseHipassCharge';
 

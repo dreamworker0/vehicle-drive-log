@@ -1,7 +1,8 @@
 import { signInWithPopup, signInWithRedirect, signOut, getRedirectResult } from 'firebase/auth';
 import type { AuthError } from 'firebase/auth';
 import { auth, googleProvider, clearOfflineCache } from './firebase';
-import { clearQueue } from './offline/syncQueue';
+import { clearQueue, getPendingCount } from './offline/syncQueue';
+import { useConfirmStore } from '../store/useConfirmStore';
 
 const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
 
@@ -93,7 +94,36 @@ export const handleRedirectResult = async () => {
     }
 };
 
+/**
+ * 로그아웃 전에 오프라인 큐의 미전송 기록을 확인한다. 있으면 사용자에게 묻고, 취소하면 false.
+ *
+ * 아래 logout()은 공용 기기 대비로 큐를 무조건 비운다. 그런데 지하 주차장에서 운행일지를 쓰고
+ * 신호가 돌아오기 전에 [로그아웃]을 누르면 그 기록이 아무 안내 없이 사라졌다 — 유실을 알려 주는
+ * 실패 표식(failed-store)까지 같은 호출에서 함께 지워지므로 나중에도 알 길이 없었다 (2026-09-02).
+ * 건수 조회가 실패하면(IDB 불가 환경) 묻지 않고 진행한다 — 로그아웃 자체를 막지는 않는다.
+ */
+async function confirmDiscardPendingWrites(): Promise<boolean> {
+    let pending = 0;
+    try {
+        pending = await getPendingCount();
+    } catch {
+        return true;
+    }
+    if (pending <= 0) return true;
+    const answer = await useConfirmStore.getState().confirm({
+        title: '전송되지 않은 기록이 있습니다',
+        message: `아직 서버에 저장되지 않은 기록이 ${pending}건 있습니다.\n지금 로그아웃하면 이 기록은 삭제됩니다.\n인터넷이 연결된 뒤 잠시 기다리면 자동으로 저장됩니다.`,
+        confirmText: '삭제하고 로그아웃',
+        cancelText: '취소',
+        confirmColor: 'danger',
+    });
+    return answer === true;
+}
+
 export const logout = async () => {
+    // 미전송 기록이 있으면 먼저 묻는다. 취소하면 아무것도 하지 않는다.
+    if (!(await confirmDiscardPendingWrites())) return;
+
     // signOut보다 먼저 표시한다 — onAuthStateChanged(null)이 await보다 앞서 도착할 수 있고,
     // 그때 표시가 없으면 정상 로그아웃이 '예기치 않은 세션 종료'로 보고된다.
     markIntentionalLogout();

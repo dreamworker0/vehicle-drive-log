@@ -6,7 +6,8 @@ import {
     collection, query, where, getDocs, addDoc, getCountFromServer,
     orderBy, limit, serverTimestamp, writeBatch,
 } from 'firebase/firestore';
-import { db } from '../firebase';
+import { httpsCallable } from 'firebase/functions';
+import { db, firebaseFunctions } from '../firebase';
 import type { Organization } from '../../types/organization';
 import type { WithServerTimestamps } from '../../types/common';
 import { createZodConverter, organizationSchema } from '../../schemas';
@@ -59,14 +60,23 @@ export const findOrganizationByInviteCode = async (code: string) => {
     }
 };
 
-// 초대 코드 재발급
+/**
+ * 초대 코드 재발급 — 서버 콜러블로만 한다 (2026-09-02).
+ *
+ * 종전에는 여기서 난수를 만들어 `inviteCode`를 직접 썼다. 그러려면 Rules가 기관관리자에게
+ * 그 필드를 열어 둬야 하고, 열어 두면 값을 고를 수 있다 — 다른 기관의 코드를 복사해 그 기관의
+ * 신규 직원을 가로채는 경로가 된다. 지금은 Rules가 기관관리자의 `inviteCode` 쓰기를 막고,
+ * `regenerateInviteCode` 콜러블이 서버 난수 + 중복 검사로 새 코드를 만든다.
+ * 재시도(callWithRetry)를 걸지 않는다 — 부를 때마다 새 코드가 나오는 비멱등 호출이다.
+ */
 export const regenerateInviteCode = async (orgId: string) => {
-    const newCode = generateInviteCode();
     try {
-        await updateDoc(doc(db, 'organizations', orgId), {
-            inviteCode: newCode,
-        });
-        return newCode;
+        const call = httpsCallable<{ organizationId: string }, { inviteCode: string }>(
+            firebaseFunctions,
+            'regenerateInviteCode',
+        );
+        const result = await call({ organizationId: orgId });
+        return result.data.inviteCode;
     } catch (error) {
         captureError(error, { context: 'regenerateInviteCode', orgId });
         throw error;

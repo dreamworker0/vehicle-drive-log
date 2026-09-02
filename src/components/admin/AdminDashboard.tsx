@@ -11,7 +11,6 @@ import { getVehicles, getOrganizationMembers, getDriveLogs, getOrganization, get
 import { getDriveLogAggregatedStats } from '../../lib/firestore/driveLogs';
 import ReleaseNotesBanner from '../common/ReleaseNotesBanner';
 import { toLocalDateStr } from '../../lib/dateUtils';
-import { SkeletonStatCard, SkeletonList } from '../common/Skeleton';
 import type { DriveLog } from '../../types/driveLog';
 import type { Organization } from '../../types/organization';
 import AdminOnboardingWizard from './AdminOnboardingWizard';

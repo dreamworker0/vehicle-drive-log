@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { captureError } from '../../lib/sentry';
 import { getMyDriveLogs } from '../../lib/firestore';
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
 import { formatTimestampShort } from '../../lib/dateUtils';
@@ -25,7 +26,7 @@ export default function MyRecords() {
                 const data = await getMyDriveLogs(userData.organizationId!, user.uid, 50);
                 setLogs(data as DriveLog[]);
             } catch (err) {
-                console.error('기록 로드 실패:', err);
+                captureError(err, { context: 'MyRecords.load', orgId: userData?.organizationId });
             } finally {
                 setLoading(false);
             }

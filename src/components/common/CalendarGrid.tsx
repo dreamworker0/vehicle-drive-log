@@ -2,7 +2,7 @@
  * CalendarGrid — 월별 달력 그리드
  * ReservationCalendar에서 추출된 서브 컴포넌트
  */
-import type { CalendarDay, Reservation } from '../../types/reservation';
+import type { CalendarDay } from '../../types/reservation';
 
 interface Props {
     calendarDays: (CalendarDay | null)[];

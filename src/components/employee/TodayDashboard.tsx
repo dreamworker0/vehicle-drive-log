@@ -10,7 +10,6 @@ import useTodayDashboard from '../../hooks/useTodayDashboard';
 import ReleaseNotesBanner from '../common/ReleaseNotesBanner';
 import { useCalendarSync } from '../../hooks/useCalendarSync';
 import { updateUser } from '../../lib/firestore';
-import { SkeletonCard, SkeletonBox } from '../common/Skeleton';
 import WelcomeGuide from './WelcomeGuide';
 import ReservationCard from './ReservationCard';
 import WeekReservationList from './WeekReservationList';

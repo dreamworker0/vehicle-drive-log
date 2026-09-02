@@ -152,7 +152,7 @@ function buildLogRow(log: PdfLogEntry, rowNo: number, includeHipass = false, inc
             <td class="right">${formatNumber(resolveStartKm(log))}</td>
             <td class="right">${formatNumber(resolveEndKm(log))}</td>
             <td class="right">${distance > 0 ? distance.toLocaleString() : ''}</td>
-            <td class="center">${log.passengerCount || ''}</td>
+            <td class="center">${escapeHtml(log.passengerCount || '')}</td>
             ${includeFuel ? `<td class="right" style="font-size: 8px;">${escapeHtml(log.fuelSummary || '')}</td>` : ''}
             ${includePassengers ? `<td class="center" style="font-size: 8px;">${escapeHtml(log.passengerNames?.join(', ') || '')}</td>` : ''}
             <td>${escapeHtml(noteText)}</td>

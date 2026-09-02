@@ -5,6 +5,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { getDriveLogs, getFuelLogs, getAllHipassCharges } from '../lib/firestore';
+import { captureError } from '../lib/sentry';
 import { toLocalDateStr } from '../lib/dateUtils';
 import { extractDateStr } from './utils/aggregationUtils';
 import {
@@ -116,7 +117,7 @@ export default function useMonthlyReport() {
                 setFuelLogs(fuelResult as FuelLog[]);
                 setHipassCharges(hipassResult as HipassCharge[]);
             } catch (err) {
-                console.error('데이터 로드 실패:', err);
+                captureError(err, { context: 'useMonthlyReport.load', orgId });
             } finally {
                 setLoading(false);
             }

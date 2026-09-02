@@ -14,9 +14,21 @@ import { checkRateLimitBySubject } from "../../utils/rateLimit";
 import { GLOBAL_BUDGETS } from "../../utils/constants";
 const db = getFirestore();
 
+/** 모든 AI 초안의 첫 문장 — 답변이 사람이 아니라 인공지능 초안임을 밝힌다. */
+export const DRAFT_PREFIX = "안녕하세요. 김종원입니다. 초안은 인공지능이 작성합니다.";
+
 /** 초안 생성이 막혔을 때 대신 저장하는 문구 — 의견 접수 자체는 정상이라는 신호다. */
-const FALLBACK_DRAFT =
-    "안녕하세요. 김종원입니다. 초안은 인공지능이 작성합니다.\n\n소중한 의견 감사합니다. 검토 후 답변드리겠습니다.";
+const FALLBACK_DRAFT = `${DRAFT_PREFIX}\n\n소중한 의견 감사합니다. 검토 후 답변드리겠습니다.`;
+
+/**
+ * AI가 규칙을 놓쳐 접두어를 빠뜨렸을 때 강제로 붙인다. 이미 있으면 중복 삽입하지 않는다.
+ * (테스트가 이 함수를 직접 import한다 — 종전에는 테스트 파일이 같은 로직을 **다시 구현해** 사본을
+ * 검사하고 있었다. 2026-09-02)
+ */
+export function applyDraftPrefix(draft: string): string {
+    const trimmed = draft.trim();
+    return trimmed.startsWith(DRAFT_PREFIX) ? trimmed : `${DRAFT_PREFIX}\n\n${trimmed}`;
+}
 
 /**
  * AI 초안 생성 쿼터를 소비한다 (통과 시 true).
@@ -78,7 +90,7 @@ async function buildPastExamplesText(limit = 5): Promise<string> {
 }
 
 /** Gemini 응답 JSON 파싱 */
-function parseAiResponse(text: string): {
+export function parseAiResponse(text: string): {
     faqId: string | null;
     confidence: number;
     draft: string;
@@ -220,11 +232,7 @@ ${pastExamples}
             const result = parseAiResponse(text);
 
             // AI가 규칙을 놓칠 경우를 대비하여 접두어 강제 추가
-            const prefix = "안녕하세요. 김종원입니다. 초안은 인공지능이 작성합니다.";
-            let finalDraft = result.draft.trim();
-            if (!finalDraft.startsWith(prefix)) {
-                finalDraft = `${prefix}\n\n${finalDraft}`;
-            }
+            const finalDraft = applyDraftPrefix(result.draft);
 
             // 5. Firestore 업데이트
             await snap.ref.update({

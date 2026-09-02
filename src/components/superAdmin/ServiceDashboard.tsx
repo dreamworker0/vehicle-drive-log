@@ -2,7 +2,6 @@
 import { lazy, Suspense, useState } from 'react';
 import { useToast } from '../../hooks/useToast';
 import useServiceDashboard from '../../hooks/useServiceDashboard';
-import { ORG_PAGE_SIZE } from './dashboard/dashboardUtils';
 import DashboardOverviewCards from './dashboard/DashboardOverviewCards';
 import DashboardMonthlyMetrics from './dashboard/DashboardMonthlyMetrics';
 import DashboardOrgTable from './dashboard/DashboardOrgTable';

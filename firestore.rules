@@ -167,9 +167,28 @@ service cloud.firestore {
       allow create: if isSuperAdmin() && !('consent' in request.resource.data);
       // 동의 기록(consent)은 위탁 계약 성립의 입증 자료이므로 어떤 클라이언트도 변경·삭제할 수 없다.
       // submitOrgApplication(Admin SDK)만 기록하며, 규칙을 우회하는 서버 경로로만 갱신한다.
-      allow update: if (isOrgAdmin(orgId) || isSuperAdmin()
-                    || (isSignedIn() && resource.data.status == 'pending' && resource.data.applicantUid == request.auth.uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'role'])))
-                    && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['consent']);
+      //
+      // 기관관리자는 **서버가 소유한 필드**도 건드릴 수 없다 (2026-09-02 보안 점검).
+      // 종전에는 consent만 막아, 기관관리자가 자기 기관 문서의 나머지 필드를 전부 쓸 수 있었다:
+      //   - inviteCode: 다른 기관의 초대 코드를 자기 기관에 복사하면 joinOrganization이
+      //     `where inviteCode == code limit(1)`로 찍는 기관이 둘이 되어 신규 직원을 가로챌 수 있다.
+      //     재발급은 regenerateInviteCode 콜러블(서버 난수 + 중복 검사)로만 한다.
+      //   - uniqueNumberImagePath·aiVerifyDetail: 값을 바꿀 때마다 autoVerifyDocument가 재발동해
+      //     Gemini·TMAP 호출과 승인 이메일·알림톡 발송이 상한 없이 반복된다.
+      //   - status·approvedAt·rejectedAt·deletedAt: 승인 상태는 superAdmin과 서버 배치만 바꾼다.
+      //   - applicant*·uniqueNumber: 신청 시 확정된 신원 정보. 알림톡·이메일 수신처가 여기서 나온다.
+      // superAdmin(승인·반려·복구)과 신청자 경로(pending 상태의 본인 신청)는 종전과 같다.
+      allow update: if !request.resource.data.diff(resource.data).affectedKeys().hasAny(['consent'])
+                    && (
+                      isSuperAdmin()
+                      || (isOrgAdmin(orgId) && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+                            'inviteCode', 'status', 'approvedAt', 'rejectedAt', 'deletedAt', 'deletedBy', 'createdAt',
+                            'aiVerified', 'aiVerifyDetail', 'ocrPrescreen',
+                            'uniqueNumber', 'uniqueNumberImagePath', 'uniqueNumberImageUrl',
+                            'applicantUid', 'applicantEmail', 'applicantName', 'applicantPhone'
+                          ]))
+                      || (isSignedIn() && resource.data.status == 'pending' && resource.data.applicantUid == request.auth.uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'role']))
+                    );
       allow delete: if isSuperAdmin();
 
       // 커스텀 휴일 (서브컬렉션)

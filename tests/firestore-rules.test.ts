@@ -418,6 +418,52 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     }));
   });
 
+  it('10-3. 기관관리자는 기관 문서의 서버 소유 필드를 쓸 수 없다 — 초대코드 가로채기·AI 재심사 반복 차단', async () => {
+    // 종전 규칙은 consent만 막아 기관관리자가 inviteCode·status·증빙 경로까지 임의로 쓸 수 있었다.
+    // (1) 다른 기관의 초대 코드를 자기 기관에 복사 → joinOrganization이 두 기관 중 하나를 찍어
+    //     신규 직원을 가로챌 수 있었고, (2) 증빙 경로를 바꿀 때마다 autoVerifyDocument가 재발동해
+    //     Gemini·알림톡 비용이 상한 없이 반복됐다. 둘 다 이 규칙 한 줄이 닫는다.
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('organizations').doc('org-A').set({
+        name: '기관A', applicantUid: 'admin_A', applicantEmail: 'a@x.com', status: 'approved',
+        inviteCode: 'AAAAAA', aiVerified: true, uniqueNumber: '123-82-00001',
+        uniqueNumberImagePath: 'organizations/org-A/doc.jpg',
+      });
+      await context.firestore().collection('organizations').doc('org-B').set({
+        name: '기관B', applicantUid: 'admin_B', status: 'approved', inviteCode: 'BBBBBB',
+      });
+    });
+
+    const adminADb = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+    const orgA = adminADb.collection('organizations').doc('org-A');
+
+    // 초대 코드 — 타 기관 코드 복사(가로채기)·임의 값 모두 차단. 재발급은 콜러블만 한다
+    await assertFails(orgA.update({ inviteCode: 'BBBBBB' }));
+    await assertFails(orgA.update({ inviteCode: 'ZZZZZZ' }));
+    // 승인 상태·시각
+    await assertFails(orgA.update({ status: 'deleted' }));
+    await assertFails(orgA.update({ approvedAt: new Date() }));
+    // AI 심사 결과·증빙 경로 — 바꾸면 autoVerifyDocument가 재발동한다
+    await assertFails(orgA.update({ aiVerified: false }));
+    await assertFails(orgA.update({ aiVerifyDetail: { rejected: false } }));
+    await assertFails(orgA.update({ uniqueNumberImagePath: 'organizations/org-A/other.jpg' }));
+    // 신청 시 확정된 신원·수신처
+    await assertFails(orgA.update({ uniqueNumber: '999-82-99999' }));
+    await assertFails(orgA.update({ applicantEmail: 'attacker@evil.com' }));
+    await assertFails(orgA.update({ applicantPhone: '010-0000-0000' }));
+    // 허용 필드와 섞어도 차단 (한 필드라도 걸리면 전체 거부)
+    await assertFails(orgA.update({ hipassEnabled: false, inviteCode: 'BBBBBB' }));
+
+    // 정상: 설정 화면이 저장하는 필드는 계속 허용
+    await assertSucceeds(orgA.update({ name: '기관A 수정', phone: '02-000-0000', hipassEnabled: false }));
+    await assertSucceeds(orgA.update({ approvalLine: [{ title: '팀장' }], sites: [] }));
+
+    // superAdmin은 승인·반려·복구 경로가 있으므로 종전대로 쓸 수 있다
+    const superDb = setupContext('super_1', { role: 'superAdmin' }).firestore();
+    await assertSucceeds(superDb.collection('organizations').doc('org-A').update({ inviteCode: 'CCCCCC' }));
+    await assertSucceeds(superDb.collection('organizations').doc('org-A').update({ status: 'rejected', rejectedAt: new Date() }));
+  });
+
   it('10-2. 직원 이용약관 동의 기록(users.consent) 클라이언트 변경·주입 차단', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const db = context.firestore();
@@ -860,6 +906,11 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
       await db.collection('slackTasks').doc('Ev1').set({ kind: 'message', teamId: 'T123' });
       await db.collection('slackConfirmations').doc('conf1').set({ slackUserId: 'U1', status: 'pending' });
       await db.collection('tmapCache').doc('hash1').set({ value: { lat: 37.5, lon: 127 }, expiresAt: new Date() });
+      // 같은 "전면 차단" 형제 4종 — 규칙 파일에는 있었지만 테스트에 없어 하나가 열려도 알 수 없었다
+      await db.collection('assistantConversations').doc('conv1').set({ organizationId: 'org-A', turns: [] });
+      await db.collection('assistantVehicleCache').doc('org-A').set({ vehicles: [] });
+      await db.collection('slackOauthStates').doc('nonce1').set({ organizationId: 'org-A', expiresAt: new Date() });
+      await db.collection('calendarBindings').doc('cal1').set({ organizationId: 'org-A', vehicleId: 'v_A' });
     });
 
     // 슈퍼관리자조차 접근 불가 (전면 false)
@@ -884,6 +935,21 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertFails(memberDb.collection('integrations').doc('slack_EVIL').set({
       organizationId: 'org-A', enabled: true,
     }));
+
+    // 어시스턴트 대화 이력·차량 캐시·OAuth state·캘린더 바인딩 — 읽기·쓰기 모두 차단
+    // (기관관리자·superAdmin 포함. 캘린더 바인딩은 기관 경계를 넘은 사고가 있었다 — Phase 168)
+    const adminDb = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+    for (const [col, id] of [
+      ['assistantConversations', 'conv1'],
+      ['assistantVehicleCache', 'org-A'],
+      ['slackOauthStates', 'nonce1'],
+      ['calendarBindings', 'cal1'],
+    ] as const) {
+      await assertFails(memberDb.collection(col).doc(id).get());
+      await assertFails(adminDb.collection(col).doc(id).get());
+      await assertFails(superDb.collection(col).doc(id).get());
+      await assertFails(adminDb.collection(col).doc(`${id}_evil`).set({ organizationId: 'org-A' }));
+    }
   });
 
   it('21. 도착 km < 출발 km — 불가능한 값을 서버에서 끊는다 (정상 경로는 열어 둔다)', async () => {

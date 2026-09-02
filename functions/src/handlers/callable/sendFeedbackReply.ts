@@ -7,7 +7,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { sendPushToUser, createInAppNotification } from "../../services/alimtalk/sendNotification";
-import { requireSuperAdmin } from "../../utils/helpers";
+import { requireSuperAdmin, escapeHtml } from "../../utils/helpers";
 import { createGmailTransporter, isGmailConfigured, systemMailFrom } from "../../core/mailer";
 import { GMAIL_APP_PASSWORD } from "../../core/params";
 
@@ -107,12 +107,12 @@ export const sendFeedbackReply = onCall(
                                     <h2 style="margin: 0; font-size: 20px;">💬 문의하신 내용에 답변이 등록되었습니다</h2>
                                 </div>
                                 <div style="background: #F8FAFC; padding: 24px; border: 1px solid #E2E8F0; border-top: none; border-radius: 0 0 12px 12px;">
-                                    <p style="color: #1E293B; font-size: 16px;">안녕하세요, <strong>${feedbackData.userName || '사용자'}</strong>님.</p>
+                                    <p style="color: #1E293B; font-size: 16px;">안녕하세요, <strong>${escapeHtml(feedbackData.userName || '사용자')}</strong>님.</p>
                                     <p style="color: #475569;">차량운행일지에 남겨주신 소중한 의견에 대해 관리자의 답변이 등록되었습니다.</p>
                                     
                                     <div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; margin: 16px 0;">
                                         <p style="color: #64748B; font-size: 14px; margin: 0 0 8px; font-weight: bold;">관리자 답변</p>
-                                        <p style="color: #1E293B; font-size: 15px; margin: 0; white-space: pre-wrap;">${replyText.trim()}</p>
+                                        <p style="color: #1E293B; font-size: 15px; margin: 0; white-space: pre-wrap;">${escapeHtml(replyText.trim())}</p>
                                     </div>
 
                                     <p style="color: #475569; font-size: 14px;">본 서비스 발전을 위해 남겨주신 의견에 깊이 감사드립니다.</p>

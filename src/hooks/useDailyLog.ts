@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from './useAuth';
 import { getVehicles, getOrganization } from '../lib/firestore';
+import { captureError } from '../lib/sentry';
 import { getDriveLogsByDate, getFuelLogsByDate, getPreviousDayEndKm } from '../lib/firestore/dailyLogQueries';
 import type { Vehicle } from '../types/vehicle';
 import type { Organization } from '../types/organization';
@@ -49,7 +50,7 @@ export default function useDailyLog() {
                     setSelectedVehicleId(active[0].id);
                 }
             } catch (err) {
-                console.error('초기 데이터 로드 실패:', err);
+                captureError(err, { context: 'useDailyLog.loadInitial', orgId });
             } finally {
                 setLoading(false);
             }
@@ -71,7 +72,7 @@ export default function useDailyLog() {
             setFuelLogs(fuels);
             setPreviousEndKm(prevKm);
         } catch (err) {
-            console.error('일별 데이터 조회 실패:', err);
+            captureError(err, { context: 'useDailyLog.loadDaily', orgId, vehicleId: selectedVehicleId, date: selectedDate });
         } finally {
             setLoadingData(false);
         }

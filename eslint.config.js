@@ -27,7 +27,7 @@ export default defineConfig([
       },
     },
     rules: {
-      'no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      'no-unused-vars': ['error', { varsIgnorePattern: '^_' }],
       'no-restricted-globals': ['error',
         { name: 'confirm', message: 'window.confirm 금지 → useConfirm() 훅을 사용하세요.' },
         { name: 'alert', message: 'window.alert 금지 → useToast() 훅을 사용하세요.' },
@@ -60,7 +60,7 @@ export default defineConfig([
       },
     },
     rules: {
-      '@typescript-eslint/no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
+      '@typescript-eslint/no-unused-vars': ['error', { varsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-empty-object-type': 'off',
       'no-unused-vars': 'off',
@@ -115,7 +115,7 @@ export default defineConfig([
       },
     },
     rules: {
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^[A-Z_]', ignoreRestSiblings: true }],
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', ignoreRestSiblings: true }],
       // Firestore 문서 등 동적 데이터가 많아 any는 경고로만 둔다(점진적 제거 대상, 빌드는 막지 않음).
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-empty-object-type': 'off',

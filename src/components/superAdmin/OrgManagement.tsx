@@ -6,6 +6,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { getApprovedOrganizations, deleteOrganization, getDeletedOrganizations, restoreOrganization, permanentDeleteOrganization, getOrganizationMembers, updateUser, leaveOrganization, updateOrganization, getOrgMemberCounts } from '../../lib/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
+import { captureError } from '../../lib/sentry';
 import { useToast } from '../../hooks/useToast';
 import { useConfirm } from '../../hooks/useConfirm';
 import OrgCard from './OrgCard';
@@ -84,7 +85,7 @@ export default function OrgManagement() {
             const members = await getOrganizationMembers(orgId);
             setMembersMap(prev => ({ ...prev, [orgId]: members as User[] }));
         } catch (err) {
-            console.error('멤버 로드 실패:', err);
+            captureError(err, { context: 'OrgManagement.loadMembers', orgId });
         } finally {
             setLoadingMembers(prev => ({ ...prev, [orgId]: false }));
         }

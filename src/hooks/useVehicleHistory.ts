@@ -5,6 +5,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useAuth } from './useAuth';
 import { getVehicles, getVehicleDriveLogs } from '../lib/firestore';
+import { captureError } from '../lib/sentry';
 import type { Vehicle } from '../types/vehicle';
 import type { DriveLog } from '../types/driveLog';
 
@@ -50,7 +51,7 @@ export default function useVehicleHistory() {
                 setVehicles(v as Vehicle[]);
                 if (v.length > 0) setSelectedVehicleId(v[0].id);
             } catch (err) {
-                console.error('차량 로드 실패:', err);
+                captureError(err, { context: 'useVehicleHistory.loadVehicles', orgId });
             } finally {
                 setLoading(false);
             }
@@ -78,7 +79,7 @@ export default function useVehicleHistory() {
                     })
                 );
             } catch (err) {
-                console.error('이용 내역 로드 실패:', err);
+                captureError(err, { context: 'useVehicleHistory.loadLogs', orgId, vehicleId: selectedVehicleId });
             } finally {
                 setLogsLoading(false);
             }

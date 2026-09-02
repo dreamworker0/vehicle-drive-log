@@ -167,7 +167,7 @@ function buildDriveRow(log: DailyDriveEntry) {
     return `
         <tr>
             <td class="center">${escapeHtml(log.driverName || '')}</td>
-            <td class="center">${log.passengers || ''}</td>
+            <td class="center">${escapeHtml(log.passengers || '')}</td>
             <td>${escapeHtml(log.purpose || '')}</td>
             <td>${escapeHtml(log.destination || '')}</td>
             <td class="center nowrap">${escapeHtml(timeStr)}</td>

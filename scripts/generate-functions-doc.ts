@@ -109,6 +109,15 @@ const FUNCTIONS: FunctionEntry[] = [
     returns: "{ success: boolean, orgId: string, orgName: string, role: 'admin' \\| 'employee' }",
   },
   {
+    name: 'regenerateInviteCode',
+    type: 'onCall',
+    file: 'handlers/callable/regenerateInviteCode.ts',
+    description: '기관 초대 코드 재발급. Rules가 기관관리자의 `inviteCode` 쓰기를 막으므로(타 기관 코드를 복사해 신규 직원을 가로채는 경로 차단) 서버 난수 + 전체 기관 중복 검사로만 발급한다. 승인된 기관만 대상. 부를 때마다 새 코드가 나오는 비멱등 호출이라 클라이언트는 재시도하지 않는다.',
+    auth: '해당 기관 관리자(클레임 `role=admin` + `orgId` 일치) 또는 superAdmin',
+    params: '{ organizationId: string }',
+    returns: '{ inviteCode: string }',
+  },
+  {
     name: 'acceptCurrentTerms',
     type: 'onCall',
     file: 'handlers/callable/acceptCurrentTerms.ts',
