@@ -95,6 +95,16 @@ const FUNCTIONS: FunctionEntry[] = [
     file: 'scripts/resetCalendarSyncFails.ts',
     description: '캘린더 동기화 실패 카운터 초기화',
     auth: 'superAdmin',
+    note: '되돌리기 전에 probeCalendarAccess로 무엇이 살아 있는지 먼저 확인한다',
+  },
+  {
+    name: 'probeCalendarAccess',
+    type: 'onCall',
+    file: 'handlers/callable/probeCalendarAccess.ts',
+    description: '연동 캘린더 일괄 접근 진단 — 살아 있는 캘린더와 죽은 캘린더를 가른다 (읽기 전용)',
+    auth: 'superAdmin',
+    params: '{ includeHealthy?: boolean }',
+    note: '영구중단(failCount >= MAX) 차량은 재시도되지 않아 상태를 알 수 없다 — 그 공백을 메우는 진단',
   },
 
   // ── 사용자·기관 ──
