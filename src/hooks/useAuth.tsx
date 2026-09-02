@@ -6,7 +6,7 @@ import { auth, db, authReady, getAppCheckBlock } from '../lib/firebase';
 import { isFirestoreTerminated } from '../lib/firestoreLifecycle';
 import { refreshTokenSilently, refreshToken, getLastTokenRefreshFailure } from '../lib/tokenRefresh';
 import { handleRedirectResult, wasIntentionalLogout } from '../lib/auth';
-import { setSentryUser, captureError } from '../lib/sentry';
+import { setSentryUser, captureError, captureWarning } from '../lib/sentry';
 import { useToastStore } from '../store/useToastStore';
 import type { User as UserDoc } from '../types/user';
 import { resolveOrgFeatures, ALL_FEATURES_ON, type OrgFeatures } from '../lib/orgFeatures';
@@ -39,6 +39,29 @@ interface AuthContextType {
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
+
+/**
+ * 앱이 지시하지 않은 세션 종료의 원인 분류.
+ * - token-invalidated: 우리 갱신 호출이 세션 무효화 코드로 실패했다(SDK가 signOut)
+ * - account-disabled : 마지막으로 본 사용자 문서가 비활성 상태였다(관리자 조치 → 토큰 폐기)
+ * - account-removed  : 사용자 문서가 확정적으로 없었다(기관 삭제·탈퇴·영구 삭제)
+ * - unknown          : 위 증거가 하나도 없다 — 저장소 소멸·SDK 오동작 후보. 이것만 error로 올린다
+ */
+type SignOutCause = 'token-invalidated' | 'account-disabled' | 'account-removed' | 'unknown';
+
+/** 원인별 안내 문구 — 사용자가 할 수 있는 조치가 다르다(문의 vs 재로그인). */
+const SIGN_OUT_MESSAGES: Record<SignOutCause, string> = {
+    'token-invalidated': '보안을 위해 세션이 종료되었습니다. 다시 로그인해 주세요.',
+    'account-disabled': '계정이 비활성화되어 로그아웃되었습니다. 기관 관리자에게 문의해 주세요.',
+    'account-removed': '소속 정보가 변경되어 로그아웃되었습니다. 다시 로그인해 주세요.',
+    unknown: '세션이 만료되어 로그아웃되었습니다. 다시 로그인해 주세요.',
+};
+
+/**
+ * 로그아웃 확정 뒤 이 시간 안에 같은 세션이 돌아오면 "저장소 일시 장애"로 기록한다.
+ * SDK의 저장소 폴링 주기(수백 ms)와 느린 기기의 IndexedDB 회복 시간을 넉넉히 덮는 값이다.
+ */
+const SESSION_RESTORE_WINDOW_MS = 30_000;
 
 /** App Check 차단으로 인한 접근 실패는 세션당 1회만 보고한다 — 원인이 하나라 반복 보고는 노이즈다. */
 let appCheckDenialReported = false;
@@ -98,6 +121,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const sessionStartedAtRef = useRef<number | null>(null);
     /** 마지막으로 규칙에 막힌 구독. 세션 소멸과 권한 오류 중 무엇이 먼저였는지 판별에 쓴다. */
     const lastDeniedRef = useRef<{ scope: 'user' | 'org'; at: number } | null>(null);
+    /**
+     * 마지막으로 본 사용자 문서의 상태. 세션이 사라졌을 때 **서버가 끊은 것인지**를 가리는 근거다.
+     *
+     * 관리자가 계정을 비활성화하면(`disableUser`) Auth 계정 disabled + 리프레시 토큰 폐기가 함께
+     * 일어나고, SDK는 다음 갱신에서 스스로 signOut 한다. 그 갱신은 SDK 내부에서 돌아
+     * `tokenRefresh.ts`의 실패 기록에 남지 않는다 — 우리 `refreshToken()`이 부른 갱신만 기록되기
+     * 때문이다. 그래서 문서의 `status: 'disabled'`가 그 경로를 가리키는 유일한 증거가 된다.
+     */
+    const lastUserDocRef = useRef<{ exists: boolean; status?: string } | null>(null);
+    /**
+     * 로그아웃으로 **확정한 직후**의 uid·시각. 곧바로 같은 세션이 다시 발화하면 세션이 진짜로
+     * 끊긴 것이 아니라 저장소(IndexedDB) 읽기가 잠깐 실패한 것이다 — SDK는 탭 간 동기화를 위해
+     * 저장소를 주기적으로 읽는데, 그 읽기가 빈손으로 돌아오면 "다른 탭이 로그아웃했다"로 해석해
+     * null을 흘리고, 다음 읽기가 성공하면 사용자를 되살린다. 그 왕복이 유예(2초)보다 길면
+     * 이 훅은 진짜 로그아웃으로 확정해 버린다. 복귀를 잡아 기록하지 않으면 이 경우와
+     * 진짜 세션 소멸이 Sentry에서 같은 이슈로 섞인다.
+     */
+    const recentDropRef = useRef<{ uid: string; at: number } | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -172,37 +213,65 @@ export function AuthProvider({ children }: { children: ReactNode }) {
          * 세션 지속 시간, 마지막으로 규칙에 막힌 구독, 탭 가시성·온라인 여부.
          * 의도적 로그아웃은 보고하지 않는다(정상 경로이고, 매 로그아웃마다 이슈가 쌓인다).
          */
+        /**
+         * 세션이 왜 사라졌는지를 가진 증거로 가른다.
+         *
+         * 2026-09-02 첫 실제 보고(Samsung Internet·Android 10, /employee/today)에서 드러난 것:
+         * 원인이 무엇이든 전부 같은 error 이슈로 올라가 고우선 알림 메일이 왔다. 그런데 이 중
+         * 서버가 의도한 결과(계정 비활성화·토큰 폐기)는 운영자가 할 일이 없는 사건이다.
+         * 갈라 두지 않으면 진짜 결함(저장소 소멸·SDK 오동작)이 그 사이에 묻힌다.
+         */
+        const classifySignOut = (): { cause: SignOutCause; detail?: string } => {
+            const failure = getLastTokenRefreshFailure();
+            // fatal이면 이 실패가 로그아웃의 직접 원인이다(SDK가 스스로 signOut 한다).
+            if (failure?.fatal) return { cause: 'token-invalidated', detail: failure.code };
+            const lastDoc = lastUserDocRef.current;
+            if (lastDoc?.exists && lastDoc.status === 'disabled') return { cause: 'account-disabled' };
+            // 문서가 확정적으로 없었다 — 기관 삭제·탈퇴·영구 삭제로 계정 자체가 정리된 경로
+            if (lastDoc && !lastDoc.exists) return { cause: 'account-removed' };
+            return { cause: 'unknown' };
+        };
+
         const reportUnexpectedSignOut = (uid: string) => {
             if (wasIntentionalLogout()) return;
 
             const now = Date.now();
             const failure = getLastTokenRefreshFailure();
             const denied = lastDeniedRef.current;
+            const { cause, detail } = classifySignOut();
             const context = {
                 uid,
+                cause,
+                detail: detail ?? null,
                 sessionAgeMs: sessionStartedAtRef.current ? now - sessionStartedAtRef.current : null,
-                // fatal이면 이 실패가 로그아웃의 직접 원인이다(SDK가 스스로 signOut 한다).
                 tokenRefreshFailure: failure
                     ? { code: failure.code, fatal: failure.fatal, agoMs: now - failure.at }
                     : null,
                 lastPermissionDenied: denied
                     ? { scope: denied.scope, agoMs: now - denied.at }
                     : null,
+                lastUserDoc: lastUserDocRef.current,
                 visibility: typeof document !== 'undefined' ? document.visibilityState : 'unknown',
                 online: typeof navigator !== 'undefined' ? navigator.onLine : null,
                 hasCurrentUser: !!auth.currentUser,
+                // 세션 저장소가 IndexedDB인지 가늠하는 최소 단서 — 없으면 SDK는 localStorage로 내려간다
+                indexedDBAvailable: typeof indexedDB !== 'undefined',
             };
+
+            if (cause !== 'unknown') {
+                // 서버가 끊은 세션 — 사실은 남기되(빈도가 근거다) 알림은 울리지 않는다.
+                captureWarning(`[Auth] 세션 종료 — ${cause}`, context);
+                useToastStore.getState().showToast(SIGN_OUT_MESSAGES[cause], 'warning', 6000);
+                return;
+            }
+
             // captureError는 Error만 콘솔에 찍는다 — 제보자가 콘솔을 보내 주는 경우가 많으므로
             // 판별 근거도 콘솔에 남긴다(error 수준이라 DevTools 기본 수준에서 보인다).
             console.error('[Auth] 예기치 않은 세션 종료 — 판별 근거:', context);
             captureError(new Error('[Auth] 예기치 않은 세션 종료'), context);
 
             // 지금까지는 아무 설명 없이 로그인 화면만 떴다. 무엇이 일어났는지는 알려 준다.
-            useToastStore.getState().showToast(
-                '세션이 만료되어 로그아웃되었습니다. 다시 로그인해 주세요.',
-                'warning',
-                6000,
-            );
+            useToastStore.getState().showToast(SIGN_OUT_MESSAGES.unknown, 'warning', 6000);
         };
 
         /** 로그아웃 상태를 화면에 확정 반영한다. */
@@ -251,6 +320,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                         console.debug('[Auth] 세션이 유예 안에 돌아오지 않아 로그아웃으로 확정합니다');
                         // 확정 전에 보고한다 — commitSignedOut이 uid·세션 시각을 지운다.
                         reportUnexpectedSignOut(droppedUid);
+                        // 확정 직후 같은 세션이 돌아오면 저장소 일시 장애였다는 뜻 — 아래 복귀 감지가 쓴다.
+                        recentDropRef.current = { uid: droppedUid, at: Date.now() };
                         commitSignedOut();
                     }, AUTH_DROP_GRACE_MS);
                     return;
@@ -267,6 +338,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     // 되돌리지 않는다. setLoading(true)로 되돌리면 로그인 플래시가 스피너
                     // 플래시로 바뀔 뿐이다 — 이미 판정된 화면을 그대로 두고 리스너만 다시 건다.
                     const sameSession = authedUidRef.current === firebaseUser!.uid;
+
+                    // 로그아웃으로 확정한 세션이 곧바로 돌아왔다 — 진짜 소멸이 아니라 저장소 일시 장애다.
+                    // 앞서 나간 '예기치 않은 종료' 보고와 짝을 맞춰 남긴다(같은 uid·간격). 이 기록이
+                    // 쌓이면 유예를 늘리는 근거가 되고, 없으면 그 가설을 접을 근거가 된다.
+                    const dropped = recentDropRef.current;
+                    if (dropped) {
+                        recentDropRef.current = null;
+                        const gapMs = Date.now() - dropped.at;
+                        if (dropped.uid === firebaseUser!.uid && gapMs < SESSION_RESTORE_WINDOW_MS) {
+                            captureWarning('[Auth] 로그아웃 확정 후 같은 세션이 복귀', {
+                                uid: firebaseUser!.uid,
+                                gapMs,
+                                visibility: typeof document !== 'undefined' ? document.visibilityState : 'unknown',
+                                online: typeof navigator !== 'undefined' ? navigator.onLine : null,
+                            });
+                        }
+                    }
+
                     authedUidRef.current = firebaseUser!.uid;
                     if (!sameSession) sessionStartedAtRef.current = Date.now();
                     setUser(firebaseUser);
@@ -282,6 +371,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                             (docSnap) => {
                                 if (docSnap.exists()) {
                                     const data = { id: docSnap.id, ...docSnap.data() } as UserDoc;
+                                    lastUserDocRef.current = { exists: true, status: data.status as string | undefined };
                                     setUserData(data);
                                     setUserDocState('present');
                                     // Sentry 사용자 컨텍스트 설정 (에러 추적 시 역할/기관 파악)
@@ -387,6 +477,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                                     // 사용자 문서가 없거나 삭제됨
                                     // orgWatch가 남아있으면 orgDeleted=true를 계속 세팅하므로 반드시 해제
                                     if (unsubscribeOrg) { unsubscribeOrg(); unsubscribeOrg = null; }
+                                    lastUserDocRef.current = { exists: false };
                                     setUserData(null);
                                     setUserDocState('absent'); // 문서가 확정적으로 없음 → 신규가입/온보딩 대상
                                     setOrgDeleted(false);

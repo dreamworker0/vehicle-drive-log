@@ -37,6 +37,7 @@ vi.mock('../../lib/auth', () => ({
 vi.mock('../../lib/sentry', () => ({
     setSentryUser: vi.fn(),
     captureError: vi.fn(),
+    captureWarning: vi.fn(),
 }));
 // Firestore 종료 상태는 테스트가 직접 뒤집는다 (로그아웃 teardown 재현)
 let firestoreTerminated = false;
@@ -50,7 +51,7 @@ import { AuthProvider, useAuth } from '../../hooks/useAuth';
 import { auth, getAppCheckBlock } from '../../lib/firebase';
 import { refreshToken, getLastTokenRefreshFailure } from '../../lib/tokenRefresh';
 import { wasIntentionalLogout } from '../../lib/auth';
-import { captureError } from '../../lib/sentry';
+import { captureError, captureWarning } from '../../lib/sentry';
 import { useToastStore } from '../../store/useToastStore';
 
 function createWrapper() {
@@ -314,7 +315,49 @@ describe('useAuth — 예기치 않은 세션 종료 보고', () => {
         useToastStore.setState({ toasts: [] });
     });
 
-    it('유예가 지나 로그아웃이 확정되면 원인 판별 근거와 함께 보고하고 안내한다', async () => {
+    /** 사용자 문서 스냅샷을 흘려보낼 onSnapshot next 콜백을 잡는다(첫 구독 = users 문서). */
+    function captureUserSnapshot() {
+        let onNext: ((snap: unknown) => void) | undefined;
+        mockOnSnapshot.mockImplementation((_ref: unknown, next: (snap: unknown) => void) => {
+            if (!onNext) onNext = next;
+            return vi.fn();
+        });
+        return () => onNext!;
+    }
+
+    const userDoc = (data: Record<string, unknown> | null) => ({
+        id: 'u1',
+        exists: () => data !== null,
+        data: () => data,
+    });
+
+    it('증거가 하나도 없으면 error로 보고한다 — 원인 unknown, 판별 근거 동봉, "세션 만료" 안내', async () => {
+        const getCb = captureAuthCallback();
+        const getNext = captureUserSnapshot();
+        renderHook(() => useAuth(), { wrapper: createWrapper() });
+
+        await vi.advanceTimersByTimeAsync(0);
+        await act(async () => { getCb()(authedUser); });
+        // 정상 활성 계정 문서를 봤다 — 서버가 끊었다는 증거가 없다
+        await act(async () => { getNext()(userDoc({ role: 'employee', status: 'active', organizationId: 'org1' })); });
+        await act(async () => { getCb()(null); });
+        await act(async () => { await vi.advanceTimersByTimeAsync(2500); });
+
+        expect(captureError).toHaveBeenCalledTimes(1);
+        expect(captureWarning).not.toHaveBeenCalled();
+        const [err, ctx] = vi.mocked(captureError).mock.calls[0] as [Error, Record<string, unknown>];
+        expect(err.message).toContain('예기치 않은 세션 종료');
+        expect(ctx).toMatchObject({ uid: 'u1', cause: 'unknown', tokenRefreshFailure: null });
+        expect(ctx.lastUserDoc).toEqual({ exists: true, status: 'active' });
+        expect(ctx).toHaveProperty('indexedDBAvailable');
+
+        expect(useToastStore.getState().toasts).toHaveLength(1);
+        expect(useToastStore.getState().toasts[0].message).toContain('세션이 만료되어');
+    });
+
+    // 2026-09-02 — 서버가 끊은 세션까지 전부 error로 올라가 고우선 알림 메일이 왔다.
+    // 운영자가 할 일이 없는 사건은 warning으로 남기고, 안내 문구도 조치가 다르므로 갈라 준다.
+    it('토큰이 무효화된 갱신 실패가 직전에 있었으면 warning으로 남긴다 — 원인 token-invalidated', async () => {
         vi.mocked(getLastTokenRefreshFailure).mockReturnValue({
             code: 'auth/user-token-expired',
             fatal: true,
@@ -328,16 +371,85 @@ describe('useAuth — 예기치 않은 세션 종료 보고', () => {
         await act(async () => { getCb()(null); });
         await act(async () => { await vi.advanceTimersByTimeAsync(2500); });
 
-        expect(captureError).toHaveBeenCalledTimes(1);
-        const [err, ctx] = vi.mocked(captureError).mock.calls[0] as [Error, Record<string, unknown>];
-        expect(err.message).toContain('예기치 않은 세션 종료');
-        expect(ctx.uid).toBe('u1');
+        expect(captureError).not.toHaveBeenCalled();
+        expect(captureWarning).toHaveBeenCalledTimes(1);
+        const [msg, ctx] = vi.mocked(captureWarning).mock.calls[0] as [string, Record<string, unknown>];
+        expect(msg).toBe('[Auth] 세션 종료 — token-invalidated');
         // 토큰이 무효화된 실패는 그 자체가 로그아웃의 직접 원인이므로 반드시 실려야 한다
         expect(ctx.tokenRefreshFailure).toMatchObject({ code: 'auth/user-token-expired', fatal: true });
+        expect(ctx.detail).toBe('auth/user-token-expired');
+        expect(useToastStore.getState().toasts[0].message).toContain('보안을 위해 세션이 종료');
+    });
 
-        // 지금까지는 아무 설명 없이 로그인 화면만 떴다
-        expect(useToastStore.getState().toasts).toHaveLength(1);
-        expect(useToastStore.getState().toasts[0].message).toContain('세션이 만료되어');
+    it('마지막으로 본 사용자 문서가 비활성이면 warning — 원인 account-disabled, 관리자 문의 안내', async () => {
+        const getCb = captureAuthCallback();
+        const getNext = captureUserSnapshot();
+        renderHook(() => useAuth(), { wrapper: createWrapper() });
+
+        await vi.advanceTimersByTimeAsync(0);
+        await act(async () => { getCb()(authedUser); });
+        await act(async () => { getNext()(userDoc({ role: 'employee', status: 'disabled', organizationId: 'org1' })); });
+        // disableUser는 토큰도 폐기한다 → SDK 내부 갱신이 실패해 스스로 signOut — 우리 기록에는 남지 않는다
+        await act(async () => { getCb()(null); });
+        await act(async () => { await vi.advanceTimersByTimeAsync(2500); });
+
+        expect(captureError).not.toHaveBeenCalled();
+        expect(captureWarning).toHaveBeenCalledWith('[Auth] 세션 종료 — account-disabled', expect.objectContaining({
+            uid: 'u1', cause: 'account-disabled', lastUserDoc: { exists: true, status: 'disabled' },
+        }));
+        expect(useToastStore.getState().toasts[0].message).toContain('계정이 비활성화');
+    });
+
+    it('사용자 문서가 확정적으로 없었으면 warning — 원인 account-removed', async () => {
+        const getCb = captureAuthCallback();
+        const getNext = captureUserSnapshot();
+        renderHook(() => useAuth(), { wrapper: createWrapper() });
+
+        await vi.advanceTimersByTimeAsync(0);
+        await act(async () => { getCb()(authedUser); });
+        await act(async () => { getNext()(userDoc(null)); });
+        await act(async () => { getCb()(null); });
+        await act(async () => { await vi.advanceTimersByTimeAsync(2500); });
+
+        expect(captureError).not.toHaveBeenCalled();
+        expect(captureWarning).toHaveBeenCalledWith('[Auth] 세션 종료 — account-removed', expect.objectContaining({ cause: 'account-removed' }));
+        expect(useToastStore.getState().toasts[0].message).toContain('소속 정보가 변경');
+    });
+
+    it('확정 직후 같은 세션이 돌아오면 "저장소 일시 장애"로 짝을 맞춰 기록한다', async () => {
+        const getCb = captureAuthCallback();
+        const { result } = renderHook(() => useAuth(), { wrapper: createWrapper() });
+
+        await vi.advanceTimersByTimeAsync(0);
+        await act(async () => { getCb()(authedUser); });
+        await act(async () => { getCb()(null); });
+        await act(async () => { await vi.advanceTimersByTimeAsync(2500); });
+        expect(result.current.user).toBeNull();
+        expect(captureError).toHaveBeenCalledTimes(1); // 확정 시점의 보고(unknown)
+
+        // 3초 뒤 SDK가 같은 사용자를 되살렸다 — 저장소 읽기가 회복된 것
+        await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+        await act(async () => { getCb()(authedUser); });
+
+        expect(captureWarning).toHaveBeenCalledWith('[Auth] 로그아웃 확정 후 같은 세션이 복귀', expect.objectContaining({ uid: 'u1' }));
+        const [, ctx] = vi.mocked(captureWarning).mock.calls[0] as [string, Record<string, unknown>];
+        expect(ctx.gapMs).toBeGreaterThanOrEqual(3000);
+        expect(ctx.gapMs).toBeLessThan(30_000);
+        expect(result.current.user).toEqual(authedUser);
+    });
+
+    it('확정 뒤 오래 지나 다시 로그인한 것은 복귀로 기록하지 않는다', async () => {
+        const getCb = captureAuthCallback();
+        renderHook(() => useAuth(), { wrapper: createWrapper() });
+
+        await vi.advanceTimersByTimeAsync(0);
+        await act(async () => { getCb()(authedUser); });
+        await act(async () => { getCb()(null); });
+        await act(async () => { await vi.advanceTimersByTimeAsync(2500); });
+        await act(async () => { await vi.advanceTimersByTimeAsync(60_000); });
+        await act(async () => { getCb()(authedUser); });
+
+        expect(captureWarning).not.toHaveBeenCalled();
     });
 
     it('사용자가 스스로 로그아웃한 경우에는 보고하지 않는다', async () => {
