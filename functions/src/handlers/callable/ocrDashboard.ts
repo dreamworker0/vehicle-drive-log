@@ -1,6 +1,7 @@
 /**
  * ocrDashboard — 계기판 OCR (Gemini API)
  */
+import { GEMINI_API_KEY } from "../../core/params";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { generateAiContent } from "../../core/gemini";
 import { wrapCallableHandler } from "../../utils/helpers";
@@ -10,6 +11,7 @@ import { checkDailyOcrQuota } from "../../utils/rateLimit";
 export const ocrDashboard = onCall(
     {
         region: "asia-northeast3",
+        secrets: [GEMINI_API_KEY],
         timeoutSeconds: 60,
         memory: "512MiB",
         enforceAppCheck: true,

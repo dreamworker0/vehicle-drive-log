@@ -1,6 +1,7 @@
 /**
  * ocrDocument — 비영리 증빙 서류 OCR (Gemini API)
  */
+import { GEMINI_API_KEY } from "../../core/params";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getStorage } from "firebase-admin/storage";
 import { generateAiContent } from "../../core/gemini";
@@ -65,6 +66,7 @@ function classifyByBizNumber(bizNumber: string): boolean | null {
 export const ocrDocument = onCall(
     {
         region: "asia-northeast3",
+        secrets: [GEMINI_API_KEY],
         timeoutSeconds: 120,
         memory: "512MiB",
         enforceAppCheck: true,

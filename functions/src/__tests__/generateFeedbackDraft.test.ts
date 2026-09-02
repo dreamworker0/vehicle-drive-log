@@ -21,6 +21,7 @@ jest.mock('../utils/faqData', () => ({ buildFaqPromptText: jest.fn(() => '가짜
 jest.mock('../core/discord', () => ({ sendDiscordAlert: jest.fn().mockResolvedValue(undefined) }));
 jest.mock('firebase-functions/params', () => ({
     defineString: jest.fn(() => ({ value: jest.fn(() => 'mock-key') })),
+    defineSecret: jest.fn(() => ({ value: jest.fn(() => 'mock-secret') })),
 }));
 jest.mock('firebase-functions/v2/firestore', () => ({
     onDocumentCreated: jest.fn(),

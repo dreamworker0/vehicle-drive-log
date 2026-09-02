@@ -176,7 +176,7 @@ Firestore 백업에서 복구가 필요한 경우:
 
 | 키 | 갱신 주기 | 갱신 방법 |
 |----|----------|----------|
-| `GEMINI_API_KEY` | API 키 변경 시 | `functions/.env` 수정 → `firebase deploy --only functions` |
+| `GEMINI_API_KEY` | API 키 변경 시 | `firebase functions:secrets:set GEMINI_API_KEY`(Secret Manager) → 다음 배포에서 반영 (2026-09-02부터 `functions/.env`에 두지 않는다 — 같은 키가 있으면 이름 충돌로 배포 거부) |
 | `EMAILJS_*` | 키 만료 시 | EmailJS 대시보드에서 재발급 → `.env` 수정 |
 | `VITE_TMAP_API_KEY` | 키 만료 시 | 티맵 개발자센터에서 재발급 → `.env` 수정 → 빌드+배포 (⚠️ 이름이 `..._APP_KEY`가 아니다 — 틀리면 경로 탐색이 **에러 없이** 죽는다) |
 | `VITE_SENTRY_DSN` | 프로젝트 변경 시 | Sentry 대시보드 → `.env` 수정 → 빌드+배포 |

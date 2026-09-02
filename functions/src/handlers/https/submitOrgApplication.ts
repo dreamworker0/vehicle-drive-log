@@ -1,3 +1,4 @@
+import { GEMINI_API_KEY } from "../../core/params";
 import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
@@ -57,6 +58,7 @@ const VERSION_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 export const submitOrgApplication = onCall(
     {
         region: "asia-northeast3",
+        secrets: [GEMINI_API_KEY],
         memory: "512MiB",
         timeoutSeconds: 60,
         // **의도적으로 끈다.** 2026-07-18 보안 재점검이 App Check 적용을 권고했지만,

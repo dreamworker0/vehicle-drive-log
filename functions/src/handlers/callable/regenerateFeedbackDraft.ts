@@ -1,3 +1,4 @@
+import { GEMINI_API_KEY } from "../../core/params";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore } from "firebase-admin/firestore";
 import { generateAiContent } from "../../core/gemini";
@@ -54,7 +55,7 @@ function parseAiResponse(text: string): {
 
 export const regenerateFeedbackDraft = onCall(
     // 첨부 이미지를 버퍼로 들고 Gemini를 호출한다 (규칙 §3.2 "OCR/AI 함수")
-    { region: "asia-northeast3", timeoutSeconds: 60, memory: "512MiB", enforceAppCheck: true },
+    { region: "asia-northeast3", timeoutSeconds: 60, memory: "512MiB", enforceAppCheck: true, secrets: [GEMINI_API_KEY] },
     wrapCallableHandler("regenerateFeedbackDraft", {}, async (request) => {
         // superAdmin 권한 확인 (관리자만 다시 생성 가능)
         requireSuperAdmin(request);
