@@ -4,6 +4,7 @@
  * Firestore `feedbacks` 컬렉션 onCreate 트리거.
  * Gemini API로 FAQ 매칭 + 과거 답변 사례 참고 + 답변 초안을 생성한다.
  */
+import { GEMINI_API_KEY } from "../../core/params";
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { getFirestore } from "firebase-admin/firestore";
 import { generateAiContent } from "../../core/gemini";
@@ -117,6 +118,7 @@ export const generateFeedbackDraft = onDocumentCreated(
     {
         document: "feedbacks/{feedbackId}",
         region: "asia-northeast3",
+        secrets: [GEMINI_API_KEY],
         timeoutSeconds: 90,
         memory: "512MiB",
     },

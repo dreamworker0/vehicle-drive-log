@@ -4,6 +4,7 @@
  */
 jest.mock('firebase-functions/params', () => ({
     defineString: () => ({ value: () => 'test-key' }),
+    defineSecret: () => ({ value: () => 'test-secret' }),
 }));
 
 // ── L2 캐시(tmapCache) Firestore mock ──

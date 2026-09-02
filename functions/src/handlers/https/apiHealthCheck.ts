@@ -6,6 +6,7 @@
  */
 import { onCall } from "firebase-functions/v2/https";
 import { defineString } from "firebase-functions/params";
+import { GEMINI_API_KEY } from "../../core/params";
 import { getFirestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { getStorage } from "firebase-admin/storage";
@@ -14,7 +15,8 @@ import { toKSTDate } from "../../utils/kstDate";
 
 const TMAP_API_KEY = defineString("TMAP_API_KEY");
 const HOLIDAY_API_KEY = defineString("HOLIDAY_API_KEY");
-const geminiApiKey = defineString("GEMINI_API_KEY");
+// Gemini 키는 Secret Manager(core/params) — 이 함수도 secrets에 선언해야 값이 주입된다
+const geminiApiKey = GEMINI_API_KEY;
 
 /** 단일 API 핑 결과 */
 interface ApiHealthResult {
@@ -350,6 +352,7 @@ async function checkSchedulerHealth(): Promise<SchedulerHealthResult[]> {
 export const apiHealthCheck = onCall(
     {
         region: "asia-northeast3",
+        secrets: [GEMINI_API_KEY],
         timeoutSeconds: 60,
         memory: "256MiB",
         enforceAppCheck: true,

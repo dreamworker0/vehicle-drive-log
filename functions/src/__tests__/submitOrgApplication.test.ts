@@ -69,7 +69,10 @@ const mockGenerateAiContent = jest.fn();
 jest.mock('../core/gemini', () => ({
     generateAiContent: (...args: unknown[]) => mockGenerateAiContent(...args),
 }));
-jest.mock('firebase-functions/params', () => ({ defineString: jest.fn(() => ({ value: jest.fn(() => 'mock-key') })) }));
+jest.mock('firebase-functions/params', () => ({
+    defineString: jest.fn(() => ({ value: jest.fn(() => 'mock-key') })),
+    defineSecret: jest.fn(() => ({ value: jest.fn(() => 'mock-secret') })),
+}));
 
 // 운영자 알림(Discord)은 실제로 보내지 않고 호출만 검증한다
 const mockSendDiscordAlert = jest.fn().mockResolvedValue(undefined);

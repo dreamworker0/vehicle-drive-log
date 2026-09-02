@@ -85,12 +85,13 @@ VITE_FIREBASE_VAPID_KEY=...
 VITE_RECAPTCHA_SITE_KEY=...
 ```
 
-`functions/.env`:
+Gemini API 키는 평문 `.env`가 아니라 **Secret Manager**에 넣습니다 (OCR — 계기판·증빙 인식의 핵심. 없으면 OCR 기능만 동작하지 않습니다):
 
-```env
-# OCR — 계기판·증빙 인식의 핵심. 없으면 OCR 기능만 동작하지 않습니다.
-GEMINI_API_KEY=...
+```bash
+firebase functions:secrets:set GEMINI_API_KEY
 ```
+
+로컬 에뮬레이터에서는 `functions/.secret.local`에 `GEMINI_API_KEY=...`로 둡니다(git 제외 대상). `functions/.env`에 같은 키가 있으면 이름 충돌로 배포가 거부됩니다.
 
 ### 4-2. 선택 (해당 기능을 쓸 때만)
 

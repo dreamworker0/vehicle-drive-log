@@ -10,7 +10,7 @@
 import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import { SLACK_TOKEN_ENC_KEY } from "../../core/params";
+import { GEMINI_API_KEY, SLACK_TOKEN_ENC_KEY } from "../../core/params";
 import { postMessage, respondToUrl, addReaction } from "../../services/slack/slackApi";
 import { resolveSlackUser, getSlackIntegration } from "../../services/slack/resolveSlackUser";
 import {
@@ -221,7 +221,8 @@ export const onSlackTaskCreated = onDocumentCreated(
     {
         document: "slackTasks/{taskId}",
         region: "asia-northeast3",
-        secrets: [SLACK_TOKEN_ENC_KEY],
+        // 어시스턴트가 parseIntent·answerDataQuestion에서 Gemini를 부른다
+        secrets: [GEMINI_API_KEY, SLACK_TOKEN_ENC_KEY],
         timeoutSeconds: 60,
         memory: "512MiB",
     },

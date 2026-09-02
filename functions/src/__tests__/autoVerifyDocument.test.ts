@@ -19,7 +19,10 @@ jest.mock('@google/genai', () => ({ GoogleGenAI: jest.fn() }));
 jest.mock('@emailjs/nodejs', () => ({ send: jest.fn() }));
 jest.mock('nodemailer', () => ({ createTransport: jest.fn() }));
 jest.mock('../services/alimtalk/sendAlimtalk', () => ({ sendApprovalAlimtalk: jest.fn() }));
-jest.mock('firebase-functions/params', () => ({ defineString: jest.fn(() => ({ value: jest.fn(() => 'mock-key') })) }));
+jest.mock('firebase-functions/params', () => ({
+    defineString: jest.fn(() => ({ value: jest.fn(() => 'mock-key') })),
+    defineSecret: jest.fn(() => ({ value: jest.fn(() => 'mock-secret') })),
+}));
 jest.mock('firebase-functions/firestore', () => ({ onDocumentWritten: jest.fn() }));
 
 // ── 원본을 import한다 ──

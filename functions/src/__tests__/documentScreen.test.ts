@@ -4,7 +4,10 @@
  * 이 규칙이 곧 "어떤 신청을 접수하고 어떤 신청을 문 앞에서 돌려보내는가"이므로,
  * 판정 경계를 회귀 테스트로 고정한다.
  */
-jest.mock('firebase-functions/params', () => ({ defineString: jest.fn(() => ({ value: jest.fn(() => 'mock-key') })) }));
+jest.mock('firebase-functions/params', () => ({
+    defineString: jest.fn(() => ({ value: jest.fn(() => 'mock-key') })),
+    defineSecret: jest.fn(() => ({ value: jest.fn(() => 'mock-secret') })),
+}));
 jest.mock('@google/genai', () => ({ GoogleGenAI: jest.fn() }));
 
 import {

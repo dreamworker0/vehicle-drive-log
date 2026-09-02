@@ -13,6 +13,18 @@
  */
 import { defineSecret } from "firebase-functions/params";
 
+/**
+ * Gemini API 키 — core/gemini를 (간접적으로라도) 쓰는 함수 전부:
+ * ocrDashboard·ocrDocument·askAI·regenerateFeedbackDraft·autoVerifyDocument·generateFeedbackDraft·
+ * submitOrgApplication(documentScreen 프리스크린)·onSlackTaskCreated(어시스턴트 parseIntent·answerDataQuestion).
+ *
+ * 2026-09-02 이관. 과금 LLM 키인데 defineString(functions/.env 평문)으로 남아 있어 위 정책과 어긋났다.
+ * 함께 지적된 TMAP_API_KEY·HOLIDAY_API_KEY는 이관하지 않는다 — 같은 키가 프론트 번들에
+ * VITE_TMAP_API_KEY·VITE_HOLIDAY_API_KEY로 이미 공개돼 있어 서버 사본만 감춰도 얻는 것이 없고,
+ * DISCORD_WEBHOOK_URL은 선택 항목(셀프호스팅 §4-2)이라 시크릿으로 강제하면 값이 없는 배포가 막힌다.
+ */
+export const GEMINI_API_KEY = defineSecret("GEMINI_API_KEY");
+
 /** Gmail SMTP 앱 비밀번호 — core/mailer 사용 함수 전부 */
 export const GMAIL_APP_PASSWORD = defineSecret("GMAIL_APP_PASSWORD");
 

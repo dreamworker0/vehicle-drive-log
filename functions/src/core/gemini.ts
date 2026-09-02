@@ -1,7 +1,8 @@
-import { defineString } from "firebase-functions/params";
+import { GEMINI_API_KEY } from "./params";
 import { GoogleGenAI } from "@google/genai";
 
-const geminiApiKey = defineString("GEMINI_API_KEY");
+// Secret Manager(defineSecret) — 이 값을 쓰는 함수는 옵션에 `secrets: [GEMINI_API_KEY]`를 선언해야 한다.
+const geminiApiKey = GEMINI_API_KEY;
 
 let aiInstance: GoogleGenAI | null = null;
 

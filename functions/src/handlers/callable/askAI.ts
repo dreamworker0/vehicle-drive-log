@@ -4,6 +4,7 @@
  * FAQ 데이터 + 사용 설명서를 컨텍스트로 활용하여
  * Gemini flash-lite로 사용자 질문에 답변한다.
  */
+import { GEMINI_API_KEY } from "../../core/params";
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { buildFaqPromptText } from "../../utils/faqData";
 import { generateAiContent } from "../../core/gemini";
@@ -41,6 +42,7 @@ const MANUAL_SUMMARY = `
 export const askAI = onCall(
     {
         region: "asia-northeast3",
+        secrets: [GEMINI_API_KEY],
         timeoutSeconds: 30,
         memory: "256MiB",
         enforceAppCheck: true,
