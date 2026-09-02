@@ -2,9 +2,9 @@
 
 > **자동 생성 문서** — `scripts/generate-functions-doc.ts`로 생성됨
 >
-> 마지막 업데이트: 2026. 8. 29. AM 8:00:16
+> 마지막 업데이트: 2026. 9. 2. PM 12:17:39
 >
-> 총 함수 수: **69개**
+> 총 함수 수: **70개**
 
 ---
 
@@ -23,7 +23,7 @@
 
 ## 📞 onCall (클라이언트 직접 호출)
 
-> 총 38개
+> 총 39개
 
 ### `ocrDashboard`
 
@@ -100,6 +100,16 @@
 | **인증** | 인증 필수 (익명 로그인 차단) |
 | **요청 파라미터** | `{ code: string, agreedTerms: true, termsVersion: string }` |
 | **반환값** | `{ success: boolean, orgId: string, orgName: string, role: 'admin' \| 'employee' }` |
+
+### `regenerateInviteCode`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/callable/regenerateInviteCode.ts` |
+| **설명** | 기관 초대 코드 재발급. Rules가 기관관리자의 `inviteCode` 쓰기를 막으므로(타 기관 코드를 복사해 신규 직원을 가로채는 경로 차단) 서버 난수 + 전체 기관 중복 검사로만 발급한다. 승인된 기관만 대상. 부를 때마다 새 코드가 나오는 비멱등 호출이라 클라이언트는 재시도하지 않는다. |
+| **인증** | 해당 기관 관리자(클레임 `role=admin` + `orgId` 일치) 또는 superAdmin |
+| **요청 파라미터** | `{ organizationId: string }` |
+| **반환값** | `{ inviteCode: string }` |
 
 ### `acceptCurrentTerms`
 

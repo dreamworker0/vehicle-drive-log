@@ -214,7 +214,7 @@ export function printPdfReport<T>(config: PdfReportConfig<T>): boolean {
     const buildPage = (page: ReportPage<T>, pageIdx: number, totalPages: number) => `
             <div class="page">
                 <div class="header-area">
-                    <h1 class="title">${title}</h1>
+                    <h1 class="title">${escapeHtml(title)}</h1>
                     ${buildApprovalHtml(approvalLine, pageIdx > 0)}
                 </div>
                 <div class="info-row">
@@ -244,7 +244,7 @@ export function printPdfReport<T>(config: PdfReportConfig<T>): boolean {
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>${title} - ${escapeHtml(orgName)}</title>
+    <title>${escapeHtml(title)} - ${escapeHtml(orgName)}</title>
     <style>${styles}</style>
 </head>
 <body>${pages.map((page, pageIdx) => buildPage(page, pageIdx, pages.length)).join('')}</body>

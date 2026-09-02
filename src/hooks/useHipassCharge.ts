@@ -5,9 +5,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
-import type { HipassCard } from '../types/hipass';
 import type { HipassCharge } from '../types/hipassCharge';
-import type { Vehicle } from '../types/vehicle';
 import {
     updateHipassCard,
     createHipassCharge,

@@ -244,7 +244,7 @@ export default function useVehicleManager() {
                     : prev
             );
         } catch (err) {
-            console.error('캘린더 테스트 결과 저장 실패:', err);
+            captureError(err, { context: 'useVehicleManager.saveCalendarTestResult', orgId });
         }
     };
 

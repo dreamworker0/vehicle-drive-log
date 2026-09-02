@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react';
 import { collection, query, where, getDocs, getCountFromServer } from 'firebase/firestore';
 import { db } from '../lib/firebase';
+import { captureError } from '../lib/sentry';
 import { useAuth } from './useAuth';
 import { toLocalDateStr } from '../lib/dateUtils';
 import { cachedQuery } from '../lib/firestore/cache';
@@ -82,7 +83,7 @@ export default function useAdminBadges(): AdminBadges {
                     setReservationCount(activeReservations.length);
                 }
             } catch (err) {
-                console.error("Failed to fetch admin badges:", err);
+                captureError(err, { context: 'useAdminBadges.fetch', orgId });
                 if (isMounted) {
                     setVehicleCount(null);
                     setEmployeeCount(null);

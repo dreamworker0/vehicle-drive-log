@@ -26,37 +26,11 @@ jest.mock('firebase-functions/v2/firestore', () => ({
     onDocumentCreated: jest.fn(),
 }));
 
-// ── parseAiResponse 순수 함수 재현 ──
-function parseAiResponse(text: string): {
-    faqId: string | null;
-    confidence: number;
-    draft: string;
-} {
-    const defaults = { faqId: null, confidence: 0, draft: '' };
-    try {
-        const jsonMatch = text.match(/\{[\s\S]*?\}/);
-        if (!jsonMatch) return defaults;
-        const parsed = JSON.parse(jsonMatch[0]);
-        return {
-            faqId: parsed.faqId ?? parsed.faqIndex ?? null,
-            confidence: typeof parsed.confidence === 'number' ? parsed.confidence : 0,
-            draft: parsed.draft || '',
-        };
-    } catch {
-        return defaults;
-    }
-}
-
-const PREFIX = '안녕하세요. 김종원입니다. 초안은 인공지능이 작성합니다.';
-
-/** prefix가 없으면 앞에 붙이는 로직 */
-function applyPrefix(draft: string): string {
-    const trimmed = draft.trim();
-    if (!trimmed.startsWith(PREFIX)) {
-        return `${PREFIX}\n\n${trimmed}`;
-    }
-    return trimmed;
-}
+// ── 원본을 import한다 ──
+// 종전에는 parseAiResponse와 접두어 삽입 로직을 이 파일에 **다시 구현해** 사본을 검사했다.
+// 원본에서 export하도록 바꾸고(applyDraftPrefix로 추출) 실제 코드를 검사한다 (2026-09-02).
+// 모듈 로드 시 Firestore·Gemini·Discord·params를 건드리므로 위 mock들이 그대로 필요하다.
+import { parseAiResponse, applyDraftPrefix, DRAFT_PREFIX } from '../handlers/triggers/generateFeedbackDraft';
 
 // ──────────────────────────────────────────────────
 describe('parseAiResponse()', () => {
@@ -109,28 +83,28 @@ describe('parseAiResponse()', () => {
     });
 });
 
-describe('applyPrefix() — prefix 강제 삽입 로직', () => {
+describe('applyDraftPrefix() — prefix 강제 삽입 로직', () => {
     it('prefix가 없으면 앞에 붙인다', () => {
-        const result = applyPrefix('소중한 의견 감사합니다.');
-        expect(result).toContain(PREFIX);
-        expect(result.startsWith(PREFIX)).toBe(true);
+        const result = applyDraftPrefix('소중한 의견 감사합니다.');
+        expect(result).toContain(DRAFT_PREFIX);
+        expect(result.startsWith(DRAFT_PREFIX)).toBe(true);
     });
 
     it('이미 prefix가 있으면 중복 삽입하지 않는다', () => {
-        const draft = `${PREFIX}\n\n이미 있는 내용`;
-        const result = applyPrefix(draft);
-        const count = result.split(PREFIX).length - 1;
+        const draft = `${DRAFT_PREFIX}\n\n이미 있는 내용`;
+        const result = applyDraftPrefix(draft);
+        const count = result.split(DRAFT_PREFIX).length - 1;
         expect(count).toBe(1);
     });
 
     it('빈 draft에도 prefix 삽입', () => {
-        const result = applyPrefix('');
-        expect(result).toContain(PREFIX);
+        const result = applyDraftPrefix('');
+        expect(result).toContain(DRAFT_PREFIX);
     });
 
     it('앞뒤 공백 있는 draft는 trim 후 prefix 삽입', () => {
-        const result = applyPrefix('   내용   ');
-        expect(result.startsWith(PREFIX)).toBe(true);
+        const result = applyDraftPrefix('   내용   ');
+        expect(result.startsWith(DRAFT_PREFIX)).toBe(true);
         expect(result).toContain('내용');
     });
 });

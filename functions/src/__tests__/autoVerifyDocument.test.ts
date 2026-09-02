@@ -22,57 +22,12 @@ jest.mock('../services/alimtalk/sendAlimtalk', () => ({ sendApprovalAlimtalk: je
 jest.mock('firebase-functions/params', () => ({ defineString: jest.fn(() => ({ value: jest.fn(() => 'mock-key') })) }));
 jest.mock('firebase-functions/firestore', () => ({ onDocumentWritten: jest.fn() }));
 
-// ── 순수 함수만 추출하여 테스트 ──
-// autoVerifyDocument.ts에서 export되지 않는 함수들이므로 직접 구현 후 검증
-// (향후 함수들이 export되면 import로 교체 가능)
-
-/** maskName: 이름 마스킹 함수 */
-function maskName(name: string | null | undefined): string {
-    if (!name || name.length === 0) return '알 수 없음';
-    if (name.length === 1) return name;
-    if (name.length === 2) return name[0] + '*';
-    const first = name[0];
-    const last = name[name.length - 1];
-    const middle = '*'.repeat(name.length - 2);
-    return first + middle + last;
-}
-
-/** maskEmail: 이메일 마스킹 함수 */
-function maskEmail(email: string | null | undefined): string {
-    if (!email || !email.includes('@')) return '알 수 없음';
-    const [local, domain] = email.split('@');
-    if (local.length <= 2) return local + '***@' + domain;
-    return local.substring(0, 2) + '***@' + domain;
-}
-
-/** classifyByBizNumber: 사업자번호 기반 비영리 분류 */
-function classifyByBizNumber(
-    bizNumber: string | null,
-    orgName: string | null,
-    documentType: string
-): { score: number; result?: string } {
-    let score = 0;
-    if (documentType === '고유번호증') return { score: 100, result: '비영리 확정' };
-    if (bizNumber) {
-        const bizMatch = bizNumber.match(/\d{3}-(\d{2})-\d{5}/);
-        const mid = bizMatch ? bizMatch[1] : null;
-        if (mid === '82') score += 40;
-        else if (mid === '81') score -= 40;
-        else if (mid === '80') score -= 30;
-    }
-    const name = (orgName || '').toLowerCase();
-    if (name.includes('사단법인')) score += 30;
-    if (name.includes('재단법인')) score += 30;
-    if (name.includes('사회복지')) score += 40;
-    if (name.includes('비영리')) score += 30;
-    if (name.includes('복지관')) score += 20;
-    if (name.includes('복지센터')) score += 20;
-    if (name.includes('사회적협동조합')) score += 40;
-    else if (name.includes('협동조합')) score += 20;
-    if (name.includes('주식회사') || name.includes('(주)')) score -= 50;
-    if (name.includes('유한회사') || name.includes('유한책임')) score -= 40;
-    return { score };
-}
+// ── 원본을 import한다 ──
+// 종전에는 "export되지 않는 함수"라는 이유로 maskName/maskEmail/classifyByBizNumber를 이 파일에
+// **다시 구현해** 사본을 검사했다. 그동안 원본은 utils/mask.ts·services/driveLog/documentScreen.ts로
+// 이관돼 export되어 있었으므로, 이 테스트는 원본 코드를 한 줄도 실행하지 않는 녹색 신호였다 (2026-09-02).
+import { maskName, maskEmail } from '../utils/mask';
+import { classifyByBizNumber } from '../services/driveLog/documentScreen';
 
 // ──────────────────────────────────────────────────
 describe('maskName()', () => {

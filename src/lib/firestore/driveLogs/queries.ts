@@ -9,7 +9,6 @@ import {
     type DocumentData,
 } from 'firebase/firestore';
 import { db } from '../../firebase';
-import type { DriveLog } from '../../../types/driveLog';
 import { createZodConverter, driveLogSchema } from '../../../schemas';
 import { captureError } from '../../sentry';
 import { cachedQuery } from '../cache';

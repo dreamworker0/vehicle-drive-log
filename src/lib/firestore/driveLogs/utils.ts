@@ -5,8 +5,6 @@
 import {
     collection, query, where, getDocs,
     orderBy, limit,
-    type QueryDocumentSnapshot,
-    type SnapshotOptions
 } from 'firebase/firestore';
 import { db } from '../../firebase';
 import type { DriveLog } from '../../../types/driveLog';

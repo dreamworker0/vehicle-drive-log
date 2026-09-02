@@ -5,6 +5,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
+import { captureError } from '../lib/sentry';
 import { useConfirm } from './useConfirm';
 import { getOrganization, updateOrganization, regenerateInviteCode, getCustomHolidays, addCustomHoliday, deleteCustomHoliday } from '../lib/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
@@ -140,7 +141,7 @@ export default function useSettings() {
                 }
                 setCustomHolidays(holidays as CustomHoliday[]);
             } catch (err) {
-                console.error('기관 정보 로드 실패:', err);
+                captureError(err, { context: 'useSettings.loadOrg', orgId });
             } finally {
                 setLoading(false);
             }
@@ -244,7 +245,8 @@ export default function useSettings() {
             const newCode = await regenerateInviteCode(orgId);
             setOrg(prev => prev ? ({ ...prev, inviteCode: newCode }) : null);
         } catch (err) {
-            console.error('코드 재발급 실패:', err);
+            captureError(err, { context: 'useSettings.handleRegenCode', orgId });
+            showToast('초대 코드 재발급에 실패했습니다.', 'error');
         }
     };
 

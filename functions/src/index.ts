@@ -90,6 +90,8 @@ export { setCustomClaims } from "./handlers/triggers/setCustomClaims";
 
 // 초대 코드로 기관 가입 (신규 사용자 Custom Claims 미보유 대응)
 export { joinOrganization } from "./handlers/callable/joinOrganization";
+// 초대 코드 재발급 — Rules가 기관관리자의 inviteCode 쓰기를 닫아 서버 난수·중복 검사로만 발급한다
+export { regenerateInviteCode } from "./handlers/callable/regenerateInviteCode";
 export { acceptCurrentTerms } from "./handlers/callable/acceptCurrentTerms";
 export { recordSession } from "./handlers/callable/recordSession";
 export { recordExport } from "./handlers/callable/recordExport";

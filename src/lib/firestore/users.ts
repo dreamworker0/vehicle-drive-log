@@ -5,7 +5,6 @@ import {
     doc, getDoc, setDoc, updateDoc, deleteDoc,
     collection, query, where, getDocs, getCountFromServer,
     serverTimestamp,
-    type DocumentData,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import type { User } from '../../types/user';

@@ -8,6 +8,7 @@ import NotificationBell from '../common/NotificationBell';
 import Toggle from '../common/Toggle';
 import AdminNotice from './AdminNotice';
 import ReleaseNotesModal from '../common/ReleaseNotesModal';
+import ErrorBoundary from '../common/ErrorBoundary';
 import { useTheme } from '../../hooks/useTheme';
 import useBackButton from '../../hooks/useBackButton';
 import useAdminBadges from '../../hooks/useAdminBadges';
@@ -276,22 +277,25 @@ export default function AdminLayout() {
 
                 <div className="flex-1 p-4 lg:p-6 overflow-y-auto">
                     <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-8 h-8 spinner" /></div>}>
-                        <Routes>
-                            <Route path="dashboard" element={<AdminDashboard />} />
-                            <Route path="employees" element={<EmployeeManager />} />
-                            <Route path="hipass" element={<HipassManager />} />
-                            <Route path="vehicles" element={<VehicleManager />} />
-                            <Route path="logs" element={<LogManager />} />
+                        {/* 라우트 단위 경계 — 한 화면(예: 차트)의 크래시가 관리자 화면 전체를 비우지 않게 한다. EmployeeLayout과 같은 구조 (2026-09-02) */}
+                        <ErrorBoundary>
+                            <Routes>
+                                <Route path="dashboard" element={<AdminDashboard />} />
+                                <Route path="employees" element={<EmployeeManager />} />
+                                <Route path="hipass" element={<HipassManager />} />
+                                <Route path="vehicles" element={<VehicleManager />} />
+                                <Route path="logs" element={<LogManager />} />
 
-                            <Route path="monthly-report" element={<MonthlyReport />} />
-                            <Route path="analytics" element={<AnalyticsDashboard />} />
-                            <Route path="maintenance" element={<MaintenanceLog />} />
-                            <Route path="reservations" element={<ReservationCalendar isAdmin />} />
-                            <Route path="settings" element={<Settings />} />
-                            {/* 접속기록 점검 — 설정에서 진입한다(월 1회 점검용이라 상단 메뉴에는 두지 않는다) */}
-                            <Route path="audit-logs" element={<AuditLogViewer />} />
-                            <Route path="" element={<Navigate to="dashboard" replace />} />
-                        </Routes>
+                                <Route path="monthly-report" element={<MonthlyReport />} />
+                                <Route path="analytics" element={<AnalyticsDashboard />} />
+                                <Route path="maintenance" element={<MaintenanceLog />} />
+                                <Route path="reservations" element={<ReservationCalendar isAdmin />} />
+                                <Route path="settings" element={<Settings />} />
+                                {/* 접속기록 점검 — 설정에서 진입한다(월 1회 점검용이라 상단 메뉴에는 두지 않는다) */}
+                                <Route path="audit-logs" element={<AuditLogViewer />} />
+                                <Route path="" element={<Navigate to="dashboard" replace />} />
+                            </Routes>
+                        </ErrorBoundary>
                     </Suspense>
                 </div>
             </main>

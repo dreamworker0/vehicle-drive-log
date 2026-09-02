@@ -11,14 +11,6 @@ interface Props {
     onDismiss: () => void;
 }
 
-interface OnboardingStep {
-    icon: string;
-    title: string;
-    desc: string;
-    action: string | null;
-    path: string | null;
-}
-
 const LS_KEY = 'admin-onboarding-dismissed';
 
 const STEPS = [

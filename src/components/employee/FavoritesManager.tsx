@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { getFavorites, createFavorite, deleteFavorite } from '../../lib/firestore';
+import { captureError } from '../../lib/sentry';
 import { useToast } from '../../hooks/useToast';
 import { useConfirm } from '../../hooks/useConfirm';
 import type { Favorite } from '../../types/favorite';
@@ -20,7 +21,7 @@ export default function FavoritesManager() {
         try {
             setFavorites(await getFavorites(user!.uid));
         } catch (err) {
-            console.error('즐겨찾기 로드 실패:', err);
+            captureError(err, { context: 'FavoritesManager.load' });
         } finally {
             setLoading(false);
         }

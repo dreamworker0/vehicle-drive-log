@@ -19,7 +19,10 @@
             dbs.forEach(function (d) {
                 if (d.name &&
                     d.name.indexOf('firestore') === -1 &&
-                    d.name.indexOf('firebase') === -1) {
+                    d.name.indexOf('firebase') === -1 &&
+                    // 오프라인 쓰기 큐(src/lib/offline/syncQueue.ts) — 지하 주차장에서 쓴 미전송 기록이 담겨 있다.
+                    // 이름에 firebase가 없어 종전에는 PURGE_VER를 올릴 때마다 함께 지워졌다 (2026-09-02).
+                    d.name !== 'sync-db') {
                     indexedDB.deleteDatabase(d.name);
                 }
             });

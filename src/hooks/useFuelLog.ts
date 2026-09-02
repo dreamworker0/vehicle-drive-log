@@ -6,7 +6,6 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
 import { useConfirm } from './useConfirm';
-import type { Vehicle } from '../types/vehicle';
 import type { FuelLog } from '../types/fuelLog';
 import { createFuelLog, updateFuelLog, getFuelLogs, getTodayReservations } from '../lib/firestore';
 import { isChargeableFuel } from './useVehicleManager';

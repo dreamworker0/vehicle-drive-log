@@ -81,6 +81,20 @@ registerRoute(
     })
 );
 
+// 정적 데이터 JSON(/data/*.json — 사용 설명서·업데이트 소식)
+// 번들 크기를 줄이려고 코드에서 빼내 런타임 fetch로 바꿨는데, 프리캐시 glob에도 다른 런타임 라우트에도
+// 걸리지 않아 오프라인에서는 설명서와 소식이 빈 화면이었다 — 현장에서 "어떻게 하지?"를 열어 보는
+// 바로 그 순간이다 (2026-09-02). 갱신은 다음 온라인 방문에서 조용히 받는다.
+registerRoute(
+    ({ url }) => url.origin === self.location.origin && url.pathname.startsWith('/data/') && url.pathname.endsWith('.json'),
+    new StaleWhileRevalidate({
+        cacheName: 'static-data',
+        plugins: [
+            new ExpirationPlugin({ maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 30 }),
+        ],
+    })
+);
+
 // Firebase Storage 캐싱 (차량 사진, OCR 등)
 registerRoute(
     /^https:\/\/firebasestorage\.googleapis\.com\/.*/i,

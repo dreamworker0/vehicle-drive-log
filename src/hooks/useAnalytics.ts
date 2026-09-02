@@ -8,7 +8,7 @@ import { getRecentMonthKeys } from './utils/aggregationUtils';
 import {
     DAY_NAMES, MONTH_LABELS, getWorkdaysInMonth, calcRecommendations,
 } from './utils/analyticsCalc';
-import type { CostTrendItem, DriverComparisonItem, RecommendationItem } from './utils/analyticsCalc';
+import type { CostTrendItem, DriverComparisonItem } from './utils/analyticsCalc';
 
 export default function useAnalytics() {
     const { userData } = useAuth();

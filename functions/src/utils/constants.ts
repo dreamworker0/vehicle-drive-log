@@ -29,6 +29,9 @@ export const DEFAULT_RATE_LIMITS = {
     // 캘린더 연결 진단 — 임의 캘린더 ID의 접근 가능 여부를 되돌려 주는 경로라, 상한이 없으면
     // 후보 ID를 훑는 오라클이 된다(2026-08-23 감사 발견 1). 정상 진단은 몇 번으로 끝난다.
     testCalendarAccess: { max: 20, windowSec: 3600 },         // uid당 시간당 20회
+    // 초대 코드 재발급 — 정상 사용은 기관당 몇 달에 한 번. 상한은 코드를 계속 돌려
+    // 직원 가입을 방해하는 남용만 막으면 된다 (2026-09-02, Rules에서 클라이언트 쓰기를 닫고 서버로 이관).
+    regenerateInviteCode: { max: 5, windowSec: 3600 },        // uid당 시간당 5회
 } as const;
 
 export type RateLimitKey = keyof typeof DEFAULT_RATE_LIMITS;

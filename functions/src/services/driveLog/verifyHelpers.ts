@@ -8,6 +8,7 @@ import * as emailjs from "@emailjs/nodejs";
 import { EMAILJS_PRIVATE_KEY } from "../../core/params";
 import { createGmailTransporter, systemMailFrom } from "../../core/mailer";
 import { maskEmail } from "../../utils/mask";
+import { escapeHtml } from "../../utils/helpers";
 
 // ── 마스킹 유틸리티 ──
 // 구현은 utils/mask.ts로 승격됨 (알림톡·이메일 로그 마스킹과 공용).
@@ -187,11 +188,11 @@ export async function sendRejectionEmail(recipientEmail: string, orgName: string
                         <table style="width: 100%; border-collapse: collapse;">
                             <tr>
                                 <td style="padding: 12px 0; border-bottom: 1px solid #E2E8F0; color: #64748B; width: 100px;">기관명</td>
-                                <td style="padding: 12px 0; border-bottom: 1px solid #E2E8F0; font-weight: 600; color: #1E293B;">${orgName}</td>
+                                <td style="padding: 12px 0; border-bottom: 1px solid #E2E8F0; font-weight: 600; color: #1E293B;">${escapeHtml(orgName)}</td>
                             </tr>
                             <tr>
                                 <td style="padding: 12px 0; color: #64748B;">거부 사유</td>
-                                <td style="padding: 12px 0; color: #DC2626; font-weight: 600;">${reason}</td>
+                                <td style="padding: 12px 0; color: #DC2626; font-weight: 600;">${escapeHtml(reason)}</td>
                             </tr>
                         </table>
                         <div style="margin-top: 20px; padding: 16px; background: #FEF2F2; border-radius: 8px; border: 1px solid #FECACA;">

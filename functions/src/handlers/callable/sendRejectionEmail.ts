@@ -6,7 +6,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { checkRateLimitByUid } from "../../utils/rateLimit";
 import { RATE_LIMITS } from "../../utils/constants";
-import { requireSuperAdmin } from "../../utils/helpers";
+import { requireSuperAdmin, escapeHtml } from "../../utils/helpers";
 import { createGmailTransporter, isGmailConfigured, systemMailFrom } from "../../core/mailer";
 import { maskEmail } from "../../utils/mask";
 import { GMAIL_APP_PASSWORD } from "../../core/params";
@@ -42,7 +42,7 @@ export const sendRejectionEmail = onCall(
         const rejectionReasonHtml = reason 
             ? `<div style="background: white; border: 1px solid #E2E8F0; border-radius: 8px; padding: 16px; margin: 16px 0;">
                 <p style="color: #64748B; font-size: 14px; margin: 0 0 8px; font-weight: bold;">거절 사유</p>
-                <p style="color: #1E293B; font-size: 15px; margin: 0; white-space: pre-wrap;">${reason}</p>
+                <p style="color: #1E293B; font-size: 15px; margin: 0; white-space: pre-wrap;">${escapeHtml(reason)}</p>
                </div>` 
             : ``;
 
@@ -56,8 +56,8 @@ export const sendRejectionEmail = onCall(
                         <h2 style="margin: 0; font-size: 20px;">⚠️ 기관 신청이 반려되었습니다</h2>
                     </div>
                     <div style="background: #F8FAFC; padding: 24px; border: 1px solid #E2E8F0; border-top: none; border-radius: 0 0 12px 12px;">
-                        <p style="color: #1E293B; font-size: 16px;">안녕하세요, <strong>${displayName}</strong>님.</p>
-                        <p style="color: #475569;">신청해주신 <strong>${orgName}</strong> 기관의 가입 신청이 검토 결과 아쉽게도 반려되었습니다.</p>
+                        <p style="color: #1E293B; font-size: 16px;">안녕하세요, <strong>${escapeHtml(displayName)}</strong>님.</p>
+                        <p style="color: #475569;">신청해주신 <strong>${escapeHtml(orgName)}</strong> 기관의 가입 신청이 검토 결과 아쉽게도 반려되었습니다.</p>
                         
                         ${rejectionReasonHtml}
 

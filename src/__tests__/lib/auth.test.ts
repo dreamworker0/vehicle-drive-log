@@ -14,12 +14,17 @@ vi.mock('@/lib/firebase', () => ({
 }));
 vi.mock('@/lib/offline/syncQueue', () => ({
     clearQueue: vi.fn(() => Promise.resolve()),
+    getPendingCount: vi.fn(() => Promise.resolve(0)),
+}));
+const mockConfirm = vi.fn();
+vi.mock('@/store/useConfirmStore', () => ({
+    useConfirmStore: { getState: () => ({ confirm: mockConfirm }) },
 }));
 
 import { logout } from '@/lib/auth';
 import { signOut } from 'firebase/auth';
 import { clearOfflineCache } from '@/lib/firebase';
-import { clearQueue } from '@/lib/offline/syncQueue';
+import { clearQueue, getPendingCount } from '@/lib/offline/syncQueue';
 
 const originalLocation = window.location;
 
@@ -71,6 +76,51 @@ describe('logout (2026-07-10 감사 #8 — 공용 기기 잔존 데이터 폐기
 
         expect(clearQueue).not.toHaveBeenCalled();
         expect(clearOfflineCache).not.toHaveBeenCalled();
+    });
+
+    // 2026-09-02 — 큐를 무조건 비우는 것은 유지하되, 지하 주차장에서 쓴 미전송 기록이
+    // 아무 안내 없이 사라지지 않게 로그아웃 **전에** 건수를 확인하고 묻는다.
+    describe('미전송 기록이 있을 때', () => {
+        it('건수를 담아 확인을 묻고, 취소하면 signOut·큐 정리·리다이렉트를 하나도 하지 않는다', async () => {
+            vi.mocked(getPendingCount).mockResolvedValueOnce(3);
+            mockConfirm.mockResolvedValueOnce(false);
+
+            await logout();
+
+            expect(mockConfirm).toHaveBeenCalledTimes(1);
+            expect(mockConfirm.mock.calls[0][0]).toMatchObject({ confirmColor: 'danger' });
+            expect(mockConfirm.mock.calls[0][0].message).toContain('3건');
+            expect(signOut).not.toHaveBeenCalled();
+            expect(clearQueue).not.toHaveBeenCalled();
+            expect(clearOfflineCache).not.toHaveBeenCalled();
+            expect(window.location.href).toBe('');
+        });
+
+        it('삭제를 확인하면 종전과 같이 signOut → clearQueue → clearOfflineCache로 진행한다', async () => {
+            vi.mocked(getPendingCount).mockResolvedValueOnce(1);
+            mockConfirm.mockResolvedValueOnce(true);
+
+            await logout();
+
+            expect(signOut).toHaveBeenCalledTimes(1);
+            expect(clearQueue).toHaveBeenCalledTimes(1);
+            expect(window.location.href).toBe('/');
+        });
+
+        it('미전송 기록이 없으면 묻지 않는다', async () => {
+            vi.mocked(getPendingCount).mockResolvedValueOnce(0);
+            await logout();
+            expect(mockConfirm).not.toHaveBeenCalled();
+            expect(signOut).toHaveBeenCalledTimes(1);
+        });
+
+        it('건수 조회가 실패하면(IDB 불가) 묻지 않고 로그아웃을 막지 않는다', async () => {
+            vi.mocked(getPendingCount).mockRejectedValueOnce(new Error('idb unavailable'));
+            await logout();
+            expect(mockConfirm).not.toHaveBeenCalled();
+            expect(signOut).toHaveBeenCalledTimes(1);
+            expect(window.location.href).toBe('/');
+        });
     });
 });
 

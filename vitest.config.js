@@ -118,6 +118,12 @@ export default defineConfig({
                 'src/hooks/useDailyLog.ts': {
                     lines: 94, statements: 92, functions: 94, branches: 74,
                 },
+                // 기관 문서 — 초대 코드·승인 상태·소속 사용자 일괄 삭제가 지나가는 자리. 글롭 평균(57%)이
+                // 통과하는 동안 이 파일은 26%였다 — 위 "전역 임계치만으로는 부족하다"가 한 단계 아래에서
+                // 재현된 것이라 파일 단위로 따로 건다 (2026-09-02 실측 96/96/100/100)
+                'src/lib/firestore/organizations.ts': {
+                    lines: 90, statements: 90, functions: 95, branches: 90,
+                },
                 // 온디맨드 캘린더 동기화 — 예약 화면을 열 때마다 백그라운드로 호출되므로
                 // "실패했을 때 몇 번 더 부르는가"가 곧 비용이다. 서버 빈도 상한 응답에
                 // 재시도하지 않는 계약을 고정한다 (실측 66/65/50/60)
