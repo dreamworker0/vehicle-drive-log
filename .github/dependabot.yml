@@ -51,6 +51,14 @@ updates:
     labels:
       - dependencies
       - functions
+    # 루트와 같은 이유로 minor/patch를 한 PR로 묶는다. 개별 PR로 열리면 셋 다
+    # functions/package-lock.json을 건드려, 하나를 머지하는 순간 나머지가 충돌하고
+    # 리베이스 후 CI 재실행이 필요하다(2026-09-02 PR #260·#261·#262에서 실측).
+    groups:
+      functions-minor-and-patch:
+        update-types:
+          - minor
+          - patch
     # 아래 두 메이저는 **함께 올려야 하는 한 묶음**이면서 코드 마이그레이션이 필요하다.
     # firebase-functions@6의 peer가 `firebase-admin ^11 || ^12 || ^13`이라 admin 14 단독은
     # npm ci가 ERESOLVE로 실패하고(PR #116), functions 7은 peer에 ^14를 포함하므로 상향 순서가
