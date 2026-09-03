@@ -79,7 +79,7 @@ async function handleCalendarError(
 ): Promise<void> {
     console.error("Reservation " + reservationId + ": " + context + " failed", (err as Error).message);
     if (isCalendarAuthError(err)) {
-        await recordCalendarFailure(vehicleId, failCount);
+        await recordCalendarFailure(vehicleId, failCount, err);
         return;
     }
     const { captureError } = await import("../../core/sentry");

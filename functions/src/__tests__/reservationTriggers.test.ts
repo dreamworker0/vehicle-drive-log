@@ -168,10 +168,14 @@ describe('reservationTriggers', () => {
             const event = makeCreateEvent({ vehicleId: 'v1', organizationId: 'org1', date: '2026-01-01' });
             await (onReservationCreated as Function)(event);
 
-            // failCount 2 → 3 으로 증가 + 마지막 실패 시각 기록
+            // failCount 2 → 3 으로 증가 + 마지막 실패 시각·**사유** 기록.
+            // 사유를 남기지 않으면 나중에 이 차량이 403인지 404인지 알 수 없다
+            // (로그 보존 30일이 지나면 원인 규명 자체가 불가능해진다 — 2026-09-03 조사).
             expect(mockUpdate).toHaveBeenCalledWith({
                 calendarSyncFailCount: 3,
                 calendarSyncLastFailAt: 'SERVER_TIMESTAMP',
+                calendarSyncLastFailStatus: 404,
+                calendarSyncLastFailReason: 'not_found',
             });
         });
     });

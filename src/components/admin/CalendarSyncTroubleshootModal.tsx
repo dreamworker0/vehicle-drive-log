@@ -15,8 +15,19 @@ import React, { useState } from 'react';
 import { firebaseFunctions } from '../../lib/firebase';
 import { httpsCallable } from 'firebase/functions';
 import type { Vehicle } from '../../types/vehicle';
+import { CALENDAR_MAX_FAIL_COUNT } from '../../lib/constants';
 
 const SERVICE_ACCOUNT_EMAIL = '1066541065552-compute@developer.gserviceaccount.com';
+
+/**
+ * 서버가 기록한 마지막 실패 사유별 안내.
+ * (functions/src/services/calendar/calendarFailTracking.ts의 REASON_GUIDE와 짝을 이룬다.)
+ */
+const FAIL_REASON_TEXT: Record<'not_found' | 'forbidden' | 'other', string> = {
+    not_found: '캘린더를 찾을 수 없습니다(404). 캘린더가 삭제되었거나 캘린더 ID가 올바르지 않습니다.',
+    forbidden: '캘린더 접근 권한이 없습니다(403). 서비스 계정에 준 공유 권한이 해제되었습니다.',
+    other: 'Google 캘린더에 일정을 기록하지 못하고 있습니다.',
+};
 
 interface Props {
     vehicle: Vehicle;
@@ -41,6 +52,10 @@ export default function CalendarSyncTroubleshootModal({
 
     const failCount = vehicle.calendarSyncFailCount || 0;
     const calendarId = vehicle.googleCalendarId || '';
+    const failReason = vehicle.calendarSyncLastFailReason;
+    // 임계부터는 서버가 이 차량 호출을 아예 건너뛴다 — 고쳐도 저절로 돌아오지 않으므로,
+    // 연동 테스트를 눌러야 복구된다는 것을 명시한다.
+    const isPermanentlyDisabled = failCount >= CALENDAR_MAX_FAIL_COUNT;
 
     const handleCopyEmail = () => {
         navigator.clipboard.writeText(SERVICE_ACCOUNT_EMAIL);
@@ -122,9 +137,19 @@ export default function CalendarSyncTroubleshootModal({
                                 </span>
                             </div>
                             <p className="text-xs text-red-600 dark:text-red-400">
-                                Google 캘린더에 일정을 기록하지 못하고 있습니다.
-                                아래 해결 방법을 따라 설정을 확인해주세요.
+                                {/* 서버가 남긴 마지막 실패 사유. 403(공유 권한 해제)과 404(캘린더 삭제)는
+                                    고칠 곳이 달라서, 사유를 모르면 아래 절차를 처음부터 훑어야 한다. */}
+                                {failReason
+                                    ? FAIL_REASON_TEXT[failReason]
+                                    : 'Google 캘린더에 일정을 기록하지 못하고 있습니다.'}
+                                {' '}아래 해결 방법을 따라 설정을 확인해주세요.
                             </p>
+                            {isPermanentlyDisabled && (
+                                <p className="mt-1.5 text-xs text-red-600 dark:text-red-400">
+                                    자동 재시도가 중단된 상태입니다. 설정을 고친 뒤 아래
+                                    <strong> 연동 테스트</strong>를 실행하면 즉시 다시 동기화됩니다.
+                                </p>
+                            )}
                         </div>
                     )}
 

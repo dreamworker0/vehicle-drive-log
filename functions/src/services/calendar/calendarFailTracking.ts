@@ -66,27 +66,207 @@ export function shouldSkipVehicleCalendar(vehicleData: FirebaseFirestore.Documen
     return false;
 }
 
+/** 실패 사유 코드 — 화면이 "무엇을 고쳐야 하는가"를 바로 말할 수 있게 상태 코드를 좁힌다. */
+export type CalendarFailReason = "not_found" | "forbidden" | "other";
+
+/** 상태 코드 → 사유 코드 */
+export function calendarFailReason(status: number | null): CalendarFailReason {
+    if (status === 404) return "not_found";
+    if (status === 403) return "forbidden";
+    return "other";
+}
+
+/** 사유별 기관 안내 문구 — 403과 404는 기관이 할 조치가 다르다. */
+const REASON_GUIDE: Record<CalendarFailReason, string> = {
+    not_found: "캘린더가 삭제되었거나 캘린더 ID가 올바르지 않습니다.",
+    forbidden: "서비스 계정에 준 캘린더 공유 권한이 해제되었습니다.",
+    other: "캘린더에 접근할 수 없습니다.",
+};
+
 /**
- * 캘린더 인증/부재 오류 시 실패 카운트를 1 증가시키고 마지막 실패 시각을 기록한다.
+ * 캘린더 인증/부재 오류 시 실패 카운트를 1 증가시키고 마지막 실패 시각·**사유**를 기록한다.
+ *
+ * 사유를 남기는 이유(2026-09-03 조사): 예전에는 카운터와 시각만 남겨서, 어느 차량이
+ * 403(공유 권한 해제)이고 어느 차량이 404(캘린더 삭제)인지 **차량 문서만 봐서는 알 수
+ * 없었다.** 둘은 기관이 할 조치가 다르다. 유일한 단서가 Cloud Logging이었는데 보존이
+ * 30일이라, 그 전에 영구 제외로 얼어붙은 차량은 원인 규명 자체가 불가능해졌다 —
+ * 조사 시점에 67대 중 57대가 정확히 그 상태였다.
+ *
  * 카운터는 MAX_FAIL_COUNT를 넘지 않도록 캡한다(영구제외 임계). 일부 경로가 백오프 가드를
  * 빠뜨려도 카운터가 무한 증가(예: 192회)하지 않도록 하는 방어적 불변식이다.
+ *
+ * @param err 원인 오류. 넘기면 사유를 함께 기록한다(넘기지 않으면 기존 사유를 보존한다).
  * @returns 증가된(캡 적용) 새 failCount
  */
-export async function recordCalendarFailure(vehicleId: string, currentFailCount: number): Promise<number> {
+export async function recordCalendarFailure(
+    vehicleId: string,
+    currentFailCount: number,
+    err?: unknown,
+): Promise<number> {
     const newFailCount = Math.min(currentFailCount + 1, MAX_FAIL_COUNT);
-    await getFirestore().collection("vehicles").doc(vehicleId).update({
+
+    const update: Record<string, unknown> = {
         calendarSyncFailCount: newFailCount,
         calendarSyncLastFailAt: FieldValue.serverTimestamp(),
-    });
+    };
+    if (err !== undefined) {
+        const status = calendarErrorStatus(err);
+        // 상태를 모를 때 지난 사유를 지우면 그나마 있던 진단 근거가 사라진다 — 아는 것만 쓴다.
+        if (status !== null) update.calendarSyncLastFailStatus = status;
+        update.calendarSyncLastFailReason = calendarFailReason(status);
+    }
+
+    await getFirestore().collection("vehicles").doc(vehicleId).update(update);
+
+    // 영구 제외로 **넘어가는 순간**에만 기관에 알린다. 그 뒤로는 호출 자체가 없으므로
+    // 여기서 알리지 않으면 기관은 캘린더에 일정이 안 뜨는 이유를 영영 모른다.
+    if (newFailCount >= MAX_FAIL_COUNT && currentFailCount < MAX_FAIL_COUNT) {
+        try {
+            await notifyOrgCalendarDisabled(vehicleId);
+        } catch (notifyErr: unknown) {
+            // 알림 실패가 실패 기록 자체를 되돌리게 두지 않는다.
+            console.error(`[calendarFailTracking] 기관 알림 실패 (${vehicleId}):`, (notifyErr as Error).message);
+        }
+    }
+
     return newFailCount;
+}
+
+/**
+ * 같은 기관에 중단 알림을 다시 보내기까지의 최소 간격.
+ *
+ * 이 앱은 **기관 내 모든 차량이 같은 캘린더 ID를 쓰도록** 안내한다(calendarBinding 주석).
+ * 그 캘린더가 지워지면 그 기관 차량 전부가 같은 시각에 실패하고, 쿨다운도 같이 풀려
+ * **한 번의 스케줄러 실행에서 나란히 임계를 넘는다.** 차량 단위로만 막으면 차량 8대 ×
+ * 관리자 3명 = 알림 24건이 한꺼번에 쌓인다. 같은 저장소가 이미 아는 실패 방식이다 —
+ * "잘못 등록된 차량 하나 때문에 디스코드가 도배되면 그 채널은 무뎌진다"(calendarBinding).
+ */
+const ORG_NOTIFY_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000; // 7일
+
+/**
+ * 영구 제외로 넘어간 차량을 그 기관의 **관리자에게** 알린다.
+ *
+ * 직원이 아니라 관리자만 받는 이유: 복구는 차량 설정(캘린더 ID·공유 재설정)에서만 할 수
+ * 있고 그 화면은 관리자 전용이다. 전 직원에게 보내면 고칠 수 없는 사람들에게 알림만 쌓인다.
+ *
+ * 발송 자리는 **트랜잭션으로 선점한다.** 검사와 쓰기가 갈라져 있으면, 쿨다운이 풀린 직후
+ * 예약이 여러 건 동시에 쓰이는 순간 여러 트리거가 모두 `failCount=9`를 읽고 가드를 함께
+ * 통과해 관리자 전원에게 각각 보낸다.
+ */
+async function notifyOrgCalendarDisabled(vehicleId: string): Promise<void> {
+    const db = getFirestore();
+    const vehicleRef = db.collection("vehicles").doc(vehicleId);
+
+    // 1. 발송 자리 선점 — 읽고 쓰는 사이에 남이 끼어들지 못하게 한 트랜잭션에 넣는다.
+    const claimed = await db.runTransaction(async (tx) => {
+        const snap = await tx.get(vehicleRef);
+        const data = snap.data();
+        if (!data) return null;
+        if (data.calendarSyncDisabledNotifiedAt) return null; // 이미 알렸다
+        tx.update(vehicleRef, { calendarSyncDisabledNotifiedAt: FieldValue.serverTimestamp() });
+        return data;
+    });
+    if (!claimed) return;
+
+    /** 선점을 되돌린다 — 보내지 못했으면 "알렸다"고 남겨 두면 안 된다. */
+    const releaseClaim = () =>
+        vehicleRef.update({ calendarSyncDisabledNotifiedAt: FieldValue.delete() }).catch(() => {});
+
+    const organizationId = (claimed.organizationId as string) || "";
+    if (!organizationId) {
+        await releaseClaim();
+        return;
+    }
+
+    // 2. 캘린더 기능을 끈 기관에는 알릴 것이 없다 — 애초에 동기화가 돌지 않는다.
+    const orgSnap = await db.collection("organizations").doc(organizationId).get();
+    if (!orgSnap.exists || orgSnap.data()?.googleCalendarEnabled === false) return;
+
+    // 3. 같은 기관에 최근 보냈으면 이번엔 보내지 않는다. 선점은 유지한다 — 이 차량은
+    //    "알림 대상으로 처리됐다"가 맞고, 풀어 두면 다음 실행에서 다시 후보가 된다.
+    //    (선점끼리의 경합으로 드물게 두 건이 나갈 수 있지만, 막지 않으면 24건이다.)
+    const siblingsSnap = await db.collection("vehicles")
+        .where("organizationId", "==", organizationId)
+        .get();
+    const cutoff = Date.now() - ORG_NOTIFY_COOLDOWN_MS;
+    const recentlyNotified = siblingsSnap.docs.some((d) => {
+        if (d.id === vehicleId) return false;
+        const at = d.data().calendarSyncDisabledNotifiedAt;
+        const time = at?.toDate?.() ?? at;
+        return time ? new Date(time).getTime() >= cutoff : false;
+    });
+    if (recentlyNotified) {
+        console.log(`[calendarFailTracking] 기관 ${organizationId}에 최근 알림 발송됨 — 중복 발송 억제: ${vehicleId}`);
+        return;
+    }
+
+    // 4. 받을 사람. 비활성 계정은 로그인 자체가 막히므로 제외한다 — 전원이 비활성이면
+    //    아무도 못 읽는 알림을 만들고 선점만 태우는 꼴이 된다.
+    const adminsSnap = await db.collection("users")
+        .where("organizationId", "==", organizationId)
+        .where("role", "==", "admin")
+        .get();
+    const targets = adminsSnap.docs.filter((d) => d.data().status !== "disabled");
+    if (targets.length === 0) {
+        await releaseClaim();
+        await warnUndeliverable(vehicleId, organizationId, "활성 관리자가 없다");
+        return;
+    }
+
+    const vehicleName = (claimed.displayName as string) || "차량";
+    const reason = (claimed.calendarSyncLastFailReason as CalendarFailReason) || "other";
+    const title = "⚠️ 구글 캘린더 동기화가 중단되었습니다";
+    const message =
+        `'${vehicleName}' 차량의 캘린더 동기화가 반복 실패로 중단되었습니다. ${REASON_GUIDE[reason]} ` +
+        `차량 관리 화면의 '동기화 실패' 배지를 눌러 원인을 진단하고 복구할 수 있습니다. ` +
+        `같은 캘린더를 쓰는 다른 차량도 함께 중단됐을 수 있으니 차량 목록을 확인해 주세요.`;
+
+    // sendNotification은 messaging까지 끌고 오는 무거운 모듈이라 필요한 순간에만 부른다
+    // (calendarSync의 googleapis와 같은 이유). 순환 참조도 함께 피한다.
+    const { createInAppNotification } = await import("../alimtalk/sendNotification");
+    const results = await Promise.allSettled(
+        targets.map((d) =>
+            createInAppNotification(d.id, "calendar_sync_disabled", title, message, organizationId),
+        ),
+    );
+
+    // 5. 전부 실패했으면 선점을 되돌리고 사람을 부른다. 이 차량은 임계에 갇혀 다시
+    //    호출되지 않으므로 **자동 재시도 기회가 없다** — 조용히 삼키면 그 기관은 영영 모른다.
+    if (results.every((r) => r.status === "rejected")) {
+        await releaseClaim();
+        await warnUndeliverable(vehicleId, organizationId, "관리자 알림 생성이 모두 실패했다");
+        return;
+    }
+
+    console.log(`[calendarFailTracking] 캘린더 동기화 중단을 기관 관리자 ${targets.length}명에게 알림: ${vehicleId}`);
+}
+
+/** 통지가 불가능했음을 운영자에게 올린다 (자동 재시도가 없는 경로라 사람이 메워야 한다). */
+async function warnUndeliverable(vehicleId: string, organizationId: string, why: string): Promise<void> {
+    console.error(JSON.stringify({
+        severity: "ERROR",
+        functionName: "calendarFailTracking",
+        message: "캘린더 동기화 중단을 기관에 알리지 못했다 — 자동 재시도 없음",
+        vehicleId,
+        organizationId,
+        reason: why,
+    }));
+    const { captureWarning } = await import("../../core/sentry");
+    captureWarning("캘린더 동기화 중단을 기관에 알리지 못했습니다", { vehicleId, organizationId, reason: why });
 }
 
 /**
  * 동기화 성공 시 실패 카운트를 0으로 리셋한다.
  * (호출 측에서 failCount > 0 일 때만 호출하여 불필요한 쓰기를 피한다.)
+ *
+ * 사유·통지 표식도 함께 지운다. 남겨 두면 지난 실패의 사유가 복구된 차량에 계속 붙어
+ * 있고, 통지 표식이 남아 다음에 다시 끊겼을 때 기관에 알리지 못한다.
  */
 export async function resetCalendarFailure(vehicleId: string): Promise<void> {
     await getFirestore().collection("vehicles").doc(vehicleId).update({
         calendarSyncFailCount: 0,
+        calendarSyncLastFailReason: FieldValue.delete(),
+        calendarSyncLastFailStatus: FieldValue.delete(),
+        calendarSyncDisabledNotifiedAt: FieldValue.delete(),
     });
 }

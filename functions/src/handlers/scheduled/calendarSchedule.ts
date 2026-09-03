@@ -149,7 +149,7 @@ export const syncCalendarToApp = onSchedule(
 
                     // Not Found / 인증 에러 시 실패 카운터 증가
                     if (isCalendarAuthError(vehicleErr)) {
-                        const newFailCount = await recordCalendarFailure(vehicleId, failCount);
+                        const newFailCount = await recordCalendarFailure(vehicleId, failCount, vehicleErr);
                         if (newFailCount >= MAX_FAIL_COUNT) {
                             console.warn("Vehicle " + vehicleName + "(" + vehicleId + "): permanently disabled after " + newFailCount + " failures");
                         } else if (newFailCount >= 3) {

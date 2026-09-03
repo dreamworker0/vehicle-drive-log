@@ -1,4 +1,4 @@
-import { getLastScheduledTick, evaluateSchedulerStatus, resolveFailureStatus } from "../handlers/https/apiHealthCheck";
+import { getLastScheduledTick, evaluateSchedulerStatus, resolveFailureStatus, evaluateCalendarSyncStatus } from "../handlers/https/apiHealthCheck";
 
 // 평일 08~18시 매시 정각 (예약 알림과 동일)
 const WEEKDAY_BIZ = { days: [1, 2, 3, 4, 5], startHour: 8, endHour: 18 };
@@ -112,5 +112,71 @@ describe("apiHealthCheck — 핑 실패 등급 판정", () => {
         expect(resolveFailureStatus(null, true)).toBe("error");
         expect(resolveFailureStatus(undefined, true)).toBe("error");
         expect(resolveFailureStatus("timeout", true)).toBe("error");
+    });
+});
+
+describe("apiHealthCheck — 캘린더 동기화 판정", () => {
+    /** 집계 결과 골격 — 각 테스트는 필요한 수치만 덮어쓴다 */
+    const stat = (o: Partial<Parameters<typeof evaluateCalendarSyncStatus>[0]> = {}) => ({
+        totalLinked: 100, activeLinked: 100, failedCount: 0,
+        permanentlyDisabled: 0, cooldownCount: 0, excludedCount: 0, ...o,
+    });
+
+    it("실패가 없으면 정상", () => {
+        expect(evaluateCalendarSyncStatus(stat()).status).toBe("ok");
+    });
+
+    it("영구중단 1대가 시스템 전체를 error로 만들지 않는다", () => {
+        // 예전에는 permanentlyDisabled > 0이면 조건 없이 error였다. 그 카운터는 수동 리셋
+        // 전까지 내려가지 않으므로 **한 번 빨개지면 영원히 빨간** 상태가 됐다.
+        const r = evaluateCalendarSyncStatus(stat({ failedCount: 1, permanentlyDisabled: 1 }));
+        expect(r.status).toBe("degraded");
+    });
+
+    it("실패 비율이 임계(30%)를 넘으면 error로 올린다", () => {
+        const r = evaluateCalendarSyncStatus(stat({ failedCount: 31, permanentlyDisabled: 31 }));
+        expect(r.status).toBe("error");
+    });
+
+    it("임계 경계(정확히 30%)는 아직 degraded", () => {
+        expect(evaluateCalendarSyncStatus(stat({ failedCount: 30, permanentlyDisabled: 30 })).status).toBe("degraded");
+    });
+
+    it("분모는 동기화가 실제로 도는 차량이다 — 제외분은 비율에 끼지 않는다", () => {
+        // 연동 100대 중 40대가 기능 OFF·고아 기관이라면, 실패 20/60(33%)이 실제 상황이다
+        const r = evaluateCalendarSyncStatus(stat({
+            totalLinked: 100, activeLinked: 60, failedCount: 20, permanentlyDisabled: 20, excludedCount: 40,
+        }));
+        expect(r.status).toBe("error");
+        expect(r.statusDetail).toContain("20/60");
+        expect(r.statusDetail).toContain("33%");
+        // 왜 숫자가 줄었는지 화면에서 설명한다
+        expect(r.statusDetail).toContain("실패 40대는 동기화 미작동으로 제외");
+    });
+
+    it("영구중단과 쿨다운을 나눠 보여준다 (조치가 다르다)", () => {
+        const r = evaluateCalendarSyncStatus(stat({ failedCount: 5, permanentlyDisabled: 3, cooldownCount: 2 }));
+        expect(r.statusDetail).toContain("영구중단 3");
+        expect(r.statusDetail).toContain("쿨다운 2");
+    });
+
+    it("연동 차량이 아예 없으면 정상 (0으로 나누지 않는다)", () => {
+        expect(evaluateCalendarSyncStatus(stat({ totalLinked: 0, activeLinked: 0 })).status).toBe("ok");
+    });
+
+    it("연동은 있는데 대상이 0으로 집계되면 초록으로 덮지 않는다", () => {
+        // '영원한 빨강'을 고치면서 반대편 극단('영원한 초록')을 만들면 안 된다.
+        // organizationId 유실·기관 조회 실패 등으로 도달할 수 있고, 그 순간 헬스는 눈이 먼다.
+        const r = evaluateCalendarSyncStatus(stat({ totalLinked: 161, activeLinked: 0 }));
+        expect(r.status).toBe("degraded");
+        expect(r.statusDetail).toContain("161대");
+    });
+
+    it("제외분 문구는 '제외된 실패 차량 수'임이 드러나야 한다", () => {
+        const r = evaluateCalendarSyncStatus(stat({
+            totalLinked: 100, activeLinked: 60, failedCount: 10, permanentlyDisabled: 10, excludedCount: 5,
+        }));
+        // excludedCount는 제외된 차량 전체가 아니라 그중 실패 상태인 것만 센다
+        expect(r.statusDetail).toContain("실패 5대는 동기화 미작동으로 제외");
     });
 });

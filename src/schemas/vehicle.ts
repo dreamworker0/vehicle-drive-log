@@ -58,6 +58,17 @@ export const vehicleSchema = z.object({
     calendarSyncFailCount: z.coerce.number().optional().catch(0),
     calendarSyncLastFailAt: timestampSchema.optional().catch(undefined),
     /**
+     * 마지막 실패 사유 (백엔드 기록). 403(공유 권한 해제)과 404(캘린더 삭제)는 기관이 할
+     * 조치가 다른데, 예전에는 카운터와 시각만 남겨 차량 문서만으로는 구분할 수 없었다.
+     * 유일한 단서인 Cloud Logging은 30일 보존이라 그 전에 영구 제외로 얼어붙은 차량은
+     * 원인 규명 자체가 불가능해졌다 (2026-09-03 조사).
+     */
+    calendarSyncLastFailReason: z.enum(['not_found', 'forbidden', 'other']).optional().catch(undefined),
+    /** 마지막 실패의 HTTP 상태 코드 (403·404 등). 사유를 판별하지 못하면 기록하지 않는다. */
+    calendarSyncLastFailStatus: z.coerce.number().optional().catch(undefined),
+    /** 영구 중단을 기관 관리자에게 알린 시각 — 중복 발송 방지 겸 통지 여부 확인 근거 */
+    calendarSyncDisabledNotifiedAt: timestampSchema.optional().catch(undefined),
+    /**
      * 차량이 서 있는 출발지(차고지) id — `organization.sites[].id`.
      * 미설정·빈 값이면 본관(기관 주소)에서 출발하는 것으로 본다.
      */

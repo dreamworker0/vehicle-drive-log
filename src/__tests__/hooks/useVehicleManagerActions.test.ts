@@ -358,13 +358,20 @@ describe('폐차 / 복원 / 정비 해제', () => {
 });
 
 describe('캘린더 연동 테스트 결과 반영', () => {
-    it('성공하면 실패 카운터를 0으로 저장하고 목록을 다시 읽지 않는다 — 스켈레톤 깜빡임 방지', async () => {
+    it('성공하면 실패 상태를 통째로 되돌리고 목록을 다시 읽지 않는다 — 스켈레톤 깜빡임 방지', async () => {
         const { result } = await setup();
         mockGetVehicles.mockClear();
 
         await act(async () => { await result.current.handleCalendarTestResult('v1', true); });
 
-        expect(mockUpdateVehicle).toHaveBeenCalledWith('v1', { calendarSyncFailCount: 0 });
+        // 카운터만 0으로 두면 **통지 표식이 남아 다음에 다시 끊겼을 때 기관에 알리지 못한다.**
+        // 이 버튼이 사용자가 안내받는 복구 수단이라, 여기서 빠지면 서버 리셋 경로를 맞춰 놔도
+        // 실사용 경로에서 결함이 되살아난다.
+        const payload = mockUpdateVehicle.mock.calls[0][1] as Record<string, unknown>;
+        expect(payload.calendarSyncFailCount).toBe(0);
+        expect(payload).toHaveProperty('calendarSyncLastFailReason');
+        expect(payload).toHaveProperty('calendarSyncLastFailStatus');
+        expect(payload).toHaveProperty('calendarSyncDisabledNotifiedAt');
         expect(mockGetVehicles).not.toHaveBeenCalled();
         expect(result.current.vehicles[0].calendarSyncFailCount).toBe(0);
     });

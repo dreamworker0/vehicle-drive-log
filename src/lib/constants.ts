@@ -2,6 +2,7 @@
  * 프로젝트 전역 상수
  * 차량 관련 아이콘, 색상, 유틸 등 여러 컴포넌트에서 공유하는 값을 한 곳에서 관리한다.
  */
+import { deleteField } from 'firebase/firestore';
 
 // 차종별 이모지 아이콘
 export const VEHICLE_TYPE_ICONS: Record<string, string> = {
@@ -61,3 +62,31 @@ export const formatLegalVersion = (version: string) => {
     const [year, month, day] = version.split('-');
     return `${year}년 ${Number(month)}월 ${Number(day)}일`;
 };
+
+/**
+ * 캘린더 동기화 실패 임계 — 서버 `calendarFailTracking.MAX_FAIL_COUNT`와 같은 값이다.
+ * 이 이상이면 스케줄러도 예약 트리거도 그 차량 호출을 아예 건너뛰므로, 설정을 고쳐도
+ * 저절로 돌아오지 않는다(관리자가 '연동 테스트'를 눌러야 복구된다).
+ *
+ * 화면마다 10을 적어 두면 서버 상수를 바꿨을 때 화면이 조용히 거짓말을 한다 —
+ * 자동 재시도가 살아 있는데 "중단됨"이라 하거나 그 반대가 된다.
+ */
+export const CALENDAR_MAX_FAIL_COUNT = 10;
+
+/** 관리자 화면에 '동기화 실패' 배지를 띄우는 임계 (서버의 쿨다운 진입 지점과 같다) */
+export const CALENDAR_FAIL_BADGE_THRESHOLD = 3;
+
+/**
+ * 캘린더 실패 상태를 되돌릴 때 함께 지워야 하는 필드 집합.
+ *
+ * 서버 `resetCalendarFailure`와 짝을 이룬다. 카운터만 0으로 두면
+ *  - 지난 실패 사유가 복구된 차량에 계속 붙어 보이고,
+ *  - 통지 표식이 남아 **다음에 다시 끊겼을 때 기관에 알리지 못한다.**
+ * 리셋 지점이 여러 곳이라 필드 목록이 갈라지기 쉬워 한 곳에 모은다.
+ */
+export const CALENDAR_FAIL_RESET_FIELDS = {
+    calendarSyncFailCount: 0,
+    calendarSyncLastFailReason: deleteField(),
+    calendarSyncLastFailStatus: deleteField(),
+    calendarSyncDisabledNotifiedAt: deleteField(),
+} as const;
