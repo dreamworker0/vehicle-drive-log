@@ -43,6 +43,6 @@ export const weeklyMaintenanceBatch = onSchedule(
         await runStep(failed, CONTEXT, "cleanupImages", () => cleanupImages(db, bucket));
         await runStep(failed, CONTEXT, "archiveLogs", () => archiveLogs(db, bucket));
 
-        logBatchResult(CONTEXT, failed);
+        await logBatchResult(CONTEXT, failed);
     }
 );
