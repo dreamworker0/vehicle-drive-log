@@ -195,6 +195,7 @@ async function applyVehicleCurrentSite(
     orgId: string,
     vehId: string,
     endSiteId: unknown,
+    ts: Date,
     isEffectivelyRetroactive: boolean,
 ): Promise<void> {
     if (isEffectivelyRetroactive) return;
@@ -202,15 +203,48 @@ async function applyVehicleCurrentSite(
 
     // 차량이 운행일지의 기관 소속인지 검증 후 갱신 (교차 테넌트 오염 차단 — currentKm과 같은 규칙)
     const vehSnap = await db.collection("vehicles").doc(vehId).get();
-    if (!vehSnap.exists || vehSnap.data()?.organizationId !== orgId) {
+    const veh = vehSnap.data();
+    if (!vehSnap.exists || veh?.organizationId !== orgId) {
         console.warn(`[applyVehicleCurrentSite] 차량 org 불일치 — 현재 위치 갱신 건너뜀: veh=${vehId}, org=${orgId}`);
         return;
     }
+
+    // 마지막 확인보다 **과거의 운행**은 위치를 되돌리지 않는다.
+    //
+    // isEffectivelyRetroactive는 "뒤에 다른 운행일지가 있는가"만 본다. 관리자가 기록 없이 차를
+    // 옮기고 15:00에 현재 위치를 손으로 고쳤는데 16:00에 누군가 09~10시 운행을 뒤늦게 적으면,
+    // 그 일지 뒤에는 아무 기록도 없으므로 소급으로 판정되지 않아 **관리자 보정이 지워진다.**
+    const confirmedAt = veh?.currentSiteUpdatedAt;
+    const confirmedDate = confirmedAt instanceof Date ? confirmedAt : confirmedAt?.toDate?.();
+    if (confirmedDate instanceof Date && confirmedDate.getTime() > ts.getTime()) return;
 
     await db.collection("vehicles").doc(vehId).update({
         currentSiteId: endSiteId,
         currentSiteUpdatedAt: FieldValue.serverTimestamp(),
     });
+}
+
+/**
+ * 위치 갱신은 **누적 km·통계 회계와 분리해서** 실행한다.
+ *
+ * 두 트리거는 retry: false라 한 번 던지면 이벤트가 사라진다. 표시용 위치 갱신이 일시적
+ * UNAVAILABLE로 실패했다고 바깥 catch까지 올라가면, 그 뒤에 있는 currentKm 차분과 기관 통계가
+ * **통째로 유실된다.** 위치는 다음 운행이 다시 맞춰 주지만 회계는 스스로 복구되지 않는다.
+ */
+async function applyVehicleCurrentSiteSafely(
+    context: string,
+    orgId: string,
+    vehId: string,
+    endSiteId: unknown,
+    ts: Date,
+    isEffectivelyRetroactive: boolean,
+): Promise<void> {
+    try {
+        await applyVehicleCurrentSite(orgId, vehId, endSiteId, ts, isEffectivelyRetroactive);
+    } catch (error) {
+        console.error(`[${context}] 차량 현재 위치 갱신 실패 (km 동기화는 계속 진행):`, error);
+        captureError(error, { context, vehId, orgId });
+    }
 }
 
 /**
@@ -261,7 +295,7 @@ export const onDriveLogCreated = onDocumentCreated(
             }
 
             // 차를 세운 곳을 차량의 현재 위치로 반영 (소급이면 건너뛴다)
-            await applyVehicleCurrentSite(orgId, vehId, data.endSiteId, isEffectivelyRetroactive);
+            await applyVehicleCurrentSiteSafely('onDriveLogCreated', orgId, vehId, data.endSiteId, ts, isEffectivelyRetroactive);
 
             // 다음 기록의 startKm 자동 연동 (소급이든 아니든 항상 시도)
             const chain = await syncNextLogStartKm(orgId, vehId, ts, endKm);
@@ -332,7 +366,7 @@ export const onDriveLogUpdated = onDocumentUpdated(
             // 아래 km 블록보다 먼저 두는 이유는, 주행거리가 그대로인 수정이 거기서 조기 반환되기 때문이다.
             if (data.endSiteId !== oldData.endSiteId && vehId && orgId && ts) {
                 const isRetroactiveForSite = isRetro || await hasLaterDriveLog(orgId, vehId, ts);
-                await applyVehicleCurrentSite(orgId, vehId, data.endSiteId, isRetroactiveForSite);
+                await applyVehicleCurrentSiteSafely('onDriveLogUpdated', orgId, vehId, data.endSiteId, ts, isRetroactiveForSite);
             }
 
             if (data.endKm !== undefined && vehId && orgId && ts) {

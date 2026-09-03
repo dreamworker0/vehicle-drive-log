@@ -97,7 +97,13 @@ export default function useDriveLogForm() {
     const siteDefaultsAppliedRef = useRef<string | null>(null);
     useEffect(() => {
         const vehicleId = form.vehicleId;
-        if (!vehicleId || orgSites.length === 0) return;
+        if (!vehicleId) return;
+
+        // 차량 목록이 아직 안 왔으면 아무 판단도 하지 않는다. 수정 모드는 editLog에서 vehicleId를
+        // **동기적으로** 채우는데 vehicles는 비동기라, 여기서 판정하면 "고정 차량"으로 오인해
+        // 초기화를 끝냈다고 표시해 버린다. 그러면 차량이 도착한 뒤에도 복원이 영영 실행되지 않고,
+        // 저장 시 startLocation이 '본관'으로 덮여 **기록의 출발지가 조용히 바뀐다**.
+        if (!selectedVehicle) return;
 
         // 고정 출발지 차량으로 바꾸면 남아 있던 선택을 비운다 — 그대로 두면 저장 시점에
         // 고정 차량의 기록으로 새어 나간다.

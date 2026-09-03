@@ -49,8 +49,6 @@ export const FIELD_LABEL: Record<string, string> = {
     passengerNames: '탑승자',
     date: '운행일',
     startLocation: '출발지',
-    siteVaries: '출발지 변경 허용',
-    currentSiteId: '현재 위치',
     destination: '목적지',
     purpose: '용무',
     notes: '비고',

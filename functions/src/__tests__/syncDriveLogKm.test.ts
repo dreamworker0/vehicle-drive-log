@@ -480,6 +480,49 @@ describe('차량 현재 위치(currentSiteId) 갱신', () => {
         expect(vehicleSitePatches()).toHaveLength(0);
     });
 
+    it('관리자가 방금 손으로 고친 위치는 그보다 과거의 운행이 되돌리지 않는다', async () => {
+        // 관리자가 15:00에 차를 옮기고 현재 위치를 고쳤는데, 16:00에 누군가 09~10시 운행을
+        // 뒤늦게 적는 상황. 그 일지 뒤에는 아무 기록도 없어 소급으로 판정되지 않는다.
+        seedLogs([], [{
+            id: VEH, col: 'vehicles',
+            data: { organizationId: ORG, currentKm: 1000, currentSiteId: 'site_b', currentSiteUpdatedAt: d(21) },
+        }]);
+
+        await (onDriveLogCreated as unknown as Function)(makeEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: d(20),
+            startKm: 1000, endKm: 1050, distance: 50, endSiteId: 'site_a',
+        }));
+
+        expect(vehicleSitePatches()).toHaveLength(0);
+        expect(db.__get('vehicles', VEH)).toMatchObject({ currentSiteId: 'site_b' });
+    });
+
+    it('위치 갱신이 터져도 차량 누적 km 갱신은 그대로 진행된다', async () => {
+        // 두 트리거는 retry: false라 한 번 던지면 이벤트가 사라진다. 수정 경로에서는 위치 갱신이
+        // km 블록보다 **먼저** 도므로, 표시용 실패가 바깥으로 올라가면 회계가 통째로 유실된다.
+        // 위치는 다음 운행이 다시 맞춰 주지만 currentKm은 스스로 복구되지 않는다.
+        const explodingTimestamp = { toDate: () => { throw new Error('UNAVAILABLE'); } };
+        seedLogs(
+            [{ id: 'B', timestamp: d(20), startKm: 1000, endKm: 1060 }],
+            [{
+                id: VEH, col: 'vehicles',
+                data: { organizationId: ORG, currentKm: 1050, currentSiteId: 'site_a', currentSiteUpdatedAt: explodingTimestamp },
+            }],
+        );
+
+        await (onDriveLogUpdated as unknown as Function)(makeUpdateEvent(
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1050, endSiteId: 'site_a' },
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1060, endSiteId: 'site_b' },
+        ));
+
+        // 위치는 못 옮겼지만(예외) 누적 km 차분 +10은 반영됐다
+        expect(vehicleSitePatches()).toHaveLength(0);
+        const kmPatches = db.__updates()
+            .filter((u: { col: string; patch: Record<string, unknown> }) => u.col === 'vehicles' && 'currentKm' in u.patch)
+            .map((u: { patch: Record<string, unknown> }) => u.patch);
+        expect(kmPatches).toEqual([{ currentKm: { __increment: 10 } }]);
+    });
+
     it('수정으로 세운 곳이 바뀌면 현재 위치를 다시 맞춘다', async () => {
         seedLogs(
             [{ id: 'B', timestamp: d(20), startKm: 1000, endKm: 1050 }],

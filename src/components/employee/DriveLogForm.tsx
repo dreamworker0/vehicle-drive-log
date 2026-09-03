@@ -10,6 +10,7 @@ import type { DriveLog } from '../../types/driveLog';
 import VehicleInfoSection from './driveLogFormLayout/VehicleInfoSection';
 import DateSection from './driveLogFormLayout/DateSection';
 import WaypointSection from './driveLogFormLayout/WaypointSection';
+import SiteSection from './driveLogFormLayout/SiteSection';
 import DriverSection from './driveLogFormLayout/DriverSection';
 import PassengerSection from '../common/PassengerSection';
 import VehicleStatusSection from './driveLogFormLayout/VehicleStatusSection';
@@ -149,6 +150,13 @@ export default function DriveLogForm() {
                     setFavName={setFavName}
                     handleFavoriteSelect={handleFavoriteSelect}
                     handleSaveFavorite={handleSaveFavorite}
+                />
+
+                {/* 3-1. 출발지·세운 곳 — 예약에서 넘어온 일지에서도 반드시 보여야 하므로
+                    WaypointSection(예약 시 null 반환) 밖에 둔다 */}
+                <SiteSection
+                    form={form}
+                    setForm={setForm}
                     orgSites={orgSites}
                     selectedVehicle={selectedVehicle}
                 />

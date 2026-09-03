@@ -1,7 +1,6 @@
-import { memo, useState } from 'react';
+import { memo } from 'react';
 import type { DriveLogForm, LocationState } from '../../../hooks/driveLogForm/types';
 import type { Favorite } from '../../../types/favorite';
-import { canChooseSite, MAIN_SITE_ID, type OrgSite } from '../../../lib/orgSites';
 
 interface WaypointSectionProps {
     reservationData: LocationState | null;
@@ -15,10 +14,6 @@ interface WaypointSectionProps {
     setFavName: (name: string) => void;
     handleFavoriteSelect: (fav: Favorite) => void;
     handleSaveFavorite: () => void;
-    /** 기관의 출발지 목록(본관 + 분관) */
-    orgSites: OrgSite[];
-    /** 선택된 차량 — 출발지가 매번 바뀌는 차량에만 선택을 연다 */
-    selectedVehicle?: { siteVaries?: boolean } | null;
 }
 
 const WaypointSection = memo(function WaypointSection({
@@ -32,38 +27,12 @@ const WaypointSection = memo(function WaypointSection({
     favName,
     setFavName,
     handleFavoriteSelect,
-    handleSaveFavorite,
-    orgSites,
-    selectedVehicle
+    handleSaveFavorite
 }: WaypointSectionProps) {
-    /**
-     * 세운 곳을 사용자가 직접 건드렸는가. 건드리기 전까지는 출발지를 따라가고(대부분 왕복이라
-     * 확인만 하고 넘어간다), 한 번 고른 뒤에는 따라가지 않는다 — 편도로 세운 곳을 지정했는데
-     * 출발지를 고치다가 조용히 되돌아가면 차량 위치가 틀어진다.
-     */
-    const [endSiteTouched, setEndSiteTouched] = useState(false);
-
-    // 예약 데이터가 있거나 수정 모드이더라도 운행 목적과 행선지를 직접 입력해야 할 때 표시
+    // 예약 데이터가 있거나 수정 모드이더라도 운행 목적과 행선지를 직접 입력해야 할 때 표시.
+    // ⚠️ 출발지·세운 곳은 이 조건에 걸리면 안 되므로 SiteSection으로 분리했다 — 예약이 채우지
+    // 못하는 값인데, 예약 → 도착 → 일지가 가장 흔한 경로다.
     if (reservationData?.vehicleId && !isEditMode) return null;
-
-    // 분관 등록만으로는 열지 않는다 — 분관 기능은 원래 분산되어 있지만 **고정된** 차량을 위한
-    // 것이라, 그 기관 운전자에게는 얻는 것 없이 잘못 고를 기회만 생긴다.
-    const showSiteSelects = canChooseSite(orgSites, selectedVehicle);
-    const startSiteId = form.startSiteId || MAIN_SITE_ID;
-    const endSiteId = form.endSiteId || MAIN_SITE_ID;
-
-    const handleStartSiteChange = (value: string) => {
-        setForm({
-            ...form,
-            startSiteId: value,
-            ...(endSiteTouched ? {} : { endSiteId: value }),
-        });
-    };
-
-    const handleEndSiteChange = (value: string) => {
-        setEndSiteTouched(true);
-        setForm({ ...form, endSiteId: value });
-    };
 
     // 행선지는 즐겨찾기 선택 등 외부 경로로 채워지므로 빈 값을 방어한다 — 렌더 중 trim()이
     // 터지면 폼 전체가 사라져 운행일지를 아예 쓸 수 없게 된다.
@@ -82,22 +51,6 @@ const WaypointSection = memo(function WaypointSection({
                     placeholder="출장"
                 />
             </div>
-            {/* 출발 → 도착 → 세운 곳. 시간 순서가 그대로 위에서 아래로 읽히게 둔다. */}
-            {showSiteSelects && (
-                <div>
-                    <label htmlFor="startSiteId" className="label">출발지</label>
-                    <select
-                        id="startSiteId"
-                        value={startSiteId}
-                        onChange={e => handleStartSiteChange(e.target.value)}
-                        className="input min-h-[48px]"
-                    >
-                        {orgSites.map(site => (
-                            <option key={site.id} value={site.id}>{site.name}</option>
-                        ))}
-                    </select>
-                </div>
-            )}
             <div>
                 <label htmlFor="destination" className="label">행선지</label>
                 <div className="flex items-center gap-1.5">
@@ -165,24 +118,6 @@ const WaypointSection = memo(function WaypointSection({
                     </div>
                 )}
             </div>
-            {showSiteSelects && (
-                <div>
-                    <label htmlFor="endSiteId" className="label">차를 세운 곳</label>
-                    <select
-                        id="endSiteId"
-                        value={endSiteId}
-                        onChange={e => handleEndSiteChange(e.target.value)}
-                        className="input min-h-[48px]"
-                    >
-                        {orgSites.map(site => (
-                            <option key={site.id} value={site.id}>{site.name}</option>
-                        ))}
-                    </select>
-                    <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
-                        다음에 이 차를 여기서 찾게 됩니다.
-                    </p>
-                </div>
-            )}
         </div>
     );
 });
