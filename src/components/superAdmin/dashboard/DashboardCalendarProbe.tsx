@@ -232,7 +232,10 @@ export default function DashboardCalendarProbe() {
                         {/* 상세 */}
                         {data.rows.length > 0 ? (
                             <div className="overflow-x-auto">
-                                <table className="w-full text-xs">
+                                {/* 최소 너비를 주지 않으면 좁은 화면에서 마지막 열이 글자 하나 폭까지
+                                    쥐어짜여 세로로 쪼개진다. 컨테이너가 overflow-x-auto이므로
+                                    여기서 바닥을 정해 두면 대신 가로 스크롤이 걸린다. */}
+                                <table className="w-full min-w-[56rem] text-xs">
                                     <caption className="sr-only">
                                         기관별 캘린더 연동 진단 결과 — 판정과 필요한 조치
                                     </caption>
@@ -242,7 +245,7 @@ export default function DashboardCalendarProbe() {
                                             <th scope="col" className="py-2 pr-3 font-medium whitespace-nowrap">판정</th>
                                             <th scope="col" className="py-2 pr-3 font-medium whitespace-nowrap">차량</th>
                                             <th scope="col" className="py-2 pr-3 font-medium whitespace-nowrap">실패</th>
-                                            <th scope="col" className="py-2 pr-3 font-medium">필요한 조치</th>
+                                            <th scope="col" className="py-2 pr-3 font-medium min-w-[16rem]">필요한 조치</th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -275,10 +278,13 @@ export default function DashboardCalendarProbe() {
                                                             {cfg.emoji} {cfg.label}
                                                         </span>
                                                     </td>
-                                                    <td className="py-2 pr-3 text-surface-600 dark:text-surface-300 whitespace-nowrap">
-                                                        {row.vehicleCount}대
+                                                    {/* 열 전체에 nowrap을 걸면 **차량명 목록이 줄바꿈되지 않아 이 열이
+                                                        폭을 독점하고**, 유일하게 줄바꿈 가능한 '필요한 조치'가 글자 하나
+                                                        폭까지 쥐어짜인다. 수치 줄만 붙여 두고 이름은 접히게 둔다. */}
+                                                    <td className="py-2 pr-3 text-surface-600 dark:text-surface-300">
+                                                        <span className="whitespace-nowrap">{row.vehicleCount}대</span>
                                                         {row.blockedVehicleCount > 0 && (
-                                                            <span className="block text-red-600 dark:text-red-400">
+                                                            <span className="block whitespace-nowrap text-red-600 dark:text-red-400">
                                                                 영구중단 {row.blockedVehicleCount}대
                                                             </span>
                                                         )}
@@ -290,7 +296,7 @@ export default function DashboardCalendarProbe() {
                                                     <td className="py-2 pr-3 text-surface-600 dark:text-surface-300 whitespace-nowrap">
                                                         {row.maxFailCount}회
                                                     </td>
-                                                    <td className="py-2 pr-3 text-surface-600 dark:text-surface-300">
+                                                    <td className="py-2 pr-3 text-surface-600 dark:text-surface-300 min-w-[16rem]">
                                                         {inert ? (
                                                             <span className="text-surface-400 dark:text-surface-500">
                                                                 동기화가 돌지 않는 기관 — 조치 불필요
