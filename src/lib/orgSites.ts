@@ -5,7 +5,9 @@
  */
 export {
     MAIN_SITE_ID, MAIN_SITE_NAME,
-    resolveOrgSites, hasBranchSites, resolveVehicleSite,
-    resolveDepartureAddress, resolveStartLocationLabel, createSiteId,
+    resolveOrgSites, hasBranchSites, canChooseSite,
+    resolveVehicleSite, resolveVehicleCurrentSite,
+    resolveDepartureAddress, resolveCurrentDepartureAddress,
+    resolveStartLocationLabel, createSiteId,
 } from '../../shared/orgSites';
 export type { OrgSite, OrgSiteFields } from '../../shared/orgSites';

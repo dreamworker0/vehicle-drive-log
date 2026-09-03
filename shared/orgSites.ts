@@ -72,6 +72,38 @@ export function resolveVehicleSite(
 }
 
 /**
+ * 차량이 **지금** 서 있는 곳. 운행 종료 기록으로 갱신되는 실제 위치를 우선하고, 값이 없거나
+ * 이미 지워진 분관을 가리키면 기본 차고지(`siteId`) → 본관 순으로 되돌린다.
+ *
+ * 예약 **생성** 화면은 이 함수를 쓰지 않는다 — 한 달 뒤 차가 어디 있을지는 알 수 없고,
+ * 오늘 위치로 미래 예약의 거리를 계산하면 오늘 어디 있었느냐에 따라 값이 흔들린다.
+ */
+export function resolveVehicleCurrentSite(
+    sites: OrgSite[],
+    vehicle?: { siteId?: string; currentSiteId?: string } | null
+): OrgSite {
+    const found = vehicle?.currentSiteId ? sites.find(s => s.id === vehicle.currentSiteId) : undefined;
+    return found || resolveVehicleSite(sites, vehicle);
+}
+
+/**
+ * 운전자가 이 차량의 출발지를 고를 수 있는가 — 신규 출발지 UI 전체의 **단일 판정**이다.
+ *
+ * 분관 등록만으로 선택 UI를 띄우면 안 된다. 분관 기능은 원래 *분산되어 있지만 고정된* 차량의
+ * 거리를 맞추려고 만든 것이라, 분관을 쓰는 기관의 대다수는 여전히 전 차량 고정이다.
+ * 그들에게 선택지를 띄우면 얻는 것 없이 잘못 고를 기회만 생긴다.
+ *
+ * 조건을 화면마다 손으로 조합하지 말고 반드시 이 함수를 쓴다 — 한 곳을 빠뜨리면 고정 차량에
+ * 선택 UI가 새는데, 그 화면은 아무도 안 보고 지나간다.
+ */
+export function canChooseSite(
+    sites: OrgSite[],
+    vehicle?: { siteVaries?: boolean } | null
+): boolean {
+    return hasBranchSites(sites) && vehicle?.siteVaries === true;
+}
+
+/**
  * 경로 탐색의 출발 주소. 분관에 주소를 안 적어 두었으면 본관 주소로 계산한다
  * (빈 문자열을 넘기면 경로 조회 자체가 사라져 예약 화면의 거리·시간이 통째로 없어진다).
  */
@@ -80,6 +112,18 @@ export function resolveDepartureAddress(
     vehicle?: { siteId?: string } | null
 ): string {
     const site = resolveVehicleSite(sites, vehicle);
+    return site.address || sites[0]?.address || '';
+}
+
+/**
+ * 현재 위치 기준 출발 주소 — 바로 운행처럼 **지금 출발**하는 화면에서만 쓴다.
+ * 주소가 비어 있을 때 본관으로 되돌리는 규칙은 `resolveDepartureAddress`와 같다.
+ */
+export function resolveCurrentDepartureAddress(
+    sites: OrgSite[],
+    vehicle?: { siteId?: string; currentSiteId?: string } | null
+): string {
+    const site = resolveVehicleCurrentSite(sites, vehicle);
     return site.address || sites[0]?.address || '';
 }
 

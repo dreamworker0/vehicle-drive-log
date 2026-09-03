@@ -181,6 +181,39 @@ async function applyChainCurrentKm(orgId: string, vehicleId: string, chain: KmCh
 }
 
 /**
+ * 차를 세운 곳(`endSiteId`)을 차량의 현재 위치로 반영한다.
+ *
+ * 소급 입력(더 최신 운행이 이미 있는 경우)에는 갱신하지 않는다 — 어제 운행을 오늘 입력했다고
+ * 오늘 위치를 덮어쓰면, 차를 찾으러 간 사람이 엉뚱한 곳으로 간다. 판정은 currentKm과 같은
+ * `isEffectivelyRetroactive`를 그대로 받아 쓴다(규칙을 따로 만들면 둘이 어긋난다).
+ *
+ * 차량의 `siteVaries` 플래그는 여기서 다시 보지 않는다. `endSiteId`는 선택 UI가 열린
+ * 차량에서만 기록되므로 값의 존재 자체가 이미 판정 결과이고, 여기서 플래그를 다시 읽으면
+ * 관리자가 플래그를 끈 순간 처리 중이던 기록이 조용히 버려진다.
+ */
+async function applyVehicleCurrentSite(
+    orgId: string,
+    vehId: string,
+    endSiteId: unknown,
+    isEffectivelyRetroactive: boolean,
+): Promise<void> {
+    if (isEffectivelyRetroactive) return;
+    if (typeof endSiteId !== 'string' || !endSiteId) return;
+
+    // 차량이 운행일지의 기관 소속인지 검증 후 갱신 (교차 테넌트 오염 차단 — currentKm과 같은 규칙)
+    const vehSnap = await db.collection("vehicles").doc(vehId).get();
+    if (!vehSnap.exists || vehSnap.data()?.organizationId !== orgId) {
+        console.warn(`[applyVehicleCurrentSite] 차량 org 불일치 — 현재 위치 갱신 건너뜀: veh=${vehId}, org=${orgId}`);
+        return;
+    }
+
+    await db.collection("vehicles").doc(vehId).update({
+        currentSiteId: endSiteId,
+        currentSiteUpdatedAt: FieldValue.serverTimestamp(),
+    });
+}
+
+/**
  * 운행일지 생성 시 부수효과 처리 (currentKm 갱신 및 startKm 연쇄 동기화)
  */
 export const onDriveLogCreated = onDocumentCreated(
@@ -226,6 +259,9 @@ export const onDriveLogCreated = onDocumentCreated(
                     }
                 }
             }
+
+            // 차를 세운 곳을 차량의 현재 위치로 반영 (소급이면 건너뛴다)
+            await applyVehicleCurrentSite(orgId, vehId, data.endSiteId, isEffectivelyRetroactive);
 
             // 다음 기록의 startKm 자동 연동 (소급이든 아니든 항상 시도)
             const chain = await syncNextLogStartKm(orgId, vehId, ts, endKm);
@@ -290,6 +326,14 @@ export const onDriveLogUpdated = onDocumentUpdated(
             const tsRaw = data.timestamp || oldData.timestamp;
             const ts = tsRaw instanceof Date ? tsRaw : tsRaw?.toDate();
             const isRetro = data.isRetroactive !== undefined ? data.isRetroactive : oldData.isRetroactive;
+
+            // 세운 곳이 **바뀐** 수정만 현재 위치를 다시 맞춘다. 매 수정마다 갱신하면 확인 시각이
+            // 실제로 확인되지 않은 시점을 가리켜 신선도 표기가 거짓말이 된다.
+            // 아래 km 블록보다 먼저 두는 이유는, 주행거리가 그대로인 수정이 거기서 조기 반환되기 때문이다.
+            if (data.endSiteId !== oldData.endSiteId && vehId && orgId && ts) {
+                const isRetroactiveForSite = isRetro || await hasLaterDriveLog(orgId, vehId, ts);
+                await applyVehicleCurrentSite(orgId, vehId, data.endSiteId, isRetroactiveForSite);
+            }
 
             if (data.endKm !== undefined && vehId && orgId && ts) {
                 // 이전 endKm과 현재 endKm이 동일하다면 부수효과를 실행할 필요가 없음

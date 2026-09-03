@@ -409,6 +409,106 @@ describe('onDriveLogCreated — 차량 누적 km 분기', () => {
     });
 });
 
+describe('차량 현재 위치(currentSiteId) 갱신', () => {
+    beforeEach(() => {
+        jest.spyOn(console, 'error').mockImplementation();
+        jest.spyOn(console, 'warn').mockImplementation();
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    const makeEvent = (data: Record<string, unknown>) => ({
+        data: { data: () => data },
+        params: { logId: 'R' },
+    });
+    const makeUpdateEvent = (before: Record<string, unknown>, after: Record<string, unknown>, id = 'B') => ({
+        data: {
+            before: { data: () => before },
+            after: { data: () => after, ref: db.collection('driveLogs').doc(id) },
+        },
+        params: { logId: id },
+    });
+    const vehicleSitePatches = () => db.__updates()
+        .filter((u: { col: string; patch: Record<string, unknown> }) => u.col === 'vehicles' && 'currentSiteId' in u.patch)
+        .map((u: { patch: Record<string, unknown> }) => u.patch);
+
+    it('최신 기록이면 세운 곳을 차량의 현재 위치로 반영한다', async () => {
+        seedLogs([], [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1000 } }]);
+
+        await (onDriveLogCreated as unknown as Function)(makeEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: d(20),
+            startKm: 1000, endKm: 1050, distance: 50, endSiteId: 'site_a',
+        }));
+
+        expect(vehicleSitePatches()).toEqual([{ currentSiteId: 'site_a', currentSiteUpdatedAt: 'SERVER_TS' }]);
+        expect(db.__get('vehicles', VEH)).toMatchObject({ currentSiteId: 'site_a' });
+    });
+
+    it('소급 입력은 현재 위치를 덮어쓰지 않는다 — 어제 기록이 오늘 위치를 밀어내면 차를 못 찾는다', async () => {
+        seedLogs(
+            [{ id: 'B', timestamp: d(15), startKm: 60200, endKm: 60250 }],
+            [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 60250, currentSiteId: 'site_b' } }],
+        );
+
+        await (onDriveLogCreated as unknown as Function)(makeEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: d(10),
+            startKm: 60123, endKm: 60200, distance: 77, isRetroactive: true, endSiteId: 'site_a',
+        }));
+
+        expect(vehicleSitePatches()).toHaveLength(0);
+        expect(db.__get('vehicles', VEH)).toMatchObject({ currentSiteId: 'site_b' });
+    });
+
+    it('차량이 다른 기관 소속이면 갱신하지 않는다 (교차 테넌트 오염 차단)', async () => {
+        seedLogs([], [{ id: VEH, col: 'vehicles', data: { organizationId: 'other-org', currentKm: 1000 } }]);
+
+        await (onDriveLogCreated as unknown as Function)(makeEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: d(20),
+            startKm: 1000, endKm: 1050, distance: 50, endSiteId: 'site_a',
+        }));
+
+        expect(vehicleSitePatches()).toHaveLength(0);
+    });
+
+    it('세운 곳이 없으면 아무것도 하지 않는다 — 고정 출발지 차량이 타는 경로다', async () => {
+        seedLogs([], [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1000 } }]);
+
+        await (onDriveLogCreated as unknown as Function)(makeEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: d(20),
+            startKm: 1000, endKm: 1050, distance: 50,
+        }));
+
+        expect(vehicleSitePatches()).toHaveLength(0);
+    });
+
+    it('수정으로 세운 곳이 바뀌면 현재 위치를 다시 맞춘다', async () => {
+        seedLogs(
+            [{ id: 'B', timestamp: d(20), startKm: 1000, endKm: 1050 }],
+            [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1050, currentSiteId: 'site_a' } }],
+        );
+
+        await (onDriveLogUpdated as unknown as Function)(makeUpdateEvent(
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1050, endSiteId: 'site_a' },
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1050, endSiteId: 'site_b' },
+        ));
+
+        expect(vehicleSitePatches()).toEqual([{ currentSiteId: 'site_b', currentSiteUpdatedAt: 'SERVER_TS' }]);
+    });
+
+    it('세운 곳이 그대로인 수정은 확인 시각을 건드리지 않는다 — 매 수정마다 갱신하면 신선도 표기가 거짓말이 된다', async () => {
+        seedLogs(
+            [{ id: 'B', timestamp: d(20), startKm: 1000, endKm: 1060 }],
+            [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1060, currentSiteId: 'site_a' } }],
+        );
+
+        await (onDriveLogUpdated as unknown as Function)(makeUpdateEvent(
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1050, endSiteId: 'site_a' },
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1060, endSiteId: 'site_a' },
+        ));
+
+        expect(vehicleSitePatches()).toHaveLength(0);
+    });
+});
+
 describe('onDriveLogDeleted — 중간 기록 삭제 후 재정합', () => {
     beforeEach(() => {
         jest.spyOn(console, 'error').mockImplementation();
