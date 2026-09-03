@@ -54,7 +54,7 @@ export default function DriveLogForm() {
         handleConfirmStartKm,
         handleCancelConfirm,
     } = useDriveLogForm();
-    const { orgFeatures } = useAuth();
+    const { orgFeatures, orgSites } = useAuth();
     const { usageCounts } = useVehiclePriority();
 
     // 비고 접기/펼치기 상태 (기본값: 접힘 — 자주 사용하지 않는 항목)
@@ -149,6 +149,8 @@ export default function DriveLogForm() {
                     setFavName={setFavName}
                     handleFavoriteSelect={handleFavoriteSelect}
                     handleSaveFavorite={handleSaveFavorite}
+                    orgSites={orgSites}
+                    selectedVehicle={selectedVehicle}
                 />
 
                 {/* 4. 주행 거리 입력 섹션 */}

@@ -2,7 +2,7 @@
  * useDriveLogForm — 운행일지 작성/수정 폼의 상태 관리 및 서비스 통합 (Facade)
  * 리팩토링: 로직을 driveLogForm/ 하위 모듈로 분산하여 유지보수성 개선
  */
-import { useState, useTransition, useMemo } from 'react';
+import { useState, useTransition, useMemo, useEffect, useRef } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
@@ -21,7 +21,7 @@ import type { DriveLog } from '../types/driveLog';
 export type { DriveLogForm, LocationState };
 
 // 하이 레벨에서 분리된 훅들 임포트
-import { resolveStartLocationLabel } from '../lib/orgSites';
+import { canChooseSite, resolveStartLocationLabel, resolveVehicleCurrentSite, resolveVehicleSite } from '../lib/orgSites';
 import { useDriveLogInitializer } from './driveLogForm/useDriveLogInitializer';
 import { useDriveLogSubmit } from './driveLogForm/useDriveLogSubmit';
 
@@ -87,6 +87,46 @@ export default function useDriveLogForm() {
     const selectedVehicle = vehicles.find(v => v.id === form.vehicleId);
     const isElectric = selectedVehicle?.fuelType === 'electric';
     const isRetroactive = form.driveDate !== todayStr();
+
+    /**
+     * 출발지·세운 곳의 기본값을 차량마다 **한 번만** 채운다.
+     *
+     * 매 렌더 채우면 운전자가 고른 값이 조용히 되돌아간다(orgSites·vehicles는 배열 정체성이
+     * 바뀔 수 있어 의존성만으로는 막지 못한다). 그래서 초기화를 끝낸 차량 id를 기억해 둔다.
+     */
+    const siteDefaultsAppliedRef = useRef<string | null>(null);
+    useEffect(() => {
+        const vehicleId = form.vehicleId;
+        if (!vehicleId || orgSites.length === 0) return;
+
+        // 고정 출발지 차량으로 바꾸면 남아 있던 선택을 비운다 — 그대로 두면 저장 시점에
+        // 고정 차량의 기록으로 새어 나간다.
+        if (!canChooseSite(orgSites, selectedVehicle)) {
+            siteDefaultsAppliedRef.current = vehicleId;
+            setForm(prev => (prev.startSiteId || prev.endSiteId)
+                ? { ...prev, startSiteId: undefined, endSiteId: undefined }
+                : prev);
+            return;
+        }
+
+        if (siteDefaultsAppliedRef.current === vehicleId) return;
+        siteDefaultsAppliedRef.current = vehicleId;
+
+        // 수정 모드에서는 기록에 남은 값을 복원한다. 차량의 현재 위치로 덮으면 과거 기록이
+        // 오늘 상태로 오염된다. 출발지는 라벨만 저장돼 있어 이름으로 되찾고, 못 찾으면
+        // 현재 위치로 떨어진다 — 폼 초기값이라 틀려도 운전자 눈에 보이고 고칠 수 있다.
+        const restoredStart = isEditMode && editLog?.startLocation
+            ? orgSites.find(site => site.name === editLog.startLocation)?.id
+            : undefined;
+        const restoredEnd = isEditMode ? editLog?.endSiteId : undefined;
+        const currentSiteId = resolveVehicleCurrentSite(orgSites, selectedVehicle).id;
+
+        setForm(prev => ({
+            ...prev,
+            startSiteId: restoredStart ?? currentSiteId,
+            endSiteId: restoredEnd ?? restoredStart ?? currentSiteId,
+        }));
+    }, [form.vehicleId, orgSites, selectedVehicle, isEditMode, editLog]);
 
     // ── 운전자 지정 관련 파생값 ──────────────────────────────────
     const isAdmin = userData?.role === 'admin';
@@ -167,7 +207,11 @@ export default function useDriveLogForm() {
         isElectric, isRetroactive, isEditMode, editLog, reservationData, hipassCard, favName,
         showToast, runWithRetry, startTransition, ocrSuccess: ocr.ocrSuccess,
         lastDriveLog, nextDriveLog, setLastDriveLog,
-        startLocation: resolveStartLocationLabel(orgSites, selectedVehicle),
+        // 출발지가 매번 바뀌는 차량은 운전자가 폼에서 고른 값을 기록한다.
+        // 고정 출발지 차량은 예전 그대로 차량의 기본 차고지에서 라벨을 파생시킨다.
+        startLocation: canChooseSite(orgSites, selectedVehicle)
+            ? resolveVehicleSite(orgSites, { siteId: form.startSiteId }).name
+            : resolveStartLocationLabel(orgSites, selectedVehicle),
     });
 
     // ── 공개 API ──────────────────────────────────────────────────
