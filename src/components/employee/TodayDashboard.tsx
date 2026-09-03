@@ -19,7 +19,7 @@ import type { Reservation } from '../../types/reservation';
 import type { Vehicle } from '../../types/vehicle';
 
 export default function TodayDashboard() {
-    const { user, userData, orgFeatures } = useAuth();
+    const { user, userData, orgFeatures, orgSites } = useAuth();
     const {
         vehicles, startingId, cancellingId,
         myReservations, weekGrouped, todayLabel,
@@ -173,6 +173,7 @@ export default function TodayDashboard() {
                                     onStartNavigation={handleStartNavigation}
                                     onArrival={navigateToArrival}
                                     onCancel={(res) => setCancelTarget({ reservation: res, type: 'today' })}
+                                    orgSites={orgSites}
                                 />
                             );
                         })}

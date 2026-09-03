@@ -16,7 +16,7 @@ import type { Vehicle } from '../types/vehicle';
 import type { User as UserDoc } from '../types/user';
 import type { PassengerFormValues } from '../types/reservation';
 import { isVehicleBlocked, isVehicleRestrictedForUser } from '../lib/vehicleUtils';
-import { resolveDepartureAddress, resolveVehicleSite, hasBranchSites } from '../lib/orgSites';
+import { canChooseSite, resolveCurrentDepartureAddress, resolveDepartureAddress, resolveVehicleCurrentSite, resolveVehicleSite, hasBranchSites } from '../lib/orgSites';
 import type { Organization } from '../types/organization';
 import { invalidateDashboardCache } from './useTodayDashboard';
 
@@ -128,8 +128,13 @@ export default function useQuickDriveStart() {
 
         // 출발지는 차량이 세워져 있는 곳이다 — 분관 차량을 본관 주소에서 출발시키면
         // 거리·소요시간·통행료가 전부 어긋난다. 분관 주소가 비어 있으면 본관으로 되돌아간다.
+        //
+        // 바로 운행은 정의상 **지금 출발**이라, 출발지가 매번 바뀌는 차량은 기본 차고지가 아니라
+        // 마지막으로 세워 둔 곳에서 출발한다. 고정 차량은 예전 경로 그대로다.
         const selectedV = vehicles.find(v => v.id === form.vehicleId);
-        const origin = resolveDepartureAddress(orgSites, selectedV) || orgAddress;
+        const origin = (canChooseSite(orgSites, selectedV)
+            ? resolveCurrentDepartureAddress(orgSites, selectedV)
+            : resolveDepartureAddress(orgSites, selectedV)) || orgAddress;
 
         if (!form.destination.trim() || !origin || !isTmapAvailable()) return;
 
@@ -178,7 +183,9 @@ export default function useQuickDriveStart() {
     const selectedVehicle = vehicles.find(v => v.id === form.vehicleId);
     // 분관을 등록한 기관에서만 화면에 출발지를 알린다(본관뿐이면 새 정보가 없다).
     const departureSiteName = hasBranchSites(orgSites)
-        ? resolveVehicleSite(orgSites, selectedVehicle).name
+        ? (canChooseSite(orgSites, selectedVehicle)
+            ? resolveVehicleCurrentSite(orgSites, selectedVehicle)
+            : resolveVehicleSite(orgSites, selectedVehicle)).name
         : '';
 
     const handleVehicleSelect = (vehicleId: string) => {

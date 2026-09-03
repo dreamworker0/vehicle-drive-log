@@ -30,8 +30,12 @@ const INITIAL_FORM = {
     currentKm: '', googleCalendarId: '',
     insuranceCompany: '', insurancePhone: '', insuranceExpiryDate: '',
     allowedUserIds: [] as string[],
-    // 출발지(차고지) id. 빈 값 = 본관(기관 주소) — 분관을 등록하지 않은 기관은 계속 빈 값이다.
+    // 기본 차고지 id. 빈 값 = 본관(기관 주소) — 분관을 등록하지 않은 기관은 계속 빈 값이다.
     siteId: '',
+    // 출발지가 매번 바뀌는 차량인가. 꺼짐이 기본이라 기존 기관의 운전자 화면은 그대로다.
+    siteVaries: false,
+    // 지금 실제로 서 있는 곳. 평소에는 운행 기록으로 서버가 갱신하고, 여기서는 보정만 한다.
+    currentSiteId: '',
 };
 
 export default function useVehicleManager() {
@@ -138,6 +142,8 @@ export default function useVehicleManager() {
             insuranceExpiryDate: vehicle.insurance?.expiryDate || '',
             allowedUserIds: vehicle.allowedUserIds || [],
             siteId: vehicle.siteId || '',
+            siteVaries: vehicle.siteVaries === true,
+            currentSiteId: vehicle.currentSiteId || '',
         });
         setEditingVehicle(vehicle);
         setOpenWithCalendarError(calendarError);
@@ -199,6 +205,14 @@ export default function useVehicleManager() {
                     allowedUserIds: form.allowedUserIds,
                     // 본관으로 되돌린 경우도 빈 값으로 덮어써야 하므로 항상 포함
                     siteId: form.siteId,
+                    siteVaries: form.siteVaries,
+                    // 유동 차량이 아니면 현재 위치를 비운다 — 남겨 두면 나중에 다시 켰을 때
+                    // 몇 달 전 위치가 되살아나 차를 찾으러 간 사람을 엉뚱한 곳으로 보낸다.
+                    currentSiteId: form.siteVaries ? form.currentSiteId : '',
+                    // 관리자가 위치를 손으로 고친 때만 확인 시각을 새로 찍는다. 저장할 때마다
+                    // 찍으면 실제로 확인하지 않은 시점을 가리켜 화면의 신선도 표기가 거짓말이 된다.
+                    ...((form.siteVaries && form.currentSiteId !== (editingVehicle?.currentSiteId || ''))
+                        ? { currentSiteUpdatedAt: new Date() } : {}),
                     insurance: {
                         company: form.insuranceCompany.trim(),
                         phone: form.insurancePhone.trim(),

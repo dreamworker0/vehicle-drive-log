@@ -10,6 +10,7 @@ import { FUEL_TYPES } from '../../types/vehicle';
 import VehicleCalendarSection from './VehicleCalendarSection';
 import { useAuth } from '../../hooks/useAuth';
 import { hasBranchSites, MAIN_SITE_ID } from '../../lib/orgSites';
+import Toggle from '../common/Toggle';
 import { stripNegative } from '../../hooks/utils/numberValidation';
 
 interface VehicleFormData {
@@ -24,8 +25,12 @@ interface VehicleFormData {
     insurancePhone: string;
     insuranceExpiryDate: string;
     allowedUserIds: string[];
-    /** 출발지(차고지) id. 빈 값 = 본관 */
+    /** 기본 차고지 id. 빈 값 = 본관 */
     siteId: string;
+    /** 출발지가 매번 바뀌는 차량인가. 켜야 운전자용 출발지 선택이 열린다. */
+    siteVaries: boolean;
+    /** 지금 실제로 서 있는 곳. 운행 기록으로 자동 갱신되며, 유동 차량에만 노출된다. */
+    currentSiteId: string;
 }
 
 interface Props {
@@ -279,7 +284,7 @@ export default function VehicleForm({
                     </div>
                     {showSiteSelect && (
                     <div>
-                        <label className="label">출발지</label>
+                        <label className="label">기본 차고지</label>
                         <div className="grid grid-cols-2 gap-2">
                             {orgSites.map(site => {
                                 const selected = (form.siteId || MAIN_SITE_ID) === site.id;
@@ -298,7 +303,46 @@ export default function VehicleForm({
                             })}
                         </div>
                         <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
-                            이 차량이 세워져 있는 곳 · 예약·바로 운행의 거리와 소요시간이 이 주소에서 출발하는 기준으로 계산됩니다
+                            평소 이 차량이 세워져 있는 곳 · 예약의 거리와 소요시간이 이 주소에서 출발하는 기준으로 계산됩니다
+                        </p>
+                    </div>
+                    )}
+                    {showSiteSelect && (
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                            <p className="label mb-0.5">출발지가 매번 바뀜</p>
+                            <p className="text-xs text-surface-400 dark:text-surface-500">
+                                켜면 운전자가 운행일지에서 출발지와 차를 세운 곳을 직접 고릅니다 · 24시간 운영처럼 차가 매일 다른 곳에서 출발할 때만 켜세요
+                            </p>
+                        </div>
+                        <div className="flex-shrink-0 pt-1">
+                            <Toggle
+                                checked={form.siteVaries}
+                                onChange={next => setForm(prev => ({
+                                    // 끄면 현재 위치도 함께 비운다 — 남겨 두면 나중에 다시 켰을 때
+                                    // 몇 달 전 위치가 되살아나 사람을 엉뚱한 곳으로 보낸다.
+                                    ...prev, siteVaries: next, ...(next ? {} : { currentSiteId: '' }),
+                                }))}
+                                label="출발지가 매번 바뀜"
+                            />
+                        </div>
+                    </div>
+                    )}
+                    {showSiteSelect && form.siteVaries && (
+                    <div data-testid="vehicle-current-site">
+                        <label className="label">현재 위치</label>
+                        <select
+                            value={form.currentSiteId || MAIN_SITE_ID}
+                            onChange={e => setForm({ ...form, currentSiteId: e.target.value })}
+                            className="input"
+                            aria-label="현재 위치"
+                        >
+                            {orgSites.map(site => (
+                                <option key={site.id} value={site.id}>{site.name}</option>
+                            ))}
+                        </select>
+                        <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
+                            운행 기록으로 자동 갱신됩니다 · 기록 없이 차를 옮겼을 때만 직접 고치세요
                         </p>
                     </div>
                     )}
