@@ -431,3 +431,22 @@
 | **검증** | `verify:fast`(lint · tsc · Functions tsc · env·카탈로그 정합) 0오류 · Functions Jest **1,005**(+2) · 에뮬레이터 통합 **20건 4스위트** · Vitest **1,848**(+3) · CI 9/9 초록(첫 실행은 CodeQL 실패 → 위 판별 교정 후 재초록) · 배포 성공 후 `holidayproxy` 새 리비전(00348) 확인 |
 | **커밋·PR** | #309 |
 | **남는 것** | ① **폴백 사유 로그를 며칠 뒤 읽어야 한다** — 이 회차는 답을 심었을 뿐 아직 읽지 않았다. `firestore-permission-denied`가 나오면 App Check 확정이고, 그때는 이 경로만의 문제가 아니다(그 사용자는 같은 시간 동안 Firestore를 읽는 **모든 화면**에서 막힌다) ② `rateLimit.ts`의 로그 문구·문서 필드가 아직 `ip`인데 값은 `uid_...`가 들어간다 — 필드명은 저장된 문서 모양이라 바꾸면 기존 문서·조회와 어긋나 따로 다뤄야 한다 ③ **같은 사본 방식이 두 곳 더 있다** — `joinOrganization.emulator.test.ts`("핵심 로직을 함수로 추출")와 `setCustomClaims.emulator.test.ts`("핵심 로직 재현")는 실물을 import하지 않는다. `computeDashboardStats.emulator.test.ts`는 실물(`computeAllDashboardStats`)을 부른다 ④ 이월 — 이 이력 파일 분할 · Modal 프리미티브 · 변경형 콜러블 6개 `wrapCallableHandler` 이관 · Functions 런타임 메이저 |
+
+---
+
+### Phase 204: 문서가 다시 거짓말하지 않게 — 배포 경로·테스트 규모 하네스화 🩺📚
+
+> 2026-09-04. 프로젝트 전수 감사에서 찾은 즉시 개선 세 가지 중, 현재 메이저 범위에서 안전하게 닫을 수 있는 두 가지를 구현했다. 공통 원인은 **사람이 고치는 문서 수치와 절차에는 시간이 지나면 다시 낡는다는 사실을 알려 주는 소비자가 없었다**는 것이다. 의존성 취약점은 같은 방식으로 억지로 닫지 않았다. 잠금 파일을 갱신해 실제 해소 여부를 먼저 확인했고, 메이저 이관 없이는 해결되지 않는다는 증거가 나와 별도 트랙으로 분리했다.
+
+| 항목 | 내용 |
+|------|------|
+| **의존성 취약점 — 최소 갱신으로는 닫히지 않았다** | Functions 감사의 moderate 3건은 `qs` 권고 두 건이 `body-parser`·`express`로 전파된 결과다. 잠금 파일만 갱신하면 `qs 6.15.2 → 6.15.3`에 그쳐 취약 범위(`<=6.15.3`, `<6.16.0`)를 벗어나지 못했다. 경로를 확인하니 `firebase-functions 6.6.0 → express 4.22.2 → qs ~6.15.1`이 안전 버전 6.16 이상을 막는다. `firebase-functions 7.3.2`는 `express ^5.2.1`을 사용해 비로소 범위가 열리므로, 부분 잠금 변경을 되돌리고 **Functions 7 호환성 이관을 독립 계획**으로 남겼다. `--force`나 범위 밖 override로 감사 숫자만 지우지 않았다 |
+| **운영 문서의 배포 경로** | `OPERATIONS.md`와 `ROLLBACK.md`에 로컬 `firebase deploy` 절차가 11줄 남아 최상위 규칙의 “master → CI Deploy 단일 경로”와 충돌했다. 환경변수·Functions·Rules·Hosting 복구는 이전 정상 변경을 되돌리는 커밋/PR과 GitHub Actions Deploy로 통일하고, Hosting 즉시 롤백은 Firebase Console 경로를 유지했다. 셀프호스터의 CLI 절차는 `docs/SELF_HOSTING.md`로만 분리했다 |
+| **17번 하네스 검사** | `findForbiddenDeployCommands(markdown)`가 주석이 아닌 줄의 `firebase deploy`와 `npx firebase-tools deploy`를 1-based 줄 번호로 돌려준다. 두 원본 운영 문서를 매 CI에서 검사하므로 직접 배포 명령이 다시 들어오면 위치와 함께 차단한다. TDD로 미구현 export 실패 → 파서 통과 → 기존 문서 11줄 실패 → 문서 교정 후 통과 순서를 확인했다 |
+| **README 테스트 규모 드리프트** | 테스트 케이스 수는 실행 시점의 관측값이고, 파일 수는 실행 없이 계산할 수 있는데 예전 표는 둘을 같은 수동 숫자로 관리했다. `extractDocumentedTestInventory`와 `countTestInventory`를 추가하고 18번 검사가 `git ls-files`를 실제 실행 대상 규칙으로 분류해 README의 **프론트 159파일·Functions 76 suite·Rules 2파일·E2E 26 spec**과 대조한다. 파서는 네 행 중 하나라도 읽지 못하면 실패한다 |
+| **실행 수치** | Node 22에서 프론트 **159파일·1,856테스트** 전부 통과, Statements 51.28% / Branches 40.14% / Functions 42.92% / Lines 52.53%. Functions **76 suite·1,005테스트** 전부 통과, Statements·Lines 64.67% / Branches 81.11% / Functions 66.77%. Firestore·Storage Rules **2파일·37테스트** 통과 |
+| **정적·빌드 검증** | 하네스 **18영역 오류·경고 0**, `verify:fast`(lint·프론트/Functions tsc·env·카탈로그) 통과. 빌드와 번들 예산 통과 — 첫 로드 JS 102.6KB(32.1KB gzip), 전체 JS 3,374.6KB(1,060.3KB gzip), 최대 청크 547.8KB, CSS 188.5KB(29.2KB gzip), precache 161개/3,670.29KiB |
+| **플레이크 확인** | 첫 프론트 커버리지 실행에서 기존 `ServiceDashboard`의 “기관 활성도” 테스트가 전체 병렬 부하 중 5초 타임아웃 1회 발생했다. 이 작업은 해당 파일을 건드리지 않았고, 대상 파일 단독 연속 2회는 6/6 통과(문제 테스트 35ms·632ms), 전체 커버리지 재실행도 1,856/1,856 통과했다. assertion이나 타임아웃은 바꾸지 않았다. 기존 jsdom `requestSubmit()` 미구현 경고는 남는다 |
+| **보안 감사의 정직한 상태** | 프론트 취약점 0건. Functions는 moderate 3건이 그대로이며 현재 감사 스크립트 정책상 high·critical이 없어 exit 0이다. 따라서 “감사 통과”를 “취약점 0”으로 기록하지 않는다 |
+| **커밋** | `3432275` 운영 배포 경로 CI 통일 · `1910ed3` 테스트 문서 수치 드리프트 차단 · `0fd756a` 최종 테스트 실행 수치 보정 |
+| **남는 것** | ① **Functions 7 이관** — Firebase Functions/Express 메이저 호환성, 타입·에뮬레이터·전체 함수 테스트를 별도 설계 후 진행 ② 이번 감사에서 확인한 핵심 Functions 0% 커버리지 모듈(`tokenCrypto`, `slackApi`, `ocrDashboard`, `computeDashboardStats` 등) 보강은 2단계 테스트 트랙 ③ 프론트 커버리지의 기존 jsdom 경고와 전체 부하 타임아웃 노이즈 정리는 별도 테스트 인프라 트랙 |
