@@ -93,6 +93,17 @@ const BATCH5_ENFORCED = [
     'callable/getSlackInstallUrl.ts',
 ];
 
+/**
+ * 6차(2026-09-03) — 슈퍼관리자 대시보드 전용 캘린더 진단.
+ *
+ * PENDING_DECISION의 캘린더 2종과 헷갈리기 쉬워 근거를 남긴다: 그 둘은 **기관 관리자**가
+ * 자기 연동 문제를 진단하는 도구라 강제가 실패하면 원인 파악 자체가 막힌다. 이 함수는
+ * **슈퍼관리자**가 운영 화면에서 부르고, 같은 화면의 apiHealthCheck가 이미 강제 상태다.
+ */
+const BATCH6_ENFORCED = [
+    'callable/probeCalendarAccess.ts',
+];
+
 /** handlers/ 하위 .ts 파일을 재귀 수집 (테스트 제외) */
 function collectHandlerFiles(dir: string): string[] {
     const out: string[] = [];
@@ -165,6 +176,12 @@ describe('enforceAppCheck 불변식', () => {
 
     it('5차 배치 5종은 강제 상태를 유지한다', () => {
         for (const key of BATCH5_ENFORCED) {
+            expect(read(key), `${key}에 enforceAppCheck: true가 없다`).toMatch(/enforceAppCheck:\s*true/);
+        }
+    });
+
+    it('6차 배치 1종은 강제 상태를 유지한다', () => {
+        for (const key of BATCH6_ENFORCED) {
             expect(read(key), `${key}에 enforceAppCheck: true가 없다`).toMatch(/enforceAppCheck:\s*true/);
         }
     });

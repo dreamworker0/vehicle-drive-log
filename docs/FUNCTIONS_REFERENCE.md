@@ -2,9 +2,9 @@
 
 > **자동 생성 문서** — `scripts/generate-functions-doc.ts`로 생성됨
 >
-> 마지막 업데이트: 2026. 9. 2. PM 12:17:39
+> 마지막 업데이트: 2026. 9. 3. AM 8:36:01
 >
-> 총 함수 수: **70개**
+> 총 함수 수: **71개**
 
 ---
 
@@ -23,7 +23,7 @@
 
 ## 📞 onCall (클라이언트 직접 호출)
 
-> 총 39개
+> 총 40개
 
 ### `ocrDashboard`
 
@@ -90,6 +90,17 @@
 | **파일** | `functions/src/scripts/resetCalendarSyncFails.ts` |
 | **설명** | 캘린더 동기화 실패 카운터 초기화 |
 | **인증** | superAdmin |
+| **비고** | 되돌리기 전에 probeCalendarAccess로 무엇이 살아 있는지 먼저 확인한다 |
+
+### `probeCalendarAccess`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/callable/probeCalendarAccess.ts` |
+| **설명** | 연동 캘린더 일괄 접근 진단 — 살아 있는 캘린더와 죽은 캘린더를 가른다 (읽기 전용) |
+| **인증** | superAdmin |
+| **요청 파라미터** | `{ includeHealthy?: boolean }` |
+| **비고** | 영구중단(failCount >= MAX) 차량은 재시도되지 않아 상태를 알 수 없다 — 그 공백을 메우는 진단 |
 
 ### `joinOrganization`
 

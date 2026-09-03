@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useConfirm } from '../../../hooks/useConfirm';
 import { useToast } from '../../../hooks/useToast';
+import DashboardCalendarProbe from './DashboardCalendarProbe';
 
 /** 단일 API 헬스 결과 */
 interface ApiHealthResult {
@@ -84,7 +85,9 @@ export default function DashboardApiHealth() {
     const resetCalendarSync = useCallback(async () => {
         const confirmed = await confirm({
             title: '캘린더 동기화 리셋',
-            message: '캘린더 동기화 실패 카운터를 리셋하시겠습니까?\n모든 차량이 다음 주기에 재시도됩니다.',
+            // 이 버튼은 공유가 살아난 뒤에 쓰는 도구다. 죽은 캘린더까지 한꺼번에 풀면
+            // 며칠에 걸쳐 도로 영구중단으로 돌아가고 대시보드만 잠깐 초록이 된다.
+            message: '캘린더 동기화 실패 카운터를 리셋하시겠습니까?\n\n실패한 모든 차량이 다음 주기에 재시도됩니다. 공유가 아직 끊겨 있는 캘린더는 며칠 안에 다시 영구중단으로 돌아갑니다.\n\n아래 "🔍 연동 진단"을 먼저 실행해 무엇이 살아 있는지 확인하세요.',
             confirmText: '리셋',
             cancelText: '취소',
         });
@@ -328,6 +331,12 @@ export default function DashboardApiHealth() {
                     </div>
                 </>
             )}
+
+            {/* 캘린더 연동 진단 — 리셋 판단의 근거를 여기서 만든다.
+                헬스가 ok일 때도 보여준다: 리셋 직후에는 카운터가 0이라 헬스가 ok로 바뀌는데,
+                그때 패널이 사라지면 **리셋이 실제로 복구로 이어졌는지 같은 화면에서 확인할
+                방법이 없다.** 실행은 버튼을 눌러야만 일어나므로 상시 노출 비용은 없다. */}
+            <DashboardCalendarProbe />
 
             {/* 안내 메시지 */}
             <p className="mt-3 text-xs text-surface-400 dark:text-surface-500">

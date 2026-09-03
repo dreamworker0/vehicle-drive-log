@@ -123,6 +123,9 @@ export { apiHealthCheck } from "./handlers/https/apiHealthCheck";
 // 캘린더 동기화 실패 카운터 리셋 (슈퍼관리자용)
 export { resetCalendarSyncFails } from "./scripts/resetCalendarSyncFails";
 
+// 연동 캘린더 일괄 접근 진단 — 리셋 전에 무엇이 살아 있는지 가른다 (슈퍼관리자용·읽기 전용)
+export { probeCalendarAccess } from "./handlers/callable/probeCalendarAccess";
+
 // 캘린더 접근 테스트 (관리자용)
 export { testCalendarAccess } from "./handlers/callable/testCalendarAccess";
 
