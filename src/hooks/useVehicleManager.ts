@@ -7,6 +7,7 @@ import { useAuth } from './useAuth';
 import type { Vehicle, FuelType } from '../types/vehicle';
 import type { User } from '../types/user';
 import useRetry from './useRetry';
+import { CALENDAR_FAIL_RESET_FIELDS } from '../lib/constants';
 
 interface VehicleModal {
     type: 'delete' | 'clearMaintenance' | 'retire' | 'restore';
@@ -204,9 +205,12 @@ export default function useVehicleManager() {
                         ...(form.insuranceExpiryDate ? { expiryDate: form.insuranceExpiryDate } : {}),
                     },
                     ...(form.googleCalendarId.trim() ? { googleCalendarId: form.googleCalendarId.trim() } : {}),
-                    // googleCalendarId가 변경된 경우 failCount 초기화
+                    // googleCalendarId가 변경된 경우 실패 상태를 통째로 초기화한다.
+                    // 카운터만 0으로 두면 지난 사유가 새 캘린더에 붙어 보이고, 통지 표식이
+                    // 남아 **다음에 다시 끊겼을 때 기관에 알리지 못한다**
+                    // (서버 resetCalendarFailure와 같은 필드 집합).
                     ...((editingVehicle && (editingVehicle.googleCalendarId || '') !== form.googleCalendarId.trim())
-                        ? { calendarSyncFailCount: 0 } : {}),
+                        ? CALENDAR_FAIL_RESET_FIELDS : {}),
                 };
                 if (editingVehicle) {
                     await updateVehicle(editingVehicle.id, vehicleData);
@@ -228,7 +232,12 @@ export default function useVehicleManager() {
     const handleCalendarTestResult = async (vehicleId: string, success: boolean) => {
         const newFailCount = success ? 0 : 3;
         try {
-            await updateVehicle(vehicleId, { calendarSyncFailCount: newFailCount });
+            // 성공 = 복구다. 카운터만 되돌리면 통지 표식이 남아 다음 단절을 못 알린다 —
+            // 이 버튼이 바로 사용자가 안내받는 복구 수단이라, 여기서 빠지면 서버 리셋 경로를
+            // 아무리 맞춰 놔도 실사용 경로에서 결함이 되살아난다.
+            await updateVehicle(vehicleId, success
+                ? CALENDAR_FAIL_RESET_FIELDS
+                : { calendarSyncFailCount: newFailCount });
             // 로컬 vehicles 배열만 업데이트 (로딩 스켈레톤 없이 카드 즉시 반영)
             setVehicles(prev =>
                 prev.map(v =>

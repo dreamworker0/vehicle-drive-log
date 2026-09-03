@@ -151,7 +151,7 @@ describe("apiHealthCheck — 캘린더 동기화 판정", () => {
         expect(r.statusDetail).toContain("20/60");
         expect(r.statusDetail).toContain("33%");
         // 왜 숫자가 줄었는지 화면에서 설명한다
-        expect(r.statusDetail).toContain("40대 제외");
+        expect(r.statusDetail).toContain("실패 40대는 동기화 미작동으로 제외");
     });
 
     it("영구중단과 쿨다운을 나눠 보여준다 (조치가 다르다)", () => {
@@ -160,7 +160,23 @@ describe("apiHealthCheck — 캘린더 동기화 판정", () => {
         expect(r.statusDetail).toContain("쿨다운 2");
     });
 
-    it("연동 차량이 하나도 없으면 0으로 나누지 않는다", () => {
-        expect(evaluateCalendarSyncStatus(stat({ activeLinked: 0 })).status).toBe("ok");
+    it("연동 차량이 아예 없으면 정상 (0으로 나누지 않는다)", () => {
+        expect(evaluateCalendarSyncStatus(stat({ totalLinked: 0, activeLinked: 0 })).status).toBe("ok");
+    });
+
+    it("연동은 있는데 대상이 0으로 집계되면 초록으로 덮지 않는다", () => {
+        // '영원한 빨강'을 고치면서 반대편 극단('영원한 초록')을 만들면 안 된다.
+        // organizationId 유실·기관 조회 실패 등으로 도달할 수 있고, 그 순간 헬스는 눈이 먼다.
+        const r = evaluateCalendarSyncStatus(stat({ totalLinked: 161, activeLinked: 0 }));
+        expect(r.status).toBe("degraded");
+        expect(r.statusDetail).toContain("161대");
+    });
+
+    it("제외분 문구는 '제외된 실패 차량 수'임이 드러나야 한다", () => {
+        const r = evaluateCalendarSyncStatus(stat({
+            totalLinked: 100, activeLinked: 60, failedCount: 10, permanentlyDisabled: 10, excludedCount: 5,
+        }));
+        // excludedCount는 제외된 차량 전체가 아니라 그중 실패 상태인 것만 센다
+        expect(r.statusDetail).toContain("실패 5대는 동기화 미작동으로 제외");
     });
 });

@@ -40,6 +40,9 @@ const PING_TIMEOUT_MS = 5000;
  */
 const CALENDAR_FAIL_ERROR_RATIO = 0.3;
 
+/** 기관 문서를 한 번에 받아오는 묶음 크기 (getAll은 스스로 분할하지 않는다) */
+const ORG_BATCH_SIZE = 300;
+
 /**
  * AbortSignal.timeout으로 끊긴 실패인지 판별한다.
  * Node의 fetch는 이 경우 DOMException(name: "TimeoutError")으로 거부하는데,
@@ -255,8 +258,11 @@ async function checkCalendarSyncStatus(): Promise<CalendarSyncStatus> {
         linkedSnap.docs.map((d) => (d.data().organizationId as string) || "").filter(Boolean),
     )];
     const syncEnabled = new Map<string, boolean>();
-    if (orgIds.length > 0) {
-        const orgSnaps = await db.getAll(...orgIds.map((id) => db.collection("organizations").doc(id)));
+    // getAll은 자동 분할하지 않고 한 번의 BatchGetDocuments로 나간다 — 기관이 늘어도
+    // 요청이 커지지 않게 나눠 보내고, 필요한 필드만 받아 페이로드를 줄인다(sites 배열 등 제외).
+    for (let i = 0; i < orgIds.length; i += ORG_BATCH_SIZE) {
+        const refs = orgIds.slice(i, i + ORG_BATCH_SIZE).map((id) => db.collection("organizations").doc(id));
+        const orgSnaps = await db.getAll(...refs, { fieldMask: ["googleCalendarEnabled"] });
         for (const snap of orgSnaps) {
             // calendarFeature.isGoogleCalendarEnabled와 같은 기준 (명시적 false만 끔)
             syncEnabled.set(snap.id, snap.exists && snap.data()?.googleCalendarEnabled !== false);
@@ -274,9 +280,19 @@ async function checkCalendarSyncStatus(): Promise<CalendarSyncStatus> {
         const orgId = (data.organizationId as string) || "";
         const failCount = (data.calendarSyncFailCount as number) || 0;
         const failing = failCount >= 3;
+        const calendarId = ((data.googleCalendarId as string) || "").trim().toLowerCase();
 
-        // 기관 문서가 없거나(고아 차량) 캘린더 기능이 꺼진 기관은 동기화가 돌지 않는다.
-        if (!orgId || !syncEnabled.get(orgId)) {
+        // 동기화 경로가 캘린더 API 앞에서 거르는 것들 — 여기서도 같이 거른다.
+        //  · 기관 문서 없음(고아 차량) · 기관이 캘린더 기능을 끔 (calendarFeature)
+        //  · `@` 없는 값 (calendarSchedule이 건너뛴다)
+        //  · 서비스 계정 주소 오입력 (calendarBinding이 즉시 거절한다 — 실측 8대)
+        // 바인딩 소유권까지 보려면 차량마다 문서를 읽어야 해서 여기서는 문자열 검사로 그친다.
+        const syncSkipped =
+            !orgId ||
+            !syncEnabled.get(orgId) ||
+            !calendarId.includes("@") ||
+            calendarId.endsWith(".gserviceaccount.com");
+        if (syncSkipped) {
             if (failing) excludedCount++;
             continue;
         }
@@ -307,6 +323,15 @@ export function evaluateCalendarSyncStatus(s: CalendarSyncStatus): {
 } {
     const failRatio = s.activeLinked > 0 ? s.failedCount / s.activeLinked : 0;
 
+    // 연동 차량이 있는데 '도는 차량'이 하나도 없다면 집계가 눈이 먼 것이다(organizationId
+    // 유실·기관 조회 실패 등). 초록으로 두면 "영원한 빨강"을 "영원한 초록"으로 바꿀 뿐이다.
+    if (s.totalLinked > 0 && s.activeLinked === 0) {
+        return {
+            status: "degraded",
+            statusDetail: `연동 ${s.totalLinked}대 중 동기화 대상이 0대로 집계됨 — 확인 필요`,
+        };
+    }
+
     if (s.failedCount === 0) {
         return { status: "ok", statusDetail: `${s.activeLinked}대 연동 중` };
     }
@@ -316,7 +341,9 @@ export function evaluateCalendarSyncStatus(s: CalendarSyncStatus): {
         `영구중단 ${s.permanentlyDisabled} · 쿨다운 ${s.cooldownCount}`;
     if (s.excludedCount > 0) {
         // 예전 판정이 실패로 세던 분량 — 왜 숫자가 줄었는지 화면에서 설명한다.
-        statusDetail += ` / 동기화 미작동 기관 ${s.excludedCount}대 제외`;
+        // excludedCount는 '제외된 차량 전체'가 아니라 '제외된 것 중 실패 상태'다 — 문구가
+        // 총 제외분처럼 읽히면 숫자가 맞지 않는다.
+        statusDetail += ` / 실패 ${s.excludedCount}대는 동기화 미작동으로 제외`;
     }
 
     return {

@@ -133,57 +133,126 @@ export async function recordCalendarFailure(
 }
 
 /**
+ * 같은 기관에 중단 알림을 다시 보내기까지의 최소 간격.
+ *
+ * 이 앱은 **기관 내 모든 차량이 같은 캘린더 ID를 쓰도록** 안내한다(calendarBinding 주석).
+ * 그 캘린더가 지워지면 그 기관 차량 전부가 같은 시각에 실패하고, 쿨다운도 같이 풀려
+ * **한 번의 스케줄러 실행에서 나란히 임계를 넘는다.** 차량 단위로만 막으면 차량 8대 ×
+ * 관리자 3명 = 알림 24건이 한꺼번에 쌓인다. 같은 저장소가 이미 아는 실패 방식이다 —
+ * "잘못 등록된 차량 하나 때문에 디스코드가 도배되면 그 채널은 무뎌진다"(calendarBinding).
+ */
+const ORG_NOTIFY_COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000; // 7일
+
+/**
  * 영구 제외로 넘어간 차량을 그 기관의 **관리자에게** 알린다.
  *
  * 직원이 아니라 관리자만 받는 이유: 복구는 차량 설정(캘린더 ID·공유 재설정)에서만 할 수
  * 있고 그 화면은 관리자 전용이다. 전 직원에게 보내면 고칠 수 없는 사람들에게 알림만 쌓인다.
  *
- * 한 번만 보낸다(`calendarSyncDisabledNotifiedAt`). 이 표식은 운영자가 "이 기관은 이미
- * 통지됐는가"를 확인하는 근거도 된다.
+ * 발송 자리는 **트랜잭션으로 선점한다.** 검사와 쓰기가 갈라져 있으면, 쿨다운이 풀린 직후
+ * 예약이 여러 건 동시에 쓰이는 순간 여러 트리거가 모두 `failCount=9`를 읽고 가드를 함께
+ * 통과해 관리자 전원에게 각각 보낸다.
  */
 async function notifyOrgCalendarDisabled(vehicleId: string): Promise<void> {
     const db = getFirestore();
-    const snap = await db.collection("vehicles").doc(vehicleId).get();
-    const vehicle = snap.data();
-    if (!vehicle) return;
+    const vehicleRef = db.collection("vehicles").doc(vehicleId);
 
-    // 이미 알렸다 — 동시 실행으로 두 경로가 같은 순간을 넘겨도 두 번 보내지 않는다.
-    if (vehicle.calendarSyncDisabledNotifiedAt) return;
+    // 1. 발송 자리 선점 — 읽고 쓰는 사이에 남이 끼어들지 못하게 한 트랜잭션에 넣는다.
+    const claimed = await db.runTransaction(async (tx) => {
+        const snap = await tx.get(vehicleRef);
+        const data = snap.data();
+        if (!data) return null;
+        if (data.calendarSyncDisabledNotifiedAt) return null; // 이미 알렸다
+        tx.update(vehicleRef, { calendarSyncDisabledNotifiedAt: FieldValue.serverTimestamp() });
+        return data;
+    });
+    if (!claimed) return;
 
-    const organizationId = (vehicle.organizationId as string) || "";
-    if (!organizationId) return;
+    /** 선점을 되돌린다 — 보내지 못했으면 "알렸다"고 남겨 두면 안 된다. */
+    const releaseClaim = () =>
+        vehicleRef.update({ calendarSyncDisabledNotifiedAt: FieldValue.delete() }).catch(() => {});
 
-    // 캘린더 기능을 끈 기관에는 알릴 것이 없다 — 애초에 동기화가 돌지 않는다.
+    const organizationId = (claimed.organizationId as string) || "";
+    if (!organizationId) {
+        await releaseClaim();
+        return;
+    }
+
+    // 2. 캘린더 기능을 끈 기관에는 알릴 것이 없다 — 애초에 동기화가 돌지 않는다.
     const orgSnap = await db.collection("organizations").doc(organizationId).get();
     if (!orgSnap.exists || orgSnap.data()?.googleCalendarEnabled === false) return;
 
+    // 3. 같은 기관에 최근 보냈으면 이번엔 보내지 않는다. 선점은 유지한다 — 이 차량은
+    //    "알림 대상으로 처리됐다"가 맞고, 풀어 두면 다음 실행에서 다시 후보가 된다.
+    //    (선점끼리의 경합으로 드물게 두 건이 나갈 수 있지만, 막지 않으면 24건이다.)
+    const siblingsSnap = await db.collection("vehicles")
+        .where("organizationId", "==", organizationId)
+        .get();
+    const cutoff = Date.now() - ORG_NOTIFY_COOLDOWN_MS;
+    const recentlyNotified = siblingsSnap.docs.some((d) => {
+        if (d.id === vehicleId) return false;
+        const at = d.data().calendarSyncDisabledNotifiedAt;
+        const time = at?.toDate?.() ?? at;
+        return time ? new Date(time).getTime() >= cutoff : false;
+    });
+    if (recentlyNotified) {
+        console.log(`[calendarFailTracking] 기관 ${organizationId}에 최근 알림 발송됨 — 중복 발송 억제: ${vehicleId}`);
+        return;
+    }
+
+    // 4. 받을 사람. 비활성 계정은 로그인 자체가 막히므로 제외한다 — 전원이 비활성이면
+    //    아무도 못 읽는 알림을 만들고 선점만 태우는 꼴이 된다.
     const adminsSnap = await db.collection("users")
         .where("organizationId", "==", organizationId)
         .where("role", "==", "admin")
         .get();
-    if (adminsSnap.empty) return;
+    const targets = adminsSnap.docs.filter((d) => d.data().status !== "disabled");
+    if (targets.length === 0) {
+        await releaseClaim();
+        await warnUndeliverable(vehicleId, organizationId, "활성 관리자가 없다");
+        return;
+    }
 
-    const vehicleName = (vehicle.displayName as string) || "차량";
-    const reason = (vehicle.calendarSyncLastFailReason as CalendarFailReason) || "other";
+    const vehicleName = (claimed.displayName as string) || "차량";
+    const reason = (claimed.calendarSyncLastFailReason as CalendarFailReason) || "other";
     const title = "⚠️ 구글 캘린더 동기화가 중단되었습니다";
     const message =
         `'${vehicleName}' 차량의 캘린더 동기화가 반복 실패로 중단되었습니다. ${REASON_GUIDE[reason]} ` +
-        `차량 관리 화면의 '동기화 실패' 배지를 눌러 원인을 진단하고 복구할 수 있습니다.`;
+        `차량 관리 화면의 '동기화 실패' 배지를 눌러 원인을 진단하고 복구할 수 있습니다. ` +
+        `같은 캘린더를 쓰는 다른 차량도 함께 중단됐을 수 있으니 차량 목록을 확인해 주세요.`;
 
     // sendNotification은 messaging까지 끌고 오는 무거운 모듈이라 필요한 순간에만 부른다
     // (calendarSync의 googleapis와 같은 이유). 순환 참조도 함께 피한다.
     const { createInAppNotification } = await import("../alimtalk/sendNotification");
-    await Promise.allSettled(
-        adminsSnap.docs.map((d) =>
+    const results = await Promise.allSettled(
+        targets.map((d) =>
             createInAppNotification(d.id, "calendar_sync_disabled", title, message, organizationId),
         ),
     );
 
-    await db.collection("vehicles").doc(vehicleId).update({
-        calendarSyncDisabledNotifiedAt: FieldValue.serverTimestamp(),
-    });
+    // 5. 전부 실패했으면 선점을 되돌리고 사람을 부른다. 이 차량은 임계에 갇혀 다시
+    //    호출되지 않으므로 **자동 재시도 기회가 없다** — 조용히 삼키면 그 기관은 영영 모른다.
+    if (results.every((r) => r.status === "rejected")) {
+        await releaseClaim();
+        await warnUndeliverable(vehicleId, organizationId, "관리자 알림 생성이 모두 실패했다");
+        return;
+    }
 
-    console.log(`[calendarFailTracking] 캘린더 동기화 중단을 기관 관리자 ${adminsSnap.size}명에게 알림: ${vehicleId}`);
+    console.log(`[calendarFailTracking] 캘린더 동기화 중단을 기관 관리자 ${targets.length}명에게 알림: ${vehicleId}`);
+}
+
+/** 통지가 불가능했음을 운영자에게 올린다 (자동 재시도가 없는 경로라 사람이 메워야 한다). */
+async function warnUndeliverable(vehicleId: string, organizationId: string, why: string): Promise<void> {
+    console.error(JSON.stringify({
+        severity: "ERROR",
+        functionName: "calendarFailTracking",
+        message: "캘린더 동기화 중단을 기관에 알리지 못했다 — 자동 재시도 없음",
+        vehicleId,
+        organizationId,
+        reason: why,
+    }));
+    const { captureWarning } = await import("../../core/sentry");
+    captureWarning("캘린더 동기화 중단을 기관에 알리지 못했습니다", { vehicleId, organizationId, reason: why });
 }
 
 /**

@@ -37,6 +37,7 @@ function getNotificationIcon(type?: string) {
         case 'reservation_changed': return '✏️';
         case 'admin_notice': return '📢';
         case 'insurance_expiry_warning': return '🛡️';
+        case 'calendar_sync_disabled': return '📅';
         default: return 'ℹ️';
     }
 }

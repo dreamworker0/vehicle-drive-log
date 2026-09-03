@@ -15,6 +15,7 @@ import React, { useState } from 'react';
 import { firebaseFunctions } from '../../lib/firebase';
 import { httpsCallable } from 'firebase/functions';
 import type { Vehicle } from '../../types/vehicle';
+import { CALENDAR_MAX_FAIL_COUNT } from '../../lib/constants';
 
 const SERVICE_ACCOUNT_EMAIL = '1066541065552-compute@developer.gserviceaccount.com';
 
@@ -52,9 +53,9 @@ export default function CalendarSyncTroubleshootModal({
     const failCount = vehicle.calendarSyncFailCount || 0;
     const calendarId = vehicle.googleCalendarId || '';
     const failReason = vehicle.calendarSyncLastFailReason;
-    // 10회(MAX_FAIL_COUNT)부터는 서버가 이 차량 호출을 아예 건너뛴다 — 고쳐도 저절로
-    // 돌아오지 않으므로, 연동 테스트를 눌러야 복구된다는 것을 명시한다.
-    const isPermanentlyDisabled = failCount >= 10;
+    // 임계부터는 서버가 이 차량 호출을 아예 건너뛴다 — 고쳐도 저절로 돌아오지 않으므로,
+    // 연동 테스트를 눌러야 복구된다는 것을 명시한다.
+    const isPermanentlyDisabled = failCount >= CALENDAR_MAX_FAIL_COUNT;
 
     const handleCopyEmail = () => {
         navigator.clipboard.writeText(SERVICE_ACCOUNT_EMAIL);

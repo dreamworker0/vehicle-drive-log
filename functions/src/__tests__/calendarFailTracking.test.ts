@@ -12,6 +12,11 @@ const mockUsersGet = jest.fn();
 /** users 쿼리에 걸린 where 절 — 관리자만 대상으로 삼는지 검증용 */
 const mockUsersWhere = jest.fn();
 
+/** 같은 기관의 다른 차량들 (기관 단위 중복 억제 검증용) */
+const mockSiblingsGet = jest.fn();
+/** 트랜잭션 안에서 일어난 쓰기 */
+const mockTxUpdate = jest.fn();
+
 jest.mock('firebase-admin/firestore', () => ({
     getFirestore: () => ({
         collection: (name: string) => {
@@ -25,8 +30,16 @@ jest.mock('firebase-admin/firestore', () => ({
                 };
                 return chain;
             }
-            return { doc: () => ({ update: mockUpdate, get: mockVehicleGet }) };
+            // vehicles — doc 단건과 기관 형제 조회 둘 다 받는다
+            const vehicles: Record<string, unknown> = {
+                doc: () => ({ update: mockUpdate, get: mockVehicleGet }),
+                where: () => vehicles,
+                get: () => mockSiblingsGet(),
+            };
+            return vehicles;
         },
+        runTransaction: async (fn: (tx: unknown) => Promise<unknown>) =>
+            fn({ get: () => mockVehicleGet(), update: (...a: unknown[]) => mockTxUpdate(...a) }),
     }),
     FieldValue: {
         serverTimestamp: jest.fn(() => 'SERVER_TIMESTAMP'),
@@ -54,6 +67,7 @@ import {
 /** 영구 중단 통지 경로가 정상적으로 흐르도록 하는 기본 mock 상태 */
 function givenNotifiableVehicle(overrides: Record<string, unknown> = {}) {
     mockVehicleGet.mockResolvedValue({
+        exists: true,
         data: () => ({
             organizationId: 'org1',
             displayName: '모닝',
@@ -62,7 +76,15 @@ function givenNotifiableVehicle(overrides: Record<string, unknown> = {}) {
         }),
     });
     mockOrgGet.mockResolvedValue({ exists: true, data: () => ({ name: '테스트기관' }) });
-    mockUsersGet.mockResolvedValue({ empty: false, size: 2, docs: [{ id: 'admin1' }, { id: 'admin2' }] });
+    mockUsersGet.mockResolvedValue({
+        empty: false,
+        docs: [
+            { id: 'admin1', data: () => ({ status: 'active' }) },
+            { id: 'admin2', data: () => ({}) },
+        ],
+    });
+    // 기관에 이 차량뿐 — 중복 억제에 걸리지 않는 상태
+    mockSiblingsGet.mockResolvedValue({ docs: [] });
 }
 
 describe('calendarFailTracking', () => {
@@ -207,12 +229,42 @@ describe('calendarFailTracking', () => {
             // 복구는 관리자 전용 화면에서만 가능하다 — 전 직원에게 보내면 고칠 수 없는 사람에게 알림만 쌓인다
             expect(mockUsersWhere).toHaveBeenCalledWith('role', '==', 'admin');
             expect(mockUsersWhere).toHaveBeenCalledWith('organizationId', '==', 'org1');
-            // 사유별 안내가 본문에 실린다
             const message = mockCreateInAppNotification.mock.calls[0][3] as string;
             expect(message).toContain('모닝');
             expect(message).toContain('캘린더가 삭제되었거나');
-            // 재발송 방지 표식
-            expect(mockUpdate).toHaveBeenLastCalledWith({ calendarSyncDisabledNotifiedAt: 'SERVER_TIMESTAMP' });
+        });
+
+        it('발송 자리를 트랜잭션으로 선점한다 (검사와 쓰기가 갈라지지 않는다)', async () => {
+            givenNotifiableVehicle();
+            await recordCalendarFailure('v1', MAX_FAIL_COUNT - 1, { code: 404, message: 'Not Found' });
+            // 표식은 트랜잭션 안에서 찍힌다 — 밖에서 찍으면 동시 진입이 함께 통과한다
+            expect(mockTxUpdate).toHaveBeenCalledWith(
+                expect.anything(),
+                { calendarSyncDisabledNotifiedAt: 'SERVER_TIMESTAMP' },
+            );
+        });
+
+        it('동시에 두 번 들어와도 한 번만 보낸다 (선점 경합)', async () => {
+            givenNotifiableVehicle();
+            // 두 번째 트랜잭션이 읽을 때는 이미 표식이 찍혀 있다
+            let claimed = false;
+            mockVehicleGet.mockImplementation(async () => {
+                const data = {
+                    organizationId: 'org1',
+                    displayName: '모닝',
+                    calendarSyncLastFailReason: 'not_found',
+                    ...(claimed ? { calendarSyncDisabledNotifiedAt: 'SERVER_TIMESTAMP' } : {}),
+                };
+                claimed = true;
+                return { exists: true, data: () => data };
+            });
+
+            await Promise.all([
+                recordCalendarFailure('v1', MAX_FAIL_COUNT - 1, { code: 404, message: 'Not Found' }),
+                recordCalendarFailure('v1', MAX_FAIL_COUNT - 1, { code: 404, message: 'Not Found' }),
+            ]);
+
+            expect(mockCreateInAppNotification).toHaveBeenCalledTimes(2); // 관리자 2명 × 1회
         });
 
         it('임계 아래에서는 알리지 않는다', async () => {
@@ -227,10 +279,37 @@ describe('calendarFailTracking', () => {
             expect(mockCreateInAppNotification).not.toHaveBeenCalled();
         });
 
-        it('이미 통지한 차량은 다시 알리지 않는다 (동시 실행 방어)', async () => {
+        it('표식이 이미 있으면 선점에 실패해 보내지 않는다', async () => {
             givenNotifiableVehicle({ calendarSyncDisabledNotifiedAt: 'SERVER_TIMESTAMP' });
             await recordCalendarFailure('v1', MAX_FAIL_COUNT - 1, { code: 404, message: 'Not Found' });
             expect(mockCreateInAppNotification).not.toHaveBeenCalled();
+            expect(mockTxUpdate).not.toHaveBeenCalled();
+        });
+
+        it('같은 기관에 최근 보냈으면 억제한다 — 기관 전체가 한꺼번에 끊겨도 도배하지 않는다', async () => {
+            // 이 앱은 기관 내 모든 차량이 같은 캘린더를 쓰도록 안내한다. 그 캘린더가 지워지면
+            // 차량 전부가 한 실행에서 나란히 임계를 넘어 알림이 차량 수 × 관리자 수만큼 쌓인다.
+            givenNotifiableVehicle();
+            mockSiblingsGet.mockResolvedValue({
+                docs: [{ id: 'v2', data: () => ({ calendarSyncDisabledNotifiedAt: new Date() }) }],
+            });
+
+            await recordCalendarFailure('v1', MAX_FAIL_COUNT - 1, { code: 404, message: 'Not Found' });
+
+            expect(mockCreateInAppNotification).not.toHaveBeenCalled();
+            // 선점은 유지한다 — 이 차량은 처리된 것이 맞고, 풀면 다음 실행에서 다시 후보가 된다
+            expect(mockUpdate).not.toHaveBeenCalledWith({ calendarSyncDisabledNotifiedAt: 'DELETE' });
+        });
+
+        it('오래된 형제 알림은 억제하지 않는다 (쿨다운 경과)', async () => {
+            givenNotifiableVehicle();
+            const old = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000); // 8일 전
+            mockSiblingsGet.mockResolvedValue({
+                docs: [{ id: 'v2', data: () => ({ calendarSyncDisabledNotifiedAt: old }) }],
+            });
+
+            await recordCalendarFailure('v1', MAX_FAIL_COUNT - 1, { code: 404, message: 'Not Found' });
+            expect(mockCreateInAppNotification).toHaveBeenCalled();
         });
 
         it('캘린더 기능을 끈 기관에는 알리지 않는다 (애초에 동기화가 돌지 않는다)', async () => {
@@ -238,6 +317,29 @@ describe('calendarFailTracking', () => {
             mockOrgGet.mockResolvedValue({ exists: true, data: () => ({ googleCalendarEnabled: false }) });
             await recordCalendarFailure('v1', MAX_FAIL_COUNT - 1, { code: 404, message: 'Not Found' });
             expect(mockCreateInAppNotification).not.toHaveBeenCalled();
+        });
+
+        it('비활성 관리자만 남은 기관은 선점을 되돌리고 운영자에게 올린다', async () => {
+            // 아무도 못 읽는 알림을 만들고 표식만 태우면, 그 기관은 영영 통지 대상에서 빠진다
+            givenNotifiableVehicle();
+            mockUsersGet.mockResolvedValue({
+                empty: false,
+                docs: [{ id: 'admin1', data: () => ({ status: 'disabled' }) }],
+            });
+
+            await recordCalendarFailure('v1', MAX_FAIL_COUNT - 1, { code: 404, message: 'Not Found' });
+
+            expect(mockCreateInAppNotification).not.toHaveBeenCalled();
+            expect(mockUpdate).toHaveBeenCalledWith({ calendarSyncDisabledNotifiedAt: 'DELETE' });
+        });
+
+        it('알림 생성이 모두 실패하면 선점을 되돌린다 (자동 재시도가 없는 경로다)', async () => {
+            givenNotifiableVehicle();
+            mockCreateInAppNotification.mockRejectedValue(new Error('write failed'));
+
+            await recordCalendarFailure('v1', MAX_FAIL_COUNT - 1, { code: 404, message: 'Not Found' });
+
+            expect(mockUpdate).toHaveBeenCalledWith({ calendarSyncDisabledNotifiedAt: 'DELETE' });
         });
 
         it('알림이 실패해도 실패 카운트 기록은 성립한다', async () => {
