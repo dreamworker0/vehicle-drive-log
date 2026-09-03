@@ -232,7 +232,7 @@ export default function FuelLogTab() {
                                     <label className="label text-xs">{isChargeable ? '⚡ 충전량 (kWh/kg)' : '⛽ 주유량 (L)'} <span className="text-red-500 dark:text-red-400">*</span></label>
                                     <input
                                         type="number"
-                                        step="0.01"
+                                        step="0.001"
                                         min="0"
                                         value={form.fuelAmount}
                                         onChange={e => setForm({ ...form, fuelAmount: stripNegative(e.target.value) })}
