@@ -254,7 +254,7 @@ export default function DashboardApiHealth() {
 
                                 {/* 에러 메시지 (있을 때만) */}
                                 {api.error && (
-                                    <p className="mt-2 text-xs text-red-500 dark:text-red-400 truncate" title={api.error}>
+                                    <p className={`mt-2 text-xs truncate ${cfg.textClass}`} title={api.error}>
                                         {api.error}
                                     </p>
                                 )}
@@ -318,7 +318,7 @@ export default function DashboardApiHealth() {
                                         </p>
                                     )}
                                     {api.error && (
-                                        <p className="mt-2 text-xs text-red-500 dark:text-red-400 truncate" title={api.error}>
+                                        <p className={`mt-2 text-xs truncate ${cfg.textClass}`} title={api.error}>
                                             {api.error}
                                         </p>
                                     )}

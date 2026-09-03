@@ -6,6 +6,7 @@
 import { defineString } from "firebase-functions/params";
 import { getFirestore } from "firebase-admin/firestore";
 import { recordHeartbeat } from "../../utils/helpers";
+import { captureError, captureWarning } from "../../core/sentry";
 import { getKSTYear } from "../../utils/kstDate";
 
 const HOLIDAY_API_KEY = defineString("HOLIDAY_API_KEY");
@@ -40,11 +41,19 @@ export async function syncHolidays(): Promise<void> {
                     data = JSON.parse(text);
                 } catch {
                     console.error(`[공공데이터 API] JSON 파싱 실패 (year: ${year}): ${text.substring(0, 200)}`);
+                    captureWarning("공휴일 API 응답을 파싱하지 못했다 — 해당 연도를 건너뛴다", {
+                        year,
+                        bodyPreview: text.substring(0, 200),
+                    });
                     continue;
                 }
 
                 if (!response.ok) {
                     console.error(`[공공데이터 API] 상태 코드 에러 (year: ${year}): ${response.status}`);
+                    captureWarning("공휴일 API가 오류 상태로 응답했다 — 해당 연도를 건너뛴다", {
+                        year,
+                        status: response.status,
+                    });
                     continue;
                 }
 
@@ -70,11 +79,19 @@ export async function syncHolidays(): Promise<void> {
                 await docRef.set(holidaysData, { merge: true });
                 console.log("Successfully synced holidays to Firestore");
             } else {
+                // 한 해도 받지 못한 경우. 기존 문서를 지우지 않는 것은 의도한 동작이지만,
+                // 그대로 두면 **하트비트는 정상으로 찍히고 공휴일만 낡은 채 남는다** —
+                // 화면의 공휴일 표시가 조용히 틀어지는 형태라 반드시 보고한다.
                 console.log("No holiday data fetched, skipping Firestore update");
+                captureError(
+                    new Error("공휴일 동기화가 한 해도 받지 못했다 — Firestore 갱신 생략(기존 데이터 유지)"),
+                    { fn: "syncHolidays", yearsToFetch }
+                );
             }
 
             await recordHeartbeat("syncHolidays");
         } catch (error: unknown) {
             console.error("Error syncing holidays:", error);
+            captureError(error, { fn: "syncHolidays" });
         }
 }

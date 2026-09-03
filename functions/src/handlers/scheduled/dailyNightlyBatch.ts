@@ -479,6 +479,6 @@ export const dailyNightlyBatch = onSchedule(
         await runStep(failed, CONTEXT, "backupFirestore", () => backupFirestoreData());
         await runStep(failed, CONTEXT, "checkInsuranceExpiry", () => checkInsuranceExpiry(db));
 
-        logBatchResult(CONTEXT, failed);
+        await logBatchResult(CONTEXT, failed);
     }
 );

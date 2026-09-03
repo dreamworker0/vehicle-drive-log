@@ -10,6 +10,7 @@
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { syncHolidays } from "./syncHolidays";
 import { verifyMileageConsistency } from "./verifyMileageConsistency";
+import { flushSentry } from "../../core/sentry";
 
 export const monthlyBatch = onSchedule(
     {
@@ -44,5 +45,11 @@ export const monthlyBatch = onSchedule(
         }
 
         console.log("[monthlyBatch] completed.");
+
+        // 두 단계의 captureError/captureWarning을 여기서 전송한다.
+        // Sentry 전송은 비동기라 핸들러가 반환하면 인스턴스가 동결·종료되면서 버퍼가 그대로 사라진다 —
+        // wrapHttps·wrapCallableHandler가 경계에서 flush하는 것과 같은 이유이고, 스케줄 함수에는
+        // 그 래퍼가 없어 여기가 유일한 경계다. 빠뜨리면 "실패를 보고한다"가 조용히 무효가 된다.
+        await flushSentry();
     }
 );

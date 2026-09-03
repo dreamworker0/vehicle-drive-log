@@ -41,6 +41,6 @@ export const nightlyStatsBatch = onSchedule(
         await runStep(failed, CONTEXT, "dailyAggregation", () => runDailyAggregation());
         await runStep(failed, CONTEXT, "computeAllDashboardStats", () => computeAllDashboardStats());
 
-        logBatchResult(CONTEXT, failed);
+        await logBatchResult(CONTEXT, failed);
     }
 );
