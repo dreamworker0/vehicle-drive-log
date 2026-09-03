@@ -4,6 +4,7 @@
 import { defineString } from "firebase-functions/params";
 import { createAuthenticatedProxy } from "../../utils/createAuthenticatedProxy";
 import { log } from "../../utils/helpers";
+import { describeFetchFailure } from "../../utils/fetchFailure";
 
 const HOLIDAY_API_KEY = defineString("HOLIDAY_API_KEY");
 
@@ -16,19 +17,6 @@ const HOLIDAY_API_KEY = defineString("HOLIDAY_API_KEY");
  * pingHoliday 주석) 5초에 맞춰 끊으면 정상 응답까지 잘라내므로 여유를 둔다.
  */
 const UPSTREAM_TIMEOUT_MS = 10_000;
-
-/**
- * 공공데이터 포털에 닿지 못한 원인을 한 줄로 요약한다.
- *
- * Node의 fetch(undici)는 message에 "fetch failed" 한 줄만 남기고 실제 원인(DNS·연결 끊김 등)은
- * `cause`에 숨긴다. 그대로 올리면 원인 없는 "fetch failed"만 쌓여 조치할 것이 없다(2026-09-03).
- * 타임아웃은 이름이 `cause`에 실려 오는 런타임도 있어 두 자리를 모두 본다(apiHealthCheck와 동일).
- */
-function describeFetchFailure(err: unknown): string {
-    const e = err as { name?: string; message?: string; cause?: { name?: string; code?: string } } | null;
-    if (e?.name === "TimeoutError" || e?.cause?.name === "TimeoutError") return "timeout";
-    return e?.cause?.code || e?.message || "unknown";
-}
 
 export const holidayProxy = createAuthenticatedProxy("holidayProxy", async (req, res) => {
     const { solYear, numOfRows = 50 } = req.query;
