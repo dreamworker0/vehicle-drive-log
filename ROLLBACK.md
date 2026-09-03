@@ -24,43 +24,28 @@
 2. **릴리즈 기록**에서 이전 버전 옆 `⋮` 클릭
 3. **"롤백"** 선택 → 즉시 반영 (캐시 무효화 포함)
 
-### 방법 B: CLI
-```bash
-firebase hosting:rollback --project vehicle-drive-log
-```
+### 방법 B: 이전 정상 커밋으로 복구
 
-### 방법 C: 이전 커밋으로 재배포
-```bash
-git log --oneline -5                    # 이전 정상 커밋 확인
-git checkout <commit-hash>              # 해당 커밋으로 이동
-npm run build                           # 빌드
-firebase deploy --only hosting          # Hosting만 배포
-git checkout master                     # 원래 브랜치로 복귀
-```
+이전 정상 커밋을 되돌리는 새 커밋과 PR을 만들고 CI를 통과시킨다. `master` 반영 후 Deploy
+워크플로가 같은 커밋 기준으로 배포한다. 즉시 실행이 필요하면 GitHub Actions → Deploy →
+Run workflow를 사용하고 결과를 확인한다.
 
 ---
 
 ## 2. Cloud Functions 롤백
 
-### 방법 A: 이전 커밋에서 재배포 (추천)
-```bash
-git log --oneline -5                    # 이전 정상 커밋 확인
-git checkout <commit-hash>              # 해당 커밋으로 이동
-cd functions && npm ci && npm run build # 의존성 설치 + 빌드
-cd .. && firebase deploy --only functions --project vehicle-drive-log
-git checkout master                     # 원래 브랜치로 복귀
-```
+### 방법 A: 이전 정상 커밋으로 복구 (추천)
+
+문제 변경을 되돌리는 새 커밋과 PR을 만든다. Functions 타입 검사와 테스트를 포함한 CI가
+통과한 뒤 `master`에 반영하고 Deploy 워크플로 결과를 확인한다.
 
 ### 방법 B: GCP Console에서 트래픽 전환
 1. [Cloud Console](https://console.cloud.google.com) → Cloud Functions
 2. 해당 함수 선택 → **수정 버전** 탭
 3. 이전 버전으로 트래픽 100% 전환
 
-### 특정 함수만 롤백
-```bash
-# 특정 함수만 재배포
-firebase deploy --only functions:ocrDashboard,functions:joinOrganization
-```
+특정 함수만 로컬 CLI로 재배포하지 않는다. 배포 단위를 나눠야 하는 긴급 상황도 GitHub Actions의
+Deploy `workflow_dispatch` 입력을 사용해 실행 기록과 커밋 기준을 남긴다.
 
 ---
 
@@ -72,17 +57,9 @@ firebase deploy --only functions:ocrDashboard,functions:joinOrganization
 3. **되돌리기** 버튼
 
 ### 방법 B: Git에서 이전 규칙 복원
-```bash
-git log --oneline -- firestore.rules    # 이전 정상 버전 확인
-git checkout <commit-hash> -- firestore.rules
-firebase deploy --only firestore:rules --project vehicle-drive-log
-```
 
-### Storage Rules도 동일
-```bash
-git checkout <commit-hash> -- storage.rules
-firebase deploy --only storage --project vehicle-drive-log
-```
+이전 정상 규칙을 되돌리는 새 커밋과 PR을 만들고 Rules 테스트를 포함한 CI를 통과시킨다.
+Storage Rules도 같은 절차를 사용한다. `master` 반영 후 Deploy 워크플로 결과를 확인한다.
 
 ---
 
@@ -94,9 +71,10 @@ firebase deploy --only storage --project vehicle-drive-log
 - [ ] `npx vitest run` 전체 테스트 통과
 - [ ] `cd functions && npm run build && npm test` Functions 빌드+테스트 통과
 - [ ] `npx tsc --noEmit` 타입 체크 통과
-- [ ] Firestore Rules 변경 시 → `firebase deploy --only firestore:rules` 먼저 단독 배포
+- [ ] Firestore/Storage Rules 변경 시 → Rules 테스트 통과 확인
 
-> **💡 Tip**: 워크플로우 `/deploy`를 사용하면 빌드→테스트→배포를 한 번에 실행합니다.
+> **💡 Tip**: 배포는 `master` 반영 후 CI Deploy 워크플로만 사용합니다. 셀프호스터는
+> [셀프호스팅 가이드](docs/SELF_HOSTING.md)의 별도 절차를 따릅니다.
 
 ---
 

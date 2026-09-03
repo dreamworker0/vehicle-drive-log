@@ -90,6 +90,16 @@ export function findPwshChainingIssues(md: string): string[] {
     return issues;
 }
 
+/** 원본 운영 문서에서 금지된 로컬 Firebase 직접 배포 명령의 줄 번호를 찾는다. */
+export function findForbiddenDeployCommands(markdown: string): number[] {
+    return markdown
+        .split(/\r?\n/)
+        .map((line, index) => ({ line: line.trim(), lineNumber: index + 1 }))
+        .filter(({ line }) => !line.startsWith('#'))
+        .filter(({ line }) => /\b(?:npx\s+firebase-tools\s+|firebase\s+)deploy\b/.test(line))
+        .map(({ lineNumber }) => lineNumber);
+}
+
 /** 문서에서 `npm run <script>` / `npm test run` 등 명령 참조를 추출한다. */
 export function extractNpmRunScripts(md: string): string[] {
     const out: string[] = [];
@@ -521,6 +531,14 @@ export function runChecks(root: string = ROOT): { findings: Finding[]; checked: 
             warn('docs/FUNCTIONS_REFERENCE.md', '총 함수 수 표기를 찾지 못함 — 생성기 출력 형식이 바뀐 것인지 확인');
         } else if (Number(refTotal) !== catalogNames.length) {
             err('docs/FUNCTIONS_REFERENCE.md', `문서 총계(${refTotal})와 카탈로그 항목 수(${catalogNames.length}) 불일치 — npx tsx scripts/generate-functions-doc.ts 재실행 필요`);
+        }
+    }
+
+    // 17. 원본 운영 문서의 배포 경로는 CI 하나로 유지한다.
+    checked++;
+    for (const rel of ['OPERATIONS.md', 'ROLLBACK.md']) {
+        for (const line of findForbiddenDeployCommands(read(rel))) {
+            err(rel, '로컬 Firebase 직접 배포 명령이 남아 있음(' + line + '행) — CI Deploy 워크플로로 교체');
         }
     }
 

@@ -88,7 +88,7 @@ firebase functions:log --only ocrDashboard,autoVerifyDocument
 |------|------|------|
 | `Gemini API quota exceeded` | AI API 일일 한도 초과 | Google Cloud Console → API 할당량 확인/증가 |
 | `messaging/registration-token-not-registered` | FCM 토큰 만료 | 자동 삭제됨 (조치 불필요) |
-| `EMAILJS: 401 Unauthorized` | EmailJS 키 만료 | `functions/.env`에서 키 갱신 후 `firebase deploy --only functions` |
+| `EMAILJS: 401 Unauthorized` | EmailJS 키 만료 | GitHub Secret을 갱신한 뒤 GitHub Actions의 Deploy 워크플로를 수동 실행 |
 
 ### 3.2 외부 API 장애 시
 
@@ -105,7 +105,7 @@ firebase functions:log --only ocrDashboard,autoVerifyDocument
 1. [Firebase Status](https://status.firebase.google.com/) 확인
 2. Firebase Console → Hosting → 최근 배포 롤백 검토
 3. Sentry 대시보드에서 에러 패턴 확인
-4. 필요 시 이전 버전 재배포: `firebase hosting:clone <version> live`
+4. 즉시 복구가 필요하면 GitHub Actions → Deploy → Run workflow에서 이전 정상 커밋을 기준으로 실행
 
 ---
 
@@ -209,10 +209,12 @@ Functions(`functions/.env`의 `SENTRY_RELEASE`)에 같은 값을 넣는다. 그�
 # 현재 규칙 확인
 cat firestore.rules
 cat storage.rules
-
-# 규칙만 배포
-firebase deploy --only firestore:rules,storage
 ```
+
+규칙 변경은 브랜치 커밋과 PR을 거쳐 `master`에 반영한다. CI가 성공하면 Deploy 워크플로가
+Functions·Rules·Hosting을 같은 커밋 기준으로 배포한다. 긴급 수동 실행도 GitHub Actions →
+Deploy → Run workflow를 사용하고 실행 결과를 확인한다. 셀프호스터만
+[셀프호스팅 가이드](docs/SELF_HOSTING.md)의 Firebase CLI 절차를 사용한다.
 
 **핵심 원칙:**
 - 슈퍼관리자: 모든 organizations 읽기/쓰기
@@ -341,14 +343,11 @@ jsonPayload.function="assistantVehicleCache"
 # 개발 서버 실행
 npm run dev
 
-# 전체 배포
-fnm use 22 && npm run build && firebase deploy
+# 전체 검증
+fnm exec --using=22 npm.cmd run verify:full
 
-# Functions만 배포
-firebase deploy --only functions
-
-# 보안 규칙만 배포
-firebase deploy --only firestore:rules,storage
+# 배포 상태 확인·긴급 재실행
+# GitHub Actions → Deploy 워크플로에서 실행 결과를 확인하거나 Run workflow를 사용
 
 # Functions 로그 확인
 firebase functions:log -n 50
