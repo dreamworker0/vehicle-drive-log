@@ -37,8 +37,13 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
         syncNow, syncing, lastSyncAt,
     } = useReservationCalendar({ isAdmin });
 
-    // 구글 캘린더 연동 차량이 하나라도 있을 때만 동기화 컨트롤 노출
-    const hasCalendarLinkedVehicle = vehicles.some(v => v.googleCalendarId && v.googleCalendarId.includes('@'));
+    // 구글 캘린더 연동 차량이 하나라도 있을 때만 동기화 컨트롤 노출.
+    // **기관이 연동을 껐으면 차량에 ID가 남아 있어도 감춘다** — 서버가 그 기관의 동기화를
+    // 아예 돌리지 않으므로(calendarFeature.isGoogleCalendarEnabled), 눌러도 "동기화하지
+    // 못했습니다. 캘린더 공유 설정을 확인해주세요"만 뜬다. 관리자 차량 목록에서 없앤
+    // '고칠 수 없는 실패 안내'가 여기서는 전 직원에게 남는 셈이었다.
+    const hasCalendarLinkedVehicle = orgFeatures.googleCalendar
+        && vehicles.some(v => v.googleCalendarId && v.googleCalendarId.includes('@'));
     const { usageCounts } = useVehiclePriority();
     const { recentDestinations } = useReservationPattern();
 

@@ -12,6 +12,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Vehicle } from '../../types/vehicle';
+import { ALL_FEATURES_ON } from '../../lib/orgFeatures';
 
 const hookState = {
     vehicles: [] as Vehicle[],
@@ -42,6 +43,14 @@ const hookState = {
     openRestoreModal: vi.fn(),
     confirmRestore: vi.fn(),
 };
+
+/**
+ * 기관 기능 플래그 — 캘린더를 끈 기관에서 배지가 사라지는지 보기 위해 켜고 끈다.
+ * 한 플래그만 담으면 나중에 다른 기능을 읽는 컴포넌트가 트리에 들어왔을 때 조용히
+ * undefined가 된다(vi.mock 팩토리는 tsc가 검사하지 않는다). 전체를 채워 둔다.
+ */
+const authState = { orgFeatures: { ...ALL_FEATURES_ON } };
+vi.mock('../../hooks/useAuth', () => ({ useAuth: () => authState }));
 
 vi.mock('../../hooks/useVehicleManager', () => ({ default: () => hookState }));
 vi.mock('../../components/admin/VehicleForm', () => ({ default: () => <div data-testid="vehicle-form" /> }));
@@ -76,8 +85,14 @@ function renderWith(vehicles: Vehicle[], over: Partial<typeof hookState> = {}) {
     return render(<VehicleManager />);
 }
 
+/** 기관의 Google 캘린더 연동 기능 on/off */
+function setCalendarFeature(on: boolean) {
+    authState.orgFeatures.googleCalendar = on;
+}
+
 beforeEach(() => {
     vi.clearAllMocks();
+    setCalendarFeature(true);
 });
 afterEach(() => {
     vi.useRealTimers();
@@ -185,6 +200,48 @@ describe('캘린더 동기화 상태', () => {
         const btn = screen.getByRole('button', { name: /캘린더 동기화 실패/ });
         fireEvent.click(btn);
         expect(screen.getByTestId('troubleshoot-modal')).toHaveTextContent('카니발');
+    });
+
+    describe('기관이 캘린더 연동을 껐을 때', () => {
+        afterEach(() => setCalendarFeature(true));
+
+        it('실패 배지를 띄우지 않는다 — 끈 기능을 고치라고 요구하면 안 된다', () => {
+            // 실제로 겪은 상태다: 캘린더 기능을 끈 활성 기관에 실패 41~49회가 남아 있어,
+            // 관리자 화면에 빨간 배지가 두 달째 깜빡였다. 눌러도 '공유를 고치라'는 안내뿐이라
+            // 관리자가 할 수 있는 일이 없다.
+            setCalendarFeature(false);
+            renderWith([vehicle({ googleCalendarId: 'cal@group', calendarSyncFailCount: 41 })]);
+
+            expect(screen.queryByRole('button', { name: /캘린더 동기화 실패/ })).not.toBeInTheDocument();
+        });
+
+        it('재시도 중도 띄우지 않는다', () => {
+            setCalendarFeature(false);
+            renderWith([vehicle({ googleCalendarId: 'cal@group', calendarSyncFailCount: 2 })]);
+            expect(screen.queryByText('📅 재시도 중')).not.toBeInTheDocument();
+        });
+
+        it('"동기화 정상"도 말하지 않는다 — 돌지 않는데 정상이라고 하면 거짓이다', () => {
+            setCalendarFeature(false);
+            renderWith([vehicle({ googleCalendarId: 'cal@group' })]);
+            expect(screen.queryByText('📅 캘린더 동기화 정상')).not.toBeInTheDocument();
+        });
+
+        it('캘린더만 있고 보험이 없는 차량은 그 줄 자체를 그리지 않는다 (빈 줄 방지)', () => {
+            // 바깥 줄 조건과 안쪽 배지가 같은 값을 봐야 한다 — 안쪽만 막으면
+            // min-h를 가진 빈 행이 남는다
+            const row = (c: HTMLElement) =>
+                Array.from(c.querySelectorAll('div')).some(el => el.className.includes('min-h-[20px]'));
+
+            setCalendarFeature(true);
+            const on = renderWith([vehicle({ googleCalendarId: 'cal@group', calendarSyncFailCount: 41 })]);
+            expect(row(on.container)).toBe(true); // 대조군 — 켜져 있으면 줄이 있다
+            on.unmount();
+
+            setCalendarFeature(false);
+            const off = renderWith([vehicle({ googleCalendarId: 'cal@group', calendarSyncFailCount: 41 })]);
+            expect(row(off.container)).toBe(false);
+        });
     });
 });
 

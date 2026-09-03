@@ -4,6 +4,7 @@
  */
 import { useState } from 'react';
 import useVehicleManager from '../../hooks/useVehicleManager';
+import { useAuth } from '../../hooks/useAuth';
 import VehicleForm from './VehicleForm';
 import ConfirmModal from '../common/ConfirmModal';
 import CalendarSyncTroubleshootModal from './CalendarSyncTroubleshootModal';
@@ -26,6 +27,8 @@ function insuranceDaysLeft(dateStr?: string): number | null {
 }
 
 export default function VehicleManager() {
+    // 기관이 캘린더 연동을 껐으면 동기화 상태 자체를 말하지 않는다 — 아래 게이팅 참고.
+    const { orgFeatures } = useAuth();
     const {
         vehicles, loading, showForm, setShowForm,
         editingVehicle, formLoading, form, setForm,
@@ -63,7 +66,11 @@ export default function VehicleManager() {
     }
 
     // 차량 카드 렌더링 함수
-    const renderVehicleCard = (vehicle: Vehicle, isRetired = false) => (
+    const renderVehicleCard = (vehicle: Vehicle, isRetired = false) => {
+        // 캘린더 상태를 말할지 여부. 바깥 줄 렌더 조건과 안쪽 배지가 같은 값을 봐야
+        // 한다 — 안쪽만 막으면 캘린더만 있고 보험이 없는 차량에 빈 줄이 남는다.
+        const showCalendarStatus = !!vehicle.googleCalendarId && orgFeatures.googleCalendar;
+        return (
         <div key={vehicle.id} className={`glass-card p-5 transition-all group ${isRetired ? 'opacity-60' : 'hover:shadow-glass-lg'}`}>
             <div className="flex items-start justify-between mb-3">
                 <div className="flex items-center gap-3">
@@ -133,7 +140,7 @@ export default function VehicleManager() {
                 </span>
             </div>
             {/* 보험 정보 및 캘린더 상태 */}
-            {(vehicle.insurance?.company || vehicle.insurance?.expiryDate || vehicle.googleCalendarId) && (
+            {(vehicle.insurance?.company || vehicle.insurance?.expiryDate || showCalendarStatus) && (
                 <div className="mt-1.5 flex items-center justify-between gap-2 text-xs text-surface-500 dark:text-surface-400 min-h-[20px]">
                     <div className="flex items-center gap-2 flex-wrap">
                         {vehicle.insurance?.company && (
@@ -157,7 +164,13 @@ export default function VehicleManager() {
                             );
                         })()}
                     </div>
-                    {vehicle.googleCalendarId && (
+                    {/* 기관이 Google 캘린더 연동을 끈 경우에는 이 자리를 아예 비운다.
+                        예전에는 `googleCalendarId`만 보고 배지를 띄워서, **끄기로 결정한 기능에
+                        대해 빨간 '동기화 실패'가 계속 깜빡였다** — 눌러도 '공유를 고치라'는 안내만
+                        나오니 관리자가 고칠 방법이 없다. failCount가 0이면 '동기화 정상'이라고
+                        말하는 것도 마찬가지로 거짓이다(돌지 않는데 정상이라고 한다).
+                        폼의 캘린더 섹션은 이미 같은 플래그로 숨긴다(VehicleForm). */}
+                    {showCalendarStatus && (
                         <div className="shrink-0 text-right">
                             {(() => {
                                 const failCount = vehicle.calendarSyncFailCount || 0;
@@ -207,7 +220,8 @@ export default function VehicleManager() {
                 </div>
             )}
         </div>
-    );
+        );
+    };
 
     // 모달 props 결정
     const getModalProps = () => {
