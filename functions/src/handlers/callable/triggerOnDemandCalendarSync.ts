@@ -181,7 +181,7 @@ export const triggerOnDemandCalendarSync = onCall(
             // (2) 에러가 아닌 정상 응답(success:false)으로 반환해 클라이언트가 조용히 재시도를 멈추게 한다.
             if (isCalendarAuthError(err)) {
                 try {
-                    await recordCalendarFailure(vehicleId, (vehicleData.calendarSyncFailCount as number) || 0);
+                    await recordCalendarFailure(vehicleId, (vehicleData.calendarSyncFailCount as number) || 0, err);
                 } catch (updateErr: unknown) {
                     console.error(`[OnDemandSync] Failed to record sync failure for ${vehicleId}:`, (updateErr as Error).message);
                 }

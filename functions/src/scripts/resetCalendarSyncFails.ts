@@ -5,7 +5,7 @@
  * 다음 syncCalendarToApp 주기에 재시도하게 합니다.
  */
 import { onCall } from "firebase-functions/v2/https";
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { log, requireSuperAdmin } from "../utils/helpers";
 
 const db = getFirestore();
@@ -44,9 +44,15 @@ export const resetCalendarSyncFails = onCall(
                 previousFailCount: (data.calendarSyncFailCount as number) || 0,
             });
 
+            // 사유·통지 표식도 함께 지운다(resetCalendarFailure와 같은 이유) — 남겨 두면
+            // 복구된 차량에 지난 사유가 붙어 있고, 통지 표식 탓에 다음에 다시 끊겼을 때
+            // 기관에 알리지 못한다.
             batch.update(doc.ref, {
                 calendarSyncFailCount: 0,
                 calendarSyncLastFailAt: null,
+                calendarSyncLastFailReason: FieldValue.delete(),
+                calendarSyncLastFailStatus: FieldValue.delete(),
+                calendarSyncDisabledNotifiedAt: FieldValue.delete(),
             });
         }
 

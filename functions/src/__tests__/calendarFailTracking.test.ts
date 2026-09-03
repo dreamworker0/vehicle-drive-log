@@ -6,20 +6,64 @@
 
 // ── Firestore mock ──
 const mockUpdate = jest.fn();
-const mockDoc = jest.fn(() => ({ update: mockUpdate }));
-const mockCollection = jest.fn(() => ({ doc: mockDoc }));
+const mockVehicleGet = jest.fn();
+const mockOrgGet = jest.fn();
+const mockUsersGet = jest.fn();
+/** users 쿼리에 걸린 where 절 — 관리자만 대상으로 삼는지 검증용 */
+const mockUsersWhere = jest.fn();
+
 jest.mock('firebase-admin/firestore', () => ({
-    getFirestore: () => ({ collection: mockCollection }),
-    FieldValue: { serverTimestamp: jest.fn(() => 'SERVER_TIMESTAMP') },
+    getFirestore: () => ({
+        collection: (name: string) => {
+            if (name === 'organizations') {
+                return { doc: () => ({ get: mockOrgGet }) };
+            }
+            if (name === 'users') {
+                const chain: Record<string, unknown> = {
+                    where: (...args: unknown[]) => { mockUsersWhere(...args); return chain; },
+                    get: () => mockUsersGet(),
+                };
+                return chain;
+            }
+            return { doc: () => ({ update: mockUpdate, get: mockVehicleGet }) };
+        },
+    }),
+    FieldValue: {
+        serverTimestamp: jest.fn(() => 'SERVER_TIMESTAMP'),
+        delete: jest.fn(() => 'DELETE'),
+    },
+}));
+
+// 알림 모듈은 messaging까지 끌고 오므로 동적 import를 가로챈다
+const mockCreateInAppNotification = jest.fn();
+jest.mock('../services/alimtalk/sendNotification', () => ({
+    createInAppNotification: (...args: unknown[]) => mockCreateInAppNotification(...args),
 }));
 
 import {
     shouldSkipVehicleCalendar,
     recordCalendarFailure,
+    resetCalendarFailure,
     isCalendarAuthError,
+    calendarErrorStatus,
+    calendarFailReason,
     MAX_FAIL_COUNT,
     RETRY_COOLDOWN_MS,
 } from '../services/calendar/calendarFailTracking';
+
+/** 영구 중단 통지 경로가 정상적으로 흐르도록 하는 기본 mock 상태 */
+function givenNotifiableVehicle(overrides: Record<string, unknown> = {}) {
+    mockVehicleGet.mockResolvedValue({
+        data: () => ({
+            organizationId: 'org1',
+            displayName: '모닝',
+            calendarSyncLastFailReason: 'not_found',
+            ...overrides,
+        }),
+    });
+    mockOrgGet.mockResolvedValue({ exists: true, data: () => ({ name: '테스트기관' }) });
+    mockUsersGet.mockResolvedValue({ empty: false, size: 2, docs: [{ id: 'admin1' }, { id: 'admin2' }] });
+}
 
 describe('calendarFailTracking', () => {
     beforeEach(() => {
@@ -103,6 +147,121 @@ describe('calendarFailTracking', () => {
         it('null·undefined에도 안전하다', () => {
             expect(isCalendarAuthError(null)).toBe(false);
             expect(isCalendarAuthError(undefined)).toBe(false);
+        });
+    });
+
+    describe('calendarErrorStatus() — 판정 근거 단일 원본', () => {
+        it('isCalendarAuthError와 같은 오류를 같은 상태로 읽는다', () => {
+            // 숫자 없이 사유 문구만 오는 형태까지 흡수해야 진단 도구와 운영 경로의 판정이 갈리지 않는다
+            expect(calendarErrorStatus(new Error('Forbidden'))).toBe(403);
+            expect(calendarErrorStatus(new Error('Not Found'))).toBe(404);
+            expect(calendarErrorStatus({ response: { status: 404 }, message: '' })).toBe(404);
+            expect(calendarErrorStatus({ code: '403', message: 'Request failed' })).toBe(403);
+        });
+
+        it('설정 오류가 아닌 상태 코드는 그대로 돌려주고, 판별 불가는 null이다', () => {
+            expect(calendarErrorStatus({ code: 500, message: 'Backend Error' })).toBe(500);
+            expect(calendarErrorStatus({ code: 'ETIMEDOUT', message: 'socket hang up' })).toBeNull();
+            expect(calendarErrorStatus(null)).toBeNull();
+        });
+
+        it('상태 코드를 사유 코드로 좁힌다', () => {
+            expect(calendarFailReason(404)).toBe('not_found');
+            expect(calendarFailReason(403)).toBe('forbidden');
+            expect(calendarFailReason(500)).toBe('other');
+            expect(calendarFailReason(null)).toBe('other');
+        });
+    });
+
+    describe('recordCalendarFailure() — 실패 사유 기록', () => {
+        it('오류를 넘기면 상태 코드와 사유를 함께 남긴다', async () => {
+            await recordCalendarFailure('v1', 1, { code: 403, message: 'Forbidden' });
+            expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({
+                calendarSyncLastFailStatus: 403,
+                calendarSyncLastFailReason: 'forbidden',
+            }));
+        });
+
+        it('오류를 넘기지 않으면 사유를 건드리지 않는다 (지난 진단 근거를 지우지 않는다)', async () => {
+            await recordCalendarFailure('v1', 1);
+            const payload = mockUpdate.mock.calls[0][0];
+            expect(payload).not.toHaveProperty('calendarSyncLastFailReason');
+            expect(payload).not.toHaveProperty('calendarSyncLastFailStatus');
+        });
+
+        it('상태를 판별하지 못하면 사유만 other로 남기고 상태 코드는 쓰지 않는다', async () => {
+            await recordCalendarFailure('v1', 1, new Error('socket hang up'));
+            const payload = mockUpdate.mock.calls[0][0];
+            expect(payload.calendarSyncLastFailReason).toBe('other');
+            expect(payload).not.toHaveProperty('calendarSyncLastFailStatus');
+        });
+    });
+
+    describe('recordCalendarFailure() — 영구 중단 기관 통지', () => {
+        it('영구 중단으로 넘어가는 순간 기관 관리자에게만 알린다', async () => {
+            givenNotifiableVehicle();
+
+            await recordCalendarFailure('v1', MAX_FAIL_COUNT - 1, { code: 404, message: 'Not Found' });
+
+            expect(mockCreateInAppNotification).toHaveBeenCalledTimes(2);
+            // 복구는 관리자 전용 화면에서만 가능하다 — 전 직원에게 보내면 고칠 수 없는 사람에게 알림만 쌓인다
+            expect(mockUsersWhere).toHaveBeenCalledWith('role', '==', 'admin');
+            expect(mockUsersWhere).toHaveBeenCalledWith('organizationId', '==', 'org1');
+            // 사유별 안내가 본문에 실린다
+            const message = mockCreateInAppNotification.mock.calls[0][3] as string;
+            expect(message).toContain('모닝');
+            expect(message).toContain('캘린더가 삭제되었거나');
+            // 재발송 방지 표식
+            expect(mockUpdate).toHaveBeenLastCalledWith({ calendarSyncDisabledNotifiedAt: 'SERVER_TIMESTAMP' });
+        });
+
+        it('임계 아래에서는 알리지 않는다', async () => {
+            givenNotifiableVehicle();
+            await recordCalendarFailure('v1', MAX_FAIL_COUNT - 2, { code: 404, message: 'Not Found' });
+            expect(mockCreateInAppNotification).not.toHaveBeenCalled();
+        });
+
+        it('이미 영구 중단이던 차량은 다시 알리지 않는다', async () => {
+            givenNotifiableVehicle();
+            await recordCalendarFailure('v1', MAX_FAIL_COUNT, { code: 404, message: 'Not Found' });
+            expect(mockCreateInAppNotification).not.toHaveBeenCalled();
+        });
+
+        it('이미 통지한 차량은 다시 알리지 않는다 (동시 실행 방어)', async () => {
+            givenNotifiableVehicle({ calendarSyncDisabledNotifiedAt: 'SERVER_TIMESTAMP' });
+            await recordCalendarFailure('v1', MAX_FAIL_COUNT - 1, { code: 404, message: 'Not Found' });
+            expect(mockCreateInAppNotification).not.toHaveBeenCalled();
+        });
+
+        it('캘린더 기능을 끈 기관에는 알리지 않는다 (애초에 동기화가 돌지 않는다)', async () => {
+            givenNotifiableVehicle();
+            mockOrgGet.mockResolvedValue({ exists: true, data: () => ({ googleCalendarEnabled: false }) });
+            await recordCalendarFailure('v1', MAX_FAIL_COUNT - 1, { code: 404, message: 'Not Found' });
+            expect(mockCreateInAppNotification).not.toHaveBeenCalled();
+        });
+
+        it('알림이 실패해도 실패 카운트 기록은 성립한다', async () => {
+            givenNotifiableVehicle();
+            mockUsersGet.mockRejectedValue(new Error('users 조회 실패'));
+
+            const next = await recordCalendarFailure('v1', MAX_FAIL_COUNT - 1, { code: 404, message: 'Not Found' });
+
+            expect(next).toBe(MAX_FAIL_COUNT);
+            expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ calendarSyncFailCount: MAX_FAIL_COUNT }));
+        });
+    });
+
+    describe('resetCalendarFailure() — 사유·통지 표식도 함께 지운다', () => {
+        it('카운터와 함께 사유·상태·통지 표식을 제거한다', async () => {
+            await resetCalendarFailure('v1');
+            expect(mockUpdate).toHaveBeenCalledWith({
+                calendarSyncFailCount: 0,
+                // 남겨 두면 복구된 차량에 지난 사유가 붙어 있고, 통지 표식 탓에
+                // 다음에 다시 끊겼을 때 기관에 알리지 못한다
+                calendarSyncLastFailReason: 'DELETE',
+                calendarSyncLastFailStatus: 'DELETE',
+                calendarSyncDisabledNotifiedAt: 'DELETE',
+            });
         });
     });
 });

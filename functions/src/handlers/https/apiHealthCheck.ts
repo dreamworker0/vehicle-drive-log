@@ -12,6 +12,7 @@ import { getAuth } from "firebase-admin/auth";
 import { getStorage } from "firebase-admin/storage";
 import { log, requireSuperAdmin } from "../../utils/helpers";
 import { toKSTDate } from "../../utils/kstDate";
+import { MAX_FAIL_COUNT } from "../../services/calendar/calendarFailTracking";
 
 const TMAP_API_KEY = defineString("TMAP_API_KEY");
 const HOLIDAY_API_KEY = defineString("HOLIDAY_API_KEY");
@@ -31,6 +32,13 @@ interface ApiHealthResult {
 /** 지연 기준 (ms) */
 const DEGRADED_THRESHOLD_MS = 3000;
 const PING_TIMEOUT_MS = 5000;
+
+/**
+ * 캘린더 동기화를 error로 올리는 실패 비율 임계.
+ * 그 아래는 degraded로 드러낸다 — 몇 개 기관의 설정 문제로 시스템 전체를 빨갛게 만들면
+ * 경보가 무뎌지고, 그 카운터는 수동 리셋 전까지 내려가지 않아 영원히 빨간 채로 남는다.
+ */
+const CALENDAR_FAIL_ERROR_RATIO = 0.3;
 
 /**
  * AbortSignal.timeout으로 끊긴 실패인지 판별한다.
@@ -205,12 +213,31 @@ async function pingFirestore(): Promise<void> {
     await ref.get();
 }
 
-/** Calendar Sync 상태 체크 — 실패 차량 비율 확인 */
+/**
+ * Calendar Sync 상태 체크 — **동기화가 실제로 도는 차량만** 놓고 실패 비율을 본다.
+ *
+ * 2026-09-03 조사에서 드러난 두 결함을 고친 형태다.
+ *
+ *  1. **오탐을 실패로 셌다.** 기관이 캘린더 기능을 껐거나 기관 문서가 없는 차량은 애초에
+ *     동기화가 돌지 않는데(calendarFeature · calendarSchedule), 여기서는 `googleCalendarId`가
+ *     있다는 이유만으로 실패로 셌다. 조사 시점에 그런 차량이 5대였다.
+ *  2. **영구히 빨강에 갇혔다.** `permanentlyDisabled > 0`이면 조건 없이 error였다.
+ *     719대 중 1대만 걸려도 시스템 전체가 error이고, 그 카운터는 수동 리셋 전에는 절대
+ *     내려가지 않으므로 **한 번 빨개지면 영원히 빨갛다.** 경보가 그렇게 무뎌졌다.
+ *
+ * 그래서 판정을 비율에 비례하게 바꾼다. 한 기관의 공유가 끊긴 것은 그 기관의 설정 문제이지
+ * 시스템 장애가 아니다 — 노랑으로 드러내되, 전체의 30%를 넘을 때만 빨강으로 올린다.
+ */
 interface CalendarSyncStatus {
+    /** googleCalendarId가 있는 전체 차량 */
     totalLinked: number;
+    /** 그중 동기화가 실제로 도는 차량 (기관 캘린더 기능 ON + 기관 문서 존재) */
+    activeLinked: number;
     failedCount: number;
     permanentlyDisabled: number;
     cooldownCount: number;
+    /** 동기화가 돌지 않아 집계에서 뺀 실패 차량 수 (예전 판정의 오탐분) */
+    excludedCount: number;
 }
 
 async function checkCalendarSyncStatus(): Promise<CalendarSyncStatus> {
@@ -222,23 +249,80 @@ async function checkCalendarSyncStatus(): Promise<CalendarSyncStatus> {
         .get();
 
     const totalLinked = linkedSnap.size;
+
+    // 기관 문서는 한 번에 읽는다 — 차량마다 읽으면 헬스 체크가 느려진다.
+    const orgIds = [...new Set(
+        linkedSnap.docs.map((d) => (d.data().organizationId as string) || "").filter(Boolean),
+    )];
+    const syncEnabled = new Map<string, boolean>();
+    if (orgIds.length > 0) {
+        const orgSnaps = await db.getAll(...orgIds.map((id) => db.collection("organizations").doc(id)));
+        for (const snap of orgSnaps) {
+            // calendarFeature.isGoogleCalendarEnabled와 같은 기준 (명시적 false만 끔)
+            syncEnabled.set(snap.id, snap.exists && snap.data()?.googleCalendarEnabled !== false);
+        }
+    }
+
+    let activeLinked = 0;
     let failedCount = 0;
     let permanentlyDisabled = 0;
     let cooldownCount = 0;
+    let excludedCount = 0;
 
     for (const doc of linkedSnap.docs) {
         const data = doc.data();
+        const orgId = (data.organizationId as string) || "";
         const failCount = (data.calendarSyncFailCount as number) || 0;
-        if (failCount >= 10) {
+        const failing = failCount >= 3;
+
+        // 기관 문서가 없거나(고아 차량) 캘린더 기능이 꺼진 기관은 동기화가 돌지 않는다.
+        if (!orgId || !syncEnabled.get(orgId)) {
+            if (failing) excludedCount++;
+            continue;
+        }
+
+        activeLinked++;
+        if (failCount >= MAX_FAIL_COUNT) {
             permanentlyDisabled++;
             failedCount++;
-        } else if (failCount >= 3) {
+        } else if (failing) {
             cooldownCount++;
             failedCount++;
         }
     }
 
-    return { totalLinked, failedCount, permanentlyDisabled, cooldownCount };
+    return { totalLinked, activeLinked, failedCount, permanentlyDisabled, cooldownCount, excludedCount };
+}
+
+/**
+ * 집계 → 신호등 판정 (순수 함수).
+ *
+ * 분모는 **동기화가 실제로 도는 차량**이다. 기능을 끈 기관의 차량까지 넣으면 고칠 수 없는
+ * 것으로 비율이 희석된다. 판정은 비율에 비례한다 — 한 기관의 공유 단절은 그 기관의 설정
+ * 문제이지 시스템 장애가 아니므로 드러내되(노랑), 임계를 넘을 때만 빨강으로 올린다.
+ */
+export function evaluateCalendarSyncStatus(s: CalendarSyncStatus): {
+    status: "ok" | "degraded" | "error";
+    statusDetail: string;
+} {
+    const failRatio = s.activeLinked > 0 ? s.failedCount / s.activeLinked : 0;
+
+    if (s.failedCount === 0) {
+        return { status: "ok", statusDetail: `${s.activeLinked}대 연동 중` };
+    }
+
+    let statusDetail =
+        `${s.failedCount}/${s.activeLinked}대 실패 (${Math.round(failRatio * 100)}%) — ` +
+        `영구중단 ${s.permanentlyDisabled} · 쿨다운 ${s.cooldownCount}`;
+    if (s.excludedCount > 0) {
+        // 예전 판정이 실패로 세던 분량 — 왜 숫자가 줄었는지 화면에서 설명한다.
+        statusDetail += ` / 동기화 미작동 기관 ${s.excludedCount}대 제외`;
+    }
+
+    return {
+        status: failRatio > CALENDAR_FAIL_ERROR_RATIO ? "error" : "degraded",
+        statusDetail,
+    };
 }
 
 /** Firebase Auth 핑 — 사용자 1명 조회 */
@@ -415,20 +499,7 @@ export const apiHealthCheck = onCall(
         let calendarSyncResult: ApiHealthResult;
         try {
             const syncStatus = await checkCalendarSyncStatus();
-            const failRatio = syncStatus.totalLinked > 0
-                ? syncStatus.failedCount / syncStatus.totalLinked
-                : 0;
-
-            let status: "ok" | "degraded" | "error" = "ok";
-            let statusDetail = `${syncStatus.totalLinked}대 연동 중`;
-
-            if (syncStatus.permanentlyDisabled > 0) {
-                status = "error";
-                statusDetail = `${syncStatus.permanentlyDisabled}대 영구중단, ${syncStatus.cooldownCount}대 쿨다운`;
-            } else if (failRatio > 0.3) {
-                status = "degraded";
-                statusDetail = `${syncStatus.failedCount}/${syncStatus.totalLinked}대 실패 중`;
-            }
+            const { status, statusDetail } = evaluateCalendarSyncStatus(syncStatus);
 
             calendarSyncResult = {
                 name: "calendarSync",
