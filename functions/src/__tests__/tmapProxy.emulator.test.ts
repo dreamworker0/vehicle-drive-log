@@ -60,9 +60,22 @@ type TmapInit = { headers?: Record<string, string>; method?: string; body?: stri
 let tmapResponder: (url: string, init?: unknown) => Promise<TmapReply>;
 const tmapCalls: { url: string; init?: TmapInit }[] = [];
 
+/**
+ * 티맵으로 나가는 호출인지 — 호스트를 정확히 비교한다.
+ * `includes("apis.openapi.sk.com")`로 두면 다른 호스트의 URL에 그 문자열이 들어 있기만 해도
+ * 걸린다(CodeQL js/incomplete-url-substring-sanitization).
+ */
+function isTmapUrl(raw: string): boolean {
+    try {
+        return new URL(raw).hostname === "apis.openapi.sk.com";
+    } catch {
+        return false;
+    }
+}
+
 global.fetch = ((input: unknown, init?: unknown) => {
     const url = String(input);
-    if (url.includes("apis.openapi.sk.com")) {
+    if (isTmapUrl(url)) {
         tmapCalls.push({ url, init: init as TmapInit });
         return tmapResponder(url, init);
     }
