@@ -26,6 +26,8 @@
  * 15. gemini-pr-review.ts RULE_MAP ↔ .agent/rules/ 정합 — 리네임 시 리뷰 주입에서
  *     조용히 빠지는 것(오류) + 어디에도 매핑되지 않은 규칙(경고)
  * 16. .claude/settings.json 훅 배선 실존 — 경로 오타 시 훅이 조용히 죽는 것을 막는다
+ * 17. 원본 운영 문서에 로컬 Firebase 직접 배포 명령이 없는지 확인
+ * 18. README 테스트 파일·suite 수가 추적 파일의 실제 규모와 일치하는지 확인
  *
  * 단위 테스트: scripts/__tests__/check-harness.test.ts (파서·판정 함수)
  */
@@ -88,6 +90,59 @@ export function findPwshChainingIssues(md: string): string[] {
         }
     }
     return issues;
+}
+
+/** 원본 운영 문서에서 금지된 로컬 Firebase 직접 배포 명령의 줄 번호를 찾는다. */
+export function findForbiddenDeployCommands(markdown: string): number[] {
+    return markdown
+        .split(/\r?\n/)
+        .map((line, index) => ({ line: line.trim(), lineNumber: index + 1 }))
+        .filter(({ line }) => !line.startsWith('#'))
+        .filter(({ line }) => /\b(?:npx\s+firebase-tools\s+|firebase\s+)deploy\b/.test(line))
+        .map(({ lineNumber }) => lineNumber);
+}
+
+export interface TestInventory {
+    frontendFiles: number;
+    functionSuites: number;
+    rulesFiles: number;
+    e2eSpecs: number;
+}
+
+/** README 테스트 표에서 실행 없이 검증 가능한 파일·suite 수를 읽는다. */
+export function extractDocumentedTestInventory(markdown: string): TestInventory | null {
+    const patterns = {
+        frontendFiles: /\|\s*단위 테스트 \(프론트 \+ 스크립트\)\s*\|\s*([\d,]+)파일(?=\s|[|/])/,
+        functionSuites: /\|\s*Functions 단위 테스트\s*\|\s*([\d,]+)개 suite(?=\s|[|/])/,
+        rulesFiles: /\|\s*Rules 테스트\s*\|\s*([\d,]+)파일(?=\s|[|/])/,
+        e2eSpecs: /\|\s*E2E 테스트\s*\|\s*([\d,]+)개 spec 파일(?=\s|[|/])/,
+    } satisfies Record<keyof TestInventory, RegExp>;
+    const values = Object.fromEntries(
+        Object.entries(patterns).map(([key, pattern]) => {
+            const match = pattern.exec(markdown);
+            return [key, match ? Number(match[1].replace(/,/g, '')) : null];
+        }),
+    ) as Record<keyof TestInventory, number | null>;
+
+    if (Object.values(values).some((value) => value === null)) return null;
+    return values as TestInventory;
+}
+
+/** Git 추적 경로를 실제 테스트 실행 대상과 같은 규칙으로 분류한다. */
+export function countTestInventory(paths: string[]): TestInventory {
+    const normalized = paths.map((path) => path.replace(/\\/g, '/'));
+    return {
+        frontendFiles: normalized.filter((path) =>
+            /^(src|scripts|eslint-rules)\/.+\.test\.(?:[cm]?js|tsx?)$/.test(path),
+        ).length,
+        functionSuites: normalized.filter(
+            (path) =>
+                /^functions\/src\/__tests__\/.+\.test\.ts$/.test(path) &&
+                !path.endsWith('.emulator.test.ts'),
+        ).length,
+        rulesFiles: normalized.filter((path) => /^tests\/.+-rules\.test\.ts$/.test(path)).length,
+        e2eSpecs: normalized.filter((path) => /^e2e\/.+\.spec\.ts$/.test(path)).length,
+    };
 }
 
 /** 문서에서 `npm run <script>` / `npm test run` 등 명령 참조를 추출한다. */
@@ -521,6 +576,38 @@ export function runChecks(root: string = ROOT): { findings: Finding[]; checked: 
             warn('docs/FUNCTIONS_REFERENCE.md', '총 함수 수 표기를 찾지 못함 — 생성기 출력 형식이 바뀐 것인지 확인');
         } else if (Number(refTotal) !== catalogNames.length) {
             err('docs/FUNCTIONS_REFERENCE.md', `문서 총계(${refTotal})와 카탈로그 항목 수(${catalogNames.length}) 불일치 — npx tsx scripts/generate-functions-doc.ts 재실행 필요`);
+        }
+    }
+
+    // 17. 원본 운영 문서의 배포 경로는 CI 하나로 유지한다.
+    checked++;
+    for (const rel of ['OPERATIONS.md', 'ROLLBACK.md']) {
+        for (const line of findForbiddenDeployCommands(read(rel))) {
+            err(rel, '로컬 Firebase 직접 배포 명령이 남아 있음(' + line + '행) — CI Deploy 워크플로로 교체');
+        }
+    }
+
+    // 18. README 테스트 규모는 Git 추적 파일의 실제 분류 결과와 일치해야 한다.
+    checked++;
+    const documentedInventory = extractDocumentedTestInventory(read('README.md'));
+    if (!documentedInventory) {
+        err('README.md', '테스트 표에서 파일·suite 수 네 항목을 모두 읽지 못함');
+    } else {
+        try {
+            const trackedPaths = execFileSync('git', ['ls-files'], { cwd: root, encoding: 'utf-8' })
+                .split(/\r?\n/)
+                .filter(Boolean);
+            const actualInventory = countTestInventory(trackedPaths);
+            for (const key of Object.keys(actualInventory) as (keyof TestInventory)[]) {
+                if (documentedInventory[key] !== actualInventory[key]) {
+                    err(
+                        'README.md',
+                        `테스트 규모 ${key} 불일치 — 문서 ${documentedInventory[key]}, 실제 ${actualInventory[key]}`,
+                    );
+                }
+            }
+        } catch {
+            err('(git)', 'git ls-files 실행 실패 — README 테스트 규모 검사를 완료할 수 없음');
         }
     }
 

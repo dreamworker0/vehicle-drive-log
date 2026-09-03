@@ -13,6 +13,9 @@ import {
     extractScriptCommandPaths,
     extractQuotedMdRefs,
     extractHookScriptPaths,
+    findForbiddenDeployCommands,
+    countTestInventory,
+    extractDocumentedTestInventory,
 } from '../check-harness';
 
 describe('parseFrontmatter', () => {
@@ -78,6 +81,66 @@ describe('findPwshChainingIssues', () => {
     it('bash 블록이나 본문의 &&는 무시한다', () => {
         const md = '```bash\na && b\n```\n본문 && 언급\n```powershell\nnpm test\n```';
         expect(findPwshChainingIssues(md)).toEqual([]);
+    });
+});
+
+describe('findForbiddenDeployCommands', () => {
+    it('Firebase CLI 직접 배포 명령의 줄 번호를 찾는다', () => {
+        const markdown = [
+            '# 운영',
+            'firebase deploy --only functions',
+            'npx firebase-tools deploy --only hosting',
+        ].join('\n');
+
+        expect(findForbiddenDeployCommands(markdown)).toEqual([2, 3]);
+    });
+
+    it('CI 배포 설명과 셀프호스팅 링크는 차단하지 않는다', () => {
+        const markdown = [
+            'master 푸시 후 CI Deploy 워크플로를 확인한다.',
+            '[셀프호스팅](docs/SELF_HOSTING.md)을 참고한다.',
+        ].join('\n');
+
+        expect(findForbiddenDeployCommands(markdown)).toEqual([]);
+    });
+});
+
+describe('테스트 규모 문서 정합성', () => {
+    it('README 테스트 표에서 파일·suite 수를 읽는다', () => {
+        const markdown = [
+            '| 단위 테스트 (프론트 + 스크립트) | 159파일 / 1,852개 테스트 | Vitest |',
+            '| Functions 단위 테스트 | 76개 suite / 1,005개 테스트 | Jest |',
+            '| Rules 테스트 | 2파일 / 37개 테스트 | Emulator |',
+            '| E2E 테스트 | 26개 spec 파일 | Playwright |',
+        ].join('\n');
+
+        expect(extractDocumentedTestInventory(markdown)).toEqual({
+            frontendFiles: 159,
+            functionSuites: 76,
+            rulesFiles: 2,
+            e2eSpecs: 26,
+        });
+    });
+
+    it('실행 대상별 테스트 파일을 같은 규칙으로 분류한다', () => {
+        expect(
+            countTestInventory([
+                'src/__tests__/a.test.ts',
+                'scripts/__tests__/b.test.ts',
+                'scripts/hooks/__tests__/guard.test.mjs',
+                'eslint-rules/local-rule.test.js',
+                'functions/src/__tests__/c.test.ts',
+                'functions/src/__tests__/d.emulator.test.ts',
+                'tests/firestore-rules.test.ts',
+                'tests/storage-rules.test.ts',
+                'e2e/login.spec.ts',
+            ]),
+        ).toEqual({
+            frontendFiles: 4,
+            functionSuites: 1,
+            rulesFiles: 2,
+            e2eSpecs: 1,
+        });
     });
 });
 
