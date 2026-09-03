@@ -18,8 +18,24 @@ const HOLIDAY_API_KEY = defineString("HOLIDAY_API_KEY");
  */
 const UPSTREAM_TIMEOUT_MS = 10_000;
 
+/**
+ * 화면이 이 프록시를 부른 사유(`fallbackReason`)를 로그에 적을 수 있게 다듬는다.
+ *
+ * 화면(src/lib/holidayApi.ts)은 Firestore `system/holidays`를 먼저 읽고 실패했을 때만 여기로
+ * 온다. 그 사유가 여태 클라이언트 콘솔에만 남아 **폴백이 왜 도는지 알 수 없었다**
+ * (Phase 200 남는 것 ②). 클라이언트가 보내는 값이므로 그대로 로그에 넣지 않는다 —
+ * 길이와 문자를 묶어 로그를 어지럽히거나 줄을 끼워 넣지 못하게 한다.
+ */
+function sanitizeReason(raw: unknown): string {
+    if (typeof raw !== "string" || raw.length === 0) return "none";
+    const cleaned = raw.slice(0, 64).replace(/[^A-Za-z0-9._+-]/g, "");
+    return cleaned || "invalid";
+}
+
 export const holidayProxy = createAuthenticatedProxy("holidayProxy", async (req, res) => {
     const { solYear, numOfRows = 50 } = req.query;
+    // 화면이 폴백을 타게 된 사유 — 모든 로그 줄에 함께 남긴다
+    const clientReason = sanitizeReason(req.query.fallbackReason);
 
     if (!solYear) {
         res.status(400).json({ error: "solYear is required" });
@@ -46,6 +62,7 @@ export const holidayProxy = createAuthenticatedProxy("holidayProxy", async (req,
         log("WARNING", "holidayProxy", "공공데이터 포털 연결 실패", {
             solYear,
             reason: describeFetchFailure(err),
+            clientReason,
         });
         res.status(502).json({ error: "공공데이터 포털에 연결할 수 없습니다." });
         return;
@@ -57,17 +74,17 @@ export const holidayProxy = createAuthenticatedProxy("holidayProxy", async (req,
     } catch {
         // 상대가 JSON 대신 XML·HTML 에러 문서를 돌려준 경우. 월배치(syncHolidays)도 같은 상황을
         // captureWarning으로 남긴다 — 여기만 ERROR로 올리면 같은 사건이 경보 두 종류로 갈린다.
-        log("WARNING", "holidayProxy", `JSON 파싱 실패 (API 응답): ${text.substring(0, 200)}`);
+        log("WARNING", "holidayProxy", `JSON 파싱 실패 (API 응답): ${text.substring(0, 200)}`, { clientReason });
         res.status(502).json({ error: "공공데이터 포털 API 연동 오류", details: text.substring(0, 100) });
         return;
     }
 
     if (status < 200 || status >= 300) {
-        log("WARNING", "holidayProxy", `공공데이터 포털 에러 응답: ${status}`);
+        log("WARNING", "holidayProxy", `공공데이터 포털 에러 응답: ${status}`, { clientReason });
         res.status(status).json(data);
         return;
     }
 
-    log("INFO", "holidayProxy", `공휴일 조회 완료: ${solYear}년`);
+    log("INFO", "holidayProxy", `공휴일 조회 완료: ${solYear}년`, { clientReason });
     res.status(200).json(data);
 });

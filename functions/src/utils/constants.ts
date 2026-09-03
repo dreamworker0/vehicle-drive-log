@@ -8,9 +8,12 @@ import { getRemoteConfig } from "firebase-admin/remote-config";
 import { log } from "../utils/helpers";
 
 // === Rate Limit 기본값 (Remote Config fallback) ===
+// 두 프록시(tmapProxy·holidayProxy)의 키는 IP가 아니라 uid다 — `req.ip`는 X-Forwarded-For 맨 앞
+// 값이라 헤더 한 줄로 매번 새 버킷을 만들 수 있었다(2026-08-14 감사 발견 2).
+// createAuthenticatedProxy가 인증을 통과한 뒤 `uid_{uid}`로 센다.
 export const DEFAULT_RATE_LIMITS = {
-    tmapProxy: { max: 30, windowSec: 60 },         // IP당 분당 30회
-    holidayProxy: { max: 10, windowSec: 3600 },     // IP당 시간당 10회
+    tmapProxy: { max: 30, windowSec: 60 },         // uid당 분당 30회
+    holidayProxy: { max: 10, windowSec: 3600 },     // uid당 시간당 10회
     ocrDashboard: { max: 5, windowSec: 60 },        // uid당 분당 5회
     ocrDocument: { max: 3, windowSec: 60 },          // uid당 분당 3회
     ocrDailyUser: { max: 20, windowSec: 86400 },     // OCR 통합(계기판+증빙) 사용자당 일일 누적 (ocr-cost-security §1.1)

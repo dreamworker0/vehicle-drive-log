@@ -11,6 +11,7 @@
  *   2. 실패 로그에 원인(undici cause code / timeout)이 남는다
  *   3. 응답 없는 상대에 묶이지 않도록 fetch에 타임아웃 시그널을 건다
  *   4. 정상 응답은 그대로 통과시킨다
+ *   5. 화면이 보낸 폴백 사유(fallbackReason)가 로그에 남고, 이상한 값은 다듬어진다
  */
 
 const mockOnRequest = jest.fn((_opts: unknown, handler: unknown) => handler);
@@ -139,5 +140,30 @@ describe('holidayProxy — 외부 API 실패 처리', () => {
         expect(res.status).toHaveBeenCalledWith(502);
         expect(findLog('ERROR')).toBeUndefined();
         expect(findLog('WARNING')).toBeDefined();
+    });
+    it('화면이 보낸 폴백 사유를 로그에 남긴다', async () => {
+        // 폴백이 왜 도는지 서버 로그만으로 알 수 있게 하는 지점 (Phase 200 남는 것 ②)
+        global.fetch = jest.fn().mockResolvedValue({
+            status: 200,
+            text: async () => JSON.stringify({ response: { body: { items: {} } } }),
+        }) as unknown as typeof fetch;
+
+        await proxy({ ...req, query: { solYear: '2026', fallbackReason: 'firestore-permission-denied' } }, makeRes());
+
+        expect(findLog('INFO')?.[3]).toMatchObject({ clientReason: 'firestore-permission-denied' });
+    });
+
+    it('사유가 없거나 로그를 어지럽히는 값이면 다듬는다', async () => {
+        global.fetch = jest.fn().mockRejectedValue(new TypeError('fetch failed')) as unknown as typeof fetch;
+
+        await proxy(req, makeRes());
+        expect(findLog('WARNING')?.[3]).toMatchObject({ clientReason: 'none' });
+
+        mockLog.mockClear();
+        // 줄바꿈·따옴표를 섞어 보내도 로그에 그대로 들어가지 않는다 —
+        // 클라이언트가 준 문자열이므로 로그 한 줄을 위조할 여지를 남기지 않는다
+        const nasty = ['a', String.fromCharCode(10), '"b" severity=ERROR'].join('');
+        await proxy({ ...req, query: { solYear: '2026', fallbackReason: nasty } }, makeRes());
+        expect(findLog('WARNING')?.[3]).toMatchObject({ clientReason: 'abseverityERROR' });
     });
 });

@@ -1,8 +1,20 @@
 /**
- * tmapProxy 에뮬레이터 통합 테스트
+ * tmapProxy 에뮬레이터 통합 테스트 — **실물 핸들러**를 구동한다
  *
- * 외부 티맵 API는 fetch를 mock하고,
- * 인증 검증 / Rate Limit / 라우팅 로직만 에뮬레이터로 실제 검증.
+ * 예전 이 파일은 `verifyAuthToken`·rate limit·라우팅을 테스트 안에서 **다시 구현한 사본**을
+ * 검사했다. 그래서 Phase 201에서 프록시의 fetch 처리를 전부 바꿨는데도 초록이었고, rate limit
+ * 키가 IP에서 uid로 바뀐 뒤에도(2026-08-14 감사 발견 2) 사본은 여전히 IP로 세고 있었다 —
+ * **구현이 갈라져도 통과하는 테스트**였다. 이제 `tmapProxy`를 그대로 import해 실행한다.
+ *
+ * 목으로 갈아치우는 것은 셋뿐이다:
+ *   - `onRequest` — 옵션·핸들러를 통과시켜 핸들러를 직접 부를 수 있게 한다
+ *   - `defineString` — 배포 파라미터(TMAP_API_KEY)
+ *   - `getRateLimits` — **한도 값만** 낮춘다(1시간 2회). 세는 장치(Firestore 트랜잭션)는 실물이다.
+ *     윈도우를 넉넉히 두는 이유는 플레이크 방지다 — 60초 윈도우는 경계가 호출 사이에 걸리면
+ *     카운터가 리셋되어 429가 나지 않는다. 문서는 테스트마다 clearFirestoreData로 지운다
+ *
+ * 인증(Auth 에뮬레이터의 실제 ID 토큰 검증) · rate limit 누적(Firestore 에뮬레이터) ·
+ * 라우팅 · 응답 처리는 모두 실물 코드다. 외부 티맵 API만 URL로 갈라 가로챈다.
  */
 import {
     initializeTestApp,
@@ -14,120 +26,99 @@ import { getAuth } from "firebase-admin/auth";
 
 initializeTestApp();
 
+// 기본 5초로는 부족하다 — 각 테스트의 첫 rate limit 트랜잭션이 Firestore 에뮬레이터로 가는
+// gRPC 채널을 새로 여느라 몇 초를 먹는다(테스트 로직이 느린 것이 아니다).
+jest.setTimeout(30_000);
+
+/** getRateLimits 목이 돌려주는 한도와 같은 값 (목 팩토리 안에서는 변수를 참조할 수 없어 중복해 둔다) */
+const RATE_LIMIT_MAX = 2;
+
+const mockOnRequest = jest.fn((_opts: unknown, handler: unknown) => handler);
+jest.mock("firebase-functions/v2/https", () => ({
+    onRequest: (...args: unknown[]) => mockOnRequest(args[0], args[1]),
+}));
+
+jest.mock("firebase-functions/params", () => ({
+    defineString: () => ({ value: () => "TEST_APP_KEY" }),
+}));
+
+jest.mock("../utils/constants", () => ({
+    getRateLimits: async () => ({ max: 2, windowSec: 3600 }),
+}));
+
+import { tmapProxy } from "../handlers/https/tmapProxy";
+
 const db = getTestFirestore();
 const auth = getAuth();
 
-// 원본 fetch 보존 (에뮬레이터 API 호출용)
+// === 외부 티맵 호출만 가로챈다 ===
+// 에뮬레이터 정리·토큰 교환도 global.fetch를 쓰므로 통째로 갈아치우면 안 된다. URL로 가른다.
 const originalFetch = global.fetch;
+type TmapReply = { status: number; text: () => Promise<string> };
+type TmapInit = { headers?: Record<string, string>; method?: string; body?: string; signal?: AbortSignal };
+
+let tmapResponder: (url: string, init?: unknown) => Promise<TmapReply>;
+const tmapCalls: { url: string; init?: TmapInit }[] = [];
 
 /**
- * verifyAuthToken 로직 재현
+ * 티맵으로 나가는 호출인지 — 호스트를 정확히 비교한다.
+ * `includes("apis.openapi.sk.com")`로 두면 다른 호스트의 URL에 그 문자열이 들어 있기만 해도
+ * 걸린다(CodeQL js/incomplete-url-substring-sanitization).
  */
-async function verifyAuthToken(authHeader?: string): Promise<string | null> {
-    if (!authHeader?.startsWith("Bearer ")) return null;
-    const idToken = authHeader.slice(7);
+function isTmapUrl(raw: string): boolean {
     try {
-        const decoded = await auth.verifyIdToken(idToken);
-        return decoded.uid;
+        return new URL(raw).hostname === "apis.openapi.sk.com";
     } catch {
-        return null;
+        return false;
     }
 }
 
-/**
- * Rate Limit 확인 (Firestore 기반)
- */
-async function checkRateLimit(
-    functionName: string,
-    ip: string,
-    maxRequests: number
-): Promise<boolean> {
-    const safeIp = ip.replace(/[.:]/g, "_");
-    const docsSnap = await db
-        .collection("_rateLimits")
-        .where("functionName", "==", functionName)
-        .where("ip", "==", safeIp)
-        .get();
+global.fetch = ((input: unknown, init?: unknown) => {
+    const url = String(input);
+    if (isTmapUrl(url)) {
+        tmapCalls.push({ url, init: init as TmapInit });
+        return tmapResponder(url, init);
+    }
+    return (originalFetch as unknown as (i: unknown, n?: unknown) => Promise<unknown>)(input, init);
+}) as unknown as typeof fetch;
 
-    let totalCount = 0;
-    docsSnap.docs.forEach((d) => {
-        totalCount += d.data().count || 0;
+type Res = { status: jest.Mock; json: jest.Mock };
+
+function makeRes(): Res {
+    const res: Res = { status: jest.fn(), json: jest.fn() };
+    res.status.mockReturnValue(res);
+    res.json.mockReturnValue(res);
+    return res;
+}
+
+// onRequest·defineString만 목이므로 export된 값은 실물 핸들러다.
+const proxy = tmapProxy as unknown as (req: unknown, res: unknown) => Promise<void>;
+
+/** 정상 지오코딩 응답 */
+function okGeocode(): Promise<TmapReply> {
+    return Promise.resolve({
+        status: 200,
+        text: async () => JSON.stringify({ coordinateInfo: { coordinate: [{ lat: "37.5", lon: "127.0" }] } }),
     });
-
-    return totalCount >= maxRequests;
 }
 
-/**
- * tmapProxy 핵심 로직 시뮬레이션 — fetch는 mock된 것 사용
- */
-async function executeTmapProxy(
-    mockFetch: jest.Mock,
-    params: {
-        authHeader?: string;
-        ip?: string;
-        action?: string;
-        query?: Record<string, string>;
-        body?: Record<string, unknown>;
-        path?: string;
-    }
-): Promise<{ status: number; body: unknown }> {
-    const { authHeader, ip = "127.0.0.1", action, query = {}, body } = params;
-
-    // 1. 인증 확인
-    const uid = await verifyAuthToken(authHeader);
-    if (!uid) {
-        return { status: 401, body: { error: "인증이 필요합니다." } };
-    }
-
-    // 2. Rate Limit 확인
-    const exceeded = await checkRateLimit("tmapProxy", ip, 30);
-    if (exceeded) {
-        return { status: 429, body: { error: "요청이 너무 많습니다." } };
-    }
-
-    // 3. 라우팅
-    if (action === "geocode") {
-        if (!query.address || query.address.trim().length < 2) {
-            return { status: 400, body: { error: "address is required and must be at least 2 characters" } };
-        }
-        const data = await (await mockFetch("https://apis.openapi.sk.com/tmap/geo/fullAddrGeo")).json();
-        return { status: 200, body: data };
-    }
-
-    if (action === "poi") {
-        if (!query.keyword || query.keyword.trim().length < 2) {
-            return { status: 400, body: { error: "keyword is required and must be at least 2 characters" } };
-        }
-        const data = await (await mockFetch("https://apis.openapi.sk.com/tmap/pois")).json();
-        return { status: 200, body: data };
-    }
-
-    if (action === "route") {
-        if (!body || !body.startX || !body.endX) {
-            return { status: 400, body: { error: "startX, startY, endX, endY are required" } };
-        }
-        const data = await (await mockFetch("https://apis.openapi.sk.com/tmap/routes")).json();
-        return { status: 200, body: data };
-    }
-
-    return { status: 400, body: { error: "지원하지 않는 엔드포인트입니다." } };
-}
-
-describe("tmapProxy — 에뮬레이터 통합 테스트", () => {
+describe("tmapProxy — 에뮬레이터 통합 테스트 (실물 핸들러)", () => {
+    const UID = "tmap-user-001";
     let validIdToken: string;
-    let mockFetch: jest.Mock;
 
     beforeEach(async () => {
-        // 에뮬레이터 정리에는 원본 fetch 사용
+        jest.clearAllMocks();
+        tmapCalls.length = 0;
+        tmapResponder = okGeocode;
+
         await clearFirestoreData();
         await clearAuthUsers();
 
-        // 테스트용 사용자 생성 및 ID 토큰 발급
-        await auth.createUser({ uid: "tmap-user-001", email: "tmap@example.com" });
-        const customToken = await auth.createCustomToken("tmap-user-001");
+        await auth.createUser({ uid: UID, email: "tmap@example.com" });
+        const customToken = await auth.createCustomToken(UID);
 
-        // 에뮬레이터 REST API로 ID 토큰 교환 (원본 fetch 사용)
-        const tokenRes = await originalFetch(
+        // 에뮬레이터 REST API로 ID 토큰 교환 (티맵이 아닌 URL이라 원본 fetch로 나간다)
+        const tokenRes = await fetch(
             "http://127.0.0.1:9099/identitytoolkit.googleapis.com/v1/accounts:signInWithCustomToken?key=fake-api-key",
             {
                 method: "POST",
@@ -137,109 +128,140 @@ describe("tmapProxy — 에뮬레이터 통합 테스트", () => {
         );
         const tokenData = (await tokenRes.json()) as { idToken: string };
         validIdToken = tokenData.idToken;
-
-        // 외부 API mock 설정 (에뮬레이터 호출과 분리)
-        mockFetch = jest.fn().mockResolvedValue({
-            ok: true,
-            json: () => Promise.resolve({ result: "mocked tmap response" }),
-        });
     });
 
     afterAll(async () => {
         await clearFirestoreData();
         await clearAuthUsers();
+        global.fetch = originalFetch;
     });
 
-    it("인증 없이 호출 시 401 반환", async () => {
-        const result = await executeTmapProxy(mockFetch, {});
+    /** 인증된 지오코딩 요청 */
+    function geocodeReq(address = "서울특별시 강남구") {
+        return {
+            headers: { authorization: `Bearer ${validIdToken}` },
+            path: "/",
+            query: { action: "geocode", address },
+        };
+    }
 
-        expect(result.status).toBe(401);
-        expect(result.body).toEqual(
-            expect.objectContaining({ error: expect.stringContaining("인증") })
+    it("인증 헤더가 없으면 401 — 외부 API를 부르지 않는다", async () => {
+        const res = makeRes();
+
+        await proxy({ headers: {}, path: "/", query: { action: "geocode", address: "서울" } }, res);
+
+        expect(res.status).toHaveBeenCalledWith(401);
+        expect(tmapCalls).toHaveLength(0);
+    });
+
+    it("위조된 토큰은 실제 검증에서 걸러 401", async () => {
+        const res = makeRes();
+
+        await proxy(
+            {
+                headers: { authorization: "Bearer invalid-token-123" },
+                path: "/",
+                query: { action: "geocode", address: "서울" },
+            },
+            res
         );
+
+        expect(res.status).toHaveBeenCalledWith(401);
+        expect(tmapCalls).toHaveLength(0);
     });
 
-    it("유효하지 않은 토큰으로 호출 시 401 반환", async () => {
-        const result = await executeTmapProxy(mockFetch, {
-            authHeader: "Bearer invalid-token-123",
-        });
+    it("유효한 ID 토큰이면 통과하고 티맵 호출에 appKey·주소·타임아웃이 실린다", async () => {
+        const res = makeRes();
 
-        expect(result.status).toBe(401);
+        await proxy(geocodeReq(), res);
+
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(tmapCalls).toHaveLength(1);
+        expect(tmapCalls[0].url).toContain("fullAddrGeo");
+        expect(tmapCalls[0].url).toContain(encodeURIComponent("서울특별시 강남구"));
+        expect(tmapCalls[0].init?.headers).toMatchObject({ appKey: "TEST_APP_KEY" });
+        // Phase 201 — 응답 없는 상대에 인스턴스가 묶이지 않게 하는 시그널
+        expect(tmapCalls[0].init?.signal).toBeInstanceOf(AbortSignal);
     });
 
-    it("geocode action 정상 호출", async () => {
-        const result = await executeTmapProxy(mockFetch, {
-            authHeader: `Bearer ${validIdToken}`,
-            action: "geocode",
-            query: { address: "서울특별시 강남구" },
-        });
+    it("필수 파라미터가 빠지면 400 — 외부 API를 부르지 않는다", async () => {
+        const res = makeRes();
 
-        expect(result.status).toBe(200);
-        expect(result.body).toEqual({ result: "mocked tmap response" });
-        expect(mockFetch).toHaveBeenCalled();
-    });
-
-    it("geocode action에 address 없으면 400", async () => {
-        const result = await executeTmapProxy(mockFetch, {
-            authHeader: `Bearer ${validIdToken}`,
-            action: "geocode",
-            query: {},
-        });
-
-        expect(result.status).toBe(400);
-        expect(result.body).toEqual(
-            expect.objectContaining({ error: "address is required and must be at least 2 characters" })
+        await proxy(
+            { headers: { authorization: `Bearer ${validIdToken}` }, path: "/", query: { action: "geocode" } },
+            res
         );
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(tmapCalls).toHaveLength(0);
     });
 
-    it("poi action 정상 호출", async () => {
-        const result = await executeTmapProxy(mockFetch, {
-            authHeader: `Bearer ${validIdToken}`,
-            action: "poi",
-            query: { keyword: "복지관" },
-        });
+    it("지원하지 않는 요청은 400", async () => {
+        const res = makeRes();
 
-        expect(result.status).toBe(200);
-    });
-
-    it("route action 정상 호출", async () => {
-        const result = await executeTmapProxy(mockFetch, {
-            authHeader: `Bearer ${validIdToken}`,
-            action: "route",
-            body: { startX: 127.0, startY: 37.5, endX: 127.1, endY: 37.6 },
-        });
-
-        expect(result.status).toBe(200);
-    });
-
-    it("지원하지 않는 action 시 400 반환", async () => {
-        const result = await executeTmapProxy(mockFetch, {
-            authHeader: `Bearer ${validIdToken}`,
-            action: "unknown",
-        });
-
-        expect(result.status).toBe(400);
-        expect(result.body).toEqual(
-            expect.objectContaining({ error: "지원하지 않는 엔드포인트입니다." })
+        await proxy(
+            { headers: { authorization: `Bearer ${validIdToken}` }, path: "/", query: { action: "unknown" } },
+            res
         );
+
+        expect(res.status).toHaveBeenCalledWith(400);
+        expect(tmapCalls).toHaveLength(0);
     });
 
-    it("Rate Limit 초과 시 429 반환", async () => {
-        // Firestore에 Rate Limit 문서를 직접 생성하여 초과 상태 시뮬레이션
-        const safeIp = "127_0_0_1";
-        await db.collection("_rateLimits").doc(`tmapProxy:${safeIp}:test`).set({
-            count: 30,
-            functionName: "tmapProxy",
-            ip: safeIp,
-            expiresAt: new Date(Date.now() + 60000),
-        });
+    it("티맵에 닿지 못하면 502 — 상대 장애가 우리 예외가 되지 않는다", async () => {
+        const err = new TypeError("fetch failed");
+        (err as unknown as { cause: { code: string } }).cause = { code: "ECONNRESET" };
+        tmapResponder = () => Promise.reject(err);
+        const res = makeRes();
 
-        const result = await executeTmapProxy(mockFetch, {
-            authHeader: `Bearer ${validIdToken}`,
-            action: "geocode",
-            query: { address: "서울" },
-        });
+        await proxy(geocodeReq(), res);
 
-        expect(result.status).toBe(429);
+        expect(res.status).toHaveBeenCalledWith(502);
+    });
+
+    it("한도를 넘기면 429이고, 카운터는 IP가 아니라 uid로 쌓인다", async () => {
+        // 한도까지는 통과
+        for (let i = 0; i < RATE_LIMIT_MAX; i++) {
+            const res = makeRes();
+            await proxy(geocodeReq(), res);
+            expect(res.status).toHaveBeenCalledWith(200);
+        }
+
+        // 초과분은 거부되고 외부 API도 부르지 않는다
+        const callsBefore = tmapCalls.length;
+        const res = makeRes();
+        await proxy(geocodeReq(), res);
+
+        expect(res.status).toHaveBeenCalledWith(429);
+        expect(tmapCalls).toHaveLength(callsBefore);
+
+        // 문서 ID가 uid 기반인지 — IP 기반으로 되돌아가면 헤더 한 줄로 버킷을 회전시킬 수 있다
+        const snap = await db.collection("_rateLimits").where("functionName", "==", "tmapProxy").get();
+        expect(snap.empty).toBe(false);
+        expect(snap.docs.some(d => d.id.includes(`uid_${UID}`))).toBe(true);
+        expect(snap.docs.reduce((sum, d) => sum + (d.data().count || 0), 0)).toBe(RATE_LIMIT_MAX);
+    });
+
+    it("헤더로 IP를 바꿔도 같은 uid면 같은 버킷을 쓴다", async () => {
+        for (let i = 0; i < RATE_LIMIT_MAX; i++) {
+            await proxy(
+                {
+                    ...geocodeReq(),
+                    headers: { authorization: `Bearer ${validIdToken}`, "x-forwarded-for": `10.0.0.${i}` },
+                },
+                makeRes()
+            );
+        }
+
+        const res = makeRes();
+        await proxy(
+            {
+                ...geocodeReq(),
+                headers: { authorization: `Bearer ${validIdToken}`, "x-forwarded-for": "10.9.9.9" },
+            },
+            res
+        );
+
+        expect(res.status).toHaveBeenCalledWith(429);
     });
 });
