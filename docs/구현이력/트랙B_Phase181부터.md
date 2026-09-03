@@ -373,3 +373,21 @@
 | **검증** | Functions Jest **996**(+5) · tsc(Functions) · CI 9/9 초록 · 배포 성공 후 `gcloud run services describe`로 `holidayproxy` 새 리비전(00344) 확인 |
 | **커밋·PR** | #302 |
 | **남는 것** | ① `tmapProxy`도 같은 모양의 맨 fetch다 — 최근 2주 발생 0건이라 이번엔 손대지 않았다 ② **폴백이 왜 도는지는 규명하지 않았다** — Firestore에 2026이 있는데도 08-25~09-03에 7건이 프록시로 갔고 전부 2026년 조회였다. 화면이 Firestore를 못 읽고 폴백으로 내려가는 경로가 있다는 뜻이다 ③ `syncHolidays`의 fetch에는 여전히 타임아웃이 없다 — 배치는 느려도 성공하는 편이 낫다는 196의 의도된 상태 ④ 이월 — 이 이력 파일 분할 · Modal 프리미티브 · 변경형 콜러블 6개 `wrapCallableHandler` 이관 · Functions 런타임 메이저 |
+
+---
+
+### Phase 201: 같은 구조는 같은 방식으로 터진다 — 티맵 프록시 · `updateTime`은 신선도 지표가 아니었다 📡🕰️
+
+> 2026-09-03. Phase 200이 "남는 것 ①"로 남긴 `tmapProxy`를 닫았다. 발생 이력이 0건인데 손댄 근거는 하나다 — **원인이 상대 쪽이 아니라 우리 코드의 구조**였고, 그 구조가 두 프록시에 똑같이 있었다. holidayProxy가 실제로 울린 경보가 그 구조의 증거다. 덤으로 Phase 200이 "그렇게 보인다"로 남겨 둔 `system/holidays` 갱신 의문을 로그로 닫았는데, 결론이 **내가 본 지표 자체가 틀린 지표였다**는 쪽이라 따로 적어 둔다.
+
+| 항목 | 내용 |
+|------|------|
+| **여섯 곳을 한 곳으로** | `safeFetchJson(response, ctx)` → `fetchTmapJson(url, init, ctx)`. `fetch`를 함수 안으로 들이니 호출부 6곳(`geocode`·`poi`·`route` × 신·구 경로)이 각각 한 줄이 됐다. 예전 구조는 `fetch`가 호출부에 흩어져 있어 **여섯 곳이 모두 타임아웃도 실패 처리도 없는 상태**였다 — 이제 새 엔드포인트를 추가할 때 그것을 빠뜨릴 자리가 없다 |
+| **처리 내용** | 연결 실패(DNS·연결 끊김·타임아웃)는 **502 + WARNING**에 원인(`cause.code` 또는 `timeout`)을 남긴다 · 상한 없던 `fetch`에 **10초 타임아웃**(holidayProxy와 같은 값) · 2xx 아님·빈 body·파싱 실패는 종전과 동일 |
+| **한 곳은 일부러 다르게 뒀다** | **2xx인데 JSON이 아닌 경우는 ERROR 그대로.** holidayProxy에서 이 경로를 WARNING으로 낮춘 근거는 공공데이터 포털이 오류 문서(XML·HTML)를 상시 돌려주고 월배치 `syncHolidays`가 같은 상황을 `captureWarning`으로 남긴다는 것이었다. 티맵에는 그런 이력이 없고, 2xx 비-JSON이면 상대의 장애보다 엔드포인트·계약 문제일 가능성이 커 조치가 필요하다. **"같은 방식으로 고친다"가 "모든 판정을 같게 한다"는 뜻은 아니다** |
+| **공용 유틸을 `helpers`에 두지 않은 이유** | `describeFetchFailure`를 `utils/fetchFailure.ts`로 뽑아 두 프록시가 공유한다. 프록시 단위 테스트는 `utils/helpers`를 **통째로 목으로 갈아치우므로**(`log`·`wrapHttps`만 남긴다) helpers에 두면 실제 구현이 테스트에서 사라진다. 새 파일을 만든 근거라 파일 주석에 남겼다 |
+| **`updateTime`은 신선도 지표가 아니었다** | Phase 200이 추정으로 남긴 것을 로그로 닫았다. 09-01 06:00 KST 월배치는 `Fetched and parsed 22 holidays for year 2026` · `24 ... 2027` · `Successfully synced holidays to Firestore`까지 정상이었다. 그런데 `system/holidays`의 `updateTime`은 07-31에 그대로 멈춰 있다 — 두 해 값이 직전과 같아 **문서 내용이 바뀌지 않았기 때문**이다(Firestore는 내용이 바뀌지 않는 쓰기로 `updateTime`을 올리지 않는다). 요점은 **조사하던 내가 그 값을 보고 배치 누락을 의심했다**는 것이다. 실제 신선도 지표는 `_health/{스케줄러}.lastRun`이고 모니터링은 이미 그것을 쓴다 — 문서의 `updateTime`으로 배치 생사를 판단하면 안 된다 |
+| **테스트** | `tmapProxy.test.ts` 신설 7건 — 연결 실패 시 502이고 **ERROR 로그가 없다**(경보 회귀 방지) · 원인이 남는다 · 타임아웃은 `timeout`으로 적힌다 · POST(`route`)도 같은 처리를 받는다 · 타임아웃 시그널을 걸면서 method·body가 보존된다 · 정상 응답 통과 · `route` 응답은 `features[0].properties`만 남긴다 · 오류 상태 코드는 그대로 전달하고 WARNING |
+| **검증** | `verify:fast`(lint · tsc · Functions tsc · env·카탈로그 정합) 0오류 · Functions Jest **1,003**(+7) · CI 9/9 초록 · 배포 성공 후 `gcloud run services describe`로 `tmapproxy` 새 리비전(00263) 확인 |
+| **커밋·PR** | #305 |
+| **남는 것** | ① `tmapProxy.emulator.test.ts`는 실물 핸들러를 import하지 않고 로직을 **사본으로 시뮬레이션**한다 — 그래서 이번 변경을 전혀 검증하지 못했고, 앞으로 프록시 로직이 갈라져도 초록으로 남는다 ② Firestore에 2026이 들어 있는데도 화면이 폴백으로 내려가 프록시를 부르는 이유는 여전히 미규명(Phase 200 남는 것 ②) ③ `syncHolidays`의 `fetch`에는 여전히 타임아웃이 없다 — 배치는 느려도 성공하는 편이 낫다는 196의 의도된 상태 ④ 이월 — 이 이력 파일 분할 · Modal 프리미티브 · 변경형 콜러블 6개 `wrapCallableHandler` 이관 · Functions 런타임 메이저 |
