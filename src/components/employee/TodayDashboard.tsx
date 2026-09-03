@@ -19,7 +19,7 @@ import type { Reservation } from '../../types/reservation';
 import type { Vehicle } from '../../types/vehicle';
 
 export default function TodayDashboard() {
-    const { user, userData } = useAuth();
+    const { user, userData, orgFeatures } = useAuth();
     const {
         vehicles, startingId, cancellingId,
         myReservations, weekGrouped, todayLabel,
@@ -62,6 +62,8 @@ export default function TodayDashboard() {
     // 30분 쿨다운(checkCooldown)으로 홈의 높은 접근 빈도에 따른 호출 비용을 방어한다.
     useEffect(() => {
         if (!userData?.organizationId || vehicles.length === 0) return;
+        // 기관이 연동을 껐으면 서버가 어차피 건너뛴다 — 호출 자체를 하지 않는다.
+        if (!orgFeatures.googleCalendar) return;
 
         const triggerSyncs = async () => {
             let anySynced = false;
@@ -77,7 +79,7 @@ export default function TodayDashboard() {
         };
 
         triggerSyncs();
-    }, [vehicles, userData?.organizationId, syncVehicleOnDemand, checkCooldown, refresh]);
+    }, [vehicles, userData?.organizationId, orgFeatures.googleCalendar, syncVehicleOnDemand, checkCooldown, refresh]);
 
     return (
         <div className="max-w-lg mx-auto animate-fade-in">

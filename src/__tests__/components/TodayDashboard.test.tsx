@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { ALL_FEATURES_ON } from '../../lib/orgFeatures';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import TodayDashboard from '../../components/employee/TodayDashboard';
@@ -19,6 +20,9 @@ vi.mock('../../hooks/useAuth', () => ({
     useAuth: () => ({
         user: { uid: 'test-user-123' },
         userData: mockUserData,
+        // 기능 플래그 전체를 담는다 — 하나만 넣어 두면 나중에 다른 플래그를 읽는
+        // 코드가 들어왔을 때 조용히 undefined가 되고 런타임에서야 터진다.
+        orgFeatures: { ...ALL_FEATURES_ON },
     }),
 }));
 

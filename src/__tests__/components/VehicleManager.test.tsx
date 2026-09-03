@@ -12,6 +12,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import type { Vehicle } from '../../types/vehicle';
+import { ALL_FEATURES_ON } from '../../lib/orgFeatures';
 
 const hookState = {
     vehicles: [] as Vehicle[],
@@ -43,8 +44,12 @@ const hookState = {
     confirmRestore: vi.fn(),
 };
 
-/** 기관 기능 플래그 — 캘린더를 끈 기관에서 배지가 사라지는지 보기 위해 켜고 끈다 */
-const authState = { orgFeatures: { googleCalendar: true } };
+/**
+ * 기관 기능 플래그 — 캘린더를 끈 기관에서 배지가 사라지는지 보기 위해 켜고 끈다.
+ * 한 플래그만 담으면 나중에 다른 기능을 읽는 컴포넌트가 트리에 들어왔을 때 조용히
+ * undefined가 된다(vi.mock 팩토리는 tsc가 검사하지 않는다). 전체를 채워 둔다.
+ */
+const authState = { orgFeatures: { ...ALL_FEATURES_ON } };
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => authState }));
 
 vi.mock('../../hooks/useVehicleManager', () => ({ default: () => hookState }));
@@ -87,6 +92,7 @@ function setCalendarFeature(on: boolean) {
 
 beforeEach(() => {
     vi.clearAllMocks();
+    setCalendarFeature(true);
 });
 afterEach(() => {
     vi.useRealTimers();
@@ -219,6 +225,22 @@ describe('캘린더 동기화 상태', () => {
             setCalendarFeature(false);
             renderWith([vehicle({ googleCalendarId: 'cal@group' })]);
             expect(screen.queryByText('📅 캘린더 동기화 정상')).not.toBeInTheDocument();
+        });
+
+        it('캘린더만 있고 보험이 없는 차량은 그 줄 자체를 그리지 않는다 (빈 줄 방지)', () => {
+            // 바깥 줄 조건과 안쪽 배지가 같은 값을 봐야 한다 — 안쪽만 막으면
+            // min-h를 가진 빈 행이 남는다
+            const row = (c: HTMLElement) =>
+                Array.from(c.querySelectorAll('div')).some(el => el.className.includes('min-h-[20px]'));
+
+            setCalendarFeature(true);
+            const on = renderWith([vehicle({ googleCalendarId: 'cal@group', calendarSyncFailCount: 41 })]);
+            expect(row(on.container)).toBe(true); // 대조군 — 켜져 있으면 줄이 있다
+            on.unmount();
+
+            setCalendarFeature(false);
+            const off = renderWith([vehicle({ googleCalendarId: 'cal@group', calendarSyncFailCount: 41 })]);
+            expect(row(off.container)).toBe(false);
         });
     });
 });
