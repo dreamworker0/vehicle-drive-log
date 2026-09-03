@@ -282,3 +282,21 @@
 | **검증** | lint·tsc 0 · CI 9/9 초록(2회) · 배포 `cf41f12`(IAM 바인딩 후 재실행) · `bash -e`로 필터 스텝 2케이스 실측(옛 줄 제거·다른 키 보존 / 전부 걸러져도 스텝 생존) · YAML 파싱 · 배포 후 시크릿 바인딩 9개 확인 |
 | **커밋·PR** | #290 |
 | **남는 것** | ① **옛 키 폐기는 대시보드 신호등 확인 뒤** — 프로덕션은 이미 버전 2를 읽지만 순서를 지키면 되돌릴 여지가 남는다 ② `FUNCTIONS_ENV_FILE`의 옛 줄은 그대로다 — 필터가 막아 주지만 값은 시크릿 안에 남아 있다 ③ **키 교체 시 재배포가 필요하다** — 배포 시점 버전(`version: 2`)이 고정돼 들어가므로 버전 3을 만들어도 재배포 전까지는 2를 읽는다 ④ 새 시크릿을 추가할 때마다 IAM 바인딩을 먼저 붙여야 한다 ⑤ 이월 — 이 이력 파일 분할(193 ⑤, 이번에도 미룸) · Modal 프리미티브 · 변경형 콜러블 6개 `wrapCallableHandler` 이관 · Functions 런타임 메이저 |
+
+### Phase 196: 빨강이 상주하니 진짜 빨강이 묻혔다 — 헬스체크 등급과 배치 보고 경계 🟡📮
+
+> 2026-09-03. Phase 195를 마무리하며 슈퍼관리자 헬스체크를 열었다가 공공데이터포털이 상시 빨강인 것을 봤다. 파 보니 **장애가 아니었고**, 정작 그 옆에 묻혀 있던 캘린더 동기화 빨강이 진짜였다(연동 161대 중 67대가 실패 10회를 넘겨 영구중단). 빨강이 상주하면 "빨강은 원래 있는 것"이 되어 진짜를 가린다는 것을 실물로 겪은 회차다. 두 방향으로 고쳤다 — **빨강이 아닌 것을 빨강에서 내리고, 조용히 사라지던 보고를 실제로 보내게.**
+
+| 항목 | 내용 |
+|------|------|
+| **상시 빨강의 정체** | 응답이 **정확히 5.0초**에 끊긴다 — 인증 거부라면 즉시 에러 응답이 왔을 테니 이건 `PING_TIMEOUT_MS`(5초)에 걸린 것이다. 그런데 **사용자 화면은 이 API를 실시간으로 부르지 않는다**: 프런트(`holidayApi.ts`)는 Firestore `system/holidays`를 먼저 읽고, 그 문서는 월배치가 채우며, 그 배치의 `fetch`에는 타임아웃이 아예 없어 느려도 성공한다. 하트비트를 직접 조회해 **09-01 06시 성공**을 확인했다 — 연동은 살아 있었다 |
+| **등급을 가른 기준** | 타임아웃만 `degraded`로 낮춘다. **상태 코드 에러는 error 그대로** — 키·엔드포인트 문제라 조치가 필요하다. 옵트인(`degradeOnTimeout`)이라 T맵·Gemini는 종전대로 전부 error다: 그쪽은 사용자 경로가 실시간 호출에 걸려 있어 느린 것 자체가 장애다. 판정만 순수 함수(`resolveFailureStatus`)로 떼어 테스트했다 |
+| **조용히 실패하던 공휴일 배치** | `syncHolidays`의 catch가 `console.error`만 해서 Sentry에도 Discord에도 가지 않았다. 한 해도 받지 못하면 기존 문서를 유지한 채 넘어가는데(이 동작 자체는 의도한 것) **하트비트는 그대로 찍혀 스케줄러 타일은 초록으로 남는다** — 공휴일만 낡은 채 예약 화면 표시가 조용히 틀어지고, 월 1회 실행이라 알아채는 데 한 달이 걸린다. 연도별 실패는 `captureWarning`(부분 유실), 한 해도 못 받으면 `captureError` |
+| **리뷰가 잡은 결함 — 보고를 넣었는데 전송 경로가 없었다** | 머지 전 적대적 리뷰의 지적. `flushSentry`를 부르는 곳은 `helpers.ts`의 `wrapHttps`·`wrapHandler`·`wrapCallableHandler` 셋뿐인데 **스케줄 함수는 그 어느 래퍼도 거치지 않는다**(`monthlyBatch`도 `recordHeartbeat`도 console 로그만 한다). Sentry 전송은 비동기라 핸들러가 반환하면 Cloud Run 인스턴스가 동결·종료되며 버퍼가 사라진다 — 10월 배치에서 실패해도 이벤트가 전송 전에 없어져 **이 회차가 없애려던 상태가 그대로 남을 뻔했다.** `monthlyBatch` 끝에 `await flushSentry()` |
+| **같은 공백이 세 배치에도 있었다** | `batchStep`의 `runStep`은 스텝 실패를 `captureError`로 승격해 두는데(백업 실패를 놓치면 복구 시점에야 안다는 이유로 Phase 178 무렵 넣은 것), 이를 쓰는 `dailyNightlyBatch`·`nightlyStatsBatch`·`weeklyMaintenanceBatch` 어디에도 전송 경계가 없었다 — 승격해 둔 의미가 무효였다. 배치마다 flush를 흩뿌리면 새 배치에서 빠뜨리기 쉬우므로 **세 배치가 모두 마지막에 부르는 `logBatchResult`를 공통 경계로** 삼았다(async 전환 + 호출부 3곳 await) |
+| **회귀를 잡는 테스트를 골라 넣었다** | `flush`를 `await` 없이 부르는 회귀는 **코드가 멀쩡해 보이고 다른 테스트도 전부 통과한다** — 알림이 사라진 뒤에야 드러난다. 그래서 "반환 전에 flush가 끝나는가"를 명시적으로 고정했다(타이머로 지연시킨 flush가 완료됐는지 단언). `batchStep`은 테스트가 아예 없어 9건 신설, `monthlyBatch`는 `onSchedule`을 목으로 걷어내 핸들러만 꺼내 검증 |
+| **작은 것 둘** | `degraded` 카드의 상태 문구가 `text-red-500`으로 하드코딩돼 있었다 — 노랑으로 낮춰도 카드 안 문구가 빨가면 낮춘 의미가 없어 상태 색을 따르게 했다 · ESLint `globalIgnores`에 `.claude/worktrees` 추가: 백그라운드 작업이 만드는 저장소 사본의 `functions/`를 프론트 규칙으로 검사해 `no-undef` 194건이 나면서 **작업과 무관한 pre-push 실패**를 유발했다(경로가 `functions/**`가 아니라 `.claude/worktrees/<이름>/functions/**`라 기존 ignore에 안 걸린다) |
+| **곁에서 드러난 것 — 별건** | 캘린더 연동 차량 161대 중 **67대(42%)가 `calendarSyncFailCount >= 10`으로 영구중단** 상태다. Phase 68에서 넣은 상한이 걸려 재시도조차 하지 않으므로 해당 기관은 예약이 캘린더에 안 뜨는 것을 이미 겪고 있을 수 있다. 원인 규명·복구 경로는 조사량이 있어 별도 작업으로 분리했다 |
+| **검증** | lint·tsc(프론트·Functions) 0 · Jest **942**(+19: `batchStep` 9 · `syncHolidays` 6 · `apiHealthCheck` 5(+`resolveFailureStatus`) · `monthlyBatch` 2) · Vitest 1,844 · CI 9/9 초록 · 배포 `2784c3d` 성공. 배포 후 `gcloud`로 함수 환경변수를 직접 읽어 확인 — `SENTRY_DSN_FUNCTIONS` 주입됨(Functions 에러가 처음으로 Sentry `vehicle-node`로 간다) · `GEMINI_API_KEY` 평문 부재 · 나머지 5개 키 누락 없음 · Sentry 릴리즈 등록 스텝 success(= 슬러그 `vehicle-node` 유효) |
+| **커밋·PR** | #296 |
+| **남는 것** | ① **캘린더 동기화 67대**(별건 조사 중) ② `dailyNightlyBatch` 등 세 배치의 flush는 닫았지만, 스케줄 함수 전반에 `wrapCallableHandler` 같은 **공통 경계 래퍼가 없다** — 새 스케줄러를 추가할 때 같은 것을 또 빠뜨릴 수 있다 ③ 공공데이터포털이 왜 느려졌는지는 규명하지 않았다. 월배치가 성공하는 한 급하지 않지만 10월 실행은 확인할 값어치가 있다 ④ 이월 — Modal 프리미티브 · 변경형 콜러블 6개 `wrapCallableHandler` 이관 · Functions 런타임 메이저 |
