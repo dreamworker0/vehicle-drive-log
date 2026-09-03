@@ -43,6 +43,10 @@ const hookState = {
     confirmRestore: vi.fn(),
 };
 
+/** 기관 기능 플래그 — 캘린더를 끈 기관에서 배지가 사라지는지 보기 위해 켜고 끈다 */
+const authState = { orgFeatures: { googleCalendar: true } };
+vi.mock('../../hooks/useAuth', () => ({ useAuth: () => authState }));
+
 vi.mock('../../hooks/useVehicleManager', () => ({ default: () => hookState }));
 vi.mock('../../components/admin/VehicleForm', () => ({ default: () => <div data-testid="vehicle-form" /> }));
 vi.mock('../../components/admin/CalendarSyncTroubleshootModal', () => ({
@@ -74,6 +78,11 @@ function freezeToday(iso = '2026-03-05T10:00:00+09:00') {
 function renderWith(vehicles: Vehicle[], over: Partial<typeof hookState> = {}) {
     Object.assign(hookState, { vehicles, loading: false, modal: null, deletableIds: new Set<string>(), ...over });
     return render(<VehicleManager />);
+}
+
+/** 기관의 Google 캘린더 연동 기능 on/off */
+function setCalendarFeature(on: boolean) {
+    authState.orgFeatures.googleCalendar = on;
 }
 
 beforeEach(() => {
@@ -185,6 +194,32 @@ describe('캘린더 동기화 상태', () => {
         const btn = screen.getByRole('button', { name: /캘린더 동기화 실패/ });
         fireEvent.click(btn);
         expect(screen.getByTestId('troubleshoot-modal')).toHaveTextContent('카니발');
+    });
+
+    describe('기관이 캘린더 연동을 껐을 때', () => {
+        afterEach(() => setCalendarFeature(true));
+
+        it('실패 배지를 띄우지 않는다 — 끈 기능을 고치라고 요구하면 안 된다', () => {
+            // 실제로 겪은 상태다: 캘린더 기능을 끈 활성 기관에 실패 41~49회가 남아 있어,
+            // 관리자 화면에 빨간 배지가 두 달째 깜빡였다. 눌러도 '공유를 고치라'는 안내뿐이라
+            // 관리자가 할 수 있는 일이 없다.
+            setCalendarFeature(false);
+            renderWith([vehicle({ googleCalendarId: 'cal@group', calendarSyncFailCount: 41 })]);
+
+            expect(screen.queryByRole('button', { name: /캘린더 동기화 실패/ })).not.toBeInTheDocument();
+        });
+
+        it('재시도 중도 띄우지 않는다', () => {
+            setCalendarFeature(false);
+            renderWith([vehicle({ googleCalendarId: 'cal@group', calendarSyncFailCount: 2 })]);
+            expect(screen.queryByText('📅 재시도 중')).not.toBeInTheDocument();
+        });
+
+        it('"동기화 정상"도 말하지 않는다 — 돌지 않는데 정상이라고 하면 거짓이다', () => {
+            setCalendarFeature(false);
+            renderWith([vehicle({ googleCalendarId: 'cal@group' })]);
+            expect(screen.queryByText('📅 캘린더 동기화 정상')).not.toBeInTheDocument();
+        });
     });
 });
 
