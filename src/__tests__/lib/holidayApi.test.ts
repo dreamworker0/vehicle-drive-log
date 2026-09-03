@@ -84,3 +84,70 @@ describe('fetchPublicHolidays — 외부 폴백 타임아웃', () => {
         expect(fetchMock).not.toHaveBeenCalled();
     });
 });
+
+/**
+ * 폴백 사유 계측 — 프록시 URL에 실려 서버 로그로 간다.
+ *
+ * 월배치가 올해·내년을 Firestore에 채우므로 이 폴백은 거의 돌지 않아야 하는데 실제로는
+ * 하루 한 번쯤 돌았고, 사유가 클라이언트 콘솔에만 남아 원인을 알 수 없었다
+ * (Phase 200 남는 것 ②). 사유가 프록시까지 실려 가는 것을 고정한다.
+ */
+describe('fetchPublicHolidays — 폴백 사유', () => {
+    /** 즉시 응답하는 fetch (공휴일 없는 정상 JSON) */
+    function okFetch() {
+        return vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({ response: { body: { items: {} } } }),
+        });
+    }
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        // 프로덕션 분기(Cloud Function 프록시)로 들어가게 한다 — 개발 분기는 Vite 프록시로
+        // 공공데이터 포털에 직접 나가므로 사유를 실어 보내지 않는다
+        vi.stubEnv('DEV', false);
+        vi.stubEnv('PROD', true);
+    });
+
+    afterEach(() => {
+        vi.unstubAllEnvs();
+    });
+
+    it('Firestore 읽기가 거부되면 그 코드를 사유로 보낸다', async () => {
+        const fetchMock = okFetch();
+        vi.stubGlobal('fetch', fetchMock);
+        mockGetDoc.mockRejectedValue(Object.assign(new Error('Missing or insufficient permissions.'), {
+            code: 'permission-denied',
+        }));
+
+        const fetchPublicHolidays = await loadModule();
+        await fetchPublicHolidays(2034);
+
+        expect(fetchMock.mock.calls[0][0]).toContain('fallbackReason=firestore-permission-denied');
+    });
+
+    it('문서는 읽혔지만 그 해가 없으면 year-missing', async () => {
+        const fetchMock = okFetch();
+        vi.stubGlobal('fetch', fetchMock);
+        mockGetDoc.mockResolvedValue({
+            exists: () => true,
+            data: () => ({ '2035': {} }),
+        });
+
+        const fetchPublicHolidays = await loadModule();
+        await fetchPublicHolidays(2036);
+
+        expect(fetchMock.mock.calls[0][0]).toContain('fallbackReason=year-missing');
+    });
+
+    it('문서 자체가 없으면 doc-missing', async () => {
+        const fetchMock = okFetch();
+        vi.stubGlobal('fetch', fetchMock);
+        mockGetDoc.mockResolvedValue({ exists: () => false });
+
+        const fetchPublicHolidays = await loadModule();
+        await fetchPublicHolidays(2037);
+
+        expect(fetchMock.mock.calls[0][0]).toContain('fallbackReason=doc-missing');
+    });
+});

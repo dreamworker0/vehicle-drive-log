@@ -20,6 +20,11 @@ const API_KEY = import.meta.env.VITE_HOLIDAY_API_KEY;
  */
 const FALLBACK_TIMEOUT_MS = 5000;
 
+/**
+ * 폴백을 타게 된 사유 코드의 상한 길이. 서버가 로그에 그대로 적으므로 짧게 묶는다.
+ */
+const FALLBACK_REASON_MAX = 64;
+
 // 연도별 캐시
 const cache: Record<number, Record<string, string>> = {};
 
@@ -35,6 +40,23 @@ export const fetchPublicHolidays = async (year: number) => {
     const yearStr = String(year);
     let map: Record<string, string> = {};
 
+    /**
+     * 폴백을 타게 된 사유. 프록시(holidayProxy)에 실어 보내 서버 로그에 남긴다.
+     *
+     * **왜 남기나.** 월배치(syncHolidays)가 올해·내년을 Firestore에 채우므로 이 폴백은 원래
+     * 거의 돌지 않아야 하는데, 실제로는 하루 한 번쯤 프록시가 호출됐다(2026-08-25~09-03 7건,
+     * 전부 올해 조회). 아래 catch가 사유를 console.warn으로만 흘려서 **왜 도는지 알 수 없었다**
+     * (Phase 200 남는 것 ②). 사유 코드를 서버 로그에 남기면 다음 발생이 스스로 답한다.
+     *
+     * 사유를 읽는 법: `firestore-permission-denied`인데 **프록시 호출은 성공**했다면
+     * 그 사용자는 로그인 상태였다는 뜻이다(프록시는 Auth 토큰을 요구한다). Rules는 로그인만
+     * 요구하므로(`system/holidays`: isSignedIn) 남는 원인은 **App Check**다 — Firestore는
+     * 강제(ENFORCED) 대상이고, reCAPTCHA 토큰이 막히면 최대 24시간 거부된다(firebase.ts 주석).
+     * 프록시는 App Check를 검사하지 않아 그때도 성공한다. `unavailable`이면 네트워크·오프라인,
+     * `failed-precondition`·terminated류면 로그아웃 전환 중 종료된 인스턴스다.
+     */
+    let fallbackReason = 'unknown';
+
     try {
         // 2. Firestore에서 먼저 조회 시도
         const docRef = doc(db, 'system', 'holidays');
@@ -48,8 +70,14 @@ export const fetchPublicHolidays = async (year: number) => {
                 console.debug(`Loaded holidays for ${year} from Firestore`);
                 return map;
             }
+            // 문서는 읽혔는데 그 해가 없다 — 월배치가 채우는 범위(올해·내년) 밖이면 정상이다
+            fallbackReason = 'year-missing';
+        } else {
+            fallbackReason = 'doc-missing';
         }
     } catch (dbError) {
+        const code = (dbError as { code?: string })?.code;
+        fallbackReason = `firestore-${code || 'error'}`;
         console.warn('Firestore에서 휴일 정보를 가져오지 못했습니다. API 폴백을 시도합니다.', dbError);
     }
 
@@ -62,7 +90,8 @@ export const fetchPublicHolidays = async (year: number) => {
             url = `/api/holiday/getRestDeInfo?serviceKey=${API_KEY}&solYear=${year}&numOfRows=50&_type=json`;
         } else {
             // 프로덕션 환경: Cloud Function 프록시 사용
-            url = `/api/holiday?solYear=${year}&numOfRows=50`;
+            url = `/api/holiday?solYear=${year}&numOfRows=50`
+                + `&fallbackReason=${encodeURIComponent(fallbackReason.slice(0, FALLBACK_REASON_MAX))}`;
         }
         // 응답이 없는 외부 API에 화면이 묶이지 않도록 상한을 둔다.
         const controller = new AbortController();
