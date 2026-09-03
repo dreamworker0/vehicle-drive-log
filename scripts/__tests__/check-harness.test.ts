@@ -14,6 +14,8 @@ import {
     extractQuotedMdRefs,
     extractHookScriptPaths,
     findForbiddenDeployCommands,
+    countTestInventory,
+    extractDocumentedTestInventory,
 } from '../check-harness';
 
 describe('parseFrontmatter', () => {
@@ -100,6 +102,45 @@ describe('findForbiddenDeployCommands', () => {
         ].join('\n');
 
         expect(findForbiddenDeployCommands(markdown)).toEqual([]);
+    });
+});
+
+describe('테스트 규모 문서 정합성', () => {
+    it('README 테스트 표에서 파일·suite 수를 읽는다', () => {
+        const markdown = [
+            '| 단위 테스트 (프론트 + 스크립트) | 159파일 / 1,852개 테스트 | Vitest |',
+            '| Functions 단위 테스트 | 76개 suite / 1,005개 테스트 | Jest |',
+            '| Rules 테스트 | 2파일 / 37개 테스트 | Emulator |',
+            '| E2E 테스트 | 26개 spec 파일 | Playwright |',
+        ].join('\n');
+
+        expect(extractDocumentedTestInventory(markdown)).toEqual({
+            frontendFiles: 159,
+            functionSuites: 76,
+            rulesFiles: 2,
+            e2eSpecs: 26,
+        });
+    });
+
+    it('실행 대상별 테스트 파일을 같은 규칙으로 분류한다', () => {
+        expect(
+            countTestInventory([
+                'src/__tests__/a.test.ts',
+                'scripts/__tests__/b.test.ts',
+                'scripts/hooks/__tests__/guard.test.mjs',
+                'eslint-rules/local-rule.test.js',
+                'functions/src/__tests__/c.test.ts',
+                'functions/src/__tests__/d.emulator.test.ts',
+                'tests/firestore-rules.test.ts',
+                'tests/storage-rules.test.ts',
+                'e2e/login.spec.ts',
+            ]),
+        ).toEqual({
+            frontendFiles: 4,
+            functionSuites: 1,
+            rulesFiles: 2,
+            e2eSpecs: 1,
+        });
     });
 });
 

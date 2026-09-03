@@ -305,12 +305,12 @@ npm run build           # 프로덕션 빌드 확인
 
 | 종류 | 규모 | 도구 |
 |------|------|------|
-| 단위 테스트 (프론트 + 스크립트) | 155파일 / 1,763개 테스트 | Vitest |
-| Functions 단위 테스트 | 69개 suite / 906개 테스트 (emulator 테스트 제외) | Jest + ts-jest |
-| Rules 테스트 | Firestore 30개 + Storage 6개 테스트 | Firebase Emulator + Vitest |
+| 단위 테스트 (프론트 + 스크립트) | 159파일 / 1,852개 테스트 | Vitest |
+| Functions 단위 테스트 | 76개 suite / 1,005개 테스트 (emulator 테스트 제외) | Jest + ts-jest |
+| Rules 테스트 | 2파일 / 37개 테스트 | Firebase Emulator + Vitest |
 | E2E 테스트 | 26개 spec 파일 (일부 인증/오프라인 시나리오 fixme) | Playwright |
 
-> 2026-08-29 기준. `npm run verify:full`이 위 대부분을 한 번에 실행합니다 (Storage Rules는 `npm run test:rules:storage`로 별도 실행).
+> 테스트 케이스 수는 2026-09-03 Node 22 실행 결과입니다. 파일·suite 수는 `npm run verify:harness`가 저장소와 대조합니다.
 
 ---
 
