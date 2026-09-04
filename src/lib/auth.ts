@@ -141,12 +141,12 @@ export const logout = async () => {
     } catch (e) {
         console.warn('[logout] 오프라인 큐 정리 실패:', e);
     }
-    // 목적지 관련 로컬 캐시도 함께 지운다. 여기에는 확정된 목적지("○○○ 어르신 댁 …")뿐
-    // 아니라 **치다가 지운 검색어와 그 후보 목록**까지 남는다. 공용 태블릿에서 다음 사람이
-    // 앞사람이 어디를 찾아봤는지 알 수 있으면 안 된다 (2026-07-10 감사 #8과 같은 취지).
-    for (const key of ['poi_search_cache_v1', 'tmap_geo_cache_v1', 'tmap_route_cache_v1']) {
-        try { localStorage.removeItem(key); } catch { /* 저장소를 못 쓰면 넘어간다 */ }
-    }
+    // ⚠️ 목적지 관련 로컬 캐시(tmap_geo_cache_v1 · tmap_route_cache_v1 · poi_search_cache_v1)는
+    // 여기서 지우지 않는다. Tmap 무료 한도를 아끼는 것이 이 캐시들의 존재 이유인데,
+    // 로그아웃마다 비우면 다음 사용자가 같은 곳을 다시 조회해 절감이 사라진다.
+    // 대신 남는 것을 알고 있어야 한다 — 확정된 목적지("○○○ 어르신 댁 …")와 치다가 지운
+    // 검색어·후보 목록이 이 기기에 계속 보관된다. 공용 태블릿에서 정리가 필요해지면
+    // poi_search_cache_v1(검색어)만 먼저 떼는 것이 절감 손실이 가장 적다.
     // Firestore 영구 캐시 폐기 → 인스턴스가 종료되므로 깨끗한 상태로 재시작한다.
     await clearOfflineCache();
     if (typeof window !== 'undefined') {
