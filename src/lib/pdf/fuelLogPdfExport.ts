@@ -59,7 +59,7 @@ function renderTotalRow(pageRows: PdfFuelLogEntry[]): string {
     return `
         <tr class="total-row">
             <td colspan="6" class="center total-label">소 계</td>
-            <td class="right total-value">${totalAmount > 0 ? formatFuelAmount(totalAmount) : ''}</td>
+            <td class="right total-value">${totalAmount > 0 ? totalAmount.toLocaleString() : ''}</td>
             <td class="right total-value">${totalCost > 0 ? totalCost.toLocaleString() : ''}</td>
             <td>&nbsp;</td>
         </tr>

@@ -147,7 +147,7 @@ function buildSummaryHtml(
             <tr>
                 <td class="label-cell">전일 누계</td>
                 <td class="value-cell right">${previousEndKm !== null ? formatNumber(previousEndKm) : '-'} km</td>
-                ${hasFuel ? `<td class="fuel-label">주유량(ℓ)</td><td class="fuel-value right">${formatFuelAmount(fuel!.fuelAmount)}</td>` : ''}
+                ${hasFuel ? `<td class="fuel-label">주유량(ℓ)</td><td class="fuel-value right">${fuel!.fuelAmount ? formatFuelAmount(fuel!.fuelAmount) : ''}</td>` : ''}
             </tr>
             <tr>
                 <td class="label-cell">금일 누계</td>

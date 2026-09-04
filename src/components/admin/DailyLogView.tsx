@@ -238,7 +238,7 @@ export default function DailyLogView() {
                                         </div>
                                         <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg px-3 py-2">
                                             <span className="text-xs text-surface-400 dark:text-surface-500">{isEV ? '충전량' : '주유량'}</span>
-                                            <p className="font-medium text-surface-900 dark:text-surface-100">{formatFuelAmount(fuel.fuelAmount) || '-'} {isEV ? 'kWh' : 'ℓ'}</p>
+                                            <p className="font-medium text-surface-900 dark:text-surface-100">{fuel.fuelAmount ? formatFuelAmount(fuel.fuelAmount) : '-'} {isEV ? 'kWh' : 'ℓ'}</p>
                                         </div>
                                         <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg px-3 py-2">
                                             <span className="text-xs text-surface-400 dark:text-surface-500">{isEV ? '충전금액' : '주유금액'}</span>

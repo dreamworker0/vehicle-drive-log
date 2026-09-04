@@ -20,6 +20,10 @@ export const FUEL_DECIMALS = 3;
  * 그대로 흘려보내야 다음 글자를 계속 칠 수 있다.
  */
 export function limitFuelDecimals(value: string): string {
+    // 숫자·점 말고 다른 글자가 섞였으면 손대지 않는다. `<input type="number">`는 지수
+    // 표기('1.23456e2')도 유효한 값으로 넘겨주는데, 그걸 소수부로 착각해 자르면
+    // 123.456이 1.234가 된다 — 100배 어긋난 값이 조용히 저장된다.
+    if (!/^\d*\.?\d*$/.test(value)) return value;
     const dot = value.indexOf('.');
     if (dot === -1) return value;
     // 두 번째 점부터는 버린다 — 붙여넣기로 '1.2.3'이 들어와도 소수부만 남긴다.
@@ -40,4 +44,21 @@ export function formatFuelAmount(value: number | string | null | undefined): str
     const num = Number(value);
     if (!Number.isFinite(num)) return '';
     return String(Number(num.toFixed(FUEL_DECIMALS)));
+}
+
+/**
+ * 저장할 값으로 반올림한다.
+ *
+ * 입력 칸의 자릿수 제한만으로는 부족하다 — 기존 기록을 수정할 때 폼은 저장된 값을 그대로
+ * 채우므로(`useFuelLog`의 편집 프리필), 주유금액만 고치고 저장하면 긴 주유량이 다시
+ * 그대로 쓰인다. 저장 길목에서 한 번 더 맞춰야 "이제 셋째 자리까지만 들어간다"가 참이 된다.
+ *
+ * 자르지 않고 **반올림**하는 이유는 화면에 보이는 값(`formatFuelAmount`)과 저장값을
+ * 일치시키기 위해서다. 입력 중에는 반대로 잘라야 한다(위 주석 참고).
+ *
+ * @returns 숫자로 만들 수 없으면 NaN — 호출부의 기존 검증이 이미 빈 값을 막는다.
+ */
+export function roundFuelAmount(value: number | string): number {
+    const formatted = formatFuelAmount(value);
+    return formatted === '' ? NaN : Number(formatted);
 }
