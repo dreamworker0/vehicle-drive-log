@@ -7,7 +7,7 @@
 //
 // 픽스처는 그날 실제 로그에서 가져왔다.
 import { describe, it, expect } from 'vitest';
-import { summarizeLogs, classifyError } from '../check-functions-health';
+import { summarizeLogs, classifyError, isEmptyLogNotice } from '../check-functions-health';
 
 /** 실제 배포 중 남은 쿼터 초과 감사 로그 (길어서 핵심만 남김) */
 const DEPLOY_QUOTA = '2026-09-04T21:51:05.558608330Z E auditUserUpdated: {"@type":"type.googleapis.com/google.cloud.audit.AuditLog","status":{"code":8,"message":"Could not update Cloud Run service projects/vehicle-drive-log/locations/asia-northeast3/services/audituserupdated. Quota exceeded for quota metric \'Write requests\' and limit \'Write requests per minute per region\'"},"methodName":"google.cloud.functions.v2.FunctionService.UpdateFunction"}';
@@ -27,8 +27,16 @@ const WARNING = '2026-09-04T14:42:29.951173Z W tmapproxy: {"message":"T맵 API �
 const DEBUG_WITH_ERROR_WORD = '2026-09-04T14:42:29.093262Z D tmapproxy: {"message":"Remote Config fetch failed, using defaults","error":"[NOT_FOUND]: Template not found"}';
 
 describe('classifyError — ERROR 한 줄의 출처', () => {
-    it('플랫폼 감사 로그는 deploy', () => {
-        expect(classifyError(' {"@type":"type.googleapis.com/google.cloud.audit.AuditLog"}')).toBe('deploy');
+    // @type만으로는 부족하다 — Admin Activity·Data Access·Policy Denied가 모두 같은 타입이라
+    // 배포를 뜻하는 메서드명까지 봐야 한다.
+    it('배포 메서드가 찍힌 감사 로그만 deploy', () => {
+        const deploy = ' {"@type":"type.googleapis.com/google.cloud.audit.AuditLog","methodName":"google.cloud.functions.v2.FunctionService.UpdateFunction"}';
+        expect(classifyError(deploy)).toBe('deploy');
+    });
+
+    it('배포가 아닌 감사 로그는 app으로 남긴다 (판정에서 빠지면 안 된다)', () => {
+        const denied = ' {"@type":"type.googleapis.com/google.cloud.audit.AuditLog","methodName":"google.cloud.run.v1.Services.GetService"}';
+        expect(classifyError(denied)).toBe('app');
     });
 
     it('본문이 비면 request (HTTP 상태에서 유래한 요청 로그)', () => {
@@ -130,5 +138,55 @@ describe('summarizeLogs — 2026-09-04 배포 직후 재현', () => {
         expect(r.deployEvents).toBe(7);
         expect(r.deployQuotaEvents).toBe(7);
         expect(r.runtimeErrors).toBe(0); // 예전에는 7이었고 "점검이 필요합니다"가 떴다
+    });
+});
+
+// 리뷰가 실행으로 잡아낸 것들. 셋 다 "감시기가 잘못된 안심을 준다"는 같은 계열이다.
+describe('리뷰 지적 회귀', () => {
+    // firebase CLI는 결과가 없으면 안내문 한 줄만 찍는다. 예전 가드는 이걸 "형식이 바뀌었다"로
+    // 읽어 조용한 프로젝트에서 매번 거짓 경보를 냈다.
+    it('로그가 없을 때의 안내문을 형식 변경으로 오해하지 않는다', () => {
+        expect(isEmptyLogNotice(['No log entries found.'])).toBe(true);
+        expect(isEmptyLogNotice(['no log entries found'])).toBe(true);
+        expect(summarizeLogs('No log entries found.').parsed).toBe(0);
+    });
+
+    it('실제 로그가 섞여 있으면 빈 결과가 아니다', () => {
+        expect(isEmptyLogNotice(['No log entries found.', APP_ERROR])).toBe(false);
+        expect(isEmptyLogNotice([])).toBe(false);
+    });
+
+    // CRITICAL·ALERT는 ERROR보다 무겁다. 예전 정규식은 DIWE만 받아 이 줄들을 통째로 흘렸고,
+    // parsed 카운트에도 안 잡혀 fail-loud 가드까지 비껴갔다.
+    it('CRITICAL·ALERT를 에러로 센다', () => {
+        const critical = '2026-09-04T21:51:05.558Z C myFn: {"message":"container terminated"}';
+        const alert = '2026-09-04T21:51:06.000Z A myFn: {"message":"alert"}';
+        const r = summarizeLogs([critical, alert].join('\n'));
+        expect(r.parsed).toBe(2);
+        expect(r.appErrors).toBe(2);
+        expect(r.runtimeErrors).toBe(2);
+    });
+
+    it('NOTICE·미상(?) 심각도도 파싱은 한다 (에러로는 세지 않는다)', () => {
+        const r = summarizeLogs('2026-09-04T21:51:05.558Z N myFn: {"message":"notice"}');
+        expect(r.parsed).toBe(1);
+        expect(r.runtimeErrors).toBe(0);
+    });
+
+    // @type만 보면 정책 거부(policy_denied)까지 "배포 이벤트"로 빠진다 — 그건 실제 호출이
+    // 막힌 것이라 판정에서 빼면 안 된다.
+    it('배포가 아닌 감사 로그는 판정에서 빼지 않는다', () => {
+        const denied = '2026-09-04T21:51:05.558Z E myFn: {"@type":"type.googleapis.com/google.cloud.audit.AuditLog","methodName":"google.cloud.run.v1.Services.GetService","status":{"code":7,"message":"policy denied"}}';
+        const r = summarizeLogs(denied);
+        expect(r.deployEvents).toBe(0);
+        expect(r.appErrors).toBe(1);
+    });
+
+    // 영문 문구만 보면 구글이 표현을 바꾸는 순간 모든 쿼터 재시도가 "배포 실패"로 뒤집힌다.
+    it('쿼터 판정은 문구가 아니라 코드 8로도 성립한다', () => {
+        const codeOnly = '2026-09-04T21:51:05.558Z E myFn: {"@type":"type.googleapis.com/google.cloud.audit.AuditLog","methodName":"google.cloud.functions.v2.FunctionService.UpdateFunction","status":{"code":8,"message":"표현이 바뀐 한도 초과 메시지"}}';
+        const r = summarizeLogs(codeOnly);
+        expect(r.deployEvents).toBe(1);
+        expect(r.deployQuotaEvents).toBe(1);
     });
 });
