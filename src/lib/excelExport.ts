@@ -13,6 +13,7 @@ import type { FirestoreTimestamp } from '../types/common';
 import {
     ACTOR_SOURCE_NOTE, describeChangedFields, describeEvent, describeExportTarget,
 } from './auditLogLabels';
+import { formatFuelAmount } from './fuelFormat';
 
 /**
  * 운행일지 데이터를 엑셀 파일로 다운로드
@@ -251,7 +252,7 @@ export async function downloadFuelLogsExcel(
             '차량': rec.vehicleName || '',
             '주유/충전원': rec.driverName || '',
             '주유미터(km)': rec.meterReading ? rec.meterReading : '',
-            [`주유/충전량`]: rec.fuelAmount ? `${rec.fuelAmount} ${unit}` : '',
+            [`주유/충전량`]: rec.fuelAmount ? `${formatFuelAmount(rec.fuelAmount)} ${unit}` : '',
             '주유/충전금액(원)': rec.fuelCost ? rec.fuelCost : '',
             '비고': rec.notes || '',
         };

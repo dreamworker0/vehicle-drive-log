@@ -14,6 +14,7 @@ import { ocrDashboard } from '../lib/ocr';
 import type { Reservation } from '../types/reservation';
 import useBaseFuelLog from './base/useBaseFuelLog';
 import { validateNonNegativeFields } from './utils/numberValidation';
+import { roundFuelAmount } from '../lib/fuelFormat';
 
 const INITIAL_FORM = {
     vehicleId: '',
@@ -226,7 +227,9 @@ export default function useFuelLog() {
                 date: form.date,
                 meterReading: parseInt(form.meterReading),
                 fuelType: actualFuelType,
-                fuelAmount: parseFloat(form.fuelAmount),
+                // 저장 길목에서 자릿수를 맞춘다 — 입력 칸만 제한하면 기존 기록을 수정할 때
+                // (폼이 저장된 값을 그대로 프리필하므로) 긴 값이 다시 그대로 쓰인다.
+                fuelAmount: roundFuelAmount(form.fuelAmount),
                 fuelCost: parseInt(form.fuelCost),
                 notes: form.notes.trim() || '',
             };

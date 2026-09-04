@@ -31,6 +31,12 @@ export const driveLogSchema = z.object({
     passengerCount: z.coerce.number().optional().catch(undefined),
     passengerNames: z.array(z.string()).optional().catch(undefined),
     notes: z.string().optional().catch(undefined),
+    /**
+     * ⚠️ **금액(원)** 이다. 같은 이름인 `fuelLog.fuelAmount`는 **리터/kWh**라 뜻이 다르다.
+     * 표시부가 이를 증명한다 — MyRecords는 '주유비 … 원'으로 찍고, analyticsCalc·
+     * monthlyReportCalc·MyStatsSummary는 `fuelAmount || energyCost`로 비용에 더한다.
+     * 주유량 표기 규칙(src/lib/fuelFormat.ts)을 여기에 적용하면 안 된다.
+     */
     fuelAmount: z.coerce.number().optional().catch(undefined),
     energyCost: z.coerce.number().optional().catch(undefined),
     // 하이패스 사용 정보 (운행일지 저장 시 선택적으로 기록 — PDF/Excel '하이패스 포함' 출력에 사용)
