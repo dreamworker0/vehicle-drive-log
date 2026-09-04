@@ -15,6 +15,7 @@ interface VehicleModal {
 }
 import { getVehicles, createVehicle, updateVehicle, deleteVehicle, hasVehicleDriveLogs, clearVehicleMaintenanceBlock, retireVehicle, restoreVehicle, cancelVehicleReservations, getOrganizationMembers } from '../lib/firestore';
 import { useToast } from './useToast';
+import { MAIN_SITE_ID } from '../lib/orgSites';
 import { captureError } from '../lib/sentry';
 import {
     VEHICLE_MODEL_SUGGESTIONS, isElectricModel, isHydrogenModel,
@@ -30,9 +31,18 @@ const INITIAL_FORM = {
     currentKm: '', googleCalendarId: '',
     insuranceCompany: '', insurancePhone: '', insuranceExpiryDate: '',
     allowedUserIds: [] as string[],
-    // 출발지(차고지) id. 빈 값 = 본관(기관 주소) — 분관을 등록하지 않은 기관은 계속 빈 값이다.
+    // 기본 차고지 id. 빈 값 = 본관(기관 주소) — 분관을 등록하지 않은 기관은 계속 빈 값이다.
     siteId: '',
+    // 출발지가 매번 바뀌는 차량인가. 꺼짐이 기본이라 기존 기관의 운전자 화면은 그대로다.
+    siteVaries: false,
+    // 지금 실제로 서 있는 곳. 평소에는 운행 기록으로 서버가 갱신하고, 여기서는 보정만 한다.
+    currentSiteId: '',
 };
+
+/** 본관을 가리키는 두 표기('' 와 'main')를 하나로 모은다 — 비교와 저장 모두 이 값을 쓴다. */
+function normalizeSiteId(siteId: string | undefined | null): string {
+    return !siteId || siteId === MAIN_SITE_ID ? '' : siteId;
+}
 
 export default function useVehicleManager() {
     const { userData } = useAuth();
@@ -138,6 +148,8 @@ export default function useVehicleManager() {
             insuranceExpiryDate: vehicle.insurance?.expiryDate || '',
             allowedUserIds: vehicle.allowedUserIds || [],
             siteId: vehicle.siteId || '',
+            siteVaries: vehicle.siteVaries === true,
+            currentSiteId: vehicle.currentSiteId || '',
         });
         setEditingVehicle(vehicle);
         setOpenWithCalendarError(calendarError);
@@ -183,6 +195,10 @@ export default function useVehicleManager() {
             showToast('현재 누적 km는 0 이상이어야 합니다.', 'warning');
             return;
         }
+        // 본관은 저장할 때 빈 값으로 두는 것이 기존 규칙이다(siteId와 같다). 셀렉트는 'main'을
+        // 값으로 쓰므로 저장 직전에 한 번 되돌려, 같은 곳을 가리키는 두 표기가 섞이지 않게 한다.
+        const normalizedCurrentSiteId = normalizeSiteId(form.currentSiteId);
+
         const action = editingVehicle ? '차량 부분 수정' : '차량 등록';
         await runWithRetry(action, async () => {
             setFormLoading(true);
@@ -199,6 +215,18 @@ export default function useVehicleManager() {
                     allowedUserIds: form.allowedUserIds,
                     // 본관으로 되돌린 경우도 빈 값으로 덮어써야 하므로 항상 포함
                     siteId: form.siteId,
+                    siteVaries: form.siteVaries,
+                    // 유동 차량이 아니면 현재 위치를 **확인 시각까지** 비운다. 시각만 남겨 두면
+                    // 몇 달 뒤 다시 켰을 때 기본 차고지 이름에 옛날 시각이 붙어
+                    // "본관 · 5/1 09:00 기준"처럼 확인한 적 없는 신선도가 표시된다.
+                    currentSiteId: form.siteVaries ? normalizedCurrentSiteId : '',
+                    ...(form.siteVaries ? {} : { currentSiteUpdatedAt: null }),
+                    // 관리자가 위치를 **실제로 바꾼** 때만 확인 시각을 새로 찍는다. 저장할 때마다
+                    // 찍으면 실제로 확인하지 않은 시점을 가리켜 화면의 신선도 표기가 거짓말이 된다.
+                    // 양쪽을 같은 규칙으로 정규화해서 비교한다 — 빈 값과 'main'은 모두 본관이라,
+                    // 셀렉트를 열어 이미 표시돼 있던 본관을 다시 고른 것이 변경으로 잡히면 안 된다.
+                    ...((form.siteVaries && normalizedCurrentSiteId !== normalizeSiteId(editingVehicle?.currentSiteId))
+                        ? { currentSiteUpdatedAt: new Date() } : {}),
                     insurance: {
                         company: form.insuranceCompany.trim(),
                         phone: form.insurancePhone.trim(),

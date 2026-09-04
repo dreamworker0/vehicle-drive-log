@@ -2,6 +2,8 @@
  * ReservationCard — 오늘의 예약 카드 (운행 시작/도착 버튼 포함)
  */
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
+import { canChooseSite, hasBranchSites, resolveVehicleCurrentSite, resolveVehicleSite, type OrgSite } from '../../lib/orgSites';
+import { toDateOrNull } from '../../lib/dateUtils';
 import type { Vehicle } from '../../types/vehicle';
 import type { Reservation } from '../../types/reservation';
 
@@ -20,14 +22,41 @@ interface ReservationCardProps {
     onCancel?: (reservation: Reservation) => void;
     /** 하위 호환 */
     onStartWithTmap?: (reservation: Reservation) => void;
+    /** 기관의 출발지 목록(본관 + 분관). 분관이 없으면 위치 배지를 띄우지 않는다. */
+    orgSites?: OrgSite[];
+}
+
+/**
+ * 차를 가지러 가는 사람에게 보여 줄 위치 한 줄.
+ *
+ * 유동 차량에는 확인 시각을 반드시 붙인다 — 방금 확인된 값인지 3주 전 값인지 모르면,
+ * 한 번 헛걸음한 뒤로는 기능 자체를 믿지 않게 된다. 반대로 고정 차량에 시각을 붙이면
+ * 바뀌지도 않는 값에 낡음을 암시해 불필요한 의심을 만든다.
+ */
+function buildSiteLabel(orgSites: OrgSite[], vehicle: Vehicle | undefined, isInProgress: boolean): string | null {
+    if (!hasBranchSites(orgSites)) return null;
+    if (isInProgress) return '운행 중';
+
+    if (!canChooseSite(orgSites, vehicle)) {
+        return resolveVehicleSite(orgSites, vehicle).name;
+    }
+
+    const name = resolveVehicleCurrentSite(orgSites, vehicle).name;
+    const checkedAt = toDateOrNull(vehicle?.currentSiteUpdatedAt as Parameters<typeof toDateOrNull>[0]);
+    if (!checkedAt) return name;
+
+    const when = `${checkedAt.getMonth() + 1}/${checkedAt.getDate()} ${String(checkedAt.getHours()).padStart(2, '0')}:${String(checkedAt.getMinutes()).padStart(2, '0')}`;
+    return `${name} · ${when} 기준`;
 }
 
 export default function ReservationCard({
     reservation, vehicle, isInProgress, disabled,
     startingId, cancellingId, onStartDrive, onStartNavigation, onArrival, onCancel,
     onStartWithTmap,
+    orgSites = [],
 }: ReservationCardProps) {
     const isButtonDisabled = disabled || startingId === reservation.id;
+    const siteLabel = buildSiteLabel(orgSites, vehicle, isInProgress);
 
     // 운행 시작 임박 여부 계산 (오늘 30분 전 ~ 15분 경과)
     const isSoon = (() => {
@@ -114,6 +143,14 @@ export default function ReservationCard({
                             {reservation.destination && (
                                 <p className={`text-xs truncate ${isInProgress ? 'text-amber-700/70 dark:text-amber-300/80' : 'text-surface-500 dark:text-surface-300'}`}>
                                     {reservation.destination}
+                                </p>
+                            )}
+                            {siteLabel && (
+                                <p
+                                    data-testid="vehicle-site-badge"
+                                    className={`text-xs truncate ${isInProgress ? 'text-amber-700/70 dark:text-amber-300/80' : 'text-surface-500 dark:text-surface-300'}`}
+                                >
+                                    🚩 {siteLabel}
                                 </p>
                             )}
                             {reservation.recurringGroupId && (

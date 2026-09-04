@@ -92,7 +92,7 @@ interface BuildLogContext {
     orgId: string | null | undefined;
     user: { uid: string; displayName?: string | null; email?: string | null };
     userData: { name?: string } | null | undefined;
-    selectedVehicle: { vehicleType?: string } | undefined;
+    selectedVehicle: { vehicleType?: string; siteVaries?: boolean } | undefined;
     selectedPassengers: Array<{ name?: string; email?: string }>;
     externalPassengerCount?: number;
     externalPassengerNames?: string;
@@ -164,6 +164,9 @@ export function buildLogData(form: DriveLogForm, { orgId, user, userData, select
         inputMethod: ocrUsed ? 'ocr' : (favoriteUsed ? 'favorite' : 'manual'),
         // 분관을 등록한 기관에서만 값이 있다(그 외에는 undefined → sanitizeUndefined가 필드를 만들지 않는다)
         startLocation: startLocation || undefined,
+        // 세운 곳은 출발지가 매번 바뀌는 차량에서만 남긴다. 차량을 유동 → 고정으로 바꾼 뒤
+        // 폼에 남아 있던 값이 새어 나가면, 서버 트리거가 엉뚱한 차량의 위치를 옮긴다.
+        endSiteId: selectedVehicle?.siteVaries ? (form.endSiteId || undefined) : undefined,
     };
 
     if (!isNaN(startKm) && !isNaN(endKm)) {

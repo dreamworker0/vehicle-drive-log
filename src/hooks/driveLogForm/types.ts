@@ -22,6 +22,14 @@ export interface DriveLogForm {
     notes: string;
     driveDate: string;
     hipassBalanceAfter: string;
+    /**
+     * 출발지·세운 곳으로 고른 출발지 id (`organization.sites[].id`, 본관은 `main`).
+     *
+     * 출발지가 매번 바뀌는 차량에서만 채워진다. 고정 출발지 차량에서는 값이 아예 없고,
+     * 그때 출발지 라벨은 예전처럼 차량의 기본 차고지에서 파생된다 — optional인 이유다.
+     */
+    startSiteId?: string;
+    endSiteId?: string;
 }
 
 export interface LocationState {

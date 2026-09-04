@@ -29,7 +29,9 @@ const WaypointSection = memo(function WaypointSection({
     handleFavoriteSelect,
     handleSaveFavorite
 }: WaypointSectionProps) {
-    // 예약 데이터가 있거나 수정 모드이더라도 운행 목적과 행선지를 직접 입력해야 할 때 표시
+    // 예약 데이터가 있거나 수정 모드이더라도 운행 목적과 행선지를 직접 입력해야 할 때 표시.
+    // ⚠️ 출발지·세운 곳은 이 조건에 걸리면 안 되므로 SiteSection으로 분리했다 — 예약이 채우지
+    // 못하는 값인데, 예약 → 도착 → 일지가 가장 흔한 경로다.
     if (reservationData?.vehicleId && !isEditMode) return null;
 
     // 행선지는 즐겨찾기 선택 등 외부 경로로 채워지므로 빈 값을 방어한다 — 렌더 중 trim()이

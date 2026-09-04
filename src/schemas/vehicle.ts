@@ -69,10 +69,24 @@ export const vehicleSchema = z.object({
     /** 영구 중단을 기관 관리자에게 알린 시각 — 중복 발송 방지 겸 통지 여부 확인 근거 */
     calendarSyncDisabledNotifiedAt: timestampSchema.optional().catch(undefined),
     /**
-     * 차량이 서 있는 출발지(차고지) id — `organization.sites[].id`.
+     * 차량이 서 있는 **기본 차고지** id — `organization.sites[].id`.
      * 미설정·빈 값이면 본관(기관 주소)에서 출발하는 것으로 본다.
      */
     siteId: z.string().optional().catch(undefined),
+    /**
+     * 출발지가 매번 바뀌는 차량인가. 관리자가 켠 차량에만 운전자용 출발지 선택이 열린다.
+     *
+     * 기본값이 거짓이라, 분관을 등록했더라도 전 차량이 고정 출발지인 기관의 화면은 그대로다
+     * (분관 기능 자체는 *분산되어 있지만 고정된* 차량을 위해 만든 것이다).
+     */
+    siteVaries: z.boolean().optional().catch(undefined),
+    /**
+     * 차량이 지금 실제로 서 있는 출발지 id. 운행 종료 기록으로 **서버 트리거가** 갱신한다.
+     * 미설정이면 `siteId`(기본 차고지)에서 출발하는 것으로 본다.
+     */
+    currentSiteId: z.string().optional().catch(undefined),
+    /** 위 값이 확인된 시각 — 화면에 "○○ 기준"으로 신선도를 함께 보여 준다. */
+    currentSiteUpdatedAt: timestampSchema.optional().catch(undefined),
     /** 사용 가능 직원 uid 목록. undefined 또는 빈 배열 = 전체 허용 */
     allowedUserIds: z.array(z.string()).optional().catch(undefined),
     retired: vehicleRetiredSchema.nullable().optional().catch(null),

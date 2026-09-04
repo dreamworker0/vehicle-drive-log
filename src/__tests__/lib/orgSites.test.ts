@@ -2,9 +2,12 @@ import { describe, it, expect } from 'vitest';
 import {
     resolveOrgSites,
     resolveVehicleSite,
+    resolveVehicleCurrentSite,
     resolveDepartureAddress,
+    resolveCurrentDepartureAddress,
     resolveStartLocationLabel,
     hasBranchSites,
+    canChooseSite,
     createSiteId,
     MAIN_SITE_ID,
 } from '../../lib/orgSites';
@@ -89,6 +92,59 @@ describe('resolveStartLocationLabel', () => {
         const sites = resolveOrgSites(ORG);
         expect(resolveStartLocationLabel(sites, {})).toBe('본관');
         expect(resolveStartLocationLabel(sites, { siteId: 'site_a' })).toBe('제2분관');
+    });
+});
+
+describe('canChooseSite', () => {
+    const branchSites = resolveOrgSites(ORG);
+    const mainOnly = resolveOrgSites({ address: '서울시 본관로 1' });
+
+    it('분관이 없으면 siteVaries가 켜져 있어도 false — 고를 대상이 하나뿐이다', () => {
+        expect(canChooseSite(mainOnly, { siteVaries: true })).toBe(false);
+    });
+
+    it('분관이 있어도 siteVaries가 꺼져 있으면 false — 기존 기관 대다수가 이 경우다', () => {
+        expect(canChooseSite(branchSites, { siteVaries: false })).toBe(false);
+        expect(canChooseSite(branchSites, {})).toBe(false);
+        expect(canChooseSite(branchSites, null)).toBe(false);
+    });
+
+    it('분관이 있고 siteVaries가 켜졌을 때만 true', () => {
+        expect(canChooseSite(branchSites, { siteVaries: true })).toBe(true);
+    });
+});
+
+describe('resolveVehicleCurrentSite', () => {
+    const sites = resolveOrgSites(ORG);
+
+    it('현재 위치가 유효하면 그 출발지를 돌려준다', () => {
+        expect(resolveVehicleCurrentSite(sites, { siteId: MAIN_SITE_ID, currentSiteId: 'site_a' }).name).toBe('제2분관');
+    });
+
+    it('현재 위치가 없으면 기본 차고지로 되돌아간다', () => {
+        expect(resolveVehicleCurrentSite(sites, { siteId: 'site_a' }).name).toBe('제2분관');
+    });
+
+    it('이미 삭제된 분관을 가리키면 기본 차고지 → 본관 순으로 되돌린다', () => {
+        expect(resolveVehicleCurrentSite(sites, { siteId: 'site_a', currentSiteId: 'site_deleted' }).name).toBe('제2분관');
+        expect(resolveVehicleCurrentSite(sites, { currentSiteId: 'site_deleted' }).id).toBe(MAIN_SITE_ID);
+        expect(resolveVehicleCurrentSite(sites, null).id).toBe(MAIN_SITE_ID);
+    });
+});
+
+describe('resolveCurrentDepartureAddress', () => {
+    const sites = resolveOrgSites(ORG);
+
+    it('현재 위치 주소에서 출발한다', () => {
+        expect(resolveCurrentDepartureAddress(sites, { currentSiteId: 'site_a' })).toBe('경기도 분관로 2');
+    });
+
+    it('현재 위치에 주소를 안 적었으면 본관 주소로 계산한다 (빈 출발지로 경로가 사라지지 않게)', () => {
+        expect(resolveCurrentDepartureAddress(sites, { currentSiteId: 'site_b' })).toBe('서울시 본관로 1');
+    });
+
+    it('현재 위치가 없으면 기본 차고지 주소를 쓴다', () => {
+        expect(resolveCurrentDepartureAddress(sites, { siteId: 'site_a' })).toBe('경기도 분관로 2');
     });
 });
 

@@ -21,6 +21,11 @@ export const driveLogSchema = z.object({
     purpose: z.string().optional().catch(undefined),
     destination: z.string().optional().catch(undefined),
     startLocation: z.string().optional().catch(undefined),
+    /**
+     * 운행 후 차를 세운 출발지 id. 서버 트리거가 차량의 현재 위치를 갱신하는 근거다.
+     * 출발지 선택이 열린 차량(`siteVaries`)에서만 기록되므로, 값의 존재 자체가 판정 결과다.
+     */
+    endSiteId: z.string().optional().catch(undefined),
     passengers: z.coerce.number().optional().catch(undefined),
     vehicleType: z.string().optional().catch(undefined),
     passengerCount: z.coerce.number().optional().catch(undefined),
