@@ -196,6 +196,21 @@ export function summarizeAudit(raw: string): { counts: AuditCounts; accepted: nu
     return { counts, accepted };
 }
 
+/**
+ * `npm audit` 한 번의 제한 시간.
+ *
+ * 이 감사는 fail-closed다 — **실행 실패와 취약점 발견을 똑같이 차단으로 취급한다.** 그래서
+ * 제한은 "진짜로 멈춘 감사"만 걸러낼 만큼 넉넉해야 한다. 짧게 잡으면 취약점이 하나도 없는데도
+ * 시간만으로 pre-push와 CI가 막히고, 남는 탈출구가 `--no-verify`뿐이라 **게이트를 끄는 습관**이
+ * 생긴다. 게이트는 통과 기준을 낮추는 것이 아니라 **실행을 끝까지 마치게** 해야 지켜진다.
+ *
+ * 30초로는 부족하다는 근거(2026-09-04 측정, 모두 유효한 리포트로 정상 종료):
+ * 로컬 루트 167~272초 · 로컬 Functions 217초 · GitHub 러너는 양쪽 모두 60초 초과.
+ * npm 레지스트리 응답 속도는 날마다 크게 달라지므로(같은 날 17초에서 200초대까지) 관측된
+ * 최악값의 배수를 준다. 러너에 더 짧게 주는 이유는 실패해도 사람의 작업을 막지 않아서다.
+ */
+const AUDIT_TIMEOUT_MS = process.env.CI ? 300000 : 600000;
+
 function runAudit(dir: string, label: string): AuditCounts | null {
     console.log(`\n🔍 ${label} 보안 감사 (${dir})`);
     console.log('─'.repeat(50));
@@ -206,7 +221,7 @@ function runAudit(dir: string, label: string): AuditCounts | null {
         raw = execSync('npm audit --json', {
             cwd: dir,
             encoding: 'utf-8',
-            timeout: 30000,
+            timeout: AUDIT_TIMEOUT_MS,
             stdio: ['pipe', 'pipe', 'ignore'],
         });
     } catch (err: unknown) {
