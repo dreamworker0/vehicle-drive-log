@@ -13,6 +13,7 @@ import HipassChargeTab from './HipassChargeTab';
 import MaintenanceTab from './MaintenanceTab';
 import { isChargeableFuel } from '../../hooks/useVehicleManager';
 import { stripNegative } from '../../hooks/utils/numberValidation';
+import { formatFuelAmount, limitFuelDecimals } from '../../lib/fuelFormat';
 
 type TabType = 'fuel' | 'charge' | 'maintenance';
 
@@ -235,7 +236,7 @@ export default function FuelLogTab() {
                                         step="0.001"
                                         min="0"
                                         value={form.fuelAmount}
-                                        onChange={e => setForm({ ...form, fuelAmount: stripNegative(e.target.value) })}
+                                        onChange={e => setForm({ ...form, fuelAmount: limitFuelDecimals(stripNegative(e.target.value)) })}
                                         className="input min-h-[48px]"
                                         placeholder={isChargeable ? '30.5' : '40.5'}
                                         required
@@ -335,7 +336,7 @@ export default function FuelLogTab() {
                                         {/* 금액/리터 + 삭제 */}
                                         <div className="flex flex-col items-end gap-0.5 flex-shrink-0">
                                             <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                                                {rec.fuelAmount}
+                                                {formatFuelAmount(rec.fuelAmount)}
                                                 {isChargeableFuel(rec.fuelType) ? (rec.fuelType === 'hydrogen' ? 'kg' : 'kWh') : 'L'}
                                             </span>
                                             <span className="text-xs text-surface-500 dark:text-surface-400">

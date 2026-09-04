@@ -4,6 +4,7 @@
  */
 import { printPdfReport, getTimeStr, formatDate, formatNumber, escapeHtml } from './pdfEngine';
 import type { ApprovalEntry, PdfColumn } from './pdfEngine';
+import { formatFuelAmount } from '../fuelFormat';
 
 /** PDF용 주유 기록 행 */
 interface PdfFuelLogEntry {
@@ -45,7 +46,7 @@ function renderRow(rec: PdfFuelLogEntry, rowNumber: number): string {
             <td class="center">${escapeHtml(rec.vehicleName || '')}</td>
             <td class="center">${escapeHtml(rec.driverName || '')}</td>
             <td class="right">${formatNumber(rec.meterReading)}</td>
-            <td class="right">${rec.fuelAmount ? `${rec.fuelAmount} ${unit}` : ''}</td>
+            <td class="right">${rec.fuelAmount ? `${formatFuelAmount(rec.fuelAmount)} ${unit}` : ''}</td>
             <td class="right">${rec.fuelCost ? rec.fuelCost.toLocaleString() : ''}</td>
             <td class="left">${escapeHtml(rec.notes || '')}</td>
         </tr>
@@ -58,7 +59,7 @@ function renderTotalRow(pageRows: PdfFuelLogEntry[]): string {
     return `
         <tr class="total-row">
             <td colspan="6" class="center total-label">소 계</td>
-            <td class="right total-value">${totalAmount > 0 ? totalAmount.toLocaleString() : ''}</td>
+            <td class="right total-value">${totalAmount > 0 ? formatFuelAmount(totalAmount) : ''}</td>
             <td class="right total-value">${totalCost > 0 ? totalCost.toLocaleString() : ''}</td>
             <td>&nbsp;</td>
         </tr>
