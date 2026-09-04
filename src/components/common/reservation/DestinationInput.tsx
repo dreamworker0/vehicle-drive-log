@@ -5,8 +5,9 @@
  * `form`/`setForm` 대신 목적지 문자열과 변경 콜백만 주고받는다.
  */
 import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
-import { parseDestinations } from '../../../lib/tmap';
+import { parseDestinations, primeGeocodeCache } from '../../../lib/tmap';
 import { usePoiSearch } from '../../../hooks/usePoiSearch';
+import type { PoiResult } from '../../../hooks/usePoiSearch';
 import type { Favorite } from '../../../types/favorite';
 
 interface DestinationInputProps {
@@ -128,9 +129,13 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
             setInputError('');
         };
 
-        const handleSelectPoi = (name: string, address: string) => {
+        const handleSelectPoi = (poi: PoiResult) => {
             // "서울 강남구 테헤란로" 처럼 주소가 있으면 "이름 (주소)" 형태로 저장
-            handleAddDestination(address ? `${name} (${address})` : name);
+            const label = poi.address ? `${poi.name} (${poi.address})` : poi.name;
+            // POI 검색이 이미 좌표를 줬으므로 경로 계산이 같은 곳을 다시 검색하지 않도록
+            // 저장할 문자열 그대로를 키로 캐시에 심는다.
+            primeGeocodeCache(label, { lat: poi.lat, lon: poi.lon, name: poi.name });
+            handleAddDestination(label);
         };
 
         /**
@@ -160,7 +165,7 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
                 if (highlighted) {
                     // 방향키로 검색 결과를 직접 고른 경우에만 그 장소를 넣는다.
                     // (예전에는 결과가 뜨기만 하면 첫 항목이 들어가 엉뚱한 곳이 기록됐다)
-                    handleSelectPoi(highlighted.name, highlighted.address);
+                    handleSelectPoi(highlighted);
                 } else if (inputValue.trim()) {
                     // 기본 동작: 입력한 그대로 목적지로 등록
                     handleAddDestination(inputValue);
@@ -319,7 +324,7 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
                                     type="button"
                                     onMouseDown={e => {
                                         e.preventDefault(); // onBlur보다 먼저 실행되도록
-                                        handleSelectPoi(poi.name, poi.address);
+                                        handleSelectPoi(poi);
                                     }}
                                     className={`w-full text-left px-3 py-2.5 flex items-start gap-2.5 transition-colors border-b border-surface-100 dark:border-surface-700 last:border-0 ${highlightIndex === i
                                         ? 'bg-primary-50 dark:bg-primary-900/20'

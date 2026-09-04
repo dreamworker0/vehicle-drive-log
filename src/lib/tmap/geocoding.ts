@@ -68,6 +68,29 @@ export const searchPOIList = async (keyword: string, count = 5): Promise<PoiResu
 
 
 /**
+ * 드롭다운에서 고른 장소의 좌표를 `geocode` 캐시에 미리 심는다.
+ *
+ * POI 검색은 이미 `lat`/`lon`을 함께 돌려주는데, 목적지 입력창은 그 좌표를 버리고
+ * 문자열(`"이름 (주소)"`)만 저장해 왔다. 그러면 경로를 계산할 때 `geocode`가 **방금 고른
+ * 바로 그 장소를 다시 검색한다** — 목적지 하나당 POI 호출 1건이 확정적으로 낭비된다
+ * (2026-09-05 기준 하루 경로 300건 ≒ POI 300건, 전체 POI 호출의 약 1/3).
+ *
+ * @param address `geocode`가 나중에 넘겨받을 문자열과 **정확히 같아야** 한다. 다르면
+ *   캐시가 빗나가고 예전처럼 API를 부를 뿐이라, 틀려도 조용히 손해만 볼 뿐 깨지지는 않는다.
+ */
+export function primeGeocodeCache(
+    address: string,
+    coord: { lat: number; lon: number; name: string },
+): void {
+    const key = address?.trim();
+    if (!key) return;
+    // 좌표가 없는 결과로 캐시를 오염시키지 않는다 — null을 심으면 그 목적지는 이후
+    // 계속 "찾을 수 없음"으로 굳어 경로 계산이 조용히 실패한다.
+    if (!Number.isFinite(coord?.lat) || !Number.isFinite(coord?.lon)) return;
+    geoCache.set(key, { lat: coord.lat, lon: coord.lon, name: coord.name || key });
+}
+
+/**
  * 주소 → 좌표 변환 (지오코딩)
  * 캐싱 적용
  */

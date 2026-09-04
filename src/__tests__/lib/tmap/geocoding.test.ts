@@ -263,3 +263,49 @@ describe('geocode — 3단 폴백', () => {
         expect(core.isTmapCoolingDown()).toBe(false); // 리셋되지 않았다면 여기서 쿨다운
     });
 });
+
+// POI 드롭다운은 이미 좌표를 받아오는데, 예전에는 그걸 버리고 문자열만 저장해
+// 경로 계산에서 `geocode`가 같은 장소를 다시 검색했다 — 목적지 하나당 POI 호출 1건이
+// 확정적으로 낭비됐다(2026-09-05 실측: 하루 경로 300건 ≒ POI 300건).
+describe('primeGeocodeCache — 고른 장소를 다시 검색하지 않는다', () => {
+    it('심어 둔 좌표가 있으면 geocode가 API를 부르지 않는다', async () => {
+        geo.primeGeocodeCache('서울시청 (서울 중구 세종대로)', { lat: 37.5663, lon: 126.9779, name: '서울시청' });
+
+        const result = await settle(geo.geocode('서울시청 (서울 중구 세종대로)'));
+
+        expect(result).toEqual({ lat: 37.5663, lon: 126.9779, name: '서울시청' });
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('키가 다르면 평소대로 API를 부른다 (빗나가도 손해만 볼 뿐 깨지지 않는다)', async () => {
+        geo.primeGeocodeCache('서울시청 (서울 중구 세종대로)', { lat: 37.5663, lon: 126.9779, name: '서울시청' });
+        respondWith(poiResponse(SEOUL_CITY_HALL));
+
+        await settle(geo.geocode('서울시청'));
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('좌표가 없는 값으로는 캐시를 오염시키지 않는다', async () => {
+        // null이 심기면 그 목적지는 이후 계속 "찾을 수 없음"으로 굳어 경로 계산이 조용히 실패한다.
+        geo.primeGeocodeCache('엉터리', { lat: NaN, lon: 126.9, name: '엉터리' });
+        expect(core.geoCache.has('엉터리')).toBe(false);
+
+        geo.primeGeocodeCache('', { lat: 37.5, lon: 126.9, name: '빈키' });
+        expect(core.geoCache.has('')).toBe(false);
+    });
+
+    it('앞뒤 공백은 지우고 심는다 (목적지 문자열은 trim되어 넘어온다)', async () => {
+        geo.primeGeocodeCache('  서울역  ', { lat: 37.55, lon: 126.97, name: '서울역' });
+
+        const result = await settle(geo.geocode('서울역'));
+
+        expect(result).toEqual({ lat: 37.55, lon: 126.97, name: '서울역' });
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('name이 비면 키를 이름으로 쓴다', () => {
+        geo.primeGeocodeCache('무명장소', { lat: 37.1, lon: 127.1, name: '' });
+        expect(core.geoCache.get('무명장소')).toEqual({ lat: 37.1, lon: 127.1, name: '무명장소' });
+    });
+});
