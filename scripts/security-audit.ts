@@ -196,6 +196,82 @@ export function summarizeAudit(raw: string): { counts: AuditCounts; accepted: nu
     return { counts, accepted };
 }
 
+/** 진단 한 줄의 최대 길이 — JSON·비-JSON 경로 공통(한쪽만 바꿔 갈라지지 않게 상수로 묶는다) */
+const FAILURE_DETAIL_MAX = 300;
+
+/**
+ * URL에 박힌 basic-auth 자격증명을 지운다.
+ *
+ * npm은 `--json` stdout의 오류 문면에서 레지스트리 URL을 **리댁트하지 않는다**(실측:
+ * `--registry=http://user:pw@…`로 감사하면 message에 비밀번호가 평문으로 남는다).
+ * 이 저장소 CI 로그는 공개이고, GitHub의 시크릿 마스킹은 `.npmrc`에서 읽힌 값을 모른다.
+ * 지금은 공개 npmjs.org만 쓰므로 잠재 위험이지만, 사설 미러를 붙이는 사람이 이 로그
+ * 경로를 기억할 이유가 없어 여기서 막아 둔다. 호스트명은 남긴다 — 진단에 필요하다.
+ */
+function redactCredentials(text: string): string {
+    return text.replace(/\/\/[^/@\s]+:[^/@\s]*@/g, '//***:***@');
+}
+
+/** 진단 문자열을 한 줄로 눌러 자격증명을 걷어내고 자른다 (자르기 전에 걷어내야 반쪽이 남지 않는다) */
+function clipDetail(text: string): string {
+    return redactCredentials(text.replace(/\s+/g, ' ').trim()).slice(0, FAILURE_DETAIL_MAX);
+}
+
+/**
+ * 유효한 리포트가 아닐 때, npm이 실제로 뭐라고 했는지 한 줄로 뽑는다.
+ *
+ * npm은 감사 엔드포인트가 죽으면 취약점 리포트 대신 오류 JSON만 stdout에 내보낸다.
+ * 형태는 한 가지가 아니다 — 쓸 만한 정보가 `error.code`/`error.summary`에 있을 때도 있고,
+ * 최상위 `message`에만 있을 때도 있다(ECONNREFUSED가 후자다 — 실측). 종료 코드도 실패
+ * 모드에 따라 다르고, **0으로 끝나는 경로가 있다**는 것이 게이트를 통째로 통과시킬 수 있다는
+ * 2026-07-18 검증 #5의 지적이다(그래서 `summarizeAudit`이 리포트 형태를 따로 검증한다).
+ *
+ * 어느 형태든 상태 코드와 URL은 그 안에 들어 있었는데도 화면에는 "리포트가 유효하지 않음"만
+ * 찍혔던 탓에, 2026-09-04 장애 때 원인이 우리 쪽인지 npm 쪽인지 가리는 데 하루가 갔다
+ * (그동안 제한 시간만 네 번 늘렸다 — 증상을 쫓은 것이다). 다음 장애에서는 **첫 실행 한 번**으로
+ * 판별되게 한다.
+ *
+ * 판정 자체는 바꾸지 않는다 — 이 함수는 진단 출력 전용이고 fail-closed는 그대로다.
+ */
+export function describeAuditFailure(raw: string): string | null {
+    const trimmed = raw.trim();
+    if (!trimmed) return null;
+
+    let parsed: unknown;
+    try {
+        parsed = JSON.parse(trimmed);
+    } catch {
+        // JSON조차 아니면(프록시 HTML 응답 등) 앞부분을 그대로 보여준다.
+        return clipDetail(trimmed);
+    }
+    if (typeof parsed !== 'object' || parsed === null) return null;
+
+    const obj = parsed as { error?: unknown; message?: unknown };
+    const err = typeof obj.error === 'object' && obj.error !== null
+        ? (obj.error as { code?: unknown; summary?: unknown; detail?: unknown })
+        : undefined;
+
+    // summary에 "503 Service Unavailable - POST https://…/audits/quick"처럼 상태·URL이 함께 온다.
+    const parts = [err?.code, err?.summary, obj.message, err?.detail]
+        .filter((v): v is string => typeof v === 'string' && v.trim().length > 0)
+        .map((v) => v.replace(/\s+/g, ' ').trim());
+
+    if (parts.length === 0) {
+        // 레지스트리 오류가 아니라 **형식 불일치** 쪽이다(npm 6/7 계열 리포트 등). 이 경우
+        // 오류 필드가 없어 위 목록이 비는데, 그러면 콘솔에 남는 건 "레지스트리 오류·형식
+        // 불일치" 한 줄뿐이라 이 커밋이 없애려던 모호함이 그대로 남고 오히려 레지스트리
+        // 장애로 오인하게 된다. 최상위 키만 흘려도 "우리 쪽 형식 문제"로 갈린다.
+        const keys = Object.keys(parsed as Record<string, unknown>);
+        return keys.length > 0 ? `형식 불일치 — 최상위 키: ${keys.slice(0, 8).join(', ')}` : null;
+    }
+
+    // code가 summary 안에 이미 들어 있는 경우가 흔해 중복을 걷어낸다 (더 긴 쪽을 남긴다).
+    const unique = parts.filter(
+        (v, i) => !parts.some((o, j) => j !== i && o.includes(v) && (o.length > v.length || j < i)),
+    );
+    return clipDetail(unique.join(' — '));
+}
+
 /**
  * `npm audit` 한 번의 제한 시간.
  *
@@ -204,10 +280,21 @@ export function summarizeAudit(raw: string): { counts: AuditCounts; accepted: nu
  * 시간만으로 pre-push와 CI가 막히고, 남는 탈출구가 `--no-verify`뿐이라 **게이트를 끄는 습관**이
  * 생긴다. 게이트는 통과 기준을 낮추는 것이 아니라 **실행을 끝까지 마치게** 해야 지켜진다.
  *
- * 30초로는 부족하다는 근거(2026-09-04 측정, 모두 유효한 리포트로 정상 종료):
- * 로컬 루트 167~272초 · 로컬 Functions 217초 · GitHub 러너는 양쪽 모두 60초 초과.
- * npm 레지스트리 응답 속도는 날마다 크게 달라지므로(같은 날 17초에서 200초대까지) 관측된
- * 최악값의 배수를 준다. 러너에 더 짧게 주는 이유는 실패해도 사람의 작업을 막지 않아서다.
+ * ⚠️ 이 값이 왜 이렇게 큰지 — 2026-09-04 장애 기록.
+ * 로컬 루트 167~272초 · 로컬 Functions 217초 · 러너 양쪽 모두 60초 초과라는 측정이 나온 날,
+ * 원인은 **회선도 레지스트리 전반도 아니었다.** 직접 찔러 보니 감사 엔드포인트
+ * (`POST /-/npm/v1/security/audits/quick`)만 503 → 무응답 → 500이었고, 같은 시각
+ * `/-/ping`·패키지 내려받기·api.github.com은 모두 0.2초에 200을 냈다. 즉 그 200초대는
+ * "레지스트리가 느린 시간"이 아니라 **npm 내부 재시도 백오프가 쌓인 시간**이다.
+ *
+ * 그리고 **이 값을 정당화하는 사실은 그 200초대가 결국 뚫렸다는 것이다** — 위 측정은 모두
+ * 유효한 리포트로 정상 종료했다(같은 장애 중에도 17초에 끝난 실행이 있었다 — 편차가 이만큼
+ * 크다). 즉 버티면 npm의 재시도가 성공한다. 짧게 자르면 성공할 감사를 우리가 포기하는
+ * 것이고, fail-closed라 그 포기가 곧 차단이다. 그래서 이 제한은 평소를 위한 여유가 아니라
+ * **npm 쪽 장애가 지나가는 동안에도 감사를 끝까지 마치게 하는 여유**다.
+ *
+ * 엔드포인트 복구 후 같은 명령은 로컬 루트+Functions 합 11초 · CI 8초에 끝났다.
+ * 러너에 더 짧게 주는 이유는 실패해도 사람의 작업을 막지 않아서다.
  */
 const AUDIT_TIMEOUT_MS = process.env.CI ? 300000 : 600000;
 
@@ -228,7 +315,11 @@ function runAudit(dir: string, label: string): AuditCounts | null {
         raw = (err as { stdout?: string }).stdout || '';
         if (!raw) {
             const errorMessage = err instanceof Error ? err.message : String(err);
-            console.log('   ⚠️  audit 실행 실패:', errorMessage.slice(0, 100));
+            console.log('   ⚠️  audit 실행 실패:', clipDetail(errorMessage));
+            // 제한 시간에 걸리면 stdout이 비어(실측: `spawnSync … ETIMEDOUT` + stdout '')
+            // npm의 오류 원문이 없다 — 무엇이 죽었는지는 알 수 없으므로 최소한 얼마를
+            // 기다렸는지는 남긴다. 이 줄이 없으면 위 주석의 측정값과 대조할 근거가 없다.
+            console.log(`   ↳ 제한 시간 ${Math.round(AUDIT_TIMEOUT_MS / 1000)}초 · npm 응답 원문 없음`);
             // fail-closed: 실행 실패를 취약점 0건으로 위장하지 않는다 (2026-07-10 감사 하드닝)
             return null;
         }
@@ -237,6 +328,9 @@ function runAudit(dir: string, label: string): AuditCounts | null {
     const summary = summarizeAudit(raw);
     if (summary === null) {
         console.log('   ⚠️  audit 리포트가 유효하지 않습니다 (레지스트리 오류·형식 불일치)');
+        // npm이 남긴 원문을 함께 보여준다 — 우리 쪽 문제인지 npm 쪽 장애인지 여기서 갈린다.
+        const detail = describeAuditFailure(raw);
+        if (detail) console.log(`   ↳ npm 응답: ${detail}`);
         // fail-closed: 유효한 리포트가 아니면 "취약점 없음"으로 처리하지 않는다
         return null;
     }
