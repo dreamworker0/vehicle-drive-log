@@ -10,6 +10,7 @@ import {
     extractGhsa,
     validateRegistry,
     summarizeAudit,
+    describeAuditFailure,
     resetAcceptedHits,
     getAcceptedHits,
 } from '../security-audit';
@@ -236,5 +237,90 @@ describe('summarizeAudit — 리포트 형태 검증 (네트워크 장애 fail-o
         expect(summarizeAudit('')).toBeNull();
         expect(summarizeAudit('{ not json')).toBeNull();
         expect(summarizeAudit('null')).toBeNull();
+    });
+});
+
+// 2026-09-04 장애에서 화면에 "리포트가 유효하지 않음"만 찍히는 바람에 원인이 우리 쪽인지
+// npm 쪽인지 가리는 데 하루가 걸렸다. 그 판별을 첫 실행에 끝내는 것이 이 함수의 계약이다.
+describe('describeAuditFailure — 실패 원인 진단 출력', () => {
+    it('감사 엔드포인트 장애 응답에서 상태 코드와 URL을 뽑는다', () => {
+        const raw = JSON.stringify({
+            error: {
+                code: 'E503',
+                summary: '503 Service Unavailable - POST https://registry.npmjs.org/-/npm/v1/security/audits/quick',
+                detail: '',
+            },
+        });
+        const out = describeAuditFailure(raw);
+        expect(out).toContain('E503');
+        expect(out).toContain('/-/npm/v1/security/audits/quick');
+    });
+
+    it('message만 있는 응답도 그대로 보여준다', () => {
+        expect(describeAuditFailure(JSON.stringify({ message: 'connect ECONNREFUSED 1.2.3.4:443' })))
+            .toContain('ECONNREFUSED');
+    });
+
+    it('code가 summary에 이미 포함되면 중복해서 붙이지 않는다', () => {
+        const out = describeAuditFailure(JSON.stringify({
+            error: { code: 'E500', summary: 'E500 Internal Server Error' },
+        }));
+        expect(out).toBe('E500 Internal Server Error');
+    });
+
+    it('JSON이 아니면(프록시 HTML 등) 원문 앞부분을 한 줄로 보여준다', () => {
+        const out = describeAuditFailure('<html>\n  <body>502 Bad Gateway</body>\n</html>');
+        expect(out).toBe('<html> <body>502 Bad Gateway</body> </html>');
+    });
+
+    // 오류 필드가 없는 응답은 레지스트리 장애가 아니라 형식 불일치다(npm 6/7 계열 리포트 등).
+    // 여기서 아무것도 못 보여주면 콘솔에는 "레지스트리 오류·형식 불일치" 한 줄만 남아,
+    // 이 함수가 없애려던 모호함이 그대로 남는다.
+    it('오류 필드가 없으면 최상위 키를 보여준다 (형식 불일치를 레지스트리 장애로 오인하지 않게)', () => {
+        const out = describeAuditFailure(JSON.stringify({ advisories: {}, metadata: {} }));
+        expect(out).toBe('형식 불일치 — 최상위 키: advisories, metadata');
+    });
+
+    it('error 객체가 비어 있어도 형식 불일치로 알려준다', () => {
+        expect(describeAuditFailure(JSON.stringify({ error: {} }))).toBe('형식 불일치 — 최상위 키: error');
+    });
+
+    it('오류 필드가 문자열이 아니면 값으로 쓰지 않는다', () => {
+        expect(describeAuditFailure(JSON.stringify({ error: { code: 503 } })))
+            .toBe('형식 불일치 — 최상위 키: error');
+    });
+
+    // 이 저장소 CI 로그는 공개다. npm은 stdout 오류 문면에서 레지스트리 URL을 리댁트하지
+    // 않으므로(실측), 사설 미러를 붙이면 자격증명이 평문으로 남는다. 조용히 회귀하는
+    // 종류의 코드라 테스트로 못박는다.
+    it('레지스트리 URL의 자격증명을 지운다 (공개 CI 로그 유출 차단)', () => {
+        const raw = JSON.stringify({
+            message: 'request to http://deployuser:sup3rs3cr3t@mirror.example.com/-/npm/v1/security/audits/quick failed',
+        });
+        const out = describeAuditFailure(raw)!;
+        expect(out).not.toContain('sup3rs3cr3t');
+        expect(out).not.toContain('deployuser');
+        expect(out).toContain('//***:***@');
+        // 호스트명은 남긴다 — 어느 레지스트리가 죽었는지가 진단의 핵심이다.
+        expect(out).toContain('mirror.example.com');
+    });
+
+    it('JSON이 아닌 원문에서도 자격증명을 지운다', () => {
+        const out = describeAuditFailure('failed: https://u:pw@reg.example.com/x')!;
+        expect(out).not.toContain('pw@');
+        expect(out).toContain('//***:***@');
+    });
+
+    it('길어도 잘라서 로그 한 줄을 넘기지 않는다 (JSON·비-JSON 같은 한계)', () => {
+        expect(describeAuditFailure(JSON.stringify({ message: 'x'.repeat(1000) }))!.length).toBe(300);
+        expect(describeAuditFailure('y'.repeat(1000))!.length).toBe(300);
+    });
+
+    it('보여줄 것이 없으면 null (빈 출력·객체가 아닌 JSON)', () => {
+        expect(describeAuditFailure('')).toBeNull();
+        expect(describeAuditFailure('   ')).toBeNull();
+        expect(describeAuditFailure('null')).toBeNull();
+        expect(describeAuditFailure('"just a string"')).toBeNull();
+        expect(describeAuditFailure('{}')).toBeNull();
     });
 });
