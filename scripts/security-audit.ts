@@ -26,7 +26,14 @@ interface AuditCounts {
  * ⚠️ 여기 등록한 권고는 아래 집계에서 **차감**되어 게이트를 통과한다. 즉 "이 앱에
  * 해당하지 않음"을 근거와 함께 확인한 것만 올린다(단순히 시끄러워서 끄는 용도 아님).
  *
- * 해소되어 제거된 이력:
+ * overrides로 해소한 이력 (등록 없이 정면으로 고친 것들 — 같은 권고가 다시 뜨면 여기부터 본다):
+ *  - qs(GHSA-x5fp-wj9c-mxmx array-limit 우회, GHSA-4mjr-xmp4-gh2g DoS / functions moderate
+ *    3건)는 functions/package.json의 overrides(qs ^6.16.0)로 2026-09-04 해소(audit 0).
+ *    ⚠️ `npm audit fix`로는 못 고친다 — 고쳐진 6.16.0이 express·body-parser가 선언한
+ *    `~6.15.1` 범위 밖이라 npm이 적용을 거부하고, "fix available via npm audit fix"라는
+ *    안내만 반복한다(실행해도 qs는 그대로고 lockfile의 libc 메타데이터만 걷어낸다).
+ *    즉 이 override는 upstream이 아직 검증하지 않은 마이너를 우리가 앞당겨 쓰는 것이다.
+ *    express가 범위를 넓히면 override를 지우고 정상 해소로 돌린다.
  *  - js-yaml DoS(GHSA-h67p-54hq-rp68, functions moderate 20건의 단일 근본)는
  *    functions/package.json의 overrides(js-yaml ^4.2.0) + jest coverageProvider 'v8'로
  *    2026-06-19 실제 해소(audit 0). v8은 babel-plugin-istanbul/load-nyc-config 경로를
