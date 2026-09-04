@@ -78,15 +78,24 @@ export const searchPOIList = async (keyword: string, count = 5): Promise<PoiResu
  * @param address `geocode`가 나중에 넘겨받을 문자열과 **정확히 같아야** 한다. 다르면
  *   캐시가 빗나가고 예전처럼 API를 부를 뿐이라, 틀려도 조용히 손해만 볼 뿐 깨지지는 않는다.
  */
+function isPlausibleKoreanCoord(lat: unknown, lon: unknown): boolean {
+    if (typeof lat !== 'number' || typeof lon !== 'number') return false;
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return false;
+    // 제주 남단~강원 북단, 서해~독도까지 여유 있게 잡는다.
+    return lat >= 32 && lat <= 40 && lon >= 123 && lon <= 133;
+}
+
 export function primeGeocodeCache(
     address: string,
     coord: { lat: number; lon: number; name: string },
 ): void {
     const key = address?.trim();
     if (!key) return;
-    // 좌표가 없는 결과로 캐시를 오염시키지 않는다 — null을 심으면 그 목적지는 이후
-    // 계속 "찾을 수 없음"으로 굳어 경로 계산이 조용히 실패한다.
-    if (!Number.isFinite(coord?.lat) || !Number.isFinite(coord?.lon)) return;
+    // 좌표가 없거나 말이 안 되는 값으로 캐시를 오염시키지 않는다. 한 번 심기면 그 목적지는
+    // 재시도조차 없이 그 값으로 굳는다 — null이면 계속 "찾을 수 없음"이 되고, (0, 0)이면
+    // 기니만 근해로 경로를 계산해 조용히 실패한다. searchPOIList는 `"0"`을 truthy로 통과
+    // 시키므로 유한성만으로는 못 막는다. 한반도 범위 밖은 우리 서비스에서 목적지가 아니다.
+    if (!isPlausibleKoreanCoord(coord?.lat, coord?.lon)) return;
     geoCache.set(key, { lat: coord.lat, lon: coord.lon, name: coord.name || key });
 }
 

@@ -25,10 +25,14 @@ interface PoiCacheData {
 }
 
 /**
- * 캐시 키. 저장소를 sessionStorage → localStorage로 옮기면서 키는 그대로 둔다 —
- * 저장소가 다르므로 옛 sessionStorage 항목과 섞이지 않고, 탭을 닫으면 알아서 사라진다.
+ * 캐시 키.
+ *
+ * 영속화하면서 버전을 붙인다(`geoCache`의 `tmap_geo_cache_v1`과 같은 방식). PoiResult 모양이
+ * 바뀌어도 옛 항목이 무한정 남지 않게 — `loadCache`는 queue가 배열이고 data가 객체인지만
+ * 보므로 모양이 달라진 항목을 걸러내지 못한다. sessionStorage 시절의 옛 키는 탭을 닫으면
+ * 알아서 사라지므로 옮겨 담지 않는다.
  */
-const CACHE_KEY = 'poi_search_cache';
+const CACHE_KEY = 'poi_search_cache_v1';
 const MAX_CACHE_SIZE = 50;
 
 /**
@@ -65,9 +69,24 @@ function persistCache(): void {
         window.localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
     } catch (e) {
         console.error('POI 검색 캐시 저장 실패:', e);
-        // QuotaExceeded 가드: 한도에 닿으면 저장소만 비운다. 메모리 캐시는 살려 두어
-        // 이번 세션의 검색은 계속 캐시가 듣는다.
-        try { window.localStorage.removeItem(CACHE_KEY); } catch { /* 무시 */ }
+        // QuotaExceeded 가드.
+        //
+        // ⚠️ 저장소만 비우면 안 된다. 메모리 캐시는 그대로 50건이라 다음 쓰기도 같은 크기로
+        // 다시 실패하고, 그 뒤로 **영원히** 저장이 안 된다 — 캐시를 세션 너머로 남기려던
+        // 목적이 조용히 무효가 되고 콘솔 에러만 쌓인다. 예전(sessionStorage) 구현은 저장소를
+        // 비우면 다음 쓰기가 작은 크기로 다시 성공해 스스로 회복했다.
+        // 그래서 메모리도 함께 줄여 회복 여지를 만든다. 최근 것부터 남긴다.
+        const keep = cache.queue.slice(-Math.max(1, Math.floor(cache.queue.length / 2)));
+        const kept = new Set(keep);
+        for (const k of Object.keys(cache.data)) if (!kept.has(k)) delete cache.data[k];
+        cache.queue.length = 0;
+        cache.queue.push(...keep);
+        try {
+            window.localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+        } catch {
+            // 줄여도 안 되면 저장소 항목을 치우고 이번 세션은 메모리로만 간다.
+            try { window.localStorage.removeItem(CACHE_KEY); } catch { /* 무시 */ }
+        }
     }
 }
 

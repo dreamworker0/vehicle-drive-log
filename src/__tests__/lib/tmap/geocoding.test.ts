@@ -286,13 +286,30 @@ describe('primeGeocodeCache — 고른 장소를 다시 검색하지 않는다',
         expect(fetchMock).toHaveBeenCalledTimes(1);
     });
 
-    it('좌표가 없는 값으로는 캐시를 오염시키지 않는다', async () => {
-        // null이 심기면 그 목적지는 이후 계속 "찾을 수 없음"으로 굳어 경로 계산이 조용히 실패한다.
+    // 한 번 심기면 그 목적지는 재시도조차 없이 그 값으로 굳는다 — 잘못된 좌표는
+    // 조용히 실패하는 경로 계산으로 이어지고, geoCache에 non-null로 남아 복구되지 않는다.
+    it('말이 안 되는 좌표로는 캐시를 오염시키지 않는다', async () => {
         geo.primeGeocodeCache('엉터리', { lat: NaN, lon: 126.9, name: '엉터리' });
         expect(core.geoCache.has('엉터리')).toBe(false);
 
         geo.primeGeocodeCache('', { lat: 37.5, lon: 126.9, name: '빈키' });
         expect(core.geoCache.has('')).toBe(false);
+
+        // searchPOIList는 문자열 "0"을 truthy로 통과시키므로 유한성만으로는 못 막는다.
+        // (0, 0)이 심기면 기니만 근해로 경로를 계산해 조용히 실패한다.
+        geo.primeGeocodeCache('영점', { lat: 0, lon: 0, name: '영점' });
+        expect(core.geoCache.has('영점')).toBe(false);
+
+        // 한반도 밖은 이 서비스의 목적지가 아니다
+        geo.primeGeocodeCache('도쿄', { lat: 35.68, lon: 139.69, name: '도쿄' });
+        expect(core.geoCache.has('도쿄')).toBe(false);
+    });
+
+    it('한반도 범위 안이면 정상적으로 심는다 (제주·강원 끝단 포함)', () => {
+        geo.primeGeocodeCache('제주남단', { lat: 33.1, lon: 126.3, name: '제주남단' });
+        geo.primeGeocodeCache('강원북단', { lat: 38.6, lon: 128.4, name: '강원북단' });
+        expect(core.geoCache.has('제주남단')).toBe(true);
+        expect(core.geoCache.has('강원북단')).toBe(true);
     });
 
     it('앞뒤 공백은 지우고 심는다 (목적지 문자열은 trim되어 넘어온다)', async () => {

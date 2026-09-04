@@ -141,6 +141,12 @@ export const logout = async () => {
     } catch (e) {
         console.warn('[logout] 오프라인 큐 정리 실패:', e);
     }
+    // 목적지 관련 로컬 캐시도 함께 지운다. 여기에는 확정된 목적지("○○○ 어르신 댁 …")뿐
+    // 아니라 **치다가 지운 검색어와 그 후보 목록**까지 남는다. 공용 태블릿에서 다음 사람이
+    // 앞사람이 어디를 찾아봤는지 알 수 있으면 안 된다 (2026-07-10 감사 #8과 같은 취지).
+    for (const key of ['poi_search_cache_v1', 'tmap_geo_cache_v1', 'tmap_route_cache_v1']) {
+        try { localStorage.removeItem(key); } catch { /* 저장소를 못 쓰면 넘어간다 */ }
+    }
     // Firestore 영구 캐시 폐기 → 인스턴스가 종료되므로 깨끗한 상태로 재시작한다.
     await clearOfflineCache();
     if (typeof window !== 'undefined') {

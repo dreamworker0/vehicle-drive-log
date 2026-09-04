@@ -59,7 +59,7 @@ describe('usePoiSearch', () => {
 
         // sessionStorage 확인
         if (typeof window !== 'undefined') {
-            const raw = window.localStorage.getItem('poi_search_cache');
+            const raw = window.localStorage.getItem('poi_search_cache_v1');
             expect(raw).toBeDefined();
             const parsed = JSON.parse(raw!);
             expect(parsed.queue).toContain('서울시청');
@@ -72,7 +72,7 @@ describe('usePoiSearch', () => {
         
         // 미리 로컬스토리지에 캐시 적재
         if (typeof window !== 'undefined') {
-            window.localStorage.setItem('poi_search_cache', JSON.stringify({
+            window.localStorage.setItem('poi_search_cache_v1', JSON.stringify({
                 queue: ['강남역'],
                 data: { '강남역': mockResults }
             }));
@@ -98,7 +98,7 @@ describe('usePoiSearch', () => {
         }
 
         if (typeof window !== 'undefined') {
-            window.localStorage.setItem('poi_search_cache', JSON.stringify({
+            window.localStorage.setItem('poi_search_cache_v1', JSON.stringify({
                 queue: initialQueue,
                 data: initialData
             }));
@@ -120,7 +120,7 @@ describe('usePoiSearch', () => {
 
         // 로컬스토리지 FIFO 만료 확인
         if (typeof window !== 'undefined') {
-            const raw = window.localStorage.getItem('poi_search_cache');
+            const raw = window.localStorage.getItem('poi_search_cache_v1');
             const parsed = JSON.parse(raw!);
             // 큐 크기 50 유지
             expect(parsed.queue.length).toBe(50);
@@ -155,8 +155,7 @@ describe('usePoiSearch', () => {
         expect(mockSearchPOIList).toHaveBeenCalledTimes(1); // 다시 부르지 않았다
     });
 
-    it('QuotaExceededError 등 스토리지 예외 발생 시 캐시가 리셋된다', async () => {
-        // localStorage.setItem이 에러를 발생시키도록 모킹
+    it('스토리지 예외가 나도 화면은 정상 동작한다', async () => {
         const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
             throw new Error('QuotaExceededError');
         });
@@ -171,9 +170,38 @@ describe('usePoiSearch', () => {
         });
 
         expect(result.current.poiResults).toEqual(mockResults);
-        // setItemSpy가 호출되었는지 검증
         expect(setItemSpy).toHaveBeenCalled();
 
         setItemSpy.mockRestore();
+    });
+
+    // ⚠️ 저장소만 비우면 메모리 캐시가 그대로 남아 다음 쓰기도 같은 크기로 다시 실패하고,
+    // 그 뒤로 **영원히** 저장이 안 된다 — 캐시를 세션 너머로 남기려던 목적이 조용히 무효가
+    // 된다. 예전 구현(sessionStorage)은 비우면 다음 쓰기가 작게 다시 성공해 회복됐다.
+    it('한도에 닿아도 저장 능력을 영구히 잃지 않는다', async () => {
+        // 일정 크기를 넘는 페이로드만 거부해 "한도"를 흉내 낸다
+        const LIMIT = 400;
+        let attempts = 0;
+        let successes = 0;
+        const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation((_k, v) => {
+            attempts++;
+            if (String(v).length > LIMIT) throw new Error('QuotaExceededError');
+            successes++;
+        });
+
+        for (let i = 1; i <= 8; i++) {
+            const kw = `장소_${i}`;
+            mockSearchPOIList.mockResolvedValueOnce([
+                { name: kw, lat: 37, lon: 126, address: '충분히 긴 테스트 주소 문자열입니다' } as PoiResult,
+            ]);
+            const { unmount } = renderHook(() => usePoiSearch(kw));
+            await act(async () => { vi.advanceTimersByTime(500); });
+            unmount();
+        }
+
+        expect(attempts).toBeGreaterThan(0);
+        // 한도를 넘긴 뒤에도 스스로 줄여 다시 저장에 성공한다
+        expect(successes).toBeGreaterThan(0);
+        spy.mockRestore();
     });
 });
