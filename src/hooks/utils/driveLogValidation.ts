@@ -167,6 +167,9 @@ export function buildLogData(form: DriveLogForm, { orgId, user, userData, select
         // 세운 곳은 출발지가 매번 바뀌는 차량에서만 남긴다. 차량을 유동 → 고정으로 바꾼 뒤
         // 폼에 남아 있던 값이 새어 나가면, 서버 트리거가 엉뚱한 차량의 위치를 옮긴다.
         endSiteId: selectedVehicle?.siteVaries ? (form.endSiteId || undefined) : undefined,
+        // 표시했을 때만 필드를 남긴다(false는 undefined로 떨궈 sanitizeUndefined가 지운다).
+        // 서버 트리거는 값의 존재만 보고 차량 상태를 켠다 — 끄는 것은 주유일지·관리자 몫이다.
+        needsRefuel: form.needsRefuel || undefined,
     };
 
     if (!isNaN(startKm) && !isNaN(endKm)) {

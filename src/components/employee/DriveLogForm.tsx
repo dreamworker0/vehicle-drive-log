@@ -226,6 +226,8 @@ export default function DriveLogForm() {
                     hipassEnabled={orgFeatures.hipass}
                     isEditMode={isEditMode}
                     isRetroactive={isRetroactive}
+                    refuelFlagEnabled={orgFeatures.refuelFlag}
+                    fuelType={selectedVehicle?.fuelType}
                 />
 
                 {/* 7. 비고 섹션 */}

@@ -152,6 +152,7 @@ describe('buildLogData', () => {
         batteryStart: '', batteryEnd: '',
         notes: '비고 없음', driveDate: '2026-01-15',
         hipassBalanceAfter: '',
+        needsRefuel: false,
     };
 
     it('폼 데이터를 로그 객체로 변환한다', () => {

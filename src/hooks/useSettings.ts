@@ -39,6 +39,8 @@ export interface SettingsForm {
     passengerAllowCount: boolean;
     /** 예약 화면 동승자 입력(opt-in — 기본 꺼짐) */
     reservationPassengerEnabled: boolean;
+    /** 주유(충전) 필요 표시(opt-in — 기본 꺼짐) */
+    refuelFlagEnabled: boolean;
     driverAllowList: boolean;
     driverAllowSearch: boolean;
     /** 분관·별관 등 추가 출발지(차고지). 본관(기관 주소)은 포함하지 않는다. */
@@ -86,6 +88,7 @@ export default function useSettings() {
         passengerAllowSearch: true,
         passengerAllowCount: true,
         reservationPassengerEnabled: false,
+        refuelFlagEnabled: false,
         driverAllowList: true,
         driverAllowSearch: true,
         sites: [],
@@ -134,6 +137,7 @@ export default function useSettings() {
                         passengerAllowSearch: features.passengerAllowSearch,
                         passengerAllowCount: features.passengerAllowCount,
                         reservationPassengerEnabled: features.reservationPassenger,
+                        refuelFlagEnabled: features.refuelFlag,
                         driverAllowList: features.driverAllowList,
                         driverAllowSearch: features.driverAllowSearch,
                         sites: orgData.sites ? orgData.sites.map(site => ({ ...site })) : [],
@@ -212,6 +216,7 @@ export default function useSettings() {
                     passengerAllowSearch: targetData.passengerAllowSearch,
                     passengerAllowCount: targetData.passengerAllowCount,
                     reservationPassengerEnabled: targetData.reservationPassengerEnabled,
+                    refuelFlagEnabled: targetData.refuelFlagEnabled,
                     driverAllowList: targetData.driverAllowList,
                     driverAllowSearch: targetData.driverAllowSearch,
                     sites: targetData.sites,

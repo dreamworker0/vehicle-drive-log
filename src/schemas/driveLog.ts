@@ -45,6 +45,13 @@ export const driveLogSchema = z.object({
     hipassBalanceAfter: z.coerce.number().optional().catch(undefined),
     batteryStart: z.coerce.number().optional().catch(undefined),
     batteryEnd: z.coerce.number().optional().catch(undefined),
+    /**
+     * 운전자가 "주유(충전) 필요"로 표시했는가. 서버 트리거가 차량의 `needsRefuel`을
+     * 켜는 근거다 — `endSiteId`(차를 세운 곳)와 같은 구조다.
+     *
+     * 기관이 기능을 켠 경우에만 입력칸이 뜨므로, 값의 존재 자체가 판정 결과다.
+     */
+    needsRefuel: z.boolean().optional().catch(undefined),
     isRetroactive: z.boolean().optional().catch(undefined),
     isIncomplete: z.boolean().optional().catch(undefined),
     isManuallyCorrected: z.boolean().optional().catch(undefined),

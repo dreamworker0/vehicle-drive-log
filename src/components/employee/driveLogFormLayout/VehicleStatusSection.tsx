@@ -1,4 +1,5 @@
 import { memo, useState, useEffect } from 'react';
+import Toggle from '../../common/Toggle';
 import { stripNegative } from '../../../hooks/utils/numberValidation';
 import type { DriveLogForm } from '../../../hooks/driveLogForm/types';
 import type { HipassCard } from '../../../types/hipass';
@@ -15,6 +16,10 @@ interface VehicleStatusSectionProps {
     isEditMode?: boolean;
     /** 오늘이 아닌 날짜의 운행인지(소급 입력). 이때도 하이패스 블록을 숨긴다 */
     isRetroactive?: boolean;
+    /** 기관 설정: 주유(충전) 필요 표시 사용 여부(opt-in — 기본 꺼짐) */
+    refuelFlagEnabled?: boolean;
+    /** 차량 연료 종류. 전기·수소는 '주유'가 아니라 '충전'으로 부른다 */
+    fuelType?: string;
 }
 
 const VehicleStatusSection = memo(function VehicleStatusSection({
@@ -25,7 +30,9 @@ const VehicleStatusSection = memo(function VehicleStatusSection({
     hipassCard,
     hipassEnabled = true,
     isEditMode = false,
-    isRetroactive = false
+    isRetroactive = false,
+    refuelFlagEnabled = false,
+    fuelType
 }: VehicleStatusSectionProps) {
     // 하이패스 접기/펼치기 상태 (기본값: 접힘 — 자주 사용하지 않는 항목)
     // 훅은 early return 앞에 위치해야 Rules of Hooks를 위반하지 않는다.
@@ -50,7 +57,15 @@ const VehicleStatusSection = memo(function VehicleStatusSection({
     // (submitDriveLog의 shouldApplyHipass가 저장 쪽에서도 같은 경계를 지킨다)
     const showHipass = hipassEnabled && !!hipassCard && !isEditMode && !isRetroactive;
 
-    if (!isElectric && !showHipass) return null;
+    // 주유 필요 표시는 **오늘 운행을 오늘 기록할 때만** 받는다.
+    // 지난 일지를 고치면서 표시해도 그 사이 누가 주유했을 수 있어, 지금 차량 상태의
+    // 근거가 되지 못한다(서버 트리거도 같은 이유로 소급 건은 무시한다).
+    const showRefuel = refuelFlagEnabled && !isEditMode && !isRetroactive;
+
+    // 전기·수소차는 '주유'가 아니라 '충전'이다.
+    const refuelWord = fuelType === 'electric' || fuelType === 'hydrogen' ? '충전' : '주유';
+
+    if (!isElectric && !showHipass && !showRefuel) return null;
 
     return (
         <div className="space-y-5">
@@ -148,6 +163,31 @@ const VehicleStatusSection = memo(function VehicleStatusSection({
                             <p className="text-xs text-surface-400 dark:text-surface-500 mt-2">하이패스 사용 시 사용후 금액을 입력하면 잔액이 자동으로 업데이트됩니다</p>
                         </>
                     )}
+                </div>
+            )}
+
+            {/* 주유·충전 필요 표시 (기관이 켠 경우만) */}
+            {showRefuel && (
+                <div className="glass-card p-4">
+                    <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                            <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300">
+                                ⛽ {refuelWord} 필요
+                            </h3>
+                            <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
+                                켜 두면 다음 사람이 이 차량을 예약할 때 안내가 떠요.
+                                {refuelWord}일지를 쓰면 자동으로 꺼집니다.
+                            </p>
+                        </div>
+                        <div className="flex-shrink-0 pt-0.5">
+                            <Toggle
+                                label={`${refuelWord} 필요 표시`}
+                                checked={form.needsRefuel}
+                                onChange={next => setForm({ ...form, needsRefuel: next })}
+                                onClassName="bg-amber-500"
+                            />
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

@@ -47,6 +47,14 @@ export const organizationSchema = z.object({
      * 다른 플래그와 반대로 opt-in인 이유는 orgFeatures.ts 주석 참고.
      */
     reservationPassengerEnabled: z.boolean().optional().catch(undefined),
+    /**
+     * 주유(충전) 필요 표시 사용 (미설정=**꺼짐**).
+     *
+     * reservationPassenger와 같은 opt-in이다. 켜짐 기본으로 두면 전기차도 아니고
+     * 하이패스 카드도 없는 차량의 운행일지에 **없던 카드가 갑자기 생긴다**
+     * (VehicleStatusSection은 그 조건에서 아무것도 그리지 않는다).
+     */
+    refuelFlagEnabled: z.boolean().optional().catch(undefined),
     /** 운전자(대표·공동): 직원 목록에서 직접 선택 */
     driverAllowList: z.boolean().optional().catch(undefined),
     /** 운전자(대표·공동): 검색으로 선택. 목록·검색 둘 다 켜지면 후보 8명 기준 자동 전환 */

@@ -87,6 +87,20 @@ export const vehicleSchema = z.object({
     currentSiteId: z.string().optional().catch(undefined),
     /** 위 값이 확인된 시각 — 화면에 "○○ 기준"으로 신선도를 함께 보여 준다. */
     currentSiteUpdatedAt: timestampSchema.optional().catch(undefined),
+    /**
+     * 주유(충전)가 필요한 차량인가. 운전자가 운행일지에 표시하면 **서버 트리거가** 켜고,
+     * 주유일지가 작성되면 끈다. 관리자도 [차량 관리]에서 직접 끌 수 있다 —
+     * 주유일지를 쓰지 않는 기관은 자동 해제가 돌지 않기 때문이다.
+     *
+     * 미설정은 거짓으로 본다(기존 차량 문서 마이그레이션 불필요).
+     */
+    needsRefuel: z.boolean().optional().catch(undefined),
+    /**
+     * 위 값이 바뀐 시각. 화면에 "9/5 17:20 기준"으로 신선도를 보여 주고,
+     * 트리거가 **이 시각보다 과거의 운행으로는 상태를 되돌리지 않는** 근거로도 쓴다
+     * (관리자가 방금 해제했는데 오전 운행이 뒤늦게 저장되어 다시 켜지는 것을 막는다).
+     */
+    needsRefuelAt: timestampSchema.optional().catch(undefined),
     /** 사용 가능 직원 uid 목록. undefined 또는 빈 배열 = 전체 허용 */
     allowedUserIds: z.array(z.string()).optional().catch(undefined),
     retired: vehicleRetiredSchema.nullable().optional().catch(null),

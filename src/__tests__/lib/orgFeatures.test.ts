@@ -3,10 +3,12 @@ import { resolveOrgFeatures, ALL_FEATURES_ON } from '../../lib/orgFeatures';
 
 /**
  * 이 파일의 규칙은 "미설정(undefined)=켜짐, false만 꺼짐"이다.
- * **예외가 하나 있다** — `reservationPassenger`(예약 화면 동승자 입력)는 opt-in이라
- * 명시적으로 켠 기관에서만 true다. 아래 기대값에 그 예외가 반영돼 있다.
+ * **예외가 둘 있다** — `reservationPassenger`(예약 화면 동승자 입력)와
+ * `refuelFlag`(주유·충전 필요 표시)는 opt-in이라 명시적으로 켠 기관에서만 true다.
+ * 둘 다 전 직원이 매일 보는 화면에 새 입력란을 만들기 때문이다.
+ * 아래 기대값에 그 예외가 반영돼 있다.
  */
-const DEFAULTS_FOR_UNSET_ORG = { ...ALL_FEATURES_ON, reservationPassenger: false };
+const DEFAULTS_FOR_UNSET_ORG = { ...ALL_FEATURES_ON, reservationPassenger: false, refuelFlag: false };
 
 describe('resolveOrgFeatures', () => {
     it('org가 없으면(undefined/null) opt-in 항목을 뺀 전부가 켜짐', () => {
@@ -20,6 +22,7 @@ describe('resolveOrgFeatures', () => {
             passengerAllowList: true, passengerAllowSearch: true, passengerAllowCount: true,
             // 기존 기관의 예약 폼에 새 입력란이 예고 없이 나타나지 않아야 한다
             reservationPassenger: false,
+            refuelFlag: false,
             driverAllowList: true, driverAllowSearch: true,
             maintenanceEmployeeAccess: true, allowedUsers: true, googleCalendar: true,
         });
@@ -41,6 +44,7 @@ describe('resolveOrgFeatures', () => {
         const f = resolveOrgFeatures({
             hipassEnabled: true, maintenanceEnabled: true, driverSelectionEnabled: true,
             coDriverEnabled: true, passengerEnabled: true, reservationPassengerEnabled: true,
+            refuelFlagEnabled: true,
         });
         expect(f).toEqual(ALL_FEATURES_ON);
     });
@@ -58,6 +62,7 @@ describe('resolveOrgFeatures', () => {
             hipass: false, maintenance: true, driverSelection: true, coDriver: true, passenger: true,
             passengerAllowList: true, passengerAllowSearch: true, passengerAllowCount: true,
             reservationPassenger: false,
+            refuelFlag: false,
             driverAllowList: true, driverAllowSearch: true,
             maintenanceEmployeeAccess: true, allowedUsers: true, googleCalendar: true,
         });
@@ -72,6 +77,7 @@ describe('resolveOrgFeatures', () => {
             hipass: false, maintenance: false, driverSelection: true, coDriver: true, passenger: true,
             passengerAllowList: true, passengerAllowSearch: true, passengerAllowCount: true,
             reservationPassenger: false,
+            refuelFlag: false,
             driverAllowList: true, driverAllowSearch: true,
             maintenanceEmployeeAccess: true, allowedUsers: true, googleCalendar: true,
         });

@@ -23,6 +23,11 @@ export interface DriveLogForm {
     driveDate: string;
     hipassBalanceAfter: string;
     /**
+     * 운전자가 "주유(충전) 필요"로 표시했는가.
+     * 기관이 기능을 켠 경우에만 입력칸이 뜨므로, 꺼진 기관에서는 늘 false다.
+     */
+    needsRefuel: boolean;
+    /**
      * 출발지·세운 곳으로 고른 출발지 id (`organization.sites[].id`, 본관은 `main`).
      *
      * 출발지가 매번 바뀌는 차량에서만 채워진다. 고정 출발지 차량에서는 값이 아예 없고,
