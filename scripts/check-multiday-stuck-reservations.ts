@@ -27,6 +27,16 @@
  *   ① 그룹의 예약을 가리키는 운행일지의 `timestamp`(= 도착 시각)의 KST 날짜  ← 가장 확실
  *   ② 실패 시, `actualEndTime`이 찍힌 형제(운행일지가 붙은 그 날)의 `date`
  *
+ * ## 이 스크립트가 찾지 **못하는** 것 — 도착일 당일
+ *
+ * 도착일 당일 문서는 실제로 탄 날이라 지목하지 않는다. 그런데 그 문서에도
+ * `actualStartTime`이 없어, **반납 이후 남은 시간이 계속 점유된다.** 9/5~9/7 예약을
+ * 9/6 09:00에 반납하면 9/7은 취소되지만 9/6은 `00:00~23:59`가 통째로 막힌 채 남는다.
+ *
+ * 이건 이 결함과 무관한 **원래부터 있던 동작**이다(#323 이전에도 그 문서는 `reserved`로
+ * 남아 같은 시간을 막았다). 그래서 여기서 고치지 않는다. 다만 "차량이 안 풀린다"는 문의로
+ * 이 스크립트를 돌린 사람이 `대상 없음`을 보고 해결됐다고 믿으면 안 되므로 리포트에도 적는다.
+ *
  * ## 고치지는 않는다
  *
  * 대상이 나오면 해당 문서의 `status`를 `cancelled`로 바꾸면 차량이 곧바로 풀린다. 다만
@@ -52,8 +62,22 @@ const db = getFirestore();
 
 const args = process.argv.slice(2);
 const orgFilter = args.find((a) => a.startsWith('--org='))?.split('=')[1];
-/** 스캔 시작일 — 결함이 있던 배포일이 기본값이다. 그 이전 날짜의 예약은 이 결함과 무관하다. */
+
+/**
+ * 스캔 시작일 — 결함이 있던 배포일이 기본값이다.
+ *
+ * 이 값이 걸리는 것은 **예약 날짜**이지 문서를 쓴 시각이 아니다. 그래서 결함 창에 저장된
+ * 일지가 9/1~9/3짜리 예약을 닫은 경우는 기본값으로 잡히지 않는다 — 다만 지난 날짜는
+ * 앞으로의 예약을 막지 않고 알림도 울리지 않아 무해하다. 굳이 보려면 --from을 앞당긴다.
+ */
 const fromDate = args.find((a) => a.startsWith('--from='))?.split('=')[1] ?? '2026-09-05';
+
+// 형식이 어긋나면 문자열 비교가 조용히 빗나간다 — '2026-9-5'는 모든 실제 날짜보다 커서
+// 한 건도 스캔하지 않고 "대상 없음"을 내놓는다. 조용히 0을 내는 것이 이 도구의 최악이다.
+if (!/^\d{4}-\d{2}-\d{2}$/.test(fromDate)) {
+    console.error(`❌ --from 형식이 올바르지 않습니다: ${fromDate} (YYYY-MM-DD로 주세요)`);
+    process.exit(1);
+}
 
 /** Firestore `in` 절의 값 상한 */
 const IN_CHUNK = 30;
@@ -90,6 +114,13 @@ interface Finding {
 
 async function main() {
     console.log(`대상 프로젝트: ${projectId ?? '(미지정 — ADC 기본값. 결과를 믿지 말 것)'}`);
+    // initAdminApp을 quiet로 부르면 이 경고까지 함께 삼켜진다. 그런데 PowerShell에서
+    // $env:FIRESTORE_EMULATOR_HOST는 **세션 내내 남는다**(db-seed 워크플로가 그렇게 안내한다).
+    // 그 터미널에서 이 스크립트를 돌리면 프로덕션 프로젝트명을 찍어 놓고 빈 에뮬레이터를
+    // 조회해 "대상 없음"을 내놓는다 — 2026-08-24 check-feedbacks 사고와 같은 모양이다.
+    if (process.env.FIRESTORE_EMULATOR_HOST) {
+        console.log(`⚠️  에뮬레이터 접속 중(FIRESTORE_EMULATOR_HOST=${process.env.FIRESTORE_EMULATOR_HOST}) — 프로덕션이 아닙니다`);
+    }
     console.log(`스캔 범위: date >= ${fromDate}${orgFilter ? ` · 기관 ${orgFilter}` : ' · 전체 기관'}\n`);
 
     // 1) 후보 수집 — `date` 단일 필드 범위라 복합 인덱스가 필요 없다.
@@ -111,7 +142,8 @@ async function main() {
     }
 
     if (closedWithGroup.length === 0) {
-        console.log('\n✅ 대상 없음 — 잘못 닫힌 다일 예약이 없습니다.\n');
+        console.log('\n✅ 대상 없음 — 잘못 닫힌 다일 예약이 없습니다.');
+        printArrivalDayCaveat();
         return;
     }
 
@@ -149,10 +181,16 @@ async function main() {
     const today = kstDateString(new Date());
 
     for (const [gid, siblings] of siblingsByGroup) {
-        // ① 운행일지의 도착 시각
-        const logged = siblings.find((r) => arrivalByResId.has(r.id));
-        // ② 운행일지를 못 찾으면 actualEndTime이 찍힌 형제의 날짜
-        const drivenSibling = siblings.find((r) => r.actualEndTime);
+        // ① 운행일지의 도착 시각. 여러 건이면 **가장 늦은 것**을 쓴다 — find는 Firestore가
+        //    돌려준 순서에 좌우돼 실행마다 답이 달라질 수 있고, 이른 쪽을 잡으면 실제로 탄
+        //    날을 취소 대상으로 지목한다. 과소 지목이 과대 지목보다 낫다.
+        const logged = siblings
+            .filter((r) => arrivalByResId.has(r.id))
+            .sort((a, b) => arrivalByResId.get(b.id)!.getTime() - arrivalByResId.get(a.id)!.getTime())[0];
+        // ② 운행일지를 못 찾으면 actualEndTime이 찍힌 형제의 날짜 (역시 가장 늦은 날)
+        const drivenSibling = siblings
+            .filter((r) => r.actualEndTime)
+            .sort((a, b) => (b.date ?? '').localeCompare(a.date ?? ''))[0];
 
         let arrivalDate: string | undefined;
         let basis = '';
@@ -179,7 +217,8 @@ async function main() {
 
     // 5) 리포트
     if (findings.length === 0 && undecided.length === 0) {
-        console.log('\n✅ 대상 없음 — 완료로 닫힌 문서가 모두 실제로 운행한 날입니다.\n');
+        console.log('\n✅ 대상 없음 — 완료로 닫힌 문서가 모두 실제로 운행한 날입니다.');
+        printArrivalDayCaveat();
         return;
     }
 
@@ -208,7 +247,8 @@ async function main() {
 
         console.log('처방: 위 문서의 status를 completed → cancelled 로 바꾸면 차량이 곧바로 풀립니다.');
         console.log('      (겹침 검사가 cancelled를 제외합니다. driveLogReminderSent는 그대로 둬도 무해합니다.)');
-        console.log('      취소해도 되는지는 예약자에게 확인한 뒤 바꾸세요 — 그래서 자동으로 쓰지 않습니다.\n');
+        console.log('      취소해도 되는지는 예약자에게 확인한 뒤 바꾸세요 — 그래서 자동으로 쓰지 않습니다.');
+        printArrivalDayCaveat();
     }
 
     if (undecided.length > 0) {
@@ -219,6 +259,20 @@ async function main() {
         }
         console.log('');
     }
+}
+
+/**
+ * "대상 없음"이 "차량이 다 풀렸다"로 읽히면 안 된다.
+ *
+ * 도착일 당일 문서는 실제로 탄 날이라 지목하지 않는데, 거기에도 actualStartTime이 없어
+ * 반납 이후 남은 시간이 계속 점유된다. 이 결함과 무관한 원래 동작이지만, "차량이 안
+ * 풀린다"는 문의로 이걸 돌린 사람에게는 이쪽이 답일 수 있다.
+ */
+function printArrivalDayCaveat() {
+    console.log('\nℹ️  이 점검은 **도착일보다 뒤인 날짜**만 봅니다.');
+    console.log('   도착일 당일 예약은 실제로 탄 날이라 지목하지 않지만, 그 날 반납 이후 시간은');
+    console.log('   여전히 점유됩니다(9/6 09:00에 반납해도 9/6 00:00~23:59가 막혀 있습니다).');
+    console.log('   "차량이 안 풀린다"는 문의라면 그 날 예약을 직접 확인하세요 — 원래부터 그렇게 동작합니다.\n');
 }
 
 /**
