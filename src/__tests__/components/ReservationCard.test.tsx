@@ -124,6 +124,21 @@ describe('오늘의 예약 카드 — 주유·충전 필요 배지', () => {
         expect(screen.queryByTestId('vehicle-refuel-badge')).toBeNull();
     });
 
+    it('언제 표시된 것인지 함께 보여 준다 — 몇 달 묵은 표시와 구분되어야 한다', () => {
+        renderCard({
+            vehicle: vehicle({ needsRefuel: true, needsRefuelAt: new Date('2026-09-05T17:20:00') }),
+            refuelFlagEnabled: true,
+        });
+        expect(screen.getByTestId('vehicle-refuel-badge').textContent).toContain('9/5 표시');
+    });
+
+    it('표시 시각이 없으면 안내만 보여 준다', () => {
+        renderCard({ vehicle: vehicle({ needsRefuel: true }), refuelFlagEnabled: true });
+        const badge = screen.getByTestId('vehicle-refuel-badge');
+        expect(badge.textContent).toContain('주유 필요');
+        expect(badge.textContent).not.toContain('표시');
+    });
+
     it('전기차는 "충전 필요"로 부른다', () => {
         renderCard({
             vehicle: vehicle({ needsRefuel: true, fuelType: 'electric' }),

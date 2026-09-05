@@ -169,7 +169,11 @@ export function buildLogData(form: DriveLogForm, { orgId, user, userData, select
         endSiteId: selectedVehicle?.siteVaries ? (form.endSiteId || undefined) : undefined,
         // 표시했을 때만 필드를 남긴다(false는 undefined로 떨궈 sanitizeUndefined가 지운다).
         // 서버 트리거는 값의 존재만 보고 차량 상태를 켠다 — 끄는 것은 주유일지·관리자 몫이다.
-        needsRefuel: form.needsRefuel || undefined,
+        //
+        // 오늘 것이 아닌 일지에는 아예 남기지 않는다. 입력칸을 켠 뒤 날짜를 과거로 바꾸면
+        // UI는 사라지지만 폼 값은 true로 남는데, 그대로 저장하면 소급 문서에 표시가 묻는다.
+        // 차량 상태는 서버 가드가 막지만 기록 자체가 사실과 달라진다(하이패스와 같은 경계).
+        needsRefuel: (!isRetroactive && form.needsRefuel) || undefined,
     };
 
     if (!isNaN(startKm) && !isNaN(endKm)) {

@@ -64,6 +64,14 @@ export default function ReservationCard({
     // 차를 가지러 가기 직전에 한 번 더 알린다. 예약할 때 봤더라도 며칠 지났을 수 있다.
     const needsRefuel = refuelFlagEnabled && vehicle?.needsRefuel === true;
     const refuelWord = vehicle?.fuelType === 'electric' || vehicle?.fuelType === 'hydrogen' ? '충전' : '주유';
+    // **언제 표시된 것인지 함께 보여 준다.** 오늘 켜진 표시와 몇 달 묵은 표시를 구분할 수
+    // 없으면 한 번 헛걸음한 뒤로 배지를 아무도 믿지 않는다(현재 위치 배지와 같은 이유).
+    const refuelAt = needsRefuel
+        ? toDateOrNull(vehicle?.needsRefuelAt as Parameters<typeof toDateOrNull>[0])
+        : null;
+    const refuelLabel = refuelAt
+        ? `${refuelWord} 필요 · ${refuelAt.getMonth() + 1}/${refuelAt.getDate()} 표시`
+        : `${refuelWord} 필요`;
 
     // 운행 시작 임박 여부 계산 (오늘 30분 전 ~ 15분 경과)
     const isSoon = (() => {
@@ -165,7 +173,7 @@ export default function ReservationCard({
                                     data-testid="vehicle-refuel-badge"
                                     className="inline-flex items-center gap-0.5 mt-0.5 text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 rounded-full font-medium w-fit"
                                 >
-                                    ⛽ {refuelWord} 필요
+                                    ⛽ {refuelLabel}
                                 </span>
                             )}
                             {reservation.recurringGroupId && (

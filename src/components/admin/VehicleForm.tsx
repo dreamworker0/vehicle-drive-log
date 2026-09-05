@@ -96,6 +96,13 @@ export default function VehicleForm({
     const showSiteSelect = hasBranchSites(orgSites);
     // 전기·수소차는 '주유'가 아니라 '충전'이다 (운전자 화면과 같은 규칙).
     const refuelWord = form.fuelType === 'electric' || form.fuelType === 'hydrogen' ? '충전' : '주유';
+    // 언제 켜진 표시인지 알려 준다 — 관리자가 "지금도 유효한가"를 판단할 유일한 단서다.
+    const refuelMarkedAt = (() => {
+        if (!form.needsRefuel) return null;
+        const raw = editingVehicle?.needsRefuelAt as { toDate?: () => Date } | Date | undefined;
+        const at = raw instanceof Date ? raw : raw?.toDate?.();
+        return at instanceof Date ? `${at.getMonth() + 1}/${at.getDate()}` : null;
+    })();
     const toggleAllowedUser = (uid: string) => {
         setForm(prev => ({
             ...prev,
@@ -350,13 +357,14 @@ export default function VehicleForm({
                         </p>
                     </div>
                     )}
-                    {orgFeatures.refuelFlag && (
+                    {orgFeatures.refuelFlag && editingVehicle && (
                     <div className="flex items-start justify-between gap-3" data-testid="vehicle-needs-refuel">
                         <div className="min-w-0">
                             <label className="label mb-0">{refuelWord} 필요</label>
                             <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
                                 운전자가 운행일지에서 켜고 {refuelWord}일지를 쓰면 자동으로 꺼집니다 ·
                                 {refuelWord}일지를 쓰지 않는다면 여기서 직접 끄세요
+                                {refuelMarkedAt && ` · ${refuelMarkedAt} 표시됨`}
                             </p>
                         </div>
                         <div className="flex-shrink-0 pt-1">

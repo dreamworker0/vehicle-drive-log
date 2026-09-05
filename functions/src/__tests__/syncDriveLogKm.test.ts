@@ -420,6 +420,13 @@ describe('주유 필요 표시(needsRefuel) 갱신', () => {
         data: { data: () => data },
         params: { logId: 'R' },
     });
+    const makeUpdateEvent = (before: Record<string, unknown>, after: Record<string, unknown>, id = 'B') => ({
+        data: {
+            before: { data: () => before },
+            after: { data: () => after, ref: db.collection('driveLogs').doc(id) },
+        },
+        params: { logId: id },
+    });
     const refuelPatches = () => db.__updates()
         .filter((u: { col: string; patch: Record<string, unknown> }) => u.col === 'vehicles' && 'needsRefuel' in u.patch)
         .map((u: { patch: Record<string, unknown> }) => u.patch);
@@ -489,6 +496,54 @@ describe('주유 필요 표시(needsRefuel) 갱신', () => {
         }));
 
         expect(refuelPatches()).toHaveLength(0);
+    });
+
+    it('이미 켜져 있으면 다시 쓰지 않는다 — needsRefuelAt이 "바뀐 시각"을 지켜야 한다', async () => {
+        // 표시된 운행마다 덮어쓰면 화면의 "언제부터 필요했는지"가 계속 새 값으로 밀린다.
+        seedLogs([], [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1000, needsRefuel: true, needsRefuelAt: d(19) } }]);
+
+        await (onDriveLogCreated as unknown as Function)(makeEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: d(20),
+            startKm: 1000, endKm: 1050, distance: 50, needsRefuel: true,
+        }));
+
+        expect(refuelPatches()).toHaveLength(0);
+    });
+
+    it('수정으로 새로 표시되면 반영한다', async () => {
+        seedLogs(
+            [{ id: 'B', timestamp: d(20), startKm: 1000, endKm: 1050 }],
+            [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1050 } }],
+        );
+
+        await (onDriveLogUpdated as unknown as Function)(makeUpdateEvent(
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1050 },
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1050, needsRefuel: true },
+        ));
+
+        expect(refuelPatches()).toEqual([{ needsRefuel: true, needsRefuelAt: 'SERVER_TS' }]);
+    });
+
+    it('주유 표시 갱신이 터져도 차량 누적 km 갱신은 그대로 진행된다', async () => {
+        // 위치 갱신과 같은 이유다 — 두 트리거는 retry: false라 표시용 실패가 바깥으로
+        // 올라가면 회계가 통째로 유실된다. 표시는 다음 운행이 다시 맞춰 주지만
+        // currentKm은 스스로 복구되지 않는다.
+        const explodingTimestamp = { toDate: () => { throw new Error('UNAVAILABLE'); } };
+        seedLogs(
+            [{ id: 'B', timestamp: d(20), startKm: 1000, endKm: 1060 }],
+            [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1050, needsRefuelAt: explodingTimestamp } }],
+        );
+
+        await (onDriveLogUpdated as unknown as Function)(makeUpdateEvent(
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1050 },
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1060, needsRefuel: true },
+        ));
+
+        expect(refuelPatches()).toHaveLength(0);
+        const kmPatches = db.__updates()
+            .filter((u: { col: string; patch: Record<string, unknown> }) => u.col === 'vehicles' && 'currentKm' in u.patch)
+            .map((u: { patch: Record<string, unknown> }) => u.patch);
+        expect(kmPatches).toEqual([{ currentKm: { __increment: 10 } }]);
     });
 });
 
