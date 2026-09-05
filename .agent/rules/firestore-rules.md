@@ -30,7 +30,7 @@ description: Firestore & Storage 보안 규칙 수정 가이드. firestore.rules
 데이터베이스 부하를 막고 비용을 절감하기 위해 임시성 데이터에 대한 관리를 철저히 한다.
 - **보안 규칙 상의 제약 방어**: Firestore 자체 보안 규칙으로는 분당 요청 수(Rate Limit)를 제한하기 어렵다.
 - **TTL (Time-To-Live)**: `rateLimits`, `temporaryData` 등 영구 저장이 불필요한 컬렉션의 데이터는 **문서 내에 `expiresAt` (Timestamp) 필드**를 두어 GCP Firestore TTL 정책을 통해 자동 삭제되도록 유도한다.
-- **App Check 제거**: 현재 프로젝트에서는 App Check 인프라가 제거되었으므로, 규칙 파일에서 App Check 토큰(`request.app == null` 검사 등)을 요구해서는 안 되며, 오직 유저 인증 토큰(`request.auth`)과 역할(`role`) 기반으로만 검증한다.
+- **App Check는 켜져 있다 (규칙에서는 요구하지 않는다)**: 클라이언트는 [src/lib/firebase.ts](../../src/lib/firebase.ts)에서 `initializeAppCheck` + reCAPTCHA v3로 App Check를 초기화한다. 다만 **규칙 파일에서는 App Check 토큰을 요구하지 않는다** — `firestore.rules`·`storage.rules` 어디에도 `request.app` 검사가 없고, 검증은 유저 인증 토큰(`request.auth`)과 역할(`role`)로만 한다. 인앱 브라우저(`isInAppBrowser()`)와 에뮬레이터에서는 초기화를 건너뛰므로, 규칙에서 `request.app`을 요구하면 그 경로의 사용자가 전부 막힌다. 규칙에 App Check 검사를 새로 넣지 말고, 반대로 **클라이언트의 App Check 초기화를 지침에 맞춘다는 이유로 제거하지도 않는다.**
 
 ### 1.3 역할 체계
 
@@ -157,7 +157,7 @@ Firestore Rules 변경은 에뮬레이터 테스트(`tests/firestore-rules.test.
 
 ## 6. 주의사항
 
-1. **규칙 순서**: Firestore Rules는 첫 번째로 매칭된 규칙이 적용되므로, 와일드카드 규칙의 위치에 주의한다
+1. **규칙은 OR로 합쳐진다 (순서가 아니라)**: Firestore Rules는 첫 번째로 매칭된 규칙만 적용하는 것이 아니다. 요청에 맞는 `allow`가 여럿이면 **그중 하나라도 참이면 허용**된다([공식 문서](https://firebase.google.com/docs/rules/rules-behavior): "In the case where multiple `allow` expressions match a request, the access is allowed if **any** of the conditions is `true`"). 뒤에 오는 규칙으로 앞에서 허용한 것을 **다시 막을 수 없다** — 거부 규칙이라는 개념 자체가 없다. 그러므로 넓은 와일드카드 `match`를 하나 두면 아래에 아무리 좁은 조건을 적어도 그 넓은 허용이 그대로 살아 있다. 권한을 좁히려면 규칙을 추가하는 게 아니라 **넓은 쪽 조건 자체를 고쳐야 한다.**
 2. **인덱스**: 새 컬렉션에 복합 쿼리가 필요하면 `firestore.indexes.json`에 인덱스 추가
 3. **배포 영향**: 규칙 변경은 **즉시 모든 사용자에게 적용**되므로, 신중하게 테스트 후 배포한다
 4. **하드코딩 회피**: 슈퍼관리자 이메일을 제외하고, 특정 UID나 이메일을 하드코딩하지 않는다
