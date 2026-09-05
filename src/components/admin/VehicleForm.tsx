@@ -31,6 +31,8 @@ interface VehicleFormData {
     siteVaries: boolean;
     /** 지금 실제로 서 있는 곳. 운행 기록으로 자동 갱신되며, 유동 차량에만 노출된다. */
     currentSiteId: string;
+    /** 주유(충전)가 필요한가. 운행일지·주유일지로 자동 갱신되며, 여기서는 보정만 한다. */
+    needsRefuel: boolean;
 }
 
 interface Props {
@@ -92,6 +94,8 @@ export default function VehicleForm({
     const { orgFeatures, orgSites } = useAuth();
     // 분관을 등록하지 않은 기관에는 고를 것이 없다 — 선택지 하나짜리 UI를 띄우지 않는다.
     const showSiteSelect = hasBranchSites(orgSites);
+    // 전기·수소차는 '주유'가 아니라 '충전'이다 (운전자 화면과 같은 규칙).
+    const refuelWord = form.fuelType === 'electric' || form.fuelType === 'hydrogen' ? '충전' : '주유';
     const toggleAllowedUser = (uid: string) => {
         setForm(prev => ({
             ...prev,
@@ -344,6 +348,25 @@ export default function VehicleForm({
                         <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
                             운행 기록으로 자동 갱신됩니다 · 기록 없이 차를 옮겼을 때만 직접 고치세요
                         </p>
+                    </div>
+                    )}
+                    {orgFeatures.refuelFlag && (
+                    <div className="flex items-start justify-between gap-3" data-testid="vehicle-needs-refuel">
+                        <div className="min-w-0">
+                            <label className="label mb-0">{refuelWord} 필요</label>
+                            <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
+                                운전자가 운행일지에서 켜고 {refuelWord}일지를 쓰면 자동으로 꺼집니다 ·
+                                {refuelWord}일지를 쓰지 않는다면 여기서 직접 끄세요
+                            </p>
+                        </div>
+                        <div className="flex-shrink-0 pt-1">
+                            <Toggle
+                                checked={form.needsRefuel}
+                                onChange={next => setForm(prev => ({ ...prev, needsRefuel: next }))}
+                                label={`${refuelWord} 필요`}
+                                onClassName="bg-amber-500"
+                            />
+                        </div>
                     </div>
                     )}
                     <div>

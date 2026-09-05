@@ -2,9 +2,9 @@
 
 > **자동 생성 문서** — `scripts/generate-functions-doc.ts`로 생성됨
 >
-> 마지막 업데이트: 2026. 9. 3. AM 8:36:01
+> 마지막 업데이트: 2026. 9. 5. PM 7:15:54
 >
-> 총 함수 수: **71개**
+> 총 함수 수: **72개**
 
 ---
 
@@ -504,7 +504,7 @@
 
 ## 📝 Firestore onCreate
 
-> 총 7개
+> 총 8개
 
 ### `onReservationCreated`
 
@@ -523,6 +523,15 @@
 | **설명** | 운행일지 생성 시 차량 누적 주행거리 증분 + 집계 통계 갱신. 이후 시점 기록이 있으면 연쇄 동기화. |
 | **인증** | 시스템 자동 실행 |
 | **비고** | driveLogs/{logId} |
+
+### `onFuelLogCreated`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/triggers/clearRefuelFlag.ts` |
+| **설명** | 주유·충전일지 작성 시 그 차량의 "주유 필요" 표시를 해제. 표시를 켜는 쪽은 onDriveLogCreated. |
+| **인증** | 시스템 자동 실행 |
+| **비고** | fuelLogs/{logId} |
 
 ### `trackFirstEmployee`
 

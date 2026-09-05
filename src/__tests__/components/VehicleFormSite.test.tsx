@@ -20,9 +20,10 @@ const SITES: OrgSite[] = resolveOrgSites({
 const MAIN_ONLY: OrgSite[] = resolveOrgSites({ address: '서울시 본관로 1' });
 
 let mockSites: OrgSite[] = SITES;
+let mockRefuelFlag = false;
 vi.mock('../../hooks/useAuth', () => ({
     useAuth: () => ({
-        orgFeatures: { googleCalendar: false, allowedUsers: false },
+        orgFeatures: { googleCalendar: false, allowedUsers: false, refuelFlag: mockRefuelFlag },
         orgSites: mockSites,
     }),
 }));
@@ -41,6 +42,7 @@ function baseForm(over: Partial<FormData> = {}): FormData {
         googleCalendarId: '', insuranceCompany: '', insurancePhone: '',
         insuranceExpiryDate: '', allowedUserIds: [],
         siteId: '', siteVaries: false, currentSiteId: '',
+        needsRefuel: false,
         ...over,
     } as FormData;
 }
@@ -88,5 +90,30 @@ describe('차량 폼 — 유동 차량 지정', () => {
         render(<Harness initial={{ siteVaries: true }} />);
         expect(screen.getByText('기본 차고지')).toBeTruthy();
         expect(screen.getByText('현재 위치')).toBeTruthy();
+    });
+});
+
+describe('차량 관리 — 주유 필요 수동 해제', () => {
+    it('기관이 기능을 끄면 항목이 아예 없다', () => {
+        mockRefuelFlag = false;
+        render(<Harness />);
+        expect(screen.queryByTestId('vehicle-needs-refuel')).toBeNull();
+    });
+
+    it('기능을 켜면 관리자가 직접 끌 수 있다 — 주유일지를 쓰지 않는 기관의 유일한 해제 경로다', () => {
+        mockRefuelFlag = true;
+        render(<Harness initial={{ needsRefuel: true }} />);
+
+        const toggle = screen.getByRole('switch', { name: '주유 필요' });
+        expect(toggle.getAttribute('aria-checked')).toBe('true');
+
+        fireEvent.click(toggle);
+        expect(screen.getByRole('switch', { name: '주유 필요' }).getAttribute('aria-checked')).toBe('false');
+    });
+
+    it('전기차는 "충전 필요"로 부른다', () => {
+        mockRefuelFlag = true;
+        render(<Harness initial={{ fuelType: 'electric' }} />);
+        expect(screen.getByRole('switch', { name: '충전 필요' })).toBeTruthy();
     });
 });
