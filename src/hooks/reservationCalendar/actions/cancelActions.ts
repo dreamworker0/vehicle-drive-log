@@ -68,6 +68,14 @@ export async function handleCancel(id: string, deps: CancelDeps) {
 
         try {
             const cancelled = await cancelReservationGroup(groupId, userData?.organizationId || '');
+            // 0건이면 취소된 것이 없다 — 그룹이 이미 전부 완료·취소된 상태다.
+            // 예전에는 "0건이 취소되었습니다"를 띄우고 **화면만 취소된 것처럼 바꿨다.**
+            // 새로고침하면 예약이 그대로 돌아와, 사용자는 취소가 됐다고 믿은 채 차량이
+            // 계속 잡혀 있는 것을 나중에야 알게 된다. 쓰지 않았으면 바꾸지도 않는다.
+            if (cancelled === 0) {
+                showToast('취소할 예약이 없습니다. 이미 완료되었거나 취소된 예약입니다.', 'error');
+                return;
+            }
             showToast(`다일 예약 ${cancelled}건이 취소되었습니다.`);
             setReservations(prev => prev.map(r => r.groupId === groupId ? { ...r, status: 'cancelled' } : r));
             invalidateDashboardCache();

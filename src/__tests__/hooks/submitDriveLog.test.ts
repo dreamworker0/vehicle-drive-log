@@ -330,7 +330,9 @@ describe('submitDriveLog', () => {
 
         const result = await submitDriveLog(makeCtx({ reservationData: { reservationId: 'r1' } }));
 
-        expect(mockCompleteGroup).toHaveBeenCalledWith('r1', 'org1');
+        // 도착일을 함께 넘겨야 한다 — 이게 없으면 조기 반납으로 **타지 않은 날**까지
+        // 완료로 닫혀, 화면에서만 사라진 채 차량 점유가 풀리지 않는다.
+        expect(mockCompleteGroup).toHaveBeenCalledWith('r1', 'org1', '2026-03-05');
         expect(result.success).toBe(true);
     });
 

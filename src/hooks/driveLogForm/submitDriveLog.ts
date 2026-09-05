@@ -169,8 +169,11 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
 
             // 1박2일 예약은 문서가 여러 건이다. 운행은 한 번인데 한 건만 닫으면 남은
             // 날짜가 미완료로 떠 미작성 알림이 계속 울린다. 다일이 아니면 아무 일도 없다.
+            //
+            // 도착일(form.driveDate)을 함께 넘긴다 — 조기 반납으로 **타지 않은 날**까지
+            // 완료로 닫으면 화면에서만 사라지고 차량 점유는 풀리지 않는다.
             if (orgId) {
-                const closed = await completeReservationGroupSiblings(resId, orgId);
+                const closed = await completeReservationGroupSiblings(resId, orgId, form.driveDate);
                 if (closed > 0) console.info(`[submitDriveLog] 다일 예약 나머지 ${closed}일을 함께 완료 처리`);
                 // 오프라인이면 시도조차 못 했고 다시 시도할 기회도 없다(이 예약에 두 번째 저장은
                 // 없다). 조용히 넘기면 다일 예약의 남은 날짜가 계속 열려 있게 된다.

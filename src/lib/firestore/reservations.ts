@@ -345,6 +345,8 @@ const batchGroupAction = async (
     orgId: string,
     context: string,
     exceptId?: string,
+    /** complete 전용 — 운행일지의 **도착일**. 이보다 뒤인 날짜는 타지 않은 날이다. */
+    arrivalDate?: string,
 ) => {
     try {
         const reservations = await fetchFn(id, orgId);
@@ -356,12 +358,29 @@ const batchGroupAction = async (
             if (action === 'cancel') {
                 batch.update(reservationDoc(r.id), { status: 'cancelled' });
             } else if (action === 'complete') {
+                // 도착일보다 **뒤인 날짜는 아예 타지 않은 날**이라 완료가 아니라 취소다.
+                //
+                // 9/1~9/3 예약을 9/1 저녁에 조기 반납하면 9/2·9/3은 실제로 운행되지 않았다.
+                // 이것을 completed로 닫으면 세 가지가 한꺼번에 어긋난다 —
+                //  (1) 화면에서는 사라진다(대시보드가 completed를 거른다),
+                //  (2) 그런데 **차량 점유는 그대로다**. 겹침 검사는 completed를
+                //      `actualStartTime`이 있을 때만 실제 시각으로 접는데 여기엔 없어서
+                //      00:00~23:59 전체를 계속 막는다. 본인 겹침 검사도 같은 규칙이라
+                //      그 사람은 남은 기간에 **어떤 차량도** 예약하지 못한다,
+                //  (3) 취소도 안 된다. 아래 active 필터가 completed를 제외하므로 쓰기가 0건이다.
+                // 즉 보이지도, 풀리지도 않는 예약이 남아 관리자 개입 없이는 복구되지 않는다.
+                // cancelled로 보내면 겹침 검사가 곧바로 제외하므로 차량이 즉시 풀린다.
+                if (arrivalDate && r.date > arrivalDate) {
+                    batch.update(reservationDoc(r.id), { status: 'cancelled' });
+                    return;
+                }
                 // driveLogReminderSent를 함께 심는다 — 이게 없으면 알림을 없애는 게 아니라 **만든다.**
                 //
                 // reservationReminder의 "운행일지 미작성" 알림은 `status in [completed, in_progress]`인
                 // 예약 중 자기 id를 가리키는 driveLog가 없는 건을 찾는다. 다일 예약의 나머지 날짜를
                 // completed로 바꾸면 그 조건에 **새로** 걸린다 — 운행일지의 reservationId는 실제로
                 // 출발한 날의 문서를 가리키기 때문이다. 상태만 닫으면 조용하던 예약이 울기 시작한다.
+                // (cancelled는 두 알림 쿼리 어디에도 걸리지 않아 이 표시가 필요 없다.)
                 batch.update(reservationDoc(r.id), { status: 'completed', driveLogReminderSent: true });
             } else {
                 batch.delete(reservationDoc(r.id));
@@ -393,9 +412,17 @@ export const cancelReservationGroup = (groupId: string, orgId: string) =>
  * 진입점마다 상태를 꿰면 한 곳을 빠뜨렸을 때 조용히 동작하지 않는다. 다일 예약이 아니면
  * 읽기 한 번으로 끝나고 아무것도 쓰지 않는다.
  *
+ * **도착일보다 뒤인 날짜는 완료가 아니라 취소다.** 조기 반납하면 남은 날은 실제로 타지
+ * 않았고, 완료로 닫으면 화면에서만 사라진 채 차량 점유가 풀리지 않는다(batchGroupAction 주석).
+ *
+ * @param arrivalDate 운행일지의 도착일(YYYY-MM-DD). 생략하면 예전처럼 전부 완료 처리한다.
  * @returns 함께 닫은 **나머지** 날짜 수 (다일이 아니면 0, 오프라인이라 못 했으면 SKIPPED_OFFLINE)
  */
-export const completeReservationGroupSiblings = async (reservationId: string, orgId: string): Promise<number> => {
+export const completeReservationGroupSiblings = async (
+    reservationId: string,
+    orgId: string,
+    arrivalDate?: string,
+): Promise<number> => {
     // 오프라인에서 붙잡히는 것은 batch.commit()뿐이다 — 서버 확인을 기다리므로 **영영 resolve되지
     // 않고**, 호출부의 runWithRetry 타임아웃까지 저장 완료를 붙잡아 둔다. getDoc은 캐시로
     // 떨어지거나 즉시 거절되지 매달리지 않으므로, 다일 예약인지까지는 알아보고 판단한다.
@@ -412,6 +439,7 @@ export const completeReservationGroupSiblings = async (reservationId: string, or
         // 반영 지연으로 남아 있어도 두 번 쓰지 않도록 명시한다.
         return await batchGroupAction(
             getReservationsByGroupId, 'complete', groupId, orgId, 'completeReservationGroupSiblings', reservationId,
+            arrivalDate,
         );
     } catch (error) {
         // 오프라인이면 캐시에 예약이 없었을 뿐이다. 다일인지 알 수 없으니 조용히 넘긴다 —

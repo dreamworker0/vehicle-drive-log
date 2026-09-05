@@ -382,6 +382,66 @@ describe('firestore/reservations', () => {
             expect(count).toBe(1);
         });
 
+        it('도착일보다 뒤인 날짜는 완료가 아니라 취소로 닫는다 — 조기 반납', async () => {
+            // 9/1~9/3 예약을 9/1 저녁에 반납하면 9/2·9/3은 타지 않은 날이다.
+            // completed로 닫으면 대시보드에서만 사라지고 겹침 검사는 00:00~23:59를 계속
+            // 막는다(actualStartTime이 없어 실제 시각으로 접히지 않는다). 그러면 차량도,
+            // 그 사람도 남은 기간 내내 잠기는데 취소조차 되지 않는다(active 필터가 completed 제외).
+            const { update, commit } = batchMock();
+            vi.mocked(fs.getDoc).mockResolvedValue({ exists: () => true, data: () => ({ groupId: 'g1' }) } as never);
+            vi.mocked(fs.getDocs).mockResolvedValue(docsSnap([
+                { id: 'day1', status: 'in_progress', date: '2026-09-01' },
+                { id: 'day2', status: 'reserved', date: '2026-09-02' },
+                { id: 'day3', status: 'reserved', date: '2026-09-03' },
+            ]) as never);
+
+            const count = await completeReservationGroupSiblings('day1', 'org1', '2026-09-01');
+
+            expect(update).toHaveBeenCalledTimes(2);
+            // 두 건 모두 취소 — 완료 표시가 하나도 섞이지 않아야 한다
+            expect(update).toHaveBeenNthCalledWith(1, expect.anything(), { status: 'cancelled' });
+            expect(update).toHaveBeenNthCalledWith(2, expect.anything(), { status: 'cancelled' });
+            expect(commit).toHaveBeenCalled();
+            expect(count).toBe(2);
+        });
+
+        it('도착일까지의 날짜는 그대로 완료로 닫는다 — 정상 1박2일', async () => {
+            // 9/1 17:00 출발 → 9/2 10:00 도착. 운행일지는 day1을 가리키므로 day2가 남는데,
+            // 이건 실제로 탄 날이라 완료가 맞다. 여기까지 취소로 바뀌면 운행 기록이 사라진다.
+            const { update } = batchMock();
+            vi.mocked(fs.getDoc).mockResolvedValue({ exists: () => true, data: () => ({ groupId: 'g1' }) } as never);
+            vi.mocked(fs.getDocs).mockResolvedValue(docsSnap([
+                { id: 'day1', status: 'in_progress', date: '2026-09-01' },
+                { id: 'day2', status: 'reserved', date: '2026-09-02' },
+            ]) as never);
+
+            await completeReservationGroupSiblings('day1', 'org1', '2026-09-02');
+
+            expect(update).toHaveBeenCalledTimes(1);
+            expect(update).toHaveBeenCalledWith(expect.anything(), {
+                status: 'completed',
+                driveLogReminderSent: true,
+            });
+        });
+
+        it('같은 그룹에서 완료와 취소가 갈린다 — 중간에 반납한 3일 예약', async () => {
+            // 9/1~9/3 중 9/2에 반납: day2는 탔으니 완료, day3은 안 탔으니 취소.
+            const { update } = batchMock();
+            vi.mocked(fs.getDoc).mockResolvedValue({ exists: () => true, data: () => ({ groupId: 'g1' }) } as never);
+            vi.mocked(fs.getDocs).mockResolvedValue(docsSnap([
+                { id: 'day1', status: 'in_progress', date: '2026-09-01' },
+                { id: 'day2', status: 'reserved', date: '2026-09-02' },
+                { id: 'day3', status: 'reserved', date: '2026-09-03' },
+            ]) as never);
+
+            await completeReservationGroupSiblings('day1', 'org1', '2026-09-02');
+
+            expect(update).toHaveBeenNthCalledWith(1, expect.anything(), {
+                status: 'completed', driveLogReminderSent: true,
+            });
+            expect(update).toHaveBeenNthCalledWith(2, expect.anything(), { status: 'cancelled' });
+        });
+
         it('다일 예약이 아니면 읽기 한 번으로 끝내고 아무것도 쓰지 않는다', async () => {
             const { commit } = batchMock();
             vi.mocked(fs.getDoc).mockResolvedValue({ exists: () => true, data: () => ({}) } as never);
