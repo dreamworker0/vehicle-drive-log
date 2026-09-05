@@ -263,3 +263,66 @@ describe('geocode — 3단 폴백', () => {
         expect(core.isTmapCoolingDown()).toBe(false); // 리셋되지 않았다면 여기서 쿨다운
     });
 });
+
+// POI 드롭다운은 이미 좌표를 받아오는데, 예전에는 그걸 버리고 문자열만 저장해
+// 경로 계산에서 `geocode`가 같은 장소를 다시 검색했다 — 목적지 하나당 POI 호출 1건이
+// 확정적으로 낭비됐다(2026-09-05 실측: 하루 경로 300건 ≒ POI 300건).
+describe('primeGeocodeCache — 고른 장소를 다시 검색하지 않는다', () => {
+    it('심어 둔 좌표가 있으면 geocode가 API를 부르지 않는다', async () => {
+        geo.primeGeocodeCache('서울시청 (서울 중구 세종대로)', { lat: 37.5663, lon: 126.9779, name: '서울시청' });
+
+        const result = await settle(geo.geocode('서울시청 (서울 중구 세종대로)'));
+
+        expect(result).toEqual({ lat: 37.5663, lon: 126.9779, name: '서울시청' });
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('키가 다르면 평소대로 API를 부른다 (빗나가도 손해만 볼 뿐 깨지지 않는다)', async () => {
+        geo.primeGeocodeCache('서울시청 (서울 중구 세종대로)', { lat: 37.5663, lon: 126.9779, name: '서울시청' });
+        respondWith(poiResponse(SEOUL_CITY_HALL));
+
+        await settle(geo.geocode('서울시청'));
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+    });
+
+    // 한 번 심기면 그 목적지는 재시도조차 없이 그 값으로 굳는다 — 잘못된 좌표는
+    // 조용히 실패하는 경로 계산으로 이어지고, geoCache에 non-null로 남아 복구되지 않는다.
+    it('말이 안 되는 좌표로는 캐시를 오염시키지 않는다', async () => {
+        geo.primeGeocodeCache('엉터리', { lat: NaN, lon: 126.9, name: '엉터리' });
+        expect(core.geoCache.has('엉터리')).toBe(false);
+
+        geo.primeGeocodeCache('', { lat: 37.5, lon: 126.9, name: '빈키' });
+        expect(core.geoCache.has('')).toBe(false);
+
+        // searchPOIList는 문자열 "0"을 truthy로 통과시키므로 유한성만으로는 못 막는다.
+        // (0, 0)이 심기면 기니만 근해로 경로를 계산해 조용히 실패한다.
+        geo.primeGeocodeCache('영점', { lat: 0, lon: 0, name: '영점' });
+        expect(core.geoCache.has('영점')).toBe(false);
+
+        // 한반도 밖은 이 서비스의 목적지가 아니다
+        geo.primeGeocodeCache('도쿄', { lat: 35.68, lon: 139.69, name: '도쿄' });
+        expect(core.geoCache.has('도쿄')).toBe(false);
+    });
+
+    it('한반도 범위 안이면 정상적으로 심는다 (제주·강원 끝단 포함)', () => {
+        geo.primeGeocodeCache('제주남단', { lat: 33.1, lon: 126.3, name: '제주남단' });
+        geo.primeGeocodeCache('강원북단', { lat: 38.6, lon: 128.4, name: '강원북단' });
+        expect(core.geoCache.has('제주남단')).toBe(true);
+        expect(core.geoCache.has('강원북단')).toBe(true);
+    });
+
+    it('앞뒤 공백은 지우고 심는다 (목적지 문자열은 trim되어 넘어온다)', async () => {
+        geo.primeGeocodeCache('  서울역  ', { lat: 37.55, lon: 126.97, name: '서울역' });
+
+        const result = await settle(geo.geocode('서울역'));
+
+        expect(result).toEqual({ lat: 37.55, lon: 126.97, name: '서울역' });
+        expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it('name이 비면 키를 이름으로 쓴다', () => {
+        geo.primeGeocodeCache('무명장소', { lat: 37.1, lon: 127.1, name: '' });
+        expect(core.geoCache.get('무명장소')).toEqual({ lat: 37.1, lon: 127.1, name: '무명장소' });
+    });
+});

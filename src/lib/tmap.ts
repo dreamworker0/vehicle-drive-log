@@ -13,7 +13,7 @@ export {
     mergePendingDestination,
 } from './tmap/core';
 
-export { searchPOI, geocode } from './tmap/geocoding';
+export { searchPOI, geocode, primeGeocodeCache } from './tmap/geocoding';
 
 export {
     getRoute,

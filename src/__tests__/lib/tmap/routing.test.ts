@@ -342,3 +342,70 @@ describe('getFreeRoadRoute', () => {
         await expect(settle(routing.getFreeRoadRoute('기관', '시청'))).resolves.toBeNull();
     });
 });
+
+/**
+ * 이 PR의 전부는 "드롭다운이 심은 키"와 "geocode가 받는 문자열"이 같다는 것이다.
+ * 어긋나면 아무 일도 하지 않고 조용히 예전처럼 API를 부른다 — 실패가 눈에 안 보이는
+ * 종류라, 사슬 전체를 태우는 회귀 가드를 둔다.
+ *
+ * 사슬: DestinationInput이 만드는 `"이름 (주소)"` → onChangeDestination →
+ *       form.destination(`', '` join) → parseDestinations(split) → getMultiRoute → geocode
+ */
+describe('primeGeocodeCache 사슬 — 고른 목적지는 다시 검색하지 않는다', () => {
+    /** DestinationInput의 라벨 생성 규칙과 같은 모양 */
+    const label = (name: string, address: string) => `${name} (${address})`;
+
+    it('목적지 하나: 출발지만 지오코딩하고 목적지는 캐시로 끝난다', async () => {
+        const geo = await import('../../../lib/tmap/geocoding');
+        const dest = label('사천동주민센터', '경남 사천시 대방로');
+        geo.primeGeocodeCache(dest, { lat: 35.0, lon: 128.0, name: '사천동주민센터' });
+        seedCoords({ '기관 주소': [35.1, 128.1] });
+
+        respondWith(routeResponse({ totalDistance: 10000, totalTime: 600 }));
+        const result = await settle(routing.getMultiRoute('기관 주소', dest));
+
+        expect(result).not.toBeNull();
+        // 경로 1건만 나가고 POI 검색은 아예 없다
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(String(fetchMock.mock.calls[0][0])).toContain('routes');
+    });
+
+    it('목적지 둘: ", " join/split을 왕복해도 키가 살아 있다', async () => {
+        const geo = await import('../../../lib/tmap/geocoding');
+        const a = label('사천동주민센터', '경남 사천시 대방로');
+        const b = label('삼천포병원', '경남 사천시 중앙로');
+        geo.primeGeocodeCache(a, { lat: 35.0, lon: 128.0, name: '사천동주민센터' });
+        geo.primeGeocodeCache(b, { lat: 35.05, lon: 128.05, name: '삼천포병원' });
+        seedCoords({ '기관 주소': [35.1, 128.1] });
+
+        // 다중 목적지는 구간 수만큼 경로를 부른다 (출발→A→B→출발)
+        respondWith(
+            routeResponse({ totalDistance: 5000, totalTime: 300 }),
+            routeResponse({ totalDistance: 3000, totalTime: 200 }),
+            routeResponse({ totalDistance: 7000, totalTime: 400 }),
+        );
+
+        // 폼에 저장되는 모양 그대로 넘긴다
+        const result = await settle(routing.getMultiRoute('기관 주소', [a, b].join(', ')));
+
+        expect(result).not.toBeNull();
+        expect(result!.isMulti).toBe(true);
+        // POI 검색이 한 건도 나가지 않았다
+        const poiCalls = fetchMock.mock.calls.filter(c => String(c[0]).includes('pois'));
+        expect(poiCalls).toHaveLength(0);
+    });
+
+    it('심지 않은 목적지는 예전처럼 검색한다 (빗나가도 깨지지 않는다)', async () => {
+        seedCoords({ '기관 주소': [35.1, 128.1] });
+        respondWith(
+            { searchPoiInfo: { pois: { poi: [{ noorLat: '35.0', noorLon: '128.0', name: '직접입력한곳' }] } } },
+            routeResponse({ totalDistance: 10000, totalTime: 600 }),
+        );
+
+        const result = await settle(routing.getMultiRoute('기관 주소', '직접입력한곳'));
+
+        expect(result).not.toBeNull();
+        const poiCalls = fetchMock.mock.calls.filter(c => String(c[0]).includes('pois'));
+        expect(poiCalls).toHaveLength(1);
+    });
+});

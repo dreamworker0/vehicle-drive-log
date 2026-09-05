@@ -13,15 +13,17 @@ vi.mock('../../lib/tmap/core', () => ({
     isTmapAvailable: () => mockIsTmapAvailable(),
 }));
 
-import { usePoiSearch } from '../../hooks/usePoiSearch';
+import { usePoiSearch, __reloadPoiCacheForTest } from '../../hooks/usePoiSearch';
 
 describe('usePoiSearch', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         vi.useFakeTimers();
         if (typeof window !== 'undefined') {
-            window.sessionStorage.clear();
+            window.localStorage.clear();
         }
+        // 캐시는 모듈 로드 시 한 번만 저장소를 읽으므로, 비운 뒤 메모리도 맞춰 준다.
+        __reloadPoiCacheForTest();
     });
 
     afterEach(() => {
@@ -57,7 +59,7 @@ describe('usePoiSearch', () => {
 
         // sessionStorage 확인
         if (typeof window !== 'undefined') {
-            const raw = window.sessionStorage.getItem('poi_search_cache');
+            const raw = window.localStorage.getItem('poi_search_cache_v1');
             expect(raw).toBeDefined();
             const parsed = JSON.parse(raw!);
             expect(parsed.queue).toContain('서울시청');
@@ -68,12 +70,13 @@ describe('usePoiSearch', () => {
     it('캐시 히트 시에는 디바운스를 우회하고 0ms 만에 즉시 동기적으로 결과를 반환한다', async () => {
         const mockResults: PoiResult[] = [{ name: '강남역', lat: 37.4979, lon: 127.0276, address: '서울 강남구 강남대로 396' }];
         
-        // 미리 세션스토리지에 캐시 적재
+        // 미리 로컬스토리지에 캐시 적재
         if (typeof window !== 'undefined') {
-            window.sessionStorage.setItem('poi_search_cache', JSON.stringify({
+            window.localStorage.setItem('poi_search_cache_v1', JSON.stringify({
                 queue: ['강남역'],
                 data: { '강남역': mockResults }
             }));
+            __reloadPoiCacheForTest();
         }
 
         const { result } = renderHook(() => usePoiSearch('강남역'));
@@ -95,10 +98,11 @@ describe('usePoiSearch', () => {
         }
 
         if (typeof window !== 'undefined') {
-            window.sessionStorage.setItem('poi_search_cache', JSON.stringify({
+            window.localStorage.setItem('poi_search_cache_v1', JSON.stringify({
                 queue: initialQueue,
                 data: initialData
             }));
+            __reloadPoiCacheForTest();
         }
 
         // 새로운 51번째 키워드 검색 시도
@@ -114,9 +118,9 @@ describe('usePoiSearch', () => {
 
         expect(mockSearchPOIList).toHaveBeenCalledWith('신규위치', 10);
 
-        // 세션스토리지 FIFO 만료 확인
+        // 로컬스토리지 FIFO 만료 확인
         if (typeof window !== 'undefined') {
-            const raw = window.sessionStorage.getItem('poi_search_cache');
+            const raw = window.localStorage.getItem('poi_search_cache_v1');
             const parsed = JSON.parse(raw!);
             // 큐 크기 50 유지
             expect(parsed.queue.length).toBe(50);
@@ -131,8 +135,27 @@ describe('usePoiSearch', () => {
         }
     });
 
-    it('QuotaExceededError 등 스토리지 예외 발생 시 캐시가 리셋된다', async () => {
-        // sessionStorage.setItem이 에러를 발생시키도록 모킹
+
+    // 예전에는 sessionStorage라 탭을 닫으면 캐시가 사라져, 같은 목적지를 내일 또 검색하면
+    // API를 또 불렀다. 기관 차량의 행선지는 반복이 심하다(같은 복지관·병원·어르신 댁).
+    it('탭을 닫았다 열어도 캐시가 남는다 (localStorage)', async () => {
+        const mockResults: PoiResult[] = [{ name: '○○복지관', lat: 37.5, lon: 127.0, address: '서울 강남구' }];
+        mockSearchPOIList.mockResolvedValueOnce(mockResults);
+
+        const first = renderHook(() => usePoiSearch('○○복지관'));
+        await act(async () => { vi.advanceTimersByTime(500); });
+        expect(mockSearchPOIList).toHaveBeenCalledTimes(1);
+        first.unmount();
+
+        // 새 세션: 메모리 캐시를 버리고 저장소에서 다시 읽는다(모듈 재적재와 같은 상태)
+        __reloadPoiCacheForTest();
+
+        const second = renderHook(() => usePoiSearch('○○복지관'));
+        expect(second.result.current.poiResults).toEqual(mockResults);
+        expect(mockSearchPOIList).toHaveBeenCalledTimes(1); // 다시 부르지 않았다
+    });
+
+    it('스토리지 예외가 나도 화면은 정상 동작한다', async () => {
         const setItemSpy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
             throw new Error('QuotaExceededError');
         });
@@ -147,9 +170,38 @@ describe('usePoiSearch', () => {
         });
 
         expect(result.current.poiResults).toEqual(mockResults);
-        // setItemSpy가 호출되었는지 검증
         expect(setItemSpy).toHaveBeenCalled();
 
         setItemSpy.mockRestore();
+    });
+
+    // ⚠️ 저장소만 비우면 메모리 캐시가 그대로 남아 다음 쓰기도 같은 크기로 다시 실패하고,
+    // 그 뒤로 **영원히** 저장이 안 된다 — 캐시를 세션 너머로 남기려던 목적이 조용히 무효가
+    // 된다. 예전 구현(sessionStorage)은 비우면 다음 쓰기가 작게 다시 성공해 회복됐다.
+    it('한도에 닿아도 저장 능력을 영구히 잃지 않는다', async () => {
+        // 일정 크기를 넘는 페이로드만 거부해 "한도"를 흉내 낸다
+        const LIMIT = 400;
+        let attempts = 0;
+        let successes = 0;
+        const spy = vi.spyOn(Storage.prototype, 'setItem').mockImplementation((_k, v) => {
+            attempts++;
+            if (String(v).length > LIMIT) throw new Error('QuotaExceededError');
+            successes++;
+        });
+
+        for (let i = 1; i <= 8; i++) {
+            const kw = `장소_${i}`;
+            mockSearchPOIList.mockResolvedValueOnce([
+                { name: kw, lat: 37, lon: 126, address: '충분히 긴 테스트 주소 문자열입니다' } as PoiResult,
+            ]);
+            const { unmount } = renderHook(() => usePoiSearch(kw));
+            await act(async () => { vi.advanceTimersByTime(500); });
+            unmount();
+        }
+
+        expect(attempts).toBeGreaterThan(0);
+        // 한도를 넘긴 뒤에도 스스로 줄여 다시 저장에 성공한다
+        expect(successes).toBeGreaterThan(0);
+        spy.mockRestore();
     });
 });
