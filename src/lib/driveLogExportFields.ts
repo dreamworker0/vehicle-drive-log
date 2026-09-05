@@ -54,11 +54,30 @@ export function resolveDateStr(log: ExportableDriveLog, fallback = ''): string {
  * 찍히므로, 그것만 보면 17:00 출발 → 10:00 도착이라는 불가능한 기록으로 읽힌다.
  */
 export function resolveStartTime(log: ExportableDriveLog): string {
-    const time = log.startTime || log.departureTime || '';
-    if (!time || !log.startDate) return time;
+    return `${formatStartDatePrefix(log)}${resolveStartTimeRaw(log)}`;
+}
+
+/**
+ * 출발 시각만 — 날짜 접두어 **없이**.
+ *
+ * 정렬·비교에는 이쪽을 써야 한다. `resolveStartTime`이 붙이는 `9/1 `은 문자열 비교에서
+ * 여느 `HH:MM`보다 뒤로 밀려(`'9' > '1'`), 정렬 키로 쓰면 다일 운행이 그 날짜의 맨 아래로
+ * 내려간다 — 실제로는 가장 먼저 출발한 운행인데도.
+ */
+export function resolveStartTimeRaw(log: ExportableDriveLog): string {
+    return log.startTime || log.departureTime || '';
+}
+
+/**
+ * 이틀 이상 걸린 운행의 출발 날짜 접두어(`9/1 `). 당일 운행이면 빈 문자열.
+ *
+ * 표시하는 쪽이 여럿이라(목록 행·PDF·엑셀) 판정과 형식을 한 군데로 모은다.
+ */
+export function formatStartDatePrefix(log: ExportableDriveLog): string {
+    if (!log.startDate || !resolveStartTimeRaw(log)) return '';
     const [, m, d] = log.startDate.split('-');
-    if (!m || !d) return time;
-    return `${Number(m)}/${Number(d)} ${time}`;
+    if (!m || !d) return '';
+    return `${Number(m)}/${Number(d)} `;
 }
 
 /** 도착 시각 (endTime 우선, 없으면 arrivalTime). */

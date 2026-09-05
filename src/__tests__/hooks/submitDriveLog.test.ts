@@ -35,6 +35,7 @@ vi.mock('../../lib/sentry', () => ({
 // increment는 단순 sentinel로 치환해 호출 인자만 검증한다.
 vi.mock('firebase/firestore', () => ({
     increment: (n: number) => ({ __increment: n }),
+    deleteField: () => ({ __deleteField: true }),
 }));
 
 import { submitDriveLog } from '../../hooks/driveLogForm/submitDriveLog';
@@ -262,6 +263,30 @@ describe('submitDriveLog', () => {
 
         const payload = mockCreateDriveLog.mock.calls[0][0];
         expect(payload.startDate).toBeUndefined();
+    });
+
+    it('수정으로 다일 → 당일이 되면 출발일을 지우라고 명시한다', async () => {
+        // undefined로 두면 updateDriveLog의 sanitizeUndefined가 키째 걸러 내 updateDoc에
+        // 실리지 않는다. 그러면 문서에 남은 옛 출발일이 살아남아 사용자의 정정이 되돌아간다.
+        await submitDriveLog(makeCtx({
+            isEditMode: true,
+            editLog: { id: 'log1', vehicleId: 'v1' } as never,
+            form: { ...baseForm, driveDate: '2026-03-05', endDate: '' },
+        }));
+
+        const payload = mockUpdateDriveLog.mock.calls[0][1];
+        expect(payload.startDate).toEqual({ __deleteField: true });
+    });
+
+    it('수정으로도 다일이면 출발일을 그대로 싣는다 — 지우지 않는다', async () => {
+        await submitDriveLog(makeCtx({
+            isEditMode: true,
+            editLog: { id: 'log1', vehicleId: 'v1' } as never,
+            form: { ...baseForm, driveDate: '2026-03-05', endDate: '2026-03-06', startTime: '17:00', endTime: '10:00' },
+        }));
+
+        const payload = mockUpdateDriveLog.mock.calls[0][1];
+        expect(payload.startDate).toBe('2026-03-05');
     });
 
     it('예약 연계 제출은 다일 예약의 나머지 날짜도 함께 닫는다', async () => {

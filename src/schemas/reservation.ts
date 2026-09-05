@@ -48,6 +48,15 @@ export const reservationSchema = z.object({
     /** 반복(정기) 예약 그룹 식별자 */
     recurringGroupId: z.string().optional().catch(undefined),
     /**
+     * "운행일지 미작성" 알림을 이미 처리했다는 표시.
+     *
+     * 원래는 스케줄러(reservationReminder)가 알림을 보낸 뒤 서버에서만 심던 필드다. 다일 예약의
+     * 나머지 날짜를 운행일지 저장과 함께 닫을 때 클라이언트도 이 값을 쓴다 — 그 날짜들에는
+     * 자기를 가리키는 운행일지가 없어서, 닫기만 하면 스케줄러가 알림 대상으로 새로 집어낸다.
+     * 스키마에 없으면 컨버터가 조용히 지워 조회가 안 되므로 여기에 둔다.
+     */
+    driveLogReminderSent: z.boolean().optional().catch(undefined),
+    /**
      * 예약 시점에 미리 적어 두는 동승자 — **예정이지 기록이 아니다.**
      * 확정 기록은 운행일지(`driveLogs.passengerNames`)이며 통계·감사는 그쪽만 본다.
      * 여기 값은 운행일지 작성 화면을 열 때 초기값으로 채워지고, 거기서 자유롭게 고칠 수 있다.

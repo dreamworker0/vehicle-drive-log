@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import type { DriveLog } from '../../../types/driveLog';
 import { toDateOrNull } from '../../../lib/dateUtils';
+import { formatStartDatePrefix } from '../../../lib/driveLogExportFields';
 
 export interface DriveLogTableRowProps {
     log: DriveLog;
@@ -90,7 +91,7 @@ export default function DriveLogTableRow({ log, deletingId, onDelete }: DriveLog
                     <span>{log.destination || '-'}</span>
                     {(log.startTime || log.endTime) && (
                         <span className="text-surface-400 dark:text-surface-500">
-                            ({log.startDate ? `${Number(log.startDate.split('-')[1])}/${Number(log.startDate.split('-')[2])} ` : ''}{log.startTime || '?'} ~ {log.endTime || '?'})
+                            ({formatStartDatePrefix(log)}{log.startTime || '?'} ~ {log.endTime || '?'})
                         </span>
                     )}
                     {(log.passengerCount ?? 0) > 1 && (

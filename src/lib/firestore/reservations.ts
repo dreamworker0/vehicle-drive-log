@@ -356,7 +356,13 @@ const batchGroupAction = async (
             if (action === 'cancel') {
                 batch.update(reservationDoc(r.id), { status: 'cancelled' });
             } else if (action === 'complete') {
-                batch.update(reservationDoc(r.id), { status: 'completed' });
+                // driveLogReminderSent를 함께 심는다 — 이게 없으면 알림을 없애는 게 아니라 **만든다.**
+                //
+                // reservationReminder의 "운행일지 미작성" 알림은 `status in [completed, in_progress]`인
+                // 예약 중 자기 id를 가리키는 driveLog가 없는 건을 찾는다. 다일 예약의 나머지 날짜를
+                // completed로 바꾸면 그 조건에 **새로** 걸린다 — 운행일지의 reservationId는 실제로
+                // 출발한 날의 문서를 가리키기 때문이다. 상태만 닫으면 조용하던 예약이 울기 시작한다.
+                batch.update(reservationDoc(r.id), { status: 'completed', driveLogReminderSent: true });
             } else {
                 batch.delete(reservationDoc(r.id));
             }
@@ -387,6 +393,10 @@ export const cancelReservationGroup = (groupId: string, orgId: string) =>
  * @returns 함께 닫은 **나머지** 날짜 수 (다일이 아니면 0)
  */
 export const completeReservationGroupSiblings = async (reservationId: string, orgId: string): Promise<number> => {
+    // 오프라인에서는 건너뛴다. getDoc·batch.commit()은 오프라인 큐를 타지 않아 **영영 resolve되지
+    // 않고**, 호출부의 runWithRetry 타임아웃까지 저장 완료를 붙잡아 둔다(캐시가 memory면 즉시
+    // reject되어 "예약 상태 변경 실패" 경고까지 뜬다). 나머지 날짜는 다음 온라인 저장 때 닫힌다.
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return 0;
     try {
         const snap = await getDoc(reservationDoc(reservationId));
         const groupId = snap.exists() ? (snap.data() as Reservation).groupId : undefined;

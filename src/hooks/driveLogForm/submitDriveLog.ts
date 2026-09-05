@@ -4,7 +4,7 @@
  */
 import { createDriveLog, updateDriveLog, updateReservationStatus, updateHipassCard, completeReservationGroupSiblings } from '../../lib/firestore';
 
-import { increment } from 'firebase/firestore';
+import { increment, deleteField } from 'firebase/firestore';
 import { buildLogData, nowTime, todayStr } from '../utils/driveLogValidation';
 import type { DriveLogForm } from './types';
 import type { Vehicle } from '../../types/vehicle';
@@ -113,7 +113,17 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
     const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
 
     if (isEditMode && editLog) {
-        const result = await updateDriveLog(editLog.id, logData);
+        // 다일 → 당일로 되돌린 수정에서 startDate를 **명시적으로 지운다.**
+        //
+        // buildLogData는 같은 날이면 startDate를 undefined로 두는데, updateDriveLog의
+        // sanitizeUndefined가 undefined 키를 통째로 걸러 내므로 updateDoc에 아예 실리지 않는다.
+        // 그러면 문서에 남은 옛 출발일이 그대로 살아, 다시 열었을 때 사용자의 정정이 사라지고
+        // 목록·내보내기에는 없는 날짜가 계속 찍힌다. deleteField()는 sanitizeUndefined가
+        // Firebase 특별 객체로 알아보고 통과시킨다.
+        const result = await updateDriveLog(editLog.id, {
+            ...logData,
+            startDate: (logData.startDate ?? deleteField()) as unknown as string | undefined,
+        });
         if (result.syncResult?.updated) syncResult = result.syncResult;
         if (result.backgroundError) {
             backgroundWarnings.push('차량 km 동기화에 실패했습니다');

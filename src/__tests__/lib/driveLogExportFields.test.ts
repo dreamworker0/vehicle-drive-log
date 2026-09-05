@@ -3,7 +3,7 @@
  */
 import { describe, it, expect } from 'vitest';
 import {
-    resolveStartKm, resolveEndKm, resolveDistance, resolveDateStr, resolveStartTime, resolveEndTime,
+    resolveStartKm, resolveEndKm, resolveDistance, resolveDateStr, resolveStartTime, resolveStartTimeRaw, formatStartDatePrefix, resolveEndTime,
     attachFuelSummary,
 } from '../../lib/driveLogExportFields';
 import { toLocalDateStr } from '../../lib/dateUtils';
@@ -82,6 +82,31 @@ describe('resolveStartTime / resolveEndTime', () => {
 
     it('둘 다 없으면 빈 문자열', () => {
         expect(resolveStartTime({})).toBe('');
+    });
+
+    it('이틀 이상 걸린 운행은 출발 날짜를 앞에 붙인다', () => {
+        // 날짜 칸에는 도착일이 찍히므로, 접두어가 없으면 17:00 출발 → 10:00 도착이라는
+        // 불가능한 기록으로 읽힌다.
+        expect(resolveStartTime({ startTime: '17:00', startDate: '2026-09-01' })).toBe('9/1 17:00');
+    });
+
+    it('정렬용 원시 시각에는 접두어를 붙이지 않는다', () => {
+        // 붙이면 '9/1 17:00'이 문자열 비교에서 여느 HH:MM보다 뒤로 밀려, 가장 먼저 출발한
+        // 운행이 그 날짜의 맨 아래로 내려간다.
+        expect(resolveStartTimeRaw({ startTime: '17:00', startDate: '2026-09-01' })).toBe('17:00');
+    });
+
+    it('당일 운행에는 접두어가 없다', () => {
+        expect(formatStartDatePrefix({ startTime: '09:00' })).toBe('');
+    });
+
+    it('출발일이 YYYY-MM-DD가 아니면 접두어를 만들지 않는다 — NaN/NaN을 찍지 않는다', () => {
+        expect(formatStartDatePrefix({ startTime: '09:00', startDate: '2026' })).toBe('');
+        expect(formatStartDatePrefix({ startTime: '09:00', startDate: '' })).toBe('');
+    });
+
+    it('시각이 없으면 접두어만 남기지 않는다', () => {
+        expect(resolveStartTime({ startDate: '2026-09-01' })).toBe('');
         expect(resolveEndTime({})).toBe('');
     });
 });

@@ -6,7 +6,7 @@ import { getPdfStyles, formatDate, formatNumber, escapeHtml } from './pdfStyles'
 import { measurePageMetrics, paginateByHeight } from './pageFit';
 import { recordExport } from '../audit/recordExport';
 import {
-    resolveStartKm, resolveEndKm, resolveDistance, resolveDateStr, resolveStartTime, resolveEndTime,
+    resolveStartKm, resolveEndKm, resolveDistance, resolveDateStr, resolveStartTime, resolveStartTimeRaw, resolveEndTime,
 } from '../driveLogExportFields';
 import type { FirestoreTimestamp } from '../../types/common';
 
@@ -88,7 +88,9 @@ export function downloadDriveLogsPdf(logs: PdfLogEntry[], options: { onError?: (
     const sorted = [...logs].sort((a, b) => {
         const dateCmp = resolveDateStr(a).localeCompare(resolveDateStr(b));
         if (dateCmp !== 0) return dateCmp;
-        return resolveStartTime(a).localeCompare(resolveStartTime(b));
+        // 날짜 접두어가 붙지 않은 원래 시각으로 견준다 — 접두어가 붙으면 다일 운행이
+        // 문자열 비교에서 그 날짜의 맨 뒤로 밀린다.
+        return resolveStartTimeRaw(a).localeCompare(resolveStartTimeRaw(b));
     });
 
     const layout = { orgName, period, approvalLine, includeHipass, includePassengers, includeFuel, includeStartLocation };

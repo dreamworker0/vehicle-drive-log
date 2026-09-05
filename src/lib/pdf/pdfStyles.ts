@@ -159,7 +159,13 @@ export function getPdfStyles() {
         .col-vehicle { width: 76px; }
         .col-dest { width: auto; }
         .col-purpose { width: auto; }
-        .col-time { width: 34px; }
+        /*
+         * 34px는 'HH:MM'에 맞춘 폭이다. 이틀 이상 걸린 운행은 '9/1 17:00'처럼 날짜가 앞에
+         * 붙어 들어가지 않는데, 표 전체가 word-break: break-all이라 '9/1 1' / '7:00'처럼
+         * 토큰 한가운데가 잘린다. 폭은 그대로 두고(당일 운행이 대부분인 서식의 균형을
+         * 깨지 않는다) 줄바꿈만 공백에서 일어나게 해 '9/1' / '17:00' 두 줄로 떨어뜨린다.
+         */
+        .col-time { width: 34px; word-break: keep-all; }
         .col-km { width: 46px; }
         .col-passenger { width: 30px; }
         .col-fuel { width: 64px; }
