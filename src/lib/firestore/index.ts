@@ -91,6 +91,7 @@ export {
     getReservationsByDateRange,
     getReservationsByGroupId,
     cancelReservationGroup,
+    completeReservationGroupSiblings,
     deleteReservationGroup,
     getReservationsByRecurringGroupId,
     cancelRecurringGroup,

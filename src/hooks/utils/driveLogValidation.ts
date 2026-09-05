@@ -79,9 +79,14 @@ export function validateDriveLogForm(
 
 /**
  * 운행 날짜 기반 timestamp를 생성한다.
+ *
+ * 기준은 **도착 시각**이다(바뀌지 않았다). 이틀 이상 걸린 운행이면 도착한 **날**이
+ * `endDate`로 따로 들어오므로 그 날짜를 쓴다 — 그러지 않으면 9/1 17:00 출발 →
+ * 9/2 10:00 도착이 `9/1 10:00`으로 찍혀, 출발보다 7시간 이른 시각이 그 일지의
+ * 정렬 기준이 된다. `endDate`가 없는 기존 문서는 계산이 종전과 완전히 같다.
  */
-export function buildDriveTimestamp(driveDate: string, endTime: string, startTime: string) {
-    const dateStr = driveDate || todayStr();
+export function buildDriveTimestamp(driveDate: string, endTime: string, startTime: string, endDate?: string) {
+    const dateStr = endDate || driveDate || todayStr();
     const [y, m, d] = dateStr.split('-').map(Number);
     const timeStr = endTime || startTime || nowTime();
     const [h, min] = timeStr.split(':').map(Number);
@@ -116,7 +121,7 @@ interface BuildLogContext {
 export function buildLogData(form: DriveLogForm, { orgId, user, userData, selectedVehicle, selectedPassengers, externalPassengerCount = 0, externalPassengerNames = '', coDrivers = [], externalCoDriverNames = '', isRetroactive, ocrUsed = false, favoriteUsed = false, startLocation }: BuildLogContext) {
     const startKm = parseInt(form.startKm);
     const endKm = parseInt(form.endKm);
-    const driveTimestamp = buildDriveTimestamp(form.driveDate, form.endTime, form.startTime);
+    const driveTimestamp = buildDriveTimestamp(form.driveDate, form.endTime, form.startTime, form.endDate);
 
     const parsedExternalNames = (externalPassengerNames || '')
         .split(',')
@@ -174,6 +179,10 @@ export function buildLogData(form: DriveLogForm, { orgId, user, userData, select
         // UI는 사라지지만 폼 값은 true로 남는데, 그대로 저장하면 소급 문서에 표시가 묻는다.
         // 차량 상태는 서버 가드가 막지만 기록 자체가 사실과 달라진다(하이패스와 같은 경계).
         needsRefuel: (!isRetroactive && form.needsRefuel) || undefined,
+        // 이틀 이상 걸린 운행에서만 **출발일**을 남긴다. 도착 쪽은 timestamp가 이미 담는다.
+        // 같은 날이면 필드를 만들지 않아 기존 문서와 모양이 같아진다
+        // (판정은 어디서나 `startDate ?? timestamp의 날짜`로 떨어진다).
+        startDate: (form.endDate && form.endDate !== form.driveDate) ? form.driveDate : undefined,
     };
 
     if (!isNaN(startKm) && !isNaN(endKm)) {

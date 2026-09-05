@@ -63,7 +63,11 @@ export default function useDriveLogForm() {
     const [lastDriveLog, setLastDriveLog] = useState<DriveLog | null>(null);
     const [nextDriveLog, setNextDriveLog] = useState<DriveLog | null>(null);
 
-    const editDriveDate = editLog?.timestamp ? timestampToDateStr(editLog.timestamp) : todayStr();
+    // timestamp는 **도착** 시각이다. 다일 운행은 출발일이 따로 저장돼 있으므로 그것을 쓴다.
+    const editArrivalDate = editLog?.timestamp ? timestampToDateStr(editLog.timestamp) : todayStr();
+    const editDriveDate = editLog?.startDate || editArrivalDate;
+    // 도착일 칸은 출발일과 다를 때만 채운다(같으면 비워 두는 것이 저장 규칙과 같다).
+    const editEndDate = editLog?.startDate ? editArrivalDate : '';
     const [form, setForm] = useState<DriveLogForm>({
         vehicleId: editLog?.vehicleId || '',
         vehicleName: editLog?.vehicleName || '',
@@ -80,6 +84,7 @@ export default function useDriveLogForm() {
         batteryEnd: editLog?.batteryEnd?.toString() || '',
         notes: editLog?.notes || '',
         driveDate: editDriveDate,
+        endDate: editEndDate,
         hipassBalanceAfter: '',
         needsRefuel: false,
     });

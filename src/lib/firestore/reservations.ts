@@ -340,7 +340,7 @@ export const getReservationsByGroupId = async (groupId: string, orgId: string) =
  */
 const batchGroupAction = async (
     fetchFn: (id: string, orgId: string) => Promise<Reservation[]>,
-    action: 'cancel' | 'delete',
+    action: 'cancel' | 'delete' | 'complete',
     id: string,
     orgId: string,
     context: string,
@@ -355,6 +355,8 @@ const batchGroupAction = async (
         active.forEach(r => {
             if (action === 'cancel') {
                 batch.update(reservationDoc(r.id), { status: 'cancelled' });
+            } else if (action === 'complete') {
+                batch.update(reservationDoc(r.id), { status: 'completed' });
             } else {
                 batch.delete(reservationDoc(r.id));
             }
@@ -370,6 +372,35 @@ const batchGroupAction = async (
 // 연속 예약 그룹 일괄 취소
 export const cancelReservationGroup = (groupId: string, orgId: string) =>
     batchGroupAction(getReservationsByGroupId, 'cancel', groupId, orgId, 'cancelReservationGroup');
+
+/**
+ * 예약 하나를 완료 처리한 뒤, 같은 **다일 그룹의 나머지 날짜**도 함께 닫는다.
+ *
+ * 1박2일 예약은 문서 두 건이다(9/1 17:00~23:59 · 9/2 00:00~10:00). 실제 운행은 한 번인데
+ * 운행일지는 그중 한 건만 완료 처리하므로, 남은 날짜가 미완료로 떠 **운행일지 미작성
+ * 알림이 계속 울린다.**
+ *
+ * `groupId`를 화면 이동 상태로 실어 나르지 않고 여기서 예약 문서를 한 번 읽어 판정한다 —
+ * 진입점마다 상태를 꿰면 한 곳을 빠뜨렸을 때 조용히 동작하지 않는다. 다일 예약이 아니면
+ * 읽기 한 번으로 끝나고 아무것도 쓰지 않는다.
+ *
+ * @returns 함께 닫은 **나머지** 날짜 수 (다일이 아니면 0)
+ */
+export const completeReservationGroupSiblings = async (reservationId: string, orgId: string): Promise<number> => {
+    try {
+        const snap = await getDoc(reservationDoc(reservationId));
+        const groupId = snap.exists() ? (snap.data() as Reservation).groupId : undefined;
+        if (!groupId) return 0;
+        // 방금 완료한 건은 제외한다 — 이미 completed라 어차피 active 필터에 걸리지 않지만,
+        // 반영 지연으로 남아 있어도 두 번 쓰지 않도록 명시한다.
+        return await batchGroupAction(
+            getReservationsByGroupId, 'complete', groupId, orgId, 'completeReservationGroupSiblings', reservationId,
+        );
+    } catch (error) {
+        captureError(error, { context: 'completeReservationGroupSiblings', reservationId, orgId });
+        throw error;
+    }
+};
 
 // 연속 예약 그룹 삭제 (수정 전 기존 그룹 제거용)
 export const deleteReservationGroup = (groupId: string, orgId: string) =>

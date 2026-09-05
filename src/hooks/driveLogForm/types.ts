@@ -20,7 +20,10 @@ export interface DriveLogForm {
     batteryStart: string;
     batteryEnd: string;
     notes: string;
+    /** 출발일. 도착일(endDate)이 비어 있으면 이 날 안에 끝난 운행이다. */
     driveDate: string;
+    /** 도착일. 출발일과 같거나 비어 있으면 당일 운행으로 본다. */
+    endDate: string;
     hipassBalanceAfter: string;
     /**
      * 운전자가 "주유(충전) 필요"로 표시했는가.

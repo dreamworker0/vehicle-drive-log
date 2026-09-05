@@ -2,7 +2,7 @@
  * submitDriveLog — 운행일지 제출/수정 비즈니스 로직
  * useDriveLogForm에서 추출
  */
-import { createDriveLog, updateDriveLog, updateReservationStatus, updateHipassCard } from '../../lib/firestore';
+import { createDriveLog, updateDriveLog, updateReservationStatus, updateHipassCard, completeReservationGroupSiblings } from '../../lib/firestore';
 
 import { increment } from 'firebase/firestore';
 import { buildLogData, nowTime, todayStr } from '../utils/driveLogValidation';
@@ -152,6 +152,13 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
                 actualEndTime: actualEnd,
             });
             await clearDrivingNotification(resId);
+
+            // 1박2일 예약은 문서가 여러 건이다. 운행은 한 번인데 한 건만 닫으면 남은
+            // 날짜가 미완료로 떠 미작성 알림이 계속 울린다. 다일이 아니면 아무 일도 없다.
+            if (orgId) {
+                const closed = await completeReservationGroupSiblings(resId, orgId);
+                if (closed > 0) console.info(`[submitDriveLog] 다일 예약 나머지 ${closed}일을 함께 완료 처리`);
+            }
         } catch (e) {
             console.warn('[submitDriveLog] 예약 상태 업데이트 실패:', e);
             captureError(e, { context: 'submitDriveLog.updateReservationStatus', resId });
@@ -224,7 +231,7 @@ export function getEmptyForm(): DriveLogForm {
         purpose: '', destination: '',
         startKm: '', endKm: '', startTime: nowTime(),
         endTime: '', batteryStart: '', batteryEnd: '', notes: '',
-        driveDate: todayStr(), hipassBalanceAfter: '', needsRefuel: false,
+        driveDate: todayStr(), endDate: '', hipassBalanceAfter: '', needsRefuel: false,
     };
 }
 

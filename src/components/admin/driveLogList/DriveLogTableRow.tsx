@@ -89,7 +89,9 @@ export default function DriveLogTableRow({ log, deletingId, onDelete }: DriveLog
                     {log.startLocation && <span className="text-surface-400 dark:text-surface-500">🚩 {log.startLocation} →</span>}
                     <span>{log.destination || '-'}</span>
                     {(log.startTime || log.endTime) && (
-                        <span className="text-surface-400 dark:text-surface-500">({log.startTime || '?'} ~ {log.endTime || '?'})</span>
+                        <span className="text-surface-400 dark:text-surface-500">
+                            ({log.startDate ? `${Number(log.startDate.split('-')[1])}/${Number(log.startDate.split('-')[2])} ` : ''}{log.startTime || '?'} ~ {log.endTime || '?'})
+                        </span>
                     )}
                     {(log.passengerCount ?? 0) > 1 && (
                         <span className="text-primary-500 dark:text-primary-400">👥 {log.passengerCount}명</span>

@@ -30,6 +30,7 @@ function baseForm(): DriveLogForm {
     return {
         vehicleId: 'v1', vehicleName: '스타렉스',
         driverUid: 'u1', driverName: '홍길동',
+        endDate: '',
         needsRefuel: false,
         purpose: '', destination: '',
         startTime: '', endTime: '', startKm: '', endKm: '',

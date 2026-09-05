@@ -15,6 +15,8 @@ export interface ExportableDriveLog {
     timestamp?: FirestoreTimestamp;
     startTime?: string;
     endTime?: string;
+    /** 출발일. 이틀 이상 걸린 운행에서만 있다(도착일은 timestamp가 담는다). */
+    startDate?: string;
     departureTime?: string;
     arrivalTime?: string;
     departureKm?: number;
@@ -45,9 +47,18 @@ export function resolveDateStr(log: ExportableDriveLog, fallback = ''): string {
     return log.date || (ts ? toLocalDateStr(ts) : fallback);
 }
 
-/** 출발 시각 (startTime 우선, 없으면 departureTime). */
+/**
+ * 출발 시각 (startTime 우선, 없으면 departureTime).
+ *
+ * 이틀 이상 걸린 운행이면 **날짜를 앞에 붙인다**(`9/1 17:00`). 날짜 칸에는 도착일이
+ * 찍히므로, 그것만 보면 17:00 출발 → 10:00 도착이라는 불가능한 기록으로 읽힌다.
+ */
 export function resolveStartTime(log: ExportableDriveLog): string {
-    return log.startTime || log.departureTime || '';
+    const time = log.startTime || log.departureTime || '';
+    if (!time || !log.startDate) return time;
+    const [, m, d] = log.startDate.split('-');
+    if (!m || !d) return time;
+    return `${Number(m)}/${Number(d)} ${time}`;
 }
 
 /** 도착 시각 (endTime 우선, 없으면 arrivalTime). */
