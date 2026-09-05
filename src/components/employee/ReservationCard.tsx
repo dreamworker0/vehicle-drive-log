@@ -24,6 +24,8 @@ interface ReservationCardProps {
     onStartWithTmap?: (reservation: Reservation) => void;
     /** 기관의 출발지 목록(본관 + 분관). 분관이 없으면 위치 배지를 띄우지 않는다. */
     orgSites?: OrgSite[];
+    /** 기관 설정: 주유(충전) 필요 표시 사용 여부. 끄면 배지를 띄우지 않는다. */
+    refuelFlagEnabled?: boolean;
 }
 
 /**
@@ -54,9 +56,22 @@ export default function ReservationCard({
     startingId, cancellingId, onStartDrive, onStartNavigation, onArrival, onCancel,
     onStartWithTmap,
     orgSites = [],
+    refuelFlagEnabled = false,
 }: ReservationCardProps) {
     const isButtonDisabled = disabled || startingId === reservation.id;
     const siteLabel = buildSiteLabel(orgSites, vehicle, isInProgress);
+
+    // 차를 가지러 가기 직전에 한 번 더 알린다. 예약할 때 봤더라도 며칠 지났을 수 있다.
+    const needsRefuel = refuelFlagEnabled && vehicle?.needsRefuel === true;
+    const refuelWord = vehicle?.fuelType === 'electric' || vehicle?.fuelType === 'hydrogen' ? '충전' : '주유';
+    // **언제 표시된 것인지 함께 보여 준다.** 오늘 켜진 표시와 몇 달 묵은 표시를 구분할 수
+    // 없으면 한 번 헛걸음한 뒤로 배지를 아무도 믿지 않는다(현재 위치 배지와 같은 이유).
+    const refuelAt = needsRefuel
+        ? toDateOrNull(vehicle?.needsRefuelAt as Parameters<typeof toDateOrNull>[0])
+        : null;
+    const refuelLabel = refuelAt
+        ? `${refuelWord} 필요 · ${refuelAt.getMonth() + 1}/${refuelAt.getDate()} 표시`
+        : `${refuelWord} 필요`;
 
     // 운행 시작 임박 여부 계산 (오늘 30분 전 ~ 15분 경과)
     const isSoon = (() => {
@@ -152,6 +167,14 @@ export default function ReservationCard({
                                 >
                                     🚩 {siteLabel}
                                 </p>
+                            )}
+                            {needsRefuel && (
+                                <span
+                                    data-testid="vehicle-refuel-badge"
+                                    className="inline-flex items-center gap-0.5 mt-0.5 text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 rounded-full font-medium w-fit"
+                                >
+                                    ⛽ {refuelLabel}
+                                </span>
                             )}
                             {reservation.recurringGroupId && (
                                 <span className="inline-flex items-center gap-0.5 mt-0.5 text-[10px] px-1.5 py-0.5 bg-purple-100 text-purple-600 dark:bg-purple-900/40 dark:text-purple-300 rounded-full font-medium w-fit">

@@ -490,6 +490,14 @@ const FUNCTIONS: FunctionEntry[] = [
     note: 'driveLogs/{logId}',
   },
   {
+    name: 'onFuelLogCreated',
+    type: 'onDocumentCreated',
+    file: 'handlers/triggers/clearRefuelFlag.ts',
+    description: '주유·충전일지 작성 시 그 차량의 "주유 필요" 표시를 해제. 표시를 켜는 쪽은 onDriveLogCreated.',
+    auth: '시스템 자동 실행',
+    note: 'fuelLogs/{logId}',
+  },
+  {
     name: 'trackFirstEmployee',
     type: 'onDocumentCreated',
     file: 'handlers/triggers/trackFirstEmployee.ts',

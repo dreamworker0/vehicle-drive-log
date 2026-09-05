@@ -55,6 +55,7 @@ const baseForm = {
     notes: '',
     driveDate: '2026-03-05',
     hipassBalanceAfter: '',
+    needsRefuel: false,
 };
 
 function makeCtx(overrides: Partial<Ctx> = {}): Ctx {
@@ -208,6 +209,34 @@ describe('submitDriveLog', () => {
         expect(payload).not.toHaveProperty('hipassBalanceBefore');
         expect(payload).not.toHaveProperty('hipassBalanceAfter');
         expect(result.success).toBe(true);
+    });
+
+    it('주유 필요를 표시하면 저장 데이터에 needsRefuel을 남긴다', async () => {
+        await submitDriveLog(makeCtx({ form: { ...baseForm, needsRefuel: true } }));
+
+        const payload = mockCreateDriveLog.mock.calls[0][0];
+        expect(payload.needsRefuel).toBe(true);
+    });
+
+    it('주유 필요를 표시하지 않으면 needsRefuel 필드를 아예 남기지 않는다', async () => {
+        // false를 매번 쓰면 모든 운행일지에 의미 없는 필드가 붙는다.
+        // 서버 트리거는 값의 존재만 보므로 undefined로 떨구는 편이 맞다.
+        await submitDriveLog(makeCtx());
+
+        const payload = mockCreateDriveLog.mock.calls[0][0];
+        expect(payload.needsRefuel).toBeUndefined();
+    });
+
+    it('지난 날짜 일지에는 주유 필요를 남기지 않는다', async () => {
+        // 토글을 켠 뒤 날짜를 과거로 바꾸면 UI는 사라지지만 폼 값은 true로 남는다.
+        // 차량 상태는 서버 가드가 막지만, 그대로 저장하면 기록 자체가 사실과 달라진다.
+        await submitDriveLog(makeCtx({
+            isRetroactive: true,
+            form: { ...baseForm, needsRefuel: true },
+        }));
+
+        const payload = mockCreateDriveLog.mock.calls[0][0];
+        expect(payload.needsRefuel).toBeUndefined();
     });
 
     it('예약 상태 전환이 실패해도 본 저장은 성공시키되 backgroundWarning을 전파한다', async () => {

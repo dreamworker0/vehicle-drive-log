@@ -31,6 +31,8 @@ interface VehicleFormData {
     siteVaries: boolean;
     /** 지금 실제로 서 있는 곳. 운행 기록으로 자동 갱신되며, 유동 차량에만 노출된다. */
     currentSiteId: string;
+    /** 주유(충전)가 필요한가. 운행일지·주유일지로 자동 갱신되며, 여기서는 보정만 한다. */
+    needsRefuel: boolean;
 }
 
 interface Props {
@@ -92,6 +94,17 @@ export default function VehicleForm({
     const { orgFeatures, orgSites } = useAuth();
     // 분관을 등록하지 않은 기관에는 고를 것이 없다 — 선택지 하나짜리 UI를 띄우지 않는다.
     const showSiteSelect = hasBranchSites(orgSites);
+    // 전기·수소차는 '주유'가 아니라 '충전'이다 (운전자 화면과 같은 규칙).
+    const refuelWord = form.fuelType === 'electric' || form.fuelType === 'hydrogen' ? '충전' : '주유';
+    // 언제 켜진 표시인지 알려 준다 — 관리자가 "지금도 유효한가"를 판단할 유일한 단서다.
+    const refuelMarkedAt = (() => {
+        // 저장 전에 스위치를 만졌다면 옛 시각을 보여 주지 않는다 — 해제한 날짜가
+        // "표시됨"으로 붙어 켠 날을 잘못 알려 준다.
+        if (!form.needsRefuel || form.needsRefuel !== (editingVehicle?.needsRefuel === true)) return null;
+        const raw = editingVehicle?.needsRefuelAt as { toDate?: () => Date } | Date | undefined;
+        const at = raw instanceof Date ? raw : raw?.toDate?.();
+        return at instanceof Date ? `${at.getMonth() + 1}/${at.getDate()}` : null;
+    })();
     const toggleAllowedUser = (uid: string) => {
         setForm(prev => ({
             ...prev,
@@ -344,6 +357,26 @@ export default function VehicleForm({
                         <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
                             운행 기록으로 자동 갱신됩니다 · 기록 없이 차를 옮겼을 때만 직접 고치세요
                         </p>
+                    </div>
+                    )}
+                    {orgFeatures.refuelFlag && editingVehicle && (
+                    <div className="flex items-start justify-between gap-3" data-testid="vehicle-needs-refuel">
+                        <div className="min-w-0">
+                            <label className="label mb-0">{refuelWord} 필요</label>
+                            <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
+                                운전자가 운행일지에서 켜고 {refuelWord}일지를 쓰면 자동으로 꺼집니다 ·
+                                {refuelWord}일지를 쓰지 않는다면 여기서 직접 끄세요
+                                {refuelMarkedAt && ` · ${refuelMarkedAt} 표시됨`}
+                            </p>
+                        </div>
+                        <div className="flex-shrink-0 pt-1">
+                            <Toggle
+                                checked={form.needsRefuel}
+                                onChange={next => setForm(prev => ({ ...prev, needsRefuel: next }))}
+                                label={`${refuelWord} 필요`}
+                                onClassName="bg-amber-500"
+                            />
+                        </div>
                     </div>
                     )}
                     <div>

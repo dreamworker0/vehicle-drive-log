@@ -37,6 +37,11 @@ export interface OrgFeatures {
      * `reservationPassengerEnabled`와 맞추기 위해서다.
      */
     reservationPassenger: boolean;
+    /**
+     * 주유(충전) 필요 표시 (opt-in — 미설정이면 꺼짐).
+     * 운행일지 체크박스와 예약 화면 배지를 함께 연다.
+     */
+    refuelFlag: boolean;
     /** 운전자(대표·공동): 목록 직접 선택 허용 */
     driverAllowList: boolean;
     /** 운전자(대표·공동): 검색 선택 허용. 둘 다 켜지면 후보 8명 기준 자동 전환 */
@@ -57,6 +62,7 @@ export const ALL_FEATURES_ON: OrgFeatures = {
     passengerAllowSearch: true,
     passengerAllowCount: true,
     reservationPassenger: true,
+    refuelFlag: true,
     driverAllowList: true,
     driverAllowSearch: true,
 };
@@ -66,6 +72,7 @@ type OrgFeatureFields = Pick<
     'hipassEnabled' | 'maintenanceEnabled' | 'maintenanceEmployeeAccess' | 'allowedUsersEnabled' | 'googleCalendarEnabled'
     | 'driverSelectionEnabled' | 'coDriverEnabled' | 'passengerEnabled'
     | 'passengerAllowList' | 'passengerAllowSearch' | 'passengerAllowCount' | 'reservationPassengerEnabled'
+    | 'refuelFlagEnabled'
     | 'driverAllowList' | 'driverAllowSearch'
 >;
 
@@ -90,6 +97,10 @@ export function resolveOrgFeatures(org?: Partial<OrgFeatureFields> | null): OrgF
         // 화면에 새 입력란이 예고 없이 나타난다.** 둘 다 전 직원이 매일 쓰는 자리라,
         // 켤지 말지는 기관이 정하게 한다.
         reservationPassenger: org?.reservationPassengerEnabled === true,
+        // 이 줄도 `=== true`다(위와 같은 이유). 켜짐 기본으로 두면 전기차도 아니고 하이패스
+        // 카드도 없는 차량의 운행일지에 **없던 카드가 갑자기 생긴다** — VehicleStatusSection은
+        // 그 조건에서 아무것도 그리지 않기 때문이다.
+        refuelFlag: org?.refuelFlagEnabled === true,
         driverAllowList: org?.driverAllowList !== false,
         driverAllowSearch: org?.driverAllowSearch !== false,
     };

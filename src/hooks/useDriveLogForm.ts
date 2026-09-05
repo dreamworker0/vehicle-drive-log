@@ -81,6 +81,7 @@ export default function useDriveLogForm() {
         notes: editLog?.notes || '',
         driveDate: editDriveDate,
         hipassBalanceAfter: '',
+        needsRefuel: false,
     });
 
     const orgId = userData?.organizationId;

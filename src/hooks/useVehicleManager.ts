@@ -37,6 +37,8 @@ const INITIAL_FORM = {
     siteVaries: false,
     // 지금 실제로 서 있는 곳. 평소에는 운행 기록으로 서버가 갱신하고, 여기서는 보정만 한다.
     currentSiteId: '',
+    // 주유(충전) 필요. 운행일지가 켜고 주유일지가 끈다 — 여기서는 보정만 한다.
+    needsRefuel: false,
 };
 
 /** 본관을 가리키는 두 표기('' 와 'main')를 하나로 모은다 — 비교와 저장 모두 이 값을 쓴다. */
@@ -150,6 +152,7 @@ export default function useVehicleManager() {
             siteId: vehicle.siteId || '',
             siteVaries: vehicle.siteVaries === true,
             currentSiteId: vehicle.currentSiteId || '',
+            needsRefuel: vehicle.needsRefuel === true,
         });
         setEditingVehicle(vehicle);
         setOpenWithCalendarError(calendarError);
@@ -227,6 +230,12 @@ export default function useVehicleManager() {
                     // 셀렉트를 열어 이미 표시돼 있던 본관을 다시 고른 것이 변경으로 잡히면 안 된다.
                     ...((form.siteVaries && normalizedCurrentSiteId !== normalizeSiteId(editingVehicle?.currentSiteId))
                         ? { currentSiteUpdatedAt: new Date() } : {}),
+                    needsRefuel: form.needsRefuel,
+                    // 위와 같은 규칙 — 관리자가 **실제로 바꾼** 때만 시각을 새로 찍는다.
+                    // 저장할 때마다 찍으면 서버 트리거의 신선도 가드가 오작동한다
+                    // (표시된 적 없는 시각이 최신으로 남아 정상 운행 표시를 막는다).
+                    ...(form.needsRefuel !== (editingVehicle?.needsRefuel === true)
+                        ? { needsRefuelAt: new Date() } : {}),
                     insurance: {
                         company: form.insuranceCompany.trim(),
                         phone: form.insurancePhone.trim(),

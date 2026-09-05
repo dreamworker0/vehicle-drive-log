@@ -37,6 +37,7 @@ function renderCard(over: {
     orgSites?: typeof SITES;
     vehicle?: Vehicle;
     isInProgress?: boolean;
+    refuelFlagEnabled?: boolean;
 } = {}) {
     return render(
         <ReservationCard
@@ -48,6 +49,7 @@ function renderCard(over: {
             onStartDrive={() => { }}
             onArrival={() => { }}
             orgSites={over.orgSites ?? SITES}
+            refuelFlagEnabled={over.refuelFlagEnabled ?? false}
         />
     );
 }
@@ -103,5 +105,45 @@ describe('오늘의 예약 카드 — 차량 현재 위치 배지', () => {
         const badge = screen.getByTestId('vehicle-site-badge');
         expect(badge.textContent).toContain('운행 중');
         expect(badge.textContent).not.toContain('숙소');
+    });
+});
+
+describe('오늘의 예약 카드 — 주유·충전 필요 배지', () => {
+    it('기관이 기능을 끄면 차량에 표시가 켜져 있어도 나오지 않는다', () => {
+        renderCard({ vehicle: vehicle({ needsRefuel: true }), refuelFlagEnabled: false });
+        expect(screen.queryByTestId('vehicle-refuel-badge')).toBeNull();
+    });
+
+    it('기능을 켠 기관에서 표시된 차량이면 안내가 뜬다', () => {
+        renderCard({ vehicle: vehicle({ needsRefuel: true }), refuelFlagEnabled: true });
+        expect(screen.getByTestId('vehicle-refuel-badge').textContent).toContain('주유 필요');
+    });
+
+    it('표시되지 않은 차량에는 나오지 않는다', () => {
+        renderCard({ vehicle: vehicle(), refuelFlagEnabled: true });
+        expect(screen.queryByTestId('vehicle-refuel-badge')).toBeNull();
+    });
+
+    it('언제 표시된 것인지 함께 보여 준다 — 몇 달 묵은 표시와 구분되어야 한다', () => {
+        renderCard({
+            vehicle: vehicle({ needsRefuel: true, needsRefuelAt: new Date('2026-09-05T17:20:00') }),
+            refuelFlagEnabled: true,
+        });
+        expect(screen.getByTestId('vehicle-refuel-badge').textContent).toContain('9/5 표시');
+    });
+
+    it('표시 시각이 없으면 안내만 보여 준다', () => {
+        renderCard({ vehicle: vehicle({ needsRefuel: true }), refuelFlagEnabled: true });
+        const badge = screen.getByTestId('vehicle-refuel-badge');
+        expect(badge.textContent).toContain('주유 필요');
+        expect(badge.textContent).not.toContain('표시');
+    });
+
+    it('전기차는 "충전 필요"로 부른다', () => {
+        renderCard({
+            vehicle: vehicle({ needsRefuel: true, fuelType: 'electric' }),
+            refuelFlagEnabled: true,
+        });
+        expect(screen.getByTestId('vehicle-refuel-badge').textContent).toContain('충전 필요');
     });
 });

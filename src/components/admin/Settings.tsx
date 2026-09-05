@@ -99,6 +99,7 @@ export default function Settings() {
                     passengerAllowSearch: form.passengerAllowSearch,
                     passengerAllowCount: form.passengerAllowCount,
                     reservationPassengerEnabled: form.reservationPassengerEnabled,
+                    refuelFlagEnabled: form.refuelFlagEnabled,
                     driverAllowList: form.driverAllowList,
                     driverAllowSearch: form.driverAllowSearch,
                 }}

@@ -23,6 +23,8 @@ export interface FeatureToggleValues {
     passengerAllowCount: boolean;
     /** 예약 화면 동승자 입력(기본 꺼짐) */
     reservationPassengerEnabled: boolean;
+    /** 주유(충전) 필요 표시(기본 꺼짐) */
+    refuelFlagEnabled: boolean;
     driverAllowList: boolean;
     driverAllowSearch: boolean;
 }
@@ -32,12 +34,13 @@ interface FeatureToggleSectionProps {
     onChange: (patch: Partial<FeatureToggleValues>) => void;
 }
 
-type FeatureKey = 'requireReservationApproval' | 'hipassEnabled' | 'maintenanceEnabled' | 'allowedUsersEnabled' | 'googleCalendarEnabled' | 'driverSelectionEnabled' | 'coDriverEnabled' | 'passengerEnabled';
+type FeatureKey = 'requireReservationApproval' | 'hipassEnabled' | 'maintenanceEnabled' | 'refuelFlagEnabled' | 'allowedUsersEnabled' | 'googleCalendarEnabled' | 'driverSelectionEnabled' | 'coDriverEnabled' | 'passengerEnabled';
 
 const FEATURE_META: Record<FeatureKey, { label: string; desc: string }> = {
     requireReservationApproval: { label: '예약 관리자 승인', desc: '켜면 직원 차량 예약이 즉시 확정되지 않고 관리자 승인을 거칩니다.' },
     hipassEnabled: { label: '하이패스', desc: '끄면 운행일지 하이패스 입력과 차량관리 하이패스 탭, 관리자 하이패스 관리 메뉴가 숨겨집니다.' },
     maintenanceEnabled: { label: '수리·정비', desc: '끄면 차량관리 수리·정비 탭과 관리자 정비 기록 메뉴가 숨겨집니다.' },
+    refuelFlagEnabled: { label: '주유·충전 필요 표시', desc: '운행일지에 "주유(충전) 필요" 체크를 추가하고, 표시된 차량은 예약할 때 안내가 뜹니다. 주유일지를 쓰면 자동으로 꺼지고, 관리자가 차량 관리에서 직접 끌 수도 있습니다. (기본 꺼짐)' },
     allowedUsersEnabled: { label: '사용 가능 직원 지정', desc: '끄면 차량 등록 시 특정 직원만 사용하도록 지정하는 항목이 숨겨집니다.' },
     googleCalendarEnabled: { label: 'Google 캘린더 연동', desc: '끄면 차량 등록 시 Google 캘린더 연동 항목이 숨겨집니다.' },
     driverSelectionEnabled: { label: '운전자 지정', desc: '끄면 운행일지에서 운전자를 바꿀 수 없고 항상 작성자로 기록됩니다.' },
@@ -144,6 +147,7 @@ export default function FeatureToggleSection({ values, onChange }: FeatureToggle
                 <div className="divide-y divide-surface-100 dark:divide-surface-700">
                     {feature('hipassEnabled')}
                     {feature('maintenanceEnabled')}
+                    {feature('refuelFlagEnabled')}
                 </div>
                 {values.maintenanceEnabled && (
                     <MethodGroup caption="접근 범위">

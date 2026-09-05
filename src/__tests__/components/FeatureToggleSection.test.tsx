@@ -17,6 +17,7 @@ function baseValues(overrides: Partial<FeatureToggleValues> = {}): FeatureToggle
         passengerAllowSearch: true,
         passengerAllowCount: true,
     reservationPassengerEnabled: false,
+    refuelFlagEnabled: false,
         driverAllowList: true,
         driverAllowSearch: true,
         ...overrides,

@@ -224,7 +224,7 @@ export function getEmptyForm(): DriveLogForm {
         purpose: '', destination: '',
         startKm: '', endKm: '', startTime: nowTime(),
         endTime: '', batteryStart: '', batteryEnd: '', notes: '',
-        driveDate: todayStr(), hipassBalanceAfter: '',
+        driveDate: todayStr(), hipassBalanceAfter: '', needsRefuel: false,
     };
 }
 
