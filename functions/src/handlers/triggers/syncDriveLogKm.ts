@@ -225,6 +225,50 @@ async function applyVehicleCurrentSite(
 }
 
 /**
+ * 운전자가 표시한 "주유(충전) 필요"를 차량에 반영한다.
+ *
+ * 켜기만 한다 — 끄는 것은 주유일지 작성(자동)과 관리자(수동) 몫이다. 운행일지는
+ * "연료가 부족했다"는 사실만 증언할 수 있고, 그 뒤에 주유가 있었는지는 모른다.
+ *
+ * 소급 건에는 손대지 않는다. 3일 전 운행을 오늘 적으면서 표시해도 그 사이 누가
+ * 주유했을 수 있어, 지금 차량 상태의 근거가 되지 못한다. 판정은 currentKm·현재 위치와
+ * 같은 `isEffectivelyRetroactive`를 그대로 받아 쓴다.
+ *
+ * 표시된 일지에서만 차량 문서를 읽는다. 대부분의 운행은 표시가 없으므로,
+ * 읽기 비용이 운행일지 전체가 아니라 실제 표시 건수에만 붙는다.
+ */
+async function applyVehicleNeedsRefuel(
+    orgId: string,
+    vehId: string,
+    needsRefuel: unknown,
+    ts: Date,
+    isEffectivelyRetroactive: boolean,
+): Promise<void> {
+    if (isEffectivelyRetroactive) return;
+    if (needsRefuel !== true) return;
+
+    // 차량이 운행일지의 기관 소속인지 검증 후 갱신 (교차 테넌트 오염 차단 — currentKm과 같은 규칙)
+    const vehSnap = await db.collection("vehicles").doc(vehId).get();
+    const veh = vehSnap.data();
+    if (!vehSnap.exists || veh?.organizationId !== orgId) {
+        console.warn(`[applyVehicleNeedsRefuel] 차량 org 불일치 — 주유 필요 표시 건너뜀: veh=${vehId}, org=${orgId}`);
+        return;
+    }
+
+    // 마지막으로 상태가 바뀐 시각보다 **과거의 운행**은 표시를 되살리지 않는다.
+    // 관리자가 15:00에 해제했는데 09:00 운행이 16:00에 뒤늦게 저장되면, 그 일지 뒤에는
+    // 아무 기록도 없어 소급으로 판정되지 않아 **관리자 조치가 되돌려진다.**
+    const changedAt = veh?.needsRefuelAt;
+    const changedDate = changedAt instanceof Date ? changedAt : changedAt?.toDate?.();
+    if (changedDate instanceof Date && changedDate.getTime() > ts.getTime()) return;
+
+    await db.collection("vehicles").doc(vehId).update({
+        needsRefuel: true,
+        needsRefuelAt: FieldValue.serverTimestamp(),
+    });
+}
+
+/**
  * 위치 갱신은 **누적 km·통계 회계와 분리해서** 실행한다.
  *
  * 두 트리거는 retry: false라 한 번 던지면 이벤트가 사라진다. 표시용 위치 갱신이 일시적
@@ -243,6 +287,23 @@ async function applyVehicleCurrentSiteSafely(
         await applyVehicleCurrentSite(orgId, vehId, endSiteId, ts, isEffectivelyRetroactive);
     } catch (error) {
         console.error(`[${context}] 차량 현재 위치 갱신 실패 (km 동기화는 계속 진행):`, error);
+        captureError(error, { context, vehId, orgId });
+    }
+}
+
+/** 주유 필요 표시도 같은 이유로 회계와 분리한다(위 주석 참고). */
+async function applyVehicleNeedsRefuelSafely(
+    context: string,
+    orgId: string,
+    vehId: string,
+    needsRefuel: unknown,
+    ts: Date,
+    isEffectivelyRetroactive: boolean,
+): Promise<void> {
+    try {
+        await applyVehicleNeedsRefuel(orgId, vehId, needsRefuel, ts, isEffectivelyRetroactive);
+    } catch (error) {
+        console.error(`[${context}] 주유 필요 표시 갱신 실패 (km 동기화는 계속 진행):`, error);
         captureError(error, { context, vehId, orgId });
     }
 }
@@ -296,6 +357,7 @@ export const onDriveLogCreated = onDocumentCreated(
 
             // 차를 세운 곳을 차량의 현재 위치로 반영 (소급이면 건너뛴다)
             await applyVehicleCurrentSiteSafely('onDriveLogCreated', orgId, vehId, data.endSiteId, ts, isEffectivelyRetroactive);
+            await applyVehicleNeedsRefuelSafely('onDriveLogCreated', orgId, vehId, data.needsRefuel, ts, isEffectivelyRetroactive);
 
             // 다음 기록의 startKm 자동 연동 (소급이든 아니든 항상 시도)
             const chain = await syncNextLogStartKm(orgId, vehId, ts, endKm);
@@ -367,6 +429,13 @@ export const onDriveLogUpdated = onDocumentUpdated(
             if (data.endSiteId !== oldData.endSiteId && vehId && orgId && ts) {
                 const isRetroactiveForSite = isRetro || await hasLaterDriveLog(orgId, vehId, ts);
                 await applyVehicleCurrentSiteSafely('onDriveLogUpdated', orgId, vehId, data.endSiteId, ts, isRetroactiveForSite);
+            }
+
+            // 주유 필요도 **새로 표시된** 수정만 반영한다. 수정 화면에는 이 입력이 뜨지 않으므로
+            // 실제로는 거의 도달하지 않지만, 나중에 입력을 열더라도 같은 규칙이 지켜지도록 둔다.
+            if (data.needsRefuel !== oldData.needsRefuel && vehId && orgId && ts) {
+                const isRetroactiveForRefuel = isRetro || await hasLaterDriveLog(orgId, vehId, ts);
+                await applyVehicleNeedsRefuelSafely('onDriveLogUpdated', orgId, vehId, data.needsRefuel, ts, isRetroactiveForRefuel);
             }
 
             if (data.endKm !== undefined && vehId && orgId && ts) {

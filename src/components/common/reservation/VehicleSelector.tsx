@@ -26,7 +26,7 @@ export default function VehicleSelector({
     usageCounts,
     destinationRef,
 }: VehicleSelectorProps) {
-    const { user } = useAuth();
+    const { user, orgFeatures } = useAuth();
     // 사용 제한 차량은 맨 뒤로 (상위에서 정렬된 순서는 유지)
     const orderedVehicles = useMemo(() => [
         ...vehicles.filter(v => !isVehicleRestrictedForUser(v, user?.uid)),
@@ -40,6 +40,10 @@ export default function VehicleSelector({
                     const isBlocked = isVehicleBlocked(v.maintenance);
                     const isRestricted = !isBlocked && isVehicleRestrictedForUser(v, user?.uid);
                     const isDisabled = isBlocked || isRestricted;
+                    // 주유 필요는 **안내지 차단이 아니다** — 정비 중과 달리 선택을 막지 않는다.
+                    // 고를 수는 있게 두고, 출발 전에 알 수 있게만 한다.
+                    const needsRefuel = orgFeatures.refuelFlag && !isDisabled && v.needsRefuel === true;
+                    const refuelWord = v.fuelType === 'electric' || v.fuelType === 'hydrogen' ? '충전' : '주유';
                     const count = usageCounts?.get(v.id) || 0;
                     return (
                         <button
@@ -69,6 +73,9 @@ export default function VehicleSelector({
                                 )}
                                 {isRestricted && (
                                     <span className="text-[10px] text-surface-500 dark:text-surface-400 font-medium">지정 차량</span>
+                                )}
+                                {needsRefuel && (
+                                    <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">⛽ {refuelWord} 필요</span>
                                 )}
                             </div>
                         </button>

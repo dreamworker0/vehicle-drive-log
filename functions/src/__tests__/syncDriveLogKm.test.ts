@@ -409,6 +409,89 @@ describe('onDriveLogCreated — 차량 누적 km 분기', () => {
     });
 });
 
+describe('주유 필요 표시(needsRefuel) 갱신', () => {
+    beforeEach(() => {
+        jest.spyOn(console, 'error').mockImplementation();
+        jest.spyOn(console, 'warn').mockImplementation();
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    const makeEvent = (data: Record<string, unknown>) => ({
+        data: { data: () => data },
+        params: { logId: 'R' },
+    });
+    const refuelPatches = () => db.__updates()
+        .filter((u: { col: string; patch: Record<string, unknown> }) => u.col === 'vehicles' && 'needsRefuel' in u.patch)
+        .map((u: { patch: Record<string, unknown> }) => u.patch);
+
+    it('최신 기록에서 표시하면 차량에 주유 필요를 켠다', async () => {
+        seedLogs([], [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1000 } }]);
+
+        await (onDriveLogCreated as unknown as Function)(makeEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: d(20),
+            startKm: 1000, endKm: 1050, distance: 50, needsRefuel: true,
+        }));
+
+        expect(refuelPatches()).toEqual([{ needsRefuel: true, needsRefuelAt: 'SERVER_TS' }]);
+        expect(db.__get('vehicles', VEH)).toMatchObject({ needsRefuel: true });
+    });
+
+    it('표시하지 않은 운행은 차량 문서를 건드리지 않는다 — 끄지도 않는다', async () => {
+        // 끄는 것은 주유일지·관리자 몫이다. 운행일지는 "부족했다"만 증언할 수 있다.
+        seedLogs([], [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1000, needsRefuel: true } }]);
+
+        await (onDriveLogCreated as unknown as Function)(makeEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: d(20),
+            startKm: 1000, endKm: 1050, distance: 50,
+        }));
+
+        expect(refuelPatches()).toHaveLength(0);
+        expect(db.__get('vehicles', VEH)).toMatchObject({ needsRefuel: true });
+    });
+
+    it('소급 입력은 표시를 켜지 않는다 — 그 사이 누가 주유했을 수 있다', async () => {
+        seedLogs(
+            [{ id: 'B', timestamp: d(15), startKm: 60200, endKm: 60250 }],
+            [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 60250 } }],
+        );
+
+        await (onDriveLogCreated as unknown as Function)(makeEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: d(10),
+            startKm: 60123, endKm: 60200, distance: 77, isRetroactive: true, needsRefuel: true,
+        }));
+
+        expect(refuelPatches()).toHaveLength(0);
+    });
+
+    it('관리자가 해제한 뒤 도착한 과거 운행은 표시를 되살리지 않는다', async () => {
+        // 15:00에 해제 → 09:00 운행이 16:00에 뒤늦게 저장. 뒤에 다른 기록이 없어
+        // 소급으로 판정되지 않으므로, 신선도 가드가 없으면 관리자 조치가 되돌려진다.
+        seedLogs(
+            [],
+            [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1000, needsRefuel: false, needsRefuelAt: d(21) } }],
+        );
+
+        await (onDriveLogCreated as unknown as Function)(makeEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: d(20),
+            startKm: 1000, endKm: 1050, distance: 50, needsRefuel: true,
+        }));
+
+        expect(refuelPatches()).toHaveLength(0);
+        expect(db.__get('vehicles', VEH)).toMatchObject({ needsRefuel: false });
+    });
+
+    it('다른 기관의 차량은 건드리지 않는다', async () => {
+        seedLogs([], [{ id: VEH, col: 'vehicles', data: { organizationId: 'other-org', currentKm: 1000 } }]);
+
+        await (onDriveLogCreated as unknown as Function)(makeEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: d(20),
+            startKm: 1000, endKm: 1050, distance: 50, needsRefuel: true,
+        }));
+
+        expect(refuelPatches()).toHaveLength(0);
+    });
+});
+
 describe('차량 현재 위치(currentSiteId) 갱신', () => {
     beforeEach(() => {
         jest.spyOn(console, 'error').mockImplementation();

@@ -174,6 +174,7 @@ export default function TodayDashboard() {
                                     onArrival={navigateToArrival}
                                     onCancel={(res) => setCancelTarget({ reservation: res, type: 'today' })}
                                     orgSites={orgSites}
+                                    refuelFlagEnabled={orgFeatures.refuelFlag}
                                 />
                             );
                         })}
