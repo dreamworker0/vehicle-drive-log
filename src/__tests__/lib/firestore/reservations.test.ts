@@ -63,7 +63,7 @@ import {
     getReservations, getPendingReservations, cancelReservation, updateReservation,
     updateReservationStatus, rejectReservation,
     getTodayReservations, getWeekReservations, getMyRecentReservations,
-    getReservationsByGroupId, cancelReservationGroup, deleteReservationGroup,
+    getReservationsByGroupId, cancelReservationGroup, deleteReservationGroup, completeReservationGroupSiblings, SKIPPED_OFFLINE,
     cancelRecurringGroup, detachFromRecurringGroup,
     createReservationSafe,
 } from '../../../lib/firestore/reservations';
@@ -349,6 +349,81 @@ describe('firestore/reservations', () => {
                 destination: '복지관',
                 recurringGroupId: '__deleteField__',
             });
+        });
+    });
+
+    // ── 다일 예약: 운행일지 저장과 함께 나머지 날짜 닫기 ──
+    describe('completeReservationGroupSiblings', () => {
+        const batchMock = () => {
+            const update = vi.fn(), del = vi.fn(), commit = vi.fn().mockResolvedValue(undefined);
+            vi.mocked(fs.writeBatch).mockReturnValue({ update, delete: del, commit } as never);
+            return { update, del, commit };
+        };
+
+        it('나머지 날짜를 완료로 닫으면서 미작성 알림 표시를 함께 심는다', async () => {
+            // driveLogReminderSent가 빠지면 알림을 없애는 게 아니라 **만든다.** 스케줄러는
+            // completed인데 자기를 가리키는 운행일지가 없는 예약을 알림 대상으로 집어내는데,
+            // 나머지 날짜가 정확히 그 모양이 된다(운행일지는 출발한 날 문서를 가리킨다).
+            const { update, commit } = batchMock();
+            vi.mocked(fs.getDoc).mockResolvedValue({ exists: () => true, data: () => ({ groupId: 'g1' }) } as never);
+            vi.mocked(fs.getDocs).mockResolvedValue(docsSnap([
+                { id: 'day1', status: 'in_progress', date: '2026-09-01' },
+                { id: 'day2', status: 'reserved', date: '2026-09-02' },
+            ]) as never);
+
+            const count = await completeReservationGroupSiblings('day1', 'org1');
+
+            expect(update).toHaveBeenCalledTimes(1); // day1은 exceptId로 빠진다
+            expect(update).toHaveBeenCalledWith(expect.anything(), {
+                status: 'completed',
+                driveLogReminderSent: true,
+            });
+            expect(commit).toHaveBeenCalled();
+            expect(count).toBe(1);
+        });
+
+        it('다일 예약이 아니면 읽기 한 번으로 끝내고 아무것도 쓰지 않는다', async () => {
+            const { commit } = batchMock();
+            vi.mocked(fs.getDoc).mockResolvedValue({ exists: () => true, data: () => ({}) } as never);
+
+            const count = await completeReservationGroupSiblings('r1', 'org1');
+
+            expect(count).toBe(0);
+            expect(fs.getDocs).not.toHaveBeenCalled();
+            expect(commit).not.toHaveBeenCalled();
+        });
+
+        it('오프라인 다일 예약은 쓰지 않고 알린다 — batch.commit()은 오프라인 큐를 타지 않는다', async () => {
+            // 오프라인에서 부르면 commit이 영영 resolve되지 않아 저장 완료가 타임아웃까지 붙잡힌다.
+            // 0(닫을 게 없었다)이 아니라 SKIPPED_OFFLINE이어야 한다 — 이 예약에 두 번째
+            // 저장은 없으므로 호출부가 사용자에게 알려야 한다.
+            setOnline(false);
+            const { commit } = batchMock();
+            vi.mocked(fs.getDoc).mockResolvedValue({ exists: () => true, data: () => ({ groupId: 'g1' }) } as never);
+
+            const count = await completeReservationGroupSiblings('day1', 'org1');
+
+            expect(count).toBe(SKIPPED_OFFLINE);
+            expect(commit).not.toHaveBeenCalled();
+        });
+
+        it('오프라인이어도 단건 예약이면 조용히 넘긴다 — 헛경고를 띄우지 않는다', async () => {
+            // 단건까지 경고하면 "통신 재개 시 자동 반영됩니다" 안내와 나란히 떠 말이 어긋난다.
+            setOnline(false);
+            const { commit } = batchMock();
+            vi.mocked(fs.getDoc).mockResolvedValue({ exists: () => true, data: () => ({}) } as never);
+
+            expect(await completeReservationGroupSiblings('r1', 'org1')).toBe(0);
+            expect(commit).not.toHaveBeenCalled();
+        });
+
+        it('오프라인에서 캐시에 예약이 없으면 조용히 넘긴다', async () => {
+            // 다일인지 알 수 없다. 알 수 없는 것을 경고로 바꾸면 헛경고가 된다.
+            setOnline(false);
+            batchMock();
+            vi.mocked(fs.getDoc).mockRejectedValue(new Error('unavailable') as never);
+
+            expect(await completeReservationGroupSiblings('r1', 'org1')).toBe(0);
         });
     });
 

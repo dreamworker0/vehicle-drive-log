@@ -340,7 +340,7 @@ export const getReservationsByGroupId = async (groupId: string, orgId: string) =
  */
 const batchGroupAction = async (
     fetchFn: (id: string, orgId: string) => Promise<Reservation[]>,
-    action: 'cancel' | 'delete',
+    action: 'cancel' | 'delete' | 'complete',
     id: string,
     orgId: string,
     context: string,
@@ -355,6 +355,14 @@ const batchGroupAction = async (
         active.forEach(r => {
             if (action === 'cancel') {
                 batch.update(reservationDoc(r.id), { status: 'cancelled' });
+            } else if (action === 'complete') {
+                // driveLogReminderSent를 함께 심는다 — 이게 없으면 알림을 없애는 게 아니라 **만든다.**
+                //
+                // reservationReminder의 "운행일지 미작성" 알림은 `status in [completed, in_progress]`인
+                // 예약 중 자기 id를 가리키는 driveLog가 없는 건을 찾는다. 다일 예약의 나머지 날짜를
+                // completed로 바꾸면 그 조건에 **새로** 걸린다 — 운행일지의 reservationId는 실제로
+                // 출발한 날의 문서를 가리키기 때문이다. 상태만 닫으면 조용하던 예약이 울기 시작한다.
+                batch.update(reservationDoc(r.id), { status: 'completed', driveLogReminderSent: true });
             } else {
                 batch.delete(reservationDoc(r.id));
             }
@@ -367,9 +375,52 @@ const batchGroupAction = async (
     }
 };
 
+/** 오프라인이라 그룹 닫기를 시도조차 못 했음을 뜻한다(0건 처리와 구분해야 안내를 띄울 수 있다). */
+export const SKIPPED_OFFLINE = -1;
+
 // 연속 예약 그룹 일괄 취소
 export const cancelReservationGroup = (groupId: string, orgId: string) =>
     batchGroupAction(getReservationsByGroupId, 'cancel', groupId, orgId, 'cancelReservationGroup');
+
+/**
+ * 예약 하나를 완료 처리한 뒤, 같은 **다일 그룹의 나머지 날짜**도 함께 닫는다.
+ *
+ * 1박2일 예약은 문서 두 건이다(9/1 17:00~23:59 · 9/2 00:00~10:00). 실제 운행은 한 번인데
+ * 운행일지는 그중 한 건만 완료 처리하므로, 남은 날짜가 미완료로 떠 **운행일지 미작성
+ * 알림이 계속 울린다.**
+ *
+ * `groupId`를 화면 이동 상태로 실어 나르지 않고 여기서 예약 문서를 한 번 읽어 판정한다 —
+ * 진입점마다 상태를 꿰면 한 곳을 빠뜨렸을 때 조용히 동작하지 않는다. 다일 예약이 아니면
+ * 읽기 한 번으로 끝나고 아무것도 쓰지 않는다.
+ *
+ * @returns 함께 닫은 **나머지** 날짜 수 (다일이 아니면 0, 오프라인이라 못 했으면 SKIPPED_OFFLINE)
+ */
+export const completeReservationGroupSiblings = async (reservationId: string, orgId: string): Promise<number> => {
+    // 오프라인에서 붙잡히는 것은 batch.commit()뿐이다 — 서버 확인을 기다리므로 **영영 resolve되지
+    // 않고**, 호출부의 runWithRetry 타임아웃까지 저장 완료를 붙잡아 둔다. getDoc은 캐시로
+    // 떨어지거나 즉시 거절되지 매달리지 않으므로, 다일 예약인지까지는 알아보고 판단한다.
+    const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+    try {
+        const snap = await getDoc(reservationDoc(reservationId));
+        const groupId = snap.exists() ? (snap.data() as Reservation).groupId : undefined;
+        if (!groupId) return 0;
+        // **재시도는 없다.** 이 함수를 부르는 곳은 운행일지 신규 저장 한 군데뿐이고, 그 예약에
+        // 두 번째 저장은 일어나지 않는다. 다일인 것이 확인됐을 때만 알린다 — 단건 예약까지
+        // 경고하면 "자동 반영됩니다" 안내와 나란히 떠 서로 말이 어긋난다.
+        if (isOffline) return SKIPPED_OFFLINE;
+        // 방금 완료한 건은 제외한다 — 이미 completed라 어차피 active 필터에 걸리지 않지만,
+        // 반영 지연으로 남아 있어도 두 번 쓰지 않도록 명시한다.
+        return await batchGroupAction(
+            getReservationsByGroupId, 'complete', groupId, orgId, 'completeReservationGroupSiblings', reservationId,
+        );
+    } catch (error) {
+        // 오프라인이면 캐시에 예약이 없었을 뿐이다. 다일인지 알 수 없으니 조용히 넘긴다 —
+        // 알 수 없는 것을 경고로 바꾸면 단건 예약 저장마다 헛경고가 뜬다.
+        if (isOffline) return 0;
+        captureError(error, { context: 'completeReservationGroupSiblings', reservationId, orgId });
+        throw error;
+    }
+};
 
 // 연속 예약 그룹 삭제 (수정 전 기존 그룹 제거용)
 export const deleteReservationGroup = (groupId: string, orgId: string) =>

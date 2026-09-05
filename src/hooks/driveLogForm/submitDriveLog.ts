@@ -2,9 +2,9 @@
  * submitDriveLog — 운행일지 제출/수정 비즈니스 로직
  * useDriveLogForm에서 추출
  */
-import { createDriveLog, updateDriveLog, updateReservationStatus, updateHipassCard } from '../../lib/firestore';
+import { createDriveLog, updateDriveLog, updateReservationStatus, updateHipassCard, completeReservationGroupSiblings, SKIPPED_OFFLINE } from '../../lib/firestore';
 
-import { increment } from 'firebase/firestore';
+import { increment, deleteField } from 'firebase/firestore';
 import { buildLogData, nowTime, todayStr } from '../utils/driveLogValidation';
 import type { DriveLogForm } from './types';
 import type { Vehicle } from '../../types/vehicle';
@@ -113,7 +113,21 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
     const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
 
     if (isEditMode && editLog) {
-        const result = await updateDriveLog(editLog.id, logData);
+        // 다일 → 당일로 되돌린 수정에서 startDate를 **명시적으로 지운다.**
+        //
+        // buildLogData는 같은 날이면 startDate를 undefined로 두는데, updateDriveLog의
+        // sanitizeUndefined가 undefined 키를 통째로 걸러 내므로 updateDoc에 아예 실리지 않는다.
+        // 그러면 문서에 남은 옛 출발일이 그대로 살아, 다시 열었을 때 사용자의 정정이 사라지고
+        // 목록·내보내기에는 없는 날짜가 계속 찍힌다. deleteField()는 sanitizeUndefined가
+        // Firebase 특별 객체로 알아보고 통과시킨다.
+        const result = await updateDriveLog(editLog.id, {
+            ...logData,
+            startDate: (logData.startDate ?? deleteField()) as unknown as string | undefined,
+            // 같은 이유로 소급 표시도 명시적으로 지운다. 소급으로 적었던 일지를 오늘 도착으로
+            // 고쳐도 문서에 isRetroactive가 남으면, 서버 트리거가 그 값을 보고 차량 km·세운
+            // 곳·주유 필요 갱신을 계속 건너뛴다 — 화면은 고쳐졌는데 차량 상태만 안 따라온다.
+            isRetroactive: (isRetroactive ? true : deleteField()) as unknown as boolean | undefined,
+        });
         if (result.syncResult?.updated) syncResult = result.syncResult;
         if (result.backgroundError) {
             backgroundWarnings.push('차량 km 동기화에 실패했습니다');
@@ -152,6 +166,18 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
                 actualEndTime: actualEnd,
             });
             await clearDrivingNotification(resId);
+
+            // 1박2일 예약은 문서가 여러 건이다. 운행은 한 번인데 한 건만 닫으면 남은
+            // 날짜가 미완료로 떠 미작성 알림이 계속 울린다. 다일이 아니면 아무 일도 없다.
+            if (orgId) {
+                const closed = await completeReservationGroupSiblings(resId, orgId);
+                if (closed > 0) console.info(`[submitDriveLog] 다일 예약 나머지 ${closed}일을 함께 완료 처리`);
+                // 오프라인이면 시도조차 못 했고 다시 시도할 기회도 없다(이 예약에 두 번째 저장은
+                // 없다). 조용히 넘기면 다일 예약의 남은 날짜가 계속 열려 있게 된다.
+                if (closed === SKIPPED_OFFLINE) {
+                    backgroundWarnings.push('연결이 끊겨 예약 정리를 못 했습니다 (여러 날에 걸친 예약이었다면 [차량 예약]에서 남은 날짜를 확인해 주세요)');
+                }
+            }
         } catch (e) {
             console.warn('[submitDriveLog] 예약 상태 업데이트 실패:', e);
             captureError(e, { context: 'submitDriveLog.updateReservationStatus', resId });
@@ -224,7 +250,7 @@ export function getEmptyForm(): DriveLogForm {
         purpose: '', destination: '',
         startKm: '', endKm: '', startTime: nowTime(),
         endTime: '', batteryStart: '', batteryEnd: '', notes: '',
-        driveDate: todayStr(), hipassBalanceAfter: '', needsRefuel: false,
+        driveDate: todayStr(), endDate: '', hipassBalanceAfter: '', needsRefuel: false,
     };
 }
 

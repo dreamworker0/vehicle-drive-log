@@ -214,6 +214,32 @@ describe('useDriveLogForm', () => {
         expect(result.current.selectedPassengers).toHaveLength(0);
     });
 
+    it('소급 판정은 **도착일** 기준이다 — 어제 나가 오늘 돌아온 운행은 오늘 것이다', async () => {
+        // 출발일로 재면 1박2일 운행이 소급으로 분류되어, 오늘 끝난 운행인데도 하이패스·주유
+        // 입력칸이 사라지고 서버 트리거가 차량 km·세운 곳 갱신을 건너뛴다.
+        const { result } = renderHook(() => useDriveLogForm());
+        await waitFor(() => { expect(result.current.loading).toBe(false); });
+
+        const today = new Date();
+        const pad = (n: number) => String(n).padStart(2, '0');
+        const todayStr = `${today.getFullYear()}-${pad(today.getMonth() + 1)}-${pad(today.getDate())}`;
+        const y = new Date(today.getTime() - 86400000);
+        const yesterdayStr = `${y.getFullYear()}-${pad(y.getMonth() + 1)}-${pad(y.getDate())}`;
+
+        await act(async () => {
+            result.current.setForm(prev => ({ ...prev, driveDate: yesterdayStr, endDate: todayStr }));
+        });
+
+        expect(result.current.isRetroactive).toBe(false);
+
+        // 도착일까지 어제면 그때는 진짜 소급이다
+        await act(async () => {
+            result.current.setForm(prev => ({ ...prev, endDate: yesterdayStr }));
+        });
+
+        expect(result.current.isRetroactive).toBe(true);
+    });
+
     it('폼 검증 실패 시 toast를 표시한다', async () => {
         const { result } = renderHook(() => useDriveLogForm());
 

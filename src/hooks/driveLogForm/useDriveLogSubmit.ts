@@ -10,6 +10,7 @@ import { invalidateDashboardCache } from '../useTodayDashboard';
 import { submitDriveLog, getEmptyForm } from './submitDriveLog';
 import { validateDriveLogForm } from '../utils/driveLogValidation';
 import { validateEditKmRange } from './editKmRange';
+import { validateDriveWindow } from './driveWindow';
 import { adjustAdjacentLogs } from './adjustAdjacentLogs';
 import { captureError } from '../../lib/sentry';
 import type { User } from 'firebase/auth';
@@ -218,6 +219,15 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
         const validation = validateDriveLogForm(form, { isElectric });
         if (!validation.valid) {
             showToast(validation.message as string, 'warning');
+            return;
+        }
+
+        // ── 운행 구간 검증: 도착이 출발보다 이르면 막는다 ──
+        // 원래 없던 검증이다. 없을 때는 오타든 다일 운행이든 조용히 저장되고,
+        // timestamp가 실제 운행보다 이른 시각을 가리켰다.
+        const windowError = validateDriveWindow(form);
+        if (windowError) {
+            showToast(windowError, 'warning');
             return;
         }
 

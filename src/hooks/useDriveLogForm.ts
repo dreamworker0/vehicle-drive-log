@@ -63,7 +63,11 @@ export default function useDriveLogForm() {
     const [lastDriveLog, setLastDriveLog] = useState<DriveLog | null>(null);
     const [nextDriveLog, setNextDriveLog] = useState<DriveLog | null>(null);
 
-    const editDriveDate = editLog?.timestamp ? timestampToDateStr(editLog.timestamp) : todayStr();
+    // timestamp는 **도착** 시각이다. 다일 운행은 출발일이 따로 저장돼 있으므로 그것을 쓴다.
+    const editArrivalDate = editLog?.timestamp ? timestampToDateStr(editLog.timestamp) : todayStr();
+    const editDriveDate = editLog?.startDate || editArrivalDate;
+    // 도착일 칸은 출발일과 다를 때만 채운다(같으면 비워 두는 것이 저장 규칙과 같다).
+    const editEndDate = editLog?.startDate ? editArrivalDate : '';
     const [form, setForm] = useState<DriveLogForm>({
         vehicleId: editLog?.vehicleId || '',
         vehicleName: editLog?.vehicleName || '',
@@ -80,6 +84,7 @@ export default function useDriveLogForm() {
         batteryEnd: editLog?.batteryEnd?.toString() || '',
         notes: editLog?.notes || '',
         driveDate: editDriveDate,
+        endDate: editEndDate,
         hipassBalanceAfter: '',
         needsRefuel: false,
     });
@@ -87,7 +92,12 @@ export default function useDriveLogForm() {
     const orgId = userData?.organizationId;
     const selectedVehicle = vehicles.find(v => v.id === form.vehicleId);
     const isElectric = selectedVehicle?.fuelType === 'electric';
-    const isRetroactive = form.driveDate !== todayStr();
+    // **도착일** 기준이다. 소급 판정의 뜻은 "그 일지가 오늘 것이냐"이고, 차량 상태(하이패스
+    // 잔액·주유 필요·현재 km·세운 곳)를 지금 바꿔도 되는지가 여기에 달려 있다. 출발일로 재면
+    // 어제 나가 **오늘 아침에 돌아온** 1박2일 운행이 소급으로 분류되어, 오늘 끝난 운행인데도
+    // 하이패스·주유 입력칸이 사라지고 서버 트리거가 차량 km·세운 곳 갱신을 건너뛴다
+    // (이 일지가 최신이라 보정 체인도 비어 있어 주행거리가 영영 밀리지 않는다).
+    const isRetroactive = (form.endDate || form.driveDate) !== todayStr();
 
     /**
      * 출발지·세운 곳의 기본값을 차량마다 **한 번만** 채운다.

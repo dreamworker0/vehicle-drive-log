@@ -18,12 +18,15 @@ const mockCreateDriveLog = vi.fn();
 const mockUpdateDriveLog = vi.fn();
 const mockUpdateReservationStatus = vi.fn();
 const mockUpdateHipassCard = vi.fn();
+const mockCompleteGroup = vi.fn();
 
 vi.mock('../../lib/firestore', () => ({
+    SKIPPED_OFFLINE: -1,
     createDriveLog: (...args: unknown[]) => mockCreateDriveLog(...args),
     updateDriveLog: (...args: unknown[]) => mockUpdateDriveLog(...args),
     updateReservationStatus: (...args: unknown[]) => mockUpdateReservationStatus(...args),
     updateHipassCard: (...args: unknown[]) => mockUpdateHipassCard(...args),
+    completeReservationGroupSiblings: (...args: unknown[]) => mockCompleteGroup(...args),
 }));
 
 vi.mock('../../lib/sentry', () => ({
@@ -33,6 +36,7 @@ vi.mock('../../lib/sentry', () => ({
 // increment는 단순 sentinel로 치환해 호출 인자만 검증한다.
 vi.mock('firebase/firestore', () => ({
     increment: (n: number) => ({ __increment: n }),
+    deleteField: () => ({ __deleteField: true }),
 }));
 
 import { submitDriveLog } from '../../hooks/driveLogForm/submitDriveLog';
@@ -55,6 +59,7 @@ const baseForm = {
     notes: '',
     driveDate: '2026-03-05',
     hipassBalanceAfter: '',
+    endDate: '',
     needsRefuel: false,
 };
 
@@ -87,6 +92,7 @@ describe('submitDriveLog', () => {
         mockUpdateDriveLog.mockResolvedValue({});
         mockUpdateReservationStatus.mockResolvedValue(undefined);
         mockUpdateHipassCard.mockResolvedValue(undefined);
+        mockCompleteGroup.mockResolvedValue(0);
         // 기본은 온라인 상태
         Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
     });
@@ -237,6 +243,104 @@ describe('submitDriveLog', () => {
 
         const payload = mockCreateDriveLog.mock.calls[0][0];
         expect(payload.needsRefuel).toBeUndefined();
+    });
+
+    it('이틀 이상 걸린 운행은 출발일을 남기고 timestamp는 도착일로 찍는다', async () => {
+        // timestamp는 도착 시각 기준(바뀌지 않았다). 출발일만 따로 남긴다 —
+        // 도착일을 또 저장하면 timestamp와 중복되고 둘이 어긋날 수 있다.
+        await submitDriveLog(makeCtx({
+            form: { ...baseForm, driveDate: '2026-03-05', endDate: '2026-03-06', startTime: '17:00', endTime: '10:00' },
+        }));
+
+        const payload = mockCreateDriveLog.mock.calls[0][0];
+        expect(payload.startDate).toBe('2026-03-05');
+        const ts = payload.timestamp as Date;
+        expect(ts.getDate()).toBe(6);   // 도착일
+        expect(ts.getHours()).toBe(10); // 도착 시각
+    });
+
+    it('같은 날 운행에는 출발일 필드를 만들지 않는다 — 기존 문서와 모양이 같아야 한다', async () => {
+        await submitDriveLog(makeCtx({ form: { ...baseForm, endDate: '2026-03-05' } }));
+
+        const payload = mockCreateDriveLog.mock.calls[0][0];
+        expect(payload.startDate).toBeUndefined();
+    });
+
+    it('수정으로 다일 → 당일이 되면 출발일을 지우라고 명시한다', async () => {
+        // undefined로 두면 updateDriveLog의 sanitizeUndefined가 키째 걸러 내 updateDoc에
+        // 실리지 않는다. 그러면 문서에 남은 옛 출발일이 살아남아 사용자의 정정이 되돌아간다.
+        await submitDriveLog(makeCtx({
+            isEditMode: true,
+            editLog: { id: 'log1', vehicleId: 'v1' } as never,
+            form: { ...baseForm, driveDate: '2026-03-05', endDate: '' },
+        }));
+
+        const payload = mockUpdateDriveLog.mock.calls[0][1];
+        expect(payload.startDate).toEqual({ __deleteField: true });
+    });
+
+    it('수정으로도 다일이면 출발일을 그대로 싣는다 — 지우지 않는다', async () => {
+        await submitDriveLog(makeCtx({
+            isEditMode: true,
+            editLog: { id: 'log1', vehicleId: 'v1' } as never,
+            form: { ...baseForm, driveDate: '2026-03-05', endDate: '2026-03-06', startTime: '17:00', endTime: '10:00' },
+        }));
+
+        const payload = mockUpdateDriveLog.mock.calls[0][1];
+        expect(payload.startDate).toBe('2026-03-05');
+    });
+
+    it('소급이 아니게 고친 수정은 소급 표시도 지우라고 명시한다', async () => {
+        // 문서에 isRetroactive가 남으면 서버 트리거가 그 값을 보고 차량 km·세운 곳 갱신을
+        // 계속 건너뛴다 — 화면은 고쳐졌는데 차량 상태만 안 따라온다.
+        await submitDriveLog(makeCtx({
+            isEditMode: true,
+            isRetroactive: false,
+            editLog: { id: 'log1', vehicleId: 'v1' } as never,
+        }));
+
+        const payload = mockUpdateDriveLog.mock.calls[0][1];
+        expect(payload.isRetroactive).toEqual({ __deleteField: true });
+    });
+
+    it('여전히 소급이면 표시를 그대로 싣는다', async () => {
+        await submitDriveLog(makeCtx({
+            isEditMode: true,
+            isRetroactive: true,
+            editLog: { id: 'log1', vehicleId: 'v1' } as never,
+        }));
+
+        expect(mockUpdateDriveLog.mock.calls[0][1].isRetroactive).toBe(true);
+    });
+
+    it('오프라인이라 예약 정리를 못 하면 조용히 넘기지 않고 알린다', async () => {
+        // 이 예약에 두 번째 저장은 없다. 조용히 넘기면 남은 날짜가 영영 열려 있게 된다.
+        mockCompleteGroup.mockResolvedValueOnce(-1);
+
+        const result = await submitDriveLog(makeCtx({ reservationData: { reservationId: 'r1' } }));
+
+        expect(result.success).toBe(true);
+        expect(result.backgroundWarning).toContain('예약');
+    });
+
+    it('예약 연계 제출은 다일 예약의 나머지 날짜도 함께 닫는다', async () => {
+        // 1박2일 예약은 문서 두 건이다. 운행은 한 번인데 한 건만 닫으면 남은 날짜가
+        // 미완료로 떠 운행일지 미작성 알림이 계속 울린다.
+        mockCompleteGroup.mockResolvedValueOnce(1);
+
+        const result = await submitDriveLog(makeCtx({ reservationData: { reservationId: 'r1' } }));
+
+        expect(mockCompleteGroup).toHaveBeenCalledWith('r1', 'org1');
+        expect(result.success).toBe(true);
+    });
+
+    it('그룹 닫기가 실패해도 본 저장은 성공시키되 경고를 남긴다', async () => {
+        mockCompleteGroup.mockRejectedValueOnce(new Error('permission-denied'));
+
+        const result = await submitDriveLog(makeCtx({ reservationData: { reservationId: 'r1' } }));
+
+        expect(result.success).toBe(true);
+        expect(result.backgroundWarning).toBeTruthy();
     });
 
     it('예약 상태 전환이 실패해도 본 저장은 성공시키되 backgroundWarning을 전파한다', async () => {

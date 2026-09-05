@@ -148,6 +148,23 @@ describe('입력 검증', () => {
         expect(showToast).toHaveBeenCalledWith(expect.any(String), 'warning');
     });
 
+    it('같은 날인데 도착이 출발보다 이르면 저장을 막는다', async () => {
+        // 검증 자체는 driveWindow.test.ts가 다룬다. 여기서는 그 검증이 제출 경로에 실제로
+        // **꽂혀 있는지**를 고정한다 — 함수만 있고 호출되지 않으면 아무 소용이 없다.
+        await submit(deps({ form: validForm({ startTime: '17:00', endTime: '10:00', endDate: '' }) }));
+
+        expect(mockSubmitDriveLog).not.toHaveBeenCalled();
+        expect(showToast).toHaveBeenCalledWith(expect.stringContaining('도착 시각'), 'warning');
+    });
+
+    it('다음 날 도착이면 도착 시각이 일러도 저장한다', async () => {
+        await submit(deps({
+            form: validForm({ startTime: '17:00', endTime: '10:00', driveDate: '2026-03-05', endDate: '2026-03-06' }),
+        }));
+
+        expect(mockSubmitDriveLog).toHaveBeenCalled();
+    });
+
     it('수정 모드에서 직전·직후 기록의 범위를 벗어나면 저장하지 않고 모달 상태로 남긴다', async () => {
         const result = await submit(deps({
             isEditMode: true,

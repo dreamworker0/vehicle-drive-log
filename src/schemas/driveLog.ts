@@ -18,6 +18,18 @@ export const driveLogSchema = z.object({
     distance: z.coerce.number().optional().catch(undefined),
     startTime: z.string().optional().catch(undefined),
     endTime: z.string().optional().catch(undefined),
+    /**
+     * 출발일('YYYY-MM-DD'). **이틀 이상 걸린 운행에서만** 채워진다.
+     *
+     * 도착 쪽은 이미 `timestamp`가 담고 있다(도착 시각 기준). 그래서 새로 저장할 것은
+     * **없는 쪽인 출발일**이다 — 도착일을 따로 두면 timestamp와 중복되고 둘이 어긋날 수 있다.
+     * 없으면 도착일과 같은 날로 본다: 기존 문서 전부가 그 경우이므로 마이그레이션이 필요 없다.
+     *
+     * 하나의 물리적 운행을 날짜별로 쪼개지 않는 이유는 계기판 때문이다 — 자정에 존재하지
+     * 않았던 중간 km를 지어내야 하고, 그 순간 주행거리가 허구가 된다. (다일 **예약**은
+     * 하루당 문서 하나로 쪼개지만 그것은 시간 점유라 쪼개도 뜻이 보존된다.)
+     */
+    startDate: z.string().optional().catch(undefined),
     purpose: z.string().optional().catch(undefined),
     destination: z.string().optional().catch(undefined),
     startLocation: z.string().optional().catch(undefined),

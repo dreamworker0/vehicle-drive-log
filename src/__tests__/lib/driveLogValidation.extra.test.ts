@@ -55,6 +55,7 @@ describe('buildLogData', () => {
         notes: '  특이사항 없음  ',
         driveDate: '',
         hipassBalanceAfter: '',
+        endDate: '',
         needsRefuel: false,
     };
 

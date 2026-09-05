@@ -426,7 +426,12 @@ export const onDriveLogUpdated = onDocumentUpdated(
             const vehId = data.vehicleId || oldData.vehicleId;
             const tsRaw = data.timestamp || oldData.timestamp;
             const ts = tsRaw instanceof Date ? tsRaw : tsRaw?.toDate();
-            const isRetro = data.isRetroactive !== undefined ? data.isRetroactive : oldData.isRetroactive;
+            // `data`는 델타가 아니라 **쓰기 후 문서 전체**다. 그래서 "없으면 예전 값"이라는
+            // 되돌림은 뜻이 없고, 오히려 해롭다 — 소급으로 적었던 일지를 오늘 도착으로 고쳐
+            // 클라이언트가 이 필드를 지워도 여기서 옛 true가 되살아나, 차량 km·세운 곳·주유
+            // 필요 갱신을 계속 건너뛰었다. 화면은 고쳐졌는데 차량 상태만 안 따라오는 상태다.
+            // 생성 쪽(onDriveLogCreated)이 쓰는 판정과 같은 모양으로 맞춘다.
+            const isRetro = data.isRetroactive === true;
 
             // 세운 곳이 **바뀐** 수정만 현재 위치를 다시 맞춘다. 매 수정마다 갱신하면 확인 시각이
             // 실제로 확인되지 않은 시점을 가리켜 신선도 표기가 거짓말이 된다.

@@ -15,6 +15,8 @@ export interface ExportableDriveLog {
     timestamp?: FirestoreTimestamp;
     startTime?: string;
     endTime?: string;
+    /** 출발일. 이틀 이상 걸린 운행에서만 있다(도착일은 timestamp가 담는다). */
+    startDate?: string;
     departureTime?: string;
     arrivalTime?: string;
     departureKm?: number;
@@ -45,9 +47,39 @@ export function resolveDateStr(log: ExportableDriveLog, fallback = ''): string {
     return log.date || (ts ? toLocalDateStr(ts) : fallback);
 }
 
-/** 출발 시각 (startTime 우선, 없으면 departureTime). */
+/**
+ * 출발 시각 (startTime 우선, 없으면 departureTime).
+ *
+ * 이틀 이상 걸린 운행이면 **날짜를 앞에 붙인다**(`9/1 17:00`). 날짜 칸에는 도착일이
+ * 찍히므로, 그것만 보면 17:00 출발 → 10:00 도착이라는 불가능한 기록으로 읽힌다.
+ */
 export function resolveStartTime(log: ExportableDriveLog): string {
+    return `${formatStartDatePrefix(log)}${resolveStartTimeRaw(log)}`;
+}
+
+/**
+ * 출발 시각만 — 날짜 접두어 **없이**.
+ *
+ * 정렬·비교에는 이쪽을 써야 한다. `resolveStartTime`이 붙이는 `9/1 `은 문자열 비교에서
+ * 여느 `HH:MM`보다 뒤로 밀려(`'9' > '1'`), 정렬 키로 쓰면 다일 운행이 그 날짜의 맨 아래로
+ * 내려간다 — 실제로는 가장 먼저 출발한 운행인데도.
+ */
+export function resolveStartTimeRaw(log: ExportableDriveLog): string {
     return log.startTime || log.departureTime || '';
+}
+
+/**
+ * 이틀 이상 걸린 운행의 출발 날짜 접두어(`9/1 `). 당일 운행이면 빈 문자열.
+ *
+ * 표시하는 쪽이 여럿이라(목록 행·PDF·엑셀) 판정과 형식을 한 군데로 모은다.
+ */
+export function formatStartDatePrefix(log: ExportableDriveLog): string {
+    if (!log.startDate || !resolveStartTimeRaw(log)) return '';
+    const [, m, d] = log.startDate.split('-');
+    // 숫자가 아니면 접두어를 만들지 않는다 — 'NaN/NaN'을 서식에 찍는 것보다 아무것도 안 붙이는
+    // 편이 낫다(오프라인 큐가 값을 망가뜨린 적이 있어 방어한다).
+    if (!m || !d || !/^\d+$/.test(m) || !/^\d+$/.test(d)) return '';
+    return `${Number(m)}/${Number(d)} `;
 }
 
 /** 도착 시각 (endTime 우선, 없으면 arrivalTime). */
@@ -118,8 +150,12 @@ export function attachFuelSummary<T extends FuelJoinableDriveLog>(
     // 3) 각 그룹의 첫 운행(출발 시각 오름차순) 행에만 요약 부착
     for (const [key, groupLogs] of logsByKey) {
         const { cost, amount, fuelType } = fuelByKey.get(key)!;
+        // 묶음은 **도착일** 기준이라 시:분만 견주면 어긋난다. 9/1 23:00에 떠나 9/2에 닿은
+        // 운행은 9/2 07:00 운행보다 먼저 출발했는데도 뒤로 밀린다. 출발 날짜부터 견준다.
+        const departureKey = (log: FuelJoinableDriveLog) =>
+            `${log.startDate || resolveDateStr(log)} ${resolveStartTimeRaw(log)}`;
         const first = groupLogs.reduce((a, b) =>
-            resolveStartTime(a).localeCompare(resolveStartTime(b)) <= 0 ? a : b,
+            departureKey(a).localeCompare(departureKey(b)) <= 0 ? a : b,
         );
         first.fuelSummary = `${cost.toLocaleString()}(${amount.toLocaleString()}${fuelUnit(fuelType)})`;
     }

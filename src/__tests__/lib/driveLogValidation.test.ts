@@ -152,6 +152,7 @@ describe('buildLogData', () => {
         batteryStart: '', batteryEnd: '',
         notes: '비고 없음', driveDate: '2026-01-15',
         hipassBalanceAfter: '',
+        endDate: '',
         needsRefuel: false,
     };
 
