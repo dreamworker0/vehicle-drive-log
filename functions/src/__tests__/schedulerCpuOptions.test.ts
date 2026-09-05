@@ -47,6 +47,7 @@ interface ScheduleEndpoint {
     concurrency?: number | null;
     timeoutSeconds: number | null;
     availableMemoryMb: number | null;
+    scheduleTrigger?: { schedule?: string; timeZone?: string };
 }
 
 const endpointOf = (fn: unknown): ScheduleEndpoint =>
@@ -75,6 +76,17 @@ describe("가벼운 스케줄러 4종 — CPU 할당 회귀 가드", () => {
             expect(ep.concurrency).toBe(1);
         }
     );
+
+    it("reservationReminder는 08시 이후에만 돈다 — 임박 알림이 기대는 전제다", () => {
+        // reservationReminder.ts §1의 쿼리 하한은 `startTime >= currentTime`뿐이다.
+        // 다일 예약의 둘째 날 이후 문서(startTime "00:00")가 여기 걸리지 않는 이유는
+        // 코드가 막아서가 아니라 **첫 실행이 08:00이라 하한이 항상 "00:00"보다 늦기 때문**이다.
+        // 이 cron을 새벽까지 넓히면 그날부터 운행 중인 사람에게 "🚗 예약 임박"이 나가기 시작한다.
+        // 넓혀야 한다면 §1에도 §3처럼 다일 판별을 넣고 나서 이 단언을 고쳐야 한다.
+        const trigger = endpointOf(reservationReminder).scheduleTrigger;
+        expect(trigger?.schedule).toBe("0 8-18 * * 1-5");
+        expect(trigger?.timeZone).toBe("Asia/Seoul");
+    });
 
     it("CPU를 줄인 만큼 타임아웃에 여유가 있다 — 전역 기본값 120초에 머물지 않는다", () => {
         // monthlyBatch는 원래 540초라 그대로. 나머지 셋은 120초에서 올렸다.
