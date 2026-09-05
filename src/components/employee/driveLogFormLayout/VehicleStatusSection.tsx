@@ -13,6 +13,8 @@ interface VehicleStatusSectionProps {
     hipassEnabled?: boolean;
     /** 수정 모드 여부. 수정 화면에서는 하이패스 블록을 숨긴다(아래 showHipass 주석 참고) */
     isEditMode?: boolean;
+    /** 오늘이 아닌 날짜의 운행인지(소급 입력). 이때도 하이패스 블록을 숨긴다 */
+    isRetroactive?: boolean;
 }
 
 const VehicleStatusSection = memo(function VehicleStatusSection({
@@ -22,7 +24,8 @@ const VehicleStatusSection = memo(function VehicleStatusSection({
     lastEndBattery,
     hipassCard,
     hipassEnabled = true,
-    isEditMode = false
+    isEditMode = false,
+    isRetroactive = false
 }: VehicleStatusSectionProps) {
     // 하이패스 접기/펼치기 상태 (기본값: 접힘 — 자주 사용하지 않는 항목)
     // 훅은 early return 앞에 위치해야 Rules of Hooks를 위반하지 않는다.
@@ -41,10 +44,11 @@ const VehicleStatusSection = memo(function VehicleStatusSection({
 
     // 기관 설정에서 하이패스를 끄면 카드가 있어도 하이패스 블록을 숨긴다.
     //
-    // 수정 화면에서도 숨긴다 — 여기 '현재 잔액'은 그 일지를 쓰던 시점이 아니라 오늘의
-    // 잔액이라, 그 값을 기준으로 사용액을 계산하면 카드 잔액이 엉뚱하게 바뀐다.
+    // 그 일지가 오늘 것이 아니면 숨긴다 — 여기 '현재 잔액'은 그 운행을 하던 날이 아니라
+    // 오늘 남은 금액이라, 그 값을 기준으로 사용액을 계산하면 카드 잔액이 엉뚱하게 바뀐다.
+    // 과거 일지 수정(isEditMode)과 누락 운행 소급 입력(isRetroactive) 둘 다 해당한다.
     // (submitDriveLog의 shouldApplyHipass가 저장 쪽에서도 같은 경계를 지킨다)
-    const showHipass = hipassEnabled && !!hipassCard && !isEditMode;
+    const showHipass = hipassEnabled && !!hipassCard && !isEditMode && !isRetroactive;
 
     if (!isElectric && !showHipass) return null;
 

@@ -191,6 +191,25 @@ describe('submitDriveLog', () => {
         expect(result.success).toBe(true);
     });
 
+    it('소급 입력(오늘이 아닌 날짜의 신규 일지)에서도 하이패스 잔액을 차감하지 않는다', async () => {
+        // 누락 운행 소급 입력은 '새 일지를 쓰는' 경로라 isEditMode가 false다.
+        // 수정 모드만 막으면 오늘 잔액을 기준 삼는 같은 계산이 여기 그대로 남는다.
+        const result = await submitDriveLog(
+            makeCtx({
+                isRetroactive: true,
+                form: { ...baseForm, hipassBalanceAfter: '9500' },
+                hipassCard: { id: 'h1', cardNumber: '1234', balance: 7000 } as Ctx['hipassCard'],
+            }),
+        );
+
+        expect(mockUpdateHipassCard).not.toHaveBeenCalled();
+
+        const payload = mockCreateDriveLog.mock.calls[0][0];
+        expect(payload).not.toHaveProperty('hipassBalanceBefore');
+        expect(payload).not.toHaveProperty('hipassBalanceAfter');
+        expect(result.success).toBe(true);
+    });
+
     it('예약 상태 전환이 실패해도 본 저장은 성공시키되 backgroundWarning을 전파한다', async () => {
         mockUpdateReservationStatus.mockRejectedValueOnce(new Error('network'));
 
