@@ -86,15 +86,34 @@ describe('captureError / captureWarning — 개인정보 스크러빙 배선', (
             beforeBreadcrumb: (b: Record<string, unknown>) => Record<string, unknown>;
         };
 
+        // SDK가 실제로 만드는 모양을 그대로 쓴다 — data.arguments와 message를 **둘 다** 만들고
+        // (integrations/breadcrumbs.js의 safeJoin), Sentry 화면이 보여 주는 건 message다.
+        // 인자만 검사하는 테스트로는 message 누출이 보이지 않는다.
+        const args: unknown[] = [
+            '📋 승인된 기관 데이터:',
+            '{"applicantName":"홍길동","applicantEmail":"hong@example.or.kr","applicantPhone":"010-1234-5678"}',
+            { destination: '서울역', vehicleId: 'v1' },
+        ];
         const scrubbed = options.beforeBreadcrumb({
             category: 'console',
             level: 'warning',
-            data: { arguments: ['[submitDriveLog] 실패', { destination: '서울역', vehicleId: 'v1' }] },
+            data: { arguments: args, logger: 'console' },
+            message: args.map(a => (typeof a === 'string' ? a : JSON.stringify(a))).join(' '),
         });
 
-        const serialized = JSON.stringify((scrubbed.data as { arguments: unknown[] }).arguments);
-        expect(serialized).not.toContain('서울역');
-        expect(serialized).toContain('v1');
+        const argsOut = JSON.stringify((scrubbed.data as { arguments: unknown[] }).arguments);
+        const messageOut = scrubbed.message as string;
+
+        for (const out of [argsOut, messageOut]) {
+            expect(out).not.toContain('hong@example.or.kr');
+            expect(out).not.toContain('010-1234-5678');
+            expect(out).not.toContain('서울역');
+        }
+        // 개발자가 쓴 로그 문구와 식별자는 남아야 자취를 따라갈 수 있다
+        expect(messageOut).toContain('승인된 기관 데이터');
+        expect(argsOut).toContain('v1');
+        // logger 등 SDK가 넣은 다른 필드는 보존한다
+        expect((scrubbed.data as { logger: string }).logger).toBe('console');
     });
 
     it('console 이외의 breadcrumb은 건드리지 않는다', async () => {

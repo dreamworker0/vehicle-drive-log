@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { scrubContext, scrubValues } from '@/lib/sentryScrub';
+import { scrubContext, scrubConsoleArgs, joinConsoleArgs } from '@/lib/sentryScrub';
 
 /**
  * Sentry `extra`에서 자유 입력이 걸러지는지 검증한다.
@@ -220,11 +220,29 @@ describe('scrubContext', () => {
         expect(out.b).toEqual({ vehicleId: 'v1' });
     });
 
-    it('scrubValues는 키 없는 값 목록을 모두 차단한다', () => {
-        const out = scrubValues(['[submitDriveLog] 실패', { destination: '서울역', vehicleId: 'v1' }]);
+    it('scrubConsoleArgs는 로그 문구는 남기고 객체 덤프와 민감한 값만 지운다', () => {
+        // console breadcrumb은 extra와 규칙이 다르다 — 문자열을 전부 지우면 자취가
+        // 통째로 [redacted]가 되어 쓸모가 없어진다. 개발자가 쓴 문구는 남긴다.
+        const out = scrubConsoleArgs([
+            '[submitDriveLog] 하이패스 잔액 업데이트 실패:',
+            '신청자 hong@example.or.kr / 010-1234-5678',
+            { destination: '서울역', vehicleId: 'v1' },
+        ]);
         const serialized = JSON.stringify(out);
-        expect(serialized).not.toContain('서울역');
-        expect(serialized).not.toContain('submitDriveLog');
-        expect(serialized).toContain('v1');
+
+        expect(serialized).toContain('submitDriveLog');   // 로그 문구는 남는다
+        expect(serialized).toContain('v1');               // 식별자도 남는다
+        expect(serialized).not.toContain('hong@example.or.kr');
+        expect(serialized).not.toContain('010-1234-5678');
+        expect(serialized).not.toContain('서울역');       // 객체 안의 자유 입력은 지운다
+    });
+
+    it('joinConsoleArgs는 걸러낸 인자로 message를 다시 만든다', () => {
+        const safe = scrubConsoleArgs(['저장 실패:', { destination: '서울역', vehicleId: 'v1' }]);
+        const message = joinConsoleArgs(safe);
+
+        expect(message).toContain('저장 실패:');
+        expect(message).toContain('v1');
+        expect(message).not.toContain('서울역');
     });
 });

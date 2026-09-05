@@ -1,5 +1,5 @@
 import { isFirestoreTerminated } from './firestoreLifecycle';
-import { scrubContext, scrubValues } from './sentryScrub';
+import { scrubContext, scrubConsoleArgs, joinConsoleArgs } from './sentryScrub';
 
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
 
@@ -63,15 +63,23 @@ function initSentryWithModule(Sentry: SentryModule) {
         integrations: [
             Sentry.browserTracingIntegration(),
         ],
-        // console 호출은 SDK 기본 breadcrumbsIntegration이 **인자 객체를 그대로** 담아
-        // 다음 이벤트에 붙인다(`data.arguments`). 즉 captureError/captureWarning에서
-        // extra를 걸러도, 같은 함수의 console 출력이 원본을 다시 실어 보낸다.
-        // 여기서 같은 규칙으로 한 번 더 거른다 — 앱 전역의 console 호출이 대상이라
-        // captureWarning 한 곳만 고치는 것보다 넓게 막힌다.
+        // console 호출은 SDK 기본 breadcrumbsIntegration이 **인자를 그대로** 담아 다음
+        // 이벤트에 붙인다. 즉 captureError/captureWarning에서 extra를 걸러도, 같은 함수의
+        // console 출력이 원본을 다시 실어 보낸다. 앱 전역 console이 대상이라 여기서 막는다.
+        //
+        // SDK는 인자로 `data.arguments`와 `message`(= safeJoin(args, ' '))를 **둘 다** 만들고
+        // (integrations/breadcrumbs.js), Sentry 화면이 보여 주는 것은 message다. 인자만 걸러
+        // 두면 개인정보는 message로 나가고 진단만 사라지는 정확히 반대인 결과가 되므로,
+        // 걸러낸 인자로 message를 다시 만든다. console.assert는 접두어를 보존한다.
         beforeBreadcrumb(breadcrumb) {
             const args = (breadcrumb.data as { arguments?: unknown[] } | undefined)?.arguments;
             if (breadcrumb.category === 'console' && Array.isArray(args)) {
-                breadcrumb.data = { ...breadcrumb.data, arguments: scrubValues(args) };
+                const safeArgs = scrubConsoleArgs(args);
+                breadcrumb.data = { ...breadcrumb.data, arguments: safeArgs };
+                const assertPrefix = typeof breadcrumb.message === 'string'
+                    && breadcrumb.message.startsWith('Assertion failed: ')
+                    ? 'Assertion failed: ' : '';
+                breadcrumb.message = assertPrefix + joinConsoleArgs(safeArgs);
             }
             return breadcrumb;
         },
