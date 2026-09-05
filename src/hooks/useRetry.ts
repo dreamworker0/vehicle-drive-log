@@ -89,7 +89,9 @@ export default function useRetry({ maxRetries = 2, retryLabel = '재시도' } = 
                 console.warn(`[useRetry:${key}] 예상된 실패로 보고를 생략합니다:`, err);
             } else {
                 console.error(`[useRetry:${key}]`, err);
-                captureError(err, { key, retryCount: retryCountRef.current.get(key) || 0, context: 'useRetry' });
+                // `key`가 아니라 `retryKey`로 넘긴다 — sentryScrub의 허용 목록은 일반 명사를
+                // 담지 않는다(어떤 문서에든 같은 이름의 자유 입력이 생길 수 있다).
+                captureError(err, { retryKey: key, retryCount: retryCountRef.current.get(key) || 0, context: 'useRetry' });
             }
 
             const handled = opts.onError ? opts.onError(err) : false;

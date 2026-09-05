@@ -1,5 +1,5 @@
 import { isFirestoreTerminated } from './firestoreLifecycle';
-import { scrubContext } from './sentryScrub';
+import { scrubContext, scrubValues } from './sentryScrub';
 
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
 
@@ -63,6 +63,18 @@ function initSentryWithModule(Sentry: SentryModule) {
         integrations: [
             Sentry.browserTracingIntegration(),
         ],
+        // console 호출은 SDK 기본 breadcrumbsIntegration이 **인자 객체를 그대로** 담아
+        // 다음 이벤트에 붙인다(`data.arguments`). 즉 captureError/captureWarning에서
+        // extra를 걸러도, 같은 함수의 console 출력이 원본을 다시 실어 보낸다.
+        // 여기서 같은 규칙으로 한 번 더 거른다 — 앱 전역의 console 호출이 대상이라
+        // captureWarning 한 곳만 고치는 것보다 넓게 막힌다.
+        beforeBreadcrumb(breadcrumb) {
+            const args = (breadcrumb.data as { arguments?: unknown[] } | undefined)?.arguments;
+            if (breadcrumb.category === 'console' && Array.isArray(args)) {
+                breadcrumb.data = { ...breadcrumb.data, arguments: scrubValues(args) };
+            }
+            return breadcrumb;
+        },
         // 노이즈 에러 필터링
         ignoreErrors: [
             // reCAPTCHA 중복 렌더링 에러 (인앱 브라우저 및 특정 WebView 환경에서 발생하는 외부 노이즈)
@@ -309,7 +321,8 @@ export function captureError(error: unknown, context: Record<string, unknown> = 
     if (SENTRY_DSN && sentryLoading) {
         // 도메인 함수들이 저장하려던 문서를 통째로 넘기므로(`{ context, data }`) 목적지·
         // 동승자 이름·비고 같은 자유 입력이 그대로 실린다. 보내기 직전 여기서 거른다.
-        // 콘솔은 개발자 기기에만 남으므로 원본 그대로 둔다 — 진단이 어려워지면 안 된다.
+        // 아래 console 출력은 원본 그대로 둔다(개발자 도구에서의 진단이 우선) — 그것이
+        // breadcrumb으로 새는 경로는 init의 beforeBreadcrumb이 따로 막는다.
         const safeContext = scrubContext(context);
         sentryLoading.then((Sentry) => Sentry?.captureException(error, { extra: safeContext }));
     }

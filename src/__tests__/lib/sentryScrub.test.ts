@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { scrubContext } from '@/lib/sentryScrub';
+import { scrubContext, scrubValues } from '@/lib/sentryScrub';
 
 /**
  * Sentry `extra`에서 자유 입력이 걸러지는지 검증한다.
@@ -123,5 +123,108 @@ describe('scrubContext', () => {
 
     it('빈 컨텍스트를 그대로 통과시킨다', () => {
         expect(scrubContext({})).toEqual({});
+    });
+
+    it('일반 명사 키(reason·type·key)에 실린 자유 입력도 지운다', () => {
+        // 허용 목록이 일반 명사를 담으면 차단 목록과 똑같은 방식으로 뚫린다.
+        // 실제로 retireVehicle이 관리자가 입력한 폐차 사유 원문을 reason으로 넘기고 있었다.
+        const out = scrubContext({
+            context: 'retireVehicle',
+            vehicleId: 'v1',
+            reason: '대표 김철수 개인 사고로 전손 폐차, 보험사 연락처 010-1234-5678',
+            type: '대표자 자택 방문',
+            key: '홍길동-집',
+        });
+
+        const serialized = JSON.stringify(out);
+        expect(serialized).not.toContain('김철수');
+        expect(serialized).not.toContain('010-1234-5678');
+        expect(serialized).not.toContain('홍길동');
+        expect(serialized).not.toContain('자택');
+        expect(out.vehicleId).toBe('v1');
+    });
+
+    it('안전한 키 아래 깊은 곳의 일반 명사 키도 지운다', () => {
+        // schemas/index.ts가 Zod 파싱 실패 시 문서 전체를 rawData로 넘긴다.
+        const out = scrubContext({
+            docId: 'o1',
+            path: 'organizations/o1',
+            rawData: {
+                name: '○○복지관',
+                aiVerifyDetail: {
+                    reason: '동일한 고유번호(123-45-67890)로 이미 승인된 기관이 있습니다.',
+                },
+                retired: { reason: '노후화 및 담당자 김철수 퇴사' },
+            },
+        });
+
+        const serialized = JSON.stringify(out);
+        expect(serialized).not.toContain('123-45-67890');
+        expect(serialized).not.toContain('김철수');
+        expect(serialized).not.toContain('복지관');
+        expect(out.docId).toBe('o1');
+    });
+
+    it('허용 키라도 값이 이메일·전화번호 모양이면 지운다', () => {
+        // googleCalendarId는 *Id로 끝나지만 실제로는 계정 이메일일 수 있다.
+        const out = scrubContext({
+            context: 'updateVehicle',
+            vehicleId: 'v1',
+            googleCalendarId: 'jw@sasw.or.kr',
+            componentStack: '문의 010-9876-5432 로 연락',
+        });
+
+        expect(out.googleCalendarId).not.toContain('sasw.or.kr');
+        expect(out.componentStack).not.toContain('010-9876-5432');
+        expect(out.vehicleId).toBe('v1');
+    });
+
+    it('진단 전용 코드값은 남긴다', () => {
+        const out = scrubContext({
+            context: 'x',
+            appCheckCode: 'appCheck/throttled',
+            scope: 'userDoc',
+            dataset: 'driveLogs',
+            format: 'pdf',
+            requirement: 'admin',
+            retryKey: 'approve-res-r1',
+        });
+
+        expect(out.appCheckCode).toBe('appCheck/throttled');
+        expect(out.scope).toBe('userDoc');
+        expect(out.dataset).toBe('driveLogs');
+        expect(out.format).toBe('pdf');
+        expect(out.requirement).toBe('admin');
+        expect(out.retryKey).toBe('approve-res-r1');
+    });
+
+    it('값 하나가 읽히지 않아도 형제 값은 잃지 않는다', () => {
+        const out = scrubContext({
+            context: 'createDriveLog',
+            orgId: 'org1',
+            data: { get boom(): string { throw new Error('nope'); }, vehicleId: 'v1' },
+        });
+
+        expect(out.context).toBe('createDriveLog');
+        expect(out.orgId).toBe('org1');
+        const data = out.data as Record<string, unknown>;
+        expect(data.boom).toBe('[unreadable]');
+        expect(data.vehicleId).toBe('v1');
+    });
+
+    it('형제 자리에 같은 객체가 두 번 와도 순환으로 보지 않는다', () => {
+        const shared = { vehicleId: 'v1' };
+        const out = scrubContext({ context: 'x', a: shared, b: shared });
+
+        expect(out.a).toEqual({ vehicleId: 'v1' });
+        expect(out.b).toEqual({ vehicleId: 'v1' });
+    });
+
+    it('scrubValues는 키 없는 값 목록을 모두 차단한다', () => {
+        const out = scrubValues(['[submitDriveLog] 실패', { destination: '서울역', vehicleId: 'v1' }]);
+        const serialized = JSON.stringify(out);
+        expect(serialized).not.toContain('서울역');
+        expect(serialized).not.toContain('submitDriveLog');
+        expect(serialized).toContain('v1');
     });
 });
