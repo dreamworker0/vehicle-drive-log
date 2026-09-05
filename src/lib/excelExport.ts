@@ -104,7 +104,7 @@ export async function downloadDriveLogsExcel(logs: ExcelDriveLog[], filename = '
     // 열 너비 설정
     const cols = [
         { wch: 12 },  // 날짜
-        { wch: 6 },   // 출발시각
+        { wch: 10 },  // 출발시각 (이틀 이상 걸린 운행은 '9/1 17:00'처럼 날짜가 앞에 붙는다)
         { wch: 6 },   // 도착시각
         { wch: 10 },  // 운전자
         { wch: 14 },  // 차량

@@ -144,8 +144,8 @@ function buildLogRow(log: PdfLogEntry, rowNo: number, includeHipass = false, inc
         <tr>
             <td class="center">${rowNo}</td>
             <td class="center">${formatDate(date)}</td>
-            <td class="center">${escapeHtml(resolveStartTime(log))}</td>
-            <td class="center">${escapeHtml(resolveEndTime(log))}</td>
+            <td class="center col-time">${escapeHtml(resolveStartTime(log))}</td>
+            <td class="center col-time">${escapeHtml(resolveEndTime(log))}</td>
             <td class="center">${escapeHtml(log.driverName || '')}</td>
             <td class="center">${escapeHtml(log.vehicleDisplayName || log.vehicleName || '')}</td>
             ${includeStartLocation ? `<td>${escapeHtml(log.startLocation || '')}</td>` : ''}

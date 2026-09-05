@@ -63,7 +63,7 @@ import {
     getReservations, getPendingReservations, cancelReservation, updateReservation,
     updateReservationStatus, rejectReservation,
     getTodayReservations, getWeekReservations, getMyRecentReservations,
-    getReservationsByGroupId, cancelReservationGroup, deleteReservationGroup, completeReservationGroupSiblings,
+    getReservationsByGroupId, cancelReservationGroup, deleteReservationGroup, completeReservationGroupSiblings, SKIPPED_OFFLINE,
     cancelRecurringGroup, detachFromRecurringGroup,
     createReservationSafe,
 } from '../../../lib/firestore/reservations';
@@ -400,7 +400,9 @@ describe('firestore/reservations', () => {
 
             const count = await completeReservationGroupSiblings('day1', 'org1');
 
-            expect(count).toBe(0);
+            // 0(닫을 게 없었다)이 아니라 SKIPPED_OFFLINE이어야 한다 — 이 예약에 두 번째
+            // 저장은 없으므로 호출부가 사용자에게 알려야 한다.
+            expect(count).toBe(SKIPPED_OFFLINE);
             expect(fs.getDoc).not.toHaveBeenCalled();
             expect(commit).not.toHaveBeenCalled();
         });

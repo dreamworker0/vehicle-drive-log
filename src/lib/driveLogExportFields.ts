@@ -76,7 +76,9 @@ export function resolveStartTimeRaw(log: ExportableDriveLog): string {
 export function formatStartDatePrefix(log: ExportableDriveLog): string {
     if (!log.startDate || !resolveStartTimeRaw(log)) return '';
     const [, m, d] = log.startDate.split('-');
-    if (!m || !d) return '';
+    // 숫자가 아니면 접두어를 만들지 않는다 — 'NaN/NaN'을 서식에 찍는 것보다 아무것도 안 붙이는
+    // 편이 낫다(오프라인 큐가 값을 망가뜨린 적이 있어 방어한다).
+    if (!m || !d || !/^\d+$/.test(m) || !/^\d+$/.test(d)) return '';
     return `${Number(m)}/${Number(d)} `;
 }
 
@@ -149,7 +151,7 @@ export function attachFuelSummary<T extends FuelJoinableDriveLog>(
     for (const [key, groupLogs] of logsByKey) {
         const { cost, amount, fuelType } = fuelByKey.get(key)!;
         const first = groupLogs.reduce((a, b) =>
-            resolveStartTime(a).localeCompare(resolveStartTime(b)) <= 0 ? a : b,
+            resolveStartTimeRaw(a).localeCompare(resolveStartTimeRaw(b)) <= 0 ? a : b,
         );
         first.fuelSummary = `${cost.toLocaleString()}(${amount.toLocaleString()}${fuelUnit(fuelType)})`;
     }

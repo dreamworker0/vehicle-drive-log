@@ -159,13 +159,19 @@ export function getPdfStyles() {
         .col-vehicle { width: 76px; }
         .col-dest { width: auto; }
         .col-purpose { width: auto; }
+        .col-time { width: 34px; }
         /*
          * 34px는 'HH:MM'에 맞춘 폭이다. 이틀 이상 걸린 운행은 '9/1 17:00'처럼 날짜가 앞에
          * 붙어 들어가지 않는데, 표 전체가 word-break: break-all이라 '9/1 1' / '7:00'처럼
          * 토큰 한가운데가 잘린다. 폭은 그대로 두고(당일 운행이 대부분인 서식의 균형을
          * 깨지 않는다) 줄바꿈만 공백에서 일어나게 해 '9/1' / '17:00' 두 줄로 떨어뜨린다.
+         *
+         * td.col-time으로 쓰는 이유는 특정도다 — .log-table td(0-1-1)가 .col-time(0-1-0)을
+         * 이기므로 클래스만으로는 break-all이 그대로 남는다. 헤더에만 붙어 있던 클래스를
+         * 데이터 칸에도 달았다(word-break는 형제에게 상속되지 않는다).
+         * 이 파일은 CSS를 템플릿 리터럴로 담으므로 주석에 백틱을 쓰면 문자열이 끊긴다.
          */
-        .col-time { width: 34px; word-break: keep-all; }
+        .log-table td.col-time { word-break: keep-all; }
         .col-km { width: 46px; }
         .col-passenger { width: 30px; }
         .col-fuel { width: 64px; }

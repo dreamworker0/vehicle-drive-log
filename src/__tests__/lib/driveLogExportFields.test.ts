@@ -103,6 +103,8 @@ describe('resolveStartTime / resolveEndTime', () => {
     it('출발일이 YYYY-MM-DD가 아니면 접두어를 만들지 않는다 — NaN/NaN을 찍지 않는다', () => {
         expect(formatStartDatePrefix({ startTime: '09:00', startDate: '2026' })).toBe('');
         expect(formatStartDatePrefix({ startTime: '09:00', startDate: '' })).toBe('');
+        // 하이픈은 있는데 숫자가 아닌 경우 — 오프라인 큐가 값을 망가뜨린 전례가 있어 막는다
+        expect(formatStartDatePrefix({ startTime: '09:00', startDate: '2026-ab-cd' })).toBe('');
     });
 
     it('시각이 없으면 접두어만 남기지 않는다', () => {
@@ -116,6 +118,7 @@ type FuelTestLog = {
     date?: string;
     timestamp?: Date;
     startTime?: string;
+    startDate?: string;
     fuelSummary?: string;
 };
 
@@ -134,6 +137,21 @@ describe('attachFuelSummary', () => {
         expect(logs[1].fuelSummary).toBe('50,000(35.5L)');
         expect(logs[0].fuelSummary).toBeUndefined();
         expect(logs[2].fuelSummary).toBeUndefined();
+    });
+
+    it('이틀 걸린 운행이 섞여도 실제로 가장 먼저 출발한 행에 부착한다', () => {
+        // 표시용 문자열('9/1 07:00')로 견주면 '9'가 커서 그 행이 맨 뒤로 밀리고,
+        // 실제로는 나중에 출발한 09:00 행에 주유 요약이 붙는다.
+        const logs: FuelTestLog[] = [
+            { vehicleId: 'v1', date: '2026-09-02', startTime: '07:00', startDate: '2026-09-01' },
+            { vehicleId: 'v1', date: '2026-09-02', startTime: '09:00' },
+        ];
+        attachFuelSummary(logs, [
+            { vehicleId: 'v1', date: '2026-09-02', fuelType: 'gasoline', fuelAmount: 10, fuelCost: 15000 },
+        ]);
+
+        expect(logs[0].fuelSummary).toBe('15,000(10L)');
+        expect(logs[1].fuelSummary).toBeUndefined();
     });
 
     it('연료 유형별 단위를 표기한다 (electric→kWh, hydrogen→kg)', () => {

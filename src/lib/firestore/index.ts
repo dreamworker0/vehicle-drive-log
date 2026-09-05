@@ -92,6 +92,7 @@ export {
     getReservationsByGroupId,
     cancelReservationGroup,
     completeReservationGroupSiblings,
+    SKIPPED_OFFLINE,
     deleteReservationGroup,
     getReservationsByRecurringGroupId,
     cancelRecurringGroup,

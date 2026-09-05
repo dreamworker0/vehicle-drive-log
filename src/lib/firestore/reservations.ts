@@ -375,6 +375,9 @@ const batchGroupAction = async (
     }
 };
 
+/** 오프라인이라 그룹 닫기를 시도조차 못 했음을 뜻한다(0건 처리와 구분해야 안내를 띄울 수 있다). */
+export const SKIPPED_OFFLINE = -1;
+
 // 연속 예약 그룹 일괄 취소
 export const cancelReservationGroup = (groupId: string, orgId: string) =>
     batchGroupAction(getReservationsByGroupId, 'cancel', groupId, orgId, 'cancelReservationGroup');
@@ -395,8 +398,12 @@ export const cancelReservationGroup = (groupId: string, orgId: string) =>
 export const completeReservationGroupSiblings = async (reservationId: string, orgId: string): Promise<number> => {
     // 오프라인에서는 건너뛴다. getDoc·batch.commit()은 오프라인 큐를 타지 않아 **영영 resolve되지
     // 않고**, 호출부의 runWithRetry 타임아웃까지 저장 완료를 붙잡아 둔다(캐시가 memory면 즉시
-    // reject되어 "예약 상태 변경 실패" 경고까지 뜬다). 나머지 날짜는 다음 온라인 저장 때 닫힌다.
-    if (typeof navigator !== 'undefined' && !navigator.onLine) return 0;
+    // reject되어 "예약 상태 변경 실패" 경고까지 뜬다).
+    //
+    // **재시도는 없다.** 이 함수를 부르는 곳은 운행일지 신규 저장 한 군데뿐이고, 그 예약에
+    // 두 번째 저장은 일어나지 않는다. 그래서 조용히 넘기지 않고 -1을 돌려 호출부가 사용자에게
+    // 알리게 한다 — 남은 날짜는 [차량 예약]에서 직접 닫아야 한다.
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return SKIPPED_OFFLINE;
     try {
         const snap = await getDoc(reservationDoc(reservationId));
         const groupId = snap.exists() ? (snap.data() as Reservation).groupId : undefined;

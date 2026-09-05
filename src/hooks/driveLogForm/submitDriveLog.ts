@@ -2,7 +2,7 @@
  * submitDriveLog — 운행일지 제출/수정 비즈니스 로직
  * useDriveLogForm에서 추출
  */
-import { createDriveLog, updateDriveLog, updateReservationStatus, updateHipassCard, completeReservationGroupSiblings } from '../../lib/firestore';
+import { createDriveLog, updateDriveLog, updateReservationStatus, updateHipassCard, completeReservationGroupSiblings, SKIPPED_OFFLINE } from '../../lib/firestore';
 
 import { increment, deleteField } from 'firebase/firestore';
 import { buildLogData, nowTime, todayStr } from '../utils/driveLogValidation';
@@ -123,6 +123,10 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
         const result = await updateDriveLog(editLog.id, {
             ...logData,
             startDate: (logData.startDate ?? deleteField()) as unknown as string | undefined,
+            // 같은 이유로 소급 표시도 명시적으로 지운다. 소급으로 적었던 일지를 오늘 도착으로
+            // 고쳐도 문서에 isRetroactive가 남으면, 서버 트리거가 그 값을 보고 차량 km·세운
+            // 곳·주유 필요 갱신을 계속 건너뛴다 — 화면은 고쳐졌는데 차량 상태만 안 따라온다.
+            isRetroactive: (isRetroactive ? true : deleteField()) as unknown as boolean | undefined,
         });
         if (result.syncResult?.updated) syncResult = result.syncResult;
         if (result.backgroundError) {
@@ -168,6 +172,11 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
             if (orgId) {
                 const closed = await completeReservationGroupSiblings(resId, orgId);
                 if (closed > 0) console.info(`[submitDriveLog] 다일 예약 나머지 ${closed}일을 함께 완료 처리`);
+                // 오프라인이면 시도조차 못 했고 다시 시도할 기회도 없다(이 예약에 두 번째 저장은
+                // 없다). 조용히 넘기면 다일 예약의 남은 날짜가 계속 열려 있게 된다.
+                if (closed === SKIPPED_OFFLINE) {
+                    backgroundWarnings.push('연결이 끊겨 예약 정리를 못 했습니다 (여러 날에 걸친 예약이었다면 [차량 예약]에서 남은 날짜를 확인해 주세요)');
+                }
             }
         } catch (e) {
             console.warn('[submitDriveLog] 예약 상태 업데이트 실패:', e);

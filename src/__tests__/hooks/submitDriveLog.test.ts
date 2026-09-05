@@ -21,6 +21,7 @@ const mockUpdateHipassCard = vi.fn();
 const mockCompleteGroup = vi.fn();
 
 vi.mock('../../lib/firestore', () => ({
+    SKIPPED_OFFLINE: -1,
     createDriveLog: (...args: unknown[]) => mockCreateDriveLog(...args),
     updateDriveLog: (...args: unknown[]) => mockUpdateDriveLog(...args),
     updateReservationStatus: (...args: unknown[]) => mockUpdateReservationStatus(...args),
@@ -287,6 +288,39 @@ describe('submitDriveLog', () => {
 
         const payload = mockUpdateDriveLog.mock.calls[0][1];
         expect(payload.startDate).toBe('2026-03-05');
+    });
+
+    it('소급이 아니게 고친 수정은 소급 표시도 지우라고 명시한다', async () => {
+        // 문서에 isRetroactive가 남으면 서버 트리거가 그 값을 보고 차량 km·세운 곳 갱신을
+        // 계속 건너뛴다 — 화면은 고쳐졌는데 차량 상태만 안 따라온다.
+        await submitDriveLog(makeCtx({
+            isEditMode: true,
+            isRetroactive: false,
+            editLog: { id: 'log1', vehicleId: 'v1' } as never,
+        }));
+
+        const payload = mockUpdateDriveLog.mock.calls[0][1];
+        expect(payload.isRetroactive).toEqual({ __deleteField: true });
+    });
+
+    it('여전히 소급이면 표시를 그대로 싣는다', async () => {
+        await submitDriveLog(makeCtx({
+            isEditMode: true,
+            isRetroactive: true,
+            editLog: { id: 'log1', vehicleId: 'v1' } as never,
+        }));
+
+        expect(mockUpdateDriveLog.mock.calls[0][1].isRetroactive).toBe(true);
+    });
+
+    it('오프라인이라 예약 정리를 못 하면 조용히 넘기지 않고 알린다', async () => {
+        // 이 예약에 두 번째 저장은 없다. 조용히 넘기면 남은 날짜가 영영 열려 있게 된다.
+        mockCompleteGroup.mockResolvedValueOnce(-1);
+
+        const result = await submitDriveLog(makeCtx({ reservationData: { reservationId: 'r1' } }));
+
+        expect(result.success).toBe(true);
+        expect(result.backgroundWarning).toContain('예약');
     });
 
     it('예약 연계 제출은 다일 예약의 나머지 날짜도 함께 닫는다', async () => {

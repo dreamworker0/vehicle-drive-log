@@ -1,5 +1,5 @@
 import { openDB, DBSchema, IDBPDatabase } from 'idb';
-import { doc, setDoc, updateDoc, deleteDoc, serverTimestamp, FieldValue, Timestamp } from 'firebase/firestore';
+import { doc, setDoc, updateDoc, deleteDoc, serverTimestamp, deleteField, FieldValue, Timestamp } from 'firebase/firestore';
 import { db } from '../firebase';
 
 export interface SyncData {
@@ -72,6 +72,14 @@ export function getSyncDB() {
  * 저장 시 이 문자열로 치환하고 flush 시 serverTimestamp()로 복원한다.
  */
 export const SERVER_TIMESTAMP_MARKER = '__syncQueue.serverTimestamp__';
+/**
+ * 필드 삭제 센티널 마커.
+ *
+ * 예전에는 FieldValue를 전부 serverTimestamp로 뭉뚱그렸다 — 오프라인 쓰기 경로에 그것뿐이라는
+ * 전제였다. 운행일지 수정이 `deleteField()`로 출발일을 지우기 시작하면서 그 전제가 깨졌고,
+ * 그대로 두면 오프라인 수정이 재생될 때 **날짜 문자열 자리에 타임스탬프가 박힌다.**
+ */
+export const DELETE_FIELD_MARKER = '__syncQueue.deleteField__';
 
 // 영구 실패로 판정해 재시도 없이 폐기하는 Firestore 오류 코드.
 // (unavailable·deadline-exceeded 같은 네트워크성 오류는 재시도 대상)
@@ -105,8 +113,22 @@ export function retryCooldownMs(retryCount: number): number {
  * - Firestore Timestamp → Date (Timestamp도 클래스라 clone 시 프로토타입이 소실되지만,
  *   Date는 structuredClone을 그대로 통과하고 Firestore가 timestamp로 기록한다)
  */
+/**
+ * deleteField() 센티널인지 가른다.
+ *
+ * FieldValue 하위 클래스는 번들에서 이름이 뭉개지므로 생성자 이름으로 가를 수 없다. Firestore가
+ * 공개하는 `_methodName`('deleteField')을 보고, 그것마저 없으면 안전한 쪽(serverTimestamp)으로
+ * 떨어뜨린다 — 삭제를 타임스탬프로 잘못 쓰는 것보다 삭제가 안 되는 쪽이 덜 해롭다.
+ */
+function isDeleteFieldSentinel(value: FieldValue): boolean {
+    return (value as unknown as { _methodName?: string })._methodName === 'deleteField';
+}
+
 function toStorable(value: unknown): unknown {
-    if (value instanceof FieldValue) return SERVER_TIMESTAMP_MARKER;
+    // 센티널은 종류를 구분해서 저장한다. 한데 묶으면 삭제가 타임스탬프로 되살아난다.
+    if (value instanceof FieldValue) {
+        return isDeleteFieldSentinel(value) ? DELETE_FIELD_MARKER : SERVER_TIMESTAMP_MARKER;
+    }
     if (value instanceof Timestamp) return value.toDate();
     if (Array.isArray(value)) return value.map(toStorable);
     if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
@@ -118,6 +140,7 @@ function toStorable(value: unknown): unknown {
 // 저장 시 치환한 마커를 flush 직전에 실제 센티널로 복원한다.
 function fromStorable(value: unknown): unknown {
     if (value === SERVER_TIMESTAMP_MARKER) return serverTimestamp();
+    if (value === DELETE_FIELD_MARKER) return deleteField();
     if (Array.isArray(value)) return value.map(fromStorable);
     if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
         return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, fromStorable(v)]));

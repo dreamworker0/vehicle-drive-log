@@ -17,14 +17,15 @@ vi.mock('firebase/firestore', () => {
         updateDoc: vi.fn(() => Promise.resolve()),
         deleteDoc: vi.fn(() => Promise.resolve()),
         serverTimestamp: vi.fn(() => new FieldValue('serverTimestamp')),
+        deleteField: vi.fn(() => new FieldValue('deleteField')),
         FieldValue,
         Timestamp,
     };
 });
 vi.mock('@/lib/firebase', () => ({ db: {} }));
 
-import { enqueue, clearQueue, flushQueue, getSyncDB, drainFailedRecords, getPendingCount, retryCooldownMs, SERVER_TIMESTAMP_MARKER } from '@/lib/offline/syncQueue';
-import { setDoc, updateDoc, deleteDoc, serverTimestamp, FieldValue, Timestamp } from 'firebase/firestore';
+import { enqueue, clearQueue, flushQueue, getSyncDB, drainFailedRecords, getPendingCount, retryCooldownMs, SERVER_TIMESTAMP_MARKER, DELETE_FIELD_MARKER } from '@/lib/offline/syncQueue';
+import { setDoc, updateDoc, deleteDoc, serverTimestamp, deleteField, FieldValue, Timestamp } from 'firebase/firestore';
 
 async function allDocIds(): Promise<string[]> {
     const database = await getSyncDB();
@@ -123,6 +124,29 @@ describe('offline syncQueue', () => {
         expect(payload.createdAt).toBeInstanceOf(FieldValue);
         expect((payload.nested as Record<string, unknown>).editedAt).toBeInstanceOf(FieldValue);
         expect(payload.distance).toBe(5);
+    });
+
+    it('deleteField 센티널은 serverTimestamp로 뒤바뀌지 않는다', async () => {
+        // 예전에는 FieldValue를 전부 serverTimestamp 마커로 뭉뚱그렸다. 운행일지 수정이
+        // deleteField()로 출발일을 지우기 시작하면서, 오프라인 수정이 재생될 때
+        // **날짜 문자열 자리에 타임스탬프가 박혔다.**
+        await enqueue('UPDATE', 'driveLogs', 'del1', {
+            notes: '수정',
+            startDate: deleteField(),
+            createdAt: serverTimestamp(),
+        });
+
+        const database = await getSyncDB();
+        const [stored] = await database.getAll('sync-store');
+        expect(stored.data?.startDate).toBe(DELETE_FIELD_MARKER);
+        expect(stored.data?.createdAt).toBe(SERVER_TIMESTAMP_MARKER);
+        expect(DELETE_FIELD_MARKER).not.toBe(SERVER_TIMESTAMP_MARKER);
+
+        await flushQueue();
+
+        const payload = vi.mocked(updateDoc).mock.calls[0][1] as unknown as Record<string, unknown>;
+        expect((payload.startDate as { _methodName: string })._methodName).toBe('deleteField');
+        expect((payload.createdAt as { _methodName: string })._methodName).toBe('serverTimestamp');
     });
 
     it('Firestore Timestamp는 저장 시 Date로 변환된다', async () => {
