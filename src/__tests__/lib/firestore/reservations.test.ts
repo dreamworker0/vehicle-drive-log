@@ -63,7 +63,7 @@ import {
     getReservations, getPendingReservations, cancelReservation, updateReservation,
     updateReservationStatus, rejectReservation,
     getTodayReservations, getWeekReservations, getMyRecentReservations,
-    getReservationsByGroupId, cancelReservationGroup, deleteReservationGroup, completeReservationGroupSiblings, SKIPPED_OFFLINE,
+    getReservationsByGroupId, cancelReservationGroup, deleteReservationGroup, completeReservationGroupSiblings,
     cancelRecurringGroup, detachFromRecurringGroup,
     createReservationSafe,
 } from '../../../lib/firestore/reservations';
@@ -371,7 +371,7 @@ describe('firestore/reservations', () => {
                 { id: 'day2', status: 'reserved', date: '2026-09-02' },
             ]) as never);
 
-            const count = await completeReservationGroupSiblings('day1', 'org1');
+            const result = await completeReservationGroupSiblings('day1', 'org1');
 
             expect(update).toHaveBeenCalledTimes(1); // day1은 exceptId로 빠진다
             expect(update).toHaveBeenCalledWith(expect.anything(), {
@@ -379,7 +379,7 @@ describe('firestore/reservations', () => {
                 driveLogReminderSent: true,
             });
             expect(commit).toHaveBeenCalled();
-            expect(count).toBe(1);
+            expect(result).toEqual({ closed: 1, cancelled: 0, skippedOffline: false });
         });
 
         it('도착일보다 뒤인 날짜는 완료가 아니라 취소로 닫는다 — 조기 반납', async () => {
@@ -395,14 +395,15 @@ describe('firestore/reservations', () => {
                 { id: 'day3', status: 'reserved', date: '2026-09-03' },
             ]) as never);
 
-            const count = await completeReservationGroupSiblings('day1', 'org1', '2026-09-01');
+            const result = await completeReservationGroupSiblings('day1', 'org1', '2026-09-01');
 
             expect(update).toHaveBeenCalledTimes(2);
             // 두 건 모두 취소 — 완료 표시가 하나도 섞이지 않아야 한다
             expect(update).toHaveBeenNthCalledWith(1, expect.anything(), { status: 'cancelled' });
             expect(update).toHaveBeenNthCalledWith(2, expect.anything(), { status: 'cancelled' });
             expect(commit).toHaveBeenCalled();
-            expect(count).toBe(2);
+            // 완료는 0건 — 사용자에게 "타지 않은 2일을 취소했다"고 말할 수 있어야 한다
+            expect(result).toEqual({ closed: 0, cancelled: 2, skippedOffline: false });
         });
 
         it('도착일까지의 날짜는 그대로 완료로 닫는다 — 정상 1박2일', async () => {
@@ -446,24 +447,24 @@ describe('firestore/reservations', () => {
             const { commit } = batchMock();
             vi.mocked(fs.getDoc).mockResolvedValue({ exists: () => true, data: () => ({}) } as never);
 
-            const count = await completeReservationGroupSiblings('r1', 'org1');
+            const result = await completeReservationGroupSiblings('r1', 'org1');
 
-            expect(count).toBe(0);
+            expect(result).toEqual({ closed: 0, cancelled: 0, skippedOffline: false });
             expect(fs.getDocs).not.toHaveBeenCalled();
             expect(commit).not.toHaveBeenCalled();
         });
 
         it('오프라인 다일 예약은 쓰지 않고 알린다 — batch.commit()은 오프라인 큐를 타지 않는다', async () => {
             // 오프라인에서 부르면 commit이 영영 resolve되지 않아 저장 완료가 타임아웃까지 붙잡힌다.
-            // 0(닫을 게 없었다)이 아니라 SKIPPED_OFFLINE이어야 한다 — 이 예약에 두 번째
+            // 0건 처리와 구분되는 skippedOffline이어야 한다 — 이 예약에 두 번째
             // 저장은 없으므로 호출부가 사용자에게 알려야 한다.
             setOnline(false);
             const { commit } = batchMock();
             vi.mocked(fs.getDoc).mockResolvedValue({ exists: () => true, data: () => ({ groupId: 'g1' }) } as never);
 
-            const count = await completeReservationGroupSiblings('day1', 'org1');
+            const result = await completeReservationGroupSiblings('day1', 'org1');
 
-            expect(count).toBe(SKIPPED_OFFLINE);
+            expect(result).toEqual({ closed: 0, cancelled: 0, skippedOffline: true });
             expect(commit).not.toHaveBeenCalled();
         });
 
@@ -473,7 +474,7 @@ describe('firestore/reservations', () => {
             const { commit } = batchMock();
             vi.mocked(fs.getDoc).mockResolvedValue({ exists: () => true, data: () => ({}) } as never);
 
-            expect(await completeReservationGroupSiblings('r1', 'org1')).toBe(0);
+            expect(await completeReservationGroupSiblings('r1', 'org1')).toEqual({ closed: 0, cancelled: 0, skippedOffline: false });
             expect(commit).not.toHaveBeenCalled();
         });
 
@@ -483,7 +484,7 @@ describe('firestore/reservations', () => {
             batchMock();
             vi.mocked(fs.getDoc).mockRejectedValue(new Error('unavailable') as never);
 
-            expect(await completeReservationGroupSiblings('r1', 'org1')).toBe(0);
+            expect(await completeReservationGroupSiblings('r1', 'org1')).toEqual({ closed: 0, cancelled: 0, skippedOffline: false });
         });
     });
 

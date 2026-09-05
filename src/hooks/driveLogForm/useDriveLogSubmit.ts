@@ -289,6 +289,12 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
                 if (result.backgroundWarning) {
                     showToast(result.backgroundWarning, 'warning');
                 }
+                // 사용자가 요청하지 않은 변경이라 반드시 알린다. 조기 반납으로 남은 날이
+                // 취소되는데 조용히 넘어가면, 운행 종료를 잘못 누른 사람은 예약이 사라진
+                // 것을 모른 채 다음 날 차를 찾으러 간다.
+                if (result.cancelledReservationDays) {
+                    showToast(`타지 않은 나머지 ${result.cancelledReservationDays}일 예약을 함께 취소했습니다.`, 'info');
+                }
 
                 if (result.offline) {
                     setSuccess(true);

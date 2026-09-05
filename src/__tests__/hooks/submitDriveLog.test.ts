@@ -21,7 +21,7 @@ const mockUpdateHipassCard = vi.fn();
 const mockCompleteGroup = vi.fn();
 
 vi.mock('../../lib/firestore', () => ({
-    SKIPPED_OFFLINE: -1,
+
     createDriveLog: (...args: unknown[]) => mockCreateDriveLog(...args),
     updateDriveLog: (...args: unknown[]) => mockUpdateDriveLog(...args),
     updateReservationStatus: (...args: unknown[]) => mockUpdateReservationStatus(...args),
@@ -92,7 +92,7 @@ describe('submitDriveLog', () => {
         mockUpdateDriveLog.mockResolvedValue({});
         mockUpdateReservationStatus.mockResolvedValue(undefined);
         mockUpdateHipassCard.mockResolvedValue(undefined);
-        mockCompleteGroup.mockResolvedValue(0);
+        mockCompleteGroup.mockResolvedValue({ closed: 0, cancelled: 0, skippedOffline: false });
         // 기본은 온라인 상태
         Object.defineProperty(navigator, 'onLine', { configurable: true, value: true });
     });
@@ -315,7 +315,7 @@ describe('submitDriveLog', () => {
 
     it('오프라인이라 예약 정리를 못 하면 조용히 넘기지 않고 알린다', async () => {
         // 이 예약에 두 번째 저장은 없다. 조용히 넘기면 남은 날짜가 영영 열려 있게 된다.
-        mockCompleteGroup.mockResolvedValueOnce(-1);
+        mockCompleteGroup.mockResolvedValueOnce({ closed: 0, cancelled: 0, skippedOffline: true });
 
         const result = await submitDriveLog(makeCtx({ reservationData: { reservationId: 'r1' } }));
 
@@ -326,7 +326,7 @@ describe('submitDriveLog', () => {
     it('예약 연계 제출은 다일 예약의 나머지 날짜도 함께 닫는다', async () => {
         // 1박2일 예약은 문서 두 건이다. 운행은 한 번인데 한 건만 닫으면 남은 날짜가
         // 미완료로 떠 운행일지 미작성 알림이 계속 울린다.
-        mockCompleteGroup.mockResolvedValueOnce(1);
+        mockCompleteGroup.mockResolvedValueOnce({ closed: 1, cancelled: 0, skippedOffline: false });
 
         const result = await submitDriveLog(makeCtx({ reservationData: { reservationId: 'r1' } }));
 
@@ -341,7 +341,7 @@ describe('submitDriveLog', () => {
         // "타지 않은 날"이 되어 취소된다 — 3/5 출발 → 3/6 도착인데 3/5를 넘기면 3/6 예약이 날아간다.
         // 지금은 예약 흐름에 날짜 칸이 뜨지 않아 두 값이 우연히 같지만, 그 화면 조건에
         // 기대는 것이 위험해서 식 자체를 고정한다.
-        mockCompleteGroup.mockResolvedValueOnce(1);
+        mockCompleteGroup.mockResolvedValueOnce({ closed: 1, cancelled: 0, skippedOffline: false });
 
         await submitDriveLog(makeCtx({
             form: { ...baseForm, driveDate: '2026-03-05', endDate: '2026-03-06', startTime: '17:00', endTime: '10:00' },
@@ -349,6 +349,24 @@ describe('submitDriveLog', () => {
         }));
 
         expect(mockCompleteGroup).toHaveBeenCalledWith('r1', 'org1', '2026-03-06');
+    });
+
+    it('조기 반납으로 취소된 날 수를 호출부에 알린다', async () => {
+        // 사용자가 요청하지 않은 변경이다. 조용히 하면 운행 종료를 잘못 누른 사람이
+        // 자기 예약이 사라진 것을 모른 채 다음 날 차를 찾으러 간다.
+        mockCompleteGroup.mockResolvedValueOnce({ closed: 0, cancelled: 2, skippedOffline: false });
+
+        const result = await submitDriveLog(makeCtx({ reservationData: { reservationId: 'r1' } }));
+
+        expect(result.cancelledReservationDays).toBe(2);
+    });
+
+    it('취소된 날이 없으면 0이라 호출부가 알리지 않는다', async () => {
+        mockCompleteGroup.mockResolvedValueOnce({ closed: 1, cancelled: 0, skippedOffline: false });
+
+        const result = await submitDriveLog(makeCtx({ reservationData: { reservationId: 'r1' } }));
+
+        expect(result.cancelledReservationDays).toBe(0);
     });
 
     it('그룹 닫기가 실패해도 본 저장은 성공시키되 경고를 남긴다', async () => {

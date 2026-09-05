@@ -2,7 +2,7 @@
  * submitDriveLog — 운행일지 제출/수정 비즈니스 로직
  * useDriveLogForm에서 추출
  */
-import { createDriveLog, updateDriveLog, updateReservationStatus, updateHipassCard, completeReservationGroupSiblings, SKIPPED_OFFLINE } from '../../lib/firestore';
+import { createDriveLog, updateDriveLog, updateReservationStatus, updateHipassCard, completeReservationGroupSiblings } from '../../lib/firestore';
 
 import { increment, deleteField } from 'firebase/firestore';
 import { buildLogData, nowTime, todayStr } from '../utils/driveLogValidation';
@@ -54,6 +54,8 @@ interface SubmitResult {
     shouldResetForm?: boolean;
     /** km 동기화 실패 경고 */
     backgroundWarning?: string;
+    /** 조기 반납으로 함께 취소된 다일 예약 날짜 수 (0이면 알리지 않는다) */
+    cancelledReservationDays?: number;
 }
 
 /**
@@ -154,6 +156,9 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
         }
     }
 
+    /** 조기 반납으로 함께 취소된 다일 예약 날짜 수 — 아래 모든 반환 경로에 실어 보낸다 */
+    let cancelledReservationDays = 0;
+
     // 예약 상태 업데이트: 일지 저장 후 예약을 completed로 전환
     if (!isEditMode && reservationData?.reservationId) {
         const resId = reservationData.reservationId;
@@ -180,11 +185,16 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
             // 같은 식을 쓴다.
             if (orgId) {
                 const arrivalDate = form.endDate || form.driveDate;
-                const closed = await completeReservationGroupSiblings(resId, orgId, arrivalDate);
-                if (closed > 0) console.info(`[submitDriveLog] 다일 예약 나머지 ${closed}일을 함께 완료 처리`);
+                const group = await completeReservationGroupSiblings(resId, orgId, arrivalDate);
+                if (group.closed > 0 || group.cancelled > 0) {
+                    console.info(`[submitDriveLog] 다일 예약 정리 — 완료 ${group.closed}일 · 취소 ${group.cancelled}일`);
+                }
+                // 취소는 사용자가 요청하지 않은 변경이다. 조용히 하면 운행 종료를 잘못 누른
+                // 사람은 자기 예약이 사라진 것을 모른 채 다음 날 차를 찾으러 간다.
+                cancelledReservationDays = group.cancelled;
                 // 오프라인이면 시도조차 못 했고 다시 시도할 기회도 없다(이 예약에 두 번째 저장은
                 // 없다). 조용히 넘기면 다일 예약의 남은 날짜가 계속 열려 있게 된다.
-                if (closed === SKIPPED_OFFLINE) {
+                if (group.skippedOffline) {
                     backgroundWarnings.push('연결이 끊겨 예약 정리를 못 했습니다 (여러 날에 걸친 예약이었다면 [차량 예약]에서 남은 날짜를 확인해 주세요)');
                 }
             }
@@ -227,6 +237,7 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
             offline: isOffline,
             syncResult,
             backgroundWarning: finalBackgroundWarning,
+        cancelledReservationDays,
         };
     }
 
@@ -239,6 +250,7 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
             syncResult,
             correctedKm,
             backgroundWarning: finalBackgroundWarning,
+        cancelledReservationDays,
         };
     }
 
@@ -250,6 +262,7 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
         syncResult,
         correctedKm,
         backgroundWarning: finalBackgroundWarning,
+        cancelledReservationDays,
     };
 }
 

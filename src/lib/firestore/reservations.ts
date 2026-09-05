@@ -338,6 +338,14 @@ export const getReservationsByGroupId = async (groupId: string, orgId: string) =
  * 그룹 내 활성 예약을 조회하여 일괄 batch 액션(update/delete)을 실행하는 공용 헬퍼
  * @param exceptId 이 예약은 건드리지 않는다 (반복 → 단건 전환에서 남길 회차)
  */
+/** 그룹 배치 결과 — `cancelled`는 complete 액션에서 **타지 않아 취소한** 날 수다. */
+interface GroupActionResult {
+    /** 실제로 쓴 문서 수 */
+    total: number;
+    /** 그중 취소로 닫은 수 */
+    cancelled: number;
+}
+
 const batchGroupAction = async (
     fetchFn: (id: string, orgId: string) => Promise<Reservation[]>,
     action: 'cancel' | 'delete' | 'complete',
@@ -347,13 +355,14 @@ const batchGroupAction = async (
     exceptId?: string,
     /** complete 전용 — 운행일지의 **도착일**. 이보다 뒤인 날짜는 타지 않은 날이다. */
     arrivalDate?: string,
-) => {
+): Promise<GroupActionResult> => {
     try {
         const reservations = await fetchFn(id, orgId);
         const active = reservations.filter(r =>
             r.status !== 'cancelled' && r.status !== 'completed' && r.id !== exceptId
         );
         const batch = writeBatch(db);
+        let cancelled = 0;
         active.forEach(r => {
             if (action === 'cancel') {
                 batch.update(reservationDoc(r.id), { status: 'cancelled' });
@@ -372,6 +381,7 @@ const batchGroupAction = async (
                 // cancelled로 보내면 겹침 검사가 곧바로 제외하므로 차량이 즉시 풀린다.
                 if (arrivalDate && r.date > arrivalDate) {
                     batch.update(reservationDoc(r.id), { status: 'cancelled' });
+                    cancelled++;
                     return;
                 }
                 // driveLogReminderSent를 함께 심는다 — 이게 없으면 알림을 없애는 게 아니라 **만든다.**
@@ -387,19 +397,32 @@ const batchGroupAction = async (
             }
         });
         await batch.commit();
-        return active.length;
+        return { total: active.length, cancelled };
     } catch (error) {
         captureError(error, { context, id, orgId });
         throw error;
     }
 };
 
-/** 오프라인이라 그룹 닫기를 시도조차 못 했음을 뜻한다(0건 처리와 구분해야 안내를 띄울 수 있다). */
-export const SKIPPED_OFFLINE = -1;
+/**
+ * 다일 그룹 닫기 결과.
+ *
+ * 예전에는 건수 하나에 `SKIPPED_OFFLINE = -1` 센티널을 섞어 돌려줬다. 이제 취소한 날 수까지
+ * 알려야 해서(사용자에게 "타지 않은 N일을 취소했다"고 말해야 한다) 숫자 하나로는 부족하고,
+ * 음수 센티널은 호출부가 `> 0`으로 거르면 조용히 사라지는 종류의 값이라 필드로 갈랐다.
+ */
+export interface GroupCloseResult {
+    /** 완료로 닫은 날 수 (실제로 탄 날) */
+    closed: number;
+    /** 타지 않아 취소한 날 수 (조기 반납) */
+    cancelled: number;
+    /** 오프라인이라 시도조차 못 했다 — 0건 처리와 구분해야 안내를 띄울 수 있다 */
+    skippedOffline: boolean;
+}
 
 // 연속 예약 그룹 일괄 취소
-export const cancelReservationGroup = (groupId: string, orgId: string) =>
-    batchGroupAction(getReservationsByGroupId, 'cancel', groupId, orgId, 'cancelReservationGroup');
+export const cancelReservationGroup = async (groupId: string, orgId: string) =>
+    (await batchGroupAction(getReservationsByGroupId, 'cancel', groupId, orgId, 'cancelReservationGroup')).total;
 
 /**
  * 예약 하나를 완료 처리한 뒤, 같은 **다일 그룹의 나머지 날짜**도 함께 닫는다.
@@ -416,13 +439,12 @@ export const cancelReservationGroup = (groupId: string, orgId: string) =>
  * 않았고, 완료로 닫으면 화면에서만 사라진 채 차량 점유가 풀리지 않는다(batchGroupAction 주석).
  *
  * @param arrivalDate 운행일지의 도착일(YYYY-MM-DD). 생략하면 예전처럼 전부 완료 처리한다.
- * @returns 함께 닫은 **나머지** 날짜 수 (다일이 아니면 0, 오프라인이라 못 했으면 SKIPPED_OFFLINE)
  */
 export const completeReservationGroupSiblings = async (
     reservationId: string,
     orgId: string,
     arrivalDate?: string,
-): Promise<number> => {
+): Promise<GroupCloseResult> => {
     // 오프라인에서 붙잡히는 것은 batch.commit()뿐이다 — 서버 확인을 기다리므로 **영영 resolve되지
     // 않고**, 호출부의 runWithRetry 타임아웃까지 저장 완료를 붙잡아 둔다. getDoc은 캐시로
     // 떨어지거나 즉시 거절되지 매달리지 않으므로, 다일 예약인지까지는 알아보고 판단한다.
@@ -430,29 +452,30 @@ export const completeReservationGroupSiblings = async (
     try {
         const snap = await getDoc(reservationDoc(reservationId));
         const groupId = snap.exists() ? (snap.data() as Reservation).groupId : undefined;
-        if (!groupId) return 0;
+        if (!groupId) return { closed: 0, cancelled: 0, skippedOffline: false };
         // **재시도는 없다.** 이 함수를 부르는 곳은 운행일지 신규 저장 한 군데뿐이고, 그 예약에
         // 두 번째 저장은 일어나지 않는다. 다일인 것이 확인됐을 때만 알린다 — 단건 예약까지
         // 경고하면 "자동 반영됩니다" 안내와 나란히 떠 서로 말이 어긋난다.
-        if (isOffline) return SKIPPED_OFFLINE;
+        if (isOffline) return { closed: 0, cancelled: 0, skippedOffline: true };
         // 방금 완료한 건은 제외한다 — 이미 completed라 어차피 active 필터에 걸리지 않지만,
         // 반영 지연으로 남아 있어도 두 번 쓰지 않도록 명시한다.
-        return await batchGroupAction(
+        const { total, cancelled } = await batchGroupAction(
             getReservationsByGroupId, 'complete', groupId, orgId, 'completeReservationGroupSiblings', reservationId,
             arrivalDate,
         );
+        return { closed: total - cancelled, cancelled, skippedOffline: false };
     } catch (error) {
         // 오프라인이면 캐시에 예약이 없었을 뿐이다. 다일인지 알 수 없으니 조용히 넘긴다 —
         // 알 수 없는 것을 경고로 바꾸면 단건 예약 저장마다 헛경고가 뜬다.
-        if (isOffline) return 0;
+        if (isOffline) return { closed: 0, cancelled: 0, skippedOffline: false };
         captureError(error, { context: 'completeReservationGroupSiblings', reservationId, orgId });
         throw error;
     }
 };
 
 // 연속 예약 그룹 삭제 (수정 전 기존 그룹 제거용)
-export const deleteReservationGroup = (groupId: string, orgId: string) =>
-    batchGroupAction(getReservationsByGroupId, 'delete', groupId, orgId, 'deleteReservationGroup');
+export const deleteReservationGroup = async (groupId: string, orgId: string) =>
+    (await batchGroupAction(getReservationsByGroupId, 'delete', groupId, orgId, 'deleteReservationGroup')).total;
 
 // 내 최근 예약 조회 (취소 제외, 최신 순 정렬하여 반환)
 // 복합 인덱스: organizationId + reservedByUid + date (firestore.indexes.json)
@@ -506,9 +529,10 @@ export const getReservationsByRecurringGroupId = async (recurringGroupId: string
  * @param exceptId 남길 회차 (반복 → 단건 전환에서 단건으로 살아남는 예약)
  */
 export const cancelRecurringGroup = (recurringGroupId: string, orgId: string, exceptId?: string) =>
-    batchGroupAction(getReservationsByRecurringGroupId, 'cancel', recurringGroupId, orgId, 'cancelRecurringGroup', exceptId);
+    batchGroupAction(getReservationsByRecurringGroupId, 'cancel', recurringGroupId, orgId, 'cancelRecurringGroup', exceptId)
+        .then(r => r.total);
 
 // 반복 예약 그룹 삭제 (수정 전 기존 그룹 제거용)
-export const deleteRecurringGroup = (recurringGroupId: string, orgId: string) =>
-    batchGroupAction(getReservationsByRecurringGroupId, 'delete', recurringGroupId, orgId, 'deleteRecurringGroup');
+export const deleteRecurringGroup = async (recurringGroupId: string, orgId: string) =>
+    (await batchGroupAction(getReservationsByRecurringGroupId, 'delete', recurringGroupId, orgId, 'deleteRecurringGroup')).total;
 
