@@ -1,4 +1,5 @@
 import { isFirestoreTerminated } from './firestoreLifecycle';
+import { scrubContext } from './sentryScrub';
 
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
 
@@ -306,7 +307,11 @@ export function setSentryUser(userInfo: SentryUserInfo) {
 export function captureError(error: unknown, context: Record<string, unknown> = {}) {
     // initSentry가 호출된 적 없으면(비로그인 경량 경로) 기존과 동일하게 콘솔 출력만 수행
     if (SENTRY_DSN && sentryLoading) {
-        sentryLoading.then((Sentry) => Sentry?.captureException(error, { extra: context }));
+        // 도메인 함수들이 저장하려던 문서를 통째로 넘기므로(`{ context, data }`) 목적지·
+        // 동승자 이름·비고 같은 자유 입력이 그대로 실린다. 보내기 직전 여기서 거른다.
+        // 콘솔은 개발자 기기에만 남으므로 원본 그대로 둔다 — 진단이 어려워지면 안 된다.
+        const safeContext = scrubContext(context);
+        sentryLoading.then((Sentry) => Sentry?.captureException(error, { extra: safeContext }));
     }
     console.error(error);
 }
@@ -321,7 +326,8 @@ export function captureError(error: unknown, context: Record<string, unknown> = 
  */
 export function captureWarning(message: string, context: Record<string, unknown> = {}) {
     if (SENTRY_DSN && sentryLoading) {
-        sentryLoading.then((Sentry) => Sentry?.captureMessage(message, { level: 'warning', extra: context }));
+        const safeContext = scrubContext(context);
+        sentryLoading.then((Sentry) => Sentry?.captureMessage(message, { level: 'warning', extra: safeContext }));
     }
     console.warn(message, context);
 }
