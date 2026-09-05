@@ -38,6 +38,12 @@ import { checkReservationReminders } from "../services/alimtalk/reservationRemin
 describe('checkReservationReminders', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        // clearAllMocks는 호출 기록만 지운다 — `mockResolvedValueOnce`로 쌓아 둔 구현 큐는 남는다.
+        // 앞 테스트가 다 소비하지 못한 응답이 다음 테스트로 새면 get 시퀀스가 한 칸씩 밀리고,
+        // 그러면 이 파일의 테스트들이 **엉뚱한 쿼리 결과를 검증하면서 조용히 초록**이 된다.
+        // (실제로 그랬다 — 프로덕션 코드를 되돌려도 통과하는 테스트가 섞여 있었다.)
+        // mockWhere는 mockReturnThis 구현이 날아가므로 리셋하지 않는다.
+        mockGet.mockReset();
         // jest.spyOn(console, 'log').mockImplementation();
         // jest.spyOn(console, 'error').mockImplementation();
         // 2026-03-04 10:00 KST (= 01:00 UTC)

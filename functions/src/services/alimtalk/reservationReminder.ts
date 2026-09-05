@@ -5,6 +5,9 @@ import { toKSTDate, getKSTDateString } from "../../utils/kstDate";
 
 const db = getFirestore();
 
+/** Firestore `in` 절의 값 상한 — §2(운행일지 조회)와 §3(다일 형제 조회)이 함께 쓴다 */
+const IN_CHUNK = 30;
+
 /**
  * 예약 시작 10분 전 알림 + 운행일지 미작성 알림 전송
  * Cloud Functions Scheduler에서 15분마다 호출 (비용 최적화 적용됨)
@@ -30,7 +33,8 @@ export async function checkReservationReminders(): Promise<void> {
         // === 1. 예약 시작 10분 전 알림 ===
         // 다일 예약의 둘째 날 이후(startTime "00:00")는 여기 걸리지 않는다 — 하한이
         // `startTime >= currentTime`이고 이 스케줄러의 첫 실행이 08:00(KST)이라 항상 "00:00"보다 늦다.
-        // (§3의 미출발 알림은 하한이 없어 걸렸다. 스케줄을 새벽까지 넓히면 여기도 같이 봐야 한다.)
+        // (§3의 미출발 알림은 하한이 없어 걸렸다.) 이건 코드가 아니라 **cron에 기댄 전제**라
+        // 스케줄을 새벽까지 넓히면 그날 깨진다 — schedulerCpuOptions.test.ts가 cron을 고정한다.
         const reservationsSnap = await db.collection("reservations")
             .where("date", "==", todayStr)
             .where("status", "==", "reserved")
@@ -100,7 +104,6 @@ export async function checkReservationReminders(): Promise<void> {
         // 묶으면 청크당 1회 왕복 + 실제로 존재하는 일지 수만큼만 읽는다.
         // 이 스케줄러는 평일 08~18시 매시(하루 11회) 돌아 예약 건수에 비례해 누적된다.
         const loggedReservationIds = new Set<string>();
-        const IN_CHUNK = 30; // Firestore `in` 절의 값 상한
         for (let i = 0; i < missedCandidates.length; i += IN_CHUNK) {
             const ids = missedCandidates.slice(i, i + IN_CHUNK).map((doc) => doc.id);
             const logsSnap = await db.collection("driveLogs")
@@ -165,6 +168,15 @@ export async function checkReservationReminders(): Promise<void> {
         // 건너뛴다. 그룹 조회는 후보마다 따로 던지지 않는다 — Firestore는 결과가 없는 쿼리에도
         // 읽기 1건을 최소 과금하므로(§2와 같은 이유), groupId를 모아 `in` 절로 묶어
         // 청크당 1회만 왕복한다. 이 스케줄러는 평일 08~18시 매시(하루 11회) 돈다.
+        //
+        // completed도 근거로 본다. 대신 **조기 반납을 포기한다** — 3일 예약을 첫날 저녁에
+        // 반납하고 일지를 쓰면 남은 이틀은 reserved로 남는데, 그 이틀에는 이제 "탭하여 예약을
+        // 취소하거나 유지하세요" 넛지가 가지 않아 차량이 계속 잠긴다. 그래도 이쪽을 택한 것은,
+        // #323이 일지 저장 시 그룹 전체를 닫아 남은 예약 정리를 이 알림에 기대지 않게 만들었고,
+        // completed를 빼면 **마지막 날 아침에 일지를 쓴 경우** 그 날 문서에 헛알림이 되살아나기
+        // 때문이다. 억제된 후보에는 noShowReminderSent를 붙이지 않으므로(진짜 미출발로 바뀌면
+        // 다시 알려야 한다) 이 그룹 조회는 여행 기간 내내 매 실행마다 다시 나간다 —
+        // 그룹당 문서 몇 건 규모라 감당 가능한 값으로 봤다.
         const groupIds = [...new Set(
             noShowCandidates
                 .map((doc) => doc.data().groupId)
