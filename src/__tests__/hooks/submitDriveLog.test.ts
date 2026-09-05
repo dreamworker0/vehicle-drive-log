@@ -227,6 +227,18 @@ describe('submitDriveLog', () => {
         expect(payload.needsRefuel).toBeUndefined();
     });
 
+    it('지난 날짜 일지에는 주유 필요를 남기지 않는다', async () => {
+        // 토글을 켠 뒤 날짜를 과거로 바꾸면 UI는 사라지지만 폼 값은 true로 남는다.
+        // 차량 상태는 서버 가드가 막지만, 그대로 저장하면 기록 자체가 사실과 달라진다.
+        await submitDriveLog(makeCtx({
+            isRetroactive: true,
+            form: { ...baseForm, needsRefuel: true },
+        }));
+
+        const payload = mockCreateDriveLog.mock.calls[0][0];
+        expect(payload.needsRefuel).toBeUndefined();
+    });
+
     it('예약 상태 전환이 실패해도 본 저장은 성공시키되 backgroundWarning을 전파한다', async () => {
         mockUpdateReservationStatus.mockRejectedValueOnce(new Error('network'));
 

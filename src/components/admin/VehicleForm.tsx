@@ -98,7 +98,9 @@ export default function VehicleForm({
     const refuelWord = form.fuelType === 'electric' || form.fuelType === 'hydrogen' ? '충전' : '주유';
     // 언제 켜진 표시인지 알려 준다 — 관리자가 "지금도 유효한가"를 판단할 유일한 단서다.
     const refuelMarkedAt = (() => {
-        if (!form.needsRefuel) return null;
+        // 저장 전에 스위치를 만졌다면 옛 시각을 보여 주지 않는다 — 해제한 날짜가
+        // "표시됨"으로 붙어 켠 날을 잘못 알려 준다.
+        if (!form.needsRefuel || form.needsRefuel !== (editingVehicle?.needsRefuel === true)) return null;
         const raw = editingVehicle?.needsRefuelAt as { toDate?: () => Date } | Date | undefined;
         const at = raw instanceof Date ? raw : raw?.toDate?.();
         return at instanceof Date ? `${at.getMonth() + 1}/${at.getDate()}` : null;
