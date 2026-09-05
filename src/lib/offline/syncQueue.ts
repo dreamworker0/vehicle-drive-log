@@ -108,27 +108,33 @@ export function retryCooldownMs(retryCount: number): number {
 }
 
 /**
+ * FieldValue 센티널을 종류별 마커로 가른다.
+ *
+ * 한동안 이 자리는 "오프라인 쓰기 경로의 FieldValue는 serverTimestamp뿐"이라는 전제 위에서
+ * 전부 하나로 뭉뚱그렸다. 운행일지 수정이 `deleteField()`를 쓰기 시작하면서 그 전제가 깨졌고,
+ * 재생될 때 **날짜 문자열 자리에 타임스탬프가 박혔다.** 그래서 아는 것만 통과시키는 화이트리스트로
+ * 둔다 — `increment()`·`arrayUnion()`이 나중에 이 경로에 들어와도 같은 사고가 조용히 되풀이되지
+ * 않고 여기서 걸린다.
+ *
+ * 판별은 Firestore가 공개하는 `_methodName`으로 한다(실물 번들에서 이름이 유지되는 것을 확인했다).
+ */
+function sentinelMarker(value: FieldValue): string {
+    const method = (value as unknown as { _methodName?: string })._methodName;
+    if (method === 'deleteField') return DELETE_FIELD_MARKER;
+    if (method === 'serverTimestamp') return SERVER_TIMESTAMP_MARKER;
+    // 모르는 센티널을 아무 쪽으로나 떨어뜨리면 그 필드에 엉뚱한 값이 **덮인다.**
+    // 조용한 오염보다 시끄러운 실패가 낫다.
+    throw new Error(`[syncQueue] 오프라인 큐가 다루지 못하는 FieldValue: ${method ?? 'unknown'}`);
+}
+
+/**
  * IndexedDB에 안전하게 저장 가능한 형태로 변환한다.
- * - FieldValue 센티널 → 마커 문자열 (오프라인 쓰기 경로의 FieldValue는 serverTimestamp뿐)
+ * - FieldValue 센티널 → 종류별 마커 문자열 (sentinelMarker 참고)
  * - Firestore Timestamp → Date (Timestamp도 클래스라 clone 시 프로토타입이 소실되지만,
  *   Date는 structuredClone을 그대로 통과하고 Firestore가 timestamp로 기록한다)
  */
-/**
- * deleteField() 센티널인지 가른다.
- *
- * FieldValue 하위 클래스는 번들에서 이름이 뭉개지므로 생성자 이름으로 가를 수 없다. Firestore가
- * 공개하는 `_methodName`('deleteField')을 보고, 그것마저 없으면 안전한 쪽(serverTimestamp)으로
- * 떨어뜨린다 — 삭제를 타임스탬프로 잘못 쓰는 것보다 삭제가 안 되는 쪽이 덜 해롭다.
- */
-function isDeleteFieldSentinel(value: FieldValue): boolean {
-    return (value as unknown as { _methodName?: string })._methodName === 'deleteField';
-}
-
 function toStorable(value: unknown): unknown {
-    // 센티널은 종류를 구분해서 저장한다. 한데 묶으면 삭제가 타임스탬프로 되살아난다.
-    if (value instanceof FieldValue) {
-        return isDeleteFieldSentinel(value) ? DELETE_FIELD_MARKER : SERVER_TIMESTAMP_MARKER;
-    }
+    if (value instanceof FieldValue) return sentinelMarker(value);
     if (value instanceof Timestamp) return value.toDate();
     if (Array.isArray(value)) return value.map(toStorable);
     if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {

@@ -150,8 +150,12 @@ export function attachFuelSummary<T extends FuelJoinableDriveLog>(
     // 3) 각 그룹의 첫 운행(출발 시각 오름차순) 행에만 요약 부착
     for (const [key, groupLogs] of logsByKey) {
         const { cost, amount, fuelType } = fuelByKey.get(key)!;
+        // 묶음은 **도착일** 기준이라 시:분만 견주면 어긋난다. 9/1 23:00에 떠나 9/2에 닿은
+        // 운행은 9/2 07:00 운행보다 먼저 출발했는데도 뒤로 밀린다. 출발 날짜부터 견준다.
+        const departureKey = (log: FuelJoinableDriveLog) =>
+            `${log.startDate || resolveDateStr(log)} ${resolveStartTimeRaw(log)}`;
         const first = groupLogs.reduce((a, b) =>
-            resolveStartTimeRaw(a).localeCompare(resolveStartTimeRaw(b)) <= 0 ? a : b,
+            departureKey(a).localeCompare(departureKey(b)) <= 0 ? a : b,
         );
         first.fuelSummary = `${cost.toLocaleString()}(${amount.toLocaleString()}${fuelUnit(fuelType)})`;
     }

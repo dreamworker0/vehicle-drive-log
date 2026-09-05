@@ -393,18 +393,37 @@ describe('firestore/reservations', () => {
             expect(commit).not.toHaveBeenCalled();
         });
 
-        it('오프라인에서는 건너뛴다 — batch.commit()은 오프라인 큐를 타지 않는다', async () => {
+        it('오프라인 다일 예약은 쓰지 않고 알린다 — batch.commit()은 오프라인 큐를 타지 않는다', async () => {
             // 오프라인에서 부르면 commit이 영영 resolve되지 않아 저장 완료가 타임아웃까지 붙잡힌다.
+            // 0(닫을 게 없었다)이 아니라 SKIPPED_OFFLINE이어야 한다 — 이 예약에 두 번째
+            // 저장은 없으므로 호출부가 사용자에게 알려야 한다.
             setOnline(false);
             const { commit } = batchMock();
+            vi.mocked(fs.getDoc).mockResolvedValue({ exists: () => true, data: () => ({ groupId: 'g1' }) } as never);
 
             const count = await completeReservationGroupSiblings('day1', 'org1');
 
-            // 0(닫을 게 없었다)이 아니라 SKIPPED_OFFLINE이어야 한다 — 이 예약에 두 번째
-            // 저장은 없으므로 호출부가 사용자에게 알려야 한다.
             expect(count).toBe(SKIPPED_OFFLINE);
-            expect(fs.getDoc).not.toHaveBeenCalled();
             expect(commit).not.toHaveBeenCalled();
+        });
+
+        it('오프라인이어도 단건 예약이면 조용히 넘긴다 — 헛경고를 띄우지 않는다', async () => {
+            // 단건까지 경고하면 "통신 재개 시 자동 반영됩니다" 안내와 나란히 떠 말이 어긋난다.
+            setOnline(false);
+            const { commit } = batchMock();
+            vi.mocked(fs.getDoc).mockResolvedValue({ exists: () => true, data: () => ({}) } as never);
+
+            expect(await completeReservationGroupSiblings('r1', 'org1')).toBe(0);
+            expect(commit).not.toHaveBeenCalled();
+        });
+
+        it('오프라인에서 캐시에 예약이 없으면 조용히 넘긴다', async () => {
+            // 다일인지 알 수 없다. 알 수 없는 것을 경고로 바꾸면 헛경고가 된다.
+            setOnline(false);
+            batchMock();
+            vi.mocked(fs.getDoc).mockRejectedValue(new Error('unavailable') as never);
+
+            expect(await completeReservationGroupSiblings('r1', 'org1')).toBe(0);
         });
     });
 

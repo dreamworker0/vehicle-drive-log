@@ -154,6 +154,21 @@ describe('attachFuelSummary', () => {
         expect(logs[1].fuelSummary).toBeUndefined();
     });
 
+    it('전날 밤에 떠난 운행이 그날 아침 운행보다 먼저다 — 시:분만 견주면 뒤바뀐다', () => {
+        // 묶음은 도착일 기준이라 9/1 23:00 출발 운행과 9/2 07:00 운행이 같은 묶음에 든다.
+        // 시각만 견주면 '07:00' < '23:00'이라 늦게 출발한 쪽에 주유 요약이 붙는다.
+        const logs: FuelTestLog[] = [
+            { vehicleId: 'v1', date: '2026-09-02', startTime: '07:00' },
+            { vehicleId: 'v1', date: '2026-09-02', startTime: '23:00', startDate: '2026-09-01' },
+        ];
+        attachFuelSummary(logs, [
+            { vehicleId: 'v1', date: '2026-09-02', fuelType: 'gasoline', fuelAmount: 10, fuelCost: 15000 },
+        ]);
+
+        expect(logs[1].fuelSummary).toBe('15,000(10L)');
+        expect(logs[0].fuelSummary).toBeUndefined();
+    });
+
     it('연료 유형별 단위를 표기한다 (electric→kWh, hydrogen→kg)', () => {
         const ev: FuelTestLog[] = [{ vehicleId: 'v1', date: '2026-03-05', startTime: '09:00' }];
         attachFuelSummary(ev, [{ vehicleId: 'v1', date: '2026-03-05', fuelType: 'electric', fuelAmount: 40, fuelCost: 12000 }]);

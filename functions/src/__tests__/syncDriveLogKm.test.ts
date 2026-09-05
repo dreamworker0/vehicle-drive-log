@@ -342,6 +342,42 @@ describe('onDriveLogUpdated — 연쇄 재발동 차단', () => {
         // endKm이 200 → 210으로 늘었으므로 뒤 기록도 +10 이동해야 한다
         expect(db.__get('driveLogs', 'C')).toMatchObject({ startKm: 210, endKm: 270 });
     });
+    it('소급 표시를 지운 수정은 차량 누적 km를 다시 따라가게 한다', async () => {
+        // after는 델타가 아니라 문서 전체다. 예전에는 "없으면 예전 값"으로 되돌려, 소급으로
+        // 적었던 일지를 오늘 도착으로 고쳐도 옛 true가 되살아나 km 갱신을 계속 건너뛰었다.
+        // 화면은 고쳐졌는데 차량 상태만 안 따라오는 상태였다.
+        seedLogs(
+            [{ id: 'B', timestamp: d(20), startKm: 1000, endKm: 1050 }],
+            [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1050 } }],
+        );
+
+        await (onDriveLogUpdated as unknown as Function)(makeUpdateEvent(
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1050, isRetroactive: true },
+            // isRetroactive 키가 아예 없다 — deleteField()로 지운 뒤의 모양
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1080 },
+        ));
+
+        const kmPatches = db.__updates()
+            .filter((u: { col: string; patch: Record<string, unknown> }) => u.col === 'vehicles' && 'currentKm' in u.patch);
+        expect(kmPatches).toHaveLength(1);
+    });
+
+    it('여전히 소급인 수정은 차량 누적 km를 건드리지 않는다', async () => {
+        seedLogs(
+            [{ id: 'B', timestamp: d(20), startKm: 1000, endKm: 1050 }],
+            [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1050 } }],
+        );
+
+        await (onDriveLogUpdated as unknown as Function)(makeUpdateEvent(
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1050, isRetroactive: true },
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1080, isRetroactive: true },
+        ));
+
+        const kmPatches = db.__updates()
+            .filter((u: { col: string; patch: Record<string, unknown> }) => u.col === 'vehicles' && 'currentKm' in u.patch);
+        expect(kmPatches).toHaveLength(0);
+    });
+
 });
 
 describe('onDriveLogCreated — 차량 누적 km 분기', () => {
