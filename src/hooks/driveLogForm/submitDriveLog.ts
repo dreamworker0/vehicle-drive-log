@@ -237,7 +237,7 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
             offline: isOffline,
             syncResult,
             backgroundWarning: finalBackgroundWarning,
-        cancelledReservationDays,
+            cancelledReservationDays,
         };
     }
 
@@ -250,7 +250,7 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
             syncResult,
             correctedKm,
             backgroundWarning: finalBackgroundWarning,
-        cancelledReservationDays,
+            cancelledReservationDays,
         };
     }
 

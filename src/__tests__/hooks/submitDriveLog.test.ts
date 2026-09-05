@@ -21,7 +21,6 @@ const mockUpdateHipassCard = vi.fn();
 const mockCompleteGroup = vi.fn();
 
 vi.mock('../../lib/firestore', () => ({
-
     createDriveLog: (...args: unknown[]) => mockCreateDriveLog(...args),
     updateDriveLog: (...args: unknown[]) => mockUpdateDriveLog(...args),
     updateReservationStatus: (...args: unknown[]) => mockUpdateReservationStatus(...args),

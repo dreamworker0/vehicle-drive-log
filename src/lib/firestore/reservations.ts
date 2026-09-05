@@ -334,18 +334,23 @@ export const getReservationsByGroupId = async (groupId: string, orgId: string) =
 
 // ─── 그룹 일괄 액션 헬퍼 ───
 
+/** 그룹 배치 결과 */
+interface GroupActionResult {
+    /** 실제로 쓴 문서 수 (액션 종류와 무관) */
+    total: number;
+    /**
+     * 그중 **취소로 닫은** 수.
+     *
+     * complete 액션에서 "타지 않은 날"을 세는 값이다. cancel·delete 액션은 문서를
+     * 몇 건 취소·삭제하든 여기가 늘 0이다 — 그 둘은 `total`이 곧 처리 건수다.
+     */
+    cancelled: number;
+}
+
 /**
  * 그룹 내 활성 예약을 조회하여 일괄 batch 액션(update/delete)을 실행하는 공용 헬퍼
  * @param exceptId 이 예약은 건드리지 않는다 (반복 → 단건 전환에서 남길 회차)
  */
-/** 그룹 배치 결과 — `cancelled`는 complete 액션에서 **타지 않아 취소한** 날 수다. */
-interface GroupActionResult {
-    /** 실제로 쓴 문서 수 */
-    total: number;
-    /** 그중 취소로 닫은 수 */
-    cancelled: number;
-}
-
 const batchGroupAction = async (
     fetchFn: (id: string, orgId: string) => Promise<Reservation[]>,
     action: 'cancel' | 'delete' | 'complete',
