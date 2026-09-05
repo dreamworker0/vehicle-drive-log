@@ -92,7 +92,7 @@ export {
     getReservationsByGroupId,
     cancelReservationGroup,
     completeReservationGroupSiblings,
-    SKIPPED_OFFLINE,
+    type GroupCloseResult,
     deleteReservationGroup,
     getReservationsByRecurringGroupId,
     cancelRecurringGroup,

@@ -337,6 +337,34 @@ describe('저장 후 처리', () => {
         expect(showToast).toHaveBeenCalledWith(expect.stringContaining('동시 작성 감지'), 'info');
     });
 
+    it('타지 않은 날 예약이 취소됐으면 그 자리에서 알린다', async () => {
+        // 사용자가 요청하지 않은 변경이다. 조용히 넘어가면 [운행 종료]를 잘못 누른 사람이
+        // 예약이 사라진 것을 모른 채 다음 날 차를 찾으러 간다.
+        mockSubmitDriveLog.mockResolvedValue({ shouldResetForm: true, cancelledReservationDays: 2 });
+        await submit(deps());
+
+        expect(showToast).toHaveBeenCalledWith(expect.stringContaining('나머지 2일 예약을 함께 취소'), 'info');
+    });
+
+    it('취소된 날이 없으면 알리지 않는다', async () => {
+        // 단건 예약과 정상 다일 운행이 대다수다 — 여기에 토스트가 뜨면 헛알림이 된다.
+        mockSubmitDriveLog.mockResolvedValue({ shouldResetForm: true, cancelledReservationDays: 0 });
+        await submit(deps());
+
+        expect(showToast).not.toHaveBeenCalledWith(expect.stringContaining('취소'), 'info');
+    });
+
+    it('오프라인 저장이어도 취소가 있었다면 알린다 — 조기 반환보다 앞에 둔다', async () => {
+        // 오프라인 분기는 안내만 하고 곧바로 return한다. 토스트가 그 아래로 내려가면
+        // 취소는 실제로 일어났는데 화면에는 아무 말도 남지 않는다.
+        mockSubmitDriveLog.mockResolvedValue({
+            offline: true, message: '오프라인 저장됨', shouldResetForm: true, cancelledReservationDays: 1,
+        });
+        await submit(deps());
+
+        expect(showToast).toHaveBeenCalledWith(expect.stringContaining('나머지 1일 예약을 함께 취소'), 'info');
+    });
+
     it('부가 동기화가 실패했으면 경고로 전달한다 — 본 저장은 성공이다', async () => {
         mockSubmitDriveLog.mockResolvedValue({ shouldResetForm: true, backgroundWarning: '캘린더 반영 실패' });
         await submit(deps());
