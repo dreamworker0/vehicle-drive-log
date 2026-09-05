@@ -336,6 +336,21 @@ describe('submitDriveLog', () => {
         expect(result.success).toBe(true);
     });
 
+    it('다일 운행이면 출발일이 아니라 **도착일**을 넘긴다', async () => {
+        // driveDate는 출발일이다(types.ts). 출발일을 기준으로 삼으면 실제로 탄 날이
+        // "타지 않은 날"이 되어 취소된다 — 3/5 출발 → 3/6 도착인데 3/5를 넘기면 3/6 예약이 날아간다.
+        // 지금은 예약 흐름에 날짜 칸이 뜨지 않아 두 값이 우연히 같지만, 그 화면 조건에
+        // 기대는 것이 위험해서 식 자체를 고정한다.
+        mockCompleteGroup.mockResolvedValueOnce(1);
+
+        await submitDriveLog(makeCtx({
+            form: { ...baseForm, driveDate: '2026-03-05', endDate: '2026-03-06', startTime: '17:00', endTime: '10:00' },
+            reservationData: { reservationId: 'r1' },
+        }));
+
+        expect(mockCompleteGroup).toHaveBeenCalledWith('r1', 'org1', '2026-03-06');
+    });
+
     it('그룹 닫기가 실패해도 본 저장은 성공시키되 경고를 남긴다', async () => {
         mockCompleteGroup.mockRejectedValueOnce(new Error('permission-denied'));
 
