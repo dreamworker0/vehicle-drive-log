@@ -38,6 +38,12 @@ import { checkReservationReminders } from "../services/alimtalk/reservationRemin
 describe('checkReservationReminders', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        // clearAllMocks는 호출 기록만 지운다 — `mockResolvedValueOnce`로 쌓아 둔 구현 큐는 남는다.
+        // 앞 테스트가 다 소비하지 못한 응답이 다음 테스트로 새면 get 시퀀스가 한 칸씩 밀리고,
+        // 그러면 이 파일의 테스트들이 **엉뚱한 쿼리 결과를 검증하면서 조용히 초록**이 된다.
+        // (실제로 그랬다 — 프로덕션 코드를 되돌려도 통과하는 테스트가 섞여 있었다.)
+        // mockWhere는 mockReturnThis 구현이 날아가므로 리셋하지 않는다.
+        mockGet.mockReset();
         // jest.spyOn(console, 'log').mockImplementation();
         // jest.spyOn(console, 'error').mockImplementation();
         // 2026-03-04 10:00 KST (= 01:00 UTC)
@@ -338,5 +344,175 @@ describe('checkReservationReminders', () => {
         expect(mockGet).toHaveBeenCalledTimes(3); // driveLogs 쿼리가 끼지 않았다
         expect(mockWhere).not.toHaveBeenCalledWith('reservationId', 'in', expect.anything());
         expect(mockSendPushToUser).not.toHaveBeenCalled();
+    });
+
+    // ── 다일(연속) 예약의 미출발 알림 ──
+    // 다일 예약은 하루당 문서 하나로 쪼개진다. 둘째 날 이후 문서는 startTime "00:00" ·
+    // status "reserved"라 미출발 쿼리에 무조건 걸리는데, 그때 운전자는 이미 차를 가지고
+    // 나가 있다 — 운행 중인 사람에게 "아직 출발하지 않으셨나요?"가 가면 안 된다.
+    // 같은 groupId의 앞선 날짜 문서가 in_progress/completed인지로 판별한다.
+
+    /** 미출발 후보 (오늘 = 2026-03-04, 다일 둘째 날이라 00:00 시작) */
+    function noShowRes(id: string, over: Record<string, unknown> = {}) {
+        return {
+            id,
+            data: () => ({
+                userId: `user-${id}`,
+                organizationId: 'org1',
+                vehicleDisplayName: '카니발',
+                startTime: '00:00',
+                noShowReminderSent: false,
+                status: 'reserved',
+                ...over,
+            }),
+        };
+    }
+
+    /** 같은 그룹의 다른 날짜 문서 */
+    function sibling(id: string, over: Record<string, unknown> = {}) {
+        return {
+            id,
+            data: () => ({
+                organizationId: 'org1',
+                groupId: 'grp1',
+                date: '2026-03-03',
+                status: 'in_progress',
+                ...over,
+            }),
+        };
+    }
+
+    it('다일 예약 둘째 날에는 미출발 알림을 보내지 않는다 (앞선 날짜가 운행 중)', async () => {
+        mockGet
+            .mockResolvedValueOnce({ docs: [] })                                  // 1) 임박
+            .mockResolvedValueOnce({ docs: [] })                                  // 2) 종료
+            .mockResolvedValueOnce({ docs: [noShowRes('day2', { groupId: 'grp1' })] })
+            .mockResolvedValueOnce({ docs: [sibling('day1')] });                  // 그룹 형제
+
+        await checkReservationReminders();
+
+        expect(mockWhere).toHaveBeenCalledWith('groupId', 'in', ['grp1']);
+        expect(mockSendPushToUser).not.toHaveBeenCalled();
+        expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it('앞선 날짜가 completed여도 건너뛴다', async () => {
+        // 마지막 날 문서가 남아 있는데 첫날은 이미 완료된 경우 — 운행은 이미 일어났다.
+        mockGet
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [noShowRes('day2', { groupId: 'grp1' })] })
+            .mockResolvedValueOnce({ docs: [sibling('day1', { status: 'completed' })] });
+
+        await checkReservationReminders();
+
+        expect(mockSendPushToUser).not.toHaveBeenCalled();
+    });
+
+    it('앞선 날짜도 아직 reserved면 진짜 미출발이므로 알림을 보낸다', async () => {
+        // 다일 예약을 잡아두고 첫날부터 아무도 나가지 않은 경우 — 이건 알려야 한다.
+        mockGet
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [noShowRes('day2', { groupId: 'grp1' })] })
+            .mockResolvedValueOnce({ docs: [sibling('day1', { status: 'reserved' })] });
+
+        await checkReservationReminders();
+
+        expect(mockSendPushToUser).toHaveBeenCalledTimes(1);
+        expect(mockUpdate).toHaveBeenCalledWith({ noShowReminderSent: true });
+    });
+
+    it('오늘 이후 날짜의 형제는 "이미 출발했다"의 근거가 되지 않는다', async () => {
+        mockGet
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [noShowRes('day2', { groupId: 'grp1' })] })
+            .mockResolvedValueOnce({ docs: [sibling('day3', { date: '2026-03-05' })] });
+
+        await checkReservationReminders();
+
+        expect(mockSendPushToUser).toHaveBeenCalledTimes(1);
+    });
+
+    it('다른 기관 문서는 그룹 판정 근거로 삼지 않는다', async () => {
+        // groupId가 어쩌다 겹치더라도 기관 경계를 넘어 판단하지 않는다.
+        mockGet
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [noShowRes('day2', { groupId: 'grp1' })] })
+            .mockResolvedValueOnce({ docs: [sibling('other', { organizationId: 'org2' })] });
+
+        await checkReservationReminders();
+
+        expect(mockSendPushToUser).toHaveBeenCalledTimes(1);
+    });
+
+    it('그룹이 여러 개여도 형제 조회는 한 번이다', async () => {
+        // 후보마다 쿼리를 던지면 결과 없는 쿼리에도 읽기 1건이 최소 과금된다 (§2와 같은 이유).
+        mockGet
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({
+                docs: [
+                    noShowRes('a', { groupId: 'grp1' }),
+                    noShowRes('b', { groupId: 'grp2' }),
+                ],
+            })
+            .mockResolvedValueOnce({ docs: [sibling('day1')] }); // grp1만 운행 중
+
+        await checkReservationReminders();
+
+        expect(mockGet).toHaveBeenCalledTimes(4); // 후보 수(2)만큼이 아니라 1회
+        expect(mockWhere).toHaveBeenCalledWith('groupId', 'in', ['grp1', 'grp2']);
+        // grp2는 근거가 없으므로 그대로 알림
+        expect(mockSendPushToUser).toHaveBeenCalledTimes(1);
+        expect(mockSendPushToUser).toHaveBeenCalledWith(
+            'user-b',
+            expect.objectContaining({ title: '🚨 예약 시작시간이 지났습니다' }),
+            expect.objectContaining({ reservationId: 'b' })
+        );
+    });
+
+    it('다일 예약이 아니면 형제 조회를 아예 하지 않는다', async () => {
+        mockGet
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [noShowRes('solo', { startTime: '09:40' })] });
+
+        await checkReservationReminders();
+
+        expect(mockGet).toHaveBeenCalledTimes(3); // groupId 쿼리가 끼지 않았다
+        expect(mockWhere).not.toHaveBeenCalledWith('groupId', 'in', expect.anything());
+        expect(mockSendPushToUser).toHaveBeenCalledTimes(1);
+    });
+
+    it('이미 알림을 보낸 다일 후보는 형제 조회 대상에서도 빠진다', async () => {
+        mockGet
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({
+                docs: [noShowRes('day2', { groupId: 'grp1', noShowReminderSent: true })],
+            });
+
+        await checkReservationReminders();
+
+        expect(mockGet).toHaveBeenCalledTimes(3);
+        expect(mockSendPushToUser).not.toHaveBeenCalled();
+    });
+
+    it('임박 알림(§1)은 하한이 있어 둘째 날 00:00을 애초에 집지 않는다', async () => {
+        // 스케줄러 첫 실행이 08:00(KST)이라 startTime 하한이 항상 "00:00"보다 늦다.
+        // 스케줄을 새벽까지 넓히면 이 전제가 깨지므로 여기서 고정한다.
+        jest.setSystemTime(new Date('2026-03-03T23:00:00Z')); // 2026-03-04 08:00 KST
+        mockGet
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [] });
+
+        await checkReservationReminders();
+
+        expect(mockWhere).toHaveBeenCalledWith('startTime', '>=', '08:00');
+        expect(mockWhere).toHaveBeenCalledWith('startTime', '<=', '08:10');
     });
 });
