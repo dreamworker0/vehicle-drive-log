@@ -11,6 +11,8 @@ interface VehicleStatusSectionProps {
     hipassCard: HipassCard | null;
     /** 기관 설정: 하이패스 사용 여부(기본 true). false면 하이패스 블록 숨김 */
     hipassEnabled?: boolean;
+    /** 수정 모드 여부. 수정 화면에서는 하이패스 블록을 숨긴다(아래 showHipass 주석 참고) */
+    isEditMode?: boolean;
 }
 
 const VehicleStatusSection = memo(function VehicleStatusSection({
@@ -19,7 +21,8 @@ const VehicleStatusSection = memo(function VehicleStatusSection({
     setForm,
     lastEndBattery,
     hipassCard,
-    hipassEnabled = true
+    hipassEnabled = true,
+    isEditMode = false
 }: VehicleStatusSectionProps) {
     // 하이패스 접기/펼치기 상태 (기본값: 접힘 — 자주 사용하지 않는 항목)
     // 훅은 early return 앞에 위치해야 Rules of Hooks를 위반하지 않는다.
@@ -37,7 +40,11 @@ const VehicleStatusSection = memo(function VehicleStatusSection({
     }, [isHipassExpanded]);
 
     // 기관 설정에서 하이패스를 끄면 카드가 있어도 하이패스 블록을 숨긴다.
-    const showHipass = hipassEnabled && !!hipassCard;
+    //
+    // 수정 화면에서도 숨긴다 — 여기 '현재 잔액'은 그 일지를 쓰던 시점이 아니라 오늘의
+    // 잔액이라, 그 값을 기준으로 사용액을 계산하면 카드 잔액이 엉뚱하게 바뀐다.
+    // (submitDriveLog의 shouldApplyHipass가 저장 쪽에서도 같은 경계를 지킨다)
+    const showHipass = hipassEnabled && !!hipassCard && !isEditMode;
 
     if (!isElectric && !showHipass) return null;
 

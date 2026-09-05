@@ -224,6 +224,7 @@ export default function DriveLogForm() {
                     lastEndBattery={lastEndBattery}
                     hipassCard={hipassCard}
                     hipassEnabled={orgFeatures.hipass}
+                    isEditMode={isEditMode}
                 />
 
                 {/* 7. 비고 섹션 */}

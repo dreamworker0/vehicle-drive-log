@@ -82,8 +82,18 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
         });
     }
 
+    // 하이패스 잔액은 **신규 제출에서만** 다룬다.
+    //
+    // hipassCard.balance는 지금 카드에 남은 '오늘'의 잔액이다. 과거 일지를 수정할 때
+    // 이 값을 사용 전(before) 기준으로 삼으면 그 사이의 다른 운행이 통째로 무시되어
+    // 카드 잔액이 엉뚱한 값으로 바뀐다 — 그날 잔액이 오늘보다 많았다면 차감이 아니라
+    // 증가가 일어난다(오늘 7,000 / 그날 기록 9,500 → +2,500).
+    // 잔액 정정이 필요하면 하이패스 관리 화면에서 하고, 수정 화면에는 입력칸을 띄우지
+    // 않는다(VehicleStatusSection의 showHipass).
+    const shouldApplyHipass = !isEditMode && !!hipassCard && form.hipassBalanceAfter !== '';
+
     // 하이패스 정보를 운행일지에 저장
-    if (hipassCard && form.hipassBalanceAfter !== '') {
+    if (shouldApplyHipass && hipassCard) {
         Object.assign(logData, {
             hipassCardNumber: hipassCard.cardNumber || '',
             hipassBalanceBefore: hipassCard.balance,
@@ -145,7 +155,7 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
     }
 
     // 하이패스 잔액 업데이트: 동기적으로 await하여 잔액 불일치(데이터 정합성) 방지
-    if (hipassCard && form.hipassBalanceAfter !== '') {
+    if (shouldApplyHipass && hipassCard) {
         const hipassId = hipassCard.id;
         const balAfter = Number(form.hipassBalanceAfter);
         const usedAmount = hipassCard.balance - balAfter;

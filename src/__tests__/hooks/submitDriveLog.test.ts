@@ -166,6 +166,31 @@ describe('submitDriveLog', () => {
         expect(result.success).toBe(true);
     });
 
+    it('수정 모드에서는 하이패스 사용후 금액이 입력돼도 잔액을 차감하지 않는다', async () => {
+        // 과거 일지를 수정할 때 hipassCard.balance는 '그 일지를 쓰던 시점'이 아니라 '오늘'의
+        // 잔액이다. 이를 기준(before)으로 사용액을 계산하면 카드 잔액이 엉뚱한 값이 된다 —
+        // 아래 값(오늘 7,000 / 그날 기록 9,500)이면 차감은커녕 2,500원이 늘어난다.
+        // 그래서 잔액 반영은 신규 제출에서만 하고, 수정 화면에는 입력칸 자체를 띄우지 않는다.
+        const editLog = { id: 'log1' } as Ctx['editLog'];
+        const result = await submitDriveLog(
+            makeCtx({
+                isEditMode: true,
+                editLog,
+                form: { ...baseForm, hipassBalanceAfter: '9500' },
+                hipassCard: { id: 'h1', cardNumber: '1234', balance: 7000 } as Ctx['hipassCard'],
+            }),
+        );
+
+        expect(mockUpdateHipassCard).not.toHaveBeenCalled();
+
+        // 그 일지에 이미 남아 있는 하이패스 기록도 오늘 잔액으로 덮어쓰지 않는다.
+        // (updateDriveLog는 updateDoc이라 전달하지 않은 필드는 그대로 보존된다)
+        const payload = mockUpdateDriveLog.mock.calls[0][1];
+        expect(payload).not.toHaveProperty('hipassBalanceBefore');
+        expect(payload).not.toHaveProperty('hipassBalanceAfter');
+        expect(result.success).toBe(true);
+    });
+
     it('예약 상태 전환이 실패해도 본 저장은 성공시키되 backgroundWarning을 전파한다', async () => {
         mockUpdateReservationStatus.mockRejectedValueOnce(new Error('network'));
 
