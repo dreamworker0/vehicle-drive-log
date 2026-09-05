@@ -1,4 +1,5 @@
 import { isFirestoreTerminated } from './firestoreLifecycle';
+import { scrubContext, scrubConsoleArgs, joinConsoleArgs } from './sentryScrub';
 
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
 
@@ -62,6 +63,26 @@ function initSentryWithModule(Sentry: SentryModule) {
         integrations: [
             Sentry.browserTracingIntegration(),
         ],
+        // console 호출은 SDK 기본 breadcrumbsIntegration이 **인자를 그대로** 담아 다음
+        // 이벤트에 붙인다. 즉 captureError/captureWarning에서 extra를 걸러도, 같은 함수의
+        // console 출력이 원본을 다시 실어 보낸다. 앱 전역 console이 대상이라 여기서 막는다.
+        //
+        // SDK는 인자로 `data.arguments`와 `message`(= safeJoin(args, ' '))를 **둘 다** 만들고
+        // (integrations/breadcrumbs.js), Sentry 화면이 보여 주는 것은 message다. 인자만 걸러
+        // 두면 개인정보는 message로 나가고 진단만 사라지는 정확히 반대인 결과가 되므로,
+        // 걸러낸 인자로 message를 다시 만든다. console.assert는 접두어를 보존한다.
+        beforeBreadcrumb(breadcrumb) {
+            const args = (breadcrumb.data as { arguments?: unknown[] } | undefined)?.arguments;
+            if (breadcrumb.category === 'console' && Array.isArray(args)) {
+                const safeArgs = scrubConsoleArgs(args);
+                breadcrumb.data = { ...breadcrumb.data, arguments: safeArgs };
+                const assertPrefix = typeof breadcrumb.message === 'string'
+                    && breadcrumb.message.startsWith('Assertion failed: ')
+                    ? 'Assertion failed: ' : '';
+                breadcrumb.message = assertPrefix + joinConsoleArgs(safeArgs);
+            }
+            return breadcrumb;
+        },
         // 노이즈 에러 필터링
         ignoreErrors: [
             // reCAPTCHA 중복 렌더링 에러 (인앱 브라우저 및 특정 WebView 환경에서 발생하는 외부 노이즈)
@@ -306,7 +327,12 @@ export function setSentryUser(userInfo: SentryUserInfo) {
 export function captureError(error: unknown, context: Record<string, unknown> = {}) {
     // initSentry가 호출된 적 없으면(비로그인 경량 경로) 기존과 동일하게 콘솔 출력만 수행
     if (SENTRY_DSN && sentryLoading) {
-        sentryLoading.then((Sentry) => Sentry?.captureException(error, { extra: context }));
+        // 도메인 함수들이 저장하려던 문서를 통째로 넘기므로(`{ context, data }`) 목적지·
+        // 동승자 이름·비고 같은 자유 입력이 그대로 실린다. 보내기 직전 여기서 거른다.
+        // 아래 console 출력은 원본 그대로 둔다(개발자 도구에서의 진단이 우선) — 그것이
+        // breadcrumb으로 새는 경로는 init의 beforeBreadcrumb이 따로 막는다.
+        const safeContext = scrubContext(context);
+        sentryLoading.then((Sentry) => Sentry?.captureException(error, { extra: safeContext }));
     }
     console.error(error);
 }
@@ -321,7 +347,8 @@ export function captureError(error: unknown, context: Record<string, unknown> = 
  */
 export function captureWarning(message: string, context: Record<string, unknown> = {}) {
     if (SENTRY_DSN && sentryLoading) {
-        sentryLoading.then((Sentry) => Sentry?.captureMessage(message, { level: 'warning', extra: context }));
+        const safeContext = scrubContext(context);
+        sentryLoading.then((Sentry) => Sentry?.captureMessage(message, { level: 'warning', extra: safeContext }));
     }
     console.warn(message, context);
 }

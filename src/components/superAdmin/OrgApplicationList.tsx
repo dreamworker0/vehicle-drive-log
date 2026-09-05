@@ -72,7 +72,6 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
 
             // 이메일 발송 (실패해도 승인은 유지)
             try {
-                console.debug('📋 승인된 기관 데이터:', JSON.stringify(app));
                 if (app.applicantEmail) {
                     await sendApprovalEmail(app.applicantEmail, app.name, inviteCode, app.applicantName);
                     console.debug('📧 수동 승인 이메일 발송 완료');

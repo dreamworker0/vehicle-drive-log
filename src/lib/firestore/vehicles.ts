@@ -75,7 +75,9 @@ export const retireVehicle = async (vehicleId: string, reason = '') => {
         });
         invalidateCache('vehicles');
     } catch (error) {
-        captureError(error, { context: 'retireVehicle', vehicleId, reason });
+        // 폐차 사유는 관리자가 직접 쓰는 자유 입력이라 원문을 보고에 싣지 않는다
+        // (사고 경위·연락처가 들어온다). 입력이 비어서 실패한 건지만 구분하면 충분하다.
+        captureError(error, { context: 'retireVehicle', vehicleId, reasonLength: reason.length });
         throw error;
     }
 };
