@@ -8,6 +8,11 @@
 export interface ReleaseItem {
     type: 'new' | 'improved' | 'fixed';
     text: string;
+    /**
+     * 이 기능을 설명하는 FAQ의 id 목록 — 화면에는 쓰지 않는 편집용 메타다.
+     * 새 기능 공지가 FAQ 없이 나가는 것을 막는 게이트가 본다(scripts/lib/faqCoverageRules.ts).
+     */
+    faq?: string[];
 }
 
 export interface ReleaseNote {

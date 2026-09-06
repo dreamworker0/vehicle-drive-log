@@ -32,6 +32,7 @@
 | `npm run health` | Cloud Functions 상태 점검 |
 | `npm run audit` | 보안 감사 |
 | `npm run check:release-notes` | 업데이트 소식 누락 감지 (사용자 화면 변경이 공지 없이 배포되는 것 차단) |
+| `npm run check:faq` | FAQ 누락 감지 (새 기능 공지가 자주 하는 질문에 실리지 않은 채 배포되는 것 차단) |
 | `npm run verify:harness` | 하네스 Doctor (지침·스킬·워크플로·eval 정합성, CI에서도 실행) |
 | `npm run verify:fast` | 빠른 검증 (Node 확인 + lint + 타입 검사) |
 | `npm run verify:full` | 전체 게이트 (fast + 커버리지 + Functions + 빌드 + Rules + E2E) |
