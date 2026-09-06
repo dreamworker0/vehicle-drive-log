@@ -317,6 +317,34 @@ export function scrubDomTarget(target: string): string {
 const SPAN_URL_KEYS = ['url', 'http.url', 'url.full'] as const;
 
 /**
+ * 스팬 속성 중 **요소 설명(DOM 트리 문자열)**을 담는 키.
+ *
+ * web-vital 스팬은 어느 요소가 문제였는지를 `htmlTreeAsString`으로 적는다
+ * (@sentry/browser-utils `metrics/lcp.js`·`cls.js`·`webVitalSpans.js`). 그 함수는
+ * `aria-label`·`title`·`alt`를 **항상** 붙이므로 breadcrumb과 똑같은 값이 여기로도 나간다.
+ */
+function isDomTargetSpanKey(key: string): boolean {
+    return key === 'lcp.element'
+        || key === 'browser.web_vital.lcp.element'
+        || /^(?:browser\.web_vital\.)?cls\.source\.\d+$/.test(key);
+}
+
+/**
+ * 스팬 **이름**에서 사람이 읽는 속성값을 지운다.
+ *
+ * INP·CLS·LCP standalone 스팬은 이름 자체가 요소 설명이다
+ * (`metrics/inp.js`의 `name = ... || htmlTreeAsString(entry.target)`). `enableInp` 기본값이
+ * true라 클릭 한 번이 그대로 스팬 이름이 되고, 그 이름은 **`beforeBreadcrumb`도
+ * `scrubSpanData`도 보지 못하는 자리**다. 이름은 `data`와 함께 걸러야 한다.
+ *
+ * 요소 설명이 아닌 이름(`GET /api/tmap`, `pageload` 등)에는 지울 속성이 없어 그대로 통과한다.
+ */
+export function scrubSpanName(description: string | undefined): string | undefined {
+    if (typeof description !== 'string' || !description) return description;
+    return scrubDomTarget(description);
+}
+
+/**
  * 스팬 데이터에서 사람이 친 값을 걷어낸다.
  *
  * breadcrumb만 막아서는 부족하다. 추적(browserTracing)이 켜져 있으면 **같은 목적지 검색어가
@@ -343,6 +371,14 @@ export function scrubSpanData(data: Record<string, unknown> | undefined): Record
             out[key] = `[redacted(${(out[key] as string).length})]`;
             changed = true;
         }
+    }
+    // 요소 설명은 breadcrumb과 같은 규칙으로 거른다 — 태그·id·클래스는 남기고 속성값만 지운다.
+    for (const key of Object.keys(out)) {
+        if (!isDomTargetSpanKey(key)) continue;
+        const value = out[key];
+        if (typeof value !== 'string') continue;
+        const safe = scrubDomTarget(value);
+        if (safe !== value) { out[key] = safe; changed = true; }
     }
     return changed ? out : data;
 }

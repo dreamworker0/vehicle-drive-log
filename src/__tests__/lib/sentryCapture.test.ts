@@ -207,7 +207,25 @@ describe('captureError / captureWarning — 개인정보 스크러빙 배선', (
         expect(data.url).not.toContain('김OO');
         expect(data['http.query']).not.toContain('김OO');
         expect(data['http.method']).toBe('GET');
-        expect(out.description).toBe('GET /api/tmap');  // 스팬 이름은 이미 안전하다
+        expect(out.description).toBe('GET /api/tmap');  // fetch 스팬 이름에는 지울 것이 없다
+    });
+
+    it('스팬 이름에 실린 실명도 지운다 — INP 스팬은 이름 자체가 요소 설명이다', async () => {
+        // metrics/inp.js가 name을 htmlTreeAsString(target)으로 만들고 그 함수는 aria-label을
+        // 항상 붙인다. enableInp 기본값이 true라 클릭 한 번이 그대로 스팬 이름이 되는데,
+        // 이 자리는 beforeBreadcrumb도 scrubSpanData도 보지 못한다.
+        const { init } = await loadSentry();
+        const options = init.mock.calls[0][0] as {
+            beforeSendSpan: (s: Record<string, unknown>) => Record<string, unknown>;
+        };
+
+        const out = options.beforeSendSpan({
+            description: 'button.btn-icon[aria-label="홍길동 제거"]',
+            data: { 'http.method': 'GET' },
+        });
+
+        expect(out.description).toBe('button.btn-icon[aria-label]');
+        expect(JSON.stringify(out)).not.toContain('홍길동');
     });
 
     it('사용자 식별에 이메일을 싣지 않는다 — uid만 보낸다', async () => {

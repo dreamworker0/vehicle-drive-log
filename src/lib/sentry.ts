@@ -1,5 +1,5 @@
 import { isFirestoreTerminated } from './firestoreLifecycle';
-import { scrubContext, scrubConsoleArgs, joinConsoleArgs, scrubUrl, scrubDomTarget, scrubSpanData } from './sentryScrub';
+import { scrubContext, scrubConsoleArgs, joinConsoleArgs, scrubUrl, scrubDomTarget, scrubSpanData, scrubSpanName } from './sentryScrub';
 
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
 
@@ -122,10 +122,19 @@ function initSentryWithModule(Sentry: SentryModule) {
          * 트랜잭션 이벤트라 beforeSend도 타지 않는다(그쪽은 오류 이벤트 전용).
          *
          * 이 훅은 루트 스팬과 자식 스팬 **모두**에 적용된다(core/client.js processBeforeSend).
+         * standalone web-vital 스팬(INP·CLS·LCP)도 여기를 거친다 — 트랜잭션이 아니라 스팬
+         * 봉투로 따로 나가지만 `createSpanEnvelope`가 같은 콜백을 태운다(core/envelope.js).
+         *
+         * **이름도 함께 걸러야 한다.** 그 스팬들은 이름 자체가 요소 설명이라
+         * (`metrics/inp.js`) `aria-label`·`title`이 그대로 실린다. Phase 211에서 이 경로를
+         * "설치본에 없는 패키지"라며 반려했는데, 패키지 이름만 달랐을 뿐
+         * (`@sentry/browser-utils`) 경로는 실재했다.
          */
         beforeSendSpan(span) {
             const data = scrubSpanData(span.data as Record<string, unknown> | undefined);
-            return data === span.data ? span : { ...span, data } as typeof span;
+            const description = scrubSpanName(span.description);
+            if (data === span.data && description === span.description) return span;
+            return { ...span, data, description } as typeof span;
         },
         // 노이즈 에러 필터링
         ignoreErrors: [

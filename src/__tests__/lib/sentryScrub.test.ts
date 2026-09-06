@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { scrubContext, scrubConsoleArgs, joinConsoleArgs, scrubUrl, scrubDomTarget, scrubSpanData } from '@/lib/sentryScrub';
+import { scrubContext, scrubConsoleArgs, joinConsoleArgs, scrubUrl, scrubDomTarget, scrubSpanData, scrubSpanName } from '@/lib/sentryScrub';
 
 /**
  * Sentry `extra`에서 자유 입력이 걸러지는지 검증한다.
@@ -349,6 +349,48 @@ describe('scrubSpanData — 추적 스팬 속성', () => {
         const data = { 'http.method': 'GET', type: 'fetch' };
         expect(scrubSpanData(data)).toBe(data);
         expect(scrubSpanData(undefined)).toBeUndefined();
+    });
+
+    it('요소 설명을 담는 web-vital 속성도 거른다 — lcp.element·cls.source.N', () => {
+        // metrics/lcp.js·cls.js가 htmlTreeAsString으로 채우는 값이다. 그 함수는
+        // aria-label·title을 항상 붙이므로 breadcrumb과 똑같은 실명이 여기로도 나간다.
+        const out = scrubSpanData({
+            'lcp.element': 'img[alt="홍길동 프로필"]',
+            'cls.source.1': 'div > button[aria-label="홍길동 제거"]',
+            'browser.web_vital.cls.source.2': 'span[title="공동 운전자: 김철수"]',
+            'browser.web_vital.lcp.element': 'p[alt="박영희"]',
+        })!;
+
+        const dump = JSON.stringify(out);
+        expect(dump).not.toContain('홍길동');
+        expect(dump).not.toContain('김철수');
+        expect(dump).not.toContain('박영희');
+        // 어느 요소였는지는 남아야 진단이 된다.
+        expect(out['cls.source.1']).toBe('div > button[aria-label]');
+        expect(out['lcp.element']).toBe('img[alt]');
+    });
+
+    it('비슷한 이름의 다른 키는 건드리지 않는다', () => {
+        const data = { 'cls.source': 'x', 'cls.source.a': 'y', 'lcp.elements': 'z' };
+        expect(scrubSpanData(data)).toBe(data);
+    });
+});
+
+describe('scrubSpanName — 스팬 이름', () => {
+    it('INP 스팬 이름의 aria-label을 지운다 — 클릭 한 번이 그대로 이름이 된다', () => {
+        // metrics/inp.js: name = cachedInteractionContext?.elementName || htmlTreeAsString(target)
+        expect(scrubSpanName('button.btn-icon[aria-label="1234-5678 수정"]'))
+            .toBe('button.btn-icon[aria-label]');
+    });
+
+    it('요소 설명이 아닌 이름은 그대로 둔다', () => {
+        expect(scrubSpanName('GET /api/tmap')).toBe('GET /api/tmap');
+        expect(scrubSpanName('pageload')).toBe('pageload');
+    });
+
+    it('빈 값에도 터지지 않는다', () => {
+        expect(scrubSpanName(undefined)).toBeUndefined();
+        expect(scrubSpanName('')).toBe('');
     });
 });
 
