@@ -144,13 +144,18 @@ export default function FeatureToggleSection({ values, onChange }: FeatureToggle
             {/* 차량 관리 */}
             <div className="mb-5 pt-5 border-t border-surface-100 dark:border-surface-700">
                 <GroupTitle>🚐 차량 관리</GroupTitle>
+                {/*
+                  * 수리·정비를 **맨 아래**에 둔다. 아래 접근 범위가 수리·정비에만 걸리는데,
+                  * 목록 끝이 다른 기능이면 그 기능의 하위 설정처럼 읽힌다.
+                  * (주유·충전 필요 표시를 뒤에 붙였다가 실제로 그렇게 보였다.)
+                  */}
                 <div className="divide-y divide-surface-100 dark:divide-surface-700">
                     {feature('hipassEnabled')}
-                    {feature('maintenanceEnabled')}
                     {feature('refuelFlagEnabled')}
+                    {feature('maintenanceEnabled')}
                 </div>
                 {values.maintenanceEnabled && (
-                    <MethodGroup caption="접근 범위">
+                    <MethodGroup caption="접근 범위 · 수리·정비에 적용">
                         <MethodRow
                             label="일반 직원도 사용"
                             desc="끄면 관리자만 정비를 기록하고, 일반 직원 화면의 수리·정비 탭이 숨겨집니다."
