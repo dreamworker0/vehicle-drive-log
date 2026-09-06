@@ -3,10 +3,12 @@ name: Preview — PR 미리보기
 on:
   pull_request:
     branches: [master]
+    # closed를 넣으면 기본 목록(opened·synchronize·reopened)이 대체되므로 전부 나열한다.
+    types: [opened, synchronize, reopened, closed]
 
 jobs:
   preview:
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
@@ -37,4 +39,29 @@ jobs:
           export GOOGLE_APPLICATION_CREDENTIALS=$(mktemp)
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
           npx firebase-tools hosting:channel:deploy "pr-${{ github.event.number }}" --expires 3d --project vehicle-drive-log
+          rm -f "$GOOGLE_APPLICATION_CREDENTIALS"
+
+  # PR이 닫히면 그 미리보기 채널을 지운다.
+  #
+  # 채널은 3일 뒤 만료되지만 **만료돼도 자동 삭제되지 않고 할당량(사이트당 50개)만 차지한다.**
+  # 2026-09-06에 하루 여섯 개의 PR을 열다 한도에 닿아 preview 체크가 429로 죽었고,
+  # 만료된 19개를 손으로 지워야 했다(Phase 216). 그때 지운 것들은 전부 이미 머지된 PR의
+  # 채널이었다 — 즉 닫히는 시점에 지웠으면 애초에 쌓이지 않았다.
+  cleanup:
+    if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+
+    steps:
+      # 체크아웃하지 않는다 — CLI 호출 한 번뿐이라 저장소 내용이 필요 없다.
+      - name: Delete preview channel
+        run: |
+          export GOOGLE_APPLICATION_CREDENTIALS=$(mktemp)
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
+          # 채널이 없는 경우가 정상적으로 존재한다(dependabot PR은 배포 스텝을 건너뛰고,
+          # 3일 넘게 열려 있던 PR은 이미 만료돼 사라졌을 수 있다). 그것으로 실패하지 않는다.
+          CHANNEL="pr-${{ github.event.number }}"
+          npx firebase-tools hosting:channel:delete "$CHANNEL" --force --project vehicle-drive-log || echo "채널 $CHANNEL 없음 또는 이미 삭제됨 — 넘어간다"
           rm -f "$GOOGLE_APPLICATION_CREDENTIALS"
