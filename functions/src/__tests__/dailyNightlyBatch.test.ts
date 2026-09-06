@@ -40,6 +40,11 @@ import {
     describeExportFailure,
     isPathAlreadyExists,
     backupFirestoreData,
+    buildCompletionMarker,
+    previousKstDateString,
+    classifyBackupState,
+    describeBackupGap,
+    verifyPreviousBackup,
 } from '../handlers/scheduled/dailyNightlyBatch';
 import { getKSTDateString } from '../utils/kstDate';
 
@@ -445,5 +450,117 @@ describe('describeExportFailure — 매일 밤 나가는 알림이 조치까지 
         const msg = describeExportFailure(denied, URI, 'vehicle-drive-log', 'vehicle-drive-log-backups');
         expect(msg).toContain('<projectNumber>');
         expect(msg).not.toMatch(/\d{10,}/);
+    });
+});
+
+describe('classifyBackupState — 시작만 된 백업과 끝난 백업을 가른다', () => {
+    const D = '2026-09-05';
+    const marker = buildCompletionMarker(D);
+
+    it('완료 표식이 있으면 complete', () => {
+        expect(classifyBackupState([`backups/firestore/${D}/output-0`, marker], D)).toBe('complete');
+    });
+
+    it('출력 파일은 있는데 표식이 없으면 incomplete — 이게 지금까지 아무도 몰랐던 상태다', () => {
+        // export는 장기 실행 작업이라 호출은 성공하고 나중에 실패할 수 있다.
+        // 그때 폴더에는 쓰다 만 출력만 남고 표식은 끝내 쓰이지 않는다.
+        expect(classifyBackupState([`backups/firestore/${D}/output-0`], D)).toBe('incomplete');
+    });
+
+    it('아무것도 없으면 missing', () => {
+        expect(classifyBackupState([], D)).toBe('missing');
+    });
+
+    it('다른 날짜의 표식을 완료로 오인하지 않는다', () => {
+        expect(classifyBackupState([buildCompletionMarker('2026-09-04')], D)).toBe('incomplete');
+    });
+});
+
+describe('previousKstDateString', () => {
+    it('KST 기준 하루 전을 돌려준다', () => {
+        expect(previousKstDateString(new Date('2026-09-06T00:00:00+09:00'))).toBe('2026-09-05');
+    });
+
+    it('월 경계를 넘는다', () => {
+        expect(previousKstDateString(new Date('2026-10-01T03:20:00+09:00'))).toBe('2026-09-30');
+    });
+});
+
+describe('describeBackupGap — 무엇을 해야 하는지 적는다', () => {
+    it('missing은 배치가 안 돈 쪽을 가리킨다', () => {
+        const msg = describeBackupGap('missing', '2026-09-05', 'vehicle-drive-log-backups');
+        expect(msg).toContain('2026-09-05');
+        expect(msg).toContain('gs://vehicle-drive-log-backups');
+        expect(msg).toContain('dailyNightlyBatch');
+    });
+
+    it('incomplete는 장기 실행 작업이 나중에 실패했을 수 있음을 알린다', () => {
+        const msg = describeBackupGap('incomplete', '2026-09-05', 'b');
+        expect(msg).toContain('overall_export_metadata');
+        expect(msg).toContain('장기 실행');
+    });
+});
+
+describe('verifyPreviousBackup — 어제 백업이 끝났는지 확인한다', () => {
+    const originalProject = process.env.GCLOUD_PROJECT;
+    const YESTERDAY = previousKstDateString();
+
+    /** getFiles를 접두사별로 다르게 응답하는 버킷 스텁. */
+    function stubBucketByPrefix(byPrefix: Record<string, string[]>) {
+        const getFiles = jest.fn(async (opts: { prefix: string }) => {
+            const names = byPrefix[opts.prefix] ?? [];
+            return [names.map((name) => ({ name }))];
+        });
+        (getStorage as jest.Mock).mockReturnValue({ bucket: jest.fn().mockReturnValue({ getFiles }) });
+        return getFiles;
+    }
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        process.env.GCLOUD_PROJECT = 'vehicle-drive-log';
+        delete process.env.FIRESTORE_BACKUP_BUCKET;
+        jest.spyOn(console, 'warn').mockImplementation();
+        jest.spyOn(console, 'log').mockImplementation();
+    });
+    afterEach(() => jest.restoreAllMocks());
+    afterAll(() => {
+        if (originalProject === undefined) delete process.env.GCLOUD_PROJECT;
+        else process.env.GCLOUD_PROJECT = originalProject;
+    });
+
+    it('어제 백업이 끝나 있으면 조용히 통과한다', async () => {
+        stubBucketByPrefix({
+            [buildBackupPrefix(YESTERDAY)]: [`backups/firestore/${YESTERDAY}/o-0`, buildCompletionMarker(YESTERDAY)],
+        });
+
+        await expect(verifyPreviousBackup()).resolves.toBeUndefined();
+    });
+
+    it('시작만 되고 끝나지 않았으면 알린다 — 지금까지 영영 몰랐던 경우다', async () => {
+        stubBucketByPrefix({ [buildBackupPrefix(YESTERDAY)]: [`backups/firestore/${YESTERDAY}/o-0`] });
+
+        await expect(verifyPreviousBackup()).rejects.toThrow('끝나지 않았다');
+    });
+
+    it('어제 백업이 통째로 없고 이력이 있으면 알린다', async () => {
+        stubBucketByPrefix({
+            [buildBackupPrefix(YESTERDAY)]: [],
+            'backups/firestore/': ['backups/firestore/2026-01-01/o-0'],  // 이력은 있다
+        });
+
+        await expect(verifyPreviousBackup()).rejects.toThrow('백업이 없다');
+    });
+
+    it('백업 이력이 아예 없으면 헛경보를 내지 않는다 — 첫 배포 직후', async () => {
+        stubBucketByPrefix({ [buildBackupPrefix(YESTERDAY)]: [], 'backups/firestore/': [] });
+
+        await expect(verifyPreviousBackup()).resolves.toBeUndefined();
+    });
+
+    it('목록 조회가 실패하면 판정하지 않는다 — 권한 문제를 백업 부재로 단정하면 헛경보다', async () => {
+        const getFiles = jest.fn().mockRejectedValue(new Error('PERMISSION_DENIED'));
+        (getStorage as jest.Mock).mockReturnValue({ bucket: jest.fn().mockReturnValue({ getFiles }) });
+
+        await expect(verifyPreviousBackup()).resolves.toBeUndefined();
     });
 });

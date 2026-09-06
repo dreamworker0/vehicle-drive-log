@@ -11,7 +11,7 @@
 | 항목 | 확인 방법 | 정상 기준 |
 |------|----------|----------|
 | Functions 에러 | `npm run health` 또는 Firebase Console → Functions → 로그 | ERROR 0건 (⚠️ 최근 로그 300줄 범위의 0건이다 — 그 구간에 로그가 없는 함수는 점검되지 않는다) |
-| Firestore 백업 | Cloud Storage → `backups/firestore/YYYY-MM-DD/` | 오늘 날짜 폴더 존재 |
+| Firestore 백업 | Cloud Storage → `backups/firestore/YYYY-MM-DD/` | 어제 폴더에 `<날짜>.overall_export_metadata` 존재 (폴더만 있는 것은 **시작만 되고 끝나지 않은** 상태다 — §4.1). 오늘 폴더는 아직 export 진행 중일 수 있어 완료 판정 대상이 아니다 |
 | Sentry 에러 | [Sentry 대시보드](https://sentry.io) | 새 이슈 없음 |
 
 > **관련 문서** — 이 매뉴얼은 진입점이고, 세부는 아래에 있습니다.
@@ -144,10 +144,20 @@ firebase functions:log --only ocrDashboard,autoVerifyDocument
     빨간 `🚨 Cloud Functions Exception`과 달리 **즉시 조치가 필요한 장애는 아니다.**
 - **실패 시**: 백업 스텝이 실패하면 `captureError`가 Sentry·Discord로 알린다. `PERMISSION_DENIED`면
   알림 본문에 원인 판정(IAM)과 조치 명령이 함께 실린다(`describeExportFailure`).
-  - ⚠️ **알림이 없다고 백업이 있는 것은 아니다.** 코드는 export를 걸고 "시작됨"만 남긴 뒤 끝난다
-    (장기 실행 작업의 완료를 기다리지 않는다). 작업이 시작된 **뒤** 실패하면 아무 알림도 나가지
-    않는다. 그래서 **오늘 폴더가 비어 있으면** 두 가지가 모두 가능하다 — 배치가 안 돌았거나,
-    걸린 export가 나중에 실패했거나. 함수 로그에 `Firestore backup started`가 있으면 후자다.
+- **완료 확인은 하루 뒤에 한다** (`verifyPreviousBackup` 스텝, 2026-09-06 추가):
+  - 백업 스텝은 export를 걸고 "시작됨"만 남긴 뒤 끝난다 — 관리형 export는 장기 실행 작업이라
+    완료를 그 자리에서 기다릴 수 없다. 그래서 **호출이 성공해도 나중에 실패하면 알림이 없었다.**
+    예전에는 사람이 버킷을 눈으로 봐야만 알 수 있었다.
+  - 이제 매일 배치가 **어제 폴더**에 완료 표식(`<날짜>.overall_export_metadata`)이 있는지 본다.
+    이 표식은 export가 **끝날 때** 쓰이므로, 출력 파일만 있고 표식이 없으면 시작만 되고 끝나지
+    않은 것이다. 폴링으로 함수를 붙잡아 두는 대신 목록 조회 1회로 끝낸다 — 발견이 최대 24시간
+    늦지만, "영영 모른다"를 "하루 안에 안다"로 바꾸는 것이 실질적인 이득이다.
+  - 판정은 셋이다. **없음**(배치가 안 돌았거나 export 호출 자체가 거부) · **미완료**(시작 후
+    실패) · **완료**. 앞의 둘은 `captureError`로 Sentry·Discord에 올라가고, 메시지에 어느
+    쪽인지와 다음에 볼 곳이 함께 실린다.
+  - 헛경보를 내지 않는 두 경우: 백업 이력이 아예 없으면(첫 배포 직후) 건너뛰고, 목록 조회가
+    실패하면(권한 등) 판정하지 않는다 — 확인 못 한 것을 백업 부재로 단정하지 않는다.
+  - 보관 90일 · 매일 02:20 실행이라 어제 폴더가 수명 주기로 지워질 일은 없다.
 
 ```bash
 # Firebase Console에서 확인
