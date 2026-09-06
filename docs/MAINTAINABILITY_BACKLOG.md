@@ -71,39 +71,68 @@
 
 ## 별도 트랙: Functions 런타임 메이저 이관 (firebase-admin 14 · firebase-functions 7) — 미착수
 
+> **2026-09-06 실측으로 전면 갱신.** 이전 판(2026-08-05 기준 "8개 파일 22건")은 두 군데가
+> 틀렸다 — 최대 난관으로 적혀 있던 두 항목은 **이미 해소됐고**, 정작 막고 있는 것 둘은
+> 적혀 있지 않았다. 아래는 두 메이저를 실제로 설치해 측정한 결과다.
+>
+> 측정 방법: 브랜치에서 `npm install firebase-admin@^14 firebase-functions@^7`,
+> `npm run type-check:functions`, `npm --prefix functions run test`. 측정 후 원복했다.
+
 `firebase-admin` 13→14와 `firebase-functions` 6→7은 **함께 올려야 하는 한 묶음**이다.
 functions 6의 peer가 `firebase-admin ^11 || ^12 || ^13`이라 admin 14 단독 상향은 `npm ci`가
-ERESOLVE로 실패하고(PR #116), functions 7은 peer에 `^14`를 포함하므로 상향 순서가 강제된다.
-둘을 함께 설치해 검증하면 `npm run type-check:functions`가 **8개 파일에서 22건** 실패했다
-(2026-08-05 실측). 이 수치는 `updateDriveLogStats.ts` 삭제 **이전** 값이므로, 그 파일이
-들고 있던 8건이 빠진 현재는 더 적다 — 정확한 수는 두 메이저를 실제로 설치해 재측정해야 한다.
-그래서 dependabot은 두 메이저를 ignore에 등록해 보류 중이며
+ERESOLVE로 실패하고(PR #116), functions 7은 peer에 `^14`를 포함하므로 순서가 강제된다.
+dependabot은 두 메이저를 ignore에 등록해 보류 중이며
 ([.github/dependabot.yml](../.github/dependabot.yml)), 이관 완료 시 **두 항목을 함께** 제거한다.
 
-- **(1) `admin.firestore` 네임스페이스 API 제거 (12건 → 4건)** — firebase-admin 14가 네임스페이스
-  접근을 없앴다. 모듈러 API로 이관한다: `getFirestore()`·`FieldValue`를
-  `firebase-admin/firestore`에서 직접 import.
-  - ~~`services/driveLog/updateDriveLogStats.ts` (8건 — 가장 큼)~~ → **파일 삭제로 해소**.
-    죽은 코드였다: `index.ts`에 export가 없어 배포된 적이 없고, 트리거 경로
-    `organizations/{orgId}/driveLogs/{logId}`는 데이터 모델에 없으며(`driveLogs`는 최상위),
-    쓰는 대상 `organizations/{orgId}/monthlyStats`를 읽는 코드도 없었다. 실제 집계는
-    `syncDriveLogKm` → `updateAggregatedStats`가 담당한다. 재발 방지로
-    `check:functions-catalog`에 **고아 함수 파일 검사**를 추가했다(정의했으면 index.ts에 등록).
-  - 남은 것: `scripts/cleanDuplicateCalendars.ts` (2건),
-    `handlers/scheduled/verifyMileageConsistency.ts` (1건),
-    `handlers/https/submitPublicFeedback.ts` (1건)
-- **(2) express 타입 5 계열 전환 (8건)** — firebase-functions 7이 번들하는 `@types/express`가
-  5로 올라가며 `Request`/`Response` named export가 사라졌다.
-  - `utils/helpers.ts`, `utils/createAuthenticatedProxy.ts`,
-    `handlers/https/slackEvents.ts`, `handlers/https/slackOauthCallback.ts` (각 2건)
-- **주의**: 인증 프록시(`createAuthenticatedProxy`)는 `holidayProxy`·`tmapProxy`의 공통 관문이라
-  배포 즉시 프로덕션에 반영된다. 커버리지가 0%였으므로 이관 전제로
-  `functions/src/__tests__/createAuthenticatedProxy.test.ts`를 먼저 붙였다(401·429·uid 전달·
-  rate limit 키가 IP가 아니라 uid라는 점까지 고정). 이관 시 에뮬레이터에서 Slack 웹훅
-  경로를 함께 확인한다.
-  - 과거 이 항목이 "집계 트리거(`updateDriveLogStats`)" 위험을 함께 들고 있었으나, 그 함수는
-    배포되지 않는 죽은 코드였다(위 (1) 참고). 이관의 최대 난관으로 계산돼 있던 것이
-    실제로는 위험이 아니었다 — 남은 위험은 인증 프록시와 express 타입뿐이다.
+### 해소된 것 (더 이상 과제가 아님)
+
+- **`admin.firestore` 네임스페이스 API — 0건.** 이전 판은 3개 파일에 4건이 남았다고
+  적었으나, `functions/src`·`scripts` 전체에 `admin.firestore`·`import * as admin` 사용이
+  없다. 다른 작업에 딸려 정리된 것으로 보인다.
+- **타입 오류 — 22건이 아니라 3건이고, 그 3건도 의존성 정렬로 사라진다.**
+  `slackEvents.ts`·`slackOauthCallback.ts`·`createAuthenticatedProxy.ts`에서 나는 TS2345는
+  코드 문제가 아니라 **트리에 express 타입이 두 개 있어서** 난다 — 우리가 명시한
+  `@types/express` 4와 firebase-functions 7이 번들한 5가 `sendfile` 유무로 갈린다.
+  `@types/express`를 5로 올리면 **type-check 0건**이 된다(실측).
+  즉 열려 있는 PR #287은 틀린 게 아니라 **순서만 어긋난** PR이다.
+
+### 실제로 막고 있는 것
+
+**(1) `firebase-functions-test`가 admin 14를 막는다 — 그런데 쓰지 않는 패키지다.**
+
+peer가 `firebase-admin ^8 ~ ^13`이고 **최신이 3.5.0이라 올릴 수단이 없다.** 이 상태로는
+`npm ci`가 ERESOLVE로 죽는다. 그런데 저장소 전체에서 이 패키지를 import하는 코드가
+**한 줄도 없다**(`package.json`·`package-lock.json`에만 존재). 제거로 해소된다.
+
+**(2) `jose`가 ESM 전용이라 Jest가 로드에 실패한다 — 이것이 진짜 과제다.**
+
+```
+firebase-admin@14 → jwks-rsa@4.1.0 → jose@6.2.12
+  exports["."].default → ./dist/webapi/index.js   (CJS 빌드 없음)
+```
+
+우리 Jest는 ts-jest CommonJS 구성이라 `require()`가 불가능하고,
+`firebase-admin/auth`를 타고 들어가는 **모든 테스트가 로드 단계에서 죽는다 —
+17개 스위트, 발생 44회**(`Must use import to load ES Module`). 프로덕션 런타임은
+영향이 없다. **테스트 인프라만의 문제**다.
+
+- 배포 대상 Node 22는 ESM을 로드할 수 있고, 실제 실행 경로는 firebase-admin이 처리한다.
+- `functions/package.json`의 jest 설정에는 `transform`이 `^.+\.tsx?$` 하나뿐이라
+  `node_modules`의 JS는 변환 대상이 아니다.
+- 참고: `joinOrganization.ts:182`가 이미 `await import("firebase-admin/auth")` 형태를
+  쓰고 있다. 다만 `module: "commonjs"` 하에서는 이것도 `require`로 내려가므로,
+  지연 로딩이 통하는 이유는 "테스트가 그 경로를 실행하지 않아서"이지 ESM을
+  제대로 로드해서가 아니다 — 해법을 고를 때 이 차이를 혼동하지 말 것.
+
+### 위험 (변하지 않음)
+
+인증 프록시(`createAuthenticatedProxy`)는 `holidayProxy`·`tmapProxy`의 공통 관문이라
+배포 즉시 프로덕션에 반영된다. 커버리지가 0%였으므로 이관 전제로
+`functions/src/__tests__/createAuthenticatedProxy.test.ts`를 먼저 붙였다(401·429·uid 전달·
+rate limit 키가 IP가 아니라 uid라는 점까지 고정). 이관 시 에뮬레이터에서 Slack 웹훅
+경로를 함께 확인한다.
+
+**계획서**: [2026-09-06-Functions런타임이관-계획서.md](2026-09-06-Functions런타임이관-계획서.md)
 
 ---
 
