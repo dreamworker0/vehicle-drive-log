@@ -11,7 +11,7 @@
  *
  * 이 모듈은 화면(토스트)에 의존하므로 SW 번들에 들어가면 안 된다 — sw.ts는 syncQueue만 import한다.
  */
-import { drainFailedRecords, flushQueue, type FailedRecord } from './syncQueue';
+import { peekFailedRecords, clearFailedRecords, flushQueue, type FailedRecord } from './syncQueue';
 import { notifyUser } from '../notify';
 
 /** 큐에 적재되는 컬렉션 → 사용자가 읽는 이름 (enqueue 호출부와 1:1) */
@@ -47,7 +47,38 @@ export function buildFailureMessage(records: FailedRecord[]): string {
         ? '권한이 없거나 이미 변경된 기록이라'
         : '통신 오류가 반복되어';
 
-    return `저장하지 못한 내용이 있습니다 — ${summary}. ${cause} 서버에 반영되지 않았습니다. 번거롭지만 다시 입력해 주세요.`;
+    // 무엇을 잃었는지 함께 적는다. "다시 입력해 주세요"만으로는 다시 입력할 수가 없다 —
+    // 차에서 내린 뒤에는 계기판 숫자를 기억으로 복원할 방법이 없기 때문이다.
+    // 큐는 payload를 그대로 들고 있었는데 지금까지 건수만 세고 버렸다.
+    const details = records.map(describeRecord).filter(Boolean);
+    const detailText = details.length > 0 ? ` (${details.join(' / ')})` : '';
+
+    return `저장하지 못한 내용이 있습니다 — ${summary}${detailText}. ${cause} 서버에 반영되지 않았습니다. 번거롭지만 다시 입력해 주세요.`;
+}
+
+/**
+ * 폐기된 기록 한 건을 사용자가 알아볼 수 있는 한 줄로 만든다.
+ *
+ * 다시 입력하려면 **계기판 숫자**가 있어야 한다 — 날짜·목적지는 기억나도 그건 안 난다.
+ * 값이 없는 조각은 빼고, 남는 것이 없으면 빈 문자열을 돌려준다(빈 괄호가 뜨지 않게).
+ */
+export function describeRecord(record: FailedRecord): string {
+    const data = (record.data ?? {}) as Record<string, unknown>;
+    const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+    const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+
+    const parts: string[] = [];
+    const when = str(data.startDate) ?? str(data.date);
+    if (when) parts.push(when);
+    const where = str(data.destination);
+    if (where) parts.push(where);
+
+    const startKm = num(data.startKm);
+    const endKm = num(data.endKm);
+    if (startKm !== undefined && endKm !== undefined) {
+        parts.push(`${startKm.toLocaleString()}→${endKm.toLocaleString()}km`);
+    }
+    return parts.join(' · ');
 }
 
 /**
@@ -56,10 +87,13 @@ export function buildFailureMessage(records: FailedRecord[]): string {
  */
 export async function reportFailedSync(): Promise<number> {
     try {
-        const records = await drainFailedRecords();
+        // **읽고, 알리고, 그다음에 비운다.** 예전에는 비우면서 읽어, 알리기 직전에 화면이
+        // 닫히면 기록은 사라지고 사용자는 끝내 듣지 못했다.
+        const records = await peekFailedRecords();
         if (records.length === 0) return 0;
         // 유실 안내는 놓치면 의미가 없으므로 일반 토스트보다 길게 띄운다.
         notifyUser(buildFailureMessage(records), 'error', 15000);
+        await clearFailedRecords();
         return records.length;
     } catch (error) {
         console.error('[SyncFailureNotice] 폐기 기록 확인 실패', error);

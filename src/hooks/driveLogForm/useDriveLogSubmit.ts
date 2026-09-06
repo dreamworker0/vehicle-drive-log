@@ -20,6 +20,7 @@ import type { Vehicle } from '../../types/vehicle';
 import type { DriveLogForm, LocationState } from './types';
 import type { HipassCard } from '../../types/hipass';
 import type { DriveLog } from '../../types/driveLog';
+import { hasDurableLocalCache } from '../../lib/firebase';
 
 export interface SubmitDeps {
     // State & Form
@@ -194,7 +195,20 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
 
         if (isDuplicate || isTimeout) {
             if (isTimeout) {
-                showToast('네트워크 지연으로 운행일지를 로컬에 임시 저장했습니다. 연결 시 동기화됩니다.', 'success');
+                // 타임아웃은 **실패가 아니라 모름**이다. 8초 안에 응답을 못 받았을 뿐,
+                // 걸어 둔 쓰기는 그대로 진행 중이다.
+                //
+                // 다만 "저장했다"고 말해도 되는지는 로컬 캐시가 내구성이 있느냐에 달렸다.
+                // persistent면 Firestore가 미전송 쓰기를 IndexedDB에 남겨 다음 접속에 재전송하므로
+                // 사실상 저장된 것이 맞다. 사생활 보호 모드 등으로 memory 캐시로 떨어졌다면
+                // **탭을 닫는 순간 사라진다** — 그때도 초록색으로 "저장했습니다"라고 말하면
+                // 사라진 기록을 저장됐다고 믿게 만든다.
+                showToast(
+                    hasDurableLocalCache()
+                        ? '네트워크 지연으로 운행일지를 로컬에 임시 저장했습니다. 연결 시 동기화됩니다.'
+                        : '네트워크 지연으로 저장 여부를 확인하지 못했습니다. 이 기기는 임시 보관이 되지 않으니 [내 기록]에서 저장됐는지 확인해 주세요.',
+                    hasDurableLocalCache() ? 'success' : 'warning',
+                );
             } else {
                 showToast('요청된 내용이 정상 반영되어 이미 목록에 저장되었습니다.', 'success');
             }

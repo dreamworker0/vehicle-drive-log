@@ -24,7 +24,7 @@ vi.mock('firebase/firestore', () => {
 });
 vi.mock('@/lib/firebase', () => ({ db: {} }));
 
-import { enqueue, clearQueue, flushQueue, getSyncDB, drainFailedRecords, getPendingCount, retryCooldownMs, SERVER_TIMESTAMP_MARKER, DELETE_FIELD_MARKER } from '@/lib/offline/syncQueue';
+import { enqueue, clearQueue, flushQueue, getSyncDB, peekFailedRecords, clearFailedRecords, getPendingCount, retryCooldownMs, SERVER_TIMESTAMP_MARKER, DELETE_FIELD_MARKER } from '@/lib/offline/syncQueue';
 import { setDoc, updateDoc, deleteDoc, serverTimestamp, deleteField, FieldValue, Timestamp } from 'firebase/firestore';
 
 async function allDocIds(): Promise<string[]> {
@@ -80,7 +80,7 @@ describe('offline syncQueue', () => {
         await flushQueue();
 
         expect(await getPendingCount()).toBe(0);
-        expect(await drainFailedRecords()).toHaveLength(1);
+        expect(await peekFailedRecords()).toHaveLength(1);
     });
 
     it('flush 실패 항목은 보존하고 성공 항목만 제거한다', async () => {
@@ -177,11 +177,12 @@ describe('offline syncQueue', () => {
 
         await flushQueue();
 
-        const failed = await drainFailedRecords();
+        const failed = await peekFailedRecords();
+        await clearFailedRecords();
         expect(failed).toHaveLength(1);
         expect(failed[0]).toMatchObject({ docId: 'denied', collection: 'driveLogs', reason: 'permanent', code: 'permission-denied' });
         // 한 번 알린 유실은 다시 알리지 않는다(drain은 읽으면서 비운다)
-        expect(await drainFailedRecords()).toEqual([]);
+        expect(await peekFailedRecords()).toEqual([]);
     });
 
     it('폐기된 항목은 유실 기록으로 남는다 — 재시도 소진', async () => {
@@ -197,7 +198,8 @@ describe('offline syncQueue', () => {
                 vi.setSystemTime(Date.now() + retryCooldownMs(i) + 1);
             }
 
-            const failed = await drainFailedRecords();
+            const failed = await peekFailedRecords();
+        await clearFailedRecords();
             expect(failed).toHaveLength(1);
             expect(failed[0]).toMatchObject({ docId: 'poison', reason: 'retry-exhausted' });
         } finally {
@@ -213,7 +215,7 @@ describe('offline syncQueue', () => {
 
         await clearQueue();
 
-        expect(await drainFailedRecords()).toEqual([]);
+        expect(await peekFailedRecords()).toEqual([]);
     });
 
     it('겹친 flush 호출은 같은 실행을 공유한다 — 폐기 안내가 빈 큐를 보지 않도록', async () => {
@@ -312,7 +314,7 @@ describe('offline syncQueue', () => {
 
             // UPDATE는 전송 시도조차 하지 않는다 — not-found로 즉시 폐기되던 경로가 막혔다
             expect(vi.mocked(updateDoc)).not.toHaveBeenCalled();
-            expect(await drainFailedRecords()).toEqual([]);   // 유실 없음
+            expect(await peekFailedRecords()).toEqual([]);   // 유실 없음
             expect(await allDocIds()).toEqual(['LOG1', 'LOG1']); // 둘 다 큐에 보존
 
             // 냉각이 끝나고 연결이 회복되면 순서대로 올라간다
@@ -376,7 +378,8 @@ describe('offline syncQueue', () => {
 
         // 선행이 영영 반영되지 않으므로 후속도 즉시 폐기 — 사용자에게 정확한 사유로 바로 알린다
         expect(await allDocIds()).toEqual([]);
-        const failed = await drainFailedRecords();
+        const failed = await peekFailedRecords();
+        await clearFailedRecords();
         expect(failed).toHaveLength(2);
         expect(failed.map((f) => f.type)).toEqual(['CREATE', 'UPDATE']);
         expect(failed.every((f) => f.reason === 'permanent')).toBe(true);

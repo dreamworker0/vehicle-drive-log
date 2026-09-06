@@ -201,13 +201,22 @@ export async function getPendingCount(): Promise<number> {
  * 폐기 기록을 읽어내고 비운다(한 번 알린 유실을 다시 알리지 않기 위해 읽기와 삭제를 묶는다).
  * 페이지 컨텍스트의 안내 모듈만 호출한다.
  */
-export async function drainFailedRecords(): Promise<FailedRecord[]> {
+export async function peekFailedRecords(): Promise<FailedRecord[]> {
     const database = await getSyncDB();
     if (!database) return [];
-    const records = await database.getAll('failed-store');
-    if (records.length === 0) return [];
+    return database.getAll('failed-store');
+}
+
+/**
+ * 사용자에게 **알린 뒤** 폐기 기록을 비운다.
+ *
+ * 예전에는 읽으면서 함께 비웠다(`drainFailedRecords`). 읽은 직후 화면이 닫히면 기록은
+ * 사라지고 사용자는 끝내 듣지 못했다 — 유실을 알리는 장치가 유실되는 모양이었다.
+ */
+export async function clearFailedRecords(): Promise<void> {
+    const database = await getSyncDB();
+    if (!database) return;
     await database.clear('failed-store');
-    return records;
 }
 
 // 동시 flush 방지 — SW sync 이벤트와 window 'online' 폴백이 겹칠 수 있다.

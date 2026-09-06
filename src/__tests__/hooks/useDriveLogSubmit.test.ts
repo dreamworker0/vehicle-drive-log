@@ -37,6 +37,8 @@ vi.mock('../../hooks/driveLogForm/resolveStartKm', () => ({
     resolveStartKm: vi.fn(async () => '51000'),
 }));
 vi.mock('../../hooks/useTodayDashboard', () => ({ invalidateDashboardCache: vi.fn() }));
+const mockDurable = vi.fn(() => true);
+vi.mock('../../lib/firebase', () => ({ hasDurableLocalCache: () => mockDurable() }));
 vi.mock('../../lib/sentry', () => ({ captureError: vi.fn() }));
 
 import { useDriveLogSubmit, type SubmitDeps } from '../../hooks/driveLogForm/useDriveLogSubmit';
@@ -257,10 +259,24 @@ describe('중복·타임아웃은 성공으로 처리한다', () => {
     });
 
     it('타임아웃이면 로컬 임시 저장으로 안내한다', async () => {
+        mockDurable.mockReturnValue(true);
         mockSubmitDriveLog.mockRejectedValue(new Error('TIMEOUT'));
         await submit(deps());
 
         expect(showToast).toHaveBeenCalledWith(expect.stringContaining('로컬에 임시 저장'), 'success');
+    });
+
+    it('임시 보관이 안 되는 기기에서는 저장했다고 말하지 않는다', async () => {
+        // 타임아웃은 실패가 아니라 **모름**이다. persistent 캐시면 Firestore가 미전송 쓰기를
+        // 남겨 두므로 사실상 저장된 것이 맞지만, memory 캐시로 떨어진 기기(사생활 보호 모드 등)는
+        // 탭을 닫는 순간 사라진다. 그때도 초록색으로 "저장했습니다"라고 하면 거짓말이 된다.
+        mockDurable.mockReturnValue(false);
+        mockSubmitDriveLog.mockRejectedValue(new Error('TIMEOUT'));
+
+        await submit(deps());
+
+        expect(showToast).toHaveBeenCalledWith(expect.stringContaining('확인하지 못했습니다'), 'warning');
+        expect(showToast).not.toHaveBeenCalledWith(expect.stringContaining('임시 저장했습니다'), 'success');
     });
 
     it('예약에서 넘어온 작성이면 오늘의 운행으로 돌려보낸다', async () => {
