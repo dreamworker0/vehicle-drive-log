@@ -122,13 +122,14 @@ function initSentryWithModule(Sentry: SentryModule) {
          * 트랜잭션 이벤트라 beforeSend도 타지 않는다(그쪽은 오류 이벤트 전용).
          *
          * 이 훅은 루트 스팬과 자식 스팬 **모두**에 적용된다(core/client.js processBeforeSend).
-         * standalone web-vital 스팬(INP·CLS·LCP)도 여기를 거친다 — 트랜잭션이 아니라 스팬
-         * 봉투로 따로 나가지만 `createSpanEnvelope`가 같은 콜백을 태운다(core/envelope.js).
+         * standalone 스팬도 여기를 거친다 — 트랜잭션이 아니라 스팬 봉투로 따로 나가지만
+         * `createSpanEnvelope`가 같은 콜백을 태운다(core/envelope.js).
          *
-         * **이름도 함께 걸러야 한다.** 그 스팬들은 이름 자체가 요소 설명이라
-         * (`metrics/inp.js`) `aria-label`·`title`이 그대로 실린다. Phase 211에서 이 경로를
-         * "설치본에 없는 패키지"라며 반려했는데, 패키지 이름만 달랐을 뿐
-         * (`@sentry/browser-utils`) 경로는 실재했다.
+         * **이름도 함께 걸러야 한다.** 지금 설정에서 standalone인 것은 INP인데, 그 스팬은
+         * 이름 자체가 요소 설명이라(`metrics/inp.js`) `aria-label`·`title`이 그대로 실린다.
+         * (CLS·LCP는 standalone이 아니라 pageload 루트 스팬의 속성으로 나간다 — 그쪽은
+         * `scrubSpanData`가 맡는다.) Phase 211에서 이 경로를 "설치본에 없는 패키지"라며
+         * 반려했는데, 패키지 이름만 달랐을 뿐(`@sentry/browser-utils`) 경로는 실재했다.
          */
         beforeSendSpan(span) {
             const data = scrubSpanData(span.data as Record<string, unknown> | undefined);

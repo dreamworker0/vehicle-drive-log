@@ -319,9 +319,13 @@ const SPAN_URL_KEYS = ['url', 'http.url', 'url.full'] as const;
 /**
  * 스팬 속성 중 **요소 설명(DOM 트리 문자열)**을 담는 키.
  *
- * web-vital 스팬은 어느 요소가 문제였는지를 `htmlTreeAsString`으로 적는다
- * (@sentry/browser-utils `metrics/lcp.js`·`cls.js`·`webVitalSpans.js`). 그 함수는
+ * web-vital 계측은 어느 요소가 문제였는지를 `htmlTreeAsString`으로 적는다. 그 함수는
  * `aria-label`·`title`·`alt`를 **항상** 붙이므로 breadcrumb과 똑같은 값이 여기로도 나간다.
+ *
+ * 지금 설정에서 실제로 도는 것은 pageload 루트 스팬에 붙는 `lcp.element`·`cls.source.N`이다
+ * (@sentry/browser-utils `metrics/browserMetrics.js`의 `_setWebVitalAttributes`).
+ * `browser.web_vital.` 접두 키는 standalone/스트리밍 경로 전용이라 지금은 돌지 않지만,
+ * `_experiments` 플래그 하나로 켜지므로 함께 잡아 둔다.
  */
 function isDomTargetSpanKey(key: string): boolean {
     return key === 'lcp.element'
