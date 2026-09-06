@@ -103,6 +103,11 @@ out.txt
 # Agent / AI
 # Claude Code 개인 권한 설정 — 공용 설정은 .claude/settings.json(추적), 개인 오버라이드는 로컬 전용
 .claude/settings.local.json
+# 브라우저 미리보기용 개발 서버 설정 — 도구가 자동 생성하고 포트·경로가 기기마다 다르다.
+# .claude/ 아래 스킬·커맨드 브리지 47개는 추적 대상이므로 디렉터리째 무시하지 않는다.
+.claude/launch.json
+# 일회성 외부 프롬프트 원문 — 작업 판단은 구현이력 Phase 209에 남겼다(원문 자체는 저장소에 둘 것이 아니다)
+docs/2026-09-05-Claude-Opus-개선프롬프트.md
 .gemini/
 .agents/
 .superpowers/
