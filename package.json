@@ -10,6 +10,7 @@
     "dev": "vite",
     "check:node": "tsx scripts/check-node-version.ts",
     "check:release-notes": "tsx scripts/check-release-notes.ts",
+    "check:faq": "tsx scripts/check-faq-coverage.ts",
     "check:functions-env": "tsx scripts/check-functions-env.ts",
     "check:functions-catalog": "tsx scripts/check-functions-catalog.ts",
     "prebuild": "tsx scripts/check-node-version.ts && tsx scripts/generate-sw-config.ts",

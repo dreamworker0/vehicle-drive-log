@@ -19,6 +19,7 @@ description: 사용자용 업데이트 소식(공지) 항목을 추가·수정�
 >
 > ```bash
 > npm run check:release-notes          # 후보가 있으면 종료 코드 1
+> npm run check:faq                   # 새 기능 공지에 FAQ 연결이 비었으면 종료 코드 1
 > npm run check:release-notes -- --soft # 보고만
 > ```
 >
