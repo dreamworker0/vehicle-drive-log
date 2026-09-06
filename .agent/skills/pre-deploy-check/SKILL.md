@@ -79,10 +79,15 @@ git diff master -- src/ | grep -oE 'VITE_[A-Z_]+'
 
 ```bash
 npm run check:release-notes
-npm run check:faq
 ```
 
 `public/data/releaseNotes.json`을 마지막으로 건드린 커밋 이후의 **사용자 화면을 바꾼 feat/fix**를 나열한다. 후보가 있으면 [release-notes 스킬](../release-notes/SKILL.md) 규칙대로 항목을 추가한다. 알릴 내용이 아닌 변경이면 `-- --soft`로 확인만 하고 넘어간다 — 판단은 사람이 한다.
+
+```bash
+npm run check:faq
+```
+
+이쪽은 git을 보지 않는다. 공지의 **새 기능 항목(`type: "new"`)** 에 그것을 설명하는 FAQ id가 적혀 있는지만 본다. FAQ가 필요 없다고 판단했으면 `"faq": []`로 넘어간다 — 여기서도 판단은 사람이 한다. 다만 **끊긴 연결(없는 id)과 배열이 아닌 값은 `--soft`로도 통과하지 않는다.** 그건 판단할 것이 없는 그냥 오류다.
 
 기능이 나갔는데 공지가 없으면 사용자는 화면이 달라진 이유를 알 수 없다. 실제로 다섯 건이 공지 없이 배포된 전례가 있다.
 

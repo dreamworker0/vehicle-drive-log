@@ -22,7 +22,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { FAQ_ITEMS } from '../shared/faqData';
 import {
-    FAQ_COVERAGE_SINCE, findMissingLinks, findDanglingLinks,
+    FAQ_COVERAGE_SINCE, findMissingLinks, findDanglingLinks, findMalformedLinks,
     type ReleaseNoteEntry,
 } from './lib/faqCoverageRules';
 
@@ -41,8 +41,9 @@ function main() {
 
     const missing = findMissingLinks(notes);
     const dangling = findDanglingLinks(notes, faqIds);
+    const malformed = findMalformedLinks(notes);
 
-    if (missing.length === 0 && dangling.length === 0) {
+    if (missing.length === 0 && dangling.length === 0 && malformed.length === 0) {
         console.log(`✅ 새 기능 공지가 모두 FAQ와 연결돼 있습니다 (${FAQ_COVERAGE_SINCE} 이후 기준, FAQ ${faqIds.length}개).`);
         return;
     }
@@ -72,7 +73,21 @@ function main() {
         console.warn('');
     }
 
-    if (!soft) process.exit(1);
+    if (malformed.length > 0) {
+        console.warn(`❌ faq가 배열이 아닌 항목 ${malformed.length}건`);
+        console.warn('');
+        for (const bad of malformed) {
+            console.warn(`   · ${bad.date} ${bad.title} → ${JSON.stringify(bad.value)}`);
+        }
+        console.warn('');
+        console.warn('   → id 하나여도 배열로 적으세요: "faq": ["some-faq-id"]');
+        console.warn('');
+    }
+
+    // --soft는 "기계가 판단할 수 없으니 후보만 본다"는 뜻이다(형제 스크립트와 같은 의미).
+    // 끊긴 연결과 잘못된 모양에는 판단할 것이 없다 — 그냥 틀린 것이라 --soft로도 통과시키지 않는다.
+    const hardFailures = dangling.length + malformed.length;
+    if (hardFailures > 0 || !soft) process.exit(1);
 }
 
 // 직접 실행할 때만 검사한다 — 판정 함수는 단위 테스트가 import한다(check-release-notes.ts와 같은 관례)

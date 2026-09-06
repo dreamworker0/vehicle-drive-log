@@ -233,7 +233,7 @@ export default function FeatureToggleSection({ values, onChange }: FeatureToggle
                     다른 토글과 달리 기본값이 꺼짐이다 — 예약·바로 운행은 전 직원이 매일 쓰는 자리라
                     새 입력란이 예고 없이 나타나지 않게 기관이 켜서 쓴다(orgFeatures.ts 주석). */}
                 {values.passengerEnabled && (
-                    <MethodGroup caption="입력 위치">
+                    <MethodGroup caption="입력 위치 · 동승자에 적용">
                         <MethodRow
                             label="예약·바로 운행에서 미리 입력"
                             desc="예약 폼과 바로 운행 화면에 동승자 입력을 추가합니다. 적어 두면 운행일지 작성 시 자동으로 채워지고, 실제 탑승은 운행일지에서 확정합니다."

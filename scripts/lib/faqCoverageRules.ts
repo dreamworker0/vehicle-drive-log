@@ -26,7 +26,7 @@ export interface ReleaseNoteItem {
     type: string;
     text: string;
     /** 이 기능을 설명하는 FAQ의 id 목록. 빈 배열은 "FAQ가 필요 없다고 판단함"을 뜻한다. */
-    faq?: string[];
+    faq?: string[] | unknown;
 }
 
 export interface ReleaseNoteEntry {
@@ -66,6 +66,31 @@ export interface DanglingLink {
     date: string;
     title: string;
     faqId: string;
+}
+
+export interface MalformedLink {
+    date: string;
+    title: string;
+    value: unknown;
+}
+
+/**
+ * `faq`가 배열이 아닌 항목 — **날짜·유형과 무관하게** 전부 본다.
+ *
+ * 문자열 하나를 적는 실수(`"faq": "branch-site-setup"`)가 가장 흔한데, 그러면 두 검사 모두
+ * 조용히 빠져나간다. findMissingLinks는 `new`가 아니면 건너뛰고, findDanglingLinks는
+ * 배열이 아니면 건너뛴다. 그 결과 **오타 난 id가 적혀 있어도 게이트는 ✅를 찍는다.**
+ * 적었다는 사실만 보는 게이트에서, 적은 모양이 틀린 것은 놓치면 안 되는 유일한 종류다.
+ */
+export function findMalformedLinks(notes: ReleaseNoteEntry[]): MalformedLink[] {
+    const bad: MalformedLink[] = [];
+    for (const entry of notes) {
+        for (const item of entry.items) {
+            if (item.faq === undefined || Array.isArray(item.faq)) continue;
+            bad.push({ date: entry.date, title: entry.title, value: item.faq });
+        }
+    }
+    return bad;
 }
 
 /**

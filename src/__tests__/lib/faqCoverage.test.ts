@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import notesJson from '../../../public/data/releaseNotes.json';
 import { FAQ_ITEMS } from '@/lib/faqData';
 import {
-    FAQ_COVERAGE_SINCE, requiresFaqLink, findMissingLinks, findDanglingLinks,
+    FAQ_COVERAGE_SINCE, requiresFaqLink, findMissingLinks, findDanglingLinks, findMalformedLinks,
     type ReleaseNoteEntry,
 } from '../../../scripts/lib/faqCoverageRules';
 
@@ -27,6 +27,13 @@ describe('requiresFaqLink', () => {
 
     it('기준일 이전 공지는 요구하지 않는다 — 소급해 채운 연결은 추측이 된다', () => {
         expect(requiresFaqLink({ type: 'new', text: 'x' }, '2026-08-01', '2026-09-04')).toBe(false);
+    });
+
+    it('기준일 **당일**은 포함한다', () => {
+        // 경계가 없으면 >= 를 > 로 바꿔도 아무 테스트가 깨지지 않는다. 그러면 이 PR이
+        // 연결을 채워 넣은 2026-09-04 공지가 조용히 대상에서 빠진다.
+        expect(requiresFaqLink({ type: 'new', text: 'x' }, '2026-09-04', '2026-09-04')).toBe(true);
+        expect(requiresFaqLink({ type: 'new', text: 'x' }, '2026-09-03', '2026-09-04')).toBe(false);
     });
 });
 
@@ -62,6 +69,24 @@ describe('findDanglingLinks', () => {
     });
 });
 
+describe('findMalformedLinks', () => {
+    it('배열이 아닌 faq를 집어낸다 — 두 검사 모두 조용히 빠져나가는 유일한 구멍이다', () => {
+        // 문자열 하나를 적는 실수가 가장 흔한데, findMissingLinks는 new가 아니면 건너뛰고
+        // findDanglingLinks는 배열이 아니면 건너뛴다. 오타 난 id가 적혀 있어도 ✅가 찍힌다.
+        const bad = findMalformedLinks([
+            { date: '2026-09-10', title: 'T', items: [{ type: 'improved', text: 'x', faq: 'typo-id' }] },
+        ]);
+        expect(bad).toHaveLength(1);
+        expect(bad[0].value).toBe('typo-id');
+    });
+
+    it('없거나 배열이면 문제 삼지 않는다', () => {
+        expect(findMalformedLinks([
+            { date: '2026-09-10', title: 'T', items: [{ type: 'new', text: 'x' }, { type: 'new', text: 'y', faq: [] }] },
+        ])).toEqual([]);
+    });
+});
+
 describe('실물 공지·FAQ', () => {
     it(`${FAQ_COVERAGE_SINCE} 이후 새 기능에 FAQ 연결이 모두 적혀 있다`, () => {
         expect(findMissingLinks(notes).map(g => `${g.date} ${g.title}`)).toEqual([]);
@@ -70,5 +95,9 @@ describe('실물 공지·FAQ', () => {
     it('끊긴 연결이 없다', () => {
         const ids = FAQ_ITEMS.map(item => item.id);
         expect(findDanglingLinks(notes, ids).map(l => l.faqId)).toEqual([]);
+    });
+
+    it('모양이 잘못된 연결이 없다', () => {
+        expect(findMalformedLinks(notes).map(b => `${b.date} ${JSON.stringify(b.value)}`)).toEqual([]);
     });
 });
