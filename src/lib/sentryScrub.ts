@@ -225,3 +225,124 @@ export function joinConsoleArgs(values: unknown[]): string {
         })
         .join(' ');
 }
+
+// ─── breadcrumb 전용 ───
+
+/**
+ * 쿼리 값을 그대로 남길 파라미터 이름.
+ *
+ * ⚠️ ALLOWED_KEYS와 같은 주의가 여기에도 걸린다 — **일반 명사는 넣지 않는다.** 이 목록은
+ * 이 앱이 부르는 URL만이 아니라 SDK가 보는 **모든** URL(제3자 호스트 포함)에 적용되므로,
+ * 어딘가에서 같은 이름에 자유 입력을 실으면 그대로 새어 나간다. 아래 이름들은 현재 전부
+ * 고정 코드값이다(`action`은 poi·geocode·route 세 가지, 나머지는 리터럴·숫자).
+ */
+const SAFE_QUERY_PARAMS = new Set([
+    'action', 'version', 'format', 'count',
+    'resCoordType', 'reqCoordType',
+]);
+
+/**
+ * URL에서 사람이 친 값을 걷어낸다. 경로와 파라미터 **이름**은 남긴다.
+ *
+ * fetch·xhr breadcrumb은 URL을 통째로 담는데, 이 앱은 목적지 검색을 쿼리로 보낸다.
+ * 그래서 captureError의 extra를 아무리 걸러도 그 직전 요청의 breadcrumb으로 목적지가 따라 나갔다.
+ */
+export function scrubUrl(rawUrl: string): string {
+    if (typeof rawUrl !== 'string' || !rawUrl) return rawUrl;
+    // 쿼리도 프래그먼트도 없으면 건드릴 것이 없다(대다수 요청).
+    if (!rawUrl.includes('?') && !rawUrl.includes('#')) return rawUrl;
+
+    const [beforeHash] = rawUrl.split('#');
+    // 프래그먼트만 있는 값(`#frag`)은 지우면 빈 문자열이 된다 — 원본보다 나쁘다.
+    if (!beforeHash) return rawUrl;
+    const qIndex = beforeHash.indexOf('?');
+    if (qIndex === -1) return beforeHash;
+
+    const path = beforeHash.slice(0, qIndex);
+    const query = beforeHash.slice(qIndex + 1);
+    if (!query) return path;
+
+    const safe = query.split('&').map(pair => {
+        const eq = pair.indexOf('=');
+        if (eq === -1) return pair;
+        const key = pair.slice(0, eq);
+        if (SAFE_QUERY_PARAMS.has(key)) return pair;
+        // 값의 길이는 남긴다 — 빈 검색어와 긴 검색어는 다른 증상이다.
+        return `${key}=[redacted(${pair.length - eq - 1})]`;
+    });
+    return `${path}?${safe.join('&')}`;
+}
+
+/**
+ * 사람이 읽는 텍스트를 담는 HTML 속성. SDK가 **설정과 무관하게 항상** 붙인다
+ * (@sentry/core utils/browser.js `_htmlElementAsString`의 고정 목록).
+ *
+ * 이 앱은 여기에 실명을 넣는다 — `title="공동 운전자: 홍길동, 김철수"`,
+ * `aria-label="홍길동 제거"`. 접근성과 도움말에 필요한 값이라 화면에서 뺄 수는 없다.
+ * 그래서 나가는 길목에서 값만 지운다. `type`·`name`은 입력 칸의 식별자라 남긴다.
+ */
+const PII_BEARING_ATTRS = ['aria-label', 'title', 'alt'] as const;
+
+/**
+ * DOM breadcrumb의 요소 설명에서 사람이 읽는 속성값을 지운다.
+ *
+ * 속성이 있었다는 사실은 남긴다(`[title]`) — 어느 요소를 눌렀는지 좁히는 데 쓰이고,
+ * 태그·id·클래스는 그대로라 진단이 통째로 사라지지 않는다.
+ */
+export function scrubDomTarget(target: string): string {
+    if (typeof target !== 'string' || !target) return target;
+    let out = target;
+    for (const attr of PII_BEARING_ATTRS) {
+        // 값 안에 `"]`가 들어갈 수 있다 — SDK는 속성값의 따옴표를 escape하지 않는다
+        // (@sentry/core htmlTreeAsString). 그래서 첫 `"]`에서 끊으면 그 뒤 꼬리가 그대로
+        // 남고, 마지막 `"]`까지 버리면 뒤따르는 멀쩡한 속성이 함께 사라진다.
+        // 값의 끝을 **경계로** 판정한다: 문자열 끝, 요소 구분자(` > `), 또는 SDK가 이어 붙이는
+        // 다음 속성. 셋 중 무엇도 오지 않으면 짝이 깨진 것이라 끝까지 버린다(fail-closed).
+        const boundary = String.raw`(?=$|\s>\s|\[(?:aria-label|type|name|title|alt)=")`;
+        out = out.replace(new RegExp(String.raw`\[${attr}="[\s\S]*?"\]` + boundary, 'g'), `[${attr}]`);
+        // 경계를 못 찾은 잔여분(닫히지 않았거나 값에 `"]`가 섞여 경계 판정이 실패한 경우)
+        const orphan = out.indexOf(`[${attr}="`);
+        if (orphan !== -1) out = `${out.slice(0, orphan)}[${attr}]`;
+    }
+    return out;
+}
+
+
+/**
+ * 스팬 속성에서 URL을 담는 키 — SDK가 요청마다 채운다.
+ *
+ * `getFetchSpanAttributes`(@sentry/core)가 `url`에 **원본 URL을 통째로**, `http.query`에
+ * 쿼리 문자열을 그대로 넣는다. 위생 처리를 거치는 것은 스팬 **이름**(`GET /api/tmap`)뿐이다.
+ */
+const SPAN_URL_KEYS = ['url', 'http.url', 'url.full'] as const;
+
+/**
+ * 스팬 데이터에서 사람이 친 값을 걷어낸다.
+ *
+ * breadcrumb만 막아서는 부족하다. 추적(browserTracing)이 켜져 있으면 **같은 목적지 검색어가
+ * 스팬 속성으로 한 번 더 나간다.** 그쪽은 `beforeBreadcrumb`이 보지 못하고, 트랜잭션 이벤트라
+ * `beforeSend`도 타지 않는다(`beforeSend`는 오류 이벤트에만 걸린다).
+ *
+ * @returns 걸러낸 새 객체. 바꿀 것이 없으면 받은 객체를 그대로 돌려준다.
+ */
+export function scrubSpanData(data: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+    if (!data) return data;
+    let changed = false;
+    const out: Record<string, unknown> = { ...data };
+
+    for (const key of SPAN_URL_KEYS) {
+        const value = out[key];
+        if (typeof value === 'string') {
+            const safe = scrubUrl(value);
+            if (safe !== value) { out[key] = safe; changed = true; }
+        }
+    }
+    // 쿼리·프래그먼트는 통째로 사람이 친 값이라 스크럽할 구조가 없다. 있었다는 사실만 남긴다.
+    for (const key of ['http.query', 'http.fragment']) {
+        if (typeof out[key] === 'string' && out[key]) {
+            out[key] = `[redacted(${(out[key] as string).length})]`;
+            changed = true;
+        }
+    }
+    return changed ? out : data;
+}

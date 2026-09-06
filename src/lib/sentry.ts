@@ -1,5 +1,5 @@
 import { isFirestoreTerminated } from './firestoreLifecycle';
-import { scrubContext, scrubConsoleArgs, joinConsoleArgs } from './sentryScrub';
+import { scrubContext, scrubConsoleArgs, joinConsoleArgs, scrubUrl, scrubDomTarget, scrubSpanData } from './sentryScrub';
 
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
 
@@ -81,7 +81,51 @@ function initSentryWithModule(Sentry: SentryModule) {
                     ? 'Assertion failed: ' : '';
                 breadcrumb.message = assertPrefix + joinConsoleArgs(safeArgs);
             }
+
+            // 요청 URL — 이 앱은 목적지 검색을 쿼리로 보낸다(/api/tmap?...&keyword=김OO 어르신 댁).
+            // fetch·xhr breadcrumb은 URL을 통째로 담으므로, 오류 하나에 직전 검색어가 딸려 나갔다.
+            if (breadcrumb.category === 'fetch' || breadcrumb.category === 'xhr') {
+                const data = breadcrumb.data as { url?: unknown } | undefined;
+                if (typeof data?.url === 'string') {
+                    breadcrumb.data = { ...data, url: scrubUrl(data.url) };
+                }
+            }
+
+            // 화면 이동 — 경로에 쿼리가 붙어 오는 경우를 같은 규칙으로 막는다.
+            if (breadcrumb.category === 'navigation') {
+                const data = breadcrumb.data as { from?: unknown; to?: unknown } | undefined;
+                if (data) {
+                    breadcrumb.data = {
+                        ...data,
+                        ...(typeof data.from === 'string' ? { from: scrubUrl(data.from) } : {}),
+                        ...(typeof data.to === 'string' ? { to: scrubUrl(data.to) } : {}),
+                    };
+                }
+            }
+
+            // 클릭·입력 — SDK가 aria-label·title·alt를 **설정과 무관하게 항상** 붙인다.
+            // 이 앱은 거기에 실명을 넣는다(title="공동 운전자: 홍길동, 김철수").
+            // 접근성에 필요한 값이라 화면에서 뺄 수 없으니 나가는 길목에서 지운다.
+            if (typeof breadcrumb.category === 'string' && breadcrumb.category.startsWith('ui.')
+                && typeof breadcrumb.message === 'string') {
+                breadcrumb.message = scrubDomTarget(breadcrumb.message);
+            }
+
             return breadcrumb;
+        },
+        /**
+         * 스팬 속성 — breadcrumb만 막아서는 **같은 검색어가 한 번 더 나간다.**
+         *
+         * browserTracing이 켜져 있어(위 integrations) 요청마다 스팬이 만들어지는데,
+         * `getFetchSpanAttributes`가 `url`에 원본 URL을 통째로, `http.query`에 쿼리를
+         * 그대로 담는다. 위생 처리를 거치는 것은 스팬 **이름**(`GET /api/tmap`)뿐이다.
+         * 트랜잭션 이벤트라 beforeSend도 타지 않는다(그쪽은 오류 이벤트 전용).
+         *
+         * 이 훅은 루트 스팬과 자식 스팬 **모두**에 적용된다(core/client.js processBeforeSend).
+         */
+        beforeSendSpan(span) {
+            const data = scrubSpanData(span.data as Record<string, unknown> | undefined);
+            return data === span.data ? span : { ...span, data } as typeof span;
         },
         // 노이즈 에러 필터링
         ignoreErrors: [
@@ -293,10 +337,12 @@ function initSentryWithModule(Sentry: SentryModule) {
 
 function applySentryUser(Sentry: SentryModule, userInfo: SentryUserInfo) {
     if (userInfo) {
-        Sentry.setUser({
-            id: userInfo.uid,
-            email: userInfo.email || undefined,
-        });
+        // **이메일은 보내지 않는다.** uid만으로 사용자 수·이슈 묶음·검색이 모두 동작하고,
+        // 누구인지는 필요할 때 Firebase 콘솔에서 조회하면 된다. 이메일은 이슈 목록에서
+        // 읽기 편한 것 말고 얻는 것이 없는데, 같은 모듈의 스크러버(sentryScrub)가
+        // extra·console·breadcrumb에서 가장 공들여 지우는 값이 바로 이메일 모양이다.
+        // 그것을 매 이벤트에 붙여 보내면 앞뒤가 맞지 않는다.
+        Sentry.setUser({ id: userInfo.uid });
         Sentry.setTag('user.role', userInfo.role || 'unknown');
         if (userInfo.organizationId) {
             Sentry.setTag('organizationId', userInfo.organizationId);

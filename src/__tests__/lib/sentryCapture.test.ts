@@ -15,9 +15,10 @@ async function loadSentry() {
     const init = vi.fn();
     const captureException = vi.fn();
     const captureMessage = vi.fn();
+    const setUser = vi.fn();
     vi.doMock('../../lib/sentryClient', () => ({
         init,
-        setUser: vi.fn(),
+        setUser,
         setTag: vi.fn(),
         captureException,
         captureMessage,
@@ -27,7 +28,16 @@ async function loadSentry() {
     const mod = await import('../../lib/sentry');
     mod.initSentry();
     await vi.waitFor(() => expect(init).toHaveBeenCalled());
-    return { mod, init, captureException, captureMessage };
+    return { mod, init, captureException, captureMessage, setUser };
+}
+
+/** init에 등록된 beforeBreadcrumb을 꺼낸다 — 순수 함수가 아니라 **배선**을 본다. */
+async function loadBreadcrumbHook() {
+    const { init } = await loadSentry();
+    const options = init.mock.calls[0][0] as {
+        beforeBreadcrumb: (b: Record<string, unknown>) => Record<string, unknown>;
+    };
+    return { beforeBreadcrumb: options.beforeBreadcrumb };
 }
 
 describe('captureError / captureWarning — 개인정보 스크러빙 배선', () => {
@@ -116,13 +126,103 @@ describe('captureError / captureWarning — 개인정보 스크러빙 배선', (
         expect((scrubbed.data as { logger: string }).logger).toBe('console');
     });
 
-    it('console 이외의 breadcrumb은 건드리지 않는다', async () => {
+    it('요청 URL의 검색어를 지운다 — 목적지가 쿼리로 나간다', async () => {
+        // 이 앱은 목적지 검색을 /api/tmap?...&keyword=... 로 보낸다. fetch breadcrumb은 URL을
+        // 통째로 담으므로, extra를 아무리 걸러도 오류 직전 요청에 목적지가 실려 나갔다.
+        const { beforeBreadcrumb } = await loadBreadcrumbHook();
+
+        const out = beforeBreadcrumb({
+            category: 'fetch',
+            type: 'http',
+            data: { method: 'GET', url: '/api/tmap?action=poi&keyword=김OO 어르신 댁', status_code: 500 },
+        });
+
+        const data = out.data as { url: string; method: string; status_code: number };
+        expect(data.url).not.toContain('김OO');
+        expect(data.url).toContain('action=poi');   // 어떤 호출이었는지는 남는다
+        expect(data.method).toBe('GET');            // SDK가 넣은 다른 필드는 보존
+        expect(data.status_code).toBe(500);
+    });
+
+    it('xhr도 같은 규칙으로 지운다', async () => {
+        const { beforeBreadcrumb } = await loadBreadcrumbHook();
+        const out = beforeBreadcrumb({ category: 'xhr', data: { url: '/api/x?q=서울역' } });
+        expect((out.data as { url: string }).url).not.toContain('서울역');
+    });
+
+    it('클릭한 요소의 실명을 지운다 — SDK가 aria-label·title을 항상 붙인다', async () => {
+        // _htmlElementAsString의 고정 목록이라 serializeAttribute 설정으로는 막을 수 없다.
+        const { beforeBreadcrumb } = await loadBreadcrumbHook();
+
+        const out = beforeBreadcrumb({
+            category: 'ui.click',
+            message: 'span.badge[title="공동 운전자: 홍길동, 김철수"]',
+        });
+
+        expect(out.message).toBe('span.badge[title]');
+    });
+
+    it('화면 이동 경로의 쿼리도 지우고, 없으면 그대로 둔다', async () => {
+        const { beforeBreadcrumb } = await loadBreadcrumbHook();
+
+        const plain = { category: 'navigation', data: { from: '/employee/today', to: '/employee/drive-log' } };
+        expect(beforeBreadcrumb({ ...plain })).toEqual(plain);
+
+        const withQuery = beforeBreadcrumb({ category: 'navigation', data: { from: '/a', to: '/b?q=홍길동' } });
+        expect((withQuery.data as { to: string }).to).not.toContain('홍길동');
+    });
+
+    it('입력(ui.input)도 클릭과 같게 지운다', async () => {
+        const { beforeBreadcrumb } = await loadBreadcrumbHook();
+        const out = beforeBreadcrumb({ category: 'ui.input', message: 'input[aria-label="홍길동 메모"]' });
+        expect(out.message).toBe('input[aria-label]');
+    });
+
+    it('화면 이동은 from도 지운다 — to만 막으면 절반이다', async () => {
+        const { beforeBreadcrumb } = await loadBreadcrumbHook();
+        const out = beforeBreadcrumb({ category: 'navigation', data: { from: '/a?q=홍길동', to: '/b' } });
+        expect((out.data as { from: string }).from).not.toContain('홍길동');
+    });
+
+    it('url이 없는 fetch breadcrumb에도 터지지 않는다', async () => {
+        const { beforeBreadcrumb } = await loadBreadcrumbHook();
+        const noUrl = { category: 'fetch', data: { method: 'GET' } };
+        expect(beforeBreadcrumb({ ...noUrl })).toEqual(noUrl);
+    });
+
+    it('추적 스팬의 검색어도 지운다 — breadcrumb만 막으면 여기로 또 나간다', async () => {
+        // browserTracing이 요청마다 스팬을 만드는데, url에 원본이 http.query에 쿼리가
+        // 그대로 담긴다. 트랜잭션 이벤트라 beforeSend도 타지 않는다(오류 이벤트 전용).
         const { init } = await loadSentry();
         const options = init.mock.calls[0][0] as {
-            beforeBreadcrumb: (b: Record<string, unknown>) => Record<string, unknown>;
+            beforeSendSpan: (s: Record<string, unknown>) => Record<string, unknown>;
         };
 
-        const navigation = { category: 'navigation', data: { from: '/employee/today', to: '/employee/drive-log' } };
-        expect(options.beforeBreadcrumb({ ...navigation })).toEqual(navigation);
+        const out = options.beforeSendSpan({
+            description: 'GET /api/tmap',
+            data: { url: '/api/tmap?action=poi&keyword=김OO 어르신 댁', 'http.query': '?keyword=김OO', 'http.method': 'GET' },
+        });
+
+        const data = out.data as Record<string, string>;
+        expect(data.url).not.toContain('김OO');
+        expect(data['http.query']).not.toContain('김OO');
+        expect(data['http.method']).toBe('GET');
+        expect(out.description).toBe('GET /api/tmap');  // 스팬 이름은 이미 안전하다
+    });
+
+    it('사용자 식별에 이메일을 싣지 않는다 — uid만 보낸다', async () => {
+        const { mod, setUser } = await loadSentry();
+        mod.setSentryUser({ uid: 'u1', email: 'hong@example.or.kr', role: 'employee', organizationId: 'org1' });
+
+        const calls = setUser.mock.calls;
+        const sent = calls[calls.length - 1]?.[0];
+        expect(sent).toEqual({ id: 'u1' });
+        expect(JSON.stringify(sent)).not.toContain('hong@example.or.kr');
+    });
+
+    it('그 밖의 breadcrumb은 건드리지 않는다', async () => {
+        const { beforeBreadcrumb } = await loadBreadcrumbHook();
+        const other = { category: 'sentry.event', message: 'x', data: { url: '/a?q=1' } };
+        expect(beforeBreadcrumb({ ...other })).toEqual(other);
     });
 });

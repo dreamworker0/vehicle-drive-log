@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { scrubContext, scrubConsoleArgs, joinConsoleArgs } from '@/lib/sentryScrub';
+import { scrubContext, scrubConsoleArgs, joinConsoleArgs, scrubUrl, scrubDomTarget, scrubSpanData } from '@/lib/sentryScrub';
 
 /**
  * Sentry `extra`에서 자유 입력이 걸러지는지 검증한다.
@@ -244,5 +244,126 @@ describe('scrubContext', () => {
         expect(message).toContain('저장 실패:');
         expect(message).toContain('v1');
         expect(message).not.toContain('서울역');
+    });
+});
+
+describe('scrubUrl — 요청 URL의 사람이 친 값', () => {
+    it('목적지 검색어를 지우고 어떤 호출이었는지는 남긴다', () => {
+        // 이 앱은 목적지를 쿼리로 보낸다. fetch breadcrumb이 URL을 통째로 담으므로
+        // 오류 하나에 직전 검색어가 딸려 나갔다.
+        const out = scrubUrl('/api/tmap?action=poi&keyword=%EA%B9%80OO%20%EC%96%B4%EB%A5%B4%EC%8B%A0%20%EB%8C%81');
+        expect(out).toContain('action=poi');
+        expect(out).not.toContain('%EA%B9%80');
+        expect(out).toContain('keyword=[redacted(');
+    });
+
+    it('쿼리가 없으면 그대로 둔다 — 대다수 요청이 여기에 해당한다', () => {
+        expect(scrubUrl('/api/health')).toBe('/api/health');
+        expect(scrubUrl('https://x.example/a/b')).toBe('https://x.example/a/b');
+    });
+
+    it('프래그먼트는 통째로 버린다', () => {
+        expect(scrubUrl('/page#section-김철수')).toBe('/page');
+    });
+
+    it('값 길이는 남긴다 — 빈 검색어와 긴 검색어는 다른 증상이다', () => {
+        expect(scrubUrl('/api?q=')).toBe('/api?q=[redacted(0)]');
+        expect(scrubUrl('/api?q=abcde')).toBe('/api?q=[redacted(5)]');
+    });
+
+    it('값 없는 파라미터와 빈 쿼리도 넘어간다', () => {
+        expect(scrubUrl('/api?flag')).toBe('/api?flag');
+        expect(scrubUrl('/api?')).toBe('/api');
+    });
+});
+
+describe('scrubDomTarget — 클릭한 요소 설명', () => {
+    it('title에 담긴 실명을 지운다', () => {
+        // SDK는 aria-label·title·alt를 설정과 무관하게 항상 붙인다.
+        const out = scrubDomTarget('span.badge[title="공동 운전자: 홍길동, 김철수"]');
+        expect(out).toBe('span.badge[title]');
+    });
+
+    it('aria-label에 담긴 실명을 지운다', () => {
+        expect(scrubDomTarget('button[aria-label="홍길동 제거"]')).toBe('button[aria-label]');
+    });
+
+    it('여러 속성이 붙어도 모두 지우고 뒤 내용을 보존한다', () => {
+        const out = scrubDomTarget('a#x.y[aria-label="김철수"][type="button"][title="목적지: 서울역"]');
+        expect(out).toBe('a#x.y[aria-label][type="button"][title]');
+    });
+
+    it('alt도 지운다 — 이미지 설명에 이름이 들어갈 수 있다', () => {
+        expect(scrubDomTarget('img[alt="홍길동 프로필"]')).toBe('img[alt]');
+    });
+
+    it('요소가 여러 겹이어도 각 요소의 속성만 지운다', () => {
+        // SDK는 조상 요소를 ' > '로 잇는다. 경계 판정이 그것도 넘겨야 한다.
+        expect(scrubDomTarget('div#list > span[title="홍길동"] > b'))
+            .toBe('div#list > span[title] > b');
+    });
+
+    it('태그·id·클래스·type은 남긴다 — 진단이 통째로 사라지면 안 된다', () => {
+        expect(scrubDomTarget('input#endKm.input[type="number"]')).toBe('input#endKm.input[type="number"]');
+    });
+
+    it('잘려서 닫히지 않은 값은 통째로 버린다', () => {
+        // maxStringLength로 잘리면 따옴표가 안 닫힌다. 남기면 값이 그대로 샌다.
+        expect(scrubDomTarget('span[title="공동 운전자: 홍길')).toBe('span[title]');
+    });
+
+    it('속성이 없으면 그대로 둔다', () => {
+        expect(scrubDomTarget('button.btn-primary')).toBe('button.btn-primary');
+    });
+});
+
+describe('scrubSpanData — 추적 스팬 속성', () => {
+    it('스팬의 url과 http.query에서 검색어를 지운다 — breadcrumb만 막으면 여기로 또 나간다', () => {
+        // getFetchSpanAttributes가 url에 원본을, http.query에 쿼리를 그대로 담는다.
+        // 위생 처리를 거치는 것은 스팬 이름뿐이고, 트랜잭션 이벤트라 beforeSend도 안 탄다.
+        const out = scrubSpanData({
+            url: '/api/tmap?action=poi&keyword=김OO 어르신 댁',
+            'http.query': '?action=poi&keyword=%EA%B9%80OO',
+            'http.method': 'GET',
+            type: 'fetch',
+        })!;
+
+        expect(out.url).not.toContain('김OO');
+        expect(out.url).toContain('action=poi');
+        expect(out['http.query']).toMatch(/^\[redacted\(\d+\)\]$/);
+        expect(out['http.method']).toBe('GET');  // SDK가 넣은 다른 속성은 보존
+        expect(out.type).toBe('fetch');
+    });
+
+    it('http.url·url.full·http.fragment도 함께 막는다', () => {
+        const out = scrubSpanData({
+            'http.url': 'https://x.example/api?keyword=서울역',
+            'url.full': 'https://x.example/api?keyword=서울역',
+            'http.fragment': '#김철수',
+        })!;
+        expect(JSON.stringify(out)).not.toContain('서울역');
+        expect(JSON.stringify(out)).not.toContain('김철수');
+    });
+
+    it('바꿀 것이 없으면 받은 객체를 그대로 돌려준다 — 매 스팬마다 새 객체를 만들지 않는다', () => {
+        const data = { 'http.method': 'GET', type: 'fetch' };
+        expect(scrubSpanData(data)).toBe(data);
+        expect(scrubSpanData(undefined)).toBeUndefined();
+    });
+});
+
+describe('scrubDomTarget — 값 안에 닫는 짝이 들어간 경우', () => {
+    it('속성값에 닫는 짝이 들어 있어도 꼬리를 남기지 않는다', () => {
+        // SDK는 속성값의 따옴표를 escape하지 않는다. 첫 짝에서 끊으면 뒤가 그대로 샌다.
+        // 실제로 상류 오류 문구를 title에 그대로 싣는 화면이 있다(DashboardApiHealth).
+        const out = scrubDomTarget('span[title="오류: 배열 a["b"] 참고 — 홍길동"]');
+        expect(out).not.toContain('홍길동');
+        expect(out).toContain('[title]');
+    });
+});
+
+describe('scrubUrl — 프래그먼트만 있는 값', () => {
+    it('빈 문자열로 만들지 않는다 — 원본보다 나쁘다', () => {
+        expect(scrubUrl('#frag')).toBe('#frag');
     });
 });
