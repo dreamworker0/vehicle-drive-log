@@ -145,6 +145,104 @@ function warnDuplicateRun(reason: string, outputUri: string): void {
     });
 }
 
+/** 완료 표식 파일명. Firestore export가 **끝날 때** 이 이름으로 쓴다. */
+export function buildCompletionMarker(dateStr: string): string {
+    return `${buildBackupPrefix(dateStr)}${dateStr}.overall_export_metadata`;
+}
+
+/** KST 기준 어제 날짜('YYYY-MM-DD'). */
+export function previousKstDateString(now: Date = new Date()): string {
+    return getKSTDateString(new Date(now.getTime() - 24 * 60 * 60 * 1000));
+}
+
+export type BackupState = "complete" | "incomplete" | "missing";
+
+/**
+ * 어느 날의 백업이 **끝났는지** 파일 목록으로 판정한다.
+ *
+ * `overall_export_metadata`는 export가 완료될 때 쓰이므로, 출력 파일은 있는데 이 표식만
+ * 없으면 **시작만 되고 끝나지 않은** 상태다. 그 구분이 이 함수의 전부다.
+ */
+export function classifyBackupState(fileNames: string[], dateStr: string): BackupState {
+    if (fileNames.length === 0) return "missing";
+    return fileNames.includes(buildCompletionMarker(dateStr)) ? "complete" : "incomplete";
+}
+
+/** 미완료 백업을 **행동 가능한** 메시지로 바꾼다. */
+export function describeBackupGap(state: Exclude<BackupState, "complete">, dateStr: string, bucketName: string): string {
+    const uri = buildBackupUri(bucketName, dateStr);
+    if (state === "missing") {
+        return [
+            `어제(${dateStr}) Firestore 백업이 없다: ${uri} 아래에 객체가 하나도 없다.`,
+            "배치가 아예 돌지 않았거나(스케줄러 중단·함수 배포 실패), export 호출 자체가 거부됐다.",
+            "함수 로그에서 그날의 dailyNightlyBatch 실행과 'Firestore backup started'를 확인할 것.",
+        ].join(" ");
+    }
+    return [
+        `어제(${dateStr}) Firestore 백업이 **끝나지 않았다**: ${uri} 에 출력 파일은 있는데`,
+        "완료 표식(.overall_export_metadata)이 없다.",
+        "export는 장기 실행 작업이라 호출은 성공하고 나중에 실패할 수 있다 — 지금까지 이 경우를",
+        "아무도 알아채지 못했다. GCP 콘솔의 Firestore > 가져오기/내보내기에서 그날 작업의 상태를 확인하고,",
+        "실패했다면 그날치는 복구할 수 없으므로 보관 정책상 문제가 되는지 판단할 것.",
+    ].join(" ");
+}
+
+/**
+ * Step 1: **어제** 백업이 끝났는지 확인한다.
+ *
+ * 오늘 백업(Step 0)은 export를 걸고 "시작됨"만 남긴 뒤 끝난다 — 관리형 export가 장기 실행
+ * 작업이라 완료를 그 자리에서 기다릴 수 없기 때문이다. 그래서 **호출이 성공해도 나중에 실패하면
+ * 아무도 몰랐다.** OPERATIONS.md §4.1이 "알림이 없다고 백업이 있는 것은 아니다"라고 적어 둔
+ * 바로 그 구멍이고, 지금까지 사람이 버킷을 눈으로 봐야만 알 수 있었다.
+ *
+ * 완료를 그 자리에서 기다리는 대신 **하루 뒤에 확인한다.** 발견이 최대 24시간 늦지만, 폴링으로
+ * 함수를 몇 분씩 붙잡아 두는 것보다 훨씬 싸다(목록 조회 1회). 백업 실패는 분 단위로 다툴 일이
+ * 아니라, "영영 모른다"를 "하루 안에 안다"로 바꾸는 것이 실질적인 이득이다.
+ *
+ * 보관 90일 · 매일 02:20 실행이므로 어제 폴더가 수명 주기로 지워질 일은 없다.
+ */
+export async function verifyPreviousBackup() {
+    console.log("[Batch] Starting verifyPreviousBackup...");
+    const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT;
+    const bucketName = resolveBackupBucket(projectId);
+    const backupBucket = getStorage().bucket(bucketName);
+
+    const dateStr = previousKstDateString();
+
+    let names: string[];
+    try {
+        const [files] = await backupBucket.getFiles({ prefix: buildBackupPrefix(dateStr) });
+        names = files.map((f) => f.name);
+    } catch (e: unknown) {
+        // 확인 실패는 백업 실패가 아니다. 목록 권한이 없다고 어제 백업이 없다고 단정하면
+        // 헛경보가 된다 — 조용히 넘기되 로그에는 남긴다.
+        console.warn(`어제 백업 확인 실패 — 판정을 건너뛴다: ${(e as Error).message}`);
+        return;
+    }
+
+    const state = classifyBackupState(names, dateStr);
+    if (state === "complete") {
+        console.log(`Previous backup verified: ${buildBackupUri(bucketName, dateStr)} (파일 ${names.length}건)`);
+        return;
+    }
+
+    // 아직 백업이 한 번도 없는 프로젝트(첫 배포 직후)에서 헛경보를 내지 않는다.
+    // 불행한 경로에서만 목록을 한 번 더 부른다.
+    if (state === "missing") {
+        try {
+            const [any] = await backupBucket.getFiles({ prefix: "backups/firestore/", maxResults: 1 });
+            if (any.length === 0) {
+                console.log("백업 이력이 아직 없다 — 첫 배포 직후로 보고 어제 백업 확인을 건너뛴다.");
+                return;
+            }
+        } catch {
+            // 확인 못 했으면 아래에서 정상적으로 보고한다.
+        }
+    }
+
+    throw new Error(describeBackupGap(state, dateStr, bucketName));
+}
+
 /**
  * Step 0: Firestore 전체 백업 (기존 backupFirestore 로직 통합)
  *
@@ -477,6 +575,9 @@ export const dailyNightlyBatch = onSchedule(
         const failed: string[] = [];
 
         await runStep(failed, CONTEXT, "backupFirestore", () => backupFirestoreData());
+        // 오늘 백업을 건 **뒤에** 어제 것을 확인한다. 순서가 중요한 건 아니지만(runStep이
+        // 스텝을 격리한다) 본론이 먼저 나가는 편이 로그를 읽기 쉽다.
+        await runStep(failed, CONTEXT, "verifyPreviousBackup", () => verifyPreviousBackup());
         await runStep(failed, CONTEXT, "checkInsuranceExpiry", () => checkInsuranceExpiry(db));
 
         await logBatchResult(CONTEXT, failed);
