@@ -12,7 +12,7 @@ vi.mock('@/lib/offline/syncQueue', () => ({
 }));
 vi.mock('@/lib/notify', () => ({ notifyUser: vi.fn() }));
 
-import { buildFailureMessage, reportFailedSync, registerSyncFailureNotice, describeRecord } from '@/lib/offline/syncFailureNotice';
+import { buildFailureMessage, reportFailedSync, registerSyncFailureNotice, describeRecord, formatQueuedDate } from '@/lib/offline/syncFailureNotice';
 import { peekFailedRecords, clearFailedRecords, flushQueue, type FailedRecord } from '@/lib/offline/syncQueue';
 import { notifyUser } from '@/lib/notify';
 
@@ -225,5 +225,72 @@ describe('reportFailedSync — 알린 뒤에 비운다', () => {
 
         expect(await reportFailedSync()).toBe(0);
         expect(mockClear).not.toHaveBeenCalled();
+    });
+});
+
+describe('describeRecord — 큐가 실제로 담는 모양', () => {
+    it('내부 센티널 마커를 날짜로 찍지 않는다', () => {
+        // 오프라인 **수정**은 당일 운행의 startDate를 deleteField()로 지우는데,
+        // 큐가 그것을 '__syncQueue.deleteField__' 문자열로 바꿔 저장한다.
+        // 거르지 않으면 사용자에게 내부 문자열이 날짜라고 보여진다.
+        const line = describeRecord(record({
+            data: { startDate: '__syncQueue.deleteField__', destination: '서울역' },
+        }));
+        expect(line).toBe('서울역');
+    });
+
+    it('date가 없으면 timestamp로 날짜를 만든다 — 운행일지에는 date 필드가 없다', () => {
+        // buildLogData가 만드는 것은 timestamp(Date)뿐이다. date만 찾으면 날짜는
+        // 사실상 언제나 비어 "날짜를 알려 준다"는 말이 거짓이 된다.
+        const line = describeRecord(record({
+            data: { timestamp: new Date(2026, 8, 5, 18, 0), destination: '시청' },
+        }));
+        expect(line).toBe('2026-09-05 · 시청');
+    });
+});
+
+describe('formatQueuedDate', () => {
+    it('Date를 YYYY-MM-DD로 만든다', () => {
+        expect(formatQueuedDate(new Date(2026, 0, 3))).toBe('2026-01-03');
+    });
+
+    it('Date가 아니거나 망가졌으면 undefined', () => {
+        expect(formatQueuedDate('2026-01-03')).toBeUndefined();
+        expect(formatQueuedDate(new Date('x'))).toBeUndefined();
+        expect(formatQueuedDate(undefined)).toBeUndefined();
+    });
+});
+
+describe('buildFailureMessage — 길이를 묶는다', () => {
+    it('상세는 3건까지만 적고 나머지는 건수로 줄인다', () => {
+        const many = Array.from({ length: 6 }, (_, i) =>
+            record({ data: { destination: `목적지${i}` } }));
+
+        const msg = buildFailureMessage(many);
+
+        expect(msg).toContain('목적지0');
+        expect(msg).toContain('외 3건');
+        expect(msg).not.toContain('목적지4');
+    });
+});
+
+describe('reportFailedSync — 겹쳐 불려도 한 번만 알린다', () => {
+    beforeEach(() => { vi.clearAllMocks(); });
+
+    it('세 트리거가 동시에 발화해도 토스트는 하나다', async () => {
+        // online·visibilitychange는 잠금 화면을 풀며 통신이 돌아올 때 같이 뜬다.
+        mockDrain.mockResolvedValue([record({ data: { destination: '서울역' } })]);
+
+        await Promise.all([reportFailedSync(), reportFailedSync(), reportFailedSync()]);
+
+        expect(mockNotify).toHaveBeenCalledTimes(1);
+    });
+
+    it('알린 기록의 id만 지운다 — 그 사이 들어온 폐기는 남긴다', async () => {
+        mockDrain.mockResolvedValueOnce([record({ id: 7 }), record({ id: 9 })]);
+
+        await reportFailedSync();
+
+        expect(mockClear).toHaveBeenCalledWith([7, 9]);
     });
 });

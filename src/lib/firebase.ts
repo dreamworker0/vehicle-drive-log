@@ -285,11 +285,19 @@ let db: ReturnType<typeof getFirestore>;
  * 로컬 캐시가 **내구성이 있는지**(브라우저를 닫아도 남는지) 나타낸다.
  *
  * persistentLocalCache면 Firestore가 미전송 쓰기를 IndexedDB에 남겨 다음 접속에 재전송한다.
- * memoryLocalCache로 떨어지면(사생활 보호 모드·저장소 차단 등 아래 폴백) 그 쓰기는 탭이 닫히는
- * 순간 사라진다. **"저장했다"고 말해도 되는지가 여기서 갈린다** — 느린 통신으로 응답을 못 받았을
- * 때 낙관적으로 안내할지, 확인이 필요하다고 말할지의 근거다.
+ * memoryLocalCache로 떨어지면 그 쓰기는 탭이 닫히는 순간 사라진다.
+ * **"저장했다"고 말해도 되는지가 여기서 갈린다** — 느린 통신으로 응답을 못 받았을 때
+ * 낙관적으로 안내할지, 확인이 필요하다고 말할지의 근거다.
+ *
+ * **기본값이 false인 것이 핵심이다.** `initializeFirestore`가 persistent 설정으로 반환해도
+ * 그것은 아무것도 보증하지 않는다 — SDK는 IndexedDB를 나중에 열고, 사생활 보호 모드에서는
+ * **비동기로 조용히** 실패한다(그래서 이 파일에 checkIndexedDBAvailability 2단계가 있다).
+ * 생성자가 돌아온 것만 보고 true로 두면, 정작 안내가 필요한 그 기기에서 계속 "저장했다"고
+ * 말하게 된다. 확인된 뒤에만 true로 올린다 — 모르는 동안은 조심하는 쪽이 맞다.
  */
 let durableLocalCache = false;
+/** 동기 초기화가 persistent 설정으로 성공했는가(2단계 검사와 함께 봐야 뜻이 있다). */
+let persistentConfigured = false;
 
 /** 로컬 캐시가 내구성이 있는가. 초기화 전이나 폴백 상태면 false. */
 export function hasDurableLocalCache(): boolean {
@@ -314,7 +322,7 @@ function initFirestoreSync() {
                 tabManager: persistentMultipleTabManager(),
             }),
         });
-        durableLocalCache = true;
+        persistentConfigured = true;
         return instance;
     } catch (err) {
         const errObj = err as { message?: string; code?: string };
@@ -341,6 +349,9 @@ db = initFirestoreSync()!;
 // (에뮬레이터 모드는 이미 memory 캐시 + 에뮬레이터 연결 상태이므로 재초기화 스킵)
 checkIndexedDBAvailability().then((available) => {
     if (USE_EMULATOR) return db;
+    // 내구성 판정은 **여기서** 확정된다. 동기 초기화가 persistent 설정이었고, IndexedDB가
+    // 실제로 열리는 것까지 확인돼야 "저장했다"고 말할 수 있다.
+    durableLocalCache = persistentConfigured && available === true;
     if (!available && db) {
         if (typeof window !== 'undefined') {
             console.warn('[Firestore] IndexedDB 사용 불가 → memoryLocalCache로 재초기화');
