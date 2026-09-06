@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { scrubContext, scrubConsoleArgs, joinConsoleArgs, scrubUrl, scrubDomTarget } from '@/lib/sentryScrub';
+import { scrubContext, scrubConsoleArgs, joinConsoleArgs, scrubUrl, scrubDomTarget, scrubSpanData } from '@/lib/sentryScrub';
 
 /**
  * Sentry `extra`에서 자유 입력이 걸러지는지 검증한다.
@@ -293,6 +293,16 @@ describe('scrubDomTarget — 클릭한 요소 설명', () => {
         expect(out).toBe('a#x.y[aria-label][type="button"][title]');
     });
 
+    it('alt도 지운다 — 이미지 설명에 이름이 들어갈 수 있다', () => {
+        expect(scrubDomTarget('img[alt="홍길동 프로필"]')).toBe('img[alt]');
+    });
+
+    it('요소가 여러 겹이어도 각 요소의 속성만 지운다', () => {
+        // SDK는 조상 요소를 ' > '로 잇는다. 경계 판정이 그것도 넘겨야 한다.
+        expect(scrubDomTarget('div#list > span[title="홍길동"] > b'))
+            .toBe('div#list > span[title] > b');
+    });
+
     it('태그·id·클래스·type은 남긴다 — 진단이 통째로 사라지면 안 된다', () => {
         expect(scrubDomTarget('input#endKm.input[type="number"]')).toBe('input#endKm.input[type="number"]');
     });
@@ -304,5 +314,56 @@ describe('scrubDomTarget — 클릭한 요소 설명', () => {
 
     it('속성이 없으면 그대로 둔다', () => {
         expect(scrubDomTarget('button.btn-primary')).toBe('button.btn-primary');
+    });
+});
+
+describe('scrubSpanData — 추적 스팬 속성', () => {
+    it('스팬의 url과 http.query에서 검색어를 지운다 — breadcrumb만 막으면 여기로 또 나간다', () => {
+        // getFetchSpanAttributes가 url에 원본을, http.query에 쿼리를 그대로 담는다.
+        // 위생 처리를 거치는 것은 스팬 이름뿐이고, 트랜잭션 이벤트라 beforeSend도 안 탄다.
+        const out = scrubSpanData({
+            url: '/api/tmap?action=poi&keyword=김OO 어르신 댁',
+            'http.query': '?action=poi&keyword=%EA%B9%80OO',
+            'http.method': 'GET',
+            type: 'fetch',
+        })!;
+
+        expect(out.url).not.toContain('김OO');
+        expect(out.url).toContain('action=poi');
+        expect(out['http.query']).toMatch(/^\[redacted\(\d+\)\]$/);
+        expect(out['http.method']).toBe('GET');  // SDK가 넣은 다른 속성은 보존
+        expect(out.type).toBe('fetch');
+    });
+
+    it('http.url·url.full·http.fragment도 함께 막는다', () => {
+        const out = scrubSpanData({
+            'http.url': 'https://x.example/api?keyword=서울역',
+            'url.full': 'https://x.example/api?keyword=서울역',
+            'http.fragment': '#김철수',
+        })!;
+        expect(JSON.stringify(out)).not.toContain('서울역');
+        expect(JSON.stringify(out)).not.toContain('김철수');
+    });
+
+    it('바꿀 것이 없으면 받은 객체를 그대로 돌려준다 — 매 스팬마다 새 객체를 만들지 않는다', () => {
+        const data = { 'http.method': 'GET', type: 'fetch' };
+        expect(scrubSpanData(data)).toBe(data);
+        expect(scrubSpanData(undefined)).toBeUndefined();
+    });
+});
+
+describe('scrubDomTarget — 값 안에 닫는 짝이 들어간 경우', () => {
+    it('속성값에 닫는 짝이 들어 있어도 꼬리를 남기지 않는다', () => {
+        // SDK는 속성값의 따옴표를 escape하지 않는다. 첫 짝에서 끊으면 뒤가 그대로 샌다.
+        // 실제로 상류 오류 문구를 title에 그대로 싣는 화면이 있다(DashboardApiHealth).
+        const out = scrubDomTarget('span[title="오류: 배열 a["b"] 참고 — 홍길동"]');
+        expect(out).not.toContain('홍길동');
+        expect(out).toContain('[title]');
+    });
+});
+
+describe('scrubUrl — 프래그먼트만 있는 값', () => {
+    it('빈 문자열로 만들지 않는다 — 원본보다 나쁘다', () => {
+        expect(scrubUrl('#frag')).toBe('#frag');
     });
 });

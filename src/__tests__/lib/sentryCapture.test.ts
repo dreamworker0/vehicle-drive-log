@@ -15,9 +15,10 @@ async function loadSentry() {
     const init = vi.fn();
     const captureException = vi.fn();
     const captureMessage = vi.fn();
+    const setUser = vi.fn();
     vi.doMock('../../lib/sentryClient', () => ({
         init,
-        setUser: vi.fn(),
+        setUser,
         setTag: vi.fn(),
         captureException,
         captureMessage,
@@ -27,7 +28,7 @@ async function loadSentry() {
     const mod = await import('../../lib/sentry');
     mod.initSentry();
     await vi.waitFor(() => expect(init).toHaveBeenCalled());
-    return { mod, init, captureException, captureMessage };
+    return { mod, init, captureException, captureMessage, setUser };
 }
 
 /** init에 등록된 beforeBreadcrumb을 꺼낸다 — 순수 함수가 아니라 **배선**을 본다. */
@@ -169,6 +170,54 @@ describe('captureError / captureWarning — 개인정보 스크러빙 배선', (
 
         const withQuery = beforeBreadcrumb({ category: 'navigation', data: { from: '/a', to: '/b?q=홍길동' } });
         expect((withQuery.data as { to: string }).to).not.toContain('홍길동');
+    });
+
+    it('입력(ui.input)도 클릭과 같게 지운다', async () => {
+        const { beforeBreadcrumb } = await loadBreadcrumbHook();
+        const out = beforeBreadcrumb({ category: 'ui.input', message: 'input[aria-label="홍길동 메모"]' });
+        expect(out.message).toBe('input[aria-label]');
+    });
+
+    it('화면 이동은 from도 지운다 — to만 막으면 절반이다', async () => {
+        const { beforeBreadcrumb } = await loadBreadcrumbHook();
+        const out = beforeBreadcrumb({ category: 'navigation', data: { from: '/a?q=홍길동', to: '/b' } });
+        expect((out.data as { from: string }).from).not.toContain('홍길동');
+    });
+
+    it('url이 없는 fetch breadcrumb에도 터지지 않는다', async () => {
+        const { beforeBreadcrumb } = await loadBreadcrumbHook();
+        const noUrl = { category: 'fetch', data: { method: 'GET' } };
+        expect(beforeBreadcrumb({ ...noUrl })).toEqual(noUrl);
+    });
+
+    it('추적 스팬의 검색어도 지운다 — breadcrumb만 막으면 여기로 또 나간다', async () => {
+        // browserTracing이 요청마다 스팬을 만드는데, url에 원본이 http.query에 쿼리가
+        // 그대로 담긴다. 트랜잭션 이벤트라 beforeSend도 타지 않는다(오류 이벤트 전용).
+        const { init } = await loadSentry();
+        const options = init.mock.calls[0][0] as {
+            beforeSendSpan: (s: Record<string, unknown>) => Record<string, unknown>;
+        };
+
+        const out = options.beforeSendSpan({
+            description: 'GET /api/tmap',
+            data: { url: '/api/tmap?action=poi&keyword=김OO 어르신 댁', 'http.query': '?keyword=김OO', 'http.method': 'GET' },
+        });
+
+        const data = out.data as Record<string, string>;
+        expect(data.url).not.toContain('김OO');
+        expect(data['http.query']).not.toContain('김OO');
+        expect(data['http.method']).toBe('GET');
+        expect(out.description).toBe('GET /api/tmap');  // 스팬 이름은 이미 안전하다
+    });
+
+    it('사용자 식별에 이메일을 싣지 않는다 — uid만 보낸다', async () => {
+        const { mod, setUser } = await loadSentry();
+        mod.setSentryUser({ uid: 'u1', email: 'hong@example.or.kr', role: 'employee', organizationId: 'org1' });
+
+        const calls = setUser.mock.calls;
+        const sent = calls[calls.length - 1]?.[0];
+        expect(sent).toEqual({ id: 'u1' });
+        expect(JSON.stringify(sent)).not.toContain('hong@example.or.kr');
     });
 
     it('그 밖의 breadcrumb은 건드리지 않는다', async () => {
