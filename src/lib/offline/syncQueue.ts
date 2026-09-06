@@ -198,16 +198,35 @@ export async function getPendingCount(): Promise<number> {
 }
 
 /**
- * 폐기 기록을 읽어내고 비운다(한 번 알린 유실을 다시 알리지 않기 위해 읽기와 삭제를 묶는다).
- * 페이지 컨텍스트의 안내 모듈만 호출한다.
+ * 폐기 기록을 **읽기만** 한다. 비우지 않는다.
+ *
+ * 읽기와 삭제를 갈라 둔 이유는 `clearFailedRecords`에 적어 두었다 — 알리기 전에 지우면
+ * 유실을 알리는 장치가 유실되고, 통째로 비우면 사이에 들어온 폐기가 함께 사라진다.
  */
-export async function drainFailedRecords(): Promise<FailedRecord[]> {
+export async function peekFailedRecords(): Promise<FailedRecord[]> {
     const database = await getSyncDB();
     if (!database) return [];
-    const records = await database.getAll('failed-store');
-    if (records.length === 0) return [];
-    await database.clear('failed-store');
-    return records;
+    return database.getAll('failed-store');
+}
+
+/**
+ * 사용자에게 **알린 기록만** 골라 지운다. 같은 유실을 두 번 알리지 않기 위해서다.
+ *
+ * 예전에는 읽으면서 함께 비웠다(`drainFailedRecords`). 읽은 직후 화면이 닫히면 기록은
+ * 사라지고 사용자는 끝내 듣지 못했다 — 유실을 알리는 장치가 유실되는 모양이었다.
+ *
+ * 스토어를 통째로 비워서도 안 된다. 읽은 뒤 지우기까지 사이에 서비스워커의 flush가 새 폐기를
+ * 밀어 넣을 수 있는데, 그것까지 함께 지워지면 **한 번도 알려지지 않은 채 사라진다** —
+ * 이 함수가 막으려던 바로 그 일이다. 그래서 id로 지정해 지운다.
+ */
+export async function clearFailedRecords(ids: Array<number | undefined>): Promise<void> {
+    const database = await getSyncDB();
+    if (!database) return;
+    const tx = database.transaction('failed-store', 'readwrite');
+    await Promise.all([
+        ...ids.filter((id): id is number => typeof id === 'number').map((id) => tx.store.delete(id)),
+        tx.done,
+    ]);
 }
 
 // 동시 flush 방지 — SW sync 이벤트와 window 'online' 폴백이 겹칠 수 있다.

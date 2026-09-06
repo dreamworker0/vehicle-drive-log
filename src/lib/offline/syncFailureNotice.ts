@@ -11,7 +11,7 @@
  *
  * 이 모듈은 화면(토스트)에 의존하므로 SW 번들에 들어가면 안 된다 — sw.ts는 syncQueue만 import한다.
  */
-import { drainFailedRecords, flushQueue, type FailedRecord } from './syncQueue';
+import { peekFailedRecords, clearFailedRecords, flushQueue, type FailedRecord } from './syncQueue';
 import { notifyUser } from '../notify';
 
 /** 큐에 적재되는 컬렉션 → 사용자가 읽는 이름 (enqueue 호출부와 1:1) */
@@ -47,19 +47,96 @@ export function buildFailureMessage(records: FailedRecord[]): string {
         ? '권한이 없거나 이미 변경된 기록이라'
         : '통신 오류가 반복되어';
 
-    return `저장하지 못한 내용이 있습니다 — ${summary}. ${cause} 서버에 반영되지 않았습니다. 번거롭지만 다시 입력해 주세요.`;
+    // 무엇을 잃었는지 함께 적는다. "다시 입력해 주세요"만으로는 다시 입력할 수가 없다 —
+    // 차에서 내린 뒤에는 계기판 숫자를 기억으로 복원할 방법이 없기 때문이다.
+    // 큐는 payload를 그대로 들고 있었는데 지금까지 건수만 세고 버렸다.
+    // 길이를 묶는다. 오래 오프라인이던 사용자는 폐기가 여러 건 쌓이는데, 전부 이으면
+    // 15초짜리 토스트에 수백 자가 들어가 정작 읽히지 않는다.
+    const MAX_DETAILS = 3;
+    const all = records.map(describeRecord).filter(Boolean);
+    const shown = all.slice(0, MAX_DETAILS);
+    const rest = all.length - shown.length;
+    const detailText = shown.length > 0
+        ? ` (${shown.join(' / ')}${rest > 0 ? ` 외 ${rest}건` : ''})`
+        : '';
+
+    return `저장하지 못한 내용이 있습니다 — ${summary}${detailText}. ${cause} 서버에 반영되지 않았습니다. 번거롭지만 다시 입력해 주세요.`;
+}
+
+/**
+ * 폐기된 기록 한 건을 사용자가 알아볼 수 있는 한 줄로 만든다.
+ *
+ * 다시 입력하려면 **계기판 숫자**가 있어야 한다 — 날짜·목적지는 기억나도 그건 안 난다.
+ * 값이 없는 조각은 빼고, 남는 것이 없으면 빈 문자열을 돌려준다(빈 괄호가 뜨지 않게).
+ */
+export function describeRecord(record: FailedRecord): string {
+    const data = (record.data ?? {}) as Record<string, unknown>;
+    // 큐가 센티널을 문자열 마커로 바꿔 저장한다(syncQueue의 toStorable). 오프라인 **수정**은
+    // 당일 운행의 startDate를 deleteField()로 지우므로 그 자리에 `__syncQueue.deleteField__`가
+    // 들어 있다 — 거르지 않으면 사용자에게 내부 문자열이 날짜라고 보여진다.
+    const str = (v: unknown) => {
+        if (typeof v !== 'string') return undefined;
+        const t = v.trim();
+        return t && !t.startsWith('__syncQueue.') ? t : undefined;
+    };
+    const num = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : undefined);
+
+    const parts: string[] = [];
+    const when = str(data.startDate) ?? str(data.date) ?? formatQueuedDate(data.timestamp);
+    if (when) parts.push(when);
+    const where = str(data.destination);
+    if (where) parts.push(where);
+
+    const startKm = num(data.startKm);
+    const endKm = num(data.endKm);
+    if (startKm !== undefined && endKm !== undefined) {
+        parts.push(`${startKm.toLocaleString('ko-KR')}→${endKm.toLocaleString('ko-KR')}km`);
+    }
+    return parts.join(' · ');
+}
+
+/**
+ * 큐에 실린 `timestamp`를 'YYYY-MM-DD'로 만든다.
+ *
+ * **운행일지에는 `date` 필드가 없다.** `buildLogData`가 만드는 것은 `timestamp`(Date)뿐이고
+ * `date`는 옛 문서에만 남아 있는 레거시다. 그것만 찾으면 날짜는 사실상 언제나 비어,
+ * "날짜를 알려 준다"는 말이 거짓이 된다. Date는 structuredClone을 그대로 통과하므로
+ * 큐에서도 Date로 남아 있다.
+ */
+export function formatQueuedDate(value: unknown): string | undefined {
+    const d = value instanceof Date ? value : undefined;
+    if (!d || Number.isNaN(d.getTime())) return undefined;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 }
 
 /**
  * 폐기 기록이 있으면 사용자에게 알린다. 알린 항목은 큐에서 비워지므로 같은 유실을 두 번 알리지 않는다.
  * @returns 알린 건수(없으면 0)
  */
-export async function reportFailedSync(): Promise<number> {
+/**
+ * 진행 중인 보고를 붙잡아 둔다. 세 트리거(online·visibilitychange·앱 시작)는 겹쳐서 발화한다 —
+ * 잠금 화면을 풀며 통신이 돌아오면 두 개가 같이 뜬다. 각자 읽어 각자 알리면 **똑같은 15초짜리
+ * 오류 토스트가 두 번** 뜬다. flushQueue가 쓰는 방식 그대로, 같은 Promise를 돌려준다.
+ */
+let reporting: Promise<number> | null = null;
+
+export function reportFailedSync(): Promise<number> {
+    if (reporting) return reporting;
+    reporting = doReportFailedSync().finally(() => { reporting = null; });
+    return reporting;
+}
+
+async function doReportFailedSync(): Promise<number> {
     try {
-        const records = await drainFailedRecords();
+        // **읽고, 알리고, 그다음에 비운다.** 예전에는 비우면서 읽어, 알리기 직전에 화면이
+        // 닫히면 기록은 사라지고 사용자는 끝내 듣지 못했다.
+        const records = await peekFailedRecords();
         if (records.length === 0) return 0;
         // 유실 안내는 놓치면 의미가 없으므로 일반 토스트보다 길게 띄운다.
         notifyUser(buildFailureMessage(records), 'error', 15000);
+        // 방금 알린 것만 지운다 — 그 사이 서비스워커가 밀어 넣은 폐기는 남겨 다음에 알린다.
+        await clearFailedRecords(records.map((r) => r.id));
         return records.length;
     } catch (error) {
         console.error('[SyncFailureNotice] 폐기 기록 확인 실패', error);
