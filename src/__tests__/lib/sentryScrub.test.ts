@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { scrubContext, scrubConsoleArgs, joinConsoleArgs } from '@/lib/sentryScrub';
+import { scrubContext, scrubConsoleArgs, joinConsoleArgs, scrubUrl, scrubDomTarget } from '@/lib/sentryScrub';
 
 /**
  * Sentry `extra`에서 자유 입력이 걸러지는지 검증한다.
@@ -244,5 +244,65 @@ describe('scrubContext', () => {
         expect(message).toContain('저장 실패:');
         expect(message).toContain('v1');
         expect(message).not.toContain('서울역');
+    });
+});
+
+describe('scrubUrl — 요청 URL의 사람이 친 값', () => {
+    it('목적지 검색어를 지우고 어떤 호출이었는지는 남긴다', () => {
+        // 이 앱은 목적지를 쿼리로 보낸다. fetch breadcrumb이 URL을 통째로 담으므로
+        // 오류 하나에 직전 검색어가 딸려 나갔다.
+        const out = scrubUrl('/api/tmap?action=poi&keyword=%EA%B9%80OO%20%EC%96%B4%EB%A5%B4%EC%8B%A0%20%EB%8C%81');
+        expect(out).toContain('action=poi');
+        expect(out).not.toContain('%EA%B9%80');
+        expect(out).toContain('keyword=[redacted(');
+    });
+
+    it('쿼리가 없으면 그대로 둔다 — 대다수 요청이 여기에 해당한다', () => {
+        expect(scrubUrl('/api/health')).toBe('/api/health');
+        expect(scrubUrl('https://x.example/a/b')).toBe('https://x.example/a/b');
+    });
+
+    it('프래그먼트는 통째로 버린다', () => {
+        expect(scrubUrl('/page#section-김철수')).toBe('/page');
+    });
+
+    it('값 길이는 남긴다 — 빈 검색어와 긴 검색어는 다른 증상이다', () => {
+        expect(scrubUrl('/api?q=')).toBe('/api?q=[redacted(0)]');
+        expect(scrubUrl('/api?q=abcde')).toBe('/api?q=[redacted(5)]');
+    });
+
+    it('값 없는 파라미터와 빈 쿼리도 넘어간다', () => {
+        expect(scrubUrl('/api?flag')).toBe('/api?flag');
+        expect(scrubUrl('/api?')).toBe('/api');
+    });
+});
+
+describe('scrubDomTarget — 클릭한 요소 설명', () => {
+    it('title에 담긴 실명을 지운다', () => {
+        // SDK는 aria-label·title·alt를 설정과 무관하게 항상 붙인다.
+        const out = scrubDomTarget('span.badge[title="공동 운전자: 홍길동, 김철수"]');
+        expect(out).toBe('span.badge[title]');
+    });
+
+    it('aria-label에 담긴 실명을 지운다', () => {
+        expect(scrubDomTarget('button[aria-label="홍길동 제거"]')).toBe('button[aria-label]');
+    });
+
+    it('여러 속성이 붙어도 모두 지우고 뒤 내용을 보존한다', () => {
+        const out = scrubDomTarget('a#x.y[aria-label="김철수"][type="button"][title="목적지: 서울역"]');
+        expect(out).toBe('a#x.y[aria-label][type="button"][title]');
+    });
+
+    it('태그·id·클래스·type은 남긴다 — 진단이 통째로 사라지면 안 된다', () => {
+        expect(scrubDomTarget('input#endKm.input[type="number"]')).toBe('input#endKm.input[type="number"]');
+    });
+
+    it('잘려서 닫히지 않은 값은 통째로 버린다', () => {
+        // maxStringLength로 잘리면 따옴표가 안 닫힌다. 남기면 값이 그대로 샌다.
+        expect(scrubDomTarget('span[title="공동 운전자: 홍길')).toBe('span[title]');
+    });
+
+    it('속성이 없으면 그대로 둔다', () => {
+        expect(scrubDomTarget('button.btn-primary')).toBe('button.btn-primary');
     });
 });

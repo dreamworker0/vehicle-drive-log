@@ -225,3 +225,77 @@ export function joinConsoleArgs(values: unknown[]): string {
         })
         .join(' ');
 }
+
+// ─── breadcrumb 전용 ───
+
+/**
+ * 쿼리 값을 그대로 남길 파라미터 이름.
+ *
+ * 여기에 없는 값은 전부 지운다 — 목적지·검색어처럼 사람이 친 문자열이 쿼리로 나가기 때문이다
+ * (`/api/tmap?action=poi&keyword=김OO 어르신 댁`). 이름 자체는 남겨 어떤 호출이었는지는 보인다.
+ */
+const SAFE_QUERY_PARAMS = new Set([
+    'action', 'version', 'format', 'count',
+    'resCoordType', 'reqCoordType',
+]);
+
+/**
+ * URL에서 사람이 친 값을 걷어낸다. 경로와 파라미터 **이름**은 남긴다.
+ *
+ * fetch·xhr breadcrumb은 URL을 통째로 담는데, 이 앱은 목적지 검색을 쿼리로 보낸다.
+ * 그래서 captureError의 extra를 아무리 걸러도 그 직전 요청의 breadcrumb으로 목적지가 따라 나갔다.
+ */
+export function scrubUrl(rawUrl: string): string {
+    if (typeof rawUrl !== 'string' || !rawUrl) return rawUrl;
+    // 쿼리도 프래그먼트도 없으면 건드릴 것이 없다(대다수 요청).
+    if (!rawUrl.includes('?') && !rawUrl.includes('#')) return rawUrl;
+
+    const [beforeHash] = rawUrl.split('#');
+    const qIndex = beforeHash.indexOf('?');
+    if (qIndex === -1) return beforeHash;
+
+    const path = beforeHash.slice(0, qIndex);
+    const query = beforeHash.slice(qIndex + 1);
+    if (!query) return path;
+
+    const safe = query.split('&').map(pair => {
+        const eq = pair.indexOf('=');
+        if (eq === -1) return pair;
+        const key = pair.slice(0, eq);
+        if (SAFE_QUERY_PARAMS.has(key)) return pair;
+        // 값의 길이는 남긴다 — 빈 검색어와 긴 검색어는 다른 증상이다.
+        return `${key}=[redacted(${pair.length - eq - 1})]`;
+    });
+    return `${path}?${safe.join('&')}`;
+}
+
+/**
+ * 사람이 읽는 텍스트를 담는 HTML 속성. SDK가 **설정과 무관하게 항상** 붙인다
+ * (@sentry/core utils/browser.js `_htmlElementAsString`의 고정 목록).
+ *
+ * 이 앱은 여기에 실명을 넣는다 — `title="공동 운전자: 홍길동, 김철수"`,
+ * `aria-label="홍길동 제거"`. 접근성과 도움말에 필요한 값이라 화면에서 뺄 수는 없다.
+ * 그래서 나가는 길목에서 값만 지운다. `type`·`name`은 입력 칸의 식별자라 남긴다.
+ */
+const PII_BEARING_ATTRS = ['aria-label', 'title', 'alt'] as const;
+
+/**
+ * DOM breadcrumb의 요소 설명에서 사람이 읽는 속성값을 지운다.
+ *
+ * 속성이 있었다는 사실은 남긴다(`[title]`) — 어느 요소를 눌렀는지 좁히는 데 쓰이고,
+ * 태그·id·클래스는 그대로라 진단이 통째로 사라지지 않는다.
+ */
+export function scrubDomTarget(target: string): string {
+    if (typeof target !== 'string' || !target) return target;
+    let out = target;
+    for (const attr of PII_BEARING_ATTRS) {
+        out = out.split(`[${attr}="`).reduce((acc, part, i) => {
+            if (i === 0) return part;
+            const close = part.indexOf('"]');
+            // 닫히지 않았다면 잘린 문자열이다. 통째로 버린다 — 남기면 값이 새어 나간다.
+            if (close === -1) return `${acc}[${attr}]`;
+            return `${acc}[${attr}]${part.slice(close + 2)}`;
+        }, '');
+    }
+    return out;
+}

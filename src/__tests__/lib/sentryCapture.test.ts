@@ -30,6 +30,15 @@ async function loadSentry() {
     return { mod, init, captureException, captureMessage };
 }
 
+/** init에 등록된 beforeBreadcrumb을 꺼낸다 — 순수 함수가 아니라 **배선**을 본다. */
+async function loadBreadcrumbHook() {
+    const { init } = await loadSentry();
+    const options = init.mock.calls[0][0] as {
+        beforeBreadcrumb: (b: Record<string, unknown>) => Record<string, unknown>;
+    };
+    return { beforeBreadcrumb: options.beforeBreadcrumb };
+}
+
 describe('captureError / captureWarning — 개인정보 스크러빙 배선', () => {
     beforeEach(() => {
         vi.resetModules();
@@ -116,13 +125,55 @@ describe('captureError / captureWarning — 개인정보 스크러빙 배선', (
         expect((scrubbed.data as { logger: string }).logger).toBe('console');
     });
 
-    it('console 이외의 breadcrumb은 건드리지 않는다', async () => {
-        const { init } = await loadSentry();
-        const options = init.mock.calls[0][0] as {
-            beforeBreadcrumb: (b: Record<string, unknown>) => Record<string, unknown>;
-        };
+    it('요청 URL의 검색어를 지운다 — 목적지가 쿼리로 나간다', async () => {
+        // 이 앱은 목적지 검색을 /api/tmap?...&keyword=... 로 보낸다. fetch breadcrumb은 URL을
+        // 통째로 담으므로, extra를 아무리 걸러도 오류 직전 요청에 목적지가 실려 나갔다.
+        const { beforeBreadcrumb } = await loadBreadcrumbHook();
 
-        const navigation = { category: 'navigation', data: { from: '/employee/today', to: '/employee/drive-log' } };
-        expect(options.beforeBreadcrumb({ ...navigation })).toEqual(navigation);
+        const out = beforeBreadcrumb({
+            category: 'fetch',
+            type: 'http',
+            data: { method: 'GET', url: '/api/tmap?action=poi&keyword=김OO 어르신 댁', status_code: 500 },
+        });
+
+        const data = out.data as { url: string; method: string; status_code: number };
+        expect(data.url).not.toContain('김OO');
+        expect(data.url).toContain('action=poi');   // 어떤 호출이었는지는 남는다
+        expect(data.method).toBe('GET');            // SDK가 넣은 다른 필드는 보존
+        expect(data.status_code).toBe(500);
+    });
+
+    it('xhr도 같은 규칙으로 지운다', async () => {
+        const { beforeBreadcrumb } = await loadBreadcrumbHook();
+        const out = beforeBreadcrumb({ category: 'xhr', data: { url: '/api/x?q=서울역' } });
+        expect((out.data as { url: string }).url).not.toContain('서울역');
+    });
+
+    it('클릭한 요소의 실명을 지운다 — SDK가 aria-label·title을 항상 붙인다', async () => {
+        // _htmlElementAsString의 고정 목록이라 serializeAttribute 설정으로는 막을 수 없다.
+        const { beforeBreadcrumb } = await loadBreadcrumbHook();
+
+        const out = beforeBreadcrumb({
+            category: 'ui.click',
+            message: 'span.badge[title="공동 운전자: 홍길동, 김철수"]',
+        });
+
+        expect(out.message).toBe('span.badge[title]');
+    });
+
+    it('화면 이동 경로의 쿼리도 지우고, 없으면 그대로 둔다', async () => {
+        const { beforeBreadcrumb } = await loadBreadcrumbHook();
+
+        const plain = { category: 'navigation', data: { from: '/employee/today', to: '/employee/drive-log' } };
+        expect(beforeBreadcrumb({ ...plain })).toEqual(plain);
+
+        const withQuery = beforeBreadcrumb({ category: 'navigation', data: { from: '/a', to: '/b?q=홍길동' } });
+        expect((withQuery.data as { to: string }).to).not.toContain('홍길동');
+    });
+
+    it('그 밖의 breadcrumb은 건드리지 않는다', async () => {
+        const { beforeBreadcrumb } = await loadBreadcrumbHook();
+        const other = { category: 'sentry.event', message: 'x', data: { url: '/a?q=1' } };
+        expect(beforeBreadcrumb({ ...other })).toEqual(other);
     });
 });

@@ -1,5 +1,5 @@
 import { isFirestoreTerminated } from './firestoreLifecycle';
-import { scrubContext, scrubConsoleArgs, joinConsoleArgs } from './sentryScrub';
+import { scrubContext, scrubConsoleArgs, joinConsoleArgs, scrubUrl, scrubDomTarget } from './sentryScrub';
 
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
 
@@ -81,6 +81,36 @@ function initSentryWithModule(Sentry: SentryModule) {
                     ? 'Assertion failed: ' : '';
                 breadcrumb.message = assertPrefix + joinConsoleArgs(safeArgs);
             }
+
+            // 요청 URL — 이 앱은 목적지 검색을 쿼리로 보낸다(/api/tmap?...&keyword=김OO 어르신 댁).
+            // fetch·xhr breadcrumb은 URL을 통째로 담으므로, 오류 하나에 직전 검색어가 딸려 나갔다.
+            if (breadcrumb.category === 'fetch' || breadcrumb.category === 'xhr') {
+                const data = breadcrumb.data as { url?: unknown } | undefined;
+                if (typeof data?.url === 'string') {
+                    breadcrumb.data = { ...data, url: scrubUrl(data.url) };
+                }
+            }
+
+            // 화면 이동 — 경로에 쿼리가 붙어 오는 경우를 같은 규칙으로 막는다.
+            if (breadcrumb.category === 'navigation') {
+                const data = breadcrumb.data as { from?: unknown; to?: unknown } | undefined;
+                if (data) {
+                    breadcrumb.data = {
+                        ...data,
+                        ...(typeof data.from === 'string' ? { from: scrubUrl(data.from) } : {}),
+                        ...(typeof data.to === 'string' ? { to: scrubUrl(data.to) } : {}),
+                    };
+                }
+            }
+
+            // 클릭·입력 — SDK가 aria-label·title·alt를 **설정과 무관하게 항상** 붙인다.
+            // 이 앱은 거기에 실명을 넣는다(title="공동 운전자: 홍길동, 김철수").
+            // 접근성에 필요한 값이라 화면에서 뺄 수 없으니 나가는 길목에서 지운다.
+            if (typeof breadcrumb.category === 'string' && breadcrumb.category.startsWith('ui.')
+                && typeof breadcrumb.message === 'string') {
+                breadcrumb.message = scrubDomTarget(breadcrumb.message);
+            }
+
             return breadcrumb;
         },
         // 노이즈 에러 필터링
