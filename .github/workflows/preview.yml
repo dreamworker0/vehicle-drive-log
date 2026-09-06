@@ -55,13 +55,51 @@ jobs:
       contents: read
 
     steps:
-      # 체크아웃하지 않는다 — CLI 호출 한 번뿐이라 저장소 내용이 필요 없다.
+      # firebase.json이 있어야 CLI가 대상 사이트를 정한다. 체크아웃을 빼면
+      # "Not in a Firebase app directory"로 실패한다(#348에서 실제로 그랬다).
+      # 워크플로 파일 하나만 있으면 되므로 sparse checkout으로 최소화한다.
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: firebase.json
+          sparse-checkout-cone-mode: false
+
       - name: Delete preview channel
         run: |
           export GOOGLE_APPLICATION_CREDENTIALS=$(mktemp)
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
-          # 채널이 없는 경우가 정상적으로 존재한다(dependabot PR은 배포 스텝을 건너뛰고,
-          # 3일 넘게 열려 있던 PR은 이미 만료돼 사라졌을 수 있다). 그것으로 실패하지 않는다.
           CHANNEL="pr-${{ github.event.number }}"
-          npx firebase-tools hosting:channel:delete "$CHANNEL" --force --project vehicle-drive-log || echo "채널 $CHANNEL 없음 또는 이미 삭제됨 — 넘어간다"
+          # 채널이 없는 것은 정상 경로다(dependabot PR은 배포 스텝을 건너뛰고, 3일 넘게 열려
+          # 있던 PR은 이미 만료됐을 수 있다). 하지만 **그 한 가지만** 봐준다 — #348에서
+          # `|| echo`로 전부 삼켰다가 설정 오류를 초록으로 덮었다.
+          set +e
+          OUT=$(npx firebase-tools hosting:channel:delete "$CHANNEL" --force --project vehicle-drive-log 2>&1)
+          CODE=$?
+          set -e
+          echo "$OUT"
+          if [ "$CODE" -ne 0 ] || echo "$OUT" | grep -q "HTTP Error: 404"; then
+            if echo "$OUT" | grep -q "HTTP Error: 404"; then
+              echo "채널 $CHANNEL 없음 — 지울 것이 없다"
+            else
+              echo "::error::채널 $CHANNEL 삭제 실패"
+              rm -f "$GOOGLE_APPLICATION_CREDENTIALS"
+              exit 1
+            fi
+          fi
+          rm -f "$GOOGLE_APPLICATION_CREDENTIALS"
+
+      # 지워졌는지 실제로 확인한다. 삭제 명령이 조용히 실패해도 목록에는 남는다.
+      - name: Verify deletion
+        run: |
+          export GOOGLE_APPLICATION_CREDENTIALS=$(mktemp)
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
+          CHANNEL="pr-${{ github.event.number }}"
+          # 채널 name은 "projects/…/sites/…/channels/pr-N" 한 문자열이다. 뒤따옴표까지 붙여야
+          # 릴리스 경로("…/channels/pr-N/releases/…")와 접두 채널(pr-34 vs pr-348)에 걸리지 않는다.
+          LIST=$(npx firebase-tools hosting:channel:list --project vehicle-drive-log --json)
+          if echo "$LIST" | grep -q "channels/$CHANNEL\""; then
+            echo "::error::$CHANNEL 이 목록에 아직 남아 있다"
+            rm -f "$GOOGLE_APPLICATION_CREDENTIALS"
+            exit 1
+          fi
+          echo "$CHANNEL 삭제 확인"
           rm -f "$GOOGLE_APPLICATION_CREDENTIALS"
