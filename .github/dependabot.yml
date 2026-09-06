@@ -59,6 +59,14 @@ updates:
         update-types:
           - minor
           - patch
+    # ⚠️ 메이저 상향의 peer 커플링 두 가지 (2026-09-06 Phase 216에서 확인)
+    #   (1) firebase-admin 15가 나오면 **단독 PR은 다시 ERESOLVE로 죽는다** —
+    #       firebase-functions 7의 peer가 `^11 || ^12 || ^13 || ^14`이기 때문이다.
+    #       admin 13→14 때와 같이 functions와 **함께** 올려야 한다(PR #116·#342).
+    #   (2) @babel/core와 @babel/preset-env는 8 메이저에서 **한 묶음**이다.
+    #       preset-env 7의 peer는 `@babel/core ^7`만 받으므로, 둘이 각각 별도 PR로
+    #       올라오면 서로의 peer를 깨서 둘 다 npm ci가 실패한다. 함께 올릴 것.
+    #       (이 두 패키지는 jose ESM을 Jest에서 변환하려고 들인 것이다 — Phase 216)
     ignore:
       # typescript 7: 루트와 같은 이유로 보류한다(PR #151). 루트 `npm run lint`가 functions까지
       # 커버하므로 두 디렉터리의 typescript 버전이 갈라지면 린트 대상과 컴파일러가 어긋난다.

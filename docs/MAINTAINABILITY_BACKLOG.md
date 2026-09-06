@@ -11,7 +11,8 @@
 > 3차 정리: **Settings 결재라인 섹션 추출**과 **Functions ESLint 도입**까지 완료.
 > 코드 분리 과제(1~3)는 모두 처리되었다(아래 각 항목 "완료" 참고).
 >
-> 미착수 과제는 **Functions 런타임 메이저 이관** 한 건이다(아래 별도 트랙).
+> 코드 분리 과제(1~3)와 **Functions 런타임 메이저 이관**(2026-09-06 완료)까지 모두 처리됐다.
+> 현재 미착수 항목은 없다.
 
 ---
 
@@ -69,70 +70,37 @@
 
 ---
 
-## 별도 트랙: Functions 런타임 메이저 이관 (firebase-admin 14 · firebase-functions 7) — 미착수
+## 별도 트랙: Functions 런타임 메이저 이관 — 완료 (2026-09-06, PR #342)
 
-> **2026-09-06 실측으로 전면 갱신.** 이전 판(2026-08-05 기준 "8개 파일 22건")은 두 군데가
-> 틀렸다 — 최대 난관으로 적혀 있던 두 항목은 **이미 해소됐고**, 정작 막고 있는 것 둘은
-> 적혀 있지 않았다. 아래는 두 메이저를 실제로 설치해 측정한 결과다.
->
-> 측정 방법: 브랜치에서 `npm install firebase-admin@^14 firebase-functions@^7`,
-> `npm run type-check:functions`, `npm --prefix functions run test`. 측정 후 원복했다.
+`firebase-admin` 13→14, `firebase-functions` 6→7, `@types/express` 4→5로 올렸고
+dependabot ignore 두 항목도 제거했다. **프로덕션 소스는 한 줄도 바뀌지 않았다** —
+의존성과 jest 설정뿐이다. 자세한 경위는
+[Phase 216](구현이력/트랙B_Phase212부터.md)과
+[계획서](2026-09-06-Functions런타임이관-계획서.md).
 
-`firebase-admin` 13→14와 `firebase-functions` 6→7은 **함께 올려야 하는 한 묶음**이다.
-functions 6의 peer가 `firebase-admin ^11 || ^12 || ^13`이라 admin 14 단독 상향은 `npm ci`가
-ERESOLVE로 실패하고(PR #116), functions 7은 peer에 `^14`를 포함하므로 순서가 강제된다.
-dependabot은 두 메이저를 ignore에 등록해 보류 중이며
-([.github/dependabot.yml](../.github/dependabot.yml)), 이관 완료 시 **두 항목을 함께** 제거한다.
+이 문서의 이전 판(2026-08-05 추정 "8개 파일 22건")이 왜 틀렸는지는 남겨 둔다 —
+**측정 없이 적은 숫자가 13개월 동안 계획의 근거로 쓰였다.**
 
-### 해소된 것 (더 이상 과제가 아님)
+| 항목 | 이전 판 | 실측 |
+|---|---|---|
+| `admin.firestore` 네임스페이스 | 4건 | **0건** — 이미 해소돼 있었다 |
+| 타입 오류 | 8개 파일 22건 | **3건**, 코드가 아니라 의존성 문제 |
+| `firebase-functions-test` | 언급 없음 | **차단 원인** — 미사용 유령 의존성 |
+| Jest × ESM `jose` | 언급 없음 | **진짜 과제** — 17 스위트 |
 
-- **`admin.firestore` 네임스페이스 API — 0건.** 이전 판은 3개 파일에 4건이 남았다고
-  적었으나, `functions/src`·`scripts` 전체에 `admin.firestore`·`import * as admin` 사용이
-  없다. 다른 작업에 딸려 정리된 것으로 보인다.
-- **타입 오류 — 22건이 아니라 3건이고, 그 3건도 의존성 정렬로 사라진다.**
-  `slackEvents.ts`·`slackOauthCallback.ts`·`createAuthenticatedProxy.ts`에서 나는 TS2345는
-  코드 문제가 아니라 **트리에 express 타입이 두 개 있어서** 난다 — 우리가 명시한
-  `@types/express` 4와 firebase-functions 7이 번들한 5가 `sendfile` 유무로 갈린다.
-  `@types/express`를 5로 올리면 **type-check 0건**이 된다(실측).
-  즉 열려 있는 PR #287은 틀린 게 아니라 **순서만 어긋난** PR이다.
+또 하나 정정한다. 이전 판과 `createAuthenticatedProxy.test.ts` 머리말이
+"`@types/express` 5에서 `Request`/`Response` named export가 사라진다"고 적었는데
+**사실이 아니다** — 5에도 `interface Response`가 있다. 실제로 났던 TS2345는
+트리에 express 타입이 **두 벌** 공존해(우리 4 vs functions 7이 번들한 5)
+`sendfile` 유무로 갈린 것이었고, 한 벌로 맞추자 소스 수정 없이 사라졌다.
 
-### 실제로 막고 있는 것
+### 남은 커플링 (해소되지 않았다)
 
-**(1) `firebase-functions-test`가 admin 14를 막는다 — 그런데 쓰지 않는 패키지다.**
-
-peer가 `firebase-admin ^8 ~ ^13`이고 **최신이 3.5.0이라 올릴 수단이 없다.** 이 상태로는
-`npm ci`가 ERESOLVE로 죽는다. 그런데 저장소 전체에서 이 패키지를 import하는 코드가
-**한 줄도 없다**(`package.json`·`package-lock.json`에만 존재). 제거로 해소된다.
-
-**(2) `jose`가 ESM 전용이라 Jest가 로드에 실패한다 — 이것이 진짜 과제다.**
-
-```
-firebase-admin@14 → jwks-rsa@4.1.0 → jose@6.2.12
-  exports["."].default → ./dist/webapi/index.js   (CJS 빌드 없음)
-```
-
-우리 Jest는 ts-jest CommonJS 구성이라 `require()`가 불가능하고,
-`firebase-admin/auth`를 타고 들어가는 **모든 테스트가 로드 단계에서 죽는다 —
-17개 스위트, 발생 44회**(`Must use import to load ES Module`). 프로덕션 런타임은
-영향이 없다. **테스트 인프라만의 문제**다.
-
-- 배포 대상 Node 22는 ESM을 로드할 수 있고, 실제 실행 경로는 firebase-admin이 처리한다.
-- `functions/package.json`의 jest 설정에는 `transform`이 `^.+\.tsx?$` 하나뿐이라
-  `node_modules`의 JS는 변환 대상이 아니다.
-- 참고: `joinOrganization.ts:182`가 이미 `await import("firebase-admin/auth")` 형태를
-  쓰고 있다. 다만 `module: "commonjs"` 하에서는 이것도 `require`로 내려가므로,
-  지연 로딩이 통하는 이유는 "테스트가 그 경로를 실행하지 않아서"이지 ESM을
-  제대로 로드해서가 아니다 — 해법을 고를 때 이 차이를 혼동하지 말 것.
-
-### 위험 (변하지 않음)
-
-인증 프록시(`createAuthenticatedProxy`)는 `holidayProxy`·`tmapProxy`의 공통 관문이라
-배포 즉시 프로덕션에 반영된다. 커버리지가 0%였으므로 이관 전제로
-`functions/src/__tests__/createAuthenticatedProxy.test.ts`를 먼저 붙였다(401·429·uid 전달·
-rate limit 키가 IP가 아니라 uid라는 점까지 고정). 이관 시 에뮬레이터에서 Slack 웹훅
-경로를 함께 확인한다.
-
-**계획서**: [2026-09-06-Functions런타임이관-계획서.md](2026-09-06-Functions런타임이관-계획서.md)
+- `firebase-functions@7`의 peer가 `firebase-admin ^11 || ^12 || ^13 || ^14`라
+  **미래의 admin 15 단독 PR은 PR #116과 똑같이 ERESOLVE로 죽는다.**
+- Jest에서 `jose`를 변환하려고 들인 `@babel/core`·`@babel/preset-env`는
+  **8 메이저에서 한 묶음**이다(preset-env 7의 peer가 `@babel/core ^7`만 받는다).
+  둘 다 [.github/dependabot.yml](../.github/dependabot.yml)에 주석으로 남겼다.
 
 ---
 

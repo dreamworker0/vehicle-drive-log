@@ -15,7 +15,7 @@ description: Cloud Functions 코딩 컨벤션. functions/ 디렉터리의 코드
 - **런타임**: Node.js 22 (`engines.node: "22"`)
 - **모듈 시스템**: 소스는 `import`/`export`로 쓰지만 **빌드 산출물과 런타임은 CommonJS**다 (`functions/tsconfig.json`의 `module: "commonjs"`). top-level await와 `import.meta`는 컴파일 단계에서 막힌다(TS1378·TS1343). `require()`는 쓸 수 있으나 `@typescript-eslint/no-require-imports`가 켜져 있어 사유를 적은 disable 주석이 필요하다 (`functions/src/core/sentry.ts`)
   - ⛔ `functions/package.json`에 `"type": "module"`을 **추가하지 않는다.** Node는 가장 가까운 package.json을 보므로 루트의 `"type": "module"`은 functions로 전파되지 않는다 — 루트에 맞춘답시고 추가하면 CJS 산출물이 통째로 깨진다
-- **Firebase**: `firebase-admin`, `firebase-functions` v6 (2nd gen)
+- **Firebase**: `firebase-admin` 14, `firebase-functions` 7 (2nd gen)
 - **주요 라이브러리**: `googleapis`, `@google/genai`, `@emailjs/nodejs`, `@sentry/node`
 
 ---
