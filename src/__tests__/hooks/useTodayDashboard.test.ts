@@ -283,4 +283,46 @@ describe('useTodayDashboard', () => {
             expect(tokenRefresh.calls).toBe(0);
         });
     });
+
+    // 빈 데이터로 대체하는 설계 때문에 "예약이 없다"와 "못 받아 왔다"가 같은 화면이 된다.
+    // loadFailed가 그 둘을 갈라 준다 — 이 플래그가 없으면 운전자는 자기 예약을 없는 것으로 본다.
+    describe('불러오기 실패와 빈 결과의 구분', () => {
+        afterEach(() => {
+            mockAuth.currentUser = null;
+            mockGetWeekReservations.mockImplementation(async () => mockTodayReservations);
+        });
+
+        it('정상 로드면 loadFailed는 false다', async () => {
+            const { result } = await renderDashboardHook();
+
+            await waitFor(() => { expect(result.current?.vehicles).toHaveLength(2); });
+
+            expect(result.current?.loadFailed).toBe(false);
+        });
+
+        it('예약이 진짜 0건이어도 loadFailed는 false다 — 빈 결과는 실패가 아니다', async () => {
+            mockGetWeekReservations.mockImplementation(async () => []);
+
+            const { result } = await renderDashboardHook();
+
+            await waitFor(() => { expect(result.current?.vehicles).toHaveLength(2); });
+
+            expect(result.current?.myReservations).toHaveLength(0);
+            expect(result.current?.loadFailed).toBe(false);
+        });
+
+        it('불러오기가 실패하면 loadFailed가 true다', async () => {
+            mockGetWeekReservations.mockImplementation(async () => {
+                throw new Error('The query requires an index. That index is currently building');
+            });
+
+            const { result } = await renderDashboardHook();
+
+            await waitFor(() => { expect(result.current?.loadFailed).toBe(true); }, { timeout: 3000 });
+
+            // 실패해도 화면은 살아 있다 — 데이터만 비어 있다.
+            expect(result.current?.myReservations).toHaveLength(0);
+            expect(result.current?.todayLabel).toBeTruthy();
+        });
+    });
 });
