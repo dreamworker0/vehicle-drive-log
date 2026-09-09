@@ -2,6 +2,7 @@ import { useState, useEffect, Suspense, startTransition } from 'react';
 import { Routes, Route, NavLink, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { lazyWithRetry } from '../../lib/lazyWithRetry';
+import { warmDriverRoutes } from '../../lib/warmDriverRoutes';
 import { getOrganization } from '../../lib/firestore';
 import { SA_TEST_ROLE_KEY } from '../../App';
 import NotificationBell from '../common/NotificationBell';
@@ -93,6 +94,16 @@ export default function EmployeeLayout() {
             .then(org => org && setOrgName(org.name || ''))
             .catch(() => { });
     }, [userData?.organizationId]);
+
+    /*
+     * 운전자 경로 청크를 유휴 시점에 미리 받아 오프라인을 보장한다.
+     * 프리캐시가 앱 셸만 담으므로(vite.config.js), 이 워밍이 없으면 아직 열어 보지 않은
+     * 화면은 지하 주차장에서 열리지 않는다. 자세한 근거는 warmDriverRoutes.ts 주석 참고.
+     * 오프라인이면 내부에서 건너뛰고 다음 마운트에 다시 시도하므로 의존성은 비워 둔다.
+     */
+    useEffect(() => {
+        warmDriverRoutes();
+    }, []);
 
     return (
         <div className="min-h-screen bg-surface-50 dark:bg-surface-950 flex flex-col">
