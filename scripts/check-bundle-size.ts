@@ -142,6 +142,7 @@ function getShellAssetPaths(): string[] | null {
     for (const m of html.matchAll(/<script[^>]+src="\/(assets\/[^"]+)"/g)) names.add(m[1]);
     for (const m of html.matchAll(/<link[^>]+rel="modulepreload"[^>]+href="\/(assets\/[^"]+)"/g)) names.add(m[1]);
     for (const m of html.matchAll(/<link[^>]+rel="stylesheet"[^>]+href="\/(assets\/[^"]+)"/g)) names.add(m[1]);
+
     return [...names];
 }
 
@@ -215,12 +216,39 @@ function checkPrecache(): boolean {
         console.log(`   ${formatSize(size).padStart(10)}  ${entry.url}`);
     }
 
+    // fail-closed — 세 추출 중 **CSS만** 깨져도 조용히 지나가면 안 된다. 그때 shell에는
+    // script·modulepreload 항목이 남아 `missing`이 비고, CSS가 프리캐시에서 빠지는 회귀를
+    // 그대로 통과시킨다(오프라인에서 스타일 없는 화면). index.html은 항상 index-*.css를
+    // stylesheet로 직접 걸므로 0건은 추출 규칙이 죽었다는 뜻이다.
+    if (!shell.some(p => p.endsWith('.css'))) {
+        console.log('   ❌ dist/index.html에서 셸 스타일시트를 한 건도 찾지 못했습니다.');
+        console.log('      → getShellAssetPaths()의 추출 규칙을 산출물 구조에 맞게 갱신하세요.');
+        hasWarning = true;
+    }
+
     // 셸 유실 검사 — index.html과 그 참조 자산이 전부 들어 있어야 한다.
     const urls = new Set(manifest.map(e => e.url));
     const missing = ['index.html', ...shell].filter(p => !urls.has(p));
     if (missing.length > 0) {
         console.log(`   ❌ 앱 셸이 프리캐시에서 빠졌습니다: ${missing.join(', ')}`);
         console.log('      → 오프라인이 동작하지 않습니다. vite.config.js의 globPatterns를 확인하세요.');
+        hasWarning = true;
+    }
+
+    /*
+     * 역방향 검사 — 프리캐시의 `/assets/` 항목은 index.html이 참조하는 것과 **정확히 같아야**
+     * 한다. `assets/index-*`는 엔트리 파일명 규칙이 아니라 접두사 패턴이라, 앞으로
+     * `index.ts(x)` 모듈에서 갈라진 라우트 청크가 같은 접두사를 가지면 의도 없이 프리캐시에
+     * 들어온다. 전송 예산은 큰 유입만 잡고 작은 청크는 조용히 통과시키므로, 프리캐시를
+     * 셸로 한정한 취지가 조금씩 침식된다. 여기서 집합으로 못박는다.
+     */
+    const shellSet = new Set(shell);
+    const unexpected = manifest
+        .map(e => e.url)
+        .filter(u => u.startsWith('assets/') && !shellSet.has(u));
+    if (unexpected.length > 0) {
+        console.log(`   ❌ index.html이 참조하지 않는 청크가 프리캐시에 있습니다: ${unexpected.join(', ')}`);
+        console.log('      → 라우트 청크는 sw.ts의 /assets/ 런타임 캐시가 담아야 합니다. globPatterns를 확인하세요.');
         hasWarning = true;
     }
 

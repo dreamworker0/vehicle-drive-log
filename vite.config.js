@@ -119,6 +119,15 @@ export default defineConfig({
           'index.html',
           'assets/index-*.{js,css}',
           'assets/firebase-auth-*.js',
+          /*
+           * sw-purge.js는 **긴급 퍼지 킬 스위치**다(PURGE_VER을 올리면 전 클라이언트가
+           * 워커·캐시를 버린다 — index.html이 defer 스크립트로 싣는다). firebase.json이
+           * 이 파일을 `max-age=31536000, immutable`로 서빙하므로, 리비전이 붙는 프리캐시가
+           * 갱신본을 서빙해 주지 않으면 클라이언트는 최대 1년간 옛 사본을 쓰고
+           * **PURGE_VER를 올려도 도달하지 않는다.** 서비스 워커 동작을 바꾸는 이 설정에서
+           * 그 복구 수단을 잃을 수는 없다. 1KB이므로 예산에도 영향이 없다.
+           */
+          'sw-purge.js',
         ],
         // 자체 호스팅 폰트는 프리캐시에서 제외한다. Pretendard 동적 서브셋은 조각이 92개(3.1MB)라
         // 프리캐시에 넣으면 설치 즉시 전부 내려받는다 — 현장 저사양 폰의 데이터·용량을 쓸 이유가 없다.

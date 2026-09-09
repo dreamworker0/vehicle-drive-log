@@ -81,13 +81,29 @@ export function warmDriverRoutes(): void {
     started = true;
 
     scheduleIdle(async () => {
+        /*
+         * 판정과 실행 사이에 최대 10초가 있다. 그 사이 엘리베이터·지하로 들어가 통신이
+         * 끊기면 9건이 전부 실패하는데, `started`가 이미 true라 그 세션에서는 다시 시도하지
+         * 않는다 — 통신이 돌아와도 오프라인 보장이 없는 채로 남는다. 그래서 실행 직전에
+         * 다시 확인하고, 못 받았으면 플래그를 되돌려 다음 마운트에 기회를 남긴다.
+         */
+        if (navigator.onLine === false) {
+            started = false;
+            return;
+        }
+
+        let loaded = 0;
         for (const load of DRIVER_ROUTE_LOADERS) {
             try {
                 await load();
+                loaded += 1;
             } catch {
                 // 한 청크가 실패해도 나머지는 계속 받는다.
             }
         }
+
+        // 한 건도 못 받았으면 회선이 끊긴 것으로 보고 재시도 여지를 남긴다.
+        if (loaded === 0) started = false;
     });
 }
 
