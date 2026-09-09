@@ -16,6 +16,9 @@ import {
     findForbiddenDeployCommands,
     countTestInventory,
     extractDocumentedTestInventory,
+    extractHistoryIndexPhaseCounts,
+    extractPhaseListSummaries,
+    countPhaseHeadings,
 } from '../check-harness';
 
 describe('parseFrontmatter', () => {
@@ -309,5 +312,71 @@ describe('extractHookScriptPaths', () => {
 
     it('hooks가 없으면 빈 배열', () => {
         expect(extractHookScriptPaths('{"permissions":{}}')).toEqual([]);
+    });
+});
+
+describe('구현이력 색인 Phase 수 정합', () => {
+    const INDEX = [
+        '| 구간 | 기간 | Phase 수 | 크기 | 내용 |',
+        '|---|---|---|---|---|',
+        '| [트랙 A](구현이력/트랙A_Phase1-48.md) | 2026-05 | 48 | 120 KB | 초기 |',
+        '| [트랙 B Phase103~141](구현이력/트랙B_Phase103-141.md) | 2026-07 | 39 | 200 KB | 운영 |',
+        '| **합계** | — | **87** | 320 KB | — |',
+    ].join('\n');
+
+    it('구간 행의 제목·본문 경로·Phase 수, 합계를 읽는다', () => {
+        expect(extractHistoryIndexPhaseCounts(INDEX)).toEqual({
+            sections: [
+                { title: '트랙 A', rel: '구현이력/트랙A_Phase1-48.md', documented: 48 },
+                {
+                    title: '트랙 B Phase103~141',
+                    rel: '구현이력/트랙B_Phase103-141.md',
+                    documented: 39,
+                },
+            ],
+            total: 87,
+        });
+    });
+
+    it('합계 행이 없으면 total은 null', () => {
+        const withoutTotal = INDEX.split('\n').filter((line) => !line.includes('합계')).join('\n');
+        expect(extractHistoryIndexPhaseCounts(withoutTotal).total).toBeNull();
+    });
+
+    it('구간 파일 링크가 아닌 표는 구간으로 세지 않는다', () => {
+        const other = '| [운영 매뉴얼](../OPERATIONS.md) | 2026-07 | 39 | 200 KB | 운영 |';
+        expect(extractHistoryIndexPhaseCounts(other).sections).toEqual([]);
+    });
+
+    it('본문의 `### Phase` 제목만 센다', () => {
+        const body = [
+            '# 트랙 B',
+            '### Phase 103: 첫 작업',
+            '#### Phase 104: 더 깊은 제목은 제외',
+            '## Phase 105: 상위 제목도 제외',
+            '본문에 ### Phase 라고 적힌 인라인 언급은 줄 시작이 아니라 제외',
+            '### Phase 106: 마지막 작업',
+        ].join('\n');
+        expect(countPhaseHeadings(body)).toBe(2);
+    });
+
+    it('Phase 제목이 없으면 0', () => {
+        expect(countPhaseHeadings('# 빈 문서\n\n내용 없음')).toBe(0);
+    });
+
+    it('「Phase 목록」 summary의 구간 제목과 (N개)를 읽는다', () => {
+        const md = [
+            '<summary><strong>트랙 A — 초기 상세 이력 (Phase 1~58)</strong> — Phase 1~58 (64개)</summary>',
+            '<summary><strong>트랙 B — 운영 고도화 로그 (Phase 212~)</strong> — 열린 구간 (11개)</summary>',
+        ].join('\n');
+        expect(extractPhaseListSummaries(md)).toEqual([
+            { title: '트랙 A — 초기 상세 이력 (Phase 1~58)', documented: 64 },
+            { title: '트랙 B — 운영 고도화 로그 (Phase 212~)', documented: 11 },
+        ]);
+    });
+
+    it('개수 꼬리가 없는 summary는 건너뛴다', () => {
+        const md = '<summary><strong>부록</strong> — 개수 표기 없음</summary>';
+        expect(extractPhaseListSummaries(md)).toEqual([]);
     });
 });

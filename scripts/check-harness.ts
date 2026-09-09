@@ -28,6 +28,8 @@
  * 16. .claude/settings.json 훅 배선 실존 — 경로 오타 시 훅이 조용히 죽는 것을 막는다
  * 17. 원본 운영 문서에 로컬 Firebase 직접 배포 명령이 없는지 확인
  * 18. README 테스트 파일·suite 수가 추적 파일의 실제 규모와 일치하는지 확인
+ * 19. 구현이력 색인의 구간별 Phase 수·합계·「Phase 목록」 라벨 `(N개)` ↔ 본문의 실제
+ *     `### Phase` 개수 정합 — 색인은 제목으로 찾는 곳이라 숫자가 틀려도 아무도 실패하지 않는다
  *
  * 단위 테스트: scripts/__tests__/check-harness.test.ts (파서·판정 함수)
  */
@@ -143,6 +145,34 @@ export function countTestInventory(paths: string[]): TestInventory {
         rulesFiles: normalized.filter((path) => /^tests\/.+-rules\.test\.ts$/.test(path)).length,
         e2eSpecs: normalized.filter((path) => /^e2e\/.+\.spec\.ts$/.test(path)).length,
     };
+}
+
+/** 구현이력 색인의 구간 파일 표에서 구간 제목·본문 경로·문서화된 Phase 수와 「합계」 값을 읽는다. */
+export function extractHistoryIndexPhaseCounts(markdown: string): {
+    sections: { title: string; rel: string; documented: number }[];
+    total: number | null;
+} {
+    // | [트랙 …](구현이력/파일.md) | 기간 | 수 | 크기 | 내용 |
+    const sections = [
+        ...markdown.matchAll(/^\|\s*\[([^\]]+)\]\((구현이력\/[^)]+\.md)\)\s*\|[^|]*\|\s*(\d+)\s*\|/gm),
+    ].map((m) => ({ title: m[1].trim(), rel: m[2], documented: Number(m[3]) }));
+    const totalRow = markdown.match(/^\|\s*\*\*합계\*\*\s*\|[^|]*\|\s*\*\*(\d+)\*\*\s*\|/m);
+    return { sections, total: totalRow ? Number(totalRow[1]) : null };
+}
+
+/**
+ * 「Phase 목록」 접힌 블록의 `<summary>`에서 구간 제목과 꼬리의 `(N개)`를 읽는다.
+ * 이 제목은 구간 파일 표의 링크 텍스트와 같은 문자열이라 두 곳을 이어 붙일 수 있다.
+ */
+export function extractPhaseListSummaries(markdown: string): { title: string; documented: number }[] {
+    return [
+        ...markdown.matchAll(/^<summary><strong>([^<]+)<\/strong>[^<]*\((\d+)개\)<\/summary>/gm),
+    ].map((m) => ({ title: m[1].trim(), documented: Number(m[2]) }));
+}
+
+/** 이력 본문 파일의 실제 `### Phase` 제목 개수. */
+export function countPhaseHeadings(body: string): number {
+    return (body.match(/^### Phase /gm) ?? []).length;
 }
 
 /** 문서에서 `npm run <script>` / `npm test run` 등 명령 참조를 추출한다. */
@@ -608,6 +638,60 @@ export function runChecks(root: string = ROOT): { findings: Finding[]; checked: 
             }
         } catch {
             err('(git)', 'git ls-files 실행 실패 — README 테스트 규모 검사를 완료할 수 없음');
+        }
+    }
+
+    // 19. 구현이력 색인의 Phase 수·합계는 본문의 실제 `### Phase` 개수와 일치해야 한다.
+    //
+    // 이 값들은 사람이 손으로 고쳐 왔고 실제로 조용히 어긋났다 — `합계`는 분할 당시(#79)
+    // 이후 한 번도 갱신되지 않아 212~ 구간이 0→11로 늘어도 221에 멈춰 있었고,
+    // `103-141` 행은 37인데 본문에는 39개가 있었다(2026-09-09 발견). 색인은 "제목으로
+    // 찾는 곳"이라 숫자가 틀려도 아무도 실패하지 않는다 — 그래서 기계가 센다.
+    checked++;
+    const historyIndexRel = 'docs/구현이력.md';
+    const historyIndex = read(historyIndexRel);
+    const { sections, total } = extractHistoryIndexPhaseCounts(historyIndex);
+
+    if (sections.length === 0) {
+        err(historyIndexRel, '구간 파일 표에서 Phase 수를 한 건도 읽지 못함 — 추출 규칙을 갱신하세요');
+    } else if (total === null) {
+        err(historyIndexRel, '구간 파일 표의 「합계」 행을 읽지 못함 — 추출 규칙을 갱신하세요');
+    } else {
+        let actualTotal = 0;
+        const actualByTitle = new Map<string, number>();
+        for (const { title, rel, documented } of sections) {
+            const bodyRel = `docs/${rel}`;
+            const body = read(bodyRel);
+            if (!body) {
+                err(historyIndexRel, `색인이 가리키는 본문이 없음: ${bodyRel}`);
+                continue;
+            }
+            const actual = countPhaseHeadings(body);
+            actualTotal += actual;
+            actualByTitle.set(title, actual);
+            if (documented !== actual) {
+                err(historyIndexRel, `${rel} Phase 수 불일치 — 색인 ${documented}, 본문 ${actual}`);
+            }
+        }
+        // 합계는 열의 합이다. 두 트랙에 겹치는 Phase 49~57이 양쪽에서 세어지는 것은
+        // 의도이며(색인 본문이 그 중복을 설명한다), 열 합계가 열을 더하지 않으면 그냥 틀린 값이다.
+        if (total !== actualTotal) {
+            err(historyIndexRel, `Phase 합계 불일치 — 색인 ${total}, 실제 합 ${actualTotal}`);
+        }
+
+        // 「Phase 목록」의 `<summary>` 꼬리 `(N개)`도 같은 값을 말한다. 표만 고치고 라벨을
+        // 놔두면 드리프트가 되므로(실제로 `103~141`은 36개, `212~`는 5개에 멈춰 있었다) 같이 센다.
+        const summaries = extractPhaseListSummaries(historyIndex);
+        if (summaries.length === 0) {
+            err(historyIndexRel, '「Phase 목록」의 `<summary>` Phase 개수를 한 건도 읽지 못함 — 추출 규칙을 갱신하세요');
+        }
+        for (const { title, documented } of summaries) {
+            const actual = actualByTitle.get(title);
+            if (actual === undefined) {
+                err(historyIndexRel, `「Phase 목록」 제목이 구간 파일 표에 없음: ${title}`);
+            } else if (documented !== actual) {
+                err(historyIndexRel, `${title} 목록 라벨 Phase 수 불일치 — 라벨 ${documented}, 본문 ${actual}`);
+            }
         }
     }
 
