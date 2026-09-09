@@ -226,6 +226,25 @@ function initSentryWithModule(Sentry: SentryModule) {
             // 내부 실패를 그대로 전파하는 환경 노이즈다(앱 버그 아님). 앵커로 정확 일치만 차단해
             // "Internal error opening backing store" 등 다른 메시지와 겹치지 않게 좁힌다.
             /^Internal error\.?$/,
+            // 같은 teardown 계열의 **Firestore가 감싼** 판이다(Edge 133/Windows에서 확인,
+            // Sentry JAVASCRIPT-REACT-6D · /employee/drive-log):
+            //   `IndexedDbTransactionError: IndexedDB transaction 'shutdown' failed: UnknownError: Internal error.`
+            // `'shutdown'`은 Firestore가 `terminate()` 때 도는 내부 트랜잭션이므로
+            // 위 `Firestore shutting down`·`Connection is closing`과 원인이 같다. 그런데 SDK가
+            // 원본 IDB 오류를 자기 메시지로 감싸므로 **바로 위 앵커 정규식이 닿지 않는다**
+            // (메시지가 `Internal error.`로 시작하지 않는다) — 그래서 이 변종만 새로 떴다.
+            //
+            // 앱 쪽 처리는 이미 맞다: `clearOfflineCache`가 try/catch로 잡아 경고만 남기고
+            // 로그아웃을 계속 진행한다. 그럼에도 handled=no로 올라오는 이유는, 거부가
+            // `terminate()`가 돌려주는 프라미스가 아니라 **SDK 내부 영속성 큐의 잔여 요청**에서
+            // 나와 우리 try/catch가 볼 수 없기 때문이다.
+            //
+            // ⚠️ 트랜잭션 이름을 `'shutdown'`으로 좁힌 것은 의도다. 다른 이름의 트랜잭션 실패는
+            // 종료 레이스가 아니라 실제 영속성 문제일 수 있으므로 그때 따로 판단한다.
+            // ⚠️ 이 필터는 보고만 줄인다 — `terminate()`가 실패하면 뒤따르는
+            // `clearIndexedDbPersistence()`가 실행되지 않아 공용 기기에 이전 사용자 캐시가
+            // 남는다(2026-07-10 감사 #8). 그 잔여 위험은 별건이다.
+            /IndexedDB transaction 'shutdown' failed/,
             // IndexedDB 용량 초과 (사용자 기기 저장공간 부족, 앱 버그 아님)
             /QuotaExceededError/,
             /Encountered full disk/,
