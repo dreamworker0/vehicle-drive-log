@@ -316,36 +316,76 @@ describe('extractHookScriptPaths', () => {
 });
 
 describe('구현이력 색인 Phase 수 정합', () => {
-    const INDEX = [
+    /**
+     * 실물(`docs/구현이력.md`)의 형태를 그대로 본뜬다 — 제목에 괄호가 있고, 합계 행의
+     * 2·4·5번째 셀은 비어 있다. 픽스처가 실물과 다르면 정규식을 느슨하게 바꿔도 초록으로 남는다.
+     */
+    const buildIndex = (...rows: string[]) => [
+        '# 구현이력',
+        '',
+        '## 구간 파일',
+        '',
         '| 구간 | 기간 | Phase 수 | 크기 | 내용 |',
         '|---|---|---|---|---|',
-        '| [트랙 A](구현이력/트랙A_Phase1-48.md) | 2026-05 | 48 | 120 KB | 초기 |',
-        '| [트랙 B Phase103~141](구현이력/트랙B_Phase103-141.md) | 2026-07 | 39 | 200 KB | 운영 |',
-        '| **합계** | — | **87** | 320 KB | — |',
+        ...rows,
+        '',
+        '## Phase 목록',
+        '',
     ].join('\n');
 
+    const TRACK_A = '| [트랙 A — 초기 상세 이력 (Phase 1~58)](구현이력/트랙A_Phase1-58.md) | 2026-03-05 ~ 05-29 | 64 | 83 KB | 초기 구축 |';
+    const TRACK_B = '| [트랙 B — 운영 고도화 로그 (Phase 212~)](구현이력/트랙B_Phase212부터.md) | 2026-09-06 ~ | 11 | 56 KB | 열린 구간 |';
+    const TOTAL = '| **합계** | | **75** | | |';
+
     it('구간 행의 제목·본문 경로·Phase 수, 합계를 읽는다', () => {
-        expect(extractHistoryIndexPhaseCounts(INDEX)).toEqual({
+        expect(extractHistoryIndexPhaseCounts(buildIndex(TRACK_A, TRACK_B, TOTAL))).toEqual({
             sections: [
-                { title: '트랙 A', rel: '구현이력/트랙A_Phase1-48.md', documented: 48 },
                 {
-                    title: '트랙 B Phase103~141',
-                    rel: '구현이력/트랙B_Phase103-141.md',
-                    documented: 39,
+                    title: '트랙 A — 초기 상세 이력 (Phase 1~58)',
+                    rel: '구현이력/트랙A_Phase1-58.md',
+                    documented: 64,
+                },
+                {
+                    title: '트랙 B — 운영 고도화 로그 (Phase 212~)',
+                    rel: '구현이력/트랙B_Phase212부터.md',
+                    documented: 11,
                 },
             ],
-            total: 87,
+            total: 75,
+            unparsedRows: [],
         });
     });
 
+    it('헤더·구분선·합계 행은 해석 실패로 보지 않는다', () => {
+        expect(extractHistoryIndexPhaseCounts(buildIndex(TRACK_A, TOTAL)).unparsedRows).toEqual([]);
+    });
+
+    // 이 검사의 핵심 — 못 읽은 행을 조용히 넘기면 그 구간은 아무 검사도 받지 않는다.
+    it.each([
+        ['개수 셀 강조', '| [트랙 C](구현이력/트랙C.md) | 2026-10 | **12** | 10 KB | 새 구간 |'],
+        ['경로 ./ 접두', '| [트랙 C](./구현이력/트랙C.md) | 2026-10 | 12 | 10 KB | 새 구간 |'],
+        ['링크 없는 행', '| 트랙 C | 2026-10 | 12 | 10 KB | 새 구간 |'],
+    ])('형식이 다른 구간 행(%s)은 조용히 넘기지 않고 unparsedRows로 보고한다', (_label, row) => {
+        const result = extractHistoryIndexPhaseCounts(buildIndex(TRACK_A, row, TOTAL));
+
+        expect(result.sections).toHaveLength(1);
+        expect(result.unparsedRows).toEqual([row]);
+    });
+
     it('합계 행이 없으면 total은 null', () => {
-        const withoutTotal = INDEX.split('\n').filter((line) => !line.includes('합계')).join('\n');
-        expect(extractHistoryIndexPhaseCounts(withoutTotal).total).toBeNull();
+        expect(extractHistoryIndexPhaseCounts(buildIndex(TRACK_A)).total).toBeNull();
     });
 
     it('구간 파일 링크가 아닌 표는 구간으로 세지 않는다', () => {
         const other = '| [운영 매뉴얼](../OPERATIONS.md) | 2026-07 | 39 | 200 KB | 운영 |';
-        expect(extractHistoryIndexPhaseCounts(other).sections).toEqual([]);
+        expect(extractHistoryIndexPhaseCounts(buildIndex(other, TOTAL)).sections).toEqual([]);
+    });
+
+    it('「구간 파일」 절 밖의 표는 읽지 않는다', () => {
+        const elsewhere = ['## 다른 절', '', TRACK_A, TOTAL, ''].join('\n');
+        expect(extractHistoryIndexPhaseCounts(elsewhere)).toEqual({
+            sections: [], total: null, unparsedRows: [],
+        });
     });
 
     it('본문의 `### Phase` 제목만 센다', () => {
@@ -358,6 +398,17 @@ describe('구현이력 색인 Phase 수 정합', () => {
             '### Phase 106: 마지막 작업',
         ].join('\n');
         expect(countPhaseHeadings(body)).toBe(2);
+    });
+
+    it('펜스 코드 블록 안의 `### Phase`는 예시이므로 세지 않는다', () => {
+        const body = [
+            '### Phase 103: 진짜 제목',
+            '',
+            '```markdown',
+            '### Phase 999: 문서 서식 예시',
+            '```',
+        ].join('\n');
+        expect(countPhaseHeadings(body)).toBe(1);
     });
 
     it('Phase 제목이 없으면 0', () => {

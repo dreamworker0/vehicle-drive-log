@@ -147,22 +147,69 @@ export function countTestInventory(paths: string[]): TestInventory {
     };
 }
 
-/** 구현이력 색인의 구간 파일 표에서 구간 제목·본문 경로·문서화된 Phase 수와 「합계」 값을 읽는다. */
-export function extractHistoryIndexPhaseCounts(markdown: string): {
+export interface HistoryIndexCounts {
     sections: { title: string; rel: string; documented: number }[];
     total: number | null;
-} {
-    // | [트랙 …](구현이력/파일.md) | 기간 | 수 | 크기 | 내용 |
-    const sections = [
-        ...markdown.matchAll(/^\|\s*\[([^\]]+)\]\((구현이력\/[^)]+\.md)\)\s*\|[^|]*\|\s*(\d+)\s*\|/gm),
-    ].map((m) => ({ title: m[1].trim(), rel: m[2], documented: Number(m[3]) }));
-    const totalRow = markdown.match(/^\|\s*\*\*합계\*\*\s*\|[^|]*\|\s*\*\*(\d+)\*\*\s*\|/m);
-    return { sections, total: totalRow ? Number(totalRow[1]) : null };
+    /**
+     * 구간 표의 데이터 행인데 구간·합계 어느 쪽으로도 해석되지 않은 줄.
+     *
+     * **이 목록이 비어 있어야 검사가 의미를 갖는다.** 새 구간 행이 조금 다른 형식으로
+     * 들어오면(경로에 `./` 접두, 개수 셀 `**12**` 강조, 링크 없는 행) 추출에서 빠지고,
+     * 그러면 그 구간은 아무 검사도 받지 않은 채 합계까지 맞아떨어져 조용히 통과한다.
+     */
+    unparsedRows: string[];
+}
+
+/**
+ * 구현이력 색인의 「구간 파일」 표를 읽는다.
+ *
+ * 정규식으로 문서 전체를 훑지 않고 **표 블록을 먼저 잘라 낸 뒤 행마다 판정**한다.
+ * 전체 훑기는 못 읽은 행을 그냥 건너뛰어서, 형식이 조금 바뀌면 검사가 조용히 약해진다.
+ */
+export function extractHistoryIndexPhaseCounts(markdown: string): HistoryIndexCounts {
+    const sections: HistoryIndexCounts['sections'] = [];
+    const unparsedRows: string[] = [];
+    let total: number | null = null;
+
+    for (const line of sliceSection(markdown, '## 구간 파일').split(/\r?\n/)) {
+        const row = line.trim();
+        if (!row.startsWith('|')) continue;
+        if (/^\|[\s:|-]+\|$/.test(row)) continue;          // 구분선
+        if (/^\|\s*구간\s*\|/.test(row)) continue;          // 헤더
+
+        // | [트랙 …](구현이력/파일.md) | 기간 | 수 | 크기 | 내용 |
+        const section = row.match(/^\|\s*\[([^\]]+)\]\((구현이력\/[^)]+\.md)\)\s*\|[^|]*\|\s*(\d+)\s*\|/);
+        if (section) {
+            sections.push({ title: section[1].trim(), rel: section[2], documented: Number(section[3]) });
+            continue;
+        }
+        const totalMatch = row.match(/^\|\s*\*\*합계\*\*\s*\|[^|]*\|\s*\*\*(\d+)\*\*\s*\|/);
+        if (totalMatch) {
+            total = Number(totalMatch[1]);
+            continue;
+        }
+        unparsedRows.push(row);
+    }
+
+    return { sections, total, unparsedRows };
+}
+
+/** 마크다운에서 지정한 제목 아래 같은 수준의 다음 제목까지를 잘라 낸다. */
+function sliceSection(markdown: string, heading: string): string {
+    const start = markdown.indexOf(`\n${heading}\n`);
+    if (start < 0) return '';
+    const rest = markdown.slice(start + 1);
+    const next = rest.indexOf('\n## ', 1);
+    return next < 0 ? rest : rest.slice(0, next);
 }
 
 /**
  * 「Phase 목록」 접힌 블록의 `<summary>`에서 구간 제목과 꼬리의 `(N개)`를 읽는다.
  * 이 제목은 구간 파일 표의 링크 텍스트와 같은 문자열이라 두 곳을 이어 붙일 수 있다.
+ *
+ * 못 읽은 `<summary>`는 그냥 빠지므로, 호출부는 **구간마다 대응 라벨이 정확히 하나인지**
+ * 확인해야 한다. 라벨이 낡는 시점이 바로 구간을 새로 쓰는 시점이라, 형식이 조금 달라
+ * 추출에서 빠지는 경로와 값이 낡는 경로가 같다.
  */
 export function extractPhaseListSummaries(markdown: string): { title: string; documented: number }[] {
     return [
@@ -170,9 +217,13 @@ export function extractPhaseListSummaries(markdown: string): { title: string; do
     ].map((m) => ({ title: m[1].trim(), documented: Number(m[2]) }));
 }
 
-/** 이력 본문 파일의 실제 `### Phase` 제목 개수. */
+/**
+ * 이력 본문 파일의 실제 `### Phase` 제목 개수.
+ * 펜스 코드 블록 안의 `### Phase`는 예시이므로 제목으로 세지 않는다.
+ */
 export function countPhaseHeadings(body: string): number {
-    return (body.match(/^### Phase /gm) ?? []).length;
+    const withoutFences = body.replace(/```[\s\S]*?```/g, '');
+    return (withoutFences.match(/^### Phase /gm) ?? []).length;
 }
 
 /** 문서에서 `npm run <script>` / `npm test run` 등 명령 참조를 추출한다. */
@@ -650,7 +701,13 @@ export function runChecks(root: string = ROOT): { findings: Finding[]; checked: 
     checked++;
     const historyIndexRel = 'docs/구현이력.md';
     const historyIndex = read(historyIndexRel);
-    const { sections, total } = extractHistoryIndexPhaseCounts(historyIndex);
+    const { sections, total, unparsedRows } = extractHistoryIndexPhaseCounts(historyIndex);
+
+    // 해석하지 못한 행을 그냥 넘기면 그 구간은 아무 검사도 받지 않고 합계까지 맞아 통과한다.
+    // 검사가 조용히 약해지는 쪽이 값이 틀린 쪽보다 나쁘므로, 못 읽은 행 자체를 오류로 본다.
+    for (const row of unparsedRows) {
+        err(historyIndexRel, `구간 표에서 해석하지 못한 행 — 추출 규칙을 갱신하세요: ${row.slice(0, 70)}`);
+    }
 
     if (sections.length === 0) {
         err(historyIndexRel, '구간 파일 표에서 Phase 수를 한 건도 읽지 못함 — 추출 규칙을 갱신하세요');
@@ -661,12 +718,18 @@ export function runChecks(root: string = ROOT): { findings: Finding[]; checked: 
         const actualByTitle = new Map<string, number>();
         for (const { title, rel, documented } of sections) {
             const bodyRel = `docs/${rel}`;
-            const body = read(bodyRel);
-            if (!body) {
+            // read()는 없는 파일에서 throw한다 — 그러면 1~18번이 모아 둔 오류까지 함께 묻힌다.
+            // 깨진 링크는 이 검사가 다루는 드리프트 부류이므로 여기서 조용히 죽으면 안 된다.
+            if (!existsSync(join(root, bodyRel))) {
                 err(historyIndexRel, `색인이 가리키는 본문이 없음: ${bodyRel}`);
                 continue;
             }
-            const actual = countPhaseHeadings(body);
+            // 제목은 「Phase 목록」 라벨과 이어 붙이는 유일한 키다. 겹치면 뒤 구간이 앞을 덮어
+            // 라벨이 엉뚱한 본문과 비교된다.
+            if (actualByTitle.has(title)) {
+                err(historyIndexRel, `구간 제목이 중복됨 — 라벨 대조가 어긋난다: ${title}`);
+            }
+            const actual = countPhaseHeadings(read(bodyRel));
             actualTotal += actual;
             actualByTitle.set(title, actual);
             if (documented !== actual) {
@@ -681,16 +744,28 @@ export function runChecks(root: string = ROOT): { findings: Finding[]; checked: 
 
         // 「Phase 목록」의 `<summary>` 꼬리 `(N개)`도 같은 값을 말한다. 표만 고치고 라벨을
         // 놔두면 드리프트가 되므로(실제로 `103~141`은 36개, `212~`는 5개에 멈춰 있었다) 같이 센다.
+        //
+        // **구간 기준으로 순회한다.** 라벨 기준으로 돌면 형식이 조금 달라 추출에서 빠진
+        // `<summary>`가 검사 대상에서 사라져 조용히 통과한다 — 라벨이 낡는 시점이 바로
+        // 구간을 새로 쓰는 시점이라, 빠지는 경로와 낡는 경로가 같다.
         const summaries = extractPhaseListSummaries(historyIndex);
-        if (summaries.length === 0) {
-            err(historyIndexRel, '「Phase 목록」의 `<summary>` Phase 개수를 한 건도 읽지 못함 — 추출 규칙을 갱신하세요');
-        }
+        const labelsByTitle = new Map<string, number[]>();
         for (const { title, documented } of summaries) {
-            const actual = actualByTitle.get(title);
-            if (actual === undefined) {
+            labelsByTitle.set(title, [...(labelsByTitle.get(title) ?? []), documented]);
+        }
+        for (const [title, actual] of actualByTitle) {
+            const labels = labelsByTitle.get(title);
+            if (!labels) {
+                err(historyIndexRel, `「Phase 목록」에 이 구간의 \`(N개)\` 라벨이 없거나 형식이 달라 읽지 못함: ${title}`);
+            } else if (labels.length > 1) {
+                err(historyIndexRel, `「Phase 목록」 라벨이 ${labels.length}개 중복됨: ${title}`);
+            } else if (labels[0] !== actual) {
+                err(historyIndexRel, `${title} 목록 라벨 Phase 수 불일치 — 라벨 ${labels[0]}, 본문 ${actual}`);
+            }
+        }
+        for (const { title } of summaries) {
+            if (!actualByTitle.has(title)) {
                 err(historyIndexRel, `「Phase 목록」 제목이 구간 파일 표에 없음: ${title}`);
-            } else if (documented !== actual) {
-                err(historyIndexRel, `${title} 목록 라벨 Phase 수 불일치 — 라벨 ${documented}, 본문 ${actual}`);
             }
         }
     }
