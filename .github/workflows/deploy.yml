@@ -119,6 +119,27 @@ jobs:
           npx firebase-tools deploy --only firestore:indexes --non-interactive --project vehicle-drive-log
           rm -f "$GOOGLE_APPLICATION_CREDENTIALS"
 
+      # 인덱스 배포는 **제출만** 하고 빌드 완료를 기다리지 않는다. 위 스텝 주석의 Phase 139도
+      # 같은 계열 사고였고("화면은 나갔는데 인덱스가 없었다") 그때 **순서**만 고치고 이 절반을
+      # 빠뜨렸다. 그래서 2026-09-09에 `(organizationId, date, status)`가 CREATING인 동안
+      # Hosting이 먼저 나가, 새 번들을 받은 운전자의 `/employee/today`가 약 5분간
+      # "예약 없음"으로 비어 보였다(Sentry JAVASCRIPT-REACT-6C — 실제 사용자 1명).
+      # 실측: Hosting 완료 11:21 → 인덱스 READY 11:25:52 → 서빙까지 약 10초 더.
+      #
+      # 상한 15분을 넘기면 **Hosting을 배포하지 않고 실패시킨다.** 그러면 Functions·Rules만
+      # 나간 부분 배포로 남지만, 조용히 넘어가 같은 사고를 반복하는 것보다 낫다 —
+      # 그 증상은 배포 직후 현장에서만 드러난다. 판정 근거와 실패 조건은
+      # scripts/wait-for-firestore-indexes.ts 주석에 있다.
+      - name: 인덱스 빌드 완료 대기
+        env:
+          WAIT_MINUTES: "15"
+        run: |
+          export GOOGLE_APPLICATION_CREDENTIALS=$(mktemp)
+          echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
+          gcloud auth activate-service-account --key-file="$GOOGLE_APPLICATION_CREDENTIALS" --quiet
+          rm -f "$GOOGLE_APPLICATION_CREDENTIALS"
+          ACCESS_TOKEN=$(gcloud auth print-access-token) npx tsx scripts/wait-for-firestore-indexes.ts
+
       # Hosting은 firebase-tools CLI로 직접 배포한다.
       # action-hosting-deploy는 실패 시 --debug로 재시도하며 functions/.env 시크릿을
       # 로그에 평문 출력하는 문제가 있어 사용하지 않는다. (--debug 미사용 = 누출 없음)
