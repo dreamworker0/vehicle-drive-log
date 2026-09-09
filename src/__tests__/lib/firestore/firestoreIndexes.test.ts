@@ -29,9 +29,17 @@ describe('firestore.indexes.json — 복합 인덱스 필수 쿼리', () => {
         expect(hasIndex('reservations', ['organizationId', 'vehicleId', 'status', 'date'])).toBe(true);
     });
 
-    // src/lib/firestore/reservations.ts — getWeekReservations · getReservations(기간)
+    // src/lib/firestore/reservations.ts — getReservations(기간 미지정 시 최근 1개월)
     it('기간별 예약 조회: reservations (organizationId, date)', () => {
         expect(hasIndex('reservations', ['organizationId', 'date'])).toBe(true);
+    });
+
+    // src/lib/firestore/reservations.ts — getWeekReservations(= getReservationsByDateRange)
+    // 캘린더·오늘 대시보드가 여는 쿼리다. 취소 건을 서버에서 걸러내려고 date 범위에
+    // status 부등식을 더했고, 필드 순서는 Firestore가 요구한 그대로다(선택도 높은 기간이 앞).
+    // 이 인덱스가 없으면 캘린더가 "The query requires an index"로 통째로 실패한다.
+    it('취소 제외 기간별 예약 조회: reservations (organizationId, date, status)', () => {
+        expect(hasIndex('reservations', ['organizationId', 'date', 'status'])).toBe(true);
     });
 
     // src/lib/firestore/reservations.ts — getMyRecentReservations
