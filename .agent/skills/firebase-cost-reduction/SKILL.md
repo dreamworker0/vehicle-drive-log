@@ -139,7 +139,7 @@ export const syncCalendarToApp = onSchedule({
 
 | 층 | 방법 |
 |---|---|
-| 서버 | `lastUpdatedAt` **1건 read**로 쿨다운(5분) 판정. 이 1건이 풀스캔을 막는 값이다 |
+| 서버 | `lastUpdatedAt` **1건 read**로 쿨다운 판정. 이 1건이 풀스캔을 막는 값이다. 쿨다운 길이는 `functions/src/handlers/callable/refreshDashboardStats.ts`의 `REFRESH_COOLDOWN_SEC`가 단일 원본이다 — **여기 숫자를 적지 않는다. 값을 말해야 하면 코드를 열어 확인한다** |
 | 클라이언트 | 재진입 가드. 서버가 생략하면 재로드도 생략한다 |
 
 - **NaN·시계 스큐는 fail-open** — 판정 자체가 깨졌을 때 기능을 막으면 사용자가 갱신을 영영 못 한다. 비용 방어는 정상 경로에서만 작동하면 된다

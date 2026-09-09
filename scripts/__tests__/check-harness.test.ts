@@ -16,6 +16,9 @@ import {
     findForbiddenDeployCommands,
     countTestInventory,
     extractDocumentedTestInventory,
+    extractHistoryIndexPhaseCounts,
+    extractPhaseListSummaries,
+    countPhaseHeadings,
 } from '../check-harness';
 
 describe('parseFrontmatter', () => {
@@ -309,5 +312,122 @@ describe('extractHookScriptPaths', () => {
 
     it('hooks가 없으면 빈 배열', () => {
         expect(extractHookScriptPaths('{"permissions":{}}')).toEqual([]);
+    });
+});
+
+describe('구현이력 색인 Phase 수 정합', () => {
+    /**
+     * 실물(`docs/구현이력.md`)의 형태를 그대로 본뜬다 — 제목에 괄호가 있고, 합계 행의
+     * 2·4·5번째 셀은 비어 있다. 픽스처가 실물과 다르면 정규식을 느슨하게 바꿔도 초록으로 남는다.
+     */
+    const buildIndex = (...rows: string[]) => [
+        '# 구현이력',
+        '',
+        '## 구간 파일',
+        '',
+        '| 구간 | 기간 | Phase 수 | 크기 | 내용 |',
+        '|---|---|---|---|---|',
+        ...rows,
+        '',
+        '## Phase 목록',
+        '',
+    ].join('\n');
+
+    const TRACK_A = '| [트랙 A — 초기 상세 이력 (Phase 1~58)](구현이력/트랙A_Phase1-58.md) | 2026-03-05 ~ 05-29 | 64 | 83 KB | 초기 구축 |';
+    const TRACK_B = '| [트랙 B — 운영 고도화 로그 (Phase 212~)](구현이력/트랙B_Phase212부터.md) | 2026-09-06 ~ | 11 | 56 KB | 열린 구간 |';
+    const TOTAL = '| **합계** | | **75** | | |';
+
+    it('구간 행의 제목·본문 경로·Phase 수, 합계를 읽는다', () => {
+        expect(extractHistoryIndexPhaseCounts(buildIndex(TRACK_A, TRACK_B, TOTAL))).toEqual({
+            sections: [
+                {
+                    title: '트랙 A — 초기 상세 이력 (Phase 1~58)',
+                    rel: '구현이력/트랙A_Phase1-58.md',
+                    documented: 64,
+                },
+                {
+                    title: '트랙 B — 운영 고도화 로그 (Phase 212~)',
+                    rel: '구현이력/트랙B_Phase212부터.md',
+                    documented: 11,
+                },
+            ],
+            total: 75,
+            unparsedRows: [],
+        });
+    });
+
+    it('헤더·구분선·합계 행은 해석 실패로 보지 않는다', () => {
+        expect(extractHistoryIndexPhaseCounts(buildIndex(TRACK_A, TOTAL)).unparsedRows).toEqual([]);
+    });
+
+    // 이 검사의 핵심 — 못 읽은 행을 조용히 넘기면 그 구간은 아무 검사도 받지 않는다.
+    it.each([
+        ['개수 셀 강조', '| [트랙 C](구현이력/트랙C.md) | 2026-10 | **12** | 10 KB | 새 구간 |'],
+        ['경로 ./ 접두', '| [트랙 C](./구현이력/트랙C.md) | 2026-10 | 12 | 10 KB | 새 구간 |'],
+        ['링크 없는 행', '| 트랙 C | 2026-10 | 12 | 10 KB | 새 구간 |'],
+    ])('형식이 다른 구간 행(%s)은 조용히 넘기지 않고 unparsedRows로 보고한다', (_label, row) => {
+        const result = extractHistoryIndexPhaseCounts(buildIndex(TRACK_A, row, TOTAL));
+
+        expect(result.sections).toHaveLength(1);
+        expect(result.unparsedRows).toEqual([row]);
+    });
+
+    it('합계 행이 없으면 total은 null', () => {
+        expect(extractHistoryIndexPhaseCounts(buildIndex(TRACK_A)).total).toBeNull();
+    });
+
+    it('구간 파일 링크가 아닌 표는 구간으로 세지 않는다', () => {
+        const other = '| [운영 매뉴얼](../OPERATIONS.md) | 2026-07 | 39 | 200 KB | 운영 |';
+        expect(extractHistoryIndexPhaseCounts(buildIndex(other, TOTAL)).sections).toEqual([]);
+    });
+
+    it('「구간 파일」 절 밖의 표는 읽지 않는다', () => {
+        const elsewhere = ['## 다른 절', '', TRACK_A, TOTAL, ''].join('\n');
+        expect(extractHistoryIndexPhaseCounts(elsewhere)).toEqual({
+            sections: [], total: null, unparsedRows: [],
+        });
+    });
+
+    it('본문의 `### Phase` 제목만 센다', () => {
+        const body = [
+            '# 트랙 B',
+            '### Phase 103: 첫 작업',
+            '#### Phase 104: 더 깊은 제목은 제외',
+            '## Phase 105: 상위 제목도 제외',
+            '본문에 ### Phase 라고 적힌 인라인 언급은 줄 시작이 아니라 제외',
+            '### Phase 106: 마지막 작업',
+        ].join('\n');
+        expect(countPhaseHeadings(body)).toBe(2);
+    });
+
+    it('펜스 코드 블록 안의 `### Phase`는 예시이므로 세지 않는다', () => {
+        const body = [
+            '### Phase 103: 진짜 제목',
+            '',
+            '```markdown',
+            '### Phase 999: 문서 서식 예시',
+            '```',
+        ].join('\n');
+        expect(countPhaseHeadings(body)).toBe(1);
+    });
+
+    it('Phase 제목이 없으면 0', () => {
+        expect(countPhaseHeadings('# 빈 문서\n\n내용 없음')).toBe(0);
+    });
+
+    it('「Phase 목록」 summary의 구간 제목과 (N개)를 읽는다', () => {
+        const md = [
+            '<summary><strong>트랙 A — 초기 상세 이력 (Phase 1~58)</strong> — Phase 1~58 (64개)</summary>',
+            '<summary><strong>트랙 B — 운영 고도화 로그 (Phase 212~)</strong> — 열린 구간 (11개)</summary>',
+        ].join('\n');
+        expect(extractPhaseListSummaries(md)).toEqual([
+            { title: '트랙 A — 초기 상세 이력 (Phase 1~58)', documented: 64 },
+            { title: '트랙 B — 운영 고도화 로그 (Phase 212~)', documented: 11 },
+        ]);
+    });
+
+    it('개수 꼬리가 없는 summary는 건너뛴다', () => {
+        const md = '<summary><strong>부록</strong> — 개수 표기 없음</summary>';
+        expect(extractPhaseListSummaries(md)).toEqual([]);
     });
 });
