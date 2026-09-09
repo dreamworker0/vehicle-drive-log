@@ -205,20 +205,60 @@ export interface AggregationSummary {
     orgs: number;       // 전체 기관 수
     processed: number;  // 집계 성공 기관 수
     errors: number;     // 집계 실패 기관 수
+    skipped: number;    // 집계를 건너뛴 기관 수(운영 대상이 아니거나 차량·구성원이 없음)
     months: string[];   // 집계 대상 월(YYYY-MM)
+}
+
+/**
+ * 집계 대상이 아닌 기관 상태.
+ *
+ * `not-in` 쿼리를 쓰지 않고 메모리에서 가른다 — Firestore의 `not-in`은 **필드가 없는 문서를
+ * 제외**하므로 status가 붙기 전의 옛 기관이 조용히 집계에서 빠진다. 기관 목록 자체는
+ * 어차피 전부 읽어야 하므로 여기서 거르는 것으로 읽기 비용도 같다.
+ */
+const NON_OPERATING_STATUSES = new Set(["rejected", "deleted"]);
+
+/**
+ * 지난달을 며칠까지 다시 집계할지.
+ *
+ * 지각·소급 입력을 흡수하려고 당월+전월을 매일 재집계해 왔는데, 전월은 월초 며칠이 지나면
+ * 더 들어올 것이 없는데도 그달 말일까지 매일 같은 답을 다시 계산했다. 실측(2026-09-09)으로
+ * 전월분 driveLogs 재스캔이 하룻밤 약 4,000 read였다 — 이 배치가 무료 할당량(5만/일)의
+ * 43%를 사용자 접속 전에 쓰는 주된 이유다.
+ *
+ * ⚠️ 이 날짜가 지난 뒤 전월에 들어온 소급 입력은 **야간 배치가 반영하지 않는다.**
+ * 그 경우 `backfillMonthlyStats` 콜러블을 더 큰 recentMonths로 1회 호출한다(그것이 이
+ * 함수에 recentMonths 인자가 있는 이유다).
+ */
+const PREV_MONTH_GRACE_DAY = 10;
+
+/**
+ * 이번 실행에서 집계할 월 수를 정한다(인자를 주지 않았을 때의 기본값).
+ *
+ * 기준 시각은 `getRecentMonthWindows`와 같은 **실행 시각 -3h**다. 그래서 매월 1일 02:00
+ * 실행의 기준일은 전월 말일이 되어 1개월(=막 끝난 달)만 집계하고, 2일부터 11일까지는
+ * 2개월(당월 + 막 끝난 달)을 집계한다.
+ */
+export function resolveRecentMonths(now: Date = new Date()): number {
+    const base = toKSTDate(new Date(now.getTime() - 3 * 60 * 60 * 1000));
+    return base.getDate() <= PREV_MONTH_GRACE_DAY ? 2 : 1;
 }
 
 /**
  * 전체 기관의 최근 N개월 운행/비용/이상 통계를 집계해 orgStats/{orgId}/monthly/{YYYY-MM}에 캐싱한다.
  *
  * 통합 야간 배치(dailyNightlyBatch)의 한 단계로 KST 02:00에 실행되며(실행 시각 -3h 기준으로 대상 월 산정),
- * 지각·소급 입력(retroactive) 로그를 반영하기 위해 당월+전월(기본 2개월)을 재집계한다.
+ * 지각·소급 입력(retroactive) 로그를 반영하기 위해 **월초에는** 당월+전월을 재집계한다
+ * (기본값은 `resolveRecentMonths` — 그 주석에 날짜 경계와 한계를 적어 두었다).
  * 과거 월 전체를 소급 교정하려면 더 큰 recentMonths로 1회 호출(백필)하면 된다.
+ *
+ * 집계 대상이 아닌 기관은 건너뛴다 — 반려·삭제된 기관, 그리고 차량도 구성원도 없는 기관이다
+ * (판정 근거는 각 분기의 주석 참고). 건너뛴 수는 요약의 `skipped`에 담긴다.
  *
  * 기관별로 오류를 격리해 한 기관 실패가 나머지를 중단시키지 않으며, 실행 요약을 반환한다.
  * 기관 목록 조회 실패 등 치명적 오류는 상위로 전파해 호출자가 실패를 인지하도록 한다.
  */
-export async function runDailyAggregation(recentMonths = 2): Promise<AggregationSummary> {
+export async function runDailyAggregation(recentMonths = resolveRecentMonths()): Promise<AggregationSummary> {
     const windows = getRecentMonthWindows(recentMonths);
     const months = windows.map((w) => w.yearMonth);
     logger.info(`[dailyAggregation] 일일 배치 집계 시작 (최근 ${recentMonths}개월: ${months.join(", ")})`);
@@ -226,15 +266,40 @@ export async function runDailyAggregation(recentMonths = 2): Promise<Aggregation
     const orgsSnap = await db.collection("organizations").get();
     let processed = 0;
     let errors = 0;
+    let skipped = 0;
 
     for (const orgDoc of orgsSnap.docs) {
         const orgId = orgDoc.id;
+
+        // 반려·삭제된 기관은 집계하지 않는다. 통계를 볼 화면이 없는데도 기관당 월별
+        // 쿼리 4종이 나가고 있었다(빈 결과도 1 read로 과금된다).
+        const status = orgDoc.data()?.status as string | undefined;
+        if (status && NON_OPERATING_STATUSES.has(status)) {
+            skipped++;
+            continue;
+        }
+
         try {
             // 유저·차량 메타데이터는 월과 무관하므로 기관당 1회만 로드해 월 루프에서 재사용
             const [usersSnap, vehiclesSnap] = await Promise.all([
                 db.collection("users").where("organizationId", "==", orgId).get(),
                 db.collection("vehicles").where("organizationId", "==", orgId).get(),
             ]);
+
+            /*
+             * 차량도 구성원도 없는 기관은 월별 쿼리를 걸지 않는다.
+             *
+             * 운행일지·주유·정비·하이패스 기록은 모두 차량을 지정해야 만들어지므로, 차량이
+             * 없는 기관에는 **새로 들어올 기록이 없다.** 구성원까지 없으면 시작조차 하지 않은
+             * 기관이다. 그럼에도 매일 밤 월별 쿼리 4종 × 월 수가 나가고 있었다.
+             *
+             * 이미 저장된 통계 문서는 그대로 남는다 — 원본 기록이 바뀌지 않으므로 다시 계산해도
+             * 같은 값이다(차량 이름 표시만 "알 수 없음"으로 남을 수 있다).
+             */
+            if (usersSnap.size === 0 && vehiclesSnap.size === 0) {
+                skipped++;
+                continue;
+            }
 
             const userMap = new Map<string, string>();
             usersSnap.forEach((u) => userMap.set(u.id, u.data().name || "알 수 없음"));
@@ -253,7 +318,9 @@ export async function runDailyAggregation(recentMonths = 2): Promise<Aggregation
         }
     }
 
-    const summary: AggregationSummary = { orgs: orgsSnap.size, processed, errors, months };
-    logger.info(`[dailyAggregation] 집계 완료 — 기관 ${summary.orgs}, 성공 ${processed}, 실패 ${errors}`);
+    const summary: AggregationSummary = { orgs: orgsSnap.size, processed, errors, skipped, months };
+    logger.info(
+        `[dailyAggregation] 집계 완료 — 기관 ${summary.orgs}, 성공 ${processed}, 건너뜀 ${skipped}, 실패 ${errors}`
+    );
     return summary;
 }

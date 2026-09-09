@@ -50,6 +50,19 @@ function snap(docs: Array<Record<string, unknown>>) {
     };
 }
 
+/** 기본 픽스처 — 테스트별로 갈아 끼운다(집계 건너뛰기 분기 검증용). beforeEach가 되돌린다. */
+const DEFAULT_ORGS = [{ id: "org-1", name: "테스트기관" }];
+const DEFAULT_USERS = [{ id: "u1", name: "김운전" }, { id: "u2", name: "이기사" }];
+const DEFAULT_VEHICLES = [{ id: "veh-1", name: "스타렉스" }, { id: "veh-2", name: "카니발" }];
+
+const fixtures: {
+    orgs: Array<Record<string, unknown>>;
+    users: Array<Record<string, unknown>>;
+    vehicles: Array<Record<string, unknown>>;
+    /** 어떤 컬렉션에 실제로 접근했는지 — "쿼리를 아예 걸지 않는다"를 검증한다. */
+    touched: string[];
+} = { orgs: [...DEFAULT_ORGS], users: [...DEFAULT_USERS], vehicles: [...DEFAULT_VEHICLES], touched: [] };
+
 jest.mock("firebase-admin/firestore", () => {
     const makeQuery = (docs: Array<Record<string, unknown>>) => {
         const q: Record<string, unknown> = {};
@@ -62,14 +75,15 @@ jest.mock("firebase-admin/firestore", () => {
         FieldValue: { serverTimestamp: jest.fn(() => "SERVER_TS") },
         getFirestore: jest.fn(() => ({
             collection: jest.fn((name: string) => {
+                fixtures.touched.push(name);
                 if (name === "organizations") {
-                    return { get: jest.fn().mockResolvedValue(snap([{ id: "org-1", name: "테스트기관" }])) };
+                    return { get: jest.fn().mockResolvedValue(snap(fixtures.orgs)) };
                 }
                 if (name === "users") {
-                    return makeQuery([{ id: "u1", name: "김운전" }, { id: "u2", name: "이기사" }]);
+                    return makeQuery(fixtures.users);
                 }
                 if (name === "vehicles") {
-                    return makeQuery([{ id: "veh-1", name: "스타렉스" }, { id: "veh-2", name: "카니발" }]);
+                    return makeQuery(fixtures.vehicles);
                 }
                 if (name === "driveLogs") return makeQuery(driveLogs);
                 if (name === "fuelLogs") return makeQuery(fuelLogs);
@@ -91,10 +105,16 @@ jest.mock("firebase-admin/firestore", () => {
     };
 });
 
-import { runDailyAggregation } from "../handlers/scheduled/dailyAggregation";
+import { runDailyAggregation, resolveRecentMonths } from "../handlers/scheduled/dailyAggregation";
 
 describe("runDailyAggregation — 월별 집계 프로듀서", () => {
-    beforeEach(() => jest.clearAllMocks());
+    beforeEach(() => {
+        jest.clearAllMocks();
+        fixtures.orgs = [...DEFAULT_ORGS];
+        fixtures.users = [...DEFAULT_USERS];
+        fixtures.vehicles = [...DEFAULT_VEHICLES];
+        fixtures.touched = [];
+    });
 
     it("최근 1개월 집계 시 org당 1회 set을 호출하고 요약을 반환한다", async () => {
         const res = await runDailyAggregation(1);
@@ -152,5 +172,87 @@ describe("runDailyAggregation — 월별 집계 프로듀서", () => {
             const hour = String(toKSTDate(ts).getHours());
             expect(heatmap[day]?.[hour]).toBeGreaterThanOrEqual(1);
         }
+    });
+
+    /**
+     * 집계 건너뛰기 — **빈 결과도 1 read로 과금된다**는 것이 이 분기들의 존재 이유다.
+     * 기관당 월별 쿼리 4종 × 월 수가 나가므로, 통계를 볼 일이 없는 기관을 걸러내는 것만으로
+     * 하룻밤 read가 줄어든다. 되돌리면 조용히 비용만 늘고 결과는 같으므로 테스트로 고정한다.
+     */
+    describe("집계 대상 기관 선별", () => {
+        it("반려·삭제된 기관은 users·vehicles 쿼리조차 걸지 않는다", async () => {
+            fixtures.orgs = [{ id: "org-x", name: "반려기관", status: "rejected" }];
+
+            const res = await runDailyAggregation(1);
+
+            expect(res).toMatchObject({ orgs: 1, processed: 0, skipped: 1, errors: 0 });
+            expect(mockSet).not.toHaveBeenCalled();
+            expect(fixtures.touched).not.toContain("users");
+            expect(fixtures.touched).not.toContain("vehicles");
+            expect(fixtures.touched).not.toContain("driveLogs");
+        });
+
+        it("status가 없는 옛 기관은 그대로 집계한다", async () => {
+            // Firestore의 not-in 쿼리를 쓰지 않고 메모리에서 가르는 이유가 이 경우다 —
+            // not-in은 필드가 없는 문서를 제외해 옛 기관이 조용히 빠진다.
+            fixtures.orgs = [{ id: "org-legacy", name: "옛기관" }];
+
+            const res = await runDailyAggregation(1);
+
+            expect(res).toMatchObject({ processed: 1, skipped: 0 });
+            expect(mockSet).toHaveBeenCalledTimes(1);
+        });
+
+        it("차량도 구성원도 없는 기관은 월별 쿼리를 걸지 않는다", async () => {
+            fixtures.users = [];
+            fixtures.vehicles = [];
+
+            const res = await runDailyAggregation(1);
+
+            expect(res).toMatchObject({ orgs: 1, processed: 0, skipped: 1, errors: 0 });
+            expect(mockSet).not.toHaveBeenCalled();
+            // 판정에 필요한 두 쿼리는 걸지만, 그 뒤 월별 쿼리 4종은 걸지 않는다.
+            expect(fixtures.touched).toContain("users");
+            expect(fixtures.touched).toContain("vehicles");
+            expect(fixtures.touched).not.toContain("driveLogs");
+            expect(fixtures.touched).not.toContain("fuelLogs");
+        });
+
+        it("차량이 없어도 구성원이 있으면 집계한다", async () => {
+            // 차량을 아직 등록하지 않은 신규 기관도 통계 화면을 열 수 있어야 한다.
+            fixtures.vehicles = [];
+
+            const res = await runDailyAggregation(1);
+
+            expect(res).toMatchObject({ processed: 1, skipped: 0 });
+            expect(fixtures.touched).toContain("driveLogs");
+        });
+    });
+});
+
+/**
+ * 지난달 재집계 창 — 전월분 재스캔이 하룻밤 약 4,000 read였다(2026-09-09 실측).
+ * 기준 시각이 **실행 시각 -3h**라는 것이 경계 판정의 핵심이므로 날짜별로 고정한다.
+ */
+describe("resolveRecentMonths — 지난달 재집계 창", () => {
+    /** KST 벽시계로 지정한 시각의 UTC instant (배치는 02:00에 돈다) */
+    const at = (y: number, m0: number, d: number, h = 2) => kstInstant(y, m0, d, h);
+
+    it("매월 1일 02:00에는 1개월 — 기준일이 전월 말일이라 막 끝난 달만 집계한다", () => {
+        expect(resolveRecentMonths(at(2026, 8, 1))).toBe(1);
+    });
+
+    it("2일부터 유예일까지는 2개월 — 막 끝난 달의 지각 입력을 흡수한다", () => {
+        expect(resolveRecentMonths(at(2026, 8, 2))).toBe(2);
+        expect(resolveRecentMonths(at(2026, 8, 11))).toBe(2); // 기준일 10일
+    });
+
+    it("유예일이 지나면 1개월 — 같은 답을 매일 다시 계산하지 않는다", () => {
+        expect(resolveRecentMonths(at(2026, 8, 12))).toBe(1); // 기준일 11일
+        expect(resolveRecentMonths(at(2026, 8, 28))).toBe(1);
+    });
+
+    it("월말에도 1개월을 유지한다", () => {
+        expect(resolveRecentMonths(at(2026, 7, 31))).toBe(1);
     });
 });
