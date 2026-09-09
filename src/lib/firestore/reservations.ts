@@ -291,7 +291,27 @@ export const getTodayReservations = async (orgId: string, date: string) => {
     }
 };
 
-// 주간 예약 조회 (취소 제외)
+/**
+ * 주간·월간 예약 조회 (취소 제외)
+ *
+ * 취소분을 **서버에서** 걸러낸다. 종전에는 기간 안의 예약을 전부 읽고 JS로
+ * `status !== 'cancelled'`를 걸렀는데, 취소 예약이 전체 19,456건 중 3,830건(약 20%)이고
+ * 캘린더를 열 때마다 그만큼을 읽어 버리고 있었다 — 서버 필터링을 금지 사항으로 못박은
+ * `firestore-query-optimization` §1의 그 패턴이다.
+ *
+ * **`in` 열거가 아니라 `!=`를 쓴다.** 이 파일 위쪽 주석이 적어 둔 원칙 때문이다 —
+ * 알 수 없는 상태를 `'cancelled'`로 떨어뜨리면 화면에서 사라져 같은 차량이 이중 배차된다.
+ * `!=`는 "명시적으로 취소된 것만 제외"이므로 나중에 상태가 추가돼도 자동으로 남는다.
+ * 상태 목록을 열거하면 그 목록에 없는 새 상태가 조용히 캘린더에서 빠진다.
+ *
+ * ⚠️ 부등식 필터는 **필드가 없는 문서를 제외한다.** `status`는 스키마에서 필수이고
+ * (`reservationStatusSchema.catch('reserved')`) 실측(2026-09-09)으로 19,456건 전부가
+ * 값을 가지고 있어 지금은 빠지는 문서가 없다. 컨버터를 우회해 쓰는 경로를 만들면
+ * 그 예약이 캘린더에서 사라지므로, 쓰기는 반드시 컨버터를 지나야 한다.
+ *
+ * 필요한 복합 인덱스는 `(organizationId, date, status)`다 — Firestore가 요구하는 순서로,
+ * 선택도가 높은 부등식(기간)이 앞이다.
+ */
 export const getWeekReservations = async (orgId: string, startDate: string, endDate: string) => {
     try {
         const q = query(
@@ -299,11 +319,10 @@ export const getWeekReservations = async (orgId: string, startDate: string, endD
             where('organizationId', '==', orgId),
             where('date', '>=', startDate),
             where('date', '<=', endDate),
+            where('status', '!=', 'cancelled'),
         );
         const snap = await getDocs(q);
-        return snap.docs
-            .map(d => d.data() as Reservation)
-            .filter(r => r.status !== 'cancelled');
+        return snap.docs.map(d => d.data() as Reservation);
     } catch (error) {
         captureError(error, { context: 'getWeekReservations', orgId, startDate, endDate });
         throw error;
