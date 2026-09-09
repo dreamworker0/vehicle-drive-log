@@ -6,6 +6,7 @@ import { getStorage } from 'firebase/storage';
 import { getFunctions, connectFunctionsEmulator } from 'firebase/functions';
 import { initializeAppCheck, ReCaptchaV3Provider, onTokenChanged } from 'firebase/app-check';
 import { isInAppBrowser } from './inAppBrowser';
+import { runCacheClearWithMarker, runPendingCacheClear } from './offline/cacheClearMarker';
 import { markFirestoreTerminated } from './firestoreLifecycle';
 import { notifyUser } from './notify';
 // firebase/analytics, firebase/messaging은 동적 import (번들 최적화)
@@ -345,6 +346,19 @@ function initFirestoreSync() {
 // 1단계: 동기적으로 먼저 초기화 (페이지 로드 즉시 사용 가능)
 db = initFirestoreSync()!;
 
+/*
+ * 지난 로그아웃에서 끝내지 못한 캐시 폐기를 여기서 다시 시도한다 (2026-07-10 감사 #8).
+ *
+ * **인스턴스를 만든 직후, 아직 아무 쿼리도 걸리지 않은 이 자리**여야 한다 —
+ * `clearIndexedDbPersistence`는 시작된 인스턴스에서 거부되고, 앱의 첫 구독은
+ * `authReady`(firebaseAuth.ts) 이후에 걸리므로 이 시점이 가장 앞이다.
+ * 표식이 없으면 아무 일도 하지 않으므로 정상 경로에는 비용이 없다.
+ * 실패해도 표식이 남아 다음 부팅에 다시 시도하므로 여기서 기다리지 않는다.
+ */
+if (typeof window !== 'undefined' && !USE_EMULATOR) {
+    void retryPendingCacheClear();
+}
+
 // 2단계: 비동기로 IndexedDB 검사 후 사용 불가 시 memoryLocalCache로 재초기화
 // (에뮬레이터 모드는 이미 memory 캐시 + 에뮬레이터 연결 상태이므로 재초기화 스킵)
 checkIndexedDBAvailability().then((available) => {
@@ -372,17 +386,47 @@ export { db };
  * 로그아웃 시 Firestore 영구(IndexedDB) 캐시를 폐기한다.
  * 공용 기기에서 이전 사용자의 문서 캐시가 남지 않도록 한다 (2026-07-10 감사 #8).
  * 인스턴스를 terminate하므로 호출 후에는 반드시 페이지를 리로드해야 한다.
- * 다중 탭이 캐시를 점유 중이면 실패할 수 있으나, 로그아웃 흐름은 계속 진행한다.
+ *
+ * ## 실패하면 표식을 남긴다 — 그 자리에서 더 할 수 있는 것이 없기 때문이다
+ *
+ * 대표적인 실패 원인은 **다중 탭**이다. `persistentMultipleTabManager`로 캐시를 공유하므로
+ * 다른 탭이 붙어 있으면 `clearIndexedDbPersistence`가 `failed-precondition`으로 거부된다.
+ * 그 탭을 우리가 닫을 수는 없으니 지금은 포기하고 로그아웃을 계속 진행하는 것이 맞다 —
+ * 문제는 **그렇게 포기한 사실이 어디에도 남지 않아 캐시가 영구히 남는다**는 것이었다.
+ * 공용 기기에서 다음 사용자가 오프라인으로 이전 사용자의 문서를 읽을 수 있는 상태다.
+ *
+ * 그래서 실패를 `localStorage`에 적어 두고, 다음 부팅에서 `retryPendingCacheClear()`가
+ * 다시 시도한다. 성공할 때까지 남으므로 "다른 탭이 닫힌 첫 부팅"에 정리된다.
  */
 export async function clearOfflineCache(): Promise<void> {
     // terminate() 이후 살아남은 타이머·이벤트 핸들러가 새 구독을 걸면 SDK가 동기 throw를 낸다.
     // 종료를 기다리는 동안에도 이미 종료 의도가 확정이므로 호출 직전에 표시한다.
     markFirestoreTerminated();
-    try {
-        await terminate(db);
-        await clearIndexedDbPersistence(db);
-    } catch (err) {
-        console.warn('[Firestore] 오프라인 캐시 정리 실패 (계속 진행):', err);
+    // 표식·순서 계약은 offline/cacheClearMarker.ts가 지킨다(그 파일 주석 참고).
+    await runCacheClearWithMarker(
+        () => terminate(db),
+        () => clearIndexedDbPersistence(db),
+        (err) => console.warn('[Firestore] 오프라인 캐시 정리 실패 — 다음 실행에서 다시 시도합니다:', err),
+    );
+}
+
+/**
+ * 지난 로그아웃에서 끝내지 못한 캐시 폐기를 다시 시도한다.
+ *
+ * **부팅 중 가장 이른 시점에** 불러야 한다. `clearIndexedDbPersistence`는 인스턴스가
+ * 시작되지 않은 상태(방금 만든 상태 또는 terminate 이후)에서만 허용되므로, 첫 쿼리·구독이
+ * 걸리면 `failed-precondition`으로 거부된다. 그 경우에도 표식을 지우지 않아 다음 부팅에
+ * 다시 시도한다 — 늦게 성공하는 것이 조용히 포기하는 것보다 낫다.
+ *
+ * 표식이 없으면 아무 일도 하지 않는다(정상 경로의 비용 0).
+ */
+export async function retryPendingCacheClear(): Promise<void> {
+    const result = await runPendingCacheClear(
+        () => clearIndexedDbPersistence(db),
+        (err) => console.warn('[Firestore] 남은 캐시 정리 재시도 실패 — 다음 실행에서 다시 시도합니다:', err),
+    );
+    if (result === 'cleared') {
+        console.warn('[Firestore] 지난 로그아웃에서 남은 오프라인 캐시를 정리했습니다.');
     }
 }
 export const storage = getStorage(app);
