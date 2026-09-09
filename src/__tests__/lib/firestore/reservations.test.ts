@@ -255,17 +255,45 @@ describe('firestore/reservations', () => {
             expect(result.map(r => r.id)).toEqual(['a']);
         });
 
-        it('주간 예약은 date 범위 필터로 조회하고 취소 건을 제외한다', async () => {
+        /*
+         * 주간·월간 조회는 취소 건을 **서버에서** 걸러낸다.
+         *
+         * 종전에는 기간 안의 예약을 전부 읽고 JS로 걸렀다 — 취소분이 전체 19,456건 중
+         * 3,830건(약 20%)이라 캘린더를 열 때마다 그만큼을 읽어 버렸다. 클라이언트 필터를
+         * 되돌리면 테스트는 통과하는데 비용만 늘어나므로, 여기서 `where` 호출로 고정한다.
+         */
+        it('주간 예약은 취소 건을 서버에서 제외한다 (클라이언트 필터로 되돌리지 않는다)', async () => {
             vi.mocked(fs.getDocs).mockResolvedValue(docsSnap([
                 { id: 'a', status: 'reserved' },
-                { id: 'b', status: 'cancelled' },
             ]) as never);
 
             const result = await getWeekReservations('org1', '2026-08-01', '2026-08-07');
 
+            expect(fs.where).toHaveBeenCalledWith('organizationId', '==', 'org1'); // org 격리
             expect(fs.where).toHaveBeenCalledWith('date', '>=', '2026-08-01');
             expect(fs.where).toHaveBeenCalledWith('date', '<=', '2026-08-07');
-            expect(result).toHaveLength(1);
+            // `in` 열거가 아니라 `!=` — 알 수 없는 상태를 취소로 떨어뜨리면 화면에서 사라져
+            // 같은 차량이 이중 배차된다(reservation 스키마 주석).
+            expect(fs.where).toHaveBeenCalledWith('status', '!=', 'cancelled');
+            expect(result.map(r => r.id)).toEqual(['a']);
+        });
+
+        it('서버가 준 것을 그대로 돌려준다 — 취소 필터를 두 번 걸지 않는다', async () => {
+            /*
+             * 목이 취소 건을 함께 돌려주는 것은 **의도적으로 비현실적**이다. 서버 필터가
+             * 걸려 있으면 실제로는 오지 않는다. 그런데도 이렇게 두는 이유는, 클라이언트
+             * 필터를 되살리면 이 테스트가 깨지도록 만드는 것이 목적이기 때문이다 —
+             * 필터가 양쪽에 다 있으면 서버 필터를 지워도 화면은 정상이라 비용만 조용히
+             * 되돌아간다. 클라이언트가 손대지 않는다는 것을 여기서 못박는다.
+             */
+            vi.mocked(fs.getDocs).mockResolvedValue(docsSnap([
+                { id: 'a', status: 'reserved' },
+                { id: 'cancelled-b', status: 'cancelled' },
+            ]) as never);
+
+            const result = await getWeekReservations('org1', '2026-08-01', '2026-08-07');
+
+            expect(result.map(r => r.id)).toEqual(['a', 'cancelled-b']);
         });
     });
 
