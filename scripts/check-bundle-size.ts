@@ -56,6 +56,17 @@ const BUDGETS = {
 
     largestJs: 600 * 1024,  // 단일 최대 JS 청크 원시: 600KB (firebase-db ~548KB. 2026-08-01 firestore/storage
                             //   청크 분리로 582→560KB 확보 — 합쳐두면 다음 firebase 마이너에서 바로 터진다)
+
+    // ── 프리캐시 전송량 — Hosting 대역폭의 직접 원인이다 ────────────────────────────
+    // 서비스 워커가 **설치 즉시** 내려받는 양이다. 사용자가 화면을 하나도 열지 않아도,
+    // 로그인을 하지 않아도 이만큼 나간다. 그래서 첫 로드 게이트와 별개로 필요하다 —
+    // 2026-09-09 이전에는 첫 로드가 gzip 32KB인데 프리캐시가 148개 청크 1,010KB를
+    // 끌어왔고, 두 게이트 어디에도 걸리지 않았다. 그것이 Hosting 월 26GB(무료 10GB)의
+    // 정체였다(비로그인 방문 1회당 1.14MB × 하루 약 1,000회).
+    // 실측(2026-09-09): 86.1KB = index.html 1.8 + index.js 2.6 + index.css 22.9
+    //                            + firebase-auth 29.5 + 아이콘 3종 29.4.
+    // 여유는 firebase-auth 마이너 갱신 몇 번을 흡수할 만큼만 둔다.
+    precacheWire: 130 * 1024,
 };
 
 interface FileInfo {
@@ -121,6 +132,109 @@ function getInitialJsNames(): string[] | null {
     return [...names];
 }
 
+/** `dist/index.html`이 참조하는 셸 자산을 프리캐시 매니페스트와 같은 표기(`assets/x.js`)로 뽑는다. */
+function getShellAssetPaths(): string[] | null {
+    const indexHtml = path.resolve(__dirname, '..', 'dist', 'index.html');
+    if (!fs.existsSync(indexHtml)) return null;
+
+    const html = fs.readFileSync(indexHtml, 'utf8');
+    const names = new Set<string>();
+    for (const m of html.matchAll(/<script[^>]+src="\/(assets\/[^"]+)"/g)) names.add(m[1]);
+    for (const m of html.matchAll(/<link[^>]+rel="modulepreload"[^>]+href="\/(assets\/[^"]+)"/g)) names.add(m[1]);
+    for (const m of html.matchAll(/<link[^>]+rel="stylesheet"[^>]+href="\/(assets\/[^"]+)"/g)) names.add(m[1]);
+    return [...names];
+}
+
+/**
+ * 생성된 `dist/sw.js`에서 프리캐시 매니페스트를 뽑는다.
+ *
+ * `injectManifest` 전략이라 `self.__WB_MANIFEST`가 빌드 시 `{revision,url}` 배열로 치환되고,
+ * sw.js는 번들·최소화되어 `precacheAndRoute` 식별자가 남지 않는다. 그래서 **함수명이 아니라
+ * 배열 리터럴의 모양**으로 찾는다. 항목마다 `revision` 키가 먼저 오는 것은 workbox가
+ * 생성하는 형태다.
+ */
+function getPrecacheManifest(): Array<{ url: string; revision: string | null }> | null {
+    const swPath = path.resolve(__dirname, '..', 'dist', 'sw.js');
+    if (!fs.existsSync(swPath)) return null;
+
+    const sw = fs.readFileSync(swPath, 'utf8');
+    const m = sw.match(/\[\{"revision":[\s\S]*?\}\]/);
+    if (!m) return null;
+    try {
+        return JSON.parse(m[0]);
+    } catch {
+        return null;
+    }
+}
+
+/** 실제로 회선을 타는 크기 — 압축 가능한 텍스트는 gzip, 이미지 등은 원시 크기다. */
+function wireSize(relUrl: string): number | null {
+    const filePath = path.resolve(__dirname, '..', 'dist', relUrl);
+    if (!fs.existsSync(filePath)) return null;
+    const buf = fs.readFileSync(filePath);
+    return /\.(js|css|html|svg|json)$/i.test(relUrl) ? gzipSync(buf).length : buf.length;
+}
+
+/**
+ * 프리캐시 게이트 — 두 방향의 회귀를 모두 막는다.
+ *
+ *  1. **부풀기**: 전송 합계가 예산을 넘으면 실패. Hosting 대역폭이 곧바로 늘어난다.
+ *  2. **셸 유실**: index.html과 그것이 참조하는 자산이 매니페스트에서 빠지면 실패.
+ *     vite.config.js의 globPatterns가 엔트리 파일명과 어긋나면 프리캐시가 조용히 비고
+ *     **오프라인이 통째로 죽는다** — 그 실패는 배포 후 현장에서야 드러난다.
+ *
+ * @returns 경고가 발생했으면 true
+ */
+function checkPrecache(): boolean {
+    const shell = getShellAssetPaths();
+    if (shell === null) {
+        console.log('\n⚠️  dist/index.html이 없어 프리캐시 게이트를 건너뜁니다 (빌드 전 실행).');
+        return false;
+    }
+
+    const manifest = getPrecacheManifest();
+    if (manifest === null) {
+        // fail-closed — sw.js가 있어야 할 시점에 없거나 형태가 바뀐 것이다.
+        console.log('\n❌ dist/sw.js에서 프리캐시 매니페스트를 읽지 못했습니다.');
+        console.log('   vite-plugin-pwa의 산출물 형태가 바뀌었다면 getPrecacheManifest()를 함께 갱신하세요.');
+        return true;
+    }
+
+    console.log(`\n📥 프리캐시 (${manifest.length}개 — SW 설치 즉시 내려받는 양)`);
+
+    let hasWarning = false;
+    let wireTotal = 0;
+    for (const entry of manifest) {
+        const size = wireSize(entry.url);
+        if (size === null) {
+            console.log(`   ❌ 매니페스트가 가리키는 파일이 없습니다: ${entry.url}`);
+            hasWarning = true;
+            continue;
+        }
+        wireTotal += size;
+        console.log(`   ${formatSize(size).padStart(10)}  ${entry.url}`);
+    }
+
+    // 셸 유실 검사 — index.html과 그 참조 자산이 전부 들어 있어야 한다.
+    const urls = new Set(manifest.map(e => e.url));
+    const missing = ['index.html', ...shell].filter(p => !urls.has(p));
+    if (missing.length > 0) {
+        console.log(`   ❌ 앱 셸이 프리캐시에서 빠졌습니다: ${missing.join(', ')}`);
+        console.log('      → 오프라인이 동작하지 않습니다. vite.config.js의 globPatterns를 확인하세요.');
+        hasWarning = true;
+    }
+
+    if (wireTotal > BUDGETS.precacheWire) {
+        console.log(`   ⚠️  프리캐시 전송 예산 초과! (${formatSize(wireTotal)} / ${formatSize(BUDGETS.precacheWire)})`);
+        console.log('      → 라우트 청크는 프리캐시가 아니라 sw.ts의 /assets/ 런타임 캐시가 담아야 합니다.');
+        hasWarning = true;
+    } else {
+        console.log(`   ✅ 프리캐시 전송 예산 이내 (${formatSize(wireTotal)} / ${formatSize(BUDGETS.precacheWire)})`);
+    }
+
+    return hasWarning;
+}
+
 function main(): void {
     console.log('\n📦 번들 크기 리포트');
     console.log('─'.repeat(60));
@@ -161,6 +275,9 @@ function main(): void {
             console.log(`   ✅ 첫 로드 JS gzip 예산 이내 (${formatSize(initialGzip)} / ${formatSize(BUDGETS.initialJsGzip)})`);
         }
     }
+
+    // ── 프리캐시 게이트 — SW 설치 즉시 나가는 양(Hosting 대역폭의 직접 원인) ──────────
+    if (checkPrecache()) hasWarning = true;
 
     // JS 리포트 — 아래는 지연 로드까지 전부 더한 값이다(드리프트 감시). 사용자 다운로드량이 아니다.
     const jsTotal = files.js.reduce((sum, f) => sum + f.size, 0);

@@ -89,10 +89,42 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.ts',
       injectManifest: {
-        globPatterns: ['**/*.{js,css,html,svg,png,woff2,webp}'],
+        /*
+         * ## 프리캐시는 **앱 셸만** 담는다 (2026-09-09)
+         *
+         * 이전 값은 js·css·html·svg·png·woff2·webp를 재귀 글롭으로 통째로 담는 패턴이었다.
+         * 청구서에서 드러났다:
+         * Hosting 대역폭이 평일 1.2GB(월 26GB, 무료 한도 10GB)였고, 그 정체는
+         * **비로그인 랜딩 방문 1회당 1.14MB**였다. 랜딩 자체는 128KB인데 서비스 워커가
+         * 곧바로 청크 148개(전송 1.01MB)를 끌어왔다 — recharts(99KB)·xlsx(82KB)·
+         * leaflet(42KB)까지, 로그인도 하지 않고 떠나는 방문자에게.
+         *
+         * main.tsx에 "첫 방문자는 자기에게 필요 없는 appEntry(100KB + 의존성)를 내려받느라
+         * 정작 필요한 lightEntry와 대역폭을 다퉜다"고 적어 두고 그건 막아 뒀는데, 바로 옆에서
+         * **10배 큰 것이** 같은 일을 하고 있었다.
+         *
+         * 그래서 기본값을 뒤집는다. 프리캐시에는 index.html이 실제로 참조하는 셸
+         * (index-*.js 2.6KB + firebase-auth-*.js 29.5KB + index-*.css 22.9KB = gzip 55KB)만
+         * 두고, 나머지 청크는 **방문 시점에** sw.ts의 `/assets/` 런타임 캐시가 담는다.
+         * 운전자 경로의 오프라인은 `lib/warmDriverRoutes.ts`가 로그인 후 워밍해 보장한다
+         * (오프라인 보장 범위를 운전자 경로로 한정한 결정에 따른 것 — 관리자·통계·내보내기
+         *  화면은 오프라인 대상이 아니다).
+         *
+         * ⚠️ 이 패턴이 엔트리 파일명과 어긋나면 셸이 프리캐시에서 조용히 빠져 **오프라인이
+         * 통째로 죽는다.** 그 회귀는 `scripts/check-bundle-size.ts`의 프리캐시 게이트가
+         * 막는다 — index.html이 참조하는 파일이 프리캐시 매니페스트에 전부 들어 있는지
+         * 대조하고, 하나라도 빠지면 빌드를 실패시킨다(fail-closed).
+         */
+        globPatterns: [
+          'index.html',
+          'assets/index-*.{js,css}',
+          'assets/firebase-auth-*.js',
+        ],
         // 자체 호스팅 폰트는 프리캐시에서 제외한다. Pretendard 동적 서브셋은 조각이 92개(3.1MB)라
         // 프리캐시에 넣으면 설치 즉시 전부 내려받는다 — 현장 저사양 폰의 데이터·용량을 쓸 이유가 없다.
         // 실제로 필요한 조각은 unicode-range에 따라 몇 개뿐이고, 그것만 sw.ts의 런타임 캐시가 담는다.
+        // (globPatterns를 좁힌 뒤로는 fonts/**가 애초에 걸리지 않지만, 패턴을 넓힐 때
+        //  이 제외가 함께 사라지지 않도록 남겨 둔다.)
         globIgnores: ['fonts/**'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
       },

@@ -56,7 +56,54 @@ try {
     console.log('[SW] PWA 네비게이션 폴백 설정 에러 (개발 환경 등):', e);
 }
 
-// 3. 런타임 캐싱 (Google Fonts, Firebase Storage)
+// 3. 런타임 캐싱 (앱 청크, 폰트, Storage, 지도)
+
+/*
+ * 앱 청크(/assets/) — 프리캐시에서 뺀 나머지를 **방문 시점에** 담는다.
+ *
+ * vite.config.js의 프리캐시는 앱 셸만 담으므로(그 주석 참고), 라우트별 청크는 여기서
+ * 캐시된다. 파일명에 콘텐츠 해시가 박혀 있어 내용이 바뀌면 URL도 바뀐다 — 즉 같은 URL이
+ * 다른 내용을 가리키는 일이 없으므로 CacheFirst가 안전하다(재검증 왕복이 순수 낭비다).
+ *
+ * 프리캐시된 셸 URL은 위 `precacheAndRoute`가 **먼저** 등록되어 그쪽이 처리한다.
+ * workbox는 등록 순서로 라우트를 고르므로 이 라우트는 셸을 가로채지 않는다.
+ *
+ * ⚠️ 배포 후 오프라인 공백: 새 배포가 활성화되면 프리캐시의 index.html은 갱신되지만
+ * 그것이 참조하는 **새 해시의 청크는 아직 이 캐시에 없다.** 온라인으로 한 번 열면
+ * 그 순간 채워지고, 운전자 경로는 `lib/warmDriverRoutes.ts`가 앱 진입 때 워밍해 메운다.
+ * (이전 전량 프리캐시 방식도 새 워커 설치가 온라인을 전제했으므로 이 전제 자체는 같다.)
+ */
+// 판정은 `request.destination`이 아니라 **경로 확장자**로 한다. 모듈 스크립트의
+// destination은 브라우저·버전에 따라 빈 문자열로 오는 경우가 있어(iOS Safari),
+// 그걸 조건에 걸면 그 기기에서만 청크가 캐시되지 않아 오프라인이 조용히 깨진다.
+registerRoute(
+    ({ url }) =>
+        url.origin === self.location.origin &&
+        url.pathname.startsWith('/assets/') &&
+        (url.pathname.endsWith('.js') || url.pathname.endsWith('.css')),
+    new CacheFirst({
+        cacheName: 'app-chunks',
+        /*
+         * `Vary`를 무시한다. 캐시 조회는 기본적으로 응답의 `Vary`(호스팅은 `Accept-Encoding`을
+         * 붙인다)에 걸린 요청 헤더까지 일치해야 히트한다. 청크를 담을 때와 오프라인에서 꺼낼 때의
+         * `Accept-Encoding`이 조금이라도 다르면 **캐시에 있는데도 빗나가** 네트워크로 나가고,
+         * 오프라인이면 그대로 실패한다 — 지하 주차장에서 화면이 안 열리는 그 증상이다.
+         * 실제로 미리보기 서버에서 재현됐다(2026-09-09: cache.match 미스, import()는 히트).
+         * 파일명에 콘텐츠 해시가 있어 URL 하나가 내용 하나를 가리키므로 `Vary`로 구분할 것이 없다.
+         */
+        matchOptions: { ignoreVary: true },
+        plugins: [
+            new ExpirationPlugin({
+                // 청크 148개 중 한 사용자가 실제로 밟는 것은 소수다. 배포가 잦아(하루 10~20회)
+                // 옛 해시가 쌓이므로 상한을 둔다 — 최근 항목이 남으므로 현재 배포분이 밀려나지 않는다.
+                maxEntries: 120,
+                maxAgeSeconds: 60 * 60 * 24 * 30,
+                purgeOnQuotaError: true,
+            }),
+        ],
+    })
+);
+
 // Google Fonts 캐싱
 registerRoute(
     /^https:\/\/fonts\.(?:gstatic|googleapis)\.com\/.*/i,
