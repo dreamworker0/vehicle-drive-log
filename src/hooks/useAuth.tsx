@@ -6,6 +6,7 @@ import { auth, db, authReady, getAppCheckBlock } from '../lib/firebase';
 import { isFirestoreTerminated } from '../lib/firestoreLifecycle';
 import { refreshTokenSilently, refreshToken, getLastTokenRefreshFailure } from '../lib/tokenRefresh';
 import { handleRedirectResult, wasIntentionalLogout } from '../lib/auth';
+import { clearSessionMarkers } from '../lib/sessionBoot';
 import { setSentryUser, captureError, captureWarning } from '../lib/sentry';
 import { useToastStore } from '../store/useToastStore';
 import type { User as UserDoc } from '../types/user';
@@ -276,6 +277,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         /** 로그아웃 상태를 화면에 확정 반영한다. */
         const commitSignedOut = () => {
+            // 이 종료는 여기서 이미(원인까지 붙여) 보고했다. 재방문 표식을 남겨 두면 다음
+            // 부팅에서 sessionBoot가 같은 사건을 '세션 소실'로 한 번 더, 그것도 원인 없이
+            // 올린다 — 계정 비활성화·소속 변경처럼 서버가 끊은 세션에서 특히 그렇다.
+            clearSessionMarkers();
             pauseWatches = null;
             resumeWatches = null;
             if (unsubscribeUser) { unsubscribeUser(); unsubscribeUser = null; }

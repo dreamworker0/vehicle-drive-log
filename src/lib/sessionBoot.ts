@@ -6,10 +6,14 @@
  * 방문자의 초기 번들을 지키는 것이 lightEntry 분리의 목적이므로 이 제약이 곧 설계다.
  *
  * 담는 것은 세 가지다.
- *   ① 재방문 힌트 — appEntry를 미리 받아 둘지 정한다
+ *   ① 재방문 표식 — appEntry를 미리 받아 둘지 정하고, "세션이 있었어야 하는 기기"인지 가른다
  *   ② 의도적 로그아웃 표식 — "사용자가 눌렀다"와 "혼자 사라졌다"를 가른다
- *   ③ 세션 소실 증거 — ②가 아닌데 세션이 없는 채로 부팅했을 때 무엇이 남아 있었는지
+ *   ③ 세션 소실 증거 — ②가 아닌데 세션 없이 부팅했을 때 무엇이 남아 있었는지
  */
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ① 재방문 표식 — 성질이 다른 저장소 두 곳에 남긴다
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * 이전에 로그인한 적이 있는 브라우저인지 표시하는 힌트.
@@ -17,10 +21,39 @@
  * appEntry 프리로드를 **누구에게 걸지** 정하는 데 쓴다. 인증 판정은 여전히
  * `onAuthStateChanged`가 하며, 이 값이 틀려도(로그아웃 뒤 남아 있거나 지워졌거나)
  * 화면 동작은 달라지지 않는다 — 프리로드가 한 번 헛돌거나 한 번 늦을 뿐이다.
- *
- * 아래 ③에서는 "세션이 있었어야 하는 브라우저인가"의 근거로도 쓴다.
  */
 const RETURNING_VISITOR_KEY = 'vdl:returning-visitor';
+
+/**
+ * 같은 사실을 쿠키에도 남긴다. **저장소가 통째로 비워진 경우를 보려면 이게 있어야 한다.**
+ *
+ * 휴대폰에서 세션이 사라지는 가장 유력한 경로는 브라우저의 저장소 축출인데, 그때
+ * localStorage와 IndexedDB가 **함께** 비워진다. 위 힌트도 localStorage에 있으니 같이 사라지고,
+ * 그러면 그 부팅은 "처음 온 사람"과 구분되지 않는다 — 정작 보고 싶은 사건만 관측하지 못한다.
+ * 쿠키는 용량 축출의 대상이 아니라서(사이트 데이터 삭제·ITP는 별개 경로다) 그 구분이 된다.
+ *
+ * 값은 `1` 하나뿐이고 개인정보가 없다. 로그아웃 때는 힌트와 함께 지운다.
+ */
+const RETURNING_VISITOR_COOKIE = 'vdl_seen';
+const RETURNING_COOKIE_MAX_AGE = 60 * 60 * 24 * 730; // 2년
+
+function readCookieMark(): boolean {
+    try {
+        return document.cookie.split('; ').some((entry) => entry === RETURNING_VISITOR_COOKIE + '=1');
+    } catch {
+        return false;
+    }
+}
+
+function writeCookieMark(value: boolean): void {
+    try {
+        const secure = location.protocol === 'https:' ? '; Secure' : '';
+        const common = '; Path=/; SameSite=Lax' + secure;
+        document.cookie = value
+            ? RETURNING_VISITOR_COOKIE + '=1; Max-Age=' + RETURNING_COOKIE_MAX_AGE + common
+            : RETURNING_VISITOR_COOKIE + '=; Max-Age=0' + common;
+    } catch { /* 쿠키를 못 쓰면 힌트만으로 동작한다 */ }
+}
 
 export function readReturningHint(): boolean {
     try {
@@ -36,7 +69,12 @@ export function writeReturningHint(value: boolean): void {
         if (value) localStorage.setItem(RETURNING_VISITOR_KEY, '1');
         else localStorage.removeItem(RETURNING_VISITOR_KEY);
     } catch { /* 저장소를 못 쓰면 힌트 없이 동작한다 */ }
+    writeCookieMark(value);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ② 의도적 로그아웃 표식
+// ─────────────────────────────────────────────────────────────────────────────
 
 /**
  * 사용자가 스스로 로그아웃했음을 남기는 표시.
@@ -80,6 +118,17 @@ export function wasIntentionalLogout(): boolean {
     }
 }
 
+/**
+ * 세션이 끝났음을 장부에 반영한다 — 의도적 로그아웃이든, 앱이 관측해 이미 보고한 종료든.
+ *
+ * 표식을 남겨 두면 **다음 부팅에서 같은 사건이 '세션 소실'로 한 번 더** 올라간다.
+ * 계정 비활성화·소속 변경처럼 서버가 끊은 세션이 특히 그렇다 — useAuth가 원인까지 붙여
+ * 이미 보고한 사건이, 원인 없는 이름으로 중복 기록된다.
+ */
+export function clearSessionMarkers(): void {
+    writeReturningHint(false);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ③ 세션 소실 증거
 // ─────────────────────────────────────────────────────────────────────────────
@@ -87,61 +136,85 @@ export function wasIntentionalLogout(): boolean {
 /** 다음 로그인 때 Sentry로 올릴 증거를 담아 두는 자리. 한 건만 유지한다. */
 const SESSION_LOSS_KEY = 'vdl:session-loss';
 
-/** 우리 앱이 localStorage에 쓰는 키들. 저장소가 통째로 비워졌는지 가늠하는 데 쓴다. */
+/** Firebase가 세션을 넣어 두는 localStorage 키의 접두사 (`firebase:authUser:<apiKey>:[DEFAULT]`). */
+const FIREBASE_AUTH_KEY_PREFIX = 'firebase:authUser:';
+
+/** 우리 앱이 localStorage에 쓰는 키들. 저장소가 얼마나 남았는지 가늠하는 데 쓴다. */
 const APP_KEY_PREFIXES = ['vdl:', 'driveLog_', 'tmap_', 'poi_search_cache_v1', 'preferred-nav-app', 'employee-welcome-dismissed', 'sw_purge_v', 'pendingInviteCode'];
 
-export interface SessionLossEvidence {
-    /** 발생 시각 (ISO) */
-    at: string;
-    /** 로그인한 적 있는 브라우저라는 힌트가 남아 있었나 */
+interface BootSnapshot {
     returningHint: boolean;
-    /** Firebase가 세션을 넣어 두는 localStorage 키가 남아 있었나 */
+    cookieMark: boolean;
+    /** 예전 빌드가 쓰던 localStorage 세션 키가 남아 있었나 */
     authKeyInLocalStorage: boolean;
-    /** Firebase Auth의 IndexedDB(firebaseLocalStorageDb)가 있었나 */
-    authDbInIndexedDB: 'yes' | 'no' | 'unsupported';
-    /** 우리 앱 키 중 살아남은 개수 — 0이면 localStorage가 통째로 비워졌다는 뜻 */
-    survivingAppKeys: number;
-    /** localStorage 전체 키 개수 */
+    /** 우리 앱 키 중 살아남은 개수 (재방문 힌트는 세지 않는다 — 0이 의미를 갖게) */
+    appKeys: number;
+    localStorageKeys: number;
+}
+
+function takeBootSnapshot(): BootSnapshot {
+    const snapshot: BootSnapshot = {
+        returningHint: false,
+        cookieMark: readCookieMark(),
+        authKeyInLocalStorage: false,
+        appKeys: 0,
+        localStorageKeys: 0,
+    };
+    try {
+        const keys = Object.keys(localStorage);
+        snapshot.localStorageKeys = keys.length;
+        for (const key of keys) {
+            if (key === RETURNING_VISITOR_KEY) {
+                snapshot.returningHint = localStorage.getItem(key) === '1';
+                continue;
+            }
+            if (key.startsWith(FIREBASE_AUTH_KEY_PREFIX)) snapshot.authKeyInLocalStorage = true;
+            if (APP_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))) snapshot.appKeys += 1;
+        }
+    } catch { /* 저장소가 막힌 환경 — 기본값이 그 자체로 증거다 */ }
+    return snapshot;
+}
+
+/**
+ * 부팅 직후의 저장소 모습. **모듈 평가 시점에 동기적으로** 찍는다.
+ *
+ * **왜 그때인가.** Firebase Auth는 초기화 중에 저장소를 바꿔 놓는다 —
+ * `PersistenceUserManager.create`가 1순위가 아닌 저장소에서 세션 키를 **지우고**,
+ * IndexedDB 가용성 검사가 `firebaseLocalStorageDb`를 **만든다**. 그 뒤에 읽으면
+ * "localStorage에 세션이 있었나"는 언제나 아니오가 되어 증거가 상수로 굳는다.
+ * SDK의 그 정리는 전부 마이크로태스크 뒤에서 일어나므로 동기 스냅숏이 반드시 앞선다.
+ */
+const bootSnapshot = takeBootSnapshot();
+
+/**
+ * Sentry로 올릴 증거.
+ *
+ * **전부 숫자·불리언이다.** 문자열은 `sentryScrub`의 기본 차단에 걸려 `[redacted string(n)]`로
+ * 바뀐다 — 허용 목록은 자유 입력이 새는 것을 막으려고 일부러 좁게 두었으므로, 진단값을
+ * 문자열로 실으면 도착하지 않는다. 기기·브라우저 종류는 Sentry가 자체 컨텍스트로 붙인다.
+ */
+export interface SessionLossEvidence {
+    /** 기록 시각 (epoch ms) */
+    at: number;
+    /** localStorage의 재방문 힌트가 남아 있었나 */
+    returningHint: boolean;
+    /** 쿠키 표식이 남아 있었나 — 힌트가 없는데 이게 있으면 저장소가 통째로 비워진 것이다 */
+    cookieMark: boolean;
+    /** 예전 빌드의 localStorage 세션 키가 남아 있었나 */
+    authKeyInLocalStorage: boolean;
+    /** 우리 앱 키 중 살아남은 개수(힌트 제외). 0이면 localStorage가 비워졌다는 뜻 */
+    appKeys: number;
     localStorageKeys: number;
     /** 저장소가 축출 대상이 아닌 상태로 승격돼 있었나 (미지원 시 null) */
     persisted: boolean | null;
-    /** 사용량·할당량 (MB, 미지원 시 null) */
     usageMb: number | null;
     quotaMb: number | null;
     /** 설치형(PWA)으로 열렸나 */
     standalone: boolean;
     online: boolean;
-    userAgent: string;
 }
 
-function isAppKey(key: string): boolean {
-    return APP_KEY_PREFIXES.some((prefix) => key.startsWith(prefix));
-}
-
-async function collectEvidence(returningHint: boolean): Promise<SessionLossEvidence> {
-    let authKeyInLocalStorage = false;
-    let survivingAppKeys = 0;
-    let localStorageKeys = 0;
-    try {
-        const keys = Object.keys(localStorage);
-        localStorageKeys = keys.length;
-        for (const key of keys) {
-            // Firebase가 쓰는 이름은 `firebase:authUser:<apiKey>:[DEFAULT]`다.
-            // apiKey를 실어 보내지 않으려고 접두사만 본다.
-            if (key.startsWith('firebase:authUser:')) authKeyInLocalStorage = true;
-            if (isAppKey(key)) survivingAppKeys += 1;
-        }
-    } catch { /* 저장소가 막힌 환경 — 기본값(false/0)이 그 자체로 증거다 */ }
-
-    let authDbInIndexedDB: SessionLossEvidence['authDbInIndexedDB'] = 'unsupported';
-    try {
-        // Safari·Firefox는 indexedDB.databases()를 지원하지 않는다 — 'unsupported'로 남긴다.
-        const list = await indexedDB.databases?.();
-        if (list) {
-            authDbInIndexedDB = list.some((d) => d.name === 'firebaseLocalStorageDb') ? 'yes' : 'no';
-        }
-    } catch { /* 조회 실패도 'unsupported'로 둔다 */ }
-
+async function collectEvidence(): Promise<SessionLossEvidence> {
     let persisted: boolean | null = null;
     let usageMb: number | null = null;
     let quotaMb: number | null = null;
@@ -160,23 +233,26 @@ async function collectEvidence(returningHint: boolean): Promise<SessionLossEvide
     } catch { /* matchMedia 미구현 환경 — false로 둔다 */ }
 
     return {
-        at: new Date().toISOString(),
-        returningHint,
-        authKeyInLocalStorage,
-        authDbInIndexedDB,
-        survivingAppKeys,
-        localStorageKeys,
+        at: Date.now(),
+        returningHint: bootSnapshot.returningHint,
+        cookieMark: bootSnapshot.cookieMark,
+        authKeyInLocalStorage: bootSnapshot.authKeyInLocalStorage,
+        appKeys: bootSnapshot.appKeys,
+        localStorageKeys: bootSnapshot.localStorageKeys,
         persisted,
         usageMb,
         quotaMb,
         standalone,
         online: typeof navigator !== 'undefined' ? navigator.onLine : true,
-        userAgent: typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 200) : '',
     };
 }
 
 /**
- * 세션 없이 부팅했는데 **세션이 있었어야 하는 브라우저**라면 증거를 적어 둔다.
+ * 세션 없이 부팅했다 — 표식을 정리하고, 세션이 있었어야 하는 기기였다면 증거를 적어 둔다.
+ *
+ * 정리와 판정을 **한 함수에 묶은 것이 요점**이다. 호출부에서 "먼저 판정하고 그 다음 표식을
+ * 내린다"로 나누면 두 줄의 순서가 계약이 되는데, 뒤바꿔도 타입도 테스트도 통과하고 계측만
+ * 조용히 죽는다. 판정 근거는 부팅 스냅숏이라 정리를 먼저 해도 결과가 달라지지 않는다.
  *
  * **왜 여기서 바로 Sentry로 보내지 않나.** 이 시점은 경량 진입점이라 Sentry가 초기화돼
  * 있지 않다. 여기서 올리려면 랜딩 화면에 @sentry/react를 통째로 끌어와야 하는데, 그건
@@ -187,13 +263,15 @@ async function collectEvidence(returningHint: boolean): Promise<SessionLossEvide
  * 보고하지만, "껐다 켰더니 로그인 화면"은 main.tsx가 조용히 경량 진입점을 띄우고 끝이라
  * 지금까지 어디에도 남지 않았다 — 휴대폰 PWA 제보가 정확히 그 모양이었다.
  */
-export function recordSessionLossIfSuspicious(): void {
-    // 힌트는 **동기적으로** 먼저 읽는다 — 호출자가 곧바로 힌트를 내리기 때문이다.
-    const returningHint = readReturningHint();
-    if (!returningHint) return;
+export function noteUnauthenticatedBoot(): void {
+    const hadSession = bootSnapshot.returningHint || bootSnapshot.cookieMark;
+    // 다음 방문도 가볍게 연다(그리고 이 판정이 다음 부팅에서 되풀이되지 않게 한다)
+    clearSessionMarkers();
+
+    if (!hadSession) return;
     if (wasIntentionalLogout()) return;
 
-    collectEvidence(returningHint)
+    collectEvidence()
         .then((evidence) => {
             try {
                 localStorage.setItem(SESSION_LOSS_KEY, JSON.stringify(evidence));

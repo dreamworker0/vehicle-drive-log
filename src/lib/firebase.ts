@@ -150,8 +150,9 @@ export const auth = getAuth(app);
 if (USE_EMULATOR && typeof window !== 'undefined' && !(auth as unknown as { emulatorConfig?: unknown }).emulatorConfig) {
     connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
 }
-// main.tsx → firebaseAuth.ts에서 이미 setPersistence 완료.
-// 중복 호출 대신 기존 Promise를 재수출하여 ~200-500ms 절감.
+// firebaseAuth.ts가 만든 것과 같은 인스턴스다(getAuth는 앱당 하나). persistence는 지정하지
+// 않는다 — 기본 우선순위(IndexedDB 우선)를 쓰는 이유는 firebaseAuth.ts 주석에 적어 뒀다.
+// authReady도 거기서 만든 Promise를 재수출한다(중복 대기 없이 ~200-500ms 절감).
 export const authReady = _authReady;
 
 // IndexedDB / Firestore 비동기 에러 억제 (Sentry 노이즈 방지)

@@ -3,7 +3,7 @@ import type { AuthError } from 'firebase/auth';
 import { auth, googleProvider, clearOfflineCache } from './firebase';
 import { clearQueue, getPendingCount } from './offline/syncQueue';
 import { useConfirmStore } from '../store/useConfirmStore';
-import { markIntentionalLogout, wasIntentionalLogout, writeReturningHint } from './sessionBoot';
+import { markIntentionalLogout, wasIntentionalLogout, clearSessionMarkers } from './sessionBoot';
 
 // 의도적 로그아웃 표식은 sessionBoot가 소유한다(경량 진입점도 읽어야 해서 Firebase 의존이 없어야 한다).
 export { wasIntentionalLogout };
@@ -89,9 +89,10 @@ export const logout = async () => {
     // signOut보다 먼저 표시한다 — onAuthStateChanged(null)이 await보다 앞서 도착할 수 있고,
     // 그때 표시가 없으면 정상 로그아웃이 '예기치 않은 세션 종료'로 보고된다.
     markIntentionalLogout();
-    // 재방문 힌트도 지금 내린다. 다음 부팅의 세션 소실 감지(sessionBoot)가 이 힌트를 근거로
-    // 쓰는데, 표식의 유효창(10초)보다 로그아웃 정리가 길어지면 정상 로그아웃이 오탐으로 잡힌다.
-    writeReturningHint(false);
+    // 재방문 표식도 지금 내린다. 다음 부팅의 세션 소실 감지(sessionBoot)가 이 표식을 근거로
+    // 쓰는데, 의도적 로그아웃 표시의 유효창(10초)보다 로그아웃 정리가 길어지면 정상 로그아웃이
+    // 오탐으로 잡힌다.
+    clearSessionMarkers();
     try {
         await signOut(auth);
     } catch (error) {

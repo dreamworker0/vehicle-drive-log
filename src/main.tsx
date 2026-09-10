@@ -12,7 +12,7 @@
  */
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, authReady } from './lib/firebaseAuth';
-import { readReturningHint, writeReturningHint, recordSessionLossIfSuspicious } from './lib/sessionBoot';
+import { readReturningHint, writeReturningHint, noteUnauthenticatedBoot } from './lib/sessionBoot';
 import './index.css';
 
 // 로딩 표시 (Auth 상태 확인 중)
@@ -108,11 +108,9 @@ authReady.then(() => {
                 const { renderFullApp } = await (appEntryPreload ?? import('./appEntry'));
                 renderFullApp();
             } else {
-                // 로그인한 적 있는 브라우저인데 세션이 없다 — 증거를 적어 둔다(힌트를 내리기 전에).
-                // 사용자가 스스로 로그아웃한 경우는 안에서 걸러낸다.
-                recordSessionLossIfSuspicious();
-                // 로그아웃했거나 애초에 로그인한 적이 없는 브라우저 — 다음 방문도 가볍게 연다
-                writeReturningHint(false);
+                // 표식을 정리하고, 세션이 있었어야 하는 기기였다면 증거를 남긴다.
+                // (다음 방문을 가볍게 여는 것도 이 안에서 함께 한다 — 순서가 계약이 되지 않게)
+                noteUnauthenticatedBoot();
                 // 비인증 사용자 → 경량 앱 로드
                 const { renderLightApp } = await import('./lightEntry');
                 renderLightApp();
