@@ -144,7 +144,7 @@ describe('sessionBoot — 세션 소실 증거', () => {
      * 스냅숏을 모듈 평가 시점에 찍는 이유. 프로덕션에서 Firebase Auth는 초기화 중에
      * 1순위가 아닌 저장소의 세션 키를 지운다 — 그 뒤에 읽으면 이 값이 언제나 false로 굳는다.
      */
-    it('예전 빌드가 localStorage에 남긴 세션 키를 부팅 시점 기준으로 본다', async () => {
+    it('예전 빌드가 localStorage에 남긴 세션 사본을 부팅 시점 기준으로 본다', async () => {
         localStorage.setItem(HINT_KEY, '1');
         localStorage.setItem('firebase:authUser:key:[DEFAULT]', '{}');
         const { noteUnauthenticatedBoot, takePendingSessionLoss } = await load();
@@ -155,7 +155,7 @@ describe('sessionBoot — 세션 소실 증거', () => {
         noteUnauthenticatedBoot();
         await flush();
 
-        expect(takePendingSessionLoss()!.authKeyInLocalStorage).toBe(true);
+        expect(takePendingSessionLoss()!.legacyLocalCopy).toBe(true);
     });
 
     /**

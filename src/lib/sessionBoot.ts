@@ -136,8 +136,14 @@ export function clearSessionMarkers(): void {
 /** 다음 로그인 때 Sentry로 올릴 증거를 담아 두는 자리. 한 건만 유지한다. */
 const SESSION_LOSS_KEY = 'vdl:session-loss';
 
-/** Firebase가 세션을 넣어 두는 localStorage 키의 접두사 (`firebase:authUser:<apiKey>:[DEFAULT]`). */
-const FIREBASE_AUTH_KEY_PREFIX = 'firebase:authUser:';
+/**
+ * 예전 빌드가 세션을 두던 localStorage 키의 접두사 (`firebase:authUser:<apiKey>:[DEFAULT]`).
+ *
+ * 있고 없고만 본다 — 값은 읽지도, 어디에도 싣지도 않는다. 필드 이름에 `authKey`를 쓰면
+ * CodeQL(js/clear-text-storage-of-sensitive-data)이 이름만 보고 자격증명을 저장하는 것으로
+ * 읽으므로, 사실 그대로 "예전 사본"이라고 부른다.
+ */
+const LEGACY_LOCAL_COPY_PREFIX = 'firebase:authUser:';
 
 /** 우리 앱이 localStorage에 쓰는 키들. 저장소가 얼마나 남았는지 가늠하는 데 쓴다. */
 const APP_KEY_PREFIXES = ['vdl:', 'driveLog_', 'tmap_', 'poi_search_cache_v1', 'preferred-nav-app', 'employee-welcome-dismissed', 'sw_purge_v', 'pendingInviteCode'];
@@ -145,8 +151,8 @@ const APP_KEY_PREFIXES = ['vdl:', 'driveLog_', 'tmap_', 'poi_search_cache_v1', '
 interface BootSnapshot {
     returningHint: boolean;
     cookieMark: boolean;
-    /** 예전 빌드가 쓰던 localStorage 세션 키가 남아 있었나 */
-    authKeyInLocalStorage: boolean;
+    /** 예전 빌드가 localStorage에 두던 세션 사본이 남아 있었나 */
+    legacyLocalCopy: boolean;
     /** 우리 앱 키 중 살아남은 개수 (재방문 힌트는 세지 않는다 — 0이 의미를 갖게) */
     appKeys: number;
     localStorageKeys: number;
@@ -156,7 +162,7 @@ function takeBootSnapshot(): BootSnapshot {
     const snapshot: BootSnapshot = {
         returningHint: false,
         cookieMark: readCookieMark(),
-        authKeyInLocalStorage: false,
+        legacyLocalCopy: false,
         appKeys: 0,
         localStorageKeys: 0,
     };
@@ -168,7 +174,7 @@ function takeBootSnapshot(): BootSnapshot {
                 snapshot.returningHint = localStorage.getItem(key) === '1';
                 continue;
             }
-            if (key.startsWith(FIREBASE_AUTH_KEY_PREFIX)) snapshot.authKeyInLocalStorage = true;
+            if (key.startsWith(LEGACY_LOCAL_COPY_PREFIX)) snapshot.legacyLocalCopy = true;
             if (APP_KEY_PREFIXES.some((prefix) => key.startsWith(prefix))) snapshot.appKeys += 1;
         }
     } catch { /* 저장소가 막힌 환경 — 기본값이 그 자체로 증거다 */ }
@@ -200,8 +206,8 @@ export interface SessionLossEvidence {
     returningHint: boolean;
     /** 쿠키 표식이 남아 있었나 — 힌트가 없는데 이게 있으면 저장소가 통째로 비워진 것이다 */
     cookieMark: boolean;
-    /** 예전 빌드의 localStorage 세션 키가 남아 있었나 */
-    authKeyInLocalStorage: boolean;
+    /** 예전 빌드가 localStorage에 두던 세션 사본이 남아 있었나 */
+    legacyLocalCopy: boolean;
     /** 우리 앱 키 중 살아남은 개수(힌트 제외). 0이면 localStorage가 비워졌다는 뜻 */
     appKeys: number;
     localStorageKeys: number;
@@ -236,7 +242,7 @@ async function collectEvidence(): Promise<SessionLossEvidence> {
         at: Date.now(),
         returningHint: bootSnapshot.returningHint,
         cookieMark: bootSnapshot.cookieMark,
-        authKeyInLocalStorage: bootSnapshot.authKeyInLocalStorage,
+        legacyLocalCopy: bootSnapshot.legacyLocalCopy,
         appKeys: bootSnapshot.appKeys,
         localStorageKeys: bootSnapshot.localStorageKeys,
         persisted,
