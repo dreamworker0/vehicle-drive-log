@@ -13,6 +13,7 @@
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, authReady } from './lib/firebaseAuth';
 import { readReturningHint, writeReturningHint, noteUnauthenticatedBoot } from './lib/sessionBoot';
+import { noteChunkLoadSuccess, retryOnceForNewBuild } from './lib/chunkReload';
 import './index.css';
 
 // 로딩 표시 (Auth 상태 확인 중)
@@ -106,6 +107,7 @@ authReady.then(() => {
                 writeReturningHint(true);
                 // 인증 사용자 → 전체 앱 로드 (프리로드가 걸려 있으면 즉시 사용)
                 const { renderFullApp } = await (appEntryPreload ?? import('./appEntry'));
+                noteChunkLoadSuccess();
                 renderFullApp();
             } else {
                 // 표식을 정리하고, 세션이 있었어야 하는 기기였다면 증거를 남긴다.
@@ -113,9 +115,16 @@ authReady.then(() => {
                 noteUnauthenticatedBoot();
                 // 비인증 사용자 → 경량 앱 로드
                 const { renderLightApp } = await import('./lightEntry');
+                noteChunkLoadSuccess();
                 renderLightApp();
             }
         } catch (err) {
+            // 새 배포 직후에는 **옛 셸이 사라진 청크를 부르는** 일이 있다. 서버에는 그 파일이
+            // 없어 Hosting이 index.html을 돌려주고, 브라우저는 text/html을 모듈로 받아 거절한다 —
+            // 네트워크 문제가 아닌데 "네트워크를 확인해 주세요"가 뜨던 자리다.
+            // 한 번만 새로고침해 새 셸을 받아 온다(근거는 lib/chunkReload.ts).
+            // 리로드가 예약되면 로딩 화면을 그대로 둔다 — 곧 페이지를 떠난다.
+            if (retryOnceForNewBuild()) return;
             // 청크를 못 받으면 여기서 잡지 않는 한 "로딩 중..." 화면이 영원히 남는다
             showBootError(err);
         }
