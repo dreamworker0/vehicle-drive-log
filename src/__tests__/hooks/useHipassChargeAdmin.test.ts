@@ -214,4 +214,57 @@ describe('useHipassChargeAdmin — 관리자 정정', () => {
         // 기록 쪽 변경은 화면에도 반영돼야 한다(실제로 저장됐으므로)
         expect(result.current.filteredRecords[0].chargeAmount).toBe(30000);
     });
+    it('관리자 삭제도 카드 잔액을 되돌린다 (정정과 어긋나지 않게)', async () => {
+        // 수정은 차액만큼 잔액을 맞추면서 삭제는 두면, 같은 화면에서 어느 버튼을
+        // 누르느냐에 따라 잔액이 맞기도 하고 틀리기도 한다.
+        const { result } = await renderLoaded();
+
+        await act(async () => { await result.current.handleDelete(RECORDS[0] as never); });
+
+        expect(mockDeleteHipassCharge).toHaveBeenCalledWith('h1');
+        // 80,000원 - 50,000원(삭제된 충전금액)
+        expect(mockUpdateHipassCard).toHaveBeenCalledWith('c1', { balance: 30000 });
+        expect(mockShowToast).toHaveBeenCalledWith('충전 기록이 삭제되었습니다.', 'success');
+        await waitFor(() => expect(result.current.filteredRecords).toHaveLength(0));
+    });
+
+    it('삭제 확인창에는 잔액이 되돌아간다는 사실이 적힌다', async () => {
+        mockConfirm.mockResolvedValue(false);
+        const { result } = await renderLoaded();
+
+        await act(async () => { await result.current.handleDelete(RECORDS[0] as never); });
+
+        expect(mockConfirm).toHaveBeenCalledWith(expect.objectContaining({
+            message: expect.stringContaining('카드 잔액이 원래대로 되돌아갑니다'),
+        }));
+        expect(mockDeleteHipassCharge).not.toHaveBeenCalled();
+    });
+
+    it('기록은 지워졌는데 잔액 되돌리기만 실패하면 그 사실 그대로 알린다', async () => {
+        mockUpdateHipassCard.mockRejectedValueOnce(new Error('permission-denied'));
+        const { result } = await renderLoaded();
+
+        await act(async () => { await result.current.handleDelete(RECORDS[0] as never); });
+
+        expect(mockShowToast).toHaveBeenCalledWith(
+            '기록은 삭제됐지만 카드 잔액을 되돌리지 못했습니다. [하이패스 관리]에서 잔액을 확인해주세요.',
+            'warning',
+        );
+        // 삭제 자체는 성공했으므로 목록에서도 빠진다
+        await waitFor(() => expect(result.current.filteredRecords).toHaveLength(0));
+    });
+    it('카드가 이미 삭제됐으면 삭제해도 성공이라고 말하지 않는다', async () => {
+        // 확인창에서 "잔액이 되돌아갑니다"라고 약속했는데 되돌릴 곳이 없는 경우다.
+        mockGetHipassCards.mockResolvedValue([]);
+        const { result } = await renderLoaded();
+
+        await act(async () => { await result.current.handleDelete(RECORDS[0] as never); });
+
+        expect(mockDeleteHipassCharge).toHaveBeenCalledWith('h1');
+        expect(mockUpdateHipassCard).not.toHaveBeenCalled();
+        expect(mockShowToast).toHaveBeenCalledWith(
+            expect.stringContaining('카드 잔액을 되돌리지 못했습니다'),
+            'warning',
+        );
+    });
 });

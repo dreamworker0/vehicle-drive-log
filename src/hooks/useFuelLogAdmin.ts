@@ -25,7 +25,7 @@ import { useToast } from './useToast';
 import type { FuelLog } from '../types/fuelLog';
 import useBaseFuelLog from './base/useBaseFuelLog';
 import { updateFuelLog } from '../lib/firestore';
-import { validateNonNegativeFields } from './utils/numberValidation';
+import { validateNonNegativeFields, parseIntegerInput } from './utils/numberValidation';
 import { roundFuelAmount } from '../lib/fuelFormat';
 
 /** 수정 폼 값 — 입력 중에는 전부 문자열로 다룬다(저장 직전에 숫자로 바꾼다). */
@@ -162,14 +162,11 @@ export default function useFuelLogAdmin() {
                 vehicleId: form.vehicleId,
                 vehicleName: form.vehicleName,
                 date: form.date,
-                // parseInt가 아니라 Number로 읽는다 — `<input type="number">`는 지수 표기
-                // ('1e5')도 유효한 값으로 넘기고, parseInt는 그것을 1로 읽는다(50,000km가
-                // 1km로 조용히 저장된다). limitFuelDecimals가 같은 함정을 주석으로 남겨 뒀다.
-                meterReading: Math.trunc(Number(form.meterReading)),
+                meterReading: parseIntegerInput(form.meterReading),
                 fuelType: selectedVehicle?.fuelType || editingRecord.fuelType || 'gasoline',
                 // 저장 길목에서 자릿수를 맞춘다 — 입력 칸만 제한하면 기존 값을 그대로 되쓸 때 통과한다.
                 fuelAmount: roundFuelAmount(form.fuelAmount),
-                fuelCost: Math.trunc(Number(form.fuelCost)),
+                fuelCost: parseIntegerInput(form.fuelCost),
                 notes: form.notes.trim() || '',
             };
 

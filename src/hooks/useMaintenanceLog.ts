@@ -10,7 +10,7 @@ import type { Vehicle } from '../types/vehicle';
 import type { MaintenanceRecord } from '../types/maintenance';
 import { getVehicles, getMaintenanceRecords, createMaintenanceRecord, deleteMaintenanceRecord, clearVehicleMaintenanceBlock, cancelVehicleReservations, updateMaintenanceRecord } from '../lib/firestore';
 import { toLocalDateStr } from '../lib/dateUtils';
-import { validateNonNegativeFields } from './utils/numberValidation';
+import { validateNonNegativeFields, parseIntegerInput } from './utils/numberValidation';
 
 export const MAINTENANCE_TYPES = [
     { value: 'oil', label: '엔진오일', icon: '🛢️' },
@@ -123,10 +123,10 @@ export default function useMaintenanceLog() {
                 date: form.date,
                 type: form.type,
                 description: form.description.trim(),
-                cost: form.cost ? parseInt(String(form.cost)) : null,
+                cost: form.cost ? parseIntegerInput(form.cost) : null,
                 shop: form.shop.trim(),
-                km: form.km ? parseInt(String(form.km)) : null,
-                nextDueKm: form.nextDueKm ? parseInt(String(form.nextDueKm)) : null,
+                km: form.km ? parseIntegerInput(form.km) : null,
+                nextDueKm: form.nextDueKm ? parseIntegerInput(form.nextDueKm) : null,
                 nextDueDate: form.nextDueDate || null,
                 blockVehicle: form.blockVehicle,
                 blockEndDate: form.blockEndDate || null,

@@ -8,7 +8,7 @@ import type { HipassCard } from '../types/hipass';
 import type { Vehicle } from '../types/vehicle';
 import { getHipassCards, createHipassCard, updateHipassCard, deleteHipassCard, getVehicles } from '../lib/firestore';
 import { useToast } from './useToast';
-import { validateNonNegativeFields } from './utils/numberValidation';
+import { validateNonNegativeFields, parseIntegerInput } from './utils/numberValidation';
 
 interface HipassModal {
     type: 'delete';
@@ -117,7 +117,7 @@ export default function useHipassManager() {
                 cardNumber: form.cardNumber.trim(),
                 vehicleId: form.vehicleId,
                 vehicleName: selectedVehicle?.displayName || '',
-                balance: form.balance ? parseInt(form.balance) : 0,
+                balance: form.balance ? parseIntegerInput(form.balance) : 0,
                 memo: form.memo.trim(),
                 organizationId: orgId,
             };
