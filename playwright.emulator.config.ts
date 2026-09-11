@@ -1,4 +1,16 @@
+import { readFileSync } from 'node:fs';
 import { defineConfig } from '@playwright/test';
+
+const BASE_URL = 'http://127.0.0.1:5174';
+
+/**
+ * `public/sw-purge.js`의 일회성 마이그레이션을 테스트에서는 이미 끝난 것으로 표시한다.
+ * 표식이 없으면 그 스크립트가 캐시를 지운 뒤 1초 뒤에 리로드해 진행 중인 네비게이션을
+ * 가로챈다 — 사용자는 브라우저당 한 번뿐이지만 빈 프로필로 시작하는 테스트는 매번 겪는다.
+ * (자세한 경위는 playwright.config.js의 같은 주석 참고.)
+ */
+const purgeVersion = /PURGE_VER\s*=\s*'([^']+)'/.exec(readFileSync('public/sw-purge.js', 'utf8'))?.[1];
+if (!purgeVersion) throw new Error('public/sw-purge.js에서 PURGE_VER을 읽지 못했습니다 — 형식이 바뀌었는지 확인하세요.');
 
 /**
  * 에뮬레이터 기반 인증 E2E 전용 설정.
@@ -28,7 +40,11 @@ export default defineConfig({
     outputDir: 'test-results/authed',
     globalSetup: './e2e/emulator/global-setup.ts',
     use: {
-        baseURL: 'http://127.0.0.1:5174',
+        baseURL: BASE_URL,
+        storageState: {
+            cookies: [],
+            origins: [{ origin: BASE_URL, localStorage: [{ name: 'sw_purge_v', value: purgeVersion }] }],
+        },
         headless: true,
         screenshot: 'only-on-failure',
         // CI 실패 진단용 trace — 실패한 테스트만 남기고 아티팩트로 업로드된다(ci.yml)

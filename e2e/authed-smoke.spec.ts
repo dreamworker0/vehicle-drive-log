@@ -1,5 +1,9 @@
+import { readFileSync } from 'node:fs';
 import { test, expect, type Page } from '@playwright/test';
 import { TEST_ADMIN, TEST_EMPLOYEE } from './emulator/seed';
+
+/** sw-purge의 일회성 마이그레이션 표식 버전 (근거는 playwright.config.js 주석) */
+const purgeVersion = /PURGE_VER\s*=\s*'([^']+)'/.exec(readFileSync('public/sw-purge.js', 'utf8'))![1];
 
 /**
  * 인증 상태 E2E (에뮬레이터 전용 — playwright.emulator.config.ts).
@@ -157,7 +161,14 @@ test.describe('인증 상태 E2E (에뮬레이터)', () => {
             baseURL: origin,
             storageState: {
                 cookies: [],
-                origins: [{ origin, localStorage: [{ name: session!.key, value: session!.value }] }],
+                origins: [{
+                    origin,
+                    localStorage: [
+                        { name: session!.key, value: session!.value },
+                        // 설정이 심어 주던 표식 — 새 컨텍스트에도 들고 가야 sw-purge가 리로드하지 않는다
+                        { name: 'sw_purge_v', value: purgeVersion },
+                    ],
+                }],
             },
         });
         try {

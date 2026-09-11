@@ -1,6 +1,24 @@
+import { readFileSync } from 'node:fs';
 import { defineConfig, devices } from '@playwright/test';
 
 const isCI = !!process.env.CI;
+const baseURL = isCI ? 'http://localhost:4173' : 'http://localhost:5173';
+
+/**
+ * `public/sw-purge.js`의 일회성 마이그레이션을 **테스트에서는 이미 끝난 것으로** 표시한다.
+ *
+ * 그 스크립트는 표식이 없는 브라우저에서 서비스워커를 해제하고 캐시·IndexedDB를 지운 뒤
+ * **1초 뒤에 `location.reload()`** 한다. 실제 사용자는 브라우저당 한 번 겪지만, Playwright는
+ * 테스트마다 빈 프로필로 시작하므로 **모든 테스트가 매번** 겪는다. 그 리로드가 진행 중인
+ * `page.goto`를 가로채
+ *   `Navigation to "/" is interrupted by another navigation to "/"`
+ * 로 스펙을 흔들었고(느린 WebKit에서 특히), 캐시를 지우는 동안 청크 요청이 실패해 앱의
+ * 청크 재시도까지 덩달아 발동했다. 어느 쪽도 **검증하려는 동작이 아니다.**
+ *
+ * 버전은 원본에서 읽는다 — 손으로 복사하면 PURGE_VER이 올라간 순간 조용히 어긋난다.
+ */
+const purgeVersion = /PURGE_VER\s*=\s*'([^']+)'/.exec(readFileSync('public/sw-purge.js', 'utf8'))?.[1];
+if (!purgeVersion) throw new Error('public/sw-purge.js에서 PURGE_VER을 읽지 못했습니다 — 형식이 바뀌었는지 확인하세요.');
 
 export default defineConfig({
     testDir: './e2e',
@@ -16,7 +34,11 @@ export default defineConfig({
     // test-results/ 전체라 하위 폴더로 나누기만 하면 그대로 수집된다.
     outputDir: 'test-results/e2e',
     use: {
-        baseURL: isCI ? 'http://localhost:4173' : 'http://localhost:5173',
+        baseURL,
+        storageState: {
+            cookies: [],
+            origins: [{ origin: baseURL, localStorage: [{ name: 'sw_purge_v', value: purgeVersion }] }],
+        },
         headless: true,
         screenshot: 'only-on-failure',
         // CI 실패 진단용 trace — 실패한 테스트만 남기고 아티팩트로 업로드된다(ci.yml)

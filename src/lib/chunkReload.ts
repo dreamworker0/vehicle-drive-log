@@ -17,13 +17,26 @@
  *
  * ## 어떻게 복구하는가
  *
- * 새로고침하면 새 서비스워커의 셸을 받아 해결된다 — 사용자가 직접 다시 들어가면 괜찮아지는
- * 이유다. 그것을 자동으로 한 번만 한다.
+ * 새로고침하면 새 워커의 셸을 받아 해결된다 — 사용자가 직접 다시 들어가면 괜찮아지는
+ * 이유다. 그것을 자동으로 **한 번만** 한다. `main.tsx`(부팅)와 `lazyWithRetry`(라우트)가
+ * 같은 예산을 나눠 쓴다 — 따로 두면 한 세션에서 두 번 리로드할 수 있다.
  *
- * **그냥 리로드하지 않고 워커 교체를 기다린다.** 새 워커가 아직 활성화되지 않았으면 리로드해도
- * 같은 옛 셸이 나와 한 번뿐인 재시도 예산만 쓰고 끝난다. `sw.ts`가 `skipWaiting()`을 부르므로
- * 설치만 끝나면 곧 활성화되고, 그때 `controllerchange`가 온다. 상한을 두어 워커가 오지 않아도
- * 리로드는 한다 — 늦게라도 새 셸을 받을 가능성이 남는 편이 낫다.
+ * ## 왜 즉시 리로드하는가 — 서비스워커를 기다리지 않는다
+ *
+ * 처음에는 "새 워커가 활성화될 때까지 기다렸다가(최대 3초) 리로드"로 썼다. 둘 다 틀렸다.
+ *
+ *   1. **기다림이 성립하지 않는다.** `sw.ts`는 `clientsClaim`을 의도적으로 쓰지 않으므로
+ *      (그 파일 주석 참고) 현재 클라이언트에는 `controllerchange`가 오지 않는다. 즉 상한
+ *      3초를 매번 그대로 소진한다.
+ *   2. **지연된 리로드가 남의 네비게이션을 가로챈다.** 실측했다 — E2E에서
+ *      `Navigation to "/" is interrupted by another navigation to "/"`로 여러 건이 깨졌다.
+ *      사용자 화면에서도 같은 일이 일어난다: 실패 3초 뒤에 리로드가 터지면 그 사이 옮겨 간
+ *      화면에서 되돌려진다.
+ *
+ * 기다릴 필요도 없다. 네비게이션은 등록의 **활성** 워커가 처리하므로 `clientsClaim` 없이도
+ * 새 워커가 활성화돼 있으면 리로드가 새 셸을 받는다. `main.tsx`가 부팅 때 `reg.update()`를
+ * 부르므로 대개 그 시점에 이미 설치가 진행 중이다. 아직이라면 두 번째 실패에서 에러 화면이
+ * 뜬다 — 고치기 전과 같은 자리이므로 나빠지지 않는다.
  *
  * ## 왜 한 번뿐인가
  *
@@ -33,9 +46,6 @@
  */
 
 const RETRY_KEY = 'chunk-reload-retried';
-
-/** 새 워커가 활성화되기를 기다리는 상한. 넘기면 그냥 리로드한다. */
-const SW_SWAP_TIMEOUT_MS = 3000;
 
 /**
  * 청크를 받아 오는 데 성공했다 — 재시도 예산을 되돌린다.
@@ -50,28 +60,10 @@ export function noteChunkLoadSuccess(): void {
     } catch { /* sessionStorage를 못 쓰는 환경 — 무시 */ }
 }
 
-async function reloadAfterServiceWorkerUpdate(): Promise<void> {
-    try {
-        const container = typeof navigator !== 'undefined' ? navigator.serviceWorker : undefined;
-        // 워커가 제어하고 있지 않으면 셸은 네트워크에서 온다 — 기다릴 것이 없다.
-        if (container?.controller) {
-            const registration = await container.getRegistration();
-            await registration?.update();
-            await Promise.race([
-                new Promise<void>((resolve) => {
-                    container.addEventListener('controllerchange', () => resolve(), { once: true });
-                }),
-                new Promise<void>((resolve) => { setTimeout(resolve, SW_SWAP_TIMEOUT_MS); }),
-            ]);
-        }
-    } catch { /* 워커가 없거나 갱신이 실패해도 리로드는 한다 */ }
-    window.location.reload();
-}
-
 /**
  * 새 빌드를 받기 위해 **한 번만** 새로고침한다.
  *
- * @returns 리로드를 예약했으면 true. false면 이번 세션의 예산을 이미 썼다는 뜻이므로
+ * @returns 리로드했으면 true. false면 이번 세션의 예산을 이미 썼다는 뜻이므로
  *          호출부는 에러를 그대로 드러내야 한다(두 번째 실패는 배포 문제가 아니다).
  */
 export function retryOnceForNewBuild(): boolean {
@@ -82,6 +74,6 @@ export function retryOnceForNewBuild(): boolean {
         // 예산을 기억하지 못하면 재시도 자체가 무한 루프가 된다
         return false;
     }
-    void reloadAfterServiceWorkerUpdate();
+    window.location.reload();
     return true;
 }
