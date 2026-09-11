@@ -34,6 +34,18 @@ root.innerHTML = `
  * catch가 없던 동안에는 위 "로딩 중..." 화면이 그대로 남아, 회선이 불안정한 환경의
  * 사용자에게는 앱이 죽은 것처럼 보였다(랜딩 청크를 2회 연속 실패시켜 실측).
  * React 없이 그릴 수 있어야 하므로 로딩 화면과 같은 방식으로 직접 마크업을 넣는다.
+ *
+ * ## 자동 새로고침을 넣지 않은 이유 — 해 보고 물렸다
+ *
+ * 이 실패의 **가장 흔한 원인은 네트워크가 아니라 배포**다. 서비스워커가 프리캐시한 옛
+ * index.html이 사라진 해시 청크를 부르면, Hosting의 SPA 리라이트가 index.html을 돌려주고
+ * 브라우저가 text/html을 모듈로 받아 거절한다. 새로고침 한 번이면 새 셸을 받아 풀린다.
+ *
+ * 그래서 한 번 자동으로 새로고침하게 해 봤는데(2026-09-11), CI e2e가 두 번 연속 깨졌다 —
+ * `Navigation to "/" is interrupted by another navigation to "/"`. **부팅 중의 리로드는 그
+ * 시점에 진행 중인 네비게이션을 가로챈다.** 사용자 화면에서도 같은 일이 일어날 수 있어
+ * (막 누른 링크가 취소된다) 되돌렸다. 원인을 못 가린 채로 리로드를 심는 대신, **문구를
+ * 사실대로** 고쳐 사용자가 한 번 누르면 낫게 했다.
  */
 function showBootError(err: unknown) {
     console.error('앱 로드 실패:', err);
@@ -42,7 +54,8 @@ function showBootError(err: unknown) {
     <div style="text-align:center;font-family:system-ui,sans-serif;max-width:320px">
       <p style="color:#fff;font-size:16px;font-weight:600;margin:0 0 8px">앱을 불러오지 못했습니다</p>
       <p style="color:rgba(255,255,255,.75);font-size:14px;line-height:1.6;margin:0 0 20px">
-        네트워크 상태를 확인한 뒤 다시 시도해 주세요.
+        앱이 새 버전으로 바뀌었거나 연결이 잠시 끊겼을 수 있습니다.<br />
+        아래 버튼을 누르면 다시 불러옵니다.
       </p>
       <button id="boot-retry" style="min-height:48px;padding:0 24px;border:0;border-radius:12px;background:#fff;color:#3730a3;font-size:14px;font-weight:600;cursor:pointer">
         다시 시도
