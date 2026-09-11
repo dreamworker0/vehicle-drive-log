@@ -1213,4 +1213,59 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertFails(superAdmin.collection('system').doc('holidays').update({ hacked: true }));
   });
 
+  it('26. 관리자의 주유·충전 기록 정정 — 같은 기관만, 행위자 스탬프는 위조 불가', async () => {
+    // 관리자가 직원 기록의 금액을 고치는 길은 Rules에 원래 열려 있었고(isOrgAdmin 분기),
+    // 화면에도 열렸다. 그래서 '누가 고쳤나'(lastEditedByUid)가 신뢰할 수 있어야 한다 —
+    // 남의 명의로 심을 수 있으면 흔적이 오히려 거짓말이 된다.
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.collection('fuelLogs').doc('f_emp').set({
+        organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'emp_1',
+        date: '2026-09-01', meterReading: 51000, fuelAmount: 40, fuelCost: 60000,
+      });
+      await db.collection('hipassCharges').doc('h_emp').set({
+        organizationId: 'org-A', cardId: 'c_A', chargerUid: 'emp_1',
+        date: '2026-09-01', chargeAmount: 50000, balanceBefore: 10000, balanceAfter: 60000,
+      });
+    });
+
+    const adminA = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+    const adminB = setupContext('admin_B', { role: 'admin', orgId: 'org-B' }).firestore();
+    const empDb = setupContext('emp_1', { role: 'employee', orgId: 'org-A' }).firestore();
+
+    // 같은 기관 관리자: 직원 기록의 금액을 정정하면서 자기 uid를 남긴다
+    await assertSucceeds(adminA.collection('fuelLogs').doc('f_emp').update({
+      fuelAmount: 30, fuelCost: 45000, lastEditedByUid: 'admin_A',
+    }));
+    await assertSucceeds(adminA.collection('hipassCharges').doc('h_emp').update({
+      chargeAmount: 30000, balanceAfter: 40000, lastEditedByUid: 'admin_A',
+    }));
+
+    // 타인 명의 스탬프는 거부된다 — 관리자도, 작성자 본인도 예외가 아니다.
+    // (검사는 '스탬프 값이 바뀔 때'만 돈다. 이미 박혀 있는 값을 그대로 다시 쓰는 것은
+    //  변경이 아니라 통과하며, 이는 actorStampValid의 의도된 설계다 — 스탬프를 심지 않는
+    //  옛 경로가 통째로 막히지 않게 하려고 그렇게 두었다.)
+    await assertFails(adminA.collection('fuelLogs').doc('f_emp').update({
+      fuelCost: 10000, lastEditedByUid: 'emp_1',
+    }));
+    await assertFails(empDb.collection('fuelLogs').doc('f_emp').update({
+      fuelCost: 10000, lastEditedByUid: 'admin_B',
+    }));
+    await assertFails(adminA.collection('hipassCharges').doc('h_emp').update({
+      chargeAmount: 10000, lastEditedByUid: 'emp_1',
+    }));
+
+    // 타 기관 관리자는 애초에 손대지 못한다
+    await assertFails(adminB.collection('fuelLogs').doc('f_emp').update({
+      fuelCost: 1, lastEditedByUid: 'admin_B',
+    }));
+    await assertFails(adminB.collection('hipassCharges').doc('h_emp').update({
+      chargeAmount: 1, lastEditedByUid: 'admin_B',
+    }));
+
+    // 스탬프를 건드리지 않는 수정은 여전히 통과한다 — 스탬프를 심지 않는 옛 경로가
+    // 통째로 막히면 안 된다(actorStampValid가 '변경될 때만' 검사하는 이유).
+    await assertSucceeds(empDb.collection('fuelLogs').doc('f_emp').update({ notes: '영수증 재확인' }));
+  });
+
 });

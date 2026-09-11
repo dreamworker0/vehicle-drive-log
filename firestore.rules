@@ -418,6 +418,9 @@ service cloud.firestore {
                         // organizationId 불변 — admin의 타 기관 이전 차단 (2026-07-10 감사 #6)
                         || (isOrgAdmin(resource.data.organizationId) && request.resource.data.organizationId == resource.data.organizationId)
                     )))
+                    // 관리자가 직원 기록을 정정하는 길이 화면에도 열려 있다(주유일지 관리).
+                    // 그래서 '누가 고쳤나'가 남아야 하고, 그 값이 타인 명의로 위조되면 안 된다.
+                    && actorStampValid()
                     && fieldNonNegativeOnChange('meterReading')
                     && fieldNonNegativeOnChange('fuelAmount')
                     && fieldNonNegativeOnChange('fuelCost');
@@ -443,6 +446,8 @@ service cloud.firestore {
                         // organizationId 불변 — admin의 타 기관 이전 차단 (2026-07-10 감사 #6)
                         || (isOrgAdmin(resource.data.organizationId) && request.resource.data.organizationId == resource.data.organizationId)
                     )))
+                    // 주유 기록과 같은 이유 — 관리자 정정 경로가 열려 있으므로 행위자를 남긴다.
+                    && actorStampValid()
                     && fieldNonNegativeOnChange('chargeAmount');
       allow delete: if (belongsToMyOrg()
                     && (resource.data.chargerUid == request.auth.uid

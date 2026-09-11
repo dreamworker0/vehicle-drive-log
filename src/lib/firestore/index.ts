@@ -193,5 +193,6 @@ export {
     getAllHipassCharges,
     getHipassCharges,
     createHipassCharge,
+    updateHipassCharge,
     deleteHipassCharge,
 } from './hipassCharges';

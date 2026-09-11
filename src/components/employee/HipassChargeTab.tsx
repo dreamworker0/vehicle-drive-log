@@ -5,6 +5,7 @@
 import useHipassCharge from '../../hooks/useHipassCharge';
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
 import { SkeletonBox, SkeletonList } from '../common/Skeleton';
+import AdminEditedBadge from '../common/AdminEditedBadge';
 import { stripNegative } from '../../hooks/utils/numberValidation';
 
 export default function HipassChargeTab() {
@@ -209,6 +210,7 @@ export default function HipassChargeTab() {
                                                         +{rec.chargeAmount?.toLocaleString()}원
                                                     </span>
                                                     <span className="text-xs text-surface-400 dark:text-surface-500">{rec.chargerName}</span>
+                                                    <AdminEditedBadge lastEditedByUid={rec.lastEditedByUid} ownerUid={rec.chargerUid} />
                                                 </div>
                                                 <p className="text-xs text-surface-400 dark:text-surface-500 mt-0.5">
                                                     {rec.date} · 잔액 {rec.balanceBefore?.toLocaleString()} → {rec.balanceAfter?.toLocaleString()}원

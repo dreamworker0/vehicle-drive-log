@@ -1,22 +1,47 @@
 /**
  * useHipassChargeAdmin — 관리자용 하이패스 충전 기록 관리 훅
  * useFuelLogAdmin 패턴 기반
+ *
+ * ## 관리자 정정(수정)
+ * 주유 기록과 같은 이유로 관리자가 직원의 충전 기록을 고칠 수 있다
+ * (배경은 useFuelLogAdmin 주석 참고). 다른 점은 **카드 잔액**이다 — 충전 기록은
+ * 생성 시 카드 잔액을 그만큼 올리므로(useHipassCharge), 금액을 고치면 잔액도 같이
+ * 맞춰야 앱이 들고 있는 잔액이 거짓이 되지 않는다. 차액은 저장 시 확인창에 그대로
+ * 보여 주고, 카드가 이미 삭제됐으면 기록만 고친다.
+ *
+ * 충전자(chargerUid·chargerName)와 카드는 바꾸지 않는다 — 기록의 정체성이라
+ * 틀렸다면 삭제 후 재등록이 맞다.
  */
 import { useState, useMemo } from 'react';
 import { useAuth } from './useAuth';
+import { useToast } from './useToast';
+import { useConfirm } from './useConfirm';
 import type { HipassCharge } from '../types/hipassCharge';
 import useBaseHipassCharge from './base/useBaseHipassCharge';
+import { updateHipassCharge, updateHipassCard } from '../lib/firestore';
+import { validateNonNegativeFields } from './utils/numberValidation';
+
+/** 수정 폼 값 — 입력 중에는 문자열로 다룬다(저장 직전에 숫자로 바꾼다). */
+export interface HipassChargeEditForm {
+    date: string;
+    chargeAmount: string;
+}
+
+const EMPTY_FORM: HipassChargeEditForm = { date: '', chargeAmount: '' };
 
 export default function useHipassChargeAdmin() {
-    const { userData } = useAuth();
+    const { user, userData } = useAuth();
     const orgId = userData?.organizationId;
+    const { showToast } = useToast();
+    const { confirm } = useConfirm();
 
-    const { 
-        vehicles, 
-        records, 
-        loading, 
-        calculateTotalCharge, 
-        handleDeleteBase 
+    const {
+        vehicles,
+        cards, setCards,
+        records, setRecords,
+        loading,
+        calculateTotalCharge,
+        handleDeleteBase
     } = useBaseHipassCharge(orgId ? orgId : undefined, { isAdmin: true });
 
     const [filters, setFilters] = useState({
@@ -25,6 +50,11 @@ export default function useHipassChargeAdmin() {
         startDate: '',
         endDate: '',
     });
+
+    // 수정 상태 — 편집 중인 기록과 폼
+    const [editingRecord, setEditingRecord] = useState<HipassCharge | null>(null);
+    const [form, setForm] = useState<HipassChargeEditForm>(EMPTY_FORM);
+    const [saving, setSaving] = useState(false);
 
     const filteredRecords = useMemo(() => {
         return records
@@ -98,11 +128,106 @@ export default function useHipassChargeAdmin() {
         await handleDeleteBase(rec);
     };
 
+    // ── 기록 정정 ──
+
+    const handleEdit = (rec: HipassCharge) => {
+        setEditingRecord(rec);
+        setForm({ date: rec.date, chargeAmount: String(rec.chargeAmount || '') });
+    };
+
+    const handleCancelEdit = () => {
+        setEditingRecord(null);
+        setForm(EMPTY_FORM);
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingRecord) return;
+
+        if (!form.date || !form.chargeAmount) {
+            showToast('날짜와 충전금액을 입력해주세요.', 'warning');
+            return;
+        }
+
+        const negativeError = validateNonNegativeFields([{ label: '충전금액', value: form.chargeAmount }]);
+        if (negativeError) {
+            showToast(negativeError, 'warning');
+            return;
+        }
+
+        const amount = parseInt(form.chargeAmount);
+        if (isNaN(amount) || amount <= 0) {
+            showToast('올바른 충전금액을 입력해주세요.', 'warning');
+            return;
+        }
+
+        const delta = amount - (editingRecord.chargeAmount || 0);
+        const card = cards.find(c => c.id === editingRecord.cardId);
+
+        // 금액이 바뀌면 카드 잔액도 그만큼 어긋난다 — 얼마가 어떻게 바뀌는지 미리 보여 준다.
+        if (delta !== 0) {
+            const sign = delta > 0 ? '+' : '−';
+            const message = card
+                ? `충전금액을 ${(editingRecord.chargeAmount || 0).toLocaleString()}원 → ${amount.toLocaleString()}원으로 수정합니다.\n`
+                  + `카드(${editingRecord.cardNumber}) 잔액도 함께 조정됩니다: `
+                  + `${card.balance.toLocaleString()}원 → ${Math.max(0, card.balance + delta).toLocaleString()}원 (${sign}${Math.abs(delta).toLocaleString()}원)`
+                : `충전금액을 ${(editingRecord.chargeAmount || 0).toLocaleString()}원 → ${amount.toLocaleString()}원으로 수정합니다.\n`
+                  + '연결된 카드를 찾을 수 없어 카드 잔액은 조정되지 않습니다.';
+            if (!await confirm({ message, confirmText: '수정' })) return;
+        }
+
+        setSaving(true);
+        try {
+            // balanceAfter는 '충전 전 잔액 + 충전금액'이라는 그 시점의 계산 결과다 —
+            // 금액을 고치면 이 값도 같이 맞춰야 기록 안에서 앞뒤가 맞는다.
+            const payload = {
+                date: form.date,
+                chargeAmount: amount,
+                balanceAfter: (editingRecord.balanceBefore || 0) + amount,
+            };
+
+            await updateHipassCharge(editingRecord.id, payload);
+
+            // 잔액 조정은 별도로 잡는다 — 기록 쓰기는 이미 성공했으므로 여기서 통째로
+            // "수정 실패"라고 알리면 거짓말이 된다. 어긋난 것이 잔액뿐임을 그대로 말한다.
+            let balanceAdjusted = true;
+            if (delta !== 0 && card) {
+                const newBalance = Math.max(0, card.balance + delta);
+                try {
+                    await updateHipassCard(card.id, { balance: newBalance });
+                    setCards(prev => prev.map(c => (c.id === card.id ? { ...c, balance: newBalance } : c)));
+                } catch (err) {
+                    balanceAdjusted = false;
+                    console.error('카드 잔액 조정 실패:', err);
+                }
+            }
+
+            // 목록을 다시 읽지 않고 그 자리만 갱신한다(읽기 비용 절약).
+            setRecords(prev => prev.map(r => (
+                r.id === editingRecord.id ? { ...r, ...payload, lastEditedByUid: user?.uid } : r
+            )));
+            if (balanceAdjusted) {
+                showToast('충전 기록이 수정되었습니다.', 'success');
+            } else {
+                showToast('기록은 수정됐지만 카드 잔액 조정에 실패했습니다. [하이패스 관리]에서 잔액을 확인해주세요.', 'warning');
+            }
+            handleCancelEdit();
+        } catch (err) {
+            console.error('충전 기록 수정 실패:', err);
+            showToast('수정에 실패했습니다.', 'error');
+        } finally {
+            setSaving(false);
+        }
+    };
+
     return {
         vehicles, loading,
         filters, setFilters, resetFilters,
         filteredRecords, totalChargeAmount,
         monthlyTrend, cardStats, vehicleStats,
         handleDelete,
+        // 정정
+        editingRecord, form, setForm, saving,
+        handleEdit, handleCancelEdit, handleSubmit,
     };
 }

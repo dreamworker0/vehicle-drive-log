@@ -37,12 +37,16 @@ export default function useBaseHipassCharge(orgId: string | undefined, options?:
         const fetchInitial = async () => {
             try {
                 if (isAdmin) {
-                    const [vReq, rReq] = await Promise.allSettled([
+                    // 카드까지 읽는 이유: 관리자가 충전금액을 정정하면 카드 잔액도 그만큼
+                    // 어긋난다. 잔액을 함께 맞추려면 현재 잔액을 알고 있어야 한다.
+                    const [vReq, rReq, cReq] = await Promise.allSettled([
                         getVehicles(orgId),
-                        getAllHipassCharges(orgId)
+                        getAllHipassCharges(orgId),
+                        getHipassCards(orgId)
                     ]);
                     if (isMounted && vReq.status === 'fulfilled') setVehicles(vReq.value as Vehicle[]);
                     if (isMounted && rReq.status === 'fulfilled') setRecords(rReq.value as HipassCharge[]);
+                    if (isMounted && cReq.status === 'fulfilled') setCards(cReq.value as HipassCard[]);
                 } else {
                     const [cReq, vReq] = await Promise.allSettled([
                         getHipassCards(orgId),

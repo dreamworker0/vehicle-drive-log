@@ -30,6 +30,13 @@ export const hipassChargeSchema = z.object({
     balanceBefore: z.coerce.number().catch(0),
     /** 충전 후 잔액 */
     balanceAfter: z.coerce.number().catch(0),
+    /**
+     * 마지막으로 이 기록을 고친 사람의 UID(행위자 스탬프).
+     *
+     * 관리자가 직원의 기록을 대신 정정할 수 있어 '충전자'와 수정자가 달라질 수 있다.
+     * 자세한 이유는 `src/schemas/fuelLog.ts`의 같은 필드 주석을 본다.
+     */
+    lastEditedByUid: z.string().optional().catch(undefined),
     createdAt: timestampSchema.optional(),
     updatedAt: timestampSchema.optional(),
 });
