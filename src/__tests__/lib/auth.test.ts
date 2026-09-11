@@ -163,15 +163,14 @@ describe('의도적 로그아웃 표시', () => {
         expect(markedWhenSignOutCalled).toBe(true);
     });
 
-    it('다른 탭이 볼 수 있도록 스토리지에도 남긴다 (한 탭의 로그아웃이 다른 탭을 끌고 간다)', async () => {
-        const { markIntentionalLogout } = await import('@/lib/auth');
-        markIntentionalLogout();
-        expect(localStorage.getItem('vdl:intentional-logout')).not.toBeNull();
-    });
+    it('로그아웃하면 재방문 힌트도 내린다 (정상 로그아웃이 세션 소실로 오탐되지 않게)', async () => {
+        localStorage.setItem('vdl:returning-visitor', '1');
+        const { logout } = await import('@/lib/auth');
 
-    it('창을 벗어난 옛 표시는 무시한다 (나중의 진짜 세션 소멸을 덮지 않게)', async () => {
-        localStorage.setItem('vdl:intentional-logout', String(Date.now() - 60_000));
-        const { wasIntentionalLogout } = await import('@/lib/auth');
-        expect(wasIntentionalLogout()).toBe(false);
+        await logout();
+
+        expect(localStorage.getItem('vdl:returning-visitor')).toBeNull();
     });
 });
+
+// 표식 자체의 계약(스토리지 기록·유효창)은 소유 모듈인 sessionBoot의 테스트에 있다.

@@ -7,14 +7,12 @@
  * ⚠️ 이 모듈은 경량 경로(비인증 사용자)에서만 사용해야 함.
  * 인증 후 전체 앱에서는 반드시 firebase.ts의 auth를 사용할 것.
  *
- * ⚠️ setPersistence(browserLocalPersistence) 호출이 필수.
- * 이를 호출하지 않으면 main.tsx에서 authReady가 즉시 resolve되어
- * onAuthStateChanged 첫 콜백 시점에 IndexedDB 세션 복원이 완료되지 않아
- * user=null로 판단 → 새 탭에서 로그아웃되는 버그가 발생한다.
- * iOS Safari ITP 대응도 이 호출로 처리된다.
+ * ⚠️ `authReady`를 await한 뒤에 onAuthStateChanged를 구독해야 한다.
+ * 그러지 않으면 첫 콜백 시점에 저장소 세션 복원이 끝나지 않아 user=null로 판단하고
+ * 새 탭에서 로그아웃되는 버그가 난다 (그것이 이 export의 존재 이유다).
  */
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth, initializeAuth, browserLocalPersistence, indexedDBLocalPersistence, setPersistence, connectAuthEmulator } from 'firebase/auth';
+import { getAuth, initializeAuth, indexedDBLocalPersistence, connectAuthEmulator } from 'firebase/auth';
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -45,36 +43,33 @@ if (
 ) {
     connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
 }
-// setPersistence 완료를 기다려야 새 탭에서 IndexedDB 세션 복원이 보장됨
-// (window 없는 컨텍스트는 위에서 indexedDB persistence로 이미 초기화 완료)
-//
-// ## authStateReady()를 이어 붙인 이유 — 이전(migration) 구간을 관측하지 않게 한다
-//
-// `getAuth()`는 기본 persistence 스택 `[IndexedDB, localStorage, sessionStorage]`로 초기화된다
-// (IndexedDB가 1순위). 그 뒤에 부르는 `setPersistence(browserLocalPersistence)`는 단순 설정
-// 변경이 아니라 **이전**이다 — 세션이 IndexedDB에 있으면 읽어서 **지우고**(removeCurrentUser)
-// localStorage에 다시 쓴다. 프로덕션 스택 트레이스로 확인했다:
-//   setPersistence → removeCurrentUser → _remove → _withPendingWrite → IndexedDB
-//
-// 그 구간에는 currentUser도 토큰도 없다. 결과가 두 갈래로 나타났다.
-//   ① onAuthStateChanged가 null을 흘려 로그인/랜딩 화면이 번쩍 뜬다
-//   ② 그 사이 진행된 Firestore 작업이 전부 permission-denied로 실패한다
-//      (예약 조회·차량 사용 빈도·예약 패턴·휴일 정보·기관 상태 감시가 한꺼번에 깨졌다)
-// ②가 본질이다 — 깜빡임이 아니라 화면이 빈다. 세션이 이미 localStorage에 있으면
-// setPersistence가 no-op이라 **간헐적**으로만 재현된다.
-//
-// `authStateReady()`는 초기 인증 상태가 확정될 때까지 기다린다. main.tsx와 useAuth가 모두
-// `authReady`를 await한 뒤에야 움직이므로, 이 한 줄로 **이전 구간이 닫힌 뒤에** 구독과
-// Firestore 작업이 시작된다 — 그 구간의 null을 아무도 관측하지 않는다.
-//
-// ⚠️ persistence를 바꾸지 않은 것은 의도다. `setPersistence`를 제거해 기본 스택(IndexedDB)에
-// 맡기면 이전 자체가 사라지지만, 세션 저장 위치가 옮겨져 **기존 사용자가 1회 로그아웃될**
-// 위험이 있다. 증상을 없애는 데는 대기만으로 충분하므로 그 위험을 지지 않았다.
-export const authReady = isWindowContext
-    ? setPersistence(auth, browserLocalPersistence)
-        .catch((err) => {
-            console.warn('[Auth] persistence 설정 실패:', err);
-        })
-        .then(() => auth.authStateReady())
-    : Promise.resolve();
 
+/**
+ * 초기 인증 상태가 확정될 때까지 기다린다. 구독·Firestore 작업은 전부 이 뒤에서 시작한다.
+ *
+ * ## setPersistence(browserLocalPersistence)를 부르지 않는 이유 — 세션을 가장 약한 곳에 두게 된다
+ *
+ * `getAuth()`는 기본 우선순위 `[IndexedDB, localStorage, sessionStorage]`로 초기화된다.
+ * 예전에는 그 뒤에 `setPersistence(browserLocalPersistence)`를 불러 **저장 위치를 localStorage로
+ * 고정**했다. 그런데 그 호출은 설정 변경이 아니라 **이전**이다 — 세션이 IndexedDB에 있으면
+ * 읽어서 **지우고** localStorage에 다시 쓴다. 프로덕션 스택 트레이스로 확인했다:
+ *   setPersistence → removeCurrentUser → _remove → _withPendingWrite → IndexedDB
+ *
+ * 그래서 두 가지가 겹쳤다.
+ *   ① 부팅마다 세션이 어느 쪽에도 없는 구간이 생긴다(로그인 화면 플래시·permission-denied 폭풍)
+ *   ② 사본이 localStorage 한 곳에만 남는다 — 그리고 **모바일에서 그게 가장 먼저 날아간다**
+ *
+ * ②가 휴대폰 PWA의 "잠깐 뒀다 다시 열었더니 로그아웃"의 경로다. Firebase의 localStorage
+ * 구현은 모바일이면 storage 이벤트 대신 **1초 폴링**으로 바뀌고(`fallbackToPolling =
+ * _isMobileBrowser()`), 그 읽기가 한 번이라도 비면 재시도나 다른 저장소 조회 없이
+ * `_updateCurrentUser(null)` — 즉 로그아웃으로 직행한다. 기본값(IndexedDB)은 그 경로를 타지 않고,
+ * 설령 IndexedDB를 못 쓰는 환경이어도 우선순위 목록이 localStorage로 알아서 내려간다.
+ *
+ * **기존 사용자는 로그아웃되지 않는다.** `PersistenceUserManager.create`는 우선순위 목록
+ * **전체**를 뒤져 세션을 찾고, 찾으면 1순위(IndexedDB)에 옮겨 쓴 뒤 나머지를 지운다
+ * (@firebase/auth). localStorage에 있던 세션은 첫 부팅에서 그대로 이관된다.
+ *
+ * 원래 `setPersistence`가 막으려던 "새 탭 로그아웃"은 아래 `authStateReady()`를 await하는 것이
+ * 막는다 — 그쪽이 진짜 처방이었다.
+ */
+export const authReady = isWindowContext ? auth.authStateReady() : Promise.resolve();

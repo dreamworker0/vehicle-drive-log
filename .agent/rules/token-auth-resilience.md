@@ -8,8 +8,10 @@ description: Firebase Auth 토큰 만료 및 갱신, 세션 유지와 관련된 
 
 ## 1. 세션 유지 (Persistence) 설정
 
-- `src/lib/firebase.ts`에서 Auth 인스턴스 초기화 시 명시적으로 `browserLocalPersistence`를 설정한다.
-- iOS Safari ITP(Intelligent Tracking Prevention)로 인해 세션 유지가 꼬이는 것을 방지하기 위해, 초기 렌더링을 차단하더라도 `setPersistence`가 완료된 후 상태 구독을 시작하도록 설계한다.
+- **`setPersistence`를 부르지 않는다.** `getAuth()`의 기본 우선순위 `[IndexedDB, localStorage, sessionStorage]`를 그대로 쓴다 (`src/lib/firebaseAuth.ts`).
+- 예전에는 `setPersistence(browserLocalPersistence)`로 저장 위치를 localStorage에 고정했는데, 그게 정확히 모바일에서 세션이 날아가는 경로였다. Firebase의 localStorage 구현은 모바일이면 storage 이벤트 대신 **1초 폴링**으로 바뀌고(`fallbackToPolling = _isMobileBrowser()`), 그 읽기가 한 번이라도 비면 재시도나 다른 저장소 조회 없이 `_updateCurrentUser(null)` — 로그아웃으로 직행한다. 게다가 그 호출은 **이전**이라 부팅마다 IndexedDB 사본을 지워, 남는 사본이 가장 약한 저장소 한 곳뿐이 된다.
+- 초기 렌더링을 차단하더라도 **`auth.authStateReady()`(= `authReady`)가 끝난 뒤에** 상태 구독을 시작한다. "새 탭에서 로그아웃"을 막는 것은 persistence 지정이 아니라 이 대기다.
+- 저장 위치는 E2E로 고정돼 있다 — `e2e/authed-smoke.spec.ts`의 "세션은 IndexedDB에 저장된다".
 
 ## 2. 토큰 강제 갱신 로직 (Token Refresh)
 

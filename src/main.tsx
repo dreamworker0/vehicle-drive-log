@@ -12,6 +12,7 @@
  */
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, authReady } from './lib/firebaseAuth';
+import { readReturningHint, writeReturningHint, noteUnauthenticatedBoot } from './lib/sessionBoot';
 import './index.css';
 
 // 로딩 표시 (Auth 상태 확인 중)
@@ -71,31 +72,6 @@ if ('serviceWorker' in navigator) {
 }
 
 /**
- * 이전에 로그인한 적이 있는 브라우저인지 표시하는 힌트.
- *
- * appEntry 프리로드를 **누구에게 걸지** 정하는 데만 쓴다. 인증 판정은 여전히
- * `onAuthStateChanged`가 하며, 이 값이 틀려도(로그아웃 뒤 남아 있거나 지워졌거나)
- * 화면 동작은 달라지지 않는다 — 프리로드가 한 번 헛돌거나 한 번 늦을 뿐이다.
- */
-const RETURNING_VISITOR_KEY = 'vdl:returning-visitor';
-
-function readReturningHint(): boolean {
-    try {
-        return localStorage.getItem(RETURNING_VISITOR_KEY) === '1';
-    } catch {
-        // 시크릿 모드·저장소 차단 환경 — 첫 방문으로 취급한다(더 가벼운 쪽)
-        return false;
-    }
-}
-
-function writeReturningHint(value: boolean) {
-    try {
-        if (value) localStorage.setItem(RETURNING_VISITOR_KEY, '1');
-        else localStorage.removeItem(RETURNING_VISITOR_KEY);
-    } catch { /* 저장소를 못 쓰면 힌트 없이 동작한다 */ }
-}
-
-/**
  * Auth 상태 확인과 병렬로 appEntry 번들을 미리 로드 (추측적 프리로드).
  *
  * 예전에는 **무조건** 걸었다. 재방문(인증) 비중이 ~80%라는 근거였는데, 나머지 20%인
@@ -132,8 +108,9 @@ authReady.then(() => {
                 const { renderFullApp } = await (appEntryPreload ?? import('./appEntry'));
                 renderFullApp();
             } else {
-                // 로그아웃했거나 애초에 로그인한 적이 없는 브라우저 — 다음 방문도 가볍게 연다
-                writeReturningHint(false);
+                // 표식을 정리하고, 세션이 있었어야 하는 기기였다면 증거를 남긴다.
+                // (다음 방문을 가볍게 여는 것도 이 안에서 함께 한다 — 순서가 계약이 되지 않게)
+                noteUnauthenticatedBoot();
                 // 비인증 사용자 → 경량 앱 로드
                 const { renderLightApp } = await import('./lightEntry');
                 renderLightApp();
