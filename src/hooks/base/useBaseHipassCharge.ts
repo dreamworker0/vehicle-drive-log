@@ -111,22 +111,29 @@ export default function useBaseHipassCharge(orgId: string | undefined, options?:
         try {
             await deleteHipassCharge(rec.id);
 
-            // 잔액 복원 업데이트
-            if (rollbackBalance) {
-                setCards(prevCards => {
-                    const card = prevCards.find(c => c.id === rec.cardId);
-                    if (card) {
-                        const newBalance = Math.max(0, card.balance - rec.chargeAmount);
-                        // 백그라운드 DB 업데이트 (에러처리만 가볍게)
-                        updateHipassCard(card.id, { balance: newBalance }).catch(console.error);
-                        return prevCards.map(c => c.id === card.id ? { ...c, balance: newBalance } : c);
-                    }
-                    return prevCards;
-                });
+            // 잔액 복원 — 상태 업데이터 **밖에서** 계산한다.
+            // 예전에는 `setCards(prev => ...)` 안에서 Firestore 쓰기를 불렀는데, 업데이터는
+            // 순수해야 한다(StrictMode는 개발 중 두 번 실행한다 — 쓰기도 두 번 나간다).
+            let balanceRolledBack = true;
+            const card = rollbackBalance ? cards.find(c => c.id === rec.cardId) : undefined;
+            if (card) {
+                const newBalance = Math.max(0, card.balance - rec.chargeAmount);
+                try {
+                    await updateHipassCard(card.id, { balance: newBalance });
+                    setCards(prev => prev.map(c => (c.id === card.id ? { ...c, balance: newBalance } : c)));
+                } catch (err) {
+                    // 기록 삭제는 이미 성공했다 — 통째로 "삭제 실패"라고 하면 거짓말이 된다.
+                    balanceRolledBack = false;
+                    console.error('카드 잔액 되돌리기 실패:', err);
+                }
             }
 
             setRecords(prev => prev.filter(r => r.id !== rec.id));
-            showToast('충전 기록이 삭제되었습니다.', 'success');
+            if (balanceRolledBack) {
+                showToast('충전 기록이 삭제되었습니다.', 'success');
+            } else {
+                showToast('기록은 삭제됐지만 카드 잔액을 되돌리지 못했습니다. [하이패스 관리]에서 잔액을 확인해주세요.', 'warning');
+            }
             onSuccess?.();
             return true;
         } catch (err) {
@@ -134,7 +141,10 @@ export default function useBaseHipassCharge(orgId: string | undefined, options?:
             showToast('삭제에 실패했습니다.', 'error');
             return false;
         }
-    }, [confirm, showToast]);
+        // cards가 의존성에 있는 이유: 잔액 계산을 상태 업데이터 밖으로 뺐기 때문이다.
+        // 이벤트 핸들러는 직전 렌더의 값을 보는데, React는 다음 이벤트 전에 렌더를 끝내므로
+        // 여기서 읽는 cards는 화면에 보이는 잔액과 같다.
+    }, [cards, confirm, showToast]);
 
     return {
         vehicles, setVehicles,

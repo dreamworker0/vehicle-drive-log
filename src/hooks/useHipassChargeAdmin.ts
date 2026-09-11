@@ -19,7 +19,7 @@ import { useConfirm } from './useConfirm';
 import type { HipassCharge } from '../types/hipassCharge';
 import useBaseHipassCharge from './base/useBaseHipassCharge';
 import { updateHipassCharge, updateHipassCard } from '../lib/firestore';
-import { validateNonNegativeFields } from './utils/numberValidation';
+import { validateNonNegativeFields, parseIntegerInput } from './utils/numberValidation';
 
 /** 수정 폼 값 — 입력 중에는 문자열로 다룬다(저장 직전에 숫자로 바꾼다). */
 export interface HipassChargeEditForm {
@@ -125,7 +125,11 @@ export default function useHipassChargeAdmin() {
     const resetFilters = () => setFilters({ search: '', vehicleId: '', startDate: '', endDate: '' });
 
     const handleDelete = async (rec: HipassCharge) => {
-        await handleDeleteBase(rec);
+        // 관리자 삭제도 카드 잔액을 되돌린다. 정정(수정)은 차액만큼 잔액을 맞추면서 삭제는
+        // 그대로 두면, **같은 화면에서 어느 버튼을 누르느냐에 따라 잔액이 맞기도 하고
+        // 틀리기도 한다.** 직원 삭제는 원래 되돌리고 있었으므로 그쪽과도 어긋나 있었다.
+        // 본인 확인(checkingUid)은 넘기지 않는다 — 관리자는 기관 전체 기록을 지운다.
+        await handleDeleteBase(rec, { rollbackBalance: true });
     };
 
     // ── 기록 정정 ──
@@ -157,10 +161,7 @@ export default function useHipassChargeAdmin() {
             return;
         }
 
-        // parseInt가 아니라 Number로 읽는다 — `<input type="number">`는 지수 표기('1e5')도
-        // 유효한 값으로 넘기는데, parseInt는 그것을 1로 읽어 **100,000원이 1원으로 조용히**
-        // 저장된다(limitFuelDecimals가 같은 함정을 주석으로 남겨 둔 그 경로다).
-        const amount = Math.trunc(Number(form.chargeAmount));
+        const amount = parseIntegerInput(form.chargeAmount);
         if (isNaN(amount) || amount <= 0) {
             showToast('올바른 충전금액을 입력해주세요.', 'warning');
             return;

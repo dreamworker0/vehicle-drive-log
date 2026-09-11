@@ -12,6 +12,7 @@ import {
 } from '../lib/firestore';
 import { toLocalDateStr } from '../lib/dateUtils';
 import useBaseHipassCharge from './base/useBaseHipassCharge';
+import { parseIntegerInput } from './utils/numberValidation';
 
 const INITIAL_FORM = {
     date: toLocalDateStr(),
@@ -59,7 +60,7 @@ export default function useHipassCharge() {
     // 충전 후 예상 잔액
     const balanceAfter = useMemo(() => {
         if (!selectedCard || !form.chargeAmount) return null;
-        const amount = parseInt(form.chargeAmount);
+        const amount = parseIntegerInput(form.chargeAmount);
         if (isNaN(amount) || amount <= 0) return null;
         return selectedCard.balance + amount;
     }, [selectedCard, form.chargeAmount]);
@@ -90,7 +91,7 @@ export default function useHipassCharge() {
             showToast('모든 필수 항목을 입력해주세요.', 'warning');
             return;
         }
-        const amount = parseInt(form.chargeAmount);
+        const amount = parseIntegerInput(form.chargeAmount);
         if (isNaN(amount) || amount <= 0) {
             showToast('올바른 충전금액을 입력해주세요.', 'warning');
             return;
