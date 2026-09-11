@@ -40,12 +40,15 @@ async function readAuthStorage(page: Page) {
             req.onsuccess = () => resolve(req.result);
             req.onerror = () => reject(req.error);
         });
-        const keys = await new Promise<IDBValidKey[]>((resolve, reject) => {
-            const req = db.transaction('firebaseLocalStorage', 'readonly')
-                .objectStore('firebaseLocalStorage').getAllKeys();
-            req.onsuccess = () => resolve(req.result);
-            req.onerror = () => reject(req.error);
-        });
+        // 앱이 부팅하기 전이면 DB만 있고 스토어가 없다 — 던지면 expect.poll이 재시도하지 못한다.
+        const keys = db.objectStoreNames.contains('firebaseLocalStorage')
+            ? await new Promise<IDBValidKey[]>((resolve, reject) => {
+                const req = db.transaction('firebaseLocalStorage', 'readonly')
+                    .objectStore('firebaseLocalStorage').getAllKeys();
+                req.onsuccess = () => resolve(req.result);
+                req.onerror = () => reject(req.error);
+            })
+            : [];
         db.close();
         return {
             idb: keys.map(String).filter((k) => k.startsWith('firebase:authUser:')).length,
@@ -117,15 +120,20 @@ test.describe('인증 상태 E2E (에뮬레이터)', () => {
      * 쓰기 때문에 그런 일이 없어야 하는데(@firebase/auth), 코드를 읽은 것에 더해 실제로도
      * 그런지 본다.
      *
-     * 옛 상태를 만든다 — IndexedDB의 세션을 localStorage로 옮기고 원본을 지운 뒤 새로고침.
+     * **살아 있는 탭의 저장소를 건드리지 않는다.** 처음에는 이 탭에서 세션을 옮기고
+     * 새로고침했는데, 지우는 순간 앱이 그 자리에서 로그아웃 처리를 시작해(IndexedDB
+     * 폴링 → 유예 → /login 리다이렉트) 새로고침과 경쟁했다. 로컬에서는 통과하고 CI에서
+     * `net::ERR_ABORTED`로 깨졌다. 대신 **옛 상태를 그대로 심은 새 브라우저 컨텍스트**를
+     * 띄운다 — 세션이 localStorage에만 있는 채로 앱이 처음 부팅하는, 바로 그 상황이다.
      */
-    test('예전 빌드가 localStorage에 남긴 세션은 그대로 이관된다 (기존 사용자 강제 로그아웃 없음)', async ({ page }) => {
+    test('예전 빌드가 localStorage에 남긴 세션은 그대로 이관된다 (기존 사용자 강제 로그아웃 없음)', async ({ page, browser }) => {
         await signIn(page, TEST_EMPLOYEE.email, TEST_EMPLOYEE.password);
         await page.waitForURL(/\/employee/, { timeout: 25000 });
         await expect.poll(() => readAuthStorage(page), { timeout: 15000 })
             .toEqual({ idb: 1, localStorage: 0 });
 
-        const movedKey = await page.evaluate(async () => {
+        // 세션 사본을 읽기만 한다(이 탭은 그대로 둔다)
+        const session = await page.evaluate(async () => {
             const db = await new Promise<IDBDatabase>((resolve, reject) => {
                 const req = indexedDB.open('firebaseLocalStorageDb');
                 req.onsuccess = () => resolve(req.result);
@@ -137,28 +145,33 @@ test.describe('인증 상태 E2E (에뮬레이터)', () => {
                 req.onsuccess = () => resolve(req.result);
                 req.onerror = () => reject(req.error);
             });
-            const record = records.find((r) => r.fbase_key.startsWith('firebase:authUser:'));
-            if (!record) return null;
-
-            localStorage.setItem(record.fbase_key, JSON.stringify(record.value));
-            await new Promise<void>((resolve, reject) => {
-                const req = db.transaction('firebaseLocalStorage', 'readwrite')
-                    .objectStore('firebaseLocalStorage').delete(record.fbase_key);
-                req.onsuccess = () => resolve();
-                req.onerror = () => reject(req.error);
-            });
             db.close();
-            return record.fbase_key;
+            const record = records.find((r) => r.fbase_key.startsWith('firebase:authUser:'));
+            return record ? { key: record.fbase_key, value: JSON.stringify(record.value) } : null;
         });
-        expect(movedKey).not.toBeNull();
+        expect(session).not.toBeNull();
 
-        await page.reload();
+        // 옛 빌드가 남긴 상태 그대로 — localStorage에만 세션이 있는 새 컨텍스트
+        const origin = new URL(page.url()).origin;
+        const legacy = await browser.newContext({
+            baseURL: origin,
+            storageState: {
+                cookies: [],
+                origins: [{ origin, localStorage: [{ name: session!.key, value: session!.value }] }],
+            },
+        });
+        try {
+            const legacyPage = await legacy.newPage();
+            await legacyPage.goto('/employee/today');
 
-        // 이관은 부팅 중에 일어난다. URL은 그대로라 대기 조건이 못 되므로 저장소로 확인한다.
-        await expect.poll(() => readAuthStorage(page), { timeout: 20000 })
-            .toEqual({ idb: 1, localStorage: 0 });
+            // 이관은 부팅 중에 일어난다 — 저장소로 확인한다
+            await expect.poll(() => readAuthStorage(legacyPage), { timeout: 25000 })
+                .toEqual({ idb: 1, localStorage: 0 });
 
-        // 세션이 사라졌다면 AuthGuard가 /login으로 보냈을 것이다 — 남아 있다.
-        await expect(page).toHaveURL(/\/employee/);
+            // 세션을 못 읽었다면 AuthGuard가 /login으로 보냈을 것이다 — 남아 있다
+            await expect(legacyPage).toHaveURL(/\/employee/);
+        } finally {
+            await legacy.close();
+        }
     });
 });
