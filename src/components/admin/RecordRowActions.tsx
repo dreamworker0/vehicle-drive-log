@@ -19,7 +19,7 @@ export default memo(function RecordRowActions({ onEdit, onDelete, className = 'j
         <div className={`flex items-center ${className}`}>
             <button
                 onClick={onEdit}
-                className="p-1.5 rounded-lg text-surface-300 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors min-h-[48px] min-w-[38px] flex items-center justify-center"
+                className="p-1.5 rounded-lg text-surface-300 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors min-h-[48px] min-w-[44px] flex items-center justify-center"
                 title="수정"
                 aria-label="기록 수정"
             >
@@ -29,7 +29,7 @@ export default memo(function RecordRowActions({ onEdit, onDelete, className = 'j
             </button>
             <button
                 onClick={onDelete}
-                className="p-1.5 rounded-lg text-surface-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors min-h-[48px] min-w-[38px] flex items-center justify-center"
+                className="p-1.5 rounded-lg text-surface-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors min-h-[48px] min-w-[44px] flex items-center justify-center"
                 title="삭제"
                 aria-label="기록 삭제"
             >

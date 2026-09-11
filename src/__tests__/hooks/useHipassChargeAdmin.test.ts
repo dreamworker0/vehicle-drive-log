@@ -120,8 +120,37 @@ describe('useHipassChargeAdmin — 관리자 정정', () => {
         await act(async () => { await result.current.handleSubmit(submitEvent()); });
 
         expect(mockConfirm).not.toHaveBeenCalled();
-        expect(mockUpdateHipassCharge).toHaveBeenCalledWith('h1', expect.objectContaining({ date: '2026-09-02' }));
+        expect(mockUpdateHipassCharge).toHaveBeenCalledWith('h1', { date: '2026-09-02', chargeAmount: 50000 });
+        // 충전 후 잔액은 손대지 않는다 — 금액이 그대로인데 다시 계산하면,
+        // balanceBefore가 비어 있는 옛 기록에서 멀쩡하던 값이 지워진다.
+        expect(mockUpdateHipassCharge.mock.calls[0][1]).not.toHaveProperty('balanceAfter');
         expect(mockUpdateHipassCard).not.toHaveBeenCalled();
+    });
+
+    it('충전 전 잔액이 없는 옛 기록도 차액만큼만 움직인다', async () => {
+        // balanceBefore가 0(필드 누락 시 스키마 기본값)인 기록에서 'before + 새 금액'으로
+        // 다시 계산하면 충전 후 잔액이 통째로 틀어진다. 기준은 balanceAfter여야 한다.
+        mockGetAllHipassCharges.mockResolvedValue([{ ...RECORDS[0], balanceBefore: 0, balanceAfter: 80000 }]);
+        const { result } = await renderLoaded();
+
+        act(() => { result.current.handleEdit(result.current.filteredRecords[0] as never); });
+        act(() => { result.current.setForm(f => ({ ...f, chargeAmount: '40000' })); });
+        await act(async () => { await result.current.handleSubmit(submitEvent()); });
+
+        // 50,000 → 40,000이므로 차액 -10,000 → 80,000 - 10,000
+        expect(mockUpdateHipassCharge).toHaveBeenCalledWith('h1', expect.objectContaining({ balanceAfter: 70000 }));
+    });
+
+    it('지수 표기를 1원으로 읽지 않는다', async () => {
+        // `<input type="number">`는 '1e5'를 유효한 값으로 넘긴다. parseInt는 이것을 1로 읽어
+        // 100,000원이 1원으로 저장됐다.
+        const { result } = await renderLoaded();
+
+        act(() => { result.current.handleEdit(RECORDS[0] as never); });
+        act(() => { result.current.setForm(f => ({ ...f, chargeAmount: '1e5' })); });
+        await act(async () => { await result.current.handleSubmit(submitEvent()); });
+
+        expect(mockUpdateHipassCharge).toHaveBeenCalledWith('h1', expect.objectContaining({ chargeAmount: 100000 }));
     });
 
     it('카드가 이미 삭제됐으면 그 사실을 알리고 기록만 고친다', async () => {

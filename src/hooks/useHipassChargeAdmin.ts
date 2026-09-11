@@ -132,7 +132,9 @@ export default function useHipassChargeAdmin() {
 
     const handleEdit = (rec: HipassCharge) => {
         setEditingRecord(rec);
-        setForm({ date: rec.date, chargeAmount: String(rec.chargeAmount || '') });
+        // `|| ''`가 아니라 null 검사다 — 0으로 저장된 옛 기록이 빈 칸으로 채워지면
+        // 필수값 검사에 걸려 그 기록은 아예 고칠 수 없게 된다.
+        setForm({ date: rec.date, chargeAmount: rec.chargeAmount != null ? String(rec.chargeAmount) : '' });
     };
 
     const handleCancelEdit = () => {
@@ -155,7 +157,10 @@ export default function useHipassChargeAdmin() {
             return;
         }
 
-        const amount = parseInt(form.chargeAmount);
+        // parseInt가 아니라 Number로 읽는다 — `<input type="number">`는 지수 표기('1e5')도
+        // 유효한 값으로 넘기는데, parseInt는 그것을 1로 읽어 **100,000원이 1원으로 조용히**
+        // 저장된다(limitFuelDecimals가 같은 함정을 주석으로 남겨 둔 그 경로다).
+        const amount = Math.trunc(Number(form.chargeAmount));
         if (isNaN(amount) || amount <= 0) {
             showToast('올바른 충전금액을 입력해주세요.', 'warning');
             return;
@@ -183,7 +188,11 @@ export default function useHipassChargeAdmin() {
             const payload = {
                 date: form.date,
                 chargeAmount: amount,
-                balanceAfter: (editingRecord.balanceBefore || 0) + amount,
+                // 충전 후 잔액은 **금액이 바뀔 때만** 다시 계산한다. 날짜만 고치는데도
+                // 덮어쓰면, balanceBefore가 비어 있는 옛 기록에서 멀쩡하던 '충전후잔액'이
+                // 지워진다. 기준을 balanceBefore가 아니라 balanceAfter에 두는 이유도 같다 —
+                // 기록이 앞뒤로 어긋나 있어도 차액만큼만 움직인다.
+                ...(delta !== 0 ? { balanceAfter: (editingRecord.balanceAfter || 0) + delta } : {}),
             };
 
             await updateHipassCharge(editingRecord.id, payload);

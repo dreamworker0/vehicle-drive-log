@@ -108,9 +108,11 @@ export default function useFuelLogAdmin() {
             vehicleId: rec.vehicleId,
             vehicleName: rec.vehicleName || '',
             date: rec.date,
-            meterReading: String(rec.meterReading || ''),
-            fuelAmount: String(rec.fuelAmount || ''),
-            fuelCost: String(rec.fuelCost || ''),
+            // `|| ''`가 아니라 null 검사다 — 0으로 저장된 옛 기록이 빈 칸으로 채워지면
+            // 필수값 검사에 걸려 그 기록은 아예 고칠 수 없게 된다.
+            meterReading: rec.meterReading != null ? String(rec.meterReading) : '',
+            fuelAmount: rec.fuelAmount != null ? String(rec.fuelAmount) : '',
+            fuelCost: rec.fuelCost != null ? String(rec.fuelCost) : '',
             notes: rec.notes || '',
         });
     };
@@ -122,7 +124,13 @@ export default function useFuelLogAdmin() {
 
     const handleVehicleSelect = (vehicleId: string) => {
         const v = vehicles.find(v => v.id === vehicleId);
-        setForm(prev => ({ ...prev, vehicleId, vehicleName: v?.displayName || '' }));
+        setForm(prev => ({
+            ...prev,
+            vehicleId,
+            // 차량 목록에 없는(삭제된) 차량을 그대로 다시 고른 경우엔 기록에 남아 있던
+            // 이름을 지우지 않는다 — 지우면 목록·내보내기에서 차량이 빈칸이 된다.
+            vehicleName: v?.displayName || (vehicleId === prev.vehicleId ? prev.vehicleName : ''),
+        }));
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -154,11 +162,14 @@ export default function useFuelLogAdmin() {
                 vehicleId: form.vehicleId,
                 vehicleName: form.vehicleName,
                 date: form.date,
-                meterReading: parseInt(form.meterReading),
+                // parseInt가 아니라 Number로 읽는다 — `<input type="number">`는 지수 표기
+                // ('1e5')도 유효한 값으로 넘기고, parseInt는 그것을 1로 읽는다(50,000km가
+                // 1km로 조용히 저장된다). limitFuelDecimals가 같은 함정을 주석으로 남겨 뒀다.
+                meterReading: Math.trunc(Number(form.meterReading)),
                 fuelType: selectedVehicle?.fuelType || editingRecord.fuelType || 'gasoline',
                 // 저장 길목에서 자릿수를 맞춘다 — 입력 칸만 제한하면 기존 값을 그대로 되쓸 때 통과한다.
                 fuelAmount: roundFuelAmount(form.fuelAmount),
-                fuelCost: parseInt(form.fuelCost),
+                fuelCost: Math.trunc(Number(form.fuelCost)),
                 notes: form.notes.trim() || '',
             };
 

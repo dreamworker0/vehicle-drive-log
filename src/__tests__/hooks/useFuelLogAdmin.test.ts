@@ -179,4 +179,22 @@ describe('useFuelLogAdmin (useBaseFuelLog 위임 구조)', () => {
         expect(result.current.filteredRecords.find(r => r.id === 'r1')?.fuelCost).toBe(50000);
         expect(result.current.editingRecord?.id).toBe('r1');
     });
+    it('지수 표기(1e5)를 1로 읽지 않고, 0으로 저장된 값도 폼에 채운다', async () => {
+        // ① `<input type="number">`는 '1e5'를 유효한 값으로 넘기는데 parseInt는 1로 읽는다 —
+        //    50,000km가 1km로 조용히 저장됐다.
+        // ② 0을 `|| ''`로 비우면 필수값 검사에 걸려 그 기록은 아예 고칠 수 없게 된다.
+        mockGetFuelLogs.mockResolvedValue([{ ...RECORDS[0], meterReading: 0 }]);
+        const { result } = renderHook(() => useFuelLogAdmin());
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        act(() => { result.current.handleEdit(result.current.filteredRecords[0] as never); });
+        expect(result.current.form.meterReading).toBe('0');
+
+        act(() => { result.current.setForm(f => ({ ...f, meterReading: '1e5', fuelCost: '1e5' })); });
+        await act(async () => { await result.current.handleSubmit(submitEvent()); });
+
+        expect(mockUpdateFuelLog).toHaveBeenCalledWith('r1', expect.objectContaining({
+            meterReading: 100000, fuelCost: 100000,
+        }));
+    });
 });

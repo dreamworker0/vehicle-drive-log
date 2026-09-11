@@ -52,6 +52,13 @@ export default memo(function FuelLogEditForm({
                     <label className="label">차량 <span className="text-red-500 dark:text-red-400">*</span></label>
                     <select value={form.vehicleId} onChange={e => onVehicleSelect(e.target.value)} className="input min-h-[48px]" required>
                         <option value="">선택</option>
+                        {/* 차량이 삭제된 기록도 고칠 수 있어야 한다 — 목록에 없는 차량이면
+                            기록에 남아 있는 이름으로 항목을 하나 만들어 준다. 없으면 select가
+                            빈 값이 되고 required에 걸려, 금액만 고치려던 관리자가 차량을
+                            바꾸도록 강요당한다. */}
+                        {form.vehicleId && !vehicles.some(v => v.id === form.vehicleId) && (
+                            <option value={form.vehicleId}>{form.vehicleName || '(삭제된 차량)'}</option>
+                        )}
                         {vehicles.map(v => (<option key={v.id} value={v.id}>{v.displayName}</option>))}
                     </select>
                 </div>

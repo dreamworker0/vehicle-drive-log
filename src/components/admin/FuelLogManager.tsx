@@ -14,7 +14,7 @@ import FuelLogEditForm from './fuelLog/FuelLogEditForm';
 import RecordRowActions from './RecordRowActions';
 
 /** 목록 그리드 컬럼 — 마지막 칸은 수정·삭제 버튼 두 개가 들어간다 */
-const GRID_COLUMNS = '2fr 1fr 1.5fr 2fr 1.2fr 1.5fr 1.2fr 76px';
+const GRID_COLUMNS = '2fr 1fr 1.5fr 2fr 1.2fr 1.5fr 1.2fr 88px';
 
 export default function FuelLogManager() {
     const {

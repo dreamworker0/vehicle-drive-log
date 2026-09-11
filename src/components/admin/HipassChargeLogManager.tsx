@@ -20,7 +20,7 @@ import {
 const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#f97316'];
 
 /** 목록 그리드 컬럼 — 마지막 칸은 수정·삭제 버튼 두 개가 들어간다 */
-const GRID_COLUMNS = '2fr 1fr 1.5fr 2fr 2fr 1.5fr 1.5fr 76px';
+const GRID_COLUMNS = '2fr 1fr 1.5fr 2fr 2fr 1.5fr 1.5fr 88px';
 
 export default function HipassChargeLogManager() {
     const {

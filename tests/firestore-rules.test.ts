@@ -1266,6 +1266,15 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     // 스탬프를 건드리지 않는 수정은 여전히 통과한다 — 스탬프를 심지 않는 옛 경로가
     // 통째로 막히면 안 된다(actorStampValid가 '변경될 때만' 검사하는 이유).
     await assertSucceeds(empDb.collection('fuelLogs').doc('f_emp').update({ notes: '영수증 재확인' }));
+
+    // 그리고 **가장 흔한 경로** — 직원이 자기 기록을 고치며 자기 uid를 남기는 것 — 은
+    // 반드시 열려 있어야 한다. 여기가 막히면 주유 탭의 본인 수정이 통째로 죽는다.
+    await assertSucceeds(empDb.collection('fuelLogs').doc('f_emp').update({
+        fuelCost: 55000, lastEditedByUid: 'emp_1',
+    }));
+    await assertSucceeds(empDb.collection('hipassCharges').doc('h_emp').update({
+        chargeAmount: 20000, lastEditedByUid: 'emp_1',
+    }));
   });
 
 });
