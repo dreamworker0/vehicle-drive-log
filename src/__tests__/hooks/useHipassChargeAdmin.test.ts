@@ -253,4 +253,18 @@ describe('useHipassChargeAdmin — 관리자 정정', () => {
         // 삭제 자체는 성공했으므로 목록에서도 빠진다
         await waitFor(() => expect(result.current.filteredRecords).toHaveLength(0));
     });
+    it('카드가 이미 삭제됐으면 삭제해도 성공이라고 말하지 않는다', async () => {
+        // 확인창에서 "잔액이 되돌아갑니다"라고 약속했는데 되돌릴 곳이 없는 경우다.
+        mockGetHipassCards.mockResolvedValue([]);
+        const { result } = await renderLoaded();
+
+        await act(async () => { await result.current.handleDelete(RECORDS[0] as never); });
+
+        expect(mockDeleteHipassCharge).toHaveBeenCalledWith('h1');
+        expect(mockUpdateHipassCard).not.toHaveBeenCalled();
+        expect(mockShowToast).toHaveBeenCalledWith(
+            expect.stringContaining('카드 잔액을 되돌리지 못했습니다'),
+            'warning',
+        );
+    });
 });
