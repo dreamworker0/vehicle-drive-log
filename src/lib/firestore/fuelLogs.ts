@@ -11,6 +11,7 @@ import { captureError } from '../sentry';
 import { toLocalDateStr } from '../dateUtils';
 import { createZodConverter, fuelLogSchema } from '../../schemas';
 import { cachedQuery, invalidateCache } from './cache';
+import { actorStamp } from './actorStamp';
 
 // 읽기 경로에 스키마 검증을 건다 — 이전에는 `d.data() as Record<string, unknown>`으로
 // 캐스팅해 반환하고 호출부에서 다시 `as FuelLog[]`로 받아, 두 캐스팅 사이에 실제
@@ -83,11 +84,18 @@ export const deleteFuelLog = async (logId: string) => {
     }
 };
 
-/** 주유 기록 수정 */
+/**
+ * 주유 기록 수정
+ *
+ * 관리자는 직원의 기록도 고칠 수 있으므로(Rules의 isOrgAdmin 분기) 수정자가 '주유원'과
+ * 다를 수 있다. actorStamp로 마지막 수정자를 함께 남긴다 — 값의 신뢰는 Rules의
+ * `actorStampValid()`가 담보한다.
+ */
 export const updateFuelLog = async (logId: string, data: Record<string, unknown>) => {
     try {
         await updateDoc(doc(db, 'fuelLogs', logId), {
             ...data,
+            ...actorStamp(),
             updatedAt: serverTimestamp(),
         });
         invalidateCache('fuelLogs');

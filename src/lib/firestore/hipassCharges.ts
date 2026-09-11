@@ -2,7 +2,7 @@
  * Firestore — 하이패스 충전 기록 (HipassCharges) 관련 함수
  */
 import {
-    doc, deleteDoc,
+    doc, deleteDoc, updateDoc,
     collection, query, where, orderBy, getDocs, addDoc,
     serverTimestamp, limit,
 } from 'firebase/firestore';
@@ -10,6 +10,7 @@ import { db } from '../firebase';
 import { captureError } from '../sentry';
 import { toLocalDateStr } from '../dateUtils';
 import { createZodConverter, hipassChargeSchema } from '../../schemas';
+import { actorStamp } from './actorStamp';
 
 // 읽기 경로에 스키마 검증을 건다 (원시 캐스팅 대체 — fuelLogs와 동일한 이유).
 // 충전 금액·잔액은 카드 잔액 계산에 그대로 쓰이므로 숫자 계약이 특히 중요하다.
@@ -66,6 +67,30 @@ export const createHipassCharge = async (data: Record<string, unknown>) => {
         return docRef.id;
     } catch (error) {
         captureError(error as Error, { context: 'createHipassCharge', data });
+        throw error;
+    }
+};
+
+/**
+ * 충전 기록 수정
+ *
+ * 관리자는 직원의 기록도 고칠 수 있으므로(Rules의 isOrgAdmin 분기) 수정자가 '충전자'와
+ * 다를 수 있다. actorStamp로 마지막 수정자를 함께 남긴다 — 값의 신뢰는 Rules의
+ * `actorStampValid()`가 담보한다.
+ *
+ * 충전금액을 고치면 카드 잔액도 어긋난다. 잔액 조정은 이 함수가 하지 않고 호출부
+ * (useHipassChargeAdmin)가 delta를 계산해 `updateHipassCard`로 함께 반영한다 —
+ * 생성 경로(useHipassCharge)와 같은 구조다.
+ */
+export const updateHipassCharge = async (chargeId: string, data: Record<string, unknown>) => {
+    try {
+        await updateDoc(doc(db, 'hipassCharges', chargeId), {
+            ...data,
+            ...actorStamp(),
+            updatedAt: serverTimestamp(),
+        });
+    } catch (error) {
+        captureError(error as Error, { context: 'updateHipassCharge', chargeId, data });
         throw error;
     }
 };

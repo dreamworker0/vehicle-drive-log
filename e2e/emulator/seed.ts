@@ -239,3 +239,47 @@ export async function seedDriveLog(
         ...overrides,
     });
 }
+
+/**
+ * 직원 명의의 주유 기록 1건을 시드한다. 관리자 정정(수정) E2E 전용.
+ *
+ * 관리자가 **남의 기록**을 고치는 경로를 검증해야 하므로 작성자는 직원으로 둔다.
+ * `set`(merge 없음)이라 재실행해도 항상 같은 초깃값으로 돌아간다(재시도 안전).
+ */
+export async function seedFuelLog(
+    id: string,
+    overrides: Record<string, unknown> = {},
+): Promise<void> {
+    if (!getApps().length) initializeApp({ projectId: PROJECT_ID });
+    const db = getFirestore();
+    await db.collection('fuelLogs').doc(id).set({
+        organizationId: TEST_ORG_ID,
+        vehicleId: TEST_VEHICLE.id,
+        vehicleName: TEST_VEHICLE.displayName,
+        driverUid: TEST_EMPLOYEE.uid,
+        driverName: TEST_EMPLOYEE.name,
+        date: '2026-07-02',
+        meterReading: 50000,
+        fuelType: 'gasoline',
+        fuelAmount: 40,
+        fuelCost: 60000,
+        notes: '',
+        createdAt: new Date(),
+        ...overrides,
+    });
+}
+
+/** 주유 기록 시드를 제거한다(스펙 afterAll에서 호출해 다른 스펙과 격리). */
+export async function deleteFuelLogSeed(id: string): Promise<void> {
+    if (!getApps().length) initializeApp({ projectId: PROJECT_ID });
+    const db = getFirestore();
+    await db.collection('fuelLogs').doc(id).delete();
+}
+
+/** 시드한 주유 기록을 그대로 읽어 온다(저장 결과 확인용). */
+export async function readFuelLogSeed(id: string): Promise<Record<string, unknown> | undefined> {
+    if (!getApps().length) initializeApp({ projectId: PROJECT_ID });
+    const db = getFirestore();
+    const snap = await db.collection('fuelLogs').doc(id).get();
+    return snap.data();
+}
