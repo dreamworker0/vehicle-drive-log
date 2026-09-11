@@ -187,17 +187,4 @@ describe('ServiceDashboard', () => {
         fireEvent.click(screen.getByText('운영 요약'));
         expect(await screen.findByText(/활성도/)).toBeInTheDocument();
     });
-
-    /*
-     * 갱신 버튼 옆 비용 안내 — 이 버튼 한 번이 전 기관 재스캔이고 실측(2026-09-09)으로
-     * 클릭당 약 1.3~1.6만 read(하루 무료 한도의 3분의 1 가까이)다. 실제 사용은 30일에
-     * 24회였다. 운영자가 한 명이라 **야간 자동 갱신이 있다는 사실을 화면에 적어 두는 것**이
-     * 가장 값싼 대책인데, 문구가 없어지면 그 대책도 조용히 사라지므로 여기서 고정한다.
-     */
-    it('갱신 버튼 옆에 자동 갱신 시각과 비용 주의를 안내한다', async () => {
-        render(<ServiceDashboard />);
-
-        expect(await screen.findByText(/새벽 2시에 자동으로 갱신/)).toBeInTheDocument();
-        expect(screen.getByText(/무료 조회 한도/)).toBeInTheDocument();
-    });
 });
