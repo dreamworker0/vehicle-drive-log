@@ -126,7 +126,15 @@ Actions 화면이 비어 있는 것이 정상이고, 배포를 기다리면 오�
 
 `workflow_run`의 `branches` 필터는 base가 아니라 **선행 실행의 `head_branch`**에 걸린다. 그리고 `pull_request` 실행의 `head_branch`는 PR 소스 브랜치 이름이다. 이 저장소는 공개라 누구나 포크 PR을 열 수 있고, **포크의 기본 브랜치 이름은 원본과 같은 `master`다** — 그 브랜치에서 PR을 열면 `branches: [master]`를 그대로 통과한다.
 
-통과하면 `deploy.yml`이 그 PR의 커밋을 체크아웃해 `npm ci`·`npm run build`를 돌리는데, 이 잡은 `FIREBASE_SERVICE_ACCOUNT`를 포함한 시크릿을 전부 들고 있다. 즉 **남의 코드가 프로덕션 자격증명으로 실행된다**(2026-09-12 감사 발견 1). 2026-09-12 이전까지 이 경로가 열려 있지 않았던 유일한 이유는 브랜치를 `fix/…`·`chore/…`로 이름 지어 온 습관이었다.
+통과하면 `deploy.yml`이 그 PR의 커밋을 체크아웃해 `npm ci`·`npm run build`를 돌리는데, 이 잡은 `FIREBASE_SERVICE_ACCOUNT`를 포함한 시크릿을 전부 들고 있다. 즉 **남의 코드가 프로덕션 자격증명으로 실행된다**(2026-09-12 감사 발견 1).
+
+이 경로 앞에는 방벽이 **세 겹** 있었고 **셋 다 우회 가능했다**. 우연한 방벽을 경계로 세지 않기 위해 각각을 적어 둔다:
+
+1. **브랜치 이름 습관** — `fix/…`·`chore/…`로 지어 왔을 뿐, 규칙이 아니다. 포크의 기본 브랜치는 `master`다
+2. **최초 기여자 승인**(`fork-pr-contributor-approval: first_time_contributors`) — 한 번 머지된 계정에는 걸리지 않는다
+3. **prebuild env 게이트** — `scripts/generate-sw-config.ts`가 Firebase 환경변수 누락 시 `process.exit(1)`을 해서, 포크 PR(시크릿 미지급 → `.env` 빈 값)은 CI가 초록으로 끝나지 못했다
+
+**3번이 뚫리는 이유가 핵심이다.** `pull_request` 이벤트의 워크플로와 스크립트는 **PR의 머지 커밋에서 읽히므로**, 공격자는 자기 포크에서 `ci.yml`과 `scripts/`를 통째로 고쳐 모든 스텝을 통과시킬 수 있다(`name:`까지 맞추면 `workflows:` 필터도 통과한다). 즉 **선행 CI가 무엇을 검사하든 그 검사 자체가 공격자 소유**이므로, "CI가 초록이었다"는 배포 잡의 신뢰 근거가 되지 못한다.
 
 - **시크릿을 쥔 잡의 `if:`에는 항상 두 자물쇠를 건다.** `workflow_run.event == 'push'`(포크 PR발 실행은 `pull_request`라 잘린다) + `workflow_run.head_repository.full_name == github.repository`
 - GitHub 기본값 `fork-pr-contributor-approval: first_time_contributors`를 방벽으로 치지 않는다. **한 번 머지된 계정에는 걸리지 않고**, 승인 버튼은 "배포하겠다"가 아니라 "CI 돌려보겠다"는 뜻으로 눌린다

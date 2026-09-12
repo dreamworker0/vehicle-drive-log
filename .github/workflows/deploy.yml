@@ -39,11 +39,14 @@ jobs:
     #   - head_repository    : 원본 저장소에서 난 실행만 통과 (2차 자물쇠)
     # preview.yml이 미리보기 배포에 이미 같은 기준(head.repo.full_name)을 걸고 있다 —
     # 더 센 권한을 쥔 프로덕션 배포에만 그 가드가 없었다.
+    # 연속행은 첫 줄과 같은 칸에 맞춘다 — folded scalar(`>-`)는 **더 들여쓴 줄의 줄바꿈을 접지 않아**
+    # 표현식 문자열에 `\n`이 남는다. Actions는 그래도 평가하지만, 표현식이 틀리면 잡이 아예
+    # 생성되지 않아 "배포가 조용히 안 도는" 실패가 된다. 굳이 그 관용에 기댈 이유가 없다.
     if: >-
       github.event_name == 'workflow_dispatch'
       || (github.event.workflow_run.conclusion == 'success'
-          && github.event.workflow_run.event == 'push'
-          && github.event.workflow_run.head_repository.full_name == github.repository)
+      && github.event.workflow_run.event == 'push'
+      && github.event.workflow_run.head_repository.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
