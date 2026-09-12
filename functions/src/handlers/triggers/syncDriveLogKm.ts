@@ -3,6 +3,7 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { captureError } from "../../core/sentry";
 import { recordHeartbeat } from "../../utils/helpers";
 import { handleStatsOnCreate, handleStatsOnUpdate, handleStatsOnDelete } from "../../services/statistics/updateAggregatedStats";
+import { applyDriveLogHipassDelta, usedAmountOf } from "../../services/hipass/applyBalanceDelta";
 import { resolveDriveLogConflict } from "../sync/conflictResolver";
 
 const db = getFirestore();
@@ -334,6 +335,12 @@ export const onDriveLogCreated = onDocumentCreated(
             const distance = data.distance;
             const isRetro = data.isRetroactive === true;
 
+            // 하이패스 사용액을 카드 잔액에서 뺀다.
+            // **km 가드보다 앞에 둔다** — 아래 `endKm == null` 반환에 걸리면 하이패스가 통째로 누락된다.
+            // 소급 기록도 반영한다: 소급이어도 그 돈은 실제로 쓰였다(currentKm은 '현재 값'이라 소급을
+            // 건너뛰지만, 잔액은 누적 합이라 시점과 무관하다).
+            await applyDriveLogHipassDelta("onDriveLogCreated", orgId, vehId, usedAmountOf(data));
+
             if (!orgId || !vehId || !ts || endKm == null) return;
 
             // 차량 누적 Km 갱신 (Race Condition 방어용 증분 업데이트)
@@ -396,6 +403,18 @@ export const onDriveLogUpdated = onDocumentUpdated(
         const logId = event.params.logId;
 
         try {
+            // 하이패스 사용액의 **차액만** 반영한다.
+            // 아래 어느 조기 반환보다도 앞에 둔다 — 특히 "주요 마일리지 필드 변경 없음" 분기에
+            // 걸리면 하이패스만 고친 수정이 잔액에 영영 반영되지 않는다.
+            // 연쇄 재정합이 만든 쓰기는 하이패스 필드를 건드리지 않으므로 여기서 차액이 0이다.
+            // vehicleId는 Rules가 불변으로 막으므로 카드가 바뀌는 경우는 없다.
+            await applyDriveLogHipassDelta(
+                "onDriveLogUpdated",
+                data.organizationId,
+                data.vehicleId,
+                usedAmountOf(data) - usedAmountOf(oldData),
+            );
+
             // [재발동 차단] 연쇄 재정합이 만든 쓰기는 여기서 끝낸다.
             // 이 표시가 없던 시절에는 연쇄의 각 update가 다시 연쇄를 돌려 20건 단위 파도로 번졌다.
             if ((data[KM_SYNC_REV_FIELD] ?? 0) !== (oldData[KM_SYNC_REV_FIELD] ?? 0)) {
@@ -516,6 +535,9 @@ export const onDriveLogDeleted = onDocumentDeleted(
             const endKm = data.endKm;
             const startKm = data.startKm;
             const distance = data.distance;
+
+            // 지워진 기록이 쓴 하이패스 사용액을 잔액에 되돌린다(km 가드보다 앞).
+            await applyDriveLogHipassDelta("onDriveLogDeleted", orgId, vehId, -usedAmountOf(data));
 
             if (!orgId || !vehId || !ts) return;
 

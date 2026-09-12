@@ -7,8 +7,7 @@ import {
     getHipassCards, 
     getAllHipassCharges, 
     getHipassCharges, 
-    deleteHipassCharge, 
-    updateHipassCard 
+    deleteHipassCharge
 } from '../../lib/firestore';
 import { useConfirm } from '../useConfirm';
 import { useToast } from '../useToast';
@@ -111,23 +110,18 @@ export default function useBaseHipassCharge(orgId: string | undefined, options?:
         try {
             await deleteHipassCharge(rec.id);
 
-            // 잔액 복원 — 상태 업데이터 **밖에서** 계산한다.
-            // 예전에는 `setCards(prev => ...)` 안에서 Firestore 쓰기를 불렀는데, 업데이터는
-            // 순수해야 한다(StrictMode는 개발 중 두 번 실행한다 — 쓰기도 두 번 나간다).
+            // 잔액 되돌리기는 **서버가 한다** — 기록이 지워지면 onHipassChargeDeleted가
+            // 트랜잭션으로 뺀다(Phase 227). 여기서 함께 쓰면 이중 반영이 되고, 화면에 로드된
+            // 오래된 값으로 덮어써 남의 갱신을 지우는 문제도 있었다.
+            //
+            // 그래도 카드를 찾는 이유는 두 가지다. ① 화면을 즉시 맞춰 주고(다음 조회에서 서버
+            // 값으로 수렴한다) ② 확인창이 "잔액이 되돌아갑니다"라고 약속했으므로, **카드가 이미
+            // 삭제돼 되돌릴 곳이 없으면** 성공이라고 말하지 않는다(Phase 225에서 닫은 구멍).
             const card = rollbackBalance ? cards.find(c => c.id === rec.cardId) : undefined;
-            // 확인창에서 "잔액이 되돌아갑니다"라고 약속했으므로, 카드가 이미 삭제돼
-            // 되돌릴 곳이 없을 때도 성공이라고 말하지 않는다.
-            let balanceRolledBack = !rollbackBalance || Boolean(card);
+            const balanceRolledBack = !rollbackBalance || Boolean(card);
             if (card) {
                 const newBalance = Math.max(0, card.balance - rec.chargeAmount);
-                try {
-                    await updateHipassCard(card.id, { balance: newBalance });
-                    setCards(prev => prev.map(c => (c.id === card.id ? { ...c, balance: newBalance } : c)));
-                } catch (err) {
-                    // 기록 삭제는 이미 성공했다 — 통째로 "삭제 실패"라고 하면 거짓말이 된다.
-                    balanceRolledBack = false;
-                    console.error('카드 잔액 되돌리기 실패:', err);
-                }
+                setCards(prev => prev.map(c => (c.id === card.id ? { ...c, balance: newBalance } : c)));
             }
 
             setRecords(prev => prev.filter(r => r.id !== rec.id));

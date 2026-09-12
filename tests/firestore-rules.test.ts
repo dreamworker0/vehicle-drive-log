@@ -1277,4 +1277,41 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     }));
   });
 
+  it('27. 하이패스 카드 잔액 — 서버가 소유한다 (직원은 쓰지 못하고, 관리자도 음수는 못 넣는다)', async () => {
+    // 종전에는 "소속 기관 멤버가 balance만 갱신 가능" 분기가 있었다. 충전·사용·삭제 복원·
+    // 관리자 정정이 모두 클라이언트에서 잔액을 계산해 덮어썼기 때문인데, 그 분기는
+    // **기록 하나 없이 임의의 값을 넣는 길**이기도 했다(2026-09-12 감사 부록).
+    // 이제 잔액은 트리거가 기록에서 파생시킨다 — 여기서는 그 경계만 지킨다.
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.collection('hipassCards').doc('card_A').set({
+        organizationId: 'org-A', cardNumber: '1111', vehicleId: 'v_A', balance: 10000,
+      });
+    });
+
+    const empDb = setupContext('emp_1', { role: 'employee', orgId: 'org-A' }).firestore();
+    const adminA = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+    const adminB = setupContext('admin_B', { role: 'admin', orgId: 'org-B' }).firestore();
+
+    // 직원은 잔액을 쓸 수 없다 — 값이 그럴듯해도(충전만큼 더한 값) 막힌다.
+    await assertFails(empDb.collection('hipassCards').doc('card_A').update({ balance: 60000 }));
+    // 잔액을 0으로 만드는 것도, 다른 필드에 얹어 슬쩍 넣는 것도 마찬가지다.
+    await assertFails(empDb.collection('hipassCards').doc('card_A').update({ balance: 0 }));
+    await assertFails(empDb.collection('hipassCards').doc('card_A').update({ balance: 99999, memo: '메모' }));
+
+    // 관리자는 [하이패스 관리]에서 실물 카드와 맞추는 수동 입력이 필요하므로 열어 둔다.
+    await assertSucceeds(adminA.collection('hipassCards').doc('card_A').update({
+      cardNumber: '1111', vehicleId: 'v_A', balance: 25000, memo: '실물 확인', organizationId: 'org-A',
+    }));
+    // 다만 음수는 막는다 — 사람이 값을 넣는 유일한 경로가 여기라, 여기서 막지 않으면
+    // 화면과 Rules가 전제하는 `>= 0`이 깨진다.
+    await assertFails(adminA.collection('hipassCards').doc('card_A').update({ balance: -1 }));
+
+    // 타 기관 관리자는 애초에 손대지 못한다.
+    await assertFails(adminB.collection('hipassCards').doc('card_A').update({ balance: 1 }));
+
+    // 잔액을 건드리지 않는 수정은 그대로 통과한다(메모·차량 연결 등).
+    await assertSucceeds(adminA.collection('hipassCards').doc('card_A').update({ memo: '차량 교체' }));
+  });
+
 });

@@ -6,10 +6,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
 import type { HipassCharge } from '../types/hipassCharge';
-import {
-    updateHipassCard,
-    createHipassCharge,
-} from '../lib/firestore';
+import { createHipassCharge } from '../lib/firestore';
 import { toLocalDateStr } from '../lib/dateUtils';
 import useBaseHipassCharge from './base/useBaseHipassCharge';
 import { parseIntegerInput } from './utils/numberValidation';
@@ -117,10 +114,11 @@ export default function useHipassCharge() {
                 balanceAfter: after,
             });
 
-            // 2. 카드 잔액 업데이트
-            await updateHipassCard(selectedCard.id, { balance: after });
+            // 2. 카드 잔액은 **쓰지 않는다** — 충전 기록이 생기면 서버 트리거
+            //    (onHipassChargeCreated)가 트랜잭션으로 더한다. 여기서 함께 쓰면 이중 반영이 되고,
+            //    화면에 로드된 오래된 값으로 덮어써 남의 갱신을 지우는 문제도 있었다(Phase 227).
 
-            // 3. 로컬 상태 갱신
+            // 3. 로컬 상태 갱신 — 화면은 즉시 기대값을 보여 주고, 다음 조회에서 서버 값으로 맞춰진다.
             setCards(prev => prev.map(c =>
                 c.id === selectedCard.id ? { ...c, balance: after } : c
             ));

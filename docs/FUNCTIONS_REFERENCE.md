@@ -2,9 +2,9 @@
 
 > **자동 생성 문서** — `scripts/generate-functions-doc.ts`로 생성됨
 >
-> 마지막 업데이트: 2026. 9. 5. PM 7:15:54
+> 마지막 업데이트: 2026. 9. 12. PM 9:38:43
 >
-> 총 함수 수: **72개**
+> 총 함수 수: **75개**
 
 ---
 
@@ -504,7 +504,7 @@
 
 ## 📝 Firestore onCreate
 
-> 총 8개
+> 총 9개
 
 ### `onReservationCreated`
 
@@ -532,6 +532,15 @@
 | **설명** | 주유·충전일지 작성 시 그 차량의 "주유 필요" 표시를 해제. 표시를 켜는 쪽은 onDriveLogCreated. |
 | **인증** | 시스템 자동 실행 |
 | **비고** | fuelLogs/{logId} |
+
+### `onHipassChargeCreated`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/triggers/syncHipassBalance.ts` |
+| **설명** | 충전 기록이 생기면 그만큼 하이패스 카드 잔액을 올린다(트랜잭션). 잔액의 주인은 서버다 — 클라이언트는 쓰지 않는다. |
+| **인증** | 시스템 자동 실행 |
+| **비고** | hipassCharges/{chargeId} |
 
 ### `trackFirstEmployee`
 
@@ -621,7 +630,16 @@
 
 ## 🔄 Firestore onUpdate
 
-> 총 4개
+> 총 5개
+
+### `onHipassChargeUpdated`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/triggers/syncHipassBalance.ts` |
+| **설명** | 충전 기록이 고쳐지면 차액만큼 잔액을 맞춘다. 카드를 옮긴 정정은 옛 카드에서 빼고 새 카드에 더한다. |
+| **인증** | 시스템 자동 실행 |
+| **비고** | hipassCharges/{chargeId} |
 
 ### `onReservationUpdated`
 
@@ -659,7 +677,16 @@
 
 ## 🗑️ Firestore onDelete
 
-> 총 4개
+> 총 5개
+
+### `onHipassChargeDeleted`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/triggers/syncHipassBalance.ts` |
+| **설명** | 충전 기록이 지워지면 그만큼 잔액을 되돌린다(삭제 확인창이 약속하는 그 동작). |
+| **인증** | 시스템 자동 실행 |
+| **비고** | hipassCharges/{chargeId} |
 
 ### `onReservationDeleted`
 

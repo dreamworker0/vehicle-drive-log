@@ -234,13 +234,27 @@ service cloud.firestore {
       allow read: if belongsToMyOrg() || isSuperAdmin();
       allow create: if (newBelongsToMyOrg() && isOrgAdmin(request.resource.data.organizationId))
                     || isSuperAdmin();
-      allow update: if isSuperAdmin()
+      // 잔액(balance)은 **서버가 소유한다** (2026-09-12 감사 부록 → Phase 227).
+      //
+      // 종전에는 "소속 기관 멤버가 balance만 갱신 가능(음수 방지)" 분기가 있었다. 충전·사용·
+      // 삭제 복원·관리자 정정 네 경로가 모두 클라이언트에서 잔액을 계산해 **절대값으로 덮어썼기**
+      // 때문인데, 그 분기는 두 가지를 동시에 열어 두고 있었다:
+      //   - 기관 구성원 누구나 `balance`를 임의의 값으로, **기록 하나 남기지 않고** 덮을 수 있었다.
+      //     Rules로는 막을 수 없다 — "이 잔액이 기록들의 합과 맞는가"는 서버만 판정한다.
+      //   - 네 경로 중 셋이 화면에 로드된(오래됐을 수 있는) 값 기준의 read-modify-write라,
+      //     두 사람이 동시에 쓰면 한쪽 갱신이 통째로 유실됐다.
+      // 두 문제의 뿌리가 같아서 — 잔액의 주인이 클라이언트였다 — 트리거로 옮겼다
+      // (`syncHipassBalance` + `syncDriveLogKm`). 같은 이유로 차량 누적 주행거리는 이미
+      // 서버가 소유하고 있었다.
+      //
+      // 관리자 분기는 남긴다. [하이패스 관리]에서 카드를 등록·수정할 때 **실물 카드의 잔액과
+      // 맞추는** 수동 입력이 필요하고, 그 경로는 카드 전체를 쓰므로 기록 없는 잔액 조작과
+      // 모양이 다르다. 음수 방지는 종전에 멤버 분기에만 있었는데, 이제 사람이 값을 넣는
+      // 유일한 경로가 관리자라 여기로 옮겨 건다.
+      allow update: if (isSuperAdmin()
                     || (isOrgAdmin(resource.data.organizationId)
-                        && request.resource.data.organizationId == resource.data.organizationId)
-                    // 소속 기관 멤버가 충전 시 balance만 갱신 가능 (음수 방지)
-                    || (isOrgMember(resource.data.organizationId)
-                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['balance', 'updatedAt'])
-                        && request.resource.data.balance >= 0);
+                        && request.resource.data.organizationId == resource.data.organizationId))
+                    && fieldNonNegativeOnChange('balance');
       allow delete: if isOrgAdmin(resource.data.organizationId) || isSuperAdmin();
     }
 
