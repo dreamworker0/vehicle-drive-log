@@ -7,6 +7,7 @@ import {
     serverTimestamp,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { actorStamp } from './actorStamp';
 import { captureError } from '../sentry';
 import type { HipassCard } from '../../types/hipass';
 
@@ -38,10 +39,19 @@ export const createHipassCard = async (data: Record<string, unknown>) => {
 };
 
 // 하이패스 카드 수정
+/**
+ * 하이패스 카드 수정.
+ *
+ * **행위자 스탬프를 함께 남긴다.** 잔액(balance)은 서버 트리거가 소유하지만(Phase 227),
+ * [하이패스 관리]에서 실물 카드와 맞추는 수동 정정만은 사람이 한다. 그 경로가 유일하게
+ * 남은 수동 잔액 변경이라 "누가 고쳤나"가 남아야 하고, Rules가 잔액을 바꾸는 쓰기에
+ * 이 스탬프를 요구한다(값은 토큰과 대조되므로 타인 명의로 위조할 수 없다).
+ */
 export const updateHipassCard = async (cardId: string, data: Record<string, unknown>) => {
     try {
         const promise = updateDoc(doc(db, 'hipassCards', cardId), {
             ...data,
+            ...actorStamp(),
             updatedAt: serverTimestamp(),
         });
         const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;

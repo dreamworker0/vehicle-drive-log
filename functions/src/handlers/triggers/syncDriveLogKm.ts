@@ -1,9 +1,9 @@
 import { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { captureError } from "../../core/sentry";
-import { recordHeartbeat } from "../../utils/helpers";
+import { recordHeartbeat, log } from "../../utils/helpers";
 import { handleStatsOnCreate, handleStatsOnUpdate, handleStatsOnDelete } from "../../services/statistics/updateAggregatedStats";
-import { applyDriveLogHipassDelta, usedAmountOf } from "../../services/hipass/applyBalanceDelta";
+import { applyDriveLogHipassDelta, usedAmountOf, hipassFieldsDropped } from "../../services/hipass/applyBalanceDelta";
 import { driveLogRetentionCutoff } from "../../utils/constants";
 import { resolveDriveLogConflict } from "../sync/conflictResolver";
 
@@ -20,6 +20,30 @@ async function hasLaterDriveLog(orgId: string, vehicleId: string, afterTimestamp
         .limit(1);
     const snap = await q.get();
     return !snap.empty;
+}
+
+/**
+ * 이 기록이 **보존 기한 밖**인가 — 그렇다면 하이패스 잔액을 건드리지 않는다.
+ *
+ * 잔액은 '오늘 카드에 남은 돈'이고, 보존 기한 밖 문서의 생성·삭제는 그 돈과 무관한
+ * 사건이다(야간 아카이브의 `batch.delete`, 복원 스크립트의 `batch.set`). 거르지 않으면
+ * 3년 전 통행료가 오늘 환불되거나 다시 빠져나간다.
+ *
+ * **건너뛴 사실을 남긴다.** 관리자가 3년 넘은 기록을 직접 지웠을 때도 환불이 안 되는데,
+ * 흔적이 없으면 "왜 잔액이 안 돌아왔나"를 추적할 길이 없다. 배치는 조용한 대량 삭제라
+ * INFO로 충분하고, Cloud Logging에서 건수로 보인다.
+ *
+ * `ts`가 없으면 **보존 기한 안쪽으로 본다**(= 반영한다). 아카이브 조회가
+ * `where("timestamp","<",cutoff)`라 timestamp 없는 문서는 애초에 대상이 아니고,
+ * 기본값은 "돈을 맞춘다" 쪽이어야 한다.
+ */
+function isBeyondRetention(context: string, ts: Date | undefined | null): boolean {
+    if (ts == null) return false;
+    if (ts >= driveLogRetentionCutoff()) return false;
+    log("INFO", context, "보존 기한 밖 기록이라 하이패스 잔액을 건드리지 않는다", {
+        timestamp: ts.toISOString(),
+    });
+    return true;
 }
 
 /** 한 번의 호출에서 재정합할 최대 문서 수. 초과분은 마지막 문서에 이어받기 표시를 남겨 계속한다. */
@@ -340,7 +364,15 @@ export const onDriveLogCreated = onDocumentCreated(
             // **km 가드보다 앞에 둔다** — 아래 `endKm == null` 반환에 걸리면 하이패스가 통째로 누락된다.
             // 소급 기록도 반영한다: 소급이어도 그 돈은 실제로 쓰였다(currentKm은 '현재 값'이라 소급을
             // 건너뛰지만, 잔액은 누적 합이라 시점과 무관하다).
-            await applyDriveLogHipassDelta("onDriveLogCreated", orgId, vehId, usedAmountOf(data));
+            //
+            // **보존 기한을 넘긴 기록은 제외한다 — 삭제 쪽과 대칭이다.**
+            // `scripts/restoreArchivedLogs.ts`가 아카이브를 되돌릴 때 `batch.set`으로 문서를
+            // 다시 만드는데, 그 쓰기도 이 트리거를 깨운다. 거르지 않으면 500건 복원이 **오늘
+            // 카드에서 3년 전 통행료를 다시 빼낸다**(삭제 쪽이 환불하던 것의 정확한 거울).
+            // 3년 넘은 운행을 지금 손으로 입력하는 경우도 같은 이유로 오늘 잔액과 무관하다.
+            if (!isBeyondRetention("onDriveLogCreated", ts)) {
+                await applyDriveLogHipassDelta("onDriveLogCreated", orgId, vehId, usedAmountOf(data));
+            }
 
             if (!orgId || !vehId || !ts || endKm == null) return;
 
@@ -414,7 +446,18 @@ export const onDriveLogUpdated = onDocumentUpdated(
             // 차량 변경을 허용한다**. 차액만 반영하면 옛 차량의 카드가 그 돈을 계속 물고 있고
             // 새 차량의 카드는 손도 대지 않은 채 남는다 — 두 카드가 동시에 어긋난다.
             // 그래서 옛 카드에서 빼고 새 카드에 더한다(`onHipassChargeUpdated`의 카드 이동과 같은 처리).
-            if (oldData.vehicleId !== data.vehicleId) {
+            // 기관 변경도 같은 처리다 — superAdmin은 `organizationId`까지 바꿀 수 있는데,
+            // 차량이 그대로면 새 기관에는 그 차량의 카드가 없어 `else` 분기가 아무것도 못 한다.
+            // 그러면 **옛 기관 카드가 그 금액을 계속 문 채** 남는다.
+            // 하이패스 기록이 **사라진 수정은 환불이 아니다.** 결정론적 ID로 같은 운행을
+            // 다시 저장할 때(setDoc, merge 아님) 카드 조회 실패·빈 입력이면 필드가 통째로
+            // 빠지는데, 그대로 두면 실제로 쓴 돈이 잔액으로 돌아온다. 값이 아니라 기록이
+            // 없어진 것이므로 잔액은 그대로 두고 사실만 남긴다.
+            if (hipassFieldsDropped(oldData, data)) {
+                log("WARNING", "onDriveLogUpdated", "하이패스 기록이 사라진 수정 — 잔액은 건드리지 않는다", {
+                    logId, used: usedAmountOf(oldData),
+                });
+            } else if (oldData.vehicleId !== data.vehicleId || oldData.organizationId !== data.organizationId) {
                 await applyDriveLogHipassDelta("onDriveLogUpdated", oldData.organizationId, oldData.vehicleId, -usedAmountOf(oldData));
                 await applyDriveLogHipassDelta("onDriveLogUpdated", data.organizationId, data.vehicleId, usedAmountOf(data));
             } else {
@@ -555,9 +598,7 @@ export const onDriveLogDeleted = onDocumentDeleted(
             // 조용히. 보존 기한 정리는 역사를 덜어내는 일이지 거래를 되돌리는 일이 아니다.
             // (누적 km가 같은 사고를 피한 것은 `hasLaterDriveLog` 덕분인데, 잔액은 '현재 값'이
             //  아니라 누적 합이라 그 가드가 듣지 않는다. 그래서 경계를 명시적으로 본다.)
-            const retentionCutoff = driveLogRetentionCutoff();
-            const isRetentionPurge = ts != null && ts < retentionCutoff;
-            if (!isRetentionPurge) {
+            if (!isBeyondRetention("onDriveLogDeleted", ts)) {
                 await applyDriveLogHipassDelta("onDriveLogDeleted", orgId, vehId, -usedAmountOf(data));
             }
 

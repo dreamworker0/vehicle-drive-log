@@ -10,19 +10,22 @@
  *      거르지 않으면 3년 전에 쓴 통행료가 오늘 잔액으로 돌아온다.
  *  (3) 차량이 바뀐 수정은 옛 카드에서 빼고 새 카드에 더한다 — 차액만 반영하면
  *      두 카드가 동시에 어긋난다.
- *  (4) 잔액 반영이 실패해도 **km 회계를 함께 잃지 않는다**.
+ *  (4) 복원 스크립트가 아카이브를 되돌려도 오늘 잔액을 깎지 않는다.
  *
- * 하이패스 서비스는 모킹해 "무엇을 어떤 인자로 불렀는가"만 본다. 트리거의 나머지 부분
- * (차량 조회·연쇄 재정합)은 여기 관심사가 아니며, 최소 모킹이라 도중에 던져도 트리거의
- * 바깥 catch가 삼킨다 — 그 사실이 (4)의 검사를 성립시킨다.
+ * 하이패스 서비스는 모킹해 "무엇을 어떤 인자로 불렀는가"만 본다. 잔액 계산 자체와
+ * "그 함수는 절대 던지지 않는다"는 계약은 모킹하지 않는 `syncHipassBalance.test`가 본다.
  */
 
 const mockApplyDriveLogHipassDelta = jest.fn(async () => undefined);
+const mockStatsOnCreate = jest.fn(async () => undefined);
 
 jest.mock('../services/hipass/applyBalanceDelta', () => ({
     applyDriveLogHipassDelta: (...a: unknown[]) => mockApplyDriveLogHipassDelta(...(a as [])),
-    // usedAmountOf는 순수 함수라 진짜를 쓴다 — 모킹하면 delta 계산이 검사에서 빠진다.
+    // 순수 함수는 진짜를 쓴다 — 모킹하면 delta 계산과 필드 소실 판정이 검사에서 빠진다.
+    // (여기서 빠뜨리면 undefined 호출이 던져지고 트리거의 바깥 catch가 삼켜,
+    //  "호출 0회"로 조용히 실패한다. 실제로 그렇게 한 번 깨졌다.)
     usedAmountOf: jest.requireActual('../services/hipass/applyBalanceDelta').usedAmountOf,
+    hipassFieldsDropped: jest.requireActual('../services/hipass/applyBalanceDelta').hipassFieldsDropped,
 }));
 
 jest.mock('firebase-functions/v2/firestore', () => ({
@@ -53,12 +56,15 @@ jest.mock('firebase-admin/firestore', () => ({
 }));
 
 jest.mock('../services/statistics/updateAggregatedStats', () => ({
-    handleStatsOnCreate: jest.fn(async () => undefined),
+    handleStatsOnCreate: (...a: unknown[]) => mockStatsOnCreate(...(a as [])),
     handleStatsOnUpdate: jest.fn(async () => undefined),
     handleStatsOnDelete: jest.fn(async () => undefined),
 }));
+// 실제 반환은 **boolean**이다. 객체를 돌려주면 truthy라 `if (isConflict) return;`이 항상
+// 참이 되어 모든 update 테스트가 충돌 검사 직후 조용히 조기 반환한다 — 지금은 하이패스
+// 단언이 그보다 앞이라 결과가 맞지만, km·통계 단언을 추가하는 순간 실행되지 않는다.
 jest.mock('../handlers/sync/conflictResolver', () => ({
-    resolveDriveLogConflict: jest.fn(async () => ({ resolved: false })),
+    resolveDriveLogConflict: jest.fn(async () => false),
 }));
 jest.mock('../core/sentry', () => ({ captureError: jest.fn() }));
 jest.mock('../utils/helpers', () => ({
@@ -86,6 +92,7 @@ const log = (over: Record<string, unknown> = {}) => ({
 beforeEach(() => {
     mockApplyDriveLogHipassDelta.mockClear();
     mockApplyDriveLogHipassDelta.mockImplementation(async () => undefined);
+    mockStatsOnCreate.mockClear();
 });
 
 describe('onDriveLogCreated', () => {
@@ -108,11 +115,27 @@ describe('onDriveLogCreated', () => {
         expect(mockApplyDriveLogHipassDelta).toHaveBeenCalledWith('onDriveLogCreated', 'org-A', 'v1', 500);
     });
 
-    it('잔액 반영이 실패해도 트리거가 그 자리에서 죽지 않는다', async () => {
-        mockApplyDriveLogHipassDelta.mockRejectedValueOnce(new Error('UNAVAILABLE') as never);
-        await expect(
-            call(onDriveLogCreated, { data: { data: () => log() }, params: { logId: 'd1' } }),
-        ).resolves.toBeUndefined();
+    // 격리(잔액 실패가 km 회계를 잃게 하지 않는다)는 **여기서 검사하지 않는다.**
+    // 이 파일은 applyDriveLogHipassDelta를 통째로 모킹하므로, 그 함수를 reject시켜도
+    // 실제 구현의 try/catch는 한 줄도 실행되지 않는다. 그렇게 쓴 테스트는 고쳐지기 전의
+    // 고장난 상태(예외가 바깥 catch까지 올라가 km·통계가 유실되는 상태)를 재현하면서
+    // 초록이 된다 — 계약을 지키는 척만 한다.
+    // 진짜 계약("이 함수는 절대 던지지 않는다")은 모킹하지 않는 syncHipassBalance.test.ts에서 본다.
+
+    it('하이패스 다음에 오는 회계(기관 통계)가 실제로 실행된다', async () => {
+        // 하이패스 호출을 맨 앞에 둔 탓에 그 뒤 전부를 잃을 수 있었다. 그 뒤가 살아
+        // 있다는 것을 한 군데라도 붙들어 둔다 — 이 단언이 없으면 "앞에 두었다"만 검사하고
+        // "앞에 두어도 안전하다"는 검사하지 않는 셈이 된다.
+        await call(onDriveLogCreated, { data: { data: () => log() }, params: { logId: 'd1' } });
+        expect(mockStatsOnCreate).toHaveBeenCalled();
+    });
+
+    it('보존 기한 밖 기록의 생성(아카이브 복원)은 오늘 잔액을 깎지 않는다', async () => {
+        // scripts/restoreArchivedLogs.ts가 batch.set으로 문서를 되살리면 이 트리거가 돈다.
+        // 삭제 쪽 환불을 막은 것의 거울 — 막지 않으면 복원이 오늘 카드에서 옛 통행료를 뺀다.
+        const old = new Date(driveLogRetentionCutoff().getTime() - 24 * 60 * 60 * 1000);
+        await call(onDriveLogCreated, { data: { data: () => log({ timestamp: old }) }, params: { logId: 'd1' } });
+        expect(mockApplyDriveLogHipassDelta).not.toHaveBeenCalled();
     });
 });
 
@@ -130,6 +153,20 @@ describe('onDriveLogUpdated', () => {
     it('하이패스가 그대로면 0을 넘긴다', async () => {
         await call(onDriveLogUpdated, evt(log(), log({ endKm: 160 })));
         expect(mockApplyDriveLogHipassDelta).toHaveBeenCalledWith('onDriveLogUpdated', 'org-A', 'v1', 0);
+    });
+
+    it('기관이 바뀌면(superAdmin) 옛 기관 카드에서 빼고 새 기관 카드에 더한다', async () => {
+        // 차량이 그대로여도 기관이 바뀌면 카드가 달라진다. else 분기로 가면 옛 기관 카드가
+        // 그 금액을 계속 문 채 남는다.
+        await call(onDriveLogUpdated, evt(log(), log({ organizationId: 'org-B' })));
+        expect(mockApplyDriveLogHipassDelta).toHaveBeenNthCalledWith(1, 'onDriveLogUpdated', 'org-A', 'v1', -500);
+        expect(mockApplyDriveLogHipassDelta).toHaveBeenNthCalledWith(2, 'onDriveLogUpdated', 'org-B', 'v1', 500);
+    });
+
+    it('하이패스 기록이 사라진 수정은 환불하지 않는다', async () => {
+        // setDoc 덮어쓰기로 필드가 빠지면 usedAmountOf가 0이 되어 실제로 쓴 돈이 돌아왔다.
+        await call(onDriveLogUpdated, evt(log(), { organizationId: 'org-A', vehicleId: 'v1', timestamp: new Date(), startKm: 100, endKm: 150 }));
+        expect(mockApplyDriveLogHipassDelta).not.toHaveBeenCalled();
     });
 
     it('차량이 바뀌면 옛 카드에서 빼고 새 카드에 더한다', async () => {

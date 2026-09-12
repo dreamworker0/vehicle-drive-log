@@ -19,11 +19,16 @@ let vehicleCardIds: string[] = [];
 let transactionCount = 0;
 /** 마지막 카드 조회에 실린 where 절 — 테넌트 필터 회귀 방어 */
 let lastQueryFilters: Array<[string, string, unknown]> = [];
+/** 켜면 카드 조회가 던진다 — 일시적 UNAVAILABLE 재현 */
+let queryThrows = false;
+/** 켜면 트랜잭션이 던진다 — 쓰기 실패 재현 */
+let transactionThrows = false;
 
 jest.mock('firebase-admin/firestore', () => ({
     getFirestore: () => ({
         runTransaction: async (fn: (tx: any) => Promise<any>) => {
             transactionCount += 1;
+            if (transactionThrows) throw new Error('UNAVAILABLE');
             const tx = {
                 get: async (ref: { __id: string }) => ({
                     exists: cards[ref.__id] !== undefined,
@@ -47,6 +52,7 @@ jest.mock('firebase-admin/firestore', () => ({
                 where: (field: string, op: string, value: unknown) => { filters.push([field, op, value]); return query; },
                 limit: () => query,
                 get: async () => {
+                    if (queryThrows) throw new Error('DEADLINE_EXCEEDED');
                     lastQueryFilters = filters;
                     return {
                         empty: vehicleCardIds.length === 0,
@@ -72,7 +78,7 @@ jest.mock('firebase-functions/v2/firestore', () => ({
 }));
 
 import {
-    applyBalanceDelta, usedAmountOf, findCardIdForVehicle, applyDriveLogHipassDelta,
+    applyBalanceDelta, usedAmountOf, findCardIdForVehicle, applyDriveLogHipassDelta, hipassFieldsDropped,
 } from '../services/hipass/applyBalanceDelta';
 import {
     onHipassChargeCreated, onHipassChargeUpdated, onHipassChargeDeleted,
@@ -98,6 +104,8 @@ beforeEach(() => {
     vehicleCardIds = ['c1'];
     transactionCount = 0;
     lastQueryFilters = [];
+    queryThrows = false;
+    transactionThrows = false;
 });
 
 describe('applyBalanceDelta', () => {
@@ -161,6 +169,34 @@ describe('usedAmountOf', () => {
 
     it('숫자가 아니면 0', () => {
         expect(usedAmountOf({ hipassBalanceBefore: '10000', hipassBalanceAfter: 9_500 })).toBe(0);
+    });
+
+    it('음수 사용액은 0으로 본다 — 한 건으로 잔액을 불릴 수 없다', () => {
+        // 통행료를 쓰고 잔액이 늘 수는 없다. Rules가 먼저 막지만, Admin SDK 경로와 옛 기록이
+        // 있어 여기서도 끊는다. 막지 않으면 운행일지 한 건이 곧 임의 충전이 된다.
+        expect(usedAmountOf({ hipassBalanceBefore: 0, hipassBalanceAfter: 1_000_000 })).toBe(0);
+    });
+});
+
+describe('hipassFieldsDropped', () => {
+    // 결정론적 ID로 같은 운행을 다시 저장할 때(setDoc, merge 아님) 하이패스 필드가 통째로
+    // 빠질 수 있다. usedAmountOf만으로는 '0원 사용'과 구분되지 않아 실제로 쓴 돈이 환불됐다.
+    it('있다가 없어지면 참', () => {
+        expect(hipassFieldsDropped(
+            { hipassBalanceBefore: 10_000, hipassBalanceAfter: 9_500 }, { startKm: 1 },
+        )).toBe(true);
+    });
+
+    it('둘 다 있거나 둘 다 없으면 거짓', () => {
+        expect(hipassFieldsDropped(
+            { hipassBalanceBefore: 10_000, hipassBalanceAfter: 9_500 },
+            { hipassBalanceBefore: 10_000, hipassBalanceAfter: 9_000 },
+        )).toBe(false);
+        expect(hipassFieldsDropped({ startKm: 1 }, { startKm: 2 })).toBe(false);
+    });
+
+    it('없다가 생기는 것은 거짓(정상 입력)', () => {
+        expect(hipassFieldsDropped({ startKm: 1 }, { hipassBalanceBefore: 10_000, hipassBalanceAfter: 9_500 })).toBe(false);
     });
 });
 
@@ -269,5 +305,31 @@ describe('충전 기록 트리거', () => {
             data: undefined, params: { chargeId: 'h1' },
         });
         expect(transactionCount).toBe(0);
+    });
+});
+
+describe('실패해도 위로 던지지 않는다 — 회계 격리', () => {
+    // 이 계약이 깨지면 운행일지 트리거의 바깥 catch까지 예외가 올라가고,
+    // 그 뒤의 차량 누적 km 차분·startKm 연쇄 재정합·기관 통계가 **통째로 유실된다**
+    // (retry: false라 이벤트 재전달도 없다). 같은 이유로 위치·주유 표시 갱신이
+    // ...Safely로 격리돼 있다.
+    //
+    // **모킹하지 않은 실제 구현으로 검사한다.** 함수를 모킹한 채 reject시키면
+    // 고쳐지기 전의 고장난 상태를 재현하면서도 초록이 된다.
+
+    it('카드 조회가 던져도 삼킨다', async () => {
+        queryThrows = true;
+        await expect(applyDriveLogHipassDelta('t', 'org-A', 'v1', 500)).resolves.toBeUndefined();
+    });
+
+    it('트랜잭션이 던져도 삼킨다', async () => {
+        transactionThrows = true;
+        await expect(applyDriveLogHipassDelta('t', 'org-A', 'v1', 500)).resolves.toBeUndefined();
+    });
+
+    it('쓰기 실패는 write-failed로 보고한다 (카드 없음과 구분된다)', async () => {
+        transactionThrows = true;
+        await expect(applyBalanceDelta('t', 'c1', 'org-A', 5_000))
+            .resolves.toEqual({ applied: false, reason: 'write-failed' });
     });
 });

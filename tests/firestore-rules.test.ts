@@ -1301,14 +1301,15 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
 
     // 관리자는 [하이패스 관리]에서 실물 카드와 맞추는 수동 입력이 필요하므로 열어 둔다.
     await assertSucceeds(adminA.collection('hipassCards').doc('card_A').update({
-      cardNumber: '1111', vehicleId: 'v_A', balance: 25000, memo: '실물 확인', organizationId: 'org-A',
+      cardNumber: '1111', vehicleId: 'v_A', balance: 25000, memo: '실물 확인',
+      organizationId: 'org-A', lastEditedByUid: 'admin_A',
     }));
     // 다만 음수는 막는다 — 사람이 값을 넣는 유일한 경로가 여기라, 여기서 막지 않으면
     // 화면과 Rules가 전제하는 `>= 0`이 깨진다.
-    await assertFails(adminA.collection('hipassCards').doc('card_A').update({ balance: -1 }));
+    await assertFails(adminA.collection('hipassCards').doc('card_A').update({ balance: -1, lastEditedByUid: 'admin_A' }));
 
     // 타 기관 관리자는 애초에 손대지 못한다.
-    await assertFails(adminB.collection('hipassCards').doc('card_A').update({ balance: 1 }));
+    await assertFails(adminB.collection('hipassCards').doc('card_A').update({ balance: 1, lastEditedByUid: 'admin_B' }));
 
     // 잔액을 건드리지 않는 수정은 그대로 통과한다(메모·차량 연결 등).
     await assertSucceeds(adminA.collection('hipassCards').doc('card_A').update({ memo: '차량 교체' }));
@@ -1325,6 +1326,57 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertFails(empDb.collection('hipassCards').doc('card_emp').set({
       organizationId: 'org-A', cardNumber: '3333', vehicleId: 'v_C', balance: 1000,
     }));
+
+    // 잔액을 바꾸는 쓰기에는 행위자 스탬프가 필요하다. 두 가지를 동시에 지킨다 —
+    // 책임성(누가 손으로 고쳤나)과 **배포 전환 보호**(잔액을 계산해 쓰던 옛 화면은
+    // 스탬프를 심지 않으므로 거부된다 → 트리거 증분 위에 얹혀 두 배가 되는 일이 없다).
+    // **스탬프가 아직 없는 카드**로 검사한다 — 그것이 배포 시점의 실제 상태다
+    // (이 필드는 이번 변경에서 처음 쓰인다). card_A는 위에서 이미 스탬프가 박혔고,
+    // `request.resource.data`는 병합 결과라 그 카드로는 이 경계를 볼 수 없다.
+    await assertFails(adminA.collection('hipassCards').doc('card_new').update({ balance: 31000 }));
+    await assertFails(adminA.collection('hipassCards').doc('card_new').update({
+      balance: 31000, lastEditedByUid: 'someone_else',
+    }));
+    await assertSucceeds(adminA.collection('hipassCards').doc('card_new').update({
+      balance: 31000, lastEditedByUid: 'admin_A',
+    }));
+  });
+
+  it('28. 운행일지의 하이패스 사용액 — 음수 사용으로 잔액을 불릴 수 없다', async () => {
+    // 잔액의 클라이언트 쓰기는 닫혔지만, 서버 트리거가 이 두 값의 차이만큼 카드에서 뺀다.
+    // 제약이 없으면 **같은 능력이 다른 문으로 되살아난다** — 사용액을 음수로 적으면 환불이다.
+    const empDb = setupContext('emp_1', { role: 'employee', orgId: 'org-A' }).firestore();
+    const base = {
+      organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'emp_1', createdByUid: 'emp_1',
+      startKm: 100, endKm: 150,
+    };
+
+    // 정상 사용 — 통과해야 한다(막으면 하이패스 입력이 통째로 죽는다)
+    await assertSucceeds(empDb.collection('driveLogs').doc('dl_ok').set({
+      ...base, hipassBalanceBefore: 10000, hipassBalanceAfter: 9500,
+    }));
+    // 하이패스를 쓰지 않은 운행 — 필드가 없어도 통과
+    await assertSucceeds(empDb.collection('driveLogs').doc('dl_none').set(base));
+
+    // 사용 후가 사용 전보다 크다 = 음수 사용액 = 임의 충전
+    await assertFails(empDb.collection('driveLogs').doc('dl_neg').set({
+      ...base, hipassBalanceBefore: 0, hipassBalanceAfter: 1000000,
+    }));
+    // 음수 값 자체
+    await assertFails(empDb.collection('driveLogs').doc('dl_minus').set({
+      ...base, hipassBalanceBefore: -1, hipassBalanceAfter: -2,
+    }));
+    // 한 건의 사용액 상한
+    await assertFails(empDb.collection('driveLogs').doc('dl_huge').set({
+      ...base, hipassBalanceBefore: 9000000, hipassBalanceAfter: 0,
+    }));
+
+    // 수정도 같은 검사를 받는다
+    await assertFails(empDb.collection('driveLogs').doc('dl_ok').update({
+      hipassBalanceBefore: 0, hipassBalanceAfter: 500000,
+    }));
+    // 하이패스를 건드리지 않는 수정은 그대로 통과한다
+    await assertSucceeds(empDb.collection('driveLogs').doc('dl_ok').update({ notes: '경로 변경' }));
   });
 
 });

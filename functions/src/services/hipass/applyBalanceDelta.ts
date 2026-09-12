@@ -116,7 +116,29 @@ export function usedAmountOf(data: Record<string, unknown> | undefined | null): 
     if (typeof before !== "number" || typeof after !== "number") return 0;
     if (!Number.isFinite(before) || !Number.isFinite(after)) return 0;
     const used = before - after;
-    return Number.isFinite(used) ? used : 0;
+    if (!Number.isFinite(used)) return 0;
+    // **음수 사용액은 반영하지 않는다.** 사용액이 음수라는 것은 통행료를 쓰고 잔액이
+    // 늘었다는 뜻이라 실제로는 불가능하다. Rules가 `after <= before`로 먼저 막지만,
+    // 옛 기록·서버 경로(Admin SDK는 Rules를 우회한다)로 들어올 수 있어 여기서도 끊는다 —
+    // 막지 않으면 운행일지 한 건으로 카드 잔액을 임의로 불릴 수 있다.
+    return used > 0 ? used : 0;
+}
+
+/**
+ * 이 수정에서 하이패스 기록이 **사라졌는가**.
+ *
+ * `createDriveLog`는 결정론적 ID로 `setDoc`(merge 아님)한다. 같은 운행을 다시 저장할 때
+ * 카드 조회가 실패했거나 사용후 금액 칸이 비어 있으면 하이패스 필드가 문서에서 통째로
+ * 빠지는데, 그러면 `usedAmountOf(after)`가 0이 되어 **실제로 쓴 돈이 환불된다.**
+ * `usedAmountOf`만으로는 "0원 사용"과 "필드 소멸"을 구분할 수 없어 따로 본다.
+ */
+export function hipassFieldsDropped(
+    before: Record<string, unknown> | undefined | null,
+    after: Record<string, unknown> | undefined | null,
+): boolean {
+    const had = typeof before?.hipassBalanceBefore === "number" && typeof before?.hipassBalanceAfter === "number";
+    const has = typeof after?.hipassBalanceBefore === "number" && typeof after?.hipassBalanceAfter === "number";
+    return had && !has;
 }
 
 /**
