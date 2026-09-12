@@ -153,6 +153,10 @@ export { onDriveLogCreated, onDriveLogUpdated, onDriveLogDeleted } from "./handl
 // 주유일지가 작성되면 그 차량의 "주유 필요" 표시를 끈다 (켜는 쪽은 위 운행일지 트리거)
 export { onFuelLogCreated } from "./handlers/triggers/clearRefuelFlag";
 
+// 하이패스 카드 잔액의 서버 권위 반영 — 충전 기록이 잔액을 결정한다.
+// (운행일지의 하이패스 '사용'은 위 syncDriveLogKm 트리거가 함께 처리한다)
+export { onHipassChargeCreated, onHipassChargeUpdated, onHipassChargeDeleted } from "./handlers/triggers/syncHipassBalance";
+
 // 접속기록/변경 로그 (고시 「개인정보의 안전성 확보조치 기준」 제16조)
 export {
     auditDriveLogCreated, auditDriveLogUpdated, auditDriveLogDeleted,

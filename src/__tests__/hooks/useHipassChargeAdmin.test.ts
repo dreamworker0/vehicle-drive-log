@@ -72,7 +72,7 @@ describe('useHipassChargeAdmin — 관리자 정정', () => {
         expect(result.current.filteredRecords).toHaveLength(1);
     });
 
-    it('금액을 줄이면 기록과 카드 잔액이 같은 차액만큼 함께 줄어든다', async () => {
+    it('금액을 줄이면 기록이 바뀌고, 카드 잔액은 서버가 맞춘다', async () => {
         const { result } = await renderLoaded();
 
         act(() => { result.current.handleEdit(RECORDS[0] as never); });
@@ -91,7 +91,9 @@ describe('useHipassChargeAdmin — 관리자 정정', () => {
             // 충전 후 잔액은 '충전 전 잔액 + 새 금액'으로 다시 계산된다
             balanceAfter: 60000,
         });
-        expect(mockUpdateHipassCard).toHaveBeenCalledWith('c1', { balance: 60000 });
+        // 잔액은 **여기서 쓰지 않는다** — onHipassChargeUpdated가 차액을 반영한다(Phase 227).
+        // 함께 쓰면 이중 반영이 되므로, 쓰지 않는다는 사실 자체가 지켜야 할 계약이다.
+        expect(mockUpdateHipassCard).not.toHaveBeenCalled();
 
         const updated = result.current.filteredRecords[0];
         expect(updated.chargeAmount).toBe(30000);
@@ -197,9 +199,11 @@ describe('useHipassChargeAdmin — 관리자 정정', () => {
         expect(result.current.filteredRecords[0].chargeAmount).toBe(50000);
         expect(result.current.editingRecord?.id).toBe('h1');
     });
-    it('기록은 저장됐는데 카드 잔액 조정만 실패하면 그 사실 그대로 알린다', async () => {
-        // 여기서 통째로 "수정 실패"라고 하면 거짓말이 된다 — 기록은 이미 바뀌었다.
-        mockUpdateHipassCard.mockRejectedValueOnce(new Error('permission-denied'));
+    it('"기록은 됐는데 잔액만 어긋났다"가 생길 수 없다 — 정정·삭제 어느 쪽도 카드에 쓰지 않는다', async () => {
+        // Phase 225까지는 기록 쓰기와 잔액 쓰기가 별개라 한쪽만 실패할 수 있었고, 그래서
+        // "기록은 수정됐지만 잔액 조정에 실패했습니다" 같은 안내가 필요했다. 잔액의 주인이
+        // 서버로 옮겨지면서(Phase 227) 그 반쪽 실패 자체가 사라졌다 — 기록이 저장되면
+        // 잔액은 트리거가 따라 맞춘다. 그 전제가 깨지지 않는지를 두 경로에서 함께 고정한다.
         const { result } = await renderLoaded();
 
         act(() => { result.current.handleEdit(RECORDS[0] as never); });
@@ -207,23 +211,13 @@ describe('useHipassChargeAdmin — 관리자 정정', () => {
         await act(async () => { await result.current.handleSubmit(submitEvent()); });
 
         expect(mockUpdateHipassCharge).toHaveBeenCalled();
-        expect(mockShowToast).toHaveBeenCalledWith(
-            '기록은 수정됐지만 카드 잔액 조정에 실패했습니다. [하이패스 관리]에서 잔액을 확인해주세요.',
-            'warning',
-        );
-        // 기록 쪽 변경은 화면에도 반영돼야 한다(실제로 저장됐으므로)
-        expect(result.current.filteredRecords[0].chargeAmount).toBe(30000);
-    });
-    it('관리자 삭제도 카드 잔액을 되돌린다 (정정과 어긋나지 않게)', async () => {
-        // 수정은 차액만큼 잔액을 맞추면서 삭제는 두면, 같은 화면에서 어느 버튼을
-        // 누르느냐에 따라 잔액이 맞기도 하고 틀리기도 한다.
-        const { result } = await renderLoaded();
+        expect(mockUpdateHipassCard).not.toHaveBeenCalled();
+        expect(mockShowToast).toHaveBeenCalledWith('충전 기록이 수정되었습니다.', 'success');
 
         await act(async () => { await result.current.handleDelete(RECORDS[0] as never); });
 
         expect(mockDeleteHipassCharge).toHaveBeenCalledWith('h1');
-        // 80,000원 - 50,000원(삭제된 충전금액)
-        expect(mockUpdateHipassCard).toHaveBeenCalledWith('c1', { balance: 30000 });
+        expect(mockUpdateHipassCard).not.toHaveBeenCalled();
         expect(mockShowToast).toHaveBeenCalledWith('충전 기록이 삭제되었습니다.', 'success');
         await waitFor(() => expect(result.current.filteredRecords).toHaveLength(0));
     });
@@ -240,19 +234,6 @@ describe('useHipassChargeAdmin — 관리자 정정', () => {
         expect(mockDeleteHipassCharge).not.toHaveBeenCalled();
     });
 
-    it('기록은 지워졌는데 잔액 되돌리기만 실패하면 그 사실 그대로 알린다', async () => {
-        mockUpdateHipassCard.mockRejectedValueOnce(new Error('permission-denied'));
-        const { result } = await renderLoaded();
-
-        await act(async () => { await result.current.handleDelete(RECORDS[0] as never); });
-
-        expect(mockShowToast).toHaveBeenCalledWith(
-            '기록은 삭제됐지만 카드 잔액을 되돌리지 못했습니다. [하이패스 관리]에서 잔액을 확인해주세요.',
-            'warning',
-        );
-        // 삭제 자체는 성공했으므로 목록에서도 빠진다
-        await waitFor(() => expect(result.current.filteredRecords).toHaveLength(0));
-    });
     it('카드가 이미 삭제됐으면 삭제해도 성공이라고 말하지 않는다', async () => {
         // 확인창에서 "잔액이 되돌아갑니다"라고 약속했는데 되돌릴 곳이 없는 경우다.
         mockGetHipassCards.mockResolvedValue([]);

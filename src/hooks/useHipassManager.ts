@@ -113,17 +113,30 @@ export default function useHipassManager() {
                 return;
             }
 
+            const balance = form.balance ? parseIntegerInput(form.balance) : 0;
             const cardData = {
                 cardNumber: form.cardNumber.trim(),
                 vehicleId: form.vehicleId,
                 vehicleName: selectedVehicle?.displayName || '',
-                balance: form.balance ? parseIntegerInput(form.balance) : 0,
+                balance,
                 memo: form.memo.trim(),
                 organizationId: orgId,
             };
 
             if (editingCard) {
-                await updateHipassCard(editingCard.id, cardData);
+                // **잔액은 폼에서 실제로 바꿨을 때만 보낸다.**
+                //
+                // 이 화면의 잔액 칸은 폼을 열 때의 스냅샷이다(`handleEdit`). 잔액의 주인은
+                // 서버이고(Phase 227) 직원이 운행일지를 저장할 때마다 트리거가 잔액을 내리므로,
+                // 메모만 고치려고 폼을 열어 둔 사이에 잔액이 바뀌면 저장이 **그 갱신을 옛 값으로
+                // 되돌린다** — 쓴 통행료가 흔적 없이 사라진다.
+                //
+                // 이 화면을 닫지 않는 이유는 실물 카드와 맞추는 수동 정정이 필요해서다.
+                // 그래서 "손대지 않았으면 보내지 않는다"로 좁힌다. 실제로 고친 경우에는
+                // 관리자가 실물을 보고 넣은 값이므로 덮어쓰는 것이 맞다.
+                const { balance: _balance, ...rest } = cardData;
+                const balanceUnchanged = balance === (editingCard.balance ?? 0);
+                await updateHipassCard(editingCard.id, balanceUnchanged ? rest : cardData);
                 showToast('하이패스 정보가 수정되었습니다.', 'success');
             } else {
                 await createHipassCard(cardData);

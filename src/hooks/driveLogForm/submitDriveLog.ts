@@ -2,9 +2,9 @@
  * submitDriveLog — 운행일지 제출/수정 비즈니스 로직
  * useDriveLogForm에서 추출
  */
-import { createDriveLog, updateDriveLog, updateReservationStatus, updateHipassCard, completeReservationGroupSiblings } from '../../lib/firestore';
+import { createDriveLog, updateDriveLog, updateReservationStatus, completeReservationGroupSiblings } from '../../lib/firestore';
 
-import { increment, deleteField } from 'firebase/firestore';
+import { deleteField } from 'firebase/firestore';
 import { buildLogData, nowTime, todayStr } from '../utils/driveLogValidation';
 import type { DriveLogForm } from './types';
 import type { Vehicle } from '../../types/vehicle';
@@ -205,24 +205,13 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
         }
     }
 
-    // 하이패스 잔액 업데이트: 동기적으로 await하여 잔액 불일치(데이터 정합성) 방지
-    if (shouldApplyHipass && hipassCard) {
-        const hipassId = hipassCard.id;
-        const balAfter = Number(form.hipassBalanceAfter);
-        const usedAmount = hipassCard.balance - balAfter;
-        const org = orgId ? orgId : undefined;
-        
-        try {
-            await updateHipassCard(hipassId, {
-                balance: increment(-usedAmount),
-                organizationId: org,
-            });
-        } catch (e) {
-            console.warn('[submitDriveLog] 하이패스 잔액 업데이트 실패:', e);
-            captureError(e, { context: 'submitDriveLog.updateHipassCard', hipassId, balAfter, usedAmount, org });
-            backgroundWarnings.push('하이패스 잔액 동기화에 실패했습니다');
-        }
-    }
+    // 하이패스 잔액은 여기서 쓰지 않는다 — 운행일지가 저장되면 서버 트리거
+    // (syncDriveLogKm의 onDriveLogCreated/Updated/Deleted)가 `hipassBalanceBefore`와
+    // `hipassBalanceAfter`의 차이만큼 카드 잔액을 트랜잭션으로 뺀다(Phase 227).
+    //
+    // 여기서 함께 쓰면 이중 반영이 된다. 그리고 이 경로가 사라지면서 "운행일지는 저장됐는데
+    // 잔액만 못 맞췄다"는 실패도 없어졌다 — 기록이 저장되면 잔액은 따라온다(오프라인에서
+    // 나중에 동기화되는 경우에도 그때 함께 맞춰진다).
 
     const finalBackgroundWarning = backgroundWarnings.length > 0
         ? '운행일지는 저장되었으나 일부 동기화에 실패했습니다: ' + backgroundWarnings.join(', ') + '. 관리자에게 문의해주세요.'

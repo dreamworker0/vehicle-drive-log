@@ -25,6 +25,7 @@ import { getKSTDateString } from "../../utils/kstDate";
 import { createInAppNotification, sendPushToUser } from "../../services/alimtalk/sendNotification";
 import { captureWarning } from "../../core/sentry";
 import { runStep, logBatchResult } from "../../utils/batchStep";
+import { driveLogRetentionCutoff } from "../../utils/constants";
 import { gzip } from "node:zlib";
 import { promisify } from "node:util";
 
@@ -431,12 +432,13 @@ export async function cleanupImages(db: FirebaseFirestore.Firestore, bucket: Ret
 
 export async function archiveLogs(db: FirebaseFirestore.Firestore, bucket: ReturnType<ReturnType<typeof getStorage>["bucket"]>) {
     console.log("[Batch] Starting archiveDriveLogs...");
-    const threeYearsAgo = new Date();
-    threeYearsAgo.setFullYear(threeYearsAgo.getFullYear() - 3);
+    // 경계는 constants의 단일 원본을 쓴다 — onDriveLogDeleted의 하이패스 환불이 같은 값을
+    // 보고 "이건 보존 기한 정리이지 사용자의 취소가 아니다"를 판정한다.
+    const cutoff = driveLogRetentionCutoff();
 
     const snap = await db
         .collection("driveLogs")
-        .where("timestamp", "<", threeYearsAgo)
+        .where("timestamp", "<", cutoff)
         .limit(500)
         .get();
 

@@ -270,7 +270,7 @@ npm run build           # 프로덕션 빌드 확인
 
 ## Cloud Functions
 
-전체 72개 함수(리전 `asia-northeast3`)의 파라미터·권한·트리거 경로는 **[Cloud Functions 레퍼런스](docs/FUNCTIONS_REFERENCE.md)** 에 정리되어 있습니다. 아래는 종류별 요약입니다.
+전체 75개 함수(리전 `asia-northeast3`)의 파라미터·권한·트리거 경로는 **[Cloud Functions 레퍼런스](docs/FUNCTIONS_REFERENCE.md)** 에 정리되어 있습니다. 아래는 종류별 요약입니다.
 
 > 이 절의 숫자는 `npm run check:functions-catalog`가 `functions/src/index.ts`와 대조합니다 — 어긋나면 CI가 실패합니다.
 
@@ -279,7 +279,7 @@ npm run build           # 프로덕션 빌드 확인
 | 호출형 (onCall) | 40 | `ocrDashboard`(계기판 OCR) · `createReservationSafe`(트랜잭션 예약 생성) · `joinOrganization`(초대 코드 가입) · `withdrawOrganization`(기관 해지) · `askAI`(FAQ 기반 답변) · `getSlackInstallUrl`·`diagnoseSlackConnection`(Slack 연결) |
 | HTTP (onRequest) | 4 | `tmapProxy`·`holidayProxy`(외부 API 프록시, 인증 + Rate Limit) · `slackEvents`(Slack 이벤트 수신) · `slackOauthCallback`(설치 콜백) |
 | 스케줄 (onSchedule) | 7 | 아래 표 참고 |
-| Firestore 트리거 | 20 | `autoVerifyDocument`(증빙서류 AI 심사) · `setCustomClaims`(권한 동기화) · `onReservation*`(캘린더·푸시) · `onDriveLog*`(주행거리·집계) · `onFuelLogCreated`(주유 필요 표시 해제) · `audit*`(접속기록) · `onSlackTaskCreated`(Slack 워커) |
+| Firestore 트리거 | 23 | `autoVerifyDocument`(증빙서류 AI 심사) · `setCustomClaims`(권한 동기화) · `onReservation*`(캘린더·푸시) · `onDriveLog*`(주행거리·하이패스 잔액·집계) · `onHipassCharge*`(카드 잔액 증분) · `onFuelLogCreated`(주유 필요 표시 해제) · `audit*`(접속기록) · `onSlackTaskCreated`(Slack 워커) |
 | Auth 트리거 | 1 | `onUserDelete`(탈퇴 시 개인정보 익명화) |
 
 ### 스케줄 함수
@@ -305,12 +305,12 @@ npm run build           # 프로덕션 빌드 확인
 
 | 종류 | 규모 | 도구 |
 |------|------|------|
-| 단위 테스트 (프론트 + 스크립트) | 179파일 / 2,219개 테스트 | Vitest |
-| Functions 단위 테스트 | 77개 suite / 1,062개 테스트 (emulator 테스트 제외) | Jest + ts-jest |
-| Rules 테스트 | 2파일 / 38개 테스트 | Firebase Emulator + Vitest |
+| 단위 테스트 (프론트 + 스크립트) | 180파일 / 2,225개 테스트 | Vitest |
+| Functions 단위 테스트 | 79개 suite / 1,110개 테스트 (emulator 테스트 제외) | Jest + ts-jest |
+| Rules 테스트 | 2파일 / 39개 테스트 | Firebase Emulator + Vitest |
 | E2E 테스트 | 27개 spec 파일 (일부 인증/오프라인 시나리오 fixme) | Playwright |
 
-> 테스트 케이스 수는 2026-09-11 Node 22 실행 결과입니다. 파일·suite 수는 `npm run verify:harness`가 저장소와 대조합니다.
+> 테스트 케이스 수는 2026-09-12 Node 22 실행 결과입니다. 파일·suite 수는 `npm run verify:harness`가 저장소와 대조합니다.
 
 ---
 

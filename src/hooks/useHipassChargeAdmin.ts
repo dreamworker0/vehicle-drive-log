@@ -18,7 +18,7 @@ import { useToast } from './useToast';
 import { useConfirm } from './useConfirm';
 import type { HipassCharge } from '../types/hipassCharge';
 import useBaseHipassCharge from './base/useBaseHipassCharge';
-import { updateHipassCharge, updateHipassCard } from '../lib/firestore';
+import { updateHipassCharge } from '../lib/firestore';
 import { validateNonNegativeFields, parseIntegerInput } from './utils/numberValidation';
 
 /** 수정 폼 값 — 입력 중에는 문자열로 다룬다(저장 직전에 숫자로 바꾼다). */
@@ -198,29 +198,23 @@ export default function useHipassChargeAdmin() {
 
             await updateHipassCharge(editingRecord.id, payload);
 
-            // 잔액 조정은 별도로 잡는다 — 기록 쓰기는 이미 성공했으므로 여기서 통째로
-            // "수정 실패"라고 알리면 거짓말이 된다. 어긋난 것이 잔액뿐임을 그대로 말한다.
-            let balanceAdjusted = true;
+            // 잔액 조정은 **서버가 한다** — 기록이 고쳐지면 onHipassChargeUpdated가 차액을
+            // 트랜잭션으로 반영한다(Phase 227). 여기서 함께 쓰면 이중 반영이 된다.
+            //
+            // 그래서 "기록은 고쳤는데 잔액만 못 고쳤다"는 분기가 사라졌다 — 잔액 쓰기가 이
+            // 경로에 없으니 그것만 실패할 수 없다. 카드가 이미 삭제된 경우는 위 확인창이
+            // 먼저 알린다("연결된 카드를 찾을 수 없어…").
             if (delta !== 0 && card) {
+                // 화면만 즉시 맞춘다. 다음 조회에서 서버 값으로 수렴한다.
                 const newBalance = Math.max(0, card.balance + delta);
-                try {
-                    await updateHipassCard(card.id, { balance: newBalance });
-                    setCards(prev => prev.map(c => (c.id === card.id ? { ...c, balance: newBalance } : c)));
-                } catch (err) {
-                    balanceAdjusted = false;
-                    console.error('카드 잔액 조정 실패:', err);
-                }
+                setCards(prev => prev.map(c => (c.id === card.id ? { ...c, balance: newBalance } : c)));
             }
 
             // 목록을 다시 읽지 않고 그 자리만 갱신한다(읽기 비용 절약).
             setRecords(prev => prev.map(r => (
                 r.id === editingRecord.id ? { ...r, ...payload, lastEditedByUid: user?.uid } : r
             )));
-            if (balanceAdjusted) {
-                showToast('충전 기록이 수정되었습니다.', 'success');
-            } else {
-                showToast('기록은 수정됐지만 카드 잔액 조정에 실패했습니다. [하이패스 관리]에서 잔액을 확인해주세요.', 'warning');
-            }
+            showToast('충전 기록이 수정되었습니다.', 'success');
             handleCancelEdit();
         } catch (err) {
             console.error('충전 기록 수정 실패:', err);

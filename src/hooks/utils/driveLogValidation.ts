@@ -53,8 +53,9 @@ export function validateDriveLogForm(
     }
 
     // 하이패스 사용후 금액 검증.
-    // 이 값은 저장 시 `increment(-(사용전 - 사용후))`로 카드 잔액에 반영되므로,
+    // 저장된 뒤 서버 트리거(syncDriveLogKm)가 `사용전 - 사용후`만큼 카드 잔액에서 빼므로,
     // 음수가 들어오면 실제 사용액보다 큰 금액이 차감되어 카드 잔액까지 망가진다.
+    // 서버는 0 아래로 내려가지 않게 막지만, 그렇게 바닥을 친 잔액도 실물과는 다르다.
     if (form.hipassBalanceAfter) {
         const balanceAfter = Number(form.hipassBalanceAfter);
         if (!Number.isFinite(balanceAfter)) {
