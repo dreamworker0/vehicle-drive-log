@@ -178,6 +178,40 @@ Firestore 백업에서 복구가 필요한 경우:
 2. Firebase Console → Firestore → 수동으로 문서 생성
 3. 또는 Firebase Admin SDK 스크립트로 일괄 복원
 
+### 4.4 하이패스 잔액 검산
+
+카드 잔액은 서버 트리거가 **증분으로** 굴린다(Phase 227 — 충전 기록이 생기면 더하고,
+운행일지에 하이패스 사용이 적히면 뺀다). 증분 회계는 한 번 어긋나면 스스로 복구되지
+않으므로, 밖에서 대조할 수 있어야 한다.
+
+**배포 직후 1회 — 기준점 박기.** 기준점은 "그 시점의 잔액"이라 **지나가면 복원할 수 없다.**
+오늘 박아 두면 그 이후로는 영원히 대조할 수 있고, 안 박으면 영원히 못 한다.
+
+```bash
+npx tsx scripts/backfillHipassBalanceBaseline.ts --dry-run
+npx tsx scripts/backfillHipassBalanceBaseline.ts
+```
+
+멱등이라 다시 돌려도 안전하다(이미 기준점이 있는 카드는 건너뛴다). 새로 등록되는 카드는
+등록 시점에 스스로 박으므로 대상이 아니다.
+
+**수시 — 대조.** 읽기 전용이고 **고치지 않는다**. 차이의 원인이 트리거 누락인지 사람이
+실물과 맞춘 것인지는 기록만으로 판정되지 않아, 자동 보정은 오히려 위험하다.
+
+```bash
+npx tsx scripts/check-hipass-balance-drift.ts
+npx tsx scripts/check-hipass-balance-drift.ts --org=<organizationId>
+npx tsx scripts/check-hipass-balance-drift.ts --csv=drift.csv
+```
+
+계산식은 `잔액 == 기준점 + Σ(이후 충전) − Σ(이후 하이패스 사용)`이다. 차이가 나면 흔한
+원인은 넷이다 — ① 한 차량에 카드가 둘 이상 연결돼 트리거가 반영을 건너뜀(서버 로그 WARNING)
+② 같은 카드를 두 사람이 동시에 써서 '사용 전 잔액' 기준값이 겹침 ③ 잔액이 0에서 잘림
+④ 트리거 실행 실패(Sentry "하이패스 잔액 반영 실패").
+
+실물 카드를 확인한 뒤 **[하이패스 관리]에서 잔액을 맞추면 그 값이 새 기준점이 된다** —
+손으로 고친 값은 실물을 보고 맞춘 것이므로 그 시점부터 다시 세는 것이 옳다.
+
 ---
 
 ## 5. 보안 관리

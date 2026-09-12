@@ -305,9 +305,9 @@ npm run build           # 프로덕션 빌드 확인
 
 | 종류 | 규모 | 도구 |
 |------|------|------|
-| 단위 테스트 (프론트 + 스크립트) | 179파일 / 2,219개 테스트 | Vitest |
-| Functions 단위 테스트 | 79개 suite / 1,100개 테스트 (emulator 테스트 제외) | Jest + ts-jest |
-| Rules 테스트 | 2파일 / 38개 테스트 | Firebase Emulator + Vitest |
+| 단위 테스트 (프론트 + 스크립트) | 180파일 / 2,225개 테스트 | Vitest |
+| Functions 단위 테스트 | 79개 suite / 1,110개 테스트 (emulator 테스트 제외) | Jest + ts-jest |
+| Rules 테스트 | 2파일 / 39개 테스트 | Firebase Emulator + Vitest |
 | E2E 테스트 | 27개 spec 파일 (일부 인증/오프라인 시나리오 fixme) | Playwright |
 
 > 테스트 케이스 수는 2026-09-12 Node 22 실행 결과입니다. 파일·suite 수는 `npm run verify:harness`가 저장소와 대조합니다.

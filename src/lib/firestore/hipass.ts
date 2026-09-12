@@ -23,12 +23,21 @@ export const getHipassCards = async (orgId: string): Promise<HipassCard[]> => {
         .sort((a, b) => ((b as HipassCard & { createdAt?: { seconds: number } }).createdAt?.seconds ?? 0) - ((a as HipassCard & { createdAt?: { seconds: number } }).createdAt?.seconds ?? 0));
 };
 
-// 하이패스 카드 등록
+/**
+ * 하이패스 카드 등록.
+ *
+ * 등록 시점의 잔액을 **검산 기준점**으로 함께 박는다. 잔액은 이후 서버 트리거가 증분으로
+ * 굴리므로, 기준점이 없으면 나중에 "지금 잔액이 맞는가"를 물을 수 없다
+ * (`HipassCard.balanceBaseline` 주석 참고).
+ */
 export const createHipassCard = async (data: Record<string, unknown>) => {
     try {
+        const balance = data.balance ?? 0;
         const docRef = await addDoc(collection(db, 'hipassCards'), {
             ...data,
-            balance: data.balance ?? 0,
+            balance,
+            balanceBaseline: balance,
+            baselineAt: serverTimestamp(),
             createdAt: serverTimestamp(),
         });
         return docRef.id;
@@ -49,8 +58,15 @@ export const createHipassCard = async (data: Record<string, unknown>) => {
  */
 export const updateHipassCard = async (cardId: string, data: Record<string, unknown>) => {
     try {
+        // 잔액을 바꾸는 쓰기는 **사람이 실물 카드를 보고 맞춘 것**뿐이다(트리거는 Admin SDK라
+        // 이 함수를 지나지 않는다). 그러니 그 값이 새 검산 기준점이 된다 — 다시 세기 시작하지
+        // 않으면 이후 모든 대조가 그 정정만큼 어긋난 채로 남는다.
+        const rebaseline = 'balance' in data
+            ? { balanceBaseline: data.balance, baselineAt: serverTimestamp() }
+            : {};
         const promise = updateDoc(doc(db, 'hipassCards', cardId), {
             ...data,
+            ...rebaseline,
             ...actorStamp(),
             updatedAt: serverTimestamp(),
         });
