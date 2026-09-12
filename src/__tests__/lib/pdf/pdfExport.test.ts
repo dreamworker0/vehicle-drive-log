@@ -475,12 +475,15 @@ describe('downloadDriveLogsPdf — 표시 규칙', () => {
 });
 
 describe('downloadDriveLogsPdf — XSS 방어', () => {
-    it('기관명·목적지·비고에 섞인 마크업을 이스케이프한다', () => {
+    // 날짜 칸이 페이로드 대상에 들어 있다 — reportPdfExports.test.ts의 같은 테스트와 같은 이유다
+    // (formatDate는 이스케이프가 아니라 통과 함수였다. 2026-09-12 감사 발견 2).
+    it('기관명·목적지·비고·날짜에 섞인 마크업을 이스케이프한다', () => {
         const stub = stubPrintWindow();
         downloadDriveLogsPdf([log({
             destination: XSS_PAYLOAD,
             notes: XSS_PAYLOAD,
             driverName: XSS_PAYLOAD,
+            date: XSS_PAYLOAD,
         })], { orgName: XSS_PAYLOAD, period: XSS_PAYLOAD });
 
         expectNoLiveInjection(stub);
