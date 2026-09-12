@@ -100,10 +100,15 @@ describe.each(REPORTS)('$name PDF — 공통 계약', ({ columns, title, run, sa
         expectUniformColumns(table, `${title} 표`);
     });
 
+    // 날짜 칸이 페이로드 대상에 들어 있다. 종전에는 이름·비고 계열만 넣어서, formatDate가
+    // 입력을 그대로 돌려주는 통과 함수라는 사실을 이 테스트가 덮지 못했다 (2026-09-12 감사 발견 2).
     it('사용자 입력에 섞인 마크업을 이스케이프한다', () => {
         const stub = stubPrintWindow();
-        run([{ ...sample, vehicleName: XSS_PAYLOAD, notes: XSS_PAYLOAD, description: XSS_PAYLOAD, shop: XSS_PAYLOAD }],
-            { orgName: XSS_PAYLOAD });
+        run([{
+            ...sample,
+            vehicleName: XSS_PAYLOAD, notes: XSS_PAYLOAD, description: XSS_PAYLOAD, shop: XSS_PAYLOAD,
+            date: XSS_PAYLOAD, nextDueDate: XSS_PAYLOAD,
+        }], { orgName: XSS_PAYLOAD });
 
         expectNoLiveInjection(stub);
     });
