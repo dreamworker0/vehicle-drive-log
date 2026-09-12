@@ -4,6 +4,7 @@ import { captureError } from "../../core/sentry";
 import { recordHeartbeat } from "../../utils/helpers";
 import { handleStatsOnCreate, handleStatsOnUpdate, handleStatsOnDelete } from "../../services/statistics/updateAggregatedStats";
 import { applyDriveLogHipassDelta, usedAmountOf } from "../../services/hipass/applyBalanceDelta";
+import { driveLogRetentionCutoff } from "../../utils/constants";
 import { resolveDriveLogConflict } from "../sync/conflictResolver";
 
 const db = getFirestore();
@@ -407,13 +408,23 @@ export const onDriveLogUpdated = onDocumentUpdated(
             // 아래 어느 조기 반환보다도 앞에 둔다 — 특히 "주요 마일리지 필드 변경 없음" 분기에
             // 걸리면 하이패스만 고친 수정이 잔액에 영영 반영되지 않는다.
             // 연쇄 재정합이 만든 쓰기는 하이패스 필드를 건드리지 않으므로 여기서 차액이 0이다.
-            // vehicleId는 Rules가 불변으로 막으므로 카드가 바뀌는 경우는 없다.
-            await applyDriveLogHipassDelta(
-                "onDriveLogUpdated",
-                data.organizationId,
-                data.vehicleId,
-                usedAmountOf(data) - usedAmountOf(oldData),
-            );
+            //
+            // **차량이 바뀌면 카드도 바뀐다.** Rules의 `driveLogs` update는 작성자 분기에서만
+            // vehicleId를 얼리고(`hasAny([... 'vehicleId' ...])`), **기관관리자·superAdmin 분기는
+            // 차량 변경을 허용한다**. 차액만 반영하면 옛 차량의 카드가 그 돈을 계속 물고 있고
+            // 새 차량의 카드는 손도 대지 않은 채 남는다 — 두 카드가 동시에 어긋난다.
+            // 그래서 옛 카드에서 빼고 새 카드에 더한다(`onHipassChargeUpdated`의 카드 이동과 같은 처리).
+            if (oldData.vehicleId !== data.vehicleId) {
+                await applyDriveLogHipassDelta("onDriveLogUpdated", oldData.organizationId, oldData.vehicleId, -usedAmountOf(oldData));
+                await applyDriveLogHipassDelta("onDriveLogUpdated", data.organizationId, data.vehicleId, usedAmountOf(data));
+            } else {
+                await applyDriveLogHipassDelta(
+                    "onDriveLogUpdated",
+                    data.organizationId,
+                    data.vehicleId,
+                    usedAmountOf(data) - usedAmountOf(oldData),
+                );
+            }
 
             // [재발동 차단] 연쇄 재정합이 만든 쓰기는 여기서 끝낸다.
             // 이 표시가 없던 시절에는 연쇄의 각 update가 다시 연쇄를 돌려 20건 단위 파도로 번졌다.
@@ -537,7 +548,18 @@ export const onDriveLogDeleted = onDocumentDeleted(
             const distance = data.distance;
 
             // 지워진 기록이 쓴 하이패스 사용액을 잔액에 되돌린다(km 가드보다 앞).
-            await applyDriveLogHipassDelta("onDriveLogDeleted", orgId, vehId, -usedAmountOf(data));
+            //
+            // **보존 기한 정리는 제외한다.** 야간 배치(`archiveLogs`)가 3년 지난 기록을
+            // GCS로 옮기고 500건씩 batch.delete 하는데, 그 삭제도 이 트리거를 깨운다.
+            // 거르지 않으면 **3년 전에 쓴 통행료가 오늘 카드 잔액으로 환불된다** — 밤마다,
+            // 조용히. 보존 기한 정리는 역사를 덜어내는 일이지 거래를 되돌리는 일이 아니다.
+            // (누적 km가 같은 사고를 피한 것은 `hasLaterDriveLog` 덕분인데, 잔액은 '현재 값'이
+            //  아니라 누적 합이라 그 가드가 듣지 않는다. 그래서 경계를 명시적으로 본다.)
+            const retentionCutoff = driveLogRetentionCutoff();
+            const isRetentionPurge = ts != null && ts < retentionCutoff;
+            if (!isRetentionPurge) {
+                await applyDriveLogHipassDelta("onDriveLogDeleted", orgId, vehId, -usedAmountOf(data));
+            }
 
             if (!orgId || !vehId || !ts) return;
 

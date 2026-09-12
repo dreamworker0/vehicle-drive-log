@@ -78,9 +78,10 @@ export const createHipassCharge = async (data: Record<string, unknown>) => {
  * 다를 수 있다. actorStamp로 마지막 수정자를 함께 남긴다 — 값의 신뢰는 Rules의
  * `actorStampValid()`가 담보한다.
  *
- * 충전금액을 고치면 카드 잔액도 어긋난다. 잔액 조정은 이 함수가 하지 않고 호출부
- * (useHipassChargeAdmin)가 delta를 계산해 `updateHipassCard`로 함께 반영한다 —
- * 생성 경로(useHipassCharge)와 같은 구조다.
+ * 충전금액을 고치면 카드 잔액도 어긋난다. **그 조정은 서버가 한다** — 이 쓰기가
+ * `onHipassChargeUpdated`를 깨워 차액만큼 카드 잔액을 트랜잭션으로 맞춘다(Phase 227).
+ * 클라이언트는 잔액을 쓰지 않는다. 함께 쓰면 이중 반영이 되고, Rules도 직원의 잔액
+ * 쓰기를 닫아 두었다. 생성·삭제 경로도 같은 구조다.
  */
 export const updateHipassCharge = async (chargeId: string, data: Record<string, unknown>) => {
     try {

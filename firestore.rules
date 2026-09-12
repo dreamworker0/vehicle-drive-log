@@ -232,8 +232,11 @@ service cloud.firestore {
     // === 하이패스 카드 ===
     match /hipassCards/{cardId} {
       allow read: if belongsToMyOrg() || isSuperAdmin();
-      allow create: if (newBelongsToMyOrg() && isOrgAdmin(request.resource.data.organizationId))
-                    || isSuperAdmin();
+      // create에도 음수 방지를 건다. update에만 걸었을 때는 **처음부터 음수인 카드를 만드는**
+      // 길이 열려 있었다 — 화면(validateNonNegativeFields)만 막고 서버는 통과시켰다.
+      allow create: if ((newBelongsToMyOrg() && isOrgAdmin(request.resource.data.organizationId))
+                    || isSuperAdmin())
+                    && fieldNonNegative(request.resource.data, 'balance');
       // 잔액(balance)은 **서버가 소유한다** (2026-09-12 감사 부록 → Phase 227).
       //
       // 종전에는 "소속 기관 멤버가 balance만 갱신 가능(음수 방지)" 분기가 있었다. 충전·사용·

@@ -32,12 +32,13 @@
  *
  * ## 재시도와 중복 반영
  *
- * v2 백그라운드 트리거는 `retry` 옵션을 켜야만 재시도한다. 이 트리거들은 켜지 않으므로
- * 같은 이벤트가 두 번 적용되지 않는다. 켜게 된다면 **여기에 멱등성 표시가 필요하다** —
- * 증분 반영은 재시도에 안전하지 않다.
+ * v2 백그라운드 트리거는 `retry` 옵션을 켜야만 실패를 재시도한다. 이 트리거들은 켜지 않으므로
+ * **재시도로 인한 중복 반영은 없다.** 다만 Eventarc 전달 자체는 at-least-once라 성공한
+ * 이벤트가 드물게 두 번 올 수 있고, `retry: false`가 그것까지 막지는 않는다. 증분 반영에는
+ * 멱등 장치가 없으므로, 그 확률을 감수할 수 없게 되면 **여기에 멱등성 표시가 필요하다**
+ * (같은 저장소의 `auditLog`는 반대로 `retry: true` + 멱등 문서 ID 조합을 쓴다).
  */
 import { getFirestore } from "firebase-admin/firestore";
-import { captureError } from "../../core/sentry";
 import { log } from "../../utils/helpers";
 
 const db = getFirestore();
@@ -45,7 +46,7 @@ const db = getFirestore();
 /** 잔액 반영 결과 — 호출부가 로그로만 쓰고 흐름을 바꾸지는 않는다. */
 export type BalanceDeltaOutcome =
     | { applied: true; before: number; after: number }
-    | { applied: false; reason: "no-delta" | "no-card" | "card-missing" | "org-mismatch" };
+    | { applied: false; reason: "no-delta" | "no-card" | "card-missing" | "org-mismatch" | "write-failed" };
 
 /**
  * 카드 잔액에 delta를 더한다(음수면 뺀다). 0 미만으로는 내려가지 않는다.
@@ -93,11 +94,12 @@ export async function applyBalanceDelta(
     } catch (err) {
         // 잔액 반영 실패가 기록 저장을 되돌리지는 않는다 — 기록이 정본이고 잔액은 그 파생이다.
         // 다만 조용히 어긋나면 아무도 모르므로 반드시 올린다.
+        // log("ERROR", ...)가 이미 Sentry로 올린다(helpers.log) — captureError를 겹쳐 부르면
+        // 같은 실패가 두 건으로 쌓인다.
         log("ERROR", context, "하이패스 잔액 반영 실패", {
             cardId, orgId, delta, error: (err as Error).message,
         });
-        captureError(err, { context, cardId, orgId, delta });
-        return { applied: false, reason: "card-missing" };
+        return { applied: false, reason: "write-failed" };
     }
 }
 
@@ -124,9 +126,10 @@ export function usedAmountOf(data: Record<string, unknown> | undefined | null): 
  * 카드를 고르는 규칙이 `기관 + 차량`이므로(`useDriveLogInitializer`의
  * `cards.find(c => c.vehicleId === form.vehicleId)`) 서버도 **같은 규칙**을 쓴다.
  *
- * 한 차량에 카드가 둘 이상이면 화면이 어느 것을 골랐는지 알 수 없으므로 반영하지 않는다.
- * (등록 화면이 중복 연결을 막지만 Rules가 강제하지는 않는다 — 막지 못한 상태를 만나면
- *  잘못 깎는 것보다 안 깎고 남기는 쪽이 낫다.)
+ * **다만 카드가 하나일 때만 같다.** 화면은 `find`라 목록의 첫 카드를 집는 반면 여기서는
+ * 둘 이상이면 **아무것도 고르지 않는다**. 잘못된 카드를 깎는 것보다 안 깎고 경고를 남기는
+ * 쪽이 낫다고 봤다(등록 화면이 중복 연결을 막지만 Rules가 강제하지는 않는다). 그 상태에서는
+ * 기록과 잔액이 어긋난 채 남으므로, WARNING이 뜨면 카드 연결을 정리해야 한다.
  */
 export async function findCardIdForVehicle(
     context: string,
@@ -151,6 +154,16 @@ export async function findCardIdForVehicle(
 /**
  * 운행일지의 하이패스 사용액 변화를 카드 잔액에 반영한다.
  *
+ * **이 함수는 절대 던지지 않는다.** 운행일지 트리거의 바깥 try 안에서, 그것도 맨 앞에서
+ * 불리기 때문이다. 카드 조회가 일시적 UNAVAILABLE로 실패했다고 예외가 위로 올라가면
+ * 그 뒤에 있는 **차량 누적 km 차분·startKm 연쇄 재정합·기관 통계가 통째로 유실된다**
+ * (트리거는 retry: false라 이벤트 재전달도 없다). 같은 이유로 위치·주유 표시 갱신이
+ * `applyVehicleCurrentSiteSafely`/`applyVehicleNeedsRefuelSafely`로 격리돼 있고,
+ * 이 함수는 그 규약을 함수 안에 들고 있는 형태다.
+ *
+ * 잔액은 다음 충전·사용 기록이 다시 맞춰 주지 못한다(증분이라 한 번 놓치면 어긋난 채
+ * 남는다). 그래도 회계 전체를 잃는 것보다는 잔액 하나가 어긋나고 **경보가 남는** 쪽이 낫다.
+ *
  * @param usedDelta 사용액의 증가분. 사용이 늘면 잔액은 그만큼 **줄어든다**.
  */
 export async function applyDriveLogHipassDelta(
@@ -160,7 +173,13 @@ export async function applyDriveLogHipassDelta(
     usedDelta: number,
 ): Promise<void> {
     if (!Number.isFinite(usedDelta) || usedDelta === 0) return;
-    const cardId = await findCardIdForVehicle(context, orgId, vehicleId);
-    if (!cardId) return;
-    await applyBalanceDelta(context, cardId, orgId, -usedDelta);
+    try {
+        const cardId = await findCardIdForVehicle(context, orgId, vehicleId);
+        if (!cardId) return;
+        await applyBalanceDelta(context, cardId, orgId, -usedDelta);
+    } catch (err) {
+        log("ERROR", context, "하이패스 사용액 반영 실패 (km 동기화는 계속 진행)", {
+            orgId, vehicleId, usedDelta, error: (err as Error).message,
+        });
+    }
 }

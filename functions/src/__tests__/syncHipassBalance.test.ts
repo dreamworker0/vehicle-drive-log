@@ -17,6 +17,8 @@ let cards: Record<string, Record<string, unknown> | undefined> = {};
 let vehicleCardIds: string[] = [];
 /** 트랜잭션 실행 횟수 — "아무것도 쓰지 않았다"를 증명하는 데 쓴다 */
 let transactionCount = 0;
+/** 마지막 카드 조회에 실린 where 절 — 테넌트 필터 회귀 방어 */
+let lastQueryFilters: Array<[string, string, unknown]> = [];
 
 jest.mock('firebase-admin/firestore', () => ({
     getFirestore: () => ({
@@ -35,15 +37,23 @@ jest.mock('firebase-admin/firestore', () => ({
         },
         collection: (name: string) => {
             if (name !== 'hipassCards') throw new Error(`예상하지 못한 컬렉션 접근: ${name}`);
+            // where 인자를 **버리지 않고 기록한다.** 인자를 무시하는 가짜였을 때는
+            // `.where("organizationId", ...)`를 지워도 테스트가 전부 통과했다 —
+            // 멀티테넌트 필터(CLAUDE.md 절대규칙 #1)를 지키는 장치가 하나도 없던 셈이다.
+            // 커스텀 ESLint 규칙은 src/lib/firestore/ 전용이라 functions/를 덮지 않는다.
+            const filters: Array<[string, string, unknown]> = [];
             const query: any = {
                 doc: (id: string) => ({ __id: id }),
-                where: () => query,
+                where: (field: string, op: string, value: unknown) => { filters.push([field, op, value]); return query; },
                 limit: () => query,
-                get: async () => ({
-                    empty: vehicleCardIds.length === 0,
-                    size: vehicleCardIds.length,
-                    docs: vehicleCardIds.map((id) => ({ id })),
-                }),
+                get: async () => {
+                    lastQueryFilters = filters;
+                    return {
+                        empty: vehicleCardIds.length === 0,
+                        size: vehicleCardIds.length,
+                        docs: vehicleCardIds.map((id) => ({ id })),
+                    };
+                },
             };
             return query;
         },
@@ -53,14 +63,41 @@ jest.mock('firebase-admin/firestore', () => ({
 
 jest.mock('../core/sentry', () => ({ captureError: jest.fn() }));
 
+// 트리거 래퍼는 핸들러를 그대로 반환한다(syncDriveLogKm.test와 같은 방식) —
+// 진짜 래퍼를 쓰면 CloudEvent 모양을 온전히 만들어야 해서 검사 대상이 흐려진다.
+jest.mock('firebase-functions/v2/firestore', () => ({
+    onDocumentCreated: (_o: unknown, h: unknown) => h,
+    onDocumentUpdated: (_o: unknown, h: unknown) => h,
+    onDocumentDeleted: (_o: unknown, h: unknown) => h,
+}));
+
 import {
     applyBalanceDelta, usedAmountOf, findCardIdForVehicle, applyDriveLogHipassDelta,
 } from '../services/hipass/applyBalanceDelta';
+import {
+    onHipassChargeCreated, onHipassChargeUpdated, onHipassChargeDeleted,
+} from '../handlers/triggers/syncHipassBalance';
+
+/** 트리거 핸들러를 이벤트 모양으로 호출한다 */
+const created = (data: Record<string, unknown>) =>
+    (onHipassChargeCreated as unknown as (e: unknown) => Promise<void>)({
+        data: { data: () => data }, params: { chargeId: 'h1' },
+    });
+const deleted = (data: Record<string, unknown>) =>
+    (onHipassChargeDeleted as unknown as (e: unknown) => Promise<void>)({
+        data: { data: () => data }, params: { chargeId: 'h1' },
+    });
+const updated = (before: Record<string, unknown>, after: Record<string, unknown>) =>
+    (onHipassChargeUpdated as unknown as (e: unknown) => Promise<void>)({
+        data: { before: { data: () => before }, after: { data: () => after } },
+        params: { chargeId: 'h1' },
+    });
 
 beforeEach(() => {
     cards = { c1: { organizationId: 'org-A', balance: 10_000 } };
     vehicleCardIds = ['c1'];
     transactionCount = 0;
+    lastQueryFilters = [];
 });
 
 describe('applyBalanceDelta', () => {
@@ -169,6 +206,68 @@ describe('applyDriveLogHipassDelta', () => {
         vehicleCardIds = ['c1', 'c2'];
         await applyDriveLogHipassDelta('t', 'org-A', 'v1', 500);
         expect(cards.c1?.balance).toBe(10_000);
+        expect(transactionCount).toBe(0);
+    });
+});
+
+describe('findCardIdForVehicle — 테넌트 필터', () => {
+    it('기관과 차량을 모두 where 절로 건다', async () => {
+        await findCardIdForVehicle('t', 'org-A', 'v1');
+        expect(lastQueryFilters).toEqual([
+            ['organizationId', '==', 'org-A'],
+            ['vehicleId', '==', 'v1'],
+        ]);
+    });
+});
+
+describe('충전 기록 트리거', () => {
+    const charge = (over: Record<string, unknown> = {}) => ({
+        organizationId: 'org-A', cardId: 'c1', chargeAmount: 5_000, ...over,
+    });
+
+    it('생성하면 그만큼 는다', async () => {
+        await created(charge());
+        expect(cards.c1?.balance).toBe(15_000);
+    });
+
+    it('삭제하면 그만큼 준다', async () => {
+        await deleted(charge());
+        expect(cards.c1?.balance).toBe(5_000);
+    });
+
+    it('수정하면 차액만 반영한다', async () => {
+        await updated(charge(), charge({ chargeAmount: 8_000 }));
+        expect(cards.c1?.balance).toBe(13_000);
+    });
+
+    it('금액이 그대로면 아무것도 쓰지 않는다', async () => {
+        await updated(charge(), charge({ date: '2026-09-02' }));
+        expect(cards.c1?.balance).toBe(10_000);
+        expect(transactionCount).toBe(0);
+    });
+
+    it('카드를 옮긴 정정은 옛 카드에서 빼고 새 카드에 더한다', async () => {
+        // 차액만 반영하면 두 카드가 동시에 어긋난다.
+        cards.c2 = { organizationId: 'org-A', balance: 1_000 };
+        await updated(charge(), charge({ cardId: 'c2', chargeAmount: 8_000 }));
+        expect(cards.c1?.balance).toBe(5_000);   // 10,000 - 5,000(옛 금액)
+        expect(cards.c2?.balance).toBe(9_000);   // 1,000 + 8,000(새 금액)
+    });
+
+    it('금액이 숫자가 아니면 0으로 보고 잔액을 건드리지 않는다', async () => {
+        await created(charge({ chargeAmount: '5000' }));
+        expect(cards.c1?.balance).toBe(10_000);
+    });
+
+    it('다른 기관의 카드를 가리키는 기록은 반영하지 않는다', async () => {
+        await created(charge({ organizationId: 'org-B' }));
+        expect(cards.c1?.balance).toBe(10_000);
+    });
+
+    it('문서가 비어 있으면 조용히 끝난다', async () => {
+        await (onHipassChargeCreated as unknown as (e: unknown) => Promise<void>)({
+            data: undefined, params: { chargeId: 'h1' },
+        });
         expect(transactionCount).toBe(0);
     });
 });

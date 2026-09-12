@@ -1312,6 +1312,19 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
 
     // 잔액을 건드리지 않는 수정은 그대로 통과한다(메모·차량 연결 등).
     await assertSucceeds(adminA.collection('hipassCards').doc('card_A').update({ memo: '차량 교체' }));
+
+    // create에도 같은 하한이 걸린다. update에만 걸었을 때는 **처음부터 음수인 카드를
+    // 만드는** 길이 남아 있었고, 그러면 update의 방어가 무의미해진다.
+    await assertFails(adminA.collection('hipassCards').doc('card_neg').set({
+      organizationId: 'org-A', cardNumber: '2222', vehicleId: 'v_B', balance: -5000,
+    }));
+    await assertSucceeds(adminA.collection('hipassCards').doc('card_new').set({
+      organizationId: 'org-A', cardNumber: '2222', vehicleId: 'v_B', balance: 0,
+    }));
+    // 직원은 카드를 만들 수 없다(종전과 같다 — 음수 가드가 이 경계를 흐리지 않았는지 함께 본다).
+    await assertFails(empDb.collection('hipassCards').doc('card_emp').set({
+      organizationId: 'org-A', cardNumber: '3333', vehicleId: 'v_C', balance: 1000,
+    }));
   });
 
 });
