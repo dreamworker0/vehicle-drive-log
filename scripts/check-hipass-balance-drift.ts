@@ -99,14 +99,21 @@ async function run(): Promise<void> {
 
         // 기준점 이후의 충전 — 기록의 시각은 createdAt을 쓴다(date는 사용자가 고르는 값이라
         // 기준점과 같은 시간축이 아니다).
+        //
+        // **시각 필터는 Firestore가 아니라 여기서 건다.** 동등 두 개(org·card)에 범위 하나를
+        // 더하면 `(cardId, organizationId, createdAt ASC)` 복합 인덱스가 필요한데, 기존 인덱스는
+        // `createdAt DESC`라 받지 못한다(실행해서 확인했다 — code 9 "query requires an index").
+        // 한 카드의 충전 기록은 많아야 월 몇 건이라 전부 읽어도 부담이 없고, 검산 하나 때문에
+        // 인덱스를 늘리는 것보다 낫다. 기관·카드 필터는 그대로 남긴다(절대규칙 #1).
         const charges = await db.collection("hipassCharges")
             .where("organizationId", "==", org)
             .where("cardId", "==", card.id)
-            .where("createdAt", ">", baselineAt)
             .get();
-        const chargeSum = charges.docs.reduce(
-            (sum, d) => sum + (typeof d.data().chargeAmount === "number" ? d.data().chargeAmount : 0), 0,
-        );
+        const chargeSum = charges.docs.reduce((sum, d) => {
+            const createdAt = toDate(d.data().createdAt);
+            if (!createdAt || createdAt <= baselineAt) return sum;
+            return sum + (typeof d.data().chargeAmount === "number" ? d.data().chargeAmount : 0);
+        }, 0);
 
         // 기준점 이후의 사용 — 트리거가 카드를 찾는 규칙과 같게 기관+차량으로 모은다.
         const logs = await db.collection("driveLogs")
