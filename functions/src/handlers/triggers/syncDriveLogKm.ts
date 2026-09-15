@@ -299,6 +299,78 @@ async function applyVehicleNeedsRefuel(
     });
 }
 
+/** 차량 문서로 옮겨 싣는 비고의 최대 길이. 넘치면 잘라 담는다(전문은 운행일지에 그대로 남는다). */
+const LAST_DRIVE_NOTE_MAX = 300;
+
+/**
+ * 직전 운행의 비고를 차량 문서로 복사한다 — 다음 사람이 **차를 가지러 가기 전에** 읽도록.
+ *
+ * 원본은 운행일지에 있는데도 굳이 옮기는 이유는 읽는 쪽의 사정이다. 오늘의 예약 카드는
+ * 차량 목록만 읽고 일지는 읽지 않는다. 카드에서 직접 조회하면 전 운전자가 매일 여는 화면에
+ * 예약마다 읽기가 하나씩 붙는다. 차량 문서는 이미 읽고 있으므로 여기로 옮기면 읽기가 늘지
+ * 않고, 쓰기도 현재 위치·주유 필요와 같은 update에 얹힌다.
+ *
+ * **비고를 지운 수정은 차량의 값도 지운다.** 앞 운전자의 "3층 B-12"가 남아 있는 쪽이
+ * 아무것도 안 보이는 쪽보다 나쁘다 — 사람을 엉뚱한 층으로 보낸다.
+ *
+ * 소급 건에는 손대지 않는다. 3일 전 운행을 오늘 적으면서 주차 위치를 남겨도 그 뒤에 차가
+ * 몇 번 더 움직였을 수 있어, 지금 차가 어디 있는지의 근거가 되지 못한다. 판정은 currentKm·
+ * 현재 위치와 같은 `isEffectivelyRetroactive`를 그대로 받아 쓴다.
+ */
+async function applyVehicleLastDriveNote(
+    orgId: string,
+    vehId: string,
+    notes: unknown,
+    driverName: unknown,
+    ts: Date,
+    isEffectivelyRetroactive: boolean,
+): Promise<void> {
+    if (isEffectivelyRetroactive) return;
+
+    const note = (typeof notes === "string" ? notes.trim() : "").slice(0, LAST_DRIVE_NOTE_MAX);
+    const by = typeof driverName === "string" ? driverName.trim() : "";
+
+    // 차량이 운행일지의 기관 소속인지 검증 후 갱신 (교차 테넌트 오염 차단 — currentKm과 같은 규칙)
+    const vehSnap = await db.collection("vehicles").doc(vehId).get();
+    const veh = vehSnap.data();
+    if (!vehSnap.exists || veh?.organizationId !== orgId) {
+        console.warn(`[applyVehicleLastDriveNote] 차량 org 불일치 — 직전 비고 갱신 건너뜀: veh=${vehId}, org=${orgId}`);
+        return;
+    }
+
+    // 더 최신 운행의 비고가 이미 올라와 있으면 덮지 않는다. `isEffectivelyRetroactive`는
+    // "뒤에 다른 운행일지가 있는가"만 보므로, 뒤 기록이 없는 경로로 들어온 과거 운행을
+    // 여기서 한 번 더 거른다(현재 위치·주유 필요와 같은 2차 방어선).
+    const notedAt = veh?.lastDriveNoteAt;
+    const notedDate = notedAt instanceof Date ? notedAt : notedAt?.toDate?.();
+    if (notedDate instanceof Date && notedDate.getTime() > ts.getTime()) return;
+
+    const stored = typeof veh?.lastDriveNote === "string" ? veh.lastDriveNote : "";
+    const storedBy = typeof veh?.lastDriveNoteBy === "string" ? veh.lastDriveNoteBy : "";
+
+    if (!note) {
+        // 지울 것이 없으면 쓰지 않는다. 비고 없는 운행이 대부분이라, 이 조기 반환이 곧 쓰기 절약이다.
+        if (!stored) return;
+        await db.collection("vehicles").doc(vehId).update({
+            lastDriveNote: FieldValue.delete(),
+            lastDriveNoteBy: FieldValue.delete(),
+            // 시각은 남긴다 — 지운 것도 "이 운행까지 반영했다"는 사실이고, 남겨 두어야 더 오래된
+            // 운행이 뒤늦게 저장되며 지워진 비고를 되살리는 일을 위 신선도 가드가 막을 수 있다.
+            lastDriveNoteAt: ts,
+        });
+        return;
+    }
+
+    // 같은 내용을 다시 쓰지 않는다(트리거 재실행·무관한 필드 수정으로 여기까지 온 경우).
+    if (stored === note && storedBy === by) return;
+
+    await db.collection("vehicles").doc(vehId).update({
+        lastDriveNote: note,
+        lastDriveNoteBy: by,
+        lastDriveNoteAt: ts,
+    });
+}
+
 /**
  * 위치 갱신은 **누적 km·통계 회계와 분리해서** 실행한다.
  *
@@ -335,6 +407,29 @@ async function applyVehicleNeedsRefuelSafely(
         await applyVehicleNeedsRefuel(orgId, vehId, needsRefuel, ts, isEffectivelyRetroactive);
     } catch (error) {
         console.error(`[${context}] 주유 필요 표시 갱신 실패 (km 동기화는 계속 진행):`, error);
+        captureError(error, { context, vehId, orgId });
+    }
+}
+
+/**
+ * 직전 비고도 같은 이유로 회계와 분리한다(위 주석 참고).
+ *
+ * Sentry 컨텍스트에 **비고 본문을 싣지 않는다.** 목적지·동승자 이름과 함께 비고는 자유 입력이라
+ * 개인정보가 섞이는 자리이고, 프런트에서도 스크러빙 대상으로 다루고 있다. 식별자만 남긴다.
+ */
+async function applyVehicleLastDriveNoteSafely(
+    context: string,
+    orgId: string,
+    vehId: string,
+    notes: unknown,
+    driverName: unknown,
+    ts: Date,
+    isEffectivelyRetroactive: boolean,
+): Promise<void> {
+    try {
+        await applyVehicleLastDriveNote(orgId, vehId, notes, driverName, ts, isEffectivelyRetroactive);
+    } catch (error) {
+        console.error(`[${context}] 직전 비고 갱신 실패 (km 동기화는 계속 진행):`, error);
         captureError(error, { context, vehId, orgId });
     }
 }
@@ -403,6 +498,8 @@ export const onDriveLogCreated = onDocumentCreated(
             // 차를 세운 곳을 차량의 현재 위치로 반영 (소급이면 건너뛴다)
             await applyVehicleCurrentSiteSafely('onDriveLogCreated', orgId, vehId, data.endSiteId, ts, isEffectivelyRetroactive);
             await applyVehicleNeedsRefuelSafely('onDriveLogCreated', orgId, vehId, data.needsRefuel, ts, isEffectivelyRetroactive);
+            // 직전 비고를 차량에 옮겨 다음 사람이 차를 가지러 가기 전에 읽게 한다 (소급이면 건너뛴다)
+            await applyVehicleLastDriveNoteSafely('onDriveLogCreated', orgId, vehId, data.notes, data.driverName, ts, isEffectivelyRetroactive);
 
             // 다음 기록의 startKm 자동 연동 (소급이든 아니든 항상 시도)
             const chain = await syncNextLogStartKm(orgId, vehId, ts, endKm);
@@ -519,6 +616,14 @@ export const onDriveLogUpdated = onDocumentUpdated(
             if (data.needsRefuel !== oldData.needsRefuel && vehId && orgId && ts) {
                 const isRetroactiveForRefuel = isRetro || await hasLaterDriveLog(orgId, vehId, ts);
                 await applyVehicleNeedsRefuelSafely('onDriveLogUpdated', orgId, vehId, data.needsRefuel, ts, isRetroactiveForRefuel);
+            }
+
+            // 비고가 **바뀐** 수정만 차량에 다시 싣는다. 대부분의 수정은 비고와 무관하고,
+            // 매번 들어가면 운행일지 수정 한 번마다 차량 문서 읽기가 하나씩 늘어난다.
+            // 비고를 지운 수정도 여기에 걸린다 — 지우는 것 역시 반영해야 할 변경이다.
+            if (data.notes !== oldData.notes && vehId && orgId && ts) {
+                const isRetroactiveForNote = isRetro || await hasLaterDriveLog(orgId, vehId, ts);
+                await applyVehicleLastDriveNoteSafely('onDriveLogUpdated', orgId, vehId, data.notes, data.driverName, ts, isRetroactiveForNote);
             }
 
             if (data.endKm !== undefined && vehId && orgId && ts) {

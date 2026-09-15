@@ -147,3 +147,56 @@ describe('오늘의 예약 카드 — 주유·충전 필요 배지', () => {
         expect(screen.getByTestId('vehicle-refuel-badge').textContent).toContain('충전 필요');
     });
 });
+
+/**
+ * 직전 운전자가 비고에 적어 둔 주차 위치는, 차를 가지러 **가기 전에** 보여야 쓸모가 있다
+ * (운행일지 작성 화면은 운행이 끝난 뒤에 열린다). 그래서 이 카드가 그 자리를 맡는다.
+ *
+ * 회귀 지점은 낡음이다. 일지가 지워지거나 보존기간이 지나도 차량 문서의 사본은 남으므로,
+ * 14일 컷이 무너지면 몇 달 전 주차 위치가 오늘의 안내인 척 뜬다.
+ */
+describe('오늘의 예약 카드 — 직전 운행 비고', () => {
+    const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000);
+
+    it('비고를 적지 않았으면 줄 자체가 나오지 않는다', () => {
+        renderCard({ vehicle: vehicle() });
+        expect(screen.queryByTestId('vehicle-last-note')).toBeNull();
+    });
+
+    it('공백만 적힌 비고도 없는 것으로 본다', () => {
+        renderCard({ vehicle: vehicle({ lastDriveNote: '   ', lastDriveNoteAt: daysAgo(1) }) });
+        expect(screen.queryByTestId('vehicle-last-note')).toBeNull();
+    });
+
+    it('최근 비고는 적은 사람과 시각을 함께 보여 준다', () => {
+        renderCard({
+            vehicle: vehicle({
+                lastDriveNote: '타워 3층 B-12',
+                lastDriveNoteBy: '홍길동',
+                lastDriveNoteAt: new Date('2026-09-15T17:20:00'),
+            }),
+        });
+        const note = screen.getByTestId('vehicle-last-note');
+        expect(note.textContent).toContain('타워 3층 B-12');
+        expect(note.textContent).toContain('홍길동');
+        expect(note.textContent).toContain('9/15 17:20');
+    });
+
+    it('14일이 지난 비고는 띄우지 않는다 — 2주 전 주차 위치는 오정보다', () => {
+        renderCard({ vehicle: vehicle({ lastDriveNote: '타워 3층 B-12', lastDriveNoteAt: daysAgo(15) }) });
+        expect(screen.queryByTestId('vehicle-last-note')).toBeNull();
+    });
+
+    it('시각을 모르는 비고는 띄우지 않는다 — 낡음을 판단할 수 없다', () => {
+        renderCard({ vehicle: vehicle({ lastDriveNote: '타워 3층 B-12' }) });
+        expect(screen.queryByTestId('vehicle-last-note')).toBeNull();
+    });
+
+    it('운행 중에는 띄우지 않는다 — 차는 이미 내 손에 있다', () => {
+        renderCard({
+            isInProgress: true,
+            vehicle: vehicle({ lastDriveNote: '타워 3층 B-12', lastDriveNoteAt: daysAgo(1) }),
+        });
+        expect(screen.queryByTestId('vehicle-last-note')).toBeNull();
+    });
+});
