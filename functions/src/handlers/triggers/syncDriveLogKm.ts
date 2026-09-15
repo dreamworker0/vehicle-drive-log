@@ -37,10 +37,15 @@ async function hasLaterDriveLog(orgId: string, vehicleId: string, afterTimestamp
  * `where("timestamp","<",cutoff)`라 timestamp 없는 문서는 애초에 대상이 아니고,
  * 기본값은 "돈을 맞춘다" 쪽이어야 한다.
  */
-function isBeyondRetention(context: string, ts: Date | undefined | null): boolean {
+function isBeyondRetention(
+    context: string,
+    ts: Date | undefined | null,
+    /** 건너뛴 대상 — 잔액 말고도 이 경계를 쓰는 곳이 생겨서 로그에 무엇을 건드리지 않았는지 남긴다. */
+    what = "하이패스 잔액을 건드리지 않는다",
+): boolean {
     if (ts == null) return false;
     if (ts >= driveLogRetentionCutoff()) return false;
-    log("INFO", context, "보존 기한 밖 기록이라 하이패스 잔액을 건드리지 않는다", {
+    log("INFO", context, `보존 기한 밖 기록이라 ${what}`, {
         timestamp: ts.toISOString(),
     });
     return true;
@@ -305,10 +310,14 @@ const LAST_DRIVE_NOTE_MAX = 300;
 /**
  * 직전 운행의 비고를 차량 문서로 복사한다 — 다음 사람이 **차를 가지러 가기 전에** 읽도록.
  *
- * 원본은 운행일지에 있는데도 굳이 옮기는 이유는 읽는 쪽의 사정이다. 오늘의 예약 카드는
+ * 원본은 운행일지에 있는데도 굳이 옮기는 이유는 **읽는 쪽**의 사정이다. 오늘의 예약 카드는
  * 차량 목록만 읽고 일지는 읽지 않는다. 카드에서 직접 조회하면 전 운전자가 매일 여는 화면에
- * 예약마다 읽기가 하나씩 붙는다. 차량 문서는 이미 읽고 있으므로 여기로 옮기면 읽기가 늘지
- * 않고, 쓰기도 현재 위치·주유 필요와 같은 update에 얹힌다.
+ * 예약마다 읽기가 하나씩 붙는다. 여기로 옮기면 그 화면의 읽기가 늘지 않는다.
+ *
+ * 대신 **트리거 쪽에서는 늘어난다** — 차량 문서를 한 번 읽고, 바뀔 때 한 번 쓴다. 바로 위
+ * `applyVehicleNeedsRefuel`은 표시된 일지에서만 읽지만 여기서는 그럴 수 없다. 비고가 비어
+ * 있어도 **앞사람이 남긴 값을 지워야 하는지** 알아야 하고, 그건 읽어 봐야 안다. 운행일지
+ * 한 건당 차량 문서 읽기 1회가 붙는 것이 이 기능의 서버 측 값이다.
  *
  * **비고를 지운 수정은 차량의 값도 지운다.** 앞 운전자의 "3층 B-12"가 남아 있는 쪽이
  * 아무것도 안 보이는 쪽보다 나쁘다 — 사람을 엉뚱한 층으로 보낸다.
@@ -327,8 +336,24 @@ async function applyVehicleLastDriveNote(
 ): Promise<void> {
     if (isEffectivelyRetroactive) return;
 
-    const note = (typeof notes === "string" ? notes.trim() : "").slice(0, LAST_DRIVE_NOTE_MAX);
+    // 보존 기한 밖 기록은 오늘의 차량 상태와 무관하다 — 하이패스와 같은 경계를 본다.
+    // `scripts/restoreArchivedLogs.ts`가 아카이브를 `batch.set`으로 되돌리면 이 트리거가
+    // 깨는데, 거르지 않으면 **3년 전에 적은 비고가 살아 있는 차량 문서로 되살아난다.**
+    // 화면에는 14일 컷에 걸려 안 보이지만, 정리했던 개인정보가 활성 문서로 돌아오는 것은
+    // 그 자체로 되돌리면 안 되는 일이다.
+    if (isBeyondRetention("applyVehicleLastDriveNote", ts, "직전 비고를 차량에 싣지 않는다")) return;
+
+    // 글자 단위로 자른다. `slice`는 UTF-16 코드 유닛을 세므로 이모지가 경계에 걸리면
+    // 짝 잃은 서러게이트가 남는다.
+    const trimmed = typeof notes === "string" ? notes.trim() : "";
+    const note = [...trimmed].slice(0, LAST_DRIVE_NOTE_MAX).join("");
     const by = typeof driverName === "string" ? driverName.trim() : "";
+
+    // 신선도 판정과 표시에 쓸 시각. `ts`는 운전자가 고른 날짜·도착 시각에서 만들어진
+    // **사용자 입력**이라 오늘 날짜의 미래 시각이 그대로 들어올 수 있다(그 경우 소급으로도
+    // 판정되지 않는다). 미래 값을 그대로 저장하면 아래 가드가 스스로 잠겨, 그날 실제로
+    // 적힌 비고들이 조용히 무시된다. 그래서 지금보다 미래면 지금으로 당긴다.
+    const notedTime = new Date(Math.min(ts.getTime(), Date.now()));
 
     // 차량이 운행일지의 기관 소속인지 검증 후 갱신 (교차 테넌트 오염 차단 — currentKm과 같은 규칙)
     const vehSnap = await db.collection("vehicles").doc(vehId).get();
@@ -343,10 +368,18 @@ async function applyVehicleLastDriveNote(
     // 여기서 한 번 더 거른다(현재 위치·주유 필요와 같은 2차 방어선).
     const notedAt = veh?.lastDriveNoteAt;
     const notedDate = notedAt instanceof Date ? notedAt : notedAt?.toDate?.();
-    if (notedDate instanceof Date && notedDate.getTime() > ts.getTime()) return;
+    if (notedDate instanceof Date && notedDate.getTime() > notedTime.getTime()) return;
 
     const stored = typeof veh?.lastDriveNote === "string" ? veh.lastDriveNote : "";
     const storedBy = typeof veh?.lastDriveNoteBy === "string" ? veh.lastDriveNoteBy : "";
+
+    // 같은 이벤트가 다시 전달된 경우에만 건너뛴다 — 내용과 시각이 **모두** 같을 때다.
+    //
+    // 내용만 보고 건너뛰면 안 된다. 고정 주차면을 쓰는 기관은 매일 같은 비고("타워 3층 B-12")를
+    // 적는데, 그때 시각 갱신까지 건너뛰면 `lastDriveNoteAt`이 첫날에 멈춘다. 화면의 신선도
+    // 컷은 이 시각만 보므로 **매일 적고 있는데도 2주 뒤 예약 카드에서 비고가 사라진다.**
+    // 그 전에도 메타 줄이 어제 적은 것을 2주 전 것으로 표시한다.
+    if (stored === note && storedBy === by && notedDate?.getTime() === notedTime.getTime()) return;
 
     if (!note) {
         // 지울 것이 없으면 쓰지 않는다. 비고 없는 운행이 대부분이라, 이 조기 반환이 곧 쓰기 절약이다.
@@ -356,18 +389,50 @@ async function applyVehicleLastDriveNote(
             lastDriveNoteBy: FieldValue.delete(),
             // 시각은 남긴다 — 지운 것도 "이 운행까지 반영했다"는 사실이고, 남겨 두어야 더 오래된
             // 운행이 뒤늦게 저장되며 지워진 비고를 되살리는 일을 위 신선도 가드가 막을 수 있다.
-            lastDriveNoteAt: ts,
+            lastDriveNoteAt: notedTime,
         });
         return;
     }
 
-    // 같은 내용을 다시 쓰지 않는다(트리거 재실행·무관한 필드 수정으로 여기까지 온 경우).
-    if (stored === note && storedBy === by) return;
-
     await db.collection("vehicles").doc(vehId).update({
         lastDriveNote: note,
         lastDriveNoteBy: by,
-        lastDriveNoteAt: ts,
+        lastDriveNoteAt: notedTime,
+    });
+}
+
+/**
+ * 지워진 운행일지가 차량에 남긴 비고 사본을 함께 지운다.
+ *
+ * 비고에는 이용자 성함 같은 자유 입력이 섞인다. 관리자가 그것을 지우려고 운행일지를 삭제해도
+ * 차량 문서의 사본은 남는데, 이 기능은 관리자 직접 수정 경로를 열지 않았으므로 **지울 수 있는
+ * 사람이 아무도 없다.** 같은 차량에 새 운행이 들어와야만 덮인다(폐차·장기 미운행 차량은 영영).
+ * 화면의 14일 컷은 보이지 않게 할 뿐 데이터를 지우지 않는다.
+ *
+ * 그 일지에서 온 사본일 때만 지운다 — 판정은 시각 일치다. 사본은 출처 일지의 `timestamp`를
+ * 그대로 싣고 있어(미래 시각만 당겨진다) 다른 일지가 덮어쓴 뒤에는 시각이 어긋난다.
+ */
+async function clearVehicleLastDriveNoteOnDelete(
+    orgId: string,
+    vehId: string,
+    ts: Date,
+): Promise<void> {
+    const vehSnap = await db.collection("vehicles").doc(vehId).get();
+    const veh = vehSnap.data();
+    if (!vehSnap.exists || veh?.organizationId !== orgId) return;
+    if (typeof veh?.lastDriveNote !== "string" || !veh.lastDriveNote) return;
+
+    const notedAt = veh?.lastDriveNoteAt;
+    const notedDate = notedAt instanceof Date ? notedAt : notedAt?.toDate?.();
+    // 시각이 정확히 같을 때만 지운다. 도착 시각을 미래로 적어 저장 때 당겨진 사본은 여기서
+    // 어긋나 남는데, 그 경우는 다음 운행이 덮는다 — 남의 비고를 지우는 쪽이 더 나쁘다.
+    if (!(notedDate instanceof Date) || notedDate.getTime() !== ts.getTime()) return;
+
+    await db.collection("vehicles").doc(vehId).update({
+        lastDriveNote: FieldValue.delete(),
+        lastDriveNoteBy: FieldValue.delete(),
+        // 시각은 남긴다 — 저장 쪽과 같은 이유다(더 오래된 운행이 되살리지 못하게).
+        lastDriveNoteAt: notedDate,
     });
 }
 
@@ -430,6 +495,21 @@ async function applyVehicleLastDriveNoteSafely(
         await applyVehicleLastDriveNote(orgId, vehId, notes, driverName, ts, isEffectivelyRetroactive);
     } catch (error) {
         console.error(`[${context}] 직전 비고 갱신 실패 (km 동기화는 계속 진행):`, error);
+        captureError(error, { context, vehId, orgId });
+    }
+}
+
+/** 삭제 쪽 비고 정리도 같은 이유로 회계와 분리한다(위 주석 참고). */
+async function clearVehicleLastDriveNoteSafely(
+    context: string,
+    orgId: string,
+    vehId: string,
+    ts: Date,
+): Promise<void> {
+    try {
+        await clearVehicleLastDriveNoteOnDelete(orgId, vehId, ts);
+    } catch (error) {
+        console.error(`[${context}] 직전 비고 정리 실패 (km 동기화는 계속 진행):`, error);
         captureError(error, { context, vehId, orgId });
     }
 }
@@ -708,6 +788,11 @@ export const onDriveLogDeleted = onDocumentDeleted(
             }
 
             if (!orgId || !vehId || !ts) return;
+
+            // 그 일지가 차량에 남긴 비고 사본을 함께 지운다. 원본을 지웠는데 사본이 남으면
+            // 지울 수 있는 사람이 아무도 없다(관리자 직접 수정 경로를 열지 않았다).
+            // 보존 기한은 보지 않는다 — 오래된 사본일수록 지워야 할 이유가 크다.
+            await clearVehicleLastDriveNoteSafely('onDriveLogDeleted', orgId, vehId, ts);
 
             // 최신 기록 삭제 여부 판별 (자기 자신은 삭제되었으므로 본인 이후의 기록이 있는지 확인)
             const isEffectivelyRetroactive = await hasLaterDriveLog(orgId, vehId, ts);
