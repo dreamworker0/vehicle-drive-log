@@ -51,6 +51,39 @@ function buildSiteLabel(orgSites: OrgSite[], vehicle: Vehicle | undefined, isInP
     return `${name} · ${when} 기준`;
 }
 
+/**
+ * 예약 카드에 직전 비고를 띄우는 신선도 한계.
+ *
+ * 2주 전 주차 위치는 정보가 아니라 오정보다. 이 컷은 낡은 안내를 막는 동시에, 운행일지가
+ * 삭제되거나 보존기간이 지나 정리된 뒤에도 차량 문서에 남아 있는 사본이 화면으로 새어
+ * 나오지 않게 하는 마개이기도 하다(트리거는 일지 삭제를 따라가지 않는다).
+ */
+const LAST_NOTE_MAX_AGE_MS = 14 * 24 * 60 * 60 * 1000;
+
+/**
+ * 직전 운전자가 비고에 남긴 한 줄 — 주차 위치처럼 다음 사람이 출발 전에 알아야 하는 것.
+ *
+ * 운행 중에는 띄우지 않는다. 그 차는 이미 내 손에 있고, 지금 필요한 것은 앞사람이 어디에
+ * 세웠는지가 아니다. 시각을 모르면(값이 없으면) 아예 띄우지 않는다 — 언제 적힌 것인지
+ * 모르는 안내는 한 번 헛걸음시키고 나면 그 뒤로 아무도 믿지 않는다(위치 배지와 같은 이유).
+ */
+function buildLastNote(
+    vehicle: Vehicle | undefined,
+    isInProgress: boolean,
+): { text: string; meta: string } | null {
+    if (isInProgress) return null;
+
+    const text = (vehicle?.lastDriveNote || '').trim();
+    if (!text) return null;
+
+    const at = toDateOrNull(vehicle?.lastDriveNoteAt as Parameters<typeof toDateOrNull>[0]);
+    if (!at || Date.now() - at.getTime() > LAST_NOTE_MAX_AGE_MS) return null;
+
+    const when = `${at.getMonth() + 1}/${at.getDate()} ${String(at.getHours()).padStart(2, '0')}:${String(at.getMinutes()).padStart(2, '0')}`;
+    const by = (vehicle?.lastDriveNoteBy || '').trim();
+    return { text, meta: by ? `${by} · ${when}` : when };
+}
+
 export default function ReservationCard({
     reservation, vehicle, isInProgress, disabled,
     startingId, cancellingId, onStartDrive, onStartNavigation, onArrival, onCancel,
@@ -60,6 +93,7 @@ export default function ReservationCard({
 }: ReservationCardProps) {
     const isButtonDisabled = disabled || startingId === reservation.id;
     const siteLabel = buildSiteLabel(orgSites, vehicle, isInProgress);
+    const lastNote = buildLastNote(vehicle, isInProgress);
 
     // 차를 가지러 가기 직전에 한 번 더 알린다. 예약할 때 봤더라도 며칠 지났을 수 있다.
     const needsRefuel = refuelFlagEnabled && vehicle?.needsRefuel === true;
@@ -166,6 +200,19 @@ export default function ReservationCard({
                                     className={`text-xs truncate ${isInProgress ? 'text-amber-700/70 dark:text-amber-300/80' : 'text-surface-500 dark:text-surface-300'}`}
                                 >
                                     🚩 {siteLabel}
+                                </p>
+                            )}
+                            {lastNote && (
+                                <p
+                                    data-testid="vehicle-last-note"
+                                    className="text-xs text-surface-500 dark:text-surface-300 mt-0.5"
+                                >
+                                    {/* 한 줄로 자른다 — 카드의 주인공은 예약이고, 비고는 단서다.
+                                        전문은 [더보기 → 차량 이용 내역]에서 볼 수 있다. */}
+                                    <span className="block truncate">📝 {lastNote.text}</span>
+                                    <span className="block text-[10px] text-surface-400 dark:text-surface-500 truncate">
+                                        {lastNote.meta}
+                                    </span>
                                 </p>
                             )}
                             {needsRefuel && (

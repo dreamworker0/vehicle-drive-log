@@ -28,10 +28,11 @@ jest.mock('firebase-admin/firestore', () => {
         }
     };
 
-    // FieldValue.increment는 실제 Firestore처럼 숫자로 반영한다 (기록되는 patch는 원본 그대로 남긴다)
+    // FieldValue.increment·delete는 실제 Firestore처럼 반영한다 (기록되는 patch는 원본 그대로 남긴다)
     const applyPatch = (target: Record<string, unknown>, patch: Record<string, unknown>) => {
         for (const [k, v] of Object.entries(patch)) {
             const inc = (v as { __increment?: number })?.__increment;
+            if ((v as { __delete?: boolean })?.__delete) { delete target[k]; continue; }
             target[k] = typeof inc === 'number' ? ((target[k] as number) ?? 0) + inc : v;
         }
     };
@@ -115,6 +116,7 @@ jest.mock('firebase-admin/firestore', () => {
         FieldValue: {
             serverTimestamp: () => 'SERVER_TS',
             increment: (n: number) => ({ __increment: n }),
+            delete: () => ({ __delete: true }),
         },
     };
 });
@@ -757,5 +759,277 @@ describe('onDriveLogDeleted — 중간 기록 삭제 후 재정합', () => {
         const vehUpdates = db.__updates().filter((u: { col: string }) => u.col === 'vehicles');
         expect(vehUpdates).toHaveLength(1);
         expect(vehUpdates[0].patch).toEqual({ currentKm: { __increment: -30 } });
+    });
+});
+
+describe('직전 운행 비고(lastDriveNote) 갱신', () => {
+    beforeEach(() => {
+        jest.spyOn(console, 'error').mockImplementation();
+        jest.spyOn(console, 'warn').mockImplementation();
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    const makeEvent = (data: Record<string, unknown>) => ({
+        data: { data: () => data },
+        params: { logId: 'R' },
+    });
+    const makeUpdateEvent = (before: Record<string, unknown>, after: Record<string, unknown>, id = 'B') => ({
+        data: {
+            before: { data: () => before },
+            after: { data: () => after, ref: db.collection('driveLogs').doc(id) },
+        },
+        params: { logId: id },
+    });
+    const notePatches = () => db.__updates()
+        .filter((u: { col: string; patch: Record<string, unknown> }) => u.col === 'vehicles' && 'lastDriveNote' in u.patch)
+        .map((u: { patch: Record<string, unknown> }) => u.patch);
+
+    it('최신 기록의 비고를 차량에 싣는다 — 다음 사람이 차를 가지러 가기 전에 읽는다', async () => {
+        seedLogs([], [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1000 } }]);
+
+        await (onDriveLogCreated as unknown as Function)(makeEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: d(20),
+            startKm: 1000, endKm: 1050, distance: 50,
+            notes: '  타워 3층 B-12  ', driverName: '홍길동',
+        }));
+
+        expect(notePatches()).toEqual([
+            { lastDriveNote: '타워 3층 B-12', lastDriveNoteBy: '홍길동', lastDriveNoteAt: d(20) },
+        ]);
+    });
+
+    it('비고 없는 운행은 차량 문서를 건드리지 않는다', async () => {
+        // 대부분의 운행에는 비고가 없다. 여기서 조기 반환하지 않으면 운행마다 쓰기가 하나씩 는다.
+        seedLogs([], [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1000 } }]);
+
+        await (onDriveLogCreated as unknown as Function)(makeEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: d(20),
+            startKm: 1000, endKm: 1050, distance: 50, notes: '   ',
+        }));
+
+        expect(notePatches()).toHaveLength(0);
+    });
+
+    it('비고를 지운 수정은 차량의 비고도 지운다 — 낡은 주차 위치가 남으면 사람을 엉뚱한 곳으로 보낸다', async () => {
+        seedLogs(
+            [{ id: 'B', timestamp: d(20), startKm: 1000, endKm: 1050 }],
+            [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1050, lastDriveNote: '타워 3층 B-12', lastDriveNoteBy: '홍길동', lastDriveNoteAt: d(20) } }],
+        );
+
+        await (onDriveLogUpdated as unknown as Function)(makeUpdateEvent(
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1050, notes: '타워 3층 B-12' },
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1050, notes: '' },
+        ));
+
+        expect(notePatches()).toEqual([
+            { lastDriveNote: { __delete: true }, lastDriveNoteBy: { __delete: true }, lastDriveNoteAt: d(20) },
+        ]);
+        // 시각은 남는다 — 더 오래된 운행이 뒤늦게 저장되며 지워진 비고를 되살리는 것을 막는 근거다.
+        const veh = db.__get('vehicles', VEH) as Record<string, unknown>;
+        expect(veh.lastDriveNote).toBeUndefined();
+        expect(veh.lastDriveNoteAt).toEqual(d(20));
+    });
+
+    it('소급 입력은 비고를 싣지 않는다 — 그 뒤로 차가 몇 번 더 움직였을 수 있다', async () => {
+        seedLogs(
+            [{ id: 'B', timestamp: d(15), startKm: 60200, endKm: 60250 }],
+            [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 60250 } }],
+        );
+
+        await (onDriveLogCreated as unknown as Function)(makeEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: d(10),
+            startKm: 60123, endKm: 60200, distance: 77, isRetroactive: true,
+            notes: '타워 3층 B-12', driverName: '홍길동',
+        }));
+
+        expect(notePatches()).toHaveLength(0);
+    });
+
+    it('더 최신 비고가 이미 있으면 과거 운행이 덮지 않는다', async () => {
+        // 뒤에 다른 기록이 없어 소급으로 판정되지 않는 경로 — 신선도 가드만이 막는다.
+        seedLogs(
+            [],
+            [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1000, lastDriveNote: '지하 2층', lastDriveNoteAt: d(21) } }],
+        );
+
+        await (onDriveLogCreated as unknown as Function)(makeEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: d(20),
+            startKm: 1000, endKm: 1050, distance: 50, notes: '타워 3층 B-12',
+        }));
+
+        expect(notePatches()).toHaveLength(0);
+        expect(db.__get('vehicles', VEH)).toMatchObject({ lastDriveNote: '지하 2층' });
+    });
+
+    it('다른 기관의 차량은 건드리지 않는다', async () => {
+        seedLogs([], [{ id: VEH, col: 'vehicles', data: { organizationId: 'other-org', currentKm: 1000 } }]);
+
+        await (onDriveLogCreated as unknown as Function)(makeEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: d(20),
+            startKm: 1000, endKm: 1050, distance: 50, notes: '타워 3층 B-12',
+        }));
+
+        expect(notePatches()).toHaveLength(0);
+    });
+
+    it('아주 긴 비고는 잘라 담는다 — 전문은 운행일지에 그대로 남는다', async () => {
+        seedLogs([], [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1000 } }]);
+
+        await (onDriveLogCreated as unknown as Function)(makeEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: d(20),
+            startKm: 1000, endKm: 1050, distance: 50, notes: '가'.repeat(400),
+        }));
+
+        expect((notePatches()[0].lastDriveNote as string).length).toBe(300);
+    });
+
+    it('비고 갱신이 터져도 차량 누적 km 갱신은 그대로 진행된다', async () => {
+        // 두 트리거는 retry: false라 표시용 실패가 바깥으로 올라가면 회계가 통째로 유실된다.
+        const explodingTimestamp = { toDate: () => { throw new Error('UNAVAILABLE'); } };
+        seedLogs(
+            [{ id: 'B', timestamp: d(20), startKm: 1000, endKm: 1060 }],
+            [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1050, lastDriveNoteAt: explodingTimestamp } }],
+        );
+
+        await (onDriveLogUpdated as unknown as Function)(makeUpdateEvent(
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1050 },
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1060, notes: '타워 3층 B-12' },
+        ));
+
+        expect(notePatches()).toHaveLength(0);
+        const kmPatches = db.__updates()
+            .filter((u: { col: string; patch: Record<string, unknown> }) => u.col === 'vehicles' && 'currentKm' in u.patch)
+            .map((u: { patch: Record<string, unknown> }) => u.patch);
+        expect(kmPatches).toEqual([{ currentKm: { __increment: 10 } }]);
+    });
+});
+
+describe('직전 운행 비고 — 시각·수명 가드', () => {
+    beforeEach(() => {
+        jest.spyOn(console, 'error').mockImplementation();
+        jest.spyOn(console, 'warn').mockImplementation();
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    const makeEvent = (data: Record<string, unknown>) => ({
+        data: { data: () => data },
+        params: { logId: 'R' },
+    });
+    const makeUpdateEvent = (before: Record<string, unknown>, after: Record<string, unknown>, id = 'B') => ({
+        data: {
+            before: { data: () => before },
+            after: { data: () => after, ref: db.collection('driveLogs').doc(id) },
+        },
+        params: { logId: id },
+    });
+    const notePatches = () => db.__updates()
+        .filter((u: { col: string; patch: Record<string, unknown> }) => u.col === 'vehicles' && 'lastDriveNote' in u.patch)
+        .map((u: { patch: Record<string, unknown> }) => u.patch);
+
+    it('같은 비고를 매일 적어도 시각은 따라온다 — 안 그러면 2주 뒤 조용히 사라진다', () => {
+        // 고정 주차면을 쓰는 기관의 실제 사용 패턴이다. 내용만 보고 건너뛰면 lastDriveNoteAt이
+        // 첫날에 멈추고, 화면의 14일 컷은 이 시각만 보므로 매일 적는데도 카드에서 비고가 사라진다.
+        seedLogs([], [{
+            id: VEH, col: 'vehicles',
+            data: { organizationId: ORG, currentKm: 1000, lastDriveNote: '타워 3층 B-12', lastDriveNoteBy: '홍길동', lastDriveNoteAt: d(19) },
+        }]);
+
+        return (onDriveLogCreated as unknown as Function)(makeEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: d(20),
+            startKm: 1000, endKm: 1050, distance: 50,
+            notes: '타워 3층 B-12', driverName: '홍길동',
+        })).then(() => {
+            expect(notePatches()).toEqual([
+                { lastDriveNote: '타워 3층 B-12', lastDriveNoteBy: '홍길동', lastDriveNoteAt: d(20) },
+            ]);
+        });
+    });
+
+    it('같은 이벤트가 다시 전달되면(내용·시각 모두 동일) 쓰지 않는다', async () => {
+        seedLogs([], [{
+            id: VEH, col: 'vehicles',
+            data: { organizationId: ORG, currentKm: 1000, lastDriveNote: '타워 3층 B-12', lastDriveNoteBy: '홍길동', lastDriveNoteAt: d(20) },
+        }]);
+
+        await (onDriveLogCreated as unknown as Function)(makeEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: d(20),
+            startKm: 1000, endKm: 1050, distance: 50,
+            notes: '타워 3층 B-12', driverName: '홍길동',
+        }));
+
+        expect(notePatches()).toHaveLength(0);
+    });
+
+    it('비고와 무관한 수정은 차량 문서를 읽지도 쓰지도 않는다', async () => {
+        seedLogs(
+            [{ id: 'B', timestamp: d(20), startKm: 1000, endKm: 1050 }],
+            [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1050, lastDriveNote: '타워 3층 B-12', lastDriveNoteAt: d(20) } }],
+        );
+
+        await (onDriveLogUpdated as unknown as Function)(makeUpdateEvent(
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1050, notes: '타워 3층 B-12', destination: '시청' },
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1050, notes: '타워 3층 B-12', destination: '구청' },
+        ));
+
+        expect(notePatches()).toHaveLength(0);
+        expect(db.__get('vehicles', VEH)).toMatchObject({ lastDriveNote: '타워 3층 B-12' });
+    });
+
+    it('도착 시각을 미래로 적어도 저장되는 시각은 지금을 넘지 않는다', async () => {
+        // ts는 사용자 입력에서 만들어진다. 미래 값을 그대로 저장하면 신선도 가드가 스스로
+        // 잠겨, 그날 실제로 적힌 뒤 운행의 비고들이 조용히 무시된다.
+        const future = new Date(Date.now() + 60 * 60 * 1000);
+        seedLogs([], [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1000 } }]);
+
+        await (onDriveLogCreated as unknown as Function)(makeEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: future,
+            startKm: 1000, endKm: 1050, distance: 50, notes: '타워 3층 B-12',
+        }));
+
+        const saved = notePatches()[0].lastDriveNoteAt as Date;
+        expect(saved.getTime()).toBeLessThanOrEqual(Date.now());
+        expect(saved.getTime()).toBeLessThan(future.getTime());
+    });
+
+    it('보존 기한 밖 기록은 비고를 되살리지 않는다 — 복원 스크립트가 이 트리거를 깨운다', async () => {
+        // scripts/restoreArchivedLogs.ts의 batch.set이 onDriveLogCreated를 깨운다. 거르지 않으면
+        // 3년 전에 적은 비고가 살아 있는 차량 문서로 돌아온다(화면에는 14일 컷에 걸려 안 보인다).
+        seedLogs([], [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1000 } }]);
+
+        await (onDriveLogCreated as unknown as Function)(makeEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: new Date(2020, 0, 1),
+            startKm: 1000, endKm: 1050, distance: 50, notes: '3년 전 주차 위치',
+        }));
+
+        expect(notePatches()).toHaveLength(0);
+    });
+
+    it('일지를 지우면 그 일지가 남긴 비고 사본도 함께 지운다', async () => {
+        // 원본만 지우고 사본이 남으면 지울 수 있는 사람이 아무도 없다(관리자 수정 경로 없음).
+        seedLogs([], [{
+            id: VEH, col: 'vehicles',
+            data: { organizationId: ORG, currentKm: 1050, lastDriveNote: '이용자 성함이 섞인 비고', lastDriveNoteBy: '홍길동', lastDriveNoteAt: d(20) },
+        }]);
+
+        await (onDriveLogDeleted as unknown as Function)({
+            data: { data: () => ({ organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1050, distance: 50 }) },
+            params: { logId: 'R' },
+        });
+
+        expect(db.__get('vehicles', VEH)?.lastDriveNote).toBeUndefined();
+    });
+
+    it('다른 일지가 이미 덮어쓴 뒤에는 삭제가 남의 비고를 지우지 않는다', async () => {
+        seedLogs([], [{
+            id: VEH, col: 'vehicles',
+            data: { organizationId: ORG, currentKm: 1050, lastDriveNote: '나중 운행의 비고', lastDriveNoteAt: d(21) },
+        }]);
+
+        await (onDriveLogDeleted as unknown as Function)({
+            data: { data: () => ({ organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1050, distance: 50 }) },
+            params: { logId: 'R' },
+        });
+
+        expect(db.__get('vehicles', VEH)).toMatchObject({ lastDriveNote: '나중 운행의 비고' });
     });
 });

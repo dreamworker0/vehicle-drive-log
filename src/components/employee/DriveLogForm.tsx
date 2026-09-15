@@ -259,6 +259,13 @@ export default function DriveLogForm() {
                             rows={3}
                         />
                     )}
+                    {/* 공개 범위를 적어 둔다 — 여기 적은 내용이 같은 기관 다른 운전자에게
+                        보인다는 사실을 모르고 쓰면, 알리려던 것이 아닌 것까지 알려진다. */}
+                    {isNotesExpanded && (
+                        <p className="text-xs text-surface-400 dark:text-surface-500 mt-1.5">
+                            주차 위치처럼 다음 운전자가 알아야 할 내용을 적어 주세요. 같은 기관 이용자에게 함께 보입니다.
+                        </p>
+                    )}
                 </div>
 
                 {/* 제출 버튼 */}

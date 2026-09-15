@@ -175,6 +175,17 @@ export default function VehicleHistory() {
                                             <span className="ml-2">({log.startTime} ~ {log.endTime})</span>
                                         )}
                                     </div>
+                                    {/* 비고 — 주차 위치처럼 다음 운전자가 알아야 할 내용이 여기에 적힌다.
+                                        카드(예약 화면)는 한 줄로 자르지만 여기는 기록 조회 화면이므로 전문을
+                                        그대로 보여 주고, 줄바꿈도 적은 그대로 살린다. */}
+                                    {log.notes?.trim() && (
+                                        <p
+                                            data-testid="history-note"
+                                            className="text-xs text-surface-600 dark:text-surface-300 mt-1.5 ml-8 whitespace-pre-line break-words"
+                                        >
+                                            📝 {log.notes.trim()}
+                                        </p>
+                                    )}
                                 </div>
                             ))}
                         </div>

@@ -106,6 +106,35 @@ export const vehicleSchema = z.object({
      * (관리자가 방금 해제했는데 오전 운행이 뒤늦게 저장되어 다시 켜지는 것을 막는다).
      */
     needsRefuelAt: timestampSchema.optional().catch(undefined),
+    /**
+     * 직전 운행일지의 비고 원문. 운행이 끝날 때 **서버 트리거가** 차량 문서로 복사한다.
+     *
+     * 원본은 운행일지에 있지만, 오늘의 예약 카드는 차량 목록만 읽고 일지는 읽지 않는다.
+     * 여기에 두지 않으면 카드마다 직전 일지 조회가 하나씩 붙는데, 그 화면은 전 운전자가
+     * 매일 여는 곳이라 표시 한 줄에 상시 읽기를 다는 셈이 된다. 차량 문서는 이미 읽고
+     * 있으므로 **화면 쪽 읽기는 늘지 않는다.**
+     *
+     * 대신 **트리거 쪽에서 운행일지 한 건당 차량 문서 읽기가 1회 는다** — 비고가 비어 있어도
+     * 앞사람 값을 지워야 하는지 알려면 읽어야 하기 때문이다. 여기를 "비용이 안 드는 자리"로
+     * 읽지 말 것.
+     *
+     * 비고를 지운 수정이 들어오면 이 값도 지운다 — 앞 운전자가 적어 둔 "3층 B-12"가
+     * 남아 있는 쪽이, 아무것도 안 보이는 쪽보다 나쁘다(사람을 엉뚱한 곳으로 보낸다).
+     */
+    lastDriveNote: z.string().optional().catch(undefined),
+    /**
+     * 위 비고가 적힌 운행의 시각 — 화면에 "9/15 17:20"으로 신선도를 함께 보여 준다.
+     *
+     * 예약 카드는 이 시각이 14일보다 오래되면 비고를 **띄우지 않는다**. 2주 전 주차 위치는
+     * 정보가 아니라 오정보다. 일지가 삭제되거나 보존기간이 지나 정리돼도 이 사본은 남는데,
+     * 그 낡은 값이 화면에 새어 나오지 않게 막는 것도 이 시각의 몫이다.
+     *
+     * 트리거가 **이 시각보다 과거의 운행으로는 값을 되돌리지 않는** 근거로도 쓴다
+     * (현재 위치·주유 필요 표시와 같은 규칙).
+     */
+    lastDriveNoteAt: timestampSchema.optional().catch(undefined),
+    /** 그 비고를 적은 운전자 표시명. 누구에게 물어보면 되는지 알려 준다. */
+    lastDriveNoteBy: z.string().optional().catch(undefined),
     /** 사용 가능 직원 uid 목록. undefined 또는 빈 배열 = 전체 허용 */
     allowedUserIds: z.array(z.string()).optional().catch(undefined),
     retired: vehicleRetiredSchema.nullable().optional().catch(null),
