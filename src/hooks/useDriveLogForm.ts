@@ -204,6 +204,9 @@ export default function useDriveLogForm() {
     // ── 하위 모듈 3: 핸들러 및 제출 ───────────────────────────
     const {
         confirmStartKm,
+        confirmBeforeSave,
+        handleConfirmBeforeSave,
+        handleCancelBeforeSave,
         kmRangeError,
         handleDismissKmRangeError,
         handleConfirmStartKm,
@@ -271,6 +274,9 @@ export default function useDriveLogForm() {
         handleOcrReport: ocr.handleOcrReport,
         handleSubmit,
         confirmStartKm,
+        confirmBeforeSave,
+        handleConfirmBeforeSave,
+        handleCancelBeforeSave,
         kmRangeError,
         handleDismissKmRangeError,
         handleConfirmStartKm,

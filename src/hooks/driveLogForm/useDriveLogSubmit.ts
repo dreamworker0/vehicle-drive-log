@@ -2,7 +2,7 @@
  * driveLogForm/useDriveLogSubmit.ts
  * 운행일지 폼의 제출 및 사용자 입력 핸들러 모음
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createFavorite, getFavorites, getLastVehicleDriveLog } from '../../lib/firestore';
 import { resolveStartKm } from './resolveStartKm';
@@ -11,6 +11,7 @@ import { submitDriveLog, getEmptyForm } from './submitDriveLog';
 import { validateDriveLogForm } from '../utils/driveLogValidation';
 import { validateEditKmRange } from './editKmRange';
 import { validateDriveWindow } from './driveWindow';
+import { findVehicleNameAsDestination, isPurposeMissing } from './destinationGuard';
 import { adjustAdjacentLogs } from './adjustAdjacentLogs';
 import { captureError } from '../../lib/sentry';
 import type { User } from 'firebase/auth';
@@ -90,6 +91,16 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
     } = deps;
 
     const [confirmStartKm, setConfirmStartKm] = useState<{ original: number, suggested: number } | null>(null);
+    /** 저장 전에 한 번 물어야 하는 것. null이면 물어볼 것이 없다. */
+    const [confirmBeforeSave, setConfirmBeforeSave] = useState<
+        { kind: 'vehicleName'; vehicleName: string } | { kind: 'missingPurpose' } | null
+    >(null);
+    /**
+     * 확인을 이미 받았는가. state가 아니라 ref인 이유는 확인 직후 **같은 흐름에서 다시**
+     * `handleSubmit`을 부르기 때문이다 — state였다면 그 호출이 보는 값은 아직 갱신 전이라
+     * 모달이 무한히 다시 뜬다.
+     */
+    const submitConfirmedRef = useRef(false);
     const [kmRangeError, setKmRangeError] = useState<string | null>(null);
 
     const handleVehicleSelect = useCallback(async (vehicleId: string) => {
@@ -245,6 +256,30 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
             return;
         }
 
+        // ── 목적지·목적 칸 검사 (신규 작성에만) ──
+        //
+        // 수정 모드는 제외한다 — 과거 기록을 손보는 중이라 빈칸이 의도인 경우가 많고,
+        // 여기서 붙잡으면 정정 자체를 방해한다. 근거는 destinationGuard.ts 머리말.
+        //
+        // **막지 않고 묻는다.** 처음에는 "목적지 = 차량명은 의도일 수 없다"며 저장을 막았는데,
+        // 판정은 어디까지나 휴리스틱이다. 차량을 건물 이름으로 부르는 다지점 기관("복지관",
+        // "본관")에서는 지관 → 본관 운행의 목적지가 정말 그 이름이고, 막으면 **사실과 다른
+        // 문자열을 적어야만 저장되는** 막다른 길이 된다. 정확한 기록이라는 목적과 정반대다.
+        if (!isEditMode && !submitConfirmedRef.current) {
+            const vehicleNameHit = findVehicleNameAsDestination(form.destination, selectedVehicle);
+            if (vehicleNameHit) {
+                setConfirmBeforeSave({ kind: 'vehicleName', vehicleName: vehicleNameHit });
+                return;
+            }
+            if (isPurposeMissing(form)) {
+                setConfirmBeforeSave({ kind: 'missingPurpose' });
+                return;
+            }
+        }
+        // 이 저장 한 건에만 유효하다. 여기서 바로 내려 두면 오프라인·실패로 폼이 남는 경로에서도
+        // 다음 저장이 다시 묻는다(resetInputs만 믿으면 그 경로에서 확인이 조용히 건너뛰어진다).
+        submitConfirmedRef.current = false;
+
         // ── 수정 모드 범위 검증: 직전/직후 기록의 범위 안에 있는지 확인 ──
         if (isEditMode) {
             const rangeError = validateEditKmRange(form, lastDriveLog, nextDriveLog);
@@ -359,12 +394,27 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
         setConfirmStartKm(null);
     }, []);
 
+    /** "이대로 저장" — 확인 표시를 남기고 같은 제출을 다시 태운다. */
+    const handleConfirmBeforeSave = useCallback(() => {
+        submitConfirmedRef.current = true;
+        setConfirmBeforeSave(null);
+        handleSubmit(new Event('submit') as unknown as React.FormEvent);
+    }, [handleSubmit]);
+
+    /** "고치기" — 확인 표시를 남기지 않는다. 고친 뒤 다시 저장하면 그때 또 묻는다. */
+    const handleCancelBeforeSave = useCallback(() => {
+        setConfirmBeforeSave(null);
+    }, []);
+
     const handleDismissKmRangeError = useCallback(() => {
         setKmRangeError(null);
     }, []);
 
     return {
         confirmStartKm,
+        confirmBeforeSave,
+        handleConfirmBeforeSave,
+        handleCancelBeforeSave,
         kmRangeError,
         handleDismissKmRangeError,
         handleConfirmStartKm,

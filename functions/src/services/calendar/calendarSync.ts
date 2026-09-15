@@ -183,9 +183,53 @@ interface ParsedReservation {
 }
 
 /**
+ * 목적지 판정에서 걸러 낼 "그 차량 자신의 이름들".
+ *
+ * 차량 문서에서 뽑는다 — 표시 이름·본래 이름·차량번호. 스케줄러가 이미 문서를 손에 쥐고
+ * 있으므로 추가 읽기가 없다.
+ */
+export interface VehicleNameAliases {
+    displayName?: unknown;
+    name?: unknown;
+    plateNumber?: unknown;
+}
+
+/** 비교용 정규화 — 공백을 모두 지우고 소문자로. "스타렉스 1호"와 "스타렉스1호"를 같게 본다. */
+function normalizeForNameMatch(value: string): string {
+    return value.replace(/\s+/g, "").toLowerCase();
+}
+
+/**
+ * 제목에서 뽑은 목적지가 사실은 **그 차량의 이름**인가.
+ *
+ * 사람이 구글 캘린더에서 이벤트를 만들 때 제목에 차량 이름만 적는 일이 잦다("스파크", "레이").
+ * 그러면 아래 자유형식 파싱이 그것을 목적지로 집어넣고, 그 예약으로 연 운행일지의 목적지 칸이
+ * 차량명으로 미리 채워진다. 운전자가 고치지 않으면 **공식 기록(PDF·Excel)에 차량명이 목적지로
+ * 남는다.** 2026-09-15 이용 기관이 신고한 증상이다.
+ *
+ * **완전 일치만 본다.** "스파크 정비소"는 진짜 목적지이고, 부분 일치로 거르면 그것까지 죽는다.
+ * 비교할 이름이 하나도 없으면 판정하지 않는다(현행 동작 유지).
+ */
+function isVehicleOwnName(destination: string, aliases?: VehicleNameAliases): boolean {
+    const target = normalizeForNameMatch(destination);
+    if (!target) return false;
+
+    return [aliases?.displayName, aliases?.name, aliases?.plateNumber]
+        .filter((v): v is string => typeof v === "string" && v.trim() !== "")
+        .some(alias => normalizeForNameMatch(alias) === target);
+}
+
+/**
  * 캘린더 이벤트에서 예약 데이터를 파싱
  */
-export function parseEventToReservation(event: CalendarEvent, vehicleId: string, vehicleName: string, organizationId: string): ParsedReservation {
+export function parseEventToReservation(
+    event: CalendarEvent,
+    vehicleId: string,
+    vehicleName: string,
+    organizationId: string,
+    /** 목적지 자리에 차량 이름이 들어오는 것을 거르는 데 쓴다. 없으면 판정하지 않는다. */
+    vehicleAliases?: VehicleNameAliases,
+): ParsedReservation {
     const startDt = (event.start as { dateTime?: string; date?: string }).dateTime || (event.start as { date?: string }).date || "";
     const endDt = (event.end as { dateTime?: string; date?: string }).dateTime || (event.end as { date?: string }).date || "";
 
@@ -207,6 +251,9 @@ export function parseEventToReservation(event: CalendarEvent, vehicleId: string,
         if (line.startsWith("목적지:")) destination = line.replace("목적지:", "").trim();
     }
 
+    // 설명란에서 온 목적지인지 기억해 둔다 — 아래 차량명 판정은 **제목에서 뽑은 값만** 본다.
+    const destinationFromDescription = destination !== "";
+
     // 제목에서 "목적지 - 예약자" 형식 파싱 (description에 정보가 없을 때)
     const summary = event.summary || "";
     if (!reservedByName || !destination) {
@@ -220,6 +267,19 @@ export function parseEventToReservation(event: CalendarEvent, vehicleId: string,
         } else if (!destination && cleanedSummary) {
             destination = cleanedSummary;
         }
+    }
+
+    // **제목에서 뽑은** 목적지가 그 차량 자신의 이름이면 버린다.
+    //
+    // 설명란의 `목적지:` 줄에서 온 값은 사람이 그 칸에 일부러 적은 것이므로 건드리지 않는다.
+    // 같은 글자라도 어디에 적었느냐가 의도를 가른다 — 제목은 "무슨 차 쓴다"는 메모일 때가
+    // 많지만, 목적지 칸에 차량명을 적는 사람은 없다.
+    //
+    // 로그는 남기지 않는다. 이 함수는 **동기화 주기마다 모든 이벤트에** 대해 다시 도므로
+    // (평일 06~22시, 30분마다 × 200개 기관), 한 줄이라도 반복 로그가 된다. 판정은 결정적이고
+    // 단위 테스트가 덮고 있어 로그로 추적할 것이 없다.
+    if (!destinationFromDescription && destination && isVehicleOwnName(destination, vehicleAliases)) {
+        destination = "";
     }
 
     // creator 이메일 추출 (사용자 UID 조회용)

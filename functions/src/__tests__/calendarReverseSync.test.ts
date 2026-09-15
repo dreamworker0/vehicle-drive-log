@@ -113,15 +113,71 @@ describe('parseEventToReservation (제목/설명 파싱)', () => {
     });
 
     it('자유형식 제목(구분자 없음)은 전체를 목적지로 넣고 예약자는 비운다', () => {
+        // 차량 이름 후보를 함께 넘겨도 그와 다른 제목은 그대로 목적지가 된다
+        // (차량명 판정이 자유형식 파싱 전체를 죽이지 않는다는 뜻이다).
         const parsed = parseEventToReservation(
             makeEvent({ summary: '합정역' }) as never,
-            'veh-1', '스타렉스8888', 'org-1'
+            'veh-1', '스타렉스8888', 'org-1', VEHICLE
         );
         expect(parsed.destination).toBe('합정역');
         expect(parsed.reservedByName).toBe('');
         expect(parsed.syncSource).toBe('calendar');
         expect(parsed.calendarEventId).toBe('evt-1');
         expect(parsed.status).toBe('reserved');
+    });
+
+    /**
+     * 사람이 구글 캘린더에 제목을 차량 이름만 적는 일이 잦다("스파크", "레이"). 그대로 두면
+     * 목적지가 차량명이 되고, 그 예약으로 연 운행일지가 고쳐지지 않은 채 저장돼 **공식 기록
+     * (PDF·Excel)에 차량명이 목적지로 남는다.** 2026-09-15 이용 기관 신고.
+     */
+    it('제목이 차량 표시 이름뿐이면 목적지로 쓰지 않는다', () => {
+        const parsed = parseEventToReservation(
+            makeEvent({ summary: '스타렉스8888' }) as never,
+            'veh-1', '스타렉스8888', 'org-1', VEHICLE
+        );
+        expect(parsed.destination).toBe('');
+    });
+
+    it('차량번호·본래 이름도 같게 본다 (공백·대소문자 무시)', () => {
+        const aliases = { displayName: '레이', name: 'Ray', plateNumber: '12가 3456' };
+
+        expect(parseEventToReservation(
+            makeEvent({ summary: ' 레이 ' }) as never, 'veh-1', '레이', 'org-1', aliases
+        ).destination).toBe('');
+
+        expect(parseEventToReservation(
+            makeEvent({ summary: 'ray' }) as never, 'veh-1', '레이', 'org-1', aliases
+        ).destination).toBe('');
+
+        expect(parseEventToReservation(
+            makeEvent({ summary: '12가3456' }) as never, 'veh-1', '레이', 'org-1', aliases
+        ).destination).toBe('');
+    });
+
+    it('차량명으로 시작할 뿐인 진짜 목적지는 남긴다 — 완전 일치만 본다', () => {
+        // 부분 일치로 거르면 "스파크 정비소"라는 실제 행선지가 함께 죽는다.
+        const parsed = parseEventToReservation(
+            makeEvent({ summary: '스타렉스8888 정비소' }) as never,
+            'veh-1', '스타렉스8888', 'org-1', VEHICLE
+        );
+        expect(parsed.destination).toBe('스타렉스8888 정비소');
+    });
+
+    it('설명란 [목적지:]에 적힌 값은 차량명이어도 그대로 둔다 — 그 칸은 일부러 적은 것이다', () => {
+        const parsed = parseEventToReservation(
+            makeEvent({ summary: '아무 제목', description: '목적지: 스타렉스8888' }) as never,
+            'veh-1', '스타렉스8888', 'org-1', VEHICLE
+        );
+        expect(parsed.destination).toBe('스타렉스8888');
+    });
+
+    it('비교할 차량 이름을 넘기지 않으면 판정하지 않는다 (종전 동작 유지)', () => {
+        const parsed = parseEventToReservation(
+            makeEvent({ summary: '스타렉스8888' }) as never,
+            'veh-1', '스타렉스8888', 'org-1'
+        );
+        expect(parsed.destination).toBe('스타렉스8888');
     });
 
     it('종일 이벤트(date만 존재)는 09:00~18:00 기본 시간을 채운다', () => {

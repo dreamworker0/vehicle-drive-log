@@ -305,8 +305,8 @@ npm run build           # 프로덕션 빌드 확인
 
 | 종류 | 규모 | 도구 |
 |------|------|------|
-| 단위 테스트 (프론트 + 스크립트) | 181파일 / 2,236개 테스트 | Vitest |
-| Functions 단위 테스트 | 79개 suite / 1,125개 테스트 (emulator 테스트 제외) | Jest + ts-jest |
+| 단위 테스트 (프론트 + 스크립트) | 182파일 / 2,251개 테스트 | Vitest |
+| Functions 단위 테스트 | 79개 suite / 1,130개 테스트 (emulator 테스트 제외) | Jest + ts-jest |
 | Rules 테스트 | 2파일 / 39개 테스트 | Firebase Emulator + Vitest |
 | E2E 테스트 | 27개 spec 파일 (일부 인증/오프라인 시나리오 fixme) | Playwright |
 
