@@ -50,6 +50,9 @@ export default function DriveLogForm() {
         handleOcrReport,
         handleSubmit,
         confirmStartKm,
+        confirmMissingPurpose,
+        handleConfirmMissingPurpose,
+        handleCancelMissingPurpose,
         kmRangeError,
         handleDismissKmRangeError,
         handleConfirmStartKm,
@@ -291,6 +294,20 @@ export default function DriveLogForm() {
                 cancelText="취소"
                 onConfirm={handleConfirmStartKm}
                 onCancel={handleCancelConfirm}
+            />
+
+            {/* 운행 목적이 빈 채로 굳는 것을 한 번 붙잡는다. 막지는 않는다 —
+                급할 때 비워 두고 나중에 채우는 사용이 실제로 있다.
+                (목적지는 validateDriveLogForm이 이미 필수로 막는다.) */}
+            <ConfirmModal
+                open={confirmMissingPurpose}
+                title="운행 목적 확인"
+                message={'운행 목적이 비어 있습니다.\n\n운행일지는 지출결의·감사 서류로 나가는 기록입니다. 이대로 저장하시겠습니까?'}
+                confirmText="이대로 저장"
+                cancelText="고치기"
+                confirmColor="warning"
+                onConfirm={handleConfirmMissingPurpose}
+                onCancel={handleCancelMissingPurpose}
             />
 
             <ConfirmModal

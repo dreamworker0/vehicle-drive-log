@@ -432,3 +432,62 @@ describe('대표 운전자 선택', () => {
         expect(updater(validForm())).toMatchObject({ driverUid: 'u2', driverName: '김철수' });
     });
 });
+
+/**
+ * 목적지 칸에 차량 이름이 굳는 길을 막는다. 입구(캘린더 파싱)를 고쳐도 사람이 직접 적는 길은
+ * 남으므로 출구에도 그물을 둔다. 판정 자체는 destinationGuard.test.ts가 다루고, 여기서는
+ * 그 판정이 **제출 경로에 실제로 꽂혀 있는지**를 고정한다.
+ */
+describe('목적지·목적 칸 검사', () => {
+    it('목적지가 차량 이름이면 저장하지 않고 안내한다', async () => {
+        await submit(deps({
+            form: validForm({ destination: '카니발' }),
+            selectedVehicle: { id: 'v1', displayName: '카니발', currentKm: 51000 } as SubmitDeps['selectedVehicle'],
+        }));
+
+        expect(mockSubmitDriveLog).not.toHaveBeenCalled();
+        expect(showToast).toHaveBeenCalledWith(expect.stringContaining('차량 이름'), 'warning');
+    });
+
+    it('차량명으로 시작할 뿐인 목적지는 그대로 저장한다', async () => {
+        await submit(deps({
+            form: validForm({ destination: '카니발 정비소' }),
+            selectedVehicle: { id: 'v1', displayName: '카니발', currentKm: 51000 } as SubmitDeps['selectedVehicle'],
+        }));
+
+        expect(mockSubmitDriveLog).toHaveBeenCalled();
+    });
+
+    it('운행 목적이 비면 저장하지 않고 확인 모달 상태를 남긴다 — 토스트로 흘리지 않는다', async () => {
+        // 목적지는 validateDriveLogForm이 이미 필수로 막는다. 여기 도달하는 빈 칸은 목적뿐이다.
+        const result = await submit(deps({ form: validForm({ purpose: '' }) }));
+
+        expect(mockSubmitDriveLog).not.toHaveBeenCalled();
+        expect(result.current.confirmMissingPurpose).toBe(true);
+    });
+
+    it('"이대로 저장"을 누르면 그대로 저장한다', async () => {
+        const d = deps({ form: validForm({ purpose: '' }) });
+        const { result } = renderHook(() => useDriveLogSubmit(d));
+
+        await act(async () => {
+            await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
+        });
+        expect(result.current.confirmMissingPurpose).toBe(true);
+        expect(mockSubmitDriveLog).not.toHaveBeenCalled();
+
+        await act(async () => { result.current.handleConfirmMissingPurpose(); });
+        expect(mockSubmitDriveLog).toHaveBeenCalled();
+        expect(result.current.confirmMissingPurpose).toBe(false);
+    });
+
+    it('수정 모드에서는 붙잡지 않는다 — 과거 기록 정정을 방해하면 안 된다', async () => {
+        await submit(deps({
+            form: validForm({ purpose: '' }),
+            isEditMode: true,
+            editLog: { id: 'log1' } as DriveLog,
+        }));
+
+        expect(mockSubmitDriveLog).toHaveBeenCalled();
+    });
+});

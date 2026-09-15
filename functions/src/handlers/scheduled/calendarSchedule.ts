@@ -284,7 +284,7 @@ export async function syncSingleVehicleCalendar(
 
         if (!existing) {
             // calendarEventId로 연결되지 않은 예약 중에서, 동일 조건(날짜, 시간, 차량)의 앱 생성 예약 찾기
-            const tempParsed = parseEventToReservation(calEvent, vehicleId, vehicleName, organizationId) as Record<string, unknown>;
+            const tempParsed = parseEventToReservation(calEvent, vehicleId, vehicleName, organizationId, vehicleData) as Record<string, unknown>;
             const matchingAppReservation = existingReservations.find(function (r) {
                 return r.date === tempParsed.date &&
                        r.startTime === tempParsed.startTime &&
@@ -336,7 +336,7 @@ export async function syncSingleVehicleCalendar(
         if (!existing) {
             // 새 이벤트 -> Firestore에 예약 생성
             const reservationData = parseEventToReservation(
-                calEvent, vehicleId, vehicleName, organizationId
+                calEvent, vehicleId, vehicleName, organizationId, vehicleData
             ) as Record<string, unknown>;
 
             // creator.email로 사용자 UID 및 이름 조회
@@ -377,7 +377,7 @@ export async function syncSingleVehicleCalendar(
         } else {
             // 기존 예약이 있음 -> 내용 비교 후 업데이트
             const parsed = parseEventToReservation(
-                calEvent, vehicleId, vehicleName, organizationId
+                calEvent, vehicleId, vehicleName, organizationId, vehicleData
             );
 
             const fieldsToCompare = ["date", "startTime", "endTime", "purpose", "destination"];
