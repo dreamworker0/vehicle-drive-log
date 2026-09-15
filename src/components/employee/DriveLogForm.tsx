@@ -50,9 +50,9 @@ export default function DriveLogForm() {
         handleOcrReport,
         handleSubmit,
         confirmStartKm,
-        confirmMissingPurpose,
-        handleConfirmMissingPurpose,
-        handleCancelMissingPurpose,
+        confirmBeforeSave,
+        handleConfirmBeforeSave,
+        handleCancelBeforeSave,
         kmRangeError,
         handleDismissKmRangeError,
         handleConfirmStartKm,
@@ -296,18 +296,21 @@ export default function DriveLogForm() {
                 onCancel={handleCancelConfirm}
             />
 
-            {/* 운행 목적이 빈 채로 굳는 것을 한 번 붙잡는다. 막지는 않는다 —
-                급할 때 비워 두고 나중에 채우는 사용이 실제로 있다.
-                (목적지는 validateDriveLogForm이 이미 필수로 막는다.) */}
+            {/* 그럴듯하게 틀린 값이 그대로 굳는 것을 한 번 붙잡는다. 막지는 않는다 —
+                차량명 판정은 휴리스틱이라 차량을 건물 이름으로 부르는 기관에서는 그 이름이
+                진짜 행선지일 수 있고, 빈 목적은 급할 때 나중에 채우는 사용이 실제로 있다.
+                (목적지 자체가 비는 경우는 validateDriveLogForm이 이미 필수로 막는다.) */}
             <ConfirmModal
-                open={confirmMissingPurpose}
-                title="운행 목적 확인"
-                message={'운행 목적이 비어 있습니다.\n\n운행일지는 지출결의·감사 서류로 나가는 기록입니다. 이대로 저장하시겠습니까?'}
+                open={!!confirmBeforeSave}
+                title={confirmBeforeSave?.kind === 'vehicleName' ? '목적지 확인' : '운행 목적 확인'}
+                message={confirmBeforeSave?.kind === 'vehicleName'
+                    ? `목적지가 차량 이름(${confirmBeforeSave.vehicleName})과 같습니다.\n\n어디에 다녀오셨는지 적어 주세요. 차량을 부르는 이름이 실제 행선지와 같다면 이대로 저장하셔도 됩니다.`
+                    : '운행 목적이 비어 있습니다.\n\n운행일지는 지출결의·감사 서류로 나가는 기록입니다. 이대로 저장하시겠습니까?'}
                 confirmText="이대로 저장"
                 cancelText="고치기"
                 confirmColor="warning"
-                onConfirm={handleConfirmMissingPurpose}
-                onCancel={handleCancelMissingPurpose}
+                onConfirm={handleConfirmBeforeSave}
+                onCancel={handleCancelBeforeSave}
             />
 
             <ConfirmModal

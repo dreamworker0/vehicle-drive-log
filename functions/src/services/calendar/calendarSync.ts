@@ -274,9 +274,11 @@ export function parseEventToReservation(
     // 설명란의 `목적지:` 줄에서 온 값은 사람이 그 칸에 일부러 적은 것이므로 건드리지 않는다.
     // 같은 글자라도 어디에 적었느냐가 의도를 가른다 — 제목은 "무슨 차 쓴다"는 메모일 때가
     // 많지만, 목적지 칸에 차량명을 적는 사람은 없다.
+    //
+    // 로그는 남기지 않는다. 이 함수는 **동기화 주기마다 모든 이벤트에** 대해 다시 도므로
+    // (평일 06~22시, 30분마다 × 200개 기관), 한 줄이라도 반복 로그가 된다. 판정은 결정적이고
+    // 단위 테스트가 덮고 있어 로그로 추적할 것이 없다.
     if (!destinationFromDescription && destination && isVehicleOwnName(destination, vehicleAliases)) {
-        // **제목 본문은 로그에 싣지 않는다.** 자유 입력이라 개인정보가 섞인다.
-        console.log(`[parseEventToReservation] 제목이 차량 이름과 같아 목적지로 쓰지 않음: veh=${vehicleId}`);
         destination = "";
     }
 

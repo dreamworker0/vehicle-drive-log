@@ -380,17 +380,37 @@ export async function syncSingleVehicleCalendar(
                 calEvent, vehicleId, vehicleName, organizationId, vehicleData
             );
 
+            /**
+             * **파싱이 목적지를 알아내지 못했으면 기존 값을 그대로 둔다.**
+             *
+             * 제목이 차량 이름뿐이면 파서가 목적지를 비우는데(2026-09-15), 그 빈 값으로 기존
+             * 예약을 덮으면 **사용자의 구글 캘린더 일정이 앱에 의해 지워진다.** 갱신은
+             * `syncSource: "calendar"`를 다시 써 넣고, `reservationTriggers`의 루프 가드는
+             * `before.syncSource !== "calendar"`일 때만 막으므로 calendar → calendar 갱신은
+             * 통과한다. 그러면 정방향 write-back이 `events.update`(PATCH가 아니라 **전체 PUT**)로
+             * 제목·설명·참석자·알림을 `buildEvent` 결과로 덮고, 제목이 `[스파크] 예약`이 된다.
+             * 다음 동기화가 그것을 다시 읽어 **목적지가 "예약"으로 굳는다** — 차량명이 아니라
+             * 파서의 가드도 잡지 못한다. 원래 버그보다 나쁘다.
+             *
+             * 그래서 빈 파싱 결과는 "값이 바뀌었다"가 아니라 **"알아내지 못했다"**로 다룬다.
+             * 기존 예약은 자동으로 정리되지 않는다 — 대신 운행일지 저장 쪽 검사가 받는다.
+             */
+            const resolved = {
+                ...parsed,
+                destination: parsed.destination || (existing.destination as string) || "",
+            };
+
             const fieldsToCompare = ["date", "startTime", "endTime", "purpose", "destination"];
-            const changed = fieldsToCompare.some(function (f) { return (parsed as Record<string, unknown>)[f] !== existing[f]; });
+            const changed = fieldsToCompare.some(function (f) { return (resolved as Record<string, unknown>)[f] !== existing[f]; });
 
             if (changed && existing.syncSource === "calendar") {
                 await db.collection("reservations").doc(existing.id as string).update({
                     date: parsed.date,
                     startTime: parsed.startTime,
                     endTime: parsed.endTime,
-                    purpose: parsed.purpose,
-                    destination: parsed.destination,
-                    reservedByName: parsed.reservedByName,
+                    purpose: resolved.purpose,
+                    destination: resolved.destination,
+                    reservedByName: resolved.reservedByName,
                     syncSource: "calendar",
                 });
                 updated++;
