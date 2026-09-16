@@ -392,6 +392,18 @@ describe('종료시간 제안 줄', () => {
         expect(passed.endTime).toBe(baseForm.endTime);
     });
 
+    it('경로를 모를 때도 시작시간을 따라 움직인다 — 종료 < 시작이 되면 저장이 막힌다', () => {
+        // routeInfo가 없으면 calcEndTime은 '시작 + 1시간'을 준다. 여기서 멈춰 세우면
+        // 14:00~15:00 폼에서 시작을 17:00으로 옮긴 순간 종료가 15:00에 남아 저장이 거부된다.
+        const { props, container } = setup({ endTimeTouched: false, routeInfo: null });
+        const inputs = container.querySelectorAll('input[type="time"]');
+
+        fireEvent.change(inputs[0], { target: { value: '17:00' } });
+
+        const passed = vi.mocked(props.setForm).mock.calls[0][0] as ReservationForm;
+        expect(passed).toMatchObject({ startTime: '17:00', endTime: '18:00' });
+    });
+
     it('잠기지 않았으면 시작시간 변경이 종료시간을 다시 계산한다 — 편의는 남긴다', () => {
         const { props, container } = setup({
             endTimeTouched: false,

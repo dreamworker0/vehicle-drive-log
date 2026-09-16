@@ -38,11 +38,11 @@ interface Props {
     departureSiteName?: string;
     routeLoading: boolean;
     /** 경로 기준 권장 종료시간 — 덮어쓰지 않고 제안만 한다. 없으면 null */
-    suggestedEndTime?: string | null;
+    suggestedEndTime: string | null;
     /** 종료시간을 사람이 정했는가 — true면 시작시간을 바꿔도 종료시간을 건드리지 않는다 */
-    endTimeTouched?: boolean;
+    endTimeTouched: boolean;
     /** 종료시간을 사람이 정했다고 표시 — 이후 경로 자동 계산이 그 값을 덮지 않는다 */
-    setEndTimeTouched?: (v: boolean) => void;
+    setEndTimeTouched: (v: boolean) => void;
     freeRoadRoute?: { distance: number; duration: number; tollFee: number } | null;
     freeRoadLoading?: boolean;
     onFetchFreeRoad?: () => void;
@@ -97,8 +97,8 @@ export default function ReservationSidePanel({
     routeInfo,
     departureSiteName = '',
     routeLoading,
-    suggestedEndTime = null,
-    endTimeTouched = false,
+    suggestedEndTime,
+    endTimeTouched,
     setEndTimeTouched,
     freeRoadRoute,
     freeRoadLoading,
@@ -376,11 +376,13 @@ export default function ReservationSidePanel({
                                         // 종료시간을 사람이 정해 뒀으면 건드리지 않는다 — 09:00~18:00을
                                         // 잡아 둔 사람이 시작을 옮겼다고 18:00을 버릴 이유가 없다.
                                         // 바꾸고 싶으면 아래 제안 줄을 누르면 된다.
-                                        if (endTimeTouched || !routeInfo?.duration) {
+                                        if (endTimeTouched) {
                                             setForm({ ...form, startTime: val });
                                             return;
                                         }
-                                        setForm({ ...form, startTime: val, endTime: calcEndTime(val, routeInfo.duration) });
+                                        // 경로를 모를 때도 종료시간은 따라 움직여야 한다(시작 + 1시간).
+                                        // 안 움직이면 시작을 늦춘 순간 종료 < 시작이 되어 저장이 막힌다.
+                                        setForm({ ...form, startTime: val, endTime: calcEndTime(val, routeInfo?.duration || 0) });
                                     }}
                                     className="input flex-1 text-base font-medium px-2 text-center min-h-[48px]"
                                 />
@@ -392,7 +394,7 @@ export default function ReservationSidePanel({
                                         const val = e.target.value;
                                         if (!val) return;
                                         // 직접 고른 값이다. 이후 경로 조회가 끝나도 덮지 않는다.
-                                        setEndTimeTouched?.(true);
+                                        setEndTimeTouched(true);
                                         setForm({ ...form, endTime: val });
                                     }}
                                     className="input flex-1 text-base font-medium px-2 text-center min-h-[48px]"
@@ -405,7 +407,7 @@ export default function ReservationSidePanel({
                                 <button
                                     type="button"
                                     onClick={() => {
-                                        setEndTimeTouched?.(true);
+                                        setEndTimeTouched(true);
                                         setForm({ ...form, endTime: suggestedEndTime });
                                     }}
                                     className="mt-2 w-full flex items-center justify-between gap-2 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 text-left text-xs text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors min-h-[40px]"

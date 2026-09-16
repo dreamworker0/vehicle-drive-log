@@ -68,13 +68,19 @@ async function flushRoute() {
     });
 }
 
-/** setForm(updater)에 실린 endTime을 꺼낸다 — 마지막 호출 기준 */
-function lastEndTime(setForm: ReturnType<typeof vi.fn>): string | undefined {
+/**
+ * setForm(updater)에 실린 endTime을 꺼낸다 — 마지막 호출 기준.
+ *
+ * updater에 **그 시점의 실제 폼**을 넣는다. 합성 폼을 넣으면 지금은 우연히 맞지만(updater가
+ * prev를 무시하고 endTime을 무조건 쓴다) "기존 값이 더 늦으면 유지" 같은 prev 의존 규칙이
+ * 들어오는 순간 거짓 통과한다.
+ */
+function lastEndTime(setForm: ReturnType<typeof vi.fn>, currentForm: ReservationForm): string | undefined {
     const calls = setForm.mock.calls;
     if (calls.length === 0) return undefined;
     const call = calls[calls.length - 1];
     const updater = call[0] as (prev: ReservationForm) => ReservationForm;
-    return updater(baseForm()).endTime;
+    return updater(currentForm).endTime;
 }
 
 describe('useRouteInfo — 종료시간 자동 계산', () => {
@@ -89,11 +95,12 @@ describe('useRouteInfo — 종료시간 자동 계산', () => {
     });
 
     it('사람이 정하지 않은 종료시간은 경로 기준으로 채운다', async () => {
-        const { setForm } = setup({ form: baseForm(), endTimeTouched: false });
+        const form = baseForm();
+        const { setForm } = setup({ form, endTimeTouched: false });
         await flushRoute();
 
         // 09:00 + (30분 × 2) + 여유 1시간 = 11:00
-        expect(lastEndTime(setForm)).toBe('11:00');
+        expect(lastEndTime(setForm, form)).toBe('11:00');
     });
 
     it('사람이 정한 종료시간은 덮지 않는다 — 수정 화면을 열기만 해도 바뀌던 자리', async () => {
@@ -130,15 +137,14 @@ describe('useRouteInfo — 종료시간 자동 계산', () => {
         expect(result.current.suggestedEndTime).toBeNull();
     });
 
-    it('반복 예약도 같다', async () => {
-        const { result, setForm } = setup({
-            form: baseForm({ isRecurring: true, endTime: '18:00' }),
-            endTimeTouched: false,
-        });
+    it('반복 예약은 제외하지 않는다 — 회차마다 그날 안에 끝나므로 단건과 뜻이 같다', async () => {
+        // 처음에는 다일과 함께 뺐는데 근거가 틀렸다(머지 전 리뷰). 빼 두면 반복 예약을 만들 때
+        // 자동 계산 편의만 이유 없이 사라진다.
+        const form = baseForm({ isRecurring: true, endTime: '18:00' });
+        const { setForm } = setup({ form, endTimeTouched: false });
         await flushRoute();
 
-        expect(setForm).not.toHaveBeenCalled();
-        expect(result.current.suggestedEndTime).toBeNull();
+        expect(lastEndTime(setForm, form)).toBe('11:00');
     });
 
     it('잠금이 풀리면 다시 채운다 — 리셋 후 신규 작성이 막히면 안 된다', async () => {
@@ -146,11 +152,12 @@ describe('useRouteInfo — 종료시간 자동 계산', () => {
         await flushRoute();
         expect(setForm).not.toHaveBeenCalled();
 
+        const unlocked = baseForm({ endTime: '18:00' });
         await act(async () => {
-            rerender({ form: baseForm({ endTime: '18:00' }), endTimeTouched: false });
+            rerender({ form: unlocked, endTimeTouched: false });
         });
 
-        expect(lastEndTime(setForm)).toBe('11:00');
+        expect(lastEndTime(setForm, unlocked)).toBe('11:00');
     });
 
     it('목적지가 바뀌면 옛 경로 결과를 제안 근거로 쓰지 않는다', async () => {

@@ -49,9 +49,13 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
     const { recentDestinations } = useReservationPattern();
 
     const handleSlotClick = useCallback((vehicleId: string, startTime: string, endTime: string) => {
+        // 타임라인에서 **드래그로 그린 구간**이다 — 종료시간 칸을 직접 치는 것과 의도의 강도가 같다.
+        // 게다가 이 값은 다음 예약 직전까지로 잘려 들어오므로, 자동 계산이 덮으면 남의 예약을
+        // 침범하는 시간이 되어 저장 자체가 막힌다.
+        setEndTimeTouched(true);
         setForm(prev => ({ ...prev, vehicleId, startTime, endTime }));
         setShowForm(true);
-    }, [setForm, setShowForm]);
+    }, [setForm, setShowForm, setEndTimeTouched]);
 
     if (loading) {
         return (

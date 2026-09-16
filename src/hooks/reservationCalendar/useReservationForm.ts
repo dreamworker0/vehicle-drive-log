@@ -68,6 +68,10 @@ export function useReservationForm() {
                 startTime: p.startTime || '',
                 endTime: p.endTime || '',
             });
+            // 추천 배너가 권한 시간은 **사용자 자신의 과거 예약**에서 뽑은 값이다("늘 쓰던 시간").
+            // 잠그지 않으면 배너가 연 화면에서 그 시간이 1.2초 뒤 사라진다.
+            // 반면 아래 state.openForm 분기의 '시작 + 1시간'은 우리가 만든 기본값이라 잠그지 않는다.
+            if (p.endTime) setEndTimeTouched(true);
             setShowForm(true);
             window.history.replaceState({}, document.title);
         } else if (state?.openForm) {

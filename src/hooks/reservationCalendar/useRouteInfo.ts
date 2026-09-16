@@ -115,10 +115,14 @@ export function useRouteInfo({ form, setForm, orgAddress, orgSites, vehicles, en
      * 종료시간이 여러 날에 걸쳐 있는 예약인가.
      *
      * 다일 예약의 종료시간 칸은 **마지막 날의 종료**를 담는데(editActions의 `endTime: last.endTime`),
-     * 자동 계산은 **첫날 시작** 기준이라 둘의 뜻이 다르다. 그대로 채우면 3일짜리 예약이 하루로
-     * 줄어든 채 저장된다. 반복 예약도 같은 이유로 제외한다.
+     * 자동 계산은 **첫날 시작** 기준이라 둘의 뜻이 다르다. 그대로 채우면 마지막 날 반납 시각이
+     * 첫날 기준 값으로 뭉개진다.
+     *
+     * **반복 예약은 제외하지 않는다.** 처음에는 함께 뺐는데 근거가 틀렸다 — 반복은 각 회차가
+     * `startTime`~`endTime`으로 **그날 안에** 끝나므로(submitActions의 회차 생성) 단건과 뜻이 같다.
+     * 빼 두면 반복 예약을 만들 때 자동 계산 편의만 이유 없이 사라진다.
      */
-    const isSpanningDays = !!form.endDate || !!form.isRecurring;
+    const isSpanningDays = !!form.endDate;
 
     // 경로 소요시간·시작시간이 바뀌면 종료시간을 자동으로 채운다 (API 재호출 없음).
     // **사람이 정한 값은 덮지 않는다** — 대신 아래 suggestedEndTime으로 제안만 한다.
@@ -138,7 +142,10 @@ export function useRouteInfo({ form, setForm, orgAddress, orgSites, vehicles, en
      * 뜨는 것은 사실상 **사람이 정해 둔 값과 경로 계산이 어긋날 때**뿐이다.
      */
     const suggestedEndTime = (() => {
-        if (isSpanningDays || routeLoading) return null;
+        // routeLoading을 보지 않는다 — 같은 목적지를 재조회하는 동안 제안 줄이 사라졌다 나타나면
+        // 바로 아래 '예약 확정' 버튼이 위아래로 튀어 오클릭을 부른다. 경로가 실제로 바뀐 경우에는
+        // 위에서 routeInfo를 비우므로 낡은 값이 제안되지도 않는다.
+        if (isSpanningDays) return null;
         if (!form.startTime || !routeInfo?.duration) return null;
         const candidate = calcEndTime(form.startTime, routeInfo.duration);
         return candidate === form.endTime ? null : candidate;
