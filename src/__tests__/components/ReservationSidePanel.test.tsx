@@ -82,6 +82,9 @@ function setup(over: Partial<React.ComponentProps<typeof ReservationSidePanel>> 
         editingReservation: null,
         routeInfo: null,
         routeLoading: false,
+        suggestedEndTime: null,
+        endTimeTouched: false,
+        setEndTimeTouched: vi.fn(),
         user: { uid: 'u1' },
         getCurrentTimeStr: () => '13:45',
         getMinStartTime: () => '00:00',
@@ -331,5 +334,75 @@ describe('예약 열기 버튼', () => {
 
         fireEvent.click(screen.getByRole('button', { name: '닫기' }));
         expect(onOpenForm).toHaveBeenCalledWith(undefined);
+    });
+});
+
+/**
+ * 종료시간을 덮지 않는 대신 화면에서 권한다. 판정 자체는 useRouteInfo.test.ts가 다루고,
+ * 여기서는 **제안이 화면에 닿는지**와 **누르기 전에는 폼이 바뀌지 않는지**를 고정한다.
+ */
+describe('종료시간 제안 줄', () => {
+    it('제안값이 있으면 보여 준다 — 덮지 않고 권한다', () => {
+        setup({ suggestedEndTime: '15:40' });
+        expect(screen.getByText(/경로 기준 예상 종료/)).toBeInTheDocument();
+        expect(screen.getByText('15:40')).toBeInTheDocument();
+    });
+
+    it('제안값이 없으면 줄 자체를 그리지 않는다', () => {
+        setup({ suggestedEndTime: null });
+        expect(screen.queryByText(/경로 기준 예상 종료/)).not.toBeInTheDocument();
+    });
+
+    it('누르기 전에는 폼을 건드리지 않는다', () => {
+        const { props } = setup({ suggestedEndTime: '15:40' });
+        expect(props.setForm).not.toHaveBeenCalled();
+    });
+
+    it('누르면 그 값을 넣고, 이후 자동 계산이 덮지 못하게 잠근다', () => {
+        const { props } = setup({ suggestedEndTime: '15:40' });
+
+        fireEvent.click(screen.getByText('적용'));
+
+        expect(props.setForm).toHaveBeenCalledWith(expect.objectContaining({ endTime: '15:40' }));
+        expect(props.setEndTimeTouched).toHaveBeenCalledWith(true);
+    });
+
+    it('종료시간을 직접 입력하면 잠근다 — 이후 목적지를 바꿔도 덮이지 않는다', () => {
+        const { props, container } = setup({ suggestedEndTime: null });
+        const inputs = container.querySelectorAll('input[type="time"]');
+
+        fireEvent.change(inputs[1], { target: { value: '18:00' } });
+
+        expect(props.setEndTimeTouched).toHaveBeenCalledWith(true);
+        expect(props.setForm).toHaveBeenCalledWith(expect.objectContaining({ endTime: '18:00' }));
+    });
+
+    it('잠긴 뒤에는 시작시간을 바꿔도 종료시간을 건드리지 않는다', () => {
+        const { props, container } = setup({
+            endTimeTouched: true,
+            routeInfo: { distance: 25, duration: 30 },
+        });
+        const inputs = container.querySelectorAll('input[type="time"]');
+
+        fireEvent.change(inputs[0], { target: { value: '10:00' } });
+
+        // 09:00~18:00을 잡아 둔 사람이 시작을 옮겼다고 18:00을 버릴 이유가 없다
+        const passed = vi.mocked(props.setForm).mock.calls[0][0] as ReservationForm;
+        expect(passed.startTime).toBe('10:00');
+        expect(passed.endTime).toBe(baseForm.endTime);
+    });
+
+    it('잠기지 않았으면 시작시간 변경이 종료시간을 다시 계산한다 — 편의는 남긴다', () => {
+        const { props, container } = setup({
+            endTimeTouched: false,
+            routeInfo: { distance: 25, duration: 30 },
+        });
+        const inputs = container.querySelectorAll('input[type="time"]');
+
+        fireEvent.change(inputs[0], { target: { value: '10:00' } });
+
+        // 10:00 + (30분 × 2) + 여유 1시간 = 12:00
+        const passed = vi.mocked(props.setForm).mock.calls[0][0] as ReservationForm;
+        expect(passed).toMatchObject({ startTime: '10:00', endTime: '12:00' });
     });
 });

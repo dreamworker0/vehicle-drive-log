@@ -21,7 +21,8 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
         selectedDate, showForm, setShowForm,
         sideTab, setSideTab,
         submitting, editingReservation, editingGroupId, editingRecurringGroupId,
-        favorites, routeInfo, routeLoading, freeRoadRoute, freeRoadLoading, handleFetchFreeRoad, departureSiteName,
+        favorites, routeInfo, routeLoading, suggestedEndTime, endTimeTouched, setEndTimeTouched,
+        freeRoadRoute, freeRoadLoading, handleFetchFreeRoad, departureSiteName,
         showFavSave, setShowFavSave,
         favName, setFavName,
         calendarDays, monthLabel, todayStr,
@@ -123,6 +124,9 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
                         editingGroupId={editingGroupId}
                         routeInfo={routeInfo}
                         routeLoading={routeLoading}
+                        suggestedEndTime={suggestedEndTime}
+                        endTimeTouched={endTimeTouched}
+                        setEndTimeTouched={setEndTimeTouched}
                         departureSiteName={departureSiteName}
                         freeRoadRoute={freeRoadRoute}
                         freeRoadLoading={freeRoadLoading}

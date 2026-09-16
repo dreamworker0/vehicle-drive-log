@@ -20,6 +20,15 @@ export function useReservationForm() {
     const [editingRecurringGroupId, setEditingRecurringGroupId] = useState<string | null>(null);
     const [reservationSource, setReservationSource] = useState<string | null>(null);
 
+    /**
+     * 종료시간을 **사람이 정했는가.** true인 동안 경로 자동 계산이 그 값을 덮지 않는다.
+     *
+     * 켜는 곳은 둘뿐이다 — 수정 화면 진입(저장된 값은 사람이 정한 값이다)과 종료시간 칸 직접 입력.
+     * 폼을 새로 열거나 리셋하면 반드시 내려야 한다. 안 내리면 **신규 작성에서 자동 계산이 영영
+     * 돌지 않는다** — 이 변경의 가장 큰 회귀 지점이라 테스트로 고정해 두었다.
+     */
+    const [endTimeTouched, setEndTimeTouched] = useState(false);
+
     // 폼 상태
     const [form, setForm] = useState<ReservationForm>({
         vehicleId: '',
@@ -115,6 +124,7 @@ export function useReservationForm() {
                 endTime: '',
                 endDate: '',
             });
+            setEndTimeTouched(false);
         }
     };
 
@@ -123,6 +133,7 @@ export function useReservationForm() {
             setShowForm(false);
             setEditingReservation(null);
             setForm({ vehicleId: '', destination: '', purpose: '', startTime: '', endTime: '', endDate: '' });
+            setEndTimeTouched(false);
             setReservationSource(null);
             setShowFavSave(false);
             setFavName('');
@@ -159,6 +170,7 @@ export function useReservationForm() {
         setEditingGroupId(null);
         setEditingRecurringGroupId(null);
         setForm({ vehicleId: '', destination: '', purpose: '', startTime: '', endTime: '', endDate: '' });
+        setEndTimeTouched(false);
         setReservationSource(null);
     };
 
@@ -183,6 +195,8 @@ export function useReservationForm() {
         setReservationSource,
         form,
         setForm,
+        endTimeTouched,
+        setEndTimeTouched,
         showFavSave,
         setShowFavSave,
         favName,
