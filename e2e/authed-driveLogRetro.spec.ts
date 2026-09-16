@@ -108,9 +108,6 @@ test.describe('누락 운행 소급 입력 여정 E2E (에뮬레이터)', () => 
         await expect(page.getByText('ℹ️ 직후 운전 정보')).toBeVisible({ timeout: 15000 });
 
         // 7. 폼 작성(빈틈 메우기: 도착 km = 직후 출발 km) 후 저장
-        //    목적을 비우면 저장 직전 확인 모달이 뜬다(2026-09-15). 다른 운행일지 spec들과
-        //    같이 채워 둔다 — 실제 소급 입력도 목적을 적는다.
-        await page.fill('input#purpose', 'E2E 누락 소급 목적');
         await page.fill('input#destination', DESTINATION);
         await page.locator('input[type="number"]').nth(1).fill('60200');
         await page.getByRole('button', { name: /운행일지 저장/ }).click();

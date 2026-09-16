@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { findVehicleNameAsDestination, isPurposeMissing } from '../../hooks/driveLogForm/destinationGuard';
+import { findVehicleNameAsDestination } from '../../hooks/driveLogForm/destinationGuard';
 
 /**
  * 운행일지는 PDF·Excel로 뽑혀 지출결의·감사 서류가 된다. 그런데 목적지 칸은 예약에서 넘어온
@@ -36,19 +36,5 @@ describe('findVehicleNameAsDestination — 목적지가 차량 이름인가', ()
     it('이름 후보가 일부만 있어도 있는 것끼리 비교한다', () => {
         expect(findVehicleNameAsDestination('레이', { displayName: '레이' })).toBe('레이');
         expect(findVehicleNameAsDestination('레이', { plateNumber: '레이' })).toBe('레이');
-    });
-});
-
-describe('isPurposeMissing — 한 번 물어봐야 하는 빈 목적', () => {
-    it('목적이 없으면 참', () => {
-        expect(isPurposeMissing({})).toBe(true);
-    });
-
-    it('공백만 적힌 것도 빈 것으로 본다', () => {
-        expect(isPurposeMissing({ purpose: '   ' })).toBe(true);
-    });
-
-    it('채워져 있으면 거짓 — 물어볼 것이 없다', () => {
-        expect(isPurposeMissing({ purpose: '업무' })).toBe(false);
     });
 });

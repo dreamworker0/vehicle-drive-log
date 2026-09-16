@@ -11,7 +11,7 @@ import { submitDriveLog, getEmptyForm } from './submitDriveLog';
 import { validateDriveLogForm } from '../utils/driveLogValidation';
 import { validateEditKmRange } from './editKmRange';
 import { validateDriveWindow } from './driveWindow';
-import { findVehicleNameAsDestination, isPurposeMissing } from './destinationGuard';
+import { findVehicleNameAsDestination } from './destinationGuard';
 import { adjustAdjacentLogs } from './adjustAdjacentLogs';
 import { captureError } from '../../lib/sentry';
 import type { User } from 'firebase/auth';
@@ -92,9 +92,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
 
     const [confirmStartKm, setConfirmStartKm] = useState<{ original: number, suggested: number } | null>(null);
     /** 저장 전에 한 번 물어야 하는 것. null이면 물어볼 것이 없다. */
-    const [confirmBeforeSave, setConfirmBeforeSave] = useState<
-        { kind: 'vehicleName'; vehicleName: string } | { kind: 'missingPurpose' } | null
-    >(null);
+    const [confirmBeforeSave, setConfirmBeforeSave] = useState<{ vehicleName: string } | null>(null);
     /**
      * 확인을 이미 받았는가. state가 아니라 ref인 이유는 확인 직후 **같은 흐름에서 다시**
      * `handleSubmit`을 부르기 때문이다 — state였다면 그 호출이 보는 값은 아직 갱신 전이라
@@ -256,7 +254,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
             return;
         }
 
-        // ── 목적지·목적 칸 검사 (신규 작성에만) ──
+        // ── 목적지 칸 검사 (신규 작성에만) ──
         //
         // 수정 모드는 제외한다 — 과거 기록을 손보는 중이라 빈칸이 의도인 경우가 많고,
         // 여기서 붙잡으면 정정 자체를 방해한다. 근거는 destinationGuard.ts 머리말.
@@ -268,11 +266,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
         if (!isEditMode && !submitConfirmedRef.current) {
             const vehicleNameHit = findVehicleNameAsDestination(form.destination, selectedVehicle);
             if (vehicleNameHit) {
-                setConfirmBeforeSave({ kind: 'vehicleName', vehicleName: vehicleNameHit });
-                return;
-            }
-            if (isPurposeMissing(form)) {
-                setConfirmBeforeSave({ kind: 'missingPurpose' });
+                setConfirmBeforeSave({ vehicleName: vehicleNameHit });
                 return;
             }
         }
