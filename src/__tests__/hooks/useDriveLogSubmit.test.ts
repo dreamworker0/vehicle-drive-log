@@ -450,7 +450,7 @@ describe('대표 운전자 선택', () => {
  * 남으므로 출구에도 그물을 둔다. 판정 자체는 destinationGuard.test.ts가 다루고, 여기서는
  * 그 판정이 **제출 경로에 실제로 꽂혀 있는지**를 고정한다.
  */
-describe('목적지·목적 칸 검사', () => {
+describe('목적지 칸 검사', () => {
     it('목적지가 차량 이름이면 저장하지 않고 확인 모달 상태를 남긴다', async () => {
         const result = await submit(deps({
             form: validForm({ destination: '카니발' }),
@@ -458,7 +458,7 @@ describe('목적지·목적 칸 검사', () => {
         }));
 
         expect(mockSubmitDriveLog).not.toHaveBeenCalled();
-        expect(result.current.confirmBeforeSave).toEqual({ kind: 'vehicleName', vehicleName: '카니발' });
+        expect(result.current.confirmBeforeSave).toEqual({ vehicleName: '카니발' });
     });
 
     it('차량 이름이 실제 행선지인 기관을 위해 빠져나갈 문을 둔다 — "이대로 저장"이면 저장된다', async () => {
@@ -476,6 +476,7 @@ describe('목적지·목적 칸 검사', () => {
 
         await act(async () => { result.current.handleConfirmBeforeSave(); });
         expect(mockSubmitDriveLog).toHaveBeenCalled();
+        expect(result.current.confirmBeforeSave).toBeNull();
     });
 
     it('차량명으로 시작할 뿐인 목적지는 그대로 저장한다', async () => {
@@ -487,33 +488,22 @@ describe('목적지·목적 칸 검사', () => {
         expect(mockSubmitDriveLog).toHaveBeenCalled();
     });
 
-    it('운행 목적이 비면 저장하지 않고 확인 모달 상태를 남긴다 — 토스트로 흘리지 않는다', async () => {
-        // 목적지는 validateDriveLogForm이 이미 필수로 막는다. 여기 도달하는 빈 칸은 목적뿐이다.
-        const result = await submit(deps({ form: validForm({ purpose: '' }) }));
+    it('운행 목적이 비어도 묻지 않고 그대로 저장한다', async () => {
+        // 목적은 선택 항목이다(스키마도 optional). 2026-09-15에 빈 목적도 함께 물었다가
+        // 다음 날 걷어냈다 — 신고된 적 없는 칸에 매 운행마다 확인을 하나 더 세운 것이었다.
+        // 이 테스트는 그 확인이 다시 서는 것을 막는다.
+        await submit(deps({ form: validForm({ purpose: '' }) }));
 
-        expect(mockSubmitDriveLog).not.toHaveBeenCalled();
-        expect(result.current.confirmBeforeSave).toEqual({ kind: 'missingPurpose' });
-    });
-
-    it('"이대로 저장"을 누르면 그대로 저장한다', async () => {
-        const d = deps({ form: validForm({ purpose: '' }) });
-        const { result } = renderHook(() => useDriveLogSubmit(d));
-
-        await act(async () => {
-            await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
-        });
-        expect(result.current.confirmBeforeSave).toEqual({ kind: 'missingPurpose' });
-        expect(mockSubmitDriveLog).not.toHaveBeenCalled();
-
-        await act(async () => { result.current.handleConfirmBeforeSave(); });
         expect(mockSubmitDriveLog).toHaveBeenCalled();
-        expect(result.current.confirmBeforeSave).toBeNull();
     });
 
     it('확인은 그 저장 한 건에만 유효하다 — 다음 저장에서 다시 묻는다', async () => {
         // 오프라인·실패로 폼이 그대로 남는 경로가 있어, resetInputs만 믿으면 확인이 조용히
         // 건너뛰어진다. 두 번째 저장에서 다시 물어야 한다.
-        const d = deps({ form: validForm({ purpose: '' }) });
+        const d = deps({
+            form: validForm({ destination: '복지관' }),
+            selectedVehicle: { id: 'v1', displayName: '복지관', currentKm: 51000 } as SubmitDeps['selectedVehicle'],
+        });
         const { result } = renderHook(() => useDriveLogSubmit(d));
 
         await act(async () => {
@@ -526,12 +516,13 @@ describe('목적지·목적 칸 검사', () => {
             await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent);
         });
         expect(mockSubmitDriveLog).toHaveBeenCalledTimes(1);
-        expect(result.current.confirmBeforeSave).toEqual({ kind: 'missingPurpose' });
+        expect(result.current.confirmBeforeSave).toEqual({ vehicleName: '복지관' });
     });
 
     it('수정 모드에서는 붙잡지 않는다 — 과거 기록 정정을 방해하면 안 된다', async () => {
         await submit(deps({
-            form: validForm({ purpose: '' }),
+            form: validForm({ destination: '복지관' }),
+            selectedVehicle: { id: 'v1', displayName: '복지관', currentKm: 51000 } as SubmitDeps['selectedVehicle'],
             isEditMode: true,
             editLog: { id: 'log1' } as DriveLog,
         }));
