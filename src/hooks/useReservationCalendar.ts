@@ -32,6 +32,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
         editingRecurringGroupId, setEditingRecurringGroupId,
         reservationSource,
         form, setForm,
+        endTimeTouched, setEndTimeTouched,
         showFavSave, setShowFavSave,
         favName, setFavName,
         todayStr, isPastDate, isToday,
@@ -55,8 +56,8 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
     } = dataHook;
 
     // ── Route info (tmap debounce, auto end-time) ──
-    const { routeInfo, setRouteInfo, routeLoading, freeRoadRoute, freeRoadLoading, handleFetchFreeRoad, departureSiteName } = useRouteInfo({
-        form, setForm, orgAddress, orgSites, vehicles,
+    const { routeInfo, setRouteInfo, routeLoading, suggestedEndTime, freeRoadRoute, freeRoadLoading, handleFetchFreeRoad, departureSiteName } = useRouteInfo({
+        form, setForm, orgAddress, orgSites, vehicles, endTimeTouched,
     });
 
     // ── Derived values ──
@@ -94,7 +95,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
         handleEditAction(res, {
             reservations, members,
             setEditingReservation, setEditingGroupId, setEditingRecurringGroupId,
-            setSelectedDate, setForm, setShowForm,
+            setSelectedDate, setForm, setShowForm, setEndTimeTouched,
         });
 
     const handleCancel = (id: string) =>
@@ -117,7 +118,8 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
         selectedDate, showForm, setShowForm,
         sideTab, setSideTab,
         submitting, editingReservation, editingGroupId, editingRecurringGroupId,
-        favorites, routeInfo, routeLoading, freeRoadRoute, freeRoadLoading, handleFetchFreeRoad,
+        favorites, routeInfo, routeLoading, suggestedEndTime, freeRoadRoute, freeRoadLoading, handleFetchFreeRoad,
+        endTimeTouched, setEndTimeTouched,
         departureSiteName,
         showFavSave, setShowFavSave,
         favName, setFavName,
