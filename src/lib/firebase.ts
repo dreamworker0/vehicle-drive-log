@@ -167,6 +167,10 @@ function isFirestorePersistenceError(msg: string) {
         msg.includes('indexedDB.open') ||
         (msg.includes('AbortError') && !msg.includes('fetch')) ||
         msg.includes('UnknownError') ||
+        // DOMException은 이름(UnknownError)과 메시지가 갈려 있어 위 줄이 닿지 않는 판이 있다 —
+        // iOS Safari의 IDB 백엔드 실패가 그렇다(문장만 message에 담긴다). 억제만 하고
+        // isCacheCorruptionError에는 넣지 않는다: 일시적인 경우가 많은데 복구는 미전송 쓰기까지 지운다.
+        msg.includes('An internal error was encountered in the Indexed Database server') ||
         msg.includes('Failed to delete record from object store') ||
         msg.includes("Cannot read properties of null (reading 'Te')") ||
         msg.includes('mutating the [[Prototype]]') ||

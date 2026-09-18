@@ -11,7 +11,7 @@
  *
  * 이 모듈은 화면(토스트)에 의존하므로 SW 번들에 들어가면 안 된다 — sw.ts는 syncQueue만 import한다.
  */
-import { peekFailedRecords, clearFailedRecords, flushQueue, type FailedRecord } from './syncQueue';
+import { peekFailedRecords, clearFailedRecords, flushQueueQuietly, type FailedRecord } from './syncQueue';
 import { notifyUser } from '../notify';
 
 /** 큐에 적재되는 컬렉션 → 사용자가 읽는 이름 (enqueue 호출부와 1:1) */
@@ -154,7 +154,7 @@ export function registerSyncFailureNotice(): void {
     // 온라인 복귀: flush가 끝나야 폐기 여부가 확정된다. flushQueue는 진행 중이면
     // 같은 Promise를 돌려주므로, registerReconnectFlush가 이미 시작한 flush에 그대로 올라탄다.
     window.addEventListener('online', () => {
-        void flushQueue().then(() => reportFailedSync());
+        void flushQueueQuietly().then(() => reportFailedSync());
     });
 
     // 화면 복귀: 백그라운드 동안 SW가 폐기한 건을 잡는다.
