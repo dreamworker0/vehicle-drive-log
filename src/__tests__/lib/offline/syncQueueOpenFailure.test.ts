@@ -66,7 +66,7 @@ describe('syncQueue — IDB를 열지 못할 때', () => {
         expect(openDB).toHaveBeenCalledTimes(2);
     });
 
-    it('flushQueueQuietly는 IDB 실패를 삼킨다 — 처리되지 않은 거부로 새지 않는다', async () => {
+    it('flushQueueQuietly는 IDB를 못 쓰는 기기의 실패를 삼킨다 — 처리되지 않은 거부로 새지 않는다', async () => {
         const { flushQueueQuietly } = await loadQueue();
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
@@ -74,6 +74,19 @@ describe('syncQueue — IDB를 열지 못할 때', () => {
 
         await expect(flushQueueQuietly()).resolves.toBeUndefined();
         expect(warn).toHaveBeenCalled();
+
+        warn.mockRestore();
+    });
+
+    it('그 밖의 flush 실패는 삼키지 않는다 — 큐가 안 비는 결함이 조용해지면 안 된다', async () => {
+        // Firestore 쓰기는 됐는데 큐에서 지우기가 실패하는 부류. 삼키면 같은 문서가 매번
+        // 다시 전송되고 '미전송 N건'이 영영 남는데, 그것을 알아챌 방법이 사라진다.
+        const { flushQueueQuietly } = await loadQueue();
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+        openDB.mockRejectedValue(new Error('예상하지 못한 실패'));
+
+        await expect(flushQueueQuietly()).rejects.toThrow('예상하지 못한 실패');
 
         warn.mockRestore();
     });

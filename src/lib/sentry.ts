@@ -226,16 +226,6 @@ function initSentryWithModule(Sentry: SentryModule) {
             // 내부 실패를 그대로 전파하는 환경 노이즈다(앱 버그 아님). 앵커로 정확 일치만 차단해
             // "Internal error opening backing store" 등 다른 메시지와 겹치지 않게 좁힌다.
             /^Internal error\.?$/,
-            // 같은 WebKit IDB 내부 실패의 **문장형** 판이다(iOS 18.7 Mobile Safari,
-            // JAVASCRIPT-REACT-6H · /employee/my-records). 스택 없는 unhandledrejection으로
-            // 올라오는데, DOMException은 이름(UnknownError)과 메시지가 갈려 있어 바로 위
-            // 앵커 정규식이 닿지 않는다. WebKit이 IDB 백엔드 자체의 실패에만 쓰는 문구라
-            // 앱·다른 SDK 메시지와 겹치지 않는다 — 기기 상태 문제이지 앱 버그가 아니다.
-            //
-            // ⚠️ 캐시 손상 복구(firebase.ts의 attemptCacheRecovery) 대상에는 넣지 않았다.
-            // 이 오류는 일시적인 경우가 많은데 복구는 clearIndexedDbPersistence로 **미전송
-            // 오프라인 쓰기까지** 지운다 — 한 번 깜빡인 대가로 사용자 기록을 버리는 쪽이 더 나쁘다.
-            /An internal error was encountered in the Indexed Database server/,
             // 같은 teardown 계열의 **Firestore가 감싼** 판이다(Edge 133/Windows에서 확인,
             // Sentry JAVASCRIPT-REACT-6D · /employee/drive-log):
             //   `IndexedDbTransactionError: IndexedDB transaction 'shutdown' failed: UnknownError: Internal error.`
@@ -332,6 +322,24 @@ function initSentryWithModule(Sentry: SentryModule) {
             // - Safari/iOS:     "The object can not be found here"
             const errorMsg = event.exception?.values?.[0]?.value || '';
             if (/removeChild|The node to be removed is not a child|The object can not be found here/i.test(errorMsg)) {
+                return null;
+            }
+
+            // iOS Safari(WebKit)가 IndexedDB 백엔드를 잃었을 때의 문구다(JAVASCRIPT-REACT-6H,
+            // iOS 18.7 · /employee/my-records). 위 `/^Internal error\.?$/`와 같은 계열인데
+            // DOMException은 이름(UnknownError)과 메시지가 갈려 있어 그 앵커가 닿지 않는다.
+            //
+            // **ignoreErrors가 아니라 여기인 이유**: 그 목록은 전역이라 같은 문구를 **우리가
+            // 직접 보고한 것**까지 지운다. 오프라인 운행일지 적재(enqueue)가 이 오류로 실패하면
+            // createDriveLog의 catch가 captureError로 올리는데, 그건 노이즈가 아니라 '이 기기에서
+            // 오프라인 저장이 큐에 들어가지 못했다'는 유일한 신호다. 그래서 **처리되지 않은
+            // 전역 보고(handled=no)만** 억제한다.
+            //
+            // ⚠️ 캐시 손상 복구(firebase.ts의 attemptCacheRecovery) 대상에는 넣지 않았다.
+            // 이 오류는 일시적인 경우가 많은데 복구는 clearIndexedDbPersistence로 **미전송
+            // 오프라인 쓰기까지** 지운다 — 한 번 깜빡인 대가로 사용자 기록을 버리는 쪽이 더 나쁘다.
+            if (/An internal error was encountered in the Indexed Database server/.test(errorMsg)
+                && firstException?.mechanism?.handled === false) {
                 return null;
             }
 

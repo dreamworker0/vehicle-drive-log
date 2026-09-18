@@ -117,3 +117,47 @@ describe('initSentry — 종료 레이스 노이즈 필터', () => {
         expect(isIgnored(patterns, 'Internal error.')).toBe(true);
     });
 });
+
+/**
+ * beforeSend — iOS Safari IDB 백엔드 오류(JAVASCRIPT-REACT-6H)를 **어디까지** 지우는가.
+ *
+ * 같은 문구가 두 경로로 온다. 전역 핸들러가 잡은 처리되지 않은 거부는 기기 상태 문제라
+ * 앱이 할 일이 없지만, 우리가 직접 올린 보고(captureError)는 '이 기기에서 오프라인 저장이
+ * 큐에 들어가지 못했다'는 신호다. ignoreErrors는 둘을 가리지 못해 beforeSend에 둔다.
+ */
+describe('initSentry — IDB 백엔드 오류 억제 범위', () => {
+    beforeEach(() => {
+        vi.resetModules();
+        vi.stubEnv('VITE_SENTRY_DSN', DSN);
+        // beforeSend는 개발 환경에서 무조건 null이므로 프로덕션으로 두고 본다
+        vi.stubEnv('DEV', false);
+    });
+
+    afterEach(() => {
+        vi.unstubAllEnvs();
+        vi.doUnmock('../../lib/sentryClient');
+    });
+
+    const idbBackendEvent = (handled: boolean) => ({
+        exception: {
+            values: [{
+                type: 'UnknownError',
+                value: 'An internal error was encountered in the Indexed Database server',
+                mechanism: { type: 'onunhandledrejection', handled },
+            }],
+        },
+    });
+
+    type BeforeSend = (event: unknown) => unknown;
+
+    it('전역 핸들러가 잡은 것(handled=no)은 보내지 않는다', async () => {
+        const options = await loadSentry();
+        expect((options.beforeSend as BeforeSend)(idbBackendEvent(false))).toBeNull();
+    });
+
+    it('같은 문구라도 우리가 직접 올린 보고(handled=yes)는 보낸다', async () => {
+        const options = await loadSentry();
+        const event = idbBackendEvent(true);
+        expect((options.beforeSend as BeforeSend)(event)).toBe(event);
+    });
+});
