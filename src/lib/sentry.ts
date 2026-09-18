@@ -325,6 +325,24 @@ function initSentryWithModule(Sentry: SentryModule) {
                 return null;
             }
 
+            // iOS Safari(WebKit)가 IndexedDB 백엔드를 잃었을 때의 문구다(JAVASCRIPT-REACT-6H,
+            // iOS 18.7 · /employee/my-records). 위 `/^Internal error\.?$/`와 같은 계열인데
+            // DOMException은 이름(UnknownError)과 메시지가 갈려 있어 그 앵커가 닿지 않는다.
+            //
+            // **ignoreErrors가 아니라 여기인 이유**: 그 목록은 전역이라 같은 문구를 **우리가
+            // 직접 보고한 것**까지 지운다. 오프라인 운행일지 적재(enqueue)가 이 오류로 실패하면
+            // createDriveLog의 catch가 captureError로 올리는데, 그건 노이즈가 아니라 '이 기기에서
+            // 오프라인 저장이 큐에 들어가지 못했다'는 유일한 신호다. 그래서 **처리되지 않은
+            // 전역 보고(handled=no)만** 억제한다.
+            //
+            // ⚠️ 캐시 손상 복구(firebase.ts의 attemptCacheRecovery) 대상에는 넣지 않았다.
+            // 이 오류는 일시적인 경우가 많은데 복구는 clearIndexedDbPersistence로 **미전송
+            // 오프라인 쓰기까지** 지운다 — 한 번 깜빡인 대가로 사용자 기록을 버리는 쪽이 더 나쁘다.
+            if (/An internal error was encountered in the Indexed Database server/.test(errorMsg)
+                && firstException?.mechanism?.handled === false) {
+                return null;
+            }
+
             // 로그아웃 teardown 레이스: 우리가 의도적으로 terminate한 Firestore 인스턴스에
             // 뒤늦게 도착한 호출이 내는 동기 throw다(JAVASCRIPT-REACT-60).
             // **isFirestoreTerminated()가 true일 때만** 억제한다 — 종료를 지시한 적이 없는데
