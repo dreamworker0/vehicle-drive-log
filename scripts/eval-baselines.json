@@ -3,9 +3,9 @@
   "trigger": {
     "score": "24/24",
     "provenance": {
-      "measuredAt": "2026-09-06",
-      "model": "claude-opus-5",
-      "commitSha": "a6688daf66c5f28ceeffcbf21b4fcf496ecd8671",
+      "measuredAt": "2026-09-18",
+      "model": "claude-fable-5",
+      "commitSha": "6a46a59587bcdcb467c3f5dbe9989d796fbd4d52",
       "caseCount": 24,
       "resultsHash": "6883325e911a26b6"
     },
@@ -39,9 +39,9 @@
   "behavior": {
     "score": "10/10",
     "provenance": {
-      "measuredAt": "2026-09-06",
-      "model": "claude-opus-5",
-      "commitSha": "a6688daf66c5f28ceeffcbf21b4fcf496ecd8671",
+      "measuredAt": "2026-09-18",
+      "model": "claude-fable-5",
+      "commitSha": "6a46a59587bcdcb467c3f5dbe9989d796fbd4d52",
       "caseCount": 10,
       "resultsHash": "7921734135b4eddf"
     },
@@ -63,9 +63,9 @@
       "kind": "behavior",
       "score": "10/10",
       "provenance": {
-        "measuredAt": "2026-08-29",
-        "model": "claude-fable-5",
-        "commitSha": "7b20bb4ad390c9beef47e20c5df6c4ca17913459",
+        "measuredAt": "2026-08-31",
+        "model": "claude-opus-5",
+        "commitSha": "eb667be4bc5c382c6dbb150948b477c1fa7635df",
         "caseCount": 10,
         "resultsHash": "7921734135b4eddf"
       },
@@ -86,9 +86,9 @@
       "kind": "trigger",
       "score": "24/24",
       "provenance": {
-        "measuredAt": "2026-08-29",
+        "measuredAt": "2026-09-06",
         "model": "claude-opus-5",
-        "commitSha": "af8122963e6cca06f86864e1c33e0164f6387129",
+        "commitSha": "a6688daf66c5f28ceeffcbf21b4fcf496ecd8671",
         "caseCount": 24,
         "resultsHash": "6883325e911a26b6"
       },
@@ -123,9 +123,9 @@
       "kind": "behavior",
       "score": "10/10",
       "provenance": {
-        "measuredAt": "2026-08-29",
+        "measuredAt": "2026-09-06",
         "model": "claude-opus-5",
-        "commitSha": "af8122963e6cca06f86864e1c33e0164f6387129",
+        "commitSha": "a6688daf66c5f28ceeffcbf21b4fcf496ecd8671",
         "caseCount": 10,
         "resultsHash": "7921734135b4eddf"
       },
@@ -146,9 +146,9 @@
       "kind": "trigger",
       "score": "24/24",
       "provenance": {
-        "measuredAt": "2026-08-31",
+        "measuredAt": "2026-09-18",
         "model": "claude-opus-5",
-        "commitSha": "eb667be4bc5c382c6dbb150948b477c1fa7635df",
+        "commitSha": "35c5cc5d5a270ea2eb21904418a5cc3db259762e",
         "caseCount": 24,
         "resultsHash": "6883325e911a26b6"
       },
@@ -183,9 +183,9 @@
       "kind": "behavior",
       "score": "10/10",
       "provenance": {
-        "measuredAt": "2026-08-31",
+        "measuredAt": "2026-09-18",
         "model": "claude-opus-5",
-        "commitSha": "eb667be4bc5c382c6dbb150948b477c1fa7635df",
+        "commitSha": "35c5cc5d5a270ea2eb21904418a5cc3db259762e",
         "caseCount": 10,
         "resultsHash": "7921734135b4eddf"
       },
