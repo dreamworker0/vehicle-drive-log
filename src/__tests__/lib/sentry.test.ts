@@ -143,7 +143,7 @@ describe('initSentry — IDB 백엔드 오류 억제 범위', () => {
             values: [{
                 type: 'UnknownError',
                 value: 'An internal error was encountered in the Indexed Database server',
-                mechanism: { type: 'onunhandledrejection', handled },
+                mechanism: { type: 'auto.browser.global_handlers.onunhandledrejection', handled },
             }],
         },
     });
