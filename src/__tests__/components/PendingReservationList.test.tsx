@@ -1,18 +1,33 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import PendingReservationList from '../../components/admin/PendingReservationList';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 import { useConfirmStore } from '../../store/useConfirmStore';
-import { updateReservationStatus, rejectReservation, getPendingReservations } from '../../lib/firestore/reservations';
+import { updateReservationStatus, rejectReservation, getPendingReservations, ReservationConcurrencyError } from '../../lib/firestore/reservations';
+
+/** 실패 시 호출부가 넘긴 shouldReport의 판정을 기록한다(= Sentry 보고 여부). */
+const retrySpy = vi.hoisted(() => ({ reported: [] as boolean[] }));
 
 // Mocking Custom Hooks
 vi.mock('../../hooks/useAuth');
 vi.mock('../../hooks/useToast');
+// 실제 useRetry의 에러 처리 계약(shouldReport로 보고 여부 판단 → onError로 위임)을 흉내 낸다.
 vi.mock('../../hooks/useRetry', () => ({
     default: () => ({
-        runWithRetry: async (_: string, fn: () => Promise<unknown>) => await fn(),
+        runWithRetry: async (
+            _: string,
+            fn: () => Promise<unknown>,
+            opts: { shouldReport?: (e: unknown) => boolean; onError?: (e: unknown) => boolean | void } = {}
+        ) => {
+            try {
+                return await fn();
+            } catch (err) {
+                retrySpy.reported.push(opts.shouldReport ? opts.shouldReport(err) : true);
+                opts.onError?.(err);
+            }
+        },
     }),
 }));
 
@@ -21,6 +36,12 @@ vi.mock('../../lib/firestore/reservations', () => ({
     updateReservationStatus: vi.fn(),
     rejectReservation: vi.fn(),
     getPendingReservations: vi.fn(() => Promise.resolve([])),
+    ReservationConcurrencyError: class ReservationConcurrencyError extends Error {
+        constructor(currentStatus: string) {
+            super(`동시성 오류: 이미 다른 관리자에 의해 상태가 변경되었습니다. (현재 상태: ${currentStatus})`);
+            this.name = 'ReservationConcurrencyError';
+        }
+    },
 }));
 
 vi.mock('../../lib/firestore/vehicles', () => ({
@@ -40,7 +61,8 @@ describe('PendingReservationList Component', () => {
 
     beforeEach(() => {
         vi.clearAllMocks();
-        
+        retrySpy.reported.length = 0;
+
         // Mock default behaviors
         vi.mocked(useAuth).mockReturnValue({
             userData: { organizationId: 'org1', uid: 'admin_u1' },
@@ -99,6 +121,45 @@ describe('PendingReservationList Component', () => {
             expect(updateReservationStatus).toHaveBeenCalledWith('res1', 'reserved', expect.any(Object), 'pending');
             expect(mockToast).toHaveBeenCalledWith('예약이 승인되었습니다.', 'success');
         });
+    });
+
+    it('동시성 충돌은 Sentry로 올리지 않고 안내 토스트 + 목록에서 제거로 끝낸다', async () => {
+        vi.mocked(updateReservationStatus).mockRejectedValue(new ReservationConcurrencyError('reserved'));
+
+        render(<React.Suspense fallback={<div>Loading</div>}><PendingReservationList /></React.Suspense>);
+        await waitFor(() => expect(screen.getByText('승인')).toBeInTheDocument());
+
+        fireEvent.click(screen.getByText('승인'));
+
+        await waitFor(() => {
+            expect(mockToast).toHaveBeenCalledWith('이미 처리되어 상태가 변경된 예약입니다.', 'error');
+        });
+        // shouldReport가 false → useRetry가 captureError를 호출하지 않는다
+        expect(retrySpy.reported).toEqual([false]);
+        // 이미 pending이 아닌 행은 남기지 않는다 (목록이 비면 컴포넌트가 사라진다)
+        expect(screen.queryByText(/승인 대기 중인 예약/)).not.toBeInTheDocument();
+    });
+
+    it('처리 중에는 승인·반려 버튼이 잠겨 같은 예약에 중복 요청이 나가지 않는다', async () => {
+        let finishApprove: () => void = () => {};
+        vi.mocked(updateReservationStatus).mockImplementation(
+            () => new Promise<void>(resolve => { finishApprove = resolve; })
+        );
+
+        render(<React.Suspense fallback={<div>Loading</div>}><PendingReservationList /></React.Suspense>);
+        await waitFor(() => expect(screen.getByText('승인')).toBeInTheDocument());
+
+        const approveBtn = screen.getByText('승인');
+        fireEvent.click(approveBtn);
+
+        await waitFor(() => expect(approveBtn).toBeDisabled());
+        expect(screen.getByText('반려')).toBeDisabled();
+
+        fireEvent.click(approveBtn); // 연타
+        expect(updateReservationStatus).toHaveBeenCalledTimes(1);
+
+        await act(async () => { finishApprove(); });
+        await waitFor(() => expect(mockToast).toHaveBeenCalledWith('예약이 승인되었습니다.', 'success'));
     });
 
     it('반려 버튼 클릭 시 모달(confirmStore)이 팝업되고 상태 업데이트를 처리한다', async () => {
