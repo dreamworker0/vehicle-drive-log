@@ -13,7 +13,7 @@ import { getVehicles, getFavorites, getOrganizationMembers, getLastVehicleEndKm,
 import { resolveStartKm } from './resolveStartKm';
 import { todayStr } from '../utils/driveLogValidation';
 import { captureError } from '../../lib/sentry';
-import { resolveReservationPassengers } from '../utils/reservationPassengers';
+import { resolveReservationPassengers, memberDisplayName } from '../utils/reservationPassengers';
 import type { User } from 'firebase/auth';
 import type { Vehicle } from '../../types/vehicle';
 import type { Favorite } from '../../types/favorite';
@@ -117,15 +117,21 @@ export function useDriveLogInitializer(deps: InitializerDeps) {
                 const otherMembers = (mems as UserDoc[]).filter(m => m.id !== user.uid && m.status !== 'disabled');
                 setMembers(otherMembers);
 
-                if (isEditMode && editLog?.passengerNames && editLog.passengerNames.length > 0) {
-                    const matched = otherMembers.filter(m =>
-                        editLog.passengerNames?.includes(m.name || m.email?.split('@')[0])
-                    );
-                    setSelectedPassengers(matched);
-                    // 조직원 이름에 매칭되지 않은 수 = 외부 동승자 수
-                    const memberNames = otherMembers.map(m => m.name || m.email?.split('@')[0]);
-                    const externals = editLog.passengerNames.filter(n => !memberNames.includes(n));
-                    if (externals.length > 0) setExternalPassengerCount(externals.length);
+                // 동승자 복원 — 이름은 **이름 그대로** 되돌린다.
+                //
+                // 예전에는 조직원과 매칭 안 되는 이름(대개 이용자)을 '외부 인원' 숫자로만 환산해서,
+                // 수정 화면을 한 번 열었다 저장하면 그 이름이 문서에서 지워졌다. 숫자로 남기는 것은
+                // **이름이 애초에 없던 인원**뿐이다 — 저장된 총원에서 운전자와 이름 있는 사람을 뺀 나머지.
+                if (isEditMode && editLog) {
+                    const names = editLog.passengerNames || [];
+                    const memberNames = otherMembers.map(memberDisplayName);
+                    const matched = otherMembers.filter(m => names.includes(memberDisplayName(m)));
+                    const externals = names.filter(n => !memberNames.includes(n));
+                    const residual = Math.max(0, (editLog.passengerCount || 0) - 1 - names.length);
+
+                    if (matched.length > 0) setSelectedPassengers(matched);
+                    if (externals.length > 0) setExternalPassengerNames(externals.join(', '));
+                    if (residual > 0) setExternalPassengerCount(residual);
                 }
 
                 // 공동 운전자 복원(정보성) — uid 우선, 없으면 이름으로 매칭
@@ -183,7 +189,7 @@ export function useDriveLogInitializer(deps: InitializerDeps) {
             }
         };
         fetch();
-    }, [orgId, reservationData?.vehicleId, reservationData?.vehicleName, reservationData?.purpose, reservationData?.destination, reservationData?.passengerUids, reservationData?.passengerNames, reservationData?.passengerCount, applyReservationPassengers, user, isEditMode, editLog, editLog?.id, editLog?.passengerNames, editLog?.vehicleId, setVehicles, setFavorites, setMembers, setSelectedPassengers, setExternalPassengerCount, setSelectedCoDrivers, setExternalCoDriverNames, setForm, setLoading, setLastDriveLog, setNextDriveLog]);
+    }, [orgId, reservationData?.vehicleId, reservationData?.vehicleName, reservationData?.purpose, reservationData?.destination, reservationData?.passengerUids, reservationData?.passengerNames, reservationData?.passengerCount, applyReservationPassengers, user, isEditMode, editLog, editLog?.id, editLog?.passengerNames, editLog?.vehicleId, setVehicles, setFavorites, setMembers, setSelectedPassengers, setExternalPassengerCount, setExternalPassengerNames, setSelectedCoDrivers, setExternalCoDriverNames, setForm, setLoading, setLastDriveLog, setNextDriveLog]);
 
     // ── Effect 2: URL 쿼리 파라미터에서 reservationId로 예약 데이터 로드 (알림 클릭 시) ──
     useEffect(() => {

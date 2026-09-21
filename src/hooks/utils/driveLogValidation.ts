@@ -2,6 +2,7 @@
  * 운행일지 검증 유틸리티 — 순수 함수로 단위 테스트 가능
  */
 import type { DriveLogForm } from '../useDriveLogForm';
+import { composePassengerNames } from './reservationPassengers';
 
 /**
  * 현재 시간을 HH:MM 포맷으로 반환
@@ -124,10 +125,9 @@ export function buildLogData(form: DriveLogForm, { orgId, user, userData, select
     const endKm = parseInt(form.endKm);
     const driveTimestamp = buildDriveTimestamp(form.driveDate, form.endTime, form.startTime, form.endDate);
 
-    const parsedExternalNames = (externalPassengerNames || '')
-        .split(',')
-        .map(name => name.trim())
-        .filter(Boolean);
+    // 동승자 명단 = 선택한 조직원 + 직접 입력한 이름. 인원수도 이 명단에서 센다
+    // (이름만 적고 '외부 인원' 숫자를 올리지 않아도 탑승인원에 잡히게).
+    const passengerNames = composePassengerNames(selectedPassengers, externalPassengerNames);
 
     // 공동 운전자: 조직원 선택분 + 직접 입력분. 주행거리 배분 없이 이름만 기록(정보성).
     const parsedExternalCoDriverNames = (externalCoDriverNames || '')
@@ -160,11 +160,9 @@ export function buildLogData(form: DriveLogForm, { orgId, user, userData, select
         endKm,
         notes: (form.notes || '').trim(),
         timestamp: driveTimestamp,
-        passengerCount: selectedPassengers.length + externalPassengerCount + 1,
-        passengerNames: [
-            ...selectedPassengers.map(p => p.name || p.email || ''),
-            ...parsedExternalNames
-        ],
+        // 이름이 적힌 사람 + 이름 없이 숫자로만 센 인원 + 운전자 1
+        passengerCount: passengerNames.length + externalPassengerCount + 1,
+        passengerNames,
         externalPassengerCount,
         externalPassengerNames,
         inputMethod: ocrUsed ? 'ocr' : (favoriteUsed ? 'favorite' : 'manual'),

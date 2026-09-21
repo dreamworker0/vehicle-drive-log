@@ -14,7 +14,7 @@
  */
 import { memo, useMemo, useState, type ReactNode } from 'react';
 import PassengerSection from '../PassengerSection';
-import { parseExternalNames } from '../../../hooks/utils/reservationPassengers';
+import { composePassengerNames } from '../../../hooks/utils/reservationPassengers';
 import type { PassengerFormValues } from '../../../types/reservation';
 import type { User as UserDoc } from '../../../types/user';
 
@@ -40,7 +40,7 @@ export default memo(function ReservationPassengerField({
 
     const externalCount = values.passengerCount || 0;
     const externalNamesRaw = values.passengerExternalNames || '';
-    const totalCount = selectedPassengers.length + parseExternalNames(externalNamesRaw).length + externalCount;
+    const totalCount = composePassengerNames(selectedPassengers, externalNamesRaw).length + externalCount;
 
     // 이미 입력된 값이 있으면(수정 진입 등) 펼친 채로 연다 — 접힌 채로 두면
     // "적어 둔 동승자가 사라진 것처럼" 보인다.

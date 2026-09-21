@@ -95,3 +95,25 @@ export function resolveReservationPassengers(
         count: Math.max(0, Math.floor(reservation.passengerCount || 0)),
     };
 }
+
+/**
+ * 동승자 이름 명단 — 선택한 조직원 + 직접 입력한 이름.
+ *
+ * 저장(`passengerNames`)과 화면의 인원수가 **같은 근거**를 보도록 한 곳에 모았다.
+ * 예전에는 인원수를 '외부 인원' 숫자 칸으로만 셌기 때문에, 이용자 이름만 적고 숫자를
+ * 올리지 않으면 탑승인원이 운전자 1명으로 저장됐다(이름은 남는데 인원은 안 맞는 상태).
+ *
+ * 직접 입력 칸에는 자동완성으로 조직원 이름이 들어올 수 있어, 이미 선택된 조직원과
+ * 같은 이름은 뺀다 — 한 사람이 두 번 세어지는 쪽이 동명이인을 합치는 쪽보다 흔하다.
+ */
+export function composePassengerNames(
+    selected: Array<{ name?: string; email?: string }>,
+    rawExternalNames?: string,
+): string[] {
+    const memberNames = selected
+        .map(p => p.name || p.email?.split('@')[0] || '')
+        .filter(Boolean);
+    const taken = new Set(memberNames);
+    const externalNames = parseExternalNames(rawExternalNames).filter(n => !taken.has(n));
+    return [...memberNames, ...externalNames];
+}
