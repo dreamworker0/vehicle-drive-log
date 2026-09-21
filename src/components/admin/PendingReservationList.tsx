@@ -1,9 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 import { useConfirmStore } from '../../store/useConfirmStore';
 import useRetry from '../../hooks/useRetry';
-import { getPendingReservations, updateReservationStatus, rejectReservation } from '../../lib/firestore/reservations';
+import { getPendingReservations, updateReservationStatus, rejectReservation, ReservationConcurrencyError } from '../../lib/firestore/reservations';
 import { getVehicles } from '../../lib/firestore/vehicles';
 import type { Vehicle } from '../../types/vehicle';
 import { getOrganizationMembers } from '../../lib/firestore/users';
@@ -21,6 +21,48 @@ export default function PendingReservationList() {
 
     const [pendingLoading, setPendingLoading] = useState(true);
     const [dataLoading, setDataLoading] = useState(true);
+
+    /**
+     * 처리 중인 예약 id — 같은 행을 연타해 이미 승인된 예약에 또 트랜잭션을 거는 것을 막는다.
+     * 판정 기준은 ref다(클릭 사이에 리렌더가 끼지 않아도 그 자리에서 막힌다). state는
+     * 버튼 비활성화 표시 전용이다.
+     */
+    const inFlightRef = useRef<Set<string>>(new Set());
+    const [processingIds, setProcessingIds] = useState<string[]>([]);
+
+    const runExclusive = async (id: string, action: () => Promise<void>) => {
+        if (inFlightRef.current.has(id)) return;
+        inFlightRef.current.add(id);
+        setProcessingIds(prev => [...prev, id]);
+        try {
+            await action();
+        } finally {
+            inFlightRef.current.delete(id);
+            setProcessingIds(prev => prev.filter(p => p !== id));
+        }
+    };
+
+    /**
+     * 동시성 충돌(다른 관리자가 먼저 처리했거나 이미 처리된 예약)은 코드 결함이 아니라
+     * 사용자에게 안내할 상태다.
+     *
+     * `shouldReport`를 반드시 함께 준다 — 도메인 계층(`updateReservationStatus`)은 같은 이유로
+     * 이 오류를 Sentry 보고에서 빼는데, `useRetry`의 기본값이 '보고'라 여기서 빠뜨리면 그 의도가
+     * 그대로 뒤집힌다(JAVASCRIPT-REACT-6J가 그렇게 올라왔다).
+     *
+     * 충돌한 행은 목록에서도 걷어낸다. 이미 pending이 아닌 예약을 남겨 두면 같은 실패를
+     * 반복해서 누르게 된다.
+     */
+    const concurrencyGuard = (id: string) => ({
+        shouldReport: (error: unknown) => !(error instanceof ReservationConcurrencyError),
+        onError: (error: unknown) => {
+            if (error instanceof ReservationConcurrencyError) {
+                showToast('이미 처리되어 상태가 변경된 예약입니다.', 'error');
+                setPendingList(prev => prev.filter(r => r.id !== id));
+                return true;
+            }
+        },
+    });
 
     useEffect(() => {
         if (!userData?.organizationId) return;
@@ -73,21 +115,16 @@ export default function PendingReservationList() {
         fetchData();
     }, [userData?.organizationId, showToast]);
 
-    const handleApprove = async (id: string) => {
+    const handleApprove = (id: string) => runExclusive(id, async () => {
         await runWithRetry(`approve-res-${id}`, async () => {
             await updateReservationStatus(id, 'reserved', {}, 'pending');
             setPendingList(prev => prev.filter(r => r.id !== id));
             showToast('예약이 승인되었습니다.', 'success');
         }, {
             errorMessage: '예약 승인에 실패했습니다.',
-            onError: (error: unknown) => {
-                if (error instanceof Error && error.message.includes('동시성 오류')) {
-                    showToast('이미 처리되어 상태가 변경된 예약입니다.', 'error');
-                    return true;
-                }
-            }
+            ...concurrencyGuard(id),
         });
-    };
+    });
 
     const handleReject = async (id: string) => {
         const reason = await confirm({
@@ -102,18 +139,15 @@ export default function PendingReservationList() {
 
         if (reason === false || reason === null) return; // 취소 누름
 
-        await runWithRetry(`reject-res-${id}`, async () => {
-            await rejectReservation(id, reason as string);
-            setPendingList(prev => prev.filter(r => r.id !== id));
-            showToast('예약이 반려되었습니다.', 'success');
-        }, {
-            errorMessage: '예약 반려 처리에 실패했습니다.',
-            onError: (error: unknown) => {
-                if (error instanceof Error && error.message.includes('동시성 오류')) {
-                    showToast('이미 처리되어 상태가 변경된 예약입니다.', 'error');
-                    return true;
-                }
-            }
+        await runExclusive(id, async () => {
+            await runWithRetry(`reject-res-${id}`, async () => {
+                await rejectReservation(id, reason as string);
+                setPendingList(prev => prev.filter(r => r.id !== id));
+                showToast('예약이 반려되었습니다.', 'success');
+            }, {
+                errorMessage: '예약 반려 처리에 실패했습니다.',
+                ...concurrencyGuard(id),
+            });
         });
     };
 
@@ -137,6 +171,7 @@ export default function PendingReservationList() {
                     {pendingList.map(res => {
                         const vehicle = vehicles.find(v => v.id === res.vehicleId);
                         const reserver = employees[res.reservedByUid];
+                        const isProcessing = processingIds.includes(res.id);
                         return (
                             <div key={res.id} className="p-4 sm:flex items-center justify-between gap-4 group hover:bg-amber-50/50 dark:hover:bg-amber-900/10 transition-colors duration-300">
                                 <div className="space-y-2.5 mb-4 sm:mb-0 w-full overflow-hidden">
@@ -182,12 +217,14 @@ export default function PendingReservationList() {
                                 <div className="flex items-center gap-2 mt-4 sm:mt-0 shrink-0 border-t border-surface-100 dark:border-surface-800 sm:border-0 pt-4 sm:pt-0">
                                     <button
                                         onClick={() => handleReject(res.id)}
-                                        className="btn-outline flex-1 sm:flex-none h-9 px-4 text-sm border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-300 dark:border-red-900/40 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300 dark:hover:border-red-800/50 transition-all duration-300"
+                                        disabled={isProcessing}
+                                        className="btn-outline flex-1 sm:flex-none h-9 px-4 text-sm border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-300 dark:border-red-900/40 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300 dark:hover:border-red-800/50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
                                     >
                                         반려
                                     </button>
                                     <button
                                         onClick={() => handleApprove(res.id)}
+                                        disabled={isProcessing}
                                         className="btn-primary flex-1 sm:flex-none h-9 px-5 text-sm shadow-sm hover:shadow-md transition-all duration-300"
                                     >
                                         승인
