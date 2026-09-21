@@ -140,3 +140,13 @@ describe('composePassengerNames', () => {
         expect(composePassengerNames([{ email: 'lee@test.com' }], '')).toEqual(['lee']);
     });
 });
+
+describe('composeReservationPassengers — 화면과 저장의 일치', () => {
+    it('자동완성으로 직접 입력칸에 들어온 조직원은 저장 명단에서도 한 번만 센다', () => {
+        const result = composeReservationPassengers(
+            { passengerUids: ['u2'], passengerExternalNames: '김철수, 박이용', passengerCount: 0 },
+            members,
+        );
+        expect(result.passengerNames).toEqual(['김철수', '박이용']);
+    });
+});

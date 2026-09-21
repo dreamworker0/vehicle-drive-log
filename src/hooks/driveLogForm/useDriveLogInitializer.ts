@@ -120,14 +120,24 @@ export function useDriveLogInitializer(deps: InitializerDeps) {
                 // 동승자 복원 — 이름은 **이름 그대로** 되돌린다.
                 //
                 // 예전에는 조직원과 매칭 안 되는 이름(대개 이용자)을 '외부 인원' 숫자로만 환산해서,
-                // 수정 화면을 한 번 열었다 저장하면 그 이름이 문서에서 지워졌다. 숫자로 남기는 것은
-                // **이름이 애초에 없던 인원**뿐이다 — 저장된 총원에서 운전자와 이름 있는 사람을 뺀 나머지.
+                // 수정 화면을 한 번 열었다 저장하면 그 이름이 문서에서 지워졌다.
+                //
+                // 숫자 칸은 문서에 남아 있는 입력 원본(`externalPassengerCount`)을 그대로 쓴다.
+                // 합쳐진 `passengerCount`에서 역산하면 **규칙이 바뀌기 전에 저장된 기록**에서
+                // 숫자가 깎인다(옛 규칙은 직접 입력 이름을 총원에 넣지 않았다). 원본이 없는
+                // 아주 오래된 기록에서만 역산으로 떨어뜨린다 — 그때는 이름이 총원에 없으므로
+                // `총원 - 운전자 - 이름 수`가 그대로 '이름 없이 센 인원'이 된다.
                 if (isEditMode && editLog) {
                     const names = editLog.passengerNames || [];
-                    const memberNames = otherMembers.map(memberDisplayName);
-                    const matched = otherMembers.filter(m => names.includes(memberDisplayName(m)));
-                    const externals = names.filter(n => !memberNames.includes(n));
-                    const residual = Math.max(0, (editLog.passengerCount || 0) - 1 - names.length);
+                    // 이름이 없는 계정은 예전에 이메일 주소 전체로 저장됐다 — 두 표기를 모두 맞춰 본다.
+                    const nameOf = (m: UserDoc) => [memberDisplayName(m), m.email].filter(Boolean) as string[];
+                    const matched = otherMembers.filter(m => nameOf(m).some(n => names.includes(n)));
+                    const takenNames = new Set(matched.flatMap(nameOf));
+                    const externals = names.filter(n => !takenNames.has(n));
+                    const storedCount = editLog.externalPassengerCount;
+                    const residual = storedCount != null
+                        ? Math.max(0, Math.floor(storedCount))
+                        : Math.max(0, (editLog.passengerCount || 0) - 1 - names.length);
 
                     if (matched.length > 0) setSelectedPassengers(matched);
                     if (externals.length > 0) setExternalPassengerNames(externals.join(', '));
