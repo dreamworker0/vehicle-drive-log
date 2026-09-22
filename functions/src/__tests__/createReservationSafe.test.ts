@@ -113,6 +113,44 @@ describe('createReservationSafe', () => {
         );
     });
 
+    it('화면이 보낸 값을 빠짐없이 코어로 넘긴다 — 구조분해 목록에서 빠지면 조용히 버려진다', async () => {
+        // 실제로 그런 일이 있었다. `isQuickDrive`가 이 목록에 없어 줄곧 버려졌고,
+        // 서비스 대시보드의 '바로 운행' 지표가 사실상 0이었다. 코어를 직접 부르는 테스트는
+        // 이 경계를 지나지 않으므로 그 회귀를 잡지 못한다 — 여기서 통째로 고정한다.
+        mockTransactionGet.mockResolvedValue({ exists: true, data: () => ({ organizationId: 'org1' }), docs: [] });
+
+        await capturedHandler({
+            ...validRequest,
+            data: {
+                ...validRequest.data,
+                routeDistance: 12.3,
+                routeDuration: 45,
+                routeTollFee: 1500,
+                groupId: 'g1',
+                source: 'recommendation',
+                passengerUids: ['emp1'],
+                passengerNames: ['황직원', '박이용'],
+                passengerCount: 2,
+                isQuickDrive: true,
+            },
+        });
+
+        expect(mockTransactionSet).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({
+                routeDistance: 12.3,
+                routeDuration: 45,
+                routeTollFee: 1500,
+                groupId: 'g1',
+                source: 'recommendation',
+                passengerUids: ['emp1'],
+                passengerNames: ['황직원', '박이용'],
+                passengerCount: 2,
+                isQuickDrive: true,
+            }),
+        );
+    });
+
     it('시간이 겹치는 예약이 있으면 already-exists 에러를 던진다', async () => {
         const existingReservation = {
             data: () => ({
