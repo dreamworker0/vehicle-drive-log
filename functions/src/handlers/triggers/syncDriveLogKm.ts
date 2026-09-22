@@ -129,6 +129,9 @@ export async function syncNextLogStartKm(
         const batch = db.batch();
         let writes = 0;
         let lastRef: FirebaseFirestore.DocumentReference | null = null;
+        // 도착 km를 고정한 기록은 **거리가 바뀐다**. 연쇄 쓰기는 update 트리거가 조기
+        // 반환하므로(재발동 차단) 집계가 저절로 따라오지 않는다 — 커밋 뒤 직접 반영한다.
+        const statsUpdates: Array<{ before: FirebaseFirestore.DocumentData; after: FirebaseFirestore.DocumentData }> = [];
 
         for (const nextDoc of snap.docs) {
             const nextData = nextDoc.data();
@@ -141,15 +144,35 @@ export async function syncNextLogStartKm(
 
             const diff = carryKm - nextData.startKm;
             const oldEndKm = nextData.endKm ?? carryKm;
-            // [방어 코드] 주행거리가 마이너스로 전파되는 것 원천 차단
-            const newEndKm = Math.max(0, oldEndKm + diff);
 
-            batch.update(nextDoc.ref, {
+            // 사진으로 확인한 도착 계기판은 **밀지 않는다**(출발만 맞추고 거리를 다시 센다).
+            //
+            // 정정 폭이 여기서 흡수되므로 그 뒤 기록은 손대지 않게 된다 — 다음 회차에서
+            // startKm이 이미 일치해 stoppedConsistent로 끝난다. 앞 기록의 정정값이 사진
+            // 값을 넘어서면(거리가 음수가 되면) 고정을 포기하고 예전처럼 민다. 그때는 둘
+            // 중 하나가 틀린 것인데, 음수 거리를 남기면 통계까지 함께 망가진다.
+            const anchored = nextData.endKmSource === 'ocr' && oldEndKm >= carryKm;
+            if (nextData.endKmSource === 'ocr' && !anchored) {
+                log("WARNING", "syncNextLogStartKm", "사진으로 확인한 도착 km보다 앞 기록의 정정값이 커서 고정하지 못했다", {
+                    logId: nextDoc.id, photoEndKm: oldEndKm, newStartKm: carryKm,
+                });
+            }
+
+            // [방어 코드] 주행거리가 마이너스로 전파되는 것 원천 차단
+            const newEndKm = anchored ? oldEndKm : Math.max(0, oldEndKm + diff);
+
+            const patch: FirebaseFirestore.DocumentData = {
                 startKm: carryKm,
                 endKm: newEndKm,
                 editedAt: FieldValue.serverTimestamp(),
                 [KM_SYNC_REV_FIELD]: FieldValue.increment(1),
-            });
+            };
+            if (anchored) {
+                // 고정된 기록만 거리가 달라진다(민 기록은 출발·도착이 같은 폭으로 움직여 거리가 그대로다)
+                patch.distance = newEndKm - carryKm;
+                statsUpdates.push({ before: { ...nextData }, after: { ...nextData, ...patch } });
+            }
+            batch.update(nextDoc.ref, patch);
 
             writes++;
             processed++;
@@ -165,6 +188,9 @@ export async function syncNextLogStartKm(
         const truncatedHere = processed >= MAX_DOCS_PER_RUN && !stoppedConsistent;
 
         if (writes > 0) await batch.commit();
+        for (const { before, after } of statsUpdates) {
+            await handleStatsOnUpdate(orgId, before, after);
+        }
 
         if (stoppedConsistent) break;
         if (truncatedHere) {

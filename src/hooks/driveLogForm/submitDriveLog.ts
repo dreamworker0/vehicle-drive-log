@@ -27,6 +27,8 @@ interface SubmitContext {
     externalCoDriverNames: string;
     isRetroactive: boolean;
     ocrUsed: boolean;
+    /** 사진에서 읽은 도착 계기판 값(없으면 null) */
+    ocrRecognizedKm?: number | null;
     favoriteUsed: boolean;
     isElectric: boolean;
     isEditMode: boolean;
@@ -66,7 +68,7 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
         form, orgId, user, userData, selectedVehicle,
         selectedPassengers, externalPassengerCount, externalPassengerNames,
         selectedCoDrivers, externalCoDriverNames, isRetroactive,
-        ocrUsed, favoriteUsed, isEditMode, editLog, reservationData,
+        ocrUsed, ocrRecognizedKm, favoriteUsed, isEditMode, editLog, reservationData,
         hipassCard, isManuallyCorrected, originalStartKm, startLocation,
     } = ctx;
 
@@ -74,7 +76,8 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
         orgId: orgId || undefined, user, userData, selectedVehicle,
         selectedPassengers, externalPassengerCount, externalPassengerNames,
         coDrivers: selectedCoDrivers, externalCoDriverNames,
-        isRetroactive, ocrUsed, favoriteUsed, startLocation,
+        isRetroactive, ocrUsed, ocrRecognizedKm, favoriteUsed, startLocation,
+        previousLog: isEditMode && editLog ? { endKm: editLog.endKm, endKmSource: editLog.endKmSource } : null,
     });
 
     if (isManuallyCorrected !== undefined) {

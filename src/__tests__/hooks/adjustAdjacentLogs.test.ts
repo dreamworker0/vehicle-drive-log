@@ -39,6 +39,22 @@ describe('adjustAdjacentLogs', () => {
         expect(msgs[0]).toContain('직전 기록 도착 km');
     });
 
+    it('직전 기록의 도착 km가 사진으로 확인된 값이면 덮지 않고 알리기만 한다', async () => {
+        const photo = { id: 'a', startKm: 50, endKm: 90, endKmSource: 'ocr' } as unknown as DriveLog;
+        const msgs = await adjustAdjacentLogs({ lastDriveLog: photo, nextDriveLog: null, startKm: 100, endKm: 200 });
+
+        expect(mockUpdateDoc).not.toHaveBeenCalled();
+        expect(msgs[0]).toContain('사진으로 확인된 값이라 그대로');
+    });
+
+    it('직후 기록은 출발 km만 맞추므로 사진 표시와 무관하게 조정한다', async () => {
+        const photo = { id: 'b', startKm: 250, endKm: 300, endKmSource: 'ocr' } as unknown as DriveLog;
+        await adjustAdjacentLogs({ lastDriveLog: null, nextDriveLog: photo, startKm: 100, endKm: 200 });
+
+        expect(mockUpdateDoc).toHaveBeenCalledTimes(1);
+        expect(mockUpdateDoc.mock.calls[0][1]).toMatchObject({ startKm: 200 });
+    });
+
     it('직후 기록 startKm이 현재 endKm과 다르면 조정한다', async () => {
         const msgs = await adjustAdjacentLogs({ lastDriveLog: null, nextDriveLog: log('b', 250, 300), startKm: 100, endKm: 200 });
         expect(mockUpdateDoc).toHaveBeenCalledTimes(1);

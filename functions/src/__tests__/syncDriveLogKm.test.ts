@@ -138,7 +138,7 @@ jest.mock('../handlers/sync/conflictResolver', () => ({
     resolveDriveLogConflict: jest.fn(async () => false),
 }));
 jest.mock('../core/sentry', () => ({ captureError: jest.fn() }));
-jest.mock('../utils/helpers', () => ({ recordHeartbeat: jest.fn(async () => undefined) }));
+jest.mock('../utils/helpers', () => ({ recordHeartbeat: jest.fn(async () => undefined), log: jest.fn() }));
 
 import { getFirestore } from 'firebase-admin/firestore';
 import {
@@ -199,6 +199,52 @@ describe('syncNextLogStartKm — km 연쇄 재정합', () => {
         expect(db.__updates()).toHaveLength(2);
     });
 
+    it('사진으로 확인한 도착 km는 밀지 않고 출발만 맞춘 뒤 거리를 다시 센다', async () => {
+        // B는 도착 계기판을 사진으로 찍은 기록이다. 앞에 거리 30짜리를 끼워 넣어도
+        // B의 도착(200)은 그대로 두고 출발만 180으로 옮겨 거리가 50 → 20이 된다.
+        db.__setDocs([
+            { id: 'B', col: 'driveLogs', data: { organizationId: ORG, vehicleId: VEH, timestamp: d(15), startKm: 150, endKm: 200, distance: 50, endKmSource: 'ocr' } },
+            { id: 'C', col: 'driveLogs', data: { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 200, endKm: 260, distance: 60 } },
+        ]);
+
+        const chain = await syncNextLogStartKm(ORG, VEH, d(10), 180);
+
+        expect(db.__get('driveLogs', 'B')).toMatchObject({ startKm: 180, endKm: 200, distance: 20 });
+        // 정정 폭이 B에서 흡수되므로 그 뒤 기록은 손대지 않는다
+        expect(db.__get('driveLogs', 'C')).toMatchObject({ startKm: 200, endKm: 260, distance: 60 });
+        expect(db.__updates()).toHaveLength(1);
+        expect(chain.stoppedConsistent).toBe(true);
+        expect(chain.lastEndKmDelta).toBe(0);
+        // 거리가 바뀌었으므로 집계도 함께 고친다 (연쇄 쓰기는 update 트리거가 조기 반환한다)
+        expect(handleStatsOnUpdate).toHaveBeenCalledWith(
+            ORG,
+            expect.objectContaining({ startKm: 150, endKm: 200 }),
+            expect.objectContaining({ startKm: 180, endKm: 200, distance: 20 }),
+        );
+    });
+
+    it('앞 기록의 정정값이 사진으로 확인한 도착 km를 넘어서면 고정을 포기하고 민다', async () => {
+        // 거리가 음수가 되는 상황 — 둘 중 하나가 틀린 것이고, 음수 거리는 통계까지 망가뜨린다
+        db.__setDocs([
+            { id: 'B', col: 'driveLogs', data: { organizationId: ORG, vehicleId: VEH, timestamp: d(15), startKm: 150, endKm: 200, distance: 50, endKmSource: 'ocr' } },
+        ]);
+
+        await syncNextLogStartKm(ORG, VEH, d(10), 260);
+
+        expect(db.__get('driveLogs', 'B')).toMatchObject({ startKm: 260, endKm: 310 }); // 거리 50 유지
+    });
+
+    it('사진 표시가 없는 기록은 예전처럼 도착 km까지 함께 민다', async () => {
+        db.__setDocs([
+            { id: 'B', col: 'driveLogs', data: { organizationId: ORG, vehicleId: VEH, timestamp: d(15), startKm: 150, endKm: 200, distance: 50, inputMethod: 'ocr' } },
+        ]);
+
+        await syncNextLogStartKm(ORG, VEH, d(10), 180);
+
+        // inputMethod는 "무엇으로 썼나"라는 통계용 표시일 뿐 도착 km의 근거가 아니다
+        expect(db.__get('driveLogs', 'B')).toMatchObject({ startKm: 180, endKm: 230 });
+    });
+
     it('연쇄 도중 startKm이 이미 맞으면 그 지점에서 즉시 멈춘다', async () => {
         seedLogs([
             { id: 'B', timestamp: d(15), startKm: 150, endKm: 200 },
@@ -254,6 +300,8 @@ describe('syncNextLogStartKm — km 연쇄 재정합', () => {
 
 describe('onDriveLogUpdated — 연쇄 재발동 차단', () => {
     beforeEach(() => {
+        // 앞 describe가 남긴 호출 기록을 지운다 — "부수효과가 없다"를 세는 테스트가 있다
+        jest.clearAllMocks();
         jest.spyOn(console, 'error').mockImplementation();
         jest.spyOn(console, 'warn').mockImplementation();
     });

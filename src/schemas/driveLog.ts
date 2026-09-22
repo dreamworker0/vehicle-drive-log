@@ -38,6 +38,17 @@ export const driveLogSchema = z.object({
      * 출발지 선택이 열린 차량(`siteVaries`)에서만 기록되므로, 값의 존재 자체가 판정 결과다.
      */
     endSiteId: z.string().optional().catch(undefined),
+    /**
+     * 도착 계기판을 **사진으로 확인했는가**(`'ocr'`이면 그렇다).
+     *
+     * `inputMethod`와 뜻이 다르다 — 저쪽은 "이 일지를 무엇으로 썼나"라는 통계용 표시라
+     * 수정 저장 한 번에 `manual`로 덮이고, 어느 칸이 사진에서 왔는지도 말해 주지 않는다.
+     * 이 필드는 **도착 km 한 칸**에 대한 표시이고, 값이 그대로면 수정 저장에도 남는다.
+     *
+     * 이 표시가 있는 기록의 도착 km는 앞 기록이 정정돼도 **밀지 않는다**
+     * (`syncNextLogStartKm`). 사진으로 확인한 숫자가 사후에 바뀌면 증빙이 무너진다.
+     */
+    endKmSource: z.enum(['ocr']).optional().catch(undefined),
     passengers: z.coerce.number().optional().catch(undefined),
     vehicleType: z.string().optional().catch(undefined),
     passengerCount: z.coerce.number().optional().catch(undefined),

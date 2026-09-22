@@ -30,7 +30,14 @@ export async function adjustAdjacentLogs({
     const adjustMessages: string[] = [];
 
     // 직전 기록의 endKm → 현재 기록의 startKm으로 자동 변경
-    if (lastDriveLog && lastDriveLog.endKm !== startKm) {
+    //
+    // 단, 그 값이 **사진으로 확인한 도착 계기판**이면 덮지 않는다. 남의 수정 한 번에
+    // 증빙으로 찍어 둔 숫자가 바뀌면 기록의 근거가 사라진다 — 어긋난 사실만 알린다.
+    if (lastDriveLog && lastDriveLog.endKm !== startKm && lastDriveLog.endKmSource === 'ocr') {
+        adjustMessages.push(
+            `직전 기록의 도착 km ${lastDriveLog.endKm?.toLocaleString()}은 사진으로 확인된 값이라 그대로 두었습니다 (이 기록 출발 ${startKm.toLocaleString()})`,
+        );
+    } else if (lastDriveLog && lastDriveLog.endKm !== startKm) {
         try {
             await updateDoc(doc(db, 'driveLogs', lastDriveLog.id), {
                 endKm: startKm,

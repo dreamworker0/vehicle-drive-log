@@ -73,6 +73,7 @@ export interface SubmitDeps {
     ) => Promise<T | undefined>;
     startTransition: (scope: () => Promise<void>) => void;
     ocrSuccess: boolean;
+    ocrRecognizedKm?: number | null;
     /** 운행일지에 남길 출발지 이름 — 분관을 등록하지 않은 기관에서는 undefined */
     startLocation?: string;
 }
@@ -87,7 +88,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
         setFavorites, setShowFavSave, setFavName, setSuccess,
         isElectric, isRetroactive, isEditMode, editLog, reservationData, hipassCard, favName,
         lastDriveLog, nextDriveLog, setLastDriveLog,
-        showToast, runWithRetry, startTransition, ocrSuccess, startLocation
+        showToast, runWithRetry, startTransition, ocrSuccess, ocrRecognizedKm, startLocation
     } = deps;
 
     const [confirmStartKm, setConfirmStartKm] = useState<{ original: number, suggested: number } | null>(null);
@@ -296,7 +297,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
                         form, orgId, user: user!, userData, selectedVehicle,
                         selectedPassengers, externalPassengerCount, externalPassengerNames,
                         selectedCoDrivers, externalCoDriverNames, isRetroactive,
-                        ocrUsed: ocrSuccess, favoriteUsed: false, isElectric, isEditMode, editLog,
+                        ocrUsed: ocrSuccess, ocrRecognizedKm, favoriteUsed: false, isElectric, isEditMode, editLog,
                         reservationData, hipassCard,
                         isManuallyCorrected,
                         originalStartKm: isManuallyCorrected ? suggestedStartKm : undefined,
@@ -370,7 +371,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
         form, isElectric, showToast, startTransition, runWithRetry,
         orgId, user, userData, selectedVehicle, selectedPassengers, externalPassengerCount,
         externalPassengerNames, selectedCoDrivers, externalCoDriverNames, isRetroactive,
-        ocrSuccess, isEditMode, editLog, startLocation,
+        ocrSuccess, ocrRecognizedKm, isEditMode, editLog, startLocation,
         reservationData, hipassCard, handleSubmitError, setSuccess, navigate, resetInputs,
         lastDriveLog, nextDriveLog
     ]);
