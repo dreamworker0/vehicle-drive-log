@@ -72,6 +72,7 @@ const setSuccess = vi.fn();
 const setSelectedPassengers = vi.fn();
 const setSelectedCoDrivers = vi.fn();
 const setExternalPassengerCount = vi.fn();
+const setExternalPassengerNames = vi.fn();
 const setExternalCoDriverNames = vi.fn();
 
 /** runWithRetry는 실제 재시도 대신 onError 계약만 재현한다 */
@@ -101,6 +102,7 @@ function deps(over: Partial<SubmitDeps> = {}): SubmitDeps {
         setSelectedPassengers,
         externalPassengerCount: 0,
         setExternalPassengerCount,
+        setExternalPassengerNames,
         externalPassengerNames: '',
         selectedCoDrivers: [],
         setSelectedCoDrivers,
@@ -329,6 +331,16 @@ describe('저장 후 처리', () => {
 
         expect(showToast).toHaveBeenCalledWith('오프라인 저장됨', 'info');
         expect(mockNavigate).not.toHaveBeenCalled();
+    });
+
+    it('폼을 비울 때 직접 입력한 동승자 이름도 함께 비운다', async () => {
+        // 이어서 다음 일지를 쓰는 화면이다. 남겨 두면 앞 운행의 이용자 이름이 그대로 실리고,
+        // 이제는 이름이 탑승인원에도 세어지므로 인원수까지 함께 틀어진다.
+        await submit(deps());
+
+        expect(setSelectedPassengers).toHaveBeenCalledWith([]);
+        expect(setExternalPassengerCount).toHaveBeenCalledWith(0);
+        expect(setExternalPassengerNames).toHaveBeenCalledWith('');
     });
 
     it('수정 완료면 내 기록으로 이동한다', async () => {

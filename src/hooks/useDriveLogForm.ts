@@ -221,11 +221,11 @@ export default function useDriveLogForm() {
     } = useDriveLogSubmit({
         form, setForm, orgId, user, userData, vehicles, selectedVehicle,
         selectedPassengers, setSelectedPassengers, externalPassengerCount, setExternalPassengerCount,
-        externalPassengerNames,
+        externalPassengerNames, setExternalPassengerNames,
         selectedCoDrivers, setSelectedCoDrivers, externalCoDriverNames, setExternalCoDriverNames,
         setFavorites, setShowFavSave, setFavName, setSuccess,
         isElectric, isRetroactive, isEditMode, editLog, reservationData, hipassCard, favName,
-        showToast, runWithRetry, startTransition, ocrSuccess: ocr.ocrSuccess,
+        showToast, runWithRetry, startTransition, ocrSuccess: ocr.ocrSuccess, ocrRecognizedKm: ocr.ocrRecognizedKm,
         lastDriveLog, nextDriveLog, setLastDriveLog,
         // 출발지가 매번 바뀌는 차량은 운전자가 폼에서 고른 값을 기록한다.
         // 고정 출발지 차량은 예전 그대로 차량의 기본 차고지에서 라벨을 파생시킨다.

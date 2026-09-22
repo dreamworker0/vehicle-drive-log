@@ -36,6 +36,7 @@ export interface SubmitDeps {
     setSelectedPassengers: React.Dispatch<React.SetStateAction<UserDoc[]>>;
     externalPassengerCount: number;
     setExternalPassengerCount: (v: number) => void;
+    setExternalPassengerNames: (v: string) => void;
     externalPassengerNames: string;
     selectedCoDrivers: UserDoc[];
     setSelectedCoDrivers: React.Dispatch<React.SetStateAction<UserDoc[]>>;
@@ -73,6 +74,7 @@ export interface SubmitDeps {
     ) => Promise<T | undefined>;
     startTransition: (scope: () => Promise<void>) => void;
     ocrSuccess: boolean;
+    ocrRecognizedKm?: number | null;
     /** 운행일지에 남길 출발지 이름 — 분관을 등록하지 않은 기관에서는 undefined */
     startLocation?: string;
 }
@@ -82,12 +84,12 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
     const {
         form, setForm, orgId, user, userData, vehicles, selectedVehicle,
         selectedPassengers, setSelectedPassengers, externalPassengerCount, setExternalPassengerCount,
-        externalPassengerNames,
+        externalPassengerNames, setExternalPassengerNames,
         selectedCoDrivers, setSelectedCoDrivers, externalCoDriverNames, setExternalCoDriverNames,
         setFavorites, setShowFavSave, setFavName, setSuccess,
         isElectric, isRetroactive, isEditMode, editLog, reservationData, hipassCard, favName,
         lastDriveLog, nextDriveLog, setLastDriveLog,
-        showToast, runWithRetry, startTransition, ocrSuccess, startLocation
+        showToast, runWithRetry, startTransition, ocrSuccess, ocrRecognizedKm, startLocation
     } = deps;
 
     const [confirmStartKm, setConfirmStartKm] = useState<{ original: number, suggested: number } | null>(null);
@@ -178,9 +180,13 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
         });
         setSelectedPassengers([]);
         setExternalPassengerCount(0);
+        // 직접 입력한 동승자 이름도 함께 비운다. 예전에는 이 한 줄이 빠져 있어 이어서 쓰는
+        // 다음 일지에 앞 운행의 이용자 이름이 그대로 남았다(공동 운전자 쪽은 지우고 있었다).
+        // 이제는 이름이 탑승인원에도 세어지므로 인원수까지 함께 틀어진다.
+        setExternalPassengerNames('');
         setSelectedCoDrivers([]);
         setExternalCoDriverNames('');
-    }, [setForm, user, userData, setSelectedPassengers, setExternalPassengerCount, setSelectedCoDrivers, setExternalCoDriverNames]);
+    }, [setForm, user, userData, setSelectedPassengers, setExternalPassengerCount, setExternalPassengerNames, setSelectedCoDrivers, setExternalCoDriverNames]);
 
     // submitDriveLog 재시도 중 발생한 에러 처리. true 반환 시 재시도 중단(에러 무시).
     const handleSubmitError = useCallback((err: unknown): boolean | void => {
@@ -296,7 +302,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
                         form, orgId, user: user!, userData, selectedVehicle,
                         selectedPassengers, externalPassengerCount, externalPassengerNames,
                         selectedCoDrivers, externalCoDriverNames, isRetroactive,
-                        ocrUsed: ocrSuccess, favoriteUsed: false, isElectric, isEditMode, editLog,
+                        ocrUsed: ocrSuccess, ocrRecognizedKm, favoriteUsed: false, isElectric, isEditMode, editLog,
                         reservationData, hipassCard,
                         isManuallyCorrected,
                         originalStartKm: isManuallyCorrected ? suggestedStartKm : undefined,
@@ -370,7 +376,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
         form, isElectric, showToast, startTransition, runWithRetry,
         orgId, user, userData, selectedVehicle, selectedPassengers, externalPassengerCount,
         externalPassengerNames, selectedCoDrivers, externalCoDriverNames, isRetroactive,
-        ocrSuccess, isEditMode, editLog, startLocation,
+        ocrSuccess, ocrRecognizedKm, isEditMode, editLog, startLocation,
         reservationData, hipassCard, handleSubmitError, setSuccess, navigate, resetInputs,
         lastDriveLog, nextDriveLog
     ]);

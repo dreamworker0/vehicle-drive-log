@@ -27,6 +27,8 @@ interface SubmitContext {
     externalCoDriverNames: string;
     isRetroactive: boolean;
     ocrUsed: boolean;
+    /** 사진에서 읽은 도착 계기판 값(없으면 null) */
+    ocrRecognizedKm?: number | null;
     favoriteUsed: boolean;
     isElectric: boolean;
     isEditMode: boolean;
@@ -66,7 +68,7 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
         form, orgId, user, userData, selectedVehicle,
         selectedPassengers, externalPassengerCount, externalPassengerNames,
         selectedCoDrivers, externalCoDriverNames, isRetroactive,
-        ocrUsed, favoriteUsed, isEditMode, editLog, reservationData,
+        ocrUsed, ocrRecognizedKm, favoriteUsed, isEditMode, editLog, reservationData,
         hipassCard, isManuallyCorrected, originalStartKm, startLocation,
     } = ctx;
 
@@ -74,7 +76,8 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
         orgId: orgId || undefined, user, userData, selectedVehicle,
         selectedPassengers, externalPassengerCount, externalPassengerNames,
         coDrivers: selectedCoDrivers, externalCoDriverNames,
-        isRetroactive, ocrUsed, favoriteUsed, startLocation,
+        isRetroactive, ocrUsed, ocrRecognizedKm, favoriteUsed, startLocation,
+        previousLog: isEditMode && editLog ? { endKm: editLog.endKm, endKmSource: editLog.endKmSource } : null,
     });
 
     if (isManuallyCorrected !== undefined) {
@@ -129,6 +132,11 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
             // 고쳐도 문서에 isRetroactive가 남으면, 서버 트리거가 그 값을 보고 차량 km·세운
             // 곳·주유 필요 갱신을 계속 건너뛴다 — 화면은 고쳐졌는데 차량 상태만 안 따라온다.
             isRetroactive: (isRetroactive ? true : deleteField()) as unknown as boolean | undefined,
+            // 도착 계기판의 사진 확인 표시도 같은 이유로 명시적으로 지운다. 사진이 읽어 준
+            // 값을 사람이 고쳐 썼는데 표시가 남으면, **손으로 친 숫자가 '사진으로 확인된 값'
+            // 행세를 하며** 재정합에서 고정되고 인접 기록 조정도 피해 간다 — 이 기능이 막으려던
+            // 것과 정반대가 된다. 화면에는 이 표시를 지우는 수단이 없어 더욱 남으면 안 된다.
+            endKmSource: (logData.endKmSource ?? deleteField()) as unknown as 'ocr' | undefined,
         });
         if (result.syncResult?.updated) syncResult = result.syncResult;
         if (result.backgroundError) {

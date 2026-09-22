@@ -216,6 +216,48 @@ describe('buildLogData', () => {
         expect(result.passengerCount).toBe(3);
     });
 
+    describe('도착 계기판 사진 확인 표시(endKmSource)', () => {
+        const ctx = (over: Record<string, unknown> = {}) => ({
+            orgId: 'org1',
+            user: { uid: 'u1', displayName: '홍길동', email: 'hong@test.com' },
+            userData: { name: '홍길동' },
+            selectedVehicle: { vehicleType: 'sedan' },
+            selectedPassengers: [],
+            isRetroactive: false,
+            ...over,
+        });
+
+        it('사진이 읽어 준 값을 그대로 저장하면 표시를 남긴다', () => {
+            const result = buildLogData(baseForm, ctx({ ocrUsed: true, ocrRecognizedKm: 1050 }));
+            expect(result.endKmSource).toBe('ocr');
+        });
+
+        it('사진 뒤에 손으로 고쳐 쓴 값에는 표시를 남기지 않는다', () => {
+            // 사진은 1048로 읽었는데 저장되는 값은 1050 — 사람이 고친 값이다
+            const result = buildLogData(baseForm, ctx({ ocrUsed: true, ocrRecognizedKm: 1048 }));
+            expect(result.endKmSource).toBeUndefined();
+        });
+
+        it('사진을 안 썼으면 표시가 없다', () => {
+            const result = buildLogData(baseForm, ctx());
+            expect(result.endKmSource).toBeUndefined();
+        });
+
+        it('수정 저장에서 도착 km를 건드리지 않았으면 표시를 지킨다', () => {
+            const result = buildLogData(baseForm, ctx({
+                previousLog: { endKm: 1050, endKmSource: 'ocr' as const },
+            }));
+            expect(result.endKmSource).toBe('ocr');
+        });
+
+        it('수정에서 도착 km를 바꾸면 표시가 사라진다 — 더 이상 사진으로 확인된 값이 아니다', () => {
+            const result = buildLogData({ ...baseForm, endKm: '1060' }, ctx({
+                previousLog: { endKm: 1050, endKmSource: 'ocr' as const },
+            }));
+            expect(result.endKmSource).toBeUndefined();
+        });
+    });
+
     it('폼에 대표 운전자가 없으면 작성자로 폴백하고, createdByUid는 항상 작성자다', () => {
         const context = {
             orgId: 'org1',

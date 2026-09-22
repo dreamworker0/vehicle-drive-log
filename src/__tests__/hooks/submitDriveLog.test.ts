@@ -306,6 +306,29 @@ describe('submitDriveLog', () => {
         expect(payload.isRetroactive).toEqual({ __deleteField: true });
     });
 
+    it('사진으로 읽은 도착 km를 손으로 고친 수정은 사진 확인 표시를 지우라고 명시한다', async () => {
+        // 표시가 남으면 사람이 친 숫자가 '사진으로 확인된 값' 행세를 하며 재정합에서 고정된다.
+        await submitDriveLog(makeCtx({
+            isEditMode: true,
+            editLog: { id: 'log1', vehicleId: 'v1', endKm: 50040, endKmSource: 'ocr' } as never,
+            form: { ...baseForm, endKm: '50050' },
+        }));
+
+        const payload = mockUpdateDriveLog.mock.calls[0][1];
+        expect(payload.endKmSource).toEqual({ __deleteField: true });
+    });
+
+    it('도착 km를 건드리지 않은 수정은 사진 확인 표시를 지킨다', async () => {
+        await submitDriveLog(makeCtx({
+            isEditMode: true,
+            editLog: { id: 'log1', vehicleId: 'v1', endKm: 50050, endKmSource: 'ocr' } as never,
+            form: { ...baseForm, endKm: '50050', destination: '부산역' },
+        }));
+
+        const payload = mockUpdateDriveLog.mock.calls[0][1];
+        expect(payload.endKmSource).toBe('ocr');
+    });
+
     it('여전히 소급이면 표시를 그대로 싣는다', async () => {
         await submitDriveLog(makeCtx({
             isEditMode: true,
