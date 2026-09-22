@@ -37,6 +37,8 @@ export const createReservationSafe = onCall(
             passengerUids,
             passengerNames,
             passengerCount,
+            // 바로 운행 여부 — 화면이 보내던 값을 여기서 받지 않아 줄곧 버려졌다
+            isQuickDrive,
         } = request.data;
 
         const { reservationId } = await createReservationTx({
@@ -59,6 +61,7 @@ export const createReservationSafe = onCall(
             passengerUids,
             passengerNames,
             passengerCount,
+            isQuickDrive,
             actorUid: request.auth.uid,
             actorOrgId: request.auth.token.orgId,
             actorRole: request.auth.token.role,

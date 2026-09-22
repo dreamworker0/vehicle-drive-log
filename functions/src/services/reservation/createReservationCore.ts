@@ -55,6 +55,14 @@ export interface CreateReservationInput {
     passengerUids?: string[];
     passengerNames?: string[];
     passengerCount?: number;
+    /**
+     * 예약 없이 바로 출발한 운행인가('바로 운행').
+     *
+     * 화면이 이 값을 보내는데도 이 입구가 없어 **줄곧 버려지고 있었다.** 그래서
+     * 서비스 대시보드의 '바로 운행' 지표(dashboardSections)가 늘 0에 가까웠고,
+     * 운영 쪽에서 예약 경로와 즉시 출발 경로를 구분할 근거가 없었다.
+     */
+    isQuickDrive?: boolean;
 }
 
 /** 동승자 배열 길이 상한 — 클라이언트(reservationPassengers.ts)와 같은 값 */
@@ -90,6 +98,7 @@ export async function createReservationTx(
         passengerUids,
         passengerNames,
         passengerCount,
+        isQuickDrive,
     } = input;
 
     if (!organizationId || !vehicleId || !date || !startTime || !endTime) {
@@ -280,6 +289,8 @@ export async function createReservationTx(
                 ...(passengerUids?.length ? { passengerUids } : {}),
                 ...(passengerNames?.length ? { passengerNames } : {}),
                 ...(passengerCount ? { passengerCount } : {}),
+                // 빈 값은 필드를 만들지 않는다 — 예약으로 만든 건에는 false를 남기지 않는다
+                ...(isQuickDrive ? { isQuickDrive: true } : {}),
                 status,
                 createdAt: FieldValue.serverTimestamp(),
             });

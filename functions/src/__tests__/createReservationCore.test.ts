@@ -329,6 +329,27 @@ describe('createReservationTx (코어)', () => {
         await expect(createReservationTx(validInput)).rejects.toThrow('예약 생성에 실패했습니다');
     });
 
+    describe('바로 운행 표시', () => {
+        it('바로 운행으로 만든 예약에는 표시를 남긴다 — 화면이 보내던 값이 줄곧 버려지고 있었다', async () => {
+            mockTransactionGet.mockResolvedValue({ exists: true, data: () => ({ organizationId: 'org1' }), docs: [] });
+
+            await createReservationTx({ ...validInput, isQuickDrive: true });
+
+            expect(mockTransactionSet).toHaveBeenCalledWith(
+                expect.anything(),
+                expect.objectContaining({ isQuickDrive: true }),
+            );
+        });
+
+        it('예약으로 만든 건에는 false를 남기지 않는다 (문서를 키우지 않는다)', async () => {
+            mockTransactionGet.mockResolvedValue({ exists: true, data: () => ({ organizationId: 'org1' }), docs: [] });
+
+            await createReservationTx(validInput);
+
+            expect(mockTransactionSet.mock.calls[0][1]).not.toHaveProperty('isQuickDrive');
+        });
+    });
+
     describe('동승자(예정)', () => {
         it('전달한 동승자를 문서에 기록한다', async () => {
             mockTransactionGet.mockResolvedValue({ exists: true, data: () => ({ organizationId: 'org1' }), docs: [] });
