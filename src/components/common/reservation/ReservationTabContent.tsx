@@ -6,8 +6,15 @@ import VehicleTimelineBar from '../VehicleTimelineBar';
 import type { Vehicle } from '../../../types/vehicle';
 import type { Reservation } from '../../../types/reservation';
 
-/** 예약에 적어 둔 동승 인원 (조직원 + 이름 없이 센 외부 인원) */
-const passengerTotal = (res: Reservation) => (res.passengerUids?.length || 0) + (res.passengerCount || 0);
+/**
+ * 예약에 적어 둔 동승 인원 — 이름이 적힌 사람 + 이름 없이 숫자로만 센 인원.
+ *
+ * `passengerNames`에는 조직원과 직접 입력한 이용자가 **함께** 들어 있다. 예전처럼
+ * uid만 세면 이름으로 적어 둔 이용자가 인원에서 빠져 "이름은 있는데 0명"이 된다.
+ * 이름이 아예 없는 옛 예약을 위해 uid 수를 아래쪽 폴백으로 둔다.
+ */
+const passengerTotal = (res: Reservation) =>
+    Math.max(res.passengerNames?.length || 0, res.passengerUids?.length || 0) + (res.passengerCount || 0);
 
 interface ReservationTabContentProps {
     sideTab: 'list' | 'completed';

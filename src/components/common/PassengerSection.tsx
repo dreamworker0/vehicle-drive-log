@@ -5,6 +5,7 @@
  * 두 화면이 같은 컴포넌트를 쓰므로 기관 설정(허용 입력 방식)도 자동으로 함께 지켜진다.
  */
 import { memo, useState, useEffect, useRef } from 'react';
+import { composePassengerNames } from '../../hooks/utils/reservationPassengers';
 import type { User as UserDoc } from '../../types/user';
 
 interface PassengerSectionProps {
@@ -63,6 +64,9 @@ const PassengerSection = memo(function PassengerSection({
     useEffect(() => {
         localStorage.setItem('driveLog_manualInputExpanded', JSON.stringify(isManualInputExpanded));
     }, [isManualInputExpanded]);
+
+    // 인원수는 저장될 명단(buildLogData)과 같은 근거로 센다 — 직접 입력한 이름도 한 명이다.
+    const totalPassengers = composePassengerNames(selectedPassengers, externalPassengerNames).length + externalPassengerCount;
 
     const inputRef = useRef<HTMLInputElement>(null);
     const [autocompleteState, setAutocompleteState] = useState({
@@ -149,9 +153,9 @@ const PassengerSection = memo(function PassengerSection({
             <div className="flex items-center justify-between mb-3">
                 <label className="label mb-0">
                     🧑‍🤝‍🧑 동승자
-                    {(selectedPassengers.length + externalPassengerCount) > 0 && (
+                    {totalPassengers > 0 && (
                         <span className="ml-2 text-primary-600 dark:text-primary-400 font-bold">
-                            {selectedPassengers.length + externalPassengerCount}명
+                            {totalPassengers}명
                         </span>
                     )}
                 </label>
@@ -291,9 +295,9 @@ const PassengerSection = memo(function PassengerSection({
             )}
 
             {/* 총 탑승 인원 */}
-            {(selectedPassengers.length + externalPassengerCount) > 0 && (
+            {totalPassengers > 0 && (
                 <div className="mt-3 pt-2.5 border-t border-surface-100 dark:border-surface-700 text-xs text-surface-500 dark:text-surface-400">
-                    👥 총 탑승 인원: <span className="font-bold text-surface-700 dark:text-surface-200">{selectedPassengers.length + externalPassengerCount + 1}명</span> (운전자 포함)
+                    👥 총 탑승 인원: <span className="font-bold text-surface-700 dark:text-surface-200">{totalPassengers + 1}명</span> (운전자 포함)
                 </div>
             )}
         </div>

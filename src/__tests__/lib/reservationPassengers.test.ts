@@ -12,6 +12,7 @@ import {
     parseExternalNames,
     memberDisplayName,
     MAX_PASSENGERS,
+    composePassengerNames,
 } from '../../hooks/utils/reservationPassengers';
 import type { User as UserDoc } from '../../types/user';
 
@@ -121,5 +122,31 @@ describe('resolveReservationPassengers', () => {
         expect(restored.selected.map(m => m.id)).toEqual(['u1', 'u3']);
         expect(restored.externalNames.join(', ')).toBe('박영희, 최민수');
         expect(restored.count).toBe(2);
+    });
+});
+
+describe('composePassengerNames', () => {
+    it('선택한 조직원 뒤에 직접 입력한 이름을 붙인다', () => {
+        expect(composePassengerNames([{ name: '김철수' }], '김이용, 박이용'))
+            .toEqual(['김철수', '김이용', '박이용']);
+    });
+
+    it('이미 선택된 조직원과 같은 이름은 빼어 한 사람을 두 번 세지 않는다', () => {
+        expect(composePassengerNames([{ name: '김철수' }], '김철수, 박이용'))
+            .toEqual(['김철수', '박이용']);
+    });
+
+    it('이름이 없는 조직원은 이메일 앞부분으로 적는다', () => {
+        expect(composePassengerNames([{ email: 'lee@test.com' }], '')).toEqual(['lee']);
+    });
+});
+
+describe('composeReservationPassengers — 화면과 저장의 일치', () => {
+    it('자동완성으로 직접 입력칸에 들어온 조직원은 저장 명단에서도 한 번만 센다', () => {
+        const result = composeReservationPassengers(
+            { passengerUids: ['u2'], passengerExternalNames: '김철수, 박이용', passengerCount: 0 },
+            members,
+        );
+        expect(result.passengerNames).toEqual(['김철수', '박이용']);
     });
 });

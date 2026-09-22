@@ -42,6 +42,16 @@ export const driveLogSchema = z.object({
     vehicleType: z.string().optional().catch(undefined),
     passengerCount: z.coerce.number().optional().catch(undefined),
     passengerNames: z.array(z.string()).optional().catch(undefined),
+    /**
+     * 입력 화면이 적은 **그대로의 동승자 입력**. 저장은 예전부터 하고 있었는데 스키마에
+     * 없어서 컨버터가 읽을 때 지웠다 — "저장은 되고 조회는 안 되는" 상태였다.
+     *
+     * 사람 수의 근거는 `passengerCount`·`passengerNames`이고 이 둘은 그것을 **되돌리기
+     * 위한** 값이다. 수정 화면이 이름칸과 숫자칸을 원래대로 복원하려면 둘을 나눠 놓은
+     * 원본이 있어야 한다 — 합쳐진 값에서 역산하면 규칙이 바뀐 옛 기록에서 숫자가 깎인다.
+     */
+    externalPassengerCount: z.coerce.number().optional().catch(undefined),
+    externalPassengerNames: z.string().optional().catch(undefined),
     notes: z.string().optional().catch(undefined),
     /**
      * ⚠️ **금액(원)** 이다. 같은 이름인 `fuelLog.fuelAmount`는 **리터/kWh**라 뜻이 다르다.
