@@ -104,6 +104,17 @@ export async function syncNextLogStartKm(
     vehicleId: string,
     afterDate: Date,
     newStartKm: number,
+    /**
+     * 사진으로 확인한 도착 km를 만났을 때 어떻게 할 것인가.
+     *
+     * - `absorb`(기본): 출발만 맞추고 도착은 고정한다 — 정정 폭이 그 기록에서 흡수된다.
+     *   **소급 삽입·수정**에 맞는 처리다. 그 기록의 출발 km가 애초에 틀렸던 것이므로
+     *   거리를 다시 세는 것이 사실에 가깝다.
+     * - `stop`: 손대지 않고 거기서 멈춘다. **삭제**에 맞는 처리다. 지워진 것은 앞 기록이고
+     *   뒤 기록의 계기판은 그때 실제로 그랬으므로, 출발을 당기면 지워진 운행의 거리가
+     *   엉뚱한 사람·날짜의 기록으로 옮겨 붙는다(빈 구간은 빈 채로 두는 것이 맞다).
+     */
+    { onAnchored = 'absorb' }: { onAnchored?: 'absorb' | 'stop' } = {},
 ): Promise<KmChainResult> {
     let cursor = afterDate;
     let carryKm = Math.max(0, newStartKm);
@@ -152,6 +163,16 @@ export async function syncNextLogStartKm(
             // 값을 넘어서면(거리가 음수가 되면) 고정을 포기하고 예전처럼 민다. 그때는 둘
             // 중 하나가 틀린 것인데, 음수 거리를 남기면 통계까지 함께 망가진다.
             const anchored = nextData.endKmSource === 'ocr' && oldEndKm >= carryKm;
+
+            // 삭제로 촉발된 재정합은 사진 기록을 아예 건드리지 않고 멈춘다
+            if (anchored && onAnchored === 'stop') {
+                log("INFO", "syncNextLogStartKm", "사진으로 확인한 기록을 만나 재정합을 멈춘다", {
+                    logId: nextDoc.id, photoEndKm: oldEndKm,
+                });
+                stoppedConsistent = true;
+                break;
+            }
+
             if (nextData.endKmSource === 'ocr' && !anchored) {
                 log("WARNING", "syncNextLogStartKm", "사진으로 확인한 도착 km보다 앞 기록의 정정값이 커서 고정하지 못했다", {
                     logId: nextDoc.id, photoEndKm: oldEndKm, newStartKm: carryKm,
@@ -856,7 +877,7 @@ export const onDriveLogDeleted = onDocumentDeleted(
                     prevEndKm = startKm ?? 0; 
                 }
 
-                const chain = await syncNextLogStartKm(orgId, vehId, ts, prevEndKm);
+                const chain = await syncNextLogStartKm(orgId, vehId, ts, prevEndKm, { onAnchored: 'stop' });
                 // 중간 기록 삭제로 이후 기록이 앞으로 당겨졌다면 차량 누적 km도 같은 폭으로 보정
                 await applyChainCurrentKm(orgId, vehId, chain);
             }

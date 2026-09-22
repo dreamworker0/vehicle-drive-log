@@ -493,6 +493,23 @@ describe('onDriveLogCreated — 차량 누적 km 분기', () => {
         expect(vehUpdates).toHaveLength(1);
         expect(vehUpdates[0].patch).toEqual({ currentKm: { __increment: 30 } });
     });
+
+    it('소급 삽입이 사진으로 확인한 마지막 기록에 닿으면 차량 누적 km는 그대로 둔다', async () => {
+        // B의 도착(200)이 고정되므로 차량의 마지막 계기판 값도 움직이지 않는다.
+        db.__setDocs([
+            { id: 'B', col: 'driveLogs', data: { organizationId: ORG, vehicleId: VEH, timestamp: d(15), startKm: 150, endKm: 200, distance: 50, endKmSource: 'ocr' } },
+            { id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 200 } },
+        ]);
+
+        await (onDriveLogCreated as unknown as Function)(makeEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: d(10),
+            startKm: 120, endKm: 180, distance: 60, isRetroactive: true,
+        }));
+
+        expect(db.__get('driveLogs', 'B')).toMatchObject({ startKm: 180, endKm: 200, distance: 20 });
+        expect(db.__updates().filter((u: { col: string }) => u.col === 'vehicles')).toHaveLength(0);
+        expect(db.__get('vehicles', VEH)).toMatchObject({ currentKm: 200 });
+    });
 });
 
 describe('주유 필요 표시(needsRefuel) 갱신', () => {
@@ -807,6 +824,30 @@ describe('onDriveLogDeleted — 중간 기록 삭제 후 재정합', () => {
         const vehUpdates = db.__updates().filter((u: { col: string }) => u.col === 'vehicles');
         expect(vehUpdates).toHaveLength(1);
         expect(vehUpdates[0].patch).toEqual({ currentKm: { __increment: -30 } });
+    });
+
+    it('뒤 기록이 사진으로 확인한 기록이면 아예 건드리지 않는다 — 지워진 운행의 거리가 옮겨 붙지 않게', async () => {
+        // A(100→150) [삭제된 R 150→180] C(180→230, 사진). C를 당기면 지워진 R의 거리가
+        // C의 운전자·날짜 기록으로 재귀속된다(거리 50 → 80). 빈 구간은 빈 채로 둔다.
+        db.__setDocs([
+            { id: 'A', col: 'driveLogs', data: { organizationId: ORG, vehicleId: VEH, timestamp: d(5), startKm: 100, endKm: 150 } },
+            { id: 'C', col: 'driveLogs', data: { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 180, endKm: 230, distance: 50, endKmSource: 'ocr' } },
+            { id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 230 } },
+        ]);
+
+        await (onDriveLogDeleted as unknown as Function)({
+            data: {
+                data: () => ({
+                    organizationId: ORG, vehicleId: VEH, timestamp: d(10),
+                    startKm: 150, endKm: 180, distance: 30,
+                }),
+            },
+            params: { logId: 'R' },
+        });
+
+        expect(db.__get('driveLogs', 'C')).toMatchObject({ startKm: 180, endKm: 230, distance: 50 });
+        // 뒤 기록이 그대로이므로 차량 누적 km도 그대로다(마지막 기록의 도착이 안 움직였다)
+        expect(db.__updates().filter((u: { col: string }) => u.col === 'vehicles')).toHaveLength(0);
     });
 });
 

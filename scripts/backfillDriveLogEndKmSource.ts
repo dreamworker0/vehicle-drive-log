@@ -8,30 +8,46 @@
  *
  * 무엇을 근거로 채우나: `inputMethod === 'ocr'`. OCR은 **도착 계기판만** 읽어 채우므로
  * (useDriveLogOcr — endKm·배터리), 그 값이 곧 "도착 km를 사진으로 확인했다"는 뜻이다.
- * 다만 저장 뒤 손으로 고친 경우까지는 구분할 수 없다 — 그래서 **기본은 조회만** 하고,
- * 실제 쓰기는 `--apply`를 붙였을 때만 한다.
+ *
+ * ⚠️ 이 근거는 신규 기록만큼 정확하지 않다. `inputMethod`는 "사진을 썼다"까지만 말하고,
+ * 인식값을 사람이 고쳐 쓴 경우에도 그대로 `'ocr'`이다(useDriveLogOcr는 손으로 고쳐도
+ * ocrSuccess를 되돌리지 않는다). 신규 기록은 인식값과 저장값이 같을 때만 표시를 붙이지만
+ * 여기서는 그 비교를 할 수 없다. 그래서
+ *   - 기본은 **조회만** 한다(쓰려면 `--apply`),
+ *   - `--apply`는 **기관을 지정해야** 한다(`--org`) — 전 기관 일괄은 받지 않는다,
+ *   - 잘못 붙은 표시는 `--undo`로 되돌린다.
+ * 기관 담당자에게 "사진을 찍고 숫자를 고쳐 쓰신 적이 있는지" 확인한 뒤 기관별로 돌린다.
  *
  * 사용법:
- *   npx tsx scripts/backfillDriveLogEndKmSource.ts            # 대상만 집계 (기본: 변경 없음)
- *   npx tsx scripts/backfillDriveLogEndKmSource.ts --apply    # 실제 표시
- *   npx tsx scripts/backfillDriveLogEndKmSource.ts --apply --org <기관ID>   # 한 기관만
+ *   npx tsx scripts/backfillDriveLogEndKmSource.ts                        # 전체 대상 집계 (변경 없음)
+ *   npx tsx scripts/backfillDriveLogEndKmSource.ts --org <기관ID>          # 한 기관 집계
+ *   npx tsx scripts/backfillDriveLogEndKmSource.ts --org <기관ID> --apply  # 실제 표시
+ *   npx tsx scripts/backfillDriveLogEndKmSource.ts --org <기관ID> --undo   # 표시 되돌리기
  *
  * 필요 환경변수:
  *   GOOGLE_APPLICATION_CREDENTIALS — Firebase Admin SDK 서비스 계정 키 경로 (없으면 ADC)
  */
-import { getFirestore } from "firebase-admin/firestore";
+import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { initAdminApp } from "./lib/adminApp";
 
 const isApply = process.argv.includes("--apply");
+const isUndo = process.argv.includes("--undo");
 const orgArgIndex = process.argv.indexOf("--org");
 const onlyOrgId = orgArgIndex >= 0 ? process.argv[orgArgIndex + 1] : undefined;
+
+// 쓰기는 기관을 지정해야만 한다 — 근거가 완전하지 않은 표시를 200여 기관에 한 번에 붙이지 않는다.
+if ((isApply || isUndo) && !onlyOrgId) {
+    console.error("❌ --apply/--undo는 --org <기관ID>와 함께 써야 합니다 (전 기관 일괄 실행은 받지 않습니다).");
+    process.exit(1);
+}
 
 // 자격증명(서비스 계정 키 → ADC)과 **대상 프로젝트 고정**은 lib/adminApp이 맡는다.
 const app = initAdminApp();
 const db = getFirestore(app);
 
 async function backfill() {
-    console.log(`=== 백필 시작: driveLogs.endKmSource ${isApply ? "" : "(조회만 — 쓰려면 --apply)"} ===`);
+    const mode = isUndo ? "되돌리기" : isApply ? "표시" : "조회만 — 쓰려면 --org와 --apply";
+    console.log(`=== 백필 시작: driveLogs.endKmSource (${mode}) ===`);
     if (onlyOrgId) console.log(`대상 기관: ${onlyOrgId}`);
     console.log("");
 
@@ -43,6 +59,7 @@ async function backfill() {
     let marked = 0;
     let alreadyMarked = 0;
     let noEndKm = 0;
+    let cleared = 0;
 
     // Firestore 배치 상한(500)을 고려해 청크로 커밋
     let batch = db.batch();
@@ -50,6 +67,19 @@ async function backfill() {
 
     for (const doc of snap.docs) {
         const data = doc.data();
+
+        if (isUndo) {
+            if (data.endKmSource !== "ocr") continue;
+            cleared++;
+            batch.update(doc.ref, { endKmSource: FieldValue.delete() });
+            batchCount++;
+            if (batchCount >= 400) {
+                await batch.commit();
+                batch = db.batch();
+                batchCount = 0;
+            }
+            continue;
+        }
 
         if (data.endKmSource === "ocr") {
             alreadyMarked++;
@@ -74,15 +104,22 @@ async function backfill() {
         }
     }
 
-    if (isApply && batchCount > 0) {
+    if ((isApply || isUndo) && batchCount > 0) {
         await batch.commit();
     }
 
     console.log(`사진(OCR)으로 쓴 운행일지: ${snap.size}개`);
-    console.log(`  ${isApply ? "표시함" : "표시 예정"}: ${marked}개`);
-    console.log(`  이미 표시 있음(스킵): ${alreadyMarked}개`);
-    console.log(`  도착 km 없음(스킵): ${noEndKm}개`);
-    if (!isApply && marked > 0) console.log(`\n실제로 표시하려면 --apply를 붙여 다시 실행하세요.`);
+    if (isUndo) {
+        console.log(`  표시 지움: ${cleared}개`);
+    } else {
+        console.log(`  ${isApply ? "표시함" : "표시 예정"}: ${marked}개`);
+        console.log(`  이미 표시 있음(스킵): ${alreadyMarked}개`);
+        console.log(`  도착 km 없음(스킵): ${noEndKm}개`);
+        if (!isApply && marked > 0) {
+            console.log(`\n실제로 표시하려면 --org <기관ID> --apply로 다시 실행하세요.`);
+            console.log(`잘못 붙였다면 --org <기관ID> --undo로 되돌릴 수 있습니다.`);
+        }
+    }
     console.log(`\n=== 백필 완료 ===`);
 }
 
