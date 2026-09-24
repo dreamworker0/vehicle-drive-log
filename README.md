@@ -2,7 +2,7 @@
 
 사회복지기관·비영리단체를 위한 **무료** 차량 운행일지 웹 애플리케이션 (PWA)
 
-> 🔗 **지금 써보기**: **[vehicle-drive-log.web.app](https://vehicle-drive-log.web.app)** &nbsp;·&nbsp; ▶️ **[데모 영상](https://youtu.be/XdT5Wm_pd3s)** &nbsp;·&nbsp; 🛠 **[내 기관에 직접 설치하기](docs/SELF_HOSTING.md)**
+> 🔗 **지금 써보기**: **[drivelog.socialprism.co.kr](https://drivelog.socialprism.co.kr)** &nbsp;·&nbsp; ▶️ **[데모 영상](https://youtu.be/XdT5Wm_pd3s)** &nbsp;·&nbsp; 🛠 **[내 기관에 직접 설치하기](docs/SELF_HOSTING.md)**
 
 <p>
   <img src="public/icons/screenshot-desktop.webp" alt="데스크톱 화면" width="620">
@@ -305,7 +305,7 @@ npm run build           # 프로덕션 빌드 확인
 
 | 종류 | 규모 | 도구 |
 |------|------|------|
-| 단위 테스트 (프론트 + 스크립트) | 186파일 / 2,278개 테스트 | Vitest |
+| 단위 테스트 (프론트 + 스크립트) | 187파일 / 2,285개 테스트 | Vitest |
 | Functions 단위 테스트 | 79개 suite / 1,130개 테스트 (emulator 테스트 제외) | Jest + ts-jest |
 | Rules 테스트 | 2파일 / 39개 테스트 | Firebase Emulator + Vitest |
 | E2E 테스트 | 27개 spec 파일 (일부 인증/오프라인 시나리오 fixme) | Playwright |
@@ -333,7 +333,7 @@ npm run build           # 프로덕션 빌드 확인
 
 | 환경 | URL |
 |------|-----|
-| 프로덕션 | `https://vehicle-drive-log.web.app` |
+| 프로덕션 | `https://drivelog.socialprism.co.kr` (기존 `https://vehicle-drive-log.web.app`도 계속 동작) |
 | 개발 서버 | `http://localhost:5173` |
 
 ## 라이선스

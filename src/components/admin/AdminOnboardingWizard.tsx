@@ -106,12 +106,12 @@ export default function AdminOnboardingWizard({ inviteCode, onDismiss }: Props) 
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m9.862-2.22a4.5 4.5 0 0 0-1.242-7.244l-4.5-4.5a4.5 4.5 0 0 0-6.364 6.364L4.25 8.81" />
                             </svg>
                             <span className="text-sm font-medium text-primary-700 dark:text-primary-300 truncate">
-                                {`https://vehicle-drive-log.web.app?code=${inviteCode}`}
+                                {`https://drivelog.socialprism.co.kr?code=${inviteCode}`}
                             </span>
                         </div>
                         <button
                             onClick={() => {
-                                const link = `https://vehicle-drive-log.web.app?code=${inviteCode}`;
+                                const link = `https://drivelog.socialprism.co.kr?code=${inviteCode}`;
                                 navigator.clipboard?.writeText(link)
                                     .then(() => showToast('초대 링크가 클립보드에 복사되었습니다.', 'success'))
                                     .catch(() => showToast('링크 복사에 실패했습니다.', 'error'));

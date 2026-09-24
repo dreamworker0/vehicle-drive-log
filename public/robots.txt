@@ -6,4 +6,4 @@ Disallow: /super-admin/
 Disallow: /invite
 Disallow: /pending
 
-Sitemap: https://vehicle-drive-log.web.app/sitemap.xml
+Sitemap: https://drivelog.socialprism.co.kr/sitemap.xml

@@ -6,7 +6,7 @@
  */
 import { Helmet } from 'react-helmet-async';
 
-const BASE_URL = 'https://vehicle-drive-log.web.app';
+const BASE_URL = 'https://drivelog.socialprism.co.kr';
 const DEFAULT_OG_IMAGE = `${BASE_URL}/icons/icon-512.png`;
 const SITE_NAME = '차량 운행일지';
 

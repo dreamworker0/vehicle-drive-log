@@ -9,6 +9,7 @@ import { isInAppBrowser } from './inAppBrowser';
 import { runCacheClearWithMarker, runPendingCacheClear } from './offline/cacheClearMarker';
 import { markFirestoreTerminated } from './firestoreLifecycle';
 import { notifyUser } from './notify';
+import { resolveAuthDomain } from './authDomain';
 // firebase/analytics, firebase/messaging은 동적 import (번들 최적화)
 
 // === E2E/로컬 에뮬레이터 모드 ===
@@ -19,7 +20,8 @@ const USE_EMULATOR = import.meta.env.VITE_USE_EMULATOR === 'true';
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    // 접속한 Hosting 도메인과 authDomain을 맞춘다 (리다이렉트 로그인 세션 유실 방지)
+    authDomain: resolveAuthDomain(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN),
     projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
     storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
     messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,

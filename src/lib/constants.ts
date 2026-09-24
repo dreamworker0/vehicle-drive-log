@@ -27,7 +27,7 @@ export const getVehicleColor = (id: string) => {
 };
 
 // 앱 공개 URL
-export const APP_URL = 'https://vehicle-drive-log.web.app';
+export const APP_URL = 'https://drivelog.socialprism.co.kr';
 
 /**
  * 이용약관·개인정보 처리방침의 시행일 버전 (동의 기록용)
