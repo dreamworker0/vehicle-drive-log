@@ -21,6 +21,21 @@ const EMPTY_VEHICLES: Vehicle[] = [];
 const EMPTY_RESERVATIONS: Reservation[] = [];
 const EMPTY_LOGS: DriveLog[] = [];
 
+/**
+ * 대시보드 데이터 + **불러오지 못했다는 사실**.
+ *
+ * 실패해도 throw하지 않고 빈 데이터를 돌려주기 때문에(상위 ErrorBoundary로 튀지 않게),
+ * `loadFailed` 없이는 화면이 "예약이 없다"와 "못 받아 왔다"를 구분할 수 없다.
+ * 실제로 인덱스가 빌드되는 5분 사이 운전자 한 명이 자기 예약을 "예약 없음"으로 봤다(Phase 220).
+ */
+interface DashboardData {
+    vehicles: Vehicle[];
+    today: Reservation[];
+    week: Reservation[];
+    logs: DriveLog[];
+    loadFailed: boolean;
+}
+
 // React 19 Suspense 데이터 캐시
 let globalDashboardCache: { key: string, promise: Promise<unknown>, data?: unknown } | null = null;
 
@@ -33,12 +48,14 @@ function getDashboardData(orgId: string, uid: string, todayStr: string, weekEndD
     
     // 캐시 히트 시 반환
     if (globalDashboardCache?.key === key) {
-        if (globalDashboardCache.data) return globalDashboardCache.data as [Vehicle[], Reservation[], Reservation[], DriveLog[]];
+        if (globalDashboardCache.data) return globalDashboardCache.data as DashboardData;
         return globalDashboardCache.promise;
     }
-    
-    // 빈 데이터 Fallback (에러 시 사용)
-    const EMPTY_FALLBACK: [Vehicle[], Reservation[], Reservation[], DriveLog[]] = [[], [], [], []];
+
+    // 실패 시 대체값 — 데이터는 비어 있고, 비어 있는 이유가 실패임을 함께 들고 간다.
+    const EMPTY_FALLBACK: DashboardData = {
+        vehicles: [], today: [], week: [], logs: [], loadFailed: true,
+    };
 
     // 캐시 미스: 신규 페치
     // 오늘 예약은 주간(오늘~+7일) 결과의 부분집합이므로 별도 쿼리 없이 파생한다 (read 중복 제거).
@@ -49,7 +66,7 @@ function getDashboardData(orgId: string, uid: string, todayStr: string, weekEndD
         getMyDriveLogs(orgId, uid, 50),
     ]).then(async ([vehicles, week, logs]) => {
         const today = week.filter(r => r.date === todayStr);
-        const res: [Vehicle[], Reservation[], Reservation[], DriveLog[]] = [vehicles, today, week, logs];
+        const res: DashboardData = { vehicles, today, week, logs, loadFailed: false };
         globalDashboardCache!.data = res;
         return res;
     }).catch(async (err) => {
@@ -61,7 +78,8 @@ function getDashboardData(orgId: string, uid: string, todayStr: string, weekEndD
         }
         // 캐시 무효화하여 다음 렌더링에서 재시도할 수 있게 함
         globalDashboardCache = null;
-        // use()에서 throw되지 않도록 빈 데이터를 반환 → UI는 "예약 없음" 상태로 표시
+        // use()에서 throw되지 않도록 빈 데이터를 반환 → 상위 ErrorBoundary로 튀지 않는다.
+        // 대신 loadFailed로 "못 받아 왔다"를 UI까지 전달한다(빈 결과와 구분해야 한다).
         console.warn('[TodayDashboard] 데이터 로드 실패, 빈 데이터로 대체:', errCode || err);
         return EMPTY_FALLBACK;
     });
@@ -98,13 +116,14 @@ export default function useTodayDashboard() {
         void refreshTick; // 캐시 무효화 후 재페치를 강제하기 위한 의존성
         return (orgId && user?.uid) ? getDashboardData(orgId, user.uid, todayStr, weekEndDate) : null;
     }, [orgId, user, todayStr, weekEndDate, refreshTick]);
-    type DashboardData = [Vehicle[], Reservation[], Reservation[], DriveLog[]];
     const resolvedData = (dataOrPromise instanceof Promise ? use(dataOrPromise) : dataOrPromise) as DashboardData | null;
 
-    const serverVehicles: Vehicle[] = resolvedData ? resolvedData[0] : EMPTY_VEHICLES;
-    const serverToday: Reservation[] = resolvedData ? resolvedData[1] : EMPTY_RESERVATIONS;
-    const serverWeek: Reservation[] = resolvedData ? resolvedData[2] : EMPTY_RESERVATIONS;
-    const myLogs = resolvedData ? resolvedData[3] : EMPTY_LOGS;
+    const serverVehicles: Vehicle[] = resolvedData ? resolvedData.vehicles : EMPTY_VEHICLES;
+    const serverToday: Reservation[] = resolvedData ? resolvedData.today : EMPTY_RESERVATIONS;
+    const serverWeek: Reservation[] = resolvedData ? resolvedData.week : EMPTY_RESERVATIONS;
+    const myLogs = resolvedData ? resolvedData.logs : EMPTY_LOGS;
+    // 아직 orgId/uid가 없어 질의 자체를 하지 않은 상태(resolvedData === null)는 실패가 아니다.
+    const loadFailed = resolvedData?.loadFailed === true;
 
     // 2. 로컬 Override 반영
     const vehicles = serverVehicles;
@@ -265,6 +284,6 @@ export default function useTodayDashboard() {
         handleCancelTodayReservation: handleCancelReservation,
         navigateToArrival, navigateToReservations, navigateToQuickDrive,
         recommendedVehicle, myLogsCount: myLogs.length,
-        refresh,
+        refresh, loadFailed,
     };
 }

@@ -27,7 +27,7 @@ export default function TodayDashboard() {
         handleStartDrive, handleStartNavigation,
         handleCancelWeekReservation, handleCancelTodayReservation,
         navigateToArrival, navigateToReservations, navigateToQuickDrive,
-        myLogsCount, refresh,
+        myLogsCount, refresh, loadFailed,
     } = useTodayDashboard();
     const { syncVehicleOnDemand, checkCooldown } = useCalendarSync();
     const navigate = useNavigate();
@@ -182,8 +182,32 @@ export default function TodayDashboard() {
                 </div>
             )}
 
+            {/* 못 받아 온 것을 "예약 없음"으로 보여주면 안 된다 — 인덱스 빌드 중이던 5분 사이
+                운전자 한 명이 자기 예약을 없는 것으로 봤다(Phase 220). 실패는 실패라고 말한다. */}
+            {loadFailed && (
+                <div className="glass-card px-5 py-5 border-l-4 border-l-amber-500 bg-amber-50/10 dark:bg-amber-900/10">
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4 min-w-0 flex-1">
+                            <span className="w-11 h-11 rounded-xl bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center text-lg flex-shrink-0">⚠️</span>
+                            <div className="min-w-0">
+                                <p className="font-semibold text-surface-800 dark:text-surface-200 text-base">예약을 불러오지 못했습니다</p>
+                                <p className="text-sm text-surface-500 dark:text-surface-400 mt-0.5">
+                                    예약이 없는 것이 아닙니다. 잠시 뒤 다시 시도해 주세요.
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={refresh}
+                            className="btn-secondary flex-shrink-0 min-h-[48px]"
+                        >
+                            다시 시도
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* 예약이 없을 때 안내 */}
-            {myReservations.length === 0 && (
+            {!loadFailed && myReservations.length === 0 && (
                 <div className="glass-card px-5 py-5 border-l-4 border-l-primary-400">
                     <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4 min-w-0 flex-1">

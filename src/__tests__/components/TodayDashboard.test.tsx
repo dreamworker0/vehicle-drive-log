@@ -77,6 +77,25 @@ describe('TodayDashboard', () => {
         expect(screen.getByText('새 예약을 등록해보세요')).toBeInTheDocument();
     });
 
+    // 불러오기 실패는 빈 예약과 같은 화면이 되면 안 된다 — 운전자가 자기 예약을 없는 것으로 본다(Phase 220).
+    it('불러오기가 실패하면 예약 없음 대신 실패 안내와 다시 시도가 표시된다', () => {
+        const refresh = vi.fn();
+        mockUseTodayDashboardReturn = { ...mockUseTodayDashboardReturn, loadFailed: true, refresh };
+
+        render(
+            <MemoryRouter>
+                <TodayDashboard />
+            </MemoryRouter>
+        );
+
+        expect(screen.getByText('예약을 불러오지 못했습니다')).toBeInTheDocument();
+        // 같은 자리의 "오늘 예약 없음"은 나오지 않아야 한다. 둘이 함께 뜨면 구분한 의미가 없다.
+        expect(screen.queryByText('오늘 예약 없음')).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+        expect(refresh).toHaveBeenCalledTimes(1);
+    });
+
     it('미작성 운행일지 알림이 있을 경우 카드와 바로 작성 버튼이 표시된다', () => {
         mockUseTodayDashboardReturn.incompleteAlerts = [
             {
