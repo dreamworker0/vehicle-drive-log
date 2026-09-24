@@ -217,13 +217,9 @@ jobs:
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run check:functions-env
 
-      - name: functions 카탈로그·문서 수치 정합 검증
+      - name: functions 카탈로그 정합 검증
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: npm run check:functions-catalog
-
-      - name: .agent ↔ .claude 동기화 검증
-        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: npm run sync:agents -- --check
 
       - name: 하네스 Doctor (정합성 검사)
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}

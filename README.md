@@ -30,7 +30,7 @@ MIT 라이선스로 공개된 프로젝트입니다. 아래처럼 자유롭게 �
 
 | 무엇 | 어디를 보면 되나 | 왜 참고할 만한가 |
 |------|------------------|------------------|
-| **에이전트 하네스** | [.agent/](.agent/) · [scripts/check-harness.ts](scripts/check-harness.ts) · [scripts/skill-trigger-eval.json](scripts/skill-trigger-eval.json) | 스킬·워크플로·행동 규칙이 단일 원본이고 `.claude/`는 파생물이며 CI가 드리프트를 막습니다. 하네스 Doctor는 13개 영역 정합성을 검사해 **불일치 시 CI를 실패**시키고, eval 세트로 **에이전트 행동을 회귀 측정**합니다. 지침을 "문서에 적힌 약속"이 아니라 실행 가능한 게이트로 만드는 방식이라 어떤 언어·프레임워크에도 옮겨집니다 |
+| **에이전트 하네스** | [.agent/](.agent/) · [scripts/check-harness.ts](scripts/check-harness.ts) | 스킬·워크플로·행동 규칙이 단일 원본이고 `.claude/`는 파생물이며 CI가 드리프트를 막습니다. 하네스 Doctor는 지침·스킬·훅의 깨진 참조와 배선을 검사해 **불일치 시 CI를 실패**시킵니다. 지침을 "문서에 적힌 약속"이 아니라 실행 가능한 게이트로 만드는 방식이라 어떤 언어·프레임워크에도 옮겨집니다 |
 | **멀티테넌트 격리** | [eslint-rules/require-organization-filter.js](eslint-rules/require-organization-filter.js) · [firestore.rules](firestore.rules) · [tests/firestore-rules.test.ts](tests/firestore-rules.test.ts) · `setCustomClaims` | 테넌트 필터 누락은 코드 리뷰로 막기 어려운 사고입니다. 여기서는 커스텀 ESLint 규칙 `local/require-organization-filter`가 쿼리의 `organizationId` 누락을 **정적으로 차단**하고, Rules 테스트와 Custom Claims 동기화 트리거가 서버 측을 이중으로 받칩니다. 기관 → 회사·학교·지점으로 이름만 바꾸면 그대로 쓰입니다 |
 | **무료 한도 비용 설계** | [docs/FIRESTORE_COST_ANALYSIS.md](docs/FIRESTORE_COST_ANALYSIS.md) · `dailyNightlyBatch`·`monthlyBatch` · [firestore-query-optimization](.agent/skills/firestore-query-optimization/SKILL.md) | 비영리 서비스의 실질 제약은 기능이 아니라 과금입니다. 개별 스케줄러를 야간·월간 배치로 통합해 잡 수를 줄이고, 주기를 업무 시간으로 좁히고(평일 08~18시), 집계 캐싱·쿨다운·페이지네이션으로 읽기를 줄인 결정과 실측이 남아 있습니다 |
 | **예약 + 사용대장 골격** | `createReservationSafe` · [src/components/common/ReservationCalendar.tsx](src/components/common/ReservationCalendar.tsx) · [data-export-pattern](.agent/skills/data-export-pattern/SKILL.md) | 차량이라는 명사를 빼면 남는 구조는 일반적입니다. `vehicles`=자원, `reservations`는 그대로, `driveLogs`=사용대장으로 두면 회의실·장비·공용 물품 대여가 됩니다. 트랜잭션 충돌 방지, 승인 흐름, 반복 예약(공휴일 제외), 공식 양식 PDF/Excel 출력은 도메인과 무관합니다 |
@@ -208,7 +208,7 @@ firebase functions:secrets:set SLACK_TOKEN_ENC_KEY     # openssl rand -base64 32
 | `npm run screenshots` | PWA 스크린샷 생성 (Playwright + sharp) |
 | `npm run audit` | npm 보안 감사 리포트 |
 | `npm run health` | Cloud Functions 상태 점검 |
-| `npm run verify:harness` | 하네스 Doctor — 에이전트 지침·스킬·워크플로·eval 정합성 검사 |
+| `npm run verify:harness` | 하네스 Doctor — 에이전트 지침·스킬·워크플로·훅 정합성 검사 |
 | `npm run verify:fast` | 빠른 검증 (Node 확인 + lint + 타입 검사 프론트/Functions) |
 | `npm run verify:full` | 전체 게이트 (하네스 + fast + 커버리지 + Functions 테스트 + 빌드 + Rules + E2E) |
 | `npm run test:functions` | Cloud Functions 단위 테스트 (Jest) |
@@ -270,17 +270,15 @@ npm run build           # 프로덕션 빌드 확인
 
 ## Cloud Functions
 
-전체 75개 함수(리전 `asia-northeast3`)의 파라미터·권한·트리거 경로는 **[Cloud Functions 레퍼런스](docs/FUNCTIONS_REFERENCE.md)** 에 정리되어 있습니다. 아래는 종류별 요약입니다.
+전체 함수(리전 `asia-northeast3`)의 파라미터·권한·트리거 경로는 **[Cloud Functions 레퍼런스](docs/FUNCTIONS_REFERENCE.md)** 에 정리되어 있습니다. 아래는 종류별 요약입니다.
 
-> 이 절의 숫자는 `npm run check:functions-catalog`가 `functions/src/index.ts`와 대조합니다 — 어긋나면 CI가 실패합니다.
-
-| 종류 | 개수 | 대표 함수 |
-|------|------|-----------|
-| 호출형 (onCall) | 40 | `ocrDashboard`(계기판 OCR) · `createReservationSafe`(트랜잭션 예약 생성) · `joinOrganization`(초대 코드 가입) · `withdrawOrganization`(기관 해지) · `askAI`(FAQ 기반 답변) · `getSlackInstallUrl`·`diagnoseSlackConnection`(Slack 연결) |
-| HTTP (onRequest) | 4 | `tmapProxy`·`holidayProxy`(외부 API 프록시, 인증 + Rate Limit) · `slackEvents`(Slack 이벤트 수신) · `slackOauthCallback`(설치 콜백) |
-| 스케줄 (onSchedule) | 7 | 아래 표 참고 |
-| Firestore 트리거 | 23 | `autoVerifyDocument`(증빙서류 AI 심사) · `setCustomClaims`(권한 동기화) · `onReservation*`(캘린더·푸시) · `onDriveLog*`(주행거리·하이패스 잔액·집계) · `onHipassCharge*`(카드 잔액 증분) · `onFuelLogCreated`(주유 필요 표시 해제) · `audit*`(접속기록) · `onSlackTaskCreated`(Slack 워커) |
-| Auth 트리거 | 1 | `onUserDelete`(탈퇴 시 개인정보 익명화) |
+| 종류 | 대표 함수 |
+|------|-----------|
+| 호출형 (onCall) | `ocrDashboard`(계기판 OCR) · `createReservationSafe`(트랜잭션 예약 생성) · `joinOrganization`(초대 코드 가입) · `withdrawOrganization`(기관 해지) · `askAI`(FAQ 기반 답변) · `getSlackInstallUrl`·`diagnoseSlackConnection`(Slack 연결) |
+| HTTP (onRequest) | `tmapProxy`·`holidayProxy`(외부 API 프록시, 인증 + Rate Limit) · `slackEvents`(Slack 이벤트 수신) · `slackOauthCallback`(설치 콜백) |
+| 스케줄 (onSchedule) | 아래 표 참고 |
+| Firestore 트리거 | `autoVerifyDocument`(증빙서류 AI 심사) · `setCustomClaims`(권한 동기화) · `onReservation*`(캘린더·푸시) · `onDriveLog*`(주행거리·하이패스 잔액·집계) · `onHipassCharge*`(카드 잔액 증분) · `onFuelLogCreated`(주유 필요 표시 해제) · `audit*`(접속기록) · `onSlackTaskCreated`(Slack 워커) |
+| Auth 트리거 | `onUserDelete`(탈퇴 시 개인정보 익명화) |
 
 ### 스케줄 함수
 
@@ -303,14 +301,14 @@ npm run build           # 프로덕션 빌드 확인
 
 ## 테스트
 
-| 종류 | 규모 | 도구 |
-|------|------|------|
-| 단위 테스트 (프론트 + 스크립트) | 187파일 / 2,285개 테스트 | Vitest |
-| Functions 단위 테스트 | 79개 suite / 1,130개 테스트 (emulator 테스트 제외) | Jest + ts-jest |
-| Rules 테스트 | 2파일 / 39개 테스트 | Firebase Emulator + Vitest |
-| E2E 테스트 | 27개 spec 파일 (일부 인증/오프라인 시나리오 fixme) | Playwright |
+| 종류 | 위치 | 실행 | 도구 |
+|------|------|------|------|
+| 단위 테스트 (프론트 + 스크립트) | `src/**/__tests__`, `scripts/__tests__` | `npm test` | Vitest |
+| Functions 단위 테스트 | `functions/src/__tests__` (emulator 테스트 제외) | `npm run test:functions` | Jest + ts-jest |
+| Rules 테스트 | `tests/` | `npm run test:rules:all` | Firebase Emulator + Vitest |
+| E2E 테스트 | `e2e/` (일부 인증/오프라인 시나리오 fixme) | `npm run test:e2e` | Playwright |
 
-> 테스트 케이스 수는 2026-09-16 Node 22 실행 결과입니다. 파일·suite 수는 `npm run verify:harness`가 저장소와 대조합니다.
+> 규모(파일·테스트 수)는 손으로 적어 두면 곧 어긋나므로 적지 않습니다. 각 명령의 실행 결과를 보세요.
 
 ---
 
