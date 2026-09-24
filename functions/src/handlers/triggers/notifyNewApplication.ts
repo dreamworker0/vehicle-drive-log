@@ -85,7 +85,7 @@ export const notifyNewApplication = onDocumentWritten(
                                 </tr>
                             </table>
                             <div style="margin-top: 20px; text-align: center;">
-                                <a href="https://vehicle-drive-log.web.app/super-admin/applications"
+                                <a href="https://drivelog.socialprism.co.kr/super-admin/applications"
                                    style="display: inline-block; background: #3B82F6; color: white; padding: 12px 28px; border-radius: 8px; text-decoration: none; font-weight: 600;">
                                     신청 관리 페이지로 이동
                                 </a>

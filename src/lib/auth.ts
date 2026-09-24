@@ -15,7 +15,7 @@ const isLocalhost = window.location.hostname === 'localhost' || window.location.
  *
  * - 프로덕션: signInWithRedirect 사용 (안정적인 리다이렉트 플로우)
  * - 개발 환경(localhost): signInWithPopup 사용
- *   → signInWithRedirect는 authDomain(vehicle-drive-log.web.app)과 localhost 간
+ *   → signInWithRedirect는 authDomain(Hosting 도메인, authDomain.ts 참고)과 localhost 간
  *     cross-origin storage 문제로 인증 상태가 유실됨
  */
 export const signInWithGoogle = async () => {

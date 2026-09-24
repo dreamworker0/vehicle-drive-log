@@ -58,7 +58,7 @@ function initSentryWithModule(Sentry: SentryModule) {
         // 프로덕션 30% 샘플링 (주간 ~5k 샘플 확보, 비용·오버헤드 절감), 개발 시 0%
         tracesSampleRate: import.meta.env.PROD ? 0.3 : 0,
         // 자체 도메인만 트레이스 전파 (외부 API로의 불필요한 헤더 전송 차단)
-        tracePropagationTargets: ['localhost', /^https:\/\/vehicle-drive-log\.web\.app/],
+        tracePropagationTargets: ['localhost', /^https:\/\/vehicle-drive-log\.web\.app/, /^https:\/\/drivelog\.socialprism\.co\.kr/],
         // 브라우저 성능 및 라우팅 트레이싱 활성화
         integrations: [
             Sentry.browserTracingIntegration(),

@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-const DOMAIN = 'https://vehicle-drive-log.web.app';
+const DOMAIN = 'https://drivelog.socialprism.co.kr';
 
 const PAGES = [
   { path: '', changefreq: 'daily', priority: '1.0' },
