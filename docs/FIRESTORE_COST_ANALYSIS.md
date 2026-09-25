@@ -106,10 +106,12 @@
 | `weeklyMaintenanceBatch` | 매주 일 03:00 KST | 퍼지 + 이미지 정리 + 아카이빙 | **최소** — 주 1회 |
 | `monthlyBatch` | 매월 1일 06:00 | 공휴일 동기화 + 마일리지 검증 | **최소** |
 | `reservationReminder` | 평일 08~18시 매시 | 예약 + 운행일지 읽기 (OCR 워밍업 편승) | **중간** — 예약 건수에 비례 |
-| `syncCalendarToApp` | 평일 06~22시 매시 | 예약 읽기/쓰기 | **중간** — 캘린더 연동 기관 수에 비례 |
+| `syncCalendarToApp` | 평일 06~22시 30분마다 (하루 34회) | 예약 읽기/쓰기 — 캘린더 지문이 같으면 예약 조회 생략 | **낮음** — 캘린더가 바뀐 차량 수에 비례 (2026-09-25 전: 연동 차량 × 9일치 예약을 매 주기 재조회) |
 | `sendInactiveOrgAlimtalkScheduled` | 평일 14:00 | 기관 활동 조회 | **최소** |
 
 > 과거의 `warmupOcr`(5분)·`cleanupRateLimits`(매일)·개별 `archiveDriveLogs`/`backupFirestore` 스케줄은 제거·통합되었다.
+
+> **역동기화 읽기 실측**: `syncCalendarToApp`은 실행마다 `[CalendarSyncReads]` 로그(JSON: `totalReads`·`vehicleReads`·`reservationReads`·`orgAndBindingReads`·`fullSynced`·`skippedUnchanged`)를 남긴다. Cloud Logging에서 `textPayload:"[CalendarSyncReads]"`로 하루치를 모으면 이 함수가 일일 읽기에서 차지하는 몫을 확인할 수 있다. 지문(`vehicles.calendarSyncFingerprint`)은 이벤트 id·상태·수정 시각·시작/종료, 파서가 쓰는 차량 필드, KST 날짜로 만들어 **하루 한 번은 전체 동기화**된다. 온디맨드 동기화는 항상 전체로 돈다.
 
 ---
 

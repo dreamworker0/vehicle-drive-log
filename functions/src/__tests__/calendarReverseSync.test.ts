@@ -65,7 +65,8 @@ jest.mock('../services/calendar/calendarSync', () => {
 });
 
 import { parseEventToReservation } from '../services/calendar/calendarSync';
-import { syncSingleVehicleCalendar } from '../handlers/scheduled/calendarSchedule';
+import { syncSingleVehicleCalendar, computeCalendarFingerprint } from '../handlers/scheduled/calendarSchedule';
+import { getKSTDateString } from '../utils/kstDate';
 
 // ── 픽스처 ──
 const makeEvent = (overrides: Record<string, unknown> = {}) => ({
@@ -265,7 +266,7 @@ describe('syncSingleVehicleCalendar — reservedByName 폴백 체인', () => {
 
         const result = await syncSingleVehicleCalendar('veh-1', VEHICLE);
 
-        expect(result).toEqual({ created: 0, updated: 0, cancelled: 0, skippedDup: 0 });
+        expect(result).toEqual({ created: 0, updated: 0, cancelled: 0, skippedDup: 0, reads: 0, skippedUnchanged: false });
         // 캘린더 API 호출 자체가 없어야 한다 (요청을 보내면 이미 늦다)
         expect(mockListCalendarEvents).not.toHaveBeenCalled();
         expect(mockSet).not.toHaveBeenCalled();
@@ -276,7 +277,7 @@ describe('syncSingleVehicleCalendar — reservedByName 폴백 체인', () => {
 
         const result = await syncSingleVehicleCalendar('veh-1', VEHICLE);
 
-        expect(result).toEqual({ created: 0, updated: 0, cancelled: 0, skippedDup: 0 });
+        expect(result).toEqual({ created: 0, updated: 0, cancelled: 0, skippedDup: 0, reads: 0, skippedUnchanged: false });
         expect(mockListCalendarEvents).not.toHaveBeenCalled();
     });
 
@@ -288,8 +289,110 @@ describe('syncSingleVehicleCalendar — reservedByName 폴백 체인', () => {
 
         const result = await syncSingleVehicleCalendar('veh-1', VEHICLE);
 
-        expect(result).toEqual({ created: 0, updated: 0, cancelled: 0, skippedDup: 0 });
+        expect(result).toEqual({ created: 0, updated: 0, cancelled: 0, skippedDup: 0, reads: 0, skippedUnchanged: false });
         expect(mockListCalendarEvents).not.toHaveBeenCalled();
         expect(mockSet).not.toHaveBeenCalled();
+    });
+});
+
+/**
+ * 역동기화는 하루 34회 × 차량마다 9일치 예약을 다시 읽어 하루 읽기의 대부분을 차지했다
+ * (2026-09-25, 무료 한도 5만/일 중 3.7만). 캘린더가 그대로면 예약 조회부터 건너뛴다.
+ */
+describe('computeCalendarFingerprint', () => {
+    const TODAY = '2026-09-25';
+
+    it('이벤트 순서가 달라도 같은 지문을 낸다', () => {
+        const a = makeEvent({ id: 'a' });
+        const b = makeEvent({ id: 'b' });
+        expect(computeCalendarFingerprint([a, b], VEHICLE, TODAY))
+            .toBe(computeCalendarFingerprint([b, a], VEHICLE, TODAY));
+    });
+
+    it('이벤트 수정 시각·상태가 바뀌면 지문이 달라진다', () => {
+        const base = computeCalendarFingerprint([makeEvent()], VEHICLE, TODAY);
+        expect(computeCalendarFingerprint([makeEvent({ updated: '2026-07-12T11:00:00Z' })], VEHICLE, TODAY)).not.toBe(base);
+        expect(computeCalendarFingerprint([makeEvent({ status: 'cancelled' })], VEHICLE, TODAY)).not.toBe(base);
+        expect(computeCalendarFingerprint([], VEHICLE, TODAY)).not.toBe(base);
+    });
+
+    it('날짜가 바뀌면 지문이 달라진다 — 하루 한 번은 전체 동기화된다', () => {
+        expect(computeCalendarFingerprint([makeEvent()], VEHICLE, '2026-09-26'))
+            .not.toBe(computeCalendarFingerprint([makeEvent()], VEHICLE, TODAY));
+    });
+
+    it('파서가 쓰는 차량 필드가 바뀌면 지문이 달라진다', () => {
+        const base = computeCalendarFingerprint([makeEvent()], VEHICLE, TODAY);
+        expect(computeCalendarFingerprint([makeEvent()], { ...VEHICLE, displayName: '레이' }, TODAY)).not.toBe(base);
+        expect(computeCalendarFingerprint([makeEvent()], { ...VEHICLE, plateNumber: '12가3456' }, TODAY)).not.toBe(base);
+        expect(computeCalendarFingerprint([makeEvent()], { ...VEHICLE, googleCalendarId: 'other@group.calendar.google.com' }, TODAY)).not.toBe(base);
+    });
+});
+
+describe('syncSingleVehicleCalendar — 변경 없는 캘린더 건너뛰기', () => {
+    const currentFingerprint = () =>
+        computeCalendarFingerprint([makeEvent()], VEHICLE, getKSTDateString(new Date()));
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        jest.spyOn(console, 'log').mockImplementation();
+        mockReservationsQueryGet.mockResolvedValue({ docs: [], empty: true });
+        mockDoubleCheckGet.mockResolvedValue({ docs: [], empty: true });
+        mockListCalendarEvents.mockResolvedValue([makeEvent()]);
+        mockOrganizationGet.mockResolvedValue({ exists: true, data: () => ({}) });
+        mockCalendarBindingGet.mockResolvedValue({ exists: true, data: () => ({ organizationId: 'org-1' }) });
+        mockGetUserByEmail.mockResolvedValue({ uid: 'uid-1', displayName: '김직원' });
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    it('지문이 직전과 같으면 예약을 읽지도 쓰지도 않는다', async () => {
+        const vehicle = { ...VEHICLE, calendarSyncFingerprint: currentFingerprint() };
+
+        const result = await syncSingleVehicleCalendar('veh-1', vehicle, new Set(), undefined, undefined, { skipIfUnchanged: true });
+
+        expect(result).toEqual({ created: 0, updated: 0, cancelled: 0, skippedDup: 0, reads: 0, skippedUnchanged: true });
+        expect(mockReservationsQueryGet).not.toHaveBeenCalled();
+        expect(mockSet).not.toHaveBeenCalled();
+        expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it('지문이 다르면 전체 동기화하고 새 지문을 차량 문서에 남긴다', async () => {
+        const vehicle = { ...VEHICLE, calendarSyncFingerprint: 'stale' };
+
+        const result = await syncSingleVehicleCalendar('veh-1', vehicle, new Set(), undefined, undefined, { skipIfUnchanged: true });
+
+        expect(result.skippedUnchanged).toBe(false);
+        expect(result.created).toBe(1);
+        expect(mockReservationsQueryGet).toHaveBeenCalledTimes(1);
+        expect(mockUpdate).toHaveBeenCalledWith({ calendarSyncFingerprint: currentFingerprint() });
+    });
+
+    it('온디맨드 호출(옵션 없음)은 지문이 같아도 항상 전체 동기화한다', async () => {
+        const vehicle = { ...VEHICLE, calendarSyncFingerprint: currentFingerprint() };
+
+        const result = await syncSingleVehicleCalendar('veh-1', vehicle);
+
+        expect(result.skippedUnchanged).toBe(false);
+        expect(mockReservationsQueryGet).toHaveBeenCalledTimes(1);
+        // 지문이 그대로라 다시 쓰지 않는다
+        expect(mockUpdate).not.toHaveBeenCalledWith(expect.objectContaining({ calendarSyncFingerprint: expect.anything() }));
+    });
+
+    it('중간에 실패하면 지문을 남기지 않는다 — 다음 주기가 다시 전체로 돈다', async () => {
+        mockSet.mockRejectedValueOnce(new Error('write failed'));
+
+        await expect(syncSingleVehicleCalendar('veh-1', VEHICLE, new Set(), undefined, undefined, { skipIfUnchanged: true }))
+            .rejects.toThrow('write failed');
+        expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
+    it('빈 결과 쿼리도 1건으로 세어 읽기 수를 집계한다', async () => {
+        // 기간 쿼리(빈 결과 1) + 더블체크(빈 결과 1) + 프로필 조회(1)
+        mockGetUserByEmail.mockResolvedValue({ uid: 'uid-1', displayName: undefined });
+        mockUserProfileGet.mockResolvedValue({ exists: true, data: () => ({ name: '프로필이름' }) });
+
+        const result = await syncSingleVehicleCalendar('veh-1', VEHICLE);
+
+        expect(result.reads).toBe(3);
     });
 });
