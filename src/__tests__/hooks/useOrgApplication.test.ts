@@ -31,8 +31,10 @@ vi.mock('browser-image-compression', () => ({
     default: vi.fn((file) => Promise.resolve(file))
 }));
 
-// URL.createObjectURL 모킹 (jsdom 환경에서 정의되지 않을 수 있음)
-if (typeof window !== 'undefined' && !window.URL.createObjectURL) {
+// URL.createObjectURL은 **항상** 모킹한다. 미리보기 URL은 이 테스트가 검증하는 대상이 아니다.
+// 예전에는 "정의돼 있지 않을 때만" 채웠는데, jsdom 30.1부터 createObjectURL을 제공하고
+// 그 구현은 테스트의 File(Node 전역)을 받지 못해 `_buffer`에서 터졌다(2026-09-25 의존성 PR #404).
+if (typeof window !== 'undefined') {
     window.URL.createObjectURL = vi.fn(() => 'blob:mock-url');
 }
 
