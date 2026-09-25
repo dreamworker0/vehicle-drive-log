@@ -65,7 +65,7 @@ jest.mock('../services/calendar/calendarSync', () => {
 });
 
 import { parseEventToReservation } from '../services/calendar/calendarSync';
-import { syncSingleVehicleCalendar, computeCalendarFingerprint } from '../handlers/scheduled/calendarSchedule';
+import { syncSingleVehicleCalendar, computeCalendarFingerprint, createCachedEventLister } from '../handlers/scheduled/calendarSchedule';
 import { getKSTDateString } from '../utils/kstDate';
 
 // ── 픽스처 ──
@@ -394,5 +394,80 @@ describe('syncSingleVehicleCalendar — 변경 없는 캘린더 건너뛰기', (
         const result = await syncSingleVehicleCalendar('veh-1', VEHICLE);
 
         expect(result.reads).toBe(3);
+    });
+});
+
+/**
+ * 같은 캘린더를 쓰는 차량끼리 이벤트 조회를 나눠 쓴다 — 동기화 대상 95대가 캘린더 45개를
+ * 쓰는데 차량마다 다시 조회해, 실행 시간(=과금 시간)의 대부분이 캘린더 API 대기였다(2026-09-25).
+ */
+describe('createCachedEventLister', () => {
+    const W = ['2026-09-24T00:00:00.000Z', '2026-10-02T23:59:59.999Z'] as const;
+
+    it('같은 캘린더·같은 창은 한 번만 조회한다', async () => {
+        const list = jest.fn().mockResolvedValue([makeEvent()]);
+        const { listEvents, fetchCount } = createCachedEventLister(list as never);
+
+        const a = await listEvents('cal@group.calendar.google.com', ...W);
+        const b = await listEvents('cal@group.calendar.google.com', ...W);
+
+        expect(list).toHaveBeenCalledTimes(1);
+        expect(b).toBe(a);
+        expect(fetchCount()).toBe(1);
+    });
+
+    it('캘린더나 조회 창이 다르면 따로 조회한다', async () => {
+        const list = jest.fn().mockResolvedValue([]);
+        const { listEvents, fetchCount } = createCachedEventLister(list as never);
+
+        await listEvents('a@group.calendar.google.com', ...W);
+        await listEvents('b@group.calendar.google.com', ...W);
+        await listEvents('a@group.calendar.google.com', W[0], '2026-10-03T23:59:59.999Z');
+
+        expect(list).toHaveBeenCalledTimes(3);
+        expect(fetchCount()).toBe(3);
+    });
+
+    it('실패한 조회는 캐시하지 않는다 — 다음 차량이 다시 시도하고, 실패는 차량마다 따로 기록된다', async () => {
+        const list = jest.fn()
+            .mockRejectedValueOnce(new Error('Forbidden'))
+            .mockResolvedValueOnce([makeEvent()]);
+        const { listEvents } = createCachedEventLister(list as never);
+
+        await expect(listEvents('cal@group.calendar.google.com', ...W)).rejects.toThrow('Forbidden');
+        await expect(listEvents('cal@group.calendar.google.com', ...W)).resolves.toHaveLength(1);
+        expect(list).toHaveBeenCalledTimes(2);
+    });
+});
+
+describe('syncSingleVehicleCalendar — 이벤트 조회 주입', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+        jest.spyOn(console, 'log').mockImplementation();
+        mockReservationsQueryGet.mockResolvedValue({ docs: [], empty: true });
+        mockDoubleCheckGet.mockResolvedValue({ docs: [], empty: true });
+        mockOrganizationGet.mockResolvedValue({ exists: true, data: () => ({}) });
+        mockCalendarBindingGet.mockResolvedValue({ exists: true, data: () => ({ organizationId: 'org-1' }) });
+        mockGetUserByEmail.mockResolvedValue({ uid: 'uid-1', displayName: '김직원' });
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    it('넘겨받은 조회 함수를 쓴다 — 기본 조회는 부르지 않는다', async () => {
+        const listEvents = jest.fn().mockResolvedValue([makeEvent()]);
+
+        const result = await syncSingleVehicleCalendar('veh-1', VEHICLE, new Set(), undefined, undefined, { listEvents: listEvents as never });
+
+        expect(listEvents).toHaveBeenCalledWith(VEHICLE.googleCalendarId, expect.any(String), expect.any(String));
+        expect(mockListCalendarEvents).not.toHaveBeenCalled();
+        expect(result.created).toBe(1);
+    });
+
+    it('귀속되지 않은 캘린더면 넘겨받은 조회 함수도 부르지 않는다', async () => {
+        mockCalendarBindingGet.mockResolvedValue({ exists: true, data: () => ({ organizationId: 'victim-org' }) });
+        const listEvents = jest.fn().mockResolvedValue([makeEvent()]);
+
+        await syncSingleVehicleCalendar('veh-1', VEHICLE, new Set(), undefined, undefined, { listEvents: listEvents as never });
+
+        expect(listEvents).not.toHaveBeenCalled();
     });
 });

@@ -64,6 +64,39 @@ export function computeCalendarFingerprint(
     return createHash("sha256").update(payload).digest("hex");
 }
 
+/** 이벤트 조회 함수 — 정기 실행은 같은 캘린더를 한 번만 조회하도록 감싼 것을 넘긴다. */
+type ListEventsFn = typeof listCalendarEvents;
+
+/**
+ * 실행 한 번 안에서 같은 캘린더의 이벤트 조회를 한 번으로 줄인다.
+ *
+ * 한 기관이 여러 차량에 같은 캘린더를 쓰는 경우가 많다(2026-09-25 실측: 동기화 대상 95대가
+ * 캘린더 45개, 한 캘린더를 14대가 쓰는 기관도 있다). 예전에는 차량마다 같은 캘린더를 다시
+ * 조회해, 실행당 약 42초 중 대부분이 캘린더 API 응답 대기였다. Cloud Run은 기다리는 시간도
+ * 과금하므로 이 함수가 함수 과금 시간의 25%(요금 1위 SKU의 최대 몫)를 차지했다.
+ *
+ * - 키에 조회 창(timeMin·timeMax)을 넣는다 — 자정을 넘기며 창이 바뀌면 다시 조회한다.
+ * - 실패한 조회는 캐시에서 지운다. 다음 차량이 다시 시도하고, 차량마다 실패 카운터가
+ *   예전처럼 따로 쌓인다(권한 오류가 한 차량에만 기록되는 일이 없다).
+ * - 조회 순서는 그대로다. 기관 기능·캘린더 귀속 검사를 통과한 차량만 조회를 요청하므로,
+ *   남의 캘린더에는 여전히 요청조차 보내지 않는다.
+ */
+export function createCachedEventLister(list: ListEventsFn = listCalendarEvents): { listEvents: ListEventsFn; fetchCount: () => number } {
+    const cache = new Map<string, ReturnType<ListEventsFn>>();
+    let fetches = 0;
+    const listEvents: ListEventsFn = (calendarId, timeMin, timeMax) => {
+        const key = calendarId + "|" + timeMin + "|" + timeMax;
+        const cached = cache.get(key);
+        if (cached) return cached;
+        fetches++;
+        const pending = list(calendarId, timeMin, timeMax);
+        cache.set(key, pending);
+        pending.catch(function () { cache.delete(key); });
+        return pending;
+    };
+    return { listEvents, fetchCount: () => fetches };
+}
+
 /** Firestore는 결과가 없는 쿼리도 1건으로 과금한다. */
 function queryReadCount(snap: { docs: unknown[] }): number {
     return Math.max(1, snap.docs.length);
@@ -155,6 +188,8 @@ export const syncCalendarToApp = onSchedule(
             const orgFlagCache: OrgCalendarFlagCache = new Map();
             // 캘린더 바인딩 판정도 실행 단위로 모은다 (한 기관이 여러 차량에 같은 캘린더를 쓴다).
             const bindingCache: CalendarBindingCache = new Map();
+            // 같은 캘린더를 쓰는 차량끼리 이벤트 조회 결과를 나눠 쓴다
+            const eventLister = createCachedEventLister();
 
             for (let i = 0; i < vehiclesSnap.docs.length; i++) {
                 const vehicleDoc = vehiclesSnap.docs[i];
@@ -191,7 +226,7 @@ export const syncCalendarToApp = onSchedule(
                     // 개별 차량 동기화 로직 호출
                     const result = await syncSingleVehicleCalendar(
                         vehicleId, vehicle, globalProcessedEventIds, orgFlagCache, bindingCache,
-                        { skipIfUnchanged: true }
+                        { skipIfUnchanged: true, listEvents: eventLister.listEvents }
                     );
 
                     totalCreated += result.created;
@@ -234,6 +269,7 @@ export const syncCalendarToApp = onSchedule(
                 vehicleReads,
                 reservationReads,
                 orgAndBindingReads,
+                calendarFetches: eventLister.fetchCount(),
                 fullSynced: totalFullSynced,
                 skippedUnchanged: totalSkippedUnchanged,
             }));
@@ -269,7 +305,8 @@ export async function syncSingleVehicleCalendar(
     bindingCache?: CalendarBindingCache,
     // skipIfUnchanged: 캘린더 지문이 차량 문서의 직전 값과 같으면 예약 조회·비교를 건너뛴다.
     // 정기 스케줄러만 켠다 — 온디맨드 동기화는 사용자가 "지금 맞춰 달라"고 누른 것이라 항상 전체로 돈다.
-    options: { skipIfUnchanged?: boolean } = {}
+    // listEvents: 이벤트 조회 함수. 정기 실행은 캘린더별로 한 번만 조회하는 캐시판을 넘긴다.
+    options: { skipIfUnchanged?: boolean; listEvents?: ListEventsFn } = {}
 ): Promise<{
     created: number;
     updated: number;
@@ -323,7 +360,7 @@ export async function syncSingleVehicleCalendar(
     timeMax.setHours(23, 59, 59, 999);
 
     // 1. 캘린더 이벤트 조회
-    const calendarEvents = await listCalendarEvents(
+    const calendarEvents = await (options.listEvents ?? listCalendarEvents)(
         calendarId,
         timeMin.toISOString(),
         timeMax.toISOString()
