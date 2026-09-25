@@ -6,7 +6,7 @@ description: 문서 갱신·검증·커밋 후 master 푸시로 CI 배포를 트
 >
 > 🚫 **배포 단일 경로**: 프로덕션 배포는 **master 푸시 → GitHub Actions Deploy 워크플로**([.github/workflows/deploy.yml](../../.github/workflows/deploy.yml))가 수행한다.
 > 로컬 `firebase deploy`를 병행하면 동일 함수 동시 업데이트 충돌이 발생하므로 **로컬에서 직접 배포하지 않는다.**
-> 긴급 수동 부분배포가 꼭 필요하면 [deploy-hosting](deploy-hosting.md) / [deploy-functions](deploy-functions.md) / [deploy-rules](deploy-rules.md)의 **긴급 가드** 절차를 따른다.
+> 긴급 수동 부분배포가 꼭 필요하면 [deploy-emergency](deploy-emergency.md)의 **긴급 가드** 절차를 따른다.
 
 // turbo-all
 
@@ -26,6 +26,24 @@ description: 문서 갱신·검증·커밋 후 master 푸시로 CI 배포를 트
 npm run check:release-notes
 ```
 Working directory: `.`
+
+1-2. FAQ 누락 확인 — 공지의 새 기능 항목(`type: "new"`)에 FAQ id가 연결됐는지 본다. 필요 없다고 판단했으면 `"faq": []`로 넘긴다. 끊긴 연결(없는 id)은 `--soft`로도 통과하지 않는다:
+```powershell
+npm run check:faq
+```
+Working directory: `.`
+
+1-3. 수동 점검 — 기계가 보지 못하는 것:
+   - **Firestore 인덱스**: 새 복합 쿼리(`where + orderBy` 등)가 추가됐다면 `firestore.indexes.json`에 있는지 확인한다 (`git diff master -- src/lib/firestore/ functions/src/`). 인덱스 누락은 운영에서만 터진다.
+   - **환경 변수**: 새 `VITE_*`가 `.env.local.example`에, 새 Functions `process.env.*`가 Functions 환경변수에 반영됐는지 확인한다.
+
+> **자주 놓치는 것**
+> - **Functions index.ts export 누락** — 새 함수를 `functions/src/index.ts`에서 export하지 않으면 배포돼도 호출 불가.
+> - **firestore.rules 변경 후 룰 테스트 누락** — `npm run test:rules`는 별도로 돌려야 한다.
+> - **PWA 캐시 무효화** — 서비스워커(`src/sw.ts`, 빌드 시 dist/sw.js로 생성)나 `index.html` cache-control 변경 없이 배포 시 구버전이 잔존. 최근 커밋(`14d59ac`)에서도 발생한 패턴.
+> - **App Check 토큰 디버그 모드** — `b295455` 커밋처럼 프로덕션에 debug token이 새지 않는지 빌드 산출물 grep.
+> - **업데이트 소식 누락** — 배포는 됐는데 공지가 그대로인 일이 반복된다(Phase 143~145에서 다섯 건). `npm run check:release-notes`가 기계로 잡아 주므로 반드시 돌린다.
+> - **FAQ 누락** — 공지는 나갔는데 FAQ에 없는 일이 반복된다. 출발지·분관 기능은 공지가 네 번 나가는 동안 FAQ 항목이 하나도 없었다(2026-09-06 발견). `npm run check:faq`가 새 기능 공지의 FAQ 연결이 비었는지 잡아 준다 — 필요 여부는 사람이 판단하되(`"faq": []`로 넘길 수 있다), 판단을 건너뛰는 것은 막는다.
 
 ### --- [STEP 1: 사전 검증 (Node 22 + 정적 검사 + 빌드)] ---
 

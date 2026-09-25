@@ -7,7 +7,7 @@
 - **에이전트 행동 규칙**: [.agent/agents.md](.agent/agents.md) — 절대 금지 목록(§1), 자동 교정 루프(§2), 작업별 체크리스트(§4), 판단 가이드(§5)
 - **세부 규칙**: [.agent/rules/](.agent/rules/) — coding-conventions, design-system, cloud-functions, firestore-rules 등 도메인별 규칙 파일
 - **스킬 가이드**: [.agent/skills/](.agent/skills/) — 작업별 패턴 가이드 (아래 테이블 참고)
-- **워크플로우**: [.agent/workflows/](.agent/workflows/) — `/deploy`, `/test`, `/build` 등 자동화 스크립트
+- **워크플로우**: [.agent/workflows/](.agent/workflows/) — `/deploy`, `/cleanup`, `/rollback` 등 자동화 스크립트
 
 ## 스택 & 환경
 
@@ -64,33 +64,24 @@
 
 | 작업 | 가이드 |
 |---|---|
-| Firestore 함수 추가 | [firestore-model-pattern](.agent/skills/firestore-model-pattern/SKILL.md) |
-| Cloud Function 추가 (스케줄 포함) | [add-cloud-function](.agent/skills/add-cloud-function/SKILL.md) |
-| Firestore 필드 추가/마이그레이션 | [firestore-model-pattern](.agent/skills/firestore-model-pattern/SKILL.md) (일괄 마이그레이션은 `scripts/migrate*.ts` 실물 스크립트를 본뜬다) |
+| Firestore 함수 추가 · 필드 추가/마이그레이션 · Zod 스키마 | [firestore-model-pattern](.agent/skills/firestore-model-pattern/SKILL.md) (문서 스키마는 `src/schemas/`가 단일 원본, 일괄 마이그레이션은 `scripts/migrate*.ts` 실물 스크립트를 본뜬다) |
+| Cloud Function 추가 (스케줄 포함) · 이메일 알림 | [add-cloud-function](.agent/skills/add-cloud-function/SKILL.md) |
 | 커스텀 훅 추가 | [add-hook](.agent/skills/add-hook/SKILL.md) |
-| 컴포넌트 추가 | [add-component](.agent/skills/add-component/SKILL.md) |
-| 토글/스위치 등 공용 컨트롤 | [shared-ui-controls](.agent/skills/shared-ui-controls/SKILL.md) |
-| Zod 스키마 추가 | [firestore-model-pattern](.agent/skills/firestore-model-pattern/SKILL.md) (문서 스키마는 `src/schemas/`가 단일 원본) |
+| 컴포넌트 추가 · 설정 UI · 토글/스위치 등 공용 컨트롤 · 차량 색상 표시 · 다크모드 점검 | [ui-patterns](.agent/skills/ui-patterns/SKILL.md) |
 | PDF/Excel 내보내기 | [data-export-pattern](.agent/skills/data-export-pattern/SKILL.md) |
-| 이메일 알림 | [add-email-notification](.agent/skills/add-email-notification/SKILL.md) |
 | 카카오 알림톡 | `functions/src/services/alimtalk/` 실물 코드를 본뜬다 (Cafe24 프록시 구조) |
 | 캘린더 연동 | `functions/src/services/calendar/` 실물 코드를 본뜬다 (ADC 인증) |
-| 쿼리 성능 최적화 | [firestore-query-optimization](.agent/skills/firestore-query-optimization/SKILL.md) |
-| Firebase 운영 비용 절감 | [firebase-cost-reduction](.agent/skills/firebase-cost-reduction/SKILL.md) |
+| Firebase 운영 비용 절감 · 쿼리 성능(Reads) 최적화 | [firebase-cost-reduction](.agent/skills/firebase-cost-reduction/SKILL.md) |
 | PWA 기능 추가 | [add-pwa-feature](.agent/skills/add-pwa-feature/SKILL.md) |
-| 다크모드 점검 | [dark-mode-audit](.agent/skills/dark-mode-audit/SKILL.md) |
 | 테스트 작성 | [write-test](.agent/skills/write-test/SKILL.md) |
 | 배포 문제 진단 | [troubleshoot-deployment](.agent/skills/troubleshoot-deployment/SKILL.md) |
-| 배포 전 일괄 점검 | [pre-deploy-check](.agent/skills/pre-deploy-check/SKILL.md) |
 | Sentry 노이즈 에러 필터 | [sentry-noise-filter](.agent/skills/sentry-noise-filter/SKILL.md) |
-| FAQ 갱신 | [update-faq](.agent/skills/update-faq/SKILL.md) |
-| 업데이트 소식(공지) 작성 | [release-notes](.agent/skills/release-notes/SKILL.md) |
-| 설정 UI 추가 | [settings-ui](.agent/skills/settings-ui/SKILL.md) |
-| 차량 색상 표시 | [vehicle-color](.agent/skills/vehicle-color/SKILL.md) |
-| 코드 정리 (미사용 코드·패키지) | [code-cleanup](.agent/skills/code-cleanup/SKILL.md) |
+| 업데이트 소식(공지) · FAQ 갱신 | [release-notes](.agent/skills/release-notes/SKILL.md) |
 | Gemini OCR 연동 | [gemini-ocr-integration](.agent/skills/gemini-ocr-integration/SKILL.md) |
+| 배포 전 점검 · 배포 | `/deploy` 워크플로 ([deploy.md](.agent/workflows/deploy.md)) |
+| 코드 정리 (미사용 코드·패키지) | `/cleanup` 워크플로 ([cleanup.md](.agent/workflows/cleanup.md)) |
 
-위 테이블의 스킬은 모두 `.claude/skills/`로 동기화되어 Claude Code에서 자동 발동된다. `.agent/workflows/`도 `.claude/commands/`로 동기화되어 `/deploy`, `/test`, `/build` 등 **슬래시 커맨드**로 사용할 수 있다. 두 브리지 모두 `scripts/sync-claude-agents.ts`가 생성하므로 **원본은 항상 `.agent/`에서만 수정**하고 `npm run sync:agents`로 재생성한다 (CI가 `--check`로 강제).
+위 테이블의 스킬은 모두 `.claude/skills/`로 동기화되어 Claude Code에서 자동 발동된다. `.agent/workflows/`도 `.claude/commands/`로 동기화되어 `/deploy`, `/cleanup`, `/rollback` 등 **슬래시 커맨드**로 사용할 수 있다. 두 브리지 모두 `scripts/sync-claude-agents.ts`가 생성하므로 **원본은 항상 `.agent/`에서만 수정**하고 `npm run sync:agents`로 재생성한다 (CI가 `--check`로 강제).
 
 ## 테스트 정책
 

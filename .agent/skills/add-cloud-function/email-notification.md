@@ -1,8 +1,3 @@
----
-name: add-email-notification
-description: EmailJS 또는 Nodemailer를 이용해 Cloud Functions에서 이메일을 발송하는 기능 추가 가이드.
----
-
 # 이메일 알림 추가 패턴
 
 차량운행일지 시스템에서는 기관 가입 승인/거절 통보, 관리자 피드백 응답 등에서 이메일 발송 기능을 활용합니다. 이메일 전송 로직을 추가할 때 이 패턴을 준수합니다.

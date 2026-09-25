@@ -1,9 +1,11 @@
 ---
 name: add-cloud-function
-description: functions/src/ 디렉터리에 새 Cloud Function을 추가하고 index.ts에 등록하는 패턴 가이드
+description: functions/src/ 디렉터리에 새 Cloud Function(스케줄 포함)을 추가하고 index.ts에 등록하는 패턴 가이드. EmailJS·Nodemailer 이메일 알림 발송 기능 추가도 포함.
 ---
 
 # Cloud Function 추가 스킬
+
+> 📌 **이메일 알림**(EmailJS·Nodemailer) 발송을 추가할 때는 [email-notification.md](email-notification.md)도 따른다.
 
 ## functions/src/ 디렉터리 구조
 
@@ -177,9 +179,9 @@ const apiKey = process.env.MY_API_KEY;
 
 ## 배포 및 검증
 
-배포는 로컬에서 직접 하지 않는다 — master 푸시 시 CI(Deploy 워크플로)가 수행한다. 긴급 시에만 `/deploy-functions` 워크플로우를 따른다.
+배포는 로컬에서 직접 하지 않는다 — master 푸시 시 CI(Deploy 워크플로)가 수행한다. 긴급 시에만 `/deploy-emergency` 워크플로우를 따른다.
 
 ```bash
-# 로그 확인 (/logs 워크플로우 사용)
+# 로그 확인
 firebase functions:log --limit 50
 ```

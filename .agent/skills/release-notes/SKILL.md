@@ -1,9 +1,11 @@
 ---
 name: release-notes
-description: 사용자용 업데이트 소식(공지) 항목을 추가·수정하는 패턴 가이드. 새 기능·수정을 배포할 때, "공지 추가해줘"·"업데이트 소식 갱신"·"사용자에게 알려야 해" 같은 요청이나 /deploy 진행 시 발동한다. 누락 감지는 `npm run check:release-notes`.
+description: 사용자용 업데이트 소식(공지)과 자주 하는 질문(FAQ)을 추가·수정하는 패턴 가이드. 새 기능·수정을 배포할 때, "공지 추가해줘"·"업데이트 소식 갱신"·"FAQ 추가"·"사용자에게 알려야 해" 같은 요청이나 /deploy 진행 시 발동한다. 누락 감지는 `npm run check:release-notes`·`npm run check:faq`.
 ---
 
 # 업데이트 소식 작성 가이드 (release-notes)
+
+> 📌 **FAQ** 추가·수정(문체, 프론트/백엔드 데이터 동기화)은 [faq.md](faq.md)를 따른다. 새 기능 공지에는 그 기능을 설명하는 FAQ를 연결한다.
 
 사용자가 앱에서 직접 읽는 **공지**를 쓰는 규칙이다. 개발 이력(`docs/구현이력/`)과 다르다 —
 여기에는 "무엇이 달라졌고 어떻게 쓰면 되는지"만 사용자 말로 적는다.
@@ -54,7 +56,7 @@ description: 사용자용 업데이트 소식(공지) 항목을 추가·수정�
 
 ## 3. 문체
 
-FAQ와 같은 톤이다([update-faq](../update-faq/SKILL.md) §1 참고) — 사회복지기관 실무자가 읽는다.
+FAQ와 같은 톤이다([FAQ 가이드](faq.md) §1 참고) — 사회복지기관 실무자가 읽는다.
 
 - **해요체**: "~할 수 있어요", "~고쳤어요", "~해 주세요"
 - **무엇이 달라졌는지 → 어떻게 쓰는지 → 주의점** 순서
@@ -93,7 +95,7 @@ FAQ와 같은 톤이다([update-faq](../update-faq/SKILL.md) §1 참고) — 사
 
 1. `npm run check:release-notes -- --soft`로 후보 확인
 2. `public/data/releaseNotes.json` **맨 앞**에 오늘 날짜 항목 추가 (기존 항목은 건드리지 않는다)
-3. 같은 배포에 FAQ·사용 설명서 변경이 필요한지 확인 → 필요하면 [update-faq](../update-faq/SKILL.md)
+3. 같은 배포에 FAQ·사용 설명서 변경이 필요한지 확인 → 필요하면 [FAQ 가이드](faq.md)
 4. `npm run check:release-notes`로 게이트 통과 확인
 5. 커밋은 `chore:` — 구현이력 Phase 기록과 함께 묶는 것이 관례다
    (예: `chore: 구현이력 Phase 143~145 기록 + 업데이트 소식 갱신 — …`)

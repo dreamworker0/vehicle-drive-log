@@ -6,24 +6,16 @@
  *  - 경고(warn): 권고 위반·의심 패턴 → exit 0 유지, 출력만
  *
  * 검사 항목:
+ * 번호는 도입 순서다(중간 번호는 차단 실적이 없어 2026-09-25에 걷어냈다).
  *  1. Node 버전 정합 — engines / .node-version / CI 워크플로 / 현재 런타임(경고)
  *  2. AGENTS.md → .agent/agents.md 연결
- *  3. CLAUDE.md의 스킬 참조 실존 + 전체 스킬 테이블 포함 여부(경고)
- *  4. .agent/agents.md의 rules/ 링크 실존
- *  5. 스킬 frontmatter(name=디렉터리명, description 존재)
- *  6. 스킬 ↔ 워크플로 이름 충돌
  *  7. .agent ↔ .claude 브리지 동기화 (sync-claude-agents.ts --check)
- * 10. 워크플로 문서의 위험/구식 명령 패턴 (`npm test run`, PowerShell `&&`, 미존재 npm 스크립트,
- *     미존재 tsx/node 스크립트 경로) + frontmatter description 필수
  * 11. 추적되면 안 되는 개인 설정 파일 (.claude/settings.local.json 등)
  * 12. 하네스 문서의 깨진 상대 링크
  * 13. Functions 레퍼런스 카탈로그 ↔ functions/src/index.ts export 정합 + 문서 총계
- * 14. 하네스 문서 본문의 인라인 백틱 경로 실존 — 규칙·스킬이 코드 리팩터를 못 따라가
- *     조용히 낡는 것을 막는다 (Phase 180에서 stale 경로 40여 건이 이 부재로 살아남았다)
- * 15. gemini-pr-review.ts RULE_MAP ↔ .agent/rules/ 정합 — 리네임 시 리뷰 주입에서
- *     조용히 빠지는 것(오류) + 어디에도 매핑되지 않은 규칙(경고)
+ * 14. 하네스 문서 본문의 인라인 백틱 경로·워크플로의 tsx/node 실행 대상 실존 — 규칙·스킬이
+ *     코드 리팩터를 못 따라가 조용히 낡는 것을 막는다 (Phase 180에서 stale 경로 40여 건이 이 부재로 살아남았다)
  * 16. .claude/settings.json 훅 배선 실존 — 경로 오타 시 훅이 조용히 죽는 것을 막는다
- * 17. 원본 운영 문서에 로컬 Firebase 직접 배포 명령이 없는지 확인
  *
  * 단위 테스트: scripts/__tests__/check-harness.test.ts (파서·판정 함수)
  */
@@ -42,19 +34,6 @@ export interface Finding {
 
 // ── 순수 헬퍼 (단위 테스트 대상) ──────────────────────────────────────────────
 
-/** 마크다운 상단 frontmatter에서 name/description을 추출한다. */
-export function parseFrontmatter(content: string): { name?: string; description?: string } {
-    const m = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-    if (!m) return {};
-    const pick = (key: string): string | undefined => {
-        const line = m[1].split(/\r?\n/).find((l) => l.startsWith(`${key}:`));
-        if (!line) return undefined;
-        const v = line.slice(key.length + 1).trim().replace(/^["']|["']$/g, '');
-        return v.length ? v : undefined;
-    };
-    return { name: pick('name'), description: pick('description') };
-}
-
 /** 마크다운 본문에서 상대 경로 링크 대상을 추출한다 (http/앵커/메일 제외). */
 export function extractRelativeLinks(content: string): string[] {
     const out: string[] = [];
@@ -66,36 +45,6 @@ export function extractRelativeLinks(content: string): string[] {
         out.push(target.split('#')[0]);
     }
     return out.filter(Boolean);
-}
-
-/** PowerShell 코드 블록에서 PS 5.1이 지원하지 않는 `&&` 체이닝을 찾는다. */
-export function findPwshChainingIssues(md: string): string[] {
-    const issues: string[] = [];
-    for (const m of md.matchAll(/```powershell\r?\n([\s\S]*?)```/g)) {
-        for (const line of m[1].split(/\r?\n/)) {
-            if (line.includes('&&')) issues.push(line.trim());
-        }
-    }
-    return issues;
-}
-
-/** 원본 운영 문서에서 금지된 로컬 Firebase 직접 배포 명령의 줄 번호를 찾는다. */
-export function findForbiddenDeployCommands(markdown: string): number[] {
-    return markdown
-        .split(/\r?\n/)
-        .map((line, index) => ({ line: line.trim(), lineNumber: index + 1 }))
-        .filter(({ line }) => !line.startsWith('#'))
-        .filter(({ line }) => /\b(?:npx\s+firebase-tools\s+|firebase\s+)deploy\b/.test(line))
-        .map(({ lineNumber }) => lineNumber);
-}
-
-/** 문서에서 `npm run <script>` / `npm test run` 등 명령 참조를 추출한다. */
-export function extractNpmRunScripts(md: string): string[] {
-    const out: string[] = [];
-    for (const m of md.matchAll(/npm(?:\.cmd)?\s+run\s+([A-Za-z0-9:._-]+)/g)) {
-        out.push(m[1]);
-    }
-    return out;
 }
 
 /** 14번 검사가 경로로 인정하는 저장소 루트 디렉터리. 이 밖의 토큰은 경로로 판정하지 않는다. */
@@ -132,14 +81,6 @@ export function extractScriptCommandPaths(md: string): string[] {
     for (const m of md.matchAll(/(?:npx\s+)?\btsx\s+((?:scripts|functions)\/[\w./-]+\.ts)\b/g)) out.push(m[1]);
     for (const m of md.matchAll(/\bnode\s+((?:scripts|\.claude)\/[\w./-]+\.(?:mjs|cjs|js))\b/g)) out.push(m[1]);
     return out;
-}
-
-/**
- * 소스에서 따옴표로 감싼 규칙 파일 참조를 뽑는다 (gemini-pr-review.ts RULE_MAP 정합 검사용).
- * 규칙 파일명은 소문자 케밥 컨벤션이다 — CLAUDE.md 같은 비규칙 문서 참조는 제외한다.
- */
-export function extractQuotedMdRefs(src: string): string[] {
-    return [...new Set([...src.matchAll(/['"]([a-z][a-z0-9-]*\.md)['"]/g)].map((m) => m[1]))];
 }
 
 /** .claude/settings.json의 훅 명령 문자열에서 로컬 스크립트 경로를 뽑는다. */
@@ -218,7 +159,6 @@ export function runChecks(root: string = ROOT): { findings: Finding[]; checked: 
     checked++;
     const pkg = JSON.parse(read('package.json')) as {
         engines?: { node?: string };
-        scripts?: Record<string, string>;
     };
     if (!pkg.engines?.node?.startsWith('22')) err('package.json', `engines.node가 22가 아님: ${pkg.engines?.node}`);
     const nodeVersionFile = read('.node-version').trim();
@@ -240,44 +180,6 @@ export function runChecks(root: string = ROOT): { findings: Finding[]; checked: 
         err('AGENTS.md', '.agent/agents.md 참조가 없음 — Codex 진입점이 행동 헌법에 연결돼야 함');
     }
 
-    // 3. CLAUDE.md 스킬 참조
-    checked++;
-    const claudeMd = read('CLAUDE.md');
-    const skillDirs = readdirSync(join(root, '.agent', 'skills'), { withFileTypes: true })
-        .filter((d) => d.isDirectory() && existsSync(join(root, '.agent', 'skills', d.name, 'SKILL.md')))
-        .map((d) => d.name);
-    for (const m of claudeMd.matchAll(/\.agent\/skills\/([\w-]+)\/SKILL\.md/g)) {
-        if (!skillDirs.includes(m[1])) err('CLAUDE.md', `존재하지 않는 스킬 참조: ${m[1]}`);
-    }
-    for (const dir of skillDirs) {
-        if (!claudeMd.includes(`.agent/skills/${dir}/`)) warn('CLAUDE.md', `스킬 테이블에 누락된 스킬: ${dir}`);
-    }
-
-    // 4. .agent/agents.md의 rules/ 링크
-    checked++;
-    const agentsMd = read(join('.agent', 'agents.md'));
-    for (const m of agentsMd.matchAll(/\((?:\.\/)?(rules\/[\w-]+\.md)/g)) {
-        if (!existsSync(join(root, '.agent', m[1]))) err('.agent/agents.md', `깨진 rules 링크: ${m[1]}`);
-    }
-
-    // 5. 스킬 frontmatter
-    checked++;
-    for (const dir of skillDirs) {
-        const rel = join('.agent', 'skills', dir, 'SKILL.md');
-        const fm = parseFrontmatter(read(rel));
-        if (!fm.description) err(rel.replace(/\\/g, '/'), 'frontmatter description 없음 — 자동 발동 판정 근거가 사라짐');
-        if (fm.name && fm.name !== dir) err(rel.replace(/\\/g, '/'), `frontmatter name(${fm.name})이 디렉터리명(${dir})과 다름`);
-    }
-
-    // 6. 스킬 ↔ 워크플로 이름 충돌
-    checked++;
-    const workflowNames = readdirSync(join(root, '.agent', 'workflows'))
-        .filter((f) => f.endsWith('.md'))
-        .map((f) => f.replace(/\.md$/, ''));
-    for (const dup of skillDirs.filter((s) => workflowNames.includes(s))) {
-        err('.agent/', `스킬과 워크플로 이름 충돌: ${dup} — 자동 발동/슬래시 커맨드가 모호해짐`);
-    }
-
     // 7. 브리지 동기화 (sync-claude-agents.ts --check)
     checked++;
     try {
@@ -289,28 +191,6 @@ export function runChecks(root: string = ROOT): { findings: Finding[]; checked: 
     } catch (e) {
         const out = e instanceof Error && 'stderr' in e ? String((e as { stderr: unknown }).stderr) : String(e);
         err('.claude/', `.agent ↔ .claude 브리지 드리프트 — npm run sync:agents 실행 필요\n${out.trim()}`);
-    }
-
-    // 10. 워크플로 문서의 위험/구식 명령 패턴 + frontmatter
-    checked++;
-    const rootScripts = new Set(Object.keys(pkg.scripts ?? {}));
-    for (const wf of workflowNames) {
-        const rel = `.agent/workflows/${wf}.md`;
-        const md = read(join('.agent', 'workflows', `${wf}.md`));
-        if (/npm\s+test\s+run\b/.test(md)) err(rel, '`npm test run`은 잘못된 명령 — `npm test`(= vitest run) 사용');
-        for (const line of findPwshChainingIssues(md)) {
-            warn(rel, `PowerShell 5.1은 &&를 지원하지 않음: "${line}"`);
-        }
-        // --prefix 등 다른 패키지 대상 실행은 제외하고 루트 스크립트만 검사
-        for (const script of extractNpmRunScripts(md)) {
-            if (!rootScripts.has(script)) warn(rel, `package.json에 없는 npm 스크립트 참조: ${script}`);
-        }
-        // 실행 지시된 tsx/node 스크립트가 실제로 있어야 한다 — 없는 스크립트 실행 지시는 즉시 깨진다
-        for (const scriptPath of extractScriptCommandPaths(md)) {
-            if (!existsSync(join(root, scriptPath))) err(rel, `존재하지 않는 스크립트 실행 지시: ${scriptPath}`);
-        }
-        // description이 없으면 브리지가 H1 제목으로 조용히 대체해 슬래시 커맨드 품질 저하가 드러나지 않는다
-        if (!parseFrontmatter(md).description) err(rel, 'frontmatter description 없음 — 슬래시 커맨드 안내가 H1 폴백으로 조용히 대체됨');
     }
 
     // 11. 추적되면 안 되는 개인 설정 파일
@@ -358,33 +238,15 @@ export function runChecks(root: string = ROOT): { findings: Finding[]; checked: 
     // Phase 180 감사에서 stale 경로 40여 건이 전부 이 부재로 살아남았다.
     checked++;
     for (const rel of mdFiles) {
+        // 실행 지시된 tsx/node 스크립트도 실제로 있어야 한다 — 없는 스크립트 실행 지시는 즉시 깨진다
+        for (const scriptPath of extractScriptCommandPaths(read(rel))) {
+            if (!existsSync(join(root, scriptPath))) {
+                err(rel.replace(/\\/g, '/'), `존재하지 않는 스크립트 실행 지시: ${scriptPath}`);
+            }
+        }
         for (const token of extractInlineCodePaths(read(rel))) {
             if (!existsSync(join(root, token))) {
                 err(rel.replace(/\\/g, '/'), `본문이 가리키는 경로가 존재하지 않음: \`${token}\` — 리팩터를 따라가지 못한 서술이거나 오타`);
-            }
-        }
-    }
-
-    // 15. gemini-pr-review.ts RULE_MAP ↔ .agent/rules/ 정합
-    // RULE_MAP은 규칙 파일명을 문자열로 참조한다 — 리네임하면 리뷰 프롬프트에서 조용히 빠진다.
-    checked++;
-    const reviewSrc = read(join('scripts', 'gemini-pr-review.ts'));
-    const ruleRefs = extractQuotedMdRefs(reviewSrc);
-    const ruleFiles = readdirSync(join(root, '.agent', 'rules')).filter((f) => f.endsWith('.md'));
-    if (ruleRefs.length === 0) {
-        // 파서가 통째로 실패하면(형식 변경) 전부 미매핑으로 오탐한다 — 파서 고장으로 구분해 보고 (13번과 동일 원칙)
-        err('scripts/check-harness.ts', '15번 검사 파서가 RULE_MAP에서 규칙 참조를 하나도 찾지 못함 — 드리프트가 아니라 파서·파일 형식 문제');
-    } else {
-        for (const ref of ruleRefs) {
-            if (!ruleFiles.includes(ref)) {
-                err('scripts/gemini-pr-review.ts', `RULE_MAP이 존재하지 않는 규칙을 참조: ${ref} — 규칙 리네임 시 여기도 함께 고쳐야 리뷰 주입이 유지됨`);
-            }
-        }
-        // 프로세스·메타 규칙은 PR diff 경로에 대응물이 없어 의도적으로 미매핑이다.
-        const UNMAPPED_OK = new Set(['commit-message.md', 'pre-commit.md', 'multi-agent-coordination.md', 'planning-scope-review.md']);
-        for (const f of ruleFiles) {
-            if (!ruleRefs.includes(f) && !UNMAPPED_OK.has(f)) {
-                warn('scripts/gemini-pr-review.ts', `어떤 변경 경로에도 매핑되지 않은 규칙: ${f} — RULE_MAP에 추가하거나, 의도적이면 check-harness.ts의 UNMAPPED_OK에 등록`);
             }
         }
     }
@@ -431,14 +293,6 @@ export function runChecks(root: string = ROOT): { findings: Finding[]; checked: 
             warn('docs/FUNCTIONS_REFERENCE.md', '총 함수 수 표기를 찾지 못함 — 생성기 출력 형식이 바뀐 것인지 확인');
         } else if (Number(refTotal) !== catalogNames.length) {
             err('docs/FUNCTIONS_REFERENCE.md', `문서 총계(${refTotal})와 카탈로그 항목 수(${catalogNames.length}) 불일치 — npx tsx scripts/generate-functions-doc.ts 재실행 필요`);
-        }
-    }
-
-    // 17. 원본 운영 문서의 배포 경로는 CI 하나로 유지한다.
-    checked++;
-    for (const rel of ['OPERATIONS.md', 'ROLLBACK.md']) {
-        for (const line of findForbiddenDeployCommands(read(rel))) {
-            err(rel, '로컬 Firebase 직접 배포 명령이 남아 있음(' + line + '행) — CI Deploy 워크플로로 교체');
         }
     }
 

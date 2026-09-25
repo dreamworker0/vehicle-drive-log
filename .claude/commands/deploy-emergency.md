@@ -1,10 +1,10 @@
 ---
-description: (긴급용) 프론트엔드(Hosting)만 로컬에서 Firebase에 수동 배포
+description: (긴급용) Hosting·Functions·Rules 중 필요한 것만 로컬에서 Firebase에 수동 배포
 ---
 
-<!-- AUTO-GENERATED — scripts/sync-claude-agents.ts가 .agent/workflows/deploy-hosting.md에서 생성. 직접 수정 금지. -->
+<!-- AUTO-GENERATED — scripts/sync-claude-agents.ts가 .agent/workflows/deploy-emergency.md에서 생성. 직접 수정 금지. -->
 
-[.agent/workflows/deploy-hosting.md](../../.agent/workflows/deploy-hosting.md) 워크플로우를 수행한다.
+[.agent/workflows/deploy-emergency.md](../../.agent/workflows/deploy-emergency.md) 워크플로우를 수행한다.
 
 원본 파일을 읽고 각 단계의 명령을 순서대로 실행하되, 다음을 지킨다:
 - 각 단계의 `Working directory`를 준수하고, PowerShell 환경 기준으로 실행한다.

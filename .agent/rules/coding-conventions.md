@@ -123,7 +123,7 @@ if (!ok) return;
 
 ## 6. 차량 표시 상수
 
-차량 아이콘·색상은 `src/lib/constants.ts`에서 import하고 직접 재정의하지 않는다. 사용 규칙은 [vehicle-color 스킬](../skills/vehicle-color/SKILL.md), 시각 규격은 [design-system §5](design-system.md)가 단일 원본이다.
+차량 아이콘·색상은 `src/lib/constants.ts`에서 import하고 직접 재정의하지 않는다. 사용 규칙은 [vehicle-color 스킬](../skills/ui-patterns/vehicle-color.md), 시각 규격은 [design-system §5](design-system.md)가 단일 원본이다.
 
 ---
 

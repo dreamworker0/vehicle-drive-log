@@ -12,7 +12,7 @@
 //   - 감지 범위: firebase deploy 직접 실행(npx/firebase-tools/.cmd 변형 포함) +
 //     npm 스크립트 간접 실행(`npm run deploy`, `npm --prefix functions run deploy`,
 //     pnpm/yarn 변형 포함 — functions/package.json의 deploy 스크립트가 firebase deploy를 감쌈).
-//   - 긴급 수동 배포(/deploy-functions 등)는 차단이 아니라 "사용자 승인 필수"로 통과 가능.
+//   - 긴급 수동 배포(/deploy-emergency)는 차단이 아니라 "사용자 승인 필수"로 통과 가능.
 //   - 그 외 커맨드·파싱 실패는 개입하지 않는다(exit 0, 출력 없음).
 //
 // 단위 테스트: scripts/hooks/__tests__/guard-firebase-deploy.test.mjs
