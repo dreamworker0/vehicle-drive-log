@@ -320,7 +320,7 @@ npm run build           # 프로덕션 빌드 확인
 | [구현계획서](docs/차량운행일지_구현계획서.md) | 전체 설계 문서 (아키텍처, DB 스키마, API 명세, 시퀀스 다이어그램) |
 | [구현이력](docs/구현이력.md) | Phase별 구현 이력 색인 (구간별 분할 파일로 연결) |
 | [Cloud Functions 레퍼런스](docs/FUNCTIONS_REFERENCE.md) | 함수별 트리거·권한·파라미터 (자동 생성) |
-| [OPERATIONS.md](OPERATIONS.md) | 시스템 관리자용 운영 매뉴얼 (백업, 장애 대응, 기관 관리) |
+| [OPERATIONS.md](OPERATIONS.md) | 시스템 관리자용 운영 매뉴얼 (백업, 장애 대응, 기관 관리). **§0 인수인계 한 페이지** — 권한자·비밀값 위치·외부 서비스·월간 비용 점검 |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | 개발 참여 가이드 (코딩 컨벤션, PR 규칙, 브랜치 전략) |
 | [API_FALLBACK.md](docs/API_FALLBACK.md) | 외부 API 장애 대응 매뉴얼 |
 | [MONITORING_GUIDE.md](docs/MONITORING_GUIDE.md) | 운영 모니터링 가이드 (Cloud Monitoring 대시보드·알림 정책·TTL·사용량/비용 점검) |

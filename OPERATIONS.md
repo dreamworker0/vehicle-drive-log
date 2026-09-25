@@ -4,6 +4,59 @@
 
 ---
 
+## 0. 인수인계 한 페이지
+
+담당자가 바뀌거나 자리를 비워도 서비스가 멈추지 않도록, **사람이 쥐고 있는 것**만 모았다. 절차의 상세는 아래 각 절과 [ROLLBACK.md](ROLLBACK.md)에 있다.
+이 저장소는 공개이므로 계정 이메일·비밀값 내용은 여기에 적지 않는다. **이름과 위치만** 적는다.
+
+### 0.1 권한을 가진 사람이 최소 두 명이어야 하는 곳
+
+| 대상 | 필요한 권한 | 없으면 막히는 일 |
+|---|---|---|
+| GitHub 저장소 `dreamworker0/vehicle-drive-log` | Admin 또는 Maintain | PR 머지 = 프로덕션 배포, Actions Secrets 교체 |
+| GCP·Firebase 프로젝트 `vehicle-drive-log` | 소유자(Owner) | 비밀값 교체, 함수·Rules 긴급 조치, 로그·사용량 확인 |
+| 결제 계정 `차량운행일지` | 결제 계정 관리자 | 결제 수단 만료 시 **서비스 전체 중단**, 예산 알림 수신 |
+| 도메인 `socialprism.co.kr` DNS | DNS 레코드 수정 | 대표 주소 `drivelog.socialprism.co.kr` 연결 유지·인증서 갱신 |
+| Google OAuth 동의 화면(GCP 콘솔) | 프로젝트 소유자 | 로그인 화면 심사·정책 변경 대응 |
+| Sentry · Discord 알림 채널 | 조직 멤버 | 장애 알림을 아무도 받지 못함 |
+
+> 두 번째 권한자를 추가하면 이 표 옆에 날짜만 적어 둔다(누구인지는 적지 않는다).
+
+### 0.2 비밀값이 있는 곳 (값은 각 콘솔에서만 본다)
+
+| 위치 | 이름 | 교체 절차 |
+|---|---|---|
+| GCP Secret Manager | `GEMINI_API_KEY` · `GMAIL_APP_PASSWORD` · `EMAILJS_PRIVATE_KEY` · `ALIMTALK_PROXY_TOKEN` · `SLACK_CLIENT_ID` · `SLACK_CLIENT_SECRET` · `SLACK_SIGNING_SECRET` · `SLACK_STATE_SECRET` · `SLACK_TOKEN_ENC_KEY` | 새 버전 추가 → master에 아무 변경이나 머지해 재배포(함수는 배포 시점의 최신 버전을 쓴다) → 옛 버전 비활성화 → 하루 뒤 삭제. 비활성 버전도 삭제 전까지는 보관 요금이 나올 수 있다 |
+| GitHub Actions Secrets | `ENV_FILE`(프론트 `.env`) · `FUNCTIONS_ENV_FILE`(`functions/.env`) · `FIREBASE_SERVICE_ACCOUNT` · `SENTRY_AUTH_TOKEN` · `GEMINI_API_KEY`(PR 리뷰용) | 저장소 Settings → Secrets에서 교체. 다음 배포부터 반영 |
+| `functions/.env` 값 | `DISCORD_WEBHOOK_URL` · `TMAP_API_KEY` · `HOLIDAY_API_KEY` 등 (목록은 `functions/.env.example`) | `FUNCTIONS_ENV_FILE` Secret을 고친다 — 로컬 파일은 배포에 쓰이지 않는다 |
+
+### 0.3 외부 서비스 — 키를 발급한 곳
+
+Gemini(Google AI Studio, OCR·증빙 심사·도움말) · TMAP(SK open API, 경로·거리) · 공공데이터포털(공휴일) · 카카오 알림톡(Cafe24 프록시 경유) · EmailJS · Gmail 앱 비밀번호 · Slack 앱 · reCAPTCHA(App Check) · Sentry · Discord 웹훅.
+키가 만료되거나 발급 계정이 사라지면 해당 기능만 조용히 멈춘다 — **발급 계정도 개인이 아닌 기관 계정**이어야 한다.
+Google 캘린더 연동은 키가 아니라 **Functions 서비스 계정에 캘린더를 공유**하는 방식이다(§5.3).
+
+### 0.4 비용 점검 (월 1회, 10분)
+
+1. **결제 → 보고서**에서 그룹화를 `SKU`, 기간 `지난 30일`, 절감액 `없음`으로 본다. 2026-09-25 기준 상위는 Cloud Run CPU 시간 · Firestore 읽기 · Hosting 전송량 · Gemini 순이었다.
+2. Firestore 읽기가 늘었으면 시간대부터 본다 — Cloud Monitoring 측정항목 `firestore.googleapis.com/document/read_count`를 1시간 단위로 보면 **새벽 배치인지 사용자 화면인지** 바로 갈린다.
+3. 함수 비용은 측정항목 `run.googleapis.com/container/billable_instance_time`을 **서비스별로** 묶어 가장 긴 함수를 찾는다.
+4. 캘린더 역동기화는 실행마다 `[CalendarSyncReads]` 로그(읽기 수·캘린더 조회 수)를 남긴다.
+5. 무료 한도 기준: Firestore 읽기 5만/일, 쓰기 2만/일, Hosting 전송 10 GiB/월.
+
+> Windows PowerShell에서 `gcloud`가 "스크립트를 실행할 수 없으므로"로 막히면 실행 정책을 바꾸지 말고 **`gcloud.cmd`** 로 실행한다.
+
+### 0.5 비상시 먼저 볼 곳
+
+| 상황 | 할 일 |
+|---|---|
+| 배포 직후 앱이 깨졌다 | [ROLLBACK.md](ROLLBACK.md) — Hosting은 Firebase 콘솔에서 이전 버전으로 되돌리는 것이 가장 빠르다 |
+| 배포가 실패한다 | GitHub Actions → Deploy 로그를 본다. 재실행은 Deploy → Run workflow(§5.2). 로컬 `firebase deploy`는 CI와 충돌하므로 CI가 돌지 않는 것을 확인한 뒤의 최후 수단이다(`/deploy-emergency`) |
+| 결제 수단 오류·예산 초과 알림 | 결제 계정 관리자가 즉시 처리한다 — 결제 계정이 비활성화되면 Functions 등 유료 요금제 기능이 멈춘다 |
+| 특정 기능만 안 된다 | §3.2 외부 API 장애 · [API_FALLBACK.md](docs/API_FALLBACK.md) |
+
+---
+
 ## 1. 일상 운영 체크리스트
 
 ### 매일 확인
