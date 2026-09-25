@@ -1,11 +1,12 @@
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import { getKSTMonthKey, toKSTDate } from "../../utils/kstDate";
+import { groupDataByOrg, type NightlySharedData } from "../../services/statistics/nightlySharedData";
 
 const db = getFirestore();
 
 /** 단일 (기관, 월) 집계 윈도 */
-interface MonthWindow {
+export interface MonthWindow {
     yearMonth: string;         // 'YYYY-MM' (KST)
     startOfMonth: Date;        // KST 1일 00:00의 UTC instant (timestamp 범위 비교용)
     startOfNextMonth: Date;
@@ -17,7 +18,7 @@ interface MonthWindow {
  * 배치 실행 시점(-3h) 기준 최근 N개월(당월 포함)의 집계 윈도를 최신월부터 반환.
  * Date.UTC(y, m, 1, -9)는 KST 1일 00:00에 해당하는 UTC instant이며 월 오버/언더플로를 자동 처리한다.
  */
-function getRecentMonthWindows(recentMonths: number): MonthWindow[] {
+export function getRecentMonthWindows(recentMonths: number): MonthWindow[] {
     const base = toKSTDate(new Date(Date.now() - 3 * 60 * 60 * 1000));
     const year = base.getFullYear();
     const month = base.getMonth(); // 0-11 (KST)
@@ -49,6 +50,42 @@ interface VehicleAgg {
     lastMaintenanceDate: string;
 }
 
+/** 한 (기관, 월) 집계에 들어가는 원본 기록 */
+interface OrgMonthSources {
+    driveLogs: FirebaseFirestore.DocumentData[];
+    fuelLogs: FirebaseFirestore.DocumentData[];
+    hipassCharges: FirebaseFirestore.DocumentData[];
+    maintenanceRecords: FirebaseFirestore.DocumentData[];
+}
+
+/** 기관 하나의 한 달치 원본을 기관별 쿼리로 읽는다 (선로딩 데이터가 없을 때의 경로). */
+async function fetchOrgMonthSources(orgId: string, win: MonthWindow): Promise<OrgMonthSources> {
+    const driveLogsSnap = await db.collection("driveLogs")
+        .where("organizationId", "==", orgId)
+        .where("timestamp", ">=", win.startOfMonth)
+        .where("timestamp", "<", win.startOfNextMonth)
+        .get();
+
+    // orderBy("date","desc")로 기존 (organizationId ASC, date DESC) 복합 인덱스를 사용한다.
+    // orderBy 없이 범위 필터만 두면 Firestore가 date ASC 인덱스를 요구해 FAILED_PRECONDITION이 난다
+    // (정렬은 집계 결과에 영향 없음).
+    const [fuelSnap, hipassSnap, maintenanceSnap] = await Promise.all([
+        db.collection("fuelLogs").where("organizationId", "==", orgId)
+            .where("date", ">=", win.datePrefixStart).where("date", "<=", win.datePrefixEnd).orderBy("date", "desc").get(),
+        db.collection("hipassCharges").where("organizationId", "==", orgId)
+            .where("date", ">=", win.datePrefixStart).where("date", "<=", win.datePrefixEnd).orderBy("date", "desc").get(),
+        db.collection("maintenanceRecords").where("organizationId", "==", orgId)
+            .where("date", ">=", win.datePrefixStart).where("date", "<=", win.datePrefixEnd).orderBy("date", "desc").get(),
+    ]);
+
+    return {
+        driveLogs: driveLogsSnap.docs.map((d) => d.data()),
+        fuelLogs: fuelSnap.docs.map((d) => d.data()),
+        hipassCharges: hipassSnap.docs.map((d) => d.data()),
+        maintenanceRecords: maintenanceSnap.docs.map((d) => d.data()),
+    };
+}
+
 /**
  * 단일 (기관, 월) 집계를 orgStats/{orgId}/monthly/{yearMonth}에 저장한다.
  * 소비자(src/lib/firestore/statistics.ts의 mapMonthlyDoc)가 이 스키마를 평탄 MonthlyStat으로 변환한다.
@@ -58,6 +95,7 @@ async function aggregateOrgMonth(
     win: MonthWindow,
     userMap: Map<string, string>,
     vehicleMap: Map<string, string>,
+    sources: OrgMonthSources,
 ): Promise<void> {
     const monthlyTotal = { count: 0, distance: 0 };
     const driverStats: Record<string, { name: string; count: number; distance: number }> = {};
@@ -82,14 +120,7 @@ async function aggregateOrgMonth(
     };
 
     // 1. 운행일지 집계 (운행/거리/운전자/차량/히트맵/이상탐지)
-    const driveLogsSnap = await db.collection("driveLogs")
-        .where("organizationId", "==", orgId)
-        .where("timestamp", ">=", win.startOfMonth)
-        .where("timestamp", "<", win.startOfNextMonth)
-        .get();
-
-    driveLogsSnap.forEach((docSnap) => {
-        const data = docSnap.data();
+    sources.driveLogs.forEach((data) => {
         const rawDist = data.distance ?? ((data.endKm || 0) - (data.startKm || 0));
         const validDistance = rawDist > 0 ? rawDist : 0;
 
@@ -149,32 +180,18 @@ async function aggregateOrgMonth(
     anomalies.overDrive = Object.values(driverDayDistance).filter((d) => d > 200).length;
 
     // 2. 비용 집계 (주유·하이패스·정비) — date 문자열 월 범위
-    // orderBy("date","desc")로 기존 (organizationId ASC, date DESC) 복합 인덱스를 사용한다.
-    // orderBy 없이 범위 필터만 두면 Firestore가 date ASC 인덱스를 요구해 FAILED_PRECONDITION이 난다
-    // (정렬은 아래 forEach 집계 결과에 영향 없음).
-    const [fuelSnap, hipassSnap, maintenanceSnap] = await Promise.all([
-        db.collection("fuelLogs").where("organizationId", "==", orgId)
-            .where("date", ">=", win.datePrefixStart).where("date", "<=", win.datePrefixEnd).orderBy("date", "desc").get(),
-        db.collection("hipassCharges").where("organizationId", "==", orgId)
-            .where("date", ">=", win.datePrefixStart).where("date", "<=", win.datePrefixEnd).orderBy("date", "desc").get(),
-        db.collection("maintenanceRecords").where("organizationId", "==", orgId)
-            .where("date", ">=", win.datePrefixStart).where("date", "<=", win.datePrefixEnd).orderBy("date", "desc").get(),
-    ]);
-
     // 주유: FuelLog.fuelCost(원) — 조직 합계 + 차량별 연비 계산용 누적
-    fuelSnap.forEach((d) => {
-        const fd = d.data();
+    sources.fuelLogs.forEach((fd) => {
         const cost = Number(fd.fuelCost) || 0;
         costStats.fuelCost += cost;
         if (fd.vehicleId) ensureVehicle(fd.vehicleId).fuelCost += cost;
     });
     // 하이패스: HipassCharge.chargeAmount(원) — 조직 합계
-    hipassSnap.forEach((d) => {
-        costStats.hipassCost += Number(d.data().chargeAmount) || 0;
+    sources.hipassCharges.forEach((hd) => {
+        costStats.hipassCost += Number(hd.chargeAmount) || 0;
     });
     // 정비: MaintenanceRecord.cost — 조직 합계 + 차량별 정비비/횟수/최종일
-    maintenanceSnap.forEach((d) => {
-        const md = d.data();
+    sources.maintenanceRecords.forEach((md) => {
         const cost = Number(md.cost) || 0;
         costStats.maintenanceCost += cost;
         if (md.vehicleId) {
@@ -258,17 +275,22 @@ export function resolveRecentMonths(now: Date = new Date()): number {
  * 기관별로 오류를 격리해 한 기관 실패가 나머지를 중단시키지 않으며, 실행 요약을 반환한다.
  * 기관 목록 조회 실패 등 치명적 오류는 상위로 전파해 호출자가 실패를 인지하도록 한다.
  */
-export async function runDailyAggregation(recentMonths = resolveRecentMonths()): Promise<AggregationSummary> {
+export async function runDailyAggregation(
+    recentMonths = resolveRecentMonths(),
+    // 야간 배치가 대시보드 단계와 함께 쓰려고 미리 읽어 둔 원본. 없으면 기관별로 직접 읽는다.
+    shared?: NightlySharedData,
+): Promise<AggregationSummary> {
     const windows = getRecentMonthWindows(recentMonths);
     const months = windows.map((w) => w.yearMonth);
-    logger.info(`[dailyAggregation] 일일 배치 집계 시작 (최근 ${recentMonths}개월: ${months.join(", ")})`);
+    logger.info(`[dailyAggregation] 일일 배치 집계 시작 (최근 ${recentMonths}개월: ${months.join(", ")})${shared ? " — 선로딩 데이터 사용" : ""}`);
 
-    const orgsSnap = await db.collection("organizations").get();
+    const orgDocs = shared ? shared.orgDocs : (await db.collection("organizations").get()).docs;
+    const pre = shared ? await prepareSharedSources(shared, windows) : null;
     let processed = 0;
     let errors = 0;
     let skipped = 0;
 
-    for (const orgDoc of orgsSnap.docs) {
+    for (const orgDoc of orgDocs) {
         const orgId = orgDoc.id;
 
         // 반려·삭제된 기관은 집계하지 않는다. 통계를 볼 화면이 없는데도 기관당 월별
@@ -281,10 +303,12 @@ export async function runDailyAggregation(recentMonths = resolveRecentMonths()):
 
         try {
             // 유저·차량 메타데이터는 월과 무관하므로 기관당 1회만 로드해 월 루프에서 재사용
-            const [usersSnap, vehiclesSnap] = await Promise.all([
-                db.collection("users").where("organizationId", "==", orgId).get(),
-                db.collection("vehicles").where("organizationId", "==", orgId).get(),
-            ]);
+            const [userDocs, vehicleDocs] = pre
+                ? [pre.usersByOrg.get(orgId) ?? [], pre.vehiclesByOrg.get(orgId) ?? []]
+                : (await Promise.all([
+                    db.collection("users").where("organizationId", "==", orgId).get(),
+                    db.collection("vehicles").where("organizationId", "==", orgId).get(),
+                ])).map((snap) => snap.docs);
 
             /*
              * 차량도 구성원도 없는 기관은 월별 쿼리를 걸지 않는다.
@@ -296,19 +320,20 @@ export async function runDailyAggregation(recentMonths = resolveRecentMonths()):
              * 이미 저장된 통계 문서는 그대로 남는다 — 원본 기록이 바뀌지 않으므로 다시 계산해도
              * 같은 값이다(차량 이름 표시만 "알 수 없음"으로 남을 수 있다).
              */
-            if (usersSnap.size === 0 && vehiclesSnap.size === 0) {
+            if (userDocs.length === 0 && vehicleDocs.length === 0) {
                 skipped++;
                 continue;
             }
 
             const userMap = new Map<string, string>();
-            usersSnap.forEach((u) => userMap.set(u.id, u.data().name || "알 수 없음"));
+            userDocs.forEach((u) => userMap.set(u.id, u.data().name || "알 수 없음"));
 
             const vehicleMap = new Map<string, string>();
-            vehiclesSnap.forEach((v) => vehicleMap.set(v.id, v.data().name || v.data().number || "알 수 없음"));
+            vehicleDocs.forEach((v) => vehicleMap.set(v.id, v.data().name || v.data().number || "알 수 없음"));
 
             for (const win of windows) {
-                await aggregateOrgMonth(orgId, win, userMap, vehicleMap);
+                const sources = pre ? await pre.sourcesFor(orgId, win) : await fetchOrgMonthSources(orgId, win);
+                await aggregateOrgMonth(orgId, win, userMap, vehicleMap, sources);
             }
             processed++;
         } catch (err) {
@@ -318,9 +343,63 @@ export async function runDailyAggregation(recentMonths = resolveRecentMonths()):
         }
     }
 
-    const summary: AggregationSummary = { orgs: orgsSnap.size, processed, errors, skipped, months };
+    const summary: AggregationSummary = { orgs: orgDocs.length, processed, errors, skipped, months };
     logger.info(
         `[dailyAggregation] 집계 완료 — 기관 ${summary.orgs}, 성공 ${processed}, 건너뜀 ${skipped}, 실패 ${errors}`
     );
     return summary;
+}
+
+/** 월별 비용 기록 3종 — 선로딩 경로에서는 기관별이 아니라 월별로 한 번씩 읽는다. */
+const COST_COLLECTIONS = ["fuelLogs", "hipassCharges", "maintenanceRecords"] as const;
+type CostCollection = typeof COST_COLLECTIONS[number];
+
+/**
+ * 선로딩 원본을 기관·월 단위로 나눠 꺼낼 수 있게 준비한다.
+ *
+ * - 사용자·차량: 기관별로 묶기만 한다.
+ * - 운행일지: 선로딩 창이 집계 창을 덮을 때만 메모리에서 거른다. 덮지 못하면(창이 더 늦게
+ *   시작하면) 그 기관·월은 예전처럼 기관별 쿼리로 읽는다 — 조용히 덜 세는 쪽보다 낫다.
+ *   범위 조건은 기관별 쿼리와 같다: `timestamp`가 Timestamp이고 [월초, 다음 달 초) 안.
+ * - 주유·하이패스·정비: 월마다 컬렉션당 쿼리 1회로 읽어 기관별로 묶는다. 기관 수만큼
+ *   나가던 빈 쿼리(각 1 read)가 없어진다. `date` 문자열 범위도 기관별 쿼리와 같다.
+ */
+async function prepareSharedSources(shared: NightlySharedData, windows: MonthWindow[]) {
+    const usersByOrg = groupDataByOrg(shared.userDocs);
+    const vehiclesByOrg = groupDataByOrg(shared.vehicleDocs);
+    const driveLogsByOrg = groupDataByOrg(shared.driveLogDocs);
+
+    const costByWindow = new Map<string, Map<CostCollection, Map<string, FirebaseFirestore.QueryDocumentSnapshot[]>>>();
+    for (const win of windows) {
+        const snaps = await Promise.all(COST_COLLECTIONS.map((name) =>
+            db.collection(name).where("date", ">=", win.datePrefixStart).where("date", "<=", win.datePrefixEnd).get()));
+        const byCollection = new Map<CostCollection, Map<string, FirebaseFirestore.QueryDocumentSnapshot[]>>();
+        COST_COLLECTIONS.forEach((name, i) => byCollection.set(name, groupDataByOrg(snaps[i].docs)));
+        costByWindow.set(win.yearMonth, byCollection);
+    }
+
+    const pick = (win: MonthWindow, name: CostCollection, orgId: string) =>
+        (costByWindow.get(win.yearMonth)?.get(name)?.get(orgId) ?? [])
+            .map((d) => d.data())
+            .filter((d) => typeof d.date === "string" && d.date >= win.datePrefixStart && d.date <= win.datePrefixEnd);
+
+    const sourcesFor = async (orgId: string, win: MonthWindow): Promise<OrgMonthSources> => {
+        if (shared.driveLogScanStart.getTime() > win.startOfMonth.getTime()) {
+            return fetchOrgMonthSources(orgId, win);
+        }
+        const driveLogs = (driveLogsByOrg.get(orgId) ?? [])
+            .map((d) => d.data())
+            .filter((d) => {
+                const ts = d.timestamp?.toDate?.() as Date | undefined;
+                return !!ts && ts >= win.startOfMonth && ts < win.startOfNextMonth;
+            });
+        return {
+            driveLogs,
+            fuelLogs: pick(win, "fuelLogs", orgId),
+            hipassCharges: pick(win, "hipassCharges", orgId),
+            maintenanceRecords: pick(win, "maintenanceRecords", orgId),
+        };
+    };
+
+    return { usersByOrg, vehiclesByOrg, sourcesFor };
 }

@@ -30,15 +30,15 @@ const driveLogs = [
     { driverUid: "u2", driverName: "이기사", vehicleId: "veh-2", startKm: 0, endKm: 80, timestamp: { toDate: () => tsWeekday23 } },
 ];
 const fuelLogs = [
-    { vehicleId: "veh-1", fuelCost: 90000, date: "2026-06-10" },
-    { vehicleId: "veh-2", fuelCost: 40000, date: "2026-06-11" },
+    { organizationId: "org-1", vehicleId: "veh-1", fuelCost: 90000, date: "2026-06-10" },
+    { organizationId: "org-1", vehicleId: "veh-2", fuelCost: 40000, date: "2026-06-11" },
 ];
 const hipassCharges = [
-    { vehicleId: "veh-1", chargeAmount: 8000, date: "2026-06-10" },
+    { organizationId: "org-1", vehicleId: "veh-1", chargeAmount: 8000, date: "2026-06-10" },
 ];
 const maintenanceRecords = [
-    { vehicleId: "veh-1", cost: 120000, date: "2026-06-05" },
-    { vehicleId: "veh-1", cost: 30000, date: "2026-06-20" },
+    { organizationId: "org-1", vehicleId: "veh-1", cost: 120000, date: "2026-06-05" },
+    { organizationId: "org-1", vehicleId: "veh-1", cost: 30000, date: "2026-06-20" },
 ];
 
 function snap(docs: Array<Record<string, unknown>>) {
@@ -254,5 +254,77 @@ describe("resolveRecentMonths — 지난달 재집계 창", () => {
 
     it("월말에도 1개월을 유지한다", () => {
         expect(resolveRecentMonths(at(2026, 7, 31))).toBe(1);
+    });
+});
+
+/**
+ * 선로딩 경로 — 야간 배치가 대시보드 단계와 함께 읽은 원본(nightlySharedData)으로 집계한다.
+ *
+ * 읽기를 줄이는 변경이라 **결과가 같아야** 한다. 기관별 쿼리 경로와 같은 페이로드를 내는지,
+ * 다른 기관·집계 창 밖의 운행일지를 섞지 않는지, 기관별 쿼리를 더는 걸지 않는지를 고정한다.
+ */
+describe("runDailyAggregation — 선로딩 데이터 경로", () => {
+    const qdoc = (d: Record<string, unknown>, i: number) => ({ id: (d.id as string) || `s-${i}`, data: () => d });
+    const shared = () => ({
+        orgDocs: DEFAULT_ORGS.map(qdoc),
+        userDocs: [
+            ...DEFAULT_USERS.map((u) => ({ ...u, organizationId: "org-1" })),
+            { id: "u-other", name: "남의직원", organizationId: "org-2" },
+        ].map(qdoc),
+        vehicleDocs: [
+            ...DEFAULT_VEHICLES.map((v) => ({ ...v, organizationId: "org-1" })),
+            { id: "veh-other", name: "남의차", organizationId: "org-2" },
+        ].map(qdoc),
+        driveLogDocs: [
+            ...driveLogs.map((d) => ({ ...d, organizationId: "org-1" })),
+            // 다른 기관 — 섞이면 안 된다
+            { ...driveLogs[0], organizationId: "org-2" },
+            // 집계 창(6월) 밖 — 7월 1일 KST
+            { ...driveLogs[0], organizationId: "org-1", timestamp: { toDate: () => kstInstant(2026, 6, 1, 9) } },
+            // timestamp가 Timestamp가 아닌 옛 기록 — 기관별 범위 쿼리에도 걸리지 않던 문서다
+            { ...driveLogs[0], organizationId: "org-1", timestamp: "2026-06-10" },
+        ].map(qdoc) as never[],
+        driveLogScanStart: kstInstant(2026, 5, 1, 0),
+    });
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        fixtures.orgs = [...DEFAULT_ORGS];
+        fixtures.users = [...DEFAULT_USERS];
+        fixtures.vehicles = [...DEFAULT_VEHICLES];
+        fixtures.touched = [];
+        // 집계 창이 6월이 되도록 실행 시각을 6월 25일 02:00(KST)로 고정한다
+        jest.useFakeTimers().setSystemTime(kstInstant(2026, 5, 25, 2));
+    });
+    afterEach(() => jest.useRealTimers());
+
+    it("기관별 쿼리 경로와 같은 페이로드를 저장한다", async () => {
+        await runDailyAggregation(1);
+        const viaQueries = mockSet.mock.calls[0][0];
+        mockSet.mockClear();
+
+        await runDailyAggregation(1, shared() as never);
+        const viaShared = mockSet.mock.calls[0][0];
+
+        expect(viaShared).toEqual(viaQueries);
+    });
+
+    it("기관 목록·구성원·차량·운행일지를 다시 읽지 않고, 비용 기록만 월 단위로 읽는다", async () => {
+        const res = await runDailyAggregation(1, shared() as never);
+
+        expect(res).toMatchObject({ orgs: 1, processed: 1, errors: 0 });
+        expect(fixtures.touched).not.toContain("organizations");
+        expect(fixtures.touched).not.toContain("users");
+        expect(fixtures.touched).not.toContain("vehicles");
+        expect(fixtures.touched).not.toContain("driveLogs");
+        expect(fixtures.touched.filter((n) => n === "fuelLogs")).toHaveLength(1);
+    });
+
+    it("선로딩 창이 집계 창보다 늦게 시작하면 운행일지는 기관별 쿼리로 읽는다", async () => {
+        const late = { ...shared(), driveLogScanStart: kstInstant(2026, 5, 10, 0) };
+
+        await runDailyAggregation(1, late as never);
+
+        expect(fixtures.touched).toContain("driveLogs");
     });
 });
