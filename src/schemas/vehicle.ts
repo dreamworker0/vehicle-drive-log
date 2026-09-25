@@ -58,6 +58,11 @@ export const vehicleSchema = z.object({
     calendarSyncFailCount: z.coerce.number().optional().catch(0),
     calendarSyncLastFailAt: timestampSchema.optional().catch(undefined),
     /**
+     * 마지막 전체 역동기화 때의 캘린더 이벤트 지문 (백엔드 전용). 정기 역동기화는 지문이
+     * 같으면 예약 조회를 건너뛴다 — 값이 없거나 지워지면 다음 주기에 전체 동기화할 뿐이다.
+     */
+    calendarSyncFingerprint: z.string().optional().catch(undefined),
+    /**
      * 마지막 실패 사유 (백엔드 기록). 403(공유 권한 해제)과 404(캘린더 삭제)는 기관이 할
      * 조치가 다른데, 예전에는 카운터와 시각만 남겨 차량 문서만으로는 구분할 수 없었다.
      * 유일한 단서인 Cloud Logging은 30일 보존이라 그 전에 영구 제외로 얼어붙은 차량은

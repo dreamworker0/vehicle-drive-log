@@ -1,6 +1,7 @@
 /**
  * calendarSchedule — Google Calendar → App 역동기화 스케줄러
  */
+import { createHash } from "crypto";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { onSchedule } from "firebase-functions/v2/scheduler";
@@ -15,6 +16,58 @@ import { maskEmail } from "../../utils/mask";
 
 const db = getFirestore();
 const auth = getAuth();
+
+/**
+ * 캘린더 지문 형식 버전 — 파서(`parseEventToReservation`)나 비교 규칙을 바꾸면 올린다.
+ * 지문이 전부 달라져 배포 직후 첫 주기에 모든 차량이 한 번씩 전체 동기화된다.
+ */
+const CALENDAR_FINGERPRINT_VERSION = 1;
+
+/**
+ * 캘린더 이벤트 목록의 지문.
+ *
+ * 역동기화는 하루 34회 돌며 차량마다 9일치 예약을 매번 다시 읽었다. 캘린더가 그대로면
+ * 그 읽기는 아무것도 바꾸지 못하는데도 하루 읽기의 대부분을 차지했다(2026-09-25 점검,
+ * 무료 한도 5만/일 중 3.7만). 지문이 직전과 같으면 예약 조회부터 건너뛴다.
+ *
+ * 지문에 넣는 것:
+ * - 이벤트별 `id`·`status`·`updated`·시작/종료 — `updated`는 제목·설명 수정에도 바뀐다
+ * - 캘린더 ID와 파서가 쓰는 차량 필드(표시 이름·이름·번호판·기관) — 바뀌면 파싱 결과가 달라진다
+ * - KST 날짜 — 조회 창이 하루씩 밀리고, 캘린더 밖의 사정(앱에서 지운 예약 등)도
+ *   **하루 한 번은** 전체 동기화로 맞춰지게 하는 안전망
+ * - 형식 버전
+ *
+ * Google `syncToken`을 쓰지 않은 이유: `timeMin`/`timeMax`와 함께 쓸 수 없어 조회 창
+ * 대신 캘린더 전체 변경분을 추적해야 하고, 토큰 만료(410) 처리가 따로 필요하다.
+ * 이벤트 조회는 어차피 매 주기 하므로, 그 결과로 판정하면 Firestore 읽기만 정확히 줄어든다.
+ */
+export function computeCalendarFingerprint(
+    events: Array<{ id: string; status?: string; updated?: string; start?: unknown; end?: unknown }>,
+    vehicleData: FirebaseFirestore.DocumentData,
+    kstDate: string
+): string {
+    const eventKeys = events
+        .map(function (e) {
+            return [e.id, e.status || "", e.updated || "", JSON.stringify(e.start ?? null), JSON.stringify(e.end ?? null)].join("|");
+        })
+        .sort();
+    const payload = JSON.stringify({
+        v: CALENDAR_FINGERPRINT_VERSION,
+        date: kstDate,
+        calendarId: vehicleData.googleCalendarId || "",
+        organizationId: vehicleData.organizationId || "",
+        displayName: vehicleData.displayName || "",
+        name: vehicleData.name || "",
+        plateNumber: vehicleData.plateNumber || "",
+        events: eventKeys,
+    });
+    return createHash("sha256").update(payload).digest("hex");
+}
+
+/** Firestore는 결과가 없는 쿼리도 1건으로 과금한다. */
+function queryReadCount(snap: { docs: unknown[] }): number {
+    return Math.max(1, snap.docs.length);
+}
 
 /**
  * 이메일로 Firebase Auth 사용자 조회 (UID + displayName)
@@ -91,6 +144,10 @@ export const syncCalendarToApp = onSchedule(
             let totalSkippedDup = 0;
             let totalSkippedCooldown = 0;
             let totalSkippedPermanent = 0;
+            let totalSkippedUnchanged = 0;
+            let totalFullSynced = 0;
+            // 읽기 집계 — 하루 읽기의 출처를 로그로 확인하려고 둔다 (2026-09-25 무료 한도 74% 점검)
+            let reservationReads = 0;
 
             const globalProcessedEventIds = new Set<string>();
             // 이 실행에서만 유효한 기관 플래그 캐시 — 한 기관에 차량이 여러 대여도
@@ -132,12 +189,18 @@ export const syncCalendarToApp = onSchedule(
 
                 try {
                     // 개별 차량 동기화 로직 호출
-                    const result = await syncSingleVehicleCalendar(vehicleId, vehicle, globalProcessedEventIds, orgFlagCache, bindingCache);
-                    
+                    const result = await syncSingleVehicleCalendar(
+                        vehicleId, vehicle, globalProcessedEventIds, orgFlagCache, bindingCache,
+                        { skipIfUnchanged: true }
+                    );
+
                     totalCreated += result.created;
                     totalUpdated += result.updated;
                     totalCancelled += result.cancelled;
                     totalSkippedDup += result.skippedDup;
+                    reservationReads += result.reads;
+                    if (result.skippedUnchanged) totalSkippedUnchanged++;
+                    else totalFullSynced++;
 
                     // 동기화 성공 시 실패 카운터 리셋
                     if (failCount > 0) {
@@ -160,6 +223,20 @@ export const syncCalendarToApp = onSchedule(
             }
 
             console.log("=== Reverse sync done: created " + totalCreated + ", updated " + totalUpdated + ", cancelled " + totalCancelled + ", skippedDup " + totalSkippedDup + ", skippedCooldown " + totalSkippedCooldown + ", skippedPermanent " + totalSkippedPermanent + " ===");
+
+            // 캐시 미스 한 번이 문서 읽기 한 번이다(바인딩 경합 재조회는 드물어 뺐다).
+            const vehicleReads = queryReadCount(vehiclesSnap);
+            const orgAndBindingReads = orgFlagCache.size + bindingCache.size;
+            const totalReads = vehicleReads + reservationReads + orgAndBindingReads;
+            // 고정 접두사로 남겨 Cloud Logging에서 `[CalendarSyncReads]`로 모아 볼 수 있게 한다.
+            console.log("[CalendarSyncReads] " + JSON.stringify({
+                totalReads,
+                vehicleReads,
+                reservationReads,
+                orgAndBindingReads,
+                fullSynced: totalFullSynced,
+                skippedUnchanged: totalSkippedUnchanged,
+            }));
 
             // [이상 감지 알림] 한 주기(30분) 동안 예약 증식이 10건 이상이면 비정상 폭증으로 간주
             if (totalCreated >= 10) {
@@ -189,12 +266,19 @@ export async function syncSingleVehicleCalendar(
     orgFlagCache?: OrgCalendarFlagCache,
     // 캘린더 바인딩 판정 캐시 — 한 기관이 모든 차량에 같은 캘린더를 쓰는 경우가 많아
     // orgFlagCache와 같은 이유로 실행 단위 Map을 받는다.
-    bindingCache?: CalendarBindingCache
+    bindingCache?: CalendarBindingCache,
+    // skipIfUnchanged: 캘린더 지문이 차량 문서의 직전 값과 같으면 예약 조회·비교를 건너뛴다.
+    // 정기 스케줄러만 켠다 — 온디맨드 동기화는 사용자가 "지금 맞춰 달라"고 누른 것이라 항상 전체로 돈다.
+    options: { skipIfUnchanged?: boolean } = {}
 ): Promise<{
     created: number;
     updated: number;
     cancelled: number;
     skippedDup: number;
+    /** 이 함수 안에서 발생한 Firestore 읽기 수 (기관 플래그·바인딩 조회는 호출자 캐시로 집계) */
+    reads: number;
+    /** 캘린더 지문이 같아 예약 조회를 건너뛰었는지 */
+    skippedUnchanged: boolean;
 }> {
     const calendarId = vehicleData.googleCalendarId as string;
     const vehicleName = (vehicleData.displayName as string) || "";
@@ -204,16 +288,18 @@ export async function syncSingleVehicleCalendar(
     let updated = 0;
     let cancelled = 0;
     let skippedDup = 0;
+    let reads = 0;
+    const skippedUnchanged = false;
 
     if (!await isGoogleCalendarEnabled(organizationId, orgFlagCache)) {
         console.log("Vehicle " + vehicleName + "(" + vehicleId + "): organization calendar feature disabled, skip");
-        return { created, updated, cancelled, skippedDup };
+        return { created, updated, cancelled, skippedDup, reads, skippedUnchanged };
     }
 
     // 유효하지 않은 캘린더 ID 건너뛰기 (@ 포함 필수)
     if (!calendarId || !calendarId.includes("@")) {
         console.log("Vehicle " + vehicleName + "(" + vehicleId + "): invalid calendar ID, skip");
-        return { created, updated, cancelled, skippedDup };
+        return { created, updated, cancelled, skippedDup, reads, skippedUnchanged };
     }
 
     // 이 캘린더가 이 기관에 귀속된 것인지 확인한다. 이 검사가 없으면 관리자가 적어 넣은
@@ -224,7 +310,7 @@ export async function syncSingleVehicleCalendar(
         cache: bindingCache,
     })) {
         console.log("Vehicle " + vehicleName + "(" + vehicleId + "): calendar not bound to this organization, skip");
-        return { created, updated, cancelled, skippedDup };
+        return { created, updated, cancelled, skippedDup, reads, skippedUnchanged };
     }
 
     // 조회 범위: 오늘 기준 -1일 ~ +7일
@@ -243,6 +329,12 @@ export async function syncSingleVehicleCalendar(
         timeMax.toISOString()
     );
 
+    // 캘린더가 직전 전체 동기화 이후 그대로면 Firestore는 볼 것도 바꿀 것도 없다.
+    const fingerprint = computeCalendarFingerprint(calendarEvents, vehicleData, getKSTDateString(now));
+    if (options.skipIfUnchanged && vehicleData.calendarSyncFingerprint === fingerprint) {
+        return { created, updated, cancelled, skippedDup, reads, skippedUnchanged: true };
+    }
+
     // 2. 해당 차량의 기존 예약 조회 (UTC/KST 시간대 오류를 피하기 위해 조회 범위를 하루씩 넉넉히 잡습니다)
     const dateMinObj = new Date(timeMin);
     dateMinObj.setDate(dateMinObj.getDate() - 2);
@@ -257,6 +349,7 @@ export async function syncSingleVehicleCalendar(
         .where("date", ">=", dateMin)
         .where("date", "<=", dateMax)
         .get();
+    reads += queryReadCount(existingSnap);
 
     const existingByEventId: Record<string, Record<string, unknown>> = {};
     const existingReservations: Array<Record<string, unknown>> = [];
@@ -321,7 +414,8 @@ export async function syncSingleVehicleCalendar(
                 .where("calendarEventId", "==", calEvent.id)
                 .limit(1)
                 .get();
-                
+            reads += queryReadCount(doubleCheckSnap);
+
             if (!doubleCheckSnap.empty) {
                 const dupDoc = doubleCheckSnap.docs[0];
                 existingByEventId[calEvent.id] = { id: dupDoc.id, ...dupDoc.data() };
@@ -352,6 +446,7 @@ export async function syncSingleVehicleCalendar(
                             // 이메일/비밀번호 계정은 Auth displayName이 비어 있는 경우가 많아
                             // Firestore 프로필(users/{uid}.name)로 폴백
                             const profileSnap = await db.collection("users").doc(userRecord.uid).get();
+                            reads += 1;
                             const profileName = profileSnap.exists ? (profileSnap.data()?.name as string | undefined) : undefined;
                             if (profileName) reservationData.reservedByName = profileName;
                         }
@@ -437,7 +532,13 @@ export async function syncSingleVehicleCalendar(
         }
     }
 
-    return { created, updated, cancelled, skippedDup };
+    // 전체 동기화를 끝까지 마친 뒤에만 지문을 남긴다 — 중간에 throw하면 다음 주기가 다시 전체로 돈다.
+    // 차량 문서에는 트리거가 없고, 실패 카운터도 같은 문서에 기록하므로 같은 방식이다.
+    if (vehicleData.calendarSyncFingerprint !== fingerprint) {
+        await db.collection("vehicles").doc(vehicleId).update({ calendarSyncFingerprint: fingerprint });
+    }
+
+    return { created, updated, cancelled, skippedDup, reads, skippedUnchanged };
 }
 
 /**
