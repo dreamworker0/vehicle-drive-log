@@ -38,12 +38,23 @@ export function useRouteInfo({ form, setForm, orgAddress, orgSites, vehicles, en
     // 마지막 경로 탐색에 사용한 파라미터를 ref로 보관 (on-demand 재사용)
     const lastRouteParamsRef = useRef<{ origin: string; destination: string; carType: string } | null>(null);
 
+    // 선택된 차량의 출발지·carType 결정. 분관 차량은 분관 주소에서 출발한다 —
+    // 본관 주소로 계산하면 거리·소요시간·통행료가 전부 어긋난다.
+    //
+    // 효과 밖에서 문자열로 계산해 의존성으로 쓴다. 예전에는 효과 안에서 `vehicles`를 읽으면서
+    // 의존성에서는 뺐다(린트 억제). 그래서 차량 목록이 선택보다 늦게 도착하거나 차량의 출발지·
+    // 차종이 바뀌어도 경로를 다시 찾지 않고, **본관 주소·기본 차종으로 계산한 옛 결과**가 남았다.
+    // 배열을 그대로 의존성에 넣으면 매 렌더 새 배열일 때 디바운스가 끝없이 밀리므로 값으로 좁힌다.
+    const selectedVehicle = vehicles.find(v => v.id === form.vehicleId);
+    const routeOrigin = resolveDepartureAddress(orgSites, selectedVehicle) || orgAddress;
+    const routeCarType = selectedVehicle?.vehicleType
+        ? VEHICLE_TYPE_TO_CAR_TYPE[selectedVehicle.vehicleType] || '0'
+        : '0';
+
     // 경로 정보 업데이트 (차량이 세워져 있는 출발지 → 목적지 경로 탐색)
     useEffect(() => {
-        // 선택된 차량의 출발지·carType 결정. 분관 차량은 분관 주소에서 출발한다 —
-        // 본관 주소로 계산하면 거리·소요시간·통행료가 전부 어긋난다.
-        const selectedVehicle = vehicles.find(v => v.id === form.vehicleId);
-        const origin = resolveDepartureAddress(orgSites, selectedVehicle) || orgAddress;
+        const origin = routeOrigin;
+        const carType = routeCarType;
 
         if (!form.destination.trim() || !origin || !isTmapAvailable()) {
             setRouteInfo(null);
@@ -51,11 +62,7 @@ export function useRouteInfo({ form, setForm, orgAddress, orgSites, vehicles, en
             return;
         }
 
-        const carType = selectedVehicle?.vehicleType
-            ? VEHICLE_TYPE_TO_CAR_TYPE[selectedVehicle.vehicleType] || '0'
-            : '0';
-
-        // 목적지/차량 변경 시 무료도로 초기화
+        // 목적지/출발지/차종 변경 시 무료도로 초기화
         setFreeRoadRoute(null);
 
         // 경로가 바뀌었는데 옛 조회 결과가 남아 있으면, 그것이 자동 채움·제안의 근거가 된다.
@@ -93,8 +100,7 @@ export function useRouteInfo({ form, setForm, orgAddress, orgSites, vehicles, en
         }, 1200); // 충분한 디바운스로 불필요한 연속 호출 방지
 
         return () => clearTimeout(timer);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [form.destination, form.vehicleId, orgAddress, orgSites]);
+    }, [form.destination, routeOrigin, routeCarType]);
 
     // 무료도로 경로 on-demand 조회 (펼치기 버튼 클릭 시 호출)
     const handleFetchFreeRoad = useCallback(async () => {
@@ -132,8 +138,7 @@ export function useRouteInfo({ form, setForm, orgAddress, orgSites, vehicles, en
             const autoEnd = calcEndTime(form.startTime, routeInfo.duration);
             setForm(prev => ({ ...prev, endTime: autoEnd }));
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [form.startTime, routeInfo?.duration, endTimeTouched, isSpanningDays]);
+    }, [form.startTime, routeInfo?.duration, endTimeTouched, isSpanningDays, setForm]);
 
     /**
      * 화면에 권할 종료시간 — 없으면 `null`.
@@ -152,7 +157,6 @@ export function useRouteInfo({ form, setForm, orgAddress, orgSites, vehicles, en
     })();
 
     // 분관을 등록한 기관에서만 출발지를 화면에 알린다(본관뿐이면 새 정보가 없다).
-    const selectedVehicle = vehicles.find(v => v.id === form.vehicleId);
     const departureSiteName = hasBranchSites(orgSites)
         ? resolveVehicleSite(orgSites, selectedVehicle).name
         : '';

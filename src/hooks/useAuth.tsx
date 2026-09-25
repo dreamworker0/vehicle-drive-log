@@ -401,7 +401,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (unsubscribeUser) unsubscribeUser();
             if (unsubscribeOrg) unsubscribeOrg();
         };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- 인증 구독은 앱 수명 동안 한 번만 건다. 상태는 ref와 setter로만 다룬다
     }, []);
 
     /**

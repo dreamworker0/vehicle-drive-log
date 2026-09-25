@@ -117,7 +117,7 @@ export default function useQuickDriveStart() {
             }
         };
         fetch();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- user 객체 대신 uid로 본다. 같은 사용자의 토큰 갱신마다 다시 조회할 이유가 없다
     }, [orgId, user?.uid, recommendedVehicleId, passengerEnabled]);
 
     // 목적지 또는 차량 변경 시 경로 탐색 (디바운스 800ms)
