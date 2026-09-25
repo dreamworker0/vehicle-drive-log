@@ -3,8 +3,8 @@
 - **작성일**: 2026-09-06
 - **기준 커밋**: `d2a52c0`
 - **스코프 모드**: HOLD (리팩토링·의존성 이관 — 명시 범위에 엄격, 스코프 변경 없음)
-- **절차**: [planning-scope-review](../.agent/rules/planning-scope-review.md)
-- **배경 실측**: [MAINTAINABILITY_BACKLOG.md](MAINTAINABILITY_BACKLOG.md) 「Functions 런타임 메이저 이관」
+- **절차**: [planning-scope-review](../../../.agent/rules/planning-scope-review.md)
+- **배경 실측**: [MAINTAINABILITY_BACKLOG.md](../../MAINTAINABILITY_BACKLOG.md) 「Functions 런타임 메이저 이관」
 
 ## 0. 과제
 
@@ -76,7 +76,7 @@ functions/node_modules/@types/express           (4, sendfile 있음)
 `--experimental-vm-modules` + ESM 설정으로 옮긴다.
 
 - **노력**: 큼. 77개 스위트 전체가 영향권이다.
-- **위험**: 높음. 컴파일 결과가 CommonJS라는 이 프로젝트의 전제([cloud-functions.md §1](../.agent/rules/cloud-functions.md))와 정면으로 부딪힌다.
+- **위험**: 높음. 컴파일 결과가 CommonJS라는 이 프로젝트의 전제([cloud-functions.md §1](../../../.agent/rules/cloud-functions.md))와 정면으로 부딪힌다.
 - **장점**: 앞으로 오는 ESM 전용 의존성에 다시 걸리지 않는다.
 - **판단**: **주 7시간 가용에 맞지 않는다.** 이관 하나를 위해 테스트 인프라 전체를 흔드는 것은 이 프로젝트 규모에 과하다. 기록만 남기고 채택하지 않는다.
 

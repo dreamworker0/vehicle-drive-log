@@ -323,6 +323,12 @@ npm run build           # 프로덕션 빌드 확인
 | [OPERATIONS.md](OPERATIONS.md) | 시스템 관리자용 운영 매뉴얼 (백업, 장애 대응, 기관 관리) |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | 개발 참여 가이드 (코딩 컨벤션, PR 규칙, 브랜치 전략) |
 | [API_FALLBACK.md](docs/API_FALLBACK.md) | 외부 API 장애 대응 매뉴얼 |
+| [MONITORING_GUIDE.md](docs/MONITORING_GUIDE.md) | 운영 모니터링 가이드 (Cloud Monitoring 대시보드·알림 정책·TTL·사용량/비용 점검) |
+| [FIRESTORE_COST_ANALYSIS.md](docs/FIRESTORE_COST_ANALYSIS.md) | 인덱스·스케줄러별 Firestore 비용 분석과 실측 |
+| [MAINTAINABILITY_BACKLOG.md](docs/MAINTAINABILITY_BACKLOG.md) | 기존 코드의 구조 개선 후보 백로그 |
+| [ARCHIVE_POLICY.md](docs/ARCHIVE_POLICY.md) | 운행일지 아카이빙 정책 (주간 유지보수 배치) |
+| [보안 점검 보고서](docs/security-reports/) | 정기 보안 감사 결과 (날짜별) |
+| [문서 아카이브](docs/archive/) | 역할이 끝난 과거 문서와 완료된 기능 계획서 — 현재 상태 확인용이 아니다 |
 | [CHANGELOG.md](CHANGELOG.md) | Phase 61(2026-06-14)까지의 변경 이력 — 이후는 위 구현이력으로 일원화 |
 
 ---
