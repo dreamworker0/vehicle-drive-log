@@ -39,8 +39,6 @@
     "test:functions:emulator": "npx firebase-tools emulators:exec --only auth,firestore --project demo-vehicle-log \"npm --prefix functions run test:emulator\"",
     "verify:gitignore": "tsx scripts/verify-gitignore.ts",
     "sync:agents": "tsx scripts/sync-claude-agents.ts",
-    "eval:trigger": "tsx scripts/run-eval.ts trigger",
-    "eval:behavior": "tsx scripts/run-eval.ts behavior",
     "health": "tsx scripts/check-functions-health.ts",
     "pretest:e2e": "tsx scripts/check-e2e-ready.ts",
     "test:e2e": "playwright test --project=chromium --project=mobile-chrome --project=mobile-safari",
