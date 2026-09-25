@@ -199,6 +199,18 @@ describe('reservationTriggers', () => {
             expect(mockUpdateCalendarEvent).not.toHaveBeenCalled();
         });
 
+        it.each(['reminderSent', 'driveLogReminderSent', 'noShowReminderSent'])(
+            '알림 발송 표시(%s)만 바뀌면 차량을 조회하지 않고 끝낸다',
+            async (flag) => {
+                const base = { status: 'reserved', vehicleId: 'v1', organizationId: 'org1', date: '2026-01-01', startTime: '09:00', endTime: '10:00', calendarEventId: 'ev1' };
+                const event = makeUpdateEvent(base, { ...base, [flag]: true });
+                await (onReservationUpdated as Function)(event);
+                expect(mockGet).not.toHaveBeenCalled();
+                expect(mockUpdateCalendarEvent).not.toHaveBeenCalled();
+                expect(mockCreateInAppNotification).not.toHaveBeenCalled();
+            }
+        );
+
         it('취소 시 캘린더 이벤트를 삭제하고 인앱 알림을 전송한다', async () => {
             mockGet.mockResolvedValue({ exists: true, data: () => ({ googleCalendarId: 'cal@group.calendar.google.com', organizationId: 'org1' }) });
             mockDeleteCalendarEvent.mockResolvedValue(undefined);

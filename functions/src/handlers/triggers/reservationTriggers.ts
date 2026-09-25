@@ -201,9 +201,11 @@ export const onReservationUpdated = onDocumentUpdated(
         return;
     }
 
-    // reminderSent / driveLogReminderSent 업데이트만 변경된 경우 무시
+    // 알림 발송 표시(reminderSent·driveLogReminderSent·noShowReminderSent) 등 부가 필드만 바뀐 경우 무시.
+    // noShowReminderSent가 빠져 있어 미출발 알림 한 건마다 이 트리거가 끝까지 돌며
+    // 차량 문서를 읽었다 (예약 알림 스케줄러가 쓰는 표시 3종 중 하나만 누락, 2026-09-25).
     if (before.status === after.status && before.date === after.date && before.startTime === after.startTime) {
-        const ignoredFields = ["reminderSent", "driveLogReminderSent", "calendarEventId", "actualStartTime"];
+        const ignoredFields = ["reminderSent", "driveLogReminderSent", "noShowReminderSent", "calendarEventId", "actualStartTime"];
         const nonIgnoredChanged = Object.keys(after).some(function (k) {
             return !ignoredFields.includes(k) && JSON.stringify(before[k]) !== JSON.stringify(after[k]);
         });

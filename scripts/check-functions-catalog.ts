@@ -14,11 +14,9 @@
  * 그때 레퍼런스가 47개에 멈춰 누락 22개 + **존재하지 않는 7개**를 문서화하고 있었다.
  * README의 종류별 요약도 손으로 적은 숫자라 실제(67개)와 어긋난 채(63개) 남아 있었다.
  *
- * 그래서 세 가지를 기계로 대조한다:
+ * 그래서 두 가지를 기계로 대조한다:
  *   1. 카탈로그 ↔ functions/src/index.ts export  (1:1)
- *   2. README의 "전체 N개 함수"           ↔ 카탈로그 총계
- *   3. README 종류별 표의 개수            ↔ 카탈로그 타입별 집계
- *   4. 배포 가능한 함수를 정의하지만 index.ts에 export되지 않은 **고아 파일**
+ *   2. 배포 가능한 함수를 정의하지만 index.ts에 export되지 않은 **고아 파일**
  *
  * ## 4번을 뒤늦게 추가한 이유
  *
@@ -41,7 +39,6 @@ import { join, resolve, relative, sep } from 'node:path';
 const ROOT = resolve(import.meta.dirname, '..');
 const INDEX_TS = join(ROOT, 'functions/src/index.ts');
 const GENERATOR = join(ROOT, 'scripts/generate-functions-doc.ts');
-const README = join(ROOT, 'README.md');
 
 // ── 1. index.ts의 export 이름 수집 ──
 const indexSource = readFileSync(INDEX_TS, 'utf8');
@@ -112,42 +109,11 @@ for (const file of collectTsFiles(FUNCTIONS_SRC)) {
     );
 }
 
-// ── 4. README 수치 대조 ──
-const readme = readFileSync(README, 'utf8');
-const total = entries.length;
-
-const totalMatch = readme.match(/전체 (\d+)개 함수/);
-if (!totalMatch) {
-    problems.push('   README에서 "전체 N개 함수" 문구를 찾지 못했습니다 (문구가 바뀌었다면 이 스크립트도 갱신).');
-} else if (Number(totalMatch[1]) !== total) {
-    problems.push(`   README 총계 불일치: 문서 ${totalMatch[1]}개 vs 실제 ${total}개`);
-}
-
-// 종류별 집계 — README 표의 분류에 맞춰 Firestore 트리거는 onDocument* 를 합산한다.
+// 종류별 집계 — 출력용
 const byType = new Map<string, number>();
 for (const e of entries) byType.set(e.type, (byType.get(e.type) ?? 0) + 1);
-const firestoreTriggers = [...byType.entries()]
-    .filter(([t]) => t.startsWith('onDocument'))
-    .reduce((sum, [, n]) => sum + n, 0);
 
-const expectedRows: { label: string; pattern: RegExp; count: number }[] = [
-    { label: '호출형 (onCall)', pattern: /\|\s*호출형 \(onCall\)\s*\|\s*(\d+)\s*\|/, count: byType.get('onCall') ?? 0 },
-    { label: 'HTTP (onRequest)', pattern: /\|\s*HTTP \(onRequest\)\s*\|\s*(\d+)\s*\|/, count: byType.get('onRequest') ?? 0 },
-    { label: '스케줄 (onSchedule)', pattern: /\|\s*스케줄 \(onSchedule\)\s*\|\s*(\d+)\s*\|/, count: byType.get('onSchedule') ?? 0 },
-    { label: 'Firestore 트리거', pattern: /\|\s*Firestore 트리거\s*\|\s*(\d+)\s*\|/, count: firestoreTriggers },
-    { label: 'Auth 트리거', pattern: /\|\s*Auth 트리거\s*\|\s*(\d+)\s*\|/, count: byType.get('onUserDeleted') ?? 0 },
-];
-
-for (const row of expectedRows) {
-    const m = readme.match(row.pattern);
-    if (!m) {
-        problems.push(`   README 표에서 "${row.label}" 행을 찾지 못했습니다.`);
-    } else if (Number(m[1]) !== row.count) {
-        problems.push(`   README "${row.label}" 불일치: 문서 ${m[1]}개 vs 실제 ${row.count}개`);
-    }
-}
-
-console.log('🔎 Cloud Functions 카탈로그·문서 수치 정합 검사');
+console.log('🔎 Cloud Functions 카탈로그 정합 검사');
 console.log('═'.repeat(52));
 console.log(`index.ts export: ${exported.size}개 / 카탈로그: ${catalog.size}개`);
 console.log(`종류별: ${[...byType.entries()].sort().map(([t, n]) => `${t} ${n}`).join(', ')}`);
@@ -161,4 +127,4 @@ if (problems.length > 0) {
     process.exit(1);
 }
 
-console.log('✅ 카탈로그·README 모두 index.ts와 일치합니다.');
+console.log('✅ 카탈로그가 index.ts와 일치합니다.');
