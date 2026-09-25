@@ -37,7 +37,7 @@
         "@types/nodemailer": "^8.0.1",
         "babel-jest": "^30.5.1",
         "jest": "^30.5.1",
-        "ts-jest": "^29.4.12",
+        "ts-jest": "^29.4.13",
         "typescript": "^5.7.0"
     },
     "jest": {
