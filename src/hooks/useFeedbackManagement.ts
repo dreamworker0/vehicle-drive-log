@@ -57,7 +57,7 @@ export default function useFeedbackManagement() {
         });
 
         return () => { isMounted = false; };
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 때 한 번만 조회한다. orgNames는 그 시점의 초기값(빈 객체)을 보면 된다
     }, []);
 
     const handleToggleResolve = useCallback(async (fb: Feedback) => {

@@ -184,3 +184,58 @@ describe('useRouteInfo — 종료시간 자동 계산', () => {
         expect(result.current.suggestedEndTime).toBeNull();
     });
 });
+
+/** 실제 앱에서 orgSites는 useAuth 상태라 참조가 유지된다 — 테스트도 같은 참조를 넘긴다 */
+const NO_SITES: never[] = [];
+
+/**
+ * 경로 조회가 **차량 정보를 따라가는가.**
+ *
+ * 예전 효과는 `vehicles`를 읽으면서 의존성에서는 뺐다(린트 억제). 차량 목록이 선택보다 늦게
+ * 도착하면 기본 차종('0')으로 계산한 결과가 그대로 남았다.
+ */
+describe('useRouteInfo — 차량 정보 변화에 따른 재조회', () => {
+    beforeEach(() => {
+        vi.useFakeTimers();
+        vi.clearAllMocks();
+        mockGetMultiRouteWithFreeRoad.mockResolvedValue(ROUTE_30MIN);
+    });
+
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it('차량 목록이 선택보다 늦게 도착하면 그 차종으로 경로를 다시 찾는다', async () => {
+        const setForm = vi.fn();
+        const form = baseForm();
+        const { rerender } = renderHook(
+            ({ vehicles }: { vehicles: Vehicle[] }) => useRouteInfo({
+                form, setForm, orgAddress: '서울시 용산구', orgSites: NO_SITES, vehicles, endTimeTouched: false,
+            }),
+            { initialProps: { vehicles: [] as Vehicle[] } },
+        );
+        await flushRoute();
+        expect(mockGetMultiRouteWithFreeRoad).toHaveBeenLastCalledWith('서울시 용산구', '서울시청', { carType: '0' });
+
+        rerender({ vehicles: VEHICLES });
+        await flushRoute();
+
+        expect(mockGetMultiRouteWithFreeRoad).toHaveBeenLastCalledWith('서울시 용산구', '서울시청', { carType: '1' });
+    });
+
+    it('차량 목록이 매 렌더 새 배열이어도 같은 값이면 다시 조회하지 않는다', async () => {
+        const setForm = vi.fn();
+        const form = baseForm();
+        const { rerender } = renderHook(
+            ({ vehicles }: { vehicles: Vehicle[] }) => useRouteInfo({
+                form, setForm, orgAddress: '서울시 용산구', orgSites: NO_SITES, vehicles, endTimeTouched: false,
+            }),
+            { initialProps: { vehicles: [...VEHICLES] } },
+        );
+        await flushRoute();
+        rerender({ vehicles: [...VEHICLES] });
+        await flushRoute();
+
+        expect(mockGetMultiRouteWithFreeRoad).toHaveBeenCalledTimes(1);
+    });
+});

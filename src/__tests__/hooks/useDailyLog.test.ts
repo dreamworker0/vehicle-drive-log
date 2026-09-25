@@ -12,8 +12,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
 
+const authState = vi.hoisted(() => ({ orgId: 'org1' }));
 vi.mock('@/hooks/useAuth', () => ({
-    useAuth: () => ({ userData: { organizationId: 'org1', role: 'employee' } }),
+    useAuth: () => ({ userData: { organizationId: authState.orgId, role: 'employee' } }),
 }));
 
 const mockGetVehicles = vi.fn();
@@ -41,6 +42,7 @@ const vehicle = (id: string, extra: Record<string, unknown> = {}) => ({
 describe('useDailyLog', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        authState.orgId = 'org1';
         mockGetVehicles.mockResolvedValue([vehicle('v1'), vehicle('v2')]);
         mockGetOrganization.mockResolvedValue({ id: 'org1', name: '가나복지관' });
         mockDrives.mockResolvedValue([]);
@@ -57,6 +59,27 @@ describe('useDailyLog', () => {
 
         expect(result.current.selectedVehicle?.id).toBe('v1');
         expect(mockDrives).toHaveBeenCalledWith('org1', 'v1', result.current.selectedDate);
+    });
+
+    it('기관이 바뀌면 이전 기관의 차량 선택을 새 기관의 첫 차량으로 바꾼다', async () => {
+        // 예전에는 효과가 처음 캡처한 선택값을 봐서, 다른 기관 차량 id가 그대로 남았다.
+        const { result, rerender } = renderHook(() => useDailyLog());
+        await waitFor(() => expect(result.current.selectedVehicleId).toBe('v1'));
+
+        mockGetVehicles.mockResolvedValue([vehicle('w1'), vehicle('w2')]);
+        authState.orgId = 'org2';
+        rerender();
+
+        await waitFor(() => expect(result.current.selectedVehicleId).toBe('w1'));
+    });
+
+    it('같은 기관을 다시 불러와도 사용자가 고른 차량은 유지한다', async () => {
+        const { result } = renderHook(() => useDailyLog());
+        await waitFor(() => expect(result.current.selectedVehicleId).toBe('v1'));
+
+        act(() => result.current.setSelectedVehicleId('v2'));
+
+        expect(result.current.selectedVehicleId).toBe('v2');
     });
 
     it('퇴역 차량은 선택 목록에서 제외한다', async () => {
