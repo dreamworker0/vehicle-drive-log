@@ -144,7 +144,7 @@ Firestore Rules 변경은 에뮬레이터 테스트(`tests/firestore-rules.test.
 
 ### 5.2 배포
 
-로컬에서 `firebase deploy`를 직접 실행하지 않는다 — **master 푸시 시 CI(Deploy 워크플로)가 배포한다.** 긴급 시에만 [/deploy-rules 워크플로우](../workflows/deploy-rules.md)를 따른다.
+로컬에서 `firebase deploy`를 직접 실행하지 않는다 — **master 푸시 시 CI(Deploy 워크플로)가 배포한다.** 긴급 시에만 [/deploy-emergency 워크플로우](../workflows/deploy-emergency.md)를 따른다.
 
 ### 5.3 테스트 권장 사항
 

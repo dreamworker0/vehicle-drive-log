@@ -143,9 +143,9 @@ Git 커밋 시 `Husky` + `lint-staged`가 스테이징 파일에 ESLint를 자�
 
 - [ ] 커스텀 색상 토큰 사용 → D7
 - [ ] 공통 CSS 클래스 우선 사용 (`glass-card`, `btn-*`, `badge-*`)
-- [ ] 다크 모드 확인 → D8, [dark-mode-audit 스킬](skills/dark-mode-audit/SKILL.md)
+- [ ] 다크 모드 확인 → D8, [dark-mode-audit 스킬](skills/ui-patterns/dark-mode.md)
 - [ ] 터치 타겟 최소 48px → D16
-- [ ] 차량 표시 시 → [vehicle-color 스킬](skills/vehicle-color/SKILL.md)
+- [ ] 차량 표시 시 → [vehicle-color 스킬](skills/ui-patterns/vehicle-color.md)
 - [ ] 자동 교정 루프 실행 → §2
 
 ### 약관·동의·감사기록 건드릴 때
@@ -173,7 +173,7 @@ Git 커밋 시 `Husky` + `lint-staged`가 스테이징 파일에 ESLint를 자�
 - [ ] 번들 크기 예산 확인 → [bundle-size-budget](rules/bundle-size-budget.md)
 - [ ] 이번 배포에 포함된 업데이트 소식, FAQ 변경사항 반영 (`src/lib/faqData.ts` 등)
   - `npm run check:release-notes`로 **공지 누락을 기계로 확인**한다 → [release-notes 스킬](skills/release-notes/SKILL.md)
-  - `npm run check:faq`로 **FAQ 누락을 기계로 확인**한다 → [update-faq 스킬](skills/update-faq/SKILL.md). 공지는 그때 한 번 읽고 마는 글이고, 나중에 찾아보는 곳은 FAQ다 — 새 기능 공지에는 그것을 설명하는 FAQ id를 적는다(`"faq": ["some-id"]`, 필요 없으면 `[]`).
+  - `npm run check:faq`로 **FAQ 누락을 기계로 확인**한다 → [update-faq 스킬](skills/release-notes/faq.md). 공지는 그때 한 번 읽고 마는 글이고, 나중에 찾아보는 곳은 FAQ다 — 새 기능 공지에는 그것을 설명하는 FAQ id를 적는다(`"faq": ["some-id"]`, 필요 없으면 `[]`).
     (체크리스트만으로 놓친 전례가 있다 — 다섯 건이 공지 없이 배포됐다)
 - [ ] `구현계획서.md` 체크리스트 및 히스토리 최신 상태로 갱신
 - [ ] Git 스테이징 → 커밋 → 푸시 (원격 백업)

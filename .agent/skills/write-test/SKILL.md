@@ -235,4 +235,4 @@ npm run test         # 프론트엔드 단위 테스트
 npm run test:e2e     # E2E 테스트
 ```
 
-> 전체 테스트 스위트 실행은 `/test` 워크플로우를 사용한다.
+> 전체 테스트 스위트는 `npm test`(프론트)·`npm run test:functions`·`npm run test:e2e`로 실행한다.

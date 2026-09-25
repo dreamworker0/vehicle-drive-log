@@ -1,13 +1,13 @@
 ---
 name: firebase-cost-reduction
-description: Firebase 인프라·운영 비용 절감 패턴 가이드 — Functions 호출·스케줄 빈도, Hosting/Storage 용량, 모니터링 쿼터, 무료 한도 초과 대응. 스케줄 축소·비용 절감 작업 시 참고. (쿼리 자체 성능·Reads 최적화는 firestore-query-optimization 참고.)
+description: Firebase 인프라·운영 비용 절감 패턴 가이드 — Functions 호출·스케줄 빈도, Hosting/Storage 용량, 모니터링 쿼터, 무료 한도 초과 대응, 그리고 대시보드·리스트 쿼리 자체의 Reads 최적화(복합 인덱스·페이지네이션·캐싱). 스케줄 축소·비용 절감 작업, 화면이 느리거나 Reads가 많을 때 참고.
 ---
 
 # Firebase 운영 비용 절감 가이드
 
 이 프로젝트는 **사회복지기관·비영리단체용 무료 서비스**다. Firebase 무료 한도(Spark/Blaze 최소 과금) 안에서 운영하는 것이 제약 조건이므로, 기능을 추가·수정할 때 비용 증가 요인을 먼저 점검한다.
 
-> 📌 **쿼리 레벨 Read 비용**(서버 필터링·기간 제한·배치·집계 캐싱)은 [firestore-query-optimization](../firestore-query-optimization/SKILL.md)을 따른다. 이 스킬은 **쿼리 바깥의 비용 요인**(스케줄, 호스팅, 집계 쿼리 종류, 모니터링)을 다룬다.
+> 📌 **쿼리 레벨 Read 비용**(서버 필터링·기간 제한·배치·집계 캐싱)은 [query-optimization.md](query-optimization.md)를 따른다. 이 스킬은 **쿼리 바깥의 비용 요인**(스케줄, 호스팅, 집계 쿼리 종류, 모니터링)을 다룬다.
 
 ## 1. 스케줄 함수 빈도 최소화
 
@@ -150,7 +150,7 @@ export const syncCalendarToApp = onSchedule({
 
 - [ ] 새 스케줄 함수의 빈도가 최소인가? 트리거로 대체 가능한가?
 - [ ] 건수/합계만 필요한데 `getDocs` 풀스캔하고 있지 않은가? → `getCountFromServer`
-- [ ] 모든 데이터 쿼리에 기간 제한이 있는가? (→ firestore-query-optimization §2)
+- [ ] 모든 데이터 쿼리에 기간 제한이 있는가? (→ [query-optimization.md](query-optimization.md) §2)
 - [ ] 프리뷰/임시 채널에 만료가 설정됐는가?
 - [ ] 새 외부 API(OCR 등) 호출에 캐시·중복 방지가 있는가?
 - [ ] 새로 추가한 무거운 패키지를 함수 파일 최상단에서 import하고 있지 않은가? (→ §6)

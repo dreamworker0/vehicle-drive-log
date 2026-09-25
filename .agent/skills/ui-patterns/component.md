@@ -1,8 +1,3 @@
----
-name: add-component
-description: 프로젝트 구조와 네이밍 컨벤션에 맞게 새 React 컴포넌트를 추가하는 가이드
----
-
 # 새 컴포넌트 추가 스킬
 
 ## 추가 절차

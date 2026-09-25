@@ -50,7 +50,7 @@ node -e "const fs=require('fs');[['.env.example','.env'],['.env.local.example','
 
 > [!IMPORTANT]
 > 복사만으로는 값이 비어 있다. **`.env`의 Firebase 필수 6개 키를 채우지 않으면 빌드가 중단되고,
-> `pre-push` 훅이 빌드를 돌리므로 푸시도 막힌다.** 값은 Firebase Console 또는 GitHub Secrets(`ENV_FILE`)에서 가져온다.
+> CI 빌드도 같은 이유로 실패한다.** 값은 Firebase Console 또는 GitHub Secrets(`ENV_FILE`)에서 가져온다.
 > `VITE_` 접두사 값은 공개 번들에 박히므로 서버 전용 비밀은 절대 넣지 않는다.
 
 ## 4. Husky 훅 초기화

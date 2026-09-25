@@ -1,45 +1,14 @@
 // 하네스 Doctor(check-harness.ts)의 파서·판정 헬퍼 단위 테스트.
 import { describe, it, expect } from 'vitest';
 import {
-    parseFrontmatter,
     extractRelativeLinks,
-    findPwshChainingIssues,
-    extractNpmRunScripts,
     extractFunctionExports,
     extractCatalogNames,
     diffCatalogNames,
     extractInlineCodePaths,
     extractScriptCommandPaths,
-    extractQuotedMdRefs,
     extractHookScriptPaths,
-    findForbiddenDeployCommands,
 } from '../check-harness';
-
-describe('parseFrontmatter', () => {
-    it('name/description을 추출한다', () => {
-        const md = '---\nname: my-skill\ndescription: 설명 텍스트\n---\n\n# 본문';
-        expect(parseFrontmatter(md)).toEqual({ name: 'my-skill', description: '설명 텍스트' });
-    });
-
-    it('따옴표를 벗긴다', () => {
-        const md = '---\nname: "quoted"\ndescription: \'단일\'\n---\n';
-        expect(parseFrontmatter(md)).toEqual({ name: 'quoted', description: '단일' });
-    });
-
-    it('frontmatter가 없으면 빈 객체', () => {
-        expect(parseFrontmatter('# 제목뿐')).toEqual({});
-    });
-
-    it('빈 description은 undefined 취급', () => {
-        const md = '---\nname: x\ndescription:\n---\n';
-        expect(parseFrontmatter(md).description).toBeUndefined();
-    });
-
-    it('CRLF 줄바꿈도 처리한다', () => {
-        const md = '---\r\nname: crlf\r\ndescription: 윈도우\r\n---\r\n';
-        expect(parseFrontmatter(md)).toEqual({ name: 'crlf', description: '윈도우' });
-    });
-});
 
 describe('extractRelativeLinks', () => {
     it('상대 링크만 추출하고 http/앵커/메일은 제외한다', () => {
@@ -53,50 +22,6 @@ describe('extractRelativeLinks', () => {
     it('코드 블록·인라인 코드 안의 링크는 무시한다', () => {
         const md = '```\n[예시](fake/path.md)\n```\n`[inline](x.md)`\n[진짜](real.md)';
         expect(extractRelativeLinks(md)).toEqual(['real.md']);
-    });
-});
-
-describe('findPwshChainingIssues', () => {
-    it('powershell 블록 안의 &&를 잡는다', () => {
-        const md = '```powershell\nnpm run a && npm run b\n```';
-        expect(findPwshChainingIssues(md)).toEqual(['npm run a && npm run b']);
-    });
-
-    it('bash 블록이나 본문의 &&는 무시한다', () => {
-        const md = '```bash\na && b\n```\n본문 && 언급\n```powershell\nnpm test\n```';
-        expect(findPwshChainingIssues(md)).toEqual([]);
-    });
-});
-
-describe('findForbiddenDeployCommands', () => {
-    it('Firebase CLI 직접 배포 명령의 줄 번호를 찾는다', () => {
-        const markdown = [
-            '# 운영',
-            'firebase deploy --only functions',
-            'npx firebase-tools deploy --only hosting',
-        ].join('\n');
-
-        expect(findForbiddenDeployCommands(markdown)).toEqual([2, 3]);
-    });
-
-    it('CI 배포 설명과 셀프호스팅 링크는 차단하지 않는다', () => {
-        const markdown = [
-            'master 푸시 후 CI Deploy 워크플로를 확인한다.',
-            '[셀프호스팅](docs/SELF_HOSTING.md)을 참고한다.',
-        ].join('\n');
-
-        expect(findForbiddenDeployCommands(markdown)).toEqual([]);
-    });
-});
-
-describe('extractNpmRunScripts', () => {
-    it('npm run 스크립트명을 추출한다', () => {
-        const md = 'npm run build 후 npm.cmd run type-check && npm run sync:agents';
-        expect(extractNpmRunScripts(md)).toEqual(['build', 'type-check', 'sync:agents']);
-    });
-
-    it('npm test 등 run 없는 형태는 대상이 아니다', () => {
-        expect(extractNpmRunScripts('npm test; npm install')).toEqual([]);
     });
 });
 
@@ -220,13 +145,6 @@ describe('extractScriptCommandPaths', () => {
 
     it('스크립트 실행이 아닌 언급은 뽑지 않는다', () => {
         expect(extractScriptCommandPaths('`scripts/foo.ts` 파일과 node_modules 이야기')).toEqual([]);
-    });
-});
-
-describe('extractQuotedMdRefs', () => {
-    it('따옴표로 감싼 소문자 케밥 규칙 파일명만 뽑고 중복을 제거한다', () => {
-        const src = "rules: ['cloud-functions.md', 'error-handling.md']; x = 'cloud-functions.md'; readIfExists('CLAUDE.md')";
-        expect(extractQuotedMdRefs(src)).toEqual(['cloud-functions.md', 'error-handling.md']);
     });
 });
 

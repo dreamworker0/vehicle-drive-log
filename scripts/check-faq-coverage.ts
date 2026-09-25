@@ -59,7 +59,7 @@ function main() {
         console.warn('');
         console.warn(`   → 그 기능을 설명하는 FAQ의 id를 항목에 적으세요: "faq": ["some-faq-id"]`);
         console.warn('     FAQ가 필요 없다고 판단했으면 빈 배열을 적으세요: "faq": []');
-        console.warn('     FAQ 작성 규칙: .agent/skills/update-faq/SKILL.md');
+        console.warn('     FAQ 작성 규칙: .agent/skills/release-notes/faq.md');
         console.warn('');
     }
     if (dangling.length > 0) {

@@ -1,5 +1,5 @@
 ---
-description: 코드 정리 — ESLint, 미사용 패키지 탐지, 빌드 검증까지 한번에 실행
+description: 코드 정리 — ESLint, 미사용 패키지 탐지, 빌드 검증까지 한번에 실행하고 제거 가능 여부를 판단한다. "안 쓰는 코드/패키지 정리해줘" 류 요청에 사용
 ---
 
 <!-- AUTO-GENERATED — scripts/sync-claude-agents.ts가 .agent/workflows/cleanup.md에서 생성. 직접 수정 금지. -->

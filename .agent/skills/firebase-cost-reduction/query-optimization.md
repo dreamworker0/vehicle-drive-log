@@ -1,8 +1,3 @@
----
-name: firestore-query-optimization
-description: 대시보드·리스트 페이지의 Firestore 쿼리 자체 최적화 — 복합 인덱스, 페이지네이션, 캐싱으로 읽기(Reads) 횟수와 응답 속도를 개선하는 패턴 가이드. 화면이 느리거나 Reads가 많을 때 참고.
----
-
 # Firestore Query Optimization Guide
 
 Firebase Firestore 문서 읽기(Reads) 건수에 따라 비용과 응답 속도가 크게 좌우됩니다. 데이터가 쌓일수록 성능 이슈가 발생할 수 있으므로, 새로운 데이터를 쿼리하거나 기존 조회를 수정할 때 다음 가이드를 따르세요.
