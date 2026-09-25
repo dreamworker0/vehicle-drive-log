@@ -1,16 +1,20 @@
 /**
- * Hosting 캐시 헤더 — 서비스 워커 스크립트는 **매번 확인하되, 바뀌지 않았으면 다시 받지 않는다.**
+ * Hosting 캐시 헤더 — 서비스 워커 스크립트는 **브라우저는 매번 확인하고, CDN은 저장해 304로 답한다.**
  *
  * 왜 필요한가 — 2026-09-25 결제 SKU 점검에서 Hosting 전송량이 30일 23.7 GiB(무료 10 GiB의
  * 2.4배, 전체 요금의 18%)였다. 원인은 `sw.js`(압축 후 약 180 KB)였다. 앱은 10분마다, 그리고
  * 탭으로 돌아올 때마다 `registration.update()`로 새 버전을 확인한다(main.tsx·UpdatePrompt).
- * 헤더가 `no-cache, no-store, must-revalidate`라서 브라우저가 응답을 저장하지 못했고, 그래서
- * 확인할 때마다 조건부 요청 없이 전체를 다시 받았다. 실측으로 같은 CDN의 다른 파일은 ETag로
- * 304(0 바이트)를 돌려주는데 `sw.js`만 매번 200 전체였다.
  *
- * `no-cache`만 두면 브라우저는 저장한 뒤 **매번 서버에 재검증**한다. 갱신 확인이 늦어지지 않고
- * (새 배포는 ETag가 달라 즉시 200), 바뀌지 않았으면 304로 끝난다. `no-store`는 이 재검증 경로를
- * 없애기만 하고 얻는 것이 없다 — 되살리면 조용히 전송량만 늘어나므로 정적으로 못박는다.
+ * 두 단계로 알게 됐다.
+ *  1) 헤더가 `no-cache, no-store, must-revalidate`라 확인마다 전체를 다시 받았다.
+ *  2) `no-store`만 빼고 `no-cache`로 배포해 보니(#408) **그래도 매번 200 전체**였다.
+ *     `no-cache` 응답은 Hosting CDN이 저장하지 않고 원본으로 넘기는데(`X-Cache: MISS`),
+ *     원본은 조건부 요청(If-None-Match)에 304를 주지 않는다. 304는 CDN 가장자리에
+ *     **저장된** 파일에서만 나온다 — 실측으로 `max-age`가 있는 파일은 304, 0 바이트였다.
+ *
+ * 그래서 `max-age=0, must-revalidate`로 브라우저가 매번 확인하게 두고, `s-maxage`로 CDN이
+ * 저장하게 한다. Hosting은 **배포할 때마다 CDN 캐시를 비우므로** 새 버전 반영은 늦어지지 않는다.
+ * 둘 중 하나라도 빠지면 조용히 전송량만 늘어나므로 정적으로 못박는다.
  */
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
@@ -27,26 +31,28 @@ const firebaseJson = JSON.parse(readFileSync(resolve(ROOT, 'firebase.json'), 'ut
 const hosting = Array.isArray(firebaseJson.hosting) ? firebaseJson.hosting[0] : firebaseJson.hosting;
 
 /** Hosting 글롭(`@(a|b|c)`)이 이 파일명을 직접 나열하는 규칙의 Cache-Control 값 */
-function cacheControlFor(fileName: string): string | undefined {
+function cacheControlFor(fileName: string): string {
     const rule = hosting.headers.find((r) => {
         const m = r.source.match(/^@\(([^)]*)\)$/);
         return m ? m[1].split('|').includes(fileName) : r.source === fileName;
     });
-    return rule?.headers.find((h) => h.key.toLowerCase() === 'cache-control')?.value;
+    return rule?.headers.find((h) => h.key.toLowerCase() === 'cache-control')?.value ?? '';
 }
 
-describe('Hosting 캐시 헤더', () => {
-    it.each(['sw.js', 'firebase-messaging-sw.js', 'index.html'])(
-        '%s는 매번 재검증한다 (no-cache)',
-        (file) => {
-            expect(cacheControlFor(file)).toMatch(/\bno-cache\b/);
-        },
-    );
+const FILES = ['sw.js', 'firebase-messaging-sw.js', 'index.html'];
 
-    it.each(['sw.js', 'firebase-messaging-sw.js', 'index.html'])(
-        '%s에 no-store를 두지 않는다 — 저장을 막으면 304 재검증이 사라져 확인마다 전체를 다시 받는다',
-        (file) => {
-            expect(cacheControlFor(file)).not.toMatch(/\bno-store\b/);
-        },
-    );
+describe('Hosting 캐시 헤더', () => {
+    it.each(FILES)('%s는 브라우저가 매번 재검증한다 (max-age=0 + must-revalidate)', (file) => {
+        expect(cacheControlFor(file)).toMatch(/\bmax-age=0\b/);
+        expect(cacheControlFor(file)).toMatch(/\bmust-revalidate\b/);
+    });
+
+    it.each(FILES)('%s는 CDN이 저장한다 (s-maxage) — 그래야 조건부 요청에 304로 답한다', (file) => {
+        expect(cacheControlFor(file)).toMatch(/\bs-maxage=\d+/);
+    });
+
+    it.each(FILES)('%s에 no-store·no-cache를 두지 않는다 — CDN이 저장하지 않아 확인마다 전체를 다시 보낸다', (file) => {
+        expect(cacheControlFor(file)).not.toMatch(/\bno-store\b/);
+        expect(cacheControlFor(file)).not.toMatch(/\bno-cache\b/);
+    });
 });
