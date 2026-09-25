@@ -12,6 +12,7 @@ import {
     computeReservationStats,
     computeFuelHipassDaily, computeNotificationStats, KNOWN_NOTIF_TYPES,
 } from "./dashboardSections";
+import type { NightlySharedData } from "./nightlySharedData";
 
 /**
  * SuperAdmin 대시보드 통계를 배치 계산하여 system/ 문서에 캐싱.
@@ -23,7 +24,26 @@ import {
  *   - system/dashboardOrgRankings (조직별 데이터)
  */
 
-export async function computeAllDashboardStats(): Promise<void> {
+/**
+ * 대시보드가 읽는 운행일지의 시작 시점 — 30일 차트와 당월 통계를 모두 덮는 최소 창(~30-31일).
+ * 야간 배치의 선로딩(nightlySharedData)이 이 값과 월간 집계 창 중 이른 쪽부터 읽는다.
+ */
+export function getDashboardLogScanStart(now: Date = new Date()): Date {
+    const kstNow = toKSTDate(now);
+    const thirtyDaysAgoStr = getKSTDateString(new Date(now.getTime() - 29 * 24 * 60 * 60 * 1000));
+    const curMonthStartStr = `${kstNow.getFullYear()}-${String(kstNow.getMonth() + 1).padStart(2, "0")}-01`;
+    const thirtyDaysAgoInstant = new Date(`${thirtyDaysAgoStr}T00:00:00+09:00`);
+    const curMonthStartInstant = new Date(`${curMonthStartStr}T00:00:00+09:00`);
+    return thirtyDaysAgoInstant < curMonthStartInstant ? thirtyDaysAgoInstant : curMonthStartInstant;
+}
+
+type DocsLike = { docs: FirebaseFirestore.QueryDocumentSnapshot[]; size: number };
+const asDocs = (docs: FirebaseFirestore.QueryDocumentSnapshot[]): DocsLike => ({ docs, size: docs.length });
+
+export async function computeAllDashboardStats(
+    // 야간 배치가 월간 집계 단계와 함께 쓰려고 미리 읽어 둔 원본. 없으면(수동 새로고침) 직접 읽는다.
+    shared?: NightlySharedData,
+): Promise<void> {
     const startTime = Date.now();
     const db = getFirestore();
 
@@ -47,8 +67,16 @@ export async function computeAllDashboardStats(): Promise<void> {
     // driveLogs 스캔 시작점: 30일 차트와 당월 통계를 모두 커버하는 최소 창 (~30-31일).
     // 전월 통계는 원본 재스캔 대신 dailyAggregation의 월간 캐시(orgStats/{orgId}/monthly)에서
     // 읽으므로, 종전 "전월 1일부터"(최대 ~60일) 스캔 대비 read가 절반 이하로 줄어든다.
-    const curMonthStartInstant = new Date(`${curMonthStartStr}T00:00:00+09:00`);
-    const logScanStart = thirtyDaysAgoInstant < curMonthStartInstant ? thirtyDaysAgoInstant : curMonthStartInstant;
+    const logScanStart = getDashboardLogScanStart();
+
+    // 선로딩 운행일지는 더 이른 시점부터 읽혀 있을 수 있다(월초의 월간 집계 창). 대시보드는 예전과
+    // 같은 조건 — Timestamp 값이 logScanStart 이후 — 만 쓴다. 선로딩 창이 더 늦으면 직접 읽는다.
+    const sharedLogs = shared && shared.driveLogScanStart.getTime() <= logScanStart.getTime()
+        ? shared.driveLogDocs.filter((d) => {
+            const ts = d.data().timestamp?.toDate?.() as Date | undefined;
+            return !!ts && ts >= logScanStart;
+        })
+        : null;
 
     // 알림 30일 일별 창(KST) — 원본 문서 스캔 대신 창별 count() 집계쿼리로 대체한다.
     // (집계쿼리는 인덱스 엔트리 1,000개당 1 read — 수천 문서 스캔을 ~80 read로 줄인다)
@@ -86,11 +114,11 @@ export async function computeAllDashboardStats(): Promise<void> {
         fuelAllAgg, hipassAllAgg, fuelMonthAgg, hipassMonthAgg, fuelPrevMonthAgg, hipassPrevMonthAgg,
         notifTotalAgg, notifReadAgg,
     ] = await Promise.all([
-        db.collection("organizations").get(),
-        db.collection("users").get(),
+        shared ? asDocs(shared.orgDocs) : db.collection("organizations").get() as Promise<DocsLike>,
+        shared ? asDocs(shared.userDocs) : db.collection("users").get() as Promise<DocsLike>,
         db.collection("driveLogs").count().get(),
-        db.collection("driveLogs").where("timestamp", ">=", logScanStart).get(),
-        db.collection("vehicles").get(),
+        sharedLogs ? asDocs(sharedLogs) : db.collection("driveLogs").where("timestamp", ">=", logScanStart).get() as Promise<DocsLike>,
+        shared ? asDocs(shared.vehicleDocs) : db.collection("vehicles").get() as Promise<DocsLike>,
         db.collection("hipassCards").get(),
         db.collection("favorites").get(),
         db.collection("orgApplications").where("status", "==", "pending").count().get(),
@@ -429,5 +457,5 @@ export async function computeAllDashboardStats(): Promise<void> {
     }
 
     const elapsed = Date.now() - startTime;
-    console.log(`[computeDashboardStats] 완료: ${elapsed}ms, orgs=${allStats.dashboardStats.approvedOrgs}, logs=${allStats.dashboardStats.totalLogs}(count), recentLogs=${recentLogSnap.size}, users=${allStats.dashboardStats.totalUsers}, fuelDocs=${fuelRecentSnap.size}, hipassDocs=${hipassRecentSnap.size}, prevMonthlyDocs=${monthlySnaps.length}, dbWrites=${writeChunks.length}`);
+    console.log(`[computeDashboardStats] 완료${shared ? "(선로딩)" : ""}: ${elapsed}ms, orgs=${allStats.dashboardStats.approvedOrgs}, logs=${allStats.dashboardStats.totalLogs}(count), recentLogs=${recentLogSnap.size}, users=${allStats.dashboardStats.totalUsers}, fuelDocs=${fuelRecentSnap.size}, hipassDocs=${hipassRecentSnap.size}, prevMonthlyDocs=${monthlySnaps.length}, dbWrites=${writeChunks.length}`);
 }

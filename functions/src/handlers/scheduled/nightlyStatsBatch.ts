@@ -15,12 +15,20 @@
  * 메모리를 키우는 대신 프로세스를 나눈다. 집계와 백업이 메모리를 나눠 쓰지 않으므로 각자
  * 512MiB로 충분하고, 한쪽이 죽어도 다른 쪽을 재실행하지 않는다.
  *
+ * ## 원본은 한 번만 읽는다
+ * 두 스텝은 기관·사용자·차량 전체와 이번 달 운행일지를 **각자** 읽고 있었다. 월간 집계는 거기에
+ * 기관마다 쿼리 6종을 따로 던졌다(빈 결과도 1 read). 2026-09-25 실측으로 이 배치가 02:00~02:01에
+ * 약 2.4만 read — 하루 읽기의 절반이었다. 그래서 먼저 공통 원본을 한 번 읽어(nightlySharedData)
+ * 두 스텝에 넘긴다. 선로딩이 실패하면 두 스텝은 예전처럼 스스로 읽는다 — 읽기 절감은 선택이고
+ * 집계가 빠지는 것은 사고라서, 실패를 배치 전체로 번지게 하지 않는다.
+ *
  * `retryCount: 0` — 집계는 멱등하지만 재실행 비용이 그대로 두 배다. 하루 놓쳐도 다음 날
  * 배치가 같은 창(최근 2개월)을 다시 집계해 스스로 메운다. (rules/cloud-functions.md §3.1)
  */
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { runDailyAggregation } from "./dailyAggregation";
-import { computeAllDashboardStats } from "../../services/statistics/computeDashboardStats";
+import { runDailyAggregation, resolveRecentMonths, getRecentMonthWindows } from "./dailyAggregation";
+import { computeAllDashboardStats, getDashboardLogScanStart } from "../../services/statistics/computeDashboardStats";
+import { loadNightlySharedData, type NightlySharedData } from "../../services/statistics/nightlySharedData";
 import { runStep, logBatchResult } from "../../utils/batchStep";
 
 const CONTEXT = "nightlyStatsBatch";
@@ -38,8 +46,23 @@ export const nightlyStatsBatch = onSchedule(
     async function () {
         const failed: string[] = [];
 
-        await runStep(failed, CONTEXT, "dailyAggregation", () => runDailyAggregation());
-        await runStep(failed, CONTEXT, "computeAllDashboardStats", () => computeAllDashboardStats());
+        // 두 스텝이 필요로 하는 가장 이른 시점 — 월간 집계의 가장 오래된 달 1일과 대시보드 창 중 이른 쪽
+        const recentMonths = resolveRecentMonths();
+        const windows = getRecentMonthWindows(recentMonths);
+        const oldestMonthStart = windows[windows.length - 1].startOfMonth;
+        const dashboardStart = getDashboardLogScanStart();
+        const scanStart = oldestMonthStart < dashboardStart ? oldestMonthStart : dashboardStart;
+
+        let shared: NightlySharedData | undefined;
+        try {
+            shared = await loadNightlySharedData(scanStart);
+            console.log(`[${CONTEXT}] 선로딩: orgs=${shared.orgDocs.length}, users=${shared.userDocs.length}, vehicles=${shared.vehicleDocs.length}, driveLogs=${shared.driveLogDocs.length} (from ${scanStart.toISOString()})`);
+        } catch (e) {
+            console.warn(`[${CONTEXT}] 선로딩 실패 — 각 스텝이 직접 읽는다:`, (e as Error).message);
+        }
+
+        await runStep(failed, CONTEXT, "dailyAggregation", () => runDailyAggregation(recentMonths, shared));
+        await runStep(failed, CONTEXT, "computeAllDashboardStats", () => computeAllDashboardStats(shared));
 
         await logBatchResult(CONTEXT, failed);
     }
