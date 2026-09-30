@@ -21,6 +21,7 @@ export default function AdminDashboard() {
     const [stats, setStats] = useState({
         todayLogs: 0,
         todayReservations: 0,
+        todayQuickDrives: 0,
         vehicleCount: 0,
         employeeCount: 0,
         monthLogs: 0,
@@ -58,7 +59,9 @@ export default function AdminDashboard() {
 
                 setStats({
                     todayLogs,
-                    todayReservations: todayRes.filter(r => r.status === 'reserved' || r.status === 'in_progress').length,
+                    // 바로 운행은 예약 없이 출발한 운행이라 '예약'에서 빼고 따로 센다 — 운행의 절반 이상이 바로 운행이다
+                    todayReservations: todayRes.filter(r => !r.isQuickDrive && (r.status === 'reserved' || r.status === 'in_progress')).length,
+                    todayQuickDrives: todayRes.filter(r => r.isQuickDrive).length,
                     vehicleCount: vehicles.length,
                     employeeCount: members.filter(m => m.role !== 'superAdmin').length,
                     monthLogs,
@@ -109,7 +112,7 @@ export default function AdminDashboard() {
 
     const statCards = [
         { label: '오늘 운행', value: `${stats.todayLogs}건`, icon: '🚗', color: 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400' },
-        { label: '오늘 예약', value: `${stats.todayReservations}건`, icon: '📅', color: 'bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400' },
+        { label: '오늘 예약', value: `${stats.todayReservations}건`, sub: `바로 운행 ${stats.todayQuickDrives}건`, icon: '📅', color: 'bg-teal-50 dark:bg-teal-900/30 text-teal-600 dark:text-teal-400' },
         { label: '이번 달 운행', value: `${stats.monthLogs}건`, icon: '📊', color: 'bg-purple-50 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400' },
         { label: '등록 차량/직원', value: `${stats.vehicleCount}대 / ${stats.employeeCount}명`, icon: '🏢', color: 'bg-accent-50 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400' },
         { label: '누적 주행거리', value: `${Math.round(stats.totalDistance).toLocaleString()}km`, icon: '🛣️', color: 'bg-amber-50 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400' },
@@ -134,6 +137,9 @@ export default function AdminDashboard() {
                                 <p className="text-xl font-bold text-surface-900 dark:text-surface-100 whitespace-nowrap">
                                     {loading ? <span className="w-5 h-5 spinner inline-block" /> : stat.value}
                                 </p>
+                                {'sub' in stat && !loading && (
+                                    <p className="text-[11px] text-surface-400 dark:text-surface-500 mt-0.5 whitespace-nowrap">{stat.sub}</p>
+                                )}
                             </div>
                             <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg flex-shrink-0 ${stat.color}`}>
                                 {stat.icon}
