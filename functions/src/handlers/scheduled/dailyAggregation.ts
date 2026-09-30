@@ -48,6 +48,8 @@ interface VehicleAgg {
     maintenanceCost: number;   // 차량별 총 정비비
     maintenanceCount: number;  // 차량별 정비 횟수
     lastMaintenanceDate: string;
+    /** 차량별 운행 방식 건수 (정비·주유만 있는 차량은 모두 0) */
+    origin: OriginCounts;
 }
 
 /**
@@ -63,6 +65,8 @@ export interface OriginCounts {
     manual: number;
     linked: number;
 }
+
+const emptyOrigin = (): OriginCounts => ({ reservation: 0, quick: 0, manual: 0, linked: 0 });
 
 export function classifyDriveOrigin(data: FirebaseFirestore.DocumentData): keyof OriginCounts {
     if (data.driveOrigin === "reservation" || data.driveOrigin === "quick" || data.driveOrigin === "manual") {
@@ -119,8 +123,8 @@ async function aggregateOrgMonth(
     sources: OrgMonthSources,
 ): Promise<void> {
     const monthlyTotal = { count: 0, distance: 0 };
-    const originCounts: OriginCounts = { reservation: 0, quick: 0, manual: 0, linked: 0 };
-    const driverStats: Record<string, { name: string; count: number; distance: number }> = {};
+    const originCounts: OriginCounts = emptyOrigin();
+    const driverStats: Record<string, { name: string; count: number; distance: number; origin: OriginCounts }> = {};
     const vehicleStats: Record<string, VehicleAgg> = {};
     const heatmap: Record<string, Record<string, number>> = {};
     const vehicleDates: Record<string, Set<string>> = {};
@@ -136,6 +140,7 @@ async function aggregateOrgMonth(
                 name: vehicleMap.get(vehId) || "알 수 없음",
                 usedDays: 0, count: 0, distance: 0,
                 fuelCost: 0, maintenanceCost: 0, maintenanceCount: 0, lastMaintenanceDate: "",
+                origin: emptyOrigin(),
             };
         }
         return vehicleStats[vehId];
@@ -148,15 +153,17 @@ async function aggregateOrgMonth(
 
         monthlyTotal.count += 1;
         monthlyTotal.distance += validDistance;
-        originCounts[classifyDriveOrigin(data)] += 1;
+        const origin = classifyDriveOrigin(data);
+        originCounts[origin] += 1;
 
         // 운전자 통계 — 운행일지의 운전자 식별자는 driverUid
         const uid = data.driverUid;
         const driverName = data.driverName || (uid ? userMap.get(uid) : undefined) || "알 수 없음";
         if (uid) {
-            if (!driverStats[uid]) driverStats[uid] = { name: driverName, count: 0, distance: 0 };
+            if (!driverStats[uid]) driverStats[uid] = { name: driverName, count: 0, distance: 0, origin: emptyOrigin() };
             driverStats[uid].count += 1;
             driverStats[uid].distance += validDistance;
+            driverStats[uid].origin[origin] += 1;
         }
 
         // 타임스탬프 파생 — 히트맵(요일×시간), 이상탐지(주말/심야), 차량 가동일
@@ -184,6 +191,7 @@ async function aggregateOrgMonth(
             if (data.vehicleName) vs.name = data.vehicleName; // 운행일지의 표시명 우선
             vs.count += 1;
             vs.distance += validDistance;
+            vs.origin[origin] += 1;
             if (dateStr) {
                 if (!vehicleDates[vehId]) vehicleDates[vehId] = new Set<string>();
                 vehicleDates[vehId].add(dateStr);

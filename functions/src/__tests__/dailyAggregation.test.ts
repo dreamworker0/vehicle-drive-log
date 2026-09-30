@@ -130,11 +130,20 @@ describe("runDailyAggregation — 월별 집계 프로듀서", () => {
         expect(payload.originCounts).toEqual({ reservation: 0, quick: 1, manual: 1, linked: 1 });
     });
 
+    it("직원별·차량별 운행 방식을 함께 센다", async () => {
+        await runDailyAggregation(1);
+        const payload = mockSet.mock.calls[0][0];
+        expect(payload.driverStats.u1.origin).toEqual({ reservation: 0, quick: 1, manual: 0, linked: 1 });
+        expect(payload.driverStats.u2.origin).toEqual({ reservation: 0, quick: 0, manual: 1, linked: 0 });
+        expect(payload.vehicleStats["veh-1"].origin).toEqual({ reservation: 0, quick: 1, manual: 0, linked: 1 });
+        expect(payload.vehicleStats["veh-2"].origin).toEqual({ reservation: 0, quick: 0, manual: 1, linked: 0 });
+    });
+
     it("driverStats를 driverUid로 키잉하고 이름·건수·거리를 집계한다 (uid/driverId 버그 회귀 방지)", async () => {
         await runDailyAggregation(1);
         const payload = mockSet.mock.calls[0][0];
-        expect(payload.driverStats.u1).toEqual({ name: "김운전", count: 2, distance: 300 });
-        expect(payload.driverStats.u2).toEqual({ name: "이기사", count: 1, distance: 80 });
+        expect(payload.driverStats.u1).toMatchObject({ name: "김운전", count: 2, distance: 300 });
+        expect(payload.driverStats.u2).toMatchObject({ name: "이기사", count: 1, distance: 80 });
     });
 
     it("costStats.fuelCost를 FuelLog.fuelCost 필드로 합산한다 (amount/cost 버그 회귀 방지)", async () => {

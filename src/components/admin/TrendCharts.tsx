@@ -7,7 +7,7 @@ import {
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import HeatmapGrid from '../common/HeatmapGrid';
-import DriveOriginChart, { type DriveOriginPoint } from './DriveOriginChart';
+import DriveOriginChart, { type DriveOriginPoint, type DriveOriginRow } from './DriveOriginChart';
 
 interface ChartPayloadEntry {
     value: number;
@@ -58,6 +58,8 @@ function UtilTooltip({ active, payload, label }: { active?: boolean; payload?: C
 interface TrendChartsProps {
     monthlyTrend: { label: string; count: number; distance: number; [key: string]: unknown }[];
     driveOriginTrend: DriveOriginPoint[];
+    driveOriginByDriver?: DriveOriginRow[];
+    driveOriginByVehicle?: DriveOriginRow[];
     driverComparison: { name: string; monthLabels?: string[]; [key: string]: unknown }[];
     vehicleUtilization: { name: string; rate: number; usedDays?: number; totalWorkdays?: number }[];
     heatmapData: { grid: Record<number, Record<number, number>>; maxCount: number };
@@ -65,7 +67,7 @@ interface TrendChartsProps {
 }
 
 export default function TrendCharts({
-    monthlyTrend, driveOriginTrend, driverComparison, vehicleUtilization, heatmapData, costTrend,
+    monthlyTrend, driveOriginTrend, driveOriginByDriver, driveOriginByVehicle, driverComparison, vehicleUtilization, heatmapData, costTrend,
 }: TrendChartsProps) {
     const recentDrivers = driverComparison.slice(0, 10); // 상위 10명
     const monthLabels = (recentDrivers[0]?.monthLabels as string[]) || [];
@@ -94,7 +96,7 @@ export default function TrendCharts({
             </div>
 
             {/* 운행 방식 (사전 예약 · 바로 운행 · 예약 없이 기록) */}
-            <DriveOriginChart data={driveOriginTrend} />
+            <DriveOriginChart data={driveOriginTrend} byDriver={driveOriginByDriver} byVehicle={driveOriginByVehicle} />
 
             {/* 직원별 운행 비교 */}
             <div className="glass-card p-5">

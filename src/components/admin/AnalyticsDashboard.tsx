@@ -62,7 +62,7 @@ function StatMini({ icon, value, label, sub, color, onClick }: StatMiniProps) {
 export default function AnalyticsDashboard() {
     const {
         loading, rangeMonths, setRangeMonths,
-        monthlyTrend, driveOriginTrend, driverComparison, vehicleUtilization, heatmapData,
+        monthlyTrend, driveOriginTrend, driveOriginByDriver, driveOriginByVehicle, driverComparison, vehicleUtilization, heatmapData,
         fuelEfficiency, maintenanceCostAnalysis, anomalies, recommendations,
         costTrend, totalFuelCost, totalHipassCost, totalMaintenanceCost, totalOperatingCost,
         totalLogs, totalVehicles, totalMembers,
@@ -139,6 +139,8 @@ export default function AnalyticsDashboard() {
                     <TrendCharts
                         monthlyTrend={monthlyTrend}
                         driveOriginTrend={driveOriginTrend}
+                        driveOriginByDriver={driveOriginByDriver}
+                        driveOriginByVehicle={driveOriginByVehicle}
                         driverComparison={driverComparison}
                         vehicleUtilization={vehicleUtilization}
                         heatmapData={heatmapData}

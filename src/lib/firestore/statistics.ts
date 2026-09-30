@@ -5,6 +5,8 @@ export interface DriverStat {
     name?: string;
     count: number;
     distance: number;
+    /** 직원별 운행 방식 — 이 필드가 생기기 전 문서에는 없다 */
+    origin?: DriveOriginCounts;
 }
 
 export interface VehicleStat {
@@ -16,6 +18,8 @@ export interface VehicleStat {
     maintenanceCount: number;
     currentKm?: number;
     lastMaintenanceDate?: string;
+    /** 차량별 운행 방식 — 이 필드가 생기기 전 문서에는 없다 */
+    origin?: DriveOriginCounts;
 }
 
 export interface HeatmapStat {
@@ -61,15 +65,20 @@ export interface DriveOriginCounts {
 interface RawMonthlyDoc {
     monthlyTotal?: { count?: number; distance?: number };
     costStats?: { fuelCost?: number; hipassCost?: number; maintenanceCost?: number };
-    driverStats?: Record<string, { name?: string; count?: number; distance?: number }>;
+    driverStats?: Record<string, { name?: string; count?: number; distance?: number; origin?: Partial<DriveOriginCounts> }>;
     vehicleStats?: Record<string, {
         name?: string; usedDays?: number; count?: number;
         distance?: number; fuelCost?: number;
         maintenanceCost?: number; maintenanceCount?: number; lastMaintenanceDate?: string;
+        origin?: Partial<DriveOriginCounts>;
     }>;
     heatmap?: Record<string, Record<string, number>>;
     anomalies?: { weekend?: number; night?: number; overDrive?: number };
     originCounts?: Partial<DriveOriginCounts>;
+}
+
+function toOriginCounts(o?: Partial<DriveOriginCounts>): DriveOriginCounts {
+    return { reservation: o?.reservation || 0, quick: o?.quick || 0, manual: o?.manual || 0, linked: o?.linked || 0 };
 }
 
 /**
@@ -91,7 +100,10 @@ export function mapMonthlyDoc(monthKey: string, raw: RawMonthlyDoc): MonthlyStat
 
     const driverStats: Record<string, DriverStat> = {};
     for (const [uid, d] of Object.entries(raw.driverStats || {})) {
-        driverStats[uid] = { name: d.name, count: d.count || 0, distance: d.distance || 0 };
+        driverStats[uid] = {
+            name: d.name, count: d.count || 0, distance: d.distance || 0,
+            ...(d.origin ? { origin: toOriginCounts(d.origin) } : {}),
+        };
     }
 
     const vehicleStats: Record<string, VehicleStat> = {};
@@ -105,6 +117,7 @@ export function mapMonthlyDoc(monthKey: string, raw: RawMonthlyDoc): MonthlyStat
             maintenanceCost: v.maintenanceCost || 0,
             maintenanceCount: v.maintenanceCount || 0,
             lastMaintenanceDate: v.lastMaintenanceDate,
+            ...(v.origin ? { origin: toOriginCounts(v.origin) } : {}),
         };
     }
 
@@ -124,12 +137,7 @@ export function mapMonthlyDoc(monthKey: string, raw: RawMonthlyDoc): MonthlyStat
             overDrive: raw.anomalies?.overDrive || 0,
         },
         // 이 필드가 생기기 전의 문서는 운행 방식 구분이 없다 — 전부 0으로 두면 화면이 '데이터 없음'으로 처리한다
-        originCounts: {
-            reservation: raw.originCounts?.reservation || 0,
-            quick: raw.originCounts?.quick || 0,
-            manual: raw.originCounts?.manual || 0,
-            linked: raw.originCounts?.linked || 0,
-        },
+        originCounts: toOriginCounts(raw.originCounts),
     };
 }
 
