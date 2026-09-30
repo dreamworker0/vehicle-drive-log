@@ -8,6 +8,11 @@ interface ReservationPatternBannerProps {
     anchorRef?: RefObject<HTMLElement | null>;
 }
 
+/*
+ * 위치: 하단 탭(68px) 위로 솟은 가운데 '운행' 버튼(-20px, 테두리 4px) 꼭대기가 92px이다.
+ * 예전 85px은 그 버튼 윗부분을 덮었고(이 배너가 탭보다 앞 층 z-40), 아이폰 아래 여백
+ * (safe-area-inset-bottom)도 빠져 있어 탭 자체와도 겹쳤다. 여백 + 100px로 버튼 위 8px에 둔다.
+ */
 export default function ReservationPatternBanner({ anchorRef }: ReservationPatternBannerProps = {}) {
     const { recommended, loading } = useReservationPattern();
     const navigate = useNavigate();
@@ -25,7 +30,7 @@ export default function ReservationPatternBanner({ anchorRef }: ReservationPatte
                 onClick={() => setIsDismissed(false)}
                 // 펼침 배너와 같은 층(z-40). 하단 내비(z-30) 위, 헤더(z-45)·모달(z-50) 아래다.
                 // 예전의 z-index 90이던 동안에는 이 작은 버튼이 알림 패널은 물론 모달까지 덮고 있었다.
-                className="fixed bottom-[85px] right-4 z-40 flex items-center justify-center w-12 h-12 min-w-[48px] min-h-[48px] bg-surface-100 dark:bg-surface-800/70 backdrop-blur-md text-primary-600 dark:text-primary-400 border border-surface-200/50 dark:border-surface-700/50 rounded-full shadow-sm hover:bg-surface-200/80 dark:hover:bg-surface-700/80 transition-all active:scale-95 animate-fade-in-up md:right-8"
+                className="fixed bottom-[calc(100px+env(safe-area-inset-bottom,0px))] right-4 z-40 flex items-center justify-center w-12 h-12 min-w-[48px] min-h-[48px] bg-surface-100 dark:bg-surface-800/70 backdrop-blur-md text-primary-600 dark:text-primary-400 border border-surface-200/50 dark:border-surface-700/50 rounded-full shadow-sm hover:bg-surface-200/80 dark:hover:bg-surface-700/80 transition-all active:scale-95 animate-fade-in-up md:right-8"
                 title="추천 예약 켜기"
             >
                 <div className="relative">
@@ -53,7 +58,7 @@ export default function ReservationPatternBanner({ anchorRef }: ReservationPatte
     return (
         <div
             ref={bannerRef}
-            className={`fixed bottom-[85px] left-0 right-0 z-[40] pointer-events-none transition-opacity ${overlap ? 'opacity-0 invisible' : 'opacity-100'}`}
+            className={`fixed bottom-[calc(100px+env(safe-area-inset-bottom,0px))] left-0 right-0 z-[40] pointer-events-none transition-opacity ${overlap ? 'opacity-0 invisible' : 'opacity-100'}`}
         >
             <div className="max-w-screen-md mx-auto px-4 w-full">
                 <div className="max-w-lg mx-auto animate-fade-in-up">
