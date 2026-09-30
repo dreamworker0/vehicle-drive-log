@@ -27,6 +27,13 @@ interface AuditCounts {
  * 해당하지 않음"을 근거와 함께 확인한 것만 올린다(단순히 시끄러워서 끄는 용도 아님).
  *
  * overrides로 해소한 이력 (등록 없이 정면으로 고친 것들 — 같은 권고가 다시 뜨면 여기부터 본다):
+ *  - @grpc/grpc-js(GHSA-m9gg-hp2v-232j, GHSA-f596-whhp-79r4 / 루트 high 5건의 단일 근본)는
+ *    루트 package.json의 overrides(`@firebase/firestore > @grpc/grpc-js ^1.14.5`)로 2026-10-01 해소.
+ *    ⚠️ firebase를 올려서는 못 고친다 — 최신 firebase 12.19.0의 @firebase/firestore가
+ *    `~1.9.0`으로 고정했고, npm audit은 firebase 9로 **내리라고** 안내한다(따르면 안 된다).
+ *    grpc 경로는 Node 빌드(테스트·Rules 에뮬레이터)에서만 쓰이고 브라우저 번들은 webchannel이다.
+ *    firebase-admin이 이미 1.14.5를 쓰므로 같은 버전으로 합쳤다. @firebase/firestore가 범위를
+ *    넓히면 override를 지운다.
  *  - qs(GHSA-x5fp-wj9c-mxmx array-limit 우회, GHSA-4mjr-xmp4-gh2g DoS / functions moderate
  *    3건)는 functions/package.json의 overrides(qs ^6.16.0)로 2026-09-04 해소(audit 0).
  *    ⚠️ `npm audit fix`로는 못 고친다 — 고쳐진 6.16.0이 express·body-parser가 선언한
