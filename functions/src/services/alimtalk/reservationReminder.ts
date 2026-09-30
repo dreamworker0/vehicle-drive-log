@@ -9,6 +9,28 @@ const db = getFirestore();
 const IN_CHUNK = 30;
 
 /**
+ * 운행 중인 바로 운행에 일지 알림을 보내기까지 추정 종료 시각 뒤로 더 기다리는 시간(분).
+ *
+ * 바로 운행의 endTime은 사람이 정한 반납 시각이 아니라 출발 시각 + 경로 소요시간으로
+ * **추정한 값**이다(calcEndTime). 그대로 쓰면 추정보다 오래 운행하는 사람이 아직 차 안에서
+ * "운행이 종료되었습니다" 알림을 받는다. 그렇다고 빼 버리면 운행 종료를 깜빡한 사람은
+ * 끝내 알림을 못 받으므로, 여유를 두고 문구를 바꿔 보낸다.
+ */
+const QUICK_DRIVE_REMINDER_GRACE_MIN = 60;
+
+/** "HH:MM"에 분을 더한다 — 자정을 넘기면 "24:00" 이상이 되어 당일 비교에서 항상 미래로 남는다 */
+function addMinutes(hhmm: string, minutes: number): string {
+    const [h, m] = hhmm.split(":").map(Number);
+    const total = h * 60 + m + minutes;
+    return `${String(Math.floor(total / 60)).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
+}
+
+/** 운행 중인 바로 운행인가 — 종료 시각이 추정값이라 일지 알림 기준을 따로 둔다 */
+function isOngoingQuickDrive(res: FirebaseFirestore.DocumentData): boolean {
+    return res.isQuickDrive === true && res.status === "in_progress";
+}
+
+/**
  * 예약 시작 10분 전 알림 + 운행일지 미작성 알림 전송
  * Cloud Functions Scheduler에서 15분마다 호출 (비용 최적화 적용됨)
  */
@@ -91,7 +113,10 @@ export async function checkReservationReminders(): Promise<void> {
         // 알림 대상 후보를 먼저 고른다 — 운행일지 존재 확인은 아래에서 한 번에 묶어서 한다.
         const missedCandidates = completedSnap.docs.filter((doc) => {
             const res = doc.data();
-            if (res.endTime && res.endTime > currentTime) return false;
+            const remindAfter = res.endTime && isOngoingQuickDrive(res)
+                ? addMinutes(res.endTime, QUICK_DRIVE_REMINDER_GRACE_MIN)
+                : res.endTime;
+            if (remindAfter && remindAfter > currentTime) return false;
             if (res.driveLogReminderSent) return false;
             return Boolean(res.reservedByUid || res.userId);
         });
@@ -121,7 +146,9 @@ export async function checkReservationReminders(): Promise<void> {
             const res = doc.data();
             const targetUid = (res.reservedByUid || res.userId) as string;
             const title = "📝 운행일지 작성 알림";
-            const body = `${res.vehicleDisplayName || "차량"} 운행이 종료되었습니다. 운행일지를 작성해주세요.`;
+            const body = isOngoingQuickDrive(res)
+                ? `${res.vehicleDisplayName || "차량"} 운행을 마치셨다면 운행 종료 후 운행일지를 작성해주세요.`
+                : `${res.vehicleDisplayName || "차량"} 운행이 종료되었습니다. 운행일지를 작성해주세요.`;
 
             await sendPushToUser(targetUid, { title, body });
             await createInAppNotification(targetUid, "drive_log_reminder", title, body, res.organizationId);
