@@ -57,31 +57,10 @@ export default function ReservationPatternBanner({ anchorRef }: ReservationPatte
         >
             <div className="max-w-screen-md mx-auto px-4 w-full">
                 <div className="max-w-lg mx-auto animate-fade-in-up">
-                    {/* 섹션 타이틀 */}
-                    <div className="flex items-center justify-between mb-3 pointer-events-auto">
-                        <div className="flex items-center gap-2">
-                            <h2 className="text-lg font-bold text-surface-900 dark:text-surface-100 flex items-center gap-2">
-                                원클릭 추천 예약
-                            </h2>
-                            <span className="inline-block px-1.5 py-0.5 text-[0.65rem] font-medium text-surface-500 dark:text-surface-400 bg-surface-100 dark:bg-surface-800 border border-surface-200 rounded-md dark:bg-surface-800 dark:border-surface-700 dark:text-surface-400">
-                                패턴 분석
-                            </span>
-                        </div>
-                        {/* 닫기 버튼 */}
-                        <button
-                            onClick={() => setIsDismissed(true)}
-                            className="p-1 rounded-full text-surface-400 dark:text-surface-500 hover:text-surface-800 hover:bg-surface-200 dark:hover:text-surface-200 dark:hover:bg-surface-700 transition-colors min-w-[48px] min-h-[48px] flex items-center justify-center"
-                            title="닫기"
-                            aria-label="추천 예약 닫기"
-                        >
-                            <svg aria-hidden="true" className="w-5 h-5 opacity-50 hover:opacity-100 transition-opacity" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
-                        </button>
-                    </div>
-
-                    {/* 추천 항목 리스트 */}
-                    <div className="flex flex-row overflow-x-auto snap-x snap-mandatory space-x-3 pb-2 -mx-4 px-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] pointer-events-auto">
+                    {/* 추천 항목 — 한 줄짜리 작은 카드. 추천 예약은 예약의 1% 남짓이라 첫 화면을 크게 차지하지 않게 줄였다.
+                        제목 줄을 없애고 '💡 추천' 표시와 닫기 버튼을 카드 줄 안으로 옮겼다. */}
+                    <div className="flex items-center gap-2 pointer-events-auto">
+                    <div className="flex-1 min-w-0 flex flex-row overflow-x-auto snap-x snap-mandatory space-x-2 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                         {recommended.map((rec, idx) => {
                             const days = ['일', '월', '화', '수', '목', '금', '토'];
                             const koWeekday = days[rec.dayOfWeekRaw];
@@ -105,30 +84,35 @@ export default function ReservationPatternBanner({ anchorRef }: ReservationPatte
                             }
 
                             return (
-                                <div
+                                <button
                                     key={`${rec.date}-${rec.startTime}-${idx}`}
-                                    className="glass-card px-4 py-3 flex items-center justify-between gap-3 shrink-0 w-[85%] snap-center transition-colors hover:shadow-md"
+                                    onClick={() => handleQuickReserve(rec)}
+                                    className="glass-card pl-3 pr-2 min-h-[48px] flex items-center gap-2 shrink-0 w-full snap-center text-left transition-colors hover:shadow-md"
+                                    aria-label={`추천 예약: ${rec.vehicleName} ${month}월 ${date}일 ${rec.startTime}`}
                                 >
-                                    <div className="flex items-center gap-3 min-w-0 pr-2 flex-1">
-                                        <div className="min-w-0 text-left flex-1">
-                                            <p className="text-sm font-medium truncate text-surface-800 dark:text-surface-200">
-                                                {rec.vehicleName}
-                                            </p>
-                                            <p className="text-xs truncate text-surface-500 dark:text-surface-400 mt-0.5">
-                                                {month}.{date} ({koWeekday}) {rec.startTime} <span className="text-primary-500 dark:text-primary-400 font-medium ml-1">· {weekPrefix}</span>
-                                                {rec.destination ? ` · ${rec.destination}` : ''}
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <button
-                                        onClick={() => handleQuickReserve(rec)}
-                                        className="relative z-10 inline-flex items-center justify-center shrink-0 min-w-[60px] px-3 py-1.5 text-xs font-semibold text-white transition-colors rounded-lg min-h-[48px] bg-primary-600 dark:bg-primary-500 hover:bg-primary-700 dark:hover:bg-primary-400 whitespace-nowrap"
-                                    >
-                                        예약
-                                    </button>
-                                </div>
+                                    <span className="text-sm flex-shrink-0" aria-hidden="true">💡</span>
+                                    <span className="min-w-0 flex-1 text-xs truncate text-surface-600 dark:text-surface-300">
+                                        <span className="font-medium text-surface-800 dark:text-surface-200">{rec.vehicleName}</span>
+                                        {' '}· {month}.{date}({koWeekday}) {rec.startTime}
+                                        <span className="text-primary-500 dark:text-primary-400"> · {weekPrefix}</span>
+                                    </span>
+                                    <span className="flex-shrink-0 px-2.5 py-1 rounded-lg text-xs font-semibold text-primary-600 dark:text-primary-400 bg-primary-50 dark:bg-primary-900/30">
+                                        추천 예약
+                                    </span>
+                                </button>
                             );
                         })}
+                    </div>
+                    <button
+                        onClick={() => setIsDismissed(true)}
+                        className="glass-card flex-shrink-0 min-w-[48px] min-h-[48px] flex items-center justify-center text-surface-400 dark:text-surface-500 hover:text-surface-800 dark:hover:text-surface-200 transition-colors"
+                        title="닫기"
+                        aria-label="추천 예약 닫기"
+                    >
+                        <svg aria-hidden="true" className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
                     </div>
                 </div>
             </div>

@@ -67,14 +67,32 @@ describe('TodayDashboard', () => {
         vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key, value) => { store[key] = value.toString(); });
     });
 
-    it('예약이 없을 때 예약 없음 안내 문구가 표시된다', () => {
+    it('예약이 없을 때 바로 운행을 주 동작으로, 예약을 보조 동작으로 보여 준다', () => {
         render(
             <MemoryRouter>
                 <TodayDashboard />
             </MemoryRouter>
         );
-        expect(screen.getByText('오늘 예약 없음')).toBeInTheDocument();
-        expect(screen.getByText('새 예약을 등록해보세요')).toBeInTheDocument();
+        expect(screen.getByText('지금 차량이 필요하신가요?')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: /바로 운행 시작/ }));
+        expect(mockUseTodayDashboardReturn.navigateToQuickDrive).toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole('button', { name: /미리 예약하기/ }));
+        expect(mockUseTodayDashboardReturn.navigateToReservations).toHaveBeenCalled();
+
+        // 같은 동작이 두 번 보이지 않게 상단 작은 '바로 운행' 버튼은 숨긴다
+        expect(screen.queryByRole('button', { name: /^🚀\s*바로 운행$/ })).not.toBeInTheDocument();
+    });
+
+    it('운행 중이면 빈 카드에 바로 운행 시작 버튼을 두지 않는다', () => {
+        mockUseTodayDashboardReturn.hasActiveDrive = true;
+        render(
+            <MemoryRouter>
+                <TodayDashboard />
+            </MemoryRouter>
+        );
+        expect(screen.queryByRole('button', { name: /바로 운행 시작/ })).not.toBeInTheDocument();
     });
 
     it('미작성 운행일지 알림이 있을 경우 카드와 바로 작성 버튼이 표시된다', () => {

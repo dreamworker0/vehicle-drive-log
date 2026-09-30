@@ -89,7 +89,8 @@ export default function TodayDashboard() {
                     <h1 className="text-lg font-bold text-surface-900 dark:text-surface-100">오늘의 운행</h1>
                     <p className="text-sm text-surface-400 dark:text-surface-500">{todayLabel}</p>
                 </div>
-                {!hasActiveDrive && (
+                {/* 오늘 예약이 없으면 아래 카드가 바로 운행을 크게 보여 주므로 여기서는 숨긴다 */}
+                {!hasActiveDrive && myReservations.length > 0 && (
                     <button
                         onClick={navigateToQuickDrive}
                         className="flex items-center gap-1 px-4 py-2 min-h-[48px] rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-colors text-xs font-medium"
@@ -182,32 +183,34 @@ export default function TodayDashboard() {
                 </div>
             )}
 
-            {/* 예약이 없을 때 안내 */}
+            {/* 예약이 없을 때 — 바로 운행을 주 동작으로 둔다.
+                운행의 60% 이상이 예약 없이 바로 출발한다(2026-09-23~30 실측). 예약은 보조 링크와 하단 탭에 남긴다. */}
             {myReservations.length === 0 && (
-                <div className="glass-card px-5 py-5 border-l-4 border-l-primary-400">
-                    <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-4 min-w-0 flex-1">
-                            <span className="w-11 h-11 rounded-xl bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center text-lg flex-shrink-0">📋</span>
-                            <div className="min-w-0">
-                                <p className="font-semibold text-surface-800 dark:text-surface-200 text-base">오늘 예약 없음</p>
-                                <p className="text-sm text-surface-500 dark:text-surface-400 mt-0.5">새 예약을 등록해보세요</p>
-                            </div>
+                <div className="glass-card px-5 py-5 mb-6 border-l-4 border-l-emerald-400">
+                    <div className="flex items-center gap-4 mb-4">
+                        <span className="w-11 h-11 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-lg flex-shrink-0">🚗</span>
+                        <div className="min-w-0">
+                            <p className="font-semibold text-surface-800 dark:text-surface-200 text-base">지금 차량이 필요하신가요?</p>
+                            <p className="text-sm text-surface-500 dark:text-surface-400 mt-0.5">차량만 고르면 바로 출발해요</p>
                         </div>
-                        <button
-                            onClick={navigateToReservations}
-                            className="reservation-cta-btn flex-shrink-0 min-h-[48px]"
-                        >
-                            <span className="reservation-cta-glow" />
-                            <span className="relative z-10 flex items-center gap-1.5">
-                                <span>📅</span>
-                                <span>예약</span>
-                            </span>
-                        </button>
                     </div>
+                    {!hasActiveDrive && (
+                        <button
+                            onClick={navigateToQuickDrive}
+                            className="w-full min-h-[52px] rounded-xl bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white text-base font-bold flex items-center justify-center gap-2 shadow-sm transition-all active:scale-[0.98]"
+                        >
+                            <span>🚀</span>
+                            <span>바로 운행 시작</span>
+                        </button>
+                    )}
+                    <button
+                        onClick={navigateToReservations}
+                        className="w-full mt-2 min-h-[48px] rounded-xl text-sm font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
+                    >
+                        📅 미리 예약하기 ›
+                    </button>
                 </div>
             )}
-
-
 
             {/* 이번 주 예약 */}
             <WeekReservationList
