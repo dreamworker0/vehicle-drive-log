@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useAuth } from './useAuth';
 import { getVehicles, getOrganizationMembers } from '../lib/firestore';
-import { getMonthlyStats, MonthlyStat } from '../lib/firestore/statistics';
+import { getMonthlyStats, MonthlyStat, type DriveOriginCounts } from '../lib/firestore/statistics';
 import type { Vehicle } from '../types/vehicle';
 import type { User } from '../types/user';
 import { getRecentMonthKeys } from './utils/aggregationUtils';
@@ -60,6 +60,46 @@ export default function useAnalytics() {
             };
         });
     }, [stats, monthKeys]);
+
+    /** 월별 운행 방식 — 사전 예약 · 바로 운행 · 예약 없이 기록 · 예약 연결(구분 전) */
+    const driveOriginTrend = useMemo(() => {
+        return monthKeys.map(mk => {
+            const o = stats.find(s => s.monthKey === mk)?.originCounts;
+            return {
+                month: mk,
+                label: MONTH_LABELS[parseInt(mk.split('-')[1], 10) - 1],
+                reservation: o?.reservation || 0,
+                quick: o?.quick || 0,
+                manual: o?.manual || 0,
+                linked: o?.linked || 0,
+            };
+        });
+    }, [stats, monthKeys]);
+
+    /**
+     * 직원별·차량별 운행 방식 — 분석 기간 전체 합계, 운행이 많은 순 상위 10.
+     * 이 필드가 생기기 전의 월간 문서는 origin이 없어 건너뛴다(그 달은 0으로 센다).
+     */
+    const driveOriginBy = useMemo(() => {
+        type Row = { name: string; reservation: number; quick: number; manual: number; linked: number; total: number };
+        const collect = (pick: (s: MonthlyStat) => Record<string, { name?: string; origin?: DriveOriginCounts }>) => {
+            const map: Record<string, Row> = {};
+            for (const s of stats) {
+                for (const [id, v] of Object.entries(pick(s) || {})) {
+                    if (!v.origin) continue;
+                    const row = map[id] ?? (map[id] = { name: v.name || '알 수 없음', reservation: 0, quick: 0, manual: 0, linked: 0, total: 0 });
+                    if (v.name) row.name = v.name;
+                    row.reservation += v.origin.reservation;
+                    row.quick += v.origin.quick;
+                    row.manual += v.origin.manual;
+                    row.linked += v.origin.linked;
+                    row.total += v.origin.reservation + v.origin.quick + v.origin.manual + v.origin.linked;
+                }
+            }
+            return Object.values(map).filter(r => r.total > 0).sort((a, b) => b.total - a.total).slice(0, 10);
+        };
+        return { byDriver: collect(s => s.driverStats), byVehicle: collect(s => s.vehicleStats) };
+    }, [stats]);
 
     const driverComparison = useMemo(() => {
         const recentKeys = monthKeys.slice(-3);
@@ -253,6 +293,9 @@ export default function useAnalytics() {
         monthKeys,
         // 트렌드
         monthlyTrend,
+        driveOriginTrend,
+        driveOriginByDriver: driveOriginBy.byDriver,
+        driveOriginByVehicle: driveOriginBy.byVehicle,
         driverComparison,
         vehicleUtilization,
         heatmapData,

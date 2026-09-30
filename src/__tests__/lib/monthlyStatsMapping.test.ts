@@ -48,6 +48,18 @@ describe('mapMonthlyDoc — 프로듀서 스키마 → 평탄 MonthlyStat', () =
         expect(m.heatmapData).toContainEqual({ dayIdx: 5, hour: 18, count: 1 });
     });
 
+    it('운행 방식은 기관·직원·차량 모두 옮기고, 없던 문서는 0 또는 생략으로 둔다', () => {
+        const m = mapMonthlyDoc('2026-10', {
+            originCounts: { quick: 3, reservation: 1 },
+            driverStats: { d1: { name: '김', count: 2, distance: 5, origin: { quick: 2 } }, d2: { name: '이', count: 1, distance: 1 } },
+            vehicleStats: { v1: { name: '스타리아', count: 2, origin: { manual: 2 } } },
+        });
+        expect(m.originCounts).toEqual({ reservation: 1, quick: 3, manual: 0, linked: 0 });
+        expect(m.driverStats.d1.origin).toEqual({ reservation: 0, quick: 2, manual: 0, linked: 0 });
+        expect(m.driverStats.d2.origin).toBeUndefined();
+        expect(m.vehicleStats.v1.origin).toEqual({ reservation: 0, quick: 0, manual: 2, linked: 0 });
+    });
+
     it('driverStats의 name을 보존하고 count/distance를 유지한다', () => {
         const m = mapMonthlyDoc('2026-06', rawDoc);
         expect(m.driverStats['uid-1']).toEqual({ name: '김운전', count: 7, distance: 200 });

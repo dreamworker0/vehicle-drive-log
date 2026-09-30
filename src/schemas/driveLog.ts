@@ -90,6 +90,11 @@ export const driveLogSchema = z.object({
     isManuallyCorrected: z.boolean().optional().catch(undefined),
     originalStartKm: z.coerce.number().optional().catch(undefined),
     reservationId: z.string().optional().catch(undefined),
+    /**
+     * 운행을 어떻게 시작했는가 — 사전 예약 · 바로 운행 · 예약 없이 기록.
+     * 새로 쓰는 일지에만 저장된다(2026-10 도입). 없으면 reservationId 유무로 추정한다(월간 집계 참고).
+     */
+    driveOrigin: z.enum(['reservation', 'quick', 'manual']).optional().catch(undefined),
     inputMethod: z.enum(['ocr', 'manual', 'favorite']).optional().catch(undefined),
     createdAt: timestampSchema.optional().catch(undefined),
     editedAt: timestampSchema.optional().catch(undefined),

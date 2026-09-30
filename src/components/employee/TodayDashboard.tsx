@@ -137,6 +137,7 @@ export default function TodayDashboard() {
                                             passengerUids: alert.passengerUids,
                                             passengerNames: alert.passengerNames,
                                             passengerCount: alert.passengerCount,
+                                            isQuickDrive: alert.isQuickDrive,
                                         },
                                     });
                                 }}

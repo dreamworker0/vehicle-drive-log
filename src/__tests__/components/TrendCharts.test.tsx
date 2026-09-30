@@ -44,6 +44,7 @@ import TrendCharts from '../../components/admin/TrendCharts';
 
 const emptyProps = {
     monthlyTrend: [],
+    driveOriginTrend: [],
     driverComparison: [],
     vehicleUtilization: [],
     heatmapData: { grid: {}, maxCount: 1 },
@@ -59,7 +60,7 @@ function setup(over: Partial<Props> = {}) {
 describe('데이터가 없을 때', () => {
     it('빈 차트 대신 안내 문구를 보여준다', () => {
         setup();
-        expect(screen.getAllByText('데이터가 없습니다')).toHaveLength(2); // 월별 추이 · 직원 비교
+        expect(screen.getAllByText('데이터가 없습니다')).toHaveLength(3); // 월별 추이 · 운행 방식 · 직원 비교
         expect(screen.getByText('차량 데이터가 없습니다')).toBeInTheDocument();
         expect(screen.queryAllByTestId('line-chart')).toHaveLength(0);
     });
@@ -125,7 +126,7 @@ describe('월별 비용 추이', () => {
 describe('섹션 제목', () => {
     it('네 영역의 제목이 모두 보인다', () => {
         setup();
-        for (const title of ['월별 운행 추이', '직원별 운행 비교 (최근 3개월)', '차량 가동률 (최근 3개월)', '운행 밀도 히트맵 (시간대 × 요일)']) {
+        for (const title of ['월별 운행 추이', '운행 방식', '직원별 운행 비교 (최근 3개월)', '차량 가동률 (최근 3개월)', '운행 밀도 히트맵 (시간대 × 요일)']) {
             expect(screen.getByText(title)).toBeInTheDocument();
         }
     });

@@ -33,7 +33,7 @@ interface SubmitContext {
     isElectric: boolean;
     isEditMode: boolean;
     editLog: (DriveLog & { passengerNames?: string[] }) | null;
-    reservationData: { reservationId?: string } | null;
+    reservationData: { reservationId?: string; isQuickDrive?: boolean } | null;
     hipassCard: HipassCard | null;
     isManuallyCorrected?: boolean;
     originalStartKm?: number;
@@ -150,7 +150,11 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
         const extendedLogData = {
             ...logData,
             id: generatedId,
-            reservationId: reservationData?.reservationId || null
+            reservationId: reservationData?.reservationId || null,
+            // 운행 방식 — 기관 관리자 운행 분석의 '운행 방식' 비율이 이 값으로 집계된다
+            driveOrigin: reservationData?.reservationId
+                ? (reservationData.isQuickDrive ? 'quick' : 'reservation')
+                : 'manual',
         };
 
 
