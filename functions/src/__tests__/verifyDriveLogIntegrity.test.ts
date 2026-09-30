@@ -18,11 +18,32 @@ const userOrg = new Map<string, string | undefined>([
 ]);
 
 describe('findReferenceIssues — 참조 무결성 (F-01/F-02 탐지)', () => {
+    // 직원을 영구 삭제하면 사용자 문서만 지우고 운행일지는 기관 기록으로 남긴다.
+    // 2026-10-01 실제로 삭제된 직원 2명의 기록이 "없는 사용자"로 경고에 올라왔다.
+    it('감사 로그로 삭제가 확인된 사용자의 기록은 위반이 아니라 보존 기록이다', () => {
+        const logs: DriveLogLite[] = [
+            { id: 'l9', organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'u_deleted' },
+        ];
+        const { violations, retained } = findReferenceIssues(logs, vehicleOrg, userOrg, new Set(['u_deleted']));
+        expect(violations).toEqual([]);
+        expect(retained).toHaveLength(1);
+        expect(retained[0]).toContain('삭제된 사용자');
+    });
+
+    it('삭제 기록이 없는 없는 사용자는 여전히 위반이다', () => {
+        const logs: DriveLogLite[] = [
+            { id: 'l10', organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'u_ghost' },
+        ];
+        const { violations, retained } = findReferenceIssues(logs, vehicleOrg, userOrg, new Set(['u_other']));
+        expect(retained).toEqual([]);
+        expect(violations[0]).toContain('없는 사용자');
+    });
+
     it('같은 기관의 실재하는 차량·운전자면 위반이 없다', () => {
         const logs: DriveLogLite[] = [
             { id: 'l1', organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'u_A' },
         ];
-        expect(findReferenceIssues(logs, vehicleOrg, userOrg)).toEqual({ violations: [], transfers: [] });
+        expect(findReferenceIssues(logs, vehicleOrg, userOrg)).toEqual({ violations: [], transfers: [], retained: [] });
     });
 
     it('타 기관 차량을 참조하면 위반으로 잡는다 (F-02)', () => {
@@ -102,7 +123,7 @@ describe('findReferenceIssues — 참조 무결성 (F-01/F-02 탐지)', () => {
 
     it('organizationId가 없는 기록은 판정 대상에서 제외한다', () => {
         const logs: DriveLogLite[] = [{ id: 'l6', vehicleId: 'v_B', driverUid: 'u_B' }];
-        expect(findReferenceIssues(logs, vehicleOrg, userOrg)).toEqual({ violations: [], transfers: [] });
+        expect(findReferenceIssues(logs, vehicleOrg, userOrg)).toEqual({ violations: [], transfers: [], retained: [] });
     });
 });
 
