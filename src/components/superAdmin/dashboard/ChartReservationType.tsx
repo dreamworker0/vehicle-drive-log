@@ -3,7 +3,7 @@ import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid,
     Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import { tooltipStyle } from './dashboardUtils';
+import { tooltipStyle, quickDriveTrackedNote } from './dashboardUtils';
 import type { ValueType, NameType } from 'recharts/types/component/DefaultTooltipContent';
 import type { TooltipContentProps } from 'recharts/types/component/Tooltip';
 
@@ -33,6 +33,8 @@ function ChartReservationType({ reservationTypeStats, reservationTypeRatio, futu
         const currentStats = viewMode === 'past' ? reservationTypeStats : (futureReservationTypeStats || []);
         const currentRatio = viewMode === 'past' ? reservationTypeRatio : (futureReservationTypeRatio || { total: 0, single: 0, multiDay: 0, recurring: 0, singleRate: 0, multiDayRate: 0, recurringRate: 0 });
         const periodText = viewMode === 'past' ? '최근 30일' : '향후 30일';
+        // 과거 보기에서만, 창이 추적 시작일(9/23)보다 앞서는 동안 뜬다
+        const trackedNote = viewMode === 'past' ? quickDriveTrackedNote() : null;
 
         const hasData = currentStats && currentStats.length > 0;
 
@@ -60,13 +62,16 @@ function ChartReservationType({ reservationTypeStats, reservationTypeRatio, futu
                             </div>
                         </div>
                         <p className="text-xs text-surface-400 dark:text-surface-500">
-                            하루 예약 · 다일(연속) 예약 · 반복(정기) 예약 비율 추이
+                            하루 예약 · 다일(연속) 예약 · 반복(정기) 예약 비율 추이 (바로 운행 제외)
                         </p>
+                        {trackedNote && (
+                            <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">ⓘ {trackedNote}</p>
+                        )}
                     </div>
                     {/* 요약 비율 */}
                     <div className="flex items-center gap-3 bg-surface-50 dark:bg-surface-800/50 p-3 rounded-xl border border-surface-200 dark:border-surface-700">
                         <div className="text-center">
-                            <div className="text-[11px] text-surface-500 dark:text-surface-400 mb-0.5">총 예약</div>
+                            <div className="text-[11px] text-surface-500 dark:text-surface-400 mb-0.5">사전 예약</div>
                             <div className="text-sm font-bold text-surface-700 dark:text-surface-300">{currentRatio.total.toLocaleString()}건</div>
                         </div>
                         <div className="w-px h-8 bg-surface-200 dark:bg-surface-700"></div>
