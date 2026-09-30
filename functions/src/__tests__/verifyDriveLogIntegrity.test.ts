@@ -30,6 +30,20 @@ describe('findReferenceIssues — 참조 무결성 (F-01/F-02 탐지)', () => {
         expect(retained[0]).toContain('삭제된 사용자');
     });
 
+    it('감사 로그로 삭제가 확인된 차량의 기록도 보존 기록이다', () => {
+        const logs: DriveLogLite[] = [
+            { id: 'l11', organizationId: 'org-A', vehicleId: 'v_deleted', driverUid: 'u_A' },
+            { id: 'l12', organizationId: 'org-A', vehicleId: 'v_ghost', driverUid: 'u_A' },
+        ];
+        const { violations, retained } = findReferenceIssues(
+            logs, vehicleOrg, userOrg, new Set(), new Set(['v_deleted']),
+        );
+        expect(retained).toEqual([expect.stringContaining('l11')]);
+        expect(retained[0]).toContain('삭제된 차량');
+        expect(violations).toEqual([expect.stringContaining('l12')]);
+        expect(violations[0]).toContain('없는 차량');
+    });
+
     it('삭제 기록이 없는 없는 사용자는 여전히 위반이다', () => {
         const logs: DriveLogLite[] = [
             { id: 'l10', organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'u_ghost' },
