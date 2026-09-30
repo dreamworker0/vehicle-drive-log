@@ -7,6 +7,7 @@ import {
     formatMonth,
     getLogDate,
     getWorkdaysInMonth,
+    countWorkdays,
     calcMonthlyTrend,
     calcHeatmapData,
     detectAnomalies,
@@ -33,6 +34,20 @@ describe('analyticsCalc', () => {
 
         it('date 없고 timestamp도 없으면 빈 문자열', () => {
             expect(getLogDate({})).toBe('');
+        });
+    });
+
+    describe('countWorkdays — 가동률 분모', () => {
+        it('공휴일을 뺀다 — 2026년 9월 평일 22일 중 추석 연휴(9/24·25) 제외', () => {
+            const holidays = new Set(['2026-09-24', '2026-09-25', '2026-09-26']); // 26일은 토요일
+            expect(countWorkdays('2026-09', holidays, new Date(2026, 11, 31))).toBe(20);
+        });
+        it('진행 중인 달은 오늘까지만 센다 — 10/1(목)에 보면 10월은 1일', () => {
+            expect(countWorkdays('2026-10', new Set(), new Date(2026, 9, 1, 9))).toBe(1);
+        });
+        it('지난 달은 한 달 전체, 앞으로의 달은 0', () => {
+            expect(countWorkdays('2026-09', new Set(), new Date(2026, 9, 1))).toBe(22);
+            expect(countWorkdays('2026-11', new Set(), new Date(2026, 9, 1))).toBe(0);
         });
     });
 

@@ -3,7 +3,7 @@
  * Recharts 기반: 월별 추이, 직원 비교, 차량 가동률, 운행 히트맵
  */
 import {
-    LineChart, Line, BarChart, Bar,
+    LineChart, Line, BarChart, Bar, Cell,
     XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
 import HeatmapGrid from '../common/HeatmapGrid';
@@ -50,7 +50,7 @@ function UtilTooltip({ active, payload, label }: { active?: boolean; payload?: C
         <div className="bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-600 rounded-lg p-3 shadow-lg text-sm">
             <p className="font-semibold text-surface-900 dark:text-surface-100 mb-1">{label}</p>
             <p className="text-primary-600">가동률: <span className="font-mono font-bold">{payload[0]?.value}%</span></p>
-            <p className="text-surface-400 text-xs mt-1">운행일 {String(payload[0]?.payload?.usedDays ?? '')}일 / 근무일 {String(payload[0]?.payload?.totalWorkdays ?? '')}일</p>
+            <p className="text-surface-400 text-xs mt-1">운행일 {String(payload[0]?.payload?.usedDays ?? '')}일 / 근무일 {String(payload[0]?.payload?.totalWorkdays ?? '')}일 (공휴일 제외 · 이번 달은 오늘까지)</p>
         </div>
     );
 }
@@ -130,9 +130,10 @@ export default function TrendCharts({
                             <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 11 }} />
                             <Tooltip content={<UtilTooltip />} />
                             <Bar dataKey="rate" name="가동률" fill="#8b5cf6" radius={[0, 6, 6, 0]} barSize={20}>
+                                {/* Recharts는 막대별 색을 <Cell>로만 받는다 — 예전 <rect>는 무시돼 전부 보라색이었다 */}
                                 {vehicleUtilization.map((v, i) => {
                                     const color = v.rate >= 60 ? '#10b981' : v.rate >= 30 ? '#f59e0b' : '#ef4444';
-                                    return <rect key={i} fill={color} />;
+                                    return <Cell key={i} fill={color} />;
                                 })}
                             </Bar>
                         </BarChart>

@@ -65,7 +65,7 @@ export default function AnalyticsDashboard() {
         monthlyTrend, driveOriginTrend, driveOriginByDriver, driveOriginByVehicle, driverComparison, vehicleUtilization, heatmapData,
         fuelEfficiency, maintenanceCostAnalysis, anomalies, recommendations,
         costTrend, totalFuelCost, totalHipassCost, totalMaintenanceCost, totalOperatingCost,
-        totalLogs, totalVehicles, totalMembers,
+        totalLogs, totalVehicles, totalMembers, aggregatedAt,
     } = useAnalytics();
 
     const [activeTab, setActiveTab] = useState('trend');
@@ -88,7 +88,16 @@ export default function AnalyticsDashboard() {
         <div className="max-w-5xl mx-auto animate-fade-in">
             {/* 헤더 */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
-                <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100">운행 분석</h1>
+                <div>
+                    <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100">운행 분석</h1>
+                    {/* 이 화면의 숫자는 야간 집계(매일 새벽)다 — 언제 기준인지 밝히지 않으면 오늘 운행이 빠진 것을
+                        '운행이 없다'로 읽는다. 전월분은 11일부터 다시 집계하지 않으므로 그 뒤 소급 입력은 반영되지 않는다. */}
+                    <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
+                        {aggregatedAt
+                            ? `${aggregatedAt.getMonth() + 1}/${aggregatedAt.getDate()} ${String(aggregatedAt.getHours()).padStart(2, '0')}:${String(aggregatedAt.getMinutes()).padStart(2, '0')} 집계 기준 · 오늘 운행은 내일 반영돼요`
+                            : '아직 집계된 자료가 없어요 · 매일 새벽에 집계돼요'}
+                    </p>
+                </div>
                 <div className="flex items-center gap-2">
                     {RANGE_OPTIONS.map(op => (
                         <button

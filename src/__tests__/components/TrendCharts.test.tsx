@@ -31,6 +31,8 @@ vi.mock('recharts', () => {
         CartesianGrid: box('grid'),
         Tooltip: box('tooltip'),
         Legend: box('legend'),
+        // 막대별 색 — fill만 남겨 어떤 색이 매겨졌는지 본다
+        Cell: ({ fill }: { fill?: string }) => <div data-testid="cell" data-fill={fill} />,
     };
 });
 
@@ -105,6 +107,15 @@ describe('차량 가동률', () => {
         setup({ vehicleUtilization: [{ name: '카니발', rate: 42, usedDays: 25, totalWorkdays: 60 }] });
         expect(screen.queryByText('차량 데이터가 없습니다')).not.toBeInTheDocument();
         expect(screen.getAllByTestId('bar').some(b => b.getAttribute('data-key') === 'rate')).toBe(true);
+    });
+
+    it('가동률 구간별로 막대 색을 매긴다 — 예전 <rect>는 Recharts가 무시해 전부 한 색이었다', () => {
+        setup({ vehicleUtilization: [
+            { name: '카니발', rate: 75, usedDays: 45, totalWorkdays: 60 },
+            { name: '레이', rate: 40, usedDays: 24, totalWorkdays: 60 },
+            { name: '포터', rate: 10, usedDays: 6, totalWorkdays: 60 },
+        ] });
+        expect(screen.getAllByTestId('cell').map(c => c.getAttribute('data-fill'))).toEqual(['#10b981', '#f59e0b', '#ef4444']);
     });
 });
 

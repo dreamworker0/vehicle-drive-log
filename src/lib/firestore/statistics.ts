@@ -43,6 +43,8 @@ export interface MonthlyStat {
         night: number;
         overDrive: number;
     };
+    /** 야간 집계가 이 문서를 쓴 시각 — 화면이 "언제 기준 숫자인지" 밝힌다. 없으면 null */
+    updatedAt: Date | null;
     /**
      * 운행 방식별 건수 — 사전 예약 · 바로 운행 · 예약 없이 기록 · 예약 연결(구분 전).
      * linked는 driveOrigin이 저장되기 전(2026-10 이전) 일지 중 예약에 연결된 것이다.
@@ -63,6 +65,7 @@ export interface DriveOriginCounts {
  * 소비자(useAnalytics)가 기대하는 평탄 MonthlyStat과 필드 구조가 다르므로 아래 mapMonthlyDoc으로 변환한다.
  */
 interface RawMonthlyDoc {
+    updatedAt?: { toDate?: () => Date };
     monthlyTotal?: { count?: number; distance?: number };
     costStats?: { fuelCost?: number; hipassCost?: number; maintenanceCost?: number };
     driverStats?: Record<string, { name?: string; count?: number; distance?: number; origin?: Partial<DriveOriginCounts> }>;
@@ -123,6 +126,7 @@ export function mapMonthlyDoc(monthKey: string, raw: RawMonthlyDoc): MonthlyStat
 
     return {
         monthKey,
+        updatedAt: typeof raw.updatedAt?.toDate === 'function' ? raw.updatedAt.toDate() : null,
         totalLogs: raw.monthlyTotal?.count || 0,
         totalDistance: raw.monthlyTotal?.distance || 0,
         fuelCost: raw.costStats?.fuelCost || 0,
