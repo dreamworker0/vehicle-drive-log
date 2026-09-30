@@ -226,6 +226,50 @@ describe('checkReservationReminders', () => {
         expect(mockUpdate).toHaveBeenCalledWith({ driveLogReminderSent: true });
     });
 
+    describe('운행 중인 바로 운행 — 종료 시각이 추정값이다', () => {
+        const quickDoc = (endTime: string) => ({
+            id: 'resQ',
+            data: () => ({
+                userId: 'userQ',
+                vehicleDisplayName: '스타리아',
+                endTime,
+                driveLogReminderSent: false,
+                status: 'in_progress',
+                isQuickDrive: true,
+            }),
+        });
+
+        it('추정 종료 시각만 지났을 때는 아직 차 안일 수 있어 보내지 않는다', async () => {
+            // 지금 10:00, 추정 종료 09:30 → 여유 60분 전
+            mockGet
+                .mockResolvedValueOnce({ docs: [] })
+                .mockResolvedValueOnce({ docs: [quickDoc('09:30')] })
+                .mockResolvedValueOnce({ docs: [] });
+
+            await checkReservationReminders();
+
+            expect(mockSendPushToUser).not.toHaveBeenCalled();
+            expect(mockUpdate).not.toHaveBeenCalledWith({ driveLogReminderSent: true });
+        });
+
+        it('여유 60분도 지나면 운행 종료를 깜빡했을 수 있어 문구를 바꿔 보낸다', async () => {
+            // 지금 10:00, 추정 종료 08:50 → 여유 포함 09:50
+            mockGet
+                .mockResolvedValueOnce({ docs: [] })
+                .mockResolvedValueOnce({ docs: [quickDoc('08:50')] })
+                .mockResolvedValueOnce({ docs: [], empty: true })
+                .mockResolvedValueOnce({ docs: [] });
+
+            await checkReservationReminders();
+
+            expect(mockSendPushToUser).toHaveBeenCalledWith('userQ', {
+                title: '📝 운행일지 작성 알림',
+                body: '스타리아 운행을 마치셨다면 운행 종료 후 운행일지를 작성해주세요.',
+            });
+            expect(mockUpdate).toHaveBeenCalledWith({ driveLogReminderSent: true });
+        });
+    });
+
     it('미출발(No-show) 예약에 알림을 보낸다', async () => {
         const noShowDoc = {
             id: 'res3',
