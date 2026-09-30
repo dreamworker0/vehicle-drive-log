@@ -3,7 +3,7 @@ import {
     AreaChart, Area, XAxis, YAxis, CartesianGrid,
     Tooltip, ResponsiveContainer, Legend,
 } from 'recharts';
-import { tooltipStyle } from './dashboardUtils';
+import { tooltipStyle, quickDriveTrackedNote } from './dashboardUtils';
 import type { ValueType, NameType } from 'recharts/types/component/DefaultTooltipContent';
 import type { TooltipContentProps } from 'recharts/types/component/Tooltip';
 
@@ -14,6 +14,8 @@ interface Props {
 
 function ChartRecommendation({ recommendationStats, recommendationRatio }: Props) {
     const chartContent = useMemo(() => {
+        // 창이 추적 시작일(9/23)보다 앞서는 동안만 뜬다 — 서버가 그 전 기록을 빼고 센다
+        const trackedNote = quickDriveTrackedNote();
         if (!recommendationStats || recommendationStats.length === 0) {
             return (
                 <div className="glass-card p-5">
@@ -38,6 +40,9 @@ function ChartRecommendation({ recommendationStats, recommendationRatio }: Props
                         <p className="text-xs text-surface-400 dark:text-surface-500">
                             빈 시간 추천 기능을 통한 예약 생성 추이 (바로 운행 제외)
                         </p>
+                        {trackedNote && (
+                            <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">ⓘ {trackedNote}</p>
+                        )}
                     </div>
                     {/* 콤보: 누적 요약 비율 */}
                     <div className="flex items-center gap-4 bg-surface-50 dark:bg-surface-800/50 p-3 rounded-xl border border-surface-200 dark:border-surface-700">

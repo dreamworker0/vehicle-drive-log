@@ -4,7 +4,7 @@
  *   (라이브 로더·서버 캐시 경로가 공유하는 표시 매핑 단일 소스)
  */
 import { describe, it, expect } from 'vitest';
-import { mapNotifTypeCounts, NOTIF_TYPE_COLORS } from '../../components/superAdmin/dashboard/dashboardUtils';
+import { mapNotifTypeCounts, NOTIF_TYPE_COLORS, quickDriveTrackedNote } from '../../components/superAdmin/dashboard/dashboardUtils';
 
 describe('mapNotifTypeCounts', () => {
     it('알려진 type은 한글 라벨과 고정 색상으로 매핑한다', () => {
@@ -30,5 +30,17 @@ describe('mapNotifTypeCounts', () => {
 
     it('빈 입력이면 빈 배열을 반환한다', () => {
         expect(mapNotifTypeCounts([])).toEqual([]);
+    });
+});
+
+describe('quickDriveTrackedNote', () => {
+    it('최근 30일 창이 9/23보다 앞서면 안내를 돌려준다', () => {
+        expect(quickDriveTrackedNote(new Date(2026, 9, 1))).toContain('9/23부터 집계');
+        expect(quickDriveTrackedNote(new Date(2026, 9, 21))).not.toBeNull(); // 창 시작 9/22
+    });
+
+    it('창이 9/23 이후로 넘어가면 안내가 사라진다', () => {
+        expect(quickDriveTrackedNote(new Date(2026, 9, 22))).toBeNull(); // 창 시작 9/23
+        expect(quickDriveTrackedNote(new Date(2026, 11, 1))).toBeNull();
     });
 });

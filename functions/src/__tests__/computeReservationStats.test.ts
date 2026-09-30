@@ -88,6 +88,32 @@ describe("computeReservationStats", () => {
         expect(r.futureReservationTypeRatio).toMatchObject({ total: 1, single: 0, multiDay: 1 });
     });
 
+    it("trackedSince 이전 예약과 시계열 칸은 과거 집계에서 빠진다 (미래 분포는 그대로)", () => {
+        // 창 6/1~6/30 중 6/11부터 센다
+        const before = dateStrFrom(thirtyDaysAgo, 5);  // 6/6
+        const after = dateStrFrom(thirtyDaysAgo, 15);  // 6/16
+        const future = dateStrFrom(todayStart, 1);     // 6/22
+        const docs = [
+            fakeDoc({ date: before }),
+            fakeDoc({ date: before, isQuickDrive: true }),
+            fakeDoc({ date: after, isQuickDrive: true }),
+            fakeDoc({ date: future, groupId: "g1" }),
+        ];
+        const r = computeReservationStats(docs, thirtyDaysAgo, todayStart, null, "2026-06-11");
+
+        expect(r.quickDriveRatio).toEqual({ total: 2, quick: 1, regular: 1, rate: 50 });
+        expect(r.quickDriveStats).toHaveLength(20); // 6/11~6/30
+        expect(r.quickDriveStats[0].date).toBe("6/11");
+        expect(r.quickDriveStats.some(s => s.date === "6/6")).toBe(false);
+        expect(r.reservationTypeStats).toHaveLength(20);
+        expect(r.futureReservationTypeRatio.multiDay).toBe(1);
+    });
+
+    it("trackedSince가 창 시작보다 이르면 영향이 없다", () => {
+        const r = computeReservationStats([], thirtyDaysAgo, todayStart, null, "2026-01-01");
+        expect(r.quickDriveStats).toHaveLength(30);
+    });
+
     it("취소(cancelled) 예약은 집계에서 제외", () => {
         const day = dateStrFrom(thirtyDaysAgo, 3);
         const docs = [

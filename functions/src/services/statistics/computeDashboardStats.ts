@@ -10,6 +10,7 @@ import {
     computeFunnelData, computeOrgSizeDistribution,
     assembleFuelTypeStats, assembleVehicleTypeStats, assembleModelStats,
     computeReservationStats,
+    QUICK_DRIVE_TRACKED_SINCE,
     computeFuelHipassDaily, computeNotificationStats, KNOWN_NOTIF_TYPES,
 } from "./dashboardSections";
 import type { NightlySharedData } from "./nightlySharedData";
@@ -291,7 +292,7 @@ export async function computeAllDashboardStats(
             recommendationRatio, recommendationStats,
             reservationTypeRatio, reservationTypeStats,
             futureReservationTypeRatio, futureReservationTypeStats,
-        } = computeReservationStats(currentReservationDocs, thirtyDaysAgo, todayStart, orgFilterId);
+        } = computeReservationStats(currentReservationDocs, thirtyDaysAgo, todayStart, orgFilterId, QUICK_DRIVE_TRACKED_SINCE);
 
         // ── 6. 차량 집계 ──
         const vehicleResult = computeVehicleStats(currentVehicleDocs, approvedOrgMap, orgFilterId);
