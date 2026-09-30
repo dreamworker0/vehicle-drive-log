@@ -46,9 +46,8 @@ const empty: Props = {
     purposeData: [],
     dayOfWeekData: [],
     hourlyData: [],
-    vehicleFuelData: [],
     dailyTrendData: [],
-    fuelLogStats: { totalCost: 0, totalAmount: 0, count: 0, vehicleData: [] },
+    fuelLogStats: { totalCost: 0, count: 0, vehicleData: [] },
     hipassChargeStats: { totalAmount: 0, count: 0, vehicleData: [] },
     costTrendData: [],
 };
@@ -88,17 +87,6 @@ describe('일별 추이 / 비용 추이의 표시 조건', () => {
     });
 });
 
-describe('차량별 연료 사용량', () => {
-    it('데이터가 있을 때만 섹션을 만든다', () => {
-        const { unmount } = setup();
-        const before = screen.queryAllByTestId('bar-chart').length;
-        unmount();
-
-        setup({ vehicleFuelData: [{ name: '카니발', amount: 120 }] });
-        expect(screen.queryAllByTestId('bar-chart').length).toBeGreaterThan(before);
-    });
-});
-
 describe('시간대별 운행', () => {
     /** 0~23시 전부 채운 입력 */
     const hourly = Array.from({ length: 24 }, (_, h) => ({ hour: `${h}시`, count: h }));
@@ -121,7 +109,7 @@ describe('시간대별 운행', () => {
 describe('주유·하이패스 요약', () => {
     it('기록이 있으면 차량별 막대를 그린다', () => {
         setup({
-            fuelLogStats: { totalCost: 65000, totalAmount: 55, count: 3, vehicleData: [{ name: '카니발', cost: 50000 }] },
+            fuelLogStats: { totalCost: 65000, count: 3, vehicleData: [{ name: '카니발', cost: 50000 }] },
             hipassChargeStats: { totalAmount: 30000, count: 2, vehicleData: [{ name: '카니발', amount: 30000 }] },
         });
 

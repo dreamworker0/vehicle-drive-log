@@ -32,6 +32,17 @@ export function extractDateStr(log: BaseLog): string {
 }
 
 /**
+ * 운행 한 건의 주행거리(km) — 두 화면(통계·분석)과 엑셀이 같은 규칙을 쓴다.
+ *
+ * 저장된 distance를 먼저 쓰고(다일 운행·정정 기록은 이 값이 정본이다), 없으면 도착−출발.
+ * 음수는 0으로 센다 — 계기판 역전 기록이 합계를 깎지 않게 한다(야간 집계 dailyAggregation과 같다).
+ */
+export function logDistance(log: { distance?: number | null; startKm?: number | null; endKm?: number | null }): number {
+    const raw = typeof log.distance === 'number' ? log.distance : (log.endKm || 0) - (log.startKm || 0);
+    return Number.isFinite(raw) && raw > 0 ? raw : 0;
+}
+
+/**
  * 전 기간 대비 현재 기간의 변화율(%) 계산
  */
 export function calcChangeRate(cur: number, prev: number): number {

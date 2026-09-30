@@ -83,16 +83,15 @@ interface ReportChartsProps {
     purposeData: { name: string; value: number }[];
     dayOfWeekData: { name: string; count: number }[];
     hourlyData: { hour: string; count: number }[];
-    vehicleFuelData: { name: string; amount: number }[];
     dailyTrendData: { date: string; count: number; distance: number }[];
-    fuelLogStats: { totalCost: number; totalAmount: number; count: number; vehicleData: { name: string; cost: number }[] };
+    fuelLogStats: { totalCost: number; count: number; vehicleData: { name: string; cost: number }[] };
     hipassChargeStats: { totalAmount: number; count: number; vehicleData: { name: string; amount: number }[] };
     costTrendData: { date: string; fuel: number; hipass: number; total: number }[];
 }
 
 export default function ReportCharts({
     driverData, vehicleData, purposeData,
-    dayOfWeekData, hourlyData, vehicleFuelData, dailyTrendData,
+    dayOfWeekData, hourlyData, dailyTrendData,
     fuelLogStats, hipassChargeStats, costTrendData,
 }: ReportChartsProps) {
     return (
@@ -206,23 +205,7 @@ export default function ReportCharts({
                 </div>
             </div>
 
-            {/* 차량별 주유/충전비 */}
-            {vehicleFuelData.length > 0 && (
-                <div className="glass-card p-5">
-                    <SectionTitle icon="⛽" title="차량별 주유/충전비" />
-                    <div className="w-full">
-                        <ResponsiveContainer width="100%" height={280} minWidth={1} minHeight={1}>
-                            <BarChart data={vehicleFuelData} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f1f5f9" />
-                                <XAxis type="number" tick={{ fontSize: 11, fill: '#94a3b8' }} tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`} />
-                                <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 11, fill: '#64748b' }} />
-                                <Tooltip formatter={(value) => [`${(value as number).toLocaleString()}원`, '주유/충전비']} />
-                                <Bar dataKey="amount" fill="#f59e0b" radius={[0, 6, 6, 0]} barSize={20} />
-                            </BarChart>
-                        </ResponsiveContainer>
-                    </div>
-                </div>
-            )}
+            {/* (차량별 주유비는 아래 주유 기록 기준 차트 하나로 본다 — 운행일지의 옛 연료 필드로 그리던 중복 차트를 없앴다) */}
 
             {/* 일별 운행 추이 */}
             {dailyTrendData.length > 1 && (
