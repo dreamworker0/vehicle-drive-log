@@ -50,6 +50,27 @@ interface VehicleAgg {
     lastMaintenanceDate: string;
 }
 
+/**
+ * 운행 방식별 건수 — 기관 관리자 운행 분석의 '운행 방식' 차트.
+ *
+ * 새 일지는 저장할 때 driveOrigin을 적는다(2026-10 도입). 그 전 일지는 예약 연결 여부만
+ * 알 수 있다 — 연결이 없으면 '예약 없이 기록'으로 확정하고, 연결이 있으면 사전 예약인지
+ * 바로 운행인지 알 수 없어 linked(예약 연결, 구분 전)로 센다. 예약 문서를 다시 읽지 않는다.
+ */
+export interface OriginCounts {
+    reservation: number;
+    quick: number;
+    manual: number;
+    linked: number;
+}
+
+export function classifyDriveOrigin(data: FirebaseFirestore.DocumentData): keyof OriginCounts {
+    if (data.driveOrigin === "reservation" || data.driveOrigin === "quick" || data.driveOrigin === "manual") {
+        return data.driveOrigin;
+    }
+    return data.reservationId ? "linked" : "manual";
+}
+
 /** 한 (기관, 월) 집계에 들어가는 원본 기록 */
 interface OrgMonthSources {
     driveLogs: FirebaseFirestore.DocumentData[];
@@ -98,6 +119,7 @@ async function aggregateOrgMonth(
     sources: OrgMonthSources,
 ): Promise<void> {
     const monthlyTotal = { count: 0, distance: 0 };
+    const originCounts: OriginCounts = { reservation: 0, quick: 0, manual: 0, linked: 0 };
     const driverStats: Record<string, { name: string; count: number; distance: number }> = {};
     const vehicleStats: Record<string, VehicleAgg> = {};
     const heatmap: Record<string, Record<string, number>> = {};
@@ -126,6 +148,7 @@ async function aggregateOrgMonth(
 
         monthlyTotal.count += 1;
         monthlyTotal.distance += validDistance;
+        originCounts[classifyDriveOrigin(data)] += 1;
 
         // 운전자 통계 — 운행일지의 운전자 식별자는 driverUid
         const uid = data.driverUid;
@@ -214,6 +237,7 @@ async function aggregateOrgMonth(
         heatmap,
         costStats,
         anomalies,
+        originCounts,
     }, { merge: true });
 }
 

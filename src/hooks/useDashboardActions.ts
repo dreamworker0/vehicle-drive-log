@@ -131,6 +131,7 @@ export default function useDashboardActions({
                 passengerUids: res.passengerUids,
                 passengerNames: res.passengerNames,
                 passengerCount: res.passengerCount,
+                isQuickDrive: res.isQuickDrive,
             },
         });
     };

@@ -226,6 +226,7 @@ export function useDriveLogInitializer(deps: InitializerDeps) {
                         passengerUids: res.passengerUids,
                         passengerNames: res.passengerNames,
                         passengerCount: res.passengerCount,
+                        isQuickDrive: res.isQuickDrive,
                     };
                     setResolvedReservationData(data);
                     applyReservationPassengers(data, members);

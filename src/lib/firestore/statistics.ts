@@ -39,6 +39,18 @@ export interface MonthlyStat {
         night: number;
         overDrive: number;
     };
+    /**
+     * 운행 방식별 건수 — 사전 예약 · 바로 운행 · 예약 없이 기록 · 예약 연결(구분 전).
+     * linked는 driveOrigin이 저장되기 전(2026-10 이전) 일지 중 예약에 연결된 것이다.
+     */
+    originCounts: DriveOriginCounts;
+}
+
+export interface DriveOriginCounts {
+    reservation: number;
+    quick: number;
+    manual: number;
+    linked: number;
 }
 
 /**
@@ -57,6 +69,7 @@ interface RawMonthlyDoc {
     }>;
     heatmap?: Record<string, Record<string, number>>;
     anomalies?: { weekend?: number; night?: number; overDrive?: number };
+    originCounts?: Partial<DriveOriginCounts>;
 }
 
 /**
@@ -109,6 +122,13 @@ export function mapMonthlyDoc(monthKey: string, raw: RawMonthlyDoc): MonthlyStat
             weekend: raw.anomalies?.weekend || 0,
             night: raw.anomalies?.night || 0,
             overDrive: raw.anomalies?.overDrive || 0,
+        },
+        // 이 필드가 생기기 전의 문서는 운행 방식 구분이 없다 — 전부 0으로 두면 화면이 '데이터 없음'으로 처리한다
+        originCounts: {
+            reservation: raw.originCounts?.reservation || 0,
+            quick: raw.originCounts?.quick || 0,
+            manual: raw.originCounts?.manual || 0,
+            linked: raw.originCounts?.linked || 0,
         },
     };
 }

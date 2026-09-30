@@ -23,9 +23,9 @@ const tsSunday10 = kstInstant(2026, 5, 7, 10);   // 일요일 추정 시각 10�
 const tsWeekday23 = kstInstant(2026, 5, 8, 23);  // 다음날 23시(심야)
 const driveLogs = [
     // veh-1 / u1: 일자 A, 거리 250 (>200 → overDrive 버킷)
-    { driverUid: "u1", driverName: "김운전", vehicleId: "veh-1", vehicleName: "스타렉스", startKm: 0, endKm: 250, timestamp: { toDate: () => tsSunday10 } },
+    { driverUid: "u1", driverName: "김운전", vehicleId: "veh-1", vehicleName: "스타렉스", startKm: 0, endKm: 250, timestamp: { toDate: () => tsSunday10 }, reservationId: "r-q", driveOrigin: "quick" },
     // veh-1 / u1: 일자 B, 거리 50, 심야
-    { driverUid: "u1", driverName: "김운전", vehicleId: "veh-1", startKm: 250, endKm: 300, timestamp: { toDate: () => tsWeekday23 } },
+    { driverUid: "u1", driverName: "김운전", vehicleId: "veh-1", startKm: 250, endKm: 300, timestamp: { toDate: () => tsWeekday23 }, reservationId: "r-old" },
     // veh-2 / u2: 거리 80
     { driverUid: "u2", driverName: "이기사", vehicleId: "veh-2", startKm: 0, endKm: 80, timestamp: { toDate: () => tsWeekday23 } },
 ];
@@ -105,7 +105,7 @@ jest.mock("firebase-admin/firestore", () => {
     };
 });
 
-import { runDailyAggregation, resolveRecentMonths } from "../handlers/scheduled/dailyAggregation";
+import { runDailyAggregation, resolveRecentMonths, classifyDriveOrigin } from "../handlers/scheduled/dailyAggregation";
 
 describe("runDailyAggregation — 월별 집계 프로듀서", () => {
     beforeEach(() => {
@@ -121,6 +121,13 @@ describe("runDailyAggregation — 월별 집계 프로듀서", () => {
         expect(mockSet).toHaveBeenCalledTimes(1);
         expect(res).toMatchObject({ orgs: 1, processed: 1, errors: 0 });
         expect(res.months).toHaveLength(1);
+    });
+
+    it("운행 방식별 건수를 센다 — 옛 일지는 예약 연결 여부로 추정한다", async () => {
+        await runDailyAggregation(1);
+        const payload = mockSet.mock.calls[0][0];
+        // 바로 운행 1(driveOrigin) · 예약 연결만 있는 옛 일지 1(linked) · 예약 없는 일지 1(manual)
+        expect(payload.originCounts).toEqual({ reservation: 0, quick: 1, manual: 1, linked: 1 });
     });
 
     it("driverStats를 driverUid로 키잉하고 이름·건수·거리를 집계한다 (uid/driverId 버그 회귀 방지)", async () => {
@@ -326,5 +333,21 @@ describe("runDailyAggregation — 선로딩 데이터 경로", () => {
         await runDailyAggregation(1, late as never);
 
         expect(fixtures.touched).toContain("driveLogs");
+    });
+});
+
+describe("classifyDriveOrigin", () => {
+    it("저장된 driveOrigin을 그대로 쓴다", () => {
+        expect(classifyDriveOrigin({ driveOrigin: "reservation", reservationId: "r" })).toBe("reservation");
+        expect(classifyDriveOrigin({ driveOrigin: "quick", reservationId: "r" })).toBe("quick");
+        expect(classifyDriveOrigin({ driveOrigin: "manual" })).toBe("manual");
+    });
+    it("driveOrigin이 없으면 예약 연결 여부로 — 연결이 있으면 구분 전(linked)", () => {
+        expect(classifyDriveOrigin({ reservationId: "r" })).toBe("linked");
+        expect(classifyDriveOrigin({ reservationId: null })).toBe("manual");
+        expect(classifyDriveOrigin({})).toBe("manual");
+    });
+    it("알 수 없는 값은 믿지 않는다", () => {
+        expect(classifyDriveOrigin({ driveOrigin: "hacked", reservationId: "r" })).toBe("linked");
     });
 });

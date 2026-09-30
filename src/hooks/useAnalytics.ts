@@ -61,6 +61,21 @@ export default function useAnalytics() {
         });
     }, [stats, monthKeys]);
 
+    /** 월별 운행 방식 — 사전 예약 · 바로 운행 · 예약 없이 기록 · 예약 연결(구분 전) */
+    const driveOriginTrend = useMemo(() => {
+        return monthKeys.map(mk => {
+            const o = stats.find(s => s.monthKey === mk)?.originCounts;
+            return {
+                month: mk,
+                label: MONTH_LABELS[parseInt(mk.split('-')[1], 10) - 1],
+                reservation: o?.reservation || 0,
+                quick: o?.quick || 0,
+                manual: o?.manual || 0,
+                linked: o?.linked || 0,
+            };
+        });
+    }, [stats, monthKeys]);
+
     const driverComparison = useMemo(() => {
         const recentKeys = monthKeys.slice(-3);
         const map: Record<string, { totalCount: number, totalDistance: number, months: Record<string, {count: number, distance: number}> }> = {};
@@ -253,6 +268,7 @@ export default function useAnalytics() {
         monthKeys,
         // 트렌드
         monthlyTrend,
+        driveOriginTrend,
         driverComparison,
         vehicleUtilization,
         heatmapData,
