@@ -396,9 +396,14 @@ export function computeReservationStats(
 
         if (parsed >= startOfThirtyDaysAgo) {
             const key = `${parsed.getMonth() + 1}/${parsed.getDate()}`;
-            qTotal++; recTotal++;
+            qTotal++;
             if (data.isQuickDrive) { qQuick++; if (dailyResMap[key]) dailyResMap[key].quick++; }
             else { qRegular++; if (dailyResMap[key]) dailyResMap[key].regular++; }
+            // 바로 운행은 예약 없이 즉시 출발한 한 건이라 추천·다일·반복이 될 수 없다.
+            // 분모에 넣으면 '하루' 비율이 부풀고 추천·반복 비율이 희석되므로 사전 예약만 센다(아래 미래 분포도 같다).
+            // (#395 이전 기록은 바로 운행 표시가 저장되지 않아 이 구분이 적용되지 않는다)
+            if (data.isQuickDrive) return;
+            recTotal++;
             if (data.source === "recommendation") { recRecommendation++; if (dailyResMap[key]) dailyResMap[key].recommendation++; }
             else { recNormal++; if (dailyResMap[key]) dailyResMap[key].normal++; }
             if (data.recurringGroupId) { rtRecurring++; if (dailyResMap[key]) dailyResMap[key].recurring++; }

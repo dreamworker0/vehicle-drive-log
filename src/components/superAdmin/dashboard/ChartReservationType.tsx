@@ -60,13 +60,13 @@ function ChartReservationType({ reservationTypeStats, reservationTypeRatio, futu
                             </div>
                         </div>
                         <p className="text-xs text-surface-400 dark:text-surface-500">
-                            하루 예약 · 다일(연속) 예약 · 반복(정기) 예약 비율 추이
+                            하루 예약 · 다일(연속) 예약 · 반복(정기) 예약 비율 추이 (바로 운행 제외)
                         </p>
                     </div>
                     {/* 요약 비율 */}
                     <div className="flex items-center gap-3 bg-surface-50 dark:bg-surface-800/50 p-3 rounded-xl border border-surface-200 dark:border-surface-700">
                         <div className="text-center">
-                            <div className="text-[11px] text-surface-500 dark:text-surface-400 mb-0.5">총 예약</div>
+                            <div className="text-[11px] text-surface-500 dark:text-surface-400 mb-0.5">사전 예약</div>
                             <div className="text-sm font-bold text-surface-700 dark:text-surface-300">{currentRatio.total.toLocaleString()}건</div>
                         </div>
                         <div className="w-px h-8 bg-surface-200 dark:bg-surface-700"></div>

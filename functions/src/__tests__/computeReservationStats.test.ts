@@ -42,22 +42,50 @@ describe("computeReservationStats", () => {
     it("quick/regular, recommendation/normal, single/multiDay/recurring 분류", () => {
         const day = dateStrFrom(thirtyDaysAgo, 2); // 범위 내(thirtyDaysAgo 이후)
         const docs = [
-            // 빠른배차 + 추천 + 단일
-            fakeDoc({ date: day, isQuickDrive: true, source: "recommendation" }),
-            // 일반 + 일반 + 다일(groupId)
+            // 바로 운행 (추천·유형 집계에서는 빠진다)
+            fakeDoc({ date: day, isQuickDrive: true }),
+            // 사전 + 추천 + 단일
+            fakeDoc({ date: day, source: "recommendation" }),
+            // 사전 + 일반 + 다일(groupId)
             fakeDoc({ date: day, groupId: "g1" }),
-            // 일반 + 일반 + 반복(recurringGroupId)
+            // 사전 + 일반 + 반복(recurringGroupId)
             fakeDoc({ date: day, recurringGroupId: "r1" }),
         ];
 
         const r = computeReservationStats(docs, thirtyDaysAgo, todayStart, null);
 
-        expect(r.quickDriveRatio).toEqual({ total: 3, quick: 1, regular: 2, rate: 33 });
+        expect(r.quickDriveRatio).toEqual({ total: 4, quick: 1, regular: 3, rate: 25 });
         expect(r.recommendationRatio).toEqual({ total: 3, recommendation: 1, normal: 2, rate: 33 });
         expect(r.reservationTypeRatio.single).toBe(1);
         expect(r.reservationTypeRatio.multiDay).toBe(1);
         expect(r.reservationTypeRatio.recurring).toBe(1);
         expect(r.reservationTypeRatio.total).toBe(3);
+    });
+
+    it("바로 운행은 추천·예약 유형 비율의 분모에 넣지 않는다 (과거·미래 모두)", () => {
+        const past = dateStrFrom(thirtyDaysAgo, 5);
+        const today = dateStrFrom(todayStart, 0);
+        const docs = [
+            fakeDoc({ date: past, isQuickDrive: true }),
+            fakeDoc({ date: past, isQuickDrive: true }),
+            fakeDoc({ date: past, recurringGroupId: "r1" }),
+            fakeDoc({ date: today, isQuickDrive: true }),
+            fakeDoc({ date: today, groupId: "g1" }),
+        ];
+        const r = computeReservationStats(docs, thirtyDaysAgo, todayStart, null);
+
+        // 바로 운행 비율 자체는 전체 예약 기준 그대로
+        expect(r.quickDriveRatio).toEqual({ total: 5, quick: 3, regular: 2, rate: 60 });
+        // 사전 예약 2건만 분모
+        expect(r.recommendationRatio.total).toBe(2);
+        expect(r.reservationTypeRatio).toMatchObject({ total: 2, single: 0, multiDay: 1, recurring: 1, singleRate: 0 });
+        const pastDate = new Date(thirtyDaysAgo);
+        pastDate.setDate(pastDate.getDate() + 5);
+        const pastKey = `${pastDate.getMonth() + 1}/${pastDate.getDate()}`;
+        expect(r.reservationTypeStats.find(s => s.date === pastKey)).toEqual({ date: pastKey, single: 0, multiDay: 0, recurring: 1 });
+        expect(r.recommendationStats.find(s => s.date === pastKey)).toEqual({ date: pastKey, recommendation: 0, normal: 1 });
+        // 오늘 바로 운행은 미래 분포에서도 빠진다
+        expect(r.futureReservationTypeRatio).toMatchObject({ total: 1, single: 0, multiDay: 1 });
     });
 
     it("취소(cancelled) 예약은 집계에서 제외", () => {

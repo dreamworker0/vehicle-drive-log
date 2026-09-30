@@ -21,7 +21,7 @@ function ChartRecommendation({ recommendationStats, recommendationRatio }: Props
                         💡 추천 예약 활용 현황 (최근 30일)
                     </h2>
                     <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">
-                        빈 시간 추천 기능을 통한 예약 생성 추이
+                        빈 시간 추천 기능을 통한 예약 생성 추이 (바로 운행 제외)
                     </p>
                     <div className="flex flex-col items-center justify-center py-12 text-surface-400 dark:text-surface-500">최근 발생한 데이터가 없습니다.</div>
                 </div>
@@ -36,13 +36,13 @@ function ChartRecommendation({ recommendationStats, recommendationRatio }: Props
                             💡 추천 예약 활용 현황 (최근 30일)
                         </h2>
                         <p className="text-xs text-surface-400 dark:text-surface-500">
-                            빈 시간 추천 기능을 통한 예약 생성 추이
+                            빈 시간 추천 기능을 통한 예약 생성 추이 (바로 운행 제외)
                         </p>
                     </div>
                     {/* 콤보: 누적 요약 비율 */}
                     <div className="flex items-center gap-4 bg-surface-50 dark:bg-surface-800/50 p-3 rounded-xl border border-surface-200 dark:border-surface-700">
                         <div className="text-center">
-                            <div className="text-[11px] text-surface-500 dark:text-surface-400 mb-0.5">최근 총 생성</div>
+                            <div className="text-[11px] text-surface-500 dark:text-surface-400 mb-0.5">사전 예약</div>
                             <div className="text-sm font-bold text-surface-700 dark:text-surface-300">{recommendationRatio.total.toLocaleString()}건</div>
                         </div>
                         <div className="w-px h-8 bg-surface-200 dark:bg-surface-700"></div>
