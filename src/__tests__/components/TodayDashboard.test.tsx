@@ -73,7 +73,7 @@ describe('TodayDashboard', () => {
                 <TodayDashboard />
             </MemoryRouter>
         );
-        expect(screen.getByText('지금 차량이 필요하신가요?')).toBeInTheDocument();
+        expect(screen.getByText('오늘 잡힌 예약이 없어요')).toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('button', { name: /바로 운행 시작/ }));
         expect(mockUseTodayDashboardReturn.navigateToQuickDrive).toHaveBeenCalled();
