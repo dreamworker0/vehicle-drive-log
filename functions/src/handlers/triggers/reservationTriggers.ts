@@ -159,10 +159,16 @@ export const onReservationCreated = onDocumentCreated(
     // 푸시 알림 전송 (예약 관리자/지정 수신자에게)
     try {
         if (reservation.organizationId) {
-            const title = reservation.status === 'pending' ? '새 예약 신청 (승인 대기)' : '새 차량 예약';
-            const body = reservation.status === 'pending' 
-                ? `${reservation.reservedByName || '사용자'}님이 ${reservation.vehicleName || '차량'} 예약을 신청했습니다. 승인 대기 중입니다.` 
-                : `${reservation.reservedByName || '사용자'}님이 ${reservation.vehicleName || '차량'} 예약 (${reservation.date} ${reservation.startTime || ''})`;
+            const who = reservation.reservedByName || '사용자';
+            const vehicle = reservation.vehicleName || '차량';
+            // 바로 운행은 이미 출발한 운행이라 '예약'이 아니라 출발 알림으로 보낸다
+            const title = reservation.isQuickDrive ? '바로 운행 출발'
+                : reservation.status === 'pending' ? '새 예약 신청 (승인 대기)' : '새 차량 예약';
+            const body = reservation.isQuickDrive
+                ? `${who}님이 ${vehicle}로 운행을 시작했습니다 (${reservation.startTime || ''})`
+                : reservation.status === 'pending'
+                    ? `${who}님이 ${vehicle} 예약을 신청했습니다. 승인 대기 중입니다.`
+                    : `${who}님이 ${vehicle} 예약 (${reservation.date} ${reservation.startTime || ''})`;
             
             await sendPushToOrg(
                 reservation.organizationId,
