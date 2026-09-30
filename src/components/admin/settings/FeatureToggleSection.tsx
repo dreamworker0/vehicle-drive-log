@@ -37,7 +37,7 @@ interface FeatureToggleSectionProps {
 type FeatureKey = 'requireReservationApproval' | 'hipassEnabled' | 'maintenanceEnabled' | 'refuelFlagEnabled' | 'allowedUsersEnabled' | 'googleCalendarEnabled' | 'driverSelectionEnabled' | 'coDriverEnabled' | 'passengerEnabled';
 
 const FEATURE_META: Record<FeatureKey, { label: string; desc: string }> = {
-    requireReservationApproval: { label: '예약 관리자 승인', desc: '켜면 직원 차량 예약이 즉시 확정되지 않고 관리자 승인을 거칩니다.' },
+    requireReservationApproval: { label: '예약 관리자 승인', desc: '켜면 직원 차량 예약이 즉시 확정되지 않고 관리자 승인을 거칩니다. 바로 운행은 이미 출발하는 운행이라 승인 없이 시작되고, 관리자에게 출발 알림이 갑니다.' },
     hipassEnabled: { label: '하이패스', desc: '끄면 운행일지 하이패스 입력과 차량관리 하이패스 탭, 관리자 하이패스 관리 메뉴가 숨겨집니다.' },
     maintenanceEnabled: { label: '수리·정비', desc: '끄면 차량관리 수리·정비 탭과 관리자 정비 기록 메뉴가 숨겨집니다.' },
     refuelFlagEnabled: { label: '주유·충전 필요 표시', desc: '운행일지에 "주유(충전) 필요" 체크를 추가하고, 표시된 차량은 예약할 때 안내가 뜹니다. 주유일지를 쓰면 자동으로 꺼지고, 관리자가 차량 관리에서 직접 끌 수도 있습니다. (기본 꺼짐)' },

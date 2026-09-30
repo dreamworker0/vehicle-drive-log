@@ -39,7 +39,7 @@ jest.mock('firebase-admin/firestore', () => ({
     },
 }));
 
-import { createReservationTx } from "../services/reservation/createReservationCore";
+import { createReservationTx, isGenuineQuickDrive } from "../services/reservation/createReservationCore";
 
 describe('createReservationTx (코어)', () => {
     const validInput = {
@@ -330,6 +330,13 @@ describe('createReservationTx (코어)', () => {
     });
 
     describe('바로 운행 표시', () => {
+        // validInput(2026-03-05 09:00)을 '지금 출발'로 만든다 — KST 09:03
+        beforeEach(() => {
+            jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+            jest.setSystemTime(new Date('2026-03-05T00:03:00Z'));
+        });
+        afterEach(() => jest.useRealTimers());
+
         it('바로 운행으로 만든 예약에는 표시를 남긴다 — 화면이 보내던 값이 줄곧 버려지고 있었다', async () => {
             mockTransactionGet.mockResolvedValue({ exists: true, data: () => ({ organizationId: 'org1' }), docs: [] });
 
@@ -339,6 +346,31 @@ describe('createReservationTx (코어)', () => {
                 expect.anything(),
                 expect.objectContaining({ isQuickDrive: true }),
             );
+        });
+
+        it('승인제 기관이어도 바로 운행은 승인 대기 없이 확정한다 — 이미 출발하는 운행이다', async () => {
+            mockTransactionGet
+                .mockResolvedValueOnce({ exists: true, data: () => ({ organizationId: 'org1' }), docs: [] })
+                .mockResolvedValueOnce({ exists: true, data: () => ({ requireReservationApproval: true }), docs: [] })
+                .mockResolvedValue({ exists: true, data: () => ({}), docs: [] });
+
+            const result = await createReservationTx({ ...validInput, isQuickDrive: true });
+
+            expect(result.status).toBe('reserved');
+            expect(mockTransactionSet.mock.calls[0][1]).toMatchObject({ status: 'reserved', isQuickDrive: true });
+        });
+
+        it('지금 출발이 아닌 예약에 붙인 표시는 버린다 — 표시로 승인을 피하지 못한다', async () => {
+            mockTransactionGet
+                .mockResolvedValueOnce({ exists: true, data: () => ({ organizationId: 'org1' }), docs: [] })
+                .mockResolvedValueOnce({ exists: true, data: () => ({ requireReservationApproval: true }), docs: [] })
+                .mockResolvedValue({ exists: true, data: () => ({}), docs: [] });
+            jest.spyOn(console, 'warn').mockImplementation();
+
+            const result = await createReservationTx({ ...validInput, date: '2026-03-06', isQuickDrive: true });
+
+            expect(result.status).toBe('pending');
+            expect(mockTransactionSet.mock.calls[0][1]).not.toHaveProperty('isQuickDrive');
         });
 
         it('예약으로 만든 건에는 false를 남기지 않는다 (문서를 키우지 않는다)', async () => {
@@ -411,5 +443,27 @@ describe('createReservationTx (코어)', () => {
             expect.anything(),
             expect.objectContaining({ source: 'slack' })
         );
+    });
+});
+
+describe('isGenuineQuickDrive', () => {
+    const now = new Date('2026-03-05T00:03:00Z'); // KST 2026-03-05 09:03
+    const base = { date: '2026-03-05', startTime: '09:00' };
+
+    it('오늘 · 출발 시각이 지금과 10분 이내면 참', () => {
+        expect(isGenuineQuickDrive(base, now)).toBe(true);
+        expect(isGenuineQuickDrive({ ...base, startTime: '09:13' }, now)).toBe(true);
+    });
+    it('10분을 넘거나 다른 날이면 거짓', () => {
+        expect(isGenuineQuickDrive({ ...base, startTime: '08:52' }, now)).toBe(false);
+        expect(isGenuineQuickDrive({ ...base, date: '2026-03-04' }, now)).toBe(false);
+    });
+    it('KST 자정 직후에도 KST 날짜로 판단한다 (UTC로는 전날)', () => {
+        expect(isGenuineQuickDrive({ date: '2026-03-06', startTime: '00:05' }, new Date('2026-03-05T15:02:00Z'))).toBe(true);
+    });
+    it('다일 · 반복 · 추천 예약은 바로 운행이 될 수 없다', () => {
+        expect(isGenuineQuickDrive({ ...base, groupId: 'g' }, now)).toBe(false);
+        expect(isGenuineQuickDrive({ ...base, recurringGroupId: 'r' }, now)).toBe(false);
+        expect(isGenuineQuickDrive({ ...base, source: 'recommendation' }, now)).toBe(false);
     });
 });

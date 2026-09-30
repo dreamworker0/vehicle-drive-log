@@ -9,6 +9,19 @@ export const VT_LABELS: Record<string, string> = { compact: '경형', sedan: '�
 export const VT_COLORS: Record<string, string> = { compact: '#f59e0b', sedan: '#3b82f6', van: '#8b5cf6', truck: '#ef4444', bus: '#14b8a6' };
 export const ORG_PAGE_SIZE = 10;
 
+/**
+ * 예약에 바로 운행 표시가 저장되기 시작한 날 — 서버 dashboardSections.ts의 QUICK_DRIVE_TRACKED_SINCE와 같은 값.
+ * 서버는 예약 차트 3종의 과거 30일 집계를 이 날부터 센다.
+ */
+const QUICK_DRIVE_TRACKED_SINCE = new Date(2026, 8, 23);
+
+/** 최근 30일 창이 추적 시작일보다 앞서면 "9/23부터 집계" 안내를 돌려준다 (창이 지나면 null) */
+export function quickDriveTrackedNote(now: Date = new Date()): string | null {
+    const windowStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 29);
+    if (windowStart >= QUICK_DRIVE_TRACKED_SINCE) return null;
+    return `바로 운행 구분이 저장되기 시작한 ${QUICK_DRIVE_TRACKED_SINCE.getMonth() + 1}/${QUICK_DRIVE_TRACKED_SINCE.getDate()}부터 집계`;
+}
+
 export const NOTIF_TYPE_LABELS: Record<string, string> = {
     admin_notice: '관리자 공지',
     notice: '공지사항',

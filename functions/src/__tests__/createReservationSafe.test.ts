@@ -131,7 +131,6 @@ describe('createReservationSafe', () => {
                 passengerUids: ['emp1'],
                 passengerNames: ['황직원', '박이용'],
                 passengerCount: 2,
-                isQuickDrive: true,
             },
         });
 
@@ -146,9 +145,25 @@ describe('createReservationSafe', () => {
                 passengerUids: ['emp1'],
                 passengerNames: ['황직원', '박이용'],
                 passengerCount: 2,
-                isQuickDrive: true,
             }),
         );
+    });
+
+    it('바로 운행 표시도 코어로 넘긴다 (다일·추천과는 함께 올 수 없어 따로 본다)', async () => {
+        jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
+        jest.setSystemTime(new Date('2026-03-05T00:02:00Z')); // KST 09:02 — validRequest의 09:00 출발
+        try {
+            mockTransactionGet.mockResolvedValue({ exists: true, data: () => ({ organizationId: 'org1' }), docs: [] });
+
+            await capturedHandler({ ...validRequest, data: { ...validRequest.data, isQuickDrive: true } });
+
+            expect(mockTransactionSet).toHaveBeenCalledWith(
+                expect.anything(),
+                expect.objectContaining({ isQuickDrive: true }),
+            );
+        } finally {
+            jest.useRealTimers();
+        }
     });
 
     it('시간이 겹치는 예약이 있으면 already-exists 에러를 던진다', async () => {
