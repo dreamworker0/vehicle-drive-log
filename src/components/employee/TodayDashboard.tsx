@@ -186,29 +186,37 @@ export default function TodayDashboard() {
             {/* 예약이 없을 때 — 바로 운행을 주 동작으로 둔다.
                 운행의 60% 이상이 예약 없이 바로 출발한다(2026-09-23~30 실측). 예약은 보조 링크와 하단 탭에 남긴다. */}
             {myReservations.length === 0 && (
-                <div className="glass-card px-5 py-5 mb-6 border-l-4 border-l-emerald-400">
-                    <div className="flex items-center gap-4 mb-4">
-                        <span className="w-11 h-11 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center text-lg flex-shrink-0">🚗</span>
-                        <div className="min-w-0">
-                            <p className="font-semibold text-surface-800 dark:text-surface-200 text-base">지금 차량이 필요하신가요?</p>
-                            <p className="text-sm text-surface-500 dark:text-surface-400 mt-0.5">차량만 고르면 바로 출발해요</p>
-                        </div>
-                    </div>
-                    {!hasActiveDrive && (
+                <div className="mb-6">
+                    <p className="text-xs text-surface-400 dark:text-surface-500 mb-2.5">오늘 잡힌 예약이 없어요</p>
+                    <div className={`grid gap-3 ${hasActiveDrive ? 'grid-cols-1' : 'grid-cols-[1.6fr_1fr]'}`}>
+                        {!hasActiveDrive && (
+                            <button
+                                onClick={navigateToQuickDrive}
+                                aria-label="바로 운행 시작"
+                                className="group relative overflow-hidden rounded-2xl p-4 sm:p-5 min-h-[132px] text-left text-white bg-gradient-to-br from-emerald-500 to-teal-600 dark:from-emerald-600 dark:to-teal-700 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all active:scale-[0.98]"
+                            >
+                                {/* 은은한 빛 번짐 */}
+                                <span aria-hidden="true" className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-white/15 blur-2xl" />
+                                <span aria-hidden="true" className="relative w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-lg">🚀</span>
+                                <span className="relative block mt-3 text-base sm:text-lg font-bold tracking-tight">바로 운행</span>
+                                <span className="relative block text-xs sm:text-sm text-emerald-50/90 mt-0.5">차량만 고르면 바로 출발해요</span>
+                                <span aria-hidden="true" className="absolute right-4 top-5 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center transition-transform group-hover:translate-x-0.5">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5-5 5M6 12h12" />
+                                    </svg>
+                                </span>
+                            </button>
+                        )}
                         <button
-                            onClick={navigateToQuickDrive}
-                            className="w-full min-h-[52px] rounded-xl bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-500 dark:hover:bg-emerald-400 text-white text-base font-bold flex items-center justify-center gap-2 shadow-sm transition-all active:scale-[0.98]"
+                            onClick={navigateToReservations}
+                            aria-label="미리 예약하기"
+                            className="glass-card relative rounded-2xl p-4 sm:p-5 min-h-[132px] text-left transition-all hover:shadow-md active:scale-[0.98]"
                         >
-                            <span>🚀</span>
-                            <span>바로 운행 시작</span>
+                            <span aria-hidden="true" className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center text-lg">📅</span>
+                            <span className="block mt-3 text-base sm:text-lg font-bold tracking-tight text-surface-800 dark:text-surface-100">미리 예약</span>
+                            <span className="block text-xs sm:text-sm text-surface-500 dark:text-surface-400 mt-0.5">일정이 있다면</span>
                         </button>
-                    )}
-                    <button
-                        onClick={navigateToReservations}
-                        className="w-full mt-2 min-h-[48px] rounded-xl text-sm font-medium text-primary-600 dark:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors"
-                    >
-                        📅 미리 예약하기 ›
-                    </button>
+                    </div>
                 </div>
             )}
 
