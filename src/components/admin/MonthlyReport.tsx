@@ -8,6 +8,7 @@ import useMonthlyReport from '../../hooks/useMonthlyReport';
 
 const ReportCharts = lazy(() => import('./ReportCharts'));
 import ReportTables from './ReportTables';
+import { formatFuelAmount } from '../../lib/fuelFormat';
 
 const PERIOD_OPTIONS = [
     { key: 'thisWeek', label: '이번 주' },
@@ -16,7 +17,9 @@ const PERIOD_OPTIONS = [
     { key: 'last3Months', label: '최근 3개월' },
 ];
 
-function ChangeIndicator({ value }: { value?: number }) {
+function ChangeIndicator({ value }: { value?: number | null }) {
+    // null: 비교 구간에 기록이 없다 — 예전에는 "+100%"로 보여 급증처럼 읽혔다
+    if (value === null) return <span className="text-xs text-surface-400">비교 없음</span>;
     if (value === 0 || value === undefined) return <span className="text-xs text-surface-400">변동 없음</span>;
     const isUp = value > 0;
     return (
@@ -30,7 +33,7 @@ interface StatCardProps {
     icon: string;
     value: string | number;
     label: string;
-    change?: number;
+    change?: number | null;
     sub?: string;
     color: string;
 }
@@ -50,12 +53,25 @@ function StatCard({ icon, value, label, change, sub, color }: StatCardProps) {
     );
 }
 
+/** 'YYYY-MM-DD' → 'M/D' */
+function formatMD(dateStr: string): string {
+    const [, m, d] = dateStr.split('-').map(Number);
+    return `${m}/${d}`;
+}
+
+/** 단위별 주유량 — 휘발유 L · 전기 kWh · 수소 kg를 따로 적는다 */
+function formatAmountByUnit(byUnit: Record<'L' | 'kWh' | 'kg', number>): string[] {
+    return (['L', 'kWh', 'kg'] as const)
+        .filter(u => byUnit[u] > 0)
+        .map(u => `${formatFuelAmount(byUnit[u])}${u}`);
+}
+
 export default function MonthlyReport() {
     const {
-        loading, startDate, endDate, setStartDate, setEndDate,
-        activePeriod, setPeriod,
+        loading, loadError, startDate, endDate, setStartDate, setEndDate,
+        activePeriod, setPeriod, comparePeriod,
         filteredLogs, stats, driverData, vehicleData, purposeData,
-        vehicleFuelData, dailyTrendData, dayOfWeekData, hourlyData,
+        dailyTrendData, dayOfWeekData, hourlyData,
         fuelLogStats, hipassChargeStats, costTrendData,
         exportExcel, exportPdf,
     } = useMonthlyReport();
@@ -124,7 +140,18 @@ export default function MonthlyReport() {
                 </div>
             </div>
 
+            {loadError && (
+                <div role="alert" className="glass-card p-4 mb-4 border-l-4 border-l-red-400 text-sm text-red-600 dark:text-red-400">
+                    {loadError}
+                </div>
+            )}
+
             {/* 요약 카드 */}
+            <p className="text-[11px] text-surface-400 dark:text-surface-500 mb-2">
+                ▲▼ 증감은 {comparePeriod.start === comparePeriod.end
+                    ? formatMD(comparePeriod.start)
+                    : `${formatMD(comparePeriod.start)}~${formatMD(comparePeriod.end)}`}과 비교한 값이에요
+            </p>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
                 <StatCard
                     icon="🚗" value={stats.totalRuns} label="총 운행 횟수"
@@ -136,7 +163,7 @@ export default function MonthlyReport() {
                 />
                 <StatCard
                     icon="⛽" value={fuelLogStats.totalCost ? fuelLogStats.totalCost.toLocaleString() : '-'}
-                    label="주유비 (원)" sub={fuelLogStats.count > 0 ? `${fuelLogStats.count}건 · ${fuelLogStats.totalAmount.toLocaleString()}L` : ''} color="bg-amber-400 dark:bg-amber-900/40"
+                    label="주유비 (원)" sub={fuelLogStats.count > 0 ? [`${fuelLogStats.count}건`, ...formatAmountByUnit(fuelLogStats.amountByUnit)].join(' · ') : ''} color="bg-amber-400 dark:bg-amber-900/40"
                 />
                 <StatCard
                     icon="🛣️" value={hipassChargeStats.totalAmount ? hipassChargeStats.totalAmount.toLocaleString() : '-'}
@@ -178,7 +205,6 @@ export default function MonthlyReport() {
                                 purposeData={purposeData}
                                 dayOfWeekData={dayOfWeekData}
                                 hourlyData={hourlyData}
-                                vehicleFuelData={vehicleFuelData}
                                 dailyTrendData={dailyTrendData}
                                 fuelLogStats={fuelLogStats}
                                 hipassChargeStats={hipassChargeStats}
@@ -189,7 +215,7 @@ export default function MonthlyReport() {
                         <ReportTables
                             driverData={driverData}
                             vehicleData={vehicleData}
-                            stats={stats}
+                            stats={{ ...stats, totalFuel: fuelLogStats.totalCost }}
                         />
                     )}
 
