@@ -20,18 +20,19 @@ export default function WelcomeGuide({ onDismiss }: WelcomeGuideProps) {
             </button>
             <h3 className="text-base font-bold text-surface-900 dark:text-surface-100 mb-3">👋 환영합니다!</h3>
             <div className="space-y-2.5 text-sm text-surface-600 dark:text-surface-400">
+                {/* 운행의 60% 이상이 예약 없이 바로 출발한다 — 바로 운행을 먼저, 예약은 선택으로 안내한다 */}
                 <div className="flex items-start gap-3">
-                    <span className="w-7 h-7 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-sm flex-shrink-0">📅</span>
+                    <span className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-sm flex-shrink-0">🚀</span>
                     <div>
-                        <p className="font-medium text-surface-800 dark:text-surface-200">예약</p>
-                        <p className="text-xs text-surface-400 dark:text-surface-500">먼저 달력에서 원하시는 차량과 날짜를 콕 찍어주세요!</p>
+                        <p className="font-medium text-surface-800 dark:text-surface-200">바로 운행</p>
+                        <p className="text-xs text-surface-400 dark:text-surface-500">차가 필요할 때 '바로 운행 시작'을 누르고 차량만 고르면 곧바로 출발해요.</p>
                     </div>
                 </div>
                 <div className="flex items-start gap-3">
-                    <span className="w-7 h-7 rounded-lg bg-accent-100 dark:bg-accent-900/30 flex items-center justify-center text-sm flex-shrink-0">🚗</span>
+                    <span className="w-7 h-7 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-sm flex-shrink-0">📅</span>
                     <div>
-                        <p className="font-medium text-surface-800 dark:text-surface-200">운행 시작</p>
-                        <p className="text-xs text-surface-400 dark:text-surface-500">예약해 둔 카드에서 '운행 시작' 버튼을 누르면 출발 준비 끝이에요.</p>
+                        <p className="font-medium text-surface-800 dark:text-surface-200">미리 예약 <span className="text-xs font-normal text-surface-400 dark:text-surface-500">(선택)</span></p>
+                        <p className="text-xs text-surface-400 dark:text-surface-500">정해진 일정이 있다면 달력에서 차량을 미리 잡아 두세요. 그날 카드의 '운행 시작'을 누르면 돼요.</p>
                     </div>
                 </div>
                 <div className="flex items-start gap-3">
