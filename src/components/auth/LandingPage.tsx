@@ -28,7 +28,7 @@ const FEATURES: Feature[] = [
     {
         icon: '📝',
         title: '운행일지 자동화',
-        desc: '즐겨찾기·빠른 출발로 반복 입력은 터치 한 번에. 예약 연동 시 차량·목적지·시간이 자동으로 채워집니다.',
+        desc: '즐겨찾기·바로 운행으로 반복 입력은 터치 한 번에. 예약 연동 시 차량·목적지·시간이 자동으로 채워집니다.',
     },
     {
         icon: '📅',
@@ -82,7 +82,7 @@ interface SubFeature {
 }
 
 const SUB_FEATURES: SubFeature[] = [
-    { icon: '⭐', label: '즐겨찾기·빠른 출발' },
+    { icon: '⭐', label: '즐겨찾기·바로 운행' },
     { icon: '📆', label: '구글 캘린더 연동' },
     { icon: '🔔', label: '푸시 알림' },
     { icon: '📴', label: '오프라인 지원' },
