@@ -20,6 +20,7 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
 export const TARGET_LABEL: Record<AuditTargetType, string> = {
     driveLog: '운행일지',
     user: '직원 정보',
+    vehicle: '차량',
     session: '로그인',
     export: '내보내기',
     orgDocument: '기관 증빙서류',

@@ -70,7 +70,7 @@ const SYSTEM_ORG_ID = "__system__";
 const TRIGGER_OPTS = { region: "asia-northeast3", memory: "256MiB" as const, retry: true };
 
 type AuditAction = "create" | "update" | "delete";
-type AuditTargetType = "driveLog" | "user";
+type AuditTargetType = "driveLog" | "user" | "vehicle";
 
 /**
  * 기록 대상 필드 화이트리스트 — 개인정보 필드와 접근 권한 필드만.
@@ -95,6 +95,8 @@ const AUDITED_FIELDS: Record<AuditTargetType, ReadonlySet<string>> = {
         // 변동이므로 필드가 들어오는 시점부터 자동으로 기록되게 미리 넣어 둔다.
         "consent",
     ]),
+    // 차량은 자산 데이터라 필드 변경을 기록하지 않는다 — **삭제만** 남긴다(auditVehicleDeleted).
+    vehicle: new Set(),
 };
 
 interface AuditEntry {
@@ -344,6 +346,32 @@ export const auditUserDeleted = onDocumentDeleted(
             actorUid: null,
             actorSource: "unknown",
             subjectUids: [event.params.userId],
+        }, event.id);
+    }
+);
+
+/**
+ * 차량 삭제 — 개인정보는 아니지만 **삭제 사실**만 남긴다.
+ *
+ * 차량을 지워도 그 차량의 운행일지는 기관 기록으로 남는다. 월간 참조 무결성 점검
+ * (verifyDriveLogIntegrity)은 이 기록이 없으면 "원래 없던 차량을 가리키는 위조"와
+ * "삭제된 차량의 보존 기록"을 가를 근거가 없어, 차량을 지울 때마다 경고를 올렸다.
+ * 삭제자는 알 수 없으므로 unknown으로 둔다(파일 머리 주석의 삭제 원칙과 같다).
+ */
+export const auditVehicleDeleted = onDocumentDeleted(
+    { document: "vehicles/{vehicleId}", ...TRIGGER_OPTS },
+    async (event) => {
+        const data = event.data?.data();
+        if (!data) return;
+
+        await writeAuditLog({
+            organizationId: orgIdOf(data.organizationId),
+            action: "delete",
+            targetType: "vehicle",
+            targetId: event.params.vehicleId,
+            actorUid: null,
+            actorSource: "unknown",
+            subjectUids: [],
         }, event.id);
     }
 );

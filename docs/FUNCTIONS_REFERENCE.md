@@ -2,9 +2,9 @@
 
 > **자동 생성 문서** — `scripts/generate-functions-doc.ts`로 생성됨
 >
-> 마지막 업데이트: 2026. 9. 12. PM 9:38:43
+> 마지막 업데이트: 2026. 10. 1. 오전 6:44:21
 >
-> 총 함수 수: **75개**
+> 총 함수 수: **76개**
 
 ---
 
@@ -677,7 +677,7 @@
 
 ## 🗑️ Firestore onDelete
 
-> 총 5개
+> 총 6개
 
 ### `onHipassChargeDeleted`
 
@@ -718,6 +718,14 @@
 |------|------|
 | **파일** | `functions/src/handlers/triggers/auditLog.ts` |
 | **설명** | 사용자 문서 삭제 이력을 접속기록(accessLogs)에 기록 |
+| **인증** | 시스템 자동 실행 |
+
+### `auditVehicleDeleted`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/triggers/auditLog.ts` |
+| **설명** | 차량 문서 삭제 사실을 감사 로그(auditLogs)에 기록 — 월간 참조 무결성 점검이 삭제된 차량의 보존 운행일지를 위반과 가르는 근거 |
 | **인증** | 시스템 자동 실행 |
 
 ---

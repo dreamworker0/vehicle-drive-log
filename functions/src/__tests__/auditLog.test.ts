@@ -84,7 +84,7 @@ beforeEach(() => {
 });
 
 describe('auditLog — 트리거 배선', () => {
-    it('6개 트리거가 driveLogs·users의 생성/수정/삭제에 정확히 걸린다', () => {
+    it('driveLogs·users의 생성/수정/삭제 6개 + 차량 삭제 1개에 정확히 걸린다', () => {
         expect(Object.keys(capturedTriggers).sort()).toEqual([
             'driveLogs/{logId}:create',
             'driveLogs/{logId}:delete',
@@ -92,7 +92,23 @@ describe('auditLog — 트리거 배선', () => {
             'users/{userId}:create',
             'users/{userId}:delete',
             'users/{userId}:update',
+            'vehicles/{vehicleId}:delete',
         ]);
+    });
+
+    // 차량을 지워도 운행일지는 남는다. 월간 참조 무결성 점검이 이 기록으로
+    // "삭제된 차량의 보존 기록"과 "없는 차량을 가리키는 위조"를 가른다.
+    it('차량 삭제는 기관·대상과 함께 남기고, 삭제자는 unknown으로 둔다', async () => {
+        await fireDelete('vehicles/{vehicleId}', { vehicleId: 'v1' }, { organizationId: 'org1', lastEditedByUid: 'someone' });
+        expect(lastEntry()).toMatchObject({
+            organizationId: 'org1',
+            action: 'delete',
+            targetType: 'vehicle',
+            targetId: 'v1',
+            actorUid: null,
+            actorSource: 'unknown',
+            subjectUids: [],
+        });
     });
 
     it('모든 트리거가 서울 리전 + retry로 등록된다', () => {

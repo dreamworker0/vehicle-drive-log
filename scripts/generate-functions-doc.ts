@@ -652,6 +652,13 @@ const FUNCTIONS: FunctionEntry[] = [
     description: '사용자 문서 삭제 이력을 접속기록(accessLogs)에 기록',
     auth: '시스템 자동 실행',
   },
+  {
+    name: 'auditVehicleDeleted',
+    type: 'onDocumentDeleted',
+    file: 'handlers/triggers/auditLog.ts',
+    description: '차량 문서 삭제 사실을 감사 로그(auditLogs)에 기록 — 월간 참조 무결성 점검이 삭제된 차량의 보존 운행일지를 위반과 가르는 근거',
+    auth: '시스템 자동 실행',
+  },
 
   // ── Auth 트리거 ──
   {
