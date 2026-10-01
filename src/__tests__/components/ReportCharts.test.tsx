@@ -88,20 +88,24 @@ describe('일별 추이 / 비용 추이의 표시 조건', () => {
 });
 
 describe('시간대별 운행', () => {
-    /** 0~23시 전부 채운 입력 */
-    const hourly = Array.from({ length: 24 }, (_, h) => ({ hour: `${h}시`, count: h }));
+    /** 주간(9~18시)에만 운행이 있는 입력 */
+    const daytime = Array.from({ length: 24 }, (_, h) => ({ hour: `${h}시`, count: h >= 9 && h <= 18 ? 1 : 0 }));
 
-    it('06~22시만 그린다 — 새벽까지 그리면 대부분 빈 칸이라 축만 길어진다', () => {
-        setup({ hourlyData: hourly });
-
-        // 차트에 넘어간 데이터도, 막대 하나하나(Cell)도 6..22의 17개다
+    it('운행이 주간에만 있으면 06~22시를 그린다 — 새벽까지 그리면 대부분 빈 칸이라 축만 길어진다', () => {
+        setup({ hourlyData: daytime });
         const charts = screen.getAllByTestId('bar-chart');
         expect(charts.some(c => c.getAttribute('data-count') === '17')).toBe(true);
         expect(screen.queryAllByTestId('cell')).toHaveLength(17);
     });
 
+    it('심야·새벽 운행이 있으면 그 시각까지 넓힌다 — 예전에는 06~22시로 잘려 보이지 않았다', () => {
+        const night = daytime.map((h, i) => (i === 2 || i === 23 ? { ...h, count: 1 } : h));
+        setup({ hourlyData: night });
+        expect(screen.queryAllByTestId('cell')).toHaveLength(22); // 2..23시
+    });
+
     it('입력이 24시간보다 짧아도 있는 만큼만 그린다', () => {
-        setup({ hourlyData: hourly.slice(0, 10) }); // 0~9시 → 필터 후 6..9의 4개
+        setup({ hourlyData: daytime.slice(0, 10) }); // 0~9시 → 6..9의 4개
         expect(screen.queryAllByTestId('cell')).toHaveLength(4);
     });
 });
@@ -124,7 +128,7 @@ describe('주유·하이패스 요약', () => {
 describe('섹션 제목', () => {
     it('항상 보이는 섹션의 제목이 모두 있다', () => {
         setup();
-        for (const title of ['직원별 현황', '차량별 주행거리', '사용목적별 비율', '차량별 주유비', '차량별 하이패스 충전']) {
+        for (const title of ['직원별 주행거리', '차량별 주행거리', '사용목적별 비율', '차량별 주유비', '차량별 하이패스 충전']) {
             expect(screen.getByText(title)).toBeInTheDocument();
         }
     });

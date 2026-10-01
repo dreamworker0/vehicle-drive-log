@@ -5,6 +5,7 @@
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend,
 } from 'recharts';
+import useChartTheme, { formatWonTick } from '../../hooks/useChartTheme';
 
 const PRIORITY_STYLES: Record<string, string> = {
     high: 'border-l-red-500 bg-red-50/50 dark:bg-red-900/10',
@@ -99,6 +100,7 @@ export default function CostOptimization({
     fuelEfficiency, maintenanceCostAnalysis, anomalies, recommendations,
     costTrend, totalFuelCost = 0, totalHipassCost = 0, totalMaintenanceCost = 0, totalOperatingCost = 0,
 }: Props) {
+    const t = useChartTheme();
     const { items: fuelItems, avgCostPerKm } = fuelEfficiency;
     const fmt = (n: number) => n >= 10000 ? `${Math.round(n / 10000)}만` : n.toLocaleString();
 
@@ -133,15 +135,16 @@ export default function CostOptimization({
                             <p className="text-xs font-semibold text-surface-700 dark:text-surface-300 mb-2">월별 비용 추세</p>
                             <ResponsiveContainer width="100%" height={220} minWidth={1} minHeight={1}>
                                 <BarChart data={costTrend} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                                    <XAxis dataKey="label" tick={{ fontSize: 11 }} />
-                                    <YAxis tick={{ fontSize: 10 }} tickFormatter={(v: number) => v >= 10000 ? `${v / 10000}만` : String(v)} />
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke={t.grid} />
+                                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: t.tick }} />
+                                    <YAxis tick={{ fontSize: 10, fill: t.tick }} tickFormatter={formatWonTick} />
                                     <Tooltip
+                                        {...t.tooltip}
+                                        cursor={t.cursor}
                                         formatter={(value, name) => [
                                             `${Number(value).toLocaleString()}원`,
                                             name === 'fuelCost' ? '주유비' : name === 'hipassCost' ? '하이패스' : '정비비',
                                         ]}
-                                        contentStyle={{ borderRadius: '8px', fontSize: '12px' }}
                                     />
                                     <Legend
                                         formatter={(value: string) =>
@@ -149,9 +152,9 @@ export default function CostOptimization({
                                         }
                                         wrapperStyle={{ fontSize: '11px' }}
                                     />
-                                    <Bar dataKey="fuelCost" stackId="cost" fill="#3b82f6" radius={[0, 0, 0, 0]} />
-                                    <Bar dataKey="hipassCost" stackId="cost" fill="#10b981" radius={[0, 0, 0, 0]} />
-                                    <Bar dataKey="maintenanceCost" stackId="cost" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                                    <Bar dataKey="fuelCost" stackId="cost" stroke={t.surface} strokeWidth={2} fill="#3b82f6" radius={[0, 0, 0, 0]} />
+                                    <Bar dataKey="hipassCost" stackId="cost" stroke={t.surface} strokeWidth={2} fill="#10b981" radius={[0, 0, 0, 0]} />
+                                    <Bar dataKey="maintenanceCost" stackId="cost" stroke={t.surface} strokeWidth={2} fill="#f59e0b" radius={[4, 4, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </>
@@ -198,10 +201,10 @@ export default function CostOptimization({
                     <>
                         <ResponsiveContainer width="100%" height={Math.max(180, fuelItems.length * 45)} minWidth={1} minHeight={1}>
                             <BarChart data={fuelItems} layout="vertical" margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
-                                <XAxis type="number" tick={{ fontSize: 11 }} unit="원" />
-                                <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 11 }} />
-                                <Tooltip content={<FuelTooltip />} />
+                                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke={t.grid} />
+                                <XAxis type="number" tick={{ fontSize: 11, fill: t.tick }} unit="원" />
+                                <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 11, fill: t.tickStrong }} />
+                                <Tooltip content={<FuelTooltip />} cursor={t.cursor} />
                                 <Bar dataKey="costPerKm" name="km당 비용" radius={[0, 6, 6, 0]} barSize={20}>
                                     {fuelItems.map((f, i) => {
                                         const isOver = avgCostPerKm > 0 && f.costPerKm > avgCostPerKm * 1.3;

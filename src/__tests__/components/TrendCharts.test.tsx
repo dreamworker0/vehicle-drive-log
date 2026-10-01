@@ -50,7 +50,6 @@ const emptyProps = {
     driverComparison: [],
     vehicleUtilization: [],
     heatmapData: { grid: {}, maxCount: 1 },
-    costTrend: [],
 };
 
 type Props = React.ComponentProps<typeof TrendCharts>;
@@ -74,9 +73,18 @@ describe('데이터가 없을 때', () => {
 });
 
 describe('월별 추이', () => {
-    it('데이터가 있으면 라인 차트를 그린다', () => {
+    it('건수와 거리를 한 차트의 양쪽 축에 그리지 않고 두 차트로 나눈다', () => {
         setup({ monthlyTrend: [{ label: '1월', count: 3, distance: 120 }] });
-        expect(screen.getByTestId('line-chart')).toHaveAttribute('data-count', '1');
+        const charts = screen.getAllByTestId('line-chart');
+        expect(charts).toHaveLength(2);
+        expect(screen.getAllByTestId('line').map(l => l.getAttribute('data-key'))).toEqual(['count', 'distance']);
+        expect(screen.getByText('운행 횟수 (건)')).toBeInTheDocument();
+        expect(screen.getByText('주행거리 (km)')).toBeInTheDocument();
+    });
+
+    it('달은 있어도 전부 0이면 빈 0 선 대신 안내 문구를 보여 준다', () => {
+        setup({ monthlyTrend: [{ label: '1월', count: 0, distance: 0 }, { label: '2월', count: 0, distance: 0 }] });
+        expect(screen.queryAllByTestId('line-chart')).toHaveLength(0);
     });
 });
 
@@ -120,17 +128,9 @@ describe('차량 가동률', () => {
 });
 
 describe('월별 비용 추이', () => {
-    it('비용이 전부 0이면 섹션 자체를 감춘다', () => {
-        setup({ costTrend: [{ label: '1월', fuelCost: 0, hipassCost: 0, totalCost: 0 }] });
+    it('트렌드 탭에는 두지 않는다 — 정비비까지 담은 비용 최적화 탭의 차트가 정본이다', () => {
+        setup();
         expect(screen.queryByText(/월별 비용 추이/)).not.toBeInTheDocument();
-    });
-
-    it('한 달이라도 비용이 있으면 보여준다', () => {
-        setup({ costTrend: [
-            { label: '1월', fuelCost: 0, hipassCost: 0, totalCost: 0 },
-            { label: '2월', fuelCost: 50000, hipassCost: 10000, totalCost: 60000 },
-        ] });
-        expect(screen.getByText(/월별 비용 추이/)).toBeInTheDocument();
     });
 });
 

@@ -260,10 +260,16 @@ export default function useMonthlyReport() {
             }
         `;
         document.head.appendChild(style);
+        // 다크 모드 그대로 인쇄하면 밝은 회색 글자가 흰 종이에 남아 거의 읽히지 않는다(배경은 인쇄되지 않는다).
+        // 인쇄하는 동안만 라이트로 바꾼다.
+        const root = document.documentElement;
+        const wasDark = root.classList.contains('dark');
+        if (wasDark) root.classList.remove('dark');
         window.print();
-        // 인쇄 후 스타일 제거
+        // 인쇄 후 스타일·테마 되돌림
         setTimeout(() => {
             style.remove();
+            if (wasDark) root.classList.add('dark');
         }, 1000);
     }, []);
 

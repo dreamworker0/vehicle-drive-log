@@ -153,7 +153,6 @@ export default function AnalyticsDashboard() {
                         driverComparison={driverComparison}
                         vehicleUtilization={vehicleUtilization}
                         heatmapData={heatmapData}
-                        costTrend={costTrend}
                     />
                 ) : (
                     <CostOptimization
