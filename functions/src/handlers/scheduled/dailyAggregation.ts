@@ -68,6 +68,34 @@ export interface OriginCounts {
 
 const emptyOrigin = (): OriginCounts => ({ reservation: 0, quick: 0, manual: 0, linked: 0 });
 
+/** driverUid가 비어 있는 옛 기록을 모으는 키 — 버리면 직원별 합이 총계보다 작아진다 */
+export const UNASSIGNED_DRIVER = "__unassigned";
+
+const isDateStr = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
+
+/** "HH:MM" → 시(0~23). 없거나 깨졌으면 null */
+function parseHour(v: unknown): number | null {
+    if (typeof v !== "string") return null;
+    const h = parseInt(v.split(":")[0], 10);
+    return Number.isInteger(h) && h >= 0 && h < 24 ? h : null;
+}
+
+/** from~to(포함)의 'YYYY-MM-DD' 목록 — 뒤집혔거나 31일을 넘으면 to 하루만(깨진 기록 방어) */
+function daysBetween(from: string, to: string): string[] {
+    const [fy, fm, fd] = from.split("-").map(Number);
+    const [ty, tm, td] = to.split("-").map(Number);
+    const start = new Date(fy, fm - 1, fd);
+    const end = new Date(ty, tm - 1, td);
+    const span = Math.round((end.getTime() - start.getTime()) / 86_400_000);
+    if (!(span >= 0 && span <= 31)) return [to];
+    const out: string[] = [];
+    for (let i = 0; i <= span; i++) {
+        const d = new Date(fy, fm - 1, fd + i);
+        out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`);
+    }
+    return out;
+}
+
 export function classifyDriveOrigin(data: FirebaseFirestore.DocumentData): keyof OriginCounts {
     if (data.driveOrigin === "reservation" || data.driveOrigin === "quick" || data.driveOrigin === "manual") {
         return data.driveOrigin;
@@ -157,32 +185,40 @@ async function aggregateOrgMonth(
         originCounts[origin] += 1;
 
         // 운전자 통계 — 운행일지의 운전자 식별자는 driverUid
-        const uid = data.driverUid;
-        const driverName = data.driverName || (uid ? userMap.get(uid) : undefined) || "알 수 없음";
-        if (uid) {
-            if (!driverStats[uid]) driverStats[uid] = { name: driverName, count: 0, distance: 0, origin: emptyOrigin() };
-            driverStats[uid].count += 1;
-            driverStats[uid].distance += validDistance;
-            driverStats[uid].origin[origin] += 1;
-        }
+        // 운전자 통계 — 운행일지의 운전자 식별자는 driverUid. 비어 있는 옛 기록도 버리지 않는다
+        // (예전에는 버려 직원별 합이 총계보다 작았다).
+        const uid = data.driverUid || UNASSIGNED_DRIVER;
+        const driverName = uid === UNASSIGNED_DRIVER
+            ? "(운전자 미지정)"
+            : data.driverName || userMap.get(uid) || "알 수 없음";
+        if (!driverStats[uid]) driverStats[uid] = { name: driverName, count: 0, distance: 0, origin: emptyOrigin() };
+        driverStats[uid].count += 1;
+        driverStats[uid].distance += validDistance;
+        driverStats[uid].origin[origin] += 1;
 
-        // 타임스탬프 파생 — 히트맵(요일×시간), 이상탐지(주말/심야), 차량 가동일
+        // 날짜·시각 — timestamp는 **도착** 시각이다. 히트맵·주말·심야는 운행을 시작한 때로 본다
+        // (예전에는 도착 시각이라 21:00 출발·22:30 도착이 '심야'로, 05:00 출발·07:00 도착은 빠졌고,
+        // 통계 화면(출발 시각 기준)과 숫자가 달랐다). 다일 운행은 출발일(startDate)을 쓴다.
         const ts = data.timestamp?.toDate?.();
         let dateStr = "";
+        let departDateStr = "";
         if (ts) {
             const kstTs = toKSTDate(ts);
-            const dayOfWeek = kstTs.getDay(); // 0=일 ~ 6=토
-            const hour = kstTs.getHours();
             dateStr = `${kstTs.getFullYear()}-${String(kstTs.getMonth() + 1).padStart(2, "0")}-${String(kstTs.getDate()).padStart(2, "0")}`;
+            departDateStr = isDateStr(data.startDate) ? data.startDate : dateStr;
+            const departHour = parseHour(data.startTime) ?? kstTs.getHours();
+            const [dy, dm, dd] = departDateStr.split("-").map(Number);
+            const dayOfWeek = new Date(dy, dm - 1, dd).getDay(); // 0=일 ~ 6=토
 
             const dowKey = String(dayOfWeek);
-            const hourKey = String(hour);
+            const hourKey = String(departHour);
             if (!heatmap[dowKey]) heatmap[dowKey] = {};
             heatmap[dowKey][hourKey] = (heatmap[dowKey][hourKey] || 0) + 1;
 
             if (dayOfWeek === 0 || dayOfWeek === 6) anomalies.weekend += 1;
-            if (hour >= 22 || hour < 6) anomalies.night += 1;
+            if (departHour >= 22 || departHour < 6) anomalies.night += 1;
         }
+        const isMultiDay = !!departDateStr && departDateStr !== dateStr;
 
         // 차량 통계 (가동일·주행거리)
         const vehId = data.vehicleId;
@@ -193,13 +229,19 @@ async function aggregateOrgMonth(
             vs.distance += validDistance;
             vs.origin[origin] += 1;
             if (dateStr) {
+                // 다일 운행은 출발일부터 도착일까지 모두 가동일이다(이 달에 속한 날만)
                 if (!vehicleDates[vehId]) vehicleDates[vehId] = new Set<string>();
+                // 도착일은 조회 조건(timestamp)상 늘 이 달이다. 출발일 쪽은 전월에 걸칠 수 있어 이 달 것만 센다.
                 vehicleDates[vehId].add(dateStr);
+                for (const d of daysBetween(departDateStr, dateStr)) {
+                    if (d.startsWith(win.yearMonth)) vehicleDates[vehId].add(d);
+                }
             }
         }
 
-        // 1일 과다주행(200km 초과) — 운전자×일자 버킷 누적
-        if (dateStr) {
+        // 1일 과다주행(200km 초과) — 운전자×일자 버킷 누적. 다일 운행은 며칠 거리를 하루에 몰아
+        // 과다주행으로 잘못 잡으므로 뺀다.
+        if (dateStr && !isMultiDay) {
             const bucketKey = `${uid || driverName}_${dateStr}`;
             driverDayDistance[bucketKey] = (driverDayDistance[bucketKey] || 0) + validDistance;
         }
@@ -246,7 +288,10 @@ async function aggregateOrgMonth(
         costStats,
         anomalies,
         originCounts,
-    }, { merge: true });
+    });
+    // ⚠️ merge 없이 통째로 쓴다. 예전의 { merge: true }는 중첩 맵을 **깊게 합쳐**, 이번 계산에서
+    // 사라진 키(일지를 고치거나 지워 빠진 직원·차량, 0이 된 히트맵 칸)가 계속 남았다 — 직원별 합이
+    // 총계보다 커졌다. 이 문서는 이 함수만 쓰고 매번 모든 필드를 다시 계산한다.
 }
 
 /** runDailyAggregation 실행 요약 — 호출자(백필 콜러블 등)가 성공/실패를 인지할 수 있게 반환 */

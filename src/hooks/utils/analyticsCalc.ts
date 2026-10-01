@@ -36,6 +36,29 @@ interface TrendEntry {
 /**
  * 해당 월의 근무일 수 추정 (주말 제외, 공휴일 미포함)
  */
+/**
+ * 가동률 분모 — 그 달의 평일 중 공휴일이 아닌 날. `until`이 그 달 안이면 그날까지만 센다.
+ *
+ * 예전 분모(getWorkdaysInMonth)는 진행 중인 이번 달도 한 달 전체를 넣고 공휴일도 빼지 않아,
+ * 10/1에 보면 10월 약 22일이 분모에 들어가 가동률이 1/3쯤 낮게 나왔고 '가동률 낮음' 추천이
+ * 잘못 떴다.
+ */
+export function countWorkdays(yearMonth: string, holidays: ReadonlySet<string>, until: Date = new Date()) {
+    const [y, m] = yearMonth.split('-').map(Number);
+    const firstDay = new Date(y, m - 1, 1);
+    const monthEnd = new Date(y, m, 0);
+    const untilDay = new Date(until.getFullYear(), until.getMonth(), until.getDate());
+    const lastDay = untilDay < monthEnd ? untilDay : monthEnd;
+    let count = 0;
+    for (let d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate() + 1)) {
+        const dow = d.getDay();
+        if (dow === 0 || dow === 6) continue;
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        if (!holidays.has(key)) count++;
+    }
+    return count;
+}
+
 export function getWorkdaysInMonth(yearMonth: string) {
     const [y, m] = yearMonth.split('-').map(Number);
     const firstDay = new Date(y, m - 1, 1);

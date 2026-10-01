@@ -6,8 +6,9 @@ import type { Vehicle } from '../types/vehicle';
 import type { User } from '../types/user';
 import { getRecentMonthKeys } from './utils/aggregationUtils';
 import {
-    DAY_NAMES, MONTH_LABELS, getWorkdaysInMonth, calcRecommendations,
+    DAY_NAMES, MONTH_LABELS, countWorkdays, calcRecommendations,
 } from './utils/analyticsCalc';
+import { fetchPublicHolidays } from '../lib/holidayApi';
 import type { CostTrendItem, DriverComparisonItem } from './utils/analyticsCalc';
 
 export default function useAnalytics() {
@@ -19,6 +20,8 @@ export default function useAnalytics() {
     const [members, setMembers] = useState<User[]>([]);
     const [loading, setLoading] = useState(true);
     const [rangeMonths, setRangeMonths] = useState(6);
+    /** 가동률 분모에서 뺄 공휴일(YYYY-MM-DD) — 못 받아 오면 비운 채 진행한다(부가 정보) */
+    const [holidays, setHolidays] = useState<ReadonlySet<string>>(new Set());
 
     const monthKeys = useMemo(() => getRecentMonthKeys(rangeMonths), [rangeMonths]);
 
@@ -103,27 +106,34 @@ export default function useAnalytics() {
 
     const driverComparison = useMemo(() => {
         const recentKeys = monthKeys.slice(-3);
-        const map: Record<string, { totalCount: number, totalDistance: number, months: Record<string, {count: number, distance: number}> }> = {};
+        const map: Record<string, { name: string, totalCount: number, totalDistance: number, months: Record<string, {count: number, distance: number}> }> = {};
         
         recentKeys.forEach(mk => {
             const stat = stats.find(s => s.monthKey === mk);
             if (stat?.driverStats) {
-                // 집계 문서의 driverStats는 uid 키 + name 필드 구조 → 표시는 name 기준으로 그룹화
-                Object.values(stat.driverStats).forEach((dStat) => {
-                    const driverName = dStat.name || '알 수 없음';
-                    if (!map[driverName]) map[driverName] = { totalCount: 0, totalDistance: 0, months: {} };
-                    if (!map[driverName].months[mk]) map[driverName].months[mk] = { count: 0, distance: 0 };
+                // 계정(uid)으로 묶는다 — 이름으로 묶으면 동명이인이 합쳐지고, 이름을 바꾼 사람이 둘로 나뉜다.
+                // 표시 이름은 가장 최근 달의 것(recentKeys는 과거→현재 순이라 덮어쓰면 최신이 남는다).
+                Object.entries(stat.driverStats).forEach(([uid, dStat]) => {
+                    if (!map[uid]) map[uid] = { name: '', totalCount: 0, totalDistance: 0, months: {} };
+                    if (dStat.name) map[uid].name = dStat.name;
+                    if (!map[uid].months[mk]) map[uid].months[mk] = { count: 0, distance: 0 };
 
-                    map[driverName].months[mk].count += dStat.count;
-                    map[driverName].months[mk].distance += dStat.distance;
-                    map[driverName].totalCount += dStat.count;
-                    map[driverName].totalDistance += dStat.distance;
+                    map[uid].months[mk].count += dStat.count;
+                    map[uid].months[mk].distance += dStat.distance;
+                    map[uid].totalCount += dStat.count;
+                    map[uid].totalDistance += dStat.distance;
                 });
             }
         });
 
-        return Object.entries(map).map(([name, d]) => ({
-            name,
+        // 동명이인은 차트 축에서 한 줄로 합쳐지므로 번호를 붙여 가른다
+        const seen: Record<string, number> = {};
+        return Object.values(map).map((d) => {
+            const base = d.name || '알 수 없음';
+            seen[base] = (seen[base] || 0) + 1;
+            return { ...d, name: seen[base] > 1 ? `${base} (${seen[base]})` : base };
+        }).map((d) => ({
+            name: d.name,
             totalCount: d.totalCount,
             totalDistance: d.totalDistance,
             ...recentKeys.reduce((acc, mk) => {
@@ -136,9 +146,25 @@ export default function useAnalytics() {
         })).sort((a, b) => b.totalCount - a.totalCount);
     }, [stats, monthKeys]);
 
+    // 가동률 기간(최근 3개월)에 걸친 해의 공휴일
+    const utilYears = useMemo(
+        () => [...new Set(monthKeys.slice(-3).map(k => Number(k.slice(0, 4))))].join(','),
+        [monthKeys],
+    );
+    useEffect(() => {
+        let cancelled = false;
+        Promise.all(utilYears.split(',').map(y => fetchPublicHolidays(Number(y)).catch(() => ({}))))
+            .then(maps => {
+                if (cancelled) return;
+                setHolidays(new Set(maps.flatMap(mp => Object.keys(mp || {}))));
+            });
+        return () => { cancelled = true; };
+    }, [utilYears]);
+
     const vehicleUtilization = useMemo(() => {
         const recentKeys = monthKeys.slice(-3);
-        const totalWorkdays = recentKeys.reduce((s, k) => s + getWorkdaysInMonth(k), 0);
+        // 공휴일을 빼고, 진행 중인 이번 달은 오늘까지만 센다
+        const totalWorkdays = recentKeys.reduce((s, k) => s + countWorkdays(k, holidays), 0);
         const map: Record<string, number> = {};
         
         recentKeys.forEach(mk => {
@@ -154,10 +180,11 @@ export default function useAnalytics() {
         return vehicles.map(v => {
             const name = v.displayName || v.plateNumber || '(미지정)';
             const usedDays = map[v.id] || 0;
-            const rate = totalWorkdays > 0 ? Math.round((usedDays / totalWorkdays) * 100) : 0;
+            // 주말·공휴일 운행도 가동일에 들어가 분모(평일)를 넘을 수 있다 — 100%에서 멈춘다
+            const rate = totalWorkdays > 0 ? Math.min(100, Math.round((usedDays / totalWorkdays) * 100)) : 0;
             return { name, usedDays, totalWorkdays, rate };
         }).sort((a, b) => b.rate - a.rate);
-    }, [stats, vehicles, monthKeys]);
+    }, [stats, vehicles, monthKeys, holidays]);
 
     const heatmapData = useMemo(() => {
         const grid = Array.from({ length: 7 }, () => Array(24).fill(0) as number[]);
@@ -287,6 +314,12 @@ export default function useAnalytics() {
 
     const totalLogs = useMemo(() => stats.reduce((s, st) => s + (st.totalLogs || 0), 0), [stats]);
 
+    /** 가장 최근 집계 시각 — 화면에 "언제 기준 숫자인지" 적는다 */
+    const aggregatedAt = useMemo(() => {
+        const times = stats.map(s => s.updatedAt?.getTime() || 0).filter(t => t > 0);
+        return times.length ? new Date(Math.max(...times)) : null;
+    }, [stats]);
+
     return {
         loading,
         rangeMonths, setRangeMonths,
@@ -312,6 +345,7 @@ export default function useAnalytics() {
         totalOperatingCost,
         // 원시 통계
         totalLogs,
+        aggregatedAt,
         totalVehicles: vehicles.length,
         totalMembers: members.length,
     };

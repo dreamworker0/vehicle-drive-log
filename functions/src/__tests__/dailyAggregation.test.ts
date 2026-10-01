@@ -179,6 +179,69 @@ describe("runDailyAggregation — 월별 집계 프로듀서", () => {
         expect(payload.anomalies.overDrive).toBe(1);
     });
 
+    describe("출발 시각 · 다일 운행 · 운전자 미지정 · 통째 저장", () => {
+        // 픽스처가 2026년 6월이다 — 집계 창(이번 달)을 6월로 맞춰야 다일 운행의 '이 달 날짜' 판정이 맞다
+        beforeEach(() => {
+            jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] });
+            jest.setSystemTime(new Date("2026-06-20T03:00:00Z"));
+        });
+        afterEach(() => jest.useRealTimers());
+
+        /** 기본 픽스처에 기록을 잠시 더한다(driveLogs는 모듈 스코프 배열이라 끝나면 되돌린다) */
+        async function runWith(extra: Array<Record<string, unknown>>) {
+            const before = driveLogs.length;
+            driveLogs.push(...extra);
+            try {
+                await runDailyAggregation(1);
+                return mockSet.mock.calls[0][0];
+            } finally {
+                driveLogs.length = before;
+            }
+        }
+
+        it("심야·요일은 도착이 아니라 출발 시각으로 본다 — 21:00 출발·22:30 도착은 심야가 아니다", async () => {
+            const base = await runWith([]);
+            const payload = await (async () => { jest.clearAllMocks(); return runWith([
+                // 수요일 21:00 출발 → 22:30 도착 (예전엔 도착 시각이라 심야로 셌다)
+                { driverUid: "u2", vehicleId: "veh-2", startKm: 0, endKm: 10, startTime: "21:00",
+                  timestamp: { toDate: () => kstInstant(2026, 5, 10, 22) } },
+                // 05:00 출발 → 07:00 도착 (예전엔 빠졌다)
+                { driverUid: "u2", vehicleId: "veh-2", startKm: 10, endKm: 20, startTime: "05:00",
+                  timestamp: { toDate: () => kstInstant(2026, 5, 10, 7) } },
+            ]); })();
+            expect(payload.anomalies.night - base.anomalies.night).toBe(1);
+            expect(payload.heatmap["3"]?.["21"]).toBe(1); // 2026-06-10은 수요일, 출발 21시 칸
+            expect(payload.heatmap["3"]?.["5"]).toBe(1);
+        });
+
+        it("다일 운행은 출발일로 요일을 보고, 과다주행에서 빼고, 가동일은 출발~도착을 모두 센다", async () => {
+            const payload = await runWith([
+                // 6/12(금) 출발 → 6/14(일) 도착, 400km
+                { driverUid: "u2", vehicleId: "veh-2", startKm: 100, endKm: 500, startDate: "2026-06-12", startTime: "09:00",
+                  timestamp: { toDate: () => kstInstant(2026, 5, 14, 18) } },
+            ]);
+            // 기본 픽스처의 과다주행 1건(250km 하루)만 남는다 — 이틀 400km는 하루 과다주행이 아니다
+            expect(payload.anomalies.overDrive).toBe(1);
+            // veh-2: 기본 1일(6/8) + 6/12·13·14 = 4일
+            expect(payload.vehicleStats["veh-2"].usedDays).toBe(4);
+            expect(payload.heatmap["5"]?.["9"]).toBe(1); // 금요일 9시(출발) 칸
+        });
+
+        it("driverUid가 없는 옛 기록도 '(운전자 미지정)'으로 센다 — 직원별 합이 총계와 맞는다", async () => {
+            const payload = await runWith([
+                { driverName: "옛기록", vehicleId: "veh-2", startKm: 0, endKm: 30, timestamp: { toDate: () => tsWeekday23 } },
+            ]);
+            expect(payload.driverStats.__unassigned).toMatchObject({ name: "(운전자 미지정)", count: 1, distance: 30 });
+            const sum = Object.values(payload.driverStats as Record<string, { count: number }>).reduce((a, d) => a + d.count, 0);
+            expect(sum).toBe(payload.monthlyTotal.count);
+        });
+
+        it("merge 없이 통째로 저장한다 — 지워진 직원·차량·히트맵 칸이 남지 않게", async () => {
+            await runDailyAggregation(1);
+            expect(mockSet.mock.calls[0]).toHaveLength(1); // 두 번째 인자({ merge: true })가 없다
+        });
+    });
+
     it("heatmap을 요일→시간 중첩객체로 저장한다", async () => {
         await runDailyAggregation(1);
         const heatmap = mockSet.mock.calls[0][0].heatmap;

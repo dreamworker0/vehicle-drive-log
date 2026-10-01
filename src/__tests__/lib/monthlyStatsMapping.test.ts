@@ -48,6 +48,12 @@ describe('mapMonthlyDoc — 프로듀서 스키마 → 평탄 MonthlyStat', () =
         expect(m.heatmapData).toContainEqual({ dayIdx: 5, hour: 18, count: 1 });
     });
 
+    it('야간 집계 시각(updatedAt)을 넘긴다 — 없으면 null', () => {
+        const at = new Date('2026-10-01T02:14:00+09:00');
+        expect(mapMonthlyDoc('2026-10', { updatedAt: { toDate: () => at } }).updatedAt).toEqual(at);
+        expect(mapMonthlyDoc('2026-10', {}).updatedAt).toBeNull();
+    });
+
     it('운행 방식은 기관·직원·차량 모두 옮기고, 없던 문서는 0 또는 생략으로 둔다', () => {
         const m = mapMonthlyDoc('2026-10', {
             originCounts: { quick: 3, reservation: 1 },
