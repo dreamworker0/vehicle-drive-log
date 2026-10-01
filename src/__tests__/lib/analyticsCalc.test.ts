@@ -1,188 +1,178 @@
 /**
- * analyticsCalc 단위 테스트
- * 월별 추이, 히트맵, 비정상 탐지 계산 함수 검증
+ * analyticsCalc — 야간 집계 문서를 화면 데이터로 바꾸는 계산 (트렌드 · 히트맵 · 이상 탐지 · 집계 시각)
+ *
+ * 예전 이 파일은 원본 일지를 받는 옛 함수(화면이 쓰지 않는다)를 시험했다. 지금은 `useAnalytics`가
+ * 실제로 부르는 함수를 시험한다.
  */
 import { describe, it, expect } from 'vitest';
 import {
-    formatMonth,
-    getLogDate,
-    getWorkdaysInMonth,
     countWorkdays,
     calcMonthlyTrend,
-    calcHeatmapData,
-    detectAnomalies,
+    calcDriveOriginTrend,
+    calcDriveOriginBy,
+    calcHeatmap,
+    calcAnomalies,
+    calcHipassUsedTotal,
+    calcAggregatedAt,
     MONTH_LABELS,
     DAY_NAMES,
 } from '../../hooks/utils/analyticsCalc';
+import { stat, vstat } from './monthlyStatFixture';
 
-describe('analyticsCalc', () => {
-    describe('formatMonth', () => {
-        it('Date를 YYYY-MM 포맷으로 변환한다', () => {
-            expect(formatMonth(new Date(2026, 1, 27))).toBe('2026-02');
-            expect(formatMonth(new Date(2026, 11, 1))).toBe('2026-12');
-        });
+const MONTHS = ['2026-07', '2026-08', '2026-09'];
 
-        it('한 자리 월은 0으로 패딩한다', () => {
-            expect(formatMonth(new Date(2026, 0, 1))).toBe('2026-01');
-        });
+describe('countWorkdays — 가동률 분모', () => {
+    it('공휴일을 뺀다 — 2026년 9월 평일 22일 중 추석 연휴(9/24·25) 제외', () => {
+        const holidays = new Set(['2026-09-24', '2026-09-25', '2026-09-26']); // 26일은 토요일
+        expect(countWorkdays('2026-09', holidays, new Date(2026, 11, 31))).toBe(20);
+    });
+    it('진행 중인 달은 오늘까지만 센다 — 10/1(목)에 보면 10월은 1일', () => {
+        expect(countWorkdays('2026-10', new Set(), new Date(2026, 9, 1, 9))).toBe(1);
+    });
+    it('지난 달은 한 달 전체, 앞으로의 달은 0', () => {
+        expect(countWorkdays('2026-09', new Set(), new Date(2026, 9, 1))).toBe(22);
+        expect(countWorkdays('2026-11', new Set(), new Date(2026, 9, 1))).toBe(0);
+    });
+});
+
+describe('calcMonthlyTrend', () => {
+    it('monthKeys 순서대로 건수·거리·주유비를 옮기고, 문서가 없는 달은 0', () => {
+        const r = calcMonthlyTrend([
+            stat('2026-09', { totalLogs: 12, totalDistance: 340, fuelCost: 90000 }),
+            stat('2026-07', { totalLogs: 3, totalDistance: 50 }),
+        ], MONTHS);
+        expect(r).toEqual([
+            { month: '2026-07', label: '7월', count: 3, distance: 50, fuelCost: 0 },
+            { month: '2026-08', label: '8월', count: 0, distance: 0, fuelCost: 0 },
+            { month: '2026-09', label: '9월', count: 12, distance: 340, fuelCost: 90000 },
+        ]);
+    });
+});
+
+describe('calcDriveOriginTrend', () => {
+    it('월별 운행 방식 건수를 옮긴다', () => {
+        const r = calcDriveOriginTrend([
+            stat('2026-08', { originCounts: { reservation: 4, quick: 7, manual: 1, linked: 2 } }),
+        ], MONTHS);
+        expect(r[1]).toEqual({ month: '2026-08', label: '8월', reservation: 4, quick: 7, manual: 1, linked: 2 });
+        expect(r[0]).toMatchObject({ reservation: 0, quick: 0, manual: 0, linked: 0 });
+    });
+});
+
+describe('calcDriveOriginBy — 직원별·차량별 운행 방식', () => {
+    const o = (reservation: number, quick: number, manual = 0, linked = 0) => ({ reservation, quick, manual, linked });
+
+    it('기간 전체를 id로 합치고 최신 이름을 쓰며, 많은 순으로 낸다', () => {
+        const r = calcDriveOriginBy([
+            stat('2026-08', { driverStats: { u1: { name: '김옛이름', count: 2, distance: 0, origin: o(1, 1) } } }),
+            stat('2026-09', {
+                driverStats: {
+                    u1: { name: '김새이름', count: 1, distance: 0, origin: o(0, 1) },
+                    u2: { name: '이기사', count: 5, distance: 0, origin: o(2, 2, 1) },
+                },
+            }),
+        ]);
+        expect(r.byDriver.map(d => [d.name, d.total])).toEqual([['이기사', 5], ['김새이름', 3]]);
+        expect(r.byDriver[1]).toMatchObject({ reservation: 1, quick: 2 });
     });
 
-    describe('getLogDate', () => {
-        it('date 필드가 있으면 그대로 반환한다', () => {
-            expect(getLogDate({ date: '2026-02-27' })).toBe('2026-02-27');
-        });
-
-        it('date 없고 timestamp도 없으면 빈 문자열', () => {
-            expect(getLogDate({})).toBe('');
-        });
+    it('origin이 없는 옛 문서는 건너뛰고, 합이 0인 줄은 뺀다', () => {
+        const r = calcDriveOriginBy([
+            stat('2026-08', { vehicleStats: { v1: vstat({ name: '스타렉스' }), v2: vstat({ name: '카니발', origin: o(0, 0) }) } }),
+        ]);
+        expect(r.byVehicle).toEqual([]);
     });
 
-    describe('countWorkdays — 가동률 분모', () => {
-        it('공휴일을 뺀다 — 2026년 9월 평일 22일 중 추석 연휴(9/24·25) 제외', () => {
-            const holidays = new Set(['2026-09-24', '2026-09-25', '2026-09-26']); // 26일은 토요일
-            expect(countWorkdays('2026-09', holidays, new Date(2026, 11, 31))).toBe(20);
-        });
-        it('진행 중인 달은 오늘까지만 센다 — 10/1(목)에 보면 10월은 1일', () => {
-            expect(countWorkdays('2026-10', new Set(), new Date(2026, 9, 1, 9))).toBe(1);
-        });
-        it('지난 달은 한 달 전체, 앞으로의 달은 0', () => {
-            expect(countWorkdays('2026-09', new Set(), new Date(2026, 9, 1))).toBe(22);
-            expect(countWorkdays('2026-11', new Set(), new Date(2026, 9, 1))).toBe(0);
-        });
+    it('상위 10곳까지만', () => {
+        const driverStats = Object.fromEntries(Array.from({ length: 12 }, (_, i) =>
+            [`u${i}`, { name: `직원${i}`, count: i + 1, distance: 0, origin: o(i + 1, 0) }]));
+        expect(calcDriveOriginBy([stat('2026-09', { driverStats })]).byDriver).toHaveLength(10);
+    });
+});
+
+describe('calcHeatmap', () => {
+    it('달마다의 칸을 더하고, 범위 밖 칸은 버린다', () => {
+        const r = calcHeatmap([
+            stat('2026-08', { heatmapData: [{ dayIdx: 1, hour: 9, count: 2 }, { dayIdx: 7, hour: 9, count: 99 }] }),
+            stat('2026-09', { heatmapData: [{ dayIdx: 1, hour: 9, count: 3 }, { dayIdx: 0, hour: 23, count: 1 }] }),
+        ]);
+        expect(r.grid).toHaveLength(7);
+        expect(r.grid[0]).toHaveLength(24);
+        expect(r.grid[1][9]).toBe(5);
+        expect(r.items).toEqual([
+            { day: '일', dayIdx: 0, hour: 23, count: 1 },
+            { day: '월', dayIdx: 1, hour: 9, count: 5 },
+        ]);
+        expect(r.maxCount).toBe(5);
     });
 
-    describe('getWorkdaysInMonth', () => {
-        it('2026-02의 근무일을 정확히 계산한다', () => {
-            // 2026-02: 28일, 일: 1,8,15,22 / 토: 7,14,21,28 → 주말 8일 → 근무일 20일
-            expect(getWorkdaysInMonth('2026-02')).toBe(20);
-        });
+    it('자료가 없어도 maxCount는 1 — 색 계산에서 0으로 나누지 않게', () => {
+        expect(calcHeatmap([]).maxCount).toBe(1);
+    });
+});
 
-        it('2026-01의 근무일을 정확히 계산한다', () => {
-            // 2026-01: 31일
-            const result = getWorkdaysInMonth('2026-01');
-            expect(result).toBeGreaterThan(0);
-            expect(result).toBeLessThanOrEqual(23); // 최대 23 근무일
-        });
+describe('calcAnomalies — 기간 합계로 판정', () => {
+    const at = (totalLogs: number, weekend: number, night: number, overDrive: number) =>
+        calcAnomalies([stat('2026-09', { totalLogs, anomalies: { weekend, night, overDrive } })]);
+
+    it('주말 비율 15% 초과부터, 30% 초과는 높음', () => {
+        expect(at(100, 15, 0, 0)).toEqual([]);
+        expect(at(100, 16, 0, 0)[0]).toMatchObject({ type: 'weekend', severity: 'medium', title: '주말 운행 비율 16%' });
+        expect(at(100, 31, 0, 0)[0]).toMatchObject({ severity: 'high' });
     });
 
-    describe('calcMonthlyTrend', () => {
-        const monthKeys = ['2026-01', '2026-02'];
-        const logs = [
-            { date: '2026-01-15', startKm: 100, endKm: 150, fuelAmount: 30 },
-            { date: '2026-01-20', startKm: 150, endKm: 200, fuelAmount: 25 },
-            { date: '2026-02-10', startKm: 200, endKm: 350, fuelAmount: 50 },
-        ];
-
-        it('월별 운행 횟수를 올바르게 합산한다', () => {
-            const result = calcMonthlyTrend(logs, monthKeys);
-            expect(result[0].count).toBe(2); // 1월: 2건
-            expect(result[1].count).toBe(1); // 2월: 1건
-        });
-
-        it('월별 주행거리를 올바르게 합산한다', () => {
-            const result = calcMonthlyTrend(logs, monthKeys);
-            expect(result[0].distance).toBe(100); // 1월: 50+50
-            expect(result[1].distance).toBe(150); // 2월: 150
-        });
-
-        it('월별 연료비를 올바르게 합산한다', () => {
-            const result = calcMonthlyTrend(logs, monthKeys);
-            expect(result[0].fuelCost).toBe(55); // 1월: 30+25
-            expect(result[1].fuelCost).toBe(50); // 2월: 50
-        });
-
-        it('월 라벨을 올바르게 생성한다', () => {
-            const result = calcMonthlyTrend(logs, monthKeys);
-            expect(result[0].label).toBe('1월');
-            expect(result[1].label).toBe('2월');
-        });
-
-        it('로그가 없는 월은 0으로 초기화된다', () => {
-            const result = calcMonthlyTrend([], monthKeys);
-            expect(result[0].count).toBe(0);
-            expect(result[0].distance).toBe(0);
-        });
+    it('심야 3건 초과부터, 10건 초과는 높음', () => {
+        expect(at(100, 0, 3, 0)).toEqual([]);
+        expect(at(100, 0, 4, 0)[0]).toMatchObject({ type: 'night', severity: 'medium' });
+        expect(at(100, 0, 11, 0)[0]).toMatchObject({ severity: 'high' });
     });
 
-    describe('calcHeatmapData', () => {
-        const logs = [
-            { date: '2026-02-23', startTime: '09:00' }, // 월
-            { date: '2026-02-23', startTime: '09:30' }, // 월 09시대
-            { date: '2026-02-24', startTime: '14:00' }, // 화
-        ];
-
-        it('히트맵 그리드를 7×24로 생성한다', () => {
-            const result = calcHeatmapData(logs);
-            expect(result.grid.length).toBe(7);
-            expect(result.grid[0].length).toBe(24);
-        });
-
-        it('같은 요일/시간대의 건수를 합산한다', () => {
-            const result = calcHeatmapData(logs);
-            // 월요일(1) 09시에 2건
-            expect(result.grid[1][9]).toBe(2);
-        });
-
-        it('최대 건수를 올바르게 계산한다', () => {
-            const result = calcHeatmapData(logs);
-            expect(result.maxCount).toBe(2);
-        });
-
-        it('빈 로그에서도 정상 동작한다', () => {
-            const result = calcHeatmapData([]);
-            expect(result.items.length).toBe(0);
-            expect(result.maxCount).toBe(1); // 최소값 1
-        });
+    it('하루 200km 초과는 1건부터, 5건 초과는 높음', () => {
+        expect(at(100, 0, 0, 1)[0]).toMatchObject({ type: 'overdrive', severity: 'low' });
+        expect(at(100, 0, 0, 6)[0]).toMatchObject({ severity: 'high' });
     });
 
-    describe('detectAnomalies', () => {
-        it('주말 운행 비율이 15% 초과이면 경고를 생성한다', () => {
-            // 10건 중 2건 주말 (20%) → 경고 발생
-            const logs = [
-                ...Array(8).fill(null).map(() => ({ date: '2026-02-23', startKm: 0, endKm: 10, driverName: 'A' })), // 월요일
-                { date: '2026-02-22', startKm: 0, endKm: 10, driverName: 'A' }, // 일요일
-                { date: '2026-02-28', startKm: 0, endKm: 10, driverName: 'A' }, // 토요일
-            ];
-            const result = detectAnomalies(logs);
-            expect(result.find(a => a.type === 'weekend')).toBeTruthy();
-        });
-
-        it('심야 운행이 3건 초과이면 경고를 생성한다', () => {
-            const logs = Array(5).fill(null).map(() => ({
-                date: '2026-02-23', startTime: '23:00', startKm: 0, endKm: 10, driverName: 'A'
-            }));
-            const result = detectAnomalies(logs);
-            expect(result.find(a => a.type === 'night')).toBeTruthy();
-        });
-
-        it('1일 200km 이상 주행이 있으면 경고를 생성한다', () => {
-            const logs = [
-                { date: '2026-02-23', startKm: 0, endKm: 250, driverName: 'A' },
-            ];
-            const result = detectAnomalies(logs);
-            expect(result.find(a => a.type === 'overdrive')).toBeTruthy();
-        });
-
-        it('정상 운행이면 빈 배열을 반환한다', () => {
-            const logs = Array(10).fill(null).map(() => ({
-                date: '2026-02-23', startTime: '10:00', startKm: 0, endKm: 10, driverName: 'A'
-            }));
-            const result = detectAnomalies(logs);
-            expect(result.length).toBe(0);
-        });
+    it('여러 달을 더해서 본다 — 한 달씩은 기준 아래여도', () => {
+        const r = calcAnomalies([
+            stat('2026-08', { totalLogs: 10, anomalies: { weekend: 0, night: 2, overDrive: 0 } }),
+            stat('2026-09', { totalLogs: 10, anomalies: { weekend: 0, night: 2, overDrive: 0 } }),
+        ]);
+        expect(r.map(a => a.type)).toEqual(['night']);
     });
 
-    describe('상수 확인', () => {
-        it('MONTH_LABELS는 12개월을 포함한다', () => {
-            expect(MONTH_LABELS).toHaveLength(12);
-            expect(MONTH_LABELS[0]).toBe('1월');
-            expect(MONTH_LABELS[11]).toBe('12월');
-        });
+    it('운행이 없으면 빈 배열', () => {
+        expect(calcAnomalies([])).toEqual([]);
+    });
+});
 
-        it('DAY_NAMES는 7요일을 포함한다', () => {
-            expect(DAY_NAMES).toHaveLength(7);
-            expect(DAY_NAMES[0]).toBe('일');
-            expect(DAY_NAMES[6]).toBe('토');
-        });
+describe('calcHipassUsedTotal', () => {
+    it('기간 안의 달만 더한다', () => {
+        expect(calcHipassUsedTotal([
+            stat('2026-08', { hipassUsed: 1000 }),
+            stat('2026-09', { hipassUsed: 2500 }),
+            stat('2026-01', { hipassUsed: 99999 }),
+        ], MONTHS)).toBe(3500);
+    });
+
+    it('사용액을 담은 달이 하나도 없으면 null — 0원 사용과 구분한다', () => {
+        expect(calcHipassUsedTotal([stat('2026-09')], MONTHS)).toBeNull();
+        expect(calcHipassUsedTotal([stat('2026-09', { hipassUsed: 0 })], MONTHS)).toBe(0);
+    });
+});
+
+describe('calcAggregatedAt', () => {
+    it('가장 최근 집계 시각, 없으면 null', () => {
+        const a = new Date('2026-09-30T02:10:00+09:00');
+        const b = new Date('2026-10-01T02:14:00+09:00');
+        expect(calcAggregatedAt([stat('2026-09', { updatedAt: a }), stat('2026-10', { updatedAt: b })])).toEqual(b);
+        expect(calcAggregatedAt([stat('2026-09')])).toBeNull();
+    });
+});
+
+describe('상수', () => {
+    it('MONTH_LABELS는 12개월, DAY_NAMES는 일요일부터 7요일', () => {
+        expect(MONTH_LABELS).toHaveLength(12);
+        expect(MONTH_LABELS[0]).toBe('1월');
+        expect(DAY_NAMES).toEqual(['일', '월', '화', '수', '목', '금', '토']);
     });
 });
