@@ -55,7 +55,7 @@ export default function ReportTables({ driverData, vehicleData, stats }: Props) 
                         </thead>
                         <tbody>
                             {driverData.map((d, i) => (
-                                <tr key={d.name} className={`border-b border-surface-50 ${i % 2 === 0 ? 'bg-surface-25' : ''} hover:bg-primary-50/30 transition-colors`}>
+                                <tr key={d.name} className={`border-b border-surface-50 dark:border-surface-700/60 ${i % 2 === 0 ? 'bg-surface-25 dark:bg-surface-800/40' : ''} hover:bg-primary-50/30 dark:hover:bg-primary-900/20 transition-colors`}>
                                     <td className="py-2.5 px-3 font-medium text-surface-800 dark:text-surface-200">{d.name}</td>
                                     <td className="py-2.5 px-3 text-right text-surface-600 dark:text-surface-400">{d.count}건</td>
                                     <td className="py-2.5 px-3 text-right font-mono text-surface-700 dark:text-surface-300">{d.distance.toLocaleString()} km</td>
@@ -90,7 +90,7 @@ export default function ReportTables({ driverData, vehicleData, stats }: Props) 
                         </thead>
                         <tbody>
                             {vehicleData.map((v, i) => (
-                                <tr key={v.name} className={`border-b border-surface-50 ${i % 2 === 0 ? 'bg-surface-25' : ''} hover:bg-primary-50/30 transition-colors`}>
+                                <tr key={v.name} className={`border-b border-surface-50 dark:border-surface-700/60 ${i % 2 === 0 ? 'bg-surface-25 dark:bg-surface-800/40' : ''} hover:bg-primary-50/30 dark:hover:bg-primary-900/20 transition-colors`}>
                                     <td className="py-2.5 px-3 font-medium text-surface-800 dark:text-surface-200">{v.name}</td>
                                     <td className="py-2.5 px-3 text-right text-surface-600 dark:text-surface-400">{v.count}건</td>
                                     <td className="py-2.5 px-3 text-right font-mono text-surface-700 dark:text-surface-300">{v.distance.toLocaleString()} km</td>

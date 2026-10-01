@@ -285,3 +285,19 @@ export function formatDailyTrendData(byDate: Record<string, { count: number; dis
             distance: data.distance,
         }));
 }
+
+/**
+ * 시간대 차트에 그릴 범위 — 기본 06~22시, 그 밖에 운행이 있으면 거기까지 넓힌다.
+ * 예전에는 06~22시로 잘라 심야·새벽 운행이 이 화면에서 보이지 않았다.
+ */
+export function hourlyRange(hourly: { count: number }[]): [number, number] {
+    let lo = 6;
+    let hi = Math.min(22, hourly.length - 1);
+    hourly.forEach((h, i) => {
+        if (h.count > 0) {
+            if (i < lo) lo = i;
+            if (i > hi) hi = i;
+        }
+    });
+    return [lo, hi];
+}

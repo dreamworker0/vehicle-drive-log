@@ -90,8 +90,12 @@ export default function MonthlyReport() {
         <div id="monthly-report-print" className="max-w-5xl mx-auto animate-fade-in">
             {/* 헤더 */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 gap-3">
-                <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100">운행 통계 보고서</h1>
-                <div className="flex gap-2">
+                <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100">
+                    운행 통계 보고서
+                    {/* 인쇄본에는 기간 선택 줄이 빠지므로 제목 옆에 기간을 남긴다 */}
+                    <span className="hidden print:inline text-base font-normal text-surface-500 ml-3">{startDate} ~ {endDate}</span>
+                </h1>
+                <div className="flex gap-2 no-print">
                     <button
                         onClick={exportPdf}
                         disabled={filteredLogs.length === 0}
@@ -110,7 +114,7 @@ export default function MonthlyReport() {
             </div>
 
             {/* 빠른 기간 선택 */}
-            <div className="flex flex-wrap items-center gap-2 mb-4">
+            <div className="flex flex-wrap items-center gap-2 mb-4 no-print">
                 {PERIOD_OPTIONS.map((op) => (
                     <button
                         key={op.key}
@@ -179,7 +183,7 @@ export default function MonthlyReport() {
             ) : (
                 <>
                     {/* 탭 선택 */}
-                    <div className="flex gap-1 bg-surface-100 dark:bg-surface-800 rounded-xl p-1 mb-6">
+                    <div className="flex gap-1 bg-surface-100 dark:bg-surface-800 rounded-xl p-1 mb-6 no-print">
                         {[
                             { key: 'charts', label: '차트 분석' },
                             { key: 'table', label: '상세 테이블' },
