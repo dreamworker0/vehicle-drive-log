@@ -1,8 +1,9 @@
 /**
  * analyticsCalc — 비용·가동률·추천 계산 테스트
  *
- * 기존 analyticsCalc.test.ts는 월별 추이·히트맵·이상 탐지까지만 덮고 있었다. 이 파일은
  * 관리자 [분석] 화면 아래쪽 절반(직원 비교·가동률·연비·정비비·비용 추이·추천 카드)을 덮는다.
+ * 입력은 화면과 같은 **야간 집계 문서(MonthlyStat)** 다 — 예전에는 화면이 쓰지 않는 원본 일지용
+ * 옛 함수를 시험해, 통과해도 화면 숫자가 맞다는 보장이 없었다.
  *
  * 추천 카드는 특히 임계값이 촘촘하다(평균 대비 1.3배, 전월 대비 1.5배 + 최소 5건, 90/180일,
  * 가동률 10% + 근무일 20일). 임계 바로 아래에서 뜨거나 바로 위에서 안 뜨면 관리자에게
@@ -17,168 +18,123 @@ import {
     calcCostTrend,
     calcRecommendations,
     calcMonthOverMonth,
-    detectAnomalies,
-    type LogEntry,
+    calcAnomalies,
 } from '../../hooks/utils/analyticsCalc';
+import { stat, vstat, vehicle } from './monthlyStatFixture';
 
 const MONTHS = ['2026-01', '2026-02', '2026-03'];
 
-describe('calcDriverComparison', () => {
-    const logs: LogEntry[] = [
-        { date: '2026-02-10', driverName: '홍길동', startKm: 0, endKm: 100 },
-        { date: '2026-03-10', driverName: '홍길동', startKm: 0, endKm: 50 },
-        { date: '2026-03-11', driverName: '김철수', startKm: 0, endKm: 30 },
-    ];
+describe('calcDriverComparison — 최근 3개월', () => {
+    const d = (name: string | undefined, count: number, distance: number) => ({ name, count, distance });
 
-    it('최근 3개월만 보고 운행 건수 내림차순으로 낸다', () => {
-        const r = calcDriverComparison(logs, MONTHS);
-        expect(r.map(d => d.name)).toEqual(['홍길동', '김철수']);
-        expect(r[0].totalCount).toBe(2);
-        expect(r[0].totalDistance).toBe(150);
-    });
-
-    it('월 라벨별 건수·거리를 펼쳐 담는다 (차트가 이 키를 읽는다)', () => {
-        const r = calcDriverComparison(logs, MONTHS) as unknown as Record<string, number | string[]>[];
-        expect(r[0]['2월_count']).toBe(1);
-        expect(r[0]['3월_distance']).toBe(50);
-        expect(r[0]['1월_count']).toBe(0); // 기록이 없는 달도 0으로 채운다
+    it('uid로 묶어 운행 건수 내림차순으로 내고, 월 라벨별 건수·거리를 펼친다(차트가 이 키를 읽는다)', () => {
+        const r = calcDriverComparison([
+            stat('2026-02', { driverStats: { u1: d('홍길동', 1, 100) } }),
+            stat('2026-03', { driverStats: { u1: d('홍길동', 1, 50), u2: d('김철수', 1, 30) } }),
+        ], MONTHS) as unknown as Record<string, number | string | string[]>[];
+        expect(r.map(x => x.name)).toEqual(['홍길동', '김철수']);
+        expect(r[0]).toMatchObject({ totalCount: 2, totalDistance: 150, '2월_count': 1, '3월_distance': 50, '1월_count': 0 });
         expect(r[0].monthLabels).toEqual(['1월', '2월', '3월']);
     });
 
-    it('최근 3개월 밖의 기록은 세지 않는다', () => {
-        expect(calcDriverComparison([{ date: '2025-12-01', driverName: '홍길동' }], MONTHS)).toEqual([]);
+    it('최근 3개월 밖의 달은 세지 않는다', () => {
+        expect(calcDriverComparison([stat('2025-12', { driverStats: { u1: d('홍길동', 9, 9) } })], MONTHS)).toEqual([]);
     });
 
-    it('운전자명이 없으면 (이름 없음)으로 묶는다', () => {
-        expect(calcDriverComparison([{ date: '2026-03-01' }], MONTHS)[0].name).toBe('(이름 없음)');
+    it('이름을 바꾼 사람은 한 줄(최신 이름), 동명이인은 번호로 가른다', () => {
+        const r = calcDriverComparison([
+            stat('2026-02', { driverStats: { u1: d('김옛이름', 1, 0) } }),
+            stat('2026-03', { driverStats: { u1: d('김새이름', 3, 0), u2: d('이민수', 2, 0), u3: d('이민수', 1, 0) } }),
+        ], MONTHS);
+        expect(r.map(x => x.name)).toEqual(['김새이름', '이민수', '이민수 (2)']);
     });
 
-    it('날짜를 알 수 없는 기록은 건너뛴다', () => {
-        expect(calcDriverComparison([{ driverName: '홍길동' }], MONTHS)).toEqual([]);
+    it('이름이 없으면 알 수 없음', () => {
+        expect(calcDriverComparison([stat('2026-03', { driverStats: { u1: d(undefined, 1, 0) } })], MONTHS)[0].name).toBe('알 수 없음');
     });
 });
 
-describe('calcVehicleUtilization', () => {
-    const vehicles = [
-        { id: 'v1', displayName: '카니발' },
-        { id: 'v2', displayName: '스타렉스' },
-    ];
+describe('calcVehicleUtilization — 최근 3개월 가동률', () => {
+    // 2026-03-31(화) 기준: 1월 22 · 2월 20 · 3월 22 평일 = 64
+    const UNTIL = new Date(2026, 2, 31, 12);
 
-    it('같은 날 여러 번 써도 하루로 세고, 가동률 내림차순으로 낸다', () => {
+    it('가동일 합 ÷ 평일(공휴일 제외) 수, 가동률 내림차순', () => {
         const r = calcVehicleUtilization(
-            [
-                { date: '2026-03-02', vehicleDisplayName: '카니발' },
-                { date: '2026-03-02', vehicleDisplayName: '카니발' },
-                { date: '2026-03-03', vehicleDisplayName: '카니발' },
-            ],
-            vehicles,
-            MONTHS,
+            [stat('2026-02', { vehicleStats: { a: vstat({ usedDays: 10 }) } }), stat('2026-03', { vehicleStats: { a: vstat({ usedDays: 6 }), b: vstat({ usedDays: 32 }) } })],
+            [vehicle('a', { displayName: '스타렉스' }), vehicle('b', { displayName: '카니발' })],
+            MONTHS, new Set(['2026-03-02']), UNTIL,
         );
-
-        expect(r[0].name).toBe('카니발');
-        expect(r[0].usedDays).toBe(2);
-        expect(r[1]).toMatchObject({ name: '스타렉스', usedDays: 0, rate: 0 });
-        expect(r[0].totalWorkdays).toBeGreaterThan(0);
-        expect(r[0].rate).toBe(Math.round((2 / r[0].totalWorkdays) * 100));
+        expect(r).toEqual([
+            { name: '카니발', usedDays: 32, totalWorkdays: 63, rate: 51 },
+            { name: '스타렉스', usedDays: 16, totalWorkdays: 63, rate: 25 },
+        ]);
     });
 
-    it('차량 이름은 displayName → plateNumber → (미지정) 순으로 정한다', () => {
-        const r = calcVehicleUtilization([], [{ id: 'v1', plateNumber: '12가3456' }, { id: 'v2' }], MONTHS);
-        expect(r.map(v => v.name).sort()).toEqual(['(미지정)', '12가3456']);
+    it('주말 운행으로 분모를 넘어도 100%에서 멈춘다', () => {
+        const r = calcVehicleUtilization([stat('2026-03', { vehicleStats: { a: vstat({ usedDays: 99 }) } })], [vehicle('a')], MONTHS, new Set(), UNTIL);
+        expect(r[0].rate).toBe(100);
     });
 
-    it('대상 기간이 없으면 0으로 나누지 않는다', () => {
-        const r = calcVehicleUtilization([], vehicles, []);
-        expect(r.every(v => v.rate === 0 && v.totalWorkdays === 0)).toBe(true);
+    it('차량 이름은 displayName → plateNumber → (미지정), 기록이 없으면 0%', () => {
+        const r = calcVehicleUtilization([], [vehicle('a', { plateNumber: '12가3456' }), vehicle('b', { plateNumber: '' })], MONTHS, new Set(), UNTIL);
+        expect(r.map(v => [v.name, v.rate])).toEqual([['12가3456', 0], ['(미지정)', 0]]);
+    });
+
+    it('대상 기간에 평일이 없으면 0으로 나누지 않는다', () => {
+        const r = calcVehicleUtilization([], [vehicle('a')], ['2027-01'], new Set(), UNTIL);
+        expect(r[0]).toMatchObject({ totalWorkdays: 0, rate: 0 });
     });
 });
 
 describe('calcFuelEfficiency', () => {
-    it('차량별 km당 연료비를 내고 비싼 순으로 정렬한다', () => {
+    it('차량별로 달을 더해 km당 연료비를 내고 비싼 순, 평균은 차량 평균', () => {
         const r = calcFuelEfficiency([
-            { vehicleDisplayName: '카니발', startKm: 0, endKm: 100, fuelAmount: 1000 },
-            { vehicleDisplayName: '스타렉스', startKm: 0, endKm: 100, fuelAmount: 2000 },
+            stat('2026-02', { vehicleStats: { a: vstat({ name: '스타렉스', totalDist: 100, totalCost: 10000 }) } }),
+            stat('2026-03', { vehicleStats: { a: vstat({ totalDist: 100, totalCost: 20000 }), b: vstat({ name: '카니발', totalDist: 400, totalCost: 40000 }) } }),
         ]);
-
-        expect(r.items.map(i => i.name)).toEqual(['스타렉스', '카니발']);
-        expect(r.items[0].costPerKm).toBe(20);
-        expect(r.items[1].costPerKm).toBe(10);
-        expect(r.avgCostPerKm).toBe(15);
+        expect(r.items.map(i => [i.name, i.costPerKm])).toEqual([['스타렉스', 150], ['카니발', 100]]);
+        expect(r.avgCostPerKm).toBe(125);
     });
 
-    it('거리가 0 이하인 기록은 빼고 계산한다 — 미완료 일지가 연비를 왜곡하지 않게', () => {
-        const r = calcFuelEfficiency([
-            { vehicleDisplayName: '카니발', startKm: 100, endKm: 100, fuelAmount: 9999 },
-            { vehicleDisplayName: '카니발', startKm: 0, endKm: 100, fuelAmount: 1000 },
-        ]);
-        expect(r.items).toHaveLength(1);
-        expect(r.items[0].costPerKm).toBe(10);
-    });
-
-    it('연료비가 없는 차량은 목록에서 뺀다', () => {
-        const r = calcFuelEfficiency([{ vehicleName: '카니발', startKm: 0, endKm: 100 }]);
-        expect(r.items).toEqual([]);
-        expect(r.avgCostPerKm).toBe(0);
-    });
-
-    it('전기차 충전요금(energyCost)도 연료비로 본다', () => {
-        const r = calcFuelEfficiency([{ vehicleName: '아이오닉', startKm: 0, endKm: 100, energyCost: 500 }]);
-        expect(r.items[0].costPerKm).toBe(5);
+    it('거리나 연료비가 없는 차량은 뺀다', () => {
+        const r = calcFuelEfficiency([stat('2026-03', { vehicleStats: { a: vstat({ totalDist: 100 }), b: vstat({ totalCost: 5000 }) } })]);
+        expect(r).toEqual({ items: [], avgCostPerKm: 0 });
     });
 });
 
 describe('calcMaintenanceCostAnalysis', () => {
-    it('차량별 정비비 합계·건수·마지막 정비일을 내고 비용 내림차순으로 낸다', () => {
+    it('차량별 정비비 합·건수·마지막 정비일과 보험 만료일·운행 중지 여부를 담고, 비용 내림차순', () => {
         const r = calcMaintenanceCostAnalysis(
-            [{ id: 'v1', displayName: '카니발', currentKm: 10000 }, { id: 'v2', displayName: '스타렉스' }],
             [
-                { vehicleName: '카니발', cost: 100000, date: '2026-01-05' },
-                { vehicleName: '카니발', cost: 50000, date: '2026-03-05' },
+                stat('2026-02', { vehicleStats: { a: vstat({ maintenanceCost: 50000, maintenanceCount: 1, lastMaintenanceDate: '2026-02-10' }) } }),
+                stat('2026-03', { vehicleStats: { a: vstat({ maintenanceCost: 150000, maintenanceCount: 1, lastMaintenanceDate: '2026-03-05' }) } }),
+            ],
+            [
+                vehicle('b', { displayName: '카니발', currentKm: 1000, retired: { isRetired: true, reason: '', retiredAt: null } as never }),
+                vehicle('a', { displayName: '스타렉스', currentKm: 20000, insurance: { company: '', phone: '', expiryDate: '2026-04-01' } }),
             ],
         );
-
         expect(r[0]).toMatchObject({
-            name: '카니발',
-            totalMaintenanceCost: 150000,
-            maintenanceCount: 2,
-            lastMaintenanceDate: '2026-03-05',
-            costPerKm: 15,
+            name: '스타렉스', totalMaintenanceCost: 200000, maintenanceCount: 2, lastMaintenanceDate: '2026-03-05',
+            costPerKm: 10, insuranceExpiryDate: '2026-04-01', retired: false,
         });
-        expect(r[1]).toMatchObject({ name: '스타렉스', totalMaintenanceCost: 0, costPerKm: 0 });
+        expect(r[1]).toMatchObject({ name: '카니발', totalMaintenanceCost: 0, maintenanceCount: 0, lastMaintenanceDate: '', retired: true });
     });
 
     it('누적 거리가 0이면 km당 비용을 0으로 두고 나누지 않는다', () => {
-        const r = calcMaintenanceCostAnalysis(
-            [{ id: 'v1', displayName: '카니발' }],
-            [{ vehicleName: '카니발', cost: 100000, date: '2026-01-05' }],
-        );
+        const r = calcMaintenanceCostAnalysis([stat('2026-03', { vehicleStats: { a: vstat({ maintenanceCost: 1000, maintenanceCount: 1 }) } })], [vehicle('a')]);
         expect(r[0].costPerKm).toBe(0);
     });
 });
 
 describe('calcCostTrend', () => {
-    it('월별로 주유·하이패스·정비비를 더해 총액을 낸다', () => {
-        const r = calcCostTrend(
-            [{ date: '2026-02-10', fuelCost: 50000 }],
-            [{ date: '2026-02-11', chargeAmount: 10000 }],
-            [{ date: '2026-03-01', cost: 200000 }],
-            MONTHS,
-        );
-
-        expect(r).toHaveLength(3);
-        expect(r[0]).toMatchObject({ label: '1월', totalCost: 0 });
-        expect(r[1]).toMatchObject({ label: '2월', fuelCost: 50000, hipassCost: 10000, totalCost: 60000 });
-        expect(r[2]).toMatchObject({ label: '3월', maintenanceCost: 200000, totalCost: 200000 });
-    });
-
-    it('대상 월 밖이거나 날짜가 없는 기록은 세지 않는다', () => {
-        const r = calcCostTrend(
-            [{ date: '2025-12-01', fuelCost: 99999 }, { fuelCost: 88888 }],
-            [{ date: '2025-12-01', chargeAmount: 99999 }, { chargeAmount: 88888 }],
-            [{ date: '2025-12-01', cost: 99999 }],
-            MONTHS,
-        );
-        expect(r.every(m => m.totalCost === 0)).toBe(true);
+    it('월별로 주유·하이패스(충전액)·정비비를 더해 총액을 내고, 문서가 없는 달은 0', () => {
+        const r = calcCostTrend([stat('2026-02', { fuelCost: 100, hipassCost: 20, maintenanceCost: 3 })], MONTHS);
+        expect(r).toEqual([
+            { label: '1월', fuelCost: 0, hipassCost: 0, maintenanceCost: 0, totalCost: 0 },
+            { label: '2월', fuelCost: 100, hipassCost: 20, maintenanceCost: 3, totalCost: 123 },
+            { label: '3월', fuelCost: 0, hipassCost: 0, maintenanceCost: 0, totalCost: 0 },
+        ]);
     });
 });
 
@@ -263,10 +219,7 @@ describe('calcRecommendations', () => {
     });
 
     it('주말 운행 경고가 있으면 정책 검토 카드를 만든다', () => {
-        const anomalies = detectAnomalies([
-            { date: '2026-03-07', startKm: 0, endKm: 10 }, // 토
-            { date: '2026-03-02', startKm: 0, endKm: 10 }, // 월
-        ]);
+        const anomalies = calcAnomalies([stat('2026-03', { totalLogs: 2, anomalies: { weekend: 1, night: 0, overDrive: 0 } })]);
         const r = calcRecommendations({ ...empty, anomalies });
         expect(r.find(i => i.type === 'policy')).toBeTruthy();
     });
