@@ -45,6 +45,24 @@ describe('releaseNotes.json 데이터 계약', () => {
         expect(empty).toEqual([]);
     });
 
+    it('굵은 글씨 표시(**)가 짝을 이룬다 — 짝이 안 맞으면 별표가 화면에 그대로 보인다', () => {
+        const odd = notes.flatMap(note =>
+            note.items
+                .filter(item => ((item.text.match(/\*\*/g) || []).length) % 2 === 1)
+                .map(item => `${note.date}: ${item.text.slice(0, 30)}`),
+        );
+        expect(odd).toEqual([]);
+    });
+
+    it('주제(area)를 적었다면 비어 있지 않은 글자다', () => {
+        const bad = notes.flatMap(note =>
+            note.items
+                .filter(item => 'area' in item && (typeof item.area !== 'string' || item.area.trim() === ''))
+                .map(() => note.date),
+        );
+        expect(bad).toEqual([]);
+    });
+
     it('날짜가 YYYY-MM-DD이고 최신순으로 정렬돼 있다', () => {
         // 배지(useReleaseNotesStatus)와 모달의 최근 N일 창이 날짜 문자열 비교에 기대므로
         // 형식이 어긋나면 새 소식이 안 뜨거나 이미 읽은 소식이 다시 뜬다.

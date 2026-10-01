@@ -1,14 +1,9 @@
 import { useState, useEffect } from 'react';
-import { loadReleaseNotes, type ReleaseItem, type ReleaseNote } from '../../lib/releaseNotes';
+import { loadReleaseNotes, type ReleaseNote } from '../../lib/releaseNotes';
+import ReleaseNoteItems from '../common/ReleaseNoteItems';
 import useForceLightMode from '../../hooks/useForceLightMode';
 import SEOHead from '../common/SEOHead';
 import PublicNav from '../common/PublicNav';
-
-const TYPE_CONFIG: Record<ReleaseItem['type'], { emoji: string; label: string; color: string }> = {
-    new: { emoji: '✨', label: '신규', color: 'bg-emerald-100 text-emerald-700' },
-    improved: { emoji: '💡', label: '개선', color: 'bg-blue-100 text-blue-700' },
-    fixed: { emoji: '🐛', label: '수정', color: 'bg-amber-100 text-amber-700' },
-};
 
 export default function ReleaseNotesPage() {
     useForceLightMode();
@@ -48,33 +43,19 @@ export default function ReleaseNotesPage() {
                         notes.map((note, noteIdx) => (
                             <section key={note.date + noteIdx} className="space-y-3">
                                 {/* 날짜 헤더 */}
-                                <div className="flex items-center gap-3">
+                                <div className="flex items-center gap-x-3 gap-y-1 flex-wrap">
                                     <time className="text-sm font-mono font-semibold text-primary-600 dark:text-primary-400 whitespace-nowrap">
                                         {note.date}
                                     </time>
                                     {note.title && (
-                                        <span className="text-sm font-medium text-surface-700 dark:text-surface-300 truncate">
+                                        <span className="text-sm font-medium text-surface-700 dark:text-surface-300">
                                             {note.title}
                                         </span>
                                     )}
                                 </div>
 
-                                {/* 변경 사항 리스트 */}
-                                <ul className="space-y-2 pl-1">
-                                    {note.items.map((item, idx) => {
-                                        const cfg = TYPE_CONFIG[item.type];
-                                        return (
-                                            <li key={idx} className="flex items-start gap-2.5 text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
-                                                <span
-                                                    className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium whitespace-nowrap mt-0.5 ${cfg.color}`}
-                                                >
-                                                    {cfg.emoji} {cfg.label}
-                                                </span>
-                                                <span>{item.text}</span>
-                                            </li>
-                                        );
-                                    })}
-                                </ul>
+                                {/* 변경 사항 리스트 — 주제별로 묶는다 */}
+                                <ReleaseNoteItems items={note.items} />
 
                                 {/* 구분선 (마지막 제외) */}
                                 {noteIdx < notes.length - 1 && (
