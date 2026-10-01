@@ -6,13 +6,8 @@
  */
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { loadReleaseNotes, type ReleaseItem, type ReleaseNote } from '../../lib/releaseNotes';
-
-const TYPE_CONFIG: Record<ReleaseItem['type'], { emoji: string; label: string; color: string }> = {
-    new: { emoji: '✨', label: '신규', color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300' },
-    improved: { emoji: '💡', label: '개선', color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300' },
-    fixed: { emoji: '🐛', label: '수정', color: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' },
-};
+import { loadReleaseNotes, type ReleaseNote } from '../../lib/releaseNotes';
+import ReleaseNoteItems from './ReleaseNoteItems';
 
 /** 최근 N일 이내 소식만 노출(기본 7일). 너무 많은 과거 소식으로 압도되지 않게 한다. */
 const RECENT_DAYS = 7;
@@ -88,19 +83,7 @@ export default function ReleaseNotesModal({ onClose }: { onClose: () => void }) 
                                         </span>
                                     )}
                                 </div>
-                                <ul className="space-y-2 pl-1">
-                                    {note.items.map((item, idx) => {
-                                        const cfg = TYPE_CONFIG[item.type];
-                                        return (
-                                            <li key={idx} className="flex items-start gap-2.5 text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
-                                                <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-medium whitespace-nowrap mt-0.5 ${cfg.color}`}>
-                                                    {cfg.emoji} {cfg.label}
-                                                </span>
-                                                <span>{item.text}</span>
-                                            </li>
-                                        );
-                                    })}
-                                </ul>
+                                <ReleaseNoteItems items={note.items} />
                                 {noteIdx < visibleNotes.length - 1 && (
                                     <hr className="border-surface-100 dark:border-surface-700 mt-4" />
                                 )}
