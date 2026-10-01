@@ -84,6 +84,23 @@ describe('paginateByHeight — 행 범위와 빈 행', () => {
         expect(usedHeight(m, only, true)).toBeLessThanOrEqual(availableHeight());
     });
 
+    /**
+     * 중간 장에 빈 행을 채우면 기록과 기록 사이(12번 → 빈 칸 → 다음 장 13번)에 공란이 끼어
+     * 누락처럼 보이고, 출력 후 없던 기록을 손으로 적어 넣을 수 있게 된다 — 고객 문의로 확인된 문제.
+     * 다음 행이 길어 남은 높이에 못 들어가는 상황을 재현한다.
+     */
+    it('빈 행은 마지막 장에만 채우고 중간 장에는 넣지 않는다', () => {
+        // 1줄 행으로 거의 채운 뒤 3줄짜리 긴 행이 와서 다음 장으로 넘어가는 분포
+        const heights = [...Array.from({ length: 22 }, () => 22), 60, 22, 22];
+        const m = metrics(heights);
+
+        const slices = paginateByHeight(m);
+
+        expect(slices.length).toBeGreaterThan(1);
+        slices.slice(0, -1).forEach(slice => expect(slice.emptyCount).toBe(0));
+        expect(slices[slices.length - 1].emptyCount).toBeGreaterThan(0);
+    });
+
     it('데이터가 없으면 페이지도 없다', () => {
         expect(paginateByHeight(metrics([]))).toEqual([]);
     });
