@@ -89,3 +89,33 @@ export function splitEmphasis(text: string): { text: string; strong: boolean }[]
     if (last < text.length) parts.push({ text: text.slice(last), strong: false });
     return parts;
 }
+
+/**
+ * '새 소식' 배지 서명 — `최신 날짜#그날 공지 내용의 지문`.
+ *
+ * 예전 서명은 `날짜#날짜 항목 수`였다. 같은 날 공지는 **같은 날짜 항목에 줄을 더하므로** 날짜 항목 수가
+ * 늘지 않아, 오전 공지를 열어 본 사람에게는 오후에 붙은 공지(또는 다시 쓴 공지)의 배지가 뜨지
+ * 않았다(2026-10-01: 하루 11건 중 대부분이 배지 없이 지나갔다). 지문은 그날 제목·항목을 모두 담는다.
+ */
+export function releaseSignature(notes: readonly ReleaseNote[]): string | null {
+    if (notes.length === 0) return null;
+    const latest = notes.reduce((max, n) => (n.date > max.date ? n : max), notes[0]);
+    const body = [latest.title ?? '', ...latest.items.map(i => `${i.type}|${i.area ?? ''}|${i.text}`)].join('\n');
+    // djb2 — 같은지만 보면 되므로 짧은 해시로 충분하다
+    let h = 5381;
+    for (let i = 0; i < body.length; i++) h = ((h * 33) ^ body.charCodeAt(i)) >>> 0;
+    return `${latest.date}#${h.toString(36)}`;
+}
+
+/**
+ * 아직 안 본 소식이 있는가 — 저장된 서명보다 **날짜가 새것**이거나, 날짜가 같은데 **내용이 달라졌으면** 참.
+ * 저장된 날짜가 더 새것이면(이전 배포로 되돌린 경우) 거짓 — 이미 본 사람에게 옛 소식을 다시 띄우지 않는다.
+ * 예전 형식(`날짜` · `날짜#0114`)도 앞 10글자로 날짜를 읽는다.
+ */
+export function hasUnseenRelease(lastSeen: string | null, signature: string): boolean {
+    if (!lastSeen) return true;
+    const seenDate = lastSeen.slice(0, 10);
+    const latestDate = signature.slice(0, 10);
+    if (seenDate !== latestDate) return seenDate < latestDate;
+    return lastSeen !== signature;
+}

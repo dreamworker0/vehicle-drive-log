@@ -114,5 +114,6 @@ FAQ와 같은 톤이다([FAQ 가이드](faq.md) §1 참고) — 사회복지기�
 
 - JSON 파싱: `node -e "JSON.parse(require('fs').readFileSync('public/data/releaseNotes.json','utf8'))"`
 - 화면 확인: 로그인 후 [더보기] → [업데이트 소식], 공개 페이지 `/release-notes`
-- 최신 항목의 날짜가 바뀌면 **사용자에게 새 소식 배너가 뜬다**(`useReleaseNotesStatus`).
-  날짜를 잘못 넣으면 배너가 안 뜨거나 이미 읽은 소식이 다시 뜬다.
+- 최신 항목의 날짜가 바뀌거나, **같은 날짜라도 그날 공지 내용이 바뀌면** 사용자에게 새 소식 배너가 뜬다
+  (`useReleaseNotesStatus` · `releaseSignature`). 오타 하나 고쳐도 다시 뜨므로, 이미 나간 공지의 사소한
+  손질은 다음 공지 때 함께 한다. 날짜를 잘못 넣으면 배너가 안 뜨거나 이미 읽은 소식이 다시 뜬다.
