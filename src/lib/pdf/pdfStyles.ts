@@ -159,15 +159,14 @@ export function getPdfStyles() {
         .col-vehicle { width: 76px; }
         .col-dest { width: auto; }
         .col-purpose { width: auto; }
-        .col-time { width: 34px; }
+        .col-time { width: 40px; }
         /*
          * 이틀 이상 걸린 운행은 '9/1 17:00'처럼 날짜가 앞에 붙는데, 표 전체가
          * word-break: break-all이라 '9/1 1' / '7:00'처럼 토큰 한가운데가 잘린다.
          * 줄바꿈이 공백에서만 일어나게 해 '9/1' / '17:00' 두 줄로 떨어뜨린다.
          *
-         * (위 .col-time의 34px은 이 열에 실제로 걸리지 않는다 — table-layout: fixed에서 폭은
-         *  colgroup이나 첫 행이 정하는데, 첫 행은 두 시각 열을 colspan=2로 덮는다. 폭을
-         *  손볼 생각이라면 colgroup부터 넣어야 한다.)
+         * (열 폭은 pdfExport.ts의 colgroup이 이 col-* 클래스로 정한다 — table-layout: fixed에서
+         *  첫 행은 시각·주행거리 칸을 colspan으로 덮어 th의 폭이 걸리지 않기 때문이다.)
          *
          * td.col-time으로 쓰는 이유는 특정도다 — .log-table td(0-1-1)가 .col-time(0-1-0)을
          * 이기므로 클래스만으로는 break-all이 그대로 남는다. 헤더에만 붙어 있던 클래스를

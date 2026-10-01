@@ -294,6 +294,25 @@ describe('downloadDriveLogsPdf — 조건부 컬럼 정합성', () => {
         const table = pageTables(stub.doc())[0];
         expect(columnCount(table)).toBe(expected);
         expectUniformColumns(table, '운행일지 표');
+        // 열 폭은 colgroup이 정한다 — 개수가 어긋나면 뒤쪽 열 폭이 한 칸씩 밀린다
+        expect(table.querySelectorAll('colgroup col')).toHaveLength(expected);
+    });
+
+    /**
+     * 첫 머리글 행이 시각·주행거리 칸을 colspan으로 덮어 th의 class 폭이 무시되던 문제 —
+     * '09:59'·'36,108'이 들어가는 다섯 칸이 목적지만큼 넓어져 주소가 3줄로 접혔다(고객 문의).
+     */
+    it('colgroup이 시각·주행거리 칸에 좁은 폭 클래스를 지정한다', () => {
+        const stub = stubPrintWindow();
+        downloadDriveLogsPdf([log({ startLocation: '제2분관' })], { includeFuel: true, includePassengers: true });
+
+        const cols = Array.from(pageTables(stub.doc())[0].querySelectorAll('colgroup col'))
+            .map(c => c.getAttribute('class'));
+        expect(cols).toEqual([
+            'col-no', 'col-date', 'col-time', 'col-time', 'col-driver', 'col-vehicle',
+            'col-dest', 'col-dest', 'col-purpose', 'col-km', 'col-km', 'col-km', 'col-passenger',
+            'col-fuel', 'col-passengers', 'col-note',
+        ]);
     });
 
     it('주유 컬럼을 켜면 헤더와 값이 함께 나타난다', () => {
@@ -326,6 +345,7 @@ describe('downloadDriveLogsPdf — 조건부 컬럼 정합성', () => {
         expect(columnCount(table)).toBe(14);
         // 소계·합계의 colspan까지 함께 늘지 않으면 주행거리 합계 칸이 밀린다
         expectUniformColumns(table, '운행일지 표');
+        expect(table.querySelectorAll('colgroup col')).toHaveLength(14);
     });
 
     it('출발지가 한 건에만 있어도 열을 만들고 나머지는 공란으로 둔다', () => {
