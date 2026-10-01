@@ -206,6 +206,26 @@ function buildApprovalHtml(approvalLine: ApprovalEntry[], hidden = false) {
 }
 
 /**
+ * 열 폭 정의 — 순서는 thead의 열 순서와 같아야 한다
+ *
+ * table-layout: fixed는 열 폭을 colgroup이나 **첫 행**에서 정한다. 첫 행은 시각(2칸)·
+ * 주행거리(3칸)를 colspan으로 덮어서 그 아래 칸의 class 폭이 무시되고, '09:59'·'36,108'이
+ * 들어가는 다섯 칸이 목적지·사용목적과 남는 폭을 똑같이 나눠 가졌다. 그만큼 목적지가 좁아져
+ * 주소가 3줄로 접혔다. 폭은 pdfStyles.ts의 col-* 클래스가 정한다(auto 칸이 나머지를 나눈다).
+ */
+function buildColGroup(includeStartLocation = false, includeFuel = false, includePassengers = false) {
+    const classes = [
+        'col-no', 'col-date', 'col-time', 'col-time', 'col-driver', 'col-vehicle',
+        ...(includeStartLocation ? ['col-dest'] : []),
+        'col-dest', 'col-purpose', 'col-km', 'col-km', 'col-km', 'col-passenger',
+        ...(includeFuel ? ['col-fuel'] : []),
+        ...(includePassengers ? ['col-passengers'] : []),
+        'col-note',
+    ];
+    return `<colgroup>${classes.map(c => `<col class="${c}" />`).join('')}</colgroup>`;
+}
+
+/**
  * 단일 페이지 HTML 생성
  */
 function buildPageHtml(page: PageContent, pageIdx: number, totalPages: number, { orgName, period, approvalLine, includeHipass = false, includePassengers = false, includeFuel = false, includeStartLocation = false, totalAllDistance = 0 }: { orgName: string; period: string; approvalLine: ApprovalEntry[]; includeHipass?: boolean; includePassengers?: boolean; includeFuel?: boolean; includeStartLocation?: boolean; totalAllDistance?: number }) {
@@ -236,6 +256,7 @@ function buildPageHtml(page: PageContent, pageIdx: number, totalPages: number, {
                 </div>
             </div>
             <table class="log-table">
+                ${buildColGroup(includeStartLocation, includeFuel, includePassengers)}
                 <thead>
                     <tr>
                         <th rowspan="2" class="col-no">No.</th>
