@@ -3,7 +3,7 @@
  * useDriveLogList에서 추출: 기간 검증 → 전체 데이터 로드 → 검색 필터 적용 → PDF/Excel 직렬화.
  * 목록 상태(logs/페이지네이션)에 부작용이 없는 읽기 전용 흐름이라 독립 훅으로 분리한다.
  */
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useToast } from '../useToast';
 import { getAllDriveLogsForExport, getFuelLogs } from '../../lib/firestore';
 import { attachFuelSummary } from '../../lib/driveLogExportFields';
@@ -18,15 +18,45 @@ export interface ExportFilters {
     endDate: string;
 }
 
+/**
+ * 내보내기 옵션('주유·하이패스·동행자 포함') 체크 상태를 이 브라우저에 기억한다.
+ *
+ * 매번 꺼진 채로 시작해, PDF에 동승자 이름을 넣고 싶은 기관이 체크박스를 못 보고
+ * "인원만 나온다"며 기능 요청을 보내 왔다(2026-10-01). 기본값(꺼짐)은 그대로 두고,
+ * 한 번 켜면 다음에도 켜진 채로 둔다. 저장소를 못 쓰는 환경에서는 예전처럼 매번 꺼짐.
+ */
+export const EXPORT_OPTIONS_KEY = 'driveLogExportOptions';
+type ExportOptionKey = 'hipass' | 'passengers' | 'fuel';
+
+function readExportOptions(): Record<string, unknown> {
+    try {
+        const saved = JSON.parse(localStorage.getItem(EXPORT_OPTIONS_KEY) || '{}');
+        return saved && typeof saved === 'object' ? saved : {};
+    } catch {
+        return {};
+    }
+}
+
+function useExportOption(key: ExportOptionKey) {
+    const [value, setValue] = useState(() => readExportOptions()[key] === true);
+    const set = useCallback((next: boolean) => {
+        setValue(next);
+        try {
+            localStorage.setItem(EXPORT_OPTIONS_KEY, JSON.stringify({ ...readExportOptions(), [key]: next }));
+        } catch { /* 저장 불가 환경 — 이번 화면에서만 유지 */ }
+    }, [key]);
+    return [value, set] as const;
+}
+
 export function useDriveLogExport(
     orgId: string | null | undefined,
     filters: ExportFilters,
     org: Organization | null,
 ) {
     const { showToast } = useToast();
-    const [includeHipass, setIncludeHipass] = useState(false);
-    const [includePassengers, setIncludePassengers] = useState(false);
-    const [includeFuel, setIncludeFuel] = useState(false);
+    const [includeHipass, setIncludeHipass] = useExportOption('hipass');
+    const [includePassengers, setIncludePassengers] = useExportOption('passengers');
+    const [includeFuel, setIncludeFuel] = useExportOption('fuel');
 
     // 내보내기 유효성 검사 (기간 필수 + 최대 3개월)
     const validateExportDates = (format: string): string | null => {
