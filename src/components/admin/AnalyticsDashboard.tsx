@@ -4,6 +4,7 @@
  */
 import { useState, Suspense, lazy } from 'react';
 import useAnalytics from '../../hooks/useAnalytics';
+import type { MonthCompare, MonthCompareMetric } from '../../hooks/utils/analyticsCalc';
 
 const TrendCharts = lazy(() => import('./TrendCharts'));
 const CostOptimization = lazy(() => import('./CostOptimization'));
@@ -59,13 +60,43 @@ function StatMini({ icon, value, label, sub, color, onClick }: StatMiniProps) {
     );
 }
 
+/** 증감 표시 — 색이 아니라 화살표와 글자로 방향을 말한다(운영비가 늘었다고 늘 나쁜 것은 아니다) */
+function delta(m: MonthCompareMetric): string {
+    if (m.pct === null) return m.cur > 0 ? '전달 기록 없음' : '-';
+    if (m.pct === 0) return '변동 없음';
+    return `${m.pct > 0 ? '▲' : '▼'} ${Math.abs(m.pct)}%`;
+}
+
+function metricValue(m: MonthCompareMetric): string {
+    if (m.key === 'cost') return m.cur > 0 ? `${formatCost(m.cur)}${m.cur >= 10000 ? '원' : ''}` : '0원';
+    return `${m.cur.toLocaleString()}${m.unit}`;
+}
+
+/** 전월 대비 — 진행 중인 이번 달이 아니라 다 끝난 지난달을 그 전달과 견준다 */
+function MonthCompareStrip({ data }: { data: MonthCompare }) {
+    return (
+        <section aria-label="전월 대비" className="glass-card px-4 py-3 mb-6 flex flex-wrap items-center gap-x-6 gap-y-2">
+            <p className="text-xs font-semibold text-surface-500 dark:text-surface-400">
+                지난달({data.label}) · {data.prevLabel} 대비
+            </p>
+            {data.metrics.map(m => (
+                <div key={m.key} className="flex items-baseline gap-1.5" title={`${data.prevLabel} ${m.prev.toLocaleString()}${m.unit}`}>
+                    <span className="text-xs text-surface-400 dark:text-surface-500">{m.label}</span>
+                    <span className="text-sm font-bold text-surface-900 dark:text-surface-100">{metricValue(m)}</span>
+                    <span className="text-xs font-medium text-surface-600 dark:text-surface-300">{delta(m)}</span>
+                </div>
+            ))}
+        </section>
+    );
+}
+
 export default function AnalyticsDashboard() {
     const {
         loading, rangeMonths, setRangeMonths,
         monthlyTrend, driveOriginTrend, driveOriginByDriver, driveOriginByVehicle, driverComparison, vehicleUtilization, heatmapData,
         fuelEfficiency, maintenanceCostAnalysis, anomalies, recommendations,
-        costTrend, totalFuelCost, totalHipassCost, totalMaintenanceCost, totalOperatingCost,
-        totalLogs, totalVehicles, totalMembers, aggregatedAt,
+        costTrend, totalFuelCost, totalHipassCost, totalHipassUsed, totalMaintenanceCost, totalOperatingCost,
+        monthOverMonth, totalLogs, totalVehicles, totalMembers, aggregatedAt,
     } = useAnalytics();
 
     const [activeTab, setActiveTab] = useState('trend');
@@ -91,7 +122,7 @@ export default function AnalyticsDashboard() {
                 <div>
                     <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100">운행 분석</h1>
                     {/* 이 화면의 숫자는 야간 집계(매일 새벽)다 — 언제 기준인지 밝히지 않으면 오늘 운행이 빠진 것을
-                        '운행이 없다'로 읽는다. 전월분은 11일부터 다시 집계하지 않으므로 그 뒤 소급 입력은 반영되지 않는다. */}
+                        '운행이 없다'로 읽는다. 지난달에 소급 입력·수정한 기록도 다음 날 새벽 집계에 반영된다. */}
                     <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
                         {aggregatedAt
                             ? `${aggregatedAt.getMonth() + 1}/${aggregatedAt.getDate()} ${String(aggregatedAt.getHours()).padStart(2, '0')}:${String(aggregatedAt.getMinutes()).padStart(2, '0')} 집계 기준 · 오늘 운행은 내일 반영돼요`
@@ -119,9 +150,18 @@ export default function AnalyticsDashboard() {
                 <StatMini icon="📊" value={`${totalLogs}건`} label="분석 기간 운행" sub={totalDistance > 0 ? `총 ${totalDistance.toLocaleString()}km` : undefined} color="bg-primary-400 dark:bg-primary-600/50" />
                 <StatMini icon="🚗" value={totalVehicles} label="등록 차량" sub={`직원 ${totalMembers}명`} color="bg-accent-400 dark:bg-accent-600/50" />
                 <StatMini icon="⛽" value={formatCost(totalFuelCost)} label="총 주유비" sub={totalFuelCost > 0 ? `${totalFuelCost.toLocaleString()}원` : undefined} color="bg-amber-400 dark:bg-amber-600/50" />
-                <StatMini icon="🛣️" value={formatCost(totalHipassCost)} label="하이패스 충전" sub={totalHipassCost > 0 ? `${totalHipassCost.toLocaleString()}원` : undefined} color="bg-purple-400 dark:bg-purple-600/50" />
+                {/* 충전액은 몰아서 낸 돈이라 달마다 들쭉날쭉하다 — 운행일지에 적힌 실제 통행료를 함께 보여 준다 */}
+                <StatMini
+                    icon="🛣️" value={formatCost(totalHipassCost)} label="하이패스 충전"
+                    sub={totalHipassUsed !== null
+                        ? `실제 사용 ${totalHipassUsed > 0 ? `${formatCost(totalHipassUsed)}${totalHipassUsed >= 10000 ? '원' : ''}` : '0원'}`
+                        : totalHipassCost > 0 ? `${totalHipassCost.toLocaleString()}원` : undefined}
+                    color="bg-purple-400 dark:bg-purple-600/50"
+                />
                 <StatMini icon="💡" value={recommendations.length} label="최적화 추천" sub="연료·정비·가동률 개선 제안" color="bg-rose-400 dark:bg-rose-600/50" onClick={() => setActiveTab('cost')} />
             </div>
+
+            {monthOverMonth && <MonthCompareStrip data={monthOverMonth} />}
 
             {/* 탭 */}
             <div className="flex gap-1 bg-surface-100 dark:bg-surface-800 rounded-xl p-1 mb-6">

@@ -83,6 +83,12 @@ describe('mapMonthlyDoc — 프로듀서 스키마 → 평탄 MonthlyStat', () =
         expect(m.vehicleStats['veh-1'].lastMaintenanceDate).toBe('2026-06-20');
     });
 
+    it('하이패스 실제 사용액을 옮기고, 집계 도입 전 문서는 null로 둔다(0원 사용과 구분)', () => {
+        expect(mapMonthlyDoc('2026-09', { costStats: { hipassCost: 50000, hipassUsed: 12300 } }).hipassUsed).toBe(12300);
+        expect(mapMonthlyDoc('2026-09', { costStats: { hipassUsed: 0 } }).hipassUsed).toBe(0);
+        expect(mapMonthlyDoc('2026-05', { costStats: { hipassCost: 8000 } }).hipassUsed).toBeNull();
+    });
+
     it('anomalies(weekend/night/overDrive)를 그대로 전달한다', () => {
         const m = mapMonthlyDoc('2026-06', rawDoc);
         expect(m.anomalies).toEqual({ weekend: 4, night: 2, overDrive: 1 });

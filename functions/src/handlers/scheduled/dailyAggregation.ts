@@ -2,6 +2,8 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import * as logger from "firebase-functions/logger";
 import { getKSTMonthKey, toKSTDate } from "../../utils/kstDate";
 import { groupDataByOrg, type NightlySharedData } from "../../services/statistics/nightlySharedData";
+import { usedAmountOf } from "../../services/hipass/applyBalanceDelta";
+import { pickStaleMonths, MAX_STALE_MONTHS_PER_RUN } from "../../services/statistics/staleMonths";
 
 const db = getFirestore();
 
@@ -23,19 +25,28 @@ export function getRecentMonthWindows(recentMonths: number): MonthWindow[] {
     const year = base.getFullYear();
     const month = base.getMonth(); // 0-11 (KST)
     const windows: MonthWindow[] = [];
-    for (let i = 0; i < recentMonths; i++) {
-        const startOfMonth = new Date(Date.UTC(year, month - i, 1, -9, 0, 0, 0));
-        const startOfNextMonth = new Date(Date.UTC(year, month - i + 1, 1, -9, 0, 0, 0));
-        const yearMonth = getKSTMonthKey(startOfMonth);
-        windows.push({
-            yearMonth,
-            startOfMonth,
-            startOfNextMonth,
-            datePrefixStart: `${yearMonth}-01`,
-            datePrefixEnd: `${yearMonth}-31`,
-        });
-    }
+    for (let i = 0; i < recentMonths; i++) windows.push(monthWindowAt(year, month - i));
     return windows;
+}
+
+/** (KST 연, 0-based 월)의 집계 윈도 — 월 오버/언더플로는 Date.UTC가 처리한다 */
+function monthWindowAt(year: number, month0: number): MonthWindow {
+    const startOfMonth = new Date(Date.UTC(year, month0, 1, -9, 0, 0, 0));
+    const startOfNextMonth = new Date(Date.UTC(year, month0 + 1, 1, -9, 0, 0, 0));
+    const yearMonth = getKSTMonthKey(startOfMonth);
+    return {
+        yearMonth,
+        startOfMonth,
+        startOfNextMonth,
+        datePrefixStart: `${yearMonth}-01`,
+        datePrefixEnd: `${yearMonth}-31`,
+    };
+}
+
+/** 'YYYY-MM'의 집계 윈도 — 재집계 표시가 붙은 지난달용 */
+export function monthWindowOf(yearMonth: string): MonthWindow {
+    const [y, m] = yearMonth.split("-").map(Number);
+    return monthWindowAt(y, m - 1);
 }
 
 /** orgStats/{orgId}/monthly/{YYYY-MM} 문서의 차량별 통계 값 */
@@ -48,6 +59,8 @@ interface VehicleAgg {
     maintenanceCost: number;   // 차량별 총 정비비
     maintenanceCount: number;  // 차량별 정비 횟수
     lastMaintenanceDate: string;
+    /** 차량별 하이패스 실제 사용액(통행료) — 운행일지의 사용 전·후 잔액 차 */
+    hipassUsed: number;
     /** 차량별 운행 방식 건수 (정비·주유만 있는 차량은 모두 0) */
     origin: OriginCounts;
 }
@@ -156,7 +169,9 @@ async function aggregateOrgMonth(
     const vehicleStats: Record<string, VehicleAgg> = {};
     const heatmap: Record<string, Record<string, number>> = {};
     const vehicleDates: Record<string, Set<string>> = {};
-    const costStats = { fuelCost: 0, hipassCost: 0, maintenanceCost: 0 };
+    // hipassCost는 **충전액**(돈이 나간 때), hipassUsed는 운행일지에 적힌 **실제 통행료**다.
+    // 충전은 몰아서 하므로 달마다 충전액만 보면 들쭉날쭉하다.
+    const costStats = { fuelCost: 0, hipassCost: 0, maintenanceCost: 0, hipassUsed: 0 };
     // 이상 탐지 (월 단위 카운트) — 소비자가 임계값 기반으로 카드 표시
     const anomalies = { weekend: 0, night: 0, overDrive: 0 };
     const driverDayDistance: Record<string, number> = {}; // `${운전자}_${dateStr}` → 거리 합 (1일 과다주행 판정용)
@@ -168,6 +183,7 @@ async function aggregateOrgMonth(
                 name: vehicleMap.get(vehId) || "알 수 없음",
                 usedDays: 0, count: 0, distance: 0,
                 fuelCost: 0, maintenanceCost: 0, maintenanceCount: 0, lastMaintenanceDate: "",
+                hipassUsed: 0,
                 origin: emptyOrigin(),
             };
         }
@@ -181,6 +197,9 @@ async function aggregateOrgMonth(
 
         monthlyTotal.count += 1;
         monthlyTotal.distance += validDistance;
+        // 잔액이 늘어난 기록(불가능한 값)은 0으로 본다 — 카드 잔액 반영과 같은 규칙(usedAmountOf)
+        const hipassUsed = usedAmountOf(data);
+        costStats.hipassUsed += hipassUsed;
         const origin = classifyDriveOrigin(data);
         originCounts[origin] += 1;
 
@@ -227,6 +246,7 @@ async function aggregateOrgMonth(
             if (data.vehicleName) vs.name = data.vehicleName; // 운행일지의 표시명 우선
             vs.count += 1;
             vs.distance += validDistance;
+            vs.hipassUsed += hipassUsed;
             vs.origin[origin] += 1;
             if (dateStr) {
                 // 다일 운행은 출발일부터 도착일까지 모두 가동일이다(이 달에 속한 날만)
@@ -301,6 +321,8 @@ export interface AggregationSummary {
     errors: number;     // 집계 실패 기관 수
     skipped: number;    // 집계를 건너뛴 기관 수(운영 대상이 아니거나 차량·구성원이 없음)
     months: string[];   // 집계 대상 월(YYYY-MM)
+    /** 소급 입력·수정으로 다시 집계한 (기관, 지난달) 수 — 위 months 밖의 달 */
+    staleRebuilt: number;
 }
 
 /**
@@ -320,9 +342,10 @@ const NON_OPERATING_STATUSES = new Set(["rejected", "deleted"]);
  * 전월분 driveLogs 재스캔이 하룻밤 약 4,000 read였다 — 이 배치가 무료 할당량(5만/일)의
  * 43%를 사용자 접속 전에 쓰는 주된 이유다.
  *
- * ⚠️ 이 날짜가 지난 뒤 전월에 들어온 소급 입력은 **야간 배치가 반영하지 않는다.**
- * 그 경우 `backfillMonthlyStats` 콜러블을 더 큰 recentMonths로 1회 호출한다(그것이 이
- * 함수에 recentMonths 인자가 있는 이유다).
+ * 이 날짜가 지난 뒤(또는 더 오래된 달에) 들어온 소급 입력·수정은 **재집계 표시**로 잡는다
+ * (`collectStaleMonths` — 운행일지는 트리거가 표시하고, 주유·하이패스·정비는 하루 동안 생기거나
+ * 고쳐진 기록을 훑는다). 표시가 닿지 않는 경우(1년보다 오래된 달, 비용 기록 삭제)는 예전처럼
+ * `backfillMonthlyStats` 콜러블을 더 큰 recentMonths로 1회 호출한다.
  */
 const PREV_MONTH_GRACE_DAY = 10;
 
@@ -366,6 +389,8 @@ export async function runDailyAggregation(
     let processed = 0;
     let errors = 0;
     let skipped = 0;
+    let staleRebuilt = 0;
+    const stale = await collectStaleMonths(orgDocs.map((d) => d.id), new Set(months));
 
     for (const orgDoc of orgDocs) {
         const orgId = orgDoc.id;
@@ -412,6 +437,31 @@ export async function runDailyAggregation(
                 const sources = pre ? await pre.sourcesFor(orgId, win) : await fetchOrgMonthSources(orgId, win);
                 await aggregateOrgMonth(orgId, win, userMap, vehicleMap, sources);
             }
+
+            // 소급 입력·수정이 있었던 지난달 — 표시를 **먼저** 지우고 다시 읽는다. 다시 읽는 사이에
+            // 들어온 기록은 새 표시를 남기므로 다음 밤에 잡힌다(나중에 지우면 그 표시까지 지워진다).
+            const plan = stale.get(orgId);
+            if (plan) {
+                if (plan.clear.length > 0) {
+                    await db.collection("orgStats").doc(orgId).update({ staleMonths: FieldValue.arrayRemove(...plan.clear) });
+                }
+                try {
+                    for (const ym of plan.rebuild) {
+                        // 선로딩 원본은 집계 창의 달만 담고 있어 지난달은 기관별 쿼리로 읽는다
+                        const win = monthWindowOf(ym);
+                        await aggregateOrgMonth(orgId, win, userMap, vehicleMap, await fetchOrgMonthSources(orgId, win));
+                        staleRebuilt++;
+                    }
+                } catch (err) {
+                    // 다시 계산하지 못한 달은 표시를 되살려 다음 밤에 다시 시도한다
+                    if (plan.clear.length > 0) {
+                        await db.collection("orgStats").doc(orgId)
+                            .set({ staleMonths: FieldValue.arrayUnion(...plan.clear) }, { merge: true })
+                            .catch(() => undefined);
+                    }
+                    throw err;
+                }
+            }
             processed++;
         } catch (err) {
             // 한 기관 실패가 전체 배치를 중단시키지 않도록 격리 (나머지 기관은 계속 집계)
@@ -420,11 +470,79 @@ export async function runDailyAggregation(
         }
     }
 
-    const summary: AggregationSummary = { orgs: orgDocs.length, processed, errors, skipped, months };
+    const summary: AggregationSummary = { orgs: orgDocs.length, processed, errors, skipped, months, staleRebuilt };
     logger.info(
-        `[dailyAggregation] 집계 완료 — 기관 ${summary.orgs}, 성공 ${processed}, 건너뜀 ${skipped}, 실패 ${errors}`
+        `[dailyAggregation] 집계 완료 — 기관 ${summary.orgs}, 성공 ${processed}, 건너뜀 ${skipped}, 실패 ${errors}, 지난달 재집계 ${staleRebuilt}`
     );
     return summary;
+}
+
+/** 기관별 지난달 재집계 계획 — rebuild: 이번 밤에 다시 계산할 달, clear: 지울 표시 */
+interface StalePlan {
+    rebuild: string[];
+    clear: string[];
+}
+
+/** 비용 기록을 '하루 동안 바뀐 것'으로 훑는 폭 — 실행 시각이 조금 밀려도 틈이 생기지 않게 26시간 */
+const COST_CHANGE_SCAN_MS = 26 * 60 * 60 * 1000;
+
+/**
+ * 이번 밤에 다시 집계할 지난달(집계 창 밖)을 기관별로 모은다.
+ *
+ * - **운행일지**: 트리거가 `orgStats/{orgId}.staleMonths`에 남긴 표시(`markStaleMonths`). 생성·수정·
+ *   삭제를 모두 잡는다. 기관당 1 read(getAll).
+ * - **주유·하이패스·정비**: 트리거가 없어 지난 26시간 동안 생기거나(createdAt) 고친(updatedAt)
+ *   기록을 훑는다. 하루 수십 건이라 읽기가 작다. **삭제는 잡지 못한다** — 백필 콜러블로 교정한다.
+ *
+ * 실패하면 빈 계획으로 진행한다 — 재집계는 부가 기능이고, 본 집계(이번 달)를 막으면 안 된다.
+ */
+async function collectStaleMonths(orgIds: string[], covered: ReadonlySet<string>): Promise<Map<string, StalePlan>> {
+    const plans = new Map<string, StalePlan>();
+    try {
+        const marked = new Map<string, string[]>();
+        for (let i = 0; i < orgIds.length; i += 100) {
+            const refs = orgIds.slice(i, i + 100).map((id) => db.collection("orgStats").doc(id));
+            const snaps = await db.getAll(...refs);
+            snaps.forEach((snap) => {
+                const months = snap.exists ? snap.data()?.staleMonths : undefined;
+                if (Array.isArray(months) && months.length > 0) {
+                    marked.set(snap.id, months.filter((m): m is string => typeof m === "string"));
+                }
+            });
+        }
+
+        const changed = new Map<string, Set<string>>();
+        const since = new Date(Date.now() - COST_CHANGE_SCAN_MS);
+        const scans = await Promise.all(COST_COLLECTIONS.flatMap((name) =>
+            (["createdAt", "updatedAt"] as const).map((field) => db.collection(name).where(field, ">=", since).get())));
+        for (const snap of scans) {
+            snap.docs.forEach((d) => {
+                const data = d.data();
+                const orgId = data.organizationId;
+                if (typeof orgId !== "string" || typeof data.date !== "string") return;
+                const set = changed.get(orgId) ?? new Set<string>();
+                set.add(data.date.slice(0, 7));
+                changed.set(orgId, set);
+            });
+        }
+
+        for (const orgId of new Set([...marked.keys(), ...changed.keys()])) {
+            const marks = marked.get(orgId) ?? [];
+            const candidates = pickStaleMonths([...marks, ...(changed.get(orgId) ?? [])])
+                .filter((m) => !covered.has(m))
+                .reverse() // 최근 달부터 — 분석 화면 기본 기간(6개월)에 먼저 닿는다
+                .slice(0, MAX_STALE_MONTHS_PER_RUN);
+            // 집계 창 안의 달은 방금 다시 계산했으니 표시도 지운다. 1년보다 오래된 표시는 다시 계산할
+            // 일이 없으므로 함께 지운다. 상한에 걸려 미룬 달만 남는다.
+            const keep = new Set(pickStaleMonths(marks).filter((m) => !covered.has(m) && !candidates.includes(m)));
+            const clear = marks.filter((m) => !keep.has(m));
+            if (candidates.length > 0 || clear.length > 0) plans.set(orgId, { rebuild: candidates, clear });
+        }
+    } catch (err) {
+        logger.warn("[dailyAggregation] 지난달 재집계 대상을 모으지 못했다 — 이번 밤은 건너뛴다:", (err as Error).message);
+        return new Map();
+    }
+    return plans;
 }
 
 /** 월별 비용 기록 3종 — 선로딩 경로에서는 기관별이 아니라 월별로 한 번씩 읽는다. */

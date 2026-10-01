@@ -25,7 +25,7 @@ const driveLogs = [
     // veh-1 / u1: 일자 A, 거리 250 (>200 → overDrive 버킷)
     { driverUid: "u1", driverName: "김운전", vehicleId: "veh-1", vehicleName: "스타렉스", startKm: 0, endKm: 250, timestamp: { toDate: () => tsSunday10 }, reservationId: "r-q", driveOrigin: "quick" },
     // veh-1 / u1: 일자 B, 거리 50, 심야
-    { driverUid: "u1", driverName: "김운전", vehicleId: "veh-1", startKm: 250, endKm: 300, timestamp: { toDate: () => tsWeekday23 }, reservationId: "r-old" },
+    { driverUid: "u1", driverName: "김운전", vehicleId: "veh-1", startKm: 250, endKm: 300, timestamp: { toDate: () => tsWeekday23 }, reservationId: "r-old", hipassBalanceBefore: 20000, hipassBalanceAfter: 16800 },
     // veh-2 / u2: 거리 80
     { driverUid: "u2", driverName: "이기사", vehicleId: "veh-2", startKm: 0, endKm: 80, timestamp: { toDate: () => tsWeekday23 } },
 ];
@@ -61,19 +61,39 @@ const fixtures: {
     vehicles: Array<Record<string, unknown>>;
     /** 어떤 컬렉션에 실제로 접근했는지 — "쿼리를 아예 걸지 않는다"를 검증한다. */
     touched: string[];
-} = { orgs: [...DEFAULT_ORGS], users: [...DEFAULT_USERS], vehicles: [...DEFAULT_VEHICLES], touched: [] };
+    /** orgStats/{orgId}.staleMonths — 트리거가 남긴 재집계 표시 */
+    stale: Record<string, string[]>;
+    /** createdAt/updatedAt 범위 쿼리(하루 동안 바뀐 비용 기록)가 돌려줄 문서 */
+    changed: Record<string, Array<Record<string, unknown>>>;
+} = { orgs: [...DEFAULT_ORGS], users: [...DEFAULT_USERS], vehicles: [...DEFAULT_VEHICLES], touched: [], stale: {}, changed: {} };
+
+const mockStaleUpdate = jest.fn().mockResolvedValue(undefined);
+const mockStaleSet = jest.fn().mockResolvedValue(undefined);
 
 jest.mock("firebase-admin/firestore", () => {
-    const makeQuery = (docs: Array<Record<string, unknown>>) => {
+    const makeQuery = (docs: Array<Record<string, unknown>>, name = "") => {
         const q: Record<string, unknown> = {};
-        q.where = jest.fn(() => q);
+        let changedScan = false;
+        q.where = jest.fn((field: string) => {
+            if (field === "createdAt" || field === "updatedAt") changedScan = true;
+            return q;
+        });
         q.orderBy = jest.fn(() => q);
-        q.get = jest.fn().mockResolvedValue(snap(docs));
+        q.get = jest.fn(async () => snap(changedScan ? (fixtures.changed[name] ?? []) : docs));
         return q;
     };
     return {
-        FieldValue: { serverTimestamp: jest.fn(() => "SERVER_TS") },
+        FieldValue: {
+            serverTimestamp: jest.fn(() => "SERVER_TS"),
+            arrayRemove: jest.fn((...v: string[]) => ({ remove: v })),
+            arrayUnion: jest.fn((...v: string[]) => ({ union: v })),
+        },
         getFirestore: jest.fn(() => ({
+            getAll: jest.fn(async (...refs: Array<{ id: string }>) => refs.map((r) => ({
+                id: r.id,
+                exists: !!fixtures.stale[r.id],
+                data: () => ({ staleMonths: fixtures.stale[r.id] }),
+            }))),
             collection: jest.fn((name: string) => {
                 fixtures.touched.push(name);
                 if (name === "organizations") {
@@ -86,13 +106,16 @@ jest.mock("firebase-admin/firestore", () => {
                     return makeQuery(fixtures.vehicles);
                 }
                 if (name === "driveLogs") return makeQuery(driveLogs);
-                if (name === "fuelLogs") return makeQuery(fuelLogs);
-                if (name === "hipassCharges") return makeQuery(hipassCharges);
-                if (name === "maintenanceRecords") return makeQuery(maintenanceRecords);
-                // orgStats/{orgId}/monthly/{ym}
+                if (name === "fuelLogs") return makeQuery(fuelLogs, name);
+                if (name === "hipassCharges") return makeQuery(hipassCharges, name);
+                if (name === "maintenanceRecords") return makeQuery(maintenanceRecords, name);
+                // orgStats/{orgId}(재집계 표시) · orgStats/{orgId}/monthly/{ym}
                 if (name === "orgStats") {
                     return {
-                        doc: jest.fn(() => ({
+                        doc: jest.fn((id: string) => ({
+                            id,
+                            update: mockStaleUpdate,
+                            set: mockStaleSet,
                             collection: jest.fn(() => ({
                                 doc: jest.fn(() => ({ set: mockSet })),
                             })),
@@ -114,6 +137,8 @@ describe("runDailyAggregation — 월별 집계 프로듀서", () => {
         fixtures.users = [...DEFAULT_USERS];
         fixtures.vehicles = [...DEFAULT_VEHICLES];
         fixtures.touched = [];
+        fixtures.stale = {};
+        fixtures.changed = {};
     });
 
     it("최근 1개월 집계 시 org당 1회 set을 호출하고 요약을 반환한다", async () => {
@@ -152,6 +177,15 @@ describe("runDailyAggregation — 월별 집계 프로듀서", () => {
         expect(payload.costStats.fuelCost).toBe(130000); // 90000 + 40000
         expect(payload.costStats.hipassCost).toBe(8000);
         expect(payload.costStats.maintenanceCost).toBe(150000); // 120000 + 30000
+    });
+
+    it("하이패스 실제 사용액을 운행일지의 사용 전·후 잔액 차로 센다 — 충전액과 따로", async () => {
+        await runDailyAggregation(1);
+        const payload = mockSet.mock.calls[0][0];
+        expect(payload.costStats.hipassUsed).toBe(3200); // 20000 → 16800
+        expect(payload.costStats.hipassCost).toBe(8000); // 충전액은 그대로
+        expect(payload.vehicleStats["veh-1"].hipassUsed).toBe(3200);
+        expect(payload.vehicleStats["veh-2"].hipassUsed).toBe(0);
     });
 
     it("차량별 연비/정비비를 vehId 키로 집계한다", async () => {
@@ -294,7 +328,8 @@ describe("runDailyAggregation — 월별 집계 프로듀서", () => {
             expect(fixtures.touched).toContain("users");
             expect(fixtures.touched).toContain("vehicles");
             expect(fixtures.touched).not.toContain("driveLogs");
-            expect(fixtures.touched).not.toContain("fuelLogs");
+            // 기관 루프 앞의 '하루 동안 바뀐 비용 기록' 훑기(전 기관 공통 1회)는 빼고 본다
+            expect(fixtures.touched.slice(fixtures.touched.indexOf("users"))).not.toContain("fuelLogs");
         });
 
         it("차량이 없어도 구성원이 있으면 집계한다", async () => {
@@ -372,6 +407,8 @@ describe("runDailyAggregation — 선로딩 데이터 경로", () => {
         fixtures.users = [...DEFAULT_USERS];
         fixtures.vehicles = [...DEFAULT_VEHICLES];
         fixtures.touched = [];
+        fixtures.stale = {};
+        fixtures.changed = {};
         // 집계 창이 6월이 되도록 실행 시각을 6월 25일 02:00(KST)로 고정한다
         jest.useFakeTimers().setSystemTime(kstInstant(2026, 5, 25, 2));
     });
@@ -396,7 +433,8 @@ describe("runDailyAggregation — 선로딩 데이터 경로", () => {
         expect(fixtures.touched).not.toContain("users");
         expect(fixtures.touched).not.toContain("vehicles");
         expect(fixtures.touched).not.toContain("driveLogs");
-        expect(fixtures.touched.filter((n) => n === "fuelLogs")).toHaveLength(1);
+        // 월 범위 1회 + 하루 동안 바뀐 기록 훑기 2회(createdAt·updatedAt — 지난달 재집계 대상 찾기)
+        expect(fixtures.touched.filter((n) => n === "fuelLogs")).toHaveLength(3);
     });
 
     it("선로딩 창이 집계 창보다 늦게 시작하면 운행일지는 기관별 쿼리로 읽는다", async () => {
@@ -421,5 +459,79 @@ describe("classifyDriveOrigin", () => {
     });
     it("알 수 없는 값은 믿지 않는다", () => {
         expect(classifyDriveOrigin({ driveOrigin: "hacked", reservationId: "r" })).toBe("linked");
+    });
+});
+
+describe("runDailyAggregation — 소급 입력한 지난달 재집계", () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+        fixtures.orgs = [...DEFAULT_ORGS];
+        fixtures.users = [...DEFAULT_USERS];
+        fixtures.vehicles = [...DEFAULT_VEHICLES];
+        fixtures.touched = [];
+        fixtures.stale = {};
+        fixtures.changed = {};
+        // 집계 창이 9월(1개월)이 되도록 9월 20일 02:00(KST)
+        jest.useFakeTimers().setSystemTime(kstInstant(2026, 8, 20, 2));
+    });
+    afterEach(() => jest.useRealTimers());
+
+    const savedMonths = () => mockSet.mock.calls.map((c) => c[0].yearMonth);
+
+    it("트리거가 표시한 지난달을 다시 집계하고, 표시를 먼저 지운다", async () => {
+        fixtures.stale = { "org-1": ["2026-06"] };
+        const res = await runDailyAggregation(1);
+
+        expect(savedMonths()).toEqual(["2026-09", "2026-06"]);
+        expect(res.staleRebuilt).toBe(1);
+        expect(mockStaleUpdate).toHaveBeenCalledWith({ staleMonths: { remove: ["2026-06"] } });
+        // 지우기가 다시 읽기보다 먼저 — 그 사이 들어온 표시가 지워지지 않게
+        expect(mockStaleUpdate.mock.invocationCallOrder[0]).toBeLessThan(mockSet.mock.invocationCallOrder[1]);
+    });
+
+    it("하루 동안 생기거나 고친 지난달 주유·하이패스·정비 기록도 그 달을 다시 집계한다", async () => {
+        fixtures.changed = { fuelLogs: [{ organizationId: "org-1", date: "2026-07-03", fuelCost: 50000 }] };
+        await runDailyAggregation(1);
+
+        expect(savedMonths()).toEqual(["2026-09", "2026-07"]);
+        // 표시가 없었으니 지울 것도 없다
+        expect(mockStaleUpdate).not.toHaveBeenCalled();
+    });
+
+    it("집계 창 안의 달 표시는 다시 읽지 않고 지우기만 한다", async () => {
+        fixtures.stale = { "org-1": ["2026-09"] };
+        await runDailyAggregation(1);
+
+        expect(savedMonths()).toEqual(["2026-09"]);
+        expect(mockStaleUpdate).toHaveBeenCalledWith({ staleMonths: { remove: ["2026-09"] } });
+    });
+
+    it("하룻밤 상한을 넘는 달은 최근 달부터 다시 집계하고, 나머지 표시는 남겨 다음 밤으로 미룬다", async () => {
+        fixtures.stale = { "org-1": ["2025-12", "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07"] };
+        const res = await runDailyAggregation(1);
+
+        expect(res.staleRebuilt).toBe(6);
+        expect(savedMonths().slice(1)).toEqual(["2026-07", "2026-06", "2026-05", "2026-04", "2026-03", "2026-02"]);
+        expect(mockStaleUpdate).toHaveBeenCalledWith({
+            staleMonths: { remove: ["2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07"] },
+        });
+    });
+
+    it("1년보다 오래된 표시는 다시 집계하지 않고 지운다", async () => {
+        fixtures.stale = { "org-1": ["2025-01"] };
+        const res = await runDailyAggregation(1);
+
+        expect(res.staleRebuilt).toBe(0);
+        expect(savedMonths()).toEqual(["2026-09"]);
+        expect(mockStaleUpdate).toHaveBeenCalledWith({ staleMonths: { remove: ["2025-01"] } });
+    });
+
+    it("다시 집계하다 실패하면 지운 표시를 되살린다", async () => {
+        fixtures.stale = { "org-1": ["2026-06"] };
+        mockSet.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("boom"));
+        const res = await runDailyAggregation(1);
+
+        expect(res).toMatchObject({ processed: 0, errors: 1 });
+        expect(mockStaleSet).toHaveBeenCalledWith({ staleMonths: { union: ["2026-06"] } }, { merge: true });
     });
 });
