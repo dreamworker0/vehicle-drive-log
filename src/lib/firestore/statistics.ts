@@ -34,6 +34,8 @@ export interface MonthlyStat {
     totalDistance: number;
     fuelCost: number;
     hipassCost: number;
+    /** 하이패스 실제 사용액(운행일지의 사용 전·후 잔액 차) — 이 필드가 생기기 전 문서는 null */
+    hipassUsed: number | null;
     maintenanceCost: number;
     driverStats: Record<string, DriverStat>;
     vehicleStats: Record<string, VehicleStat>;
@@ -67,7 +69,7 @@ export interface DriveOriginCounts {
 interface RawMonthlyDoc {
     updatedAt?: { toDate?: () => Date };
     monthlyTotal?: { count?: number; distance?: number };
-    costStats?: { fuelCost?: number; hipassCost?: number; maintenanceCost?: number };
+    costStats?: { fuelCost?: number; hipassCost?: number; maintenanceCost?: number; hipassUsed?: number };
     driverStats?: Record<string, { name?: string; count?: number; distance?: number; origin?: Partial<DriveOriginCounts> }>;
     vehicleStats?: Record<string, {
         name?: string; usedDays?: number; count?: number;
@@ -131,6 +133,7 @@ export function mapMonthlyDoc(monthKey: string, raw: RawMonthlyDoc): MonthlyStat
         totalDistance: raw.monthlyTotal?.distance || 0,
         fuelCost: raw.costStats?.fuelCost || 0,
         hipassCost: raw.costStats?.hipassCost || 0,
+        hipassUsed: typeof raw.costStats?.hipassUsed === 'number' ? raw.costStats.hipassUsed : null,
         maintenanceCost: raw.costStats?.maintenanceCost || 0,
         driverStats,
         vehicleStats,

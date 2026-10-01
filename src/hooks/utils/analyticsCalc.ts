@@ -248,6 +248,10 @@ export interface MaintenanceCostItem {
     lastMaintenanceDate: string;
     currentKm: number;
     costPerKm: number;
+    /** 보험 만료일 (YYYY-MM-DD) — 차량 관리에서 입력한 값 */
+    insuranceExpiryDate?: string;
+    /** 운행을 중지한(퇴역) 차량 — 정비·보험 추천에서 뺀다 */
+    retired?: boolean;
 }
 
 export interface CostTrendItem {
@@ -264,6 +268,57 @@ export interface RecommendationItem {
     priority: string;
     title: string;
     desc: string;
+}
+
+/** 로컬(KST) 'YYYY-MM-DD' */
+function localDateStr(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/** from → to 날짜 차(일). to가 없거나 깨졌으면 null */
+function daysUntil(from: string, to: string | undefined): number | null {
+    if (!to || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return null;
+    const [fy, fm, fd] = from.split('-').map(Number);
+    const [ty, tm, td] = to.split('-').map(Number);
+    return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86_400_000);
+}
+
+export interface MonthCompareMetric {
+    key: 'count' | 'distance' | 'cost';
+    label: string;
+    unit: string;
+    cur: number;
+    prev: number;
+    /** 증감률(%) — 비교할 전달 값이 0이면 null */
+    pct: number | null;
+}
+
+export interface MonthCompare {
+    /** 비교하는 달 ('9월') — 진행 중인 이번 달이 아니라 **지난달**이다 */
+    label: string;
+    prevLabel: string;
+    metrics: MonthCompareMetric[];
+}
+
+/**
+ * 전월 대비 증감 — **지난달**과 그 전달을 비교한다.
+ *
+ * 이번 달은 진행 중이라(그리고 야간 집계라 오늘 운행도 빠져 있다) 꽉 찬 전달과 견주면 늘 줄어든 것처럼
+ * 보인다. 그래서 다 끝난 달끼리 비교한다. rows는 과거→현재 순이고 마지막이 이번 달이다.
+ */
+export function calcMonthOverMonth(rows: ReadonlyArray<{ month: string; count: number; distance: number; cost: number }>): MonthCompare | null {
+    if (rows.length < 3) return null;
+    const cur = rows[rows.length - 2];
+    const prev = rows[rows.length - 3];
+    const pct = (a: number, b: number) => (b > 0 ? Math.round(((a - b) / b) * 100) : null);
+    const label = (mk: string) => MONTH_LABELS[parseInt(mk.split('-')[1], 10) - 1];
+    const metrics: MonthCompareMetric[] = [
+        { key: 'count', label: '운행', unit: '건', cur: cur.count, prev: prev.count, pct: pct(cur.count, prev.count) },
+        { key: 'distance', label: '주행거리', unit: 'km', cur: cur.distance, prev: prev.distance, pct: pct(cur.distance, prev.distance) },
+        { key: 'cost', label: '운영비', unit: '원', cur: cur.cost, prev: prev.cost, pct: pct(cur.cost, prev.cost) },
+    ];
+    if (metrics.every(m => m.cur === 0 && m.prev === 0)) return null;
+    return { label: label(cur.month), prevLabel: label(prev.month), metrics };
 }
 
 /** 직원별 운행 비교 (최근 3개월) */
@@ -438,8 +493,10 @@ export function calcRecommendations(params: {
     anomalies: ReturnType<typeof detectAnomalies>;
     vehicleUtilization: VehicleUtilizationItem[];
     monthKeys: string[];
+    /** 분석 기간(개월) — '기간 내 정비 기록 없음'은 6개월 이상일 때만 본다 */
+    rangeMonths?: number;
 }): RecommendationItem[] {
-    const { fuelEfficiency, driverComparison, maintenanceCostAnalysis, anomalies, vehicleUtilization, monthKeys } = params;
+    const { fuelEfficiency, driverComparison, maintenanceCostAnalysis, anomalies, vehicleUtilization, monthKeys, rangeMonths = 0 } = params;
     const items: RecommendationItem[] = [];
 
     // 1) 연료 비효율 차량
@@ -481,7 +538,38 @@ export function calcRecommendations(params: {
     }
 
     // 3) 정비 시기 알림
+    const today = localDateStr(new Date());
+    // 정비를 기록하는 기관인가 — 기록을 아예 쓰지 않는 기관에 모든 차량 경고를 띄우지 않는다
+    const orgRecordsMaintenance = maintenanceCostAnalysis.some(v => v.maintenanceCount > 0);
     maintenanceCostAnalysis.forEach(v => {
+        if (v.retired) return;
+
+        // 3-1) 보험 만료 — 만료됐거나 30일 안
+        const left = daysUntil(today, v.insuranceExpiryDate);
+        if (left !== null && left <= 30) {
+            items.push({
+                type: 'insurance',
+                icon: '🛡️',
+                priority: left <= 7 ? 'high' : 'medium',
+                title: left < 0 ? `${v.name} 보험 만료됨` : `${v.name} 보험 만료 ${left === 0 ? '오늘' : `D-${left}`}`,
+                desc: left < 0
+                    ? `보험이 ${v.insuranceExpiryDate}에 만료됐어요. 갱신했다면 [차량 관리]에서 만료일을 고쳐 주세요.`
+                    : `보험이 ${v.insuranceExpiryDate}에 만료돼요. 갱신 일정을 확인하세요.`,
+            });
+        }
+
+        // 3-2) 분석 기간 안에 정비 기록이 한 건도 없는 차량 — 마지막 정비일을 모르므로 '경과일'로는 잡히지 않는다
+        if (v.maintenanceCount === 0 && v.currentKm > 0 && orgRecordsMaintenance && rangeMonths >= 6) {
+            items.push({
+                type: 'maintenance',
+                icon: '🔧',
+                priority: 'medium',
+                title: `${v.name} 정비 기록 없음`,
+                desc: `최근 ${rangeMonths}개월 동안 정비 기록이 없어요. 다른 차량은 정비를 기록하고 있으니 점검 시기를 확인해 보세요.`,
+            });
+            return;
+        }
+
         if (!v.lastMaintenanceDate || !v.currentKm) return;
         const daysSinceMaint = Math.floor((new Date().getTime() - new Date(v.lastMaintenanceDate).getTime()) / (1000 * 60 * 60 * 24));
         if (daysSinceMaint > 90) {

@@ -16,6 +16,7 @@ import {
     calcMaintenanceCostAnalysis,
     calcCostTrend,
     calcRecommendations,
+    calcMonthOverMonth,
     detectAnomalies,
     type LogEntry,
 } from '../../hooks/utils/analyticsCalc';
@@ -294,5 +295,104 @@ describe('calcRecommendations', () => {
             vehicleUtilization: [{ name: 'B', usedDays: 1, totalWorkdays: 60, rate: 2 }],
         });
         expect(r.map(i => i.priority)).toEqual(['high', 'low']);
+    });
+});
+
+describe('calcRecommendations — 보험 만료 · 기간 내 정비 기록 없음', () => {
+    const empty = {
+        fuelEfficiency: { items: [], avgCostPerKm: 0 },
+        driverComparison: [],
+        maintenanceCostAnalysis: [],
+        anomalies: [],
+        vehicleUtilization: [],
+        monthKeys: MONTHS,
+    };
+    const veh = (over: Partial<Parameters<typeof calcRecommendations>[0]['maintenanceCostAnalysis'][number]> = {}) => ({
+        name: '카니발', totalMaintenanceCost: 0, maintenanceCount: 0, lastMaintenanceDate: '',
+        currentKm: 10000, costPerKm: 0, ...over,
+    });
+
+    beforeEach(() => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-06-01T10:00:00+09:00'));
+    });
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
+    it('보험 만료 30일 안이면 알리고, 7일 안·만료는 높은 우선순위', () => {
+        const at = (insuranceExpiryDate: string) => calcRecommendations({ ...empty, maintenanceCostAnalysis: [veh({ insuranceExpiryDate })] });
+
+        expect(at('2026-07-02')).toEqual([]); // 31일 뒤
+        expect(at('2026-07-01')[0]).toMatchObject({ type: 'insurance', priority: 'medium', title: '카니발 보험 만료 D-30' });
+        expect(at('2026-06-09')[0]).toMatchObject({ priority: 'medium', title: '카니발 보험 만료 D-8' });
+        expect(at('2026-06-08')[0]).toMatchObject({ priority: 'high', title: '카니발 보험 만료 D-7' });
+    });
+
+    it('7일 안·오늘·이미 만료', () => {
+        const at = (insuranceExpiryDate: string) => calcRecommendations({ ...empty, maintenanceCostAnalysis: [veh({ insuranceExpiryDate })] })[0];
+
+        expect(at('2026-06-07')).toMatchObject({ priority: 'high', title: '카니발 보험 만료 D-6' });
+        expect(at('2026-06-01')).toMatchObject({ priority: 'high', title: '카니발 보험 만료 오늘' });
+        expect(at('2026-05-20')).toMatchObject({ priority: 'high', title: '카니발 보험 만료됨' });
+        expect(at('2026-05-20').desc).toContain('[차량 관리]');
+    });
+
+    it('만료일이 없거나 깨졌으면, 또는 운행을 중지한 차량이면 알리지 않는다', () => {
+        expect(calcRecommendations({ ...empty, maintenanceCostAnalysis: [veh({ insuranceExpiryDate: '' })] })).toEqual([]);
+        expect(calcRecommendations({ ...empty, maintenanceCostAnalysis: [veh({ insuranceExpiryDate: '2026/06/03' })] })).toEqual([]);
+        expect(calcRecommendations({ ...empty, maintenanceCostAnalysis: [veh({ insuranceExpiryDate: '2026-06-03', retired: true })] })).toEqual([]);
+    });
+
+    it('정비를 기록하는 기관에서, 6개월 이상 기간에 정비가 한 건도 없는 차량을 알린다', () => {
+        const fleet = [veh({ name: '스타렉스', maintenanceCount: 1, lastMaintenanceDate: '2026-05-20' }), veh({ name: '카니발' })];
+
+        const r = calcRecommendations({ ...empty, maintenanceCostAnalysis: fleet, rangeMonths: 6 });
+        expect(r).toHaveLength(1);
+        expect(r[0]).toMatchObject({ type: 'maintenance', priority: 'medium', title: '카니발 정비 기록 없음' });
+        expect(r[0].desc).toContain('6개월');
+    });
+
+    it('기간이 짧거나(3개월), 정비 기록을 아예 쓰지 않는 기관이거나, 운행 기록이 없는 차량이면 알리지 않는다', () => {
+        const fleet = [veh({ name: '스타렉스', maintenanceCount: 1, lastMaintenanceDate: '2026-05-20' }), veh({ name: '카니발' })];
+        expect(calcRecommendations({ ...empty, maintenanceCostAnalysis: fleet, rangeMonths: 3 })).toEqual([]);
+        expect(calcRecommendations({ ...empty, maintenanceCostAnalysis: [veh(), veh({ name: 'B' })], rangeMonths: 12 })).toEqual([]);
+        expect(calcRecommendations({
+            ...empty, rangeMonths: 12,
+            maintenanceCostAnalysis: [fleet[0], veh({ name: '새차', currentKm: 0 })],
+        })).toEqual([]);
+        expect(calcRecommendations({
+            ...empty, rangeMonths: 12,
+            maintenanceCostAnalysis: [fleet[0], veh({ name: '퇴역', retired: true })],
+        })).toEqual([]);
+    });
+});
+
+describe('calcMonthOverMonth — 지난달과 그 전달', () => {
+    const row = (month: string, count: number, distance: number, cost: number) => ({ month, count, distance, cost });
+
+    it('진행 중인 이번 달이 아니라 지난달을 그 전달과 견준다', () => {
+        const r = calcMonthOverMonth([
+            row('2026-07', 1, 1, 1),
+            row('2026-08', 100, 2000, 500000),
+            row('2026-09', 120, 1800, 500000),
+            row('2026-10', 3, 40, 0), // 이번 달(진행 중) — 비교에 쓰지 않는다
+        ]);
+        expect(r).toMatchObject({ label: '9월', prevLabel: '8월' });
+        expect(r!.metrics.map(m => [m.key, m.cur, m.prev, m.pct])).toEqual([
+            ['count', 120, 100, 20],
+            ['distance', 1800, 2000, -10],
+            ['cost', 500000, 500000, 0],
+        ]);
+    });
+
+    it('전달 값이 0이면 증감률은 null', () => {
+        const r = calcMonthOverMonth([row('2026-08', 0, 0, 0), row('2026-09', 5, 50, 0), row('2026-10', 0, 0, 0)]);
+        expect(r!.metrics[0]).toMatchObject({ cur: 5, prev: 0, pct: null });
+    });
+
+    it('비교할 두 달이 모두 비었거나 기간이 3개월보다 짧으면 null', () => {
+        expect(calcMonthOverMonth([row('2026-08', 0, 0, 0), row('2026-09', 0, 0, 0), row('2026-10', 9, 9, 9)])).toBeNull();
+        expect(calcMonthOverMonth([row('2026-09', 5, 5, 5), row('2026-10', 5, 5, 5)])).toBeNull();
     });
 });

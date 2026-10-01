@@ -6,7 +6,7 @@ import type { Vehicle } from '../types/vehicle';
 import type { User } from '../types/user';
 import { getRecentMonthKeys } from './utils/aggregationUtils';
 import {
-    DAY_NAMES, MONTH_LABELS, countWorkdays, calcRecommendations,
+    DAY_NAMES, MONTH_LABELS, countWorkdays, calcRecommendations, calcMonthOverMonth,
 } from './utils/analyticsCalc';
 import { fetchPublicHolidays } from '../lib/holidayApi';
 import type { CostTrendItem, DriverComparisonItem } from './utils/analyticsCalc';
@@ -259,7 +259,9 @@ export default function useAnalytics() {
                 maintenanceCount: maint.count,
                 lastMaintenanceDate: maint.lastDate,
                 currentKm,
-                costPerKm: currentKm > 0 ? Math.round((maint.totalCost / currentKm) * 100) / 100 : 0
+                costPerKm: currentKm > 0 ? Math.round((maint.totalCost / currentKm) * 100) / 100 : 0,
+                insuranceExpiryDate: v.insurance?.expiryDate,
+                retired: !!v.retired?.isRetired,
             };
         }).sort((a, b) => b.totalMaintenanceCost - a.totalMaintenanceCost);
     }, [stats, vehicles]);
@@ -306,11 +308,21 @@ export default function useAnalytics() {
     const totalHipassCost = useMemo(() => costTrend.reduce((s: number, c: CostTrendItem) => s + c.hipassCost, 0), [costTrend]);
     const totalMaintenanceCost = useMemo(() => costTrend.reduce((s: number, c: CostTrendItem) => s + c.maintenanceCost, 0), [costTrend]);
     const totalOperatingCost = useMemo(() => totalFuelCost + totalHipassCost + totalMaintenanceCost, [totalFuelCost, totalHipassCost, totalMaintenanceCost]);
+    /** 하이패스 실제 사용액 합 — 사용액을 담은 달이 하나도 없으면(집계 도입 전) null */
+    const totalHipassUsed = useMemo(() => {
+        const months = stats.filter(s => monthKeys.includes(s.monthKey) && s.hipassUsed !== null);
+        return months.length ? months.reduce((sum, s) => sum + (s.hipassUsed || 0), 0) : null;
+    }, [stats, monthKeys]);
+
+    /** 전월 대비 — 다 끝난 지난달과 그 전달 */
+    const monthOverMonth = useMemo(() => calcMonthOverMonth(monthlyTrend.map((m, i) => ({
+        month: m.month, count: m.count, distance: m.distance, cost: costTrend[i]?.totalCost || 0,
+    }))), [monthlyTrend, costTrend]);
 
     const recommendations = useMemo(() => calcRecommendations({
         fuelEfficiency, driverComparison: driverComparison as DriverComparisonItem[], maintenanceCostAnalysis,
-        anomalies, vehicleUtilization, monthKeys,
-    }), [fuelEfficiency, driverComparison, maintenanceCostAnalysis, anomalies, vehicleUtilization, monthKeys]);
+        anomalies, vehicleUtilization, monthKeys, rangeMonths,
+    }), [fuelEfficiency, driverComparison, maintenanceCostAnalysis, anomalies, vehicleUtilization, monthKeys, rangeMonths]);
 
     const totalLogs = useMemo(() => stats.reduce((s, st) => s + (st.totalLogs || 0), 0), [stats]);
 
@@ -341,8 +353,10 @@ export default function useAnalytics() {
         costTrend,
         totalFuelCost,
         totalHipassCost,
+        totalHipassUsed,
         totalMaintenanceCost,
         totalOperatingCost,
+        monthOverMonth,
         // 원시 통계
         totalLogs,
         aggregatedAt,
