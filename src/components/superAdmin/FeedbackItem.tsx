@@ -16,7 +16,7 @@ interface FeedbackItemProps {
     onToggleExpand: (id: string | null) => void;
     onToggleResolve: (fb: Feedback) => void;
     onSetDeleteTarget: (fb: Feedback) => void;
-    onSetSelectedImage: (url: string) => void;
+    onSetSelectedImage: (image: { urls: string[]; index: number }) => void;
     onCopyMessage: (e: React.MouseEvent, id: string, message: string) => void;
     onSendReply: (id: string, text: string) => void;
     onRegenerateDraft: (id: string) => void;
@@ -173,7 +173,7 @@ export default function FeedbackItem({
                                 {fb.imageUrls?.map((url: string, idx: number) => (
                                     <button
                                         key={idx}
-                                        onClick={() => onSetSelectedImage(url)}
+                                        onClick={() => onSetSelectedImage({ urls: fb.imageUrls ?? [], index: idx })}
                                         className="w-24 h-24 rounded-xl overflow-hidden border border-surface-200 dark:border-surface-600 hover:border-primary-300 dark:hover:border-primary-700/50 hover:shadow-md transition-all"
                                     >
                                         <img
