@@ -25,7 +25,16 @@ describe('resolveOrgFeatures', () => {
             refuelFlag: false,
             driverAllowList: true, driverAllowSearch: true,
             maintenanceEmployeeAccess: true, allowedUsers: true, googleCalendar: true,
+            quickDrive: true,
         });
+    });
+
+    it('바로 운행은 승인제를 켜고 하위 허용을 끈 기관에서만 꺼진다', () => {
+        expect(resolveOrgFeatures({ requireReservationApproval: true, quickDriveWithApproval: false }).quickDrive).toBe(false);
+        expect(resolveOrgFeatures({ requireReservationApproval: true }).quickDrive).toBe(true);
+        expect(resolveOrgFeatures({ requireReservationApproval: true, quickDriveWithApproval: true }).quickDrive).toBe(true);
+        // 승인을 끄면 하위 설정이 false로 남아 있어도 바로 운행은 열린다
+        expect(resolveOrgFeatures({ requireReservationApproval: false, quickDriveWithApproval: false }).quickDrive).toBe(true);
     });
 
     it('입력 방식 플래그는 false만 꺼지고 미설정은 켜짐', () => {
@@ -65,6 +74,7 @@ describe('resolveOrgFeatures', () => {
             refuelFlag: false,
             driverAllowList: true, driverAllowSearch: true,
             maintenanceEmployeeAccess: true, allowedUsers: true, googleCalendar: true,
+            quickDrive: true,
         });
         expect(resolveOrgFeatures({ maintenanceEnabled: false })).toMatchObject({ maintenance: false, hipass: true });
         expect(resolveOrgFeatures({ driverSelectionEnabled: false })).toMatchObject({ driverSelection: false });
@@ -80,6 +90,7 @@ describe('resolveOrgFeatures', () => {
             refuelFlag: false,
             driverAllowList: true, driverAllowSearch: true,
             maintenanceEmployeeAccess: true, allowedUsers: true, googleCalendar: true,
+            quickDrive: true,
         });
     });
 });

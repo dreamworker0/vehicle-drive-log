@@ -18,6 +18,12 @@ export const organizationSchema = z.object({
     approvalLine: z.array(z.object({ title: z.string().catch('') })).optional().catch(undefined),
     hideApprovalLine: z.boolean().optional().catch(undefined),
     requireReservationApproval: z.boolean().optional().catch(undefined),
+    /**
+     * 승인제 기관에서 바로 운행 허용(미설정=허용). 승인이 꺼진 기관에서는 의미가 없다.
+     * 끄면 직원 화면에서 바로 운행이 사라지고 서버도 거부한다 — 승인 대기로 바꾸지 않는다
+     * (바로 운행은 '지금 출발'이라 승인을 기다리면 의미가 없다). 기관 관리자는 영향받지 않는다.
+     */
+    quickDriveWithApproval: z.boolean().optional().catch(undefined),
     // ── 기능 사용 토글(미설정=켜짐). resolveOrgFeatures로 해석 ──
     /** 하이패스 사용(운행일지 하이패스 입력 + 차량관리 하이패스 탭 + 관리자 하이패스 관리) */
     hipassEnabled: z.boolean().optional().catch(undefined),

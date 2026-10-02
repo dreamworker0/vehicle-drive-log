@@ -46,6 +46,11 @@ export interface OrgFeatures {
     driverAllowList: boolean;
     /** 운전자(대표·공동): 검색 선택 허용. 둘 다 켜지면 후보 8명 기준 자동 전환 */
     driverAllowSearch: boolean;
+    /**
+     * 일반 직원의 바로 운행 사용. 승인제(`requireReservationApproval`)를 켜고
+     * `quickDriveWithApproval`을 끈 기관만 꺼진다. 기관 관리자는 이 값과 무관하게 쓸 수 있다.
+     */
+    quickDrive: boolean;
 }
 
 /** 전 기능 켜짐 기본값(슈퍼관리자·기관 미구독 등). */
@@ -65,6 +70,7 @@ export const ALL_FEATURES_ON: OrgFeatures = {
     refuelFlag: true,
     driverAllowList: true,
     driverAllowSearch: true,
+    quickDrive: true,
 };
 
 type OrgFeatureFields = Pick<
@@ -74,6 +80,7 @@ type OrgFeatureFields = Pick<
     | 'passengerAllowList' | 'passengerAllowSearch' | 'passengerAllowCount' | 'reservationPassengerEnabled'
     | 'refuelFlagEnabled'
     | 'driverAllowList' | 'driverAllowSearch'
+    | 'requireReservationApproval' | 'quickDriveWithApproval'
 >;
 
 /**
@@ -103,5 +110,15 @@ export function resolveOrgFeatures(org?: Partial<OrgFeatureFields> | null): OrgF
         refuelFlag: org?.refuelFlagEnabled === true,
         driverAllowList: org?.driverAllowList !== false,
         driverAllowSearch: org?.driverAllowSearch !== false,
+        // 승인이 꺼진 기관은 바로 운행을 막을 이유가 없다 — 하위 설정이 남아 있어도 무시한다
+        quickDrive: !(org?.requireReservationApproval === true && org?.quickDriveWithApproval === false),
     };
+}
+
+/**
+ * 바로 운행 버튼을 보여 줄지. 기관 관리자는 승인권자라 자기 운행을 승인받을 이유가 없어
+ * 기관 설정과 무관하게 쓸 수 있다(서버 createReservationCore도 같은 기준).
+ */
+export function canUseQuickDrive(features: Pick<OrgFeatures, 'quickDrive'>, role?: string | null): boolean {
+    return features.quickDrive || role === 'admin';
 }

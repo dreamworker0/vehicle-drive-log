@@ -4,9 +4,11 @@
 
 interface WelcomeGuideProps {
     onDismiss: () => void;
+    /** 기관이 바로 운행을 꺼 두었으면 바로 운행 안내를 빼고 미리 예약을 주 동작으로 안내한다 */
+    showQuickDrive?: boolean;
 }
 
-export default function WelcomeGuide({ onDismiss }: WelcomeGuideProps) {
+export default function WelcomeGuide({ onDismiss, showQuickDrive = true }: WelcomeGuideProps) {
     return (
         <div className="glass-card border-2 border-primary-200 p-5 mb-5 animate-fade-in relative">
             <button aria-label="버튼"
@@ -21,17 +23,19 @@ export default function WelcomeGuide({ onDismiss }: WelcomeGuideProps) {
             <h3 className="text-base font-bold text-surface-900 dark:text-surface-100 mb-3">👋 환영합니다!</h3>
             <div className="space-y-2.5 text-sm text-surface-600 dark:text-surface-400">
                 {/* 운행의 60% 이상이 예약 없이 바로 출발한다 — 바로 운행을 먼저, 예약은 선택으로 안내한다 */}
-                <div className="flex items-start gap-3">
-                    <span className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-sm flex-shrink-0">🚀</span>
-                    <div>
-                        <p className="font-medium text-surface-800 dark:text-surface-200">바로 운행</p>
-                        <p className="text-xs text-surface-400 dark:text-surface-500">차가 필요할 때 '바로 운행 시작'을 누르고 차량만 고르면 곧바로 출발해요.</p>
+                {showQuickDrive && (
+                    <div className="flex items-start gap-3">
+                        <span className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-sm flex-shrink-0">🚀</span>
+                        <div>
+                            <p className="font-medium text-surface-800 dark:text-surface-200">바로 운행</p>
+                            <p className="text-xs text-surface-400 dark:text-surface-500">차가 필요할 때 '바로 운행 시작'을 누르고 차량만 고르면 곧바로 출발해요.</p>
+                        </div>
                     </div>
-                </div>
+                )}
                 <div className="flex items-start gap-3">
                     <span className="w-7 h-7 rounded-lg bg-primary-100 dark:bg-primary-900/30 flex items-center justify-center text-sm flex-shrink-0">📅</span>
                     <div>
-                        <p className="font-medium text-surface-800 dark:text-surface-200">미리 예약 <span className="text-xs font-normal text-surface-400 dark:text-surface-500">(선택)</span></p>
+                        <p className="font-medium text-surface-800 dark:text-surface-200">미리 예약{showQuickDrive && <> <span className="text-xs font-normal text-surface-400 dark:text-surface-500">(선택)</span></>}</p>
                         <p className="text-xs text-surface-400 dark:text-surface-500">정해진 일정이 있다면 달력에서 차량을 미리 잡아 두세요. 그날 카드의 '운행 시작'을 누르면 돼요.</p>
                     </div>
                 </div>

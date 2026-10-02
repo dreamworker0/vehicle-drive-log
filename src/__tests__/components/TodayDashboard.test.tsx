@@ -15,14 +15,15 @@ vi.mock('react-router-dom', async () => {
 });
 
 // 2. Auth 모킹
-let mockUserData = { welcomeDismissed: true };
+let mockUserData: { welcomeDismissed: boolean; role?: string } = { welcomeDismissed: true };
+let mockOrgFeatures = { ...ALL_FEATURES_ON };
 vi.mock('../../hooks/useAuth', () => ({
     useAuth: () => ({
         user: { uid: 'test-user-123' },
         userData: mockUserData,
         // 기능 플래그 전체를 담는다 — 하나만 넣어 두면 나중에 다른 플래그를 읽는
         // 코드가 들어왔을 때 조용히 undefined가 되고 런타임에서야 터진다.
-        orgFeatures: { ...ALL_FEATURES_ON },
+        orgFeatures: mockOrgFeatures,
     }),
 }));
 
@@ -61,6 +62,8 @@ describe('TodayDashboard', () => {
             navigateToQuickDrive: vi.fn(),
             myLogsCount: 5,
         };
+        mockOrgFeatures = { ...ALL_FEATURES_ON };
+        mockUserData = { welcomeDismissed: true };
         // localStorage mock 초기화
         const store: Record<string, string> = { 'employee-welcome-dismissed': 'true' };
         vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key) => store[key] || null);
@@ -83,6 +86,29 @@ describe('TodayDashboard', () => {
 
         // 같은 동작이 두 번 보이지 않게 상단 작은 '바로 운행' 버튼은 숨긴다
         expect(screen.queryByRole('button', { name: /^🚀\s*바로 운행$/ })).not.toBeInTheDocument();
+    });
+
+    it('승인제 기관이 바로 운행을 끄면 직원에게 바로 운행 버튼을 보이지 않는다', () => {
+        mockOrgFeatures = { ...ALL_FEATURES_ON, quickDrive: false };
+        mockUserData = { welcomeDismissed: true, role: 'employee' };
+        render(
+            <MemoryRouter>
+                <TodayDashboard />
+            </MemoryRouter>
+        );
+        expect(screen.queryByRole('button', { name: /바로 운행 시작/ })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /미리 예약하기/ })).toBeInTheDocument();
+    });
+
+    it('바로 운행을 꺼도 기관 관리자에게는 버튼을 보여 준다', () => {
+        mockOrgFeatures = { ...ALL_FEATURES_ON, quickDrive: false };
+        mockUserData = { welcomeDismissed: true, role: 'admin' };
+        render(
+            <MemoryRouter>
+                <TodayDashboard />
+            </MemoryRouter>
+        );
+        expect(screen.getByRole('button', { name: /바로 운행 시작/ })).toBeInTheDocument();
     });
 
     it('운행 중이면 빈 카드에 바로 운행 시작 버튼을 두지 않는다', () => {

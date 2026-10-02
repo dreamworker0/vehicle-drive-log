@@ -360,6 +360,40 @@ describe('createReservationTx (코어)', () => {
             expect(mockTransactionSet.mock.calls[0][1]).toMatchObject({ status: 'reserved', isQuickDrive: true });
         });
 
+        it('승인제 기관이 바로 운행 허용을 끄면 직원의 바로 운행을 거절한다', async () => {
+            mockTransactionGet
+                .mockResolvedValueOnce({ exists: true, data: () => ({ organizationId: 'org1' }), docs: [] })
+                .mockResolvedValueOnce({ exists: true, data: () => ({ requireReservationApproval: true, quickDriveWithApproval: false }), docs: [] })
+                .mockResolvedValue({ exists: true, data: () => ({}), docs: [] });
+
+            await expect(
+                createReservationTx({ ...validInput, actorRole: 'employee', isQuickDrive: true })
+            ).rejects.toMatchObject({ code: 'failed-precondition' });
+            expect(mockTransactionSet).not.toHaveBeenCalled();
+        });
+
+        it('바로 운행 허용을 꺼도 기관 관리자는 바로 운행할 수 있다', async () => {
+            mockTransactionGet
+                .mockResolvedValueOnce({ exists: true, data: () => ({ organizationId: 'org1' }), docs: [] })
+                .mockResolvedValueOnce({ exists: true, data: () => ({ requireReservationApproval: true, quickDriveWithApproval: false }), docs: [] })
+                .mockResolvedValue({ exists: true, data: () => ({}), docs: [] });
+
+            const result = await createReservationTx({ ...validInput, actorRole: 'admin', isQuickDrive: true });
+
+            expect(result.status).toBe('reserved');
+        });
+
+        it('바로 운행 허용을 꺼도 미리 잡는 예약은 지금처럼 승인 대기로 만든다', async () => {
+            mockTransactionGet
+                .mockResolvedValueOnce({ exists: true, data: () => ({ organizationId: 'org1' }), docs: [] })
+                .mockResolvedValueOnce({ exists: true, data: () => ({ requireReservationApproval: true, quickDriveWithApproval: false }), docs: [] })
+                .mockResolvedValue({ exists: true, data: () => ({}), docs: [] });
+
+            const result = await createReservationTx({ ...validInput, actorRole: 'employee' });
+
+            expect(result.status).toBe('pending');
+        });
+
         it('지금 출발이 아닌 예약에 붙인 표시는 버린다 — 표시로 승인을 피하지 못한다', async () => {
             mockTransactionGet
                 .mockResolvedValueOnce({ exists: true, data: () => ({ organizationId: 'org1' }), docs: [] })

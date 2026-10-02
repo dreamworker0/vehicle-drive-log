@@ -7,6 +7,9 @@
  * 목적지 여러 곳 입력처럼 한쪽에만 있는 기능이 생긴다.
  */
 import { useMemo, useRef, useState } from 'react';
+import { Navigate } from 'react-router-dom';
+import { useAuth } from '../../hooks/useAuth';
+import { canUseQuickDrive } from '../../lib/orgFeatures';
 import useQuickDriveStart from '../../hooks/useQuickDriveStart';
 import { mergePendingDestination } from '../../lib/tmap';
 import useVehiclePriority from '../../hooks/useVehiclePriority';
@@ -44,6 +47,12 @@ export default function QuickDriveStart() {
         if (!usageCounts || usageCounts.size === 0) return filtered;
         return [...filtered].sort((a, b) => (usageCounts.get(b.id) || 0) - (usageCounts.get(a.id) || 0));
     }, [vehicles, usageCounts]);
+    const { userData, orgFeatures } = useAuth();
+
+    // 승인제 기관이 바로 운행을 끈 경우 — 주소로 직접 들어와도 첫 화면으로 돌려보낸다(서버도 거부한다)
+    if (!canUseQuickDrive(orgFeatures, userData?.role)) {
+        return <Navigate to="/employee/today" replace />;
+    }
 
     if (loading) {
         return (
