@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import useFeedbackManagement from '../../hooks/useFeedbackManagement';
 import { formatTimestampFull } from '../../lib/dateUtils';
 import type { Feedback } from '../../types';
@@ -42,6 +42,27 @@ export default function FeedbackManagement() {
 
     // 보기 모드 상태
     const [viewMode, setViewMode] = useState<'grouped' | 'timeline'>('grouped');
+
+    // 확대 이미지 넘기기 — 끝에서 다음을 누르면 처음으로 돌아간다
+    const showSiblingImage = useCallback((step: number) => {
+        setSelectedImage(prev => prev && {
+            ...prev,
+            index: (prev.index + step + prev.urls.length) % prev.urls.length,
+        });
+    }, [setSelectedImage]);
+
+    // 확대 보기 중 키보드 ←/→로 넘기고 Esc로 닫는다
+    const imageOpen = selectedImage !== null;
+    useEffect(() => {
+        if (!imageOpen) return;
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'ArrowLeft') showSiblingImage(-1);
+            else if (e.key === 'ArrowRight') showSiblingImage(1);
+            else if (e.key === 'Escape') setSelectedImage(null);
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, [imageOpen, showSiblingImage, setSelectedImage]);
 
     const renderFeedbackItem = (fb: Feedback, showAuthorInfo = false) => {
         return (
@@ -267,12 +288,38 @@ export default function FeedbackManagement() {
                         </button>
                         <img
                             role="presentation"
-                            src={selectedImage}
-                            alt="확대 이미지"
+                            src={selectedImage.urls[selectedImage.index]}
+                            alt={`확대 이미지 ${selectedImage.index + 1}`}
                             className="max-w-full max-h-[85vh] rounded-2xl shadow-2xl object-contain"
                             onClick={e => e.stopPropagation()}
                             onKeyDown={e => e.stopPropagation()}
                         />
+                        {/* 이미지가 2장 이상이면 이전/다음 버튼과 위치 표시 */}
+                        {selectedImage.urls.length > 1 && (
+                            <>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); showSiblingImage(-1); }}
+                                    aria-label="이전 이미지"
+                                    className="absolute left-2 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/90 dark:bg-surface-800/90 rounded-full shadow-lg flex items-center justify-center text-surface-600 dark:text-surface-300 hover:text-surface-900 dark:hover:text-surface-100 transition-colors"
+                                >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5" />
+                                    </svg>
+                                </button>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); showSiblingImage(1); }}
+                                    aria-label="다음 이미지"
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 w-12 h-12 bg-white/90 dark:bg-surface-800/90 rounded-full shadow-lg flex items-center justify-center text-surface-600 dark:text-surface-300 hover:text-surface-900 dark:hover:text-surface-100 transition-colors"
+                                >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                                    </svg>
+                                </button>
+                                <span className="absolute bottom-3 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full bg-black/60 text-white text-xs font-medium">
+                                    {selectedImage.index + 1} / {selectedImage.urls.length}
+                                </span>
+                            </>
+                        )}
                     </div>
                 </div>
             )}

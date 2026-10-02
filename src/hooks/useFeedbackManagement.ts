@@ -18,7 +18,8 @@ export default function useFeedbackManagement() {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
     const [filter, setFilter] = useState<'all' | 'unread' | 'resolved'>('unread');
-    const [selectedImage, setSelectedImage] = useState<string | null>(null);
+    // 확대 보기 중인 첨부 이미지 — 같은 의견의 다른 이미지로 넘겨 볼 수 있도록 목록과 위치를 함께 둔다
+    const [selectedImage, setSelectedImage] = useState<{ urls: string[]; index: number } | null>(null);
     const [deleteTarget, setDeleteTarget] = useState<Feedback | null>(null);
     const [deleting, setDeleting] = useState(false);
     const [orgNames, setOrgNames] = useState<Record<string, string>>({});
