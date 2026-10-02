@@ -231,6 +231,20 @@ export async function createReservationTx(
             const orgSnap = await transaction.get(orgRef);
             const requireReservationApproval = orgSnap.exists ? (orgSnap.data()?.requireReservationApproval || false) : false;
 
+            // 승인제 기관이 '바로 운행은 승인 없이 허용'을 끄면 직원의 바로 운행을 거절한다.
+            // 승인 대기로 바꾸지 않는 이유: 바로 운행은 지금 출발이라 기다리면 의미가 없다.
+            // 기관 관리자는 승인권자라 막지 않는다(화면의 canUseQuickDrive와 같은 기준).
+            if (
+                isQuickDrive && requireReservationApproval &&
+                orgSnap.data()?.quickDriveWithApproval === false &&
+                actorRole !== "admin"
+            ) {
+                throw new HttpsError(
+                    "failed-precondition",
+                    "이 기관은 바로 운행을 쓰지 않아요. 미리 예약 후 승인을 받아 주세요."
+                );
+            }
+
             const existingSnap = await transaction.get(
                 db.collection("reservations")
                     .where("organizationId", "==", organizationId)
