@@ -130,7 +130,7 @@ export default function SuperAdminLayout() {
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
         flex flex-col
       `}>
-                <div className="p-4 border-b border-surface-100 dark:border-surface-700">
+                <div className="p-4 pt-[calc(1rem+env(safe-area-inset-top,0px))] border-b border-surface-100 dark:border-surface-700">
                     <div className="flex items-center gap-3">
                         <div className="w-10 h-10 bg-primary-100 dark:bg-primary-900/40 rounded-xl flex items-center justify-center">
                             <svg className="w-5 h-5 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -217,7 +217,7 @@ export default function SuperAdminLayout() {
 
                 </nav>
 
-                <div className="p-3 border-t border-surface-100 dark:border-surface-700 space-y-1">
+                <div className="p-3 pb-[calc(0.75rem+env(safe-area-inset-bottom,0px))] border-t border-surface-100 dark:border-surface-700 space-y-1">
 
 
                     <div className="flex items-center justify-between px-3 py-2 rounded-lg">
@@ -254,7 +254,7 @@ export default function SuperAdminLayout() {
                 예약 배너(z-40)와 약관 재동의 배너(z-40)가 알림 패널을 덮었다.
                 고정 배너(40)보다 위, 모달(50)보다 아래여야 하므로 그 사이 값을 쓴다.
                 */}
-                <header className="sticky top-0 z-[45] bg-white/80 dark:bg-surface-900/80 backdrop-blur-md border-b border-surface-100 dark:border-surface-700 px-4 lg:px-6 h-14 flex items-center justify-between safe-top">
+                <header className="sticky top-0 z-[45] bg-white/80 dark:bg-surface-900/80 backdrop-blur-md border-b border-surface-100 dark:border-surface-700 px-4 lg:px-6 h-[calc(3.5rem+env(safe-area-inset-top,0px))] flex items-center justify-between safe-top">
                     <button
                         onClick={() => setSidebarOpen(true)}
                         className="btn-icon lg:hidden min-h-[48px] min-w-[48px]"
