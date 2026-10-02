@@ -16,6 +16,7 @@ import WeekReservationList from './WeekReservationList';
 import ReservationPatternBanner from './ReservationPatternBanner';
 import ConfirmModal from '../common/ConfirmModal';
 import type { Reservation } from '../../types/reservation';
+import { canUseQuickDrive } from '../../lib/orgFeatures';
 import type { Vehicle } from '../../types/vehicle';
 
 export default function TodayDashboard() {
@@ -34,6 +35,8 @@ export default function TodayDashboard() {
     const [cancelTarget, setCancelTarget] = useState<{ reservation: Reservation; type: 'today' | 'week' } | null>(null);
     // "이번 주 예약" 요소 ref — 추천 배너와의 화면 겹침 감지에 사용
     const weekRef = useRef<HTMLDivElement>(null);
+    // 승인제 기관이 바로 운행을 끄면 버튼을 모두 숨기고 미리 예약을 주 동작으로 둔다
+    const showQuickDrive = !hasActiveDrive && canUseQuickDrive(orgFeatures, userData?.role);
 
     // 웰컴 가이드 (첫 방문 시 1회 표시)
     // 웰컴 가이드 표시 여부
@@ -90,7 +93,7 @@ export default function TodayDashboard() {
                     <p className="text-sm text-surface-400 dark:text-surface-500">{todayLabel}</p>
                 </div>
                 {/* 오늘 예약이 없으면 아래 카드가 바로 운행을 크게 보여 주므로 여기서는 숨긴다 */}
-                {!hasActiveDrive && myReservations.length > 0 && (
+                {showQuickDrive && myReservations.length > 0 && (
                     <button
                         onClick={navigateToQuickDrive}
                         className="flex items-center gap-1 px-4 py-2 min-h-[48px] rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-colors text-xs font-medium"
@@ -102,7 +105,7 @@ export default function TodayDashboard() {
             </div>
 
             {/* 첫 방문 웰컴 가이드 */}
-            {showWelcome && <WelcomeGuide onDismiss={dismissWelcome} />}
+            {showWelcome && <WelcomeGuide onDismiss={dismissWelcome} showQuickDrive={canUseQuickDrive(orgFeatures, userData?.role)} />}
 
             {/* 미작성 알림 */}
             {incompleteAlerts.length > 0 && (
@@ -189,8 +192,8 @@ export default function TodayDashboard() {
             {myReservations.length === 0 && (
                 <div className="mb-6">
                     <p className="text-xs text-surface-400 dark:text-surface-500 mb-2.5">오늘 잡힌 예약이 없어요</p>
-                    <div className={`grid gap-3 ${hasActiveDrive ? 'grid-cols-1' : 'grid-cols-[1.6fr_1fr]'}`}>
-                        {!hasActiveDrive && (
+                    <div className={`grid gap-3 ${showQuickDrive ? 'grid-cols-[1.6fr_1fr]' : 'grid-cols-1'}`}>
+                        {showQuickDrive && (
                             <button
                                 onClick={navigateToQuickDrive}
                                 aria-label="바로 운행 시작"

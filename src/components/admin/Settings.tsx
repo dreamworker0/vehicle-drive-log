@@ -87,6 +87,7 @@ export default function Settings() {
             <FeatureToggleSection
                 values={{
                     requireReservationApproval: form.requireReservationApproval,
+                    quickDriveWithApproval: form.quickDriveWithApproval,
                     hipassEnabled: form.hipassEnabled,
                     maintenanceEnabled: form.maintenanceEnabled,
                     maintenanceEmployeeAccess: form.maintenanceEmployeeAccess,

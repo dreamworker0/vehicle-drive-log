@@ -18,6 +18,7 @@ function baseForm(sites: OrgSite[]): SettingsForm {
         approvalLine: [{ title: '담당' }],
         hideApprovalLine: false,
         requireReservationApproval: false,
+        quickDriveWithApproval: true,
         hipassEnabled: true,
         maintenanceEnabled: true,
         maintenanceEmployeeAccess: true,
