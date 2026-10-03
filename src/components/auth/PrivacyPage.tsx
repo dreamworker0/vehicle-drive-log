@@ -207,7 +207,8 @@ export default function PrivacyPage() {
                                 <p className="font-medium text-surface-700 dark:text-surface-300">동의 기록</p>
                                 <ul className="list-disc list-inside space-y-1 ml-2">
                                     <li>기관 신청 시 이용약관·개인정보 처리방침에 동의한 사실, 동의한 문서의 시행일 버전, 동의 일시</li>
-                                    <li>직원이 초대 코드로 가입하거나 개정된 약관에 다시 동의할 때 그 동의 사실, 문서의 시행일 버전, 동의 일시</li>
+                                    {/* 직원에게는 개인정보 동의를 받지 않는다(legal-consent.md §2) — 이용약관 동의만 기록됨을 분명히 한다 */}
+                                    <li>직원이 초대 코드로 가입하거나 개정된 이용약관을 확인할 때 그 이용약관 동의 사실, 약관의 시행일 버전, 동의 일시 (직원에게는 개인정보 수집·이용 동의를 따로 받지 않습니다)</li>
                                 </ul>
                                 <p className="text-xs text-surface-500 dark:text-surface-400">
                                     위탁 계약(이용약관 제9조)의 성립과 동의 사실을 입증하기 위한 항목으로, 기관 신청 기록은 해당 기관 정보와 함께,
