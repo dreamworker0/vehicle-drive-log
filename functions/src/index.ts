@@ -39,6 +39,9 @@ export { sendBroadcastNotice } from "./handlers/callable/sendBroadcastNotice";
 // 예약 생성 (중복 방지 — Firestore Transaction)
 export { createReservationSafe } from "./handlers/callable/createReservationSafe";
 
+// 예약 수정 (일정·차량·명의 변경 시 생성과 같은 검증 + 승인제 재승인 — 2026-10-03 감사 발견 1)
+export { updateReservationSafe } from "./handlers/callable/updateReservationSafe";
+
 // 기관 신청 이메일 알림
 export { notifyNewApplication } from "./handlers/triggers/notifyNewApplication";
 

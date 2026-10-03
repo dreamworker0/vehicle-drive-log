@@ -187,18 +187,51 @@ describe('firestore/reservations', () => {
             expect(fs.updateDoc).toHaveBeenCalledWith(expect.anything(), { status: 'cancelled' });
         });
 
-        it('updateReservation은 전달한 데이터로 updateDoc를 호출한다', async () => {
-            await updateReservation('r1', { destination: '복지관' });
+        // 수정은 생성처럼 콜러블을 거친다 — 직접 updateDoc하던 동안 승인된 예약의 일정·차량을
+        // 바꿔도 승인 상태가 유지됐다(2026-10-03 감사 발견 1). Rules도 직원의 직접 변경을 막는다.
+        it('updateReservation은 updateReservationSafe 콜러블로 보내고 updateDoc를 쓰지 않는다', async () => {
+            const callable = vi.fn().mockResolvedValue({ data: { status: 'reserved', requiresReapproval: false } });
+            vi.mocked(httpsCallable).mockReturnValue(callable as never);
 
-            expect(fs.updateDoc).toHaveBeenCalledWith(expect.anything(), { destination: '복지관' });
+            const result = await updateReservation('r1', { destination: '복지관' });
+
+            expect(httpsCallable).toHaveBeenCalledWith(expect.anything(), 'updateReservationSafe', expect.anything());
+            expect(callable).toHaveBeenCalledWith({ destination: '복지관', reservationId: 'r1', detachRecurring: false });
+            expect(fs.updateDoc).not.toHaveBeenCalled();
+            expect(result).toEqual({ status: 'reserved', requiresReapproval: false });
         });
 
         it('updateReservation은 undefined 필드를 보내지 않는다', async () => {
-            // Firestore가 undefined를 거부해 "Unsupported field value: undefined"로
-            // 저장 전체가 실패한다 — 폼 상태를 통째로 넘기는 호출부가 있어 여기서 막는다
+            // 폼 상태를 통째로 넘기는 호출부가 있다 — 서버는 "보낸 필드만 바꾼다"로 해석한다
+            const callable = vi.fn().mockResolvedValue({ data: { status: 'reserved' } });
+            vi.mocked(httpsCallable).mockReturnValue(callable as never);
+
             await updateReservation('r1', { destination: '복지관', recurringDays: undefined } as never);
 
-            expect(fs.updateDoc).toHaveBeenCalledWith(expect.anything(), { destination: '복지관' });
+            expect(callable).toHaveBeenCalledWith({ destination: '복지관', reservationId: 'r1', detachRecurring: false });
+        });
+
+        it('재승인 필요 여부를 그대로 돌려준다 (화면 안내용)', async () => {
+            const callable = vi.fn().mockResolvedValue({ data: { status: 'pending', requiresReapproval: true } });
+            vi.mocked(httpsCallable).mockReturnValue(callable as never);
+
+            expect(await updateReservation('r1', { startTime: '10:00' })).toEqual({ status: 'pending', requiresReapproval: true });
+        });
+
+        it('예상된 거절(already-exists)은 Sentry에 보고하지 않고 재던진다', async () => {
+            const callable = vi.fn().mockRejectedValue(Object.assign(new Error('겹침'), { code: 'functions/already-exists' }));
+            vi.mocked(httpsCallable).mockReturnValue(callable as never);
+
+            await expect(updateReservation('r1', { startTime: '10:00' })).rejects.toThrow('겹침');
+            expect(captureError).not.toHaveBeenCalled();
+        });
+
+        it('예상 밖 에러는 captureError로 보고하고 재던진다', async () => {
+            const callable = vi.fn().mockRejectedValue(Object.assign(new Error('internal'), { code: 'functions/internal' }));
+            vi.mocked(httpsCallable).mockReturnValue(callable as never);
+
+            await expect(updateReservation('r1', { startTime: '10:00' })).rejects.toThrow('internal');
+            expect(captureError).toHaveBeenCalled();
         });
     });
 
@@ -369,14 +402,15 @@ describe('firestore/reservations', () => {
             expect(count).toBe(2);
         });
 
-        it('detachFromRecurringGroup은 그룹 링크를 deleteField로 제거한다', async () => {
-            // undefined로 덮으면 Firestore가 거부하고, 남겨 두면 1일짜리 반복 그룹으로 해석된다
+        it('detachFromRecurringGroup은 detachRecurring으로 서버에 그룹 링크 제거를 맡긴다', async () => {
+            // 남겨 두면 1일짜리 반복 그룹으로 해석된다 — 링크 제거는 서버(updateReservationSafe)가 한다
+            const callable = vi.fn().mockResolvedValue({ data: { status: 'reserved', requiresReapproval: false } });
+            vi.mocked(httpsCallable).mockReturnValue(callable as never);
+
             await detachFromRecurringGroup('r2', { destination: '복지관', purpose: undefined } as never);
 
-            expect(fs.updateDoc).toHaveBeenCalledWith(expect.anything(), {
-                destination: '복지관',
-                recurringGroupId: '__deleteField__',
-            });
+            expect(callable).toHaveBeenCalledWith({ destination: '복지관', reservationId: 'r2', detachRecurring: true });
+            expect(fs.updateDoc).not.toHaveBeenCalled();
         });
     });
 

@@ -55,6 +55,14 @@ function buildReservationBaseData(
     };
 }
 
+/**
+ * 승인제 기관에서 승인된 예약의 일정·차량을 바꾸면 서버가 승인 대기로 되돌린다.
+ * 사용자는 "수정되었습니다"만 보고 확정이라고 믿기 쉬우므로 그 사실을 함께 알린다.
+ */
+function reapprovalNotice(result: { requiresReapproval?: boolean } | undefined) {
+    return result?.requiresReapproval ? ' 일정이 바뀌어 관리자 승인을 다시 기다립니다.' : '';
+}
+
 export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
     e.preventDefault();
     const {
@@ -328,13 +336,13 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
                 userData.organizationId!,
                 editingReservation!.id,
             );
-            await detachFromRecurringGroup(editingReservation!.id, {
+            const detached = await detachFromRecurringGroup(editingReservation!.id, {
                 ...baseData,
                 ...passengersForUpdate,
                 startTime: form.startTime,
                 endTime: form.endTime,
             });
-            showToast(`${editingReservation!.date} 단건 예약으로 전환되었습니다. (반복 ${cancelled}건 취소)`);
+            showToast(`${editingReservation!.date} 단건 예약으로 전환되었습니다. (반복 ${cancelled}건 취소)${reapprovalNotice(detached)}`);
         } else if (isRecurringToMultiDay) {
             // ── 반복 → 다일 전환 ──
             // 순서는 단건 전환과 같은 이유로 정해진다. 먼저 만들면 아직 살아 있는 반복 회차와
@@ -395,13 +403,13 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
             // 반복 그룹 수정은 아래 전용 블록이 그룹째 다시 만든다.
             // 이 분기가 그것까지 받아 단건 저장을 시도하면, 폼에 남은 반복 설정 필드가
             // 예약 문서에 섞여 들어가거나 undefined 값으로 저장이 실패한다.
-            await updateReservation(editingReservation.id, {
+            const updated = await updateReservation(editingReservation.id, {
                 ...baseData,
                 ...passengersForUpdate,
                 startTime: form.startTime,
                 endTime: form.endTime,
             });
-            showToast('예약이 수정되었습니다.');
+            showToast(`예약이 수정되었습니다.${reapprovalNotice(updated)}`);
         } else if (isMultiDay) {
             // ── 다일 연속 예약 생성 ──
             const groupId = `grp_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;

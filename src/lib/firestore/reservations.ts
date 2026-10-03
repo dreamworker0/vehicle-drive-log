@@ -2,7 +2,7 @@
  * Firestore — 차량 예약 (Reservations) 관련 함수
  */
 import {
-    doc, getDoc, updateDoc, deleteField,
+    doc, getDoc, updateDoc,
     collection, query, where, getDocs, addDoc,
     serverTimestamp, runTransaction, writeBatch, Timestamp,
 } from 'firebase/firestore';
@@ -153,23 +153,55 @@ export const cancelReservation = async (reservationId: string) => {
     }
 };
 
+/** 예약 수정 결과 — 승인제 기관에서 일정이 바뀌면 승인 대기로 돌아간다 */
+export interface UpdateReservationResult {
+    status: string;
+    requiresReapproval: boolean;
+}
+
 /**
- * 예약 정보 수정
+ * 예약 수정 콜러블(updateReservationSafe) 호출.
  *
- * `undefined` 필드는 보내지 않는다. Firestore updateDoc은 undefined를 거부하고
- * "Unsupported field value: undefined (found in field …)"로 **저장 전체를 실패**시킨다.
- * 호출부가 폼 상태를 통째로 넘기는 구조라(선택하지 않은 반복 설정 등이 undefined로 남는다)
- * 값 하나 때문에 수정이 막히는 일이 실제로 있었다.
- * 필드를 지우려면 undefined가 아니라 deleteField()를 명시적으로 넘긴다.
+ * 수정도 생성처럼 서버를 거친다. 화면이 Firestore에 직접 쓰던 동안에는 승인된 예약의
+ * 날짜·시간·차량을 바꿔도 승인 상태가 그대로 남고, 차량 사용 제한·정비 차단·겹침 검사를
+ * 건너뛰었다(2026-10-03 감사 발견 1). 이제 Rules도 직원의 일정·차량 직접 변경을 막는다.
+ *
+ * `undefined` 필드는 보내지 않는다 — 호출부가 폼 상태를 넘기는 구조라 선택하지 않은
+ * 값이 undefined로 남는데, 서버는 "보낸 필드만 바꾼다"로 해석한다.
  */
+async function callUpdateReservationSafe(
+    reservationId: string,
+    data: Partial<Reservation>,
+    detachRecurring: boolean,
+): Promise<UpdateReservationResult> {
+    const defined = Object.fromEntries(
+        Object.entries(data).filter(([, value]) => value !== undefined)
+    );
+    // 모바일 백그라운드 복귀 시 Firebase 토큰 만료에 따른 Unauthenticated 에러 방지
+    if (auth.currentUser) {
+        await auth.currentUser.getIdToken();
+    }
+    const callable = httpsCallable(functions, 'updateReservationSafe', { timeout: 60000 });
+    const result = await callable({ ...defined, reservationId, detachRecurring });
+    const { status, requiresReapproval } = result.data as UpdateReservationResult;
+    return { status, requiresReapproval: requiresReapproval === true };
+}
+
+/** 겹침·권한·형식 오류는 사용자에게 토스트로 안내되는 예상된 거절이라 Sentry에 올리지 않는다 */
+function isExpectedUpdateRejection(error: unknown) {
+    const code = (error as { code?: string })?.code;
+    return code === 'functions/already-exists' || code === 'functions/invalid-argument'
+        || code === 'functions/permission-denied' || code === 'functions/failed-precondition';
+}
+
+/** 예약 정보 수정 */
 export const updateReservation = async (reservationId: string, data: Partial<Reservation>) => {
     try {
-        const defined = Object.fromEntries(
-            Object.entries(data).filter(([, value]) => value !== undefined)
-        );
-        await updateDoc(reservationDoc(reservationId), defined);
+        return await callUpdateReservationSafe(reservationId, data, false);
     } catch (error) {
-        captureError(error, { context: 'updateReservation', reservationId, data });
+        if (!isExpectedUpdateRejection(error)) {
+            captureError(error, { context: 'updateReservation', reservationId, data });
+        }
         throw error;
     }
 };
@@ -177,28 +209,25 @@ export const updateReservation = async (reservationId: string, data: Partial<Res
 /**
  * 반복 그룹에서 한 건을 떼어낸다 (반복 → 단건 전환, 반복 → 다일 전환의 첫날).
  *
- * 그룹 링크(`recurringGroupId`)를 문서에서 **제거**한다. 남겨 두면 이 예약을 다시 열 때
- * 1일짜리 반복 그룹으로 해석돼 단건이 된 것이 아니게 된다. 값을 undefined로 덮는 것은
- * Firestore가 거부하므로 `deleteField()`를 쓴다.
+ * 그룹 링크(`recurringGroupId`)를 문서에서 **제거**한다(서버가 지운다). 남겨 두면 이 예약을
+ * 다시 열 때 1일짜리 반복 그룹으로 해석돼 단건이 된 것이 아니게 된다.
  *
  * 다일 전환에서는 `data.groupId`로 새 다일 그룹을 함께 지정한다 — 반복 링크는 끊고
- * 연속 예약 그룹에 붙이는 것이 한 번의 update로 끝난다.
+ * 연속 예약 그룹에 붙이는 것이 한 번의 수정으로 끝난다.
  *
  * 새로 만들지 않고 기존 문서를 고치는 이유가 둘 있다.
- *  (1) **삭제 권한** — Rules의 예약 delete는 소유자 본인(또는 superAdmin)만 허용한다.
- *      새로 만들려면 그룹을 지워야 하는데, 그러면 기관 관리자가 직원의 반복 예약을
- *      단건으로 바꿀 수 없다. update만 쓰면 관리자 경로도 그대로 동작한다.
- *  (2) **명의 보존** — createReservationSafe는 reservedByUid를 호출자로 강제한다.
- *      다시 만드는 방식은 관리자가 전환할 때 직원의 예약이 관리자 명의로 넘어간다.
+ *  (1) **삭제 권한** — 새로 만들려면 그룹을 지워야 하는데, 수정이면 기관 관리자가
+ *      직원의 반복 예약을 단건으로 바꾸는 경로가 그대로 동작한다.
+ *  (2) **명의 보존** — 다시 만드는 방식은 관리자가 전환할 때 직원의 예약이 관리자
+ *      명의로 넘어갈 위험이 있다.
  */
 export const detachFromRecurringGroup = async (reservationId: string, data: Partial<Reservation>) => {
     try {
-        const defined = Object.fromEntries(
-            Object.entries(data).filter(([, value]) => value !== undefined)
-        );
-        await updateDoc(reservationDoc(reservationId), { ...defined, recurringGroupId: deleteField() });
+        return await callUpdateReservationSafe(reservationId, data, true);
     } catch (error) {
-        captureError(error, { context: 'detachFromRecurringGroup', reservationId, data });
+        if (!isExpectedUpdateRejection(error)) {
+            captureError(error, { context: 'detachFromRecurringGroup', reservationId, data });
+        }
         throw error;
     }
 };

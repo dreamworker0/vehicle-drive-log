@@ -74,6 +74,15 @@ const FUNCTIONS: FunctionEntry[] = [
     returns: '{ success: boolean, reservationId: string }',
   },
   {
+    name: 'updateReservationSafe',
+    type: 'onCall',
+    file: 'handlers/callable/updateReservationSafe.ts',
+    description: '예약 수정(단건·반복 그룹 떼어내기). 일정·차량·명의가 바뀌면 생성과 같은 검증(차량 제한·정비·겹침)을 하고, 승인제 기관에서 직원이 승인된 예약의 일정을 바꾸면 승인 대기로 되돌린다',
+    auth: '예약 명의자 본인 또는 기관 관리자',
+    params: '{ reservationId, vehicleId?, date?, startTime?, endTime?, reservedByUid?, purpose?, destination?, passenger*?, detachRecurring?, groupId? }',
+    returns: '{ success: boolean, status: string, requiresReapproval: boolean }',
+  },
+  {
     name: 'triggerOnDemandCalendarSync',
     type: 'onCall',
     file: 'handlers/callable/triggerOnDemandCalendarSync.ts',

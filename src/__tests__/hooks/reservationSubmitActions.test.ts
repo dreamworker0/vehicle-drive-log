@@ -256,6 +256,26 @@ describe('handleSubmit — 예약 제출', () => {
         expect(updateReservation).toHaveBeenCalledTimes(1);
     });
 
+    it('서버가 승인 대기로 되돌리면 재승인이 필요하다고 함께 안내한다', async () => {
+        // 승인제 기관에서 승인된 예약의 일정을 바꾸면 서버가 pending으로 돌린다 —
+        // "수정되었습니다"만 보이면 사용자는 확정이라고 믿는다
+        vi.mocked(updateReservation).mockResolvedValueOnce({ status: 'pending', requiresReapproval: true });
+        const deps = makeDeps({
+            editingReservation: { id: 'r1', startTime: '09:00', endTime: '10:00' } as never,
+        });
+        await handleSubmit(fakeEvent(), deps);
+        expect(deps.showToast).toHaveBeenCalledWith(expect.stringContaining('승인을 다시 기다립니다'));
+    });
+
+    it('재승인이 필요 없으면 평소 문구만 보인다', async () => {
+        vi.mocked(updateReservation).mockResolvedValueOnce({ status: 'reserved', requiresReapproval: false });
+        const deps = makeDeps({
+            editingReservation: { id: 'r1', startTime: '10:00', endTime: '11:00' } as never,
+        });
+        await handleSubmit(fakeEvent(), deps);
+        expect(deps.showToast).toHaveBeenCalledWith('예약이 수정되었습니다.');
+    });
+
     describe('반복 그룹 수정', () => {
         const recurringDeps = (overrides: Partial<ActionDeps> = {}) => makeDeps({
             editingReservation: { id: 'r1', startTime: '10:00', endTime: '11:00' } as never,

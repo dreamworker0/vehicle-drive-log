@@ -218,9 +218,12 @@ export const onReservationUpdated = onDocumentUpdated(
         if (!nonIgnoredChanged) return;
     }
 
-    // [오프라인 충돌 방어] 시간이나 상태가 변경된 경우 겹침 체크
+    // [오프라인 충돌 방어] 시간·차량·상태가 변경된 경우 겹침 체크
+    // 차량 변경이 빠져 있던 동안은 시간을 그대로 두고 차량만 바꾸면 겹침 검사를 피했다
+    // (2026-10-03 감사 발견 1 — 수정 콜러블이 1차로 막고, 여기는 관리자 직접 쓰기 등에 대한 심층 방어).
     if (after.status === 'pending' || after.status === 'reserved') {
-        const timeChanged = before.date !== after.date || before.startTime !== after.startTime || before.endTime !== after.endTime || before.status !== after.status;
+        const timeChanged = before.date !== after.date || before.startTime !== after.startTime || before.endTime !== after.endTime || before.status !== after.status
+            || before.vehicleId !== after.vehicleId;
         if (timeChanged) {
             const isTimeConflict = await checkReservationTimeConflict(after.vehicleId, after.date, after.startTime, after.endTime, reservationId);
             if (isTimeConflict) {
