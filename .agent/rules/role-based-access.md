@@ -42,3 +42,14 @@ description: 역할 기반 접근 권한(RBAC) 검증 원칙. 프론트엔드 UI
 - **바인딩을 새로 도입할 때는 기존 데이터를 먼저 시딩한다.** 선점 등록만 켜면, 아직 그 기능을 쓰지 않은 기존 기관의 식별자가 선점 대상으로 열린 채 남는다(`scripts/seed-calendar-bindings.ts`가 선례).
 
 구현 참고: [functions/src/services/calendar/calendarBinding.ts](../../functions/src/services/calendar/calendarBinding.ts), 회귀 고정: `functions/src/__tests__/calendarBinding.test.ts`.
+
+### 5. 생성을 서버로 잠갔다면 수정도 같은 문으로 닫는다
+
+정책 검증(승인제·차량 사용 제한·정비 차단·시간 겹침)을 콜러블에 두고 Rules에서 클라이언트 `create`를 막았다면, **그 정책이 판단하는 필드의 `update`도 같은 서버 경로로만 바꿀 수 있어야 한다.** 생성만 잠그면 "작게 만들어 승인받고, 수정으로 원하는 모양으로 바꾸기"가 정상 화면에서도 된다.
+
+- 예약이 실제로 그랬다 — 생성은 `createReservationSafe` 전용(2026-07-10 감사 #5)이었지만 수정은 화면의 직접 `updateDoc`이라, 승인된 예약을 다른 날짜·시간·사용 제한 차량으로 옮겨도 `reserved`가 유지됐다([2026-10-03 감사 발견 1](../../docs/security-reports/2026-10-03.md)).
+- **Rules**: 소유자(직원) 분기에서 정책 필드(`vehicleId`·`date`·`startTime`·`endTime`·그룹 링크 등)의 변경을 금지한다. 상태 전이도 "승인되지 않은 것을 스스로 쓸 수 있는 상태로 올리기"를 막는다(`pending`→`reserved`만이 아니라 `in_progress`·`cancelled`→`reserved`까지).
+- **서버**: 정책 필드가 바뀌는 수정은 생성과 **같은 검증**을 다시 하고, 승인이 필요한 변경이면 승인 상태를 되돌린다(`updateReservationSafe`). 정책과 무관한 정보 수정은 그대로 통과시켜 정상 흐름을 막지 않는다.
+- 새 컬렉션에 "콜러블 전용 생성"을 도입할 때는 같은 PR에서 `update` 분기를 함께 점검한다.
+
+구현 참고: [functions/src/services/reservation/updateReservationCore.ts](../../functions/src/services/reservation/updateReservationCore.ts), 회귀 고정: `tests/firestore-rules.test.ts`(5-1b)·`functions/src/__tests__/updateReservationCore.test.ts`.

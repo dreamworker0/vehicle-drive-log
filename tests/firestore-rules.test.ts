@@ -209,6 +209,51 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertSucceeds(adminADb.collection('reservations').doc('res_reserved').update({ status: 'reserved', reservedByName: 'x' }));
   });
 
+  it('5-1b. 예약 소유자는 일정·차량·그룹을 직접 바꾸지 못한다 — 수정 콜러블 전용 (2026-10-03 감사 발견 1)', async () => {
+    // 직접 쓰기가 열려 있던 동안은 승인된 예약을 다른 날짜·시간·사용 제한 차량으로 옮겨도
+    // reserved가 유지됐다(승인제·차량 제한·겹침 검사 우회). 정보 수정·취소·운행 시작/종료는 그대로 열어 둔다.
+    const base = {
+      organizationId: 'org-A', vehicleId: 'vehicle_A', reservedByUid: 'user_A',
+      date: '2026-10-10', startTime: '09:00', endTime: '10:00', recurringGroupId: 'rcr_1',
+    };
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.collection('reservations').doc('res_reserved').set({ ...base, status: 'reserved' });
+      await db.collection('reservations').doc('res_pending').set({ ...base, status: 'pending' });
+      await db.collection('reservations').doc('res_cancelled').set({ ...base, status: 'cancelled' });
+    });
+
+    const ownerDb = setupContext('user_A', { role: 'employee', orgId: 'org-A' }).firestore();
+    const reserved = ownerDb.collection('reservations').doc('res_reserved');
+
+    // 감사 PoC 그대로 — 다른 차량·날짜·종일로 옮기기
+    await assertFails(reserved.update({ vehicleId: 'v_restricted', date: '2026-12-24', startTime: '00:00', endTime: '23:59' }));
+    // 필드 하나씩도 막힌다
+    await assertFails(reserved.update({ vehicleId: 'vehicle_B' }));
+    await assertFails(reserved.update({ date: '2026-12-24' }));
+    await assertFails(reserved.update({ startTime: '08:00' }));
+    await assertFails(reserved.update({ endTime: '18:00' }));
+    await assertFails(reserved.update({ groupId: 'grp_x' }));
+    await assertFails(reserved.update({ recurringGroupId: 'rcr_other' }));
+    await assertFails(reserved.update({ isQuickDrive: true }));
+
+    // 정책과 무관한 정보 수정·운행 시작은 허용
+    await assertSucceeds(reserved.update({ destination: '복지관', purpose: '업무', passengerCount: 2 }));
+    await assertSucceeds(reserved.update({ status: 'in_progress', actualStartTime: '09:05' }));
+
+    // 승인되지 않은 예약을 스스로 쓸 수 있는 상태로 올리지 못한다
+    const pending = ownerDb.collection('reservations').doc('res_pending');
+    await assertFails(pending.update({ status: 'in_progress' }));
+    await assertFails(pending.update({ status: 'in_use' }));
+    await assertFails(ownerDb.collection('reservations').doc('res_cancelled').update({ status: 'reserved' }));
+    // 승인 대기 예약의 취소는 허용
+    await assertSucceeds(pending.update({ status: 'cancelled' }));
+
+    // 기관 관리자는 일정·차량을 직접 바꿀 수 있다 (승인권자)
+    const adminDb = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+    await assertSucceeds(adminDb.collection('reservations').doc('res_reserved').update({ startTime: '11:00', endTime: '12:00' }));
+  });
+
   it('5-2. 예약 삭제 — 소유자 본인과 기관 관리자만 허용, 타 기관·타인(직원)은 차단', async () => {
     // 다일·반복 그룹 수정은 "기존 그룹 삭제 → 재생성" 경로라 삭제 권한이 필요한데
     // superAdmin 전용이던 탓에 소유자 본인조차 그룹 수정이 항상 실패했다.

@@ -350,13 +350,33 @@ service cloud.firestore {
       // 클라이언트 직접 create는 allowedUserIds(차량 사용 제한)·시간 중복·승인 필요 여부
       // 검증을 우회할 수 있었음 (2026-07-10 감사 #5).
       allow create: if isSuperAdmin();
+      // 소유자의 상태 전이 — **승인되지 않은 예약을 스스로 쓸 수 있는 상태로 올리지 못한다.**
+      // pending→reserved 자가 승인만 막던 시절에는 pending→in_progress(바로 운행 시작)나
+      // cancelled→reserved(취소한 예약 되살리기, 그 사이 다른 사람이 잡은 시간과 겹친다)가
+      // 같은 결과로 열려 있었다. 화면은 승인 대기 예약에 운행 시작 버튼을 띄우지 않으므로
+      // 정상 흐름은 영향이 없다.
+      function ownerStatusTransitionValid() {
+        let from = resource.data.get('status', 'reserved');
+        let to = request.resource.data.get('status', 'reserved');
+        return from == to
+               || !(to in ['reserved', 'in_progress', 'in_use'])
+               || from in ['reserved', 'in_progress', 'in_use'];
+      }
       allow update: if isSuperAdmin()
                     || (belongsToMyOrg() && (
-                        // 소유자는 취소·운행 종료·정보 수정만 가능. pending→reserved 자가 승인은 차단
-                        // (requireReservationApproval 우회 방지 — 승인은 admin만).
+                        // 소유자는 취소·운행 시작/종료·정보(목적지·목적·동승자) 수정만 가능.
+                        //
+                        // 일정·차량·그룹은 직접 바꾸지 못한다 — updateReservationSafe(콜러블) 전용이다.
+                        // 직접 쓰기가 열려 있던 동안은 승인된 예약을 다른 날짜·시간·차량으로 옮겨도
+                        // reserved가 유지됐고(승인제 우회), 차량 사용 제한·정비 차단·겹침 검사를 건너뛰었다
+                        // (2026-10-03 감사 발견 1). 생성을 콜러블로 잠근 2026-07-10 감사 #5의 나머지 절반이다.
+                        // 기관 관리자 본인 예약은 아래 관리자 분기로 통과한다.
                         (resource.data.reservedByUid == request.auth.uid
-                            && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['organizationId', 'reservedByUid'])
-                            && !(resource.data.status == 'pending' && request.resource.data.status == 'reserved'))
+                            && !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+                                'organizationId', 'reservedByUid',
+                                'vehicleId', 'date', 'startTime', 'endTime',
+                                'groupId', 'recurringGroupId', 'isQuickDrive'])
+                            && ownerStatusTransitionValid())
                         // organizationId 불변 — admin의 타 기관 이전 차단 (2026-07-10 감사 #6)
                         || (isOrgAdmin(resource.data.organizationId) && request.resource.data.organizationId == resource.data.organizationId)
                     ));

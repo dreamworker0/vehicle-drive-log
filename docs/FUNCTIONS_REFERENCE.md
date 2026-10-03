@@ -2,9 +2,9 @@
 
 > **자동 생성 문서** — `scripts/generate-functions-doc.ts`로 생성됨
 >
-> 마지막 업데이트: 2026. 10. 1. 오전 6:44:21
+> 마지막 업데이트: 2026. 10. 3. 오전 10:41:42
 >
-> 총 함수 수: **76개**
+> 총 함수 수: **77개**
 
 ---
 
@@ -23,7 +23,7 @@
 
 ## 📞 onCall (클라이언트 직접 호출)
 
-> 총 40개
+> 총 41개
 
 ### `ocrDashboard`
 
@@ -64,6 +64,16 @@
 | **인증** | 인증된 기관 멤버 |
 | **요청 파라미터** | `{ organizationId, vehicleId, vehicleName, date, startTime, endTime, purpose, destination, reservedByUid, reservedByName }` |
 | **반환값** | `{ success: boolean, reservationId: string }` |
+
+### `updateReservationSafe`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/callable/updateReservationSafe.ts` |
+| **설명** | 예약 수정(단건·반복 그룹 떼어내기). 일정·차량·명의가 바뀌면 생성과 같은 검증(차량 제한·정비·겹침)을 하고, 승인제 기관에서 직원이 승인된 예약의 일정을 바꾸면 승인 대기로 되돌린다 |
+| **인증** | 예약 명의자 본인 또는 기관 관리자 |
+| **요청 파라미터** | `{ reservationId, vehicleId?, date?, startTime?, endTime?, reservedByUid?, purpose?, destination?, passenger*?, detachRecurring?, groupId? }` |
+| **반환값** | `{ success: boolean, status: string, requiresReapproval: boolean }` |
 
 ### `triggerOnDemandCalendarSync`
 
