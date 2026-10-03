@@ -119,6 +119,27 @@ describe('useHipassCharge', () => {
         expect(result.current.balanceAfter).toBe(60000); // 50000 + 10000
     });
 
+    it('상한(100만 원)을 넘는 충전은 저장하지 않고 안내한다 — 서버 규칙과 같은 선', async () => {
+        const { result } = renderHook(() => useHipassCharge());
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        act(() => { result.current.setForm({ date: '2026-03-15', chargeAmount: '1000001' }); });
+        await act(async () => { await result.current.handleSubmit({ preventDefault: vi.fn() } as never); });
+
+        expect(mockShowToast).toHaveBeenCalledWith(expect.stringContaining('1,000,000원까지'), 'warning');
+        expect(mockCreateHipassCharge).not.toHaveBeenCalled();
+    });
+
+    it('상한과 같은 금액(100만 원)은 저장한다', async () => {
+        const { result } = renderHook(() => useHipassCharge());
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        act(() => { result.current.setForm({ date: '2026-03-15', chargeAmount: '1000000' }); });
+        await act(async () => { await result.current.handleSubmit({ preventDefault: vi.fn() } as never); });
+
+        expect(mockCreateHipassCharge).toHaveBeenCalledWith(expect.objectContaining({ chargeAmount: 1000000 }));
+    });
+
     it('getVehicleById가 차량을 찾는다', async () => {
         const { result } = renderHook(() => useHipassCharge());
 

@@ -10,6 +10,7 @@ import { createHipassCharge } from '../lib/firestore';
 import { toLocalDateStr } from '../lib/dateUtils';
 import useBaseHipassCharge from './base/useBaseHipassCharge';
 import { parseIntegerInput } from './utils/numberValidation';
+import { MAX_HIPASS_CHARGE_AMOUNT } from '../lib/constants';
 
 const INITIAL_FORM = {
     date: toLocalDateStr(),
@@ -91,6 +92,10 @@ export default function useHipassCharge() {
         const amount = parseIntegerInput(form.chargeAmount);
         if (isNaN(amount) || amount <= 0) {
             showToast('올바른 충전금액을 입력해주세요.', 'warning');
+            return;
+        }
+        if (amount > MAX_HIPASS_CHARGE_AMOUNT) {
+            showToast(`한 번에 충전할 수 있는 금액은 ${MAX_HIPASS_CHARGE_AMOUNT.toLocaleString()}원까지예요. 금액을 다시 확인해 주세요.`, 'warning');
             return;
         }
 

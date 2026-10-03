@@ -20,6 +20,7 @@ import type { HipassCharge } from '../types/hipassCharge';
 import useBaseHipassCharge from './base/useBaseHipassCharge';
 import { updateHipassCharge } from '../lib/firestore';
 import { validateNonNegativeFields, parseIntegerInput } from './utils/numberValidation';
+import { MAX_HIPASS_CHARGE_AMOUNT } from '../lib/constants';
 
 /** 수정 폼 값 — 입력 중에는 문자열로 다룬다(저장 직전에 숫자로 바꾼다). */
 export interface HipassChargeEditForm {
@@ -164,6 +165,10 @@ export default function useHipassChargeAdmin() {
         const amount = parseIntegerInput(form.chargeAmount);
         if (isNaN(amount) || amount <= 0) {
             showToast('올바른 충전금액을 입력해주세요.', 'warning');
+            return;
+        }
+        if (amount > MAX_HIPASS_CHARGE_AMOUNT) {
+            showToast(`한 번에 충전할 수 있는 금액은 ${MAX_HIPASS_CHARGE_AMOUNT.toLocaleString()}원까지예요. 금액을 다시 확인해 주세요.`, 'warning');
             return;
         }
 
