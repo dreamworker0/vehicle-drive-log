@@ -9,6 +9,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { TERMS_VERSION, formatLegalVersion } from '../../lib/constants';
 
 const mocks = vi.hoisted(() => ({
     callable: vi.fn(),
@@ -68,7 +69,7 @@ describe('BroadcastNoticePage', () => {
         expect(screen.getByLabelText('제목')).toHaveValue('이용약관 개정 안내');
         // 시행일은 상수에서 파생되므로 본문과 어긋날 수 없다
         expect((screen.getByLabelText('내용') as HTMLTextAreaElement).value)
-            .toContain('2026년 8월 10일부터 개정 시행됩니다');
+            .toContain(`${formatLegalVersion(TERMS_VERSION)}부터 개정 시행됩니다`);
     });
 
     it('대상을 확인하기 전에는 발송 버튼이 잠겨 있다', async () => {

@@ -152,6 +152,7 @@ describe('useOrgApplication 통합 테스트', () => {
         act(() => {
             result.current.handleChange({ target: { name: 'applicantName', value: '홍길동' } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.handleChange({ target: { name: 'applicantEmail', value: 'test@example.com' } } as unknown as React.ChangeEvent<HTMLInputElement>);
+            result.current.handleChange({ target: { name: 'applicantPhone', value: '010-1234-5678' } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.handleChange({ target: { name: 'orgName', value: '은혜사랑교회' } } as unknown as React.ChangeEvent<HTMLInputElement>);
         });
         
@@ -177,6 +178,24 @@ describe('useOrgApplication 통합 테스트', () => {
             await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent<HTMLFormElement>);
         });
         expect(result.current.error).toContain('병원는 현재 서비스 대상이 아닙니다');
+    });
+
+    // 서버가 전화번호 없는 신청을 거부하므로, 화면에서 먼저 막아 원인 모를 오류를 없앤다.
+    it('시나리오 6-1: 전화번호가 비어 있으면 제출하지 않고 필수 항목 안내를 띄운다', async () => {
+        const { result } = renderHook(() => useOrgApplication());
+
+        act(() => {
+            result.current.handleChange({ target: { name: 'applicantName', value: '홍길동' } } as unknown as React.ChangeEvent<HTMLInputElement>);
+            result.current.handleChange({ target: { name: 'applicantEmail', value: 'test@example.com' } } as unknown as React.ChangeEvent<HTMLInputElement>);
+            result.current.handleChange({ target: { name: 'orgName', value: '우리복지재단' } } as unknown as React.ChangeEvent<HTMLInputElement>);
+        });
+
+        await act(async () => {
+            await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent<HTMLFormElement>);
+        });
+
+        expect(result.current.error).toBe('필수 항목을 모두 입력해주세요.');
+        expect(mockSubmitOrgApplication).not.toHaveBeenCalled();
     });
 
     it('시나리오 7: 증빙 확장자 제한 - 허용되지 않은 파일 업로드 시 에러 검증', () => {
@@ -216,6 +235,7 @@ describe('useOrgApplication 통합 테스트', () => {
         act(() => {
             result.current.handleChange({ target: { name: 'applicantName', value: '홍길동' } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.handleChange({ target: { name: 'applicantEmail', value: 'test@example.com' } } as unknown as React.ChangeEvent<HTMLInputElement>);
+            result.current.handleChange({ target: { name: 'applicantPhone', value: '010-1234-5678' } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.handleChange({ target: { name: 'orgName', value: '우리복지재단' } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.handleImageChange({ target: { files: [validFile] } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.setAgreeTerms(true);
@@ -241,6 +261,7 @@ describe('useOrgApplication 통합 테스트', () => {
         act(() => {
             result.current.handleChange({ target: { name: 'applicantName', value: '홍길동' } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.handleChange({ target: { name: 'applicantEmail', value: 'test@example.com' } } as unknown as React.ChangeEvent<HTMLInputElement>);
+            result.current.handleChange({ target: { name: 'applicantPhone', value: '010-1234-5678' } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.handleChange({ target: { name: 'orgName', value: '우리복지재단' } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.handleImageChange({ target: { files: [validFile] } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.setAgreeTerms(true);
@@ -272,6 +293,7 @@ describe('useOrgApplication 통합 테스트', () => {
         act(() => {
             result.current.handleChange({ target: { name: 'applicantName', value: '홍길동' } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.handleChange({ target: { name: 'applicantEmail', value: 'test@example.com' } } as unknown as React.ChangeEvent<HTMLInputElement>);
+            result.current.handleChange({ target: { name: 'applicantPhone', value: '010-1234-5678' } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.handleChange({ target: { name: 'orgName', value: '우리복지재단' } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.handleImageChange({ target: { files: [validFile] } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.setAgreeTerms(terms);
@@ -297,6 +319,7 @@ describe('useOrgApplication 통합 테스트', () => {
         act(() => {
             result.current.handleChange({ target: { name: 'applicantName', value: '홍길동' } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.handleChange({ target: { name: 'applicantEmail', value: 'test@example.com' } } as unknown as React.ChangeEvent<HTMLInputElement>);
+            result.current.handleChange({ target: { name: 'applicantPhone', value: '010-1234-5678' } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.handleChange({ target: { name: 'orgName', value: '행복한복지관' } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.handleImageChange({ target: { files: [validFile] } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.setAgreeTerms(true);
@@ -321,6 +344,7 @@ describe('useOrgApplication 통합 테스트', () => {
         act(() => {
             result.current.handleChange({ target: { name: 'applicantName', value: '홍길동' } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.handleChange({ target: { name: 'applicantEmail', value: 'test@example.com' } } as unknown as React.ChangeEvent<HTMLInputElement>);
+            result.current.handleChange({ target: { name: 'applicantPhone', value: '010-1234-5678' } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.handleChange({ target: { name: 'orgName', value: '행복한복지관' } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.handleImageChange({ target: { files: [validFile] } } as unknown as React.ChangeEvent<HTMLInputElement>);
             result.current.setAgreeTerms(true);
