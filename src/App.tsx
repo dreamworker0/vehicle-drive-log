@@ -10,6 +10,7 @@ import useSessionRecord from './hooks/useSessionRecord';
 import { useOrientationLock } from './hooks/useOrientationLock';
 import useThemeSync from './hooks/useThemeSync';
 import { AuthGuard } from './components/auth/AuthGuard';
+import { adminHomePath } from './lib/lastArea';
 import { updateUser } from './lib/firestore/users';
 import InAppBrowserGuard from './components/common/InAppBrowserGuard';
 
@@ -79,7 +80,7 @@ function RouteFallback() {
   if (userDocState === 'pending') return <LoadingScreen />;
   if (!userData) return <Navigate to="/invite" replace />;
   if (userData.role === 'superAdmin') return <Navigate to="/super-admin" replace />;
-  if (userData.role === 'admin') return <Navigate to="/admin" replace />;
+  if (userData.role === 'admin') return <Navigate to={adminHomePath(user.uid)} replace />;
   return <Navigate to="/employee" replace />;
 }
 

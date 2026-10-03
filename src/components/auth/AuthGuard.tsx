@@ -4,6 +4,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { SA_TEST_ROLE_KEY, LoadingScreen } from '../../App';
 import { clearUserOrganization } from '../../lib/firestore';
 import { logout } from '../../lib/auth';
+import { adminHomePath } from '../../lib/lastArea';
 
 /** 비활성화/기관 삭제 등 차단 상태 공통 화면 */
 export function BlockedScreen({ emoji, title, description, uid, allowTransfer = false }: {
@@ -87,7 +88,10 @@ export function AuthGuard({
     }
 
     if (effectiveRole === 'superAdmin') return <Navigate to="/super-admin" replace />;
-    if (effectiveRole === 'admin') return <Navigate to="/admin" replace />;
+    // 기관 관리자는 마지막에 쓴 화면(관리자/직원)으로 연다 — 슈퍼관리자 테스트 모드는 제외
+    if (effectiveRole === 'admin') {
+      return <Navigate to={isSuperAdmin ? '/admin' : adminHomePath(user.uid)} replace />;
+    }
     if (effectiveRole === 'employee') return <Navigate to="/employee" replace />;
     return <Navigate to="/invite" replace />;
   }

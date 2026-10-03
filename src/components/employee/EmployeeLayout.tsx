@@ -5,6 +5,7 @@ import { lazyWithRetry } from '../../lib/lazyWithRetry';
 import { warmDriverRoutes } from '../../lib/warmDriverRoutes';
 import { getOrganization } from '../../lib/firestore';
 import { SA_TEST_ROLE_KEY } from '../../App';
+import { rememberAdminArea } from '../../lib/lastArea';
 import NotificationBell from '../common/NotificationBell';
 import AdminNotice from '../admin/AdminNotice';
 import IOSInstallPrompt from '../common/IOSInstallPrompt';
@@ -81,12 +82,17 @@ const navItems: NavItem[] = [
 ];
 
 export default function EmployeeLayout() {
-    const { userData, isSuperAdmin } = useAuth();
+    const { user, userData, isSuperAdmin } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
     const [orgName, setOrgName] = useState('');
     const { hasNew: hasNewReleaseNotes } = useReleaseNotesStatus();
     useBackButton();
+
+    // 기관 관리자가 직원 화면을 쓰고 있으면 다음에 앱을 열 때 여기로 돌아오게 기억한다
+    useEffect(() => {
+        if (userData?.role === 'admin' && !isSuperAdmin) rememberAdminArea(user?.uid, 'employee');
+    }, [user?.uid, userData?.role, isSuperAdmin]);
 
     useEffect(() => {
         if (!userData?.organizationId) return;
