@@ -1,9 +1,10 @@
-import React, { useState, Suspense, startTransition } from 'react';
+import React, { useState, useEffect, Suspense, startTransition } from 'react';
 import { Routes, Route, NavLink, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { lazyWithRetry } from '../../lib/lazyWithRetry';
 import { useAuth } from '../../hooks/useAuth';
 import { logout } from '../../lib/auth';
 import { SA_TEST_ROLE_KEY } from '../../App';
+import { rememberAdminArea } from '../../lib/lastArea';
 import NotificationBell from '../common/NotificationBell';
 import Toggle from '../common/Toggle';
 import AdminNotice from './AdminNotice';
@@ -64,6 +65,11 @@ export default function AdminLayout() {
     const [showReleaseNotes, setShowReleaseNotes] = useState(false);
     const { hasNew: hasNewReleaseNotes, markSeen: markReleaseNotesSeen } = useReleaseNotesStatus();
     useBackButton();
+
+    // 다음에 앱을 열 때 이 화면으로 돌아오게 기억한다 (슈퍼관리자 테스트 모드는 제외)
+    useEffect(() => {
+        if (!isSuperAdmin) rememberAdminArea(user?.uid, 'admin');
+    }, [user?.uid, isSuperAdmin]);
 
     const { vehicleCount, employeeCount, hipassCount, reservationCount } = useAdminBadges();
 

@@ -153,3 +153,55 @@ describe('AuthGuard — 슈퍼관리자 테스트 역할은 탭 단위(sessionSt
     expect(screen.queryByText('EMP_CONTENT')).not.toBeInTheDocument();
   });
 });
+
+describe('AuthGuard — 기관 관리자는 마지막에 쓴 화면으로 연다', () => {
+  // 폰 PWA에서 직원 화면으로 운행을 기록하고 나중에 다시 열면 항상 관리자 화면으로
+  // 돌아가던 문제(2026-10-03 사용자 요청). 시작 주소 `/`가 이 가드를 거친다.
+  function renderLanding() {
+    return render(
+      <MemoryRouter initialEntries={['/']}>
+        <Routes>
+          <Route path="/" element={<AuthGuard requireGuest><div>LANDING</div></AuthGuard>} />
+          <Route path="/admin" element={<div>ADMIN</div>} />
+          <Route path="/employee" element={<div>EMP</div>} />
+        </Routes>
+      </MemoryRouter>
+    );
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+    mockAuth = {
+      user: { uid: 'admin1' },
+      userData: { role: 'admin', organizationId: 'org1' },
+      userDocState: 'present',
+      isSuperAdmin: false,
+      orgDeleted: false,
+    };
+  });
+
+  it('기록이 없으면 관리자 화면으로 연다 (기존 동작)', () => {
+    renderLanding();
+    expect(screen.getByText('ADMIN')).toBeInTheDocument();
+  });
+
+  it('마지막에 직원 화면을 썼으면 직원 화면으로 연다', () => {
+    localStorage.setItem('admin-last-area', JSON.stringify({ uid: 'admin1', area: 'employee' }));
+    renderLanding();
+    expect(screen.getByText('EMP')).toBeInTheDocument();
+  });
+
+  it('다른 계정의 기록은 따르지 않는다 (한 기기를 여러 사람이 쓰는 경우)', () => {
+    localStorage.setItem('admin-last-area', JSON.stringify({ uid: 'someone-else', area: 'employee' }));
+    renderLanding();
+    expect(screen.getByText('ADMIN')).toBeInTheDocument();
+  });
+
+  it('직원 계정은 기록과 무관하게 직원 화면으로 연다', () => {
+    mockAuth.userData = { role: 'employee', organizationId: 'org1' };
+    mockAuth.user = { uid: 'emp1' };
+    renderLanding();
+    expect(screen.getByText('EMP')).toBeInTheDocument();
+  });
+});
