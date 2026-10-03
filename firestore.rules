@@ -103,6 +103,20 @@ service cloud.firestore {
                      && data.hipassBalanceBefore - data.hipassBalanceAfter <= 1000000));
     }
 
+    /**
+     * 하이패스 충전금액의 상한 — `hipassUsageValid`의 짝이다 (2026-10-03 감사 부록).
+     *
+     * 잔액은 서버 트리거가 충전 기록의 `chargeAmount`만큼 더해 정한다. 사용 쪽(운행일지)에는
+     * 한 건 100만 원 상한을 걸었는데 충전 쪽에는 없어서, 기록 한 건으로 카드 잔액을 임의로
+     * 키울 수 있었다. 상한은 사용 쪽과 같은 값이다 — 실물 카드의 충전 한도(보통 수십만 원)보다
+     * 넉넉하되 '불가능한 값'은 끊는 선이다. 화면(`MAX_HIPASS_CHARGE_AMOUNT`)도 같은 검사를 한다.
+     */
+    function chargeAmountWithinCap(data) {
+      return !data.keys().hasAny(['chargeAmount'])
+             || data.get('chargeAmount', 0) == null
+             || data.chargeAmount <= 1000000;
+    }
+
     function isOrgAdmin(orgId) {
       return isOrgMember(orgId)
         && request.auth.token.role == 'admin';
@@ -526,7 +540,8 @@ service cloud.firestore {
                     // 충전금액은 음수가 될 수 없다.
                     // balanceBefore·balanceAfter는 카드의 현재 상태를 옮겨 적은 값이라 검사하지 않는다 —
                     // 이미 음수가 된 카드에 충전 기록을 남기는 길까지 막히면 복구가 불가능해진다.
-                    && fieldNonNegative(request.resource.data, 'chargeAmount');
+                    && fieldNonNegative(request.resource.data, 'chargeAmount')
+                    && chargeAmountWithinCap(request.resource.data);
       allow update: if (isSuperAdmin()
                     || (belongsToMyOrg() && (
                         (resource.data.chargerUid == request.auth.uid && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['organizationId', 'cardId', 'chargerUid']))
@@ -535,7 +550,11 @@ service cloud.firestore {
                     )))
                     // 주유 기록과 같은 이유 — 관리자 정정 경로가 열려 있으므로 행위자를 남긴다.
                     && actorStampValid()
-                    && fieldNonNegativeOnChange('chargeAmount');
+                    && fieldNonNegativeOnChange('chargeAmount')
+                    // 음수 방지와 같은 이유로 '바뀔 때만' 본다 — 이미 상한을 넘은 옛 기록의
+                    // 다른 필드를 고치는 길까지 막으면 그 기록을 바로잡을 수 없다.
+                    && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['chargeAmount'])
+                        || chargeAmountWithinCap(request.resource.data));
       allow delete: if (belongsToMyOrg()
                     && (resource.data.chargerUid == request.auth.uid
                         || isOrgAdmin(resource.data.organizationId)))

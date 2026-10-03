@@ -186,6 +186,17 @@ describe('useHipassChargeAdmin — 관리자 정정', () => {
         expect(mockUpdateHipassCharge).not.toHaveBeenCalled();
     });
 
+    it('상한(100만 원)을 넘는 금액으로는 정정하지 않는다 — 서버 규칙과 같은 선', async () => {
+        const { result } = await renderLoaded();
+
+        act(() => { result.current.handleEdit(RECORDS[0] as never); });
+        act(() => { result.current.setForm(f => ({ ...f, chargeAmount: '1000001' })); });
+        await act(async () => { await result.current.handleSubmit(submitEvent()); });
+
+        expect(mockShowToast).toHaveBeenCalledWith(expect.stringContaining('1,000,000원까지'), 'warning');
+        expect(mockUpdateHipassCharge).not.toHaveBeenCalled();
+    });
+
     it('저장에 실패하면 목록을 바꾸지 않고 수정 상태를 유지한다', async () => {
         mockUpdateHipassCharge.mockRejectedValueOnce(new Error('permission-denied'));
         const { result } = await renderLoaded();

@@ -26,6 +26,13 @@ export const getVehicleColor = (id: string) => {
     return VEHICLE_COLORS[Math.abs(hash) % VEHICLE_COLORS.length];
 };
 
+/**
+ * 하이패스 충전 한 건의 상한(원). firestore.rules의 `chargeAmountWithinCap`과 같은 값이다.
+ * 실물 카드 충전 한도(보통 수십만 원)보다 넉넉하되, 오타·조작으로 잔액이 터무니없이
+ * 커지는 것은 막는 선이다. 화면에서 먼저 안내해 저장 시 권한 오류로 보이지 않게 한다.
+ */
+export const MAX_HIPASS_CHARGE_AMOUNT = 1_000_000;
+
 // 앱 공개 URL
 export const APP_URL = 'https://drivelog.socialprism.co.kr';
 

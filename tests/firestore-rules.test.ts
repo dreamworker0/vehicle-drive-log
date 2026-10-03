@@ -855,6 +855,22 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertFails(empDb.collection('hipassCharges').doc('h_neg').set({
       organizationId: 'org-A', cardId: 'c_A', chargerUid: 'emp_1', chargeAmount: -50000,
     }));
+    // 상한 — 잔액은 서버가 충전금액만큼 더하므로, 상한이 없으면 기록 한 건으로 잔액을 임의로
+    // 키울 수 있었다(2026-10-03 감사 부록). 운행일지 사용액 상한(hipassUsageValid)과 같은 선이다.
+    await assertSucceeds(empDb.collection('hipassCharges').doc('h_cap').set({
+      organizationId: 'org-A', cardId: 'c_A', chargerUid: 'emp_1', chargeAmount: 1000000,
+    }));
+    await assertFails(empDb.collection('hipassCharges').doc('h_over').set({
+      organizationId: 'org-A', cardId: 'c_A', chargerUid: 'emp_1', chargeAmount: 999999999,
+    }));
+    // 수정으로 상한을 넘기는 것도 차단 (본인 기록)
+    await assertFails(empDb.collection('hipassCharges').doc('h_ok').update({
+      chargeAmount: 1000001, lastEditedByUid: 'emp_1',
+    }));
+    // 금액을 건드리지 않는 수정은 상한 검사를 타지 않는다
+    await assertSucceeds(empDb.collection('hipassCharges').doc('h_ok').update({
+      memo: '영수증 확인', lastEditedByUid: 'emp_1',
+    }));
 
     // ── 정비 기록 ──
     await assertSucceeds(empDb.collection('maintenanceRecords').doc('m_ok').set({
