@@ -9,6 +9,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { TERMS_VERSION, formatLegalVersion } from '../../lib/constants';
 
 const mocks = vi.hoisted(() => ({
     callable: vi.fn(),
@@ -65,10 +66,15 @@ const historyItem = (over: Record<string, unknown> = {}) => ({
 describe('BroadcastNoticePage', () => {
     it('약관 개정 공지 문안이 기본값으로 채워진다', async () => {
         await renderSettled();
-        expect(screen.getByLabelText('제목')).toHaveValue('이용약관 개정 안내');
-        // 시행일은 상수에서 파생되므로 본문과 어긋날 수 없다
-        expect((screen.getByLabelText('내용') as HTMLTextAreaElement).value)
-            .toContain('2026년 8월 10일부터 개정 시행됩니다');
+        // 시행일은 상수에서 파생되므로 제목·본문과 어긋날 수 없다 (제목은 연도를 뺀 표기)
+        const effectiveDate = formatLegalVersion(TERMS_VERSION);
+        expect(screen.getByLabelText('제목'))
+            .toHaveValue(`개인정보 처리방침 개정 안내 (${effectiveDate.replace(/^\d+년 /, '')} 시행)`);
+        const message = (screen.getByLabelText('내용') as HTMLTextAreaElement).value;
+        expect(message).toContain(`${effectiveDate}부터 개정 시행됩니다`);
+        // 관리자(차단 모달)와 직원(배너)의 재동의 방법을 둘 다 안내한다
+        expect(message).toContain('기관 관리자: 앱에 접속하면 동의 창이');
+        expect(message).toContain('[확인했습니다]');
     });
 
     it('대상을 확인하기 전에는 발송 버튼이 잠겨 있다', async () => {
@@ -113,7 +119,7 @@ describe('BroadcastNoticePage', () => {
         await waitFor(() => expect(mocks.showToast).toHaveBeenCalled());
         const sendPayload = mocks.callable.mock.calls[1][0];
         expect(sendPayload.dryRun).toBeUndefined();
-        expect(sendPayload).toMatchObject({ title: '이용약관 개정 안내' });
+        expect(sendPayload.title).toContain('개인정보 처리방침 개정 안내');
         expect(mocks.showToast.mock.calls[0][0]).toContain('812명에게 발송했습니다');
         expect(mocks.showToast.mock.calls[0][0]).toContain('실패 10');
     });

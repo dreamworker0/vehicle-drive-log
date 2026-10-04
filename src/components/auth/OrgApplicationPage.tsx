@@ -101,10 +101,10 @@ export default function OrgApplicationPage() {
                             />
                         </div>
                         <div>
-                            <label className="label">전화번호</label>
+                            <label className="label">전화번호 <span className="text-red-500 dark:text-red-400">*</span></label>
                             <input
                                 type="tel" name="applicantPhone" value={form.applicantPhone}
-                                onChange={handlePhoneChange} className="input min-h-[48px]" placeholder="010-0000-0000"
+                                onChange={handlePhoneChange} className="input min-h-[48px]" placeholder="010-0000-0000" required
                             />
                         </div>
                     </div>

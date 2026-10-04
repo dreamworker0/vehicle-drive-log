@@ -155,7 +155,8 @@ export default function useOrgApplication() {
     const handleSubmit = useCallback(async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
 
-        if (!form.orgName || !form.applicantName || !form.applicantEmail) {
+        // 전화번호는 서버(submitOrgApplication)도 필수로 검사한다 — 승인·반려 알림톡 수신 번호
+        if (!form.orgName || !form.applicantName || !form.applicantEmail || !form.applicantPhone) {
             setError('필수 항목을 모두 입력해주세요.');
             return;
         }
