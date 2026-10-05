@@ -6,7 +6,7 @@
  *  (2) 행위자 uid는 이름으로 바꿔 보여준다
  *  (3) 기록의 신뢰 수준(행위자 미확인)을 숨기지 않는다
  *  (4) 기간·유형 버튼이 훅의 필터를 바꾼다
- *  (5) 운행일지 기록에는 원본에서 읽은 운행 내용을 붙이고, 삭제된 것은 그렇다고 알린다
+ *  (5) 운행일지·예약 기록에는 원본에서 읽은 요약을 제목 자리에 붙이고, 삭제된 것은 그렇다고 알린다
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
@@ -68,6 +68,7 @@ const setHook = (over: Partial<UseAuditLogsResult> = {}) => {
         loadMore: vi.fn(),
         nameOf: (uid) => (uid === 'u1' ? '김간사' : uid === 'u2' ? '이팀장' : '알 수 없음'),
         driveLogOf: () => undefined,
+        reservationOf: () => undefined,
         ...over,
     };
     return hookState.value;
@@ -142,7 +143,6 @@ describe('AuditLogViewer', () => {
         });
         render(<AuditLogViewer />);
 
-        expect(screen.getByText('운행 내용')).toBeInTheDocument();
         expect(screen.getByText('2026.10.01 07:30 · 스타리아 · 복지관 → 시청')).toBeInTheDocument();
     });
 
@@ -165,8 +165,28 @@ describe('AuditLogViewer', () => {
         });
         render(<AuditLogViewer />);
 
-        expect(screen.getAllByText('운행 내용')).toHaveLength(1);
+        // 읽는 중인 기록은 요약 자리를 비운다 — 삭제 안내는 하나만
+        expect(screen.getAllByText(/내용을 확인할 수 없음/)).toHaveLength(1);
         expect(screen.getByText('삭제된 운행일지라 내용을 확인할 수 없음')).toBeInTheDocument();
+    });
+
+    // "기록은 남았는데 어떤 차를 어디로인지 모르겠다"(운영자) — 예약도 원본에서 요약을 붙인다
+    it('예약 기록에는 예약일·시간·차량·목적지를 붙이고, 삭제된 예약은 그렇다고 알린다', () => {
+        setHook({
+            logs: [
+                log({ id: 'l1', action: 'create', targetType: 'reservation', targetId: 'r-1' }),
+                log({ id: 'l2', action: 'delete', targetType: 'reservation', targetId: 'r-gone' }),
+            ],
+            reservationOf: (id) => (id === 'r-1' ? {
+                id: 'r-1', date: '2026-10-05', startTime: '14:00', endTime: '16:00',
+                vehicleDisplayName: '스타리아4347', destination: '서울역',
+            } as unknown as ReturnType<UseAuditLogsResult['reservationOf']> : id === 'r-gone' ? null : undefined),
+        });
+        render(<AuditLogViewer />);
+
+        expect(screen.getByText('예약 생성')).toBeInTheDocument();
+        expect(screen.getByText('2026.10.05 14:00~16:00 · 스타리아4347 · 서울역')).toBeInTheDocument();
+        expect(screen.getByText('삭제된 예약이라 내용을 확인할 수 없음')).toBeInTheDocument();
     });
 
     it('직원을 고르면 훅의 직원 필터를 바꾼다', () => {

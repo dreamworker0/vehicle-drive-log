@@ -136,8 +136,9 @@ export default function EmployeeLayout() {
                             onClick={() => { sessionStorage.removeItem(SA_TEST_ROLE_KEY); window.location.href = '/super-admin'; }}
                             className="flex items-center justify-center gap-1 text-xs bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 px-3 py-2 rounded-lg transition-colors font-medium"
                             title="슈퍼관리자 화면으로 복귀"
+                            aria-label="슈퍼관리자 화면으로 복귀"
                         >
-                            ⚡ 슈퍼관리자
+                            <span aria-hidden="true">⚡</span>
                         </button>
                     )}
                     {(userData?.role === 'admin' || isSuperAdmin) && (

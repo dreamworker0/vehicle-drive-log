@@ -82,6 +82,7 @@ export {
     getReservations,
     getReservationById,
     getReservationByIdAndOrg,
+    getReservationsByIds,
     cancelReservation,
     updateReservation,
     detachFromRecurringGroup,

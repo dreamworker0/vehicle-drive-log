@@ -12,9 +12,11 @@ import useAuditLogs, { AUDIT_LOG_DAY_OPTIONS, type AuditLogDays } from '../../ho
 import type { AuditLogKind } from '../../lib/firestore';
 import type { AuditAction, AuditLog } from '../../types/auditLog';
 import type { DriveLog } from '../../types/driveLog';
+import type { Reservation } from '../../types/reservation';
 import { formatTimestampFull } from '../../lib/dateUtils';
 import {
     ACTOR_SOURCE_NOTE, describeChangedFields, describeDriveLog, describeEvent, describeExportTarget,
+    describeReservation,
 } from '../../lib/auditLogLabels';
 
 const ACTION_BADGE: Record<AuditAction, string> = {
@@ -59,20 +61,38 @@ function SegmentButton({ active, onClick, children }: { active: boolean; onClick
     );
 }
 
+/**
+ * 기록이 가리키는 운행·예약의 한 줄 요약 — 원본을 읽어 붙인다(기록 자체에는 ID만 있다).
+ *
+ * "운행일지 생성 · 김종원"만으로는 무엇을 했는지 알 수 없다는 운영자 지적에 따라, 이 줄을
+ * 상세 칸이 아니라 **기록의 제목 자리**에 둔다. 읽는 중이면 null(자리를 비운다), 원본이
+ * 삭제됐으면 그 사실을 문장으로 알린다.
+ */
+function summaryOf(
+    log: AuditLog,
+    driveLogOf: (id: string) => DriveLog | null | undefined,
+    reservationOf: (id: string) => Reservation | null | undefined,
+): { text: string; missing: boolean } | null {
+    if (!log.targetId) return null;
+    if (log.targetType === 'driveLog') {
+        const d = driveLogOf(log.targetId);
+        if (d) return { text: describeDriveLog(d) || '내용 없음', missing: false };
+        if (d === null) return { text: '삭제된 운행일지라 내용을 확인할 수 없음', missing: true };
+    }
+    if (log.targetType === 'reservation') {
+        const r = reservationOf(log.targetId);
+        if (r) return { text: describeReservation(r) || '내용 없음', missing: false };
+        if (r === null) return { text: '삭제된 예약이라 내용을 확인할 수 없음', missing: true };
+    }
+    return null;
+}
+
 /** 기록 1건의 상세 — 유형에 따라 남아 있는 항목만 보여준다 */
-function LogDetail({ log, nameOf, driveLogOf }: {
+function LogDetail({ log, nameOf }: {
     log: AuditLog;
     nameOf: (uid?: string | null) => string;
-    driveLogOf: (id: string) => DriveLog | null | undefined;
 }) {
     const rows: Array<[string, string]> = [];
-
-    // 운행일지 기록은 "어느 운행이었는지"가 먼저 보여야 점검이 된다 — 원본에서 읽은 요약을 붙인다
-    if (log.targetType === 'driveLog' && log.targetId) {
-        const driveLog = driveLogOf(log.targetId);
-        if (driveLog) rows.push(['운행 내용', describeDriveLog(driveLog) || '내용 없음']);
-        else if (driveLog === null) rows.push(['운행 내용', '삭제된 운행일지라 내용을 확인할 수 없음']);
-    }
 
     if (log.targetType === 'session') {
         if (log.ip) rows.push(['접속지 IP', log.ip]);
@@ -112,7 +132,7 @@ export default function AuditLogViewer() {
         kind, setKind, days, setDays, range, setRange, rangeActive,
         memberUid, setMemberUid, members,
         vehicleId, setVehicleId, vehicles,
-        loadMore, nameOf, driveLogOf, exportExcel, exporting,
+        loadMore, nameOf, driveLogOf, reservationOf, exportExcel, exporting,
     } = useAuditLogs();
 
     return (
@@ -269,6 +289,7 @@ export default function AuditLogViewer() {
                 <ul className="space-y-2">
                     {logs.map((log) => {
                         const note = ACTOR_SOURCE_NOTE[log.actorSource];
+                        const summary = summaryOf(log, driveLogOf, reservationOf);
                         return (
                             <li key={log.id} className="glass-card p-4">
                                 <div className="flex items-center justify-between gap-2 mb-1">
@@ -279,13 +300,22 @@ export default function AuditLogViewer() {
                                         {formatTimestampFull(log.at) ?? '-'}
                                     </span>
                                 </div>
+                                {summary && (
+                                    <p className={`text-sm font-semibold mb-0.5 break-keep ${
+                                        summary.missing
+                                            ? 'text-surface-400 dark:text-surface-500'
+                                            : 'text-surface-900 dark:text-surface-100'
+                                    }`}>
+                                        {summary.text}
+                                    </p>
+                                )}
                                 <p className="text-sm text-surface-700 dark:text-surface-200">
                                     {nameOf(log.actorUid)}
                                     {note && (
                                         <span className="ml-1.5 text-xs text-surface-400 dark:text-surface-500">({note})</span>
                                     )}
                                 </p>
-                                <LogDetail log={log} nameOf={nameOf} driveLogOf={driveLogOf} />
+                                <LogDetail log={log} nameOf={nameOf} />
                             </li>
                         );
                     })}

@@ -4,7 +4,7 @@
 import {
     doc, getDoc, updateDoc,
     collection, query, where, getDocs, addDoc,
-    serverTimestamp, runTransaction, writeBatch, Timestamp,
+    serverTimestamp, runTransaction, writeBatch, Timestamp, documentId,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, firebaseFunctions, auth } from '../firebase';
@@ -596,3 +596,30 @@ export const cancelRecurringGroup = (recurringGroupId: string, orgId: string, ex
 export const deleteRecurringGroup = async (recurringGroupId: string, orgId: string) =>
     (await batchGroupAction(getReservationsByRecurringGroupId, 'delete', recurringGroupId, orgId, 'deleteRecurringGroup')).total;
 
+/**
+ * 문서 ID 목록으로 예약을 읽는다 — 접속기록 점검 화면이 "어떤 예약이었는지"를 붙이는 데 쓴다.
+ *
+ * 접속기록에는 최소수집대로 대상 ID만 남으므로 내용은 조회 시점에 원본에서 가져온다
+ * (운행일지의 getDriveLogsByIds와 같은 방식). 삭제된 예약은 결과에 없다 — 호출 측이 "삭제됨"으로 구분한다.
+ */
+export const getReservationsByIds = async (orgId: string, ids: string[]): Promise<Map<string, Reservation>> => {
+    const unique = [...new Set(ids.filter(Boolean))];
+    const result = new Map<string, Reservation>();
+    if (unique.length === 0) return result;
+    try {
+        const chunks: string[][] = [];
+        for (let i = 0; i < unique.length; i += 30) chunks.push(unique.slice(i, i + 30));
+        const snaps = await Promise.all(chunks.map((chunk) => getDocs(query(
+            collection(db, 'reservations').withConverter(createZodConverter(reservationSchema)),
+            where('organizationId', '==', orgId),
+            where(documentId(), 'in', chunk),
+        ))));
+        for (const snap of snaps) {
+            for (const d of snap.docs) result.set(d.id, d.data() as Reservation);
+        }
+        return result;
+    } catch (error) {
+        captureError(error, { context: 'getReservationsByIds', orgId, count: unique.length });
+        throw error;
+    }
+};
