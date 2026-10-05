@@ -166,17 +166,17 @@ describe('AuditLogViewer', () => {
         expect(screen.getByRole('option', { name: '전체 직원' })).toBeInTheDocument();
     });
 
-    it('차량을 고르면 훅의 차량 필터를 바꾸고, 선택 중에는 조회 가능 시점을 알린다', () => {
+    it('차량을 고르면 훅의 차량 필터를 바꾸고, 선택 중에는 옛 기록을 찾는 방식과 한계를 알린다', () => {
         const state = setHook({ vehicles: [{ id: 'car-1', name: '스타리아' }] });
         const { rerender } = render(<AuditLogViewer />);
-        expect(screen.queryByText(/2026년 10월 5일 이후 기록부터/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/10월 5일 이전 기록은 이 차량의 운행일지로 찾아/)).not.toBeInTheDocument();
 
         fireEvent.change(screen.getByLabelText('차량'), { target: { value: 'car-1' } });
         expect(state.setVehicleId).toHaveBeenCalledWith('car-1');
 
         setHook({ vehicles: [{ id: 'car-1', name: '스타리아' }], vehicleId: 'car-1' });
         rerender(<AuditLogViewer />);
-        expect(screen.getByText(/2026년 10월 5일 이후 기록부터/)).toBeInTheDocument();
+        expect(screen.getByText(/10월 5일 이전 기록은 이 차량의 운행일지로 찾아/)).toBeInTheDocument();
     });
 
     it('기간·유형 버튼이 훅의 필터를 바꾼다', () => {
