@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
     getAuditLogs: vi.fn(),
     getAuditLogsForExport: vi.fn(),
     getOrganizationMembers: vi.fn(),
+    getDriveLogsByIds: vi.fn(),
     downloadAuditLogsExcel: vi.fn(),
     auth: { userData: null as { organizationId?: string | null } | null },
     captureError: vi.fn(),
@@ -24,6 +25,7 @@ vi.mock('../../lib/firestore', () => ({
     getAuditLogs: mocks.getAuditLogs,
     getAuditLogsForExport: mocks.getAuditLogsForExport,
     getOrganizationMembers: mocks.getOrganizationMembers,
+    getDriveLogsByIds: mocks.getDriveLogsByIds,
     AUDIT_LOG_PAGE_SIZE: 50,
     AUDIT_LOG_EXPORT_MAX: 5000,
 }));
@@ -49,6 +51,7 @@ beforeEach(() => {
     ]);
     mocks.getAuditLogsForExport.mockResolvedValue({ logs: page(['a1', 'a2']).logs, truncated: false });
     mocks.downloadAuditLogsExcel.mockResolvedValue(true);
+    mocks.getDriveLogsByIds.mockResolvedValue(new Map());
 });
 
 describe('useAuditLogs', () => {
@@ -257,5 +260,51 @@ describe('useAuditLogs', () => {
         await waitFor(() => expect(result.current.error).toContain('불러오지 못했습니다'));
         expect(result.current.logs).toEqual([]);
         expect(result.current.hasMore).toBe(false);
+    });
+
+    describe('운행 내용', () => {
+        const driveLogPage = (targetIds: string[], hasMore = false) => ({
+            logs: targetIds.map((targetId, i) => ({ id: `d${i}-${targetId}`, action: 'create', targetType: 'driveLog', targetId, subjectUids: [] })),
+            lastDoc: { id: 'cursor' },
+            hasMore,
+        });
+
+        it('운행일지 기록의 원본을 한 번에 읽고, 없는 것은 null(삭제됨)로 둔다', async () => {
+            mocks.getAuditLogs.mockResolvedValue({
+                ...driveLogPage(['dl-1', 'dl-1', 'dl-gone']),
+                logs: [...driveLogPage(['dl-1', 'dl-1', 'dl-gone']).logs, ...page(['s1']).logs],
+            });
+            mocks.getDriveLogsByIds.mockResolvedValue(new Map([['dl-1', { id: 'dl-1', destination: '시청' }]]));
+            const { result } = renderHook(() => useAuditLogs());
+
+            await waitFor(() => expect(result.current.driveLogOf('dl-1')).toEqual({ id: 'dl-1', destination: '시청' }));
+            expect(result.current.driveLogOf('dl-gone')).toBeNull();
+            // 세션 기록은 대상이 아니고, 같은 ID는 한 번만 묻는다
+            expect(mocks.getDriveLogsByIds).toHaveBeenCalledTimes(1);
+            expect(mocks.getDriveLogsByIds).toHaveBeenCalledWith('org-1', ['dl-1', 'dl-gone']);
+        });
+
+        it('더 보기로 붙은 기록은 아직 읽지 않은 ID만 묻는다', async () => {
+            mocks.getAuditLogs
+                .mockResolvedValueOnce(driveLogPage(['dl-1'], true))
+                .mockResolvedValueOnce(driveLogPage(['dl-1', 'dl-2']));
+            const { result } = renderHook(() => useAuditLogs());
+            await waitFor(() => expect(mocks.getDriveLogsByIds).toHaveBeenCalledTimes(1));
+
+            act(() => result.current.loadMore());
+
+            await waitFor(() => expect(mocks.getDriveLogsByIds).toHaveBeenCalledTimes(2));
+            expect(mocks.getDriveLogsByIds).toHaveBeenLastCalledWith('org-1', ['dl-2']);
+        });
+
+        it('원본을 못 읽어도 기록은 보여주고 운행 내용만 비워 둔다', async () => {
+            mocks.getAuditLogs.mockResolvedValue(driveLogPage(['dl-1']));
+            mocks.getDriveLogsByIds.mockRejectedValue(new Error('offline'));
+            const { result } = renderHook(() => useAuditLogs());
+
+            await waitFor(() => expect(mocks.getDriveLogsByIds).toHaveBeenCalled());
+            expect(result.current.logs).toHaveLength(1);
+            expect(result.current.driveLogOf('dl-1')).toBeUndefined();
+        });
     });
 });

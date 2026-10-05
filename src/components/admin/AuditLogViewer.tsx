@@ -11,9 +11,10 @@
 import useAuditLogs, { AUDIT_LOG_DAY_OPTIONS, type AuditLogDays } from '../../hooks/useAuditLogs';
 import type { AuditLogKind } from '../../lib/firestore';
 import type { AuditAction, AuditLog } from '../../types/auditLog';
+import type { DriveLog } from '../../types/driveLog';
 import { formatTimestampFull } from '../../lib/dateUtils';
 import {
-    ACTOR_SOURCE_NOTE, describeChangedFields, describeEvent, describeExportTarget,
+    ACTOR_SOURCE_NOTE, describeChangedFields, describeDriveLog, describeEvent, describeExportTarget,
 } from '../../lib/auditLogLabels';
 
 const ACTION_BADGE: Record<AuditAction, string> = {
@@ -59,8 +60,19 @@ function SegmentButton({ active, onClick, children }: { active: boolean; onClick
 }
 
 /** 기록 1건의 상세 — 유형에 따라 남아 있는 항목만 보여준다 */
-function LogDetail({ log, nameOf }: { log: AuditLog; nameOf: (uid?: string | null) => string }) {
+function LogDetail({ log, nameOf, driveLogOf }: {
+    log: AuditLog;
+    nameOf: (uid?: string | null) => string;
+    driveLogOf: (id: string) => DriveLog | null | undefined;
+}) {
     const rows: Array<[string, string]> = [];
+
+    // 운행일지 기록은 "어느 운행이었는지"가 먼저 보여야 점검이 된다 — 원본에서 읽은 요약을 붙인다
+    if (log.targetType === 'driveLog' && log.targetId) {
+        const driveLog = driveLogOf(log.targetId);
+        if (driveLog) rows.push(['운행 내용', describeDriveLog(driveLog) || '내용 없음']);
+        else if (driveLog === null) rows.push(['운행 내용', '삭제된 운행일지라 내용을 확인할 수 없음']);
+    }
 
     if (log.targetType === 'session') {
         if (log.ip) rows.push(['접속지 IP', log.ip]);
@@ -98,7 +110,7 @@ export default function AuditLogViewer() {
     const {
         logs, loading, loadingMore, error, hasMore,
         kind, setKind, days, setDays, range, setRange, rangeActive,
-        loadMore, nameOf, exportExcel, exporting,
+        loadMore, nameOf, driveLogOf, exportExcel, exporting,
     } = useAuditLogs();
 
     return (
@@ -230,7 +242,7 @@ export default function AuditLogViewer() {
                                         <span className="ml-1.5 text-xs text-surface-400 dark:text-surface-500">({note})</span>
                                     )}
                                 </p>
-                                <LogDetail log={log} nameOf={nameOf} />
+                                <LogDetail log={log} nameOf={nameOf} driveLogOf={driveLogOf} />
                             </li>
                         );
                     })}
