@@ -52,6 +52,11 @@ export interface UseAuditLogsResult {
     /** 직접 지정 기간. 빈 문자열이면 프리셋(days)을 쓴다. */
     range: AuditLogDateRange;
     setRange: (patch: Partial<AuditLogDateRange>) => void;
+    /** 직원 필터 — 빈 문자열이면 전체. 그 직원이 직접 했거나 대상이 된 기록만 본다 */
+    memberUid: string;
+    setMemberUid: (uid: string) => void;
+    /** 직원 필터 선택지 — 기관 구성원(이름순) */
+    members: Array<{ uid: string; name: string }>;
     /** 직접 지정 기간이 적용 중인지 — 화면이 프리셋 선택 표시를 끄는 데 쓴다 */
     rangeActive: boolean;
     loadMore: () => void;
@@ -80,6 +85,8 @@ export default function useAuditLogs(): UseAuditLogsResult {
     const [days, setDays] = useState<AuditLogDays>(30);
     const [range, setRangeState] = useState<AuditLogDateRange>({ start: '', end: '' });
     const [names, setNames] = useState<Record<string, string>>({});
+    const [members, setMembers] = useState<Array<{ uid: string; name: string }>>([]);
+    const [memberUid, setMemberUid] = useState('');
     const [exporting, setExporting] = useState(false);
     /** 운행일지 ID → 원본(삭제됐으면 null). 필터를 바꿔도 같은 문서를 다시 읽지 않게 유지한다 */
     const [driveLogs, setDriveLogs] = useState<Record<string, DriveLog | null>>({});
@@ -134,12 +141,16 @@ export default function useAuditLogs(): UseAuditLogsResult {
             .then((members) => {
                 if (cancelled) return;
                 const map: Record<string, string> = {};
+                const list: Array<{ uid: string; name: string }> = [];
                 for (const m of members) {
+                    const uid = m.uid || m.id;
+                    if (uid) list.push({ uid, name: m.name || m.email || uid });
                     // users 문서 ID가 uid다. uid 필드가 따로 있으면 그것도 함께 매핑한다.
                     if (m.id) map[m.id] = m.name || m.email || m.id;
                     if (m.uid) map[m.uid] = m.name || m.email || m.uid;
                 }
                 setNames(map);
+                setMembers(list.sort((a, b) => a.name.localeCompare(b.name, 'ko')));
             })
             .catch((err) => {
                 // 이름을 못 붙여도 기록 자체는 보여준다 — 점검을 막을 이유가 아니다
@@ -159,7 +170,7 @@ export default function useAuditLogs(): UseAuditLogsResult {
         setLoading(true);
         setError('');
 
-        getAuditLogs(orgId, { since, until, kind })
+        getAuditLogs(orgId, { since, until, kind, uid: memberUid || undefined })
             .then((page) => {
                 if (generation !== generationRef.current) return; // 필터가 바뀌었으면 폐기
                 setLogs(page.logs);
@@ -176,14 +187,14 @@ export default function useAuditLogs(): UseAuditLogsResult {
             .finally(() => {
                 if (generation === generationRef.current) setLoading(false);
             });
-    }, [orgId, since, until, kind]);
+    }, [orgId, since, until, kind, memberUid]);
 
     const loadMore = useCallback(() => {
         if (!orgId || !hasMore || loadingMore || !lastDocRef.current) return;
         const generation = generationRef.current;
         setLoadingMore(true);
 
-        getAuditLogs(orgId, { since, until, kind, startAfter: lastDocRef.current })
+        getAuditLogs(orgId, { since, until, kind, uid: memberUid || undefined, startAfter: lastDocRef.current })
             .then((page) => {
                 if (generation !== generationRef.current) return;
                 setLogs((prev) => [...prev, ...page.logs]);
@@ -197,7 +208,7 @@ export default function useAuditLogs(): UseAuditLogsResult {
             .finally(() => {
                 if (generation === generationRef.current) setLoadingMore(false);
             });
-    }, [orgId, since, until, kind, hasMore, loadingMore]);
+    }, [orgId, since, until, kind, memberUid, hasMore, loadingMore]);
 
     // 기관이 바뀌면 운행일지 캐시도 비운다 — 다른 기관 문서는 읽을 수도 없다
     useEffect(() => {
@@ -254,16 +265,18 @@ export default function useAuditLogs(): UseAuditLogsResult {
         setExporting(true);
         setError('');
 
-        getAuditLogsForExport(orgId, { since, until, kind })
+        getAuditLogsForExport(orgId, { since, until, kind, uid: memberUid || undefined })
             .then(async (result) => {
                 if (result.logs.length === 0) {
                     setError('선택한 기간에 내보낼 기록이 없습니다.');
                     return;
                 }
                 const { downloadAuditLogsExcel } = await import('../lib/excelExport');
-                const label = rangeActive
+                const period = rangeActive
                     ? `${range.start}_${range.end}`
                     : `최근${days}일`;
+                // 직원을 골라 받은 파일은 이름을 붙여 기관 전체 파일과 구분한다
+                const label = memberUid ? `${period}_${nameOf(memberUid)}` : period;
                 await downloadAuditLogsExcel(result.logs, nameOf, `접속기록_${label}`);
                 if (result.truncated) {
                     setError(`기록이 많아 최근 ${AUDIT_LOG_EXPORT_MAX.toLocaleString()}건만 내보냈습니다. 기간을 좁혀 다시 받아주세요.`);
@@ -274,11 +287,12 @@ export default function useAuditLogs(): UseAuditLogsResult {
                 setError('내보내기에 실패했습니다. 잠시 후 다시 시도해주세요.');
             })
             .finally(() => setExporting(false));
-    }, [orgId, exporting, since, until, kind, rangeActive, range.start, range.end, days, nameOf]);
+    }, [orgId, exporting, since, until, kind, memberUid, rangeActive, range.start, range.end, days, nameOf]);
 
     return {
         logs, loading, loadingMore, error, hasMore,
         kind, setKind, days, setDays, range, setRange, rangeActive,
+        memberUid, setMemberUid, members,
         loadMore, nameOf, driveLogOf, exportExcel, exporting,
     };
 }

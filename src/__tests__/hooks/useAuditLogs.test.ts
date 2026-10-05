@@ -91,6 +91,50 @@ describe('useAuditLogs', () => {
         expect(options.startAfter).toBeUndefined();
     });
 
+    describe('직원 필터', () => {
+        it('기본은 전체 직원이고, 구성원을 이름순 선택지로 준다', async () => {
+            const { result } = renderHook(() => useAuditLogs());
+            await waitFor(() => expect(result.current.members).toHaveLength(2));
+
+            expect(mocks.getAuditLogs.mock.calls[0][1].uid).toBeUndefined();
+            expect(result.current.memberUid).toBe('');
+            // 이름이 없으면 이메일로 — 선택지에 빈 줄이 생기지 않게
+            expect(result.current.members).toEqual([
+                { uid: 'u1', name: '김간사' },
+                { uid: 'u2', name: 'lee@x.or.kr' },
+            ]);
+        });
+
+        it('직원을 고르면 그 uid로 첫 페이지부터 다시 읽고, 더 보기에도 같은 필터를 쓴다', async () => {
+            mocks.getAuditLogs.mockResolvedValue(page(['a1'], true));
+            const { result } = renderHook(() => useAuditLogs());
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            act(() => result.current.setMemberUid('u1'));
+            await waitFor(() => expect(mocks.getAuditLogs).toHaveBeenCalledTimes(2));
+            expect(mocks.getAuditLogs.mock.calls[1][1]).toMatchObject({ uid: 'u1' });
+            expect(mocks.getAuditLogs.mock.calls[1][1].startAfter).toBeUndefined();
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            act(() => result.current.loadMore());
+            await waitFor(() => expect(mocks.getAuditLogs).toHaveBeenCalledTimes(3));
+            expect(mocks.getAuditLogs.mock.calls[2][1]).toMatchObject({ uid: 'u1', startAfter: { id: 'a1' } });
+        });
+
+        it('직원을 골라 내보내면 같은 필터로 읽고 파일명에 이름을 붙인다', async () => {
+            const { result } = renderHook(() => useAuditLogs());
+            await waitFor(() => expect(result.current.members).toHaveLength(2));
+
+            act(() => result.current.setMemberUid('u1'));
+            await waitFor(() => expect(result.current.memberUid).toBe('u1'));
+            act(() => result.current.exportExcel());
+            await waitFor(() => expect(mocks.downloadAuditLogsExcel).toHaveBeenCalled());
+
+            expect(mocks.getAuditLogsForExport.mock.calls[0][1]).toMatchObject({ uid: 'u1' });
+            expect(mocks.downloadAuditLogsExcel.mock.calls[0][2]).toBe('접속기록_최근30일_김간사');
+        });
+    });
+
     it('기간을 바꾸면 다시 읽는다', async () => {
         const { result } = renderHook(() => useAuditLogs());
         await waitFor(() => expect(result.current.loading).toBe(false));

@@ -51,4 +51,12 @@ describe('firestore.indexes.json — 복합 인덱스 필수 쿼리', () => {
     it('접속기록 유형 필터: auditLogs (action, organizationId, at)', () => {
         expect(hasIndex('auditLogs', ['action', 'organizationId', 'at'])).toBe(true);
     });
+
+    // src/lib/firestore/auditLogs.ts — 직원 필터는 OR의 갈래(행위자/대상)마다 인덱스가 따로 필요하다
+    it('접속기록 직원 필터: 행위자·대상 갈래별 인덱스 (유형 필터 포함)', () => {
+        expect(hasIndex('auditLogs', ['actorUid', 'organizationId', 'at'])).toBe(true);
+        expect(hasIndex('auditLogs', ['organizationId', 'subjectUids', 'at'])).toBe(true);
+        expect(hasIndex('auditLogs', ['action', 'actorUid', 'organizationId', 'at'])).toBe(true);
+        expect(hasIndex('auditLogs', ['action', 'organizationId', 'subjectUids', 'at'])).toBe(true);
+    });
 });
