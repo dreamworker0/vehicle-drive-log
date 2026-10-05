@@ -7,6 +7,7 @@
  */
 import type { AuditAction, AuditLog, AuditTargetType } from '../types/auditLog';
 import type { DriveLog } from '../types/driveLog';
+import { toDateOrNull, toLocalDateStr } from './dateUtils';
 
 /** 수행업무 — 고시 제2조의 '수행업무'를 관리자가 읽는 말로 */
 export const ACTION_LABEL: Record<AuditAction, string> = {
@@ -96,9 +97,12 @@ export function describeExportTarget(log: Pick<AuditLog, 'exportDataset' | 'expo
  * 점검하는 사람이 "어느 운행이었는지" 알아볼 만큼만 담는다 — 탑승자·비고는 넣지 않는다.
  */
 export function describeDriveLog(
-    log: Pick<DriveLog, 'date' | 'startDate' | 'startTime' | 'vehicleDisplayName' | 'vehicleName' | 'startLocation' | 'destination'>,
+    log: Pick<DriveLog, 'date' | 'startDate' | 'timestamp' | 'startTime' | 'vehicleDisplayName' | 'vehicleName' | 'startLocation' | 'destination'>,
 ): string {
-    const day = (log.date || log.startDate || '').replace(/-/g, '.');
+    // date 문자열이 없는 기록이 많다(바로 운행 등) — 그때는 운행 시각(timestamp)의 날짜를 쓴다.
+    // 날짜가 빠지면 "11:52 · 스타리아"만 남아 어느 날 운행인지 알 수 없다.
+    const stamped = toDateOrNull(log.timestamp);
+    const day = (log.date || log.startDate || (stamped ? toLocalDateStr(stamped) : '')).replace(/-/g, '.');
     const when = [day, log.startTime].filter(Boolean).join(' ');
     const vehicle = log.vehicleDisplayName || log.vehicleName || '';
     const route = log.startLocation && log.destination
