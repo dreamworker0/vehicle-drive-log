@@ -9,15 +9,19 @@
  * 기록에는 최소수집 원칙에 따라 **uid만** 남는다(이름·이메일을 남기면 로그 자체가
  * 또 하나의 개인정보 데이터셋이 된다). 그러나 점검하는 사람에게 uid는 읽을 수 없어
  * 조회 시점에 기관 구성원 목록으로 이름을 붙인다 — 저장은 uid, 표시는 이름이다.
+ *
+ * 운행일지 기록도 같은 원칙이다. 기록에는 문서 ID만 있어 "운행일지 생성"만으로는 어느
+ * 운행인지 알 수 없으므로, 화면에 불러온 기록의 원본 운행일지를 읽어 요약을 붙인다.
  */
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from './useAuth';
 import {
-    getAuditLogs, getAuditLogsForExport, getOrganizationMembers,
+    getAuditLogs, getAuditLogsForExport, getOrganizationMembers, getDriveLogsByIds,
     AUDIT_LOG_PAGE_SIZE, AUDIT_LOG_EXPORT_MAX,
 } from '../lib/firestore';
 import type { AuditLogKind } from '../lib/firestore';
 import type { AuditLog } from '../types/auditLog';
+import type { DriveLog } from '../types/driveLog';
 import { captureError } from '../lib/sentry';
 
 /**
@@ -53,6 +57,11 @@ export interface UseAuditLogsResult {
     loadMore: () => void;
     /** uid를 표시용 이름으로 바꾼다. 구성원이 아니면 축약한 uid를 돌려준다. */
     nameOf: (uid: string | null | undefined) => string;
+    /**
+     * 기록 대상 운행일지 — 아직 읽는 중이면 undefined, 삭제돼 없으면 null.
+     * targetType이 driveLog인 기록에만 의미가 있다.
+     */
+    driveLogOf: (id: string) => DriveLog | null | undefined;
     /** 선택한 기간·유형 전체를 엑셀로 내보낸다(화면에 불러온 만큼이 아니라 기간 전체) */
     exportExcel: () => void;
     exporting: boolean;
@@ -72,6 +81,9 @@ export default function useAuditLogs(): UseAuditLogsResult {
     const [range, setRangeState] = useState<AuditLogDateRange>({ start: '', end: '' });
     const [names, setNames] = useState<Record<string, string>>({});
     const [exporting, setExporting] = useState(false);
+    /** 운행일지 ID → 원본(삭제됐으면 null). 필터를 바꿔도 같은 문서를 다시 읽지 않게 유지한다 */
+    const [driveLogs, setDriveLogs] = useState<Record<string, DriveLog | null>>({});
+    const requestedDriveLogIdsRef = useRef(new Set<string>());
 
     /** 커서와 세대 — 필터가 바뀌면 세대를 올려 이전 응답을 폐기한다 */
     const lastDocRef = useRef<unknown | null>(null);
@@ -187,6 +199,40 @@ export default function useAuditLogs(): UseAuditLogsResult {
             });
     }, [orgId, since, until, kind, hasMore, loadingMore]);
 
+    // 기관이 바뀌면 운행일지 캐시도 비운다 — 다른 기관 문서는 읽을 수도 없다
+    useEffect(() => {
+        requestedDriveLogIdsRef.current = new Set();
+        setDriveLogs({});
+    }, [orgId]);
+
+    // 화면에 올라온 운행일지 기록의 원본을 읽는다 — 이미 요청한 ID는 건너뛴다
+    useEffect(() => {
+        if (!orgId) return;
+        const requested = requestedDriveLogIdsRef.current;
+        const ids = [...new Set(
+            logs.filter((l) => l.targetType === 'driveLog' && l.targetId).map((l) => l.targetId),
+        )].filter((id) => !requested.has(id));
+        if (ids.length === 0) return;
+        ids.forEach((id) => requested.add(id));
+
+        getDriveLogsByIds(orgId, ids)
+            .then((found) => {
+                if (requestedDriveLogIdsRef.current !== requested) return; // 기관이 바뀌었으면 폐기
+                setDriveLogs((prev) => {
+                    const next = { ...prev };
+                    for (const id of ids) next[id] = found.get(id) ?? null;
+                    return next;
+                });
+            })
+            .catch(() => {
+                // 요약을 못 붙여도 기록 자체는 보여준다. 다음 갱신 때 다시 시도하도록 요청 표시를 지운다
+                // (captureError는 도메인 함수가 이미 보고했다)
+                ids.forEach((id) => requested.delete(id));
+            });
+    }, [orgId, logs]);
+
+    const driveLogOf = useCallback((id: string) => driveLogs[id], [driveLogs]);
+
     const nameOf = useCallback((uid: string | null | undefined): string => {
         if (!uid) return '알 수 없음';
         const name = names[uid];
@@ -233,7 +279,7 @@ export default function useAuditLogs(): UseAuditLogsResult {
     return {
         logs, loading, loadingMore, error, hasMore,
         kind, setKind, days, setDays, range, setRange, rangeActive,
-        loadMore, nameOf, exportExcel, exporting,
+        loadMore, nameOf, driveLogOf, exportExcel, exporting,
     };
 }
 

@@ -69,6 +69,7 @@ export {
     updateDriveLog,
     getVehicleDriveLogs,
     hasVehicleDriveLogs,
+    getDriveLogsByIds,
     cleanupDuplicateLogs,
     deleteDriveLog,
     getAdjacentDriveLogs,

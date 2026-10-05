@@ -6,6 +6,7 @@
  *  (2) 행위자 uid는 이름으로 바꿔 보여준다
  *  (3) 기록의 신뢰 수준(행위자 미확인)을 숨기지 않는다
  *  (4) 기간·유형 버튼이 훅의 필터를 바꾼다
+ *  (5) 운행일지 기록에는 원본에서 읽은 운행 내용을 붙이고, 삭제된 것은 그렇다고 알린다
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
@@ -60,6 +61,7 @@ const setHook = (over: Partial<UseAuditLogsResult> = {}) => {
         exporting: false,
         loadMore: vi.fn(),
         nameOf: (uid) => (uid === 'u1' ? '김간사' : uid === 'u2' ? '이팀장' : '알 수 없음'),
+        driveLogOf: () => undefined,
         ...over,
     };
     return hookState.value;
@@ -122,6 +124,31 @@ describe('AuditLogViewer', () => {
 
         expect(screen.getByText('운행일지 삭제')).toBeInTheDocument();
         expect(screen.getByText('(행위자 미확인)')).toBeInTheDocument();
+    });
+
+    it('운행일지 기록에는 운행일·차량·경로를 붙인다', () => {
+        setHook({
+            logs: [log({ action: 'create' })],
+            driveLogOf: (id) => (id === 'dl-1' ? {
+                id: 'dl-1', date: '2026-10-01', startTime: '07:30', vehicleDisplayName: '스타리아',
+                startLocation: '복지관', destination: '시청',
+            } as unknown as ReturnType<UseAuditLogsResult['driveLogOf']> : undefined),
+        });
+        render(<AuditLogViewer />);
+
+        expect(screen.getByText('운행 내용')).toBeInTheDocument();
+        expect(screen.getByText('2026.10.01 07:30 · 스타리아 · 복지관 → 시청')).toBeInTheDocument();
+    });
+
+    it('삭제돼 원본이 없는 운행일지는 확인할 수 없다고 알리고, 읽는 중에는 아무것도 붙이지 않는다', () => {
+        setHook({
+            logs: [log({ id: 'l1', targetId: 'gone' }), log({ id: 'l2', targetId: 'loading' })],
+            driveLogOf: (id) => (id === 'gone' ? null : undefined),
+        });
+        render(<AuditLogViewer />);
+
+        expect(screen.getAllByText('운행 내용')).toHaveLength(1);
+        expect(screen.getByText('삭제된 운행일지라 내용을 확인할 수 없음')).toBeInTheDocument();
     });
 
     it('기간·유형 버튼이 훅의 필터를 바꾼다', () => {

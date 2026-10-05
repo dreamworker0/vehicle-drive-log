@@ -12,6 +12,7 @@ export {
     getMyDriveLogs,
     getVehicleDriveLogs,
     hasVehicleDriveLogs,
+    getDriveLogsByIds,
 } from './driveLogs/queries';
 
 export {
