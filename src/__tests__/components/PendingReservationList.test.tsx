@@ -5,14 +5,21 @@ import PendingReservationList from '../../components/admin/PendingReservationLis
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
 import { useConfirmStore } from '../../store/useConfirmStore';
-import { updateReservationStatus, rejectReservation, getPendingReservations } from '../../lib/firestore/reservations';
+import { updateReservationStatus, rejectReservation, getPendingReservations, ReservationConcurrencyError } from '../../lib/firestore/reservations';
 
 // Mocking Custom Hooks
 vi.mock('../../hooks/useAuth');
 vi.mock('../../hooks/useToast');
+const retry = vi.hoisted(() => ({
+    /** 마지막 runWithRetry 호출의 옵션 — shouldReport 판정을 직접 검사한다 */
+    lastOptions: null as null | { shouldReport?: (e: unknown) => boolean },
+}));
 vi.mock('../../hooks/useRetry', () => ({
     default: () => ({
-        runWithRetry: async (_: string, fn: () => Promise<unknown>) => await fn(),
+        runWithRetry: async (_: string, fn: () => Promise<unknown>, options?: { shouldReport?: (e: unknown) => boolean }) => {
+            retry.lastOptions = options ?? null;
+            return await fn();
+        },
     }),
 }));
 
@@ -21,6 +28,12 @@ vi.mock('../../lib/firestore/reservations', () => ({
     updateReservationStatus: vi.fn(),
     rejectReservation: vi.fn(),
     getPendingReservations: vi.fn(() => Promise.resolve([])),
+    ReservationConcurrencyError: class ReservationConcurrencyError extends Error {
+        constructor(status: string) {
+            super(`동시성 오류: 이미 다른 관리자에 의해 상태가 변경되었습니다. (현재 상태: ${status})`);
+            this.name = 'ReservationConcurrencyError';
+        }
+    },
 }));
 
 vi.mock('../../lib/firestore/vehicles', () => ({
@@ -115,5 +128,34 @@ describe('PendingReservationList Component', () => {
             // 반려는 도메인 함수(rejectReservation)로 캡슐화됨 — 사유가 그대로 전달되는지 확인
             expect(rejectReservation).toHaveBeenCalledWith('res1', 'test reason');
         });
+    });
+
+    // 다른 관리자가 먼저 처리한 예약은 안내 토스트로 끝나는 예상된 결과 — Sentry에 올리지 않는다(JAVASCRIPT-REACT-6J)
+    it('동시성 오류는 Sentry 보고에서 빼고, 다른 오류는 그대로 보고한다', async () => {
+        render(<React.Suspense fallback={<div>Loading</div>}><PendingReservationList /></React.Suspense>);
+        await waitFor(() => expect(screen.getByText('승인')).toBeInTheDocument());
+
+        fireEvent.click(screen.getByText('승인'));
+        await waitFor(() => expect(retry.lastOptions?.shouldReport).toBeDefined());
+
+        const shouldReport = retry.lastOptions!.shouldReport!;
+        expect(shouldReport(new ReservationConcurrencyError('reserved'))).toBe(false);
+        expect(shouldReport(new Error('permission-denied'))).toBe(true);
+    });
+
+    it('처리 중에는 승인·반려를 다시 누를 수 없다 (두 번 눌러 동시성 오류가 나던 경로)', async () => {
+        let finish: () => void = () => {};
+        vi.mocked(updateReservationStatus).mockImplementation(() => new Promise<void>((resolve) => { finish = resolve; }) as never);
+        render(<React.Suspense fallback={<div>Loading</div>}><PendingReservationList /></React.Suspense>);
+        await waitFor(() => expect(screen.getByText('승인')).toBeInTheDocument());
+
+        fireEvent.click(screen.getByText('승인'));
+        await waitFor(() => expect(screen.getByText('승인')).toBeDisabled());
+        expect(screen.getByText('반려')).toBeDisabled();
+        fireEvent.click(screen.getByText('승인'));
+        expect(updateReservationStatus).toHaveBeenCalledTimes(1);
+
+        finish();
+        await waitFor(() => expect(mockToast).toHaveBeenCalledWith('예약이 승인되었습니다.', 'success'));
     });
 });
