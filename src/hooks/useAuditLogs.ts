@@ -16,7 +16,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from './useAuth';
 import {
-    getAuditLogs, getAuditLogsForExport, getOrganizationMembers, getDriveLogsByIds,
+    getAuditLogs, getAuditLogsForExport, getOrganizationMembers, getDriveLogsByIds, getVehicles,
     AUDIT_LOG_PAGE_SIZE, AUDIT_LOG_EXPORT_MAX,
 } from '../lib/firestore';
 import type { AuditLogKind } from '../lib/firestore';
@@ -57,6 +57,11 @@ export interface UseAuditLogsResult {
     setMemberUid: (uid: string) => void;
     /** 직원 필터 선택지 — 기관 구성원(이름순) */
     members: Array<{ uid: string; name: string }>;
+    /** 차량 필터 — 빈 문자열이면 전체. 2026-10-05 이후 기록에만 걸린다(그 전 기록에는 차량 정보가 없다) */
+    vehicleId: string;
+    setVehicleId: (id: string) => void;
+    /** 차량 필터 선택지 — 기관 차량 */
+    vehicles: Array<{ id: string; name: string }>;
     /** 직접 지정 기간이 적용 중인지 — 화면이 프리셋 선택 표시를 끄는 데 쓴다 */
     rangeActive: boolean;
     loadMore: () => void;
@@ -87,6 +92,8 @@ export default function useAuditLogs(): UseAuditLogsResult {
     const [names, setNames] = useState<Record<string, string>>({});
     const [members, setMembers] = useState<Array<{ uid: string; name: string }>>([]);
     const [memberUid, setMemberUid] = useState('');
+    const [vehicles, setVehicles] = useState<Array<{ id: string; name: string }>>([]);
+    const [vehicleId, setVehicleId] = useState('');
     const [exporting, setExporting] = useState(false);
     /** 운행일지 ID → 원본(삭제됐으면 null). 필터를 바꿔도 같은 문서를 다시 읽지 않게 유지한다 */
     const [driveLogs, setDriveLogs] = useState<Record<string, DriveLog | null>>({});
@@ -159,6 +166,24 @@ export default function useAuditLogs(): UseAuditLogsResult {
         return () => { cancelled = true; };
     }, [orgId]);
 
+    // 차량 선택지 — 기관이 바뀔 때만 다시 읽는다. 실패해도 차량 필터만 빠질 뿐 점검은 계속된다
+    useEffect(() => {
+        if (!orgId) return;
+        let cancelled = false;
+        getVehicles(orgId)
+            .then((list) => {
+                if (cancelled) return;
+                setVehicles(list.map((v) => ({
+                    id: v.id,
+                    name: v.displayName || [v.name, v.plateNumber].filter(Boolean).join(' '),
+                })));
+            })
+            .catch((err) => {
+                captureError(err, { context: 'useAuditLogs.getVehicles', orgId });
+            });
+        return () => { cancelled = true; };
+    }, [orgId]);
+
     // 첫 페이지 — 기관·기간·유형이 바뀌면 처음부터 다시 읽는다
     useEffect(() => {
         if (!orgId) {
@@ -170,7 +195,7 @@ export default function useAuditLogs(): UseAuditLogsResult {
         setLoading(true);
         setError('');
 
-        getAuditLogs(orgId, { since, until, kind, uid: memberUid || undefined })
+        getAuditLogs(orgId, { since, until, kind, uid: memberUid || undefined, vehicleId: vehicleId || undefined })
             .then((page) => {
                 if (generation !== generationRef.current) return; // 필터가 바뀌었으면 폐기
                 setLogs(page.logs);
@@ -187,14 +212,17 @@ export default function useAuditLogs(): UseAuditLogsResult {
             .finally(() => {
                 if (generation === generationRef.current) setLoading(false);
             });
-    }, [orgId, since, until, kind, memberUid]);
+    }, [orgId, since, until, kind, memberUid, vehicleId]);
 
     const loadMore = useCallback(() => {
         if (!orgId || !hasMore || loadingMore || !lastDocRef.current) return;
         const generation = generationRef.current;
         setLoadingMore(true);
 
-        getAuditLogs(orgId, { since, until, kind, uid: memberUid || undefined, startAfter: lastDocRef.current })
+        getAuditLogs(orgId, {
+            since, until, kind, uid: memberUid || undefined, vehicleId: vehicleId || undefined,
+            startAfter: lastDocRef.current,
+        })
             .then((page) => {
                 if (generation !== generationRef.current) return;
                 setLogs((prev) => [...prev, ...page.logs]);
@@ -208,7 +236,7 @@ export default function useAuditLogs(): UseAuditLogsResult {
             .finally(() => {
                 if (generation === generationRef.current) setLoadingMore(false);
             });
-    }, [orgId, since, until, kind, memberUid, hasMore, loadingMore]);
+    }, [orgId, since, until, kind, memberUid, vehicleId, hasMore, loadingMore]);
 
     // 기관이 바뀌면 운행일지 캐시도 비운다 — 다른 기관 문서는 읽을 수도 없다
     useEffect(() => {
@@ -265,7 +293,7 @@ export default function useAuditLogs(): UseAuditLogsResult {
         setExporting(true);
         setError('');
 
-        getAuditLogsForExport(orgId, { since, until, kind, uid: memberUid || undefined })
+        getAuditLogsForExport(orgId, { since, until, kind, uid: memberUid || undefined, vehicleId: vehicleId || undefined })
             .then(async (result) => {
                 if (result.logs.length === 0) {
                     setError('선택한 기간에 내보낼 기록이 없습니다.');
@@ -276,7 +304,9 @@ export default function useAuditLogs(): UseAuditLogsResult {
                     ? `${range.start}_${range.end}`
                     : `최근${days}일`;
                 // 직원을 골라 받은 파일은 이름을 붙여 기관 전체 파일과 구분한다
-                const label = memberUid ? `${period}_${nameOf(memberUid)}` : period;
+                const vehicleName = vehicles.find((v) => v.id === vehicleId)?.name;
+                const label = [period, memberUid && nameOf(memberUid), vehicleId && vehicleName]
+                    .filter(Boolean).join('_');
                 await downloadAuditLogsExcel(result.logs, nameOf, `접속기록_${label}`);
                 if (result.truncated) {
                     setError(`기록이 많아 최근 ${AUDIT_LOG_EXPORT_MAX.toLocaleString()}건만 내보냈습니다. 기간을 좁혀 다시 받아주세요.`);
@@ -287,12 +317,13 @@ export default function useAuditLogs(): UseAuditLogsResult {
                 setError('내보내기에 실패했습니다. 잠시 후 다시 시도해주세요.');
             })
             .finally(() => setExporting(false));
-    }, [orgId, exporting, since, until, kind, memberUid, rangeActive, range.start, range.end, days, nameOf]);
+    }, [orgId, exporting, since, until, kind, memberUid, vehicleId, vehicles, rangeActive, range.start, range.end, days, nameOf]);
 
     return {
         logs, loading, loadingMore, error, hasMore,
         kind, setKind, days, setDays, range, setRange, rangeActive,
         memberUid, setMemberUid, members,
+        vehicleId, setVehicleId, vehicles,
         loadMore, nameOf, driveLogOf, exportExcel, exporting,
     };
 }

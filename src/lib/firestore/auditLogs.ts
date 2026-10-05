@@ -56,6 +56,8 @@ export interface AuditLogQueryOptions {
      * 서버가 남긴 약관 동의·삭제는 행위자가 비어 있다.
      */
     uid?: string;
+    /** 이 차량과 관련된 기록만 — 서버가 vehicleId를 남기기 시작한(2026-10-05) 뒤 기록에만 걸린다 */
+    vehicleId?: string;
     /** 커서 — 이전 페이지의 `lastDoc` */
     startAfter?: unknown;
     pageSize?: number;
@@ -85,6 +87,9 @@ export interface AuditLogPage {
  * 직원 필터(`uid`)는 OR의 갈래마다 인덱스가 따로 필요하다 — `(actorUid, organizationId, at desc)`,
  * `(organizationId, subjectUids, at desc)`와 유형 필터가 붙은 `action` 포함 조합. 위 사례처럼
  * Firestore가 요구하는 동등 필드 순서(알파벳순)로 등록했다.
+ *
+ * 차량 필터(`vehicleId`)는 동등 필터 하나가 더 붙는 것이라, 위 조합마다 `vehicleId`를 끼운
+ * 인덱스가 하나씩 더 있다(같은 알파벳순 — `vehicleId`는 늘 `at` 바로 앞).
  */
 export const getAuditLogs = async (
     orgId: string,
@@ -99,6 +104,9 @@ export const getAuditLogs = async (
         const kind = options.kind ?? 'all';
         if (kind !== 'all') {
             filters.push(where('action', 'in', KIND_ACTIONS[kind]));
+        }
+        if (options.vehicleId) {
+            filters.push(where('vehicleId', '==', options.vehicleId));
         }
         if (options.since) {
             filters.push(where('at', '>=', Timestamp.fromDate(options.since)));

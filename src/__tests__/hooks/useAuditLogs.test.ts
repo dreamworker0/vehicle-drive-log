@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
     getAuditLogsForExport: vi.fn(),
     getOrganizationMembers: vi.fn(),
     getDriveLogsByIds: vi.fn(),
+    getVehicles: vi.fn(),
     downloadAuditLogsExcel: vi.fn(),
     auth: { userData: null as { organizationId?: string | null } | null },
     captureError: vi.fn(),
@@ -26,6 +27,7 @@ vi.mock('../../lib/firestore', () => ({
     getAuditLogsForExport: mocks.getAuditLogsForExport,
     getOrganizationMembers: mocks.getOrganizationMembers,
     getDriveLogsByIds: mocks.getDriveLogsByIds,
+    getVehicles: mocks.getVehicles,
     AUDIT_LOG_PAGE_SIZE: 50,
     AUDIT_LOG_EXPORT_MAX: 5000,
 }));
@@ -52,6 +54,10 @@ beforeEach(() => {
     mocks.getAuditLogsForExport.mockResolvedValue({ logs: page(['a1', 'a2']).logs, truncated: false });
     mocks.downloadAuditLogsExcel.mockResolvedValue(true);
     mocks.getDriveLogsByIds.mockResolvedValue(new Map());
+    mocks.getVehicles.mockResolvedValue([
+        { id: 'car-1', displayName: '스타리아', name: '스타리아', plateNumber: '12가3456' },
+        { id: 'car-2', name: '레이', plateNumber: '34나5678' },
+    ]);
 });
 
 describe('useAuditLogs', () => {
@@ -132,6 +138,43 @@ describe('useAuditLogs', () => {
 
             expect(mocks.getAuditLogsForExport.mock.calls[0][1]).toMatchObject({ uid: 'u1' });
             expect(mocks.downloadAuditLogsExcel.mock.calls[0][2]).toBe('접속기록_최근30일_김간사');
+        });
+    });
+
+    describe('차량 필터', () => {
+        it('차량 선택지는 표시명, 없으면 이름+번호판으로 만든다', async () => {
+            const { result } = renderHook(() => useAuditLogs());
+            await waitFor(() => expect(result.current.vehicles).toHaveLength(2));
+            expect(result.current.vehicles).toEqual([
+                { id: 'car-1', name: '스타리아' },
+                { id: 'car-2', name: '레이 34나5678' },
+            ]);
+        });
+
+        it('차량을 고르면 그 차량으로 다시 읽고, 직원 필터와 함께 쓸 수 있다', async () => {
+            const { result } = renderHook(() => useAuditLogs());
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            act(() => result.current.setVehicleId('car-1'));
+            await waitFor(() => expect(mocks.getAuditLogs).toHaveBeenCalledTimes(2));
+            expect(mocks.getAuditLogs.mock.calls[1][1]).toMatchObject({ vehicleId: 'car-1' });
+
+            act(() => result.current.setMemberUid('u1'));
+            await waitFor(() => expect(mocks.getAuditLogs).toHaveBeenCalledTimes(3));
+            expect(mocks.getAuditLogs.mock.calls[2][1]).toMatchObject({ vehicleId: 'car-1', uid: 'u1' });
+        });
+
+        it('차량을 골라 내보내면 파일명에 차량 이름을 붙인다', async () => {
+            const { result } = renderHook(() => useAuditLogs());
+            await waitFor(() => expect(result.current.vehicles).toHaveLength(2));
+
+            act(() => result.current.setVehicleId('car-1'));
+            await waitFor(() => expect(result.current.vehicleId).toBe('car-1'));
+            act(() => result.current.exportExcel());
+            await waitFor(() => expect(mocks.downloadAuditLogsExcel).toHaveBeenCalled());
+
+            expect(mocks.getAuditLogsForExport.mock.calls[0][1]).toMatchObject({ vehicleId: 'car-1' });
+            expect(mocks.downloadAuditLogsExcel.mock.calls[0][2]).toBe('접속기록_최근30일_스타리아');
         });
     });
 

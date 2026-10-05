@@ -108,6 +108,11 @@ interface AuditEntry {
     actorSource: "stamp" | "document" | "unknown";
     subjectUids: string[];
     changedFields?: string[];
+    /**
+     * 관련 차량 — 점검 화면의 차량별 조회용. 차량은 자산 데이터라 개인정보가 아니므로
+     * 최소수집 원칙에 걸리지 않는다. 없으면 키 자체를 넣지 않는다(빈 값으로 오염시키지 않는다).
+     */
+    vehicleId?: string;
 }
 
 /**
@@ -196,6 +201,12 @@ function stampedActor(data: Record<string, unknown> | undefined): string | null 
     return typeof uid === "string" && uid ? uid : null;
 }
 
+/** 문서의 차량 ID — 있으면 `{ vehicleId }`, 없으면 빈 객체(키를 만들지 않는다) */
+function vehicleOf(data: Record<string, unknown> | undefined): { vehicleId?: string } {
+    const id = data?.vehicleId;
+    return typeof id === "string" && id ? { vehicleId: id } : {};
+}
+
 /** 기관 식별자를 정규화한다. 소속이 없으면 시스템 기관으로 남긴다(기록 누락 방지). */
 function orgIdOf(...candidates: unknown[]): string {
     for (const c of candidates) {
@@ -227,6 +238,7 @@ export const auditDriveLogCreated = onDocumentCreated(
             actorUid,
             actorSource: actorUid ? "document" : "unknown",
             subjectUids: driveLogSubjects(data),
+            ...vehicleOf(data),
         }, event.id);
     }
 );
@@ -254,6 +266,8 @@ export const auditDriveLogUpdated = onDocumentUpdated(
             actorSource: actorUid ? "stamp" : "unknown",
             subjectUids: driveLogSubjects(after),
             changedFields,
+            // 차량을 바꾼 수정이면 바뀐 뒤 차량으로 남긴다 — 이전 차량은 changedFields가 아니라 원본 이력의 몫이다
+            ...vehicleOf(after),
         }, event.id);
     }
 );
@@ -272,6 +286,7 @@ export const auditDriveLogDeleted = onDocumentDeleted(
             actorUid: null,
             actorSource: "unknown",
             subjectUids: driveLogSubjects(data),
+            ...vehicleOf(data),
         }, event.id);
     }
 );
@@ -372,6 +387,7 @@ export const auditVehicleDeleted = onDocumentDeleted(
             actorUid: null,
             actorSource: "unknown",
             subjectUids: [],
+            vehicleId: event.params.vehicleId,
         }, event.id);
     }
 );
