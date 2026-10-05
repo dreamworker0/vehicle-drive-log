@@ -170,3 +170,70 @@ export const getAuditLogsForExport = async (
     const page = await getAuditLogs(orgId, { ...options, pageSize: AUDIT_LOG_EXPORT_MAX });
     return { logs: page.logs, truncated: page.logs.length >= AUDIT_LOG_EXPORT_MAX };
 };
+
+/** Firestore `in` 연산자의 값 개수 상한 */
+const IN_QUERY_MAX = 30;
+
+/**
+ * 차량 정보가 없는 옛 기록 — 서버가 `vehicleId`를 남기기 시작한 시점(2026-10-05 배포) 이전 기록이다.
+ * 이 시각 이전 기간을 차량으로 조회할 때만 아래 보조 조회를 쓴다.
+ */
+export const AUDIT_VEHICLE_ID_SINCE = new Date('2026-10-06T00:00:00+09:00');
+
+/**
+ * 대상 문서 ID 목록으로 기록을 읽는다 — 차량 정보가 없는 옛 기록을 차량별로 찾는 보조 조회.
+ *
+ * 화면이 그 차량의 운행일지 ID를 먼저 모은 뒤 여기서 그 운행일지들의 기록을 가져온다.
+ * 기간·유형·직원 조건은 **걸지 않고** 호출 측이 메모리에서 거른다(`filterAuditLogs`):
+ * `targetId in`에 다른 `in`·범위 조건을 더하면 복합 인덱스와 분리 조건 상한(30)에 걸린다.
+ * 동등 + `in`만이라 단일 필드 인덱스로 처리된다. 운행일지 한 건의 기록은 몇 건뿐이다.
+ */
+export const getAuditLogsByTargets = async (orgId: string, targetIds: string[]): Promise<AuditLog[]> => {
+    const unique = [...new Set(targetIds.filter(Boolean))];
+    if (unique.length === 0) return [];
+    try {
+        const chunks: string[][] = [];
+        for (let i = 0; i < unique.length; i += IN_QUERY_MAX) chunks.push(unique.slice(i, i + IN_QUERY_MAX));
+        const snaps = await Promise.all(chunks.map((chunk) => getDocs(query(
+            collection(db, 'auditLogs').withConverter(auditLogConverter),
+            where('organizationId', '==', orgId),
+            where('targetId', 'in', chunk),
+        ))));
+        return snaps.flatMap((snap) => snap.docs.map((d) => d.data())) as AuditLog[];
+    } catch (error) {
+        captureError(error, { context: 'getAuditLogsByTargets', orgId, count: unique.length });
+        throw error;
+    }
+};
+
+/** 기록 시각(ms). Timestamp·Date 어느 쪽이 와도 읽는다 */
+const atMillis = (log: AuditLog): number => {
+    const at = log.at as unknown as { toMillis?: () => number; toDate?: () => Date } | Date | null;
+    if (!at) return 0;
+    if (at instanceof Date) return at.getTime();
+    if (typeof at.toMillis === 'function') return at.toMillis();
+    if (typeof at.toDate === 'function') return at.toDate().getTime();
+    return 0;
+};
+
+/** 서버 조회와 같은 조건을 메모리에서 적용한다 — 보조 조회 결과용. 최신순으로 돌려준다 */
+export function filterAuditLogs(
+    logs: AuditLog[],
+    options: Pick<AuditLogQueryOptions, 'since' | 'until' | 'kind' | 'uid'>,
+): AuditLog[] {
+    const kind = options.kind ?? 'all';
+    const actions = kind === 'all' ? null : new Set(KIND_ACTIONS[kind]);
+    const since = options.since?.getTime() ?? -Infinity;
+    const until = options.until?.getTime() ?? Infinity;
+    return logs
+        .filter((log) => {
+            const t = atMillis(log);
+            if (t < since || t > until) return false;
+            if (actions && !actions.has(log.action)) return false;
+            if (options.uid && log.actorUid !== options.uid && !log.subjectUids.includes(options.uid)) return false;
+            return true;
+        })
+        .sort((a, b) => atMillis(b) - atMillis(a));
+}
+
+export { atMillis as auditLogAtMillis };
