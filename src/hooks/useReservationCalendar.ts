@@ -48,6 +48,7 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
     const dataHook = useReservationData({
         user, userData, isAdmin, showToast, currentMonth,
         needsMembers: reservationPassengerOn,
+        calendarSyncEnabled: orgFeatures.googleCalendar,
     });
     const {
         vehicles, reservations, setReservations, loading,

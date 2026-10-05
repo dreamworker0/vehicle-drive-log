@@ -69,14 +69,15 @@ export default function TodayDashboard() {
         if (!orgFeatures.googleCalendar) return;
 
         const triggerSyncs = async () => {
-            let anySynced = false;
-            for (const vehicle of vehicles as Vehicle[]) {
+            // 차량별 호출을 동시에 보낸다 — 순서대로 기다리면 연동 차량 수만큼 줄지어 늦어진다(6E)
+            const due = (vehicles as Vehicle[]).filter((vehicle) => {
                 const calId = vehicle.googleCalendarId;
-                if (calId && calId.includes('@') && checkCooldown(vehicle.id)) {
-                    const success = await syncVehicleOnDemand(vehicle.id, userData.organizationId!);
-                    if (success) anySynced = true;
-                }
-            }
+                return calId && calId.includes('@') && checkCooldown(vehicle.id);
+            });
+            const results = await Promise.all(
+                due.map((vehicle) => syncVehicleOnDemand(vehicle.id, userData.organizationId!)),
+            );
+            const anySynced = results.some(Boolean);
             // 새로 당겨온 예약이 있을 수 있으므로 대시보드 데이터 갱신
             if (anySynced) refresh();
         };
