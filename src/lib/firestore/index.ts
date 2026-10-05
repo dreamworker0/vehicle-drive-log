@@ -182,6 +182,10 @@ export {
 export {
     getAuditLogs,
     getAuditLogsForExport,
+    getAuditLogsByTargets,
+    filterAuditLogs,
+    auditLogAtMillis,
+    AUDIT_VEHICLE_ID_SINCE,
     AUDIT_LOG_PAGE_SIZE,
     AUDIT_LOG_EXPORT_MAX,
 } from './auditLogs';

@@ -17,6 +17,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from './useAuth';
 import {
     getAuditLogs, getAuditLogsForExport, getOrganizationMembers, getDriveLogsByIds, getVehicles,
+    getVehicleDriveLogs, getAuditLogsByTargets, filterAuditLogs, auditLogAtMillis, AUDIT_VEHICLE_ID_SINCE,
     AUDIT_LOG_PAGE_SIZE, AUDIT_LOG_EXPORT_MAX,
 } from '../lib/firestore';
 import type { AuditLogKind } from '../lib/firestore';
@@ -77,11 +78,40 @@ export interface UseAuditLogsResult {
     exporting: boolean;
 }
 
+/**
+ * 차량 정보가 없는 옛 기록 중 이 차량의 것을 찾는다.
+ *
+ * 그 차량의 운행일지 ID(+ 차량 삭제 기록용 차량 ID)로 기록을 모은 뒤, 서버 조회와 같은 조건을
+ * 메모리에서 적용한다. 운행일지는 기간 시작 1년 전부터 본다 — 오래전 운행을 이번 기간에 고친
+ * 기록도 잡아야 하고, 접속기록 보관기간이 1년이라 그보다 앞은 의미가 없다.
+ * ⚠️ 이미 삭제된 운행일지는 ID를 알 수 없어 그 기록은 나오지 않는다.
+ */
+const LEGACY_DRIVE_LOG_LOOKBACK_MS = 365 * 24 * 60 * 60 * 1000;
+const LEGACY_DRIVE_LOG_MAX = 1000;
+
+async function loadLegacyVehicleLogs(
+    orgId: string,
+    vehicleId: string,
+    options: { since: Date; until?: Date; kind: AuditLogKind; uid?: string },
+): Promise<AuditLog[]> {
+    const driveLogs = await getVehicleDriveLogs(
+        orgId, vehicleId, new Date(options.since.getTime() - LEGACY_DRIVE_LOG_LOOKBACK_MS), LEGACY_DRIVE_LOG_MAX,
+    );
+    const raw = await getAuditLogsByTargets(orgId, [vehicleId, ...driveLogs.map((d) => d.id)]);
+    const cutoff = AUDIT_VEHICLE_ID_SINCE.getTime();
+    // vehicleId가 있는 기록은 서버 조회가 이미 맡는다
+    const legacy = raw.filter((l) => !l.vehicleId && auditLogAtMillis(l) < cutoff);
+    return filterAuditLogs(legacy, options);
+}
+
 export default function useAuditLogs(): UseAuditLogsResult {
     const { userData } = useAuth();
     const orgId = userData?.organizationId ?? null;
 
-    const [logs, setLogs] = useState<AuditLog[]>([]);
+    /** 서버 조회(페이지 단위) 결과 */
+    const [mainLogs, setLogs] = useState<AuditLog[]>([]);
+    /** 차량 정보가 없는 옛 기록 중 선택한 차량의 것 — 보조 조회로 한 번에 읽는다 */
+    const [legacyLogs, setLegacyLogs] = useState<AuditLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState('');
@@ -195,6 +225,20 @@ export default function useAuditLogs(): UseAuditLogsResult {
         setLoading(true);
         setError('');
 
+        setLegacyLogs([]);
+        // 차량을 골랐고 기간이 차량 정보 기록 시작 전까지 걸치면 옛 기록을 보조 조회로 찾는다.
+        // 서버는 2026-10-05부터 vehicleId를 남겼다 — 그 전 기록은 vehicleId 조건에 걸리지 않는다.
+        if (vehicleId && since < AUDIT_VEHICLE_ID_SINCE) {
+            loadLegacyVehicleLogs(orgId, vehicleId, { since, until, kind, uid: memberUid || undefined })
+                .then((legacy) => {
+                    if (generation === generationRef.current) setLegacyLogs(legacy);
+                })
+                .catch(() => {
+                    if (generation !== generationRef.current) return;
+                    setError('10월 5일 이전 기록 일부를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
+                });
+        }
+
         getAuditLogs(orgId, { since, until, kind, uid: memberUid || undefined, vehicleId: vehicleId || undefined })
             .then((page) => {
                 if (generation !== generationRef.current) return; // 필터가 바뀌었으면 폐기
@@ -237,6 +281,22 @@ export default function useAuditLogs(): UseAuditLogsResult {
                 if (generation === generationRef.current) setLoadingMore(false);
             });
     }, [orgId, since, until, kind, memberUid, vehicleId, hasMore, loadingMore]);
+
+    /**
+     * 화면에 보일 목록 — 서버 조회 + 옛 기록 보조 조회.
+     *
+     * 서버 조회가 아직 더 있으면(hasMore) 옛 기록은 **지금까지 불러온 가장 오래된 시각까지만**
+     * 섞는다. 다 섞으면 아직 안 불러온 페이지보다 오래된 옛 기록이 먼저 보여 시간 순서가 깨진다.
+     */
+    const logs = useMemo(() => {
+        if (legacyLogs.length === 0) return mainLogs;
+        const ids = new Set(mainLogs.map((l) => l.id));
+        const floor = hasMore && mainLogs.length > 0
+            ? auditLogAtMillis(mainLogs[mainLogs.length - 1])
+            : -Infinity;
+        const extra = legacyLogs.filter((l) => !ids.has(l.id) && auditLogAtMillis(l) >= floor);
+        return [...mainLogs, ...extra].sort((a, b) => auditLogAtMillis(b) - auditLogAtMillis(a));
+    }, [mainLogs, legacyLogs, hasMore]);
 
     // 기관이 바뀌면 운행일지 캐시도 비운다 — 다른 기관 문서는 읽을 수도 없다
     useEffect(() => {
@@ -295,6 +355,15 @@ export default function useAuditLogs(): UseAuditLogsResult {
 
         getAuditLogsForExport(orgId, { since, until, kind, uid: memberUid || undefined, vehicleId: vehicleId || undefined })
             .then(async (result) => {
+                // 옛 기록 보조 조회분도 파일에 담는다 — 화면에 보인 기록이 파일에서 빠지면 증빙이 어긋난다
+                if (legacyLogs.length > 0) {
+                    const ids = new Set(result.logs.map((l) => l.id));
+                    result = {
+                        ...result,
+                        logs: [...result.logs, ...legacyLogs.filter((l) => !ids.has(l.id))]
+                            .sort((a, b) => auditLogAtMillis(b) - auditLogAtMillis(a)),
+                    };
+                }
                 if (result.logs.length === 0) {
                     setError('선택한 기간에 내보낼 기록이 없습니다.');
                     return;
@@ -317,7 +386,7 @@ export default function useAuditLogs(): UseAuditLogsResult {
                 setError('내보내기에 실패했습니다. 잠시 후 다시 시도해주세요.');
             })
             .finally(() => setExporting(false));
-    }, [orgId, exporting, since, until, kind, memberUid, vehicleId, vehicles, rangeActive, range.start, range.end, days, nameOf]);
+    }, [orgId, exporting, since, until, kind, memberUid, vehicleId, vehicles, legacyLogs, rangeActive, range.start, range.end, days, nameOf]);
 
     return {
         logs, loading, loadingMore, error, hasMore,
