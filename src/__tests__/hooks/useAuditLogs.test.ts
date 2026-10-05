@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
     getVehicles: vi.fn(),
     getVehicleDriveLogs: vi.fn(),
     getAuditLogsByTargets: vi.fn(),
+    getReservationsByIds: vi.fn(),
     downloadAuditLogsExcel: vi.fn(),
     auth: { userData: null as { organizationId?: string | null } | null },
     captureError: vi.fn(),
@@ -32,6 +33,7 @@ vi.mock('../../lib/firestore', () => ({
     getVehicles: mocks.getVehicles,
     getVehicleDriveLogs: mocks.getVehicleDriveLogs,
     getAuditLogsByTargets: mocks.getAuditLogsByTargets,
+    getReservationsByIds: mocks.getReservationsByIds,
     // 조건 적용은 auditLogs.test.ts가 따로 고정한다 — 여기서는 배선만 본다
     filterAuditLogs: (logs: unknown[]) => logs,
     auditLogAtMillis: (log: { at?: { ms?: number } }) => log.at?.ms ?? 0,
@@ -68,6 +70,7 @@ beforeEach(() => {
     ]);
     mocks.getVehicleDriveLogs.mockResolvedValue([]);
     mocks.getAuditLogsByTargets.mockResolvedValue([]);
+    mocks.getReservationsByIds.mockResolvedValue(new Map());
 });
 
 describe('useAuditLogs', () => {
@@ -411,6 +414,29 @@ describe('useAuditLogs', () => {
         await waitFor(() => expect(result.current.error).toContain('불러오지 못했습니다'));
         expect(result.current.logs).toEqual([]);
         expect(result.current.hasMore).toBe(false);
+    });
+
+    describe('예약 내용', () => {
+        it('예약 기록의 원본을 한 번에 읽고, 없는 것은 null(삭제됨)로 둔다', async () => {
+            mocks.getAuditLogs.mockResolvedValue({
+                logs: [
+                    { id: 'a', action: 'create', targetType: 'reservation', targetId: 'r-1', subjectUids: [] },
+                    { id: 'b', action: 'update', targetType: 'reservation', targetId: 'r-1', subjectUids: [] },
+                    { id: 'c', action: 'delete', targetType: 'reservation', targetId: 'r-gone', subjectUids: [] },
+                ],
+                lastDoc: null,
+                hasMore: false,
+            });
+            mocks.getReservationsByIds.mockResolvedValue(new Map([['r-1', { id: 'r-1', destination: '서울역' }]]));
+            const { result } = renderHook(() => useAuditLogs());
+
+            await waitFor(() => expect(result.current.reservationOf('r-1')).toEqual({ id: 'r-1', destination: '서울역' }));
+            expect(result.current.reservationOf('r-gone')).toBeNull();
+            expect(mocks.getReservationsByIds).toHaveBeenCalledTimes(1);
+            expect(mocks.getReservationsByIds).toHaveBeenCalledWith('org-1', ['r-1', 'r-gone']);
+            // 운행일지 조회와 섞이지 않는다
+            expect(mocks.getDriveLogsByIds).not.toHaveBeenCalled();
+        });
     });
 
     describe('운행 내용', () => {

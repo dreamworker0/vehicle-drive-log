@@ -7,6 +7,7 @@
  */
 import type { AuditAction, AuditLog, AuditTargetType } from '../types/auditLog';
 import type { DriveLog } from '../types/driveLog';
+import type { Reservation } from '../types/reservation';
 import { toDateOrNull, toLocalDateStr } from './dateUtils';
 
 /** 수행업무 — 고시 제2조의 '수행업무'를 관리자가 읽는 말로 */
@@ -128,4 +129,20 @@ export function describeDriveLog(
         ? `${log.startLocation} → ${log.destination}`
         : (log.destination || log.startLocation || '');
     return [when, vehicle, route].filter(Boolean).join(' · ');
+}
+
+/**
+ * 예약 한 줄 요약 — `2026.10.05 14:00~16:00 · 스타리아4347 · 서울역`
+ *
+ * describeDriveLog와 같은 이유로 원본 예약을 읽어 붙인다. 동승자·용무는 넣지 않는다 —
+ * "어느 차를 언제 어디로"면 점검하는 사람이 어떤 예약인지 알아본다.
+ */
+export function describeReservation(
+    r: Pick<Reservation, 'date' | 'startTime' | 'endTime' | 'vehicleDisplayName' | 'vehicleName' | 'destination'>,
+): string {
+    const day = (r.date || '').replace(/-/g, '.');
+    const time = r.startTime && r.endTime ? `${r.startTime}~${r.endTime}` : (r.startTime || '');
+    const when = [day, time].filter(Boolean).join(' ');
+    const vehicle = r.vehicleDisplayName || r.vehicleName || '';
+    return [when, vehicle, r.destination || ''].filter(Boolean).join(' · ');
 }

@@ -17,12 +17,14 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from './useAuth';
 import {
     getAuditLogs, getAuditLogsForExport, getOrganizationMembers, getDriveLogsByIds, getVehicles,
+    getReservationsByIds,
     getVehicleDriveLogs, getAuditLogsByTargets, filterAuditLogs, auditLogAtMillis, AUDIT_VEHICLE_ID_SINCE,
     AUDIT_LOG_PAGE_SIZE, AUDIT_LOG_EXPORT_MAX,
 } from '../lib/firestore';
 import type { AuditLogKind } from '../lib/firestore';
 import type { AuditLog } from '../types/auditLog';
 import type { DriveLog } from '../types/driveLog';
+import type { Reservation } from '../types/reservation';
 import { captureError } from '../lib/sentry';
 
 /**
@@ -73,6 +75,8 @@ export interface UseAuditLogsResult {
      * targetType이 driveLog인 기록에만 의미가 있다.
      */
     driveLogOf: (id: string) => DriveLog | null | undefined;
+    /** 기록 대상 예약 — 아직 읽는 중이면 undefined, 삭제돼 없으면 null */
+    reservationOf: (id: string) => Reservation | null | undefined;
     /** 선택한 기간·유형 전체를 엑셀로 내보낸다(화면에 불러온 만큼이 아니라 기간 전체) */
     exportExcel: () => void;
     exporting: boolean;
@@ -128,6 +132,9 @@ export default function useAuditLogs(): UseAuditLogsResult {
     /** 운행일지 ID → 원본(삭제됐으면 null). 필터를 바꿔도 같은 문서를 다시 읽지 않게 유지한다 */
     const [driveLogs, setDriveLogs] = useState<Record<string, DriveLog | null>>({});
     const requestedDriveLogIdsRef = useRef(new Set<string>());
+    /** 예약 ID → 원본(삭제됐으면 null). 운행일지와 같은 방식으로 한 번만 읽는다 */
+    const [reservations, setReservations] = useState<Record<string, Reservation | null>>({});
+    const requestedReservationIdsRef = useRef(new Set<string>());
 
     /** 커서와 세대 — 필터가 바뀌면 세대를 올려 이전 응답을 폐기한다 */
     const lastDocRef = useRef<unknown | null>(null);
@@ -302,6 +309,8 @@ export default function useAuditLogs(): UseAuditLogsResult {
     useEffect(() => {
         requestedDriveLogIdsRef.current = new Set();
         setDriveLogs({});
+        requestedReservationIdsRef.current = new Set();
+        setReservations({});
     }, [orgId]);
 
     // 화면에 올라온 운행일지 기록의 원본을 읽는다 — 이미 요청한 ID는 건너뛴다
@@ -331,6 +340,33 @@ export default function useAuditLogs(): UseAuditLogsResult {
     }, [orgId, logs]);
 
     const driveLogOf = useCallback((id: string) => driveLogs[id], [driveLogs]);
+
+    // 예약 기록도 원본을 읽어 "어느 차를 언제 어디로"를 붙인다 — 위 운행일지와 같은 규칙
+    useEffect(() => {
+        if (!orgId) return;
+        const requested = requestedReservationIdsRef.current;
+        const ids = [...new Set(
+            logs.filter((l) => l.targetType === 'reservation' && l.targetId).map((l) => l.targetId),
+        )].filter((id) => !requested.has(id));
+        if (ids.length === 0) return;
+        ids.forEach((id) => requested.add(id));
+
+        getReservationsByIds(orgId, ids)
+            .then((found) => {
+                if (requestedReservationIdsRef.current !== requested) return; // 기관이 바뀌었으면 폐기
+                setReservations((prev) => {
+                    const next = { ...prev };
+                    for (const id of ids) next[id] = found.get(id) ?? null;
+                    return next;
+                });
+            })
+            .catch(() => {
+                // 요약을 못 붙여도 기록은 보여준다. 다음 갱신 때 다시 시도하도록 요청 표시를 지운다
+                ids.forEach((id) => requested.delete(id));
+            });
+    }, [orgId, logs]);
+
+    const reservationOf = useCallback((id: string) => reservations[id], [reservations]);
 
     const nameOf = useCallback((uid: string | null | undefined): string => {
         if (!uid) return '알 수 없음';
@@ -393,7 +429,7 @@ export default function useAuditLogs(): UseAuditLogsResult {
         kind, setKind, days, setDays, range, setRange, rangeActive,
         memberUid, setMemberUid, members,
         vehicleId, setVehicleId, vehicles,
-        loadMore, nameOf, driveLogOf, exportExcel, exporting,
+        loadMore, nameOf, driveLogOf, reservationOf, exportExcel, exporting,
     };
 }
 
