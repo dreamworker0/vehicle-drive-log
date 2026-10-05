@@ -25,8 +25,20 @@ let sentryLoading: Promise<SentryModule | null> | null = null;
 // SDK 로드 완료 전에 setSentryUser가 호출되면 보관했다가 init 직후 적용 (undefined = 대기 없음)
 let queuedUser: SentryUserInfo | undefined;
 
+/**
+ * 루프백 주소에서 돈 프로덕션 빌드인가 — CI e2e·Lighthouse·`vite preview`가 해당한다.
+ *
+ * CI는 실제 `.env`(DSN 포함)로 빌드한 앱을 localhost에서 헤드리스 브라우저로 돌린다. 그 실행이
+ * 낸 에러가 프로덕션 이슈로 올라왔다(Sentry JAVASCRIPT-REACT-6K, HeadlessChrome·localhost:21045).
+ * 실사용자는 루프백 주소로 앱을 열 수 없으므로 여기서는 SDK를 아예 띄우지 않는다.
+ */
+function isLoopbackProductionBuild(): boolean {
+    if (!import.meta.env.PROD || typeof location === 'undefined') return false;
+    return ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+}
+
 export function initSentry() {
-    if (!SENTRY_DSN || sentryLoading) return;
+    if (!SENTRY_DSN || sentryLoading || isLoopbackProductionBuild()) return;
 
     sentryLoading = import('./sentryClient')
         .then((Sentry) => {
