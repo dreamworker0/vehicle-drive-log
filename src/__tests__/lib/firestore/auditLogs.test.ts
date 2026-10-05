@@ -190,6 +190,16 @@ describe('firestore/auditLogs', () => {
             expect(rest).toContainEqual({ _type: 'limit', n: AUDIT_LOG_PAGE_SIZE });
         });
 
+        it('차량 필터는 vehicleId 동등 조건으로, 직원 필터와 함께면 AND 안에 들어간다', async () => {
+            await getAuditLogs('org-1', { vehicleId: 'car-1' });
+            expect(whereOn('vehicleId')).toEqual([{ _type: 'where', field: 'vehicleId', op: '==', value: 'car-1' }]);
+
+            await getAuditLogs('org-1', { vehicleId: 'car-1', uid: 'u1' });
+            const [composite] = lastConstraints() as unknown as Array<{ _type: string; filters: Array<Record<string, unknown>> }>;
+            expect(composite.filters).toContainEqual({ _type: 'where', field: 'vehicleId', op: '==', value: 'car-1' });
+            expect(composite.filters).toContainEqual({ _type: 'where', field: 'organizationId', op: '==', value: 'org-1' });
+        });
+
         it('직원을 고르지 않으면 OR 필터를 만들지 않는다', async () => {
             await getAuditLogs('org-1');
             expect(fs.or).not.toHaveBeenCalled();

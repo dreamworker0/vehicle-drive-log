@@ -108,7 +108,28 @@ describe('auditLog — 트리거 배선', () => {
             actorUid: null,
             actorSource: 'unknown',
             subjectUids: [],
+            vehicleId: 'v1',
         });
+    });
+
+    // 점검 화면의 차량별 조회 근거. 차량은 개인정보가 아니라 최소수집에 걸리지 않는다.
+    it('운행일지 생성·수정·삭제는 관련 차량을 함께 남긴다 (수정은 바뀐 뒤 차량)', async () => {
+        await fireCreate(DRIVE_LOG, { logId: 'dl-v1' }, { organizationId: 'org-1', driverUid: 'd1', vehicleId: 'car-1' });
+        expect(lastEntry().vehicleId).toBe('car-1');
+
+        await fireUpdate(DRIVE_LOG, { logId: 'dl-v1' },
+            { organizationId: 'org-1', driverUid: 'd1', vehicleId: 'car-1', destination: '구청' },
+            { organizationId: 'org-1', driverUid: 'd1', vehicleId: 'car-2', destination: '시청' },
+        );
+        expect(lastEntry().vehicleId).toBe('car-2');
+
+        await fireDelete(DRIVE_LOG, { logId: 'dl-v1' }, { organizationId: 'org-1', driverUid: 'd1', vehicleId: 'car-2' });
+        expect(lastEntry().vehicleId).toBe('car-2');
+    });
+
+    it('차량이 없는 운행일지는 vehicleId 키를 만들지 않는다', async () => {
+        await fireCreate(DRIVE_LOG, { logId: 'dl-v2' }, { organizationId: 'org-1', driverUid: 'd1', vehicleId: '' });
+        expect(lastEntry()).not.toHaveProperty('vehicleId');
     });
 
     it('모든 트리거가 서울 리전 + retry로 등록된다', () => {

@@ -111,6 +111,7 @@ export default function AuditLogViewer() {
         logs, loading, loadingMore, error, hasMore,
         kind, setKind, days, setDays, range, setRange, rangeActive,
         memberUid, setMemberUid, members,
+        vehicleId, setVehicleId, vehicles,
         loadMore, nameOf, driveLogOf, exportExcel, exporting,
     } = useAuditLogs();
 
@@ -178,18 +179,42 @@ export default function AuditLogViewer() {
                   직원 — 그 직원이 직접 한 일과 대상이 된 일을 함께 본다. 한쪽만 보면
                   관리자의 엑셀 반출(대상 없음)이나 서버가 남긴 동의 기록(행위자 없음)이 빠진다.
                 */}
-                <p className="text-xs font-medium text-surface-400 dark:text-surface-500 mb-2">직원</p>
-                <select
-                    aria-label="직원"
-                    value={memberUid}
-                    onChange={(e) => setMemberUid(e.target.value)}
-                    className="input w-full min-h-[48px] mb-4"
-                >
-                    <option value="">전체 직원</option>
-                    {members.map((m) => (
-                        <option key={m.uid} value={m.uid}>{m.name}</option>
-                    ))}
-                </select>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-2 mb-4">
+                    <div>
+                        <p className="text-xs font-medium text-surface-400 dark:text-surface-500 mb-2">직원</p>
+                        <select
+                            aria-label="직원"
+                            value={memberUid}
+                            onChange={(e) => setMemberUid(e.target.value)}
+                            className="input w-full min-h-[48px] mb-3 sm:mb-0"
+                        >
+                            <option value="">전체 직원</option>
+                            {members.map((m) => (
+                                <option key={m.uid} value={m.uid}>{m.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <p className="text-xs font-medium text-surface-400 dark:text-surface-500 mb-2">차량</p>
+                        <select
+                            aria-label="차량"
+                            value={vehicleId}
+                            onChange={(e) => setVehicleId(e.target.value)}
+                            className="input w-full min-h-[48px]"
+                        >
+                            <option value="">전체 차량</option>
+                            {vehicles.map((v) => (
+                                <option key={v.id} value={v.id}>{v.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+                {/* 차량 정보는 서버가 이날부터 남기기 시작했다 — 그 전 기록이 안 나오는 걸 '기록 없음'으로 오해하지 않게 */}
+                {vehicleId && (
+                    <p className="text-xs text-surface-400 dark:text-surface-500 -mt-2 mb-4">
+                        차량별 조회는 2026년 10월 5일 이후 기록부터 가능합니다.
+                    </p>
+                )}
 
                 <p className="text-xs font-medium text-surface-400 dark:text-surface-500 mb-2">유형</p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -215,7 +240,7 @@ export default function AuditLogViewer() {
                         {exporting ? '내보내는 중...' : '엑셀로 내보내기'}
                     </button>
                     <p className="text-xs text-surface-400 dark:text-surface-500 mt-2 leading-relaxed">
-                        선택한 기간·직원·유형의 기록 전체가 담깁니다. 접속지 IP가 포함되므로 파일 보관에 주의해 주세요 —
+                        선택한 기간·직원·차량·유형의 기록 전체가 담깁니다. 접속지 IP가 포함되므로 파일 보관에 주의해 주세요 —
                         내보낸 사실은 접속기록에 남습니다.
                     </p>
                 </div>
