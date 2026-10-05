@@ -12,8 +12,9 @@
  * 기관 ID가 아니라 이 필터에 걸리지 않는다 — 의도된 동작이다.
  */
 import {
-    collection, query, where, orderBy, limit, getDocs, Timestamp,
-    type QueryConstraint,
+    collection, query, where, orderBy, limit, getDocs, Timestamp, and, or,
+    type QueryFieldFilterConstraint,
+    type QueryNonFilterConstraint,
     type DocumentData,
 } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -49,6 +50,12 @@ export interface AuditLogQueryOptions {
     /** 이 시각 이전의 기록만 — 직접 지정한 종료일이 있을 때만 쓴다 */
     until?: Date;
     kind?: AuditLogKind;
+    /**
+     * 이 직원과 관련된 기록만 — 직접 한 일(actorUid)이거나 대상이 된 일(subjectUids).
+     * 둘 중 하나만 보면 빠지는 기록이 생긴다: 관리자가 한 엑셀 반출은 대상 직원이 없고,
+     * 서버가 남긴 약관 동의·삭제는 행위자가 비어 있다.
+     */
+    uid?: string;
     /** 커서 — 이전 페이지의 `lastDoc` */
     startAfter?: unknown;
     pageSize?: number;
@@ -74,6 +81,10 @@ export interface AuditLogPage {
  * 2026-08-02). 동등 필터 두 개의 순서가 바뀐 것뿐이라 중복으로 보고 #176에서 파일에서 지웠는데,
  * 프로덕션에는 남아 있어(인덱스 배포는 `--force` 없이는 삭제하지 않는다) 화면은 계속 동작했다.
  * 즉 파일만 프로덕션과 어긋난 상태였다. 정리하려면 순서 무관성을 먼저 확인해야 한다.
+ *
+ * 직원 필터(`uid`)는 OR의 갈래마다 인덱스가 따로 필요하다 — `(actorUid, organizationId, at desc)`,
+ * `(organizationId, subjectUids, at desc)`와 유형 필터가 붙은 `action` 포함 조합. 위 사례처럼
+ * Firestore가 요구하는 동등 필드 순서(알파벳순)로 등록했다.
  */
 export const getAuditLogs = async (
     orgId: string,
@@ -81,22 +92,22 @@ export const getAuditLogs = async (
 ): Promise<AuditLogPage> => {
     const pageSize = options.pageSize ?? AUDIT_LOG_PAGE_SIZE;
     try {
-        const constraints: QueryConstraint[] = [
+        const filters: QueryFieldFilterConstraint[] = [
             where('organizationId', '==', orgId),
         ];
 
         const kind = options.kind ?? 'all';
         if (kind !== 'all') {
-            constraints.push(where('action', 'in', KIND_ACTIONS[kind]));
+            filters.push(where('action', 'in', KIND_ACTIONS[kind]));
         }
         if (options.since) {
-            constraints.push(where('at', '>=', Timestamp.fromDate(options.since)));
+            filters.push(where('at', '>=', Timestamp.fromDate(options.since)));
         }
         if (options.until) {
-            constraints.push(where('at', '<=', Timestamp.fromDate(options.until)));
+            filters.push(where('at', '<=', Timestamp.fromDate(options.until)));
         }
 
-        constraints.push(orderBy('at', 'desc'), limit(pageSize));
+        const constraints: QueryNonFilterConstraint[] = [orderBy('at', 'desc'), limit(pageSize)];
 
         if (options.startAfter) {
             // 커서를 쓰는 화면에서만 필요한 함수라 초기 번들에 넣지 않는다
@@ -104,10 +115,15 @@ export const getAuditLogs = async (
             constraints.push(startAfterFn(options.startAfter as DocumentData));
         }
 
-        const q = query(
-            collection(db, 'auditLogs').withConverter(auditLogConverter),
-            ...constraints,
-        );
+        const ref = collection(db, 'auditLogs').withConverter(auditLogConverter);
+        // OR 필터는 복합 필터라 다른 조건과 함께 and()로 묶어야 한다
+        const q = options.uid
+            ? query(
+                ref,
+                and(...filters, or(where('actorUid', '==', options.uid), where('subjectUids', 'array-contains', options.uid))),
+                ...constraints,
+            )
+            : query(ref, ...filters, ...constraints);
         const snap = await getDocs(q);
 
         return {

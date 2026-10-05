@@ -57,6 +57,9 @@ const setHook = (over: Partial<UseAuditLogsResult> = {}) => {
         range: { start: '', end: '' },
         setRange: vi.fn(),
         rangeActive: false,
+        memberUid: '',
+        setMemberUid: vi.fn(),
+        members: [],
         exportExcel: vi.fn(),
         exporting: false,
         loadMore: vi.fn(),
@@ -149,6 +152,15 @@ describe('AuditLogViewer', () => {
 
         expect(screen.getAllByText('운행 내용')).toHaveLength(1);
         expect(screen.getByText('삭제된 운행일지라 내용을 확인할 수 없음')).toBeInTheDocument();
+    });
+
+    it('직원을 고르면 훅의 직원 필터를 바꾼다', () => {
+        const state = setHook({ members: [{ uid: 'u1', name: '김간사' }, { uid: 'u2', name: '이팀장' }] });
+        render(<AuditLogViewer />);
+
+        fireEvent.change(screen.getByLabelText('직원'), { target: { value: 'u2' } });
+        expect(state.setMemberUid).toHaveBeenCalledWith('u2');
+        expect(screen.getByRole('option', { name: '전체 직원' })).toBeInTheDocument();
     });
 
     it('기간·유형 버튼이 훅의 필터를 바꾼다', () => {

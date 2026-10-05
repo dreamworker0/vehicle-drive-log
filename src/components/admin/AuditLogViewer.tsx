@@ -110,6 +110,7 @@ export default function AuditLogViewer() {
     const {
         logs, loading, loadingMore, error, hasMore,
         kind, setKind, days, setDays, range, setRange, rangeActive,
+        memberUid, setMemberUid, members,
         loadMore, nameOf, driveLogOf, exportExcel, exporting,
     } = useAuditLogs();
 
@@ -173,6 +174,23 @@ export default function AuditLogViewer() {
                     )}
                 </div>
 
+                {/*
+                  직원 — 그 직원이 직접 한 일과 대상이 된 일을 함께 본다. 한쪽만 보면
+                  관리자의 엑셀 반출(대상 없음)이나 서버가 남긴 동의 기록(행위자 없음)이 빠진다.
+                */}
+                <p className="text-xs font-medium text-surface-400 dark:text-surface-500 mb-2">직원</p>
+                <select
+                    aria-label="직원"
+                    value={memberUid}
+                    onChange={(e) => setMemberUid(e.target.value)}
+                    className="input w-full min-h-[48px] mb-4"
+                >
+                    <option value="">전체 직원</option>
+                    {members.map((m) => (
+                        <option key={m.uid} value={m.uid}>{m.name}</option>
+                    ))}
+                </select>
+
                 <p className="text-xs font-medium text-surface-400 dark:text-surface-500 mb-2">유형</p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {KIND_TABS.map((tab) => (
@@ -197,7 +215,7 @@ export default function AuditLogViewer() {
                         {exporting ? '내보내는 중...' : '엑셀로 내보내기'}
                     </button>
                     <p className="text-xs text-surface-400 dark:text-surface-500 mt-2 leading-relaxed">
-                        선택한 기간·유형의 기록 전체가 담깁니다. 접속지 IP가 포함되므로 파일 보관에 주의해 주세요 —
+                        선택한 기간·직원·유형의 기록 전체가 담깁니다. 접속지 IP가 포함되므로 파일 보관에 주의해 주세요 —
                         내보낸 사실은 접속기록에 남습니다.
                     </p>
                 </div>

@@ -5,6 +5,7 @@
  *  (1) 멀티테넌트 격리 — organizationId 필터 없이는 절대 조회하지 않는다
  *  (2) 유형 필터는 action `in` 하나로 처리한다 (인덱스가 1개면 충분한 근거)
  *  (3) 최신순 + 페이지 상한 + 커서 (점검 화면이 전량을 읽지 않게)
+ *  (4) 직원 필터는 행위자 OR 대상으로 걸되, 기관 격리는 그 바깥 AND에 둔다
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -22,6 +23,8 @@ vi.mock('firebase/firestore', () => ({
     where: vi.fn((field: string, op: string, value: unknown) => ({ _type: 'where', field, op, value })),
     orderBy: vi.fn((field: string, dir?: string) => ({ _type: 'orderBy', field, dir })),
     limit: vi.fn((n: number) => ({ _type: 'limit', n })),
+    and: vi.fn((...filters: unknown[]) => ({ _type: 'and', filters })),
+    or: vi.fn((...filters: unknown[]) => ({ _type: 'or', filters })),
     startAfter: vi.fn((cursor: unknown) => ({ _type: 'startAfter', cursor })),
     getDocs: vi.fn(),
     Timestamp: {
@@ -165,5 +168,32 @@ describe('firestore/auditLogs', () => {
         vi.mocked(fs.getDocs).mockRejectedValue(new Error('permission-denied'));
         await expect(getAuditLogs('org-1')).rejects.toThrow('permission-denied');
         expect(captureError).toHaveBeenCalled();
+    });
+
+    describe('직원 필터', () => {
+        it('직원을 고르면 기관 격리 AND (행위자 == uid OR 대상에 uid 포함)으로 조회한다', async () => {
+            await getAuditLogs('org-1', { uid: 'u1', kind: 'change', since: new Date('2026-09-01') });
+
+            const [composite, ...rest] = lastConstraints() as unknown as Array<{ _type: string; filters: Array<Record<string, unknown>> }>;
+            expect(composite._type).toBe('and');
+            expect(composite.filters).toContainEqual({ _type: 'where', field: 'organizationId', op: '==', value: 'org-1' });
+            expect(composite.filters).toContainEqual({ _type: 'where', field: 'action', op: 'in', value: ['create', 'update', 'delete'] });
+            expect(composite.filters).toContainEqual({
+                _type: 'or',
+                filters: [
+                    { _type: 'where', field: 'actorUid', op: '==', value: 'u1' },
+                    { _type: 'where', field: 'subjectUids', op: 'array-contains', value: 'u1' },
+                ],
+            });
+            // 정렬·상한은 필터 바깥에 그대로 붙는다
+            expect(rest).toContainEqual({ _type: 'orderBy', field: 'at', dir: 'desc' });
+            expect(rest).toContainEqual({ _type: 'limit', n: AUDIT_LOG_PAGE_SIZE });
+        });
+
+        it('직원을 고르지 않으면 OR 필터를 만들지 않는다', async () => {
+            await getAuditLogs('org-1');
+            expect(fs.or).not.toHaveBeenCalled();
+            expect(fs.and).not.toHaveBeenCalled();
+        });
     });
 });
