@@ -25,3 +25,17 @@ export function actorStamp(): { lastEditedByUid?: string } {
     const uid = auth.currentUser?.uid;
     return uid ? { lastEditedByUid: uid } : {};
 }
+
+/**
+ * 예약용 스탬프 — 행위자에 **이번 쓰기의 고유 ID**(`lastEditId`)를 붙인다.
+ *
+ * 예약은 서버도 자주 고친다(캘린더 동기화·상태 일괄 전환). 그 쓰기는 스탬프를 건드리지 않으므로
+ * `lastEditedByUid`만으로는 서버 변경이 마지막으로 손댄 직원에게 귀속된다. 감사 트리거는
+ * `lastEditId`가 바뀐 쓰기에서만 행위자를 인정하고, Rules는 둘 중 하나라도 바뀌면 uid가 본인이어야
+ * 한다고 강제한다. 문자열이라 오프라인 큐(IndexedDB)에 그대로 담긴다.
+ */
+export function reservationActorStamp(): { lastEditedByUid?: string; lastEditId?: string } {
+    const stamp = actorStamp();
+    if (!stamp.lastEditedByUid) return {};
+    return { ...stamp, lastEditId: crypto.randomUUID() };
+}

@@ -165,6 +165,7 @@ export {
     auditDriveLogCreated, auditDriveLogUpdated, auditDriveLogDeleted,
     auditUserCreated, auditUserUpdated, auditUserDeleted,
     auditVehicleDeleted,
+    auditReservationCreated, auditReservationUpdated, auditReservationDeleted,
 } from "./handlers/triggers/auditLog";
 
 // 구글 캘린더 온디맨드 동기화 API

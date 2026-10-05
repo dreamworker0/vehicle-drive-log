@@ -12,6 +12,7 @@ import { createZodConverter, reservationSchema } from '../../schemas';
 import type { Reservation } from '../../types/reservation';
 import { captureError } from '../sentry';
 import { enqueue } from '../offline/syncQueue';
+import { reservationActorStamp } from './actorStamp';
 
 const functions = firebaseFunctions;
 
@@ -146,6 +147,7 @@ export const cancelReservation = async (reservationId: string) => {
     try {
         await updateDoc(reservationDoc(reservationId), {
             status: 'cancelled',
+            ...reservationActorStamp(),
         });
     } catch (error) {
         captureError(error, { context: 'cancelReservation', reservationId });
@@ -241,6 +243,8 @@ export const updateReservationStatus = async (
 ) => {
     try {
         const reservationRef = reservationDoc(reservationId);
+        // 접속기록의 '계정' — 오프라인 큐로 미뤄져도 같은 값이 실리도록 한 번만 만든다
+        const stamp = reservationActorStamp();
         
         // 운행 종료 등 사용자가 직접 업데이트하는 경우, 오프라인 큐 및 즉각적인 UI 반영(낙관적 업데이트)을 위해 일반 updateDoc 사용.
         // expectedCurrentStatus가 들어오는 경우(관리자 승인 등)만 동시성 방어를 위해 트랜잭션(온라인 한정) 사용.
@@ -248,13 +252,14 @@ export const updateReservationStatus = async (
             const promise = updateDoc(reservationRef, {
                 status,
                 ...extraData,
+                ...stamp,
             });
             const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
             if (!isOffline) {
                 await promise;
             } else {
                 promise.catch(e => console.error('[Firestore Offline Sync Error]', e));
-                await enqueue('UPDATE', 'reservations', reservationId, { status, ...extraData });
+                await enqueue('UPDATE', 'reservations', reservationId, { status, ...extraData, ...stamp });
                 if (typeof window !== 'undefined' && 'serviceWorker' in navigator && 'SyncManager' in window) {
                     navigator.serviceWorker.ready.then(reg => {
                         const syncReg = reg as ServiceWorkerRegistration & { sync?: { register: (tag: string) => Promise<void> } };
@@ -279,6 +284,7 @@ export const updateReservationStatus = async (
             transaction.update(reservationRef, {
                 status,
                 ...extraData,
+                ...stamp,
             });
         });
     } catch (error) {
@@ -416,9 +422,10 @@ const batchGroupAction = async (
         );
         const batch = writeBatch(db);
         let cancelled = 0;
+        // 같은 일괄 처리라도 문서마다 고유 ID가 필요하다 — 트리거가 문서별로 "이번에 새로 찍혔나"를 본다
         active.forEach(r => {
             if (action === 'cancel') {
-                batch.update(reservationDoc(r.id), { status: 'cancelled' });
+                batch.update(reservationDoc(r.id), { status: 'cancelled', ...reservationActorStamp() });
             } else if (action === 'complete') {
                 // 도착일보다 **뒤인 날짜는 아예 타지 않은 날**이라 완료가 아니라 취소다.
                 //
@@ -433,7 +440,7 @@ const batchGroupAction = async (
                 // 즉 보이지도, 풀리지도 않는 예약이 남아 관리자 개입 없이는 복구되지 않는다.
                 // cancelled로 보내면 겹침 검사가 곧바로 제외하므로 차량이 즉시 풀린다.
                 if (arrivalDate && r.date > arrivalDate) {
-                    batch.update(reservationDoc(r.id), { status: 'cancelled' });
+                    batch.update(reservationDoc(r.id), { status: 'cancelled', ...reservationActorStamp() });
                     cancelled++;
                     return;
                 }
@@ -444,7 +451,7 @@ const batchGroupAction = async (
                 // completed로 바꾸면 그 조건에 **새로** 걸린다 — 운행일지의 reservationId는 실제로
                 // 출발한 날의 문서를 가리키기 때문이다. 상태만 닫으면 조용하던 예약이 울기 시작한다.
                 // (cancelled는 두 알림 쿼리 어디에도 걸리지 않아 이 표시가 필요 없다.)
-                batch.update(reservationDoc(r.id), { status: 'completed', driveLogReminderSent: true });
+                batch.update(reservationDoc(r.id), { status: 'completed', driveLogReminderSent: true, ...reservationActorStamp() });
             } else {
                 batch.delete(reservationDoc(r.id));
             }

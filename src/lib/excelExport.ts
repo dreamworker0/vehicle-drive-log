@@ -374,7 +374,7 @@ export async function downloadAuditLogsExcel(
         '행위자': nameOf(log.actorUid),
         '행위자 확인': ACTOR_SOURCE_NOTE[log.actorSource] || '확정',
         '대상 직원': log.subjectUids.map((uid) => nameOf(uid)).join(', '),
-        '바뀐 항목': describeChangedFields(log.changedFields),
+        '바뀐 항목': describeChangedFields(log.changedFields, log.targetType),
         '접속지 IP': log.ip || '',
         '접속 환경': log.userAgent || '',
         '반출 대상': describeExportTarget(log),

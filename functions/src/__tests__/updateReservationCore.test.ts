@@ -112,7 +112,8 @@ describe('updateReservationTx (코어)', () => {
         it('관리자는 같은 기관 직원의 예약을 수정할 수 있다', async () => {
             setup();
             await expect(updateReservationTx({ ...ADMIN, destination: '복지관' })).resolves.toMatchObject({ status: 'reserved' });
-            expect(reservationWrite()).toEqual({ destination: '복지관' });
+            // 대리 수정은 예약자가 아니라 실제로 고친 관리자가 행위자다
+            expect(reservationWrite()).toEqual({ destination: '복지관', lastEditedByUid: 'adm1', lastEditId: expect.any(String) });
         });
 
         it('직원은 명의를 바꿀 수 없다', async () => {
@@ -131,7 +132,7 @@ describe('updateReservationTx (코어)', () => {
             setup({ reservation: { ...TARGET, status: 'completed' } });
             const result = await updateReservationTx({ ...EMP, purpose: '업무', vehicleId: 'v1', startTime: '09:00' });
             expect(result).toEqual({ status: 'completed', requiresReapproval: false });
-            expect(reservationWrite()).toEqual({ purpose: '업무' });
+            expect(reservationWrite()).toEqual({ purpose: '업무', lastEditedByUid: 'emp1', lastEditId: expect.any(String) });
             // 차량을 읽지도 잠그지도 않는다
             expect(mockTransactionUpdate.mock.calls.some(([ref]) => ref.col === 'vehicles')).toBe(false);
         });
@@ -229,7 +230,10 @@ describe('updateReservationTx (코어)', () => {
         it('recurringGroupId를 지우고 새 다일 그룹을 붙인다', async () => {
             setup();
             await updateReservationTx({ ...EMP, detachRecurring: true, groupId: 'grp_1', destination: 'x' });
-            expect(reservationWrite()).toEqual({ destination: 'x', recurringGroupId: '__delete__', groupId: 'grp_1' });
+            expect(reservationWrite()).toEqual({
+                destination: 'x', recurringGroupId: '__delete__', groupId: 'grp_1',
+                lastEditedByUid: 'emp1', lastEditId: expect.any(String),
+            });
         });
 
         it('떼어내지 않으면서 groupId만 바꿀 수는 없다', async () => {

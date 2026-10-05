@@ -2,9 +2,9 @@
 
 > **자동 생성 문서** — `scripts/generate-functions-doc.ts`로 생성됨
 >
-> 마지막 업데이트: 2026. 10. 3. 오전 10:41:42
+> 마지막 업데이트: 2026. 10. 5. 오후 12:31:27
 >
-> 총 함수 수: **77개**
+> 총 함수 수: **80개**
 
 ---
 
@@ -514,7 +514,7 @@
 
 ## 📝 Firestore onCreate
 
-> 총 9개
+> 총 10개
 
 ### `onReservationCreated`
 
@@ -596,6 +596,14 @@
 | **인증** | 시스템 자동 실행 |
 | **비고** | users/{userId} |
 
+### `auditReservationCreated`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/triggers/auditLog.ts` |
+| **설명** | 예약 생성을 감사 로그(auditLogs)에 기록 — 행위자는 콜러블이 남긴 호출자(lastEditedByUid), 정보주체는 예약자·직원 동승자, 차량 포함 |
+| **인증** | 시스템 자동 실행 |
+
 ---
 
 ## ✏️ Firestore onWrite
@@ -640,7 +648,7 @@
 
 ## 🔄 Firestore onUpdate
 
-> 총 5개
+> 총 6개
 
 ### `onHipassChargeUpdated`
 
@@ -683,11 +691,19 @@
 | **설명** | 사용자 개인정보 변경 이력을 접속기록(accessLogs)에 기록 |
 | **인증** | 시스템 자동 실행 |
 
+### `auditReservationUpdated`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/triggers/auditLog.ts` |
+| **설명** | 예약의 일정·차량·상태·목적지·동승자 등 화이트리스트 필드 변경을 필드명만 기록 — 이번 쓰기가 새 lastEditId를 찍었을 때만 행위자로 인정(서버 쓰기의 무고한 귀속 방지) |
+| **인증** | 시스템 자동 실행 |
+
 ---
 
 ## 🗑️ Firestore onDelete
 
-> 총 6개
+> 총 7개
 
 ### `onHipassChargeDeleted`
 
@@ -736,6 +752,14 @@
 |------|------|
 | **파일** | `functions/src/handlers/triggers/auditLog.ts` |
 | **설명** | 차량 문서 삭제 사실을 감사 로그(auditLogs)에 기록 — 월간 참조 무결성 점검이 삭제된 차량의 보존 운행일지를 위반과 가르는 근거 |
+| **인증** | 시스템 자동 실행 |
+
+### `auditReservationDeleted`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/triggers/auditLog.ts` |
+| **설명** | 예약 삭제를 감사 로그에 기록 — 삭제자는 unknown, 예약자·동승자·차량은 남긴다 |
 | **인증** | 시스템 자동 실행 |
 
 ---

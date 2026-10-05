@@ -14,6 +14,7 @@
  *
  * 메신저 어시스턴트의 날짜·시간 수정은 modifyReservationCore가 따로 맡는다(본인 예약만·차량 변경 없음).
  */
+import { randomUUID } from "crypto";
 import { HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import type { DocumentData, DocumentReference } from "firebase-admin/firestore";
@@ -280,6 +281,9 @@ export async function updateReservationTx(
                 transaction.update(vehicleRef, { _lastReservationLock: FieldValue.serverTimestamp() });
             }
             if (Object.keys(update).length > 0) {
+                // 접속기록의 '계정' — 새 lastEditId가 있어야 감사 트리거가 이 쓰기의 행위자로 인정한다
+                update.lastEditedByUid = actorUid;
+                update.lastEditId = randomUUID();
                 transaction.update(ref, update);
             }
 

@@ -25,6 +25,7 @@ export const TARGET_LABEL: Record<AuditTargetType, string> = {
     session: '로그인',
     export: '내보내기',
     orgDocument: '기관 증빙서류',
+    reservation: '예약',
 };
 
 /** 반출 대상 — 서버(recordExport)의 DATASETS 화이트리스트와 1:1 */
@@ -76,10 +77,28 @@ export function describeEvent(log: Pick<AuditLog, 'action' | 'targetType'>): str
     return `${TARGET_LABEL[log.targetType]} ${ACTION_LABEL[log.action]}`;
 }
 
+/**
+ * 예약에서 뜻이 달라지는 필드 — 같은 `status`라도 사용자는 '계정 상태', 예약은 '예약 상태'다.
+ * 서버(AUDITED_FIELDS.reservation)와 1:1.
+ */
+const RESERVATION_FIELD_LABEL: Record<string, string> = {
+    reservedByUid: '예약자',
+    reservedByName: '예약자 이름',
+    vehicleId: '차량',
+    date: '예약일',
+    startTime: '시작 시각',
+    endTime: '종료 시각',
+    status: '예약 상태',
+    passengerUids: '동승자',
+    passengerNames: '동승자 이름',
+    rejectedReason: '반려 사유',
+};
+
 /** 바뀐 항목 이름 목록 — 값은 애초에 기록하지 않으므로 이름만 나온다 */
-export function describeChangedFields(fields?: string[]): string {
+export function describeChangedFields(fields?: string[], targetType?: AuditTargetType): string {
     if (!fields?.length) return '';
-    return fields.map((f) => FIELD_LABEL[f] ?? f).join(', ');
+    const override = targetType === 'reservation' ? RESERVATION_FIELD_LABEL : {};
+    return fields.map((f) => override[f] ?? FIELD_LABEL[f] ?? f).join(', ');
 }
 
 /** `운행일지 · 엑셀 파일`처럼 반출 대상과 형식을 한 줄로 */

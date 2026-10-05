@@ -11,6 +11,7 @@ import { db } from '../firebase';
 import { captureError } from '../sentry';
 import { createZodConverter, maintenanceSchema } from '../../schemas';
 import { invalidateCache } from './cache';
+import { reservationActorStamp } from './actorStamp';
 
 // 읽기 경로에 스키마 검증을 건다 (원시 캐스팅 대체 — fuelLogs와 동일한 이유).
 const maintenanceRef = () => collection(db, 'maintenanceRecords').withConverter(createZodConverter(maintenanceSchema));
@@ -179,7 +180,7 @@ export const cancelVehicleReservations = async (orgId: string, vehicleId: string
 
         // 일괄 취소 + 예약자에게 알림 발송
         for (const res of targets) {
-            await updateDoc(doc(db, 'reservations', res.id), { status: 'cancelled' });
+            await updateDoc(doc(db, 'reservations', res.id), { status: 'cancelled', ...reservationActorStamp() });
             await addDoc(collection(db, 'notifications'), {
                 targetUid: res.reservedByUid,
                 title: '예약 자동 취소 안내',

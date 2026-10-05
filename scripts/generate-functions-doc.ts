@@ -668,6 +668,27 @@ const FUNCTIONS: FunctionEntry[] = [
     description: '차량 문서 삭제 사실을 감사 로그(auditLogs)에 기록 — 월간 참조 무결성 점검이 삭제된 차량의 보존 운행일지를 위반과 가르는 근거',
     auth: '시스템 자동 실행',
   },
+  {
+    name: 'auditReservationCreated',
+    type: 'onDocumentCreated',
+    file: 'handlers/triggers/auditLog.ts',
+    description: '예약 생성을 감사 로그(auditLogs)에 기록 — 행위자는 콜러블이 남긴 호출자(lastEditedByUid), 정보주체는 예약자·직원 동승자, 차량 포함',
+    auth: '시스템 자동 실행',
+  },
+  {
+    name: 'auditReservationUpdated',
+    type: 'onDocumentUpdated',
+    file: 'handlers/triggers/auditLog.ts',
+    description: '예약의 일정·차량·상태·목적지·동승자 등 화이트리스트 필드 변경을 필드명만 기록 — 이번 쓰기가 새 lastEditId를 찍었을 때만 행위자로 인정(서버 쓰기의 무고한 귀속 방지)',
+    auth: '시스템 자동 실행',
+  },
+  {
+    name: 'auditReservationDeleted',
+    type: 'onDocumentDeleted',
+    file: 'handlers/triggers/auditLog.ts',
+    description: '예약 삭제를 감사 로그에 기록 — 삭제자는 unknown, 예약자·동승자·차량은 남긴다',
+    auth: '시스템 자동 실행',
+  },
 
   // ── Auth 트리거 ──
   {
