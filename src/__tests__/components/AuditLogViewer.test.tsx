@@ -146,6 +146,18 @@ describe('AuditLogViewer', () => {
         expect(screen.getByText('2026.10.01 07:30 · 스타리아 · 복지관 → 시청')).toBeInTheDocument();
     });
 
+    it('운행일 문자열이 없는 운행일지는 운행 시각의 날짜를 쓴다 (날짜 없이 시각만 보이던 문제)', () => {
+        setHook({
+            logs: [log({ action: 'create' })],
+            driveLogOf: () => ({
+                id: 'dl-1', timestamp: new Date('2026-09-30T11:52:00+09:00'), startTime: '11:52',
+                vehicleDisplayName: '스타리아4347', startLocation: '본관', destination: '서울역',
+            } as unknown as ReturnType<UseAuditLogsResult['driveLogOf']>),
+        });
+        render(<AuditLogViewer />);
+        expect(screen.getByText('2026.09.30 11:52 · 스타리아4347 · 본관 → 서울역')).toBeInTheDocument();
+    });
+
     it('삭제돼 원본이 없는 운행일지는 확인할 수 없다고 알리고, 읽는 중에는 아무것도 붙이지 않는다', () => {
         setHook({
             logs: [log({ id: 'l1', targetId: 'gone' }), log({ id: 'l2', targetId: 'loading' })],
