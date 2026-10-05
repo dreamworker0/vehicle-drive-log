@@ -36,6 +36,18 @@ service cloud.firestore {
     }
 
     /**
+     * 예약 스탬프 — `lastEditId`(이번 쓰기의 고유 ID)까지 함께 묶는다.
+     *
+     * 감사 트리거는 lastEditId가 바뀐 쓰기에서만 lastEditedByUid를 행위자로 인정한다. 그러니
+     * **lastEditId만 바꾸고 uid는 남의 것을 그대로 두는 쓰기**가 열려 있으면, 지난번 수정자에게
+     * 이번 변경을 떠넘길 수 있다. 둘 중 하나라도 건드리면 uid가 본인이어야 한다.
+     */
+    function reservationStampValid() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['lastEditedByUid', 'lastEditId'])
+             || request.resource.data.lastEditedByUid == request.auth.uid;
+    }
+
+    /**
      * 도착 km는 출발 km보다 크거나 같아야 한다.
      *
      * 화면은 이미 막는다(validateDriveLogForm) — 오타는 여기까지 오지 않는다. 그래도 두는
@@ -377,7 +389,7 @@ service cloud.firestore {
                || from in ['reserved', 'in_progress', 'in_use'];
       }
       allow update: if isSuperAdmin()
-                    || (belongsToMyOrg() && (
+                    || (belongsToMyOrg() && reservationStampValid() && (
                         // 소유자는 취소·운행 시작/종료·정보(목적지·목적·동승자) 수정만 가능.
                         //
                         // 일정·차량·그룹은 직접 바꾸지 못한다 — updateReservationSafe(콜러블) 전용이다.

@@ -686,6 +686,35 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
   });
 
 
+  it('10-4b. 예약 스탬프(lastEditedByUid + lastEditId) — 이번 쓰기 ID만 바꿔 남에게 떠넘기기 차단', async () => {
+    // 감사 트리거는 lastEditId가 바뀐 쓰기에서만 스탬프를 행위자로 인정한다(서버 쓰기의 무고한 귀속 방지).
+    // 그래서 lastEditId만 새로 찍고 uid는 지난 수정자 것을 두는 쓰기를 막아야 한다.
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('reservations').doc('res_stamp').set({
+        organizationId: 'org-A', vehicleId: 'v_A', reservedByUid: 'user_A', status: 'reserved',
+        date: '2026-10-10', startTime: '09:00', endTime: '10:00',
+        lastEditedByUid: 'user_T', lastEditId: 'old',
+      });
+    });
+    const ownerA = setupContext('user_A', { role: 'member', orgId: 'org-A' }).firestore();
+    const adminA = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+    const owned = ownerA.collection('reservations').doc('res_stamp');
+    const asAdmin = adminA.collection('reservations').doc('res_stamp');
+
+    // (1) 저장된 스탬프가 남(user_T)의 것일 때 새 ID만 찍기 → 차단 (지난 수정자에게 떠넘기기)
+    await assertFails(owned.update({ destination: '시청', lastEditId: 'e2' }));
+    // (2) 본인 uid + 새 ID → 허용
+    await assertSucceeds(owned.update({ destination: '구청', lastEditedByUid: 'user_A', lastEditId: 'e1' }));
+    // (3) 남의 uid로 위조 → 차단
+    await assertFails(owned.update({ destination: '남산', lastEditedByUid: 'user_T', lastEditId: 'e3' }));
+    // (4) 관리자도 본인 명의만
+    await assertSucceeds(asAdmin.update({ status: 'cancelled', lastEditedByUid: 'admin_A', lastEditId: 'e4' }));
+    await assertFails(asAdmin.update({ status: 'reserved', lastEditedByUid: 'user_A', lastEditId: 'e5' }));
+    // (5) 스탬프를 건드리지 않는 쓰기 → 허용 (트리거는 행위자를 unknown으로 남긴다)
+    await assertSucceeds(asAdmin.update({ reservedByName: '직원A' }));
+  });
+
+
   it('10-5. 전체 공지 이력(broadcasts) — 클라이언트 쓰기 전면 차단, 읽기는 운영자만', async () => {
     // sendBroadcastNotice(Admin SDK)만 기록한다. 발송자 uid가 담기므로 읽기도 운영자 한정.
     await testEnv.withSecurityRulesDisabled(async (context) => {

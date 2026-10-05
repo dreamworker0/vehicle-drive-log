@@ -44,7 +44,8 @@ vi.mock('firebase/functions', () => ({
 }));
 
 // ── 앱 모듈 mock ──
-vi.mock('../../../lib/firebase', () => ({ db: {}, firebaseFunctions: {}, auth: { currentUser: null } }));
+const mockAuth = vi.hoisted(() => ({ currentUser: null as { uid: string } | null }));
+vi.mock('../../../lib/firebase', () => ({ db: {}, firebaseFunctions: {}, auth: mockAuth }));
 vi.mock('../../../lib/sentry', () => ({ captureError: vi.fn() }));
 vi.mock('../../../lib/firestore/cache', () => ({
     cachedQuery: vi.fn((_k: string, f: () => unknown) => f()),
@@ -185,6 +186,19 @@ describe('firestore/reservations', () => {
             await cancelReservation('r1');
 
             expect(fs.updateDoc).toHaveBeenCalledWith(expect.anything(), { status: 'cancelled' });
+        });
+
+        // 접속기록의 '계정' — 취소한 사람이 남아야 "누가 차를 풀었나"를 점검할 수 있다
+        it('로그인 상태의 취소는 행위자 스탬프와 이번 쓰기 ID를 함께 남긴다', async () => {
+            mockAuth.currentUser = { uid: 'user-1' };
+            try {
+                await cancelReservation('r1');
+                expect(fs.updateDoc).toHaveBeenCalledWith(expect.anything(), {
+                    status: 'cancelled', lastEditedByUid: 'user-1', lastEditId: expect.any(String),
+                });
+            } finally {
+                mockAuth.currentUser = null;
+            }
         });
 
         // 수정은 생성처럼 콜러블을 거친다 — 직접 updateDoc하던 동안 승인된 예약의 일정·차량을

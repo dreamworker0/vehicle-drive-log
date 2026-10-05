@@ -40,7 +40,7 @@ import { timestampSchema } from './common';
 export const auditActionSchema = z.enum(['create', 'update', 'delete', 'login', 'export', 'read']);
 
 /** 기록 대상 — 개인정보를 담는 컬렉션, 로그인 세션, 반출, 기관 증빙서류 */
-export const auditTargetTypeSchema = z.enum(['driveLog', 'user', 'vehicle', 'session', 'export', 'orgDocument']);
+export const auditTargetTypeSchema = z.enum(['driveLog', 'user', 'vehicle', 'session', 'export', 'orgDocument', 'reservation']);
 
 /**
  * 행위자를 어떻게 알아냈는지 — 기록의 신뢰 수준을 스스로 구분한다.

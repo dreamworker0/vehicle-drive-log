@@ -85,7 +85,7 @@ function LogDetail({ log, nameOf, driveLogOf }: {
         if (typeof log.recordCount === 'number') rows.push(['반출 건수', `${log.recordCount.toLocaleString()}건`]);
     }
 
-    const changed = describeChangedFields(log.changedFields);
+    const changed = describeChangedFields(log.changedFields, log.targetType);
     if (changed) rows.push(['바뀐 항목', changed]);
 
     if (log.subjectUids.length > 0) {

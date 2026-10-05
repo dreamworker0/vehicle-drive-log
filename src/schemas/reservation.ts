@@ -77,5 +77,9 @@ export const reservationSchema = z.object({
     /** 연결된 Google 캘린더 이벤트 id — 캘린더 동기화(Functions)가 심는다 */
     calendarEventId: z.string().optional().catch(undefined),
     createdAt: timestampSchema.optional().catch(undefined),
+    /** 접속기록의 '계정' — 마지막으로 고친 사람. Rules가 본인 uid만 허용한다(reservationActorStamp) */
+    lastEditedByUid: z.string().optional().catch(undefined),
+    /** 이번 쓰기의 고유 ID — 감사 트리거가 이 값이 바뀐 쓰기에서만 위 행위자를 인정한다 */
+    lastEditId: z.string().optional().catch(undefined),
     expiresAt: timestampSchema.optional().catch(undefined),
 });

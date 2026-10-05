@@ -10,6 +10,7 @@
  *   - 같은 org+vehicle+date 시간 겹침 검사
  *   - 같은 org+명의자+date 시간 겹침 검사 (한 사람은 같은 시간에 한 대만)
  */
+import { randomUUID } from "crypto";
 import { HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { isVehicleBlockedOn, isVehicleRetired, seoulTodayStr } from "../../utils/vehicleStatus";
@@ -339,6 +340,9 @@ export async function createReservationTx(
                 ...(isQuickDrive ? { isQuickDrive: true } : {}),
                 status,
                 createdAt: FieldValue.serverTimestamp(),
+                // 접속기록의 '계정' — 대리 예약이면 예약자가 아니라 실제로 만든 사람이다
+                lastEditedByUid: actorUid,
+                lastEditId: randomUUID(),
             });
 
             return { reservationId: newRef.id, status };
