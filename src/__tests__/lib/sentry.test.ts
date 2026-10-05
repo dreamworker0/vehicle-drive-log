@@ -59,6 +59,52 @@ describe('initSentry — 릴리즈 태깅', () => {
 });
 
 /**
+ * 루프백 주소 — CI e2e·Lighthouse가 실제 DSN으로 빌드한 앱을 localhost에서 돌린다.
+ * 그 실행의 에러가 프로덕션 이슈로 올라왔다(JAVASCRIPT-REACT-6K). jsdom의 주소는 localhost다.
+ */
+describe('initSentry — 루프백 주소의 프로덕션 빌드', () => {
+    beforeEach(() => {
+        vi.resetModules();
+        vi.stubEnv('VITE_SENTRY_DSN', DSN);
+    });
+
+    afterEach(() => {
+        vi.unstubAllEnvs();
+        vi.doUnmock('../../lib/sentryClient');
+    });
+
+    it('프로덕션 빌드가 localhost에서 돌면 SDK를 띄우지 않는다', async () => {
+        vi.stubEnv('PROD', true);
+        const init = vi.fn();
+        // loadSentry와 같은 모양이어야 한다 — 빠진 함수가 있으면 init 인자를 만들다 예외로
+        // 끝나 init이 불리지 않고, 가드가 없어도 이 테스트가 통과해 버린다
+        vi.doMock('../../lib/sentryClient', () => ({
+            init,
+            setUser: vi.fn(),
+            setTag: vi.fn(),
+            captureException: vi.fn(),
+            setMeasurement: vi.fn(),
+            browserTracingIntegration: vi.fn(() => ({ name: 'BrowserTracing' })),
+        }));
+        const mod = await import('../../lib/sentry');
+
+        mod.initSentry();
+        // SDK는 동적 import로 뜬다 — 그 로드가 끝날 만큼 기다린 뒤에도 init이 없어야 한다
+        await import('../../lib/sentryClient');
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        expect(location.hostname).toBe('localhost');
+        expect(init).not.toHaveBeenCalled();
+    });
+
+    it('개발·테스트 모드에서는 localhost여도 기존대로 띄운다', async () => {
+        vi.stubEnv('PROD', false);
+        const options = await loadSentry();
+        expect(options.dsn).toBe(DSN);
+    });
+});
+
+/**
  * ignoreErrors — 종료(teardown) 레이스 노이즈
  *
  * Firestore를 의도적으로 `terminate()`하는 경로(logout→clearOfflineCache)에서 SDK 내부
