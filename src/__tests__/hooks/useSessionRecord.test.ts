@@ -18,12 +18,16 @@ const mocks = vi.hoisted(() => ({
     captureError: vi.fn(),
     /** Firebase Auth의 현재 사용자 — 보고 시점에 세션이 남아 있는지 판정하는 값 */
     firebaseAuth: { currentUser: null as { uid: string } | null },
+    appCheckBlock: null as { code: string; at: number } | null,
 }));
 
 vi.mock('firebase/functions', () => ({
     httpsCallable: () => mocks.callable,
 }));
-vi.mock('../../lib/firebase', () => ({ firebaseFunctions: {}, db: {}, auth: mocks.firebaseAuth }));
+vi.mock('../../lib/firebase', () => ({
+    firebaseFunctions: {}, db: {}, auth: mocks.firebaseAuth,
+    getAppCheckBlock: () => mocks.appCheckBlock,
+}));
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => mocks.auth }));
 vi.mock('../../lib/sentry', () => ({ captureError: mocks.captureError }));
 
@@ -36,6 +40,7 @@ beforeEach(() => {
     mocks.auth.user = null;
     mocks.auth.userDocState = 'pending';
     mocks.firebaseAuth.currentUser = null;
+    mocks.appCheckBlock = null;
 });
 
 describe('useSessionRecord', () => {
@@ -181,6 +186,21 @@ describe('useSessionRecord', () => {
 
         await waitFor(() => expect(mocks.captureError).toHaveBeenCalled());
         expect(mocks.captureError.mock.calls[0][1]).toMatchObject({ context: 'useSessionRecord', uid: 'u1' });
+    });
+
+    it('로그인 중 Unauthenticated 보고에는 App Check 차단 상태를 싣는다 (원인 구분용)', async () => {
+        mocks.auth.user = { uid: 'u1' };
+        mocks.auth.userDocState = 'present';
+        mocks.firebaseAuth.currentUser = { uid: 'u1' };
+        mocks.appCheckBlock = { code: 'appCheck/throttled', at: 1 };
+        mocks.callable.mockRejectedValue(
+            Object.assign(new Error('Unauthenticated'), { code: 'functions/unauthenticated' })
+        );
+
+        renderHook(() => useSessionRecord());
+
+        await waitFor(() => expect(mocks.captureError).toHaveBeenCalled());
+        expect(mocks.captureError.mock.calls[0][1]).toMatchObject({ appCheckCode: 'appCheck/throttled' });
     });
 
     it('응답이 늦으면 같은 sessionId로 다시 부른다 — 서버가 같은 문서를 덮어쓴다', async () => {

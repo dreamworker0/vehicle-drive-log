@@ -54,6 +54,22 @@ describe('captureError / captureWarning — 개인정보 스크러빙 배선', (
         vi.doUnmock('../../lib/sentryClient');
     });
 
+    // 로그아웃 확정이 곧바로 setSentryUser(null)을 부른다. 보고를 다음 틱으로 미루면 사용자
+    // 없이 나간다(JAVASCRIPT-REACT-66 "0 users") — SDK가 떠 있으면 호출한 그 자리에서 보내야 한다.
+    it('SDK가 로드된 뒤에는 호출 즉시 보낸다 — 직후 사용자를 지워도 보고에는 사용자가 남는다', async () => {
+        const { mod, captureException, captureMessage, setUser } = await loadSentry();
+
+        mod.captureError(new Error('[Auth] 예기치 않은 세션 종료'), { context: 'signOut' });
+        mod.captureWarning('[Auth] 세션 종료 — token-invalidated', { context: 'signOut' });
+        expect(captureException).toHaveBeenCalledTimes(1);
+        expect(captureMessage).toHaveBeenCalledTimes(1);
+
+        mod.setSentryUser(null);
+        const order = setUser.mock.invocationCallOrder;
+        expect(order[order.length - 1])
+            .toBeGreaterThan(captureException.mock.invocationCallOrder[0]);
+    });
+
     it('captureError가 extra의 자유 입력을 지우고 보낸다', async () => {
         const { mod, captureException } = await loadSentry();
 

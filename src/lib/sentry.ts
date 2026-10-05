@@ -437,7 +437,11 @@ export function captureError(error: unknown, context: Record<string, unknown> = 
         // 아래 console 출력은 원본 그대로 둔다(개발자 도구에서의 진단이 우선) — 그것이
         // breadcrumb으로 새는 경로는 init의 beforeBreadcrumb이 따로 막는다.
         const safeContext = scrubContext(context);
-        sentryLoading.then((Sentry) => Sentry?.captureException(error, { extra: safeContext }));
+        // SDK가 이미 떠 있으면 **바로** 보낸다. 다음 틱으로 미루면 그 사이 호출부가 사용자를
+        // 지울 수 있다 — 로그아웃 확정 직후 setSentryUser(null)이 먼저 돌아 세션 종료 보고가
+        // 사용자 없이 나갔다(JAVASCRIPT-REACT-66 "0 users"). 미루는 것은 로드 중일 때뿐이다.
+        if (sentry) sentry.captureException(error, { extra: safeContext });
+        else sentryLoading.then((Sentry) => Sentry?.captureException(error, { extra: safeContext }));
     }
     console.error(error);
 }
@@ -453,7 +457,9 @@ export function captureError(error: unknown, context: Record<string, unknown> = 
 export function captureWarning(message: string, context: Record<string, unknown> = {}) {
     if (SENTRY_DSN && sentryLoading) {
         const safeContext = scrubContext(context);
-        sentryLoading.then((Sentry) => Sentry?.captureMessage(message, { level: 'warning', extra: safeContext }));
+        // captureError와 같은 이유로 SDK가 떠 있으면 바로 보낸다
+        if (sentry) sentry.captureMessage(message, { level: 'warning', extra: safeContext });
+        else sentryLoading.then((Sentry) => Sentry?.captureMessage(message, { level: 'warning', extra: safeContext }));
     }
     console.warn(message, context);
 }
