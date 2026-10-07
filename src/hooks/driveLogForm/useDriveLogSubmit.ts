@@ -2,7 +2,7 @@
  * driveLogForm/useDriveLogSubmit.ts
  * 운행일지 폼의 제출 및 사용자 입력 핸들러 모음
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { createFavorite, getFavorites, getLastVehicleDriveLog } from '../../lib/firestore';
 import { resolveStartKm } from './resolveStartKm';
@@ -11,6 +11,7 @@ import { submitDriveLog, getEmptyForm } from './submitDriveLog';
 import { validateDriveLogForm } from '../utils/driveLogValidation';
 import { validateEditKmRange } from './editKmRange';
 import { validateDriveWindow } from './driveWindow';
+import { findVehicleNameAsDestination } from './destinationGuard';
 import { adjustAdjacentLogs } from './adjustAdjacentLogs';
 import { captureError } from '../../lib/sentry';
 import type { User } from 'firebase/auth';
@@ -35,6 +36,7 @@ export interface SubmitDeps {
     setSelectedPassengers: React.Dispatch<React.SetStateAction<UserDoc[]>>;
     externalPassengerCount: number;
     setExternalPassengerCount: (v: number) => void;
+    setExternalPassengerNames: (v: string) => void;
     externalPassengerNames: string;
     selectedCoDrivers: UserDoc[];
     setSelectedCoDrivers: React.Dispatch<React.SetStateAction<UserDoc[]>>;
@@ -72,6 +74,7 @@ export interface SubmitDeps {
     ) => Promise<T | undefined>;
     startTransition: (scope: () => Promise<void>) => void;
     ocrSuccess: boolean;
+    ocrRecognizedKm?: number | null;
     /** 운행일지에 남길 출발지 이름 — 분관을 등록하지 않은 기관에서는 undefined */
     startLocation?: string;
 }
@@ -81,15 +84,23 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
     const {
         form, setForm, orgId, user, userData, vehicles, selectedVehicle,
         selectedPassengers, setSelectedPassengers, externalPassengerCount, setExternalPassengerCount,
-        externalPassengerNames,
+        externalPassengerNames, setExternalPassengerNames,
         selectedCoDrivers, setSelectedCoDrivers, externalCoDriverNames, setExternalCoDriverNames,
         setFavorites, setShowFavSave, setFavName, setSuccess,
         isElectric, isRetroactive, isEditMode, editLog, reservationData, hipassCard, favName,
         lastDriveLog, nextDriveLog, setLastDriveLog,
-        showToast, runWithRetry, startTransition, ocrSuccess, startLocation
+        showToast, runWithRetry, startTransition, ocrSuccess, ocrRecognizedKm, startLocation
     } = deps;
 
     const [confirmStartKm, setConfirmStartKm] = useState<{ original: number, suggested: number } | null>(null);
+    /** 저장 전에 한 번 물어야 하는 것. null이면 물어볼 것이 없다. */
+    const [confirmBeforeSave, setConfirmBeforeSave] = useState<{ vehicleName: string } | null>(null);
+    /**
+     * 확인을 이미 받았는가. state가 아니라 ref인 이유는 확인 직후 **같은 흐름에서 다시**
+     * `handleSubmit`을 부르기 때문이다 — state였다면 그 호출이 보는 값은 아직 갱신 전이라
+     * 모달이 무한히 다시 뜬다.
+     */
+    const submitConfirmedRef = useRef(false);
     const [kmRangeError, setKmRangeError] = useState<string | null>(null);
 
     const handleVehicleSelect = useCallback(async (vehicleId: string) => {
@@ -169,9 +180,13 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
         });
         setSelectedPassengers([]);
         setExternalPassengerCount(0);
+        // 직접 입력한 동승자 이름도 함께 비운다. 예전에는 이 한 줄이 빠져 있어 이어서 쓰는
+        // 다음 일지에 앞 운행의 이용자 이름이 그대로 남았다(공동 운전자 쪽은 지우고 있었다).
+        // 이제는 이름이 탑승인원에도 세어지므로 인원수까지 함께 틀어진다.
+        setExternalPassengerNames('');
         setSelectedCoDrivers([]);
         setExternalCoDriverNames('');
-    }, [setForm, user, userData, setSelectedPassengers, setExternalPassengerCount, setSelectedCoDrivers, setExternalCoDriverNames]);
+    }, [setForm, user, userData, setSelectedPassengers, setExternalPassengerCount, setExternalPassengerNames, setSelectedCoDrivers, setExternalCoDriverNames]);
 
     // submitDriveLog 재시도 중 발생한 에러 처리. true 반환 시 재시도 중단(에러 무시).
     const handleSubmitError = useCallback((err: unknown): boolean | void => {
@@ -245,6 +260,26 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
             return;
         }
 
+        // ── 목적지 칸 검사 (신규 작성에만) ──
+        //
+        // 수정 모드는 제외한다 — 과거 기록을 손보는 중이라 빈칸이 의도인 경우가 많고,
+        // 여기서 붙잡으면 정정 자체를 방해한다. 근거는 destinationGuard.ts 머리말.
+        //
+        // **막지 않고 묻는다.** 처음에는 "목적지 = 차량명은 의도일 수 없다"며 저장을 막았는데,
+        // 판정은 어디까지나 휴리스틱이다. 차량을 건물 이름으로 부르는 다지점 기관("복지관",
+        // "본관")에서는 지관 → 본관 운행의 목적지가 정말 그 이름이고, 막으면 **사실과 다른
+        // 문자열을 적어야만 저장되는** 막다른 길이 된다. 정확한 기록이라는 목적과 정반대다.
+        if (!isEditMode && !submitConfirmedRef.current) {
+            const vehicleNameHit = findVehicleNameAsDestination(form.destination, selectedVehicle);
+            if (vehicleNameHit) {
+                setConfirmBeforeSave({ vehicleName: vehicleNameHit });
+                return;
+            }
+        }
+        // 이 저장 한 건에만 유효하다. 여기서 바로 내려 두면 오프라인·실패로 폼이 남는 경로에서도
+        // 다음 저장이 다시 묻는다(resetInputs만 믿으면 그 경로에서 확인이 조용히 건너뛰어진다).
+        submitConfirmedRef.current = false;
+
         // ── 수정 모드 범위 검증: 직전/직후 기록의 범위 안에 있는지 확인 ──
         if (isEditMode) {
             const rangeError = validateEditKmRange(form, lastDriveLog, nextDriveLog);
@@ -267,7 +302,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
                         form, orgId, user: user!, userData, selectedVehicle,
                         selectedPassengers, externalPassengerCount, externalPassengerNames,
                         selectedCoDrivers, externalCoDriverNames, isRetroactive,
-                        ocrUsed: ocrSuccess, favoriteUsed: false, isElectric, isEditMode, editLog,
+                        ocrUsed: ocrSuccess, ocrRecognizedKm, favoriteUsed: false, isElectric, isEditMode, editLog,
                         reservationData, hipassCard,
                         isManuallyCorrected,
                         originalStartKm: isManuallyCorrected ? suggestedStartKm : undefined,
@@ -341,7 +376,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
         form, isElectric, showToast, startTransition, runWithRetry,
         orgId, user, userData, selectedVehicle, selectedPassengers, externalPassengerCount,
         externalPassengerNames, selectedCoDrivers, externalCoDriverNames, isRetroactive,
-        ocrSuccess, isEditMode, editLog, startLocation,
+        ocrSuccess, ocrRecognizedKm, isEditMode, editLog, startLocation,
         reservationData, hipassCard, handleSubmitError, setSuccess, navigate, resetInputs,
         lastDriveLog, nextDriveLog
     ]);
@@ -359,12 +394,27 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
         setConfirmStartKm(null);
     }, []);
 
+    /** "이대로 저장" — 확인 표시를 남기고 같은 제출을 다시 태운다. */
+    const handleConfirmBeforeSave = useCallback(() => {
+        submitConfirmedRef.current = true;
+        setConfirmBeforeSave(null);
+        handleSubmit(new Event('submit') as unknown as React.FormEvent);
+    }, [handleSubmit]);
+
+    /** "고치기" — 확인 표시를 남기지 않는다. 고친 뒤 다시 저장하면 그때 또 묻는다. */
+    const handleCancelBeforeSave = useCallback(() => {
+        setConfirmBeforeSave(null);
+    }, []);
+
     const handleDismissKmRangeError = useCallback(() => {
         setKmRangeError(null);
     }, []);
 
     return {
         confirmStartKm,
+        confirmBeforeSave,
+        handleConfirmBeforeSave,
+        handleCancelBeforeSave,
         kmRangeError,
         handleDismissKmRangeError,
         handleConfirmStartKm,

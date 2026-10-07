@@ -1,22 +1,48 @@
 /**
  * useHipassChargeAdmin — 관리자용 하이패스 충전 기록 관리 훅
  * useFuelLogAdmin 패턴 기반
+ *
+ * ## 관리자 정정(수정)
+ * 주유 기록과 같은 이유로 관리자가 직원의 충전 기록을 고칠 수 있다
+ * (배경은 useFuelLogAdmin 주석 참고). 다른 점은 **카드 잔액**이다 — 충전 기록은
+ * 생성 시 카드 잔액을 그만큼 올리므로(useHipassCharge), 금액을 고치면 잔액도 같이
+ * 맞춰야 앱이 들고 있는 잔액이 거짓이 되지 않는다. 차액은 저장 시 확인창에 그대로
+ * 보여 주고, 카드가 이미 삭제됐으면 기록만 고친다.
+ *
+ * 충전자(chargerUid·chargerName)와 카드는 바꾸지 않는다 — 기록의 정체성이라
+ * 틀렸다면 삭제 후 재등록이 맞다.
  */
 import { useState, useMemo } from 'react';
 import { useAuth } from './useAuth';
+import { useToast } from './useToast';
+import { useConfirm } from './useConfirm';
 import type { HipassCharge } from '../types/hipassCharge';
 import useBaseHipassCharge from './base/useBaseHipassCharge';
+import { updateHipassCharge } from '../lib/firestore';
+import { validateNonNegativeFields, parseIntegerInput } from './utils/numberValidation';
+import { MAX_HIPASS_CHARGE_AMOUNT } from '../lib/constants';
+
+/** 수정 폼 값 — 입력 중에는 문자열로 다룬다(저장 직전에 숫자로 바꾼다). */
+export interface HipassChargeEditForm {
+    date: string;
+    chargeAmount: string;
+}
+
+const EMPTY_FORM: HipassChargeEditForm = { date: '', chargeAmount: '' };
 
 export default function useHipassChargeAdmin() {
-    const { userData } = useAuth();
+    const { user, userData } = useAuth();
     const orgId = userData?.organizationId;
+    const { showToast } = useToast();
+    const { confirm } = useConfirm();
 
-    const { 
-        vehicles, 
-        records, 
-        loading, 
-        calculateTotalCharge, 
-        handleDeleteBase 
+    const {
+        vehicles,
+        cards, setCards,
+        records, setRecords,
+        loading,
+        calculateTotalCharge,
+        handleDeleteBase
     } = useBaseHipassCharge(orgId ? orgId : undefined, { isAdmin: true });
 
     const [filters, setFilters] = useState({
@@ -25,6 +51,11 @@ export default function useHipassChargeAdmin() {
         startDate: '',
         endDate: '',
     });
+
+    // 수정 상태 — 편집 중인 기록과 폼
+    const [editingRecord, setEditingRecord] = useState<HipassCharge | null>(null);
+    const [form, setForm] = useState<HipassChargeEditForm>(EMPTY_FORM);
+    const [saving, setSaving] = useState(false);
 
     const filteredRecords = useMemo(() => {
         return records
@@ -95,7 +126,107 @@ export default function useHipassChargeAdmin() {
     const resetFilters = () => setFilters({ search: '', vehicleId: '', startDate: '', endDate: '' });
 
     const handleDelete = async (rec: HipassCharge) => {
-        await handleDeleteBase(rec);
+        // 관리자 삭제도 카드 잔액을 되돌린다. 정정(수정)은 차액만큼 잔액을 맞추면서 삭제는
+        // 그대로 두면, **같은 화면에서 어느 버튼을 누르느냐에 따라 잔액이 맞기도 하고
+        // 틀리기도 한다.** 직원 삭제는 원래 되돌리고 있었으므로 그쪽과도 어긋나 있었다.
+        // 본인 확인(checkingUid)은 넘기지 않는다 — 관리자는 기관 전체 기록을 지운다.
+        await handleDeleteBase(rec, { rollbackBalance: true });
+    };
+
+    // ── 기록 정정 ──
+
+    const handleEdit = (rec: HipassCharge) => {
+        setEditingRecord(rec);
+        // `|| ''`가 아니라 null 검사다 — 0으로 저장된 옛 기록이 빈 칸으로 채워지면
+        // 필수값 검사에 걸려 그 기록은 아예 고칠 수 없게 된다.
+        setForm({ date: rec.date, chargeAmount: rec.chargeAmount != null ? String(rec.chargeAmount) : '' });
+    };
+
+    const handleCancelEdit = () => {
+        setEditingRecord(null);
+        setForm(EMPTY_FORM);
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingRecord) return;
+
+        if (!form.date || !form.chargeAmount) {
+            showToast('날짜와 충전금액을 입력해주세요.', 'warning');
+            return;
+        }
+
+        const negativeError = validateNonNegativeFields([{ label: '충전금액', value: form.chargeAmount }]);
+        if (negativeError) {
+            showToast(negativeError, 'warning');
+            return;
+        }
+
+        const amount = parseIntegerInput(form.chargeAmount);
+        if (isNaN(amount) || amount <= 0) {
+            showToast('올바른 충전금액을 입력해주세요.', 'warning');
+            return;
+        }
+        if (amount > MAX_HIPASS_CHARGE_AMOUNT) {
+            showToast(`한 번에 충전할 수 있는 금액은 ${MAX_HIPASS_CHARGE_AMOUNT.toLocaleString()}원까지예요. 금액을 다시 확인해 주세요.`, 'warning');
+            return;
+        }
+
+        const delta = amount - (editingRecord.chargeAmount || 0);
+        const card = cards.find(c => c.id === editingRecord.cardId);
+
+        // 금액이 바뀌면 카드 잔액도 그만큼 어긋난다 — 얼마가 어떻게 바뀌는지 미리 보여 준다.
+        if (delta !== 0) {
+            const sign = delta > 0 ? '+' : '−';
+            const message = card
+                ? `충전금액을 ${(editingRecord.chargeAmount || 0).toLocaleString()}원 → ${amount.toLocaleString()}원으로 수정합니다.\n`
+                  + `카드(${editingRecord.cardNumber}) 잔액도 함께 조정됩니다: `
+                  + `${card.balance.toLocaleString()}원 → ${Math.max(0, card.balance + delta).toLocaleString()}원 (${sign}${Math.abs(delta).toLocaleString()}원)`
+                : `충전금액을 ${(editingRecord.chargeAmount || 0).toLocaleString()}원 → ${amount.toLocaleString()}원으로 수정합니다.\n`
+                  + '연결된 카드를 찾을 수 없어 카드 잔액은 조정되지 않습니다.';
+            if (!await confirm({ message, confirmText: '수정' })) return;
+        }
+
+        setSaving(true);
+        try {
+            // balanceAfter는 '충전 전 잔액 + 충전금액'이라는 그 시점의 계산 결과다 —
+            // 금액을 고치면 이 값도 같이 맞춰야 기록 안에서 앞뒤가 맞는다.
+            const payload = {
+                date: form.date,
+                chargeAmount: amount,
+                // 충전 후 잔액은 **금액이 바뀔 때만** 다시 계산한다. 날짜만 고치는데도
+                // 덮어쓰면, balanceBefore가 비어 있는 옛 기록에서 멀쩡하던 '충전후잔액'이
+                // 지워진다. 기준을 balanceBefore가 아니라 balanceAfter에 두는 이유도 같다 —
+                // 기록이 앞뒤로 어긋나 있어도 차액만큼만 움직인다.
+                ...(delta !== 0 ? { balanceAfter: (editingRecord.balanceAfter || 0) + delta } : {}),
+            };
+
+            await updateHipassCharge(editingRecord.id, payload);
+
+            // 잔액 조정은 **서버가 한다** — 기록이 고쳐지면 onHipassChargeUpdated가 차액을
+            // 트랜잭션으로 반영한다(Phase 227). 여기서 함께 쓰면 이중 반영이 된다.
+            //
+            // 그래서 "기록은 고쳤는데 잔액만 못 고쳤다"는 분기가 사라졌다 — 잔액 쓰기가 이
+            // 경로에 없으니 그것만 실패할 수 없다. 카드가 이미 삭제된 경우는 위 확인창이
+            // 먼저 알린다("연결된 카드를 찾을 수 없어…").
+            if (delta !== 0 && card) {
+                // 화면만 즉시 맞춘다. 다음 조회에서 서버 값으로 수렴한다.
+                const newBalance = Math.max(0, card.balance + delta);
+                setCards(prev => prev.map(c => (c.id === card.id ? { ...c, balance: newBalance } : c)));
+            }
+
+            // 목록을 다시 읽지 않고 그 자리만 갱신한다(읽기 비용 절약).
+            setRecords(prev => prev.map(r => (
+                r.id === editingRecord.id ? { ...r, ...payload, lastEditedByUid: user?.uid } : r
+            )));
+            showToast('충전 기록이 수정되었습니다.', 'success');
+            handleCancelEdit();
+        } catch (err) {
+            console.error('충전 기록 수정 실패:', err);
+            showToast('수정에 실패했습니다.', 'error');
+        } finally {
+            setSaving(false);
+        }
     };
 
     return {
@@ -104,5 +235,8 @@ export default function useHipassChargeAdmin() {
         filteredRecords, totalChargeAmount,
         monthlyTrend, cardStats, vehicleStats,
         handleDelete,
+        // 정정
+        editingRecord, form, setForm, saving,
+        handleEdit, handleCancelEdit, handleSubmit,
     };
 }

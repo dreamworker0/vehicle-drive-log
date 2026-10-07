@@ -71,7 +71,8 @@ export default function useAdminBadges(): AdminBadges {
                             where('date', '==', today)
                         );
                         const rSnap = await getDocs(reservationQ);
-                        return rSnap.docs.filter(d => d.data().status !== 'cancelled');
+                        // 바로 운행은 예약 없이 출발한 운행이라 '예약' 배지에서 뺀다 (관리자 홈 카드와 같은 기준)
+                        return rSnap.docs.filter(d => d.data().status !== 'cancelled' && !d.data().isQuickDrive);
                     },
                     300_000, // 5분 캐시
                 );

@@ -9,15 +9,22 @@
  * 기록에는 최소수집 원칙에 따라 **uid만** 남는다(이름·이메일을 남기면 로그 자체가
  * 또 하나의 개인정보 데이터셋이 된다). 그러나 점검하는 사람에게 uid는 읽을 수 없어
  * 조회 시점에 기관 구성원 목록으로 이름을 붙인다 — 저장은 uid, 표시는 이름이다.
+ *
+ * 운행일지 기록도 같은 원칙이다. 기록에는 문서 ID만 있어 "운행일지 생성"만으로는 어느
+ * 운행인지 알 수 없으므로, 화면에 불러온 기록의 원본 운행일지를 읽어 요약을 붙인다.
  */
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from './useAuth';
 import {
-    getAuditLogs, getAuditLogsForExport, getOrganizationMembers,
+    getAuditLogs, getAuditLogsForExport, getOrganizationMembers, getDriveLogsByIds, getVehicles,
+    getReservationsByIds,
+    getVehicleDriveLogs, getAuditLogsByTargets, filterAuditLogs, auditLogAtMillis, AUDIT_VEHICLE_ID_SINCE,
     AUDIT_LOG_PAGE_SIZE, AUDIT_LOG_EXPORT_MAX,
 } from '../lib/firestore';
 import type { AuditLogKind } from '../lib/firestore';
 import type { AuditLog } from '../types/auditLog';
+import type { DriveLog } from '../types/driveLog';
+import type { Reservation } from '../types/reservation';
 import { captureError } from '../lib/sentry';
 
 /**
@@ -48,21 +55,67 @@ export interface UseAuditLogsResult {
     /** 직접 지정 기간. 빈 문자열이면 프리셋(days)을 쓴다. */
     range: AuditLogDateRange;
     setRange: (patch: Partial<AuditLogDateRange>) => void;
+    /** 직원 필터 — 빈 문자열이면 전체. 그 직원이 직접 했거나 대상이 된 기록만 본다 */
+    memberUid: string;
+    setMemberUid: (uid: string) => void;
+    /** 직원 필터 선택지 — 기관 구성원(이름순) */
+    members: Array<{ uid: string; name: string }>;
+    /** 차량 필터 — 빈 문자열이면 전체. 2026-10-05 이후 기록에만 걸린다(그 전 기록에는 차량 정보가 없다) */
+    vehicleId: string;
+    setVehicleId: (id: string) => void;
+    /** 차량 필터 선택지 — 기관 차량 */
+    vehicles: Array<{ id: string; name: string }>;
     /** 직접 지정 기간이 적용 중인지 — 화면이 프리셋 선택 표시를 끄는 데 쓴다 */
     rangeActive: boolean;
     loadMore: () => void;
     /** uid를 표시용 이름으로 바꾼다. 구성원이 아니면 축약한 uid를 돌려준다. */
     nameOf: (uid: string | null | undefined) => string;
+    /**
+     * 기록 대상 운행일지 — 아직 읽는 중이면 undefined, 삭제돼 없으면 null.
+     * targetType이 driveLog인 기록에만 의미가 있다.
+     */
+    driveLogOf: (id: string) => DriveLog | null | undefined;
+    /** 기록 대상 예약 — 아직 읽는 중이면 undefined, 삭제돼 없으면 null */
+    reservationOf: (id: string) => Reservation | null | undefined;
     /** 선택한 기간·유형 전체를 엑셀로 내보낸다(화면에 불러온 만큼이 아니라 기간 전체) */
     exportExcel: () => void;
     exporting: boolean;
+}
+
+/**
+ * 차량 정보가 없는 옛 기록 중 이 차량의 것을 찾는다.
+ *
+ * 그 차량의 운행일지 ID(+ 차량 삭제 기록용 차량 ID)로 기록을 모은 뒤, 서버 조회와 같은 조건을
+ * 메모리에서 적용한다. 운행일지는 기간 시작 1년 전부터 본다 — 오래전 운행을 이번 기간에 고친
+ * 기록도 잡아야 하고, 접속기록 보관기간이 1년이라 그보다 앞은 의미가 없다.
+ * ⚠️ 이미 삭제된 운행일지는 ID를 알 수 없어 그 기록은 나오지 않는다.
+ */
+const LEGACY_DRIVE_LOG_LOOKBACK_MS = 365 * 24 * 60 * 60 * 1000;
+const LEGACY_DRIVE_LOG_MAX = 1000;
+
+async function loadLegacyVehicleLogs(
+    orgId: string,
+    vehicleId: string,
+    options: { since: Date; until?: Date; kind: AuditLogKind; uid?: string },
+): Promise<AuditLog[]> {
+    const driveLogs = await getVehicleDriveLogs(
+        orgId, vehicleId, new Date(options.since.getTime() - LEGACY_DRIVE_LOG_LOOKBACK_MS), LEGACY_DRIVE_LOG_MAX,
+    );
+    const raw = await getAuditLogsByTargets(orgId, [vehicleId, ...driveLogs.map((d) => d.id)]);
+    const cutoff = AUDIT_VEHICLE_ID_SINCE.getTime();
+    // vehicleId가 있는 기록은 서버 조회가 이미 맡는다
+    const legacy = raw.filter((l) => !l.vehicleId && auditLogAtMillis(l) < cutoff);
+    return filterAuditLogs(legacy, options);
 }
 
 export default function useAuditLogs(): UseAuditLogsResult {
     const { userData } = useAuth();
     const orgId = userData?.organizationId ?? null;
 
-    const [logs, setLogs] = useState<AuditLog[]>([]);
+    /** 서버 조회(페이지 단위) 결과 */
+    const [mainLogs, setLogs] = useState<AuditLog[]>([]);
+    /** 차량 정보가 없는 옛 기록 중 선택한 차량의 것 — 보조 조회로 한 번에 읽는다 */
+    const [legacyLogs, setLegacyLogs] = useState<AuditLog[]>([]);
     const [loading, setLoading] = useState(true);
     const [loadingMore, setLoadingMore] = useState(false);
     const [error, setError] = useState('');
@@ -71,7 +124,17 @@ export default function useAuditLogs(): UseAuditLogsResult {
     const [days, setDays] = useState<AuditLogDays>(30);
     const [range, setRangeState] = useState<AuditLogDateRange>({ start: '', end: '' });
     const [names, setNames] = useState<Record<string, string>>({});
+    const [members, setMembers] = useState<Array<{ uid: string; name: string }>>([]);
+    const [memberUid, setMemberUid] = useState('');
+    const [vehicles, setVehicles] = useState<Array<{ id: string; name: string }>>([]);
+    const [vehicleId, setVehicleId] = useState('');
     const [exporting, setExporting] = useState(false);
+    /** 운행일지 ID → 원본(삭제됐으면 null). 필터를 바꿔도 같은 문서를 다시 읽지 않게 유지한다 */
+    const [driveLogs, setDriveLogs] = useState<Record<string, DriveLog | null>>({});
+    const requestedDriveLogIdsRef = useRef(new Set<string>());
+    /** 예약 ID → 원본(삭제됐으면 null). 운행일지와 같은 방식으로 한 번만 읽는다 */
+    const [reservations, setReservations] = useState<Record<string, Reservation | null>>({});
+    const requestedReservationIdsRef = useRef(new Set<string>());
 
     /** 커서와 세대 — 필터가 바뀌면 세대를 올려 이전 응답을 폐기한다 */
     const lastDocRef = useRef<unknown | null>(null);
@@ -122,16 +185,38 @@ export default function useAuditLogs(): UseAuditLogsResult {
             .then((members) => {
                 if (cancelled) return;
                 const map: Record<string, string> = {};
+                const list: Array<{ uid: string; name: string }> = [];
                 for (const m of members) {
+                    const uid = m.uid || m.id;
+                    if (uid) list.push({ uid, name: m.name || m.email || uid });
                     // users 문서 ID가 uid다. uid 필드가 따로 있으면 그것도 함께 매핑한다.
                     if (m.id) map[m.id] = m.name || m.email || m.id;
                     if (m.uid) map[m.uid] = m.name || m.email || m.uid;
                 }
                 setNames(map);
+                setMembers(list.sort((a, b) => a.name.localeCompare(b.name, 'ko')));
             })
             .catch((err) => {
                 // 이름을 못 붙여도 기록 자체는 보여준다 — 점검을 막을 이유가 아니다
                 captureError(err, { context: 'useAuditLogs.getOrganizationMembers', orgId });
+            });
+        return () => { cancelled = true; };
+    }, [orgId]);
+
+    // 차량 선택지 — 기관이 바뀔 때만 다시 읽는다. 실패해도 차량 필터만 빠질 뿐 점검은 계속된다
+    useEffect(() => {
+        if (!orgId) return;
+        let cancelled = false;
+        getVehicles(orgId)
+            .then((list) => {
+                if (cancelled) return;
+                setVehicles(list.map((v) => ({
+                    id: v.id,
+                    name: v.displayName || [v.name, v.plateNumber].filter(Boolean).join(' '),
+                })));
+            })
+            .catch((err) => {
+                captureError(err, { context: 'useAuditLogs.getVehicles', orgId });
             });
         return () => { cancelled = true; };
     }, [orgId]);
@@ -147,7 +232,21 @@ export default function useAuditLogs(): UseAuditLogsResult {
         setLoading(true);
         setError('');
 
-        getAuditLogs(orgId, { since, until, kind })
+        setLegacyLogs([]);
+        // 차량을 골랐고 기간이 차량 정보 기록 시작 전까지 걸치면 옛 기록을 보조 조회로 찾는다.
+        // 서버는 2026-10-05부터 vehicleId를 남겼다 — 그 전 기록은 vehicleId 조건에 걸리지 않는다.
+        if (vehicleId && since < AUDIT_VEHICLE_ID_SINCE) {
+            loadLegacyVehicleLogs(orgId, vehicleId, { since, until, kind, uid: memberUid || undefined })
+                .then((legacy) => {
+                    if (generation === generationRef.current) setLegacyLogs(legacy);
+                })
+                .catch(() => {
+                    if (generation !== generationRef.current) return;
+                    setError('10월 5일 이전 기록 일부를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.');
+                });
+        }
+
+        getAuditLogs(orgId, { since, until, kind, uid: memberUid || undefined, vehicleId: vehicleId || undefined })
             .then((page) => {
                 if (generation !== generationRef.current) return; // 필터가 바뀌었으면 폐기
                 setLogs(page.logs);
@@ -164,14 +263,17 @@ export default function useAuditLogs(): UseAuditLogsResult {
             .finally(() => {
                 if (generation === generationRef.current) setLoading(false);
             });
-    }, [orgId, since, until, kind]);
+    }, [orgId, since, until, kind, memberUid, vehicleId]);
 
     const loadMore = useCallback(() => {
         if (!orgId || !hasMore || loadingMore || !lastDocRef.current) return;
         const generation = generationRef.current;
         setLoadingMore(true);
 
-        getAuditLogs(orgId, { since, until, kind, startAfter: lastDocRef.current })
+        getAuditLogs(orgId, {
+            since, until, kind, uid: memberUid || undefined, vehicleId: vehicleId || undefined,
+            startAfter: lastDocRef.current,
+        })
             .then((page) => {
                 if (generation !== generationRef.current) return;
                 setLogs((prev) => [...prev, ...page.logs]);
@@ -185,7 +287,86 @@ export default function useAuditLogs(): UseAuditLogsResult {
             .finally(() => {
                 if (generation === generationRef.current) setLoadingMore(false);
             });
-    }, [orgId, since, until, kind, hasMore, loadingMore]);
+    }, [orgId, since, until, kind, memberUid, vehicleId, hasMore, loadingMore]);
+
+    /**
+     * 화면에 보일 목록 — 서버 조회 + 옛 기록 보조 조회.
+     *
+     * 서버 조회가 아직 더 있으면(hasMore) 옛 기록은 **지금까지 불러온 가장 오래된 시각까지만**
+     * 섞는다. 다 섞으면 아직 안 불러온 페이지보다 오래된 옛 기록이 먼저 보여 시간 순서가 깨진다.
+     */
+    const logs = useMemo(() => {
+        if (legacyLogs.length === 0) return mainLogs;
+        const ids = new Set(mainLogs.map((l) => l.id));
+        const floor = hasMore && mainLogs.length > 0
+            ? auditLogAtMillis(mainLogs[mainLogs.length - 1])
+            : -Infinity;
+        const extra = legacyLogs.filter((l) => !ids.has(l.id) && auditLogAtMillis(l) >= floor);
+        return [...mainLogs, ...extra].sort((a, b) => auditLogAtMillis(b) - auditLogAtMillis(a));
+    }, [mainLogs, legacyLogs, hasMore]);
+
+    // 기관이 바뀌면 운행일지 캐시도 비운다 — 다른 기관 문서는 읽을 수도 없다
+    useEffect(() => {
+        requestedDriveLogIdsRef.current = new Set();
+        setDriveLogs({});
+        requestedReservationIdsRef.current = new Set();
+        setReservations({});
+    }, [orgId]);
+
+    // 화면에 올라온 운행일지 기록의 원본을 읽는다 — 이미 요청한 ID는 건너뛴다
+    useEffect(() => {
+        if (!orgId) return;
+        const requested = requestedDriveLogIdsRef.current;
+        const ids = [...new Set(
+            logs.filter((l) => l.targetType === 'driveLog' && l.targetId).map((l) => l.targetId),
+        )].filter((id) => !requested.has(id));
+        if (ids.length === 0) return;
+        ids.forEach((id) => requested.add(id));
+
+        getDriveLogsByIds(orgId, ids)
+            .then((found) => {
+                if (requestedDriveLogIdsRef.current !== requested) return; // 기관이 바뀌었으면 폐기
+                setDriveLogs((prev) => {
+                    const next = { ...prev };
+                    for (const id of ids) next[id] = found.get(id) ?? null;
+                    return next;
+                });
+            })
+            .catch(() => {
+                // 요약을 못 붙여도 기록 자체는 보여준다. 다음 갱신 때 다시 시도하도록 요청 표시를 지운다
+                // (captureError는 도메인 함수가 이미 보고했다)
+                ids.forEach((id) => requested.delete(id));
+            });
+    }, [orgId, logs]);
+
+    const driveLogOf = useCallback((id: string) => driveLogs[id], [driveLogs]);
+
+    // 예약 기록도 원본을 읽어 "어느 차를 언제 어디로"를 붙인다 — 위 운행일지와 같은 규칙
+    useEffect(() => {
+        if (!orgId) return;
+        const requested = requestedReservationIdsRef.current;
+        const ids = [...new Set(
+            logs.filter((l) => l.targetType === 'reservation' && l.targetId).map((l) => l.targetId),
+        )].filter((id) => !requested.has(id));
+        if (ids.length === 0) return;
+        ids.forEach((id) => requested.add(id));
+
+        getReservationsByIds(orgId, ids)
+            .then((found) => {
+                if (requestedReservationIdsRef.current !== requested) return; // 기관이 바뀌었으면 폐기
+                setReservations((prev) => {
+                    const next = { ...prev };
+                    for (const id of ids) next[id] = found.get(id) ?? null;
+                    return next;
+                });
+            })
+            .catch(() => {
+                // 요약을 못 붙여도 기록은 보여준다. 다음 갱신 때 다시 시도하도록 요청 표시를 지운다
+                ids.forEach((id) => requested.delete(id));
+            });
+    }, [orgId, logs]);
+
+    const reservationOf = useCallback((id: string) => reservations[id], [reservations]);
 
     const nameOf = useCallback((uid: string | null | undefined): string => {
         if (!uid) return '알 수 없음';
@@ -208,16 +389,29 @@ export default function useAuditLogs(): UseAuditLogsResult {
         setExporting(true);
         setError('');
 
-        getAuditLogsForExport(orgId, { since, until, kind })
+        getAuditLogsForExport(orgId, { since, until, kind, uid: memberUid || undefined, vehicleId: vehicleId || undefined })
             .then(async (result) => {
+                // 옛 기록 보조 조회분도 파일에 담는다 — 화면에 보인 기록이 파일에서 빠지면 증빙이 어긋난다
+                if (legacyLogs.length > 0) {
+                    const ids = new Set(result.logs.map((l) => l.id));
+                    result = {
+                        ...result,
+                        logs: [...result.logs, ...legacyLogs.filter((l) => !ids.has(l.id))]
+                            .sort((a, b) => auditLogAtMillis(b) - auditLogAtMillis(a)),
+                    };
+                }
                 if (result.logs.length === 0) {
                     setError('선택한 기간에 내보낼 기록이 없습니다.');
                     return;
                 }
                 const { downloadAuditLogsExcel } = await import('../lib/excelExport');
-                const label = rangeActive
+                const period = rangeActive
                     ? `${range.start}_${range.end}`
                     : `최근${days}일`;
+                // 직원을 골라 받은 파일은 이름을 붙여 기관 전체 파일과 구분한다
+                const vehicleName = vehicles.find((v) => v.id === vehicleId)?.name;
+                const label = [period, memberUid && nameOf(memberUid), vehicleId && vehicleName]
+                    .filter(Boolean).join('_');
                 await downloadAuditLogsExcel(result.logs, nameOf, `접속기록_${label}`);
                 if (result.truncated) {
                     setError(`기록이 많아 최근 ${AUDIT_LOG_EXPORT_MAX.toLocaleString()}건만 내보냈습니다. 기간을 좁혀 다시 받아주세요.`);
@@ -228,12 +422,14 @@ export default function useAuditLogs(): UseAuditLogsResult {
                 setError('내보내기에 실패했습니다. 잠시 후 다시 시도해주세요.');
             })
             .finally(() => setExporting(false));
-    }, [orgId, exporting, since, until, kind, rangeActive, range.start, range.end, days, nameOf]);
+    }, [orgId, exporting, since, until, kind, memberUid, vehicleId, vehicles, legacyLogs, rangeActive, range.start, range.end, days, nameOf]);
 
     return {
         logs, loading, loadingMore, error, hasMore,
         kind, setKind, days, setDays, range, setRange, rangeActive,
-        loadMore, nameOf, exportExcel, exporting,
+        memberUid, setMemberUid, members,
+        vehicleId, setVehicleId, vehicles,
+        loadMore, nameOf, driveLogOf, reservationOf, exportExcel, exporting,
     };
 }
 

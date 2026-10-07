@@ -11,7 +11,7 @@ import { createGmailTransporter, isGmailConfigured, systemMailFrom } from "../..
 import { maskEmail } from "../../utils/mask";
 import { GMAIL_APP_PASSWORD } from "../../core/params";
 
-const SERVICE_URL = "https://vehicle-drive-log.web.app";
+const SERVICE_URL = "https://drivelog.socialprism.co.kr";
 
 export const sendRejectionEmail = onCall(
     { region: "asia-northeast3", enforceAppCheck: true, secrets: [GMAIL_APP_PASSWORD] },

@@ -50,6 +50,9 @@ export default function DriveLogForm() {
         handleOcrReport,
         handleSubmit,
         confirmStartKm,
+        confirmBeforeSave,
+        handleConfirmBeforeSave,
+        handleCancelBeforeSave,
         kmRangeError,
         handleDismissKmRangeError,
         handleConfirmStartKm,
@@ -259,6 +262,13 @@ export default function DriveLogForm() {
                             rows={3}
                         />
                     )}
+                    {/* 공개 범위를 적어 둔다 — 여기 적은 내용이 같은 기관 다른 운전자에게
+                        보인다는 사실을 모르고 쓰면, 알리려던 것이 아닌 것까지 알려진다. */}
+                    {isNotesExpanded && (
+                        <p className="text-xs text-surface-400 dark:text-surface-500 mt-1.5">
+                            주차 위치처럼 다음 운전자가 알아야 할 내용을 적어 주세요. 같은 기관 이용자에게 함께 보입니다.
+                        </p>
+                    )}
                 </div>
 
                 {/* 제출 버튼 */}
@@ -284,6 +294,21 @@ export default function DriveLogForm() {
                 cancelText="취소"
                 onConfirm={handleConfirmStartKm}
                 onCancel={handleCancelConfirm}
+            />
+
+            {/* 목적지 칸에 차량 이름이 그대로 굳는 것을 한 번 붙잡는다. 막지는 않는다 —
+                판정은 휴리스틱이라 차량을 건물 이름으로 부르는 기관에서는 그 이름이 진짜
+                행선지일 수 있다. (목적지 자체가 비는 경우는 validateDriveLogForm이 이미
+                필수로 막는다.) */}
+            <ConfirmModal
+                open={!!confirmBeforeSave}
+                title="목적지 확인"
+                message={`목적지가 차량 이름(${confirmBeforeSave?.vehicleName})과 같습니다.\n\n어디에 다녀오셨는지 적어 주세요. 차량을 부르는 이름이 실제 행선지와 같다면 이대로 저장하셔도 됩니다.`}
+                confirmText="이대로 저장"
+                cancelText="고치기"
+                confirmColor="warning"
+                onConfirm={handleConfirmBeforeSave}
+                onCancel={handleCancelBeforeSave}
             />
 
             <ConfirmModal

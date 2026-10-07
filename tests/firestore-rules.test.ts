@@ -209,6 +209,51 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertSucceeds(adminADb.collection('reservations').doc('res_reserved').update({ status: 'reserved', reservedByName: 'x' }));
   });
 
+  it('5-1b. 예약 소유자는 일정·차량·그룹을 직접 바꾸지 못한다 — 수정 콜러블 전용 (2026-10-03 감사 발견 1)', async () => {
+    // 직접 쓰기가 열려 있던 동안은 승인된 예약을 다른 날짜·시간·사용 제한 차량으로 옮겨도
+    // reserved가 유지됐다(승인제·차량 제한·겹침 검사 우회). 정보 수정·취소·운행 시작/종료는 그대로 열어 둔다.
+    const base = {
+      organizationId: 'org-A', vehicleId: 'vehicle_A', reservedByUid: 'user_A',
+      date: '2026-10-10', startTime: '09:00', endTime: '10:00', recurringGroupId: 'rcr_1',
+    };
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.collection('reservations').doc('res_reserved').set({ ...base, status: 'reserved' });
+      await db.collection('reservations').doc('res_pending').set({ ...base, status: 'pending' });
+      await db.collection('reservations').doc('res_cancelled').set({ ...base, status: 'cancelled' });
+    });
+
+    const ownerDb = setupContext('user_A', { role: 'employee', orgId: 'org-A' }).firestore();
+    const reserved = ownerDb.collection('reservations').doc('res_reserved');
+
+    // 감사 PoC 그대로 — 다른 차량·날짜·종일로 옮기기
+    await assertFails(reserved.update({ vehicleId: 'v_restricted', date: '2026-12-24', startTime: '00:00', endTime: '23:59' }));
+    // 필드 하나씩도 막힌다
+    await assertFails(reserved.update({ vehicleId: 'vehicle_B' }));
+    await assertFails(reserved.update({ date: '2026-12-24' }));
+    await assertFails(reserved.update({ startTime: '08:00' }));
+    await assertFails(reserved.update({ endTime: '18:00' }));
+    await assertFails(reserved.update({ groupId: 'grp_x' }));
+    await assertFails(reserved.update({ recurringGroupId: 'rcr_other' }));
+    await assertFails(reserved.update({ isQuickDrive: true }));
+
+    // 정책과 무관한 정보 수정·운행 시작은 허용
+    await assertSucceeds(reserved.update({ destination: '복지관', purpose: '업무', passengerCount: 2 }));
+    await assertSucceeds(reserved.update({ status: 'in_progress', actualStartTime: '09:05' }));
+
+    // 승인되지 않은 예약을 스스로 쓸 수 있는 상태로 올리지 못한다
+    const pending = ownerDb.collection('reservations').doc('res_pending');
+    await assertFails(pending.update({ status: 'in_progress' }));
+    await assertFails(pending.update({ status: 'in_use' }));
+    await assertFails(ownerDb.collection('reservations').doc('res_cancelled').update({ status: 'reserved' }));
+    // 승인 대기 예약의 취소는 허용
+    await assertSucceeds(pending.update({ status: 'cancelled' }));
+
+    // 기관 관리자는 일정·차량을 직접 바꿀 수 있다 (승인권자)
+    const adminDb = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+    await assertSucceeds(adminDb.collection('reservations').doc('res_reserved').update({ startTime: '11:00', endTime: '12:00' }));
+  });
+
   it('5-2. 예약 삭제 — 소유자 본인과 기관 관리자만 허용, 타 기관·타인(직원)은 차단', async () => {
     // 다일·반복 그룹 수정은 "기존 그룹 삭제 → 재생성" 경로라 삭제 권한이 필요한데
     // superAdmin 전용이던 탓에 소유자 본인조차 그룹 수정이 항상 실패했다.
@@ -641,6 +686,35 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
   });
 
 
+  it('10-4b. 예약 스탬프(lastEditedByUid + lastEditId) — 이번 쓰기 ID만 바꿔 남에게 떠넘기기 차단', async () => {
+    // 감사 트리거는 lastEditId가 바뀐 쓰기에서만 스탬프를 행위자로 인정한다(서버 쓰기의 무고한 귀속 방지).
+    // 그래서 lastEditId만 새로 찍고 uid는 지난 수정자 것을 두는 쓰기를 막아야 한다.
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      await context.firestore().collection('reservations').doc('res_stamp').set({
+        organizationId: 'org-A', vehicleId: 'v_A', reservedByUid: 'user_A', status: 'reserved',
+        date: '2026-10-10', startTime: '09:00', endTime: '10:00',
+        lastEditedByUid: 'user_T', lastEditId: 'old',
+      });
+    });
+    const ownerA = setupContext('user_A', { role: 'member', orgId: 'org-A' }).firestore();
+    const adminA = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+    const owned = ownerA.collection('reservations').doc('res_stamp');
+    const asAdmin = adminA.collection('reservations').doc('res_stamp');
+
+    // (1) 저장된 스탬프가 남(user_T)의 것일 때 새 ID만 찍기 → 차단 (지난 수정자에게 떠넘기기)
+    await assertFails(owned.update({ destination: '시청', lastEditId: 'e2' }));
+    // (2) 본인 uid + 새 ID → 허용
+    await assertSucceeds(owned.update({ destination: '구청', lastEditedByUid: 'user_A', lastEditId: 'e1' }));
+    // (3) 남의 uid로 위조 → 차단
+    await assertFails(owned.update({ destination: '남산', lastEditedByUid: 'user_T', lastEditId: 'e3' }));
+    // (4) 관리자도 본인 명의만
+    await assertSucceeds(asAdmin.update({ status: 'cancelled', lastEditedByUid: 'admin_A', lastEditId: 'e4' }));
+    await assertFails(asAdmin.update({ status: 'reserved', lastEditedByUid: 'user_A', lastEditId: 'e5' }));
+    // (5) 스탬프를 건드리지 않는 쓰기 → 허용 (트리거는 행위자를 unknown으로 남긴다)
+    await assertSucceeds(asAdmin.update({ reservedByName: '직원A' }));
+  });
+
+
   it('10-5. 전체 공지 이력(broadcasts) — 클라이언트 쓰기 전면 차단, 읽기는 운영자만', async () => {
     // sendBroadcastNotice(Admin SDK)만 기록한다. 발송자 uid가 담기므로 읽기도 운영자 한정.
     await testEnv.withSecurityRulesDisabled(async (context) => {
@@ -809,6 +883,22 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     }));
     await assertFails(empDb.collection('hipassCharges').doc('h_neg').set({
       organizationId: 'org-A', cardId: 'c_A', chargerUid: 'emp_1', chargeAmount: -50000,
+    }));
+    // 상한 — 잔액은 서버가 충전금액만큼 더하므로, 상한이 없으면 기록 한 건으로 잔액을 임의로
+    // 키울 수 있었다(2026-10-03 감사 부록). 운행일지 사용액 상한(hipassUsageValid)과 같은 선이다.
+    await assertSucceeds(empDb.collection('hipassCharges').doc('h_cap').set({
+      organizationId: 'org-A', cardId: 'c_A', chargerUid: 'emp_1', chargeAmount: 1000000,
+    }));
+    await assertFails(empDb.collection('hipassCharges').doc('h_over').set({
+      organizationId: 'org-A', cardId: 'c_A', chargerUid: 'emp_1', chargeAmount: 999999999,
+    }));
+    // 수정으로 상한을 넘기는 것도 차단 (본인 기록)
+    await assertFails(empDb.collection('hipassCharges').doc('h_ok').update({
+      chargeAmount: 1000001, lastEditedByUid: 'emp_1',
+    }));
+    // 금액을 건드리지 않는 수정은 상한 검사를 타지 않는다
+    await assertSucceeds(empDb.collection('hipassCharges').doc('h_ok').update({
+      memo: '영수증 확인', lastEditedByUid: 'emp_1',
     }));
 
     // ── 정비 기록 ──
@@ -1211,6 +1301,172 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertSucceeds(superAdmin.collection('system').doc('secretConfig').get());
     // 공휴일도 클라이언트가 고칠 수는 없다
     await assertFails(superAdmin.collection('system').doc('holidays').update({ hacked: true }));
+  });
+
+  it('26. 관리자의 주유·충전 기록 정정 — 같은 기관만, 행위자 스탬프는 위조 불가', async () => {
+    // 관리자가 직원 기록의 금액을 고치는 길은 Rules에 원래 열려 있었고(isOrgAdmin 분기),
+    // 화면에도 열렸다. 그래서 '누가 고쳤나'(lastEditedByUid)가 신뢰할 수 있어야 한다 —
+    // 남의 명의로 심을 수 있으면 흔적이 오히려 거짓말이 된다.
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.collection('fuelLogs').doc('f_emp').set({
+        organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'emp_1',
+        date: '2026-09-01', meterReading: 51000, fuelAmount: 40, fuelCost: 60000,
+      });
+      await db.collection('hipassCharges').doc('h_emp').set({
+        organizationId: 'org-A', cardId: 'c_A', chargerUid: 'emp_1',
+        date: '2026-09-01', chargeAmount: 50000, balanceBefore: 10000, balanceAfter: 60000,
+      });
+    });
+
+    const adminA = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+    const adminB = setupContext('admin_B', { role: 'admin', orgId: 'org-B' }).firestore();
+    const empDb = setupContext('emp_1', { role: 'employee', orgId: 'org-A' }).firestore();
+
+    // 같은 기관 관리자: 직원 기록의 금액을 정정하면서 자기 uid를 남긴다
+    await assertSucceeds(adminA.collection('fuelLogs').doc('f_emp').update({
+      fuelAmount: 30, fuelCost: 45000, lastEditedByUid: 'admin_A',
+    }));
+    await assertSucceeds(adminA.collection('hipassCharges').doc('h_emp').update({
+      chargeAmount: 30000, balanceAfter: 40000, lastEditedByUid: 'admin_A',
+    }));
+
+    // 타인 명의 스탬프는 거부된다 — 관리자도, 작성자 본인도 예외가 아니다.
+    // (검사는 '스탬프 값이 바뀔 때'만 돈다. 이미 박혀 있는 값을 그대로 다시 쓰는 것은
+    //  변경이 아니라 통과하며, 이는 actorStampValid의 의도된 설계다 — 스탬프를 심지 않는
+    //  옛 경로가 통째로 막히지 않게 하려고 그렇게 두었다.)
+    await assertFails(adminA.collection('fuelLogs').doc('f_emp').update({
+      fuelCost: 10000, lastEditedByUid: 'emp_1',
+    }));
+    await assertFails(empDb.collection('fuelLogs').doc('f_emp').update({
+      fuelCost: 10000, lastEditedByUid: 'admin_B',
+    }));
+    await assertFails(adminA.collection('hipassCharges').doc('h_emp').update({
+      chargeAmount: 10000, lastEditedByUid: 'emp_1',
+    }));
+
+    // 타 기관 관리자는 애초에 손대지 못한다
+    await assertFails(adminB.collection('fuelLogs').doc('f_emp').update({
+      fuelCost: 1, lastEditedByUid: 'admin_B',
+    }));
+    await assertFails(adminB.collection('hipassCharges').doc('h_emp').update({
+      chargeAmount: 1, lastEditedByUid: 'admin_B',
+    }));
+
+    // 스탬프를 건드리지 않는 수정은 여전히 통과한다 — 스탬프를 심지 않는 옛 경로가
+    // 통째로 막히면 안 된다(actorStampValid가 '변경될 때만' 검사하는 이유).
+    await assertSucceeds(empDb.collection('fuelLogs').doc('f_emp').update({ notes: '영수증 재확인' }));
+
+    // 그리고 **가장 흔한 경로** — 직원이 자기 기록을 고치며 자기 uid를 남기는 것 — 은
+    // 반드시 열려 있어야 한다. 여기가 막히면 주유 탭의 본인 수정이 통째로 죽는다.
+    await assertSucceeds(empDb.collection('fuelLogs').doc('f_emp').update({
+        fuelCost: 55000, lastEditedByUid: 'emp_1',
+    }));
+    await assertSucceeds(empDb.collection('hipassCharges').doc('h_emp').update({
+        chargeAmount: 20000, lastEditedByUid: 'emp_1',
+    }));
+  });
+
+  it('27. 하이패스 카드 잔액 — 서버가 소유한다 (직원은 쓰지 못하고, 관리자도 음수는 못 넣는다)', async () => {
+    // 종전에는 "소속 기관 멤버가 balance만 갱신 가능" 분기가 있었다. 충전·사용·삭제 복원·
+    // 관리자 정정이 모두 클라이언트에서 잔액을 계산해 덮어썼기 때문인데, 그 분기는
+    // **기록 하나 없이 임의의 값을 넣는 길**이기도 했다(2026-09-12 감사 부록).
+    // 이제 잔액은 트리거가 기록에서 파생시킨다 — 여기서는 그 경계만 지킨다.
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.collection('hipassCards').doc('card_A').set({
+        organizationId: 'org-A', cardNumber: '1111', vehicleId: 'v_A', balance: 10000,
+      });
+    });
+
+    const empDb = setupContext('emp_1', { role: 'employee', orgId: 'org-A' }).firestore();
+    const adminA = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+    const adminB = setupContext('admin_B', { role: 'admin', orgId: 'org-B' }).firestore();
+
+    // 직원은 잔액을 쓸 수 없다 — 값이 그럴듯해도(충전만큼 더한 값) 막힌다.
+    await assertFails(empDb.collection('hipassCards').doc('card_A').update({ balance: 60000 }));
+    // 잔액을 0으로 만드는 것도, 다른 필드에 얹어 슬쩍 넣는 것도 마찬가지다.
+    await assertFails(empDb.collection('hipassCards').doc('card_A').update({ balance: 0 }));
+    await assertFails(empDb.collection('hipassCards').doc('card_A').update({ balance: 99999, memo: '메모' }));
+
+    // 관리자는 [하이패스 관리]에서 실물 카드와 맞추는 수동 입력이 필요하므로 열어 둔다.
+    await assertSucceeds(adminA.collection('hipassCards').doc('card_A').update({
+      cardNumber: '1111', vehicleId: 'v_A', balance: 25000, memo: '실물 확인',
+      organizationId: 'org-A', lastEditedByUid: 'admin_A',
+    }));
+    // 다만 음수는 막는다 — 사람이 값을 넣는 유일한 경로가 여기라, 여기서 막지 않으면
+    // 화면과 Rules가 전제하는 `>= 0`이 깨진다.
+    await assertFails(adminA.collection('hipassCards').doc('card_A').update({ balance: -1, lastEditedByUid: 'admin_A' }));
+
+    // 타 기관 관리자는 애초에 손대지 못한다.
+    await assertFails(adminB.collection('hipassCards').doc('card_A').update({ balance: 1, lastEditedByUid: 'admin_B' }));
+
+    // 잔액을 건드리지 않는 수정은 그대로 통과한다(메모·차량 연결 등).
+    await assertSucceeds(adminA.collection('hipassCards').doc('card_A').update({ memo: '차량 교체' }));
+
+    // create에도 같은 하한이 걸린다. update에만 걸었을 때는 **처음부터 음수인 카드를
+    // 만드는** 길이 남아 있었고, 그러면 update의 방어가 무의미해진다.
+    await assertFails(adminA.collection('hipassCards').doc('card_neg').set({
+      organizationId: 'org-A', cardNumber: '2222', vehicleId: 'v_B', balance: -5000,
+    }));
+    await assertSucceeds(adminA.collection('hipassCards').doc('card_new').set({
+      organizationId: 'org-A', cardNumber: '2222', vehicleId: 'v_B', balance: 0,
+    }));
+    // 직원은 카드를 만들 수 없다(종전과 같다 — 음수 가드가 이 경계를 흐리지 않았는지 함께 본다).
+    await assertFails(empDb.collection('hipassCards').doc('card_emp').set({
+      organizationId: 'org-A', cardNumber: '3333', vehicleId: 'v_C', balance: 1000,
+    }));
+
+    // 잔액을 바꾸는 쓰기에는 행위자 스탬프가 필요하다. 두 가지를 동시에 지킨다 —
+    // 책임성(누가 손으로 고쳤나)과 **배포 전환 보호**(잔액을 계산해 쓰던 옛 화면은
+    // 스탬프를 심지 않으므로 거부된다 → 트리거 증분 위에 얹혀 두 배가 되는 일이 없다).
+    // **스탬프가 아직 없는 카드**로 검사한다 — 그것이 배포 시점의 실제 상태다
+    // (이 필드는 이번 변경에서 처음 쓰인다). card_A는 위에서 이미 스탬프가 박혔고,
+    // `request.resource.data`는 병합 결과라 그 카드로는 이 경계를 볼 수 없다.
+    await assertFails(adminA.collection('hipassCards').doc('card_new').update({ balance: 31000 }));
+    await assertFails(adminA.collection('hipassCards').doc('card_new').update({
+      balance: 31000, lastEditedByUid: 'someone_else',
+    }));
+    await assertSucceeds(adminA.collection('hipassCards').doc('card_new').update({
+      balance: 31000, lastEditedByUid: 'admin_A',
+    }));
+  });
+
+  it('28. 운행일지의 하이패스 사용액 — 음수 사용으로 잔액을 불릴 수 없다', async () => {
+    // 잔액의 클라이언트 쓰기는 닫혔지만, 서버 트리거가 이 두 값의 차이만큼 카드에서 뺀다.
+    // 제약이 없으면 **같은 능력이 다른 문으로 되살아난다** — 사용액을 음수로 적으면 환불이다.
+    const empDb = setupContext('emp_1', { role: 'employee', orgId: 'org-A' }).firestore();
+    const base = {
+      organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'emp_1', createdByUid: 'emp_1',
+      startKm: 100, endKm: 150,
+    };
+
+    // 정상 사용 — 통과해야 한다(막으면 하이패스 입력이 통째로 죽는다)
+    await assertSucceeds(empDb.collection('driveLogs').doc('dl_ok').set({
+      ...base, hipassBalanceBefore: 10000, hipassBalanceAfter: 9500,
+    }));
+    // 하이패스를 쓰지 않은 운행 — 필드가 없어도 통과
+    await assertSucceeds(empDb.collection('driveLogs').doc('dl_none').set(base));
+
+    // 사용 후가 사용 전보다 크다 = 음수 사용액 = 임의 충전
+    await assertFails(empDb.collection('driveLogs').doc('dl_neg').set({
+      ...base, hipassBalanceBefore: 0, hipassBalanceAfter: 1000000,
+    }));
+    // 음수 값 자체
+    await assertFails(empDb.collection('driveLogs').doc('dl_minus').set({
+      ...base, hipassBalanceBefore: -1, hipassBalanceAfter: -2,
+    }));
+    // 한 건의 사용액 상한
+    await assertFails(empDb.collection('driveLogs').doc('dl_huge').set({
+      ...base, hipassBalanceBefore: 9000000, hipassBalanceAfter: 0,
+    }));
+
+    // 수정도 같은 검사를 받는다
+    await assertFails(empDb.collection('driveLogs').doc('dl_ok').update({
+      hipassBalanceBefore: 0, hipassBalanceAfter: 500000,
+    }));
+    // 하이패스를 건드리지 않는 수정은 그대로 통과한다
+    await assertSucceeds(empDb.collection('driveLogs').doc('dl_ok').update({ notes: '경로 변경' }));
   });
 
 });

@@ -37,6 +37,12 @@ interface Props {
     /** 선택한 차량의 출발지 이름 — 분관이 없는 기관에서는 빈 문자열 */
     departureSiteName?: string;
     routeLoading: boolean;
+    /** 경로 기준 권장 종료시간 — 덮어쓰지 않고 제안만 한다. 없으면 null */
+    suggestedEndTime: string | null;
+    /** 종료시간을 사람이 정했는가 — true면 시작시간을 바꿔도 종료시간을 건드리지 않는다 */
+    endTimeTouched: boolean;
+    /** 종료시간을 사람이 정했다고 표시 — 이후 경로 자동 계산이 그 값을 덮지 않는다 */
+    setEndTimeTouched: (v: boolean) => void;
     freeRoadRoute?: { distance: number; duration: number; tollFee: number } | null;
     freeRoadLoading?: boolean;
     onFetchFreeRoad?: () => void;
@@ -91,6 +97,9 @@ export default function ReservationSidePanel({
     routeInfo,
     departureSiteName = '',
     routeLoading,
+    suggestedEndTime,
+    endTimeTouched,
+    setEndTimeTouched,
     freeRoadRoute,
     freeRoadLoading,
     onFetchFreeRoad,
@@ -364,8 +373,16 @@ export default function ReservationSidePanel({
                                     onChange={e => {
                                         const val = e.target.value;
                                         if (!val) return; // 브라우저가 입력 중간에 보내는 빈 값은 무시
-                                        const autoEnd = calcEndTime(val, routeInfo?.duration || 0);
-                                        setForm({ ...form, startTime: val, endTime: autoEnd });
+                                        // 종료시간을 사람이 정해 뒀으면 건드리지 않는다 — 09:00~18:00을
+                                        // 잡아 둔 사람이 시작을 옮겼다고 18:00을 버릴 이유가 없다.
+                                        // 바꾸고 싶으면 아래 제안 줄을 누르면 된다.
+                                        if (endTimeTouched) {
+                                            setForm({ ...form, startTime: val });
+                                            return;
+                                        }
+                                        // 경로를 모를 때도 종료시간은 따라 움직여야 한다(시작 + 1시간).
+                                        // 안 움직이면 시작을 늦춘 순간 종료 < 시작이 되어 저장이 막힌다.
+                                        setForm({ ...form, startTime: val, endTime: calcEndTime(val, routeInfo?.duration || 0) });
                                     }}
                                     className="input flex-1 text-base font-medium px-2 text-center min-h-[48px]"
                                 />
@@ -376,11 +393,29 @@ export default function ReservationSidePanel({
                                     onChange={e => {
                                         const val = e.target.value;
                                         if (!val) return;
+                                        // 직접 고른 값이다. 이후 경로 조회가 끝나도 덮지 않는다.
+                                        setEndTimeTouched(true);
                                         setForm({ ...form, endTime: val });
                                     }}
                                     className="input flex-1 text-base font-medium px-2 text-center min-h-[48px]"
                                 />
                             </div>
+                            {/* 경로가 바뀌어도 사람이 정한 종료시간을 덮지 않는다 — 대신 여기서 권한다.
+                                자동으로 채운 경우에는 계산값과 폼의 값이 같아 이 줄이 뜨지 않는다.
+                                다일·반복 예약에서는 훅이 null을 주므로 역시 뜨지 않는다(칸의 뜻이 다르다). */}
+                            {suggestedEndTime && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        setEndTimeTouched(true);
+                                        setForm({ ...form, endTime: suggestedEndTime });
+                                    }}
+                                    className="mt-2 w-full flex items-center justify-between gap-2 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 text-left text-xs text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors min-h-[40px]"
+                                >
+                                    <span>🕒 경로 기준 예상 종료 <strong className="font-semibold">{suggestedEndTime}</strong></span>
+                                    <span className="shrink-0 font-semibold underline">적용</span>
+                                </button>
+                            )}
                         </div>
                         <button type="submit" disabled={submitting} className={`w-full btn-sm min-h-[48px] ${form.isRecurring ? 'bg-purple-500 hover:bg-purple-600 dark:hover:bg-purple-500 text-white rounded-xl py-2 font-semibold transition-colors disabled:opacity-50' : 'btn-primary'}`}>
                             {submitting

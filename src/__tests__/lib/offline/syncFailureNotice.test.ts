@@ -8,12 +8,12 @@ import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 vi.mock('@/lib/offline/syncQueue', () => ({
     peekFailedRecords: vi.fn(),
     clearFailedRecords: vi.fn(),
-    flushQueue: vi.fn(() => Promise.resolve()),
+    flushQueueQuietly: vi.fn(() => Promise.resolve()),
 }));
 vi.mock('@/lib/notify', () => ({ notifyUser: vi.fn() }));
 
 import { buildFailureMessage, reportFailedSync, registerSyncFailureNotice, describeRecord, formatQueuedDate } from '@/lib/offline/syncFailureNotice';
-import { peekFailedRecords, clearFailedRecords, flushQueue, type FailedRecord } from '@/lib/offline/syncQueue';
+import { peekFailedRecords, clearFailedRecords, flushQueueQuietly, type FailedRecord } from '@/lib/offline/syncQueue';
 import { notifyUser } from '@/lib/notify';
 
 const mockDrain = vi.mocked(peekFailedRecords);
@@ -113,7 +113,7 @@ describe('registerSyncFailureNotice', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockDrain.mockResolvedValue([]);
-        vi.mocked(flushQueue).mockResolvedValue(undefined);
+        vi.mocked(flushQueueQuietly).mockResolvedValue(undefined);
     });
 
     const fire = (key: string) => handlers.get(key)!(new Event(key.split(':')[1]));
@@ -127,7 +127,7 @@ describe('registerSyncFailureNotice', () => {
     it('온라인 복귀 시 flush가 끝난 뒤에 확인한다', async () => {
         // flush 완료 전에 확인하면 방금 폐기될 항목을 놓친다 — 순서가 계약이다.
         let resolveFlush: () => void = () => {};
-        vi.mocked(flushQueue).mockReturnValueOnce(new Promise<void>((r) => { resolveFlush = r; }));
+        vi.mocked(flushQueueQuietly).mockReturnValueOnce(new Promise<void>((r) => { resolveFlush = r; }));
         mockDrain.mockResolvedValueOnce([record()]);
 
         fire('window:online');

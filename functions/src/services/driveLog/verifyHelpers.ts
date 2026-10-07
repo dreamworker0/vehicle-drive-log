@@ -137,7 +137,7 @@ const EMAILJS_PUBLIC_KEY = "2G7A7gudLQ01I4hJW";
 // EMAILJS_PRIVATE_KEY는 defineSecret(core/params)로 이관 — 사용 함수는 secrets 선언 필수
 const EMAILJS_SERVICE_ID = "service_p4hpecv";
 const EMAILJS_TEMPLATE_ID = "template_qmfktgb";
-const SERVICE_URL = "https://vehicle-drive-log.web.app";
+const SERVICE_URL = "https://drivelog.socialprism.co.kr";
 
 /**
  * 승인 이메일 발송 (서버 사이드)

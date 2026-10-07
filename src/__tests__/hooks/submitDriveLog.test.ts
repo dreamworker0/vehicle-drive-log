@@ -155,7 +155,11 @@ describe('submitDriveLog', () => {
         expect(result.message).toContain('오프라인');
     });
 
-    it('하이패스 카드 사용 시 사용액만큼 잔액을 차감한다', async () => {
+    it('하이패스 사용은 일지에 기록만 하고, 카드 잔액은 건드리지 않는다', async () => {
+        // 잔액의 주인은 서버다(Phase 227). 운행일지가 저장되면 syncDriveLogKm의 트리거가
+        // `hipassBalanceBefore - hipassBalanceAfter`만큼 카드에서 뺀다. 여기서 함께 쓰면
+        // 이중 차감이 되므로, **쓰지 않는다는 것**과 **트리거가 계산할 두 값을 남긴다는 것**이
+        // 이 경로가 지켜야 할 계약이다.
         const result = await submitDriveLog(
             makeCtx({
                 form: { ...baseForm, hipassBalanceAfter: '9500' },
@@ -163,12 +167,12 @@ describe('submitDriveLog', () => {
             }),
         );
 
-        expect(mockUpdateHipassCard).toHaveBeenCalledTimes(1);
-        const [hipassId, update] = mockUpdateHipassCard.mock.calls[0];
-        expect(hipassId).toBe('h1');
-        // 10000 → 9500 사용액 500 차감
-        expect(update.balance).toEqual({ __increment: -500 });
-        expect(update.organizationId).toBe('org1');
+        expect(mockUpdateHipassCard).not.toHaveBeenCalled();
+
+        const [saved] = mockCreateDriveLog.mock.calls[0];
+        expect(saved.hipassCardNumber).toBe('1234');
+        expect(saved.hipassBalanceBefore).toBe(10000);
+        expect(saved.hipassBalanceAfter).toBe(9500);
         expect(result.success).toBe(true);
     });
 
@@ -300,6 +304,29 @@ describe('submitDriveLog', () => {
 
         const payload = mockUpdateDriveLog.mock.calls[0][1];
         expect(payload.isRetroactive).toEqual({ __deleteField: true });
+    });
+
+    it('사진으로 읽은 도착 km를 손으로 고친 수정은 사진 확인 표시를 지우라고 명시한다', async () => {
+        // 표시가 남으면 사람이 친 숫자가 '사진으로 확인된 값' 행세를 하며 재정합에서 고정된다.
+        await submitDriveLog(makeCtx({
+            isEditMode: true,
+            editLog: { id: 'log1', vehicleId: 'v1', endKm: 50040, endKmSource: 'ocr' } as never,
+            form: { ...baseForm, endKm: '50050' },
+        }));
+
+        const payload = mockUpdateDriveLog.mock.calls[0][1];
+        expect(payload.endKmSource).toEqual({ __deleteField: true });
+    });
+
+    it('도착 km를 건드리지 않은 수정은 사진 확인 표시를 지킨다', async () => {
+        await submitDriveLog(makeCtx({
+            isEditMode: true,
+            editLog: { id: 'log1', vehicleId: 'v1', endKm: 50050, endKmSource: 'ocr' } as never,
+            form: { ...baseForm, endKm: '50050', destination: '부산역' },
+        }));
+
+        const payload = mockUpdateDriveLog.mock.calls[0][1];
+        expect(payload.endKmSource).toBe('ocr');
     });
 
     it('여전히 소급이면 표시를 그대로 싣는다', async () => {

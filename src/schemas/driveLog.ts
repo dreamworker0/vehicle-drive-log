@@ -38,10 +38,31 @@ export const driveLogSchema = z.object({
      * 출발지 선택이 열린 차량(`siteVaries`)에서만 기록되므로, 값의 존재 자체가 판정 결과다.
      */
     endSiteId: z.string().optional().catch(undefined),
+    /**
+     * 도착 계기판을 **사진으로 확인했는가**(`'ocr'`이면 그렇다).
+     *
+     * `inputMethod`와 뜻이 다르다 — 저쪽은 "이 일지를 무엇으로 썼나"라는 통계용 표시라
+     * 수정 저장 한 번에 `manual`로 덮이고, 어느 칸이 사진에서 왔는지도 말해 주지 않는다.
+     * 이 필드는 **도착 km 한 칸**에 대한 표시이고, 값이 그대로면 수정 저장에도 남는다.
+     *
+     * 이 표시가 있는 기록의 도착 km는 앞 기록이 정정돼도 **밀지 않는다**
+     * (`syncNextLogStartKm`). 사진으로 확인한 숫자가 사후에 바뀌면 증빙이 무너진다.
+     */
+    endKmSource: z.enum(['ocr']).optional().catch(undefined),
     passengers: z.coerce.number().optional().catch(undefined),
     vehicleType: z.string().optional().catch(undefined),
     passengerCount: z.coerce.number().optional().catch(undefined),
     passengerNames: z.array(z.string()).optional().catch(undefined),
+    /**
+     * 입력 화면이 적은 **그대로의 동승자 입력**. 저장은 예전부터 하고 있었는데 스키마에
+     * 없어서 컨버터가 읽을 때 지웠다 — "저장은 되고 조회는 안 되는" 상태였다.
+     *
+     * 사람 수의 근거는 `passengerCount`·`passengerNames`이고 이 둘은 그것을 **되돌리기
+     * 위한** 값이다. 수정 화면이 이름칸과 숫자칸을 원래대로 복원하려면 둘을 나눠 놓은
+     * 원본이 있어야 한다 — 합쳐진 값에서 역산하면 규칙이 바뀐 옛 기록에서 숫자가 깎인다.
+     */
+    externalPassengerCount: z.coerce.number().optional().catch(undefined),
+    externalPassengerNames: z.string().optional().catch(undefined),
     notes: z.string().optional().catch(undefined),
     /**
      * ⚠️ **금액(원)** 이다. 같은 이름인 `fuelLog.fuelAmount`는 **리터/kWh**라 뜻이 다르다.
@@ -69,6 +90,11 @@ export const driveLogSchema = z.object({
     isManuallyCorrected: z.boolean().optional().catch(undefined),
     originalStartKm: z.coerce.number().optional().catch(undefined),
     reservationId: z.string().optional().catch(undefined),
+    /**
+     * 운행을 어떻게 시작했는가 — 사전 예약 · 바로 운행 · 예약 없이 기록.
+     * 새로 쓰는 일지에만 저장된다(2026-10 도입). 없으면 reservationId 유무로 추정한다(월간 집계 참고).
+     */
+    driveOrigin: z.enum(['reservation', 'quick', 'manual']).optional().catch(undefined),
     inputMethod: z.enum(['ocr', 'manual', 'favorite']).optional().catch(undefined),
     createdAt: timestampSchema.optional().catch(undefined),
     editedAt: timestampSchema.optional().catch(undefined),

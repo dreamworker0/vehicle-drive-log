@@ -11,9 +11,12 @@
 import useAuditLogs, { AUDIT_LOG_DAY_OPTIONS, type AuditLogDays } from '../../hooks/useAuditLogs';
 import type { AuditLogKind } from '../../lib/firestore';
 import type { AuditAction, AuditLog } from '../../types/auditLog';
+import type { DriveLog } from '../../types/driveLog';
+import type { Reservation } from '../../types/reservation';
 import { formatTimestampFull } from '../../lib/dateUtils';
 import {
-    ACTOR_SOURCE_NOTE, describeChangedFields, describeEvent, describeExportTarget,
+    ACTOR_SOURCE_NOTE, describeChangedFields, describeDriveLog, describeEvent, describeExportTarget,
+    describeReservation,
 } from '../../lib/auditLogLabels';
 
 const ACTION_BADGE: Record<AuditAction, string> = {
@@ -58,8 +61,37 @@ function SegmentButton({ active, onClick, children }: { active: boolean; onClick
     );
 }
 
+/**
+ * 기록이 가리키는 운행·예약의 한 줄 요약 — 원본을 읽어 붙인다(기록 자체에는 ID만 있다).
+ *
+ * "운행일지 생성 · 김종원"만으로는 무엇을 했는지 알 수 없다는 운영자 지적에 따라, 이 줄을
+ * 상세 칸이 아니라 **기록의 제목 자리**에 둔다. 읽는 중이면 null(자리를 비운다), 원본이
+ * 삭제됐으면 그 사실을 문장으로 알린다.
+ */
+function summaryOf(
+    log: AuditLog,
+    driveLogOf: (id: string) => DriveLog | null | undefined,
+    reservationOf: (id: string) => Reservation | null | undefined,
+): { text: string; missing: boolean } | null {
+    if (!log.targetId) return null;
+    if (log.targetType === 'driveLog') {
+        const d = driveLogOf(log.targetId);
+        if (d) return { text: describeDriveLog(d) || '내용 없음', missing: false };
+        if (d === null) return { text: '삭제된 운행일지라 내용을 확인할 수 없음', missing: true };
+    }
+    if (log.targetType === 'reservation') {
+        const r = reservationOf(log.targetId);
+        if (r) return { text: describeReservation(r) || '내용 없음', missing: false };
+        if (r === null) return { text: '삭제된 예약이라 내용을 확인할 수 없음', missing: true };
+    }
+    return null;
+}
+
 /** 기록 1건의 상세 — 유형에 따라 남아 있는 항목만 보여준다 */
-function LogDetail({ log, nameOf }: { log: AuditLog; nameOf: (uid?: string | null) => string }) {
+function LogDetail({ log, nameOf }: {
+    log: AuditLog;
+    nameOf: (uid?: string | null) => string;
+}) {
     const rows: Array<[string, string]> = [];
 
     if (log.targetType === 'session') {
@@ -73,7 +105,7 @@ function LogDetail({ log, nameOf }: { log: AuditLog; nameOf: (uid?: string | nul
         if (typeof log.recordCount === 'number') rows.push(['반출 건수', `${log.recordCount.toLocaleString()}건`]);
     }
 
-    const changed = describeChangedFields(log.changedFields);
+    const changed = describeChangedFields(log.changedFields, log.targetType);
     if (changed) rows.push(['바뀐 항목', changed]);
 
     if (log.subjectUids.length > 0) {
@@ -98,7 +130,9 @@ export default function AuditLogViewer() {
     const {
         logs, loading, loadingMore, error, hasMore,
         kind, setKind, days, setDays, range, setRange, rangeActive,
-        loadMore, nameOf, exportExcel, exporting,
+        memberUid, setMemberUid, members,
+        vehicleId, setVehicleId, vehicles,
+        loadMore, nameOf, driveLogOf, reservationOf, exportExcel, exporting,
     } = useAuditLogs();
 
     return (
@@ -161,6 +195,47 @@ export default function AuditLogViewer() {
                     )}
                 </div>
 
+                {/*
+                  직원 — 그 직원이 직접 한 일과 대상이 된 일을 함께 본다. 한쪽만 보면
+                  관리자의 엑셀 반출(대상 없음)이나 서버가 남긴 동의 기록(행위자 없음)이 빠진다.
+                */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-2 mb-4">
+                    <div>
+                        <p className="text-xs font-medium text-surface-400 dark:text-surface-500 mb-2">직원</p>
+                        <select
+                            aria-label="직원"
+                            value={memberUid}
+                            onChange={(e) => setMemberUid(e.target.value)}
+                            className="input w-full min-h-[48px] mb-3 sm:mb-0"
+                        >
+                            <option value="">전체 직원</option>
+                            {members.map((m) => (
+                                <option key={m.uid} value={m.uid}>{m.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                    <div>
+                        <p className="text-xs font-medium text-surface-400 dark:text-surface-500 mb-2">차량</p>
+                        <select
+                            aria-label="차량"
+                            value={vehicleId}
+                            onChange={(e) => setVehicleId(e.target.value)}
+                            className="input w-full min-h-[48px]"
+                        >
+                            <option value="">전체 차량</option>
+                            {vehicles.map((v) => (
+                                <option key={v.id} value={v.id}>{v.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+                {/* 그 전 기록은 차량의 운행일지로 찾아 붙인다 — 삭제된 운행일지의 기록이 빠지는 한계는 숨기지 않는다 */}
+                {vehicleId && (
+                    <p className="text-xs text-surface-400 dark:text-surface-500 -mt-2 mb-4">
+                        10월 5일 이전 기록은 이 차량의 운행일지로 찾아 함께 보여 줍니다. 이미 삭제된 운행일지의 기록은 나오지 않습니다.
+                    </p>
+                )}
+
                 <p className="text-xs font-medium text-surface-400 dark:text-surface-500 mb-2">유형</p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {KIND_TABS.map((tab) => (
@@ -185,7 +260,7 @@ export default function AuditLogViewer() {
                         {exporting ? '내보내는 중...' : '엑셀로 내보내기'}
                     </button>
                     <p className="text-xs text-surface-400 dark:text-surface-500 mt-2 leading-relaxed">
-                        선택한 기간·유형의 기록 전체가 담깁니다. 접속지 IP가 포함되므로 파일 보관에 주의해 주세요 —
+                        선택한 기간·직원·차량·유형의 기록 전체가 담깁니다. 접속지 IP가 포함되므로 파일 보관에 주의해 주세요 —
                         내보낸 사실은 접속기록에 남습니다.
                     </p>
                 </div>
@@ -214,6 +289,7 @@ export default function AuditLogViewer() {
                 <ul className="space-y-2">
                     {logs.map((log) => {
                         const note = ACTOR_SOURCE_NOTE[log.actorSource];
+                        const summary = summaryOf(log, driveLogOf, reservationOf);
                         return (
                             <li key={log.id} className="glass-card p-4">
                                 <div className="flex items-center justify-between gap-2 mb-1">
@@ -224,6 +300,15 @@ export default function AuditLogViewer() {
                                         {formatTimestampFull(log.at) ?? '-'}
                                     </span>
                                 </div>
+                                {summary && (
+                                    <p className={`text-sm font-semibold mb-0.5 break-keep ${
+                                        summary.missing
+                                            ? 'text-surface-400 dark:text-surface-500'
+                                            : 'text-surface-900 dark:text-surface-100'
+                                    }`}>
+                                        {summary.text}
+                                    </p>
+                                )}
                                 <p className="text-sm text-surface-700 dark:text-surface-200">
                                     {nameOf(log.actorUid)}
                                     {note && (

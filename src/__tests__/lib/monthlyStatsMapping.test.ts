@@ -48,6 +48,24 @@ describe('mapMonthlyDoc — 프로듀서 스키마 → 평탄 MonthlyStat', () =
         expect(m.heatmapData).toContainEqual({ dayIdx: 5, hour: 18, count: 1 });
     });
 
+    it('야간 집계 시각(updatedAt)을 넘긴다 — 없으면 null', () => {
+        const at = new Date('2026-10-01T02:14:00+09:00');
+        expect(mapMonthlyDoc('2026-10', { updatedAt: { toDate: () => at } }).updatedAt).toEqual(at);
+        expect(mapMonthlyDoc('2026-10', {}).updatedAt).toBeNull();
+    });
+
+    it('운행 방식은 기관·직원·차량 모두 옮기고, 없던 문서는 0 또는 생략으로 둔다', () => {
+        const m = mapMonthlyDoc('2026-10', {
+            originCounts: { quick: 3, reservation: 1 },
+            driverStats: { d1: { name: '김', count: 2, distance: 5, origin: { quick: 2 } }, d2: { name: '이', count: 1, distance: 1 } },
+            vehicleStats: { v1: { name: '스타리아', count: 2, origin: { manual: 2 } } },
+        });
+        expect(m.originCounts).toEqual({ reservation: 1, quick: 3, manual: 0, linked: 0 });
+        expect(m.driverStats.d1.origin).toEqual({ reservation: 0, quick: 2, manual: 0, linked: 0 });
+        expect(m.driverStats.d2.origin).toBeUndefined();
+        expect(m.vehicleStats.v1.origin).toEqual({ reservation: 0, quick: 0, manual: 2, linked: 0 });
+    });
+
     it('driverStats의 name을 보존하고 count/distance를 유지한다', () => {
         const m = mapMonthlyDoc('2026-06', rawDoc);
         expect(m.driverStats['uid-1']).toEqual({ name: '김운전', count: 7, distance: 200 });
@@ -63,6 +81,12 @@ describe('mapMonthlyDoc — 프로듀서 스키마 → 평탄 MonthlyStat', () =
         expect(m.vehicleStats['veh-1'].maintenanceCost).toBe(120000);
         expect(m.vehicleStats['veh-1'].maintenanceCount).toBe(2);
         expect(m.vehicleStats['veh-1'].lastMaintenanceDate).toBe('2026-06-20');
+    });
+
+    it('하이패스 실제 사용액을 옮기고, 집계 도입 전 문서는 null로 둔다(0원 사용과 구분)', () => {
+        expect(mapMonthlyDoc('2026-09', { costStats: { hipassCost: 50000, hipassUsed: 12300 } }).hipassUsed).toBe(12300);
+        expect(mapMonthlyDoc('2026-09', { costStats: { hipassUsed: 0 } }).hipassUsed).toBe(0);
+        expect(mapMonthlyDoc('2026-05', { costStats: { hipassCost: 8000 } }).hipassUsed).toBeNull();
     });
 
     it('anomalies(weekend/night/overDrive)를 그대로 전달한다', () => {

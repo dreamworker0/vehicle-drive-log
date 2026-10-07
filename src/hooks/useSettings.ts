@@ -25,6 +25,8 @@ export interface SettingsForm {
     approvalLine: { title: string }[];
     hideApprovalLine: boolean;
     requireReservationApproval: boolean;
+    /** 승인제에서 바로 운행 허용(미설정=허용) */
+    quickDriveWithApproval: boolean;
     // 기능 사용 토글(실제 켜짐 여부 boolean)
     hipassEnabled: boolean;
     maintenanceEnabled: boolean;
@@ -76,6 +78,7 @@ export default function useSettings() {
         approvalLine: [{ title: '담당' }, { title: '팀장' }],
         hideApprovalLine: false,
         requireReservationApproval: false,
+        quickDriveWithApproval: true,
         hipassEnabled: true,
         maintenanceEnabled: true,
         maintenanceEmployeeAccess: true,
@@ -125,6 +128,7 @@ export default function useSettings() {
                             : [{ title: '담당' }, { title: '팀장' }],
                         hideApprovalLine: orgData.hideApprovalLine ?? false,
                         requireReservationApproval: orgData.requireReservationApproval ?? false,
+                        quickDriveWithApproval: orgData.quickDriveWithApproval !== false,
                         hipassEnabled: features.hipass,
                         maintenanceEnabled: features.maintenance,
                         maintenanceEmployeeAccess: features.maintenanceEmployeeAccess,
@@ -204,6 +208,7 @@ export default function useSettings() {
                     approvalLine: targetData.approvalLine.filter(a => a.title.trim()).map(a => ({ title: a.title.trim() })),
                     hideApprovalLine: targetData.hideApprovalLine,
                     requireReservationApproval: targetData.requireReservationApproval,
+                    quickDriveWithApproval: targetData.quickDriveWithApproval,
                     hipassEnabled: targetData.hipassEnabled,
                     maintenanceEnabled: targetData.maintenanceEnabled,
                     maintenanceEmployeeAccess: targetData.maintenanceEmployeeAccess,

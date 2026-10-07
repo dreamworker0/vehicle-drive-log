@@ -40,7 +40,7 @@ import { timestampSchema } from './common';
 export const auditActionSchema = z.enum(['create', 'update', 'delete', 'login', 'export', 'read']);
 
 /** 기록 대상 — 개인정보를 담는 컬렉션, 로그인 세션, 반출, 기관 증빙서류 */
-export const auditTargetTypeSchema = z.enum(['driveLog', 'user', 'session', 'export', 'orgDocument']);
+export const auditTargetTypeSchema = z.enum(['driveLog', 'user', 'vehicle', 'session', 'export', 'orgDocument', 'reservation']);
 
 /**
  * 행위자를 어떻게 알아냈는지 — 기록의 신뢰 수준을 스스로 구분한다.
@@ -112,6 +112,11 @@ export const auditLogSchema = z.object({
     exportFormat: z.string().optional().catch(undefined),
     exportDataset: z.string().optional().catch(undefined),
     recordCount: z.number().optional().catch(undefined),
+    /**
+     * 관련 차량 — 운행일지·차량 기록에만 있다(점검 화면의 차량별 조회용).
+     * 2026-10-05 이전 기록에는 없다 — 차량 필터는 그 뒤 기록부터 걸린다.
+     */
+    vehicleId: z.string().optional().catch(undefined),
     at: timestampSchema,
     /** TTL 정책 대상 필드 — at + 1년. 콘솔에서 auditLogs 컬렉션에 TTL을 설정해야 동작한다 */
     expiresAt: timestampSchema,

@@ -85,7 +85,7 @@ export default function EmployeeManager() {
                                 </button>
                             </div>
                             <div className="font-mono text-sm text-surface-700 dark:text-surface-300 break-all select-all pr-2">
-                                https://vehicle-drive-log.web.app?code={organization?.inviteCode || '------'}
+                                https://drivelog.socialprism.co.kr?code={organization?.inviteCode || '------'}
                             </div>
                         </div>
 

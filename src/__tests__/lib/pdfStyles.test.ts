@@ -38,6 +38,18 @@ describe('formatDate', () => {
     it('비표준 형식은 그대로 반환', () => {
         expect(formatDate('2026/02/27')).toBe('2026/02/27');
     });
+
+    // 결과는 곧바로 document.write로 나가는 HTML이다 — 이 함수가 막지 않으면 막는 곳이 없다.
+    // 하이픈 유무로 갈리는 두 갈래 모두 덮는다(둘 다 입력을 그대로 돌려주던 자리다).
+    it('마크업을 이스케이프한다 — 하이픈이 없는 입력', () => {
+        expect(formatDate('<img src=x onerror=alert(1)>'))
+            .toBe('&lt;img src=x onerror=alert(1)&gt;');
+    });
+
+    it('마크업을 이스케이프한다 — 하이픈 2개로 3분할되는 입력', () => {
+        expect(formatDate('<b>-"x"-</b>'))
+            .toBe('&lt;b&gt;-&quot;x&quot;-&lt;/b&gt;');
+    });
 });
 
 describe('formatNumber', () => {

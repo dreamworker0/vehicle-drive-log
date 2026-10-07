@@ -54,3 +54,4 @@
 - 계획은 plan mode의 ExitPlanMode로 **사용자 승인**을 받고 구현에 들어간다.
 - 시간 추정 시 사람-시간과 CC 압축 시간을 함께 제시할 수 있다(선택).
 - 작업 완료 후 구현계획서에 Phase로 기록(프로젝트 관행).
+- 계획서를 파일(`docs/YYYY-MM-DD-주제-계획서.md`)로 남겼다면, 구현을 마친 뒤 [docs/archive/plans/](../../docs/archive/plans/)로 옮기고 [아카이브 색인](../../docs/archive/README.md)에 한 줄 추가한다 — `docs/` 최상위에는 살아있는 문서만 둔다.

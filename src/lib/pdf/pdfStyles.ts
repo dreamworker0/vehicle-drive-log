@@ -159,15 +159,14 @@ export function getPdfStyles() {
         .col-vehicle { width: 76px; }
         .col-dest { width: auto; }
         .col-purpose { width: auto; }
-        .col-time { width: 34px; }
+        .col-time { width: 40px; }
         /*
          * 이틀 이상 걸린 운행은 '9/1 17:00'처럼 날짜가 앞에 붙는데, 표 전체가
          * word-break: break-all이라 '9/1 1' / '7:00'처럼 토큰 한가운데가 잘린다.
          * 줄바꿈이 공백에서만 일어나게 해 '9/1' / '17:00' 두 줄로 떨어뜨린다.
          *
-         * (위 .col-time의 34px은 이 열에 실제로 걸리지 않는다 — table-layout: fixed에서 폭은
-         *  colgroup이나 첫 행이 정하는데, 첫 행은 두 시각 열을 colspan=2로 덮는다. 폭을
-         *  손볼 생각이라면 colgroup부터 넣어야 한다.)
+         * (열 폭은 pdfExport.ts의 colgroup이 이 col-* 클래스로 정한다 — table-layout: fixed에서
+         *  첫 행은 시각·주행거리 칸을 colspan으로 덮어 th의 폭이 걸리지 않기 때문이다.)
          *
          * td.col-time으로 쓰는 이유는 특정도다 — .log-table td(0-1-1)가 .col-time(0-1-0)을
          * 이기므로 클래스만으로는 break-all이 그대로 남는다. 헤더에만 붙어 있던 클래스를
@@ -228,16 +227,32 @@ export function getPdfStyles() {
 
 /**
  * 날짜 포맷 (YYYY-MM-DD)
+ *
+ * **결과는 이미 이스케이프되어 있다 — 호출부에서 다시 감싸지 않는다.**
+ *
+ * 이 함수는 이름과 달리 '포맷'을 하지 않는다. 두 갈래 모두 입력 문자를 그대로 돌려주는
+ * 사실상의 통과 함수다(2026-09-12 감사 발견 2). 그런데 호출부 다섯 곳은 전부 `document.write`로
+ * 새 창에 보간하는 HTML 템플릿이고, 그 창은 `window.open('')`이 여는 about:blank라
+ * **앱 오리진을 상속한다**. 즉 여기를 지나는 문자열은 곧 앱 오리진의 HTML이다.
+ *
+ * 날짜 필드는 Rules도 Zod 스키마(`z.string()`)도 형식을 검사하지 않아 기관 구성원이면
+ * 임의 문자열을 심을 수 있었고, 같은 행의 이름·목적지·비고가 `escapeHtml`을 지나는 동안
+ * 날짜만 그대로 나갔다. 관리자가 PDF를 뽑는 순간 그 문자열이 관리자 세션으로 실행됐다.
+ *
+ * 호출부를 감싸는 대신 **여기서** 막는 이유는 앞으로 늘어날 호출부 때문이다 — 통과 함수라는
+ * 사실이 이름에 드러나지 않아, 다음 사람도 이스케이프된 값이라고 믿고 쓴다.
+ * (`formatDateKorean`은 호출부가 이미 감싸고 있어 그대로 둔다.)
+ *
  * @param {string} dateStr
- * @returns {string}
+ * @returns {string} HTML에 그대로 넣어도 안전한 문자열
  */
 export function formatDate(dateStr: string) {
     if (!dateStr || dateStr === '-') return '-';
     const parts = dateStr.split('-');
     if (parts.length === 3) {
-        return `${parts[0]}-${parts[1]}-${parts[2]}`;
+        return escapeHtml(`${parts[0]}-${parts[1]}-${parts[2]}`);
     }
-    return dateStr;
+    return escapeHtml(dateStr);
 }
 
 /**

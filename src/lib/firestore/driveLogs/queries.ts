@@ -4,7 +4,7 @@
  */
 import {
     collection, query, where, getDocs,
-    orderBy, limit,
+    orderBy, limit, documentId,
     type QueryConstraint,
     type DocumentData,
 } from 'firebase/firestore';
@@ -12,6 +12,7 @@ import { db } from '../../firebase';
 import { createZodConverter, driveLogSchema } from '../../../schemas';
 import { captureError } from '../../sentry';
 import { cachedQuery } from '../cache';
+import type { DriveLog } from '../../../types/driveLog';
 
 const driveLogConverter = createZodConverter(driveLogSchema);
 
@@ -134,6 +135,37 @@ export const getMyDriveLogs = async (orgId: string, uid: string, limitCount = 30
         },
         180_000 // 3분 캐시
     );
+};
+
+/** Firestore `in` 연산자의 값 개수 상한 */
+const IN_QUERY_MAX = 30;
+
+/**
+ * 문서 ID 목록으로 운행일지를 읽는다 — 접속기록 점검 화면이 "어떤 운행일지였는지"를 붙이는 데 쓴다.
+ *
+ * 접속기록은 최소수집 원칙에 따라 대상 문서 ID만 남기므로, 내용은 조회 시점에 원본에서 가져온다.
+ * 삭제된 운행일지는 결과 Map에 없다 — 호출 측이 "삭제됨"으로 구분한다.
+ */
+export const getDriveLogsByIds = async (orgId: string, ids: string[]) => {
+    const unique = [...new Set(ids.filter(Boolean))];
+    const result = new Map<string, DriveLog>();
+    if (unique.length === 0) return result;
+    try {
+        const chunks: string[][] = [];
+        for (let i = 0; i < unique.length; i += IN_QUERY_MAX) chunks.push(unique.slice(i, i + IN_QUERY_MAX));
+        const snaps = await Promise.all(chunks.map((chunk) => getDocs(query(
+            collection(db, 'driveLogs').withConverter(driveLogConverter),
+            where('organizationId', '==', orgId),
+            where(documentId(), 'in', chunk),
+        ))));
+        for (const snap of snaps) {
+            for (const d of snap.docs) result.set(d.id, d.data());
+        }
+        return result;
+    } catch (error) {
+        captureError(error, { context: 'getDriveLogsByIds', orgId, count: unique.length });
+        throw error;
+    }
 };
 
 // 차량별 운행일지 조회 (기간 필터 + limit 기본 200) (캐시 적용, TTL: 3분)

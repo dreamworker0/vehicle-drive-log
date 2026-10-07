@@ -13,7 +13,7 @@ import { toLocalDateStr } from '../lib/dateUtils';
 import { ocrDashboard } from '../lib/ocr';
 import type { Reservation } from '../types/reservation';
 import useBaseFuelLog from './base/useBaseFuelLog';
-import { validateNonNegativeFields } from './utils/numberValidation';
+import { validateNonNegativeFields, parseIntegerInput } from './utils/numberValidation';
 import { roundFuelAmount } from '../lib/fuelFormat';
 
 const INITIAL_FORM = {
@@ -205,7 +205,7 @@ export default function useFuelLog() {
         }
 
         // 주유미터가 차량의 현재 누적 km보다 작으면 경고
-        const meter = parseInt(form.meterReading);
+        const meter = parseIntegerInput(form.meterReading);
         if (selectedVehicleKm > 0 && meter < selectedVehicleKm) {
             const ok = await confirm({
                 message: `입력한 주유미터(${meter.toLocaleString()} km)가 차량의 현재 누적 km(${selectedVehicleKm.toLocaleString()} km)보다 작습니다. 그래도 저장하시겠습니까?`,
@@ -225,12 +225,12 @@ export default function useFuelLog() {
                 driverUid: user?.uid,
                 driverName: userData?.name || user?.displayName || '',
                 date: form.date,
-                meterReading: parseInt(form.meterReading),
+                meterReading: parseIntegerInput(form.meterReading),
                 fuelType: actualFuelType,
                 // 저장 길목에서 자릿수를 맞춘다 — 입력 칸만 제한하면 기존 기록을 수정할 때
                 // (폼이 저장된 값을 그대로 프리필하므로) 긴 값이 다시 그대로 쓰인다.
                 fuelAmount: roundFuelAmount(form.fuelAmount),
-                fuelCost: parseInt(form.fuelCost),
+                fuelCost: parseIntegerInput(form.fuelCost),
                 notes: form.notes.trim() || '',
             };
 

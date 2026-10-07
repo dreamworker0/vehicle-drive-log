@@ -115,7 +115,13 @@ export default memo(function ReservationTypeSelector({ form, setForm, selectedDa
                             type="date"
                             value={form.endDate}
                             min={selectedDate}
-                            onChange={e => setForm(prev => ({ ...prev, endDate: e.target.value }))}
+                            onChange={e => {
+                                // 브라우저가 입력 중간에 보내는 빈 값은 무시한다(시간 입력과 같은 규칙).
+                                // 빈 값을 그대로 받으면 이 블록 자체가 사라져 되돌릴 수단이 없어지고,
+                                // 그 상태로 저장하면 여러 날짜로 잡아 둔 예약이 **하루짜리로 줄어든다**.
+                                if (!e.target.value) return;
+                                setForm(prev => ({ ...prev, endDate: e.target.value }));
+                            }}
                             className="input text-sm px-2 h-[38px]"
                         />
                     </div>

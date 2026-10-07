@@ -15,13 +15,28 @@ import OfflineBanner from './components/common/OfflineBanner';
 import App from './App';
 import UpdatePrompt from './components/common/UpdatePrompt';
 import InstallPrompt from './components/common/InstallPrompt';
+import { takePendingSessionLoss } from './lib/sessionBoot';
+import { auth } from './lib/firebaseAuth';
 
 // 본 웹 폰트는 이 엔트리에서만 붙인다 (공개 랜딩은 폴백 서체로 빠르게 — 근거는 webFont.ts)
 import { loadWebFont } from './lib/webFont';
 loadWebFont();
 
 // Sentry 지연 초기화
-import('./lib/sentry').then(m => m.initSentry()).catch(() => { });
+import('./lib/sentry').then((m) => {
+    m.initSentry();
+    // 지난 부팅에서 "세션이 없는 채로" 열렸다면(껐다 켰더니 로그인 화면) 그 증거를 지금 올린다.
+    // 그 시점은 경량 진입점이라 Sentry가 없었다 — 미뤄 두는 이유는 sessionBoot.ts에 적어 뒀다.
+    const evidence = takePendingSessionLoss();
+    if (evidence) {
+        // uid는 sentryScrub이 통과시키는 몇 안 되는 문자열이다 — 누가 겪는지가 없으면
+        // 같은 기기에서 반복되는 건지 여러 기관에 퍼진 건지 가릴 수 없다.
+        m.captureWarning('[Auth] 부팅 시 세션 없음 — 다시 로그인해 복귀', {
+            uid: auth.currentUser?.uid ?? null,
+            ...evidence,
+        });
+    }
+}).catch(() => { });
 
 // iOS 등 Background Sync 미지원 브라우저용 오프라인 큐 flush 폴백
 import { registerReconnectFlush } from './lib/offline/syncQueue';

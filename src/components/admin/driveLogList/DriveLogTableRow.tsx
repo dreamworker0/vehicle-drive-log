@@ -42,6 +42,29 @@ function DeleteButton({ onClick, disabled }: { onClick: () => void; disabled: bo
     );
 }
 
+/**
+ * 동승자 배지 — 인원수와 **이름**을 함께 보여준다.
+ *
+ * 이름(`passengerNames`)에는 직원뿐 아니라 직접 적어 넣은 이용자도 들어 있는데,
+ * 목록이 인원수만 보여 주던 때에는 관리자 화면 어디에서도 그 이름을 볼 수 없었다.
+ * 인원수는 운전자를 포함하므로 2명부터가 "동승자가 있는 운행"이다.
+ */
+function PassengerBadge({ count, names }: { count?: number; names?: string[] }) {
+    const named = names?.length ?? 0;
+    if ((count ?? 0) < 2 && named === 0) return null;
+    // 이름이 인원수보다 많은 옛 기록이 있다(이름을 적어도 인원에 안 세던 때의 것).
+    // 저장값을 그대로 찍으면 "1명 (김이용, 박이용)"처럼 자기모순으로 보인다.
+    const total = Math.max(count ?? 0, named + 1);
+    return (
+        <span className="flex items-center gap-1 min-w-0 text-primary-500 dark:text-primary-400" title={named > 0 ? `동승자: ${names!.join(', ')}` : undefined}>
+            <span className="whitespace-nowrap">👥 {total}명</span>
+            {named > 0 && (
+                <span className="truncate text-surface-500 dark:text-surface-400">({names!.join(', ')})</span>
+            )}
+        </span>
+    );
+}
+
 /** 공동 운전자 배지 (있을 때만 표시) */
 function CoDriverBadge({ names }: { names?: string[] }) {
     if (!names || names.length === 0) return null;
@@ -55,7 +78,7 @@ function CoDriverBadge({ names }: { names?: string[] }) {
     );
 }
 
-const GRID_COLUMNS = '80px 60px 60px 70px 100px 1fr 100px 40px 80px 76px';
+const GRID_COLUMNS = '80px 60px 60px 70px 100px 1fr 100px 96px 80px 76px';
 
 export default function DriveLogTableRow({ log, deletingId, onDelete }: DriveLogTableRowProps) {
     const navigate = useNavigate();
@@ -83,7 +106,7 @@ export default function DriveLogTableRow({ log, deletingId, onDelete }: DriveLog
                         <DeleteButton onClick={() => onDelete(log.id, log.driverName || '')} disabled={isDeleting} />
                     </div>
                 </div>
-                <div className="flex items-center gap-2 text-xs text-surface-500 dark:text-surface-400">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-surface-500 dark:text-surface-400">
                     <span>{log.vehicleName}</span>
                     <span>·</span>
                     {/* 분관을 등록한 기관에서만 값이 있다 — 어디서 출발한 차인지 목록에서 바로 구분된다 */}
@@ -94,9 +117,7 @@ export default function DriveLogTableRow({ log, deletingId, onDelete }: DriveLog
                             ({formatStartDatePrefix(log)}{log.startTime || '?'} ~ {log.endTime || '?'})
                         </span>
                     )}
-                    {(log.passengerCount ?? 0) > 1 && (
-                        <span className="text-primary-500 dark:text-primary-400">👥 {log.passengerCount}명</span>
-                    )}
+                    <PassengerBadge count={log.passengerCount} names={log.passengerNames} />
                 </div>
             </div>
 
@@ -129,8 +150,16 @@ export default function DriveLogTableRow({ log, deletingId, onDelete }: DriveLog
                         {log.startKm?.toLocaleString()} → {log.endKm?.toLocaleString()}
                     </p>
                 </div>
-                <div className="text-center">
-                    <p className="text-xs text-surface-600 dark:text-surface-400">{log.passengerCount || '-'}</p>
+                <div className="text-center min-w-0" title={log.passengerNames?.length ? `동승자: ${log.passengerNames.join(', ')}` : undefined}>
+                    <p className="text-xs text-surface-600 dark:text-surface-400">
+                        {log.passengerCount ? Math.max(log.passengerCount, (log.passengerNames?.length ?? 0) + 1) : '-'}
+                    </p>
+                    {/* 이름은 칸에 적어 둔다 — 길면 잘리지만 전체는 툴팁으로 볼 수 있다 */}
+                    {(log.passengerNames?.length ?? 0) > 0 && (
+                        <p className="text-[10px] text-surface-400 dark:text-surface-500 truncate">
+                            {log.passengerNames!.join(', ')}
+                        </p>
+                    )}
                 </div>
                 <div className="text-right">
                     <span className="font-bold text-primary-600 dark:text-primary-400">{distance.toLocaleString()} km</span>

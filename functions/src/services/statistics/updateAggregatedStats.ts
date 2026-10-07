@@ -1,5 +1,6 @@
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getKSTMonthKey } from "../../utils/kstDate";
+import { markStaleMonths } from "./staleMonths";
 
 /** 타임스탬프에서 월 키(YYYY-MM) 추출 */
 export const getMonthKey = (data: FirebaseFirestore.DocumentData | undefined): string | null => {
@@ -52,6 +53,8 @@ export async function handleStatsOnCreate(orgId: string, afterData: FirebaseFire
     } catch (error) {
         console.error(`[handleStatsOnCreate] 통계 업데이트 실패 (${orgId}):`, error);
     }
+    // 지난달 이전에 소급 입력한 기록 — 야간 집계가 그 달을 다시 계산하도록 표시한다
+    await markStaleMonths(orgId, [monthKey]);
 }
 
 /**
@@ -67,6 +70,9 @@ export async function handleStatsOnUpdate(orgId: string, beforeData: FirebaseFir
     const beforeMonth = getMonthKey(beforeData);
     const afterMonth = getMonthKey(afterData);
     const monthChanged = beforeMonth && afterMonth && beforeMonth !== afterMonth;
+
+    // 거리가 그대로여도 운전자·시각·하이패스 등이 바뀌면 그 달 분석 숫자가 달라진다 — 아래 조기 반환보다 먼저
+    await markStaleMonths(orgId, [beforeMonth, afterMonth]);
 
     if (distanceChange === 0 && !monthChanged) return;
 
@@ -134,4 +140,6 @@ export async function handleStatsOnDelete(orgId: string, beforeData: FirebaseFir
     } catch (error) {
         console.error(`[handleStatsOnDelete] 통계 업데이트 실패 (${orgId}):`, error);
     }
+    // 보존 기한 정리(3년)로 지워진 기록은 1년 표시 범위 밖이라 표시되지 않는다(staleMonths.ts)
+    await markStaleMonths(orgId, [monthKey]);
 }

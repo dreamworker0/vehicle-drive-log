@@ -84,15 +84,114 @@ beforeEach(() => {
 });
 
 describe('auditLog — 트리거 배선', () => {
-    it('6개 트리거가 driveLogs·users의 생성/수정/삭제에 정확히 걸린다', () => {
+    it('driveLogs·users·reservations의 생성/수정/삭제 9개 + 차량 삭제 1개에 정확히 걸린다', () => {
         expect(Object.keys(capturedTriggers).sort()).toEqual([
             'driveLogs/{logId}:create',
             'driveLogs/{logId}:delete',
             'driveLogs/{logId}:update',
+            'reservations/{reservationId}:create',
+            'reservations/{reservationId}:delete',
+            'reservations/{reservationId}:update',
             'users/{userId}:create',
             'users/{userId}:delete',
             'users/{userId}:update',
+            'vehicles/{vehicleId}:delete',
         ]);
+    });
+
+    // 차량을 지워도 운행일지는 남는다. 월간 참조 무결성 점검이 이 기록으로
+    // "삭제된 차량의 보존 기록"과 "없는 차량을 가리키는 위조"를 가른다.
+    it('차량 삭제는 기관·대상과 함께 남기고, 삭제자는 unknown으로 둔다', async () => {
+        await fireDelete('vehicles/{vehicleId}', { vehicleId: 'v1' }, { organizationId: 'org1', lastEditedByUid: 'someone' });
+        expect(lastEntry()).toMatchObject({
+            organizationId: 'org1',
+            action: 'delete',
+            targetType: 'vehicle',
+            targetId: 'v1',
+            actorUid: null,
+            actorSource: 'unknown',
+            subjectUids: [],
+            vehicleId: 'v1',
+        });
+    });
+
+    // 점검 화면의 차량별 조회 근거. 차량은 개인정보가 아니라 최소수집에 걸리지 않는다.
+    it('운행일지 생성·수정·삭제는 관련 차량을 함께 남긴다 (수정은 바뀐 뒤 차량)', async () => {
+        await fireCreate(DRIVE_LOG, { logId: 'dl-v1' }, { organizationId: 'org-1', driverUid: 'd1', vehicleId: 'car-1' });
+        expect(lastEntry().vehicleId).toBe('car-1');
+
+        await fireUpdate(DRIVE_LOG, { logId: 'dl-v1' },
+            { organizationId: 'org-1', driverUid: 'd1', vehicleId: 'car-1', destination: '구청' },
+            { organizationId: 'org-1', driverUid: 'd1', vehicleId: 'car-2', destination: '시청' },
+        );
+        expect(lastEntry().vehicleId).toBe('car-2');
+
+        await fireDelete(DRIVE_LOG, { logId: 'dl-v1' }, { organizationId: 'org-1', driverUid: 'd1', vehicleId: 'car-2' });
+        expect(lastEntry().vehicleId).toBe('car-2');
+    });
+
+    it('차량이 없는 운행일지는 vehicleId 키를 만들지 않는다', async () => {
+        await fireCreate(DRIVE_LOG, { logId: 'dl-v2' }, { organizationId: 'org-1', driverUid: 'd1', vehicleId: '' });
+        expect(lastEntry()).not.toHaveProperty('vehicleId');
+    });
+
+    describe('예약', () => {
+        const RES = 'reservations/{reservationId}';
+
+        it('생성: 콜러블이 남긴 호출자를 행위자로, 예약자·동승자(직원)를 정보주체로, 차량을 함께 남긴다', async () => {
+            await fireCreate(RES, { reservationId: 'r1' }, {
+                organizationId: 'org-1', vehicleId: 'car-1', reservedByUid: 'emp1',
+                passengerUids: ['emp2'], passengerNames: ['박동승', '외부 이용자'],
+                lastEditedByUid: 'adm1', lastEditId: 'e1',
+            });
+            expect(lastEntry()).toMatchObject({
+                organizationId: 'org-1', action: 'create', targetType: 'reservation', targetId: 'r1',
+                actorUid: 'adm1', actorSource: 'stamp', vehicleId: 'car-1',
+            });
+            expect(lastEntry().subjectUids).toEqual(['emp1', 'emp2']);
+            // 외부 동승자 이름은 기록에 들어가지 않는다
+            expect(JSON.stringify(lastEntry())).not.toContain('외부 이용자');
+        });
+
+        it('생성: 스탬프가 없으면(캘린더 동기화 등 서버 생성) 행위자를 지어내지 않는다', async () => {
+            await fireCreate(RES, { reservationId: 'r2' }, { organizationId: 'org-1', vehicleId: 'car-1', reservedByUid: 'emp1' });
+            expect(lastEntry()).toMatchObject({ actorUid: null, actorSource: 'unknown' });
+        });
+
+        it('수정: 이번 쓰기가 새 lastEditId를 찍었을 때만 행위자로 인정한다', async () => {
+            await fireUpdate(RES, { reservationId: 'r3' },
+                { organizationId: 'org-1', reservedByUid: 'emp1', status: 'reserved', lastEditedByUid: 'emp1', lastEditId: 'e1' },
+                { organizationId: 'org-1', reservedByUid: 'emp1', status: 'cancelled', lastEditedByUid: 'adm1', lastEditId: 'e2' },
+            );
+            expect(lastEntry()).toMatchObject({ action: 'update', actorUid: 'adm1', actorSource: 'stamp', changedFields: ['status'] });
+        });
+
+        it('수정: 서버 쓰기처럼 스탬프를 그대로 두면 마지막 수정자에게 귀속하지 않는다', async () => {
+            // 상태 일괄 전환이 예약을 completed로 닫았다 — 스탬프는 지난번 직원의 것이 그대로 남아 있다
+            await fireUpdate(RES, { reservationId: 'r4' },
+                { organizationId: 'org-1', reservedByUid: 'emp1', status: 'in_use', lastEditedByUid: 'emp1', lastEditId: 'e1' },
+                { organizationId: 'org-1', reservedByUid: 'emp1', status: 'completed', lastEditedByUid: 'emp1', lastEditId: 'e1' },
+            );
+            expect(lastEntry()).toMatchObject({ actorUid: null, actorSource: 'unknown' });
+        });
+
+        it('수정: 경로 거리·알림 표시 같은 운영 필드만 바뀌면 기록하지 않는다', async () => {
+            mockSet.mockClear();
+            await fireUpdate(RES, { reservationId: 'r5' },
+                { organizationId: 'org-1', reservedByUid: 'emp1', routeDistance: 10, driveLogReminderSent: false },
+                { organizationId: 'org-1', reservedByUid: 'emp1', routeDistance: 12, driveLogReminderSent: true },
+            );
+            expect(mockSet).not.toHaveBeenCalled();
+        });
+
+        it('삭제: 행위자는 unknown, 차량·정보주체는 남긴다', async () => {
+            await fireDelete(RES, { reservationId: 'r6' },
+                { organizationId: 'org-1', vehicleId: 'car-2', reservedByUid: 'emp1', lastEditedByUid: 'emp1', lastEditId: 'e9' });
+            expect(lastEntry()).toMatchObject({
+                action: 'delete', targetType: 'reservation', actorUid: null, actorSource: 'unknown', vehicleId: 'car-2',
+            });
+            expect(lastEntry().subjectUids).toEqual(['emp1']);
+        });
     });
 
     it('모든 트리거가 서울 리전 + retry로 등록된다', () => {
@@ -104,13 +203,15 @@ describe('auditLog — 트리거 배선', () => {
         }
     });
 
-    it('index.ts가 6개 트리거를 전부 export한다', () => {
+    it('index.ts가 감사 트리거를 전부 export한다', () => {
         // export하지 않으면 배포되지 않는다(CLAUDE.md 절대 규칙 #3). 소스를 직접 읽어 고정한다 —
         // index.ts를 import하면 firebase-admin 초기화까지 끌려와 단위 테스트에 부적합하다.
         const src = fs.readFileSync(path.join(__dirname, '..', 'index.ts'), 'utf-8');
         for (const name of [
             'auditDriveLogCreated', 'auditDriveLogUpdated', 'auditDriveLogDeleted',
             'auditUserCreated', 'auditUserUpdated', 'auditUserDeleted',
+            'auditVehicleDeleted',
+            'auditReservationCreated', 'auditReservationUpdated', 'auditReservationDeleted',
         ]) {
             expect(src).toContain(name);
         }

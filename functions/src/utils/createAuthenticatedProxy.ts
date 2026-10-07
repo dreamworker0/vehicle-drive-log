@@ -22,6 +22,7 @@ type AuthenticatedHandler = (
 const CORS_ORIGINS = [
     "https://vehicle-drive-log.web.app",
     "https://vehicle-drive-log.firebaseapp.com",
+    "https://drivelog.socialprism.co.kr",
 ] as const;
 
 /**

@@ -175,9 +175,87 @@ describe('buildLogData', () => {
         expect(result.endKm).toBe(1050);
         expect(result.distance).toBe(50);
 
-        expect(result.passengerCount).toBe(4); // 기사 + 직원 동승자 1명 + 외부 2명
+        // 기사 1 + 이름이 적힌 3명(직원 1 + 직접 입력 2) + 이름 없이 숫자로만 센 2명
+        expect(result.passengerCount).toBe(6);
         expect(result.passengerNames).toEqual(['김철수', '김종원', '이영희']);
         expect(result.isRetroactive).toBe(true);
+    });
+
+    it('이름만 적은 동승자도 탑승인원에 센다 — 이용자는 직원 목록에 없어 이름으로만 적힌다', () => {
+        const context = {
+            orgId: 'org1',
+            user: { uid: 'u1', displayName: '홍길동', email: 'hong@test.com' },
+            userData: { name: '홍길동' },
+            selectedVehicle: { vehicleType: 'sedan' },
+            selectedPassengers: [],
+            externalPassengerNames: '김이용, 박이용',
+            // '외부 인원' 숫자는 올리지 않았다 — 예전에는 이 경우 운전자 1명으로 저장됐다
+            externalPassengerCount: 0,
+            isRetroactive: false,
+        };
+
+        const result = buildLogData(baseForm, context);
+        expect(result.passengerCount).toBe(3);
+        expect(result.passengerNames).toEqual(['김이용', '박이용']);
+    });
+
+    it('자동완성으로 직접 입력칸에 들어온 조직원 이름은 두 번 세지 않는다', () => {
+        const context = {
+            orgId: 'org1',
+            user: { uid: 'u1', displayName: '홍길동', email: 'hong@test.com' },
+            userData: { name: '홍길동' },
+            selectedVehicle: { vehicleType: 'sedan' },
+            selectedPassengers: [{ name: '김철수' }],
+            externalPassengerNames: '김철수, 박이용',
+            externalPassengerCount: 0,
+            isRetroactive: false,
+        };
+
+        const result = buildLogData(baseForm, context);
+        expect(result.passengerNames).toEqual(['김철수', '박이용']);
+        expect(result.passengerCount).toBe(3);
+    });
+
+    describe('도착 계기판 사진 확인 표시(endKmSource)', () => {
+        const ctx = (over: Record<string, unknown> = {}) => ({
+            orgId: 'org1',
+            user: { uid: 'u1', displayName: '홍길동', email: 'hong@test.com' },
+            userData: { name: '홍길동' },
+            selectedVehicle: { vehicleType: 'sedan' },
+            selectedPassengers: [],
+            isRetroactive: false,
+            ...over,
+        });
+
+        it('사진이 읽어 준 값을 그대로 저장하면 표시를 남긴다', () => {
+            const result = buildLogData(baseForm, ctx({ ocrUsed: true, ocrRecognizedKm: 1050 }));
+            expect(result.endKmSource).toBe('ocr');
+        });
+
+        it('사진 뒤에 손으로 고쳐 쓴 값에는 표시를 남기지 않는다', () => {
+            // 사진은 1048로 읽었는데 저장되는 값은 1050 — 사람이 고친 값이다
+            const result = buildLogData(baseForm, ctx({ ocrUsed: true, ocrRecognizedKm: 1048 }));
+            expect(result.endKmSource).toBeUndefined();
+        });
+
+        it('사진을 안 썼으면 표시가 없다', () => {
+            const result = buildLogData(baseForm, ctx());
+            expect(result.endKmSource).toBeUndefined();
+        });
+
+        it('수정 저장에서 도착 km를 건드리지 않았으면 표시를 지킨다', () => {
+            const result = buildLogData(baseForm, ctx({
+                previousLog: { endKm: 1050, endKmSource: 'ocr' as const },
+            }));
+            expect(result.endKmSource).toBe('ocr');
+        });
+
+        it('수정에서 도착 km를 바꾸면 표시가 사라진다 — 더 이상 사진으로 확인된 값이 아니다', () => {
+            const result = buildLogData({ ...baseForm, endKm: '1060' }, ctx({
+                previousLog: { endKm: 1050, endKmSource: 'ocr' as const },
+            }));
+            expect(result.endKmSource).toBeUndefined();
+        });
     });
 
     it('폼에 대표 운전자가 없으면 작성자로 폴백하고, createdByUid는 항상 작성자다', () => {

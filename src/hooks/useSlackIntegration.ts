@@ -139,7 +139,7 @@ export function useSlackIntegration() {
         void loadStatus().then((s) => {
             if (s?.connected) void diagnose({ silent: true });
         });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 때 한 번만: OAuth 복귀 쿼리 처리와 상태 로드는 재실행하면 토스트·진단이 중복된다
     }, []);
 
     return {

@@ -15,14 +15,15 @@ vi.mock('react-router-dom', async () => {
 });
 
 // 2. Auth 모킹
-let mockUserData = { welcomeDismissed: true };
+let mockUserData: { welcomeDismissed: boolean; role?: string } = { welcomeDismissed: true };
+let mockOrgFeatures = { ...ALL_FEATURES_ON };
 vi.mock('../../hooks/useAuth', () => ({
     useAuth: () => ({
         user: { uid: 'test-user-123' },
         userData: mockUserData,
         // 기능 플래그 전체를 담는다 — 하나만 넣어 두면 나중에 다른 플래그를 읽는
         // 코드가 들어왔을 때 조용히 undefined가 되고 런타임에서야 터진다.
-        orgFeatures: { ...ALL_FEATURES_ON },
+        orgFeatures: mockOrgFeatures,
     }),
 }));
 
@@ -61,20 +62,63 @@ describe('TodayDashboard', () => {
             navigateToQuickDrive: vi.fn(),
             myLogsCount: 5,
         };
+        mockOrgFeatures = { ...ALL_FEATURES_ON };
+        mockUserData = { welcomeDismissed: true };
         // localStorage mock 초기화
         const store: Record<string, string> = { 'employee-welcome-dismissed': 'true' };
         vi.spyOn(Storage.prototype, 'getItem').mockImplementation((key) => store[key] || null);
         vi.spyOn(Storage.prototype, 'setItem').mockImplementation((key, value) => { store[key] = value.toString(); });
     });
 
-    it('예약이 없을 때 예약 없음 안내 문구가 표시된다', () => {
+    it('예약이 없을 때 바로 운행을 주 동작으로, 예약을 보조 동작으로 보여 준다', () => {
         render(
             <MemoryRouter>
                 <TodayDashboard />
             </MemoryRouter>
         );
-        expect(screen.getByText('오늘 예약 없음')).toBeInTheDocument();
-        expect(screen.getByText('새 예약을 등록해보세요')).toBeInTheDocument();
+        expect(screen.getByText('오늘 잡힌 예약이 없어요')).toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: /바로 운행 시작/ }));
+        expect(mockUseTodayDashboardReturn.navigateToQuickDrive).toHaveBeenCalled();
+
+        fireEvent.click(screen.getByRole('button', { name: /미리 예약하기/ }));
+        expect(mockUseTodayDashboardReturn.navigateToReservations).toHaveBeenCalled();
+
+        // 같은 동작이 두 번 보이지 않게 상단 작은 '바로 운행' 버튼은 숨긴다
+        expect(screen.queryByRole('button', { name: /^🚀\s*바로 운행$/ })).not.toBeInTheDocument();
+    });
+
+    it('승인제 기관이 바로 운행을 끄면 직원에게 바로 운행 버튼을 보이지 않는다', () => {
+        mockOrgFeatures = { ...ALL_FEATURES_ON, quickDrive: false };
+        mockUserData = { welcomeDismissed: true, role: 'employee' };
+        render(
+            <MemoryRouter>
+                <TodayDashboard />
+            </MemoryRouter>
+        );
+        expect(screen.queryByRole('button', { name: /바로 운행 시작/ })).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /미리 예약하기/ })).toBeInTheDocument();
+    });
+
+    it('바로 운행을 꺼도 기관 관리자에게는 버튼을 보여 준다', () => {
+        mockOrgFeatures = { ...ALL_FEATURES_ON, quickDrive: false };
+        mockUserData = { welcomeDismissed: true, role: 'admin' };
+        render(
+            <MemoryRouter>
+                <TodayDashboard />
+            </MemoryRouter>
+        );
+        expect(screen.getByRole('button', { name: /바로 운행 시작/ })).toBeInTheDocument();
+    });
+
+    it('운행 중이면 빈 카드에 바로 운행 시작 버튼을 두지 않는다', () => {
+        mockUseTodayDashboardReturn.hasActiveDrive = true;
+        render(
+            <MemoryRouter>
+                <TodayDashboard />
+            </MemoryRouter>
+        );
+        expect(screen.queryByRole('button', { name: /바로 운행 시작/ })).not.toBeInTheDocument();
     });
 
     // 불러오기 실패는 빈 예약과 같은 화면이 되면 안 된다 — 운전자가 자기 예약을 없는 것으로 본다(Phase 220).
@@ -89,11 +133,26 @@ describe('TodayDashboard', () => {
         );
 
         expect(screen.getByText('예약을 불러오지 못했습니다')).toBeInTheDocument();
-        // 같은 자리의 "오늘 예약 없음"은 나오지 않아야 한다. 둘이 함께 뜨면 구분한 의미가 없다.
-        expect(screen.queryByText('오늘 예약 없음')).not.toBeInTheDocument();
+        // 같은 자리의 "예약 없음" 안내는 나오지 않아야 한다. 둘이 함께 뜨면 구분한 의미가 없다.
+        expect(screen.queryByText('오늘 잡힌 예약이 없어요')).not.toBeInTheDocument();
 
         fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
         expect(refresh).toHaveBeenCalledTimes(1);
+    });
+
+    // 예약이 있을 수도 있으니 바로 운행을 주 동작으로 키우지 않되, 길은 막지 않는다.
+    it('불러오기가 실패하면 큰 바로 운행 타일 대신 상단의 작은 바로 운행 버튼을 둔다', () => {
+        mockUseTodayDashboardReturn = { ...mockUseTodayDashboardReturn, loadFailed: true, refresh: vi.fn() };
+
+        render(
+            <MemoryRouter>
+                <TodayDashboard />
+            </MemoryRouter>
+        );
+
+        expect(screen.queryByRole('button', { name: /바로 운행 시작/ })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /^🚀\s*바로 운행$/ }));
+        expect(mockUseTodayDashboardReturn.navigateToQuickDrive).toHaveBeenCalled();
     });
 
     it('미작성 운행일지 알림이 있을 경우 카드와 바로 작성 버튼이 표시된다', () => {

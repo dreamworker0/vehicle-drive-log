@@ -12,6 +12,7 @@
  */
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, authReady } from './lib/firebaseAuth';
+import { readReturningHint, writeReturningHint, noteUnauthenticatedBoot } from './lib/sessionBoot';
 import './index.css';
 
 // 로딩 표시 (Auth 상태 확인 중)
@@ -33,6 +34,18 @@ root.innerHTML = `
  * catch가 없던 동안에는 위 "로딩 중..." 화면이 그대로 남아, 회선이 불안정한 환경의
  * 사용자에게는 앱이 죽은 것처럼 보였다(랜딩 청크를 2회 연속 실패시켜 실측).
  * React 없이 그릴 수 있어야 하므로 로딩 화면과 같은 방식으로 직접 마크업을 넣는다.
+ *
+ * ## 자동 새로고침을 넣지 않은 이유 — 해 보고 물렸다
+ *
+ * 이 실패의 **가장 흔한 원인은 네트워크가 아니라 배포**다. 서비스워커가 프리캐시한 옛
+ * index.html이 사라진 해시 청크를 부르면, Hosting의 SPA 리라이트가 index.html을 돌려주고
+ * 브라우저가 text/html을 모듈로 받아 거절한다. 새로고침 한 번이면 새 셸을 받아 풀린다.
+ *
+ * 그래서 한 번 자동으로 새로고침하게 해 봤는데(2026-09-11), CI e2e가 두 번 연속 깨졌다 —
+ * `Navigation to "/" is interrupted by another navigation to "/"`. **부팅 중의 리로드는 그
+ * 시점에 진행 중인 네비게이션을 가로챈다.** 사용자 화면에서도 같은 일이 일어날 수 있어
+ * (막 누른 링크가 취소된다) 되돌렸다. 원인을 못 가린 채로 리로드를 심는 대신, **문구를
+ * 사실대로** 고쳐 사용자가 한 번 누르면 낫게 했다.
  */
 function showBootError(err: unknown) {
     console.error('앱 로드 실패:', err);
@@ -41,7 +54,8 @@ function showBootError(err: unknown) {
     <div style="text-align:center;font-family:system-ui,sans-serif;max-width:320px">
       <p style="color:#fff;font-size:16px;font-weight:600;margin:0 0 8px">앱을 불러오지 못했습니다</p>
       <p style="color:rgba(255,255,255,.75);font-size:14px;line-height:1.6;margin:0 0 20px">
-        네트워크 상태를 확인한 뒤 다시 시도해 주세요.
+        앱이 새 버전으로 바뀌었거나 연결이 잠시 끊겼을 수 있습니다.<br />
+        아래 버튼을 누르면 다시 불러옵니다.
       </p>
       <button id="boot-retry" style="min-height:48px;padding:0 24px;border:0;border-radius:12px;background:#fff;color:#3730a3;font-size:14px;font-weight:600;cursor:pointer">
         다시 시도
@@ -68,31 +82,6 @@ if ('serviceWorker' in navigator) {
   navigator.serviceWorker.ready.then((reg) => {
     reg.update().catch(() => { /* 네트워크 에러 무시 */ });
   });
-}
-
-/**
- * 이전에 로그인한 적이 있는 브라우저인지 표시하는 힌트.
- *
- * appEntry 프리로드를 **누구에게 걸지** 정하는 데만 쓴다. 인증 판정은 여전히
- * `onAuthStateChanged`가 하며, 이 값이 틀려도(로그아웃 뒤 남아 있거나 지워졌거나)
- * 화면 동작은 달라지지 않는다 — 프리로드가 한 번 헛돌거나 한 번 늦을 뿐이다.
- */
-const RETURNING_VISITOR_KEY = 'vdl:returning-visitor';
-
-function readReturningHint(): boolean {
-    try {
-        return localStorage.getItem(RETURNING_VISITOR_KEY) === '1';
-    } catch {
-        // 시크릿 모드·저장소 차단 환경 — 첫 방문으로 취급한다(더 가벼운 쪽)
-        return false;
-    }
-}
-
-function writeReturningHint(value: boolean) {
-    try {
-        if (value) localStorage.setItem(RETURNING_VISITOR_KEY, '1');
-        else localStorage.removeItem(RETURNING_VISITOR_KEY);
-    } catch { /* 저장소를 못 쓰면 힌트 없이 동작한다 */ }
 }
 
 /**
@@ -132,8 +121,9 @@ authReady.then(() => {
                 const { renderFullApp } = await (appEntryPreload ?? import('./appEntry'));
                 renderFullApp();
             } else {
-                // 로그아웃했거나 애초에 로그인한 적이 없는 브라우저 — 다음 방문도 가볍게 연다
-                writeReturningHint(false);
+                // 표식을 정리하고, 세션이 있었어야 하는 기기였다면 증거를 남긴다.
+                // (다음 방문을 가볍게 여는 것도 이 안에서 함께 한다 — 순서가 계약이 되지 않게)
+                noteUnauthenticatedBoot();
                 // 비인증 사용자 → 경량 앱 로드
                 const { renderLightApp } = await import('./lightEntry');
                 renderLightApp();

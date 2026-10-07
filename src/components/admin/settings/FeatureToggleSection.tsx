@@ -9,6 +9,8 @@ import Toggle from '../../common/Toggle';
 
 export interface FeatureToggleValues {
     requireReservationApproval: boolean;
+    /** 승인제에서 바로 운행 허용(미설정=허용) */
+    quickDriveWithApproval: boolean;
     hipassEnabled: boolean;
     maintenanceEnabled: boolean;
     maintenanceEmployeeAccess: boolean;
@@ -139,6 +141,18 @@ export default function FeatureToggleSection({ values, onChange }: FeatureToggle
                 <div className="divide-y divide-surface-100 dark:divide-surface-700">
                     {feature('requireReservationApproval')}
                 </div>
+                {values.requireReservationApproval && (
+                    <MethodGroup caption="바로 운행 · 예약 관리자 승인에 적용">
+                        <MethodRow
+                            label="바로 운행은 승인 없이 허용"
+                            desc={values.quickDriveWithApproval
+                                ? '바로 운행은 이미 출발하는 운행이라 승인 없이 시작되고, 관리자에게 출발 알림이 갑니다.'
+                                : '직원 화면에서 바로 운행이 사라집니다. 직원은 미리 예약 후 승인을 받아야 출발할 수 있어요. 기관 관리자는 계속 바로 운행을 쓸 수 있습니다.'}
+                            checked={values.quickDriveWithApproval}
+                            onChange={(next) => onChange({ quickDriveWithApproval: next })}
+                        />
+                    </MethodGroup>
+                )}
             </div>
 
             {/* 차량 관리 */}

@@ -10,7 +10,7 @@ import type { Vehicle } from '../types/vehicle';
 import type { MaintenanceRecord } from '../types/maintenance';
 import { getVehicles, getMaintenanceRecords, createMaintenanceRecord, updateMaintenanceRecord, deleteMaintenanceRecord } from '../lib/firestore';
 import { toLocalDateStr } from '../lib/dateUtils';
-import { validateNonNegativeFields } from './utils/numberValidation';
+import { validateNonNegativeFields, parseIntegerInput } from './utils/numberValidation';
 
 const INITIAL_FORM = {
     vehicleId: '', vehicleName: '',
@@ -116,9 +116,9 @@ export default function useEmployeeMaintenance() {
                 date: form.date,
                 type: form.type,
                 description: form.description.trim(),
-                cost: form.cost ? parseInt(String(form.cost)) : null,
+                cost: form.cost ? parseIntegerInput(form.cost) : null,
                 shop: form.shop.trim(),
-                km: form.km ? parseInt(String(form.km)) : null,
+                km: form.km ? parseIntegerInput(form.km) : null,
                 createdByUid: currentUid,
                 createdByName: userData?.name || user?.displayName || '',
                 // 차량 차단은 관리자 전용 — 직원은 항상 false

@@ -70,7 +70,7 @@ const SYSTEM_ORG_ID = "__system__";
 const TRIGGER_OPTS = { region: "asia-northeast3", memory: "256MiB" as const, retry: true };
 
 type AuditAction = "create" | "update" | "delete";
-type AuditTargetType = "driveLog" | "user";
+type AuditTargetType = "driveLog" | "user" | "vehicle" | "reservation";
 
 /**
  * 기록 대상 필드 화이트리스트 — 개인정보 필드와 접근 권한 필드만.
@@ -95,6 +95,26 @@ const AUDITED_FIELDS: Record<AuditTargetType, ReadonlySet<string>> = {
         // 변동이므로 필드가 들어오는 시점부터 자동으로 기록되게 미리 넣어 둔다.
         "consent",
     ]),
+    // 차량은 자산 데이터라 필드 변경을 기록하지 않는다 — **삭제만** 남긴다(auditVehicleDeleted).
+    vehicle: new Set(),
+    // 예약 — 예약자·동승자 이름과 목적지를 담는다. 일정·차량·상태(승인·반려·취소·운행)는
+    // "누가 언제 차를 잡고 풀었나"라 점검에서 묻는 항목이다. 경로 거리·알림 표시 같은
+    // 계산·운영 필드는 넣지 않는다(서버가 수시로 고쳐 기록이 소음이 된다).
+    reservation: new Set([
+        "organizationId",
+        "reservedByUid",
+        "reservedByName",
+        "vehicleId",
+        "date",
+        "startTime",
+        "endTime",
+        "status",
+        "destination",
+        "purpose",
+        "passengerUids",
+        "passengerNames",
+        "rejectedReason",
+    ]),
 };
 
 interface AuditEntry {
@@ -106,6 +126,11 @@ interface AuditEntry {
     actorSource: "stamp" | "document" | "unknown";
     subjectUids: string[];
     changedFields?: string[];
+    /**
+     * 관련 차량 — 점검 화면의 차량별 조회용. 차량은 자산 데이터라 개인정보가 아니므로
+     * 최소수집 원칙에 걸리지 않는다. 없으면 키 자체를 넣지 않는다(빈 값으로 오염시키지 않는다).
+     */
+    vehicleId?: string;
 }
 
 /**
@@ -194,6 +219,44 @@ function stampedActor(data: Record<string, unknown> | undefined): string | null 
     return typeof uid === "string" && uid ? uid : null;
 }
 
+/**
+ * 예약의 정보주체 — 예약자와 동승자(직원).
+ * 이름만 있는 외부 동승자는 넣지 않는다(driveLogSubjects와 같은 이유 — 최소수집).
+ */
+function reservationSubjects(data: Record<string, unknown> | undefined): string[] {
+    if (!data) return [];
+    const subjects = new Set<string>();
+    if (typeof data.reservedByUid === "string" && data.reservedByUid) subjects.add(data.reservedByUid);
+    if (Array.isArray(data.passengerUids)) {
+        for (const uid of data.passengerUids) if (typeof uid === "string" && uid) subjects.add(uid);
+    }
+    return [...subjects];
+}
+
+/**
+ * 예약 수정의 행위자 — **이번 쓰기가 스탬프를 새로 찍었을 때만** 믿는다.
+ *
+ * 예약은 사용자만 고치지 않는다. 캘린더 동기화·상태 일괄 전환 같은 서버 쓰기는 스탬프를 건드리지
+ * 않으므로, `lastEditedByUid`만 보면 그 변경이 **마지막으로 손댄 사람**에게 귀속된다(무고한 귀속).
+ * 그래서 쓰기마다 새 `lastEditId`를 함께 심고(클라이언트 reservationActorStamp, 서버 콜러블),
+ * 그 값이 바뀐 쓰기에서만 행위자로 인정한다. Rules가 둘 중 하나라도 바뀌면 uid가 본인이어야
+ * 한다고 강제하므로 타인 명의로 찍을 수 없다.
+ */
+function freshReservationActor(
+    before: Record<string, unknown> | undefined,
+    after: Record<string, unknown> | undefined,
+): string | null {
+    const editId = after?.lastEditId;
+    if (typeof editId !== "string" || !editId || editId === before?.lastEditId) return null;
+    return stampedActor(after);
+}
+
+/** 문서의 차량 ID — 있으면 `{ vehicleId }`, 없으면 빈 객체(키를 만들지 않는다) */
+function vehicleOf(data: Record<string, unknown> | undefined): { vehicleId?: string } {
+    const id = data?.vehicleId;
+    return typeof id === "string" && id ? { vehicleId: id } : {};
+}
+
 /** 기관 식별자를 정규화한다. 소속이 없으면 시스템 기관으로 남긴다(기록 누락 방지). */
 function orgIdOf(...candidates: unknown[]): string {
     for (const c of candidates) {
@@ -225,6 +288,7 @@ export const auditDriveLogCreated = onDocumentCreated(
             actorUid,
             actorSource: actorUid ? "document" : "unknown",
             subjectUids: driveLogSubjects(data),
+            ...vehicleOf(data),
         }, event.id);
     }
 );
@@ -252,6 +316,8 @@ export const auditDriveLogUpdated = onDocumentUpdated(
             actorSource: actorUid ? "stamp" : "unknown",
             subjectUids: driveLogSubjects(after),
             changedFields,
+            // 차량을 바꾼 수정이면 바뀐 뒤 차량으로 남긴다 — 이전 차량은 changedFields가 아니라 원본 이력의 몫이다
+            ...vehicleOf(after),
         }, event.id);
     }
 );
@@ -270,6 +336,7 @@ export const auditDriveLogDeleted = onDocumentDeleted(
             actorUid: null,
             actorSource: "unknown",
             subjectUids: driveLogSubjects(data),
+            ...vehicleOf(data),
         }, event.id);
     }
 );
@@ -344,6 +411,106 @@ export const auditUserDeleted = onDocumentDeleted(
             actorUid: null,
             actorSource: "unknown",
             subjectUids: [event.params.userId],
+        }, event.id);
+    }
+);
+
+/**
+ * 차량 삭제 — 개인정보는 아니지만 **삭제 사실**만 남긴다.
+ *
+ * 차량을 지워도 그 차량의 운행일지는 기관 기록으로 남는다. 월간 참조 무결성 점검
+ * (verifyDriveLogIntegrity)은 이 기록이 없으면 "원래 없던 차량을 가리키는 위조"와
+ * "삭제된 차량의 보존 기록"을 가를 근거가 없어, 차량을 지울 때마다 경고를 올렸다.
+ * 삭제자는 알 수 없으므로 unknown으로 둔다(파일 머리 주석의 삭제 원칙과 같다).
+ */
+export const auditVehicleDeleted = onDocumentDeleted(
+    { document: "vehicles/{vehicleId}", ...TRIGGER_OPTS },
+    async (event) => {
+        const data = event.data?.data();
+        if (!data) return;
+
+        await writeAuditLog({
+            organizationId: orgIdOf(data.organizationId),
+            action: "delete",
+            targetType: "vehicle",
+            targetId: event.params.vehicleId,
+            actorUid: null,
+            actorSource: "unknown",
+            subjectUids: [],
+            vehicleId: event.params.vehicleId,
+        }, event.id);
+    }
+);
+
+// ── 예약 ──
+// 예약자·동승자 이름과 목적지를 담는다. "누가 언제 어떤 차를 잡았다 풀었나"는 운행일지와 함께
+// 점검에서 묻는 항목이다(운영자 요청, 2026-10-05).
+
+export const auditReservationCreated = onDocumentCreated(
+    { document: "reservations/{reservationId}", ...TRIGGER_OPTS },
+    async (event) => {
+        const data = event.data?.data();
+        if (!data) return;
+
+        // 생성은 콜러블(createReservationSafe)이 Admin SDK로만 한다 — 호출자를 lastEditedByUid로 남긴다.
+        // 그게 없으면(캘린더 동기화 등 서버 생성) 시스템 생성이라 행위자를 지어내지 않는다.
+        const stamped = stampedActor(data);
+
+        await writeAuditLog({
+            organizationId: orgIdOf(data.organizationId),
+            action: "create",
+            targetType: "reservation",
+            targetId: event.params.reservationId,
+            actorUid: stamped,
+            actorSource: stamped ? "stamp" : "unknown",
+            subjectUids: reservationSubjects(data),
+            ...vehicleOf(data),
+        }, event.id);
+    }
+);
+
+export const auditReservationUpdated = onDocumentUpdated(
+    { document: "reservations/{reservationId}", ...TRIGGER_OPTS },
+    async (event) => {
+        const before = event.data?.before.data();
+        const after = event.data?.after.data();
+        if (!after) return;
+
+        const changedFields = diffFieldNames("reservation", before, after);
+        // 경로 거리·알림 표시 등 운영 필드만 바뀐 쓰기는 기록하지 않는다.
+        if (changedFields.length === 0) return;
+
+        const actorUid = freshReservationActor(before, after);
+
+        await writeAuditLog({
+            organizationId: orgIdOf(before?.organizationId, after.organizationId),
+            action: "update",
+            targetType: "reservation",
+            targetId: event.params.reservationId,
+            actorUid,
+            actorSource: actorUid ? "stamp" : "unknown",
+            subjectUids: reservationSubjects(after),
+            changedFields,
+            ...vehicleOf(after),
+        }, event.id);
+    }
+);
+
+export const auditReservationDeleted = onDocumentDeleted(
+    { document: "reservations/{reservationId}", ...TRIGGER_OPTS },
+    async (event) => {
+        const data = event.data?.data();
+        if (!data) return;
+
+        await writeAuditLog({
+            organizationId: orgIdOf(data.organizationId),
+            action: "delete",
+            targetType: "reservation",
+            targetId: event.params.reservationId,
+            actorUid: null,
+            actorSource: "unknown",
+            subjectUids: reservationSubjects(data),
+            ...vehicleOf(data),
         }, event.id);
     }
 );

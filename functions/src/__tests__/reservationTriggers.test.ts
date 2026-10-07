@@ -40,6 +40,13 @@ jest.mock('../core/sentry', () => ({
     captureError: (...args: unknown[]) => mockCaptureError(...args),
 }));
 
+// 겹침 검사는 호출 여부·인자만 본다 (LWW 판정은 실제 구현 그대로)
+const mockCheckConflict = jest.fn();
+jest.mock('../handlers/sync/conflictResolver', () => ({
+    ...jest.requireActual('../handlers/sync/conflictResolver'),
+    checkReservationTimeConflict: (...args: unknown[]) => mockCheckConflict(...args),
+}));
+
 // firebase-functions v2 트리거를 단순 래퍼로 mock
 jest.mock('firebase-functions/v2/firestore', () => ({
     onDocumentCreated: (_path: string, handler: Function) => handler,
@@ -66,7 +73,7 @@ describe('reservationTriggers', () => {
     const makeUpdateEvent = (before: Record<string, unknown>, after: Record<string, unknown>) => ({
         data: {
             before: { data: () => before },
-            after: { data: () => after },
+            after: { data: () => after, ref: { update: mockUpdate } },
         },
         params: { reservationId: 'res-1' },
     });
@@ -197,6 +204,28 @@ describe('reservationTriggers', () => {
             );
             await (onReservationUpdated as Function)(event);
             expect(mockUpdateCalendarEvent).not.toHaveBeenCalled();
+        });
+
+        it.each(['reminderSent', 'driveLogReminderSent', 'noShowReminderSent'])(
+            '알림 발송 표시(%s)만 바뀌면 차량을 조회하지 않고 끝낸다',
+            async (flag) => {
+                const base = { status: 'reserved', vehicleId: 'v1', organizationId: 'org1', date: '2026-01-01', startTime: '09:00', endTime: '10:00', calendarEventId: 'ev1' };
+                const event = makeUpdateEvent(base, { ...base, [flag]: true });
+                await (onReservationUpdated as Function)(event);
+                expect(mockGet).not.toHaveBeenCalled();
+                expect(mockUpdateCalendarEvent).not.toHaveBeenCalled();
+                expect(mockCreateInAppNotification).not.toHaveBeenCalled();
+            }
+        );
+
+        it('시간은 그대로 두고 차량만 바꿔도 겹침 검사를 돌린다 (2026-10-03 감사 발견 1)', async () => {
+            // 차량 변경이 조건에서 빠져 있던 동안은 차량만 바꾸면 이중 예약이 검사 없이 남았다
+            mockCheckConflict.mockResolvedValueOnce(true);
+            const base = { status: 'reserved', vehicleId: 'v1', organizationId: 'org1', date: '2026-10-10', startTime: '09:00', endTime: '10:00', reservedByUid: 'u1' };
+            const event = makeUpdateEvent(base, { ...base, vehicleId: 'v2' });
+            await (onReservationUpdated as Function)(event);
+            expect(mockCheckConflict).toHaveBeenCalledWith('v2', '2026-10-10', '09:00', '10:00', 'res-1');
+            expect(mockUpdate).toHaveBeenCalledWith({ status: 'rejected', rejectedReason: 'offline_time_conflict' });
         });
 
         it('취소 시 캘린더 이벤트를 삭제하고 인앱 알림을 전송한다', async () => {

@@ -215,5 +215,16 @@ describe('useFuelLog', () => {
 
             expect(mockCreateFuelLog).toHaveBeenCalledTimes(1);
         });
+
+        it('지수 표기(1e5)를 1로 저장하지 않는다', async () => {
+            // `<input type="number">`는 '1e5'를 유효한 값으로 넘긴다. 검증은 Number로 하고
+            // 저장은 parseInt로 하던 탓에, 검증을 통과한 100,000이 1로 저장될 수 있었다.
+            await submitWith({ meterReading: '1e5', fuelCost: '1e5' });
+
+            expect(mockCreateFuelLog).toHaveBeenCalledWith(expect.objectContaining({
+                meterReading: 100000,
+                fuelCost: 100000,
+            }));
+        });
     });
 });

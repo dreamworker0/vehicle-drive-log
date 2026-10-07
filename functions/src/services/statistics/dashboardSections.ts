@@ -342,6 +342,16 @@ export interface ReservationStatsResult {
 }
 
 /**
+ * 예약에 바로 운행 표시가 실제로 저장되기 시작한 날(#395 배포 2026-09-22 14:26 KST의 다음 날).
+ *
+ * 그 전 기록은 바로 운행도 표시 없이 저장돼 '사전 예약'과 구분할 수 없다. 30일 창에 섞이면
+ * 바로 운행 비율은 낮게, 추천·다일·반복 비율은 희석돼 보이고, 창이 밀리며 매일 조금씩
+ * 오르는 착시가 생긴다. 과거 30일 집계는 이 날부터 센다(창이 이 날을 지나면 영향 없음).
+ * 화면(ChartQuickDrive 등)의 안내 문구가 같은 날짜를 쓴다.
+ */
+export const QUICK_DRIVE_TRACKED_SINCE = "2026-09-23";
+
+/**
  * 예약 집계 — 빠른배차/추천/예약유형 비율과 30일 시계열, 미래 30일 예약유형 분포 계산.
  *
  * 입력 Date(thirtyDaysAgo, todayStart)와 year/month/kstNow는 호출자가 준비한 값을
@@ -353,15 +363,20 @@ export function computeReservationStats(
     thirtyDaysAgo: Date,
     todayStart: Date,
     orgFilterId: string | null,
+    /** 과거 집계의 시작 하한 (YYYY-MM-DD). 이 날 이전 예약과 시계열 칸은 빠진다 — 미래 분포에는 쓰지 않는다 */
+    trackedSince?: string,
 ): ReservationStatsResult {
     // thirtyDaysAgo는 호출자가 Date.now() 기준으로 만들어 시각(시/분/초)이 실려 있을 수 있다.
     // 아래 비교 대상 parsed는 new Date(y, m-1, dd)로 자정이므로, 시각을 0으로 정규화하지 않으면
     // 윈도우 첫날(=thirtyDaysAgo와 같은 날짜)의 예약이 parsed >= thirtyDaysAgo에서 누락된다.
     const startOfThirtyDaysAgo = new Date(thirtyDaysAgo.getFullYear(), thirtyDaysAgo.getMonth(), thirtyDaysAgo.getDate());
+    const trackedStart = trackedSince ? (() => { const [ty, tm, td] = trackedSince.split("-").map(Number); return new Date(ty, tm - 1, td); })() : null;
+    const pastStart = trackedStart && trackedStart > startOfThirtyDaysAgo ? trackedStart : startOfThirtyDaysAgo;
     const dailyResMap: Record<string, { regular: number; quick: number; recommendation: number; normal: number; single: number; multiDay: number; recurring: number }> = {};
     for (let i = 0; i < 30; i++) {
         const d = new Date(startOfThirtyDaysAgo);
         d.setDate(d.getDate() + i);
+        if (d < pastStart) continue;
         const key = `${d.getMonth() + 1}/${d.getDate()}`;
         dailyResMap[key] = { regular: 0, quick: 0, recommendation: 0, normal: 0, single: 0, multiDay: 0, recurring: 0 };
     }
@@ -394,11 +409,16 @@ export function computeReservationStats(
         const [y, m, dd] = dStr.split("-").map(Number);
         const parsed = new Date(y, m - 1, dd);
 
-        if (parsed >= startOfThirtyDaysAgo) {
+        if (parsed >= pastStart) {
             const key = `${parsed.getMonth() + 1}/${parsed.getDate()}`;
-            qTotal++; recTotal++;
+            qTotal++;
             if (data.isQuickDrive) { qQuick++; if (dailyResMap[key]) dailyResMap[key].quick++; }
             else { qRegular++; if (dailyResMap[key]) dailyResMap[key].regular++; }
+            // 바로 운행은 예약 없이 즉시 출발한 한 건이라 추천·다일·반복이 될 수 없다.
+            // 분모에 넣으면 '하루' 비율이 부풀고 추천·반복 비율이 희석되므로 사전 예약만 센다(아래 미래 분포도 같다).
+            // (#395 이전 기록은 바로 운행 표시가 저장되지 않아 이 구분이 적용되지 않는다)
+            if (data.isQuickDrive) return;
+            recTotal++;
             if (data.source === "recommendation") { recRecommendation++; if (dailyResMap[key]) dailyResMap[key].recommendation++; }
             else { recNormal++; if (dailyResMap[key]) dailyResMap[key].normal++; }
             if (data.recurringGroupId) { rtRecurring++; if (dailyResMap[key]) dailyResMap[key].recurring++; }

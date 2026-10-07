@@ -6,6 +6,9 @@
  * 잘못 읽게 만든다(서버가 쓰는 값이 늘 때 갱신할 지점을 하나로 묶는 이유이기도 하다).
  */
 import type { AuditAction, AuditLog, AuditTargetType } from '../types/auditLog';
+import type { DriveLog } from '../types/driveLog';
+import type { Reservation } from '../types/reservation';
+import { toDateOrNull, toLocalDateStr } from './dateUtils';
 
 /** 수행업무 — 고시 제2조의 '수행업무'를 관리자가 읽는 말로 */
 export const ACTION_LABEL: Record<AuditAction, string> = {
@@ -20,9 +23,11 @@ export const ACTION_LABEL: Record<AuditAction, string> = {
 export const TARGET_LABEL: Record<AuditTargetType, string> = {
     driveLog: '운행일지',
     user: '직원 정보',
+    vehicle: '차량',
     session: '로그인',
     export: '내보내기',
     orgDocument: '기관 증빙서류',
+    reservation: '예약',
 };
 
 /** 반출 대상 — 서버(recordExport)의 DATASETS 화이트리스트와 1:1 */
@@ -74,10 +79,28 @@ export function describeEvent(log: Pick<AuditLog, 'action' | 'targetType'>): str
     return `${TARGET_LABEL[log.targetType]} ${ACTION_LABEL[log.action]}`;
 }
 
+/**
+ * 예약에서 뜻이 달라지는 필드 — 같은 `status`라도 사용자는 '계정 상태', 예약은 '예약 상태'다.
+ * 서버(AUDITED_FIELDS.reservation)와 1:1.
+ */
+const RESERVATION_FIELD_LABEL: Record<string, string> = {
+    reservedByUid: '예약자',
+    reservedByName: '예약자 이름',
+    vehicleId: '차량',
+    date: '예약일',
+    startTime: '시작 시각',
+    endTime: '종료 시각',
+    status: '예약 상태',
+    passengerUids: '동승자',
+    passengerNames: '동승자 이름',
+    rejectedReason: '반려 사유',
+};
+
 /** 바뀐 항목 이름 목록 — 값은 애초에 기록하지 않으므로 이름만 나온다 */
-export function describeChangedFields(fields?: string[]): string {
+export function describeChangedFields(fields?: string[], targetType?: AuditTargetType): string {
     if (!fields?.length) return '';
-    return fields.map((f) => FIELD_LABEL[f] ?? f).join(', ');
+    const override = targetType === 'reservation' ? RESERVATION_FIELD_LABEL : {};
+    return fields.map((f) => override[f] ?? FIELD_LABEL[f] ?? f).join(', ');
 }
 
 /** `운행일지 · 엑셀 파일`처럼 반출 대상과 형식을 한 줄로 */
@@ -85,4 +108,41 @@ export function describeExportTarget(log: Pick<AuditLog, 'exportDataset' | 'expo
     const dataset = log.exportDataset ? DATASET_LABEL[log.exportDataset] ?? log.exportDataset : '';
     const format = log.exportFormat ? FORMAT_LABEL[log.exportFormat] ?? log.exportFormat : '';
     return [dataset, format && `${format} 파일`].filter(Boolean).join(' · ');
+}
+
+/**
+ * 운행일지 한 줄 요약 — `2026.10.01 07:30 · 스타리아 · 복지관 → 시청`
+ *
+ * 접속기록에는 문서 ID만 남으므로(최소수집) 화면이 원본 운행일지를 읽어 이 요약을 붙인다.
+ * 점검하는 사람이 "어느 운행이었는지" 알아볼 만큼만 담는다 — 탑승자·비고는 넣지 않는다.
+ */
+export function describeDriveLog(
+    log: Pick<DriveLog, 'date' | 'startDate' | 'timestamp' | 'startTime' | 'vehicleDisplayName' | 'vehicleName' | 'startLocation' | 'destination'>,
+): string {
+    // date 문자열이 없는 기록이 많다(바로 운행 등) — 그때는 운행 시각(timestamp)의 날짜를 쓴다.
+    // 날짜가 빠지면 "11:52 · 스타리아"만 남아 어느 날 운행인지 알 수 없다.
+    const stamped = toDateOrNull(log.timestamp);
+    const day = (log.date || log.startDate || (stamped ? toLocalDateStr(stamped) : '')).replace(/-/g, '.');
+    const when = [day, log.startTime].filter(Boolean).join(' ');
+    const vehicle = log.vehicleDisplayName || log.vehicleName || '';
+    const route = log.startLocation && log.destination
+        ? `${log.startLocation} → ${log.destination}`
+        : (log.destination || log.startLocation || '');
+    return [when, vehicle, route].filter(Boolean).join(' · ');
+}
+
+/**
+ * 예약 한 줄 요약 — `2026.10.05 14:00~16:00 · 스타리아4347 · 서울역`
+ *
+ * describeDriveLog와 같은 이유로 원본 예약을 읽어 붙인다. 동승자·용무는 넣지 않는다 —
+ * "어느 차를 언제 어디로"면 점검하는 사람이 어떤 예약인지 알아본다.
+ */
+export function describeReservation(
+    r: Pick<Reservation, 'date' | 'startTime' | 'endTime' | 'vehicleDisplayName' | 'vehicleName' | 'destination'>,
+): string {
+    const day = (r.date || '').replace(/-/g, '.');
+    const time = r.startTime && r.endTime ? `${r.startTime}~${r.endTime}` : (r.startTime || '');
+    const when = [day, time].filter(Boolean).join(' ');
+    const vehicle = r.vehicleDisplayName || r.vehicleName || '';
+    return [when, vehicle, r.destination || ''].filter(Boolean).join(' · ');
 }

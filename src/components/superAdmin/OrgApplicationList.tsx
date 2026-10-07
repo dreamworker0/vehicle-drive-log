@@ -42,7 +42,7 @@ export default function OrgApplicationList({ onCountChange }: OrgApplicationList
     // 최초 1회 데이터 조회
     useEffect(() => {
         fetchData();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- 마운트 때 한 번만 조회한다. 이후 갱신은 승인·반려 핸들러가 fetchData를 직접 부른다
     }, []);
 
     const handleApprove = async (app: Organization) => {

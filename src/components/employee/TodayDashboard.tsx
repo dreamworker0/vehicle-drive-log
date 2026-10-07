@@ -16,6 +16,7 @@ import WeekReservationList from './WeekReservationList';
 import ReservationPatternBanner from './ReservationPatternBanner';
 import ConfirmModal from '../common/ConfirmModal';
 import type { Reservation } from '../../types/reservation';
+import { canUseQuickDrive } from '../../lib/orgFeatures';
 import type { Vehicle } from '../../types/vehicle';
 
 export default function TodayDashboard() {
@@ -34,6 +35,8 @@ export default function TodayDashboard() {
     const [cancelTarget, setCancelTarget] = useState<{ reservation: Reservation; type: 'today' | 'week' } | null>(null);
     // "이번 주 예약" 요소 ref — 추천 배너와의 화면 겹침 감지에 사용
     const weekRef = useRef<HTMLDivElement>(null);
+    // 승인제 기관이 바로 운행을 끄면 버튼을 모두 숨기고 미리 예약을 주 동작으로 둔다
+    const showQuickDrive = !hasActiveDrive && canUseQuickDrive(orgFeatures, userData?.role);
 
     // 웰컴 가이드 (첫 방문 시 1회 표시)
     // 웰컴 가이드 표시 여부
@@ -66,14 +69,15 @@ export default function TodayDashboard() {
         if (!orgFeatures.googleCalendar) return;
 
         const triggerSyncs = async () => {
-            let anySynced = false;
-            for (const vehicle of vehicles as Vehicle[]) {
+            // 차량별 호출을 동시에 보낸다 — 순서대로 기다리면 연동 차량 수만큼 줄지어 늦어진다(6E)
+            const due = (vehicles as Vehicle[]).filter((vehicle) => {
                 const calId = vehicle.googleCalendarId;
-                if (calId && calId.includes('@') && checkCooldown(vehicle.id)) {
-                    const success = await syncVehicleOnDemand(vehicle.id, userData.organizationId!);
-                    if (success) anySynced = true;
-                }
-            }
+                return calId && calId.includes('@') && checkCooldown(vehicle.id);
+            });
+            const results = await Promise.all(
+                due.map((vehicle) => syncVehicleOnDemand(vehicle.id, userData.organizationId!)),
+            );
+            const anySynced = results.some(Boolean);
             // 새로 당겨온 예약이 있을 수 있으므로 대시보드 데이터 갱신
             if (anySynced) refresh();
         };
@@ -89,7 +93,10 @@ export default function TodayDashboard() {
                     <h1 className="text-lg font-bold text-surface-900 dark:text-surface-100">오늘의 운행</h1>
                     <p className="text-sm text-surface-400 dark:text-surface-500">{todayLabel}</p>
                 </div>
-                {!hasActiveDrive && (
+                {/* 오늘 예약이 없으면 아래 카드가 바로 운행을 크게 보여 주므로 여기서는 숨긴다.
+                    불러오기에 실패했을 때는 그 카드 대신 실패 안내가 뜨므로 여기에 남겨 바로 운행 길을 열어 둔다
+                    — 다만 예약이 있을 수 있으니 주 동작으로 키우지는 않는다. */}
+                {showQuickDrive && (myReservations.length > 0 || loadFailed) && (
                     <button
                         onClick={navigateToQuickDrive}
                         className="flex items-center gap-1 px-4 py-2 min-h-[48px] rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-colors text-xs font-medium"
@@ -101,7 +108,7 @@ export default function TodayDashboard() {
             </div>
 
             {/* 첫 방문 웰컴 가이드 */}
-            {showWelcome && <WelcomeGuide onDismiss={dismissWelcome} />}
+            {showWelcome && <WelcomeGuide onDismiss={dismissWelcome} showQuickDrive={canUseQuickDrive(orgFeatures, userData?.role)} />}
 
             {/* 미작성 알림 */}
             {incompleteAlerts.length > 0 && (
@@ -136,6 +143,7 @@ export default function TodayDashboard() {
                                             passengerUids: alert.passengerUids,
                                             passengerNames: alert.passengerNames,
                                             passengerCount: alert.passengerCount,
+                                            isQuickDrive: alert.isQuickDrive,
                                         },
                                     });
                                 }}
@@ -185,7 +193,7 @@ export default function TodayDashboard() {
             {/* 못 받아 온 것을 "예약 없음"으로 보여주면 안 된다 — 인덱스 빌드 중이던 5분 사이
                 운전자 한 명이 자기 예약을 없는 것으로 봤다(Phase 220). 실패는 실패라고 말한다. */}
             {loadFailed && (
-                <div className="glass-card px-5 py-5 border-l-4 border-l-amber-500 bg-amber-50/10 dark:bg-amber-900/10">
+                <div className="glass-card mb-6 px-5 py-5 border-l-4 border-l-amber-500 bg-amber-50/10 dark:bg-amber-900/10">
                     <div className="flex items-center justify-between gap-4">
                         <div className="flex items-center gap-4 min-w-0 flex-1">
                             <span className="w-11 h-11 rounded-xl bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center text-lg flex-shrink-0">⚠️</span>
@@ -206,32 +214,42 @@ export default function TodayDashboard() {
                 </div>
             )}
 
-            {/* 예약이 없을 때 안내 */}
+            {/* 예약이 없을 때 — 바로 운행을 주 동작으로 둔다.
+                운행의 60% 이상이 예약 없이 바로 출발한다(2026-09-23~30 실측). 예약은 보조 링크와 하단 탭에 남긴다. */}
             {!loadFailed && myReservations.length === 0 && (
-                <div className="glass-card px-5 py-5 border-l-4 border-l-primary-400">
-                    <div className="flex items-center justify-between gap-4">
-                        <div className="flex items-center gap-4 min-w-0 flex-1">
-                            <span className="w-11 h-11 rounded-xl bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center text-lg flex-shrink-0">📋</span>
-                            <div className="min-w-0">
-                                <p className="font-semibold text-surface-800 dark:text-surface-200 text-base">오늘 예약 없음</p>
-                                <p className="text-sm text-surface-500 dark:text-surface-400 mt-0.5">새 예약을 등록해보세요</p>
-                            </div>
-                        </div>
+                <div className="mb-6">
+                    <p className="text-xs text-surface-400 dark:text-surface-500 mb-2.5">오늘 잡힌 예약이 없어요</p>
+                    <div className={`grid gap-3 ${showQuickDrive ? 'grid-cols-[1.6fr_1fr]' : 'grid-cols-1'}`}>
+                        {showQuickDrive && (
+                            <button
+                                onClick={navigateToQuickDrive}
+                                aria-label="바로 운행 시작"
+                                className="group relative overflow-hidden rounded-2xl p-4 sm:p-5 min-h-[132px] text-left text-white bg-gradient-to-br from-emerald-500 to-teal-600 dark:from-emerald-600 dark:to-teal-700 shadow-lg shadow-emerald-500/20 hover:shadow-emerald-500/30 transition-all active:scale-[0.98]"
+                            >
+                                {/* 은은한 빛 번짐 */}
+                                <span aria-hidden="true" className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-white/15 blur-2xl" />
+                                <span aria-hidden="true" className="relative w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center text-lg">🚀</span>
+                                <span className="relative block mt-3 text-base sm:text-lg font-bold tracking-tight">바로 운행</span>
+                                <span className="relative block text-xs sm:text-sm text-emerald-50/90 mt-0.5">차량만 고르면 바로 출발해요</span>
+                                <span aria-hidden="true" className="absolute right-4 top-5 w-8 h-8 rounded-full bg-white/20 flex items-center justify-center transition-transform group-hover:translate-x-0.5">
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M13 7l5 5-5 5M6 12h12" />
+                                    </svg>
+                                </span>
+                            </button>
+                        )}
                         <button
                             onClick={navigateToReservations}
-                            className="reservation-cta-btn flex-shrink-0 min-h-[48px]"
+                            aria-label="미리 예약하기"
+                            className="glass-card relative rounded-2xl p-4 sm:p-5 min-h-[132px] text-left transition-all hover:shadow-md active:scale-[0.98]"
                         >
-                            <span className="reservation-cta-glow" />
-                            <span className="relative z-10 flex items-center gap-1.5">
-                                <span>📅</span>
-                                <span>예약</span>
-                            </span>
+                            <span aria-hidden="true" className="w-10 h-10 rounded-xl bg-primary-50 dark:bg-primary-900/30 flex items-center justify-center text-lg">📅</span>
+                            <span className="block mt-3 text-base sm:text-lg font-bold tracking-tight text-surface-800 dark:text-surface-100">미리 예약</span>
+                            <span className="block text-xs sm:text-sm text-surface-500 dark:text-surface-400 mt-0.5">일정이 있다면</span>
                         </button>
                     </div>
                 </div>
             )}
-
-
 
             {/* 이번 주 예약 */}
             <WeekReservationList

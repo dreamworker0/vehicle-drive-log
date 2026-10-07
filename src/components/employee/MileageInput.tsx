@@ -119,6 +119,14 @@ export default function MileageInput({
                             </span>
                         </span>
                     </div>
+                    {/* 앞사람이 남긴 인수인계 — "블랙박스 껐음" 같은 내용이 여기에 적힌다.
+                        주차 위치는 차를 가지러 가기 전에 봐야 하므로 오늘의 예약 카드가 맡고,
+                        이 배너는 일지를 쓰면서 확인하는 자리다(이 화면은 운행이 끝난 뒤 연다). */}
+                    {lastDriveLog.notes?.trim() && (
+                        <p className="text-surface-600 dark:text-surface-300 mt-0.5 line-clamp-2 break-words">
+                            📝 {lastDriveLog.notes.trim()}
+                        </p>
+                    )}
                 </div>
             )}
 

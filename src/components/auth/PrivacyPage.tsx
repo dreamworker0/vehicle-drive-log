@@ -45,7 +45,7 @@ const PROCESSORS: {
         name: 'Google LLC (Firebase)',
         country: '미국',
         task: '이용자 인증, 데이터베이스·파일 저장, 웹 호스팅, 푸시 알림 발송, 서비스 이용 통계 분석',
-        items: '이메일 주소, 이름, 전화번호, 운행일지·차량·예약 데이터, 증빙서류 사본, 접속 기기·이용 기록',
+        items: '이메일 주소, 이름, 전화번호, 운행일지·차량·예약 데이터, 증빙서류 사본, 푸시 알림 토큰, 접속 기기·이용 기록',
         contact: 'https://support.google.com/policies/troubleshooter/7575787',
     },
     {
@@ -110,7 +110,8 @@ const PROCESSORS: {
         name: 'Functional Software, Inc. (Sentry)',
         country: '미국',
         task: '서비스 오류 수집 및 안정성 모니터링',
-        items: '이메일 주소, 사용자 식별자, 소속 기관 식별자, 오류 발생 시점의 접속 기록·브라우저 정보',
+        // 프론트(src/lib/sentry.ts setSentryUser)는 uid·역할·기관 ID만 보내고 이메일은 보내지 않는다.
+        items: '사용자 식별자, 사용자 역할, 소속 기관 식별자, 오류 발생 시점의 접속 기록·브라우저 정보',
         contact: 'compliance@sentry.io',
     },
 ];
@@ -184,26 +185,46 @@ export default function PrivacyPage() {
                                 <p className="font-medium text-surface-700 dark:text-surface-300">필수 수집 항목</p>
                                 <ul className="list-disc list-inside space-y-1 ml-2">
                                     <li>이메일 주소 (Google 로그인을 통해 자동 수집)</li>
-                                    <li>이름 (Google 계정 표시 이름)</li>
+                                    <li>이름 (Google 계정 표시 이름. 기관관리자가 직원 이름을 미리 등록한 경우 그 이름)</li>
+                                    <li>전화번호 (기관 신청 시 신청자의 휴대전화번호 — 승인·반려 결과를 카카오 알림톡으로 안내하는 데 사용)</li>
                                 </ul>
+                                <p className="text-xs text-surface-500 dark:text-surface-400">
+                                    Google 계정의 프로필 사진은 가입 화면 표시에만 사용하며 저장하지 않습니다.
+                                </p>
                             </div>
 
                             <div className="bg-surface-50 dark:bg-surface-800 rounded-xl p-4 space-y-2">
                                 <p className="font-medium text-surface-700 dark:text-surface-300">선택 수집 항목</p>
                                 <ul className="list-disc list-inside space-y-1 ml-2">
-                                    <li>전화번호 (기관 신청 시)</li>
+                                    <li>푸시 알림 토큰 (알림 수신을 허용한 경우에만, 예약 알림·공지·문의 답변 알림을 기기로 보내는 데 사용)</li>
                                 </ul>
+                                <p className="text-xs text-surface-500 dark:text-surface-400">
+                                    알림을 허용하지 않아도 서비스 이용에는 제한이 없으며, 브라우저·기기 설정에서 언제든 알림을 끌 수 있습니다.
+                                </p>
                             </div>
 
                             <div className="bg-surface-50 dark:bg-surface-800 rounded-xl p-4 space-y-2">
                                 <p className="font-medium text-surface-700 dark:text-surface-300">동의 기록</p>
                                 <ul className="list-disc list-inside space-y-1 ml-2">
                                     <li>기관 신청 시 이용약관·개인정보 처리방침에 동의한 사실, 동의한 문서의 시행일 버전, 동의 일시</li>
+                                    {/* 직원에게는 개인정보 동의를 받지 않는다(legal-consent.md §2) — 이용약관 동의만 기록됨을 분명히 한다 */}
+                                    <li>직원이 초대 코드로 가입하거나 개정된 이용약관을 확인할 때 그 이용약관 동의 사실, 약관의 시행일 버전, 동의 일시 (직원에게는 개인정보 수집·이용 동의를 따로 받지 않습니다)</li>
                                 </ul>
                                 <p className="text-xs text-surface-500 dark:text-surface-400">
-                                    위탁 계약(이용약관 제9조)의 성립을 입증하기 위한 항목으로, 해당 기관 정보와 함께 보관되며
-                                    기관 삭제 시 <strong>본 처리방침 제9조(파기)</strong>에 따릅니다.
+                                    위탁 계약(이용약관 제9조)의 성립과 동의 사실을 입증하기 위한 항목으로, 기관 신청 기록은 해당 기관 정보와 함께,
+                                    직원 동의 기록은 해당 계정 정보와 함께 보관되며 기관 삭제·회원 탈퇴 시 <strong>본 처리방침 제9조(파기)</strong>에 따릅니다.
                                     동의 시점의 IP 주소는 수집하지 않습니다.
+                                </p>
+                            </div>
+
+                            <div className="bg-surface-50 dark:bg-surface-800 rounded-xl p-4 space-y-2">
+                                <p className="font-medium text-surface-700 dark:text-surface-300">자동 수집 정보 (이용 통계)</p>
+                                <ul className="list-disc list-inside space-y-1 ml-2">
+                                    <li>서비스 이용 통계 분석을 위해 Google Analytics for Firebase가 쿠키 등 자동 수집 장치로 수집하는 기기·브라우저 식별자, 접속 일시, 이용 이벤트(예: 페이지 조회, 앱 설치 안내 표시·설치)</li>
+                                </ul>
+                                <p className="text-xs text-surface-500 dark:text-surface-400">
+                                    이름·이메일 등 이용자를 직접 식별하는 정보는 통계에 넣지 않으며, 서비스 제공자는 이 정보를 광고 목적으로 이용하지 않습니다.
+                                    브라우저 설정에서 쿠키 저장을 거부하거나 삭제할 수 있고, 거부하더라도 서비스 이용에는 제한이 없습니다.
                                 </p>
                             </div>
 
@@ -242,6 +263,8 @@ export default function PrivacyPage() {
                                 <li>운행일지 작성자 기록</li>
                                 <li>차량 예약 관리</li>
                                 <li>서비스 운영 관련 공지 전달</li>
+                                <li>예약·공지·문의 답변 푸시 알림 발송 (알림 수신을 허용한 경우)</li>
+                                <li>서비스 이용 통계 분석 및 개선</li>
                                 <li>법령상 의무인 접속기록의 보관 및 비정상 접근 점검</li>
                             </ul>
                         </div>
@@ -539,8 +562,11 @@ export default function PrivacyPage() {
                     <div className="border-t border-surface-100 dark:border-surface-700 pt-4 space-y-2 text-center">
                         <p className="text-xs text-surface-400 dark:text-surface-500">본 개인정보 처리방침은 {EFFECTIVE_DATE}부터 시행됩니다.</p>
                         <p className="text-xs text-surface-400 dark:text-surface-500">
-                            개정 이력 · 2026년 2월 1일 최초 시행 / {EFFECTIVE_DATE} 위탁·국외 이전·보호책임자 조항 신설,
-                            개인정보처리자와 수탁자의 지위 명시, 법령상 의무 기록인 접속기록 항목 명시
+                            {/* 지난 개정의 날짜는 고정한다 — EFFECTIVE_DATE로 쓰면 다음 개정 때 과거 내용이 새 날짜로 바뀐다 */}
+                            개정 이력 · 2026년 2월 1일 최초 시행 / 2026년 8월 10일 위탁·국외 이전·보호책임자 조항 신설,
+                            개인정보처리자와 수탁자의 지위 명시, 법령상 의무 기록인 접속기록 항목 명시 /
+                            {' '}{EFFECTIVE_DATE} 수집 항목 정정(기관 신청 전화번호 필수, 푸시 알림 토큰·이용 통계 자동 수집 정보 신설,
+                            직원 동의 기록 명시), 오류 모니터링 전달 항목 정정
                         </p>
                     </div>
                 </div>

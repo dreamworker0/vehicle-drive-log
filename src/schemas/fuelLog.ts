@@ -33,6 +33,15 @@ export const fuelLogSchema = z.object({
     fuelCost: z.coerce.number().catch(0),
     /** 비고 (선택) */
     notes: z.string().optional().catch(undefined),
+    /**
+     * 마지막으로 이 기록을 고친 사람의 UID(행위자 스탬프).
+     *
+     * 관리자가 직원의 기록을 대신 정정할 수 있으므로, 화면의 '주유원'과 실제 수정자가
+     * 달라질 수 있다. 이 값이 있고 driverUid와 다르면 목록에 '관리자 수정' 표시를 띄운다 —
+     * 지출결의서와 대조하는 금액이 누구 손에서 바뀌었는지 흔적 없이 사라지면 안 된다.
+     * 값의 신뢰는 Rules의 `actorStampValid()`가 담보한다(타인 명의 위조 불가).
+     */
+    lastEditedByUid: z.string().optional().catch(undefined),
     createdAt: timestampSchema.optional(),
     updatedAt: timestampSchema.optional(),
 });

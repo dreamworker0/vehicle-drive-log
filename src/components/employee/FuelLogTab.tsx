@@ -7,6 +7,7 @@ import useFuelLog from '../../hooks/useFuelLog';
 import { useAuth } from '../../hooks/useAuth';
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
 import { SkeletonBox, SkeletonList } from '../common/Skeleton';
+import AdminEditedBadge from '../common/AdminEditedBadge';
 import VehicleSelector from './VehicleSelector';
 import useVehiclePriority from '../../hooks/useVehiclePriority';
 import HipassChargeTab from './HipassChargeTab';
@@ -324,9 +325,10 @@ export default function FuelLogTab() {
 
                                         {/* 정보 */}
                                         <div className="flex-1 min-w-0">
-                                            <div className="flex items-center gap-2">
+                                            <div className="flex items-center gap-2 flex-wrap">
                                                 <span className="font-bold text-sm text-surface-900 dark:text-surface-100">{rec.vehicleName}</span>
                                                 <span className="text-xs text-surface-400 dark:text-surface-500">{rec.driverName}</span>
+                                                <AdminEditedBadge lastEditedByUid={rec.lastEditedByUid} ownerUid={rec.driverUid} />
                                             </div>
                                             <p className="text-xs text-surface-400 dark:text-surface-500 mt-0.5">
                                                 {rec.date} · {rec.meterReading?.toLocaleString()} km

@@ -23,6 +23,8 @@ interface UseReservationDataParams {
     currentMonth: Date;
     /** 예약 동승자 입력이 켜진 기관인지 — 켜져 있으면 일반 직원도 직원 목록이 필요하다 */
     needsMembers?: boolean;
+    /** 기관이 구글 캘린더 연동을 켰는지 — 꺼져 있으면 서버가 어차피 건너뛰므로 자동 동기화를 부르지 않는다 */
+    calendarSyncEnabled?: boolean;
 }
 
 export function useReservationData({
@@ -32,6 +34,7 @@ export function useReservationData({
     showToast,
     currentMonth,
     needsMembers = false,
+    calendarSyncEnabled = true,
 }: UseReservationDataParams) {
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
     const [reservations, setReservations] = useState<Reservation[]>([]);
@@ -134,20 +137,18 @@ export function useReservationData({
     // 구글 캘린더 온디맨드 백그라운드 동기화 트리거
     useEffect(() => {
         if (!userData?.organizationId || calendarLinkedVehicles.length === 0) return;
+        if (!calendarSyncEnabled) return;
 
         const triggerSyncs = async () => {
-            let anySynced = false;
-            for (const vehicle of calendarLinkedVehicles) {
-                // 30분 쿨다운을 지난 경우 백그라운드 동기화 자동 시작
-                if (checkCooldown(vehicle.id)) {
-                    // 정보성 로그는 개발 모드에서만 — 프로덕션 콘솔 노이즈·차량 정보 노출 방지
-                    if (import.meta.env.DEV) console.log(`[useReservationData] Triggering background calendar sync for ${vehicle.displayName} (${vehicle.id})`);
-                    const success = await syncVehicleOnDemand(vehicle.id, userData.organizationId!);
-                    if (success) {
-                        anySynced = true;
-                    }
-                }
-            }
+            // 30분 쿨다운을 지난 차량만, **동시에** 부른다 — 차량마다 앞 호출을 기다리면 연동 차량
+            // 수만큼 요청이 줄지어 화면 반영이 늦고 Sentry가 "Consecutive HTTP"로 잡는다(6E).
+            const due = calendarLinkedVehicles.filter((vehicle) => checkCooldown(vehicle.id));
+            // 정보성 로그는 개발 모드에서만 — 프로덕션 콘솔 노이즈·차량 정보 노출 방지
+            if (import.meta.env.DEV && due.length) console.log(`[useReservationData] Triggering background calendar sync for ${due.length} vehicle(s)`);
+            const results = await Promise.all(
+                due.map((vehicle) => syncVehicleOnDemand(vehicle.id, userData.organizationId!)),
+            );
+            const anySynced = results.some(Boolean);
             // 하나라도 성공했으면 예약을 즉시 리프레시하여 실시간 반영
             if (anySynced) {
                 if (import.meta.env.DEV) console.log('[useReservationData] Calendar sync completed, refreshing reservations...');
@@ -157,7 +158,7 @@ export function useReservationData({
         };
 
         triggerSyncs();
-    }, [calendarLinkedVehicles, userData?.organizationId, syncVehicleOnDemand, checkCooldown, fetchReservations]);
+    }, [calendarLinkedVehicles, userData?.organizationId, calendarSyncEnabled, syncVehicleOnDemand, checkCooldown, fetchReservations]);
 
     // 수동 "지금 동기화" — 쿨다운을 우회하여 연동 차량 전체를 즉시 동기화
     const syncNow = useCallback(async () => {
@@ -165,11 +166,11 @@ export function useReservationData({
 
         setSyncing(true);
         try {
-            let anySynced = false;
-            for (const vehicle of calendarLinkedVehicles) {
-                const success = await syncVehicleOnDemand(vehicle.id, userData.organizationId!, { force: true });
-                if (success) anySynced = true;
-            }
+            const results = await Promise.all(
+                calendarLinkedVehicles.map((vehicle) =>
+                    syncVehicleOnDemand(vehicle.id, userData.organizationId!, { force: true })),
+            );
+            const anySynced = results.some(Boolean);
             if (anySynced) {
                 fetchReservations();
                 setLastSyncAt(Date.now());

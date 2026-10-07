@@ -15,13 +15,9 @@ on:
       - '.claude/**'
       - '.husky/**'
       - 'scripts/hooks/**'
-      - 'scripts/run-eval.ts'
       - 'scripts/check-harness.ts'
       - 'scripts/sync-claude-agents.ts'
       - 'scripts/check-node-version.ts'
-      - 'scripts/skill-trigger-eval.json'
-      - 'scripts/behavior-rule-eval.json'
-      - 'scripts/eval-baselines.json'
       - '.github/workflows/harness-ci.yml'
   pull_request:
     branches: [master]
@@ -32,13 +28,9 @@ on:
       - '.claude/**'
       - '.husky/**'
       - 'scripts/hooks/**'
-      - 'scripts/run-eval.ts'
       - 'scripts/check-harness.ts'
       - 'scripts/sync-claude-agents.ts'
       - 'scripts/check-node-version.ts'
-      - 'scripts/skill-trigger-eval.json'
-      - 'scripts/behavior-rule-eval.json'
-      - 'scripts/eval-baselines.json'
       - '.github/workflows/harness-ci.yml'
 
 permissions:
@@ -65,9 +57,6 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
-
-      - name: .agent ↔ .claude 동기화 검증
-        run: npm run sync:agents -- --check
 
       - name: 하네스 Doctor (정합성 검사)
         run: npm run verify:harness

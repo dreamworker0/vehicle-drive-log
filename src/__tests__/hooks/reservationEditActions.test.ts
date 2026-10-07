@@ -22,7 +22,10 @@ const passengerFields = {
     passengerCount: 2,
 };
 
-function makeDeps(reservations: Reservation[]): EditDeps & { setForm: ReturnType<typeof vi.fn> } {
+function makeDeps(reservations: Reservation[]): EditDeps & {
+    setForm: ReturnType<typeof vi.fn>;
+    setEndTimeTouched: ReturnType<typeof vi.fn>;
+} {
     return {
         reservations,
         members,
@@ -32,7 +35,11 @@ function makeDeps(reservations: Reservation[]): EditDeps & { setForm: ReturnType
         setSelectedDate: vi.fn(),
         setForm: vi.fn(),
         setShowForm: vi.fn(),
-    } as unknown as EditDeps & { setForm: ReturnType<typeof vi.fn> };
+        setEndTimeTouched: vi.fn(),
+    } as unknown as EditDeps & {
+        setForm: ReturnType<typeof vi.fn>;
+        setEndTimeTouched: ReturnType<typeof vi.fn>;
+    };
 }
 
 const formOf = (deps: { setForm: ReturnType<typeof vi.fn> }) => deps.setForm.mock.calls[0][0] as ReservationForm;
@@ -87,5 +94,52 @@ describe('handleEdit — 동승자 복원', () => {
         handleEdit(res, deps);
 
         expect(formOf(deps)).toMatchObject({ passengerUids: [], passengerExternalNames: '', passengerCount: 0 });
+    });
+});
+
+/**
+ * 저장된 종료시간은 **사람이 정한 값**이다. 수정 진입이 잠가 두지 않으면, 목적지가 이미 채워져
+ * 있으므로 경로 조회가 돌고 1.2초 뒤 결과가 그 값을 갈아치운다 — 사용자는 목적지만 고치러
+ * 들어왔는데 시간이 바뀐 채 저장된다(2026-09-16 신고 2건). 잠금 자체의 효과는
+ * useRouteInfo.test.ts가 다루고, 여기서는 **세 갈래 모두 잠그는지**를 고정한다.
+ */
+describe('handleEdit — 종료시간 잠금', () => {
+    it('단건 수정은 종료시간을 잠근다', () => {
+        const res = {
+            id: 'r1', vehicleId: 'v1', date: '2026-08-10', startTime: '10:00', endTime: '18:00', status: 'reserved',
+        } as unknown as Reservation;
+        const deps = makeDeps([res]);
+
+        handleEdit(res, deps);
+
+        expect(deps.setEndTimeTouched).toHaveBeenCalledWith(true);
+        expect(formOf(deps)).toMatchObject({ endTime: '18:00' });
+    });
+
+    it('다일 그룹 수정도 잠근다 — 마지막 날 종료시간이 첫날 기준으로 뭉개지던 자리', () => {
+        const group = [
+            { id: 'r1', vehicleId: 'v1', groupId: 'grp_1', date: '2026-08-10', startTime: '09:00', endTime: '23:59', status: 'reserved' },
+            { id: 'r2', vehicleId: 'v1', groupId: 'grp_1', date: '2026-08-12', startTime: '00:00', endTime: '18:00', status: 'reserved' },
+        ] as unknown as Reservation[];
+        const deps = makeDeps(group);
+
+        handleEdit(group[0], deps);
+
+        expect(deps.setEndTimeTouched).toHaveBeenCalledWith(true);
+        // 마지막 날의 종료시간이 그대로 들어와야 한다(첫날 기준 계산값으로 바뀌면 예약이 줄어든다)
+        expect(formOf(deps)).toMatchObject({ endTime: '18:00', endDate: '2026-08-12' });
+    });
+
+    it('반복 그룹 수정도 잠근다', () => {
+        const group = [
+            { id: 'r1', vehicleId: 'v1', recurringGroupId: 'rcr_1', date: '2026-08-10', startTime: '10:00', endTime: '18:00', status: 'reserved' },
+            { id: 'r2', vehicleId: 'v1', recurringGroupId: 'rcr_1', date: '2026-08-17', startTime: '10:00', endTime: '18:00', status: 'reserved' },
+        ] as unknown as Reservation[];
+        const deps = makeDeps(group);
+
+        handleEdit(group[0], deps);
+
+        expect(deps.setEndTimeTouched).toHaveBeenCalledWith(true);
+        expect(formOf(deps)).toMatchObject({ endTime: '18:00', isRecurring: true });
     });
 });

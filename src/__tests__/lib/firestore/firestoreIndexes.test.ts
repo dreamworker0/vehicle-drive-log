@@ -51,4 +51,26 @@ describe('firestore.indexes.json — 복합 인덱스 필수 쿼리', () => {
     it('접속기록 유형 필터: auditLogs (action, organizationId, at)', () => {
         expect(hasIndex('auditLogs', ['action', 'organizationId', 'at'])).toBe(true);
     });
+
+    // src/lib/firestore/auditLogs.ts — 직원 필터는 OR의 갈래(행위자/대상)마다 인덱스가 따로 필요하다
+    it('접속기록 직원 필터: 행위자·대상 갈래별 인덱스 (유형 필터 포함)', () => {
+        expect(hasIndex('auditLogs', ['actorUid', 'organizationId', 'at'])).toBe(true);
+        expect(hasIndex('auditLogs', ['organizationId', 'subjectUids', 'at'])).toBe(true);
+        expect(hasIndex('auditLogs', ['action', 'actorUid', 'organizationId', 'at'])).toBe(true);
+        expect(hasIndex('auditLogs', ['action', 'organizationId', 'subjectUids', 'at'])).toBe(true);
+    });
+
+    // 차량 필터는 위 모든 조합에 vehicleId 동등 조건이 하나 더 붙는다
+    it('접속기록 차량 필터: 단독·유형·직원 조합마다 vehicleId 인덱스', () => {
+        for (const prefix of [
+            ['organizationId'],
+            ['action', 'organizationId'],
+            ['actorUid', 'organizationId'],
+            ['organizationId', 'subjectUids'],
+            ['action', 'actorUid', 'organizationId'],
+            ['action', 'organizationId', 'subjectUids'],
+        ]) {
+            expect(hasIndex('auditLogs', [...prefix, 'vehicleId', 'at'])).toBe(true);
+        }
+    });
 });

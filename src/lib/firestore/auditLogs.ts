@@ -12,8 +12,9 @@
  * 기관 ID가 아니라 이 필터에 걸리지 않는다 — 의도된 동작이다.
  */
 import {
-    collection, query, where, orderBy, limit, getDocs, Timestamp,
-    type QueryConstraint,
+    collection, query, where, orderBy, limit, getDocs, Timestamp, and, or,
+    type QueryFieldFilterConstraint,
+    type QueryNonFilterConstraint,
     type DocumentData,
 } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -49,6 +50,14 @@ export interface AuditLogQueryOptions {
     /** 이 시각 이전의 기록만 — 직접 지정한 종료일이 있을 때만 쓴다 */
     until?: Date;
     kind?: AuditLogKind;
+    /**
+     * 이 직원과 관련된 기록만 — 직접 한 일(actorUid)이거나 대상이 된 일(subjectUids).
+     * 둘 중 하나만 보면 빠지는 기록이 생긴다: 관리자가 한 엑셀 반출은 대상 직원이 없고,
+     * 서버가 남긴 약관 동의·삭제는 행위자가 비어 있다.
+     */
+    uid?: string;
+    /** 이 차량과 관련된 기록만 — 서버가 vehicleId를 남기기 시작한(2026-10-05) 뒤 기록에만 걸린다 */
+    vehicleId?: string;
     /** 커서 — 이전 페이지의 `lastDoc` */
     startAfter?: unknown;
     pageSize?: number;
@@ -74,6 +83,13 @@ export interface AuditLogPage {
  * 2026-08-02). 동등 필터 두 개의 순서가 바뀐 것뿐이라 중복으로 보고 #176에서 파일에서 지웠는데,
  * 프로덕션에는 남아 있어(인덱스 배포는 `--force` 없이는 삭제하지 않는다) 화면은 계속 동작했다.
  * 즉 파일만 프로덕션과 어긋난 상태였다. 정리하려면 순서 무관성을 먼저 확인해야 한다.
+ *
+ * 직원 필터(`uid`)는 OR의 갈래마다 인덱스가 따로 필요하다 — `(actorUid, organizationId, at desc)`,
+ * `(organizationId, subjectUids, at desc)`와 유형 필터가 붙은 `action` 포함 조합. 위 사례처럼
+ * Firestore가 요구하는 동등 필드 순서(알파벳순)로 등록했다.
+ *
+ * 차량 필터(`vehicleId`)는 동등 필터 하나가 더 붙는 것이라, 위 조합마다 `vehicleId`를 끼운
+ * 인덱스가 하나씩 더 있다(같은 알파벳순 — `vehicleId`는 늘 `at` 바로 앞).
  */
 export const getAuditLogs = async (
     orgId: string,
@@ -81,22 +97,25 @@ export const getAuditLogs = async (
 ): Promise<AuditLogPage> => {
     const pageSize = options.pageSize ?? AUDIT_LOG_PAGE_SIZE;
     try {
-        const constraints: QueryConstraint[] = [
+        const filters: QueryFieldFilterConstraint[] = [
             where('organizationId', '==', orgId),
         ];
 
         const kind = options.kind ?? 'all';
         if (kind !== 'all') {
-            constraints.push(where('action', 'in', KIND_ACTIONS[kind]));
+            filters.push(where('action', 'in', KIND_ACTIONS[kind]));
+        }
+        if (options.vehicleId) {
+            filters.push(where('vehicleId', '==', options.vehicleId));
         }
         if (options.since) {
-            constraints.push(where('at', '>=', Timestamp.fromDate(options.since)));
+            filters.push(where('at', '>=', Timestamp.fromDate(options.since)));
         }
         if (options.until) {
-            constraints.push(where('at', '<=', Timestamp.fromDate(options.until)));
+            filters.push(where('at', '<=', Timestamp.fromDate(options.until)));
         }
 
-        constraints.push(orderBy('at', 'desc'), limit(pageSize));
+        const constraints: QueryNonFilterConstraint[] = [orderBy('at', 'desc'), limit(pageSize)];
 
         if (options.startAfter) {
             // 커서를 쓰는 화면에서만 필요한 함수라 초기 번들에 넣지 않는다
@@ -104,10 +123,15 @@ export const getAuditLogs = async (
             constraints.push(startAfterFn(options.startAfter as DocumentData));
         }
 
-        const q = query(
-            collection(db, 'auditLogs').withConverter(auditLogConverter),
-            ...constraints,
-        );
+        const ref = collection(db, 'auditLogs').withConverter(auditLogConverter);
+        // OR 필터는 복합 필터라 다른 조건과 함께 and()로 묶어야 한다
+        const q = options.uid
+            ? query(
+                ref,
+                and(...filters, or(where('actorUid', '==', options.uid), where('subjectUids', 'array-contains', options.uid))),
+                ...constraints,
+            )
+            : query(ref, ...filters, ...constraints);
         const snap = await getDocs(q);
 
         return {
@@ -146,3 +170,70 @@ export const getAuditLogsForExport = async (
     const page = await getAuditLogs(orgId, { ...options, pageSize: AUDIT_LOG_EXPORT_MAX });
     return { logs: page.logs, truncated: page.logs.length >= AUDIT_LOG_EXPORT_MAX };
 };
+
+/** Firestore `in` 연산자의 값 개수 상한 */
+const IN_QUERY_MAX = 30;
+
+/**
+ * 차량 정보가 없는 옛 기록 — 서버가 `vehicleId`를 남기기 시작한 시점(2026-10-05 배포) 이전 기록이다.
+ * 이 시각 이전 기간을 차량으로 조회할 때만 아래 보조 조회를 쓴다.
+ */
+export const AUDIT_VEHICLE_ID_SINCE = new Date('2026-10-06T00:00:00+09:00');
+
+/**
+ * 대상 문서 ID 목록으로 기록을 읽는다 — 차량 정보가 없는 옛 기록을 차량별로 찾는 보조 조회.
+ *
+ * 화면이 그 차량의 운행일지 ID를 먼저 모은 뒤 여기서 그 운행일지들의 기록을 가져온다.
+ * 기간·유형·직원 조건은 **걸지 않고** 호출 측이 메모리에서 거른다(`filterAuditLogs`):
+ * `targetId in`에 다른 `in`·범위 조건을 더하면 복합 인덱스와 분리 조건 상한(30)에 걸린다.
+ * 동등 + `in`만이라 단일 필드 인덱스로 처리된다. 운행일지 한 건의 기록은 몇 건뿐이다.
+ */
+export const getAuditLogsByTargets = async (orgId: string, targetIds: string[]): Promise<AuditLog[]> => {
+    const unique = [...new Set(targetIds.filter(Boolean))];
+    if (unique.length === 0) return [];
+    try {
+        const chunks: string[][] = [];
+        for (let i = 0; i < unique.length; i += IN_QUERY_MAX) chunks.push(unique.slice(i, i + IN_QUERY_MAX));
+        const snaps = await Promise.all(chunks.map((chunk) => getDocs(query(
+            collection(db, 'auditLogs').withConverter(auditLogConverter),
+            where('organizationId', '==', orgId),
+            where('targetId', 'in', chunk),
+        ))));
+        return snaps.flatMap((snap) => snap.docs.map((d) => d.data())) as AuditLog[];
+    } catch (error) {
+        captureError(error, { context: 'getAuditLogsByTargets', orgId, count: unique.length });
+        throw error;
+    }
+};
+
+/** 기록 시각(ms). Timestamp·Date 어느 쪽이 와도 읽는다 */
+const atMillis = (log: AuditLog): number => {
+    const at = log.at as unknown as { toMillis?: () => number; toDate?: () => Date } | Date | null;
+    if (!at) return 0;
+    if (at instanceof Date) return at.getTime();
+    if (typeof at.toMillis === 'function') return at.toMillis();
+    if (typeof at.toDate === 'function') return at.toDate().getTime();
+    return 0;
+};
+
+/** 서버 조회와 같은 조건을 메모리에서 적용한다 — 보조 조회 결과용. 최신순으로 돌려준다 */
+export function filterAuditLogs(
+    logs: AuditLog[],
+    options: Pick<AuditLogQueryOptions, 'since' | 'until' | 'kind' | 'uid'>,
+): AuditLog[] {
+    const kind = options.kind ?? 'all';
+    const actions = kind === 'all' ? null : new Set(KIND_ACTIONS[kind]);
+    const since = options.since?.getTime() ?? -Infinity;
+    const until = options.until?.getTime() ?? Infinity;
+    return logs
+        .filter((log) => {
+            const t = atMillis(log);
+            if (t < since || t > until) return false;
+            if (actions && !actions.has(log.action)) return false;
+            if (options.uid && log.actorUid !== options.uid && !log.subjectUids.includes(options.uid)) return false;
+            return true;
+        })
+        .sort((a, b) => atMillis(b) - atMillis(a));
+}
+
+export { atMillis as auditLogAtMillis };

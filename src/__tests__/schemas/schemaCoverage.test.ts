@@ -19,6 +19,8 @@ import {
     userSchema,
     organizationSchema,
     favoriteSchema,
+    fuelLogSchema,
+    hipassChargeSchema,
 } from '../../schemas';
 import type { QueryDocumentSnapshot } from 'firebase/firestore';
 
@@ -100,6 +102,36 @@ describe('스키마가 앱이 실제로 쓰는 필드를 모두 담는다', () =
         });
 
         expect(result.status).toBe('reserved');
+    });
+
+    it('주유·충전 기록: 마지막 수정자(행위자 스탬프)가 컨버터를 통과한다', () => {
+        // 관리자가 직원 기록을 정정하면 목록에 '관리자 수정' 배지를 띄운다. 이 필드가
+        // 컨버터에서 지워지면 배지는 영원히 뜨지 않고, 정정 흔적이 화면에서 사라진다.
+        const fuel = readThrough(fuelLogSchema, {
+            organizationId: 'org1',
+            vehicleId: 'v1',
+            driverUid: 'emp-1',
+            date: '2026-09-01',
+            meterReading: 51000,
+            fuelAmount: 40,
+            fuelCost: 60000,
+            lastEditedByUid: 'admin-1',
+        });
+        expect(fuel.lastEditedByUid).toBe('admin-1');
+
+        const charge = readThrough(hipassChargeSchema, {
+            organizationId: 'org1',
+            cardId: 'c1',
+            cardNumber: '1234-5678',
+            vehicleId: 'v1',
+            chargerUid: 'emp-1',
+            date: '2026-09-01',
+            chargeAmount: 50000,
+            balanceBefore: 30000,
+            balanceAfter: 80000,
+            lastEditedByUid: 'admin-1',
+        });
+        expect(charge.lastEditedByUid).toBe('admin-1');
     });
 
     it('사용자: FCM 토큰이 컨버터를 통과한다', () => {

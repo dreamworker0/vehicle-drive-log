@@ -78,7 +78,7 @@ export interface PageSlice {
     start: number;
     /** 담을 데이터 행 수 */
     count: number;
-    /** 아래를 채울 빈 행 수 — 양식 높이를 유지한다 */
+    /** 아래를 채울 빈 행 수 — 양식 높이를 유지한다. 마지막 장이 아니면 항상 0 */
     emptyCount: number;
 }
 
@@ -146,7 +146,12 @@ export function paginateByHeight(metrics: PageMetrics, options: PaginateOptions 
     }
 
     return slices.map((slice, idx) => {
-        const reserve = subtotalHeight + (idx === slices.length - 1 ? totalHeight : 0);
+        const isLast = idx === slices.length - 1;
+        // 빈 행은 마지막 장에만 채운다 — 중간 장에 채우면 기록과 기록 사이(예: 12번과 13번)에
+        // 빈 칸이 끼어 누락처럼 보이고, 출력 후 손으로 없던 운행을 적어 넣을 여지가 생긴다.
+        // 남는 높이는 소계 아래 여백으로 둔다.
+        if (!isLast) return { start: slice.start, count: slice.count, emptyCount: 0 };
+        const reserve = subtotalHeight + totalHeight;
         const remaining = avail - slice.used - reserve;
         // 남은 높이가 허용하는 만큼 채우되, 양식 칸 수(fillTo)가 정해져 있으면 거기까지만 채운다
         const byHeight = emptyRowHeight > 0 ? Math.floor(remaining / emptyRowHeight) : 0;

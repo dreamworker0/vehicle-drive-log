@@ -15,6 +15,7 @@ interface VehicleModal {
 }
 import { getVehicles, createVehicle, updateVehicle, deleteVehicle, hasVehicleDriveLogs, clearVehicleMaintenanceBlock, retireVehicle, restoreVehicle, cancelVehicleReservations, getOrganizationMembers } from '../lib/firestore';
 import { useToast } from './useToast';
+import { parseIntegerInput } from './utils/numberValidation';
 import { MAIN_SITE_ID } from '../lib/orgSites';
 import { captureError } from '../lib/sentry';
 import {
@@ -212,7 +213,7 @@ export default function useVehicleManager() {
                     plateNumber: form.plateNumber.trim(),
                     vehicleType: form.vehicleType as Vehicle['vehicleType'],
                     fuelType: form.fuelType as FuelType,
-                    currentKm: form.currentKm ? parseInt(form.currentKm) : 0,
+                    currentKm: form.currentKm ? parseIntegerInput(form.currentKm) : 0,
                     organizationId: orgId!,
                     // 전부 해제 시 빈 배열 저장으로 제한이 풀려야 하므로 항상 포함
                     allowedUserIds: form.allowedUserIds,

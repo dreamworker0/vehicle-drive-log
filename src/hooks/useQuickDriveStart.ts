@@ -117,7 +117,7 @@ export default function useQuickDriveStart() {
             }
         };
         fetch();
-        // eslint-disable-next-line react-hooks/exhaustive-deps
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- user 객체 대신 uid로 본다. 같은 사용자의 토큰 갱신마다 다시 조회할 이유가 없다
     }, [orgId, user?.uid, recommendedVehicleId, passengerEnabled]);
 
     // 목적지 또는 차량 변경 시 경로 탐색 (디바운스 800ms)
@@ -289,6 +289,9 @@ export default function useQuickDriveStart() {
             const errObj = err as Record<string, string>;
             if (errObj?.code === 'functions/already-exists' || errObj?.message?.includes('이미 예약')) {
                 showToast(errObj.message || '해당 시간대에 이미 예약이 있습니다.', 'warning');
+            } else if (errObj?.code === 'functions/failed-precondition' && errObj.message) {
+                // 서버가 사유를 담아 거절한 경우(기관이 바로 운행을 끔·정비 중 차량 등) 그대로 보여 준다
+                showToast(errObj.message, 'warning');
             } else {
                 showToast('운행 시작에 실패했습니다. 다시 시도해주세요.', 'error');
             }

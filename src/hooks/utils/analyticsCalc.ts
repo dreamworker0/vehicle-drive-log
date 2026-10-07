@@ -1,200 +1,337 @@
 /**
- * 분석(Analytics) 계산 유틸리티 — 순수 함수로 단위 테스트 가능
+ * 분석(Analytics) 계산 — 야간 집계 문서(MonthlyStat)를 화면 데이터로 바꾸는 순수 함수.
+ *
+ * 예전에는 화면이 쓰는 계산이 `useAnalytics` 훅 안에 있고, 이 파일에는 **원본 일지를 받는**
+ * 옛 함수들(아무도 부르지 않는다)이 테스트와 함께 남아 있었다. 테스트가 통과해도 화면 숫자가
+ * 맞다는 보장이 없었다. 지금은 훅이 이 함수들을 부르기만 하고, 테스트도 이 함수들을 본다.
  */
-
-import { extractDateStr, formatMonth, getRecentMonthKeys } from './aggregationUtils';
-export { formatMonth, extractDateStr as getLogDate, getRecentMonthKeys };
+import type { MonthlyStat, DriveOriginCounts } from '../../lib/firestore/statistics';
+import type { Vehicle } from '../../types/vehicle';
 
 export const DAY_NAMES = ['일', '월', '화', '수', '목', '금', '토'];
 export const MONTH_LABELS = ['1월', '2월', '3월', '4월', '5월', '6월', '7월', '8월', '9월', '10월', '11월', '12월'];
 
-export interface LogEntry {
-    date?: string;
-    timestamp?: Date | { toDate?: () => Date };
-    startTime?: string;
-    departureTime?: string;
-    startKm?: number;
-    endKm?: number;
-    fuelAmount?: number;
-    energyCost?: number;
-    driverName?: string;
-    vehicleDisplayName?: string;
-    vehicleName?: string;
-}
+/** 'YYYY-MM' → '9월' */
+const monthLabel = (mk: string) => MONTH_LABELS[parseInt(mk.split('-')[1], 10) - 1];
 
-interface TrendEntry {
-    [key: string]: unknown;
-    month: string;
-    count: number;
-    distance: number;
-    fuelCost: number;
-    label: string;
-}
+/** monthKeys 순서대로 그 달 문서를 찾는다 — 문서가 없는 달은 undefined */
+const statOf = (stats: readonly MonthlyStat[], mk: string) => stats.find(s => s.monthKey === mk);
 
-// aggregationUtils 참조로 대체됨
+/** 분석 화면이 차량 문서에서 읽는 필드 */
+export type AnalyticsVehicle = Pick<Vehicle, 'id' | 'displayName' | 'plateNumber' | 'currentKm' | 'insurance' | 'retired'>;
+
+const vehicleName = (v: AnalyticsVehicle) => v.displayName || v.plateNumber || '(미지정)';
 
 /**
- * 해당 월의 근무일 수 추정 (주말 제외, 공휴일 미포함)
+ * 가동률 분모 — 그 달의 평일 중 공휴일이 아닌 날. `until`이 그 달 안이면 그날까지만 센다.
+ *
+ * 예전 분모(getWorkdaysInMonth)는 진행 중인 이번 달도 한 달 전체를 넣고 공휴일도 빼지 않아,
+ * 10/1에 보면 10월 약 22일이 분모에 들어가 가동률이 1/3쯤 낮게 나왔고 '가동률 낮음' 추천이
+ * 잘못 떴다.
  */
-export function getWorkdaysInMonth(yearMonth: string) {
+export function countWorkdays(yearMonth: string, holidays: ReadonlySet<string>, until: Date = new Date()) {
     const [y, m] = yearMonth.split('-').map(Number);
     const firstDay = new Date(y, m - 1, 1);
-    const lastDay = new Date(y, m, 0);
+    const monthEnd = new Date(y, m, 0);
+    const untilDay = new Date(until.getFullYear(), until.getMonth(), until.getDate());
+    const lastDay = untilDay < monthEnd ? untilDay : monthEnd;
     let count = 0;
     for (let d = new Date(firstDay); d <= lastDay; d.setDate(d.getDate() + 1)) {
         const dow = d.getDay();
-        if (dow !== 0 && dow !== 6) count++;
+        if (dow === 0 || dow === 6) continue;
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        if (!holidays.has(key)) count++;
     }
     return count;
 }
 
-/**
- * 월별 운행 추이를 계산한다.
- */
-export function calcMonthlyTrend(logs: LogEntry[], monthKeys: string[]): TrendEntry[] {
-    const map: Record<string, { month: string; count: number; distance: number; fuelCost: number }> = {};
-    monthKeys.forEach(k => { map[k] = { month: k, count: 0, distance: 0, fuelCost: 0 }; });
+// ─── 트렌드 ─────────────────────────────────────────────
 
-    logs.forEach(l => {
-        const d = extractDateStr(l);
-        if (!d) return;
-        const mk = d.slice(0, 7);
-        if (!map[mk]) return;
-        map[mk].count++;
-        map[mk].distance += ((l.endKm ?? 0) - (l.startKm ?? 0)) || 0;
-        map[mk].fuelCost += l.fuelAmount || l.energyCost || 0;
+// interface가 아니라 type — 차트 props의 인덱스 시그니처({ [key: string]: unknown })에 그대로 들어가야 한다
+export type MonthlyTrendItem = {
+    month: string;
+    label: string;
+    count: number;
+    distance: number;
+    fuelCost: number;
+};
+
+/** 월별 운행 추이 — 문서가 없는 달은 0 */
+export function calcMonthlyTrend(stats: readonly MonthlyStat[], monthKeys: readonly string[]): MonthlyTrendItem[] {
+    return monthKeys.map(mk => {
+        const stat = statOf(stats, mk);
+        return {
+            month: mk,
+            label: monthLabel(mk),
+            count: stat?.totalLogs || 0,
+            distance: stat?.totalDistance || 0,
+            fuelCost: stat?.fuelCost || 0,
+        };
     });
+}
 
-    return monthKeys.map(k => ({
-        ...map[k],
-        label: MONTH_LABELS[parseInt(k.split('-')[1], 10) - 1],
-    }));
+export interface DriveOriginTrendItem extends DriveOriginCounts {
+    month: string;
+    label: string;
+}
+
+/** 월별 운행 방식 — 사전 예약 · 바로 운행 · 예약 없이 기록 · 예약 연결(구분 전) */
+export function calcDriveOriginTrend(stats: readonly MonthlyStat[], monthKeys: readonly string[]): DriveOriginTrendItem[] {
+    return monthKeys.map(mk => {
+        const o = statOf(stats, mk)?.originCounts;
+        return {
+            month: mk,
+            label: monthLabel(mk),
+            reservation: o?.reservation || 0,
+            quick: o?.quick || 0,
+            manual: o?.manual || 0,
+            linked: o?.linked || 0,
+        };
+    });
+}
+
+export interface DriveOriginByRow extends DriveOriginCounts {
+    name: string;
+    total: number;
 }
 
 /**
- * 요일 × 시간대 히트맵 데이터를 계산한다.
+ * 직원별·차량별 운행 방식 — 분석 기간 전체 합계, 운행이 많은 순 상위 10.
+ * 이 필드가 생기기 전의 월간 문서는 origin이 없어 건너뛴다(그 달은 0으로 센다).
  */
-export function calcHeatmapData(logs: LogEntry[]) {
-    const grid = Array.from({ length: 7 }, () => Array(24).fill(0) as number[]);
-
-    logs.forEach(l => {
-        const d = extractDateStr(l);
-        const t = l.startTime || l.departureTime || '';
-        if (!d || !t) return;
-        const dayIdx = new Date(d).getDay();
-        const hour = parseInt(t.split(':')[0], 10);
-        if (!isNaN(hour) && hour >= 0 && hour < 24) {
-            grid[dayIdx][hour]++;
-        }
-    });
-
-    const result: { day: string; dayIdx: number; hour: number; count: number }[] = [];
-    for (let dayIdx = 0; dayIdx < 7; dayIdx++) {
-        for (let hour = 0; hour < 24; hour++) {
-            if (grid[dayIdx][hour] > 0) {
-                result.push({
-                    day: DAY_NAMES[dayIdx],
-                    dayIdx,
-                    hour,
-                    count: grid[dayIdx][hour],
-                });
+export function calcDriveOriginBy(stats: readonly MonthlyStat[]): { byDriver: DriveOriginByRow[]; byVehicle: DriveOriginByRow[] } {
+    const collect = (pick: (s: MonthlyStat) => Record<string, { name?: string; origin?: DriveOriginCounts }>) => {
+        const map: Record<string, DriveOriginByRow> = {};
+        for (const s of stats) {
+            for (const [id, v] of Object.entries(pick(s) || {})) {
+                if (!v.origin) continue;
+                const row = map[id] ?? (map[id] = { name: v.name || '알 수 없음', reservation: 0, quick: 0, manual: 0, linked: 0, total: 0 });
+                if (v.name) row.name = v.name;
+                row.reservation += v.origin.reservation;
+                row.quick += v.origin.quick;
+                row.manual += v.origin.manual;
+                row.linked += v.origin.linked;
+                row.total += v.origin.reservation + v.origin.quick + v.origin.manual + v.origin.linked;
             }
         }
+        return Object.values(map).filter(r => r.total > 0).sort((a, b) => b.total - a.total).slice(0, 10);
+    };
+    return { byDriver: collect(s => s.driverStats), byVehicle: collect(s => s.vehicleStats) };
+}
+
+/** 직원별 운행 비교 — 최근 3개월 */
+export function calcDriverComparison(stats: readonly MonthlyStat[], monthKeys: readonly string[]): DriverComparisonItem[] {
+    const recentKeys = monthKeys.slice(-3);
+    const map: Record<string, { name: string; totalCount: number; totalDistance: number; months: Record<string, { count: number; distance: number }> }> = {};
+
+    recentKeys.forEach(mk => {
+        const stat = statOf(stats, mk);
+        if (!stat?.driverStats) return;
+        // 계정(uid)으로 묶는다 — 이름으로 묶으면 동명이인이 합쳐지고, 이름을 바꾼 사람이 둘로 나뉜다.
+        // 표시 이름은 가장 최근 달의 것(recentKeys는 과거→현재 순이라 덮어쓰면 최신이 남는다).
+        Object.entries(stat.driverStats).forEach(([uid, dStat]) => {
+            if (!map[uid]) map[uid] = { name: '', totalCount: 0, totalDistance: 0, months: {} };
+            if (dStat.name) map[uid].name = dStat.name;
+            if (!map[uid].months[mk]) map[uid].months[mk] = { count: 0, distance: 0 };
+
+            map[uid].months[mk].count += dStat.count;
+            map[uid].months[mk].distance += dStat.distance;
+            map[uid].totalCount += dStat.count;
+            map[uid].totalDistance += dStat.distance;
+        });
+    });
+
+    // 동명이인은 차트 축에서 한 줄로 합쳐지므로 번호를 붙여 가른다
+    const seen: Record<string, number> = {};
+    return Object.values(map).map((d) => {
+        const base = d.name || '알 수 없음';
+        seen[base] = (seen[base] || 0) + 1;
+        return { ...d, name: seen[base] > 1 ? `${base} (${seen[base]})` : base };
+    }).map((d) => ({
+        name: d.name,
+        totalCount: d.totalCount,
+        totalDistance: d.totalDistance,
+        ...recentKeys.reduce((acc, mk) => {
+            const label = monthLabel(mk);
+            acc[`${label}_count`] = d.months[mk]?.count || 0;
+            acc[`${label}_distance`] = d.months[mk]?.distance || 0;
+            return acc;
+        }, {} as Record<string, number>),
+        monthLabels: recentKeys.map(monthLabel),
+    })).sort((a, b) => b.totalCount - a.totalCount);
+}
+
+/** 차량 가동률 — 최근 3개월, 공휴일을 빼고 진행 중인 이번 달은 `until`까지 */
+export function calcVehicleUtilization(
+    stats: readonly MonthlyStat[],
+    vehicles: readonly AnalyticsVehicle[],
+    monthKeys: readonly string[],
+    holidays: ReadonlySet<string>,
+    until: Date = new Date(),
+): VehicleUtilizationItem[] {
+    const recentKeys = monthKeys.slice(-3);
+    const totalWorkdays = recentKeys.reduce((s, k) => s + countWorkdays(k, holidays, until), 0);
+    const map: Record<string, number> = {};
+
+    recentKeys.forEach(mk => {
+        const stat = statOf(stats, mk);
+        if (!stat?.vehicleStats) return;
+        // 집계 문서의 vehicleStats는 vehId 키 구조 → 차량 매칭은 v.id 기준 (이름 불일치 회피)
+        Object.entries(stat.vehicleStats).forEach(([vehId, vStat]) => {
+            map[vehId] = (map[vehId] || 0) + (vStat.usedDays || 0);
+        });
+    });
+
+    return vehicles.map(v => {
+        const usedDays = map[v.id] || 0;
+        // 주말·공휴일 운행도 가동일에 들어가 분모(평일)를 넘을 수 있다 — 100%에서 멈춘다
+        const rate = totalWorkdays > 0 ? Math.min(100, Math.round((usedDays / totalWorkdays) * 100)) : 0;
+        return { name: vehicleName(v), usedDays, totalWorkdays, rate };
+    }).sort((a, b) => b.rate - a.rate);
+}
+
+export interface HeatmapResult {
+    grid: number[][];
+    items: { day: string; dayIdx: number; hour: number; count: number }[];
+    maxCount: number;
+}
+
+/** 요일 × 시간대 히트맵 — 기간 전체 합 */
+export function calcHeatmap(stats: readonly MonthlyStat[]): HeatmapResult {
+    const grid = Array.from({ length: 7 }, () => Array(24).fill(0) as number[]);
+    stats.forEach(stat => {
+        stat.heatmapData?.forEach(h => {
+            if (h.dayIdx >= 0 && h.dayIdx < 7 && h.hour >= 0 && h.hour < 24) {
+                grid[h.dayIdx][h.hour] += h.count;
+            }
+        });
+    });
+
+    const items: HeatmapResult['items'] = [];
+    for (let d = 0; d < 7; d++) {
+        for (let h = 0; h < 24; h++) {
+            if (grid[d][h] > 0) items.push({ day: DAY_NAMES[d], dayIdx: d, hour: h, count: grid[d][h] });
+        }
     }
-    return { grid, items: result, maxCount: Math.max(1, ...result.map(r => r.count)) };
+    return { grid, items, maxCount: Math.max(1, ...items.map(i => i.count)) };
+}
+
+// ─── 비용 ───────────────────────────────────────────────
+
+/** 차량별 km당 연료비 — 거리와 연료비가 모두 있는 차량만, 비싼 순 */
+export function calcFuelEfficiency(stats: readonly MonthlyStat[]): { items: FuelEfficiencyItem[]; avgCostPerKm: number } {
+    // vehicleStats는 vehId 키 구조 → vehId로 누적하고 표시명은 vStat.name 사용
+    const map: Record<string, { name: string; totalDist: number; totalCost: number }> = {};
+    stats.forEach(stat => {
+        Object.entries(stat.vehicleStats || {}).forEach(([vehId, vStat]) => {
+            if (!map[vehId]) map[vehId] = { name: vStat.name || vehId, totalDist: 0, totalCost: 0 };
+            map[vehId].totalDist += (vStat.totalDist || 0);
+            map[vehId].totalCost += (vStat.totalCost || 0);
+        });
+    });
+
+    const items = Object.values(map).filter((v) => v.totalDist > 0 && v.totalCost > 0).map((v) => ({
+        name: v.name,
+        totalDist: v.totalDist,
+        totalCost: v.totalCost,
+        costPerKm: Math.round((v.totalCost / v.totalDist) * 10) / 10,
+    })).sort((a, b) => b.costPerKm - a.costPerKm);
+
+    const avgCostPerKm = items.length > 0 ? Math.round((items.reduce((s, r) => s + r.costPerKm, 0) / items.length) * 10) / 10 : 0;
+    return { items, avgCostPerKm };
+}
+
+/** 차량별 정비비·횟수·마지막 정비일 + 보험 만료일(추천용) — 정비비가 큰 순 */
+export function calcMaintenanceCostAnalysis(stats: readonly MonthlyStat[], vehicles: readonly AnalyticsVehicle[]): MaintenanceCostItem[] {
+    // vehicleStats는 vehId 키 구조 → vehId로 누적하고 차량 매칭은 v.id 기준
+    const map: Record<string, { totalCost: number; count: number; lastDate: string }> = {};
+    stats.forEach(stat => {
+        Object.entries(stat.vehicleStats || {}).forEach(([vehId, vStat]) => {
+            if (!map[vehId]) map[vehId] = { totalCost: 0, count: 0, lastDate: '' };
+            map[vehId].totalCost += (vStat.maintenanceCost || 0);
+            map[vehId].count += (vStat.maintenanceCount || 0);
+            if (vStat.lastMaintenanceDate && vStat.lastMaintenanceDate > map[vehId].lastDate) {
+                map[vehId].lastDate = vStat.lastMaintenanceDate;
+            }
+        });
+    });
+
+    return vehicles.map(v => {
+        const maint = map[v.id] || { totalCost: 0, count: 0, lastDate: '' };
+        const currentKm = v.currentKm || 0;
+        return {
+            name: vehicleName(v),
+            totalMaintenanceCost: maint.totalCost,
+            maintenanceCount: maint.count,
+            lastMaintenanceDate: maint.lastDate,
+            currentKm,
+            costPerKm: currentKm > 0 ? Math.round((maint.totalCost / currentKm) * 100) / 100 : 0,
+            insuranceExpiryDate: v.insurance?.expiryDate,
+            retired: !!v.retired?.isRetired,
+        };
+    }).sort((a, b) => b.totalMaintenanceCost - a.totalMaintenanceCost);
+}
+
+export interface AnomalyItem {
+    type: 'weekend' | 'night' | 'overdrive';
+    icon: string;
+    severity: 'high' | 'medium' | 'low';
+    title: string;
+    desc: string;
 }
 
 /**
- * 비정상 운행을 탐지한다.
+ * 이상 운행 — 기간 합계로 판정한다. 주말 비율 15% 초과(30% 초과는 높음), 심야 3건 초과(10건 초과는
+ * 높음), 하루 200km 초과 1건 이상(5건 초과는 높음). 세는 기준(출발 시각 등)은 야간 집계에 있다.
  */
-export function detectAnomalies(logs: LogEntry[]) {
-    const items: { type: string; icon: string; severity: string; title: string; desc: string }[] = [];
-
-    // 주말 운행
-    const weekendLogs = logs.filter(l => {
-        const d = extractDateStr(l);
-        if (!d) return false;
-        const dow = new Date(d).getDay();
-        return dow === 0 || dow === 6;
+export function calcAnomalies(stats: readonly MonthlyStat[]): AnomalyItem[] {
+    const sums = { weekend: 0, night: 0, overDrive: 0, totalLogs: 0 };
+    stats.forEach(s => {
+        sums.weekend += (s.anomalies?.weekend || 0);
+        sums.night += (s.anomalies?.night || 0);
+        sums.overDrive += (s.anomalies?.overDrive || 0);
+        sums.totalLogs += (s.totalLogs || 0);
     });
-    const weekendRate = logs.length > 0
-        ? Math.round((weekendLogs.length / logs.length) * 100) : 0;
+
+    const items: AnomalyItem[] = [];
+    const weekendRate = sums.totalLogs > 0 ? Math.round((sums.weekend / sums.totalLogs) * 100) : 0;
 
     if (weekendRate > 15) {
-        items.push({
-            type: 'weekend',
-            icon: '📅',
-            severity: weekendRate > 30 ? 'high' : 'medium',
-            title: `주말 운행 비율 ${weekendRate}%`,
-            desc: `전체 ${logs.length}건 중 ${weekendLogs.length}건이 주말 운행입니다. 예약 정책 검토를 권장합니다.`,
-        });
+        items.push({ type: 'weekend', icon: '📅', severity: weekendRate > 30 ? 'high' : 'medium', title: `주말 운행 비율 ${weekendRate}%`, desc: `전체 ${sums.totalLogs}건 중 ${sums.weekend}건이 주말 운행입니다. 예약 정책 검토를 권장합니다.` });
     }
-
-    // 심야 운행 (22시~06시)
-    const nightLogs = logs.filter(l => {
-        const t = l.startTime || l.departureTime || '';
-        if (!t) return false;
-        const h = parseInt(t.split(':')[0], 10);
-        return h >= 22 || h < 6;
-    });
-    if (nightLogs.length > 3) {
-        items.push({
-            type: 'night',
-            icon: '🌙',
-            severity: nightLogs.length > 10 ? 'high' : 'medium',
-            title: `심야 운행 ${nightLogs.length}건 감지`,
-            desc: `22시~06시 사이 운행이 ${nightLogs.length}건 발생했습니다.`,
-        });
+    if (sums.night > 3) {
+        items.push({ type: 'night', icon: '🌙', severity: sums.night > 10 ? 'high' : 'medium', title: `심야 운행 ${sums.night}건 감지`, desc: `22시~06시 사이 운행이 ${sums.night}건 발생했습니다.` });
     }
-
-    // 1일 과다 주행 (200km 이상)
-    const dailyDist: Record<string, { driver: string; date: string; distance: number }> = {};
-    logs.forEach(l => {
-        const d = extractDateStr(l);
-        if (!d) return;
-        const key = `${l.driverName || '?'}_${d}`;
-        if (!dailyDist[key]) dailyDist[key] = { driver: l.driverName || '(이름 없음)', date: d, distance: 0 };
-        dailyDist[key].distance += ((l.endKm ?? 0) - (l.startKm ?? 0)) || 0;
-    });
-    const overDrive = Object.values(dailyDist).filter(d => d.distance > 200);
-    if (overDrive.length > 0) {
-        items.push({
-            type: 'overdrive',
-            icon: '⚡',
-            severity: overDrive.length > 5 ? 'high' : 'low',
-            title: `1일 200km 이상 주행 ${overDrive.length}건`,
-            desc: `장거리 운행이 빈번합니다. 운행 분담 또는 경로 최적화를 검토하세요.`,
-        });
+    if (sums.overDrive > 0) {
+        items.push({ type: 'overdrive', icon: '⚡', severity: sums.overDrive > 5 ? 'high' : 'low', title: `1일 200km 이상 주행 ${sums.overDrive}건`, desc: `장거리 운행이 빈번합니다. 운행 분담 또는 경로 최적화를 검토하세요.` });
     }
-
     return items;
 }
 
-// ─── useAnalytics에서 추출된 순수 계산 함수들 ────────────
-
-interface VehicleInfo {
-    displayName?: string;
-    plateNumber?: string;
-    name?: string;
-    currentKm?: number;
-    id: string;
+/** 월별 비용 추이 — 주유 · 하이패스(충전액) · 정비 */
+export function calcCostTrend(stats: readonly MonthlyStat[], monthKeys: readonly string[]): CostTrendItem[] {
+    return monthKeys.map(mk => {
+        const stat = statOf(stats, mk);
+        const fuelCost = stat?.fuelCost || 0;
+        const hipassCost = stat?.hipassCost || 0;
+        const maintenanceCost = stat?.maintenanceCost || 0;
+        return { label: monthLabel(mk), fuelCost, hipassCost, maintenanceCost, totalCost: fuelCost + hipassCost + maintenanceCost };
+    });
 }
 
-interface MaintenanceInfo {
-    vehicleName?: string;
-    cost?: number;
-    date: string;
+/** 하이패스 실제 사용액 합 — 사용액을 담은 달이 하나도 없으면(집계 도입 전) null */
+export function calcHipassUsedTotal(stats: readonly MonthlyStat[], monthKeys: readonly string[]): number | null {
+    const months = stats.filter(s => monthKeys.includes(s.monthKey) && s.hipassUsed !== null);
+    return months.length ? months.reduce((sum, s) => sum + (s.hipassUsed || 0), 0) : null;
 }
 
-interface FuelLogInfo {
-    date?: string;
-    fuelCost?: number;
+/** 가장 최근 집계 시각 — 화면에 "언제 기준 숫자인지" 적는다 */
+export function calcAggregatedAt(stats: readonly MonthlyStat[]): Date | null {
+    const times = stats.map(s => s.updatedAt?.getTime() || 0).filter(t => t > 0);
+    return times.length ? new Date(Math.max(...times)) : null;
 }
 
-interface HipassChargeInfo {
-    date?: string;
-    chargeAmount?: number;
-}
+// ─── 타입 · 추천 · 전월 대비 ───────────────────────────────
 
 export interface DriverComparisonItem {
     name: string;
@@ -225,6 +362,10 @@ export interface MaintenanceCostItem {
     lastMaintenanceDate: string;
     currentKm: number;
     costPerKm: number;
+    /** 보험 만료일 (YYYY-MM-DD) — 차량 관리에서 입력한 값 */
+    insuranceExpiryDate?: string;
+    /** 운행을 중지한(퇴역) 차량 — 정비·보험 추천에서 뺀다 */
+    retired?: boolean;
 }
 
 export interface CostTrendItem {
@@ -243,180 +384,69 @@ export interface RecommendationItem {
     desc: string;
 }
 
-/** 직원별 운행 비교 (최근 3개월) */
-export function calcDriverComparison(logs: LogEntry[], monthKeys: string[]): DriverComparisonItem[] {
-    const recentKeys = monthKeys.slice(-3);
-    const map: Record<string, { name: string; totalCount: number; totalDistance: number; months: Record<string, { count: number; distance: number }> }> = {};
-
-    logs.forEach(l => {
-        const d = extractDateStr(l);
-        if (!d) return;
-        const mk = d.slice(0, 7);
-        if (!recentKeys.includes(mk)) return;
-        const driver = l.driverName || '(이름 없음)';
-        if (!map[driver]) map[driver] = { name: driver, totalCount: 0, totalDistance: 0, months: {} };
-        if (!map[driver].months[mk]) map[driver].months[mk] = { count: 0, distance: 0 };
-        map[driver].months[mk].count++;
-        map[driver].months[mk].distance += ((l.endKm ?? 0) - (l.startKm ?? 0)) || 0;
-        map[driver].totalCount++;
-        map[driver].totalDistance += ((l.endKm ?? 0) - (l.startKm ?? 0)) || 0;
-    });
-
-    return Object.values(map)
-        .sort((a, b) => b.totalCount - a.totalCount)
-        .map(d => ({
-            name: d.name,
-            totalCount: d.totalCount,
-            totalDistance: d.totalDistance,
-            ...recentKeys.reduce((acc: Record<string, number>, mk: string) => {
-                const label = MONTH_LABELS[parseInt(mk.split('-')[1], 10) - 1];
-                acc[`${label}_count`] = d.months[mk]?.count || 0;
-                acc[`${label}_distance`] = d.months[mk]?.distance || 0;
-                return acc;
-            }, {} as Record<string, number>),
-            monthLabels: recentKeys.map(mk => MONTH_LABELS[parseInt(mk.split('-')[1], 10) - 1]),
-        }));
+/** 로컬(KST) 'YYYY-MM-DD' */
+function localDateStr(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-/** 차량별 가동률 */
-export function calcVehicleUtilization(logs: LogEntry[], vehicles: VehicleInfo[], monthKeys: string[]): VehicleUtilizationItem[] {
-    const recentKeys = monthKeys.slice(-3);
-    const totalWorkdays = recentKeys.reduce((s: number, k: string) => s + getWorkdaysInMonth(k), 0);
-
-    const daysByVehicle: Record<string, Set<string>> = {};
-    logs.forEach(l => {
-        const d = extractDateStr(l);
-        if (!d) return;
-        const mk = d.slice(0, 7);
-        if (!recentKeys.includes(mk)) return;
-        const vn = l.vehicleDisplayName || l.vehicleName || '(미지정)';
-        if (!daysByVehicle[vn]) daysByVehicle[vn] = new Set();
-        daysByVehicle[vn].add(d);
-    });
-
-    return vehicles.map(v => {
-        const name = v.displayName || v.plateNumber || '(미지정)';
-        const usedDays = daysByVehicle[name]?.size || 0;
-        const rate = totalWorkdays > 0 ? Math.round((usedDays / totalWorkdays) * 100) : 0;
-        return { name, usedDays, totalWorkdays, rate };
-    }).sort((a, b) => b.rate - a.rate);
+/** from → to 날짜 차(일). to가 없거나 깨졌으면 null */
+function daysUntil(from: string, to: string | undefined): number | null {
+    if (!to || !/^\d{4}-\d{2}-\d{2}$/.test(to)) return null;
+    const [fy, fm, fd] = from.split('-').map(Number);
+    const [ty, tm, td] = to.split('-').map(Number);
+    return Math.round((Date.UTC(ty, tm - 1, td) - Date.UTC(fy, fm - 1, fd)) / 86_400_000);
 }
 
-/** 차량별 km당 연료비 */
-export function calcFuelEfficiency(logs: LogEntry[]): { items: FuelEfficiencyItem[]; avgCostPerKm: number } {
-    const map: Record<string, { totalDist: number; totalCost: number }> = {};
-    logs.forEach(l => {
-        const name = l.vehicleDisplayName || l.vehicleName || '(미지정)';
-        const dist = ((l.endKm ?? 0) - (l.startKm ?? 0)) || 0;
-        const cost = l.fuelAmount || l.energyCost || 0;
-        if (dist <= 0) return;
-        if (!map[name]) map[name] = { totalDist: 0, totalCost: 0 };
-        map[name].totalDist += dist;
-        map[name].totalCost += cost;
-    });
-
-    const result = Object.entries(map)
-        .filter(([, v]) => v.totalDist > 0 && v.totalCost > 0)
-        .map(([name, v]) => ({
-            name,
-            totalDist: v.totalDist,
-            totalCost: v.totalCost,
-            costPerKm: Math.round((v.totalCost / v.totalDist) * 10) / 10,
-        }))
-        .sort((a, b) => b.costPerKm - a.costPerKm);
-
-    const avgCostPerKm = result.length > 0
-        ? Math.round((result.reduce((s, r) => s + r.costPerKm, 0) / result.length) * 10) / 10
-        : 0;
-
-    return { items: result, avgCostPerKm };
+export interface MonthCompareMetric {
+    key: 'count' | 'distance' | 'cost';
+    label: string;
+    unit: string;
+    cur: number;
+    prev: number;
+    /** 증감률(%) — 비교할 전달 값이 0이면 null */
+    pct: number | null;
 }
 
-/** 차량별 정비비 분석 */
-export function calcMaintenanceCostAnalysis(vehicles: VehicleInfo[], maintenanceRecords: MaintenanceInfo[]): MaintenanceCostItem[] {
-    const maintMap: Record<string, { totalCost: number; count: number; lastDate: string }> = {};
-    maintenanceRecords.forEach(r => {
-        const name = r.vehicleName || '(미지정)';
-        if (!maintMap[name]) maintMap[name] = { totalCost: 0, count: 0, lastDate: '' };
-        maintMap[name].totalCost += r.cost || 0;
-        maintMap[name].count++;
-        if (r.date > maintMap[name].lastDate) maintMap[name].lastDate = r.date;
-    });
-
-    return vehicles.map(v => {
-        const name = v.displayName || v.plateNumber || '(미지정)';
-        const maint = maintMap[name] || { totalCost: 0, count: 0, lastDate: '' };
-        const currentKm = v.currentKm || 0;
-        return {
-            name,
-            totalMaintenanceCost: maint.totalCost,
-            maintenanceCount: maint.count,
-            lastMaintenanceDate: maint.lastDate,
-            currentKm,
-            costPerKm: currentKm > 0 ? Math.round((maint.totalCost / currentKm) * 100) / 100 : 0,
-        };
-    }).sort((a, b) => b.totalMaintenanceCost - a.totalMaintenanceCost);
+export interface MonthCompare {
+    /** 비교하는 달 ('9월') — 진행 중인 이번 달이 아니라 **지난달**이다 */
+    label: string;
+    prevLabel: string;
+    metrics: MonthCompareMetric[];
 }
 
-/** 월별 주유비 + 하이패스 충전비 + 정비비 트렌드 */
-export function calcCostTrend(
-    fuelLogs: FuelLogInfo[],
-    hipassCharges: HipassChargeInfo[],
-    maintenanceRecords: MaintenanceInfo[],
-    monthKeys: string[],
-): CostTrendItem[] {
-    const fuelByMonth: Record<string, number> = {};
-    fuelLogs.forEach(l => {
-        if (!l.date) return;
-        const mk = l.date.slice(0, 7);
-        if (!monthKeys.includes(mk)) return;
-        if (!fuelByMonth[mk]) fuelByMonth[mk] = 0;
-        fuelByMonth[mk] += l.fuelCost || 0;
-    });
-
-    const hipassByMonth: Record<string, number> = {};
-    hipassCharges.forEach(l => {
-        if (!l.date) return;
-        const mk = l.date.slice(0, 7);
-        if (!monthKeys.includes(mk)) return;
-        if (!hipassByMonth[mk]) hipassByMonth[mk] = 0;
-        hipassByMonth[mk] += l.chargeAmount || 0;
-    });
-
-    const maintByMonth: Record<string, number> = {};
-    maintenanceRecords.forEach(r => {
-        if (!r.date) return;
-        const mk = r.date.slice(0, 7);
-        if (!monthKeys.includes(mk)) return;
-        if (!maintByMonth[mk]) maintByMonth[mk] = 0;
-        maintByMonth[mk] += r.cost || 0;
-    });
-
-    return monthKeys.map(mk => {
-        const monthNum = parseInt(mk.split('-')[1], 10);
-        const fuel = fuelByMonth[mk] || 0;
-        const hipass = hipassByMonth[mk] || 0;
-        const maint = maintByMonth[mk] || 0;
-        return {
-            label: MONTH_LABELS[monthNum - 1],
-            fuelCost: fuel,
-            hipassCost: hipass,
-            maintenanceCost: maint,
-            totalCost: fuel + hipass + maint,
-        };
-    });
+/**
+ * 전월 대비 증감 — **지난달**과 그 전달을 비교한다.
+ *
+ * 이번 달은 진행 중이라(그리고 야간 집계라 오늘 운행도 빠져 있다) 꽉 찬 전달과 견주면 늘 줄어든 것처럼
+ * 보인다. 그래서 다 끝난 달끼리 비교한다. rows는 과거→현재 순이고 마지막이 이번 달이다.
+ */
+export function calcMonthOverMonth(rows: ReadonlyArray<{ month: string; count: number; distance: number; cost: number }>): MonthCompare | null {
+    if (rows.length < 3) return null;
+    const cur = rows[rows.length - 2];
+    const prev = rows[rows.length - 3];
+    const pct = (a: number, b: number) => (b > 0 ? Math.round(((a - b) / b) * 100) : null);
+    const label = (mk: string) => MONTH_LABELS[parseInt(mk.split('-')[1], 10) - 1];
+    const metrics: MonthCompareMetric[] = [
+        { key: 'count', label: '운행', unit: '건', cur: cur.count, prev: prev.count, pct: pct(cur.count, prev.count) },
+        { key: 'distance', label: '주행거리', unit: 'km', cur: cur.distance, prev: prev.distance, pct: pct(cur.distance, prev.distance) },
+        { key: 'cost', label: '운영비', unit: '원', cur: cur.cost, prev: prev.cost, pct: pct(cur.cost, prev.cost) },
+    ];
+    if (metrics.every(m => m.cur === 0 && m.prev === 0)) return null;
+    return { label: label(cur.month), prevLabel: label(prev.month), metrics };
 }
 
 /** 최적화 추천 카드 생성 */
 export function calcRecommendations(params: {
     fuelEfficiency: { items: FuelEfficiencyItem[]; avgCostPerKm: number };
-    driverComparison: DriverComparisonItem[];
-    maintenanceCostAnalysis: MaintenanceCostItem[];
-    anomalies: ReturnType<typeof detectAnomalies>;
-    vehicleUtilization: VehicleUtilizationItem[];
-    monthKeys: string[];
+    driverComparison: readonly DriverComparisonItem[];
+    maintenanceCostAnalysis: readonly MaintenanceCostItem[];
+    anomalies: readonly AnomalyItem[];
+    vehicleUtilization: readonly VehicleUtilizationItem[];
+    monthKeys: readonly string[];
+    /** 분석 기간(개월) — '기간 내 정비 기록 없음'은 6개월 이상일 때만 본다 */
+    rangeMonths?: number;
 }): RecommendationItem[] {
-    const { fuelEfficiency, driverComparison, maintenanceCostAnalysis, anomalies, vehicleUtilization, monthKeys } = params;
+    const { fuelEfficiency, driverComparison, maintenanceCostAnalysis, anomalies, vehicleUtilization, monthKeys, rangeMonths = 0 } = params;
     const items: RecommendationItem[] = [];
 
     // 1) 연료 비효율 차량
@@ -458,7 +488,38 @@ export function calcRecommendations(params: {
     }
 
     // 3) 정비 시기 알림
+    const today = localDateStr(new Date());
+    // 정비를 기록하는 기관인가 — 기록을 아예 쓰지 않는 기관에 모든 차량 경고를 띄우지 않는다
+    const orgRecordsMaintenance = maintenanceCostAnalysis.some(v => v.maintenanceCount > 0);
     maintenanceCostAnalysis.forEach(v => {
+        if (v.retired) return;
+
+        // 3-1) 보험 만료 — 만료됐거나 30일 안
+        const left = daysUntil(today, v.insuranceExpiryDate);
+        if (left !== null && left <= 30) {
+            items.push({
+                type: 'insurance',
+                icon: '🛡️',
+                priority: left <= 7 ? 'high' : 'medium',
+                title: left < 0 ? `${v.name} 보험 만료됨` : `${v.name} 보험 만료 ${left === 0 ? '오늘' : `D-${left}`}`,
+                desc: left < 0
+                    ? `보험이 ${v.insuranceExpiryDate}에 만료됐어요. 갱신했다면 [차량 관리]에서 만료일을 고쳐 주세요.`
+                    : `보험이 ${v.insuranceExpiryDate}에 만료돼요. 갱신 일정을 확인하세요.`,
+            });
+        }
+
+        // 3-2) 분석 기간 안에 정비 기록이 한 건도 없는 차량 — 마지막 정비일을 모르므로 '경과일'로는 잡히지 않는다
+        if (v.maintenanceCount === 0 && v.currentKm > 0 && orgRecordsMaintenance && rangeMonths >= 6) {
+            items.push({
+                type: 'maintenance',
+                icon: '🔧',
+                priority: 'medium',
+                title: `${v.name} 정비 기록 없음`,
+                desc: `최근 ${rangeMonths}개월 동안 정비 기록이 없어요. 다른 차량은 정비를 기록하고 있으니 점검 시기를 확인해 보세요.`,
+            });
+            return;
+        }
+
         if (!v.lastMaintenanceDate || !v.currentKm) return;
         const daysSinceMaint = Math.floor((new Date().getTime() - new Date(v.lastMaintenanceDate).getTime()) / (1000 * 60 * 60 * 24));
         if (daysSinceMaint > 90) {

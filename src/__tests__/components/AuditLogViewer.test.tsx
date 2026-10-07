@@ -6,6 +6,7 @@
  *  (2) 행위자 uid는 이름으로 바꿔 보여준다
  *  (3) 기록의 신뢰 수준(행위자 미확인)을 숨기지 않는다
  *  (4) 기간·유형 버튼이 훅의 필터를 바꾼다
+ *  (5) 운행일지·예약 기록에는 원본에서 읽은 요약을 제목 자리에 붙이고, 삭제된 것은 그렇다고 알린다
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
@@ -56,10 +57,18 @@ const setHook = (over: Partial<UseAuditLogsResult> = {}) => {
         range: { start: '', end: '' },
         setRange: vi.fn(),
         rangeActive: false,
+        memberUid: '',
+        setMemberUid: vi.fn(),
+        members: [],
+        vehicleId: '',
+        setVehicleId: vi.fn(),
+        vehicles: [],
         exportExcel: vi.fn(),
         exporting: false,
         loadMore: vi.fn(),
         nameOf: (uid) => (uid === 'u1' ? '김간사' : uid === 'u2' ? '이팀장' : '알 수 없음'),
+        driveLogOf: () => undefined,
+        reservationOf: () => undefined,
         ...over,
     };
     return hookState.value;
@@ -122,6 +131,84 @@ describe('AuditLogViewer', () => {
 
         expect(screen.getByText('운행일지 삭제')).toBeInTheDocument();
         expect(screen.getByText('(행위자 미확인)')).toBeInTheDocument();
+    });
+
+    it('운행일지 기록에는 운행일·차량·경로를 붙인다', () => {
+        setHook({
+            logs: [log({ action: 'create' })],
+            driveLogOf: (id) => (id === 'dl-1' ? {
+                id: 'dl-1', date: '2026-10-01', startTime: '07:30', vehicleDisplayName: '스타리아',
+                startLocation: '복지관', destination: '시청',
+            } as unknown as ReturnType<UseAuditLogsResult['driveLogOf']> : undefined),
+        });
+        render(<AuditLogViewer />);
+
+        expect(screen.getByText('2026.10.01 07:30 · 스타리아 · 복지관 → 시청')).toBeInTheDocument();
+    });
+
+    it('운행일 문자열이 없는 운행일지는 운행 시각의 날짜를 쓴다 (날짜 없이 시각만 보이던 문제)', () => {
+        setHook({
+            logs: [log({ action: 'create' })],
+            driveLogOf: () => ({
+                id: 'dl-1', timestamp: new Date('2026-09-30T11:52:00+09:00'), startTime: '11:52',
+                vehicleDisplayName: '스타리아4347', startLocation: '본관', destination: '서울역',
+            } as unknown as ReturnType<UseAuditLogsResult['driveLogOf']>),
+        });
+        render(<AuditLogViewer />);
+        expect(screen.getByText('2026.09.30 11:52 · 스타리아4347 · 본관 → 서울역')).toBeInTheDocument();
+    });
+
+    it('삭제돼 원본이 없는 운행일지는 확인할 수 없다고 알리고, 읽는 중에는 아무것도 붙이지 않는다', () => {
+        setHook({
+            logs: [log({ id: 'l1', targetId: 'gone' }), log({ id: 'l2', targetId: 'loading' })],
+            driveLogOf: (id) => (id === 'gone' ? null : undefined),
+        });
+        render(<AuditLogViewer />);
+
+        // 읽는 중인 기록은 요약 자리를 비운다 — 삭제 안내는 하나만
+        expect(screen.getAllByText(/내용을 확인할 수 없음/)).toHaveLength(1);
+        expect(screen.getByText('삭제된 운행일지라 내용을 확인할 수 없음')).toBeInTheDocument();
+    });
+
+    // "기록은 남았는데 어떤 차를 어디로인지 모르겠다"(운영자) — 예약도 원본에서 요약을 붙인다
+    it('예약 기록에는 예약일·시간·차량·목적지를 붙이고, 삭제된 예약은 그렇다고 알린다', () => {
+        setHook({
+            logs: [
+                log({ id: 'l1', action: 'create', targetType: 'reservation', targetId: 'r-1' }),
+                log({ id: 'l2', action: 'delete', targetType: 'reservation', targetId: 'r-gone' }),
+            ],
+            reservationOf: (id) => (id === 'r-1' ? {
+                id: 'r-1', date: '2026-10-05', startTime: '14:00', endTime: '16:00',
+                vehicleDisplayName: '스타리아4347', destination: '서울역',
+            } as unknown as ReturnType<UseAuditLogsResult['reservationOf']> : id === 'r-gone' ? null : undefined),
+        });
+        render(<AuditLogViewer />);
+
+        expect(screen.getByText('예약 생성')).toBeInTheDocument();
+        expect(screen.getByText('2026.10.05 14:00~16:00 · 스타리아4347 · 서울역')).toBeInTheDocument();
+        expect(screen.getByText('삭제된 예약이라 내용을 확인할 수 없음')).toBeInTheDocument();
+    });
+
+    it('직원을 고르면 훅의 직원 필터를 바꾼다', () => {
+        const state = setHook({ members: [{ uid: 'u1', name: '김간사' }, { uid: 'u2', name: '이팀장' }] });
+        render(<AuditLogViewer />);
+
+        fireEvent.change(screen.getByLabelText('직원'), { target: { value: 'u2' } });
+        expect(state.setMemberUid).toHaveBeenCalledWith('u2');
+        expect(screen.getByRole('option', { name: '전체 직원' })).toBeInTheDocument();
+    });
+
+    it('차량을 고르면 훅의 차량 필터를 바꾸고, 선택 중에는 옛 기록을 찾는 방식과 한계를 알린다', () => {
+        const state = setHook({ vehicles: [{ id: 'car-1', name: '스타리아' }] });
+        const { rerender } = render(<AuditLogViewer />);
+        expect(screen.queryByText(/10월 5일 이전 기록은 이 차량의 운행일지로 찾아/)).not.toBeInTheDocument();
+
+        fireEvent.change(screen.getByLabelText('차량'), { target: { value: 'car-1' } });
+        expect(state.setVehicleId).toHaveBeenCalledWith('car-1');
+
+        setHook({ vehicles: [{ id: 'car-1', name: '스타리아' }], vehicleId: 'car-1' });
+        rerender(<AuditLogViewer />);
+        expect(screen.getByText(/10월 5일 이전 기록은 이 차량의 운행일지로 찾아/)).toBeInTheDocument();
     });
 
     it('기간·유형 버튼이 훅의 필터를 바꾼다', () => {

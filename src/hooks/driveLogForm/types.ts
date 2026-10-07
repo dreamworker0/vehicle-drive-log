@@ -55,4 +55,6 @@ export interface LocationState {
     passengerCount?: number;
     /** 예약 없이 과거 누락 건을 직접 소급 입력하는 진입점 여부 */
     retroactive?: boolean;
+    /** 이 예약이 바로 운행으로 만든 것인가 — 운행일지의 driveOrigin을 정한다 */
+    isQuickDrive?: boolean;
 }

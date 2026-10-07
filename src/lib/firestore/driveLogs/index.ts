@@ -10,6 +10,7 @@ export {
     getMyDriveLogs,
     getVehicleDriveLogs,
     hasVehicleDriveLogs,
+    getDriveLogsByIds,
 } from './queries';
 
 export {

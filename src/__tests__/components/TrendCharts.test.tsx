@@ -31,6 +31,8 @@ vi.mock('recharts', () => {
         CartesianGrid: box('grid'),
         Tooltip: box('tooltip'),
         Legend: box('legend'),
+        // 막대별 색 — fill만 남겨 어떤 색이 매겨졌는지 본다
+        Cell: ({ fill }: { fill?: string }) => <div data-testid="cell" data-fill={fill} />,
     };
 });
 
@@ -44,10 +46,10 @@ import TrendCharts from '../../components/admin/TrendCharts';
 
 const emptyProps = {
     monthlyTrend: [],
+    driveOriginTrend: [],
     driverComparison: [],
     vehicleUtilization: [],
     heatmapData: { grid: {}, maxCount: 1 },
-    costTrend: [],
 };
 
 type Props = React.ComponentProps<typeof TrendCharts>;
@@ -59,7 +61,7 @@ function setup(over: Partial<Props> = {}) {
 describe('데이터가 없을 때', () => {
     it('빈 차트 대신 안내 문구를 보여준다', () => {
         setup();
-        expect(screen.getAllByText('데이터가 없습니다')).toHaveLength(2); // 월별 추이 · 직원 비교
+        expect(screen.getAllByText('데이터가 없습니다')).toHaveLength(3); // 월별 추이 · 운행 방식 · 직원 비교
         expect(screen.getByText('차량 데이터가 없습니다')).toBeInTheDocument();
         expect(screen.queryAllByTestId('line-chart')).toHaveLength(0);
     });
@@ -71,9 +73,18 @@ describe('데이터가 없을 때', () => {
 });
 
 describe('월별 추이', () => {
-    it('데이터가 있으면 라인 차트를 그린다', () => {
+    it('건수와 거리를 한 차트의 양쪽 축에 그리지 않고 두 차트로 나눈다', () => {
         setup({ monthlyTrend: [{ label: '1월', count: 3, distance: 120 }] });
-        expect(screen.getByTestId('line-chart')).toHaveAttribute('data-count', '1');
+        const charts = screen.getAllByTestId('line-chart');
+        expect(charts).toHaveLength(2);
+        expect(screen.getAllByTestId('line').map(l => l.getAttribute('data-key'))).toEqual(['count', 'distance']);
+        expect(screen.getByText('운행 횟수 (건)')).toBeInTheDocument();
+        expect(screen.getByText('주행거리 (km)')).toBeInTheDocument();
+    });
+
+    it('달은 있어도 전부 0이면 빈 0 선 대신 안내 문구를 보여 준다', () => {
+        setup({ monthlyTrend: [{ label: '1월', count: 0, distance: 0 }, { label: '2월', count: 0, distance: 0 }] });
+        expect(screen.queryAllByTestId('line-chart')).toHaveLength(0);
     });
 });
 
@@ -105,27 +116,28 @@ describe('차량 가동률', () => {
         expect(screen.queryByText('차량 데이터가 없습니다')).not.toBeInTheDocument();
         expect(screen.getAllByTestId('bar').some(b => b.getAttribute('data-key') === 'rate')).toBe(true);
     });
+
+    it('가동률 구간별로 막대 색을 매긴다 — 예전 <rect>는 Recharts가 무시해 전부 한 색이었다', () => {
+        setup({ vehicleUtilization: [
+            { name: '카니발', rate: 75, usedDays: 45, totalWorkdays: 60 },
+            { name: '레이', rate: 40, usedDays: 24, totalWorkdays: 60 },
+            { name: '포터', rate: 10, usedDays: 6, totalWorkdays: 60 },
+        ] });
+        expect(screen.getAllByTestId('cell').map(c => c.getAttribute('data-fill'))).toEqual(['#10b981', '#f59e0b', '#ef4444']);
+    });
 });
 
 describe('월별 비용 추이', () => {
-    it('비용이 전부 0이면 섹션 자체를 감춘다', () => {
-        setup({ costTrend: [{ label: '1월', fuelCost: 0, hipassCost: 0, totalCost: 0 }] });
+    it('트렌드 탭에는 두지 않는다 — 정비비까지 담은 비용 최적화 탭의 차트가 정본이다', () => {
+        setup();
         expect(screen.queryByText(/월별 비용 추이/)).not.toBeInTheDocument();
-    });
-
-    it('한 달이라도 비용이 있으면 보여준다', () => {
-        setup({ costTrend: [
-            { label: '1월', fuelCost: 0, hipassCost: 0, totalCost: 0 },
-            { label: '2월', fuelCost: 50000, hipassCost: 10000, totalCost: 60000 },
-        ] });
-        expect(screen.getByText(/월별 비용 추이/)).toBeInTheDocument();
     });
 });
 
 describe('섹션 제목', () => {
     it('네 영역의 제목이 모두 보인다', () => {
         setup();
-        for (const title of ['월별 운행 추이', '직원별 운행 비교 (최근 3개월)', '차량 가동률 (최근 3개월)', '운행 밀도 히트맵 (시간대 × 요일)']) {
+        for (const title of ['월별 운행 추이', '운행 방식', '직원별 운행 비교 (최근 3개월)', '차량 가동률 (최근 3개월)', '운행 밀도 히트맵 (시간대 × 요일)']) {
             expect(screen.getByText(title)).toBeInTheDocument();
         }
     });

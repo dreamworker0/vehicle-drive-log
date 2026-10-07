@@ -2,9 +2,9 @@
  * Firestore — 차량 예약 (Reservations) 관련 함수
  */
 import {
-    doc, getDoc, updateDoc, deleteField,
+    doc, getDoc, updateDoc,
     collection, query, where, getDocs, addDoc,
-    serverTimestamp, runTransaction, writeBatch, Timestamp,
+    serverTimestamp, runTransaction, writeBatch, Timestamp, documentId,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { db, firebaseFunctions, auth } from '../firebase';
@@ -12,6 +12,7 @@ import { createZodConverter, reservationSchema } from '../../schemas';
 import type { Reservation } from '../../types/reservation';
 import { captureError } from '../sentry';
 import { enqueue } from '../offline/syncQueue';
+import { reservationActorStamp } from './actorStamp';
 
 const functions = firebaseFunctions;
 
@@ -146,6 +147,7 @@ export const cancelReservation = async (reservationId: string) => {
     try {
         await updateDoc(reservationDoc(reservationId), {
             status: 'cancelled',
+            ...reservationActorStamp(),
         });
     } catch (error) {
         captureError(error, { context: 'cancelReservation', reservationId });
@@ -153,23 +155,55 @@ export const cancelReservation = async (reservationId: string) => {
     }
 };
 
+/** 예약 수정 결과 — 승인제 기관에서 일정이 바뀌면 승인 대기로 돌아간다 */
+export interface UpdateReservationResult {
+    status: string;
+    requiresReapproval: boolean;
+}
+
 /**
- * 예약 정보 수정
+ * 예약 수정 콜러블(updateReservationSafe) 호출.
  *
- * `undefined` 필드는 보내지 않는다. Firestore updateDoc은 undefined를 거부하고
- * "Unsupported field value: undefined (found in field …)"로 **저장 전체를 실패**시킨다.
- * 호출부가 폼 상태를 통째로 넘기는 구조라(선택하지 않은 반복 설정 등이 undefined로 남는다)
- * 값 하나 때문에 수정이 막히는 일이 실제로 있었다.
- * 필드를 지우려면 undefined가 아니라 deleteField()를 명시적으로 넘긴다.
+ * 수정도 생성처럼 서버를 거친다. 화면이 Firestore에 직접 쓰던 동안에는 승인된 예약의
+ * 날짜·시간·차량을 바꿔도 승인 상태가 그대로 남고, 차량 사용 제한·정비 차단·겹침 검사를
+ * 건너뛰었다(2026-10-03 감사 발견 1). 이제 Rules도 직원의 일정·차량 직접 변경을 막는다.
+ *
+ * `undefined` 필드는 보내지 않는다 — 호출부가 폼 상태를 넘기는 구조라 선택하지 않은
+ * 값이 undefined로 남는데, 서버는 "보낸 필드만 바꾼다"로 해석한다.
  */
+async function callUpdateReservationSafe(
+    reservationId: string,
+    data: Partial<Reservation>,
+    detachRecurring: boolean,
+): Promise<UpdateReservationResult> {
+    const defined = Object.fromEntries(
+        Object.entries(data).filter(([, value]) => value !== undefined)
+    );
+    // 모바일 백그라운드 복귀 시 Firebase 토큰 만료에 따른 Unauthenticated 에러 방지
+    if (auth.currentUser) {
+        await auth.currentUser.getIdToken();
+    }
+    const callable = httpsCallable(functions, 'updateReservationSafe', { timeout: 60000 });
+    const result = await callable({ ...defined, reservationId, detachRecurring });
+    const { status, requiresReapproval } = result.data as UpdateReservationResult;
+    return { status, requiresReapproval: requiresReapproval === true };
+}
+
+/** 겹침·권한·형식 오류는 사용자에게 토스트로 안내되는 예상된 거절이라 Sentry에 올리지 않는다 */
+function isExpectedUpdateRejection(error: unknown) {
+    const code = (error as { code?: string })?.code;
+    return code === 'functions/already-exists' || code === 'functions/invalid-argument'
+        || code === 'functions/permission-denied' || code === 'functions/failed-precondition';
+}
+
+/** 예약 정보 수정 */
 export const updateReservation = async (reservationId: string, data: Partial<Reservation>) => {
     try {
-        const defined = Object.fromEntries(
-            Object.entries(data).filter(([, value]) => value !== undefined)
-        );
-        await updateDoc(reservationDoc(reservationId), defined);
+        return await callUpdateReservationSafe(reservationId, data, false);
     } catch (error) {
-        captureError(error, { context: 'updateReservation', reservationId, data });
+        if (!isExpectedUpdateRejection(error)) {
+            captureError(error, { context: 'updateReservation', reservationId, data });
+        }
         throw error;
     }
 };
@@ -177,28 +211,25 @@ export const updateReservation = async (reservationId: string, data: Partial<Res
 /**
  * 반복 그룹에서 한 건을 떼어낸다 (반복 → 단건 전환, 반복 → 다일 전환의 첫날).
  *
- * 그룹 링크(`recurringGroupId`)를 문서에서 **제거**한다. 남겨 두면 이 예약을 다시 열 때
- * 1일짜리 반복 그룹으로 해석돼 단건이 된 것이 아니게 된다. 값을 undefined로 덮는 것은
- * Firestore가 거부하므로 `deleteField()`를 쓴다.
+ * 그룹 링크(`recurringGroupId`)를 문서에서 **제거**한다(서버가 지운다). 남겨 두면 이 예약을
+ * 다시 열 때 1일짜리 반복 그룹으로 해석돼 단건이 된 것이 아니게 된다.
  *
  * 다일 전환에서는 `data.groupId`로 새 다일 그룹을 함께 지정한다 — 반복 링크는 끊고
- * 연속 예약 그룹에 붙이는 것이 한 번의 update로 끝난다.
+ * 연속 예약 그룹에 붙이는 것이 한 번의 수정으로 끝난다.
  *
  * 새로 만들지 않고 기존 문서를 고치는 이유가 둘 있다.
- *  (1) **삭제 권한** — Rules의 예약 delete는 소유자 본인(또는 superAdmin)만 허용한다.
- *      새로 만들려면 그룹을 지워야 하는데, 그러면 기관 관리자가 직원의 반복 예약을
- *      단건으로 바꿀 수 없다. update만 쓰면 관리자 경로도 그대로 동작한다.
- *  (2) **명의 보존** — createReservationSafe는 reservedByUid를 호출자로 강제한다.
- *      다시 만드는 방식은 관리자가 전환할 때 직원의 예약이 관리자 명의로 넘어간다.
+ *  (1) **삭제 권한** — 새로 만들려면 그룹을 지워야 하는데, 수정이면 기관 관리자가
+ *      직원의 반복 예약을 단건으로 바꾸는 경로가 그대로 동작한다.
+ *  (2) **명의 보존** — 다시 만드는 방식은 관리자가 전환할 때 직원의 예약이 관리자
+ *      명의로 넘어갈 위험이 있다.
  */
 export const detachFromRecurringGroup = async (reservationId: string, data: Partial<Reservation>) => {
     try {
-        const defined = Object.fromEntries(
-            Object.entries(data).filter(([, value]) => value !== undefined)
-        );
-        await updateDoc(reservationDoc(reservationId), { ...defined, recurringGroupId: deleteField() });
+        return await callUpdateReservationSafe(reservationId, data, true);
     } catch (error) {
-        captureError(error, { context: 'detachFromRecurringGroup', reservationId, data });
+        if (!isExpectedUpdateRejection(error)) {
+            captureError(error, { context: 'detachFromRecurringGroup', reservationId, data });
+        }
         throw error;
     }
 };
@@ -212,6 +243,8 @@ export const updateReservationStatus = async (
 ) => {
     try {
         const reservationRef = reservationDoc(reservationId);
+        // 접속기록의 '계정' — 오프라인 큐로 미뤄져도 같은 값이 실리도록 한 번만 만든다
+        const stamp = reservationActorStamp();
         
         // 운행 종료 등 사용자가 직접 업데이트하는 경우, 오프라인 큐 및 즉각적인 UI 반영(낙관적 업데이트)을 위해 일반 updateDoc 사용.
         // expectedCurrentStatus가 들어오는 경우(관리자 승인 등)만 동시성 방어를 위해 트랜잭션(온라인 한정) 사용.
@@ -219,13 +252,14 @@ export const updateReservationStatus = async (
             const promise = updateDoc(reservationRef, {
                 status,
                 ...extraData,
+                ...stamp,
             });
             const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
             if (!isOffline) {
                 await promise;
             } else {
                 promise.catch(e => console.error('[Firestore Offline Sync Error]', e));
-                await enqueue('UPDATE', 'reservations', reservationId, { status, ...extraData });
+                await enqueue('UPDATE', 'reservations', reservationId, { status, ...extraData, ...stamp });
                 if (typeof window !== 'undefined' && 'serviceWorker' in navigator && 'SyncManager' in window) {
                     navigator.serviceWorker.ready.then(reg => {
                         const syncReg = reg as ServiceWorkerRegistration & { sync?: { register: (tag: string) => Promise<void> } };
@@ -250,6 +284,7 @@ export const updateReservationStatus = async (
             transaction.update(reservationRef, {
                 status,
                 ...extraData,
+                ...stamp,
             });
         });
     } catch (error) {
@@ -387,9 +422,10 @@ const batchGroupAction = async (
         );
         const batch = writeBatch(db);
         let cancelled = 0;
+        // 같은 일괄 처리라도 문서마다 고유 ID가 필요하다 — 트리거가 문서별로 "이번에 새로 찍혔나"를 본다
         active.forEach(r => {
             if (action === 'cancel') {
-                batch.update(reservationDoc(r.id), { status: 'cancelled' });
+                batch.update(reservationDoc(r.id), { status: 'cancelled', ...reservationActorStamp() });
             } else if (action === 'complete') {
                 // 도착일보다 **뒤인 날짜는 아예 타지 않은 날**이라 완료가 아니라 취소다.
                 //
@@ -404,7 +440,7 @@ const batchGroupAction = async (
                 // 즉 보이지도, 풀리지도 않는 예약이 남아 관리자 개입 없이는 복구되지 않는다.
                 // cancelled로 보내면 겹침 검사가 곧바로 제외하므로 차량이 즉시 풀린다.
                 if (arrivalDate && r.date > arrivalDate) {
-                    batch.update(reservationDoc(r.id), { status: 'cancelled' });
+                    batch.update(reservationDoc(r.id), { status: 'cancelled', ...reservationActorStamp() });
                     cancelled++;
                     return;
                 }
@@ -415,7 +451,7 @@ const batchGroupAction = async (
                 // completed로 바꾸면 그 조건에 **새로** 걸린다 — 운행일지의 reservationId는 실제로
                 // 출발한 날의 문서를 가리키기 때문이다. 상태만 닫으면 조용하던 예약이 울기 시작한다.
                 // (cancelled는 두 알림 쿼리 어디에도 걸리지 않아 이 표시가 필요 없다.)
-                batch.update(reservationDoc(r.id), { status: 'completed', driveLogReminderSent: true });
+                batch.update(reservationDoc(r.id), { status: 'completed', driveLogReminderSent: true, ...reservationActorStamp() });
             } else {
                 batch.delete(reservationDoc(r.id));
             }
@@ -560,3 +596,30 @@ export const cancelRecurringGroup = (recurringGroupId: string, orgId: string, ex
 export const deleteRecurringGroup = async (recurringGroupId: string, orgId: string) =>
     (await batchGroupAction(getReservationsByRecurringGroupId, 'delete', recurringGroupId, orgId, 'deleteRecurringGroup')).total;
 
+/**
+ * 문서 ID 목록으로 예약을 읽는다 — 접속기록 점검 화면이 "어떤 예약이었는지"를 붙이는 데 쓴다.
+ *
+ * 접속기록에는 최소수집대로 대상 ID만 남으므로 내용은 조회 시점에 원본에서 가져온다
+ * (운행일지의 getDriveLogsByIds와 같은 방식). 삭제된 예약은 결과에 없다 — 호출 측이 "삭제됨"으로 구분한다.
+ */
+export const getReservationsByIds = async (orgId: string, ids: string[]): Promise<Map<string, Reservation>> => {
+    const unique = [...new Set(ids.filter(Boolean))];
+    const result = new Map<string, Reservation>();
+    if (unique.length === 0) return result;
+    try {
+        const chunks: string[][] = [];
+        for (let i = 0; i < unique.length; i += 30) chunks.push(unique.slice(i, i + 30));
+        const snaps = await Promise.all(chunks.map((chunk) => getDocs(query(
+            collection(db, 'reservations').withConverter(createZodConverter(reservationSchema)),
+            where('organizationId', '==', orgId),
+            where(documentId(), 'in', chunk),
+        ))));
+        for (const snap of snaps) {
+            for (const d of snap.docs) result.set(d.id, d.data() as Reservation);
+        }
+        return result;
+    } catch (error) {
+        captureError(error, { context: 'getReservationsByIds', orgId, count: unique.length });
+        throw error;
+    }
+};

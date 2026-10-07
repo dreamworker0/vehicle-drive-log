@@ -104,4 +104,44 @@ describe('useCalendarSync — syncVehicleOnDemand', () => {
 
         expect(mockCallable).toHaveBeenCalledTimes(2);
     });
+
+    // 6E "Consecutive HTTP": 재시도까지 다 실패하면 쿨다운이 없어 화면을 열 때마다 3회씩 다시 불렀다
+    it('재시도까지 모두 실패해도 쿨다운을 걸어 다음 화면 진입에서 다시 부르지 않는다', async () => {
+        vi.useFakeTimers();
+        mockCallable.mockRejectedValue(new Error('internal'));
+        const { result } = renderHook(() => useCalendarSync());
+
+        let ok: boolean | undefined;
+        await act(async () => {
+            const pending = result.current.syncVehicleOnDemand('veh-1', 'org-1');
+            await vi.runAllTimersAsync();   // 2초·4초 백오프
+            ok = await pending;
+        });
+        expect(ok).toBe(false);
+        expect(mockCallable).toHaveBeenCalledTimes(3);
+        expect(result.current.checkCooldown('veh-1')).toBe(false);
+
+        await act(async () => { await result.current.syncVehicleOnDemand('veh-1', 'org-1'); });
+        expect(mockCallable).toHaveBeenCalledTimes(3);
+    });
+
+    it('같은 차량을 동시에 부르면 요청은 한 번만 나가고 결과를 함께 받는다 (화면 두 곳·effect 재실행)', async () => {
+        let resolve: (v: unknown) => void = () => {};
+        mockCallable.mockImplementation(() => new Promise((r) => { resolve = r; }));
+        const home = renderHook(() => useCalendarSync());
+        const calendar = renderHook(() => useCalendarSync());
+
+        let results: boolean[] = [];
+        await act(async () => {
+            const both = Promise.all([
+                home.result.current.syncVehicleOnDemand('veh-1', 'org-1'),
+                calendar.result.current.syncVehicleOnDemand('veh-1', 'org-1', { force: true }),
+            ]);
+            resolve({ data: { success: true } });
+            results = await both;
+        });
+
+        expect(mockCallable).toHaveBeenCalledTimes(1);
+        expect(results).toEqual([true, true]);
+    });
 });

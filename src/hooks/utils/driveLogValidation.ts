@@ -2,6 +2,7 @@
  * 운행일지 검증 유틸리티 — 순수 함수로 단위 테스트 가능
  */
 import type { DriveLogForm } from '../useDriveLogForm';
+import { composePassengerNames } from './reservationPassengers';
 
 /**
  * 현재 시간을 HH:MM 포맷으로 반환
@@ -53,8 +54,9 @@ export function validateDriveLogForm(
     }
 
     // 하이패스 사용후 금액 검증.
-    // 이 값은 저장 시 `increment(-(사용전 - 사용후))`로 카드 잔액에 반영되므로,
+    // 저장된 뒤 서버 트리거(syncDriveLogKm)가 `사용전 - 사용후`만큼 카드 잔액에서 빼므로,
     // 음수가 들어오면 실제 사용액보다 큰 금액이 차감되어 카드 잔액까지 망가진다.
+    // 서버는 0 아래로 내려가지 않게 막지만, 그렇게 바닥을 친 잔액도 실물과는 다르다.
     if (form.hipassBalanceAfter) {
         const balanceAfter = Number(form.hipassBalanceAfter);
         if (!Number.isFinite(balanceAfter)) {
@@ -107,6 +109,10 @@ interface BuildLogContext {
     externalCoDriverNames?: string;
     isRetroactive: boolean;
     ocrUsed?: boolean;
+    /** 사진에서 읽은 도착 계기판 값. 이 값이 그대로 저장될 때만 사진 확인 표시를 남긴다. */
+    ocrRecognizedKm?: number | null;
+    /** 수정 전 문서(수정 모드에서만). 도착 km를 건드리지 않았다면 사진 확인 표시를 지키는 근거다. */
+    previousLog?: { endKm?: number; endKmSource?: 'ocr' } | null;
     favoriteUsed?: boolean;
     /**
      * 출발지 이름(분관을 등록한 기관만). 분관이 없으면 넘어오지 않으며, 그때는 필드를 만들지 않는다 —
@@ -118,15 +124,14 @@ interface BuildLogContext {
 /**
  * 폼 데이터로 저장용 logData 객체를 구성한다.
  */
-export function buildLogData(form: DriveLogForm, { orgId, user, userData, selectedVehicle, selectedPassengers, externalPassengerCount = 0, externalPassengerNames = '', coDrivers = [], externalCoDriverNames = '', isRetroactive, ocrUsed = false, favoriteUsed = false, startLocation }: BuildLogContext) {
+export function buildLogData(form: DriveLogForm, { orgId, user, userData, selectedVehicle, selectedPassengers, externalPassengerCount = 0, externalPassengerNames = '', coDrivers = [], externalCoDriverNames = '', isRetroactive, ocrUsed = false, ocrRecognizedKm = null, previousLog = null, favoriteUsed = false, startLocation }: BuildLogContext) {
     const startKm = parseInt(form.startKm);
     const endKm = parseInt(form.endKm);
     const driveTimestamp = buildDriveTimestamp(form.driveDate, form.endTime, form.startTime, form.endDate);
 
-    const parsedExternalNames = (externalPassengerNames || '')
-        .split(',')
-        .map(name => name.trim())
-        .filter(Boolean);
+    // 동승자 명단 = 선택한 조직원 + 직접 입력한 이름. 인원수도 이 명단에서 센다
+    // (이름만 적고 '외부 인원' 숫자를 올리지 않아도 탑승인원에 잡히게).
+    const passengerNames = composePassengerNames(selectedPassengers, externalPassengerNames);
 
     // 공동 운전자: 조직원 선택분 + 직접 입력분. 주행거리 배분 없이 이름만 기록(정보성).
     const parsedExternalCoDriverNames = (externalCoDriverNames || '')
@@ -138,6 +143,15 @@ export function buildLogData(form: DriveLogForm, { orgId, user, userData, select
         ...parsedExternalCoDriverNames,
     ];
     const coDriverUids = coDrivers.map(c => c.id).filter((id): id is string => !!id);
+
+    // 도착 계기판을 사진으로 확인했는가 — 이 표시가 있으면 서버 재정합이 그 값을 밀지 않는다.
+    //
+    // 사진이 읽어 준 값을 **그대로** 저장할 때만 붙인다. 손으로 고쳐 쓴 값에 붙이면
+    // "사진으로 확인된 숫자"라는 뜻이 헐거워진다. 수정 저장에서는 도착 km를 건드리지
+    // 않은 경우에 한해 이전 표시를 그대로 지킨다(수정 한 번에 증빙이 사라지지 않게).
+    const endKmPhotoConfirmed =
+        (ocrUsed && ocrRecognizedKm != null && ocrRecognizedKm === endKm)
+        || (previousLog?.endKmSource === 'ocr' && previousLog.endKm === endKm);
 
     const cleanData: Record<string, unknown> = {
         organizationId: orgId ? String(orgId) : '',
@@ -159,14 +173,14 @@ export function buildLogData(form: DriveLogForm, { orgId, user, userData, select
         endKm,
         notes: (form.notes || '').trim(),
         timestamp: driveTimestamp,
-        passengerCount: selectedPassengers.length + externalPassengerCount + 1,
-        passengerNames: [
-            ...selectedPassengers.map(p => p.name || p.email || ''),
-            ...parsedExternalNames
-        ],
+        // 이름이 적힌 사람 + 이름 없이 숫자로만 센 인원 + 운전자 1
+        passengerCount: passengerNames.length + externalPassengerCount + 1,
+        passengerNames,
         externalPassengerCount,
         externalPassengerNames,
         inputMethod: ocrUsed ? 'ocr' : (favoriteUsed ? 'favorite' : 'manual'),
+        // 값이 있을 때만 남긴다(false/빈 값은 undefined → sanitizeUndefined가 필드를 만들지 않는다)
+        endKmSource: endKmPhotoConfirmed ? 'ocr' : undefined,
         // 분관을 등록한 기관에서만 값이 있다(그 외에는 undefined → sanitizeUndefined가 필드를 만들지 않는다)
         startLocation: startLocation || undefined,
         // 세운 곳은 출발지가 매번 바뀌는 차량에서만 남긴다. 차량을 유동 → 고정으로 바꾼 뒤

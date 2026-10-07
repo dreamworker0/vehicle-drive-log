@@ -216,8 +216,8 @@ ${pastExamples}
 4. FAQ에 없는 내용이라도 (기능 요청, 버그 신고 등) 반드시 친절한 답변 초안을 작성하세요.
 5. 과거 답변 사례를 참고해 사람처럼 자연스럽고 친절하게 본론을 작성하세요. (존댓말, 2~4문장 내외)
 6. FAQ와 매칭된 경우, 답변 끝에 반드시 해당 FAQ 항목으로 바로 이동할 수 있는 링크를 남겨주세요.
-   - 링크 형식: https://vehicle-drive-log.web.app/faq#{해당 faqId}
-   - 예시 문구: "자세한 설정 방법은 아래 링크(자주 하는 질문)를 참고해 주세요. \n👉 https://vehicle-drive-log.web.app/faq#app-install"
+   - 링크 형식: https://drivelog.socialprism.co.kr/faq#{해당 faqId}
+   - 예시 문구: "자세한 설정 방법은 아래 링크(자주 하는 질문)를 참고해 주세요. \n👉 https://drivelog.socialprism.co.kr/faq#app-install"
 
 반드시 아래 JSON 형식으로만 응답하세요. 다른 텍스트 없이 JSON만:
 {"faqId": "app-install", "confidence": 0.85, "draft": "답변 초안 내용..."}

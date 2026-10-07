@@ -2,9 +2,9 @@
 
 > **자동 생성 문서** — `scripts/generate-functions-doc.ts`로 생성됨
 >
-> 마지막 업데이트: 2026. 9. 5. PM 7:15:54
+> 마지막 업데이트: 2026. 10. 5. 오후 12:31:27
 >
-> 총 함수 수: **72개**
+> 총 함수 수: **80개**
 
 ---
 
@@ -23,7 +23,7 @@
 
 ## 📞 onCall (클라이언트 직접 호출)
 
-> 총 40개
+> 총 41개
 
 ### `ocrDashboard`
 
@@ -64,6 +64,16 @@
 | **인증** | 인증된 기관 멤버 |
 | **요청 파라미터** | `{ organizationId, vehicleId, vehicleName, date, startTime, endTime, purpose, destination, reservedByUid, reservedByName }` |
 | **반환값** | `{ success: boolean, reservationId: string }` |
+
+### `updateReservationSafe`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/callable/updateReservationSafe.ts` |
+| **설명** | 예약 수정(단건·반복 그룹 떼어내기). 일정·차량·명의가 바뀌면 생성과 같은 검증(차량 제한·정비·겹침)을 하고, 승인제 기관에서 직원이 승인된 예약의 일정을 바꾸면 승인 대기로 되돌린다 |
+| **인증** | 예약 명의자 본인 또는 기관 관리자 |
+| **요청 파라미터** | `{ reservationId, vehicleId?, date?, startTime?, endTime?, reservedByUid?, purpose?, destination?, passenger*?, detachRecurring?, groupId? }` |
+| **반환값** | `{ success: boolean, status: string, requiresReapproval: boolean }` |
 
 ### `triggerOnDemandCalendarSync`
 
@@ -504,7 +514,7 @@
 
 ## 📝 Firestore onCreate
 
-> 총 8개
+> 총 10개
 
 ### `onReservationCreated`
 
@@ -532,6 +542,15 @@
 | **설명** | 주유·충전일지 작성 시 그 차량의 "주유 필요" 표시를 해제. 표시를 켜는 쪽은 onDriveLogCreated. |
 | **인증** | 시스템 자동 실행 |
 | **비고** | fuelLogs/{logId} |
+
+### `onHipassChargeCreated`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/triggers/syncHipassBalance.ts` |
+| **설명** | 충전 기록이 생기면 그만큼 하이패스 카드 잔액을 올린다(트랜잭션). 잔액의 주인은 서버다 — 클라이언트는 쓰지 않는다. |
+| **인증** | 시스템 자동 실행 |
+| **비고** | hipassCharges/{chargeId} |
 
 ### `trackFirstEmployee`
 
@@ -577,6 +596,14 @@
 | **인증** | 시스템 자동 실행 |
 | **비고** | users/{userId} |
 
+### `auditReservationCreated`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/triggers/auditLog.ts` |
+| **설명** | 예약 생성을 감사 로그(auditLogs)에 기록 — 행위자는 콜러블이 남긴 호출자(lastEditedByUid), 정보주체는 예약자·직원 동승자, 차량 포함 |
+| **인증** | 시스템 자동 실행 |
+
 ---
 
 ## ✏️ Firestore onWrite
@@ -621,7 +648,16 @@
 
 ## 🔄 Firestore onUpdate
 
-> 총 4개
+> 총 6개
+
+### `onHipassChargeUpdated`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/triggers/syncHipassBalance.ts` |
+| **설명** | 충전 기록이 고쳐지면 차액만큼 잔액을 맞춘다. 카드를 옮긴 정정은 옛 카드에서 빼고 새 카드에 더한다. |
+| **인증** | 시스템 자동 실행 |
+| **비고** | hipassCharges/{chargeId} |
 
 ### `onReservationUpdated`
 
@@ -655,11 +691,28 @@
 | **설명** | 사용자 개인정보 변경 이력을 접속기록(accessLogs)에 기록 |
 | **인증** | 시스템 자동 실행 |
 
+### `auditReservationUpdated`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/triggers/auditLog.ts` |
+| **설명** | 예약의 일정·차량·상태·목적지·동승자 등 화이트리스트 필드 변경을 필드명만 기록 — 이번 쓰기가 새 lastEditId를 찍었을 때만 행위자로 인정(서버 쓰기의 무고한 귀속 방지) |
+| **인증** | 시스템 자동 실행 |
+
 ---
 
 ## 🗑️ Firestore onDelete
 
-> 총 4개
+> 총 7개
+
+### `onHipassChargeDeleted`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/triggers/syncHipassBalance.ts` |
+| **설명** | 충전 기록이 지워지면 그만큼 잔액을 되돌린다(삭제 확인창이 약속하는 그 동작). |
+| **인증** | 시스템 자동 실행 |
+| **비고** | hipassCharges/{chargeId} |
 
 ### `onReservationDeleted`
 
@@ -691,6 +744,22 @@
 |------|------|
 | **파일** | `functions/src/handlers/triggers/auditLog.ts` |
 | **설명** | 사용자 문서 삭제 이력을 접속기록(accessLogs)에 기록 |
+| **인증** | 시스템 자동 실행 |
+
+### `auditVehicleDeleted`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/triggers/auditLog.ts` |
+| **설명** | 차량 문서 삭제 사실을 감사 로그(auditLogs)에 기록 — 월간 참조 무결성 점검이 삭제된 차량의 보존 운행일지를 위반과 가르는 근거 |
+| **인증** | 시스템 자동 실행 |
+
+### `auditReservationDeleted`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/triggers/auditLog.ts` |
+| **설명** | 예약 삭제를 감사 로그에 기록 — 삭제자는 unknown, 예약자·동승자·차량은 남긴다 |
 | **인증** | 시스템 자동 실행 |
 
 ---

@@ -25,8 +25,20 @@ let sentryLoading: Promise<SentryModule | null> | null = null;
 // SDK 로드 완료 전에 setSentryUser가 호출되면 보관했다가 init 직후 적용 (undefined = 대기 없음)
 let queuedUser: SentryUserInfo | undefined;
 
+/**
+ * 루프백 주소에서 돈 프로덕션 빌드인가 — CI e2e·Lighthouse·`vite preview`가 해당한다.
+ *
+ * CI는 실제 `.env`(DSN 포함)로 빌드한 앱을 localhost에서 헤드리스 브라우저로 돌린다. 그 실행이
+ * 낸 에러가 프로덕션 이슈로 올라왔다(Sentry JAVASCRIPT-REACT-6K, HeadlessChrome·localhost:21045).
+ * 실사용자는 루프백 주소로 앱을 열 수 없으므로 여기서는 SDK를 아예 띄우지 않는다.
+ */
+function isLoopbackProductionBuild(): boolean {
+    if (!import.meta.env.PROD || typeof location === 'undefined') return false;
+    return ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+}
+
 export function initSentry() {
-    if (!SENTRY_DSN || sentryLoading) return;
+    if (!SENTRY_DSN || sentryLoading || isLoopbackProductionBuild()) return;
 
     sentryLoading = import('./sentryClient')
         .then((Sentry) => {
@@ -58,7 +70,7 @@ function initSentryWithModule(Sentry: SentryModule) {
         // 프로덕션 30% 샘플링 (주간 ~5k 샘플 확보, 비용·오버헤드 절감), 개발 시 0%
         tracesSampleRate: import.meta.env.PROD ? 0.3 : 0,
         // 자체 도메인만 트레이스 전파 (외부 API로의 불필요한 헤더 전송 차단)
-        tracePropagationTargets: ['localhost', /^https:\/\/vehicle-drive-log\.web\.app/],
+        tracePropagationTargets: ['localhost', /^https:\/\/vehicle-drive-log\.web\.app/, /^https:\/\/drivelog\.socialprism\.co\.kr/],
         // 브라우저 성능 및 라우팅 트레이싱 활성화
         integrations: [
             Sentry.browserTracingIntegration(),
@@ -325,6 +337,24 @@ function initSentryWithModule(Sentry: SentryModule) {
                 return null;
             }
 
+            // iOS Safari(WebKit)가 IndexedDB 백엔드를 잃었을 때의 문구다(JAVASCRIPT-REACT-6H,
+            // iOS 18.7 · /employee/my-records). 위 `/^Internal error\.?$/`와 같은 계열인데
+            // DOMException은 이름(UnknownError)과 메시지가 갈려 있어 그 앵커가 닿지 않는다.
+            //
+            // **ignoreErrors가 아니라 여기인 이유**: 그 목록은 전역이라 같은 문구를 **우리가
+            // 직접 보고한 것**까지 지운다. 오프라인 운행일지 적재(enqueue)가 이 오류로 실패하면
+            // createDriveLog의 catch가 captureError로 올리는데, 그건 노이즈가 아니라 '이 기기에서
+            // 오프라인 저장이 큐에 들어가지 못했다'는 유일한 신호다. 그래서 **처리되지 않은
+            // 전역 보고(handled=no)만** 억제한다.
+            //
+            // ⚠️ 캐시 손상 복구(firebase.ts의 attemptCacheRecovery) 대상에는 넣지 않았다.
+            // 이 오류는 일시적인 경우가 많은데 복구는 clearIndexedDbPersistence로 **미전송
+            // 오프라인 쓰기까지** 지운다 — 한 번 깜빡인 대가로 사용자 기록을 버리는 쪽이 더 나쁘다.
+            if (/An internal error was encountered in the Indexed Database server/.test(errorMsg)
+                && firstException?.mechanism?.handled === false) {
+                return null;
+            }
+
             // 로그아웃 teardown 레이스: 우리가 의도적으로 terminate한 Firestore 인스턴스에
             // 뒤늦게 도착한 호출이 내는 동기 throw다(JAVASCRIPT-REACT-60).
             // **isFirestoreTerminated()가 true일 때만** 억제한다 — 종료를 지시한 적이 없는데
@@ -407,7 +437,11 @@ export function captureError(error: unknown, context: Record<string, unknown> = 
         // 아래 console 출력은 원본 그대로 둔다(개발자 도구에서의 진단이 우선) — 그것이
         // breadcrumb으로 새는 경로는 init의 beforeBreadcrumb이 따로 막는다.
         const safeContext = scrubContext(context);
-        sentryLoading.then((Sentry) => Sentry?.captureException(error, { extra: safeContext }));
+        // SDK가 이미 떠 있으면 **바로** 보낸다. 다음 틱으로 미루면 그 사이 호출부가 사용자를
+        // 지울 수 있다 — 로그아웃 확정 직후 setSentryUser(null)이 먼저 돌아 세션 종료 보고가
+        // 사용자 없이 나갔다(JAVASCRIPT-REACT-66 "0 users"). 미루는 것은 로드 중일 때뿐이다.
+        if (sentry) sentry.captureException(error, { extra: safeContext });
+        else sentryLoading.then((Sentry) => Sentry?.captureException(error, { extra: safeContext }));
     }
     console.error(error);
 }
@@ -423,7 +457,9 @@ export function captureError(error: unknown, context: Record<string, unknown> = 
 export function captureWarning(message: string, context: Record<string, unknown> = {}) {
     if (SENTRY_DSN && sentryLoading) {
         const safeContext = scrubContext(context);
-        sentryLoading.then((Sentry) => Sentry?.captureMessage(message, { level: 'warning', extra: safeContext }));
+        // captureError와 같은 이유로 SDK가 떠 있으면 바로 보낸다
+        if (sentry) sentry.captureMessage(message, { level: 'warning', extra: safeContext });
+        else sentryLoading.then((Sentry) => Sentry?.captureMessage(message, { level: 'warning', extra: safeContext }));
     }
     console.warn(message, context);
 }

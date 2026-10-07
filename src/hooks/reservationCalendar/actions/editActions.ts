@@ -24,8 +24,13 @@ export function handleEdit(res: Reservation, deps: EditDeps) {
     const {
         reservations, members,
         setEditingReservation, setEditingGroupId, setEditingRecurringGroupId,
-        setSelectedDate, setForm, setShowForm,
+        setSelectedDate, setForm, setShowForm, setEndTimeTouched,
     } = deps;
+
+    // 저장된 종료시간은 **사람이 정한 값**이다. 여기서 잠가 두지 않으면, 목적지가 이미 채워져
+    // 있으므로 경로 조회가 돌고 1.2초 뒤 결과가 오면서 그 값을 조용히 갈아치운다 —
+    // 사용자는 목적지만 고치러 들어왔는데 시간이 바뀐 채 저장된다(2026-09-16 신고 2건).
+    setEndTimeTouched(true);
 
     if (res.recurringGroupId) {
         // 반복 예약 그룹 수정 — 그룹의 모든 활성 예약 조회

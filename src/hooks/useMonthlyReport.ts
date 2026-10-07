@@ -4,15 +4,16 @@
  */
 import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from './useAuth';
-import { getDriveLogs, getFuelLogs, getAllHipassCharges } from '../lib/firestore';
+import { getFuelLogs, getAllHipassCharges } from '../lib/firestore';
+import { getAllDriveLogsForExport } from '../lib/firestore/driveLogs/queries';
 import { captureError } from '../lib/sentry';
 import { toLocalDateStr } from '../lib/dateUtils';
-import { extractDateStr } from './utils/aggregationUtils';
+import { extractDateStr, logDistance } from './utils/aggregationUtils';
 import {
-    calcDriveStats, filterPrevPeriodLogs,
+    calcDriveStats, filterPrevPeriodLogs, calcComparePeriod,
     calcFuelStats, calcHipassStats, calcCostTrend,
     formatDriverData, formatVehicleData, formatPurposeData,
-    formatVehicleFuelData, formatDailyTrendData,
+    formatDailyTrendData,
 } from './utils/monthlyReportCalc';
 import type { DriveLog } from '../types/driveLog';
 import type { FuelLog } from '../types/fuelLog';
@@ -28,6 +29,8 @@ export default function useMonthlyReport() {
     const [fuelLogs, setFuelLogs] = useState<FuelLog[]>([]);
     const [hipassCharges, setHipassCharges] = useState<HipassCharge[]>([]);
     const [loading, setLoading] = useState(true);
+    /** 불러오기 실패 안내 — 조용히 0을 보여 주면 "운행이 없다"로 읽힌다 */
+    const [loadError, setLoadError] = useState<string | null>(null);
     const [activePeriod, setActivePeriod] = useState<string | null>('thisMonth');
 
     const now = new Date();
@@ -87,43 +90,53 @@ export default function useMonthlyReport() {
     }, []);
 
 
-    // 전월 비교 기간 계산
-    const prevStartDate = useMemo(() => {
-        const s = new Date(startDate);
-        const e = new Date(endDate);
-        const daysDiff = Math.ceil((e.getTime() - s.getTime()) / (1000 * 60 * 60 * 24));
-        const prevEnd = new Date(s);
-        prevEnd.setDate(prevEnd.getDate() - 1);
-        const prevStart = new Date(prevEnd);
-        prevStart.setDate(prevStart.getDate() - daysDiff);
-        return toLocalDateStr(prevStart);
-    }, [startDate, endDate]);
+    // 비교 구간 — 1일부터 보는 기간은 앞선 달의 같은 날짜들(calcComparePeriod 참고)
+    const comparePeriod = useMemo(() => calcComparePeriod(startDate, endDate), [startDate, endDate]);
+    const prevStartDate = comparePeriod.start;
 
     useEffect(() => {
         if (!orgId) { setLoading(false); return; }
+        // 시작일이 종료일보다 늦으면 조회하지 않는다(날짜를 고치는 중간 상태)
+        if (startDate > endDate) { setLoading(false); return; }
+        let cancelled = false;
         const fetchData = async () => {
             setLoading(true);
+            setLoadError(null);
             try {
-                // 선택 기간 + 전월 비교 기간만 서버에서 조회 (Firestore 읽기 비용 절감)
+                // 선택 기간 + 비교 구간만 서버에서 조회 (Firestore 읽기 비용 절감)
                 const sinceDate = new Date(`${prevStartDate}T00:00:00`);
                 const untilDate = new Date(`${endDate}T23:59:59`);
 
+                // 운행일지는 **끝까지** 읽는다. 예전에는 limit 500에서 조용히 잘려(차량 10대면 보름치)
+                // 최근 3개월의 총계·엑셀이 모자랐고, 최신순이라 비교 구간이 먼저 잘려 증감률이 부풀었다.
+                // 내보내기와 같은 상한(5,000)을 넘으면 오류로 알린다 — 잘린 숫자를 보여 주지 않는다.
                 const [driveResult, fuelResult, hipassResult] = await Promise.all([
-                    getDriveLogs(orgId!, { limit: 500, startDate: prevStartDate, endDate }),
-                    getFuelLogs(orgId!, null, { since: sinceDate, until: untilDate }).catch(() => []),
-                    getAllHipassCharges(orgId!, { since: sinceDate, until: untilDate }).catch(() => []),
+                    getAllDriveLogsForExport(orgId!, { startDate: prevStartDate, endDate }),
+                    getFuelLogs(orgId!, null, { since: sinceDate, until: untilDate }),
+                    getAllHipassCharges(orgId!, { since: sinceDate, until: untilDate }),
                 ]);
-                setLogs(driveResult.docs as DriveLog[]);
+                if (cancelled) return;
+                setLogs(driveResult as DriveLog[]);
                 setFuelLogs(fuelResult as FuelLog[]);
                 setHipassCharges(hipassResult as HipassCharge[]);
             } catch (err) {
+                if (cancelled) return;
                 captureError(err, { context: 'useMonthlyReport.load', orgId });
+                const message = err instanceof Error && err.message.includes('초과')
+                    ? `${err.message} (비교 구간 ${comparePeriod.start}~${comparePeriod.end}까지 함께 읽습니다)`
+                    : '통계를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요.';
+                setLoadError(message);
+                setLogs([]);
+                setFuelLogs([]);
+                setHipassCharges([]);
             } finally {
-                setLoading(false);
+                if (!cancelled) setLoading(false);
             }
         };
-        fetchData();
-    }, [orgId, startDate, endDate, prevStartDate]);
+        // 날짜를 타이핑하는 동안 매 글자마다 다시 읽지 않도록 잠깐 기다린다
+        const timer = setTimeout(fetchData, 300);
+        return () => { cancelled = true; clearTimeout(timer); };
+    }, [orgId, startDate, endDate, prevStartDate, comparePeriod.start, comparePeriod.end]);
 
     const filteredLogs = useMemo(
         () => logs.filter(l => {
@@ -145,16 +158,18 @@ export default function useMonthlyReport() {
         [filteredLogs, prevPeriodLogs, startDate, endDate]
     );
 
-    const driverData = useMemo(() => formatDriverData(stats.byDriver), [stats.byDriver]);
-    const vehicleData = useMemo(() => formatVehicleData(stats.byVehicle, stats.byVehicleFuel), [stats.byVehicle, stats.byVehicleFuel]);
-    const purposeData = useMemo(() => formatPurposeData(stats.byPurpose), [stats.byPurpose]);
-    const vehicleFuelData = useMemo(() => formatVehicleFuelData(stats.byVehicleFuel), [stats.byVehicleFuel]);
-    const dailyTrendData = useMemo(() => formatDailyTrendData(stats.byDate), [stats.byDate]);
-
     const fuelLogStats = useMemo(
         () => calcFuelStats(fuelLogs, startDate, endDate),
         [fuelLogs, startDate, endDate]
     );
+
+    const driverData = useMemo(() => formatDriverData(stats.byDriver), [stats.byDriver]);
+    const vehicleData = useMemo(
+        () => formatVehicleData(stats.byVehicle, fuelLogStats.costByVehicleId),
+        [stats.byVehicle, fuelLogStats.costByVehicleId]
+    );
+    const purposeData = useMemo(() => formatPurposeData(stats.byPurpose), [stats.byPurpose]);
+    const dailyTrendData = useMemo(() => formatDailyTrendData(stats.byDate), [stats.byDate]);
 
     const hipassChargeStats = useMemo(
         () => calcHipassStats(hipassCharges, startDate, endDate),
@@ -193,14 +208,14 @@ export default function useMonthlyReport() {
         const rows = filteredLogs.map(l => {
             const ts = (l.timestamp as { toDate?: () => Date })?.toDate?.();
             return [
-            l.date || (ts ? toLocalDateStr(ts) : ''),
+            extractDateStr(l) || (ts ? toLocalDateStr(ts) : ''),
             l.driverName || '',
             l.vehicleDisplayName || l.vehicleName || '',
             ...(includeStartLocation ? [l.startLocation || ''] : []),
             l.destination || '',
             l.startKm || 0,
             l.endKm || 0,
-            (l.endKm - l.startKm) || 0,
+            logDistance(l),
             l.purpose || '',
             l.startTime || '',
             l.endTime || '',
@@ -245,19 +260,25 @@ export default function useMonthlyReport() {
             }
         `;
         document.head.appendChild(style);
+        // 다크 모드 그대로 인쇄하면 밝은 회색 글자가 흰 종이에 남아 거의 읽히지 않는다(배경은 인쇄되지 않는다).
+        // 인쇄하는 동안만 라이트로 바꾼다.
+        const root = document.documentElement;
+        const wasDark = root.classList.contains('dark');
+        if (wasDark) root.classList.remove('dark');
         window.print();
-        // 인쇄 후 스타일 제거
+        // 인쇄 후 스타일·테마 되돌림
         setTimeout(() => {
             style.remove();
+            if (wasDark) root.classList.add('dark');
         }, 1000);
     }, []);
 
     return {
-        loading, startDate, endDate,
+        loading, loadError, startDate, endDate,
         setStartDate: handleStartDate, setEndDate: handleEndDate,
-        activePeriod, setPeriod,
+        activePeriod, setPeriod, comparePeriod,
         filteredLogs, stats, driverData, vehicleData, purposeData,
-        vehicleFuelData, dailyTrendData, dayOfWeekData, hourlyData,
+        dailyTrendData, dayOfWeekData, hourlyData,
         fuelLogStats, hipassChargeStats, costTrendData,
         exportExcel, exportPdf,
     };

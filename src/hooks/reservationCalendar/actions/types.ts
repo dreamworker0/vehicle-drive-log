@@ -51,6 +51,8 @@ export interface EditDeps {
     setSelectedDate: (d: string) => void;
     setForm: React.Dispatch<React.SetStateAction<ReservationForm>>;
     setShowForm: (v: boolean) => void;
+    /** 저장된 종료시간은 사람이 정한 값이다 — 경로 자동 계산이 덮지 못하게 잠근다 */
+    setEndTimeTouched: (v: boolean) => void;
 }
 
 export interface CancelDeps {

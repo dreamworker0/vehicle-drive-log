@@ -32,7 +32,7 @@ CLAUDE.md                  ← Claude Code 진입점 (.agent/를 가리키는 �
   `.agent/skills/`·`.agent/workflows/`에서 **자동 생성**한다 (`npm run sync:agents`).
 - 따라서 스킬/워크플로우 추가·수정은 **`.agent/` 원본 한 곳만** 고치고 `npm run sync:agents`로 재생성한 뒤 함께 커밋한다.
 - Claude Code에서는 PostToolUse 훅(`scripts/hooks/sync-agent-bridge.mjs`)이 `.agent/skills/`·`.agent/workflows/` 편집 직후 자동으로 재생성한다. Antigravity 등 훅 밖에서 편집했다면 수동으로 `npm run sync:agents`.
-- CI(`ci.yml`)와 `/sync-configs` 워크플로우가 `npm run sync:agents -- --check`로 동기화 누락을 차단한다.
+- CI(`ci.yml`·`harness-ci.yml`)의 하네스 Doctor(7번 검사)가 `sync-claude-agents.ts --check`로 동기화 누락을 차단한다.
 
 ### 규칙 변경 시
 - **세부 규칙 변경** → `.agent/rules/` 파일 수정 (한 곳만)

@@ -5,6 +5,7 @@ import FeatureToggleSection, { type FeatureToggleValues } from '../../components
 function baseValues(overrides: Partial<FeatureToggleValues> = {}): FeatureToggleValues {
     return {
         requireReservationApproval: false,
+        quickDriveWithApproval: true,
         hipassEnabled: true,
         maintenanceEnabled: true,
         maintenanceEmployeeAccess: true,
@@ -34,6 +35,17 @@ describe('FeatureToggleSection', () => {
     it('예약 관리자 승인 토글이 섹션 안에 표시된다', () => {
         setup();
         expect(screen.getByText('예약 관리자 승인')).toBeInTheDocument();
+    });
+
+    it('바로 운행 허용 하위 토글은 예약 승인을 켰을 때만 표시', () => {
+        setup({ requireReservationApproval: false });
+        expect(screen.queryByText('바로 운행은 승인 없이 허용')).not.toBeInTheDocument();
+    });
+
+    it('바로 운행 허용을 끄면 quickDriveWithApproval: false로 저장한다', () => {
+        const { onChange } = setup({ requireReservationApproval: true, quickDriveWithApproval: true });
+        fireEvent.click(screen.getByRole('switch', { name: '바로 운행은 승인 없이 허용' }));
+        expect(onChange).toHaveBeenCalledWith({ quickDriveWithApproval: false });
     });
 
     it('동승자 입력 방식 하위 토글은 동승자 사용 시에만 표시', () => {

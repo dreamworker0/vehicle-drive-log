@@ -155,16 +155,81 @@ describe('수정 모드 복원', () => {
         { id: 'b', name: '이영희' } as UserDoc,
     ];
 
-    it('동승자 이름을 조직원과 맞추고, 못 맞춘 이름은 외부 인원 수로 센다', async () => {
+    it('동승자 이름을 조직원과 맞추고, 못 맞춘 이름(이용자)은 직접 입력칸에 되돌린다', async () => {
         mockGetOrganizationMembers.mockResolvedValue(members);
         renderHook(() => useDriveLogInitializer(deps({
             isEditMode: true,
-            editLog: { id: 'e1', passengerNames: ['김철수', '외부손님'] } as DriveLog & { passengerNames?: string[] },
+            editLog: {
+                id: 'e1', passengerCount: 3, passengerNames: ['김철수', '외부손님'],
+            } as DriveLog & { passengerNames?: string[] },
         })));
 
         await waitFor(() => expect(setters.setSelectedPassengers).toHaveBeenCalled());
         expect(setters.setSelectedPassengers.mock.calls[0][0]).toEqual([members[0]]);
+        // 이름을 숫자로 환산하지 않는다 — 환산하면 저장할 때 그 이름이 문서에서 지워졌다
+        expect(setters.setExternalPassengerNames).toHaveBeenCalledWith('외부손님');
+        expect(setters.setExternalPassengerCount).not.toHaveBeenCalled();
+    });
+
+    it('이름과 외부 인원을 함께 적은 기록은 문서에 남은 입력 원본 그대로 되돌린다', async () => {
+        mockGetOrganizationMembers.mockResolvedValue(members);
+        renderHook(() => useDriveLogInitializer(deps({
+            isEditMode: true,
+            // 옛 규칙(직접 입력 이름을 총원에 넣지 않음)으로 저장된 기록:
+            // 이름 2명 + 외부 인원 3명인데 passengerCount는 4로 적혀 있다.
+            editLog: {
+                id: 'e1',
+                passengerCount: 4,
+                passengerNames: ['김이용', '박이용'],
+                externalPassengerCount: 3,
+                externalPassengerNames: '김이용, 박이용',
+            } as DriveLog,
+        })));
+
+        await waitFor(() => expect(setters.setExternalPassengerCount).toHaveBeenCalled());
+        // 역산(4 - 1 - 2 = 1)하면 사용자가 적어 둔 3이 1로 깎인다
+        expect(setters.setExternalPassengerCount).toHaveBeenCalledWith(3);
+        expect(setters.setExternalPassengerNames).toHaveBeenCalledWith('김이용, 박이용');
+    });
+
+    it('이름이 없던 계정이 이메일 주소로 저장된 옛 기록도 직원 선택으로 되돌린다', async () => {
+        const withEmail: UserDoc[] = [{ id: 'c', email: 'lee@test.com' } as UserDoc];
+        mockGetOrganizationMembers.mockResolvedValue(withEmail);
+        renderHook(() => useDriveLogInitializer(deps({
+            isEditMode: true,
+            editLog: { id: 'e1', passengerCount: 2, passengerNames: ['lee@test.com'] } as DriveLog,
+        })));
+
+        await waitFor(() => expect(setters.setSelectedPassengers).toHaveBeenCalled());
+        expect(setters.setSelectedPassengers.mock.calls[0][0]).toEqual(withEmail);
+        // 이메일 주소가 직접 입력칸(자유 텍스트)으로 새어 나가지 않는다
+        expect(setters.setExternalPassengerNames).not.toHaveBeenCalled();
+    });
+
+    it('이름 없이 숫자로만 적힌 인원은 남은 수만큼 외부 인원으로 되돌린다', async () => {
+        mockGetOrganizationMembers.mockResolvedValue(members);
+        renderHook(() => useDriveLogInitializer(deps({
+            isEditMode: true,
+            // 총 4명 = 운전자 + 이름 2명(김철수·외부손님) + 이름 없는 1명
+            editLog: {
+                id: 'e1', passengerCount: 4, passengerNames: ['김철수', '외부손님'],
+            } as DriveLog & { passengerNames?: string[] },
+        })));
+
+        await waitFor(() => expect(setters.setExternalPassengerCount).toHaveBeenCalled());
         expect(setters.setExternalPassengerCount).toHaveBeenCalledWith(1);
+    });
+
+    it('이름이 하나도 없는 옛 기록도 인원수를 잃지 않는다', async () => {
+        mockGetOrganizationMembers.mockResolvedValue(members);
+        renderHook(() => useDriveLogInitializer(deps({
+            isEditMode: true,
+            editLog: { id: 'e1', passengerCount: 3 } as DriveLog,
+        })));
+
+        await waitFor(() => expect(setters.setExternalPassengerCount).toHaveBeenCalled());
+        expect(setters.setExternalPassengerCount).toHaveBeenCalledWith(2);
+        expect(setters.setExternalPassengerNames).not.toHaveBeenCalled();
     });
 
     it('공동 운전자는 uid를 우선으로 맞추고 남은 이름은 직접 입력란에 되돌린다', async () => {

@@ -37,6 +37,9 @@ export default function useDriveLogOcr({ isElectric, setForm, user, userData, ve
     const endKmInputRef = useRef<HTMLInputElement>(null);
 
     const [ocrImageUrl, setOcrImageUrl] = useState<string | null>(null);
+    // 사진에서 읽은 도착 계기판 값. 저장할 때 "이 값이 그대로 저장되는가"를 판정해
+    // 사진 확인 표시(endKmSource)를 남길지 정한다 — 손으로 고쳐 쓴 값에는 붙이지 않는다.
+    const [ocrRecognizedKm, setOcrRecognizedKm] = useState<number | null>(null);
 
     // 마지막 OCR 결과를 저장 (오류 신고 시 사용)
     const lastOcrRef = useRef<OcrResult | null>(null);
@@ -50,6 +53,7 @@ export default function useDriveLogOcr({ isElectric, setForm, user, userData, ve
         setOcrSuccess(false);
         setOcrReportSent(false);
         setOcrImageUrl(null);
+        setOcrRecognizedKm(null);
 
         try {
             // browser-image-compression을 통해 WebWorker 기반 리사이즈 및 WebP 변환
@@ -85,6 +89,7 @@ export default function useDriveLogOcr({ isElectric, setForm, user, userData, ve
                     endKm: result.km!.toString(),
                     ...(isElectric && result.battery != null ? { batteryEnd: result.battery.toString() } : {}),
                 }));
+                setOcrRecognizedKm(result.km);
                 setOcrSuccess(true);
             } else {
                 setOcrError('계기판에서 숫자를 인식하지 못했습니다. 직접 입력해주세요.');
@@ -159,7 +164,7 @@ export default function useDriveLogOcr({ isElectric, setForm, user, userData, ve
     }, [ocrReportSending, user, userData, vehicleName]);
 
     return {
-        ocrLoading, ocrError, ocrSuccess, ocrImageUrl,
+        ocrLoading, ocrError, ocrSuccess, ocrImageUrl, ocrRecognizedKm,
         ocrReportSending, ocrReportSent,
         cameraInputRef, endKmInputRef,
         handleOcrCapture,

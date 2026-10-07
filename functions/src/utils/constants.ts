@@ -114,3 +114,21 @@ export const RATE_LIMITS = DEFAULT_RATE_LIMITS;
 // === 파일 크기 제한 ===
 /** base64 인코딩 최대 크기 (원본 ~5MB → base64 ~6.67MB, 여유분 포함 7MB) */
 export const MAX_BASE64_SIZE = 7 * 1024 * 1024;
+
+// === 운행일지 보존 기한 ===
+/**
+ * 운행일지를 GCS로 옮기고 Firestore에서 지우는 기준 나이(년).
+ *
+ * 이 값이 **두 곳에서 같아야 한다.** 지우는 쪽(`archiveLogs`)과, 그 삭제를 보고
+ * "사용자가 기록을 취소한 것"으로 오해하면 안 되는 쪽(`onDriveLogDeleted`의 하이패스
+ * 환불)이다. 보존 기한 정리는 역사를 덜어내는 일이지 거래를 되돌리는 일이 아니다 —
+ * 3년 전에 쓴 통행료를 오늘 잔액으로 돌려주면 그 카드는 실물과 영영 어긋난다.
+ */
+export const DRIVE_LOG_RETENTION_YEARS = 3;
+
+/** 보존 기한 경계 시각. 이보다 오래된 운행일지는 아카이브 대상이다. */
+export function driveLogRetentionCutoff(now: Date = new Date()): Date {
+    const cutoff = new Date(now);
+    cutoff.setFullYear(cutoff.getFullYear() - DRIVE_LOG_RETENTION_YEARS);
+    return cutoff;
+}

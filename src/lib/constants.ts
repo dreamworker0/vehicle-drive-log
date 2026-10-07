@@ -26,8 +26,15 @@ export const getVehicleColor = (id: string) => {
     return VEHICLE_COLORS[Math.abs(hash) % VEHICLE_COLORS.length];
 };
 
+/**
+ * 하이패스 충전 한 건의 상한(원). firestore.rules의 `chargeAmountWithinCap`과 같은 값이다.
+ * 실물 카드 충전 한도(보통 수십만 원)보다 넉넉하되, 오타·조작으로 잔액이 터무니없이
+ * 커지는 것은 막는 선이다. 화면에서 먼저 안내해 저장 시 권한 오류로 보이지 않게 한다.
+ */
+export const MAX_HIPASS_CHARGE_AMOUNT = 1_000_000;
+
 // 앱 공개 URL
-export const APP_URL = 'https://vehicle-drive-log.web.app';
+export const APP_URL = 'https://drivelog.socialprism.co.kr';
 
 /**
  * 이용약관·개인정보 처리방침의 시행일 버전 (동의 기록용)
@@ -47,9 +54,13 @@ export const APP_URL = 'https://vehicle-drive-log.web.app';
  *   명시하면서 시행 전 재지정. 8/1~8/4에 동의한 기관은 이 항목이 없는 문안에
  *   동의한 것이 되므로, 시행일을 옮겨 재동의를 받는다(ConsentGate가 자동 판정).
  *   오늘(8/1) 기준 9일 유예 — 처리방침 변경은 최소 7일 전 공지가 관행이다.
+ * - `2026-10-12`: 처리방침 수집 항목을 실제 코드와 대조해 정정 — 푸시 알림 토큰·
+ *   이용 통계(Firebase Analytics 쿠키) 신설, 기관 신청 전화번호를 필수로, 직원 가입
+ *   동의 기록 명시, Sentry 전달 항목에서 이메일 제외. 수집 항목이 늘어 재동의를 받는다.
+ *   약관 본문은 그대로지만 위 원칙대로 시행일을 같이 옮긴다. 10/4 기준 8일 유예.
  */
-export const TERMS_VERSION = '2026-08-10';
-export const PRIVACY_VERSION = '2026-08-10';
+export const TERMS_VERSION = '2026-10-12';
+export const PRIVACY_VERSION = '2026-10-12';
 
 /**
  * 시행일 버전('2026-08-10')을 문서 표기('2026년 8월 10일')로 변환한다.

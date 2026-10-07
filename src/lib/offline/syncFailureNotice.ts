@@ -11,7 +11,7 @@
  *
  * 이 모듈은 화면(토스트)에 의존하므로 SW 번들에 들어가면 안 된다 — sw.ts는 syncQueue만 import한다.
  */
-import { peekFailedRecords, clearFailedRecords, flushQueue, type FailedRecord } from './syncQueue';
+import { peekFailedRecords, clearFailedRecords, flushQueueQuietly, type FailedRecord } from './syncQueue';
 import { notifyUser } from '../notify';
 
 /** 큐에 적재되는 컬렉션 → 사용자가 읽는 이름 (enqueue 호출부와 1:1) */
@@ -153,8 +153,16 @@ export function registerSyncFailureNotice(): void {
 
     // 온라인 복귀: flush가 끝나야 폐기 여부가 확정된다. flushQueue는 진행 중이면
     // 같은 Promise를 돌려주므로, registerReconnectFlush가 이미 시작한 flush에 그대로 올라탄다.
+    //
+    // `then`이 아니라 `finally`인 이유 — flushQueueQuietly는 **모르는 실패를 다시 던진다**
+    // (그래야 큐가 안 비는 결함이 조용해지지 않는다). `then`이면 실패한 회차에 이미 폐기된
+    // 기록을 사용자가 듣지 못한 채 지나간다. 알리는 일은 flush가 어떻게 끝났든 해야 한다.
+    //
+    // 뒤에 `catch`를 달지 않은 것도 의도다. `finally`는 거부를 그대로 흘려보내므로 이 체인은
+    // 처리되지 않은 거부로 남고, 그래야 모르는 flush 실패가 Sentry에 드러난다. 삼키면
+    // 위 한 줄이 무의미해진다.
     window.addEventListener('online', () => {
-        void flushQueue().then(() => reportFailedSync());
+        void flushQueueQuietly().finally(() => reportFailedSync());
     });
 
     // 화면 복귀: 백그라운드 동안 SW가 폐기한 건을 잡는다.

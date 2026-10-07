@@ -69,6 +69,7 @@ export {
     updateDriveLog,
     getVehicleDriveLogs,
     hasVehicleDriveLogs,
+    getDriveLogsByIds,
     cleanupDuplicateLogs,
     deleteDriveLog,
     getAdjacentDriveLogs,
@@ -81,6 +82,7 @@ export {
     getReservations,
     getReservationById,
     getReservationByIdAndOrg,
+    getReservationsByIds,
     cancelReservation,
     updateReservation,
     detachFromRecurringGroup,
@@ -181,6 +183,10 @@ export {
 export {
     getAuditLogs,
     getAuditLogsForExport,
+    getAuditLogsByTargets,
+    filterAuditLogs,
+    auditLogAtMillis,
+    AUDIT_VEHICLE_ID_SINCE,
     AUDIT_LOG_PAGE_SIZE,
     AUDIT_LOG_EXPORT_MAX,
 } from './auditLogs';
@@ -193,5 +199,6 @@ export {
     getAllHipassCharges,
     getHipassCharges,
     createHipassCharge,
+    updateHipassCharge,
     deleteHipassCharge,
 } from './hipassCharges';

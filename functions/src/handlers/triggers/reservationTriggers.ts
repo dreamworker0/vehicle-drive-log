@@ -159,10 +159,16 @@ export const onReservationCreated = onDocumentCreated(
     // 푸시 알림 전송 (예약 관리자/지정 수신자에게)
     try {
         if (reservation.organizationId) {
-            const title = reservation.status === 'pending' ? '새 예약 신청 (승인 대기)' : '새 차량 예약';
-            const body = reservation.status === 'pending' 
-                ? `${reservation.reservedByName || '사용자'}님이 ${reservation.vehicleName || '차량'} 예약을 신청했습니다. 승인 대기 중입니다.` 
-                : `${reservation.reservedByName || '사용자'}님이 ${reservation.vehicleName || '차량'} 예약 (${reservation.date} ${reservation.startTime || ''})`;
+            const who = reservation.reservedByName || '사용자';
+            const vehicle = reservation.vehicleName || '차량';
+            // 바로 운행은 이미 출발한 운행이라 '예약'이 아니라 출발 알림으로 보낸다
+            const title = reservation.isQuickDrive ? '바로 운행 출발'
+                : reservation.status === 'pending' ? '새 예약 신청 (승인 대기)' : '새 차량 예약';
+            const body = reservation.isQuickDrive
+                ? `${who}님이 ${vehicle}로 운행을 시작했습니다 (${reservation.startTime || ''})`
+                : reservation.status === 'pending'
+                    ? `${who}님이 ${vehicle} 예약을 신청했습니다. 승인 대기 중입니다.`
+                    : `${who}님이 ${vehicle} 예약 (${reservation.date} ${reservation.startTime || ''})`;
             
             await sendPushToOrg(
                 reservation.organizationId,
@@ -201,18 +207,23 @@ export const onReservationUpdated = onDocumentUpdated(
         return;
     }
 
-    // reminderSent / driveLogReminderSent 업데이트만 변경된 경우 무시
+    // 알림 발송 표시(reminderSent·driveLogReminderSent·noShowReminderSent) 등 부가 필드만 바뀐 경우 무시.
+    // noShowReminderSent가 빠져 있어 미출발 알림 한 건마다 이 트리거가 끝까지 돌며
+    // 차량 문서를 읽었다 (예약 알림 스케줄러가 쓰는 표시 3종 중 하나만 누락, 2026-09-25).
     if (before.status === after.status && before.date === after.date && before.startTime === after.startTime) {
-        const ignoredFields = ["reminderSent", "driveLogReminderSent", "calendarEventId", "actualStartTime"];
+        const ignoredFields = ["reminderSent", "driveLogReminderSent", "noShowReminderSent", "calendarEventId", "actualStartTime"];
         const nonIgnoredChanged = Object.keys(after).some(function (k) {
             return !ignoredFields.includes(k) && JSON.stringify(before[k]) !== JSON.stringify(after[k]);
         });
         if (!nonIgnoredChanged) return;
     }
 
-    // [오프라인 충돌 방어] 시간이나 상태가 변경된 경우 겹침 체크
+    // [오프라인 충돌 방어] 시간·차량·상태가 변경된 경우 겹침 체크
+    // 차량 변경이 빠져 있던 동안은 시간을 그대로 두고 차량만 바꾸면 겹침 검사를 피했다
+    // (2026-10-03 감사 발견 1 — 수정 콜러블이 1차로 막고, 여기는 관리자 직접 쓰기 등에 대한 심층 방어).
     if (after.status === 'pending' || after.status === 'reserved') {
-        const timeChanged = before.date !== after.date || before.startTime !== after.startTime || before.endTime !== after.endTime || before.status !== after.status;
+        const timeChanged = before.date !== after.date || before.startTime !== after.startTime || before.endTime !== after.endTime || before.status !== after.status
+            || before.vehicleId !== after.vehicleId;
         if (timeChanged) {
             const isTimeConflict = await checkReservationTimeConflict(after.vehicleId, after.date, after.startTime, after.endTime, reservationId);
             if (isTimeConflict) {

@@ -46,8 +46,10 @@ export default function useDailyLog() {
                 const active = (v as Vehicle[]).filter(vh => !vh.retired?.isRetired);
                 setVehicles(active);
                 setOrg(orgData as Organization | null);
-                if (active.length > 0 && !selectedVehicleId) {
-                    setSelectedVehicleId(active[0].id);
+                // 이전 선택이 이 기관 차량이 아니면 첫 차량으로 바꾼다. 예전에는 효과가 처음 캡처한
+                // selectedVehicleId를 봐서(린트 억제), 기관이 바뀌어도 다른 기관 차량 id가 남았다.
+                if (active.length > 0) {
+                    setSelectedVehicleId(prev => (prev && active.some(vh => vh.id === prev)) ? prev : active[0].id);
                 }
             } catch (err) {
                 captureError(err, { context: 'useDailyLog.loadInitial', orgId });
@@ -56,7 +58,7 @@ export default function useDailyLog() {
             }
         };
         fetch();
-    }, [orgId]); // eslint-disable-line react-hooks/exhaustive-deps
+    }, [orgId]);
 
     // 날짜+차량 변경 시 데이터 조회
     const fetchData = useCallback(async () => {

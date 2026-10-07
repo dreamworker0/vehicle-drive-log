@@ -23,22 +23,22 @@ const tsSunday10 = kstInstant(2026, 5, 7, 10);   // 일요일 추정 시각 10�
 const tsWeekday23 = kstInstant(2026, 5, 8, 23);  // 다음날 23시(심야)
 const driveLogs = [
     // veh-1 / u1: 일자 A, 거리 250 (>200 → overDrive 버킷)
-    { driverUid: "u1", driverName: "김운전", vehicleId: "veh-1", vehicleName: "스타렉스", startKm: 0, endKm: 250, timestamp: { toDate: () => tsSunday10 } },
+    { driverUid: "u1", driverName: "김운전", vehicleId: "veh-1", vehicleName: "스타렉스", startKm: 0, endKm: 250, timestamp: { toDate: () => tsSunday10 }, reservationId: "r-q", driveOrigin: "quick" },
     // veh-1 / u1: 일자 B, 거리 50, 심야
-    { driverUid: "u1", driverName: "김운전", vehicleId: "veh-1", startKm: 250, endKm: 300, timestamp: { toDate: () => tsWeekday23 } },
+    { driverUid: "u1", driverName: "김운전", vehicleId: "veh-1", startKm: 250, endKm: 300, timestamp: { toDate: () => tsWeekday23 }, reservationId: "r-old", hipassBalanceBefore: 20000, hipassBalanceAfter: 16800 },
     // veh-2 / u2: 거리 80
     { driverUid: "u2", driverName: "이기사", vehicleId: "veh-2", startKm: 0, endKm: 80, timestamp: { toDate: () => tsWeekday23 } },
 ];
 const fuelLogs = [
-    { vehicleId: "veh-1", fuelCost: 90000, date: "2026-06-10" },
-    { vehicleId: "veh-2", fuelCost: 40000, date: "2026-06-11" },
+    { organizationId: "org-1", vehicleId: "veh-1", fuelCost: 90000, date: "2026-06-10" },
+    { organizationId: "org-1", vehicleId: "veh-2", fuelCost: 40000, date: "2026-06-11" },
 ];
 const hipassCharges = [
-    { vehicleId: "veh-1", chargeAmount: 8000, date: "2026-06-10" },
+    { organizationId: "org-1", vehicleId: "veh-1", chargeAmount: 8000, date: "2026-06-10" },
 ];
 const maintenanceRecords = [
-    { vehicleId: "veh-1", cost: 120000, date: "2026-06-05" },
-    { vehicleId: "veh-1", cost: 30000, date: "2026-06-20" },
+    { organizationId: "org-1", vehicleId: "veh-1", cost: 120000, date: "2026-06-05" },
+    { organizationId: "org-1", vehicleId: "veh-1", cost: 30000, date: "2026-06-20" },
 ];
 
 function snap(docs: Array<Record<string, unknown>>) {
@@ -61,19 +61,39 @@ const fixtures: {
     vehicles: Array<Record<string, unknown>>;
     /** 어떤 컬렉션에 실제로 접근했는지 — "쿼리를 아예 걸지 않는다"를 검증한다. */
     touched: string[];
-} = { orgs: [...DEFAULT_ORGS], users: [...DEFAULT_USERS], vehicles: [...DEFAULT_VEHICLES], touched: [] };
+    /** orgStats/{orgId}.staleMonths — 트리거가 남긴 재집계 표시 */
+    stale: Record<string, string[]>;
+    /** createdAt/updatedAt 범위 쿼리(하루 동안 바뀐 비용 기록)가 돌려줄 문서 */
+    changed: Record<string, Array<Record<string, unknown>>>;
+} = { orgs: [...DEFAULT_ORGS], users: [...DEFAULT_USERS], vehicles: [...DEFAULT_VEHICLES], touched: [], stale: {}, changed: {} };
+
+const mockStaleUpdate = jest.fn().mockResolvedValue(undefined);
+const mockStaleSet = jest.fn().mockResolvedValue(undefined);
 
 jest.mock("firebase-admin/firestore", () => {
-    const makeQuery = (docs: Array<Record<string, unknown>>) => {
+    const makeQuery = (docs: Array<Record<string, unknown>>, name = "") => {
         const q: Record<string, unknown> = {};
-        q.where = jest.fn(() => q);
+        let changedScan = false;
+        q.where = jest.fn((field: string) => {
+            if (field === "createdAt" || field === "updatedAt") changedScan = true;
+            return q;
+        });
         q.orderBy = jest.fn(() => q);
-        q.get = jest.fn().mockResolvedValue(snap(docs));
+        q.get = jest.fn(async () => snap(changedScan ? (fixtures.changed[name] ?? []) : docs));
         return q;
     };
     return {
-        FieldValue: { serverTimestamp: jest.fn(() => "SERVER_TS") },
+        FieldValue: {
+            serverTimestamp: jest.fn(() => "SERVER_TS"),
+            arrayRemove: jest.fn((...v: string[]) => ({ remove: v })),
+            arrayUnion: jest.fn((...v: string[]) => ({ union: v })),
+        },
         getFirestore: jest.fn(() => ({
+            getAll: jest.fn(async (...refs: Array<{ id: string }>) => refs.map((r) => ({
+                id: r.id,
+                exists: !!fixtures.stale[r.id],
+                data: () => ({ staleMonths: fixtures.stale[r.id] }),
+            }))),
             collection: jest.fn((name: string) => {
                 fixtures.touched.push(name);
                 if (name === "organizations") {
@@ -86,13 +106,16 @@ jest.mock("firebase-admin/firestore", () => {
                     return makeQuery(fixtures.vehicles);
                 }
                 if (name === "driveLogs") return makeQuery(driveLogs);
-                if (name === "fuelLogs") return makeQuery(fuelLogs);
-                if (name === "hipassCharges") return makeQuery(hipassCharges);
-                if (name === "maintenanceRecords") return makeQuery(maintenanceRecords);
-                // orgStats/{orgId}/monthly/{ym}
+                if (name === "fuelLogs") return makeQuery(fuelLogs, name);
+                if (name === "hipassCharges") return makeQuery(hipassCharges, name);
+                if (name === "maintenanceRecords") return makeQuery(maintenanceRecords, name);
+                // orgStats/{orgId}(재집계 표시) · orgStats/{orgId}/monthly/{ym}
                 if (name === "orgStats") {
                     return {
-                        doc: jest.fn(() => ({
+                        doc: jest.fn((id: string) => ({
+                            id,
+                            update: mockStaleUpdate,
+                            set: mockStaleSet,
                             collection: jest.fn(() => ({
                                 doc: jest.fn(() => ({ set: mockSet })),
                             })),
@@ -105,7 +128,7 @@ jest.mock("firebase-admin/firestore", () => {
     };
 });
 
-import { runDailyAggregation, resolveRecentMonths } from "../handlers/scheduled/dailyAggregation";
+import { runDailyAggregation, resolveRecentMonths, classifyDriveOrigin } from "../handlers/scheduled/dailyAggregation";
 
 describe("runDailyAggregation — 월별 집계 프로듀서", () => {
     beforeEach(() => {
@@ -114,6 +137,8 @@ describe("runDailyAggregation — 월별 집계 프로듀서", () => {
         fixtures.users = [...DEFAULT_USERS];
         fixtures.vehicles = [...DEFAULT_VEHICLES];
         fixtures.touched = [];
+        fixtures.stale = {};
+        fixtures.changed = {};
     });
 
     it("최근 1개월 집계 시 org당 1회 set을 호출하고 요약을 반환한다", async () => {
@@ -123,11 +148,27 @@ describe("runDailyAggregation — 월별 집계 프로듀서", () => {
         expect(res.months).toHaveLength(1);
     });
 
+    it("운행 방식별 건수를 센다 — 옛 일지는 예약 연결 여부로 추정한다", async () => {
+        await runDailyAggregation(1);
+        const payload = mockSet.mock.calls[0][0];
+        // 바로 운행 1(driveOrigin) · 예약 연결만 있는 옛 일지 1(linked) · 예약 없는 일지 1(manual)
+        expect(payload.originCounts).toEqual({ reservation: 0, quick: 1, manual: 1, linked: 1 });
+    });
+
+    it("직원별·차량별 운행 방식을 함께 센다", async () => {
+        await runDailyAggregation(1);
+        const payload = mockSet.mock.calls[0][0];
+        expect(payload.driverStats.u1.origin).toEqual({ reservation: 0, quick: 1, manual: 0, linked: 1 });
+        expect(payload.driverStats.u2.origin).toEqual({ reservation: 0, quick: 0, manual: 1, linked: 0 });
+        expect(payload.vehicleStats["veh-1"].origin).toEqual({ reservation: 0, quick: 1, manual: 0, linked: 1 });
+        expect(payload.vehicleStats["veh-2"].origin).toEqual({ reservation: 0, quick: 0, manual: 1, linked: 0 });
+    });
+
     it("driverStats를 driverUid로 키잉하고 이름·건수·거리를 집계한다 (uid/driverId 버그 회귀 방지)", async () => {
         await runDailyAggregation(1);
         const payload = mockSet.mock.calls[0][0];
-        expect(payload.driverStats.u1).toEqual({ name: "김운전", count: 2, distance: 300 });
-        expect(payload.driverStats.u2).toEqual({ name: "이기사", count: 1, distance: 80 });
+        expect(payload.driverStats.u1).toMatchObject({ name: "김운전", count: 2, distance: 300 });
+        expect(payload.driverStats.u2).toMatchObject({ name: "이기사", count: 1, distance: 80 });
     });
 
     it("costStats.fuelCost를 FuelLog.fuelCost 필드로 합산한다 (amount/cost 버그 회귀 방지)", async () => {
@@ -136,6 +177,15 @@ describe("runDailyAggregation — 월별 집계 프로듀서", () => {
         expect(payload.costStats.fuelCost).toBe(130000); // 90000 + 40000
         expect(payload.costStats.hipassCost).toBe(8000);
         expect(payload.costStats.maintenanceCost).toBe(150000); // 120000 + 30000
+    });
+
+    it("하이패스 실제 사용액을 운행일지의 사용 전·후 잔액 차로 센다 — 충전액과 따로", async () => {
+        await runDailyAggregation(1);
+        const payload = mockSet.mock.calls[0][0];
+        expect(payload.costStats.hipassUsed).toBe(3200); // 20000 → 16800
+        expect(payload.costStats.hipassCost).toBe(8000); // 충전액은 그대로
+        expect(payload.vehicleStats["veh-1"].hipassUsed).toBe(3200);
+        expect(payload.vehicleStats["veh-2"].hipassUsed).toBe(0);
     });
 
     it("차량별 연비/정비비를 vehId 키로 집계한다", async () => {
@@ -161,6 +211,69 @@ describe("runDailyAggregation — 월별 집계 프로듀서", () => {
         expect(payload.anomalies.night).toBe(expectNight);
         // (u1, 일자A) 버킷 거리 250 > 200 → overDrive 1건
         expect(payload.anomalies.overDrive).toBe(1);
+    });
+
+    describe("출발 시각 · 다일 운행 · 운전자 미지정 · 통째 저장", () => {
+        // 픽스처가 2026년 6월이다 — 집계 창(이번 달)을 6월로 맞춰야 다일 운행의 '이 달 날짜' 판정이 맞다
+        beforeEach(() => {
+            jest.useFakeTimers({ doNotFake: ["nextTick", "setImmediate"] });
+            jest.setSystemTime(new Date("2026-06-20T03:00:00Z"));
+        });
+        afterEach(() => jest.useRealTimers());
+
+        /** 기본 픽스처에 기록을 잠시 더한다(driveLogs는 모듈 스코프 배열이라 끝나면 되돌린다) */
+        async function runWith(extra: Array<Record<string, unknown>>) {
+            const before = driveLogs.length;
+            driveLogs.push(...extra);
+            try {
+                await runDailyAggregation(1);
+                return mockSet.mock.calls[0][0];
+            } finally {
+                driveLogs.length = before;
+            }
+        }
+
+        it("심야·요일은 도착이 아니라 출발 시각으로 본다 — 21:00 출발·22:30 도착은 심야가 아니다", async () => {
+            const base = await runWith([]);
+            const payload = await (async () => { jest.clearAllMocks(); return runWith([
+                // 수요일 21:00 출발 → 22:30 도착 (예전엔 도착 시각이라 심야로 셌다)
+                { driverUid: "u2", vehicleId: "veh-2", startKm: 0, endKm: 10, startTime: "21:00",
+                  timestamp: { toDate: () => kstInstant(2026, 5, 10, 22) } },
+                // 05:00 출발 → 07:00 도착 (예전엔 빠졌다)
+                { driverUid: "u2", vehicleId: "veh-2", startKm: 10, endKm: 20, startTime: "05:00",
+                  timestamp: { toDate: () => kstInstant(2026, 5, 10, 7) } },
+            ]); })();
+            expect(payload.anomalies.night - base.anomalies.night).toBe(1);
+            expect(payload.heatmap["3"]?.["21"]).toBe(1); // 2026-06-10은 수요일, 출발 21시 칸
+            expect(payload.heatmap["3"]?.["5"]).toBe(1);
+        });
+
+        it("다일 운행은 출발일로 요일을 보고, 과다주행에서 빼고, 가동일은 출발~도착을 모두 센다", async () => {
+            const payload = await runWith([
+                // 6/12(금) 출발 → 6/14(일) 도착, 400km
+                { driverUid: "u2", vehicleId: "veh-2", startKm: 100, endKm: 500, startDate: "2026-06-12", startTime: "09:00",
+                  timestamp: { toDate: () => kstInstant(2026, 5, 14, 18) } },
+            ]);
+            // 기본 픽스처의 과다주행 1건(250km 하루)만 남는다 — 이틀 400km는 하루 과다주행이 아니다
+            expect(payload.anomalies.overDrive).toBe(1);
+            // veh-2: 기본 1일(6/8) + 6/12·13·14 = 4일
+            expect(payload.vehicleStats["veh-2"].usedDays).toBe(4);
+            expect(payload.heatmap["5"]?.["9"]).toBe(1); // 금요일 9시(출발) 칸
+        });
+
+        it("driverUid가 없는 옛 기록도 '(운전자 미지정)'으로 센다 — 직원별 합이 총계와 맞는다", async () => {
+            const payload = await runWith([
+                { driverName: "옛기록", vehicleId: "veh-2", startKm: 0, endKm: 30, timestamp: { toDate: () => tsWeekday23 } },
+            ]);
+            expect(payload.driverStats.__unassigned).toMatchObject({ name: "(운전자 미지정)", count: 1, distance: 30 });
+            const sum = Object.values(payload.driverStats as Record<string, { count: number }>).reduce((a, d) => a + d.count, 0);
+            expect(sum).toBe(payload.monthlyTotal.count);
+        });
+
+        it("merge 없이 통째로 저장한다 — 지워진 직원·차량·히트맵 칸이 남지 않게", async () => {
+            await runDailyAggregation(1);
+            expect(mockSet.mock.calls[0]).toHaveLength(1); // 두 번째 인자({ merge: true })가 없다
+        });
     });
 
     it("heatmap을 요일→시간 중첩객체로 저장한다", async () => {
@@ -215,7 +328,8 @@ describe("runDailyAggregation — 월별 집계 프로듀서", () => {
             expect(fixtures.touched).toContain("users");
             expect(fixtures.touched).toContain("vehicles");
             expect(fixtures.touched).not.toContain("driveLogs");
-            expect(fixtures.touched).not.toContain("fuelLogs");
+            // 기관 루프 앞의 '하루 동안 바뀐 비용 기록' 훑기(전 기관 공통 1회)는 빼고 본다
+            expect(fixtures.touched.slice(fixtures.touched.indexOf("users"))).not.toContain("fuelLogs");
         });
 
         it("차량이 없어도 구성원이 있으면 집계한다", async () => {
@@ -254,5 +368,170 @@ describe("resolveRecentMonths — 지난달 재집계 창", () => {
 
     it("월말에도 1개월을 유지한다", () => {
         expect(resolveRecentMonths(at(2026, 7, 31))).toBe(1);
+    });
+});
+
+/**
+ * 선로딩 경로 — 야간 배치가 대시보드 단계와 함께 읽은 원본(nightlySharedData)으로 집계한다.
+ *
+ * 읽기를 줄이는 변경이라 **결과가 같아야** 한다. 기관별 쿼리 경로와 같은 페이로드를 내는지,
+ * 다른 기관·집계 창 밖의 운행일지를 섞지 않는지, 기관별 쿼리를 더는 걸지 않는지를 고정한다.
+ */
+describe("runDailyAggregation — 선로딩 데이터 경로", () => {
+    const qdoc = (d: Record<string, unknown>, i: number) => ({ id: (d.id as string) || `s-${i}`, data: () => d });
+    const shared = () => ({
+        orgDocs: DEFAULT_ORGS.map(qdoc),
+        userDocs: [
+            ...DEFAULT_USERS.map((u) => ({ ...u, organizationId: "org-1" })),
+            { id: "u-other", name: "남의직원", organizationId: "org-2" },
+        ].map(qdoc),
+        vehicleDocs: [
+            ...DEFAULT_VEHICLES.map((v) => ({ ...v, organizationId: "org-1" })),
+            { id: "veh-other", name: "남의차", organizationId: "org-2" },
+        ].map(qdoc),
+        driveLogDocs: [
+            ...driveLogs.map((d) => ({ ...d, organizationId: "org-1" })),
+            // 다른 기관 — 섞이면 안 된다
+            { ...driveLogs[0], organizationId: "org-2" },
+            // 집계 창(6월) 밖 — 7월 1일 KST
+            { ...driveLogs[0], organizationId: "org-1", timestamp: { toDate: () => kstInstant(2026, 6, 1, 9) } },
+            // timestamp가 Timestamp가 아닌 옛 기록 — 기관별 범위 쿼리에도 걸리지 않던 문서다
+            { ...driveLogs[0], organizationId: "org-1", timestamp: "2026-06-10" },
+        ].map(qdoc) as never[],
+        driveLogScanStart: kstInstant(2026, 5, 1, 0),
+    });
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        fixtures.orgs = [...DEFAULT_ORGS];
+        fixtures.users = [...DEFAULT_USERS];
+        fixtures.vehicles = [...DEFAULT_VEHICLES];
+        fixtures.touched = [];
+        fixtures.stale = {};
+        fixtures.changed = {};
+        // 집계 창이 6월이 되도록 실행 시각을 6월 25일 02:00(KST)로 고정한다
+        jest.useFakeTimers().setSystemTime(kstInstant(2026, 5, 25, 2));
+    });
+    afterEach(() => jest.useRealTimers());
+
+    it("기관별 쿼리 경로와 같은 페이로드를 저장한다", async () => {
+        await runDailyAggregation(1);
+        const viaQueries = mockSet.mock.calls[0][0];
+        mockSet.mockClear();
+
+        await runDailyAggregation(1, shared() as never);
+        const viaShared = mockSet.mock.calls[0][0];
+
+        expect(viaShared).toEqual(viaQueries);
+    });
+
+    it("기관 목록·구성원·차량·운행일지를 다시 읽지 않고, 비용 기록만 월 단위로 읽는다", async () => {
+        const res = await runDailyAggregation(1, shared() as never);
+
+        expect(res).toMatchObject({ orgs: 1, processed: 1, errors: 0 });
+        expect(fixtures.touched).not.toContain("organizations");
+        expect(fixtures.touched).not.toContain("users");
+        expect(fixtures.touched).not.toContain("vehicles");
+        expect(fixtures.touched).not.toContain("driveLogs");
+        // 월 범위 1회 + 하루 동안 바뀐 기록 훑기 2회(createdAt·updatedAt — 지난달 재집계 대상 찾기)
+        expect(fixtures.touched.filter((n) => n === "fuelLogs")).toHaveLength(3);
+    });
+
+    it("선로딩 창이 집계 창보다 늦게 시작하면 운행일지는 기관별 쿼리로 읽는다", async () => {
+        const late = { ...shared(), driveLogScanStart: kstInstant(2026, 5, 10, 0) };
+
+        await runDailyAggregation(1, late as never);
+
+        expect(fixtures.touched).toContain("driveLogs");
+    });
+});
+
+describe("classifyDriveOrigin", () => {
+    it("저장된 driveOrigin을 그대로 쓴다", () => {
+        expect(classifyDriveOrigin({ driveOrigin: "reservation", reservationId: "r" })).toBe("reservation");
+        expect(classifyDriveOrigin({ driveOrigin: "quick", reservationId: "r" })).toBe("quick");
+        expect(classifyDriveOrigin({ driveOrigin: "manual" })).toBe("manual");
+    });
+    it("driveOrigin이 없으면 예약 연결 여부로 — 연결이 있으면 구분 전(linked)", () => {
+        expect(classifyDriveOrigin({ reservationId: "r" })).toBe("linked");
+        expect(classifyDriveOrigin({ reservationId: null })).toBe("manual");
+        expect(classifyDriveOrigin({})).toBe("manual");
+    });
+    it("알 수 없는 값은 믿지 않는다", () => {
+        expect(classifyDriveOrigin({ driveOrigin: "hacked", reservationId: "r" })).toBe("linked");
+    });
+});
+
+describe("runDailyAggregation — 소급 입력한 지난달 재집계", () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+        fixtures.orgs = [...DEFAULT_ORGS];
+        fixtures.users = [...DEFAULT_USERS];
+        fixtures.vehicles = [...DEFAULT_VEHICLES];
+        fixtures.touched = [];
+        fixtures.stale = {};
+        fixtures.changed = {};
+        // 집계 창이 9월(1개월)이 되도록 9월 20일 02:00(KST)
+        jest.useFakeTimers().setSystemTime(kstInstant(2026, 8, 20, 2));
+    });
+    afterEach(() => jest.useRealTimers());
+
+    const savedMonths = () => mockSet.mock.calls.map((c) => c[0].yearMonth);
+
+    it("트리거가 표시한 지난달을 다시 집계하고, 표시를 먼저 지운다", async () => {
+        fixtures.stale = { "org-1": ["2026-06"] };
+        const res = await runDailyAggregation(1);
+
+        expect(savedMonths()).toEqual(["2026-09", "2026-06"]);
+        expect(res.staleRebuilt).toBe(1);
+        expect(mockStaleUpdate).toHaveBeenCalledWith({ staleMonths: { remove: ["2026-06"] } });
+        // 지우기가 다시 읽기보다 먼저 — 그 사이 들어온 표시가 지워지지 않게
+        expect(mockStaleUpdate.mock.invocationCallOrder[0]).toBeLessThan(mockSet.mock.invocationCallOrder[1]);
+    });
+
+    it("하루 동안 생기거나 고친 지난달 주유·하이패스·정비 기록도 그 달을 다시 집계한다", async () => {
+        fixtures.changed = { fuelLogs: [{ organizationId: "org-1", date: "2026-07-03", fuelCost: 50000 }] };
+        await runDailyAggregation(1);
+
+        expect(savedMonths()).toEqual(["2026-09", "2026-07"]);
+        // 표시가 없었으니 지울 것도 없다
+        expect(mockStaleUpdate).not.toHaveBeenCalled();
+    });
+
+    it("집계 창 안의 달 표시는 다시 읽지 않고 지우기만 한다", async () => {
+        fixtures.stale = { "org-1": ["2026-09"] };
+        await runDailyAggregation(1);
+
+        expect(savedMonths()).toEqual(["2026-09"]);
+        expect(mockStaleUpdate).toHaveBeenCalledWith({ staleMonths: { remove: ["2026-09"] } });
+    });
+
+    it("하룻밤 상한을 넘는 달은 최근 달부터 다시 집계하고, 나머지 표시는 남겨 다음 밤으로 미룬다", async () => {
+        fixtures.stale = { "org-1": ["2025-12", "2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07"] };
+        const res = await runDailyAggregation(1);
+
+        expect(res.staleRebuilt).toBe(6);
+        expect(savedMonths().slice(1)).toEqual(["2026-07", "2026-06", "2026-05", "2026-04", "2026-03", "2026-02"]);
+        expect(mockStaleUpdate).toHaveBeenCalledWith({
+            staleMonths: { remove: ["2026-02", "2026-03", "2026-04", "2026-05", "2026-06", "2026-07"] },
+        });
+    });
+
+    it("1년보다 오래된 표시는 다시 집계하지 않고 지운다", async () => {
+        fixtures.stale = { "org-1": ["2025-01"] };
+        const res = await runDailyAggregation(1);
+
+        expect(res.staleRebuilt).toBe(0);
+        expect(savedMonths()).toEqual(["2026-09"]);
+        expect(mockStaleUpdate).toHaveBeenCalledWith({ staleMonths: { remove: ["2025-01"] } });
+    });
+
+    it("다시 집계하다 실패하면 지운 표시를 되살린다", async () => {
+        fixtures.stale = { "org-1": ["2026-06"] };
+        mockSet.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("boom"));
+        const res = await runDailyAggregation(1);
+
+        expect(res).toMatchObject({ processed: 0, errors: 1 });
+        expect(mockStaleSet).toHaveBeenCalledWith({ staleMonths: { union: ["2026-06"] } }, { merge: true });
     });
 });

@@ -39,6 +39,9 @@ export { sendBroadcastNotice } from "./handlers/callable/sendBroadcastNotice";
 // 예약 생성 (중복 방지 — Firestore Transaction)
 export { createReservationSafe } from "./handlers/callable/createReservationSafe";
 
+// 예약 수정 (일정·차량·명의 변경 시 생성과 같은 검증 + 승인제 재승인 — 2026-10-03 감사 발견 1)
+export { updateReservationSafe } from "./handlers/callable/updateReservationSafe";
+
 // 기관 신청 이메일 알림
 export { notifyNewApplication } from "./handlers/triggers/notifyNewApplication";
 
@@ -153,10 +156,16 @@ export { onDriveLogCreated, onDriveLogUpdated, onDriveLogDeleted } from "./handl
 // 주유일지가 작성되면 그 차량의 "주유 필요" 표시를 끈다 (켜는 쪽은 위 운행일지 트리거)
 export { onFuelLogCreated } from "./handlers/triggers/clearRefuelFlag";
 
+// 하이패스 카드 잔액의 서버 권위 반영 — 충전 기록이 잔액을 결정한다.
+// (운행일지의 하이패스 '사용'은 위 syncDriveLogKm 트리거가 함께 처리한다)
+export { onHipassChargeCreated, onHipassChargeUpdated, onHipassChargeDeleted } from "./handlers/triggers/syncHipassBalance";
+
 // 접속기록/변경 로그 (고시 「개인정보의 안전성 확보조치 기준」 제16조)
 export {
     auditDriveLogCreated, auditDriveLogUpdated, auditDriveLogDeleted,
     auditUserCreated, auditUserUpdated, auditUserDeleted,
+    auditVehicleDeleted,
+    auditReservationCreated, auditReservationUpdated, auditReservationDeleted,
 } from "./handlers/triggers/auditLog";
 
 // 구글 캘린더 온디맨드 동기화 API

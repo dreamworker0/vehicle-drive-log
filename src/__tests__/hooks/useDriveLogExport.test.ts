@@ -17,7 +17,7 @@ vi.mock('../../lib/firestore', () => ({
     getAllDriveLogsForExport: (...args: unknown[]) => mockGetAllDriveLogsForExport(...args),
 }));
 
-import { useDriveLogExport, type ExportFilters } from '../../hooks/driveLogList/useDriveLogExport';
+import { useDriveLogExport, EXPORT_OPTIONS_KEY, type ExportFilters } from '../../hooks/driveLogList/useDriveLogExport';
 import type { Organization } from '../../types/organization';
 
 const baseFilters: ExportFilters = {
@@ -103,5 +103,39 @@ describe('useDriveLogExport', () => {
         });
 
         expect(mockShowToast).toHaveBeenCalledWith(expect.stringContaining('추출할 데이터가 없'), 'warning');
+    });
+});
+
+describe('useDriveLogExport — 내보내기 옵션 기억', () => {
+    beforeEach(() => {
+        localStorage.clear();
+    });
+
+    it('처음에는 모두 꺼져 있다 — 기본값은 그대로', () => {
+        const { result } = setup();
+        expect(result.current.includePassengers).toBe(false);
+        expect(result.current.includeHipass).toBe(false);
+        expect(result.current.includeFuel).toBe(false);
+    });
+
+    it('켠 옵션은 다음에 열 때도 켜져 있고, 끄면 다시 꺼진다', () => {
+        const first = setup();
+        act(() => first.result.current.setIncludePassengers(true));
+        act(() => first.result.current.setIncludeFuel(true));
+        first.unmount();
+
+        const second = setup();
+        expect(second.result.current.includePassengers).toBe(true);
+        expect(second.result.current.includeFuel).toBe(true);
+        expect(second.result.current.includeHipass).toBe(false);
+
+        act(() => second.result.current.setIncludePassengers(false));
+        second.unmount();
+        expect(setup().result.current.includePassengers).toBe(false);
+    });
+
+    it('저장된 값이 깨져 있으면 꺼진 채로 시작한다', () => {
+        localStorage.setItem(EXPORT_OPTIONS_KEY, '{깨짐');
+        expect(setup().result.current.includePassengers).toBe(false);
     });
 });

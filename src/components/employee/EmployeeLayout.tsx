@@ -5,6 +5,7 @@ import { lazyWithRetry } from '../../lib/lazyWithRetry';
 import { warmDriverRoutes } from '../../lib/warmDriverRoutes';
 import { getOrganization } from '../../lib/firestore';
 import { SA_TEST_ROLE_KEY } from '../../App';
+import { rememberAdminArea } from '../../lib/lastArea';
 import NotificationBell from '../common/NotificationBell';
 import AdminNotice from '../admin/AdminNotice';
 import IOSInstallPrompt from '../common/IOSInstallPrompt';
@@ -81,12 +82,17 @@ const navItems: NavItem[] = [
 ];
 
 export default function EmployeeLayout() {
-    const { userData, isSuperAdmin } = useAuth();
+    const { user, userData, isSuperAdmin } = useAuth();
     const location = useLocation();
     const navigate = useNavigate();
     const [orgName, setOrgName] = useState('');
     const { hasNew: hasNewReleaseNotes } = useReleaseNotesStatus();
     useBackButton();
+
+    // 기관 관리자가 직원 화면을 쓰고 있으면 다음에 앱을 열 때 여기로 돌아오게 기억한다
+    useEffect(() => {
+        if (userData?.role === 'admin' && !isSuperAdmin) rememberAdminArea(user?.uid, 'employee');
+    }, [user?.uid, userData?.role, isSuperAdmin]);
 
     useEffect(() => {
         if (!userData?.organizationId) return;
@@ -115,7 +121,7 @@ export default function EmployeeLayout() {
             예약 배너(z-40)와 약관 재동의 배너(z-40)가 알림 패널을 덮었다.
             고정 배너(40)보다 위, 모달(50)보다 아래여야 하므로 그 사이 값을 쓴다.
             */}
-            <header className="sticky top-0 z-[45] bg-white/80 dark:bg-surface-900/80 backdrop-blur-md border-b border-surface-100 dark:border-surface-700 px-4 h-14 flex items-center justify-between safe-top">
+            <header className="sticky top-0 z-[45] bg-white/80 dark:bg-surface-900/80 backdrop-blur-md border-b border-surface-100 dark:border-surface-700 px-4 h-[calc(3.5rem+env(safe-area-inset-top,0px))] flex items-center justify-between safe-top">
                 <div className="flex items-center gap-3">
                     <div className="w-8 h-8 bg-primary-100 dark:bg-primary-900/40 rounded-lg flex items-center justify-center">
                         <svg aria-hidden="true" className="w-4 h-4 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -130,8 +136,9 @@ export default function EmployeeLayout() {
                             onClick={() => { sessionStorage.removeItem(SA_TEST_ROLE_KEY); window.location.href = '/super-admin'; }}
                             className="flex items-center justify-center gap-1 text-xs bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/50 px-3 py-2 rounded-lg transition-colors font-medium"
                             title="슈퍼관리자 화면으로 복귀"
+                            aria-label="슈퍼관리자 화면으로 복귀"
                         >
-                            ⚡ 슈퍼관리자
+                            <span aria-hidden="true">⚡</span>
                         </button>
                     )}
                     {(userData?.role === 'admin' || isSuperAdmin) && (

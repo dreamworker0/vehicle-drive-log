@@ -59,6 +59,52 @@ describe('initSentry — 릴리즈 태깅', () => {
 });
 
 /**
+ * 루프백 주소 — CI e2e·Lighthouse가 실제 DSN으로 빌드한 앱을 localhost에서 돌린다.
+ * 그 실행의 에러가 프로덕션 이슈로 올라왔다(JAVASCRIPT-REACT-6K). jsdom의 주소는 localhost다.
+ */
+describe('initSentry — 루프백 주소의 프로덕션 빌드', () => {
+    beforeEach(() => {
+        vi.resetModules();
+        vi.stubEnv('VITE_SENTRY_DSN', DSN);
+    });
+
+    afterEach(() => {
+        vi.unstubAllEnvs();
+        vi.doUnmock('../../lib/sentryClient');
+    });
+
+    it('프로덕션 빌드가 localhost에서 돌면 SDK를 띄우지 않는다', async () => {
+        vi.stubEnv('PROD', true);
+        const init = vi.fn();
+        // loadSentry와 같은 모양이어야 한다 — 빠진 함수가 있으면 init 인자를 만들다 예외로
+        // 끝나 init이 불리지 않고, 가드가 없어도 이 테스트가 통과해 버린다
+        vi.doMock('../../lib/sentryClient', () => ({
+            init,
+            setUser: vi.fn(),
+            setTag: vi.fn(),
+            captureException: vi.fn(),
+            setMeasurement: vi.fn(),
+            browserTracingIntegration: vi.fn(() => ({ name: 'BrowserTracing' })),
+        }));
+        const mod = await import('../../lib/sentry');
+
+        mod.initSentry();
+        // SDK는 동적 import로 뜬다 — 그 로드가 끝날 만큼 기다린 뒤에도 init이 없어야 한다
+        await import('../../lib/sentryClient');
+        await new Promise((resolve) => setTimeout(resolve, 50));
+
+        expect(location.hostname).toBe('localhost');
+        expect(init).not.toHaveBeenCalled();
+    });
+
+    it('개발·테스트 모드에서는 localhost여도 기존대로 띄운다', async () => {
+        vi.stubEnv('PROD', false);
+        const options = await loadSentry();
+        expect(options.dsn).toBe(DSN);
+    });
+});
+
+/**
  * ignoreErrors — 종료(teardown) 레이스 노이즈
  *
  * Firestore를 의도적으로 `terminate()`하는 경로(logout→clearOfflineCache)에서 SDK 내부
@@ -115,5 +161,49 @@ describe('initSentry — 종료 레이스 노이즈 필터', () => {
         expect(isIgnored(patterns, 'FirebaseError: Firestore shutting down')).toBe(true);
         expect(isIgnored(patterns, 'UnknownError: Connection is closing.')).toBe(true);
         expect(isIgnored(patterns, 'Internal error.')).toBe(true);
+    });
+});
+
+/**
+ * beforeSend — iOS Safari IDB 백엔드 오류(JAVASCRIPT-REACT-6H)를 **어디까지** 지우는가.
+ *
+ * 같은 문구가 두 경로로 온다. 전역 핸들러가 잡은 처리되지 않은 거부는 기기 상태 문제라
+ * 앱이 할 일이 없지만, 우리가 직접 올린 보고(captureError)는 '이 기기에서 오프라인 저장이
+ * 큐에 들어가지 못했다'는 신호다. ignoreErrors는 둘을 가리지 못해 beforeSend에 둔다.
+ */
+describe('initSentry — IDB 백엔드 오류 억제 범위', () => {
+    beforeEach(() => {
+        vi.resetModules();
+        vi.stubEnv('VITE_SENTRY_DSN', DSN);
+        // beforeSend는 개발 환경에서 무조건 null이므로 프로덕션으로 두고 본다
+        vi.stubEnv('DEV', false);
+    });
+
+    afterEach(() => {
+        vi.unstubAllEnvs();
+        vi.doUnmock('../../lib/sentryClient');
+    });
+
+    const idbBackendEvent = (handled: boolean) => ({
+        exception: {
+            values: [{
+                type: 'UnknownError',
+                value: 'An internal error was encountered in the Indexed Database server',
+                mechanism: { type: 'auto.browser.global_handlers.onunhandledrejection', handled },
+            }],
+        },
+    });
+
+    type BeforeSend = (event: unknown) => unknown;
+
+    it('전역 핸들러가 잡은 것(handled=no)은 보내지 않는다', async () => {
+        const options = await loadSentry();
+        expect((options.beforeSend as BeforeSend)(idbBackendEvent(false))).toBeNull();
+    });
+
+    it('같은 문구라도 우리가 직접 올린 보고(handled=yes)는 보낸다', async () => {
+        const options = await loadSentry();
+        const event = idbBackendEvent(true);
+        expect((options.beforeSend as BeforeSend)(event)).toBe(event);
     });
 });

@@ -44,6 +44,8 @@ export interface ReferenceFindings {
     violations: string[];
     /** 기관 이동으로 설명되는 교차 참조 — 위반이 아니다 */
     transfers: string[];
+    /** 삭제된 사용자·차량의 보존 기록 — 위반이 아니다(아래 findReferenceIssues 주석 참고) */
+    retained: string[];
 }
 
 /**
@@ -67,14 +69,30 @@ export interface ReferenceFindings {
  * 반대로 작성자가 타인이면 F-01이 상정한 바로 그 경우(남의 기관 사용자를 운전자로
  * 지정)라 위반으로 남긴다. `createdByUid`가 없는 구 기록도 판별 근거가 없으므로
  * 보수적으로 위반에 둔다.
+ *
+ * ## 삭제된 사용자를 위반과 가른다
+ *
+ * 직원을 영구 삭제(`deleteUserPermanently`)하면 사용자 문서만 지우고 **운행일지는
+ * 기관 기록으로 보존한다**(운전자 이름이 비정규화돼 있다). 그러면 다음 달 점검에서
+ * "없는 사용자"로 잡힌다 — 2026-10-01 실제로 삭제된 직원 2명의 기록 9건이 경고로 올라왔다.
+ * 사용자 삭제는 `auditUserDeleted`가 감사 로그에 남기므로, 그 기록이 있는 uid는
+ * 보존 기록으로 분류한다. 감사 기록이 없는 "없는 사용자"는 그대로 위반이다.
+ *
+ * 차량도 같다 — 차량 삭제는 `auditVehicleDeleted`가 남긴다(2026-10-01 도입, 그 전에
+ * 지운 차량은 기록이 없어 위반으로 남는다).
  */
 export function findReferenceIssues(
     logs: DriveLogLite[],
     vehicleOrg: Map<string, string | undefined>,
     userOrg: Map<string, string | undefined>,
+    /** 감사 로그로 삭제가 확인된 사용자 uid */
+    deletedUserUids: ReadonlySet<string> = new Set(),
+    /** 감사 로그로 삭제가 확인된 차량 ID */
+    deletedVehicleIds: ReadonlySet<string> = new Set(),
 ): ReferenceFindings {
     const violations: string[] = [];
     const transfers: string[] = [];
+    const retained: string[] = [];
     for (const entry of logs) {
         const orgId = entry.organizationId;
         if (!orgId) continue;
@@ -82,7 +100,11 @@ export function findReferenceIssues(
         if (entry.vehicleId) {
             const owner = vehicleOrg.get(entry.vehicleId);
             if (!vehicleOrg.has(entry.vehicleId)) {
-                violations.push(`log=${entry.id} vehicleId=${entry.vehicleId} 없는 차량`);
+                if (deletedVehicleIds.has(entry.vehicleId)) {
+                    retained.push(`log=${entry.id} vehicleId=${entry.vehicleId} 삭제된 차량(기록 보존)`);
+                } else {
+                    violations.push(`log=${entry.id} vehicleId=${entry.vehicleId} 없는 차량`);
+                }
             } else if (owner !== orgId) {
                 // 차량은 기관 간 이동 경로가 없다 — 소속이 다르면 그대로 위반이다.
                 violations.push(`log=${entry.id} vehicleId=${entry.vehicleId} 타 기관 차량(${owner})`);
@@ -91,7 +113,11 @@ export function findReferenceIssues(
         if (entry.driverUid) {
             const owner = userOrg.get(entry.driverUid);
             if (!userOrg.has(entry.driverUid)) {
-                violations.push(`log=${entry.id} driverUid=${entry.driverUid} 없는 사용자`);
+                if (deletedUserUids.has(entry.driverUid)) {
+                    retained.push(`log=${entry.id} driverUid=${entry.driverUid} 삭제된 사용자(기록 보존)`);
+                } else {
+                    violations.push(`log=${entry.id} driverUid=${entry.driverUid} 없는 사용자`);
+                }
             } else if (owner !== orgId) {
                 if (entry.createdByUid && entry.createdByUid === entry.driverUid) {
                     transfers.push(
@@ -106,7 +132,36 @@ export function findReferenceIssues(
             }
         }
     }
-    return { violations, transfers };
+    return { violations, transfers, retained };
+}
+
+/** Firestore `in` 절의 값 상한 */
+const IN_CHUNK = 30;
+
+/**
+ * 문서가 없는 ID 중 감사 로그에 삭제 기록이 있는 것을 고른다(사용자·차량 공용).
+ *
+ * 없는 ID만 조회하므로 평소에는 0~몇 건이다. targetId `in` 조회 후 종류·동작은
+ * 메모리에서 거른다(복합 인덱스를 새로 두지 않는다).
+ */
+export async function findDeletedTargets(
+    db: FirebaseFirestore.Firestore,
+    targetType: 'user' | 'vehicle',
+    missingIds: string[],
+): Promise<Set<string>> {
+    const deleted = new Set<string>();
+    for (let i = 0; i < missingIds.length; i += IN_CHUNK) {
+        const snap = await db.collection('auditLogs')
+            .where('targetId', 'in', missingIds.slice(i, i + IN_CHUNK))
+            .get();
+        for (const doc of snap.docs) {
+            const a = doc.data();
+            if (a.targetType === targetType && a.action === 'delete' && typeof a.targetId === 'string') {
+                deleted.add(a.targetId);
+            }
+        }
+    }
+    return deleted;
 }
 
 /** 같은 차량의 인접 기록에서 도착 km ≠ 다음 출발 km 인 지점을 센다. */
@@ -177,14 +232,30 @@ export async function verifyMileageConsistency(): Promise<void> {
         usersSnap.docs.map((d) => [d.id, d.data().organizationId as string | undefined]),
     );
 
-    const { violations, transfers } = findReferenceIssues(logs, vehicleOrg, userOrg);
+    const missingUids = [...new Set(
+        logs.map((l) => l.driverUid).filter((uid): uid is string => !!uid && !userOrg.has(uid)),
+    )];
+    const missingVehicleIds = [...new Set(
+        logs.map((l) => l.vehicleId).filter((id): id is string => !!id && !vehicleOrg.has(id)),
+    )];
+    const [deletedUserUids, deletedVehicleIds] = await Promise.all([
+        findDeletedTargets(db, 'user', missingUids),
+        findDeletedTargets(db, 'vehicle', missingVehicleIds),
+    ]);
+
+    const { violations, transfers, retained } = findReferenceIssues(
+        logs, vehicleOrg, userOrg, deletedUserUids, deletedVehicleIds,
+    );
     const mileageGaps = countMileageGaps(logs);
 
     console.log(
         `[verifyDriveLogIntegrity] 검증 완료 (${label}, 대상 ${logs.length}건). ` +
         `마일리지 불일치 ${mileageGaps}건, 참조 무결성 위반 ${violations.length}건, ` +
-        `기관 이동으로 설명 ${transfers.length}건`,
+        `기관 이동으로 설명 ${transfers.length}건, 삭제된 사용자·차량의 보존 기록 ${retained.length}건`,
     );
+    if (retained.length > 0) {
+        console.log(`[Reference Integrity] 삭제된 사용자·차량의 보존 기록 — ${retained.slice(0, 50).join(' | ')}`);
+    }
 
     // 이동은 정상이므로 경고로 올리지 않는다. 다만 교차 참조가 일어난 사실 자체는
     // 감사 때 따라갈 수 있어야 하므로 로그에는 남긴다.

@@ -13,6 +13,13 @@ interface SyncTimeMap {
     [vehicleId: string]: number;
 }
 
+/**
+ * 진행 중인 차량별 동기화 — 화면 두 곳(홈·예약 캘린더)과 effect 재실행이 같은 차량을 겹쳐
+ * 부르지 않게 모듈 수준에서 공유한다. 쿨다운은 끝난 뒤에야 기록되므로 그 사이의 중복은
+ * 쿨다운으로 막을 수 없다(JAVASCRIPT-REACT-6E "Consecutive HTTP").
+ */
+const inFlight = new Map<string, Promise<boolean>>();
+
 export function useCalendarSync() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -52,13 +59,8 @@ export function useCalendarSync() {
         return times.length > 0 ? Math.max(...times) : null;
     }, [getSyncTimeMap]);
 
-    const syncVehicleOnDemand = useCallback(async (vehicleId: string, organizationId: string, options?: { force?: boolean }): Promise<boolean> => {
-        // 쿨다운 상태 검증 (수동 "지금 동기화"는 force로 우회)
-        if (!options?.force && !checkCooldown(vehicleId)) {
-            devLog(`[useCalendarSync] Vehicle ${vehicleId} is on cooldown. Skip on-demand sync.`);
-            return false;
-        }
-
+    /** 실제 호출 + 백오프 재시도 — 쿨다운·중복 판정은 syncVehicleOnDemand가 맡는다 */
+    const runSync = useCallback(async (vehicleId: string, organizationId: string): Promise<boolean> => {
         setLoading(true);
         setError(null);
 
@@ -120,6 +122,9 @@ export function useCalendarSync() {
 
                 attempt++;
                 if (attempt >= maxAttempts) {
+                    // 재시도까지 다 실패해도 쿨다운을 건다. 안 걸면 화면을 열 때마다 3회씩 다시
+                    // 부른다(6E). 놓친 변경은 30분 주기 스케줄러가 따라잡는다.
+                    updateSyncTime(vehicleId);
                     setError(errMsg);
                     setLoading(false);
                     return false;
@@ -133,7 +138,26 @@ export function useCalendarSync() {
 
         setLoading(false);
         return false;
-    }, [checkCooldown, updateSyncTime]);
+    }, [updateSyncTime]);
+
+    const syncVehicleOnDemand = useCallback(async (vehicleId: string, organizationId: string, options?: { force?: boolean }): Promise<boolean> => {
+        // 쿨다운 상태 검증 (수동 "지금 동기화"는 force로 우회)
+        if (!options?.force && !checkCooldown(vehicleId)) {
+            devLog(`[useCalendarSync] Vehicle ${vehicleId} is on cooldown. Skip on-demand sync.`);
+            return false;
+        }
+        // 같은 차량을 이미 동기화 중이면 그 결과를 함께 기다린다 — force여도 같은 요청을 두 번 보낼 이유는 없다
+        const running = inFlight.get(vehicleId);
+        if (running) return running;
+
+        const task = runSync(vehicleId, organizationId);
+        inFlight.set(vehicleId, task);
+        try {
+            return await task;
+        } finally {
+            inFlight.delete(vehicleId);
+        }
+    }, [checkCooldown, runSync]);
 
     return {
         syncVehicleOnDemand,

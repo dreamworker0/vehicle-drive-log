@@ -20,6 +20,7 @@ export const triggerOnDemandCalendarSync = onCall(
         cors: [
             "https://vehicle-drive-log.web.app",
             "https://vehicle-drive-log.firebaseapp.com",
+            "https://drivelog.socialprism.co.kr",
             "http://localhost:5173",
         ],
     },

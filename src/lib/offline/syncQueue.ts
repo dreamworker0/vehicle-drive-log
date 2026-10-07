@@ -59,6 +59,15 @@ export function getSyncDB() {
                     store.createIndex('by-failedAt', 'failedAt');
                 }
             },
+        }).catch((error) => {
+            // **실패한 Promise를 캐시에 남기지 않는다.** iOS Safari는 IDB 백엔드가 일시적으로
+            // 죽으면 여는 것부터 거부한다(`UnknownError: An internal error was encountered in
+            // the Indexed Database server`). 그 거부를 계속 들고 있으면 기기가 회복된 뒤에도
+            // **이 세션 내내 큐가 죽은 채로 남는다** — 미전송 건수는 0으로 보이고
+            // (getPendingCount의 catch), 이후 오프라인 쓰기는 전부 적재에 실패한다.
+            // 비워 두면 다음 호출이 다시 연다.
+            dbPromise = null;
+            throw error;
         });
     }
     return dbPromise;
@@ -243,6 +252,48 @@ export function flushQueue(): Promise<void> {
     return flushing;
 }
 
+/**
+ * 이 기기에서 **IndexedDB 자체를 쓸 수 없을 때** 나오는 문구들.
+ *
+ * WebKit은 IDB 백엔드를 잃으면 여는 것부터 이 문구로 거부한다(iOS Safari). 그런 기기에서
+ * flush가 할 수 있는 일은 없다 — 다음 계기에 다시 시도하는 것 말고는.
+ *
+ * **여기 없는 실패는 삼키지 않는다.** 예컨대 Firestore 쓰기는 성공했는데 큐에서 지우기가
+ * 실패하면 같은 문서가 매번 다시 전송되고 '미전송 N건'이 영영 남는다. 그건 환경이 아니라
+ * 우리 문제이고, 보이지 않으면 고칠 수 없다 — 이 이슈도 처리되지 않은 거부로 드러나서 찾았다.
+ */
+const IDB_UNUSABLE_MESSAGES = [
+    'An internal error was encountered in the Indexed Database server',
+    'Connection to Indexed Database server lost',
+];
+
+function isIdbUnusable(error: unknown): boolean {
+    const message = (error as { message?: unknown } | null)?.message;
+    const text = typeof message === 'string' ? message : String(error ?? '');
+    return IDB_UNUSABLE_MESSAGES.some((known) => text.includes(known));
+}
+
+/**
+ * 페이지 컨텍스트에서 쓰는 flush — **IDB를 못 쓰는 기기에서만** 실패를 삼킨다.
+ *
+ * `online`·앱 시작 같은 계기에서 부르는 쪽은 결과를 기다리지 않는다(`void`). 그래서 IDB가
+ * 통째로 실패하는 기기에서는 runFlush의 거부가 곧 **처리되지 않은 프라미스 거부**가 되어
+ * 스택 없는 오류로 Sentry에 올라왔다(JAVASCRIPT-REACT-6H, iOS Safari). 그 자리에서 사용자에게
+ * 할 말도, 할 수 있는 일도 없으므로 경고만 남기고 넘어간다.
+ *
+ * 그 밖의 실패는 **그대로 드러낸다**(isIdbUnusable 주석 참고). 전부 삼키면 큐가 영영 비지
+ * 않는 종류의 결함이 조용해진다.
+ *
+ * 서비스워커(sw.ts)는 그대로 `flushQueue`를 쓴다. 거기서는 거부가 Background Sync의
+ * 재시도 신호이므로 삼키면 안 된다.
+ */
+export function flushQueueQuietly(): Promise<void> {
+    return flushQueue().catch((error) => {
+        if (!isIdbUnusable(error)) throw error;
+        console.warn('[SyncQueue] IDB를 쓸 수 없어 flush를 건너뛴다 — 다음 계기에 다시 시도한다', error);
+    });
+}
+
 async function runFlush(): Promise<void> {
     const database = await getSyncDB();
     if (!database) return;
@@ -360,7 +411,7 @@ export function registerReconnectFlush() {
     if (reconnectFlushRegistered) return;
     if (typeof window === 'undefined' || 'SyncManager' in window) return;
     reconnectFlushRegistered = true;
-    window.addEventListener('online', () => { void flushQueue(); });
+    window.addEventListener('online', () => { void flushQueueQuietly(); });
     // 이전 세션에서 flush되지 못하고 남은 항목 처리
-    if (navigator.onLine) void flushQueue();
+    if (navigator.onLine) void flushQueueQuietly();
 }

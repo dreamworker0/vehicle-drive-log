@@ -2,9 +2,9 @@
  * submitDriveLog — 운행일지 제출/수정 비즈니스 로직
  * useDriveLogForm에서 추출
  */
-import { createDriveLog, updateDriveLog, updateReservationStatus, updateHipassCard, completeReservationGroupSiblings } from '../../lib/firestore';
+import { createDriveLog, updateDriveLog, updateReservationStatus, completeReservationGroupSiblings } from '../../lib/firestore';
 
-import { increment, deleteField } from 'firebase/firestore';
+import { deleteField } from 'firebase/firestore';
 import { buildLogData, nowTime, todayStr } from '../utils/driveLogValidation';
 import type { DriveLogForm } from './types';
 import type { Vehicle } from '../../types/vehicle';
@@ -27,11 +27,13 @@ interface SubmitContext {
     externalCoDriverNames: string;
     isRetroactive: boolean;
     ocrUsed: boolean;
+    /** 사진에서 읽은 도착 계기판 값(없으면 null) */
+    ocrRecognizedKm?: number | null;
     favoriteUsed: boolean;
     isElectric: boolean;
     isEditMode: boolean;
     editLog: (DriveLog & { passengerNames?: string[] }) | null;
-    reservationData: { reservationId?: string } | null;
+    reservationData: { reservationId?: string; isQuickDrive?: boolean } | null;
     hipassCard: HipassCard | null;
     isManuallyCorrected?: boolean;
     originalStartKm?: number;
@@ -66,7 +68,7 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
         form, orgId, user, userData, selectedVehicle,
         selectedPassengers, externalPassengerCount, externalPassengerNames,
         selectedCoDrivers, externalCoDriverNames, isRetroactive,
-        ocrUsed, favoriteUsed, isEditMode, editLog, reservationData,
+        ocrUsed, ocrRecognizedKm, favoriteUsed, isEditMode, editLog, reservationData,
         hipassCard, isManuallyCorrected, originalStartKm, startLocation,
     } = ctx;
 
@@ -74,7 +76,8 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
         orgId: orgId || undefined, user, userData, selectedVehicle,
         selectedPassengers, externalPassengerCount, externalPassengerNames,
         coDrivers: selectedCoDrivers, externalCoDriverNames,
-        isRetroactive, ocrUsed, favoriteUsed, startLocation,
+        isRetroactive, ocrUsed, ocrRecognizedKm, favoriteUsed, startLocation,
+        previousLog: isEditMode && editLog ? { endKm: editLog.endKm, endKmSource: editLog.endKmSource } : null,
     });
 
     if (isManuallyCorrected !== undefined) {
@@ -129,6 +132,11 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
             // 고쳐도 문서에 isRetroactive가 남으면, 서버 트리거가 그 값을 보고 차량 km·세운
             // 곳·주유 필요 갱신을 계속 건너뛴다 — 화면은 고쳐졌는데 차량 상태만 안 따라온다.
             isRetroactive: (isRetroactive ? true : deleteField()) as unknown as boolean | undefined,
+            // 도착 계기판의 사진 확인 표시도 같은 이유로 명시적으로 지운다. 사진이 읽어 준
+            // 값을 사람이 고쳐 썼는데 표시가 남으면, **손으로 친 숫자가 '사진으로 확인된 값'
+            // 행세를 하며** 재정합에서 고정되고 인접 기록 조정도 피해 간다 — 이 기능이 막으려던
+            // 것과 정반대가 된다. 화면에는 이 표시를 지우는 수단이 없어 더욱 남으면 안 된다.
+            endKmSource: (logData.endKmSource ?? deleteField()) as unknown as 'ocr' | undefined,
         });
         if (result.syncResult?.updated) syncResult = result.syncResult;
         if (result.backgroundError) {
@@ -142,7 +150,11 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
         const extendedLogData = {
             ...logData,
             id: generatedId,
-            reservationId: reservationData?.reservationId || null
+            reservationId: reservationData?.reservationId || null,
+            // 운행 방식 — 기관 관리자 운행 분석의 '운행 방식' 비율이 이 값으로 집계된다
+            driveOrigin: reservationData?.reservationId
+                ? (reservationData.isQuickDrive ? 'quick' : 'reservation')
+                : 'manual',
         };
 
 
@@ -205,24 +217,13 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
         }
     }
 
-    // 하이패스 잔액 업데이트: 동기적으로 await하여 잔액 불일치(데이터 정합성) 방지
-    if (shouldApplyHipass && hipassCard) {
-        const hipassId = hipassCard.id;
-        const balAfter = Number(form.hipassBalanceAfter);
-        const usedAmount = hipassCard.balance - balAfter;
-        const org = orgId ? orgId : undefined;
-        
-        try {
-            await updateHipassCard(hipassId, {
-                balance: increment(-usedAmount),
-                organizationId: org,
-            });
-        } catch (e) {
-            console.warn('[submitDriveLog] 하이패스 잔액 업데이트 실패:', e);
-            captureError(e, { context: 'submitDriveLog.updateHipassCard', hipassId, balAfter, usedAmount, org });
-            backgroundWarnings.push('하이패스 잔액 동기화에 실패했습니다');
-        }
-    }
+    // 하이패스 잔액은 여기서 쓰지 않는다 — 운행일지가 저장되면 서버 트리거
+    // (syncDriveLogKm의 onDriveLogCreated/Updated/Deleted)가 `hipassBalanceBefore`와
+    // `hipassBalanceAfter`의 차이만큼 카드 잔액을 트랜잭션으로 뺀다(Phase 227).
+    //
+    // 여기서 함께 쓰면 이중 반영이 된다. 그리고 이 경로가 사라지면서 "운행일지는 저장됐는데
+    // 잔액만 못 맞췄다"는 실패도 없어졌다 — 기록이 저장되면 잔액은 따라온다(오프라인에서
+    // 나중에 동기화되는 경우에도 그때 함께 맞춰진다).
 
     const finalBackgroundWarning = backgroundWarnings.length > 0
         ? '운행일지는 저장되었으나 일부 동기화에 실패했습니다: ' + backgroundWarnings.join(', ') + '. 관리자에게 문의해주세요.'

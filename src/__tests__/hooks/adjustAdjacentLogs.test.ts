@@ -39,6 +39,33 @@ describe('adjustAdjacentLogs', () => {
         expect(msgs[0]).toContain('직전 기록 도착 km');
     });
 
+    it('직전 기록의 도착 km가 사진으로 확인된 값이면 덮지 않고 알리기만 한다', async () => {
+        const photo = { id: 'a', startKm: 50, endKm: 90, endKmSource: 'ocr' } as unknown as DriveLog;
+        const msgs = await adjustAdjacentLogs({ lastDriveLog: photo, nextDriveLog: null, startKm: 100, endKm: 200 });
+
+        expect(mockUpdateDoc).not.toHaveBeenCalled();
+        expect(msgs[0]).toContain('사진으로 확인된 값이라 그대로');
+    });
+
+    it('사진 값이라도 구간이 겹치면 맞춘다 — 같은 거리가 두 기록에 잡히는 것을 막는다', async () => {
+        // 직전 도착(150)이 이 기록 출발(140)보다 크면 140~150이 두 기록에 함께 잡혀
+        // 기관 주행거리가 부풀려진다. 서버 재정합도 같은 경계에서 고정을 포기한다.
+        const photo = { id: 'a', startKm: 100, endKm: 150, endKmSource: 'ocr' } as unknown as DriveLog;
+        const msgs = await adjustAdjacentLogs({ lastDriveLog: photo, nextDriveLog: null, startKm: 140, endKm: 200 });
+
+        expect(mockUpdateDoc).toHaveBeenCalledTimes(1);
+        expect(mockUpdateDoc.mock.calls[0][1]).toMatchObject({ endKm: 140 });
+        expect(msgs[0]).toContain('구간이 겹쳐');
+    });
+
+    it('직후 기록은 출발 km만 맞추므로 사진 표시와 무관하게 조정한다', async () => {
+        const photo = { id: 'b', startKm: 250, endKm: 300, endKmSource: 'ocr' } as unknown as DriveLog;
+        await adjustAdjacentLogs({ lastDriveLog: null, nextDriveLog: photo, startKm: 100, endKm: 200 });
+
+        expect(mockUpdateDoc).toHaveBeenCalledTimes(1);
+        expect(mockUpdateDoc.mock.calls[0][1]).toMatchObject({ startKm: 200 });
+    });
+
     it('직후 기록 startKm이 현재 endKm과 다르면 조정한다', async () => {
         const msgs = await adjustAdjacentLogs({ lastDriveLog: null, nextDriveLog: log('b', 250, 300), startKm: 100, endKm: 200 });
         expect(mockUpdateDoc).toHaveBeenCalledTimes(1);

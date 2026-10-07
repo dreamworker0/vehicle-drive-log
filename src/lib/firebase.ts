@@ -9,6 +9,7 @@ import { isInAppBrowser } from './inAppBrowser';
 import { runCacheClearWithMarker, runPendingCacheClear } from './offline/cacheClearMarker';
 import { markFirestoreTerminated } from './firestoreLifecycle';
 import { notifyUser } from './notify';
+import { resolveAuthDomain } from './authDomain';
 // firebase/analytics, firebase/messaging은 동적 import (번들 최적화)
 
 // === E2E/로컬 에뮬레이터 모드 ===
@@ -19,7 +20,8 @@ const USE_EMULATOR = import.meta.env.VITE_USE_EMULATOR === 'true';
 
 const firebaseConfig = {
     apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-    authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+    // 접속한 Hosting 도메인과 authDomain을 맞춘다 (리다이렉트 로그인 세션 유실 방지)
+    authDomain: resolveAuthDomain(import.meta.env.VITE_FIREBASE_AUTH_DOMAIN),
     projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
     storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
     messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
@@ -150,8 +152,9 @@ export const auth = getAuth(app);
 if (USE_EMULATOR && typeof window !== 'undefined' && !(auth as unknown as { emulatorConfig?: unknown }).emulatorConfig) {
     connectAuthEmulator(auth, 'http://127.0.0.1:9099', { disableWarnings: true });
 }
-// main.tsx → firebaseAuth.ts에서 이미 setPersistence 완료.
-// 중복 호출 대신 기존 Promise를 재수출하여 ~200-500ms 절감.
+// firebaseAuth.ts가 만든 것과 같은 인스턴스다(getAuth는 앱당 하나). persistence는 지정하지
+// 않는다 — 기본 우선순위(IndexedDB 우선)를 쓰는 이유는 firebaseAuth.ts 주석에 적어 뒀다.
+// authReady도 거기서 만든 Promise를 재수출한다(중복 대기 없이 ~200-500ms 절감).
 export const authReady = _authReady;
 
 // IndexedDB / Firestore 비동기 에러 억제 (Sentry 노이즈 방지)
@@ -166,6 +169,10 @@ function isFirestorePersistenceError(msg: string) {
         msg.includes('indexedDB.open') ||
         (msg.includes('AbortError') && !msg.includes('fetch')) ||
         msg.includes('UnknownError') ||
+        // DOMException은 이름(UnknownError)과 메시지가 갈려 있어 위 줄이 닿지 않는 판이 있다 —
+        // iOS Safari의 IDB 백엔드 실패가 그렇다(문장만 message에 담긴다). 억제만 하고
+        // isCacheCorruptionError에는 넣지 않는다: 일시적인 경우가 많은데 복구는 미전송 쓰기까지 지운다.
+        msg.includes('An internal error was encountered in the Indexed Database server') ||
         msg.includes('Failed to delete record from object store') ||
         msg.includes("Cannot read properties of null (reading 'Te')") ||
         msg.includes('mutating the [[Prototype]]') ||

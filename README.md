@@ -2,7 +2,7 @@
 
 사회복지기관·비영리단체를 위한 **무료** 차량 운행일지 웹 애플리케이션 (PWA)
 
-> 🔗 **지금 써보기**: **[vehicle-drive-log.web.app](https://vehicle-drive-log.web.app)** &nbsp;·&nbsp; ▶️ **[데모 영상](https://youtu.be/XdT5Wm_pd3s)** &nbsp;·&nbsp; 🛠 **[내 기관에 직접 설치하기](docs/SELF_HOSTING.md)**
+> 🔗 **지금 써보기**: **[drivelog.socialprism.co.kr](https://drivelog.socialprism.co.kr)** &nbsp;·&nbsp; ▶️ **[데모 영상](https://youtu.be/XdT5Wm_pd3s)** &nbsp;·&nbsp; 🛠 **[내 기관에 직접 설치하기](docs/SELF_HOSTING.md)**
 
 <p>
   <img src="public/icons/screenshot-desktop.webp" alt="데스크톱 화면" width="620">
@@ -30,9 +30,9 @@ MIT 라이선스로 공개된 프로젝트입니다. 아래처럼 자유롭게 �
 
 | 무엇 | 어디를 보면 되나 | 왜 참고할 만한가 |
 |------|------------------|------------------|
-| **에이전트 하네스** | [.agent/](.agent/) · [scripts/check-harness.ts](scripts/check-harness.ts) · [scripts/skill-trigger-eval.json](scripts/skill-trigger-eval.json) | 스킬·워크플로·행동 규칙이 단일 원본이고 `.claude/`는 파생물이며 CI가 드리프트를 막습니다. 하네스 Doctor는 13개 영역 정합성을 검사해 **불일치 시 CI를 실패**시키고, eval 세트로 **에이전트 행동을 회귀 측정**합니다. 지침을 "문서에 적힌 약속"이 아니라 실행 가능한 게이트로 만드는 방식이라 어떤 언어·프레임워크에도 옮겨집니다 |
+| **에이전트 하네스** | [.agent/](.agent/) · [scripts/check-harness.ts](scripts/check-harness.ts) | 스킬·워크플로·행동 규칙이 단일 원본이고 `.claude/`는 파생물이며 CI가 드리프트를 막습니다. 하네스 Doctor는 지침·스킬·훅의 깨진 참조와 배선을 검사해 **불일치 시 CI를 실패**시킵니다. 지침을 "문서에 적힌 약속"이 아니라 실행 가능한 게이트로 만드는 방식이라 어떤 언어·프레임워크에도 옮겨집니다 |
 | **멀티테넌트 격리** | [eslint-rules/require-organization-filter.js](eslint-rules/require-organization-filter.js) · [firestore.rules](firestore.rules) · [tests/firestore-rules.test.ts](tests/firestore-rules.test.ts) · `setCustomClaims` | 테넌트 필터 누락은 코드 리뷰로 막기 어려운 사고입니다. 여기서는 커스텀 ESLint 규칙 `local/require-organization-filter`가 쿼리의 `organizationId` 누락을 **정적으로 차단**하고, Rules 테스트와 Custom Claims 동기화 트리거가 서버 측을 이중으로 받칩니다. 기관 → 회사·학교·지점으로 이름만 바꾸면 그대로 쓰입니다 |
-| **무료 한도 비용 설계** | [docs/FIRESTORE_COST_ANALYSIS.md](docs/FIRESTORE_COST_ANALYSIS.md) · `dailyNightlyBatch`·`monthlyBatch` · [firestore-query-optimization](.agent/skills/firestore-query-optimization/SKILL.md) | 비영리 서비스의 실질 제약은 기능이 아니라 과금입니다. 개별 스케줄러를 야간·월간 배치로 통합해 잡 수를 줄이고, 주기를 업무 시간으로 좁히고(평일 08~18시), 집계 캐싱·쿨다운·페이지네이션으로 읽기를 줄인 결정과 실측이 남아 있습니다 |
+| **무료 한도 비용 설계** | [docs/FIRESTORE_COST_ANALYSIS.md](docs/FIRESTORE_COST_ANALYSIS.md) · `dailyNightlyBatch`·`monthlyBatch` · [firestore-query-optimization](.agent/skills/firebase-cost-reduction/query-optimization.md) | 비영리 서비스의 실질 제약은 기능이 아니라 과금입니다. 개별 스케줄러를 야간·월간 배치로 통합해 잡 수를 줄이고, 주기를 업무 시간으로 좁히고(평일 08~18시), 집계 캐싱·쿨다운·페이지네이션으로 읽기를 줄인 결정과 실측이 남아 있습니다 |
 | **예약 + 사용대장 골격** | `createReservationSafe` · [src/components/common/ReservationCalendar.tsx](src/components/common/ReservationCalendar.tsx) · [data-export-pattern](.agent/skills/data-export-pattern/SKILL.md) | 차량이라는 명사를 빼면 남는 구조는 일반적입니다. `vehicles`=자원, `reservations`는 그대로, `driveLogs`=사용대장으로 두면 회의실·장비·공용 물품 대여가 됩니다. 트랜잭션 충돌 방지, 승인 흐름, 반복 예약(공휴일 제외), 공식 양식 PDF/Excel 출력은 도메인과 무관합니다 |
 | **개인정보 규제 대응** | `functions/src/handlers/triggers/auditLog.ts` · `PROCESSORS`(처리방침) | 접속기록을 클라이언트가 아니라 Firestore 트리거로 남기고, **무엇을 기록하지 않을지**를 화이트리스트로 정한 설계입니다. 처리방침의 위탁·국외이전 조항은 실제 연동 목록 단일 원본에서 파생시켜 두 조항이 구조적으로 어긋날 수 없게 했습니다. 법 문구는 각자 사실관계가 다르니 그대로 베끼지 말고 **구조만** 참고하세요 |
 | **의사결정 기록** | [docs/구현이력.md](docs/구현이력.md) | Phase 141개에 무엇을 했는지가 아니라 **왜 그렇게 했고 어떤 지적을 기각했는지**가 남아 있습니다(오진을 CI 아티팩트로 뒤집은 과정, 리뷰 지적의 반영·기각 분리). 알려진 제약과 열린 항목도 여기서 확인할 수 있습니다 |
@@ -66,7 +66,7 @@ MIT 라이선스로 공개된 프로젝트입니다. 아래처럼 자유롭게 �
 | ⛽ 주유·하이패스 | 주유 기록, 하이패스 충전 관리, 통계 차트 |
 | 💬 Slack 어시스턴트 | 워크스페이스를 연결하면 대화로 예약 조회·생성. 기관이 직접 OAuth로 연결(기관별 토큰 암호화 보관) |
 | 🙋 AI 도움말·문의 | FAQ·매뉴얼 기반 질문 답변, 접수된 문의에 AI 답변 초안 자동 생성 |
-| 🔐 보안·개인정보 | App Check(reCAPTCHA v3), 기관 간 데이터 격리(Firestore Rules), 개인정보 변경 접속기록 서버 기록 |
+| 🔐 보안·개인정보 | App Check(reCAPTCHA v3), 기관 간 데이터 격리(Firestore Rules), 개인정보 변경 접속기록 서버 기록(운행일지·직원·예약, 관리자 화면에서 기간·직원·차량·유형으로 점검) |
 | 🌙 다크 모드 | 신규 사용자 기본 다크 모드 적용, 시스템/사용자 설정 기반 테마 지원, 글꼴 크기 3단계 조절 |
 
 ---
@@ -208,7 +208,7 @@ firebase functions:secrets:set SLACK_TOKEN_ENC_KEY     # openssl rand -base64 32
 | `npm run screenshots` | PWA 스크린샷 생성 (Playwright + sharp) |
 | `npm run audit` | npm 보안 감사 리포트 |
 | `npm run health` | Cloud Functions 상태 점검 |
-| `npm run verify:harness` | 하네스 Doctor — 에이전트 지침·스킬·워크플로·eval 정합성 검사 |
+| `npm run verify:harness` | 하네스 Doctor — 에이전트 지침·스킬·워크플로·훅 정합성 검사 |
 | `npm run verify:fast` | 빠른 검증 (Node 확인 + lint + 타입 검사 프론트/Functions) |
 | `npm run verify:full` | 전체 게이트 (하네스 + fast + 커버리지 + Functions 테스트 + 빌드 + Rules + E2E) |
 | `npm run test:functions` | Cloud Functions 단위 테스트 (Jest) |
@@ -270,17 +270,15 @@ npm run build           # 프로덕션 빌드 확인
 
 ## Cloud Functions
 
-전체 72개 함수(리전 `asia-northeast3`)의 파라미터·권한·트리거 경로는 **[Cloud Functions 레퍼런스](docs/FUNCTIONS_REFERENCE.md)** 에 정리되어 있습니다. 아래는 종류별 요약입니다.
+전체 함수(리전 `asia-northeast3`)의 파라미터·권한·트리거 경로는 **[Cloud Functions 레퍼런스](docs/FUNCTIONS_REFERENCE.md)** 에 정리되어 있습니다. 아래는 종류별 요약입니다.
 
-> 이 절의 숫자는 `npm run check:functions-catalog`가 `functions/src/index.ts`와 대조합니다 — 어긋나면 CI가 실패합니다.
-
-| 종류 | 개수 | 대표 함수 |
-|------|------|-----------|
-| 호출형 (onCall) | 40 | `ocrDashboard`(계기판 OCR) · `createReservationSafe`(트랜잭션 예약 생성) · `joinOrganization`(초대 코드 가입) · `withdrawOrganization`(기관 해지) · `askAI`(FAQ 기반 답변) · `getSlackInstallUrl`·`diagnoseSlackConnection`(Slack 연결) |
-| HTTP (onRequest) | 4 | `tmapProxy`·`holidayProxy`(외부 API 프록시, 인증 + Rate Limit) · `slackEvents`(Slack 이벤트 수신) · `slackOauthCallback`(설치 콜백) |
-| 스케줄 (onSchedule) | 7 | 아래 표 참고 |
-| Firestore 트리거 | 20 | `autoVerifyDocument`(증빙서류 AI 심사) · `setCustomClaims`(권한 동기화) · `onReservation*`(캘린더·푸시) · `onDriveLog*`(주행거리·집계) · `onFuelLogCreated`(주유 필요 표시 해제) · `audit*`(접속기록) · `onSlackTaskCreated`(Slack 워커) |
-| Auth 트리거 | 1 | `onUserDelete`(탈퇴 시 개인정보 익명화) |
+| 종류 | 대표 함수 |
+|------|-----------|
+| 호출형 (onCall) | `ocrDashboard`(계기판 OCR) · `createReservationSafe`(트랜잭션 예약 생성) · `joinOrganization`(초대 코드 가입) · `withdrawOrganization`(기관 해지) · `askAI`(FAQ 기반 답변) · `getSlackInstallUrl`·`diagnoseSlackConnection`(Slack 연결) |
+| HTTP (onRequest) | `tmapProxy`·`holidayProxy`(외부 API 프록시, 인증 + Rate Limit) · `slackEvents`(Slack 이벤트 수신) · `slackOauthCallback`(설치 콜백) |
+| 스케줄 (onSchedule) | 아래 표 참고 |
+| Firestore 트리거 | `autoVerifyDocument`(증빙서류 AI 심사) · `setCustomClaims`(권한 동기화) · `onReservation*`(캘린더·푸시) · `onDriveLog*`(주행거리·하이패스 잔액·집계) · `onHipassCharge*`(카드 잔액 증분) · `onFuelLogCreated`(주유 필요 표시 해제) · `audit*`(접속기록) · `onSlackTaskCreated`(Slack 워커) |
+| Auth 트리거 | `onUserDelete`(탈퇴 시 개인정보 익명화) |
 
 ### 스케줄 함수
 
@@ -303,14 +301,14 @@ npm run build           # 프로덕션 빌드 확인
 
 ## 테스트
 
-| 종류 | 규모 | 도구 |
-|------|------|------|
-| 단위 테스트 (프론트 + 스크립트) | 176파일 / 2,151개 테스트 | Vitest |
-| Functions 단위 테스트 | 77개 suite / 1,062개 테스트 (emulator 테스트 제외) | Jest + ts-jest |
-| Rules 테스트 | 2파일 / 37개 테스트 | Firebase Emulator + Vitest |
-| E2E 테스트 | 26개 spec 파일 (일부 인증/오프라인 시나리오 fixme) | Playwright |
+| 종류 | 위치 | 실행 | 도구 |
+|------|------|------|------|
+| 단위 테스트 (프론트 + 스크립트) | `src/**/__tests__`, `scripts/__tests__` | `npm test` | Vitest |
+| Functions 단위 테스트 | `functions/src/__tests__` (emulator 테스트 제외) | `npm run test:functions` | Jest + ts-jest |
+| Rules 테스트 | `tests/` | `npm run test:rules:all` | Firebase Emulator + Vitest |
+| E2E 테스트 | `e2e/` (일부 인증/오프라인 시나리오 fixme) | `npm run test:e2e` | Playwright |
 
-> 테스트 케이스 수는 2026-09-06 Node 22 실행 결과입니다. 파일·suite 수는 `npm run verify:harness`가 저장소와 대조합니다.
+> 규모(파일·테스트 수)는 손으로 적어 두면 곧 어긋나므로 적지 않습니다. 각 명령의 실행 결과를 보세요.
 
 ---
 
@@ -322,9 +320,15 @@ npm run build           # 프로덕션 빌드 확인
 | [구현계획서](docs/차량운행일지_구현계획서.md) | 전체 설계 문서 (아키텍처, DB 스키마, API 명세, 시퀀스 다이어그램) |
 | [구현이력](docs/구현이력.md) | Phase별 구현 이력 색인 (구간별 분할 파일로 연결) |
 | [Cloud Functions 레퍼런스](docs/FUNCTIONS_REFERENCE.md) | 함수별 트리거·권한·파라미터 (자동 생성) |
-| [OPERATIONS.md](OPERATIONS.md) | 시스템 관리자용 운영 매뉴얼 (백업, 장애 대응, 기관 관리) |
+| [OPERATIONS.md](OPERATIONS.md) | 시스템 관리자용 운영 매뉴얼 (백업, 장애 대응, 기관 관리). **§0 인수인계 한 페이지** — 권한자·비밀값 위치·외부 서비스·월간 비용 점검 |
 | [CONTRIBUTING.md](CONTRIBUTING.md) | 개발 참여 가이드 (코딩 컨벤션, PR 규칙, 브랜치 전략) |
 | [API_FALLBACK.md](docs/API_FALLBACK.md) | 외부 API 장애 대응 매뉴얼 |
+| [MONITORING_GUIDE.md](docs/MONITORING_GUIDE.md) | 운영 모니터링 가이드 (Cloud Monitoring 대시보드·알림 정책·TTL·사용량/비용 점검) |
+| [FIRESTORE_COST_ANALYSIS.md](docs/FIRESTORE_COST_ANALYSIS.md) | 인덱스·스케줄러별 Firestore 비용 분석과 실측 |
+| [MAINTAINABILITY_BACKLOG.md](docs/MAINTAINABILITY_BACKLOG.md) | 기존 코드의 구조 개선 후보 백로그 |
+| [ARCHIVE_POLICY.md](docs/ARCHIVE_POLICY.md) | 운행일지 아카이빙 정책 (주간 유지보수 배치) |
+| [보안 점검 보고서](docs/security-reports/) | 정기 보안 감사 결과 (날짜별) |
+| [문서 아카이브](docs/archive/) | 역할이 끝난 과거 문서와 완료된 기능 계획서 — 현재 상태 확인용이 아니다 |
 | [CHANGELOG.md](CHANGELOG.md) | Phase 61(2026-06-14)까지의 변경 이력 — 이후는 위 구현이력으로 일원화 |
 
 ---
@@ -333,7 +337,7 @@ npm run build           # 프로덕션 빌드 확인
 
 | 환경 | URL |
 |------|-----|
-| 프로덕션 | `https://vehicle-drive-log.web.app` |
+| 프로덕션 | `https://drivelog.socialprism.co.kr` (기존 `https://vehicle-drive-log.web.app`도 계속 동작) |
 | 개발 서버 | `http://localhost:5173` |
 
 ## 라이선스

@@ -33,7 +33,7 @@
 import { useEffect, useRef } from 'react';
 import { callWithRetry, isTransientCallableError, isAuthExpiredError, isRateLimitedError } from '../lib/callableRetry';
 import { useAuth } from './useAuth';
-import { auth } from '../lib/firebase';
+import { auth, getAppCheckBlock } from '../lib/firebase';
 import { captureError } from '../lib/sentry';
 
 const SESSION_KEY = 'auditSessionId';
@@ -121,7 +121,14 @@ export default function useSessionRecord() {
                 console.warn('[useSessionRecord] 접속기록 실패 (서버 상한 초과)', err);
                 return;
             }
-            captureError(err, { context: 'useSessionRecord', uid: user.uid });
+            // 로그인 중인데 토큰 갱신 후에도 Unauthenticated면 우리 핸들러가 아니라 플랫폼이 거절한
+            // 것이다 — 이 콜러블은 App Check를 강제하므로 그쪽이 1순위 용의자다. 보고에 그 상태를
+            // 실어 다음 이벤트에서 원인을 가를 수 있게 한다(JAVASCRIPT-REACT-64, /invite 가입 직후).
+            captureError(err, {
+                context: 'useSessionRecord',
+                uid: user.uid,
+                appCheckCode: getAppCheckBlock()?.code ?? 'none',
+            });
         });
     }, [user, userDocState]);
 }

@@ -5,6 +5,8 @@ export interface DriverStat {
     name?: string;
     count: number;
     distance: number;
+    /** 직원별 운행 방식 — 이 필드가 생기기 전 문서에는 없다 */
+    origin?: DriveOriginCounts;
 }
 
 export interface VehicleStat {
@@ -16,6 +18,8 @@ export interface VehicleStat {
     maintenanceCount: number;
     currentKm?: number;
     lastMaintenanceDate?: string;
+    /** 차량별 운행 방식 — 이 필드가 생기기 전 문서에는 없다 */
+    origin?: DriveOriginCounts;
 }
 
 export interface HeatmapStat {
@@ -30,6 +34,8 @@ export interface MonthlyStat {
     totalDistance: number;
     fuelCost: number;
     hipassCost: number;
+    /** 하이패스 실제 사용액(운행일지의 사용 전·후 잔액 차) — 이 필드가 생기기 전 문서는 null */
+    hipassUsed: number | null;
     maintenanceCost: number;
     driverStats: Record<string, DriverStat>;
     vehicleStats: Record<string, VehicleStat>;
@@ -39,6 +45,20 @@ export interface MonthlyStat {
         night: number;
         overDrive: number;
     };
+    /** 야간 집계가 이 문서를 쓴 시각 — 화면이 "언제 기준 숫자인지" 밝힌다. 없으면 null */
+    updatedAt: Date | null;
+    /**
+     * 운행 방식별 건수 — 사전 예약 · 바로 운행 · 예약 없이 기록 · 예약 연결(구분 전).
+     * linked는 driveOrigin이 저장되기 전(2026-10 이전) 일지 중 예약에 연결된 것이다.
+     */
+    originCounts: DriveOriginCounts;
+}
+
+export interface DriveOriginCounts {
+    reservation: number;
+    quick: number;
+    manual: number;
+    linked: number;
 }
 
 /**
@@ -47,16 +67,23 @@ export interface MonthlyStat {
  * 소비자(useAnalytics)가 기대하는 평탄 MonthlyStat과 필드 구조가 다르므로 아래 mapMonthlyDoc으로 변환한다.
  */
 interface RawMonthlyDoc {
+    updatedAt?: { toDate?: () => Date };
     monthlyTotal?: { count?: number; distance?: number };
-    costStats?: { fuelCost?: number; hipassCost?: number; maintenanceCost?: number };
-    driverStats?: Record<string, { name?: string; count?: number; distance?: number }>;
+    costStats?: { fuelCost?: number; hipassCost?: number; maintenanceCost?: number; hipassUsed?: number };
+    driverStats?: Record<string, { name?: string; count?: number; distance?: number; origin?: Partial<DriveOriginCounts> }>;
     vehicleStats?: Record<string, {
         name?: string; usedDays?: number; count?: number;
         distance?: number; fuelCost?: number;
         maintenanceCost?: number; maintenanceCount?: number; lastMaintenanceDate?: string;
+        origin?: Partial<DriveOriginCounts>;
     }>;
     heatmap?: Record<string, Record<string, number>>;
     anomalies?: { weekend?: number; night?: number; overDrive?: number };
+    originCounts?: Partial<DriveOriginCounts>;
+}
+
+function toOriginCounts(o?: Partial<DriveOriginCounts>): DriveOriginCounts {
+    return { reservation: o?.reservation || 0, quick: o?.quick || 0, manual: o?.manual || 0, linked: o?.linked || 0 };
 }
 
 /**
@@ -78,7 +105,10 @@ export function mapMonthlyDoc(monthKey: string, raw: RawMonthlyDoc): MonthlyStat
 
     const driverStats: Record<string, DriverStat> = {};
     for (const [uid, d] of Object.entries(raw.driverStats || {})) {
-        driverStats[uid] = { name: d.name, count: d.count || 0, distance: d.distance || 0 };
+        driverStats[uid] = {
+            name: d.name, count: d.count || 0, distance: d.distance || 0,
+            ...(d.origin ? { origin: toOriginCounts(d.origin) } : {}),
+        };
     }
 
     const vehicleStats: Record<string, VehicleStat> = {};
@@ -92,15 +122,18 @@ export function mapMonthlyDoc(monthKey: string, raw: RawMonthlyDoc): MonthlyStat
             maintenanceCost: v.maintenanceCost || 0,
             maintenanceCount: v.maintenanceCount || 0,
             lastMaintenanceDate: v.lastMaintenanceDate,
+            ...(v.origin ? { origin: toOriginCounts(v.origin) } : {}),
         };
     }
 
     return {
         monthKey,
+        updatedAt: typeof raw.updatedAt?.toDate === 'function' ? raw.updatedAt.toDate() : null,
         totalLogs: raw.monthlyTotal?.count || 0,
         totalDistance: raw.monthlyTotal?.distance || 0,
         fuelCost: raw.costStats?.fuelCost || 0,
         hipassCost: raw.costStats?.hipassCost || 0,
+        hipassUsed: typeof raw.costStats?.hipassUsed === 'number' ? raw.costStats.hipassUsed : null,
         maintenanceCost: raw.costStats?.maintenanceCost || 0,
         driverStats,
         vehicleStats,
@@ -110,6 +143,8 @@ export function mapMonthlyDoc(monthKey: string, raw: RawMonthlyDoc): MonthlyStat
             night: raw.anomalies?.night || 0,
             overDrive: raw.anomalies?.overDrive || 0,
         },
+        // 이 필드가 생기기 전의 문서는 운행 방식 구분이 없다 — 전부 0으로 두면 화면이 '데이터 없음'으로 처리한다
+        originCounts: toOriginCounts(raw.originCounts),
     };
 }
 

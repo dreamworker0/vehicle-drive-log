@@ -10,6 +10,7 @@
  *   - 같은 org+vehicle+date 시간 겹침 검사
  *   - 같은 org+명의자+date 시간 겹침 검사 (한 사람은 같은 시간에 한 대만)
  */
+import { randomUUID } from "crypto";
 import { HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { isVehicleBlockedOn, isVehicleRetired, seoulTodayStr } from "../../utils/vehicleStatus";
@@ -55,6 +56,38 @@ export interface CreateReservationInput {
     passengerUids?: string[];
     passengerNames?: string[];
     passengerCount?: number;
+    /**
+     * 예약 없이 바로 출발한 운행인가('바로 운행').
+     *
+     * 화면이 이 값을 보내는데도 이 입구가 없어 **줄곧 버려지고 있었다.** 그래서
+     * 서비스 대시보드의 '바로 운행' 지표(dashboardSections)가 늘 0에 가까웠고,
+     * 운영 쪽에서 예약 경로와 즉시 출발 경로를 구분할 근거가 없었다.
+     */
+    isQuickDrive?: boolean;
+}
+
+/** 바로 운행으로 인정하는 출발 시각 허용 오차(분) — 기기 시계 차이를 흡수한다 */
+const QUICK_DRIVE_TOLERANCE_MIN = 10;
+
+/**
+ * 바로 운행 표시를 믿어도 되는가 — '지금 출발하는 한 건'일 때만 참이다.
+ *
+ * 바로 운행은 승인제 기관에서도 승인 대기를 건너뛰므로, 표시만 보고 믿으면
+ * 미래 예약에 표시를 붙여 승인을 피할 수 있다. 오늘(KST) 날짜 · 출발 시각이 지금과
+ * 허용 오차 이내 · 다일/반복/추천이 아닌 경우로 좁힌다.
+ */
+export function isGenuineQuickDrive(
+    input: { date: string; startTime: string; groupId?: string; recurringGroupId?: string; source?: string },
+    now: Date = new Date(),
+): boolean {
+    if (input.groupId || input.recurringGroupId || input.source) return false;
+    const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+    const today = kst.toISOString().slice(0, 10);
+    if (input.date !== today) return false;
+    const [h, m] = input.startTime.split(":").map(Number);
+    if (!Number.isFinite(h) || !Number.isFinite(m)) return false;
+    const nowMin = kst.getUTCHours() * 60 + kst.getUTCMinutes();
+    return Math.abs(h * 60 + m - nowMin) <= QUICK_DRIVE_TOLERANCE_MIN;
 }
 
 /** 동승자 배열 길이 상한 — 클라이언트(reservationPassengers.ts)와 같은 값 */
@@ -90,6 +123,7 @@ export async function createReservationTx(
         passengerUids,
         passengerNames,
         passengerCount,
+        isQuickDrive: requestedQuickDrive,
     } = input;
 
     if (!organizationId || !vehicleId || !date || !startTime || !endTime) {
@@ -97,6 +131,12 @@ export async function createReservationTx(
             "invalid-argument",
             "organizationId, vehicleId, date, startTime, endTime은 필수입니다."
         );
+    }
+
+    // 조건에 맞지 않는 바로 운행 표시는 버린다(일반 예약으로 처리) — 승인 우회 방지
+    const isQuickDrive = Boolean(requestedQuickDrive) && isGenuineQuickDrive({ date, startTime, groupId, recurringGroupId, source });
+    if (requestedQuickDrive && !isQuickDrive) {
+        console.warn(`[createReservation] 바로 운행 조건 불일치로 일반 예약 처리: org=${organizationId} date=${date} start=${startTime}`);
     }
 
     // 호출자가 해당 기관에 소속되어 있는지 검증 (조직 격리)
@@ -192,6 +232,20 @@ export async function createReservationTx(
             const orgSnap = await transaction.get(orgRef);
             const requireReservationApproval = orgSnap.exists ? (orgSnap.data()?.requireReservationApproval || false) : false;
 
+            // 승인제 기관이 '바로 운행은 승인 없이 허용'을 끄면 직원의 바로 운행을 거절한다.
+            // 승인 대기로 바꾸지 않는 이유: 바로 운행은 지금 출발이라 기다리면 의미가 없다.
+            // 기관 관리자는 승인권자라 막지 않는다(화면의 canUseQuickDrive와 같은 기준).
+            if (
+                isQuickDrive && requireReservationApproval &&
+                orgSnap.data()?.quickDriveWithApproval === false &&
+                actorRole !== "admin"
+            ) {
+                throw new HttpsError(
+                    "failed-precondition",
+                    "이 기관은 바로 운행을 쓰지 않아요. 미리 예약 후 승인을 받아 주세요."
+                );
+            }
+
             const existingSnap = await transaction.get(
                 db.collection("reservations")
                     .where("organizationId", "==", organizationId)
@@ -257,7 +311,9 @@ export async function createReservationTx(
             // 모든 읽기 작업(get)이 종료된 후 쓰기 작업(update, set)을 수행 (Firestore Transaction 제약조건)
             transaction.update(vehicleRef, { _lastReservationLock: FieldValue.serverTimestamp() });
 
-            const status: "pending" | "reserved" = requireReservationApproval ? "pending" : "reserved";
+            // 바로 운행은 이미 출발하는 운행이라 승인을 기다릴 수 없다 — 승인제 기관에서도 바로 확정하고,
+            // 관리자에게는 승인 요청 대신 출발 알림이 간다(onReservationCreated).
+            const status: "pending" | "reserved" = requireReservationApproval && !isQuickDrive ? "pending" : "reserved";
             const newRef = db.collection("reservations").doc();
             transaction.set(newRef, {
                 organizationId,
@@ -280,8 +336,13 @@ export async function createReservationTx(
                 ...(passengerUids?.length ? { passengerUids } : {}),
                 ...(passengerNames?.length ? { passengerNames } : {}),
                 ...(passengerCount ? { passengerCount } : {}),
+                // 빈 값은 필드를 만들지 않는다 — 예약으로 만든 건에는 false를 남기지 않는다
+                ...(isQuickDrive ? { isQuickDrive: true } : {}),
                 status,
                 createdAt: FieldValue.serverTimestamp(),
+                // 접속기록의 '계정' — 대리 예약이면 예약자가 아니라 실제로 만든 사람이다
+                lastEditedByUid: actorUid,
+                lastEditId: randomUUID(),
             });
 
             return { reservationId: newRef.id, status };
