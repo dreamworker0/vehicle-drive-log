@@ -28,7 +28,7 @@ export default function TodayDashboard() {
         handleStartDrive, handleStartNavigation,
         handleCancelWeekReservation, handleCancelTodayReservation,
         navigateToArrival, navigateToReservations, navigateToQuickDrive,
-        myLogsCount, refresh,
+        myLogsCount, refresh, loadFailed,
     } = useTodayDashboard();
     const { syncVehicleOnDemand, checkCooldown } = useCalendarSync();
     const navigate = useNavigate();
@@ -93,8 +93,10 @@ export default function TodayDashboard() {
                     <h1 className="text-lg font-bold text-surface-900 dark:text-surface-100">오늘의 운행</h1>
                     <p className="text-sm text-surface-400 dark:text-surface-500">{todayLabel}</p>
                 </div>
-                {/* 오늘 예약이 없으면 아래 카드가 바로 운행을 크게 보여 주므로 여기서는 숨긴다 */}
-                {showQuickDrive && myReservations.length > 0 && (
+                {/* 오늘 예약이 없으면 아래 카드가 바로 운행을 크게 보여 주므로 여기서는 숨긴다.
+                    불러오기에 실패했을 때는 그 카드 대신 실패 안내가 뜨므로 여기에 남겨 바로 운행 길을 열어 둔다
+                    — 다만 예약이 있을 수 있으니 주 동작으로 키우지는 않는다. */}
+                {showQuickDrive && (myReservations.length > 0 || loadFailed) && (
                     <button
                         onClick={navigateToQuickDrive}
                         className="flex items-center gap-1 px-4 py-2 min-h-[48px] rounded-full bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 transition-colors text-xs font-medium"
@@ -188,9 +190,33 @@ export default function TodayDashboard() {
                 </div>
             )}
 
+            {/* 못 받아 온 것을 "예약 없음"으로 보여주면 안 된다 — 인덱스 빌드 중이던 5분 사이
+                운전자 한 명이 자기 예약을 없는 것으로 봤다(Phase 220). 실패는 실패라고 말한다. */}
+            {loadFailed && (
+                <div className="glass-card mb-6 px-5 py-5 border-l-4 border-l-amber-500 bg-amber-50/10 dark:bg-amber-900/10">
+                    <div className="flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4 min-w-0 flex-1">
+                            <span className="w-11 h-11 rounded-xl bg-amber-50 dark:bg-amber-900/30 flex items-center justify-center text-lg flex-shrink-0">⚠️</span>
+                            <div className="min-w-0">
+                                <p className="font-semibold text-surface-800 dark:text-surface-200 text-base">예약을 불러오지 못했습니다</p>
+                                <p className="text-sm text-surface-500 dark:text-surface-400 mt-0.5">
+                                    예약이 없는 것이 아닙니다. 잠시 뒤 다시 시도해 주세요.
+                                </p>
+                            </div>
+                        </div>
+                        <button
+                            onClick={refresh}
+                            className="btn-secondary flex-shrink-0 min-h-[48px]"
+                        >
+                            다시 시도
+                        </button>
+                    </div>
+                </div>
+            )}
+
             {/* 예약이 없을 때 — 바로 운행을 주 동작으로 둔다.
                 운행의 60% 이상이 예약 없이 바로 출발한다(2026-09-23~30 실측). 예약은 보조 링크와 하단 탭에 남긴다. */}
-            {myReservations.length === 0 && (
+            {!loadFailed && myReservations.length === 0 && (
                 <div className="mb-6">
                     <p className="text-xs text-surface-400 dark:text-surface-500 mb-2.5">오늘 잡힌 예약이 없어요</p>
                     <div className={`grid gap-3 ${showQuickDrive ? 'grid-cols-[1.6fr_1fr]' : 'grid-cols-1'}`}>

@@ -121,6 +121,40 @@ describe('TodayDashboard', () => {
         expect(screen.queryByRole('button', { name: /바로 운행 시작/ })).not.toBeInTheDocument();
     });
 
+    // 불러오기 실패는 빈 예약과 같은 화면이 되면 안 된다 — 운전자가 자기 예약을 없는 것으로 본다(Phase 220).
+    it('불러오기가 실패하면 예약 없음 대신 실패 안내와 다시 시도가 표시된다', () => {
+        const refresh = vi.fn();
+        mockUseTodayDashboardReturn = { ...mockUseTodayDashboardReturn, loadFailed: true, refresh };
+
+        render(
+            <MemoryRouter>
+                <TodayDashboard />
+            </MemoryRouter>
+        );
+
+        expect(screen.getByText('예약을 불러오지 못했습니다')).toBeInTheDocument();
+        // 같은 자리의 "예약 없음" 안내는 나오지 않아야 한다. 둘이 함께 뜨면 구분한 의미가 없다.
+        expect(screen.queryByText('오늘 잡힌 예약이 없어요')).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByRole('button', { name: '다시 시도' }));
+        expect(refresh).toHaveBeenCalledTimes(1);
+    });
+
+    // 예약이 있을 수도 있으니 바로 운행을 주 동작으로 키우지 않되, 길은 막지 않는다.
+    it('불러오기가 실패하면 큰 바로 운행 타일 대신 상단의 작은 바로 운행 버튼을 둔다', () => {
+        mockUseTodayDashboardReturn = { ...mockUseTodayDashboardReturn, loadFailed: true, refresh: vi.fn() };
+
+        render(
+            <MemoryRouter>
+                <TodayDashboard />
+            </MemoryRouter>
+        );
+
+        expect(screen.queryByRole('button', { name: /바로 운행 시작/ })).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /^🚀\s*바로 운행$/ }));
+        expect(mockUseTodayDashboardReturn.navigateToQuickDrive).toHaveBeenCalled();
+    });
+
     it('미작성 운행일지 알림이 있을 경우 카드와 바로 작성 버튼이 표시된다', () => {
         mockUseTodayDashboardReturn.incompleteAlerts = [
             {
