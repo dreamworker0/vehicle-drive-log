@@ -26,6 +26,7 @@ import type { AuditLog } from '../types/auditLog';
 import type { DriveLog } from '../types/driveLog';
 import type { Reservation } from '../types/reservation';
 import { captureError } from '../lib/sentry';
+import { isStaleChunkError, STALE_CHUNK_MESSAGE } from '../lib/staleChunk';
 
 /**
  * 기간 선택지 (일) — 월 1회 점검이 기본이라 30일을 기본값으로 둔다.
@@ -419,7 +420,7 @@ export default function useAuditLogs(): UseAuditLogsResult {
             })
             .catch((err) => {
                 captureError(err, { context: 'useAuditLogs.exportExcel', orgId });
-                setError('내보내기에 실패했습니다. 잠시 후 다시 시도해주세요.');
+                setError(isStaleChunkError(err) ? STALE_CHUNK_MESSAGE : '내보내기에 실패했습니다. 잠시 후 다시 시도해주세요.');
             })
             .finally(() => setExporting(false));
     }, [orgId, exporting, since, until, kind, memberUid, vehicleId, vehicles, legacyLogs, rangeActive, range.start, range.end, days, nameOf]);

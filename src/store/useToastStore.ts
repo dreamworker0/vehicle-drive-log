@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { isStaleChunkError, STALE_CHUNK_MESSAGE } from '../lib/staleChunk';
 
 export type ToastType = 'info' | 'success' | 'warning' | 'error';
 
@@ -22,9 +23,16 @@ interface ToastState {
     removeToast: (id: number) => void;
 }
 
-export const useToastStore = create<ToastState>((set) => ({
+export const useToastStore = create<ToastState>((set, get) => ({
     toasts: [],
     showToast: (message, type = 'info', options = 3000) => {
+        // 배포 직후 구버전 청크 실패 원문은 안내 문구 + [새로고침]으로 바꾼다 (staleChunk.ts 참고)
+        if (message === STALE_CHUNK_MESSAGE || isStaleChunkError(message)) {
+            if (get().toasts.some(t => t.message === STALE_CHUNK_MESSAGE)) return;
+            message = STALE_CHUNK_MESSAGE;
+            type = 'warning';
+            options = { duration: 15000, actionLabel: '새로고침', onAction: () => window.location.reload() };
+        }
         const id = Date.now() + Math.random();
         const config: Required<Pick<ToastOptions, 'duration'>> & ToastOptions =
             typeof options === 'number'

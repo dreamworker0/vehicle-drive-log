@@ -9,6 +9,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
 import { getOrganization } from '../lib/firestore';
+import { isStaleChunkError, STALE_CHUNK_MESSAGE } from '../lib/staleChunk';
 import type { Organization } from '../types/organization';
 
 /** 결재란 기본값 — 기관에 별도 설정이 없을 때 사용 */
@@ -39,7 +40,7 @@ export function useAdminLogExport() {
             await task();
         } catch (err) {
             console.error('엑셀 다운로드 실패:', err);
-            showToast('엑셀 다운로드 중 오류가 발생했습니다.', 'error');
+            showToast(isStaleChunkError(err) ? STALE_CHUNK_MESSAGE : '엑셀 다운로드 중 오류가 발생했습니다.', 'error');
         }
     }, [showToast]);
 
@@ -49,7 +50,7 @@ export function useAdminLogExport() {
             await task();
         } catch (err) {
             console.error('PDF 다운로드 실패:', err);
-            showToast('PDF 다운로드 중 오류가 발생했습니다.', 'error');
+            showToast(isStaleChunkError(err) ? STALE_CHUNK_MESSAGE : 'PDF 다운로드 중 오류가 발생했습니다.', 'error');
         }
     }, [showToast]);
 
