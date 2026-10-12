@@ -7,6 +7,8 @@ import { useAuth } from './useAuth';
 import { getFuelLogs, getAllHipassCharges } from '../lib/firestore';
 import { getAllDriveLogsForExport } from '../lib/firestore/driveLogs/queries';
 import { captureError } from '../lib/sentry';
+import { notifyUser } from '../lib/notify';
+import { isStaleChunkError, STALE_CHUNK_MESSAGE } from '../lib/staleChunk';
 import { toLocalDateStr } from '../lib/dateUtils';
 import { extractDateStr, logDistance } from './utils/aggregationUtils';
 import {
@@ -200,7 +202,15 @@ export default function useMonthlyReport() {
     const exportExcel = useCallback(async () => {
         if (filteredLogs.length === 0) return;
 
-        const XLSX = await import('xlsx');
+        let XLSX: typeof import('xlsx');
+        try {
+            XLSX = await import('xlsx');
+        } catch (err) {
+            // 모듈을 못 받으면 아무 반응 없이 끝났다 — 배포 직후 구버전 탭이면 새로고침 안내
+            console.error('엑셀 모듈 로드 실패:', err);
+            notifyUser(isStaleChunkError(err) ? STALE_CHUNK_MESSAGE : '엑셀 다운로드 중 오류가 발생했습니다.', 'error');
+            return;
+        }
 
         // 출발지는 기록에 있을 때만 열을 만든다 — 분관을 쓰지 않는 기관의 파일은 예전 그대로다.
         const includeStartLocation = filteredLogs.some(l => (l.startLocation || '').trim() !== '');

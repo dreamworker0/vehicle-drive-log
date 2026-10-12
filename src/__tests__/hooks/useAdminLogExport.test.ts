@@ -22,6 +22,7 @@ vi.mock('../../lib/firestore', () => ({
 }));
 
 import { useAdminLogExport } from '../../hooks/useAdminLogExport';
+import { STALE_CHUNK_MESSAGE } from '../../lib/staleChunk';
 
 describe('useAdminLogExport', () => {
     beforeEach(() => {
@@ -73,5 +74,17 @@ describe('useAdminLogExport', () => {
         });
 
         expect(mockShowToast).toHaveBeenCalledWith(expect.stringContaining('PDF'), 'error');
+    });
+
+    it('배포 직후 구버전 청크를 못 받으면 새로고침 안내 문구를 넘긴다', async () => {
+        const { result } = renderHook(() => useAdminLogExport());
+
+        await act(async () => {
+            await result.current.runExcel(async () => {
+                throw new TypeError('Failed to fetch dynamically imported module: https://vehicle-drive-log.web.app/assets/excelExport-C_yf1lx3.js');
+            });
+        });
+
+        expect(mockShowToast).toHaveBeenCalledWith(STALE_CHUNK_MESSAGE, 'error');
     });
 });

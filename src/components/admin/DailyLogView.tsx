@@ -8,6 +8,7 @@ import { useToast } from '../../hooks/useToast';
 import { SkeletonBox } from '../common/Skeleton';
 import { resolveOrgSites, resolveStartLocationLabel } from '../../lib/orgSites';
 import { formatFuelAmount } from '../../lib/fuelFormat';
+import { isStaleChunkError, STALE_CHUNK_MESSAGE } from '../../lib/staleChunk';
 import type { DriveLog } from '../../types/driveLog';
 
 const DriveLogMobileCard = React.memo(({ log }: { log: DriveLog }) => {
@@ -87,7 +88,15 @@ export default function DailyLogView() {
 
     const handlePdfDownload = useCallback(async () => {
         if (driveLogs.length === 0 || loadingData) return;
-        const { downloadDailyLogPdf } = await import('../../lib/pdf/dailyLogPdfExport');
+        let downloadDailyLogPdf: typeof import('../../lib/pdf/dailyLogPdfExport').downloadDailyLogPdf;
+        try {
+            ({ downloadDailyLogPdf } = await import('../../lib/pdf/dailyLogPdfExport'));
+        } catch (err) {
+            // 모듈을 못 받으면 아무 반응 없이 끝났다 — 배포 직후 구버전 탭이면 새로고침 안내
+            console.error('PDF 모듈 로드 실패:', err);
+            showToast(isStaleChunkError(err) ? STALE_CHUNK_MESSAGE : 'PDF 다운로드 중 오류가 발생했습니다.', 'error');
+            return;
+        }
         downloadDailyLogPdf(driveLogs, fuelLogs, {
             orgName: org?.name || '',
             vehicleName: selectedVehicle?.displayName || selectedVehicle?.name || '',
