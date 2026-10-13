@@ -186,12 +186,24 @@ self.addEventListener('message', (event) => {
     }
 });
 
-// 백그라운드 동기화 (Background Sync) 처리
-import { flushQueue } from './lib/offline/syncQueue';
-
+// 백그라운드 동기화 (Background Sync) — **여기서는 Firestore에 쓰지 않는다.**
+//
+// 예전에는 이 자리에서 flushQueue()로 큐를 직접 비웠다. 그런데 서비스워커에는 App Check가
+// 없다(firebase.ts의 초기화가 `typeof window` 가드로 건너뛴다). Firestore는 App Check
+// ENFORCED라 SW의 쓰기는 거부될 수 있고, permission-denied는 영구 오류로 분류돼 **폐기**된다
+// — 페이지가 같은 순간 같은 큐를 비우고 있었으므로(두 컨텍스트 사이에는 잠금이 없다),
+// 어느 쪽이 먼저 집느냐에 따라 멀쩡한 기록이 "다시 입력해 주세요"로 버려질 수 있었다.
+//
+// 그래서 쓰기는 App Check가 있는 페이지 한 곳에서만 한다(syncQueue.registerReconnectFlush).
+// SW는 연결이 돌아왔다는 신호를 열린 화면에 전달만 한다. 열린 화면이 없으면 다음에 앱을
+// 열 때 페이지가 시작 flush로 처리한다.
 self.addEventListener('sync', (event: SyncEvent) => {
     if (event.tag === 'sync-db') {
-        event.waitUntil(flushQueue());
+        event.waitUntil(
+            self.clients.matchAll({ type: 'window' }).then((windows) => {
+                windows.forEach((client) => client.postMessage({ type: 'FLUSH_SYNC_QUEUE' }));
+            }),
+        );
     }
 });
 

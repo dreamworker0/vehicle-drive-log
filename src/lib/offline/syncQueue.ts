@@ -32,9 +32,8 @@ interface SyncDB extends DBSchema {
         value: SyncData & { id?: number; timestamp: number; retryCount?: number; lastAttemptAt?: number };
         indexes: { 'by-timestamp': number };
     };
-    // 폐기된 항목의 무덤. flushQueue는 서비스워커에서도 돌기 때문에 폐기 사실을
-    // 그 자리에서 토스트로 띄울 수 없다(SW에는 화면이 없다). 대신 여기에 남겨 두고,
-    // 페이지 컨텍스트(syncFailureNotice)가 다음 기회에 읽어서 사용자에게 알린다.
+    // 폐기된 항목의 무덤. 큐 모듈은 화면(토스트)에 의존하지 않으므로 폐기 사실을 여기에
+    // 남겨 두고, 페이지 컨텍스트(syncFailureNotice)가 flush 뒤·다음 기회에 읽어서 사용자에게 알린다.
     'failed-store': {
         key: number;
         value: FailedRecord;
@@ -224,7 +223,7 @@ export async function peekFailedRecords(): Promise<FailedRecord[]> {
  * 예전에는 읽으면서 함께 비웠다(`drainFailedRecords`). 읽은 직후 화면이 닫히면 기록은
  * 사라지고 사용자는 끝내 듣지 못했다 — 유실을 알리는 장치가 유실되는 모양이었다.
  *
- * 스토어를 통째로 비워서도 안 된다. 읽은 뒤 지우기까지 사이에 서비스워커의 flush가 새 폐기를
+ * 스토어를 통째로 비워서도 안 된다. 읽은 뒤 지우기까지 사이에 다른 탭의 flush가 새 폐기를
  * 밀어 넣을 수 있는데, 그것까지 함께 지워지면 **한 번도 알려지지 않은 채 사라진다** —
  * 이 함수가 막으려던 바로 그 일이다. 그래서 id로 지정해 지운다.
  */
@@ -238,8 +237,8 @@ export async function clearFailedRecords(ids: Array<number | undefined>): Promis
     ]);
 }
 
-// 동시 flush 방지 — SW sync 이벤트와 window 'online' 폴백이 겹칠 수 있다.
-// (SW와 페이지는 모듈 인스턴스가 분리되므로 이 값은 각 컨텍스트 내부만 보호한다)
+// 동시 flush 방지 — 'online'·앱 시작·SW 메시지·화면 복귀가 겹칠 수 있다.
+// (이 값은 한 컨텍스트 안만 보호한다. 그래서 flush는 페이지에서만 한다 — registerReconnectFlush)
 //
 // 불리언이 아니라 진행 중인 Promise를 붙잡아 둔다. 겹친 호출이 즉시 반환해 버리면
 // "flush가 끝난 뒤 폐기분을 안내"하려는 호출자(syncFailureNotice)가 아직 시작도 안 한
@@ -284,8 +283,7 @@ function isIdbUnusable(error: unknown): boolean {
  * 그 밖의 실패는 **그대로 드러낸다**(isIdbUnusable 주석 참고). 전부 삼키면 큐가 영영 비지
  * 않는 종류의 결함이 조용해진다.
  *
- * 서비스워커(sw.ts)는 그대로 `flushQueue`를 쓴다. 거기서는 거부가 Background Sync의
- * 재시도 신호이므로 삼키면 안 된다.
+ * 서비스워커는 더 이상 flush하지 않는다(sw.ts 'sync' 주석) — flush 계기는 모두 페이지에 있다.
  */
 export function flushQueueQuietly(): Promise<void> {
     return flushQueue().catch((error) => {
@@ -400,18 +398,30 @@ async function runFlush(): Promise<void> {
 let reconnectFlushRegistered = false;
 
 /**
- * Background Sync('SyncManager') 미지원 브라우저용 flush 폴백.
+ * 큐 flush를 **페이지 컨텍스트 한 곳에서만** 하도록 등록한다 (모든 브라우저).
  *
- * iOS Safari는 SyncManager가 없어 SW 'sync' 이벤트 경로가 영원히 실행되지 않는다
- * (sentry.ts의 iOS 필터 주석 참고). 그런 환경에서는 페이지 컨텍스트의 'online'
- * 이벤트와 앱 시작 시점에 직접 flush한다. SyncManager 지원 브라우저는 SW 경로가
- * 처리하므로 등록하지 않는다 — 두 컨텍스트의 동시 flush 경합을 피한다.
+ * 예전에는 SyncManager 지원 브라우저(Android Chrome 등)는 서비스워커가 비우게 두고 여기서는
+ * 등록하지 않았다. 그런데 서비스워커에는 App Check가 없어 Firestore(App Check ENFORCED)
+ * 쓰기가 거부될 수 있고, syncFailureNotice의 online flush는 브라우저를 가리지 않아 두
+ * 컨텍스트가 같은 큐를 동시에 비우고 있었다(sw.ts 'sync' 주석 참고). 이제 쓰기는 여기서만 한다.
+ *
+ * 계기는 넷이다. 같은 컨텍스트 안의 겹친 호출은 flushQueue가 같은 Promise로 합친다.
+ *   1) 앱 시작 — 이전 세션에 남은 항목
+ *   2) 'online' — 연결 복귀
+ *   3) 서비스워커의 FLUSH_SYNC_QUEUE 메시지 — Background Sync가 연결 복귀를 알려 올 때
+ *   4) 화면 복귀 — 백그라운드에서 'online'을 놓쳤거나 재시도 냉각이 끝난 항목
  */
 export function registerReconnectFlush() {
     if (reconnectFlushRegistered) return;
-    if (typeof window === 'undefined' || 'SyncManager' in window) return;
+    if (typeof window === 'undefined') return;
     reconnectFlushRegistered = true;
     window.addEventListener('online', () => { void flushQueueQuietly(); });
+    navigator.serviceWorker?.addEventListener('message', (event: MessageEvent) => {
+        if (event.data?.type === 'FLUSH_SYNC_QUEUE' && navigator.onLine) void flushQueueQuietly();
+    });
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible' && navigator.onLine) void flushQueueQuietly();
+    });
     // 이전 세션에서 flush되지 못하고 남은 항목 처리
     if (navigator.onLine) void flushQueueQuietly();
 }
