@@ -109,8 +109,15 @@ Google 캘린더 연동은 키가 아니라 **Functions 서비스 계정에 캘�
 2. soft delete 적용 (status: 'deleted')
 3. 소속 직원은 즉시 로그인 불가 (실시간 감지)
 4. 30일 이내: "삭제된 기관" 탭에서 복구 가능
-5. 30일 경과: autoPurgeOrgs 함수가 자동 영구 삭제
+5. 30일 경과: 주간 배치(weeklyMaintenanceBatch, 일요일 03:00)의 purgeOrgs가 기관 데이터 전체를 파기
+   ("삭제된 기관" 탭의 [영구 삭제]는 같은 파기를 purgeOrganization 콜러블로 즉시 실행)
 ```
+
+파기 범위는 `functions/src/services/organization/purgeOrganizationData.ts`가 정본이다 — 운행일지·예약·차량·
+주유·정비·하이패스·알림·즐겨찾기·의견·Slack/캘린더 연동·월별 통계·기관 하위 컬렉션·증빙 이미지
+(`organizations/{orgId}/`)를 지우고 **기관 문서를 마지막에** 지운다. 중간에 실패하면 기관 문서가 남아
+다음 실행이 이어서 지우며, 실패는 Discord 경고로 온다. **남는 것**: 접속기록(auditLogs, 1년 TTL — 법정 보관),
+Firestore 백업(90일 수명 주기), 3년 지난 운행일지 GCS 아카이브(전 기관 통합 파일), uid로만 묶인 일부 데이터.
 
 ### 2.3 기관 복구
 
