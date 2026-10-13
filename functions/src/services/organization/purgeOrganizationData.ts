@@ -111,14 +111,26 @@ export async function purgeOrganizationData(
     const status = orgSnap.data()?.status;
     if (status !== "deleted") throw new OrgNotRetiredError(orgId, status);
 
+    /**
+     * 파기 도중 복구(restoreOrganization)되면 멈춘다. 상태를 시작할 때 한 번만 보면, 파기가 도는
+     * 수 초~수 분 사이에 슈퍼관리자가 복구를 눌러도 끝까지 진행해 **복구된 기관 문서까지** 지운다.
+     * 이미 지운 것은 되돌릴 수 없지만, 기관 문서와 남은 데이터는 지킨다. 단계마다 읽기 1회다.
+     */
+    const assertStillRetired = async () => {
+        const now = (await orgRef.get()).data()?.status;
+        if (now !== "deleted") throw new OrgNotRetiredError(orgId, now);
+    };
+
     const deleted: Record<string, number> = {};
     const count = (key: string, n: number) => { deleted[key] = (deleted[key] ?? 0) + n; };
 
     for (const [collection, field] of ORG_SCOPED) {
+        await assertStillRetired();
         count(collection, await deleteByQuery(db, db.collection(collection).where(field, "==", orgId)));
     }
 
     // Slack 연동: 워크스페이스에 묶인 캐시·작업 큐를 먼저, 연동 문서(봇 토큰 암호문)를 마지막에.
+    await assertStillRetired();
     const integrations = await db.collection("integrations").where("organizationId", "==", orgId).get();
     for (const intg of integrations.docs) {
         const teamId = intg.data().teamId;
@@ -142,6 +154,7 @@ export async function purgeOrganizationData(
 
     // 마지막: 기관 문서와 그 하위 컬렉션(customHolidays·preRegistered·stats).
     // 문서 delete는 하위 컬렉션을 지우지 않으므로 recursiveDelete를 쓴다.
+    await assertStillRetired();
     await db.recursiveDelete(orgRef);
     count("organizations", 1);
 

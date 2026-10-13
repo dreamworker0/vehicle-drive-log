@@ -26,7 +26,7 @@ import { createInAppNotification, sendPushToUser } from "../../services/alimtalk
 import { captureWarning } from "../../core/sentry";
 import { runStep, logBatchResult } from "../../utils/batchStep";
 import { driveLogRetentionCutoff } from "../../utils/constants";
-import { purgeOrganizationData, type PurgeBucket } from "../../services/organization/purgeOrganizationData";
+import { purgeOrganizationData, OrgNotRetiredError, type PurgeBucket } from "../../services/organization/purgeOrganizationData";
 import { gzip } from "node:zlib";
 import { promisify } from "node:util";
 
@@ -362,6 +362,11 @@ export async function purgeOrgs(db: FirebaseFirestore.Firestore, bucket: PurgeBu
             totalPurged++;
             console.log(`Purged org "${orgName}" (${orgId}): ${JSON.stringify(summary.deleted)}`);
         } catch (err: unknown) {
+            // 대상 조회 뒤 처리 전에(또는 도중에) 복구된 기관 — 실패가 아니라 막아야 할 것을 막은 것이다.
+            if (err instanceof OrgNotRetiredError) {
+                console.log(`Skipped org "${orgName}" (${orgId}): 파기 중 복구됨 — ${err.message}`);
+                continue;
+            }
             console.error(`Failed to purge org "${orgName}" (${orgId}):`, (err as Error).message);
             // 다른 루프(cleanupImages 등)와 달리 기관별로 올린다 — 파기는 처리방침이 약속한 법적
             // 의무라 실패를 사람이 알아야 하고, 대상이 주에 몇 곳뿐이라 알림이 쏟아질 일도 없다.
