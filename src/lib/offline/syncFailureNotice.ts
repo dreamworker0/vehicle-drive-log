@@ -1,15 +1,15 @@
 /**
  * syncFailureNotice — 오프라인 큐에서 폐기된(= 서버에 반영되지 못한) 기록을 사용자에게 알린다.
  *
- * flushQueue는 서비스워커에서도 돌기 때문에 폐기 시점에 토스트를 띄울 수 없다(SW에는 화면이 없다).
+ * 큐 모듈(syncQueue)은 화면에 의존하지 않으므로 폐기 시점에 토스트를 띄우지 않는다.
  * 그래서 큐는 폐기분을 IndexedDB의 failed-store에 남겨만 두고, 화면이 있는 이 모듈이
  * 다음 세 시점에 그걸 읽어 알린다:
  *
- *   1) 앱 시작 — 지난 세션에 SW가 폐기한 건
+ *   1) 앱 시작 — 지난 세션에 알리지 못한 건
  *   2) 온라인 복귀 후 flush 완료 — 방금 폐기된 건 (flushQueue를 await해서 순서를 보장)
- *   3) 화면 복귀(visibilitychange) — 앱이 백그라운드인 동안 SW가 폐기한 건
+ *   3) 화면 복귀(visibilitychange) — 앱이 백그라운드인 동안 폐기된 건
  *
- * 이 모듈은 화면(토스트)에 의존하므로 SW 번들에 들어가면 안 된다 — sw.ts는 syncQueue만 import한다.
+ * 이 모듈은 화면(토스트)에 의존하므로 SW 번들에 들어가면 안 된다. (SW는 큐를 비우지 않는다 — sw.ts 'sync' 주석)
  */
 import { peekFailedRecords, clearFailedRecords, flushQueueQuietly, type FailedRecord } from './syncQueue';
 import { notifyUser } from '../notify';
@@ -135,7 +135,7 @@ async function doReportFailedSync(): Promise<number> {
         if (records.length === 0) return 0;
         // 유실 안내는 놓치면 의미가 없으므로 일반 토스트보다 길게 띄운다.
         notifyUser(buildFailureMessage(records), 'error', 15000);
-        // 방금 알린 것만 지운다 — 그 사이 서비스워커가 밀어 넣은 폐기는 남겨 다음에 알린다.
+        // 방금 알린 것만 지운다 — 그 사이 다른 탭의 flush가 밀어 넣은 폐기는 남겨 다음에 알린다.
         await clearFailedRecords(records.map((r) => r.id));
         return records.length;
     } catch (error) {
@@ -165,7 +165,7 @@ export function registerSyncFailureNotice(): void {
         void flushQueueQuietly().finally(() => reportFailedSync());
     });
 
-    // 화면 복귀: 백그라운드 동안 SW가 폐기한 건을 잡는다.
+    // 화면 복귀: 백그라운드 동안 폐기된 건을 잡는다(이 시점의 flush는 registerReconnectFlush가 한다).
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') void reportFailedSync();
     });
