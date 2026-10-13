@@ -33,6 +33,11 @@ jest.mock('firebase-admin/firestore', () => ({
     FieldValue: { serverTimestamp: jest.fn() },
 }));
 
+const mockCaptureError = jest.fn();
+jest.mock('../core/sentry', () => ({
+    captureError: mockCaptureError,
+}));
+
 import { checkReservationReminders } from "../services/alimtalk/reservationReminder";
 
 describe('checkReservationReminders', () => {
@@ -69,7 +74,7 @@ describe('checkReservationReminders', () => {
         expect(mockUpdate).not.toHaveBeenCalled();
     });
 
-    it('10분 이내 예약에 임박 알림을 보낸다', async () => {
+    it('다음 실행 전에 시작하는 예약에 임박 알림을 보낸다', async () => {
         const upcomingDoc = {
             id: 'res1',
             data: () => ({
@@ -557,6 +562,59 @@ describe('checkReservationReminders', () => {
         await checkReservationReminders();
 
         expect(mockWhere).toHaveBeenCalledWith('startTime', '>=', '08:00');
-        expect(mockWhere).toHaveBeenCalledWith('startTime', '<=', '08:10');
+        expect(mockWhere).toHaveBeenCalledWith('startTime', '<=', '09:00');
+    });
+
+    // 회귀 방지: 조회 창이 "지금부터 10분"이던 시절, 매시 정각 실행과 겹쳐 HH:30 시작 예약은
+    // 사전 알림을 한 번도 받지 못했다. 창은 스케줄러 주기(1시간)와 같아야 한다.
+    it('임박 알림(§1)의 조회 창은 다음 실행까지(1시간)라 HH:30 시작 예약도 걸린다', async () => {
+        const halfPastDoc = {
+            id: 'res-half',
+            data: () => ({
+                userId: 'user1',
+                vehicleDisplayName: '소나타',
+                startTime: '10:30',
+                reminderSent: false,
+                status: 'reserved',
+            }),
+        };
+        mockGet
+            .mockResolvedValueOnce({ docs: [halfPastDoc] })
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [] });
+
+        await checkReservationReminders(); // 10:00 KST
+
+        expect(mockWhere).toHaveBeenCalledWith('startTime', '>=', '10:00');
+        expect(mockWhere).toHaveBeenCalledWith('startTime', '<=', '11:00');
+        expect(mockSendPushToUser).toHaveBeenCalledWith('user1', {
+            title: '🚗 예약 임박',
+            body: '소나타 예약이 10:30에 시작됩니다.',
+        });
+    });
+
+    it('마지막 실행(18:00)의 창 상한은 자정을 넘기지 않는다', async () => {
+        jest.setSystemTime(new Date('2026-03-04T09:00:00Z')); // 2026-03-04 18:00 KST
+        mockGet
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [] });
+
+        await checkReservationReminders();
+
+        expect(mockWhere).toHaveBeenCalledWith('startTime', '<=', '19:00');
+    });
+
+    // 회귀 방지: 예전에는 실패를 console.error로만 삼키고 정상 반환해, 스케줄러가 그 뒤에
+    // heartbeat를 찍었다 — 알림이 통째로 죽어도 헬스 체크가 녹색이었다.
+    it('조회가 실패하면 captureError로 올리고 다시 던진다', async () => {
+        jest.spyOn(console, 'error').mockImplementation(() => {});
+        const failure = new Error('FAILED_PRECONDITION: index missing');
+        mockGet.mockRejectedValueOnce(failure);
+
+        await expect(checkReservationReminders()).rejects.toThrow('FAILED_PRECONDITION');
+
+        expect(mockCaptureError).toHaveBeenCalledWith(failure, expect.objectContaining({ context: 'reservationReminder' }));
+        expect(mockSendPushToUser).not.toHaveBeenCalled();
     });
 });

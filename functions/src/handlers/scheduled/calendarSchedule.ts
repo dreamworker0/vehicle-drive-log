@@ -10,6 +10,7 @@ import { isGoogleCalendarEnabled, type OrgCalendarFlagCache } from "../../servic
 import { isCalendarBoundToOrg, type CalendarBindingCache } from "../../services/calendar/calendarBinding";
 import { RETRY_COOLDOWN_MS, MAX_FAIL_COUNT, isCalendarAuthError, recordCalendarFailure, resetCalendarFailure } from "../../services/calendar/calendarFailTracking";
 import { sendDiscordAlert } from "../../core/discord";
+import { captureError, flushSentry } from "../../core/sentry";
 import { recordHeartbeat } from "../../utils/helpers";
 import { toKSTDate, getKSTDateString } from "../../utils/kstDate";
 import { maskEmail } from "../../utils/mask";
@@ -285,7 +286,13 @@ export const syncCalendarToApp = onSchedule(
 
             await recordHeartbeat("syncCalendarToApp");
         } catch (err: unknown) {
+            // 전체 실패는 Sentry·Discord로 올린다. 예전에는 console.error뿐이라 역동기화가 통째로
+            // 죽어도 아무에게도 닿지 않았다(heartbeat는 try 끝에서만 찍히므로 헬스 체크만 늦게 알았다).
+            // 차량별 실패는 recordCalendarFailure가 따로 다루므로 여기는 회차 전체가 죽은 경우만 온다.
+            // 스케줄 함수는 경계 래퍼가 없어 flush를 직접 한다(batchStep.ts 참고).
             console.error("Reverse sync overall failed:", (err as Error).message);
+            captureError(err, { context: "syncCalendarToApp" });
+            await flushSentry();
         }
     }
 );

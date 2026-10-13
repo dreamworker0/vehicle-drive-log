@@ -2,6 +2,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { sendPushToUser, createInAppNotification } from "../../services/alimtalk/sendNotification";
 import { resolveOrgSlackBotToken, sendSlackDMToUser } from "../../services/slack/notifySlackUser";
 import { toKSTDate, getKSTDateString } from "../../utils/kstDate";
+import { captureError } from "../../core/sentry";
 
 const db = getFirestore();
 
@@ -31,8 +32,26 @@ function isOngoingQuickDrive(res: FirebaseFirestore.DocumentData): boolean {
 }
 
 /**
- * 예약 시작 10분 전 알림 + 운행일지 미작성 알림 전송
- * Cloud Functions Scheduler에서 15분마다 호출 (비용 최적화 적용됨)
+ * 임박 알림의 조회 창(분) — **스케줄러 주기(1시간)와 같아야 한다.**
+ *
+ * 예전 창은 "지금부터 10분"이었다. 스케줄러가 15분 주기일 때 만든 값인데, 비용 절감으로
+ * 매시 정각 실행(reservationReminderScheduler)이 된 뒤에도 그대로 남아 HH:00~HH:10에
+ * 시작하는 예약만 알림을 받았다. 예약 시각은 30분 단위로 맞춰지므로 **HH:30 시작 예약은
+ * 사전 알림을 한 번도 받지 못했다**(2026-06-04 주기 변경 ~ 2026-10 감사에서 발견).
+ *
+ * 창을 주기와 같게 두면 모든 예약이 시작 전 마지막 실행에서 한 번 걸린다(0~60분 전).
+ * 정각 시작 예약은 앞 회차 창의 끝(+60)과 이번 회차 창의 시작(+0)에 모두 걸리지만
+ * `reminderSent`가 두 번째 발송을 막는다. cron을 바꾸면 이 값도 함께 바꾼다.
+ */
+const UPCOMING_WINDOW_MIN = 60;
+
+/**
+ * 예약 시작 전 알림 + 운행일지 미작성 알림 + 미출발 알림 전송
+ * reservationReminderScheduler가 평일 08~18시 매시 정각에 호출한다.
+ *
+ * 실패는 **삼키지 않고 다시 던진다.** 예전에는 console.error만 남기고 정상 반환해, 스케줄러가
+ * 그 뒤에 heartbeat를 찍었다 — 알림 기능이 통째로 죽어도 헬스 체크는 녹색이고 Discord도
+ * 조용했다. captureError로 Sentry·Discord에 올리고 던지면 heartbeat가 찍히지 않는다.
  */
 export async function checkReservationReminders(): Promise<void> {
     const now = new Date();
@@ -42,26 +61,22 @@ export async function checkReservationReminders(): Promise<void> {
     const currentHH = String(kstNow.getHours()).padStart(2, "0");
     const currentMM = String(kstNow.getMinutes()).padStart(2, "0");
     const currentTime = `${currentHH}:${currentMM}`;
+    const windowEndTime = addMinutes(currentTime, UPCOMING_WINDOW_MIN);
 
-    // 10분 후 시각 계산
-    const tenMinLater = new Date(kstNow.getTime() + 10 * 60 * 1000);
-    const laterHH = String(tenMinLater.getHours()).padStart(2, "0");
-    const laterMM = String(tenMinLater.getMinutes()).padStart(2, "0");
-    const tenMinLaterTime = `${laterHH}:${laterMM}`;
-
-    console.log(`[Reminder] Check at ${todayStr} ${currentTime} (KST), 10min later = ${tenMinLaterTime}`);
+    console.log(`[Reminder] Check at ${todayStr} ${currentTime} (KST), upcoming until ${windowEndTime}`);
 
     try {
-        // === 1. 예약 시작 10분 전 알림 ===
+        // === 1. 예약 시작 전 알림 (다음 실행 전까지 시작하는 예약) ===
         // 다일 예약의 둘째 날 이후(startTime "00:00")는 여기 걸리지 않는다 — 하한이
         // `startTime >= currentTime`이고 이 스케줄러의 첫 실행이 08:00(KST)이라 항상 "00:00"보다 늦다.
         // (§3의 미출발 알림은 하한이 없어 걸렸다.) 이건 코드가 아니라 **cron에 기댄 전제**라
         // 스케줄을 새벽까지 넓히면 그날 깨진다 — schedulerCpuOptions.test.ts가 cron을 고정한다.
+        // 상한은 마지막 실행(18:00)에서도 "19:00"이라 자정을 넘기지 않는다.
         const reservationsSnap = await db.collection("reservations")
             .where("date", "==", todayStr)
             .where("status", "==", "reserved")
             .where("startTime", ">=", currentTime)
-            .where("startTime", "<=", tenMinLaterTime)
+            .where("startTime", "<=", windowEndTime)
             .get();
 
         // 기관별 Slack 봇 토큰 캐시 — 같은 run에서 동일 기관 연동 조회를 1회로 줄인다.
@@ -266,5 +281,7 @@ export async function checkReservationReminders(): Promise<void> {
         console.log(`[Reminder] Sent ${reminderCount} upcoming, ${missedCount} drive log, ${noShowCount} no-show reminders`);
     } catch (err: unknown) {
         console.error("[Reminder] Failed:", (err as Error).message);
+        captureError(err, { context: "reservationReminder", currentTime });
+        throw err;
     }
 }
