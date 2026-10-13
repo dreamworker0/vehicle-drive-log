@@ -2,6 +2,7 @@
  * reservationReminderScheduler — 예약 알림 스케줄러 (D13 규칙 준수: index.ts에서 분리)
  *
  * 평일 08~18시, 매시 정각에 실행하여 예약 임박 알림 및 미작성 운행일지 알림을 발송한다.
+ * 임박 알림의 조회 창은 이 주기와 같은 1시간이다(reservationReminder.ts UPCOMING_WINDOW_MIN).
  * 비용 최적화: 15분→1시간 주기로 변경, 주말/야간 제외 (App Engine cron → 표준 cron 전환)
  */
 import { onSchedule } from "firebase-functions/v2/scheduler";
@@ -9,6 +10,7 @@ import { checkReservationReminders } from "../../services/alimtalk/reservationRe
 import { warmupOcrFunction } from "../../services/ocr/warmupOcr";
 import { recordHeartbeat } from "../../utils/helpers";
 import { SLACK_TOKEN_ENC_KEY } from "../../core/params";
+import { flushSentry } from "../../core/sentry";
 
 export const reservationReminder = onSchedule(
     {
@@ -41,7 +43,15 @@ export const reservationReminder = onSchedule(
             await recordHeartbeat("reservationReminder");
             return;
         }
-        await checkReservationReminders();
+        // 실패하면 checkReservationReminders가 captureError로 올리고 다시 던진다. 여기서는 전송만
+        // 마무리하고 그대로 던져 **heartbeat를 찍지 않는다** — 그래야 헬스 체크가 중단을 드러낸다.
+        // 스케줄 함수는 wrapHttps 같은 경계 래퍼를 거치지 않으므로 flush를 직접 해야 한다(batchStep.ts 참고).
+        try {
+            await checkReservationReminders();
+        } catch (err) {
+            await flushSentry();
+            throw err;
+        }
 
         // OCR 콜드스타트 완화 — 같은 근무시간 cron에 편승해 ocrDashboard를 워밍업한다.
         // (근무시간 가드·10초 타임아웃은 warmupOcrFunction 내부에 있음. 실패해도 알림 발송에 영향 없음)
