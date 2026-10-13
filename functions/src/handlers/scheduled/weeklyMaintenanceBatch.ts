@@ -1,7 +1,7 @@
 /**
  * weeklyMaintenanceBatch — 매주 일요일 03:00(KST) 유지보수 배치
  *
- * 1. purgeOrgs: soft-deleted 기관 30일 경과 시 영구 삭제
+ * 1. purgeOrgs: soft-deleted 기관 30일 경과 시 기관 데이터 전체 파기(purgeOrganizationData)
  * 2. cleanupImages: 승인·반려 후 30일 경과 기관의 증빙 이미지 삭제
  * 3. archiveLogs: 3년 이상 된 운행 기록을 GCS로 아카이빙 후 삭제
  *
@@ -39,7 +39,7 @@ export const weeklyMaintenanceBatch = onSchedule(
 
         const failed: string[] = [];
 
-        await runStep(failed, CONTEXT, "purgeOrgs", () => purgeOrgs(db));
+        await runStep(failed, CONTEXT, "purgeOrgs", () => purgeOrgs(db, bucket));
         await runStep(failed, CONTEXT, "cleanupImages", () => cleanupImages(db, bucket));
         await runStep(failed, CONTEXT, "archiveLogs", () => archiveLogs(db, bucket));
 

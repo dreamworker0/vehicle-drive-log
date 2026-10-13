@@ -131,7 +131,7 @@ export default function OrgManagement() {
     };
 
     const handlePermanentDelete = async (org: Organization) => {
-        if (!await confirm({ title: '⚠️ 영구 삭제', message: `${org.name} 기관을 영구 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.\n소속된 모든 사용자 계정도 함께 삭제됩니다.`, confirmText: '영구 삭제', confirmColor: 'danger' })) return;
+        if (!await confirm({ title: '⚠️ 영구 삭제', message: `${org.name} 기관을 영구 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.\n운행일지·예약·차량·주유·정비 기록과 소속 사용자 등 이 기관의 데이터가 모두 삭제됩니다.\n(접속기록은 법정 보관 기간 1년 동안 남습니다)`, confirmText: '영구 삭제', confirmColor: 'danger' })) return;
         if (!await confirm({ message: '정말로 영구 삭제를 진행하시겠습니까? 마지막 확인입니다.', confirmText: '확인', confirmColor: 'danger' })) return;
         setDeletingOrgId(org.id);
         try {
@@ -140,7 +140,8 @@ export default function OrgManagement() {
             await fetchOrganizations();
         } catch (err) {
             console.error('영구 삭제 실패:', err);
-            showToast('영구 삭제에 실패했습니다.', 'error');
+            // 서버가 기관 문서를 마지막에 지우므로, 다시 누르면 남은 데이터부터 이어서 지운다.
+            showToast('영구 삭제를 끝내지 못했습니다. 다시 누르면 남은 데이터부터 이어서 삭제합니다.', 'error');
         } finally {
             setDeletingOrgId(null);
         }

@@ -12,6 +12,7 @@ import { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } from "firebas
 import { captureError } from "../../core/sentry";
 import { log } from "../../utils/helpers";
 import { applyBalanceDelta } from "../../services/hipass/applyBalanceDelta";
+import { isOrgRetired } from "../../utils/orgRetirement";
 
 /** 문서에서 충전금액을 숫자로 읽는다. 숫자가 아니면 0 — 잔액을 NaN으로 만들지 않는다. */
 function chargeAmountOf(data: Record<string, unknown> | undefined | null): number {
@@ -84,6 +85,8 @@ export const onHipassChargeDeleted = onDocumentDeleted(
         const data = event.data?.data();
         if (!data) return;
         try {
+            // 해지된 기관의 파기(purgeOrganizationData)는 잔액을 되돌리지 않는다 — 카드도 곧 지워진다.
+            if (await isOrgRetired(data.organizationId)) return;
             await applyBalanceDelta(
                 "onHipassChargeDeleted",
                 data.cardId as string | undefined,

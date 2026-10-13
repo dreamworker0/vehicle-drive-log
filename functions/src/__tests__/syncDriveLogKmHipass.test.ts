@@ -67,6 +67,9 @@ jest.mock('../handlers/sync/conflictResolver', () => ({
     resolveDriveLogConflict: jest.fn(async () => false),
 }));
 jest.mock('../core/sentry', () => ({ captureError: jest.fn() }));
+// 해지 기관 가드는 orgRetirement.test.ts가 따로 검증한다 — 여기서는 정상 기관으로 고정한다.
+const mockIsOrgRetired = jest.fn(async (_orgId: unknown) => false);
+jest.mock('../utils/orgRetirement', () => ({ isOrgRetired: (orgId: unknown) => mockIsOrgRetired(orgId) }));
 jest.mock('../utils/helpers', () => ({
     recordHeartbeat: jest.fn(async () => undefined),
     log: jest.fn(),
@@ -195,5 +198,13 @@ describe('onDriveLogDeleted', () => {
         const recent = new Date(driveLogRetentionCutoff().getTime() + 24 * 60 * 60 * 1000);
         await call(onDriveLogDeleted, { data: { data: () => log({ timestamp: recent }) }, params: { logId: 'd1' } });
         expect(mockApplyDriveLogHipassDelta).toHaveBeenCalledWith('onDriveLogDeleted', 'org-A', 'v1', -500);
+    });
+
+    it('해지된 기관의 파기는 환불하지 않는다', async () => {
+        // 기관 파기가 운행일지를 수천 건 지울 때 건마다 옛 통행료가 카드로 돌아가면 안 된다.
+        mockIsOrgRetired.mockResolvedValueOnce(true);
+        await call(onDriveLogDeleted, { data: { data: () => log() }, params: { logId: 'd1' } });
+        expect(mockIsOrgRetired).toHaveBeenCalledWith('org-A');
+        expect(mockApplyDriveLogHipassDelta).not.toHaveBeenCalled();
     });
 });

@@ -207,6 +207,16 @@ const FUNCTIONS: FunctionEntry[] = [
     auth: '기관 관리자 (자기 기관만)',
     params: '{ organizationId: string, reason: string, reasonDetail?: string }',
   },
+  {
+    name: 'purgeOrganization',
+    type: 'onCall',
+    file: 'handlers/callable/purgeOrganization.ts',
+    description: '해지된(status: deleted) 기관을 즉시 파기한다 — 슈퍼관리자 [영구 삭제]. 주간 배치 purgeOrgs와 같은 purgeOrganizationData로 운행일지·예약·차량·주유·정비·하이패스·알림·연동·통계·증빙 이미지를 지우고 기관 문서를 마지막에 지운다. 감사 기록(auditLogs)은 1년 보관 요건이라 남긴다.',
+    auth: 'superAdmin',
+    params: '{ orgId: string }',
+    returns: '{ success: true, deleted: Record<string, number> }',
+    note: '기관 문서를 마지막에 지우므로 타임아웃 시 재호출하면 이어서 지운다(멱등)',
+  },
 
   // ── 알림·이메일 ──
   {
@@ -460,7 +470,7 @@ const FUNCTIONS: FunctionEntry[] = [
     name: 'weeklyMaintenanceBatch',
     type: 'onSchedule',
     file: 'handlers/scheduled/weeklyMaintenanceBatch.ts',
-    description: '주간 유지보수: soft-delete 기관 30일 후 영구 삭제 → 증빙 이미지 정리 → 3년 이상 운행기록 GCS 아카이빙',
+    description: '주간 유지보수: soft-delete 기관 30일 후 기관 데이터 전체 파기(purgeOrganizationData) → 증빙 이미지 정리 → 3년 이상 운행기록 GCS 아카이빙',
     auth: '시스템 자동 실행',
     note: 'schedule: "0 3 * * 0" (KST 일요일 03:00). 판정 기준이 30일·3년이라 매일 돌 이유가 없어 주 1회로 옮긴 것',
   },

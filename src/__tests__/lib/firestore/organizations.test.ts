@@ -222,15 +222,17 @@ describe('firestore/organizations', () => {
             expect(mockBatch.commit).toHaveBeenCalledTimes(1);
         });
 
-        it('영구 삭제: 사용자 문서와 기관 문서를 모두 지운다', async () => {
-            vi.mocked(fs.getDocs).mockResolvedValue(members as never);
+        // 회귀 방지: 예전에는 클라이언트가 users와 기관 문서만 지워 기관 데이터가 영구히 남았다.
+        it('영구 삭제: 클라이언트에서 지우지 않고 서버 파기(purgeOrganization)를 부른다', async () => {
+            mockCallable.mockResolvedValueOnce({ data: { success: true, deleted: { driveLogs: 3 } } });
 
-            await permanentDeleteOrganization('org-A');
+            const deleted = await permanentDeleteOrganization('org-A');
 
-            expect(mockBatch.delete).toHaveBeenCalledTimes(3);
-            expect(mockBatch.delete).toHaveBeenCalledWith(expect.objectContaining({ label: 'doc:organizations/org-A' }));
-            expect(mockBatch.update).not.toHaveBeenCalled();
-            expect(mockBatch.commit).toHaveBeenCalledTimes(1);
+            expect(httpsCallable).toHaveBeenCalledWith({ __tag: 'functions' }, 'purgeOrganization', { timeout: 540_000 });
+            expect(mockCallable).toHaveBeenCalledWith({ orgId: 'org-A' });
+            expect(deleted).toEqual({ driveLogs: 3 });
+            expect(mockBatch.delete).not.toHaveBeenCalled();
+            expect(mockBatch.commit).not.toHaveBeenCalled();
         });
 
         it('복구: status=approved, deletedAt=null', async () => {
@@ -248,8 +250,8 @@ describe('firestore/organizations', () => {
             await expect(deleteOrganization('org-A')).rejects.toThrow('commit fail');
             expect(captureError).toHaveBeenCalledWith(expect.any(Error), expect.objectContaining({ context: 'deleteOrganization', orgId: 'org-A' }));
 
-            mockBatch.commit.mockRejectedValueOnce(new Error('commit fail 2'));
-            await expect(permanentDeleteOrganization('org-A')).rejects.toThrow('commit fail 2');
+            mockCallable.mockRejectedValueOnce(new Error('purge fail'));
+            await expect(permanentDeleteOrganization('org-A')).rejects.toThrow('purge fail');
 
             vi.mocked(fs.updateDoc).mockRejectedValueOnce(new Error('restore fail'));
             await expect(restoreOrganization('org-A')).rejects.toThrow('restore fail');
