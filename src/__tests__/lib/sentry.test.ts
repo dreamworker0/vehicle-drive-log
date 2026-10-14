@@ -22,6 +22,7 @@ async function loadSentry() {
         captureException: vi.fn(),
         setMeasurement: vi.fn(),
         browserTracingIntegration: vi.fn(() => ({ name: 'BrowserTracing' })),
+        withStaticSpan: <T,>(cb: T) => cb,
     }));
     const mod = await import('../../lib/sentry');
     mod.initSentry();
@@ -85,6 +86,7 @@ describe('initSentry — 루프백 주소의 프로덕션 빌드', () => {
             captureException: vi.fn(),
             setMeasurement: vi.fn(),
             browserTracingIntegration: vi.fn(() => ({ name: 'BrowserTracing' })),
+            withStaticSpan: <T,>(cb: T) => cb,
         }));
         const mod = await import('../../lib/sentry');
 

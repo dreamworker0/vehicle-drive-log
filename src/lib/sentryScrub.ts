@@ -317,6 +317,15 @@ export function scrubDomTarget(target: string): string {
 const SPAN_URL_KEYS = ['url', 'http.url', 'url.full'] as const;
 
 /**
+ * 쿼리·프래그먼트를 담는 키 — v10은 `http.*`, v11부터는 시맨틱 컨벤션 이름(`url.*`)이다.
+ *
+ * SDK 11에서 `getFetchSpanAttributes`가 `url.query`·`url.fragment`로 옮겨 갔다. 옛 키만 보고
+ * 있으면 검색어가 새 키로 그대로 나간다(init의 `dataCollection.urlQueryParams: false`가 1차로
+ * 막지만, 프래그먼트는 그 설정의 대상이 아니다). 두 세대를 다 잡는다.
+ */
+const SPAN_QUERY_KEYS = ['http.query', 'http.fragment', 'url.query', 'url.fragment'] as const;
+
+/**
  * 스팬 속성 중 **요소 설명(DOM 트리 문자열)**을 담는 키.
  *
  * web-vital 계측은 어느 요소가 문제였는지를 `htmlTreeAsString`으로 적는다. 그 함수는
@@ -370,7 +379,7 @@ export function scrubSpanData(data: Record<string, unknown> | undefined): Record
         }
     }
     // 쿼리·프래그먼트는 통째로 사람이 친 값이라 스크럽할 구조가 없다. 있었다는 사실만 남긴다.
-    for (const key of ['http.query', 'http.fragment']) {
+    for (const key of SPAN_QUERY_KEYS) {
         if (typeof out[key] === 'string' && out[key]) {
             out[key] = `[redacted(${(out[key] as string).length})]`;
             changed = true;
