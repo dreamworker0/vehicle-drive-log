@@ -7,6 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from './useToast';
 import { updateReservationStatus, cancelReservation } from '../lib/firestore';
 import { invalidateDashboardCache } from './useTodayDashboard';
+import { isStaleChunkError, STALE_CHUNK_MESSAGE } from '../lib/staleChunk';
 import type { Vehicle } from '../types/vehicle';
 import type { Reservation } from '../types/reservation';
 
@@ -85,13 +86,28 @@ export default function useDashboardActions({
             setLocalStartedIds(prev => new Map(prev).set(reservation.id, actualStartTime));
             invalidateDashboardCache();
             showDrivingNotification(reservation);
+        } catch (err) {
+            console.error('운행 시작 실패:', err);
+            showToast('운행 시작에 실패했습니다.', 'error');
+            setStartingId(null);
+            return;
+        }
 
+        // 길안내는 운행 시작과 분리한다. 예전에는 한 try 안에 있어, 상태를 in_progress로 바꾼 **뒤**
+        // tmap 모듈 로드(배포 직후 구버전 탭)나 지오코딩이 실패하면 "운행 시작에 실패했습니다"가 떴다 —
+        // 실제로는 운행이 이미 시작된 상태였다(2026-10-14 감사).
+        try {
             const destination = reservation.destination || '';
             const navUrl = await (await import('../lib/tmap')).getNavigationDeeplink(app, destination);
             window.location.href = navUrl;
         } catch (err) {
-            console.error('운행 시작 실패:', err);
-            showToast('운행 시작에 실패했습니다.', 'error');
+            console.error('길안내 열기 실패:', err);
+            if (isStaleChunkError(err)) {
+                // 토스트 스토어가 이 문구와 정확히 같을 때만 [새로고침] 버튼을 붙인다(useToastStore)
+                showToast(STALE_CHUNK_MESSAGE, 'warning');
+            } else {
+                showToast('운행은 시작되었어요. 길안내 앱을 열지 못했으니 직접 열어 주세요.', 'error');
+            }
         } finally {
             setStartingId(null);
         }

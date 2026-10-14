@@ -41,7 +41,7 @@ description: Cloud Functions, 프론트엔드 빌드 및 배포 시 발생하는
 **증상**: `npm test` 시 "Firebase: Error (auth/invalid-api-key)." 등 인증 에러 발생.
 **원인**: 테스트 환경(Vitest)에 Firebase 초기화에 필요한 `VITE_FIREBASE_API_KEY` 환경변수가 제대로 로딩되지 않거나 Mocking되지 않음.
 **해결책**:
-- `vite.config.ts`의 test 섹션에서 `env` 변수를 명시적으로 로드하거나 Mock 설정(`vi.mock`)을 통해 Firebase 초기화 부분을 모의(Mock) 객체로 우회한다.
+- `vitest.config.js`의 `test.env`에 테스트용 `VITE_FIREBASE_*` 값이 있는지 확인하거나(현재 설정에 들어 있다) Mock 설정(`vi.mock`)을 통해 Firebase 초기화 부분을 모의(Mock) 객체로 우회한다.
 
 ### 2.5 새 시크릿·새 공개 HTTP 함수 첫 배포 시 IAM 권한 거부 (403 setIamPolicy)
 **증상**: CI 배포의 "Deploy Functions & Rules" 단계가 아래 중 하나로 실패.

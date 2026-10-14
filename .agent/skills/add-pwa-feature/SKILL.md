@@ -10,8 +10,10 @@ description: "PWA 기능, 서비스워커 및 오프라인 상태 관련 로직�
 ## 1. 네트워크 감지 패턴
 단순히 `navigator.onLine`만을 사용하는 것을 지양합니다. 상태 관리를 통해 전역으로 UI를 핸들링합니다.
 
+실제 구현은 [OfflineBanner.tsx](../../../src/components/common/OfflineBanner.tsx)가 `online`/`offline` 이벤트로 직접 처리한다(전용 훅은 없다). 여러 곳에서 필요해지면 아래 모양의 훅으로 추출한다.
+
 ```typescript
-// src/hooks/useNetworkStatus.ts (권장 훅 사용 예시)
+// 추출할 때의 예시 (현재 저장소에는 없는 파일)
 import { useState, useEffect } from 'react';
 
 export function useNetworkStatus() {
@@ -35,13 +37,16 @@ export function useNetworkStatus() {
 ```
 
 ## 2. PWA 서비스워커 업데이트 방식
-서비스워커(`registerSW.js` 또는 `pwa-plugin` 설정 파일)의 캐시된 리소스를 날리고 최신 버전을 적용해야 할 때 다음과 같은 패턴을 권장합니다.
+서비스워커는 `vite-plugin-pwa`의 **injectManifest** 전략으로 직접 작성한다 — 원본은 [src/sw.ts](../../../src/sw.ts)이고
+설정은 `vite.config.js`의 `VitePWA({ strategies: 'injectManifest', srcDir: 'src', filename: 'sw.ts', registerType: 'autoUpdate' })`다.
+`registerSW.js` 같은 생성 파일은 쓰지 않는다.
 
-1. **자동 업데이트 모드 사용**: `vite-plugin-pwa`를 사용 중이라면 `autoUpdate` 활성화를 기본으로 합니다.
-2. **리로드 프롬프트(Prompt) 제공**: 중요한 로직 수정 시, 캐시만 남아있으면 구문을 실행할 수 없습니다. 사용자 화면 아래에 '최신 버전이 있습니다. 새로고침 하세요' 스낵바(Toast) 로직을 추가하세요.
+1. **업데이트 반영**: `registerType: 'autoUpdate'` + [src/lib/swUpdate.ts](../../../src/lib/swUpdate.ts)가 새 워커를 받아 다음 화면 이동에서 반영한다(작성 중인 내용을 지우지 않으려고 즉시 새로고침하지 않는다).
+2. **배포 직후 구버전 탭**: 지연 로드 청크가 사라져 실패하면 [src/lib/staleChunk.ts](../../../src/lib/staleChunk.ts)의 `STALE_CHUNK_MESSAGE`로 안내한다 — 토스트 스토어가 이 문구일 때만 [새로고침] 버튼을 붙인다.
+3. **서비스워커에서 Firestore에 쓰지 않는다**: 서비스워커에는 App Check가 없고 Firestore는 App Check ENFORCED다. 쓰기는 페이지에서만 한다(`sw.ts`의 `sync` 주석).
 
 ## 3. 에이전트 행동 지침
-- "오프라인에서도 글 작성 되게 해줘"라는 요청을 받으면, `IndexedDB` 나 `dexie.js` 등 브라우저 기반 저장소를 사용하는 로직 초안을 제안하세요.
+- "오프라인에서도 글 작성 되게 해줘"라는 요청을 받으면, **새 저장소를 만들지 말고 기존 오프라인 큐를 쓴다** — [src/lib/offline/syncQueue.ts](../../../src/lib/offline/syncQueue.ts)(`idb` 기반 `enqueue`·`flushQueue`, 같은 문서 순서 보장·재시도 냉각·폐기 안내)와 [syncFailureNotice.ts](../../../src/lib/offline/syncFailureNotice.ts). `dexie` 등 새 라이브러리는 들이지 않는다(D15).
 - 단순히 UI만 바꾸지 말고, 오프라인 시 Firebase Sync 지연(Timeout)을 우회/재시도(`useRetry`)하는 설계를 병행해야 합니다.
 
 ## 관련 문서
