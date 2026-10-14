@@ -1,5 +1,5 @@
 ---
-description: 문서 갱신·검증·커밋 후 master 푸시로 CI 배포를 트리거한다 (로컬 직접 배포 금지)
+description: 문서 갱신·검증 후 PR을 머지해 CI 배포를 트리거한다 (master 직접 푸시·로컬 직접 배포 금지)
 ---
 
 <!-- AUTO-GENERATED — scripts/sync-claude-agents.ts가 .agent/workflows/deploy.md에서 생성. 직접 수정 금지. -->

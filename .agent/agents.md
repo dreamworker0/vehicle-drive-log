@@ -176,7 +176,8 @@ Git 커밋 시 `Husky` + `lint-staged`가 스테이징 파일에 ESLint를 자�
   - `npm run check:faq`로 **FAQ 누락을 기계로 확인**한다 → [update-faq 스킬](skills/release-notes/faq.md). 공지는 그때 한 번 읽고 마는 글이고, 나중에 찾아보는 곳은 FAQ다 — 새 기능 공지에는 그것을 설명하는 FAQ id를 적는다(`"faq": ["some-id"]`, 필요 없으면 `[]`).
     (체크리스트만으로 놓친 전례가 있다 — 다섯 건이 공지 없이 배포됐다)
 - [ ] `구현계획서.md` 체크리스트 및 히스토리 최신 상태로 갱신
-- [ ] Git 스테이징 → 커밋 → 푸시 (원격 백업)
+- [ ] 브랜치 커밋 → PR → CI 초록 → squash 머지 (master 직접 푸시는 보호 브랜치라 거부된다)
+- [ ] **머지는 한 건씩** — 앞 머지의 Deploy 성공(함수·Hosting 반영)을 확인한 뒤 다음 PR을 머지한다 → [ci-cd §2.4](rules/ci-cd.md)
 - [ ] Node.js 22 확인: `fnm use 22 && node --version`
 - [ ] 자동 교정 루프 전체 통과 → §2
 - [ ] `/deploy` 워크플로우 실행 (빌드 + 배포 자동화)

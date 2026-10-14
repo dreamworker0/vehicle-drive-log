@@ -1,10 +1,10 @@
 ---
-description: 문서 갱신·검증·커밋 후 master 푸시로 CI 배포를 트리거한다 (로컬 직접 배포 금지)
+description: 문서 갱신·검증 후 PR을 머지해 CI 배포를 트리거한다 (master 직접 푸시·로컬 직접 배포 금지)
 ---
 
 > 📋 **배포 전 체크리스트**: 실행 전에 [agents.md §4 배포 시](../agents.md) 항목을 모두 확인한다.
 >
-> 🚫 **배포 단일 경로**: 프로덕션 배포는 **master 푸시 → GitHub Actions Deploy 워크플로**([.github/workflows/deploy.yml](../../.github/workflows/deploy.yml))가 수행한다.
+> 🚫 **배포 단일 경로**: 프로덕션 배포는 **PR 머지(= master 푸시) → GitHub Actions Deploy 워크플로**([.github/workflows/deploy.yml](../../.github/workflows/deploy.yml))가 수행한다.
 > 로컬 `firebase deploy`를 병행하면 동일 함수 동시 업데이트 충돌이 발생하므로 **로컬에서 직접 배포하지 않는다.**
 > 긴급 수동 부분배포가 꼭 필요하면 [deploy-emergency](deploy-emergency.md)의 **긴급 가드** 절차를 따른다.
 
@@ -39,7 +39,7 @@ Working directory: `.`
 
 > **자주 놓치는 것**
 > - **Functions index.ts export 누락** — 새 함수를 `functions/src/index.ts`에서 export하지 않으면 배포돼도 호출 불가.
-> - **firestore.rules 변경 후 룰 테스트 누락** — `npm run test:rules`는 별도로 돌려야 한다.
+> - **firestore.rules 변경 후 룰 테스트 누락** — CI(`ci.yml`의 Security Rules tests)가 PR마다 돌리지만, 규칙을 고쳤다면 `npm run test:rules`로 로컬에서도 먼저 확인한다.
 > - **PWA 캐시 무효화** — 서비스워커(`src/sw.ts`, 빌드 시 dist/sw.js로 생성)나 `index.html` cache-control 변경 없이 배포 시 구버전이 잔존. 최근 커밋(`14d59ac`)에서도 발생한 패턴.
 > - **App Check 토큰 디버그 모드** — `b295455` 커밋처럼 프로덕션에 debug token이 새지 않는지 빌드 산출물 grep.
 > - **업데이트 소식 누락** — 배포는 됐는데 공지가 그대로인 일이 반복된다(Phase 143~145에서 다섯 건). `npm run check:release-notes`가 기계로 잡아 주므로 반드시 돌린다.
@@ -72,20 +72,35 @@ npm run build
 ```
 Working directory: `.`
 
-### --- [STEP 2: 커밋 & 푸시 → CI 배포 트리거] ---
+### --- [STEP 2: 브랜치 → PR → 머지 (CI 배포 트리거)] ---
 
-5. Commit & Push:
-   - **지시사항**: 모든 변경점을 스테이징·커밋한 뒤 master로 푸시한다. 푸시하면 CI가 돌고, **CI가 성공해야** Deploy 워크플로가 이어진다(Deploy는 `workflow_run` 트리거라 푸시가 직접 부르지 않는다).
-   - ⚠️ **문서(`docs/**`·`**.md`)만 바뀐 푸시는 CI가 건너뛰어져 배포도 일어나지 않는다.** master에 워크플로 실행이 하나도 생기지 않는 것이 정상이므로 배포를 기다리지 말 것 — [ci-cd 규칙 §1.2](../rules/ci-cd.md).
+> ⚠️ **master에 직접 푸시하지 않는다 — 거부된다.** master는 보호 브랜치다(필수 PR · 필수 체크 `ci`·`e2e`·
+> `functions-tests`·`security-audit` · `enforce_admins: true`). 예전 이 단계는 `git push origin master`를 지시했지만
+> 실제 경로는 PR squash 머지뿐이다(2026-10-14 감사에서 정정).
+
+5. 브랜치에 커밋하고 PR을 연다:
+   - 커밋 메시지는 한국어 Conventional Commits([commit-message](../rules/commit-message.md)).
+   - 문서(`docs/**`·`**.md`)만 바뀐 PR은 CI가 건너뛰어지고 **머지해도 배포가 일어나지 않는다** — 배포를 기다리지 말 것([ci-cd 규칙 §1.2](../rules/ci-cd.md)).
 ```powershell
-git add . ; git commit -m "chore: 배포 전 문서 및 환경 갱신 완료" ; git push origin master
+git switch -c <type>/<짧은-설명> ; git add <파일들> ; git commit -m "<type>: <한국어 요약>" ; git push -u origin HEAD ; gh pr create --base master --fill
 ```
 Working directory: `.`
 
+6. CI가 전부 초록이고 미해결 리뷰 지적이 없으면 squash 머지한다(GitHub auto-merge는 저장소 설정상 쓸 수 없다):
+```powershell
+gh pr checks <PR번호> ; gh pr merge <PR번호> --squash
+```
+Working directory: `.`
+
+> ⚠️ **머지는 한 건씩 — 앞 머지의 Deploy 성공을 확인한 뒤 다음 PR을 머지한다.** 머지마다 Deploy가 함수 전체를
+> 갱신하는데, 연달아 돌면 Cloud Functions API 한도(`Quota Exceeded`)에 걸려 일부 함수가 실패하고 **Hosting 단계가
+> 실행되지 않는다**(2026-10-01 실제 발생, Phase 235). 자세한 규칙은 [ci-cd §2.4](../rules/ci-cd.md).
+
 ### --- [STEP 3: CI 배포 모니터링] ---
 
-6. GitHub Actions 배포 상태 추적:
-   - **지시사항**: 트리거된 Deploy 워크플로의 진행 상황을 추적한다. 실패하면 로그를 확인하고 원인을 보고한다 (로컬에서 임의로 `firebase deploy`를 실행해 우회하지 않는다).
+7. GitHub Actions 배포 상태 추적:
+   - **지시사항**: 머지 커밋의 master CI → Deploy 워크플로를 추적한다. 실패하면 로그를 확인하고 원인을 보고한다 (로컬에서 임의로 `firebase deploy`를 실행해 우회하지 않는다).
+   - **성공 판정은 로그로 한다**: `failed to update function`이 재시도 뒤 `Successful update operation`이 됐는지(함수 수만큼), Hosting `release complete`가 찍혔는지. `Quota Exceeded`로 일부 함수가 끝내 실패했으면 로컬 배포 대신 `gh run rerun <run-id> --failed`로 Deploy를 다시 돌린다.
 ```powershell
 gh run watch --exit-status
 ```
