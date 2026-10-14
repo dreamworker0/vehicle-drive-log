@@ -328,4 +328,23 @@ describe('fetchTmap', () => {
 
         await expect(core.fetchTmap('/prod', '/dev')).resolves.toBeNull();
     });
+
+    // 회귀 방지(2026-10-14 감사): 요청이 직렬 큐라 멈춘 요청 하나가 뒤의 요청을 전부 붙잡았다.
+    it('응답이 오지 않으면 상한 시간 뒤 중단하고, 다음 요청은 계속 처리된다', async () => {
+        vi.useFakeTimers();
+        // 실제 fetch처럼 signal이 abort되면 AbortError로 거부한다
+        fetchMock.mockImplementationOnce((_url: string, init: { signal: AbortSignal }) => new Promise((_resolve, reject) => {
+            init.signal.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')));
+        }));
+        fetchMock.mockResolvedValueOnce(jsonResponse({ ok: 2 }));
+
+        const stalled = core.fetchTmap('/prod', '/dev');
+        const stalledResult = expect(stalled).rejects.toThrow('aborted');
+        const next = core.fetchTmap('/prod', '/dev');
+
+        await vi.advanceTimersByTimeAsync(core.TMAP_FETCH_TIMEOUT_MS);
+        await stalledResult;
+        await vi.advanceTimersByTimeAsync(2_000); // 큐의 최소 간격
+        await expect(next).resolves.toEqual({ ok: 2 });
+    });
 });

@@ -38,6 +38,15 @@ export default defineConfig([
         { name: 'alert', message: 'window.alert 금지 → useToast() 훅을 사용하세요.' },
         { name: 'prompt', message: 'window.prompt 금지 → useConfirm() 또는 커스텀 입력 UI를 사용하세요.' },
       ],
+      // no-restricted-globals는 맨 이름(confirm(...))만 잡고 `window.confirm(...)` 같은 멤버 접근은 놓친다 —
+      // 실제로 ReservationCard가 그 모양으로 6개월간 감지되지 않았다(2026-10-14 감사). 둘을 함께 둔다.
+      'no-restricted-properties': ['error',
+        ...['window', 'globalThis', 'self'].flatMap((object) => [
+          { object, property: 'confirm', message: 'window.confirm 금지 → useConfirm() 훅을 사용하세요.' },
+          { object, property: 'alert', message: 'window.alert 금지 → useToast() 훅을 사용하세요.' },
+          { object, property: 'prompt', message: 'window.prompt 금지 → useConfirm() 또는 커스텀 입력 UI를 사용하세요.' },
+        ]),
+      ],
       'react-hooks/set-state-in-effect': 'off',
       'react-hooks/preserve-manual-memoization': 'off',
       'jsx-a11y/label-has-associated-control': 'off',
@@ -73,6 +82,15 @@ export default defineConfig([
         { name: 'confirm', message: 'window.confirm 금지 → useConfirm() 훅을 사용하세요.' },
         { name: 'alert', message: 'window.alert 금지 → useToast() 훅을 사용하세요.' },
         { name: 'prompt', message: 'window.prompt 금지 → useConfirm() 또는 커스텀 입력 UI를 사용하세요.' },
+      ],
+      // no-restricted-globals는 맨 이름(confirm(...))만 잡고 `window.confirm(...)` 같은 멤버 접근은 놓친다 —
+      // 실제로 ReservationCard가 그 모양으로 6개월간 감지되지 않았다(2026-10-14 감사). 둘을 함께 둔다.
+      'no-restricted-properties': ['error',
+        ...['window', 'globalThis', 'self'].flatMap((object) => [
+          { object, property: 'confirm', message: 'window.confirm 금지 → useConfirm() 훅을 사용하세요.' },
+          { object, property: 'alert', message: 'window.alert 금지 → useToast() 훅을 사용하세요.' },
+          { object, property: 'prompt', message: 'window.prompt 금지 → useConfirm() 또는 커스텀 입력 UI를 사용하세요.' },
+        ]),
       ],
       'react-hooks/set-state-in-effect': 'off',
       'react-hooks/preserve-manual-memoization': 'off',

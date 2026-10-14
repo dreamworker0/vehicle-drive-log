@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 
 vi.mock('../../hooks/useAuth', () => ({
     useAuth: () => ({
@@ -33,6 +33,17 @@ vi.mock('../../lib/firestore', () => ({
 const mockGetAll = vi.fn();
 vi.mock('../../lib/firestore/driveLogs/queries', () => ({
     getAllDriveLogsForExport: (...args: unknown[]) => mockGetAll(...args),
+}));
+
+const mockRecordExport = vi.fn();
+vi.mock('../../lib/audit/recordExport', () => ({
+    recordExport: (...args: unknown[]) => mockRecordExport(...args),
+}));
+
+const mockWriteFile = vi.fn();
+vi.mock('xlsx', () => ({
+    utils: { aoa_to_sheet: () => ({}), book_new: () => ({}), book_append_sheet: vi.fn() },
+    writeFile: (...args: unknown[]) => mockWriteFile(...args),
 }));
 
 import useMonthlyReport from '../../hooks/useMonthlyReport';
@@ -111,6 +122,29 @@ describe('useMonthlyReport', () => {
         });
 
         expect(typeof result.current.exportExcel).toBe('function');
+    });
+
+    // 회귀 방지(2026-10-14 감사): 다른 내보내기 경로는 모두 반출을 기록하는데 이 화면만 빠져 있었다.
+    it('엑셀을 내려받으면 반출 건수를 접속기록에 남긴다', async () => {
+        const { result } = renderHook(() => useMonthlyReport());
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        await act(async () => { await result.current.exportExcel(); });
+
+        expect(mockWriteFile).toHaveBeenCalledTimes(1);
+        expect(mockRecordExport).toHaveBeenCalledWith('excel', 'driveLogs', result.current.filteredLogs.length);
+    });
+
+    it('PDF로 인쇄하면 반출을 접속기록에 남긴다', async () => {
+        const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {});
+        const { result } = renderHook(() => useMonthlyReport());
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        act(() => { result.current.exportPdf(); });
+
+        expect(printSpy).toHaveBeenCalledTimes(1);
+        expect(mockRecordExport).toHaveBeenCalledWith('pdf', 'driveLogs', result.current.filteredLogs.length);
+        printSpy.mockRestore();
     });
 
     it('activePeriod와 setPeriod가 존재한다', async () => {

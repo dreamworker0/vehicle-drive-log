@@ -10,6 +10,7 @@ import { captureError } from '../lib/sentry';
 import { notifyUser } from '../lib/notify';
 import { isStaleChunkError, STALE_CHUNK_MESSAGE } from '../lib/staleChunk';
 import { toLocalDateStr } from '../lib/dateUtils';
+import { recordExport } from '../lib/audit/recordExport';
 import { extractDateStr, logDistance } from './utils/aggregationUtils';
 import {
     calcDriveStats, filterPrevPeriodLogs, calcComparePeriod,
@@ -253,6 +254,9 @@ export default function useMonthlyReport() {
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, '운행일지');
         XLSX.writeFile(wb, `운행통계_${startDate}_${endDate}.xlsx`);
+        // 운전자·목적지·시각을 담은 파일이라 개인정보 반출이다(고시 제16조). 다른 내보내기 경로는
+        // 모두 기록하는데 이 화면만 빠져 있었다(2026-10-14 감사). fire-and-forget이라 내려받기를 막지 않는다.
+        recordExport('excel', 'driveLogs', filteredLogs.length);
     }, [filteredLogs, startDate, endDate]);
 
     // PDF 인쇄 (브라우저 인쇄 대화상자 → PDF 저장)
@@ -275,13 +279,15 @@ export default function useMonthlyReport() {
         const root = document.documentElement;
         const wasDark = root.classList.contains('dark');
         if (wasDark) root.classList.remove('dark');
+        // 인쇄(PDF 저장)도 운전자별 통계를 담는 반출이다 — 엑셀과 같은 이유로 기록한다.
+        recordExport('pdf', 'driveLogs', filteredLogs.length);
         window.print();
         // 인쇄 후 스타일·테마 되돌림
         setTimeout(() => {
             style.remove();
             if (wasDark) root.classList.add('dark');
         }, 1000);
-    }, []);
+    }, [filteredLogs.length]);
 
     return {
         loading, loadError, startDate, endDate,

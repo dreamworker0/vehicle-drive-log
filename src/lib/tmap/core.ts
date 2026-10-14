@@ -78,6 +78,8 @@ export const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, 
  */
 let _queue: Promise<void> = Promise.resolve();
 const MIN_GAP_MS = 1200; // 무료 API 제약(초당 1건 수준) 준수를 위해 최소 1200ms 간격으로 상향
+/** TMAP 요청 1건의 상한 — 직렬 큐라 멈춘 요청 하나가 뒤를 전부 막지 않게 한다 */
+export const TMAP_FETCH_TIMEOUT_MS = 10_000;
 
 export function enqueue<T>(fn: () => Promise<T>): Promise<T> {
     return new Promise<T>((resolve, reject) => {
@@ -117,11 +119,22 @@ export async function fetchTmap(prodUrl: string, devUrl: string, method = 'GET',
         }
 
         // 단일 시도 — 재시도는 큐 밖에서 하지 않음 (429 폭주 방지)
-        const res = await fetch(url, {
-            method,
-            headers,
-            body: bodyObj ? JSON.stringify(bodyObj) : undefined,
-        });
+        // 상한을 둔다. 요청은 직렬 큐로 하나씩 처리되므로, 회선이 멈춘 요청 하나가 뒤의 지오코딩·경로
+        // 요청을 전부 붙잡고 운행 시작 버튼이 계속 돌았다(2026-10-14 감사). 시간이 지나면 AbortError로
+        // 끝나고, 호출부(딥링크·경로 추정)는 이미 실패 시 대체 경로를 갖고 있다.
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), TMAP_FETCH_TIMEOUT_MS);
+        let res: Response;
+        try {
+            res = await fetch(url, {
+                method,
+                headers,
+                body: bodyObj ? JSON.stringify(bodyObj) : undefined,
+                signal: controller.signal,
+            });
+        } finally {
+            clearTimeout(timer);
+        }
 
         if (!res.ok) {
             if (res.status === 429) {

@@ -172,11 +172,13 @@ export default function FAQPage() {
                             const qId = item.id;
 
                             // isHighlighted일 때는 약간 튀어나오면서(Scale up) 진한 링과 배경 적용
+                            // 다크 짝을 함께 둔다 — 없으면 밝은 배경 위에 dark:text-surface-200 글자가 올라가
+                            // 다크 모드에서 질문이 거의 읽히지 않았다(2026-10-14 감사).
                             const containerClasses = isHighlighted
-                                ? 'border-primary-400 ring-4 ring-primary-300 ring-offset-2 bg-primary-50 scale-[1.02] shadow-xl relative z-10'
+                                ? 'border-primary-400 ring-4 ring-primary-300 ring-offset-2 bg-primary-50 dark:bg-primary-900/30 dark:ring-primary-700 dark:ring-offset-surface-900 scale-[1.02] shadow-xl relative z-10'
                                 : isOpen
-                                    ? 'border-primary-300 ring-2 ring-primary-100 bg-white relative z-0'
-                                    : 'border-surface-200 hover:border-primary-300 bg-white relative z-0';
+                                    ? 'border-primary-300 dark:border-primary-700 ring-2 ring-primary-100 dark:ring-primary-900/40 bg-white dark:bg-surface-800 relative z-0'
+                                    : 'border-surface-200 dark:border-surface-700 hover:border-primary-300 dark:hover:border-primary-700 bg-white dark:bg-surface-800 relative z-0';
 
                             return (
                                 <div
@@ -195,8 +197,8 @@ export default function FAQPage() {
                                                 toggle(idx);
                                             }
                                         }}
-                                        className={`cursor-pointer w-full flex items-center gap-3 px-4 py-3.5 text-left outline-none focus-visible:bg-primary-50 transition-colors min-h-[48px] ${
-                                            isHighlighted ? 'bg-transparent' : 'bg-surface-50 hover:bg-primary-50/50'
+                                        className={`cursor-pointer w-full flex items-center gap-3 px-4 py-3.5 text-left outline-none focus-visible:bg-primary-50 dark:focus-visible:bg-surface-700 transition-colors min-h-[48px] ${
+                                            isHighlighted ? 'bg-transparent' : 'bg-surface-50 hover:bg-primary-50/50 dark:bg-surface-800 dark:hover:bg-surface-700'
                                         }`}
                                     >
                                         <span className="flex-shrink-0 w-7 h-7 rounded-lg bg-primary-100 dark:bg-primary-900/40 text-primary-600 dark:text-primary-400 flex items-center justify-center text-xs font-bold">
