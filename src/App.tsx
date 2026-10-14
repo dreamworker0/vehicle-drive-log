@@ -13,6 +13,7 @@ import { AuthGuard } from './components/auth/AuthGuard';
 import { adminHomePath } from './lib/lastArea';
 import { updateUser } from './lib/firestore/users';
 import InAppBrowserGuard from './components/common/InAppBrowserGuard';
+import { captureInviteCodeFromUrl } from './lib/inviteCodeCapture';
 
 // 레이아웃 (기존)
 const SuperAdminLayout = lazyWithRetry(() => import('./components/superAdmin/SuperAdminLayout'));
@@ -221,19 +222,10 @@ function AppContent() {
     }
   }, [user, userData, theme, setTheme]);
 
-  // 이메일 링크의 ?code= 파라미터를 localStorage에 저장
-  // (Google 로그인 리다이렉트 도메인 횡단 시 sessionStorage 증발 방지)
+  // 초대 링크의 ?code= 보관 — 부팅 첫 지점(main.tsx)이 먼저 하고, 여기서는 다른 경로로
+  // 들어온 코드까지 받는다(두 번 불려도 안전). 이유는 inviteCodeCapture.ts 머리 주석.
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const code = params.get('code');
-    if (code) {
-      localStorage.setItem('pendingInviteCode', code.toUpperCase());
-      params.delete('code');
-      const newUrl = params.toString()
-        ? `${window.location.pathname}?${params}`
-        : window.location.pathname;
-      window.history.replaceState({}, '', newUrl);
-    }
+    captureInviteCodeFromUrl();
   }, []);
 
   // 서비스 워커의 알림 클릭 postMessage 수신 → 네비게이션
