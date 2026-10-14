@@ -9,7 +9,14 @@
  * - 해지 상태가 아닌 기관은 아무것도 지우지 않고 거부한다
  */
 import { initializeTestApp, clearFirestoreData, getTestFirestore } from "./emulator.setup";
-import { purgeOrganizationData, OrgNotRetiredError } from "../services/organization/purgeOrganizationData";
+import {
+    purgeOrganizationData,
+    OrgNotRetiredError,
+    purgeOrphanOrganizationData,
+    OrgStillExistsError,
+    findOrphanOrgIds,
+    countOrgData,
+} from "../services/organization/purgeOrganizationData";
 
 initializeTestApp();
 
@@ -143,6 +150,62 @@ describe("purgeOrganizationData (에뮬레이터)", () => {
         expect(org.exists).toBe(true);
         expect(org.data()?.status).toBe("approved");
         expect((await org.ref.collection("customHolidays").get()).size).toBe(1);
+    });
+
+    describe("고아 데이터 (기관 문서가 이미 없는 기관) — 일회성 정리 스크립트", () => {
+        const ORPHAN = "org-orphan";
+
+        beforeEach(async () => {
+            // 예전 퍼지가 남긴 모양: 기관 문서는 지워졌고 데이터·하위 컬렉션·통계·연동이 남았다
+            await seedOrg(ORPHAN, "deleted", "T-ORPHAN");
+            await db.collection("organizations").doc(ORPHAN).delete(); // 문서만 삭제 — 하위 컬렉션은 남는다
+            // 기관 필드가 __system__인 기록은 고아가 아니다
+            await db.collection("notifications").doc("system-note").set({ organizationId: "__system__", title: "공지" });
+        });
+
+        it("findOrphanOrgIds는 기관 문서가 없는 기관만 찾는다 (해지 중·운영 중·__system__·빈 값 제외)", async () => {
+            expect(await findOrphanOrgIds(db)).toEqual([ORPHAN]);
+        });
+
+        it("하위 컬렉션(사전 등록 직원 등)만 남은 고아도 찾는다", async () => {
+            await db.collection("organizations").doc("org-subonly").collection("preRegistered").doc("p1").set({ name: "예비", email: "e@t.kr" });
+            expect(await findOrphanOrgIds(db)).toEqual([ORPHAN, "org-subonly"]);
+
+            await purgeOrphanOrganizationData("org-subonly", fakeBucket(), db);
+            expect((await db.collection("organizations").doc("org-subonly").collection("preRegistered").get()).size).toBe(0);
+        });
+
+        it("countOrgData는 컬렉션별 남은 건수를 센다", async () => {
+            const counts = await countOrgData(ORPHAN, db);
+            expect(counts.driveLogs).toBe(2);
+            expect(counts.integrations).toBe(1);
+        });
+
+        it("purgeOrphanOrganizationData는 남은 데이터와 기관 하위 컬렉션까지 지우고 다른 기관은 그대로 둔다", async () => {
+            const liveBefore = await countAll(LIVE, "T-LIVE");
+            const goneBefore = await countAll(GONE, "T-GONE");
+            const bucket = fakeBucket();
+
+            await purgeOrphanOrganizationData(ORPHAN, bucket, db);
+
+            const after = await countAll(ORPHAN, "T-ORPHAN");
+            const { auditLogs, ...rest } = after;
+            expect(Object.entries(rest).filter(([, n]) => n !== 0)).toEqual([]);
+            expect(auditLogs).toBe(1);
+            expect(await countAll(LIVE, "T-LIVE")).toEqual(liveBefore);
+            expect(await countAll(GONE, "T-GONE")).toEqual(goneBefore);
+            expect((await db.collection("feedbacks").doc("public-inquiry").get()).exists).toBe(true);
+            expect((await db.collection("notifications").doc("system-note").get()).exists).toBe(true);
+            expect(bucket.prefixes).toEqual([`organizations/${ORPHAN}/`]);
+            expect(await findOrphanOrgIds(db)).toEqual([]);
+        });
+
+        it("기관 문서가 있는 기관(운영 중·해지 중)은 고아로 지우지 않는다", async () => {
+            const before = await countAll(LIVE, "T-LIVE");
+            await expect(purgeOrphanOrganizationData(LIVE, fakeBucket(), db)).rejects.toBeInstanceOf(OrgStillExistsError);
+            await expect(purgeOrphanOrganizationData(GONE, fakeBucket(), db)).rejects.toBeInstanceOf(OrgStillExistsError);
+            expect(await countAll(LIVE, "T-LIVE")).toEqual(before);
+        });
     });
 
     it.each(["", "  ", "__system__", "a/b"])("올바르지 않은 기관 ID(%j)는 거부한다", async (orgId) => {

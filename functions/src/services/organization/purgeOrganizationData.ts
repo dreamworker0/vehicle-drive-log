@@ -88,49 +88,34 @@ async function deleteByQuery(db: Firestore, query: Query): Promise<number> {
     }
 }
 
-/**
- * 기관 하나의 데이터를 파기한다. 기관 문서가 해지 상태(`status: "deleted"`)일 때만 진행한다.
- * 30일 유예 판정은 호출자(purgeOrgs·purgeOrganization 콜러블)의 몫이다.
- */
-export async function purgeOrganizationData(
-    orgId: string,
-    bucket: PurgeBucket,
-    db: Firestore = getFirestore(),
-): Promise<PurgeSummary> {
-    // 빈 값으로 where(==)를 돌리면 organizationId가 빈 문서(공개 문의 등)를 통째로 지운다.
+/** 기관 ID 형식 검사 — 빈 값으로 where(==)를 돌리면 organizationId가 빈 문서(공개 문의 등)를 통째로 지운다 */
+function assertValidOrgId(orgId: unknown): asserts orgId is string {
     if (typeof orgId !== "string" || orgId.trim() === "" || orgId === SYSTEM_ORG_ID || orgId.includes("/")) {
         throw new Error(`파기할 기관 ID가 올바르지 않다: ${JSON.stringify(orgId)}`);
     }
+}
 
+/**
+ * 파기 본체 — 해지 기관(purgeOrganizationData)과 고아 데이터(purgeOrphanOrganizationData)가 공유한다.
+ * `guard`는 단계마다 불려 진행해도 되는지 다시 확인한다(던지면 그 자리에서 멈춘다).
+ */
+async function runPurge(
+    orgId: string,
+    bucket: PurgeBucket,
+    db: Firestore,
+    guard: () => Promise<void>,
+): Promise<PurgeSummary> {
     const orgRef = db.collection("organizations").doc(orgId);
-    const orgSnap = await orgRef.get();
-    if (!orgSnap.exists) {
-        // 이미 끝까지 지워졌다(기관 문서는 마지막에 지운다). 할 일이 없다.
-        return { orgId, deleted: {}, storagePrefix: "" };
-    }
-    const status = orgSnap.data()?.status;
-    if (status !== "deleted") throw new OrgNotRetiredError(orgId, status);
-
-    /**
-     * 파기 도중 복구(restoreOrganization)되면 멈춘다. 상태를 시작할 때 한 번만 보면, 파기가 도는
-     * 수 초~수 분 사이에 슈퍼관리자가 복구를 눌러도 끝까지 진행해 **복구된 기관 문서까지** 지운다.
-     * 이미 지운 것은 되돌릴 수 없지만, 기관 문서와 남은 데이터는 지킨다. 단계마다 읽기 1회다.
-     */
-    const assertStillRetired = async () => {
-        const now = (await orgRef.get()).data()?.status;
-        if (now !== "deleted") throw new OrgNotRetiredError(orgId, now);
-    };
-
     const deleted: Record<string, number> = {};
     const count = (key: string, n: number) => { deleted[key] = (deleted[key] ?? 0) + n; };
 
     for (const [collection, field] of ORG_SCOPED) {
-        await assertStillRetired();
+        await guard();
         count(collection, await deleteByQuery(db, db.collection(collection).where(field, "==", orgId)));
     }
 
     // Slack 연동: 워크스페이스에 묶인 캐시·작업 큐를 먼저, 연동 문서(봇 토큰 암호문)를 마지막에.
-    await assertStillRetired();
+    await guard();
     const integrations = await db.collection("integrations").where("organizationId", "==", orgId).get();
     for (const intg of integrations.docs) {
         const teamId = intg.data().teamId;
@@ -153,10 +138,121 @@ export async function purgeOrganizationData(
     await bucket.deleteFiles({ prefix: storagePrefix });
 
     // 마지막: 기관 문서와 그 하위 컬렉션(customHolidays·preRegistered·stats).
-    // 문서 delete는 하위 컬렉션을 지우지 않으므로 recursiveDelete를 쓴다.
-    await assertStillRetired();
+    // 문서 delete는 하위 컬렉션을 지우지 않으므로 recursiveDelete를 쓴다. 기관 문서가 이미 없는
+    // 고아도 하위 컬렉션은 남아 있을 수 있다(예전 퍼지는 문서만 지웠다) — 없는 문서에도 그대로 돈다.
+    await guard();
     await db.recursiveDelete(orgRef);
     count("organizations", 1);
 
     return { orgId, deleted, storagePrefix };
+}
+
+/**
+ * 기관 하나의 데이터를 파기한다. 기관 문서가 해지 상태(`status: "deleted"`)일 때만 진행한다.
+ * 30일 유예 판정은 호출자(purgeOrgs·purgeOrganization 콜러블)의 몫이다.
+ */
+export async function purgeOrganizationData(
+    orgId: string,
+    bucket: PurgeBucket,
+    db: Firestore = getFirestore(),
+): Promise<PurgeSummary> {
+    assertValidOrgId(orgId);
+
+    const orgRef = db.collection("organizations").doc(orgId);
+    const orgSnap = await orgRef.get();
+    if (!orgSnap.exists) {
+        // 이미 끝까지 지워졌다(기관 문서는 마지막에 지운다). 할 일이 없다.
+        return { orgId, deleted: {}, storagePrefix: "" };
+    }
+    const status = orgSnap.data()?.status;
+    if (status !== "deleted") throw new OrgNotRetiredError(orgId, status);
+
+    /**
+     * 파기 도중 복구(restoreOrganization)되면 멈춘다. 상태를 시작할 때 한 번만 보면, 파기가 도는
+     * 수 초~수 분 사이에 슈퍼관리자가 복구를 눌러도 끝까지 진행해 **복구된 기관 문서까지** 지운다.
+     * 이미 지운 것은 되돌릴 수 없지만, 기관 문서와 남은 데이터는 지킨다. 단계마다 읽기 1회다.
+     */
+    return runPurge(orgId, bucket, db, async () => {
+        const now = (await orgRef.get()).data()?.status;
+        if (now !== "deleted") throw new OrgNotRetiredError(orgId, now);
+    });
+}
+
+/** 고아 파기 대상이 아닌 기관(기관 문서가 있다) — 해지 기관은 purgeOrganizationData로 지운다 */
+export class OrgStillExistsError extends Error {
+    constructor(orgId: string) {
+        super(`기관 ${orgId}의 문서가 있어 고아 데이터로 보지 않는다 — 해지 기관이면 purgeOrganization을 쓴다`);
+        this.name = "OrgStillExistsError";
+    }
+}
+
+/**
+ * **기관 문서가 이미 없는** 기관의 남은 데이터를 파기한다(일회성 정리 스크립트 전용).
+ *
+ * 2026-10-14 이전의 퍼지는 users와 기관 문서만 지워, 그 기관의 운행일지·예약 등이 기관 문서
+ * 없이 남았다. 기관 문서가 없으니 주간 배치(status·deletedAt으로 대상을 찾는다)도 콜러블도
+ * 그 기관을 찾지 못한다. `scripts/purge-orphan-org-data.ts`가 고아 기관 ID를 찾아 이 함수를 부른다.
+ * 단계마다 기관 문서가 여전히 없는지 다시 확인한다 — 있으면 고아가 아니므로 멈춘다.
+ */
+export async function purgeOrphanOrganizationData(
+    orgId: string,
+    bucket: PurgeBucket,
+    db: Firestore = getFirestore(),
+): Promise<PurgeSummary> {
+    assertValidOrgId(orgId);
+    const orgRef = db.collection("organizations").doc(orgId);
+    return runPurge(orgId, bucket, db, async () => {
+        if ((await orgRef.get()).exists) throw new OrgStillExistsError(orgId);
+    });
+}
+
+/** 고아 탐색 대상 — 기관 필드로 묶인 컬렉션(ORG_SCOPED) + 연동 문서 */
+const ORPHAN_SCAN: ReadonlyArray<readonly [collection: string, field: string]> = [
+    ...ORG_SCOPED,
+    ["integrations", "organizationId"],
+];
+
+/**
+ * 데이터는 남아 있는데 기관 문서가 없는 기관 ID를 찾는다.
+ *
+ * 문서를 전부 읽지 않는다 — 컬렉션마다 `where(field, ">", 직전 ID).orderBy(field).limit(1)`로
+ * **서로 다른 기관 ID만 건너뛰며** 훑으므로 읽기 비용은 (컬렉션 수 × 기관 수) 수준이다.
+ * 기관 필드가 비었거나 문자열이 아닌 문서는 `> ""` 조건에서 빠진다(빈 값 일괄 삭제 방지).
+ * orgStats는 부모 문서 없이 하위 컬렉션만 있을 수 있어 listDocuments로 본다.
+ */
+export async function findOrphanOrgIds(db: Firestore = getFirestore()): Promise<string[]> {
+    const candidates = new Set<string>();
+    for (const [collection, field] of ORPHAN_SCAN) {
+        let last = "";
+        for (;;) {
+            const snap = await db.collection(collection).where(field, ">", last).orderBy(field).limit(1).get();
+            if (snap.empty) break;
+            const value = snap.docs[0].get(field);
+            if (typeof value !== "string" || value <= last) break; // 방어: 진행하지 않으면 멈춘다
+            if (value !== SYSTEM_ORG_ID) candidates.add(value);
+            last = value;
+        }
+    }
+    for (const ref of await db.collection("orgStats").listDocuments()) candidates.add(ref.id);
+    // 예전 퍼지는 기관 문서만 지워 하위 컬렉션(preRegistered: 사전 등록 직원 이름·이메일 등)이 남았다.
+    // listDocuments는 하위 컬렉션만 남은 "없는 문서"도 돌려주므로, 다른 데이터가 없는 고아도 여기서 잡힌다.
+    for (const ref of await db.collection("organizations").listDocuments()) candidates.add(ref.id);
+
+    const orphans: string[] = [];
+    for (const orgId of [...candidates].sort()) {
+        if (orgId.includes("/") || orgId.trim() === "") continue;
+        if (!(await db.collection("organizations").doc(orgId).get()).exists) orphans.push(orgId);
+    }
+    return orphans;
+}
+
+/** 고아 기관 하나가 컬렉션별로 남긴 문서 수 (dry-run 보고용, count 집계라 1,000건당 읽기 1회) */
+export async function countOrgData(orgId: string, db: Firestore = getFirestore()): Promise<Record<string, number>> {
+    assertValidOrgId(orgId);
+    const out: Record<string, number> = {};
+    for (const [collection, field] of ORPHAN_SCAN) {
+        const n = (await db.collection(collection).where(field, "==", orgId).count().get()).data().count;
+        if (n > 0) out[collection] = n;
+    }
+    return out;
 }
