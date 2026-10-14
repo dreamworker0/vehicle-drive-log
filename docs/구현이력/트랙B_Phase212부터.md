@@ -577,3 +577,23 @@
 | **배포는 한 건씩** | #472 → #473 → #474 순으로 Deploy 성공 확인 후 다음 머지. 매번 Quota Exceeded 몇 건이 재시도로 성공(80·80·81개 반영) |
 | **검증** | functions jest 1,252 + 에뮬레이터 파기 8건 · web Vitest(offline 60건 포함) · scripts 200 · tsc·eslint · 하네스 Doctor |
 | **남는 것** | ① 처리방침 문구에 접속기록 1년·백업 90일 보관 명시(법무 판단) ② 과거에 퍼지된 기관의 고아 데이터 — 기관 문서가 없어 대상 식별에 일회성 스크립트 필요 ③ uid로만 묶인 데이터(organizationId 없는 즐겨찾기·알림, Storage `feedbacks/{uid}/`)와 3년 아카이브(전 기관 통합 파일) ④ 감사 저위험 묶음: 예약 생성 시각 형식 검증, `currentKm` 직원 분기, Rules 부정 테스트 보강, `firestore-rules.md` 템플릿, `deploy.md` 직접 푸시 지시, `window.confirm`, 통계 엑셀 `recordExport` 누락 |
+
+### Phase 242: 감사의 나머지 — 규칙이 강제한다고 믿었던 것들 🔐🧭📄
+
+> 2026-10-14. Phase 241 직후 운영자가 *"이어서 진행해 줘"*. 감사의 "남는 것 ④"(저위험 묶음)를 배포 횟수를 줄이려고 성격별 두 PR로 묶었다 — 머지마다 함수 81개가 전부 갱신되기 때문이다. 공통점은 **"강제되고 있다"고 문서나 테스트가 말하지만 실제로는 아니었던 것들**이었다.
+
+| 항목 | 내용 |
+|------|------|
+| **예약 생성 형식 검증** (#476) | 수정 코어(`updateReservationCore`)에는 `DATE_RE`·`TIME_RE`가 있었는데 생성 코어에만 없었다. 겹침·"한 사람 한 대" 판정이 문자열 비교라 `startTime: '9:00'`은 `'9:00' < '12:00'`이 거짓이 되어 09:00~12:00 예약 위에 같은 차를 다시 잡을 수 있었다. parseIntent와 같은 고정 폭 정규식 + 문자열 필드 타입 검사. 화면(`<input type=time>`)·Slack(parseIntent)은 이미 `HH:MM`이라 정상 경로 영향 없음 |
+| **`currentKm` 직원 분기** (#476) | Rules에 "소속 멤버는 증가만 허용"이 남아 있었다 — 누적 km는 서버 트리거가 소유하는데. 직원 누구나 9,999,999로 기록 없이 올릴 수 있고 감소가 막혀 스스로 복구되지도 않았다. 클라이언트 쓰기는 관리자 훅뿐임을 확인하고 닫았다(Phase 227 잔액과 같은 이유) |
+| **다른 이유로 통과하던 테스트** (#476) | 교차 기관 운행일지 생성은 `createdByUid`가 빠져 `hasAll`에서 먼저 거부됐고, role 자가 상승은 사용자 문서를 심지 않아 "없는 문서 수정"으로 실패했다 — **기관 격리나 role 차단을 지워도 초록**이었다. 필수 필드를 갖추고 **같은 payload의 정상 쓰기가 성공하는 대조군**을 붙여 거부 사유를 하나로 고정. superAdmin 부여 차단·직원 km 증가 차단 신규 |
+| **규칙 템플릿** (#476) | `firestore-rules.md`의 새 컬렉션 템플릿 update에 organizationId 불변 조건이 없어, 그대로 복사하면 07-10 감사 #6(교차 기관 이전)이 재발하는 지침이었다. 존재하지 않는 superAdmin 와일드카드 서술도 정정 |
+| **운행 시작 ↔ 길안내** (#477) | 상태를 `in_progress`로 바꾼 **뒤** tmap 모듈 로드·지오코딩이 같은 try 안에 있어, 실패하면 "운행 시작에 실패했습니다" — 실제로는 시작돼 있었다. 분리하고, 구버전 청크면 `STALE_CHUNK_MESSAGE`(토스트 스토어가 **정확히 같은 문구**일 때만 [새로고침]을 붙이므로 접두어를 붙이지 않았다) |
+| **TMAP 타임아웃** (#477) | 직렬 큐인데 fetch에 상한이 없어 멈춘 요청 하나가 뒤를 전부 붙잡았다 → 10초 AbortController. 딥링크·경로 추정은 이미 실패 대체 경로가 있다 |
+| **반출 기록** (#477) | 통계 화면의 엑셀만 빠졌다고 보고됐는데, 고쳐 보니 **같은 화면의 PDF 인쇄도** `recordExport`가 없었다. 둘 다 기록 |
+| **`window.confirm`** (#477) | agents.md는 D1을 ESLint가 감지한다고 했지만 `no-restricted-globals`는 맨 이름만 잡고 `window.confirm(...)`은 놓친다 — `ReservationCard`가 그 모양으로 6개월간 남아 있었다. `useConfirm`으로 바꾸고 `no-restricted-properties`(window·globalThis·self)를 더했다. 임시 파일로 탐지를 확인 |
+| **오프라인 띠·FAQ** (#477) | `fixed top-0`에 safe-area가 없어 아이폰 홈 화면 앱에서 상태바에 가려졌다. FAQ 아코디언은 밝은 배경 위 `dark:text-surface-200`이라 다크 모드에서 질문이 거의 안 보였다 |
+| **배포 절차** (#477) | `deploy.md`가 `git push origin master`를 지시했지만 master는 보호 브랜치(필수 PR·체크, `enforce_admins`)라 거부된다 → PR squash 머지와 Deploy 판정·`rerun --failed` 복구. **"머지는 한 건씩"(Phase 235)은 개인 메모리에만 있었다** — 메모리 없는 다른 에이전트가 같은 사고를 되풀이할 수 있어 `ci-cd.md §2.4`·`agents.md`·`CLAUDE.md`로 옮겼다. 낡은 스킬(`registerSW.js`·dexie 권장·`vite.config.ts`) 정정 |
+| **배포** | #476 → #477 한 건씩. 둘 다 함수 81개·Hosting 반영, #476은 Firestore Rules 릴리스 확인. #477 대기 스크립트가 `gh` 종료 코드 4(일시적 인증 오류)로 끊겼으나 배포 자체는 성공 — 상태를 다시 조회해 확인 |
+| **검증** | functions jest 1,265 · Rules 에뮬레이터 36 · Vitest 2,483(로컬 1건은 `tmap.test.ts` 첫 테스트의 부하성 지연 — 단독·CI 통과) · eslint 전체 0 · tsc · 하네스 Doctor |
+| **남는 것** | ① 처리방침 문구(접속기록 1년·백업 90일, 법무 판단) ② 과거에 퍼지된 기관의 고아 데이터 일회성 스크립트(운영 데이터 삭제라 운영자 결정) ③ Sentry Inbound Filter(localhost) — 운영자 설정 ④ 부하 시 플래키 테스트 2건(`ServiceDashboard.test.tsx`·`tmap.test.ts` 첫 테스트) |
