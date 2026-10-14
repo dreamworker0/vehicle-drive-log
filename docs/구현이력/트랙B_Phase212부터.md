@@ -560,3 +560,20 @@
 | **배포는 한 건씩** | 11건을 배포 확인 → 다음 머지로 이었다. 한 번 함수 8개가 `Quota Exceeded`였으나 재시도로 전부 성공. 다음 단계로 넘기는 배경 스크립트가 **출력 파일 끝의 `[exited with code 0]` 줄을 결과로 읽어** 성공한 배포를 실패로 판정하고 멈춘 일이 있었다 — 실제 상태를 확인하고 재개. #460은 새 함수 3개를 함수 카탈로그에 넣지 않아 CI(`check:functions-catalog`)에서 한 번 막혔다 |
 | **검증** | web Vitest 2,406 · functions 1,231 · Rules 36(신규 10-4b) · lint · type-check. 배포 6회 모두 함수·Hosting 반영 확인(#460은 새 함수 3개 생성·Rules 릴리스). 운영자가 직원 필터·차량 필터(9월 기록 포함) 화면을 직접 확인 |
 | **남는 것** | ① 예약 생성·취소 후 본인 이름으로 남는지 운영자 확인 ② Sentry 6F(한 사용자 기기의 반복 세션 유실) — 이벤트의 `cookieMark`·`appKeys`·`persisted`·브라우저를 봐야 판단(`navigator.storage.persist()` 후보) ③ 예약 기록에는 운행일지 같은 '내용 요약'이 아직 없다 ④ 예약 이력은 오늘 이후분부터라 그 전은 되살릴 수 없다 |
+
+### Phase 241: 감사 점수보다 "아무것도 안 하면 무엇이 깨지나" — 알림 절반, 오프라인 폐기, 지워지지 않던 기관 데이터 🔔📶🗑️
+
+> 2026-10-14. 운영자 요청 — *"코드베이스를 항목별 점수로 감사하되, 의도된 트레이드오프와 실제로 놓친 허점을 구분해 줘. Top 3는 전제 도전·최소안/이상안·회귀 위험으로."* 7개 영역을 병렬 감사하고(아키텍처 80·보안 83·성능 89·테스트 86·하네스 84·규제 76·UX 80) 큰 주장은 코드로 재확인했다. 운영자가 "추천대로" 진행을 지시해 Top 3를 최소안 중심으로 한 건씩 배포했다.
+
+| 항목 | 내용 |
+|------|------|
+| **감사에서 바로잡은 것** | 리마인더 영향을 에이전트는 "예약의 5/6"이라 했지만 예약 시각은 30분 단위로 맞춰진다(`reservationUtils.ts:184`) — **HH:30 시작 예약, 약 절반**이 정확한 범위다. 보안 감사의 "role 자가 상승 테스트가 다른 이유로 통과" 주장은 사전 데이터 부재를 직접 확인했다 |
+| **알림 창** (#472) | cron은 06-04(`3f0778cb`)부터 매시 정각인데 조회 창은 `[지금, 지금+10분]` 그대로 → 창 = 주기(1시간, `UPCOMING_WINDOW_MIN`). 정각 경계 중복은 기존 `reminderSent`가 막는다. 실행·쿼리 수 그대로라 비용 변화 없음 |
+| **침묵 실패** (#472) | `checkReservationReminders`가 실패를 삼켜 스케줄러가 heartbeat를 찍었다 → `captureError` 후 재throw, 스케줄러는 flush 후 재throw(heartbeat 미기록). `syncCalendarToApp` 전체 실패도 `captureError`+flush |
+| **오프라인 큐** (#473) | 저장소 기록상 Firestore는 App Check ENFORCED인데 서비스워커는 App Check를 초기화하지 않는다. "SyncManager 브라우저는 SW가 처리"라던 주석과 달리 `syncFailureNotice`의 online flush가 모든 브라우저에서 돌아 **두 컨텍스트가 잠금 없이 같은 큐를 비웠다**. SW 쓰기가 거부되면 permission-denied → 영구 폐기 → "다시 입력" 안내. SW는 `FLUSH_SYNC_QUEUE` 메시지만 보내고 페이지가 시작·online·SW 메시지·화면 복귀에 flush. 부수 효과로 운영 `sw.js`가 Firestore SDK를 싣지 않게 됐다(26.8KB, Firestore 호출 0건 실측). 프로덕션 발생 건수는 Sentry 토큰이 없어 확인하지 못했다 |
+| **기관 파기** (#474) | 처리방침 제4조·제9조·해지 모달의 "완전 삭제"와 달리 `purgeOrgs`·[영구 삭제]는 users·기관 문서만 지웠다. [영구 삭제]는 기관 문서까지 지워 **배치가 그 기관을 다시 찾지 못했다**. `purgeOrganizationData`가 기관 필드 14개 컬렉션 → Slack 팀 단위 → 연동 → 월별 통계 → Storage `organizations/{orgId}/` → **기관 문서(하위 컬렉션 포함) 마지막**. 접속기록은 1년 법정 보관이라 남기고, 파기로 생기는 삭제 감사 기록이 곧 파기 기록이 된다 |
+| **파기의 안전장치** | 해지 상태가 아니면 아무것도 지우지 않는다 · 빈 ID·`__system__`·`/` 거부(빈 organizationId 문서 일괄 삭제 방지) · **단계마다 상태 재확인**(적대적 리뷰 지적 — 파기 중 복구되면 복구된 기관 문서까지 지울 수 있었다) · 삭제 트리거(km·하이패스·캘린더)는 `isOrgRetired`로 해지 기관의 파기에서 거래를 되돌리지 않는다(fail-open, 60초 캐시) · 에뮬레이터 통합 테스트가 **다른 기관 데이터와 빈 기관 필드 문서가 한 건도 지워지지 않음**을 고정. 처음 쓴 테스트는 시드를 한 건씩 써 콜드 에뮬레이터에서 beforeEach가 5초를 넘겼다 → 배치 쓰기 |
+| **Sentry 6M** | HeadlessChrome·`localhost:21025`·release 없음·운영에 없는 청크(`index.esm-DxuQAuNZ.js`, 우리 빌드는 10월 내내 `X5dCzDw9`) — 실사용자가 아니고 #455 가드 이전 빌드나 밖의 사본으로 추정. Sentry Inbound Filter(localhost)를 운영자에게 권고 |
+| **배포는 한 건씩** | #472 → #473 → #474 순으로 Deploy 성공 확인 후 다음 머지. 매번 Quota Exceeded 몇 건이 재시도로 성공(80·80·81개 반영) |
+| **검증** | functions jest 1,252 + 에뮬레이터 파기 8건 · web Vitest(offline 60건 포함) · scripts 200 · tsc·eslint · 하네스 Doctor |
+| **남는 것** | ① 처리방침 문구에 접속기록 1년·백업 90일 보관 명시(법무 판단) ② 과거에 퍼지된 기관의 고아 데이터 — 기관 문서가 없어 대상 식별에 일회성 스크립트 필요 ③ uid로만 묶인 데이터(organizationId 없는 즐겨찾기·알림, Storage `feedbacks/{uid}/`)와 3년 아카이브(전 기관 통합 파일) ④ 감사 저위험 묶음: 예약 생성 시각 형식 검증, `currentKm` 직원 분기, Rules 부정 테스트 보강, `firestore-rules.md` 템플릿, `deploy.md` 직접 푸시 지시, `window.confirm`, 통계 엑셀 `recordExport` 누락 |
