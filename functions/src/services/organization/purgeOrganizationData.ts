@@ -212,6 +212,9 @@ const ORPHAN_SCAN: ReadonlyArray<readonly [collection: string, field: string]> =
     ["integrations", "organizationId"],
 ];
 
+/** 기관 ID를 문서 ID로 쓰는 하위 컬렉션 — 예전 퍼지가 부모 문서만 지워 남겼을 수 있다 */
+const ORG_SUBCOLLECTIONS = ["customHolidays", "preRegistered", "stats"] as const;
+
 /**
  * 데이터는 남아 있는데 기관 문서가 없는 기관 ID를 찾는다.
  *
@@ -219,40 +222,65 @@ const ORPHAN_SCAN: ReadonlyArray<readonly [collection: string, field: string]> =
  * **서로 다른 기관 ID만 건너뛰며** 훑으므로 읽기 비용은 (컬렉션 수 × 기관 수) 수준이다.
  * 기관 필드가 비었거나 문자열이 아닌 문서는 `> ""` 조건에서 빠진다(빈 값 일괄 삭제 방지).
  * orgStats는 부모 문서 없이 하위 컬렉션만 있을 수 있어 listDocuments로 본다.
+ *
+ * 컬렉션별 훑기는 **동시에** 돌린다. 처음 판은 순서대로 돌아 운영(기관 수십 곳)에서 출력 없이
+ * 수 분이 걸려 멈춘 것처럼 보였다(2026-10-14 실측). `onProgress`로 진행을 알린다.
  */
-export async function findOrphanOrgIds(db: Firestore = getFirestore()): Promise<string[]> {
+export async function findOrphanOrgIds(
+    db: Firestore = getFirestore(),
+    onProgress: (message: string) => void = () => {},
+): Promise<string[]> {
     const candidates = new Set<string>();
-    for (const [collection, field] of ORPHAN_SCAN) {
+    await Promise.all(ORPHAN_SCAN.map(async ([collection, field]) => {
         let last = "";
+        let distinct = 0;
         for (;;) {
             const snap = await db.collection(collection).where(field, ">", last).orderBy(field).limit(1).get();
             if (snap.empty) break;
             const value = snap.docs[0].get(field);
             if (typeof value !== "string" || value <= last) break; // 방어: 진행하지 않으면 멈춘다
             if (value !== SYSTEM_ORG_ID) candidates.add(value);
+            distinct++;
             last = value;
         }
-    }
+        onProgress(`  · ${collection}: 기관 ${distinct}곳`);
+    }));
     for (const ref of await db.collection("orgStats").listDocuments()) candidates.add(ref.id);
     // 예전 퍼지는 기관 문서만 지워 하위 컬렉션(preRegistered: 사전 등록 직원 이름·이메일 등)이 남았다.
     // listDocuments는 하위 컬렉션만 남은 "없는 문서"도 돌려주므로, 다른 데이터가 없는 고아도 여기서 잡힌다.
     for (const ref of await db.collection("organizations").listDocuments()) candidates.add(ref.id);
 
+    const ids = [...candidates].filter((id) => !id.includes("/") && id.trim() !== "").sort();
+    onProgress(`  · 후보 기관 ${ids.length}곳 — 기관 문서 존재 여부 확인 중`);
     const orphans: string[] = [];
-    for (const orgId of [...candidates].sort()) {
-        if (orgId.includes("/") || orgId.trim() === "") continue;
-        if (!(await db.collection("organizations").doc(orgId).get()).exists) orphans.push(orgId);
+    // 존재 확인은 getAll로 묶어 왕복을 줄인다(100개씩).
+    for (let i = 0; i < ids.length; i += 100) {
+        const chunk = ids.slice(i, i + 100);
+        const snaps = await db.getAll(...chunk.map((id) => db.collection("organizations").doc(id)));
+        snaps.forEach((snap, j) => { if (!snap.exists) orphans.push(chunk[j]); });
     }
     return orphans;
 }
 
-/** 고아 기관 하나가 컬렉션별로 남긴 문서 수 (dry-run 보고용, count 집계라 1,000건당 읽기 1회) */
+/**
+ * 고아 기관 하나가 남긴 문서 수 (dry-run 보고용, count 집계라 1,000건당 읽기 1회).
+ *
+ * 기관 필드로 묶인 컬렉션뿐 아니라 **기관 하위 컬렉션·월별 통계**도 센다. 처음 판은 앞쪽만 세서,
+ * 하위 컬렉션만 남은 고아가 "0건 {}"으로 보여 무엇을 지우는지 판단할 수 없었다.
+ */
 export async function countOrgData(orgId: string, db: Firestore = getFirestore()): Promise<Record<string, number>> {
     assertValidOrgId(orgId);
+    const orgRef = db.collection("organizations").doc(orgId);
+    const statsRef = db.collection("orgStats").doc(orgId);
+    const entries = await Promise.all([
+        ...ORPHAN_SCAN.map(async ([collection, field]) =>
+            [collection, (await db.collection(collection).where(field, "==", orgId).count().get()).data().count] as const),
+        ...ORG_SUBCOLLECTIONS.map(async (sub) =>
+            [`organizations/${sub}`, (await orgRef.collection(sub).count().get()).data().count] as const),
+        (async () => ["orgStats/monthly", (await statsRef.collection("monthly").count().get()).data().count] as const)(),
+        (async () => ["orgStats", (await statsRef.get()).exists ? 1 : 0] as const)(),
+    ]);
     const out: Record<string, number> = {};
-    for (const [collection, field] of ORPHAN_SCAN) {
-        const n = (await db.collection(collection).where(field, "==", orgId).count().get()).data().count;
-        if (n > 0) out[collection] = n;
-    }
+    for (const [key, n] of entries) if (n > 0) out[key] = n;
     return out;
 }

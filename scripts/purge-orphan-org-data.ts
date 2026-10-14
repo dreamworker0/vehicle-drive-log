@@ -8,7 +8,7 @@
  * 파기를 과거 기관에도 적용하려고 한 번 돌린다. 앞으로 생기는 해지 기관은 주간 배치가 처리한다.
  *
  * ## 사용법 (저장소 루트에서 — firebase-admin은 functions/node_modules에서 읽는다)
- *   cd functions
+ *   cd functions            (Windows PowerShell 5.1은 `&&`를 지원하지 않는다 — 한 줄씩 또는 `;`로 잇는다)
  *   npx tsx ../scripts/purge-orphan-org-data.ts                 # 1단계: 대상만 집계 (기본, 아무것도 지우지 않음)
  *   npx tsx ../scripts/purge-orphan-org-data.ts --execute       # 2단계: 위 목록 전부 파기
  *   npx tsx ../scripts/purge-orphan-org-data.ts --execute --only=<기관ID>   # 한 기관만 파기
@@ -53,7 +53,8 @@ async function main() {
     const db = getFirestore();
     console.log(execute ? "🗑️  실행 모드 — 고아 데이터를 파기합니다" : "🔎 확인 모드(dry-run) — 아무것도 지우지 않습니다");
 
-    const orphans = await findOrphanOrgIds(db);
+    console.log("\n기관 ID를 훑는 중…");
+    const orphans = await findOrphanOrgIds(db, (message) => console.log(message));
     const targets = only ? orphans.filter((id) => id === only) : orphans;
 
     if (only && targets.length === 0) {
@@ -65,11 +66,17 @@ async function main() {
         return;
     }
 
-    console.log(`\n고아 기관 ${targets.length}곳:`);
-    for (const orgId of targets) {
-        const counts = await countOrgData(orgId, db);
-        const total = Object.values(counts).reduce((a, b) => a + b, 0);
-        console.log(`  - ${orgId}: ${total}건 ${JSON.stringify(counts)}`);
+    console.log(`\n고아 기관 ${targets.length}곳 (organizations/* = 기관 하위 컬렉션, orgStats* = 월별 통계):`);
+    // 기관별 집계를 몇 곳씩 동시에 — 하나씩 세면 기관당 수 초씩 걸렸다
+    const CONCURRENCY = 5;
+    for (let i = 0; i < targets.length; i += CONCURRENCY) {
+        const chunk = targets.slice(i, i + CONCURRENCY);
+        const results = await Promise.all(chunk.map((orgId) => countOrgData(orgId, db)));
+        chunk.forEach((orgId, j) => {
+            const counts = results[j];
+            const total = Object.values(counts).reduce((a, b) => a + b, 0);
+            console.log(`  - ${orgId}: ${total}건 ${JSON.stringify(counts)}`);
+        });
     }
 
     if (!execute) {
