@@ -64,14 +64,17 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     const logReadPromise = orgAMemberDb.collection('driveLogs').doc('log_B').get();
     await assertFails(logReadPromise);
 
-    // org-B에 기습적으로 운행일지 기록
-    const badLogWritePromise = orgAMemberDb.collection('driveLogs').doc('evil_log').set({
-      organizationId: 'org-B',  // 내 orgId가 아님
+    // org-B에 기습적으로 운행일지 기록 — 필수 필드를 다 갖춰 **기관 조건 하나만** 걸리게 한다.
+    // (예전 payload는 createdByUid가 빠져 hasAll에서 먼저 거부돼, 기관 격리를 지워도 초록이었다)
+    const logPayload = {
       vehicleId: 'vehicle_B',
       driverUid: 'user_A',
+      createdByUid: 'user_A',
       purpose: '타 조직으로 비용 떠넘기기',
-    });
-    await assertFails(badLogWritePromise);
+    };
+    await assertFails(orgAMemberDb.collection('driveLogs').doc('evil_log').set({ ...logPayload, organizationId: 'org-B' }));
+    // 대조군: 같은 payload를 내 기관으로 쓰면 통과한다 — 위 거부가 기관 조건 때문임을 보증한다
+    await assertSucceeds(orgAMemberDb.collection('driveLogs').doc('own_log').set({ ...logPayload, organizationId: 'org-A' }));
   });
 
   it('2. 권한 상승 공격 (Privilege Escalation)', async () => {
@@ -82,19 +85,30 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
         plateNumber: '22나2222',
         currentKm: 1000,
       });
+      // 본인 문서를 심어 둔다 — 없으면 update가 "없는 문서"로 실패해 role 차단을 검증하지 못한다
+      await db.collection('users').doc('user_A').set({
+        email: 'a@example.com', name: '직원A', role: 'employee', organizationId: 'org-A',
+      });
+      await db.collection('users').doc('user_A2').set({
+        email: 'a2@example.com', name: '직원A2', role: 'employee', organizationId: 'org-A',
+      });
     });
 
-    const orgAMemberDb = setupContext('user_A', { role: 'member', orgId: 'org-A' }).firestore();
+    const orgAMemberDb = setupContext('user_A', { role: 'employee', orgId: 'org-A' }).firestore();
+    const orgAAdminDb = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
 
     // 일반 멤버가 차량 삭제 시도
     const vehicleDelPromise = orgAMemberDb.collection('vehicles').doc('vehicle_A').delete();
     await assertFails(vehicleDelPromise);
 
     // 일반 멤버가 자기 계정 role을 강제로 관리자로 변경 시도 (`users/{uid}` 수정 제약)
-    const promotePromise = orgAMemberDb.collection('users').doc('user_A').update({
-      role: 'admin',
-    });
-    await assertFails(promotePromise); // diff.affectedKeys().hasAny(['role', 'organizationId'])에 걸려야 함
+    await assertFails(orgAMemberDb.collection('users').doc('user_A').update({ role: 'admin' }));
+    // 대조군: 같은 문서의 다른 필드는 본인이 고칠 수 있다 — 위 거부가 role 때문임을 보증한다
+    await assertSucceeds(orgAMemberDb.collection('users').doc('user_A').update({ phone: '010-0000-0000' }));
+
+    // 기관관리자도 superAdmin은 부여할 수 없다 (rules users update — 관리자 분기)
+    await assertFails(orgAAdminDb.collection('users').doc('user_A2').update({ role: 'superAdmin' }));
+    await assertSucceeds(orgAAdminDb.collection('users').doc('user_A2').update({ role: 'admin' }));
   });
 
   it('3. 데이터 주입 공격 (driverUid 속이기 및 주행거리 역행)', async () => {
@@ -125,12 +139,15 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
       currentKm: 3000, // 기존 5000에서 감소
     });
     await assertFails(rewindKm);
-    
-    // 허용되는 정상 업데이트(주행거리 증가)는 성공해야 정상
-    const forwardKm = orgAMemberDb.collection('vehicles').doc('vehicle_A').update({
-      currentKm: 5100, // 증가
-    });
-    await assertSucceeds(forwardKm);
+
+    // 증가도 막는다(2026-10-14 감사) — 누적 km는 서버 트리거가 소유한다. 예전에는 직원 누구나
+    // 상한 없이·기록 없이 부풀릴 수 있었고, 감소가 막혀 있어 스스로 복구되지도 않았다.
+    await assertFails(orgAMemberDb.collection('vehicles').doc('vehicle_A').update({ currentKm: 5100 }));
+    await assertFails(orgAMemberDb.collection('vehicles').doc('vehicle_A').update({ currentKm: 9999999 }));
+
+    // 관리자의 정정(차량 관리 화면)은 그대로 허용
+    const orgAAdminDb = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+    await assertSucceeds(orgAAdminDb.collection('vehicles').doc('vehicle_A').update({ currentKm: 5100 }));
   });
   
   it('4. 관리자의 정상 오퍼레이션 허용', async () => {

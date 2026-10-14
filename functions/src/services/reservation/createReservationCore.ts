@@ -93,6 +93,10 @@ export function isGenuineQuickDrive(
 /** 동승자 배열 길이 상한 — 클라이언트(reservationPassengers.ts)와 같은 값 */
 const MAX_PASSENGERS = 50;
 
+/** 겹침 판정이 문자열 비교라 0을 채운 고정 폭이어야 한다 — parseIntent의 TIME_RE와 같은 기준 */
+const DATE_RE = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
+const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
+
 export interface CreateReservationResult {
     reservationId: string;
     status: "pending" | "reserved";
@@ -131,6 +135,22 @@ export async function createReservationTx(
             "invalid-argument",
             "organizationId, vehicleId, date, startTime, endTime은 필수입니다."
         );
+    }
+
+    // 날짜·시각 형식을 먼저 고정한다. 겹침 판정과 "한 사람 한 대" 검사는 **문자열 비교**라
+    // 0을 채우지 않은 값이 들어오면 판정이 무너진다 — "9:00" < "12:00"은 거짓이라('9' > '1')
+    // 09:00~12:00 예약 위에 같은 차를 다시 잡을 수 있었다(2026-10-14 감사). 화면은 `<input type=time>`,
+    // Slack 어시스턴트는 parseIntent의 TIME_RE를 거쳐 항상 "HH:MM"이므로 정상 경로는 영향이 없다.
+    // 수정 코어(updateReservationCore)는 이미 같은 검사를 하고 있었다.
+    if (typeof date !== "string" || !DATE_RE.test(date)
+        || typeof startTime !== "string" || !TIME_RE.test(startTime)
+        || typeof endTime !== "string" || !TIME_RE.test(endTime)) {
+        throw new HttpsError("invalid-argument", "날짜·시간 형식이 올바르지 않습니다.");
+    }
+    for (const [key, value] of Object.entries({ vehicleName, reservedByName, purpose, destination, groupId, recurringGroupId })) {
+        if (value !== undefined && value !== null && typeof value !== "string") {
+            throw new HttpsError("invalid-argument", `${key} 형식이 올바르지 않습니다.`);
+        }
     }
 
     // 조건에 맞지 않는 바로 운행 표시는 버린다(일반 예약으로 처리) — 승인 우회 방지

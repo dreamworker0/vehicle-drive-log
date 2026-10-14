@@ -270,12 +270,11 @@ service cloud.firestore {
                     // 오염시키는 교차 테넌트 무결성 침해 차단 (2026-07-10 감사 #6).
                     || (isOrgAdmin(resource.data.organizationId)
                         && request.resource.data.organizationId == resource.data.organizationId
-                        && (!request.resource.data.keys().hasAny(['currentKm']) || request.resource.data.currentKm >= 0))
-                    // 소속 기관 멤버가 운행일지 저장 시 currentKm만 갱신 가능 (감소 방지)
-                    || (isOrgMember(resource.data.organizationId)
-                        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['currentKm'])
-                        && request.resource.data.currentKm >= resource.data.currentKm
-                        && request.resource.data.currentKm >= 0);
+                        && (!request.resource.data.keys().hasAny(['currentKm']) || request.resource.data.currentKm >= 0));
+                    // 소속 멤버의 currentKm 갱신 분기는 없앴다(2026-10-14 감사). 운행일지 저장 시 누적 km는
+                    // 서버 트리거(syncDriveLogKm)가 FieldValue.increment로 보정하므로 클라이언트 경로가 없는데,
+                    // 분기가 남아 있어 직원 누구나 상한 없이·기록 없이 누적 km를 부풀릴 수 있었다. 감소는 막혀
+                    // 있어 스스로 복구되지도 않았다 — 하이패스 잔액(아래 hipassCards)과 같은 이유로 닫는다.
       allow delete: if isOrgAdmin(resource.data.organizationId) || isSuperAdmin();
     }
 

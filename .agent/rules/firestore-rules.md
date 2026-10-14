@@ -17,7 +17,7 @@ description: Firestore & Storage 보안 규칙 수정 가이드. firestore.rules
 | 함수 | 용도 |
 |------|------|
 | `isSignedIn()` | 로그인 여부 |
-| `isSuperAdmin()` | 슈퍼관리자 (이메일 + role 체크) |
+| `isSuperAdmin()` | 슈퍼관리자 (커스텀 클레임 `role == 'superAdmin'`만 본다 — `get()` 없음) |
 | `isOrgMember(orgId)` | 해당 기관 소속 여부 |
 | `isOrgAdmin(orgId)` | 해당 기관의 관리자 여부 |
 | `isOwner(uid)` | 자신의 문서 여부 |
@@ -49,17 +49,27 @@ description: Firestore & Storage 보안 규칙 수정 가이드. firestore.rules
 match /collectionName/{docId} {
     allow read: if belongsToMyOrg() || isSuperAdmin();
     allow create: if newBelongsToMyOrg();
-    allow update: if belongsToMyOrg() || isSuperAdmin();
+    // organizationId는 불변 — 빠뜨리면 문서를 다른 기관으로 옮길 수 있다(2026-07-10 감사 #6)
+    allow update: if isSuperAdmin()
+                  || (belongsToMyOrg()
+                      && request.resource.data.organizationId == resource.data.organizationId);
     allow delete: if isSuperAdmin();
 }
 ```
+
+> ⚠️ **update에는 반드시 organizationId 불변 조건을 붙인다.** `belongsToMyOrg()`는 **기존** 문서(`resource.data`)만
+> 보므로, 그것만으로는 내 기관 문서의 `organizationId`를 남의 기관 값으로 바꾸는 쓰기가 통과한다. 실제 규칙의
+> 모든 기관 컬렉션(vehicles·driveLogs·reservations·fuelLogs·hipassCharges·maintenanceRecords·hipassCards)이 이 조건을 갖고 있다.
+>
+> ⚠️ **서버가 소유한 값(누적 km·하이패스 잔액 등)에 구성원 쓰기 분기를 열지 않는다.** "증가만 허용" 같은 조건으로도
+> 상한 없는·기록 없는 조작은 막지 못한다 — 차량 `currentKm`과 카드 `balance`가 그래서 닫혔다(Phase 227, 2026-10-14 감사).
 
 ### 2.1 패턴별 선택 가이드
 
 | 시나리오 | read | create | update | delete |
 |---------|------|--------|--------|--------|
-| 기관 공용 데이터 (차량, 예약 등) | `belongsToMyOrg()` | `newBelongsToMyOrg()` | `belongsToMyOrg()` | `isSuperAdmin()` |
-| 관리자만 관리 (정비기록 등) | `belongsToMyOrg()` | `newBelongsToMyOrg() && isOrgAdmin(...)` | `isOrgAdmin(...)` | `isOrgAdmin(...)` |
+| 기관 공용 데이터 (차량, 예약 등) | `belongsToMyOrg()` | `newBelongsToMyOrg()` | `belongsToMyOrg()` **+ organizationId 불변** | `isSuperAdmin()` |
+| 관리자만 관리 (정비기록 등) | `belongsToMyOrg()` | `newBelongsToMyOrg() && isOrgAdmin(...)` | `isOrgAdmin(...)` **+ organizationId 불변** | `isOrgAdmin(...)` |
 | 개인 데이터 (즐겨찾기 등) | `resource.data.userId == request.auth.uid` | `request.resource.data.userId == request.auth.uid` | 소유자만 | 소유자만 |
 | 시스템 데이터 | `isSignedIn()` | `false` | `false` | `false` |
 
@@ -86,17 +96,12 @@ match /parentCollection/{parentId} {
 - `belongsToMyOrg()`는 `resource.data.organizationId == userOrgId()`를 검증
 - `newBelongsToMyOrg()`는 `request.resource.data.organizationId == userOrgId()`를 검증
 
-### 3.2 SuperAdmin 와일드카드
+### 3.2 SuperAdmin 접근은 컬렉션마다 명시한다
 
-`firestore.rules` 최상단에 SuperAdmin 전체 접근 규칙이 이미 존재한다. 이 규칙이 다른 모든 규칙보다 먼저 평가된다:
+`firestore.rules`에는 SuperAdmin 와일드카드(`match /{document=**}`)가 **없다.** SuperAdmin이 접근해야 하는 컬렉션은
+각 `allow`에 `|| isSuperAdmin()`를 **직접 적어야** 한다. 적지 않으면 SuperAdmin도 막힌다.
 
-```
-match /{document=**} {
-    allow read, write: if isSuperAdmin();
-}
-```
-
-> 따라서 개별 컬렉션 규칙에 `|| isSuperAdmin()`를 명시하지 않아도 SuperAdmin은 접근 가능하다. 다만 **가독성을 위해** 명시적으로 기술하는 것을 권장한다.
+> 와일드카드를 새로 두지 않는다 — 규칙은 OR로 합쳐지므로(§6.1) 넓은 허용 하나가 아래의 좁은 조건을 전부 무력화한다.
 
 ### 3.3 Firestore read 제한
 
