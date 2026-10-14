@@ -17,6 +17,7 @@ async function loadSentry() {
     const captureMessage = vi.fn();
     const setUser = vi.fn();
     vi.doMock('../../lib/sentryClient', () => ({
+        withStaticSpan,
         init,
         setUser,
         setTag: vi.fn(),
@@ -45,9 +46,15 @@ async function loadBreadcrumbHook() {
  * 차가워, 부하가 걸린 로컬 실행에서 첫 테스트의 `vi.waitFor`(기본 1초)가 init 호출을 기다리다 넘쳤다
  * (2026-10-14 워커 100% + 커버리지 실측 — 단독 2.9초 통과). 변환 결과는 resetModules 뒤에도 남는다.
  * SDK(sentryClient)는 각 테스트가 doMock으로 바꾸므로 여기서 불러오지 않는다.
+ *
+ * withStaticSpan만은 **진짜**를 쓴다 — 콜백에 표식을 다는 것이 계약이라, 가짜로 바꾸면
+ * traceLifecycle과 짝이 맞는지(아래 테스트)를 확인할 수 없다. 패키지 로드가 무거워(첫 회 ~12초)
+ * 테스트 안이 아니라 여기서 한 번 받는다.
  */
+let withStaticSpan: typeof import('@sentry/react').withStaticSpan;
 beforeAll(async () => {
     await import('../../lib/sentry');
+    ({ withStaticSpan } = await vi.importActual<typeof import('@sentry/react')>('@sentry/react'));
 }, 60_000);
 
 describe('captureError / captureWarning — 개인정보 스크러빙 배선', () => {
@@ -234,6 +241,50 @@ describe('captureError / captureWarning — 개인정보 스크러빙 배선', (
         expect(data['http.query']).not.toContain('김OO');
         expect(data['http.method']).toBe('GET');
         expect(out.description).toBe('GET /api/tmap');  // fetch 스팬 이름에는 지울 것이 없다
+    });
+
+    it('SDK 11의 새 속성 키(url.query·url.fragment)도 지운다', async () => {
+        // SDK 11에서 getFetchSpanAttributes가 쿼리를 http.query → url.query로 옮겼다.
+        const { init } = await loadSentry();
+        const options = init.mock.calls[0][0] as {
+            beforeSendSpan: (s: Record<string, unknown>) => Record<string, unknown>;
+        };
+
+        const out = options.beforeSendSpan({
+            description: 'GET /api/tmap',
+            data: { 'url.full': 'https://x.web.app/api/tmap?keyword=김OO#홍길동', 'url.query': 'keyword=김OO', 'url.fragment': '홍길동' },
+        });
+
+        expect(JSON.stringify(out)).not.toContain('김OO');
+        expect(JSON.stringify(out)).not.toContain('홍길동');
+    });
+
+    it('beforeSendSpan이 traceLifecycle과 짝이 맞는다 — 어긋나면 SDK가 훅을 조용히 건너뛴다', async () => {
+        // SDK 11은 static 모드에서 withStaticSpan으로 감싼 콜백만 부른다(감싸지 않은 콜백은 스트림용).
+        // 둘 중 하나만 바뀌면 오류 없이 스크러빙이 꺼지고 검색어가 원본으로 나간다.
+        const { init } = await loadSentry();
+        const options = init.mock.calls[0][0] as { traceLifecycle?: string; beforeSendSpan: object };
+
+        const isStatic = '_static' in options.beforeSendSpan
+            && (options.beforeSendSpan as { _static?: boolean })._static === true;
+        expect(options.traceLifecycle).toBe('static');
+        expect(isStatic).toBe(true);
+    });
+
+    it('수집 범위를 v10 수준으로 묶는다 — SDK 11은 비워 두면 IP·쿠키·쿼리·본문까지 거둔다', async () => {
+        const { init } = await loadSentry();
+        const options = init.mock.calls[0][0] as {
+            dataCollection?: Record<string, unknown>;
+            sendDefaultPii?: boolean;
+        };
+
+        const dc = options.dataCollection;
+        expect(dc).toBeDefined();
+        expect(dc?.userInfo).toBe(false);          // true면 infer_ip: 'auto' — IP가 이벤트마다 붙는다
+        expect(dc?.cookies).toBe(false);
+        expect(dc?.urlQueryParams).toBe(false);    // 목적지 검색어·초대 코드
+        expect(dc?.httpBodies).toEqual([]);
+        expect(options.sendDefaultPii).not.toBe(true);
     });
 
     it('스팬 이름에 실린 실명도 지운다 — INP 스팬은 이름 자체가 요소 설명이다', async () => {

@@ -13,4 +13,5 @@ export {
     captureMessage,
     setMeasurement,
     browserTracingIntegration,
+    withStaticSpan,
 } from '@sentry/react';

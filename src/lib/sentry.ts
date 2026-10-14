@@ -75,6 +75,40 @@ function initSentryWithModule(Sentry: SentryModule) {
         integrations: [
             Sentry.browserTracingIntegration(),
         ],
+        /**
+         * 스팬 전송 방식 — SDK 11부터 기본값이 'stream'(스팬을 묶음으로 따로 보냄)이다.
+         *
+         * 'static'(v10과 같은 트랜잭션 이벤트)으로 고정한다. 스트림 형식(`StreamedSpanJSON`)에는
+         * `events`가 없어 `reportWebVitals`의 `setMeasurement`(루트 스팬 event로 붙는다)가 실리지
+         * 않을 수 있고, 아래 `beforeSendSpan` 스크러빙도 형식(`data`→`attributes`,
+         * `description`→`name`)을 새로 맞춰야 한다. 개인정보 훅을 바꾸는 일이라 SDK 올리기와
+         * 섞지 않았다 — 스트림 전환은 Web Vitals 수집을 확인하며 따로 한다.
+         */
+        traceLifecycle: 'static',
+        /**
+         * 수집 범위 — SDK 11은 `sendDefaultPii`를 이것으로 바꾸면서 **비워 두면 v10보다 더 많이
+         * 거둔다**(userInfo·cookies·헤더·쿼리·본문이 모두 기본 켜짐). 특히 `userInfo: true`면
+         * SDK가 Sentry에 `infer_ip: 'auto'`를 보내 사용자 IP가 이벤트마다 붙는다(@sentry/browser
+         * client.js). v10에서 sendDefaultPii를 켠 적이 없으므로 v10 기본값 수준으로 명시한다.
+         *
+         * - httpHeaders.request: User-Agent는 남긴다 — 브라우저·OS 판별과 Sentry의 "구형 브라우저
+         *   ·크롤러 필터"가 이 값을 쓴다(httpcontext.js). Referer는 쿼리째 담기므로 뺀다.
+         * - urlQueryParams: 이 앱의 쿼리에는 검색어(목적지)·초대 코드가 실린다. 스크러버가 2차로 막는다.
+         */
+        dataCollection: {
+            userInfo: false,
+            cookies: false,
+            httpHeaders: { request: { allow: ['User-Agent'] }, response: false },
+            httpBodies: [],
+            urlQueryParams: false,
+            graphQL: { document: false, variables: false },
+            genAI: { inputs: false, outputs: false },
+            databaseQueryData: false,
+            queues: false,
+        },
+        // SDK 11은 기본으로 captureMessage에도 스택을 붙이고, 그 이벤트가 세션을 '오류'로 센다.
+        // captureWarning(경고성 captureMessage)이 crash-free 지표를 깎지 않도록 v10 동작을 유지한다.
+        attachStacktrace: false,
         // console 호출은 SDK 기본 breadcrumbsIntegration이 **인자를 그대로** 담아 다음
         // 이벤트에 붙인다. 즉 captureError/captureWarning에서 extra를 걸러도, 같은 함수의
         // console 출력이 원본을 다시 실어 보낸다. 앱 전역 console이 대상이라 여기서 막는다.
@@ -142,13 +176,18 @@ function initSentryWithModule(Sentry: SentryModule) {
          * (CLS·LCP는 standalone이 아니라 pageload 루트 스팬의 속성으로 나간다 — 그쪽은
          * `scrubSpanData`가 맡는다.) Phase 211에서 이 경로를 "설치본에 없는 패키지"라며
          * 반려했는데, 패키지 이름만 달랐을 뿐(`@sentry/browser-utils`) 경로는 실재했다.
+         *
+         * **`withStaticSpan`을 벗기면 이 훅이 아예 불리지 않는다.** SDK 11은 감싸지 않은 콜백을
+         * 스트림용으로 보고, 위 `traceLifecycle: 'static'`과 짝이 맞지 않는 콜백은 건너뛴다
+         * (core client.js `isStaticBeforeSendSpanCallback`) — 오류 없이 원본 스팬이 나간다.
+         * 짝은 sentryCapture.test.ts가 지킨다.
          */
-        beforeSendSpan(span) {
+        beforeSendSpan: Sentry.withStaticSpan((span) => {
             const data = scrubSpanData(span.data as Record<string, unknown> | undefined);
             const description = scrubSpanName(span.description);
             if (data === span.data && description === span.description) return span;
             return { ...span, data, description } as typeof span;
-        },
+        }),
         // 노이즈 에러 필터링
         ignoreErrors: [
             // reCAPTCHA 중복 렌더링 에러 (인앱 브라우저 및 특정 WebView 환경에서 발생하는 외부 노이즈)
