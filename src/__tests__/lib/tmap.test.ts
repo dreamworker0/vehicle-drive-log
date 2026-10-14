@@ -1,10 +1,20 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll } from 'vitest';
 
 // 환경변수 모킹 (Vite 환경)
 vi.stubEnv('VITE_TMAP_API_KEY', 'test-key');
 
 // 모듈 상태 초기화를 위해 동적 import
 let isTmapCoolingDown: () => boolean, isTmapAvailable: () => boolean, parseDestinations: (s: string) => string[], MAX_DESTINATIONS: number;
+
+/**
+ * 모듈 변환을 미리 끝내 둔다. 아래 beforeEach는 테스트마다 resetModules 후 다시 import하는데,
+ * **첫 회만** 변환이 차가워 부하가 걸린 로컬 실행에서 첫 테스트가 실패했다(2026-10-14 실측 —
+ * 단독·CI에서는 통과). resetModules는 모듈 레지스트리만 비우고 변환 결과는 남기므로, 여기서 한 번
+ * 불러 두면 이후 import는 빠르다. 테스트마다 모듈 상태를 새로 만드는 격리는 그대로다.
+ */
+beforeAll(async () => {
+    await import('../../lib/tmap.js');
+}, 60_000);
 
 beforeEach(async () => {
     vi.resetModules();

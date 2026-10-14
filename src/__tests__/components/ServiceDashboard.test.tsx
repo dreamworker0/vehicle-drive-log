@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import ServiceDashboard from '../../components/superAdmin/ServiceDashboard';
@@ -115,6 +115,22 @@ const mockData = {
         refreshServerStats: vi.fn().mockResolvedValue({ skipped: false })
     }
 };
+
+/**
+ * 모킹하지 않은 지연 로드 차트를 미리 변환해 둔다.
+ *
+ * '운영 요약' 탭을 처음 누르는 테스트가 ChartOrgTrend·ChartFirstEmployee(+ 실제 recharts)를
+ * **처음** 불러오면서 코드 변환 비용을 혼자 떠안았다. 평소엔 3초 안에 끝나지만 다른 작업과 동시에
+ * 돌아 CPU가 붐비면 22.8초가 걸려 기본 5초 제한을 넘겼다(2026-10-14 실측, CI 전용 러너에서는 실패 없음).
+ * 여기서 넉넉한 제한으로 한 번 불러 두면 각 테스트는 변환이 끝난 모듈을 쓴다 — 테스트별 제한은
+ * 그대로라 진짜로 멈추는 회귀는 여전히 잡힌다.
+ */
+beforeAll(async () => {
+    await Promise.all([
+        import('../../components/superAdmin/dashboard/ChartOrgTrend'),
+        import('../../components/superAdmin/dashboard/ChartFirstEmployee'),
+    ]);
+}, 60_000);
 
 describe('ServiceDashboard', () => {
     beforeEach(() => {
