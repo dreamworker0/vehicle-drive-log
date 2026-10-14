@@ -9,7 +9,8 @@ description: Cloud Storage 버킷에 수명 주기(자동 삭제) 규칙을 적�
 
 | 버킷 | 위치 | 규칙 파일 | 대상 | 보관 |
 |---|---|---|---|---|
-| `vehicle-drive-log.firebasestorage.app` (기본) | us-east1 | `storage-lifecycle.json` | `temp/`·`ocr_images/` prefix만 | 30일 |
+| `vehicle-drive-log.firebasestorage.app` (기본) | us-east1 | `storage-lifecycle.json` | `temp/`·`ocr_images/` prefix | 30일 |
+| 〃 | 〃 | 〃 | `archives/driveLogs/` prefix (3년 지난 운행일지 보관본) | 생성 후 730일 = 작성 후 약 5년 (처리방침 제4·9조) |
 | `vehicle-drive-log-backups` (백업 전용) | asia-northeast3 | `storage-lifecycle-backups.json` | 버킷 전체 | 90일 |
 
 - 기본 버킷에는 사용자 업로드(고유번호증·피드백 등)가 함께 있으므로 **prefix 한정**이다.

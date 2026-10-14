@@ -12,6 +12,18 @@
           "ocr_images/"
         ]
       }
+    },
+    {
+      "action": {
+        "type": "Delete"
+      },
+      "condition": {
+        "age": 730,
+        "isLive": true,
+        "matchesPrefix": [
+          "archives/driveLogs/"
+        ]
+      }
     }
   ]
 }

@@ -8,6 +8,7 @@
  * 두 경로 모두 개인정보 동의를 직원에게 요구하지 않는다(useConsentGate 주석 참고).
  */
 import useConsentGate from '../../hooks/useConsentGate';
+import { PRIVACY_VERSION, formatLegalVersion } from '../../lib/constants';
 
 /** 약관·처리방침 링크 — 모달에 갇히지 않도록 새 탭으로 연다. */
 function LegalLink({ href, children }: { href: string; children: React.ReactNode }) {
@@ -71,9 +72,12 @@ export default function ConsentGate() {
                     개정 약관 동의가 필요합니다
                 </h2>
                 <div className="text-sm text-surface-600 dark:text-surface-400 space-y-2 mb-4 leading-relaxed">
+                    {/* 개정마다 이 창이 다시 뜬다 — 특정 개정의 내용을 적으면 다음 개정 때 틀린 안내가 된다
+                        (8월 위탁 조항 신설 문구가 10월 개정 때도 그대로 떴다). 바뀐 내용은 문서의 개정 이력이 정본이다. */}
                     <p>
-                        <LegalLink href="/terms">이용약관</LegalLink>에 개인정보 처리의 위탁 조항(제9조)이
-                        신설되고 <LegalLink href="/privacy">개인정보 처리방침</LegalLink>이 개정되었습니다.
+                        <LegalLink href="/terms">이용약관</LegalLink>과 <LegalLink href="/privacy">개인정보 처리방침</LegalLink>이
+                        개정되어 <strong>{formatLegalVersion(PRIVACY_VERSION)}</strong>부터 시행됩니다.
+                        바뀐 내용은 각 문서 끝의 개정 이력에서 확인할 수 있어요.
                     </p>
                     <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 dark:bg-blue-900/20 dark:border-blue-800">
                         <p className="text-xs text-blue-700 dark:text-blue-400">
