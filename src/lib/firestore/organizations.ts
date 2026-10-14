@@ -162,20 +162,23 @@ export const deleteOrganization = async (orgId: string) => {
     }
 };
 
-// 영구 삭제 (소속 사용자 + 기관 문서 완전 제거)
+/**
+ * 영구 삭제 — 해지된 기관의 데이터 전체를 서버에서 파기한다(`purgeOrganization` 콜러블).
+ *
+ * 예전에는 여기서 users와 기관 문서만 지웠다. 운행일지·예약·차량 등은 그대로 남았고, 기관 문서가
+ * 사라져 주간 파기 배치도 그 기관을 다시 찾지 못했다. 파기 범위는 서버(purgeOrganizationData)가
+ * 정본이다. 큰 기관은 오래 걸릴 수 있어 서버 상한(540초)에 맞춰 기다린다. 중간에 실패해도
+ * 다시 부르면 남은 것부터 이어서 지운다(기관 문서를 마지막에 지운다).
+ */
 export const permanentDeleteOrganization = async (orgId: string) => {
     try {
-        const usersQuery = query(
-            collection(db, 'users'),
-            where('organizationId', '==', orgId)
+        const call = httpsCallable<{ orgId: string }, { success: boolean; deleted: Record<string, number> }>(
+            firebaseFunctions,
+            'purgeOrganization',
+            { timeout: 540_000 },
         );
-        const usersSnap = await getDocs(usersQuery);
-        const batch = writeBatch(db);
-        usersSnap.docs.forEach(userDoc => {
-            batch.delete(userDoc.ref);
-        });
-        batch.delete(doc(db, 'organizations', orgId));
-        await batch.commit();
+        const result = await call({ orgId });
+        return result.data.deleted;
     } catch (error) {
         captureError(error, { context: 'permanentDeleteOrganization', orgId });
         throw error;

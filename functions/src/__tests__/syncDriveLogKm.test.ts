@@ -138,6 +138,9 @@ jest.mock('../handlers/sync/conflictResolver', () => ({
     resolveDriveLogConflict: jest.fn(async () => false),
 }));
 jest.mock('../core/sentry', () => ({ captureError: jest.fn() }));
+// 해지 기관 가드는 orgRetirement.test.ts가 따로 검증한다 — 여기서는 정상 기관으로 고정한다.
+const mockIsOrgRetired = jest.fn(async (_orgId: unknown) => false);
+jest.mock('../utils/orgRetirement', () => ({ isOrgRetired: (orgId: unknown) => mockIsOrgRetired(orgId) }));
 jest.mock('../utils/helpers', () => ({ recordHeartbeat: jest.fn(async () => undefined), log: jest.fn() }));
 
 import { getFirestore } from 'firebase-admin/firestore';

@@ -2,9 +2,9 @@
 
 > **자동 생성 문서** — `scripts/generate-functions-doc.ts`로 생성됨
 >
-> 마지막 업데이트: 2026. 10. 5. 오후 12:31:27
+> 마지막 업데이트: 2026. 10. 14. 오전 8:19:06
 >
-> 총 함수 수: **80개**
+> 총 함수 수: **81개**
 
 ---
 
@@ -23,7 +23,7 @@
 
 ## 📞 onCall (클라이언트 직접 호출)
 
-> 총 41개
+> 총 42개
 
 ### `ocrDashboard`
 
@@ -209,6 +209,17 @@
 | **설명** | 기관 자발적 서비스 해지. 소속 직원 user 문서를 일괄 삭제하고 기관을 soft delete(30일 복구 가능) 처리하며 해지 사유를 기록한다. |
 | **인증** | 기관 관리자 (자기 기관만) |
 | **요청 파라미터** | `{ organizationId: string, reason: string, reasonDetail?: string }` |
+
+### `purgeOrganization`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/callable/purgeOrganization.ts` |
+| **설명** | 해지된(status: deleted) 기관을 즉시 파기한다 — 슈퍼관리자 [영구 삭제]. 주간 배치 purgeOrgs와 같은 purgeOrganizationData로 운행일지·예약·차량·주유·정비·하이패스·알림·연동·통계·증빙 이미지를 지우고 기관 문서를 마지막에 지운다. 감사 기록(auditLogs)은 1년 보관 요건이라 남긴다. |
+| **인증** | superAdmin |
+| **요청 파라미터** | `{ orgId: string }` |
+| **반환값** | `{ success: true, deleted: Record<string, number> }` |
+| **비고** | 기관 문서를 마지막에 지우므로 타임아웃 시 재호출하면 이어서 지운다(멱등) |
 
 ### `sendAdminNotice`
 
@@ -488,7 +499,7 @@
 | 항목 | 내용 |
 |------|------|
 | **파일** | `functions/src/handlers/scheduled/weeklyMaintenanceBatch.ts` |
-| **설명** | 주간 유지보수: soft-delete 기관 30일 후 영구 삭제 → 증빙 이미지 정리 → 3년 이상 운행기록 GCS 아카이빙 |
+| **설명** | 주간 유지보수: soft-delete 기관 30일 후 기관 데이터 전체 파기(purgeOrganizationData) → 증빙 이미지 정리 → 3년 이상 운행기록 GCS 아카이빙 |
 | **인증** | 시스템 자동 실행 |
 | **비고** | schedule: "0 3 * * 0" (KST 일요일 03:00). 판정 기준이 30일·3년이라 매일 돌 이유가 없어 주 1회로 옮긴 것 |
 

@@ -42,6 +42,9 @@ jest.mock('../core/sentry', () => ({
 
 // 겹침 검사는 호출 여부·인자만 본다 (LWW 판정은 실제 구현 그대로)
 const mockCheckConflict = jest.fn();
+// 해지 기관 가드는 orgRetirement.test.ts가 따로 검증한다 — 여기서는 정상 기관으로 고정한다.
+const mockIsOrgRetired = jest.fn(async (_orgId: unknown) => false);
+jest.mock('../utils/orgRetirement', () => ({ isOrgRetired: (orgId: unknown) => mockIsOrgRetired(orgId) }));
 jest.mock('../handlers/sync/conflictResolver', () => ({
     ...jest.requireActual('../handlers/sync/conflictResolver'),
     checkReservationTimeConflict: (...args: unknown[]) => mockCheckConflict(...args),
@@ -348,6 +351,15 @@ describe('reservationTriggers', () => {
             await (onReservationDeleted as Function)(event);
 
             expect(mockDeleteCalendarEvent).toHaveBeenCalledWith('cal@group.calendar.google.com', 'ev1');
+        });
+
+        it('해지된 기관의 파기는 기관 캘린더의 일정을 지우지 않는다', async () => {
+            mockIsOrgRetired.mockResolvedValueOnce(true);
+            const event = makeDeleteEvent({ vehicleId: 'v1', calendarEventId: 'ev1', organizationId: 'org1' });
+            await (onReservationDeleted as Function)(event);
+
+            expect(mockIsOrgRetired).toHaveBeenCalledWith('org1');
+            expect(mockDeleteCalendarEvent).not.toHaveBeenCalled();
         });
     });
 });

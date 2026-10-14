@@ -6,6 +6,7 @@ import { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } from "firebas
 import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent } from "../../services/calendar/calendarSync";
 import { isGoogleCalendarEnabled } from "../../services/calendar/calendarFeature";
 import { isCalendarBoundToOrg } from "../../services/calendar/calendarBinding";
+import { isOrgRetired } from "../../utils/orgRetirement";
 import { isCalendarAuthError, shouldSkipVehicleCalendar, recordCalendarFailure, resetCalendarFailure } from "../../services/calendar/calendarFailTracking";
 import { sendPushToOrg, sendPushToUser, createInAppNotification } from "../../services/alimtalk/sendNotification";
 import { checkReservationTimeConflict, resolveReservationConflict } from "../sync/conflictResolver";
@@ -377,6 +378,9 @@ export const onReservationDeleted = onDocumentDeleted(
     const reservationId = event.params.reservationId;
 
     if (!reservation.calendarEventId) return;
+    // 해지된 기관의 파기(purgeOrganizationData)는 그 기관 캘린더의 일정을 지우지 않는다.
+    // 캘린더는 기관 소유이고, 파기 대상은 우리 쪽에 남은 사본이다.
+    if (await isOrgRetired(reservation.organizationId)) return;
 
     const vc = await getVehicleCalendar(reservation.vehicleId, reservation.organizationId);
     if (!vc) return;

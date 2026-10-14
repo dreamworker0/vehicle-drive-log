@@ -5,6 +5,7 @@ import { recordHeartbeat, log } from "../../utils/helpers";
 import { handleStatsOnCreate, handleStatsOnUpdate, handleStatsOnDelete } from "../../services/statistics/updateAggregatedStats";
 import { applyDriveLogHipassDelta, usedAmountOf, hipassFieldsDropped } from "../../services/hipass/applyBalanceDelta";
 import { driveLogRetentionCutoff } from "../../utils/constants";
+import { isOrgRetired } from "../../utils/orgRetirement";
 import { resolveDriveLogConflict } from "../sync/conflictResolver";
 
 const db = getFirestore();
@@ -821,6 +822,11 @@ export const onDriveLogDeleted = onDocumentDeleted(
             const endKm = data.endKm;
             const startKm = data.startKm;
             const distance = data.distance;
+
+            // **해지된 기관의 파기는 제외한다**(purgeOrganizationData). 보존 기한 정리와 같은 이유로
+            // 파기는 거래를 되돌리는 일이 아니다 — 환불·km 차감·통계 차감을 하지 않는다. 차량이 먼저
+            // 지워진 뒤라면 km 보정이 NOT_FOUND로 실패해 건마다 알림이 쏟아지기도 한다.
+            if (await isOrgRetired(orgId)) return;
 
             // 지워진 기록이 쓴 하이패스 사용액을 잔액에 되돌린다(km 가드보다 앞).
             //

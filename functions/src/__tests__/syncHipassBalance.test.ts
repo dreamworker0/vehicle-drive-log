@@ -68,6 +68,9 @@ jest.mock('firebase-admin/firestore', () => ({
 }));
 
 jest.mock('../core/sentry', () => ({ captureError: jest.fn() }));
+// 해지 기관 가드는 orgRetirement.test.ts가 따로 검증한다 — 여기서는 정상 기관으로 고정한다.
+const mockIsOrgRetired = jest.fn(async (_orgId: unknown) => false);
+jest.mock('../utils/orgRetirement', () => ({ isOrgRetired: (orgId: unknown) => mockIsOrgRetired(orgId) }));
 
 // 트리거 래퍼는 핸들러를 그대로 반환한다(syncDriveLogKm.test와 같은 방식) —
 // 진짜 래퍼를 쓰면 CloudEvent 모양을 온전히 만들어야 해서 검사 대상이 흐려진다.
@@ -269,6 +272,13 @@ describe('충전 기록 트리거', () => {
     it('삭제하면 그만큼 준다', async () => {
         await deleted(charge());
         expect(cards.c1?.balance).toBe(5_000);
+    });
+
+    it('해지된 기관의 파기로 지워지면 잔액을 되돌리지 않는다', async () => {
+        mockIsOrgRetired.mockResolvedValueOnce(true);
+        await deleted(charge());
+        expect(cards.c1?.balance).toBe(10_000);
+        expect(transactionCount).toBe(0);
     });
 
     it('수정하면 차액만 반영한다', async () => {

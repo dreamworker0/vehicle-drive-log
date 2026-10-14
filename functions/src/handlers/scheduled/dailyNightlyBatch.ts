@@ -26,6 +26,7 @@ import { createInAppNotification, sendPushToUser } from "../../services/alimtalk
 import { captureWarning } from "../../core/sentry";
 import { runStep, logBatchResult } from "../../utils/batchStep";
 import { driveLogRetentionCutoff } from "../../utils/constants";
+import { purgeOrganizationData, OrgNotRetiredError, type PurgeBucket } from "../../services/organization/purgeOrganizationData";
 import { gzip } from "node:zlib";
 import { promisify } from "node:util";
 
@@ -325,8 +326,15 @@ export async function backupFirestoreData() {
     }
 }
 
-export async function purgeOrgs(db: FirebaseFirestore.Firestore) {
-    console.log("[Batch] Starting autoPurgeOrgs...");
+/**
+ * 해지 30일이 지난 기관을 파기한다(주간 배치 weeklyMaintenanceBatch에서 호출).
+ *
+ * 예전에는 users와 기관 문서만 지워, 운행일지·예약·차량 등 기관 데이터가 영구히 남았다.
+ * 이제 purgeOrganizationData가 기관 데이터 전체를 지우고 기관 문서를 맨 마지막에 지운다 —
+ * 기관 하나가 중간에 실패해도 기관 문서가 남아 다음 주에 이어서 지운다.
+ */
+export async function purgeOrgs(db: FirebaseFirestore.Firestore, bucket: PurgeBucket) {
+    console.log("[Batch] Starting purgeOrgs...");
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -350,25 +358,25 @@ export async function purgeOrgs(db: FirebaseFirestore.Firestore) {
         const orgName = (orgDoc.data().name as string) || orgId;
 
         try {
-            const usersSnap = await db
-                .collection("users")
-                .where("organizationId", "==", orgId)
-                .get();
-
-            const batch = db.batch();
-            usersSnap.docs.forEach((userDoc) => {
-                batch.delete(userDoc.ref);
-            });
-            batch.delete(orgDoc.ref);
-            await batch.commit();
-
+            const summary = await purgeOrganizationData(orgId, bucket, db);
             totalPurged++;
-            console.log(`Purged org "${orgName}" (${orgId}) with ${usersSnap.size} users`);
+            console.log(`Purged org "${orgName}" (${orgId}): ${JSON.stringify(summary.deleted)}`);
         } catch (err: unknown) {
+            // 대상 조회 뒤 처리 전에(또는 도중에) 복구된 기관 — 실패가 아니라 막아야 할 것을 막은 것이다.
+            if (err instanceof OrgNotRetiredError) {
+                console.log(`Skipped org "${orgName}" (${orgId}): 파기 중 복구됨 — ${err.message}`);
+                continue;
+            }
             console.error(`Failed to purge org "${orgName}" (${orgId}):`, (err as Error).message);
+            // 다른 루프(cleanupImages 등)와 달리 기관별로 올린다 — 파기는 처리방침이 약속한 법적
+            // 의무라 실패를 사람이 알아야 하고, 대상이 주에 몇 곳뿐이라 알림이 쏟아질 일도 없다.
+            // 기관 문서가 남아 있으므로 다음 주 배치가 이어서 지운다.
+            captureWarning(`기관 파기 실패 — 다음 주 배치가 이어서 지운다: ${orgId}`, {
+                context: "purgeOrgs", orgId, error: (err as Error).message,
+            });
         }
     }
-    console.log(`Auto-purge complete: ${totalPurged} organizations permanently deleted.`);
+    console.log(`Purge complete: ${totalPurged} organizations purged.`);
 }
 
 export async function cleanupImages(db: FirebaseFirestore.Firestore, bucket: ReturnType<ReturnType<typeof getStorage>["bucket"]>) {
