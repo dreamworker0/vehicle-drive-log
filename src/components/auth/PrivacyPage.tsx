@@ -316,7 +316,7 @@ export default function PrivacyPage() {
                                 <p className="font-medium text-green-800 dark:text-green-300 mb-2">🏢 데이터 소유</p>
                                 <p className="text-green-700 dark:text-green-400 text-xs">
                                     서비스 내 모든 운행일지, 차량 정보, 예약 데이터는 <strong>해당 기관의 소유</strong>입니다.
-                                    기관 삭제 시 해당 기관의 모든 데이터가 완전히 삭제됩니다.
+                                    기관을 삭제하면 해당 기관의 데이터는 <strong>제9조(개인정보의 파기)</strong>에 따라 파기됩니다.
                                 </p>
                             </div>
 
@@ -327,6 +327,10 @@ export default function PrivacyPage() {
                                         운행일지 데이터: 지자체 감사 대응을 위해 <strong>최소 3년~5년</strong> 보존을 권장합니다.
                                     </li>
                                     <li>기관 삭제를 요청하지 않는 한 데이터는 유지됩니다.</li>
+                                    <li>
+                                        작성 후 3년이 지난 운행일지는 서비스 화면에서 빠지고 압축 보관본으로 옮겨지며,
+                                        <strong>작성일로부터 5년이 되면 자동으로 파기</strong>됩니다.
+                                    </li>
                                 </ul>
                             </div>
                         </div>
@@ -463,6 +467,10 @@ export default function PrivacyPage() {
                                         운행일지·예약 등 데이터베이스(Firestore)는 Google Cloud의 <strong>서울(asia-northeast3) 리전</strong>에 보관되나,
                                         운영 주체가 미국 법인이므로 국외 이전에 해당합니다.
                                     </li>
+                                    <li>
+                                        비영리 증빙서류 사본과 작성 후 3년이 지난 운행일지 보관본은 Google Cloud Storage의
+                                        <strong>미국(us-east1) 리전</strong>에 보관됩니다.
+                                    </li>
                                 </ul>
                             </div>
 
@@ -497,7 +505,16 @@ export default function PrivacyPage() {
                         <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200">제9조 (개인정보의 파기)</h2>
                         <div className="text-sm text-surface-600 dark:text-surface-400 leading-relaxed">
                             <ul className="list-disc list-inside space-y-1 ml-2">
-                                <li>기관 삭제 시 해당 기관의 모든 사용자 정보와 데이터가 완전히 삭제됩니다.</li>
+                                <li>
+                                    기관을 삭제하면(해지 후 30일의 복구 기간이 지나거나 운영자가 영구 삭제하면) 운행일지·예약·차량·주유·정비·하이패스 기록,
+                                    소속 사용자 정보, 연동 정보, 증빙서류 사본 등 <strong>해당 기관의 데이터를 파기</strong>합니다.
+                                    다만 다음 기록은 아래 기간이 지나면 자동으로 파기됩니다.
+                                    <ul className="list-disc list-inside space-y-1 ml-5 mt-1">
+                                        <li><strong>접속기록</strong>: 법령상 의무 기록이라 기관 삭제와 관계없이 <strong>기록일로부터 1년</strong> 보관 후 파기 (제1조)</li>
+                                        <li><strong>장애 복구용 전체 백업</strong>: 매일 만들어 <strong>최대 90일</strong> 보관 후 파기하며, 장애 복구 외의 목적으로 이용하지 않습니다</li>
+                                        <li><strong>3년이 지난 운행일지 보관본</strong>: 여러 기관의 기록이 함께 담긴 압축 파일이라 기관 단위로 분리해 지우지 못하며, <strong>작성일로부터 5년</strong>이 되면 파기 (제4조)</li>
+                                    </ul>
+                                </li>
                                 <li>계기판 사진은 AI 분석 직후 즉시 파기됩니다.</li>
                                 <li>비영리 증빙서류(고유번호증/사업자등록증) 사본은 <strong>승인 후 30일 경과 시 자동 파기</strong>됩니다.</li>
                             </ul>
@@ -565,8 +582,10 @@ export default function PrivacyPage() {
                             {/* 지난 개정의 날짜는 고정한다 — EFFECTIVE_DATE로 쓰면 다음 개정 때 과거 내용이 새 날짜로 바뀐다 */}
                             개정 이력 · 2026년 2월 1일 최초 시행 / 2026년 8월 10일 위탁·국외 이전·보호책임자 조항 신설,
                             개인정보처리자와 수탁자의 지위 명시, 법령상 의무 기록인 접속기록 항목 명시 /
-                            {' '}{EFFECTIVE_DATE} 수집 항목 정정(기관 신청 전화번호 필수, 푸시 알림 토큰·이용 통계 자동 수집 정보 신설,
-                            직원 동의 기록 명시), 오류 모니터링 전달 항목 정정
+                            2026년 10월 12일 수집 항목 정정(기관 신청 전화번호 필수, 푸시 알림 토큰·이용 통계 자동 수집 정보 신설,
+                            직원 동의 기록 명시), 오류 모니터링 전달 항목 정정 /
+                            {' '}{EFFECTIVE_DATE} 파기 조항 구체화(기관 삭제 시 파기 범위와 접속기록·백업·운행일지 보관본의 보관 기간),
+                            증빙서류 사본·운행일지 보관본의 저장 위치 명시
                         </p>
                     </div>
                 </div>

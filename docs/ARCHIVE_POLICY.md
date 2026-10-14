@@ -76,6 +76,7 @@ await batch.commit();
 
 ### ✅ 적절한 부분
 - 3년 보관 기준은 법적 요구사항(차량운행일지 5년 보존)에 비해 보수적이나 적절
+- **보관본 파기**: 기본 버킷 수명 주기 규칙(`storage-lifecycle.json`)이 `archives/driveLogs/`를 **생성 후 730일**에 지운다 — 보관본은 작성 3년 뒤 만들어지므로 작성 후 약 5년에 파기된다(처리방침 제4·9조, 2026-10-26 시행). 보관본은 여러 기관의 기록이 한 파일에 섞여 있어 기관 파기(`purgeOrganizationData`)가 지우지 못한다 — 처리방침이 이 예외를 명시한다. 규칙 적용은 [storage-lifecycle 워크플로](../.agent/workflows/storage-lifecycle.md)대로 gcloud로 한다
 - 500건 배치 크기는 Firestore batch 제한(500)에 맞춤
 - JSON 형식 → 사람이 읽을 수 있고 복원 용이
 

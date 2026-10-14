@@ -61,7 +61,7 @@ export default function WithdrawOrgModal({ orgName, submitting, onClose, onConfi
                         <ul className="list-disc list-inside text-xs space-y-0.5">
                             <li>모든 직원의 접근이 즉시 차단됩니다.</li>
                             <li>해지 후 30일간 데이터를 보관하며, 복구는 운영자(슈퍼관리자)에게 문의해야 합니다.</li>
-                            <li>30일이 지나면 데이터가 영구 삭제됩니다.</li>
+                            <li>30일이 지나면 데이터가 영구 삭제됩니다. (법령상 의무인 접속기록은 1년, 장애 복구용 백업은 최대 90일 뒤 자동 파기)</li>
                         </ul>
                     </div>
 
