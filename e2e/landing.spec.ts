@@ -75,3 +75,23 @@ test.describe('랜딩 페이지', () => {
         }).toPass({ timeout: 10000 });
     });
 });
+
+// 회귀 방지(2026-10-14): 처음 로그인하는 직원은 경량 화면으로 시작하는데, 코드 보관은 전체 앱에만
+// 있었다. 랜딩에서 [직원 로그인]으로 넘어가는 순간 ?code=가 떨어져 초대 코드 화면이 빈 칸으로 떴다.
+test.describe('초대 링크', () => {
+    test('비로그인으로 초대 링크를 열면 코드를 보관하고, 로그인 화면으로 넘어가도 남는다', async ({ page }) => {
+        await page.goto('/?code=abc123');
+        await expect(page.getByRole('button', { name: '직원 로그인' })).toBeVisible({ timeout: 10000 });
+
+        // 부팅 첫 지점이 보관하고 주소창에서 지운다(공유·북마크로 옮겨 가지 않게)
+        await expect.poll(() => page.evaluate(() => localStorage.getItem('pendingInviteCode'))).toBe('ABC123');
+        expect(new URL(page.url()).searchParams.get('code')).toBeNull();
+
+        const loginBtn = page.getByRole('button', { name: '직원 로그인' });
+        await expect(async () => {
+            if (!/login/.test(page.url())) await loginBtn.click();
+            await expect(page).toHaveURL(/login/, { timeout: 1000 });
+        }).toPass({ timeout: 10000 });
+        expect(await page.evaluate(() => localStorage.getItem('pendingInviteCode'))).toBe('ABC123');
+    });
+});
