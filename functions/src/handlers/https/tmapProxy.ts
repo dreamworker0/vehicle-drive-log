@@ -43,6 +43,15 @@ async function fetchTmapJson(url: string, init: RequestInit, context: string): P
         return { ok: false, status: 502, error: "T맵 API에 연결할 수 없습니다." };
     }
 
+    // 204 No Content = **검색 결과 없음**이다. T맵 장소 검색(pois)은 찾는 것이 없으면 본문 없이
+    // 204를 돌려준다. 예전에는 아래 "빈 응답" 분기에 걸려 502 + WARNING이 됐고, 그게 이 프록시
+    // 실패의 92%였다(2026-10-13~14 실측: 경고 360건 중 333건, 실제 T맵 장애는 2건) — 실패율이 늘
+    // 20%로 보여 진짜 장애가 묻혔다. 빈 결과로 성공 응답한다. 화면은 이미 결과가 없는 모양을
+    // "결과 없음"으로 처리한다(searchPoiInfo 등이 없으면 null/빈 목록).
+    if (status === 204) {
+        return { ok: true, data: {} };
+    }
+
     if (status < 200 || status >= 300) {
         log("WARNING", "tmapProxy", `T맵 API 오류 응답 (${context})`, {
             status,

@@ -317,6 +317,22 @@ describe('fetchTmap', () => {
         await expect(core.fetchTmap('/prod', '/dev')).rejects.toThrow('T-Map API HTTP Error: 500');
     });
 
+    // 회귀 방지(2026-10-14): 찾을 수 없는 주소의 400이 예외 → recordFail로 세여, 3번이면 5분 쿨다운이 걸렸다.
+    it.each([400, 404])('%i(입력을 해석하지 못함)는 예외 없이 null — 쿨다운으로 세지 않는다', async (status) => {
+        fetchMock.mockResolvedValue(rawResponse('{"error":{"code":"9401"}}', status));
+
+        await expect(core.fetchTmap('/prod', '/dev')).resolves.toBeNull();
+        await expect(core.fetchTmap('/prod', '/dev')).resolves.toBeNull();
+        await expect(core.fetchTmap('/prod', '/dev')).resolves.toBeNull();
+        expect(core.isTmapCoolingDown()).toBe(false);
+    });
+
+    it.each([401, 403])('%i(인증 실패)는 지금처럼 예외로 올린다', async (status) => {
+        fetchMock.mockResolvedValue(rawResponse('', status));
+
+        await expect(core.fetchTmap('/prod', '/dev')).rejects.toThrow(`T-Map API HTTP Error: ${status}`);
+    });
+
     it('본문이 비어 있으면 null을 반환한다 (204 등)', async () => {
         fetchMock.mockResolvedValue(rawResponse(''));
 

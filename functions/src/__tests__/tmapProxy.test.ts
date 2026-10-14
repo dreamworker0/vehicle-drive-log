@@ -169,6 +169,34 @@ describe('tmapProxy — 외부 API 실패 처리', () => {
         expect(res.json).toHaveBeenCalledWith({ features: [{ properties: { totalDistance: 100 } }] });
     });
 
+    // 회귀 방지(2026-10-14): 장소 검색의 "결과 없음"(204)이 502 + WARNING으로 바뀌어 실패의 92%를 차지했다.
+    it('204(검색 결과 없음)는 빈 결과로 성공 응답하고 경고를 남기지 않는다', async () => {
+        global.fetch = jest.fn().mockResolvedValue({
+            status: 204,
+            text: async () => '',
+        }) as unknown as typeof fetch;
+        const res = makeRes();
+
+        await proxy({ ...geocodeReq, query: { action: 'poi', keyword: '없는장소이름' } }, res);
+
+        expect(res.status).toHaveBeenCalledWith(200);
+        expect(res.json).toHaveBeenCalledWith({});
+        expect(findLog('WARNING')).toBeUndefined();
+    });
+
+    it('200인데 본문이 비면 여전히 502로 본다 (204와 달리 계약 위반)', async () => {
+        global.fetch = jest.fn().mockResolvedValue({
+            status: 200,
+            text: async () => '',
+        }) as unknown as typeof fetch;
+        const res = makeRes();
+
+        await proxy(geocodeReq, res);
+
+        expect(res.status).toHaveBeenCalledWith(502);
+        expect(findLog('WARNING')).toBeDefined();
+    });
+
     it('오류 상태 응답은 상태 코드를 그대로 전달하고 WARNING으로 남긴다', async () => {
         global.fetch = jest.fn().mockResolvedValue({
             status: 429,

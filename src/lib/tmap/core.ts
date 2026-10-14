@@ -141,6 +141,13 @@ export async function fetchTmap(prodUrl: string, devUrl: string, method = 'GET',
                 recordFail(true); // 즉시 쿨다운 활성화
                 return null; // 빨간 에러 방지를 위해 throw 대신 조용히 null 반환
             }
+            // 400·404 = T맵이 **입력을 해석하지 못했다**(찾을 수 없는 주소 등) — 장애가 아니라 결과 없음이다.
+            // 예전에는 예외로 올라가 geocode가 recordFail로 셌고, 찾을 수 없는 목적지를 3번 넣으면 5분 동안
+            // T맵 기능 전체(경로 계산·길안내 좌표)가 쉬었다(2026-10-14 실측: 주소 변환 37건 중 400이 25건).
+            // 실패 카운트에 넣지 않고 null을 돌려준다. 인증(401·403)·5xx·네트워크 오류는 지금처럼 예외다.
+            if (res.status === 400 || res.status === 404) {
+                return null;
+            }
             throw new Error(`T-Map API HTTP Error: ${res.status}`);
         }
 
