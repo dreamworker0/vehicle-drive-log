@@ -87,6 +87,29 @@ describe('createReservationTx (코어)', () => {
         ).rejects.toThrow('필수입니다');
     });
 
+    // 회귀 방지(2026-10-14 감사): 겹침 판정이 문자열 비교라 "9:00" < "12:00"이 거짓이 되어
+    // 09:00~12:00 예약 위에 같은 차를 다시 잡을 수 있었다. 형식이 틀리면 트랜잭션 전에 거부한다.
+    it.each([
+        ['0을 채우지 않은 시각', { startTime: '9:00', endTime: '9:30' }],
+        ['범위를 벗어난 시각', { startTime: '25:00', endTime: '26:00' }],
+        ['분이 60 이상', { startTime: '09:60', endTime: '10:00' }],
+        ['0을 채우지 않은 날짜', { date: '2026-3-5' }],
+        ['날짜가 아닌 값', { date: '2026-13-01' }],
+        ['문자열이 아닌 시각', { startTime: 900 as unknown as string }],
+    ])('%s는 invalid-argument로 거부한다', async (_label, patch) => {
+        await expect(
+            createReservationTx({ ...validInput, ...patch })
+        ).rejects.toThrow('날짜·시간 형식이 올바르지 않습니다');
+        expect(mockRunTransaction).not.toHaveBeenCalled();
+    });
+
+    it('문자열이 아닌 목적지는 거부한다', async () => {
+        await expect(
+            createReservationTx({ ...validInput, destination: { $gt: '' } as unknown as string })
+        ).rejects.toThrow('destination 형식');
+        expect(mockRunTransaction).not.toHaveBeenCalled();
+    });
+
     it('시작 시간이 종료 시간보다 늦으면 에러를 던진다', async () => {
         await expect(
             createReservationTx({ ...validInput, startTime: '14:00', endTime: '12:00' })
