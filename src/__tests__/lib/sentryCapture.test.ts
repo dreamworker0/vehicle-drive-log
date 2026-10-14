@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, beforeAll, vi } from 'vitest';
 
 /**
  * captureError / captureWarning이 **실제로** 스크러빙을 거쳐 보내는지 검증한다.
@@ -39,6 +39,16 @@ async function loadBreadcrumbHook() {
     };
     return { beforeBreadcrumb: options.beforeBreadcrumb };
 }
+
+/**
+ * sentry 모듈 변환을 미리 끝내 둔다. 테스트마다 resetModules 후 다시 import하는데 **첫 회만** 변환이
+ * 차가워, 부하가 걸린 로컬 실행에서 첫 테스트의 `vi.waitFor`(기본 1초)가 init 호출을 기다리다 넘쳤다
+ * (2026-10-14 워커 100% + 커버리지 실측 — 단독 2.9초 통과). 변환 결과는 resetModules 뒤에도 남는다.
+ * SDK(sentryClient)는 각 테스트가 doMock으로 바꾸므로 여기서 불러오지 않는다.
+ */
+beforeAll(async () => {
+    await import('../../lib/sentry');
+}, 60_000);
 
 describe('captureError / captureWarning — 개인정보 스크러빙 배선', () => {
     beforeEach(() => {
