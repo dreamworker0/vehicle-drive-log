@@ -27,7 +27,8 @@ const localMaxWorkers = rawWorkers
  *   (`Cannot redefine property: location`). 아래 셋은 그렇게 목을 건다.
  * - 저장소(fake-indexeddb)가 돌려준 값은 바깥 영역의 `Date`라 VM 안의 `instanceof Date`가 거짓이다.
  * - gRPC(@grpc/grpc-js) 콜백이 테스트 뒤에 도착하면 VM 안에 `process`가 없어 터진다 —
- *   Rules 테스트(에뮬레이터)와, Firestore를 목으로 두지 않아 실제로 접속하는 VehicleFormSite.
+ *   Rules 테스트(에뮬레이터). 단위 테스트는 실제 서버에 접속하면 안 된다 — App Check는
+ *   setup.ts가 전역으로 비우고, Firestore·Functions는 테스트마다 목으로 둔다.
  * 고치려면 앱 코드의 `location` 사용을 감싸야 해 이번 범위를 넘는다. **새 테스트가 위 패턴을
  * 쓰면 여기에 추가하는 대신 그 패턴을 피하는 것을 먼저 검토한다** — 이 목록은 줄어야 한다.
  */
@@ -36,12 +37,6 @@ const THREADS_ONLY_TESTS = [
     'src/__tests__/lib/inAppBrowser.test.ts',            // window.location·document 재정의
     'src/__tests__/lib/staleChunk.test.ts',              // window.location.reload 재정의
     'src/__tests__/lib/offline/syncQueue.test.ts',       // fake-indexeddb 값의 instanceof
-    'src/__tests__/components/VehicleFormSite.test.tsx', // 실제 Firestore gRPC 접속
-    // 아래 둘도 Firestore를 목으로 두지 않아 실제로 접속한다(2026-10-16 열린 소켓 실측: 34.128.10.74:443).
-    // 늦게 온 응답이 **다음 파일**이 도는 중에 터져 오류가 엉뚱한 파일(tmap·FeatureToggleSection)로 찍혔고,
-    // 디렉터리만 따로 돌리면 워커가 죽었다. 목을 보강하면 목록에서 뺀다.
-    'src/__tests__/hooks/useAnalytics.test.ts',
-    'src/__tests__/components/FeatureToggleSection.test.tsx',
     'tests/**/*.test.ts',                                // Rules 테스트 — 에뮬레이터 gRPC
 ];
 
