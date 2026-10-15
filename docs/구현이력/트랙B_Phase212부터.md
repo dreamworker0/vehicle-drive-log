@@ -643,3 +643,18 @@
 | **검증** | `idb`를 목으로 둔 재현 테스트 6건 — 수정 전 코드에서 5건 실패 확인 후 수정. Vitest 2,500 · tsc · eslint · release-notes·FAQ 검사. 업데이트 소식 10-15. 배포: 함수 81개·Hosting 반영, 운영 사이트 공지 확인 |
 | **교훈** | 실행 계기를 늘리는 변경은 **그 계기가 놓이는 순간의 환경**(여기서는 "막 포그라운드로 돌아온 iOS")에서 기존 코드가 무엇을 가정하는지까지 봐야 한다. #473의 테스트는 계기가 걸리는지만 봤다 |
 | **남는 것** | ① 6N 재발 여부 관찰(Sentry에서 Resolved in next release) ② Phase 244의 남는 것(Sentry 스트림 전환·`@sentry/node` 11·localhost 필터·`pool: 'vmThreads'`) |
+
+### Phase 246: 서버 Sentry도 같은 문을 닫고, 화면 복귀 순간을 한 번 더 훑었다 🛡️🔁
+
+> 2026-10-15. Phase 245 뒤 "이제 무엇을 해야 해?"에 추천 순서(① functions `@sentry/node` 11 → ② 화면 복귀 계기의 다른 가정 점검)를 제시했고, 운영자가 *"추천대로 진행해주세요."*
+
+| 항목 | 내용 |
+|------|------|
+| **functions Sentry 11** (#491) | `@sentry/node` 10.75 → 11.8(Node >=22.12, node22 런타임 충족). 프론트(#486)와 같은 함정이 서버에서는 더 컸다 — `dataCollection`을 비워 두면 **들어온 요청의 본문·헤더·쿠키·IP**를 오류 이벤트에 붙인다(core `requestdata.js`). 실제 SDK에 넣어 확인한 기본값: `httpBodies`에 `incomingRequest` 포함, `userInfo: true`. 콜러블 본문에는 예약 목적지·탑승자, 헤더에는 ID 토큰·App Check 토큰이 실린다. `SENTRY_DATA_COLLECTION`으로 모두 끔(지역 변수 `stackFrameVariables` 포함 — 지금은 `includeLocalVariables` 기본 꺼짐으로도 막혀 있지만 옵션 하나로 열리는 경로). 스팬은 `tracesSampleRate: 0`이라 `beforeSendSpan` 이관은 불필요 |
+| **키 오타 방지 테스트** (#491) | 목으로는 설정 키 이름이 틀려도 통과한다 — 틀리면 SDK는 조용히 기본값(전부 수집)을 쓴다. **진짜 SDK**에 설정을 넣고 `getDataCollectionOptions()`가 "모두 끔"으로 해석되는지 본다(전송 없음) |
+| **배포 확인** (#491) | 함수 81개·Hosting. 배포 뒤 40분 Cloud Run ERROR 로그 0건. (PowerShell 5.1은 native 인자 안쪽 큰따옴표를 지워 `gcloud logging read` 필터가 깨진다 — `--freshness`와 따옴표 없는 필터로) |
+| **화면 복귀 점검** (#492) | 6N(#489)은 #473이 넣은 "화면 복귀" 순간에 기존 가정(IDB 연결이 살아 있음)이 깨진 경우였다. 같은 순간에 도는 핸들러 6곳을 점검 — 큐 3곳은 #489로 해결, 토큰 선갱신(네트워크 오류 백오프·실패 삼킴)·구독 재개(`isFirestoreTerminated` 확인)·SW 업데이트 확인(실패 잡음)·알림 구독(로그아웃이 `signOut` → `terminate` 순서)은 문제 없음. **고칠 코드는 없었다** |
+| **새로 안 것** (#492) | #489는 **로그아웃의 개인정보 경로**도 막고 있었다. 큐 항목에는 사용자 식별자가 없어 로그아웃의 `clearQueue`가 유일한 방어선인데, 죽은 연결로 실패하면 `auth.ts`는 경고만 남기고 넘어간다 — 공용 기기에서 다음 사용자의 flush가 앞사람의 오프라인 쓰기를 보낸다. 그 계약을 테스트로 고정. 또 Chromium용 노이즈 필터 `/Connection is closing/`이 대소문자를 구분해 우리 큐 메시지("database **c**onnection is closing")를 삼키지 않았다 — 그래서 6N이 드러났다 |
+| **부하성 플래키** | #491 pre-push에서 Vitest 처리되지 않은 오류 4건(2,399건만 실행) — 재실행 200파일·2,500건 무오류. 변경은 functions뿐이라 기존 jsdom 부하 문제(`pool: 'vmThreads'` 미착수)로 판단 |
+| **검증** | functions jest 1,269 · Vitest 2,501 · tsc·eslint·build · `npm@10 ci` · 보안 감사 |
+| **남는 것** | ① Sentry 스트림 전환(Web Vitals 확인 후, v12 전) ② jsdom 환경 생성 비용(`pool: 'vmThreads'`) — pre-push 실패로 체감되기 시작 ③ Sentry Inbound Filter(localhost)·6N Resolved in next release — 운영자 |
