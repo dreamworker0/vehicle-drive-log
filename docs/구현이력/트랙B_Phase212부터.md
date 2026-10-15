@@ -615,3 +615,18 @@
 | **배포** | #479 → #480 → #481 → #482 → #483 한 건씩, 모두 함수 81개·Hosting 반영. #482는 머지 스크립트가 리뷰 댓글을 읽지 못한 채 머지했다 — 사후 확인 "지적 없음". 다음부터 #483처럼 리뷰 문구를 확인한 뒤 머지하도록 대기 스크립트에 조건을 넣었다 |
 | **검증** | functions jest 1,267 · 에뮬레이터 파기 13 · Vitest 2,483 · TMAP 144 · 초대 링크 단위 4 + E2E 1(로컬 3회 반복) · scripts 200 · tsc·eslint |
 | **남는 것** | ① Sentry Inbound Filter(localhost) — 운영자 설정 ② dependabot PR 5건(#415·#418 Sentry 11 메이저·#419·#470·#471) ③ jsdom 환경 생성 비용(`pool: 'vmThreads'`) 검토 |
+
+### Phase 244: 의존성 정리 — 메이저 업그레이드가 개인정보 훅을 조용히 끄는 방식 📦🔒
+
+> 2026-10-14~15. Phase 243의 "남는 것" ②에 운영자가 *"dependabot PR 정리해줘"*, 이어 *"배포 끝나면 Sentry 11 PR도 진행해줘"*, *"googleapis 185 PR(#415)도 이어서 정리해줘"*.
+
+| 항목 | 내용 |
+|------|------|
+| **묶음 갱신** (#485) | dependabot PR 4건(#471·#470·#419·#415의 당시 판)을 하나로. 루트: vite 7.3.7·vitest 5.0.4·playwright 1.64.1·firebase-admin 14.5·typescript-eslint 8.71.2·jsdom 30.1.2 등, **dotenv 18**(preload 제거·출력 stderr — `generate-sw-config.ts`는 `config()`만 써 영향 없음). functions: @google/genai 2.29.1·googleapis 182·nodemailer 10.1.1·jest 30.5.2 등. CI와 같은 npm 10으로 `ci` 검증, 보안 감사 0건 |
+| **Sentry 11 — 스팬 훅** (#486) | v11은 `traceLifecycle` 기본값이 `'stream'`이고 `beforeSendSpan`이 `StreamedSpanJSON`(`attributes`·`name`)을 받는다. 기존 콜백(`data`·`description`)은 타입 검사로는 잡히지만, **런타임에서 SDK는 수명주기와 짝이 맞지 않는 콜백을 경고 없이 건너뛴다**(`isStaticBeforeSendSpanCallback`) — 고쳤다고 믿고 한쪽만 바꾸면 목적지 검색어가 스크럽 없이 나간다. `'static'` + `withStaticSpan`으로 v10 동작 유지. 스트림 형식에는 `events`가 없어 `setMeasurement`(Web Vitals)가 실리지 않을 수 있어 전환은 보류. 짝은 **진짜 `withStaticSpan`**으로 테스트가 지킨다 |
+| **Sentry 11 — 수집 범위** (#486) | `sendDefaultPii` → `dataCollection`으로 바뀌며 **비워 두면 v10보다 더 많이 거둔다** — `userInfo: true`면 `infer_ip: 'auto'`로 IP가 붙는다(@sentry/browser client.js). userInfo·cookies·urlQueryParams 끔, 본문 없음, 헤더는 User-Agent만(브라우저 판별·크롤러 필터용). 릴리스 노트만 읽었다면 놓쳤을 항목 — dependabot PR 본문에는 없다 |
+| **Sentry 11 — 속성 이름** (#486) | fetch 스팬 쿼리가 `http.query` → `url.query`(시맨틱 컨벤션)로 옮겨 갔다. 스크러버가 옛 키만 보고 있었다 — 두 세대 모두 가림. `attachStacktrace: false`로 captureWarning이 세션을 오류로 세지 않게 유지 |
+| **googleapis 185** (#487) | #415가 #485 이전 lockfile 기준이라 최신 master 위에서 다시 맞춤. 브레이킹은 workspaceevents뿐(이 저장소는 calendar v3만) |
+| **배포** | #485 → #486 → #487 한 건씩, 모두 함수 81개·Hosting 반영. dependabot PR 자동 종료 — #471·#470·#419(#485), #418(#486), #415(#487) |
+| **검증** | functions jest 1,267 · Vitest 2,494 · Sentry 배선 66 · tsc·eslint · 빌드 번들 예산(JS gzip 1,108.6/1,160KB) |
+| **남는 것** | ① Sentry 스트림 전환(Web Vitals 수집 확인 후) ② Sentry Inbound Filter(localhost) — 운영자 설정 ③ jsdom 환경 생성 비용(`pool: 'vmThreads'`) 검토 ④ functions `@sentry/node` 11(서버 SDK — 같은 `dataCollection` 점검 필요) |
