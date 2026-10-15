@@ -658,3 +658,20 @@
 | **부하성 플래키** | #491 pre-push에서 Vitest 처리되지 않은 오류 4건(2,399건만 실행) — 재실행 200파일·2,500건 무오류. 변경은 functions뿐이라 기존 jsdom 부하 문제(`pool: 'vmThreads'` 미착수)로 판단 |
 | **검증** | functions jest 1,269 · Vitest 2,501 · tsc·eslint·build · `npm@10 ci` · 보안 감사 |
 | **남는 것** | ① Sentry 스트림 전환(Web Vitals 확인 후, v12 전) ② jsdom 환경 생성 비용(`pool: 'vmThreads'`) — pre-push 실패로 체감되기 시작 ③ Sentry Inbound Filter(localhost)·6N Resolved in next release — 운영자 |
+
+### Phase 247: 테스트 시간의 60%는 jsdom을 다시 만드는 데 쓰이고 있었다 — 그리고 테스트가 Google에 접속하고 있었다 ⚡🧪
+
+> 2026-10-15~16. Phase 246 "남는 것" ②(jsdom 환경 생성 비용). 10-15 pre-push가 부하성 플래키로 막혀 체감 문제가 됐다. 운영자 *"다음 진행해줘."*
+
+| 항목 | 내용 |
+|------|------|
+| **측정** | 파일마다 jsdom을 새로 만드는 비용이 실행 시간의 59~64%(200파일, 누적 227초). 같은 조건에서 `--pool=vmThreads`는 106초 → 24초지만 4개 파일 17건 실패 + 처리되지 않은 오류 2건 |
+| **VM에서 안 되는 것** | ① jsdom 창이 곧 전역이라 `window.location`·`document` 재정의 불가(`Cannot redefine property`) — auth·inAppBrowser·staleChunk ② fake-indexeddb가 돌려준 값이 바깥 영역 객체라 `instanceof Date`·`FieldValue` 거짓 — syncQueue ③ 늦게 온 gRPC 응답이 **다음 파일**이 도는 중에 `process is not defined`로 터짐 — 오류가 엉뚱한 파일(tmap·FeatureToggleSection)에 찍혔고, 파일을 하나씩 돌리면 재현되지 않았으며, hooks만 돌리면 워커가 죽었다 |
+| **원인 추적** | `http2.connect` 가로채기는 ESM 네임스페이스라 실패. 파일마다 `afterAll`에서 **열린 소켓**(`process._getActiveHandles`)을 찍어 찾았다 — Firestore를 목으로 두지 않아 **실제 gRPC로 접속**하는 테스트(VehicleFormSite·useAnalytics·FeatureToggleSection) |
+| **분할** (#494) | `vitest.config.js` projects — vm(`vmThreads`) + threads(`THREADS_ONLY_TESTS` 7개 + Rules 테스트). 앱의 `location` 사용을 감싸야 하는 전면 이관 대신 목록으로 격리하고, write-test 스킬에 VM에서 피할 패턴을 적었다(목록은 줄어야 한다) |
+| **효과** | 로컬 106~152초 → 26~45초(3회, 오류 0), coverage 포함 157초 → 44초, pre-push 약 150초 → 29초. **CI 단위 테스트+커버리지 게이트 135초 → 45초.** 커버리지 동일(stmts 56.90 → 56.91, lines 57.96 → 57.98) |
+| **새로 안 것** | 열린 소켓 실측에서 **테스트 9개 파일이 실제 Google에 접속**하고 있었다 — App Check(5), Firestore gRPC(3), Cloud Functions `test-project`(1), Google(1). 기존 풀에서도 같다. 별도 작업으로 분리(목 보강 후 THREADS_ONLY에서 제거) |
+| **E2E 경쟁** (#495) | #494 CI에서 초대 링크 e2e(#483)가 mobile-safari에서 3회 연속 `Execution context was destroyed`. 첫 방문의 추가 페이지 이동과 localStorage 읽기가 겹친 것 — 코드는 이미 보관된 상태라 앱이 아니라 읽는 쪽 문제. `expect.poll` 콜백이 던지면 재시도하지 않으므로 읽기 실패를 `null`로 받아 다시 읽게 함. #495를 먼저 배포해 #494의 master e2e가 같은 이유로 막히지 않게 했다 |
+| **로컬 E2E** | #485(Playwright 1.64) 뒤 이 PC에 브라우저가 없어 실행 불가였다 — 운영자가 `npx playwright install`. 단독 3회 통과. 두 브라우저 동시 실행 시 랜딩 10초 초과는 dev 서버의 첫 변환 지연(CI는 `vite preview`) |
+| **검증** | Vitest 2,501 · 커버리지 게이트 · harness·sync 검사 · e2e(CI) |
+| **남는 것** | ① 테스트의 실제 네트워크 접속 제거(별도 세션 진행 중) ② Sentry 스트림 전환 ③ Sentry Inbound Filter(localhost)·6N Resolved — 운영자 |
