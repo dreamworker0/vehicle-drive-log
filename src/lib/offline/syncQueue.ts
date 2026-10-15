@@ -47,7 +47,9 @@ export function getSyncDB() {
     if (!dbPromise) {
         // v2: 'failed-store' 추가. 기존 사용자의 v1 DB는 upgrade로 스토어만 덧붙는다
         // (sync-store의 미전송 항목은 그대로 보존된다).
-        dbPromise = openDB<SyncDB>('sync-db', 2, {
+        // terminated는 열기가 끝난 뒤에야 불리므로 그때는 cached가 채워져 있다
+        let cached: Promise<IDBPDatabase<SyncDB>> | null = null;
+        cached = openDB<SyncDB>('sync-db', 2, {
             upgrade(database) {
                 if (!database.objectStoreNames.contains('sync-store')) {
                     const store = database.createObjectStore('sync-store', { keyPath: 'id', autoIncrement: true });
@@ -57,6 +59,13 @@ export function getSyncDB() {
                     const store = database.createObjectStore('failed-store', { keyPath: 'id', autoIncrement: true });
                     store.createIndex('by-failedAt', 'failedAt');
                 }
+            },
+            // 브라우저가 연결을 **우리 몰래** 닫았다 — 캐시를 비워 다음 호출이 새로 열게 한다.
+            // iOS Safari는 앱이 백그라운드에 있는 동안 IDB 연결을 끊는다. 이 콜백이 없으면 죽은
+            // 연결을 세션 내내 들고 있어 화면 복귀 flush가 바로 그 연결로 읽다 실패했다
+            // (withSyncDB 주석 참고). 그사이 다른 호출이 새 연결을 이미 열었으면 건드리지 않는다.
+            terminated() {
+                if (dbPromise === cached) dbPromise = null;
             },
         }).catch((error) => {
             // **실패한 Promise를 캐시에 남기지 않는다.** iOS Safari는 IDB 백엔드가 일시적으로
@@ -68,8 +77,45 @@ export function getSyncDB() {
             dbPromise = null;
             throw error;
         });
+        dbPromise = cached;
     }
     return dbPromise;
+}
+
+/**
+ * 이미 닫히는 중인 연결로 트랜잭션을 열려 했다 — `InvalidStateError: Failed to execute
+ * 'transaction' on 'IDBDatabase': The database connection is closing.`
+ */
+function isConnectionClosing(error: unknown): boolean {
+    const message = (error as { message?: unknown } | null)?.message;
+    return typeof message === 'string' && message.includes('database connection is closing');
+}
+
+/**
+ * 캐시된 연결로 `fn`을 실행하고, **그 연결이 닫혀 있었으면 새로 열어 한 번만 다시 한다.**
+ *
+ * iOS Safari는 앱이 백그라운드로 가면 IDB 연결을 끊는다. 그 사실(`close` 이벤트 → 위의
+ * `terminated`)이 화면 복귀 뒤 우리 호출보다 늦게 도착할 수 있어, terminated만으로는 첫 호출이
+ * 여전히 죽은 연결을 쓴다. 화면 복귀는 flush 계기(registerReconnectFlush ④)라 정확히 그
+ * 순간에 읽기가 실패해 처리되지 않은 거부로 올라왔다(Sentry JAVASCRIPT-REACT-6N, iOS 18.7).
+ * 같은 죽은 연결로 enqueue가 실패하면 **오프라인 쓰기를 큐에 담지 못한다** — 이쪽이 더 크다.
+ *
+ * 다시 하는 것은 한 번뿐이다. 새로 연 연결마저 닫히는 중이면 이 기기의 IDB를 지금 쓸 수 없는
+ * 것이므로(IDB_UNUSABLE_MESSAGES) 호출자에게 넘긴다.
+ *
+ * `fn`은 다시 실행돼도 안전한 IDB 작업만 담는다 — Firestore 쓰기처럼 되돌릴 수 없는 일을
+ * 넣으면 그것까지 두 번 한다.
+ */
+async function withSyncDB<T>(fn: (database: IDBPDatabase<SyncDB>) => Promise<T>): Promise<T> {
+    const stale = getSyncDB();
+    try {
+        return await fn(await stale);
+    } catch (error) {
+        if (!isConnectionClosing(error)) throw error;
+        // 다른 호출이 이미 새로 열었으면 그것을 쓴다
+        if (dbPromise === stale) dbPromise = null;
+        return fn(await getSyncDB());
+    }
 }
 
 /**
@@ -163,15 +209,14 @@ function fromStorable(value: unknown): unknown {
 }
 
 export async function enqueue(type: SyncData['type'], collectionName: string, docId: string, data: Record<string, unknown> | null) {
-    const database = await getSyncDB();
-    if (!database) return;
-    await database.add('sync-store', {
+    const record = {
         type,
         collection: collectionName,
         docId,
         data: data ? (toStorable(data) as Record<string, unknown>) : null,
         timestamp: Date.now(),
-    });
+    };
+    await withSyncDB(async (database) => { await database.add('sync-store', record); });
 }
 
 /**
@@ -183,10 +228,10 @@ export async function enqueue(type: SyncData['type'], collectionName: string, do
  * 유실 안내가 뜨면 안 된다.
  */
 export async function clearQueue() {
-    const database = await getSyncDB();
-    if (!database) return;
-    await database.clear('sync-store');
-    await database.clear('failed-store');
+    await withSyncDB(async (database) => {
+        await database.clear('sync-store');
+        await database.clear('failed-store');
+    });
 }
 
 /**
@@ -197,9 +242,7 @@ export async function clearQueue() {
  */
 export async function getPendingCount(): Promise<number> {
     try {
-        const database = await getSyncDB();
-        if (!database) return 0;
-        return await database.count('sync-store');
+        return await withSyncDB((database) => database.count('sync-store'));
     } catch {
         return 0;
     }
@@ -212,9 +255,7 @@ export async function getPendingCount(): Promise<number> {
  * 유실을 알리는 장치가 유실되고, 통째로 비우면 사이에 들어온 폐기가 함께 사라진다.
  */
 export async function peekFailedRecords(): Promise<FailedRecord[]> {
-    const database = await getSyncDB();
-    if (!database) return [];
-    return database.getAll('failed-store');
+    return withSyncDB((database) => database.getAll('failed-store'));
 }
 
 /**
@@ -228,13 +269,13 @@ export async function peekFailedRecords(): Promise<FailedRecord[]> {
  * 이 함수가 막으려던 바로 그 일이다. 그래서 id로 지정해 지운다.
  */
 export async function clearFailedRecords(ids: Array<number | undefined>): Promise<void> {
-    const database = await getSyncDB();
-    if (!database) return;
-    const tx = database.transaction('failed-store', 'readwrite');
-    await Promise.all([
-        ...ids.filter((id): id is number => typeof id === 'number').map((id) => tx.store.delete(id)),
-        tx.done,
-    ]);
+    await withSyncDB(async (database) => {
+        const tx = database.transaction('failed-store', 'readwrite');
+        await Promise.all([
+            ...ids.filter((id): id is number => typeof id === 'number').map((id) => tx.store.delete(id)),
+            tx.done,
+        ]);
+    });
 }
 
 // 동시 flush 방지 — 'online'·앱 시작·SW 메시지·화면 복귀가 겹칠 수 있다.
@@ -264,6 +305,8 @@ export function flushQueue(): Promise<void> {
 const IDB_UNUSABLE_MESSAGES = [
     'An internal error was encountered in the Indexed Database server',
     'Connection to Indexed Database server lost',
+    // withSyncDB가 새 연결로 한 번 다시 했는데도 닫히는 중이었다 — 지금은 기기가 IDB를 내주지 않는다
+    'database connection is closing',
 ];
 
 function isIdbUnusable(error: unknown): boolean {
@@ -293,14 +336,16 @@ export function flushQueueQuietly(): Promise<void> {
 }
 
 async function runFlush(): Promise<void> {
-    const database = await getSyncDB();
-    if (!database) return;
-
     // 단일 트랜잭션을 열어두고 그 안에서 Firestore 네트워크 쓰기를 await하면 안 된다.
     // IndexedDB 트랜잭션은 비-IDB Promise를 await하는 순간 auto-commit되어 비활성화되고,
     // 그 뒤의 store.delete는 "Attempt to delete range from database without an in-progress
     // transaction"(WebKit) 등으로 실패한다. 따라서 읽기·삭제를 각각 독립된 짧은 트랜잭션으로 분리한다.
-    const allRecords = await database.getAll('sync-store');
+    //
+    // 첫 읽기만 withSyncDB로 감싼다 — 화면 복귀 직후 죽은 연결을 만나는 곳이 여기다. 아래 루프는
+    // Firestore 쓰기를 끼고 있어 통째로 다시 할 수 없다. 루프 중간에 연결이 끊기면 지금처럼
+    // 실패로 끝나고, 남은 항목은 다음 계기에 새 연결로 이어 보낸다.
+    const allRecords = await withSyncDB((database) => database.getAll('sync-store'));
+    const database = await getSyncDB();
 
     if (allRecords.length === 0) return;
 
