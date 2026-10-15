@@ -630,3 +630,16 @@
 | **배포** | #485 → #486 → #487 한 건씩, 모두 함수 81개·Hosting 반영. dependabot PR 자동 종료 — #471·#470·#419(#485), #418(#486), #415(#487) |
 | **검증** | functions jest 1,267 · Vitest 2,494 · Sentry 배선 66 · tsc·eslint · 빌드 번들 예산(JS gzip 1,108.6/1,160KB) |
 | **남는 것** | ① Sentry 스트림 전환(Web Vitals 수집 확인 후) ② Sentry Inbound Filter(localhost) — 운영자 설정 ③ jsdom 환경 생성 비용(`pool: 'vmThreads'`) 검토 ④ functions `@sentry/node` 11(서버 SDK — 같은 `dataCollection` 점검 필요) |
+
+### Phase 245: 어제 넣은 계기가 아이폰의 끊긴 연결을 정확히 밟았다 📱🔌
+
+> 2026-10-15. 운영자가 Sentry 알림 메일(JAVASCRIPT-REACT-6N)을 붙여 넣고 *"이것 확인해줘."*
+
+| 항목 | 내용 |
+|------|------|
+| **증상** | `InvalidStateError: Failed to execute 'transaction' on 'IDBDatabase': The database connection is closing.` at `runFlush`(첫 `getAll('sync-store')`), 처리되지 않은 거부. iOS 18.7 · Mobile Safari · `/employee/today`, 릴리스 265a5257(#486 배포본) |
+| **원인** | iOS Safari는 앱이 백그라운드에 있는 동안 IndexedDB 연결을 끊는다. `getSyncDB()`는 연 연결을 **세션 내내 캐시**하고 끊김을 듣지 않았다. #473(10-14)이 flush 계기에 **화면 복귀**를 넣으면서, 앱으로 돌아오는 바로 그 순간 죽은 연결로 읽게 됐다. 계기를 늘린 것이 잠복해 있던 캐시 문제를 드러냈다. 보고된 것은 flush지만 **같은 연결로 `enqueue`가 실패하면 오프라인 쓰기를 큐에 담지 못한다** — 이쪽이 더 크다 |
+| **수정** (#489) | ① `openDB`의 `terminated` 콜백에서 캐시를 비운다(그사이 새로 열린 연결은 건드리지 않음) ② `withSyncDB(fn)` — 닫히는 중이면 새로 열어 **한 번만** 다시 한다. `close` 이벤트가 우리 호출보다 늦게 올 수 있어 ①만으로는 첫 호출이 여전히 실패한다. enqueue·clearQueue·getPendingCount·peek/clearFailedRecords·runFlush 첫 읽기에 적용. **runFlush 루프는 감싸지 않았다** — Firestore 쓰기를 끼고 있어 다시 하면 같은 쓰기를 두 번 한다 ③ 다시 해도 닫히는 중이면 IDB를 못 쓰는 기기로 보고 `flushQueueQuietly`가 경고만 남긴다(IDB_UNUSABLE_MESSAGES) |
+| **검증** | `idb`를 목으로 둔 재현 테스트 6건 — 수정 전 코드에서 5건 실패 확인 후 수정. Vitest 2,500 · tsc · eslint · release-notes·FAQ 검사. 업데이트 소식 10-15. 배포: 함수 81개·Hosting 반영, 운영 사이트 공지 확인 |
+| **교훈** | 실행 계기를 늘리는 변경은 **그 계기가 놓이는 순간의 환경**(여기서는 "막 포그라운드로 돌아온 iOS")에서 기존 코드가 무엇을 가정하는지까지 봐야 한다. #473의 테스트는 계기가 걸리는지만 봤다 |
+| **남는 것** | ① 6N 재발 여부 관찰(Sentry에서 Resolved in next release) ② Phase 244의 남는 것(Sentry 스트림 전환·`@sentry/node` 11·localhost 필터·`pool: 'vmThreads'`) |
