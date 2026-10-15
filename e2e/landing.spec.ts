@@ -84,7 +84,12 @@ test.describe('초대 링크', () => {
         await expect(page.getByRole('button', { name: '직원 로그인' })).toBeVisible({ timeout: 10000 });
 
         // 부팅 첫 지점이 보관하고 주소창에서 지운다(공유·북마크로 옮겨 가지 않게)
-        await expect.poll(() => page.evaluate(() => localStorage.getItem('pendingInviteCode'))).toBe('ABC123');
+        //
+        // 읽는 도중 페이지가 한 번 더 이동할 수 있다 — 첫 방문은 서비스워커가 자리 잡는 시점과 겹쳐
+        // mobile-safari에서 `Execution context was destroyed`로 3회 연속 실패했다(2026-10-16 CI #1319).
+        // 코드는 이미 localStorage에 있으므로 앱 문제가 아니라 읽는 쪽 경쟁이다. 실패한 읽기는 다시 한다.
+        const readPending = () => page.evaluate(() => localStorage.getItem('pendingInviteCode')).catch(() => null);
+        await expect.poll(readPending).toBe('ABC123');
         expect(new URL(page.url()).searchParams.get('code')).toBeNull();
 
         const loginBtn = page.getByRole('button', { name: '직원 로그인' });
@@ -92,6 +97,6 @@ test.describe('초대 링크', () => {
             if (!/login/.test(page.url())) await loginBtn.click();
             await expect(page).toHaveURL(/login/, { timeout: 1000 });
         }).toPass({ timeout: 10000 });
-        expect(await page.evaluate(() => localStorage.getItem('pendingInviteCode'))).toBe('ABC123');
+        await expect.poll(readPending).toBe('ABC123');
     });
 });
