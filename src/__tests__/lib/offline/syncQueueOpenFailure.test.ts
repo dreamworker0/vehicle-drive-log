@@ -144,6 +144,20 @@ describe('syncQueue — 브라우저가 연결을 끊었을 때', () => {
         await expect(getPendingCount()).resolves.toBe(3);
     });
 
+    it('로그아웃의 큐 정리도 새 연결로 다시 한다 — 실패하면 다음 사람 세션에 앞사람 쓰기가 재생된다', async () => {
+        // 큐 항목에는 사용자 식별자가 없다. 로그아웃(auth.ts)의 clearQueue가 죽은 연결로 실패하면
+        // 경고만 남고 넘어가, 공용 기기에서 다음 로그인 사용자의 flush가 앞사람의 오프라인 쓰기를 보낸다.
+        const { getSyncDB, clearQueue } = await loadQueue();
+        const fresh = { clear: vi.fn(async () => undefined) };
+        openDB.mockResolvedValueOnce(deadConnection()).mockResolvedValueOnce(fresh);
+
+        await getSyncDB();
+        await clearQueue();
+
+        expect(fresh.clear).toHaveBeenCalledWith('sync-store');
+        expect(fresh.clear).toHaveBeenCalledWith('failed-store');
+    });
+
     it('브라우저가 연결 종료를 알리면(terminated) 다음 호출은 새로 연다', async () => {
         const { getSyncDB } = await loadQueue();
         const first = { name: 'first' };
