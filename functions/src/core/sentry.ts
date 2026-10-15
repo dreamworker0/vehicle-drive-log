@@ -15,8 +15,39 @@ const DSN = process.env.SENTRY_DSN_FUNCTIONS || "";
 const IS_TEST = process.env.NODE_ENV === "test";
 const RELEASE = process.env.SENTRY_RELEASE || "";
 
+/**
+ * 수집 범위 — SDK 11은 `sendDefaultPii`를 이것으로 바꾸면서 **비워 두면 v10보다 더 많이 거둔다**.
+ *
+ * 서버 SDK는 들어온 요청을 오류 이벤트에 붙인다(core requestdata.js). 콜러블 요청 본문에는
+ * 예약 목적지·탑승자 같은 사용자 입력이, 헤더에는 ID 토큰·App Check 토큰이 실린다. 기본값
+ * (`userInfo: true`)이면 요청자 IP까지 붙는다. 장애 진단에는 우리가 `extra`로 직접 넘기는
+ * 문맥이면 충분하므로 요청에서 자동으로 거두는 것은 모두 끈다. 프론트(src/lib/sentry.ts)와 같은 판단.
+ *
+ * - stackFrameVariables: 지역 변수 값 — 지금은 `includeLocalVariables`(기본 꺼짐)로도 막혀
+ *   있지만, 그 옵션 하나로 켜지는 경로라 여기서 한 번 더 닫는다.
+ */
+export const SENTRY_DATA_COLLECTION = {
+    userInfo: false,
+    cookies: false,
+    httpHeaders: false,
+    httpBodies: [] as string[],
+    urlQueryParams: false,
+    graphQL: { document: false, variables: false },
+    genAI: { inputs: false, outputs: false },
+    databaseQueryData: false,
+    queues: false,
+    stackFrameVariables: false,
+} as const;
+
 interface SentryLike {
-    init(options: { dsn: string; environment: string; tracesSampleRate: number; release?: string }): void;
+    init(options: {
+        dsn: string;
+        environment: string;
+        tracesSampleRate: number;
+        release?: string;
+        dataCollection: typeof SENTRY_DATA_COLLECTION;
+        attachStacktrace: boolean;
+    }): void;
     captureException(error: unknown, options?: { extra?: Record<string, unknown> }): void;
     captureMessage(message: string, options?: { level?: string; extra?: Record<string, unknown> }): void;
     flush(timeoutMs?: number): Promise<boolean>;
@@ -41,6 +72,9 @@ function getSentry(): SentryLike | null {
                 // 없으면 "이 에러가 어느 배포에서 나왔는지"를 알 수 없고 Sentry의
                 // "Resolved in next release"도 쓸 수 없다. 로컬·에뮬레이터에서는 비어 있다.
                 ...(RELEASE ? { release: RELEASE } : {}),
+                dataCollection: SENTRY_DATA_COLLECTION,
+                // SDK 11은 captureMessage(captureWarning)에도 스택을 붙여 이슈 묶음이 바뀐다 — v10 동작 유지
+                attachStacktrace: false,
             });
         } catch {
             // @sentry/node 로드 실패 시 무시
