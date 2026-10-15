@@ -175,3 +175,57 @@ describe('captureWarning — 경고도 Discord까지 가되, 장애처럼 보이
         expect(sendDiscordAlert).not.toHaveBeenCalled();
     });
 });
+
+/**
+ * SDK 11은 `sendDefaultPii`를 `dataCollection`으로 바꾸며 **비워 두면** 들어온 요청의 본문·헤더·쿠키·
+ * IP까지 오류 이벤트에 붙인다(2026-10-15 실측: 기본값 httpBodies에 incomingRequest 포함, userInfo true).
+ * 콜러블 본문에는 예약 목적지·탑승자, 헤더에는 ID 토큰이 실린다.
+ */
+describe('Sentry 수집 범위 — 요청에서 자동으로 거두는 것은 끈다', () => {
+    const OLD_ENV = process.env;
+
+    beforeEach(() => {
+        jest.resetModules();
+        process.env = { ...OLD_ENV, NODE_ENV: 'production' };
+    });
+
+    afterEach(() => {
+        process.env = OLD_ENV;
+        jest.restoreAllMocks();
+    });
+
+    it('init에 dataCollection과 attachStacktrace: false를 넘긴다', () => {
+        process.env.SENTRY_DSN_FUNCTIONS = 'https://examplePublicKey@o0.ingest.sentry.io/0';
+        const init = jest.fn();
+        jest.doMock('@sentry/node', () => ({ init, captureException: jest.fn(), captureMessage: jest.fn(), flush: jest.fn() }));
+        jest.doMock('../core/discord', () => ({ sendDiscordAlert: jest.fn().mockResolvedValue(undefined) }));
+
+        const { captureError, SENTRY_DATA_COLLECTION } = require('../core/sentry');
+        captureError(new Error('boom'));
+
+        expect(init).toHaveBeenCalledWith(expect.objectContaining({
+            dataCollection: SENTRY_DATA_COLLECTION,
+            attachStacktrace: false,
+        }));
+    });
+
+    it('진짜 SDK가 그 설정을 "모두 끔"으로 해석한다 — 키 이름이 틀리면 조용히 기본값(전부 수집)이 된다', async () => {
+        // 목으로는 키 오타를 못 잡는다. 실제 SDK에 넣고 해석된 값을 본다(전송은 일어나지 않는다).
+        const Sentry = jest.requireActual('@sentry/node');
+        const { SENTRY_DATA_COLLECTION } = jest.requireActual('../core/sentry');
+        Sentry.init({ dsn: 'https://examplePublicKey@o0.ingest.sentry.io/0', defaultIntegrations: false, dataCollection: SENTRY_DATA_COLLECTION });
+        try {
+            const resolved = Sentry.getClient().getDataCollectionOptions();
+            expect(resolved).toMatchObject({
+                userInfo: false,
+                cookies: false,
+                httpHeaders: { request: false, response: false },
+                httpBodies: [],
+                urlQueryParams: false,
+                stackFrameVariables: false,
+            });
+        } finally {
+            await Sentry.close();
+        }
+    });
+});
