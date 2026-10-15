@@ -91,3 +91,91 @@ describe('syncQueue — IDB를 열지 못할 때', () => {
         warn.mockRestore();
     });
 });
+
+/**
+ * iOS Safari는 앱이 백그라운드에 있는 동안 IDB 연결을 끊는다. 캐시된 연결은 그대로라 화면에
+ * 돌아온 직후의 flush가 죽은 연결로 읽다 실패했다(Sentry JAVASCRIPT-REACT-6N, iOS 18.7 —
+ * `InvalidStateError: ... The database connection is closing.` at runFlush).
+ */
+const connectionClosing = () => new DOMException(
+    "Failed to execute 'transaction' on 'IDBDatabase': The database connection is closing.",
+    'InvalidStateError',
+);
+
+/** 모든 작업이 '닫히는 중'으로 실패하는 죽은 연결 */
+const deadConnection = () => {
+    const fail = vi.fn(async () => { throw connectionClosing(); });
+    return { getAll: fail, add: fail, count: fail, clear: fail, delete: fail, put: fail };
+};
+
+describe('syncQueue — 브라우저가 연결을 끊었을 때', () => {
+    beforeEach(() => {
+        openDB.mockReset();
+    });
+
+    it('화면 복귀 flush가 죽은 연결을 만나면 새로 열어 이어 간다', async () => {
+        const { getSyncDB, flushQueueQuietly } = await loadQueue();
+        const fresh = { getAll: vi.fn(async () => []) };
+        openDB.mockResolvedValueOnce(deadConnection()).mockResolvedValueOnce(fresh);
+
+        await getSyncDB();  // 앱 시작 때 연 연결 — 그 뒤 백그라운드에서 끊겼다
+        await expect(flushQueueQuietly()).resolves.toBeUndefined();
+
+        expect(openDB).toHaveBeenCalledTimes(2);
+        expect(fresh.getAll).toHaveBeenCalledWith('sync-store');
+    });
+
+    it('오프라인 쓰기 적재도 새 연결로 다시 한다 — 죽은 연결 때문에 기록을 잃지 않는다', async () => {
+        const { getSyncDB, enqueue } = await loadQueue();
+        const fresh = { add: vi.fn(async () => 1) };
+        openDB.mockResolvedValueOnce(deadConnection()).mockResolvedValueOnce(fresh);
+
+        await getSyncDB();
+        await enqueue('CREATE', 'driveLogs', 'd1', { startKm: 100 });
+
+        expect(fresh.add).toHaveBeenCalledTimes(1);
+    });
+
+    it('미전송 건수도 새 연결로 센다 — 죽은 연결이면 0으로 보였다', async () => {
+        const { getSyncDB, getPendingCount } = await loadQueue();
+        openDB.mockResolvedValueOnce(deadConnection()).mockResolvedValueOnce({ count: vi.fn(async () => 3) });
+
+        await getSyncDB();
+        await expect(getPendingCount()).resolves.toBe(3);
+    });
+
+    it('브라우저가 연결 종료를 알리면(terminated) 다음 호출은 새로 연다', async () => {
+        const { getSyncDB } = await loadQueue();
+        const first = { name: 'first' };
+        const second = { name: 'second' };
+        openDB.mockResolvedValueOnce(first).mockResolvedValueOnce(second);
+
+        await expect(getSyncDB()).resolves.toBe(first);
+        const { terminated } = openDB.mock.calls[0][2] as { terminated: () => void };
+        terminated();
+
+        await expect(getSyncDB()).resolves.toBe(second);
+    });
+
+    it('새 연결마저 닫히는 중이면 한 번만 다시 하고 조용히 넘긴다 — 처리되지 않은 거부로 새지 않는다', async () => {
+        const { getSyncDB, flushQueueQuietly } = await loadQueue();
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+        openDB.mockResolvedValue(deadConnection());
+
+        await getSyncDB();
+        await expect(flushQueueQuietly()).resolves.toBeUndefined();
+
+        expect(openDB).toHaveBeenCalledTimes(2);  // 처음 + 한 번 다시 — 무한히 다시 열지 않는다
+        expect(warn).toHaveBeenCalled();
+        warn.mockRestore();
+    });
+
+    it('닫힘이 아닌 실패는 다시 하지 않는다', async () => {
+        const { getSyncDB, enqueue } = await loadQueue();
+        openDB.mockResolvedValue({ add: vi.fn(async () => { throw new Error('QuotaExceededError'); }) });
+
+        await getSyncDB();
+        await expect(enqueue('CREATE', 'driveLogs', 'd1', null)).rejects.toThrow('QuotaExceededError');
+        expect(openDB).toHaveBeenCalledTimes(1);
+    });
+});
