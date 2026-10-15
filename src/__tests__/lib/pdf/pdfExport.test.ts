@@ -16,6 +16,9 @@ import {
     XSS_PAYLOAD,
 } from './printWindowHarness';
 
+// 반출 기록 콜러블(fire-and-forget)이 실제 Cloud Functions로 나가지 않도록 막는다
+vi.mock('../../../lib/audit/recordExport', () => ({ recordExport: vi.fn() }));
+
 interface Log {
     date?: string;
     startTime?: string;

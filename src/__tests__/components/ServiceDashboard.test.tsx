@@ -26,6 +26,10 @@ vi.mock('../../components/superAdmin/dashboard/DashboardDriveAnalysis', () => ({
 vi.mock('../../components/superAdmin/dashboard/DashboardFunnelChart', () => ({
     default: () => <div data-testid="DashboardFunnelChart" />
 }));
+// 마운트 시 listSlackIntegrations 콜러블을 부르므로 실제 Cloud Functions로 나가지 않도록 막는다
+vi.mock('../../components/superAdmin/dashboard/SlackIntegrationStatus', () => ({
+    default: () => <div data-testid="SlackIntegrationStatus" />
+}));
 
 // useServiceDashboard 모킹
 vi.mock('../../hooks/useServiceDashboard', () => ({

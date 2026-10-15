@@ -18,6 +18,9 @@ import {
     XSS_PAYLOAD,
 } from './printWindowHarness';
 
+// 반출 기록 콜러블(fire-and-forget)이 실제 Cloud Functions로 나가지 않도록 막는다
+vi.mock('../../../lib/audit/recordExport', () => ({ recordExport: vi.fn() }));
+
 function dataRows(doc: Document): HTMLTableRowElement[] {
     return Array.from(doc.querySelectorAll('tbody tr'))
         .filter(tr => !tr.classList.contains('total-row'))
