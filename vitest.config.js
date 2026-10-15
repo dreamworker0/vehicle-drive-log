@@ -13,6 +13,38 @@ const localMaxWorkers = rawWorkers
     ? (rawWorkers.includes('%') ? rawWorkers : Number(rawWorkers))
     : '25%';
 
+/**
+ * 기존 `threads` 풀에 남겨 두는 테스트 — 나머지는 `vmThreads`로 돈다(아래 projects).
+ *
+ * ## 왜 나눴나
+ * jsdom 환경을 **파일마다 새로 만드는 비용**이 전체 실행 시간의 59~64%였다(2026-10-15 실측:
+ * 200개 파일에서 jsdom 생성 227초). 워커가 몰리면 첫 import가 제한 시간을 넘기는 부하성 플래키가
+ * 났고(Phase 243 #480), pre-push가 그 때문에 막히기도 했다(Phase 246). `vmThreads`는 워커당
+ * 환경을 한 번 만들고 파일마다 VM 컨텍스트로 격리해 106초 → 24초(로컬 워커 25%)가 됐다.
+ *
+ * ## 왜 전부 옮기지 않았나 — VM 컨텍스트에서는 다음이 다르다
+ * - jsdom 창이 곧 전역이라 `window.location`·`document`를 **다시 정의할 수 없다**
+ *   (`Cannot redefine property: location`). 아래 셋은 그렇게 목을 건다.
+ * - 저장소(fake-indexeddb)가 돌려준 값은 바깥 영역의 `Date`라 VM 안의 `instanceof Date`가 거짓이다.
+ * - gRPC(@grpc/grpc-js) 콜백이 테스트 뒤에 도착하면 VM 안에 `process`가 없어 터진다 —
+ *   Rules 테스트(에뮬레이터)와, Firestore를 목으로 두지 않아 실제로 접속하는 VehicleFormSite.
+ * 고치려면 앱 코드의 `location` 사용을 감싸야 해 이번 범위를 넘는다. **새 테스트가 위 패턴을
+ * 쓰면 여기에 추가하는 대신 그 패턴을 피하는 것을 먼저 검토한다** — 이 목록은 줄어야 한다.
+ */
+const THREADS_ONLY_TESTS = [
+    'src/__tests__/lib/auth.test.ts',                    // window.location 재정의
+    'src/__tests__/lib/inAppBrowser.test.ts',            // window.location·document 재정의
+    'src/__tests__/lib/staleChunk.test.ts',              // window.location.reload 재정의
+    'src/__tests__/lib/offline/syncQueue.test.ts',       // fake-indexeddb 값의 instanceof
+    'src/__tests__/components/VehicleFormSite.test.tsx', // 실제 Firestore gRPC 접속
+    // 아래 둘도 Firestore를 목으로 두지 않아 실제로 접속한다(2026-10-16 열린 소켓 실측: 34.128.10.74:443).
+    // 늦게 온 응답이 **다음 파일**이 도는 중에 터져 오류가 엉뚱한 파일(tmap·FeatureToggleSection)로 찍혔고,
+    // 디렉터리만 따로 돌리면 워커가 죽었다. 목을 보강하면 목록에서 뺀다.
+    'src/__tests__/hooks/useAnalytics.test.ts',
+    'src/__tests__/components/FeatureToggleSection.test.tsx',
+    'tests/**/*.test.ts',                                // Rules 테스트 — 에뮬레이터 gRPC
+];
+
 export default defineConfig({
     plugins: [react()],
     resolve: {
@@ -143,5 +175,25 @@ export default defineConfig({
                 'src/components/common/IOSInstallPrompt.tsx',
             ],
         },
+        // 위 설정을 두 프로젝트가 물려받는다(extends). 배열은 이어 붙으므로 exclude는 루트 것에 더해진다.
+        // 루트에는 include가 없어 threads 프로젝트의 include는 목록 그대로다.
+        projects: [
+            {
+                extends: true,
+                test: {
+                    name: 'vm',
+                    pool: 'vmThreads',
+                    exclude: THREADS_ONLY_TESTS,
+                },
+            },
+            {
+                extends: true,
+                test: {
+                    name: 'threads',
+                    pool: 'threads',
+                    include: THREADS_ONLY_TESTS,
+                },
+            },
+        ],
     },
 });

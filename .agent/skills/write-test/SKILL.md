@@ -168,6 +168,16 @@ useEffect(() => {
 - "~한다" 형식으로 동작을 서술
 - 에러 케이스: `'XXX 에러 시 토스트를 표시한다'`
 
+### 실행 풀 — 대부분 `vmThreads`에서 돈다
+
+`vitest.config.js`는 테스트를 두 프로젝트로 나눈다. 대부분은 `vmThreads`(워커당 jsdom 한 번, 파일마다 VM 컨텍스트)이고, `THREADS_ONLY_TESTS` 목록만 기존 `threads`에서 돈다. VM 컨텍스트에서는 다음이 **안 된다** — 새 테스트에서 피한다.
+
+- `Object.defineProperty(window, 'location', …)`·`delete window.location`·`document` 재정의 → `Cannot redefine property`. URL은 `window.history.replaceState`로 바꾸고, 이동·새로고침은 그 호출을 감싼 모듈을 `vi.mock`한다.
+- 저장소(fake-indexeddb)가 돌려준 값에 `instanceof Date` 등 — 바깥 영역 객체라 거짓이 된다.
+- **실제 Firestore 접속**(목 없이 `lib/firebase`의 db로 조회) — 늦게 온 gRPC 응답이 다음 파일에서 `process is not defined`로 터지고 워커가 죽을 수 있다. 원래도 테스트가 Google 서버에 접속해서는 안 된다.
+
+목록에 추가하는 것은 마지막 수단이다 — 그 목록은 줄어야 한다.
+
 ## 2. Cloud Functions 테스트
 
 ### 순수 단위 테스트 (`*.test.ts`)
