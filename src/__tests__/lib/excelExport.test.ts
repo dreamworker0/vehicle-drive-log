@@ -13,6 +13,9 @@ vi.mock('xlsx', () => ({
     writeFile: vi.fn(),
 }));
 
+// 반출 기록 콜러블(fire-and-forget)이 실제 Cloud Functions로 나가지 않도록 막는다
+vi.mock('../../lib/audit/recordExport', () => ({ recordExport: vi.fn() }));
+
 import { downloadDriveLogsExcel } from '../../lib/excelExport';
 import * as XLSX from 'xlsx';
 import { Timestamp } from 'firebase/firestore';
