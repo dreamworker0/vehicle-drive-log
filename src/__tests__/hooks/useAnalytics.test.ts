@@ -17,6 +17,12 @@ vi.mock('../../lib/firestore', () => ({
     getAllHipassCharges: vi.fn().mockResolvedValue([]),
 }));
 
+// 공휴일 조회는 Firestore 캐시(getDoc)를 먼저 읽는다 — 목이 없으면 실제 Firestore에 gRPC로 접속하고,
+// 늦게 온 응답이 다음 파일 실행 중에 터진다(2026-10-16 실측).
+vi.mock('../../lib/holidayApi', () => ({
+    fetchPublicHolidays: vi.fn().mockResolvedValue({}),
+}));
+
 import useAnalytics from '../../hooks/useAnalytics';
 
 describe('useAnalytics', () => {

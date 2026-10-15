@@ -6,6 +6,19 @@ vi.mock('@/lib/firestore/statistics', () => ({
     getMonthlyStats: vi.fn().mockResolvedValue([]),
 }));
 
+// 전역 Mock: App Check — 단위 테스트가 실제 Google 서버에 접속하지 못하도록 차단
+// lib/firebase.ts를 목 없이 불러오면 import만으로 App Check가 초기화된다. jsdom 주소가 localhost라
+// 개발자 PC의 .env.local에 VITE_APPCHECK_DEBUG_TOKEN이 있으면 디버그 토큰 교환이
+// content-firebaseappcheck.googleapis.com으로 나갔다(2026-10-16 실측). 늦게 온 응답이 다음 파일
+// 실행 중에 터지고, 결과가 개발자 환경(.env.local)에 따라 달라진다. App Check 자체를 검증하는
+// 단위 테스트는 없으므로(lib/firebase를 쓰는 테스트는 getAppCheckBlock을 직접 목으로 둔다) 전부 비운다.
+vi.mock('firebase/app-check', () => ({
+    initializeAppCheck: vi.fn(() => ({})),
+    ReCaptchaV3Provider: class {},
+    onTokenChanged: vi.fn(() => () => { }),
+    getToken: vi.fn().mockResolvedValue({ token: 'test-app-check-token' }),
+}));
+
 // ── '거짓 녹색' 가드 ──────────────────────────────────────────────
 // 오류가 console.error로 삼켜져도 최종 단언이 통과하면 회귀를 놓친다.
 // 그래서 "언제나 테스트 결함"인 두 패턴만 감지해 해당 테스트를 실패시킨다.
