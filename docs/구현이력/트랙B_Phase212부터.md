@@ -709,3 +709,16 @@
 | **필터를 주소에** (#502) | `?vehicle=&driver=&q=&from=&to=` — 수정 뒤 복귀·뒤로 가기·새로고침에서 같은 조건. 기본값(전체·이번 달)은 적지 않고 날짜 형식이 아닌 값은 버리며 다른 쿼리는 보존. 주소 갱신은 `replace`라 필터를 바꿀 때마다 방문 기록이 쌓이지 않는다 |
 | **검증** | 테스트 추가: `returnPath` 7 · 주소 필터 3(기존 11개는 라우터 안에서 띄우도록) · 관리자 복귀 1. Vitest 2,541 · tsc · eslint · e2e(CI). 배포: 함수 81개·Hosting, 운영 사이트 공지 확인 |
 | **남는 것** | ① 의견 주신 선생님의 실사용 확인 ② 외부 대여 운영 확인(Phase 248) ③ THREADS_ONLY 4개 ④ Sentry 스트림 전환 |
+
+### Phase 250: 테스트가 `window.location`을 바꿔 끼우지 않게 — browserNav, 그리고 Sentry 스트림 전환 보류 🧭
+
+> 2026-10-16. Phase 247에서 남긴 THREADS_ONLY 4개 중 "앱의 `location` 사용을 감싸면 줄어든다"던 3개를 처리하고, 오래 남은 "Sentry 스트림 전환"을 다시 따져 보았다.
+
+| 항목 | 내용 |
+|------|------|
+| **browserNav** (#504) | `src/lib/browserNav.ts`(`navigateTo`·`reloadPage`·`currentHref`). 로그아웃 뒤 루트 이동(`auth.ts`)·외부 브라우저 딥링크(`inAppBrowser.ts`)·구버전 청크 [새로고침](`useToastStore.ts`)이 이 함수를 거치고, 테스트는 모듈을 `vi.mock`한다 — `vmThreads`에서는 `window.location`을 다시 정의할 수 없었다. `auth.test`는 `resetModules`를 쓰므로 `vi.hoisted`로 같은 목을 유지. 클립보드 폴백 테스트는 `document`를 통째로 바꾸지 않고 `execCommand`만 얹어 실제 textarea가 붙었다 떨어지는지까지 본다. Android 인앱 Chrome Intent 경로 테스트 추가. 동작 변화 없음 |
+| **범위** | 직접 이동은 앱에 20곳 더 있지만 테스트가 이동을 확인하는 곳만 옮겼다(작업에 정리를 끼워 넣지 않는다). 새로 이동을 테스트하는 코드는 이 함수를 쓴다 |
+| **남긴 1개** | `syncQueue.test` — fake-indexeddb가 돌려준 값이 바깥 영역의 `Date`·`Object`라 테스트의 `instanceof`뿐 아니라 **앱의 센티널 복원도** 값을 알아보지 못한다(vm 풀에서 23개 중 3개 실패). 맞추려면 운영 코드의 판별을 영역 무관하게 바꿔야 해 두었고, 그 이유를 vitest.config.js 주석에 적었다 |
+| **Sentry 스트림 전환 — 보류** | 설치본(@sentry/core 11.x) 타입에서 `traceLifecycle: 'static'`·`withStaticSpan`에 지원 중단 표시가 없다 — 기본값만 'stream'으로 바뀌었다. 전환하면 `beforeSendSpan` 스크러빙을 새 형식(`attributes`·`name`)으로 다시 짜고 `setMeasurement` 기반 Web Vitals가 실리는지 다시 확인해야 하는데, 얻는 것이 없다. **SDK가 'static'을 지원 중단할 때** 한다 — 주간 dependabot PR의 변경 기록에서 확인 |
+| **검증** | 세 파일 vm 풀 47개 · Vitest 2,542 · tsc · eslint · e2e(CI). 배포: 함수 81개·Hosting |
+| **남는 것** | ① 외부 대여·일지 수정 복귀 운영 확인(운영자) ② THREADS_ONLY `syncQueue` 1개(운영 코드 변경 필요) ③ Sentry 'static' 지원 중단 시 스트림 전환 |
