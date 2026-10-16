@@ -52,6 +52,8 @@ export interface SubmitDeps {
     isRetroactive: boolean;
     isEditMode: boolean;
     editLog: DriveLog | null;
+    /** 수정을 마치고 돌아갈 관리자 화면(검증된 앱 안 경로). 없으면 '내 기록' */
+    editReturnTo?: string | null;
     reservationData: LocationState | null;
     hipassCard: HipassCard | null;
     favName: string;
@@ -87,7 +89,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
         externalPassengerNames, setExternalPassengerNames,
         selectedCoDrivers, setSelectedCoDrivers, externalCoDriverNames, setExternalCoDriverNames,
         setFavorites, setShowFavSave, setFavName, setSuccess,
-        isElectric, isRetroactive, isEditMode, editLog, reservationData, hipassCard, favName,
+        isElectric, isRetroactive, isEditMode, editLog, editReturnTo, reservationData, hipassCard, favName,
         lastDriveLog, nextDriveLog, setLastDriveLog,
         showToast, runWithRetry, startTransition, ocrSuccess, ocrRecognizedKm, startLocation
     } = deps;
@@ -232,7 +234,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
             if (reservationData?.reservationId || reservationData?.actualStartTime) {
                 navigate('/employee/today', { replace: true });
             } else if (isEditMode) {
-                navigate('/employee/my-records', { replace: true });
+                navigate(editReturnTo || '/employee/my-records', { replace: true });
             } else {
                 resetInputs();
                 setTimeout(() => setSuccess(false), 2000);
@@ -240,7 +242,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
             return true;
         }
         return false;
-    }, [reservationData, isEditMode, navigate, showToast, setSuccess, resetInputs]);
+    }, [reservationData, isEditMode, editReturnTo, navigate, showToast, setSuccess, resetInputs]);
 
     const handleSubmit = useCallback(async (e: React.FormEvent | Event) => {
         if (e && 'preventDefault' in e) e.preventDefault();
@@ -358,7 +360,8 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
                 setSuccess(true);
                 if (result.shouldNavigate === 'my-records') {
                     showToast(result.message || '운행일지가 수정되었습니다.', 'success');
-                    navigate('/employee/my-records', { replace: true });
+                    // 관리자 일지관리에서 열었으면 그 목록(같은 필터)으로 돌아간다
+                    navigate(editReturnTo || '/employee/my-records', { replace: true });
                 } else if (result.shouldNavigate === 'today') {
                     showToast(result.message || '예약 운행일지가 저장되었습니다.', 'success');
                     invalidateDashboardCache();
@@ -373,7 +376,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
             }
         });
     }, [
-        form, isElectric, showToast, startTransition, runWithRetry,
+        form, isElectric, showToast, startTransition, runWithRetry, editReturnTo,
         orgId, user, userData, selectedVehicle, selectedPassengers, externalPassengerCount,
         externalPassengerNames, selectedCoDrivers, externalCoDriverNames, isRetroactive,
         ocrSuccess, ocrRecognizedKm, isEditMode, editLog, startLocation,

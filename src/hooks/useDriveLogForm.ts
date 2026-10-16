@@ -24,6 +24,7 @@ export type { DriveLogForm, LocationState };
 import { canChooseSite, resolveStartLocationLabel, resolveVehicleCurrentSite, resolveVehicleSite } from '../lib/orgSites';
 import { useDriveLogInitializer } from './driveLogForm/useDriveLogInitializer';
 import { useDriveLogSubmit } from './driveLogForm/useDriveLogSubmit';
+import { safeAdminReturnPath } from './driveLogForm/returnPath';
 
 export default function useDriveLogForm() {
     const { user, userData, orgSites } = useAuth();
@@ -40,6 +41,8 @@ export default function useDriveLogForm() {
     const reservationData = resolvedReservationData;
     const editLog = state?.editLog || null;
     const isEditMode = !!editLog;
+    // 수정을 마치고 돌아갈 곳 — 관리자 일지관리에서 열었을 때만 있다(LocationState.returnTo 주석)
+    const editReturnTo = isEditMode ? safeAdminReturnPath(state?.returnTo) : null;
     // 예약 없이 과거 누락 건을 직접 소급 입력하는 진입점(내 기록 → "누락 운행 입력").
     // 이 모드에서만 신규 작성 폼에 운행 일자 섹션을 노출해 과거 날짜 선택을 허용한다.
     const retroEntry = !!state?.retroactive && !isEditMode;
@@ -224,7 +227,7 @@ export default function useDriveLogForm() {
         externalPassengerNames, setExternalPassengerNames,
         selectedCoDrivers, setSelectedCoDrivers, externalCoDriverNames, setExternalCoDriverNames,
         setFavorites, setShowFavSave, setFavName, setSuccess,
-        isElectric, isRetroactive, isEditMode, editLog, reservationData, hipassCard, favName,
+        isElectric, isRetroactive, isEditMode, editLog, editReturnTo, reservationData, hipassCard, favName,
         showToast, runWithRetry, startTransition, ocrSuccess: ocr.ocrSuccess, ocrRecognizedKm: ocr.ocrRecognizedKm,
         lastDriveLog, nextDriveLog, setLastDriveLog,
         // 출발지가 매번 바뀌는 차량은 운전자가 폼에서 고른 값을 기록한다.

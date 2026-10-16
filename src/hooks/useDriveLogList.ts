@@ -2,6 +2,7 @@
  * useDriveLogList — 운행일지 목록 데이터 fetching, 페이지네이션, 중복 검사, 내보내기 핸들러
  */
 import { useState, useEffect, useMemo, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
 import { useConfirm } from './useConfirm';
@@ -45,13 +46,36 @@ export default function useDriveLogList() {
     const firstDay = toLocalDateStr(new Date(now.getFullYear(), now.getMonth(), 1));
     const lastDay = toLocalDateStr(new Date(now.getFullYear(), now.getMonth() + 1, 0));
 
-    const [filters, setFilters] = useState({
-        vehicleId: '',
-        driverUid: '',
-        search: '',
-        startDate: firstDay,
-        endDate: lastDay,
+    // 필터는 **주소에 담는다**(?vehicle=&driver=&q=&from=&to=). 화면 안에만 두면 일지를 고치러 나갔다
+    // 돌아올 때마다 이번 달·전체 차량으로 초기화돼, 같은 차량·기간의 다른 직원 일지를 이어서 고치려면
+    // 차량과 기간을 매번 다시 골라야 했다(2026-10-16 운영 의견). 주소에 있으면 수정 후 복귀
+    // (DriveLogTableRow의 returnTo)·뒤로 가기·새로고침에서 그대로 남는다. 기본값은 주소에 적지 않는다.
+    const [searchParams, setSearchParams] = useSearchParams();
+    const [filters, setFilters] = useState(() => {
+        const dateOr = (v: string | null, fallback: string) => (v && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : fallback);
+        return {
+            vehicleId: searchParams.get('vehicle') ?? '',
+            driverUid: searchParams.get('driver') ?? '',
+            search: searchParams.get('q') ?? '',
+            startDate: dateOr(searchParams.get('from'), firstDay),
+            endDate: dateOr(searchParams.get('to'), lastDay),
+        };
     });
+
+    useEffect(() => {
+        const next = new URLSearchParams(searchParams);
+        const put = (key: string, value: string, fallback = '') => {
+            if (value && value !== fallback) next.set(key, value); else next.delete(key);
+        };
+        put('vehicle', filters.vehicleId);
+        put('driver', filters.driverUid);
+        put('q', filters.search);
+        put('from', filters.startDate, firstDay);
+        put('to', filters.endDate, lastDay);
+        if (next.toString() !== searchParams.toString()) setSearchParams(next, { replace: true });
+        // searchParams를 의존성에 넣으면 주소를 바꿀 때마다 다시 돈다 — 필터가 바뀔 때만 주소를 맞춘다
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [filters.vehicleId, filters.driverUid, filters.search, filters.startDate, filters.endDate]);
 
     const orgId = userData?.organizationId;
 
