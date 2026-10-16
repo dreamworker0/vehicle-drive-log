@@ -64,6 +64,35 @@ export interface CreateReservationInput {
      * 운영 쪽에서 예약 경로와 즉시 출발 경로를 구분할 근거가 없었다.
      */
     isQuickDrive?: boolean;
+    /**
+     * 외부 대여 — 이 앱을 쓰지 않는 기관에 차를 빌려주는 기간.
+     *
+     * 빌려 가는 쪽은 계정이 없으므로 **명의자를 비운다**(`reservedByUid: ''`). 관리자 명의로 두면
+     * 관리자 오늘 화면에 '운행 시작'이 뜨고, 리마인더·노쇼가 관리자에게 가고, '한 사람 한 대'
+     * 검사가 관리자 본인 예약을 막는다. 빈 명의자는 캘린더 동기화 예약에 이미 선례가 있다.
+     * 차량 겹침·정비·폐차 검사는 그대로라 그 기간에는 누구도 이 차를 잡을 수 없다.
+     */
+    externalLoan?: { borrowerOrg?: unknown; driverName?: unknown };
+}
+
+/** 외부 대여의 기관명·운전자 이름 길이 상한 — 화면(ExternalLoanFields)과 같은 값 */
+export const EXTERNAL_LOAN_TEXT_MAX = 50;
+
+/**
+ * 외부 대여 입력을 다듬어 돌려준다. 형식이 틀리면 던진다.
+ * 예약자 이름 칸에 들어갈 표시 문자열도 함께 만든다 — 목록·타임라인·캘린더가 모두 그 칸을 읽는다.
+ */
+export function normalizeExternalLoan(raw: unknown): { borrowerOrg: string; driverName: string; displayName: string } {
+    const loan = (raw ?? {}) as { borrowerOrg?: unknown; driverName?: unknown };
+    const borrowerOrg = typeof loan.borrowerOrg === "string" ? loan.borrowerOrg.trim() : "";
+    const driverName = typeof loan.driverName === "string" ? loan.driverName.trim() : "";
+    if (!borrowerOrg || borrowerOrg.length > EXTERNAL_LOAN_TEXT_MAX) {
+        throw new HttpsError("invalid-argument", `빌려 가는 기관명을 1~${EXTERNAL_LOAN_TEXT_MAX}자로 적어 주세요.`);
+    }
+    if (!driverName || driverName.length > EXTERNAL_LOAN_TEXT_MAX) {
+        throw new HttpsError("invalid-argument", `운전자(담당자) 이름을 1~${EXTERNAL_LOAN_TEXT_MAX}자로 적어 주세요.`);
+    }
+    return { borrowerOrg, driverName, displayName: `(외부) ${borrowerOrg} ${driverName}` };
 }
 
 /** 바로 운행으로 인정하는 출발 시각 허용 오차(분) — 기기 시계 차이를 흡수한다 */
@@ -128,6 +157,7 @@ export async function createReservationTx(
         passengerNames,
         passengerCount,
         isQuickDrive: requestedQuickDrive,
+        externalLoan: rawExternalLoan,
     } = input;
 
     if (!organizationId || !vehicleId || !date || !startTime || !endTime) {
@@ -167,10 +197,21 @@ export async function createReservationTx(
         );
     }
 
+    // 외부 대여 — 관리자만 등록한다. 명의자는 비우고(위 입력 주석), 바로 운행 표시는 받지 않는다.
+    const externalLoan = rawExternalLoan !== undefined && rawExternalLoan !== null
+        ? normalizeExternalLoan(rawExternalLoan)
+        : null;
+    if (externalLoan && actorRole !== "admin") {
+        throw new HttpsError("permission-denied", "외부 대여는 기관 관리자만 등록할 수 있습니다.");
+    }
+    if (externalLoan && isQuickDrive) {
+        throw new HttpsError("invalid-argument", "외부 대여는 바로 운행으로 등록할 수 없습니다.");
+    }
+
     // 명의자 — 지정이 없으면 호출자 자신이다.
     // 남의 명의를 지정하는 것은 기관 관리자만 할 수 있다(직원 예약 대행·그룹 수정).
-    const ownerUid = reservedByUid || actorUid;
-    const isOnBehalf = ownerUid !== actorUid;
+    const ownerUid = externalLoan ? "" : (reservedByUid || actorUid);
+    const isOnBehalf = !externalLoan && ownerUid !== actorUid;
     if (isOnBehalf && actorRole !== "admin") {
         throw new HttpsError(
             "permission-denied",
@@ -240,8 +281,10 @@ export async function createReservationTx(
             // 차량별 사용 가능 직원 제한 검증 (allowedUserIds 없거나 빈 배열 = 전체 허용, 역할 무관 목록 기준)
             // 판정 기준은 호출자가 아니라 **명의자**다 — 제한은 "누가 이 차를 쓰는가"에 대한 것이고,
             // 대리 생성에서 실제 운행자는 명의자다.
+            // 외부 대여는 기관 구성원이 운전하지 않으므로 이 제한의 대상이 아니다(관리자가 직접 내준다).
             const allowedUserIds = vehicleSnap.data()?.allowedUserIds;
             if (
+                !externalLoan &&
                 Array.isArray(allowedUserIds) && allowedUserIds.length > 0 &&
                 !allowedUserIds.includes(ownerUid)
             ) {
@@ -300,14 +343,16 @@ export async function createReservationTx(
             //
             // 그룹 수정(다일·반복)은 "지우고 다시 만들기" 경로라 재생성 시점에는 옛 회차가
             // 이미 사라져 있다. 따라서 여기서 자기 그룹을 따로 제외할 필요가 없다.
-            const ownerSnap = await transaction.get(
+            //
+            // 외부 대여는 명의자가 없다 — 빈 명의자로 조회하면 다른 대여·캘린더 예약과 서로 막는다.
+            const ownerSnap = externalLoan ? null : await transaction.get(
                 db.collection("reservations")
                     .where("organizationId", "==", organizationId)
                     .where("reservedByUid", "==", ownerUid)
                     .where("date", "==", date)
             );
 
-            const ownerOverlapping = ownerSnap.docs.find((doc) => {
+            const ownerOverlapping = ownerSnap?.docs.find((doc) => {
                 const r = doc.data();
                 if (r.status === "cancelled") return false;
 
@@ -333,14 +378,20 @@ export async function createReservationTx(
 
             // 바로 운행은 이미 출발하는 운행이라 승인을 기다릴 수 없다 — 승인제 기관에서도 바로 확정하고,
             // 관리자에게는 승인 요청 대신 출발 알림이 간다(onReservationCreated).
-            const status: "pending" | "reserved" = requireReservationApproval && !isQuickDrive ? "pending" : "reserved";
+            // 외부 대여는 관리자가 직접 등록하므로 승인 단계가 없다.
+            const status: "pending" | "reserved" =
+                requireReservationApproval && !isQuickDrive && !externalLoan ? "pending" : "reserved";
             const newRef = db.collection("reservations").doc();
             transaction.set(newRef, {
                 organizationId,
                 vehicleId,
                 vehicleName: vehicleName || "",
                 reservedByUid: ownerUid,
-                reservedByName: reservedByName || "",
+                // 외부 대여는 표시용 이름을 서버가 만든다 — 목록·타임라인·캘린더가 모두 이 칸을 읽는다
+                reservedByName: externalLoan ? externalLoan.displayName : (reservedByName || ""),
+                ...(externalLoan
+                    ? { externalLoan: { borrowerOrg: externalLoan.borrowerOrg, driverName: externalLoan.driverName } }
+                    : {}),
                 date,
                 startTime,
                 endTime,

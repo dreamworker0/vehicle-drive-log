@@ -87,6 +87,9 @@ export async function checkReservationReminders(): Promise<void> {
         for (const doc of reservationsSnap.docs) {
             const res = doc.data();
             if (res.reminderSent) continue;
+            // 외부 대여는 받을 사람이 없다(명의자를 비운다 — createReservationCore). 빈 명의자 검사에만
+            // 기대지 않고 명시적으로 건너뛴다 — 아래 2·3도 같다.
+            if (res.externalLoan) continue;
 
             const targetUid = res.reservedByUid || res.userId;
             if (targetUid) {
@@ -133,6 +136,7 @@ export async function checkReservationReminders(): Promise<void> {
                 : res.endTime;
             if (remindAfter && remindAfter > currentTime) return false;
             if (res.driveLogReminderSent) return false;
+            if (res.externalLoan) return false;
             return Boolean(res.reservedByUid || res.userId);
         });
 
@@ -193,6 +197,7 @@ export async function checkReservationReminders(): Promise<void> {
         const noShowCandidates = noShowSnap.docs.filter((doc) => {
             const res = doc.data();
             if (res.noShowReminderSent) return false;
+            if (res.externalLoan) return false;
             return Boolean(res.reservedByUid || res.userId);
         });
 

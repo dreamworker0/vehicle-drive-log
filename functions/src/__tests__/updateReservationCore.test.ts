@@ -247,3 +247,35 @@ describe('updateReservationTx (코어)', () => {
             .rejects.toThrow('최대 50명');
     });
 });
+
+/** 외부 대여 — 명의자를 비운 예약(createReservationCore의 externalLoan) */
+describe('updateReservationTx — 외부 대여', () => {
+    const LOAN = {
+        ...TARGET, reservedByUid: '', reservedByName: '(외부) 동산 사회복지관 홍길동',
+        externalLoan: { borrowerOrg: '동산 사회복지관', driverName: '홍길동' },
+    };
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        mockTransactionGet.mockReset();
+        jest.spyOn(console, 'error').mockImplementation();
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    it('직원은 대여를 고칠 수 없다', async () => {
+        setup({ reservation: LOAN });
+        await expect(updateReservationTx({ ...EMP, destination: 'x' })).rejects.toThrow('본인이 예약한');
+    });
+
+    it('관리자가 시간을 옮겨도 명의자는 비운 채로 두고, 표시 이름을 덮어쓰지 않는다', async () => {
+        setup({ reservation: LOAN, vehicle: { organizationId: 'org1', allowedUserIds: ['someone_else'] } });
+
+        await updateReservationTx({ ...ADMIN, startTime: '11:00', endTime: '12:00', reservedByUid: 'adm1', reservedByName: '관리자' });
+
+        const write = reservationWrite();
+        expect(write).toMatchObject({ startTime: '11:00', endTime: '12:00', reservedByUid: '' });
+        expect(write).not.toHaveProperty('reservedByName');
+        // 명의자 문서도, '한 사람 한 대' 쿼리도 읽지 않는다 — 예약·차량·기관·차량 겹침 네 번
+        expect(mockTransactionGet).toHaveBeenCalledTimes(4);
+    });
+});

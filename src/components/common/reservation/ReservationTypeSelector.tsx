@@ -10,9 +10,11 @@ interface Props {
     selectedDate: string;
     /** 반복 그룹을 수정 중인지 — 체크박스 안내 문구가 '전환'으로 바뀐다 */
     editingRecurringGroupId?: string | null;
+    /** 반복 예약을 숨긴다 — 외부 대여는 정해진 한 기간이라 반복과 함께 쓰지 않는다 */
+    hideRecurring?: boolean;
 }
 
-export default memo(function ReservationTypeSelector({ form, setForm, selectedDate, editingRecurringGroupId }: Props) {
+export default memo(function ReservationTypeSelector({ form, setForm, selectedDate, editingRecurringGroupId, hideRecurring = false }: Props) {
     // 반복 그룹 수정 중에는 두 체크박스가 **전환** 스위치가 된다 (handleSubmit이 같은 조건으로 판정).
     //  · 반복 체크를 끄면 → 수정을 누른 회차만 남기는 단건 전환
     //  · 다일을 체크하면 → 시작일~종료일 연속 예약으로 전환 (나머지 회차는 취소)
@@ -55,7 +57,7 @@ export default memo(function ReservationTypeSelector({ form, setForm, selectedDa
                         })()}
                     </span>
                 </label>
-                <label
+                {!hideRecurring && <label
                     title={editingRecurringGroupId ? '체크를 끄면 이 회차만 남기는 단건 예약으로 전환됩니다.' : undefined}
                     className="flex items-center gap-2 cursor-pointer select-none px-2 py-1.5 rounded-lg hover:bg-surface-100 dark:hover:bg-surface-800 transition-colors"
                 >
@@ -94,7 +96,7 @@ export default memo(function ReservationTypeSelector({ form, setForm, selectedDa
                     <span className="text-sm font-medium text-surface-600 dark:text-surface-300">
                         반복 예약
                     </span>
-                </label>
+                </label>}
             </div>
 
             {/* 다일 예약: 시작일 / 종료일 */}

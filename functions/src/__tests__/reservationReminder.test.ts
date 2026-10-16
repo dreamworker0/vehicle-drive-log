@@ -183,6 +183,27 @@ describe('checkReservationReminders', () => {
         expect(mockSendPushToUser).toHaveBeenCalled();
     });
 
+    // 외부 대여는 받을 사람이 없다(명의자를 비운다). 빈 명의자 필터에만 기대지 않고 명시적으로 건너뛴다 —
+    // 명의자 칸이 어떤 경로로든 채워져도 관리자에게 임박·미출발 알림이 가지 않게.
+    it('외부 대여에는 임박·미출발 알림을 보내지 않는다', async () => {
+        const loan = (id: string, startTime: string) => ({
+            id,
+            data: () => ({
+                reservedByUid: 'adm1', vehicleDisplayName: '스타렉스', startTime, status: 'reserved',
+                externalLoan: { borrowerOrg: '동산 사회복지관', driverName: '홍길동' },
+            }),
+        });
+        mockGet
+            .mockResolvedValueOnce({ docs: [loan('loan1', '10:05')] })
+            .mockResolvedValueOnce({ docs: [] })
+            .mockResolvedValueOnce({ docs: [loan('loan2', '09:40')] });
+
+        await checkReservationReminders();
+
+        expect(mockSendPushToUser).not.toHaveBeenCalled();
+        expect(mockUpdate).not.toHaveBeenCalled();
+    });
+
     it('이미 알림을 보낸 예약은 스킵한다', async () => {
         const alreadySent = {
             id: 'res1',

@@ -43,6 +43,8 @@ export interface ReservationForm extends PassengerFormValues {
     endDate?: string;
     reservedByUid?: string;
     reservedByName?: string;
+    /** 외부 대여(관리자 전용) — 있으면 명의자 없이 빌려 가는 기관·운전자로 등록한다 */
+    externalLoan?: { borrowerOrg: string; driverName: string };
     // 반복 예약 필드
     isRecurring?: boolean;
     recurringDays?: number[];

@@ -146,6 +146,18 @@ describe('reservationTriggers', () => {
             );
         });
 
+        // 외부 대여는 관리자가 직접 등록한 것이고, 여러 날이면 날짜마다 문서가 생겨 같은 알림이 쏟아진다
+        it('외부 대여는 조직 푸시를 보내지 않는다', async () => {
+            mockGet.mockResolvedValue({ exists: false });
+            const event = makeCreateEvent({
+                vehicleId: 'v1', organizationId: 'org1', reservedByUid: '',
+                externalLoan: { borrowerOrg: '동산 사회복지관', driverName: '홍길동' },
+            });
+            await (onReservationCreated as Function)(event);
+
+            expect(mockSendPushToOrg).not.toHaveBeenCalled();
+        });
+
         it('차량이 예약과 다른 기관 소속이면 캘린더 이벤트를 만들지 않는다 (교차 테넌트 차단 — 감사 N3)', async () => {
             mockGet.mockResolvedValue({ exists: true, data: () => ({ googleCalendarId: 'cal@group.calendar.google.com', organizationId: 'org-OTHER' }) });
             mockSendPushToOrg.mockResolvedValue(undefined);

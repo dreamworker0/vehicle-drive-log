@@ -158,8 +158,10 @@ export const onReservationCreated = onDocumentCreated(
     }
 
     // 푸시 알림 전송 (예약 관리자/지정 수신자에게)
+    // 외부 대여는 보내지 않는다 — 관리자가 직접 등록한 것이고, 여러 날이면 날짜마다 문서가 생겨
+    // 같은 알림이 그 수만큼 쏟아진다.
     try {
-        if (reservation.organizationId) {
+        if (reservation.organizationId && !reservation.externalLoan) {
             const who = reservation.reservedByName || '사용자';
             const vehicle = reservation.vehicleName || '차량';
             // 바로 운행은 이미 출발한 운행이라 '예약'이 아니라 출발 알림으로 보낸다

@@ -11,6 +11,7 @@ import RouteInfoPanel from './reservation/RouteInfoPanel';
 import RecurringReservationPanel from './reservation/RecurringReservationPanel';
 import ReservationTabContent from './reservation/ReservationTabContent';
 import ReservationTypeSelector from './reservation/ReservationTypeSelector';
+import ExternalLoanFields from './reservation/ExternalLoanFields';
 import ReservationPassengerField from './reservation/ReservationPassengerField';
 import type { Vehicle } from '../../types/vehicle';
 import type { Favorite } from '../../types/favorite';
@@ -241,8 +242,12 @@ export default function ReservationSidePanel({
                             usageCounts={usageCounts}
                             destinationRef={destinationRef}
                         />
-                        {/* 관리자 모드: 예약자 선택 드롭다운 */}
-                        {isAdmin && editingReservation && members.length > 0 && (
+                        {/* 외부 대여 — 관리자 전용. 일반 예약을 수정할 때는 보이지 않는다(대여로 바꾸려면 새로 등록) */}
+                        {isAdmin && (!editingReservation || editingReservation.externalLoan) && (
+                            <ExternalLoanFields form={form} setForm={setForm} locked={Boolean(editingReservation)} />
+                        )}
+                        {/* 관리자 모드: 예약자 선택 드롭다운 — 외부 대여는 명의자가 없어 숨긴다 */}
+                        {isAdmin && editingReservation && !form.externalLoan && members.length > 0 && (
                             <div>
                                 <label className="label text-xs">예약자</label>
                                 <select
@@ -318,6 +323,7 @@ export default function ReservationSidePanel({
                             setForm={setForm}
                             selectedDate={selectedDate}
                             editingRecurringGroupId={editingRecurringGroupId}
+                            hideRecurring={Boolean(form.externalLoan)}
                         />
 
                         {/* 반복 → 단건/다일 전환 안내

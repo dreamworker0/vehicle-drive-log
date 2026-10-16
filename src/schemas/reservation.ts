@@ -70,6 +70,17 @@ export const reservationSchema = z.object({
     passengerCount: z.coerce.number().optional().catch(undefined),
     /** 바로 운행(예약 없이 출발) 여부 플래그 */
     isQuickDrive: z.boolean().optional().catch(undefined),
+    /**
+     * 외부 대여 — 이 앱을 쓰지 않는 기관에 차를 빌려준 기간. 관리자만 등록한다.
+     *
+     * 이 값이 있으면 명의자(`reservedByUid`)는 비어 있다(빌려 간 사람은 계정이 없다). 표시용 이름
+     * (`reservedByName` = "(외부) 기관명 운전자")은 서버(createReservationCore)가 만든다.
+     * 여러 날이면 날짜별 문서가 `groupId`로 묶인다(다일 예약과 같은 구조).
+     */
+    externalLoan: z.object({
+        borrowerOrg: z.string().catch(''),
+        driverName: z.string().catch(''),
+    }).optional().catch(undefined),
     /** 예약 출처 (예: 'recommendation' — 추천 예약) */
     source: z.string().optional().catch(undefined),
     /** 예약 동기화 출처 (예: 'calendar'). 예약 목록의 📅 배지가 읽는다 */

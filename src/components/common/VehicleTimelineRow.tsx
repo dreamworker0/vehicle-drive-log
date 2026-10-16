@@ -93,7 +93,11 @@ export default function VehicleTimelineRow({
                         const { start: effStart, end: effEnd } = resolveEffectiveTimes(r);
 
                         const colorClass = getVehicleColor(vehicle.id);
-                        const bgClass = isPending
+                        // 외부 대여는 차량 색 대신 호박색 빗금으로 — "이 기간 차가 기관에 없다"가 한눈에 보여야 한다
+                        const isLoan = Boolean(r.externalLoan);
+                        const bgClass = isLoan
+                            ? `bg-amber-500 text-amber-700/30 bg-[repeating-linear-gradient(45deg,currentColor,currentColor_2px,transparent_2px,transparent_6px)] ${isCompleted ? 'opacity-60 dark:opacity-40' : 'opacity-90 dark:opacity-70'}`
+                            : isPending
                             ? `${colorClass} ${colorClass.replace('bg-', 'text-')}/20 bg-[repeating-linear-gradient(45deg,currentColor,currentColor_2px,transparent_2px,transparent_6px)] opacity-90`
                             : `${colorClass} ${isCompleted ? 'opacity-60 dark:opacity-40' : 'opacity-80 dark:opacity-60'}`;
 
@@ -102,7 +106,9 @@ export default function VehicleTimelineRow({
                                 key={r.id}
                                 className={`absolute top-0.5 bottom-0.5 rounded-sm ${bgClass} border border-white/40 dark:border-surface-500/30 cursor-pointer hover:opacity-100 dark:hover:opacity-80 transition-opacity`}
                                 style={{ left: `${left}%`, width: `${width}%` }}
-                                title={`${r.reservedByName}: ${effStart}~${effEnd} ${r.purpose || ''}${isCompleted ? ' (운행완료)' : isPending ? ' (승인 대기)' : ''}`}
+                                title={isLoan
+                                    ? `외부 대여 · ${r.externalLoan!.borrowerOrg} (${r.externalLoan!.driverName}): ${effStart}~${effEnd}${isCompleted ? ' (반납 완료)' : ''}`
+                                    : `${r.reservedByName}: ${effStart}~${effEnd} ${r.purpose || ''}${isCompleted ? ' (운행완료)' : isPending ? ' (승인 대기)' : ''}`}
                                 onClick={() => toggleExpand(vehicle.id)}
                                 role="button"
                                 tabIndex={0}

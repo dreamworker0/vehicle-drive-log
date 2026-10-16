@@ -680,3 +680,58 @@ describe('handleSubmit — 예약 제출', () => {
         expect(deps.setSubmitting).toHaveBeenLastCalledWith(false);
     });
 });
+
+/**
+ * 외부 대여 — 이 앱을 쓰지 않는 기관에 차를 빌려준다. 명의자 없이 기관·운전자로 보내고,
+ * 사람 기준 검사(한 사람 한 대·차량 사용 제한)는 건너뛴다. 며칠이면 다일 구간 그대로 날짜별로 만든다.
+ */
+describe('handleSubmit — 외부 대여', () => {
+    const loanForm = (over: Partial<ReservationForm> = {}) => ({
+        destination: '',
+        startTime: '14:00',
+        endTime: '11:00',
+        endDate: '2026-07-17',
+        externalLoan: { borrowerOrg: ' 동산 사회복지관 ', driverName: '홍길동' },
+        ...over,
+    }) as unknown as ReservationForm;
+
+    beforeEach(() => {
+        vi.clearAllMocks();
+        vi.mocked(findOverlappingReservation).mockReturnValue(null);
+        vi.mocked(isVehicleRestrictedForUser).mockReturnValue(true); // 제한 차량이어도 막지 않아야 한다
+        vi.mocked(getTodayStr).mockReturnValue('2000-01-01');
+        vi.mocked(getCurrentTimeStr).mockReturnValue('12:00');
+    });
+
+    it('여러 날 대여는 날짜별로 같은 그룹에, 명의자 없이 기관·운전자로 만든다 (목적지 없어도 된다)', async () => {
+        const deps = makeDeps({ form: loanForm() });
+        await handleSubmit(fakeEvent(), deps);
+
+        const calls = vi.mocked(createReservationSafe).mock.calls.map(c => c[0]);
+        expect(calls.map(c => [c.date, c.startTime, c.endTime])).toEqual([
+            ['2026-07-15', '14:00', '23:59'],
+            ['2026-07-16', '00:00', '23:59'],
+            ['2026-07-17', '00:00', '11:00'],
+        ]);
+        expect(new Set(calls.map(c => c.groupId)).size).toBe(1);
+        for (const c of calls) {
+            expect(c.reservedByUid).toBe('');
+            expect(c).not.toHaveProperty('reservedByName');
+            expect(c.externalLoan).toEqual({ borrowerOrg: '동산 사회복지관', driverName: '홍길동' });
+        }
+    });
+
+    it('기관명이나 운전자가 비면 막는다', async () => {
+        const deps = makeDeps({ form: loanForm({ externalLoan: { borrowerOrg: '  ', driverName: '홍길동' } }) });
+        await handleSubmit(fakeEvent(), deps);
+        expect(deps.showToast).toHaveBeenCalledWith('빌려 가는 기관명과 운전자(담당자) 이름을 입력해주세요.', 'warning');
+        expect(createReservationSafe).not.toHaveBeenCalled();
+    });
+
+    it('반복 예약과 함께 쓸 수 없다', async () => {
+        const deps = makeDeps({ form: loanForm({ isRecurring: true, endDate: '' }) });
+        await handleSubmit(fakeEvent(), deps);
+        expect(deps.showToast).toHaveBeenCalledWith(expect.stringContaining('반복 예약으로 등록할 수 없습니다'), 'warning');
+        expect(createReservationSafe).not.toHaveBeenCalled();
+    });
+});

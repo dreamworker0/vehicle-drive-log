@@ -18,6 +18,8 @@ interface ReservationData {
     reservedByName?: string;
     purpose?: string;
     destination?: string;
+    /** 외부 대여(앱 미등록 기관) — createReservationCore가 심는다 */
+    externalLoan?: { borrowerOrg?: string; driverName?: string };
     [key: string]: unknown;
 }
 
@@ -101,16 +103,19 @@ export async function deleteCalendarEvent(calendarId: string, eventId: string): 
  * 예약 데이터 → 캘린더 이벤트 객체 변환
  */
 function buildEvent(reservation: ReservationData): calendar_v3.Schema$Event {
-    const { date, startTime, endTime, reservedByName, purpose, destination, vehicleName } = reservation;
+    const { date, startTime, endTime, reservedByName, purpose, destination, vehicleName, externalLoan } = reservation;
 
     // ISO 8601 datetime 생성 (Asia/Seoul)
     const startDateTime = `${date}T${startTime}:00`;
     const endDateTime = `${date}T${endTime}:00`;
 
     // 캘린더 보기 편의를 위해 [차량명] 추가
-    const summaryStr = destination
-        ? `${destination} — ${reservedByName || ""}`
-        : reservedByName || "예약";
+    // 외부 대여는 목적지보다 "누구에게 나갔는가"가 먼저 보여야 한다 — 그 기간에 차가 없다는 표시다
+    const summaryStr = externalLoan?.borrowerOrg
+        ? `외부 대여 · ${externalLoan.borrowerOrg}`
+        : destination
+            ? `${destination} — ${reservedByName || ""}`
+            : reservedByName || "예약";
         
     const summary = vehicleName ? `[${vehicleName}] ${summaryStr}` : summaryStr;
 
