@@ -768,3 +768,19 @@
 | **CI 네트워크 실패** | #511의 `ci`가 functions `npm ci` 중 ECONNRESET으로 실패 — 코드와 무관해 실패 job만 재실행(`gh run rerun --failed`)해 통과 |
 | **검증** | functions 단위 1,340 → 1,402(#510) → **1,432**(#511) · 줄 72.38% → 74.86%(#510) · tsc·eslint·check:faq · e2e(CI). 공지 10-16에 `fixed` 한 줄. 배포: 두 번 모두 함수 80개·Hosting, 운영 사이트 공지 확인 |
 | **남는 것** | ① 0% 핸들러 7개 — `autoVerifyDocument`(트리거·Gemini), 운영 도구(`backfillOrgCoords`·`recalculateAggregatedStats`·`testCalendarAccess`·`getSlackInstallUrl`), 트리거(`notifyRoleChange`·`onUserDelete`) ② 사업자번호 보조 판별 범위 ③ 운영 확인(의견 Discord 알림·외부 대여·일지 수정 복귀) ④ THREADS_ONLY `syncQueue` 1개 ⑤ Sentry 'static' 지원 중단 시 스트림 전환 |
+
+### Phase 254: functions 커버리지 0% 핸들러 0개 — 서류 자동 판독 트리거부터 탈퇴 익명화까지 🧪✅
+
+> 2026-10-16. Phase 252·253에 이어 *"다음 진행해줘"* — 0%로 남은 핸들러 7개를 모두 채웠다(#513). 운영 코드 변경 없음.
+
+| 항목 | 내용 |
+|------|------|
+| **autoVerifyDocument** (트리거 본체) | 기존 `autoVerifyDocument.test`는 마스킹·점수 같은 순수 함수만 봐 핸들러는 0%였다. 서류가 새로 붙을 때 한 번만(재저장·이미 판독·서류 없음·삭제 무시), **화이트리스트 자동 승인은 `ALLOW_TEST_WHITELIST=true`일 때만**(운영에서는 같은 이름도 정식 판독, 2026-07-10 감사 #2), 차단 업종(교회·학교·병원)은 Gemini 없이 거절, 접수 판별 재사용(신청 1건당 Gemini 1회), **그 기관 경로에서만** 내려받기(감사 #3)·기관명 위생 처리, 승인(초대 코드 메일·알림톡)·영리·중복 고유번호(자기 자신 제외, 기존 신청자 마스킹)·판독불가/기타/고유번호 없음은 수동 심사, Tmap 주소·좌표 폴백과 실패 내성, 내려받기·Gemini 실패는 트리거를 실패시키지 않음 |
+| **testCalendarAccess** | 관리자 이상, 시간당 상한(캘린더 ID 열거 오라클 방지, 2026-08-23 감사 발견 1), **다른 기관 귀속 캘린더는 접근 여부 비공개**(superAdmin은 진단용 예외, `organizationId` 클레임도 인정), 서비스 계정 주소 오입력 안내, 읽기 전용 스코프·공백 제거·1건 조회, 403·404·기타 오류 안내 |
+| **getSlackInstallUrl** | 관리자만, **기관은 토큰에서**(본문의 `organizationId` 무시), 1회성 nonce·TTL 기록, state를 실제 `verifyState`로 되읽고 다른 비밀키로는 실패함을 확인, 호출마다 다른 nonce |
+| **운영 도구 2개** | `backfillOrgCoords`: superAdmin만, 좌표 없는 승인 기관만, POI → 주소 검색 폴백, AI 판독 주소로 주소 필드 보충, Tmap 예외는 그 건만 실패. `recalculateAggregatedStats`: **users 문서 역할로** superAdmin 확인, `organizationId` 필터, 음수 거리 0, KST 월 키(09-30 15:30Z → 10월), 덮어쓰기 |
+| **작은 트리거 2개** | `notifyRoleChange`: superAdmin **승격**일 때만 경보(강등·프로필 수정·삭제는 조용히, 알림 실패 내성). `onUserDelete`: 이름·이메일·전화·사진 익명화, NOT_FOUND는 정보 로그, 원시값·null 오류도 ERROR로 |
+| **함께 본 것** | 증빙서류 OCR 화면의 `classifyByBizNumber`(Phase 253에서 기록한 80~89 문제)와 이름이 같은 함수가 `documentScreen`에도 있고, 그쪽은 81·80을 감점해 맞게 판정한다 — 두 구현이 갈라져 있다 |
+| **커버리지 보강 정리** (#508·#510·#513) | 0% 핸들러 19 → **0** · functions 단위 1,278 → **1,497** · 줄 69.75% → **79.43%**(분기 85.41%) · 도중에 OCR 버그 2건 수정(#511) · 사본 테스트 1건 교체(notifyNewApplication)·1건 재발 방지(aiCallables) |
+| **검증** | tsc·eslint · functions-tests·e2e(CI). 배포: 함수 80개·Hosting |
+| **남는 것** | ① jest `coverageThreshold`(줄 43%)가 실제(79%)보다 크게 낮다 — 상향 여부 판단 ② 사업자번호 보조 판별 두 구현 통일 ③ 운영 확인(의견 Discord 알림·외부 대여·일지 수정 복귀) ④ THREADS_ONLY `syncQueue` 1개 ⑤ Sentry 'static' 지원 중단 시 스트림 전환 |
