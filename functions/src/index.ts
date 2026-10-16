@@ -111,11 +111,9 @@ export { backfillMonthlyStats } from "./handlers/callable/backfillMonthlyStats";
 // 해지된 기관 즉시 파기 (superAdmin [영구 삭제])
 export { purgeOrganization } from "./handlers/callable/purgeOrganization";
 
-// 피드백 AI 답변 초안 생성 (의견 등록 시 자동 실행)
-export { generateFeedbackDraft } from "./handlers/triggers/generateFeedbackDraft";
-
-// 피드백 AI 답변 수동 재생성 (관리자 호출)
-export { regenerateFeedbackDraft } from "./handlers/callable/regenerateFeedbackDraft";
+// 의견 등록 알림 (Discord). AI 답변 초안(generateFeedbackDraft·regenerateFeedbackDraft)은
+// 2026-10-16 운영자 요청으로 없앴다 — 답변은 시스템 관리자가 직접 쓴다.
+export { notifyNewFeedback } from "./handlers/triggers/notifyNewFeedback";
 
 // 피드백 답변 발송 (슈퍼관리자 → 사용자 알림)
 export { sendFeedbackReply } from "./handlers/callable/sendFeedbackReply";

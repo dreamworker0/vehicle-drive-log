@@ -20,10 +20,6 @@ export interface Feedback extends FirestoreDoc {
     message?: string; // FeedbackForm.tsx에서 사용하는 필드 대응
     status: FeedbackStatus;
     reply?: string;
-    aiDraft?: string;
-    aiMatchedFaqId?: string | null;
-    aiMatchedFaqIndex?: number | null; // 하위 호환성 유지용 (기존 데이터)
-    aiConfidence?: number;
     repliedAt?: TimestampField;
     repliedBy?: 'superAdmin';
     createdAt?: TimestampField;

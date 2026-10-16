@@ -267,13 +267,6 @@ const FUNCTIONS: FunctionEntry[] = [
 
   // ── 피드백·AI ──
   {
-    name: 'regenerateFeedbackDraft',
-    type: 'onCall',
-    file: 'handlers/callable/regenerateFeedbackDraft.ts',
-    description: 'AI 피드백 답변 초안 수동 재생성 (관리자 호출)',
-    auth: 'superAdmin',
-  },
-  {
     name: 'sendFeedbackReply',
     type: 'onCall',
     file: 'handlers/callable/sendFeedbackReply.ts',
@@ -549,10 +542,10 @@ const FUNCTIONS: FunctionEntry[] = [
     note: 'users/{uid}',
   },
   {
-    name: 'generateFeedbackDraft',
+    name: 'notifyNewFeedback',
     type: 'onDocumentCreated',
-    file: 'handlers/triggers/generateFeedbackDraft.ts',
-    description: 'feedbacks/{feedbackId} 생성 시 Gemini API로 FAQ 매칭 + AI 답변 초안 자동 생성',
+    file: 'handlers/triggers/notifyNewFeedback.ts',
+    description: 'feedbacks/{feedbackId} 생성 시 운영 채널(Discord)에 알림. 작성자별·전역 일일 상한(fail-closed)',
     auth: '시스템 자동 실행 (Firestore 트리거)',
   },
   {

@@ -58,12 +58,12 @@ export type RateLimitKey = keyof typeof DEFAULT_RATE_LIMITS;
 export const GLOBAL_BUDGETS = {
     /** 기관 신청 접수 — 요청 1건당 Gemini 프리스크린 1회. 실사용은 하루 몇 건 수준이다. */
     submitOrgApplication: { max: 40, windowSec: 3600 },
-    /** 랜딩 공개 문의 — 접수 자체는 싸지만 generateFeedbackDraft가 뒤따른다. */
+    /** 랜딩 공개 문의 — 접수마다 notifyNewFeedback(Discord 알림)이 뒤따른다. */
     submitPublicFeedback: { max: 60, windowSec: 3600 },
-    /** 의견 AI 초안(트리거) — 전 사용자 합산 일일 상한 */
-    feedbackAiDraft: { max: 200, windowSec: 86400 },
-    /** 의견 AI 초안 — 작성자 1인당 일일 상한 */
-    feedbackAiDraftPerAuthor: { max: 20, windowSec: 86400 },
+    /** 의견 등록 알림(트리거) — 전 사용자 합산 일일 상한 */
+    feedbackAlert: { max: 200, windowSec: 86400 },
+    /** 의견 등록 알림 — 작성자 1인당 일일 상한 */
+    feedbackAlertPerAuthor: { max: 20, windowSec: 86400 },
 } as const;
 type RateLimitConfig = { max: number; windowSec: number };
 

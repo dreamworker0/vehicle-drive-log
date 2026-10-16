@@ -30,7 +30,6 @@ export default function useFeedbackManagement() {
     const [copiedMessage, setCopiedMessage] = useState<string | null>(null);
     const [sendingReply, setSendingReply] = useState<string | null>(null);
     const [replyError, setReplyError] = useState<string | null>(null);
-    const [regeneratingDraftId, setRegeneratingDraftId] = useState<string | null>(null);
 
     useEffect(() => {
         let isMounted = true;
@@ -164,35 +163,6 @@ export default function useFeedbackManagement() {
         }
     }, []);
 
-    // AI 초안 강제 재생성
-    const handleRegenerateDraft = useCallback(async (feedbackId: string) => {
-        setRegeneratingDraftId(feedbackId);
-        try {
-            const fns = getFunctions(undefined, 'asia-northeast3');
-            const fn = httpsCallable<unknown, { success: boolean; faqId: string | null; confidence: number; draft: string }>(fns, 'regenerateFeedbackDraft');
-            const response = await fn({ feedbackId });
-            
-            if (response.data && response.data.success) {
-                // 로컬 상태 업데이트
-                setFeedbacks(prev => prev.map(f => f.id === feedbackId ? {
-                    ...f,
-                    aiDraft: response.data.draft,
-                    aiMatchedFaqId: response.data.faqId,
-                    aiMatchedFaqIndex: undefined,
-                    aiConfidence: response.data.confidence,
-                } : f));
-                showToast('AI 초안이 새롭게 작성되었습니다.', 'success');
-            } else {
-                throw new Error('응답 실패');
-            }
-        } catch (err) {
-            console.error('AI 초안 재생성 실패:', err);
-            showToast('초안을 새로 생성하지 못했습니다. 콘솔 로그를 확인해주세요.', 'error');
-        } finally {
-            setRegeneratingDraftId(null);
-        }
-    }, [showToast]);
-
     // 답변 발송
     const handleSendReply = useCallback(async (feedbackId: string, replyText: string) => {
         setSendingReply(feedbackId);
@@ -245,11 +215,9 @@ export default function useFeedbackManagement() {
         copiedMessage,
         sendingReply,
         replyError,
-        regeneratingDraftId,
         handleToggleResolve,
         handleDelete,
         handleSendReply,
-        handleRegenerateDraft,
         groupedFeedbacks,
         timelineFeedbacks,
         toggleGroup,

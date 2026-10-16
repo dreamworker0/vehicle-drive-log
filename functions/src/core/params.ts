@@ -15,7 +15,7 @@ import { defineSecret } from "firebase-functions/params";
 
 /**
  * Gemini API 키 — core/gemini를 (간접적으로라도) 쓰는 함수 전부:
- * ocrDashboard·ocrDocument·askAI·regenerateFeedbackDraft·autoVerifyDocument·generateFeedbackDraft·
+ * ocrDashboard·ocrDocument·askAI·autoVerifyDocument·
  * submitOrgApplication(documentScreen 프리스크린)·onSlackTaskCreated(어시스턴트 parseIntent·answerDataQuestion).
  *
  * 2026-09-02 이관. 과금 LLM 키인데 defineString(functions/.env 평문)으로 남아 있어 위 정책과 어긋났다.

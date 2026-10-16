@@ -47,7 +47,7 @@ Gemini API 호출은 종량제 비용이 발생하므로, 악의적이거나 비
 *   **짝을 이뤄야 한다**:
     1.  Rules — 작성자 명의 강제, 첨부 개수·본문 길이 상한 (쓰기 1건의 크기)
     2.  트리거 — 작성자별 + 전역 일일 쿼터, 둘 다 fail-closed (쓰기 횟수)
-*   **구현 예**: `feedbacks` → `generateFeedbackDraft`의 `consumeAiDraftQuota`, `firestore.rules`의 feedbacks create, `tests/firestore-rules.test.ts` 11번 케이스.
+*   **구현 예**: `feedbacks` → `notifyNewFeedback`의 `consumeAlertQuota`, `firestore.rules`의 feedbacks create, `tests/firestore-rules.test.ts` 11번 케이스. (이 트리거는 2026-10-16 AI 초안을 없애 지금은 Discord 알림만 보내지만, 운영 채널 도배를 막는 같은 짝이다.)
 
 ### 1.7 서버가 대신 가져오는 URL (필수 — 2026-08-14 감사 발견 3)
 

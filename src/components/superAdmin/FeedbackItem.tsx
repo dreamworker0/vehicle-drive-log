@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { formatTimestampFull } from '../../lib/dateUtils';
 import type { Feedback } from '../../types';
 
@@ -11,7 +11,6 @@ interface FeedbackItemProps {
     copiedMessage: string | null;
     sendingReply: string | null;
     replyError: string | null;
-    regeneratingDraftId: string | null;
     // 부모로부터 받아오는 핸들러
     onToggleExpand: (id: string | null) => void;
     onToggleResolve: (fb: Feedback) => void;
@@ -19,7 +18,6 @@ interface FeedbackItemProps {
     onSetSelectedImage: (image: { urls: string[]; index: number }) => void;
     onCopyMessage: (e: React.MouseEvent, id: string, message: string) => void;
     onSendReply: (id: string, text: string) => void;
-    onRegenerateDraft: (id: string) => void;
 }
 
 export default function FeedbackItem({
@@ -30,27 +28,19 @@ export default function FeedbackItem({
     copiedMessage,
     sendingReply,
     replyError,
-    regeneratingDraftId,
     onToggleExpand,
     onToggleResolve,
     onSetDeleteTarget,
     onSetSelectedImage,
     onCopyMessage,
     onSendReply,
-    onRegenerateDraft,
 }: FeedbackItemProps) {
     const isExpanded = expandedId === fb.id;
     const isResolved = fb.status === 'read' || fb.status === 'resolved';
     const isUnread = !isResolved;
 
-    const [replyText, setReplyText] = useState(fb.aiDraft ?? '');
-
-    // 초안이 새로 생성되면 상태값 업데이트
-    useEffect(() => {
-        if (fb.aiDraft) {
-            setReplyText(fb.aiDraft);
-        }
-    }, [fb.aiDraft]);
+    // 답변은 직접 쓴다 — AI 초안은 2026-10-16 운영자 요청으로 없앴다(옛 문서의 aiDraft도 쓰지 않는다)
+    const [replyText, setReplyText] = useState('');
 
     return (
         <div
@@ -187,10 +177,10 @@ export default function FeedbackItem({
                         </div>
                     )}
 
-                    {/* ── AI 답변 초안 + 답변 발송 영역 ── */}
+                    {/* ── 답변 작성·발송 영역 ── */}
                     <div className="mt-4 pt-4 border-t border-surface-200 dark:border-surface-600">
                         {fb.status === 'resolved' ? (
-                            /* 답변 완료(AI 전송된 건) — 발송된 답변 표시 */
+                            /* 답변 완료 — 발송된 답변 표시 */
                             <div>
                                 <div className="flex items-center gap-2 mb-2">
                                     <span className="text-sm font-semibold text-green-600 dark:text-green-400">✅ 발송된 답변</span>
@@ -210,65 +200,14 @@ export default function FeedbackItem({
                                 </div>
                             </div>
                         ) : (
-                            /* 미답변 — AI 초안 + 편집 + 발송 */
+                            /* 미답변 — 답변 작성 + 발송 */
                             <div>
-                                {/* AI 초안 헤더 */}
-                                <div className="flex items-center justify-between mb-2">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="text-sm font-semibold text-surface-700 dark:text-surface-300">🤖 AI 답변 초안</span>
-                                        {fb.aiMatchedFaqId != null || fb.aiMatchedFaqIndex != null ? (
-                                            <span className="text-xs px-1.5 py-0.5 rounded-full btn-soft-blue whitespace-nowrap">
-                                                {fb.aiMatchedFaqId ? 'FAQ 매칭' : `Q${fb.aiMatchedFaqIndex} 매칭`}
-                                                {fb.aiConfidence != null && ` (${Math.round(fb.aiConfidence * 100)}%)`}
-                                            </span>
-                                        ) : null}
-                                        {!fb.aiDraft && (() => {
-                                            const createdMs = fb.createdAt
-                                                ? ('toMillis' in fb.createdAt
-                                                    ? (fb.createdAt as { toMillis: () => number }).toMillis()
-                                                    : 'seconds' in fb.createdAt
-                                                        ? (fb.createdAt as { seconds: number }).seconds * 1000
-                                                        : 0)
-                                                : 0;
-                                            // eslint-disable-next-line react-hooks/purity
-                                            const elapsed = Date.now() - createdMs;
-                                            const isTimeout = elapsed > 30_000;
-
-                                            return isTimeout ? (
-                                                <span className="text-xs text-amber-500 dark:text-amber-400">
-                                                    ⚠ 실패
-                                                </span>
-                                            ) : (
-                                                <span className="flex items-center gap-1 text-xs text-surface-400 dark:text-surface-500">
-                                                    <span className="w-3 h-3 spinner" /> 생성 중...
-                                                </span>
-                                            );
-                                        })()}
-                                    </div>
-                                    <button
-                                        onClick={() => onRegenerateDraft(fb.id)}
-                                        disabled={regeneratingDraftId === fb.id || sendingReply === fb.id}
-                                        className="flex-shrink-0 flex items-center gap-1.5 px-3 py-1.5 min-h-[48px] text-xs font-medium text-surface-500 dark:text-surface-400 hover:text-primary-600 dark:hover:text-primary-400 bg-surface-100 dark:bg-surface-700 hover:bg-primary-50 dark:hover:bg-primary-900/30 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                        title="새로운 답변 초안 생성"
-                                    >
-                                        {regeneratingDraftId === fb.id ? (
-                                            <>
-                                                <span className="w-3.5 h-3.5 spinner" />
-                                                <span className="hidden sm:inline">생성 중...</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-                                                </svg>
-                                                <span className="hidden sm:inline">새로 생성</span>
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-
+                                <label htmlFor={`reply-${fb.id}`} className="block mb-2 text-sm font-semibold text-surface-700 dark:text-surface-300">
+                                    ✍️ 답변 작성
+                                </label>
                                 {/* 답변 편집 textarea */}
                                 <textarea
+                                    id={`reply-${fb.id}`}
                                     value={replyText}
                                     onChange={(e) => setReplyText(e.target.value)}
                                     className="w-full min-h-[200px] p-3 rounded-xl border border-surface-200 dark:border-surface-600 bg-white dark:bg-surface-700 text-sm md:text-base text-surface-700 dark:text-surface-300 resize-y focus:ring-2 focus:ring-primary-300 dark:focus:ring-primary-700 focus:border-transparent transition-all"
