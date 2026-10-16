@@ -752,3 +752,19 @@
 | **사본을 검사하던 테스트 하나 더** | `notifyNewApplication.test`는 상태 판정을 파일 안에 **다시 구현해** 그 사본을 검사했다 — 원본 커버리지 0%(Phase 181~211에서 찾은 2건과 같은 모양). 실제 트리거 핸들러를 부르도록 다시 쓰고 메일 수신자 대체·이스케이프·실패 내성을 더했다. `setCustomClaims.emulator.test`도 사본이지만 원본은 단위 테스트가 96.9% 덮어 두었다 |
 | **검증** | 5개 파일 줄 100%(분기 93.5~100) · functions 단위 1,278 → **1,340** · 줄 69.75% → **72.38%**(분기 84.15) · tsc·eslint · e2e(CI). 운영 코드 변경 없음. 배포: 함수 80개 갱신·Hosting |
 | **남는 것** | ① 0% 핸들러 14개 — Gemini 호출형(`askAI`·`ocr*`·`autoVerifyDocument`), 승인·반려 메일·알림톡(`send*Approval*`·`send*Rejection*`), 운영 도구(`backfillOrgCoords`·`recalculateAggregatedStats`·`testCalendarAccess`) ② 운영 확인(의견 Discord 알림·외부 대여·일지 수정 복귀) ③ THREADS_ONLY `syncQueue` 1개 ④ Sentry 'static' 지원 중단 시 스트림 전환 |
+
+### Phase 253: 테스트를 쓰다 찾은 OCR 버그 — km 칸의 "NaN"과 거부된 요청이 깎던 하루 한도 🧪📷
+
+> 2026-10-16. Phase 252에 이은 functions 커버리지 2차(#510)에서 발송·Gemini 경로를 채우다 운영 버그 둘을 찾았고, 운영자가 *"추천대로 진행해주세요"* — 고쳤다(#511).
+
+| 항목 | 내용 |
+|------|------|
+| **커버리지 2차** (#510) | 0%였던 6개 + 공통 헬퍼. 승인·반려 메일(`sendApprovalEmail`·`sendRejectionEmail`): superAdmin만(거부 시 상한도 안 씀)·uid당 시간당 10회·**메일 설정이 없으면 성공으로 넘기지 않고 internal**·이스케이프·초대 코드 링크 인코딩·발송 실패 원인 비노출·로그의 수신 주소 마스킹. 수동 알림톡 2개: 전화번호·초대 코드 없으면 생략+이유, 반려 신청일 **KST**(23:30 KST가 UTC로 하루 어긋나지 않음). `askAI`·`ocrDashboard`: 분 단위 상한 fail-closed → 일일 한도 → 걸리면 Gemini 미호출, 입력 상한, 응답 파싱 기본값 |
+| **사본 테스트를 다시 만들 뻔했다** | 일일 한도 함수가 같은 모듈의 카운터를 직접 불러 목이 닿지 않자, 목 안에 그 규칙을 **다시 구현했다** — #508에서 고친 모양 그대로. 커밋 전에 되돌리고 그 함수는 목으로 호출만 확인했다(규칙은 `rateLimit.test`가 원본으로 검사) |
+| **버그 ① km 칸의 "NaN"** (#511) | Gemini가 km를 `"12,345"`·`"12,345.6 km"` 같은 **문자열**로 주면 `Number()`가 NaN, 화면은 `km != null`만 봐 도착 km(주유 기록은 계기판) 칸에 "NaN"을 채웠다. `parseDashboardReading`·`toReading` — 콤마·공백·단위 제거 후 정수, 음수·범위 밖(오도미터 7자리 초과·배터리 100 초과)·숫자 아님은 null. 깨진 JSON의 숫자 추출도 `"12,345"`를 12와 345로 쪼개지 않게 |
+| **버그 ② 거부된 요청이 하루 한도를 깎음** (#511) | `ocrDashboard`·`ocrDocument` 모두 일일 한도를 입력 검증 **앞에서** 셌다 — 사진 없음·크기 초과·경로 조작·남의 기관 파일처럼 Gemini를 부르지 않는 요청도 하루 한 번을 썼다. 검증 뒤로 옮겼다(분 단위 상한은 래퍼가 맨 앞에서 그대로). 비용 방어선은 같고 순서만 Gemini 호출 직전으로 |
+| **ocrDocument 테스트 신규** | 경로 권한(자기 기관·본인 의견 폴더, superAdmin은 심사용 모든 기관 폴더)·경로 조작 8가지 거부와 한도 미사용·확장자 형식·파싱·사업자번호 보조 판별 |
+| **고치지 않은 관찰** | `classifyByBizNumber`가 업태 코드 80~89를 모두 비영리로 본다 — 81·85·86(영리법인 본점·지점)도 들어간다. AI가 비영리 여부를 못 읽었을 때만 쓰는 보조 판별이라 두었다 |
+| **CI 네트워크 실패** | #511의 `ci`가 functions `npm ci` 중 ECONNRESET으로 실패 — 코드와 무관해 실패 job만 재실행(`gh run rerun --failed`)해 통과 |
+| **검증** | functions 단위 1,340 → 1,402(#510) → **1,432**(#511) · 줄 72.38% → 74.86%(#510) · tsc·eslint·check:faq · e2e(CI). 공지 10-16에 `fixed` 한 줄. 배포: 두 번 모두 함수 80개·Hosting, 운영 사이트 공지 확인 |
+| **남는 것** | ① 0% 핸들러 7개 — `autoVerifyDocument`(트리거·Gemini), 운영 도구(`backfillOrgCoords`·`recalculateAggregatedStats`·`testCalendarAccess`·`getSlackInstallUrl`), 트리거(`notifyRoleChange`·`onUserDelete`) ② 사업자번호 보조 판별 범위 ③ 운영 확인(의견 Discord 알림·외부 대여·일지 수정 복귀) ④ THREADS_ONLY `syncQueue` 1개 ⑤ Sentry 'static' 지원 중단 시 스트림 전환 |
