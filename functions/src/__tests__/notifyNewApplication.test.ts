@@ -1,128 +1,144 @@
 /**
  * notifyNewApplication.test.ts
- * - 신규 신청 / 승인 / 거절 상태 변화 감지 분기 로직 테스트
- * - nodemailer, Discord 알림은 mock 처리
+ * - 기관 신청 문서의 상태 변화(신규 신청·거절·승인)에 따라 Discord·이메일 알림을 보낸다
+ *
+ * 2026-10-16 — 종전 파일은 상태 판정 로직을 이 파일 안에 **다시 구현해** 그 사본을 검사했다.
+ * 원본 트리거를 한 줄도 실행하지 않아 커버리지 0%였다(Phase 181~211의 "사본을 검사하던 테스트"와
+ * 같은 모양). 트리거 핸들러를 직접 부르도록 바꿨다. 판정 케이스는 그대로 옮겼다.
  */
 
-// ── 외부 의존성 Mock ──
-jest.mock('nodemailer', () => ({
-    createTransport: jest.fn(() => ({
-        sendMail: jest.fn().mockResolvedValue({ messageId: 'mock-id' }),
-    })),
-}));
+const mockSendDiscordAlert = jest.fn().mockResolvedValue(undefined);
+const mockSendMail = jest.fn().mockResolvedValue({ messageId: 'mock-id' });
+const mockIsGmailConfigured = jest.fn(() => true);
 
-jest.mock('../core/discord', () => ({
-    sendDiscordAlert: jest.fn().mockResolvedValue(undefined),
+jest.mock('../core/discord', () => ({ sendDiscordAlert: (...args: unknown[]) => mockSendDiscordAlert(...args) }));
+jest.mock('../core/mailer', () => ({
+    isGmailConfigured: () => mockIsGmailConfigured(),
+    createGmailTransporter: () => ({ sendMail: mockSendMail }),
+    systemMailFrom: () => '"차량운행일지" <noreply@example.com>',
 }));
-
+jest.mock('../core/params', () => ({ GMAIL_APP_PASSWORD: {} }));
+jest.mock('../core/sentry', () => ({ captureError: jest.fn(), flushSentry: jest.fn() }));
+jest.mock('firebase-admin/auth', () => ({ getAuth: jest.fn() }));
 jest.mock('firebase-functions/v2/firestore', () => ({
-    onDocumentWritten: (_doc: string, handler: any) => handler,
+    onDocumentWritten: (_opts: unknown, handler: unknown) => handler,
 }));
 
-import { sendDiscordAlert } from "../core/discord";
+import { notifyNewApplication } from '../handlers/triggers/notifyNewApplication';
 
-// notifyNewApplication 로직 핵심 함수만 재현하여 테스트
-// (함수 내부 상태 변화 감지 로직 추출)
-function detectChange(before: Record<string, any> | null, after: Record<string, any> | null) {
-    if (!after) return { isNewApplication: false, isRejected: false, isApproved: false };
+type Doc = Record<string, unknown> | null;
+const run = (before: Doc, after: Doc) =>
+    (notifyNewApplication as unknown as (e: unknown) => Promise<void>)({
+        params: { orgId: 'org1' },
+        data: {
+            before: { data: () => before ?? undefined },
+            after: { data: () => after ?? undefined },
+        },
+    });
 
-    const isNewApplication =
-        (!before && after.status === 'pending') ||
-        (before?.status !== 'pending' && after.status === 'pending');
-    const isRejected = before?.status !== 'rejected' && after.status === 'rejected';
-    const isApproved = before?.status !== 'approved' && after.status === 'approved';
+const applicant = { name: '행복복지관', applicantName: '홍길동', applicantEmail: 'a@b.c', applicantPhone: '010-0000-0000' };
+const discordTitle = () => mockSendDiscordAlert.mock.calls[0]?.[0].title as string | undefined;
 
-    return { isNewApplication, isRejected, isApproved };
-}
+describe('notifyNewApplication', () => {
+    const env = { ...process.env };
 
-describe('notifyNewApplication — 상태 변화 감지 로직', () => {
-    describe('isNewApplication', () => {
-        it('신규 문서 생성 (before=null, status=pending) → true', () => {
-            const { isNewApplication } = detectChange(null, { status: 'pending' });
-            expect(isNewApplication).toBe(true);
+    beforeEach(() => {
+        jest.clearAllMocks();
+        mockIsGmailConfigured.mockReturnValue(true);
+        process.env.ADMIN_NOTIFICATION_EMAIL = 'ops@example.com';
+        jest.spyOn(console, 'log').mockImplementation(() => {});
+        jest.spyOn(console, 'error').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+        process.env = { ...env };
+        jest.restoreAllMocks();
+    });
+
+    describe('상태 변화 판정', () => {
+        it.each([
+            ['새 문서가 pending', null, 'pending', '새 기관 신청'],
+            ['rejected → pending(재신청)', 'rejected', 'pending', '새 기관 신청'],
+            ['pending → rejected', 'pending', 'rejected', '보류'],
+            ['pending → approved', 'pending', 'approved', '승인 완료'],
+        ])('%s', async (_label, beforeStatus, afterStatus, titlePart) => {
+            await run(beforeStatus ? { ...applicant, status: beforeStatus } : null, { ...applicant, status: afterStatus });
+            expect(mockSendDiscordAlert).toHaveBeenCalledTimes(1);
+            expect(discordTitle()).toContain(titlePart);
         });
 
-        it('status가 rejected → pending으로 변경 → true', () => {
-            const { isNewApplication } = detectChange(
-                { status: 'rejected' },
-                { status: 'pending' }
-            );
-            expect(isNewApplication).toBe(true);
+        it.each([
+            ['상태 변화 없음(pending 유지)', 'pending', 'pending'],
+            ['상태 변화 없음(approved 유지 — 기관 정보 수정)', 'approved', 'approved'],
+            ['새 문서가 approved가 아님(초기 상태 없음)', null, undefined],
+        ])('%s이면 알리지 않는다', async (_label, beforeStatus, afterStatus) => {
+            await run(beforeStatus ? { ...applicant, status: beforeStatus } : null, { ...applicant, status: afterStatus });
+            expect(mockSendDiscordAlert).not.toHaveBeenCalled();
+            expect(mockSendMail).not.toHaveBeenCalled();
         });
 
-        it('이미 pending인 상태에서 다른 필드만 변경 → false', () => {
-            const { isNewApplication } = detectChange(
-                { status: 'pending', name: '기존기관' },
-                { status: 'pending', name: '변경기관' }
-            );
-            expect(isNewApplication).toBe(false);
-        });
-
-        it('after가 null (문서 삭제) → false', () => {
-            const { isNewApplication } = detectChange({ status: 'pending' }, null);
-            expect(isNewApplication).toBe(false);
+        it('문서가 지워지면 아무것도 하지 않는다', async () => {
+            await run({ ...applicant, status: 'pending' }, null);
+            expect(mockSendDiscordAlert).not.toHaveBeenCalled();
         });
     });
 
-    describe('isRejected', () => {
-        it('pending → rejected → true', () => {
-            const { isRejected } = detectChange({ status: 'pending' }, { status: 'rejected' });
-            expect(isRejected).toBe(true);
+    describe('신규 신청', () => {
+        it('Discord에 연락처와 함께 알리고 운영 메일로 보낸다', async () => {
+            await run(null, { ...applicant, status: 'pending', createdAt: { seconds: 1_760_000_000 } });
+
+            expect(mockSendDiscordAlert.mock.calls[0][0].fields).toEqual([
+                { name: '신청자 연락처', value: '010-0000-0000', inline: true },
+                { name: '기관 이메일', value: 'a@b.c', inline: true },
+            ]);
+            expect(mockSendMail).toHaveBeenCalledWith(expect.objectContaining({
+                to: 'ops@example.com',
+                subject: '[차량운행일지] 새 기관 신청: 행복복지관',
+            }));
         });
 
-        it('이미 rejected인 상태에서 재업데이트 → false', () => {
-            const { isRejected } = detectChange({ status: 'rejected' }, { status: 'rejected' });
-            expect(isRejected).toBe(false);
+        it('운영 메일 수신자가 없으면 발신 계정으로 받는다', async () => {
+            delete process.env.ADMIN_NOTIFICATION_EMAIL;
+            process.env.GMAIL_USER = 'sender@example.com';
+            await run(null, { ...applicant, status: 'pending' });
+            expect(mockSendMail.mock.calls[0][0].to).toBe('sender@example.com');
         });
 
-        it('approved → rejected → true', () => {
-            const { isRejected } = detectChange({ status: 'approved' }, { status: 'rejected' });
-            expect(isRejected).toBe(true);
+        it('메일 본문의 신청 정보는 HTML로 해석되지 않게 이스케이프한다', async () => {
+            await run(null, { ...applicant, name: '<b>기관</b>', applicantName: '<script>x</script>', status: 'pending' });
+            const { html } = mockSendMail.mock.calls[0][0];
+            expect(html).not.toContain('<script>');
+            expect(html).toContain('&lt;b&gt;기관&lt;/b&gt;');
+        });
+
+        it('빈 신청 정보는 대체 문구로 채운다', async () => {
+            await run(null, { status: 'pending' });
+            expect(mockSendDiscordAlert.mock.calls[0][0].description).toContain('**이름 없음** (이름: 이름 없음)');
+        });
+
+        it('메일 설정이 없으면 Discord만 보낸다', async () => {
+            mockIsGmailConfigured.mockReturnValue(false);
+            await run(null, { ...applicant, status: 'pending' });
+            expect(mockSendDiscordAlert).toHaveBeenCalledTimes(1);
+            expect(mockSendMail).not.toHaveBeenCalled();
+        });
+
+        it('Discord·메일 실패는 트리거를 실패시키지 않는다(재시도 폭주 방지)', async () => {
+            mockSendDiscordAlert.mockRejectedValueOnce(new Error('webhook down'));
+            mockSendMail.mockRejectedValueOnce(new Error('smtp down'));
+            await expect(run(null, { ...applicant, status: 'pending' })).resolves.toBeUndefined();
         });
     });
 
-    describe('isApproved', () => {
-        it('pending → approved → true', () => {
-            const { isApproved } = detectChange({ status: 'pending' }, { status: 'approved' });
-            expect(isApproved).toBe(true);
-        });
+    describe('거절', () => {
+        it('AI 검증 사유를 담고, 없으면 수동 반려로 적는다', async () => {
+            await run({ ...applicant, status: 'pending' }, { ...applicant, status: 'rejected', aiVerifyDetail: { reason: '고유번호 불일치' } });
+            expect(mockSendDiscordAlert.mock.calls[0][0].description).toContain('**사유**: 고유번호 불일치');
 
-        it('이미 approved인 상태에서 재업데이트 → false', () => {
-            const { isApproved } = detectChange({ status: 'approved' }, { status: 'approved' });
-            expect(isApproved).toBe(false);
-        });
-
-        it('신규 문서 (before=null) + approved → true', () => {
-            const { isApproved } = detectChange(null, { status: 'approved' });
-            expect(isApproved).toBe(true);
-        });
-    });
-
-    describe('복합 상태', () => {
-        it('상태 변화가 없을 때 세 플래그 모두 false', () => {
-            const result = detectChange(
-                { status: 'pending' },
-                { status: 'pending' }
-            );
-            expect(result.isNewApplication).toBe(false);
-            expect(result.isRejected).toBe(false);
-            expect(result.isApproved).toBe(false);
-        });
-    });
-
-    describe('sendDiscordAlert mock 동작 확인', () => {
-        beforeEach(() => {
-            jest.clearAllMocks();
-        });
-
-        it('sendDiscordAlert가 mock으로 동작한다', async () => {
-            await sendDiscordAlert({
-                title: '테스트',
-                description: '테스트 메시지',
-                color: 0,
-                fields: [],
-            });
-            expect(sendDiscordAlert).toHaveBeenCalledTimes(1);
+            mockSendDiscordAlert.mockClear();
+            await run({ ...applicant, status: 'pending' }, { ...applicant, status: 'rejected' });
+            expect(mockSendDiscordAlert.mock.calls[0][0].description).toContain('수동 반려');
+            expect(mockSendMail).not.toHaveBeenCalled();
         });
     });
 });
