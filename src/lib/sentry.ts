@@ -310,6 +310,15 @@ function initSentryWithModule(Sentry: SentryModule) {
             /AppCheck:.*(throttled|initial-throttle|500 error|fetch-network-error|failed to connect)/i,
             /App Check 토큰 발급 에러/i,
             /reCAPTCHA token is invalid/,
+            // Firebase Analytics 동적 설정 조회 실패 — getAnalytics()가 유휴 시점에 firebase.googleapis.com
+            // (…/webConfig)을 부르고, 실패하면 SDK 내부 Promise가 처리되지 않은 거부로 올라온다
+            // (JAVASCRIPT-REACT-6M, /apply 등 비로그인 화면, 이용자 0명). 같은 요청이 운영 두 도메인에서 모두
+            // 200임을 확인했다(2026-10-16) — API 키 제한이 아니라 광고 차단기·네트워크가 막은 것이고, 실패해도
+            // Analytics만 빠질 뿐 앱 동작과 무관하다. 6K는 같은 요청이 네트워크 단계에서 끊긴 판이다
+            // (SDK가 메시지 뒤에 호스트를 붙인다). 호스트를 firebase.googleapis.com으로 묶어 Firestore
+            // (firestore.googleapis.com)·Auth(identitytoolkit·securetoken) 실패는 그대로 보이게 한다.
+            /analytics\/config-fetch-failed|Analytics: Dynamic config fetch failed/,
+            /^Failed to fetch \(firebase\.googleapis\.com\)$/,
             // React Hydration 에러 제외 (사용자 환경의 번역기 플러그인 등으로 발생)
             /Hydration failed because the initial UI does not match what was rendered on the server/,
             /Text content does not match server-rendered HTML/,
