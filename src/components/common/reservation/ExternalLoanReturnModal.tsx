@@ -6,7 +6,7 @@
  * 일찍 돌아왔으면 반납일 뒤의 날짜는 취소되어 그날부터 다시 예약할 수 있다(completeReservationGroupSiblings).
  */
 import { useEffect, useMemo, useState } from 'react';
-import { createDriveLog, updateReservationStatus, completeReservationGroupSiblings } from '../../../lib/firestore';
+import { createDriveLog, updateReservationStatus, completeReservationGroupSiblings, getReservationsByGroupId } from '../../../lib/firestore';
 import { resolveStartKm } from '../../../hooks/driveLogForm/resolveStartKm';
 import { buildExternalLoanDriveLog, resolveLoanPeriod } from '../../../hooks/utils/externalLoanReturn';
 import { invalidateDashboardCache } from '../../../hooks/useTodayDashboard';
@@ -34,33 +34,51 @@ const timeOf = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 export default function ExternalLoanReturnModal({ reservation, allReservations, vehicles, orgId, adminUid, onClose, onDone }: Props) {
     const { showToast } = useToast();
     const { confirm } = useConfirm();
-    const period = useMemo(() => resolveLoanPeriod(reservation, allReservations), [reservation, allReservations]);
     const vehicle = vehicles.find(v => v.id === reservation.vehicleId) ?? null;
     const loan = reservation.externalLoan;
 
-    // 반납 시각 기본값 — 예정 반납 시각이 이미 지났으면 그 시각, 아니면 지금(일찍 돌아온 경우)
-    const [defaults] = useState(() => {
-        const now = new Date();
-        const planned = `${period.plannedEndDate} ${period.plannedEndTime}`;
-        return planned <= `${dateOf(now)} ${timeOf(now)}`
-            ? { date: period.plannedEndDate, time: period.plannedEndTime }
-            : { date: dateOf(now), time: timeOf(now) };
-    });
-    const [returnDate, setReturnDate] = useState(defaults.date);
-    const [returnTime, setReturnTime] = useState(defaults.time);
+    // 대여 묶음은 **서버에서 다시 읽는다.** 예약 화면은 그 달 예약만 들고 있어, 달을 넘긴 대여
+    // (9/30 → 10/2)를 10월 화면에서 열면 첫날이 빠져 대여 시작을 10/1 00:00으로 잘못 잡는다 —
+    // 운행일지의 출발일·출발 km가 함께 틀어진다. 읽기에 실패하면 화면에 있는 날짜로 대신한다.
+    const [groupDays, setGroupDays] = useState<Reservation[] | null>(reservation.groupId ? null : allReservations);
+    useEffect(() => {
+        if (!reservation.groupId) return;
+        let cancelled = false;
+        getReservationsByGroupId(reservation.groupId, orgId)
+            .then(days => { if (!cancelled) setGroupDays(days.length > 0 ? days as Reservation[] : allReservations); })
+            .catch(() => { if (!cancelled) setGroupDays(allReservations); });
+        return () => { cancelled = true; };
+    }, [reservation.groupId, orgId, allReservations]);
+    const period = useMemo(
+        () => resolveLoanPeriod(reservation, groupDays ?? allReservations),
+        [reservation, groupDays, allReservations],
+    );
+    const loadingGroup = groupDays === null;
+
+    const [returnDate, setReturnDate] = useState('');
+    const [returnTime, setReturnTime] = useState('');
     const [startKm, setStartKm] = useState('');
     const [endKm, setEndKm] = useState('');
     const [notes, setNotes] = useState('');
     const [saving, setSaving] = useState(false);
 
-    // 출발 km — 대여 시작 시점의 직전 도착 km(운행일지 작성 화면과 같은 규칙)
+    // 묶음을 다 읽은 뒤 한 번 채운다
+    //  · 반납 시각 — 예정 반납 시각이 이미 지났으면 그 시각, 아니면 지금(일찍 돌아온 경우)
+    //  · 출발 km — 대여 시작 시점의 직전 도착 km(운행일지 작성 화면과 같은 규칙)
     useEffect(() => {
+        if (loadingGroup) return;
+        const now = new Date();
+        const planned = `${period.plannedEndDate} ${period.plannedEndTime}`;
+        const usePlanned = planned <= `${dateOf(now)} ${timeOf(now)}`;
+        setReturnDate(prev => prev || (usePlanned ? period.plannedEndDate : dateOf(now)));
+        setReturnTime(prev => prev || (usePlanned ? period.plannedEndTime : timeOf(now)));
+
         let cancelled = false;
         resolveStartKm(orgId, reservation.vehicleId, { driveDate: period.startDate, startTime: period.startTime, vehicle })
             .then(km => { if (!cancelled) setStartKm(prev => prev || km); })
             .catch(() => { /* 비워 두면 관리자가 직접 적는다 */ });
         return () => { cancelled = true; };
-    }, [orgId, reservation.vehicleId, period.startDate, period.startTime, vehicle]);
+    }, [loadingGroup, orgId, reservation.vehicleId, period.startDate, period.startTime, period.plannedEndDate, period.plannedEndTime, vehicle]);
 
     if (!loan) return null;
 
@@ -170,8 +188,8 @@ export default function ExternalLoanReturnModal({ reservation, allReservations, 
                     </p>
                     <div className="flex gap-2 pt-1">
                         <button type="button" onClick={onClose} className="btn-secondary flex-1 min-h-[48px]">닫기</button>
-                        <button type="submit" disabled={saving} className="btn-primary flex-1 min-h-[48px]">
-                            {saving ? '저장 중…' : '반납 처리'}
+                        <button type="submit" disabled={saving || loadingGroup} className="btn-primary flex-1 min-h-[48px]">
+                            {saving ? '저장 중…' : loadingGroup ? '불러오는 중…' : '반납 처리'}
                         </button>
                     </div>
                 </form>
