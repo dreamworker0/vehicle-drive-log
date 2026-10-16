@@ -90,6 +90,7 @@ export function handleEdit(res: Reservation, deps: EditDeps) {
                 endDate: last.date !== first.date ? last.date : '',
                 reservedByUid: first.reservedByUid,
                 reservedByName: first.reservedByName,
+                ...(first.externalLoan ? { externalLoan: { ...first.externalLoan } } : {}),
                 ...passengerFormFields(first, members),
             });
             setShowForm(true);
@@ -108,6 +109,7 @@ export function handleEdit(res: Reservation, deps: EditDeps) {
         endTime: res.endTime,
         reservedByUid: res.reservedByUid,
         reservedByName: res.reservedByName,
+        ...(res.externalLoan ? { externalLoan: { ...res.externalLoan } } : {}),
         ...passengerFormFields(res, members),
     });
     setShowForm(true);

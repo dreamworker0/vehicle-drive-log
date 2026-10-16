@@ -84,6 +84,12 @@ const emptyOrigin = (): OriginCounts => ({ reservation: 0, quick: 0, manual: 0, 
 /** driverUid가 비어 있는 옛 기록을 모으는 키 — 버리면 직원별 합이 총계보다 작아진다 */
 export const UNASSIGNED_DRIVER = "__unassigned";
 
+/**
+ * 외부 대여 반납 기록을 모으는 키. 운전자가 기관 구성원이 아니라 driverUid가 비어 있는데,
+ * 그대로 두면 "(운전자 미지정)"에 섞여 옛 기록 정리 대상처럼 보인다. 대여는 따로 모아 이름을 붙인다.
+ */
+export const EXTERNAL_LOAN_DRIVER = "__external_loan";
+
 const isDateStr = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v);
 
 /** "HH:MM" → 시(0~23). 없거나 깨졌으면 null */
@@ -113,6 +119,8 @@ export function classifyDriveOrigin(data: FirebaseFirestore.DocumentData): keyof
     if (data.driveOrigin === "reservation" || data.driveOrigin === "quick" || data.driveOrigin === "manual") {
         return data.driveOrigin;
     }
+    // 외부 대여는 관리자가 기간을 미리 등록한 것이라 '사전 예약'으로 센다(예약 연결이 있어도 '구분 전'이 아니다)
+    if (data.driveOrigin === "external_loan") return "reservation";
     return data.reservationId ? "linked" : "manual";
 }
 
@@ -206,10 +214,12 @@ async function aggregateOrgMonth(
         // 운전자 통계 — 운행일지의 운전자 식별자는 driverUid
         // 운전자 통계 — 운행일지의 운전자 식별자는 driverUid. 비어 있는 옛 기록도 버리지 않는다
         // (예전에는 버려 직원별 합이 총계보다 작았다).
-        const uid = data.driverUid || UNASSIGNED_DRIVER;
-        const driverName = uid === UNASSIGNED_DRIVER
-            ? "(운전자 미지정)"
-            : data.driverName || userMap.get(uid) || "알 수 없음";
+        const uid = data.driveOrigin === "external_loan" ? EXTERNAL_LOAN_DRIVER : (data.driverUid || UNASSIGNED_DRIVER);
+        const driverName = uid === EXTERNAL_LOAN_DRIVER
+            ? "외부 대여"
+            : uid === UNASSIGNED_DRIVER
+                ? "(운전자 미지정)"
+                : data.driverName || userMap.get(uid) || "알 수 없음";
         if (!driverStats[uid]) driverStats[uid] = { name: driverName, count: 0, distance: 0, origin: emptyOrigin() };
         driverStats[uid].count += 1;
         driverStats[uid].distance += validDistance;

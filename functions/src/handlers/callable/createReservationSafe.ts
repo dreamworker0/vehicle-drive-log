@@ -39,6 +39,8 @@ export const createReservationSafe = onCall(
             passengerCount,
             // 바로 운행 여부 — 화면이 보내던 값을 여기서 받지 않아 줄곧 버려졌다
             isQuickDrive,
+            // 외부 대여(앱 미등록 기관) — 관리자 권한·형식 검증은 코어가 한다
+            externalLoan,
         } = request.data;
 
         const { reservationId } = await createReservationTx({
@@ -62,6 +64,7 @@ export const createReservationSafe = onCall(
             passengerNames,
             passengerCount,
             isQuickDrive,
+            externalLoan,
             actorUid: request.auth.uid,
             actorOrgId: request.auth.token.orgId,
             actorRole: request.auth.token.role,

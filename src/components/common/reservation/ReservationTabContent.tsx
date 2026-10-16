@@ -28,6 +28,7 @@ interface ReservationTabContentProps {
     isToday: boolean;
     onEdit: (res: Reservation) => void;
     onCancel: (id: string) => Promise<void>;
+    onReturnLoan?: (res: Reservation) => void;
     user: { uid?: string; id?: string } | null;
     isAdmin: boolean;
     setShowForm: (show: boolean) => void;
@@ -45,6 +46,7 @@ export default memo(function ReservationTabContent({
     isToday,
     onEdit,
     onCancel,
+    onReturnLoan,
     user,
     isAdmin,
     setShowForm,
@@ -96,6 +98,7 @@ export default memo(function ReservationTabContent({
                             isToday={isToday}
                             onEdit={onEdit}
                             onCancel={onCancel}
+                            onReturnLoan={onReturnLoan}
                             user={user}
                             isAdmin={isAdmin}
                             setShowForm={setShowForm}

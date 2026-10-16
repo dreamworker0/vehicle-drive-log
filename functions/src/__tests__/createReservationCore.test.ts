@@ -524,3 +524,86 @@ describe('isGenuineQuickDrive', () => {
         expect(isGenuineQuickDrive({ ...base, source: 'recommendation' }, now)).toBe(false);
     });
 });
+
+/**
+ * 외부 대여 — 이 앱을 쓰지 않는 기관에 차를 빌려주는 기간.
+ * 명의자를 비우고(관리자 오늘 화면·리마인더·'한 사람 한 대'에 걸리지 않게) 차량 겹침은 그대로 막는다.
+ */
+describe('createReservationTx — 외부 대여', () => {
+    const loanInput = {
+        organizationId: 'org1',
+        vehicleId: 'v1',
+        vehicleName: '스타렉스',
+        date: '2026-10-20',
+        startTime: '14:00',
+        endTime: '23:59',
+        actorUid: 'admin1',
+        actorOrgId: 'org1',
+        actorRole: 'admin',
+        externalLoan: { borrowerOrg: '  동산 사회복지관 ', driverName: '홍길동' },
+    };
+    const vehicleSnap = { exists: true, data: () => ({ organizationId: 'org1', allowedUserIds: ['someone-else'] }) };
+    const approvalOrgSnap = { exists: true, data: () => ({ requireReservationApproval: true }) };
+    const emptyDay = { docs: [] };
+
+    beforeEach(() => {
+        jest.clearAllMocks();
+        mockTransactionGet.mockReset();
+        jest.spyOn(console, 'error').mockImplementation();
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    it('관리자는 등록할 수 있다 — 명의자는 비우고, 표시 이름은 서버가 만들고, 승인제여도 바로 확정된다', async () => {
+        mockTransactionGet
+            .mockResolvedValueOnce(vehicleSnap)
+            .mockResolvedValueOnce(approvalOrgSnap)
+            .mockResolvedValueOnce(emptyDay);
+
+        const result = await createReservationTx(loanInput);
+
+        expect(result.status).toBe('reserved');
+        const written = mockTransactionSet.mock.calls[0][1];
+        expect(written.reservedByUid).toBe('');
+        expect(written.reservedByName).toBe('(외부) 동산 사회복지관 홍길동');
+        expect(written.externalLoan).toEqual({ borrowerOrg: '동산 사회복지관', driverName: '홍길동' });
+        // 명의자 조회·'한 사람 한 대' 조회를 하지 않는다 — 차량·기관·차량별 그날 예약 세 번만 읽는다.
+        // (빈 명의자로 조회하면 다른 대여·캘린더 예약과 서로 막는다)
+        expect(mockTransactionGet).toHaveBeenCalledTimes(3);
+    });
+
+    it('직원은 등록할 수 없다', async () => {
+        await expect(createReservationTx({ ...loanInput, actorRole: 'employee' }))
+            .rejects.toThrow('기관 관리자만');
+        expect(mockRunTransaction).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ['기관명이 비면', { borrowerOrg: '   ', driverName: '홍길동' }, '기관명'],
+        ['기관명이 50자를 넘으면', { borrowerOrg: '가'.repeat(51), driverName: '홍길동' }, '기관명'],
+        ['운전자 이름이 비면', { borrowerOrg: '동산 사회복지관', driverName: '' }, '운전자'],
+        ['문자열이 아니면', { borrowerOrg: { $gt: '' }, driverName: '홍길동' }, '기관명'],
+    ])('%s 거부한다', async (_label, externalLoan, message) => {
+        await expect(createReservationTx({ ...loanInput, externalLoan }))
+            .rejects.toThrow(message);
+        expect(mockRunTransaction).not.toHaveBeenCalled();
+    });
+
+    it('같은 차량·시간대에 직원 예약이 있으면 거부한다 — 대여 기간이 기존 예약을 덮지 않는다', async () => {
+        mockTransactionGet
+            .mockResolvedValueOnce(vehicleSnap)
+            .mockResolvedValueOnce(approvalOrgSnap)
+            .mockResolvedValueOnce({ docs: [{ id: 'r1', data: () => ({ status: 'reserved', startTime: '15:00', endTime: '16:00' }) }] });
+
+        await expect(createReservationTx(loanInput)).rejects.toThrow('이미 예약되어 있습니다');
+        expect(mockTransactionSet).not.toHaveBeenCalled();
+    });
+
+    it('정비 중인 차량은 대여할 수 없다', async () => {
+        mockTransactionGet.mockResolvedValueOnce({
+            exists: true,
+            data: () => ({ organizationId: 'org1', maintenance: { isBlocked: true, endDate: null } }),
+        });
+
+        await expect(createReservationTx(loanInput)).rejects.toThrow('정비 중');
+    });
+});

@@ -418,3 +418,51 @@ describe('종료시간 제안 줄', () => {
         expect(passed).toMatchObject({ startTime: '10:00', endTime: '12:00' });
     });
 });
+
+// 외부 대여 — 이 앱을 쓰지 않는 기관에 차를 빌려준다. 관리자만 등록하고, 명의자가 없다.
+describe('외부 대여', () => {
+    const loanToggle = () => screen.queryByRole('switch', { name: '외부 대여' });
+    const members = [{ id: 'u1', name: '홍길동', role: 'admin' }] as never;
+
+    it('관리자의 새 예약에만 보인다', () => {
+        setup({ isAdmin: true });
+        expect(loanToggle()).not.toBeNull();
+    });
+
+    it('직원에게는 보이지 않는다', () => {
+        setup({ isAdmin: false });
+        expect(loanToggle()).toBeNull();
+    });
+
+    it('일반 예약을 수정할 때는 보이지 않는다 — 대여로 바꾸려면 새로 등록한다', () => {
+        setup({ isAdmin: true, editingReservation: reservation() });
+        expect(loanToggle()).toBeNull();
+    });
+
+    it('대여를 수정할 때는 켜진 채로 잠기고, 예약자 선택을 숨긴다', () => {
+        const loan = { borrowerOrg: '동산 사회복지관', driverName: '홍길동' };
+        setup({
+            isAdmin: true,
+            members,
+            editingReservation: reservation({ reservedByUid: '', externalLoan: loan }),
+            form: { ...baseForm, externalLoan: loan },
+        });
+        expect(loanToggle()).toHaveAttribute('aria-checked', 'true');
+        expect(loanToggle()).toBeDisabled();
+        expect(screen.getByLabelText('빌려 가는 기관 *')).toHaveValue('동산 사회복지관');
+        expect(screen.queryByText('예약자')).toBeNull();
+    });
+
+    it('켜면 대여 칸을 열고 반복 설정을 지운다', () => {
+        const setForm = vi.fn();
+        setup({ isAdmin: true, setForm, form: { ...baseForm, isRecurring: true, recurringDays: [1] } });
+
+        fireEvent.click(loanToggle()!);
+
+        const updater = setForm.mock.calls[0][0] as (prev: ReservationForm) => ReservationForm;
+        const next = updater({ ...baseForm, isRecurring: true, recurringDays: [1] });
+        expect(next.externalLoan).toEqual({ borrowerOrg: '', driverName: '' });
+        expect(next.isRecurring).toBe(false);
+        expect(next.recurringDays).toBeUndefined();
+    });
+});

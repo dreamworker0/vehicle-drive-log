@@ -82,3 +82,36 @@ describe('ReservationAccordion', () => {
         expect(screen.queryByText('취소')).not.toBeInTheDocument();
     });
 });
+
+// 외부 대여 — 관리자에게, 대여가 시작된 뒤에만 [반납 처리]가 보인다
+describe('ReservationAccordion — 외부 대여', () => {
+    const loanRes = {
+        id: 'L1', vehicleId: 'v1', reservedByUid: '', reservedByName: '(외부) 동산 사회복지관 홍길동',
+        date: '2026-10-20', startTime: '14:00', endTime: '23:59', status: 'reserved',
+        externalLoan: { borrowerOrg: '동산 사회복지관', driverName: '홍길동' },
+    } as unknown as Reservation;
+    const afterStart = new Date(2026, 9, 20, 15, 0);
+    const beforeStart = new Date(2026, 9, 20, 13, 0);
+
+    it('대여 배지를 단다', () => {
+        render(<ReservationAccordion reservations={[loanRes]} isExpanded user={adminUser} isAdmin now={afterStart} />);
+        expect(screen.getByText('외부 대여')).toBeInTheDocument();
+    });
+
+    it('시작 뒤 관리자에게 [반납 처리]를 보이고, 누르면 그 예약으로 연다', () => {
+        const onReturnLoan = vi.fn();
+        render(<ReservationAccordion reservations={[loanRes]} isExpanded user={adminUser} isAdmin onReturnLoan={onReturnLoan} now={afterStart} />);
+        fireEvent.click(screen.getByText('반납 처리'));
+        expect(onReturnLoan).toHaveBeenCalledWith(loanRes);
+    });
+
+    it('시작 전·직원·이미 반납한 대여에는 보이지 않는다', () => {
+        const onReturnLoan = vi.fn();
+        const { rerender } = render(<ReservationAccordion reservations={[loanRes]} isExpanded user={adminUser} isAdmin onReturnLoan={onReturnLoan} now={beforeStart} />);
+        expect(screen.queryByText('반납 처리')).toBeNull();
+        rerender(<ReservationAccordion reservations={[loanRes]} isExpanded user={{ uid: 'emp' }} isAdmin={false} onReturnLoan={onReturnLoan} now={afterStart} />);
+        expect(screen.queryByText('반납 처리')).toBeNull();
+        rerender(<ReservationAccordion reservations={[{ ...loanRes, status: 'completed' }]} isExpanded user={adminUser} isAdmin onReturnLoan={onReturnLoan} now={afterStart} />);
+        expect(screen.queryByText('반납 처리')).toBeNull();
+    });
+});

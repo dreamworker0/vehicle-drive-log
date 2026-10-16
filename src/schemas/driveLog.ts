@@ -93,8 +93,21 @@ export const driveLogSchema = z.object({
     /**
      * 운행을 어떻게 시작했는가 — 사전 예약 · 바로 운행 · 예약 없이 기록.
      * 새로 쓰는 일지에만 저장된다(2026-10 도입). 없으면 reservationId 유무로 추정한다(월간 집계 참고).
+     * `external_loan` = 외부 대여(앱 미등록 기관에 빌려준 기간)의 반납 기록. 월간 집계는 사전 예약으로 센다.
      */
-    driveOrigin: z.enum(['reservation', 'quick', 'manual']).optional().catch(undefined),
+    driveOrigin: z.enum(['reservation', 'quick', 'manual', 'external_loan']).optional().catch(undefined),
+    /**
+     * 외부 대여 반납 기록 — 빌려 간 기관·운전자와 대여 예약 묶음.
+     *
+     * 운전자가 기관 구성원이 아니라 `driverUid`는 비어 있고 `driverName`에 "(외부) 기관 운전자"가 들어간다.
+     * 대여 기간 전체가 운행일지 한 건이다(여러 날이면 `startDate`) — 날짜별로 쪼개면 빌려 간 쪽에서 받을 수
+     * 없는 자정 계기판 값을 지어내야 한다.
+     */
+    externalLoan: z.object({
+        borrowerOrg: z.string().catch(''),
+        driverName: z.string().catch(''),
+        groupId: z.string().optional().catch(undefined),
+    }).optional().catch(undefined),
     inputMethod: z.enum(['ocr', 'manual', 'favorite']).optional().catch(undefined),
     createdAt: timestampSchema.optional().catch(undefined),
     editedAt: timestampSchema.optional().catch(undefined),

@@ -41,13 +41,19 @@ function buildReservationBaseData(
     },
 ) {
     const { form, user, userData, reservationSource } = deps;
+    // 외부 대여는 명의자가 없다 — 명의자·표시 이름은 서버가 정한다(createReservationCore의 externalLoan).
+    const owner = form.externalLoan
+        ? { reservedByUid: '', externalLoan: { borrowerOrg: form.externalLoan.borrowerOrg.trim(), driverName: form.externalLoan.driverName.trim() } }
+        : {
+            reservedByUid: form.reservedByUid || user.uid,
+            reservedByName: form.reservedByName || userData.name || user.email || '익명',
+        };
     return {
         vehicleId: form.vehicleId,
         vehicleName,
         destination: form.destination,
         purpose: form.purpose,
-        reservedByUid: form.reservedByUid || user.uid,
-        reservedByName: form.reservedByName || userData.name || user.email || '익명',
+        ...owner,
         organizationId,
         ...routeData,
         ...passengers,
@@ -73,8 +79,18 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
     } = deps;
 
     if (!user || !userData?.organizationId) return;
-    if (!form.vehicleId || !form.destination || !form.startTime || !form.endTime) {
+    // 외부 대여는 목적지를 모를 수 있다(빌려 간 기관이 정한다) — 대신 기관명·운전자가 필수다
+    const externalLoan = form.externalLoan;
+    if (!form.vehicleId || (!externalLoan && !form.destination) || !form.startTime || !form.endTime) {
         showToast('필수 정보를 입력해주세요.', 'warning');
+        return;
+    }
+    if (externalLoan && (!externalLoan.borrowerOrg.trim() || !externalLoan.driverName.trim())) {
+        showToast('빌려 가는 기관명과 운전자(담당자) 이름을 입력해주세요.', 'warning');
+        return;
+    }
+    if (externalLoan && form.isRecurring) {
+        showToast('외부 대여는 반복 예약으로 등록할 수 없습니다. 며칠이면 다일 예약을 쓰세요.', 'warning');
         return;
     }
 
@@ -129,7 +145,11 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
 
     // 시간 유효성은 입력 중이 아니라 여기서 판정한다.
     // 입력 도중의 중간값으로 되돌리면 오전↔오후 전환조차 불가능해진다(ReservationSidePanel 주석).
-    if (form.endTime <= form.startTime) {
+    //
+    // 여러 날이면 시작 시각은 첫날, 종료 시각은 마지막 날의 것이라 비교할 대상이 아니다 — 예전에는
+    // 여기서 막혀 "오후에 가져가 다음 날 오전에 반납"(14:00 → 이튿날 11:00)을 만들 수 없었다(외부 대여에서
+    // 흔한 모양). 날짜별 구간(buildMultiDaySlots)은 각각 시작 < 종료이고 서버가 구간마다 다시 본다.
+    if (!isMultiDay && !isRecurringToMultiDay && form.endTime <= form.startTime) {
         showToast('종료 시간은 시작 시간보다 늦어야 합니다.', 'warning');
         return;
     }
@@ -249,6 +269,7 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
     // 한 사람은 같은 시간에 차량 한 대만 예약한다 — 차량이 달라도 사람이 겹치면 막는다.
     // 위 차량 검사와 **같은 제외 규칙**을 쓰므로, 수정 중인 자기 예약·그룹은 충돌이 아니다.
     // 서버 코어(createReservationCore)가 같은 규칙으로 다시 판정한다.
+    // 외부 대여는 명의자가 없어 이 검사의 대상이 아니다(서버도 건너뛴다)
     const ownerUid = form.reservedByUid || user.uid;
     const ownerName = form.reservedByName || userData.name || '해당 직원';
     // 다일은 **전 구간**을 본다. 첫날만 보고 시작하면 중간 날짜에서 서버가 거부하는데,
@@ -263,7 +284,7 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
                     ? buildMultiDaySlots(selectedDate, effectiveEndDate, form.startTime, form.endTime)
                     : [{ date: selectedDate, startTime: form.startTime, endTime: form.endTime }];
 
-    for (const slot of ownerConflictSlots) {
+    for (const slot of externalLoan ? [] : ownerConflictSlots) {
         const ownerOverlap = findOwnerOverlappingReservation(reservations, {
             reservedByUid: ownerUid,
             date: slot.date,
@@ -294,7 +315,8 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
 
     // 차량별 사용 가능 직원 제한 검증 (UI 비활성의 방어적 이중 체크, 서버 콜러블에서도 재검증됨)
     const selectedVehicle = vehicles.find(v => v.id === form.vehicleId);
-    if (selectedVehicle && isVehicleRestrictedForUser(selectedVehicle, user.uid)) {
+    // 외부 대여는 기관 구성원이 운전하지 않으므로 사용 제한의 대상이 아니다(서버도 같다)
+    if (!externalLoan && selectedVehicle && isVehicleRestrictedForUser(selectedVehicle, user.uid)) {
         showToast('이 차량은 지정된 직원만 예약할 수 있습니다.', 'warning');
         return;
     }

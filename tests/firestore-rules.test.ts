@@ -1486,4 +1486,16 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertSucceeds(empDb.collection('driveLogs').doc('dl_ok').update({ notes: '경로 변경' }));
   });
 
+  // 외부 대여 반납 — 운전자가 기관 구성원이 아니라 driverUid를 비운 운행일지를 관리자가 쓴다.
+  // Rules는 driverUid의 **존재**만 본다(대리 작성 기능과 같은 판단). 이 전제가 바뀌면 반납이 막힌다.
+  it('외부 대여 반납: 관리자는 driverUid가 빈 운행일지를 쓸 수 있고, 작성자 위조는 여전히 막힌다', async () => {
+    const adminADb = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+    const payload = {
+      organizationId: 'org-A', vehicleId: 'vehicle_A', driverUid: '', driverName: '(외부) 동산 사회복지관 홍길동',
+      startKm: 1000, endKm: 1120, driveOrigin: 'external_loan',
+      externalLoan: { borrowerOrg: '동산 사회복지관', driverName: '홍길동' },
+    };
+    await assertSucceeds(adminADb.collection('driveLogs').doc('loan_log').set({ ...payload, createdByUid: 'admin_A' }));
+    await assertFails(adminADb.collection('driveLogs').doc('loan_log_forged').set({ ...payload, createdByUid: 'someone_else' }));
+  });
 });

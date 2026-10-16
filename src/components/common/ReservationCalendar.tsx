@@ -2,13 +2,15 @@
  * ReservationCalendar — 차량 예약 캘린더
  * 로직은 useReservationCalendar 훅으로 분리, UI는 CalendarGrid + ReservationSidePanel 사용
  */
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { format } from 'date-fns';
 import useReservationCalendar from '../../hooks/useReservationCalendar';
 import useVehiclePriority from '../../hooks/useVehiclePriority';
 import { useReservationPattern } from '../../hooks/useReservationPattern';
 import CalendarGrid from './CalendarGrid';
 import ReservationSidePanel from './ReservationSidePanel';
+import ExternalLoanReturnModal from './reservation/ExternalLoanReturnModal';
+import type { Reservation } from '../../types/reservation';
 import PendingReservationList from '../admin/PendingReservationList';
 
 interface Props {
@@ -36,7 +38,10 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
         getNavigationDeeplink,
         holidays, reservations,
         syncNow, syncing, lastSyncAt,
+        reloadReservations, orgId,
     } = useReservationCalendar({ isAdmin });
+    // 외부 대여 반납 처리 대상(관리자 전용) — 예약 목록의 [반납 처리]가 연다
+    const [loanReturnTarget, setLoanReturnTarget] = useState<Reservation | null>(null);
 
     // 구글 캘린더 연동 차량이 하나라도 있을 때만 동기화 컨트롤 노출.
     // **기관이 연동을 껐으면 차량에 ID가 남아 있어도 감춘다** — 서버가 그 기관의 동기화를
@@ -144,6 +149,7 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
                         onSubmit={handleSubmit}
                         onEdit={handleEdit}
                         onCancel={handleCancel}
+                        onReturnLoan={isAdmin ? setLoanReturnTarget : undefined}
                         showFavSave={showFavSave}
                         setShowFavSave={setShowFavSave}
                         favName={favName}
@@ -163,6 +169,17 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
                     />
                 </div>
             </div>
+            {isAdmin && loanReturnTarget && orgId && user && (
+                <ExternalLoanReturnModal
+                    reservation={loanReturnTarget}
+                    allReservations={reservations}
+                    vehicles={vehicles}
+                    orgId={orgId}
+                    adminUid={user.uid}
+                    onClose={() => setLoanReturnTarget(null)}
+                    onDone={() => { setLoanReturnTarget(null); void reloadReservations(); }}
+                />
+            )}
         </div>
     );
 }

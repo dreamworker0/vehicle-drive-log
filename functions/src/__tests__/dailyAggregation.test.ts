@@ -270,6 +270,15 @@ describe("runDailyAggregation — 월별 집계 프로듀서", () => {
             expect(sum).toBe(payload.monthlyTotal.count);
         });
 
+        it("외부 대여 반납 기록은 '(운전자 미지정)'이 아니라 '외부 대여'로 따로 모은다", async () => {
+            const payload = await runWith([
+                { driverUid: "", driverName: "(외부) 동산 사회복지관 홍길동", driveOrigin: "external_loan",
+                  vehicleId: "veh-2", startKm: 0, endKm: 120, timestamp: { toDate: () => tsWeekday23 } },
+            ]);
+            expect(payload.driverStats.__external_loan).toMatchObject({ name: "외부 대여", count: 1, distance: 120 });
+            expect(payload.driverStats.__unassigned).toBeUndefined();
+        });
+
         it("merge 없이 통째로 저장한다 — 지워진 직원·차량·히트맵 칸이 남지 않게", async () => {
             await runDailyAggregation(1);
             expect(mockSet.mock.calls[0]).toHaveLength(1); // 두 번째 인자({ merge: true })가 없다
@@ -456,6 +465,9 @@ describe("classifyDriveOrigin", () => {
         expect(classifyDriveOrigin({ reservationId: "r" })).toBe("linked");
         expect(classifyDriveOrigin({ reservationId: null })).toBe("manual");
         expect(classifyDriveOrigin({})).toBe("manual");
+    });
+    it("외부 대여는 미리 등록한 기간이라 사전 예약으로 센다", () => {
+        expect(classifyDriveOrigin({ driveOrigin: "external_loan", reservationId: "r" })).toBe("reservation");
     });
     it("알 수 없는 값은 믿지 않는다", () => {
         expect(classifyDriveOrigin({ driveOrigin: "hacked", reservationId: "r" })).toBe("linked");

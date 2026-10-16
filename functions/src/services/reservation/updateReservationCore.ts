@@ -131,12 +131,16 @@ export async function updateReservationTx(
                 throw new HttpsError("permission-denied", "본인이 예약한 건만 수정할 수 있습니다.");
             }
 
+            // 외부 대여(createReservationCore의 externalLoan 주석) — 명의자는 비운 채로 둔다.
+            // 수정 화면이 명의자를 함께 보내도 받지 않는다: 관리자 명의로 넘어가면 관리자 오늘 화면에
+            // '운행 시작'이 뜨고 '한 사람 한 대'가 관리자 본인 예약을 막는다.
+            const isExternalLoan = Boolean(r.externalLoan);
             const next = {
                 vehicleId: input.vehicleId ?? (r.vehicleId as string),
                 date: input.date ?? (r.date as string),
                 startTime: input.startTime ?? (r.startTime as string),
                 endTime: input.endTime ?? (r.endTime as string),
-                ownerUid: input.reservedByUid || (r.reservedByUid as string),
+                ownerUid: isExternalLoan ? "" : (input.reservedByUid || (r.reservedByUid as string)),
             };
             const vehicleChanged = next.vehicleId !== r.vehicleId;
             const ownerChanged = next.ownerUid !== r.reservedByUid;
@@ -190,7 +194,7 @@ export async function updateReservationTx(
                 }
 
                 // 차량별 사용 가능 직원 제한 — 판정 기준은 명의자(실제 운행자)
-                if (vehicleChanged || ownerChanged) {
+                if (!isExternalLoan && (vehicleChanged || ownerChanged)) {
                     const allowedUserIds = vehicleSnap.data()?.allowedUserIds;
                     if (Array.isArray(allowedUserIds) && allowedUserIds.length > 0 && !allowedUserIds.includes(next.ownerUid)) {
                         throw new HttpsError("permission-denied", "이 차량은 지정된 직원만 예약할 수 있습니다.");
@@ -220,13 +224,14 @@ export async function updateReservationTx(
                 }
 
                 // 사람 기준 겹침 — 한 사람은 같은 시간에 차량 한 대만 (자기 자신 제외)
-                const ownerDayRes = await transaction.get(
+                // 외부 대여는 명의자가 없다 — 빈 명의자로 조회하면 다른 대여·캘린더 예약과 서로 막는다.
+                const ownerDayRes = isExternalLoan ? null : await transaction.get(
                     db.collection("reservations")
                         .where("organizationId", "==", orgId)
                         .where("reservedByUid", "==", next.ownerUid)
                         .where("date", "==", next.date)
                 );
-                const ownerOverlapping = ownerDayRes.docs.find((doc) => {
+                const ownerOverlapping = ownerDayRes?.docs.find((doc) => {
                     if (doc.id === reservationId) return false;
                     const other = doc.data();
                     if (other.status === "cancelled") return false;
@@ -262,7 +267,8 @@ export async function updateReservationTx(
                 update.reservedByUid = next.ownerUid;
             }
             if (input.vehicleName !== undefined) update.vehicleName = input.vehicleName;
-            if (input.reservedByName !== undefined) update.reservedByName = input.reservedByName;
+            // 외부 대여의 표시 이름은 생성 코어가 기관명·운전자로 만든 값이다 — 화면이 덮어쓰지 못하게 한다
+            if (input.reservedByName !== undefined && !isExternalLoan) update.reservedByName = input.reservedByName;
             if (input.purpose !== undefined) update.purpose = input.purpose;
             if (input.destination !== undefined) update.destination = input.destination;
             if (input.routeDistance !== undefined) update.routeDistance = input.routeDistance || null;
