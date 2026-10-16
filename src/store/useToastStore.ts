@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { isStaleChunkError, STALE_CHUNK_MESSAGE } from '../lib/staleChunk';
+import { reloadPage } from '../lib/browserNav';
 
 export type ToastType = 'info' | 'success' | 'warning' | 'error';
 
@@ -31,7 +32,7 @@ export const useToastStore = create<ToastState>((set, get) => ({
             if (get().toasts.some(t => t.message === STALE_CHUNK_MESSAGE)) return;
             message = STALE_CHUNK_MESSAGE;
             type = 'warning';
-            options = { duration: 15000, actionLabel: '새로고침', onAction: () => window.location.reload() };
+            options = { duration: 15000, actionLabel: '새로고침', onAction: reloadPage };
         }
         const id = Date.now() + Math.random();
         const config: Required<Pick<ToastOptions, 'duration'>> & ToastOptions =

@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { isStaleChunkError, STALE_CHUNK_MESSAGE } from '../../lib/staleChunk';
 import { useToastStore } from '../../store/useToastStore';
+import { reloadPage } from '../../lib/browserNav';
+
+vi.mock('../../lib/browserNav', () => ({ reloadPage: vi.fn(), navigateTo: vi.fn(), currentHref: vi.fn(() => '') }));
 
 /**
  * 배포 직후 구버전 탭에서 내보내기 모듈을 못 받았을 때, 브라우저 원문 대신
@@ -39,15 +42,9 @@ describe('useToastStore — 구버전 청크 안내', () => {
     });
 
     it('[새로고침]을 누르면 페이지를 다시 불러온다', () => {
-        const reload = vi.fn();
-        vi.stubGlobal('location', { ...window.location, reload });
-        try {
-            useToastStore.getState().showToast(STALE_CHUNK_MESSAGE, 'error');
-            useToastStore.getState().toasts[0].onAction?.();
-            expect(reload).toHaveBeenCalledOnce();
-        } finally {
-            vi.unstubAllGlobals();
-        }
+        useToastStore.getState().showToast(STALE_CHUNK_MESSAGE, 'error');
+        useToastStore.getState().toasts[0].onAction?.();
+        expect(reloadPage).toHaveBeenCalledOnce();
     });
 
     it('이미 떠 있으면 겹쳐 띄우지 않는다', () => {

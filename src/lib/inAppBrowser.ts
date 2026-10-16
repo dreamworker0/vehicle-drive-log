@@ -6,6 +6,8 @@
  * disallowed_useragent) 문제를 우회한다.
  */
 
+import { currentHref, navigateTo } from './browserNav';
+
 /**
  * 현재 브라우저가 인앱 브라우저(WebView)인지 감지한다.
  *
@@ -44,20 +46,19 @@ export function getInAppBrowserName() {
  * @param {string} [url] - 열 URL. 기본값은 현재 페이지 URL.
  */
 export function openInExternalBrowser(url?: string) {
-    const target = url || window.location.href;
+    const target = url || currentHref();
     const ua = navigator.userAgent || '';
     const encoded = encodeURIComponent(target);
 
     // 카카오톡: 전용 딥링크로 외부 브라우저 전환 (iOS/Android 공통)
     if (/KAKAOTALK/i.test(ua)) {
-        window.location.href = 'kakaotalk://web/openExternal?url=' + encoded;
+        navigateTo('kakaotalk://web/openExternal?url=' + encoded);
         return;
     }
 
     // 네이버: 전용 딥링크로 외부 브라우저 전환 (iOS/Android 공통)
     if (/NAVER/i.test(ua)) {
-        window.location.href =
-            'naversearchapp://inappbrowser?url=' + encoded + '&target=externalBrowser';
+        navigateTo('naversearchapp://inappbrowser?url=' + encoded + '&target=externalBrowser');
         return;
     }
 
@@ -66,7 +67,7 @@ export function openInExternalBrowser(url?: string) {
         const intentUrl =
             `intent://${target.replace(/^https?:\/\//, '')}` +
             `#Intent;scheme=https;package=com.android.chrome;end`;
-        window.location.href = intentUrl;
+        navigateTo(intentUrl);
     } else {
         // iOS 기타 인앱 / 기타: 새 창/탭으로 시도
         window.open(target, '_blank');
@@ -79,7 +80,7 @@ export function openInExternalBrowser(url?: string) {
  * @returns {Promise<boolean>} 복사 성공 여부
  */
 export async function copyUrlToClipboard(url?: string) {
-    const target = url || window.location.href;
+    const target = url || currentHref();
     try {
         await navigator.clipboard.writeText(target);
         return true;
