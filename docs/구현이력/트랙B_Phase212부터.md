@@ -659,7 +659,7 @@
 | **검증** | functions jest 1,269 · Vitest 2,501 · tsc·eslint·build · `npm@10 ci` · 보안 감사 |
 | **남는 것** | ① Sentry 스트림 전환(Web Vitals 확인 후, v12 전) ② jsdom 환경 생성 비용(`pool: 'vmThreads'`) — pre-push 실패로 체감되기 시작 ③ Sentry Inbound Filter(localhost)·6N Resolved in next release — 운영자 |
 
-### Phase 247: 테스트 시간의 60%는 jsdom을 다시 만드는 데 쓰이고 있었다 — 그리고 테스트가 Google에 접속하고 있었다 ⚡🧪
+### Phase 247: 테스트 시간의 60%는 jsdom을 다시 만드는 데 쓰이고 있었다 — 그리고 테스트가 Google에 접속하고 있었다 ⚡🧪🚫
 
 > 2026-10-15~16. Phase 246 "남는 것" ②(jsdom 환경 생성 비용). 10-15 pre-push가 부하성 플래키로 막혀 체감 문제가 됐다. 운영자 *"다음 진행해줘."*
 
@@ -670,8 +670,10 @@
 | **원인 추적** | `http2.connect` 가로채기는 ESM 네임스페이스라 실패. 파일마다 `afterAll`에서 **열린 소켓**(`process._getActiveHandles`)을 찍어 찾았다 — Firestore를 목으로 두지 않아 **실제 gRPC로 접속**하는 테스트(VehicleFormSite·useAnalytics·FeatureToggleSection) |
 | **분할** (#494) | `vitest.config.js` projects — vm(`vmThreads`) + threads(`THREADS_ONLY_TESTS` 7개 + Rules 테스트). 앱의 `location` 사용을 감싸야 하는 전면 이관 대신 목록으로 격리하고, write-test 스킬에 VM에서 피할 패턴을 적었다(목록은 줄어야 한다) |
 | **효과** | 로컬 106~152초 → 26~45초(3회, 오류 0), coverage 포함 157초 → 44초, pre-push 약 150초 → 29초. **CI 단위 테스트+커버리지 게이트 135초 → 45초.** 커버리지 동일(stmts 56.90 → 56.91, lines 57.96 → 57.98) |
-| **새로 안 것** | 열린 소켓 실측에서 **테스트 9개 파일이 실제 Google에 접속**하고 있었다 — App Check(5), Firestore gRPC(3), Cloud Functions `test-project`(1), Google(1). 기존 풀에서도 같다. 별도 작업으로 분리(목 보강 후 THREADS_ONLY에서 제거) |
+| **새로 안 것** | 열린 소켓 실측에서 **테스트가 실제 Google에 접속**하고 있었다(기존 풀에서도 같다). 처음엔 9개 파일로 셌으나 **과대 추정이었다** — 파일 끝의 열린 소켓 목록에는 앞 파일이 연 연결이 섞인다(FeatureToggleSection은 접속하지 않았다). 별도 세션으로 분리 |
+| **접속 차단** (#496) | 연결을 **연 순간**(`net.Socket.connect`·`dns.lookup`)을 가로채 파일을 특정: useAnalytics는 `lib/holidayApi`의 캐시 조회가 실제 Firestore로, VehicleFormSite는 목 없는 `lib/firebase`가 App Check를 초기화. App Check 접속은 **개발자 PC의 `.env.local`(디버그 토큰)에 따라 달라** 워크트리·CI에서는 재현되지 않았다. `setup.ts`에 `firebase/app-check` 전역 목, holidayApi 목 → THREADS_ONLY 7개 → **4개** |
+| **영구 가드** (#498) | `setup.ts`가 루프백이 아닌 `net.Socket.connect`를 그 자리에서 던지고 해당 테스트를 실패시킨다(catch로 삼켜도 `afterEach`가 잡음, 시도한 파일·테스트 이름을 남김). 가드가 master에 남아 있던 접속을 더 잡았다 — PDF·엑셀 내보내기 테스트 4개의 `recordExport` 콜러블과 ServiceDashboard의 `listSlackIntegrations`가 `test-project.cloudfunctions.net`으로 나가고 있었다(101개 테스트) |
 | **E2E 경쟁** (#495) | #494 CI에서 초대 링크 e2e(#483)가 mobile-safari에서 3회 연속 `Execution context was destroyed`. 첫 방문의 추가 페이지 이동과 localStorage 읽기가 겹친 것 — 코드는 이미 보관된 상태라 앱이 아니라 읽는 쪽 문제. `expect.poll` 콜백이 던지면 재시도하지 않으므로 읽기 실패를 `null`로 받아 다시 읽게 함. #495를 먼저 배포해 #494의 master e2e가 같은 이유로 막히지 않게 했다 |
 | **로컬 E2E** | #485(Playwright 1.64) 뒤 이 PC에 브라우저가 없어 실행 불가였다 — 운영자가 `npx playwright install`. 단독 3회 통과. 두 브라우저 동시 실행 시 랜딩 10초 초과는 dev 서버의 첫 변환 지연(CI는 `vite preview`) |
 | **검증** | Vitest 2,501 · 커버리지 게이트 · harness·sync 검사 · e2e(CI) |
-| **남는 것** | ① 테스트의 실제 네트워크 접속 제거(별도 세션 진행 중) ② Sentry 스트림 전환 ③ Sentry Inbound Filter(localhost)·6N Resolved — 운영자 |
+| **남는 것** | ① THREADS_ONLY 4개(location 재정의 3·fake-indexeddb instanceof 1) — 앱의 `location` 사용을 감싸면 줄어든다 ② Sentry 스트림 전환 ③ Sentry Inbound Filter(localhost)·6N Resolved — 운영자 |
