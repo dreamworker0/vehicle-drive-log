@@ -2,9 +2,9 @@
 
 > **자동 생성 문서** — `scripts/generate-functions-doc.ts`로 생성됨
 >
-> 마지막 업데이트: 2026. 10. 14. 오전 8:19:06
+> 마지막 업데이트: 2026. 10. 16. 오후 2:21:31
 >
-> 총 함수 수: **81개**
+> 총 함수 수: **80개**
 
 ---
 
@@ -23,7 +23,7 @@
 
 ## 📞 onCall (클라이언트 직접 호출)
 
-> 총 42개
+> 총 41개
 
 ### `ocrDashboard`
 
@@ -271,14 +271,6 @@
 | **설명** | 미활성 기관(직원 0명)에게 알림톡 일괄 발송 |
 | **인증** | superAdmin |
 | **반환값** | `{ sentCount, failCount, noPhoneCount, results }` |
-
-### `regenerateFeedbackDraft`
-
-| 항목 | 내용 |
-|------|------|
-| **파일** | `functions/src/handlers/callable/regenerateFeedbackDraft.ts` |
-| **설명** | AI 피드백 답변 초안 수동 재생성 (관리자 호출) |
-| **인증** | superAdmin |
 
 ### `sendFeedbackReply`
 
@@ -572,12 +564,12 @@
 | **인증** | 시스템 자동 실행 |
 | **비고** | users/{uid} |
 
-### `generateFeedbackDraft`
+### `notifyNewFeedback`
 
 | 항목 | 내용 |
 |------|------|
-| **파일** | `functions/src/handlers/triggers/generateFeedbackDraft.ts` |
-| **설명** | feedbacks/{feedbackId} 생성 시 Gemini API로 FAQ 매칭 + AI 답변 초안 자동 생성 |
+| **파일** | `functions/src/handlers/triggers/notifyNewFeedback.ts` |
+| **설명** | feedbacks/{feedbackId} 생성 시 운영 채널(Discord)에 알림. 작성자별·전역 일일 상한(fail-closed) |
 | **인증** | 시스템 자동 실행 (Firestore 트리거) |
 
 ### `onSlackTaskCreated`

@@ -28,8 +28,6 @@ export default function FeedbackManagement() {
         handleToggleResolve,
         handleDelete,
         handleSendReply,
-        regeneratingDraftId,
-        handleRegenerateDraft,
         groupedFeedbacks,
         toggleGroup,
         handleCopyEmail,
@@ -75,14 +73,12 @@ export default function FeedbackManagement() {
                 copiedMessage={copiedMessage}
                 sendingReply={sendingReply}
                 replyError={replyError}
-                regeneratingDraftId={regeneratingDraftId}
                 onToggleExpand={setExpandedId}
                 onToggleResolve={handleToggleResolve}
                 onSetDeleteTarget={setDeleteTarget}
                 onSetSelectedImage={setSelectedImage}
                 onCopyMessage={handleCopyMessage}
                 onSendReply={handleSendReply}
-                onRegenerateDraft={handleRegenerateDraft}
             />
         );
     }

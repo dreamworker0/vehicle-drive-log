@@ -1108,8 +1108,8 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
   /**
    * 의견(feedbacks) 생성이 **서버 비용을 부르는 쓰기**라는 점을 규칙으로 못박는다.
    *
-   * 이 컬렉션의 onCreate(generateFeedbackDraft)는 Discord 웹훅·첨부 다운로드·Gemini 호출을
-   * 연쇄로 실행한다. 규칙이 `isSignedIn()` 하나였을 때는 로그인한 누구나 타인 명의로,
+   * 이 컬렉션의 onCreate(notifyNewFeedback)는 Discord 웹훅을 실행한다(당시에는 첨부 다운로드·
+   * Gemini 호출까지 — AI 초안은 2026-10-16에 없앴다). 규칙이 `isSignedIn()` 하나였을 때는 로그인한 누구나 타인 명의로,
    * 첨부 개수·본문 길이 제한 없이 그 연쇄를 무제한 유발할 수 있었다 (2026-08-14 감사 발견 1).
    *
    * 호출 '횟수' 상한은 Rules로 표현할 수 없어 트리거 안의 일일 쿼터가 맡는다. 여기서는

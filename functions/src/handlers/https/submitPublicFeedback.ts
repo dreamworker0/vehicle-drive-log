@@ -45,7 +45,7 @@ export const submitPublicFeedback = onCall(
             throw new HttpsError("resource-exhausted", "요청이 너무 많습니다. 잠시 후 다시 시도해주세요.");
         }
 
-        // 전역 예산 — 이 경로로 만들어진 문서는 generateFeedbackDraft(Gemini)를 깨우므로
+        // 전역 예산 — 이 경로로 만들어진 문서는 notifyNewFeedback(Discord 알림)을 깨우므로
         // 주체 키를 모두 회전시켰을 때의 마지막 비용 상한이 필요하다 (ocr-cost-security §1.4).
         const budget = GLOBAL_BUDGETS.submitPublicFeedback;
         if (await checkGlobalBudget("submitPublicFeedback", budget.max, budget.windowSec)) {
