@@ -722,3 +722,17 @@
 | **Sentry 스트림 전환 — 보류** | 설치본(@sentry/core 11.x) 타입에서 `traceLifecycle: 'static'`·`withStaticSpan`에 지원 중단 표시가 없다 — 기본값만 'stream'으로 바뀌었다. 전환하면 `beforeSendSpan` 스크러빙을 새 형식(`attributes`·`name`)으로 다시 짜고 `setMeasurement` 기반 Web Vitals가 실리는지 다시 확인해야 하는데, 얻는 것이 없다. **SDK가 'static'을 지원 중단할 때** 한다 — 주간 dependabot PR의 변경 기록에서 확인 |
 | **검증** | 세 파일 vm 풀 47개 · Vitest 2,542 · tsc · eslint · e2e(CI). 배포: 함수 81개·Hosting |
 | **남는 것** | ① 외부 대여·일지 수정 복귀 운영 확인(운영자) ② THREADS_ONLY `syncQueue` 1개(운영 코드 변경 필요) ③ Sentry 'static' 지원 중단 시 스트림 전환 |
+
+### Phase 251: 의견 관리의 AI 답변 초안을 없앤다 — 알림만 남긴 트리거 ✍️🔔
+
+> 2026-10-16. 의견 관리 화면을 보던 운영자가 *"AI 답변 초안은 나오지 않게 해줘."*
+
+| 항목 | 내용 |
+|------|------|
+| **화면** (#506) | 시스템 관리자 › 의견 관리에서 '🤖 AI 답변 초안' 영역·[새로 생성]·FAQ 매칭 배지·"생성 중…/⚠ 실패"를 없앴다. 답변 칸은 빈 칸에서 시작하고('✍️ 답변 작성' 라벨), **이미 초안이 저장된 옛 문서의 `aiDraft`도 채우지 않는다.** 발송(`sendFeedbackReply`)은 그대로 |
+| **서버도 멈춘다** | 화면에서만 숨기면 보이지 않는 초안에 Gemini(멀티모달·첨부 다운로드)를 계속 쓴다. `generateFeedbackDraft`(트리거)·`regenerateFeedbackDraft`(콜러블) 삭제 |
+| **트리거가 하던 다른 일** | 그 트리거가 **새 의견 Discord 알림**도 보내고 있었다 — 지우면 운영자가 의견 도착을 모른다. 알림만 `notifyNewFeedback`으로 옮기고 이름을 하는 일에 맞췄다. 작성자별 20·전역 200 일일 상한(fail-closed)은 남겼다 — 비용 대신 **운영 채널 도배**를 막는 같은 짝(Rules 크기 검증 + 트리거 횟수 상한, ocr-cost-security §1.6). 카운터 키가 바뀌어 한도는 새로 센다 |
+| **그대로 둔 것** | Rules의 feedbacks create 검증(명의·본문 5000자·첨부 3개·AI/답변 필드 선점 금지) — 주석만 갱신. 옛 문서의 `aiDraft` 필드는 지우지 않는다(읽는 곳이 없다) |
+| **공지** | 넣지 않았다 — 시스템 관리자 화면만 바뀌고 기관 사용자 화면은 그대로다(`check:release-notes`는 안내만 한다) |
+| **검증** | functions 단위 1,278(새 `notifyNewFeedback` 5: 알림 내용·문서 미수정·작성자별/전역 한도·빈 의견·기관명 조회 실패) · `FeedbackItem` 2(초안 영역 없음·옛 aiDraft 미사용·직접 쓴 답변 발송) · Vitest 2,544 · 카탈로그·harness·e2e(CI). 배포: 79개 갱신 + `notifyNewFeedback` 생성 + 2개 삭제 = **함수 80개**, Hosting |
+| **남는 것** | ① 다음 실제 의견에서 Discord 알림 도착 확인(운영자) ② 외부 대여·일지 수정 복귀 운영 확인 ③ THREADS_ONLY `syncQueue` 1개 ④ Sentry 'static' 지원 중단 시 스트림 전환 |
