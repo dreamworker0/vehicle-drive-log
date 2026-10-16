@@ -736,3 +736,19 @@
 | **공지** | 넣지 않았다 — 시스템 관리자 화면만 바뀌고 기관 사용자 화면은 그대로다(`check:release-notes`는 안내만 한다) |
 | **검증** | functions 단위 1,278(새 `notifyNewFeedback` 5: 알림 내용·문서 미수정·작성자별/전역 한도·빈 의견·기관명 조회 실패) · `FeedbackItem` 2(초안 영역 없음·옛 aiDraft 미사용·직접 쓴 답변 발송) · Vitest 2,544 · 카탈로그·harness·e2e(CI). 배포: 79개 갱신 + `notifyNewFeedback` 생성 + 2개 삭제 = **함수 80개**, Hosting |
 | **남는 것** | ① 다음 실제 의견에서 Discord 알림 도착 확인(운영자) ② 외부 대여·일지 수정 복귀 운영 확인 ③ THREADS_ONLY `syncQueue` 1개 ④ Sentry 'static' 지원 중단 시 스트림 전환 |
+
+### Phase 252: 운영 비용 실측과 functions 커버리지 보강 — 권한·기관 격리·외부 발송부터 📏🧪
+
+> 2026-10-16. 남은 개발 항목이 급하지 않아 로드맵의 "확인할 것"(9월 말 비용 절감의 효과)을 먼저 재고, 이어 *"Cloud Functions 테스트 커버리지 보강 진행해줘."*
+
+| 항목 | 내용 |
+|------|------|
+| **비용 실측** (Cloud Monitoring 35일) | 02:00대 Firestore 읽기 2.2~2.4만 → **1.5~1.8만**(#406·#409 목표 달성) · 평일 하루 읽기 23~25만 → 20~22만 · Hosting 평일 0.9~1.0GiB → **0.22~0.45GiB**(#411 — 월 약 7GiB로 무료 10GiB 안 추정) · Cloud Run 과금 인스턴스 하루 40~110분(상위 syncCalendarToApp·triggerOnDemandCalendarSync·tmapProxy, 배포 많은 날 높다). 요금 SKU는 결제 콘솔에서 확인할 몫 |
+| **커버리지 현황** | 줄 69.75%, 0%인 핸들러 19개. 위험도 순으로 권한·기관 격리·외부 발송이 걸린 5개부터 |
+| **getOrgDocumentUrl** | superAdmin만, **그 기관 폴더 안의 파일만** 서명(다른 기관·`..`·역슬래시·절대 경로·기관 폴더 밖 차단, 레거시 토큰 URL 역추출과 그 URL이 다른 기관을 가리킬 때 거부), 5분 읽기 URL, 발급 **뒤** 감사 기록(검증에서 걸린 요청은 기록 안 함, 기록 실패해도 URL·ERROR 로그) |
+| **sendFeedbackReply** | superAdmin만(기관 관리자도 거부), 답변 한 번만(`already-exists`), 비회원 문의는 메일만, 푸시 80자 미리보기·앱 알림 전체, 메일 이름·답변 HTML 이스케이프, 메일 실패가 저장을 되돌리지 않음 |
+| **submitPublicFeedback** | 입력·길이 검증이 상한 검사보다 먼저, 이메일(소문자) 5·IP(`resolveClientIp`) 30·전역 60 시간당 상한 fail-closed, 비회원 표기로 저장, 저장 실패 원인 비노출 |
+| **updateReservationSafe** | **행위자는 토큰에서만** — 화면이 보낸 `actorRole: 'superAdmin'`·`organizationId`·`status`·`externalLoan`은 코어에 닿지 않는다. `detachRecurring`은 `true`일 때만 |
+| **사본을 검사하던 테스트 하나 더** | `notifyNewApplication.test`는 상태 판정을 파일 안에 **다시 구현해** 그 사본을 검사했다 — 원본 커버리지 0%(Phase 181~211에서 찾은 2건과 같은 모양). 실제 트리거 핸들러를 부르도록 다시 쓰고 메일 수신자 대체·이스케이프·실패 내성을 더했다. `setCustomClaims.emulator.test`도 사본이지만 원본은 단위 테스트가 96.9% 덮어 두었다 |
+| **검증** | 5개 파일 줄 100%(분기 93.5~100) · functions 단위 1,278 → **1,340** · 줄 69.75% → **72.38%**(분기 84.15) · tsc·eslint · e2e(CI). 운영 코드 변경 없음. 배포: 함수 80개 갱신·Hosting |
+| **남는 것** | ① 0% 핸들러 14개 — Gemini 호출형(`askAI`·`ocr*`·`autoVerifyDocument`), 승인·반려 메일·알림톡(`send*Approval*`·`send*Rejection*`), 운영 도구(`backfillOrgCoords`·`recalculateAggregatedStats`·`testCalendarAccess`) ② 운영 확인(의견 Discord 알림·외부 대여·일지 수정 복귀) ③ THREADS_ONLY `syncQueue` 1개 ④ Sentry 'static' 지원 중단 시 스트림 전환 |
