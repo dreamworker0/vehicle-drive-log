@@ -784,3 +784,16 @@
 | **커버리지 보강 정리** (#508·#510·#513) | 0% 핸들러 19 → **0** · functions 단위 1,278 → **1,497** · 줄 69.75% → **79.43%**(분기 85.41%) · 도중에 OCR 버그 2건 수정(#511) · 사본 테스트 1건 교체(notifyNewApplication)·1건 재발 방지(aiCallables) |
 | **검증** | tsc·eslint · functions-tests·e2e(CI). 배포: 함수 80개·Hosting |
 | **남는 것** | ① jest `coverageThreshold`(줄 43%)가 실제(79%)보다 크게 낮다 — 상향 여부 판단 ② 사업자번호 보조 판별 두 구현 통일 ③ 운영 확인(의견 Discord 알림·외부 대여·일지 수정 복귀) ④ THREADS_ONLY `syncQueue` 1개 ⑤ Sentry 'static' 지원 중단 시 스트림 전환 |
+
+### Phase 255: 올린 커버리지를 지키는 하한 — functions coverageThreshold 43 → 75% 🔒
+
+> 2026-10-16. Phase 254의 남는 것 ①을 *"다음 진행해줘"*로 처리했다(#515).
+
+| 항목 | 내용 |
+|------|------|
+| **문제** | #508·#510·#513으로 줄 79.43%·분기 85.41%·함수 75.6%가 됐는데 `functions/package.json`의 jest `coverageThreshold`는 줄·문장 43·분기 74·함수 46에 머물렀다 — 커버리지가 30점 넘게 떨어져도 PR CI가 막지 못했다 |
+| **게이트가 실제로 도는가** | 먼저 확인했다. `ci.yml`의 `functions-tests`가 매 푸시 `npx jest --coverage`를 돌린다(ts-jest transpile 모드 전환 뒤 계측 비용이 사라져 주간에서 되돌렸다는 주석). 하한을 올리면 곧바로 PR 게이트가 된다 |
+| **변경** (#515) | 줄·문장 75 · 분기 82 · 함수 72 — 실측에서 약 4점 여유. 테스트를 조금 정리하거나 새 코드를 넣을 때 바로 걸리지 않되 큰 회귀는 막는다 |
+| **고치지 않은 것** | `functions-coverage.yml`(주간)은 머리 주석이 "per-push에서 떼어냈다"고 설명하지만 지금은 ci.yml이 같은 게이트를 매 푸시 돌린다 — 중복 워크플로와 낡은 주석이 남아 있다 |
+| **검증** | 로컬 `jest --coverage` 1,497 통과·새 하한 통과(exit 0) · CI 전부 초록. 배포: 함수 80개·Hosting |
+| **남는 것** | ① 사업자번호 보조 판별 두 구현 통일(증빙서류 OCR 쪽만 81·85·86을 비영리로 본다) ② `functions-coverage.yml` 정리 ③ 운영 확인(의견 Discord 알림·외부 대여·일지 수정 복귀) ④ THREADS_ONLY `syncQueue` 1개 ⑤ Sentry 'static' 지원 중단 시 스트림 전환 |
