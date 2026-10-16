@@ -56,6 +56,8 @@ interface Props {
     onSubmit: (e: React.FormEvent) => Promise<void>;
     onEdit: (res: Reservation) => void;
     onCancel: (id: string) => Promise<void>;
+    /** 외부 대여 반납 처리 열기 — 관리자 전용(ReservationCalendar가 모달을 띄운다) */
+    onReturnLoan?: (res: Reservation) => void;
     onSlotClick: (vehicleId: string, startTime: string, endTime: string) => void;
     showFavSave: boolean;
     setShowFavSave: (show: boolean) => void;
@@ -111,6 +113,7 @@ export default function ReservationSidePanel({
     onSubmit,
     onEdit,
     onCancel,
+    onReturnLoan,
     onSlotClick,
     showFavSave,
     setShowFavSave,
@@ -444,6 +447,7 @@ export default function ReservationSidePanel({
                 isToday={isToday}
                 onEdit={onEdit}
                 onCancel={onCancel}
+                onReturnLoan={onReturnLoan}
                 user={user}
                 isAdmin={isAdmin}
                 setShowForm={setShowForm}

@@ -26,6 +26,7 @@ interface VehicleTimelineBarProps {
     isToday: boolean;
     onEdit?: (res: Reservation) => void;
     onCancel?: (resId: string) => void;
+    onReturnLoan?: (res: Reservation) => void;
     user: { uid?: string; id?: string } | null;
     isAdmin: boolean;
     setShowForm?: (show: boolean) => void;
@@ -33,7 +34,7 @@ interface VehicleTimelineBarProps {
 
 export default function VehicleTimelineBar({
     vehicles, reservations, onSlotClick, isPastDate, isToday,
-    onEdit, onCancel, user, isAdmin, setShowForm,
+    onEdit, onCancel, onReturnLoan, user, isAdmin, setShowForm,
 }: VehicleTimelineBarProps) {
     // 오늘일 때 현재 시각(분) — 1분마다 갱신
     const [nowMinutes, setNowMinutes] = useState<number>(() => {
@@ -160,6 +161,7 @@ export default function VehicleTimelineBar({
                             toggleExpand={toggleExpand}
                             onEdit={onEdit}
                             onCancel={onCancel}
+                            onReturnLoan={onReturnLoan}
                             user={user}
                             isAdmin={isAdmin}
                             setShowForm={setShowForm}

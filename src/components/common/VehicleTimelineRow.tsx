@@ -27,6 +27,7 @@ interface VehicleTimelineRowProps {
     toggleExpand: (vehicleId: string) => void;
     onEdit?: (res: Reservation) => void;
     onCancel?: (resId: string) => void;
+    onReturnLoan?: (res: Reservation) => void;
     user: { uid?: string; id?: string } | null;
     isAdmin: boolean;
     setShowForm?: (show: boolean) => void;
@@ -35,7 +36,7 @@ interface VehicleTimelineRowProps {
 export default function VehicleTimelineRow({
     vehicle, vRes, dynamicStart, hourLabels, gaps, isDragging, dragOverlay,
     barRefCallback, handleDragStart, isPastDate, isExpanded, toggleExpand,
-    onEdit, onCancel, user, isAdmin, setShowForm,
+    onEdit, onCancel, onReturnLoan, user, isAdmin, setShowForm,
 }: VehicleTimelineRowProps) {
     const isBlocked = isVehicleBlocked(vehicle.maintenance);
     // 사용 제한 차량: 현황은 그대로 보여주되 드래그 예약 시작만 차단
@@ -172,6 +173,7 @@ export default function VehicleTimelineRow({
                 isExpanded={isExpanded}
                 onEdit={onEdit}
                 onCancel={onCancel}
+                onReturnLoan={onReturnLoan}
                 user={user}
                 isAdmin={isAdmin}
                 setShowForm={setShowForm}

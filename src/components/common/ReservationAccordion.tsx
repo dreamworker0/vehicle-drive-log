@@ -10,15 +10,29 @@ interface ReservationAccordionProps {
     isExpanded: boolean;
     onEdit?: (res: Reservation) => void;
     onCancel?: (resId: string) => void;
+    /** 외부 대여 반납 처리 — 관리자에게, 대여가 시작된 뒤에만 보인다 */
+    onReturnLoan?: (res: Reservation) => void;
+    /** 테스트용 — 기본은 지금 */
+    now?: Date;
     user: { uid?: string; id?: string } | null;
     isAdmin: boolean;
     setShowForm?: (show: boolean) => void;
 }
 
 export default function ReservationAccordion({
-    reservations, isExpanded, onEdit, onCancel, user, isAdmin, setShowForm,
+    reservations, isExpanded, onEdit, onCancel, onReturnLoan, user, isAdmin, setShowForm, now,
 }: ReservationAccordionProps) {
     if (!isExpanded || reservations.length === 0) return null;
+
+    const at = now ?? new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const nowStr = `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())} ${pad(at.getHours())}:${pad(at.getMinutes())}`;
+    // 반납은 대여가 시작된 뒤에만 — 아직 나가지 않은 차를 돌려받을 수는 없다
+    const canReturn = (r: Reservation) => Boolean(
+        isAdmin && onReturnLoan && r.externalLoan
+        && (r.status === 'reserved' || r.status === 'in_progress')
+        && `${r.date} ${r.startTime}` <= nowStr,
+    );
 
     return (
         <div className="ml-[72px] pl-2 mt-1 mb-1 border-l-2 border-primary-300 dark:border-primary-700 animate-fade-in">
@@ -40,6 +54,14 @@ export default function ReservationAccordion({
                                     <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300 rounded-full font-medium">
                                         📅
                                     </span>
+                                )}
+                                {r.externalLoan && (
+                                    <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300 rounded-full font-medium whitespace-nowrap">
+                                        외부 대여
+                                    </span>
+                                )}
+                                {canReturn(r) && (
+                                    <button onClick={() => onReturnLoan?.(r)} className="text-[11px] leading-none py-0.5 text-amber-600 dark:text-amber-400 font-medium hover:underline min-w-[48px] min-h-[48px] flex items-center justify-center">반납 처리</button>
                                 )}
                                 {r.status === 'pending' && (
                                     <span className="text-[10px] px-1.5 py-0.5 badge-warning rounded-full font-medium whitespace-nowrap">

@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useAuth } from './useAuth';
 import { useToast } from './useToast';
 import { useConfirm } from './useConfirm';
-import { format, addMonths, subMonths } from 'date-fns';
+import { format, addMonths, subMonths, startOfMonth, endOfMonth } from 'date-fns';
+import { getReservationsByDateRange } from '../lib/firestore';
 import { useReservationData } from './reservationCalendar/useReservationData';
 import { useReservationForm } from './reservationCalendar/useReservationForm';
 import { useRouteInfo } from './reservationCalendar/useRouteInfo';
@@ -104,6 +105,14 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
             reservations, userData, showToast, confirm, setReservations,
         });
 
+    // 외부 대여 반납 — 모달이 운행일지를 쓰고 예약 묶음을 닫은 뒤 이 달 목록을 다시 읽는다
+    const reloadReservations = useCallback(async () => {
+        if (!userData?.organizationId) return;
+        const start = format(startOfMonth(currentMonth), 'yyyy-MM-dd');
+        const end = format(endOfMonth(currentMonth), 'yyyy-MM-dd');
+        setReservations(await getReservationsByDateRange(userData.organizationId, start, end) as Reservation[]);
+    }, [userData?.organizationId, currentMonth, setReservations]);
+
     const handleSaveFavorite = () =>
         handleSaveFavoriteAction({
             user: user!, userData, form, favName,
@@ -135,5 +144,6 @@ export default function useReservationCalendar({ isAdmin = false } = {}) {
         getNavigationDeeplink,
         holidays, reservations,
         syncNow, syncing, lastSyncAt,
+        reloadReservations, orgId: userData?.organizationId,
     };
 }
