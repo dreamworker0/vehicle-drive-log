@@ -164,6 +164,28 @@ describe('initSentry — 종료 레이스 노이즈 필터', () => {
         expect(isIgnored(patterns, 'UnknownError: Connection is closing.')).toBe(true);
         expect(isIgnored(patterns, 'Internal error.')).toBe(true);
     });
+
+    // Analytics 동적 설정 조회(firebase.googleapis.com/…/webConfig) 실패 — 6M·6K.
+    // 운영 두 도메인에서 같은 요청이 200이라 광고 차단기·네트워크 쪽 실패이고 Analytics만 빠진다.
+    it('Analytics 설정 조회 실패를 걸러낸다 (6M·6K)', async () => {
+        const options = await loadSentry();
+        const patterns = options.ignoreErrors as Array<RegExp | string>;
+
+        expect(isIgnored(patterns, 'FirebaseError: Analytics: Dynamic config fetch failed: [400] (analytics/config-fetch-failed).')).toBe(true);
+        // SDK는 value만으로도 맞춰 본다 — 앞뒤를 고정한 패턴은 이 모양에 걸린다
+        expect(isIgnored(patterns, 'Failed to fetch (firebase.googleapis.com)')).toBe(true);
+    });
+
+    it('같은 모양이라도 Firestore·Auth 접속 실패와 우리 큐의 연결 끊김은 걸러내지 않는다', async () => {
+        const options = await loadSentry();
+        const patterns = options.ignoreErrors as Array<RegExp | string>;
+
+        // 호스트를 firebase.googleapis.com으로 묶은 이유 — 이것들은 앱 동작에 직결된다
+        expect(isIgnored(patterns, 'Failed to fetch (firestore.googleapis.com)')).toBe(false);
+        expect(isIgnored(patterns, 'Failed to fetch (identitytoolkit.googleapis.com)')).toBe(false);
+        // Chromium용 `/Connection is closing/`이 대소문자를 구분해 6N(#489)을 삼키지 않았다 — 그대로 둔다
+        expect(isIgnored(patterns, "InvalidStateError: Failed to execute 'transaction' on 'IDBDatabase': The database connection is closing.")).toBe(false);
+    });
 });
 
 /**
