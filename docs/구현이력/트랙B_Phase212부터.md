@@ -797,3 +797,17 @@
 | **고치지 않은 것** | `functions-coverage.yml`(주간)은 머리 주석이 "per-push에서 떼어냈다"고 설명하지만 지금은 ci.yml이 같은 게이트를 매 푸시 돌린다 — 중복 워크플로와 낡은 주석이 남아 있다 |
 | **검증** | 로컬 `jest --coverage` 1,497 통과·새 하한 통과(exit 0) · CI 전부 초록. 배포: 함수 80개·Hosting |
 | **남는 것** | ① 사업자번호 보조 판별 두 구현 통일(증빙서류 OCR 쪽만 81·85·86을 비영리로 본다) ② `functions-coverage.yml` 정리 ③ 운영 확인(의견 Discord 알림·외부 대여·일지 수정 복귀) ④ THREADS_ONLY `syncQueue` 1개 ⑤ Sentry 'static' 지원 중단 시 스트림 전환 |
+
+### Phase 256: 늘 실패하던 [AI 재분석] — 증빙서류 판별을 한 곳으로 🔍🧾
+
+> 2026-10-16. Phase 253에서 남긴 "사업자번호 보조 판별 두 구현 통일"을 *"다음 진행해줘"*로 시작했다가, 호출부를 확인하던 중 더 큰 문제를 찾았다(#517).
+
+| 항목 | 내용 |
+|------|------|
+| **발견** | 시스템 관리자 › 신청 관리의 **[AI 재분석]**(`OrgApplicationList.handleAiReanalyze`)은 `ocrDocument` 결과의 `documentType`·`uniqueNumber`·`extractedName`·`nameMatch`·`address`·`aiVerified`를 기관 문서에 쓴다. 그런데 `ocrDocument`만 별도 프롬프트로 `{orgName, bizNumber, repName, isNonProfit, orgType, confidence}`를 돌려줘 그 값이 모두 `undefined` — 클라이언트 Firestore는 `ignoreUndefinedProperties`가 꺼져 있어 쓰기를 거부했다. **Gemini 비용만 쓰고 늘 "AI 문서 분석에 실패했습니다"**였다 |
+| **원래 하려던 일과 같은 뿌리** | 별도 사업자번호 판정(업태 코드 80~89를 모두 비영리 — 81·85·86 영리법인 포함)도 이 별도 구현에 있었다. `documentScreen` 머리 주석이 "접수 프리스크린과 자동 검증 트리거가 같은 프롬프트·같은 판정을 쓰도록 한 곳에 모은다"고 적었는데, 세 번째 호출부(재분석)만 그 원칙 밖에 있었다 |
+| **수정** (#517) | `ocrDocument`가 `buildOcrPrompt`·`parseScreenResponse`를 쓰고 화면이 저장하는 모양(`ScreenResult` + `aiVerified` + `raw`)을 돌려준다. `aiVerified`는 트리거의 자동 승인 조건과 같다(비영리 증빙 + 고유번호). 화면이 보내기만 하고 서버가 버리던 `orgName`을 위생 처리해 이름 일치 판단에 쓴다. 별도 `classifyByBizNumber` 삭제. **화면 코드는 그대로** — 화면이 원래 기대한 모양에 서버를 맞췄다 |
+| **테스트** | 화면이 쓰는 6개 필드가 깨진 응답에서도 `undefined` 없이 오는지, 위생 처리한 기관명으로 트리거와 같은 프롬프트, 유형별 자동 승인 조건, 목록 밖 유형 '기타' 강등, 81은 비영리로 끌어올리지 않음. 경로 권한·일일 한도 순서 테스트는 그대로 |
+| **교훈** | 테스트(#511)는 함수의 **반환 모양**을 그대로 받아 적어 통과했다 — 그 모양을 쓰는 화면과의 계약은 아무도 검사하지 않았다. 호출부를 읽고 나서야 보였다. 이번 테스트는 "화면이 쓰는 필드"를 목록으로 못박았다 |
+| **검증** | functions 단위 1,502 · 커버리지 하한(#515) 통과 · tsc·eslint · e2e(CI). 배포: 함수 80개(`ocrDocument` 포함)·Hosting. 시스템 관리자 로그인이 필요한 화면이라 운영 확인은 운영자 몫 |
+| **남는 것** | ① 운영에서 [AI 재분석] 한 번 확인 ② `functions-coverage.yml`(주간) 중복·낡은 주석 정리 ③ 운영 확인(의견 Discord 알림·외부 대여·일지 수정 복귀) ④ THREADS_ONLY `syncQueue` 1개 ⑤ Sentry 'static' 지원 중단 시 스트림 전환 |
