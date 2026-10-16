@@ -2,7 +2,15 @@
  * inAppBrowser.js 테스트
  */
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { isInAppBrowser, copyUrlToClipboard, getInAppBrowserName } from '../../lib/inAppBrowser';
+import { isInAppBrowser, copyUrlToClipboard, getInAppBrowserName, openInExternalBrowser } from '../../lib/inAppBrowser';
+import { navigateTo } from '../../lib/browserNav';
+
+// 딥링크 이동은 browserNav로 관찰한다(window.location 재정의는 vmThreads에서 불가)
+vi.mock('../../lib/browserNav', () => ({
+    navigateTo: vi.fn(),
+    reloadPage: vi.fn(),
+    currentHref: vi.fn(() => 'https://vehicle-drive-log.web.app/login'),
+}));
 
 describe('inAppBrowser', () => {
     const originalNavigator = { ...navigator };
@@ -81,61 +89,49 @@ describe('inAppBrowser', () => {
                 clipboard: { writeText: vi.fn().mockRejectedValue(new Error('not supported')) },
             });
 
+            // document 자체를 바꾸지 않고 execCommand만 얹는다(jsdom에는 없다) — 실제 textarea로 폴백을 돈다
             const execCommandMock = vi.fn().mockReturnValue(true);
-            vi.stubGlobal('document', {
-                ...document,
-                createElement: vi.fn().mockReturnValue({
-                    value: '',
-                    style: {},
-                    select: vi.fn(),
-                }),
-                body: {
-                    appendChild: vi.fn(),
-                    removeChild: vi.fn(),
-                },
-                execCommand: execCommandMock,
-            });
-
-            const result = await copyUrlToClipboard('https://example.com');
-            expect(result).toBe(true);
+            Object.defineProperty(document, 'execCommand', { configurable: true, value: execCommandMock });
+            try {
+                const result = await copyUrlToClipboard('https://example.com');
+                expect(result).toBe(true);
+                expect(execCommandMock).toHaveBeenCalledWith('copy');
+                expect(document.querySelector('textarea')).toBeNull();
+            } finally {
+                delete (document as unknown as Record<string, unknown>).execCommand;
+            }
         });
     });
 
     describe('openInExternalBrowser', () => {
-        let locationSpy: ReturnType<typeof vi.fn> | undefined;
-
         afterEach(() => {
-            if (locationSpy) locationSpy = undefined;
+            vi.mocked(navigateTo).mockClear();
         });
 
-        it('카카오톡 UA에서 kakaotalk:// 딥링크를 사용해야 한다', async () => {
+        it('카카오톡 UA에서 kakaotalk:// 딥링크를 사용해야 한다', () => {
             vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 KAKAOTALK 26.1.6 iPhone', vendor: '' });
-            // window.location.href 세터를 감시
-            const hrefSetter = vi.fn();
-            delete (window as unknown as Record<string, unknown>).location;
-            (window as unknown as Record<string, unknown>).location = { href: 'https://vehicle-drive-log.web.app/login' };
-            Object.defineProperty(window.location, 'href', { set: hrefSetter, get: () => 'https://vehicle-drive-log.web.app/login' });
-
-            const { openInExternalBrowser } = await import('../../lib/inAppBrowser');
             openInExternalBrowser();
 
-            expect(hrefSetter).toHaveBeenCalledWith(
-                expect.stringContaining('kakaotalk://web/openExternal?url=')
+            expect(navigateTo).toHaveBeenCalledWith(
+                'kakaotalk://web/openExternal?url=' + encodeURIComponent('https://vehicle-drive-log.web.app/login')
             );
         });
 
-        it('네이버 UA에서 naversearchapp:// 딥링크를 사용해야 한다', async () => {
+        it('네이버 UA에서 naversearchapp:// 딥링크를 사용해야 한다', () => {
             vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 NAVER(inapp;) iPhone', vendor: '' });
-            const hrefSetter = vi.fn();
-            delete (window as unknown as Record<string, unknown>).location;
-            (window as unknown as Record<string, unknown>).location = { href: 'https://vehicle-drive-log.web.app/login' };
-            Object.defineProperty(window.location, 'href', { set: hrefSetter, get: () => 'https://vehicle-drive-log.web.app/login' });
-
-            const { openInExternalBrowser } = await import('../../lib/inAppBrowser');
             openInExternalBrowser();
 
-            expect(hrefSetter).toHaveBeenCalledWith(
+            expect(navigateTo).toHaveBeenCalledWith(
                 expect.stringContaining('naversearchapp://inappbrowser?url=')
+            );
+        });
+
+        it('기타 Android 인앱은 Chrome Intent로 연다', () => {
+            vi.stubGlobal('navigator', { userAgent: 'Mozilla/5.0 (Linux; Android 13; wv) BAND/14.0', vendor: '' });
+            openInExternalBrowser();
+
+            expect(navigateTo).toHaveBeenCalledWith(
+                'intent://vehicle-drive-log.web.app/login#Intent;scheme=https;package=com.android.chrome;end'
             );
         });
     });

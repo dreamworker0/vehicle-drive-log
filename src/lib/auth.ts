@@ -4,6 +4,7 @@ import { auth, googleProvider, clearOfflineCache } from './firebase';
 import { clearQueue, getPendingCount } from './offline/syncQueue';
 import { useConfirmStore } from '../store/useConfirmStore';
 import { markIntentionalLogout, wasIntentionalLogout, clearSessionMarkers } from './sessionBoot';
+import { navigateTo } from './browserNav';
 
 // 의도적 로그아웃 표식은 sessionBoot가 소유한다(경량 진입점도 읽어야 해서 Firebase 의존이 없어야 한다).
 export { wasIntentionalLogout };
@@ -116,6 +117,6 @@ export const logout = async () => {
     // Firestore 영구 캐시 폐기 → 인스턴스가 종료되므로 깨끗한 상태로 재시작한다.
     await clearOfflineCache();
     if (typeof window !== 'undefined') {
-        window.location.href = '/';
+        navigateTo('/');
     }
 };

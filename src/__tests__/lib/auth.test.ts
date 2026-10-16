@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // firebase/auth·firebase 초기화·offline 큐를 모두 목으로 대체해 logout 오케스트레이션만 검증한다.
 vi.mock('firebase/auth', () => ({
@@ -16,6 +16,10 @@ vi.mock('@/lib/offline/syncQueue', () => ({
     clearQueue: vi.fn(() => Promise.resolve()),
     getPendingCount: vi.fn(() => Promise.resolve(0)),
 }));
+// 루트 이동은 browserNav로 관찰한다(window.location 재정의는 vmThreads에서 불가).
+// resetModules 뒤에도 같은 목을 보도록 hoisted로 둔다.
+const nav = vi.hoisted(() => ({ navigateTo: vi.fn(), reloadPage: vi.fn(), currentHref: vi.fn(() => '') }));
+vi.mock('@/lib/browserNav', () => nav);
 const mockConfirm = vi.fn();
 vi.mock('@/store/useConfirmStore', () => ({
     useConfirmStore: { getState: () => ({ confirm: mockConfirm }) },
@@ -26,20 +30,9 @@ import { signOut } from 'firebase/auth';
 import { clearOfflineCache } from '@/lib/firebase';
 import { clearQueue, getPendingCount } from '@/lib/offline/syncQueue';
 
-const originalLocation = window.location;
-
 describe('logout (2026-07-10 감사 #8 — 공용 기기 잔존 데이터 폐기)', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        // window.location.href 할당을 관찰하기 위해 목으로 대체 (jsdom 네비게이션 미구현 경고 회피)
-        Object.defineProperty(window, 'location', {
-            configurable: true,
-            writable: true,
-            value: { href: '' },
-        });
-    });
-    afterAll(() => {
-        Object.defineProperty(window, 'location', { configurable: true, value: originalLocation });
     });
 
     it('signOut → clearQueue → clearOfflineCache 순서로 실행하고 루트로 이동한다', async () => {
@@ -55,7 +48,7 @@ describe('logout (2026-07-10 감사 #8 — 공용 기기 잔존 데이터 폐기
         expect(signOutOrder).toBeLessThan(clearQueueOrder);
         expect(clearQueueOrder).toBeLessThan(clearCacheOrder);
 
-        expect(window.location.href).toBe('/');
+        expect(nav.navigateTo).toHaveBeenCalledWith('/');
     });
 
     it('큐 정리 실패가 캐시 폐기와 리다이렉트를 막지 않는다', async () => {
@@ -65,7 +58,7 @@ describe('logout (2026-07-10 감사 #8 — 공용 기기 잔존 데이터 폐기
         await logout();
 
         expect(clearOfflineCache).toHaveBeenCalledTimes(1);
-        expect(window.location.href).toBe('/');
+        expect(nav.navigateTo).toHaveBeenCalledWith('/');
     });
 
     it('signOut 실패 시 예외를 던지고 이후 정리를 수행하지 않는다', async () => {
@@ -93,7 +86,7 @@ describe('logout (2026-07-10 감사 #8 — 공용 기기 잔존 데이터 폐기
             expect(signOut).not.toHaveBeenCalled();
             expect(clearQueue).not.toHaveBeenCalled();
             expect(clearOfflineCache).not.toHaveBeenCalled();
-            expect(window.location.href).toBe('');
+            expect(nav.navigateTo).not.toHaveBeenCalled();
         });
 
         it('삭제를 확인하면 종전과 같이 signOut → clearQueue → clearOfflineCache로 진행한다', async () => {
@@ -104,7 +97,7 @@ describe('logout (2026-07-10 감사 #8 — 공용 기기 잔존 데이터 폐기
 
             expect(signOut).toHaveBeenCalledTimes(1);
             expect(clearQueue).toHaveBeenCalledTimes(1);
-            expect(window.location.href).toBe('/');
+            expect(nav.navigateTo).toHaveBeenCalledWith('/');
         });
 
         it('미전송 기록이 없으면 묻지 않는다', async () => {
@@ -119,7 +112,7 @@ describe('logout (2026-07-10 감사 #8 — 공용 기기 잔존 데이터 폐기
             await logout();
             expect(mockConfirm).not.toHaveBeenCalled();
             expect(signOut).toHaveBeenCalledTimes(1);
-            expect(window.location.href).toBe('/');
+            expect(nav.navigateTo).toHaveBeenCalledWith('/');
         });
     });
 });
@@ -136,11 +129,6 @@ describe('의도적 로그아웃 표시', () => {
     beforeEach(() => {
         vi.resetModules();
         localStorage.clear();
-        Object.defineProperty(window, 'location', {
-            configurable: true,
-            writable: true,
-            value: { href: '' },
-        });
     });
 
     it('표시가 없으면 의도적 로그아웃이 아니다', async () => {
