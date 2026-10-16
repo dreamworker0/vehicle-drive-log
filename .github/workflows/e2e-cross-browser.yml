@@ -3,13 +3,13 @@ name: E2E Cross-browser — 주간 전체 브라우저 검증
 # PR 게이트(ci.yml)는 chromium · mobile-chrome · mobile-safari 세 프로젝트만 돌린다.
 # 남는 것은 데스크톱 WebKit(macOS Safari)인데, 이 서비스의 사용자 비중이 낮아 PR마다
 # 돌릴 값은 아니지만 "전혀 검증하지 않는" 상태로 두기도 곤란하다. 그래서 주 1회 전체를
-# 돌린다 — Functions 커버리지를 주간으로 뺀 것(functions-coverage.yml)과 같은 배분이다.
+# 돌린다.
 #
 # 실패하면 GitHub이 스케줄 실행 실패를 저장소 관리자에게 메일로 알린다.
 
 on:
   schedule:
-    # 매주 월요일 01:00 KST (일요일 16:00 UTC) — functions-coverage(00:00 KST)와 겹치지 않게 한 시간 뒤
+    # 매주 월요일 01:00 KST (일요일 16:00 UTC)
     - cron: '0 16 * * 0'
   workflow_dispatch:
 
