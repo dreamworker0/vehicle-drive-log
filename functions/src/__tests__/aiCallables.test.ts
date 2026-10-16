@@ -146,6 +146,8 @@ describe('ocrDashboard', () => {
         await expect(ocr({ auth: employee, data: { imageBase64: 'a'.repeat(MAX_BASE64_SIZE + 1) } }))
             .rejects.toMatchObject({ code: 'invalid-argument' });
         expect(mockGenerateAiContent).not.toHaveBeenCalled();
+        // 2026-10-16 — 검증 전에 일일 한도를 세서 잘못된 요청도 하루 OCR 한 번을 깎았다
+        expect(mockCheckDailyOcrQuota).not.toHaveBeenCalled();
     });
 
     it('일반 차량은 km만, 전기차는 km와 배터리를 묻는다', async () => {
@@ -184,6 +186,30 @@ describe('ocrDashboard', () => {
 
             mockGenerateAiContent.mockResolvedValueOnce('{"km": 23456,,}');
             await expect(ocr({ auth: employee, data: image })).resolves.toMatchObject({ km: 23456, battery: null });
+        });
+
+        // 2026-10-16 — 문자열 값에 Number()를 그대로 써서 NaN이 나갔고, 화면은 km != null만 보고
+        // 도착 km 칸에 "NaN"을 채웠다
+        it.each([
+            ['콤마가 든 문자열', '{"km": "12,345", "battery": "80"}', 12345, 80],
+            ['소수점·단위가 붙은 문자열', '{"km": "12,345.6 km", "battery": "80%"}', 12345, 80],
+            ['소수점 숫자', '{"km": 12345.9, "battery": 79.5}', 12345, 79],
+            ['숫자가 없는 문자열', '{"km": "읽을 수 없음", "battery": "?"}', null, null],
+            ['음수', '{"km": -5, "battery": -1}', null, null],
+            ['범위 밖(배터리 100 초과·오도미터 7자리 초과)', '{"km": 123456789, "battery": 150}', null, null],
+            ['숫자도 문자열도 아님', '{"km": true, "battery": [80]}', null, null],
+        ])('%s는 NaN 없이 정수나 null로', async (_label, text, km, battery) => {
+            mockGenerateAiContent.mockResolvedValueOnce(text);
+            const result = await ocr({ auth: employee, data: { ...image, isElectric: true } });
+            expect(result).toMatchObject({ km, battery });
+            expect(Number.isNaN(result.km)).toBe(false);
+            expect(Number.isNaN(result.battery)).toBe(false);
+        });
+
+        it('깨진 JSON에서도 콤마가 든 숫자를 쪼개지 않는다', async () => {
+            mockGenerateAiContent.mockResolvedValueOnce('{"km": 12,345, "battery": 80,,}');
+            await expect(ocr({ auth: employee, data: { ...image, isElectric: true } }))
+                .resolves.toMatchObject({ km: 12345, battery: 80 });
         });
     });
 });
