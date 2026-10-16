@@ -350,6 +350,15 @@ describe('저장 후 처리', () => {
         expect(mockNavigate).toHaveBeenCalledWith('/employee/my-records', { replace: true });
     });
 
+    // 관리자 일지관리에서 연 수정은 그 목록(같은 필터)으로 돌아간다 — 관리자 본인의 '내 기록'에는
+    // 방금 고친 남의 일지가 없어 확인할 수 없었다(2026-10-16 운영 의견).
+    it('관리자 일지관리에서 연 수정이면 그 목록으로 돌아간다', async () => {
+        mockSubmitDriveLog.mockResolvedValue({ shouldNavigate: 'my-records', message: '수정됨' });
+        await submit({ ...deps(), editReturnTo: '/admin/drive-logs?vehicle=v1&from=2026-10-01' });
+
+        expect(mockNavigate).toHaveBeenCalledWith('/admin/drive-logs?vehicle=v1&from=2026-10-01', { replace: true });
+    });
+
     it('예약 운행 완료면 오늘의 운행으로 이동한다', async () => {
         mockSubmitDriveLog.mockResolvedValue({ shouldNavigate: 'today' });
         await submit(deps());

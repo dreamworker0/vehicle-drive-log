@@ -11,6 +11,8 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act, waitFor } from '@testing-library/react';
+import { createElement, type ReactNode } from 'react';
+import { MemoryRouter, useLocation } from 'react-router-dom';
 
 const mockShowToast = vi.fn();
 vi.mock('@/hooks/useToast', () => ({ useToast: () => ({ showToast: mockShowToast }) }));
@@ -57,6 +59,19 @@ function page(docs: ReturnType<typeof log>[], hasMore = false, lastDoc: unknown 
     return { docs, hasMore, lastDoc };
 }
 
+/** 필터를 주소에 담으므로(useSearchParams) 라우터 안에서 띄운다. 주소를 바꿔 넣으면 그 필터로 시작한다. */
+function renderList(initialEntry = '/admin/drive-logs') {
+    let location: { search: string } = { search: '' };
+    const Probe = () => {
+        location = useLocation();
+        return null;
+    };
+    const wrapper = ({ children }: { children: ReactNode }) =>
+        createElement(MemoryRouter, { initialEntries: [initialEntry] }, children, createElement(Probe));
+    const rendered = renderHook(() => useDriveLogList(), { wrapper });
+    return { ...rendered, currentSearch: () => location.search };
+}
+
 describe('useDriveLogList', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -71,7 +86,7 @@ describe('useDriveLogList', () => {
     });
 
     it('초기 로드에서 목록·차량·구성원·기관을 함께 가져온다', async () => {
-        const { result } = renderHook(() => useDriveLogList());
+        const { result } = renderList();
 
         await waitFor(() => expect(result.current.loading).toBe(false));
 
@@ -90,7 +105,7 @@ describe('useDriveLogList', () => {
             .mockReturnValueOnce(slow)                              // 초기 로드 (느림)
             .mockResolvedValueOnce(page([log('fresh')]));           // 필터 변경 후 (빠름)
 
-        const { result } = renderHook(() => useDriveLogList());
+        const { result } = renderList();
 
         // 필터를 바꿔 두 번째 요청을 띄운다
         await act(async () => { result.current.setFilters((f) => ({ ...f, vehicleId: 'v1' })); });
@@ -104,7 +119,7 @@ describe('useDriveLogList', () => {
 
     it('더보기는 기존 목록에 이어 붙이고 커서를 갱신한다', async () => {
         mockGetDriveLogs.mockResolvedValueOnce(page([log('l1')], true, { id: 'c1' }));
-        const { result } = renderHook(() => useDriveLogList());
+        const { result } = renderList();
         await waitFor(() => expect(result.current.hasMore).toBe(true));
 
         mockGetDriveLogs.mockResolvedValueOnce(page([log('l2')], false, { id: 'c2' }));
@@ -117,7 +132,7 @@ describe('useDriveLogList', () => {
     });
 
     it('더 가져올 게 없으면 더보기를 호출하지 않는다', async () => {
-        const { result } = renderHook(() => useDriveLogList());
+        const { result } = renderList();
         await waitFor(() => expect(result.current.loading).toBe(false));
         mockGetDriveLogs.mockClear();
 
@@ -131,7 +146,7 @@ describe('useDriveLogList', () => {
             log('l1', { purpose: '병원 이동', endKm: 150 }),
             log('l2', { purpose: '장보기', startKm: 200, endKm: 260 }),
         ]));
-        const { result } = renderHook(() => useDriveLogList());
+        const { result } = renderList();
         await waitFor(() => expect(result.current.logs).toHaveLength(2));
 
         expect(result.current.totalDistance).toBe(50 + 60);
@@ -149,7 +164,7 @@ describe('useDriveLogList', () => {
         mockConfirm.mockResolvedValue(true);
         mockDeleteDriveLog.mockResolvedValue(undefined);
 
-        const { result } = renderHook(() => useDriveLogList());
+        const { result } = renderList();
         await waitFor(() => expect(result.current.logs).toHaveLength(2));
 
         await act(async () => { await result.current.handleDelete('l1', '홍길동'); });
@@ -161,7 +176,7 @@ describe('useDriveLogList', () => {
 
     it('삭제 확인을 취소하면 아무것도 지우지 않는다', async () => {
         mockConfirm.mockResolvedValue(false);
-        const { result } = renderHook(() => useDriveLogList());
+        const { result } = renderList();
         await waitFor(() => expect(result.current.loading).toBe(false));
 
         await act(async () => { await result.current.handleDelete('l1', '홍길동'); });
@@ -172,7 +187,7 @@ describe('useDriveLogList', () => {
 
     it('중복이 없으면 검사 범위를 함께 알린다 — "없습니다"만 띄우면 전량 무결로 오해한다', async () => {
         mockCleanupDuplicateLogs.mockResolvedValue({ deleteCount: 0, duplicateGroups: 0, totalLogs: 12, scanMonths: 6 });
-        const { result } = renderHook(() => useDriveLogList());
+        const { result } = renderList();
         await waitFor(() => expect(result.current.loading).toBe(false));
 
         await act(async () => { await result.current.handleDupScan(); });
@@ -184,7 +199,7 @@ describe('useDriveLogList', () => {
 
     it('중복이 있으면 결과 화면으로 넘기고, 정리는 확인 후 dryRun 없이 실행한다', async () => {
         mockCleanupDuplicateLogs.mockResolvedValueOnce({ deleteCount: 3, duplicateGroups: 1, totalLogs: 20, scanMonths: 6 });
-        const { result } = renderHook(() => useDriveLogList());
+        const { result } = renderList();
         await waitFor(() => expect(result.current.loading).toBe(false));
 
         await act(async () => { await result.current.handleDupScan(); });
@@ -203,7 +218,7 @@ describe('useDriveLogList', () => {
 
     it('중복 정리가 실패하면 결과 화면으로 되돌려 다시 시도할 수 있게 한다', async () => {
         mockCleanupDuplicateLogs.mockResolvedValueOnce({ deleteCount: 2, duplicateGroups: 1, totalLogs: 9, scanMonths: 6 });
-        const { result } = renderHook(() => useDriveLogList());
+        const { result } = renderList();
         await waitFor(() => expect(result.current.loading).toBe(false));
         await act(async () => { await result.current.handleDupScan(); });
 
@@ -217,9 +232,52 @@ describe('useDriveLogList', () => {
 
     it('초기 로드가 실패해도 로딩이 풀린다 — 화면이 영원히 스피너로 남지 않게', async () => {
         mockGetDriveLogs.mockRejectedValueOnce(new Error('network'));
-        const { result } = renderHook(() => useDriveLogList());
+        const { result } = renderList();
 
         await waitFor(() => expect(result.current.loading).toBe(false));
         expect(result.current.logs).toEqual([]);
+    });
+});
+
+
+// 2026-10-16 운영 의견 — 같은 차량·기간의 여러 직원 일지를 이어서 고칠 때마다 필터를 다시 골라야 했다.
+describe('useDriveLogList — 필터를 주소에 담는다', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        mockGetDriveLogs.mockResolvedValue(page([]));
+        mockGetVehicles.mockResolvedValue([]);
+        mockGetMembers.mockResolvedValue([]);
+        mockGetOrganization.mockResolvedValue({ id: 'org1', name: '가나복지관' });
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+    });
+
+    it('주소의 차량·직원·기간·검색어로 시작한다 — 수정 후 돌아오면 같은 조건이다', async () => {
+        const { result } = renderList('/admin/drive-logs?vehicle=v1&driver=u1&q=시청&from=2026-10-01&to=2026-10-15');
+        expect(result.current.filters).toEqual({
+            vehicleId: 'v1', driverUid: 'u1', search: '시청', startDate: '2026-10-01', endDate: '2026-10-15',
+        });
+        await waitFor(() => expect(mockGetDriveLogs).toHaveBeenCalled());
+        expect(mockGetDriveLogs.mock.calls[0][1]).toMatchObject({ vehicleId: 'v1', driverUid: 'u1', startDate: '2026-10-01', endDate: '2026-10-15' });
+    });
+
+    it('필터를 바꾸면 주소에 적고, 기본값으로 되돌리면 지운다', async () => {
+        const { result, currentSearch } = renderList();
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        act(() => result.current.setFilters({ ...result.current.filters, vehicleId: 'v2', startDate: '2026-09-01' }));
+        await waitFor(() => expect(currentSearch()).toContain('vehicle=v2'));
+        expect(currentSearch()).toContain('from=2026-09-01');
+        expect(currentSearch()).not.toContain('driver=');
+
+        await waitFor(() => expect(result.current.loading).toBe(false));
+        act(() => result.current.setFilters({ ...result.current.filters, vehicleId: '' }));
+        await waitFor(() => expect(currentSearch()).not.toContain('vehicle='));
+        await waitFor(() => expect(result.current.loading).toBe(false));
+    });
+
+    it('날짜가 아닌 값은 받지 않는다', async () => {
+        const { result } = renderList('/admin/drive-logs?from=hack&to=2026-13');
+        expect(result.current.filters.startDate).toMatch(/^\d{4}-\d{2}-01$/);
+        expect(result.current.filters.endDate).not.toBe('2026-13');
+        await waitFor(() => expect(result.current.loading).toBe(false));
     });
 });

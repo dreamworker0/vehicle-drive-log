@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import type { DriveLog } from '../../../types/driveLog';
 import { toDateOrNull } from '../../../lib/dateUtils';
 import { formatStartDatePrefix } from '../../../lib/driveLogExportFields';
@@ -82,13 +82,17 @@ const GRID_COLUMNS = '80px 60px 60px 70px 100px 1fr 100px 96px 80px 76px';
 
 export default function DriveLogTableRow({ log, deletingId, onDelete }: DriveLogTableRowProps) {
     const navigate = useNavigate();
+    const location = useLocation();
     const logDate = toDateOrNull(log.timestamp);
     const date = logDate
         ? logDate.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })
         : '-';
     const distance = (log.endKm - log.startKm) || 0;
     const isDeleting = deletingId === log.id;
-    const handleEdit = () => navigate('/employee/drive-log', { state: { editLog: log } });
+    // 수정을 마치면 이 목록으로 — 주소에 담긴 필터(차량·직원·기간)까지 그대로 돌아온다(useDriveLogList)
+    const handleEdit = () => navigate('/employee/drive-log', {
+        state: { editLog: log, returnTo: `${location.pathname}${location.search}` },
+    });
 
     return (
         <div className="glass-card p-4 hover:shadow-glass-lg transition-all">

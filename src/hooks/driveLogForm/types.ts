@@ -49,6 +49,12 @@ export interface LocationState {
     actualStartTime?: string;
     currentKm?: number;
     editLog?: DriveLog & { passengerNames?: string[] };
+    /**
+     * 수정을 마치면 돌아갈 화면(앱 안 경로). 관리자 일지관리가 자기 주소(필터 포함)를 실어 보낸다.
+     * 없으면 직원 흐름대로 '내 기록'으로 간다 — 관리자가 남의 일지를 고친 뒤 관리자 **본인의** 기록으로
+     * 떨어져 방금 고친 일지를 확인할 수 없었다(2026-10-16 운영 의견).
+     */
+    returnTo?: string;
     /** 예약에 미리 적어 둔 동승자(예정) — 운행일지 폼의 초기값이 된다 */
     passengerUids?: string[];
     passengerNames?: string[];
