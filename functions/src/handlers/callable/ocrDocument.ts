@@ -72,10 +72,6 @@ export const ocrDocument = onCall(
         enforceAppCheck: true,
     },
     wrapCallableHandler("ocrDocument", { rateLimitKey: "ocrDocument", rateLimitFailMode: "closed" }, async (request) => {
-        // 일일 누적 한도(사용자/조직) — 분 단위 제한과 별개의 비용 증폭 방어 (ocr-cost-security §1.1)
-        const [dailyUser, dailyOrg] = await Promise.all([getRateLimits("ocrDailyUser"), getRateLimits("ocrDailyOrg")]);
-        await checkDailyOcrQuota(request.auth!.uid, request.auth!.token.orgId as string | undefined, dailyUser, dailyOrg);
-
         const { storagePath, imageBase64, mimeType } = request.data as { storagePath?: string; imageBase64?: string; mimeType?: string };
 
         if (!storagePath && !imageBase64) {
@@ -104,6 +100,12 @@ export const ocrDocument = onCall(
         if (imageBase64 && imageBase64.length > MAX_BASE64_SIZE) {
             throw new HttpsError("invalid-argument", "이미지 크기가 너무 큽니다 (최대 5MB).");
         }
+
+        // 일일 누적 한도(사용자/조직) — 분 단위 제한과 별개의 비용 증폭 방어 (ocr-cost-security §1.1).
+        // 입력·경로 검증 **뒤에** 센다 — 앞에 두면 Gemini를 부르지 않는 잘못된 요청(경로 조작·
+        // 남의 기관 파일 포함)도 하루 한도를 깎았다(2026-10-16, ocrDashboard와 같은 순서).
+        const [dailyUser, dailyOrg] = await Promise.all([getRateLimits("ocrDailyUser"), getRateLimits("ocrDailyOrg")]);
+        await checkDailyOcrQuota(request.auth!.uid, request.auth!.token.orgId as string | undefined, dailyUser, dailyOrg);
 
         let base64Data: string;
         let fileMimeType: string;
