@@ -182,6 +182,21 @@ function sentinelMarker(value: FieldValue): string {
 }
 
 /**
+ * 평범한 객체(`{}` 리터럴·JSON 모양)인가 — 재귀해 들어갈 대상.
+ *
+ * `Object.getPrototypeOf(v) === Object.prototype`으로 비교하면 **다른 영역(realm)에서 만든 객체**를
+ * 놓친다. IndexedDB가 structured clone으로 돌려준 값은 그 저장소 구현의 영역에 속할 수 있어서,
+ * 그 경우 저장해 둔 마커를 복원하지 못한 채 재생된다(Vitest vmThreads + fake-indexeddb에서 실측,
+ * 2026-10-17). 프로토타입 사슬이 "어느 영역이든 Object.prototype 하나 → null"이면 평범한 객체로 본다.
+ * FieldValue·Timestamp·Date 같은 클래스 인스턴스는 사슬이 한 단계 더 길어 걸러진다.
+ */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+    if (value === null || typeof value !== 'object') return false;
+    const proto = Object.getPrototypeOf(value);
+    return proto === null || Object.getPrototypeOf(proto) === null;
+}
+
+/**
  * IndexedDB에 안전하게 저장 가능한 형태로 변환한다.
  * - FieldValue 센티널 → 종류별 마커 문자열 (sentinelMarker 참고)
  * - Firestore Timestamp → Date (Timestamp도 클래스라 clone 시 프로토타입이 소실되지만,
@@ -191,7 +206,7 @@ function toStorable(value: unknown): unknown {
     if (value instanceof FieldValue) return sentinelMarker(value);
     if (value instanceof Timestamp) return value.toDate();
     if (Array.isArray(value)) return value.map(toStorable);
-    if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+    if (isPlainObject(value)) {
         return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, toStorable(v)]));
     }
     return value;
@@ -202,7 +217,7 @@ function fromStorable(value: unknown): unknown {
     if (value === SERVER_TIMESTAMP_MARKER) return serverTimestamp();
     if (value === DELETE_FIELD_MARKER) return deleteField();
     if (Array.isArray(value)) return value.map(fromStorable);
-    if (value && typeof value === 'object' && Object.getPrototypeOf(value) === Object.prototype) {
+    if (isPlainObject(value)) {
         return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, fromStorable(v)]));
     }
     return value;

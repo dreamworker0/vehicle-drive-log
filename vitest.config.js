@@ -26,9 +26,9 @@ const localMaxWorkers = rawWorkers
  * - jsdom 창이 곧 전역이라 `window.location`·`document`를 **다시 정의할 수 없다**
  *   (`Cannot redefine property: location`). 페이지 이동·새로고침은 `src/lib/browserNav.ts`를 거치고
  *   테스트는 그 모듈을 `vi.mock`한다 — 그렇게 바꿔 auth·inAppBrowser·staleChunk 세 파일을 옮겼다.
- * - 저장소(fake-indexeddb)가 돌려준 값은 바깥 영역의 `Date`·`Object`라 VM 안의 `instanceof Date`가
- *   거짓이고, 앱의 센티널 복원도 그 값을 알아보지 못한다(syncQueue 23개 중 3개 실패, 2026-10-16).
- *   맞추려면 운영 코드의 판별을 영역 무관하게 바꿔야 해 두었다.
+ * - 저장소(fake-indexeddb)가 돌려준 값은 바깥 영역의 `Date`·`Object`라 VM 안의 `instanceof`·
+ *   `=== Object.prototype` 비교가 거짓이 된다. syncQueue의 평범한 객체 판별을 영역 무관하게
+ *   바꾸고(isPlainObject) 테스트는 내부 태그로 Date를 확인해 옮겼다(2026-10-17).
  * - gRPC(@grpc/grpc-js) 콜백이 테스트 뒤에 도착하면 VM 안에 `process`가 없어 터진다 —
  *   Rules 테스트(에뮬레이터). 단위 테스트는 실제 서버에 접속하면 안 된다 — App Check는
  *   setup.ts가 전역으로 비우고, Firestore·Functions는 테스트마다 목으로 둔다.
@@ -36,7 +36,6 @@ const localMaxWorkers = rawWorkers
  * 쓰면 여기에 추가하는 대신 그 패턴을 피하는 것을 먼저 검토한다** — 이 목록은 줄어야 한다.
  */
 const THREADS_ONLY_TESTS = [
-    'src/__tests__/lib/offline/syncQueue.test.ts',       // fake-indexeddb 값의 instanceof
     'tests/**/*.test.ts',                                // Rules 테스트 — 에뮬레이터 gRPC
 ];
 
