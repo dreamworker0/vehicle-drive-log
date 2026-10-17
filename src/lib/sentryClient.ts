@@ -11,7 +11,8 @@ export {
     setTag,
     captureException,
     captureMessage,
-    setMeasurement,
+    setAttributes,
+    getIsolationScope,
     browserTracingIntegration,
-    withStaticSpan,
+    withStreamedSpan,
 } from '@sentry/react';

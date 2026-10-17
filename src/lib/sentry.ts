@@ -1,5 +1,5 @@
 import { isFirestoreTerminated } from './firestoreLifecycle';
-import { scrubContext, scrubConsoleArgs, joinConsoleArgs, scrubUrl, scrubDomTarget, scrubSpanData, scrubSpanName } from './sentryScrub';
+import { scrubContext, scrubConsoleArgs, joinConsoleArgs, scrubUrl, scrubDomTarget, scrubSpanAttributes, scrubSpanName } from './sentryScrub';
 
 const SENTRY_DSN = import.meta.env.VITE_SENTRY_DSN;
 
@@ -64,7 +64,9 @@ function initSentryWithModule(Sentry: SentryModule) {
         // (성과관리 앱의 ApiError가 우리 이슈로 올라온 사례). 이슈 검색에서 `app:vehicle-drive-log`로 거른다.
         // 로그인 여부와 무관한 값이라 로그아웃 때 정리되는 user.role·organizationId와 달리
         // 스코프에 처음부터 심어 둔다 — 비로그인 화면에서 난 에러에도 붙어야 한다.
-        initialScope: { tags: { app: 'vehicle-drive-log' } },
+        // 스트림 스팬에는 태그가 실리지 않고 스코프 **속성**만 실린다(core captureSpan의 commonSpanAttributes)
+        // — 성능 데이터에서도 이 앱 것을 가려내도록 같은 값을 속성으로도 둔다.
+        initialScope: { tags: { app: 'vehicle-drive-log' }, attributes: { app: 'vehicle-drive-log' } },
         // 값이 없을 때 release: undefined를 넘기지 않도록 조건부로 편다 (SDK 기본 동작 유지)
         ...(SENTRY_RELEASE ? { release: SENTRY_RELEASE } : {}),
         // 프로덕션 30% 샘플링 (주간 ~5k 샘플 확보, 비용·오버헤드 절감), 개발 시 0%
@@ -76,15 +78,19 @@ function initSentryWithModule(Sentry: SentryModule) {
             Sentry.browserTracingIntegration(),
         ],
         /**
-         * 스팬 전송 방식 — SDK 11부터 기본값이 'stream'(스팬을 묶음으로 따로 보냄)이다.
+         * 스팬 전송 방식 — 'stream'(스팬을 묶음으로 따로 보냄, SDK 11 기본값).
          *
-         * 'static'(v10과 같은 트랜잭션 이벤트)으로 고정한다. 스트림 형식(`StreamedSpanJSON`)에는
-         * `events`가 없어 `reportWebVitals`의 `setMeasurement`(루트 스팬 event로 붙는다)가 실리지
-         * 않을 수 있고, 아래 `beforeSendSpan` 스크러빙도 형식(`data`→`attributes`,
-         * `description`→`name`)을 새로 맞춰야 한다. 개인정보 훅을 바꾸는 일이라 SDK 올리기와
-         * 섞지 않았다 — 스트림 전환은 Web Vitals 수집을 확인하며 따로 한다.
+         * SDK 11로 올릴 때(#486)는 'static'(v10과 같은 트랜잭션 이벤트)으로 묶어 두고 전환을 미뤘다.
+         * 2026-10-17 운영자 결정으로 전환하며 바뀐 것:
+         * - Web Vitals: 직접 보내던 `web-vitals` + `setMeasurement`는 스트림 형식(`StreamedSpanJSON`)에
+         *   `events`가 없어 실리지 않는다. 대신 browserTracing이 스스로 TTFB·FP·FCP를 pageload 스팬
+         *   속성으로, LCP·CLS·INP를 **전용 스팬**으로 보낸다(webVitalsIntegration 자동 추가) — 직접
+         *   수집을 없앴다.
+         * - 개인정보 훅: 아래 `beforeSendSpan`이 `attributes`·`name`을 거른다(static은 `data`·`description`).
+         * - 사용자: SDK가 스코프 사용자(user.id)를 모든 스팬 속성에 붙인다 — uid만 싣는다(applySentryUser).
+         * - IP: `dataCollection.userInfo: false`면 스팬 묶음도 `infer_ip: 'never'`다(core spans/envelope).
          */
-        traceLifecycle: 'static',
+        traceLifecycle: 'stream',
         /**
          * 수집 범위 — SDK 11은 `sendDefaultPii`를 이것으로 바꾸면서 **비워 두면 v10보다 더 많이
          * 거둔다**(userInfo·cookies·헤더·쿼리·본문이 모두 기본 켜짐). 특히 `userInfo: true`면
@@ -162,31 +168,22 @@ function initSentryWithModule(Sentry: SentryModule) {
         /**
          * 스팬 속성 — breadcrumb만 막아서는 **같은 검색어가 한 번 더 나간다.**
          *
-         * browserTracing이 켜져 있어(위 integrations) 요청마다 스팬이 만들어지는데,
-         * `getFetchSpanAttributes`가 `url`에 원본 URL을 통째로, `http.query`에 쿼리를
-         * 그대로 담는다. 위생 처리를 거치는 것은 스팬 **이름**(`GET /api/tmap`)뿐이다.
-         * 트랜잭션 이벤트라 beforeSend도 타지 않는다(그쪽은 오류 이벤트 전용).
+         * browserTracing이 켜져 있어 요청마다 스팬이 만들어지는데, 요청 URL·쿼리가 `url.full`·
+         * `url.query` 속성에 담긴다. 트랜잭션·스팬은 beforeSend도 타지 않는다(그쪽은 오류 이벤트 전용).
          *
-         * 이 훅은 루트 스팬과 자식 스팬 **모두**에 적용된다(core/client.js processBeforeSend).
-         * standalone 스팬도 여기를 거친다 — 트랜잭션이 아니라 스팬 봉투로 따로 나가지만
-         * `createSpanEnvelope`가 같은 콜백을 태운다(core/envelope.js).
+         * **이름도 함께 거른다.** LCP·CLS·INP 스팬은 static 시절 이름 자체가 요소 설명이었고(aria-label·
+         * title이 그대로), 스트림에서는 이름이 컴포넌트명으로 바뀌었지만 요소 설명은
+         * `browser.web_vital.*.element/target/source` 속성으로 옮겨 실린다 — `scrubSpanAttributes`가 맡는다.
          *
-         * **이름도 함께 걸러야 한다.** 지금 설정에서 standalone인 것은 INP인데, 그 스팬은
-         * 이름 자체가 요소 설명이라(`metrics/inp.js`) `aria-label`·`title`이 그대로 실린다.
-         * (CLS·LCP는 standalone이 아니라 pageload 루트 스팬의 속성으로 나간다 — 그쪽은
-         * `scrubSpanData`가 맡는다.) Phase 211에서 이 경로를 "설치본에 없는 패키지"라며
-         * 반려했는데, 패키지 이름만 달랐을 뿐(`@sentry/browser-utils`) 경로는 실재했다.
-         *
-         * **`withStaticSpan`을 벗기면 이 훅이 아예 불리지 않는다.** SDK 11은 감싸지 않은 콜백을
-         * 스트림용으로 보고, 위 `traceLifecycle: 'static'`과 짝이 맞지 않는 콜백은 건너뛴다
-         * (core client.js `isStaticBeforeSendSpanCallback`) — 오류 없이 원본 스팬이 나간다.
-         * 짝은 sentryCapture.test.ts가 지킨다.
+         * **`withStreamedSpan`으로 감싼다.** SDK 11은 `traceLifecycle`과 짝이 맞지 않는 콜백을 오류 없이
+         * 건너뛴다(core captureSpan — static 표식이 있는 콜백은 stream에서 불리지 않는다). 짝은
+         * sentryCapture.test.ts가, 실제 SDK 파이프라인을 거쳐 걸러지는지는 sentryStreamPipeline.test.ts가 지킨다.
          */
-        beforeSendSpan: Sentry.withStaticSpan((span) => {
-            const data = scrubSpanData(span.data as Record<string, unknown> | undefined);
-            const description = scrubSpanName(span.description);
-            if (data === span.data && description === span.description) return span;
-            return { ...span, data, description } as typeof span;
+        beforeSendSpan: Sentry.withStreamedSpan((span) => {
+            const attributes = scrubSpanAttributes(span.attributes as Record<string, unknown> | undefined);
+            const name = scrubSpanName(span.name) ?? span.name;
+            if (attributes === span.attributes && name === span.name) return span;
+            return { ...span, attributes, name } as typeof span;
         }),
         // 노이즈 에러 필터링
         ignoreErrors: [
@@ -435,11 +432,6 @@ function initSentryWithModule(Sentry: SentryModule) {
             return event;
         },
     });
-
-    // 프로덕션에서 Web Vitals 수집
-    if (import.meta.env.PROD) {
-        reportWebVitals(Sentry);
-    }
 }
 
 function applySentryUser(Sentry: SentryModule, userInfo: SentryUserInfo) {
@@ -454,12 +446,18 @@ function applySentryUser(Sentry: SentryModule, userInfo: SentryUserInfo) {
         if (userInfo.organizationId) {
             Sentry.setTag('organizationId', userInfo.organizationId);
         }
+        // 스트림 스팬에는 태그가 실리지 않는다 — 성능 데이터도 역할·기관으로 거를 수 있게 속성으로 함께 둔다
+        Sentry.setAttributes({
+            'user.role': userInfo.role || 'unknown',
+            ...(userInfo.organizationId ? { organizationId: userInfo.organizationId } : {}),
+        });
     } else {
         Sentry.setUser(null);
         // 로그아웃 시 이전 세션의 역할·기관 태그가 스코프에 잔존해 후속(teardown) 이벤트에
-        // 잘못 붙는 것을 방지 — 함께 정리한다.
+        // 잘못 붙는 것을 방지 — 함께 정리한다(스팬용 속성도).
         Sentry.setTag('user.role', undefined);
         Sentry.setTag('organizationId', undefined);
+        Sentry.getIsolationScope().removeAttribute('user.role').removeAttribute('organizationId');
     }
 }
 
@@ -510,22 +508,4 @@ export function captureWarning(message: string, context: Record<string, unknown>
         else sentryLoading.then((Sentry) => Sentry?.captureMessage(message, { level: 'warning', extra: safeContext }));
     }
     console.warn(message, context);
-}
-
-/**
- * Web Vitals(LCP, FID, CLS, FCP, TTFB) 수집 → Sentry Custom Measurements
- */
-function reportWebVitals(Sentry: SentryModule) {
-    import('web-vitals').then(({ onCLS, onFCP, onLCP, onTTFB, onINP }) => {
-        const sendToSentry = (metric: { name: string; value: number }) => {
-            Sentry.setMeasurement(metric.name, metric.value, metric.name === 'CLS' ? '' : 'millisecond');
-        };
-        onCLS(sendToSentry);
-        onFCP(sendToSentry);
-        onLCP(sendToSentry);
-        onTTFB(sendToSentry);
-        onINP(sendToSentry);
-    }).catch(() => {
-        // web-vitals 로드 실패 시 무시
-    });
 }

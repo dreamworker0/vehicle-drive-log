@@ -1,7 +1,7 @@
 name: Lighthouse — 주간 웹 성능 회귀 게이트
 
 # ## 왜 PR마다 돌리지 않는가
-# `web-vitals`가 src/lib/sentry.ts에서 Sentry로 값을 보내기만 하고 **회귀를 막는 임계치가
+# Sentry browserTracing(src/lib/sentry.ts)이 Web Vitals를 Sentry로 보내기만 하고 **회귀를 막는 임계치가
 # 없었다.** 번들 크기는 PR마다 게이트되지만(scripts/check-bundle-size.ts) LCP/INP/CLS는
 # 아무도 막지 않았다 — 이 워크플로가 그 자리를 메운다.
 #

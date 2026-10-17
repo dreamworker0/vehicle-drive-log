@@ -20,9 +20,10 @@ async function loadSentry() {
         setUser: vi.fn(),
         setTag: vi.fn(),
         captureException: vi.fn(),
-        setMeasurement: vi.fn(),
+        setAttributes: vi.fn(),
+        getIsolationScope: vi.fn(() => ({ removeAttribute: vi.fn().mockReturnThis() })),
         browserTracingIntegration: vi.fn(() => ({ name: 'BrowserTracing' })),
-        withStaticSpan: <T,>(cb: T) => cb,
+        withStreamedSpan: <T,>(cb: T) => cb,
     }));
     const mod = await import('../../lib/sentry');
     mod.initSentry();
@@ -84,9 +85,10 @@ describe('initSentry — 루프백 주소의 프로덕션 빌드', () => {
             setUser: vi.fn(),
             setTag: vi.fn(),
             captureException: vi.fn(),
-            setMeasurement: vi.fn(),
+            setAttributes: vi.fn(),
+            getIsolationScope: vi.fn(() => ({ removeAttribute: vi.fn().mockReturnThis() })),
             browserTracingIntegration: vi.fn(() => ({ name: 'BrowserTracing' })),
-            withStaticSpan: <T,>(cb: T) => cb,
+            withStreamedSpan: <T,>(cb: T) => cb,
         }));
         const mod = await import('../../lib/sentry');
 

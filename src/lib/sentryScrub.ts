@@ -314,7 +314,7 @@ export function scrubDomTarget(target: string): string {
  * `getFetchSpanAttributes`(@sentry/core)가 `url`에 **원본 URL을 통째로**, `http.query`에
  * 쿼리 문자열을 그대로 넣는다. 위생 처리를 거치는 것은 스팬 **이름**(`GET /api/tmap`)뿐이다.
  */
-const SPAN_URL_KEYS = ['url', 'http.url', 'url.full'] as const;
+const SPAN_URL_KEYS = ['url', 'http.url', 'url.full', 'browser.web_vital.lcp.url'] as const;
 
 /**
  * 쿼리·프래그먼트를 담는 키 — v10은 `http.*`, v11부터는 시맨틱 컨벤션 이름(`url.*`)이다.
@@ -331,14 +331,15 @@ const SPAN_QUERY_KEYS = ['http.query', 'http.fragment', 'url.query', 'url.fragme
  * web-vital 계측은 어느 요소가 문제였는지를 `htmlTreeAsString`으로 적는다. 그 함수는
  * `aria-label`·`title`·`alt`를 **항상** 붙이므로 breadcrumb과 똑같은 값이 여기로도 나간다.
  *
- * 지금 설정에서 실제로 도는 것은 pageload 루트 스팬에 붙는 `lcp.element`·`cls.source.N`이다
- * (@sentry/browser-utils `metrics/browserMetrics.js`의 `_setWebVitalAttributes`).
- * `browser.web_vital.` 접두 키는 standalone/스트리밍 경로 전용이라 지금은 돌지 않지만,
- * `_experiments` 플래그 하나로 켜지므로 함께 잡아 둔다.
+ * 스트림 전송(traceLifecycle 'stream', 2026-10-17)에서는 LCP·CLS·INP가 **전용 스팬**으로 나가고
+ * 요소 설명이 `browser.web_vital.lcp.element`·`browser.web_vital.cls.source.N`·
+ * `browser.web_vital.inp.target`에 실린다(@sentry/browser-utils `web-vitals/spans.js`).
+ * static 시절의 pageload 루트 스팬 키(`lcp.element`·`cls.source.N`)도 함께 잡아 둔다.
  */
 function isDomTargetSpanKey(key: string): boolean {
     return key === 'lcp.element'
         || key === 'browser.web_vital.lcp.element'
+        || key === 'browser.web_vital.inp.target'
         || /^(?:browser\.web_vital\.)?cls\.source\.\d+$/.test(key);
 }
 
@@ -394,4 +395,36 @@ export function scrubSpanData(data: Record<string, unknown> | undefined): Record
         if (safe !== value) { out[key] = safe; changed = true; }
     }
     return changed ? out : data;
+}
+
+/** 스트림 스팬 속성값은 원시값이거나 `{ value, unit }` 객체다(RawAttributes) */
+function isAttributeObject(v: unknown): v is { value: unknown } {
+    return v !== null && typeof v === 'object' && !Array.isArray(v) && 'value' in v;
+}
+
+/**
+ * 스트림 스팬(`StreamedSpanJSON.attributes`)을 `scrubSpanData`와 같은 규칙으로 거른다.
+ *
+ * static 스팬의 `data`와 키 이름은 같지만, 값이 `{ value, unit }` 객체로 올 수 있다. 그 안의
+ * 문자열을 꺼내 거르고 같은 모양으로 되돌린다 — 객체째 넘기면 `typeof value === 'string'`
+ * 검사에 걸리지 않아 **원본이 그대로 나간다.**
+ *
+ * @returns 걸러낸 새 객체. 바꿀 것이 없으면 받은 객체를 그대로 돌려준다.
+ */
+export function scrubSpanAttributes(attributes: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+    if (!attributes) return attributes;
+    const flat: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(attributes)) {
+        flat[key] = isAttributeObject(value) ? value.value : value;
+    }
+    const scrubbed = scrubSpanData(flat);
+    if (!scrubbed || scrubbed === flat) return attributes;
+
+    const out: Record<string, unknown> = { ...attributes };
+    for (const [key, value] of Object.entries(scrubbed)) {
+        if (value === flat[key]) continue;
+        const original = attributes[key];
+        out[key] = isAttributeObject(original) ? { ...original, value } : value;
+    }
+    return out;
 }
