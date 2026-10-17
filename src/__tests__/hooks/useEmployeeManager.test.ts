@@ -15,6 +15,20 @@ vi.mock('../../lib/firebase', () => ({
     default: {},
 }));
 
+// 탈퇴 직원 재확인(recheckDeniedTarget)은 실물을 쓰고, 그 아래 Firestore 원시 읽기·쓰기만 바꿔 끼운다.
+const { mockGetDoc, mockUpdateDoc, mockCaptureError } = vi.hoisted(() => ({
+    mockGetDoc: vi.fn(),
+    mockUpdateDoc: vi.fn(),
+    mockCaptureError: vi.fn(),
+}));
+vi.mock('firebase/firestore', async (importOriginal) => ({
+    ...(await importOriginal<typeof import('firebase/firestore')>()),
+    doc: vi.fn((_db: unknown, ...path: string[]) => ({ path: path.join('/') })),
+    getDoc: mockGetDoc,
+    updateDoc: mockUpdateDoc,
+}));
+vi.mock('../../lib/sentry', () => ({ captureError: mockCaptureError }));
+
 vi.mock('../../hooks/useAuth', () => ({
     useAuth: () => ({
         user: { uid: 'admin1', displayName: '관리자' },
@@ -62,7 +76,10 @@ const mockRestoreUser = vi.fn().mockResolvedValue({});
 const mockAddPreRegisteredEmployee = vi.fn().mockResolvedValue({});
 const mockDeletePreRegisteredEmployee = vi.fn().mockResolvedValue({});
 
+const actualUsers = await vi.importActual<typeof import('../../lib/firestore/users')>('../../lib/firestore/users');
+
 vi.mock('../../lib/firestore', () => ({
+    recheckDeniedTarget: (...args: Parameters<typeof actualUsers.recheckDeniedTarget>) => actualUsers.recheckDeniedTarget(...args),
     getOrganizationMembers: (...args: unknown[]) => mockGetOrganizationMembers(...args),
     getOrganization: (...args: unknown[]) => mockGetOrganization(...args),
     updateUserRole: (...args: unknown[]) => mockUpdateUserRole(...args),
@@ -243,6 +260,8 @@ describe('useEmployeeManager', () => {
             mockCallable.mockRejectedValue(
                 Object.assign(new Error('다른 기관의 직원을 비활성화할 수 없습니다.'), { code: 'functions/permission-denied' })
             );
+            // 재확인 읽기에서 대상이 아직 같은 기관에 있다 — 낡은 행이 아니라 진짜 거부다
+            mockGetDoc.mockResolvedValue({ exists: () => true, get: () => 'org1' });
             const { result } = renderHook(() => useEmployeeManager());
             await waitFor(() => expect(result.current.loading).toBe(false));
 
@@ -252,6 +271,91 @@ describe('useEmployeeManager', () => {
             });
 
             expect(mockShowToast).toHaveBeenCalledWith('다른 기관의 직원을 비활성화할 수 없습니다.', 'error');
+        });
+    });
+
+    describe('본인이 기관을 나가 소속이 비워진 직원 행(문서는 남음) 처리', () => {
+        // 직원 본인의 '기관 나가기'는 users 문서를 지우지 않고 organizationId=null·role=employee로 비운다
+        // (clearUserOrganization). 그 뒤 관리자가 열어 둔 목록의 그 행에서 작업하면:
+        // - 클라이언트 쓰기는 Rules의 isOrgAdmin(resource.data.organizationId)이 실패해 permission-denied
+        // - 콜러블은 "다른 기관의 직원을 …할 수 없습니다"(functions/permission-denied)
+        // - 재확인 읽기도 "미소속 문서는 본인 외 열람 불가"로 permission-denied
+        const denied = () => Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' });
+        const STALE = '이미 탈퇴하거나 삭제된 직원입니다. 목록을 새로 고칩니다.';
+
+        beforeEach(() => {
+            mockGetDoc.mockRejectedValue(denied());
+            mockUpdateDoc.mockRejectedValue(denied());
+            // 화면이 부르는 updateUser·restoreUser를 실물로 돌려 데이터 계층의 보고까지 확인한다
+            mockUpdateUser.mockImplementation(actualUsers.updateUser);
+            mockRestoreUser.mockImplementation(actualUsers.restoreUser);
+        });
+
+        it('역할 변경·이름 수정·재활성화는 안내 후 목록을 새로 고치고 Sentry에 보고하지 않는다', async () => {
+            const { result } = renderHook(() => useEmployeeManager());
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            for (const run of [
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                () => result.current.handleChangeRole({ id: 'u1', name: '김직원', role: 'employee' } as any, 'admin'),
+                () => result.current.handleSaveEdit('u1'),
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                () => result.current.handleRestoreEmployee({ id: 'u9', name: '퇴사직원' } as any),
+            ]) {
+                mockShowToast.mockClear();
+                await act(async () => { await run(); });
+                expect(mockShowToast).toHaveBeenCalledWith(STALE, 'warning');
+                expect(mockShowToast).not.toHaveBeenCalledWith(expect.stringContaining('실패했습니다'), 'error');
+            }
+
+            await waitFor(() => expect(mockGetOrganizationMembers).toHaveBeenCalledTimes(4));
+            expect(mockCaptureError).not.toHaveBeenCalled();
+        });
+
+        it('비활성화·완전 삭제 콜러블의 "다른 기관의 직원" 거부도 같은 안내로 바꾼다', async () => {
+            mockConfirm.mockResolvedValueOnce(true).mockResolvedValueOnce('퇴사직원');
+            mockCallable.mockRejectedValue(
+                Object.assign(new Error('다른 기관의 직원을 비활성화할 수 없습니다.'), { code: 'functions/permission-denied' })
+            );
+            const { result } = renderHook(() => useEmployeeManager());
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            await act(async () => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                await result.current.handleDeleteEmployee({ id: 'u1', name: '김직원' } as any);
+            });
+            await act(async () => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                await result.current.handleDeletePermanently({ id: 'u9', name: '퇴사직원', status: 'disabled' } as any);
+            });
+
+            expect(mockShowToast.mock.calls.filter(([msg]) => msg === STALE)).toHaveLength(2);
+            expect(mockShowToast).not.toHaveBeenCalledWith('다른 기관의 직원을 비활성화할 수 없습니다.', 'error');
+            await waitFor(() => expect(mockGetOrganizationMembers).toHaveBeenCalledTimes(3));
+            expect(mockCaptureError).not.toHaveBeenCalled();
+        });
+
+        it('대상이 같은 기관에 그대로 있는데 거부되면 지금처럼 보고한다', async () => {
+            // 예: 관리자 본인이 그 사이 직원으로 강등됨 — 대상은 읽히지만 쓰기는 거부된다
+            mockGetDoc.mockResolvedValue({ exists: () => true, get: () => 'org1' });
+            const { result } = renderHook(() => useEmployeeManager());
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            await act(async () => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                await result.current.handleChangeRole({ id: 'u1', name: '김직원', role: 'employee' } as any, 'admin');
+            });
+
+            expect(mockShowToast).toHaveBeenCalledWith('역할 변경에 실패했습니다.', 'error');
+            expect(mockShowToast).not.toHaveBeenCalledWith(STALE, 'warning');
+            expect(mockCaptureError).toHaveBeenCalledWith(
+                expect.objectContaining({ code: 'permission-denied' }),
+                expect.objectContaining({ context: 'updateUser' }),
+            );
+            expect(mockCaptureError).toHaveBeenCalledWith(
+                expect.objectContaining({ code: 'permission-denied' }),
+                expect.objectContaining({ context: 'useRetry' }),
+            );
         });
     });
 });

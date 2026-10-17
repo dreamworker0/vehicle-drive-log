@@ -43,13 +43,19 @@ import * as fs from 'firebase/firestore';
 import { captureError } from '../../../lib/sentry';
 import {
     getUser, createUser, updateUser, leaveOrganization,
-    restoreUser, clearUserOrganization,
+    restoreUser, clearUserOrganization, recheckDeniedTarget,
     getOrganizationMembers, getOrganizationAdmins, getOrgMemberCounts,
 } from '../../../lib/firestore/users';
 
 // 스냅샷 스텁 헬퍼
 const docsSnap = (rows: unknown[]) => ({ docs: rows.map(r => ({ data: () => r })) });
-const getDocSnap = (data: unknown | null) => ({ exists: () => data !== null, data: () => data });
+const getDocSnap = (data: unknown | null) => ({
+    exists: () => data !== null,
+    data: () => data,
+    get: (field: string) => (data as Record<string, unknown> | null)?.[field],
+});
+// 쓰기·읽기 거부(Rules) 오류
+const denied = () => Object.assign(new Error('Missing or insufficient permissions.'), { code: 'permission-denied' });
 
 describe('firestore/users', () => {
     beforeEach(() => {
@@ -129,12 +135,28 @@ describe('firestore/users', () => {
             expect(captureError).not.toHaveBeenCalled();
         });
 
-        it('그 외 실패는 예전처럼 captureError로 보고한다', async () => {
+        it('대상이 같은 기관에 그대로 있는데 거부되면 예전처럼 captureError로 보고한다', async () => {
             const err = Object.assign(new Error('denied'), { code: 'permission-denied' });
             vi.mocked(fs.updateDoc).mockRejectedValue(err as never);
+            // 재확인 읽기는 성공한다 — 대상이 아직 기관에 있다는 뜻이라 진짜 권한 문제다
+            vi.mocked(fs.getDoc).mockResolvedValue(getDocSnap({ organizationId: 'org1' }) as never);
 
-            await expect(updateUser('u1', { name: '새이름' })).rejects.toThrow('denied');
-            expect(captureError).toHaveBeenCalled();
+            await expect(updateUser('u1', { name: '새이름' })).rejects.toBe(err);
+            expect(captureError).toHaveBeenCalledWith(err, expect.objectContaining({ context: 'updateUser' }));
+        });
+
+        it('본인이 기관을 나가 소속이 비워진 직원이면(permission-denied) not-found로 바꿔 던지고 보고하지 않는다', async () => {
+            // 탈퇴(clearUserOrganization) 후에도 문서는 남는다 — 관리자의 쓰기는 isOrgAdmin(null)로,
+            // 재확인 읽기는 "미소속 문서는 본인 외 열람 불가"로 둘 다 거부된다.
+            const writeErr = denied();
+            vi.mocked(fs.updateDoc).mockRejectedValue(writeErr as never);
+            vi.mocked(fs.getDoc).mockRejectedValue(denied() as never);
+
+            const thrown = await updateUser('u1', { role: 'admin' }).catch((e: unknown) => e);
+
+            expect(thrown).toMatchObject({ code: 'not-found', cause: writeErr });
+            expect(fs.doc).toHaveBeenCalledWith(expect.anything(), 'users', 'u1');
+            expect(captureError).not.toHaveBeenCalled();
         });
     });
 
@@ -166,6 +188,54 @@ describe('firestore/users', () => {
             vi.mocked(fs.updateDoc).mockRejectedValue(err as never);
 
             await expect(restoreUser('u1')).rejects.toThrow('No document to update');
+            expect(captureError).not.toHaveBeenCalled();
+        });
+
+        it('소속이 비워진 직원이면(permission-denied) not-found로 바꿔 던지고 보고하지 않는다', async () => {
+            vi.mocked(fs.updateDoc).mockRejectedValue(denied() as never);
+            vi.mocked(fs.getDoc).mockRejectedValue(denied() as never);
+
+            await expect(restoreUser('u1')).rejects.toMatchObject({ code: 'not-found' });
+            expect(captureError).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('recheckDeniedTarget', () => {
+        it('permission-denied가 아니면 읽지 않고 원래 오류를 돌려준다', async () => {
+            const err = Object.assign(new Error('offline'), { code: 'unavailable' });
+
+            expect(await recheckDeniedTarget(err, 'u1', 'org1')).toBe(err);
+            expect(fs.getDoc).not.toHaveBeenCalled();
+        });
+
+        it('콜러블의 functions/permission-denied도 재확인한다', async () => {
+            const err = Object.assign(new Error('다른 기관의 직원을 비활성화할 수 없습니다.'), { code: 'functions/permission-denied' });
+            vi.mocked(fs.getDoc).mockRejectedValue(denied() as never);
+
+            expect(await recheckDeniedTarget(err, 'u1', 'org1')).toMatchObject({ code: 'not-found', cause: err });
+        });
+
+        it('읽혔는데 문서가 없거나 소속이 다르면 빠진 것으로 본다', async () => {
+            const err = denied();
+            vi.mocked(fs.getDoc).mockResolvedValueOnce(getDocSnap(null) as never);
+            expect(await recheckDeniedTarget(err, 'u1', 'org1')).toMatchObject({ code: 'not-found' });
+
+            vi.mocked(fs.getDoc).mockResolvedValueOnce(getDocSnap({ organizationId: null }) as never);
+            expect(await recheckDeniedTarget(err, 'u1', 'org1')).toMatchObject({ code: 'not-found' });
+        });
+
+        it('같은 기관에 그대로 있으면 원래 오류를 돌려준다', async () => {
+            const err = denied();
+            vi.mocked(fs.getDoc).mockResolvedValue(getDocSnap({ organizationId: 'org1' }) as never);
+
+            expect(await recheckDeniedTarget(err, 'u1', 'org1')).toBe(err);
+        });
+
+        it('재확인 읽기가 다른 이유로 실패하면 판단하지 않고 원래 오류를 돌려준다', async () => {
+            const err = denied();
+            vi.mocked(fs.getDoc).mockRejectedValue(Object.assign(new Error('offline'), { code: 'unavailable' }) as never);
+
+            expect(await recheckDeniedTarget(err, 'u1', 'org1')).toBe(err);
             expect(captureError).not.toHaveBeenCalled();
         });
     });
