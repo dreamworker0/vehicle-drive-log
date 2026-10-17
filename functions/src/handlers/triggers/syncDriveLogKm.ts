@@ -239,6 +239,32 @@ export async function syncNextLogStartKm(
 }
 
 /**
+ * 차량 누적 km(currentKm)를 쓰되, **차량이 운행일지의 기관 소속일 때만** 쓴다.
+ *
+ * Rules는 운행일지 생성 때 vehicleId가 자기 기관 차량인지 보지 않고, 기관관리자는 수정 때
+ * vehicleId를 바꿀 수도 있다. 여기서 거르지 않으면 다른 기관 차량의 문서 ID만 알아도 자기 기관
+ * 일지를 그 ID로 만든 뒤 수정·삭제해서 그 차량의 currentKm을 늘리거나 줄이거나 덮어쓸 수 있다
+ * (교차 테넌트 오염 — 2026-07-04 감사 N3, 2026-10 규칙 감사에서 수정·삭제 경로 누락 확인).
+ * 생성·수정·삭제·연쇄 보정이 모두 이 함수를 지나야 한 경로만 빠지는 일이 없다.
+ *
+ * 차량이 없거나 기관이 다르면 경고만 남기고 건너뛴다.
+ */
+async function updateOwnedVehicleCurrentKm(
+    context: string,
+    orgId: string,
+    vehId: string,
+    currentKm: number | FieldValue,
+): Promise<void> {
+    const vehRef = db.collection("vehicles").doc(vehId);
+    const vehSnap = await vehRef.get();
+    if (!vehSnap.exists || vehSnap.data()?.organizationId !== orgId) {
+        console.warn(`[${context}] 차량 org 불일치 — currentKm 갱신 건너뜀: veh=${vehId}, org=${orgId}`);
+        return;
+    }
+    await vehRef.update({ currentKm });
+}
+
+/**
  * 연쇄 재정합이 차량의 최신 기록까지 이동시켰다면 차량 누적 km(currentKm)도 같은 폭으로 보정한다.
  *
  * 이전에는 마지막 문서의 update 트리거가 "최신 기록 수정"으로 판정해 우연히 증분해줬다.
@@ -247,16 +273,7 @@ export async function syncNextLogStartKm(
 async function applyChainCurrentKm(orgId: string, vehicleId: string, chain: KmChainResult): Promise<void> {
     if (!chain.reachedEnd || chain.lastEndKmDelta === 0) return;
 
-    // 차량이 운행일지의 기관 소속인지 검증 후 갱신 (교차 테넌트 currentKm 오염 차단)
-    const vehSnap = await db.collection('vehicles').doc(vehicleId).get();
-    if (!vehSnap.exists || vehSnap.data()?.organizationId !== orgId) {
-        console.warn(`[applyChainCurrentKm] 차량 org 불일치 — currentKm 보정 건너뜀: veh=${vehicleId}, org=${orgId}`);
-        return;
-    }
-
-    await db.collection('vehicles').doc(vehicleId).update({
-        currentKm: FieldValue.increment(chain.lastEndKmDelta),
-    });
+    await updateOwnedVehicleCurrentKm('applyChainCurrentKm', orgId, vehicleId, FieldValue.increment(chain.lastEndKmDelta));
 }
 
 /**
@@ -611,15 +628,7 @@ export const onDriveLogCreated = onDocumentCreated(
                 }
 
                 if (distanceToAdd > 0) {
-                    // 차량이 운행일지의 기관 소속인지 검증 후 갱신 (교차 테넌트 currentKm 오염 차단 — 2026-07-04 감사 N3)
-                    const vehSnap = await db.collection("vehicles").doc(vehId).get();
-                    if (vehSnap.exists && vehSnap.data()?.organizationId === orgId) {
-                        await db.collection("vehicles").doc(vehId).update({
-                            currentKm: FieldValue.increment(distanceToAdd),
-                        });
-                    } else {
-                        console.warn(`[onDriveLogCreated] 차량 org 불일치 — currentKm 갱신 건너뜀: veh=${vehId}, org=${orgId}`);
-                    }
+                    await updateOwnedVehicleCurrentKm('onDriveLogCreated', orgId, vehId, FieldValue.increment(distanceToAdd));
                 }
             }
 
@@ -767,15 +776,11 @@ export const onDriveLogUpdated = onDocumentUpdated(
                     if (oldData.endKm !== undefined) {
                         const distanceDiff = data.endKm - oldData.endKm;
                         if (distanceDiff !== 0) {
-                            await db.collection("vehicles").doc(vehId).update({
-                                currentKm: FieldValue.increment(distanceDiff),
-                            });
+                            await updateOwnedVehicleCurrentKm('onDriveLogUpdated', orgId, vehId, FieldValue.increment(distanceDiff));
                         }
                     } else {
                         // 기존 값이 없었다면 안전하게 절대값으로 갱신
-                        await db.collection("vehicles").doc(vehId).update({
-                            currentKm: data.endKm,
-                        });
+                        await updateOwnedVehicleCurrentKm('onDriveLogUpdated', orgId, vehId, data.endKm);
                     }
                 }
 
@@ -860,9 +865,7 @@ export const onDriveLogDeleted = onDocumentDeleted(
                 }
 
                 if (distanceToSubtract > 0) {
-                    await db.collection("vehicles").doc(vehId).update({
-                        currentKm: FieldValue.increment(-distanceToSubtract),
-                    });
+                    await updateOwnedVehicleCurrentKm('onDriveLogDeleted', orgId, vehId, FieldValue.increment(-distanceToSubtract));
                 }
             } else {
                 // 소급(중간) 기록이 삭제된 경우: 
