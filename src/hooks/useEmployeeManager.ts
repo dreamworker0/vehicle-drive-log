@@ -7,7 +7,7 @@ import { useAuth } from './useAuth';
 import { useToast } from './useToast';
 import { useConfirm } from './useConfirm';
 import useRetry from './useRetry';
-import { getOrganizationMembers, getOrganization, regenerateInviteCode, updateUser, restoreUser, getPreRegisteredEmployees, addPreRegisteredEmployee, deletePreRegisteredEmployee } from '../lib/firestore';
+import { getOrganizationMembers, getOrganization, regenerateInviteCode, updateUser, restoreUser, getPreRegisteredEmployees, addPreRegisteredEmployee, deletePreRegisteredEmployee, recheckDeniedTarget } from '../lib/firestore';
 import { invalidateCache } from '../lib/firestore/cache';
 import type { User, UserRole, MemberStatus, UnifiedMember } from '../types/user';
 import type { Organization } from '../types/organization';
@@ -15,12 +15,14 @@ import { captureError } from '../lib/sentry';
 import { APP_URL } from '../lib/constants';
 
 /**
- * 콜러블이 "대상 사용자 문서가 없다"고 거부한 경우인지 판별한다.
+ * 대상 사용자가 이미 기관에 없어서 거부된 경우인지 판별한다.
  *
  * 직원 목록은 마운트 시 한 번만 읽어 오므로(실시간 구독이 아니다), 화면을 열어 둔 사이에
- * 직원이 스스로 기관을 탈퇴하거나(users 문서 삭제) 다른 관리자가 계정을 지우면 **이미 사라진
- * 계정의 행이 남는다.** 그 행에서 비활성화·완전 삭제를 누르면 서버가 규칙대로 not-found로
- * 거부한다 — 코드 결함이 아니라 목록이 낡았다는 신호다.
+ * 직원이 스스로 기관을 탈퇴하거나(소속 비움) 다른 관리자·슈퍼관리자가 계정을 지우면(문서 삭제)
+ * **이미 빠진 계정의 행이 남는다.** 그 행의 작업은 서버가 규칙대로 거부한다 — 코드 결함이 아니라
+ * 목록이 낡았다는 신호다. 문서가 지워졌으면 not-found로 오고, 문서가 남아 소속만 비워졌으면
+ * permission-denied로 오는데 후자는 recheckDeniedTarget이 대상을 다시 읽어 not-found로 바꿔 온다
+ * (updateUser·restoreUser는 데이터 계층에서, 콜러블은 아래 callTargetCallable에서).
  *
  * 메시지가 아니라 **코드로 판별한다.** 같은 한국어 문구를 sendAdminNotice는
  * permission-denied(호출자 문서 없음)로도 던지는데, 그건 성격이 다른 실패라 함께 묶으면
@@ -142,6 +144,7 @@ export default function useEmployeeManager() {
      *
      * 안내 문구를 띄우고 목록을 다시 읽어 유령 행을 걷어낸다. Sentry 보고도 생략한다 —
      * 서버가 규칙대로 거부한 예상된 결과이지 코드 결함이 아니다(isTargetUserMissing 주석 참고).
+     * 대상이 같은 기관에 그대로 있는데 거부된 permission-denied는 여기 걸리지 않고 지금처럼 보고된다.
      *
      * @param onOtherError not-found가 아닌 실패의 처리. 직접 처리했으면 true를 반환한다.
      */
@@ -156,6 +159,21 @@ export default function useEmployeeManager() {
             return onOtherError?.(err);
         },
     });
+
+    /**
+     * 대상 직원에 대한 콜러블을 호출한다. permission-denied면 대상을 다시 읽어, 이미 기관에서
+     * 빠진 경우 not-found로 바꿔 던진다 — 서버는 이 경우 "다른 기관의 직원을 …할 수 없습니다"로
+     * 거부하는데, 열어 둔 목록 입장에서는 탈퇴한 직원이라 그 문구가 오해를 부른다.
+     */
+    const callTargetCallable = async (name: 'disableUser' | 'deleteUserPermanently', uid: string) => {
+        const { getFunctions, httpsCallable } = await import('firebase/functions');
+        const functions = getFunctions(undefined, 'asia-northeast3');
+        try {
+            await httpsCallable(functions, name)({ uid });
+        } catch (err) {
+            throw await recheckDeniedTarget(err, uid, orgId);
+        }
+    };
 
     /**
      * 콜러블이 규칙대로 거부한 사유(다른 기관 직원·상위 권한 계정 등)는 서버 문구가 가장
@@ -191,10 +209,7 @@ export default function useEmployeeManager() {
         if (!await confirm({ message: `${emp.name || emp.email} 직원을 비활성화하시겠습니까?\n\n비활성 직원은 앱 이용이 차단됩니다.`, confirmColor: 'danger' })) return;
         
         await runWithRetry(`disable-emp-${emp.id}`, async () => {
-            const { getFunctions, httpsCallable } = await import('firebase/functions');
-            const functions = getFunctions(undefined, 'asia-northeast3');
-            const callable = httpsCallable(functions, 'disableUser');
-            await callable({ uid: emp.id });
+            await callTargetCallable('disableUser', emp.id);
             showToast('직원이 비활성화되었습니다.', 'success');
             await fetchData();
         }, {
@@ -227,10 +242,7 @@ export default function useEmployeeManager() {
         }
 
         await runWithRetry(`hard-delete-emp-${emp.id}`, async () => {
-            const { getFunctions, httpsCallable } = await import('firebase/functions');
-            const functions = getFunctions(undefined, 'asia-northeast3');
-            const callable = httpsCallable(functions, 'deleteUserPermanently');
-            await callable({ uid: emp.id });
+            await callTargetCallable('deleteUserPermanently', emp.id);
             showToast('직원 계정이 완전히 삭제되었습니다.', 'success');
             await fetchData();
         }, {

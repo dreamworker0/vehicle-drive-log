@@ -16,11 +16,59 @@ import { cachedQuery, invalidateCache } from './cache';
 const userConverter = createZodConverter(userSchema);
 
 /**
+ * 쓰기가 permission-denied로 거부됐을 때, 대상이 **이미 내 기관에서 빠졌는지** 다시 읽어 확인한다.
+ *
+ * 본인이 기관을 나가면 users 문서가 지워지거나 소속이 비워진다(organizationId=null). 관리자
+ * 화면의 목록은 한 번 읽어 온 스냅샷이라 그 행이 남는데, 문서가 남아 있으면 그 행의 쓰기는
+ * not-found가 아니라 permission-denied로 온다 — Rules의 isOrgAdmin(resource.data.organizationId)이
+ * 실패하기 때문이다. 콜러블(disableUser·deleteUserPermanently)도 같은 경우 "다른 기관의 직원을
+ * …할 수 없습니다"(permission-denied)로 거부한다.
+ *
+ * 그래서 거부의 원인이 "대상이 빠졌다"인지 문서를 다시 읽어 가린다.
+ * - 읽기도 거부되면 빠진 것이다. Rules는 같은 기관 멤버의 문서만 읽게 하므로(미소속 문서는
+ *   본인 외 열람 불가) 문서가 없거나·미소속이거나·다른 기관이면 모두 여기로 온다.
+ * - 읽혔는데 문서가 없거나 소속이 `orgId`와 다르면 빠진 것이다(superAdmin 등 읽기 권한이 넓은 경우).
+ * - 읽혔고 소속이 같으면 진짜 권한 문제다 — 원래 오류를 그대로 돌려준다.
+ * - 재확인 자체가 실패하면(네트워크 등) 판단하지 않고 원래 오류를 돌려준다. 재확인 실패는
+ *   보고하지 않는다 — 원래 오류가 호출부의 보고 경로로 올라간다.
+ *
+ * 한계: 관리자 **본인의** 소속 클레임이 바뀐 상태(본인이 기관을 나감)에서도 읽기가 거부되어
+ * "대상이 빠졌다"로 판정된다. 그 경우는 본인 문서 구독이 화면을 초대 코드 화면으로 넘기므로
+ * 안내 문구가 잘못 뜨는 순간이 짧고, 보고할 결함도 아니다.
+ *
+ * @param orgId 기대하는 소속. 생략하면 "읽기 거부·문서 없음"만으로 판정한다.
+ * @returns 대상이 빠졌으면 code가 'not-found'인 오류(원래 오류는 cause), 아니면 원래 오류.
+ *   code를 not-found로 맞추는 이유: 관리자에게는 "문서가 없다"와 "내 기관에 없다"가 구별되지
+ *   않으며(Rules상 둘 다 읽기 거부), 화면·보고 경로가 이미 not-found를 낡은 목록 신호로 다룬다.
+ */
+export const recheckDeniedTarget = async (error: unknown, uid: string, orgId?: string | null): Promise<unknown> => {
+    const code = (error as { code?: unknown })?.code;
+    if (code !== 'permission-denied' && code !== 'functions/permission-denied') return error;
+
+    let gone: boolean;
+    try {
+        const snap = await getDoc(doc(db, 'users', uid));
+        gone = !snap.exists() || (orgId != null && snap.get('organizationId') !== orgId);
+    } catch (readError) {
+        if ((readError as { code?: unknown })?.code === 'permission-denied') {
+            gone = true;
+        } else {
+            console.warn('[recheckDeniedTarget] 대상 재확인 실패 — 원래 오류로 처리합니다.', readError);
+            return error;
+        }
+    }
+    if (!gone) return error;
+    return Object.assign(new Error('대상 사용자가 이미 기관에 없습니다.'), { code: 'not-found', cause: error });
+};
+
+/**
  * 갱신 실패를 보고한다 — 단, **대상 문서가 이미 없는 경우(not-found)는 제외**한다.
  *
- * users 문서는 슈퍼관리자가 멤버를 제거하면 삭제된다(leaveOrganization). 관리자·슈퍼관리자 화면의
- * 목록은 한 번 읽어 온 스냅샷이라, 그 사이 사라진 계정의 행이 남고 거기서 수정·역할 변경·
- * 재활성화를 누르면 not-found가 온다. **화면이 판단해 안내할 상태이지 코드 결함이 아니다.**
+ * 관리자·슈퍼관리자 화면의 목록은 한 번 읽어 온 스냅샷이라, 그 사이 본인이 기관을 나가거나
+ * (소속 비움 — clearUserOrganization) 슈퍼관리자가 멤버를 제거한(문서 삭제 — leaveOrganization)
+ * 계정의 행이 남고, 거기서 수정·역할 변경·재활성화를 누르면 not-found가 온다
+ * (문서가 남은 경우의 permission-denied는 recheckDeniedTarget이 not-found로 바꿔 온다).
+ * **화면이 판단해 안내할 상태이지 코드 결함이 아니다.**
  *
  * 코드가 잘못된 id를 넘긴 경우도 같은 코드로 오지만, 그 실패는 화면에서 매번 재현되고
  * 여기서 삼켜도 콘솔 경고와 호출부의 보고 경로(useRetry의 기본 동작)에 그대로 남는다.
@@ -86,8 +134,9 @@ export const updateUser = async (uid: string, data: Partial<User>) => {
         await updateDoc(doc(db, 'users', uid), { ...data, ...actorStamp() });
         invalidateCache('members');
     } catch (error) {
-        reportUnlessMissing(error, { context: 'updateUser', uid, data });
-        throw error;
+        const resolved = await recheckDeniedTarget(error, uid);
+        reportUnlessMissing(resolved, { context: 'updateUser', uid, data });
+        throw resolved;
     }
 };
 
@@ -161,8 +210,9 @@ export const restoreUser = async (uid: string): Promise<void> => {
         await updateDoc(doc(db, 'users', uid), { status: 'active', disabledAt: null, ...actorStamp() });
         invalidateCache('members');
     } catch (error) {
-        reportUnlessMissing(error, { context: 'restoreUser', uid });
-        throw error;
+        const resolved = await recheckDeniedTarget(error, uid);
+        reportUnlessMissing(resolved, { context: 'restoreUser', uid });
+        throw resolved;
     }
 };
 
