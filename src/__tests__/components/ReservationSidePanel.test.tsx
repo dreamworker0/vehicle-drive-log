@@ -424,25 +424,32 @@ describe('외부 대여', () => {
     const loanToggle = () => screen.queryByRole('switch', { name: '외부 대여' });
     const members = [{ id: 'u1', name: '홍길동', role: 'admin' }] as never;
 
-    it('관리자의 새 예약에만 보인다', () => {
-        setup({ isAdmin: true });
+    it('기관이 켠 경우 관리자의 새 예약에 보인다', () => {
+        setup({ isAdmin: true, externalLoanEnabled: true });
         expect(loanToggle()).not.toBeNull();
     });
 
+    // 2026-10-17 — 차를 빌려주는 기관은 드물어 설정 › 기능 사용의 opt-in으로 옮겼다
+    it('기관이 켜지 않았으면 관리자에게도 보이지 않는다', () => {
+        setup({ isAdmin: true });
+        expect(loanToggle()).toBeNull();
+    });
+
     it('직원에게는 보이지 않는다', () => {
-        setup({ isAdmin: false });
+        setup({ isAdmin: false, externalLoanEnabled: true });
         expect(loanToggle()).toBeNull();
     });
 
     it('일반 예약을 수정할 때는 보이지 않는다 — 대여로 바꾸려면 새로 등록한다', () => {
-        setup({ isAdmin: true, editingReservation: reservation() });
+        setup({ isAdmin: true, externalLoanEnabled: true, editingReservation: reservation() });
         expect(loanToggle()).toBeNull();
     });
 
-    it('대여를 수정할 때는 켜진 채로 잠기고, 예약자 선택을 숨긴다', () => {
+    it('대여를 수정할 때는 켜진 채로 잠기고, 예약자 선택을 숨긴다 — 기능을 꺼도 기존 대여는 고칠 수 있다', () => {
         const loan = { borrowerOrg: '동산 사회복지관', driverName: '홍길동' };
         setup({
             isAdmin: true,
+            externalLoanEnabled: false,
             members,
             editingReservation: reservation({ reservedByUid: '', externalLoan: loan }),
             form: { ...baseForm, externalLoan: loan },
@@ -455,7 +462,7 @@ describe('외부 대여', () => {
 
     it('켜면 대여 칸을 열고 반복 설정을 지운다', () => {
         const setForm = vi.fn();
-        setup({ isAdmin: true, setForm, form: { ...baseForm, isRecurring: true, recurringDays: [1] } });
+        setup({ isAdmin: true, externalLoanEnabled: true, setForm, form: { ...baseForm, isRecurring: true, recurringDays: [1] } });
 
         fireEvent.click(loanToggle()!);
 

@@ -101,6 +101,7 @@ export default function Settings() {
                     passengerAllowCount: form.passengerAllowCount,
                     reservationPassengerEnabled: form.reservationPassengerEnabled,
                     refuelFlagEnabled: form.refuelFlagEnabled,
+                    externalLoanEnabled: form.externalLoanEnabled,
                     driverAllowList: form.driverAllowList,
                     driverAllowSearch: form.driverAllowSearch,
                 }}

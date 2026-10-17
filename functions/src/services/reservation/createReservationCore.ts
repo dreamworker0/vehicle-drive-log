@@ -295,6 +295,16 @@ export async function createReservationTx(
             const orgSnap = await transaction.get(orgRef);
             const requireReservationApproval = orgSnap.exists ? (orgSnap.data()?.requireReservationApproval || false) : false;
 
+            // 외부 대여는 기관이 켠 경우에만 새로 등록한다(opt-in, 화면의 orgFeatures.externalLoan과 같은
+            // 기준). 화면만 숨기면 설정을 바꾸기 전에 열어 둔 탭에서는 여전히 등록된다.
+            // 이미 등록된 대여의 수정·반납은 막지 않는다(updateReservationCore는 이 값을 보지 않는다).
+            if (externalLoan && orgSnap.data()?.externalLoanEnabled !== true) {
+                throw new HttpsError(
+                    "failed-precondition",
+                    "외부 대여를 쓰려면 설정 › 기능 사용에서 '외부 대여'를 켜 주세요."
+                );
+            }
+
             // 승인제 기관이 '바로 운행은 승인 없이 허용'을 끄면 직원의 바로 운행을 거절한다.
             // 승인 대기로 바꾸지 않는 이유: 바로 운행은 지금 출발이라 기다리면 의미가 없다.
             // 기관 관리자는 승인권자라 막지 않는다(화면의 canUseQuickDrive와 같은 기준).

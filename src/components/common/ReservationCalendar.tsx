@@ -142,6 +142,7 @@ export default function ReservationCalendar({ isAdmin = false }: Props) {
                         onFetchFreeRoad={handleFetchFreeRoad}
                         user={user!}
                         isAdmin={isAdmin}
+                        externalLoanEnabled={orgFeatures.externalLoan}
                         members={members}
                         getCurrentTimeStr={getCurrentTimeStr}
                         getMinStartTime={getMinStartTime}

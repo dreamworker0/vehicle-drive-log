@@ -27,6 +27,8 @@ export interface FeatureToggleValues {
     reservationPassengerEnabled: boolean;
     /** 주유(충전) 필요 표시(기본 꺼짐) */
     refuelFlagEnabled: boolean;
+    /** 외부 대여 등록(기본 꺼짐) */
+    externalLoanEnabled: boolean;
     driverAllowList: boolean;
     driverAllowSearch: boolean;
 }
@@ -36,10 +38,11 @@ interface FeatureToggleSectionProps {
     onChange: (patch: Partial<FeatureToggleValues>) => void;
 }
 
-type FeatureKey = 'requireReservationApproval' | 'hipassEnabled' | 'maintenanceEnabled' | 'refuelFlagEnabled' | 'allowedUsersEnabled' | 'googleCalendarEnabled' | 'driverSelectionEnabled' | 'coDriverEnabled' | 'passengerEnabled';
+type FeatureKey = 'requireReservationApproval' | 'externalLoanEnabled' | 'hipassEnabled' | 'maintenanceEnabled' | 'refuelFlagEnabled' | 'allowedUsersEnabled' | 'googleCalendarEnabled' | 'driverSelectionEnabled' | 'coDriverEnabled' | 'passengerEnabled';
 
 const FEATURE_META: Record<FeatureKey, { label: string; desc: string }> = {
     requireReservationApproval: { label: '예약 관리자 승인', desc: '켜면 직원 차량 예약이 즉시 확정되지 않고 관리자 승인을 거칩니다.' },
+    externalLoanEnabled: { label: '외부 대여', desc: '이 앱을 쓰지 않는 기관에 차를 빌려줄 때 켜세요. 관리자의 차량 예약 화면에 \'외부 대여\' 등록이 생기고, 그 기간에는 직원이 예약할 수 없어요. 꺼도 이미 등록한 대여의 반납 처리는 할 수 있습니다. (기본 꺼짐)' },
     hipassEnabled: { label: '하이패스', desc: '끄면 운행일지 하이패스 입력과 차량관리 하이패스 탭, 관리자 하이패스 관리 메뉴가 숨겨집니다.' },
     maintenanceEnabled: { label: '수리·정비', desc: '끄면 차량관리 수리·정비 탭과 관리자 정비 기록 메뉴가 숨겨집니다.' },
     refuelFlagEnabled: { label: '주유·충전 필요 표시', desc: '운행일지에 "주유(충전) 필요" 체크를 추가하고, 표시된 차량은 예약할 때 안내가 뜹니다. 주유일지를 쓰면 자동으로 꺼지고, 관리자가 차량 관리에서 직접 끌 수도 있습니다. (기본 꺼짐)' },
@@ -139,6 +142,8 @@ export default function FeatureToggleSection({ values, onChange }: FeatureToggle
             <div className="mb-5">
                 <GroupTitle>🗓️ 차량 예약</GroupTitle>
                 <div className="divide-y divide-surface-100 dark:divide-surface-700">
+                    {/* 승인을 **맨 아래**에 둔다 — 아래 [바로 운행] 하위 설정이 목록 뒤에 붙어 승인에만 걸린다(차량 관리의 수리·정비와 같은 이유) */}
+                    {feature('externalLoanEnabled')}
                     {feature('requireReservationApproval')}
                 </div>
                 {values.requireReservationApproval && (

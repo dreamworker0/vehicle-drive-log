@@ -32,6 +32,7 @@ function baseForm(sites: OrgSite[]): SettingsForm {
         passengerAllowCount: true,
         reservationPassengerEnabled: false,
         refuelFlagEnabled: false,
+        externalLoanEnabled: false,
         driverAllowList: true,
         driverAllowSearch: true,
         sites,

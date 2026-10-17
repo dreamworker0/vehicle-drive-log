@@ -49,6 +49,8 @@ interface Props {
     onFetchFreeRoad?: () => void;
     user: { uid?: string; id?: string } | null;
     isAdmin?: boolean;
+    /** 기관이 외부 대여를 켰는가(설정 › 기능 사용). 수정 중인 기존 대여는 이 값과 무관하게 보인다 */
+    externalLoanEnabled?: boolean;
     members?: UserDoc[];
     getCurrentTimeStr: () => string;
     getMinStartTime: () => string;
@@ -108,6 +110,7 @@ export default function ReservationSidePanel({
     onFetchFreeRoad,
     user,
     isAdmin = false,
+    externalLoanEnabled = false,
     members = [],
     getCurrentTimeStr,
     onSubmit,
@@ -246,7 +249,7 @@ export default function ReservationSidePanel({
                             destinationRef={destinationRef}
                         />
                         {/* 외부 대여 — 관리자 전용. 일반 예약을 수정할 때는 보이지 않는다(대여로 바꾸려면 새로 등록) */}
-                        {isAdmin && (!editingReservation || editingReservation.externalLoan) && (
+                        {isAdmin && (editingReservation ? Boolean(editingReservation.externalLoan) : externalLoanEnabled) && (
                             <ExternalLoanFields form={form} setForm={setForm} locked={Boolean(editingReservation)} />
                         )}
                         {/* 관리자 모드: 예약자 선택 드롭다운 — 외부 대여는 명의자가 없어 숨긴다 */}
