@@ -16,20 +16,23 @@ async function loadSentry() {
     const captureException = vi.fn();
     const captureMessage = vi.fn();
     const setUser = vi.fn();
+    const setAttributes = vi.fn();
+    const removeAttribute = vi.fn().mockReturnThis();
     vi.doMock('../../lib/sentryClient', () => ({
-        withStaticSpan,
+        withStreamedSpan,
         init,
         setUser,
         setTag: vi.fn(),
         captureException,
         captureMessage,
-        setMeasurement: vi.fn(),
+        setAttributes,
+        getIsolationScope: () => ({ removeAttribute }),
         browserTracingIntegration: vi.fn(() => ({ name: 'BrowserTracing' })),
     }));
     const mod = await import('../../lib/sentry');
     mod.initSentry();
     await vi.waitFor(() => expect(init).toHaveBeenCalled());
-    return { mod, init, captureException, captureMessage, setUser };
+    return { mod, init, captureException, captureMessage, setUser, setAttributes, removeAttribute };
 }
 
 /** init에 등록된 beforeBreadcrumb을 꺼낸다 — 순수 함수가 아니라 **배선**을 본다. */
@@ -47,14 +50,14 @@ async function loadBreadcrumbHook() {
  * (2026-10-14 워커 100% + 커버리지 실측 — 단독 2.9초 통과). 변환 결과는 resetModules 뒤에도 남는다.
  * SDK(sentryClient)는 각 테스트가 doMock으로 바꾸므로 여기서 불러오지 않는다.
  *
- * withStaticSpan만은 **진짜**를 쓴다 — 콜백에 표식을 다는 것이 계약이라, 가짜로 바꾸면
+ * withStreamedSpan만은 **진짜**를 쓴다 — 콜백 모양을 SDK가 판정하는 것이 계약이라, 가짜로 바꾸면
  * traceLifecycle과 짝이 맞는지(아래 테스트)를 확인할 수 없다. 패키지 로드가 무거워(첫 회 ~12초)
  * 테스트 안이 아니라 여기서 한 번 받는다.
  */
-let withStaticSpan: typeof import('@sentry/react').withStaticSpan;
+let withStreamedSpan: typeof import('@sentry/react').withStreamedSpan;
 beforeAll(async () => {
     await import('../../lib/sentry');
-    ({ withStaticSpan } = await vi.importActual<typeof import('@sentry/react')>('@sentry/react'));
+    ({ withStreamedSpan } = await vi.importActual<typeof import('@sentry/react')>('@sentry/react'));
 }, 60_000);
 
 describe('captureError / captureWarning — 개인정보 스크러빙 배선', () => {
@@ -232,15 +235,15 @@ describe('captureError / captureWarning — 개인정보 스크러빙 배선', (
         };
 
         const out = options.beforeSendSpan({
-            description: 'GET /api/tmap',
-            data: { url: '/api/tmap?action=poi&keyword=김OO 어르신 댁', 'http.query': '?keyword=김OO', 'http.method': 'GET' },
+            name: 'GET /api/tmap',
+            attributes: { url: '/api/tmap?action=poi&keyword=김OO 어르신 댁', 'http.query': '?keyword=김OO', 'http.method': 'GET' },
         });
 
-        const data = out.data as Record<string, string>;
-        expect(data.url).not.toContain('김OO');
-        expect(data['http.query']).not.toContain('김OO');
-        expect(data['http.method']).toBe('GET');
-        expect(out.description).toBe('GET /api/tmap');  // fetch 스팬 이름에는 지울 것이 없다
+        const attributes = out.attributes as Record<string, string>;
+        expect(attributes.url).not.toContain('김OO');
+        expect(attributes['http.query']).not.toContain('김OO');
+        expect(attributes['http.method']).toBe('GET');
+        expect(out.name).toBe('GET /api/tmap');  // fetch 스팬 이름에는 지울 것이 없다
     });
 
     it('SDK 11의 새 속성 키(url.query·url.fragment)도 지운다', async () => {
@@ -251,8 +254,8 @@ describe('captureError / captureWarning — 개인정보 스크러빙 배선', (
         };
 
         const out = options.beforeSendSpan({
-            description: 'GET /api/tmap',
-            data: { 'url.full': 'https://x.web.app/api/tmap?keyword=김OO#홍길동', 'url.query': 'keyword=김OO', 'url.fragment': '홍길동' },
+            name: 'GET /api/tmap',
+            attributes: { 'url.full': 'https://x.web.app/api/tmap?keyword=김OO#홍길동', 'url.query': 'keyword=김OO', 'url.fragment': '홍길동' },
         });
 
         expect(JSON.stringify(out)).not.toContain('김OO');
@@ -260,15 +263,59 @@ describe('captureError / captureWarning — 개인정보 스크러빙 배선', (
     });
 
     it('beforeSendSpan이 traceLifecycle과 짝이 맞는다 — 어긋나면 SDK가 훅을 조용히 건너뛴다', async () => {
-        // SDK 11은 static 모드에서 withStaticSpan으로 감싼 콜백만 부른다(감싸지 않은 콜백은 스트림용).
+        // SDK 11은 stream 모드에서 static 표식(withStaticSpan)이 붙은 콜백을 부르지 않는다(core captureSpan).
         // 둘 중 하나만 바뀌면 오류 없이 스크러빙이 꺼지고 검색어가 원본으로 나간다.
         const { init } = await loadSentry();
-        const options = init.mock.calls[0][0] as { traceLifecycle?: string; beforeSendSpan: object };
+        const options = init.mock.calls[0][0] as { traceLifecycle?: string; beforeSendSpan: unknown };
 
-        const isStatic = '_static' in options.beforeSendSpan
-            && (options.beforeSendSpan as { _static?: boolean })._static === true;
-        expect(options.traceLifecycle).toBe('static');
-        expect(isStatic).toBe(true);
+        expect(options.traceLifecycle).toBe('stream');
+        // SDK의 판정(core isStaticBeforeSendSpanCallback)은 withStaticSpan이 다는 `_static` 표식이다.
+        // 실제로 SDK가 이 콜백을 부르는지는 sentryStreamPipeline.test.ts가 진짜 파이프라인으로 확인한다.
+        expect(typeof options.beforeSendSpan).toBe('function');
+        expect((options.beforeSendSpan as { _static?: boolean })._static).not.toBe(true);
+    });
+
+    it('스트림 속성값이 { value } 객체로 와도 거른다 — 객체째 넘기면 문자열 검사에 안 걸린다', async () => {
+        const { init } = await loadSentry();
+        const options = init.mock.calls[0][0] as {
+            beforeSendSpan: (s: Record<string, unknown>) => Record<string, unknown>;
+        };
+
+        const out = options.beforeSendSpan({
+            name: 'GET /api/tmap',
+            attributes: {
+                'url.full': { value: 'https://x.web.app/api/tmap?keyword=김OO', type: 'string' },
+                'http.response.status_code': { value: 200, type: 'integer' },
+            },
+        });
+
+        expect(JSON.stringify(out)).not.toContain('김OO');
+        const attrs = out.attributes as Record<string, { value: unknown; type: string }>;
+        expect(attrs['url.full'].type).toBe('string');  // 모양은 그대로
+        expect(attrs['http.response.status_code']).toEqual({ value: 200, type: 'integer' });
+    });
+
+    it('스트림 Web Vitals 스팬의 요소 설명(INP target·LCP element·CLS source)과 LCP 이미지 주소를 거른다', async () => {
+        // 스트림에서는 LCP·CLS·INP가 전용 스팬으로 나가고 요소 설명이 이 속성들에 실린다(browser-utils web-vitals/spans.js)
+        const { init } = await loadSentry();
+        const options = init.mock.calls[0][0] as {
+            beforeSendSpan: (s: Record<string, unknown>) => Record<string, unknown>;
+        };
+
+        const out = options.beforeSendSpan({
+            name: 'interaction.click',
+            attributes: {
+                'browser.web_vital.inp.target': 'button.btn-icon[aria-label="홍길동 제거"]',
+                'browser.web_vital.lcp.element': 'img[alt="김철수 어르신 댁"]',
+                'browser.web_vital.cls.source.1': 'div[title="공동 운전자: 이영희"]',
+                'browser.web_vital.lcp.url': 'https://x.web.app/a.png?name=박민수',
+                'browser.web_vital.inp.value': 120,
+            },
+        });
+
+        const json = JSON.stringify(out);
+        for (const name of ['홍길동', '김철수', '이영희', '박민수']) expect(json).not.toContain(name);
+        expect((out.attributes as Record<string, unknown>)['browser.web_vital.inp.value']).toBe(120);
     });
 
     it('수집 범위를 v10 수준으로 묶는다 — SDK 11은 비워 두면 IP·쿠키·쿼리·본문까지 거둔다', async () => {
@@ -297,11 +344,11 @@ describe('captureError / captureWarning — 개인정보 스크러빙 배선', (
         };
 
         const out = options.beforeSendSpan({
-            description: 'button.btn-icon[aria-label="홍길동 제거"]',
-            data: { 'http.method': 'GET' },
+            name: 'button.btn-icon[aria-label="홍길동 제거"]',
+            attributes: { 'http.method': 'GET' },
         });
 
-        expect(out.description).toBe('button.btn-icon[aria-label]');
+        expect(out.name).toBe('button.btn-icon[aria-label]');
         expect(JSON.stringify(out)).not.toContain('홍길동');
     });
 
@@ -313,6 +360,17 @@ describe('captureError / captureWarning — 개인정보 스크러빙 배선', (
         const sent = calls[calls.length - 1]?.[0];
         expect(sent).toEqual({ id: 'u1' });
         expect(JSON.stringify(sent)).not.toContain('hong@example.or.kr');
+    });
+
+    it('역할·기관을 스팬 속성으로도 두고(스트림 스팬엔 태그가 안 실린다) 로그아웃하면 지운다', async () => {
+        const { mod, setAttributes, removeAttribute } = await loadSentry();
+        mod.setSentryUser({ uid: 'u1', email: 'hong@example.or.kr', role: 'admin', organizationId: 'org1' });
+        expect(setAttributes).toHaveBeenLastCalledWith({ 'user.role': 'admin', organizationId: 'org1' });
+        expect(JSON.stringify(setAttributes.mock.calls)).not.toContain('hong@example.or.kr');
+
+        mod.setSentryUser(null);
+        expect(removeAttribute).toHaveBeenCalledWith('user.role');
+        expect(removeAttribute).toHaveBeenCalledWith('organizationId');
     });
 
     it('그 밖의 breadcrumb은 건드리지 않는다', async () => {
