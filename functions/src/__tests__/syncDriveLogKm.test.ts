@@ -152,7 +152,7 @@ import {
     KM_SYNC_REV_FIELD,
     KM_SYNC_CONTINUE_FIELD,
 } from '../handlers/triggers/syncDriveLogKm';
-import { handleStatsOnUpdate } from '../services/statistics/updateAggregatedStats';
+import { handleStatsOnUpdate, handleStatsOnDelete } from '../services/statistics/updateAggregatedStats';
 
  
 const db = getFirestore() as any;
@@ -1123,5 +1123,114 @@ describe('직전 운행 비고 — 시각·수명 가드', () => {
         });
 
         expect(db.__get('vehicles', VEH)).toMatchObject({ lastDriveNote: '나중 운행의 비고' });
+    });
+});
+
+describe('차량 누적 km — 다른 기관 차량 차단 (수정·삭제 경로)', () => {
+    // Rules는 운행일지 생성 때 vehicleId의 소속을 보지 않고, 기관관리자는 수정 때 vehicleId를
+    // 바꿀 수 있다. 다른 기관 차량의 문서 ID만 알면 자기 기관 일지를 그 ID로 만든 뒤 endKm을
+    // 고치거나(직원) 지워서(관리자) 그 차량의 currentKm을 움직일 수 있었다.
+    beforeEach(() => {
+        jest.clearAllMocks();
+        jest.spyOn(console, 'error').mockImplementation();
+        jest.spyOn(console, 'warn').mockImplementation();
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    const makeUpdateEvent = (before: Record<string, unknown>, after: Record<string, unknown>, id = 'X') => ({
+        data: {
+            before: { data: () => before },
+            after: { data: () => after, ref: db.collection('driveLogs').doc(id) },
+        },
+        params: { logId: id },
+    });
+    const makeDeleteEvent = (data: Record<string, unknown>, id = 'X') => ({
+        data: { data: () => data },
+        params: { logId: id },
+    });
+    const vehicleKmPatches = () => db.__updates()
+        .filter((u: { col: string; patch: Record<string, unknown> }) => u.col === 'vehicles' && 'currentKm' in u.patch);
+    const seedVehicle = (organizationId: string, currentKm: number) =>
+        seedLogs([], [{ id: VEH, col: 'vehicles', data: { organizationId, currentKm } }]);
+
+    it('수정으로 endKm을 바꿔도 다른 기관 차량의 currentKm은 늘리지 않는다', async () => {
+        seedVehicle('other-org', 50000);
+
+        await (onDriveLogUpdated as unknown as Function)(makeUpdateEvent(
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1050 },
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 9000 },
+        ));
+
+        expect(vehicleKmPatches()).toHaveLength(0);
+        expect(db.__get('vehicles', VEH)).toMatchObject({ currentKm: 50000 });
+    });
+
+    it('이전 endKm이 없던 수정도 다른 기관 차량의 currentKm을 절대값으로 덮어쓰지 않는다', async () => {
+        seedVehicle('other-org', 50000);
+
+        await (onDriveLogUpdated as unknown as Function)(makeUpdateEvent(
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000 },
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1 },
+        ));
+
+        expect(vehicleKmPatches()).toHaveLength(0);
+        expect(db.__get('vehicles', VEH)).toMatchObject({ currentKm: 50000 });
+    });
+
+    it('최신 기록을 지워도 다른 기관 차량의 currentKm은 줄이지 않는다', async () => {
+        seedVehicle('other-org', 50000);
+
+        await (onDriveLogDeleted as unknown as Function)(makeDeleteEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 0, endKm: 40000, distance: 40000,
+        }));
+
+        expect(vehicleKmPatches()).toHaveLength(0);
+        expect(db.__get('vehicles', VEH)).toMatchObject({ currentKm: 50000 });
+    });
+
+    it('차량 문서가 없으면 쓰지 않고 건너뛴다', async () => {
+        seedLogs([]);
+
+        await (onDriveLogDeleted as unknown as Function)(makeDeleteEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1050, distance: 50,
+        }));
+
+        expect(vehicleKmPatches()).toHaveLength(0);
+        expect(handleStatsOnDelete).toHaveBeenCalled();
+    });
+
+    // 대조군 — 같은 기관 차량은 예전처럼 갱신된다
+    it('같은 기관 차량은 수정 차분만큼 currentKm을 갱신한다', async () => {
+        seedVehicle(ORG, 1050);
+
+        await (onDriveLogUpdated as unknown as Function)(makeUpdateEvent(
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1050 },
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1080 },
+        ));
+
+        expect(vehicleKmPatches().map((u: { patch: Record<string, unknown> }) => u.patch)).toEqual([{ currentKm: { __increment: 30 } }]);
+        expect(db.__get('vehicles', VEH)).toMatchObject({ currentKm: 1080 });
+    });
+
+    it('같은 기관 차량은 이전 endKm이 없던 수정에서 절대값으로 맞춘다', async () => {
+        seedVehicle(ORG, 900);
+
+        await (onDriveLogUpdated as unknown as Function)(makeUpdateEvent(
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000 },
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1050 },
+        ));
+
+        expect(vehicleKmPatches().map((u: { patch: Record<string, unknown> }) => u.patch)).toEqual([{ currentKm: 1050 }]);
+    });
+
+    it('같은 기관 차량은 최신 기록 삭제 시 그 거리만큼 currentKm을 줄인다', async () => {
+        seedVehicle(ORG, 1050);
+
+        await (onDriveLogDeleted as unknown as Function)(makeDeleteEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1050, distance: 50,
+        }));
+
+        expect(vehicleKmPatches().map((u: { patch: Record<string, unknown> }) => u.patch)).toEqual([{ currentKm: { __increment: -50 } }]);
+        expect(db.__get('vehicles', VEH)).toMatchObject({ currentKm: 1000 });
     });
 });
