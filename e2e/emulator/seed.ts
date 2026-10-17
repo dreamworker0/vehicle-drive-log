@@ -14,7 +14,7 @@ import { TERMS_VERSION, PRIVACY_VERSION } from '../../src/lib/constants';
 const PROJECT_ID =
     process.env.GCLOUD_PROJECT ||
     process.env.VITE_FIREBASE_PROJECT_ID ||
-    'vehicle-drive-log';
+    'demo-vehicle-log';
 
 export const TEST_ORG_ID = 'e2e-org';
 export const TEST_ADMIN = {

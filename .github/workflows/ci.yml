@@ -385,9 +385,11 @@ jobs:
 
       # 인증 E2E — 에뮬레이터(auth,firestore) 위에서 로그인·역할 리다이렉트·오프라인 동기화 검증
       # 비인증 E2E와 검증 대상이 겹치지 않으므로 그쪽 실패에 묶지 않는다.
+      # --project는 demo- 값으로 고정한다 — 앱(.env.emulator)·시드(GCLOUD_PROJECT)와 같은 값이어야
+      # 데이터 공간이 맞는다. 규칙 테스트 스텝과 같은 이유로 실제 프로젝트 ID로 뜨지 않게 한다.
       - name: Authed E2E (emulator)
         if: ${{ !cancelled() && steps.pw-install.outcome == 'success' }}
-        run: npx firebase-tools emulators:exec --only auth,firestore "npx playwright test -c playwright.emulator.config.ts"
+        run: npx firebase-tools emulators:exec --only auth,firestore --project demo-vehicle-log "npx playwright test -c playwright.emulator.config.ts"
         env:
           CI: true
 
