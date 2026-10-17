@@ -840,3 +840,17 @@
 | **규칙으로** (#522) | `agents.md` §5.7 "옵션 기능은 설정 토글로" — 판단 트리(모든 기관이 쓰는가 → 새 기능 기본 꺼짐 / 기존 기능에 끄는 토글은 기본 켜짐), 꺼도 진행 중 기록 처리, 서버 같은 기준, 공지·FAQ·요청 기관 안내, opt-in 선례 셋. §4 새 기능 체크리스트에 한 줄. `ui-patterns/settings.md` §7-4 연결 절차 8단계(스키마 → orgFeatures → 설정 폼 4곳 → 토글 UI → 화면 → 서버 → 테스트 → 공지·FAQ)와 하위 설정 자리 주의 |
 | **검증** | Vitest 2,548 · functions 1,504(꺼진 기관 미설정·false 거부) · tsc·eslint·check:faq · `sync:agents --check`·`verify:harness`. #521 배포: 함수 80개·Hosting, 운영 사이트 공지 확인. #522는 문서만 |
 | **남는 것** | ① 요청 기관에 외부 대여 켜기 안내(운영자) ② 운영 확인(신청 관리 [AI 재분석]·의견 Discord 알림·외부 대여·일지 수정 복귀) ③ THREADS_ONLY `syncQueue` 1개 ④ Sentry 'static' 지원 중단 시 스트림 전환 |
+
+### Phase 259: 미뤄 둔 두 가지 — syncQueue를 vm 풀로, Sentry 스팬을 stream으로 🧪📡
+
+> 2026-10-17. "남은 것"의 장기 과제 둘을 운영자가 *"진행하자."* — Phase 250에서 "SDK가 static을 지원 중단할 때"로 보류했던 스트림 전환도 운영자 결정으로 지금 했다.
+
+| 항목 | 내용 |
+|------|------|
+| **syncQueue** (#524) | `THREADS_ONLY_TESTS`의 마지막 단위 테스트. fake-indexeddb가 돌려준 값은 VM 바깥 영역의 `Object`·`Date`라 `Object.getPrototypeOf(v) === Object.prototype`이 거짓 → 저장해 둔 serverTimestamp·deleteField 마커를 복원하지 못했다(23개 중 3개). `isPlainObject` — 사슬이 "어느 영역이든 Object.prototype 하나 → null"이면 평범한 객체(클래스 인스턴스는 한 단계 더 길다). 실제 브라우저에서는 결과가 같다. 테스트의 Date는 내부 태그로. 이제 threads 풀은 Rules 테스트(에뮬레이터 gRPC)뿐 |
+| **스트림 전환 — 무엇이 다른가** (#525) | 설치본(@sentry/core 11.7)을 읽어 대조: ① 스팬이 `attributes`·`name`(값이 `{ value, unit }` 객체일 수 있음) ② static 표식 콜백은 stream에서 **조용히 건너뛰고**, 콜백이 던지면 원본 전송(`safeCallback`) ③ `StreamedSpanJSON`엔 `events`가 없어 `setMeasurement` Web Vitals가 사라짐 — 대신 browserTracing이 TTFB·FP·FCP를 pageload 속성, LCP·CLS·INP를 **전용 스팬**으로 직접 보냄(webVitalsIntegration 자동) ④ 요소 설명이 `browser.web_vital.lcp.element`·`cls.source.N`·**`inp.target`**(새 키), LCP 이미지 주소가 `lcp.url` ⑤ 스팬엔 **태그가 안 실리고 스코프 속성만** ⑥ SDK가 스코프 `user.id/email/username`을 **모든 스팬**에 붙임 ⑦ `infer_ip`는 `dataCollection.userInfo`를 따른다 |
+| **대응** | `withStreamedSpan` + `scrubSpanAttributes`(객체 안 문자열을 꺼내 거르고 모양 유지), `inp.target`·`lcp.url` 스크럽 추가, Web Vitals 직접 수집과 `web-vitals` 직접 의존 제거(Sentry가 자체 의존으로 계속 씀), `app`·`user.role`·`organizationId`를 스코프 속성으로도(로그아웃 시 제거 — `app`은 같은 프로젝트의 다른 앱과 가려내는 값), 사용자는 여전히 uid만, `userInfo: false`라 `infer_ip: 'never'` |
+| **실제 파이프라인 테스트** | 기존 테스트는 init에 넘긴 콜백을 **직접 불러** SDK가 그 콜백을 건너뛰는 사고(가장 위험한 실패)를 잡지 못한다. `sentryStreamPipeline.test` — 진짜 `@sentry/react`를 우리 init 옵션 그대로(전송만 가로채고 표본 1) 띄워 스팬을 만들고 **보낸 봉투**에서 검색어·요소 설명·실명이 사라졌는지 본다. 콜백을 static으로 바꾸면 실패함을 확인. jsdom엔 `performance.getEntriesByType`이 없어 빈 구현을, `ingest_settings`는 Node에서 붙지 않아 그 입력(`userInfo: false`)을 확인 |
+| **작업 중 메모** | Python 편집 중 Windows `Errno 22`로 파일 쓰기 한 번 실패 — 파일은 온전했고 남은 두 군데를 Edit 도구로 마무리. 린트 훅 오류는 두 단계 사이 중간 상태(함수만 남은 때)였다 |
+| **검증** | #524: syncQueue 23개 threads·vmThreads·vm 모두 통과, Vitest 2,548. #525: Vitest 2,553, tsc·eslint·build·번들 예산. 배포: 두 번 모두 함수 80개·Hosting. 운영 사이트 JS 49개를 따라가 `sentry-*.js` 청크에 `traceLifecycle:"stream"`, static 흔적 없음 확인 |
+| **남는 것** | ① Sentry › Traces에서 `app = vehicle-drive-log` 스팬·Web Vitals 유입 확인(운영자, 표본 30%) ② 운영 확인(외부 대여 켜기 안내·신청 관리 [AI 재분석]·의견 Discord 알림·일지 수정 복귀) |
