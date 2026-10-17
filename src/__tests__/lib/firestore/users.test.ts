@@ -139,7 +139,7 @@ describe('firestore/users', () => {
     });
 
     describe('leaveOrganization', () => {
-        it('사용자 문서를 삭제한다', async () => {
+        it('사용자 문서를 삭제한다 (슈퍼관리자의 멤버 제거 — Rules상 superAdmin 전용)', async () => {
             vi.mocked(fs.deleteDoc).mockResolvedValue(undefined as never);
 
             await leaveOrganization('u1');
@@ -180,6 +180,22 @@ describe('firestore/users', () => {
                 expect.anything(),
                 { organizationId: null, role: 'employee' },
             );
+        });
+
+        it('본인 기관 나가기는 문서를 지우지 않는다 — users 삭제는 Rules상 superAdmin 전용', async () => {
+            vi.mocked(fs.updateDoc).mockResolvedValue(undefined as never);
+
+            await clearUserOrganization('u1');
+
+            expect(fs.doc).toHaveBeenCalledWith(expect.anything(), 'users', 'u1');
+            expect(fs.deleteDoc).not.toHaveBeenCalled();
+        });
+
+        it('실패하면 보고하고 에러를 재던진다 (화면이 실패 토스트를 띄운다)', async () => {
+            vi.mocked(fs.updateDoc).mockRejectedValue(new Error('denied') as never);
+
+            await expect(clearUserOrganization('u1')).rejects.toThrow('denied');
+            expect(captureError).toHaveBeenCalledWith(expect.any(Error), { context: 'clearUserOrganization', uid: 'u1' });
         });
     });
 

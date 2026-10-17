@@ -18,7 +18,7 @@ const userConverter = createZodConverter(userSchema);
 /**
  * 갱신 실패를 보고한다 — 단, **대상 문서가 이미 없는 경우(not-found)는 제외**한다.
  *
- * users 문서는 본인이 기관을 나가면 삭제된다(leaveOrganization). 관리자·슈퍼관리자 화면의
+ * users 문서는 슈퍼관리자가 멤버를 제거하면 삭제된다(leaveOrganization). 관리자·슈퍼관리자 화면의
  * 목록은 한 번 읽어 온 스냅샷이라, 그 사이 사라진 계정의 행이 남고 거기서 수정·역할 변경·
  * 재활성화를 누르면 not-found가 온다. **화면이 판단해 안내할 상태이지 코드 결함이 아니다.**
  *
@@ -66,7 +66,8 @@ export const createUser = async (uid: string, data: Partial<User>) => {
     }
 };
 
-// 기관 나가기 (사용자 문서 삭제 → onSnapshot이 감지 → 초대 코드 화면)
+// 멤버 제거 (사용자 문서 삭제 → onSnapshot이 감지 → 초대 코드 화면)
+// users 삭제는 Rules상 superAdmin 전용이다. 본인이 기관을 나갈 때는 clearUserOrganization을 쓴다.
 export const leaveOrganization = async (uid: string) => {
     try {
         await deleteDoc(doc(db, 'users', uid));
@@ -165,7 +166,7 @@ export const restoreUser = async (uid: string): Promise<void> => {
     }
 };
 
-// 사용자의 기관 정보 초기화 (기관 이동 준비)
+// 사용자의 기관 정보 초기화 (본인 기관 나가기·기관 이동 준비 — Rules의 본인 탈퇴 update 분기)
 export const clearUserOrganization = async (uid: string): Promise<void> => {
     try {
         await updateDoc(doc(db, 'users', uid), {
