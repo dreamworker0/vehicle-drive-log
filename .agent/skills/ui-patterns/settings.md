@@ -220,6 +220,25 @@ Settings
 2. 섹션 그룹 헤더에 `mt-8` 포함
 3. 섹션 순서는 사용 빈도와 중요도를 고려하여 배치
 
+### 7-4. 기능 사용 토글 추가 (옵션 기능)
+
+언제 토글을 만드는지·기본값은 [agents.md §5.7](../../agents.md). 아래는 연결 절차다 — 하나라도 빠지면
+"켰는데 저장이 안 된다"·"설정은 꺼졌는데 서버는 받는다"가 된다. 실물 예: 외부 대여(#521).
+
+1. **스키마** `src/schemas/organization.ts` — `xxxEnabled: z.boolean().optional().catch(undefined)` (단일 원본)
+2. **해석** `src/lib/orgFeatures.ts` — `OrgFeatures`에 키, `ALL_FEATURES_ON`, `OrgFeatureFields` Pick, `resolveOrgFeatures`
+   (새 기능은 `=== true` + 왜 opt-in인지 한 줄 주석). `src/__tests__/lib/orgFeatures.test.ts`의 기본값 기대도 함께
+3. **설정 폼** `src/hooks/useSettings.ts` — 폼 타입·초기값·기관 문서에서 불러오기·저장(4곳), `Settings.tsx`의 값 전달
+4. **토글 UI** `src/components/admin/settings/FeatureToggleSection.tsx` — 값 타입·`FeatureKey`·`FEATURE_META`(설명 끝에 "(기본 꺼짐)")·묶음 안 배치
+5. **화면** — `useAuth().orgFeatures.xxx`로 새로 만드는 진입점만 숨긴다. 이미 만들어진 데이터의 표시·처리는 그대로 둔다
+6. **서버** — 생성 코어(callable/트리거)가 기관 문서의 `xxxEnabled !== true`면 `failed-precondition`으로 거부하고 "설정 › 기능 사용에서 켜 주세요"라고 안내
+7. **테스트** — 꺼진 기관에서 진입점이 안 보이는지, 껐어도 기존 데이터는 처리되는지, 서버 거부, 토글 저장
+8. **공지·FAQ** — 켜는 위치(설정 › 기능 사용 › 묶음 이름)와 꺼도 남는 것을 적는다 → [release-notes](../release-notes/SKILL.md)
+
+> ⚠️ **배치 주의**: 하위 설정(`MethodGroup`)은 목록 **뒤에** 붙어 바로 위 항목의 것으로 읽힌다. 하위 설정이
+> 딸린 항목(예약 관리자 승인 → [바로 운행], 수리·정비 → [접근 범위]) **아래에** 새 토글을 끼우지 말고 그 위에
+> 넣는다. 두 자리 모두 `FeatureToggleSection.test.tsx`가 순서를 고정한다.
+
 ---
 
 ## 8. 로직 분리 규칙
