@@ -44,7 +44,7 @@
     "test:e2e": "playwright test --project=chromium --project=mobile-chrome --project=mobile-safari",
     "test:e2e:all": "playwright test",
     "lighthouse": "npm run build && npx --yes @lhci/cli@0.15.1 autorun --config=lighthouserc.json",
-    "test:e2e:emulator": "firebase emulators:exec --only auth,firestore \"playwright test -c playwright.emulator.config.ts\"",
+    "test:e2e:emulator": "firebase emulators:exec --only auth,firestore --project demo-vehicle-log \"playwright test -c playwright.emulator.config.ts\"",
     "prepare": "husky"
   },
   "dependencies": {
