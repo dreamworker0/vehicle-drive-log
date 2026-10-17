@@ -19,6 +19,7 @@ function baseValues(overrides: Partial<FeatureToggleValues> = {}): FeatureToggle
         passengerAllowCount: true,
     reservationPassengerEnabled: false,
     refuelFlagEnabled: false,
+    externalLoanEnabled: false,
         driverAllowList: true,
         driverAllowSearch: true,
         ...overrides,
@@ -35,6 +36,14 @@ describe('FeatureToggleSection', () => {
     it('예약 관리자 승인 토글이 섹션 안에 표시된다', () => {
         setup();
         expect(screen.getByText('예약 관리자 승인')).toBeInTheDocument();
+    });
+
+    it('외부 대여 토글은 차량 예약 묶음에 있고, 켜면 externalLoanEnabled: true로 저장한다', () => {
+        const { onChange } = setup({ externalLoanEnabled: false });
+        const toggle = screen.getByRole('switch', { name: '외부 대여' });
+        expect(toggle).toHaveAttribute('aria-checked', 'false');
+        fireEvent.click(toggle);
+        expect(onChange).toHaveBeenCalledWith({ externalLoanEnabled: true });
     });
 
     it('바로 운행 허용 하위 토글은 예약 승인을 켰을 때만 표시', () => {
@@ -89,6 +98,15 @@ describe('하위 설정이 붙는 자리', () => {
         expect(last?.textContent?.trim()).toBe('수리·정비');
         // 캡션이 대상을 밝히는지도 함께 고정한다 — 순서가 또 바뀌어도 글로는 남는다
         expect(caption.textContent).toContain('수리·정비');
+    });
+
+    it('[바로 운행] 하위 설정은 바로 위가 예약 관리자 승인이어야 한다 — 외부 대여에 딸린 것처럼 보이면 안 된다', () => {
+        setup({ requireReservationApproval: true });
+        const caption = screen.getByText(/바로 운행 · 예약 관리자 승인에 적용/);
+        const labels = Array.from(document.querySelectorAll('label, p, span, h3'))
+            .filter(el => el.textContent && ['외부 대여', '예약 관리자 승인'].includes(el.textContent.trim()));
+        expect(labels[labels.length - 1]?.textContent?.trim()).toBe('예약 관리자 승인');
+        expect(caption.textContent).toContain('예약 관리자 승인');
     });
 
     it('수리·정비를 끄면 접근 범위도 사라진다', () => {

@@ -43,6 +43,8 @@ export interface SettingsForm {
     reservationPassengerEnabled: boolean;
     /** 주유(충전) 필요 표시(opt-in — 기본 꺼짐) */
     refuelFlagEnabled: boolean;
+    /** 외부 대여 등록(opt-in — 기본 꺼짐) */
+    externalLoanEnabled: boolean;
     driverAllowList: boolean;
     driverAllowSearch: boolean;
     /** 분관·별관 등 추가 출발지(차고지). 본관(기관 주소)은 포함하지 않는다. */
@@ -92,6 +94,7 @@ export default function useSettings() {
         passengerAllowCount: true,
         reservationPassengerEnabled: false,
         refuelFlagEnabled: false,
+        externalLoanEnabled: false,
         driverAllowList: true,
         driverAllowSearch: true,
         sites: [],
@@ -142,6 +145,7 @@ export default function useSettings() {
                         passengerAllowCount: features.passengerAllowCount,
                         reservationPassengerEnabled: features.reservationPassenger,
                         refuelFlagEnabled: features.refuelFlag,
+                        externalLoanEnabled: features.externalLoan,
                         driverAllowList: features.driverAllowList,
                         driverAllowSearch: features.driverAllowSearch,
                         sites: orgData.sites ? orgData.sites.map(site => ({ ...site })) : [],
@@ -222,6 +226,7 @@ export default function useSettings() {
                     passengerAllowCount: targetData.passengerAllowCount,
                     reservationPassengerEnabled: targetData.reservationPassengerEnabled,
                     refuelFlagEnabled: targetData.refuelFlagEnabled,
+                    externalLoanEnabled: targetData.externalLoanEnabled,
                     driverAllowList: targetData.driverAllowList,
                     driverAllowSearch: targetData.driverAllowSearch,
                     sites: targetData.sites,

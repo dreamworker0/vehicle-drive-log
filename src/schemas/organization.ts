@@ -61,6 +61,13 @@ export const organizationSchema = z.object({
      * (VehicleStatusSection은 그 조건에서 아무것도 그리지 않는다).
      */
     refuelFlagEnabled: z.boolean().optional().catch(undefined),
+    /**
+     * 외부 대여(앱을 쓰지 않는 기관에 차를 빌려준 기간 등록) — **opt-in**(미설정=꺼짐).
+     * 빌려주는 기관은 드물어, 켜짐 기본이면 모든 관리자 예약 화면에 쓰지 않는 줄이 생긴다.
+     * 서버(createReservationCore)도 꺼진 기관의 새 대여 등록을 거부한다. 이미 등록된 대여는
+     * 꺼도 표시·수정·반납 처리가 그대로 된다.
+     */
+    externalLoanEnabled: z.boolean().optional().catch(undefined),
     /** 운전자(대표·공동): 직원 목록에서 직접 선택 */
     driverAllowList: z.boolean().optional().catch(undefined),
     /** 운전자(대표·공동): 검색으로 선택. 목록·검색 둘 다 켜지면 후보 8명 기준 자동 전환 */

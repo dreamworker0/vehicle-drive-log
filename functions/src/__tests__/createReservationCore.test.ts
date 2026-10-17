@@ -543,7 +543,8 @@ describe('createReservationTx — 외부 대여', () => {
         externalLoan: { borrowerOrg: '  동산 사회복지관 ', driverName: '홍길동' },
     };
     const vehicleSnap = { exists: true, data: () => ({ organizationId: 'org1', allowedUserIds: ['someone-else'] }) };
-    const approvalOrgSnap = { exists: true, data: () => ({ requireReservationApproval: true }) };
+    // 외부 대여는 기관이 켠 경우에만 등록된다(opt-in, externalLoanEnabled)
+    const approvalOrgSnap = { exists: true, data: () => ({ requireReservationApproval: true, externalLoanEnabled: true }) };
     const emptyDay = { docs: [] };
 
     beforeEach(() => {
@@ -595,6 +596,18 @@ describe('createReservationTx — 외부 대여', () => {
             .mockResolvedValueOnce({ docs: [{ id: 'r1', data: () => ({ status: 'reserved', startTime: '15:00', endTime: '16:00' }) }] });
 
         await expect(createReservationTx(loanInput)).rejects.toThrow('이미 예약되어 있습니다');
+        expect(mockTransactionSet).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ['켜지 않은 기관(미설정)', {}],
+        ['끈 기관', { externalLoanEnabled: false }],
+    ])('%s은 등록할 수 없다 — 설정 › 기능 사용에서 켜도록 안내', async (_label, orgData) => {
+        mockTransactionGet
+            .mockResolvedValueOnce(vehicleSnap)
+            .mockResolvedValueOnce({ exists: true, data: () => orgData });
+
+        await expect(createReservationTx(loanInput)).rejects.toThrow("'외부 대여'를 켜 주세요");
         expect(mockTransactionSet).not.toHaveBeenCalled();
     });
 
