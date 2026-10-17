@@ -274,9 +274,11 @@ jobs:
 
       # 멀티테넌트 격리의 유일한 자동 검증이다. 단위 테스트 실패에 묶여 건너뛰어지면
       # 기관 간 데이터 격리 회귀가 그 실행에서 아예 검사되지 않는다 — 가장 묻히면 안 되는 게이트다.
+      # --project는 demo- 값으로 고정한다 — .firebaserc 기본값(실제 프로젝트 ID)으로 에뮬레이터가
+      # 뜨지 않게 하고, 테스트 파일의 PROJECT_ID와 맞춘다(firebase.json singleProjectMode).
       - name: Security Rules tests (Firestore + Storage emulator)
         if: ${{ !cancelled() && steps.install.outcome == 'success' }}
-        run: npx firebase-tools emulators:exec --only firestore,storage "npx vitest run tests/firestore-rules.test.ts tests/storage-rules.test.ts"
+        run: npx firebase-tools emulators:exec --only firestore,storage --project demo-vehicle-log "npx vitest run tests/firestore-rules.test.ts tests/storage-rules.test.ts"
 
   # ── E2E (별도 잡) ──
   # 한때 이 스텝들은 ci 잡 안에 있었고 그때는 그게 맞았다 — 임계경로가 functions 단위 테스트

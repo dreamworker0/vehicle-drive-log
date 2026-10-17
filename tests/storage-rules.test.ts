@@ -6,7 +6,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
 // Firebase 에뮬레이터 프로젝트 ID
-const PROJECT_ID = 'vehicle-drive-log-test';
+const PROJECT_ID = 'demo-vehicle-log';
 
 // 기관 고유번호증(정부 발급 PII) 경로
 const ORG_DOC_PATH = 'organizations/org-A/unique-number.jpg';

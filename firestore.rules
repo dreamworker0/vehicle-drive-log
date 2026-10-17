@@ -189,7 +189,13 @@ service cloud.firestore {
                     // orgAdmin은 소속 기관 사용자만 수정 가능하되, superAdmin 역할 부여 불가.
                     // organizationId는 불변으로 강제한다 — admin이 자기/타인 문서의 org를 바꿔
                     // 타 기관 admin 클레임을 획득하는 교차 테넌트 권한상승을 차단(2026-07-04 감사 N1).
+                    // 대상이 superAdmin인 문서는 건드리지 못한다 — addSuperAdmin은 organizationId를
+                    // 지우지 않으므로 기관 소속 superAdmin이 생기고, 이 조건이 없으면 그 기관의
+                    // 관리자가 운영자를 employee로 강등하거나 status를 disabled로 바꿀 수 있었다
+                    // (2026-10-17 규칙 감사 #13). 직원 관리 화면은 superAdmin을 목록에서 빼므로
+                    // 정상 경로는 영향이 없다(useEmployeeManager).
                     || (isOrgAdmin(resource.data.organizationId)
+                        && resource.data.get('role', 'employee') != 'superAdmin'
                         && request.resource.data.role != 'superAdmin'
                         && request.resource.data.organizationId == resource.data.organizationId)
                     );
