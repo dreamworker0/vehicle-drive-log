@@ -154,7 +154,8 @@ describe('offline syncQueue', () => {
 
         const database = await getSyncDB();
         const [stored] = await database.getAll('sync-store');
-        expect(stored.data?.timestamp).toBeInstanceOf(Date);
+        // 저장소가 돌려준 Date는 다른 영역의 것일 수 있어 instanceof 대신 내부 태그로 본다
+        expect(Object.prototype.toString.call(stored.data?.timestamp)).toBe('[object Date]');
         expect((stored.data?.timestamp as Date).getTime()).toBe(1_700_000_000_000);
     });
 
