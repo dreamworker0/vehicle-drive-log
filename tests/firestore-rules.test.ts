@@ -1757,4 +1757,45 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
       }
     });
   });
+
+  // 직원 화면 더보기 › 기관 나가기 — 문서 삭제는 superAdmin 전용이라 본인은 소속만 비우는 update 분기를 쓴다.
+  // (예전 화면은 deleteDoc을 불러 직원이 항상 permission-denied를 받았다.)
+  it('29. 본인 기관 나가기 — 소속 비우기 update는 허용, users 문서 삭제는 superAdmin만', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.collection('users').doc('emp_A').set({
+        email: 'emp@example.com', name: '직원A', role: 'employee', organizationId: 'org-A', status: 'active',
+      });
+      await db.collection('users').doc('emp_A2').set({
+        email: 'emp2@example.com', name: '직원A2', role: 'employee', organizationId: 'org-A', status: 'active',
+      });
+      await db.collection('users').doc('admin_A').set({
+        email: 'admin@example.com', name: '관리자A', role: 'admin', organizationId: 'org-A',
+      });
+    });
+    const empDb = setupContext('emp_A', { role: 'employee', orgId: 'org-A' }).firestore();
+    const emp2Db = setupContext('emp_A2', { role: 'employee', orgId: 'org-A' }).firestore();
+    const adminDb = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+    const superDb = setupContext('super_1', { role: 'superAdmin' }).firestore();
+    const leave = { organizationId: null, role: 'employee' };
+
+    // 직원은 본인 문서라도 삭제할 수 없다 — 예전 기관 나가기가 실패하던 경로
+    await assertFails(empDb.collection('users').doc('emp_A').delete());
+
+    // 본인 탈퇴 분기에 기대는 우회는 막힌다
+    await assertFails(empDb.collection('users').doc('emp_A').update({ organizationId: 'org-B', role: 'employee' })); // 다른 기관으로 옮겨 타기
+    await assertFails(empDb.collection('users').doc('emp_A').update({ ...leave, status: 'disabled' })); // 상태 필드 동반 변경
+    await assertFails(emp2Db.collection('users').doc('emp_A').update(leave)); // 동료의 소속 비우기
+    await assertFails(empDb.collection('users').doc('emp_A').update({ ...leave, lastEditedByUid: 'emp_A2' })); // 행위자 위조
+
+    // 정상 경로: 본인이 소속을 비운다 (clearUserOrganization과 같은 payload)
+    await assertSucceeds(empDb.collection('users').doc('emp_A').update({ ...leave, lastEditedByUid: 'emp_A' }));
+
+    // 관리자도 같은 분기로 나갈 수 있다 — role은 employee로만 내려간다
+    await assertFails(adminDb.collection('users').doc('admin_A').update({ organizationId: null, role: 'admin' }));
+    await assertSucceeds(adminDb.collection('users').doc('admin_A').update({ ...leave, lastEditedByUid: 'admin_A' }));
+
+    // 대조군: superAdmin의 멤버 제거(문서 삭제)는 허용된다
+    await assertSucceeds(superDb.collection('users').doc('emp_A2').delete());
+  });
 });

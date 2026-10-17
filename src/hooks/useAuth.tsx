@@ -309,6 +309,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                                             } else {
                                                 startOrgWatch();
                                             }
+                                        } else {
+                                            // 소속이 비었다(기관 나가기·다른 기관으로 가입 — 문서는 남고 organizationId만 null).
+                                            // 문서 삭제 때처럼 이전 기관 구독을 끊는다. 남겨 두면 Claims가 orgId=null로
+                                            // 바뀐 뒤 권한 거부 재시도·경고 토스트가 나고, 삭제된 기관에서 나온 경우
+                                            // orgDeleted=true가 남아 초대 코드 화면 대신 차단 화면이 계속 뜬다.
+                                            if (unsubscribeOrg) { unsubscribeOrg(); unsubscribeOrg = null; }
+                                            setOrgDeleted(false);
+                                            setOrgFeatures(ALL_FEATURES_ON);
+                                            setOrgSites(resolveOrgSites(null));
                                         }
                                         setLoading(false);
                                     };

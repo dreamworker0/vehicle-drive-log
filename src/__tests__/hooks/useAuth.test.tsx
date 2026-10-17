@@ -568,3 +568,61 @@ describe('useAuth — App Check 차단 시 안내와 보고', () => {
         expect(after).toHaveLength(1);
     });
 });
+
+/**
+ * 본인 기관 나가기·'다른 기관으로 가입'은 users 문서를 지우지 않고 organizationId만 비운다
+ * (문서 삭제는 Rules상 superAdmin 전용). 문서 삭제 때처럼 이전 기관 구독을 끊지 않으면
+ * 삭제된 기관에서 나온 사용자에게 orgDeleted=true가 남아 초대 코드 화면 대신 차단 화면이 계속 뜬다.
+ */
+describe('useAuth — 소속을 비우면 이전 기관 구독을 정리한다', () => {
+    const authedUser = {
+        uid: 'u1',
+        isAnonymous: false,
+        getIdTokenResult: vi.fn().mockResolvedValue({ claims: {} }),
+    };
+
+    beforeEach(() => {
+        firestoreTerminated = false;
+        (auth as { currentUser: unknown }).currentUser = authedUser;
+    });
+
+    afterEach(() => {
+        (auth as { currentUser: unknown }).currentUser = null;
+    });
+
+    it('organizationId가 null로 바뀌면 기관 구독을 해제하고 orgDeleted를 내린다', async () => {
+        mockOnAuthStateChanged.mockImplementation((_a: unknown, callback: (u: unknown) => void) => {
+            callback(authedUser);
+            return vi.fn();
+        });
+        // onSnapshot 호출 순서: 0 = users/{uid}, 1 = organizations/{orgId}
+        const nexts: Array<(snap: unknown) => void> = [];
+        const unsubs: Array<ReturnType<typeof vi.fn>> = [];
+        mockOnSnapshot.mockImplementation((_ref: unknown, next: (snap: unknown) => void) => {
+            const unsub = vi.fn();
+            nexts.push(next);
+            unsubs.push(unsub);
+            return unsub;
+        });
+        const userSnap = (organizationId: string | null) => ({
+            exists: () => true,
+            id: 'u1',
+            data: () => ({ role: 'employee', organizationId }),
+        });
+
+        const { result } = renderHook(() => useAuth(), { wrapper: createWrapper() });
+        await waitFor(() => expect(nexts).toHaveLength(1));
+
+        await act(async () => { nexts[0](userSnap('org1')); });
+        expect(nexts).toHaveLength(2); // 기관 구독 시작
+        await act(async () => { nexts[1]({ exists: () => true, data: () => ({ status: 'deleted' }) }); });
+        expect(result.current.orgDeleted).toBe(true);
+
+        await act(async () => { nexts[0](userSnap(null)); });
+
+        expect(unsubs[1]).toHaveBeenCalled();
+        expect(result.current.orgDeleted).toBe(false);
+        expect(result.current.userData?.organizationId).toBeNull();
+        expect(result.current.userDocState).toBe('present');
+    });
+});
