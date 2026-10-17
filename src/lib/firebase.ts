@@ -14,8 +14,8 @@ import { resolveAuthDomain } from './authDomain';
 
 // === E2E/로컬 에뮬레이터 모드 ===
 // VITE_USE_EMULATOR=true 일 때만 Auth/Firestore/Functions 에뮬레이터에 연결하고
-// App Check를 비활성화한다. 빌드 타임 치환되는 환경변수이므로 프로덕션 빌드(false)에서는
-// 아래 분기들이 dead code로 제거되어 기존 동작과 100% 동일하다.
+// App Check·Analytics·Messaging(FCM)을 비활성화한다. 빌드 타임 치환되는 환경변수이므로
+// 프로덕션 빌드(false)에서는 아래 분기들이 dead code로 제거되어 기존 동작과 100% 동일하다.
 const USE_EMULATOR = import.meta.env.VITE_USE_EMULATOR === 'true';
 
 const firebaseConfig = {
@@ -133,6 +133,10 @@ if (typeof window !== 'undefined' && !USE_EMULATOR && !isInAppBrowser()) {
 let _analytics: ReturnType<typeof import('firebase/analytics').getAnalytics> | null = null;
 function initAnalyticsLazy() {
     if (typeof window === 'undefined' || import.meta.env.MODE === 'test') return;
+    // 에뮬레이터 모드: Analytics는 에뮬레이터가 없어 설정 조회(firebase.googleapis.com)와
+    // Installations 등록(firebaseinstallations.googleapis.com)이 실제 Google 서버로 나간다.
+    // CI의 인증 E2E는 실제 키(.env)로 돌므로 그대로 두면 테스트 실행이 운영 Analytics에 집계된다.
+    if (USE_EMULATOR) return;
     import('firebase/analytics').then(({ getAnalytics }) => {
         _analytics = getAnalytics(app);
     }).catch(() => { /* Analytics 로드 실패 무시 */ });
@@ -455,6 +459,10 @@ let _messagingInit = false;
 export async function getMessagingInstance() {
     if (_messagingInit) return _messaging;
     _messagingInit = true;
+    // 에뮬레이터 모드: FCM도 에뮬레이터가 없어 토큰 발급(getToken)이 Installations 등록과
+    // FCM 등록을 실제 Google 서버로 보낸다. null을 돌려주면 호출부(useNotification)가
+    // "지원되지 않는 환경"으로 처리하므로 별도 분기가 필요 없다.
+    if (USE_EMULATOR) return _messaging;
     try {
         const { getMessaging, isSupported } = await import('firebase/messaging');
         const supported = await isSupported();
