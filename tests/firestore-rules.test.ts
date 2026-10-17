@@ -4,8 +4,8 @@ import { describe, it, beforeAll, afterAll, beforeEach } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 
-// Firebase 에뮬레이터 프로젝트 ID
-const PROJECT_ID = 'vehicle-drive-log-test';
+// Firebase 에뮬레이터 프로젝트 ID — demo- 접두사는 에뮬레이터 전용(실제 프로젝트에 닿지 않음)임을 보장한다
+const PROJECT_ID = 'demo-vehicle-log';
 
 let testEnv: RulesTestEnvironment;
 
@@ -36,6 +36,7 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
   const setupContext = (uid: string, token: Record<string, unknown>) => testEnv.authenticatedContext(uid, token);
   const _unauthContext = () => testEnv.unauthenticatedContext();
 
+  // 기대 동작 표 #3(허용 대조군) · #4(거부) · #5
   it('1. 타 조직 데이터 접근 공격 (Tenant Isolation)', async () => {
     // given: 조직 A의 자동차가 존재함 (관리자가 생성했다고 가정하는 편의를 위해 내부 어드민 룰을 통과하는 셋업)
     // withSecurityRulesDisabled를 사용하면 Rules를 우회하여 초기 데이터를 세팅할 수 있습니다.
@@ -77,6 +78,7 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertSucceeds(orgAMemberDb.collection('driveLogs').doc('own_log').set({ ...logPayload, organizationId: 'org-A' }));
   });
 
+  // 기대 동작 표 #9(삭제) · #10 · #13
   it('2. 권한 상승 공격 (Privilege Escalation)', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const db = context.firestore();
@@ -111,6 +113,7 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertSucceeds(orgAAdminDb.collection('users').doc('user_A2').update({ role: 'admin' }));
   });
 
+  // 기대 동작 표 #6a · #9(currentKm)
   it('3. 데이터 주입 공격 (driverUid 속이기 및 주행거리 역행)', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const db = context.firestore();
@@ -162,6 +165,7 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertSucceeds(newVehicle);
   });
 
+  // 기대 동작 표 #17 · #18a
   it('5. 예약(reservations) 조직 격리 및 명의 위조 차단', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       await context.firestore().collection('reservations').doc('res_B').set({
@@ -199,6 +203,7 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     }));
   });
 
+  // 기대 동작 표 #18b · #18c
   it('5-1. 예약 소유자의 pending→reserved 자가 승인 차단, 취소/완료는 허용', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const db = context.firestore();
@@ -226,6 +231,7 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertSucceeds(adminADb.collection('reservations').doc('res_reserved').update({ status: 'reserved', reservedByName: 'x' }));
   });
 
+  // 기대 동작 표 #18b · #18c
   it('5-1b. 예약 소유자는 일정·차량·그룹을 직접 바꾸지 못한다 — 수정 콜러블 전용 (2026-10-03 감사 발견 1)', async () => {
     // 직접 쓰기가 열려 있던 동안은 승인된 예약을 다른 날짜·시간·사용 제한 차량으로 옮겨도
     // reserved가 유지됐다(승인제·차량 제한·겹침 검사 우회). 정보 수정·취소·운행 시작/종료는 그대로 열어 둔다.
@@ -358,6 +364,7 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertFails(orgBMemberDb.collection('notifications').doc('noti_A').get());
   });
 
+  // 기대 동작 표 #10 · #12 · #13
   it('8. 관리자의 organizationId 변경(교차 테넌트 권한상승) 차단', async () => {
     // given: 기관 A의 admin과 소속 직원 문서 존재
     await testEnv.withSecurityRulesDisabled(async (context) => {
@@ -388,6 +395,7 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     }));
   });
 
+  // 기대 동작 표 #12(organizationId 이전)
   it('9. admin의 organizationId 변경 차단 — 차량·운행일지·예약·주유·정비 전 컬렉션', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const db = context.firestore();
@@ -943,6 +951,7 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertFails(empDb.collection('maintenanceRecords').doc('m_legacy').update({ km: -1 }));
   });
 
+  // 기대 동작 표 #3 · #6b · #7(수정) · #11(수정)
   it('9. 운행일지 대표 운전자 지정/수정 권한 (작성자·관리자, 구 데이터 폴백)', async () => {
     await testEnv.withSecurityRulesDisabled(async (context) => {
       const db = context.firestore();
@@ -1003,6 +1012,7 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     }));
   });
 
+  // 기대 동작 표 #21
   it('13. 메신저 어시스턴트 서버 전용 컬렉션 — 클라이언트 접근 전면 차단', async () => {
     // 연동 매핑·매핑 캐시·task 큐·확인 문서는 Functions(Admin SDK) 전용이며
     // 어떤 역할의 클라이언트도 읽거나 쓸 수 없어야 한다.
@@ -1497,5 +1507,254 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     };
     await assertSucceeds(adminADb.collection('driveLogs').doc('loan_log').set({ ...payload, createdByUid: 'admin_A' }));
     await assertFails(adminADb.collection('driveLogs').doc('loan_log_forged').set({ ...payload, createdByUid: 'someone_else' }));
+  });
+
+  /**
+   * 기대 동작 표 (2026-10-17 규칙 감사) — 표 번호마다 허용·거부를 함께 고정한다.
+   *
+   * 위 테스트들이 이미 정확히 검증하는 항목(#3·#5·#6a·#17·#18a~c 등)은 여기서 다시 만들지 않고
+   * 해당 테스트에 표 번호 주석만 달았다. 여기에는 빠져 있던 쪽(허용 대조군, 목록 쿼리, 삭제,
+   * 다른 기관 관리자 등)만 둔다.
+   *
+   * 픽스처: 기관 2개 × (직원 2명 + 기관 관리자 1명) + 전체 관리자 1명. 문서 모양은 src/schemas/를 따른다.
+   * 클레임의 직원 역할은 실제 값인 'employee'다(위 테스트의 'member'는 실재하지 않는 값).
+   */
+  describe('기대 동작 표', () => {
+    const ORGS = ['org-A', 'org-B'] as const;
+    const at = new Date('2026-10-01T09:00:00Z');
+
+    const emp = (org: 'A' | 'B', n: 1 | 2) =>
+      setupContext(`emp_${org}${n}`, { role: 'employee', orgId: `org-${org}` }).firestore();
+    const admin = (org: 'A' | 'B') =>
+      setupContext(`admin_${org}`, { role: 'admin', orgId: `org-${org}` }).firestore();
+    const superAdmin = () => setupContext('super_1', { role: 'superAdmin' }).firestore();
+    const anon = () => testEnv.unauthenticatedContext().firestore();
+
+    beforeEach(async () => {
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        const db = context.firestore();
+        for (const orgId of ORGS) {
+          const o = orgId.slice(-1); // 'A' | 'B'
+          await db.collection('organizations').doc(orgId).set({
+            name: `기관${o}`, applicantUid: `admin_${o}`, status: 'approved',
+          });
+          for (const [uid, role] of [[`emp_${o}1`, 'employee'], [`emp_${o}2`, 'employee'], [`admin_${o}`, 'admin']] as const) {
+            await db.collection('users').doc(uid).set({
+              name: uid, email: `${uid}@example.org`, role, organizationId: orgId, status: 'active',
+            });
+          }
+          await db.collection('vehicles').doc(`v_${o}1`).set({
+            organizationId: orgId, name: `차량${o}`, plateNumber: `12가000${o === 'A' ? 1 : 2}`, currentKm: 1000,
+          });
+          // 운행일지 — 직원 1·2가 각자 작성(작성자 = 대표 운전자)
+          for (const n of [1, 2] as const) {
+            await db.collection('driveLogs').doc(`dl_${o}${n}`).set({
+              organizationId: orgId, vehicleId: `v_${o}1`,
+              driverUid: `emp_${o}${n}`, driverName: `emp_${o}${n}`, createdByUid: `emp_${o}${n}`,
+              timestamp: at, date: '2026-10-01', startKm: 1000 + n * 10, endKm: 1005 + n * 10,
+              purpose: '가정방문', destination: '복지관',
+            });
+            await db.collection('reservations').doc(`res_${o}${n}`).set({
+              organizationId: orgId, vehicleId: `v_${o}1`, date: '2026-10-20',
+              startTime: n === 1 ? '09:00' : '13:00', endTime: n === 1 ? '11:00' : '15:00',
+              reservedByUid: `emp_${o}${n}`, reservedByName: `emp_${o}${n}`, status: 'reserved',
+              purpose: '외근', destination: '구청',
+            });
+          }
+        }
+        await db.collection('users').doc('super_1').set({
+          name: '운영자', email: 'super_1@example.org', role: 'superAdmin', organizationId: null,
+        });
+        // 기관에 소속된 채로 지정된 전체 관리자 — addSuperAdmin은 organizationId를 지우지 않는다
+        await db.collection('users').doc('super_inorg').set({
+          name: '운영자(기관 소속)', email: 'super_inorg@example.org', role: 'superAdmin', organizationId: 'org-A',
+        });
+        // 규칙에 match가 없는 서버 전용 컬렉션 (기본 거부)
+        await db.collection('_health').doc('ping').set({ at });
+        await db.collection('_rateLimits').doc('k1').set({ count: 1 });
+      });
+    });
+
+    it('#1 로그인 안 한 사람은 표의 컬렉션을 읽지도 쓰지도 못한다', async () => {
+      const db = anon();
+      await assertFails(db.collection('users').doc('emp_A1').get());
+      await assertFails(db.collection('organizations').doc('org-A').get());
+      await assertFails(db.collection('vehicles').doc('v_A1').get());
+      await assertFails(db.collection('driveLogs').doc('dl_A1').get());
+      await assertFails(db.collection('reservations').doc('res_A1').get());
+      // 목록 쿼리도 기관 필터를 붙여 봐야 소용없다
+      await assertFails(db.collection('driveLogs').where('organizationId', '==', 'org-A').get());
+
+      await assertFails(db.collection('users').doc('anon_new').set({ email: 'x@example.org' }));
+      await assertFails(db.collection('users').doc('emp_A1').update({ phone: '010-0000-0000' }));
+      await assertFails(db.collection('organizations').doc('org-A').update({ name: '변경' }));
+      await assertFails(db.collection('vehicles').doc('v_A1').update({ name: '변경' }));
+      await assertFails(db.collection('driveLogs').doc('dl_anon').set({
+        organizationId: 'org-A', vehicleId: 'v_A1', driverUid: 'emp_A1', createdByUid: 'emp_A1',
+      }));
+      await assertFails(db.collection('driveLogs').doc('dl_A1').update({ purpose: '변경' }));
+      await assertFails(db.collection('reservations').doc('res_A1').update({ status: 'cancelled' }));
+      await assertFails(db.collection('reservations').doc('res_A1').delete());
+    });
+
+    it('#2 직원은 자기 기관 차량을 읽을 수 있다 (단건·목록)', async () => {
+      const db = emp('A', 1);
+      await assertSucceeds(db.collection('vehicles').doc('v_A1').get());
+      await assertSucceeds(db.collection('vehicles').where('organizationId', '==', 'org-A').get());
+    });
+
+    it('#4 직원은 다른 기관 운행일지·차량을 읽을 수 없다 (목록 쿼리 포함)', async () => {
+      const db = emp('A', 1);
+      await assertFails(db.collection('driveLogs').doc('dl_B1').get());
+      await assertFails(db.collection('vehicles').doc('v_B1').get());
+      await assertFails(db.collection('driveLogs').where('organizationId', '==', 'org-B').get());
+      await assertFails(db.collection('vehicles').where('organizationId', '==', 'org-B').get());
+      // 기관 필터가 없는 목록은 다른 기관 문서가 섞이므로 거부된다
+      await assertFails(db.collection('driveLogs').get());
+    });
+
+    it('#6b 대표 운전자 지정 — 같은 기관 다른 직원 허용, 다른 기관 uid도 현재는 허용(구성원 확인 없음)', async () => {
+      const db = emp('A', 1);
+      const base = { organizationId: 'org-A', vehicleId: 'v_A1', createdByUid: 'emp_A1', startKm: 1100, endKm: 1110 };
+      await assertSucceeds(db.collection('driveLogs').doc('dl_6b_same').set({ ...base, driverUid: 'emp_A2' }));
+      // 표 개정: 막으려면 get()으로 users를 읽어야 해 저장마다 읽기 비용이 는다. 현행 동작을 기록해 둔다.
+      await assertSucceeds(db.collection('driveLogs').doc('dl_6b_other').set({ ...base, driverUid: 'emp_B1' }));
+    });
+
+    it('#7 직원은 같은 기관 다른 직원이 작성한 운행일지를 수정·삭제할 수 없다', async () => {
+      const db = emp('A', 1);
+      await assertFails(db.collection('driveLogs').doc('dl_A2').update({ purpose: '침범' }));
+      await assertFails(db.collection('driveLogs').doc('dl_A2').delete());
+      // 대조군: 자기가 작성한 일지는 수정할 수 있다
+      await assertSucceeds(db.collection('driveLogs').doc('dl_A1').update({ purpose: '수정', lastEditedByUid: 'emp_A1' }));
+    });
+
+    it('#8 직원은 같은 기관 다른 직원의 운행일지를 읽을 수 있다 (현행 유지 — 출발 km·직전 운행 조회의 전제)', async () => {
+      const db = emp('A', 1);
+      await assertSucceeds(db.collection('driveLogs').doc('dl_A2').get());
+      // 화면은 기관+차량 조건의 목록 쿼리로 직전 기록을 찾는다(getLastVehicleEndKm 등)
+      await assertSucceeds(
+        db.collection('driveLogs').where('organizationId', '==', 'org-A').where('vehicleId', '==', 'v_A1').get()
+      );
+    });
+
+    it('#9 직원은 차량을 등록·수정·삭제할 수 없다 (관리자는 가능)', async () => {
+      const db = emp('A', 1);
+      const vehicle = { organizationId: 'org-A', name: '새 차량', plateNumber: '34나5678', currentKm: 0 };
+      await assertFails(db.collection('vehicles').doc('v_emp').set(vehicle));
+      await assertFails(db.collection('vehicles').doc('v_A1').update({ name: '이름 변경' }));
+      await assertFails(db.collection('vehicles').doc('v_A1').update({ currentKm: 1200 }));
+      await assertFails(db.collection('vehicles').doc('v_A1').delete());
+      // 대조군
+      const adminDb = admin('A');
+      await assertSucceeds(adminDb.collection('vehicles').doc('v_admin').set(vehicle));
+      await assertSucceeds(adminDb.collection('vehicles').doc('v_A1').update({ name: '이름 변경' }));
+    });
+
+    it('#10 직원·관리자는 자기 문서의 역할을 올리거나 기관을 바꿀 수 없다 (탈퇴·자기 강등은 허용)', async () => {
+      const empDb = emp('A', 1);
+      const self = empDb.collection('users').doc('emp_A1');
+      await assertFails(self.update({ role: 'admin' }));
+      await assertFails(self.update({ role: 'superAdmin' }));
+      await assertFails(self.update({ organizationId: 'org-B' }));
+      await assertFails(self.update({ status: 'disabled' }));
+      // 탈퇴 분기: 기관을 비우고 employee로 — 허용 (clearUserOrganization)
+      await assertSucceeds(self.update({ organizationId: null, role: 'employee' }));
+
+      const adminDb = admin('A');
+      const adminSelf = adminDb.collection('users').doc('admin_A');
+      await assertFails(adminSelf.update({ role: 'superAdmin' }));
+      await assertFails(adminSelf.update({ organizationId: 'org-B' }));
+      // 표 정밀화(b): 관리자는 자기 역할을 낮출 수 있다 — 권한 상승이 아니다
+      await assertSucceeds(adminSelf.update({ role: 'employee' }));
+    });
+
+    it('#11 기관 관리자는 자기 기관 운행일지를 읽고 수정할 수 있다', async () => {
+      const db = admin('A');
+      await assertSucceeds(db.collection('driveLogs').doc('dl_A1').get());
+      await assertSucceeds(db.collection('driveLogs').where('organizationId', '==', 'org-A').get());
+      await assertSucceeds(db.collection('driveLogs').doc('dl_A1').update({ purpose: '정정', lastEditedByUid: 'admin_A' }));
+    });
+
+    it('#12 기관 관리자는 다른 기관 데이터를 읽거나 쓸 수 없다', async () => {
+      const db = admin('A');
+      await assertFails(db.collection('driveLogs').doc('dl_B1').get());
+      await assertFails(db.collection('vehicles').doc('v_B1').get());
+      await assertFails(db.collection('reservations').doc('res_B1').get());
+      await assertFails(db.collection('users').doc('emp_B1').get());
+      await assertFails(db.collection('driveLogs').where('organizationId', '==', 'org-B').get());
+
+      await assertFails(db.collection('driveLogs').doc('dl_B1').update({ purpose: '침범' }));
+      await assertFails(db.collection('driveLogs').doc('dl_B1').delete());
+      await assertFails(db.collection('vehicles').doc('v_B1').update({ name: '침범' }));
+      await assertFails(db.collection('reservations').doc('res_B1').update({ status: 'cancelled' }));
+      await assertFails(db.collection('users').doc('emp_B1').update({ role: 'admin' }));
+      await assertFails(db.collection('driveLogs').doc('dl_into_B').set({
+        organizationId: 'org-B', vehicleId: 'v_B1', driverUid: 'admin_A', createdByUid: 'admin_A',
+      }));
+      await assertFails(db.collection('vehicles').doc('v_into_B').set({
+        organizationId: 'org-B', name: '침범', plateNumber: '00가0000', currentKm: 0,
+      }));
+    });
+
+    it('#13 기관 관리자는 같은 기관 직원의 역할을 admin·employee로만 바꿀 수 있다', async () => {
+      const db = admin('A');
+      await assertSucceeds(db.collection('users').doc('emp_A1').update({ role: 'admin', lastEditedByUid: 'admin_A' }));
+      await assertSucceeds(db.collection('users').doc('emp_A1').update({ role: 'employee', lastEditedByUid: 'admin_A' }));
+      await assertFails(db.collection('users').doc('emp_A2').update({ role: 'superAdmin' }));
+      await assertFails(db.collection('users').doc('emp_A2').update({ organizationId: 'org-B' }));
+    });
+
+    it('#13 기관 관리자는 자기 기관에 소속된 전체 관리자를 강등·비활성화할 수 없다', async () => {
+      // addSuperAdmin은 organizationId를 지우지 않아 기관 소속 전체 관리자가 생긴다.
+      // 2단계 분류 (a) 규칙 문제 후보 — users update의 관리자 분기에 대상 역할 조건이 없다.
+      const db = admin('A');
+      await assertFails(db.collection('users').doc('super_inorg').update({ role: 'employee' }));
+      await assertFails(db.collection('users').doc('super_inorg').update({ status: 'disabled' }));
+    });
+
+    it('#15 전체 관리자는 모든 기관의 운행일지·차량·예약을 직접 조회할 수 있다 (현행 유지 — 테스트 모드의 전제)', async () => {
+      const db = superAdmin();
+      await assertSucceeds(db.collection('driveLogs').doc('dl_B1').get());
+      await assertSucceeds(db.collection('vehicles').doc('v_A1').get());
+      await assertSucceeds(db.collection('reservations').doc('res_B2').get());
+      await assertSucceeds(db.collection('driveLogs').where('organizationId', '==', 'org-B').get());
+      await assertSucceeds(db.collection('driveLogs').get());
+    });
+
+    it('#16 직원은 자기 기관 예약 현황을 읽을 수 있다 (단건·목록)', async () => {
+      const db = emp('A', 1);
+      await assertSucceeds(db.collection('reservations').doc('res_A2').get());
+      await assertSucceeds(
+        db.collection('reservations').where('organizationId', '==', 'org-A').where('date', '==', '2026-10-20').get()
+      );
+    });
+
+    it('#19 직원은 다른 직원의 예약을 수정·취소할 수 없다 (기관 관리자는 가능)', async () => {
+      const db = emp('A', 1);
+      const others = db.collection('reservations').doc('res_A2');
+      await assertFails(others.update({ status: 'cancelled' }));
+      await assertFails(others.update({ purpose: '침범' }));
+      await assertFails(others.delete());
+      await assertSucceeds(admin('A').collection('reservations').doc('res_A2').update({ status: 'cancelled' }));
+    });
+
+    it('#20 직원은 예약 수정 시 예약자를 다른 사람으로 바꿀 수 없다', async () => {
+      const db = emp('A', 1);
+      const mine = db.collection('reservations').doc('res_A1');
+      await assertFails(mine.update({ reservedByUid: 'emp_A2' }));
+      await assertFails(mine.update({ reservedByUid: 'emp_A2', reservedByName: 'emp_A2' }));
+      // 대조군: 정책과 무관한 정보 수정은 허용
+      await assertSucceeds(mine.update({ purpose: '외근(변경)' }));
+    });
+
+    it('#21 규칙에 없는 서버 전용 컬렉션(_health·_rateLimits)은 누구도 접근할 수 없다', async () => {
+      for (const db of [emp('A', 1), admin('A'), superAdmin()]) {
+        await assertFails(db.collection('_health').doc('ping').get());
+        await assertFails(db.collection('_rateLimits').doc('k1').get());
+        await assertFails(db.collection('_health').doc('ping').set({ at }));
+        await assertFails(db.collection('_rateLimits').doc('k2').set({ count: 0 }));
+      }
+    });
   });
 });
