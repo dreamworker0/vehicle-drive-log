@@ -9,6 +9,15 @@ on:
     types: [completed]
     branches: [master]
   workflow_dispatch:
+    inputs:
+      force_functions:
+        # firebase-tools는 소스·env 해시가 같은 함수를 "변경 없음"으로 건너뛴다. 같은 커밋을
+        # 다시 배포하면 SENTRY_RELEASE도 같아 함수가 하나도 다시 빌드되지 않는다.
+        # 함수 컨테이너 이미지를 새로 만들어야 할 때(2026-10-23 장애: Artifact Registry 정리 정책이
+        # 이미지를 지운 뒤 베이스 이미지 자동 업데이트가 오자 전 함수가 기동 전 500) 켠다.
+        description: "변경 없는 함수도 강제로 다시 빌드·배포"
+        type: boolean
+        default: false
 
 # 최소 권한 — 배포는 Firebase 서비스 계정으로 수행하며 GITHUB_TOKEN으로 저장소에 쓰지 않는다.
 permissions:
@@ -90,6 +99,11 @@ jobs:
           # Functions 런타임에 릴리즈를 알린다 (functions/src/core/sentry.ts가 읽는다).
           # 시크릿 파일에 넣지 않고 여기서 덧붙이는 이유: 값이 배포마다 달라진다.
           echo "SENTRY_RELEASE=${SENTRY_RELEASE_VERSION}" >> functions/.env
+          # 강제 재배포: 실행마다 다른 값을 넣어 함수 해시를 바꾼다 (inputs.force_functions 주석 참고).
+          # firebase-tools 안내 문구의 FUNCTIONS_DEPLOY_UNCHANGED는 실제로 읽히지 않는다.
+          if [ "${{ inputs.force_functions }}" = "true" ]; then
+            echo "DEPLOY_NONCE=${{ github.run_id }}-${{ github.run_attempt }}" >> functions/.env
+          fi
 
       - name: Build
         env:
