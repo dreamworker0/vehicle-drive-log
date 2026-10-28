@@ -404,6 +404,50 @@ describe('submitDriveLog', () => {
         expect(result.backgroundWarning).toBeTruthy();
     });
 
+    it('일지 쓰기가 큐에 들어가는 즉시 예약 완료를 건다 — 일지의 서버 응답을 기다리지 않는다', async () => {
+        // 통신이 약하면 일지의 서버 응답이 한참 늦는다. 그 사이 앱이 닫히면 일지만 기기에 남고
+        // 예약은 '운행 중'으로 남아 운행 종료를 두 번 누르게 된다(2026-10-28 이용 기관 신고).
+        let ackLog!: (v: unknown) => void;
+        mockCreateDriveLog.mockImplementationOnce((_data: unknown, opts?: { onWriteQueued?: () => void }) => {
+            opts?.onWriteQueued?.();
+            return new Promise(resolve => { ackLog = resolve; });
+        });
+
+        const pending = submitDriveLog(makeCtx({ reservationData: { reservationId: 'r1' } }));
+        await Promise.resolve();
+
+        // 일지가 아직 서버에 닿지 않았는데도 예약 완료 쓰기가 이미 걸려 있다
+        expect(mockUpdateReservationStatus).toHaveBeenCalledWith('r1', 'completed', expect.anything());
+
+        ackLog({});
+        const result = await pending;
+        expect(result.success).toBe(true);
+        // 미리 건 쓰기를 기다릴 뿐, 한 번 더 쓰지 않는다
+        expect(mockUpdateReservationStatus).toHaveBeenCalledTimes(1);
+    });
+
+    it('직전 기록 확인에 걸려 일지를 쓰지 않으면 예약도 건드리지 않는다', async () => {
+        mockCreateDriveLog.mockRejectedValueOnce(
+            Object.assign(new Error('직전 운행 기록과 출발 주행거리가 일치하지 않습니다.'), { code: 'REQUIRES_START_KM_CONFIRMATION' }),
+        );
+
+        await expect(submitDriveLog(makeCtx({ reservationData: { reservationId: 'r1' } }))).rejects.toThrow();
+        expect(mockUpdateReservationStatus).not.toHaveBeenCalled();
+    });
+
+    it('미리 건 예약 완료가 실패해도 본 저장은 성공시키되 경고를 남긴다', async () => {
+        mockUpdateReservationStatus.mockRejectedValueOnce(new Error('network'));
+        mockCreateDriveLog.mockImplementationOnce(async (_data: unknown, opts?: { onWriteQueued?: () => void }) => {
+            opts?.onWriteQueued?.();
+            return {};
+        });
+
+        const result = await submitDriveLog(makeCtx({ reservationData: { reservationId: 'r1' } }));
+
+        expect(result.success).toBe(true);
+        expect(result.backgroundWarning).toContain('예약 상태');
+    });
+
     it('예약 상태 전환이 실패해도 본 저장은 성공시키되 backgroundWarning을 전파한다', async () => {
         mockUpdateReservationStatus.mockRejectedValueOnce(new Error('network'));
 

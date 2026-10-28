@@ -232,6 +232,9 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
 
             setSuccess(true);
             if (reservationData?.reservationId || reservationData?.actualStartTime) {
+                // 오늘 화면을 새로 받게 한다. 이 길에서만 빠져 있어, 저장 직전에 받아 둔
+                // '운행 중' 화면이 그대로 떠 운행 종료를 다시 누르게 만들었다.
+                invalidateDashboardCache();
                 navigate('/employee/today', { replace: true });
             } else if (isEditMode) {
                 navigate(editReturnTo || '/employee/my-records', { replace: true });

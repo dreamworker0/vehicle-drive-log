@@ -5,9 +5,10 @@
  * 리팩토링: Mutation 핸들러 → useDashboardActions 분리
  */
 
-import { useState, useMemo, useCallback, use } from 'react';
+import { useState, useMemo, useCallback, useEffect, useRef, use } from 'react';
 import { useAuth } from './useAuth';
-import { getVehicles, getWeekReservations, getMyDriveLogs } from '../lib/firestore';
+import { getVehicles, getWeekReservations, getMyDriveLogs, updateReservationStatus } from '../lib/firestore';
+import { captureError } from '../lib/sentry';
 import { toLocalDateStr } from '../lib/dateUtils';
 import { auth as firebaseAuth } from '../lib/firebase';
 import { refreshTokenSilently } from '../lib/tokenRefresh';
@@ -127,17 +128,45 @@ export default function useTodayDashboard() {
 
     // 2. 로컬 Override 반영
     const vehicles = serverVehicles;
-    const todayReservations = useMemo(() => 
-        serverToday
-            .filter(r => !localCancelledIds.has(r.id))
-            .map(r => localStartedIds.has(r.id) ? { ...r, status: 'in_progress' as ReservationStatus, actualStartTime: localStartedIds.get(r.id) } : r)
-    , [serverToday, localCancelledIds, localStartedIds]);
 
-    const weekReservations = useMemo(() => 
-        serverWeek
+    /**
+     * 운행일지가 이미 있는데 '운행 중'으로 남은 내 예약 → 일지 기준으로 끝난 운행으로 본다.
+     *
+     * 일지는 올라갔는데 예약 완료 쓰기가 빠진 경우다(통신이 약할 때 저장 중 앱이 닫히면 생긴다).
+     * 화면에 '운행 중'이 그대로 뜨면 운전자는 운행 종료를 다시 눌러 같은 운행의 일지를 두 번
+     * 쓴다(2026-10-28 이용 기관 신고). 일지가 있다는 것은 운행이 끝났다는 확실한 근거다.
+     */
+    const loggedEndTimes = useMemo(() => {
+        const map = new Map<string, string>();
+        for (const log of myLogs) {
+            if (log.reservationId) map.set(log.reservationId, log.endTime || '');
+        }
+        return map;
+    }, [myLogs]);
+    const applyLocalState = useCallback((list: Reservation[]) =>
+        list
             .filter(r => !localCancelledIds.has(r.id))
             .map(r => localStartedIds.has(r.id) ? { ...r, status: 'in_progress' as ReservationStatus, actualStartTime: localStartedIds.get(r.id) } : r)
-    , [serverWeek, localCancelledIds, localStartedIds]);
+            .map(r => r.status === 'in_progress' && loggedEndTimes.has(r.id) ? { ...r, status: 'completed' as ReservationStatus } : r)
+    , [localCancelledIds, localStartedIds, loggedEndTimes]);
+
+    const todayReservations = useMemo(() => applyLocalState(serverToday), [serverToday, applyLocalState]);
+    const weekReservations = useMemo(() => applyLocalState(serverWeek), [serverWeek, applyLocalState]);
+
+    // 위에서 끝난 운행으로 본 예약은 서버에도 완료로 고쳐 둔다 — 화면만 고치면 차량이 계속
+    // 점유된 것으로 보이고 미작성 알림이 울린다. 소유자 본인의 in_progress → completed라 규칙이 허용한다.
+    const healedIds = useRef(new Set<string>());
+    useEffect(() => {
+        if (!user?.uid) return;
+        for (const r of serverWeek) {
+            if (r.reservedByUid !== user.uid || r.status !== 'in_progress') continue;
+            if (!loggedEndTimes.has(r.id) || healedIds.current.has(r.id)) continue;
+            healedIds.current.add(r.id);
+            updateReservationStatus(r.id, 'completed', {
+                actualEndTime: loggedEndTimes.get(r.id) || r.endTime,
+            }).catch(err => captureError(err, { context: 'useTodayDashboard.healLoggedReservation', reservationId: r.id }));
+        }
+    }, [serverWeek, loggedEndTimes, user]);
 
     // 3. 파생 상태 연산
     const incompleteAlerts = useMemo(() => {

@@ -30,8 +30,24 @@ export interface UpdateDriveLogResult {
     backgroundError: Error | string | null;
 }
 
+export interface CreateDriveLogOptions {
+    /**
+     * 일지 쓰기가 로컬 쓰기 큐에 들어간 직후, **서버 응답을 기다리기 전에** 부른다.
+     *
+     * 함께 남아야 하는 쓰기(예약 완료 전환)를 여기서 걸어야 한다. 서버 응답 뒤에 걸면
+     * 통신이 약할 때 그 사이 앱이 닫히는 순간 일지만 기기에 남고 예약 쓰기는 시작도 못 한다.
+     * 다음 실행에서 일지만 올라가 예약이 '운행 중'으로 남고, 운전자는 운행 종료를 다시
+     * 눌러 일지를 두 번 쓴다(2026-10-28 이용 기관 신고). 직전 기록 검증에 걸려 쓰기 자체를
+     * 하지 않는 경우에는 부르지 않는다.
+     */
+    onWriteQueued?: () => void;
+}
+
 // 운행일지 생성 (중복 방지 체크 포함)
-export const createDriveLog = async (data: Partial<DriveLog>): Promise<CreateDriveLogResult> => {
+export const createDriveLog = async (
+    data: Partial<DriveLog>,
+    options: CreateDriveLogOptions = {},
+): Promise<CreateDriveLogResult> => {
     try {
         const logDate = data.timestamp instanceof Date 
             ? data.timestamp 
@@ -72,6 +88,7 @@ export const createDriveLog = async (data: Partial<DriveLog>): Promise<CreateDri
         const expiresAt = new Date(Date.now() + 5 * 365 * 24 * 60 * 60 * 1000); // TTL: 5 years
         const finalData = sanitizeUndefined({ ...data, id: docRef.id, createdAt: serverTimestamp(), expiresAt });
         const promise = setDoc(docRef, finalData);
+        options.onWriteQueued?.();
 
         if (!isOffline) {
             await promise;

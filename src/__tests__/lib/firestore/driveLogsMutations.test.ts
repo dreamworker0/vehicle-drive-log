@@ -109,6 +109,27 @@ describe('firestore/driveLogs/mutations', () => {
             expect(fs.setDoc).toHaveBeenCalled();
         });
 
+        it('onWriteQueued는 쓰기를 건 직후, 서버 응답을 기다리기 전에 부른다', async () => {
+            // 서버 응답이 오지 않는 약한 통신을 흉내 낸다
+            vi.mocked(fs.setDoc).mockReturnValueOnce(new Promise(() => {}) as never);
+            const onWriteQueued = vi.fn();
+
+            void createDriveLog({ organizationId: 'org1', vehicleId: 'v1', startKm: 100, endKm: 200 }, { onWriteQueued });
+
+            await vi.waitFor(() => expect(onWriteQueued).toHaveBeenCalledTimes(1));
+            expect(fs.setDoc).toHaveBeenCalledTimes(1);
+        });
+
+        it('직전 기록 확인에 걸려 쓰지 않으면 onWriteQueued도 부르지 않는다', async () => {
+            vi.mocked(getVehicleEndKmBefore).mockResolvedValueOnce(150);
+            const onWriteQueued = vi.fn();
+
+            await expect(createDriveLog({
+                organizationId: 'org1', vehicleId: 'v1', startKm: 100, endKm: 200, timestamp: new Date(),
+            }, { onWriteQueued })).rejects.toMatchObject({ code: 'REQUIRES_START_KM_CONFIRMATION' });
+            expect(onWriteQueued).not.toHaveBeenCalled();
+        });
+
         it('오프라인: setDoc를 await하지 않고 enqueue(CREATE)에 쌓는다 (직전 기록 확인도 생략)', async () => {
             setOnline(false);
 

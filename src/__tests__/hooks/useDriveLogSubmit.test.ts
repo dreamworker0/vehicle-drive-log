@@ -42,6 +42,7 @@ vi.mock('../../lib/firebase', () => ({ hasDurableLocalCache: () => mockDurable()
 vi.mock('../../lib/sentry', () => ({ captureError: vi.fn() }));
 
 import { useDriveLogSubmit, type SubmitDeps } from '../../hooks/driveLogForm/useDriveLogSubmit';
+import { invalidateDashboardCache } from '../../hooks/useTodayDashboard';
 import { getEmptyForm } from '../../hooks/driveLogForm/submitDriveLog';
 import type { DriveLogForm } from '../../hooks/driveLogForm/types';
 import type { DriveLog } from '../../types/driveLog';
@@ -297,6 +298,14 @@ describe('중복·타임아웃은 성공으로 처리한다', () => {
         mockSubmitDriveLog.mockRejectedValue(new Error('중복 요청'));
         await submit(deps({ reservationData: { reservationId: 'r1' } }));
 
+        expect(mockNavigate).toHaveBeenCalledWith('/employee/today', { replace: true });
+    });
+
+    it('타임아웃으로 오늘의 운행에 돌아갈 때 저장 전에 받아 둔 화면을 버린다 — 운행 중이 남아 다시 누르게 하지 않는다', async () => {
+        mockSubmitDriveLog.mockRejectedValue(new Error('TIMEOUT'));
+        await submit(deps({ reservationData: { reservationId: 'r1' } }));
+
+        expect(invalidateDashboardCache).toHaveBeenCalled();
         expect(mockNavigate).toHaveBeenCalledWith('/employee/today', { replace: true });
     });
 
