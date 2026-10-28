@@ -5,7 +5,7 @@
  *  - **진단 대상에 쓰지 않는다**, 특히 바인딩 **선점 등록** 경로를 부르지 않는다
  *  - 운영 경로와 같은 순서로 판정한다 (값 형식 → 기관 바인딩 → 캘린더 접근)
  *  - 기관 × 캘린더로 묶는다 — 같은 ID를 쓰는 다른 기관이 한 행에 뭉쳐 사라지지 않는다
- *  - 404/403/쿼터403을 구분한다 (기관이 할 조치가 각각 다르다)
+ *  - 404/403/쿼터403/보기 권한을 구분한다 (기관이 할 조치가 각각 다르다)
  *  - 요약 네 갈래가 **배타적**이다 — 겹치면 운영자가 규모를 과대평가한다
  */
 
@@ -267,6 +267,19 @@ describe('probeCalendarAccess', () => {
             const byId = Object.fromEntries(res.rows.map(r => [r.calendarId, r.verdict]));
             expect(byId['gone@example.or.kr']).toBe('not_found');
             expect(byId['noperm@example.or.kr']).toBe('forbidden');
+        });
+
+        it("읽히지만 accessRole이 보기 권한이면 read_only로 가르고 '리셋만으로 복구'에서 뺀다", async () => {
+            // 목록은 보기 권한으로도 읽힌다 — ok로 접으면 리셋해도 앱 예약이 계속 403으로 떨어진다
+            mockVehiclesGet.mockResolvedValue({
+                docs: [vehicle('v1', { googleCalendarId: 'view@example.or.kr', organizationId: 'o1', calendarSyncFailCount: 10 })],
+            });
+            mockEventsList.mockResolvedValue({ data: { items: [], accessRole: 'reader' } });
+
+            const res = await probe(superAdminReq());
+            expect(res.rows[0].verdict).toBe('read_only');
+            expect(res.summary.resettableRows).toBe(0);
+            expect(res.summary.needsOrgActionVehicles).toBe(1);
         });
 
         it('숫자 코드 없이 사유 문구만 오는 오류도 운영 경로와 같은 기준으로 읽는다', async () => {

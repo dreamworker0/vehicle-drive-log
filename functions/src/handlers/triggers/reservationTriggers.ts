@@ -331,6 +331,21 @@ export const onReservationUpdated = onDocumentUpdated(
                 } catch (e: unknown) {
                     await handleCalendarError(e, "officialCalendarSync_updated", reservationId, after.vehicleId, calendarFailCount);
                 }
+            } else if (calendarId && !eventId && after.status === "reserved") {
+                // 캘린더 일정이 없는 확정 예약 — 생성 시점에 캘린더 ID가 아직 없었거나, 공유 권한이
+                // 부족해 쓰기가 403으로 떨어졌던 예약이다. 예전에는 이 분기가 없어 **수정해도 캘린더에
+                // 끝내 올라가지 않았다** (2026-10-28 이용 기관 신고: 캘린더를 나중에 연결한 뒤 기존 예약
+                // 4건이 그대로 빠져 있었다). 저장된 calendarEventId는 위 무한 루프 방지 가드가 걸러 낸다.
+                try {
+                    const newEventId = await createCalendarEvent(calendarId, after as Parameters<typeof createCalendarEvent>[1]);
+                    await getFirestore().collection("reservations").doc(reservationId).update({
+                        calendarEventId: newEventId,
+                    });
+                    if (calendarFailCount > 0) await resetCalendarFailure(after.vehicleId);
+                    console.log("Reservation " + reservationId + ": calendar event created on update (" + newEventId + ")");
+                } catch (e: unknown) {
+                    await handleCalendarError(e, "officialCalendarSync_updated_created", reservationId, after.vehicleId, calendarFailCount);
+                }
             }
 
             // 예약자에게 변경 알림 — 대상이 예약 org 소속일 때만

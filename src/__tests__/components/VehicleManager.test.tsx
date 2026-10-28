@@ -202,6 +202,27 @@ describe('캘린더 동기화 상태', () => {
         expect(screen.getByTestId('troubleshoot-modal')).toHaveTextContent('카니발');
     });
 
+    // '보기' 권한 공유는 역동기화가 성공해 실패 카운터가 늘 0이다 — 카운터만 보면 '정상'이라고
+    // 거짓말을 한다 (2026-10-28 이용 기관 신고: 배지가 정상인데 앱 예약이 캘린더에 하나도 안 올라감).
+    it.each(['reader', 'freeBusyReader'])('권한이 %s면 정상 대신 해결 버튼을 띄운다', (calendarAccessRole) => {
+        renderWith([vehicle({ googleCalendarId: 'cal@group', calendarAccessRole })]);
+
+        expect(screen.queryByText('📅 캘린더 동기화 정상')).not.toBeInTheDocument();
+        fireEvent.click(screen.getByRole('button', { name: /보기 권한만 있음/ }));
+        expect(screen.getByTestId('troubleshoot-modal')).toHaveTextContent('카니발');
+    });
+
+    it.each(['writer', 'owner'])('권한이 %s면 정상으로 표시한다', (calendarAccessRole) => {
+        renderWith([vehicle({ googleCalendarId: 'cal@group', calendarAccessRole })]);
+        expect(screen.getByText('📅 캘린더 동기화 정상')).toBeInTheDocument();
+    });
+
+    it('3회 이상 실패가 보기 권한보다 먼저 보인다', () => {
+        renderWith([vehicle({ googleCalendarId: 'cal@group', calendarAccessRole: 'reader', calendarSyncFailCount: 3 })]);
+        expect(screen.getByRole('button', { name: /캘린더 동기화 실패/ })).toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /보기 권한만 있음/ })).not.toBeInTheDocument();
+    });
+
     describe('기관이 캘린더 연동을 껐을 때', () => {
         afterEach(() => setCalendarFeature(true));
 

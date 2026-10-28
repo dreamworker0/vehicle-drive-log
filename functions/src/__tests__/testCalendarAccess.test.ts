@@ -2,7 +2,8 @@
  * testCalendarAccess.test.ts — 관리자의 캘린더 공유 설정 진단
  * - 지키는 것: 관리자 이상만, 시간당 상한(후보 ID를 훑는 오라클 방지, 2026-08-23 감사 발견 1),
  *   **다른 기관에 귀속된 캘린더는 접근 여부를 알려주지 않음**(superAdmin은 진단을 위해 예외),
- *   서비스 계정 주소 오입력 안내, 읽기 전용 스코프로 1건만 조회, 오류 코드별 안내
+ *   서비스 계정 주소 오입력 안내, 읽기 전용 스코프로 1건만 조회, 오류 코드별 안내,
+ *   보기 권한만 받은 공유는 정상이 아니라고 알림(accessRole)
  */
 
 const mockCheckRateLimitByUid = jest.fn().mockResolvedValue(undefined);
@@ -119,6 +120,20 @@ describe('testCalendarAccess — 접근 확인', () => {
         const result = await call(CAL);
         expect(result).toMatchObject({ success: false, errorType });
         expect(result.message).toContain(hint);
+    });
+
+    // 목록 조회는 보기 권한으로도 성공한다 — 성공이라고 답하면 앱 예약이 조용히 403으로 떨어진다
+    // (2026-10-28 이용 기관 신고: 연결 테스트·배지 모두 정상인데 캘린더에 아무것도 안 올라감).
+    it.each(['reader', 'freeBusyReader'])('accessRole=%s면 보기 권한 공유라고 알린다', async (accessRole) => {
+        mockEventsList.mockResolvedValueOnce({ data: { items: [], accessRole } });
+        const result = await call(CAL);
+        expect(result).toMatchObject({ success: false, errorType: 'READ_ONLY' });
+        expect(result.message).toContain('일정 변경');
+    });
+
+    it.each(['writer', 'owner', undefined])('accessRole=%s는 정상으로 본다', async (accessRole) => {
+        mockEventsList.mockResolvedValueOnce({ data: { items: [], accessRole } });
+        await expect(call(CAL)).resolves.toMatchObject({ success: true });
     });
 
     it('그 밖의 오류는 UNKNOWN으로 원문을 담는다', async () => {

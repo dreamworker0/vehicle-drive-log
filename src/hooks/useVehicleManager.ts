@@ -277,19 +277,16 @@ export default function useVehicleManager() {
                 ? CALENDAR_FAIL_RESET_FIELDS
                 : { calendarSyncFailCount: newFailCount });
             // 로컬 vehicles 배열만 업데이트 (로딩 스켈레톤 없이 카드 즉시 반영)
-            setVehicles(prev =>
-                prev.map(v =>
-                    v.id === vehicleId
-                        ? { ...v, calendarSyncFailCount: newFailCount }
-                        : v
-                )
-            );
+            // 성공이면 지난 권한 기록도 지운다 — 테스트가 쓰기 권한까지 확인했으므로
+            // '보기 권한만 있음' 배지가 다음 역동기화까지 남아 있을 이유가 없다.
+            const patch = (v: Vehicle): Vehicle => ({
+                ...v,
+                calendarSyncFailCount: newFailCount,
+                ...(success ? { calendarAccessRole: undefined } : {}),
+            });
+            setVehicles(prev => prev.map(v => (v.id === vehicleId ? patch(v) : v)));
             // editingVehicle도 업데이트하여 폼 내부 상태도 동기화
-            setEditingVehicle(prev =>
-                prev && prev.id === vehicleId
-                    ? { ...prev, calendarSyncFailCount: newFailCount }
-                    : prev
-            );
+            setEditingVehicle(prev => (prev && prev.id === vehicleId ? patch(prev) : prev));
         } catch (err) {
             captureError(err, { context: 'useVehicleManager.saveCalendarTestResult', orgId });
         }

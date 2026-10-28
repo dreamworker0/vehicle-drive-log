@@ -17,6 +17,7 @@ type ProbeVerdict =
     | 'ok'
     | 'not_found'
     | 'forbidden'
+    | 'read_only'
     | 'rate_limited'
     | 'bound_to_other_org'
     | 'service_account_address'
@@ -84,6 +85,12 @@ const VERDICT_CONFIG: Record<ProbeVerdict, { emoji: string; label: string; actio
         emoji: '🟠',
         label: '권한 부족 (403)',
         action: "기관이 서비스 계정을 '일정 변경' 권한으로 다시 초대해야 함",
+        chipClass: 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-400',
+    },
+    read_only: {
+        emoji: '🟠',
+        label: '보기 권한만 있음',
+        action: "역동기화는 돌지만 앱 예약은 캘린더에 못 씀 — 기관이 서비스 계정 권한을 '일정 변경'으로 바꿔야 함",
         chipClass: 'bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-400',
     },
     bound_to_other_org: {

@@ -141,9 +141,29 @@ function buildEvent(reservation: ReservationData): calendar_v3.Schema$Event {
 }
 
 /**
- * 캘린더 이벤트 목록 조회 (역동기화용)
+ * 서비스 계정이 캘린더를 **읽기만** 할 수 있는 권한인가.
+ *
+ * events.list 응답 최상위의 `accessRole`(none·freeBusyReader·reader·writer·owner)로 판정한다.
+ * 목록 조회는 읽기 권한으로도 성공하므로, 이것을 보지 않으면 '모든 일정 세부정보 보기'로
+ * 공유한 캘린더가 연결 테스트·역동기화 모두에서 **정상으로 보이고 앱 예약만 조용히 403으로
+ * 떨어진다.** 2026-10-28 이용 기관 신고가 정확히 이 상태였다("You need to have writer access").
+ *
+ * 값이 없거나 모르는 값이면 false — 판단 근거 없이 기관에 경고를 띄우지 않는다.
  */
-export async function listCalendarEvents(calendarId: string, timeMin: string, timeMax: string): Promise<CalendarEvent[]> {
+export function isReadOnlyAccessRole(accessRole: string | null | undefined): boolean {
+    return accessRole === "reader" || accessRole === "freeBusyReader";
+}
+
+/** 이벤트 목록 + 서비스 계정의 이 캘린더 권한 (`accessRole`, 응답에 없으면 undefined) */
+export type CalendarEventList = CalendarEvent[] & { accessRole?: string };
+
+/**
+ * 캘린더 이벤트 목록 조회 (역동기화용)
+ *
+ * 반환 배열에 `accessRole`을 함께 싣는다. 역동기화가 이 값을 차량 문서에 남겨,
+ * 쓰기 권한이 없는 공유를 관리자 화면이 '동기화 정상'으로 표시하지 않게 한다.
+ */
+export async function listCalendarEvents(calendarId: string, timeMin: string, timeMax: string): Promise<CalendarEventList> {
     const calendar = await getCalendarClient();
 
     const res = await calendar.events.list({
@@ -155,7 +175,7 @@ export async function listCalendarEvents(calendarId: string, timeMin: string, ti
         maxResults: 250,
     });
 
-    return (res.data.items || []).map((event) => ({
+    const events = (res.data.items || []).map((event) => ({
         id: event.id!,
         summary: event.summary || "",
         description: event.description || "",
@@ -165,6 +185,7 @@ export async function listCalendarEvents(calendarId: string, timeMin: string, ti
         updated: event.updated || "",
         creator: event.creator || null,
     }));
+    return Object.assign(events, { accessRole: res.data.accessRole ?? undefined });
 }
 
 interface ParsedReservation {

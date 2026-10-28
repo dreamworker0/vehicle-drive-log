@@ -71,6 +71,13 @@ export const vehicleSchema = z.object({
     calendarSyncLastFailReason: z.enum(['not_found', 'forbidden', 'other']).optional().catch(undefined),
     /** 마지막 실패의 HTTP 상태 코드 (403·404 등). 사유를 판별하지 못하면 기록하지 않는다. */
     calendarSyncLastFailStatus: z.coerce.number().optional().catch(undefined),
+    /**
+     * 서비스 계정의 이 캘린더 권한 (Google `accessRole`: owner·writer·reader·freeBusyReader, 백엔드 기록).
+     * 역동기화가 바뀔 때만 쓴다. 목록 조회는 '보기' 권한으로도 성공해 실패 카운터가 늘 0으로
+     * 돌아오므로, 이 값이 없으면 앱 예약을 캘린더에 쓰지 못하는 차량도 '동기화 정상'으로 보였다
+     * (2026-10-28 이용 기관 신고).
+     */
+    calendarAccessRole: z.string().optional().catch(undefined),
     /** 영구 중단을 기관 관리자에게 알린 시각 — 중복 발송 방지 겸 통지 여부 확인 근거 */
     calendarSyncDisabledNotifiedAt: timestampSchema.optional().catch(undefined),
     /**

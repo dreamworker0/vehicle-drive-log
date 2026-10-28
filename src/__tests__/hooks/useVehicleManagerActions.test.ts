@@ -359,6 +359,7 @@ describe('폐차 / 복원 / 정비 해제', () => {
 
 describe('캘린더 연동 테스트 결과 반영', () => {
     it('성공하면 실패 상태를 통째로 되돌리고 목록을 다시 읽지 않는다 — 스켈레톤 깜빡임 방지', async () => {
+        mockGetVehicles.mockResolvedValue([vehicle({ calendarAccessRole: 'reader' })]);
         const { result } = await setup();
         mockGetVehicles.mockClear();
 
@@ -372,16 +373,22 @@ describe('캘린더 연동 테스트 결과 반영', () => {
         expect(payload).toHaveProperty('calendarSyncLastFailReason');
         expect(payload).toHaveProperty('calendarSyncLastFailStatus');
         expect(payload).toHaveProperty('calendarSyncDisabledNotifiedAt');
+        // 테스트가 쓰기 권한까지 확인했으므로 지난 '보기 권한' 기록도 지운다 — 남기면
+        // 공유를 고친 뒤에도 다음 역동기화까지 '보기 권한만 있음' 배지가 남는다.
+        expect(payload).toHaveProperty('calendarAccessRole');
         expect(mockGetVehicles).not.toHaveBeenCalled();
         expect(result.current.vehicles[0].calendarSyncFailCount).toBe(0);
+        expect(result.current.vehicles[0].calendarAccessRole).toBeUndefined();
     });
 
-    it('실패하면 실패 카운터를 3으로 올려 경고 상태로 만든다', async () => {
+    it('실패하면 실패 카운터를 3으로 올려 경고 상태로 만든다 — 권한 기록은 건드리지 않는다', async () => {
+        mockGetVehicles.mockResolvedValue([vehicle({ calendarAccessRole: 'reader' })]);
         const { result } = await setup();
         await act(async () => { await result.current.handleCalendarTestResult('v1', false); });
 
         expect(mockUpdateVehicle).toHaveBeenCalledWith('v1', { calendarSyncFailCount: 3 });
         expect(result.current.vehicles[0].calendarSyncFailCount).toBe(3);
+        expect(result.current.vehicles[0].calendarAccessRole).toBe('reader');
     });
 
     it('저장이 실패해도 화면을 깨뜨리지 않는다', async () => {
