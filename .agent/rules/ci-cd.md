@@ -158,15 +158,23 @@ Cloud Build에서의 2차 불필요한 빌드를 방지하기 위해 다음 설�
 배포 시 용량 초과나 불필요한 파일 전송을 막기 위해 Cloud Functions 전송 범위는 최적화되어야 한다.
 - `node_modules/`, `src/` (TypeScript 원본), 테스트 파일 등은 배포 대상에서 제외된다.
 
-### 2.4 머지는 한 건씩 — Deploy 성공을 확인한 뒤 다음 머지
-- master 머지(= 푸시)마다 Deploy가 **함수 전체**를 갱신한다. PR 여러 개를 짧은 간격으로 머지하면 Cloud Functions API
+### 2.4 머지는 GitHub 자동 머지로 — 연속 배포는 Deploy 워크플로가 막는다
+- 2026-10-29부터 저장소의 **Allow auto-merge**를 켰다. PR을 연 뒤 `gh pr merge <번호> --auto --squash`를 걸어 두면
+  필수 검사(`ci`·`e2e`·`functions-tests`·`security-audit`)가 초록이 되는 순간 GitHub가 squash 머지한다.
+  에이전트가 CI를 지켜보다가 머지할 필요가 없다. 사용자가 직접 판단하겠다고 한 PR에만 걸지 않는다.
+- master 머지(= 푸시)마다 Deploy가 **함수 전체**를 갱신한다. 배포가 연달아 돌면 Cloud Functions API
   한도(`Quota Exceeded`)에 걸려 일부 함수 갱신이 실패하고, **그 Deploy의 Hosting 단계가 실행되지 않는다**
-  (2026-10-01 실제 발생 — 사용자가 Discord·화면으로 먼저 발견, Phase 235). master CI는 concurrency로 앞선 실행을
-  취소하므로 중간 커밋의 Deploy는 skipped/cancelled로 보이기도 한다.
-- 그래서 **앞 머지의 Deploy가 끝나고 로그로 반영을 확인한 뒤** 다음 PR을 머지한다. 판정: 함수마다
-  `Successful update/create operation`(일시적 `failed to update function`은 재시도로 성공하면 정상), Hosting `release complete`.
-- 일부 함수가 끝내 실패했다면 로컬 `firebase deploy`가 아니라 `gh run rerun <run-id> --failed`로 복구한다.
-- 문서 전용 PR은 Deploy가 돌지 않으므로(§1.2) 기다리지 않고 다음으로 넘어간다.
+  (2026-10-01 실제 발생 — 사용자가 Discord·화면으로 먼저 발견, Phase 235). 예전에는 사람이 "앞 Deploy 확인 뒤 다음 머지"로
+  막았고, 자동 머지는 그 순서를 지켜 주지 않으므로 이제 **Deploy 워크플로가 막는다**:
+  - `concurrency: production-deploy`로 한 번에 하나만 돈다(기존).
+  - **직전 배포와 간격 두기** — 직전 배포가 5분 안에 끝났으면 남은 시간만큼 기다린 뒤 함수를 배포한다.
+  - **한도 초과 재시도** — 함수 배포가 한도 초과로 실패하면 90초 뒤 한 번 더 배포한다(실패한 함수만 다시 올라간다).
+- master CI는 concurrency로 앞선 실행을 취소하므로, 짧은 간격으로 두 건이 머지되면 중간 커밋의 Deploy는 skipped/cancelled로
+  보이고 뒤 커밋의 배포가 둘을 함께 싣는다. 정상이다.
+- 배포 결과는 여전히 확인해 보고한다. 판정: 함수마다 `Successful update/create operation`(일시적 `failed to update function`은
+  재시도로 성공하면 정상), Hosting `release complete`.
+- 재시도까지 실패했다면 로컬 `firebase deploy`가 아니라 `gh run rerun <run-id> --failed`로 복구한다.
+- 문서 전용 PR은 Deploy가 돌지 않는다(§1.2).
 
 ---
 

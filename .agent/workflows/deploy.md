@@ -86,15 +86,16 @@ git switch -c <type>/<짧은-설명> ; git add <파일들> ; git commit -m "<typ
 ```
 Working directory: `.`
 
-6. CI가 전부 초록이고 미해결 리뷰 지적이 없으면 squash 머지한다(GitHub auto-merge는 저장소 설정상 쓸 수 없다):
+6. 자동 머지를 걸어 둔다. 필수 검사가 전부 초록이 되면 GitHub가 squash 머지한다(2026-10-29부터 저장소에서 허용).
+   미해결 리뷰 지적이 생기면 `gh pr merge <PR번호> --disable-auto`로 풀고 고친다:
 ```powershell
-gh pr checks <PR번호> ; gh pr merge <PR번호> --squash
+gh pr merge <PR번호> --auto --squash
 ```
 Working directory: `.`
 
-> ⚠️ **머지는 한 건씩 — 앞 머지의 Deploy 성공을 확인한 뒤 다음 PR을 머지한다.** 머지마다 Deploy가 함수 전체를
-> 갱신하는데, 연달아 돌면 Cloud Functions API 한도(`Quota Exceeded`)에 걸려 일부 함수가 실패하고 **Hosting 단계가
-> 실행되지 않는다**(2026-10-01 실제 발생, Phase 235). 자세한 규칙은 [ci-cd §2.4](../rules/ci-cd.md).
+> ⚠️ 머지마다 Deploy가 함수 전체를 갱신하고, 연달아 돌면 Cloud Functions API 한도(`Quota Exceeded`)에 걸려
+> **Hosting 단계가 실행되지 않을 수 있다**(2026-10-01 실제 발생, Phase 235). 자동 머지는 앞 배포를 기다리지 않으므로
+> Deploy 워크플로가 직전 배포와 5분 간격을 두고 한도 초과를 한 번 재시도한다. 자세한 규칙은 [ci-cd §2.4](../rules/ci-cd.md).
 
 ### --- [STEP 3: CI 배포 모니터링] ---
 
