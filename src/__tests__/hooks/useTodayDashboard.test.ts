@@ -62,6 +62,7 @@ const { mockAuth, tokenRefresh } = vi.hoisted(() => ({
     tokenRefresh: { calls: 0, fatal: false },
 }));
 vi.mock('../../lib/firebase', () => ({ db: {}, auth: mockAuth, default: {} }));
+vi.mock('../../lib/sentry', () => ({ captureError: vi.fn() }));
 
 // 실제 getIdToken(true)을 부르지 않도록 대체하고, 세션 무효화 여부를 테스트가 조종한다.
 vi.mock('../../lib/tokenRefresh', () => ({
@@ -142,6 +143,47 @@ describe('useTodayDashboard', () => {
         });
 
         expect(result.current?.hasActiveDrive).toBe(true);
+    });
+
+    describe('일지가 이미 있는데 운행 중으로 남은 예약', () => {
+        // 통신이 약할 때 저장 중 앱이 닫히면 일지만 올라가고 예약은 '운행 중'으로 남는다.
+        // 그대로 보여 주면 운행 종료를 다시 눌러 같은 운행의 일지를 두 번 쓴다(2026-10-28 신고).
+        const inProgress = { id: 'res1', vehicleId: 'v1', reservedByUid: 'testUser', status: 'in_progress', startTime: '09:30', endTime: '11:00', date: '2026-03-04' };
+
+        it('끝난 운행으로 보고 운행 중 카드를 띄우지 않는다', async () => {
+            mockGetWeekReservations.mockResolvedValueOnce([inProgress]);
+            mockGetMyDriveLogs.mockResolvedValueOnce([{ id: 'log1', reservationId: 'res1', endTime: '10:30' }]);
+
+            const { result } = await renderDashboardHook();
+
+            await waitFor(() => expect(result.current?.todayLabel).toBeDefined());
+            expect(result.current?.myReservations).toHaveLength(0);
+            expect(result.current?.hasActiveDrive).toBe(false);
+        });
+
+        it('서버의 예약도 일지의 도착 시각으로 완료 처리한다 — 다시 받아 와도 한 번만', async () => {
+            // 새로고침 뒤에도 같은 상태가 내려오는 경우(완료 쓰기가 아직 서버에 닿기 전)
+            mockGetWeekReservations.mockResolvedValueOnce([inProgress]).mockResolvedValueOnce([inProgress]);
+            const logs = [{ id: 'log1', reservationId: 'res1', endTime: '10:30' }];
+            mockGetMyDriveLogs.mockResolvedValueOnce(logs).mockResolvedValueOnce(logs);
+
+            const { result } = await renderDashboardHook();
+
+            await waitFor(() => expect(mockUpdateReservationStatus).toHaveBeenCalledWith('res1', 'completed', { actualEndTime: '10:30' }));
+            act(() => result.current?.refresh());
+            await act(async () => { await new Promise(resolve => setTimeout(resolve, 50)); });
+            expect(mockUpdateReservationStatus).toHaveBeenCalledTimes(1);
+        });
+
+        it('일지가 없는 운행 중 예약은 그대로 둔다', async () => {
+            mockGetWeekReservations.mockResolvedValueOnce([inProgress]);
+
+            const { result } = await renderDashboardHook();
+
+            await waitFor(() => expect(result.current?.todayLabel).toBeDefined());
+            expect(result.current?.hasActiveDrive).toBe(true);
+            expect(mockUpdateReservationStatus).not.toHaveBeenCalled();
+        });
     });
 
     it('navigateToReservations가 올바른 경로로 이동한다', async () => {

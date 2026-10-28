@@ -117,6 +117,18 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
 
     const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
 
+    // 예약 연계 신규 일지면 예약을 완료로 돌린다. 이 쓰기는 일지 쓰기가 큐에 들어가는 즉시
+    // 건다(createDriveLog의 onWriteQueued) — 일지의 서버 응답 뒤로 미루면 통신이 약할 때
+    // 일지만 남고 예약은 '운행 중'으로 남아 운행 종료를 두 번 누르게 된다.
+    const completesReservation = !isEditMode && !!reservationData?.reservationId;
+    const completeReservation = () => updateReservationStatus(reservationData!.reservationId!, 'completed', {
+        actualStartTime: form.startTime || '',
+        actualEndTime: form.endTime || nowTime(),
+    }).then(() => null, (e: unknown) => e ?? new Error('예약 상태 변경 실패'));
+    // 미리 건 쓰기의 결과. 실패도 값으로 받아 둔다 — 아래에서 기다리기 전에 거부되면
+    // 처리되지 않은 거부로 잡히기 때문이다.
+    const queuedReservationWrite: { result?: Promise<unknown> } = {};
+
     if (isEditMode && editLog) {
         // 다일 → 당일로 되돌린 수정에서 startDate를 **명시적으로 지운다.**
         //
@@ -158,7 +170,11 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
         };
 
 
-        const result = await createDriveLog(extendedLogData as Parameters<typeof createDriveLog>[0]);
+        const result = await createDriveLog(extendedLogData as Parameters<typeof createDriveLog>[0], {
+            onWriteQueued: completesReservation
+                ? () => { queuedReservationWrite.result = completeReservation(); }
+                : undefined,
+        });
         if (result.syncResult?.updated) syncResult = result.syncResult;
 
         // 기존의 correctedStartKm 참조 코드 제거 (더 이상 자동 보정하지 않음)
@@ -172,16 +188,12 @@ export async function submitDriveLog(ctx: SubmitContext): Promise<SubmitResult> 
     let cancelledReservationDays = 0;
 
     // 예약 상태 업데이트: 일지 저장 후 예약을 completed로 전환
-    if (!isEditMode && reservationData?.reservationId) {
-        const resId = reservationData.reservationId;
-        const actualStart = form.startTime || '';
-        const actualEnd = form.endTime || nowTime();
-        
+    if (completesReservation) {
+        const resId = reservationData!.reservationId!;
+
         try {
-            await updateReservationStatus(resId, 'completed', {
-                actualStartTime: actualStart,
-                actualEndTime: actualEnd,
-            });
+            const reservationWriteError = await (queuedReservationWrite.result ?? completeReservation());
+            if (reservationWriteError) throw reservationWriteError;
             await clearDrivingNotification(resId);
 
             // 1박2일 예약은 문서가 여러 건이다. 운행은 한 번인데 한 건만 닫으면 남은
