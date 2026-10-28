@@ -373,6 +373,15 @@ export async function syncSingleVehicleCalendar(
         timeMax.toISOString()
     );
 
+    // 서비스 계정의 이 캘린더 권한을 남긴다 — 바뀔 때만 쓴다(대부분의 주기에는 쓰기 0).
+    // 목록 조회는 '보기' 권한으로도 성공하므로, 이 기록이 없으면 앱 예약의 캘린더 쓰기가 403으로
+    // 떨어지는 차량도 아래 실패 카운터 리셋 때문에 관리자 화면에 '동기화 정상'으로 보인다
+    // (2026-10-28 이용 기관 신고). 지문 비교 **앞에** 둔다 — 지문이 같아 건너뛰는 주기에도 권한은 바뀔 수 있다.
+    const accessRole = calendarEvents.accessRole;
+    if (accessRole && vehicleData.calendarAccessRole !== accessRole) {
+        await db.collection("vehicles").doc(vehicleId).update({ calendarAccessRole: accessRole });
+    }
+
     // 캘린더가 직전 전체 동기화 이후 그대로면 Firestore는 볼 것도 바꿀 것도 없다.
     const fingerprint = computeCalendarFingerprint(calendarEvents, vehicleData, getKSTDateString(now));
     if (options.skipIfUnchanged && vehicleData.calendarSyncFingerprint === fingerprint) {

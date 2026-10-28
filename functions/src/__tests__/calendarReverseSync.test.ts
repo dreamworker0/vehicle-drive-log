@@ -523,6 +523,42 @@ describe('syncSingleVehicleCalendar — 이벤트 조회 주입', () => {
         expect(result.created).toBe(1);
     });
 
+    // 목록 조회는 '보기' 권한으로도 성공한다 — 권한을 남기지 않으면 앱 예약의 캘린더 쓰기가
+    // 403으로 떨어지는 차량도 관리자 화면에 '동기화 정상'으로 보인다 (2026-10-28 이용 기관 신고).
+    describe('캘린더 권한(accessRole) 기록', () => {
+        const withRole = (role: string | undefined) => Object.assign([makeEvent()], { accessRole: role });
+
+        it('권한이 바뀌면 차량 문서에 남긴다', async () => {
+            const listEvents = jest.fn().mockResolvedValue(withRole('reader'));
+            await syncSingleVehicleCalendar('veh-1', VEHICLE, new Set(), undefined, undefined, { listEvents: listEvents as never });
+            expect(mockUpdate).toHaveBeenCalledWith({ calendarAccessRole: 'reader' });
+        });
+
+        it('같은 권한이면 다시 쓰지 않는다', async () => {
+            const listEvents = jest.fn().mockResolvedValue(withRole('writer'));
+            await syncSingleVehicleCalendar('veh-1', { ...VEHICLE, calendarAccessRole: 'writer' }, new Set(), undefined, undefined, { listEvents: listEvents as never });
+            expect(mockUpdate).not.toHaveBeenCalledWith(expect.objectContaining({ calendarAccessRole: expect.anything() }));
+        });
+
+        it('응답에 권한이 없으면 기존 기록을 건드리지 않는다', async () => {
+            const listEvents = jest.fn().mockResolvedValue(withRole(undefined));
+            await syncSingleVehicleCalendar('veh-1', { ...VEHICLE, calendarAccessRole: 'reader' }, new Set(), undefined, undefined, { listEvents: listEvents as never });
+            expect(mockUpdate).not.toHaveBeenCalledWith(expect.objectContaining({ calendarAccessRole: expect.anything() }));
+        });
+
+        it('지문이 같아 예약 조회를 건너뛰는 주기에도 권한 변화는 남긴다', async () => {
+            const events = withRole('writer');
+            const vehicle = { ...VEHICLE, calendarAccessRole: 'reader' };
+            const fingerprint = computeCalendarFingerprint(events, vehicle, getKSTDateString(new Date()));
+            const listEvents = jest.fn().mockResolvedValue(events);
+
+            const result = await syncSingleVehicleCalendar('veh-1', { ...vehicle, calendarSyncFingerprint: fingerprint }, new Set(), undefined, undefined, { listEvents: listEvents as never, skipIfUnchanged: true });
+
+            expect(result.skippedUnchanged).toBe(true);
+            expect(mockUpdate).toHaveBeenCalledWith({ calendarAccessRole: 'writer' });
+        });
+    });
+
     it('귀속되지 않은 캘린더면 넘겨받은 조회 함수도 부르지 않는다', async () => {
         mockCalendarBindingGet.mockResolvedValue({ exists: true, data: () => ({ organizationId: 'victim-org' }) });
         const listEvents = jest.fn().mockResolvedValue([makeEvent()]);

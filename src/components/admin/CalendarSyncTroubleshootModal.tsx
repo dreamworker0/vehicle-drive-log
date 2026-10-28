@@ -15,7 +15,7 @@ import React, { useState } from 'react';
 import { firebaseFunctions } from '../../lib/firebase';
 import { httpsCallable } from 'firebase/functions';
 import type { Vehicle } from '../../types/vehicle';
-import { CALENDAR_MAX_FAIL_COUNT } from '../../lib/constants';
+import { CALENDAR_MAX_FAIL_COUNT, CALENDAR_FAIL_BADGE_THRESHOLD, isCalendarReadOnly } from '../../lib/constants';
 
 const SERVICE_ACCOUNT_EMAIL = '1066541065552-compute@developer.gserviceaccount.com';
 
@@ -56,6 +56,9 @@ export default function CalendarSyncTroubleshootModal({
     // 임계부터는 서버가 이 차량 호출을 아예 건너뛴다 — 고쳐도 저절로 돌아오지 않으므로,
     // 연동 테스트를 눌러야 복구된다는 것을 명시한다.
     const isPermanentlyDisabled = failCount >= CALENDAR_MAX_FAIL_COUNT;
+    // '보기' 권한 공유 — 실패 카운터가 쌓이지 않으므로 'N회 연속 실패' 요약은 거짓이 된다.
+    // 카운터가 배지 임계를 넘었으면 그쪽이 더 급한 상태라 기존 요약을 그대로 보인다.
+    const isReadOnlyShare = isCalendarReadOnly(vehicle.calendarAccessRole) && failCount < CALENDAR_FAIL_BADGE_THRESHOLD;
 
     const handleCopyEmail = () => {
         navigator.clipboard.writeText(SERVICE_ACCOUNT_EMAIL);
@@ -126,7 +129,19 @@ export default function CalendarSyncTroubleshootModal({
                 <div className="p-6 space-y-5">
 
                     {/* ── 현재 상태 요약 ── */}
-                    {testResult === null && (
+                    {testResult === null && isReadOnlyShare && (
+                        <div className="p-3.5 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                            <p className="text-sm font-semibold text-amber-700 dark:text-amber-400 mb-1">
+                                ⚠️ 캘린더에 일정을 쓸 권한이 없습니다
+                            </p>
+                            <p className="text-xs text-amber-700 dark:text-amber-300">
+                                서비스 계정이 이 캘린더를 <strong>보기 권한</strong>으로만 공유받았습니다.
+                                캘린더에 직접 등록한 일정은 앱으로 들어오지만, <strong>앱에서 만든 예약은 캘린더에 올라가지 않습니다.</strong>
+                                {' '}아래 1단계에서 권한을 「일정 변경」으로 바꾼 뒤 연동 테스트를 눌러주세요.
+                            </p>
+                        </div>
+                    )}
+                    {testResult === null && !isReadOnlyShare && (
                         <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
                             <div className="flex items-center gap-2 mb-1">
                                 <span className="text-sm font-semibold text-red-700 dark:text-red-400">

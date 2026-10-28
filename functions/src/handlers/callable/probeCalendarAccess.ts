@@ -43,6 +43,7 @@ import { onCall } from "firebase-functions/v2/https";
 import { getFirestore } from "firebase-admin/firestore";
 import { normalizeCalendarId, getCalendarBindingOwner } from "../../services/calendar/calendarBinding";
 import { MAX_FAIL_COUNT, calendarErrorStatus } from "../../services/calendar/calendarFailTracking";
+import { isReadOnlyAccessRole } from "../../services/calendar/calendarSync";
 import { checkRateLimitByUid } from "../../utils/rateLimit";
 import { getRateLimits } from "../../utils/constants";
 import { log, requireSuperAdmin } from "../../utils/helpers";
@@ -64,6 +65,7 @@ const ORG_MISSING = "(문서없음)";
 /** 진단 결과 유형 */
 export type ProbeVerdict =
     | "ok"                      // 접근 가능 — 공유가 살아 있다
+    | "read_only"               // 읽히지만 '보기' 권한뿐 — 역동기화는 돌고 앱 예약 쓰기는 403
     | "not_found"               // 404: 캘린더가 삭제됐거나 공유된 적이 없다
     | "forbidden"               // 403: 공유는 있으나 권한이 부족하다
     | "rate_limited"            // 403이지만 사유가 쿼터·유량 — 캘린더 상태를 알 수 없다
@@ -277,7 +279,12 @@ export const probeCalendarAccess = onCall<ProbeRequest>(
             const results = await runPooled<{ verdict: ProbeVerdict; detail?: string }>(
                 needsApi.map((calendarId) => async () => {
                     try {
-                        await calendar.events.list({ calendarId, timeMin, maxResults: 1, singleEvents: true });
+                        const res = await calendar.events.list({ calendarId, timeMin, maxResults: 1, singleEvents: true });
+                        // 목록은 보기 권한으로도 읽힌다. ok로 접으면 '리셋만으로 복구'에 들어가는데,
+                        // 리셋해도 앱 예약은 계속 캘린더 쓰기에서 떨어진다.
+                        if (isReadOnlyAccessRole(res.data.accessRole)) {
+                            return { verdict: "read_only" as ProbeVerdict, detail: `accessRole=${res.data.accessRole}` };
+                        }
                         return { verdict: "ok" as ProbeVerdict };
                     } catch (err: unknown) {
                         const message = (err as Error)?.message || "알 수 없는 오류";
@@ -378,8 +385,8 @@ export const probeCalendarAccess = onCall<ProbeRequest>(
 
         // 심각한 것부터 보이게 정렬한다 (판정 → 막힌 차량 수 → 기관명).
         const order: Record<ProbeVerdict, number> = {
-            not_found: 0, forbidden: 1, bound_to_other_org: 2, service_account_address: 3,
-            malformed: 4, rate_limited: 5, error: 6, ok: 7,
+            not_found: 0, forbidden: 1, read_only: 2, bound_to_other_org: 3, service_account_address: 4,
+            malformed: 5, rate_limited: 6, error: 7, ok: 8,
         };
         rows.sort((a, b) =>
             order[a.verdict] - order[b.verdict] ||

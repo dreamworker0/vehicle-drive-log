@@ -278,6 +278,67 @@ describe('reservationTriggers', () => {
             expect(mockSendPushToUser).not.toHaveBeenCalled();
         });
 
+        // ── 캘린더 일정이 없는 확정 예약 — 캘린더를 나중에 연결했거나 쓰기가 403으로 떨어졌던 예약 ──
+        // 예전에는 수정 분기가 calendarEventId가 있을 때만 돌아, 이런 예약은 수정해도 끝내
+        // 캘린더에 올라가지 않았다 (2026-10-28 이용 기관 신고).
+        describe('일정 없는 예약의 수정', () => {
+            const withCalendar = () => mockGet.mockResolvedValue({
+                exists: true,
+                data: () => ({ googleCalendarId: 'cal@group.calendar.google.com', organizationId: 'org1' }),
+            });
+            const base = { vehicleId: 'v1', organizationId: 'org1', date: '2026-01-01', startTime: '09:00', endTime: '10:00', destination: '시청' };
+
+            it('확정 예약이면 수정할 때 일정을 만들고 이벤트 ID를 저장한다', async () => {
+                withCalendar();
+                mockCreateCalendarEvent.mockResolvedValue('ev-new');
+
+                await (onReservationUpdated as Function)(makeUpdateEvent(
+                    { ...base, status: 'reserved' },
+                    { ...base, status: 'reserved', destination: '도청' },
+                ));
+
+                expect(mockCreateCalendarEvent).toHaveBeenCalledWith('cal@group.calendar.google.com', expect.objectContaining({ destination: '도청' }));
+                expect(mockUpdate).toHaveBeenCalledWith({ calendarEventId: 'ev-new' });
+                expect(mockUpdateCalendarEvent).not.toHaveBeenCalled();
+            });
+
+            it('이미 일정이 있으면 새로 만들지 않고 수정한다', async () => {
+                withCalendar();
+
+                await (onReservationUpdated as Function)(makeUpdateEvent(
+                    { ...base, status: 'reserved', calendarEventId: 'ev1' },
+                    { ...base, status: 'reserved', calendarEventId: 'ev1', destination: '도청' },
+                ));
+
+                expect(mockUpdateCalendarEvent).toHaveBeenCalledWith('cal@group.calendar.google.com', 'ev1', expect.anything());
+                expect(mockCreateCalendarEvent).not.toHaveBeenCalled();
+            });
+
+            it('승인 대기 예약은 수정해도 일정을 만들지 않는다 — 승인 분기가 만든다', async () => {
+                withCalendar();
+
+                await (onReservationUpdated as Function)(makeUpdateEvent(
+                    { ...base, status: 'pending' },
+                    { ...base, status: 'pending', destination: '도청' },
+                ));
+
+                expect(mockCreateCalendarEvent).not.toHaveBeenCalled();
+            });
+
+            it('쓰기 권한이 없어 403이면 Sentry로 올리지 않고 실패 카운터만 올린다', async () => {
+                withCalendar();
+                mockCreateCalendarEvent.mockRejectedValue(Object.assign(new Error('You need to have writer access to this calendar.'), { code: 403 }));
+
+                await (onReservationUpdated as Function)(makeUpdateEvent(
+                    { ...base, status: 'reserved' },
+                    { ...base, status: 'reserved', destination: '도청' },
+                ));
+
+                expect(mockCaptureError).not.toHaveBeenCalled();
+                expect(mockUpdate).toHaveBeenCalledWith(expect.objectContaining({ calendarSyncFailCount: 1 }));
+            });
+        });
+
         // ── 캘린더 실패가 알림을 삼키지 않는다 + 설정 오류는 Sentry로 올리지 않는다 ──
         describe('캘린더 실패 격리', () => {
             const withCalendar = () => mockGet.mockResolvedValue({

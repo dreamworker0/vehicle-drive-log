@@ -8,7 +8,7 @@ import { useAuth } from '../../hooks/useAuth';
 import VehicleForm from './VehicleForm';
 import ConfirmModal from '../common/ConfirmModal';
 import CalendarSyncTroubleshootModal from './CalendarSyncTroubleshootModal';
-import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
+import { VEHICLE_TYPE_ICONS, getVehicleColor, isCalendarReadOnly } from '../../lib/constants';
 import { isVehicleBlocked } from '../../lib/vehicleUtils';
 import { SkeletonCard, SkeletonBox } from '../common/Skeleton';
 import type { Vehicle } from '../../types/vehicle';
@@ -181,6 +181,19 @@ export default function VehicleManager() {
                                             onClick={(e) => { e.stopPropagation(); setCalendarTroubleshootVehicle(vehicle); }}
                                         >
                                             📅 캘린더 동기화 실패 ⚠️
+                                        </button>
+                                    );
+                                }
+                                // 실패 카운터만 보면 안 되는 경우 — '보기' 권한 공유는 역동기화가 성공해
+                                // 카운터가 늘 0으로 돌아오는데, 앱 예약은 캘린더에 하나도 쓰이지 않는다
+                                // (2026-10-28 이용 기관 신고: 배지가 '정상'인데 캘린더에 아무것도 안 올라감).
+                                if (isCalendarReadOnly(vehicle.calendarAccessRole)) {
+                                    return (
+                                        <button type="button" className="px-3 py-1.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 font-medium cursor-pointer hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors min-h-[48px]"
+                                            title="앱 예약이 캘린더에 올라가지 않습니다. 클릭하여 해결 방법을 확인하세요."
+                                            onClick={(e) => { e.stopPropagation(); setCalendarTroubleshootVehicle(vehicle); }}
+                                        >
+                                            📅 보기 권한만 있음 ⚠️
                                         </button>
                                     );
                                 }

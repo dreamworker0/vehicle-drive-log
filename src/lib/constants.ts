@@ -105,4 +105,20 @@ export const CALENDAR_FAIL_RESET_FIELDS = {
     calendarSyncLastFailReason: deleteField(),
     calendarSyncLastFailStatus: deleteField(),
     calendarSyncDisabledNotifiedAt: deleteField(),
+    // 서버 리셋에는 없다 — 서버는 역동기화마다 응답의 권한으로 다시 쓰기 때문이다. 화면의 두
+    // 리셋 지점(캘린더 ID 변경·연동 테스트 성공)은 지난 권한이 더는 사실이 아니므로 함께 지운다.
+    // 남기면 공유를 고치고 테스트까지 통과했는데 다음 역동기화 전까지 '보기 권한만 있음'이 남는다.
+    calendarAccessRole: deleteField(),
 } as const;
+
+/**
+ * 서비스 계정이 이 캘린더를 '보기' 권한으로만 공유받았는가.
+ * (서버 functions/src/services/calendar/calendarSync.ts의 isReadOnlyAccessRole과 짝을 이룬다.)
+ *
+ * 이 상태에서는 캘린더 → 앱 역동기화는 돌지만 앱 예약은 캘린더에 쓰이지 않는다. 실패 카운터는
+ * 역동기화 성공으로 늘 0으로 돌아오므로, 이것을 따로 보지 않으면 배지가 '동기화 정상'이라고 한다.
+ * 값이 없거나 모르는 값이면 false — 근거 없이 경고하지 않는다.
+ */
+export function isCalendarReadOnly(accessRole: string | null | undefined): boolean {
+    return accessRole === 'reader' || accessRole === 'freeBusyReader';
+}

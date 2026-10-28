@@ -6,6 +6,7 @@
  */
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getCalendarBindingOwner } from "../../services/calendar/calendarBinding";
+import { isReadOnlyAccessRole } from "../../services/calendar/calendarSync";
 import { checkRateLimitByUid } from "../../utils/rateLimit";
 import { getRateLimits } from "../../utils/constants";
 
@@ -95,12 +96,23 @@ export const testCalendarAccess = onCall(
 
             // 이벤트 1건만 조회하여 접근 가능 여부 테스트
             const now = new Date();
-            await calendar.events.list({
+            const res = await calendar.events.list({
                 calendarId: calendarId.trim(),
                 timeMin: now.toISOString(),
                 maxResults: 1,
                 singleEvents: true,
             });
+
+            // 목록 조회는 '보기' 권한으로도 성공한다. 여기서 성공이라고 답하면 관리자는 연동이
+            // 끝났다고 믿는데, 앱 예약은 캘린더 쓰기에서 403으로 모두 떨어진다 (2026-10-28 이용 기관 신고).
+            if (isReadOnlyAccessRole(res.data.accessRole)) {
+                return {
+                    success: false,
+                    errorType: "READ_ONLY",
+                    errorTitle: "보기 권한으로만 공유되어 있음",
+                    message: "서비스 계정이 이 캘린더를 읽을 수는 있지만 일정을 쓸 수 없어, 앱에서 만든 예약이 캘린더에 올라가지 않습니다. 구글 캘린더 설정 → 특정 사용자 또는 그룹과 공유에서 서비스 계정의 권한을 '일정 변경'으로 바꿔주세요.",
+                };
+            }
 
             return {
                 success: true,
