@@ -224,6 +224,35 @@ function isVehicleOwnName(destination: string, aliases?: VehicleNameAliases): bo
         .some(alias => normalizeForNameMatch(alias) === target);
 }
 
+/** 이름으로 찾을 기관 구성원 — users 문서에서 필요한 것만 */
+export interface MemberNameEntry {
+    uid: string;
+    name?: unknown;
+    status?: unknown;
+}
+
+/**
+ * 일정에 적힌 예약자 이름과 **정확히 같은 이름의 활성 구성원이 한 명뿐이면** 그 uid.
+ *
+ * 다른 직원의 운행을 대신 캘린더에 올리는 일이 잦은데, 예약 명의를 일정을 만든 사람으로만
+ * 정하면 목록에는 제목의 이름이, 명의는 등록한 사람이 남는다. 그러면 실제 운전자의
+ * [오늘의 운행]에는 예약이 뜨지 않고 '운행 시작'·알림이 등록한 사람에게 간다
+ * (2026-10-28 이용 기관 신고 — 9/15 이후 캘린더 예약 42건이 이렇게 어긋나 있었다).
+ *
+ * 동명이인이 있거나 한 글자라도 다르면 짐작하지 않는다(null) — 엉뚱한 사람에게 예약을
+ * 넘기는 것이 등록한 사람에게 두는 것보다 나쁘다. 비교는 공백만 무시한다.
+ */
+export function matchMemberByName(name: string, members: MemberNameEntry[]): string | null {
+    const target = normalizeForNameMatch(name);
+    if (!target) return null;
+    const hits = members.filter(m =>
+        m.status !== "disabled"
+        && typeof m.name === "string"
+        && normalizeForNameMatch(m.name) === target
+    );
+    return hits.length === 1 ? hits[0].uid : null;
+}
+
 /**
  * 캘린더 이벤트에서 예약 데이터를 파싱
  */

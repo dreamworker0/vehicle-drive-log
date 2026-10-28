@@ -13,6 +13,7 @@ const mockUpdate = jest.fn();
 const mockReservationsQueryGet = jest.fn();
 const mockDoubleCheckGet = jest.fn();
 const mockUserProfileGet = jest.fn();
+const mockMembersGet = jest.fn();
 const mockOrganizationGet = jest.fn();
 const mockCalendarBindingGet = jest.fn();
 const mockCalendarBindingCreate = jest.fn();
@@ -21,7 +22,8 @@ jest.mock('firebase-admin/firestore', () => ({
     getFirestore: () => ({
         collection: (name: string) => {
             if (name === 'users') {
-                return { doc: () => ({ get: mockUserProfileGet }) };
+                // doc().get: 생성자 프로필 / where().get: 예약자 이름 매칭용 기관 구성원 목록
+                return { doc: () => ({ get: mockUserProfileGet }), where: () => ({ get: mockMembersGet }) };
             }
             if (name === 'organizations') {
                 return { doc: () => ({ get: mockOrganizationGet }) };
@@ -64,7 +66,7 @@ jest.mock('../services/calendar/calendarSync', () => {
     };
 });
 
-import { parseEventToReservation } from '../services/calendar/calendarSync';
+import { parseEventToReservation, matchMemberByName } from '../services/calendar/calendarSync';
 import { syncSingleVehicleCalendar, computeCalendarFingerprint, createCachedEventLister } from '../handlers/scheduled/calendarSchedule';
 import { getKSTDateString } from '../utils/kstDate';
 
@@ -192,6 +194,25 @@ describe('parseEventToReservation (제목/설명 파싱)', () => {
     });
 });
 
+describe('matchMemberByName (일정의 예약자 이름 → 구성원)', () => {
+    it('이름이 같은 활성 구성원이 한 명이면 그 uid (공백은 무시)', () => {
+        expect(matchMemberByName('조 연숙', [{ uid: 'a', name: '조연숙' }, { uid: 'b', name: '이민애' }])).toBe('a');
+    });
+
+    it('동명이인이면 짐작하지 않는다', () => {
+        expect(matchMemberByName('김영웅', [{ uid: 'a', name: '김영웅' }, { uid: 'b', name: '김영웅' }])).toBeNull();
+    });
+
+    it('비활성 구성원은 후보에서 뺀다 — 남은 한 명으로 잇는다', () => {
+        expect(matchMemberByName('김영웅', [{ uid: 'a', name: '김영웅', status: 'disabled' }, { uid: 'b', name: '김영웅', status: 'active' }])).toBe('b');
+    });
+
+    it('부분 일치·빈 이름은 잇지 않는다', () => {
+        expect(matchMemberByName('조연', [{ uid: 'a', name: '조연숙' }])).toBeNull();
+        expect(matchMemberByName('  ', [{ uid: 'a', name: '' }])).toBeNull();
+    });
+});
+
 describe('syncSingleVehicleCalendar — reservedByName 폴백 체인', () => {
     beforeEach(() => {
         jest.clearAllMocks();
@@ -204,8 +225,48 @@ describe('syncSingleVehicleCalendar — reservedByName 폴백 체인', () => {
         mockOrganizationGet.mockResolvedValue({ exists: true, data: () => ({}) });
         // 캘린더는 이 차량의 기관에 귀속돼 있다 (정상 경로)
         mockCalendarBindingGet.mockResolvedValue({ exists: true, data: () => ({ organizationId: 'org-1' }) });
+        mockMembersGet.mockResolvedValue({ docs: [] });
     });
     afterEach(() => jest.restoreAllMocks());
+
+    const members = (...list: Array<{ id: string; name: string; status?: string }>) => ({
+        docs: list.map(m => ({ id: m.id, data: () => ({ name: m.name, status: m.status }) })),
+    });
+
+    it('일정의 예약자 이름이 기관 구성원과 같으면 일정을 만든 사람이 아니라 그 사람의 예약이 된다', async () => {
+        // 2026-10-28 이용 기관 신고: 이민애 님이 조연숙 님 운행을 대신 올렸는데 명의가 이민애로 잡혀
+        // 목록(조연숙)과 수정 화면(이민애)의 이름이 달랐다.
+        mockListCalendarEvents.mockResolvedValue([makeEvent({ summary: '고척동 — 조연숙' })]);
+        mockGetUserByEmail.mockResolvedValue({ uid: 'uid-creator', displayName: '이민애' });
+        mockMembersGet.mockResolvedValue(members({ id: 'uid-creator', name: '이민애' }, { id: 'uid-driver', name: '조연숙' }));
+
+        await syncSingleVehicleCalendar('veh-1', VEHICLE);
+
+        expect(mockSet).toHaveBeenCalledWith(expect.objectContaining({
+            reservedByName: '조연숙',
+            reservedByUid: 'uid-driver',
+            userId: 'uid-driver',
+        }));
+    });
+
+    it('맞는 구성원이 없으면 종전대로 일정을 만든 사람의 예약으로 둔다', async () => {
+        // 제목 뒷부분에 용도를 적은 경우("은행방문")가 대표적이다
+        mockListCalendarEvents.mockResolvedValue([makeEvent({ summary: '구로구청 — 은행방문' })]);
+        mockGetUserByEmail.mockResolvedValue({ uid: 'uid-creator', displayName: '이민애' });
+        mockMembersGet.mockResolvedValue(members({ id: 'uid-creator', name: '이민애' }));
+
+        await syncSingleVehicleCalendar('veh-1', VEHICLE);
+
+        expect(mockSet).toHaveBeenCalledWith(expect.objectContaining({ reservedByUid: 'uid-creator' }));
+    });
+
+    it('일정에 예약자 이름이 없으면 구성원 목록을 읽지 않는다', async () => {
+        mockGetUserByEmail.mockResolvedValue({ uid: 'uid-1', displayName: '김직원' });
+
+        await syncSingleVehicleCalendar('veh-1', VEHICLE);
+
+        expect(mockMembersGet).not.toHaveBeenCalled();
+    });
 
     it('Auth displayName이 있으면 예약자로 사용한다', async () => {
         mockGetUserByEmail.mockResolvedValue({ uid: 'uid-1', displayName: '김직원' });

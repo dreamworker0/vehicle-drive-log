@@ -283,6 +283,42 @@ describe('관리자 예약자 지정', () => {
         expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
     });
 
+    it('캘린더 일정의 이름과 명의가 다르면 알려 준다 — 목록과 수정 화면의 이름이 달라 혼란스러웠다', () => {
+        // 2026-10-28 이용 기관 신고: 목록엔 조연숙, 수정 화면엔 등록한 이민애로 보였다
+        const res = reservation({ syncSource: 'calendar', reservedByUid: 'u2', reservedByName: '홍길동' });
+        setup({ isAdmin: true, editingReservation: res, members, form: { ...baseForm, reservedByUid: 'u2', reservedByName: '홍길동' } });
+
+        expect(screen.getByText(/일정을 등록한/)).toBeInTheDocument();
+    });
+
+    it('앱에서 만든 예약이거나 이름이 같으면 알리지 않는다', () => {
+        const { unmount } = setup({
+            isAdmin: true, members,
+            editingReservation: reservation({ reservedByUid: 'u2', reservedByName: '홍길동' }),
+            form: { ...baseForm, reservedByUid: 'u2', reservedByName: '홍길동' },
+        });
+        expect(screen.queryByText(/일정을 등록한/)).not.toBeInTheDocument();
+        unmount();
+
+        setup({
+            isAdmin: true, members,
+            editingReservation: reservation({ syncSource: 'calendar', reservedByUid: 'u1', reservedByName: '홍길동' }),
+            form: { ...baseForm, reservedByUid: 'u1', reservedByName: '홍길동' },
+        });
+        expect(screen.queryByText(/일정을 등록한/)).not.toBeInTheDocument();
+    });
+
+    it('명의가 구성원 목록에 없으면 첫 구성원이 골라진 것처럼 보이지 않는다', () => {
+        setup({
+            isAdmin: true, members,
+            editingReservation: reservation({ syncSource: 'calendar', reservedByUid: '', reservedByName: '외부인' }),
+            form: { ...baseForm, reservedByUid: '', reservedByName: '외부인' },
+        });
+
+        const select = screen.getByRole('combobox') as HTMLSelectElement;
+        expect(select.selectedOptions[0].textContent).toContain('외부인 (구성원 아님)');
+    });
+
     it('예약자를 고르면 uid와 이름을 함께 폼에 반영한다', () => {
         const setForm = vi.fn();
         setup({ isAdmin: true, editingReservation: reservation(), members, setForm });

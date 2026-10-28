@@ -202,6 +202,16 @@ export default function ReservationSidePanel({
         ).length;
     }, [allReservations, editingRecurringGroupId, editingReservation]);
 
+    // 예약자 드롭다운 — 지금 명의에 해당하는 구성원과, 캘린더 일정의 이름과 명의가 어긋나는지
+    const ownerMember = members.find(m => m.id === form.reservedByUid);
+    // 일정 제목의 이름과 명의가 다르고 아직 예약자를 바꾸지 않았을 때만 안내한다
+    const calendarNameMismatch = !!editingReservation
+        && editingReservation.syncSource === 'calendar'
+        && !!ownerMember
+        && form.reservedByUid === editingReservation.reservedByUid
+        && !!editingReservation.reservedByName
+        && ownerMember.name !== editingReservation.reservedByName;
+
     if (!selectedDate) {
         return (
             <div className="glass-card p-8 text-center">
@@ -264,12 +274,24 @@ export default function ReservationSidePanel({
                                     }}
                                     className="input text-sm min-h-[48px]"
                                 >
+                                    {/* 명의가 구성원 목록에 없으면(캘린더 예약 등) 빈 칸을 보인다.
+                                        없으면 브라우저가 첫 구성원을 골라 놓은 것처럼 보여 실제 명의와 화면이 어긋난다. */}
+                                    {!ownerMember && (
+                                        <option value={form.reservedByUid || ''} disabled>
+                                            {form.reservedByName ? `${form.reservedByName} (구성원 아님)` : '예약자 선택'}
+                                        </option>
+                                    )}
                                     {members.map(m => (
                                         <option key={m.id} value={m.id}>
                                             {m.name || m.email} {m.role === 'admin' ? '(관리자)' : ''}
                                         </option>
                                     ))}
                                 </select>
+                                {calendarNameMismatch && (
+                                    <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+                                        📅 캘린더 일정에는 <strong>{editingReservation?.reservedByName}</strong> 님으로 적혀 있지만, 예약은 일정을 등록한 <strong>{ownerMember?.name}</strong> 님 명의예요. 실제로 운전하실 분으로 골라 주세요.
+                                    </p>
+                                )}
                             </div>
                         )}
                         <div>
