@@ -5,7 +5,7 @@ import { createHash } from "crypto";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { onSchedule } from "firebase-functions/v2/scheduler";
-import { listCalendarEvents, parseEventToReservation } from "../../services/calendar/calendarSync";
+import { listCalendarEvents, parseEventToReservation, matchMemberByName, type MemberNameEntry } from "../../services/calendar/calendarSync";
 import { isGoogleCalendarEnabled, type OrgCalendarFlagCache } from "../../services/calendar/calendarFeature";
 import { isCalendarBoundToOrg, type CalendarBindingCache } from "../../services/calendar/calendarBinding";
 import { RETRY_COOLDOWN_MS, MAX_FAIL_COUNT, isCalendarAuthError, recordCalendarFailure, resetCalendarFailure } from "../../services/calendar/calendarFailTracking";
@@ -411,6 +411,19 @@ export async function syncSingleVehicleCalendar(
 
     const calendarEventIds = new Set(calendarEvents.map(function (e) { return e.id; }));
 
+    // 기관 구성원 이름 목록 — 새 예약을 만들 때 예약자 이름을 구성원과 맞춰 볼 때만, 한 번 읽는다
+    let membersPromise: Promise<MemberNameEntry[]> | null = null;
+    const loadMembers = function (): Promise<MemberNameEntry[]> {
+        if (!membersPromise) {
+            membersPromise = db.collection("users").where("organizationId", "==", organizationId).get()
+                .then(function (snap) {
+                    reads += queryReadCount(snap);
+                    return snap.docs.map(function (d) { return { uid: d.id, name: d.data().name, status: d.data().status }; });
+                });
+        }
+        return membersPromise;
+    };
+
     // 3. 캘린더 이벤트 기준으로 동기화
     for (let j = 0; j < calendarEvents.length; j++) {
         const calEvent = calendarEvents[j];
@@ -476,6 +489,8 @@ export async function syncSingleVehicleCalendar(
             const reservationData = parseEventToReservation(
                 calEvent, vehicleId, vehicleName, organizationId, vehicleData
             ) as Record<string, unknown>;
+            // 일정 제목·설명에 사람이 적은 예약자 이름 — 아래 폴백으로 채운 이름과 구분해 둔다
+            const nameFromEvent = reservationData.reservedByName as string;
 
             // creator.email로 사용자 UID 및 이름 조회
             if (reservationData.creatorEmail) {
@@ -501,6 +516,16 @@ export async function syncSingleVehicleCalendar(
                 // (개인정보 보호를 위해 이메일 전체는 저장하지 않음)
                 if (!reservationData.reservedByName) {
                     reservationData.reservedByName = (reservationData.creatorEmail as string).split("@")[0];
+                }
+            }
+
+            // 일정에 적힌 예약자가 기관 구성원과 이름이 같으면 **그 사람의 예약**으로 잇는다.
+            // 일정을 만든 사람 기준보다 우선한다 — 다른 직원의 운행을 대신 올리는 경우다.
+            if (nameFromEvent) {
+                const memberUid = matchMemberByName(nameFromEvent, await loadMembers());
+                if (memberUid) {
+                    reservationData.reservedByUid = memberUid;
+                    reservationData.userId = memberUid;
                 }
             }
 
