@@ -34,8 +34,16 @@ export interface DriveLogLite {
     driverUid?: string;
     /** 작성자 — 기관 이동을 판별하는 근거다(아래 findReferenceIssues 주석 참고) */
     createdByUid?: string;
+    /** 작성 시각 — 운전자의 기관 이탈이 작성 이후인지 가르는 근거다 */
+    createdAt?: { toMillis(): number };
     startKm?: number;
     endKm?: number;
+}
+
+/** 감사 로그로 확인된 사용자의 기관 이탈 — 떠난 기관과 그 시각 */
+export interface OrgDeparture {
+    orgId: string;
+    atMs: number;
 }
 
 /** 참조 무결성 판정 결과 */
@@ -70,6 +78,13 @@ export interface ReferenceFindings {
  * 지정)라 위반으로 남긴다. `createdByUid`가 없는 구 기록도 판별 근거가 없으므로
  * 보수적으로 위반에 둔다.
  *
+ * 단, 작성자가 타인이어도 **운전자가 작성 이후에 그 기관을 떠났다는 감사 기록**이 있으면
+ * 이동으로 분류한다. 동료가 운행을 대신 기록해 준 뒤 그 직원이 기관을 나가면 위와 같은
+ * 이유로 정상인데 위반으로 잡혔다 — 2026-11-01 실제로 1건이 경고로 올라왔다(작성 2시간
+ * 뒤 운전자 본인이 탈퇴). 사용자 소속 변경은 `auditUserUpdated`가 **이전 소속 기준**으로
+ * 남기므로 "그 기관에서, 작성 이후에" 떠났는지 가를 수 있다. 작성 시각이 없거나 이탈이
+ * 작성보다 앞서면(이미 떠난 사람을 지정) 그대로 위반이다.
+ *
  * ## 삭제된 사용자를 위반과 가른다
  *
  * 직원을 영구 삭제(`deleteUserPermanently`)하면 사용자 문서만 지우고 **운행일지는
@@ -89,6 +104,8 @@ export function findReferenceIssues(
     deletedUserUids: ReadonlySet<string> = new Set(),
     /** 감사 로그로 삭제가 확인된 차량 ID */
     deletedVehicleIds: ReadonlySet<string> = new Set(),
+    /** 감사 로그로 확인된 사용자별 기관 이탈 */
+    orgDepartures: ReadonlyMap<string, readonly OrgDeparture[]> = new Map(),
 ): ReferenceFindings {
     const violations: string[] = [];
     const transfers: string[] = [];
@@ -123,6 +140,11 @@ export function findReferenceIssues(
                     transfers.push(
                         `log=${entry.id} driverUid=${entry.driverUid} 기관 이동(작성 당시 ${orgId} → 현재 ${owner})`,
                     );
+                } else if (leftAfterWriting(entry, orgId, orgDepartures.get(entry.driverUid))) {
+                    transfers.push(
+                        `log=${entry.id} driverUid=${entry.driverUid} ` +
+                        `기관 이동(작성 후 ${orgId}에서 이탈 → 현재 ${owner ?? '소속 없음'})`,
+                    );
                 } else {
                     violations.push(
                         `log=${entry.id} driverUid=${entry.driverUid} 타 기관 사용자(${owner}) ` +
@@ -133,6 +155,17 @@ export function findReferenceIssues(
         }
     }
     return { violations, transfers, retained };
+}
+
+/** 운전자가 이 기록을 쓴 뒤에 기록의 기관을 떠났는가 */
+function leftAfterWriting(
+    entry: DriveLogLite,
+    orgId: string,
+    departures: readonly OrgDeparture[] | undefined,
+): boolean {
+    const createdMs = entry.createdAt?.toMillis();
+    if (createdMs === undefined || !departures) return false;
+    return departures.some((d) => d.orgId === orgId && d.atMs >= createdMs);
 }
 
 /** Firestore `in` 절의 값 상한 */
@@ -162,6 +195,38 @@ export async function findDeletedTargets(
         }
     }
     return deleted;
+}
+
+/**
+ * 사용자의 기관 이탈(소속 변경) 기록을 감사 로그에서 모은다.
+ *
+ * 소속이 기록과 어긋난 운전자만 조회하므로 평소에는 0~몇 건이다. 조회 방식은
+ * findDeletedTargets와 같다(targetId `in` 후 메모리에서 거름, 새 인덱스 없음).
+ */
+export async function findOrgDepartures(
+    db: FirebaseFirestore.Firestore,
+    uids: string[],
+): Promise<Map<string, OrgDeparture[]>> {
+    const departures = new Map<string, OrgDeparture[]>();
+    for (let i = 0; i < uids.length; i += IN_CHUNK) {
+        const snap = await db.collection('auditLogs')
+            .where('targetId', 'in', uids.slice(i, i + IN_CHUNK))
+            .get();
+        for (const doc of snap.docs) {
+            const a = doc.data();
+            if (
+                a.targetType === 'user' && a.action === 'update' &&
+                Array.isArray(a.changedFields) && a.changedFields.includes('organizationId') &&
+                typeof a.targetId === 'string' && typeof a.organizationId === 'string' &&
+                typeof a.at?.toMillis === 'function'
+            ) {
+                const list = departures.get(a.targetId) ?? [];
+                list.push({ orgId: a.organizationId, atMs: a.at.toMillis() });
+                departures.set(a.targetId, list);
+            }
+        }
+    }
+    return departures;
 }
 
 /** 같은 차량의 인접 기록에서 도착 km ≠ 다음 출발 km 인 지점을 센다. */
@@ -238,13 +303,21 @@ export async function verifyMileageConsistency(): Promise<void> {
     const missingVehicleIds = [...new Set(
         logs.map((l) => l.vehicleId).filter((id): id is string => !!id && !vehicleOrg.has(id)),
     )];
-    const [deletedUserUids, deletedVehicleIds] = await Promise.all([
+    // 남이 써 준 기록인데 운전자 소속이 다른 경우만 — 기관 이탈 기록으로 이동인지 가린다.
+    const strayDriverUids = [...new Set(
+        logs
+            .filter((l) => !!l.organizationId && !!l.driverUid && userOrg.has(l.driverUid) &&
+                userOrg.get(l.driverUid) !== l.organizationId && l.createdByUid !== l.driverUid)
+            .map((l) => l.driverUid as string),
+    )];
+    const [deletedUserUids, deletedVehicleIds, orgDepartures] = await Promise.all([
         findDeletedTargets(db, 'user', missingUids),
         findDeletedTargets(db, 'vehicle', missingVehicleIds),
+        findOrgDepartures(db, strayDriverUids),
     ]);
 
     const { violations, transfers, retained } = findReferenceIssues(
-        logs, vehicleOrg, userOrg, deletedUserUids, deletedVehicleIds,
+        logs, vehicleOrg, userOrg, deletedUserUids, deletedVehicleIds, orgDepartures,
     );
     const mileageGaps = countMileageGaps(logs);
 
