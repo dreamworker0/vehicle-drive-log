@@ -94,6 +94,72 @@ describe('findReferenceIssues — 참조 무결성 (F-01/F-02 탐지)', () => {
         expect(transfers[0]).toContain('org-B');
     });
 
+    // 2026-11-01 실제 경고: 동료가 운행을 대신 기록한 지 2시간 뒤 운전자 본인이 탈퇴했다.
+    describe('타인이 작성한 기록 뒤 운전자의 기관 이탈', () => {
+        const at = (ms: number) => ({ toMillis: () => ms });
+        const leftUsers = new Map<string, string | undefined>([['u_left', undefined], ['u_B', 'org-B']]);
+
+        it('작성 이후 그 기관을 떠난 기록이 있으면 기관 이동으로 분류한다', () => {
+            const logs: DriveLogLite[] = [
+                { id: 'l13', organizationId: 'org-A', driverUid: 'u_left', createdByUid: 'u_A', createdAt: at(1000) },
+            ];
+            const departures = new Map([['u_left', [{ orgId: 'org-A', atMs: 2000 }]]]);
+            const { violations, transfers } = findReferenceIssues(
+                logs, vehicleOrg, leftUsers, new Set(), new Set(), departures,
+            );
+            expect(violations).toEqual([]);
+            expect(transfers).toHaveLength(1);
+            expect(transfers[0]).toContain('작성 후 org-A에서 이탈');
+            expect(transfers[0]).toContain('소속 없음');
+        });
+
+        it('다른 기관으로 옮긴 경우도 같다', () => {
+            const logs: DriveLogLite[] = [
+                { id: 'l14', organizationId: 'org-A', driverUid: 'u_B', createdByUid: 'u_A', createdAt: at(1000) },
+            ];
+            const departures = new Map([['u_B', [{ orgId: 'org-A', atMs: 5000 }]]]);
+            const { violations, transfers } = findReferenceIssues(
+                logs, vehicleOrg, leftUsers, new Set(), new Set(), departures,
+            );
+            expect(violations).toEqual([]);
+            expect(transfers[0]).toContain('현재 org-B');
+        });
+
+        it('작성 전에 이미 떠난 사람을 지정했으면 위반이다', () => {
+            const logs: DriveLogLite[] = [
+                { id: 'l15', organizationId: 'org-A', driverUid: 'u_left', createdByUid: 'u_A', createdAt: at(3000) },
+            ];
+            const departures = new Map([['u_left', [{ orgId: 'org-A', atMs: 2000 }]]]);
+            const { violations, transfers } = findReferenceIssues(
+                logs, vehicleOrg, leftUsers, new Set(), new Set(), departures,
+            );
+            expect(transfers).toEqual([]);
+            expect(violations[0]).toContain('타 기관 사용자');
+        });
+
+        it('다른 기관에서 떠난 기록은 근거가 되지 않는다', () => {
+            const logs: DriveLogLite[] = [
+                { id: 'l16', organizationId: 'org-A', driverUid: 'u_B', createdByUid: 'u_A', createdAt: at(1000) },
+            ];
+            const departures = new Map([['u_B', [{ orgId: 'org-C', atMs: 2000 }]]]);
+            const { violations } = findReferenceIssues(
+                logs, vehicleOrg, leftUsers, new Set(), new Set(), departures,
+            );
+            expect(violations).toHaveLength(1);
+        });
+
+        it('작성 시각이 없으면 판별 근거가 없으므로 위반에 남긴다', () => {
+            const logs: DriveLogLite[] = [
+                { id: 'l17', organizationId: 'org-A', driverUid: 'u_left', createdByUid: 'u_A' },
+            ];
+            const departures = new Map([['u_left', [{ orgId: 'org-A', atMs: 2000 }]]]);
+            const { violations } = findReferenceIssues(
+                logs, vehicleOrg, leftUsers, new Set(), new Set(), departures,
+            );
+            expect(violations).toHaveLength(1);
+        });
+    });
+
     it('작성자를 모르는 구 기록은 보수적으로 위반에 남긴다', () => {
         const logs: DriveLogLite[] = [
             { id: 'l8', organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'u_B' },
