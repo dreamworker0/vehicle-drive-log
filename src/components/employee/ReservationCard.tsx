@@ -237,10 +237,11 @@ export default function ReservationCard({
                                 </span>
                             )}
                             {reservation.routeDistance && (
-                                <p className="text-xs text-blue-500 dark:text-blue-400 flex items-center gap-2 mt-0.5">
-                                    <span>↔{Math.floor(reservation.routeDistance)}km</span>
-                                    <span>⏱{reservation.routeDuration}분</span>
-                                    {(reservation.routeTollFee ?? 0) > 0 && <span>₩{reservation.routeTollFee!.toLocaleString()}</span>}
+                                // 좁은 화면에서는 항목 단위로 줄을 넘긴다 — 항목 안에서 끊기면 "⏱ / 152 / 분"처럼 흩어진다.
+                                <p className="text-xs text-blue-500 dark:text-blue-400 flex flex-wrap items-center gap-x-2 mt-0.5">
+                                    <span className="whitespace-nowrap">↔{Math.floor(reservation.routeDistance)}km</span>
+                                    <span className="whitespace-nowrap">⏱{reservation.routeDuration}분</span>
+                                    {(reservation.routeTollFee ?? 0) > 0 && <span className="whitespace-nowrap">₩{reservation.routeTollFee!.toLocaleString()}</span>}
                                 </p>
                             )}
                         </div>
