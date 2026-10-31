@@ -122,15 +122,16 @@ export default function EmployeeLayout() {
             고정 배너(40)보다 위, 모달(50)보다 아래여야 하므로 그 사이 값을 쓴다.
             */}
             <header className="sticky top-0 z-[45] bg-white/80 dark:bg-surface-900/80 backdrop-blur-md border-b border-surface-100 dark:border-surface-700 px-4 h-[calc(3.5rem+env(safe-area-inset-top,0px))] flex items-center justify-between safe-top">
-                <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-primary-100 dark:bg-primary-900/40 rounded-lg flex items-center justify-center">
+                <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 h-8 flex-shrink-0 bg-primary-100 dark:bg-primary-900/40 rounded-lg flex items-center justify-center">
                         <svg aria-hidden="true" className="w-4 h-4 text-primary-600 dark:text-primary-400" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 0 0-10.026 0 1.106 1.106 0 0 0-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
                         </svg>
                     </div>
-                    <span className="font-semibold text-surface-900 dark:text-surface-100 text-sm">{orgName || '운행일지'}</span>
+                    {/* 기관명은 한 줄로 — 오른쪽 버튼에 밀려 "소셜프리/즘"처럼 글자 단위로 꺾이지 않게 한다. */}
+                    <span className="font-semibold text-surface-900 dark:text-surface-100 text-sm truncate" title={orgName || undefined}>{orgName || '운행일지'}</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 flex-shrink-0">
                     {isSuperAdmin && (
                         <button
                             onClick={() => { sessionStorage.removeItem(SA_TEST_ROLE_KEY); window.location.href = '/super-admin'; }}
