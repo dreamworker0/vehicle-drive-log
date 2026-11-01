@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { getToken, onMessage } from 'firebase/messaging';
 import { getMessagingInstance } from '../lib/firebase';
 import { updateUser } from '../lib/firestore';
@@ -19,8 +19,16 @@ function getNotificationAPI() {
 }
 
 export default function useNotification() {
-    const { user } = useAuth();
+    const { user, userData } = useAuth();
     const { showToast } = useToast();
+    // 저장된 토큰은 ref로 본다 — effect 의존성에 넣으면 토큰을 쓸 때마다 effect가 다시 돈다
+    // (아래 자동 갱신 effect보다 먼저 선언해 같은 커밋에서 먼저 반영되게 한다)
+    const storedFcmToken = userData?.fcmToken;
+    const storedFcmTokenRef = useRef(storedFcmToken);
+    useEffect(() => {
+        storedFcmTokenRef.current = storedFcmToken;
+    }, [storedFcmToken]);
+    const userDataLoaded = userData != null;
     const NotificationAPI = getNotificationAPI();
     const [permission, setPermission] = useState(
         NotificationAPI ? NotificationAPI.permission : 'denied'
@@ -74,8 +82,13 @@ export default function useNotification() {
     }, [user, showToast]);
 
     // 앱 로드 시 FCM 토큰 자동 갱신 (권한이 이미 granted인 경우)
+    //
+    // 저장된 토큰과 같으면 쓰지 않는다. users 문서를 쓸 때마다 트리거 3개(감사 로그·커스텀 클레임·
+    // 권한 변경 알림)가 깨어나는데, 토큰은 거의 바뀌지 않아 앱을 열 때마다 헛돌았다
+    // (2026-10 실측: 각 1.47만 회/월, Cloud Run vCPU 사용량의 약 7%). 비교하려면 users 문서가
+    // 로드돼 있어야 하므로 그 전에는 기다린다.
     useEffect(() => {
-        if (!user?.uid) return;
+        if (!user?.uid || !userDataLoaded) return;
         const Notif = getNotificationAPI();
         if (!Notif || Notif.permission !== 'granted') return;
 
@@ -86,7 +99,9 @@ export default function useNotification() {
                 const fcmToken = await getToken(messaging, { vapidKey: VAPID_KEY });
                 if (fcmToken) {
                     setToken(fcmToken);
-                    await updateUser(user.uid, { fcmToken });
+                    if (fcmToken !== storedFcmTokenRef.current) {
+                        await updateUser(user.uid, { fcmToken });
+                    }
                 }
             } catch (err: unknown) {
                 const errorMessage = err instanceof Error ? err.message : String(err);
@@ -97,7 +112,7 @@ export default function useNotification() {
                 }
             }
         })();
-    }, [user]);
+    }, [user, userDataLoaded]);
 
     // 포그라운드 메시지 수신
     useEffect(() => {
