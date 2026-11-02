@@ -31,3 +31,27 @@ export function captureInviteCodeFromUrl(): void {
         // 저장소가 막힌 환경(시크릿 모드 일부 등) — 사용자가 코드를 직접 입력하면 된다
     }
 }
+
+/**
+ * 보관해 둔 초대 코드를 주소에 `?code=`로 다시 붙인다 — 인앱 → 외부 브라우저 전환용.
+ *
+ * 카톡 인앱에서 초대 링크를 열면 위 함수가 코드를 **인앱의 localStorage**로 옮기고 주소에서
+ * 지운다. 그 뒤 외부 브라우저 전환(InAppBrowserWarning)은 현재 주소를 넘기는데, 크롬·사파리는
+ * 인앱과 저장소가 따로라 코드가 끊겨 초대 코드 화면이 빈 칸으로 떴다. 넘기는 주소에 코드를
+ * 다시 실어 보내면, 외부 브라우저의 부팅 첫 지점(main.tsx)이 같은 방식으로 다시 보관한다.
+ *
+ * 보관된 코드가 없거나 주소에 이미 코드가 있으면 그대로 돌려준다.
+ */
+export function withPendingInviteCode(url: string): string {
+    try {
+        const code = localStorage.getItem(PENDING_INVITE_CODE_KEY);
+        if (!code) return url;
+        const parsed = new URL(url);
+        if (parsed.searchParams.has('code')) return url;
+        parsed.searchParams.set('code', code);
+        return parsed.toString();
+    } catch {
+        // 저장소가 막혔거나 주소를 해석할 수 없으면 원래 주소로 넘긴다
+        return url;
+    }
+}
