@@ -302,7 +302,11 @@ jobs:
     # 조건이 거짓이면 잡은 'skipped'로 보고되고, 브랜치 보호는 skipped를 통과로 본다
     # — 위 functions-tests가 이미 같은 방식으로 동작한다(문서 PR에서 skipping 표시).
     if: needs.changes.outputs.code == 'true'
-    runs-on: ubuntu-latest
+    # ubuntu-latest가 아니라 24.04로 고정한다. 2026-11-02 ubuntu-latest가 26.04로 바뀌자
+    # 아래 캐시(키에 OS 버전이 없다)가 24.04용 WebKit을 그대로 복원했고, 26.04에는 그 빌드가
+    # 링크한 libicudata.so.74가 없어 mobile-safari 74건이 브라우저 실행 단계에서 전부 실패했다.
+    # Playwright가 26.04를 공식 지원하는 버전으로 올라간 뒤 latest로 되돌리고 캐시 키에 이미지 OS를 넣는다.
+    runs-on: ubuntu-24.04
     # 25분이었다가 40분으로 올렸다. 실제 소요는 9~12분인데, `playwright install --with-deps`가
     # apt에서 OS 의존성을 받아오는 구간이 러너 미러 상태에 따라 20분을 넘긴 적이 있다
     # (#207에서 두 번 연속 그 지점에서 25분 제한에 걸려 cancelled — 테스트는 한 줄도 못 돌았다).
