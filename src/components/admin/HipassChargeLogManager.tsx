@@ -11,6 +11,7 @@ import AdminEditedBadge from '../common/AdminEditedBadge';
 import LogExportButtons from './LogExportButtons';
 import HipassChargeEditForm from './hipassCharge/HipassChargeEditForm';
 import RecordRowActions from './RecordRowActions';
+import DateRangeSearch from './DateRangeSearch';
 import { useState } from 'react';
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -111,30 +112,22 @@ export default function HipassChargeLogManager() {
                         ))}
                     </select>
                 </div>
-                <div className="flex items-center gap-2 mt-3">
-                    <span className="text-xs text-surface-400 whitespace-nowrap">기간</span>
-                    <input
-                        type="date"
-                        value={filters.startDate}
-                        onChange={e => setFilters({ ...filters, startDate: e.target.value })}
-                        className="input text-sm flex-1 min-h-[48px]"
-                    />
-                    <span className="text-surface-300">~</span>
-                    <input
-                        type="date"
-                        value={filters.endDate}
-                        onChange={e => setFilters({ ...filters, endDate: e.target.value })}
-                        className="input text-sm flex-1 min-h-[48px]"
-                    />
+                {/* 기간 필터 — [검색]을 눌러야 적용된다 */}
+                <DateRangeSearch
+                    startDate={filters.startDate}
+                    endDate={filters.endDate}
+                    onSearch={(startDate, endDate) => setFilters({ ...filters, startDate, endDate })}
+                >
                     {(filters.search || filters.vehicleId || filters.startDate || filters.endDate) && (
                         <button
+                            type="button"
                             onClick={resetFilters}
                             className="text-xs text-surface-400 hover:text-red-500 whitespace-nowrap min-h-[48px]"
                         >
                             초기화
                         </button>
                     )}
-                </div>
+                </DateRangeSearch>
             </div>
 
             {/* 통계 토글 버튼 */}

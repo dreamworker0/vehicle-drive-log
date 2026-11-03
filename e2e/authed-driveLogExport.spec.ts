@@ -52,6 +52,8 @@ test.describe('운행일지 내보내기 여정 E2E (에뮬레이터)', () => {
         const dateInputs = page.locator('input[type="date"]');
         await dateInputs.nth(0).fill('2026-07-01');
         await dateInputs.nth(1).fill('2026-07-04');
+        // 기간은 [검색]을 눌러야 적용된다
+        await page.getByRole('button', { name: '검색', exact: true }).click();
         // 기간 필터 적용 후에도 시드 로그(07-02)가 범위 안이라 버튼은 활성 유지
         await expect(excelBtn).toBeEnabled();
 
