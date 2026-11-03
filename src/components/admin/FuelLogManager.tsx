@@ -12,6 +12,7 @@ import AdminEditedBadge from '../common/AdminEditedBadge';
 import LogExportButtons from './LogExportButtons';
 import FuelLogEditForm from './fuelLog/FuelLogEditForm';
 import RecordRowActions from './RecordRowActions';
+import DateRangeSearch from './DateRangeSearch';
 
 /** 목록 그리드 컬럼 — 마지막 칸은 수정·삭제 버튼 두 개가 들어간다 */
 const GRID_COLUMNS = '2fr 1fr 1.5fr 2fr 1.2fr 1.5fr 1.2fr 88px';
@@ -106,30 +107,22 @@ export default function FuelLogManager() {
                         ))}
                     </select>
                 </div>
-                <div className="flex items-center gap-2 mt-3">
-                    <span className="text-xs text-surface-400 whitespace-nowrap">기간</span>
-                    <input
-                        type="date"
-                        value={filters.startDate}
-                        onChange={e => setFilters({ ...filters, startDate: e.target.value })}
-                        className="input text-sm flex-1 min-h-[48px]"
-                    />
-                    <span className="text-surface-300">~</span>
-                    <input
-                        type="date"
-                        value={filters.endDate}
-                        onChange={e => setFilters({ ...filters, endDate: e.target.value })}
-                        className="input text-sm flex-1 min-h-[48px]"
-                    />
+                {/* 기간 필터 — [검색]을 눌러야 적용된다 */}
+                <DateRangeSearch
+                    startDate={filters.startDate}
+                    endDate={filters.endDate}
+                    onSearch={(startDate, endDate) => setFilters({ ...filters, startDate, endDate })}
+                >
                     {(filters.search || filters.vehicleId || filters.startDate || filters.endDate) && (
                         <button
+                            type="button"
                             onClick={resetFilters}
                             className="text-xs text-surface-400 hover:text-red-500 whitespace-nowrap min-h-[48px]"
                         >
                             초기화
                         </button>
                     )}
-                </div>
+                </DateRangeSearch>
             </div>
 
             {/* 기록 목록 */}

@@ -1,5 +1,6 @@
 import type { Vehicle } from '../../../types/vehicle';
 import type { User } from '../../../types/user';
+import DateRangeSearch from '../DateRangeSearch';
 
 interface Filters {
     vehicleId: string;
@@ -48,31 +49,22 @@ export default function DriveLogFilters({ filters, onFiltersChange, vehicles, me
                     ))}
                 </select>
             </div>
-            {/* 기간 필터 */}
-            <div className="flex items-center gap-2 mt-3">
-                <span className="text-xs text-surface-400 dark:text-surface-500 whitespace-nowrap">기간</span>
-                <input
-                    type="date"
-                    value={filters.startDate}
-                    onChange={e => onFiltersChange({ ...filters, startDate: e.target.value })}
-                    className="input text-sm flex-1"
-                />
-                <span className="text-surface-300 dark:text-surface-600">~</span>
-                <input
-                    type="date"
-                    value={filters.endDate}
-                    onChange={e => onFiltersChange({ ...filters, endDate: e.target.value })}
-                    className="input text-sm flex-1"
-                />
+            {/* 기간 필터 — [검색]을 눌러야 적용된다 */}
+            <DateRangeSearch
+                startDate={filters.startDate}
+                endDate={filters.endDate}
+                onSearch={(startDate, endDate) => onFiltersChange({ ...filters, startDate, endDate })}
+            >
                 {(filters.startDate || filters.endDate) && (
                     <button
+                        type="button"
                         onClick={() => onFiltersChange({ ...filters, startDate: '', endDate: '' })}
                         className="text-xs text-surface-400 dark:text-surface-500 hover:text-red-500 dark:hover:text-red-400 whitespace-nowrap"
                     >
                         초기화
                     </button>
                 )}
-            </div>
+            </DateRangeSearch>
         </div>
     );
 }
