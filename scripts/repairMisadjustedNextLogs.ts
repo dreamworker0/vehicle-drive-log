@@ -11,7 +11,8 @@
  *
  *   - 기본은 **조회만** 한다(쓰려면 `--apply`).
  *   - `--apply`는 **기관을 지정해야** 한다(`--org`).
- *   - 확신도 'manual'(되돌려도 앞 기록과 겹침)은 목록에만 올리고 쓰지 않는다.
+ *   - 되돌린 출발이 앞 기록 도착과 정확히 이어지는 것('exact')만 쓴다. 'gap'(빈 구간이 새로
+ *     생김)·'manual'(되돌려도 겹침)은 목록에만 올린다.
  *   - 쓰기 전 원래 값을 `scripts/.backups/`에 남기고, `--undo <백업 파일>`로 되돌린다.
  *
  * 쓰기는 `onDriveLogUpdated` 트리거를 깨운다. 출발 km만 바뀌므로 km 연쇄 재정합은 돌지 않고,
@@ -148,7 +149,9 @@ async function scan() {
             if (!vehicleNames.has(l.vehicleId)) {
                 vehicleNames.set(l.vehicleId, await nameOf("vehicles", l.vehicleId, ["displayName", "name", "plateNumber"]));
             }
-            const label = l.confidence === "exact" ? "앞 기록과 이어짐" : l.confidence === "gap" ? "앞 기록과 빈 구간" : "확인 필요(자동 복구 안 함)";
+            const label = l.confidence === "exact" ? "앞 기록과 이어짐"
+                : l.confidence === "gap" ? "빈 구간이 생김 — 확인 필요(자동 복구 안 함)"
+                    : "되돌려도 겹침 — 확인 필요(자동 복구 안 함)";
             console.log(
                 `  ${vehicleNames.get(l.vehicleId)} · ${kst(l.timestampMs)} · ${l.driverName || "-"}\n` +
                 `    출발 ${l.startKm.toLocaleString()} → ${l.restoredStartKm.toLocaleString()} ` +
