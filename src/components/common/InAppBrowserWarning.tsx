@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { openInExternalBrowser, copyUrlToClipboard, getInAppBrowserName } from '../../lib/inAppBrowser';
 import useForceLightMode from '../../hooks/useForceLightMode';
+import { withPendingInviteCode } from '../../lib/inviteCodeCapture';
 
 export default function InAppBrowserWarning() {
     // 로그인 화면과 동일한 톤(밝은 카드 + 블루 그라데이션)을 유지한다.
@@ -8,9 +9,9 @@ export default function InAppBrowserWarning() {
     const [copied, setCopied] = useState(false);
     const appName = getInAppBrowserName();
 
-    /** 공유할 URL 획득 */
+    /** 외부 브라우저로 넘길 URL — 초대 링크로 들어왔다면 보관된 코드를 다시 붙인다 */
     const getShareUrl = () => {
-        return window.location.href;
+        return withPendingInviteCode(window.location.href);
     };
 
     /** 외부 브라우저로 전환 */

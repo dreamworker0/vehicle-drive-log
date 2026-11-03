@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { captureInviteCodeFromUrl, PENDING_INVITE_CODE_KEY } from '@/lib/inviteCodeCapture';
+import { captureInviteCodeFromUrl, withPendingInviteCode, PENDING_INVITE_CODE_KEY } from '@/lib/inviteCodeCapture';
 import MAIN_SOURCE from '../../main.tsx?raw';
 
 describe('captureInviteCodeFromUrl', () => {
@@ -42,5 +42,39 @@ describe('captureInviteCodeFromUrl', () => {
         expect(call).toBeGreaterThan(-1);
         expect(branch).toBeGreaterThan(-1);
         expect(call).toBeLessThan(branch);
+    });
+});
+
+describe('withPendingInviteCode', () => {
+    beforeEach(() => {
+        localStorage.clear();
+    });
+
+    it('보관된 코드를 ?code=로 붙인다 (경로·다른 파라미터·해시는 유지)', () => {
+        localStorage.setItem(PENDING_INVITE_CODE_KEY, 'ABC123');
+        expect(withPendingInviteCode('https://drivelog.socialprism.co.kr/login?from=mail#top'))
+            .toBe('https://drivelog.socialprism.co.kr/login?from=mail&code=ABC123#top');
+    });
+
+    it('보관된 코드가 없으면 주소를 그대로 돌려준다', () => {
+        expect(withPendingInviteCode('https://drivelog.socialprism.co.kr/login'))
+            .toBe('https://drivelog.socialprism.co.kr/login');
+    });
+
+    it('주소에 이미 코드가 있으면 덮어쓰지 않는다', () => {
+        localStorage.setItem(PENDING_INVITE_CODE_KEY, 'ABC123');
+        expect(withPendingInviteCode('https://drivelog.socialprism.co.kr/?code=ZZZ999'))
+            .toBe('https://drivelog.socialprism.co.kr/?code=ZZZ999');
+    });
+
+    // 회귀 방지: 인앱에서 보관 → 주소에서 지움 → 외부 브라우저로 넘길 주소에 다시 실린다
+    it('인앱에서 캡처한 코드가 외부 브라우저로 넘길 주소에 다시 실린다', () => {
+        window.history.replaceState(null, '', '/?code=abc123');
+        captureInviteCodeFromUrl();
+        window.history.replaceState(null, '', '/login');
+
+        const next = new URL(withPendingInviteCode(window.location.href));
+        expect(next.pathname).toBe('/login');
+        expect(next.searchParams.get('code')).toBe('ABC123');
     });
 });
