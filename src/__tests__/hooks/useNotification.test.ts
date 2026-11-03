@@ -31,8 +31,12 @@ vi.mock('../../lib/firebase', () => ({
     getMessagingInstance: vi.fn().mockResolvedValue({}),
 }));
 
-// VAPID_KEY 모킹
-vi.stubEnv('VITE_FIREBASE_VAPID_KEY', 'test-vapid-key');
+// VAPID_KEY 모킹 — 훅이 모듈을 불러올 때 한 번 읽으므로 import보다 먼저 넣어야 한다.
+// 맨 위로 끌어올려지는 import 앞에서 실행되도록 vi.hoisted 안에서 넣는다. 그냥 두면
+// CI가 만든 .env(실제 키)에 기대게 되어, 저장소 비밀값을 받지 못하는 Dependabot PR에서만 깨졌다.
+vi.hoisted(() => {
+    vi.stubEnv('VITE_FIREBASE_VAPID_KEY', 'test-vapid-key');
+});
 
 import useNotification from '../../hooks/useNotification';
 
