@@ -11,10 +11,16 @@
 
 // ── 인메모리 페이크 Firestore ──
 jest.mock('firebase-admin/firestore', () => {
-    const store: { docs: Array<{ id: string; _col: string; _data: Record<string, unknown> }>; updates: Array<{ col: string; id: string; patch: Record<string, unknown> }>; commits: number } = {
+    const store: {
+        docs: Array<{ id: string; _col: string; _data: Record<string, unknown> }>;
+        updates: Array<{ col: string; id: string; patch: Record<string, unknown> }>;
+        commits: number;
+        beforeCommit: ((commitNo: number) => void) | null;
+    } = {
         docs: [],
         updates: [],
         commits: 0,
+        beforeCommit: null,
     };
 
     const applyFilter = (v: unknown, op: string, val: unknown): boolean => {
@@ -74,6 +80,7 @@ jest.mock('firebase-admin/firestore', () => {
                         id: d.id,
                         data: () => d._data,
                         ref: {
+                            __exists: () => store.docs.includes(d),
                             update: async (patch: Record<string, unknown>) => {
                                 applyPatch(d._data, patch);
                                 store.updates.push({ col: name, id: d.id, patch });
@@ -88,15 +95,21 @@ jest.mock('firebase-admin/firestore', () => {
 
     const db = {
         collection,
-        // 배치: commit 시점에 각 ref.update를 순서대로 적용한다 (커밋 횟수도 기록)
+        // 배치: commit 시점에 각 ref.update를 순서대로 적용한다 (커밋 횟수도 기록).
+        // 실제 Firestore처럼 원자적이다 — 대상 중 하나라도 지워졌으면 아무것도 쓰지 않고 NOT_FOUND를 던진다.
         batch: () => {
-            const ops: Array<{ ref: { update: (p: Record<string, unknown>) => Promise<void> }; patch: Record<string, unknown> }> = [];
+            type BatchRef = { __exists?: () => boolean; update: (p: Record<string, unknown>) => Promise<void> };
+            const ops: Array<{ ref: BatchRef; patch: Record<string, unknown> }> = [];
             return {
-                update(ref: { update: (p: Record<string, unknown>) => Promise<void> }, patch: Record<string, unknown>) {
+                update(ref: BatchRef, patch: Record<string, unknown>) {
                     ops.push({ ref, patch });
                 },
                 commit: async () => {
                     store.commits++;
+                    store.beforeCommit?.(store.commits);
+                    if (ops.some(op => op.ref.__exists?.() === false)) {
+                        throw Object.assign(new Error('5 NOT_FOUND: No document to update'), { code: 5 });
+                    }
                     for (const op of ops) await op.ref.update(op.patch);
                 },
             };
@@ -105,6 +118,12 @@ jest.mock('firebase-admin/firestore', () => {
             store.docs = docs.map(d => ({ id: d.id, _col: d.col || 'driveLogs', _data: { ...d.data } }));
             store.updates = [];
             store.commits = 0;
+            store.beforeCommit = null;
+        },
+        /** 매 배치 커밋 직전에 실행할 동작 — 조회와 커밋 사이에 끼어드는 동시 삭제 등을 흉내 낸다 */
+        __setBeforeCommit: (fn: ((commitNo: number) => void) | null) => { store.beforeCommit = fn; },
+        __remove: (col: string, id: string) => {
+            store.docs = store.docs.filter(x => !(x.id === id && x._col === col));
         },
         __updates: () => store.updates,
         __commits: () => store.commits,
@@ -153,6 +172,7 @@ import {
     KM_SYNC_CONTINUE_FIELD,
 } from '../handlers/triggers/syncDriveLogKm';
 import { handleStatsOnUpdate, handleStatsOnDelete } from '../services/statistics/updateAggregatedStats';
+import { captureError } from '../core/sentry';
 
  
 const db = getFirestore() as any;
@@ -920,6 +940,73 @@ describe('onDriveLogDeleted — 중간 기록 삭제 후 재정합', () => {
         expect(db.__get('driveLogs', 'C')).toMatchObject({ startKm: 180, endKm: 230, distance: 50 });
         // 뒤 기록이 그대로이므로 차량 누적 km도 그대로다(마지막 기록의 도착이 안 움직였다)
         expect(db.__updates().filter((u: { col: string }) => u.col === 'vehicles')).toHaveLength(0);
+    });
+
+    it('여러 건을 한꺼번에 지워 재정합 대상이 커밋 전에 사라져도 다시 조회해 끝까지 맞춘다', async () => {
+        // A(100→150) [삭제된 R 150→180] C(180→230) D(230→260) E(260→300).
+        // R의 트리거가 C·D·E를 조회한 뒤, 커밋 직전에 D도 지워진다(같은 날 기록을 함께 지운 경우).
+        // 배치가 NOT_FOUND로 통째로 실패하면 예전에는 Sentry 오류로 끝나고 아무것도 맞추지 않았다.
+        seedLogs(
+            [
+                { id: 'A', timestamp: d(5), startKm: 100, endKm: 150 },
+                { id: 'C', timestamp: d(20), startKm: 180, endKm: 230 },
+                { id: 'D', timestamp: d(22), startKm: 230, endKm: 260 },
+                { id: 'E', timestamp: d(25), startKm: 260, endKm: 300 },
+            ],
+            [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 300 } }],
+        );
+        db.__setBeforeCommit((commitNo: number) => {
+            if (commitNo === 1) db.__remove('driveLogs', 'D');
+        });
+        (captureError as jest.Mock).mockClear();
+
+        await (onDriveLogDeleted as unknown as Function)({
+            data: {
+                data: () => ({
+                    organizationId: ORG, vehicleId: VEH, timestamp: d(10),
+                    startKm: 150, endKm: 180, distance: 30,
+                }),
+            },
+            params: { logId: 'R' },
+        });
+
+        expect(captureError).not.toHaveBeenCalled();
+        expect(db.__commits()).toBe(2); // 실패한 1회 + 다시 조회한 1회
+        // D가 빠진 상태로 다시 계산한다 — C는 A에, E는 C에 이어진다(각 거리 보존)
+        expect(db.__get('driveLogs', 'C')).toMatchObject({ startKm: 150, endKm: 200 });
+        expect(db.__get('driveLogs', 'E')).toMatchObject({ startKm: 200, endKm: 240 });
+        const vehUpdates = db.__updates().filter((u: { col: string }) => u.col === 'vehicles');
+        expect(vehUpdates.at(-1)?.patch).toEqual({ currentKm: 240 });
+    });
+
+    it('재정합이 끝내 실패해도 지운 기록은 통계에서 뺀다', async () => {
+        // 매 커밋마다 뒤 기록이 하나씩 사라지는 극단적인 경우 — 재시도 상한을 넘으면 오류로 남기되,
+        // 이미 지워진 기록이 통계에 영영 남지는 않아야 한다(이 트리거는 재시도하지 않는다).
+        seedLogs([
+            { id: 'A', timestamp: d(5), startKm: 100, endKm: 150 },
+            { id: 'C', timestamp: d(20), startKm: 180, endKm: 230 },
+            { id: 'D', timestamp: d(22), startKm: 230, endKm: 260 },
+            { id: 'E', timestamp: d(25), startKm: 260, endKm: 300 },
+        ]);
+        const vanishing = ['C', 'D', 'E'];
+        db.__setBeforeCommit((commitNo: number) => {
+            db.__remove('driveLogs', vanishing[commitNo - 1]);
+        });
+        (captureError as jest.Mock).mockClear();
+        (handleStatsOnDelete as jest.Mock).mockClear();
+
+        const deleted = {
+            organizationId: ORG, vehicleId: VEH, timestamp: d(10),
+            startKm: 150, endKm: 180, distance: 30,
+        };
+        await (onDriveLogDeleted as unknown as Function)({ data: { data: () => deleted }, params: { logId: 'R' } });
+
+        expect(db.__commits()).toBe(3); // 처음 1회 + 재시도 2회에서 멈춘다
+        expect(captureError).toHaveBeenCalledWith(
+            expect.objectContaining({ code: 5 }),
+            expect.objectContaining({ context: 'onDriveLogDeleted' }),
+        );
+        expect(handleStatsOnDelete).toHaveBeenCalledWith(ORG, expect.objectContaining(deleted));
     });
 });
 

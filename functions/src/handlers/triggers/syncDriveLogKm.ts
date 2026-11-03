@@ -56,6 +56,13 @@ function isBeyondRetention(
 const MAX_DOCS_PER_RUN = 1000;
 /** 한 번에 조회·커밋하는 페이지 크기 (Firestore 배치 상한 500 이내) */
 const PAGE_SIZE = 200;
+/** 조회와 커밋 사이에 문서가 지워져 배치가 실패했을 때 그 페이지를 다시 조회하는 최대 횟수 */
+const MAX_PAGE_RETRIES = 2;
+
+/** Firestore NOT_FOUND(gRPC 5) — 없는 문서에 update를 걸었을 때 난다 */
+function isNotFoundError(error: unknown): boolean {
+    return !!error && typeof error === 'object' && (error as { code?: unknown }).code === 5;
+}
 
 /** 연쇄 쓰기임을 표시하는 필드 — 이 값이 변한 update는 트리거가 즉시 반환한다(재발동 차단). */
 export const KM_SYNC_REV_FIELD = 'kmSyncRev';
@@ -123,8 +130,12 @@ export async function syncNextLogStartKm(
     let lastEndKmDelta = 0;
     let reachedEnd = false;
     let stoppedConsistent = false;
+    let pageRetries = 0;
 
     while (processed < MAX_DOCS_PER_RUN) {
+        // 커밋이 실패하면 이 페이지를 처음부터 다시 계산하도록 시작 상태를 남긴다
+        const pageStart = { cursor, carryKm, processed, lastEndKmDelta };
+
         const snap = await db.collection('driveLogs')
             .where('organizationId', '==', orgId)
             .where('vehicleId', '==', vehicleId)
@@ -209,7 +220,24 @@ export async function syncNextLogStartKm(
         const pageExhausted = snap.docs.length < PAGE_SIZE;
         const truncatedHere = processed >= MAX_DOCS_PER_RUN && !stoppedConsistent;
 
-        if (writes > 0) await batch.commit();
+        // 같은 차량의 기록을 여러 건 한꺼번에 지우면, 조회에 잡힌 뒤 기록이 커밋 전에 지워질 수
+        // 있다(각 삭제 트리거가 서로의 뒤 기록을 고치려 든다). 배치는 원자적이라 한 건이라도
+        // 없으면 페이지 전체가 NOT_FOUND로 실패하고 아무것도 쓰이지 않는다 — 다시 조회하면
+        // 지워진 문서는 빠지므로 같은 페이지를 처음부터 다시 계산한다.
+        if (writes > 0) {
+            try {
+                await batch.commit();
+            } catch (error) {
+                if (!isNotFoundError(error) || pageRetries >= MAX_PAGE_RETRIES) throw error;
+                pageRetries++;
+                log("INFO", "syncNextLogStartKm", "재정합 중 뒤 기록이 지워져 이 페이지를 다시 조회한다", {
+                    orgId, vehicleId, attempt: pageRetries,
+                });
+                ({ cursor, carryKm, processed, lastEndKmDelta } = pageStart);
+                stoppedConsistent = false;
+                continue;
+            }
+        }
         for (const { before, after } of statsUpdates) {
             await handleStatsOnUpdate(orgId, before, after);
         }
@@ -851,6 +879,12 @@ export const onDriveLogDeleted = onDocumentDeleted(
 
             if (!orgId || !vehId || !ts) return;
 
+            // [통합 트리거] 기관 통계 차감 업데이트
+            // **km 재정합보다 앞에 둔다.** 재정합이 실패해도(예: 여러 건을 한꺼번에 지울 때의
+            // 경쟁) 이 기록은 이미 지워졌으므로 통계에서는 반드시 빠져야 한다. 뒤에 두면 예외에
+            // 걸려 건너뛰고, 이 트리거는 재시도하지 않아 지운 기록이 통계에 영영 남는다.
+            await handleStatsOnDelete(orgId, data);
+
             // 그 일지가 차량에 남긴 비고 사본을 함께 지운다. 원본을 지웠는데 사본이 남으면
             // 지울 수 있는 사람이 아무도 없다(관리자 직접 수정 경로를 열지 않았다).
             // 보존 기한은 보지 않는다 — 오래된 사본일수록 지워야 할 이유가 크다.
@@ -887,11 +921,6 @@ export const onDriveLogDeleted = onDocumentDeleted(
             // (그 운행 전의 계기판 — 예전의 "거리만큼 차감"과 같은 결과다).
             if (latestLogMayHaveChanged(hasLater, chain)) {
                 await syncVehicleCurrentKmToLatestLog('onDriveLogDeleted', orgId, vehId, startKm);
-            }
-
-            // [통합 트리거] 기관 통계 차감 업데이트
-            if (orgId) {
-                await handleStatsOnDelete(orgId, data);
             }
 
             await recordHeartbeat("onDriveLogDeleted");
