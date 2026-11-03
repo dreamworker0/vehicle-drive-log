@@ -239,41 +239,64 @@ export async function syncNextLogStartKm(
 }
 
 /**
- * 차량 누적 km(currentKm)를 쓰되, **차량이 운행일지의 기관 소속일 때만** 쓴다.
+ * 차량 누적 km(currentKm)를 **그 차량의 가장 최근 운행일지 도착 km**로 맞춘다.
  *
+ * ## 왜 거리를 더하지 않고 최근 기록을 따라가는가
+ * 예전에는 운행 거리(도착 − 출발)를 더해 갔다. 그러면 기록하지 않은 운행(앞 기록 도착 100,
+ * 다음 기록 출발 120)의 20km가 영영 빠지고, 차량 등록 때 넣은 숫자가 틀렸으면 그 차이도
+ * 계속 남았다. 차량 관리 화면의 km가 운행일지·주유일지의 계기판 숫자와 어긋난다는 문의로
+ * 드러났다(2026-11-03 궁동종합사회복지관). 운행일지의 도착 km는 운전자가 계기판을 보고 적은
+ * 값이라, 가장 최근 기록을 따라가면 계기판에 가깝게 유지되고 틀어져도 다음 기록이 바로잡는다.
+ *
+ * 관리자가 차량 수정에서 손으로 넣은 값도 다음 운행일지가 저장되면 그 도착 km로 덮인다.
+ * 기록이 하나도 없는 차량은 `fallbackKm`(없으면 그대로)을 쓴다.
+ *
+ * ## 차량이 운행일지의 기관 소속일 때만 쓴다
  * Rules는 운행일지 생성 때 vehicleId가 자기 기관 차량인지 보지 않고, 기관관리자는 수정 때
  * vehicleId를 바꿀 수도 있다. 여기서 거르지 않으면 다른 기관 차량의 문서 ID만 알아도 자기 기관
- * 일지를 그 ID로 만든 뒤 수정·삭제해서 그 차량의 currentKm을 늘리거나 줄이거나 덮어쓸 수 있다
+ * 일지를 그 ID로 만든 뒤 수정·삭제해서 그 차량의 currentKm을 덮어쓸 수 있다
  * (교차 테넌트 오염 — 2026-07-04 감사 N3, 2026-10 규칙 감사에서 수정·삭제 경로 누락 확인).
- * 생성·수정·삭제·연쇄 보정이 모두 이 함수를 지나야 한 경로만 빠지는 일이 없다.
+ * 최근 기록 조회도 운행일지의 기관으로 거르므로, 남의 기관 일지가 그 차량의 값을 정하지 못한다.
  *
- * 차량이 없거나 기관이 다르면 경고만 남기고 건너뛴다.
+ * 차량이 없거나 기관이 다르면 경고만 남기고 건너뛴다. 값이 같으면 쓰지 않는다.
  */
-async function updateOwnedVehicleCurrentKm(
+async function syncVehicleCurrentKmToLatestLog(
     context: string,
     orgId: string,
     vehId: string,
-    currentKm: number | FieldValue,
+    fallbackKm?: unknown,
 ): Promise<void> {
+    const latestSnap = await db.collection('driveLogs')
+        .where('organizationId', '==', orgId)
+        .where('vehicleId', '==', vehId)
+        .orderBy('timestamp', 'desc')
+        .limit(1)
+        .get();
+    const km = latestSnap.empty ? fallbackKm : latestSnap.docs[0].data().endKm;
+    // 최근 기록에 도착 km가 없으면(아직 운행 중 등) 지금 값을 그대로 둔다
+    if (typeof km !== 'number' || !Number.isFinite(km) || km < 0) return;
+
     const vehRef = db.collection("vehicles").doc(vehId);
     const vehSnap = await vehRef.get();
     if (!vehSnap.exists || vehSnap.data()?.organizationId !== orgId) {
         console.warn(`[${context}] 차량 org 불일치 — currentKm 갱신 건너뜀: veh=${vehId}, org=${orgId}`);
         return;
     }
-    await vehRef.update({ currentKm });
+    if (vehSnap.data()?.currentKm === km) return;
+    await vehRef.update({ currentKm: km });
 }
 
 /**
- * 연쇄 재정합이 차량의 최신 기록까지 이동시켰다면 차량 누적 km(currentKm)도 같은 폭으로 보정한다.
+ * 이번 변경으로 차량의 **가장 최근 기록의 도착 km**가 바뀌었을 수 있는가.
  *
- * 이전에는 마지막 문서의 update 트리거가 "최신 기록 수정"으로 판정해 우연히 증분해줬다.
- * 재발동을 차단한 뒤에는 그 경로가 사라지므로 여기서 명시적으로 처리한다.
+ * 뒤에 기록이 없으면 이 기록이 최근 기록이다. 뒤에 기록이 있어도 연쇄 재정합이 끝까지 닿아
+ * 무언가를 옮겼다면 최근 기록도 움직였다. 그 밖의 경우(중간 기록만 바뀌고 연쇄가 도중에 멈춤)는
+ * 최근 기록이 그대로라 조회하지 않는다 — 야간 아카이브의 대량 삭제가 차량마다 조회를 하나씩
+ * 더 붙이지 않게 한다.
  */
-async function applyChainCurrentKm(orgId: string, vehicleId: string, chain: KmChainResult): Promise<void> {
-    if (!chain.reachedEnd || chain.lastEndKmDelta === 0) return;
-
-    await updateOwnedVehicleCurrentKm('applyChainCurrentKm', orgId, vehicleId, FieldValue.increment(chain.lastEndKmDelta));
+function latestLogMayHaveChanged(hasLater: boolean, chain: KmChainResult | null): boolean {
+    if (!hasLater) return true;
+    return !!chain && chain.reachedEnd && chain.processed > 0;
 }
 
 /**
@@ -596,8 +619,6 @@ export const onDriveLogCreated = onDocumentCreated(
             const vehId = data.vehicleId;
             const ts = data.timestamp instanceof Date ? data.timestamp : data.timestamp?.toDate();
             const endKm = data.endKm;
-            const startKm = data.startKm;
-            const distance = data.distance;
             const isRetro = data.isRetroactive === true;
 
             // 하이패스 사용액을 카드 잔액에서 뺀다.
@@ -616,21 +637,10 @@ export const onDriveLogCreated = onDocumentCreated(
 
             if (!orgId || !vehId || !ts || endKm == null) return;
 
-            // 차량 누적 Km 갱신 (Race Condition 방어용 증분 업데이트)
-            const isEffectivelyRetroactive = isRetro || await hasLaterDriveLog(orgId, vehId, ts);
-
-            if (!isEffectivelyRetroactive) {
-                let distanceToAdd = 0;
-                if (distance != null) {
-                    distanceToAdd = distance;
-                } else if (startKm != null && endKm != null) {
-                    distanceToAdd = endKm - startKm;
-                }
-
-                if (distanceToAdd > 0) {
-                    await updateOwnedVehicleCurrentKm('onDriveLogCreated', orgId, vehId, FieldValue.increment(distanceToAdd));
-                }
-            }
+            // 뒤에 기록이 있는가 — 차량 km는 이것만 본다(시간상 최근 기록을 따라가므로).
+            // 현재 위치·주유 필요·직전 비고는 운전자가 표시한 소급 여부까지 함께 본다.
+            const hasLater = await hasLaterDriveLog(orgId, vehId, ts);
+            const isEffectivelyRetroactive = isRetro || hasLater;
 
             // 차를 세운 곳을 차량의 현재 위치로 반영 (소급이면 건너뛴다)
             await applyVehicleCurrentSiteSafely('onDriveLogCreated', orgId, vehId, data.endSiteId, ts, isEffectivelyRetroactive);
@@ -640,8 +650,10 @@ export const onDriveLogCreated = onDocumentCreated(
 
             // 다음 기록의 startKm 자동 연동 (소급이든 아니든 항상 시도)
             const chain = await syncNextLogStartKm(orgId, vehId, ts, endKm);
-            // 소급 삽입으로 최신 기록의 endKm이 밀렸다면 차량 누적 km도 같은 폭으로 보정
-            if (isEffectivelyRetroactive) await applyChainCurrentKm(orgId, vehId, chain);
+            // 차량 누적 km를 최근 기록의 도착 km로 맞춘다 (소급 삽입이 최근 기록까지 밀었을 때 포함)
+            if (latestLogMayHaveChanged(hasLater, chain)) {
+                await syncVehicleCurrentKmToLatestLog('onDriveLogCreated', orgId, vehId);
+            }
 
             // [통합 트리거] 기관 통계 증분 업데이트
             await handleStatsOnCreate(orgId, data);
@@ -713,7 +725,9 @@ export const onDriveLogUpdated = onDocumentUpdated(
                     const tsRaw = data.timestamp;
                     if (orgId && vehId && tsRaw && data.endKm != null) {
                         const chain = await syncNextLogStartKm(orgId, vehId, toDate(tsRaw), data.endKm);
-                        await applyChainCurrentKm(orgId, vehId, chain);
+                        if (latestLogMayHaveChanged(true, chain)) {
+                            await syncVehicleCurrentKmToLatestLog('onDriveLogUpdated', orgId, vehId);
+                        }
                     }
                     // 표시는 이어받기를 끝낸 **뒤에** 지운다.
                     // 먼저 지우면 도중에 함수가 죽을 때(타임아웃·OOM) 표시가 사라져 1,000건 이후가
@@ -770,26 +784,18 @@ export const onDriveLogUpdated = onDocumentUpdated(
                     return; // 주요 마일리지 필드 변경 없음
                 }
 
-                const isRetroactive = isRetro || await hasLaterDriveLog(orgId, vehId, ts);
-
-                if (!isRetroactive) {
-                    if (oldData.endKm !== undefined) {
-                        const distanceDiff = data.endKm - oldData.endKm;
-                        if (distanceDiff !== 0) {
-                            await updateOwnedVehicleCurrentKm('onDriveLogUpdated', orgId, vehId, FieldValue.increment(distanceDiff));
-                        }
-                    } else {
-                        // 기존 값이 없었다면 안전하게 절대값으로 갱신
-                        await updateOwnedVehicleCurrentKm('onDriveLogUpdated', orgId, vehId, data.endKm);
-                    }
-                }
+                // 차량 km는 시간상 최근 기록을 따라가므로 운전자가 표시한 소급 여부(isRetro)는 보지 않는다.
+                // 소급으로 적었어도 뒤에 기록이 없으면 그 도착 km가 지금 계기판에 가장 가까운 값이다.
+                const hasLater = await hasLaterDriveLog(orgId, vehId, ts);
 
                 // endKm 변경 시 다음 기록의 startKm 자동 연동
+                let chain: KmChainResult | null = null;
                 if (data.endKm !== oldData.endKm) {
-                    const chain = await syncNextLogStartKm(orgId, vehId, ts, data.endKm);
-                    // 중간 기록 수정으로 최신 기록까지 밀렸다면 차량 누적 km 보정
-                    // (최신 기록 자체를 수정한 경우는 위에서 이미 증분했고, 이때 연쇄 대상이 없어 delta가 0이다)
-                    if (isRetroactive) await applyChainCurrentKm(orgId, vehId, chain);
+                    chain = await syncNextLogStartKm(orgId, vehId, ts, data.endKm);
+                }
+                // 최근 기록을 고쳤거나 중간 기록 수정이 최근 기록까지 밀었다면 차량 누적 km를 다시 맞춘다
+                if (latestLogMayHaveChanged(hasLater, chain)) {
+                    await syncVehicleCurrentKmToLatestLog('onDriveLogUpdated', orgId, vehId);
                 }
             }
 
@@ -824,9 +830,7 @@ export const onDriveLogDeleted = onDocumentDeleted(
             const vehId = data.vehicleId;
             const tsRaw = data.timestamp;
             const ts = tsRaw instanceof Date ? tsRaw : tsRaw?.toDate();
-            const endKm = data.endKm;
             const startKm = data.startKm;
-            const distance = data.distance;
 
             // **해지된 기관의 파기는 제외한다**(purgeOrganizationData). 보존 기한 정리와 같은 이유로
             // 파기는 거래를 되돌리는 일이 아니다 — 환불·km 차감·통계 차감을 하지 않는다. 차량이 먼저
@@ -853,21 +857,10 @@ export const onDriveLogDeleted = onDocumentDeleted(
             await clearVehicleLastDriveNoteSafely('onDriveLogDeleted', orgId, vehId, ts);
 
             // 최신 기록 삭제 여부 판별 (자기 자신은 삭제되었으므로 본인 이후의 기록이 있는지 확인)
-            const isEffectivelyRetroactive = await hasLaterDriveLog(orgId, vehId, ts);
+            const hasLater = await hasLaterDriveLog(orgId, vehId, ts);
 
-            if (!isEffectivelyRetroactive) {
-                // 가장 최근 기록이 삭제된 경우, 해당 거리만큼 차량 누적 Km 차감 롤백
-                let distanceToSubtract = 0;
-                if (distance != null) {
-                    distanceToSubtract = distance;
-                } else if (startKm != null && endKm != null) {
-                    distanceToSubtract = endKm - startKm;
-                }
-
-                if (distanceToSubtract > 0) {
-                    await updateOwnedVehicleCurrentKm('onDriveLogDeleted', orgId, vehId, FieldValue.increment(-distanceToSubtract));
-                }
-            } else {
+            let chain: KmChainResult | null = null;
+            if (hasLater) {
                 // 소급(중간) 기록이 삭제된 경우: 
                 // 삭제된 기록 이전의 마지막 운행일지를 찾아서 그 endKm부터 이후 기록들의 startKm을 연동
                 const prevLogSnap = await db.collection('driveLogs')
@@ -886,9 +879,14 @@ export const onDriveLogDeleted = onDocumentDeleted(
                     prevEndKm = startKm ?? 0; 
                 }
 
-                const chain = await syncNextLogStartKm(orgId, vehId, ts, prevEndKm, { onAnchored: 'stop' });
-                // 중간 기록 삭제로 이후 기록이 앞으로 당겨졌다면 차량 누적 km도 같은 폭으로 보정
-                await applyChainCurrentKm(orgId, vehId, chain);
+                chain = await syncNextLogStartKm(orgId, vehId, ts, prevEndKm, { onAnchored: 'stop' });
+            }
+
+            // 최근 기록이 지워졌으면 그 앞 기록의, 중간 기록 삭제가 최근 기록까지 당겼으면 그 기록의
+            // 도착 km로 차량 누적 km를 맞춘다. 기록이 하나도 남지 않으면 지운 기록의 출발 km로 돌린다
+            // (그 운행 전의 계기판 — 예전의 "거리만큼 차감"과 같은 결과다).
+            if (latestLogMayHaveChanged(hasLater, chain)) {
+                await syncVehicleCurrentKmToLatestLog('onDriveLogDeleted', orgId, vehId, startKm);
             }
 
             // [통합 트리거] 기관 통계 차감 업데이트

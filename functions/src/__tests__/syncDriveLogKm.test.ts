@@ -399,8 +399,9 @@ describe('onDriveLogUpdated — 연쇄 재발동 차단', () => {
         // after는 델타가 아니라 문서 전체다. 예전에는 "없으면 예전 값"으로 되돌려, 소급으로
         // 적었던 일지를 오늘 도착으로 고쳐도 옛 true가 되살아나 km 갱신을 계속 건너뛰었다.
         // 화면은 고쳐졌는데 차량 상태만 안 따라오는 상태였다.
+        // 트리거가 돌 때 저장소에는 이미 수정된 문서(endKm 1080)가 있다
         seedLogs(
-            [{ id: 'B', timestamp: d(20), startKm: 1000, endKm: 1050 }],
+            [{ id: 'B', timestamp: d(20), startKm: 1000, endKm: 1080 }],
             [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1050 } }],
         );
 
@@ -411,19 +412,39 @@ describe('onDriveLogUpdated — 연쇄 재발동 차단', () => {
         ));
 
         const kmPatches = db.__updates()
-            .filter((u: { col: string; patch: Record<string, unknown> }) => u.col === 'vehicles' && 'currentKm' in u.patch);
-        expect(kmPatches).toHaveLength(1);
+            .filter((u: { col: string; patch: Record<string, unknown> }) => u.col === 'vehicles' && 'currentKm' in u.patch)
+            .map((u: { patch: Record<string, unknown> }) => u.patch);
+        expect(kmPatches).toEqual([{ currentKm: 1080 }]);
     });
 
-    it('여전히 소급인 수정은 차량 누적 km를 건드리지 않는다', async () => {
+    it('소급으로 표시돼 있어도 뒤에 기록이 없으면 그 도착 km로 맞춘다 — 시간상 최근 기록이다', async () => {
         seedLogs(
-            [{ id: 'B', timestamp: d(20), startKm: 1000, endKm: 1050 }],
+            [{ id: 'B', timestamp: d(20), startKm: 1000, endKm: 1080 }],
             [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1050 } }],
         );
 
         await (onDriveLogUpdated as unknown as Function)(makeUpdateEvent(
             { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1050, isRetroactive: true },
             { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1080, isRetroactive: true },
+        ));
+
+        expect(db.__get('vehicles', VEH)).toMatchObject({ currentKm: 1080 });
+    });
+
+    it('뒤에 기록이 있는 중간 기록 수정은 최근 기록이 그대로면 차량 누적 km를 건드리지 않는다', async () => {
+        // B를 고쳤지만 C의 출발이 이미 맞아 연쇄가 바로 멈춘다 → 최근 기록(C)은 그대로
+        seedLogs(
+            [
+                { id: 'B', timestamp: d(15), startKm: 1000, endKm: 1080 },
+                { id: 'C', timestamp: d(20), startKm: 1080, endKm: 1100 },
+            ],
+            [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1100 } }],
+        );
+
+        await (onDriveLogUpdated as unknown as Function)(makeUpdateEvent(
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(15), startKm: 1000, endKm: 1050 },
+            { organizationId: ORG, vehicleId: VEH, timestamp: d(15), startKm: 1000, endKm: 1080 },
+            'B',
         ));
 
         const kmPatches = db.__updates()
@@ -445,9 +466,12 @@ describe('onDriveLogCreated — 차량 누적 km 분기', () => {
         params: { logId: 'R' },
     });
 
-    it('소급(isRetroactive) 기록은 차량 currentKm을 증분하지 않는다', async () => {
+    it('소급(isRetroactive) 기록은 최근 기록이 그대로면 차량 currentKm을 건드리지 않는다', async () => {
         seedLogs(
-            [{ id: 'B', timestamp: d(15), startKm: 60200, endKm: 60250 }],
+            [
+                { id: 'R', timestamp: d(10), startKm: 60123, endKm: 60200 },
+                { id: 'B', timestamp: d(15), startKm: 60200, endKm: 60250 },
+            ],
             [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 60250 } }],
         );
         await (onDriveLogCreated as unknown as Function)(makeEvent({
@@ -455,7 +479,7 @@ describe('onDriveLogCreated — 차량 누적 km 분기', () => {
             startKm: 60123, endKm: 60200, distance: 77, isRetroactive: true,
         }));
 
-        // 차량 문서에 대한 업데이트(currentKm 증분)가 없어야 한다
+        // 차량 문서에 대한 업데이트가 없어야 한다
         const vehUpdates = db.__updates().filter((u: { col: string }) => u.col === 'vehicles');
         expect(vehUpdates).toHaveLength(0);
         expect(db.__get('vehicles', VEH)).toMatchObject({ currentKm: 60250 });
@@ -463,9 +487,10 @@ describe('onDriveLogCreated — 차량 누적 km 분기', () => {
         expect(db.__get('driveLogs', 'B')).toMatchObject({ startKm: 60200, endKm: 60250 });
     });
 
-    it('최신(비소급) 기록은 차량 currentKm을 주행거리만큼 증분한다', async () => {
+    it('최신(비소급) 기록은 차량 currentKm을 그 도착 km로 맞춘다', async () => {
+        // 트리거가 돌 때 저장소에는 방금 만든 문서(R)가 이미 있다
         seedLogs(
-            [],
+            [{ id: 'R', timestamp: d(20), startKm: 1000, endKm: 1050 }],
             [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1000 } }],
         );
         await (onDriveLogCreated as unknown as Function)(makeEvent({
@@ -475,15 +500,58 @@ describe('onDriveLogCreated — 차량 누적 km 분기', () => {
 
         const vehUpdates = db.__updates().filter((u: { col: string }) => u.col === 'vehicles');
         expect(vehUpdates).toHaveLength(1);
-        expect(vehUpdates[0].patch).toEqual({ currentKm: { __increment: 50 } });
+        expect(vehUpdates[0].patch).toEqual({ currentKm: 1050 });
     });
 
-    it('소급 삽입이 최신 기록까지 밀면 차량 currentKm을 그 폭만큼 보정한다', async () => {
-        // B(150→200)만 있는 차량에 빈틈 없이 R(120→180)을 끼우면 B가 +30 밀린다
-        // → 최신 기록의 endKm이 200 → 230이므로 currentKm도 +30이어야 한다.
-        // (예전에는 연쇄가 만든 update의 트리거가 "최신 기록 수정"으로 판정해 우연히 처리했다)
+    it('기록하지 않은 운행으로 빈 구간이 있어도 차량 km는 도착 km를 따라간다', async () => {
+        // 차량은 1000인데 다음 운행이 1020에서 시작했다 — 예전에는 거리(30)만 더해 1030이 됐고,
+        // 빠진 20km가 계기판과의 차이로 영영 남았다(2026-11-03 문의).
         seedLogs(
-            [{ id: 'B', timestamp: d(15), startKm: 150, endKm: 200 }],
+            [{ id: 'R', timestamp: d(20), startKm: 1020, endKm: 1050 }],
+            [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1000 } }],
+        );
+        await (onDriveLogCreated as unknown as Function)(makeEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: d(20),
+            startKm: 1020, endKm: 1050, distance: 30,
+        }));
+
+        expect(db.__get('vehicles', VEH)).toMatchObject({ currentKm: 1050 });
+    });
+
+    it('등록 때 넣은 km가 틀렸어도 첫 운행의 도착 km로 바로잡힌다', async () => {
+        seedLogs(
+            [{ id: 'R', timestamp: d(20), startKm: 53580, endKm: 53611 }],
+            [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 0 } }],
+        );
+        await (onDriveLogCreated as unknown as Function)(makeEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: d(20),
+            startKm: 53580, endKm: 53611, distance: 31,
+        }));
+
+        expect(db.__get('vehicles', VEH)).toMatchObject({ currentKm: 53611 });
+    });
+
+    it('이미 같은 값이면 차량 문서를 쓰지 않는다', async () => {
+        seedLogs(
+            [{ id: 'R', timestamp: d(20), startKm: 1000, endKm: 1050 }],
+            [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1050 } }],
+        );
+        await (onDriveLogCreated as unknown as Function)(makeEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: d(20),
+            startKm: 1000, endKm: 1050, distance: 50,
+        }));
+
+        expect(db.__updates().filter((u: { col: string }) => u.col === 'vehicles')).toHaveLength(0);
+    });
+
+    it('소급 삽입이 최신 기록까지 밀면 차량 currentKm을 밀린 최근 기록의 도착 km로 맞춘다', async () => {
+        // B(150→200)만 있는 차량에 빈틈 없이 R(120→180)을 끼우면 B가 +30 밀린다
+        // → 최신 기록의 endKm이 200 → 230이므로 currentKm도 230이어야 한다.
+        seedLogs(
+            [
+                { id: 'R', timestamp: d(10), startKm: 120, endKm: 180 },
+                { id: 'B', timestamp: d(15), startKm: 150, endKm: 200 },
+            ],
             [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 200 } }],
         );
         await (onDriveLogCreated as unknown as Function)(makeEvent({
@@ -494,12 +562,13 @@ describe('onDriveLogCreated — 차량 누적 km 분기', () => {
         expect(db.__get('driveLogs', 'B')).toMatchObject({ startKm: 180, endKm: 230 });
         const vehUpdates = db.__updates().filter((u: { col: string }) => u.col === 'vehicles');
         expect(vehUpdates).toHaveLength(1);
-        expect(vehUpdates[0].patch).toEqual({ currentKm: { __increment: 30 } });
+        expect(vehUpdates[0].patch).toEqual({ currentKm: 230 });
     });
 
     it('소급 삽입이 사진으로 확인한 마지막 기록에 닿으면 차량 누적 km는 그대로 둔다', async () => {
         // B의 도착(200)이 고정되므로 차량의 마지막 계기판 값도 움직이지 않는다.
         db.__setDocs([
+            { id: 'R', col: 'driveLogs', data: { organizationId: ORG, vehicleId: VEH, timestamp: d(10), startKm: 120, endKm: 180 } },
             { id: 'B', col: 'driveLogs', data: { organizationId: ORG, vehicleId: VEH, timestamp: d(15), startKm: 150, endKm: 200, distance: 50, endKmSource: 'ocr' } },
             { id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 200 } },
         ]);
@@ -649,7 +718,7 @@ describe('주유 필요 표시(needsRefuel) 갱신', () => {
         const kmPatches = db.__updates()
             .filter((u: { col: string; patch: Record<string, unknown> }) => u.col === 'vehicles' && 'currentKm' in u.patch)
             .map((u: { patch: Record<string, unknown> }) => u.patch);
-        expect(kmPatches).toEqual([{ currentKm: { __increment: 10 } }]);
+        expect(kmPatches).toEqual([{ currentKm: 1060 }]);
     });
 });
 
@@ -759,12 +828,12 @@ describe('차량 현재 위치(currentSiteId) 갱신', () => {
             { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1060, endSiteId: 'site_b' },
         ));
 
-        // 위치는 못 옮겼지만(예외) 누적 km 차분 +10은 반영됐다
+        // 위치는 못 옮겼지만(예외) 누적 km는 최근 기록의 도착 km로 맞춰졌다
         expect(vehicleSitePatches()).toHaveLength(0);
         const kmPatches = db.__updates()
             .filter((u: { col: string; patch: Record<string, unknown> }) => u.col === 'vehicles' && 'currentKm' in u.patch)
             .map((u: { patch: Record<string, unknown> }) => u.patch);
-        expect(kmPatches).toEqual([{ currentKm: { __increment: 10 } }]);
+        expect(kmPatches).toEqual([{ currentKm: 1060 }]);
     });
 
     it('수정으로 세운 곳이 바뀌면 현재 위치를 다시 맞춘다', async () => {
@@ -803,7 +872,7 @@ describe('onDriveLogDeleted — 중간 기록 삭제 후 재정합', () => {
     });
     afterEach(() => jest.restoreAllMocks());
 
-    it('중간 기록을 지우면 뒤 기록을 앞으로 당기고 차량 currentKm도 같은 폭으로 줄인다', async () => {
+    it('중간 기록을 지우면 뒤 기록을 앞으로 당기고 차량 currentKm도 당겨진 최근 기록의 도착 km로 맞춘다', async () => {
         // A(100→150) [삭제된 R 150→180] C(180→230) → C는 A의 endKm(150)부터 재정합되어 150→200
         seedLogs(
             [
@@ -826,7 +895,7 @@ describe('onDriveLogDeleted — 중간 기록 삭제 후 재정합', () => {
         expect(db.__get('driveLogs', 'C')).toMatchObject({ startKm: 150, endKm: 200 }); // 거리 50 보존
         const vehUpdates = db.__updates().filter((u: { col: string }) => u.col === 'vehicles');
         expect(vehUpdates).toHaveLength(1);
-        expect(vehUpdates[0].patch).toEqual({ currentKm: { __increment: -30 } });
+        expect(vehUpdates[0].patch).toEqual({ currentKm: 200 });
     });
 
     it('뒤 기록이 사진으로 확인한 기록이면 아예 건드리지 않는다 — 지워진 운행의 거리가 옮겨 붙지 않게', async () => {
@@ -992,7 +1061,7 @@ describe('직전 운행 비고(lastDriveNote) 갱신', () => {
         const kmPatches = db.__updates()
             .filter((u: { col: string; patch: Record<string, unknown> }) => u.col === 'vehicles' && 'currentKm' in u.patch)
             .map((u: { patch: Record<string, unknown> }) => u.patch);
-        expect(kmPatches).toEqual([{ currentKm: { __increment: 10 } }]);
+        expect(kmPatches).toEqual([{ currentKm: 1060 }]);
     });
 });
 
@@ -1150,11 +1219,13 @@ describe('차량 누적 km — 다른 기관 차량 차단 (수정·삭제 경�
     });
     const vehicleKmPatches = () => db.__updates()
         .filter((u: { col: string; patch: Record<string, unknown> }) => u.col === 'vehicles' && 'currentKm' in u.patch);
-    const seedVehicle = (organizationId: string, currentKm: number) =>
-        seedLogs([], [{ id: VEH, col: 'vehicles', data: { organizationId, currentKm } }]);
+    // 트리거가 돌 때 저장소에 남아 있는 운행일지까지 함께 심는다 — 최근 기록 조회가 값을 찾아도
+    // 차량 소속 검사에서 막히는지를 봐야 한다
+    const seedVehicle = (organizationId: string, currentKm: number, logs: SeedLog[] = []) =>
+        seedLogs(logs, [{ id: VEH, col: 'vehicles', data: { organizationId, currentKm } }]);
 
     it('수정으로 endKm을 바꿔도 다른 기관 차량의 currentKm은 늘리지 않는다', async () => {
-        seedVehicle('other-org', 50000);
+        seedVehicle('other-org', 50000, [{ id: 'X', timestamp: d(20), startKm: 1000, endKm: 9000 }]);
 
         await (onDriveLogUpdated as unknown as Function)(makeUpdateEvent(
             { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1050 },
@@ -1165,8 +1236,8 @@ describe('차량 누적 km — 다른 기관 차량 차단 (수정·삭제 경�
         expect(db.__get('vehicles', VEH)).toMatchObject({ currentKm: 50000 });
     });
 
-    it('이전 endKm이 없던 수정도 다른 기관 차량의 currentKm을 절대값으로 덮어쓰지 않는다', async () => {
-        seedVehicle('other-org', 50000);
+    it('이전 endKm이 없던 수정도 다른 기관 차량의 currentKm을 덮어쓰지 않는다', async () => {
+        seedVehicle('other-org', 50000, [{ id: 'X', timestamp: d(20), startKm: 1000, endKm: 1 }]);
 
         await (onDriveLogUpdated as unknown as Function)(makeUpdateEvent(
             { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000 },
@@ -1178,7 +1249,7 @@ describe('차량 누적 km — 다른 기관 차량 차단 (수정·삭제 경�
     });
 
     it('최신 기록을 지워도 다른 기관 차량의 currentKm은 줄이지 않는다', async () => {
-        seedVehicle('other-org', 50000);
+        seedVehicle('other-org', 50000, [{ id: 'A', timestamp: d(5), startKm: 0, endKm: 10 }]);
 
         await (onDriveLogDeleted as unknown as Function)(makeDeleteEvent({
             organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 0, endKm: 40000, distance: 40000,
@@ -1200,20 +1271,20 @@ describe('차량 누적 km — 다른 기관 차량 차단 (수정·삭제 경�
     });
 
     // 대조군 — 같은 기관 차량은 예전처럼 갱신된다
-    it('같은 기관 차량은 수정 차분만큼 currentKm을 갱신한다', async () => {
-        seedVehicle(ORG, 1050);
+    it('같은 기관 차량은 수정한 최근 기록의 도착 km로 currentKm을 맞춘다', async () => {
+        seedVehicle(ORG, 1050, [{ id: 'X', timestamp: d(20), startKm: 1000, endKm: 1080 }]);
 
         await (onDriveLogUpdated as unknown as Function)(makeUpdateEvent(
             { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1050 },
             { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1080 },
         ));
 
-        expect(vehicleKmPatches().map((u: { patch: Record<string, unknown> }) => u.patch)).toEqual([{ currentKm: { __increment: 30 } }]);
+        expect(vehicleKmPatches().map((u: { patch: Record<string, unknown> }) => u.patch)).toEqual([{ currentKm: 1080 }]);
         expect(db.__get('vehicles', VEH)).toMatchObject({ currentKm: 1080 });
     });
 
-    it('같은 기관 차량은 이전 endKm이 없던 수정에서 절대값으로 맞춘다', async () => {
-        seedVehicle(ORG, 900);
+    it('같은 기관 차량은 이전 endKm이 없던 수정에서도 도착 km로 맞춘다', async () => {
+        seedVehicle(ORG, 900, [{ id: 'X', timestamp: d(20), startKm: 1000, endKm: 1050 }]);
 
         await (onDriveLogUpdated as unknown as Function)(makeUpdateEvent(
             { organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000 },
@@ -1223,14 +1294,41 @@ describe('차량 누적 km — 다른 기관 차량 차단 (수정·삭제 경�
         expect(vehicleKmPatches().map((u: { patch: Record<string, unknown> }) => u.patch)).toEqual([{ currentKm: 1050 }]);
     });
 
-    it('같은 기관 차량은 최신 기록 삭제 시 그 거리만큼 currentKm을 줄인다', async () => {
+    it('같은 기관 차량은 최신 기록 삭제 시 앞 기록의 도착 km로 돌아간다', async () => {
+        // 앞 기록(A)은 990에서 끝났고 지운 기록은 1000에서 출발했다 — 빈 구간이 있어도 남은
+        // 기록 중 최근 것(A)을 따른다
+        seedVehicle(ORG, 1050, [{ id: 'A', timestamp: d(10), startKm: 950, endKm: 990 }]);
+
+        await (onDriveLogDeleted as unknown as Function)(makeDeleteEvent({
+            organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1050, distance: 50,
+        }));
+
+        expect(vehicleKmPatches().map((u: { patch: Record<string, unknown> }) => u.patch)).toEqual([{ currentKm: 990 }]);
+    });
+
+    it('마지막 남은 기록을 지우면 그 기록의 출발 km로 돌아간다', async () => {
         seedVehicle(ORG, 1050);
 
         await (onDriveLogDeleted as unknown as Function)(makeDeleteEvent({
             organizationId: ORG, vehicleId: VEH, timestamp: d(20), startKm: 1000, endKm: 1050, distance: 50,
         }));
 
-        expect(vehicleKmPatches().map((u: { patch: Record<string, unknown> }) => u.patch)).toEqual([{ currentKm: { __increment: -50 } }]);
-        expect(db.__get('vehicles', VEH)).toMatchObject({ currentKm: 1000 });
+        expect(vehicleKmPatches().map((u: { patch: Record<string, unknown> }) => u.patch)).toEqual([{ currentKm: 1000 }]);
+    });
+
+    it('다른 기관이 같은 차량 ID로 남긴 기록은 최근 기록으로 치지 않는다', async () => {
+        // 다른 기관 일지(endKm 9000)가 더 최근이어도 우리 기관 기록만 본다
+        db.__setDocs([
+            { id: 'A', col: 'driveLogs', data: { organizationId: ORG, vehicleId: VEH, timestamp: d(10), startKm: 1000, endKm: 1050 } },
+            { id: 'Z', col: 'driveLogs', data: { organizationId: 'other-org', vehicleId: VEH, timestamp: d(25), startKm: 0, endKm: 9000 } },
+            { id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1000 } },
+        ]);
+
+        await (onDriveLogCreated as unknown as Function)({
+            data: { data: () => ({ organizationId: ORG, vehicleId: VEH, timestamp: d(10), startKm: 1000, endKm: 1050, distance: 50 }) },
+            params: { logId: 'A' },
+        });
+
+        expect(db.__get('vehicles', VEH)).toMatchObject({ currentKm: 1050 });
     });
 });

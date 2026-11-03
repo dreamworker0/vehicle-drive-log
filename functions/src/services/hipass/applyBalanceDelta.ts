@@ -18,7 +18,8 @@
  * 클라이언트였다는 것**이다.
  *
  * 이 저장소는 같은 모양의 문제를 이미 한 번 서버로 옮겼다. 차량 누적 주행거리
- * (`vehicles.currentKm`)는 `syncDriveLogKm`의 트리거가 `FieldValue.increment`로 소유한다.
+ * (`vehicles.currentKm`)는 `syncDriveLogKm`의 트리거가 소유한다(예전에는 `FieldValue.increment`로
+ * 거리를 더했고, 2026-11부터는 가장 최근 운행일지의 도착 km로 맞춘다).
  * 하이패스 잔액만 클라이언트에 남아 있었고, 그 자리가 Phase 214·224·225에서 반복해
  * 물린 곳이다.
  *

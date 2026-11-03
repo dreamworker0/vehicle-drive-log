@@ -389,7 +389,7 @@ export default function VehicleForm({
                         {form.currentKm !== '' && Number(form.currentKm) < 0 && (
                             <p className="text-[11px] text-red-500 dark:text-red-400 mt-1 font-medium">⚠️ 누적 km는 0 이상이어야 합니다.</p>
                         )}
-                        <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">차량 등록 시점의 누적 주행거리</p>
+                        <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">지금 계기판 숫자 — 운행일지가 저장되면 가장 최근 도착 km로 자동으로 맞춰져요</p>
                     </div>
                     <CollapsibleSection
                         title="🛡️ 보험 정보 (선택)"
