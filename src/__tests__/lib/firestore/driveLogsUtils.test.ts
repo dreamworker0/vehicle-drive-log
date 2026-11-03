@@ -211,12 +211,23 @@ describe('getAdjacentDriveLogs', () => {
     it('직전은 가장 가까운 과거, 직후는 가장 가까운 미래를 고르고 자기 자신은 제외한다', async () => {
         mockGetDocs
             .mockResolvedValueOnce(snap([{ id: 'cur', data: {} }, { id: 'prev', data: {} }]))
-            // 내림차순으로 받으므로 배열의 마지막이 "가장 가까운 미래"다
-            .mockResolvedValueOnce(snap([{ id: 'far', data: {} }, { id: 'next', data: {} }]));
+            // 오름차순으로 받으므로 배열의 첫 번째가 "가장 가까운 미래"다
+            .mockResolvedValueOnce(snap([{ id: 'next', data: {} }, { id: 'far', data: {} }]));
 
         const r = await getAdjacentDriveLogs('org1', 'v1', log());
         expect(r.prev?.id).toBe('prev');
         expect(r.next?.id).toBe('next');
+    });
+
+    it('직후 기록은 오름차순으로 조회한다 — 뒤 기록이 많아도 끝에서 n번째가 아니라 바로 다음을 집는다', async () => {
+        // 예전에는 내림차순 10건의 마지막을 써서, 뒤 기록이 10건을 넘으면 엉뚱한 최근 기록이
+        // '직후 기록'이 되고 수정 저장 때 그 출발 km가 덮어써졌다(2026-11-03 궁동 문의).
+        mockGetDocs.mockResolvedValue(snap([]));
+        await getAdjacentDriveLogs('org1', 'v1', log());
+
+        const nextCall = vi.mocked(fs.query).mock.calls[1].slice(1) as unknown as Array<{ _type: string; field?: string; op?: string; dir?: string }>;
+        expect(nextCall).toContainEqual(expect.objectContaining({ _type: 'where', field: 'timestamp', op: '>' }));
+        expect(nextCall).toContainEqual(expect.objectContaining({ _type: 'orderBy', field: 'timestamp', dir: 'asc' }));
     });
 
     it('앞뒤 기록이 없으면 둘 다 null', async () => {

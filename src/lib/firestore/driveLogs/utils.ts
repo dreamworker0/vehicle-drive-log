@@ -239,20 +239,26 @@ export const getAdjacentDriveLogs = async (
             .filter(d => d.id !== currentLog.id);
         const prev = prevDocs.length > 0 ? prevDocs[0] : null;
 
-        // 2. 직후 로그 조회: currentTimestamp 보다 큰 것 중 본인 제외 가장 과거 것 (최대 10개 가져와서 필터링 후 가장 마지막 원소)
+        // 2. 직후 로그 조회: currentTimestamp 보다 큰 것 중 가장 과거 것
+        //
+        // **오름차순으로 받아 첫 번째를 쓴다.** 예전에는 내림차순 10건의 마지막을 썼는데,
+        // 그건 뒤 기록이 10건 이하일 때만 '바로 다음'이고 그보다 많으면 **끝에서 10번째**가 된다.
+        // 수정 저장 뒤 adjustAdjacentLogs가 그 기록의 출발 km를 이 기록의 도착 km로 덮어써서,
+        // 지난 기록의 목적지만 고쳐도 엉뚱한 최근 기록의 주행거리가 수백 km씩 늘었다
+        // (2026-11-03 궁동종합사회복지관 문의). 피해 기록 복구는 scripts/repairMisadjustedNextLogs.ts.
         const nextQuery = query(
             collection(db, 'driveLogs'),
             where('organizationId', '==', orgId),
             where('vehicleId', '==', vehicleId),
             where('timestamp', '>', currentTimestamp),
-            orderBy('timestamp', 'desc'),
-            limit(10)
+            orderBy('timestamp', 'asc'),
+            limit(2)
         );
         const nextSnap = await getDocs(nextQuery);
         const nextDocs = nextSnap.docs
             .map(docSnap => ({ id: docSnap.id, ...docSnap.data() } as DriveLog))
             .filter(d => d.id !== currentLog.id);
-        const next = nextDocs.length > 0 ? nextDocs[nextDocs.length - 1] : null;
+        const next = nextDocs.length > 0 ? nextDocs[0] : null;
 
         return { prev, next };
     } catch (error) {
