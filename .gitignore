@@ -89,6 +89,8 @@ scripts/find_dark.mjs
 scripts/get_doc.cjs
 scripts/validate_doc.cjs
 scripts/test-zod.ts
+# 복구 스크립트가 쓰기 전에 남기는 원래 값(운행 기록 ID·km) — 되돌리기용, 커밋하지 않는다
+scripts/.backups/
 coverage-output*.txt
 deploy.log
 logs.txt
