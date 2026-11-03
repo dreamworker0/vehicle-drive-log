@@ -92,5 +92,11 @@ export function findMisadjustedNextLogs(rows: DriveLogKmRow[]): MisadjustedLog[]
     return found;
 }
 
-/** 자동으로 되돌려도 되는가 — 'manual'은 목록에만 올리고 손대지 않는다 */
-export const isAutoRepairable = (log: MisadjustedLog): boolean => log.confidence !== 'manual';
+/**
+ * 자동으로 되돌려도 되는가 — **앞 기록과 정확히 이어지는 'exact'만.**
+ *
+ * 'gap'은 되돌리면 앞에 빈 구간이 새로 생긴다. 전 기관 조회(2026-11-03)에서 나온 'gap' 1건은
+ * 관리자가 그날 같은 차량 기록을 여러 건 고치고 서버 재정합까지 겹친 경우라, 되돌리면 239km
+ * 빈 구간이 생겼다 — 이 결함 하나로 설명되지 않는다. 'gap'·'manual'은 목록에만 올리고 사람이 본다.
+ */
+export const isAutoRepairable = (log: MisadjustedLog): boolean => log.confidence === 'exact';
