@@ -22,7 +22,8 @@ concurrency:
 
 jobs:
   e2e:
-    runs-on: ubuntu-latest
+    # 24.04 고정 — ci.yml e2e 잡과 같은 이유(26.04에서 캐시된 WebKit이 libicudata.so.74를 못 찾음)
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     env:
       TZ: "Asia/Seoul"
