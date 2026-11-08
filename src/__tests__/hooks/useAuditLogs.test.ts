@@ -8,7 +8,7 @@
  *  (4) uid는 구성원 이름으로 바꿔 보여주고, 모르는 uid는 축약해 표시한다
  *  (5) 조회 실패는 화면 문구로 알린다 (빈 목록으로 위장하지 않는다)
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { renderHook, waitFor, act } from '@testing-library/react';
 
 const mocks = vi.hoisted(() => ({
@@ -192,6 +192,17 @@ describe('useAuditLogs', () => {
     });
 
     describe('차량 필터 — 차량 정보가 없는 옛 기록', () => {
+        // 옛 기록 경로는 기간 시작일이 AUDIT_VEHICLE_ID_SINCE(10-06)보다 앞설 때만 탄다.
+        // 기본 기간이 '최근 30일'이라 실제 시계를 쓰면 11월 5일 이후 이 경로를 타지 않아 테스트가 깨진다 → 오늘 날짜를 고정.
+        // Date만 가짜로 바꿔 waitFor의 타이머는 실제 시간으로 둔다.
+        beforeEach(() => {
+            vi.useFakeTimers({ toFake: ['Date'] });
+            vi.setSystemTime(new Date('2026-10-20T12:00:00+09:00'));
+        });
+        afterEach(() => {
+            vi.useRealTimers();
+        });
+
         const at = (iso: string) => ({ ms: new Date(iso).getTime() });
         const rec = (id: string, iso: string, over: Record<string, unknown> = {}) => ({
             id, action: 'update', targetType: 'driveLog', targetId: 'dl-1', subjectUids: [], at: at(iso), ...over,
