@@ -67,6 +67,7 @@ import {
     getReservationsByGroupId, cancelReservationGroup, deleteReservationGroup, completeReservationGroupSiblings,
     cancelRecurringGroup, detachFromRecurringGroup,
     createReservationSafe,
+    RESERVATION_OFFLINE_MESSAGE,
 } from '../../../lib/firestore/reservations';
 
 // 스냅샷 스텁 헬퍼
@@ -611,6 +612,37 @@ describe('firestore/reservations', () => {
 
             await expect(createReservationSafe({ vehicleId: 'v1' })).rejects.toThrow('internal');
             expect(captureError).toHaveBeenCalled();
+        });
+
+        // 오프라인에서 예약 확정 → SDK 문구 `internal [0]`이 그대로 토스트에 떴다(2026-11-11)
+        it('오프라인이면 서버에 가 보지 않고 연결 안내를 담아 던진다 — Sentry에도 올리지 않는다', async () => {
+            setOnline(false);
+            const callable = vi.fn();
+            vi.mocked(httpsCallable).mockReturnValue(callable as never);
+
+            await expect(createReservationSafe({ vehicleId: 'v1' })).rejects.toMatchObject({
+                code: 'network-unavailable', message: RESERVATION_OFFLINE_MESSAGE,
+            });
+            expect(callable).not.toHaveBeenCalled();
+            expect(captureError).not.toHaveBeenCalled();
+        });
+
+        it('응답을 받지 못한 실패(internal [0])도 연결 안내로 바꾼다 — 서버가 보낸 오류([500])는 그대로', async () => {
+            const unreachable = Object.assign(new Error('internal [0]'), { code: 'functions/internal' });
+            vi.mocked(httpsCallable).mockReturnValue(vi.fn().mockRejectedValue(unreachable) as never);
+            await expect(createReservationSafe({ vehicleId: 'v1' })).rejects.toMatchObject({ code: 'network-unavailable' });
+            expect(captureError).not.toHaveBeenCalled();
+
+            const serverError = Object.assign(new Error('INTERNAL [500]'), { code: 'functions/internal' });
+            vi.mocked(httpsCallable).mockReturnValue(vi.fn().mockRejectedValue(serverError) as never);
+            await expect(createReservationSafe({ vehicleId: 'v1' })).rejects.toThrow('INTERNAL [500]');
+            expect(captureError).toHaveBeenCalled();
+        });
+
+        it('예약 수정도 오프라인이면 같은 안내를 던진다', async () => {
+            setOnline(false);
+            await expect(updateReservation('r1', { purpose: 'x' })).rejects.toMatchObject({ code: 'network-unavailable' });
+            expect(captureError).not.toHaveBeenCalled();
         });
     });
 });

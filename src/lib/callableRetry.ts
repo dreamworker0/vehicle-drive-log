@@ -68,6 +68,45 @@ export function isTransientCallableError(err: unknown): boolean {
 }
 
 /**
+ * 서버 함수에 **닿지 못한** 실패 — 화면이 그대로 보여 줄 안내 문구를 담는다.
+ *
+ * 오프라인에서 예약을 확정하면 SDK 오류 문구 `internal [0]`이 토스트에 그대로 떴다(2026-11-11 확인).
+ * 사용자가 할 수 있는 일(연결된 뒤 다시 시도)을 말해 주는 문구로 바꿔 던진다.
+ * 예상된 실패라 Sentry에 올리지 않는다 — 호출부는 `isNetworkUnavailableError`로 거른다.
+ */
+export class NetworkUnavailableError extends Error {
+    readonly code = 'network-unavailable';
+    constructor(message: string) {
+        super(message);
+        this.name = 'NetworkUnavailableError';
+    }
+}
+
+export function isNetworkUnavailableError(err: unknown): err is NetworkUnavailableError {
+    return (err as { code?: unknown } | null)?.code === 'network-unavailable';
+}
+
+/**
+ * 콜러블이 서버에 닿지 못했는가 (오프라인이거나, 요청이 서버까지 가지 못했다).
+ *
+ * SDK는 응답을 아예 받지 못하면 HTTP 상태를 0으로 보고 `functions/internal`을 던지는데, 메시지 끝에
+ * 상태가 붙는다 — `internal [0]`. 서버가 돌려준 오류는 `… [500]`처럼 실제 상태가 붙으므로 `[0]`이면
+ * 응답이 없었던 것이다(@firebase/functions `_errorForResponse`). `unavailable`(503)도 같은 부류로 본다.
+ *
+ * 서버의 처리되지 않은 예외도 CORS 헤더가 빠져 같은 모양이 될 수 있다(SDK 주석). 그 경우에도
+ * "연결을 확인하고 다시 시도"는 틀린 안내가 아니다.
+ */
+export function isCallableUnreachable(err: unknown): boolean {
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) return true;
+    const e = err as { code?: unknown; message?: unknown } | null;
+    const code = typeof e?.code === 'string' ? e.code.replace(/^functions\//, '') : '';
+    if (code === 'unavailable') return true;
+    // 호출 직전 토큰 갱신이 통신 문제로 실패한 경우 — 같은 원인이다
+    if (e?.code === 'auth/network-request-failed') return true;
+    return code === 'internal' && typeof e?.message === 'string' && /\[0\]\s*$/.test(e.message);
+}
+
+/**
  * 토큰이 만료돼 서버가 거부한 경우인지 판별한다.
  *
  * **`unauthenticated`는 위 TRANSIENT_CODES에 넣으면 안 되고, 거부로 취급해서도 안 된다.**

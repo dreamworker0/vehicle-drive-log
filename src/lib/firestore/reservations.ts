@@ -13,6 +13,7 @@ import type { Reservation } from '../../types/reservation';
 import { captureError } from '../sentry';
 import { trackWrite } from '../offline/syncQueue';
 import { reservationActorStamp } from './actorStamp';
+import { NetworkUnavailableError, isCallableUnreachable, isNetworkUnavailableError } from '../callableRetry';
 
 const functions = firebaseFunctions;
 
@@ -79,21 +80,41 @@ export const createReservation = async (data: Partial<Reservation>, requireAppro
     }
 };
 
-/** 서버 측 중복 검증 기반 예약 생성 (Cloud Function + Firestore Transaction) */
-export const createReservationSafe = async (data: Partial<Reservation>) => {
+/**
+ * 예약 생성·수정은 서버 함수가 겹침·승인·차량 제한을 검사하므로 **인터넷이 있어야 한다**
+ * (운행일지처럼 기기에 두었다가 보낼 수 없다). 연결이 없으면 SDK 오류 문구(`internal [0]`) 대신
+ * 이 안내를 담은 NetworkUnavailableError를 던진다.
+ */
+export const RESERVATION_OFFLINE_MESSAGE = '인터넷에 연결되어 있지 않아 예약을 처리할 수 없어요. 연결된 뒤 다시 시도해 주세요.';
+
+/** 예약 콜러블 호출 — 토큰 갱신과 오프라인·서버 미도달 안내를 한곳에서 처리한다 */
+async function callReservationCallable<T>(name: string, payload: unknown): Promise<T> {
+    // 오프라인이면 서버까지 가 보지도 않는다 — 토큰 갱신부터 통신 오류로 떨어진다
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        throw new NetworkUnavailableError(RESERVATION_OFFLINE_MESSAGE);
+    }
     try {
         // 모바일 백그라운드 복귀 시 Firebase 토큰 만료에 따른 Unauthenticated 에러 방지
         if (auth.currentUser) {
             await auth.currentUser.getIdToken();
         }
+        const callable = httpsCallable(functions, name, { timeout: 60000 });
+        return (await callable(payload)).data as T;
+    } catch (error) {
+        if (isCallableUnreachable(error)) throw new NetworkUnavailableError(RESERVATION_OFFLINE_MESSAGE);
+        throw error;
+    }
+}
 
-        const callable = httpsCallable(functions, 'createReservationSafe', { timeout: 60000 });
-        const result = await callable(data);
-        return (result.data as { reservationId: string }).reservationId;
+/** 서버 측 중복 검증 기반 예약 생성 (Cloud Function + Firestore Transaction) */
+export const createReservationSafe = async (data: Partial<Reservation>) => {
+    try {
+        const result = await callReservationCallable<{ reservationId: string }>('createReservationSafe', data);
+        return result.reservationId;
     } catch (error: unknown) {
-        // 중복 예약 및 유효성 검사 등 기대되는 비즈니스 로직 에러는 Sentry에 보고하지 않음
+        // 중복 예약 및 유효성 검사 등 기대되는 비즈니스 로직 에러, 연결 없음은 Sentry에 보고하지 않음
         const err = error as { code?: string };
-        if (err?.code !== 'functions/already-exists' && err?.code !== 'functions/invalid-argument' && err?.code !== 'functions/permission-denied') {
+        if (!isNetworkUnavailableError(error) && err?.code !== 'functions/already-exists' && err?.code !== 'functions/invalid-argument' && err?.code !== 'functions/permission-denied') {
             captureError(error, { context: 'createReservationSafe', data });
         }
         throw error;
@@ -179,18 +200,14 @@ async function callUpdateReservationSafe(
     const defined = Object.fromEntries(
         Object.entries(data).filter(([, value]) => value !== undefined)
     );
-    // 모바일 백그라운드 복귀 시 Firebase 토큰 만료에 따른 Unauthenticated 에러 방지
-    if (auth.currentUser) {
-        await auth.currentUser.getIdToken();
-    }
-    const callable = httpsCallable(functions, 'updateReservationSafe', { timeout: 60000 });
-    const result = await callable({ ...defined, reservationId, detachRecurring });
-    const { status, requiresReapproval } = result.data as UpdateReservationResult;
+    const { status, requiresReapproval } = await callReservationCallable<UpdateReservationResult>(
+        'updateReservationSafe', { ...defined, reservationId, detachRecurring });
     return { status, requiresReapproval: requiresReapproval === true };
 }
 
-/** 겹침·권한·형식 오류는 사용자에게 토스트로 안내되는 예상된 거절이라 Sentry에 올리지 않는다 */
+/** 겹침·권한·형식 오류와 연결 없음은 사용자에게 토스트로 안내되는 예상된 거절이라 Sentry에 올리지 않는다 */
 function isExpectedUpdateRejection(error: unknown) {
+    if (isNetworkUnavailableError(error)) return true;
     const code = (error as { code?: string })?.code;
     return code === 'functions/already-exists' || code === 'functions/invalid-argument'
         || code === 'functions/permission-denied' || code === 'functions/failed-precondition';
