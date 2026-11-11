@@ -24,6 +24,8 @@
  *   (전 기관이 한 파일에 섞여 있어 기관 단위로 지울 수 없다).
  * - uid로만 묶인 데이터(organizationId 없는 즐겨찾기·알림, Storage feedbacks/{uid}/) —
  *   users 문서가 해지 시점에 이미 지워져 기관→uid를 되찾을 정본이 없다.
+ *   → 이 조각과 Firebase Auth 계정은 주간 배치의 cleanupOrphanAuthAccounts가 "소속 없이 90일" 기준으로
+ *     정리한다(기본은 보고만, system/authCleanup.deleteEnabled로 켠다).
  */
 import { getFirestore, type Firestore, type Query } from "firebase-admin/firestore";
 import { SYSTEM_ORG_ID } from "../audit/writeAuditEntry";

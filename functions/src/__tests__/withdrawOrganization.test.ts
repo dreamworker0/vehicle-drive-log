@@ -32,6 +32,11 @@ jest.mock('firebase-admin/firestore', () => ({
     FieldValue: { serverTimestamp: jest.fn(() => 'SERVER_TIMESTAMP') },
 }));
 
+const mockRevoke = jest.fn((_uid: string) => Promise.resolve());
+jest.mock('firebase-admin/auth', () => ({
+    getAuth: () => ({ revokeRefreshTokens: (uid: string) => mockRevoke(uid) }),
+}));
+
 jest.mock('firebase-functions/v2/https', () => ({
     onCall: (_opts: unknown, handler: (req: unknown) => unknown) => handler,
     HttpsError: class HttpsError extends Error {
@@ -99,13 +104,16 @@ describe('withdrawOrganization — 기관 서비스 해지', () => {
     it('정상 처리: 직원 문서를 삭제하고 status=deleted, deletedBy=admin으로 갱신한다', async () => {
         mockCallerGet.mockResolvedValueOnce({ exists: true, data: () => ({ role: 'admin', organizationId: 'org1' }) });
         mockOrgGet.mockResolvedValueOnce({ exists: true, data: () => ({ status: 'approved' }) });
-        mockUsersWhereGet.mockResolvedValueOnce({ docs: [{ ref: 'u1' }, { ref: 'u2' }], size: 2 });
+        mockUsersWhereGet.mockResolvedValueOnce({ docs: [{ id: 'u1', ref: 'u1' }, { id: 'u2', ref: 'u2' }], size: 2 });
 
         const req = { auth: { uid: 'caller-uid' }, data: validData };
         const result = await handler(req);
 
         expect(result).toEqual({ success: true });
         expect(mockBatchDelete).toHaveBeenCalledTimes(2);
+        // 발급된 로그인 토큰을 바로 무효화한다 — 클레임은 비워져도 ID 토큰은 만료까지 옛 권한을 든다
+        expect(mockRevoke).toHaveBeenCalledWith('u1');
+        expect(mockRevoke).toHaveBeenCalledWith('u2');
         expect(mockBatchUpdate).toHaveBeenCalledWith(expect.anything(), {
             status: 'deleted',
             deletedAt: 'SERVER_TIMESTAMP',
@@ -131,5 +139,18 @@ describe('withdrawOrganization — 기관 서비스 해지', () => {
             withdrawReason: 'other',
             withdrawReasonDetail: '예산 문제',
         });
+    });
+
+    it('토큰 무효화가 실패해도 해지는 끝난다 — 토큰은 1시간 안에 스스로 만료된다', async () => {
+        mockCallerGet.mockResolvedValueOnce({ exists: true, data: () => ({ role: 'admin', organizationId: 'org1' }) });
+        mockOrgGet.mockResolvedValueOnce({ exists: true, data: () => ({ status: 'approved' }) });
+        mockUsersWhereGet.mockResolvedValueOnce({ docs: [{ id: 'u1', ref: 'u1' }], size: 1 });
+        mockRevoke.mockRejectedValueOnce(new Error('auth/user-not-found'));
+        jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+        const result = await handler({ auth: { uid: 'caller-uid' }, data: validData });
+
+        expect(result).toEqual({ success: true });
+        expect(mockBatchCommit).toHaveBeenCalled();
     });
 });
