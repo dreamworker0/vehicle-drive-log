@@ -5,6 +5,13 @@ function isSuperAdmin() {
   return request.auth != null && request.auth.token.role == 'superAdmin';
 }
 
+// 업로드 허용 이미지 형식 — 래스터 형식만 허용한다. 'image/.*'는 image/svg+xml(스크립트 삽입 가능)까지
+// 통과시키므로 쓰지 않는다. 앱은 JPEG(피드백 첨부)·WebP(OCR 신고)로 압축해 올리고, 압축이 실패하면
+// 카메라 원본(JPEG/PNG/HEIC 등)을 그대로 올리므로 흔한 카메라·갤러리 형식은 남겨 둔다.
+function isAllowedImage() {
+  return request.resource.contentType.matches('image/(jpeg|png|webp|gif|heic|heif|avif)');
+}
+
 service firebase.storage {
   match /b/{bucket}/o {
     // 기관 고유번호증 사본(정부 발급 PII) — 업로드는 submitOrgApplication 함수(Admin SDK)가 수행하므로
@@ -23,7 +30,7 @@ service firebase.storage {
       allow write: if request.auth != null
                    && request.auth.uid == userId
                    && request.resource.size < 5 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
+                   && isAllowedImage();
     }
 
     // 일반 피드백 이미지 업로드 (본인 폴더만)
@@ -32,7 +39,7 @@ service firebase.storage {
       allow write: if request.auth != null
                    && request.auth.uid == userId
                    && request.resource.size < 5 * 1024 * 1024
-                   && request.resource.contentType.matches('image/.*');
+                   && isAllowedImage();
     }
   }
 }

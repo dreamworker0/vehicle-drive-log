@@ -87,3 +87,64 @@ describe('Storage Security Rules — 기관 증빙서류(PII) 접근 격리', ()
     await assertFails(uploadBytes(ref(superAdminStorage, ORG_DOC_PATH), new Uint8Array([9])));
   });
 });
+
+describe('Storage Security Rules — 피드백 이미지 업로드 형식 제한', () => {
+  let env: RulesTestEnvironment;
+
+  beforeAll(async () => {
+    env = await initializeTestEnvironment({
+      projectId: `${PROJECT_ID}-feedback`,
+      storage: {
+        rules: readFileSync(resolve(process.cwd(), 'storage.rules'), 'utf8'),
+        host: '127.0.0.1',
+        port: 9199,
+      },
+    });
+  });
+
+  beforeEach(async () => {
+    await env.clearStorage();
+  });
+
+  afterAll(async () => {
+    await env.cleanup();
+  });
+
+  const bytes = new Uint8Array([1, 2, 3]);
+  const svg = new TextEncoder().encode('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
+
+  it('본인 피드백 폴더에 JPEG 업로드는 허용된다 (회귀 가드 — 피드백 첨부 형식)', async () => {
+    const storage = env.authenticatedContext('user_A').storage();
+    await assertSucceeds(
+      uploadBytes(ref(storage, 'feedbacks/user_A/1_0.jpg'), bytes, { contentType: 'image/jpeg' }),
+    );
+  });
+
+  it('OCR 신고 폴더에 WebP 업로드는 허용된다 (회귀 가드 — OCR 신고 형식)', async () => {
+    const storage = env.authenticatedContext('user_A').storage();
+    await assertSucceeds(
+      uploadBytes(ref(storage, 'feedbacks/ocr-report/user_A/1.webp'), bytes, { contentType: 'image/webp' }),
+    );
+  });
+
+  it('피드백 폴더에 SVG(image/svg+xml)는 업로드할 수 없다 — 스크립트 삽입 차단', async () => {
+    const storage = env.authenticatedContext('user_A').storage();
+    await assertFails(
+      uploadBytes(ref(storage, 'feedbacks/user_A/1_0.svg'), svg, { contentType: 'image/svg+xml' }),
+    );
+  });
+
+  it('OCR 신고 폴더에도 SVG는 업로드할 수 없다', async () => {
+    const storage = env.authenticatedContext('user_A').storage();
+    await assertFails(
+      uploadBytes(ref(storage, 'feedbacks/ocr-report/user_A/1.svg'), svg, { contentType: 'image/svg+xml' }),
+    );
+  });
+
+  it('이미지가 아닌 형식(text/html)은 업로드할 수 없다', async () => {
+    const storage = env.authenticatedContext('user_A').storage();
+    await assertFails(
+      uploadBytes(ref(storage, 'feedbacks/user_A/1_0.jpg'), bytes, { contentType: 'text/html' }),
+    );
+  });
+});
