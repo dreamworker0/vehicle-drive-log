@@ -73,6 +73,19 @@ describe('adjustAdjacentLogs', () => {
         expect(msgs[0]).toContain('직후 기록 출발 km');
     });
 
+    it('직후 기록의 도착 km는 건드리지 않는다 — 그 운전자가 계기판을 보고 적은 값', async () => {
+        await adjustAdjacentLogs({ lastDriveLog: null, nextDriveLog: log('b', 250, 300), startKm: 100, endKm: 200 });
+        expect(mockUpdateDoc.mock.calls[0][1]).not.toHaveProperty('endKm');
+    });
+
+    it('출발만 고치면 직후 기록 거리가 음수가 되면 손대지 않고 서버의 연쇄 조정에 맡긴다', async () => {
+        // 이 기록 도착(350)이 직후 기록 도착(300)보다 크다 — 출발만 350으로 바꾸면 -50km
+        const msgs = await adjustAdjacentLogs({ lastDriveLog: null, nextDriveLog: log('b', 250, 300), startKm: 100, endKm: 350 });
+
+        expect(mockUpdateDoc).not.toHaveBeenCalled();
+        expect(msgs[0]).toContain('함께 조정됩니다');
+    });
+
     it('이미 일치하면 조정하지 않는다', async () => {
         const msgs = await adjustAdjacentLogs({ lastDriveLog: log('a', 50, 100), nextDriveLog: log('b', 200, 300), startKm: 100, endKm: 200 });
         expect(mockUpdateDoc).not.toHaveBeenCalled();

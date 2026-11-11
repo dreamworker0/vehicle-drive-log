@@ -694,6 +694,61 @@ export const onDriveLogCreated = onDocumentCreated(
     }
 );
 
+/** 사람이 고친 도착 km에 다음 기록을 맞춘 결과 */
+export type NextLogAlignment =
+    /** 뒤 기록이 없다 */
+    | 'none'
+    /** 다음 기록 출발이 이미 맞다 (화면의 인접 자동 조정이 먼저 맞춘 경우가 대부분) */
+    | 'aligned'
+    /** 다음 기록의 출발 km만 고쳤다 */
+    | 'stretched'
+    /** 출발만 고치면 그 기록의 거리가 음수가 된다 — 호출부가 뒤 기록을 함께 민다 */
+    | 'push';
+
+/**
+ * 사람이 운행일지의 도착 km를 고쳤을 때 **바로 다음 기록의 출발 km만** 맞춘다.
+ *
+ * 다음 기록의 도착 km는 그 운전자가 계기판을 보고 적은 값이라 건드리지 않는다. 출발이 바뀐 만큼
+ * 그 기록의 거리가 늘거나 줄고, 그 뒤 기록과 차량 km는 그대로다.
+ *
+ * 예전에는 여기서 연쇄 재정합(`syncNextLogStartKm`)으로 출발·도착을 같은 폭으로 밀었다. 그런데 화면의
+ * 인접 자동 조정(`adjustAdjacentLogs`)은 출발만 맞추고, 대개 이 트리거보다 먼저 저장된다 — 그러면
+ * 연쇄가 "이미 맞다"며 바로 멈춰서 결과가 출발만 맞춘 것이 됐다. 통신이 느려 트리거가 먼저 돌면
+ * 뒤 기록 전체와 차량 km가 밀렸다. **같은 수정이 그때그때 다른 결과**를 냈으므로 출발만 맞추는 쪽으로
+ * 통일한다(2026-11-11 운영자 결정).
+ *
+ * 출발만 고치면 거리가 음수가 되는 경우(고친 도착 km가 다음 기록의 도착 km보다 크다)는 계기판 숫자끼리
+ * 모순이라 출발만으로는 맞출 수 없다 — `push`를 돌려 호출부가 예전처럼 민다. 화면 쪽도 같은 경계를 쓴다.
+ *
+ * 이 쓰기에는 `kmSyncRev`를 올리지 않는다. 다음 기록의 트리거가 평소 수정처럼 돌아야 그 기록의 기관
+ * 통계 거리와 저장된 distance가 따라온다(도착 km가 그대로라 연쇄는 일어나지 않는다).
+ *
+ * @remarks 단위 테스트(syncDriveLogKm.test.ts)를 위해 export한다.
+ */
+export async function alignNextLogStartKm(
+    orgId: string,
+    vehicleId: string,
+    afterDate: Date,
+    newEndKm: number,
+): Promise<NextLogAlignment> {
+    const snap = await db.collection('driveLogs')
+        .where('organizationId', '==', orgId)
+        .where('vehicleId', '==', vehicleId)
+        .where('timestamp', '>', afterDate)
+        .orderBy('timestamp', 'asc')
+        .limit(1)
+        .get();
+    if (snap.empty) return 'none';
+
+    const next = snap.docs[0];
+    const nextData = next.data();
+    if (nextData.startKm === newEndKm) return 'aligned';
+    if (typeof nextData.endKm === 'number' && newEndKm > nextData.endKm) return 'push';
+
+    await next.ref.update({ startKm: newEndKm, editedAt: FieldValue.serverTimestamp() });
+    return 'stretched';
+}
+
 /**
  * 저장된 주행거리(`distance`)를 고친 km에 맞춘다.
  *
@@ -849,10 +904,14 @@ export const onDriveLogUpdated = onDocumentUpdated(
                 // 소급으로 적었어도 뒤에 기록이 없으면 그 도착 km가 지금 계기판에 가장 가까운 값이다.
                 const hasLater = await hasLaterDriveLog(orgId, vehId, ts);
 
-                // endKm 변경 시 다음 기록의 startKm 자동 연동
+                // endKm 변경 시 다음 기록의 출발 km만 맞춘다 (alignNextLogStartKm 주석).
+                // 출발만으로 맞출 수 없을 때(거리가 음수가 될 때)만 뒤 기록을 함께 민다.
                 let chain: KmChainResult | null = null;
                 if (data.endKm !== oldData.endKm) {
-                    chain = await syncNextLogStartKm(orgId, vehId, ts, data.endKm);
+                    const alignment = await alignNextLogStartKm(orgId, vehId, ts, data.endKm);
+                    if (alignment === 'push') {
+                        chain = await syncNextLogStartKm(orgId, vehId, ts, data.endKm);
+                    }
                 }
                 // 최근 기록을 고쳤거나 중간 기록 수정이 최근 기록까지 밀었다면 차량 누적 km를 다시 맞춘다
                 if (latestLogMayHaveChanged(hasLater, chain)) {
