@@ -56,7 +56,7 @@ export interface ReservationForm extends PassengerFormValues {
     // 기관 설정 reservationPassengerEnabled가 켜진 기관에서만 입력받는다.
 }
 
-/** createReservation에 전달할 데이터 */
+/** 예약 생성 데이터 (서버 콜러블 createReservationSafe로 보낸다) */
 export type CreateReservationData = Omit<Reservation, 'id' | 'status' | 'createdAt'>;
 
 /** 캘린더 렌더링에 사용되는 일자별 데이터 구조 */

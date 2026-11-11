@@ -60,7 +60,7 @@ import { httpsCallable } from 'firebase/functions';
 import { captureError } from '../../../lib/sentry';
 import { trackWrite } from '../../../lib/offline/syncQueue';
 import {
-    getReservationById, getReservationByIdAndOrg, createReservation,
+    getReservationById, getReservationByIdAndOrg,
     getReservations, getPendingReservations, cancelReservation, updateReservation,
     updateReservationStatus, rejectReservation,
     getTodayReservations, getWeekReservations, getMyRecentReservations,
@@ -117,33 +117,6 @@ describe('firestore/reservations', () => {
 
             vi.mocked(fs.getDoc).mockResolvedValueOnce(getDocSnap(null) as never);
             expect(await getReservationById('none')).toBeNull();
-        });
-    });
-
-    describe('createReservation', () => {
-        const base = { organizationId: 'org1', vehicleId: 'v1', date: '2026-08-01', startTime: '09:00', endTime: '10:00', reservedByUid: 'u1' };
-
-        it('기본(승인 불필요)은 status reserved로 addDoc하고 새 id를 반환한다', async () => {
-            vi.mocked(fs.addDoc).mockResolvedValueOnce({ id: 'r-new' } as never);
-
-            const id = await createReservation(base);
-
-            expect(id).toBe('r-new');
-            expect(fs.addDoc).toHaveBeenCalledWith(
-                expect.anything(),
-                expect.objectContaining({ status: 'reserved', createdAt: '__serverTimestamp__', expiresAt: expect.any(Date) }),
-            );
-        });
-
-        it('requireApproval=true면 status pending으로 생성한다', async () => {
-            vi.mocked(fs.addDoc).mockResolvedValueOnce({ id: 'r-new' } as never);
-
-            await createReservation(base, true);
-
-            expect(fs.addDoc).toHaveBeenCalledWith(
-                expect.anything(),
-                expect.objectContaining({ status: 'pending' }),
-            );
         });
     });
 

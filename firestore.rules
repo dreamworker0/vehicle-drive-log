@@ -66,6 +66,46 @@ service cloud.firestore {
     }
 
     /**
+     * 운행일지 핵심 필드의 **타입** — 숫자 자리에 문자열, 시각 자리에 문자열이 들어오는 것을 끊는다.
+     *
+     * 화면은 km를 숫자로, 운행 시각을 Date로 만들어 보낸다(buildLogData·buildExternalLoanDriveLog).
+     * 예전에는 저장 직전 Zod 검증(driveLogSchema.parse)이 이 역할을 하는 것처럼 보였지만, 읽기용 관대한
+     * 스키마라 아무것도 막지 못했고 조작된 클라이언트는 어차피 건너뛴다 — 막을 수 있는 곳은 여기뿐이다
+     * (2026-11-11). 집계·내보내기·km 재정합은 이 필드들이 숫자·시각이라고 믿고 계산한다.
+     *
+     * km·거리가 null인 경우는 여기서 통과시킨다(옛 기록 호환) — 생성 시 km의 null은 아래 `>= 0` 검사가 따로 막는다.
+     */
+    function driveLogNumberOk(data, field) {
+      return !data.keys().hasAny([field]) || data.get(field, null) == null || data.get(field, null) is number;
+    }
+
+    function driveLogTypesValid(data) {
+      return driveLogNumberOk(data, 'startKm')
+             && driveLogNumberOk(data, 'endKm')
+             && driveLogNumberOk(data, 'distance')
+             && (!data.keys().hasAny(['timestamp']) || data.timestamp is timestamp)
+             && data.organizationId is string
+             && data.vehicleId is string
+             && data.driverUid is string
+             && data.createdByUid is string;
+    }
+
+    /**
+     * 수정은 **바뀌는 필드만** 타입을 본다 — kmOrderValid·actorStampValid와 같은 이유다.
+     * 모든 수정에 요구하면 형식이 어긋난 옛 기록의 목적지 하나 고치는 것까지 막힌다.
+     */
+    function driveLogTypesValidOnChange() {
+      let changed = request.resource.data.diff(resource.data).affectedKeys();
+      let d = request.resource.data;
+      return (!changed.hasAny(['startKm']) || driveLogNumberOk(d, 'startKm'))
+             && (!changed.hasAny(['endKm']) || driveLogNumberOk(d, 'endKm'))
+             && (!changed.hasAny(['distance']) || driveLogNumberOk(d, 'distance'))
+             && (!changed.hasAny(['timestamp']) || d.get('timestamp', null) is timestamp)
+             && (!changed.hasAny(['vehicleId']) || d.get('vehicleId', null) is string)
+             && (!changed.hasAny(['driverUid']) || d.get('driverUid', null) is string);
+    }
+
+    /**
      * 금액·거리 필드가 음수로 저장되는 것을 막는다.
      *
      * 화면이 먼저 막지만(각 훅의 validateNonNegativeFields), driveLogs의 startKm과 같은 이유로
@@ -347,6 +387,7 @@ service cloud.firestore {
                     && (!request.resource.data.keys().hasAny(['startKm']) || request.resource.data.startKm >= 0)
                     && (!request.resource.data.keys().hasAny(['endKm']) || request.resource.data.endKm >= 0)
                     && kmOrderValid()
+                    && driveLogTypesValid(request.resource.data)
                     // 하이패스 사용액은 서버가 이 두 값의 차이로 카드 잔액에서 뺀다 —
                     // 제약이 없으면 음수 사용액으로 잔액을 임의로 불릴 수 있다.
                     && hipassUsageValid(request.resource.data);
@@ -361,6 +402,7 @@ service cloud.firestore {
                         || (isOrgAdmin(resource.data.organizationId) && request.resource.data.organizationId == resource.data.organizationId)
                     )))
                     && actorStampValid()
+                    && driveLogTypesValidOnChange()
                     && (!request.resource.data.keys().hasAny(['startKm']) || request.resource.data.startKm >= 0)
                     && (!request.resource.data.keys().hasAny(['endKm']) || request.resource.data.endKm >= 0)
                     // km를 건드리는 수정만 순서를 검사한다. 이미 어긋난 옛 기록의 다른 필드를

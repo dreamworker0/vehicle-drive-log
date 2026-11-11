@@ -14,7 +14,6 @@ import {
     sanitizeUndefined,
     getVehicleEndKmBefore,
 } from './utils';
-import { driveLogSchema } from '../../../schemas';
 import { invalidateCache } from '../cache';
 import { trackWrite } from '../../offline/syncQueue';
 import { actorStamp } from '../actorStamp';
@@ -80,8 +79,9 @@ export const createDriveLog = async (
         }
         // === 끝 ===
 
-        // zod 스키마로 런타임 값 검증 (실패 시 ZodError throw)
-        driveLogSchema.parse(data);
+        // 값 검증은 입력 화면(validateDriveLogForm·buildLogData)과 Firestore Rules가 맡는다.
+        // 예전 이 자리의 driveLogSchema.parse(data)는 읽기용 관대한 스키마(.catch)라 아무것도 막지 못했고
+        // 결과도 버렸다 — 조작된 클라이언트는 어차피 건너뛰므로 막는 곳은 Rules다(2026-11-11).
 
         // Use a deterministic generated ID for offline idempotency (if provided from client)
         const docRef = data.id ? doc(db, 'driveLogs', data.id as string) : doc(collection(db, 'driveLogs'));

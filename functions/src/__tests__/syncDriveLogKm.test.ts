@@ -554,7 +554,7 @@ describe('저장된 주행거리(distance) 동기화', () => {
         expect(db.__get('driveLogs', 'B')).toMatchObject({ distance: 90, [KM_SYNC_REV_FIELD]: 1 });
     });
 
-    it('저장된 거리가 없는 기록은 건드리지 않는다 (지금 앱이 만드는 기록 — 쓰기를 늘리지 않는다)', async () => {
+    it('저장된 거리가 없는 기록은 건드리지 않는다 (옛 기록 — 값이 없으면 새로 만들지 않는다)', async () => {
         seedLogs([{ id: 'B', timestamp: d(15), startKm: 990, endKm: 1080 }]);
         await syncStoredDistance(ref(),
             { ...base, startKm: 1000, endKm: 1080 },
