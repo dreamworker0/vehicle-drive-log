@@ -66,7 +66,7 @@ import { getVehicles, createReservation } from '../../lib/firestore';
 ### 3.3 조직 격리
 
 - **모든 쿼리**에 `organizationId` 조건을 포함하고, 함수 첫 파라미터로 `orgId`를 받는다.
-- **정적 강제**: tenant-scoped 도메인 파일은 커스텀 ESLint 규칙 `local/require-organization-filter`(→ [eslint-rules/require-organization-filter.js](../../eslint-rules/require-organization-filter.js))가 `query()`가 속한 함수 본문에 `where('organizationId', ...)`가 없으면 CI lint 게이트에서 차단한다. **대상 파일 목록의 단일 원본은 `eslint.config.js`의 해당 `files` 글롭**이다.
+- **정적 강제**: tenant-scoped 도메인 파일은 커스텀 ESLint 규칙 `local/require-organization-filter`(→ [eslint-rules/require-organization-filter.js](../../eslint-rules/require-organization-filter.js))가 `query()`가 속한 함수 본문에 `where('organizationId', ...)`가 없으면 CI lint 게이트에서 차단한다. 대상은 `eslint.config.js`의 해당 블록이 단일 원본이며, **`src/lib/firestore/**/*.ts` 전체에 기본 적용하고 전역 도메인만 `ignores`로 뺀다(fail-closed)** — 새 도메인 파일은 등록 없이 자동 검사된다.
 - 전역 도메인(기관·사용자·알림 등)은 조직 격리 대상이 아니라 규칙에서 제외된다. 의도된 전역 쿼리는 `// eslint-disable-next-line local/require-organization-filter -- <사유>`로 예외 처리한다.
 
 ### 3.4 에러 처리

@@ -180,18 +180,24 @@ export default defineConfig([
     },
   },
   {
-    // 멀티테넌트 격리: tenant-scoped Firestore 도메인 파일의 query()에 organizationId 필터 강제.
-    // 전역 도메인(organizations, users, favorites, feedbacks, notifications, superAdmin,
-    // statistics, holidays, preRegistered, cache)은 조직 격리 대상이 아니므로 제외한다.
-    files: [
-      'src/lib/firestore/reservations.ts',
-      'src/lib/firestore/vehicles.ts',
-      'src/lib/firestore/fuelLogs.ts',
-      'src/lib/firestore/maintenance.ts',
-      'src/lib/firestore/hipass.ts',
-      'src/lib/firestore/hipassCharges.ts',
-      'src/lib/firestore/dailyLogQueries.ts',
-      'src/lib/firestore/driveLogs/**/*.ts',
+    // 멀티테넌트 격리: Firestore 도메인 파일의 query()에 organizationId 필터 강제.
+    // fail-closed — src/lib/firestore/ 아래 모든 파일에 기본 적용하고, 조직 격리 대상이 아닌
+    // 전역 도메인만 ignores로 명시해 뺀다. 새 도메인 파일은 별도 등록 없이 자동으로 검사된다.
+    files: ['src/lib/firestore/**/*.ts'],
+    ignores: [
+      // 전역 도메인 — 컬렉션이 기관 단위가 아니거나(기관·사용자·공휴일·통계·캐시),
+      // 사용자 본인(uid) 또는 superAdmin 범위로 격리된다(broadcasts: superAdmin 전용 전체 공지 이력).
+      'src/lib/firestore/organizations.ts',
+      'src/lib/firestore/users.ts',
+      'src/lib/firestore/favorites.ts',
+      'src/lib/firestore/feedbacks.ts',
+      'src/lib/firestore/notifications.ts',
+      'src/lib/firestore/superAdmin.ts',
+      'src/lib/firestore/statistics.ts',
+      'src/lib/firestore/holidays.ts',
+      'src/lib/firestore/preRegistered.ts',
+      'src/lib/firestore/cache.ts',
+      'src/lib/firestore/broadcasts.ts',
     ],
     plugins: {
       local: { rules: { 'require-organization-filter': requireOrganizationFilter } },

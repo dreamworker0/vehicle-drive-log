@@ -114,4 +114,5 @@ docs/2026-09-05-Claude-Opus-개선프롬프트.md
 .agents/
 .superpowers/
 .worktrees/
+.claude/worktrees/
 progress.md

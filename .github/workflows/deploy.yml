@@ -67,6 +67,11 @@ jobs:
       # Functions(functions/.env의 SENTRY_RELEASE)가 **같은 값**을 써야 한 배포가
       # Sentry에서 하나의 릴리즈로 묶인다.
       SENTRY_RELEASE_VERSION: ${{ github.event.workflow_run.head_sha || github.sha }}
+      # 배포 도구 버전 고정 — 루트 devDependencies에 없어 `npx`가 실행 때마다 레지스트리 최신판을
+      # 받아 왔다. 그러면 같은 커밋도 언제 배포하느냐에 따라 다른 도구로 배포되고, 도구 쪽 회귀가
+      # 코드 변경 없이 배포를 깨뜨린다. 올릴 때는 이 두 줄만 바꾼다(값은 2026-11-08 성공 배포가 쓴 버전).
+      FIREBASE_TOOLS: firebase-tools@15.35.0
+      SENTRY_CLI: "@sentry/cli@2.58.6"
 
     steps:
       # CI가 검증한 바로 그 커밋을 배포한다 (workflow_run 사이에 새 푸시가 끼어도 안전)
@@ -84,7 +89,7 @@ jobs:
         run: npm ci
 
       - name: Install functions dependencies
-        run: cd functions && npm ci --legacy-peer-deps
+        run: cd functions && npm ci
 
       - name: Create .env files
         run: |
@@ -175,7 +180,7 @@ jobs:
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
           LOG=$(mktemp)
           deploy_backend() {
-            npx firebase-tools deploy --only functions,firestore:rules,storage --force --project vehicle-drive-log 2>&1 | tee "$LOG"
+            npx --yes "$FIREBASE_TOOLS" deploy --only functions,firestore:rules,storage --force --project vehicle-drive-log 2>&1 | tee "$LOG"
           }
           deploy_backend
           CODE=$?
@@ -204,7 +209,7 @@ jobs:
         run: |
           export GOOGLE_APPLICATION_CREDENTIALS=$(mktemp)
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
-          npx firebase-tools deploy --only firestore:indexes --non-interactive --project vehicle-drive-log
+          npx --yes "$FIREBASE_TOOLS" deploy --only firestore:indexes --non-interactive --project vehicle-drive-log
           rm -f "$GOOGLE_APPLICATION_CREDENTIALS"
 
       # 인덱스 배포는 **제출만** 하고 빌드 완료를 기다리지 않는다. 위 스텝 주석의 Phase 139도
@@ -236,7 +241,7 @@ jobs:
           export GOOGLE_APPLICATION_CREDENTIALS=$(mktemp)
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$GOOGLE_APPLICATION_CREDENTIALS"
           set +e
-          OUT=$(npx firebase-tools deploy --only hosting --force --project vehicle-drive-log 2>&1)
+          OUT=$(npx --yes "$FIREBASE_TOOLS" deploy --only hosting --force --project vehicle-drive-log 2>&1)
           CODE=$?
           echo "$OUT"
           rm -f "$GOOGLE_APPLICATION_CREDENTIALS"
@@ -284,7 +289,7 @@ jobs:
         run: |
           set -e
           VERSION="$SENTRY_RELEASE_VERSION"
-          CLI="npx --yes @sentry/cli@2"
+          CLI="npx --yes $SENTRY_CLI"
           PROJECTS="-p $SENTRY_PROJECT"
           if [ -n "$SENTRY_PROJECT_FUNCTIONS" ]; then
             PROJECTS="$PROJECTS -p $SENTRY_PROJECT_FUNCTIONS"
