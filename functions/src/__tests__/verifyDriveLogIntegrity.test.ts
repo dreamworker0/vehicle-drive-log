@@ -6,7 +6,7 @@
  * 참조)를 위험 수용하면서 전제로 삼은 보완 통제다 — Rules는 no-get 원칙 때문에
  * create 시점에 이 둘을 검증하지 않으므로, 여기서 탐지하지 못하면 탐지 수단이 없다.
  */
-import { findReferenceIssues, countMileageGaps, type DriveLogLite } from '../handlers/scheduled/verifyMileageConsistency';
+import { findReferenceIssues, countMileageGaps, previousKstMonthWindow, type DriveLogLite } from '../handlers/scheduled/verifyMileageConsistency';
 
 const vehicleOrg = new Map<string, string | undefined>([
     ['v_A', 'org-A'],
@@ -255,5 +255,30 @@ describe('countMileageGaps — 마일리지 연속성', () => {
             { id: 'b', organizationId: 'org-A', vehicleId: 'v_A', startKm: 150, endKm: 200 },
         ];
         expect(countMileageGaps(logs)).toBe(0);
+    });
+});
+
+describe('previousKstMonthWindow — 검증 대상 기간', () => {
+    // 매월 1일 03:00 KST(= 전날 18:00 UTC)쯤 도는 배치를 가정한다
+    it('지난달 1일 00:00 KST ~ 이번 달 1일 00:00 KST다 (9시간 밀리지 않는다)', () => {
+        const { start, end, label } = previousKstMonthWindow(new Date('2026-10-31T18:00:00Z')); // 11-01 03:00 KST
+        expect(start.toISOString()).toBe('2026-09-30T15:00:00.000Z'); // 10-01 00:00 KST
+        expect(end.toISOString()).toBe('2026-10-31T15:00:00.000Z');   // 11-01 00:00 KST
+        expect(label).toBe('2026-10');
+    });
+
+    it('1월에 돌면 지난해 12월을 본다', () => {
+        const { start, end, label } = previousKstMonthWindow(new Date('2026-12-31T18:00:00Z')); // 2027-01-01 03:00 KST
+        expect(start.toISOString()).toBe('2026-11-30T15:00:00.000Z'); // 2026-12-01 00:00 KST
+        expect(end.toISOString()).toBe('2026-12-31T15:00:00.000Z');   // 2027-01-01 00:00 KST
+        expect(label).toBe('2026-12');
+    });
+
+    it('1일 0~9시 KST 기록이 그 달 구간에 들어간다', () => {
+        const { start, end } = previousKstMonthWindow(new Date('2026-10-31T18:00:00Z'));
+        const oct1EarlyMorning = new Date('2026-09-30T16:30:00Z'); // 10-01 01:30 KST
+        const nov1EarlyMorning = new Date('2026-10-31T16:30:00Z'); // 11-01 01:30 KST
+        expect(oct1EarlyMorning >= start && oct1EarlyMorning < end).toBe(true);
+        expect(nov1EarlyMorning >= start && nov1EarlyMorning < end).toBe(false);
     });
 });

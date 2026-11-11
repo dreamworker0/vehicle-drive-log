@@ -1,7 +1,7 @@
 import { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { captureError } from "../../core/sentry";
-import { recordHeartbeat, log } from "../../utils/helpers";
+import { log } from "../../utils/helpers";
 import { handleStatsOnCreate, handleStatsOnUpdate, handleStatsOnDelete } from "../../services/statistics/updateAggregatedStats";
 import { applyDriveLogHipassDelta, usedAmountOf, hipassFieldsDropped } from "../../services/hipass/applyBalanceDelta";
 import { driveLogRetentionCutoff } from "../../utils/constants";
@@ -685,8 +685,6 @@ export const onDriveLogCreated = onDocumentCreated(
 
             // [통합 트리거] 기관 통계 증분 업데이트
             await handleStatsOnCreate(orgId, data);
-
-            await recordHeartbeat("onDriveLogCreated");
         } catch (error) {
             console.error('[onDriveLogCreated] km 동기화 오류:', error);
             captureError(error, { context: 'onDriveLogCreated', logId });
@@ -924,8 +922,6 @@ export const onDriveLogUpdated = onDocumentUpdated(
             if (finalOrgId) {
                 await handleStatsOnUpdate(finalOrgId, oldData, data);
             }
-
-            await recordHeartbeat("onDriveLogUpdated");
         } catch (error) {
             console.error('[onDriveLogUpdated] km 동기화 오류:', error);
             captureError(error, { context: 'onDriveLogUpdated', logId });
@@ -1014,8 +1010,6 @@ export const onDriveLogDeleted = onDocumentDeleted(
             if (latestLogMayHaveChanged(hasLater, chain)) {
                 await syncVehicleCurrentKmToLatestLog('onDriveLogDeleted', orgId, vehId, startKm);
             }
-
-            await recordHeartbeat("onDriveLogDeleted");
         } catch (error) {
             console.error('[onDriveLogDeleted] km 동기화(삭제) 오류:', error);
             captureError(error, { context: 'onDriveLogDeleted', logId });
