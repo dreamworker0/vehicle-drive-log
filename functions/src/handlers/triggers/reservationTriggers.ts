@@ -84,6 +84,55 @@ function notifyTargetOnOthersEdit(before: Record<string, unknown>, after: Record
     return owner;
 }
 
+/** 한 예약자에게 보낼 취소 알림의 범위 — 일괄 취소면 여러 건을 묶는다 */
+interface CancelSummary {
+    count: number;
+    firstDate: string;
+    lastDate: string;
+}
+
+/**
+ * 일괄 취소(다일·반복 묶음, 정비 차단)를 예약자별로 **한 번만** 알리기 위한 요약.
+ *
+ * 묶음은 문서마다 따로 트리거가 돌아서, 예전 그대로면 반복 예약 석 달치를 취소할 때 알림이 열몇 개 간다.
+ * 클라이언트가 한 번의 writeBatch로 취소하며 같은 `editBatchId`를 남기므로, 트리거마다 그 번호로
+ * 함께 취소된 같은 예약자의 문서를 찾아 **가장 이른 회차(날짜·시작 시각·ID 순)의 트리거만** 요약을 보낸다.
+ * 묶음이 한꺼번에 커밋된 뒤에 트리거가 돌므로 어느 트리거가 보든 같은 집합·같은 대표가 나온다.
+ *
+ * 반환: 이 트리거가 알려야 하면 요약, 다른 회차의 트리거가 대신 알리면 null.
+ * 처리 번호가 없거나(단건 취소) 이번 쓰기가 찍은 번호가 아니면 이 예약 하나만 요약한다.
+ */
+async function cancelSummaryFor(
+    reservationId: string,
+    before: Record<string, unknown>,
+    after: Record<string, unknown>,
+    target: string,
+): Promise<CancelSummary | null> {
+    const single: CancelSummary = { count: 1, firstDate: String(after.date || ""), lastDate: String(after.date || "") };
+    const batchId = after.editBatchId;
+    if (typeof batchId !== "string" || !batchId || batchId === before.editBatchId) return single;
+
+    const snap = await getFirestore().collection("reservations")
+        .where("organizationId", "==", after.organizationId)
+        .where("editBatchId", "==", batchId)
+        .get();
+    const siblings = snap.docs
+        .map(d => ({ id: d.id, data: d.data() }))
+        .filter(s => s.data.reservedByUid === target && s.data.status === "cancelled")
+        .sort((a, b) =>
+            String(a.data.date || "").localeCompare(String(b.data.date || ""))
+            || String(a.data.startTime || "").localeCompare(String(b.data.startTime || ""))
+            || a.id.localeCompare(b.id));
+    // 조회 결과에 자기 자신이 없으면(조회 실패에 준하는 상황) 알림을 잃지 않도록 단건으로 보낸다
+    if (!siblings.some(s => s.id === reservationId)) return single;
+    if (siblings[0].id !== reservationId) return null;
+    return {
+        count: siblings.length,
+        firstDate: String(siblings[0].data.date || ""),
+        lastDate: String(siblings[siblings.length - 1].data.date || ""),
+    };
+}
+
 /**
  * 캘린더 호출 실패 처리 — 모든 캘린더 분기가 공유하는 단일 정책.
  *
@@ -326,20 +375,20 @@ export const onReservationUpdated = onDocumentUpdated(
             }
 
             // 예약자에게 취소 알림 (취소한 본인이 아닌 경우) — 대상이 예약 org 소속일 때만
+            // 일괄 취소면 예약자별로 한 번만 — 대표 회차가 아닌 트리거는 여기서 끝낸다
             const cancelTarget = notifyTargetOnOthersEdit(before, after);
-            if (await isNotifiableOrgMember(cancelTarget, after.organizationId)) {
+            const summary = cancelTarget ? await cancelSummaryFor(reservationId, before, after, cancelTarget) : null;
+            if (summary && await isNotifiableOrgMember(cancelTarget, after.organizationId)) {
                 const reason = typeof after.cancelReason === "string" && after.cancelReason ? " 사유: " + after.cancelReason : "";
-                await createInAppNotification(
-                    cancelTarget!,
-                    "reservation_cancelled",
-                    "🚫 예약 취소",
-                    vehicleLabel(after) + " 예약(" + after.date + " " + (after.startTime || "") + ")이 취소되었습니다." + reason,
-                    after.organizationId
-                );
-                await sendPushToUser(cancelTarget!, {
-                    title: "🚫 예약 취소",
-                    body: vehicleLabel(after) + " 예약(" + after.date + ")이 취소되었습니다." + reason,
-                });
+                const range = summary.firstDate === summary.lastDate ? summary.firstDate : summary.firstDate + "~" + summary.lastDate;
+                const inApp = summary.count > 1
+                    ? vehicleLabel(after) + " 예약 " + summary.count + "건(" + range + ")이 취소되었습니다." + reason
+                    : vehicleLabel(after) + " 예약(" + after.date + " " + (after.startTime || "") + ")이 취소되었습니다." + reason;
+                const push = summary.count > 1
+                    ? vehicleLabel(after) + " 예약 " + summary.count + "건(" + range + ")이 취소되었습니다." + reason
+                    : vehicleLabel(after) + " 예약(" + after.date + ")이 취소되었습니다." + reason;
+                await createInAppNotification(cancelTarget!, "reservation_cancelled", "🚫 예약 취소", inApp, after.organizationId);
+                await sendPushToUser(cancelTarget!, { title: "🚫 예약 취소", body: push });
             }
             return;
         }

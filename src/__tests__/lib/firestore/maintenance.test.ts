@@ -26,6 +26,7 @@ vi.mock('firebase/firestore', () => ({
     getDoc: vi.fn(),
     addDoc: vi.fn(),
     updateDoc: vi.fn(),
+    writeBatch: vi.fn(),
     deleteDoc: vi.fn(),
     serverTimestamp: vi.fn(() => '__serverTimestamp__'),
 }));
@@ -39,6 +40,14 @@ vi.mock('../../../lib/firestore/actorStamp', () => ({
 import * as fs from 'firebase/firestore';
 import { cancelVehicleReservations } from '../../../lib/firestore/maintenance';
 
+const mockBatch = () => {
+    const update = vi.fn();
+    const commit = vi.fn().mockResolvedValue(undefined);
+    const batch = { update, commit };
+    vi.mocked(fs.writeBatch).mockReturnValue(batch as never);
+    return { batch, update, commit };
+};
+
 const snapOf = (ids: string[]) => ({
     size: ids.length,
     docs: ids.map(id => ({ id, data: () => ({ status: 'reserved' }) })),
@@ -51,7 +60,7 @@ describe('cancelVehicleReservations', () => {
 
     it('승인 대기·확정 예약을 모두 찾아 사유·스탬프와 함께 취소한다', async () => {
         vi.mocked(fs.getDocs).mockResolvedValue(snapOf(['r1', 'r2', 'r3']) as never);
-        vi.mocked(fs.updateDoc).mockResolvedValue(undefined);
+        const { batch, update, commit } = mockBatch();
 
         const count = await cancelVehicleReservations('org1', 'v1', '스타렉스', '2026-11-12', '2026-11-14', '정비(엔진오일)로 차량 사용 차단');
 
@@ -59,21 +68,30 @@ describe('cancelVehicleReservations', () => {
         expect(fs.where).toHaveBeenCalledWith('organizationId', '==', 'org1');
         expect(fs.where).toHaveBeenCalledWith('status', 'in', ['pending', 'reserved']);
         expect(fs.where).toHaveBeenCalledWith('date', '<=', '2026-11-14');
-        expect(fs.updateDoc).toHaveBeenCalledTimes(3);
-        expect(fs.updateDoc).toHaveBeenCalledWith(
+        // 한 번의 쓰기 묶음으로, 같은 처리 번호를 남겨 취소한다 (트리거가 예약자별로 한 번만 알린다)
+        expect(fs.writeBatch).toHaveBeenCalledTimes(1);
+        expect(batch.update).toHaveBeenCalledTimes(3);
+        expect(update).toHaveBeenCalledWith(
             expect.objectContaining({ label: 'doc:reservations/r2' }),
-            { status: 'cancelled', cancelReason: '정비(엔진오일)로 차량 사용 차단', lastEditedByUid: 'admin1', lastEditId: 'edit-x' },
+            {
+                status: 'cancelled', cancelReason: '정비(엔진오일)로 차량 사용 차단',
+                editBatchId: expect.any(String), lastEditedByUid: 'admin1', lastEditId: 'edit-x',
+            },
         );
+        const ids = update.mock.calls.map(c => (c[1] as { editBatchId: string }).editBatchId);
+        expect(new Set(ids).size).toBe(1);
+        expect(commit).toHaveBeenCalledTimes(1);
+        expect(fs.updateDoc).not.toHaveBeenCalled();
     });
 
     it('알림 문서를 클라이언트에서 직접 만들지 않는다 (Rules가 막아 일괄 취소가 멈추던 원인)', async () => {
         vi.mocked(fs.getDocs).mockResolvedValue(snapOf(['r1', 'r2']) as never);
-        vi.mocked(fs.updateDoc).mockResolvedValue(undefined);
+        const { update } = mockBatch();
 
         await cancelVehicleReservations('org1', 'v1', '스타렉스', '2026-11-12', null, '폐차 (매각)');
 
         expect(fs.addDoc).not.toHaveBeenCalled();
-        expect(fs.updateDoc).toHaveBeenCalledTimes(2);
+        expect(update).toHaveBeenCalledTimes(2);
         // 종료일이 없으면(폐차) 날짜 상한을 걸지 않는다
         expect(fs.where).not.toHaveBeenCalledWith('date', '<=', expect.anything());
     });

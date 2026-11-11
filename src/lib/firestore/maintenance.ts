@@ -4,7 +4,7 @@
 import {
     doc, getDoc, updateDoc, deleteDoc,
     collection, query, where, getDocs, addDoc,
-    orderBy, limit, serverTimestamp,
+    orderBy, limit, serverTimestamp, writeBatch,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { captureError } from '../sentry';
@@ -149,6 +149,9 @@ export const clearVehicleMaintenanceBlock = async (vehicleId: string) => {
     }
 };
 
+/** Firestore 쓰기 묶음(writeBatch) 한 번의 최대 쓰기 수 */
+const BATCH_LIMIT = 500;
+
 /**
  * 차량 정비 차단·폐차 시 기존 예약 일괄 취소
  *
@@ -162,8 +165,10 @@ export const clearVehicleMaintenanceBlock = async (vehicleId: string) => {
  * 동등 필터 3개 뒤에 `date` 범위가 붙어 단일 필드 인덱스 병합으로는 처리되지 않는다.
  * 인덱스가 없으면 조회가 통째로 실패해 **정비 기록은 저장됐는데 예약은 그대로 남고**
  * 화면에는 "저장에 실패했습니다"만 뜬다 (Sentry JAVASCRIPT-REACT-5F, 2026-08-26).
- */
-/**
+ *
+ * 한 번의 쓰기 묶음(writeBatch)으로 취소하고 처리 번호(`editBatchId`)를 함께 남긴다. 트리거는 그 번호로
+ * 예약자별로 묶어 **한 번만** 요약 알림을 보낸다(묶음이 한꺼번에 커밋되어야 요약 건수가 맞다).
+ *
  * @param _vehicleName 쓰지 않는다 — 알림의 차량 이름은 트리거가 예약 문서에서 붙인다(호출부 호환용으로 남김).
  * @param reason 예약자에게 보일 취소 사유 문구 (예: `정비(엔진오일)로 차량 사용 차단`, `폐차 (매각)`)
  */
@@ -184,9 +189,17 @@ export const cancelVehicleReservations = async (orgId: string, vehicleId: string
         );
         const snap = await getDocs(q);
 
-        // 일괄 취소 — 문서마다 새 스탬프를 찍어야 트리거가 "다른 사람이 취소했다"고 보고 예약자에게 알린다
-        for (const d of snap.docs) {
-            await updateDoc(doc(db, 'reservations', d.id), { status: 'cancelled', cancelReason: reason, ...reservationActorStamp() });
+        // 일괄 취소 — 문서마다 새 스탬프를 찍어야 트리거가 "다른 사람이 취소했다"고 보고 예약자에게 알린다.
+        // 한 묶음 쓰기 한도(500건)를 넘는 일은 사실상 없지만, 넘으면 나눠 커밋한다(그때는 요약이 묶음별로 나뉜다).
+        const editBatchId = crypto.randomUUID();
+        for (let i = 0; i < snap.docs.length; i += BATCH_LIMIT) {
+            const batch = writeBatch(db);
+            for (const d of snap.docs.slice(i, i + BATCH_LIMIT)) {
+                batch.update(doc(db, 'reservations', d.id), {
+                    status: 'cancelled', cancelReason: reason, editBatchId, ...reservationActorStamp(),
+                });
+            }
+            await batch.commit();
         }
         return snap.size;
     } catch (error) {

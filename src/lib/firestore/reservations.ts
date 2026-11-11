@@ -422,10 +422,12 @@ const batchGroupAction = async (
         );
         const batch = writeBatch(db);
         let cancelled = 0;
+        // 이번 일괄 취소의 처리 번호 — 취소 트리거가 이 번호로 묶어 예약자에게 한 번만 알린다
+        const editBatchId = crypto.randomUUID();
         // 같은 일괄 처리라도 문서마다 고유 ID가 필요하다 — 트리거가 문서별로 "이번에 새로 찍혔나"를 본다
         active.forEach(r => {
             if (action === 'cancel') {
-                batch.update(reservationDoc(r.id), { status: 'cancelled', ...reservationActorStamp() });
+                batch.update(reservationDoc(r.id), { status: 'cancelled', editBatchId, ...reservationActorStamp() });
             } else if (action === 'complete') {
                 // 도착일보다 **뒤인 날짜는 아예 타지 않은 날**이라 완료가 아니라 취소다.
                 //
@@ -440,7 +442,7 @@ const batchGroupAction = async (
                 // 즉 보이지도, 풀리지도 않는 예약이 남아 관리자 개입 없이는 복구되지 않는다.
                 // cancelled로 보내면 겹침 검사가 곧바로 제외하므로 차량이 즉시 풀린다.
                 if (arrivalDate && r.date > arrivalDate) {
-                    batch.update(reservationDoc(r.id), { status: 'cancelled', ...reservationActorStamp() });
+                    batch.update(reservationDoc(r.id), { status: 'cancelled', editBatchId, ...reservationActorStamp() });
                     cancelled++;
                     return;
                 }

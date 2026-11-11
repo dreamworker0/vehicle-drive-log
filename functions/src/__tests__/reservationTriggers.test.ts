@@ -10,7 +10,10 @@
 const mockGet = jest.fn();
 const mockUpdate = jest.fn();
 const mockDoc = jest.fn(() => ({ get: mockGet, update: mockUpdate }));
-const mockCollection = jest.fn(() => ({ doc: mockDoc }));
+// 일괄 취소 요약 조회(where().where().get()) — 기본은 빈 결과
+const mockQueryGet = jest.fn(async () => ({ docs: [] as unknown[] }));
+const mockWhere: jest.Mock = jest.fn(() => ({ where: mockWhere, get: mockQueryGet }));
+const mockCollection = jest.fn(() => ({ doc: mockDoc, where: mockWhere }));
 jest.mock('firebase-admin/firestore', () => ({
     getFirestore: () => ({ collection: mockCollection, doc: mockDoc }),
     FieldValue: { serverTimestamp: jest.fn(() => 'SERVER_TIMESTAMP') },
@@ -62,6 +65,7 @@ import { onReservationCreated, onReservationUpdated, onReservationDeleted } from
 describe('reservationTriggers', () => {
     beforeEach(() => {
         jest.clearAllMocks();
+        mockQueryGet.mockResolvedValue({ docs: [] });
         jest.spyOn(console, 'log').mockImplementation();
         jest.spyOn(console, 'error').mockImplementation();
     });
@@ -330,6 +334,76 @@ describe('reservationTriggers', () => {
                     'user1', 'reservation_changed', expect.any(String),
                     '스타렉스 예약이 변경되었습니다. (날짜: 2026-01-02)', 'org1'
                 );
+            });
+
+            describe('일괄 취소는 예약자별로 한 번만 알린다', () => {
+                // 같은 처리 번호(editBatchId)로 함께 취소된 문서들 — r-a(가장 이른 회차)가 대표
+                const cancelledDoc = (id: string, date: string, uid = 'user1') => ({
+                    id, data: () => ({ ...before, date, reservedByUid: uid, status: 'cancelled', editBatchId: 'batch-1' }),
+                });
+                const batchAfter = (date: string) => ({
+                    ...before, date, status: 'cancelled', editBatchId: 'batch-1',
+                    lastEditedByUid: 'admin1', lastEditId: 'edit-' + date, cancelReason: '정비(엔진오일)로 차량 사용 차단',
+                });
+                const eventFor = (id: string, date: string) => ({
+                    ...makeUpdateEvent({ ...before, date }, batchAfter(date)),
+                    params: { reservationId: id },
+                });
+
+                beforeEach(() => {
+                    mockQueryGet.mockResolvedValue({
+                        docs: [
+                            cancelledDoc('r-c', '2026-01-15'),
+                            cancelledDoc('r-a', '2026-01-01'),
+                            cancelledDoc('r-b', '2026-01-08'),
+                            cancelledDoc('r-x', '2026-01-01', 'user2'), // 다른 예약자 — 건수에 넣지 않는다
+                        ],
+                    });
+                });
+
+                it('대표 회차(가장 이른 날짜)의 트리거가 건수·기간을 담아 한 번 알린다', async () => {
+                    sameOrg();
+                    await (onReservationUpdated as Function)(eventFor('r-a', '2026-01-01'));
+
+                    expect(mockWhere).toHaveBeenCalledWith('editBatchId', '==', 'batch-1');
+                    expect(mockCreateInAppNotification).toHaveBeenCalledTimes(1);
+                    expect(mockCreateInAppNotification).toHaveBeenCalledWith(
+                        'user1', 'reservation_cancelled', expect.any(String),
+                        '스타렉스 예약 3건(2026-01-01~2026-01-15)이 취소되었습니다. 사유: 정비(엔진오일)로 차량 사용 차단', 'org1'
+                    );
+                    expect(mockSendPushToUser).toHaveBeenCalledTimes(1);
+                });
+
+                it('나머지 회차의 트리거는 알리지 않는다 (캘린더 정리만 한다)', async () => {
+                    sameOrg();
+                    await (onReservationUpdated as Function)(eventFor('r-b', '2026-01-08'));
+                    await (onReservationUpdated as Function)(eventFor('r-c', '2026-01-15'));
+
+                    expect(mockCreateInAppNotification).not.toHaveBeenCalled();
+                    expect(mockSendPushToUser).not.toHaveBeenCalled();
+                });
+
+                it('조회 결과에 자기 자신이 없으면 알림을 잃지 않도록 단건으로 알린다', async () => {
+                    sameOrg();
+                    mockQueryGet.mockResolvedValue({ docs: [] });
+                    await (onReservationUpdated as Function)(eventFor('r-b', '2026-01-08'));
+
+                    expect(mockCreateInAppNotification).toHaveBeenCalledWith(
+                        'user1', 'reservation_cancelled', expect.any(String),
+                        '스타렉스 예약(2026-01-08 09:00)이 취소되었습니다. 사유: 정비(엔진오일)로 차량 사용 차단', 'org1'
+                    );
+                });
+
+                it('처리 번호가 이전 쓰기의 것이면(이번 취소는 단건) 묶지 않는다', async () => {
+                    sameOrg();
+                    const prev = { ...before, editBatchId: 'batch-old' };
+                    await (onReservationUpdated as Function)(makeUpdateEvent(prev, {
+                        ...prev, status: 'cancelled', lastEditedByUid: 'admin1', lastEditId: 'edit-2',
+                    }));
+
+                    expect(mockWhere).not.toHaveBeenCalledWith('editBatchId', '==', expect.anything());
+                    expect(mockCreateInAppNotification).toHaveBeenCalledTimes(1);
+                });
             });
 
             it('본인이 자기 예약을 바꾸면 변경 알림을 보내지 않는다', async () => {

@@ -43,6 +43,11 @@ export const reservationSchema = z.object({
      * 취소 트리거가 예약자 알림에 붙인다 — 클라이언트는 알림 문서를 직접 만들 수 없다(Rules: superAdmin 전용).
      */
     cancelReason: z.string().optional().catch(undefined),
+    /**
+     * 한 번의 일괄 취소(다일·반복 묶음, 정비 차단)로 함께 취소된 예약이 공유하는 처리 번호.
+     * 취소 트리거가 이 번호로 묶어 예약자에게 **한 번만** 요약 알림을 보낸다 — 없으면 회차마다 알림이 간다.
+     */
+    editBatchId: z.string().optional().catch(undefined),
     /** 반려 처리 시각 */
     rejectedAt: timestampSchema.optional().catch(undefined),
     routeDistance: z.coerce.number().nullable().optional().catch(null),
