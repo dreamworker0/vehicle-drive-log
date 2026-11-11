@@ -391,7 +391,7 @@ describe('firestore/reservations', () => {
 
             expect(fs.where).toHaveBeenCalledWith('organizationId', '==', 'org1'); // org 격리
             expect(update).toHaveBeenCalledTimes(1); // 활성 1건만
-            expect(update).toHaveBeenCalledWith(expect.anything(), { status: 'cancelled' });
+            expect(update).toHaveBeenCalledWith(expect.anything(), { status: 'cancelled', editBatchId: expect.any(String) });
             expect(del).not.toHaveBeenCalled();
             expect(commit).toHaveBeenCalled();
             expect(count).toBe(1);
@@ -475,8 +475,10 @@ describe('firestore/reservations', () => {
 
             expect(update).toHaveBeenCalledTimes(2);
             // 두 건 모두 취소 — 완료 표시가 하나도 섞이지 않아야 한다
-            expect(update).toHaveBeenNthCalledWith(1, expect.anything(), { status: 'cancelled' });
-            expect(update).toHaveBeenNthCalledWith(2, expect.anything(), { status: 'cancelled' });
+            expect(update).toHaveBeenNthCalledWith(1, expect.anything(), { status: 'cancelled', editBatchId: expect.any(String) });
+            expect(update).toHaveBeenNthCalledWith(2, expect.anything(), { status: 'cancelled', editBatchId: expect.any(String) });
+            // 한 번의 일괄 취소는 같은 처리 번호를 공유한다 — 트리거가 이 번호로 묶어 예약자에게 한 번만 알린다
+            expect(update.mock.calls[0][1].editBatchId).toBe(update.mock.calls[1][1].editBatchId);
             expect(commit).toHaveBeenCalled();
             // 완료는 0건 — 사용자에게 "타지 않은 2일을 취소했다"고 말할 수 있어야 한다
             expect(result).toEqual({ closed: 0, cancelled: 2, skippedOffline: false });
@@ -516,7 +518,7 @@ describe('firestore/reservations', () => {
             expect(update).toHaveBeenNthCalledWith(1, expect.anything(), {
                 status: 'completed', driveLogReminderSent: true,
             });
-            expect(update).toHaveBeenNthCalledWith(2, expect.anything(), { status: 'cancelled' });
+            expect(update).toHaveBeenNthCalledWith(2, expect.anything(), { status: 'cancelled', editBatchId: expect.any(String) });
         });
 
         it('다일 예약이 아니면 읽기 한 번으로 끝내고 아무것도 쓰지 않는다', async () => {

@@ -145,7 +145,7 @@ export default function useMaintenanceLog() {
                 cancelledCount = await cancelVehicleReservations(
                     orgId!, form.vehicleId, form.vehicleName || '',
                     form.date, form.blockEndDate || null,
-                    typeInfo?.label || '정비'
+                    `정비(${typeInfo?.label || '일반'})로 차량 사용 차단`
                 );
                 const v = await getVehicles(orgId!);
                 setVehicles(v as Vehicle[]);
