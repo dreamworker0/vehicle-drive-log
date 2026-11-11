@@ -78,7 +78,6 @@ export {
 
 // 차량 예약 (Reservations)
 export {
-    createReservation,
     createReservationSafe,
     getReservations,
     getReservationById,

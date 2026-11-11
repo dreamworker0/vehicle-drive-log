@@ -3,7 +3,7 @@
  */
 import {
     doc, getDoc, updateDoc,
-    collection, query, where, getDocs, addDoc,
+    collection, query, where, getDocs,
     serverTimestamp, runTransaction, writeBatch, Timestamp, documentId,
 } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
@@ -56,26 +56,6 @@ export const getReservationByIdAndOrg = async (reservationId: string, orgId: str
         return data;
     } catch (error) {
         captureError(error, { context: 'getReservationByIdAndOrg', reservationId, orgId });
-        throw error;
-    }
-};
-
-// 예약 생성 (클라이언트 측)
-export const createReservation = async (data: Partial<Reservation>, requireApproval: boolean = false) => {
-    try {
-        // zod 스키마로 런타임 값 검증 (실패 시 ZodError throw)
-        reservationSchema.parse(data);
-
-        const expiresAt = new Date(Date.now() + 5 * 365 * 24 * 60 * 60 * 1000); // TTL: 5 years
-        const docRef = await addDoc(reservationsCollection(), {
-            ...data,
-            status: requireApproval ? 'pending' : 'reserved',
-            createdAt: serverTimestamp(),
-            expiresAt,
-        } as Record<string, unknown>);
-        return docRef.id;
-    } catch (error) {
-        captureError(error, { context: 'createReservation', data, requireApproval });
         throw error;
     }
 };

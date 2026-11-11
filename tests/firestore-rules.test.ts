@@ -1798,4 +1798,41 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     // 대조군: superAdmin의 멤버 제거(문서 삭제)는 허용된다
     await assertSucceeds(superDb.collection('users').doc('emp_A2').delete());
   });
+  it('30. 운행일지 핵심 필드 타입 — 숫자·시각 자리에 문자열을 넣지 못한다 (옛 기록 수정 길은 열어 둔다)', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      await db.collection('driveLogs').doc('typed_A').set({
+        organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'user_A', createdByUid: 'user_A',
+        startKm: 100, endKm: 150, distance: 50, timestamp: new Date('2026-11-01T09:00:00Z'),
+      });
+      // 형식이 어긋난 옛 기록 — 시각·거리가 문자열로 남아 있다
+      await db.collection('driveLogs').doc('legacy_string_km').set({
+        organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'user_A', createdByUid: 'user_A',
+        startKm: 100, endKm: 150, distance: '50', timestamp: '2026-10-01', destination: '시청',
+      });
+    });
+    const memberA = setupContext('user_A', { role: 'member', orgId: 'org-A' }).firestore();
+    const base = { organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'user_A', createdByUid: 'user_A' };
+
+    // 화면이 보내는 모양 — km 숫자, 시각 Date
+    await assertSucceeds(memberA.collection('driveLogs').doc('ok_new').set({
+      ...base, startKm: 150, endKm: 180, distance: 30, timestamp: new Date('2026-11-02T09:00:00Z'),
+    }));
+
+    // km·거리 자리에 문자열 → 차단
+    await assertFails(memberA.collection('driveLogs').doc('bad_km').set({ ...base, startKm: 200, endKm: '250' }));
+    await assertFails(memberA.collection('driveLogs').doc('bad_dist').set({ ...base, startKm: 200, endKm: 250, distance: '50' }));
+    // 시각 자리에 문자열 → 차단
+    await assertFails(memberA.collection('driveLogs').doc('bad_ts').set({ ...base, startKm: 200, endKm: 250, timestamp: '2026-11-02' }));
+    // 식별자 자리에 문자열이 아닌 값 → 차단
+    await assertFails(memberA.collection('driveLogs').doc('bad_vid').set({ ...base, vehicleId: 123, startKm: 1, endKm: 2 }));
+
+    // 수정: 바꾸는 km가 문자열이면 차단, 숫자면 허용
+    await assertFails(memberA.collection('driveLogs').doc('typed_A').update({ endKm: '160' }));
+    await assertSucceeds(memberA.collection('driveLogs').doc('typed_A').update({ endKm: 160, distance: 60 }));
+    await assertFails(memberA.collection('driveLogs').doc('typed_A').update({ timestamp: 'yesterday' }));
+
+    // 옛 기록의 다른 필드(목적지)를 고치는 길은 열어 둔다 — 남아 있는 문자열 시각·거리는 검사하지 않는다
+    await assertSucceeds(memberA.collection('driveLogs').doc('legacy_string_km').update({ destination: '구청' }));
+  });
 });
