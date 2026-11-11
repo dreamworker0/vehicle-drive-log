@@ -261,14 +261,35 @@ export function countMileageGaps(logs: DriveLogLite[]): number {
     return gaps;
 }
 
+/** 한국 시간 하루가 UTC보다 앞서는 폭 */
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+
+/**
+ * 검증 대상 기간 — **지난달 1일 00:00 KST ~ 이번 달 1일 00:00 KST** (끝은 미포함).
+ *
+ * 예전에는 KST로 옮긴 시각의 연·월로 `new Date(y, m, 1)`을 만들었다. 함수는 UTC로 도니 그 값은
+ * **1일 00:00 UTC = 1일 09:00 KST**였고, 구간 전체가 9시간 밀려 지난달 1일 0~9시 기록은 빠지고
+ * 이번 달 1일 0~9시 기록이 섞여 들어갔다. 경계는 연·월만 KST로 읽고 시각은 UTC 기준으로 직접 계산한다.
+ *
+ * @remarks 단위 테스트(verifyDriveLogIntegrity.test.ts)를 위해 export한다.
+ */
+export function previousKstMonthWindow(now: Date = new Date()): { start: Date; end: Date; label: string } {
+    const kst = toKSTDate(now);
+    const y = kst.getFullYear();
+    const m = kst.getMonth();
+    // Date.UTC는 월 -1을 지난해 12월로 넘겨 준다
+    const start = new Date(Date.UTC(y, m - 1, 1) - KST_OFFSET_MS);
+    const end = new Date(Date.UTC(y, m, 1) - KST_OFFSET_MS);
+    const labelDate = new Date(Date.UTC(y, m - 1, 1));
+    const label = `${labelDate.getUTCFullYear()}-${String(labelDate.getUTCMonth() + 1).padStart(2, '0')}`;
+    return { start, end, label };
+}
+
 export async function verifyMileageConsistency(): Promise<void> {
     const db = getFirestore();
 
     // 지난달 1일 00:00 (KST) ~ 이번달 1일 00:00 (KST)
-    const now = toKSTDate();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    const prevMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const label = `${prevMonthStart.getFullYear()}-${String(prevMonthStart.getMonth() + 1).padStart(2, '0')}`;
+    const { start: prevMonthStart, end: monthStart, label } = previousKstMonthWindow();
 
     console.log(`[verifyDriveLogIntegrity] 검증 시작 대상 기간: ${label}`);
 
