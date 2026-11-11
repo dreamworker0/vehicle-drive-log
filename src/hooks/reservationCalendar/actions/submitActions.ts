@@ -12,6 +12,7 @@ import {
     getReservationsByDateRange,
 } from '../../../lib/firestore';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns';
+import { isNetworkUnavailableError } from '../../../lib/callableRetry';
 import { buildMultiDaySlots, findOverlappingReservation, findOwnerOverlappingReservation, getCurrentTimeStr, getTodayStr } from '../../utils/reservationUtils';
 import { composeReservationPassengers, MAX_PASSENGERS } from '../../utils/reservationPassengers';
 import { isVehicleRestrictedForUser } from '../../../lib/vehicleUtils';
@@ -531,7 +532,8 @@ export async function handleSubmit(e: React.FormEvent, deps: ActionDeps) {
         const errMsg = firebaseErr?.code === 'functions/already-exists'
             ? firebaseErr.message || '예약 처리에 실패했습니다.'
             : error instanceof Error ? error.message : '예약 처리에 실패했습니다.';
-        showToast(errMsg, 'error');
+        // 연결 없음은 고장이 아니라 상황이라 경고로 띄운다 (문구는 NetworkUnavailableError가 담아 온다)
+        showToast(errMsg, isNetworkUnavailableError(error) ? 'warning' : 'error');
     } finally {
         setSubmitting(false);
     }

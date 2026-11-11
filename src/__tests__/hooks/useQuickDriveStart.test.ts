@@ -190,6 +190,27 @@ describe('useQuickDriveStart', () => {
         );
     });
 
+    it('인터넷이 없어 예약을 만들지 못하면 운행일지 작성으로 기록하라고 안내한다', async () => {
+        // createReservationSafe가 연결 없음을 NetworkUnavailableError(code: network-unavailable)로 던진다
+        mockCreateReservationSafe.mockRejectedValueOnce(
+            Object.assign(new Error('인터넷에 연결되어 있지 않아'), { code: 'network-unavailable' }),
+        );
+        vi.spyOn(console, 'error').mockImplementation(() => {});
+        const { result } = renderHook(() => useQuickDriveStart());
+        await waitFor(() => expect(result.current.loading).toBe(false));
+
+        act(() => {
+            result.current.handleVehicleSelect('v1');
+            result.current.setForm(prev => ({ ...prev, destination: '서울역' }));
+        });
+        await act(async () => {
+            await result.current.handleStart();
+        });
+
+        expect(mockShowToast).toHaveBeenCalledWith(expect.stringContaining('[운행일지 작성]'), 'warning');
+        expect(mockShowToast).not.toHaveBeenCalledWith('운행 시작에 실패했습니다. 다시 시도해주세요.', 'error');
+    });
+
     it.each([
         ['동승자 기능', 'passenger' as const],
         ['미리 입력 위치 설정', 'reservationPassenger' as const],

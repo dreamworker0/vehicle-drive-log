@@ -19,6 +19,7 @@ import { isVehicleBlocked, isVehicleRestrictedForUser } from '../lib/vehicleUtil
 import { canChooseSite, resolveCurrentDepartureAddress, resolveDepartureAddress, resolveVehicleCurrentSite, resolveVehicleSite, hasBranchSites } from '../lib/orgSites';
 import type { Organization } from '../types/organization';
 import { invalidateDashboardCache } from './useTodayDashboard';
+import { isNetworkUnavailableError } from '../lib/callableRetry';
 
 export default function useQuickDriveStart() {
     const { user, userData, orgFeatures, orgSites } = useAuth();
@@ -287,7 +288,11 @@ export default function useQuickDriveStart() {
             console.error('운행 시작 실패:', err);
             // Cloud Function의 중복 예약 에러 → 구체적인 사유 표시
             const errObj = err as Record<string, string>;
-            if (errObj?.code === 'functions/already-exists' || errObj?.message?.includes('이미 예약')) {
+            if (isNetworkUnavailableError(err)) {
+                // 바로 운행은 예약을 서버에서 만들어야 해 인터넷이 필요하다. 운행일지는 기기에 두었다가
+                // 보낼 수 있으니, 신호가 없는 곳이라면 그쪽으로 기록할 수 있다고 알려 준다.
+                showToast('인터넷에 연결되어 있지 않아 운행을 시작할 수 없어요. 연결이 안 되는 곳이라면 운행을 마친 뒤 [운행일지 작성]으로 기록해 주세요.', 'warning');
+            } else if (errObj?.code === 'functions/already-exists' || errObj?.message?.includes('이미 예약')) {
                 showToast(errObj.message || '해당 시간대에 이미 예약이 있습니다.', 'warning');
             } else if (errObj?.code === 'functions/failed-precondition' && errObj.message) {
                 // 서버가 사유를 담아 거절한 경우(기관이 바로 운행을 끔·정비 중 차량 등) 그대로 보여 준다

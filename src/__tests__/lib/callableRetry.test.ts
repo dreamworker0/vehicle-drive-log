@@ -30,7 +30,7 @@ vi.mock('../../lib/tokenRefresh', () => ({
     refreshTokenSilently: (user: unknown) => mocks.refreshTokenSilently(user),
 }));
 
-import { callWithRetry, isTransientCallableError, isAuthExpiredError, isRateLimitedError, DEFAULT_CALL_TIMEOUT_MS } from '../../lib/callableRetry';
+import { callWithRetry, isTransientCallableError, isAuthExpiredError, isRateLimitedError, DEFAULT_CALL_TIMEOUT_MS, isCallableUnreachable, isNetworkUnavailableError, NetworkUnavailableError } from '../../lib/callableRetry';
 
 /** SDK가 시간 초과 시 던지는 것과 같은 모양 (code·message 모두 'deadline-exceeded') */
 function deadlineExceeded() {
@@ -76,6 +76,37 @@ describe('isTransientCallableError', () => {
         expect(isTransientCallableError(new Error('network error'))).toBe(true);
         expect(isTransientCallableError(new Error('그 밖의 오류'))).toBe(false);
         expect(isTransientCallableError(null)).toBe(false);
+    });
+});
+
+describe('isCallableUnreachable — 서버에 닿지 못한 실패', () => {
+    const setOnline = (online: boolean) =>
+        Object.defineProperty(navigator, 'onLine', { configurable: true, get: () => online });
+    afterEach(() => setOnline(true));
+
+    it('응답이 없었던 실패(internal [0])와 503은 닿지 못한 것이다', () => {
+        setOnline(true);
+        expect(isCallableUnreachable({ code: 'functions/internal', message: 'internal [0]' })).toBe(true);
+        expect(isCallableUnreachable({ code: 'functions/unavailable', message: 'unavailable [503]' })).toBe(true);
+        expect(isCallableUnreachable({ code: 'auth/network-request-failed', message: 'x' })).toBe(true);
+    });
+
+    it('서버가 돌려준 오류는 닿은 것이다 — 사유를 그대로 보여 줘야 한다', () => {
+        setOnline(true);
+        expect(isCallableUnreachable({ code: 'functions/internal', message: 'INTERNAL [500]' })).toBe(false);
+        expect(isCallableUnreachable({ code: 'functions/already-exists', message: '이미 예약 [409]' })).toBe(false);
+    });
+
+    it('오프라인이면 어떤 오류든 닿지 못한 것으로 본다', () => {
+        setOnline(false);
+        expect(isCallableUnreachable(new Error('whatever'))).toBe(true);
+    });
+
+    it('NetworkUnavailableError는 안내 문구를 메시지로 담고 코드로 가려진다', () => {
+        const err = new NetworkUnavailableError('연결해 주세요');
+        expect(err.message).toBe('연결해 주세요');
+        expect(isNetworkUnavailableError(err)).toBe(true);
+        expect(isNetworkUnavailableError(new Error('x'))).toBe(false);
     });
 });
 
