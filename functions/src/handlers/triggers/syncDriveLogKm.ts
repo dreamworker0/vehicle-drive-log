@@ -3,7 +3,7 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { captureError } from "../../core/sentry";
 import { log } from "../../utils/helpers";
 import { handleStatsOnCreate, handleStatsOnUpdate, handleStatsOnDelete } from "../../services/statistics/updateAggregatedStats";
-import { applyDriveLogHipassDelta, usedAmountOf, hipassFieldsDropped } from "../../services/hipass/applyBalanceDelta";
+import { applyDriveLogHipassDelta, usedAmountOf, hipassFieldsDropped, eventDedupeKey } from "../../services/hipass/applyBalanceDelta";
 import { driveLogRetentionCutoff } from "../../utils/constants";
 import { isOrgRetired } from "../../utils/orgRetirement";
 
@@ -659,7 +659,7 @@ export const onDriveLogCreated = onDocumentCreated(
             // 카드에서 3년 전 통행료를 다시 빼낸다**(삭제 쪽이 환불하던 것의 정확한 거울).
             // 3년 넘은 운행을 지금 손으로 입력하는 경우도 같은 이유로 오늘 잔액과 무관하다.
             if (!isBeyondRetention("onDriveLogCreated", ts)) {
-                await applyDriveLogHipassDelta("onDriveLogCreated", orgId, vehId, usedAmountOf(data));
+                await applyDriveLogHipassDelta("onDriveLogCreated", orgId, vehId, usedAmountOf(data), eventDedupeKey(event.id, "delta"));
             }
 
             if (!orgId || !vehId || !ts || endKm == null) return;
@@ -817,14 +817,15 @@ export const onDriveLogUpdated = onDocumentUpdated(
                     logId, used: usedAmountOf(oldData),
                 });
             } else if (oldData.vehicleId !== data.vehicleId || oldData.organizationId !== data.organizationId) {
-                await applyDriveLogHipassDelta("onDriveLogUpdated", oldData.organizationId, oldData.vehicleId, -usedAmountOf(oldData));
-                await applyDriveLogHipassDelta("onDriveLogUpdated", data.organizationId, data.vehicleId, usedAmountOf(data));
+                await applyDriveLogHipassDelta("onDriveLogUpdated", oldData.organizationId, oldData.vehicleId, -usedAmountOf(oldData), eventDedupeKey(event.id, "old"));
+                await applyDriveLogHipassDelta("onDriveLogUpdated", data.organizationId, data.vehicleId, usedAmountOf(data), eventDedupeKey(event.id, "new"));
             } else {
                 await applyDriveLogHipassDelta(
                     "onDriveLogUpdated",
                     data.organizationId,
                     data.vehicleId,
                     usedAmountOf(data) - usedAmountOf(oldData),
+                    eventDedupeKey(event.id, "delta"),
                 );
             }
 
@@ -959,7 +960,7 @@ export const onDriveLogDeleted = onDocumentDeleted(
             // (누적 km가 같은 사고를 피한 것은 `hasLaterDriveLog` 덕분인데, 잔액은 '현재 값'이
             //  아니라 누적 합이라 그 가드가 듣지 않는다. 그래서 경계를 명시적으로 본다.)
             if (!isBeyondRetention("onDriveLogDeleted", ts)) {
-                await applyDriveLogHipassDelta("onDriveLogDeleted", orgId, vehId, -usedAmountOf(data));
+                await applyDriveLogHipassDelta("onDriveLogDeleted", orgId, vehId, -usedAmountOf(data), eventDedupeKey(event.id, "delta"));
             }
 
             if (!orgId || !vehId || !ts) return;

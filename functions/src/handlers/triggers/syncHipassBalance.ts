@@ -11,7 +11,7 @@
 import { onDocumentCreated, onDocumentUpdated, onDocumentDeleted } from "firebase-functions/v2/firestore";
 import { captureError } from "../../core/sentry";
 import { log } from "../../utils/helpers";
-import { applyBalanceDelta } from "../../services/hipass/applyBalanceDelta";
+import { applyBalanceDelta, eventDedupeKey } from "../../services/hipass/applyBalanceDelta";
 import { isOrgRetired } from "../../utils/orgRetirement";
 
 /** 문서에서 충전금액을 숫자로 읽는다. 숫자가 아니면 0 — 잔액을 NaN으로 만들지 않는다. */
@@ -33,6 +33,7 @@ export const onHipassChargeCreated = onDocumentCreated(
                 data.cardId as string | undefined,
                 data.organizationId as string | undefined,
                 chargeAmountOf(data),
+                eventDedupeKey(event.id, "delta"),
             );
         } catch (error) {
             log("ERROR", "onHipassChargeCreated", "잔액 반영 중 오류", { chargeId: event.params.chargeId });
@@ -60,11 +61,11 @@ export const onHipassChargeUpdated = onDocumentUpdated(
             const oldCardId = before.cardId as string | undefined;
             const newCardId = after.cardId as string | undefined;
             if (oldCardId !== newCardId) {
-                await applyBalanceDelta("onHipassChargeUpdated", oldCardId, before.organizationId as string | undefined, -chargeAmountOf(before));
-                await applyBalanceDelta("onHipassChargeUpdated", newCardId, after.organizationId as string | undefined, chargeAmountOf(after));
+                await applyBalanceDelta("onHipassChargeUpdated", oldCardId, before.organizationId as string | undefined, -chargeAmountOf(before), eventDedupeKey(event.id, "old"));
+                await applyBalanceDelta("onHipassChargeUpdated", newCardId, after.organizationId as string | undefined, chargeAmountOf(after), eventDedupeKey(event.id, "new"));
                 return;
             }
-            await applyBalanceDelta("onHipassChargeUpdated", newCardId, after.organizationId as string | undefined, delta);
+            await applyBalanceDelta("onHipassChargeUpdated", newCardId, after.organizationId as string | undefined, delta, eventDedupeKey(event.id, "delta"));
         } catch (error) {
             log("ERROR", "onHipassChargeUpdated", "잔액 반영 중 오류", { chargeId: event.params.chargeId });
             captureError(error, { context: "onHipassChargeUpdated", chargeId: event.params.chargeId });
@@ -92,6 +93,7 @@ export const onHipassChargeDeleted = onDocumentDeleted(
                 data.cardId as string | undefined,
                 data.organizationId as string | undefined,
                 -chargeAmountOf(data),
+                eventDedupeKey(event.id, "delta"),
             );
         } catch (error) {
             log("ERROR", "onHipassChargeDeleted", "잔액 반영 중 오류", { chargeId: event.params.chargeId });

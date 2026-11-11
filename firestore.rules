@@ -754,5 +754,12 @@ service cloud.firestore {
     match /calendarBindings/{docId} {
       allow read, write: if false;
     }
+
+    // === 하이패스 잔액 반영 처리 표시 — 서버 전용 ===
+    // 같은 트리거 이벤트가 두 번 와도 잔액이 두 번 바뀌지 않게 하는 표시(applyBalanceDelta).
+    // 클라이언트가 표시를 지우거나 미리 만들면 반영을 되풀이하거나 막을 수 있다. (TTL 자동 정리)
+    match /hipassBalanceEvents/{docId} {
+      allow read, write: if false;
+    }
   }
 }
