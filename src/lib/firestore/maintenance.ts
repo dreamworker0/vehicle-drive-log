@@ -5,7 +5,6 @@ import {
     doc, getDoc, updateDoc, deleteDoc,
     collection, query, where, getDocs, addDoc,
     orderBy, limit, serverTimestamp,
-    type DocumentData,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { captureError } from '../sentry';
@@ -151,19 +150,29 @@ export const clearVehicleMaintenanceBlock = async (vehicleId: string) => {
 };
 
 /**
- * 차량 정비 차단·폐차 시 기존 예약 일괄 취소 + 예약자 알림
+ * 차량 정비 차단·폐차 시 기존 예약 일괄 취소
  *
- * 인덱스: `reservations (organizationId, vehicleId, status, date)`가 필요하다.
+ * 예약자 알림은 취소 트리거(onReservationUpdated)가 보낸다 — `cancelReason`을 함께 남기면 알림에 사유가
+ * 붙는다. 예전에는 여기서 notifications 문서를 직접 만들었는데, Rules가 클라이언트 생성을 superAdmin에게만
+ * 열어 두어 **기관 관리자가 실행하면 첫 예약만 취소되고 permission-denied로 멈췄다**(나머지 예약은 그대로).
+ *
+ * 승인 대기(pending) 예약도 함께 취소한다. 남겨 두면 막힌 차량의 예약이 승인 목록에 계속 남는다.
+ *
+ * 인덱스: `reservations (organizationId, vehicleId, status, date)`가 필요하다 (status는 `in`이어도 같은 인덱스).
  * 동등 필터 3개 뒤에 `date` 범위가 붙어 단일 필드 인덱스 병합으로는 처리되지 않는다.
  * 인덱스가 없으면 조회가 통째로 실패해 **정비 기록은 저장됐는데 예약은 그대로 남고**
  * 화면에는 "저장에 실패했습니다"만 뜬다 (Sentry JAVASCRIPT-REACT-5F, 2026-08-26).
  */
-export const cancelVehicleReservations = async (orgId: string, vehicleId: string, vehicleName: string, startDate: string, endDate: string | null, reason: string) => {
+/**
+ * @param _vehicleName 쓰지 않는다 — 알림의 차량 이름은 트리거가 예약 문서에서 붙인다(호출부 호환용으로 남김).
+ * @param reason 예약자에게 보일 취소 사유 문구 (예: `정비(엔진오일)로 차량 사용 차단`, `폐차 (매각)`)
+ */
+export const cancelVehicleReservations = async (orgId: string, vehicleId: string, _vehicleName: string, startDate: string, endDate: string | null, reason: string) => {
     try {
         const constraints = [
             where('organizationId', '==', orgId),
             where('vehicleId', '==', vehicleId),
-            where('status', '==', 'reserved'),
+            where('status', 'in', ['pending', 'reserved']),
             where('date', '>=', startDate),
         ];
         if (endDate) {
@@ -175,22 +184,11 @@ export const cancelVehicleReservations = async (orgId: string, vehicleId: string
         );
         const snap = await getDocs(q);
 
-        const targets = snap.docs
-            .map(d => ({ id: d.id, ...d.data() }) as DocumentData & { id: string; date?: string; reservedByUid?: string });
-
-        // 일괄 취소 + 예약자에게 알림 발송
-        for (const res of targets) {
-            await updateDoc(doc(db, 'reservations', res.id), { status: 'cancelled', ...reservationActorStamp() });
-            await addDoc(collection(db, 'notifications'), {
-                targetUid: res.reservedByUid,
-                title: '예약 자동 취소 안내',
-                message: `${vehicleName} 차량이 정비(${reason})로 차단되어 ${res.date} 예약이 취소되었습니다`,
-                type: 'reservation_cancelled_maintenance',
-                read: false,
-                createdAt: serverTimestamp(),
-            });
+        // 일괄 취소 — 문서마다 새 스탬프를 찍어야 트리거가 "다른 사람이 취소했다"고 보고 예약자에게 알린다
+        for (const d of snap.docs) {
+            await updateDoc(doc(db, 'reservations', d.id), { status: 'cancelled', cancelReason: reason, ...reservationActorStamp() });
         }
-        return targets.length;
+        return snap.size;
     } catch (error) {
         captureError(error as Error, { context: 'cancelVehicleReservations', orgId, vehicleId, startDate, endDate });
         throw error;

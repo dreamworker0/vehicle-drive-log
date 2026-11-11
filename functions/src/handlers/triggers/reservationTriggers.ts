@@ -58,6 +58,32 @@ async function isNotifiableOrgMember(uid: string | undefined | null, orgId: stri
     return snap.exists && snap.data()?.organizationId === orgId;
 }
 
+/** 예약 화면에 보일 차량 이름. 예약 문서는 `vehicleName`을 쓴다(`vehicleDisplayName`은 옛 문서 호환). */
+function vehicleLabel(r: Record<string, unknown>): string {
+    const name = r.vehicleName || r.vehicleDisplayName;
+    return typeof name === "string" && name ? name : "차량";
+}
+
+/**
+ * 취소·변경 알림을 받을 예약자 — **다른 사람이 바꿨을 때만** 돌려준다.
+ *
+ * 예전에는 예약 문서에 없는 `userId`를 대상으로 삼아 취소·변경 알림이 한 번도 나가지 않았다.
+ * 대상을 `reservedByUid`로 고치면 이번엔 본인이 취소·수정한 것까지 본인에게 알리게 되므로,
+ * 이번 쓰기의 행위자를 함께 본다. 행위자는 **이번 쓰기가 스탬프를 새로 찍었을 때만** 믿는다
+ * (auditLog.ts freshReservationActor와 같은 기준 — `lastEditedByUid`만 보면 캘린더 역동기화 같은
+ * 서버 쓰기가 지난번 수정자에게 귀속된다). 행위자를 모르는 쓰기는 알리지 않는다 —
+ * 본인 취소 콜러블·서버 정리 작업이 여기에 해당하고, 엉뚱한 알림보다 침묵이 낫다.
+ */
+function notifyTargetOnOthersEdit(before: Record<string, unknown>, after: Record<string, unknown>): string | null {
+    const owner = after.reservedByUid;
+    if (typeof owner !== "string" || !owner) return null;
+    const editId = after.lastEditId;
+    if (typeof editId !== "string" || !editId || editId === before.lastEditId) return null;
+    const actor = after.lastEditedByUid;
+    if (typeof actor !== "string" || !actor || actor === owner) return null;
+    return owner;
+}
+
 /**
  * 캘린더 호출 실패 처리 — 모든 캘린더 분기가 공유하는 단일 정책.
  *
@@ -119,7 +145,7 @@ export const onReservationCreated = onDocumentCreated(
             });
             const uid = reservation.reservedByUid || reservation.userId;
             if (await isNotifiableOrgMember(uid, reservation.organizationId)) {
-                const bodyMsg = `[오프라인 동기화 안내] ${reservation.vehicleDisplayName || "차량"} 예약이 이미 다른 예약과 시간이 겹쳐 반려/취소되었습니다. (${reservation.date})`;
+                const bodyMsg = `[오프라인 동기화 안내] ${vehicleLabel(reservation)} 예약이 이미 다른 예약과 시간이 겹쳐 반려/취소되었습니다. (${reservation.date})`;
                 await createInAppNotification(uid, "reservation_rejected", "⚠️ 예약 시간 충돌", bodyMsg, reservation.organizationId);
                 await sendPushToUser(uid, { title: "⚠️ 예약 시간 충돌", body: bodyMsg });
             }
@@ -233,7 +259,7 @@ export const onReservationUpdated = onDocumentUpdated(
                 await event.data!.after.ref.update({ status: "rejected", rejectedReason: "offline_time_conflict" });
                 const uid = after.reservedByUid || after.userId;
                 if (await isNotifiableOrgMember(uid, after.organizationId)) {
-                    const bodyMsg = `[오프라인 동기화 안내] ${after.vehicleDisplayName || "차량"} 예약 변경이 다른 예약과 시간이 겹쳐 반려/취소되었습니다.`;
+                    const bodyMsg = `[오프라인 동기화 안내] ${vehicleLabel(after)} 예약 변경이 다른 예약과 시간이 겹쳐 반려/취소되었습니다.`;
                     await createInAppNotification(uid, "reservation_rejected", "⚠️ 예약 시간 충돌", bodyMsg, after.organizationId);
                     await sendPushToUser(uid, { title: "⚠️ 예약 시간 충돌", body: bodyMsg });
                 }
@@ -254,7 +280,7 @@ export const onReservationUpdated = onDocumentUpdated(
         if (after.status === "rejected" && before.status === "pending") {
             const uid = after.reservedByUid || after.userId;
             if (await isNotifiableOrgMember(uid, after.organizationId)) {
-                const bodyMsg = `${after.vehicleDisplayName || "차량"} 예약이 반려되었습니다.${after.rejectedReason ? ` 사유: ${after.rejectedReason}` : ''}`;
+                const bodyMsg = `${vehicleLabel(after)} 예약이 반려되었습니다.${after.rejectedReason ? ` 사유: ${after.rejectedReason}` : ''}`;
                 await createInAppNotification(uid, "reservation_rejected", "❌ 예약 반려", bodyMsg, after.organizationId);
                 await sendPushToUser(uid, { title: "❌ 예약 반려", body: bodyMsg });
             }
@@ -278,7 +304,7 @@ export const onReservationUpdated = onDocumentUpdated(
 
             const approveUid = after.reservedByUid || after.userId;
             if (await isNotifiableOrgMember(approveUid, after.organizationId)) {
-                const bodyMsg = `${after.vehicleDisplayName || "차량"} 예약이 승인되었습니다. (${after.date} ${after.startTime || ""})`;
+                const bodyMsg = `${vehicleLabel(after)} 예약이 승인되었습니다. (${after.date} ${after.startTime || ""})`;
                 await createInAppNotification(approveUid, "reservation_approved", "✅ 예약 승인", bodyMsg, after.organizationId);
                 await sendPushToUser(approveUid, { title: "✅ 예약 승인", body: bodyMsg });
             }
@@ -300,17 +326,19 @@ export const onReservationUpdated = onDocumentUpdated(
             }
 
             // 예약자에게 취소 알림 (취소한 본인이 아닌 경우) — 대상이 예약 org 소속일 때만
-            if (await isNotifiableOrgMember(after.userId, after.organizationId)) {
+            const cancelTarget = notifyTargetOnOthersEdit(before, after);
+            if (await isNotifiableOrgMember(cancelTarget, after.organizationId)) {
+                const reason = typeof after.cancelReason === "string" && after.cancelReason ? " 사유: " + after.cancelReason : "";
                 await createInAppNotification(
-                    after.userId,
+                    cancelTarget!,
                     "reservation_cancelled",
                     "🚫 예약 취소",
-                    (after.vehicleDisplayName || "차량") + " 예약(" + after.date + " " + (after.startTime || "") + ")이 취소되었습니다.",
+                    vehicleLabel(after) + " 예약(" + after.date + " " + (after.startTime || "") + ")이 취소되었습니다." + reason,
                     after.organizationId
                 );
-                await sendPushToUser(after.userId, {
+                await sendPushToUser(cancelTarget!, {
                     title: "🚫 예약 취소",
-                    body: (after.vehicleDisplayName || "차량") + " 예약(" + after.date + ")이 취소되었습니다.",
+                    body: vehicleLabel(after) + " 예약(" + after.date + ")이 취소되었습니다." + reason,
                 });
             }
             return;
@@ -348,8 +376,9 @@ export const onReservationUpdated = onDocumentUpdated(
                 }
             }
 
-            // 예약자에게 변경 알림 — 대상이 예약 org 소속일 때만
-            if (await isNotifiableOrgMember(after.userId, after.organizationId)) {
+            // 예약자에게 변경 알림 (변경한 본인이 아닌 경우) — 대상이 예약 org 소속일 때만
+            const changeTarget = notifyTargetOnOthersEdit(before, after);
+            if (await isNotifiableOrgMember(changeTarget, after.organizationId)) {
                 const changeParts: string[] = [];
                 if (before.date !== after.date) changeParts.push("날짜: " + after.date);
                 if (before.startTime !== after.startTime || before.endTime !== after.endTime) {
@@ -358,17 +387,17 @@ export const onReservationUpdated = onDocumentUpdated(
                 if (before.destination !== after.destination) changeParts.push("목적지: " + (after.destination || ""));
 
                 const changeMsg = changeParts.length > 0
-                    ? (after.vehicleDisplayName || "차량") + " 예약이 변경되었습니다. (" + changeParts.join(", ") + ")"
-                    : (after.vehicleDisplayName || "차량") + " 예약 정보가 변경되었습니다.";
+                    ? vehicleLabel(after) + " 예약이 변경되었습니다. (" + changeParts.join(", ") + ")"
+                    : vehicleLabel(after) + " 예약 정보가 변경되었습니다.";
 
                 await createInAppNotification(
-                    after.userId,
+                    changeTarget!,
                     "reservation_changed",
                     "✏️ 예약 변경",
                     changeMsg,
                     after.organizationId
                 );
-                await sendPushToUser(after.userId, {
+                await sendPushToUser(changeTarget!, {
                     title: "✏️ 예약 변경",
                     body: changeMsg,
                 });

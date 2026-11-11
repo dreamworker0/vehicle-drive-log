@@ -114,6 +114,7 @@ const AUDITED_FIELDS: Record<AuditTargetType, ReadonlySet<string>> = {
         "passengerUids",
         "passengerNames",
         "rejectedReason",
+        "cancelReason",
     ]),
 };
 
