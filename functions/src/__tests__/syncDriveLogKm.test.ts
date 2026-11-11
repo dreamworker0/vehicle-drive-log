@@ -165,6 +165,7 @@ jest.mock('../utils/helpers', () => ({ recordHeartbeat: jest.fn(async () => unde
 import { getFirestore } from 'firebase-admin/firestore';
 import {
     syncNextLogStartKm,
+    syncStoredDistance,
     onDriveLogCreated,
     onDriveLogUpdated,
     onDriveLogDeleted,
@@ -472,6 +473,82 @@ describe('onDriveLogUpdated — 연쇄 재발동 차단', () => {
         expect(kmPatches).toHaveLength(0);
     });
 
+});
+
+describe('저장된 주행거리(distance) 동기화', () => {
+    beforeEach(() => {
+        jest.clearAllMocks();
+        jest.spyOn(console, 'error').mockImplementation();
+        jest.spyOn(console, 'warn').mockImplementation();
+    });
+    afterEach(() => jest.restoreAllMocks());
+
+    const base = { organizationId: ORG, vehicleId: VEH, timestamp: d(15) };
+    const ref = () => db.collection('driveLogs').doc('B');
+    const distancePatches = () => db.__updates()
+        .filter((u: { id: string; patch: Record<string, unknown> }) => u.id === 'B' && 'distance' in u.patch);
+
+    // 사진 고정 재정합이 남긴 거리(80)가 있는 기록의 출발 km를 인접 조정이 1000 → 990으로 바꾼 경우
+    it('km가 바뀌고 저장된 거리가 어긋나면 도착−출발로 맞추고 재발동 표시를 올린다', async () => {
+        seedLogs([{ id: 'B', timestamp: d(15), startKm: 990, endKm: 1080 }]);
+
+        await syncStoredDistance(ref(),
+            { ...base, startKm: 1000, endKm: 1080, distance: 80 },
+            { ...base, startKm: 990, endKm: 1080, distance: 80 });
+
+        expect(distancePatches()).toHaveLength(1);
+        expect(distancePatches()[0].patch).toMatchObject({ distance: 90 });
+        expect(db.__get('driveLogs', 'B')).toMatchObject({ distance: 90, [KM_SYNC_REV_FIELD]: 1 });
+    });
+
+    it('저장된 거리가 없는 기록은 건드리지 않는다 (지금 앱이 만드는 기록 — 쓰기를 늘리지 않는다)', async () => {
+        seedLogs([{ id: 'B', timestamp: d(15), startKm: 990, endKm: 1080 }]);
+        await syncStoredDistance(ref(),
+            { ...base, startKm: 1000, endKm: 1080 },
+            { ...base, startKm: 990, endKm: 1080 });
+        expect(db.__updates()).toHaveLength(0);
+    });
+
+    it('km가 그대로이거나 거리가 이미 맞으면 쓰지 않는다', async () => {
+        seedLogs([{ id: 'B', timestamp: d(15), startKm: 1000, endKm: 1080 }]);
+        // km 그대로 (목적지만 수정 등)
+        await syncStoredDistance(ref(),
+            { ...base, startKm: 1000, endKm: 1080, distance: 70 },
+            { ...base, startKm: 1000, endKm: 1080, distance: 70, destination: '시청' });
+        // 출발·도착이 같은 폭으로 움직여 거리가 그대로 (연쇄가 민 기록과 같은 모양)
+        await syncStoredDistance(ref(),
+            { ...base, startKm: 1000, endKm: 1080, distance: 80 },
+            { ...base, startKm: 1010, endKm: 1090, distance: 80 });
+        expect(db.__updates()).toHaveLength(0);
+    });
+
+    it('계기판 역전(도착 < 출발)은 0으로 맞춘다 — 집계 규칙(음수는 0)과 같다', async () => {
+        seedLogs([{ id: 'B', timestamp: d(15), startKm: 1100, endKm: 1080 }]);
+        await syncStoredDistance(ref(),
+            { ...base, startKm: 1000, endKm: 1080, distance: 80 },
+            { ...base, startKm: 1100, endKm: 1080, distance: 80 });
+        expect(distancePatches()[0].patch).toMatchObject({ distance: 0 });
+    });
+
+    it('수정 트리거가 사람의 km 수정에서 저장된 거리를 맞춘다', async () => {
+        seedLogs(
+            [
+                { id: 'B', timestamp: d(15), startKm: 990, endKm: 1080 },
+                { id: 'C', timestamp: d(20), startKm: 1080, endKm: 1100 },
+            ],
+            [{ id: VEH, col: 'vehicles', data: { organizationId: ORG, currentKm: 1100 } }],
+        );
+
+        await (onDriveLogUpdated as unknown as Function)({
+            data: {
+                before: { data: () => ({ ...base, startKm: 1000, endKm: 1080, distance: 80 }) },
+                after: { data: () => ({ ...base, startKm: 990, endKm: 1080, distance: 80 }), ref: ref() },
+            },
+            params: { logId: 'B' },
+        });
+
+        expect(db.__get('driveLogs', 'B')).toMatchObject({ distance: 90 });
+    });
 });
 
 describe('onDriveLogCreated — 차량 누적 km 분기', () => {

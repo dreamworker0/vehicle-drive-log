@@ -695,6 +695,37 @@ export const onDriveLogCreated = onDocumentCreated(
 );
 
 /**
+ * 저장된 주행거리(`distance`)를 고친 km에 맞춘다.
+ *
+ * 지금 앱은 운행일지를 저장·수정할 때 `distance`를 쓰지 않는다(화면·PDF·기관 통계는 `도착 − 출발`로 센다).
+ * 그런데 **이미 저장된 값이 있는 기록**이 있다 — 사진으로 고정한 도착 km를 연쇄 재정합이 흡수할 때
+ * 이 트리거가 쓴 값, 그리고 옛 버전이 남긴 값이다. 통계·분석 화면과 엑셀(`logDistance`), 서비스
+ * 대시보드(`computeDistance`)는 저장된 값을 **먼저** 쓰므로, 그런 기록의 km를 수정 화면이나
+ * 인접 기록 자동 조정(`adjustAdjacentLogs`)으로 고치면 낡은 거리가 그대로 집계된다.
+ *
+ * 그래서 km가 바뀐 수정에서 저장된 값이 있고 어긋날 때만 다시 쓴다. 값이 없는 기록은 건드리지 않는다
+ * (쓰기를 늘리지 않는다). 연쇄 재정합과 같은 표시(`kmSyncRev`)를 올려, 이 쓰기가 만든 update는
+ * 위 재발동 차단에서 바로 끝난다. 연쇄가 민 기록은 출발·도착이 같은 폭으로 움직여 거리가 그대로이므로
+ * 여기 올 일이 없다.
+ *
+ * @remarks 단위 테스트(syncDriveLogKm.test.ts)를 위해 export한다.
+ */
+export async function syncStoredDistance(
+    ref: FirebaseFirestore.DocumentReference,
+    before: FirebaseFirestore.DocumentData,
+    after: FirebaseFirestore.DocumentData,
+): Promise<void> {
+    if (after.startKm === before.startKm && after.endKm === before.endKm) return;
+    if (after.distance == null) return;
+    const start = Number(after.startKm);
+    const end = Number(after.endKm);
+    if (!Number.isFinite(start) || !Number.isFinite(end)) return;
+    const fresh = Math.max(0, end - start);
+    if (Number(after.distance) === fresh) return;
+    await ref.update({ distance: fresh, [KM_SYNC_REV_FIELD]: FieldValue.increment(1) });
+}
+
+/**
  * 운행일지 수정 시 부수효과 처리 (currentKm 차분 갱신 및 startKm 연쇄 동기화)
  */
 export const onDriveLogUpdated = onDocumentUpdated(
@@ -770,6 +801,8 @@ export const onDriveLogUpdated = onDocumentUpdated(
             // [오프라인 충돌 방어] LWW 기반: 들어온 데이터가 더 과거에 수정된 데이터면 롤백하고 종료
             const isConflict = await resolveDriveLogConflict(afterSnap.ref, oldData, data);
             if (isConflict) return;
+
+            await syncStoredDistance(afterSnap.ref, oldData, data);
 
             const orgId = data.organizationId || oldData.organizationId;
             const vehId = data.vehicleId || oldData.vehicleId;
