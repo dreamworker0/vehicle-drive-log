@@ -241,8 +241,8 @@ function initSentryWithModule(Sentry: SentryModule) {
             // iOS Safari(WebKit) IndexedDB 트랜잭션 조기 커밋 에러.
             // Firebase 영속성 레이어가 WebKit의 트랜잭션 auto-commit과 경합할 때 발생하는
             // unhandledrejection 노이즈다(스택 프레임이 없어 firebase-* 번들 필터를 우회한다).
-            // 오프라인 큐 flush는 모든 브라우저에서 페이지 컨텍스트(registerReconnectFlush)가 한다
-            // (서비스워커는 큐를 비우지 않는다 — sw.ts 'sync' 주석) — 앱 버그 아님.
+            // 오프라인 쓰기는 SDK가 보내고, 앱의 장부 확인은 페이지 컨텍스트(registerLedgerReconcile)가 한다
+            // (서비스워커는 Firestore에 쓰지 않는다 — sw.ts 'sync' 주석) — 앱 버그 아님.
             //
             // **동작(verb)만 다른 변종이 계속 올라온다** — 처음엔 `delete range`만 막았는데
             // `UnknownError: Attempt to get a record from database ...`(iOS 18.7 Mobile Safari,
@@ -387,10 +387,10 @@ function initSentryWithModule(Sentry: SentryModule) {
             // DOMException은 이름(UnknownError)과 메시지가 갈려 있어 그 앵커가 닿지 않는다.
             //
             // **ignoreErrors가 아니라 여기인 이유**: 그 목록은 전역이라 같은 문구를 **우리가
-            // 직접 보고한 것**까지 지운다. 오프라인 운행일지 적재(enqueue)가 이 오류로 실패하면
-            // createDriveLog의 catch가 captureError로 올리는데, 그건 노이즈가 아니라 '이 기기에서
-            // 오프라인 저장이 큐에 들어가지 못했다'는 유일한 신호다. 그래서 **처리되지 않은
-            // 전역 보고(handled=no)만** 억제한다.
+            // 직접 보고한 것**까지 지운다. 운행일지 저장(createDriveLog 등)이 이 오류로 실패하면
+            // 그 catch가 captureError로 올리는데, 그건 노이즈가 아니라 '이 기기에서 저장이
+            // 실패했다'는 신호다. 그래서 **처리되지 않은 전역 보고(handled=no)만** 억제한다.
+            // (오프라인 장부 기록 실패는 저장을 막지 않으므로 콘솔 경고로만 남긴다 — syncQueue.trackWrite)
             //
             // ⚠️ 캐시 손상 복구(firebase.ts의 attemptCacheRecovery) 대상에는 넣지 않았다.
             // 이 오류는 일시적인 경우가 많은데 복구는 clearIndexedDbPersistence로 **미전송

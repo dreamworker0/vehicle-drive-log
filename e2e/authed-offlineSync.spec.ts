@@ -20,7 +20,7 @@ async function signIn(page: Page, email: string, password: string) {
 }
 
 /**
- * 오프라인 쓰기 큐(sync-db/sync-store)의 현재 항목 수. 스토어 미존재 시 -1.
+ * 오프라인·지연 쓰기 장부(sync-db/sync-store)의 현재 항목 수. 스토어 미존재 시 -1.
  *
  * **버전을 지정하지 않고 연다.** 앱보다 낮은 버전을 지정하면 VersionError로 열기 자체가
  * 실패한다(v1 고정으로 두었다가 앱이 v2로 올라가며 실제로 깨졌다). 버전 없이 열면
@@ -94,10 +94,10 @@ test.describe('Offline-First 쓰기 큐 및 백그라운드 동기화 E2E', () =
         // 저장 버튼 클릭
         await page.getByRole('button', { name: /운행일지 저장/ }).click();
 
-        // 4. 오프라인 제출 계약 1 — 저장 즉시 오프라인 큐(sync-db/sync-store)에 적재된다.
-        //    (createDriveLog 오프라인 분기: setDoc 백그라운드 발사 + enqueue)
+        // 4. 오프라인 제출 계약 1 — 저장 즉시 장부(sync-db/sync-store)에 "서버 확인 전"으로 적힌다.
+        //    (createDriveLog: setDoc을 SDK가 보내도록 두고 trackWrite로 장부에 적는다 — "미전송 N건" 배너의 근거)
         await expect.poll(() => queueCount(page), {
-            message: '오프라인 저장이 sync-db/sync-store 큐에 적재되어야 합니다',
+            message: '오프라인 저장이 sync-db/sync-store 장부에 적혀야 합니다',
             timeout: 15000,
         }).toBeGreaterThan(0);
 
@@ -111,12 +111,15 @@ test.describe('Offline-First 쓰기 큐 및 백그라운드 동기화 E2E', () =
             window.dispatchEvent(new Event('online'));
         });
 
-        // Firestore SDK가 백그라운드 setDoc을 재전송할 시간을 준다
-        await page.waitForTimeout(3000);
+        // 오프라인 제출 계약 2 — SDK가 보낸 쓰기를 서버가 확인하면 장부에서 지워진다(앱이 다시 보내지 않는다).
+        //    장부가 비는 것을 기다리는 것이 곧 "SDK가 보냈다"를 기다리는 것이다.
+        await expect.poll(() => queueCount(page), {
+            message: '재접속 후 서버 확인을 받으면 장부가 비워져야 합니다',
+            timeout: 15000,
+        }).toBe(0);
 
-        // 6. 오프라인 제출 계약 2 — 재접속 후 서버(에뮬레이터)에 실제 반영된다.
+        // 6. 오프라인 제출 계약 3 — 재접속 후 서버(에뮬레이터)에 실제 반영된다.
         //    내 기록 화면에서 문서가 조회되는지로 검증.
-        //    (큐 flush는 SW sync 이벤트 전용이라 SW가 없는 dev 서버 E2E에선 검증 대상이 아님)
         await page.goto('/employee/my-records');
         await expect(page.locator('text=E2E 오프라인 목적지').first()).toBeVisible({ timeout: 20000 });
 

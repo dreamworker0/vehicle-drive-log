@@ -51,14 +51,14 @@ vi.mock('../../../lib/firestore/cache', () => ({
     cachedQuery: vi.fn((_k: string, f: () => unknown) => f()),
     invalidateCache: vi.fn(),
 }));
-// 오프라인 큐 — idb 실제 접근 회피(미mock 시 hang), 호출만 기록
-vi.mock('../../../lib/offline/syncQueue', () => ({ enqueue: vi.fn() }));
+// 오프라인 장부 — idb 실제 접근 회피(미mock 시 hang), 호출만 기록
+vi.mock('../../../lib/offline/syncQueue', () => ({ trackWrite: vi.fn(async () => undefined) }));
 
 // mock 선언 뒤에 import (호이스팅 주의)
 import * as fs from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { captureError } from '../../../lib/sentry';
-import { enqueue } from '../../../lib/offline/syncQueue';
+import { trackWrite } from '../../../lib/offline/syncQueue';
 import {
     getReservationById, getReservationByIdAndOrg, createReservation,
     getReservations, getPendingReservations, cancelReservation, updateReservation,
@@ -258,16 +258,17 @@ describe('firestore/reservations', () => {
                 expect.anything(),
                 expect.objectContaining({ status: 'completed', actualEndTime: '18:00' }),
             );
-            expect(enqueue).not.toHaveBeenCalled();
+            expect(trackWrite).toHaveBeenCalledWith('UPDATE', 'reservations', 'r1', expect.objectContaining({ status: 'completed' }), expect.any(Promise), { callerAwaits: true });
             expect(fs.runTransaction).not.toHaveBeenCalled();
         });
 
-        it('오프라인: enqueue(UPDATE)에 쌓는다 (낙관적 업데이트)', async () => {
+        it('오프라인: updateDoc 한 번 + 장부에 적는다 (낙관적 업데이트, 보내는 일은 SDK)', async () => {
             setOnline(false);
 
             await updateReservationStatus('r1', 'completed');
 
-            expect(enqueue).toHaveBeenCalledWith('UPDATE', 'reservations', 'r1', expect.objectContaining({ status: 'completed' }));
+            expect(fs.updateDoc).toHaveBeenCalledTimes(1);
+            expect(trackWrite).toHaveBeenCalledWith('UPDATE', 'reservations', 'r1', expect.objectContaining({ status: 'completed' }), expect.any(Promise), { callerAwaits: false });
             expect(fs.runTransaction).not.toHaveBeenCalled();
         });
     });

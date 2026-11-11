@@ -7,7 +7,7 @@
  *
  *   1) 거부된 Promise가 캐시에 남아, 기기가 회복된 뒤에도 그 세션 내내 큐가 죽어 있었다.
  *      미전송 건수는 0으로 보이고(getPendingCount의 catch) 이후 오프라인 쓰기는 전부 실패한다.
- *   2) flush는 `online`·앱 시작 계기에서 결과를 기다리지 않고 부른다(`void`). 그래서 그
+ *   2) 장부 확인(옛 flush)은 `online`·앱 시작 계기에서 결과를 기다리지 않고 부른다(`void`). 그래서 그
  *      거부가 **처리되지 않은 프라미스 거부**가 되어 스택 없는 오류로 Sentry에 올라왔다.
  *
  * 두 계약을 여기서 고정한다. 실패를 만들어 내야 하므로 fake-indexeddb 대신 `idb`를 목으로 둔다.
@@ -31,6 +31,8 @@ vi.mock('firebase/firestore', () => {
         setDoc: vi.fn(),
         updateDoc: vi.fn(),
         deleteDoc: vi.fn(),
+        getDocFromServer: vi.fn(),
+        waitForPendingWrites: vi.fn(async () => undefined),
         serverTimestamp: vi.fn(() => new FieldValue('serverTimestamp')),
         deleteField: vi.fn(() => new FieldValue('deleteField')),
         FieldValue,
@@ -66,27 +68,26 @@ describe('syncQueue — IDB를 열지 못할 때', () => {
         expect(openDB).toHaveBeenCalledTimes(2);
     });
 
-    it('flushQueueQuietly는 IDB를 못 쓰는 기기의 실패를 삼킨다 — 처리되지 않은 거부로 새지 않는다', async () => {
-        const { flushQueueQuietly } = await loadQueue();
+    it('reconcileLedgerQuietly는 IDB를 못 쓰는 기기의 실패를 삼킨다 — 처리되지 않은 거부로 새지 않는다', async () => {
+        const { reconcileLedgerQuietly } = await loadQueue();
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
         openDB.mockRejectedValue(idbBackendFailure());
 
-        await expect(flushQueueQuietly()).resolves.toBeUndefined();
+        await expect(reconcileLedgerQuietly()).resolves.toBeUndefined();
         expect(warn).toHaveBeenCalled();
 
         warn.mockRestore();
     });
 
-    it('그 밖의 flush 실패는 삼키지 않는다 — 큐가 안 비는 결함이 조용해지면 안 된다', async () => {
-        // Firestore 쓰기는 됐는데 큐에서 지우기가 실패하는 부류. 삼키면 같은 문서가 매번
-        // 다시 전송되고 '미전송 N건'이 영영 남는데, 그것을 알아챌 방법이 사라진다.
-        const { flushQueueQuietly } = await loadQueue();
+    it('그 밖의 확인 실패는 삼키지 않는다 — 장부가 안 비는 결함이 조용해지면 안 된다', async () => {
+        // 삼키면 '미전송 N건'이 영영 남는데, 그것을 알아챌 방법이 사라진다.
+        const { reconcileLedgerQuietly } = await loadQueue();
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
         openDB.mockRejectedValue(new Error('예상하지 못한 실패'));
 
-        await expect(flushQueueQuietly()).rejects.toThrow('예상하지 못한 실패');
+        await expect(reconcileLedgerQuietly()).rejects.toThrow('예상하지 못한 실패');
 
         warn.mockRestore();
     });
@@ -94,7 +95,7 @@ describe('syncQueue — IDB를 열지 못할 때', () => {
 
 /**
  * iOS Safari는 앱이 백그라운드에 있는 동안 IDB 연결을 끊는다. 캐시된 연결은 그대로라 화면에
- * 돌아온 직후의 flush가 죽은 연결로 읽다 실패했다(Sentry JAVASCRIPT-REACT-6N, iOS 18.7 —
+ * 돌아온 직후의 확인(옛 flush)이 죽은 연결로 읽다 실패했다(Sentry JAVASCRIPT-REACT-6N, iOS 18.7 —
  * `InvalidStateError: ... The database connection is closing.` at runFlush).
  */
 const connectionClosing = () => new DOMException(
@@ -113,25 +114,25 @@ describe('syncQueue — 브라우저가 연결을 끊었을 때', () => {
         openDB.mockReset();
     });
 
-    it('화면 복귀 flush가 죽은 연결을 만나면 새로 열어 이어 간다', async () => {
-        const { getSyncDB, flushQueueQuietly } = await loadQueue();
+    it('화면 복귀 확인이 죽은 연결을 만나면 새로 열어 이어 간다', async () => {
+        const { getSyncDB, reconcileLedgerQuietly } = await loadQueue();
         const fresh = { getAll: vi.fn(async () => []) };
         openDB.mockResolvedValueOnce(deadConnection()).mockResolvedValueOnce(fresh);
 
         await getSyncDB();  // 앱 시작 때 연 연결 — 그 뒤 백그라운드에서 끊겼다
-        await expect(flushQueueQuietly()).resolves.toBeUndefined();
+        await expect(reconcileLedgerQuietly()).resolves.toBeUndefined();
 
         expect(openDB).toHaveBeenCalledTimes(2);
         expect(fresh.getAll).toHaveBeenCalledWith('sync-store');
     });
 
-    it('오프라인 쓰기 적재도 새 연결로 다시 한다 — 죽은 연결 때문에 기록을 잃지 않는다', async () => {
-        const { getSyncDB, enqueue } = await loadQueue();
-        const fresh = { add: vi.fn(async () => 1) };
+    it('장부 기록도 새 연결로 다시 한다 — 죽은 연결 때문에 미전송 건수에서 빠지지 않는다', async () => {
+        const { getSyncDB, trackWrite } = await loadQueue();
+        const fresh = { add: vi.fn(async () => 1), delete: vi.fn(async () => undefined) };
         openDB.mockResolvedValueOnce(deadConnection()).mockResolvedValueOnce(fresh);
 
         await getSyncDB();
-        await enqueue('CREATE', 'driveLogs', 'd1', { startKm: 100 });
+        await trackWrite('CREATE', 'driveLogs', 'd1', { startKm: 100 }, new Promise(() => {}), { callerAwaits: false });
 
         expect(fresh.add).toHaveBeenCalledTimes(1);
     });
@@ -144,9 +145,9 @@ describe('syncQueue — 브라우저가 연결을 끊었을 때', () => {
         await expect(getPendingCount()).resolves.toBe(3);
     });
 
-    it('로그아웃의 큐 정리도 새 연결로 다시 한다 — 실패하면 다음 사람 세션에 앞사람 쓰기가 재생된다', async () => {
-        // 큐 항목에는 사용자 식별자가 없다. 로그아웃(auth.ts)의 clearQueue가 죽은 연결로 실패하면
-        // 경고만 남고 넘어가, 공용 기기에서 다음 로그인 사용자의 flush가 앞사람의 오프라인 쓰기를 보낸다.
+    it('로그아웃의 장부 정리도 새 연결로 다시 한다 — 실패하면 다음 사람 세션에 앞사람 건수·유실 안내가 뜬다', async () => {
+        // 장부 항목에는 사용자 식별자가 없다. 로그아웃(auth.ts)의 clearQueue가 죽은 연결로 실패하면
+        // 경고만 남고 넘어가, 공용 기기에서 다음 로그인 사용자에게 앞사람의 미전송 건수·유실 안내가 뜬다.
         const { getSyncDB, clearQueue } = await loadQueue();
         const fresh = { clear: vi.fn(async () => undefined) };
         openDB.mockResolvedValueOnce(deadConnection()).mockResolvedValueOnce(fresh);
@@ -172,24 +173,28 @@ describe('syncQueue — 브라우저가 연결을 끊었을 때', () => {
     });
 
     it('새 연결마저 닫히는 중이면 한 번만 다시 하고 조용히 넘긴다 — 처리되지 않은 거부로 새지 않는다', async () => {
-        const { getSyncDB, flushQueueQuietly } = await loadQueue();
+        const { getSyncDB, reconcileLedgerQuietly } = await loadQueue();
         const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
         openDB.mockResolvedValue(deadConnection());
 
         await getSyncDB();
-        await expect(flushQueueQuietly()).resolves.toBeUndefined();
+        await expect(reconcileLedgerQuietly()).resolves.toBeUndefined();
 
         expect(openDB).toHaveBeenCalledTimes(2);  // 처음 + 한 번 다시 — 무한히 다시 열지 않는다
         expect(warn).toHaveBeenCalled();
         warn.mockRestore();
     });
 
-    it('닫힘이 아닌 실패는 다시 하지 않는다', async () => {
-        const { getSyncDB, enqueue } = await loadQueue();
+    it('닫힘이 아닌 실패는 다시 하지 않고, 장부 실패가 저장을 막지 않는다', async () => {
+        const { getSyncDB, trackWrite } = await loadQueue();
+        const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
         openDB.mockResolvedValue({ add: vi.fn(async () => { throw new Error('QuotaExceededError'); }) });
 
         await getSyncDB();
-        await expect(enqueue('CREATE', 'driveLogs', 'd1', null)).rejects.toThrow('QuotaExceededError');
+        await expect(trackWrite('CREATE', 'driveLogs', 'd1', null, new Promise(() => {}), { callerAwaits: true }))
+            .resolves.toBeUndefined();
         expect(openDB).toHaveBeenCalledTimes(1);
+        expect(warn).toHaveBeenCalled();
+        warn.mockRestore();
     });
 });

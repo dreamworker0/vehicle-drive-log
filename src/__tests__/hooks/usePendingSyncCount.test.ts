@@ -1,5 +1,5 @@
 /**
- * usePendingSyncCount — 미전송 큐 개수 폴링
+ * usePendingSyncCount — 미전송(서버 확인 전) 장부 건수 폴링
  *
  * 값 자체보다 **언제 도느냐**가 계약이다. 볼 이유가 없을 때(온라인·0건) 3초마다 IndexedDB를
  * 두드리면 그만큼이 낭비이고, 반대로 오프라인·잔여분이 있을 때 멈추면 숫자가 굳어 버린다.
@@ -10,6 +10,7 @@ import { renderHook, act } from '@testing-library/react';
 const mockGetPendingCount = vi.fn<() => Promise<number>>(() => Promise.resolve(0));
 vi.mock('@/lib/offline/syncQueue', () => ({
     getPendingCount: () => mockGetPendingCount(),
+    LEDGER_CHANGE_EVENT: 'sync-ledger-change',
 }));
 
 import usePendingSyncCount from '@/hooks/usePendingSyncCount';
@@ -103,6 +104,32 @@ describe('usePendingSyncCount', () => {
 
         // 화면 복귀는 백그라운드 동안 SW가 큐를 비웠을 수 있어 계기가 된다
         expect(mockGetPendingCount).toHaveBeenCalledTimes(4);
+    });
+
+    it('온라인인데 통신이 안 되는 저장 — 장부에 적힌 줄은 3초 뒤에 센다 (정상 저장은 그 전에 지워져 깜빡이지 않는다)', async () => {
+        mockGetPendingCount.mockResolvedValue(0);
+        const { result } = renderHook(() => usePendingSyncCount());
+        await settle();
+        mockGetPendingCount.mockClear();
+
+        mockGetPendingCount.mockResolvedValue(1);
+        await act(async () => { window.dispatchEvent(new CustomEvent('sync-ledger-change', { detail: { added: true } })); });
+        expect(mockGetPendingCount).not.toHaveBeenCalled();
+
+        await advance(3000);
+        expect(mockGetPendingCount).toHaveBeenCalledTimes(1);
+        expect(result.current).toBe(1);
+    });
+
+    it('장부에서 줄이 지워지면 곧바로 다시 센다', async () => {
+        mockGetPendingCount.mockResolvedValue(1);
+        const { result } = renderHook(() => usePendingSyncCount());
+        await settle();
+
+        mockGetPendingCount.mockResolvedValue(0);
+        await act(async () => { window.dispatchEvent(new CustomEvent('sync-ledger-change', { detail: { added: false } })); });
+        await settle();
+        expect(result.current).toBe(0);
     });
 
     it('언마운트하면 폴링과 리스너를 모두 걷는다', async () => {

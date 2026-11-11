@@ -38,11 +38,11 @@ import('./lib/sentry').then((m) => {
     }
 }).catch(() => { });
 
-// iOS 등 Background Sync 미지원 브라우저용 오프라인 큐 flush 폴백
-import { registerReconnectFlush } from './lib/offline/syncQueue';
-registerReconnectFlush();
+// 오프라인·지연 쓰기 장부 확인 (저장은 Firestore SDK가 하고, 앱은 서버 반영만 확인한다)
+import { registerLedgerReconcile } from './lib/offline/syncQueue';
+registerLedgerReconcile();
 
-// 오프라인 큐에서 폐기된(서버에 반영되지 못한) 기록을 사용자에게 알린다
+// 서버에 반영되지 못한 쓰기를 사용자에게 알린다
 import { registerSyncFailureNotice } from './lib/offline/syncFailureNotice';
 registerSyncFailureNotice();
 
