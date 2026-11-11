@@ -9,6 +9,7 @@
  *       Admin SDK는 Rules를 우회하므로 여기서 막지 않으면 막을 곳이 없다
  *   (3) 남의 기관 카드를 건드리지 않는다
  *   (4) 판단이 서지 않으면(카드 없음·중복 연결) **깎지 않는다** — 잘못 깎는 것보다 낫다
+ *   (5) 같은 이벤트가 두 번 와도(Eventarc at-least-once) **한 번만** 반영된다 — 처리 표시
  */
 
 /** 카드 저장소 — 테스트마다 초기화한다 */
@@ -23,24 +24,35 @@ let lastQueryFilters: Array<[string, string, unknown]> = [];
 let queryThrows = false;
 /** 켜면 트랜잭션이 던진다 — 쓰기 실패 재현 */
 let transactionThrows = false;
+/** 처리 표시 저장소(hipassBalanceEvents) */
+let marks: Record<string, Record<string, unknown>> = {};
 
 jest.mock('firebase-admin/firestore', () => ({
     getFirestore: () => ({
         runTransaction: async (fn: (tx: any) => Promise<any>) => {
             transactionCount += 1;
             if (transactionThrows) throw new Error('UNAVAILABLE');
+            // 실제 트랜잭션처럼 쓰기는 콜백이 끝난 뒤 한꺼번에 반영한다.
+            const pending: Array<() => void> = [];
             const tx = {
-                get: async (ref: { __id: string }) => ({
-                    exists: cards[ref.__id] !== undefined,
-                    data: () => cards[ref.__id],
-                }),
+                get: async (ref: { __col: string; __id: string }) => {
+                    const store = ref.__col === 'hipassBalanceEvents' ? marks : cards;
+                    return { exists: store[ref.__id] !== undefined, data: () => store[ref.__id] };
+                },
                 update: (ref: { __id: string }, patch: Record<string, unknown>) => {
-                    cards[ref.__id] = { ...cards[ref.__id], ...patch };
+                    pending.push(() => { cards[ref.__id] = { ...cards[ref.__id], ...patch }; });
+                },
+                set: (ref: { __col: string; __id: string }, data: Record<string, unknown>) => {
+                    if (ref.__col !== 'hipassBalanceEvents') throw new Error(`예상하지 못한 set: ${ref.__col}`);
+                    pending.push(() => { marks[ref.__id] = data; });
                 },
             };
-            return fn(tx);
+            const result = await fn(tx);
+            pending.forEach((apply) => apply());
+            return result;
         },
         collection: (name: string) => {
+            if (name === 'hipassBalanceEvents') return { doc: (id: string) => ({ __col: name, __id: id }) };
             if (name !== 'hipassCards') throw new Error(`예상하지 못한 컬렉션 접근: ${name}`);
             // where 인자를 **버리지 않고 기록한다.** 인자를 무시하는 가짜였을 때는
             // `.where("organizationId", ...)`를 지워도 테스트가 전부 통과했다 —
@@ -48,7 +60,7 @@ jest.mock('firebase-admin/firestore', () => ({
             // 커스텀 ESLint 규칙은 src/lib/firestore/ 전용이라 functions/를 덮지 않는다.
             const filters: Array<[string, string, unknown]> = [];
             const query: any = {
-                doc: (id: string) => ({ __id: id }),
+                doc: (id: string) => ({ __col: name, __id: id }),
                 where: (field: string, op: string, value: unknown) => { filters.push([field, op, value]); return query; },
                 limit: () => query,
                 get: async () => {
@@ -82,22 +94,24 @@ jest.mock('firebase-functions/v2/firestore', () => ({
 
 import {
     applyBalanceDelta, usedAmountOf, findCardIdForVehicle, applyDriveLogHipassDelta, hipassFieldsDropped,
+    eventDedupeKey, EVENT_MARK_TTL_DAYS,
 } from '../services/hipass/applyBalanceDelta';
 import {
     onHipassChargeCreated, onHipassChargeUpdated, onHipassChargeDeleted,
 } from '../handlers/triggers/syncHipassBalance';
 
-/** 트리거 핸들러를 이벤트 모양으로 호출한다 */
-const created = (data: Record<string, unknown>) =>
+/** 트리거 핸들러를 이벤트 모양으로 호출한다 — 같은 eventId로 다시 부르면 재전달이다 */
+const created = (data: Record<string, unknown>, eventId = 'evt-1') =>
     (onHipassChargeCreated as unknown as (e: unknown) => Promise<void>)({
-        data: { data: () => data }, params: { chargeId: 'h1' },
+        id: eventId, data: { data: () => data }, params: { chargeId: 'h1' },
     });
-const deleted = (data: Record<string, unknown>) =>
+const deleted = (data: Record<string, unknown>, eventId = 'evt-1') =>
     (onHipassChargeDeleted as unknown as (e: unknown) => Promise<void>)({
-        data: { data: () => data }, params: { chargeId: 'h1' },
+        id: eventId, data: { data: () => data }, params: { chargeId: 'h1' },
     });
-const updated = (before: Record<string, unknown>, after: Record<string, unknown>) =>
+const updated = (before: Record<string, unknown>, after: Record<string, unknown>, eventId = 'evt-1') =>
     (onHipassChargeUpdated as unknown as (e: unknown) => Promise<void>)({
+        id: eventId,
         data: { before: { data: () => before }, after: { data: () => after } },
         params: { chargeId: 'h1' },
     });
@@ -109,6 +123,7 @@ beforeEach(() => {
     lastQueryFilters = [];
     queryThrows = false;
     transactionThrows = false;
+    marks = {};
 });
 
 describe('applyBalanceDelta', () => {
@@ -315,6 +330,84 @@ describe('충전 기록 트리거', () => {
             data: undefined, params: { chargeId: 'h1' },
         });
         expect(transactionCount).toBe(0);
+    });
+});
+
+describe('중복 반영 방지 — 처리 표시', () => {
+    // Eventarc 전달은 at-least-once다. retry: false여도 성공한 이벤트가 드물게 다시 온다.
+    // 증분 반영은 두 번 오면 두 번 더해지므로, 이벤트 ID로 처리 표시를 남겨 두 번째를 건너뛴다.
+
+    it('같은 키로 두 번 반영하면 두 번째는 건너뛴다', async () => {
+        expect(await applyBalanceDelta('t', 'c1', 'org-A', 5_000, 'evt-1_delta')).toMatchObject({ applied: true });
+        expect(await applyBalanceDelta('t', 'c1', 'org-A', 5_000, 'evt-1_delta'))
+            .toEqual({ applied: false, reason: 'duplicate' });
+        expect(cards.c1?.balance).toBe(15_000);
+    });
+
+    it('키가 다르면 각각 반영한다', async () => {
+        await applyBalanceDelta('t', 'c1', 'org-A', 5_000, 'evt-1_delta');
+        await applyBalanceDelta('t', 'c1', 'org-A', 5_000, 'evt-2_delta');
+        expect(cards.c1?.balance).toBe(20_000);
+    });
+
+    it('키가 없으면 표시 없이 반영한다(종전 동작)', async () => {
+        await applyBalanceDelta('t', 'c1', 'org-A', 5_000);
+        await applyBalanceDelta('t', 'c1', 'org-A', 5_000);
+        expect(cards.c1?.balance).toBe(20_000);
+        expect(marks).toEqual({});
+    });
+
+    it(`표시는 잔액과 함께 남고 ${EVENT_MARK_TTL_DAYS}일 뒤 만료된다`, async () => {
+        const before = Date.now();
+        await applyBalanceDelta('onHipassChargeCreated', 'c1', 'org-A', 5_000, 'evt-1_delta');
+        const mark = marks['evt-1_delta'];
+        expect(mark).toMatchObject({ context: 'onHipassChargeCreated', cardId: 'c1', organizationId: 'org-A', delta: 5_000 });
+        const ttlMs = (mark.expiresAt as Date).getTime() - before;
+        expect(ttlMs).toBeGreaterThanOrEqual(EVENT_MARK_TTL_DAYS * 86_400_000);
+        expect(ttlMs).toBeLessThan(EVENT_MARK_TTL_DAYS * 86_400_000 + 60_000);
+    });
+
+    it('반영하지 않은 경우(기관 불일치·카드 없음)는 표시를 남기지 않는다', async () => {
+        await applyBalanceDelta('t', 'c1', 'org-B', 5_000, 'evt-1_delta');
+        await applyBalanceDelta('t', 'gone', 'org-A', 5_000, 'evt-2_delta');
+        expect(marks).toEqual({});
+    });
+
+    it('충전 기록 생성 이벤트가 두 번 와도 한 번만 는다', async () => {
+        const c = { organizationId: 'org-A', cardId: 'c1', chargeAmount: 5_000 };
+        await created(c);
+        await created(c);
+        expect(cards.c1?.balance).toBe(15_000);
+    });
+
+    it('충전 기록 삭제 이벤트가 두 번 와도 한 번만 준다', async () => {
+        const c = { organizationId: 'org-A', cardId: 'c1', chargeAmount: 5_000 };
+        await deleted(c);
+        await deleted(c);
+        expect(cards.c1?.balance).toBe(5_000);
+    });
+
+    it('카드를 옮긴 정정은 옛 카드·새 카드가 각자 한 번씩만 반영된다', async () => {
+        // 한 이벤트가 카드 둘을 건드린다 — 키가 같으면 새 카드 반영이 "중복"으로 잘린다.
+        cards.c2 = { organizationId: 'org-A', balance: 1_000 };
+        const b = { organizationId: 'org-A', cardId: 'c1', chargeAmount: 5_000 };
+        const a = { organizationId: 'org-A', cardId: 'c2', chargeAmount: 8_000 };
+        await updated(b, a);
+        await updated(b, a);
+        expect(cards.c1?.balance).toBe(5_000);
+        expect(cards.c2?.balance).toBe(9_000);
+    });
+
+    it('운행일지 사용액 반영도 같은 키면 한 번만 깎는다', async () => {
+        await applyDriveLogHipassDelta('t', 'org-A', 'v1', 500, 'evt-1_delta');
+        await applyDriveLogHipassDelta('t', 'org-A', 'v1', 500, 'evt-1_delta');
+        expect(cards.c1?.balance).toBe(9_500);
+    });
+
+    it('표시 키 — 이벤트 ID가 없으면 만들지 않고, 문서 ID에 못 쓰는 / 는 바꾼다', () => {
+        expect(eventDedupeKey(undefined, 'delta')).toBeUndefined();
+        expect(eventDedupeKey('', 'delta')).toBeUndefined();
+        expect(eventDedupeKey('a/b', 'old')).toBe('a_b_old');
     });
 });
 

@@ -1028,6 +1028,7 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
       await db.collection('assistantVehicleCache').doc('org-A').set({ vehicles: [] });
       await db.collection('slackOauthStates').doc('nonce1').set({ organizationId: 'org-A', expiresAt: new Date() });
       await db.collection('calendarBindings').doc('cal1').set({ organizationId: 'org-A', vehicleId: 'v_A' });
+      await db.collection('hipassBalanceEvents').doc('evt1_delta').set({ organizationId: 'org-A', cardId: 'c1', delta: 5000, expiresAt: new Date() });
     });
 
     // 슈퍼관리자조차 접근 불가 (전면 false)
@@ -1061,6 +1062,8 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
       ['assistantVehicleCache', 'org-A'],
       ['slackOauthStates', 'nonce1'],
       ['calendarBindings', 'cal1'],
+      // 하이패스 잔액 처리 표시 — 지우면 같은 반영을 되풀이시키고, 미리 만들면 반영을 막는다
+      ['hipassBalanceEvents', 'evt1_delta'],
     ] as const) {
       await assertFails(memberDb.collection(col).doc(id).get());
       await assertFails(adminDb.collection(col).doc(id).get());

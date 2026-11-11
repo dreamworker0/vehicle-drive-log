@@ -11,6 +11,8 @@
  *  (3) 차량이 바뀐 수정은 옛 카드에서 빼고 새 카드에 더한다 — 차액만 반영하면
  *      두 카드가 동시에 어긋난다.
  *  (4) 복원 스크립트가 아카이브를 되돌려도 오늘 잔액을 깎지 않는다.
+ *  (5) 이벤트 ID로 만든 처리 표시 키를 넘긴다 — 같은 이벤트가 두 번 와도 한 번만 반영되게.
+ *      카드 둘을 건드리는 수정은 옛 카드(old)·새 카드(new) 키가 달라야 한다.
  *
  * 하이패스 서비스는 모킹해 "무엇을 어떤 인자로 불렀는가"만 본다. 잔액 계산 자체와
  * "그 함수는 절대 던지지 않는다"는 계약은 모킹하지 않는 `syncHipassBalance.test`가 본다.
@@ -26,6 +28,7 @@ jest.mock('../services/hipass/applyBalanceDelta', () => ({
     //  "호출 0회"로 조용히 실패한다. 실제로 그렇게 한 번 깨졌다.)
     usedAmountOf: jest.requireActual('../services/hipass/applyBalanceDelta').usedAmountOf,
     hipassFieldsDropped: jest.requireActual('../services/hipass/applyBalanceDelta').hipassFieldsDropped,
+    eventDedupeKey: jest.requireActual('../services/hipass/applyBalanceDelta').eventDedupeKey,
 }));
 
 jest.mock('firebase-functions/v2/firestore', () => ({
@@ -72,7 +75,8 @@ jest.mock('../utils/helpers', () => ({
 import { onDriveLogCreated, onDriveLogUpdated, onDriveLogDeleted } from '../handlers/triggers/syncDriveLogKm';
 import { driveLogRetentionCutoff } from '../utils/constants';
 
-const call = (fn: unknown, event: unknown) => (fn as (e: unknown) => Promise<void>)(event);
+/** 트리거 핸들러를 부른다 — 실제 CloudEvent처럼 이벤트 ID를 싣는다 */
+const call = (fn: unknown, event: object) => (fn as (e: unknown) => Promise<void>)({ id: 'evt-1', ...event });
 
 /** 하이패스를 쓴 오늘자 운행일지 */
 const log = (over: Record<string, unknown> = {}) => ({
@@ -95,7 +99,7 @@ beforeEach(() => {
 describe('onDriveLogCreated', () => {
     it('사용액만큼 잔액을 깎는다', async () => {
         await call(onDriveLogCreated, { data: { data: () => log() }, params: { logId: 'd1' } });
-        expect(mockApplyDriveLogHipassDelta).toHaveBeenCalledWith('onDriveLogCreated', 'org-A', 'v1', 500);
+        expect(mockApplyDriveLogHipassDelta).toHaveBeenCalledWith('onDriveLogCreated', 'org-A', 'v1', 500, 'evt-1_delta');
     });
 
     it('하이패스를 쓰지 않은 운행은 부르되 0을 넘긴다(서비스가 즉시 반환한다)', async () => {
@@ -103,13 +107,13 @@ describe('onDriveLogCreated', () => {
             data: { data: () => log({ hipassBalanceBefore: undefined, hipassBalanceAfter: undefined }) },
             params: { logId: 'd1' },
         });
-        expect(mockApplyDriveLogHipassDelta).toHaveBeenCalledWith('onDriveLogCreated', 'org-A', 'v1', 0);
+        expect(mockApplyDriveLogHipassDelta).toHaveBeenCalledWith('onDriveLogCreated', 'org-A', 'v1', 0, 'evt-1_delta');
     });
 
     it('도착 km가 없어 조기 반환되는 기록에서도 하이패스는 반영된다', async () => {
         // 하이패스 호출이 km 가드 뒤에 있으면 이 검사가 깨진다.
         await call(onDriveLogCreated, { data: { data: () => log({ endKm: undefined }) }, params: { logId: 'd1' } });
-        expect(mockApplyDriveLogHipassDelta).toHaveBeenCalledWith('onDriveLogCreated', 'org-A', 'v1', 500);
+        expect(mockApplyDriveLogHipassDelta).toHaveBeenCalledWith('onDriveLogCreated', 'org-A', 'v1', 500, 'evt-1_delta');
     });
 
     // 격리(잔액 실패가 km 회계를 잃게 하지 않는다)는 **여기서 검사하지 않는다.**
@@ -144,20 +148,20 @@ describe('onDriveLogUpdated', () => {
 
     it('사용액 차액만 반영한다', async () => {
         await call(onDriveLogUpdated, evt(log(), log({ hipassBalanceAfter: 9_000 })));
-        expect(mockApplyDriveLogHipassDelta).toHaveBeenCalledWith('onDriveLogUpdated', 'org-A', 'v1', 500);
+        expect(mockApplyDriveLogHipassDelta).toHaveBeenCalledWith('onDriveLogUpdated', 'org-A', 'v1', 500, 'evt-1_delta');
     });
 
     it('하이패스가 그대로면 0을 넘긴다', async () => {
         await call(onDriveLogUpdated, evt(log(), log({ endKm: 160 })));
-        expect(mockApplyDriveLogHipassDelta).toHaveBeenCalledWith('onDriveLogUpdated', 'org-A', 'v1', 0);
+        expect(mockApplyDriveLogHipassDelta).toHaveBeenCalledWith('onDriveLogUpdated', 'org-A', 'v1', 0, 'evt-1_delta');
     });
 
     it('기관이 바뀌면(superAdmin) 옛 기관 카드에서 빼고 새 기관 카드에 더한다', async () => {
         // 차량이 그대로여도 기관이 바뀌면 카드가 달라진다. else 분기로 가면 옛 기관 카드가
         // 그 금액을 계속 문 채 남는다.
         await call(onDriveLogUpdated, evt(log(), log({ organizationId: 'org-B' })));
-        expect(mockApplyDriveLogHipassDelta).toHaveBeenNthCalledWith(1, 'onDriveLogUpdated', 'org-A', 'v1', -500);
-        expect(mockApplyDriveLogHipassDelta).toHaveBeenNthCalledWith(2, 'onDriveLogUpdated', 'org-B', 'v1', 500);
+        expect(mockApplyDriveLogHipassDelta).toHaveBeenNthCalledWith(1, 'onDriveLogUpdated', 'org-A', 'v1', -500, 'evt-1_old');
+        expect(mockApplyDriveLogHipassDelta).toHaveBeenNthCalledWith(2, 'onDriveLogUpdated', 'org-B', 'v1', 500, 'evt-1_new');
     });
 
     it('하이패스 기록이 사라진 수정은 환불하지 않는다', async () => {
@@ -169,15 +173,15 @@ describe('onDriveLogUpdated', () => {
     it('차량이 바뀌면 옛 카드에서 빼고 새 카드에 더한다', async () => {
         // Rules의 관리자 분기는 vehicleId를 얼리지 않는다 — 차액만 반영하면 두 카드가 어긋난다.
         await call(onDriveLogUpdated, evt(log(), log({ vehicleId: 'v2', hipassBalanceBefore: 8_000, hipassBalanceAfter: 7_000 })));
-        expect(mockApplyDriveLogHipassDelta).toHaveBeenNthCalledWith(1, 'onDriveLogUpdated', 'org-A', 'v1', -500);
-        expect(mockApplyDriveLogHipassDelta).toHaveBeenNthCalledWith(2, 'onDriveLogUpdated', 'org-A', 'v2', 1_000);
+        expect(mockApplyDriveLogHipassDelta).toHaveBeenNthCalledWith(1, 'onDriveLogUpdated', 'org-A', 'v1', -500, 'evt-1_old');
+        expect(mockApplyDriveLogHipassDelta).toHaveBeenNthCalledWith(2, 'onDriveLogUpdated', 'org-A', 'v2', 1_000, 'evt-1_new');
     });
 });
 
 describe('onDriveLogDeleted', () => {
     it('사용액을 되돌린다', async () => {
         await call(onDriveLogDeleted, { data: { data: () => log() }, params: { logId: 'd1' } });
-        expect(mockApplyDriveLogHipassDelta).toHaveBeenCalledWith('onDriveLogDeleted', 'org-A', 'v1', -500);
+        expect(mockApplyDriveLogHipassDelta).toHaveBeenCalledWith('onDriveLogDeleted', 'org-A', 'v1', -500, 'evt-1_delta');
     });
 
     it('보존 기한이 지난 기록의 정리는 환불하지 않는다', async () => {
@@ -191,7 +195,7 @@ describe('onDriveLogDeleted', () => {
     it('보존 기한 안쪽이면 그대로 되돌린다', async () => {
         const recent = new Date(driveLogRetentionCutoff().getTime() + 24 * 60 * 60 * 1000);
         await call(onDriveLogDeleted, { data: { data: () => log({ timestamp: recent }) }, params: { logId: 'd1' } });
-        expect(mockApplyDriveLogHipassDelta).toHaveBeenCalledWith('onDriveLogDeleted', 'org-A', 'v1', -500);
+        expect(mockApplyDriveLogHipassDelta).toHaveBeenCalledWith('onDriveLogDeleted', 'org-A', 'v1', -500, 'evt-1_delta');
     });
 
     it('해지된 기관의 파기는 환불하지 않는다', async () => {

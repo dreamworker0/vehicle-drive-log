@@ -31,23 +31,48 @@
  * 트랜잭션 안에서 하면 원자성과 하한을 함께 얻는다. 이 경로는 호출량이 적어(운행일지의
  * 하이패스 사용 · 충전 기록) 트랜잭션 비용이 문제되지 않는다.
  *
- * ## 재시도와 중복 반영
+ * ## 재시도와 중복 반영 — 처리 표시
  *
  * v2 백그라운드 트리거는 `retry` 옵션을 켜야만 실패를 재시도한다. 이 트리거들은 켜지 않으므로
  * **재시도로 인한 중복 반영은 없다.** 다만 Eventarc 전달 자체는 at-least-once라 성공한
- * 이벤트가 드물게 두 번 올 수 있고, `retry: false`가 그것까지 막지는 않는다. 증분 반영에는
- * 멱등 장치가 없으므로, 그 확률을 감수할 수 없게 되면 **여기에 멱등성 표시가 필요하다**
- * (같은 저장소의 `auditLog`는 반대로 `retry: true` + 멱등 문서 ID 조합을 쓴다).
+ * 이벤트가 드물게 두 번 올 수 있고, `retry: false`가 그것까지 막지는 않는다. 증분 반영은
+ * 두 번 오면 두 번 더해진다.
+ *
+ * 그래서 호출부가 이벤트 ID로 만든 `dedupeKey`를 넘기면, 잔액을 바꾸는 **같은 트랜잭션 안에서**
+ * `hipassBalanceEvents/{dedupeKey}`에 처리 표시를 남기고, 표시가 이미 있으면 건너뛴다.
+ * 표시와 잔액이 한 트랜잭션이라 "잔액은 바뀌었는데 표시는 없다"(또는 그 반대)가 생기지 않는다.
+ * 표시는 EVENT_MARK_TTL_DAYS 뒤 TTL이 지운다 — 재전달은 그보다 훨씬 빨리 온다.
+ *
+ * **막는 것은 "두 번 반영"뿐이다.** 반영이 실패해 빠지는 것은 여전히 막지 못한다(retry: false).
+ * 한 이벤트가 카드 둘을 건드리면(차량·카드 이동: 옛 카드 −, 새 카드 +) 표시도 둘이어야 하므로
+ * `eventDedupeKey(eventId, part)`의 `part`로 구분한다.
+ * (같은 저장소의 `auditLog`는 반대로 `retry: true` + 멱등 문서 ID 조합을 쓴다.)
  */
 import { getFirestore } from "firebase-admin/firestore";
 import { log } from "../../utils/helpers";
 
 const db = getFirestore();
 
+/** 처리 표시 컬렉션 — 서버 전용(Rules 전면 차단), `expiresAt` TTL */
+export const BALANCE_EVENT_COLLECTION = "hipassBalanceEvents";
+/** 처리 표시 보관 기간 */
+export const EVENT_MARK_TTL_DAYS = 7;
+
+/**
+ * 트리거 이벤트 ID로 처리 표시 키를 만든다. 이벤트 ID가 없으면 `undefined` — 표시 없이 반영한다.
+ *
+ * @param part 한 이벤트 안의 반영 구분("delta" · "old" · "new")
+ */
+export function eventDedupeKey(eventId: string | undefined | null, part: string): string | undefined {
+    if (!eventId) return undefined;
+    // 문서 ID에는 '/'가 들어갈 수 없다
+    return `${eventId.replace(/\//g, "_")}_${part}`;
+}
+
 /** 잔액 반영 결과 — 호출부가 로그로만 쓰고 흐름을 바꾸지는 않는다. */
 export type BalanceDeltaOutcome =
     | { applied: true; before: number; after: number }
-    | { applied: false; reason: "no-delta" | "no-card" | "card-missing" | "org-mismatch" | "write-failed" };
+    | { applied: false; reason: "no-delta" | "no-card" | "card-missing" | "org-mismatch" | "duplicate" | "write-failed" };
 
 /**
  * 카드 잔액에 delta를 더한다(음수면 뺀다). 0 미만으로는 내려가지 않는다.
@@ -57,12 +82,14 @@ export type BalanceDeltaOutcome =
  * @param orgId    기록이 속한 기관 — 카드의 기관과 다르면 **반영하지 않는다**
  *                 (교차 테넌트 잔액 오염 차단. `syncDriveLogKm`의 차량 org 검증과 같은 이유)
  * @param delta    더할 금액
+ * @param dedupeKey 처리 표시 키(`eventDedupeKey`) — 같은 키로 이미 반영했으면 건너뛴다
  */
 export async function applyBalanceDelta(
     context: string,
     cardId: string | undefined | null,
     orgId: string | undefined | null,
     delta: number,
+    dedupeKey?: string,
 ): Promise<BalanceDeltaOutcome> {
     if (!Number.isFinite(delta) || delta === 0) return { applied: false, reason: "no-delta" };
     if (!cardId || !orgId) return { applied: false, reason: "no-card" };
@@ -70,6 +97,13 @@ export async function applyBalanceDelta(
     try {
         return await db.runTransaction(async (tx) => {
             const ref = db.collection("hipassCards").doc(cardId);
+            const markRef = dedupeKey ? db.collection(BALANCE_EVENT_COLLECTION).doc(dedupeKey) : null;
+
+            // 트랜잭션은 읽기를 모두 마친 뒤에 쓴다 — 표시를 먼저 읽는다.
+            if (markRef && (await tx.get(markRef)).exists) {
+                log("WARNING", context, "이미 반영한 이벤트가 다시 와서 잔액 반영을 건너뛴다", { cardId, orgId, delta, dedupeKey });
+                return { applied: false, reason: "duplicate" } as const;
+            }
             const snap = await tx.get(ref);
 
             // 카드가 이미 지워졌을 수 있다(충전 기록만 남은 상태). 되돌릴 곳이 없으면 조용히 넘어가되
@@ -90,6 +124,14 @@ export async function applyBalanceDelta(
             const before = typeof card.balance === "number" && Number.isFinite(card.balance) ? card.balance : 0;
             const after = Math.max(0, before + delta);
             tx.update(ref, { balance: after });
+            if (markRef) {
+                const now = Date.now();
+                tx.set(markRef, {
+                    context, cardId, organizationId: orgId, delta,
+                    appliedAt: new Date(now),
+                    expiresAt: new Date(now + EVENT_MARK_TTL_DAYS * 86_400_000),
+                });
+            }
             return { applied: true, before, after } as const;
         });
     } catch (err) {
@@ -188,18 +230,20 @@ export async function findCardIdForVehicle(
  * 남는다). 그래도 회계 전체를 잃는 것보다는 잔액 하나가 어긋나고 **경보가 남는** 쪽이 낫다.
  *
  * @param usedDelta 사용액의 증가분. 사용이 늘면 잔액은 그만큼 **줄어든다**.
+ * @param dedupeKey 처리 표시 키 — `applyBalanceDelta` 참고
  */
 export async function applyDriveLogHipassDelta(
     context: string,
     orgId: string | undefined | null,
     vehicleId: string | undefined | null,
     usedDelta: number,
+    dedupeKey?: string,
 ): Promise<void> {
     if (!Number.isFinite(usedDelta) || usedDelta === 0) return;
     try {
         const cardId = await findCardIdForVehicle(context, orgId, vehicleId);
         if (!cardId) return;
-        await applyBalanceDelta(context, cardId, orgId, -usedDelta);
+        await applyBalanceDelta(context, cardId, orgId, -usedDelta, dedupeKey);
     } catch (err) {
         log("ERROR", context, "하이패스 사용액 반영 실패 (km 동기화는 계속 진행)", {
             orgId, vehicleId, usedDelta, error: (err as Error).message,
