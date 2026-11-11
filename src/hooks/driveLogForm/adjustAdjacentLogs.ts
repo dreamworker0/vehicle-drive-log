@@ -62,8 +62,17 @@ export async function adjustAdjacentLogs({
         }
     }
 
-    // 직후 기록의 startKm → 현재 기록의 endKm으로 자동 변경
-    if (nextDriveLog && nextDriveLog.startKm !== endKm) {
+    // 직후 기록의 startKm → 현재 기록의 endKm으로 자동 변경 (도착 km는 그 운전자의 계기판 값이라 그대로 둔다)
+    //
+    // 서버 수정 트리거(alignNextLogStartKm)도 같은 규칙이다 — 어느 쪽이 먼저 저장되든 결과가 같다.
+    // 단, 출발만 고치면 그 기록의 거리가 음수가 되는 경우(이 기록의 도착이 직후 기록의 도착보다 크다)는
+    // 출발만으로 맞출 수 없다. 여기서 덮으면 서버가 "이미 맞다"며 멈춰 음수 거리가 남으므로 손대지 않고,
+    // 서버가 뒤 기록을 함께 밀도록 맡긴다.
+    const nextEndKm = nextDriveLog?.endKm;
+    const wouldGoNegative = typeof nextEndKm === 'number' && endKm > nextEndKm;
+    if (nextDriveLog && wouldGoNegative) {
+        adjustMessages.push(`직후 기록부터 km가 ${endKm.toLocaleString()}에 이어지도록 함께 조정됩니다`);
+    } else if (nextDriveLog && nextDriveLog.startKm !== endKm) {
         try {
             await updateDoc(doc(db, 'driveLogs', nextDriveLog.id), {
                 startKm: endKm,
