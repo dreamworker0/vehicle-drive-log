@@ -46,7 +46,7 @@ export function useNetworkStatus() {
 3. **서비스워커에서 Firestore에 쓰지 않는다**: 서비스워커에는 App Check가 없고 Firestore는 App Check ENFORCED다. 쓰기는 페이지에서만 한다(`sw.ts`의 `sync` 주석).
 
 ## 3. 에이전트 행동 지침
-- "오프라인에서도 글 작성 되게 해줘"라는 요청을 받으면, **새 저장소를 만들지 말고 기존 오프라인 큐를 쓴다** — [src/lib/offline/syncQueue.ts](../../../src/lib/offline/syncQueue.ts)(`idb` 기반 `enqueue`·`flushQueue`, 같은 문서 순서 보장·재시도 냉각·폐기 안내)와 [syncFailureNotice.ts](../../../src/lib/offline/syncFailureNotice.ts). `dexie` 등 새 라이브러리는 들이지 않는다(D15).
+- "오프라인에서도 글 작성 되게 해줘"라는 요청을 받으면, **새 저장소·재전송 큐를 만들지 않는다.** 저장은 Firestore SDK(영구 캐시)에 맡기고, 쓰기 Promise를 [src/lib/offline/syncQueue.ts](../../../src/lib/offline/syncQueue.ts)의 `trackWrite`로 장부에 적는다(`idb` 기반 — 미전송 건수·로그아웃 확인·다음 실행의 서버 대조 `reconcileLedger`). 유실 안내는 [syncFailureNotice.ts](../../../src/lib/offline/syncFailureNotice.ts). `dexie` 등 새 라이브러리는 들이지 않는다(D15).
 - 단순히 UI만 바꾸지 말고, 오프라인 시 Firebase Sync 지연(Timeout)을 우회/재시도(`useRetry`)하는 설계를 병행해야 합니다.
 
 ## 관련 문서

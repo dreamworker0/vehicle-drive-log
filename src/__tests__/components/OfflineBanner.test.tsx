@@ -7,6 +7,7 @@ import OfflineBanner from '../../components/common/OfflineBanner';
 const mockGetPendingCount = vi.fn<() => Promise<number>>(() => Promise.resolve(0));
 vi.mock('@/lib/offline/syncQueue', () => ({
     getPendingCount: () => mockGetPendingCount(),
+    LEDGER_CHANGE_EVENT: 'sync-ledger-change',
 }));
 
 function setNavigatorOnline(value: boolean) {

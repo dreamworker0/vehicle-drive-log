@@ -8,12 +8,12 @@ import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 vi.mock('@/lib/offline/syncQueue', () => ({
     peekFailedRecords: vi.fn(),
     clearFailedRecords: vi.fn(),
-    flushQueueQuietly: vi.fn(() => Promise.resolve()),
+    reconcileLedgerQuietly: vi.fn(() => Promise.resolve()),
 }));
 vi.mock('@/lib/notify', () => ({ notifyUser: vi.fn() }));
 
 import { buildFailureMessage, reportFailedSync, registerSyncFailureNotice, describeRecord, formatQueuedDate } from '@/lib/offline/syncFailureNotice';
-import { peekFailedRecords, clearFailedRecords, flushQueueQuietly, type FailedRecord } from '@/lib/offline/syncQueue';
+import { peekFailedRecords, clearFailedRecords, reconcileLedgerQuietly, type FailedRecord } from '@/lib/offline/syncQueue';
 import { notifyUser } from '@/lib/notify';
 
 const mockDrain = vi.mocked(peekFailedRecords);
@@ -50,7 +50,11 @@ describe('buildFailureMessage', () => {
         expect(msg).toContain('권한이 없거나 이미 변경된 기록이라');
     });
 
-    it('통신 재시도 소진만 있으면 통신 오류로 안내한다', () => {
+    it('앱이 닫힌 뒤 서버에서 확인되지 않은 기록은 그 사유로 안내한다', () => {
+        expect(buildFailureMessage([record({ reason: 'not-applied' })])).toContain('전송이 끝나기 전에 앱이 닫혀');
+    });
+
+    it('통신 재시도 소진만 있으면 통신 오류로 안내한다 (옛 버전이 남긴 기록)', () => {
         expect(buildFailureMessage([record({ reason: 'retry-exhausted' })])).toContain('통신 오류가 반복되어');
     });
 
@@ -113,7 +117,7 @@ describe('registerSyncFailureNotice', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         mockDrain.mockResolvedValue([]);
-        vi.mocked(flushQueueQuietly).mockResolvedValue(undefined);
+        vi.mocked(reconcileLedgerQuietly).mockResolvedValue(undefined);
     });
 
     const fire = (key: string) => handlers.get(key)!(new Event(key.split(':')[1]));
@@ -127,7 +131,7 @@ describe('registerSyncFailureNotice', () => {
     it('온라인 복귀 시 flush가 끝난 뒤에 확인한다', async () => {
         // flush 완료 전에 확인하면 방금 폐기될 항목을 놓친다 — 순서가 계약이다.
         let resolveFlush: () => void = () => {};
-        vi.mocked(flushQueueQuietly).mockReturnValueOnce(new Promise<void>((r) => { resolveFlush = r; }));
+        vi.mocked(reconcileLedgerQuietly).mockReturnValueOnce(new Promise<void>((r) => { resolveFlush = r; }));
         mockDrain.mockResolvedValueOnce([record()]);
 
         fire('window:online');

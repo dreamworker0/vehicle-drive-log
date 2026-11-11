@@ -1,61 +1,11 @@
-import { getFirestore, DocumentReference } from "firebase-admin/firestore";
+import { getFirestore } from "firebase-admin/firestore";
 
-/**
- * 타임스탬프, Date, 문자열 등을 밀리초 단위 숫자로 변환합니다.
+/*
+ * 예전 이 자리에는 Last-Writer-Wins 롤백(shouldRevertLWW·resolveDriveLogConflict·resolveReservationConflict)이
+ * 있었다. 비교할 시각(`clientUpdatedAt`·`updatedAt`)을 운행일지·예약 어디에서도 기록하지 않아 **한 번도
+ * 동작하지 않았고**, 시각을 심는 순간 잠들어 있던 `docRef.set(before)` 롤백이 처음 켜지는 위험만 남아
+ * 지웠다(2026-11-11). 오프라인 쓰기는 Firestore SDK 한 경로로 보낸다 — src/lib/offline/syncQueue.ts 머리 주석.
  */
-function getTimestamp(value: unknown): number {
-    if (!value) return 0;
-    if (typeof (value as { toMillis?: unknown }).toMillis === 'function') {
-        return (value as { toMillis: () => number }).toMillis();
-    }
-    if (value instanceof Date) return value.getTime();
-    if (typeof value === 'number') return value;
-    if (typeof value === 'string') return new Date(value).getTime();
-    return 0;
-}
-
-/**
- * Last-Writer-Wins (LWW) 정책에 따라 충돌 여부를 판단합니다.
- * 반환값이 true이면 새로 들어온 데이터가 구형 데이터이므로 덮어쓰기를 롤백해야 합니다.
- */
-export function shouldRevertLWW(beforeData: FirebaseFirestore.DocumentData | undefined, afterData: FirebaseFirestore.DocumentData | undefined): boolean {
-    if (!beforeData || !afterData) return false;
-
-    // 클라이언트에서 기록한 최종 수정 시간(clientUpdatedAt) 또는 서버 수정 시간(updatedAt) 비교
-    const beforeTime = getTimestamp(beforeData.clientUpdatedAt || beforeData.updatedAt);
-    const afterTime = getTimestamp(afterData.clientUpdatedAt || afterData.updatedAt);
-
-    // after의 시간이 명확히 존재하고 before보다 과거인 경우 충돌 (오프라인 구형 데이터 동기화 등)
-    if (beforeTime > 0 && afterTime > 0 && afterTime < beforeTime) {
-        return true;
-    }
-    return false;
-}
-
-/**
- * 운행일지 충돌 해결
- * LWW 위반 시 기존 데이터로 롤백하고 true를 반환합니다.
- */
-export async function resolveDriveLogConflict(docRef: DocumentReference, beforeData: FirebaseFirestore.DocumentData, afterData: FirebaseFirestore.DocumentData): Promise<boolean> {
-    if (shouldRevertLWW(beforeData, afterData)) {
-        await docRef.set(beforeData);
-        console.warn(`[ConflictResolver] DriveLog ${docRef.id} - 구형 데이터 덮어쓰기 감지. 이전 데이터로 롤백했습니다.`);
-        return true; // 충돌 발생 및 롤백됨
-    }
-    return false;
-}
-
-/**
- * 예약 데이터 충돌 해결 (LWW 위반 확인)
- */
-export async function resolveReservationConflict(docRef: DocumentReference, beforeData: FirebaseFirestore.DocumentData, afterData: FirebaseFirestore.DocumentData): Promise<boolean> {
-    if (shouldRevertLWW(beforeData, afterData)) {
-        await docRef.set(beforeData);
-        console.warn(`[ConflictResolver] Reservation ${docRef.id} - 구형 데이터 덮어쓰기 감지. 이전 데이터로 롤백했습니다.`);
-        return true;
-    }
-    return false;
-}
 
 /**
  * 예약 시간 겹침 충돌 확인 (오프라인 동기화로 인한 중복 예약 방어)

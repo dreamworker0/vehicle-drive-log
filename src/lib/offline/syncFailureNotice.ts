@@ -1,20 +1,20 @@
 /**
- * syncFailureNotice — 오프라인 큐에서 폐기된(= 서버에 반영되지 못한) 기록을 사용자에게 알린다.
+ * syncFailureNotice — 서버에 반영되지 못한 쓰기를 사용자에게 알린다.
  *
- * 큐 모듈(syncQueue)은 화면에 의존하지 않으므로 폐기 시점에 토스트를 띄우지 않는다.
- * 그래서 큐는 폐기분을 IndexedDB의 failed-store에 남겨만 두고, 화면이 있는 이 모듈이
+ * 장부 모듈(syncQueue)은 화면에 의존하지 않으므로 유실을 판정한 시점에 토스트를 띄우지 않는다.
+ * 그래서 장부는 유실분을 IndexedDB의 failed-store에 남겨만 두고, 화면이 있는 이 모듈이
  * 다음 세 시점에 그걸 읽어 알린다:
  *
  *   1) 앱 시작 — 지난 세션에 알리지 못한 건
- *   2) 온라인 복귀 후 flush 완료 — 방금 폐기된 건 (flushQueue를 await해서 순서를 보장)
- *   3) 화면 복귀(visibilitychange) — 앱이 백그라운드인 동안 폐기된 건
+ *   2) 온라인 복귀 후 장부 확인 완료 — 방금 판정된 건 (reconcileLedger를 await해서 순서를 보장)
+ *   3) 화면 복귀(visibilitychange) — 앱이 백그라운드인 동안 판정된 건
  *
- * 이 모듈은 화면(토스트)에 의존하므로 SW 번들에 들어가면 안 된다. (SW는 큐를 비우지 않는다 — sw.ts 'sync' 주석)
+ * 이 모듈은 화면(토스트)에 의존하므로 SW 번들에 들어가면 안 된다.
  */
-import { peekFailedRecords, clearFailedRecords, flushQueueQuietly, type FailedRecord } from './syncQueue';
+import { peekFailedRecords, clearFailedRecords, reconcileLedgerQuietly, type FailedRecord } from './syncQueue';
 import { notifyUser } from '../notify';
 
-/** 큐에 적재되는 컬렉션 → 사용자가 읽는 이름 (enqueue 호출부와 1:1) */
+/** 장부에 적히는 컬렉션 → 사용자가 읽는 이름 (trackWrite 호출부와 1:1) */
 const COLLECTION_LABEL: Record<string, string> = {
     driveLogs: '운행일지',
     reservations: '예약',
@@ -25,11 +25,12 @@ function labelOf(collection: string): string {
 }
 
 /**
- * 폐기 사유별 안내 문구.
- * - permanent: 권한 거부 등 다시 시도해도 결과가 같은 오류 → 재작성 외에 방법이 없다
- * - retry-exhausted: 통신 문제로 5회까지 재시도했으나 실패 → 역시 재작성이 필요하다
+ * 유실 사유별 안내 문구.
+ * - permanent: 서버가 쓰기를 거부했다(권한 등) → 재작성 외에 방법이 없다
+ * - not-applied: 앱이 닫힌 뒤 다음 실행에서 확인해 보니 서버에 없다 → 역시 재작성이 필요하다
+ * - retry-exhausted: 옛 버전의 재시도 소진 기록(기기에 남아 있을 수 있다)
  *
- * 두 경우 모두 "다시 입력해야 한다"는 행동을 분명히 말한다. 유실 사실만 알리고
+ * 어느 경우든 "다시 입력해야 한다"는 행동을 분명히 말한다. 유실 사실만 알리고
  * 무엇을 해야 하는지 말하지 않으면 운전자는 그대로 지나간다.
  */
 export function buildFailureMessage(records: FailedRecord[]): string {
@@ -42,14 +43,16 @@ export function buildFailureMessage(records: FailedRecord[]): string {
         .map(([label, count]) => `${label} ${count}건`)
         .join(', ');
 
-    const hasPermanent = records.some((r) => r.reason === 'permanent');
-    const cause = hasPermanent
+    // 사유가 섞이면 사용자가 손쓸 여지가 적은 쪽부터 말한다
+    const cause = records.some((r) => r.reason === 'permanent')
         ? '권한이 없거나 이미 변경된 기록이라'
-        : '통신 오류가 반복되어';
+        : records.some((r) => r.reason === 'not-applied')
+            ? '전송이 끝나기 전에 앱이 닫혀'
+            : '통신 오류가 반복되어';
 
     // 무엇을 잃었는지 함께 적는다. "다시 입력해 주세요"만으로는 다시 입력할 수가 없다 —
     // 차에서 내린 뒤에는 계기판 숫자를 기억으로 복원할 방법이 없기 때문이다.
-    // 큐는 payload를 그대로 들고 있었는데 지금까지 건수만 세고 버렸다.
+    // 장부는 쓴 내용을 그대로 들고 있다(다시 보내지는 않는다) — 건수만 세고 버리지 않는다.
     // 길이를 묶는다. 오래 오프라인이던 사용자는 폐기가 여러 건 쌓이는데, 전부 이으면
     // 15초짜리 토스트에 수백 자가 들어가 정작 읽히지 않는다.
     const MAX_DETAILS = 3;
@@ -71,7 +74,7 @@ export function buildFailureMessage(records: FailedRecord[]): string {
  */
 export function describeRecord(record: FailedRecord): string {
     const data = (record.data ?? {}) as Record<string, unknown>;
-    // 큐가 센티널을 문자열 마커로 바꿔 저장한다(syncQueue의 toStorable). 오프라인 **수정**은
+    // 장부가 센티널을 문자열 마커로 바꿔 저장한다(syncQueue의 toStorable). 오프라인 **수정**은
     // 당일 운행의 startDate를 deleteField()로 지우므로 그 자리에 `__syncQueue.deleteField__`가
     // 들어 있다 — 거르지 않으면 사용자에게 내부 문자열이 날짜라고 보여진다.
     const str = (v: unknown) => {
@@ -111,13 +114,13 @@ export function formatQueuedDate(value: unknown): string | undefined {
 }
 
 /**
- * 폐기 기록이 있으면 사용자에게 알린다. 알린 항목은 큐에서 비워지므로 같은 유실을 두 번 알리지 않는다.
+ * 유실 기록이 있으면 사용자에게 알린다. 알린 항목은 비워지므로 같은 유실을 두 번 알리지 않는다.
  * @returns 알린 건수(없으면 0)
  */
 /**
  * 진행 중인 보고를 붙잡아 둔다. 세 트리거(online·visibilitychange·앱 시작)는 겹쳐서 발화한다 —
  * 잠금 화면을 풀며 통신이 돌아오면 두 개가 같이 뜬다. 각자 읽어 각자 알리면 **똑같은 15초짜리
- * 오류 토스트가 두 번** 뜬다. flushQueue가 쓰는 방식 그대로, 같은 Promise를 돌려준다.
+ * 오류 토스트가 두 번** 뜬다. reconcileLedger가 쓰는 방식 그대로, 같은 Promise를 돌려준다.
  */
 let reporting: Promise<number> | null = null;
 
@@ -135,7 +138,7 @@ async function doReportFailedSync(): Promise<number> {
         if (records.length === 0) return 0;
         // 유실 안내는 놓치면 의미가 없으므로 일반 토스트보다 길게 띄운다.
         notifyUser(buildFailureMessage(records), 'error', 15000);
-        // 방금 알린 것만 지운다 — 그 사이 다른 탭의 flush가 밀어 넣은 폐기는 남겨 다음에 알린다.
+        // 방금 알린 것만 지운다 — 그 사이 다른 탭이 밀어 넣은 유실은 남겨 다음에 알린다.
         await clearFailedRecords(records.map((r) => r.id));
         return records.length;
     } catch (error) {
@@ -151,21 +154,21 @@ export function registerSyncFailureNotice(): void {
     if (registered || typeof window === 'undefined') return;
     registered = true;
 
-    // 온라인 복귀: flush가 끝나야 폐기 여부가 확정된다. flushQueue는 진행 중이면
-    // 같은 Promise를 돌려주므로, registerReconnectFlush가 이미 시작한 flush에 그대로 올라탄다.
+    // 온라인 복귀: 장부 확인이 끝나야 유실 여부가 확정된다. reconcileLedger는 진행 중이면
+    // 같은 Promise를 돌려주므로, registerLedgerReconcile이 이미 시작한 확인에 그대로 올라탄다.
     //
-    // `then`이 아니라 `finally`인 이유 — flushQueueQuietly는 **모르는 실패를 다시 던진다**
-    // (그래야 큐가 안 비는 결함이 조용해지지 않는다). `then`이면 실패한 회차에 이미 폐기된
-    // 기록을 사용자가 듣지 못한 채 지나간다. 알리는 일은 flush가 어떻게 끝났든 해야 한다.
+    // `then`이 아니라 `finally`인 이유 — reconcileLedgerQuietly는 **모르는 실패를 다시 던진다**
+    // (그래야 장부가 안 비는 결함이 조용해지지 않는다). `then`이면 실패한 회차에 이미 판정된
+    // 유실을 사용자가 듣지 못한 채 지나간다. 알리는 일은 확인이 어떻게 끝났든 해야 한다.
     //
     // 뒤에 `catch`를 달지 않은 것도 의도다. `finally`는 거부를 그대로 흘려보내므로 이 체인은
-    // 처리되지 않은 거부로 남고, 그래야 모르는 flush 실패가 Sentry에 드러난다. 삼키면
+    // 처리되지 않은 거부로 남고, 그래야 모르는 확인 실패가 Sentry에 드러난다. 삼키면
     // 위 한 줄이 무의미해진다.
     window.addEventListener('online', () => {
-        void flushQueueQuietly().finally(() => reportFailedSync());
+        void reconcileLedgerQuietly().finally(() => reportFailedSync());
     });
 
-    // 화면 복귀: 백그라운드 동안 폐기된 건을 잡는다(이 시점의 flush는 registerReconnectFlush가 한다).
+    // 화면 복귀: 백그라운드 동안 판정된 건을 잡는다(이 시점의 확인은 registerLedgerReconcile이 한다).
     document.addEventListener('visibilitychange', () => {
         if (document.visibilityState === 'visible') void reportFailedSync();
     });

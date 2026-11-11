@@ -6,7 +6,6 @@ import { handleStatsOnCreate, handleStatsOnUpdate, handleStatsOnDelete } from ".
 import { applyDriveLogHipassDelta, usedAmountOf, hipassFieldsDropped } from "../../services/hipass/applyBalanceDelta";
 import { driveLogRetentionCutoff } from "../../utils/constants";
 import { isOrgRetired } from "../../utils/orgRetirement";
-import { resolveDriveLogConflict } from "../sync/conflictResolver";
 
 const db = getFirestore();
 
@@ -850,10 +849,6 @@ export const onDriveLogUpdated = onDocumentUpdated(
                 }
                 return;
             }
-
-            // [오프라인 충돌 방어] LWW 기반: 들어온 데이터가 더 과거에 수정된 데이터면 롤백하고 종료
-            const isConflict = await resolveDriveLogConflict(afterSnap.ref, oldData, data);
-            if (isConflict) return;
 
             await syncStoredDistance(afterSnap.ref, oldData, data);
 

@@ -11,7 +11,7 @@ import { db, firebaseFunctions, auth } from '../firebase';
 import { createZodConverter, reservationSchema } from '../../schemas';
 import type { Reservation } from '../../types/reservation';
 import { captureError } from '../sentry';
-import { enqueue } from '../offline/syncQueue';
+import { trackWrite } from '../offline/syncQueue';
 import { reservationActorStamp } from './actorStamp';
 
 const functions = firebaseFunctions;
@@ -255,17 +255,10 @@ export const updateReservationStatus = async (
                 ...stamp,
             });
             const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+            // 저장은 SDK 한 경로, 장부에는 확인 전으로 적는다 (driveLogs/mutations.createDriveLog 주석)
+            await trackWrite('UPDATE', 'reservations', reservationId, { status, ...extraData, ...stamp }, promise, { callerAwaits: !isOffline });
             if (!isOffline) {
                 await promise;
-            } else {
-                promise.catch(e => console.error('[Firestore Offline Sync Error]', e));
-                await enqueue('UPDATE', 'reservations', reservationId, { status, ...extraData, ...stamp });
-                if (typeof window !== 'undefined' && 'serviceWorker' in navigator && 'SyncManager' in window) {
-                    navigator.serviceWorker.ready.then(reg => {
-                        const syncReg = reg as ServiceWorkerRegistration & { sync?: { register: (tag: string) => Promise<void> } };
-                        if (syncReg.sync) syncReg.sync.register('sync-db');
-                    });
-                }
             }
             return;
         }

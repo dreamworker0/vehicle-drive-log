@@ -1,6 +1,6 @@
 /**
  * firestore/driveLogs/mutations 도메인 함수 단위 테스트
- * 운행일지 쓰기(CQRS 쓰기 측) — 온라인/오프라인 분기, 오프라인 큐(enqueue),
+ * 운행일지 쓰기(CQRS 쓰기 측) — 온라인/오프라인 분기, 오프라인 장부(trackWrite),
  * 직전 기록 일치 확인(REQUIRES_START_KM_CONFIRMATION) 비즈니스 에러를 고정한다.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
@@ -43,8 +43,8 @@ vi.mock('../../../lib/firestore/cache', () => ({
     cachedQuery: vi.fn((_k: string, f: () => unknown) => f()),
     invalidateCache: vi.fn(),
 }));
-// 오프라인 큐 — idb 실제 접근 회피(미mock 시 hang), 호출만 기록
-vi.mock('../../../lib/offline/syncQueue', () => ({ enqueue: vi.fn() }));
+// 오프라인 장부 — idb 실제 접근 회피(미mock 시 hang), 호출만 기록
+vi.mock('../../../lib/offline/syncQueue', () => ({ trackWrite: vi.fn(async () => undefined) }));
 // utils: 직전 기록 확인 분기는 기본 꺼짐(null), sanitizeUndefined는 passthrough
 vi.mock('../../../lib/firestore/driveLogs/utils', () => ({
     sanitizeUndefined: (x: unknown) => x,
@@ -55,7 +55,7 @@ vi.mock('../../../lib/firestore/driveLogs/utils', () => ({
 import * as fs from 'firebase/firestore';
 import { captureError } from '../../../lib/sentry';
 import { invalidateCache } from '../../../lib/firestore/cache';
-import { enqueue } from '../../../lib/offline/syncQueue';
+import { trackWrite } from '../../../lib/offline/syncQueue';
 import { getVehicleEndKmBefore } from '../../../lib/firestore/driveLogs/utils';
 import { createDriveLog, updateDriveLog, deleteDriveLog } from '../../../lib/firestore/driveLogs/mutations';
 
@@ -81,7 +81,8 @@ describe('firestore/driveLogs/mutations', () => {
             const result = await createDriveLog({ organizationId: 'org1', vehicleId: 'v1', startKm: 100, endKm: 200 });
 
             expect(fs.setDoc).toHaveBeenCalled();
-            expect(enqueue).not.toHaveBeenCalled();
+            // 온라인도 장부에 적는다 — 통신이 안 되는 '온라인'(지하 주차장)에서는 결과가 한참 뒤에 온다
+            expect(trackWrite).toHaveBeenCalledWith('CREATE', 'driveLogs', expect.any(String), expect.any(Object), expect.any(Promise), { callerAwaits: true });
             expect(result.id).toBeDefined();
             expect(result.syncResult).toBeNull();
             expect(invalidateCache).toHaveBeenCalledWith('driveLogs');
@@ -130,13 +131,14 @@ describe('firestore/driveLogs/mutations', () => {
             expect(onWriteQueued).not.toHaveBeenCalled();
         });
 
-        it('오프라인: setDoc를 await하지 않고 enqueue(CREATE)에 쌓는다 (직전 기록 확인도 생략)', async () => {
+        it('오프라인: setDoc를 기다리지 않고 장부에만 적는다 — 보내는 일은 SDK가 한다 (직전 기록 확인도 생략)', async () => {
             setOnline(false);
 
             await createDriveLog({ organizationId: 'org1', vehicleId: 'v1', startKm: 100, endKm: 200, timestamp: new Date() });
 
             expect(getVehicleEndKmBefore).not.toHaveBeenCalled(); // 오프라인은 확인 분기 생략
-            expect(enqueue).toHaveBeenCalledWith('CREATE', 'driveLogs', expect.any(String), expect.any(Object));
+            expect(fs.setDoc).toHaveBeenCalledTimes(1);
+            expect(trackWrite).toHaveBeenCalledWith('CREATE', 'driveLogs', expect.any(String), expect.any(Object), expect.any(Promise), { callerAwaits: false });
             expect(invalidateCache).toHaveBeenCalledWith('driveLogs');
         });
 
@@ -165,17 +167,18 @@ describe('firestore/driveLogs/mutations', () => {
                 expect.anything(),
                 expect.objectContaining({ endKm: 300, editedAt: '__serverTimestamp__' }),
             );
-            expect(enqueue).not.toHaveBeenCalled();
+            expect(trackWrite).toHaveBeenCalledWith('UPDATE', 'driveLogs', 'log1', expect.objectContaining({ endKm: 300 }), expect.any(Promise), { callerAwaits: true });
             expect(invalidateCache).toHaveBeenCalledWith('driveLogs');
             expect(result.syncResult).toBeNull();
         });
 
-        it('오프라인: enqueue(UPDATE)에 쌓는다', async () => {
+        it('오프라인: updateDoc 한 번 + 장부에 적는다', async () => {
             setOnline(false);
 
             await updateDriveLog('log1', { endKm: 300 });
 
-            expect(enqueue).toHaveBeenCalledWith('UPDATE', 'driveLogs', 'log1', expect.objectContaining({ endKm: 300 }));
+            expect(fs.updateDoc).toHaveBeenCalledTimes(1);
+            expect(trackWrite).toHaveBeenCalledWith('UPDATE', 'driveLogs', 'log1', expect.objectContaining({ endKm: 300 }), expect.any(Promise), { callerAwaits: false });
         });
 
         it('실패 시 captureError로 보고하고 에러를 재던진다', async () => {
@@ -192,16 +195,17 @@ describe('firestore/driveLogs/mutations', () => {
 
             expect(fs.doc).toHaveBeenCalledWith(expect.anything(), 'driveLogs', 'log1');
             expect(fs.deleteDoc).toHaveBeenCalled();
-            expect(enqueue).not.toHaveBeenCalled();
+            expect(trackWrite).toHaveBeenCalledWith('DELETE', 'driveLogs', 'log1', null, expect.any(Promise), { callerAwaits: true });
             expect(invalidateCache).toHaveBeenCalledWith('driveLogs');
         });
 
-        it('오프라인: enqueue(DELETE, docId, null)에 쌓는다', async () => {
+        it('오프라인: deleteDoc 한 번 + 장부에 적는다', async () => {
             setOnline(false);
 
             await deleteDriveLog('log1');
 
-            expect(enqueue).toHaveBeenCalledWith('DELETE', 'driveLogs', 'log1', null);
+            expect(fs.deleteDoc).toHaveBeenCalledTimes(1);
+            expect(trackWrite).toHaveBeenCalledWith('DELETE', 'driveLogs', 'log1', null, expect.any(Promise), { callerAwaits: false });
         });
 
         it('실패 시 captureError로 보고하고 에러를 재던진다', async () => {

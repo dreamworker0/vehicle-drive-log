@@ -9,7 +9,7 @@ import { isCalendarBoundToOrg } from "../../services/calendar/calendarBinding";
 import { isOrgRetired } from "../../utils/orgRetirement";
 import { isCalendarAuthError, shouldSkipVehicleCalendar, recordCalendarFailure, resetCalendarFailure } from "../../services/calendar/calendarFailTracking";
 import { sendPushToOrg, sendPushToUser, createInAppNotification } from "../../services/alimtalk/sendNotification";
-import { checkReservationTimeConflict, resolveReservationConflict } from "../sync/conflictResolver";
+import { checkReservationTimeConflict } from "../sync/conflictResolver";
 
 /**
  * 차량의 캘린더 동기화 컨텍스트를 조회한다.
@@ -269,10 +269,6 @@ export const onReservationUpdated = onDocumentUpdated(
     const before = event.data!.before.data();
     const after = event.data!.after.data();
     const reservationId = event.params.reservationId;
-
-    // [오프라인 충돌 방어] LWW 기반
-    const isConflict = await resolveReservationConflict(event.data!.after.ref, before, after);
-    if (isConflict) return;
 
     // 역동기화로 수정된 예약이면 캘린더에 다시 반영하지 않음 (무한 루프 방지)
     if (after.syncSource === "calendar" && before.syncSource !== "calendar") {

@@ -194,9 +194,10 @@ self.addEventListener('message', (event) => {
 // — 페이지가 같은 순간 같은 큐를 비우고 있었으므로(두 컨텍스트 사이에는 잠금이 없다),
 // 어느 쪽이 먼저 집느냐에 따라 멀쩡한 기록이 "다시 입력해 주세요"로 버려질 수 있었다.
 //
-// 그래서 쓰기는 App Check가 있는 페이지 한 곳에서만 한다(syncQueue.registerReconnectFlush).
-// SW는 연결이 돌아왔다는 신호를 열린 화면에 전달만 한다. 열린 화면이 없으면 다음에 앱을
-// 열 때 페이지가 시작 flush로 처리한다.
+// 그래서 쓰기는 App Check가 있는 페이지 한 곳에서만 한다. 이제 앱은 다시 보내지도 않는다 — 오프라인
+// 쓰기는 Firestore SDK가 보내고, 페이지는 장부만 확인한다(syncQueue.registerLedgerReconcile).
+// SW는 연결이 돌아왔다는 신호를 열린 화면에 전달만 한다(옛 버전이 등록해 둔 'sync-db' 태그용).
+// 열린 화면이 없으면 다음에 앱을 열 때 페이지가 시작 확인으로 처리한다.
 self.addEventListener('sync', (event: SyncEvent) => {
     if (event.tag === 'sync-db') {
         event.waitUntil(
