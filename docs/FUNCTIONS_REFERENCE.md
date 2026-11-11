@@ -2,7 +2,7 @@
 
 > **자동 생성 문서** — `scripts/generate-functions-doc.ts`로 생성됨
 >
-> 마지막 업데이트: 2026. 10. 16. 오후 2:21:31
+> 마지막 업데이트: 2026. 11. 11. 오후 6:38:43
 >
 > 총 함수 수: **80개**
 
@@ -491,7 +491,7 @@
 | 항목 | 내용 |
 |------|------|
 | **파일** | `functions/src/handlers/scheduled/weeklyMaintenanceBatch.ts` |
-| **설명** | 주간 유지보수: soft-delete 기관 30일 후 기관 데이터 전체 파기(purgeOrganizationData) → 증빙 이미지 정리 → 3년 이상 운행기록 GCS 아카이빙 |
+| **설명** | 주간 유지보수: soft-delete 기관 30일 후 기관 데이터 전체 파기(purgeOrganizationData) → 증빙 이미지 정리 → 3년 이상 운행기록 GCS 아카이빙 → 소속 없이 90일 넘게 쓰이지 않은 로그인 계정 정리(기본 보고만, system/authCleanup.deleteEnabled로 켬) |
 | **인증** | 시스템 자동 실행 |
 | **비고** | schedule: "0 3 * * 0" (KST 일요일 03:00). 판정 기준이 30일·3년이라 매일 돌 이유가 없어 주 1회로 옮긴 것 |
 

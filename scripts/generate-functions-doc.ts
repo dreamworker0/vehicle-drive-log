@@ -463,7 +463,7 @@ const FUNCTIONS: FunctionEntry[] = [
     name: 'weeklyMaintenanceBatch',
     type: 'onSchedule',
     file: 'handlers/scheduled/weeklyMaintenanceBatch.ts',
-    description: '주간 유지보수: soft-delete 기관 30일 후 기관 데이터 전체 파기(purgeOrganizationData) → 증빙 이미지 정리 → 3년 이상 운행기록 GCS 아카이빙',
+    description: '주간 유지보수: soft-delete 기관 30일 후 기관 데이터 전체 파기(purgeOrganizationData) → 증빙 이미지 정리 → 3년 이상 운행기록 GCS 아카이빙 → 소속 없이 90일 넘게 쓰이지 않은 로그인 계정 정리(기본 보고만, system/authCleanup.deleteEnabled로 켬)',
     auth: '시스템 자동 실행',
     note: 'schedule: "0 3 * * 0" (KST 일요일 03:00). 판정 기준이 30일·3년이라 매일 돌 이유가 없어 주 1회로 옮긴 것',
   },

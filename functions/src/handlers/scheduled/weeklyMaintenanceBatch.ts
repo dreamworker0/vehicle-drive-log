@@ -4,6 +4,8 @@
  * 1. purgeOrgs: soft-deleted 기관 30일 경과 시 기관 데이터 전체 파기(purgeOrganizationData)
  * 2. cleanupImages: 승인·반려 후 30일 경과 기관의 증빙 이미지 삭제
  * 3. archiveLogs: 3년 이상 된 운행 기록을 GCS로 아카이빙 후 삭제
+ * 4. cleanupOrphanAuth: 기관에 소속되지 않은 채 90일 넘게 쓰이지 않은 로그인 계정 정리
+ *    (기본은 보고만 — `system/authCleanup.deleteEnabled`를 켜야 지운다, cleanupOrphanAuthAccounts 주석)
  *
  * ## 왜 주 1회인가
  * 셋 다 판정 기준이 **30일·3년**이다. 매일 돌려도 어제와 오늘의 대상이 사실상 같고,
@@ -19,9 +21,11 @@
  */
 import { getFirestore } from "firebase-admin/firestore";
 import { getStorage } from "firebase-admin/storage";
+import { getAuth } from "firebase-admin/auth";
 import { onSchedule } from "firebase-functions/v2/scheduler";
 import { purgeOrgs, cleanupImages, archiveLogs } from "./dailyNightlyBatch";
 import { runStep, logBatchResult } from "../../utils/batchStep";
+import { cleanupOrphanAuthAccounts } from "../../services/account/cleanupOrphanAuthAccounts";
 
 const CONTEXT = "weeklyMaintenanceBatch";
 
@@ -42,6 +46,8 @@ export const weeklyMaintenanceBatch = onSchedule(
         await runStep(failed, CONTEXT, "purgeOrgs", () => purgeOrgs(db, bucket));
         await runStep(failed, CONTEXT, "cleanupImages", () => cleanupImages(db, bucket));
         await runStep(failed, CONTEXT, "archiveLogs", () => archiveLogs(db, bucket));
+        // 기관 파기(purgeOrgs) 뒤에 둔다 — 같은 주에 파기된 기관의 직원은 90일이 지나야 대상이 된다
+        await runStep(failed, CONTEXT, "cleanupOrphanAuth", () => cleanupOrphanAuthAccounts({ auth: getAuth(), db, bucket }));
 
         await logBatchResult(CONTEXT, failed);
     }
