@@ -104,7 +104,8 @@
     "workbox-window": "^7.4.0"
   },
   "overrides": {
-    "minimatch": ">=9.0.5",
+    "minimatch": "^11.0.5",
+    "glob": "^14.0.4",
     "uuid": "^11.1.1",
     "esbuild": "^0.28.1",
     "@firebase/firestore": {
