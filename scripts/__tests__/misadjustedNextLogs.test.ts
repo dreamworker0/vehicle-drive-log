@@ -33,13 +33,13 @@ describe("findMisadjustedNextLogs — 직후 기록 오조회로 덮어써진 �
         expect(isAutoRepairable(found[0])).toBe(true);
     });
 
-    it("되돌린 출발이 앞 기록 도착보다 크면(기록하지 않은 운행) 'gap'으로 자동 복구 대상에 넣는다", () => {
+    it("되돌린 출발이 앞 기록 도착보다 크면 'gap'으로 올리되, 빈 구간이 새로 생기므로 자동 복구하지 않는다", () => {
         const found = findMisadjustedNextLogs([
             row("J", 19, 52_650, 52_700),
             row("K", 20, 52_000, 52_750, { distance: 30, edited: true }), // 원래 52,720 — 20km 빈 구간
         ]);
         expect(found[0]).toMatchObject({ restoredStartKm: 52_720, confidence: "gap" });
-        expect(isAutoRepairable(found[0])).toBe(true);
+        expect(isAutoRepairable(found[0])).toBe(false);
     });
 
     it("되돌려도 앞 기록과 겹치면 'manual'로만 올리고 자동 복구하지 않는다", () => {
