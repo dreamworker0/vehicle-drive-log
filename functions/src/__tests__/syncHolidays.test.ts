@@ -1,5 +1,5 @@
 /**
- * syncHolidays.test.ts — 공휴일 동기화 배치의 **실패 보고** 단위 테스트
+ * syncHolidays.test.ts — 공휴일 동기화 배치의 **실패 보고·재시도** 단위 테스트
  *
  * 이 배치는 실패해도 기존 Firestore 문서를 지우지 않고 하트비트는 그대로 찍는다.
  * 그 설계 자체는 맞지만, 보고가 없으면 **공휴일만 낡은 채 아무도 모르는** 상태가 된다
@@ -36,6 +36,9 @@ jest.mock('../core/sentry', () => ({
 
 import { syncHolidays } from '../handlers/scheduled/syncHolidays';
 
+/** 재시도 대기를 없앤 기본 정책(재시도 2번 = 연도당 최대 3번 시도) */
+const NO_WAIT = { retryDelaysMs: [0, 0] };
+
 /** 공휴일 1건이 담긴 정상 응답 본문 */
 const okBody = JSON.stringify({
     response: { body: { items: { item: { isHoliday: 'Y', locdate: 20260101, dateName: '신정' } } } },
@@ -56,7 +59,7 @@ describe('syncHolidays — 실패 보고', () => {
     it('정상 응답이면 저장하고 아무것도 보고하지 않는다', async () => {
         global.fetch = jest.fn(() => resp(true, okBody)) as unknown as typeof fetch;
 
-        await syncHolidays();
+        await syncHolidays(NO_WAIT);
 
         expect(mockSet).toHaveBeenCalledTimes(1);
         expect(mockCaptureError).not.toHaveBeenCalled();
@@ -68,7 +71,7 @@ describe('syncHolidays — 실패 보고', () => {
         // 두 해 모두 상태 코드 에러 → holidaysData가 비어 갱신 자체를 생략하는 경로
         global.fetch = jest.fn(() => resp(false, '{}', 503)) as unknown as typeof fetch;
 
-        await syncHolidays();
+        await syncHolidays(NO_WAIT);
 
         expect(mockSet).not.toHaveBeenCalled();
         expect(mockCaptureError).toHaveBeenCalledTimes(1);
@@ -81,7 +84,7 @@ describe('syncHolidays — 실패 보고', () => {
     it('상태 코드 에러는 연도별 경고로 남긴다', async () => {
         global.fetch = jest.fn(() => resp(false, '{}', 503)) as unknown as typeof fetch;
 
-        await syncHolidays();
+        await syncHolidays(NO_WAIT);
 
         // 올해·내년 두 해 모두 실패
         expect(mockCaptureWarning).toHaveBeenCalledTimes(2);
@@ -94,7 +97,7 @@ describe('syncHolidays — 실패 보고', () => {
             resp(true, '<OpenAPI_ServiceResponse><cmmMsgHeader/></OpenAPI_ServiceResponse>')
         ) as unknown as typeof fetch;
 
-        await syncHolidays();
+        await syncHolidays(NO_WAIT);
 
         expect(mockCaptureWarning).toHaveBeenCalledTimes(2);
         expect(mockCaptureWarning.mock.calls[0][0]).toContain('파싱하지 못했다');
@@ -109,7 +112,7 @@ describe('syncHolidays — 실패 보고', () => {
             return call === 1 ? resp(true, okBody) : resp(false, '{}', 500);
         }) as unknown as typeof fetch;
 
-        await syncHolidays();
+        await syncHolidays(NO_WAIT);
 
         expect(mockSet).toHaveBeenCalledTimes(1);
         expect(mockCaptureWarning).toHaveBeenCalledTimes(1);
@@ -117,13 +120,71 @@ describe('syncHolidays — 실패 보고', () => {
         expect(mockCaptureError).not.toHaveBeenCalled();
     });
 
-    it('fetch 자체가 던지면 captureError로 보고한다', async () => {
-        global.fetch = jest.fn(() => Promise.reject(new Error('network down'))) as unknown as typeof fetch;
+    it('연결이 끝내 안 되면 그 해만 건너뛰고 하트비트는 남긴다 (2026-11-01 장애)', async () => {
+        // 예전에는 던진 오류가 바깥 catch로 빠져 두 해와 하트비트가 함께 사라졌다 —
+        // 월 1회 배치라 헬스 카드가 한 달 내내 빨갛게 남았다.
+        const connectTimeout = Object.assign(new TypeError('fetch failed'), {
+            cause: { code: 'UND_ERR_CONNECT_TIMEOUT' },
+        });
+        global.fetch = jest.fn(() => Promise.reject(connectTimeout)) as unknown as typeof fetch;
 
-        await syncHolidays();
+        await syncHolidays(NO_WAIT);
+
+        // 두 해 × 3번 시도
+        expect(global.fetch).toHaveBeenCalledTimes(6);
+        expect(mockCaptureWarning).toHaveBeenCalledTimes(2);
+        expect(mockCaptureWarning.mock.calls[0][0]).toContain('연결하지 못했다');
+        expect(mockCaptureWarning.mock.calls[0][1]).toMatchObject({ cause: 'UND_ERR_CONNECT_TIMEOUT', attempts: 3 });
+        // 두 해 모두 못 받았으니 '전멸' 보고는 그대로 나간다
+        expect(mockSet).not.toHaveBeenCalled();
+        expect(mockCaptureError).toHaveBeenCalledTimes(1);
+        expect((mockCaptureError.mock.calls[0][0] as Error).message).toContain('한 해도 받지 못했다');
+        expect(mockRecordHeartbeat).toHaveBeenCalledWith('syncHolidays');
+    });
+
+    it('일시적인 연결 실패는 재시도로 넘기고 아무것도 보고하지 않는다', async () => {
+        let call = 0;
+        global.fetch = jest.fn(() => {
+            call += 1;
+            // 올해 첫 시도만 끊긴다
+            return call === 1 ? Promise.reject(new TypeError('fetch failed')) : resp(true, okBody);
+        }) as unknown as typeof fetch;
+
+        await syncHolidays(NO_WAIT);
+
+        expect(global.fetch).toHaveBeenCalledTimes(3);
+        expect(mockSet).toHaveBeenCalledTimes(1);
+        expect(mockCaptureWarning).not.toHaveBeenCalled();
+        expect(mockCaptureError).not.toHaveBeenCalled();
+        expect(mockRecordHeartbeat).toHaveBeenCalledWith('syncHolidays');
+    });
+
+    it('5xx는 재시도하고, 다시 물어도 같은 4xx는 재시도하지 않는다', async () => {
+        let call = 0;
+        global.fetch = jest.fn(() => {
+            call += 1;
+            if (call === 1) return resp(false, '{}', 503); // 올해 첫 시도 → 재시도
+            if (call === 2) return resp(true, okBody);
+            return resp(false, '{}', 401); // 내년 → 재시도 없이 경고
+        }) as unknown as typeof fetch;
+
+        await syncHolidays(NO_WAIT);
+
+        expect(global.fetch).toHaveBeenCalledTimes(3);
+        expect(mockSet).toHaveBeenCalledTimes(1);
+        expect(mockCaptureWarning).toHaveBeenCalledTimes(1);
+        expect(mockCaptureWarning.mock.calls[0][1]).toMatchObject({ status: 401 });
+        expect(mockCaptureError).not.toHaveBeenCalled();
+    });
+
+    it('Firestore 저장이 던지면 captureError로 보고한다', async () => {
+        global.fetch = jest.fn(() => resp(true, okBody)) as unknown as typeof fetch;
+        mockSet.mockRejectedValueOnce(new Error('firestore down'));
+
+        await syncHolidays(NO_WAIT);
 
         expect(mockCaptureError).toHaveBeenCalledTimes(1);
-        expect((mockCaptureError.mock.calls[0][0] as Error).message).toBe('network down');
+        expect((mockCaptureError.mock.calls[0][0] as Error).message).toBe('firestore down');
         expect(mockCaptureError.mock.calls[0][1]).toMatchObject({ fn: 'syncHolidays' });
     });
 });
