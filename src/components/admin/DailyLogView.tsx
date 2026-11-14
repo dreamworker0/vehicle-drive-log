@@ -179,7 +179,7 @@ export default function DailyLogView() {
                 <div className="glass-card p-12 text-center">
                     <div className="text-4xl mb-3">📋</div>
                     <p className="text-surface-900 dark:text-surface-100 font-medium mb-1">운행 기록 없음</p>
-                    <p className="text-sm text-surface-400 dark:text-surface-500">
+                    <p className="text-sm text-surface-500 dark:text-surface-400">
                         {selectedDate} · {selectedVehicle?.displayName || '차량 미선택'} — 해당 날짜에 기록이 없습니다
                     </p>
                 </div>
@@ -198,21 +198,21 @@ export default function DailyLogView() {
                         </h3>
                         <div className="grid grid-cols-3 gap-3">
                             <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg p-3 text-center">
-                                <p className="text-xs text-surface-400 dark:text-surface-500 mb-1">금일 운행거리</p>
+                                <p className="text-xs text-surface-500 dark:text-surface-400 mb-1">금일 운행거리</p>
                                 <p className="text-lg font-bold text-primary-600 dark:text-primary-400">
                                     {summary.todayDistance.toLocaleString()}
                                     <span className="text-xs font-normal ml-0.5">km</span>
                                 </p>
                             </div>
                             <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg p-3 text-center">
-                                <p className="text-xs text-surface-400 dark:text-surface-500 mb-1">전일 누계</p>
+                                <p className="text-xs text-surface-500 dark:text-surface-400 mb-1">전일 누계</p>
                                 <p className="text-lg font-bold text-surface-700 dark:text-surface-200">
                                     {summary.previousEndKm !== null ? summary.previousEndKm.toLocaleString() : '-'}
                                     <span className="text-xs font-normal ml-0.5">km</span>
                                 </p>
                             </div>
                             <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg p-3 text-center">
-                                <p className="text-xs text-surface-400 dark:text-surface-500 mb-1">금일 누계</p>
+                                <p className="text-xs text-surface-500 dark:text-surface-400 mb-1">금일 누계</p>
                                 <p className="text-lg font-bold text-surface-700 dark:text-surface-200">
                                     {summary.todayEndKm !== null ? summary.todayEndKm.toLocaleString() : '-'}
                                     <span className="text-xs font-normal ml-0.5">km</span>
@@ -238,19 +238,19 @@ export default function DailyLogView() {
                                     return (
                                     <div key={idx} className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-sm">
                                         <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg px-3 py-2">
-                                            <span className="text-xs text-surface-400 dark:text-surface-500">{isEV ? '충전원' : '주유원'}</span>
+                                            <span className="text-xs text-surface-500 dark:text-surface-400">{isEV ? '충전원' : '주유원'}</span>
                                             <p className="font-medium text-surface-900 dark:text-surface-100">{String(fuel.driverName || '-')}</p>
                                         </div>
                                         <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg px-3 py-2">
-                                            <span className="text-xs text-surface-400 dark:text-surface-500">{isEV ? '충전미터' : '주유미터'}</span>
+                                            <span className="text-xs text-surface-500 dark:text-surface-400">{isEV ? '충전미터' : '주유미터'}</span>
                                             <p className="font-medium text-surface-900 dark:text-surface-100">{fuel.meterReading ? Number(fuel.meterReading).toLocaleString() : '-'} km</p>
                                         </div>
                                         <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg px-3 py-2">
-                                            <span className="text-xs text-surface-400 dark:text-surface-500">{isEV ? '충전량' : '주유량'}</span>
+                                            <span className="text-xs text-surface-500 dark:text-surface-400">{isEV ? '충전량' : '주유량'}</span>
                                             <p className="font-medium text-surface-900 dark:text-surface-100">{fuel.fuelAmount ? formatFuelAmount(fuel.fuelAmount) : '-'} {isEV ? 'kWh' : 'ℓ'}</p>
                                         </div>
                                         <div className="bg-surface-50 dark:bg-surface-800/50 rounded-lg px-3 py-2">
-                                            <span className="text-xs text-surface-400 dark:text-surface-500">{isEV ? '충전금액' : '주유금액'}</span>
+                                            <span className="text-xs text-surface-500 dark:text-surface-400">{isEV ? '충전금액' : '주유금액'}</span>
                                             <p className="font-medium text-surface-900 dark:text-surface-100">{fuel.fuelCost ? Number(fuel.fuelCost).toLocaleString() : '-'} 원</p>
                                         </div>
                                     </div>
@@ -282,7 +282,7 @@ export default function DailyLogView() {
                         <div className="hidden sm:block overflow-x-auto">
                             <table className="w-full text-sm">
                                 <thead>
-                                    <tr className="text-xs text-surface-400 dark:text-surface-500 border-b border-surface-200 dark:border-surface-700">
+                                    <tr className="text-xs text-surface-500 dark:text-surface-400 border-b border-surface-200 dark:border-surface-700">
                                         <th className="px-4 py-2 text-left font-medium">사용자</th>
                                         <th className="px-2 py-2 text-center font-medium w-14">인원</th>
                                         <th className="px-3 py-2 text-left font-medium">용무</th>

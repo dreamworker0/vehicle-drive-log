@@ -19,7 +19,7 @@ export default function ApprovalLineSection({ form, setForm, handleSave, saving 
             <div className="flex items-center justify-between mb-1">
                 <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100">결재 라인</h2>
                 <label className="flex items-center gap-2 cursor-pointer select-none">
-                    <span className={`text-xs font-medium ${form.hideApprovalLine ? 'text-surface-400 dark:text-surface-500' : 'text-primary-600 dark:text-primary-400'}`}>
+                    <span className={`text-xs font-medium ${form.hideApprovalLine ? 'text-surface-500 dark:text-surface-400' : 'text-primary-600 dark:text-primary-400'}`}>
                         {form.hideApprovalLine ? 'PDF 결재란 숨김' : 'PDF 결재란 표시'}
                     </span>
                     <Toggle
@@ -29,7 +29,7 @@ export default function ApprovalLineSection({ form, setForm, handleSave, saving 
                     />
                 </label>
             </div>
-            <p className="text-xs text-surface-400 mb-4">PDF 운행일지에 표시될 결재란을 설정합니다. (수동 결재용)</p>
+            <p className="text-xs text-surface-500 dark:text-surface-400 mb-4">PDF 운행일지에 표시될 결재란을 설정합니다. (수동 결재용)</p>
 
             <div className={`space-y-2 mb-3 transition-opacity ${form.hideApprovalLine ? 'opacity-40 pointer-events-none' : ''}`}>
                 {form.approvalLine.map((item, idx) => (

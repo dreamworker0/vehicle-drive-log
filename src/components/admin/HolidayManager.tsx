@@ -145,7 +145,7 @@ export default function HolidayManager({
                         >
                             <p className="text-sm font-bold text-surface-900 dark:text-surface-100 mb-2">{month}월</p>
                             {holidays.length === 0 ? (
-                                <p className="text-xs text-surface-300 dark:text-surface-600">공휴일 없음</p>
+                                <p className="text-xs text-surface-500 dark:text-surface-400">공휴일 없음</p>
                             ) : (
                                 <div className="space-y-1">
                                     {holidays.map((h, idx) => {
@@ -154,7 +154,7 @@ export default function HolidayManager({
                                             : h.date?.toDate?.()?.getDate?.() || '?';
                                         return (
                                             <div key={idx} className="flex items-start gap-1.5 group">
-                                                <span className="text-xs text-surface-400 dark:text-surface-500 font-mono w-5 text-right flex-shrink-0">{day}</span>
+                                                <span className="text-xs text-surface-500 dark:text-surface-400 font-mono w-5 text-right flex-shrink-0">{day}</span>
                                                 <span className={`text-xs leading-tight ${h.type === 'custom' ? 'text-primary-500 dark:text-primary-400' : 'text-red-500 dark:text-red-400'}`}>
                                                     {h.name}
                                                 </span>

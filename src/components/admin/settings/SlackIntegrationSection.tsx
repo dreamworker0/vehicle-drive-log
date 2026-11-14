@@ -55,7 +55,7 @@ export default function SlackIntegrationSection() {
                 ) : status.connected ? (
                     <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-2.5 py-1 rounded-full flex-shrink-0">● 연결됨</span>
                 ) : (
-                    <span className="text-xs font-medium text-surface-500 dark:text-surface-400 bg-surface-100 dark:bg-surface-800 px-2.5 py-1 rounded-full flex-shrink-0">미연결</span>
+                    <span className="text-xs font-medium text-surface-600 dark:text-surface-400 bg-surface-100 dark:bg-surface-800 px-2.5 py-1 rounded-full flex-shrink-0">미연결</span>
                 )}
             </div>
 
@@ -63,7 +63,7 @@ export default function SlackIntegrationSection() {
                 <div className="flex justify-center py-8"><div className="w-6 h-6 spinner" /></div>
             ) : !status.connected ? (
                 <>
-                    <p className="text-xs text-surface-400 mb-4">직원이 Slack에서 말을 걸면 차량을 예약·조회할 수 있어요. 이렇게요:</p>
+                    <p className="text-xs text-surface-500 dark:text-surface-400 mb-4">직원이 Slack에서 말을 걸면 차량을 예약·조회할 수 있어요. 이렇게요:</p>
 
                     {/* 예시 대화 */}
                     <div className="flex flex-col gap-2 mb-5">
@@ -72,7 +72,7 @@ export default function SlackIntegrationSection() {
                             내일 오전 10시부터 12시까지 스타렉스 예약해줘
                         </div>
                         <div className="self-start max-w-[82%] px-3.5 py-2.5 rounded-2xl rounded-bl-md bg-surface-50 dark:bg-surface-800 border border-surface-100 dark:border-surface-700 text-sm text-surface-800 dark:text-surface-200">
-                            <span className="block text-[11px] font-semibold text-surface-400 mb-0.5">차량운행일지봇</span>
+                            <span className="block text-[11px] font-semibold text-surface-500 dark:text-surface-400 mb-0.5">차량운행일지봇</span>
                             스타렉스 · 내일 10:00~12:00 로 예약할까요?
                             <span className="flex gap-1.5 mt-2">
                                 <span className="text-xs font-semibold px-3 py-1 rounded-lg bg-emerald-600 text-white">예약 확정</span>
@@ -97,7 +97,7 @@ export default function SlackIntegrationSection() {
                         {connecting ? <div className="w-4 h-4 spinner" /> : <SlackMark className="w-4.5 h-4.5 w-[18px] h-[18px]" />}
                         {connecting ? 'Slack으로 이동 중...' : 'Slack에 연결하기'}
                     </button>
-                    <p className="text-xs text-surface-400 mt-2.5">버튼을 누르면 Slack 인증 화면으로 이동합니다. 토큰이나 코드를 직접 입력할 필요는 없습니다.</p>
+                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-2.5">버튼을 누르면 Slack 인증 화면으로 이동합니다. 토큰이나 코드를 직접 입력할 필요는 없습니다.</p>
                 </>
             ) : (
                 <>
@@ -151,7 +151,7 @@ export default function SlackIntegrationSection() {
                                 )}
                             </>
                         ) : (
-                            <p className="text-xs text-surface-400 py-2">진단 정보를 불러오지 못했습니다. 아래 '연결 테스트'를 눌러 다시 시도해주세요.</p>
+                            <p className="text-xs text-surface-500 dark:text-surface-400 py-2">진단 정보를 불러오지 못했습니다. 아래 '연결 테스트'를 눌러 다시 시도해주세요.</p>
                         )}
                     </div>
 

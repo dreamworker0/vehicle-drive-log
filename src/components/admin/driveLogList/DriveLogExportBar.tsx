@@ -145,7 +145,7 @@ export default function DriveLogExportBar({
                                     </svg>
                                     중복 검사
                                 </button>
-                                <p className="px-3 pt-1 pb-1.5 text-[11px] leading-snug text-surface-400 dark:text-surface-500">
+                                <p className="px-3 pt-1 pb-1.5 text-[11px] leading-snug text-surface-500 dark:text-surface-400">
                                     같은 운행이 실수로 두 번 저장된 기록을 찾아 정리합니다. 보통은 자동으로 방지되며, 예전 데이터 점검용입니다.
                                 </p>
                             </div>

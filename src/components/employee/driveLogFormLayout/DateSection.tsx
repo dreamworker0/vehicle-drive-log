@@ -61,7 +61,7 @@ const DateSection = memo(function DateSection({ form, setForm, isRetroactive }: 
                         />
                     </div>
                 </div>
-                <p className="text-[11px] text-surface-400 dark:text-surface-500 mt-1">2달 이내의 날짜만 선택할 수 있습니다.</p>
+                <p className="text-[11px] text-surface-500 dark:text-surface-400 mt-1">2달 이내의 날짜만 선택할 수 있습니다.</p>
                 {isMultiDay && (
                     <p className="text-[11px] text-blue-500 dark:text-blue-400 mt-0.5">
                         🌙 {nightCount}박 {nightCount + 1}일 운행으로 기록됩니다 — 계기판은 출발·도착 한 쌍만 적습니다.

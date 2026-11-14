@@ -117,7 +117,7 @@ export default function CalendarSyncTroubleshootModal({
                     </div>
                     <button
                         onClick={onClose}
-                        className="p-1.5 rounded-lg text-surface-400 dark:text-surface-500 hover:text-surface-600 hover:bg-surface-100 dark:hover:text-surface-300 dark:hover:bg-surface-700 transition-colors shrink-0 min-h-[48px]"
+                        className="p-1.5 rounded-lg text-surface-500 dark:text-surface-400 hover:text-surface-600 hover:bg-surface-100 dark:hover:text-surface-300 dark:hover:bg-surface-700 transition-colors shrink-0 min-h-[48px]"
                         aria-label="닫기"
                     >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -253,7 +253,7 @@ export default function CalendarSyncTroubleshootModal({
                             </p>
                             {calendarId && (
                                 <div className="mt-1.5 p-2 rounded-lg bg-surface-100 dark:bg-surface-800 border border-surface-200 dark:border-surface-700">
-                                    <p className="text-[10px] text-surface-400 dark:text-surface-500 mb-0.5">현재 등록된 캘린더 ID:</p>
+                                    <p className="text-[10px] text-surface-500 dark:text-surface-400 mb-0.5">현재 등록된 캘린더 ID:</p>
                                     <code className="text-[11px] font-mono text-surface-600 dark:text-surface-400 break-all">
                                         {calendarId}
                                     </code>

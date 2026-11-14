@@ -153,12 +153,12 @@ export default function UserManual({ role = 'employee', onClose }: UserManualPro
                         </div>
                         <div>
                             <h2 id="manual-title" className="text-lg font-bold text-surface-900 dark:text-surface-100">사용 설명서</h2>
-                            <p className="text-xs text-surface-400 dark:text-surface-500">
+                            <p className="text-xs text-surface-500 dark:text-surface-400">
                                 {role === 'admin' ? '관리자 기능 안내' : '직원 기능 안내'}
                             </p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="btn-icon text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 dark:text-surface-400 min-w-[48px] min-h-[48px] flex items-center justify-center" aria-label="닫기">
+                    <button onClick={onClose} className="btn-icon text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 dark:text-surface-400 min-w-[48px] min-h-[48px] flex items-center justify-center" aria-label="닫기">
                         <svg aria-hidden="true" className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
                         </svg>
@@ -204,7 +204,7 @@ export default function UserManual({ role = 'employee', onClose }: UserManualPro
                         </svg>
                         자주 하는 질문 (FAQ) 보기
                     </a>
-                    <p className="text-xs text-surface-400 dark:text-surface-500 text-center">
+                    <p className="text-xs text-surface-500 dark:text-surface-400 text-center">
                         💡 궁금한 점이 있으시면 <strong>건의하기</strong>를 이용해 주세요
                     </p>
                 </div>

@@ -32,7 +32,7 @@ export default function VehicleSelector({ vehicles, selectedVehicleId, onSelect,
     }, [vehicles, usageCounts, user?.uid]);
 
     if (activeVehicles.length === 0) {
-        return <p className="text-sm text-surface-400 dark:text-surface-500">등록된 차량이 없습니다. 관리자에게 문의하세요.</p>;
+        return <p className="text-sm text-surface-500 dark:text-surface-400">등록된 차량이 없습니다. 관리자에게 문의하세요.</p>;
     }
 
     return (
@@ -65,7 +65,7 @@ export default function VehicleSelector({ vehicles, selectedVehicleId, onSelect,
                             <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-base ${isDisabled ? 'bg-surface-200 dark:bg-surface-700' : getVehicleColor(v.id)}`}>
                                 {isBlocked ? '🔧' : isRestricted ? '🔒' : (VEHICLE_TYPE_ICONS[v.vehicleType!] || '🚗')}
                             </span>
-                            <p className={`font-medium text-xs text-center leading-tight ${isDisabled ? 'text-surface-400 dark:text-surface-500' : 'text-surface-900 dark:text-surface-100'}`}>
+                            <p className={`font-medium text-xs text-center leading-tight ${isDisabled ? 'text-surface-500 dark:text-surface-400' : 'text-surface-900 dark:text-surface-100'}`}>
                                 {v.displayName}
                             </p>
                             {isBlocked && (

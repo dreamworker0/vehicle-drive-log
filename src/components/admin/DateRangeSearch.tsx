@@ -42,7 +42,7 @@ export default function DateRangeSearch({ startDate, endDate, onSearch, children
     return (
         <form onSubmit={handleSubmit} className="mt-3">
             <div className="flex items-center gap-2">
-                <span className="text-xs text-surface-400 dark:text-surface-500 whitespace-nowrap">기간</span>
+                <span className="text-xs text-surface-500 dark:text-surface-400 whitespace-nowrap">기간</span>
                 <input
                     type="date"
                     aria-label="시작일"

@@ -23,9 +23,26 @@ description: 차량 운행일지 앱 디자인 시스템 규칙. 새 컴포넌�
 
 ### 주요 사용 패턴
 - **배경**: `bg-surface-50` (앱 전체), `bg-white` (카드, 사이드바)
-- **텍스트**: `text-surface-900` (제목), `text-surface-700` (본문), `text-surface-500` (보조), `text-surface-400` (비활성/힌트)
+- **텍스트**: `text-surface-900` (제목), `text-surface-700` (본문), `text-surface-500` (보조·힌트 — 가장 옅은 읽는 글자). `text-surface-400`·`300`은 장식 전용(아래 대비 규칙)
 - **보더**: `border-surface-100` (구분선), `border-surface-200` (인풋/카드)
 - **아이콘 배경**: `bg-primary-100 text-primary-600` (기본), `bg-accent-50 text-accent-600` (성공), `bg-amber-50 text-amber-600` (경고)
+
+### 글자 대비 규칙 (WCAG 1.4.3 · 1.4.11)
+
+> **읽어야 하는 글자는 배경 대비 4.5:1 이상, 아이콘만 있는 버튼은 3:1 이상.** 라벨·보조 설명·날짜·빈 상태 안내·「초기화」 같은 글자 버튼·placeholder가 모두 "읽어야 하는 글자"다.
+
+| 글자색 | 흰 바탕 | `surface-50` | `surface-100` | 다크 `surface-950` | `surface-900` | `surface-800` | `surface-700` |
+|--------|--------|------|------|------|------|------|------|
+| `surface-300` | 1.48 | 1.42 | 1.36 | 13.59 | 12.02 | 9.85 | 6.97 |
+| `surface-400` | 2.56 | 2.45 | 2.34 | 7.87 | 6.96 | 5.71 | 4.04 |
+| `surface-500` | **4.76** | **4.55** | 4.34 | 4.24 | 3.75 | 3.07 | 2.18 |
+| `surface-600` | 7.58 | 7.24 | **6.92** | 2.66 | 2.36 | 1.93 | 1.37 |
+
+- **라이트에서 읽는 글자의 하한은 `text-surface-500`**, 다크에서는 `dark:text-surface-400`. 그래서 보조 글자는 항상 `text-surface-500 dark:text-surface-400`로 쓴다. 거꾸로 된 `text-surface-400 dark:text-surface-500`는 라이트 2.56:1·다크 3.07:1로 양쪽 다 미달이다.
+- **회색 칩 배경 위**(`bg-surface-100` / `dark:bg-surface-700`)에서는 한 단계 진하게 `text-surface-600 dark:text-surface-300`을 쓴다. `surface-500`은 `surface-100` 위에서 4.34:1, `surface-400`은 `surface-700` 위에서 4.04:1로 미달이다.
+- **다크 페어링을 빠뜨리지 않는다.** `text-surface-500`만 쓰면 다크에서도 `surface-500`(3.07:1)으로 남는다. 공통 클래스(`btn-ghost`, `input`)의 다크 색도 인라인 `text-surface-*` 유틸리티가 덮어쓰므로, 인라인으로 글자색을 주면 `dark:`도 같이 쓴다.
+- **`text-surface-400`(다크 `dark:text-surface-500`)·`text-surface-300`을 써도 되는 곳**: 글자 옆에 붙은 장식 아이콘(svg 자체, 검색칸 돋보기, 펼침 화살표), 「~」「|」「·」「→」 같은 구분 기호, 로딩 스피너, `disabled` 상태. 대비 기준이 면제되는 곳이다.
+- **`--color-surface-400` 토큰 값을 바꿔 해결하지 않는다.** 4.5:1을 맞추면 `surface-500`과 같은 색이 되어 단계가 사라지고, 다크에서 본문 보조 글자로 쓰는 `dark:text-surface-400`(5.71:1)과 보더·포커스 링(`focus:ring-surface-400`)까지 함께 어두워진다.
 
 ### 다크 모드 필수 규칙
 
@@ -37,7 +54,9 @@ description: 차량 운행일지 앱 디자인 시스템 규칙. 새 컴포넌�
 | `text-surface-900` | `dark:text-surface-100` | 제목 |
 | `text-surface-700` | `dark:text-surface-300` | 본문 |
 | `text-surface-600` | `dark:text-surface-300` | 데이터 값 |
-| `text-surface-500` | `dark:text-surface-400` | 라벨, 보조 텍스트 |
+| `text-surface-500` | `dark:text-surface-400` | 라벨, 보조 텍스트, 힌트, 날짜, placeholder |
+| `text-surface-600` (회색 칩 위) | `dark:text-surface-300` | `bg-surface-100 dark:bg-surface-700` 위 글자 |
+| `text-surface-400` | `dark:text-surface-500` | 장식 아이콘·구분 기호 전용 (읽는 글자 금지) |
 | `bg-surface-50` | `dark:bg-surface-800` | 행/섹션 배경 |
 | `bg-{color}-50` | `dark:bg-{color}-900/20~30` | 컬러 카드 배경 |
 | `border-{color}-100~200` | `dark:border-{color}-800/40~50` | 컬러 카드 보더 |
@@ -60,8 +79,8 @@ description: 차량 운행일지 앱 디자인 시스템 규칙. 새 컴포넌�
 | 섹션 제목 | `text-lg font-semibold text-surface-900` |
 | 소제목/그룹 레이블 | `text-sm font-semibold text-surface-600` |
 | 본문 | `text-sm text-surface-700` |
-| 보조 텍스트 | `text-sm text-surface-500` 또는 `text-xs text-surface-400` |
-| 날짜/시간 | `text-sm text-surface-400` |
+| 보조 텍스트 | `text-sm text-surface-500` 또는 `text-xs text-surface-500` (+ `dark:text-surface-400`) |
+| 날짜/시간 | `text-sm text-surface-500` (+ `dark:text-surface-400`) |
 | 숫자/데이터 | `font-mono` 추가 |
 
 ---

@@ -54,7 +54,7 @@ export default function VehicleTimelineRow({
                     type="button"
                     onClick={() => vRes.length > 0 && toggleExpand(vehicle.id)}
                     className={`w-[64px] text-[10px] font-medium truncate flex-shrink-0 text-right flex items-center justify-end gap-0.5 border-0 bg-transparent p-0 ${isRestricted ? 'opacity-70' : ''} ${isBlocked
-                        ? 'text-surface-400 line-through cursor-default'
+                        ? 'text-surface-500 dark:text-surface-400 line-through cursor-default'
                         : vRes.length > 0
                             ? 'text-surface-700 dark:text-surface-300 cursor-pointer hover:text-primary-500 dark:hover:text-primary-400'
                             : 'text-surface-700 dark:text-surface-300 cursor-default'

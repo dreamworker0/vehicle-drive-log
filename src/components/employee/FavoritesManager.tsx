@@ -124,8 +124,8 @@ export default function FavoritesManager() {
             {favorites.length === 0 ? (
                 <div className="glass-card p-12 text-center">
                     <div className="text-4xl mb-3">⭐</div>
-                    <p className="text-surface-400 dark:text-surface-500 font-medium">등록된 즐겨찾기가 없습니다</p>
-                    <p className="text-xs text-surface-300 dark:text-surface-600 mt-1">자주 가는 목적지를 추가해보세요</p>
+                    <p className="text-surface-500 dark:text-surface-400 font-medium">등록된 즐겨찾기가 없습니다</p>
+                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">자주 가는 목적지를 추가해보세요</p>
                 </div>
             ) : (
                 <div className="space-y-2">
@@ -139,12 +139,12 @@ export default function FavoritesManager() {
                                 {/* 다른 화면에서 저장한 즐겨찾기는 별칭 없이 주소를 그대로 별칭으로 쓴다 —
                                     같은 값을 두 줄로 반복하지 않는다 */}
                                 {fav.address && fav.address !== fav.name && (
-                                    <p className="text-xs text-surface-400 dark:text-surface-500 truncate">{fav.address}</p>
+                                    <p className="text-xs text-surface-500 dark:text-surface-400 truncate">{fav.address}</p>
                                 )}
                             </div>
                             <button
                                 onClick={() => handleDelete(fav.id)}
-                                className="btn-icon text-surface-300 dark:text-surface-600 hover:text-red-500 dark:hover:text-red-400 min-w-[48px] min-h-[48px] flex items-center justify-center flex-shrink-0"
+                                className="btn-icon text-surface-500 dark:text-surface-400 hover:text-red-500 dark:hover:text-red-400 min-w-[48px] min-h-[48px] flex items-center justify-center flex-shrink-0"
                                 title="삭제"
                                 aria-label="즐겨찾기 삭제"
                             >

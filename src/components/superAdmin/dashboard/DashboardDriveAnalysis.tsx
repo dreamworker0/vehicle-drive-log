@@ -33,7 +33,7 @@ function DashboardDriveAnalysis({
                         <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
                             ⏰ 시간대별 운행 분포
                         </h2>
-                        <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">최근 30일 출발 시간 기준</p>
+                        <p className="text-xs text-surface-500 dark:text-surface-400 mb-4">최근 30일 출발 시간 기준</p>
                         <div>
                             <ResponsiveContainer width="100%" height={220} minWidth={1}>
                                 <BarChart data={hourlyStats} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
@@ -60,7 +60,7 @@ function DashboardDriveAnalysis({
                         <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
                             🌱 기관 증가 추이
                         </h2>
-                        <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">월별 누적 승인 기관 수</p>
+                        <p className="text-xs text-surface-500 dark:text-surface-400 mb-4">월별 누적 승인 기관 수</p>
                         <div>
                             <ResponsiveContainer width="100%" height={220} minWidth={1}>
                                 <AreaChart data={monthlyGrowth} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
@@ -89,7 +89,7 @@ function DashboardDriveAnalysis({
                 <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
                     🔥 운행 밀도 히트맵 (요일 × 시간대)
                 </h2>
-                <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">최근 30일 서비스 전체 운행 밀도</p>
+                <p className="text-xs text-surface-500 dark:text-surface-400 mb-4">최근 30일 서비스 전체 운행 밀도</p>
                 <HeatmapGrid data={heatmapData} />
             </div>
 
@@ -98,7 +98,7 @@ function DashboardDriveAnalysis({
                 <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
                     ⏱️ 평균 주행시간 분석
                 </h2>
-                <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">
+                <p className="text-xs text-surface-500 dark:text-surface-400 mb-4">
                     startTime과 endTime 기반 주행시간 (최근 30일)
                 </p>
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

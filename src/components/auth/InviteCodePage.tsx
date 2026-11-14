@@ -253,7 +253,7 @@ export default function InviteCodePage() {
                                 </button>
                                 <button
                                     onClick={logout}
-                                    className="btn-ghost w-full text-sm text-surface-400 dark:text-surface-500 hover:text-red-500 dark:hover:text-red-400 min-h-[48px]"
+                                    className="btn-ghost w-full text-sm text-surface-500 dark:text-surface-400 hover:text-red-500 dark:hover:text-red-400 min-h-[48px]"
                                 >
                                     다른 계정으로 로그인
                                 </button>

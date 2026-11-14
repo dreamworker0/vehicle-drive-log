@@ -117,7 +117,7 @@ export default function FuelLogManager() {
                         <button
                             type="button"
                             onClick={resetFilters}
-                            className="text-xs text-surface-400 hover:text-red-500 whitespace-nowrap min-h-[48px]"
+                            className="text-xs text-surface-500 dark:text-surface-400 hover:text-red-500 whitespace-nowrap min-h-[48px]"
                         >
                             초기화
                         </button>
@@ -129,13 +129,13 @@ export default function FuelLogManager() {
             {filteredRecords.length === 0 ? (
                 <div className="glass-card p-12 text-center">
                     <div className="text-4xl mb-3">⛽</div>
-                    <p className="text-surface-400 dark:text-surface-500 font-medium">주유 기록이 없습니다</p>
-                    <p className="text-sm text-surface-300 dark:text-surface-600 mt-1">직원이 주유 탭에서 기록을 등록하면 여기에 표시됩니다</p>
+                    <p className="text-surface-500 dark:text-surface-400 font-medium">주유 기록이 없습니다</p>
+                    <p className="text-sm text-surface-500 dark:text-surface-400 mt-1">직원이 주유 탭에서 기록을 등록하면 여기에 표시됩니다</p>
                 </div>
             ) : (
                 <div className="space-y-2">
                     {/* 헤더 (데스크탑) */}
-                    <div className="hidden sm:grid gap-2 px-4 py-2 text-xs font-medium text-surface-400 dark:text-surface-500" style={{ gridTemplateColumns: GRID_COLUMNS }}>
+                    <div className="hidden sm:grid gap-2 px-4 py-2 text-xs font-medium text-surface-500 dark:text-surface-400" style={{ gridTemplateColumns: GRID_COLUMNS }}>
                         <div>날짜</div>
                         <div>시각</div>
                         <div>주유원</div>
@@ -156,7 +156,7 @@ export default function FuelLogManager() {
                                     <div className="flex items-center justify-between mb-2">
                                         <div className="flex items-center gap-2 flex-wrap">
                                             <span className="font-medium text-sm text-surface-900 dark:text-surface-100">{rec.driverName}</span>
-                                            <span className="text-xs text-surface-400 dark:text-surface-500">{dateStr} {timeStr}</span>
+                                            <span className="text-xs text-surface-500 dark:text-surface-400">{dateStr} {timeStr}</span>
                                             <AdminEditedBadge lastEditedByUid={rec.lastEditedByUid} ownerUid={rec.driverUid} />
                                         </div>
                                         <div className="flex items-center gap-2">

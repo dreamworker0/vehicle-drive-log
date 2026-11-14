@@ -79,12 +79,12 @@ export default function VehicleManager() {
                     </div>
                     <div>
                         <div className="flex items-center gap-2">
-                            <h3 className={`font-semibold ${isRetired ? 'text-surface-400 line-through' : 'text-surface-900 dark:text-surface-100'}`}>{vehicle.displayName}</h3>
+                            <h3 className={`font-semibold ${isRetired ? 'text-surface-500 dark:text-surface-400 line-through' : 'text-surface-900 dark:text-surface-100'}`}>{vehicle.displayName}</h3>
                             {isRetired && (
                                 <span className="px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400">폐차</span>
                             )}
                         </div>
-                        <p className="text-sm text-surface-400">{vehicle.modelName}</p>
+                        <p className="text-sm text-surface-500 dark:text-surface-400">{vehicle.modelName}</p>
                     </div>
                 </div>
                 {/* 터치 기기(마우스 없음)는 항상 표시, 데스크톱은 hover 시 표시 */}
@@ -96,7 +96,7 @@ export default function VehicleManager() {
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
                                 </svg>
                             </button>
-                            <button onClick={() => openDeleteModal(vehicle)} className="btn-icon btn-sm text-surface-400 hover:text-red-500 min-h-[48px] min-w-[48px]" title="차량 삭제">
+                            <button onClick={() => openDeleteModal(vehicle)} className="btn-icon btn-sm text-surface-500 dark:text-surface-400 hover:text-red-500 min-h-[48px] min-w-[48px]" title="차량 삭제">
                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                                 </svg>
@@ -104,18 +104,18 @@ export default function VehicleManager() {
                         </>
                     ) : (
                         <>
-                            <button onClick={() => handleEdit(vehicle)} className="btn-icon btn-sm text-surface-400 hover:text-primary-600 min-h-[48px] min-w-[48px]">
+                            <button onClick={() => handleEdit(vehicle)} className="btn-icon btn-sm text-surface-500 dark:text-surface-400 hover:text-primary-600 min-h-[48px] min-w-[48px]">
                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Z" />
                                 </svg>
                             </button>
-                            <button onClick={() => openRetireModal(vehicle)} className="btn-icon btn-sm text-surface-400 hover:text-amber-500 min-h-[48px] min-w-[48px]" title="폐차">
+                            <button onClick={() => openRetireModal(vehicle)} className="btn-icon btn-sm text-surface-500 dark:text-surface-400 hover:text-amber-500 min-h-[48px] min-w-[48px]" title="폐차">
                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M18.364 18.364A9 9 0 0 0 5.636 5.636m12.728 12.728A9 9 0 0 1 5.636 5.636m12.728 12.728L5.636 5.636" />
                                 </svg>
                             </button>
                             {deletableIds.has(vehicle.id) && (
-                                <button onClick={() => openDeleteModal(vehicle)} className="btn-icon btn-sm text-surface-400 hover:text-red-500 min-h-[48px] min-w-[48px]">
+                                <button onClick={() => openDeleteModal(vehicle)} className="btn-icon btn-sm text-surface-500 dark:text-surface-400 hover:text-red-500 min-h-[48px] min-w-[48px]">
                                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" />
                                     </svg>
@@ -135,7 +135,7 @@ export default function VehicleManager() {
                         🔒 지정 {vehicle.allowedUserIds!.length}명
                     </span>
                 )}
-                <span className="text-surface-400 text-xs ml-auto">
+                <span className="text-surface-500 dark:text-surface-400 text-xs ml-auto">
                     {(vehicle.currentKm || 0).toLocaleString()} km
                 </span>
             </div>
@@ -153,11 +153,11 @@ export default function VehicleManager() {
                         )}
                         {vehicle.insurance?.expiryDate && (() => {
                             const d = insuranceDaysLeft(vehicle.insurance.expiryDate);
-                            const cls = d === null ? 'text-surface-400 dark:text-surface-500'
+                            const cls = d === null ? 'text-surface-500 dark:text-surface-400'
                                 : d < 0 ? 'text-red-600 dark:text-red-400 font-semibold'
                                 : d <= 15 ? 'text-red-500 dark:text-red-400 font-semibold'
                                 : d <= 30 ? 'text-amber-600 dark:text-amber-400'
-                                : 'text-surface-400 dark:text-surface-500';
+                                : 'text-surface-500 dark:text-surface-400';
                             const badge = d === null ? '' : d < 0 ? '만료됨' : d === 0 ? 'D-day' : `D-${d}`;
                             return (
                                 <span className={cls}>· 만료 {vehicle.insurance.expiryDate}{badge && ` (${badge})`}</span>
@@ -208,7 +208,7 @@ export default function VehicleManager() {
             )}
             {/* 정비 중 / 폐차 사유 표시 */}
             {(vehicle.fuelType === 'electric' || isVehicleBlocked(vehicle.maintenance) || isRetired) && (
-                <div className="mt-2 flex items-center gap-3 text-xs text-surface-400">
+                <div className="mt-2 flex items-center gap-3 text-xs text-surface-500 dark:text-surface-400">
                     {vehicle.fuelType === 'electric' && vehicle.currentBattery != null && (
                         <span className="flex items-center gap-1">🔋 {vehicle.currentBattery}%</span>
                     )}
@@ -325,8 +325,8 @@ export default function VehicleManager() {
                     <svg className="w-16 h-16 mx-auto text-surface-200 dark:text-surface-700 mb-4" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 18.75a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 0 1-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 0 0-3.213-9.193 2.056 2.056 0 0 0-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 0 0-10.026 0 1.106 1.106 0 0 0-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12" />
                     </svg>
-                    <p className="text-surface-400 dark:text-surface-500 text-lg font-medium">등록된 차량이 없습니다</p>
-                    <p className="text-sm text-surface-300 dark:text-surface-600 mt-1">차량을 등록하고 운행 관리를 시작하세요</p>
+                    <p className="text-surface-500 dark:text-surface-400 text-lg font-medium">등록된 차량이 없습니다</p>
+                    <p className="text-sm text-surface-500 dark:text-surface-400 mt-1">차량을 등록하고 운행 관리를 시작하세요</p>
                 </div>
             ) : (
                 <>
@@ -338,9 +338,9 @@ export default function VehicleManager() {
                     {/* 폐차 차량 */}
                     {retiredVehicles.length > 0 && (
                         <div className="mt-8">
-                            <h2 className="text-sm font-medium text-surface-400 dark:text-surface-500 mb-3 flex items-center gap-2">
+                            <h2 className="text-sm font-medium text-surface-500 dark:text-surface-400 mb-3 flex items-center gap-2">
                                 <span>🚫 폐차된 차량</span>
-                                <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-surface-200 dark:bg-surface-700 text-surface-500">{retiredVehicles.length}</span>
+                                <span className="px-1.5 py-0.5 rounded-full text-[10px] bg-surface-200 dark:bg-surface-700 text-surface-600 dark:text-surface-300">{retiredVehicles.length}</span>
                             </h2>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                 {retiredVehicles.map(vehicle => renderVehicleCard(vehicle, true))}

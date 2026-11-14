@@ -116,7 +116,7 @@ export default function EmployeeListItem({
                             {isSelf && <span className="badge badge-neutral text-xs">나</span>}
                         </div>
                         {member.email && (
-                            <p className="text-sm text-surface-400 dark:text-surface-500 truncate">{member.email}</p>
+                            <p className="text-sm text-surface-500 dark:text-surface-400 truncate">{member.email}</p>
                         )}
                     </div>
 
@@ -139,7 +139,7 @@ export default function EmployeeListItem({
                                 </select>
                                 <button
                                     onClick={() => onEdit(member.original)}
-                                    className="btn-icon btn-sm text-surface-400 dark:text-surface-500 hover:text-primary-600 dark:hover:text-primary-400 min-h-[48px] min-w-[48px]"
+                                    className="btn-icon btn-sm text-surface-500 dark:text-surface-400 hover:text-primary-600 dark:hover:text-primary-400 min-h-[48px] min-w-[48px]"
                                 >
                                     <svg
                                         className="w-4 h-4"
@@ -159,7 +159,7 @@ export default function EmployeeListItem({
                                     onClick={() => onDelete(member.original)}
                                     disabled={isActionDisabled}
                                     title={!selfUid ? '사용자 정보를 불러오는 중입니다' : isSelf ? '자기 자신은 비활성화할 수 없습니다' : ''}
-                                    className={`btn-icon btn-sm min-h-[48px] min-w-[48px] ${isActionDisabled ? 'text-surface-200 dark:text-surface-700 cursor-not-allowed' : 'text-surface-400 dark:text-surface-500 hover:text-red-500 dark:hover:text-red-400'}`}
+                                    className={`btn-icon btn-sm min-h-[48px] min-w-[48px] ${isActionDisabled ? 'text-surface-200 dark:text-surface-700 cursor-not-allowed' : 'text-surface-500 dark:text-surface-400 hover:text-red-500 dark:hover:text-red-400'}`}
                                 >
                                     <svg
                                         className="w-4 h-4"
@@ -182,7 +182,7 @@ export default function EmployeeListItem({
                         {isPending && (
                             <button
                                 onClick={() => onDeletePreRegistered(member.id)}
-                                className="btn-icon btn-sm text-surface-400 dark:text-surface-500 hover:text-red-500 dark:hover:text-red-400 min-h-[48px] min-w-[48px]"
+                                className="btn-icon btn-sm text-surface-500 dark:text-surface-400 hover:text-red-500 dark:hover:text-red-400 min-h-[48px] min-w-[48px]"
                                 title="사전 등록 취소"
                             >
                                 <svg
@@ -213,7 +213,7 @@ export default function EmployeeListItem({
                                 <button
                                     onClick={() => onDeletePermanently(member.original)}
                                     title="계정을 영구 삭제합니다 (운행 기록은 보존)"
-                                    className="btn-icon btn-sm text-surface-400 dark:text-surface-500 hover:text-red-500 dark:hover:text-red-400 min-h-[48px] min-w-[48px]"
+                                    className="btn-icon btn-sm text-surface-500 dark:text-surface-400 hover:text-red-500 dark:hover:text-red-400 min-h-[48px] min-w-[48px]"
                                 >
                                     <svg
                                         className="w-4 h-4"

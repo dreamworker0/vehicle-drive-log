@@ -90,7 +90,7 @@ export default function RecurringReservationPanel({
             {/* 기간 설정 */}
             <div className="grid grid-cols-2 gap-2">
                 <div>
-                    <label className="label text-xs text-surface-400 dark:text-surface-500">시작일</label>
+                    <label className="label text-xs text-surface-500 dark:text-surface-400">시작일</label>
                     <input
                         type="date"
                         value={form.recurringStartDate || selectedDate}
@@ -154,7 +154,7 @@ export default function RecurringReservationPanel({
                                     title={conflict ? `충돌: ${conflict.vehicleName || '차량'} ${conflict.startTime}~${conflict.endTime}` : isExcluded ? '클릭하여 복원' : '클릭하여 제외'}
                                     className={`px-2 py-0.5 rounded-full text-[11px] font-medium border transition-all ${
                                         isExcluded
-                                            ? 'bg-surface-100 dark:bg-surface-800 text-surface-400 border-surface-200 dark:border-surface-700 line-through opacity-60'
+                                            ? 'bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-400 border-surface-200 dark:border-surface-700 line-through'
                                             : conflict
                                                 ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border-amber-300 dark:border-amber-700'
                                                 : 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-700'
@@ -170,7 +170,7 @@ export default function RecurringReservationPanel({
             )}
 
             {(form.recurringDays || []).length === 0 && (
-                <p className="text-xs text-surface-400 dark:text-surface-500 text-center py-2">반복할 요일을 선택하세요</p>
+                <p className="text-xs text-surface-500 dark:text-surface-400 text-center py-2">반복할 요일을 선택하세요</p>
             )}
         </div>
     );

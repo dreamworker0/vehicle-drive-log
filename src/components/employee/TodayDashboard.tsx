@@ -91,7 +91,7 @@ export default function TodayDashboard() {
             <div className="flex items-center justify-between mb-5">
                 <div className="flex items-baseline gap-2">
                     <h1 className="text-lg font-bold text-surface-900 dark:text-surface-100">오늘의 운행</h1>
-                    <p className="text-sm text-surface-400 dark:text-surface-500">{todayLabel}</p>
+                    <p className="text-sm text-surface-500 dark:text-surface-400">{todayLabel}</p>
                 </div>
                 {/* 오늘 예약이 없으면 아래 카드가 바로 운행을 크게 보여 주므로 여기서는 숨긴다.
                     불러오기에 실패했을 때는 그 카드 대신 실패 안내가 뜨므로 여기에 남겨 바로 운행 길을 열어 둔다
@@ -218,7 +218,7 @@ export default function TodayDashboard() {
                 운행의 60% 이상이 예약 없이 바로 출발한다(2026-09-23~30 실측). 예약은 보조 링크와 하단 탭에 남긴다. */}
             {!loadFailed && myReservations.length === 0 && (
                 <div className="mb-6">
-                    <p className="text-xs text-surface-400 dark:text-surface-500 mb-2.5">오늘 잡힌 예약이 없어요</p>
+                    <p className="text-xs text-surface-500 dark:text-surface-400 mb-2.5">오늘 잡힌 예약이 없어요</p>
                     <div className={`grid gap-3 ${showQuickDrive ? 'grid-cols-[1.6fr_1fr]' : 'grid-cols-1'}`}>
                         {showQuickDrive && (
                             <button

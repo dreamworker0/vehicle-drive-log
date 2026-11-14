@@ -13,7 +13,7 @@ function EditButton({ onClick }: { onClick: () => void }) {
     return (
         <button
             onClick={onClick}
-            className="p-1.5 rounded-lg text-surface-300 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors min-h-[48px]"
+            className="p-1.5 rounded-lg text-surface-500 dark:text-surface-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:bg-primary-900/20 transition-colors min-h-[48px]"
             title="수정 (운전자 변경 등)"
         >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -28,7 +28,7 @@ function DeleteButton({ onClick, disabled }: { onClick: () => void; disabled: bo
         <button
             onClick={onClick}
             disabled={disabled}
-            className="p-1.5 rounded-lg text-surface-300 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50 min-h-[48px]"
+            className="p-1.5 rounded-lg text-surface-500 dark:text-surface-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors disabled:opacity-50 min-h-[48px]"
             title="삭제"
         >
             {disabled ? (
@@ -102,7 +102,7 @@ export default function DriveLogTableRow({ log, deletingId, onDelete }: DriveLog
                     <div className="flex items-center gap-2">
                         <span className="font-medium text-sm text-surface-900 dark:text-surface-100">{log.driverName || '(이름 없음)'}</span>
                         <CoDriverBadge names={log.coDriverNames} />
-                        <span className="text-xs text-surface-400 dark:text-surface-500">{date}</span>
+                        <span className="text-xs text-surface-500 dark:text-surface-400">{date}</span>
                     </div>
                     <div className="flex items-center gap-1">
                         <span className="font-bold text-primary-600 dark:text-primary-400">{distance.toLocaleString()} km</span>
@@ -114,10 +114,10 @@ export default function DriveLogTableRow({ log, deletingId, onDelete }: DriveLog
                     <span>{log.vehicleName}</span>
                     <span>·</span>
                     {/* 분관을 등록한 기관에서만 값이 있다 — 어디서 출발한 차인지 목록에서 바로 구분된다 */}
-                    {log.startLocation && <span className="text-surface-400 dark:text-surface-500">🚩 {log.startLocation} →</span>}
+                    {log.startLocation && <span className="text-surface-500 dark:text-surface-400">🚩 {log.startLocation} →</span>}
                     <span>{log.destination || '-'}</span>
                     {(log.startTime || log.endTime) && (
-                        <span className="text-surface-400 dark:text-surface-500">
+                        <span className="text-surface-500 dark:text-surface-400">
                             ({formatStartDatePrefix(log)}{log.startTime || '?'} ~ {log.endTime || '?'})
                         </span>
                     )}
@@ -145,7 +145,7 @@ export default function DriveLogTableRow({ log, deletingId, onDelete }: DriveLog
                 </div>
                 <div className="min-w-0">
                     <p className="text-sm text-surface-600 dark:text-surface-400 truncate" title={log.startLocation ? `${log.startLocation} → ${log.destination || '-'}` : (log.destination || '')}>
-                        {log.startLocation && <span className="text-xs text-surface-400 dark:text-surface-500">🚩 {log.startLocation} → </span>}
+                        {log.startLocation && <span className="text-xs text-surface-500 dark:text-surface-400">🚩 {log.startLocation} → </span>}
                         {log.destination || '-'}
                     </p>
                 </div>
@@ -160,7 +160,7 @@ export default function DriveLogTableRow({ log, deletingId, onDelete }: DriveLog
                     </p>
                     {/* 이름은 칸에 적어 둔다 — 길면 잘리지만 전체는 툴팁으로 볼 수 있다 */}
                     {(log.passengerNames?.length ?? 0) > 0 && (
-                        <p className="text-[10px] text-surface-400 dark:text-surface-500 truncate">
+                        <p className="text-[10px] text-surface-500 dark:text-surface-400 truncate">
                             {log.passengerNames!.join(', ')}
                         </p>
                     )}

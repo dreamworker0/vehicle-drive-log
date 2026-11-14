@@ -48,7 +48,7 @@ export default function RouteInfoPanel({
     return (
         <div className="mt-2">
             {routeLoading ? (
-                <div className="flex items-center gap-2 text-xs text-surface-400 dark:text-surface-500 py-1">
+                <div className="flex items-center gap-2 text-xs text-surface-500 dark:text-surface-400 py-1">
                     <div className="w-3 h-3 spinner" />
                     경로 탐색 중...
                 </div>
@@ -59,7 +59,7 @@ export default function RouteInfoPanel({
                     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs">
                         {departureSiteName && (
                             /* 분관 이름은 길 수 있다 — 쪼개지 않고 말줄임으로 넘긴다 */
-                            <span className="text-[11px] font-semibold text-surface-500 dark:text-surface-400 bg-surface-100 dark:bg-surface-700 px-1.5 py-0.5 rounded min-w-0 max-w-full truncate">
+                            <span className="text-[11px] font-semibold text-surface-600 dark:text-surface-300 bg-surface-100 dark:bg-surface-700 px-1.5 py-0.5 rounded min-w-0 max-w-full truncate">
                                 🚩 {departureSiteName} 출발
                             </span>
                         )}

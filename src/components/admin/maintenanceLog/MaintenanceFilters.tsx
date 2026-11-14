@@ -65,7 +65,7 @@ export default memo(function MaintenanceFilters({ filters, setFilters, vehicles,
                     <button
                         type="button"
                         onClick={resetFilters}
-                        className="text-xs text-surface-400 hover:text-red-500 whitespace-nowrap min-h-[48px]"
+                        className="text-xs text-surface-500 dark:text-surface-400 hover:text-red-500 whitespace-nowrap min-h-[48px]"
                     >
                         초기화
                     </button>

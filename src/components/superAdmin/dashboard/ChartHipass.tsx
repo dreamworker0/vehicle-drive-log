@@ -20,13 +20,13 @@ function ChartHipass({ hipassRatio, hipassTopOrgs }: Props) {
                         <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-4">
                             🛣️ 하이패스 연결 비율
                         </h2>
-                        <div className="flex flex-col items-center justify-center py-12 text-surface-400 dark:text-surface-500">데이터가 없습니다.</div>
+                        <div className="flex flex-col items-center justify-center py-12 text-surface-500 dark:text-surface-400">데이터가 없습니다.</div>
                     </div>
                     <div className="glass-card p-5">
                         <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-4">
                             🏆 하이패스 사용 기관 TOP 5
                         </h2>
-                        <div className="flex flex-col items-center justify-center py-12 text-surface-400 dark:text-surface-500">데이터가 없습니다.</div>
+                        <div className="flex flex-col items-center justify-center py-12 text-surface-500 dark:text-surface-400">데이터가 없습니다.</div>
                     </div>
                 </div>
             );
@@ -71,7 +71,7 @@ function ChartHipass({ hipassRatio, hipassTopOrgs }: Props) {
                             {/* 중앙 텍스트 */}
                             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
                                 <span className="text-3xl font-bold text-teal-500 dark:text-teal-400">{pct}%</span>
-                                <span className="text-xs text-surface-400 dark:text-surface-500">연결율</span>
+                                <span className="text-xs text-surface-500 dark:text-surface-400">연결율</span>
                             </div>
                         </div>
                         <div className="space-y-3">
@@ -86,7 +86,7 @@ function ChartHipass({ hipassRatio, hipassTopOrgs }: Props) {
                                 <span className="text-sm font-bold text-surface-800 dark:text-surface-100 ml-auto">{hipassRatio.withoutHipass}대</span>
                             </div>
                             <div className="border-t border-surface-200 dark:border-surface-700 pt-2">
-                                <span className="text-xs text-surface-400 dark:text-surface-500">전체 {total}대</span>
+                                <span className="text-xs text-surface-500 dark:text-surface-400">전체 {total}대</span>
                             </div>
                         </div>
                     </div>
@@ -114,7 +114,7 @@ function ChartHipass({ hipassRatio, hipassTopOrgs }: Props) {
                             </BarChart>
                         </ResponsiveContainer>
                     ) : (
-                        <p className="text-sm text-surface-400 dark:text-surface-500">하이패스 연결 차량이 없습니다</p>
+                        <p className="text-sm text-surface-500 dark:text-surface-400">하이패스 연결 차량이 없습니다</p>
                     )}
                 </div>
             </div>

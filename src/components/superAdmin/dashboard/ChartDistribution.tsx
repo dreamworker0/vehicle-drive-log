@@ -80,7 +80,7 @@ function ChartDistribution({
                             })}
                         </div>
                     ) : (
-                        <p className="text-sm text-surface-400 dark:text-surface-500">차량 데이터 없음</p>
+                        <p className="text-sm text-surface-500 dark:text-surface-400">차량 데이터 없음</p>
                     )}
                 </div>
             </div>
@@ -103,7 +103,7 @@ function ChartDistribution({
                                     <p className="text-2xl font-bold mt-1" style={{ color: item.color }}>
                                         {item.count}<span className="text-sm font-normal ml-0.5">대</span>
                                     </p>
-                                    <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">{pct}%</p>
+                                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">{pct}%</p>
                                     <div className="mt-2 h-1.5 bg-surface-200 dark:bg-surface-700 rounded-full overflow-hidden">
                                         <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: item.color }} />
                                     </div>
@@ -112,7 +112,7 @@ function ChartDistribution({
                         })}
                     </div>
                 ) : (
-                    <p className="text-sm text-surface-400 dark:text-surface-500">차량 데이터 없음</p>
+                    <p className="text-sm text-surface-500 dark:text-surface-400">차량 데이터 없음</p>
                 )}
             </div>
 
@@ -153,7 +153,7 @@ function ChartDistribution({
                                 </div>
                             );
                         }) : (
-                            <p className="text-sm text-surface-400 dark:text-surface-500 py-2 text-center">해당 상태의 차량이 없습니다.</p>
+                            <p className="text-sm text-surface-500 dark:text-surface-400 py-2 text-center">해당 상태의 차량이 없습니다.</p>
                         )}
                     </div>
                 </div>

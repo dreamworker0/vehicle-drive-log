@@ -34,8 +34,8 @@ export default function HipassChargeTab() {
         return (
             <div className="glass-card p-12 text-center animate-fade-in">
                 <div className="text-4xl mb-3">💳</div>
-                <p className="text-surface-400 dark:text-surface-500 font-medium">등록된 하이패스 카드가 없습니다</p>
-                <p className="text-sm text-surface-300 dark:text-surface-600 mt-1">관리자에게 하이패스 카드 등록을 요청하세요</p>
+                <p className="text-surface-500 dark:text-surface-400 font-medium">등록된 하이패스 카드가 없습니다</p>
+                <p className="text-sm text-surface-500 dark:text-surface-400 mt-1">관리자에게 하이패스 카드 등록을 요청하세요</p>
             </div>
         );
     }
@@ -79,13 +79,13 @@ export default function HipassChargeTab() {
                                     <p className="font-semibold text-sm text-surface-900 dark:text-surface-100">
                                         {selectedCard.vehicleName || '(차량 미연결)'}
                                     </p>
-                                    <p className="text-xs text-surface-400 dark:text-surface-500 font-mono">
+                                    <p className="text-xs text-surface-500 dark:text-surface-400 font-mono">
                                         {selectedCard.cardNumber}
                                     </p>
                                 </div>
                             </div>
                             <div className="text-right">
-                                <p className="text-xs text-surface-400 dark:text-surface-500">현재 잔액</p>
+                                <p className="text-xs text-surface-500 dark:text-surface-400">현재 잔액</p>
                                 <p className={`text-lg font-bold ${
                                     selectedCard.balance <= 5000
                                         ? 'text-red-500 dark:text-red-400'
@@ -174,13 +174,13 @@ export default function HipassChargeTab() {
 
                     {/* 충전 기록 리스트 */}
                     <div>
-                        <p className="text-xs text-surface-400 dark:text-surface-500 mb-2">
+                        <p className="text-xs text-surface-500 dark:text-surface-400 mb-2">
                             충전 기록 {records.length}건
                             {totalChargeAmount > 0 && ` · 총 ${totalChargeAmount.toLocaleString()}원`}
                         </p>
                         {records.length === 0 ? (
                             <div className="glass-card p-8 text-center">
-                                <p className="text-surface-400 dark:text-surface-500 text-sm">이 카드의 충전 기록이 없습니다</p>
+                                <p className="text-surface-500 dark:text-surface-400 text-sm">이 카드의 충전 기록이 없습니다</p>
                             </div>
                         ) : (
                             <div className="space-y-2">
@@ -209,10 +209,10 @@ export default function HipassChargeTab() {
                                                     <span className="font-bold text-sm text-surface-900 dark:text-surface-100">
                                                         +{rec.chargeAmount?.toLocaleString()}원
                                                     </span>
-                                                    <span className="text-xs text-surface-400 dark:text-surface-500">{rec.chargerName}</span>
+                                                    <span className="text-xs text-surface-500 dark:text-surface-400">{rec.chargerName}</span>
                                                     <AdminEditedBadge lastEditedByUid={rec.lastEditedByUid} ownerUid={rec.chargerUid} />
                                                 </div>
-                                                <p className="text-xs text-surface-400 dark:text-surface-500 mt-0.5">
+                                                <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
                                                     {rec.date} · 잔액 {rec.balanceBefore?.toLocaleString()} → {rec.balanceAfter?.toLocaleString()}원
                                                 </p>
                                             </div>
@@ -221,7 +221,7 @@ export default function HipassChargeTab() {
                                             {isOwn && (
                                                 <button
                                                     onClick={() => handleDelete(rec)}
-                                                    className="text-[10px] text-surface-300 dark:text-surface-600 hover:text-red-500 dark:hover:text-red-400 transition-colors flex-shrink-0 min-w-[48px] min-h-[48px] flex items-center justify-center"
+                                                    className="text-[10px] text-surface-500 dark:text-surface-400 hover:text-red-500 dark:hover:text-red-400 transition-colors flex-shrink-0 min-w-[48px] min-h-[48px] flex items-center justify-center"
                                                     aria-label="충전 기록 삭제"
                                                 >
                                                     삭제

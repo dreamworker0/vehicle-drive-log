@@ -196,7 +196,7 @@ const DriverSection = memo(function DriverSection({
                                         />
                                     )}
                                     {needDriverSearchHint ? (
-                                        <p className="text-xs text-surface-400 dark:text-surface-500 py-2">이름을 입력해 운전자를 검색하세요.</p>
+                                        <p className="text-xs text-surface-500 dark:text-surface-400 py-2">이름을 입력해 운전자를 검색하세요.</p>
                                     ) : (
                                         <MemberList
                                             list={visibleDrivers}
@@ -209,7 +209,7 @@ const DriverSection = memo(function DriverSection({
                             ) : (
                                 <div className="px-4 py-2 min-h-[48px] flex items-center rounded-lg bg-surface-50 dark:bg-surface-800 border border-surface-200 dark:border-surface-600 text-sm font-medium text-surface-700 dark:text-surface-200">
                                     {currentDriverName}
-                                    <span className="ml-2 text-xs font-normal text-surface-400 dark:text-surface-500">
+                                    <span className="ml-2 text-xs font-normal text-surface-500 dark:text-surface-400">
                                         (수정 권한 없음)
                                     </span>
                                 </div>
@@ -250,7 +250,7 @@ const DriverSection = memo(function DriverSection({
                                 />
                             )}
                             {needCoSearchHint ? (
-                                <p className="text-xs text-surface-400 dark:text-surface-500 py-2">이름을 입력해 조직원을 검색하세요.</p>
+                                <p className="text-xs text-surface-500 dark:text-surface-400 py-2">이름을 입력해 조직원을 검색하세요.</p>
                             ) : (
                                 <MemberList
                                     list={visibleCoDrivers}
@@ -307,7 +307,7 @@ function MemberList({
 }) {
     if (list.length === 0) {
         return (
-            <p className="text-xs text-surface-400 dark:text-surface-500 py-2">
+            <p className="text-xs text-surface-500 dark:text-surface-400 py-2">
                 {query.trim() ? '검색 결과가 없습니다.' : '선택 가능한 사람이 없습니다.'}
             </p>
         );
@@ -332,7 +332,7 @@ function MemberList({
                             {isSelected && <span className="flex-shrink-0">✓</span>}
                             <span className="font-medium truncate">{name}</span>
                         </span>
-                        {sub && <span className="text-xs text-surface-400 dark:text-surface-500 truncate flex-shrink-0 max-w-[45%]">{sub}</span>}
+                        {sub && <span className="text-xs text-surface-500 dark:text-surface-400 truncate flex-shrink-0 max-w-[45%]">{sub}</span>}
                     </button>
                 );
             })}

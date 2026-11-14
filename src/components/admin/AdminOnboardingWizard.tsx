@@ -73,7 +73,7 @@ export default function AdminOnboardingWizard({ inviteCode, onDismiss }: Props) 
                 </h2>
                 <button
                     onClick={handleDismiss}
-                    className="text-xs text-surface-400 hover:text-surface-600 dark:text-surface-400 transition-colors min-h-[48px]"
+                    className="text-xs text-surface-500 hover:text-surface-600 dark:text-surface-400 transition-colors min-h-[48px]"
                 >
                     건너뛰기
                 </button>

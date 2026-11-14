@@ -29,19 +29,19 @@ Settings
 
 ```tsx
 {/* 첫 번째 그룹 — mt 없음 */}
-<h2 className="text-sm font-semibold text-surface-400 dark:text-surface-500 uppercase tracking-wider mb-3 px-1">
+<h2 className="text-sm font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider mb-3 px-1">
     기관 관리
 </h2>
 
 {/* 두 번째 이후 그룹 — mt-8 추가 */}
-<h2 className="text-sm font-semibold text-surface-400 dark:text-surface-500 uppercase tracking-wider mt-8 mb-3 px-1">
+<h2 className="text-sm font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider mt-8 mb-3 px-1">
     내 계정
 </h2>
 ```
 
 **핵심 규칙:**
 - `text-sm font-semibold uppercase tracking-wider`
-- 색상: `text-surface-400 dark:text-surface-500`
+- 색상: `text-surface-500 dark:text-surface-400` (읽는 글자이므로 `surface-400`은 쓰지 않는다 — design-system.md 「글자 대비 규칙」)
 - 간격: 첫 그룹 `mb-3 px-1`, 이후 `mt-8 mb-3 px-1`
 
 ---
@@ -60,7 +60,7 @@ Settings
 **핵심 규칙:**
 - 래퍼: `glass-card p-6 mb-6` (마지막 카드는 `mb-6` 생략 가능)
 - 카드 제목: `text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4`
-- 부가 설명: `<p className="text-xs text-surface-400 mb-4">설명 텍스트</p>`
+- 부가 설명: `<p className="text-xs text-surface-500 dark:text-surface-400 mb-4">설명 텍스트</p>`
 
 ---
 
@@ -129,7 +129,7 @@ Settings
         {/* 텍스트 */}
         <div className="flex-1">
             <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">항목명</p>
-            <p className="text-xs text-surface-400">설명 텍스트</p>
+            <p className="text-xs text-surface-500 dark:text-surface-400">설명 텍스트</p>
         </div>
         {/* 우측 화살표 (네비게이션 항목) */}
         <svg className="w-4 h-4 text-surface-300" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -149,9 +149,9 @@ Settings
 - 아이콘 원형: `w-10 h-10 bg-{color}-100 dark:bg-{color}-900/40 rounded-full flex items-center justify-center flex-shrink-0`
 - 아이콘 SVG: `w-5 h-5 text-{color}-600`
 - 항목 제목: `text-sm font-semibold text-surface-900 dark:text-surface-100`
-- 항목 설명: `text-xs text-surface-400`
+- 항목 설명: `text-xs text-surface-500 dark:text-surface-400`
 - 구분선: `border-t border-surface-100 dark:border-surface-700 my-3` (또는 `my-1 mx-3`)
-- 네비게이션 화살표: `w-4 h-4 text-surface-300`
+- 네비게이션 화살표: `w-4 h-4 text-surface-300` (장식 아이콘이라 대비 기준 면제)
 
 ---
 

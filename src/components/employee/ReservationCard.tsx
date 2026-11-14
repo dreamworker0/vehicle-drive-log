@@ -163,7 +163,7 @@ export default function ReservationCard({
                 <button
                     onClick={() => onCancel(reservation)}
                     disabled={cancellingId === reservation.id}
-                    className="absolute -top-1.5 -right-1.5 z-10 text-surface-400 dark:text-surface-500 hover:text-red-500 dark:hover:text-red-400 transition-colors w-7 h-7 rounded-full bg-white dark:bg-surface-800 shadow-md border border-surface-200 dark:border-surface-700 flex items-center justify-center hover:bg-red-50 dark:hover:bg-red-955/30 before:content-[''] before:absolute before:-inset-3"
+                    className="absolute -top-1.5 -right-1.5 z-10 text-surface-500 dark:text-surface-400 hover:text-red-500 dark:hover:text-red-400 transition-colors w-7 h-7 rounded-full bg-white dark:bg-surface-800 shadow-md border border-surface-200 dark:border-surface-700 flex items-center justify-center hover:bg-red-50 dark:hover:bg-red-955/30 before:content-[''] before:absolute before:-inset-3"
                     title="예약 취소"
                 >
                     {cancellingId === reservation.id ? (
@@ -213,7 +213,7 @@ export default function ReservationCard({
                                     {/* 한 줄로 자른다 — 카드의 주인공은 예약이고, 비고는 단서다.
                                         전문은 [더보기 → 차량 이용 내역]에서 볼 수 있다. */}
                                     <span className="block truncate">📝 {lastNote.text}</span>
-                                    <span className="block text-[10px] text-surface-400 dark:text-surface-500 truncate">
+                                    <span className="block text-[10px] text-surface-500 dark:text-surface-400 truncate">
                                         {lastNote.meta}
                                     </span>
                                 </p>
@@ -269,7 +269,7 @@ export default function ReservationCard({
                             ) : (
                                 <>
                                     {disabled ? (
-                                        <span className="text-[11px] text-surface-400 dark:text-surface-500 whitespace-nowrap">다른 운행 진행 중</span>
+                                        <span className="text-[11px] text-surface-500 dark:text-surface-400 whitespace-nowrap">다른 운행 진행 중</span>
                                     ) : (
                                         <>
                                             <button

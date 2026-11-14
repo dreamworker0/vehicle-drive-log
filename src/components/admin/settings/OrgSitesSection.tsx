@@ -68,7 +68,7 @@ export default function OrgSitesSection({
     return (
         <div className="glass-card p-6 mb-6">
             <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4">출발지 (분관)</h2>
-            <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">
+            <p className="text-xs text-surface-500 dark:text-surface-400 mb-4">
                 분관·별관처럼 차를 세워 두는 곳이 따로 있으면 여기에 등록하세요. 등록하면 [차량 관리]에서
                 차량마다 출발지를 고를 수 있고, 예약·바로 운행의 거리·소요시간·통행료가 그 주소 기준으로 계산됩니다.
             </p>
@@ -141,7 +141,7 @@ export default function OrgSitesSection({
             </div>
 
             {form.sites.length === 0 && (
-                <p className="text-xs text-surface-400 dark:text-surface-500">
+                <p className="text-xs text-surface-500 dark:text-surface-400">
                     등록된 분관이 없습니다. 모든 차량이 기관 주소(본관)에서 출발하는 것으로 계산됩니다.
                 </p>
             )}

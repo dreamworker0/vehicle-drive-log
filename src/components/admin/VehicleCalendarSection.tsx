@@ -287,7 +287,7 @@ export default function VehicleCalendarSection({
                             </button>
                         </div>
                     </div>
-                    <p className="text-[11px] text-surface-400 dark:text-surface-500 mt-1">
+                    <p className="text-[11px] text-surface-500 dark:text-surface-400 mt-1">
                         💡 기관 내 모든 차량에 같은 캘린더 ID를 사용하면 통합 관리가 편리합니다
                     </p>
                 </div>

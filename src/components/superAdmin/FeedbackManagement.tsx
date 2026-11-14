@@ -118,7 +118,7 @@ export default function FeedbackManagement() {
                             onClick={() => setFilter(f.key as 'all' | 'unread' | 'resolved')}
                             className={`px-3 py-1.5 min-h-[48px] rounded-lg text-sm font-medium transition-all ${filter === f.key
                                 ? 'bg-white dark:bg-surface-700 text-primary-700 dark:text-primary-300 shadow-sm'
-                                : 'text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-300'
+                                : 'text-surface-600 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-300'
                                 }`}
                         >
                             {f.label}
@@ -136,7 +136,7 @@ export default function FeedbackManagement() {
                             onClick={() => setViewMode(v.key as 'grouped' | 'timeline')}
                             className={`px-3 py-1.5 min-h-[48px] rounded-lg text-sm font-medium transition-all ${viewMode === v.key
                                 ? 'bg-white dark:bg-surface-700 text-primary-700 dark:text-primary-300 shadow-sm'
-                                : 'text-surface-500 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-300'
+                                : 'text-surface-600 hover:text-surface-700 dark:text-surface-400 dark:hover:text-surface-300'
                                 }`}
                         >
                             {v.label}
@@ -164,7 +164,7 @@ export default function FeedbackManagement() {
                     <svg className="w-16 h-16 mx-auto text-surface-200 dark:text-surface-600 mb-4" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 8.25h9m-9 3H12m-9.75 1.51c0 1.6 1.123 2.994 2.707 3.227 1.087.16 2.185.283 3.293.369V21l4.076-4.076a1.526 1.526 0 0 1 1.037-.443 48.282 48.282 0 0 0 5.68-.494c1.584-.233 2.707-1.626 2.707-3.228V6.741c0-1.602-1.123-2.995-2.707-3.228A48.394 48.394 0 0 0 12 3c-2.392 0-4.744.175-7.043.513C3.373 3.746 2.25 5.14 2.25 6.741v6.018Z" />
                     </svg>
-                    <p className="text-surface-400 dark:text-surface-500 text-lg font-medium">
+                    <p className="text-surface-500 dark:text-surface-400 text-lg font-medium">
                         {feedbacks.length === 0 ? '받은 의견이 없습니다' : '검색 결과가 없습니다'}
                     </p>
                 </div>
@@ -201,7 +201,7 @@ export default function FeedbackManagement() {
                                                         {group.name}
                                                     </span>
                                                     {group.orgName && (
-                                                        <span className="text-xs text-surface-400 dark:text-surface-500">
+                                                        <span className="text-xs text-surface-500 dark:text-surface-400">
                                                             {group.orgName}
                                                         </span>
                                                     )}
@@ -214,12 +214,12 @@ export default function FeedbackManagement() {
                                                 </div>
                                                 {group.email && (
                                                     <span className="flex items-center gap-1 min-w-0">
-                                                        <span className="text-xs text-surface-400 dark:text-surface-500 truncate">
+                                                        <span className="text-xs text-surface-500 dark:text-surface-400 truncate">
                                                             {group.email}
                                                         </span>
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); handleCopyEmail(e, group.email); }}
-                                                            className="flex-shrink-0 p-2 min-h-[48px] min-w-[48px] flex items-center justify-center rounded hover:bg-surface-200 dark:hover:bg-surface-600 text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
+                                                            className="flex-shrink-0 p-2 min-h-[48px] min-w-[48px] flex items-center justify-center rounded hover:bg-surface-200 dark:hover:bg-surface-600 text-surface-500 dark:text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
                                                             title="이메일 복사"
                                                         >
                                                             {copiedEmail === group.email ? (
@@ -239,7 +239,7 @@ export default function FeedbackManagement() {
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2 flex-shrink-0">
-                                            <span className="text-xs text-surface-400 dark:text-surface-500 hidden sm:inline">
+                                            <span className="text-xs text-surface-500 dark:text-surface-400 hidden sm:inline">
                                                 최근 {latestTime}
                                             </span>
                                             <svg
@@ -348,12 +348,12 @@ export default function FeedbackManagement() {
                                 </p>
                             </div>
                         </div>
-                        <p className="text-xs text-surface-400 dark:text-surface-500 mb-5">삭제된 의견은 복구할 수 없습니다.</p>
+                        <p className="text-xs text-surface-500 dark:text-surface-400 mb-5">삭제된 의견은 복구할 수 없습니다.</p>
                         <div className="flex gap-2 justify-end">
                             <button
                                 onClick={() => setDeleteTarget(null)}
                                 disabled={deleting}
-                                className="px-4 py-2 min-h-[48px] rounded-xl text-sm font-medium text-surface-600 dark:text-surface-400 bg-surface-100 dark:bg-surface-700 hover:bg-surface-200 dark:hover:bg-surface-600 transition-colors"
+                                className="px-4 py-2 min-h-[48px] rounded-xl text-sm font-medium text-surface-600 dark:text-surface-300 bg-surface-100 dark:bg-surface-700 hover:bg-surface-200 dark:hover:bg-surface-600 transition-colors"
                             >
                                 취소
                             </button>

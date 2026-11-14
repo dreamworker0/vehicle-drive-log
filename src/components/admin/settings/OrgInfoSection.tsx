@@ -37,7 +37,7 @@ export default function OrgInfoSection({
                             placeholder="AI가 주소를 읽지 못한 경우 직접 입력해주세요"
                         />
                     )}
-                    <p className="text-xs text-surface-400 mt-1">
+                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">
                         💡 주소를 입력하면 예약 시 목적지까지의 소요 시간, 거리, 톨게이트비가 자동으로 계산됩니다.
                     </p>
                 </div>

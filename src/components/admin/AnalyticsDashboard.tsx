@@ -51,11 +51,11 @@ function StatMini({ icon, value, label, sub, color, onClick }: StatMiniProps) {
                 <span className="text-2xl">{icon}</span>
                 <div>
                     <p className="text-xl font-bold text-surface-900 dark:text-surface-100">{value}</p>
-                    <p className="text-xs text-surface-400 dark:text-surface-500">{label}</p>
-                    {sub && <p className="text-[10px] text-surface-500 dark:text-surface-500 mt-0.5">{sub}</p>}
+                    <p className="text-xs text-surface-500 dark:text-surface-400">{label}</p>
+                    {sub && <p className="text-[10px] text-surface-500 dark:text-surface-400 mt-0.5">{sub}</p>}
                 </div>
             </div>
-            {onClick && <span className="absolute bottom-1 right-2 text-[9px] text-surface-400 dark:text-surface-500 opacity-0 group-hover:opacity-100 transition-opacity">클릭하여 보기 →</span>}
+            {onClick && <span className="absolute bottom-1 right-2 text-[9px] text-surface-500 dark:text-surface-400 opacity-0 group-hover:opacity-100 transition-opacity">클릭하여 보기 →</span>}
         </div>
     );
 }
@@ -81,7 +81,7 @@ function MonthCompareStrip({ data }: { data: MonthCompare }) {
             </p>
             {data.metrics.map(m => (
                 <div key={m.key} className="flex items-baseline gap-1.5" title={`${data.prevLabel} ${m.prev.toLocaleString()}${m.unit}`}>
-                    <span className="text-xs text-surface-400 dark:text-surface-500">{m.label}</span>
+                    <span className="text-xs text-surface-500 dark:text-surface-400">{m.label}</span>
                     <span className="text-sm font-bold text-surface-900 dark:text-surface-100">{metricValue(m)}</span>
                     <span className="text-xs font-medium text-surface-600 dark:text-surface-300">{delta(m)}</span>
                 </div>
@@ -109,7 +109,7 @@ export default function AnalyticsDashboard() {
             <div className="flex items-center justify-center py-20">
                 <div className="text-center animate-fade-in">
                     <div className="w-8 h-8 spinner mx-auto mb-3" />
-                    <p className="text-surface-400 dark:text-surface-500 text-sm">분석 데이터를 불러오는 중...</p>
+                    <p className="text-surface-500 dark:text-surface-400 text-sm">분석 데이터를 불러오는 중...</p>
                 </div>
             </div>
         );
@@ -123,7 +123,7 @@ export default function AnalyticsDashboard() {
                     <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100">운행 분석</h1>
                     {/* 이 화면의 숫자는 야간 집계(매일 새벽)다 — 언제 기준인지 밝히지 않으면 오늘 운행이 빠진 것을
                         '운행이 없다'로 읽는다. 지난달에 소급 입력·수정한 기록도 다음 날 새벽 집계에 반영된다. */}
-                    <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
+                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">
                         {aggregatedAt
                             ? `${aggregatedAt.getMonth() + 1}/${aggregatedAt.getDate()} ${String(aggregatedAt.getHours()).padStart(2, '0')}:${String(aggregatedAt.getMinutes()).padStart(2, '0')} 집계 기준 · 오늘 운행은 내일 반영돼요`
                             : '아직 집계된 자료가 없어요 · 매일 새벽에 집계돼요'}
@@ -174,7 +174,7 @@ export default function AnalyticsDashboard() {
                         onClick={() => setActiveTab(tab.key)}
                         className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${activeTab === tab.key
                             ? 'bg-white dark:bg-surface-700 text-surface-900 dark:text-surface-100 shadow-sm'
-                            : 'text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-300'
+                            : 'text-surface-600 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-300'
                             }`}
                     >
                         {tab.label}
@@ -183,7 +183,7 @@ export default function AnalyticsDashboard() {
             </div>
 
             {/* 콘텐츠 */}
-            <Suspense fallback={<div className="p-10 text-center text-surface-400 dark:text-surface-500 spinner mx-auto">분석 차트를 불러오는 중...</div>}>
+            <Suspense fallback={<div className="p-10 text-center text-surface-500 dark:text-surface-400 spinner mx-auto">분석 차트를 불러오는 중...</div>}>
                 {activeTab === 'trend' ? (
                     <TrendCharts
                         monthlyTrend={monthlyTrend}

@@ -101,13 +101,13 @@ export default function SuperAdminManager() {
             <div className="glass-card divide-y divide-surface-100 dark:divide-surface-700">
                 <div className="px-4 py-3 flex items-center justify-between">
                     <span className="text-sm font-semibold text-surface-700 dark:text-surface-300">슈퍼관리자 목록</span>
-                    <span className="text-xs text-surface-400 dark:text-surface-500">{admins.length}명</span>
+                    <span className="text-xs text-surface-500 dark:text-surface-400">{admins.length}명</span>
                 </div>
 
                 {loading ? (
-                    <div className="p-8 text-center text-surface-400 dark:text-surface-500 text-sm">불러오는 중...</div>
+                    <div className="p-8 text-center text-surface-500 dark:text-surface-400 text-sm">불러오는 중...</div>
                 ) : admins.length === 0 ? (
-                    <div className="p-8 text-center text-surface-400 dark:text-surface-500 text-sm">슈퍼관리자가 없습니다.</div>
+                    <div className="p-8 text-center text-surface-500 dark:text-surface-400 text-sm">슈퍼관리자가 없습니다.</div>
                 ) : (
                     admins.map(admin => (
                         <div key={admin.id} className="px-4 py-4 flex items-center gap-3">

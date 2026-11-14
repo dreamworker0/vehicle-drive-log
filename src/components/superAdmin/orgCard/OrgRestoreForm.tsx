@@ -38,12 +38,12 @@ export default memo(function OrgRestoreForm({ orgId, onRestoreUser }: Props) {
                 </h4>
                 <button
                     onClick={() => { setShowRestore(false); setForm({ email: '', name: '' }); }}
-                    className="text-xs text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
+                    className="text-xs text-surface-500 dark:text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 transition-colors"
                 >
                     닫기
                 </button>
             </div>
-            <p className="text-xs text-surface-400 dark:text-surface-500">
+            <p className="text-xs text-surface-500 dark:text-surface-400">
                 삭제(비활성화)된 직원의 이메일을 입력하면 계정을 복원합니다.
             </p>
             <div className="flex gap-2">

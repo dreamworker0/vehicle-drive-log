@@ -105,7 +105,7 @@ export default function OcrTestPage() {
                 <p className="text-surface-500 dark:text-surface-400 text-sm mt-1">
                     계기판 사진을 업로드하고 Gemini AI가 누적 km를 정확히 인식하는지 테스트합니다.
                 </p>
-                <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
+                <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">
                     모델: <code className="px-1.5 py-0.5 bg-surface-100 dark:bg-surface-800 rounded text-[11px]">gemini-2.5-flash</code>
                 </p>
             </div>
@@ -140,7 +140,7 @@ export default function OcrTestPage() {
                         <p className="text-sm text-surface-500 dark:text-surface-400">
                             클릭하거나 이미지를 드래그하세요
                         </p>
-                        <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
+                        <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">
                             JPG, PNG, HEIC 지원
                         </p>
                     </div>
@@ -203,7 +203,7 @@ export default function OcrTestPage() {
                         </h2>
                         <button
                             onClick={() => setHistory([])}
-                            className="text-xs text-surface-400 dark:text-surface-500 hover:text-red-500 dark:hover:text-red-400 transition-colors"
+                            className="text-xs text-surface-500 dark:text-surface-400 hover:text-red-500 dark:hover:text-red-400 transition-colors"
                         >
                             전체 삭제
                         </button>
@@ -242,7 +242,7 @@ export default function OcrTestPage() {
                                                 <span className="text-xs text-emerald-500 dark:text-emerald-400">⚡ 전기차</span>
                                             )}
                                         </div>
-                                        <span className="text-[11px] text-surface-400 dark:text-surface-500 whitespace-nowrap">
+                                        <span className="text-[11px] text-surface-500 dark:text-surface-400 whitespace-nowrap">
                                             {item.timestamp} · {item.elapsed}s
                                         </span>
                                     </div>
@@ -283,7 +283,7 @@ export default function OcrTestPage() {
                             {/* AI Raw 응답 (접기) */}
                             {item.success && item.raw && (
                                 <details className="border-t border-surface-100 dark:border-surface-700">
-                                    <summary className="px-4 py-2 text-xs text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 cursor-pointer select-none transition-colors">
+                                    <summary className="px-4 py-2 text-xs text-surface-500 dark:text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 cursor-pointer select-none transition-colors">
                                         AI 원본 응답 보기
                                     </summary>
                                     <div className="px-4 pb-3">

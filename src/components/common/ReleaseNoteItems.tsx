@@ -31,7 +31,7 @@ export default function ReleaseNoteItems({ items }: { items: readonly ReleaseIte
                 <div key={group.area ?? `_${groupIdx}`}>
                     {group.area && (
                         <h4 className="text-sm font-semibold text-surface-800 dark:text-surface-200 mb-2 pb-1 border-b border-surface-100 dark:border-surface-700">
-                            {group.area} <span className="font-normal text-surface-400 dark:text-surface-500">· {group.items.length}</span>
+                            {group.area} <span className="font-normal text-surface-500 dark:text-surface-400">· {group.items.length}</span>
                         </h4>
                     )}
                     <ul className="space-y-2 pl-1">

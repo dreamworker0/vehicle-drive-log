@@ -51,7 +51,7 @@ function UtilTooltip({ active, payload, label }: { active?: boolean; payload?: C
         <div className="bg-white dark:bg-surface-800 border border-surface-200 dark:border-surface-600 rounded-lg p-3 shadow-lg text-sm">
             <p className="font-semibold text-surface-900 dark:text-surface-100 mb-1">{label}</p>
             <p className="text-primary-600">가동률: <span className="font-mono font-bold">{payload[0]?.value}%</span></p>
-            <p className="text-surface-400 text-xs mt-1">운행일 {String(payload[0]?.payload?.usedDays ?? '')}일 / 근무일 {String(payload[0]?.payload?.totalWorkdays ?? '')}일 (공휴일 제외 · 이번 달은 오늘까지)</p>
+            <p className="text-surface-500 dark:text-surface-400 text-xs mt-1">운행일 {String(payload[0]?.payload?.usedDays ?? '')}일 / 근무일 {String(payload[0]?.payload?.totalWorkdays ?? '')}일 (공휴일 제외 · 이번 달은 오늘까지)</p>
         </div>
     );
 }
@@ -102,7 +102,7 @@ export default function TrendCharts({
                         ))}
                     </div>
                 ) : (
-                    <p className="text-surface-400 text-center py-8">데이터가 없습니다</p>
+                    <p className="text-surface-500 dark:text-surface-400 text-center py-8">데이터가 없습니다</p>
                 )}
             </div>
 
@@ -126,7 +126,7 @@ export default function TrendCharts({
                         </BarChart>
                     </ResponsiveContainer>
                 ) : (
-                    <p className="text-surface-400 text-center py-8">데이터가 없습니다</p>
+                    <p className="text-surface-500 dark:text-surface-400 text-center py-8">데이터가 없습니다</p>
                 )}
             </div>
 
@@ -150,7 +150,7 @@ export default function TrendCharts({
                         </BarChart>
                     </ResponsiveContainer>
                 ) : (
-                    <p className="text-surface-400 text-center py-8">차량 데이터가 없습니다</p>
+                    <p className="text-surface-500 dark:text-surface-400 text-center py-8">차량 데이터가 없습니다</p>
                 )}
             </div>
 

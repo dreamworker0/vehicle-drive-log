@@ -20,10 +20,10 @@ function ChartFirstEmployee({ firstEmployeeStats, firstEmployeeDist, firstEmploy
                     <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
                         ⏱ 기관 승인 → 첫 직원 등록 소요시간
                     </h2>
-                    <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">
+                    <p className="text-xs text-surface-500 dark:text-surface-400 mb-4">
                         승인일부터 첫 번째 직원이 가입하기까지 걸린 일수
                     </p>
-                    <div className="flex flex-col items-center justify-center py-12 text-surface-400 dark:text-surface-500">최근 발생한 데이터가 없습니다.</div>
+                    <div className="flex flex-col items-center justify-center py-12 text-surface-500 dark:text-surface-400">최근 발생한 데이터가 없습니다.</div>
                 </div>
             );
         }
@@ -32,7 +32,7 @@ function ChartFirstEmployee({ firstEmployeeStats, firstEmployeeDist, firstEmploy
                 <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
                     ⏱ 기관 승인 → 첫 직원 등록 소요시간
                 </h2>
-                <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">
+                <p className="text-xs text-surface-500 dark:text-surface-400 mb-4">
                     승인일부터 첫 번째 직원이 가입하기까지 걸린 일수 (총 {firstEmployeeStats.total}개 기관 기준)
                 </p>
 

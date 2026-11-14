@@ -61,10 +61,10 @@ function FeatureRow({
         <div className="flex items-start justify-between gap-3 py-3">
             <div className="min-w-0">
                 <p className="text-sm font-medium text-surface-800 dark:text-surface-200">{label}</p>
-                <p className="text-xs text-surface-400 dark:text-surface-500 mt-0.5">{desc}</p>
+                <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">{desc}</p>
             </div>
             <label className="flex items-center gap-2 cursor-pointer select-none flex-shrink-0">
-                <span className={`text-xs font-medium ${!checked ? 'text-surface-400 dark:text-surface-500' : 'text-primary-600 dark:text-primary-400'}`}>
+                <span className={`text-xs font-medium ${!checked ? 'text-surface-500 dark:text-surface-400' : 'text-primary-600 dark:text-primary-400'}`}>
                     {checked ? '사용' : '사용 안함'}
                 </span>
                 <Toggle label={label} checked={checked} onChange={onChange} />
@@ -81,10 +81,10 @@ function MethodRow({
         <div className="flex items-start justify-between gap-3 py-2">
             <div className="min-w-0">
                 <p className="text-sm text-surface-700 dark:text-surface-300">{label}</p>
-                {desc && <p className="text-xs text-surface-400 dark:text-surface-500 mt-0.5">{desc}</p>}
+                {desc && <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">{desc}</p>}
             </div>
             <label className="flex items-center gap-2 cursor-pointer select-none flex-shrink-0">
-                <span className={`text-xs font-medium ${!checked ? 'text-surface-400 dark:text-surface-500' : 'text-primary-600 dark:text-primary-400'}`}>
+                <span className={`text-xs font-medium ${!checked ? 'text-surface-500 dark:text-surface-400' : 'text-primary-600 dark:text-primary-400'}`}>
                     {checked ? '사용' : '사용 안함'}
                 </span>
                 <Toggle label={label} checked={checked} onChange={onChange} disabled={disabled} />
@@ -134,7 +134,7 @@ export default function FeatureToggleSection({ values, onChange }: FeatureToggle
     return (
         <div className="glass-card p-6 mb-6">
             <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-1">기능 사용 설정</h2>
-            <p className="text-xs text-surface-400 mb-5">
+            <p className="text-xs text-surface-500 dark:text-surface-400 mb-5">
                 💡 기관에서 쓰지 않는 기능을 끄면 관련 입력·탭·메뉴가 직원 화면에서 사라져 더 깔끔해집니다. (기본값은 모두 켜짐)
             </p>
 

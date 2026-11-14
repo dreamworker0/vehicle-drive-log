@@ -154,7 +154,7 @@ export default function ServiceDashboard() {
 
                     {timeSeries.dailyActiveOrgStats && (
                         <Suspense fallback={
-                            <div className="flex items-center justify-center py-20 text-surface-400 dark:text-surface-500">
+                            <div className="flex items-center justify-center py-20 text-surface-500 dark:text-surface-400">
                                 <div className="w-8 h-8 spinner mx-auto mb-3" />
                             </div>
                         }>
@@ -172,7 +172,7 @@ export default function ServiceDashboard() {
 
                     {summary.firstEmployeeStats && (
                         <Suspense fallback={
-                            <div className="flex items-center justify-center py-10 text-surface-400 dark:text-surface-500">
+                            <div className="flex items-center justify-center py-10 text-surface-500 dark:text-surface-400">
                                 <div className="w-6 h-6 spinner" />
                             </div>
                         }>
@@ -185,7 +185,7 @@ export default function ServiceDashboard() {
                     )}
 
                     <Suspense fallback={
-                        <div className="flex items-center justify-center py-20 text-surface-400 dark:text-surface-500">
+                        <div className="flex items-center justify-center py-20 text-surface-500 dark:text-surface-400">
                             <div className="w-8 h-8 spinner mx-auto mb-3" />
                         </div>
                     }>
@@ -205,7 +205,7 @@ export default function ServiceDashboard() {
                     />
 
                     <Suspense fallback={
-                        <div className="flex items-center justify-center py-10 text-surface-400 dark:text-surface-500">
+                        <div className="flex items-center justify-center py-10 text-surface-500 dark:text-surface-400">
                             <div className="w-6 h-6 spinner" />
                         </div>
                     }>
@@ -220,7 +220,7 @@ export default function ServiceDashboard() {
             {activeTab === 'analysis' && (
                 <div className="space-y-6 animate-fade-in">
                     <Suspense fallback={
-                        <div className="flex items-center justify-center py-20 text-surface-400 dark:text-surface-500">
+                        <div className="flex items-center justify-center py-20 text-surface-500 dark:text-surface-400">
                             <div className="w-8 h-8 spinner mx-auto mb-3" />
                             <p className="text-sm">차트 데이터를 불러오는 중...</p>
                         </div>
@@ -313,7 +313,7 @@ export default function ServiceDashboard() {
                                     </div>
                                 </div>
                                 {s.themeStats.none > 0 && (
-                                    <p className="text-xs text-surface-400 dark:text-surface-500 mt-4">* 기본 테마 유지 사용자({s.themeStats.none}명)는 자동 라이트 모드로 간주되어 합산되었습니다.</p>
+                                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-4">* 기본 테마 유지 사용자({s.themeStats.none}명)는 자동 라이트 모드로 간주되어 합산되었습니다.</p>
                                 )}
                             </div>
                         );
@@ -362,7 +362,7 @@ export default function ServiceDashboard() {
 
                     {external.notifSummary && (
                         <Suspense fallback={
-                            <div className="flex items-center justify-center py-10 text-surface-400 dark:text-surface-500">
+                            <div className="flex items-center justify-center py-10 text-surface-500 dark:text-surface-400">
                                 <div className="w-6 h-6 spinner" />
                             </div>
                         }>

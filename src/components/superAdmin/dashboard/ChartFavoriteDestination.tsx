@@ -21,10 +21,10 @@ function ChartFavoriteDestination({ favoriteStats, favoriteRatio, favoriteUserRa
                     <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
                         ⭐ 자주 가는 목적지(즐겨찾기) 활용 현황
                     </h2>
-                    <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">
+                    <p className="text-xs text-surface-500 dark:text-surface-400 mb-4">
                         목적지를 즐겨찾기에서 선택하여 운행한 비율 (최근 30일 로그 기준)
                     </p>
-                    <div className="flex flex-col items-center justify-center py-12 text-surface-400 dark:text-surface-500">최근 발생한 데이터가 없습니다.</div>
+                    <div className="flex flex-col items-center justify-center py-12 text-surface-500 dark:text-surface-400">최근 발생한 데이터가 없습니다.</div>
                 </div>
             );
         }
@@ -36,7 +36,7 @@ function ChartFavoriteDestination({ favoriteStats, favoriteRatio, favoriteUserRa
                         <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
                             ⭐ 자주 가는 목적지(즐겨찾기) 활용 현황
                         </h2>
-                        <p className="text-xs text-surface-400 dark:text-surface-500">
+                        <p className="text-xs text-surface-500 dark:text-surface-400">
                             목적지를 즐겨찾기에서 선택하여 운행한 비율 (최근 30일 로그 기준)
                         </p>
                     </div>

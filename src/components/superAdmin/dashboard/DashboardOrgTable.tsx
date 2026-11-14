@@ -38,7 +38,7 @@ function DashboardOrgTable({
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200">🏆 활성도</h2>
                 </div>
-                <div className="flex flex-col items-center justify-center py-12 text-surface-400 dark:text-surface-500">최근 발생한 데이터가 없습니다.</div>
+                <div className="flex flex-col items-center justify-center py-12 text-surface-500 dark:text-surface-400">최근 발생한 데이터가 없습니다.</div>
             </div>
         );
     }
@@ -104,7 +104,7 @@ function DashboardOrgTable({
                                 return (
                                     <tr key={org.id} className="border-b border-surface-50 hover:bg-surface-50 dark:hover:bg-surface-800 transition-colors">
                                         <td className="py-2.5 px-1.5 sm:px-3">
-                                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-surface-100 text-surface-500 dark:bg-surface-700 dark:text-surface-400">
+                                            <span className="inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold bg-surface-100 text-surface-600 dark:bg-surface-700 dark:text-surface-300">
                                                 {rank + 1}
                                             </span>
                                         </td>
@@ -134,7 +134,7 @@ function DashboardOrgTable({
             {topOrgs.filter(o => o.lat && o.lng).length > 0 && (
                 <Suspense fallback={
                     <div className="glass-card p-5">
-                        <div className="flex items-center justify-center py-10 gap-2 text-sm text-surface-400 dark:text-surface-500">
+                        <div className="flex items-center justify-center py-10 gap-2 text-sm text-surface-500 dark:text-surface-400">
                             <div className="w-4 h-4 spinner" /> 지도 로딩 중...
                         </div>
                     </div>
@@ -177,7 +177,7 @@ function DashboardOrgTable({
                             <div key={org.id} className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 bg-surface-50 dark:bg-surface-800 rounded-xl">
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium text-surface-800 dark:text-surface-200 truncate">{org.name}</p>
-                                    <p className="text-xs text-surface-400 dark:text-surface-500 truncate">{org.address}</p>
+                                    <p className="text-xs text-surface-500 dark:text-surface-400 truncate">{org.address}</p>
                                 </div>
                                 <form
                                     className="flex items-center gap-2 shrink-0"
@@ -216,7 +216,7 @@ function DashboardOrgTable({
                             </div>
                         ))}
                     </div>
-                    <p className="text-xs text-surface-400 dark:text-surface-500 mt-3">
+                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-3">
                         💡 Google Maps에서 주소를 검색한 후 좌표를 복사하여 입력하세요
                     </p>
                 </div>
@@ -230,12 +230,12 @@ function DashboardOrgTable({
                     </p>
                     <div className="space-y-1">
                         {topOrgs.filter(o => !o.address).map(org => (
-                            <p key={org.id} className="text-xs text-surface-400 dark:text-surface-500 pl-4">
+                            <p key={org.id} className="text-xs text-surface-500 dark:text-surface-400 pl-4">
                                 • {org.name}
                             </p>
                         ))}
                     </div>
-                    <p className="text-xs text-surface-400 dark:text-surface-500 mt-2">
+                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-2">
                         기관 관리에서 해당 기관의 주소를 입력하면 좌표 변환이 가능합니다.
                     </p>
                 </div>

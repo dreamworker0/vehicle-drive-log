@@ -41,7 +41,7 @@ function NavItem({ to, icon, label, badge }: NavItemProps) {
             {icon}
             <span>{label}</span>
             {badge != null && (
-                <span className={`ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-semibold rounded-full ${badge > 0 ? 'badge-primary' : 'bg-surface-100 text-surface-400 dark:bg-surface-800 dark:text-surface-500'}`}>
+                <span className={`ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-semibold rounded-full ${badge > 0 ? 'badge-primary' : 'bg-surface-100 text-surface-600 dark:bg-surface-800 dark:text-surface-400'}`}>
                     {badge}
                 </span>
             )}
@@ -140,7 +140,7 @@ export default function SuperAdminLayout() {
                         </div>
                         <div>
                             <p className="font-semibold text-surface-900 dark:text-surface-100 text-sm">시스템 관리자</p>
-                            <p className="text-xs text-surface-400 dark:text-surface-500">{user?.email}</p>
+                            <p className="text-xs text-surface-500 dark:text-surface-400">{user?.email}</p>
                         </div>
                     </div>
                 </div>

@@ -55,7 +55,7 @@ export default function PublicFeedbackModal({ isOpen, onClose }: PublicFeedbackM
                     <h2 className="text-xl font-bold text-surface-900 dark:text-white">문의하기 / 의견 보내기</h2>
                     <button
                         onClick={onClose}
-                        className="p-2 text-surface-400 hover:text-surface-600 dark:text-surface-300 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-700 rounded-full transition-colors min-w-[48px] min-h-[48px] flex items-center justify-center"
+                        className="p-2 text-surface-500 hover:text-surface-600 dark:text-surface-300 dark:hover:text-surface-200 hover:bg-surface-100 dark:hover:bg-surface-700 rounded-full transition-colors min-w-[48px] min-h-[48px] flex items-center justify-center"
                         aria-label="닫기"
                     >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

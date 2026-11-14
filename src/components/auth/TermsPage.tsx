@@ -33,7 +33,7 @@ export default function TermsPage() {
                 <div className="bg-white dark:bg-surface-800 rounded-2xl shadow-soft p-6 md:p-8 space-y-8">
                     <div className="text-center border-b border-surface-100 dark:border-surface-700 pb-6">
                         <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-1">이용약관</h1>
-                        <p className="text-sm text-surface-400 dark:text-surface-500">시행일: {EFFECTIVE_DATE} (최초 시행: 2026년 2월 1일)</p>
+                        <p className="text-sm text-surface-500 dark:text-surface-400">시행일: {EFFECTIVE_DATE} (최초 시행: 2026년 2월 1일)</p>
                     </div>
 
                     {/* 제1조 */}
@@ -251,8 +251,8 @@ export default function TermsPage() {
                     </section>
 
                     <div className="border-t border-surface-100 dark:border-surface-700 pt-4 space-y-2 text-center">
-                        <p className="text-xs text-surface-400 dark:text-surface-500">본 약관은 {EFFECTIVE_DATE}부터 시행됩니다.</p>
-                        <p className="text-xs text-surface-400 dark:text-surface-500">
+                        <p className="text-xs text-surface-500 dark:text-surface-400">본 약관은 {EFFECTIVE_DATE}부터 시행됩니다.</p>
+                        <p className="text-xs text-surface-500 dark:text-surface-400">
                             {/* 지난 개정의 날짜는 고정한다 — EFFECTIVE_DATE로 쓰면 다음 개정 때 과거 내용이 새 날짜로 바뀐다 */}
                             개정 이력 · 2026년 2월 1일 최초 시행 / 2026년 8월 10일 개인정보 처리의 위탁 조항 신설 /
                             {' '}{EFFECTIVE_DATE} 개인정보 처리방침 개정에 맞춰 시행일 변경(본문 변경 없음)

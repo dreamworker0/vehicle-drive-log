@@ -216,7 +216,7 @@ export default function ReservationSidePanel({
         return (
             <div className="glass-card p-8 text-center">
                 <div className="text-3xl mb-2">📅</div>
-                <p className="text-sm text-surface-400 dark:text-surface-500">날짜를 선택하세요</p>
+                <p className="text-sm text-surface-500 dark:text-surface-400">날짜를 선택하세요</p>
             </div>
         );
     }

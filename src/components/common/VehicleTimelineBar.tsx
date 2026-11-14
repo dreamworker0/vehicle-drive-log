@@ -171,7 +171,7 @@ export default function VehicleTimelineBar({
 
                 {/* 조작 안내 팁 */}
                 <div className="mt-2 text-right">
-                    <span className="text-[10px] text-surface-400 dark:text-surface-500 whitespace-nowrap">
+                    <span className="text-[10px] text-surface-500 dark:text-surface-400 whitespace-nowrap">
                         {!isPastDate && '시간을 드래그하여 예약 · '}차량을 터치하여 상세 확인
                     </span>
                 </div>

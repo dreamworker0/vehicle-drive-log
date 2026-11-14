@@ -206,7 +206,7 @@ export default function PendingReservationList() {
                                             </svg>
                                             <span className="flex-1 break-keep leading-tight mt-0.5">
                                                 <span className="font-medium">{res.destination}</span>
-                                                {res.reason && <span className="text-surface-400 dark:text-surface-500 font-normal"> - {res.reason}</span>}
+                                                {res.reason && <span className="text-surface-500 dark:text-surface-400 font-normal"> - {res.reason}</span>}
                                             </span>
                                         </div>
                                     </div>

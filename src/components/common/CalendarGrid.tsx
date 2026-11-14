@@ -41,7 +41,7 @@ export default function CalendarGrid({
 
             <div className="grid grid-cols-7 gap-1 mb-2">
                 {['일', '월', '화', '수', '목', '금', '토'].map((d, i) => (
-                    <div key={d} className={`text-center text-xs font-medium py-1 ${i === 0 || i === 6 ? 'text-red-500' : 'text-surface-400'}`}>{d}</div>
+                    <div key={d} className={`text-center text-xs font-medium py-1 ${i === 0 || i === 6 ? 'text-red-500' : 'text-surface-500 dark:text-surface-400'}`}>{d}</div>
                 ))}
             </div>
 

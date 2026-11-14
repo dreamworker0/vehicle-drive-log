@@ -248,7 +248,7 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
                                 autoComplete="off"
                             />
                         ) : (
-                            <span className="text-xs text-surface-400 dark:text-surface-500 py-1 pl-1 font-medium select-none">
+                            <span className="text-xs text-surface-500 dark:text-surface-400 py-1 pl-1 font-medium select-none">
                                 목적지 최대 개수(5개) 도달
                             </span>
                         )}
@@ -306,14 +306,14 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
                                         <p className="text-sm font-medium text-surface-900 dark:text-surface-100 truncate">
                                             &lsquo;{inputValue.trim()}&rsquo; 그대로 사용
                                         </p>
-                                        <p className="text-xs text-surface-400 dark:text-surface-500 truncate mt-0.5">
+                                        <p className="text-xs text-surface-500 dark:text-surface-400 truncate mt-0.5">
                                             검색되지 않는 곳도 입력한 대로 기록됩니다
                                         </p>
                                     </div>
                                 </button>
                             )}
                             {poiLoading && (
-                                <div className="flex items-center gap-2 px-3 py-2.5 text-xs text-surface-400 dark:text-surface-500">
+                                <div className="flex items-center gap-2 px-3 py-2.5 text-xs text-surface-500 dark:text-surface-400">
                                     <span className="inline-block w-3 h-3 border-2 border-primary-400 border-t-transparent rounded-full animate-spin" />
                                     장소 검색 중...
                                 </div>
@@ -337,7 +337,7 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
                                             {poi.name}
                                         </p>
                                         {poi.address && (
-                                            <p className="text-xs text-surface-400 dark:text-surface-500 truncate mt-0.5">
+                                            <p className="text-xs text-surface-500 dark:text-surface-400 truncate mt-0.5">
                                                 {poi.address}
                                             </p>
                                         )}
@@ -346,7 +346,7 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
                             ))}
                             {/* 두 글자 이상부터 검색하므로, 그 전에는 "없다"고 말하지 않는다 */}
                             {!poiLoading && poiResults.length === 0 && inputValue.trim().length >= 2 && (
-                                <div className="px-3 py-2.5 text-xs text-surface-400 dark:text-surface-500">
+                                <div className="px-3 py-2.5 text-xs text-surface-500 dark:text-surface-400">
                                     검색된 장소가 없습니다. 입력한 그대로 사용하셔도 됩니다.
                                 </div>
                             )}

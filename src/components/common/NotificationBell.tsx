@@ -163,7 +163,7 @@ export default function NotificationBell() {
                         <h3 className="font-semibold text-surface-800 dark:text-surface-200">알림</h3>
                     </div>
                     {allNotifications.length === 0 ? (
-                        <div className="p-8 text-center text-sm text-surface-400 dark:text-surface-500">
+                        <div className="p-8 text-center text-sm text-surface-500 dark:text-surface-400">
                             알림이 없습니다
                         </div>
                     ) : (
@@ -187,7 +187,7 @@ export default function NotificationBell() {
                                                     <p className="text-sm font-medium text-surface-800 dark:text-surface-200">{n.title}</p>
                                                     <button
                                                         onClick={(e) => handleDelete(e, n.id)}
-                                                        className="text-surface-400 dark:text-surface-500 hover:text-red-500 dark:hover:text-red-400 transition-colors p-1 -mr-2 min-w-[48px] min-h-[48px] flex items-center justify-center"
+                                                        className="text-surface-500 dark:text-surface-400 hover:text-red-500 dark:hover:text-red-400 transition-colors p-1 -mr-2 min-w-[48px] min-h-[48px] flex items-center justify-center"
                                                         aria-label="알림 삭제"
                                                     >
                                                         <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">

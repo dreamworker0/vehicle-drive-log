@@ -61,12 +61,12 @@ export function LoadingScreen() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary-50 via-white to-primary-100 dark:from-surface-950 dark:via-surface-900 dark:to-surface-950">
       <div className="text-center animate-fade-in">
         <div className="w-16 h-16 spinner mx-auto mb-4"></div>
-        <p className="text-surface-500 font-medium">로딩 중...</p>
+        <p className="text-surface-500 dark:text-surface-400 font-medium">로딩 중...</p>
         {elapsed >= 2 && elapsed < 8 && (
-          <p className="mt-2 text-sm text-surface-400">권한 정보를 동기화 중입니다…</p>
+          <p className="mt-2 text-sm text-surface-500 dark:text-surface-400">권한 정보를 동기화 중입니다…</p>
         )}
         {elapsed >= 8 && (
-          <p className="mt-2 text-sm text-surface-400">네트워크가 느리거나 보안 인증이 지연되고 있습니다.</p>
+          <p className="mt-2 text-sm text-surface-500 dark:text-surface-400">네트워크가 느리거나 보안 인증이 지연되고 있습니다.</p>
         )}
       </div>
     </div>

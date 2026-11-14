@@ -118,7 +118,7 @@ function LogDetail({ log, nameOf }: {
         <dl className="mt-2 space-y-1">
             {rows.map(([label, value]) => (
                 <div key={label} className="flex gap-2 text-xs">
-                    <dt className="text-surface-400 dark:text-surface-500 flex-shrink-0">{label}</dt>
+                    <dt className="text-surface-500 dark:text-surface-400 flex-shrink-0">{label}</dt>
                     <dd className="text-surface-600 dark:text-surface-300 break-all">{value}</dd>
                 </div>
             ))}
@@ -146,7 +146,7 @@ export default function AuditLogViewer() {
 
             {/* 기간 필터 */}
             <div className="glass-card p-4 mb-4">
-                <p className="text-xs font-medium text-surface-400 dark:text-surface-500 mb-2">기간</p>
+                <p className="text-xs font-medium text-surface-500 dark:text-surface-400 mb-2">기간</p>
                 {/* 선택지가 4개라 좁은 화면에서는 2×2로 접는다 — 한 줄에 넣으면 글자가 줄바꿈된다 */}
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
                     {AUDIT_LOG_DAY_OPTIONS.map((option) => (
@@ -201,7 +201,7 @@ export default function AuditLogViewer() {
                 */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-2 mb-4">
                     <div>
-                        <p className="text-xs font-medium text-surface-400 dark:text-surface-500 mb-2">직원</p>
+                        <p className="text-xs font-medium text-surface-500 dark:text-surface-400 mb-2">직원</p>
                         <select
                             aria-label="직원"
                             value={memberUid}
@@ -215,7 +215,7 @@ export default function AuditLogViewer() {
                         </select>
                     </div>
                     <div>
-                        <p className="text-xs font-medium text-surface-400 dark:text-surface-500 mb-2">차량</p>
+                        <p className="text-xs font-medium text-surface-500 dark:text-surface-400 mb-2">차량</p>
                         <select
                             aria-label="차량"
                             value={vehicleId}
@@ -231,12 +231,12 @@ export default function AuditLogViewer() {
                 </div>
                 {/* 그 전 기록은 차량의 운행일지로 찾아 붙인다 — 삭제된 운행일지의 기록이 빠지는 한계는 숨기지 않는다 */}
                 {vehicleId && (
-                    <p className="text-xs text-surface-400 dark:text-surface-500 -mt-2 mb-4">
+                    <p className="text-xs text-surface-500 dark:text-surface-400 -mt-2 mb-4">
                         10월 5일 이전 기록은 이 차량의 운행일지로 찾아 함께 보여 줍니다. 이미 삭제된 운행일지의 기록은 나오지 않습니다.
                     </p>
                 )}
 
-                <p className="text-xs font-medium text-surface-400 dark:text-surface-500 mb-2">유형</p>
+                <p className="text-xs font-medium text-surface-500 dark:text-surface-400 mb-2">유형</p>
                 <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {KIND_TABS.map((tab) => (
                         <SegmentButton key={tab.value} active={kind === tab.value} onClick={() => setKind(tab.value)}>
@@ -259,7 +259,7 @@ export default function AuditLogViewer() {
                     >
                         {exporting ? '내보내는 중...' : '엑셀로 내보내기'}
                     </button>
-                    <p className="text-xs text-surface-400 dark:text-surface-500 mt-2 leading-relaxed">
+                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-2 leading-relaxed">
                         선택한 기간·직원·차량·유형의 기록 전체가 담깁니다. 접속지 IP가 포함되므로 파일 보관에 주의해 주세요 —
                         내보낸 사실은 접속기록에 남습니다.
                     </p>
@@ -283,7 +283,7 @@ export default function AuditLogViewer() {
             ) : logs.length === 0 ? (
                 <div className="glass-card p-8 text-center">
                     <p className="text-sm text-surface-500 dark:text-surface-400">선택한 기간에 기록이 없습니다.</p>
-                    <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">기간을 늘려 확인해 보세요.</p>
+                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">기간을 늘려 확인해 보세요.</p>
                 </div>
             ) : (
                 <ul className="space-y-2">
@@ -296,14 +296,14 @@ export default function AuditLogViewer() {
                                     <span className={ACTION_BADGE[log.action]}>
                                         {describeEvent(log)}
                                     </span>
-                                    <span className="text-xs text-surface-400 dark:text-surface-500 flex-shrink-0">
+                                    <span className="text-xs text-surface-500 dark:text-surface-400 flex-shrink-0">
                                         {formatTimestampFull(log.at) ?? '-'}
                                     </span>
                                 </div>
                                 {summary && (
                                     <p className={`text-sm font-semibold mb-0.5 break-keep ${
                                         summary.missing
-                                            ? 'text-surface-400 dark:text-surface-500'
+                                            ? 'text-surface-500 dark:text-surface-400'
                                             : 'text-surface-900 dark:text-surface-100'
                                     }`}>
                                         {summary.text}
@@ -312,7 +312,7 @@ export default function AuditLogViewer() {
                                 <p className="text-sm text-surface-700 dark:text-surface-200">
                                     {nameOf(log.actorUid)}
                                     {note && (
-                                        <span className="ml-1.5 text-xs text-surface-400 dark:text-surface-500">({note})</span>
+                                        <span className="ml-1.5 text-xs text-surface-500 dark:text-surface-400">({note})</span>
                                     )}
                                 </p>
                                 <LogDetail log={log} nameOf={nameOf} />
@@ -335,7 +335,7 @@ export default function AuditLogViewer() {
 
             {/* 기록의 한계를 화면에서 숨기지 않는다 — 점검하는 사람이 알아야 판단할 수 있다 */}
             {!loading && logs.length > 0 && (
-                <p className="text-xs text-surface-400 dark:text-surface-500 mt-6 leading-relaxed">
+                <p className="text-xs text-surface-500 dark:text-surface-400 mt-6 leading-relaxed">
                     엑셀·PDF 내보내기는 브라우저에서 만들어지므로 기록이 남지 않는 경로가 있을 수 있습니다.
                     삭제 기록의 행위자는 확정할 수 없어 '행위자 미확인'으로 남습니다 —
                     같은 시각의 접속 기록과 함께 보면 좁힐 수 있습니다.
