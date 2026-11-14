@@ -237,7 +237,7 @@ const VEHICLE_COLORS = [
 | `lg (1024px)` | 달력 레이아웃 | `grid-cols-1` → `grid-cols-3` |
 | 모바일 전체 | 직원 화면 | 하단 탭 바 + 상단 헤더 |
 
-- **모바일 줌 방지**: `input`, `select`, `textarea`는 `font-size: 16px`로 고정
+- **모바일 줌 방지**: iOS 사파리는 16px보다 작은 입력칸에 포커스하면 화면을 확대한다. 모바일 폭(`< 640px`)·터치 기기에서는 `src/index.css`의 공용 규칙이 `input`·`select`·`textarea`(입력 `text-xs`·`text-sm` 포함)를 16px 이상으로 올리므로, 입력칸 글자 크기는 `text-sm`까지만 쓰고 `text-[13px]`·인라인 `fontSize`처럼 이 규칙을 비껴가는 작은 크기는 쓰지 않는다. `viewport`의 `maximum-scale`·`user-scalable=no`로 막지 않는다(확대 차단은 접근성 위반)
 - **Safe area**: `safe-top`, `safe-bottom` 유틸리티 사용 (노치 대응)
 
 ---

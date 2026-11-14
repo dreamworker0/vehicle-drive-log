@@ -115,6 +115,19 @@
   textarea {
     font-size: 16px;
   }
+
+  /*
+   * iOS 사파리는 글자가 16px보다 작은 입력칸에 포커스가 가면 화면을 확대한다.
+   * 위 규칙은 type이 없는 input과 date·time·search·password 등을 빠뜨려, 부모의 text-sm을
+   * 물려받으면 작아졌다. 모바일 폭·터치 기기에서는 글자를 입력하는 칸을 모두 16px 이상으로 둔다.
+   * base 레이어라 text-lg 같은 유틸리티는 그대로 이긴다(작은 유틸리티는 파일 끝 규칙이 막는다).
+   * viewport의 maximum-scale·user-scalable로 막지 않는다 — 확대 자체를 막는 접근성 위반이다.
+   */
+  @media (max-width: 639px), (pointer: coarse) {
+    :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="hidden"], [type="button"], [type="submit"], [type="reset"], [type="image"]), select, textarea) {
+      font-size: max(16px, 1rem);
+    }
+  }
 }
 
 @layer components {
@@ -441,6 +454,19 @@ html.font-large .text-sm {
   font-size: 1.0625rem !important;
   /* 17px */
   line-height: 1.5rem !important;
+}
+
+/* ===== iOS 사파리 입력칸 포커스 확대 방지 (모바일 폭·터치 기기) ===== */
+/* 입력칸에 붙은 text-xs·text-sm(보통 13·15px, 작게 10·12px, 크게 text-xs 15px)을 16px로 올린다.
+   위 글자 크기 조절 규칙이 !important라 같은 수준으로 덮어야 이긴다. 크게 모드의 text-sm(17px)은
+   이미 16px 이상이라 건드리지 않는다. 데스크톱 폭(마우스)에서는 원래 크기를 그대로 쓴다.
+   줄 높이는 보통 모드 text-sm과 같은 22px로 맞춰 칸 높이가 거의 바뀌지 않게 한다. */
+@media (max-width: 639px), (pointer: coarse) {
+  html :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="hidden"], [type="button"], [type="submit"], [type="reset"], [type="image"]), select, textarea).text-xs,
+  html:not(.font-large) :is(input:not([type="checkbox"], [type="radio"], [type="range"], [type="file"], [type="color"], [type="hidden"], [type="button"], [type="submit"], [type="reset"], [type="image"]), select, textarea).text-sm {
+    font-size: max(16px, 1rem) !important;
+    line-height: 1.375rem !important;
+  }
 }
 
 /* ===== 접근성: 동작 줄이기 (prefers-reduced-motion) ===== */
