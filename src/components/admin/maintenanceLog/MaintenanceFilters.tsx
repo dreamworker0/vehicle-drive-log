@@ -4,6 +4,7 @@
 import { memo } from 'react';
 import { MAINTENANCE_TYPES } from '../../../hooks/useMaintenanceLog';
 import type { Vehicle } from '../../../types/vehicle';
+import DateRangeSearch from '../DateRangeSearch';
 
 interface Filters {
     search: string;
@@ -54,31 +55,22 @@ export default memo(function MaintenanceFilters({ filters, setFilters, vehicles,
                     ))}
                 </select>
             </div>
-            {/* 기간 필터 */}
-            <div className="flex items-center gap-2 mt-3">
-                <span className="text-xs text-surface-400 whitespace-nowrap">기간</span>
-                <input
-                    type="date"
-                    value={filters.startDate}
-                    onChange={e => setFilters({ ...filters, startDate: e.target.value })}
-                    className="input text-sm flex-1"
-                />
-                <span className="text-surface-300">~</span>
-                <input
-                    type="date"
-                    value={filters.endDate}
-                    onChange={e => setFilters({ ...filters, endDate: e.target.value })}
-                    className="input text-sm flex-1"
-                />
+            {/* 기간 필터 — 일지 관리와 같이 [검색]을 눌러야 적용된다 */}
+            <DateRangeSearch
+                startDate={filters.startDate}
+                endDate={filters.endDate}
+                onSearch={(startDate, endDate) => setFilters({ ...filters, startDate, endDate })}
+            >
                 {hasActiveFilter && (
                     <button
+                        type="button"
                         onClick={resetFilters}
                         className="text-xs text-surface-400 hover:text-red-500 whitespace-nowrap min-h-[48px]"
                     >
                         초기화
                     </button>
                 )}
-            </div>
+            </DateRangeSearch>
         </div>
     );
 });
