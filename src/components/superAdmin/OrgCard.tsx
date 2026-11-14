@@ -78,7 +78,7 @@ export default memo(function OrgCard({
                                             e.stopPropagation();
                                             setEditing(true);
                                         }}
-                                        className="p-3 min-h-[48px] min-w-[48px] flex items-center justify-center rounded-lg text-surface-400 dark:text-surface-500 hover:text-primary-500 dark:hover:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors"
+                                        className="p-3 min-h-[48px] min-w-[48px] flex items-center justify-center rounded-lg text-surface-500 dark:text-surface-400 hover:text-primary-500 dark:hover:text-primary-400 hover:bg-primary-50 dark:hover:bg-primary-900/30 transition-colors"
                                         title="기관명·주소 편집"
                                         aria-label="기관명·주소 편집"
                                     >
@@ -117,7 +117,7 @@ export default memo(function OrgCard({
                                 </div>
 
                                 {org.address && (
-                                    <p className="text-sm text-surface-400 dark:text-surface-500 flex items-center gap-1.5">
+                                    <p className="text-sm text-surface-500 dark:text-surface-400 flex items-center gap-1.5">
                                         {org.address}
                                         <a
                                             href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(org.address)}`}

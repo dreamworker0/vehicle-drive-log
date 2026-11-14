@@ -27,14 +27,14 @@ function ChartFuelHipass({ fuelStats, hipassStats, dailyFuelCost, dailyHipassAmo
                                         {fuelStats.monthCount}<span className="text-sm font-normal ml-0.5">건</span>
                                     </p>
                                     <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">이번 달 주유</p>
-                                    <p className="text-xs text-surface-400 dark:text-surface-500">{fuelStats.monthCost.toLocaleString()}원</p>
+                                    <p className="text-xs text-surface-500 dark:text-surface-400">{fuelStats.monthCost.toLocaleString()}원</p>
                                 </div>
                                 <div className="flex flex-col items-center justify-center p-4 bg-surface-50 dark:bg-surface-800 rounded-xl min-h-[100px]">
                                     <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
                                         {fuelStats.totalCount}<span className="text-sm font-normal ml-0.5">건</span>
                                     </p>
                                     <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">총 주유 건수</p>
-                                    <p className="text-xs text-surface-400 dark:text-surface-500">{fuelStats.totalCost.toLocaleString()}원</p>
+                                    <p className="text-xs text-surface-500 dark:text-surface-400">{fuelStats.totalCost.toLocaleString()}원</p>
                                 </div>
                             </>
                         )}
@@ -45,14 +45,14 @@ function ChartFuelHipass({ fuelStats, hipassStats, dailyFuelCost, dailyHipassAmo
                                         {hipassStats.monthCount}<span className="text-sm font-normal ml-0.5">건</span>
                                     </p>
                                     <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">이번 달 하이패스</p>
-                                    <p className="text-xs text-surface-400 dark:text-surface-500">{hipassStats.monthAmount.toLocaleString()}원</p>
+                                    <p className="text-xs text-surface-500 dark:text-surface-400">{hipassStats.monthAmount.toLocaleString()}원</p>
                                 </div>
                                 <div className="flex flex-col items-center justify-center p-4 bg-surface-50 dark:bg-surface-800 rounded-xl min-h-[100px]">
                                     <p className="text-2xl font-bold text-teal-600 dark:text-teal-400">
                                         {hipassStats.totalCount}<span className="text-sm font-normal ml-0.5">건</span>
                                     </p>
                                     <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">총 하이패스 충전</p>
-                                    <p className="text-xs text-surface-400 dark:text-surface-500">{hipassStats.totalAmount.toLocaleString()}원</p>
+                                    <p className="text-xs text-surface-500 dark:text-surface-400">{hipassStats.totalAmount.toLocaleString()}원</p>
                                 </div>
                             </>
                         )}
@@ -69,7 +69,7 @@ function ChartFuelHipass({ fuelStats, hipassStats, dailyFuelCost, dailyHipassAmo
                             <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
                                 ⛽ 주유 비용 추이 (최근 30일)
                             </h2>
-                            <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">
+                            <p className="text-xs text-surface-500 dark:text-surface-400 mb-4">
                                 서비스 전체 일별 주유 금액
                             </p>
                             <div>
@@ -100,7 +100,7 @@ function ChartFuelHipass({ fuelStats, hipassStats, dailyFuelCost, dailyHipassAmo
                             <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
                                 🛣️ 하이패스 충전 추이 (최근 30일)
                             </h2>
-                            <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">
+                            <p className="text-xs text-surface-500 dark:text-surface-400 mb-4">
                                 서비스 전체 일별 하이패스 충전 금액
                             </p>
                             <div>

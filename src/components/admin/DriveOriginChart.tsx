@@ -59,7 +59,7 @@ function OriginTooltip({ active, payload, label, vertical = true }: { active?: b
                 <p key={p.dataKey} className="flex items-center gap-1.5 text-surface-600 dark:text-surface-300">
                     <span className="w-2 h-2 rounded-full inline-block" style={{ backgroundColor: p.color }} />
                     {p.name}: <span className="font-mono font-medium text-surface-900 dark:text-surface-100">{(p.value || 0).toLocaleString()}건</span>
-                    <span className="text-surface-400 dark:text-surface-500">({total > 0 ? Math.round(((p.value || 0) / total) * 100) : 0}%)</span>
+                    <span className="text-surface-500 dark:text-surface-400">({total > 0 ? Math.round(((p.value || 0) / total) * 100) : 0}%)</span>
                 </p>
             ))}
         </div>
@@ -97,7 +97,7 @@ export default function DriveOriginChart({ data, byDriver = [], byVehicle = [] }
                                 onClick={() => setView(v.key)}
                                 className={`px-3 min-h-[36px] text-xs font-medium rounded-md transition-colors ${view === v.key
                                     ? 'bg-white dark:bg-surface-600 text-surface-800 dark:text-white shadow-sm'
-                                    : 'text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-300'}`}
+                                    : 'text-surface-600 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-300'}`}
                             >
                                 {v.label}
                             </button>
@@ -105,11 +105,11 @@ export default function DriveOriginChart({ data, byDriver = [], byVehicle = [] }
                     </div>
                 )}
             </div>
-            <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">
+            <p className="text-xs text-surface-500 dark:text-surface-400 mb-4">
                 운행을 미리 예약하고 했는지, 예약 없이 바로 출발했는지, 예약 없이 일지만 적었는지
             </p>
             {grand === 0 ? (
-                <p className="text-surface-400 text-center py-8">데이터가 없습니다</p>
+                <p className="text-surface-500 dark:text-surface-400 text-center py-8">데이터가 없습니다</p>
             ) : (
                 <>
                     {/* 기간 합계(기관 전체) — 범례를 겸한다. 막대 색만으로 읽히지 않게 비율을 글자로 함께 적는다 */}
@@ -119,7 +119,7 @@ export default function DriveOriginChart({ data, byDriver = [], byVehicle = [] }
                                 <span className="w-2.5 h-2.5 rounded-sm" style={{ backgroundColor: isDark ? t.dark : t.light }} aria-hidden="true" />
                                 <span className="text-sm text-surface-600 dark:text-surface-300">{t.name}</span>
                                 <span className="text-sm font-bold text-surface-900 dark:text-surface-100">{Math.round((t.value / grand) * 100)}%</span>
-                                <span className="text-xs text-surface-400 dark:text-surface-500">{t.value.toLocaleString()}건</span>
+                                <span className="text-xs text-surface-500 dark:text-surface-400">{t.value.toLocaleString()}건</span>
                             </div>
                         ))}
                     </div>
@@ -147,7 +147,7 @@ export default function DriveOriginChart({ data, byDriver = [], byVehicle = [] }
                             </BarChart>
                         </ResponsiveContainer>
                     ) : rows.length === 0 ? (
-                        <p className="text-surface-400 text-center py-8 text-sm">
+                        <p className="text-surface-500 dark:text-surface-400 text-center py-8 text-sm">
                             {view === 'driver' ? '직원별' : '차량별'} 운행 방식은 오늘 밤 집계부터 쌓여요
                         </p>
                     ) : (
@@ -174,7 +174,7 @@ export default function DriveOriginChart({ data, byDriver = [], byVehicle = [] }
                         </ResponsiveContainer>
                     )}
                     {totals.find(t => t.key === 'linked')!.value > 0 && (
-                        <p className="text-[11px] text-surface-400 dark:text-surface-500 mt-2">
+                        <p className="text-[11px] text-surface-500 dark:text-surface-400 mt-2">
                             ⓘ '예약 연결 (구분 전)'은 2026년 10월 이전에 쓴 일지 중 예약과 연결된 것이에요. 그때는 바로 운행 여부를 따로 저장하지 않아 사전 예약과 구분할 수 없어요.
                         </p>
                     )}

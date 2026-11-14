@@ -64,12 +64,12 @@ export default memo(function ReservationPassengerField({
             >
                 <span className="label mb-0 text-sm font-medium">
                     🧑‍🤝‍🧑 동승자
-                    <span className="ml-1 text-xs font-normal text-surface-400 dark:text-surface-500">(선택)</span>
+                    <span className="ml-1 text-xs font-normal text-surface-500 dark:text-surface-400">(선택)</span>
                     {totalCount > 0 && (
                         <span className="ml-2 text-primary-600 dark:text-primary-400 font-bold">{totalCount}명</span>
                     )}
                 </span>
-                <span className="text-xs text-surface-400 dark:text-surface-500">{isOpen ? '접기 ▲' : '펼치기 ▼'}</span>
+                <span className="text-xs text-surface-500 dark:text-surface-400">{isOpen ? '접기 ▲' : '펼치기 ▼'}</span>
             </button>
 
             {isOpen && (
@@ -87,7 +87,7 @@ export default memo(function ReservationPassengerField({
                         setExternalPassengerNames={names => onChange({ passengerExternalNames: names })}
                     />
                     {hint && (
-                        <p className="mt-1 px-1 text-[11px] text-surface-400 dark:text-surface-500">
+                        <p className="mt-1 px-1 text-[11px] text-surface-500 dark:text-surface-400">
                             {hint}
                         </p>
                     )}

@@ -33,7 +33,7 @@ export default function OrgDocumentViewer({ orgId, stopPropagation }: OrgDocumen
         return <p className="mt-2 text-xs text-red-500 dark:text-red-400">증빙서류를 불러오지 못했습니다.</p>;
     }
     if (!url) {
-        return <p className="mt-2 text-xs text-surface-400">증빙서류 불러오는 중…</p>;
+        return <p className="mt-2 text-xs text-surface-500 dark:text-surface-400">증빙서류 불러오는 중…</p>;
     }
     return <DocumentViewer url={url} stopPropagation={stopPropagation} />;
 }

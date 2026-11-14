@@ -32,7 +32,7 @@ export default function VehicleHistory() {
             {vehicles.length === 0 ? (
                 <div className="glass-card p-12 text-center">
                     <div className="text-4xl mb-3">🚗</div>
-                    <p className="text-surface-400 dark:text-surface-500 font-medium">등록된 차량이 없습니다</p>
+                    <p className="text-surface-500 dark:text-surface-400 font-medium">등록된 차량이 없습니다</p>
                 </div>
             ) : (
                 <>
@@ -51,7 +51,7 @@ export default function VehicleHistory() {
                                         </span>
                                         <div className="min-w-0 text-left">
                                             <p className="text-sm font-semibold text-surface-900 dark:text-surface-100 truncate">{selectedVehicle.displayName}</p>
-                                            <p className="text-xs text-surface-400 dark:text-surface-500 truncate">{selectedVehicle.plateNumber}</p>
+                                            <p className="text-xs text-surface-500 dark:text-surface-400 truncate">{selectedVehicle.plateNumber}</p>
                                         </div>
                                     </>
                                 )}
@@ -81,7 +81,7 @@ export default function VehicleHistory() {
                                             </span>
                                             <div className="min-w-0 flex-1">
                                                 <p className="text-sm font-medium text-surface-900 dark:text-surface-100 truncate">{v.displayName}</p>
-                                                <p className="text-xs text-surface-400 dark:text-surface-500 truncate">{v.plateNumber}</p>
+                                                <p className="text-xs text-surface-500 dark:text-surface-400 truncate">{v.plateNumber}</p>
                                             </div>
                                             {selectedVehicleId === v.id && (
                                                 <svg aria-hidden="true" className="w-4 h-4 text-primary-500 dark:text-primary-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
@@ -121,12 +121,12 @@ export default function VehicleHistory() {
                                     </span>
                                     <div>
                                         <p className="font-semibold text-surface-900 dark:text-surface-100">{selectedVehicle.displayName}</p>
-                                        <p className="text-xs text-surface-400 dark:text-surface-500">{selectedVehicle.plateNumber}</p>
+                                        <p className="text-xs text-surface-500 dark:text-surface-400">{selectedVehicle.plateNumber}</p>
                                     </div>
                                 </div>
                                 <div className="text-right">
                                     <p className="text-lg font-bold text-primary-600 dark:text-primary-400">{totalDistance.toLocaleString()} km</p>
-                                    <p className="text-xs text-surface-400 dark:text-surface-500">{logs.length}건 운행</p>
+                                    <p className="text-xs text-surface-500 dark:text-surface-400">{logs.length}건 운행</p>
                                 </div>
                             </div>
                         </div>
@@ -139,7 +139,7 @@ export default function VehicleHistory() {
                         </div>
                     ) : logs.length === 0 ? (
                         <div className="glass-card p-10 text-center">
-                            <p className="text-surface-400 dark:text-surface-500 text-sm">해당 기간에 운행 기록이 없습니다</p>
+                            <p className="text-surface-500 dark:text-surface-400 text-sm">해당 기간에 운행 기록이 없습니다</p>
                         </div>
                     ) : (
                         <div className="space-y-2">
@@ -148,7 +148,7 @@ export default function VehicleHistory() {
                                     <div className="flex items-center justify-between mb-2">
                                         <div className="flex items-center gap-2">
                                             <span className="text-xs font-medium text-surface-500 dark:text-surface-400">{formatTimestamp(log.timestamp)}</span>
-                                            <span className="text-xs text-surface-300 dark:text-surface-600">{formatTimestampTime(log.timestamp)}</span>
+                                            <span className="text-xs text-surface-500 dark:text-surface-400">{formatTimestampTime(log.timestamp)}</span>
                                         </div>
                                         <span className="text-sm font-bold text-primary-600 dark:text-primary-400">
                                             {((log.endKm - log.startKm) || 0).toLocaleString()} km
@@ -167,9 +167,9 @@ export default function VehicleHistory() {
                                         )}
                                     </div>
                                     {log.purpose && (
-                                        <p className="text-xs text-surface-400 dark:text-surface-500 mt-1 ml-8">{log.purpose}</p>
+                                        <p className="text-xs text-surface-500 dark:text-surface-400 mt-1 ml-8">{log.purpose}</p>
                                     )}
-                                    <div className="text-xs text-surface-400 dark:text-surface-500 mt-1.5 ml-8 font-mono">
+                                    <div className="text-xs text-surface-500 dark:text-surface-400 mt-1.5 ml-8 font-mono">
                                         {log.startKm?.toLocaleString()} → {log.endKm?.toLocaleString()} km
                                         {log.startTime && log.endTime && (
                                             <span className="ml-2">({log.startTime} ~ {log.endTime})</span>

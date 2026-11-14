@@ -32,7 +32,7 @@ export default function ReleaseNotesBanner() {
                         type="button"
                         onClick={() => markSeen()}
                         aria-label="닫기"
-                        className="flex-shrink-0 btn-icon min-h-[44px] min-w-[44px] text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300"
+                        className="flex-shrink-0 btn-icon min-h-[44px] min-w-[44px] text-surface-500 dark:text-surface-400 hover:text-surface-600 dark:hover:text-surface-300"
                     >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />

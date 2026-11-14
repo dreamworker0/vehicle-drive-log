@@ -110,7 +110,7 @@ export default function ReservationPatternBanner({ anchorRef }: ReservationPatte
                     </div>
                     <button
                         onClick={() => setIsDismissed(true)}
-                        className="glass-card flex-shrink-0 min-w-[48px] min-h-[48px] flex items-center justify-center text-surface-400 dark:text-surface-500 hover:text-surface-800 dark:hover:text-surface-200 transition-colors"
+                        className="glass-card flex-shrink-0 min-w-[48px] min-h-[48px] flex items-center justify-center text-surface-500 dark:text-surface-400 hover:text-surface-800 dark:hover:text-surface-200 transition-colors"
                         title="닫기"
                         aria-label="추천 예약 닫기"
                     >

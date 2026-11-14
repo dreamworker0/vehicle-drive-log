@@ -285,21 +285,21 @@ export default function OrgManagement() {
                 <button
                     onClick={() => setActiveTab('active')}
                     className={`flex-1 py-2 px-4 min-h-[48px] rounded-lg text-sm font-medium transition-all
-                        ${activeTab === 'active' ? 'bg-white dark:bg-surface-700 text-surface-900 dark:text-surface-100 shadow-sm' : 'text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:text-surface-300'}`}
+                        ${activeTab === 'active' ? 'bg-white dark:bg-surface-700 text-surface-900 dark:text-surface-100 shadow-sm' : 'text-surface-600 dark:text-surface-400 hover:text-surface-700 dark:text-surface-300'}`}
                 >
                     활성 기관 ({activeOrgs.length})
                 </button>
                 <button
                     onClick={() => setActiveTab('inactive')}
                     className={`flex-1 py-2 px-4 min-h-[48px] rounded-lg text-sm font-medium transition-all
-                        ${activeTab === 'inactive' ? 'bg-white dark:bg-surface-700 text-amber-600 dark:text-amber-400 shadow-sm' : 'text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:text-surface-300'}`}
+                        ${activeTab === 'inactive' ? 'bg-white dark:bg-surface-700 text-amber-600 dark:text-amber-400 shadow-sm' : 'text-surface-600 dark:text-surface-400 hover:text-surface-700 dark:text-surface-300'}`}
                 >
                     미활성 기관 ({inactiveOrgs.length})
                 </button>
                 <button
                     onClick={() => setActiveTab('deleted')}
                     className={`flex-1 py-2 px-4 min-h-[48px] rounded-lg text-sm font-medium transition-all
-                        ${activeTab === 'deleted' ? 'bg-white dark:bg-surface-700 text-red-600 dark:text-red-400 shadow-sm' : 'text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:text-surface-300'}`}
+                        ${activeTab === 'deleted' ? 'bg-white dark:bg-surface-700 text-red-600 dark:text-red-400 shadow-sm' : 'text-surface-600 dark:text-surface-400 hover:text-surface-700 dark:text-surface-300'}`}
                 >
                     삭제된 기관 ({deletedOrgs.length})
                 </button>
@@ -330,21 +330,21 @@ export default function OrgManagement() {
                         {activeTab === 'inactive' ? (
                             <>
                                 <div className="text-4xl mb-3">🎉</div>
-                                <p className="text-surface-400 dark:text-surface-500 text-lg font-medium">모든 기관에 직원이 등록되어 있습니다</p>
+                                <p className="text-surface-500 dark:text-surface-400 text-lg font-medium">모든 기관에 직원이 등록되어 있습니다</p>
                             </>
                         ) : (
                             <>
                                 <svg className="w-16 h-16 mx-auto text-surface-200 dark:text-surface-600 mb-4" fill="none" viewBox="0 0 24 24" strokeWidth={1} stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 21h19.5M3.75 3v18m16.5-18v18M5.25 3h13.5M5.25 21h13.5" />
                                 </svg>
-                                <p className="text-surface-400 dark:text-surface-500 text-lg font-medium">등록된 기관이 없습니다</p>
+                                <p className="text-surface-500 dark:text-surface-400 text-lg font-medium">등록된 기관이 없습니다</p>
                             </>
                         )}
                     </div>
                 ) : filteredOrgs.length === 0 ? (
                     <div className="glass-card p-12 text-center">
                         <div className="text-4xl mb-3">🔍</div>
-                        <p className="text-surface-400 dark:text-surface-500 font-medium">검색 결과가 없습니다</p>
+                        <p className="text-surface-500 dark:text-surface-400 font-medium">검색 결과가 없습니다</p>
                     </div>
                 ) : (
                     <div className="grid gap-2">
@@ -374,7 +374,7 @@ export default function OrgManagement() {
                 deletedOrgs.length === 0 ? (
                     <div className="glass-card p-12 text-center">
                         <div className="text-4xl mb-3">✨</div>
-                        <p className="text-surface-400 dark:text-surface-500 font-medium">삭제된 기관이 없습니다</p>
+                        <p className="text-surface-500 dark:text-surface-400 font-medium">삭제된 기관이 없습니다</p>
                     </div>
                 ) : (
                     <div className="grid gap-2">
@@ -382,12 +382,12 @@ export default function OrgManagement() {
                         <div className="glass-card p-4 mb-2">
                             <div className="flex flex-wrap items-center gap-x-6 gap-y-2">
                                 <div>
-                                    <span className="text-xs text-surface-400 dark:text-surface-500">자발적 탈퇴</span>
-                                    <p className="text-xl font-bold text-amber-600 dark:text-amber-400">{withdrawalStats.voluntaryCount}<span className="text-sm font-normal text-surface-400 ml-1">건</span></p>
+                                    <span className="text-xs text-surface-500 dark:text-surface-400">자발적 탈퇴</span>
+                                    <p className="text-xl font-bold text-amber-600 dark:text-amber-400">{withdrawalStats.voluntaryCount}<span className="text-sm font-normal text-surface-500 dark:text-surface-400 ml-1">건</span></p>
                                 </div>
                                 <div>
-                                    <span className="text-xs text-surface-400 dark:text-surface-500">운영자 정리</span>
-                                    <p className="text-xl font-bold text-surface-600 dark:text-surface-300">{withdrawalStats.byAdminCount}<span className="text-sm font-normal text-surface-400 ml-1">건</span></p>
+                                    <span className="text-xs text-surface-500 dark:text-surface-400">운영자 정리</span>
+                                    <p className="text-xl font-bold text-surface-600 dark:text-surface-300">{withdrawalStats.byAdminCount}<span className="text-sm font-normal text-surface-500 dark:text-surface-400 ml-1">건</span></p>
                                 </div>
                             </div>
                             {withdrawalStats.voluntaryCount > 0 && (

@@ -178,7 +178,7 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
                         <span className="text-xl">🤖</span>
                         <h2 className="text-lg font-bold text-surface-900 dark:text-surface-100">AI에게 물어보기</h2>
                     </div>
-                    <button onClick={onClose} aria-label="닫기" className="btn-icon text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 dark:text-surface-400 min-h-[48px] min-w-[48px] flex items-center justify-center">
+                    <button onClick={onClose} aria-label="닫기" className="btn-icon text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 dark:text-surface-400 min-h-[48px] min-w-[48px] flex items-center justify-center">
                         <svg aria-hidden="true" className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
                         </svg>
@@ -262,7 +262,7 @@ const AskAIModal: React.FC<AskAIModalProps> = ({ isOpen, onClose }) => {
                             </svg>
                         </button>
                     </div>
-                    <p className="text-[10px] text-surface-400 dark:text-surface-500 mt-1.5 text-center">
+                    <p className="text-[10px] text-surface-500 dark:text-surface-400 mt-1.5 text-center">
                         AI 답변은 FAQ와 설명서를 기반으로 합니다 · {question.length}/500
                     </p>
                 </form>

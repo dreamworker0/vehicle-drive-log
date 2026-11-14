@@ -28,6 +28,18 @@ grep -rnE "border-(green|blue|red|amber|surface)-[12]00" src/components/ | grep 
 
 > **주의**: 위 결과 중 공통 클래스(`glass-card`, `btn-*`, `badge-*`, `input`) 내부에서 사용되는 것은 이미 다크 모드가 적용되어 있으므로 무시한다.
 
+### 1.4 글자 대비 미달 (라이트·다크 공통)
+```bash
+# 읽는 글자에 쓰인 옅은 색 — 라이트 2.56:1 / 다크 3.07:1로 양쪽 다 4.5:1 미달
+grep -rnE "(^|[\"' ])text-surface-(300|400)( |[\"'])" src/components/ | grep -v "<svg"
+# 다크에서 옅은 글자 — surface-800 위 3.07:1
+grep -rnE "(^|[\"' ])dark:text-surface-(500|600)( |[\"'])" src/components/ | grep -v "<svg"
+# 회색 칩 위 보조 글자 — surface-100 위 4.34:1 / surface-700 위 4.04:1
+grep -rnE "bg-surface-100.*text-surface-500|dark:bg-surface-700.*dark:text-surface-400" src/components/
+```
+
+> 결과가 장식 아이콘(svg 자체), 구분 기호(「~」「|」「·」「→」), 스피너, `disabled` 상태면 그대로 둔다. 라벨·보조 설명·날짜·빈 상태 안내·글자 버튼·아이콘만 있는 버튼이면 `text-surface-500 dark:text-surface-400`(회색 칩 위는 `text-surface-600 dark:text-surface-300`)로 바꾼다. 기준표는 `design-system.md`의 「글자 대비 규칙」.
+
 ---
 
 ## 2. 수동 확인 — 우선순위별 체크
@@ -52,6 +64,7 @@ grep -rnE "border-(green|blue|red|amber|surface)-[12]00" src/components/ | grep 
 | `text-surface-700` | `dark:text-surface-300` |
 | `text-surface-600` | `dark:text-surface-300` |
 | `text-surface-500` | `dark:text-surface-400` |
+| `text-surface-600` (회색 칩 위) | `dark:text-surface-300` |
 | `bg-surface-50` | `dark:bg-surface-800` |
 | `bg-{color}-50` | `dark:bg-{color}-900/20~30` |
 | `border-{color}-100~200` | `dark:border-{color}-800/40~50` |
@@ -72,7 +85,7 @@ grep -rnE "border-(green|blue|red|amber|surface)-[12]00" src/components/ | grep 
 | `badge-success` | bg-accent-100, text-accent-700 | bg-accent-900/40, text-accent-300 |
 | `badge-warning` | bg-amber-100, text-amber-700 | bg-amber-900/40, text-amber-300 |
 | `badge-danger` | bg-red-100, text-red-700 | bg-red-900/40, text-red-300 |
-| `badge-neutral` | bg-surface-100, text-surface-600 | bg-surface-700, text-surface-400 |
+| `badge-neutral` | bg-surface-100, text-surface-600 | bg-surface-700, text-surface-300 |
 
 ### 점검 시 교체 패턴
 
@@ -91,7 +104,7 @@ grep -rnE "border-(green|blue|red|amber|surface)-[12]00" src/components/ | grep 
 ## 4. 검증
 
 1. 개발 서버에서 다크/라이트 모드를 전환하며 수정된 화면을 확인
-2. 특히 카드 내부 텍스트의 **대비**가 충분한지 확인
+2. 특히 카드 내부 텍스트의 **대비**가 충분한지 확인 — 읽는 글자 4.5:1, 아이콘만 있는 버튼 3:1 (§1.4 스캔)
 3. `npm run build`로 빌드 에러 없는지 확인
 
 ---

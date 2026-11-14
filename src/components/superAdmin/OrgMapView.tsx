@@ -172,7 +172,7 @@ export default function OrgMapView({ orgs }: OrgMapViewProps) {
                 <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200">
                     📍 기관 위치 지도
                 </h2>
-                <span className="text-xs text-surface-400 dark:text-surface-500">
+                <span className="text-xs text-surface-500 dark:text-surface-400">
                     {orgs.filter(o => o.lat && o.lng).length}개 기관 표시
                 </span>
             </div>
@@ -181,7 +181,7 @@ export default function OrgMapView({ orgs }: OrgMapViewProps) {
                 className="rounded-xl overflow-hidden border border-surface-200 dark:border-surface-700"
                 style={{ height: 840, width: '100%' }}
             />
-            <p className="text-xs text-surface-400 dark:text-surface-500 mt-2">
+            <p className="text-xs text-surface-500 dark:text-surface-400 mt-2">
                 좌표가 등록된 승인 기관만 표시됩니다 · 마커 클릭 시 좌표 수정 가능 · © OpenStreetMap
             </p>
         </div>

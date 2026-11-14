@@ -26,7 +26,7 @@ function StatCard({ label, value, unit, icon, color, sub }: StatCardProps) {
                 <span className="text-lg">{icon}</span>
             </div>
             <p className="text-2xl font-bold text-surface-800 dark:text-surface-100">
-                {value}<span className="text-sm font-normal text-surface-400 dark:text-surface-400 ml-1">{unit}</span>
+                {value}<span className="text-sm font-normal text-surface-500 dark:text-surface-400 ml-1">{unit}</span>
             </p>
             {sub && <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">{sub}</p>}
         </div>

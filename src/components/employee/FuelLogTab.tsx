@@ -66,7 +66,7 @@ export default function FuelLogTab() {
                     className={`flex-1 py-2 min-h-[48px] text-sm font-medium rounded-lg transition-all ${
                         activeTab === 'fuel'
                             ? 'bg-white dark:bg-surface-700 text-surface-900 dark:text-surface-100 shadow-sm'
-                            : 'text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300'
+                            : 'text-surface-600 dark:text-surface-400 hover:text-surface-600 dark:hover:text-surface-300'
                     }`}
                 >
                     ⛽ 주유
@@ -77,7 +77,7 @@ export default function FuelLogTab() {
                         className={`flex-1 py-2 min-h-[48px] text-sm font-medium rounded-lg transition-all ${
                             activeTab === 'charge'
                                 ? 'bg-white dark:bg-surface-700 text-surface-900 dark:text-surface-100 shadow-sm'
-                                : 'text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300'
+                                : 'text-surface-500 dark:text-surface-400 hover:text-surface-600 dark:hover:text-surface-300'
                         }`}
                     >
                         💳 하이패스
@@ -89,7 +89,7 @@ export default function FuelLogTab() {
                         className={`flex-1 py-2 min-h-[48px] text-sm font-medium rounded-lg transition-all ${
                             activeTab === 'maintenance'
                                 ? 'bg-white dark:bg-surface-700 text-surface-900 dark:text-surface-100 shadow-sm'
-                                : 'text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300'
+                                : 'text-surface-500 dark:text-surface-400 hover:text-surface-600 dark:hover:text-surface-300'
                         }`}
                     >
                         🔧 수리ㆍ정비
@@ -109,7 +109,7 @@ export default function FuelLogTab() {
                     {/* 헤더 */}
                     <div className="flex items-center justify-between mb-4">
                         <div>
-                            <p className="text-xs text-surface-400 dark:text-surface-500 mt-0.5">
+                            <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
                                 {enrichedRecords.length}건
                                 {totalAmount > 0 && ` · ${totalAmount.toLocaleString()}L`}
                                 {totalCost > 0 && ` · ${totalCost.toLocaleString()}원`}
@@ -195,7 +195,7 @@ export default function FuelLogTab() {
                                     required
                                 />
                                 {selectedVehicleKm > 0 && (
-                                    <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
+                                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">
                                         📍 현재 누적: <span className="font-medium">{selectedVehicleKm.toLocaleString()} km</span>
                                     </p>
                                 )}
@@ -286,8 +286,8 @@ export default function FuelLogTab() {
                     {enrichedRecords.length === 0 ? (
                         <div className="glass-card p-12 text-center">
                             <div className="text-4xl mb-3">⛽</div>
-                            <p className="text-surface-400 dark:text-surface-500 font-medium">아직 주유 기록이 없어요</p>
-                            <p className="text-sm text-surface-300 dark:text-surface-500 mt-1">차량 주유 후 기록을 등록하면 연료 사용량을 한눈에 볼 수 있어요</p>
+                            <p className="text-surface-500 dark:text-surface-400 font-medium">아직 주유 기록이 없어요</p>
+                            <p className="text-sm text-surface-500 dark:text-surface-400 mt-1">차량 주유 후 기록을 등록하면 연료 사용량을 한눈에 볼 수 있어요</p>
                             {!showForm && (
                                 <button
                                     onClick={() => setShowForm(true)}
@@ -327,10 +327,10 @@ export default function FuelLogTab() {
                                         <div className="flex-1 min-w-0">
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 <span className="font-bold text-sm text-surface-900 dark:text-surface-100">{rec.vehicleName}</span>
-                                                <span className="text-xs text-surface-400 dark:text-surface-500">{rec.driverName}</span>
+                                                <span className="text-xs text-surface-500 dark:text-surface-400">{rec.driverName}</span>
                                                 <AdminEditedBadge lastEditedByUid={rec.lastEditedByUid} ownerUid={rec.driverUid} />
                                             </div>
-                                            <p className="text-xs text-surface-400 dark:text-surface-500 mt-0.5">
+                                            <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
                                                 {rec.date} · {rec.meterReading?.toLocaleString()} km
                                             </p>
                                         </div>
@@ -347,7 +347,7 @@ export default function FuelLogTab() {
                                             {isOwn && (
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); handleDelete(rec); }}
-                                                    className="text-[10px] text-surface-300 dark:text-surface-600 hover:text-red-500 dark:hover:text-red-400 transition-colors mt-0.5 min-w-[48px] min-h-[48px] flex items-center justify-center"
+                                                    className="text-[10px] text-surface-500 dark:text-surface-400 hover:text-red-500 dark:hover:text-red-400 transition-colors mt-0.5 min-w-[48px] min-h-[48px] flex items-center justify-center"
                                                     aria-label="기록 삭제"
                                                 >
                                                     삭제

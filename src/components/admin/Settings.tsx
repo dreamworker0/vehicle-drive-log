@@ -61,7 +61,7 @@ export default function Settings() {
             )}
 
             {/* 기관 관리 섹션 */}
-            <h2 className="text-sm font-semibold text-surface-400 dark:text-surface-500 uppercase tracking-wider mb-3 px-1">기관 관리</h2>
+            <h2 className="text-sm font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider mb-3 px-1">기관 관리</h2>
 
             {/* 기관 정보 */}
             <OrgInfoSection
@@ -145,7 +145,7 @@ export default function Settings() {
                     </div>
                     <div className="flex-1">
                         <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">접속기록</p>
-                        <p className="text-xs text-surface-400">개인정보 접속·변경·반출 기록 점검 (월 1회 권장)</p>
+                        <p className="text-xs text-surface-500 dark:text-surface-400">개인정보 접속·변경·반출 기록 점검 (월 1회 권장)</p>
                     </div>
                     <svg className="w-4 h-4 text-surface-300" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
@@ -154,7 +154,7 @@ export default function Settings() {
             </div>
 
             {/* 앱 정보 섹션 */}
-            <h2 className="text-sm font-semibold text-surface-400 dark:text-surface-500 uppercase tracking-wider mt-8 mb-3 px-1">앱 정보</h2>
+            <h2 className="text-sm font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider mt-8 mb-3 px-1">앱 정보</h2>
 
             <div className="glass-card p-6 mb-6">
                 {/* 사용 설명서 */}
@@ -169,7 +169,7 @@ export default function Settings() {
                     </div>
                     <div className="flex-1">
                         <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">사용 설명서</p>
-                        <p className="text-xs text-surface-400">관리자 기능 안내 보기</p>
+                        <p className="text-xs text-surface-500 dark:text-surface-400">관리자 기능 안내 보기</p>
                     </div>
                     <svg className="w-4 h-4 text-surface-300" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
@@ -190,7 +190,7 @@ export default function Settings() {
                     </div>
                     <div className="flex-1">
                         <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">AI에게 물어보기</p>
-                        <p className="text-xs text-surface-400">앱 사용법이 궁금할 때 AI에게 물어보세요</p>
+                        <p className="text-xs text-surface-500 dark:text-surface-400">앱 사용법이 궁금할 때 AI에게 물어보세요</p>
                     </div>
                     <svg className="w-4 h-4 text-surface-300" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
@@ -211,7 +211,7 @@ export default function Settings() {
                     </div>
                     <div className="flex-1">
                         <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">개발자에게 건의하기</p>
-                        <p className="text-xs text-surface-400">소셜프리즘 · ehsheh@gmail.com</p>
+                        <p className="text-xs text-surface-500 dark:text-surface-400">소셜프리즘 · ehsheh@gmail.com</p>
                     </div>
                     <svg className="w-4 h-4 text-surface-300" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
@@ -220,12 +220,12 @@ export default function Settings() {
             </div>
 
             {/* 내 계정 */}
-            <h2 className="text-sm font-semibold text-surface-400 dark:text-surface-500 uppercase tracking-wider mt-8 mb-3 px-1">내 계정</h2>
+            <h2 className="text-sm font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider mt-8 mb-3 px-1">내 계정</h2>
 
             <AccountSection />
 
             {/* 기관 ID (읽기 전용) */}
-            <h2 className="text-sm font-semibold text-surface-400 dark:text-surface-500 uppercase tracking-wider mt-8 mb-3 px-1">기관 정보 · 해지</h2>
+            <h2 className="text-sm font-semibold text-surface-500 dark:text-surface-400 uppercase tracking-wider mt-8 mb-3 px-1">기관 정보 · 해지</h2>
 
             <div className="glass-card p-6 mb-6">
                 <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4">기관 식별 정보</h2>
@@ -256,7 +256,7 @@ export default function Settings() {
             {/* 서비스 해지 (Danger Zone) */}
             <div className="glass-card p-6 mb-6 border border-red-200 dark:border-red-900/50">
                 <h2 className="text-lg font-semibold text-red-600 dark:text-red-400 mb-1">서비스 해지</h2>
-                <p className="text-xs text-surface-400 mb-4">
+                <p className="text-xs text-surface-500 dark:text-surface-400 mb-4">
                     기관의 서비스 이용을 종료합니다. 모든 직원의 접근이 차단되며, 30일간 보관 후 데이터가 영구 삭제됩니다.
                 </p>
                 <button

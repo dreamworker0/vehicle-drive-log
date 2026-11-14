@@ -19,8 +19,8 @@ const PERIOD_OPTIONS = [
 
 function ChangeIndicator({ value }: { value?: number | null }) {
     // null: 비교 구간에 기록이 없다 — 예전에는 "+100%"로 보여 급증처럼 읽혔다
-    if (value === null) return <span className="text-xs text-surface-400">비교 없음</span>;
-    if (value === 0 || value === undefined) return <span className="text-xs text-surface-400">변동 없음</span>;
+    if (value === null) return <span className="text-xs text-surface-500 dark:text-surface-400">비교 없음</span>;
+    if (value === 0 || value === undefined) return <span className="text-xs text-surface-500 dark:text-surface-400">변동 없음</span>;
     const isUp = value > 0;
     return (
         <span className={`inline-flex items-center gap-0.5 text-xs font-semibold ${isUp ? 'text-accent-600' : 'text-red-500'}`}>
@@ -47,8 +47,8 @@ function StatCard({ icon, value, label, change, sub, color }: StatCardProps) {
                 <ChangeIndicator value={change} />
             </div>
             <p className="text-2xl sm:text-3xl font-bold text-surface-900 dark:text-surface-100 mt-1">{value}</p>
-            <p className="text-xs text-surface-400 mt-1">{label}</p>
-            {sub && <p className="text-[11px] text-surface-300 mt-0.5">{sub}</p>}
+            <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">{label}</p>
+            {sub && <p className="text-[11px] text-surface-500 dark:text-surface-400 mt-0.5">{sub}</p>}
         </div>
     );
 }
@@ -121,7 +121,7 @@ export default function MonthlyReport() {
                         onClick={() => setPeriod(op.key)}
                         className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 ${activePeriod === op.key
                             ? 'bg-primary-600 text-white shadow-md'
-                            : 'bg-surface-100 text-surface-600 dark:bg-surface-700 dark:text-surface-400 hover:bg-surface-200 dark:hover:bg-surface-600'
+                            : 'bg-surface-100 text-surface-600 dark:bg-surface-700 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-600'
                             }`}
                     >
                         {op.label}
@@ -151,7 +151,7 @@ export default function MonthlyReport() {
             )}
 
             {/* 요약 카드 */}
-            <p className="text-[11px] text-surface-400 dark:text-surface-500 mb-2">
+            <p className="text-[11px] text-surface-500 dark:text-surface-400 mb-2">
                 ▲▼ 증감은 {comparePeriod.start === comparePeriod.end
                     ? formatMD(comparePeriod.start)
                     : `${formatMD(comparePeriod.start)}~${formatMD(comparePeriod.end)}`}과 비교한 값이에요
@@ -178,7 +178,7 @@ export default function MonthlyReport() {
             {filteredLogs.length === 0 ? (
                 <div className="glass-card p-12 text-center">
                     <div className="text-4xl mb-3">📊</div>
-                    <p className="text-surface-400 dark:text-surface-500 font-medium">해당 기간의 운행 기록이 없습니다</p>
+                    <p className="text-surface-500 dark:text-surface-400 font-medium">해당 기간의 운행 기록이 없습니다</p>
                 </div>
             ) : (
                 <>
@@ -193,7 +193,7 @@ export default function MonthlyReport() {
                                 onClick={() => setActiveTab(tab.key)}
                                 className={`flex-1 py-2.5 text-sm font-medium rounded-lg transition-all duration-200 ${activeTab === tab.key
                                     ? 'bg-white dark:bg-surface-700 text-surface-900 dark:text-surface-100 shadow-sm'
-                                    : 'text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-300'
+                                    : 'text-surface-600 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-300'
                                     }`}
                             >
                                 {tab.label}
@@ -202,7 +202,7 @@ export default function MonthlyReport() {
                     </div>
 
                     {activeTab === 'charts' ? (
-                        <Suspense fallback={<div className="p-10 text-center text-surface-400 spinner mx-auto">차트를 불러오는 중...</div>}>
+                        <Suspense fallback={<div className="p-10 text-center text-surface-500 dark:text-surface-400 spinner mx-auto">차트를 불러오는 중...</div>}>
                             <ReportCharts
                                 driverData={driverData}
                                 vehicleData={vehicleData}

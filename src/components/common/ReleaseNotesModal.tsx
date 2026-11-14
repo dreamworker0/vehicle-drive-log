@@ -55,7 +55,7 @@ export default function ReleaseNotesModal({ onClose }: { onClose: () => void }) 
                     <h3 className="text-lg font-bold text-surface-900 dark:text-surface-100">📋 업데이트 소식</h3>
                     <button
                         onClick={onClose}
-                        className="btn-icon min-h-[48px] min-w-[48px] text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300"
+                        className="btn-icon min-h-[48px] min-w-[48px] text-surface-500 dark:text-surface-400 hover:text-surface-600 dark:hover:text-surface-300"
                         aria-label="닫기"
                     >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" aria-hidden="true">
@@ -69,7 +69,7 @@ export default function ReleaseNotesModal({ onClose }: { onClose: () => void }) 
                 ) : (
                     <div className="space-y-6">
                         {!showAll && recent.length > 0 && (
-                            <p className="text-xs text-surface-400 dark:text-surface-500">최근 {RECENT_DAYS}일 이내 소식이에요.</p>
+                            <p className="text-xs text-surface-500 dark:text-surface-400">최근 {RECENT_DAYS}일 이내 소식이에요.</p>
                         )}
                         {visibleNotes.map((note, noteIdx) => (
                             <section key={note.date + noteIdx} className="space-y-2">

@@ -123,7 +123,7 @@ export default function FAQPage() {
                 <div className="bg-white dark:bg-surface-900 rounded-2xl shadow-soft p-6 md:p-8 space-y-6">
                     <div className="text-center border-b border-surface-100 dark:border-surface-700 pb-6">
                         <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-1">❓ 자주 하는 질문</h1>
-                        <p className="text-sm text-surface-400 dark:text-surface-500">
+                        <p className="text-sm text-surface-500 dark:text-surface-400">
                             평소에 궁금하셨던 점들을 모아두었어요.
                         </p>
                     </div>
@@ -141,12 +141,12 @@ export default function FAQPage() {
                             value={search}
                             onChange={e => setSearch(e.target.value)}
                             placeholder="어떤 점이 궁금하신가요?"
-                            className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/50 text-sm text-surface-800 dark:text-surface-200 placeholder:text-surface-400 dark:placeholder:text-surface-500 focus:outline-none focus:ring-2 focus:ring-primary-300 transition-all min-h-[48px]"
+                            className="w-full pl-10 pr-9 py-2.5 rounded-xl border border-surface-200 dark:border-surface-700 bg-surface-50 dark:bg-surface-800/50 text-sm text-surface-800 dark:text-surface-200 placeholder:text-surface-500 dark:placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-primary-300 transition-all min-h-[48px]"
                         />
                         {search && (
                             <button
                                 onClick={() => { setSearch(''); setOpenIndex(null); }}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 transition-colors min-h-[48px] min-w-[48px] flex items-center justify-center -mr-3"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-surface-500 dark:text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 transition-colors min-h-[48px] min-w-[48px] flex items-center justify-center -mr-3"
                             >
                                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
@@ -157,7 +157,7 @@ export default function FAQPage() {
 
                     {/* 검색 결과 요약 */}
                     {search.trim() && (
-                        <p className="text-xs text-surface-400 dark:text-surface-500 -mt-2">
+                        <p className="text-xs text-surface-500 dark:text-surface-400 -mt-2">
                             {filtered.length > 0
                                 ? `총 ${filtered.length}개의 질문을 찾았어요.`
                                 : '앗, 일치하는 질문이 없네요. 다른 단어로 검색해 보시겠어요?'}
@@ -252,7 +252,7 @@ export default function FAQPage() {
                     </div>
 
                     <div className="border-t border-surface-100 dark:border-surface-700 pt-4 text-center">
-                        <p className="text-xs text-surface-400 dark:text-surface-500">
+                        <p className="text-xs text-surface-500 dark:text-surface-400">
                             여기에 없는 내용이 궁금하시다면 '더보기 → 건의하기'를 통해 편하게 물어보세요!
                         </p>
                     </div>

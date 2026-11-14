@@ -17,8 +17,8 @@ function ChartDAU({ dailyActiveUserStats }: Props) {
                     <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
                         👤 일별 활성 사용자 (DAU)
                     </h2>
-                    <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">출발 기록이 있는 고유 사용자 수</p>
-                    <div className="flex flex-col items-center justify-center py-12 text-surface-400 dark:text-surface-500">최근 발생한 데이터가 없습니다.</div>
+                    <p className="text-xs text-surface-500 dark:text-surface-400 mb-4">출발 기록이 있는 고유 사용자 수</p>
+                    <div className="flex flex-col items-center justify-center py-12 text-surface-500 dark:text-surface-400">최근 발생한 데이터가 없습니다.</div>
                 </div>
             );
         }
@@ -27,7 +27,7 @@ function ChartDAU({ dailyActiveUserStats }: Props) {
                 <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
                     👤 일별 활성 사용자 (DAU)
                 </h2>
-                <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">출발 기록이 있는 고유 사용자 수</p>
+                <p className="text-xs text-surface-500 dark:text-surface-400 mb-4">출발 기록이 있는 고유 사용자 수</p>
                 <div>
                     <ResponsiveContainer width="100%" height={256} minWidth={1}>
                         <AreaChart data={dailyActiveUserStats} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>

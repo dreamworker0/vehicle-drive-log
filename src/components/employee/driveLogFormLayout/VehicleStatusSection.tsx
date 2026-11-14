@@ -127,7 +127,7 @@ const VehicleStatusSection = memo(function VehicleStatusSection({
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <label className="label text-xs">사용전 금액</label>
-                                    <div className="input bg-surface-100 dark:bg-surface-700 text-surface-500 dark:text-surface-400 cursor-not-allowed" aria-label="하이패스 사용전 금액">
+                                    <div className="input bg-surface-100 dark:bg-surface-700 text-surface-600 dark:text-surface-300 cursor-not-allowed" aria-label="하이패스 사용전 금액">
                                         {hipassCard.balance.toLocaleString()}원
                                     </div>
                                 </div>
@@ -146,7 +146,7 @@ const VehicleStatusSection = memo(function VehicleStatusSection({
                             </div>
                             {form.hipassBalanceAfter !== '' && (
                                 <div className="mt-3 flex items-center justify-between px-1">
-                                    <span className="text-xs text-surface-400 dark:text-surface-500">
+                                    <span className="text-xs text-surface-500 dark:text-surface-400">
                                         사용 금액: <span className="font-bold text-red-500 dark:text-red-400">-{(hipassCard.balance - Number(form.hipassBalanceAfter)).toLocaleString()}원</span>
                                     </span>
                                     <span className={`text-sm font-bold ${
@@ -160,7 +160,7 @@ const VehicleStatusSection = memo(function VehicleStatusSection({
                                     </span>
                                 </div>
                             )}
-                            <p className="text-xs text-surface-400 dark:text-surface-500 mt-2">하이패스 사용 시 사용후 금액을 입력하면 잔액이 자동으로 업데이트됩니다</p>
+                            <p className="text-xs text-surface-500 dark:text-surface-400 mt-2">하이패스 사용 시 사용후 금액을 입력하면 잔액이 자동으로 업데이트됩니다</p>
                         </>
                     )}
                 </div>
@@ -174,7 +174,7 @@ const VehicleStatusSection = memo(function VehicleStatusSection({
                             <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300">
                                 ⛽ {refuelWord} 필요
                             </h3>
-                            <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
+                            <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">
                                 켜 두면 다음 사람이 이 차량을 예약할 때 안내가 떠요.
                                 {refuelWord}일지를 쓰면 자동으로 꺼집니다.
                             </p>

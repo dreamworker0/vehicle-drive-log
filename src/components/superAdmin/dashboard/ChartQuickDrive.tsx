@@ -22,10 +22,10 @@ function ChartQuickDrive({ quickDriveStats, quickDriveRatio }: Props) {
                     <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
                         🚀 사전 예약 vs 바로 운행 (최근 30일)
                     </h2>
-                    <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">
+                    <p className="text-xs text-surface-500 dark:text-surface-400 mb-4">
                         기존 예약 방식 대비 바로 운행(예약 없이 출발) 활용도 추이
                     </p>
-                    <div className="flex flex-col items-center justify-center py-12 text-surface-400 dark:text-surface-500">최근 발생한 데이터가 없습니다.</div>
+                    <div className="flex flex-col items-center justify-center py-12 text-surface-500 dark:text-surface-400">최근 발생한 데이터가 없습니다.</div>
                 </div>
             );
         }
@@ -37,7 +37,7 @@ function ChartQuickDrive({ quickDriveStats, quickDriveRatio }: Props) {
                         <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
                             🚀 사전 예약 vs 바로 운행 (최근 30일)
                         </h2>
-                        <p className="text-xs text-surface-400 dark:text-surface-500">
+                        <p className="text-xs text-surface-500 dark:text-surface-400">
                             기존 예약 방식 대비 바로 운행(예약 없이 출발) 활용도 추이
                         </p>
                         {trackedNote && (

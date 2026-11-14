@@ -42,7 +42,7 @@ export function BlockedScreen({ emoji, title, description, uid, allowTransfer = 
           <button
             onClick={() => { logout(); }}
             className={allowTransfer
-              ? 'btn-ghost w-full text-surface-500 min-h-[48px]'
+              ? 'btn-ghost w-full text-surface-500 dark:text-surface-400 min-h-[48px]'
               : 'btn-primary w-full min-h-[48px]'}
           >
             로그아웃

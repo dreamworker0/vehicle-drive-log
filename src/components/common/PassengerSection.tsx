@@ -289,7 +289,7 @@ const PassengerSection = memo(function PassengerSection({
                     >
                         +
                     </button>
-                    <span className="text-xs text-surface-400 dark:text-surface-500">명</span>
+                    <span className="text-xs text-surface-500 dark:text-surface-400">명</span>
                 </div>
             </div>
             )}

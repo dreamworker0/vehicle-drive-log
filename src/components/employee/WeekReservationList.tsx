@@ -34,7 +34,7 @@ const WeekReservationList = forwardRef<HTMLDivElement, WeekReservationListProps>
                                 <div className="flex items-center justify-between">
                                     <p className="text-xs font-semibold text-primary-600 dark:text-primary-400">{label}</p>
                                     <div className="flex items-center gap-1.5 flex-shrink-0">
-                                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${res.status === 'in_progress' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-surface-100 dark:bg-surface-700 text-surface-500 dark:text-surface-300'}`}>
+                                        <span className={`text-[10px] px-2 py-0.5 rounded-full ${res.status === 'in_progress' ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300' : 'bg-surface-100 dark:bg-surface-700 text-surface-600 dark:text-surface-300'}`}>
                                             {res.status === 'in_progress' ? '운행 중' : '예약됨'}
                                         </span>
                                         {res.groupId && (
@@ -43,7 +43,7 @@ const WeekReservationList = forwardRef<HTMLDivElement, WeekReservationListProps>
                                             </span>
                                         )}
                                         {res.status === 'reserved' && (
-                                            <button onClick={() => onCancelReservation(res)} disabled={cancellingId === res.id} className="text-xs text-surface-400 dark:text-surface-500 hover:text-red-500 dark:hover:text-red-400 transition-colors p-1 min-w-[48px] min-h-[48px] flex items-center justify-center" title="예약 취소">
+                                            <button onClick={() => onCancelReservation(res)} disabled={cancellingId === res.id} className="text-xs text-surface-500 dark:text-surface-400 hover:text-red-500 dark:hover:text-red-400 transition-colors p-1 min-w-[48px] min-h-[48px] flex items-center justify-center" title="예약 취소">
                                                 {cancellingId === res.id ? (
                                                     <div className="w-3.5 h-3.5 spinner" />
                                                 ) : (
@@ -61,7 +61,7 @@ const WeekReservationList = forwardRef<HTMLDivElement, WeekReservationListProps>
                                     </span>
                                     <div className="flex-1 min-w-0 text-left">
                                         <p className="text-sm font-medium text-surface-800 dark:text-surface-200 truncate">{res.vehicleName || vehicle?.displayName || vehicle?.name || ''}</p>
-                                        <p className="text-xs text-surface-400 dark:text-surface-500">
+                                        <p className="text-xs text-surface-500 dark:text-surface-400">
                                             {res.startTime} ~ {res.endTime}
                                             {res.destination && <span className="text-surface-500 dark:text-surface-400 font-medium ml-1">· {res.destination}</span>}
                                         </p>

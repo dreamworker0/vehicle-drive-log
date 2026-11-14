@@ -87,7 +87,7 @@ export default function OrgApplicationPage() {
                             <input
                                 type="text" name="applicantName" value={form.applicantName}
                                 onChange={handleChange}
-                                className={`input ${currentUser?.displayName ? 'bg-surface-50 dark:bg-surface-800 text-surface-500' : ''} min-h-[48px]`}
+                                className={`input ${currentUser?.displayName ? 'bg-surface-50 dark:bg-surface-800 text-surface-500 dark:text-surface-400' : ''} min-h-[48px]`}
                                 readOnly={!!currentUser?.displayName}
                                 placeholder="홍길동" required
                             />
@@ -160,7 +160,7 @@ export default function OrgApplicationPage() {
                                             <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 0 1 3.182 0l5.159 5.159m-1.5-1.5 1.409-1.409a2.25 2.25 0 0 1 3.182 0l2.909 2.909M3.75 21h16.5a1.5 1.5 0 0 0 1.5-1.5V6a1.5 1.5 0 0 0-1.5-1.5H3.75A1.5 1.5 0 0 0 2.25 6v13.5A1.5 1.5 0 0 0 3.75 21z" />
                                         </svg>
                                         <p className="text-sm text-surface-500 dark:text-surface-400">{isDragging ? '여기에 놓으세요!' : '클릭 또는 드래그하여 업로드'}</p>
-                                        <p className="text-xs text-surface-400 dark:text-surface-500">JPG, PNG, PDF (5MB 이하)</p>
+                                        <p className="text-xs text-surface-500 dark:text-surface-400">JPG, PNG, PDF (5MB 이하)</p>
                                     </div>
                                 )}
                             </div>
@@ -173,7 +173,7 @@ export default function OrgApplicationPage() {
                                 onChange={handleImageChange}
                                 className="hidden"
                             />
-                            <p className="text-xs text-surface-400 dark:text-surface-500 mt-2">
+                            <p className="text-xs text-surface-500 dark:text-surface-400 mt-2">
                                 ※ 사회복지시설신고증은 증빙서류로 인정되지 않습니다. 고유번호증 또는 사업자등록증을 업로드해주세요.
                                 <br />※ 글자가 흐리거나 서류 일부만 찍히면 확인이 되지 않습니다. 밝은 곳에서 서류 전체가 나오도록 촬영하거나 발급받은 PDF 원본을 올려주세요.
                             </p>
@@ -190,7 +190,7 @@ export default function OrgApplicationPage() {
                                 maxLength={500}
                                 rows={3}
                             />
-                            <p className="text-xs text-surface-400 dark:text-surface-500 mt-1 text-right">
+                            <p className="text-xs text-surface-500 dark:text-surface-400 mt-1 text-right">
                                 {form.message.length}/500
                             </p>
                         </div>

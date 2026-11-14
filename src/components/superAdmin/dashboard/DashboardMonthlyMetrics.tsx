@@ -56,7 +56,7 @@ function DashboardMonthlyMetrics({ monthlyStats, weeklyActiveRate, onboardingSta
                         {weeklyActiveRate.active}<span className="text-sm font-normal ml-0.5">명</span>
                     </p>
                     <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">주간 활성 (WAU)</p>
-                    <p className="text-xs text-surface-400 dark:text-surface-500 mt-0.5">
+                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
                         {weeklyActiveRate.total > 0 ? Math.round((weeklyActiveRate.active / weeklyActiveRate.total) * 100) : 0}% 활성률
                     </p>
                 </div>
@@ -65,7 +65,7 @@ function DashboardMonthlyMetrics({ monthlyStats, weeklyActiveRate, onboardingSta
                         {onboardingStats.rate}<span className="text-sm font-normal ml-0.5">%</span>
                     </p>
                     <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">온보딩 완료율</p>
-                    <p className="text-xs text-surface-400 dark:text-surface-500 mt-0.5">
+                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">
                         {onboardingStats.completed}/{onboardingStats.total} 기관
                     </p>
                 </div>

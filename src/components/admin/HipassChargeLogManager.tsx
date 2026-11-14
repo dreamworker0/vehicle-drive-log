@@ -122,7 +122,7 @@ export default function HipassChargeLogManager() {
                         <button
                             type="button"
                             onClick={resetFilters}
-                            className="text-xs text-surface-400 hover:text-red-500 whitespace-nowrap min-h-[48px]"
+                            className="text-xs text-surface-500 dark:text-surface-400 hover:text-red-500 whitespace-nowrap min-h-[48px]"
                         >
                             초기화
                         </button>
@@ -138,7 +138,7 @@ export default function HipassChargeLogManager() {
                         className={`px-3 py-1.5 min-h-[48px] rounded-lg text-xs font-medium transition-all duration-200 ${
                             showStats
                                 ? 'bg-primary-600 text-white shadow-md'
-                                : 'bg-surface-100 text-surface-600 dark:bg-surface-700 dark:text-surface-400 hover:bg-surface-200 dark:hover:bg-surface-600'
+                                : 'bg-surface-100 text-surface-600 dark:bg-surface-700 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-600'
                         }`}
                     >
                         📊 {showStats ? '통계 숨기기' : '통계 보기'}
@@ -206,7 +206,7 @@ export default function HipassChargeLogManager() {
                                             </div>
                                             <div className="text-right">
                                                 <span className="font-semibold text-surface-900 dark:text-surface-100">{v.amount.toLocaleString()}원</span>
-                                                <span className="text-xs text-surface-400 ml-1.5">({v.count}건)</span>
+                                                <span className="text-xs text-surface-500 dark:text-surface-400 ml-1.5">({v.count}건)</span>
                                             </div>
                                         </div>
                                     ))}
@@ -221,13 +221,13 @@ export default function HipassChargeLogManager() {
             {filteredRecords.length === 0 ? (
                 <div className="glass-card p-12 text-center">
                     <div className="text-4xl mb-3">🛣️</div>
-                    <p className="text-surface-400 dark:text-surface-500 font-medium">하이패스 충전 기록이 없습니다</p>
-                    <p className="text-sm text-surface-300 dark:text-surface-600 mt-1">직원이 하이패스 충전 기록을 등록하면 여기에 표시됩니다</p>
+                    <p className="text-surface-500 dark:text-surface-400 font-medium">하이패스 충전 기록이 없습니다</p>
+                    <p className="text-sm text-surface-500 dark:text-surface-400 mt-1">직원이 하이패스 충전 기록을 등록하면 여기에 표시됩니다</p>
                 </div>
             ) : (
                 <div className="space-y-2">
                     {/* 헤더 (데스크탑) */}
-                    <div className="hidden sm:grid gap-2 px-4 py-2 text-xs font-medium text-surface-400 dark:text-surface-500" style={{ gridTemplateColumns: GRID_COLUMNS }}>
+                    <div className="hidden sm:grid gap-2 px-4 py-2 text-xs font-medium text-surface-500 dark:text-surface-400" style={{ gridTemplateColumns: GRID_COLUMNS }}>
                         <div>날짜</div>
                         <div>시각</div>
                         <div>충전자</div>
@@ -248,7 +248,7 @@ export default function HipassChargeLogManager() {
                                     <div className="flex items-center justify-between mb-2">
                                         <div className="flex items-center gap-2 flex-wrap">
                                             <span className="font-medium text-sm text-surface-900 dark:text-surface-100">{rec.chargerName}</span>
-                                            <span className="text-xs text-surface-400 dark:text-surface-500">{dateStr} {timeStr}</span>
+                                            <span className="text-xs text-surface-500 dark:text-surface-400">{dateStr} {timeStr}</span>
                                             <AdminEditedBadge lastEditedByUid={rec.lastEditedByUid} ownerUid={rec.chargerUid} />
                                         </div>
                                         <div className="flex items-center gap-2">

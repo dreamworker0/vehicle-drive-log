@@ -238,7 +238,7 @@ export default function EmployeeLayout() {
                                         idx === 1 ? 'mr-14' : idx === 3 ? 'ml-14' : ''
                                     } ${isActive
                                         ? 'text-primary-600 dark:text-primary-400 font-bold'
-                                        : 'text-surface-400 dark:text-surface-500 hover:text-surface-600 hover:bg-surface-100/50 dark:hover:bg-surface-800/50 font-medium'
+                                        : 'text-surface-500 dark:text-surface-400 hover:text-surface-600 hover:bg-surface-100/50 dark:hover:bg-surface-800/50 font-medium'
                                     }`
                                 }
                             >

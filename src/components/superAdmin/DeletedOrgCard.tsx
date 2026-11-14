@@ -49,7 +49,7 @@ export default function DeletedOrgCard({ org, isDeleting, onRestore, onPermanent
                                 {org.withdrawReason === 'other' && org.withdrawReasonDetail ? ` — ${org.withdrawReasonDetail}` : ''}
                             </p>
                         )}
-                        <div className="flex flex-wrap gap-3 text-sm text-surface-400 dark:text-surface-500">
+                        <div className="flex flex-wrap gap-3 text-sm text-surface-500 dark:text-surface-400">
                             <span>고유번호: {org.uniqueNumber}</span>
                             <span>•</span>
                             <span>삭제 {elapsed}일 경과</span>
@@ -59,7 +59,7 @@ export default function DeletedOrgCard({ org, isDeleting, onRestore, onPermanent
                             </span>
                         </div>
                         {org.address && (
-                            <p className="text-sm text-surface-400 dark:text-surface-500">{org.address}</p>
+                            <p className="text-sm text-surface-500 dark:text-surface-400">{org.address}</p>
                         )}
                     </div>
                     <div className="flex gap-2">

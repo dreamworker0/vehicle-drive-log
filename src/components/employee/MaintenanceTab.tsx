@@ -36,13 +36,13 @@ export default function MaintenanceTab() {
 
     return (
         <div className="animate-fade-in">
-            <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">
+            <p className="text-xs text-surface-500 dark:text-surface-400 mb-4">
                 차량 정비ㆍ수리 후 기록을 남겨주세요. 본인이 작성한 기록만 수정ㆍ삭제할 수 있어요.
             </p>
 
             {/* 헤더 */}
             <div className="flex items-center justify-between mb-4">
-                <p className="text-xs text-surface-400 dark:text-surface-500">{enrichedRecords.length}건</p>
+                <p className="text-xs text-surface-500 dark:text-surface-400">{enrichedRecords.length}건</p>
                 <button
                     onClick={() => {
                         if (showForm) { handleCancelEdit(); } else { setShowForm(true); }
@@ -172,8 +172,8 @@ export default function MaintenanceTab() {
             {enrichedRecords.length === 0 ? (
                 <div className="glass-card p-12 text-center">
                     <div className="text-4xl mb-3">🔧</div>
-                    <p className="text-surface-400 dark:text-surface-500 font-medium">아직 정비 기록이 없어요</p>
-                    <p className="text-sm text-surface-300 dark:text-surface-500 mt-1">차량 정비ㆍ수리 후 기록을 남기면 이력을 한눈에 볼 수 있어요</p>
+                    <p className="text-surface-500 dark:text-surface-400 font-medium">아직 정비 기록이 없어요</p>
+                    <p className="text-sm text-surface-500 dark:text-surface-400 mt-1">차량 정비ㆍ수리 후 기록을 남기면 이력을 한눈에 볼 수 있어요</p>
                     {!showForm && (
                         <button
                             onClick={() => setShowForm(true)}
@@ -214,11 +214,11 @@ export default function MaintenanceTab() {
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center gap-2">
                                         <span className="font-bold text-sm text-surface-900 dark:text-surface-100">{rec.vehicleName}</span>
-                                        <span className="text-xs px-1.5 py-0.5 rounded bg-surface-100 dark:bg-surface-700 text-surface-500 dark:text-surface-400">
+                                        <span className="text-xs px-1.5 py-0.5 rounded bg-surface-100 dark:bg-surface-700 text-surface-600 dark:text-surface-300">
                                             {typeInfo.icon} {typeInfo.label}
                                         </span>
                                     </div>
-                                    <p className="text-xs text-surface-400 dark:text-surface-500 mt-0.5 truncate">
+                                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5 truncate">
                                         {rec.date}
                                         {rec.createdByName && ` · ${rec.createdByName}`}
                                         {rec.shop && ` · ${rec.shop}`}
@@ -241,7 +241,7 @@ export default function MaintenanceTab() {
                                     {isOwn && (
                                         <button
                                             onClick={(e) => { e.stopPropagation(); handleDelete(rec); }}
-                                            className="text-[10px] text-surface-300 dark:text-surface-600 hover:text-red-500 dark:hover:text-red-400 transition-colors mt-0.5 min-w-[48px] min-h-[48px] flex items-center justify-center"
+                                            className="text-[10px] text-surface-500 dark:text-surface-400 hover:text-red-500 dark:hover:text-red-400 transition-colors mt-0.5 min-w-[48px] min-h-[48px] flex items-center justify-center"
                                             aria-label="기록 삭제"
                                         >
                                             삭제

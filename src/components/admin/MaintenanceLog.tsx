@@ -101,7 +101,7 @@ export default function MaintenanceLog() {
                                 <div key={v.id} className="flex items-center gap-2 bg-amber-50 dark:bg-amber-900/20 px-3 py-1.5 rounded-full text-xs">
                                     <span className="text-amber-700 dark:text-amber-400 font-medium">
                                         {typeInfo.icon} {v.displayName}
-                                        {v.maintenance?.endDate && <span className="text-surface-400 dark:text-surface-500"> (~{v.maintenance.endDate.slice(5)})</span>}
+                                        {v.maintenance?.endDate && <span className="text-surface-500 dark:text-surface-400"> (~{v.maintenance.endDate.slice(5)})</span>}
                                     </span>
                                     <button
                                         onClick={() => handleClearBlock(v.id)}
@@ -129,8 +129,8 @@ export default function MaintenanceLog() {
             {filteredRecords.length === 0 ? (
                 <div className="glass-card p-12 text-center">
                     <div className="text-4xl mb-3">🔧</div>
-                    <p className="text-surface-400 dark:text-surface-500 font-medium">정비 기록이 없습니다</p>
-                    <p className="text-sm text-surface-300 dark:text-surface-600 mt-1">위의 버튼으로 새 기록을 추가하세요</p>
+                    <p className="text-surface-500 dark:text-surface-400 font-medium">정비 기록이 없습니다</p>
+                    <p className="text-sm text-surface-500 dark:text-surface-400 mt-1">위의 버튼으로 새 기록을 추가하세요</p>
                 </div>
             ) : (
                 <div className="space-y-2">

@@ -108,7 +108,7 @@ export default function MileageInput({
                 <div className="mb-4 px-3 py-2.5 rounded-xl bg-surface-50 dark:bg-surface-800/60 border border-surface-200 dark:border-surface-700 text-xs text-surface-600 dark:text-surface-400 flex flex-col gap-1 animate-fade-in">
                     <div className="flex items-center justify-between">
                         <span className="font-medium text-surface-700 dark:text-surface-300">ℹ️ 직전 운전 정보</span>
-                        <span className="text-[10px] text-surface-400 dark:text-surface-500">비교하여 기록할 수 있습니다</span>
+                        <span className="text-[10px] text-surface-500 dark:text-surface-400">비교하여 기록할 수 있습니다</span>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:justify-between text-surface-500 dark:text-surface-400 mt-0.5 gap-1 sm:gap-0">
                         <span>운전자: <strong className="text-surface-800 dark:text-surface-200">{lastDriveLog.driverName || '알 수 없음'}</strong></span>
@@ -135,7 +135,7 @@ export default function MileageInput({
                 <div className="mb-4 px-3 py-2.5 rounded-xl bg-surface-50 dark:bg-surface-800/60 border border-surface-200 dark:border-surface-700 text-xs text-surface-600 dark:text-surface-400 flex flex-col gap-1 animate-fade-in">
                     <div className="flex items-center justify-between">
                         <span className="font-medium text-surface-700 dark:text-surface-300">ℹ️ 직후 운전 정보</span>
-                        <span className="text-[10px] text-surface-400 dark:text-surface-500">비교하여 기록할 수 있습니다</span>
+                        <span className="text-[10px] text-surface-500 dark:text-surface-400">비교하여 기록할 수 있습니다</span>
                     </div>
                     <div className="flex flex-col sm:flex-row sm:justify-between text-surface-500 dark:text-surface-400 mt-0.5 gap-1 sm:gap-0">
                         <span>운전자: <strong className="text-surface-800 dark:text-surface-200">{nextDriveLog.driverName || '알 수 없음'}</strong></span>
@@ -207,7 +207,7 @@ export default function MileageInput({
                     <span className="text-lg font-bold text-primary-600 dark:text-primary-400">
                         {(Number(form.endKm) - Number(form.startKm)).toLocaleString()} km
                     </span>
-                    <span className="text-sm text-surface-400 dark:text-surface-500 ml-1">주행</span>
+                    <span className="text-sm text-surface-500 dark:text-surface-400 ml-1">주행</span>
                 </div>
             )}
         </div>

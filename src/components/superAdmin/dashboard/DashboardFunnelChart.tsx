@@ -15,7 +15,7 @@ function DashboardFunnelChart({ funnelData }: Props) {
                             🔄 기관 활성화 퍼널
                         </h2>
                     </div>
-                    <div className="flex flex-col items-center justify-center py-12 text-surface-400 dark:text-surface-500">최근 발생한 데이터가 없습니다.</div>
+                    <div className="flex flex-col items-center justify-center py-12 text-surface-500 dark:text-surface-400">최근 발생한 데이터가 없습니다.</div>
                 </div>
             );
         }
@@ -30,7 +30,7 @@ function DashboardFunnelChart({ funnelData }: Props) {
                     <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200">
                         🔄 기관 활성화 퍼널
                     </h2>
-                    <span className="text-xs text-surface-400 dark:text-surface-500">
+                    <span className="text-xs text-surface-500 dark:text-surface-400">
                         전체 전환율 {overallRate}%
                     </span>
                 </div>
@@ -65,7 +65,7 @@ function DashboardFunnelChart({ funnelData }: Props) {
                                     {/* 상단: 아이콘 + 단계 번호 */}
                                     <div className="relative flex items-center justify-between mb-3">
                                         <span className="text-2xl">{step.icon}</span>
-                                        <span className="text-[10px] font-mono text-surface-400 dark:text-surface-500 bg-surface-100 dark:bg-surface-700 px-1.5 py-0.5 rounded-full">
+                                        <span className="text-[10px] font-mono text-surface-600 dark:text-surface-300 bg-surface-100 dark:bg-surface-700 px-1.5 py-0.5 rounded-full">
                                             STEP {idx + 1}
                                         </span>
                                     </div>
@@ -96,7 +96,7 @@ function DashboardFunnelChart({ funnelData }: Props) {
                                         {idx > 0 && step.dropoff > 0 && (
                                             <span className="text-[11px] text-rose-500 dark:text-rose-400 font-medium">
                                                 ▼{step.dropoff}
-                                                <span className="text-surface-400 dark:text-surface-500 ml-0.5">
+                                                <span className="text-surface-500 dark:text-surface-400 ml-0.5">
                                                     ({step.conversionFromPrev}%)
                                                 </span>
                                             </span>

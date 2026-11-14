@@ -75,7 +75,7 @@ function CollapsibleSection({ title, summary, defaultOpen = false, children }: {
             >
                 <span className="text-sm font-medium text-surface-700 dark:text-surface-300">{title}</span>
                 <span className="flex items-center gap-2 min-w-0">
-                    {summary && <span className="text-xs text-surface-400 dark:text-surface-500 truncate">{summary}</span>}
+                    {summary && <span className="text-xs text-surface-500 dark:text-surface-400 truncate">{summary}</span>}
                     <svg className={`w-4 h-4 shrink-0 text-surface-400 dark:text-surface-500 transition-transform ${open ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" d="m19 9-7 7-7-7" />
                     </svg>
@@ -172,7 +172,7 @@ export default function VehicleForm({
                     <button
                         type="button"
                         onClick={onCancel}
-                        className="p-1.5 rounded-lg text-surface-400 hover:text-surface-600 hover:bg-surface-100 dark:hover:text-surface-300 dark:hover:bg-surface-700 transition-colors min-h-[48px]"
+                        className="p-1.5 rounded-lg text-surface-500 dark:text-surface-400 hover:text-surface-600 hover:bg-surface-100 dark:hover:text-surface-300 dark:hover:bg-surface-700 transition-colors min-h-[48px]"
                         aria-label="닫기"
                     >
                         <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
@@ -188,7 +188,7 @@ export default function VehicleForm({
                             onChange={e => setForm({ ...form, displayName: e.target.value })}
                             className="input" placeholder="예: 소나타2744" required
                         />
-                        <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">직원들이 쉽게 구분할 수 있는 이름</p>
+                        <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">직원들이 쉽게 구분할 수 있는 이름</p>
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -315,7 +315,7 @@ export default function VehicleForm({
                                 );
                             })}
                         </div>
-                        <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
+                        <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">
                             평소 이 차량이 세워져 있는 곳 · 예약의 거리와 소요시간이 이 주소에서 출발하는 기준으로 계산됩니다
                         </p>
                     </div>
@@ -324,7 +324,7 @@ export default function VehicleForm({
                     <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                             <p className="label mb-0.5">출발지가 매번 바뀜</p>
-                            <p className="text-xs text-surface-400 dark:text-surface-500">
+                            <p className="text-xs text-surface-500 dark:text-surface-400">
                                 켜면 운전자가 운행일지에서 출발지와 차를 세운 곳을 직접 고릅니다 · 24시간 운영처럼 차가 매일 다른 곳에서 출발할 때만 켜세요
                             </p>
                         </div>
@@ -354,7 +354,7 @@ export default function VehicleForm({
                                 <option key={site.id} value={site.id}>{site.name}</option>
                             ))}
                         </select>
-                        <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
+                        <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">
                             운행 기록으로 자동 갱신됩니다 · 기록 없이 차를 옮겼을 때만 직접 고치세요
                         </p>
                     </div>
@@ -363,7 +363,7 @@ export default function VehicleForm({
                     <div className="flex items-start justify-between gap-3" data-testid="vehicle-needs-refuel">
                         <div className="min-w-0">
                             <label className="label mb-0">{refuelWord} 필요</label>
-                            <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
+                            <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">
                                 운전자가 운행일지에서 켜고 {refuelWord}일지를 쓰면 자동으로 꺼집니다 ·
                                 {refuelWord}일지를 쓰지 않는다면 여기서 직접 끄세요
                                 {refuelMarkedAt && ` · ${refuelMarkedAt} 표시됨`}
@@ -389,7 +389,7 @@ export default function VehicleForm({
                         {form.currentKm !== '' && Number(form.currentKm) < 0 && (
                             <p className="text-[11px] text-red-500 dark:text-red-400 mt-1 font-medium">⚠️ 누적 km는 0 이상이어야 합니다.</p>
                         )}
-                        <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">지금 계기판 숫자 — 운행일지가 저장되면 가장 최근 도착 km로 자동으로 맞춰져요</p>
+                        <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">지금 계기판 숫자 — 운행일지가 저장되면 가장 최근 도착 km로 자동으로 맞춰져요</p>
                     </div>
                     <CollapsibleSection
                         title="🛡️ 보험 정보 (선택)"
@@ -414,7 +414,7 @@ export default function VehicleForm({
                             onChange={e => setForm({ ...form, insuranceExpiryDate: e.target.value })}
                             className="input" aria-describedby="insurance-info-help"
                         />
-                        <p id="insurance-info-help" className="text-xs text-surface-400 dark:text-surface-500 mt-1">
+                        <p id="insurance-info-help" className="text-xs text-surface-500 dark:text-surface-400 mt-1">
                             사고 시 연락할 보험사 정보 · 만료 15일 전 관리자에게 알림
                         </p>
                     </CollapsibleSection>
@@ -444,9 +444,9 @@ export default function VehicleForm({
                                 })}
                             </div>
                         ) : (
-                            <p className="text-xs text-surface-400 dark:text-surface-500">직원 목록을 불러오는 중이거나 등록된 직원이 없습니다</p>
+                            <p className="text-xs text-surface-500 dark:text-surface-400">직원 목록을 불러오는 중이거나 등록된 직원이 없습니다</p>
                         )}
-                        <p className="text-xs text-surface-400 dark:text-surface-500 mt-1.5">
+                        <p className="text-xs text-surface-500 dark:text-surface-400 mt-1.5">
                             선택하지 않으면 모든 직원이 사용할 수 있습니다 · 선택하면 지정된 직원만(관리자 포함 그 외 전원 불가) 예약·운행 가능
                         </p>
                     </CollapsibleSection>

@@ -59,7 +59,7 @@ export default function DriveLogFilters({ filters, onFiltersChange, vehicles, me
                     <button
                         type="button"
                         onClick={() => onFiltersChange({ ...filters, startDate: '', endDate: '' })}
-                        className="text-xs text-surface-400 dark:text-surface-500 hover:text-red-500 dark:hover:text-red-400 whitespace-nowrap"
+                        className="text-xs text-surface-500 dark:text-surface-400 hover:text-red-500 dark:hover:text-red-400 whitespace-nowrap"
                     >
                         초기화
                     </button>

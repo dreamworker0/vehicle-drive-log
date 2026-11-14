@@ -271,11 +271,11 @@ export default function DashboardCalendarProbe() {
                                                         <p className="font-medium text-surface-700 dark:text-surface-300">
                                                             {row.organizationName}
                                                         </p>
-                                                        <p className="text-surface-400 dark:text-surface-500 break-all">
+                                                        <p className="text-surface-500 dark:text-surface-400 break-all">
                                                             {row.calendarId}
                                                         </p>
                                                         {row.organizationStatus !== 'approved' && (
-                                                            <p className="text-surface-400 dark:text-surface-500">
+                                                            <p className="text-surface-500 dark:text-surface-400">
                                                                 기관 상태: {row.organizationStatus}
                                                             </p>
                                                         )}
@@ -295,7 +295,7 @@ export default function DashboardCalendarProbe() {
                                                                 영구중단 {row.blockedVehicleCount}대
                                                             </span>
                                                         )}
-                                                        <span className="block text-surface-400 dark:text-surface-500">
+                                                        <span className="block text-surface-500 dark:text-surface-400">
                                                             {row.vehicleNames.slice(0, 3).join(', ')}
                                                             {row.vehicleNames.length > 3 && ` 외 ${row.vehicleNames.length - 3}대`}
                                                         </span>
@@ -305,7 +305,7 @@ export default function DashboardCalendarProbe() {
                                                     </td>
                                                     <td className="py-2 pr-3 text-surface-600 dark:text-surface-300 min-w-[16rem]">
                                                         {inert ? (
-                                                            <span className="text-surface-400 dark:text-surface-500">
+                                                            <span className="text-surface-500 dark:text-surface-400">
                                                                 동기화가 돌지 않는 기관 — 조치 불필요
                                                                 {!row.calendarEnabled && ' (캘린더 기능 OFF)'}
                                                                 {row.organizationStatus === '(문서없음)' && ' (기관 문서 없음)'}
@@ -314,7 +314,7 @@ export default function DashboardCalendarProbe() {
                                                             cfg.action
                                                         )}
                                                         {row.detail && (row.verdict === 'error' || row.verdict === 'rate_limited') && (
-                                                            <span className="block text-surface-400 dark:text-surface-500 break-all">
+                                                            <span className="block text-surface-500 dark:text-surface-400 break-all">
                                                                 {row.detail}
                                                             </span>
                                                         )}

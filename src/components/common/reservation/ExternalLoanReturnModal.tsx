@@ -144,7 +144,7 @@ export default function ExternalLoanReturnModal({ reservation, allReservations, 
             <div className="bg-white dark:bg-surface-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden animate-slide-up">
                 <div className="flex items-center justify-between p-5 border-b border-surface-200 dark:border-surface-700">
                     <h2 id="loan-return-title" className="text-lg font-bold text-surface-800 dark:text-surface-100">🤝 외부 대여 반납</h2>
-                    <button type="button" onClick={onClose} aria-label="닫기" className="min-w-[48px] min-h-[48px] text-surface-400 hover:text-surface-600 dark:hover:text-surface-200">✕</button>
+                    <button type="button" onClick={onClose} aria-label="닫기" className="min-w-[48px] min-h-[48px] text-surface-500 dark:text-surface-400 hover:text-surface-600 dark:hover:text-surface-200">✕</button>
                 </div>
                 <form
                     className="p-5 space-y-3"

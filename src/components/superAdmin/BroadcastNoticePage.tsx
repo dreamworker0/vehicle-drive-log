@@ -183,7 +183,7 @@ export default function BroadcastNoticePage() {
                         className="input w-full min-h-[48px]"
                         placeholder="공지 제목"
                     />
-                    <p className="mt-1 text-xs text-surface-400 dark:text-surface-500 text-right">
+                    <p className="mt-1 text-xs text-surface-500 dark:text-surface-400 text-right">
                         {trimmedTitle.length} / {MAX_TITLE}
                     </p>
                 </div>
@@ -201,7 +201,7 @@ export default function BroadcastNoticePage() {
                         className="input w-full resize-y"
                         placeholder="공지 내용"
                     />
-                    <p className="mt-1 text-xs text-surface-400 dark:text-surface-500 text-right">
+                    <p className="mt-1 text-xs text-surface-500 dark:text-surface-400 text-right">
                         {trimmedMessage.length} / {MAX_MESSAGE}
                     </p>
                 </div>
@@ -242,7 +242,7 @@ export default function BroadcastNoticePage() {
             </div>
 
             {!preview && (
-                <p className="text-xs text-surface-400 dark:text-surface-500">
+                <p className="text-xs text-surface-500 dark:text-surface-400">
                     발송하려면 먼저 [대상 확인]을 눌러 인원을 확인하세요.
                 </p>
             )}
@@ -253,11 +253,11 @@ export default function BroadcastNoticePage() {
                 </h2>
 
                 {history === null && (
-                    <p className="text-sm text-surface-400 dark:text-surface-500">불러오는 중...</p>
+                    <p className="text-sm text-surface-500 dark:text-surface-400">불러오는 중...</p>
                 )}
 
                 {history?.length === 0 && (
-                    <p className="text-sm text-surface-400 dark:text-surface-500">아직 발송한 공지가 없습니다.</p>
+                    <p className="text-sm text-surface-500 dark:text-surface-400">아직 발송한 공지가 없습니다.</p>
                 )}
 
                 {history && history.length > 0 && (
@@ -271,7 +271,7 @@ export default function BroadcastNoticePage() {
                                     <p className="text-sm font-medium text-surface-800 dark:text-surface-200 break-all">
                                         {b.title}
                                     </p>
-                                    <span className="shrink-0 text-xs text-surface-400 dark:text-surface-500">
+                                    <span className="shrink-0 text-xs text-surface-500 dark:text-surface-400">
                                         {formatTimestampFull(b.sentAt as never) ?? '-'}
                                     </span>
                                 </div>

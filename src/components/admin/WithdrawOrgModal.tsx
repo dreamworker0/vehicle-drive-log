@@ -47,7 +47,7 @@ export default function WithdrawOrgModal({ orgName, submitting, onClose, onConfi
                 {/* 헤더 */}
                 <div className="flex items-center justify-between p-5 border-b border-surface-100 dark:border-surface-700">
                     <h2 className="text-lg font-bold text-red-600 dark:text-red-400">서비스 해지</h2>
-                    <button onClick={onClose} aria-label="닫기" className="btn-icon text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 dark:text-surface-400 min-w-[48px] min-h-[48px] flex items-center justify-center">
+                    <button onClick={onClose} aria-label="닫기" className="btn-icon text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 dark:text-surface-400 min-w-[48px] min-h-[48px] flex items-center justify-center">
                         <svg aria-hidden="true" className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
                         </svg>

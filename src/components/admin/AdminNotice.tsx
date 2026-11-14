@@ -76,7 +76,7 @@ export default function AdminNotice() {
                             <h3 className="text-lg font-bold text-surface-900 dark:text-surface-100">📢 공지사항 보내기</h3>
                             <button
                                 onClick={() => setIsOpen(false)}
-                                className="btn-icon min-h-[48px] min-w-[48px] text-surface-400 dark:text-surface-500 hover:text-surface-600 dark:hover:text-surface-300"
+                                className="btn-icon min-h-[48px] min-w-[48px] text-surface-500 dark:text-surface-400 hover:text-surface-600 dark:hover:text-surface-300"
                                 aria-label="닫기"
                                 disabled={sending}
                             >
@@ -115,7 +115,7 @@ export default function AdminNotice() {
                                     maxLength={500}
                                     disabled={sending}
                                 />
-                                <p className="text-xs text-surface-400 dark:text-surface-500 mt-1 text-right">{message.length}/500</p>
+                                <p className="text-xs text-surface-500 dark:text-surface-400 mt-1 text-right">{message.length}/500</p>
                             </div>
                             <div className="flex gap-2 pt-2">
                                 <button

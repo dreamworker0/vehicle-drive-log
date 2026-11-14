@@ -39,7 +39,7 @@ export default function AccountSection() {
                 </div>
                 <div className="min-w-0 flex-1">
                     <p className="text-sm font-semibold text-surface-900 dark:text-surface-100 truncate">{user?.displayName || '이름 없음'}</p>
-                    <p className="text-xs text-surface-400 truncate">{user?.email}</p>
+                    <p className="text-xs text-surface-500 dark:text-surface-400 truncate">{user?.email}</p>
                 </div>
                 <button
                     onClick={logout}
@@ -75,7 +75,7 @@ export default function AccountSection() {
                             </div>
                             <div>
                                 <p className="text-sm font-semibold text-surface-900 dark:text-surface-100">푸시 알림</p>
-                                <p className="text-xs text-surface-400">예약 알림 및 운행 관련 알림</p>
+                                <p className="text-xs text-surface-500 dark:text-surface-400">예약 알림 및 운행 관련 알림</p>
                             </div>
                         </div>
                         {permission === 'default' ? (

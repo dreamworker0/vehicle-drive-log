@@ -34,7 +34,7 @@ const VehicleInfoSection = memo(function VehicleInfoSection({
                         </span>
                         <div>
                             <p className="font-semibold text-surface-900 dark:text-surface-100">{form.vehicleName}</p>
-                            <p className="text-xs text-surface-400 dark:text-surface-500">
+                            <p className="text-xs text-surface-500 dark:text-surface-400">
                                 {isEditMode ? '수정 중인 차량' : '예약 배정 차량'}
                             </p>
                         </div>
@@ -42,7 +42,7 @@ const VehicleInfoSection = memo(function VehicleInfoSection({
                     {form.startTime && (
                         <div className="text-right">
                             <p className="text-lg font-bold text-primary-600 dark:text-primary-400">{form.startTime}</p>
-                            <p className="text-xs text-surface-400 dark:text-surface-500">출발 시각</p>
+                            <p className="text-xs text-surface-500 dark:text-surface-400">출발 시각</p>
                         </div>
                     )}
                 </div>
@@ -50,13 +50,13 @@ const VehicleInfoSection = memo(function VehicleInfoSection({
                     <div className="mt-3 pt-3 border-t border-surface-100 dark:border-surface-700 grid grid-cols-2 gap-4">
                         {form.purpose && (
                             <div>
-                                <p className="text-xs text-surface-400 dark:text-surface-500">운행 목적</p>
+                                <p className="text-xs text-surface-500 dark:text-surface-400">운행 목적</p>
                                 <p className="text-sm font-medium text-surface-800 dark:text-surface-200">{form.purpose}</p>
                             </div>
                         )}
                         {form.destination && (
                             <div>
-                                <p className="text-xs text-surface-400 dark:text-surface-500">행선지</p>
+                                <p className="text-xs text-surface-500 dark:text-surface-400">행선지</p>
                                 <p className="text-sm font-medium text-surface-800 dark:text-surface-200">{form.destination}</p>
                             </div>
                         )}

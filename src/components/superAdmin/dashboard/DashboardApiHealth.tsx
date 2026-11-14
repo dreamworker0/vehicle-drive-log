@@ -158,7 +158,7 @@ export default function DashboardApiHealth() {
                 </div>
                 <div className="flex items-center gap-2">
                     {lastChecked && (
-                        <span className="text-xs text-surface-400 dark:text-surface-500">{lastChecked} 기준</span>
+                        <span className="text-xs text-surface-500 dark:text-surface-400">{lastChecked} 기준</span>
                     )}
                     <button
                         onClick={runHealthCheck}
@@ -214,7 +214,7 @@ export default function DashboardApiHealth() {
                     <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300">
                         외부 서비스
                     </h3>
-                    <span className="inline-flex items-center gap-0.5 text-xs font-medium text-surface-500 dark:text-surface-400 bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded-full">
+                    <span className="inline-flex items-center gap-0.5 text-xs font-medium text-surface-600 dark:text-surface-400 bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded-full">
                         {results.length}
                     </span>
                 </div>
@@ -276,7 +276,7 @@ export default function DashboardApiHealth() {
                         <h3 className="text-sm font-semibold text-surface-700 dark:text-surface-300">
                             내부 서비스
                         </h3>
-                        <span className="inline-flex items-center gap-0.5 text-xs font-medium text-surface-500 dark:text-surface-400 bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded-full">
+                        <span className="inline-flex items-center gap-0.5 text-xs font-medium text-surface-600 dark:text-surface-400 bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded-full">
                             {internalResults.length}
                         </span>
                         {hasCalendarIssue && (
@@ -339,7 +339,7 @@ export default function DashboardApiHealth() {
             <DashboardCalendarProbe />
 
             {/* 안내 메시지 */}
-            <p className="mt-3 text-xs text-surface-400 dark:text-surface-500">
+            <p className="mt-3 text-xs text-surface-500 dark:text-surface-400">
                 * 각 API에 가벼운 핑을 보내 응답 속도와 가용성을 확인합니다. 🟢 정상(3초 미만) · 🟡 지연(3초 이상) · 🔴 에러(응답 없음)
             </p>
         </div>

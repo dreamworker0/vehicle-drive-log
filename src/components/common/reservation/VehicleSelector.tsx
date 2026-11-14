@@ -67,7 +67,7 @@ export default function VehicleSelector({
                                 <span className={`w-8 h-8 rounded-lg flex items-center justify-center text-base ${isDisabled ? 'bg-surface-200 dark:bg-surface-700' : getVehicleColor(v.id)}`}>
                                     {isBlocked ? '🔧' : isRestricted ? '🔒' : (VEHICLE_TYPE_ICONS[v.vehicleType as keyof typeof VEHICLE_TYPE_ICONS] || '🚗')}
                                 </span>
-                                <p className={`font-medium text-xs text-center leading-tight ${isDisabled ? 'text-surface-400' : 'text-surface-900 dark:text-surface-100'}`}>{v.displayName}</p>
+                                <p className={`font-medium text-xs text-center leading-tight ${isDisabled ? 'text-surface-500 dark:text-surface-400' : 'text-surface-900 dark:text-surface-100'}`}>{v.displayName}</p>
                                 {isBlocked && (
                                     <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">정비 중</span>
                                 )}

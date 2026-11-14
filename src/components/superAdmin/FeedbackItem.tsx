@@ -71,7 +71,7 @@ export default function FeedbackItem({
                                     </span>
                                 )}
                                 {fb.userEmail && (
-                                    <span className="text-xs text-surface-400 dark:text-surface-500">
+                                    <span className="text-xs text-surface-500 dark:text-surface-400">
                                         {fb.userEmail}
                                     </span>
                                 )}
@@ -80,7 +80,7 @@ export default function FeedbackItem({
                         <p className={`text-sm text-surface-600 dark:text-surface-400 ${isExpanded ? '' : 'line-clamp-2'}`}>
                             {fb.message}
                         </p>
-                        <div className="flex items-center gap-3 mt-2 text-xs text-surface-400 dark:text-surface-500">
+                        <div className="flex items-center gap-3 mt-2 text-xs text-surface-500 dark:text-surface-400">
                             <span>{formatTimestampFull(fb.createdAt) || '-'}</span>
                             {fb.imageUrls && fb.imageUrls.length > 0 && (
                                 <span className="flex items-center gap-1">
@@ -105,7 +105,7 @@ export default function FeedbackItem({
                             }}
                             className={`px-3 py-1.5 min-h-[48px] rounded-lg text-xs font-medium transition-all ${isUnread
                                 ? 'bg-primary-50 text-primary-600 hover:bg-primary-100 dark:bg-primary-900/30 dark:text-primary-300 dark:hover:bg-primary-900/50'
-                                : 'bg-surface-100 text-surface-500 hover:bg-surface-200 dark:bg-surface-700 dark:text-surface-400 dark:hover:bg-surface-600'
+                                : 'bg-surface-100 text-surface-600 hover:bg-surface-200 dark:bg-surface-700 dark:text-surface-300 dark:hover:bg-surface-600'
                                 }`}
                             title={isUnread ? '처리완료 상태로 표시' : '미확인으로 변경'}
                         >
@@ -113,7 +113,7 @@ export default function FeedbackItem({
                         </button>
                         <button
                             onClick={(e) => onCopyMessage(e, fb.id, fb.message || '')}
-                            className="p-2 min-h-[48px] min-w-[48px] flex items-center justify-center rounded-lg text-surface-400 dark:text-surface-500 hover:text-primary-500 hover:bg-primary-50 dark:hover:text-primary-400 dark:hover:bg-primary-900/30 transition-all"
+                            className="p-2 min-h-[48px] min-w-[48px] flex items-center justify-center rounded-lg text-surface-500 dark:text-surface-400 hover:text-primary-500 hover:bg-primary-50 dark:hover:text-primary-400 dark:hover:bg-primary-900/30 transition-all"
                             title="본문 복사"
                         >
                             {copiedMessage === fb.id ? (
@@ -131,7 +131,7 @@ export default function FeedbackItem({
                                 e.stopPropagation();
                                 onSetDeleteTarget(fb);
                             }}
-                            className="p-2 min-h-[48px] min-w-[48px] flex items-center justify-center rounded-lg text-surface-400 dark:text-surface-500 hover:text-red-500 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-900/30 transition-all"
+                            className="p-2 min-h-[48px] min-w-[48px] flex items-center justify-center rounded-lg text-surface-500 dark:text-surface-400 hover:text-red-500 hover:bg-red-50 dark:hover:text-red-400 dark:hover:bg-red-900/30 transition-all"
                             title="삭제"
                         >
                             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
@@ -190,7 +190,7 @@ export default function FeedbackItem({
                                         </span>
                                     )}
                                     {fb.repliedAt && (
-                                        <span className="text-xs text-surface-400 dark:text-surface-500">
+                                        <span className="text-xs text-surface-500 dark:text-surface-400">
                                             {formatTimestampFull(fb.repliedAt)}
                                         </span>
                                     )}

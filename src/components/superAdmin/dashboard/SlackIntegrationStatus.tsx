@@ -66,11 +66,11 @@ export default function SlackIntegrationStatus({ totalOrgs }: Props) {
             </h2>
 
             {loading ? (
-                <div className="flex items-center justify-center py-12 text-surface-400 dark:text-surface-500">
+                <div className="flex items-center justify-center py-12 text-surface-500 dark:text-surface-400">
                     <div className="w-6 h-6 spinner" />
                 </div>
             ) : error ? (
-                <div className="flex flex-col items-center justify-center py-12 text-surface-400 dark:text-surface-500">
+                <div className="flex flex-col items-center justify-center py-12 text-surface-500 dark:text-surface-400">
                     현황을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.
                 </div>
             ) : (
@@ -81,18 +81,18 @@ export default function SlackIntegrationStatus({ totalOrgs }: Props) {
                             <span className="text-xs text-surface-500 dark:text-surface-400">연결된 기관</span>
                             <span className="text-3xl font-bold text-[#4A154B] dark:text-purple-300">
                                 {data?.activeCount ?? 0}
-                                <span className="text-base font-medium text-surface-400 dark:text-surface-500"> / {totalOrgs}곳</span>
+                                <span className="text-base font-medium text-surface-500 dark:text-surface-400"> / {totalOrgs}곳</span>
                             </span>
                         </div>
                         <div className="ml-auto text-right">
                             <span className="text-2xl font-bold text-surface-700 dark:text-surface-200">{pct}%</span>
-                            <p className="text-xs text-surface-400 dark:text-surface-500">전체 기관 중 연동율</p>
+                            <p className="text-xs text-surface-500 dark:text-surface-400">전체 기관 중 연동율</p>
                         </div>
                     </div>
 
                     {/* 기관 표 */}
                     {(data?.integrations.length ?? 0) === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-8 text-surface-400 dark:text-surface-500">
+                        <div className="flex flex-col items-center justify-center py-8 text-surface-500 dark:text-surface-400">
                             아직 Slack을 연결한 기관이 없습니다.
                         </div>
                     ) : (
@@ -113,7 +113,7 @@ export default function SlackIntegrationStatus({ totalOrgs }: Props) {
                                             className="border-b border-surface-100 dark:border-surface-800 last:border-0"
                                         >
                                             <td className="py-2.5 pr-3 text-surface-800 dark:text-surface-100 font-medium">
-                                                {it.organizationName || <span className="text-surface-400">{it.organizationId || '알 수 없음'}</span>}
+                                                {it.organizationName || <span className="text-surface-500 dark:text-surface-400">{it.organizationId || '알 수 없음'}</span>}
                                             </td>
                                             <td className="py-2.5 px-3 text-surface-600 dark:text-surface-300">
                                                 {it.teamName || '-'}
@@ -124,7 +124,7 @@ export default function SlackIntegrationStatus({ totalOrgs }: Props) {
                                                         연결됨
                                                     </span>
                                                 ) : (
-                                                    <span className="inline-flex items-center gap-1 text-xs font-medium bg-surface-100 dark:bg-surface-700 text-surface-500 dark:text-surface-400 px-2 py-0.5 rounded-full">
+                                                    <span className="inline-flex items-center gap-1 text-xs font-medium bg-surface-100 dark:bg-surface-700 text-surface-600 dark:text-surface-300 px-2 py-0.5 rounded-full">
                                                         해제됨
                                                     </span>
                                                 )}

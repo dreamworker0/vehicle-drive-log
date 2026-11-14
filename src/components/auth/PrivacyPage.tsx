@@ -146,7 +146,7 @@ export default function PrivacyPage() {
                 <div className="bg-white dark:bg-surface-800 rounded-2xl shadow-soft p-6 md:p-8 space-y-8">
                     <div className="text-center border-b border-surface-100 dark:border-surface-700 pb-6">
                         <h1 className="text-2xl font-bold text-surface-900 dark:text-surface-100 mb-1">개인정보 처리방침</h1>
-                        <p className="text-sm text-surface-400 dark:text-surface-500">시행일: {EFFECTIVE_DATE} (최초 시행: 2026년 2월 1일)</p>
+                        <p className="text-sm text-surface-500 dark:text-surface-400">시행일: {EFFECTIVE_DATE} (최초 시행: 2026년 2월 1일)</p>
                     </div>
 
                     {/*
@@ -393,11 +393,11 @@ export default function PrivacyPage() {
                                             )}
                                         </p>
                                         <p className="text-xs">
-                                            <span className="text-surface-400 dark:text-surface-500">위탁 업무 · </span>
+                                            <span className="text-surface-500 dark:text-surface-400">위탁 업무 · </span>
                                             {p.task}
                                         </p>
                                         <p className="text-xs">
-                                            <span className="text-surface-400 dark:text-surface-500">처리 항목 · </span>
+                                            <span className="text-surface-500 dark:text-surface-400">처리 항목 · </span>
                                             {p.items}
                                         </p>
                                     </div>
@@ -444,15 +444,15 @@ export default function PrivacyPage() {
                                             )}
                                         </p>
                                         <p className="text-xs">
-                                            <span className="text-surface-400 dark:text-surface-500">이전 항목 · </span>
+                                            <span className="text-surface-500 dark:text-surface-400">이전 항목 · </span>
                                             {p.items}
                                         </p>
                                         <p className="text-xs">
-                                            <span className="text-surface-400 dark:text-surface-500">이용 목적 · </span>
+                                            <span className="text-surface-500 dark:text-surface-400">이용 목적 · </span>
                                             {p.task}
                                         </p>
                                         <p className="text-xs break-all">
-                                            <span className="text-surface-400 dark:text-surface-500">문의처 · </span>
+                                            <span className="text-surface-500 dark:text-surface-400">문의처 · </span>
                                             {p.contact}
                                         </p>
                                     </div>
@@ -564,9 +564,9 @@ export default function PrivacyPage() {
                             </p>
 
                             <div className="bg-surface-50 dark:bg-surface-800 rounded-xl p-4 space-y-1 text-xs">
-                                <p><span className="text-surface-400 dark:text-surface-500">운영 주체 · </span>소셜프리즘</p>
-                                <p><span className="text-surface-400 dark:text-surface-500">개인정보 보호책임자 · </span>김종원</p>
-                                <p className="break-all"><span className="text-surface-400 dark:text-surface-500">연락처 · </span>ehsheh@gmail.com</p>
+                                <p><span className="text-surface-500 dark:text-surface-400">운영 주체 · </span>소셜프리즘</p>
+                                <p><span className="text-surface-500 dark:text-surface-400">개인정보 보호책임자 · </span>김종원</p>
+                                <p className="break-all"><span className="text-surface-500 dark:text-surface-400">연락처 · </span>ehsheh@gmail.com</p>
                             </div>
 
                             <p className="text-xs">
@@ -577,8 +577,8 @@ export default function PrivacyPage() {
                     </section>
 
                     <div className="border-t border-surface-100 dark:border-surface-700 pt-4 space-y-2 text-center">
-                        <p className="text-xs text-surface-400 dark:text-surface-500">본 개인정보 처리방침은 {EFFECTIVE_DATE}부터 시행됩니다.</p>
-                        <p className="text-xs text-surface-400 dark:text-surface-500">
+                        <p className="text-xs text-surface-500 dark:text-surface-400">본 개인정보 처리방침은 {EFFECTIVE_DATE}부터 시행됩니다.</p>
+                        <p className="text-xs text-surface-500 dark:text-surface-400">
                             {/* 지난 개정의 날짜는 고정한다 — EFFECTIVE_DATE로 쓰면 다음 개정 때 과거 내용이 새 날짜로 바뀐다 */}
                             개정 이력 · 2026년 2월 1일 최초 시행 / 2026년 8월 10일 위탁·국외 이전·보호책임자 조항 신설,
                             개인정보처리자와 수탁자의 지위 명시, 법령상 의무 기록인 접속기록 항목 명시 /

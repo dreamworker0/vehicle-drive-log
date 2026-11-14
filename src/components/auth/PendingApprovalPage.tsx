@@ -16,7 +16,7 @@ export default function PendingApprovalPage() {
                 <p className="text-surface-500 dark:text-surface-400 mb-2">
                     기관 신청이 검토 중입니다.
                 </p>
-                <p className="text-sm text-surface-400 dark:text-surface-500 mb-8">
+                <p className="text-sm text-surface-500 dark:text-surface-400 mb-8">
                     승인이 완료되면 알림으로 안내드립니다.
                     <br />보통 1~2일 내에 처리됩니다.
                 </p>
@@ -45,7 +45,7 @@ export default function PendingApprovalPage() {
 
                 <button
                     onClick={logout}
-                    className="btn-ghost text-sm text-surface-400 dark:text-surface-500 hover:text-red-500 dark:hover:text-red-400 min-h-[48px] px-4 py-2"
+                    className="btn-ghost text-sm text-surface-500 dark:text-surface-400 hover:text-red-500 dark:hover:text-red-400 min-h-[48px] px-4 py-2"
                 >
                     로그아웃
                 </button>

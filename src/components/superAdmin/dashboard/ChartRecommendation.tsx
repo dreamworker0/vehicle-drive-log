@@ -22,10 +22,10 @@ function ChartRecommendation({ recommendationStats, recommendationRatio }: Props
                     <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
                         💡 추천 예약 활용 현황 (최근 30일)
                     </h2>
-                    <p className="text-xs text-surface-400 dark:text-surface-500 mb-4">
+                    <p className="text-xs text-surface-500 dark:text-surface-400 mb-4">
                         빈 시간 추천 기능을 통한 예약 생성 추이 (바로 운행 제외)
                     </p>
-                    <div className="flex flex-col items-center justify-center py-12 text-surface-400 dark:text-surface-500">최근 발생한 데이터가 없습니다.</div>
+                    <div className="flex flex-col items-center justify-center py-12 text-surface-500 dark:text-surface-400">최근 발생한 데이터가 없습니다.</div>
                 </div>
             );
         }
@@ -37,7 +37,7 @@ function ChartRecommendation({ recommendationStats, recommendationRatio }: Props
                         <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200 mb-1">
                             💡 추천 예약 활용 현황 (최근 30일)
                         </h2>
-                        <p className="text-xs text-surface-400 dark:text-surface-500">
+                        <p className="text-xs text-surface-500 dark:text-surface-400">
                             빈 시간 추천 기능을 통한 예약 생성 추이 (바로 운행 제외)
                         </p>
                         {trackedNote && (

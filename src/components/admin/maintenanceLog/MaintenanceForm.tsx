@@ -105,7 +105,7 @@ export default memo(function MaintenanceForm({
                     />
                     <div>
                         <span className="text-sm font-medium text-surface-800 dark:text-surface-200">🚫 정비 기간 중 차량 사용 차단</span>
-                        <p className="text-xs text-surface-400 mt-0.5">활성화 시 이 차량의 예약 및 운행이 차단됩니다</p>
+                        <p className="text-xs text-surface-500 dark:text-surface-400 mt-0.5">활성화 시 이 차량의 예약 및 운행이 차단됩니다</p>
                     </div>
                 </label>
                 {form.blockVehicle && (
@@ -118,7 +118,7 @@ export default memo(function MaintenanceForm({
                             className="input max-w-[200px]"
                             min={form.date}
                         />
-                        <p className="text-xs text-surface-400 mt-1">종료 예정일이 지나면 자동으로 차단이 해제됩니다</p>
+                        <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">종료 예정일이 지나면 자동으로 차단이 해제됩니다</p>
                     </div>
                 )}
             </div>

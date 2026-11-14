@@ -187,7 +187,7 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
                 {/* 헤더 */}
                 <div className="flex items-center justify-between p-5 border-b border-surface-100 dark:border-surface-700">
                     <h2 id="feedback-form-title" className="text-lg font-bold text-surface-900 dark:text-surface-100">개발자에게 건의하기</h2>
-                    <button onClick={onClose} aria-label="닫기" className="btn-icon text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 dark:text-surface-400 min-w-[48px] min-h-[48px] flex items-center justify-center">
+                    <button onClick={onClose} aria-label="닫기" className="btn-icon text-surface-500 hover:text-surface-600 dark:hover:text-surface-300 dark:text-surface-400 min-w-[48px] min-h-[48px] flex items-center justify-center">
                         <svg aria-hidden="true" className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18 18 6M6 6l12 12" />
                         </svg>
@@ -209,7 +209,7 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
                 </div>
 
                 {/* 답변 알림 안내 */}
-                <div className="mx-5 mt-2 flex items-center gap-1.5 text-xs text-surface-400 dark:text-surface-500">
+                <div className="mx-5 mt-2 flex items-center gap-1.5 text-xs text-surface-500 dark:text-surface-400">
                     <span>💬</span>
                     <span>보내신 의견에 대한 답변은 화면 우상단 알림으로 전달됩니다.</span>
                 </div>
@@ -226,7 +226,7 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
                             placeholder={`개발자 김종원이 직접 답변합니다.\n개선 사항, 요청 기능, 오류 신고를 자세하게 작성해서 보내주세요.`}
                             maxLength={2000}
                         />
-                        <p className="text-xs text-surface-400 dark:text-surface-500 mt-1 text-right">{message.length}/2000</p>
+                        <p className="text-xs text-surface-500 dark:text-surface-400 mt-1 text-right">{message.length}/2000</p>
                     </div>
 
                     {/* 이미지 첨부 */}
@@ -258,7 +258,7 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
                                     <svg aria-hidden="true" className="w-6 h-6 text-surface-300 dark:text-surface-500" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
                                     </svg>
-                                    <span className="text-[10px] text-surface-400 dark:text-surface-500 mt-0.5">추가</span>
+                                    <span className="text-[10px] text-surface-500 dark:text-surface-400 mt-0.5">추가</span>
                                 </button>
                             )}
                         </div>

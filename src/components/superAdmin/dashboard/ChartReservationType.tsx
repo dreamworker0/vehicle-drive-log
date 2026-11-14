@@ -49,19 +49,19 @@ function ChartReservationType({ reservationTypeStats, reservationTypeRatio, futu
                             <div className="flex items-center bg-surface-100 dark:bg-surface-800 rounded-lg p-0.5 border border-surface-200 dark:border-surface-700">
                                 <button
                                     onClick={() => setViewMode('past')}
-                                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${viewMode === 'past' ? 'bg-white dark:bg-surface-600 text-surface-800 dark:text-white shadow-sm' : 'text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-300'}`}
+                                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${viewMode === 'past' ? 'bg-white dark:bg-surface-600 text-surface-800 dark:text-white shadow-sm' : 'text-surface-600 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-300'}`}
                                 >
                                     과거
                                 </button>
                                 <button
                                     onClick={() => setViewMode('future')}
-                                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${viewMode === 'future' ? 'bg-white dark:bg-surface-600 text-surface-800 dark:text-white shadow-sm' : 'text-surface-500 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-300'}`}
+                                    className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${viewMode === 'future' ? 'bg-white dark:bg-surface-600 text-surface-800 dark:text-white shadow-sm' : 'text-surface-600 dark:text-surface-400 hover:text-surface-700 dark:hover:text-surface-300'}`}
                                 >
                                     미래
                                 </button>
                             </div>
                         </div>
-                        <p className="text-xs text-surface-400 dark:text-surface-500">
+                        <p className="text-xs text-surface-500 dark:text-surface-400">
                             하루 예약 · 다일(연속) 예약 · 반복(정기) 예약 비율 추이 (바로 운행 제외)
                         </p>
                         {trackedNote && (
@@ -146,7 +146,7 @@ function ChartReservationType({ reservationTypeStats, reservationTypeRatio, futu
                             </AreaChart>
                         </ResponsiveContainer>
                     ) : (
-                        <div className="flex flex-col items-center justify-center h-[256px] text-surface-400 dark:text-surface-500">해당 기간에 발생한 데이터가 없습니다.</div>
+                        <div className="flex flex-col items-center justify-center h-[256px] text-surface-500 dark:text-surface-400">해당 기간에 발생한 데이터가 없습니다.</div>
                     )}
                 </div>
             </div>

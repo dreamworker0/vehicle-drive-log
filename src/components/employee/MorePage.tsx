@@ -91,7 +91,7 @@ export default function MorePage() {
                 {showInsurance && (
                     <div className="px-4 pb-3 animate-fade-in">
                         {insuranceVehicles.length === 0 ? (
-                            <p className="text-xs text-surface-400 dark:text-surface-500 py-2">등록된 보험 정보가 없습니다</p>
+                            <p className="text-xs text-surface-500 dark:text-surface-400 py-2">등록된 보험 정보가 없습니다</p>
                         ) : (
                             <div className="space-y-2">
                                 {insuranceVehicles.map(v => (
@@ -169,7 +169,7 @@ export default function MorePage() {
                 <div className="flex items-center justify-between p-4">
                     <div className="flex items-start gap-3">
                         <svg aria-hidden="true" className="w-5 h-5 text-surface-400 dark:text-surface-500 mt-0.5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1 1 15 0Z" /></svg>
-                        <div><span className="text-sm text-surface-700 dark:text-surface-300">길안내 앱</span><p className="text-[11px] text-surface-400 dark:text-surface-500">네이버맵만 경유지 가능</p></div>
+                        <div><span className="text-sm text-surface-700 dark:text-surface-300">길안내 앱</span><p className="text-[11px] text-surface-500 dark:text-surface-400">네이버맵만 경유지 가능</p></div>
                     </div>
                     <div className="flex rounded-lg border border-surface-200 dark:border-surface-600 overflow-hidden">
                         {[{ key: 'naver', label: '네이버' }, { key: 'kakao', label: '카카오' }, { key: 'tmap', label: '티맵' }].map(opt => (
@@ -209,7 +209,7 @@ export default function MorePage() {
             </div>
 
             {/* 제작자 정보 */}
-            <div className="mt-6 flex items-center justify-center gap-2 text-xs text-surface-400 dark:text-surface-500">
+            <div className="mt-6 flex items-center justify-center gap-2 text-xs text-surface-500 dark:text-surface-400">
                 <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75 22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3-4.5 16.5" /></svg>
                 <span>제작자: 소셜프리즘</span><span>·</span>
                 <a href="mailto:ehsheh@gmail.com" className="text-primary-500 dark:text-primary-400 hover:text-primary-700 transition-colors">ehsheh@gmail.com</a>

@@ -59,7 +59,7 @@ export default memo(function ReservationTabContent({
                     onClick={() => setSideTab('list')}
                     className={`flex-1 pb-2 text-sm font-medium border-b-2 transition-colors ${sideTab === 'list'
                         ? 'border-primary-500 text-primary-600'
-                        : 'border-transparent text-surface-400 hover:text-surface-600 dark:text-surface-400'
+                        : 'border-transparent text-surface-500 hover:text-surface-600 dark:text-surface-400'
                         }`}
                 >
                     예약내역
@@ -73,7 +73,7 @@ export default memo(function ReservationTabContent({
                     onClick={() => setSideTab('completed')}
                     className={`flex-1 pb-2 text-sm font-medium border-b-2 transition-colors ${sideTab === 'completed'
                         ? 'border-primary-500 text-primary-600'
-                        : 'border-transparent text-surface-400 hover:text-surface-600 dark:text-surface-400'
+                        : 'border-transparent text-surface-500 hover:text-surface-600 dark:text-surface-400'
                         }`}
                 >
                     운행완료
@@ -108,7 +108,7 @@ export default memo(function ReservationTabContent({
                     {activeRes.length === 0 && (
                         <div className="text-center py-8">
                             <div className="text-2xl mb-2">📋</div>
-                            <p className="text-sm text-surface-400 dark:text-surface-500">예약 내역이 없습니다</p>
+                            <p className="text-sm text-surface-500 dark:text-surface-400">예약 내역이 없습니다</p>
                         </div>
                     )}
                 </div>
@@ -120,7 +120,7 @@ export default memo(function ReservationTabContent({
                     {completedRes.length === 0 ? (
                         <div className="text-center py-8">
                             <div className="text-2xl mb-2">✅</div>
-                            <p className="text-sm text-surface-400 dark:text-surface-500">운행 완료 내역이 없습니다</p>
+                            <p className="text-sm text-surface-500 dark:text-surface-400">운행 완료 내역이 없습니다</p>
                         </div>
                     ) : (
                         <div className="space-y-1.5">
@@ -148,7 +148,7 @@ export default memo(function ReservationTabContent({
                                             </div>
                                         )}
                                     </div>
-                                    <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
+                                    <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">
                                         예약 {res.startTime} ~ {res.endTime}
                                         {(res.actualStartTime || res.actualEndTime) && (
                                             <span className="ml-2 text-green-600 dark:text-green-400 font-medium">
@@ -156,7 +156,7 @@ export default memo(function ReservationTabContent({
                                             </span>
                                         )}
                                     </p>
-                                    <p className="text-xs text-surface-400 dark:text-surface-500">
+                                    <p className="text-xs text-surface-500 dark:text-surface-400">
                                         {res.reservedByName}{res.purpose ? ` · ${res.purpose}` : ''}{res.destination ? ` → ${res.destination}` : ''}
                                         {/* 동승자는 **인원수만** 보여 준다. 예약 목록은 기관 전체가 상시 보는 자리라
                                             이름까지 늘어놓지 않는다 (이름은 예약 수정 화면에서 확인). */}

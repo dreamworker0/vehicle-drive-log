@@ -48,7 +48,7 @@ function NavItem({ to, icon, label, badge, onClick }: NavItemProps) {
             {icon}
             <span>{label}</span>
             {badge != null && (
-                <span className={`ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-semibold rounded-full ${badge > 0 ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300' : 'bg-surface-100 text-surface-400 dark:bg-surface-800 dark:text-surface-500'}`}>
+                <span className={`ml-auto inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 text-xs font-semibold rounded-full ${badge > 0 ? 'bg-primary-100 text-primary-700 dark:bg-primary-900/40 dark:text-primary-300' : 'bg-surface-100 text-surface-600 dark:bg-surface-800 dark:text-surface-400'}`}>
                     {badge}
                 </span>
             )}
@@ -177,7 +177,7 @@ export default function AdminLayout() {
                         </div>
                         <div className="min-w-0">
                             <p className="font-semibold text-surface-900 dark:text-surface-100 text-sm truncate">차량 운행일지</p>
-                            <p className="text-xs text-surface-400 dark:text-surface-500 truncate">{user?.displayName || user?.email}</p>
+                            <p className="text-xs text-surface-500 dark:text-surface-400 truncate">{user?.displayName || user?.email}</p>
                         </div>
                     </div>
                 </div>

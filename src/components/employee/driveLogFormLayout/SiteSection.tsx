@@ -91,7 +91,7 @@ const SiteSection = memo(function SiteSection({
                         <option key={site.id} value={site.id}>{site.name}</option>
                     ))}
                 </select>
-                <p className="text-xs text-surface-400 dark:text-surface-500 mt-1">
+                <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">
                     다음에 이 차를 여기서 찾게 됩니다.
                 </p>
             </div>
