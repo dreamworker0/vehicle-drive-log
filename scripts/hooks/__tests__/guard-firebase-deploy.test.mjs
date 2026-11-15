@@ -15,6 +15,15 @@ describe('isDeployCommand — 직접 배포 감지', () => {
         'echo done && firebase deploy',
         'FIREBASE_TOKEN=x firebase deploy',
         'Firebase Deploy --only functions',
+        // 전역 옵션·버전 지정이 사이에 낀 형태 (처음엔 놓쳤다)
+        'firebase --project prod deploy',
+        'firebase -P default deploy --only hosting',
+        'firebase --project=prod deploy',
+        'firebase --debug deploy',
+        'firebase --non-interactive --project prod deploy --only functions',
+        'npx firebase-tools@13 deploy',
+        'npx --yes firebase-tools@latest deploy',
+        'npx -y firebase-tools@13.0.1 --project prod deploy',
     ])('감지: %s', (cmd) => {
         expect(isDeployCommand(cmd)).toBe(true);
     });
@@ -48,6 +57,10 @@ describe('isDeployCommand — 비배포 명령 오탐 없음', () => {
         'firebase emulators:exec --only firestore "vitest run"',
         'firebase functions:log',
         'npx firebase-tools emulators:start',
+        'firebase --project prod functions:log',
+        'firebase -P default emulators:start',
+        'firebase --project deploy-test functions:log', // 프로젝트 이름에 deploy가 들어가도 배포가 아니다
+        'npx firebase-tools@13 emulators:exec "vitest run"',
         'git push origin master', // CI 배포 트리거는 가드 대상이 아님 (정상 경로)
         'npm run deploy-docs',    // deploy 정확 매칭이 아니므로 통과 (해당 스크립트 없음)
         'echo "firebase deploy는 금지"', // 문자열 안 언급이지만 셸에서 실행되지 않... (주의: 단순 echo는 감지돼도 무해)

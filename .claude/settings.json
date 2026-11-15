@@ -28,7 +28,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/hooks/guard-firebase-deploy.mjs"
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/hooks/guard-firebase-deploy.mjs\""
           }
         ]
       }
@@ -39,11 +39,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node scripts/hooks/lint-changed.mjs"
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/hooks/lint-changed.mjs\""
           },
           {
             "type": "command",
-            "command": "node scripts/hooks/sync-agent-bridge.mjs"
+            "command": "node \"$CLAUDE_PROJECT_DIR/scripts/hooks/sync-agent-bridge.mjs\""
           }
         ]
       }

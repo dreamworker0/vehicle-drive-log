@@ -16,7 +16,7 @@ Claude Code는 [CLAUDE.md](CLAUDE.md), Antigravity는 [.agent/agents.md](.agent/
 
 - **멀티테넌트 격리**: Firestore 쿼리에 `organizationId` 필터 필수 (D10). 권한 제어는 백엔드(Rules/Functions)에서 재검증 (D11).
 - **배포 단일 경로**: 로컬 `firebase deploy` 금지(간접 실행 포함 — `npm run deploy`, `npx firebase-tools deploy` 등). 배포는 master 푸시 → CI Deploy 워크플로만.
-- **검증은 Node 22**: Node 24는 Rollup 빌드가 실패한다. `fnm exec --using=22 npm.cmd run <script>`. 코드 수정 후 자동 교정 루프(lint → tsc → build → test) 실행.
+- **검증은 Node 22**: Node 24는 Rollup 빌드가 실패한다. `fnm exec --using=22 npm.cmd run <script>`. fnm이 없으면 빌드만 PR CI에 맡기고 나머지는 Node 24로 돌린다(.agent/agents.md §2.1). 코드 수정 후 자동 교정 루프(lint → tsc → build → test) 실행.
 - **민감 정보 금지**: `.env`/`.env.local` 커밋·노출 금지, API 키 하드코딩 금지.
 - **브리지 자동 생성**: `.claude/skills/`·`.claude/commands/`는 자동 생성물 — 수정은 `.agent/` 원본에서만 하고 `npm run sync:agents`로 재생성.
 - **커밋 메시지**: 한국어 + Conventional Commits (`feat:`, `fix:`, `chore:`, ...). commitlint가 강제.

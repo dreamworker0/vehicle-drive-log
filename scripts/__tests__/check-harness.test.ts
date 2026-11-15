@@ -1,6 +1,10 @@
 // 하네스 Doctor(check-harness.ts)의 파서·판정 헬퍼 단위 테스트.
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, it, expect } from 'vitest';
 import {
+    ROOT,
+    findRelativeHookCommands,
     extractRelativeLinks,
     extractFunctionExports,
     extractCatalogNames,
@@ -172,5 +176,36 @@ describe('extractHookScriptPaths', () => {
 
     it('hooks가 없으면 빈 배열', () => {
         expect(extractHookScriptPaths('{"permissions":{}}')).toEqual([]);
+    });
+});
+
+describe('findRelativeHookCommands', () => {
+    const settingsWith = (...commands: string[]) =>
+        JSON.stringify({
+            hooks: { PreToolUse: [{ matcher: 'Bash', hooks: commands.map((command) => ({ type: 'command', command })) }] },
+        });
+
+    it('상대 경로로 저장소 스크립트를 부르는 명령을 찾는다', () => {
+        expect(
+            findRelativeHookCommands(
+                settingsWith('node scripts/hooks/guard-firebase-deploy.mjs', 'bash .claude/hooks/session-start.sh'),
+            ),
+        ).toEqual(['node scripts/hooks/guard-firebase-deploy.mjs', 'bash .claude/hooks/session-start.sh']);
+    });
+
+    it('$CLAUDE_PROJECT_DIR 기준 호출은 통과시킨다 (따옴표·중괄호 형태 포함)', () => {
+        expect(
+            findRelativeHookCommands(
+                settingsWith(
+                    'node "$CLAUDE_PROJECT_DIR/scripts/hooks/lint-changed.mjs"',
+                    'bash "${CLAUDE_PROJECT_DIR}/.claude/hooks/session-start.sh"',
+                    'echo no-path-here',
+                ),
+            ),
+        ).toEqual([]);
+    });
+
+    it('실제 .claude/settings.json에는 상대 경로 훅이 없다', () => {
+        expect(findRelativeHookCommands(readFileSync(join(ROOT, '.claude', 'settings.json'), 'utf-8'))).toEqual([]);
     });
 });
