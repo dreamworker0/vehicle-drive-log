@@ -10,9 +10,13 @@
  */
 import { execFileSync } from "child_process";
 
+// safe.directory: 셸 사용자와 저장소 소유자가 다른 PC에서 git이 "dubious ownership"으로 실패해,
+// 아래 사전 확인이 "Git 저장소가 아니다"로 오판하고 검사 전체가 멈췄다. 규칙 조회만 하므로 무시해도 안전하다.
+const GIT = ["-c", "safe.directory=*"];
+
 // git 실행 불가/비-저장소 환경에서 모든 검사가 잘못 실패하지 않도록 사전 확인한다.
 try {
-    execFileSync("git", ["rev-parse", "--is-inside-work-tree"], { stdio: "ignore" });
+    execFileSync("git", [...GIT, "rev-parse", "--is-inside-work-tree"], { stdio: "ignore" });
 } catch {
     console.error("❌ Git 저장소가 아니거나 git을 실행할 수 없습니다.");
     process.exit(1);
@@ -44,7 +48,7 @@ function isIgnored(relPath: string): boolean {
     try {
         // --no-index: 인덱스(추적) 상태와 무관하게 .gitignore 규칙 자체만 평가한다.
         // (추적 중인 파일도 규칙 매치 여부를 정확히 검사하기 위함)
-        execFileSync("git", ["check-ignore", "-q", "--no-index", "--", relPath], { stdio: "ignore" });
+        execFileSync("git", [...GIT, "check-ignore", "-q", "--no-index", "--", relPath], { stdio: "ignore" });
         return true;
     } catch {
         return false;
