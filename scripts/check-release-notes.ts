@@ -25,7 +25,9 @@ import { isAnnounceableSubject, isUserFacingPath } from './lib/releaseNotesRules
 
 const NOTES_PATH = 'public/data/releaseNotes.json';
 
-const git = (args: string[]) => execFileSync('git', args, { encoding: 'utf8' }).trim();
+// safe.directory: 셸 사용자와 저장소 소유자가 다른 PC에서 git이 "dubious ownership"으로
+// 실패해 이 검사가 스택트레이스로 죽었다. 읽기 전용 조회(log·show)라 무시해도 안전하다.
+const git = (args: string[]) => execFileSync('git', ['-c', 'safe.directory=*', ...args], { encoding: 'utf8' }).trim();
 
 function main() {
     const soft = process.argv.includes('--soft');
