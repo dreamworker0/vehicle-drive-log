@@ -22,8 +22,11 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 
 // firebase deploy / firebase.cmd deploy / npx firebase deploy / npx -y firebase-tools deploy ...
+// firebase와 deploy 사이의 전역 옵션(`--project prod`, `-P default`, `--debug`)과
+// 버전 지정(`firebase-tools@13`), npx 옵션(`--yes`)도 건너뛴다 — 처음엔 이 형태들을 놓쳤다.
+// deploy 뒤 `(?![\w:-])`: `--project deploy-test functions:log` 같은 프로젝트 이름은 배포로 보지 않는다.
 const DIRECT_DEPLOY_RE =
-  /(?:^|[\s;&|(])(?:npx(?:\.cmd)?\s+(?:-y\s+)?)?firebase(?:-tools)?(?:\.cmd)?\s+deploy\b/i;
+  /(?:^|[\s;&|(])(?:npx(?:\.cmd)?\s+(?:-{1,2}[\w-]+\s+)*)?firebase(?:-tools)?(?:@[\w.^~-]+)?(?:\.cmd)?(?:\s+-{1,2}[\w-]+(?:[=\s]+(?!-)[^\s;&|]+)?)*\s+deploy(?![\w:-])/i;
 
 // npm run deploy / npm.cmd run deploy:functions / npm --prefix functions run deploy /
 // npm run deploy --prefix functions / pnpm run deploy / yarn [run] deploy ...

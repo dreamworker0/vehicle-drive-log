@@ -59,6 +59,10 @@ Don'ts 항목 간 충돌, 또는 금지 항목과 기능 요구가 충돌할 때
 
 > ⚠️ **이 머신의 셸 기본 Node는 v24이고, Node 24는 Rollup 빌드(Step 3)가 실패한다.**
 > 검증 명령은 **반드시 Node 22**로 실행한다 — PowerShell: `fnm exec --using=22 npm.cmd run <script>`.
+> **fnm(Node 22)이 없는 PC라면** 설치를 임의로 하지 말고 이렇게 한다: lint·tsc·vitest·Functions jest·Rules
+> 에뮬레이터 테스트는 Node 24로 돌려도 통과하니 그대로 돌리고, **Step 3(빌드)만 건너뛰어 PR CI(Node 22) 결과로
+> 확인**한다. 빌드를 로컬에서 못 돌렸다는 사실은 PR 본문과 완료 보고에 밝힌다. 로컬 Node 22가 꼭 필요하면
+> 사용자에게 fnm 설치를 먼저 묻는다.
 > Step 1(ESLint)은 편집 직후 PostToolUse 훅(`scripts/hooks/lint-changed.mjs`)이 변경 파일에
 > 자동 실행하므로, 에이전트는 보통 Step 2~4에 집중한다(훅이 exit 2로 잔여 위반을 피드백).
 

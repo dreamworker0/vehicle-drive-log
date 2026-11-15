@@ -15,7 +15,8 @@
  * 13. Functions 레퍼런스 카탈로그 ↔ functions/src/index.ts export 정합 + 문서 총계
  * 14. 하네스 문서 본문의 인라인 백틱 경로·워크플로의 tsx/node 실행 대상 실존 — 규칙·스킬이
  *     코드 리팩터를 못 따라가 조용히 낡는 것을 막는다 (Phase 180에서 stale 경로 40여 건이 이 부재로 살아남았다)
- * 16. .claude/settings.json 훅 배선 실존 — 경로 오타 시 훅이 조용히 죽는 것을 막는다
+ * 16. .claude/settings.json 훅 배선 실존 + `$CLAUDE_PROJECT_DIR` 기준 호출 — 경로 오타나
+ *     상대 경로(다른 폴더에서 실행) 때문에 훅이 조용히 죽는 것을 막는다
  *
  * 단위 테스트: scripts/__tests__/check-harness.test.ts (파서·판정 함수)
  */
@@ -105,6 +106,32 @@ export function extractHookScriptPaths(settingsJson: string): string[] {
 }
 
 /**
+ * 저장소 스크립트를 상대 경로로 부르는 훅 명령을 찾는다.
+ * 훅은 세션의 현재 폴더에서 실행되므로 `node scripts/hooks/x.mjs`는 다른 폴더에서
+ * `Cannot find module`로 exit 1이 된다. exit 1은 차단 신호가 아니라서 배포 차단 훅이
+ * 조용히 꺼진 채 명령이 통과한다 — `$CLAUDE_PROJECT_DIR/` 접두로 불러야 한다.
+ */
+export function findRelativeHookCommands(settingsJson: string): string[] {
+    const out: string[] = [];
+    const settings = JSON.parse(settingsJson) as {
+        hooks?: Record<string, { hooks?: { command?: string }[] }[]>;
+    };
+    for (const groups of Object.values(settings.hooks ?? {})) {
+        for (const group of groups) {
+            for (const h of group.hooks ?? []) {
+                if (!h.command) continue;
+                // 경로 앞이 `$CLAUDE_PROJECT_DIR/`(또는 `${CLAUDE_PROJECT_DIR}/`)가 아니면 상대 경로다
+                const relative = [...h.command.matchAll(/(\S*?)((?:scripts|\.claude)\/[\w./-]+\.(?:mjs|cjs|js|sh))/g)].some(
+                    (m) => !/\$\{?CLAUDE_PROJECT_DIR\}?\/$/.test(m[1]),
+                );
+                if (relative) out.push(h.command);
+            }
+        }
+    }
+    return out;
+}
+
+/**
  * functions/src/index.ts의 export 이름을 뽑는다.
  * `export { a } from "..."` / `export { a, b } from "..."` / 여러 줄 형태를 모두 처리하고,
  * `x as y` 별칭은 실제 배포 이름인 `y`를 취한다.
@@ -171,7 +198,11 @@ export function runChecks(root: string = ROOT): { findings: Finding[]; checked: 
     }
     const runtimeMajor = Number(process.versions.node.split('.')[0]);
     if (runtimeMajor !== 22) {
-        warn('(런타임)', `현재 Node v${process.versions.node} — 빌드·테스트는 Node 22로: fnm exec --using=22 npm.cmd run <script>`);
+        warn(
+            '(런타임)',
+            `현재 Node v${process.versions.node} — 빌드는 Node 22로: fnm exec --using=22 npm.cmd run <script>. ` +
+                'fnm이 없으면 lint·타입·테스트는 이대로 돌리고 빌드만 PR CI로 확인한다 (.agent/agents.md §2.1)',
+        );
     }
 
     // 2. AGENTS.md → .agent/agents.md 연결
@@ -196,7 +227,9 @@ export function runChecks(root: string = ROOT): { findings: Finding[]; checked: 
     // 11. 추적되면 안 되는 개인 설정 파일
     checked++;
     try {
-        const tracked = execFileSync('git', ['ls-files', '.claude/settings.local.json', '.env', '.env.local'], {
+        // safe.directory: 셸 사용자와 저장소 소유자가 다른 PC에서 git이 "dubious ownership"으로
+        // 실패해, 이 검사가 경고만 남기고 빠진 채 Doctor가 ✅를 띄웠다. 읽기 전용 조회라 무시해도 안전하다.
+        const tracked = execFileSync('git', ['-c', 'safe.directory=*', 'ls-files', '.claude/settings.local.json', '.env', '.env.local'], {
             cwd: root,
             encoding: 'utf-8',
         })
@@ -254,10 +287,17 @@ export function runChecks(root: string = ROOT): { findings: Finding[]; checked: 
     // 16. .claude/settings.json 훅 배선 실존 — 경로 오타 시 훅이 조용히 죽는다
     checked++;
     try {
-        for (const hookPath of extractHookScriptPaths(read(join('.claude', 'settings.json')))) {
+        const settingsJson = read(join('.claude', 'settings.json'));
+        for (const hookPath of extractHookScriptPaths(settingsJson)) {
             if (!existsSync(join(root, hookPath))) {
                 err('.claude/settings.json', `훅이 가리키는 스크립트가 존재하지 않음: ${hookPath}`);
             }
+        }
+        for (const command of findRelativeHookCommands(settingsJson)) {
+            err(
+                '.claude/settings.json',
+                `훅이 저장소 스크립트를 상대 경로로 부름: ${command} — 다른 폴더에서 실행되면 exit 1로 조용히 꺼진다. "$CLAUDE_PROJECT_DIR/..."로 부를 것`,
+            );
         }
     } catch (e) {
         // 파일이 깨진 JSON(BOM 등)이면 스택트레이스로 죽는 대신 파서 고장으로 보고한다 (13·15번과 동일 원칙)
