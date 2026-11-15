@@ -11,7 +11,8 @@
 //     allowlist보다 훅 판정이 우선하므로, 간접 실행도 자동 승인을 타지 못한다.)
 //   - 감지 범위: firebase deploy 직접 실행(npx/firebase-tools/.cmd 변형 포함) +
 //     npm 스크립트 간접 실행(`npm run deploy`, `npm --prefix functions run deploy`,
-//     pnpm/yarn 변형 포함 — functions/package.json의 deploy 스크립트가 firebase deploy를 감쌈).
+//     pnpm/yarn 변형 포함 — functions/package.json의 deploy 스크립트가 firebase deploy를 감쌈) +
+//     gcloud 직접 배포(`gcloud functions deploy`, `gcloud run deploy`, alpha/beta 변형).
 //   - 긴급 수동 배포(/deploy-emergency)는 차단이 아니라 "사용자 승인 필수"로 통과 가능.
 //   - 그 외 커맨드·파싱 실패는 개입하지 않는다(exit 0, 출력 없음).
 //
@@ -28,6 +29,12 @@ import path from 'node:path';
 const DIRECT_DEPLOY_RE =
   /(?:^|[\s;&|(])(?:npx(?:\.cmd)?\s+(?:-{1,2}[\w-]+\s+)*)?firebase(?:-tools)?(?:@[\w.^~-]+)?(?:\.cmd)?(?:\s+-{1,2}[\w-]+(?:[=\s]+(?!-)[^\s;&|]+)?)*\s+deploy(?![\w:-])/i;
 
+// gcloud functions deploy / gcloud run deploy / gcloud beta functions deploy / gcloud --project x functions deploy
+// Firebase 2세대 함수는 Cloud Functions·Cloud Run 서비스라 gcloud로도 프로덕션을 바로 바꿀 수 있다.
+// 같은 함수를 CI 배포와 따로 고치면 다음 firebase deploy와 설정이 엇갈리므로 같은 승인 대상으로 둔다.
+const GCLOUD_DEPLOY_RE =
+  /(?:^|[\s;&|(])gcloud(?:\.cmd)?(?:\s+-{1,2}[\w-]+(?:[=\s]+(?!-)[^\s;&|]+)?)*(?:\s+(?:alpha|beta))?\s+(?:functions|run)\s+deploy(?![\w:-])/i;
+
 // npm run deploy / npm.cmd run deploy:functions / npm --prefix functions run deploy /
 // npm run deploy --prefix functions / pnpm run deploy / yarn [run] deploy ...
 // 스크립트명은 정확히 deploy 또는 deploy:*만 매칭한다 (deploy-docs 같은 이름은 오탐 방지).
@@ -42,6 +49,7 @@ const NPM_SCRIPT_DEPLOY_RE =
 export function isDeployCommand(command) {
   if (typeof command !== 'string') return false;
   if (DIRECT_DEPLOY_RE.test(command)) return true;
+  if (GCLOUD_DEPLOY_RE.test(command)) return true;
   // yarn은 run 없이도 스크립트를 실행하므로 `yarn deploy`도 NPM_SCRIPT_DEPLOY_RE가 잡는다
   // (run 그룹이 optional). npm은 `npm deploy`가 실제로 스크립트를 실행하지 않지만
   // 오탐 비용(사용자 승인 1회)이 미탐 비용(무중단 배포 충돌)보다 낮아 그대로 둔다.
@@ -69,7 +77,7 @@ function main() {
         hookEventName: 'PreToolUse',
         permissionDecision: 'ask',
         permissionDecisionReason:
-          '로컬 firebase deploy는 금지 경로입니다(CLAUDE.md 절대 규칙 — 배포는 master 푸시 → CI Deploy 워크플로 단일 경로, 병행 시 동일 함수 동시 업데이트 충돌). ' +
+          '로컬 배포(firebase deploy·gcloud functions/run deploy)는 금지 경로입니다(CLAUDE.md 절대 규칙 — 배포는 master 푸시 → CI Deploy 워크플로 단일 경로, 병행 시 동일 함수 동시 업데이트 충돌). ' +
           '긴급 수동 배포라면 CI 미실행을 확인하고 Node 22 환경인지 점검한 뒤 직접 승인하세요.',
       },
     }),

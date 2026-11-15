@@ -29,6 +29,20 @@ describe('isDeployCommand — 직접 배포 감지', () => {
     });
 });
 
+describe('isDeployCommand — gcloud 직접 배포 감지', () => {
+    it.each([
+        'gcloud functions deploy onDriveLogCreated --region asia-northeast3',
+        'gcloud run deploy ondrivelogcreated --image x',
+        'gcloud beta functions deploy foo',
+        'gcloud alpha run deploy foo',
+        'gcloud --project vehicle-drive-log functions deploy foo',
+        'gcloud.cmd functions deploy foo',
+        'cd functions && gcloud functions deploy foo',
+    ])('감지: %s', (cmd) => {
+        expect(isDeployCommand(cmd)).toBe(true);
+    });
+});
+
 describe('isDeployCommand — npm 스크립트 간접 배포 감지', () => {
     it.each([
         'npm run deploy',
@@ -61,6 +75,13 @@ describe('isDeployCommand — 비배포 명령 오탐 없음', () => {
         'firebase -P default emulators:start',
         'firebase --project deploy-test functions:log', // 프로젝트 이름에 deploy가 들어가도 배포가 아니다
         'npx firebase-tools@13 emulators:exec "vitest run"',
+        // gcloud 조회·로그는 배포가 아니다
+        'gcloud functions list --regions asia-northeast3',
+        'gcloud functions logs read onDriveLogCreated',
+        'gcloud run services describe ondrivelogcreated',
+        'gcloud functions describe foo --gen2',
+        'gcloud --project deploy-test functions list',
+        'gcloud app deploy', // 이 저장소는 App Engine을 쓰지 않는다 (가드 범위 밖)
         'git push origin master', // CI 배포 트리거는 가드 대상이 아님 (정상 경로)
         'npm run deploy-docs',    // deploy 정확 매칭이 아니므로 통과 (해당 스크립트 없음)
         'echo "firebase deploy는 금지"', // 문자열 안 언급이지만 셸에서 실행되지 않... (주의: 단순 echo는 감지돼도 무해)
