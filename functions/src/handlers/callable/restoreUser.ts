@@ -87,6 +87,9 @@ export const restoreUser = onCall(
                 ...(priorConsent ? { consent: priorConsent } : {}),
                 restoredAt: FieldValue.serverTimestamp(),
                 createdAt: FieldValue.serverTimestamp(),
+                // 행위자 스탬프 — 복원은 superAdmin이 타인 문서를 재생성한다. 접속기록이 이 값으로
+                // 복원한 운영자를 행위자로 남긴다(생성·덮어쓰기 모두).
+                lastEditedByUid: request.auth.uid,
             });
 
             console.log(`계정 복원 완료: ${maskEmail(email)} (uid: ${authUser.uid}, 호출자: ${request.auth.uid})`);

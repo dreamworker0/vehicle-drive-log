@@ -175,6 +175,9 @@ export const joinOrganization = onCall(
                         agreedAt: FieldValue.serverTimestamp(),
                     },
                     createdAt: FieldValue.serverTimestamp(),
+                    // 행위자 스탬프 — 기관을 나갔다 다시 가입하면 기존 문서를 덮어써 '수정' 기록이 되는데,
+                    // merge 없는 set이라 스탬프가 사라져 행위자 미확인으로 남았다. 가입은 본인 행위다.
+                    lastEditedByUid: uid,
                 });
 
             // Claims를 즉시 설정 (onDocumentWritten 트리거 대기 없이)

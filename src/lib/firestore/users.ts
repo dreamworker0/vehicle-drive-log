@@ -21,7 +21,7 @@ const userConverter = createZodConverter(userSchema);
  * 본인이 기관을 나가면 users 문서가 지워지거나 소속이 비워진다(organizationId=null). 관리자
  * 화면의 목록은 한 번 읽어 온 스냅샷이라 그 행이 남는데, 문서가 남아 있으면 그 행의 쓰기는
  * not-found가 아니라 permission-denied로 온다 — Rules의 isOrgAdmin(resource.data.organizationId)이
- * 실패하기 때문이다. 콜러블(disableUser·deleteUserPermanently)도 같은 경우 "다른 기관의 직원을
+ * 실패하기 때문이다. 콜러블(disableUser·enableUser·deleteUserPermanently)도 같은 경우 "다른 기관의 직원을
  * …할 수 없습니다"(permission-denied)로 거부한다.
  *
  * 그래서 거부의 원인이 "대상이 빠졌다"인지 문서를 다시 읽어 가린다.
@@ -201,18 +201,6 @@ export const getOrgMemberCounts = async (orgIds?: string[]): Promise<Record<stri
     } catch (error) {
         captureError(error, { context: 'getOrgMemberCounts' });
         throw error;
-    }
-};
-
-// 사용자 계정 활성화 복원
-export const restoreUser = async (uid: string): Promise<void> => {
-    try {
-        await updateDoc(doc(db, 'users', uid), { status: 'active', disabledAt: null, ...actorStamp() });
-        invalidateCache('members');
-    } catch (error) {
-        const resolved = await recheckDeniedTarget(error, uid);
-        reportUnlessMissing(resolved, { context: 'restoreUser', uid });
-        throw resolved;
     }
 };
 

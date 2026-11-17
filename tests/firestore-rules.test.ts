@@ -1726,6 +1726,23 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
       await assertFails(db.collection('users').doc('emp_A2').update({ organizationId: 'org-B' }));
     });
 
+    it('#13 기관 관리자도 직원의 활성 상태(status·disabledAt)는 직접 못 바꾼다 — 콜러블 전용', async () => {
+      // 활성/비활성은 Auth 계정 차단과 함께 바뀌어야 한다(disableUser·enableUser).
+      // 문서만 'active'로 고치면 목록은 활성인데 로그인은 auth/user-disabled로 막힌다(2026-11-18).
+      await testEnv.withSecurityRulesDisabled(async (context) => {
+        await context.firestore().collection('users').doc('emp_A2').update({ status: 'disabled', disabledAt: new Date() });
+      });
+      const db = admin('A');
+      // 비활성 → 활성 (이번 사고의 경로)
+      await assertFails(db.collection('users').doc('emp_A2').update({ status: 'active', disabledAt: null, lastEditedByUid: 'admin_A' }));
+      await assertFails(db.collection('users').doc('emp_A2').update({ disabledAt: null, lastEditedByUid: 'admin_A' }));
+      // 활성 → 비활성
+      await assertFails(db.collection('users').doc('emp_A1').update({ status: 'disabled', lastEditedByUid: 'admin_A' }));
+      await assertFails(db.collection('users').doc('emp_A1').update({ disabledAt: new Date(), lastEditedByUid: 'admin_A' }));
+      // 다른 필드(이름)는 그대로 고칠 수 있다
+      await assertSucceeds(db.collection('users').doc('emp_A1').update({ name: '바뀐이름', lastEditedByUid: 'admin_A' }));
+    });
+
     it('#13 기관 관리자는 자기 기관에 소속된 전체 관리자를 강등·비활성화할 수 없다', async () => {
       // addSuperAdmin은 organizationId를 지우지 않아 기관 소속 전체 관리자가 생긴다.
       // 2단계 분류 (a) 규칙 문제 후보 — users update의 관리자 분기에 대상 역할 조건이 없다.

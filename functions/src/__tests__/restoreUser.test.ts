@@ -137,6 +137,8 @@ describe('restoreUser — 계정 복원', () => {
             email: 'disabled@test.com',
             organizationId: 'org1',
             role: 'employee',
+            // 접속기록 행위자 — 복원한 운영자
+            lastEditedByUid: 'caller-uid',
         }));
     });
 

@@ -37,8 +37,10 @@
  *
  * ## 행위자(actorUid) — 세 가지 신뢰 수준
  * Firestore 트리거는 호출자를 알 수 없다. 그래서 출처를 그대로 남겨 구분한다.
- *  - `stamp`    : 클라이언트가 심은 `lastEditedByUid`. Rules가 `request.auth.uid`와의
- *                 일치를 강제하므로 **타인 명의 위조가 불가능**하다(Phase 2 ①).
+ *  - `stamp`    : 문서에 심긴 `lastEditedByUid`. 클라이언트 쓰기는 Rules가 `request.auth.uid`와의
+ *                 일치를 강제하므로 **타인 명의 위조가 불가능**하다(Phase 2 ①). 사람이 호출하는
+ *                 콜러블(Admin SDK)은 호출자 uid를 직접 심는다(disableUser·enableUser·restoreUser 등).
+ *                 시스템 쓰기는 사람 uid를 심지 않는다 — 필요하면 지운다(onUserDelete).
  *  - `document` : 문서가 스스로 드러내는 값(생성 시 createdByUid 등).
  *  - `unknown`  : 알 수 없음. 추정으로 채우지 않는다.
  *
@@ -356,9 +358,11 @@ export const auditUserCreated = onDocumentCreated(
         //  - 본인 가입(joinOrganization): Rules가 본인 문서만 만들게 강제하므로 본인 행위다.
         //  - 관리자 복원(restoreUser): superAdmin/관리자가 **타인** 문서를 재생성한다.
         //    이 경우 본인을 행위자로 적으면 무고한 사용자에게 책임이 귀속된다.
-        //    restoreUser가 남기는 restoredAt으로 두 경로를 가른다.
+        //    restoreUser가 남기는 restoredAt으로 두 경로를 가르고, 복원은 restoreUser가 심은
+        //    호출자 스탬프(lastEditedByUid)를 쓴다. 스탬프가 없던 예전 복원은 '알 수 없음'이다.
         const isRestored = data.restoredAt != null;
-        const actorUid = isRestored ? null : event.params.userId;
+        const actorUid = isRestored ? stampedActor(data) : event.params.userId;
+        const actorSource = !actorUid ? "unknown" : isRestored ? "stamp" : "document";
 
         await writeAuditLog({
             organizationId: orgIdOf(data.organizationId),
@@ -366,7 +370,7 @@ export const auditUserCreated = onDocumentCreated(
             targetType: "user",
             targetId: event.params.userId,
             actorUid,
-            actorSource: actorUid ? "document" : "unknown",
+            actorSource,
             subjectUids: [event.params.userId],
         }, event.id);
     }

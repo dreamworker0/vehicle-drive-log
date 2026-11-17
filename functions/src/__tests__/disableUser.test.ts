@@ -118,6 +118,8 @@ describe('disableUser — 직원 비활성화', () => {
         expect(mockUpdate).toHaveBeenCalledWith({
             status: 'disabled',
             disabledAt: 'SERVER_TIMESTAMP',
+            // 접속기록 행위자 — 호출한 관리자. 빠뜨리면 직전에 문서를 고친 사람(흔히 직원 본인)에게 귀속된다
+            lastEditedByUid: 'caller-uid',
         });
         // 서버 차단: Auth 계정 비활성화 + 리프레시 토큰 폐기까지 수행해야 한다 (감사 #1)
         expect(mockAuthUpdateUser).toHaveBeenCalledWith('target-uid', { disabled: true });

@@ -2,9 +2,9 @@
 
 > **자동 생성 문서** — `scripts/generate-functions-doc.ts`로 생성됨
 >
-> 마지막 업데이트: 2026. 11. 11. 오후 6:38:43
+> 마지막 업데이트: 2026. 11. 18. 오전 7:44:31
 >
-> 총 함수 수: **80개**
+> 총 함수 수: **81개**
 
 ---
 
@@ -23,7 +23,7 @@
 
 ## 📞 onCall (클라이언트 직접 호출)
 
-> 총 41개
+> 총 42개
 
 ### `ocrDashboard`
 
@@ -179,6 +179,16 @@
 | **파일** | `functions/src/handlers/callable/disableUser.ts` |
 | **설명** | Firebase Auth 비활성화 + Firestore 사용자 문서 삭제 (직원 제거) |
 | **인증** | 기관 관리자 이상 (admin/superAdmin) |
+| **요청 파라미터** | `{ uid: string }` |
+| **반환값** | `{ success: boolean }` |
+
+### `enableUser`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/callable/enableUser.ts` |
+| **설명** | 비활성 직원을 다시 활성화. Auth 계정 차단(disabled)을 먼저 풀고 users 문서를 status: active·disabledAt: null로 되돌린다(disableUser의 짝). Auth 계정이 없으면 문서만 복구한다. 과거 클라이언트 재활성화가 문서만 고쳐 로그인이 막히던 문제(2026-11-18)로 서버로 옮겼다. |
+| **인증** | 기관 관리자 이상 (같은 기관, superAdmin 대상 불가) |
 | **요청 파라미터** | `{ uid: string }` |
 | **반환값** | `{ success: boolean }` |
 

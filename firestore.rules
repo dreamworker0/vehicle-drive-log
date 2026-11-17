@@ -234,10 +234,14 @@ service cloud.firestore {
                     // 관리자가 운영자를 employee로 강등하거나 status를 disabled로 바꿀 수 있었다
                     // (2026-10-17 규칙 감사 #13). 직원 관리 화면은 superAdmin을 목록에서 빼므로
                     // 정상 경로는 영향이 없다(useEmployeeManager).
+                    // status·disabledAt(활성/비활성)은 관리자도 직접 못 바꾼다 — Auth 계정 차단과 한 몸이라
+                    // 콜러블(disableUser·enableUser)만 바꾼다. 문서만 'active'로 고치면 목록은 활성인데
+                    // 로그인은 auth/user-disabled로 막히는 반쪽 복구가 된다(2026-11-18 기관 문의).
                     || (isOrgAdmin(resource.data.organizationId)
                         && resource.data.get('role', 'employee') != 'superAdmin'
                         && request.resource.data.role != 'superAdmin'
-                        && request.resource.data.organizationId == resource.data.organizationId)
+                        && request.resource.data.organizationId == resource.data.organizationId
+                        && !request.resource.data.diff(resource.data).affectedKeys().hasAny(['status', 'disabledAt']))
                     );
       allow delete: if isSuperAdmin();
 

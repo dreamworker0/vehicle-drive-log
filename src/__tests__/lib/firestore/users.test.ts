@@ -43,7 +43,7 @@ import * as fs from 'firebase/firestore';
 import { captureError } from '../../../lib/sentry';
 import {
     getUser, createUser, updateUser, leaveOrganization,
-    restoreUser, clearUserOrganization, recheckDeniedTarget,
+    clearUserOrganization, recheckDeniedTarget,
     getOrganizationMembers, getOrganizationAdmins, getOrgMemberCounts,
 } from '../../../lib/firestore/users';
 
@@ -168,35 +168,6 @@ describe('firestore/users', () => {
 
             expect(fs.doc).toHaveBeenCalledWith(expect.anything(), 'users', 'u1');
             expect(fs.deleteDoc).toHaveBeenCalled();
-        });
-    });
-
-    describe('restoreUser', () => {
-        it('status를 active로 되돌리고 disabledAt을 초기화한다', async () => {
-            vi.mocked(fs.updateDoc).mockResolvedValue(undefined as never);
-
-            await restoreUser('u1');
-
-            expect(fs.updateDoc).toHaveBeenCalledWith(
-                expect.anything(),
-                { status: 'active', disabledAt: null },
-            );
-        });
-
-        it('대상 문서가 없으면(not-found) 보고 없이 에러만 재던진다', async () => {
-            const err = Object.assign(new Error('No document to update'), { code: 'not-found' });
-            vi.mocked(fs.updateDoc).mockRejectedValue(err as never);
-
-            await expect(restoreUser('u1')).rejects.toThrow('No document to update');
-            expect(captureError).not.toHaveBeenCalled();
-        });
-
-        it('소속이 비워진 직원이면(permission-denied) not-found로 바꿔 던지고 보고하지 않는다', async () => {
-            vi.mocked(fs.updateDoc).mockRejectedValue(denied() as never);
-            vi.mocked(fs.getDoc).mockRejectedValue(denied() as never);
-
-            await expect(restoreUser('u1')).rejects.toMatchObject({ code: 'not-found' });
-            expect(captureError).not.toHaveBeenCalled();
         });
     });
 
