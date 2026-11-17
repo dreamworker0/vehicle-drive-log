@@ -132,6 +132,12 @@ describe('joinOrganization — 이용약관 동의', () => {
         });
     });
 
+    it('가입은 본인 행위로 스탬프한다 — 재가입이 기존 문서를 덮어써도 행위자가 남는다', async () => {
+        await capturedHandler(makeRequest());
+        const savedDoc = mockUserSet.mock.calls[0][0];
+        expect(savedDoc.lastEditedByUid).toBe('user-001');
+    });
+
     it('개인정보 처리방침 동의는 받지도, 기록하지도 않는다', async () => {
         await capturedHandler(makeRequest());
         const savedDoc = mockUserSet.mock.calls[0][0];

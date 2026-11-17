@@ -420,6 +420,22 @@ describe('auditLog — 사용자', () => {
         expect(lastEntry()).toMatchObject({ actorUid: null, actorSource: 'unknown' });
     });
 
+    it('생성: restoreUser가 호출자를 스탬프하면 복원한 운영자가 행위자로 남는다', async () => {
+        await fireCreate(USER, { userId: 'u-2b' }, {
+            organizationId: 'org-1', email: 'a@b.c', restoredAt: 'T1', lastEditedByUid: 'super-1',
+        });
+        expect(lastEntry()).toMatchObject({ actorUid: 'super-1', actorSource: 'stamp', subjectUids: ['u-2b'] });
+    });
+
+    it('수정: 관리자 비활성화(disableUser 스탬프)는 직원 본인이 아니라 관리자에게 귀속된다', async () => {
+        // 2026-11-12 실제 사례 — 스탬프가 없어 직전에 본인이 남긴 스탬프로 기록됐다
+        await fireUpdate(USER, { userId: 'emp-1' },
+            { organizationId: 'org-1', status: 'active', lastEditedByUid: 'emp-1' },
+            { organizationId: 'org-1', status: 'disabled', disabledAt: 'T2', lastEditedByUid: 'admin-1' },
+        );
+        expect(lastEntry()).toMatchObject({ actorUid: 'admin-1', actorSource: 'stamp', subjectUids: ['emp-1'] });
+    });
+
     it('수정: 권한 변경(role)이 변경 필드로 남는다 — 고시 제5조 권한 기록 겸용', async () => {
         await fireUpdate(USER, { userId: 'u-3' },
             { organizationId: 'org-1', role: 'employee', name: '홍길동' },

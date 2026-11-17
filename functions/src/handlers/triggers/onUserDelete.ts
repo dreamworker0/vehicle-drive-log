@@ -17,7 +17,10 @@ export const onUserDelete = functions
                 phone: '***-****-****',
                 status: 'disabled',
                 photoURL: '',
-                deletedAt: FieldValue.serverTimestamp()
+                deletedAt: FieldValue.serverTimestamp(),
+                // 시스템 쓰기 — 사람 uid를 심지 않고 이전 스탬프를 지운다. 남겨 두면 접속기록이 이 익명화를
+                // 마지막으로 문서를 고친 사람에게 귀속한다(행위자는 '알 수 없음'이 맞다).
+                lastEditedByUid: FieldValue.delete(),
             });
             log('INFO', 'onUserDelete', '유저 익명화 처리 완료', { uid });
         } catch (error: unknown) {

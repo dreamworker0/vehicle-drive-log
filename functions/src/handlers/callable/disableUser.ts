@@ -1,7 +1,7 @@
 /**
  * disableUser — 직원 비활성화 (Soft Delete)
  * onCall 함수: 관리자가 직원을 비활성화할 때 호출
- * Auth 비활성화 없이 users 문서의 status만 'disabled'로 변경
+ * users 문서 status를 'disabled'로 바꾸고 Auth 계정 차단 + 리프레시 토큰 폐기 (짝: enableUser)
  */
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
@@ -51,9 +51,13 @@ export const disableUser = onCall(
             }
 
             // 3. users 문서의 status를 'disabled'로 변경 (soft delete)
+            //    행위자 스탬프 — 접속기록(auditUserUpdated)은 문서의 lastEditedByUid로 행위자를 정한다.
+            //    서버 쓰기라 클라이언트 actorStamp가 없으므로 호출자를 직접 적는다. 빠뜨리면 비활성화가
+            //    직전에 문서를 고친 사람(흔히 직원 본인)에게 귀속된다(2026-11-12 실제 사례, 11-18 확인).
             await db.collection("users").doc(uid).update({
                 status: "disabled",
                 disabledAt: FieldValue.serverTimestamp(),
+                lastEditedByUid: request.auth.uid,
             });
 
             // 4. 서버 차단 — Auth 계정을 실제로 비활성화하고 리프레시 토큰을 폐기한다.

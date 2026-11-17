@@ -16,7 +16,7 @@ const mockLog = jest.fn();
 jest.mock('../core/discord', () => ({ sendDiscordAlert: (...args: unknown[]) => mockSendDiscordAlert(...args) }));
 jest.mock('firebase-admin/firestore', () => ({
     getFirestore: () => ({ collection: mockCollection }),
-    FieldValue: { serverTimestamp: jest.fn(() => 'SERVER_TIMESTAMP') },
+    FieldValue: { serverTimestamp: jest.fn(() => 'SERVER_TIMESTAMP'), delete: jest.fn(() => 'FIELD_DELETE') },
 }));
 jest.mock('../utils/helpers', () => ({ log: (...args: unknown[]) => mockLog(...args) }));
 jest.mock('../core/params', () => ({
@@ -108,6 +108,8 @@ describe('onUserDelete — 탈퇴 계정 익명화', () => {
             status: 'disabled',
             photoURL: '',
             deletedAt: 'SERVER_TIMESTAMP',
+            // 시스템 쓰기라 이전 행위자 스탬프를 지운다 — 남기면 익명화가 마지막 수정자에게 귀속된다
+            lastEditedByUid: 'FIELD_DELETE',
         });
         expect(mockLog).toHaveBeenCalledWith('INFO', 'onUserDelete', expect.any(String), { uid: 'u1' });
     });
