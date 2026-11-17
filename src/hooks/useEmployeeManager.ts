@@ -7,7 +7,7 @@ import { useAuth } from './useAuth';
 import { useToast } from './useToast';
 import { useConfirm } from './useConfirm';
 import useRetry from './useRetry';
-import { getOrganizationMembers, getOrganization, regenerateInviteCode, updateUser, restoreUser, getPreRegisteredEmployees, addPreRegisteredEmployee, deletePreRegisteredEmployee, recheckDeniedTarget } from '../lib/firestore';
+import { getOrganizationMembers, getOrganization, regenerateInviteCode, updateUser, getPreRegisteredEmployees, addPreRegisteredEmployee, deletePreRegisteredEmployee, recheckDeniedTarget } from '../lib/firestore';
 import { invalidateCache } from '../lib/firestore/cache';
 import type { User, UserRole, MemberStatus, UnifiedMember } from '../types/user';
 import type { Organization } from '../types/organization';
@@ -22,7 +22,7 @@ import { APP_URL } from '../lib/constants';
  * **이미 빠진 계정의 행이 남는다.** 그 행의 작업은 서버가 규칙대로 거부한다 — 코드 결함이 아니라
  * 목록이 낡았다는 신호다. 문서가 지워졌으면 not-found로 오고, 문서가 남아 소속만 비워졌으면
  * permission-denied로 오는데 후자는 recheckDeniedTarget이 대상을 다시 읽어 not-found로 바꿔 온다
- * (updateUser·restoreUser는 데이터 계층에서, 콜러블은 아래 callTargetCallable에서).
+ * (updateUser는 데이터 계층에서, 콜러블은 아래 callTargetCallable에서).
  *
  * 메시지가 아니라 **코드로 판별한다.** 같은 한국어 문구를 sendAdminNotice는
  * permission-denied(호출자 문서 없음)로도 던지는데, 그건 성격이 다른 실패라 함께 묶으면
@@ -165,7 +165,7 @@ export default function useEmployeeManager() {
      * 빠진 경우 not-found로 바꿔 던진다 — 서버는 이 경우 "다른 기관의 직원을 …할 수 없습니다"로
      * 거부하는데, 열어 둔 목록 입장에서는 탈퇴한 직원이라 그 문구가 오해를 부른다.
      */
-    const callTargetCallable = async (name: 'disableUser' | 'deleteUserPermanently', uid: string) => {
+    const callTargetCallable = async (name: 'disableUser' | 'enableUser' | 'deleteUserPermanently', uid: string) => {
         const { getFunctions, httpsCallable } = await import('firebase/functions');
         const functions = getFunctions(undefined, 'asia-northeast3');
         try {
@@ -253,11 +253,17 @@ export default function useEmployeeManager() {
 
     const handleRestoreEmployee = async (emp: User) => {
         if (!await confirm({ message: `${emp.name || emp.email} 직원을 다시 활성화하시겠습니까?` })) return;
+        // 서버 콜러블로 한다 — 비활성화(disableUser)가 막은 Auth 계정은 Admin SDK로만 풀 수 있다.
+        // 예전엔 문서 status만 고쳐, 목록은 '활성'인데 직원 로그인이 auth/user-disabled로 막혔다(2026-11-18).
         await runWithRetry(`restore-emp-${emp.id}`, async () => {
-            await restoreUser(emp.id);
+            await callTargetCallable('enableUser', emp.id);
             showToast('직원이 활성화되었습니다.', 'success');
             await fetchData();
-        }, { errorMessage: '활성화에 실패했습니다.', ...staleRowGuard() });
+        }, {
+            errorMessage: '활성화에 실패했습니다.',
+            useBackoff: true,
+            ...staleRowGuard(showServerMessage),
+        });
     };
 
     const handleChangeRole = async (emp: User, newRole: UserRole) => {

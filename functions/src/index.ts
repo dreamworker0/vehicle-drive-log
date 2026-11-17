@@ -79,6 +79,9 @@ export { refreshDashboardStats } from "./handlers/callable/refreshDashboardStats
 // 직원 삭제 (Auth 비활성화 + Firestore 삭제)
 export { disableUser } from "./handlers/callable/disableUser";
 
+// 비활성 직원 다시 활성화 (Auth 차단 해제 + 문서 status 복구, disableUser의 짝)
+export { enableUser } from "./handlers/callable/enableUser";
+
 // 계정 복원 (Auth 재활성화 + Firestore 재생성)
 export { restoreUser } from "./handlers/callable/restoreUser";
 

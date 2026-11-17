@@ -14,7 +14,6 @@ export {
     getOrganizationMembers,
     getOrganizationAdmins,
     getOrgMemberCounts,
-    restoreUser,
     clearUserOrganization,
     recheckDeniedTarget,
 } from './users';

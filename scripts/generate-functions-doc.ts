@@ -183,6 +183,15 @@ const FUNCTIONS: FunctionEntry[] = [
     returns: '{ success: boolean }',
   },
   {
+    name: 'enableUser',
+    type: 'onCall',
+    file: 'handlers/callable/enableUser.ts',
+    description: '비활성 직원을 다시 활성화. Auth 계정 차단(disabled)을 먼저 풀고 users 문서를 status: active·disabledAt: null로 되돌린다(disableUser의 짝). Auth 계정이 없으면 문서만 복구한다. 과거 클라이언트 재활성화가 문서만 고쳐 로그인이 막히던 문제(2026-11-18)로 서버로 옮겼다.',
+    auth: '기관 관리자 이상 (같은 기관, superAdmin 대상 불가)',
+    params: '{ uid: string }',
+    returns: '{ success: boolean }',
+  },
+  {
     name: 'restoreUser',
     type: 'onCall',
     file: 'handlers/callable/restoreUser.ts',

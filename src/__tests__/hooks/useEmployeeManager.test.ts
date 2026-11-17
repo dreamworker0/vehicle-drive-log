@@ -47,9 +47,11 @@ vi.mock('../../hooks/useConfirm', () => ({
 }));
 
 const mockCallable = vi.fn().mockResolvedValue({ data: { success: true } });
+// 어떤 콜러블을 불렀는지(이름) 확인하려고 httpsCallable 호출도 기록한다
+const mockHttpsCallable = vi.fn<(...args: unknown[]) => typeof mockCallable>(() => mockCallable);
 vi.mock('firebase/functions', () => ({
     getFunctions: vi.fn(),
-    httpsCallable: () => mockCallable,
+    httpsCallable: (...args: unknown[]) => mockHttpsCallable(...args),
 }));
 
 const mockMembers = [
@@ -72,7 +74,6 @@ const mockRemoveUserFromOrganization = vi.fn().mockResolvedValue({});
 const mockGetPreRegisteredEmployees = vi.fn().mockResolvedValue([]);
 const mockRegenerateInviteCode = vi.fn().mockResolvedValue('NEW_CODE');
 const mockUpdateUser = vi.fn().mockResolvedValue({});
-const mockRestoreUser = vi.fn().mockResolvedValue({});
 const mockAddPreRegisteredEmployee = vi.fn().mockResolvedValue({});
 const mockDeletePreRegisteredEmployee = vi.fn().mockResolvedValue({});
 
@@ -87,7 +88,6 @@ vi.mock('../../lib/firestore', () => ({
     getPreRegisteredEmployees: (...args: unknown[]) => mockGetPreRegisteredEmployees(...args),
     regenerateInviteCode: (...args: unknown[]) => mockRegenerateInviteCode(...args),
     updateUser: (...args: unknown[]) => mockUpdateUser(...args),
-    restoreUser: (...args: unknown[]) => mockRestoreUser(...args),
     addPreRegisteredEmployee: (...args: unknown[]) => mockAddPreRegisteredEmployee(...args),
     deletePreRegisteredEmployee: (...args: unknown[]) => mockDeletePreRegisteredEmployee(...args),
 }));
@@ -190,6 +190,53 @@ describe('useEmployeeManager', () => {
         });
     });
 
+    describe('handleRestoreEmployee — 다시 활성화', () => {
+        const disabledEmp = { id: 'u9', name: '퇴사직원', email: 'out@test.com', role: 'employee', status: 'disabled' };
+
+        it('문서를 직접 고치지 않고 enableUser 콜러블을 부른다 (Auth 차단 해제는 서버만 할 수 있다)', async () => {
+            const { result } = renderHook(() => useEmployeeManager());
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            await act(async () => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                await result.current.handleRestoreEmployee(disabledEmp as any);
+            });
+
+            expect(mockHttpsCallable).toHaveBeenCalledWith(undefined, 'enableUser');
+            expect(mockCallable).toHaveBeenCalledWith({ uid: 'u9' });
+            // 예전 경로(클라이언트 updateDoc으로 status만 변경)는 쓰지 않는다
+            expect(mockUpdateDoc).not.toHaveBeenCalled();
+            expect(mockShowToast).toHaveBeenCalledWith('직원이 활성화되었습니다.', 'success');
+        });
+
+        it('확인 모달을 취소하면 콜러블을 부르지 않는다', async () => {
+            mockConfirm.mockResolvedValue(false);
+            const { result } = renderHook(() => useEmployeeManager());
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await result.current.handleRestoreEmployee(disabledEmp as any);
+
+            expect(mockCallable).not.toHaveBeenCalled();
+        });
+
+        it('서버가 규칙대로 거부한 사유는 서버 문구를 그대로 보여준다', async () => {
+            mockCallable.mockRejectedValue(
+                Object.assign(new Error('시스템 관리자 계정은 변경할 수 없습니다.'), { code: 'functions/permission-denied' })
+            );
+            mockGetDoc.mockResolvedValue({ exists: () => true, get: () => 'org1' });
+            const { result } = renderHook(() => useEmployeeManager());
+            await waitFor(() => expect(result.current.loading).toBe(false));
+
+            await act(async () => {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                await result.current.handleRestoreEmployee(disabledEmp as any);
+            });
+
+            expect(mockShowToast).toHaveBeenCalledWith('시스템 관리자 계정은 변경할 수 없습니다.', 'error');
+        });
+    });
+
     describe('이미 사라진 직원 행(낡은 목록) 처리', () => {
         const notFound = () =>
             Object.assign(new Error('사용자를 찾을 수 없습니다.'), { code: 'functions/not-found' });
@@ -231,7 +278,8 @@ describe('useEmployeeManager', () => {
             // Firestore updateDoc은 문서가 없으면 code 'not-found'로 거부한다
             const fsNotFound = () => Object.assign(new Error('No document to update'), { code: 'not-found' });
             mockUpdateUser.mockRejectedValue(fsNotFound());
-            mockRestoreUser.mockRejectedValue(fsNotFound());
+            // 재활성화는 콜러블(enableUser)이라 functions/not-found로 온다
+            mockCallable.mockRejectedValue(notFound());
 
             const { result } = renderHook(() => useEmployeeManager());
             await waitFor(() => expect(result.current.loading).toBe(false));
@@ -286,12 +334,15 @@ describe('useEmployeeManager', () => {
         beforeEach(() => {
             mockGetDoc.mockRejectedValue(denied());
             mockUpdateDoc.mockRejectedValue(denied());
-            // 화면이 부르는 updateUser·restoreUser를 실물로 돌려 데이터 계층의 보고까지 확인한다
+            // 화면이 부르는 updateUser를 실물로 돌려 데이터 계층의 보고까지 확인한다
             mockUpdateUser.mockImplementation(actualUsers.updateUser);
-            mockRestoreUser.mockImplementation(actualUsers.restoreUser);
         });
 
         it('역할 변경·이름 수정·재활성화는 안내 후 목록을 새로 고치고 Sentry에 보고하지 않는다', async () => {
+            // 재활성화 콜러블(enableUser)은 "다른 기관의 직원"으로 거부한다
+            mockCallable.mockRejectedValue(
+                Object.assign(new Error('다른 기관의 직원을 활성화할 수 없습니다.'), { code: 'functions/permission-denied' })
+            );
             const { result } = renderHook(() => useEmployeeManager());
             await waitFor(() => expect(result.current.loading).toBe(false));
 

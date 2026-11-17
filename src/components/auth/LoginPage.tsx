@@ -1,14 +1,35 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { signInWithGoogle } from '../../lib/auth';
+import { signInWithGoogle, handleRedirectResult } from '../../lib/auth';
 import useForceLightMode from '../../hooks/useForceLightMode';
 import SEOHead from '../common/SEOHead';
+
+/** Firebase 로그인 오류 코드를 화면 문구로 바꾼다. */
+function loginErrorMessage(code: string | undefined): string {
+    if (code === 'auth/user-disabled') {
+        return '계정이 비활성화되었습니다. 기관 관리자에게 다시 활성화를 요청하세요.';
+    }
+    return '로그인에 실패했습니다. 다시 시도해주세요.';
+}
 
 export default function LoginPage() {
     useForceLightMode();
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+
+    /*
+     * 리다이렉트 로그인의 실패는 여기서만 보인다.
+     * 프로덕션은 signInWithRedirect라 Google에서 돌아오면 이 화면이 새로 그려지고, 실패하면 user=null이라
+     * main.tsx가 경량 앱을 띄운다. 전체 앱(useAuth)은 이때 로드되지 않으므로 결과를 읽는 곳이 없었다 —
+     * 비활성 계정(auth/user-disabled)이 아무 안내 없이 로그인 화면으로 되돌아온 이유다(2026-11-18 기관 문의).
+     * 성공한 리다이렉트는 null이 아닌 결과로 끝나고 lightEntry의 onAuthStateChanged가 전체 앱으로 넘긴다.
+     */
+    useEffect(() => {
+        handleRedirectResult().catch((err: unknown) => {
+            setError(loginErrorMessage((err as { code?: string })?.code));
+        });
+    }, []);
 
     const handleGoogleLogin = async () => {
         setLoading(true);
@@ -18,11 +39,7 @@ export default function LoginPage() {
             // App.jsx에서 역할에 따라 자동 라우팅됨
         } catch (err: unknown) {
             const firebaseErr = err as { code?: string; message?: string };
-            if (firebaseErr.code === 'auth/user-disabled') {
-                setError('계정이 비활성화되었습니다. 기관 관리자에게 문의하세요.');
-            } else {
-                setError('로그인에 실패했습니다. 다시 시도해주세요.');
-            }
+            setError(loginErrorMessage(firebaseErr.code));
             console.error('Google 로그인 실패:', firebaseErr.code, firebaseErr.message, err);
         } finally {
             setLoading(false);
@@ -74,7 +91,7 @@ export default function LoginPage() {
                             </div>
 
                             {error && (
-                                <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-xl px-4 py-3 text-sm text-red-600 dark:text-red-400 animate-slide-down">
+                                <div role="alert" className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/40 rounded-xl px-4 py-3 text-sm text-red-600 dark:text-red-400 animate-slide-down">
                                     {error}
                                 </div>
                             )}
