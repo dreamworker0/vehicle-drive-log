@@ -115,6 +115,11 @@ export {
     getFavorites,
     createFavorite,
     deleteFavorite,
+    getFavoritePurposes,
+    createFavoritePurpose,
+    deleteFavoritePurpose,
+    MAX_FAVORITE_PURPOSES,
+    MAX_FAVORITE_PURPOSE_LENGTH,
 } from './favorites';
 export type { FavoriteInput } from './favorites';
 

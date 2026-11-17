@@ -141,6 +141,7 @@ export async function cleanupOrphanAuthAccounts(
             for (const uid of deletedUids) {
                 try {
                     await deleteQuery(db, "favorites", "userId", uid);
+                    await deleteQuery(db, "favoritePurposes", "userId", uid);
                     await deleteQuery(db, "notifications", "targetUid", uid);
                     await bucket.deleteFiles({ prefix: `feedbacks/${uid}/` });
                     await bucket.deleteFiles({ prefix: `feedbacks/ocr-report/${uid}/` });

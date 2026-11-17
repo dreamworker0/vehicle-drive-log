@@ -59,14 +59,40 @@ interface AcceptedEntry {
     revisitWhen: string;
 }
 
-// 현재 수용 중인 항목 없음.
-//
 // GHSA-qwww-vcr4-c8h2(react-router RSC CSRF 우회)는 2026-07-25에 수용했다가
 // 2026-08-09에 제거했다 — react-router-dom 7.18.2에서 권고가 더 이상 매칭되지 않고
 // `npm audit`도 취약점 0건을 보고한다. 등록부의 stale 항목은 그 자체가 위험이라
 // (해소된 권고에 대한 차감 규칙이 계속 살아 있어, 같은 GHSA가 재등장해도 조용히
 // 차감된다) 이 스크립트가 "매칭 0건" 경고로 알려준 즉시 지운다.
-const KNOWN_ACCEPTED: AcceptedEntry[] = [];
+const KNOWN_ACCEPTED: AcceptedEntry[] = [
+    {
+        // 2026-11-18 공개. 루트 high 19건 + functions high 35건이 모두 이 권고 하나에서 나온다.
+        // 운영자 승인(2026-11-18) 후 등록.
+        advisory: 'GHSA-fc5q-39xc-vjpf',
+        pkgs: [
+            // 근본
+            'picomatch',
+            // 루트 — 빌드·테스트·린트 도구
+            'fdir', 'tinyglobby', 'vite', 'vitest', '@vitest/coverage-v8', 'workbox-build',
+            '@rollup/pluginutils', '@rollup/plugin-babel', '@rollup/plugin-node-resolve', '@rollup/plugin-replace',
+            '@typescript-eslint/typescript-estree', '@typescript-eslint/utils', '@typescript-eslint/type-utils',
+            '@typescript-eslint/parser', '@typescript-eslint/eslint-plugin', '@parcel/watcher', 'anymatch',
+            // functions — jest 테스트 도구
+            'jest-util', 'jest-haste-map', 'jest-message-util', 'jest-mock', 'jest-resolve',
+            'jest-resolve-dependencies', 'jest-runner', 'jest-runtime', 'jest-snapshot', 'jest-watcher',
+            'jest-worker', 'jest-changed-files', 'jest-circus', 'jest-cli', 'jest-config', 'jest-each',
+            'jest-environment-node', 'babel-jest', 'expect',
+            '@jest/console', '@jest/core', '@jest/environment', '@jest/expect', '@jest/fake-timers',
+            '@jest/globals', '@jest/reporters', '@jest/test-result', '@jest/test-sequencer', '@jest/transform',
+        ],
+        severity: 'high',
+        scope: '빌드·테스트·린트 도구 전용 (vite·vitest·eslint·jest·workbox-build). 브라우저 번들·Cloud Functions 런타임에는 없음',
+        reason: 'picomatch extglob ReDoS는 공격자가 glob 패턴을 넣을 수 있어야 성립한다. 이 저장소에서 패턴은 vite·eslint·jest·workbox 설정 파일의 고정값뿐이고, '
+            + '`npm ls picomatch --omit=dev` 결과 functions 운영 의존성에는 없으며 루트는 빌드 플러그인(@tailwindcss/vite → vite) 경로뿐이라 배포물에 포함되지 않는다. '
+            + '공개 시점 최신 picomatch 4.0.7까지 전부 취약 범위라 override로 올릴 버전이 없다.',
+        revisitWhen: 'picomatch 패치 버전(4.0.8 이상 등) 공개 시 — overrides 또는 npm audit fix로 정식 해소하고 이 항목을 지운다',
+    },
+];
 
 /** GHSA ID 형식 — 오기입(빈 문자열·접두사만)으로 전체 권고가 차감되는 사고를 원천 차단 */
 const GHSA_RE = /^GHSA-[0-9a-z]{4}-[0-9a-z]{4}-[0-9a-z]{4}$/;

@@ -57,11 +57,14 @@ export const deleteUserPermanently = onCall(
                 throw new HttpsError("failed-precondition", "비활성 상태인 직원만 완전 삭제할 수 있습니다. 먼저 비활성화해 주세요.");
             }
 
-            // 4. 개인 부속 데이터 정리 — 즐겨찾기 (운행일지 등 기관 기록은 보존)
-            const favSnap = await db.collection("favorites").where("userId", "==", uid).get();
-            if (!favSnap.empty) {
+            // 4. 개인 부속 데이터 정리 — 목적지 즐겨찾기·자주 쓰는 목적 (운행일지 등 기관 기록은 보존)
+            const cleaned: Record<string, number> = {};
+            for (const personal of ["favorites", "favoritePurposes"]) {
+                const snap = await db.collection(personal).where("userId", "==", uid).get();
+                cleaned[personal] = snap.size;
+                if (snap.empty) continue;
                 // Firestore batch는 500건 제한 — 청크 단위로 삭제
-                const docs = favSnap.docs;
+                const docs = snap.docs;
                 for (let i = 0; i < docs.length; i += 500) {
                     const batch = db.batch();
                     docs.slice(i, i + 500).forEach((d) => batch.delete(d.ref));
@@ -87,7 +90,7 @@ export const deleteUserPermanently = onCall(
                 }
             }
 
-            console.log(`직원 완전 삭제 완료: ${uid} (호출자: ${request.auth.uid}, 즐겨찾기 ${favSnap.size}건 정리)`);
+            console.log(`직원 완전 삭제 완료: ${uid} (호출자: ${request.auth.uid}, 즐겨찾기 ${cleaned.favorites ?? 0}건·자주 쓰는 목적 ${cleaned.favoritePurposes ?? 0}건 정리)`);
             return { success: true };
         } catch (err: unknown) {
             console.error("직원 완전 삭제 실패:", (err as Error).message);

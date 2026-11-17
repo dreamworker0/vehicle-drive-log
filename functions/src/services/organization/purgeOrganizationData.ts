@@ -45,6 +45,7 @@ const ORG_SCOPED: ReadonlyArray<readonly [collection: string, field: string]> = 
     ["maintenanceRecords", "organizationId"],
     ["notifications", "organizationId"],
     ["favorites", "organizationId"],
+    ["favoritePurposes", "organizationId"],
     ["feedbacks", "organizationId"],
     ["slackOauthStates", "organizationId"],
     ["assistantConversations", "orgId"],

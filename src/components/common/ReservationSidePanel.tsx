@@ -13,6 +13,7 @@ import ReservationTabContent from './reservation/ReservationTabContent';
 import ReservationTypeSelector from './reservation/ReservationTypeSelector';
 import ExternalLoanFields from './reservation/ExternalLoanFields';
 import ReservationPassengerField from './reservation/ReservationPassengerField';
+import PurposeChips from './PurposeChips';
 import type { Vehicle } from '../../types/vehicle';
 import type { Favorite } from '../../types/favorite';
 import type { Reservation, ReservationForm, PassengerFormValues } from '../../types/reservation';
@@ -326,6 +327,7 @@ export default function ReservationSidePanel({
                                 className="input w-full mt-1 text-sm min-h-[48px]"
                                 placeholder="출장, 외근 등"
                             />
+                            <PurposeChips value={form.purpose} onSelect={text => setForm({ ...form, purpose: text })} />
                         </div>
 
                         {/* 동승자(예정) — 기관이 켠 경우에만. 기본은 접혀 있다.

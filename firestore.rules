@@ -562,6 +562,25 @@ service cloud.firestore {
       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
     }
 
+    // === 자주 쓰는 운행 목적 (개인용) ===
+    // 목적지 즐겨찾기와 같은 개인 범위 — 같은 기관 직원도 남의 것은 못 읽는다(목적 문구에
+    // 이용자 이름이 섞일 수 있다). 키 목록의 원본은 createFavoritePurpose(src/lib/firestore/favorites.ts).
+    // 화면은 추가·삭제만 하므로 update는 열지 않는다.
+    match /favoritePurposes/{purposeId} {
+      function purposeShapeValid() {
+        return request.resource.data.keys().hasOnly(['userId', 'text', 'organizationId', 'createdAt'])
+               && request.resource.data.text is string
+               && request.resource.data.text.size() > 0
+               && request.resource.data.text.size() <= 100
+               && (!request.resource.data.keys().hasAny(['organizationId'])
+                   || (request.resource.data.organizationId is string
+                       && request.resource.data.organizationId.size() <= 100));
+      }
+      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isSuperAdmin());
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid && purposeShapeValid();
+      allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+
     // === 주유 기록 ===
     match /fuelLogs/{logId} {
       allow read: if belongsToMyOrg() || isSuperAdmin();
