@@ -41,7 +41,10 @@ vi.mock('../../../lib/sentry', () => ({ captureError: vi.fn() }));
 // mock 선언 뒤에 import (호이스팅 주의)
 import * as fs from 'firebase/firestore';
 import { captureError } from '../../../lib/sentry';
-import { getFavorites, createFavorite, deleteFavorite } from '../../../lib/firestore/favorites';
+import {
+    getFavorites, createFavorite, deleteFavorite,
+    getFavoritePurposes, createFavoritePurpose, deleteFavoritePurpose,
+} from '../../../lib/firestore/favorites';
 
 // {id, ...data} 병합 반환 함수용 스냅샷 스텁 (doc.id 포함)
 const docsSnapWithId = (rows: Array<{ id: string; [k: string]: unknown }>) => ({
@@ -167,5 +170,69 @@ describe('firestore/favorites', () => {
             await expect(deleteFavorite('f1')).rejects.toThrow('deleteDoc 실패');
             expect(captureError).toHaveBeenCalled();
         });
+    });
+});
+
+describe('firestore/favorites — 자주 쓰는 목적', () => {
+    // 조회는 모듈 캐시로 묶이므로 테스트마다 다른 uid를 써서 서로 섞이지 않게 한다
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    const ts = (ms: number) => ({ toMillis: () => ms });
+
+    it('본인 uid로만 조회하고, 등록한 순서대로 돌려준다 (빈 문구는 뺀다)', async () => {
+        vi.mocked(fs.getDocs).mockResolvedValue(docsSnapWithId([
+            { id: 'p2', userId: 'u-order', text: '병원 동행', createdAt: ts(2000) },
+            { id: 'p0', userId: 'u-order', text: '  ', createdAt: ts(500) },
+            { id: 'p1', userId: 'u-order', text: '가정방문', createdAt: ts(1000) },
+            // 서버 시각이 아직 없는 문서는 맨 뒤
+            { id: 'p3', userId: 'u-order', text: '물품 구매' },
+        ]) as never);
+
+        const list = await getFavoritePurposes('u-order');
+
+        expect(fs.where).toHaveBeenCalledWith('userId', '==', 'u-order');
+        // 복합 인덱스가 필요 없도록 서버 정렬을 걸지 않는다
+        expect(fs.orderBy).not.toHaveBeenCalled();
+        expect(list.map(p => p.id)).toEqual(['p1', 'p2', 'p3']);
+    });
+
+    it('같은 사람의 두 번째 조회는 캐시에서 받고, 추가하면 다시 읽는다', async () => {
+        vi.mocked(fs.getDocs).mockResolvedValue(docsSnapWithId([
+            { id: 'p1', userId: 'u-cache', text: '가정방문', createdAt: ts(1) },
+        ]) as never);
+        vi.mocked(fs.addDoc).mockResolvedValue({ id: 'new' } as never);
+
+        await getFavoritePurposes('u-cache');
+        await getFavoritePurposes('u-cache');
+        expect(fs.getDocs).toHaveBeenCalledTimes(1);
+
+        await createFavoritePurpose({ userId: 'u-cache', text: '병원 동행' });
+        await getFavoritePurposes('u-cache');
+        expect(fs.getDocs).toHaveBeenCalledTimes(2);
+    });
+
+    it('추가할 때 앞뒤 공백을 지우고 50자로 자르며, 소속이 없으면 organizationId를 넣지 않는다', async () => {
+        vi.mocked(fs.addDoc).mockResolvedValue({ id: 'p9' } as never);
+
+        const id = await createFavoritePurpose({ userId: 'u1', text: '  ' + '가'.repeat(60) + '  ', organizationId: null });
+
+        expect(id).toBe('p9');
+        const payload = vi.mocked(fs.addDoc).mock.calls[0][1] as Record<string, unknown>;
+        expect(payload).toEqual({ userId: 'u1', text: '가'.repeat(50), createdAt: '__serverTimestamp__' });
+    });
+
+    it('소속 기관이 있으면 함께 남긴다 — 기관 해지 때 일괄 삭제하기 위해', async () => {
+        vi.mocked(fs.addDoc).mockResolvedValue({ id: 'p10' } as never);
+        await createFavoritePurpose({ userId: 'u1', text: '가정방문', organizationId: 'org-A' });
+        const payload = vi.mocked(fs.addDoc).mock.calls[0][1] as Record<string, unknown>;
+        expect(payload.organizationId).toBe('org-A');
+    });
+
+    it('삭제 실패는 Sentry에 남기고 다시 던진다', async () => {
+        vi.mocked(fs.deleteDoc).mockRejectedValue(new Error('permission-denied'));
+        await expect(deleteFavoritePurpose('p1', 'u1')).rejects.toThrow('permission-denied');
+        expect(captureError).toHaveBeenCalledWith(expect.any(Error), expect.objectContaining({ context: 'deleteFavoritePurpose' }));
     });
 });

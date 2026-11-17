@@ -39,3 +39,25 @@ export const favoriteSchema = z.object({
 });
 
 export type FavoriteParsed = z.infer<typeof favoriteSchema>;
+
+/**
+ * 자주 쓰는 운행 목적 스키마 (`favoritePurposes` 컬렉션).
+ *
+ * 목적지 즐겨찾기와 같은 개인 범위 데이터다 — 본인만 읽고 쓴다(Rules). 목적은 행선지와
+ * 따로 바뀌는 경우가 많아(같은 '병원 동행'이라도 병원은 매번 다르다) 즐겨찾기 문서의
+ * `purpose` 칸에 붙이지 않고 별도 컬렉션으로 둔다.
+ *
+ * 사용자 문서(users)에 배열로 두지 않은 이유: 사용자 문서는 같은 기관 직원 모두가 읽을 수
+ * 있고, 목적 문구에는 이용자 이름이 섞일 수 있다(예: '김OO 어르신 병원 동행').
+ *
+ * `organizationId`는 기관 해지 시 일괄 삭제(purgeOrganizationData)를 위해 함께 남긴다.
+ */
+export const favoritePurposeSchema = z.object({
+    userId: z.string().catch(''),
+    /** 목적 문구 (예: '가정방문') */
+    text: z.string().catch(''),
+    organizationId: z.string().optional().catch(undefined),
+    createdAt: timestampSchema.optional(),
+});
+
+export type FavoritePurposeParsed = z.infer<typeof favoritePurposeSchema>;

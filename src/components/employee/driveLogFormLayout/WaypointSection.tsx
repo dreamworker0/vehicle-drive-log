@@ -1,6 +1,7 @@
 import { memo } from 'react';
 import type { DriveLogForm, LocationState } from '../../../hooks/driveLogForm/types';
 import type { Favorite } from '../../../types/favorite';
+import PurposeChips from '../../common/PurposeChips';
 
 interface WaypointSectionProps {
     reservationData: LocationState | null;
@@ -50,6 +51,7 @@ const WaypointSection = memo(function WaypointSection({
                     className="input min-h-[48px]"
                     placeholder="출장"
                 />
+                <PurposeChips value={form.purpose} onSelect={text => setForm({ ...form, purpose: text })} />
             </div>
             <div>
                 <label htmlFor="destination" className="label">행선지</label>

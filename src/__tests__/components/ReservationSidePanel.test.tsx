@@ -39,6 +39,10 @@ vi.mock('../../components/common/reservation/ReservationTypeSelector', () => ({
 vi.mock('../../components/common/reservation/ReservationPassengerField', () => ({
     default: () => <div data-testid="passenger-field" />,
 }));
+// 자주 쓰는 목적 단추는 로그인 정보·Firestore를 쓴다 — 자체 테스트(PurposeChips.test)가 따로 본다
+vi.mock('../../components/common/PurposeChips', () => ({
+    default: () => <div data-testid="purpose-chips" />,
+}));
 vi.mock('../../components/common/reservation/ReservationTabContent', () => ({
     default: ({ activeRes, completedRes }: { activeRes: unknown[]; completedRes: unknown[] }) => (
         <div data-testid="tab-content">{`active:${activeRes.length} completed:${completedRes.length}`}</div>

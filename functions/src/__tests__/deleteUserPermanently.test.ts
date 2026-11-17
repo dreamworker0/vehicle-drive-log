@@ -9,6 +9,7 @@ const mockCallerGet = jest.fn();
 const mockTargetGet = jest.fn();
 const mockUserDelete = jest.fn().mockResolvedValue(undefined);
 const mockFavoritesGet = jest.fn();
+const mockPurposesGet = jest.fn();
 const mockBatchDelete = jest.fn();
 const mockBatchCommit = jest.fn().mockResolvedValue(undefined);
 const mockAuthDeleteUser = jest.fn().mockResolvedValue(undefined);
@@ -25,6 +26,11 @@ jest.mock('firebase-admin/firestore', () => ({
             if (collectionName === 'favorites') {
                 return {
                     where: jest.fn(() => ({ get: mockFavoritesGet })),
+                };
+            }
+            if (collectionName === 'favoritePurposes') {
+                return {
+                    where: jest.fn(() => ({ get: mockPurposesGet })),
                 };
             }
             return {
@@ -68,6 +74,7 @@ describe('deleteUserPermanently — 비활성 직원 완전 삭제', () => {
         mockBatchCommit.mockResolvedValue(undefined);
         mockAuthDeleteUser.mockResolvedValue(undefined);
         mockFavoritesGet.mockResolvedValue(favSnap(0));
+        mockPurposesGet.mockResolvedValue(favSnap(0));
     });
 
     it('인증이 없으면 unauthenticated 에러를 던진다', async () => {
@@ -144,7 +151,7 @@ describe('deleteUserPermanently — 비활성 직원 완전 삭제', () => {
         expect(mockAuthDeleteUser).not.toHaveBeenCalled();
     });
 
-    it('정상 처리: 비활성 직원을 삭제하면 users 문서 + 즐겨찾기 + Auth 계정을 삭제한다', async () => {
+    it('정상 처리: 비활성 직원을 삭제하면 users 문서 + 즐겨찾기 + 자주 쓰는 목적 + Auth 계정을 삭제한다', async () => {
         mockCallerGet.mockResolvedValueOnce({
             data: () => ({ role: 'admin', organizationId: 'org1' }),
         });
@@ -153,13 +160,15 @@ describe('deleteUserPermanently — 비활성 직원 완전 삭제', () => {
             data: () => ({ role: 'employee', organizationId: 'org1', status: 'disabled' }),
         });
         mockFavoritesGet.mockResolvedValueOnce(favSnap(3));
+        mockPurposesGet.mockResolvedValueOnce(favSnap(2));
 
         const req = { auth: { uid: 'caller-uid', token: {} }, data: { uid: 'target-uid' } };
         const result = await handler(req);
 
         expect(result).toEqual({ success: true });
-        expect(mockBatchDelete).toHaveBeenCalledTimes(3);
-        expect(mockBatchCommit).toHaveBeenCalledTimes(1);
+        // 즐겨찾기 3건 + 자주 쓰는 목적 2건 — 컬렉션마다 배치 하나
+        expect(mockBatchDelete).toHaveBeenCalledTimes(5);
+        expect(mockBatchCommit).toHaveBeenCalledTimes(2);
         expect(mockUserDelete).toHaveBeenCalledTimes(1);
         expect(mockAuthDeleteUser).toHaveBeenCalledWith('target-uid');
     });

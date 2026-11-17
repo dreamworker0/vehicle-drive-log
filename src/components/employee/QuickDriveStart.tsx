@@ -18,6 +18,7 @@ import VehicleSelector from '../common/reservation/VehicleSelector';
 import DestinationInput from '../common/reservation/DestinationInput';
 import RouteInfoPanel from '../common/reservation/RouteInfoPanel';
 import ReservationPassengerField from '../common/reservation/ReservationPassengerField';
+import PurposeChips from '../common/PurposeChips';
 
 export default function QuickDriveStart() {
     const {
@@ -117,6 +118,7 @@ export default function QuickDriveStart() {
                             className="input w-full mt-1 text-sm min-h-[48px]"
                             placeholder="출장, 외근 등"
                         />
+                        <PurposeChips value={form.purpose} onSelect={text => setForm({ ...form, purpose: text })} />
                     </div>
 
                     {/* 동승자 — 예약 폼과 같은 입력. 기본은 접혀 있다.
