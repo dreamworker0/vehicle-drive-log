@@ -31,7 +31,8 @@ async function signIn(page: Page, email: string, password: string) {
 async function gotoStable(page: Page, path: string) {
     await expect(async () => {
         await page.goto(path, { waitUntil: 'commit' }).catch(() => { /* 리다이렉트 중단 무시 */ });
-        await expect(page).toHaveURL(new RegExp(path.replace(/\//g, '\\/')), { timeout: 3000 });
+        // 정규식으로 만들지 않고 경로를 그대로 비교한다 — 이스케이프 누락(CodeQL) 여지를 없앤다
+        await expect(page).toHaveURL((url) => url.pathname.startsWith(path), { timeout: 3000 });
     }).toPass({ timeout: 25000 });
 }
 
