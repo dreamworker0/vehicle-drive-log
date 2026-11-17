@@ -64,6 +64,7 @@ function makeDeps(opts: {
     const deletedPrefixes: string[] = [];
     let report: Record<string, unknown> | undefined;
     const favorites = [{ id: 'f1', userId: 'orphan-1' }];
+    const favoritePurposes = [{ id: 'p1', userId: 'orphan-1' }, { id: 'p2', userId: 'member' }];
     const notifications = [{ id: 'n1', targetUid: 'orphan-1' }, { id: 'n2', targetUid: 'member' }];
 
     const auth = {
@@ -81,7 +82,7 @@ function makeDeps(opts: {
         }),
     };
 
-    const rows: Record<string, Array<Record<string, unknown>>> = { favorites, notifications };
+    const rows: Record<string, Array<Record<string, unknown>>> = { favorites, favoritePurposes, notifications };
     const db = {
         collection: (name: string) => ({
             select: () => ({ get: async () => ({ docs: [...userDocs].map((id) => ({ id })) }) }),
@@ -144,7 +145,7 @@ describe('cleanupOrphanAuthAccounts — 실행', () => {
 
         expect(result).toMatchObject({ mode: 'delete', candidates: 1, deleted: 1, failed: 0 });
         expect(t.deletedFromAuth).toEqual(['orphan-1']);
-        expect(t.deletedDocs.sort()).toEqual(['favorites/f1', 'notifications/n1']);
+        expect(t.deletedDocs.sort()).toEqual(['favoritePurposes/p1', 'favorites/f1', 'notifications/n1']);
         expect(t.deletedPrefixes).toEqual(['feedbacks/orphan-1/', 'feedbacks/ocr-report/orphan-1/']);
     });
 

@@ -19,6 +19,7 @@ const QuickDriveStart = lazyWithRetry(() => import('./QuickDriveStart'));
 const MyRecords = lazyWithRetry(() => import('./MyRecords'));
 const ReservationCalendar = lazyWithRetry(() => import('../common/ReservationCalendar'));
 const FavoritesManager = lazyWithRetry(() => import('./FavoritesManager'));
+const PurposeFavoritesManager = lazyWithRetry(() => import('./PurposeFavoritesManager'));
 const VehicleHistory = lazyWithRetry(() => import('./VehicleHistory'));
 const FuelLogTab = lazyWithRetry(() => import('./FuelLogTab'));
 const MorePage = lazyWithRetry(() => import('./MorePage'));
@@ -183,6 +184,7 @@ export default function EmployeeLayout() {
                         <Route path="my-records" element={<MyRecords />} />
                         <Route path="reservations" element={<ReservationCalendar />} />
                         <Route path="favorites" element={<FavoritesManager />} />
+                        <Route path="purposes" element={<PurposeFavoritesManager />} />
                         <Route path="vehicle-history" element={<VehicleHistory />} />
                         <Route path="more" element={<MorePage />} />
                         <Route path="" element={<Navigate to="today" replace />} />

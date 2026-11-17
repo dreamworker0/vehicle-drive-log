@@ -33,6 +33,7 @@ const DRIVER_ROUTE_LOADERS: Array<() => Promise<unknown>> = [
     () => import('../components/employee/MyRecords'),
     () => import('../components/common/ReservationCalendar'),
     () => import('../components/employee/FavoritesManager'),
+    () => import('../components/employee/PurposeFavoritesManager'),
     () => import('../components/employee/VehicleHistory'),
     () => import('../components/employee/MorePage'),
 ];

@@ -1318,6 +1318,24 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
     await assertFails(me.collection('favorites').doc('f_ok').update({ userId: 'uid_other' }));
     await assertSucceeds(me.collection('favorites').doc('f_ok').update({ name: '이름만 수정' }));
 
+    // 자주 쓰는 운행 목적 — 즐겨찾기와 같은 개인 범위
+    const purpose = { userId: 'uid_me', text: '가정방문', organizationId: 'org-A', createdAt: new Date() };
+    await assertSucceeds(me.collection('favoritePurposes').doc('p_ok').set(purpose));
+    await assertSucceeds(me.collection('favoritePurposes').where('userId', '==', 'uid_me').get());
+    // 같은 기관이어도 남의 목록은 못 읽고 못 지운다
+    await assertFails(other.collection('favoritePurposes').doc('p_ok').get());
+    await assertFails(other.collection('favoritePurposes').where('userId', '==', 'uid_me').get());
+    await assertFails(other.collection('favoritePurposes').doc('p_ok').delete());
+    // 명의 위조·열거 밖 필드·빈 문구·과대 문구·타입 위조 거부
+    await assertFails(other.collection('favoritePurposes').doc('p_forge').set(purpose));
+    await assertFails(me.collection('favoritePurposes').doc('p_extra').set({ ...purpose, blob: 'x' }));
+    await assertFails(me.collection('favoritePurposes').doc('p_empty').set({ ...purpose, text: '' }));
+    await assertFails(me.collection('favoritePurposes').doc('p_big').set({ ...purpose, text: 'x'.repeat(101) }));
+    await assertFails(me.collection('favoritePurposes').doc('p_type').set({ ...purpose, text: 12345 }));
+    // 수정 경로는 열지 않는다 (화면은 추가·삭제만)
+    await assertFails(me.collection('favoritePurposes').doc('p_ok').update({ text: '바꾼 목적' }));
+    await assertSucceeds(me.collection('favoritePurposes').doc('p_ok').delete());
+
     // 월별 집계 — 멤버 읽기 가능, 클라이언트 쓰기는 전면 차단
     await assertSucceeds(me.collection('orgStats').doc('org-A').collection('monthly').doc('2026-08').get());
     await assertFails(me.collection('orgStats').doc('org-A').collection('monthly').doc('2026-08').update({ logs: 99 }));
