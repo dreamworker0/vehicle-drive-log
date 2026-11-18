@@ -11,7 +11,7 @@ interface WelcomeGuideProps {
 export default function WelcomeGuide({ onDismiss, showQuickDrive = true }: WelcomeGuideProps) {
     return (
         <div className="glass-card border-2 border-primary-200 p-5 mb-5 animate-fade-in relative">
-            <button aria-label="버튼"
+            <button aria-label="닫기"
                 onClick={onDismiss}
                 className="absolute top-3 right-3 p-1 rounded-lg text-surface-500 dark:text-surface-400 hover:text-surface-600 dark:hover:text-surface-300 hover:bg-surface-100 dark:hover:bg-surface-700 transition-colors min-w-[48px] min-h-[48px] flex items-center justify-center"
                 title="닫기"
