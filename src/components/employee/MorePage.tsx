@@ -61,7 +61,7 @@ export default function MorePage() {
                     <p className="text-sm font-semibold text-surface-800 dark:text-surface-200 truncate">{userData?.name || user?.displayName || '사용자'}</p>
                     <p className="text-xs text-surface-500 dark:text-surface-400 truncate">{user?.email || ''}</p>
                 </div>
-                <button aria-label="버튼" onClick={logout} className="flex-shrink-0 flex items-center justify-center gap-1.5 text-xs text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 px-3 py-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors">
+                <button onClick={logout} className="flex-shrink-0 flex items-center justify-center gap-1.5 text-xs text-red-500 dark:text-red-400 hover:text-red-600 dark:hover:text-red-300 px-3 py-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors">
                     <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0 0 13.5 3h-6a2.25 2.25 0 0 0-2.25 2.25v13.5A2.25 2.25 0 0 0 7.5 21h6a2.25 2.25 0 0 0 2.25-2.25V15m3 0 3-3m0 0-3-3m3 3H9" /></svg>
                     로그아웃
                 </button>
