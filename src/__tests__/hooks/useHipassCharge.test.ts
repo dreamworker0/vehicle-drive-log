@@ -52,6 +52,22 @@ vi.mock('../../lib/firestore', () => ({
 
 import useHipassCharge from '../../hooks/useHipassCharge';
 
+/**
+ * 초기 로딩과 카드 자동 선택이 **둘 다** 끝날 때까지 기다린다.
+ *
+ * 카드 목록과 `loading=false`는 한 번에 반영되지만, 카드가 1개일 때의 자동 선택은 그 다음
+ * effect에서 따로 일어난다. `loading`만 기다리면 두 렌더 사이에 끼어 selectedCard가 아직
+ * 없는 상태를 볼 수 있어 CI처럼 느린 환경에서 간헐적으로 실패했다.
+ */
+async function renderReady() {
+    const hook = renderHook(() => useHipassCharge());
+    await waitFor(() => {
+        expect(hook.result.current.loading).toBe(false);
+        expect(hook.result.current.selectedCardId).toBe('c1');
+    });
+    return hook;
+}
+
 describe('useHipassCharge', () => {
     beforeEach(() => {
         vi.clearAllMocks();
@@ -61,35 +77,27 @@ describe('useHipassCharge', () => {
     });
 
     it('초기 로딩 후 카드 목록이 로드된다', async () => {
-        const { result } = renderHook(() => useHipassCharge());
-
-        await waitFor(() => expect(result.current.loading).toBe(false));
+        const { result } = await renderReady();
 
         expect(result.current.cards).toHaveLength(1);
         expect(result.current.vehicles).toHaveLength(1);
     });
 
     it('카드가 1개면 자동 선택된다', async () => {
-        const { result } = renderHook(() => useHipassCharge());
-
-        await waitFor(() => expect(result.current.loading).toBe(false));
+        const { result } = await renderReady();
 
         expect(result.current.selectedCardId).toBe('c1');
     });
 
     it('충전 기록이 로드되고 합계가 계산된다', async () => {
-        const { result } = renderHook(() => useHipassCharge());
-
-        await waitFor(() => expect(result.current.loading).toBe(false));
+        const { result } = await renderReady();
         await waitFor(() => expect(result.current.records).toHaveLength(1));
 
         expect(result.current.totalChargeAmount).toBe(30000);
     });
 
     it('handleCardSelect가 카드를 선택하고 폼을 초기화한다', async () => {
-        const { result } = renderHook(() => useHipassCharge());
-
-        await waitFor(() => expect(result.current.loading).toBe(false));
+        const { result } = await renderReady();
 
         act(() => {
             result.current.handleCardSelect('c1');
@@ -100,17 +108,13 @@ describe('useHipassCharge', () => {
     });
 
     it('selectedCard가 선택된 카드 객체를 반환한다', async () => {
-        const { result } = renderHook(() => useHipassCharge());
-
-        await waitFor(() => expect(result.current.loading).toBe(false));
+        const { result } = await renderReady();
 
         expect(result.current.selectedCard?.cardNumber).toBe('1234-5678');
     });
 
     it('balanceAfter가 충전금액 입력 시 계산된다', async () => {
-        const { result } = renderHook(() => useHipassCharge());
-
-        await waitFor(() => expect(result.current.loading).toBe(false));
+        const { result } = await renderReady();
 
         act(() => {
             result.current.setForm({ date: '2026-03-15', chargeAmount: '10000' });
@@ -120,8 +124,7 @@ describe('useHipassCharge', () => {
     });
 
     it('상한(100만 원)을 넘는 충전은 저장하지 않고 안내한다 — 서버 규칙과 같은 선', async () => {
-        const { result } = renderHook(() => useHipassCharge());
-        await waitFor(() => expect(result.current.loading).toBe(false));
+        const { result } = await renderReady();
 
         act(() => { result.current.setForm({ date: '2026-03-15', chargeAmount: '1000001' }); });
         await act(async () => { await result.current.handleSubmit({ preventDefault: vi.fn() } as never); });
@@ -131,8 +134,7 @@ describe('useHipassCharge', () => {
     });
 
     it('상한과 같은 금액(100만 원)은 저장한다', async () => {
-        const { result } = renderHook(() => useHipassCharge());
-        await waitFor(() => expect(result.current.loading).toBe(false));
+        const { result } = await renderReady();
 
         act(() => { result.current.setForm({ date: '2026-03-15', chargeAmount: '1000000' }); });
         await act(async () => { await result.current.handleSubmit({ preventDefault: vi.fn() } as never); });
@@ -141,9 +143,7 @@ describe('useHipassCharge', () => {
     });
 
     it('getVehicleById가 차량을 찾는다', async () => {
-        const { result } = renderHook(() => useHipassCharge());
-
-        await waitFor(() => expect(result.current.loading).toBe(false));
+        const { result } = await renderReady();
 
         const vehicle = result.current.getVehicleById('v1');
         expect(vehicle?.displayName).toBe('소나타');
@@ -153,9 +153,7 @@ describe('useHipassCharge', () => {
     });
 
     it('showForm 토글이 동작한다', async () => {
-        const { result } = renderHook(() => useHipassCharge());
-
-        await waitFor(() => expect(result.current.loading).toBe(false));
+        const { result } = await renderReady();
         expect(result.current.showForm).toBe(false);
 
         act(() => {
