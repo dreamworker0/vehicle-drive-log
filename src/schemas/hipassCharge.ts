@@ -37,8 +37,10 @@ export const hipassChargeSchema = z.object({
      * 자세한 이유는 `src/schemas/fuelLog.ts`의 같은 필드 주석을 본다.
      */
     lastEditedByUid: z.string().optional().catch(undefined),
-    createdAt: timestampSchema.optional(),
-    updatedAt: timestampSchema.optional(),
+    // serverTimestamp()로 저장·수정한 직후 다시 읽으면 서버 확정 전 값이 null로 온다 —
+    // 문서 전체를 [Zod] 실패로 올리지 않고 undefined로 받는다 (favorite.ts와 같은 처리)
+    createdAt: timestampSchema.optional().catch(undefined),
+    updatedAt: timestampSchema.optional().catch(undefined),
 });
 
 export type HipassChargeParsed = z.infer<typeof hipassChargeSchema>;

@@ -42,8 +42,10 @@ export const fuelLogSchema = z.object({
      * 값의 신뢰는 Rules의 `actorStampValid()`가 담보한다(타인 명의 위조 불가).
      */
     lastEditedByUid: z.string().optional().catch(undefined),
-    createdAt: timestampSchema.optional(),
-    updatedAt: timestampSchema.optional(),
+    // serverTimestamp()로 저장·수정한 직후 다시 읽으면 서버 확정 전 값이 null로 온다 —
+    // 문서 전체를 [Zod] 실패로 올리지 않고 undefined로 받는다 (favorite.ts와 같은 처리)
+    createdAt: timestampSchema.optional().catch(undefined),
+    updatedAt: timestampSchema.optional().catch(undefined),
 });
 
 export type FuelLogParsed = z.infer<typeof fuelLogSchema>;

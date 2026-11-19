@@ -22,6 +22,7 @@ import {
     favoritePurposeSchema,
     fuelLogSchema,
     hipassChargeSchema,
+    maintenanceSchema,
 } from '../../schemas';
 import type { QueryDocumentSnapshot } from 'firebase/firestore';
 
@@ -231,6 +232,20 @@ describe('스키마가 앱이 실제로 쓰는 필드를 모두 담는다', () =
 
         expect(result.name).toBe('보건소');
         expect(result.createdAt).toBeUndefined();
+    });
+
+    it.each([
+        ['fuelLogs', fuelLogSchema, ['createdAt', 'updatedAt']],
+        ['maintenance', maintenanceSchema, ['createdAt', 'updatedAt']],
+        ['hipassCharges', hipassChargeSchema, ['createdAt', 'updatedAt']],
+        ['favorites', favoriteSchema, ['createdAt']],
+        ['favoritePurposes', favoritePurposeSchema, ['createdAt']],
+    ] as const)('%s: serverTimestamp() 직후의 null 시각을 실패 대신 undefined로 받는다', (_name, schema, fields) => {
+        for (const field of fields) {
+            const parsed = (schema.shape as Record<string, { safeParse: (v: unknown) => { success: boolean; data?: unknown } }>)[field].safeParse(null);
+            expect(parsed.success, field).toBe(true);
+            expect(parsed.data, field).toBeUndefined();
+        }
     });
 
     it('컨버터는 스키마에 없는 키를 조용히 제거한다 — 이 테스트들이 필요한 이유', () => {
