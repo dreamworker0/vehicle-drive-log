@@ -19,6 +19,7 @@ import {
     userSchema,
     organizationSchema,
     favoriteSchema,
+    favoritePurposeSchema,
     fuelLogSchema,
     hipassChargeSchema,
 } from '../../schemas';
@@ -204,6 +205,32 @@ describe('스키마가 앱이 실제로 쓰는 필드를 모두 담는다', () =
 
         expect(result.destination).toBe('');
         expect(result.address).toBeUndefined();
+    });
+
+    it('자주 쓰는 목적: 서버 시각이 아직 없는(null) 방금 추가한 문서도 파싱이 통과한다', () => {
+        // serverTimestamp() 저장 직후 재조회하면 로컬 쓰기의 createdAt이 null로 읽힌다 (Sentry 6T)
+        const result = readThrough(favoritePurposeSchema, {
+            userId: 'u1',
+            organizationId: 'org1',
+            text: '가정방문',
+            createdAt: null,
+        });
+
+        expect(result.text).toBe('가정방문');
+        // 파싱 실패 시 컨버터는 원시 값(null)을 그대로 돌려주므로, undefined면 검증을 통과한 것이다
+        expect(result.createdAt).toBeUndefined();
+    });
+
+    it('즐겨찾기: 서버 시각이 아직 없는(null) 방금 추가한 문서도 파싱이 통과한다', () => {
+        const result = readThrough(favoriteSchema, {
+            userId: 'u1',
+            name: '보건소',
+            destination: '보건소',
+            createdAt: null,
+        });
+
+        expect(result.name).toBe('보건소');
+        expect(result.createdAt).toBeUndefined();
     });
 
     it('컨버터는 스키마에 없는 키를 조용히 제거한다 — 이 테스트들이 필요한 이유', () => {
