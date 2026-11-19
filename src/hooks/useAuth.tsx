@@ -5,7 +5,7 @@ import { doc, onSnapshot, Unsubscribe } from 'firebase/firestore';
 import { auth, db, authReady } from '../lib/firebase';
 import { isFirestoreTerminated } from '../lib/firestoreLifecycle';
 import { refreshTokenSilently, refreshToken } from '../lib/tokenRefresh';
-import { handleRedirectResult } from '../lib/auth';
+import { handleRedirectResult, wasIntentionalLogout } from '../lib/auth';
 import { clearSessionMarkers } from '../lib/sessionBoot';
 import { setSentryUser } from '../lib/sentry';
 import type { User as UserDoc } from '../types/user';
@@ -14,6 +14,7 @@ import { resolveOrgSites, type OrgSite } from '../lib/orgSites';
 import {
     reportUnexpectedSignOut,
     reportSessionRestoredAfterDrop,
+    type DroppedSession,
     type LastDenied,
     type LastUserDoc,
 } from '../lib/authSession/signOutReport';
@@ -87,7 +88,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
      * 이 훅은 진짜 로그아웃으로 확정해 버린다. 복귀를 잡아 기록하지 않으면 이 경우와
      * 진짜 세션 소멸이 Sentry에서 같은 이슈로 섞인다.
      */
-    const recentDropRef = useRef<{ uid: string; at: number } | null>(null);
+    const recentDropRef = useRef<DroppedSession | null>(null);
 
     useEffect(() => {
         let cancelled = false;
@@ -191,6 +192,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 if (!isAuthed && authedUidRef.current) {
                     if (dropTimer) return; // 이미 유예 중 — 타이머를 뒤로 미루지 않는다
                     const droppedUid = authedUidRef.current;
+                    // 사용자가 누른 로그아웃인지는 **지금** 판단한다. 유예 타이머는 휴대폰이 잠들면
+                    // 멈췄다가 깨어날 때 실행되는데, 그때는 의도적 로그아웃 표시의 유효창(10초)이 지나
+                    // 정상 로그아웃이 '예기치 않은 종료'로 보고됐다(JAVASCRIPT-REACT-66).
+                    const intentionalAtDrop = wasIntentionalLogout();
                     dropTimer = setTimeout(() => {
                         dropTimer = null;
                         if (cancelled) return;
@@ -202,9 +207,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                             lastUserDoc: lastUserDocRef.current,
                             lastDenied: lastDeniedRef.current,
                             sessionStartedAt: sessionStartedAtRef.current,
+                            intentionalAtDrop,
                         });
-                        // 확정 직후 같은 세션이 돌아오면 저장소 일시 장애였다는 뜻 — 아래 복귀 감지가 쓴다.
-                        recentDropRef.current = { uid: droppedUid, at: Date.now() };
+                        // 확정 직후 같은 세션이 돌아오면 저장소 일시 장애(또는 남지 않은 로그아웃)였다는 뜻
+                        // — 아래 복귀 감지가 쓴다.
+                        recentDropRef.current = { uid: droppedUid, at: Date.now(), intentional: intentionalAtDrop };
                         commitSignedOut();
                     }, AUTH_DROP_GRACE_MS);
                     return;
