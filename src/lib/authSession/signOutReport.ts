@@ -38,6 +38,16 @@ export interface SignOutEvidence {
     lastDenied: LastDenied;
     /** 세션이 확립된 시각. "얼마나 버텼는지"가 원인을 좁힌다. */
     sessionStartedAt: number | null;
+    /**
+     * null이 **들어온 순간** 사용자가 스스로 로그아웃한 상태였는지.
+     *
+     * 보고는 2초 유예가 끝난 뒤에 나가는데, 그 사이 휴대폰이 잠들면 타이머가 멈췄다가 깨어날 때
+     * 실행된다. 그때 `wasIntentionalLogout()`을 다시 물으면 표시의 유효창(10초)이 이미 지나
+     * 정상 로그아웃이 '예기치 않은 종료'(error)로 올라갔다(2026-11-18 JAVASCRIPT-REACT-66:
+     * 더보기에서 로그아웃을 누른 직후 화면이 꺼져 91초 뒤 보고, "세션이 만료" 안내까지 떴다).
+     * 그래서 판단은 null이 도착한 시점의 값으로 한다.
+     */
+    intentionalAtDrop?: boolean;
 }
 
 /**
@@ -72,7 +82,7 @@ export function classifySignOut(lastUserDoc: LastUserDoc): { cause: SignOutCause
  * 의도적 로그아웃은 보고하지 않는다(정상 경로이고, 매 로그아웃마다 이슈가 쌓인다).
  */
 export function reportUnexpectedSignOut(uid: string, evidence: SignOutEvidence): void {
-    if (wasIntentionalLogout()) return;
+    if (evidence.intentionalAtDrop || wasIntentionalLogout()) return;
 
     const now = Date.now();
     const failure = getLastTokenRefreshFailure();
@@ -119,15 +129,31 @@ export function reportUnexpectedSignOut(uid: string, evidence: SignOutEvidence):
  */
 const SESSION_RESTORE_WINDOW_MS = 30_000;
 
+/** 로그아웃으로 확정한 세션 — 복귀 감지가 짝을 맞추는 데 쓴다 */
+export interface DroppedSession {
+    uid: string;
+    at: number;
+    /** 사용자가 스스로 로그아웃한 것이었나(null이 도착한 시점 기준) */
+    intentional?: boolean;
+}
+
 /**
- * 로그아웃으로 확정한 세션이 곧바로 돌아왔는지 기록한다 — 진짜 소멸이 아니라 저장소 일시 장애다.
- * 앞서 나간 '예기치 않은 종료' 보고와 짝을 맞춰 남긴다(같은 uid·간격). 이 기록이
- * 쌓이면 유예를 늘리는 근거가 되고, 없으면 그 가설을 접을 근거가 된다.
+ * 로그아웃으로 확정한 세션이 곧바로 돌아왔는지 기록한다.
+ *
+ * - 앱이 지시하지 않은 종료 뒤의 복귀: 진짜 소멸이 아니라 저장소 일시 장애다. 앞서 나간
+ *   '예기치 않은 종료' 보고와 짝을 맞춰 남긴다(같은 uid·간격). 이 기록이 쌓이면 유예를 늘리는
+ *   근거가 되고, 없으면 그 가설을 접을 근거가 된다.
+ * - 사용자가 누른 로그아웃 뒤의 복귀: 저장소 장애가 아니라 **로그아웃이 남지 않은 것**이다.
+ *   같은 이름으로 섞으면 위 가설의 근거가 흐려지므로 따로 남긴다(2026-11-18 JAVASCRIPT-REACT-68:
+ *   로그아웃 뒤 같은 세션이 17초·0.8초 뒤 두 번 돌아왔다). 공용 기기에서는 의미가 큰 사건이다.
  */
-export function reportSessionRestoredAfterDrop(dropped: { uid: string; at: number }, uid: string): void {
+export function reportSessionRestoredAfterDrop(dropped: DroppedSession, uid: string): void {
     const gapMs = Date.now() - dropped.at;
     if (dropped.uid !== uid || gapMs >= SESSION_RESTORE_WINDOW_MS) return;
-    captureWarning('[Auth] 로그아웃 확정 후 같은 세션이 복귀', {
+    const title = dropped.intentional
+        ? '[Auth] 사용자 로그아웃 뒤 같은 세션이 되살아남'
+        : '[Auth] 로그아웃 확정 후 같은 세션이 복귀';
+    captureWarning(title, {
         uid,
         gapMs,
         visibility: typeof document !== 'undefined' ? document.visibilityState : 'unknown',

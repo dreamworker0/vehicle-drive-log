@@ -467,6 +467,47 @@ describe('useAuth — 예기치 않은 세션 종료 보고', () => {
         expect(captureError).not.toHaveBeenCalled();
         expect(useToastStore.getState().toasts).toHaveLength(0);
     });
+
+    // 2026-11-18 JAVASCRIPT-REACT-66 — 로그아웃을 누른 직후 휴대폰이 잠들어 유예 타이머가 91초 뒤에
+    // 실행됐다. 그때는 의도적 로그아웃 표시의 유효창(10초)이 지나 정상 로그아웃이 error로 올라갔다.
+    it('로그아웃 직후 기기가 잠들어 유예 확정이 늦어져도 보고하지 않는다 — null 도착 시점으로 판단', async () => {
+        const getCb = captureAuthCallback();
+        const { result } = renderHook(() => useAuth(), { wrapper: createWrapper() });
+
+        await vi.advanceTimersByTimeAsync(0);
+        await act(async () => { getCb()(authedUser); });
+        // null이 도착한 순간에는 로그아웃 표시가 살아 있다
+        vi.mocked(wasIntentionalLogout).mockReturnValue(true);
+        await act(async () => { getCb()(null); });
+        // 타이머가 깨어났을 때는 유효창이 지나 있다(잠든 동안 시간이 흘렀다)
+        vi.mocked(wasIntentionalLogout).mockReturnValue(false);
+        await act(async () => { await vi.advanceTimersByTimeAsync(91_000); });
+
+        expect(result.current.user).toBeNull();
+        expect(captureError).not.toHaveBeenCalled();
+        expect(captureWarning).not.toHaveBeenCalled();
+        expect(useToastStore.getState().toasts).toHaveLength(0);
+    });
+
+    // 2026-11-18 JAVASCRIPT-REACT-68 — 로그아웃 뒤 같은 세션이 돌아온 것을 '저장소 일시 장애'로 적었다.
+    // 그건 로그아웃이 남지 않은 사건이라 성격이 다르다 — 따로 남겨 두 가설의 근거가 섞이지 않게 한다.
+    it('사용자가 로그아웃한 뒤 같은 세션이 돌아오면 "저장소 일시 장애"가 아닌 별도 경고로 남긴다', async () => {
+        vi.mocked(wasIntentionalLogout).mockReturnValue(true);
+        const getCb = captureAuthCallback();
+        renderHook(() => useAuth(), { wrapper: createWrapper() });
+
+        await vi.advanceTimersByTimeAsync(0);
+        await act(async () => { getCb()(authedUser); });
+        await act(async () => { getCb()(null); });
+        await act(async () => { await vi.advanceTimersByTimeAsync(2500); });
+        await act(async () => { await vi.advanceTimersByTimeAsync(15_000); });
+        await act(async () => { getCb()(authedUser); });
+
+        expect(captureError).not.toHaveBeenCalled();
+        expect(captureWarning).toHaveBeenCalledTimes(1);
+        expect(captureWarning).toHaveBeenCalledWith('[Auth] 사용자 로그아웃 뒤 같은 세션이 되살아남', expect.objectContaining({ uid: 'u1' }));
+        expect(captureWarning).not.toHaveBeenCalledWith('[Auth] 로그아웃 확정 후 같은 세션이 복귀', expect.anything());
+    });
 });
 
 
