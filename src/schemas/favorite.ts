@@ -35,7 +35,8 @@ export const favoriteSchema = z.object({
     /** 용무 (선택) */
     purpose: z.string().optional().catch(undefined),
     organizationId: z.string().optional().catch(undefined),
-    createdAt: timestampSchema.optional(),
+    /** 방금 추가해 서버 시각이 아직 없으면 null로 읽힌다 — 실패 대신 undefined로 받는다 */
+    createdAt: timestampSchema.optional().catch(undefined),
 });
 
 export type FavoriteParsed = z.infer<typeof favoriteSchema>;
@@ -57,7 +58,13 @@ export const favoritePurposeSchema = z.object({
     /** 목적 문구 (예: '가정방문') */
     text: z.string().catch(''),
     organizationId: z.string().optional().catch(undefined),
-    createdAt: timestampSchema.optional(),
+    /**
+     * `serverTimestamp()`로 저장한 직후 다시 읽으면(추가 → 캐시 무효화 → 재조회) 서버 확정 전의
+     * 로컬 쓰기가 결과에 섞여 `createdAt`이 **null**로 온다. `.optional()`은 undefined만
+     * 받으므로 이 순간마다 [Zod] 실패가 Sentry로 올라갔다(JAVASCRIPT-REACT-6T).
+     * undefined로 받으면 getFavoritePurposes의 정렬이 '아직 시각 없음 = 맨 뒤'로 처리한다.
+     */
+    createdAt: timestampSchema.optional().catch(undefined),
 });
 
 export type FavoritePurposeParsed = z.infer<typeof favoritePurposeSchema>;
