@@ -196,7 +196,7 @@ Dependabot이 생성한 PR은 저장소의 Repository Secrets에 직접 접근�
 
 | 단계 | 무엇을 하나 |
 |---|---|
-| 릴리즈 버전 | 배포 커밋 SHA (`SENTRY_RELEASE_VERSION`). 프런트는 `VITE_SENTRY_RELEASE`, Functions는 `functions/.env`의 `SENTRY_RELEASE`로 **같은 값**을 받아 한 배포가 하나의 릴리즈로 묶인다 |
+| 릴리즈 버전 | 프런트(`VITE_SENTRY_RELEASE`)는 배포 커밋 SHA(`SENTRY_RELEASE_VERSION`). Functions(`functions/.env`의 `SENTRY_RELEASE`)는 **`functions/`·`shared/`를 마지막으로 바꾼 커밋** SHA다. 배포 커밋을 넣으면 env가 배포마다 바뀌어 화면만 고친 배포도 함수 81개를 전부 다시 올리고, 그 갱신이 분당 갱신 한도(429)를 건드렸다(2026-11-21 변경). 이 값을 배포 커밋으로 되돌리지 않는다 |
 | 소스맵 생성 | `SENTRY_SOURCEMAPS=1`일 때만 [vite.config.js](../../vite.config.js)이 `sourcemap: 'hidden'`으로 만든다. 평소 빌드에는 소스맵이 없다 |
 | 업로드 | `sentry-cli sourcemaps upload --url-prefix '~/assets' dist/assets` — 번들 URL이 `https://<host>/assets/*.js`이므로 접두어를 맞춰야 매칭된다 |
 | 커밋 연결 | `releases set-commits --auto`. Sentry의 GitHub 연동이 없으면 이 단계만 경고를 남기고 넘어간다(배포는 실패하지 않는다) |

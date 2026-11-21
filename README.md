@@ -165,7 +165,7 @@ FIRESTORE_BACKUP_BUCKET=     # 선택. 비우면 {projectId}-backups (기본 버
 TMAP_API_KEY=...
 HOLIDAY_API_KEY=...
 ALLOW_TEST_WHITELIST=        # 운영에서는 비워 둔다
-SENTRY_RELEASE=              # 비워 둔다. 배포 워크플로가 배포 커밋 SHA로 채운다
+SENTRY_RELEASE=              # 비워 둔다. 배포 워크플로가 함수 코드를 마지막으로 바꾼 커밋 SHA로 채운다
 ```
 
 > 이 목록은 `npm run check:functions-env`가 코드(`defineString`/`process.env`)와 대조합니다 —
