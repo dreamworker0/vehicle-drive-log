@@ -288,9 +288,11 @@ npx tsx scripts/check-hipass-balance-drift.ts --csv=drift.csv
 
 ### 5.1.1 Sentry 릴리즈 추적
 
-배포 워크플로가 **배포 커밋 SHA를 릴리즈 버전으로** 삼아 프런트(`VITE_SENTRY_RELEASE`)와
-Functions(`functions/.env`의 `SENTRY_RELEASE`)에 같은 값을 넣는다. 그래서 Sentry의 각 이슈에
-"어느 배포에서 났는지"가 붙고, 이슈를 **Resolved in next release**로 닫을 수 있다.
+배포 워크플로가 **배포 커밋 SHA를 릴리즈 버전으로** 삼아 프런트(`VITE_SENTRY_RELEASE`)에 넣는다.
+Functions(`functions/.env`의 `SENTRY_RELEASE`)에는 **함수 코드(`functions/`·`shared/`)를 마지막으로
+바꾼 커밋**을 넣는다 — 배포 커밋을 넣으면 화면만 고친 배포에서도 함수 81개를 전부 다시 올리게 된다.
+그래서 Sentry의 각 이슈에 "어느 배포(함수는 어느 함수 코드)에서 났는지"가 붙고, 이슈를
+**Resolved in next release**로 닫을 수 있다.
 
 > ⚠️ 릴리즈가 하나도 없는 프로젝트에서는 "Resolved in next release"가 `Unable to update issues`로
 > 실패한다. 2026-08-26에 실제로 겪은 문제이고, 이 파이프라인이 그 원인을 없앤다.

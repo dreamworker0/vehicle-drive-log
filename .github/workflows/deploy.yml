@@ -11,8 +11,8 @@ on:
   workflow_dispatch:
     inputs:
       force_functions:
-        # firebase-tools는 소스·env 해시가 같은 함수를 "변경 없음"으로 건너뛴다. 같은 커밋을
-        # 다시 배포하면 SENTRY_RELEASE도 같아 함수가 하나도 다시 빌드되지 않는다.
+        # firebase-tools는 소스·env 해시가 같은 함수를 "변경 없음"으로 건너뛴다. 함수 코드가 그대로면
+        # SENTRY_RELEASE도 같아(함수 코드의 마지막 커밋을 쓴다) 함수가 하나도 다시 빌드되지 않는다.
         # 함수 컨테이너 이미지를 새로 만들어야 할 때(2026-10-23 장애: Artifact Registry 정리 정책이
         # 이미지를 지운 뒤 베이스 이미지 자동 업데이트가 오자 전 함수가 기동 전 500) 켠다.
         description: "변경 없는 함수도 강제로 다시 빌드·배포"
@@ -63,9 +63,9 @@ jobs:
     timeout-minutes: 25
     env:
       TZ: "Asia/Seoul"
-      # 배포되는 커밋 SHA = Sentry 릴리즈 버전. 프런트(VITE_SENTRY_RELEASE)와
-      # Functions(functions/.env의 SENTRY_RELEASE)가 **같은 값**을 써야 한 배포가
-      # Sentry에서 하나의 릴리즈로 묶인다.
+      # 배포되는 커밋 SHA = 프런트(VITE_SENTRY_RELEASE)의 Sentry 릴리즈 버전.
+      # Functions(functions/.env의 SENTRY_RELEASE)는 이 값이 아니라 **함수 코드를 마지막으로 바꾼
+      # 커밋**을 쓴다 — 'Create .env files' 스텝의 주석 참고.
       SENTRY_RELEASE_VERSION: ${{ github.event.workflow_run.head_sha || github.sha }}
       # 배포 도구 버전 고정 — 루트 devDependencies에 없어 `npx`가 실행 때마다 레지스트리 최신판을
       # 받아 왔다. 그러면 같은 커밋도 언제 배포하느냐에 따라 다른 도구로 배포되고, 도구 쪽 회귀가
@@ -78,6 +78,10 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          # 함수 코드를 마지막으로 바꾼 커밋을 찾으려면 이력이 필요하다('Create .env files' 참고).
+          # 파일 내용(blob)은 빼고 커밋·트리만 받아 체크아웃 시간을 거의 늘리지 않는다.
+          fetch-depth: 0
+          filter: blob:none
 
       - name: Setup Node 22
         uses: actions/setup-node@v7
@@ -105,8 +109,23 @@ jobs:
           fi
           echo "${{ secrets.FUNCTIONS_ENV_FILE }}" | grep -vE "^(${SECRET_KEYS})=" > functions/.env || true
           # Functions 런타임에 릴리즈를 알린다 (functions/src/core/sentry.ts가 읽는다).
-          # 시크릿 파일에 넣지 않고 여기서 덧붙이는 이유: 값이 배포마다 달라진다.
-          echo "SENTRY_RELEASE=${SENTRY_RELEASE_VERSION}" >> functions/.env
+          #
+          # ## 배포 커밋이 아니라 '함수 코드를 마지막으로 바꾼 커밋'을 넣는다
+          # firebase-tools는 소스·env 해시가 같은 함수를 건너뛴다. 예전에는 여기에 배포 커밋 SHA를
+          # 넣어서 env가 **배포마다** 바뀌었고, 화면만 고친 배포에서도 함수 81개를 전부 다시 올렸다.
+          # 그 갱신이 Cloud Functions 분당 갱신 한도(429)를 매번 건드렸고, 한도 구간에 걸린 예약
+          # 함수가 배포를 실패시키곤 했다(2026-11-15·19·21). 최근 커밋 40개 중 함수 코드를 건드린 것은
+          # 19개뿐이었다 — 나머지 절반은 함수를 다시 올릴 이유가 없었다.
+          # functions/와 shared/(함수가 함께 빌드하는 공용 코드)만 본다. 실제 코드가 바뀌면 이 값과
+          # 상관없이 소스 해시가 달라져 배포되므로, 이 값은 "헛되이 바뀌지 않기"만 하면 된다.
+          # Sentry에서 함수 오류에는 그 함수 코드가 실제로 바뀐 커밋이 붙는다.
+          FUNCTIONS_RELEASE=$(git log -1 --format=%H -- functions shared)
+          if [ -z "$FUNCTIONS_RELEASE" ]; then
+            echo "::warning::함수 코드의 마지막 커밋을 찾지 못했다 — 배포 커밋으로 대신한다(함수 전부 재배포됨)"
+            FUNCTIONS_RELEASE="$SENTRY_RELEASE_VERSION"
+          fi
+          echo "Functions 릴리즈: ${FUNCTIONS_RELEASE} (배포 커밋: ${SENTRY_RELEASE_VERSION})"
+          echo "SENTRY_RELEASE=${FUNCTIONS_RELEASE}" >> functions/.env
           # 강제 재배포: 실행마다 다른 값을 넣어 함수 해시를 바꾼다 (inputs.force_functions 주석 참고).
           # firebase-tools 안내 문구의 FUNCTIONS_DEPLOY_UNCHANGED는 실제로 읽히지 않는다.
           if [ "${{ inputs.force_functions }}" = "true" ]; then
