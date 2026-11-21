@@ -30,6 +30,14 @@ export { weeklyMaintenanceBatch } from "./handlers/scheduled/weeklyMaintenanceBa
 // 통합 월배치 (공휴일 동기화 + 마일리지 검증, 매월 1일 06:00)
 export { monthlyBatch } from "./handlers/scheduled/monthlyBatch";
 
+// 미활성 기관 발송 스케줄러 (매주 월~금 14시 점검, 주 1회 발송)
+// ⚠️ 예약 함수는 이 파일 **앞쪽**에 둔다. firebase-tools는 export 순서대로 함수를 갱신하는데,
+// 뒤쪽(50번째 안팎부터)은 분당 갱신 한도(429)가 터지는 구간이다. 그 구간에서는 갱신 응답에
+// Cloud Run 서비스 정보가 빠지거나 서비스 IAM 조회가 실패한다. 일반 함수는 무해하지만 예약 함수는
+// 갱신 뒤 예약 작업 URL·호출 권한을 설정해야 해서 배포가 실패한다 — 이 함수가 143번째 줄(54번째)에
+// 있을 때 11-15·11-19·11-21 배포가 이것 하나로 실패했다. 순서는 scheduledExportOrder.test.ts가 지킨다.
+export { sendInactiveOrgAlimtalkScheduled } from "./handlers/scheduled/sendInactiveOrgAlimtalkScheduled";
+
 // Admin Notice
 export { sendAdminNotice } from "./handlers/callable/sendAdminNotice";
 
@@ -138,9 +146,6 @@ export { testCalendarAccess } from "./handlers/callable/testCalendarAccess";
 
 // 미활성 기관 일괄 알림톡 발송
 export { sendBulkReminder } from "./handlers/callable/sendBulkReminder";
-
-// 미활성 기관 발송 스케줄러 (매주 월~금 14시 점검, 주 1회 발송)
-export { sendInactiveOrgAlimtalkScheduled } from "./handlers/scheduled/sendInactiveOrgAlimtalkScheduled";
 
 // 사용자 권한 변경 탐지 (보안 알림)
 export { notifyRoleChange } from "./handlers/triggers/notifyRoleChange";
