@@ -1,4 +1,6 @@
 import { Component, ReactNode, ErrorInfo } from 'react';
+import { isStaleChunkError } from '../../lib/staleChunk';
+import NewVersionScreen from './NewVersionScreen';
 
 /**
  * 비인증(경량) 엔트리용 에러 경계.
@@ -17,13 +19,16 @@ interface Props {
 
 interface State {
     hasError: boolean;
+    /** 배포로 옛 파일이 사라져 난 오류인가 — 그렇다면 오류 대신 새 버전 안내를 띄운다 */
+    staleVersion: boolean;
 }
 
 export default class LightErrorBoundary extends Component<Props, State> {
-    state: State = { hasError: false };
+    state: State = { hasError: false, staleVersion: false };
 
-    static getDerivedStateFromError(): State {
-        return { hasError: true };
+    static getDerivedStateFromError(error: unknown): State {
+        // 오프라인이면 같은 원문이 회선 단절에서도 나오므로 업데이트로 단정하지 않는다
+        return { hasError: true, staleVersion: isStaleChunkError(error) && navigator.onLine };
     }
 
     componentDidCatch(error: Error, errorInfo: ErrorInfo) {
@@ -35,6 +40,7 @@ export default class LightErrorBoundary extends Component<Props, State> {
 
     render() {
         if (!this.state.hasError) return this.props.children;
+        if (this.state.staleVersion) return <NewVersionScreen />;
 
         return (
             <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50 dark:bg-surface-950">

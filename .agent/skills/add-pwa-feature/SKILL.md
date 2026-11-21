@@ -41,8 +41,8 @@ export function useNetworkStatus() {
 설정은 `vite.config.js`의 `VitePWA({ strategies: 'injectManifest', srcDir: 'src', filename: 'sw.ts', registerType: 'autoUpdate' })`다.
 `registerSW.js` 같은 생성 파일은 쓰지 않는다.
 
-1. **업데이트 반영**: `registerType: 'autoUpdate'` + [src/lib/swUpdate.ts](../../../src/lib/swUpdate.ts)가 새 워커를 받아 다음 화면 이동에서 반영한다(작성 중인 내용을 지우지 않으려고 즉시 새로고침하지 않는다).
-2. **배포 직후 구버전 탭**: 지연 로드 청크가 사라져 실패하면 [src/lib/staleChunk.ts](../../../src/lib/staleChunk.ts)의 `STALE_CHUNK_MESSAGE`로 안내한다 — 토스트 스토어가 이 문구일 때만 [새로고침] 버튼을 붙인다.
+1. **업데이트 반영**: `registerType: 'autoUpdate'` + [src/lib/swUpdate.ts](../../../src/lib/swUpdate.ts)가 새 워커를 받는다. 활성화되면 `UpdatePrompt`의 onNeedReload가 [src/lib/pendingUpdate.ts](../../../src/lib/pendingUpdate.ts)에 표시하고, `UpdateBanner`가 "새 버전이 나왔어요 [업데이트]" 띠를 띄운다(누를 때만 새로고침). 누르지 않으면 `useApplyUpdateOnNavigation`이 다음 화면 이동(pathname 변경) 때 새로고침한다 — 오프라인이거나 토스트가 떠 있으면 미룬다. 작성 중인 내용을 지우지 않으려고 **그 자리에서 자동 새로고침하지 않는** 원칙은 그대로다.
+2. **배포 직후 구버전 탭**: 지연 로드 청크가 사라져 실패하면 [src/lib/staleChunk.ts](../../../src/lib/staleChunk.ts)의 `STALE_CHUNK_MESSAGE`로 안내한다 — 토스트 스토어가 이 문구일 때만 [새로고침] 버튼을 붙인다. 화면 전환(`lazyWithRetry`)이 자동 새로고침 뒤에도 또 실패해 오류 경계까지 오면, 두 경계(`ErrorBoundary`·`LightErrorBoundary`)가 일반 오류 화면 대신 `NewVersionScreen`("새 버전이 나왔어요 [새 버전으로 열기]")을 띄운다(오프라인이면 일반 오류 화면). 새로고침 버튼은 `reloadToLatest`로 SW 업데이트를 먼저 확인한다.
 3. **서비스워커에서 Firestore에 쓰지 않는다**: 서비스워커에는 App Check가 없고 Firestore는 App Check ENFORCED다. 쓰기는 페이지에서만 한다(`sw.ts`의 `sync` 주석).
 
 ## 3. 에이전트 행동 지침

@@ -76,7 +76,7 @@ export default function LightApp() {
                 </Routes>
             </Suspense>
 
-            {/* 둘 다 화면을 그리지 않는다(null 반환) — 위 import 주석 참고 */}
+            {/* 평소에는 화면을 그리지 않는다 — 위 import 주석 참고 (UpdatePrompt는 새 버전이 준비됐을 때만 안내 띠를 띄운다) */}
             <UpdatePrompt />
             <InstallPrompt />
         </LightErrorBoundary>
