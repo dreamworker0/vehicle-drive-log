@@ -48,6 +48,7 @@ description: 프로젝트 컨벤션에 맞게 새 커스텀 훅을 추가하는 
 | `useVehiclePriority` | 배차 시 선호 차량 및 정렬 우선순위 설정 | `hooks/useVehiclePriority.ts` |
 | `useRetry` | 비동기 요청 실패 시 점진적 재시도 | `hooks/useRetry.ts` |
 | `useServiceDashboard` | 종합 서비스 대시보드 데이터 연동 | `hooks/useServiceDashboard.ts` |
+| `useApplyUpdateOnNavigation` | 새 버전이 준비된 뒤 화면을 옮기면 새 버전으로 다시 열기 | `hooks/useApplyUpdateOnNavigation.ts` |
 
 ### 도메인별 세부 훅 (`hooks/{domain}/`)
 

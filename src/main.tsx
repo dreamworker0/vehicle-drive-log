@@ -14,6 +14,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth, authReady } from './lib/firebaseAuth';
 import { readReturningHint, writeReturningHint, noteUnauthenticatedBoot } from './lib/sessionBoot';
 import { captureInviteCodeFromUrl } from './lib/inviteCodeCapture';
+import { reloadToLatest } from './lib/pendingUpdate';
 import './index.css';
 
 // 초대 링크의 ?code=를 **어느 화면으로 시작하든** 먼저 보관한다. 비로그인 경량 화면에서
@@ -54,6 +55,9 @@ root.innerHTML = `
  */
 function showBootError(err: unknown) {
     console.error('앱 로드 실패:', err);
+    // 여기서는 "새 버전" 안내로 단정하지 않는다 — 엔트리를 못 받은 오류는 배포로 사라진 파일과
+    // 회선 단절이 **같은 원문**("Failed to fetch dynamically imported module")으로 온다.
+    // 그래서 두 가능성을 다 적은 문구를 유지하고, 버튼만 새 버전을 확실히 받도록 바꿨다.
     root.innerHTML = `
   <div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#4f46e5 0%,#3730a3 100%);padding:24px">
     <div style="text-align:center;font-family:system-ui,sans-serif;max-width:320px">
@@ -68,7 +72,8 @@ function showBootError(err: unknown) {
     </div>
   </div>
 `;
-    document.getElementById('boot-retry')?.addEventListener('click', () => window.location.reload());
+    // 서비스 워커 업데이트를 먼저 확인하고(최대 3초) 새로고침한다 — 옛 워커가 옛 화면을 다시 내주는 것을 막는다
+    document.getElementById('boot-retry')?.addEventListener('click', () => { void reloadToLatest(); });
 }
 
 // 기존 SW가 있으면 즉시 업데이트 체크 (구버전 캐시 방지)
@@ -83,6 +88,8 @@ function showBootError(err: unknown) {
 //
 // 새 버전은 sw.ts가 문서화한 정책대로 반영한다 — (a) 다음 내비게이션·재접속,
 // (b) 구버전 청크 요청이 실패한 탭만 lazyWithRetry가 리로드. 둘 다 그 탭에서만 일어난다.
+// 새 워커가 활성화되면 UpdatePrompt가 "새 버전이 나왔어요" 안내 띠를 띄우고(누를 때만 새로고침),
+// 앱 안에서 다른 화면으로 옮길 때 새 버전으로 연다(useApplyUpdateOnNavigation).
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.ready.then((reg) => {
     reg.update().catch(() => { /* 네트워크 에러 무시 */ });

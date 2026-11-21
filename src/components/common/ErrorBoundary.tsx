@@ -1,5 +1,7 @@
 import { Component, ReactNode, ErrorInfo } from 'react';
 import { captureError } from '../../lib/sentry';
+import { isStaleChunkError } from '../../lib/staleChunk';
+import NewVersionScreen from './NewVersionScreen';
 
 interface Props {
     children: ReactNode;
@@ -44,6 +46,11 @@ export default class ErrorBoundary extends Component<Props, State> {
     };
 
     render() {
+        // 배포로 옛 파일이 사라져 난 오류는 고장이 아니라 업데이트다 — 사실대로 안내한다.
+        // 오프라인이면 같은 원문이 회선 단절에서도 나오므로 업데이트로 단정하지 않는다.
+        if (this.state.hasError && isStaleChunkError(this.state.error) && navigator.onLine) {
+            return <NewVersionScreen />;
+        }
         if (this.state.hasError) {
             return (
                 <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-surface-950 p-6">
