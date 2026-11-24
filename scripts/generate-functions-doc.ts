@@ -107,6 +107,14 @@ const FUNCTIONS: FunctionEntry[] = [
     note: '되돌리기 전에 probeCalendarAccess로 무엇이 살아 있는지 먼저 확인한다',
   },
   {
+    name: 'backfillCalendarEvents',
+    type: 'onCall',
+    file: 'scripts/backfillCalendarEvents.ts',
+    description: '캘린더에 빠진 앞으로의 예약 일정 생성·취소된 일정 삭제 (2026-10-25~ 메모리 초과 누락 보충)',
+    auth: 'superAdmin',
+    note: 'dryRun(기본)으로 대상 수를 먼저 보고, dryRun: false로 실행한다. 한 번에 캘린더 호출 400건까지',
+  },
+  {
     name: 'probeCalendarAccess',
     type: 'onCall',
     file: 'handlers/callable/probeCalendarAccess.ts',

@@ -2,9 +2,9 @@
 
 > **자동 생성 문서** — `scripts/generate-functions-doc.ts`로 생성됨
 >
-> 마지막 업데이트: 2026. 11. 18. 오전 7:44:31
+> 마지막 업데이트: 2026. 11. 24. 오후 6:38:19
 >
-> 총 함수 수: **81개**
+> 총 함수 수: **82개**
 
 ---
 
@@ -23,7 +23,7 @@
 
 ## 📞 onCall (클라이언트 직접 호출)
 
-> 총 42개
+> 총 43개
 
 ### `ocrDashboard`
 
@@ -101,6 +101,15 @@
 | **설명** | 캘린더 동기화 실패 카운터 초기화 |
 | **인증** | superAdmin |
 | **비고** | 되돌리기 전에 probeCalendarAccess로 무엇이 살아 있는지 먼저 확인한다 |
+
+### `backfillCalendarEvents`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/scripts/backfillCalendarEvents.ts` |
+| **설명** | 캘린더에 빠진 앞으로의 예약 일정 생성·취소된 일정 삭제 (2026-10-25~ 메모리 초과 누락 보충) |
+| **인증** | superAdmin |
+| **비고** | dryRun(기본)으로 대상 수를 먼저 보고, dryRun: false로 실행한다. 한 번에 캘린더 호출 400건까지 |
 
 ### `probeCalendarAccess`
 
