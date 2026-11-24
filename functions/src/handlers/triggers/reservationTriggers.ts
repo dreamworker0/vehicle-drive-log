@@ -165,9 +165,11 @@ async function handleCalendarError(
 /**
  * 예약 생성 시 -> 캘린더 이벤트 생성
  */
-// cloud-functions.md §3.2의 기본값(256MiB). 문서 1건만 처리한다. 예약 쓰기마다 도는 트리거라 절감폭이 가장 크다.
+// 512MiB — 문서 1건만 처리하지만 캘린더 동기화가 googleapis를 불러오고, 그 순간 256MiB를 넘는다.
+// 2026-10-25부터 256MiB에서 메모리 초과로 매일 10~30회 죽어 예약이 캘린더에 올라가지 않았다(재시도 없음).
+// 비용 때문에 다시 낮추지 말 것 — cloud-functions.md §3.2.
 export const onReservationCreated = onDocumentCreated(
-    { document: "reservations/{reservationId}", memory: "256MiB" },
+    { document: "reservations/{reservationId}", memory: "512MiB" },
     async (event) => {
     const reservation = event.data!.data();
     const reservationId = event.params.reservationId;
@@ -262,9 +264,11 @@ export const onReservationCreated = onDocumentCreated(
 /**
  * 예약 수정 시 -> 캘린더 이벤트 수정 또는 삭제 + 알림 전송
  */
-// cloud-functions.md §3.2의 기본값(256MiB). 문서 1건만 처리한다. 예약 쓰기마다 도는 트리거라 절감폭이 가장 크다.
+// 512MiB — 문서 1건만 처리하지만 캘린더 동기화가 googleapis를 불러오고, 그 순간 256MiB를 넘는다.
+// 2026-10-25부터 256MiB에서 메모리 초과로 매일 10~30회 죽어 예약이 캘린더에 올라가지 않았다(재시도 없음).
+// 비용 때문에 다시 낮추지 말 것 — cloud-functions.md §3.2.
 export const onReservationUpdated = onDocumentUpdated(
-    { document: "reservations/{reservationId}", memory: "256MiB" },
+    { document: "reservations/{reservationId}", memory: "512MiB" },
     async (event) => {
     const before = event.data!.before.data();
     const after = event.data!.after.data();
@@ -461,9 +465,11 @@ export const onReservationUpdated = onDocumentUpdated(
 /**
  * 예약 삭제 시 -> 캘린더 이벤트 삭제
  */
-// cloud-functions.md §3.2의 기본값(256MiB). 문서 1건만 처리한다. 예약 쓰기마다 도는 트리거라 절감폭이 가장 크다.
+// 512MiB — 문서 1건만 처리하지만 캘린더 동기화가 googleapis를 불러오고, 그 순간 256MiB를 넘는다.
+// 2026-10-25부터 256MiB에서 메모리 초과로 매일 10~30회 죽어 예약이 캘린더에 올라가지 않았다(재시도 없음).
+// 비용 때문에 다시 낮추지 말 것 — cloud-functions.md §3.2.
 export const onReservationDeleted = onDocumentDeleted(
-    { document: "reservations/{reservationId}", memory: "256MiB" },
+    { document: "reservations/{reservationId}", memory: "512MiB" },
     async (event) => {
     const reservation = event.data!.data();
     const reservationId = event.params.reservationId;
