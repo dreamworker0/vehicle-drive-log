@@ -1,10 +1,12 @@
 /**
  * SEOHead — 페이지별 SEO 메타 태그 설정
  *
- * react-helmet-async를 사용하여 title, description, canonical, OG 태그를 설정합니다.
- * 선택적으로 JSON-LD 구조화 데이터를 주입할 수 있습니다.
+ * title, description, canonical, OG 태그를 컴포넌트 안에서 그대로 렌더링한다 — React 19가
+ * `<title>`·`<meta>`·`<link>`를 문서 head로 끌어올리고 페이지를 벗어나면 걷어 낸다.
+ * (예전에는 react-helmet-async를 썼지만 3.x도 React 19에서는 같은 기본 기능에 맡기고 있어
+ *  패키지와 Provider를 걷어냈다 — 2026-11-25)
+ * 선택적으로 JSON-LD 구조화 데이터를 주입할 수 있다(본문에 남는다 — 검색엔진은 위치를 가리지 않는다).
  */
-import { Helmet } from 'react-helmet-async';
 
 const BASE_URL = 'https://drivelog.socialprism.co.kr';
 const DEFAULT_OG_IMAGE = `${BASE_URL}/icons/icon-512.png`;
@@ -28,7 +30,7 @@ export default function SEOHead({ title, description, path, jsonLd, isHome }: SE
   const canonicalUrl = `${BASE_URL}${path}`;
 
   return (
-    <Helmet>
+    <>
       <title>{fullTitle}</title>
       <meta name="description" content={description} />
       <link rel="canonical" href={canonicalUrl} />
@@ -47,6 +49,6 @@ export default function SEOHead({ title, description, path, jsonLd, isHome }: SE
           {JSON.stringify(jsonLd)}
         </script>
       )}
-    </Helmet>
+    </>
   );
 }
