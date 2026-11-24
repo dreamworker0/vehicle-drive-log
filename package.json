@@ -58,7 +58,6 @@
     "leaflet": "^1.9.4",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "react-helmet-async": "^3.0.0",
     "react-router-dom": "^7.18.5",
     "recharts": "^3.10.1",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
