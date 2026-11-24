@@ -21,14 +21,8 @@
   <meta name="description" content="AI 계기판 인식, 예약, 길안내, 정비, 통계, 출력까지. 사회복지기관·비영리단체를 위한 무료 차량 관리 서비스." />
   <meta name="theme-color" content="#f8fafc" />
   <link rel="canonical" href="https://drivelog.socialprism.co.kr/" />
-  <script>
-    // React 마운트 전 theme-color 초기화 (FOUC 방지)
-    (function(){
-      var s=localStorage.getItem('theme-preference');
-      var d=s==='dark'||(s!=='light'&&window.matchMedia('(prefers-color-scheme:dark)').matches);
-      document.querySelector('meta[name="theme-color"]').content=d?'#020617':'#f8fafc';
-    })();
-  </script>
+  <!-- theme-color 초기화 — 인라인이면 CSP에 'unsafe-inline'이 필요해 외부 파일로 둔다(defer 금지) -->
+  <script src="/theme-init.js"></script>
   <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -70,7 +64,7 @@
 
 <body>
   <div id="root"></div>
-  <script type="module" src="/src/main.jsx"></script>
+  <script type="module" src="/src/main.tsx"></script>
 </body>
 
 </html>

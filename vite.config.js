@@ -128,6 +128,8 @@ export default defineConfig({
            * 그 복구 수단을 잃을 수는 없다. 1KB이므로 예산에도 영향이 없다.
            */
           'sw-purge.js',
+          // theme-init.js도 같은 이유다 — index.html이 싣는 루트 스크립트라 immutable 캐시에 묶인다.
+          'theme-init.js',
         ],
         // 자체 호스팅 폰트는 프리캐시에서 제외한다. Pretendard 동적 서브셋은 조각이 92개(3.1MB)라
         // 프리캐시에 넣으면 설치 즉시 전부 내려받는다 — 현장 저사양 폰의 데이터·용량을 쓸 이유가 없다.

@@ -113,17 +113,6 @@ registerRoute(
     })
 );
 
-// Google Fonts 캐싱
-registerRoute(
-    /^https:\/\/fonts\.(?:gstatic|googleapis)\.com\/.*/i,
-    new CacheFirst({
-        cacheName: 'google-fonts',
-        plugins: [
-            new ExpirationPlugin({ maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 }),
-        ],
-    })
-);
-
 // 자체 호스팅 폰트 캐싱 (프리캐시 대신 런타임 — vite.config.js의 globIgnores 참고)
 // 실제로 쓰인 서브셋 조각만 담기므로 지하 주차장 등 오프라인에서도 같은 서체로 보인다.
 // 경로에 버전이 박혀 있어 갱신 시 URL이 바뀌므로 CacheFirst로 둔다.
