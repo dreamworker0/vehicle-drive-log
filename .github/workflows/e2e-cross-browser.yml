@@ -53,7 +53,9 @@ jobs:
         uses: actions/cache@v6
         with:
           path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ steps.pw-version.outputs.version }}
+          # 러너 이미지(ImageOS — 예: ubuntu24)를 키에 넣는다. runner.os는 'Linux'뿐이라 러너가 우분투 26으로
+          # 올라가도 같은 키로 옛 OS에서 받은 WebKit 바이너리를 복원해, 시스템 라이브러리 불일치로 깨질 수 있다.
+          key: playwright-${{ runner.os }}-${{ env.ImageOS }}-${{ steps.pw-version.outputs.version }}
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium webkit
