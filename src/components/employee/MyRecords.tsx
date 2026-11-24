@@ -97,8 +97,7 @@ export default function MyRecords() {
             )}
 
             {/* 월간 통계 요약 */}
-            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-            <MyStatsSummary logs={logs as any} />
+            <MyStatsSummary logs={logs} />
 
             <p className="text-sm text-surface-500 dark:text-surface-400 mb-4">
                 {searchQuery ? `검색 결과 ${filteredLogs.length}건` : `총 ${logs.length}건`} · {totalDistance.toLocaleString()} km

@@ -2,7 +2,6 @@
  * MileageInput — 주행 거리 입력 + OCR 계기판 촬영
  * DriveLogForm에서 추출된 서브 컴포넌트
  */
-/* eslint-disable @typescript-eslint/no-unused-vars */
 import React, { useId } from 'react';
 import { stripNegative } from '../../hooks/utils/numberValidation';
 import type { DriveLog } from '../../types/driveLog';
@@ -18,13 +17,9 @@ interface MileageInputProps {
     onEndKmChange: (value: string) => void;
     ocrLoading: boolean;
     ocrError: string;
-    ocrSuccess: boolean;
-    ocrImageUrl?: string | null;
-    ocrReportSending: boolean;
-    ocrReportSent: boolean;
+    // OCR 스냅샷·오인식 신고 버튼은 2026-04-21에 화면에서 숨겼다(6aeacb0a) — 관련 prop도 받지 않는다
     cameraInputRef: React.RefObject<HTMLInputElement | null>;
     onOcrCapture: (e: React.ChangeEvent<HTMLInputElement>) => void;
-    onOcrReport?: () => void;
     vehicleSelected: boolean;
     endKmRef?: React.RefObject<HTMLInputElement | null>;
     lastDriveLog?: DriveLog | null;
@@ -37,13 +32,8 @@ export default function MileageInput({
     onEndKmChange,
     ocrLoading,
     ocrError,
-    ocrSuccess,
-    ocrImageUrl,
-    ocrReportSending,
-    ocrReportSent,
     cameraInputRef,
     onOcrCapture,
-    onOcrReport,
     vehicleSelected,
     endKmRef,
     lastDriveLog,

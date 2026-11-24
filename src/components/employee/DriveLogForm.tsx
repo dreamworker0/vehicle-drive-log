@@ -37,8 +37,7 @@ export default function DriveLogForm() {
         lastEndBattery,
         lastDriveLog,
         nextDriveLog,
-        ocrLoading, ocrError, ocrSuccess, ocrImageUrl,
-        ocrReportSending, ocrReportSent,
+        ocrLoading, ocrError,
         cameraInputRef, endKmInputRef,
         handleVehicleSelect,
         handleFavoriteSelect,
@@ -47,7 +46,6 @@ export default function DriveLogForm() {
         externalPassengerCount, setExternalPassengerCount,
         externalPassengerNames, setExternalPassengerNames,
         handleOcrCapture,
-        handleOcrReport,
         handleSubmit,
         confirmStartKm,
         confirmBeforeSave,
@@ -171,13 +169,8 @@ export default function DriveLogForm() {
                     onEndKmChange={(value) => setForm({ ...form, endKm: value })}
                     ocrLoading={ocrLoading}
                     ocrError={ocrError}
-                    ocrSuccess={ocrSuccess}
-                    ocrImageUrl={ocrImageUrl}
-                    ocrReportSending={ocrReportSending}
-                    ocrReportSent={ocrReportSent}
                     cameraInputRef={cameraInputRef}
                     onOcrCapture={handleOcrCapture}
-                    onOcrReport={handleOcrReport}
                     vehicleSelected={!!form.vehicleId}
                     endKmRef={endKmInputRef}
                     lastDriveLog={lastDriveLog}

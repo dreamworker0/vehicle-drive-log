@@ -5,7 +5,7 @@
  */
 
 /** Firestore Timestamp 호환 타입 */
-type TimestampLike = { toDate: () => Date } | { seconds: number } | Date | string | number | null | undefined | unknown;
+export type TimestampLike = { toDate: () => Date } | { seconds: number } | Date | string | number | null | undefined | unknown;
 
 /**
  * 로컬 타임존 기준 오늘 날짜를 'YYYY-MM-DD' 형식으로 반환
