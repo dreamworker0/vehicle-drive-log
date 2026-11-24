@@ -5,6 +5,7 @@ import { SA_TEST_ROLE_KEY, LoadingScreen } from '../../App';
 import { clearUserOrganization } from '../../lib/firestore';
 import { logout } from '../../lib/auth';
 import { adminHomePath } from '../../lib/lastArea';
+import type { UserRole } from '../../types/user';
 
 /** 비활성화/기관 삭제 등 차단 상태 공통 화면 */
 export function BlockedScreen({ emoji, title, description, uid, allowTransfer = false }: {
@@ -57,7 +58,7 @@ interface AuthGuardProps {
   children: ReactNode;
   requireAuth?: boolean;
   requireGuest?: boolean;
-  allowedRoles?: Array<'employee' | 'admin' | 'superAdmin'>;
+  allowedRoles?: UserRole[];
   requireOrgSetup?: boolean;
 }
 
