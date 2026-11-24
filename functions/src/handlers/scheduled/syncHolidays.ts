@@ -112,7 +112,8 @@ export async function syncHolidays(options: { retryDelaysMs?: number[] } = {}): 
                     console.error(`[공공데이터 API] JSON 파싱 실패 (year: ${year}): ${text.substring(0, 200)}`);
                     captureWarning("공휴일 API 응답을 파싱하지 못했다 — 해당 연도를 건너뛴다", {
                         year,
-                        bodyPreview: text.substring(0, 200),
+                        // 전용 이름이라 Sentry 스크러버(core/sentryScrub.ts)가 남긴다 — 공개 데이터
+                        holidayApiBodyPreview: text.substring(0, 200),
                     });
                     continue;
                 }

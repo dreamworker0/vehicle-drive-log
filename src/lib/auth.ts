@@ -108,6 +108,15 @@ export const logout = async () => {
     } catch (e) {
         console.warn('[logout] 오프라인 큐 정리 실패:', e);
     }
+    // 서비스 워커의 Storage 이미지 캐시(src/sw.ts 'firebase-storage')도 비운다.
+    // 피드백 첨부·OCR 증빙·차량 사진이 다운로드 토큰 URL째 7일간 남아, 공용 기기에서
+    // 다음 사용자가 오프라인으로도 볼 수 있었다. 지도 타일 등 개인정보가 없는 캐시는 남긴다.
+    // 실패해도 로그아웃은 계속한다(Cache API가 없는 환경 포함).
+    try {
+        if (typeof caches !== 'undefined') await caches.delete('firebase-storage');
+    } catch (e) {
+        console.warn('[logout] Storage 캐시 정리 실패:', e);
+    }
     // ⚠️ 목적지 관련 로컬 캐시(tmap_geo_cache_v1 · tmap_route_cache_v1 · poi_search_cache_v1)는
     // 여기서 지우지 않는다. Tmap 무료 한도를 아끼는 것이 이 캐시들의 존재 이유인데,
     // 로그아웃마다 비우면 다음 사용자가 같은 곳을 다시 조회해 절감이 사라진다.

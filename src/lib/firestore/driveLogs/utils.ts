@@ -245,7 +245,7 @@ export const getAdjacentDriveLogs = async (
         // 그건 뒤 기록이 10건 이하일 때만 '바로 다음'이고 그보다 많으면 **끝에서 10번째**가 된다.
         // 수정 저장 뒤 adjustAdjacentLogs가 그 기록의 출발 km를 이 기록의 도착 km로 덮어써서,
         // 지난 기록의 목적지만 고쳐도 엉뚱한 최근 기록의 주행거리가 수백 km씩 늘었다
-        // (2026-11-03 궁동종합사회복지관 문의). 피해 기록 복구는 scripts/repairMisadjustedNextLogs.ts.
+        // (2026-11-03 기관 문의). 피해 기록 복구는 scripts/repairMisadjustedNextLogs.ts.
         const nextQuery = query(
             collection(db, 'driveLogs'),
             where('organizationId', '==', orgId),

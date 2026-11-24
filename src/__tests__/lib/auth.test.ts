@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // firebase/auth·firebase 초기화·offline 큐를 모두 목으로 대체해 logout 오케스트레이션만 검증한다.
 vi.mock('firebase/auth', () => ({
@@ -59,6 +59,55 @@ describe('logout (2026-07-10 감사 #8 — 공용 기기 잔존 데이터 폐기
 
         expect(clearOfflineCache).toHaveBeenCalledTimes(1);
         expect(nav.navigateTo).toHaveBeenCalledWith('/');
+    });
+
+    describe('서비스 워커 Storage 이미지 캐시', () => {
+        const cachesDelete = vi.fn(() => Promise.resolve(true));
+        beforeEach(() => {
+            vi.stubGlobal('caches', { delete: cachesDelete });
+            cachesDelete.mockClear();
+        });
+        afterEach(() => {
+            vi.unstubAllGlobals();
+        });
+
+        it('로그아웃하면 firebase-storage 캐시만 지운다 (공용 기기에 첨부·증빙 이미지가 남지 않게)', async () => {
+            await logout();
+
+            expect(cachesDelete).toHaveBeenCalledTimes(1);
+            expect(cachesDelete).toHaveBeenCalledWith('firebase-storage');
+            // 지운 뒤에도 Firestore 캐시 폐기와 루트 이동은 그대로 진행한다
+            expect(clearOfflineCache).toHaveBeenCalledTimes(1);
+            expect(nav.navigateTo).toHaveBeenCalledWith('/');
+        });
+
+        it('캐시 삭제가 실패해도 로그아웃 정리를 막지 않는다', async () => {
+            cachesDelete.mockRejectedValueOnce(new Error('quota'));
+            vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+            await logout();
+
+            expect(clearOfflineCache).toHaveBeenCalledTimes(1);
+            expect(nav.navigateTo).toHaveBeenCalledWith('/');
+        });
+
+        it('Cache API가 없는 환경에서도 로그아웃한다', async () => {
+            vi.stubGlobal('caches', undefined);
+
+            await logout();
+
+            expect(clearOfflineCache).toHaveBeenCalledTimes(1);
+            expect(nav.navigateTo).toHaveBeenCalledWith('/');
+        });
+
+        it('signOut이 실패하면 캐시를 지우지 않는다', async () => {
+            vi.mocked(signOut).mockRejectedValueOnce(new Error('network'));
+            vi.spyOn(console, 'error').mockImplementation(() => {});
+
+            await expect(logout()).rejects.toThrow('network');
+
+            expect(cachesDelete).not.toHaveBeenCalled();
+        });
     });
 
     it('signOut 실패 시 예외를 던지고 이후 정리를 수행하지 않는다', async () => {

@@ -10,6 +10,7 @@
  */
 
 import { sendDiscordAlert } from "./discord";
+import { maskSensitiveText, scrubContext, scrubSentryEvent, type ScrubbableEvent } from "./sentryScrub";
 
 const DSN = process.env.SENTRY_DSN_FUNCTIONS || "";
 const IS_TEST = process.env.NODE_ENV === "test";
@@ -47,6 +48,7 @@ interface SentryLike {
         release?: string;
         dataCollection: typeof SENTRY_DATA_COLLECTION;
         attachStacktrace: boolean;
+        beforeSend: <E extends ScrubbableEvent>(event: E) => E | null;
     }): void;
     captureException(error: unknown, options?: { extra?: Record<string, unknown> }): void;
     captureMessage(message: string, options?: { level?: string; extra?: Record<string, unknown> }): void;
@@ -75,6 +77,8 @@ function getSentry(): SentryLike | null {
                 dataCollection: SENTRY_DATA_COLLECTION,
                 // SDK 11은 captureMessage(captureWarning)에도 스택을 붙여 이슈 묶음이 바뀐다 — v10 동작 유지
                 attachStacktrace: false,
+                // 예외 메시지 본체·SDK 자동 수집분까지 개인정보 패턴을 가린다(core/sentryScrub.ts)
+                beforeSend: scrubSentryEvent,
             });
         } catch {
             // @sentry/node 로드 실패 시 무시
@@ -92,11 +96,14 @@ export function captureError(error: unknown, context: Record<string, unknown> = 
     // 그러면 SENTRY_DSN_FUNCTIONS가 비어 있을 때 DISCORD_WEBHOOK_URL을 정확히 넣어도
     // 알림이 한 건도 나가지 않고 "URL 누락" 경고조차 뜨지 않는다(URL은 있으니까).
     // 두 경로를 분리한다 — URL 미설정 방어는 sendDiscordAlert가 이미 한다.
+    // 문맥은 Discord·Sentry 양쪽에 같은 걸러진 값을 쓴다 — 자유 입력·외부 응답 본문·IP 차단,
+    // 오류 메시지의 이메일·전화번호 마스킹 (core/sentryScrub.ts)
+    const safeContext = scrubContext(context);
     if (!IS_TEST) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = maskSensitiveText(error instanceof Error ? error.message : String(error));
         sendDiscordAlert({
             title: "🚨 Cloud Functions Exception",
-            description: `**Error:** ${message}\n\n**Context:**\n\`\`\`json\n${JSON.stringify(context, null, 2)}\n\`\`\``.substring(0, 3999),
+            description: `**Error:** ${message}\n\n**Context:**\n\`\`\`json\n${JSON.stringify(safeContext, null, 2)}\n\`\`\``.substring(0, 3999),
             color: 16711680,
         }).catch(() => {});
     }
@@ -105,11 +112,11 @@ export function captureError(error: unknown, context: Record<string, unknown> = 
     if (!sentry) return;
     
     if (error instanceof Error) {
-        sentry.captureException(error, { extra: context });
+        sentry.captureException(error, { extra: safeContext });
     } else {
-        sentry.captureMessage(String(error), {
+        sentry.captureMessage(maskSensitiveText(String(error)), {
             level: "error",
-            extra: context,
+            extra: safeContext,
         });
     }
 }
@@ -125,11 +132,13 @@ export function captureError(error: unknown, context: Record<string, unknown> = 
  * 그래서 경고는 **경고로 보이게** 보낸다. 호출부는 "사람이 알아야 하지만 실패는 아닌 것"에만
  * 쓴다 — 매번 뜨는 상태 보고에 쓰면 이 채널도 같은 이유로 무뎌진다.
  */
-export function captureWarning(message: string, context: Record<string, unknown> = {}): void {
+export function captureWarning(rawMessage: string, context: Record<string, unknown> = {}): void {
+    const message = maskSensitiveText(rawMessage);
+    const safeContext = scrubContext(context);
     if (!IS_TEST) {
         sendDiscordAlert({
             title: "⚠️ Cloud Functions Warning",
-            description: `**Warning:** ${message}\n\n**Context:**\n\`\`\`json\n${JSON.stringify(context, null, 2)}\n\`\`\``.substring(0, 3999),
+            description: `**Warning:** ${message}\n\n**Context:**\n\`\`\`json\n${JSON.stringify(safeContext, null, 2)}\n\`\`\``.substring(0, 3999),
             color: 16753920, // 주황(0xFFA500) — 빨강(Exception)과 한눈에 구분된다
         }).catch(() => {});
     }
@@ -138,7 +147,7 @@ export function captureWarning(message: string, context: Record<string, unknown>
     if (!sentry) return;
     sentry.captureMessage(message, {
         level: "warning",
-        extra: context,
+        extra: safeContext,
     });
 }
 

@@ -14,7 +14,7 @@ export interface DateRangeSearchProps {
  * 일지 관리·정비 기록의 기간 필터 — 날짜를 고른 뒤 [검색]을 눌러야 조회한다.
  *
  * 예전에는 날짜가 바뀌는 즉시 조회했다. 크롬·엣지 달력은 화살표로 달만 넘겨도 값이 바뀌어,
- * 시작일만 전달로 옮겨 간 채 검색 결과가 바뀌어 헷갈린다는 문의가 있었다(2026-11-03 궁동종합사회복지관).
+ * 시작일만 전달로 옮겨 간 채 검색 결과가 바뀌어 헷갈린다는 문의가 있었다(2026-11-03 기관 문의).
  * 날짜를 바꿀 때마다 Firestore 조회가 한 번씩 나가던 것도 함께 줄어든다.
  */
 export default function DateRangeSearch({ startDate, endDate, onSearch, children }: DateRangeSearchProps) {
