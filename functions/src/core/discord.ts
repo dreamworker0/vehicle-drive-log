@@ -23,7 +23,7 @@ export async function sendDiscordAlert({
 }: DiscordAlertOptions): Promise<void> {
     const url = discordWebhookUrl.value();
     if (!url) {
-        console.warn("⚠️ [Discord Alert] DISCORD_WEBHOOK_URL 환경 변수가 누락되어 알림을 발송하지 않습니다. 메시지 요약:", title);
+        logger.warn("⚠️ [Discord Alert] DISCORD_WEBHOOK_URL 환경 변수가 누락되어 알림을 발송하지 않습니다. 메시지 요약:", title);
         return;
     }
 

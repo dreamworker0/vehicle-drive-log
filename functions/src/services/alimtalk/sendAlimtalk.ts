@@ -5,6 +5,7 @@
  * Node.js의 \n은 확실히 LF(0x0A)이므로 CRLF 문제가 발생하지 않습니다.
  */
 import { maskPhone, maskName } from "../../utils/mask";
+import * as logger from "firebase-functions/logger";
 
 interface AlimtalkResult {
     success: boolean;
@@ -27,7 +28,7 @@ export async function sendApprovalAlimtalk(
     const proxyToken = process.env.ALIMTALK_PROXY_TOKEN;
 
     if (!proxyUrl || !proxyToken) {
-        console.error("[Alimtalk] ❌ 프록시 환경변수가 설정되지 않았습니다.");
+        logger.error("[Alimtalk] ❌ 프록시 환경변수가 설정되지 않았습니다.");
         return { success: false, message: "프록시 환경변수 미설정" };
     }
 
@@ -84,17 +85,17 @@ export async function sendApprovalAlimtalk(
         });
 
         const result = await response.json() as Record<string, unknown>;
-        console.log(`[Alimtalk] 프록시 응답: ${JSON.stringify(result)}`);
+        logger.info(`[Alimtalk] 프록시 응답: ${JSON.stringify(result)}`);
 
         if (result.success) {
-            console.log(`[Alimtalk] ✅ 알림톡 발송 성공: ${maskPhone(phone)} (${maskName(name)})`);
+            logger.info(`[Alimtalk] ✅ 알림톡 발송 성공: ${maskPhone(phone)} (${maskName(name)})`);
         } else {
-            console.error(`[Alimtalk] ❌ 알림톡 발송 실패: code=${result.code}, message=${result.message}`);
+            logger.error(`[Alimtalk] ❌ 알림톡 발송 실패: code=${result.code}, message=${result.message}`);
         }
 
         return result as unknown as AlimtalkResult;
     } catch (err: unknown) {
-        console.error("[Alimtalk] ❌ 프록시 호출 중 예외:", (err as Error).message);
+        logger.error("[Alimtalk] ❌ 프록시 호출 중 예외:", (err as Error).message);
         return { success: false, message: (err as Error).message };
     }
 }
@@ -112,7 +113,7 @@ export async function sendReminderAlimtalk(
     const proxyToken = process.env.ALIMTALK_PROXY_TOKEN;
 
     if (!proxyUrl || !proxyToken) {
-        console.error("[Alimtalk] ❌ 프록시 환경변수가 설정되지 않았습니다.");
+        logger.error("[Alimtalk] ❌ 프록시 환경변수가 설정되지 않았습니다.");
         return { success: false, message: "프록시 환경변수 미설정" };
     }
 
@@ -163,17 +164,17 @@ export async function sendReminderAlimtalk(
         });
 
         const result = await response.json() as Record<string, unknown>;
-        console.log(`[Alimtalk] 리마인드 프록시 응답: ${JSON.stringify(result)}`);
+        logger.info(`[Alimtalk] 리마인드 프록시 응답: ${JSON.stringify(result)}`);
 
         if (result.success) {
-            console.log(`[Alimtalk] ✅ 리마인드 발송 성공: ${maskPhone(phone)} (${maskName(name)})`);
+            logger.info(`[Alimtalk] ✅ 리마인드 발송 성공: ${maskPhone(phone)} (${maskName(name)})`);
         } else {
-            console.error(`[Alimtalk] ❌ 리마인드 발송 실패: code=${result.code}, message=${result.message}`);
+            logger.error(`[Alimtalk] ❌ 리마인드 발송 실패: code=${result.code}, message=${result.message}`);
         }
 
         return result as unknown as AlimtalkResult;
     } catch (err: unknown) {
-        console.error("[Alimtalk] ❌ 리마인드 프록시 호출 중 예외:", (err as Error).message);
+        logger.error("[Alimtalk] ❌ 리마인드 프록시 호출 중 예외:", (err as Error).message);
         return { success: false, message: (err as Error).message };
     }
 }
@@ -195,7 +196,7 @@ export async function sendRejectionAlimtalk(
     const proxyToken = process.env.ALIMTALK_PROXY_TOKEN;
 
     if (!proxyUrl || !proxyToken) {
-        console.error("[Alimtalk] ❌ 프록시 환경변수가 설정되지 않았습니다.");
+        logger.error("[Alimtalk] ❌ 프록시 환경변수가 설정되지 않았습니다.");
         return { success: false, message: "프록시 환경변수 미설정" };
     }
 
@@ -232,17 +233,17 @@ export async function sendRejectionAlimtalk(
         });
 
         const result = await response.json() as Record<string, unknown>;
-        console.log(`[Alimtalk] 반려 프록시 응답: ${JSON.stringify(result)}`);
+        logger.info(`[Alimtalk] 반려 프록시 응답: ${JSON.stringify(result)}`);
 
         if (result.success) {
-            console.log(`[Alimtalk] ✅ 반려 알림톡 발송 성공: ${maskPhone(phone)} (${maskName(name)})`);
+            logger.info(`[Alimtalk] ✅ 반려 알림톡 발송 성공: ${maskPhone(phone)} (${maskName(name)})`);
         } else {
-            console.error(`[Alimtalk] ❌ 반려 알림톡 발송 실패: code=${result.code}, message=${result.message}`);
+            logger.error(`[Alimtalk] ❌ 반려 알림톡 발송 실패: code=${result.code}, message=${result.message}`);
         }
 
         return result as unknown as AlimtalkResult;
     } catch (err: unknown) {
-        console.error("[Alimtalk] ❌ 반려 알림톡 프록시 호출 중 예외:", (err as Error).message);
+        logger.error("[Alimtalk] ❌ 반려 알림톡 프록시 호출 중 예외:", (err as Error).message);
         return { success: false, message: (err as Error).message };
     }
 }

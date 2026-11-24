@@ -6,6 +6,7 @@
  */
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { createReservationTx } from "../../services/reservation/createReservationCore";
+import * as logger from "firebase-functions/logger";
 
 export const createReservationSafe = onCall(
     { region: "asia-northeast3", enforceAppCheck: true },
@@ -70,7 +71,7 @@ export const createReservationSafe = onCall(
             actorRole: request.auth.token.role,
         });
 
-        console.log(`Reservation created safely: ${reservationId} (${vehicleName}, ${date} ${startTime}-${endTime})`);
+        logger.info(`Reservation created safely: ${reservationId} (${vehicleName}, ${date} ${startTime}-${endTime})`);
         return { success: true, reservationId };
     }
 );

@@ -10,6 +10,7 @@ import { isOrgRetired } from "../../utils/orgRetirement";
 import { isCalendarAuthError, shouldSkipVehicleCalendar, recordCalendarFailure, resetCalendarFailure } from "../../services/calendar/calendarFailTracking";
 import { sendPushToOrg, sendPushToUser, createInAppNotification } from "../../services/alimtalk/sendNotification";
 import { checkReservationTimeConflict } from "../sync/conflictResolver";
+import * as logger from "firebase-functions/logger";
 
 /**
  * 차량의 캘린더 동기화 컨텍스트를 조회한다.
@@ -153,7 +154,7 @@ async function handleCalendarError(
     vehicleId: string,
     failCount: number,
 ): Promise<void> {
-    console.error("Reservation " + reservationId + ": " + context + " failed", (err as Error).message);
+    logger.error("Reservation " + reservationId + ": " + context + " failed", (err as Error).message);
     if (isCalendarAuthError(err)) {
         await recordCalendarFailure(vehicleId, failCount, err);
         return;
@@ -176,7 +177,7 @@ export const onReservationCreated = onDocumentCreated(
 
     // 역동기화로 생성된 예약이면 캘린더에 다시 생성하지 않음 (무한 루프 방지)
     if (reservation.syncSource === "calendar") {
-        console.log("Reservation " + reservationId + ": calendar reverse-sync, skip calendar event creation");
+        logger.info("Reservation " + reservationId + ": calendar reverse-sync, skip calendar event creation");
         return;
     }
 
@@ -208,11 +209,11 @@ export const onReservationCreated = onDocumentCreated(
     if (reservation.status !== 'pending') {
         const vc = await getVehicleCalendar(reservation.vehicleId, reservation.organizationId);
         if (!vc) {
-            console.log("Vehicle " + reservation.vehicleId + ": no calendar ID, skip");
+            logger.info("Vehicle " + reservation.vehicleId + ": no calendar ID, skip");
             // 캘린더 연동을 안해도 실패 처리는 아님, 알림 로직으로 넘어가도록 수정
         } else if (vc.skip) {
             // 실패 누적(쿨다운/영구제외)으로 캘린더 호출을 건너뜀 — 반복 404로 인한 Sentry 스팸/쿼터 낭비 방지
-            console.log("Vehicle " + reservation.vehicleId + ": calendar sync disabled (failCount=" + vc.failCount + "), skip");
+            logger.info("Vehicle " + reservation.vehicleId + ": calendar sync disabled (failCount=" + vc.failCount + "), skip");
         } else {
             try {
                 const eventId = await createCalendarEvent(vc.calendarId, reservation as Parameters<typeof createCalendarEvent>[1]);
@@ -225,13 +226,13 @@ export const onReservationCreated = onDocumentCreated(
                 // 성공: 직전까지 누적된 실패 카운트가 있으면 리셋
                 if (vc.failCount > 0) await resetCalendarFailure(reservation.vehicleId);
 
-                console.log("Reservation " + reservationId + ": calendar event created (" + eventId + ")");
+                logger.info("Reservation " + reservationId + ": calendar event created (" + eventId + ")");
             } catch (err: unknown) {
                 await handleCalendarError(err, "officialCalendarSync_created", reservationId, reservation.vehicleId, vc.failCount);
             }
         }
     } else {
-        console.log("Reservation " + reservationId + ": status is pending, skipping calendar event creation");
+        logger.info("Reservation " + reservationId + ": status is pending, skipping calendar event creation");
     }
 
     // 푸시 알림 전송 (예약 관리자/지정 수신자에게)
@@ -257,7 +258,7 @@ export const onReservationCreated = onDocumentCreated(
             );
         }
     } catch (err: unknown) {
-        console.error("Reservation " + reservationId + ": push notification failed", (err as Error).message);
+        logger.error("Reservation " + reservationId + ": push notification failed", (err as Error).message);
     }
 });
 
@@ -276,7 +277,7 @@ export const onReservationUpdated = onDocumentUpdated(
 
     // 역동기화로 수정된 예약이면 캘린더에 다시 반영하지 않음 (무한 루프 방지)
     if (after.syncSource === "calendar" && before.syncSource !== "calendar") {
-        console.log("Reservation " + reservationId + ": calendar reverse-sync update, skip");
+        logger.info("Reservation " + reservationId + ": calendar reverse-sync update, skip");
         return;
     }
 
@@ -368,7 +369,7 @@ export const onReservationUpdated = onDocumentUpdated(
                 try {
                     await deleteCalendarEvent(calendarId, eventId);
                     if (calendarFailCount > 0) await resetCalendarFailure(after.vehicleId);
-                    console.log("Reservation " + reservationId + ": cancelled -> calendar event deleted");
+                    logger.info("Reservation " + reservationId + ": cancelled -> calendar event deleted");
                 } catch (e: unknown) {
                     await handleCalendarError(e, "officialCalendarSync_cancelled", reservationId, after.vehicleId, calendarFailCount);
                 }
@@ -404,7 +405,7 @@ export const onReservationUpdated = onDocumentUpdated(
                 try {
                     await updateCalendarEvent(calendarId, eventId, after as Parameters<typeof updateCalendarEvent>[2]);
                     if (calendarFailCount > 0) await resetCalendarFailure(after.vehicleId);
-                    console.log("Reservation " + reservationId + ": calendar event updated");
+                    logger.info("Reservation " + reservationId + ": calendar event updated");
                 } catch (e: unknown) {
                     await handleCalendarError(e, "officialCalendarSync_updated", reservationId, after.vehicleId, calendarFailCount);
                 }
@@ -419,7 +420,7 @@ export const onReservationUpdated = onDocumentUpdated(
                         calendarEventId: newEventId,
                     });
                     if (calendarFailCount > 0) await resetCalendarFailure(after.vehicleId);
-                    console.log("Reservation " + reservationId + ": calendar event created on update (" + newEventId + ")");
+                    logger.info("Reservation " + reservationId + ": calendar event created on update (" + newEventId + ")");
                 } catch (e: unknown) {
                     await handleCalendarError(e, "officialCalendarSync_updated_created", reservationId, after.vehicleId, calendarFailCount);
                 }
@@ -458,7 +459,7 @@ export const onReservationUpdated = onDocumentUpdated(
         // officialCalendarSync_updated로 두면 캘린더 문제로 오독하게 된다.
         const { captureError } = await import("../../core/sentry");
         captureError(err, { context: "onReservationUpdated", reservationId, vehicleId: after.vehicleId });
-        console.error("Reservation " + reservationId + ": update trigger failed", (err as Error).message);
+        logger.error("Reservation " + reservationId + ": update trigger failed", (err as Error).message);
     }
 });
 
@@ -483,14 +484,14 @@ export const onReservationDeleted = onDocumentDeleted(
     if (!vc) return;
     // 실패 누적(쿨다운/영구제외) 차량은 삭제 호출도 건너뜀 (어차피 404 반복)
     if (vc.skip) {
-        console.log("Vehicle " + reservation.vehicleId + ": calendar sync disabled (failCount=" + vc.failCount + "), skip delete");
+        logger.info("Vehicle " + reservation.vehicleId + ": calendar sync disabled (failCount=" + vc.failCount + "), skip delete");
         return;
     }
 
     try {
         await deleteCalendarEvent(vc.calendarId, reservation.calendarEventId);
         if (vc.failCount > 0) await resetCalendarFailure(reservation.vehicleId);
-        console.log("Reservation " + reservationId + ": deleted -> calendar event deleted");
+        logger.info("Reservation " + reservationId + ": deleted -> calendar event deleted");
     } catch (err: unknown) {
         await handleCalendarError(err, "officialCalendarSync_deleted", reservationId, reservation.vehicleId, vc.failCount);
     }

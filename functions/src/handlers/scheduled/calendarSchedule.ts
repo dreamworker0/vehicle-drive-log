@@ -14,6 +14,7 @@ import { captureError, flushSentry } from "../../core/sentry";
 import { recordHeartbeat } from "../../utils/helpers";
 import { toKSTDate, getKSTDateString } from "../../utils/kstDate";
 import { maskEmail } from "../../utils/mask";
+import * as logger from "firebase-functions/logger";
 
 const db = getFirestore();
 const auth = getAuth();
@@ -145,12 +146,12 @@ export const syncCalendarToApp = onSchedule(
         const hour = nowKST.getHours();
 
         if (dayOfWeek === 0 || dayOfWeek === 6 || hour < 6 || hour > 22) {
-            console.log(`=== Calendar sync skipped (weekend or night: ${hour}시) ===`);
+            logger.info(`=== Calendar sync skipped (weekend or night: ${hour}시) ===`);
             await recordHeartbeat("syncCalendarToApp");
             return;
         }
 
-        console.log("=== Calendar -> App reverse sync start ===");
+        logger.info("=== Calendar -> App reverse sync start ===");
 
         try {
             // googleCalendarId가 있는 모든 차량 조회
@@ -159,7 +160,7 @@ export const syncCalendarToApp = onSchedule(
                 .get();
 
             if (vehiclesSnap.empty) {
-                console.log("No calendar-linked vehicles, skip");
+                logger.info("No calendar-linked vehicles, skip");
                 return;
             }
 
@@ -201,7 +202,7 @@ export const syncCalendarToApp = onSchedule(
 
                 // 유효하지 않은 캘린더 ID 건너뛰기 (@ 포함 필수)
                 if (!calendarId || !calendarId.includes("@")) {
-                    console.log("Vehicle " + vehicleName + "(" + vehicleId + "): invalid calendar ID, skip");
+                    logger.info("Vehicle " + vehicleName + "(" + vehicleId + "): invalid calendar ID, skip");
                     continue;
                 }
 
@@ -220,7 +221,7 @@ export const syncCalendarToApp = onSchedule(
                         totalSkippedCooldown++;
                         continue;
                     }
-                    console.log("Vehicle " + vehicleName + "(" + vehicleId + "): 24h cooldown passed, retrying (failCount: " + failCount + ")");
+                    logger.info("Vehicle " + vehicleName + "(" + vehicleId + "): 24h cooldown passed, retrying (failCount: " + failCount + ")");
                 }
 
                 try {
@@ -244,28 +245,28 @@ export const syncCalendarToApp = onSchedule(
                     }
                 } catch (vehicleErr: unknown) {
                     const errMsg = (vehicleErr as Error).message;
-                    console.error("Vehicle " + vehicleName + "(" + vehicleId + ") sync failed:", errMsg);
+                    logger.error("Vehicle " + vehicleName + "(" + vehicleId + ") sync failed:", errMsg);
 
                     // Not Found / 인증 에러 시 실패 카운터 증가
                     if (isCalendarAuthError(vehicleErr)) {
                         const newFailCount = await recordCalendarFailure(vehicleId, failCount, vehicleErr);
                         if (newFailCount >= MAX_FAIL_COUNT) {
-                            console.warn("Vehicle " + vehicleName + "(" + vehicleId + "): permanently disabled after " + newFailCount + " failures");
+                            logger.warn("Vehicle " + vehicleName + "(" + vehicleId + "): permanently disabled after " + newFailCount + " failures");
                         } else if (newFailCount >= 3) {
-                            console.warn("Vehicle " + vehicleName + "(" + vehicleId + "): cooldown activated after " + newFailCount + " failures (retry in 24h)");
+                            logger.warn("Vehicle " + vehicleName + "(" + vehicleId + "): cooldown activated after " + newFailCount + " failures (retry in 24h)");
                         }
                     }
                 }
             }
 
-            console.log("=== Reverse sync done: created " + totalCreated + ", updated " + totalUpdated + ", cancelled " + totalCancelled + ", skippedDup " + totalSkippedDup + ", skippedCooldown " + totalSkippedCooldown + ", skippedPermanent " + totalSkippedPermanent + " ===");
+            logger.info("=== Reverse sync done: created " + totalCreated + ", updated " + totalUpdated + ", cancelled " + totalCancelled + ", skippedDup " + totalSkippedDup + ", skippedCooldown " + totalSkippedCooldown + ", skippedPermanent " + totalSkippedPermanent + " ===");
 
             // 캐시 미스 한 번이 문서 읽기 한 번이다(바인딩 경합 재조회는 드물어 뺐다).
             const vehicleReads = queryReadCount(vehiclesSnap);
             const orgAndBindingReads = orgFlagCache.size + bindingCache.size;
             const totalReads = vehicleReads + reservationReads + orgAndBindingReads;
             // 고정 접두사로 남겨 Cloud Logging에서 `[CalendarSyncReads]`로 모아 볼 수 있게 한다.
-            console.log("[CalendarSyncReads] " + JSON.stringify({
+            logger.info("[CalendarSyncReads] " + JSON.stringify({
                 totalReads,
                 vehicleReads,
                 reservationReads,
@@ -290,7 +291,7 @@ export const syncCalendarToApp = onSchedule(
             // 죽어도 아무에게도 닿지 않았다(heartbeat는 try 끝에서만 찍히므로 헬스 체크만 늦게 알았다).
             // 차량별 실패는 recordCalendarFailure가 따로 다루므로 여기는 회차 전체가 죽은 경우만 온다.
             // 스케줄 함수는 경계 래퍼가 없어 flush를 직접 한다(batchStep.ts 참고).
-            console.error("Reverse sync overall failed:", (err as Error).message);
+            logger.error("Reverse sync overall failed:", (err as Error).message);
             captureError(err, { context: "syncCalendarToApp" });
             await flushSentry();
         }
@@ -336,13 +337,13 @@ export async function syncSingleVehicleCalendar(
     const skippedUnchanged = false;
 
     if (!await isGoogleCalendarEnabled(organizationId, orgFlagCache)) {
-        console.log("Vehicle " + vehicleName + "(" + vehicleId + "): organization calendar feature disabled, skip");
+        logger.info("Vehicle " + vehicleName + "(" + vehicleId + "): organization calendar feature disabled, skip");
         return { created, updated, cancelled, skippedDup, reads, skippedUnchanged };
     }
 
     // 유효하지 않은 캘린더 ID 건너뛰기 (@ 포함 필수)
     if (!calendarId || !calendarId.includes("@")) {
-        console.log("Vehicle " + vehicleName + "(" + vehicleId + "): invalid calendar ID, skip");
+        logger.info("Vehicle " + vehicleName + "(" + vehicleId + "): invalid calendar ID, skip");
         return { created, updated, cancelled, skippedDup, reads, skippedUnchanged };
     }
 
@@ -353,7 +354,7 @@ export async function syncSingleVehicleCalendar(
         logName: "syncCalendarToApp",
         cache: bindingCache,
     })) {
-        console.log("Vehicle " + vehicleName + "(" + vehicleId + "): calendar not bound to this organization, skip");
+        logger.info("Vehicle " + vehicleName + "(" + vehicleId + "): calendar not bound to this organization, skip");
         return { created, updated, cancelled, skippedDup, reads, skippedUnchanged };
     }
 
@@ -463,7 +464,7 @@ export async function syncSingleVehicleCalendar(
                 existing.calendarEventId = calEvent.id;
                 existingByEventId[calEvent.id] = existing;
                 globalProcessedEventIds.add(calEvent.id);
-                console.log("[" + vehicleName + "] Linked unmapped app reservation " + existing.id + " with calendar event " + calEvent.id);
+                logger.info("[" + vehicleName + "] Linked unmapped app reservation " + existing.id + " with calendar event " + calEvent.id);
             }
         }
 
@@ -471,7 +472,7 @@ export async function syncSingleVehicleCalendar(
             // 같은 calendarEventId가 다른 차량에서 이미 처리되었으면 건너뛰기
             if (globalProcessedEventIds.has(calEvent.id)) {
                 skippedDup++;
-                console.log("[" + vehicleName + "] Skip duplicate calendarEventId: " + calEvent.id + " (" + calEvent.summary + ")");
+                logger.info("[" + vehicleName + "] Skip duplicate calendarEventId: " + calEvent.id + " (" + calEvent.summary + ")");
                 continue;
             }
 
@@ -486,7 +487,7 @@ export async function syncSingleVehicleCalendar(
                 const dupDoc = doubleCheckSnap.docs[0];
                 existingByEventId[calEvent.id] = { id: dupDoc.id, ...dupDoc.data() };
                 globalProcessedEventIds.add(calEvent.id);
-                console.log("[" + vehicleName + "] Found existing event out of date range for calendarEventId: " + calEvent.id);
+                logger.info("[" + vehicleName + "] Found existing event out of date range for calendarEventId: " + calEvent.id);
                 // 기존 문서가 있음 처리로 넘기기 위해 루프 강제 분기
                 existing = existingByEventId[calEvent.id];
             }
@@ -519,7 +520,7 @@ export async function syncSingleVehicleCalendar(
                             if (profileName) reservationData.reservedByName = profileName;
                         }
                     }
-                    console.log("[" + vehicleName + "] User matched: " + maskEmail(reservationData.creatorEmail as string) + " -> " + userRecord.uid);
+                    logger.info("[" + vehicleName + "] User matched: " + maskEmail(reservationData.creatorEmail as string) + " -> " + userRecord.uid);
                 }
                 // 최종 폴백: 이메일 로컬파트 — "예약자 미상"으로 남지 않게 최소 식별자 제공
                 // (개인정보 보호를 위해 이메일 전체는 저장하지 않음)
@@ -546,7 +547,7 @@ export async function syncSingleVehicleCalendar(
             await db.collection("reservations").doc(calEvent.id).set(reservationData);
             globalProcessedEventIds.add(calEvent.id);
             created++;
-            console.log("[" + vehicleName + "] New reservation: " + calEvent.summary + " (" + calEvent.id + ")");
+            logger.info("[" + vehicleName + "] New reservation: " + calEvent.summary + " (" + calEvent.id + ")");
         } else {
             // 기존 예약이 있음 -> 내용 비교 후 업데이트
             const parsed = parseEventToReservation(
@@ -587,7 +588,7 @@ export async function syncSingleVehicleCalendar(
                     syncSource: "calendar",
                 });
                 updated++;
-                console.log("[" + vehicleName + "] Reservation updated: " + existing.id);
+                logger.info("[" + vehicleName + "] Reservation updated: " + existing.id);
             }
         }
     }
@@ -606,7 +607,7 @@ export async function syncSingleVehicleCalendar(
                 syncSource: "calendar",
             });
             cancelled++;
-            console.log("[" + vehicleName + "] Reservation cancelled (calendar deleted): " + reservation.id);
+            logger.info("[" + vehicleName + "] Reservation cancelled (calendar deleted): " + reservation.id);
         }
     }
 
@@ -628,15 +629,15 @@ export async function syncVehicleCalendar(vehicleId: string, vehicleInfo: Record
     const vehicleName = (vehicleInfo.displayName as string) || "";
     
     if (!calendarId || !calendarId.includes("@")) {
-        console.log(`[SyncVehicle] Vehicle ${vehicleName}(${vehicleId}) invalid calendar ID, skip`);
+        logger.info(`[SyncVehicle] Vehicle ${vehicleName}(${vehicleId}) invalid calendar ID, skip`);
         return;
     }
     
-    console.log(`[SyncVehicle] Start single vehicle sync for ${vehicleName} (${vehicleId})`);
+    logger.info(`[SyncVehicle] Start single vehicle sync for ${vehicleName} (${vehicleId})`);
     
     try {
         await syncSingleVehicleCalendar(vehicleId, vehicleInfo);
     } catch (err: unknown) {
-        console.error(`[SyncVehicle] Single sync failed for ${vehicleName}:`, (err as Error).message);
+        logger.error(`[SyncVehicle] Single sync failed for ${vehicleName}:`, (err as Error).message);
     }
 }

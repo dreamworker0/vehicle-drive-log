@@ -7,6 +7,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
+import * as logger from "firebase-functions/logger";
 
 const WITHDRAW_REASONS = ["no_longer_needed", "too_difficult", "missing_features", "other"] as const;
 type WithdrawReason = (typeof WITHDRAW_REASONS)[number];
@@ -82,15 +83,15 @@ export const withdrawOrganization = onCall(
             );
             const revokeFailed = revoked.filter((r) => r.status === "rejected").length;
             if (revokeFailed > 0) {
-                console.warn(`기관 해지: 토큰 무효화 ${revokeFailed}/${usersSnap.size}건 실패 (${organizationId})`);
+                logger.warn(`기관 해지: 토큰 무효화 ${revokeFailed}/${usersSnap.size}건 실패 (${organizationId})`);
             }
 
-            console.log(
+            logger.info(
                 `기관 서비스 해지 완료: ${organizationId} (사유: ${reason}, 호출자: ${request.auth.uid}, 직원 ${usersSnap.size}명 정리)`
             );
             return { success: true };
         } catch (err: unknown) {
-            console.error("기관 서비스 해지 실패:", (err as Error).message);
+            logger.error("기관 서비스 해지 실패:", (err as Error).message);
             if (err instanceof HttpsError) throw err;
             throw new HttpsError("internal", "서비스 해지 중 오류가 발생했습니다.");
         }

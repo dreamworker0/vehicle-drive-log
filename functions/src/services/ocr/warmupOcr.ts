@@ -1,3 +1,4 @@
+import * as logger from "firebase-functions/logger";
 /**
  * warmupOcr — 근무시간(08~18시) 동안 ocrDashboard 함수를 따뜻하게 유지
  */
@@ -6,7 +7,7 @@ export async function warmupOcrFunction(): Promise<void> {
     const kstHour = new Date(now.toLocaleString("en-US", { timeZone: "Asia/Seoul" })).getHours();
 
     if (kstHour < 8 || kstHour >= 18) {
-        console.log(`warmupOcr: 현재 KST ${kstHour}시, 근무시간 외 → skip`);
+        logger.info(`warmupOcr: 현재 KST ${kstHour}시, 근무시간 외 → skip`);
         return;
     }
 
@@ -23,8 +24,8 @@ export async function warmupOcrFunction(): Promise<void> {
             signal: AbortSignal.timeout(10000),
         });
 
-        console.log(`warmupOcr: ping → ${response.status} (KST ${kstHour}시)`);
+        logger.info(`warmupOcr: ping → ${response.status} (KST ${kstHour}시)`);
     } catch (err: unknown) {
-        console.log(`warmupOcr: ping 완료 (${(err as Error).message || "ok"}) — 인스턴스 워밍업 성공`);
+        logger.info(`warmupOcr: ping 완료 (${(err as Error).message || "ok"}) — 인스턴스 워밍업 성공`);
     }
 }

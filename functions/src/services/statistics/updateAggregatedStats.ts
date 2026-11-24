@@ -1,6 +1,7 @@
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getKSTMonthKey } from "../../utils/kstDate";
 import { markStaleMonths } from "./staleMonths";
+import * as logger from "firebase-functions/logger";
 
 /** 타임스탬프에서 월 키(YYYY-MM) 추출 */
 export const getMonthKey = (data: FirebaseFirestore.DocumentData | undefined): string | null => {
@@ -51,7 +52,7 @@ export async function handleStatsOnCreate(orgId: string, afterData: FirebaseFire
     try {
         await orgStatsRef.set(payload, { merge: true });
     } catch (error) {
-        console.error(`[handleStatsOnCreate] 통계 업데이트 실패 (${orgId}):`, error);
+        logger.error(`[handleStatsOnCreate] 통계 업데이트 실패 (${orgId}):`, error);
     }
     // 지난달 이전에 소급 입력한 기록 — 야간 집계가 그 달을 다시 계산하도록 표시한다
     await markStaleMonths(orgId, [monthKey]);
@@ -105,7 +106,7 @@ export async function handleStatsOnUpdate(orgId: string, beforeData: FirebaseFir
     try {
         await orgStatsRef.set(payload, { merge: true });
     } catch (error) {
-        console.error(`[handleStatsOnUpdate] 통계 업데이트 실패 (${orgId}):`, error);
+        logger.error(`[handleStatsOnUpdate] 통계 업데이트 실패 (${orgId}):`, error);
     }
 }
 
@@ -138,7 +139,7 @@ export async function handleStatsOnDelete(orgId: string, beforeData: FirebaseFir
     try {
         await orgStatsRef.set(payload, { merge: true });
     } catch (error) {
-        console.error(`[handleStatsOnDelete] 통계 업데이트 실패 (${orgId}):`, error);
+        logger.error(`[handleStatsOnDelete] 통계 업데이트 실패 (${orgId}):`, error);
     }
     // 보존 기한 정리(3년)로 지워진 기록은 1년 표시 범위 밖이라 표시되지 않는다(staleMonths.ts)
     await markStaleMonths(orgId, [monthKey]);

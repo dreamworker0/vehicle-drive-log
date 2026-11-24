@@ -1,6 +1,7 @@
 import { getFirestore } from 'firebase-admin/firestore';
 import { toKSTDate } from '../../utils/kstDate';
 import { captureWarning } from '../../core/sentry';
+import * as logger from "firebase-functions/logger";
 
 /**
  * 운행일지 정합성 월간 검증.
@@ -250,7 +251,7 @@ export function countMileageGaps(logs: DriveLogLite[]): number {
             const previous = ordered[i];
             const next = ordered[i + 1];
             if (previous.endKm !== next.startKm) {
-                console.warn(
+                logger.warn(
                     `[Mileage Inconsistency] ${key} — 이전(${previous.id}) ${previous.startKm}→${previous.endKm}, ` +
                     `다음(${next.id}) ${next.startKm}→${next.endKm}`,
                 );
@@ -291,7 +292,7 @@ export async function verifyMileageConsistency(): Promise<void> {
     // 지난달 1일 00:00 (KST) ~ 이번달 1일 00:00 (KST)
     const { start: prevMonthStart, end: monthStart, label } = previousKstMonthWindow();
 
-    console.log(`[verifyDriveLogIntegrity] 검증 시작 대상 기간: ${label}`);
+    logger.info(`[verifyDriveLogIntegrity] 검증 시작 대상 기간: ${label}`);
 
     const logsSnap = await db
         .collection('driveLogs')
@@ -300,7 +301,7 @@ export async function verifyMileageConsistency(): Promise<void> {
         .get();
 
     if (logsSnap.empty) {
-        console.log('[verifyDriveLogIntegrity] 대상 기간에 운행일지 없음. 스킵.');
+        logger.info('[verifyDriveLogIntegrity] 대상 기간에 운행일지 없음. 스킵.');
         return;
     }
 
@@ -342,24 +343,24 @@ export async function verifyMileageConsistency(): Promise<void> {
     );
     const mileageGaps = countMileageGaps(logs);
 
-    console.log(
+    logger.info(
         `[verifyDriveLogIntegrity] 검증 완료 (${label}, 대상 ${logs.length}건). ` +
         `마일리지 불일치 ${mileageGaps}건, 참조 무결성 위반 ${violations.length}건, ` +
         `기관 이동으로 설명 ${transfers.length}건, 삭제된 사용자·차량의 보존 기록 ${retained.length}건`,
     );
     if (retained.length > 0) {
-        console.log(`[Reference Integrity] 삭제된 사용자·차량의 보존 기록 — ${retained.slice(0, 50).join(' | ')}`);
+        logger.info(`[Reference Integrity] 삭제된 사용자·차량의 보존 기록 — ${retained.slice(0, 50).join(' | ')}`);
     }
 
     // 이동은 정상이므로 경고로 올리지 않는다. 다만 교차 참조가 일어난 사실 자체는
     // 감사 때 따라갈 수 있어야 하므로 로그에는 남긴다.
     if (transfers.length > 0) {
-        console.log(`[Reference Integrity] 기관 이동으로 설명됨 — ${transfers.slice(0, 50).join(' | ')}`);
+        logger.info(`[Reference Integrity] 기관 이동으로 설명됨 — ${transfers.slice(0, 50).join(' | ')}`);
     }
 
     // 참조 무결성 위반은 Rules가 막지 않는 영역이라 조용히 넘기면 탐지 수단이 사라진다.
     if (violations.length > 0) {
-        console.warn(`[Reference Integrity] ${violations.slice(0, 50).join(' | ')}`);
+        logger.warn(`[Reference Integrity] ${violations.slice(0, 50).join(' | ')}`);
         captureWarning('운행일지 참조 무결성 위반 감지', {
             context: 'verifyDriveLogIntegrity',
             period: label,

@@ -2,6 +2,7 @@ import { onDocumentCreated } from "firebase-functions/v2/firestore";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { captureError } from "../../core/sentry";
 import { getKSTDateString } from "../../utils/kstDate";
+import * as logger from "firebase-functions/logger";
 
 const db = getFirestore();
 
@@ -31,7 +32,7 @@ export const onFuelLogCreated = onDocumentCreated(
             const vehSnap = await db.collection("vehicles").doc(vehId).get();
             const veh = vehSnap.data();
             if (!vehSnap.exists || veh?.organizationId !== orgId) {
-                console.warn(`[onFuelLogCreated] 차량 org 불일치 — 주유 필요 해제 건너뜀: veh=${vehId}, org=${orgId}`);
+                logger.warn(`[onFuelLogCreated] 차량 org 불일치 — 주유 필요 해제 건너뜀: veh=${vehId}, org=${orgId}`);
                 return;
             }
 
@@ -57,7 +58,7 @@ export const onFuelLogCreated = onDocumentCreated(
         } catch (error) {
             // 해제 실패는 주유 기록 자체를 되돌릴 이유가 되지 않는다. 표시가 남아 있으면
             // 관리자가 [차량 관리]에서 직접 끌 수 있다 — 복구 경로가 있는 실패다.
-            console.error("[onFuelLogCreated] 주유 필요 표시 해제 실패:", error);
+            logger.error("[onFuelLogCreated] 주유 필요 표시 해제 실패:", error);
             captureError(error, { context: "onFuelLogCreated", vehId, orgId });
         }
     },

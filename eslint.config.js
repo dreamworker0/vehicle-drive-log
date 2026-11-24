@@ -143,6 +143,10 @@ export default defineConfig([
       '@typescript-eslint/no-explicit-any': 'warn',
       '@typescript-eslint/no-empty-object-type': 'off',
       'no-unused-vars': 'off',
+      // 로그는 firebase-functions/logger로 남긴다(심각도·필드가 Cloud Logging에 구조화되어 실린다).
+      // 2026-11-24에 console.* 266건을 옮겼다 — 다시 섞이지 않게 고정한다. 알림까지 필요한
+      // 오류는 utils/helpers의 log("ERROR")(= captureError)를 쓴다. 테스트·스크립트는 아래 블록에서 끈다.
+      'no-console': 'error',
       // firebase-admin 네임스페이스 import 차단.
       // admin.firestore()·admin.firestore.FieldValue 같은 네임스페이스 접근은 firebase-admin 14가
       // 제거한다. #253에서 마지막 4곳을 모듈러 API로 옮겨 0건이 됐는데, 다시 스며들면 메이저
@@ -167,6 +171,7 @@ export default defineConfig([
       'functions/**/*.test.{ts,js}',
       'functions/**/scripts/**/*.{ts,js}',
       'functions/scripts/**/*.{ts,js}',
+      'functions/test-support/**/*.ts',
     ],
     languageOptions: {
       globals: globals.node,
@@ -177,6 +182,7 @@ export default defineConfig([
       // 테스트 모킹·일회성 스크립트에서는 any를 허용한다(과도한 타입화 비용 회피).
       '@typescript-eslint/no-explicit-any': 'off',
       'no-undef': 'off',
+      'no-console': 'off',
     },
   },
   {

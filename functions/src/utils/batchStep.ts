@@ -6,6 +6,7 @@
  * 다르게 넘긴다.
  */
 import { captureError, flushSentry } from "../core/sentry";
+import * as logger from "firebase-functions/logger";
 
 /**
  * 배치 스텝 하나를 실행한다. 실패해도 다음 스텝으로 넘어가되, **조용히 넘어가지는 않는다.**
@@ -26,7 +27,7 @@ export async function runStep(
     try {
         await fn();
     } catch (e: unknown) {
-        console.error(`Error in ${name}:`, (e as Error).message);
+        logger.error(`Error in ${name}:`, (e as Error).message);
         captureError(e, { context, step: name });
         failed.push(name);
     }
@@ -44,9 +45,9 @@ export async function runStep(
  */
 export async function logBatchResult(context: string, failed: string[]): Promise<void> {
     if (failed.length > 0) {
-        console.error(`[Batch] ${context} completed with ${failed.length} failed step(s): ${failed.join(", ")}`);
+        logger.error(`[Batch] ${context} completed with ${failed.length} failed step(s): ${failed.join(", ")}`);
     } else {
-        console.log(`[Batch] ${context} completed.`);
+        logger.info(`[Batch] ${context} completed.`);
     }
     await flushSentry();
 }

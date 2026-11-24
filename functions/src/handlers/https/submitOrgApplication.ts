@@ -9,6 +9,7 @@ import { GLOBAL_BUDGETS } from "../../utils/constants";
 import { maskEmail } from "../../utils/mask";
 import { screenDocument, getScreenRejection, ScreenResult, ScreenRejection } from "../../services/driveLog/documentScreen";
 import { sendDiscordAlert } from "../../core/discord";
+import * as logger from "firebase-functions/logger";
 
 /**
  * 업로드 허용 MIME 화이트리스트 (2026-07-10 코덱스 평가 대응 — 작업 3).
@@ -300,5 +301,5 @@ async function notifyPrescreenRejection(
             { name: "기관 이메일", value: maskEmail(email), inline: true },
             { name: "판별 결과", value: `${screen.documentType} (${rejection.code})`, inline: true },
         ],
-    }).catch((e) => console.error("Discord alert error:", e));
+    }).catch((e) => logger.error("Discord alert error:", e));
 }

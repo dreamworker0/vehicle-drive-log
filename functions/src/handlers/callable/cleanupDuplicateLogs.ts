@@ -18,6 +18,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore } from "firebase-admin/firestore";
 import { getKSTDateString } from "../../utils/kstDate";
+import * as logger from "firebase-functions/logger";
 
 /** 기본 조회 범위(개월). 중복은 생성 시점에 생기므로 최근 구간이면 충분하다. */
 export const DEFAULT_SCAN_MONTHS = 6;
@@ -84,7 +85,7 @@ export const cleanupDuplicateLogs = onCall(
                 .orderBy("createdAt", "asc")
                 .get();
 
-            console.log(`[cleanupDuplicateLogs] 기관=${organizationId}, 최근 ${scanMonths}개월(${since.toISOString()}) ${logsSnap.size}건 조회`);
+            logger.info(`[cleanupDuplicateLogs] 기관=${organizationId}, 최근 ${scanMonths}개월(${since.toISOString()}) ${logsSnap.size}건 조회`);
 
             const logMap = new Map<string, Array<{ id: string; createdAt: unknown; dateStr: string }>>();
 
@@ -117,7 +118,7 @@ export const cleanupDuplicateLogs = onCall(
                 }
             }
 
-            console.log(`[cleanupDuplicateLogs] 중복 그룹: ${duplicateGroups.length}개, 삭제 대상: ${deleteTargets.length}건`);
+            logger.info(`[cleanupDuplicateLogs] 중복 그룹: ${duplicateGroups.length}개, 삭제 대상: ${deleteTargets.length}건`);
 
             if (!dryRun && deleteTargets.length > 0) {
                 const batchSize = 500;
@@ -128,7 +129,7 @@ export const cleanupDuplicateLogs = onCall(
                         batch.delete(db.collection("driveLogs").doc(id));
                     });
                     await batch.commit();
-                    console.log(`[cleanupDuplicateLogs] 삭제 완료: ${i + chunk.length}/${deleteTargets.length}`);
+                    logger.info(`[cleanupDuplicateLogs] 삭제 완료: ${i + chunk.length}/${deleteTargets.length}`);
                 }
             }
 
@@ -145,7 +146,7 @@ export const cleanupDuplicateLogs = onCall(
                 details: duplicateGroups.slice(0, 50),
             };
         } catch (err: unknown) {
-            console.error("cleanupDuplicateLogs 실패:", (err as Error).message);
+            logger.error("cleanupDuplicateLogs 실패:", (err as Error).message);
             throw new HttpsError("internal", (err as Error).message);
         }
     }

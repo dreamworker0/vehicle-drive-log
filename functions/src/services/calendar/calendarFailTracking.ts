@@ -7,6 +7,7 @@
  * 동일한 백오프(쿨다운/영구제외) 정책을 공유하도록 단일 원본으로 둔다.
  */
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import * as logger from "firebase-functions/logger";
 
 /** 쿨다운 재시도 관련 상수 (역동기화/정방향 트리거 공통) */
 export const RETRY_COOLDOWN_MS = 24 * 60 * 60 * 1000; // 24시간
@@ -125,7 +126,7 @@ export async function recordCalendarFailure(
             await notifyOrgCalendarDisabled(vehicleId);
         } catch (notifyErr: unknown) {
             // 알림 실패가 실패 기록 자체를 되돌리게 두지 않는다.
-            console.error(`[calendarFailTracking] 기관 알림 실패 (${vehicleId}):`, (notifyErr as Error).message);
+            logger.error(`[calendarFailTracking] 기관 알림 실패 (${vehicleId}):`, (notifyErr as Error).message);
         }
     }
 
@@ -196,7 +197,7 @@ async function notifyOrgCalendarDisabled(vehicleId: string): Promise<void> {
         return time ? new Date(time).getTime() >= cutoff : false;
     });
     if (recentlyNotified) {
-        console.log(`[calendarFailTracking] 기관 ${organizationId}에 최근 알림 발송됨 — 중복 발송 억제: ${vehicleId}`);
+        logger.info(`[calendarFailTracking] 기관 ${organizationId}에 최근 알림 발송됨 — 중복 발송 억제: ${vehicleId}`);
         return;
     }
 
@@ -238,12 +239,12 @@ async function notifyOrgCalendarDisabled(vehicleId: string): Promise<void> {
         return;
     }
 
-    console.log(`[calendarFailTracking] 캘린더 동기화 중단을 기관 관리자 ${targets.length}명에게 알림: ${vehicleId}`);
+    logger.info(`[calendarFailTracking] 캘린더 동기화 중단을 기관 관리자 ${targets.length}명에게 알림: ${vehicleId}`);
 }
 
 /** 통지가 불가능했음을 운영자에게 올린다 (자동 재시도가 없는 경로라 사람이 메워야 한다). */
 async function warnUndeliverable(vehicleId: string, organizationId: string, why: string): Promise<void> {
-    console.error(JSON.stringify({
+    logger.error(JSON.stringify({
         severity: "ERROR",
         functionName: "calendarFailTracking",
         message: "캘린더 동기화 중단을 기관에 알리지 못했다 — 자동 재시도 없음",

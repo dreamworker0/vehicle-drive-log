@@ -15,6 +15,7 @@ import { getStorage } from "firebase-admin/storage";
 import { requireSuperAdmin } from "../../utils/helpers";
 import { captureError, flushSentry } from "../../core/sentry";
 import { purgeOrganizationData, OrgNotRetiredError } from "../../services/organization/purgeOrganizationData";
+import * as logger from "firebase-functions/logger";
 
 export const purgeOrganization = onCall(
     {
@@ -31,16 +32,16 @@ export const purgeOrganization = onCall(
             throw new HttpsError("invalid-argument", "기관 ID가 필요합니다.");
         }
 
-        console.log(`[purgeOrganization] 파기 시작 org=${orgId} (uid=${request.auth.uid})`);
+        logger.info(`[purgeOrganization] 파기 시작 org=${orgId} (uid=${request.auth.uid})`);
         try {
             const summary = await purgeOrganizationData(orgId, getStorage().bucket());
-            console.log(`[purgeOrganization] 파기 완료 org=${orgId}: ${JSON.stringify(summary.deleted)}`);
+            logger.info(`[purgeOrganization] 파기 완료 org=${orgId}: ${JSON.stringify(summary.deleted)}`);
             return { success: true, deleted: summary.deleted };
         } catch (err: unknown) {
             if (err instanceof OrgNotRetiredError) {
                 throw new HttpsError("failed-precondition", "해지된 기관만 영구 삭제할 수 있습니다.");
             }
-            console.error(`[purgeOrganization] 파기 실패 org=${orgId}:`, (err as Error).message);
+            logger.error(`[purgeOrganization] 파기 실패 org=${orgId}:`, (err as Error).message);
             captureError(err, { context: "purgeOrganization", orgId });
             await flushSentry();
             throw new HttpsError("internal", "영구 삭제 중 오류가 발생했습니다. 다시 시도하면 남은 데이터부터 이어서 지웁니다.");

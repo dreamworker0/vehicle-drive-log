@@ -11,6 +11,7 @@
  */
 import { HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import * as logger from "firebase-functions/logger";
 
 const db = getFirestore();
 
@@ -87,7 +88,7 @@ export async function cancelReservationTx(
         });
     } catch (err: unknown) {
         if (err instanceof HttpsError) throw err;
-        console.error("cancelReservationTx 실패:", (err as Error).message);
+        logger.error("cancelReservationTx 실패:", (err as Error).message);
         throw new HttpsError("internal", "예약 취소에 실패했습니다.");
     }
 }

@@ -1,6 +1,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore } from "firebase-admin/firestore";
 import { getKSTMonthKey } from "../../utils/kstDate";
+import * as logger from "firebase-functions/logger";
 
 /**
  * 모든 기관(또는 특정 기관)의 운행일지 집계 통계를 처음부터 재계산합니다.
@@ -40,7 +41,7 @@ export const recalculateAggregatedStats = onCall(
             orgIds = orgSnap.docs.map((d) => d.id);
         }
 
-        console.log(`[recalculateAggregatedStats] 대상 기관 수: ${orgIds.length}`);
+        logger.info(`[recalculateAggregatedStats] 대상 기관 수: ${orgIds.length}`);
 
         let processedCount = 0;
 
@@ -93,11 +94,11 @@ export const recalculateAggregatedStats = onCall(
 
             processedCount++;
             if (processedCount % 10 === 0) {
-                console.log(`[recalculateAggregatedStats] 진행: ${processedCount}/${orgIds.length}`);
+                logger.info(`[recalculateAggregatedStats] 진행: ${processedCount}/${orgIds.length}`);
             }
         }
 
-        console.log(`[recalculateAggregatedStats] 완료: ${processedCount}개 기관 처리됨`);
+        logger.info(`[recalculateAggregatedStats] 완료: ${processedCount}개 기관 처리됨`);
         return { success: true, processedCount };
     }
 );

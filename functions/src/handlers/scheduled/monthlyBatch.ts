@@ -11,6 +11,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import { syncHolidays } from "./syncHolidays";
 import { verifyMileageConsistency } from "./verifyMileageConsistency";
 import { flushSentry } from "../../core/sentry";
+import * as logger from "firebase-functions/logger";
 
 export const monthlyBatch = onSchedule(
     {
@@ -34,17 +35,17 @@ export const monthlyBatch = onSchedule(
         try {
             await syncHolidays();
         } catch (e: unknown) {
-            console.error("[monthlyBatch] Error in syncHolidays:", (e as Error).message);
+            logger.error("[monthlyBatch] Error in syncHolidays:", (e as Error).message);
         }
 
         // Step 2: 마일리지 불일치 검증 (기존 verifyMileageConsistency 통합)
         try {
             await verifyMileageConsistency();
         } catch (e: unknown) {
-            console.error("[monthlyBatch] Error in verifyMileageConsistency:", (e as Error).message);
+            logger.error("[monthlyBatch] Error in verifyMileageConsistency:", (e as Error).message);
         }
 
-        console.log("[monthlyBatch] completed.");
+        logger.info("[monthlyBatch] completed.");
 
         // 두 단계의 captureError/captureWarning을 여기서 전송한다.
         // Sentry 전송은 비동기라 핸들러가 반환하면 인스턴스가 동결·종료되면서 버퍼가 그대로 사라진다 —

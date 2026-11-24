@@ -18,6 +18,7 @@ import { wrapCallableHandler, sanitizePromptValue } from "../../utils/helpers";
 import { MAX_BASE64_SIZE, getRateLimits } from "../../utils/constants";
 import { checkDailyOcrQuota } from "../../utils/rateLimit";
 import { buildOcrPrompt, parseScreenResponse, isNonProfitDocument, type ScreenResult } from "../../services/driveLog/documentScreen";
+import * as logger from "firebase-functions/logger";
 
 /** 화면(OrgApplicationList [AI 재분석])이 기관 문서의 aiVerifyDetail로 저장하는 모양 */
 interface OcrResult extends ScreenResult {
@@ -125,7 +126,7 @@ export const ocrDocument = onCall(
             raw: text,
         };
 
-        console.log(`OCR 완료: ${result.documentType} (자동 승인 조건: ${result.aiVerified})`);
+        logger.info(`OCR 완료: ${result.documentType} (자동 승인 조건: ${result.aiVerified})`);
 
         return result;
     })

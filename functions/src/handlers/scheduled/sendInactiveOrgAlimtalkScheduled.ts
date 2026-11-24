@@ -5,6 +5,7 @@ import { sendDiscordAlert } from "../../core/discord";
 import { recordHeartbeat } from "../../utils/helpers";
 import { toKSTDate } from "../../utils/kstDate";
 import { ALIMTALK_PROXY_TOKEN } from "../../core/params";
+import * as logger from "firebase-functions/logger";
 
 /**
  * 디스코드 브리핑: 비활성 기관 알림 + 월요일 주간 리포트
@@ -48,7 +49,7 @@ async function runDiscordBriefing(db: FirebaseFirestore.Firestore) {
                 title: `⚠️ 가입 후 3일 경과 비활성 기관 (${inactiveCount}곳)`,
                 description: `다음 기관들은 인증 완료 후 3일이 지났으나 직원을 1명도 등록하지 않았습니다.\n온보딩 지원 스탭의 팔로업이 필요합니다.\n\n${inactiveListText}`,
                 color: 16753920,
-            }).catch(e => console.error("Discord alert error:", e));
+            }).catch(e => logger.error("Discord alert error:", e));
         }
     }
 
@@ -77,7 +78,7 @@ async function runDiscordBriefing(db: FirebaseFirestore.Firestore) {
                 { name: "✨ 신규 가입 기관", value: `${newOrgsCount} 곳`, inline: true },
                 { name: "💬 접수된 고객 의견", value: `${newFeedbacksCount} 건`, inline: true }
             ]
-        }).catch(e => console.error("Discord alert error:", e));
+        }).catch(e => logger.error("Discord alert error:", e));
     }
 
     await recordHeartbeat("discordBriefing");
@@ -118,7 +119,7 @@ export const sendInactiveOrgAlimtalkScheduled = onSchedule(
         try {
             await runDiscordBriefing(db);
         } catch (e: unknown) {
-            console.error("Error in discordBriefing:", (e as Error).message);
+            logger.error("Error in discordBriefing:", (e as Error).message);
         }
 
         // === Part 2: 미활성 기관 알림톡 발송 ===
@@ -129,7 +130,7 @@ export const sendInactiveOrgAlimtalkScheduled = onSchedule(
             const holidaysData = holidayDoc.data();
             if (holidaysData && holidaysData[y] && holidaysData[y][todayStr]) {
                 const holidayName = holidaysData[y][todayStr];
-                console.log(`[Scheduled Alimtalk] 오늘(${todayStr})은 공휴일(${holidayName})이므로 발송을 스킵합니다.`);
+                logger.info(`[Scheduled Alimtalk] 오늘(${todayStr})은 공휴일(${holidayName})이므로 발송을 스킵합니다.`);
                 return;
             }
         }
@@ -151,7 +152,7 @@ export const sendInactiveOrgAlimtalkScheduled = onSchedule(
         const logRef = db.collection("system").doc("alimtalkLogs").collection("inactiveOrg").doc(thisMondayStr);
         const logDoc = await logRef.get();
         if (logDoc.exists && logDoc.data()?.sent) {
-            console.log(`[Scheduled Alimtalk] 이번 주(${thisMondayStr} 주간)는 이미 발송이 완료되었습니다.`);
+            logger.info(`[Scheduled Alimtalk] 이번 주(${thisMondayStr} 주간)는 이미 발송이 완료되었습니다.`);
             return;
         }
 
@@ -165,7 +166,7 @@ export const sendInactiveOrgAlimtalkScheduled = onSchedule(
         const lastMondayStartUtc = new Date(`${lastWeekMondayStr}T00:00:00+09:00`);
         const lastSundayEndUtc = new Date(`${lastWeekSundayStr}T23:59:59.999+09:00`);
 
-        console.log(`[Scheduled Alimtalk] 대상 가입일: ${lastWeekMondayStr} ~ ${lastWeekSundayStr}`);
+        logger.info(`[Scheduled Alimtalk] 대상 가입일: ${lastWeekMondayStr} ~ ${lastWeekSundayStr}`);
 
         // 4. 발송 대상 추출 및 발송
         const orgsSnap = await db.collection("organizations")
@@ -219,7 +220,7 @@ export const sendInactiveOrgAlimtalkScheduled = onSchedule(
             }
         }
 
-        console.log(`[Scheduled Alimtalk] 발송 완료: 성공 ${sentCount}, 실패 ${failCount}, 번호없음 ${noPhoneCount}`);
+        logger.info(`[Scheduled Alimtalk] 발송 완료: 성공 ${sentCount}, 실패 ${failCount}, 번호없음 ${noPhoneCount}`);
 
         await logRef.set({
             sent: true,

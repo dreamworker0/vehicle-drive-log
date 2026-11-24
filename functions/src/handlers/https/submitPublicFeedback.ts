@@ -3,6 +3,7 @@ import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { checkRateLimitByUid, checkRateLimitByIp, checkGlobalBudget } from "../../utils/rateLimit";
 import { resolveClientIp } from "../../utils/clientIp";
 import { GLOBAL_BUDGETS } from "../../utils/constants";
+import * as logger from "firebase-functions/logger";
 
 export const submitPublicFeedback = onCall(
     { 
@@ -70,7 +71,7 @@ export const submitPublicFeedback = onCall(
         } catch (error) {
             // Rate limit 에러는 그대로 전파
             if (error instanceof HttpsError) throw error;
-            console.error("public feedback error:", error);
+            logger.error("public feedback error:", error);
             throw new HttpsError("internal", "문의 등록 중 서버 오류가 발생했습니다.");
         }
     }

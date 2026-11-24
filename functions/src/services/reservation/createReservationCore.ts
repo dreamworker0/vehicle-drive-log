@@ -14,6 +14,7 @@ import { randomUUID } from "crypto";
 import { HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { isVehicleBlockedOn, isVehicleRetired, seoulTodayStr } from "../../utils/vehicleStatus";
+import * as logger from "firebase-functions/logger";
 
 const db = getFirestore();
 
@@ -186,7 +187,7 @@ export async function createReservationTx(
     // 조건에 맞지 않는 바로 운행 표시는 버린다(일반 예약으로 처리) — 승인 우회 방지
     const isQuickDrive = Boolean(requestedQuickDrive) && isGenuineQuickDrive({ date, startTime, groupId, recurringGroupId, source });
     if (requestedQuickDrive && !isQuickDrive) {
-        console.warn(`[createReservation] 바로 운행 조건 불일치로 일반 예약 처리: org=${organizationId} date=${date} start=${startTime}`);
+        logger.warn(`[createReservation] 바로 운행 조건 불일치로 일반 예약 처리: org=${organizationId} date=${date} start=${startTime}`);
     }
 
     // 호출자가 해당 기관에 소속되어 있는지 검증 (조직 격리)
@@ -430,7 +431,7 @@ export async function createReservationTx(
         });
     } catch (err: unknown) {
         if (err instanceof HttpsError) throw err;
-        console.error("createReservationTx 실패:", (err as Error).message);
+        logger.error("createReservationTx 실패:", (err as Error).message);
         throw new HttpsError("internal", "예약 생성에 실패했습니다.");
     }
 }

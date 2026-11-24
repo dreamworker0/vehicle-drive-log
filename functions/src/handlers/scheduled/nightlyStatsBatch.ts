@@ -30,6 +30,7 @@ import { runDailyAggregation, resolveRecentMonths, getRecentMonthWindows } from 
 import { computeAllDashboardStats, getDashboardLogScanStart } from "../../services/statistics/computeDashboardStats";
 import { loadNightlySharedData, type NightlySharedData } from "../../services/statistics/nightlySharedData";
 import { runStep, logBatchResult } from "../../utils/batchStep";
+import * as logger from "firebase-functions/logger";
 
 const CONTEXT = "nightlyStatsBatch";
 
@@ -56,9 +57,9 @@ export const nightlyStatsBatch = onSchedule(
         let shared: NightlySharedData | undefined;
         try {
             shared = await loadNightlySharedData(scanStart);
-            console.log(`[${CONTEXT}] 선로딩: orgs=${shared.orgDocs.length}, users=${shared.userDocs.length}, vehicles=${shared.vehicleDocs.length}, driveLogs=${shared.driveLogDocs.length} (from ${scanStart.toISOString()})`);
+            logger.info(`[${CONTEXT}] 선로딩: orgs=${shared.orgDocs.length}, users=${shared.userDocs.length}, vehicles=${shared.vehicleDocs.length}, driveLogs=${shared.driveLogDocs.length} (from ${scanStart.toISOString()})`);
         } catch (e) {
-            console.warn(`[${CONTEXT}] 선로딩 실패 — 각 스텝이 직접 읽는다:`, (e as Error).message);
+            logger.warn(`[${CONTEXT}] 선로딩 실패 — 각 스텝이 직접 읽는다:`, (e as Error).message);
         }
 
         await runStep(failed, CONTEXT, "dailyAggregation", () => runDailyAggregation(recentMonths, shared));

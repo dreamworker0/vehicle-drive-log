@@ -17,6 +17,7 @@ import {
 import {
     ScreenResult, isNonProfitDocument, normalizeStoredScreen, parseScreenResponse, buildOcrPrompt,
 } from "../../services/driveLog/documentScreen";
+import * as logger from "firebase-functions/logger";
 
 const tmapApiKey = defineString("TMAP_API_KEY");
 
@@ -83,7 +84,7 @@ export const autoVerifyDocument = onDocumentWritten(
             ? WHITELIST.find((w) => orgName.includes(w.name))
             : undefined;
         if (whitelistMatch) {
-            console.log(`[AutoVerify] ✅ 화이트리스트 기관 감지: ${orgName} (${orgId})`);
+            logger.info(`[AutoVerify] ✅ 화이트리스트 기관 감지: ${orgName} (${orgId})`);
             const db = getFirestore();
             const inviteCode = generateInviteCode();
             await db.doc(`organizations/${orgId}`).update({
@@ -104,7 +105,7 @@ export const autoVerifyDocument = onDocumentWritten(
             });
 
             // 초대코드는 재사용 가능한 민감정보이므로 로그에는 마스킹하여 남긴다
-            console.log(`[AutoVerify] 화이트리스트 자동 승인: ${orgName} (${orgId}), 초대코드: ${inviteCode.slice(0, 2)}****`);
+            logger.info(`[AutoVerify] 화이트리스트 자동 승인: ${orgName} (${orgId}), 초대코드: ${inviteCode.slice(0, 2)}****`);
 
             if (applicantEmail) {
                 await sendApprovalEmailServer(applicantEmail, orgName, inviteCode, applicantName);
@@ -121,7 +122,7 @@ export const autoVerifyDocument = onDocumentWritten(
         );
         if (blockedMatch) {
             const reason = `${blockedMatch.category}는 현재 서비스 대상이 아닙니다.`;
-            console.log(`[AutoVerify] 🚫 ${blockedMatch.category} 감지 → 자동 거절: ${orgName} (${orgId})`);
+            logger.info(`[AutoVerify] 🚫 ${blockedMatch.category} 감지 → 자동 거절: ${orgName} (${orgId})`);
             const db = getFirestore();
             await db.doc(`organizations/${orgId}`).update({
                 aiVerified: false,
@@ -136,7 +137,7 @@ export const autoVerifyDocument = onDocumentWritten(
             return;
         }
 
-        console.log(`[AutoVerify] 기관 ${orgName} (${orgId}) AI 분석 시작`);
+        logger.info(`[AutoVerify] 기관 ${orgName} (${orgId}) AI 분석 시작`);
 
         try {
 
@@ -147,7 +148,7 @@ export const autoVerifyDocument = onDocumentWritten(
 
             if (stored) {
                 result = stored;
-                console.log(`[AutoVerify] 접수 단계 판별 결과 재사용: ${result.documentType} (${orgId})`);
+                logger.info(`[AutoVerify] 접수 단계 판별 결과 재사용: ${result.documentType} (${orgId})`);
             } else {
                 // 반드시 현재 기관 경로의 증빙서류만 다운로드 (교차 테넌트 OCR 차단, 감사 #3)
                 const fileInfo = await downloadFileAsBase64(imagePath, `organizations/${orgId}/`);
@@ -175,12 +176,12 @@ export const autoVerifyDocument = onDocumentWritten(
                         result.address = tmapResult.address;
                         geoLat = tmapResult.lat;
                         geoLng = tmapResult.lng;
-                        console.log(`[AutoVerify] Tmap 주소 폴백 성공: ${tmapResult.address} (${geoLat}, ${geoLng})`);
+                        logger.info(`[AutoVerify] Tmap 주소 폴백 성공: ${tmapResult.address} (${geoLat}, ${geoLng})`);
                     } else {
-                        console.log(`[AutoVerify] Tmap 주소 폴백: 검색 결과 없음 (${orgName})`);
+                        logger.info(`[AutoVerify] Tmap 주소 폴백: 검색 결과 없음 (${orgName})`);
                     }
                 } catch (tmapErr: unknown) {
-                    console.warn("[AutoVerify] Tmap 주소 폴백 실패:", (tmapErr as Error).message);
+                    logger.warn("[AutoVerify] Tmap 주소 폴백 실패:", (tmapErr as Error).message);
                 }
             }
 
@@ -191,10 +192,10 @@ export const autoVerifyDocument = onDocumentWritten(
                     if (coords) {
                         geoLat = coords.lat;
                         geoLng = coords.lng;
-                        console.log(`[AutoVerify] Tmap geocoding 성공: ${result.address} → (${geoLat}, ${geoLng})`);
+                        logger.info(`[AutoVerify] Tmap geocoding 성공: ${result.address} → (${geoLat}, ${geoLng})`);
                     }
                 } catch (geoErr: unknown) {
-                    console.warn("[AutoVerify] Tmap geocoding 실패:", (geoErr as Error).message);
+                    logger.warn("[AutoVerify] Tmap geocoding 실패:", (geoErr as Error).message);
                 }
             }
 
@@ -259,7 +260,7 @@ export const autoVerifyDocument = onDocumentWritten(
                     (updateData.aiVerifyDetail as Record<string, unknown>).reason =
                         `동일한 고유번호(${result.uniqueNumber})로 이미 ${existingStatus} 기관이 있습니다. (신청자: ${existingApplicant}, 이메일: ${existingEmail})`;
 
-                    console.log(
+                    logger.info(
                         `[AutoVerify] 기관 ${orgName} (${orgId}) 중복 고유번호 거절: ${result.uniqueNumber} (기존 기관: ${existingOrg.name})`
                     );
 
@@ -279,12 +280,12 @@ export const autoVerifyDocument = onDocumentWritten(
                 updateData.approvedAt = new Date();
                 updateData.inviteCode = inviteCode;
 
-                console.log(`[AutoVerify] 기관 ${orgName} (${orgId}) AI 자동 승인! 초대코드: ${inviteCode.slice(0, 2)}****`);
+                logger.info(`[AutoVerify] 기관 ${orgName} (${orgId}) AI 자동 승인! 초대코드: ${inviteCode.slice(0, 2)}****`);
 
                 if (applicantEmail) {
                     await sendApprovalEmailServer(applicantEmail, orgName, inviteCode, applicantName);
                 } else {
-                    console.warn(`[AutoVerify] 신청자 이메일 없음, 이메일 발송 스킵`);
+                    logger.warn(`[AutoVerify] 신청자 이메일 없음, 이메일 발송 스킵`);
                 }
                 if (applicantPhone) {
                     await sendApprovalAlimtalk(applicantPhone, applicantName || orgName, orgName, inviteCode);
@@ -293,12 +294,12 @@ export const autoVerifyDocument = onDocumentWritten(
 
             await db.doc(`organizations/${orgId}`).update(updateData);
 
-            console.log(
+            logger.info(
                 `[AutoVerify] 기관 ${orgName} (${orgId}) AI 분석 완료:`,
                 aiVerified ? "승인 추천" : "거절 추천"
             );
         } catch (error: unknown) {
-            console.error(`[AutoVerify] 기관 ${orgName} (${orgId}) AI 분석 실패:`, error);
+            logger.error(`[AutoVerify] 기관 ${orgName} (${orgId}) AI 분석 실패:`, error);
         }
     }
 );

@@ -6,6 +6,7 @@ import { handleStatsOnCreate, handleStatsOnUpdate, handleStatsOnDelete } from ".
 import { applyDriveLogHipassDelta, usedAmountOf, hipassFieldsDropped, eventDedupeKey } from "../../services/hipass/applyBalanceDelta";
 import { driveLogRetentionCutoff } from "../../utils/constants";
 import { isOrgRetired } from "../../utils/orgRetirement";
+import * as logger from "firebase-functions/logger";
 
 const db = getFirestore();
 
@@ -251,7 +252,7 @@ export async function syncNextLogStartKm(
                     [KM_SYNC_REV_FIELD]: FieldValue.increment(1),
                 });
             }
-            console.warn(
+            logger.warn(
                 `[syncNextLogStartKm] 상한 ${MAX_DOCS_PER_RUN}건 도달 — 이어받기 표시 후 중단: org=${orgId}, veh=${vehicleId}`,
             );
             return { processed, lastEndKmDelta, reachedEnd: false, stoppedConsistent: false, truncated: true };
@@ -306,7 +307,7 @@ async function syncVehicleCurrentKmToLatestLog(
     const vehRef = db.collection("vehicles").doc(vehId);
     const vehSnap = await vehRef.get();
     if (!vehSnap.exists || vehSnap.data()?.organizationId !== orgId) {
-        console.warn(`[${context}] 차량 org 불일치 — currentKm 갱신 건너뜀: veh=${vehId}, org=${orgId}`);
+        logger.warn(`[${context}] 차량 org 불일치 — currentKm 갱신 건너뜀: veh=${vehId}, org=${orgId}`);
         return;
     }
     if (vehSnap.data()?.currentKm === km) return;
@@ -351,7 +352,7 @@ async function applyVehicleCurrentSite(
     const vehSnap = await db.collection("vehicles").doc(vehId).get();
     const veh = vehSnap.data();
     if (!vehSnap.exists || veh?.organizationId !== orgId) {
-        console.warn(`[applyVehicleCurrentSite] 차량 org 불일치 — 현재 위치 갱신 건너뜀: veh=${vehId}, org=${orgId}`);
+        logger.warn(`[applyVehicleCurrentSite] 차량 org 불일치 — 현재 위치 갱신 건너뜀: veh=${vehId}, org=${orgId}`);
         return;
     }
 
@@ -397,7 +398,7 @@ async function applyVehicleNeedsRefuel(
     const vehSnap = await db.collection("vehicles").doc(vehId).get();
     const veh = vehSnap.data();
     if (!vehSnap.exists || veh?.organizationId !== orgId) {
-        console.warn(`[applyVehicleNeedsRefuel] 차량 org 불일치 — 주유 필요 표시 건너뜀: veh=${vehId}, org=${orgId}`);
+        logger.warn(`[applyVehicleNeedsRefuel] 차량 org 불일치 — 주유 필요 표시 건너뜀: veh=${vehId}, org=${orgId}`);
         return;
     }
 
@@ -474,7 +475,7 @@ async function applyVehicleLastDriveNote(
     const vehSnap = await db.collection("vehicles").doc(vehId).get();
     const veh = vehSnap.data();
     if (!vehSnap.exists || veh?.organizationId !== orgId) {
-        console.warn(`[applyVehicleLastDriveNote] 차량 org 불일치 — 직전 비고 갱신 건너뜀: veh=${vehId}, org=${orgId}`);
+        logger.warn(`[applyVehicleLastDriveNote] 차량 org 불일치 — 직전 비고 갱신 건너뜀: veh=${vehId}, org=${orgId}`);
         return;
     }
 
@@ -569,7 +570,7 @@ async function applyVehicleCurrentSiteSafely(
     try {
         await applyVehicleCurrentSite(orgId, vehId, endSiteId, ts, isEffectivelyRetroactive);
     } catch (error) {
-        console.error(`[${context}] 차량 현재 위치 갱신 실패 (km 동기화는 계속 진행):`, error);
+        logger.error(`[${context}] 차량 현재 위치 갱신 실패 (km 동기화는 계속 진행):`, error);
         captureError(error, { context, vehId, orgId });
     }
 }
@@ -586,7 +587,7 @@ async function applyVehicleNeedsRefuelSafely(
     try {
         await applyVehicleNeedsRefuel(orgId, vehId, needsRefuel, ts, isEffectivelyRetroactive);
     } catch (error) {
-        console.error(`[${context}] 주유 필요 표시 갱신 실패 (km 동기화는 계속 진행):`, error);
+        logger.error(`[${context}] 주유 필요 표시 갱신 실패 (km 동기화는 계속 진행):`, error);
         captureError(error, { context, vehId, orgId });
     }
 }
@@ -609,7 +610,7 @@ async function applyVehicleLastDriveNoteSafely(
     try {
         await applyVehicleLastDriveNote(orgId, vehId, notes, driverName, ts, isEffectivelyRetroactive);
     } catch (error) {
-        console.error(`[${context}] 직전 비고 갱신 실패 (km 동기화는 계속 진행):`, error);
+        logger.error(`[${context}] 직전 비고 갱신 실패 (km 동기화는 계속 진행):`, error);
         captureError(error, { context, vehId, orgId });
     }
 }
@@ -624,7 +625,7 @@ async function clearVehicleLastDriveNoteSafely(
     try {
         await clearVehicleLastDriveNoteOnDelete(orgId, vehId, ts);
     } catch (error) {
-        console.error(`[${context}] 직전 비고 정리 실패 (km 동기화는 계속 진행):`, error);
+        logger.error(`[${context}] 직전 비고 정리 실패 (km 동기화는 계속 진행):`, error);
         captureError(error, { context, vehId, orgId });
     }
 }
@@ -685,7 +686,7 @@ export const onDriveLogCreated = onDocumentCreated(
             // [통합 트리거] 기관 통계 증분 업데이트
             await handleStatsOnCreate(orgId, data);
         } catch (error) {
-            console.error('[onDriveLogCreated] km 동기화 오류:', error);
+            logger.error('[onDriveLogCreated] km 동기화 오류:', error);
             captureError(error, { context: 'onDriveLogCreated', logId });
         }
     }
@@ -921,7 +922,7 @@ export const onDriveLogUpdated = onDocumentUpdated(
                 await handleStatsOnUpdate(finalOrgId, oldData, data);
             }
         } catch (error) {
-            console.error('[onDriveLogUpdated] km 동기화 오류:', error);
+            logger.error('[onDriveLogUpdated] km 동기화 오류:', error);
             captureError(error, { context: 'onDriveLogUpdated', logId });
         }
     }
@@ -1009,7 +1010,7 @@ export const onDriveLogDeleted = onDocumentDeleted(
                 await syncVehicleCurrentKmToLatestLog('onDriveLogDeleted', orgId, vehId, startKm);
             }
         } catch (error) {
-            console.error('[onDriveLogDeleted] km 동기화(삭제) 오류:', error);
+            logger.error('[onDriveLogDeleted] km 동기화(삭제) 오류:', error);
             captureError(error, { context: 'onDriveLogDeleted', logId });
         }
     }

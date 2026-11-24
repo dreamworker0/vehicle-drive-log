@@ -1,5 +1,6 @@
 import { onDocumentWritten } from "firebase-functions/v2/firestore";
 import { sendDiscordAlert } from "../../core/discord";
+import * as logger from "firebase-functions/logger";
 
 export const notifyRoleChange = onDocumentWritten(
     // cloud-functions.md §3.2의 기본값(256MiB). 문서 1건만 처리한다.
@@ -28,7 +29,7 @@ export const notifyRoleChange = onDocumentWritten(
                     { name: "이메일", value: email, inline: true },
                     { name: "추정 소속(Org ID)", value: orgId, inline: false }
                 ]
-            }).catch(e => console.error("Discord alert error:", e));
+            }).catch(e => logger.error("Discord alert error:", e));
         }
     }
 );

@@ -8,6 +8,7 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { checkRateLimitByUid } from "../../utils/rateLimit";
 import { RATE_LIMITS } from "../../utils/constants";
+import * as logger from "firebase-functions/logger";
 
 const db = getFirestore();
 
@@ -195,11 +196,11 @@ export const joinOrganization = onCall(
                         .doc(preRegDocId)
                         .delete();
                 } catch (err) {
-                    console.warn("사전 등록 문서 삭제 실패:", err);
+                    logger.warn("사전 등록 문서 삭제 실패:", err);
                 }
             }
 
-            console.log(
+            logger.info(
                 `[joinOrganization] 가입 완료: uid=${uid}, orgId=${orgId}, role=${role}`
             );
 
@@ -213,7 +214,7 @@ export const joinOrganization = onCall(
             // HttpsError는 그대로 throw
             if (err instanceof HttpsError) throw err;
 
-            console.error("[joinOrganization] 처리 실패:", err);
+            logger.error("[joinOrganization] 처리 실패:", err);
             throw new HttpsError(
                 "internal",
                 "기관 가입 처리에 실패했습니다. 다시 시도해주세요."
