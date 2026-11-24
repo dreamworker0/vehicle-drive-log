@@ -4,6 +4,7 @@ import {
     Tooltip, ResponsiveContainer,
 } from 'recharts';
 import { tooltipStyle, tooltipFormatter } from './dashboardUtils';
+import { CHART_NEUTRAL, CHART_SERIES } from '../../../lib/chartPalette';
 
 interface Props {
     dailyActiveUserStats: { date: string; users: number }[];
@@ -33,19 +34,19 @@ function ChartDAU({ dailyActiveUserStats }: Props) {
                         <AreaChart data={dailyActiveUserStats} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                             <defs>
                                 <linearGradient id="colorDau" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3} />
-                                    <stop offset="95%" stopColor="#06b6d4" stopOpacity={0} />
+                                    <stop offset="5%" stopColor={CHART_SERIES.cyan} stopOpacity={0.3} />
+                                    <stop offset="95%" stopColor={CHART_SERIES.cyan} stopOpacity={0} />
                                 </linearGradient>
                             </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-                            <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false}
-                                axisLine={{ stroke: '#4b5563' }} interval={Math.ceil(dailyActiveUserStats.length / 8)} />
-                            <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} allowDecimals={false} />
+                            <CartesianGrid strokeDasharray="3 3" stroke={CHART_NEUTRAL[700]} opacity={0.3} />
+                            <XAxis dataKey="date" tick={{ fontSize: 11, fill: CHART_NEUTRAL[400] }} tickLine={false}
+                                axisLine={{ stroke: CHART_NEUTRAL[600] }} interval={Math.ceil(dailyActiveUserStats.length / 8)} />
+                            <YAxis tick={{ fontSize: 11, fill: CHART_NEUTRAL[400] }} tickLine={false} axisLine={false} allowDecimals={false} />
                             <Tooltip {...tooltipStyle}
                                 formatter={tooltipFormatter('명', '활성 사용자')}
                             />
-                            <Area type="monotone" dataKey="users" stroke="#06b6d4" strokeWidth={2.5}
-                                fill="url(#colorDau)" dot={{ r: 2, fill: '#06b6d4' }} activeDot={{ r: 5, fill: '#06b6d4' }} />
+                            <Area type="monotone" dataKey="users" stroke={CHART_SERIES.cyan} strokeWidth={2.5}
+                                fill="url(#colorDau)" dot={{ r: 2, fill: CHART_SERIES.cyan }} activeDot={{ r: 5, fill: CHART_SERIES.cyan }} />
                         </AreaChart>
                     </ResponsiveContainer>
                 </div>

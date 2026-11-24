@@ -6,6 +6,7 @@ import {
 import { tooltipStyle } from './dashboardUtils';
 import type { ValueType, NameType } from 'recharts/types/component/DefaultTooltipContent';
 import type { TooltipContentProps } from 'recharts/types/component/Tooltip';
+import { CHART_NEUTRAL, CHART_SERIES } from '../../../lib/chartPalette';
 
 interface Props {
     inputMethodStats: { date: string; ocr: number; manual: number }[];
@@ -39,18 +40,18 @@ function ChartInputMethod({ inputMethodStats }: Props) {
                         <AreaChart data={inputMethodStats} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                             <defs>
                                 <linearGradient id="colorOcr" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4} />
-                                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.05} />
+                                    <stop offset="5%" stopColor={CHART_SERIES.violet} stopOpacity={0.4} />
+                                    <stop offset="95%" stopColor={CHART_SERIES.violet} stopOpacity={0.05} />
                                 </linearGradient>
                                 <linearGradient id="colorManual" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.4} />
-                                    <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.05} />
+                                    <stop offset="5%" stopColor={CHART_SERIES.cyan} stopOpacity={0.4} />
+                                    <stop offset="95%" stopColor={CHART_SERIES.cyan} stopOpacity={0.05} />
                                 </linearGradient>
                             </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-                            <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false}
-                                axisLine={{ stroke: '#4b5563' }} interval={Math.ceil(inputMethodStats.length / 8)} />
-                            <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} allowDecimals={false} />
+                            <CartesianGrid strokeDasharray="3 3" stroke={CHART_NEUTRAL[700]} opacity={0.3} />
+                            <XAxis dataKey="date" tick={{ fontSize: 11, fill: CHART_NEUTRAL[400] }} tickLine={false}
+                                axisLine={{ stroke: CHART_NEUTRAL[600] }} interval={Math.ceil(inputMethodStats.length / 8)} />
+                            <YAxis tick={{ fontSize: 11, fill: CHART_NEUTRAL[400] }} tickLine={false} axisLine={false} allowDecimals={false} />
                             <Tooltip {...tooltipStyle}
                                 content={({ active, payload, label }: TooltipContentProps<ValueType, NameType>) => {
                                     if (!active || !payload?.length) return null;
@@ -58,21 +59,21 @@ function ChartInputMethod({ inputMethodStats }: Props) {
                                     if (!data) return null;
                                     const total = data.ocr + data.manual;
                                     return (
-                                        <div style={{ background: '#1f2937', border: '1px solid #374151', borderRadius: 8, padding: '10px 14px', fontSize: 13 }}>
-                                            <p style={{ color: '#e5e7eb', fontWeight: 600, marginBottom: 6 }}>{label} <span style={{ color: '#9ca3af', fontWeight: 400 }}>총 {total}건</span></p>
-                                            <p style={{ color: '#8b5cf6', margin: '3px 0' }}>
+                                        <div style={{ background: CHART_NEUTRAL[800], border: `1px solid ${CHART_NEUTRAL[700]}`, borderRadius: 8, padding: '10px 14px', fontSize: 13 }}>
+                                            <p style={{ color: CHART_NEUTRAL[200], fontWeight: 600, marginBottom: 6 }}>{label} <span style={{ color: CHART_NEUTRAL[400], fontWeight: 400 }}>총 {total}건</span></p>
+                                            <p style={{ color: CHART_SERIES.violet, margin: '3px 0' }}>
                                                 📷 계기판 촬영: <b>{data.ocr}건</b>
                                             </p>
-                                            <p style={{ color: '#06b6d4', margin: '3px 0' }}>
+                                            <p style={{ color: CHART_SERIES.cyan, margin: '3px 0' }}>
                                                 ⌨️ 수동 입력: <b>{data.manual}건</b>
                                             </p>
                                         </div>
                                     );
                                 }} />
                             <Legend formatter={(value: string) => value === 'ocr' ? '📷 계기판 촬영' : '⌨️ 수동 입력'}
-                                wrapperStyle={{ fontSize: '13px', color: '#9ca3af' }} />
-                            <Area type="monotone" dataKey="manual" stackId="input" stroke="#06b6d4" strokeWidth={2} fill="url(#colorManual)" />
-                            <Area type="monotone" dataKey="ocr" stackId="input" stroke="#8b5cf6" strokeWidth={2} fill="url(#colorOcr)" />
+                                wrapperStyle={{ fontSize: '13px', color: CHART_NEUTRAL[400] }} />
+                            <Area type="monotone" dataKey="manual" stackId="input" stroke={CHART_SERIES.cyan} strokeWidth={2} fill="url(#colorManual)" />
+                            <Area type="monotone" dataKey="ocr" stackId="input" stroke={CHART_SERIES.violet} strokeWidth={2} fill="url(#colorOcr)" />
                         </AreaChart>
                     </ResponsiveContainer>
                 </div>

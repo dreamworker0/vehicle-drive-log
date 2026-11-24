@@ -7,8 +7,9 @@ import {
 } from 'recharts';
 import useChartTheme, { formatWonTick } from '../../hooks/useChartTheme';
 import { hourlyRange } from '../../hooks/utils/monthlyReportCalc';
+import { CHART_SERIES } from '../../lib/chartPalette';
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#f97316'];
+const COLORS = [CHART_SERIES.blue, CHART_SERIES.emerald, CHART_SERIES.amber, CHART_SERIES.red, CHART_SERIES.violet, CHART_SERIES.cyan, CHART_SERIES.pink, CHART_SERIES.orange];
 
 interface ChartPayloadEntry {
     value: number;
@@ -116,7 +117,7 @@ export default function ReportCharts({
                                 <XAxis type="number" tick={{ fontSize: 11, fill: t.tick }} unit="km" />
                                 <YAxis dataKey="name" type="category" width={70} tick={{ fontSize: 11, fill: t.tickStrong }} />
                                 <Tooltip content={<DistanceCountTooltip />} cursor={t.cursor} />
-                                <Bar dataKey="distance" name="주행거리" fill="#3b82f6" radius={[0, 4, 4, 0]} barSize={16} />
+                                <Bar dataKey="distance" name="주행거리" fill={CHART_SERIES.blue} radius={[0, 4, 4, 0]} barSize={16} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
@@ -131,7 +132,7 @@ export default function ReportCharts({
                                 <XAxis type="number" tick={{ fontSize: 11, fill: t.tick }} unit="km" />
                                 <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 11, fill: t.tickStrong }} />
                                 <Tooltip content={<DistanceCountTooltip />} cursor={t.cursor} />
-                                <Bar dataKey="distance" name="주행거리" fill="#10b981" radius={[0, 4, 4, 0]} barSize={16} />
+                                <Bar dataKey="distance" name="주행거리" fill={CHART_SERIES.emerald} radius={[0, 4, 4, 0]} barSize={16} />
                             </BarChart>
                         </ResponsiveContainer>
                     </div>
@@ -172,11 +173,11 @@ export default function ReportCharts({
                                 <XAxis dataKey="name" tick={{ fontSize: 12, fill: t.tickStrong }} />
                                 <YAxis tick={{ fontSize: 11, fill: t.tick }} allowDecimals={false} />
                                 <Tooltip content={<SimpleCountTooltip suffix="요일" />} />
-                                <Bar dataKey="count" fill="#8b5cf6" radius={[6, 6, 0, 0]} barSize={28}>
+                                <Bar dataKey="count" fill={CHART_SERIES.violet} radius={[6, 6, 0, 0]} barSize={28}>
                                     {dayOfWeekData.map((entry, index) => (
                                         <Cell
                                             key={`dow-${index}`}
-                                            fill={index === 0 || index === 6 ? '#f87171' : '#8b5cf6'}
+                                            fill={index === 0 || index === 6 ? CHART_SERIES.redLight : CHART_SERIES.violet}
                                             fillOpacity={entry.count > 0 ? 0.85 : 0.3}
                                         />
                                     ))}
@@ -196,11 +197,11 @@ export default function ReportCharts({
                                 <XAxis dataKey="hour" tick={{ fontSize: 10, fill: t.tickStrong }} interval={hourlyShown.length > 17 ? 2 : hourlyShown.length > 12 ? 1 : 0} />
                                 <YAxis tick={{ fontSize: 11, fill: t.tick }} allowDecimals={false} />
                                 <Tooltip content={<SimpleCountTooltip />} />
-                                <Bar dataKey="count" fill="#06b6d4" radius={[4, 4, 0, 0]} barSize={18}>
+                                <Bar dataKey="count" fill={CHART_SERIES.cyan} radius={[4, 4, 0, 0]} barSize={18}>
                                     {hourlyShown.map((entry, index) => (
                                         <Cell
                                             key={`hr-${index}`}
-                                            fill={entry.count > 0 ? '#06b6d4' : t.grid}
+                                            fill={entry.count > 0 ? CHART_SERIES.cyan : t.grid}
                                             fillOpacity={entry.count > 0 ? 0.85 : 0.4}
                                         />
                                     ))}
@@ -224,7 +225,7 @@ export default function ReportCharts({
                                 <XAxis dataKey="date" tick={{ fontSize: 11, fill: t.tickStrong }} />
                                 <YAxis tick={{ fontSize: 11, fill: t.tick }} allowDecimals={false} />
                                 <Tooltip content={<TrendTooltip />} />
-                                <Line type="monotone" dataKey="count" name="count" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 3, fill: '#3b82f6' }} activeDot={{ r: 5 }} />
+                                <Line type="monotone" dataKey="count" name="count" stroke={CHART_SERIES.blue} strokeWidth={2.5} dot={{ r: 3, fill: CHART_SERIES.blue }} activeDot={{ r: 5 }} />
                             </LineChart>
                         </ResponsiveContainer>
                     </div>
@@ -249,8 +250,8 @@ export default function ReportCharts({
                                     ]}
                                 />
                                 <Legend formatter={(v) => v === 'fuel' ? '주유비' : v === 'hipass' ? '하이패스' : '합계'} />
-                                <Area type="monotone" dataKey="fuel" name="fuel" stackId="1" fill="#f59e0b" fillOpacity={0.4} stroke="#f59e0b" strokeWidth={2} />
-                                <Area type="monotone" dataKey="hipass" name="hipass" stackId="1" fill="#8b5cf6" fillOpacity={0.4} stroke="#8b5cf6" strokeWidth={2} />
+                                <Area type="monotone" dataKey="fuel" name="fuel" stackId="1" fill={CHART_SERIES.amber} fillOpacity={0.4} stroke={CHART_SERIES.amber} strokeWidth={2} />
+                                <Area type="monotone" dataKey="hipass" name="hipass" stackId="1" fill={CHART_SERIES.violet} fillOpacity={0.4} stroke={CHART_SERIES.violet} strokeWidth={2} />
                             </AreaChart>
                         </ResponsiveContainer>
                     </div>
@@ -270,7 +271,7 @@ export default function ReportCharts({
                                     <XAxis type="number" tick={{ fontSize: 11, fill: t.tick }} tickFormatter={formatWonTick} />
                                     <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 11, fill: t.tickStrong }} />
                                     <Tooltip {...t.tooltip} cursor={t.cursor} formatter={(value) => [`${(value as number).toLocaleString()}원`, '주유비']} />
-                                    <Bar dataKey="cost" fill="#f59e0b" radius={[0, 6, 6, 0]} barSize={20} />
+                                    <Bar dataKey="cost" fill={CHART_SERIES.amber} radius={[0, 6, 6, 0]} barSize={20} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>
@@ -290,7 +291,7 @@ export default function ReportCharts({
                                     <XAxis type="number" tick={{ fontSize: 11, fill: t.tick }} tickFormatter={formatWonTick} />
                                     <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 11, fill: t.tickStrong }} />
                                     <Tooltip {...t.tooltip} cursor={t.cursor} formatter={(value) => [`${(value as number).toLocaleString()}원`, '충전액']} />
-                                    <Bar dataKey="amount" fill="#8b5cf6" radius={[0, 6, 6, 0]} barSize={20} />
+                                    <Bar dataKey="amount" fill={CHART_SERIES.violet} radius={[0, 6, 6, 0]} barSize={20} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </div>

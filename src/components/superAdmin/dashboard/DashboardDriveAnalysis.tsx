@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import HeatmapGrid from '../../common/HeatmapGrid';
 import { tooltipStyle, tooltipFormatter } from './dashboardUtils';
+import { CHART_NEUTRAL, CHART_SERIES } from '../../../lib/chartPalette';
 
 interface Props {
     heatmapData: { grid: number[][]; maxCount: number };
@@ -37,15 +38,15 @@ function DashboardDriveAnalysis({
                         <div>
                             <ResponsiveContainer width="100%" height={220} minWidth={1}>
                                 <BarChart data={hourlyStats} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} vertical={false} />
-                                    <XAxis dataKey="hour" tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false}
-                                        axisLine={{ stroke: '#4b5563' }} interval={1}
+                                    <CartesianGrid strokeDasharray="3 3" stroke={CHART_NEUTRAL[700]} opacity={0.3} vertical={false} />
+                                    <XAxis dataKey="hour" tick={{ fontSize: 10, fill: CHART_NEUTRAL[400] }} tickLine={false}
+                                        axisLine={{ stroke: CHART_NEUTRAL[600] }} interval={1}
                                         tickFormatter={(v: string) => v.replace('시', '')} />
-                                    <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false} allowDecimals={false} />
+                                    <YAxis tick={{ fontSize: 10, fill: CHART_NEUTRAL[400] }} tickLine={false} axisLine={false} allowDecimals={false} />
                                     <Tooltip {...tooltipStyle} formatter={tooltipFormatter('건', '출발 건수')} />
                                     <Bar dataKey="count" radius={[4, 4, 0, 0]}>
                                         {hourlyStats.map((entry, idx) => (
-                                            <Cell key={idx} fill={entry.count > 0 ? '#8b5cf6' : '#374151'} opacity={entry.count > 0 ? 0.85 : 0.3} />
+                                            <Cell key={idx} fill={entry.count > 0 ? CHART_SERIES.violet : CHART_NEUTRAL[700]} opacity={entry.count > 0 ? 0.85 : 0.3} />
                                         ))}
                                     </Bar>
                                 </BarChart>
@@ -66,17 +67,17 @@ function DashboardDriveAnalysis({
                                 <AreaChart data={monthlyGrowth} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                                     <defs>
                                         <linearGradient id="colorGrowth" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
-                                            <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                                            <stop offset="5%" stopColor={CHART_SERIES.emerald} stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor={CHART_SERIES.emerald} stopOpacity={0} />
                                         </linearGradient>
                                     </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-                                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false}
-                                        axisLine={{ stroke: '#4b5563' }}
+                                    <CartesianGrid strokeDasharray="3 3" stroke={CHART_NEUTRAL[700]} opacity={0.3} />
+                                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: CHART_NEUTRAL[400] }} tickLine={false}
+                                        axisLine={{ stroke: CHART_NEUTRAL[600] }}
                                         interval={monthlyGrowth.length > 8 ? Math.ceil(monthlyGrowth.length / 6) : 0} />
-                                    <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false} allowDecimals={false} />
+                                    <YAxis tick={{ fontSize: 10, fill: CHART_NEUTRAL[400] }} tickLine={false} axisLine={false} allowDecimals={false} />
                                     <Tooltip {...tooltipStyle} formatter={tooltipFormatter('개', '누적 기관')} />
-                                    <Area type="monotone" dataKey="cumulative" stroke="#10b981" strokeWidth={2} fill="url(#colorGrowth)" />
+                                    <Area type="monotone" dataKey="cumulative" stroke={CHART_SERIES.emerald} strokeWidth={2} fill="url(#colorGrowth)" />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
@@ -110,17 +111,17 @@ function DashboardDriveAnalysis({
                                 <AreaChart data={dailyAvgDuration} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                                     <defs>
                                         <linearGradient id="colorAvgDur" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#ec4899" stopOpacity={0.3} />
-                                            <stop offset="95%" stopColor="#ec4899" stopOpacity={0} />
+                                            <stop offset="5%" stopColor={CHART_SERIES.pink} stopOpacity={0.3} />
+                                            <stop offset="95%" stopColor={CHART_SERIES.pink} stopOpacity={0} />
                                         </linearGradient>
                                     </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-                                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false}
-                                        axisLine={{ stroke: '#4b5563' }} interval={Math.ceil(dailyAvgDuration.length / 8)} />
-                                    <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false}
+                                    <CartesianGrid strokeDasharray="3 3" stroke={CHART_NEUTRAL[700]} opacity={0.3} />
+                                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: CHART_NEUTRAL[400] }} tickLine={false}
+                                        axisLine={{ stroke: CHART_NEUTRAL[600] }} interval={Math.ceil(dailyAvgDuration.length / 8)} />
+                                    <YAxis tick={{ fontSize: 10, fill: CHART_NEUTRAL[400] }} tickLine={false} axisLine={false}
                                         allowDecimals={false} unit="분" />
                                     <Tooltip {...tooltipStyle} formatter={tooltipFormatter('분', '평균 주행시간')} />
-                                    <Area type="monotone" dataKey="avg" stroke="#ec4899" strokeWidth={2} fill="url(#colorAvgDur)" />
+                                    <Area type="monotone" dataKey="avg" stroke={CHART_SERIES.pink} strokeWidth={2} fill="url(#colorAvgDur)" />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
@@ -132,16 +133,16 @@ function DashboardDriveAnalysis({
                             <h3 className="text-sm font-medium text-surface-600 dark:text-surface-300 mb-2">⏰ 시간대별 평균 주행시간</h3>
                             <ResponsiveContainer width="100%" height={220} minWidth={1}>
                                 <BarChart data={hourlyAvgDuration} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} vertical={false} />
-                                    <XAxis dataKey="hour" tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false}
-                                        axisLine={{ stroke: '#4b5563' }} interval={1}
+                                    <CartesianGrid strokeDasharray="3 3" stroke={CHART_NEUTRAL[700]} opacity={0.3} vertical={false} />
+                                    <XAxis dataKey="hour" tick={{ fontSize: 10, fill: CHART_NEUTRAL[400] }} tickLine={false}
+                                        axisLine={{ stroke: CHART_NEUTRAL[600] }} interval={1}
                                         tickFormatter={(v: string) => v.replace('시', '')} />
-                                    <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false}
+                                    <YAxis tick={{ fontSize: 10, fill: CHART_NEUTRAL[400] }} tickLine={false} axisLine={false}
                                         allowDecimals={false} unit="분" />
                                     <Tooltip {...tooltipStyle} formatter={tooltipFormatter('분', '평균 주행시간')} />
                                     <Bar dataKey="avg" radius={[4, 4, 0, 0]}>
                                         {hourlyAvgDuration.map((entry, idx) => (
-                                            <Cell key={idx} fill={entry.avg > 0 ? '#f472b6' : '#374151'} opacity={entry.avg > 0 ? 0.85 : 0.3} />
+                                            <Cell key={idx} fill={entry.avg > 0 ? CHART_SERIES.pinkLight : CHART_NEUTRAL[700]} opacity={entry.avg > 0 ? 0.85 : 0.3} />
                                         ))}
                                     </Bar>
                                 </BarChart>
@@ -156,10 +157,10 @@ function DashboardDriveAnalysis({
                         <h3 className="text-sm font-medium text-surface-600 dark:text-surface-300 mb-2">🏢 기관별 평균 주행시간 (운행 10건 이상, 상위 15개)</h3>
                         <ResponsiveContainer width="100%" height={Math.max(200, orgAvgDuration.length * 32)} minWidth={1}>
                             <BarChart data={orgAvgDuration} layout="vertical" margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} horizontal={false} />
-                                <XAxis type="number" tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false}
+                                <CartesianGrid strokeDasharray="3 3" stroke={CHART_NEUTRAL[700]} opacity={0.3} horizontal={false} />
+                                <XAxis type="number" tick={{ fontSize: 10, fill: CHART_NEUTRAL[400] }} tickLine={false}
                                     axisLine={false} unit="분" />
-                                <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#d1d5db' }} tickLine={false}
+                                <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: CHART_NEUTRAL[300] }} tickLine={false}
                                     axisLine={false} width={100} />
                                 <Tooltip {...tooltipStyle} formatter={tooltipFormatter('분', '평균 주행시간')} />
                                 <Bar dataKey="avg" radius={[0, 4, 4, 0]}>

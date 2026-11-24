@@ -6,6 +6,7 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend,
 } from 'recharts';
 import useChartTheme, { formatWonTick } from '../../hooks/useChartTheme';
+import { CHART_SERIES } from '../../lib/chartPalette';
 
 const PRIORITY_STYLES: Record<string, string> = {
     high: 'border-l-red-500 bg-red-50/50 dark:bg-red-900/10',
@@ -152,9 +153,9 @@ export default function CostOptimization({
                                         }
                                         wrapperStyle={{ fontSize: '11px' }}
                                     />
-                                    <Bar dataKey="fuelCost" stackId="cost" stroke={t.surface} strokeWidth={2} fill="#3b82f6" radius={[0, 0, 0, 0]} />
-                                    <Bar dataKey="hipassCost" stackId="cost" stroke={t.surface} strokeWidth={2} fill="#10b981" radius={[0, 0, 0, 0]} />
-                                    <Bar dataKey="maintenanceCost" stackId="cost" stroke={t.surface} strokeWidth={2} fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                                    <Bar dataKey="fuelCost" stackId="cost" stroke={t.surface} strokeWidth={2} fill={CHART_SERIES.blue} radius={[0, 0, 0, 0]} />
+                                    <Bar dataKey="hipassCost" stackId="cost" stroke={t.surface} strokeWidth={2} fill={CHART_SERIES.emerald} radius={[0, 0, 0, 0]} />
+                                    <Bar dataKey="maintenanceCost" stackId="cost" stroke={t.surface} strokeWidth={2} fill={CHART_SERIES.amber} radius={[4, 4, 0, 0]} />
                                 </BarChart>
                             </ResponsiveContainer>
                         </>
@@ -208,7 +209,7 @@ export default function CostOptimization({
                                 <Bar dataKey="costPerKm" name="km당 비용" radius={[0, 6, 6, 0]} barSize={20}>
                                     {fuelItems.map((f, i) => {
                                         const isOver = avgCostPerKm > 0 && f.costPerKm > avgCostPerKm * 1.3;
-                                        return <Cell key={i} fill={isOver ? '#ef4444' : '#3b82f6'} />;
+                                        return <Cell key={i} fill={isOver ? CHART_SERIES.red : CHART_SERIES.blue} />;
                                     })}
                                 </Bar>
                             </BarChart>
