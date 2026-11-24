@@ -253,7 +253,7 @@ export default function HipassChargeLogManager() {
                                             <AdminEditedBadge lastEditedByUid={rec.lastEditedByUid} ownerUid={rec.chargerUid} />
                                         </div>
                                         <div className="flex items-center gap-2">
-                                            <span className="font-bold text-blue-600 dark:text-blue-400">{rec.chargeAmount?.toLocaleString()}원</span>
+                                            <span className="font-bold text-primary-600 dark:text-primary-400">{rec.chargeAmount?.toLocaleString()}원</span>
                                             <RecordRowActions onEdit={() => handleEdit(rec)} onDelete={() => handleDelete(rec)} />
                                         </div>
                                     </div>
@@ -286,7 +286,7 @@ export default function HipassChargeLogManager() {
                                         <p className="text-xs font-mono text-surface-500 dark:text-surface-400 truncate">{rec.cardNumber}</p>
                                     </div>
                                     <div className="text-right">
-                                        <span className="text-sm font-bold text-blue-600 dark:text-blue-400">{rec.chargeAmount?.toLocaleString()}원</span>
+                                        <span className="text-sm font-bold text-primary-600 dark:text-primary-400">{rec.chargeAmount?.toLocaleString()}원</span>
                                     </div>
                                     <div className="text-right">
                                         <span className="text-xs font-mono text-surface-500 dark:text-surface-400">{rec.balanceAfter?.toLocaleString()}원</span>

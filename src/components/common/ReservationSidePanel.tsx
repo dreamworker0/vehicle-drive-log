@@ -451,7 +451,7 @@ export default function ReservationSidePanel({
                                         setEndTimeTouched(true);
                                         setForm({ ...form, endTime: suggestedEndTime });
                                     }}
-                                    className="mt-2 w-full flex items-center justify-between gap-2 rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20 px-3 py-2 text-left text-xs text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors min-h-[40px]"
+                                    className="mt-2 w-full flex items-center justify-between gap-2 rounded-lg border border-primary-200 dark:border-primary-800 bg-primary-50 dark:bg-primary-900/20 px-3 py-2 text-left text-xs text-primary-700 dark:text-primary-300 hover:bg-primary-100 dark:hover:bg-primary-900/40 transition-colors min-h-[40px]"
                                 >
                                     <span>🕒 경로 기준 예상 종료 <strong className="font-semibold">{suggestedEndTime}</strong></span>
                                     <span className="shrink-0 font-semibold underline">적용</span>

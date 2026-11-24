@@ -214,7 +214,7 @@ export default function FAQPage() {
                                             title="이 질문 링크 복사"
                                         >
                                             {copiedIdx === idx ? (
-                                                <svg className="w-3.5 h-3.5 text-green-500 dark:text-green-400" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                                                <svg className="w-3.5 h-3.5 text-accent-500 dark:text-accent-400" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
                                                     <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                                                 </svg>
                                             ) : (
@@ -264,7 +264,7 @@ export default function FAQPage() {
             {copiedIdx !== null && (
                 <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-fade-in">
                     <div className="bg-surface-800 text-white text-sm px-4 py-2.5 rounded-xl shadow-lg flex items-center gap-2">
-                        <svg className="w-4 h-4 text-green-400 dark:text-green-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
+                        <svg className="w-4 h-4 text-accent-400 dark:text-accent-500" fill="none" viewBox="0 0 24 24" strokeWidth={2.5} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                         </svg>
                         Q{copiedIdx + 1} 링크가 복사되었어요!

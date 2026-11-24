@@ -172,12 +172,12 @@ export default function CalendarSyncTroubleshootModal({
                     {testResult !== null && (
                         <div className={`p-3.5 rounded-xl border text-sm ${
                             testResult.success
-                                ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800'
+                                ? 'bg-accent-50 dark:bg-accent-900/20 border-accent-200 dark:border-accent-800'
                                 : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800'
                         }`}>
                             <p className={`font-semibold mb-1 ${
                                 testResult.success
-                                    ? 'text-green-700 dark:text-green-400'
+                                    ? 'text-accent-700 dark:text-accent-400'
                                     : 'text-red-700 dark:text-red-400'
                             }`}>
                                 {testResult.success ? '✅ 연동 정상 확인!' : `❌ ${testResult.errorTitle || '연동 실패'}`}
@@ -186,7 +186,7 @@ export default function CalendarSyncTroubleshootModal({
                                 {testResult.message}
                             </p>
                             {testResult.success && (
-                                <p className="text-xs text-green-600 dark:text-green-400 mt-2 font-medium">
+                                <p className="text-xs text-accent-600 dark:text-accent-400 mt-2 font-medium">
                                     🎉 이제 차량 예약 시 Google 캘린더에 자동으로 기록됩니다.
                                 </p>
                             )}
@@ -227,7 +227,7 @@ export default function CalendarSyncTroubleshootModal({
                                     onClick={handleCopyEmail}
                                     className={`shrink-0 px-2.5 py-1.5 text-[11px] font-medium rounded-lg transition-colors ${
                                         emailCopied
-                                            ? 'bg-green-500 dark:bg-green-600 text-white'
+                                            ? 'bg-accent-500 dark:bg-accent-600 text-white'
                                             : 'bg-primary-500 dark:bg-primary-600 hover:bg-primary-600 dark:hover:bg-primary-700 text-white'
                                     }`}
                                 >

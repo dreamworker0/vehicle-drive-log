@@ -79,8 +79,8 @@ export default function ConsentGate() {
                         개정되어 <strong>{formatLegalVersion(PRIVACY_VERSION)}</strong>부터 시행됩니다.
                         바뀐 내용은 각 문서 끝의 개정 이력에서 확인할 수 있어요.
                     </p>
-                    <div className="rounded-xl bg-blue-50 border border-blue-200 px-4 py-3 dark:bg-blue-900/20 dark:border-blue-800">
-                        <p className="text-xs text-blue-700 dark:text-blue-400">
+                    <div className="rounded-xl bg-primary-50 border border-primary-200 px-4 py-3 dark:bg-primary-900/20 dark:border-primary-800">
+                        <p className="text-xs text-primary-700 dark:text-primary-400">
                             소속 <strong>기관이 개인정보처리자</strong>이며, 서비스 제공자는 기관의 위탁을 받아
                             개인정보를 처리하는 <strong>수탁자</strong>입니다. 기관 관리자로서 위탁에 동의해 주세요.
                         </p>

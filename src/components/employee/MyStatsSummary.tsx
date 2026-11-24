@@ -107,7 +107,7 @@ function ChangeIndicator({ value }: { value: number }) {
     if (value === 0) return null;
     const isUp = value > 0;
     return (
-        <span className={`text-[10px] font-medium ${isUp ? 'text-accent-600 dark:text-accent-400' : 'text-blue-600 dark:text-blue-400'}`}>
+        <span className={`text-[10px] font-medium ${isUp ? 'text-accent-600 dark:text-accent-400' : 'text-primary-600 dark:text-primary-400'}`}>
             {isUp ? '▲' : '▼'} {Math.abs(value)}%
         </span>
     );

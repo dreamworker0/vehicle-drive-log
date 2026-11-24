@@ -13,7 +13,7 @@ interface StatCardProps {
 
 function StatCard({ label, value, unit, icon, color, sub }: StatCardProps) {
     const colorMap: Record<string, string> = {
-        blue: 'from-blue-50 to-blue-100 border-blue-200 dark:from-blue-950/50 dark:to-blue-900/30 dark:border-blue-800/50',
+        blue: 'from-primary-50 to-primary-100 border-primary-200 dark:from-primary-950/50 dark:to-primary-900/30 dark:border-primary-800/50',
         green: 'from-emerald-50 to-emerald-100 border-emerald-200 dark:from-emerald-950/50 dark:to-emerald-900/30 dark:border-emerald-800/50',
         purple: 'from-purple-50 to-purple-100 border-purple-200 dark:from-purple-950/50 dark:to-purple-900/30 dark:border-purple-800/50',
         orange: 'from-orange-50 to-orange-100 border-orange-200 dark:from-orange-950/50 dark:to-orange-900/30 dark:border-orange-800/50',

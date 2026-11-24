@@ -232,13 +232,13 @@ export default function ReservationCard({
                                 </span>
                             )}
                             {reservation.groupId && !reservation.recurringGroupId && (
-                                <span className="inline-flex items-center gap-0.5 mt-0.5 text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300 rounded-full font-medium w-fit">
+                                <span className="inline-flex items-center gap-0.5 mt-0.5 text-[10px] px-1.5 py-0.5 bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-300 rounded-full font-medium w-fit">
                                     🔗 다일 예약
                                 </span>
                             )}
                             {reservation.routeDistance && (
                                 // 좁은 화면에서는 항목 단위로 줄을 넘긴다 — 항목 안에서 끊기면 "⏱ / 152 / 분"처럼 흩어진다.
-                                <p className="text-xs text-blue-500 dark:text-blue-400 flex flex-wrap items-center gap-x-2 mt-0.5">
+                                <p className="text-xs text-primary-500 dark:text-primary-400 flex flex-wrap items-center gap-x-2 mt-0.5">
                                     <span className="whitespace-nowrap">↔{Math.floor(reservation.routeDistance)}km</span>
                                     <span className="whitespace-nowrap">⏱{reservation.routeDuration}분</span>
                                     {(reservation.routeTollFee ?? 0) > 0 && <span className="whitespace-nowrap">₩{reservation.routeTollFee!.toLocaleString()}</span>}
@@ -275,7 +275,7 @@ export default function ReservationCard({
                                             <button
                                                 onClick={() => handleNavSelect(preferredApp)}
                                                 disabled={isButtonDisabled}
-                                                className={`w-full rounded-xl py-2.5 px-4 min-h-[48px] font-semibold text-sm ${isSoon ? 'bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700' : 'bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-600 dark:hover:bg-blue-500'} whitespace-nowrap shadow-sm transition-colors inline-flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed`}
+                                                className={`w-full rounded-xl py-2.5 px-4 min-h-[48px] font-semibold text-sm ${isSoon ? 'bg-surface-100 dark:bg-surface-800 text-surface-600 dark:text-surface-300 hover:bg-surface-200 dark:hover:bg-surface-700' : 'bg-primary-50 dark:bg-primary-900/30 text-primary-600 dark:text-primary-400 hover:bg-primary-600 dark:hover:bg-primary-500'} whitespace-nowrap shadow-sm transition-colors inline-flex items-center justify-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed`}
                                                 title={`${NAV_LABELS[preferredApp]} 길안내`}
                                             >
                                                 <span>🗺️</span>

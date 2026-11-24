@@ -158,9 +158,9 @@ export default function TermsPage() {
                     <section className="space-y-2">
                         <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200">제9조 (개인정보 처리의 위탁)</h2>
                         <div className="text-sm text-surface-600 dark:text-surface-400 leading-relaxed space-y-3">
-                            <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 dark:bg-blue-900/20 dark:border-blue-800">
-                                <p className="font-medium text-blue-800 dark:text-blue-300 mb-2">🏢 개인정보처리자는 기관입니다</p>
-                                <p className="text-blue-700 dark:text-blue-400 text-xs">
+                            <div className="bg-primary-50 border border-primary-200 rounded-xl px-4 py-3 dark:bg-primary-900/20 dark:border-primary-800">
+                                <p className="font-medium text-primary-800 dark:text-primary-300 mb-2">🏢 개인정보처리자는 기관입니다</p>
+                                <p className="text-primary-700 dark:text-primary-400 text-xs">
                                     서비스를 이용하는 <strong>기관이 소속 직원 개인정보의 개인정보처리자(위탁자)</strong>이며,
                                     서비스 제공자는 기관의 위탁을 받아 개인정보를 처리하는 <strong>수탁자</strong>입니다.
                                     기관은 서비스 이용을 신청할 때 또는 본 조 신설 이후 별도로 안내되는 재동의 절차를 통해

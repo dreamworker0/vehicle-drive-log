@@ -223,7 +223,7 @@ export default function FeedbackManagement() {
                                                             title="이메일 복사"
                                                         >
                                                             {copiedEmail === group.email ? (
-                                                                <svg className="w-3.5 h-3.5 text-green-500 dark:text-green-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                                                <svg className="w-3.5 h-3.5 text-accent-500 dark:text-accent-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                                                                     <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                                                                 </svg>
                                                             ) : (

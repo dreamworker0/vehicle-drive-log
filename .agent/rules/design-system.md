@@ -13,6 +13,8 @@ description: 차량 운행일지 앱 디자인 시스템 규칙. 새 컴포넌�
 
 > `src/index.css`의 `@theme`에 정의된 커스텀 색상 토큰만 사용한다. Tailwind 기본 `blue`, `green`, `slate` 등을 직접 쓰지 않는다.
 
+> `blue`·`green`·`slate`·`gray`는 `src/__tests__/lib/designTokenColors.test.ts`가 소스 전체에서 막는다(2026-11-25에 323곳 치환, 예외는 차량 색상 팔레트). `emerald`·`indigo`·`teal`·`cyan`은 아직 남아 있다. 이 넷은 토큰으로 바꾸면 색조가 눈에 띄게 달라지므로(OKLab ΔE 5~16), 화면별로 의도를 확인한 뒤 바꾼다. 새 코드에서는 쓰지 않는다.
+
 | 토큰 | 용도 | 실제 색상 |
 |------|------|-----------|
 | `primary-*` | 브랜드 색상, 주요 버튼, 활성 상태, 링크 | Blue 계열 (`#2563eb` 기준) |

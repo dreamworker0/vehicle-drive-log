@@ -11,13 +11,13 @@ import { CHART_SERIES } from '../../lib/chartPalette';
 const PRIORITY_STYLES: Record<string, string> = {
     high: 'border-l-red-500 bg-red-50/50 dark:bg-red-900/10',
     medium: 'border-l-amber-500 bg-amber-50/50 dark:bg-amber-900/10',
-    low: 'border-l-blue-500 bg-blue-50/50 dark:bg-blue-900/10',
+    low: 'border-l-primary-500 bg-primary-50/50 dark:bg-primary-900/10',
 };
 
 const PRIORITY_LABELS: Record<string, { text: string; color: string }> = {
     high: { text: '높음', color: 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900/30' },
     medium: { text: '보통', color: 'text-amber-600 bg-amber-100 dark:text-amber-400 dark:bg-amber-900/30' },
-    low: { text: '낮음', color: 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900/30' },
+    low: { text: '낮음', color: 'text-primary-600 bg-primary-100 dark:text-primary-400 dark:bg-primary-900/30' },
 };
 
 const SEVERITY_STYLES: Record<string, string> = {

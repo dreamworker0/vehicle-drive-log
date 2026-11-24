@@ -66,13 +66,13 @@ function ChartCalendarSync({ calendarSyncRatio, calendarTopOrgs, calendarSyncOrg
                             </ResponsiveContainer>
                             {/* 중앙 텍스트 */}
                             <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                <span className="text-3xl font-bold text-blue-500 dark:text-blue-400">{pct}%</span>
+                                <span className="text-3xl font-bold text-primary-500 dark:text-primary-400">{pct}%</span>
                                 <span className="text-xs text-surface-500 dark:text-surface-400">연동율</span>
                             </div>
                         </div>
                         <div className="space-y-3">
                             <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full bg-blue-500 dark:bg-blue-600" />
+                                <div className="w-3 h-3 rounded-full bg-primary-500 dark:bg-primary-600" />
                                 <span className="text-sm text-surface-600 dark:text-surface-300">연동됨</span>
                                 <span className="text-sm font-bold text-surface-800 dark:text-surface-100 ml-auto">{calendarSyncRatio.sync}대</span>
                             </div>
@@ -95,7 +95,7 @@ function ChartCalendarSync({ calendarSyncRatio, calendarTopOrgs, calendarSyncOrg
                             💡 캘린더 연동 인사이트
                         </h3>
                         {calendarSyncOrgs > 0 && (
-                            <span className="text-xs font-medium bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2.5 py-1 rounded-full border border-blue-200 dark:border-blue-800/50 shadow-sm">
+                            <span className="text-xs font-medium bg-primary-100 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 px-2.5 py-1 rounded-full border border-primary-200 dark:border-primary-800/50 shadow-sm">
                                 1대 이상 연동: {calendarSyncOrgs}개 기관
                             </span>
                         )}
@@ -122,7 +122,7 @@ function ChartCalendarSync({ calendarSyncRatio, calendarTopOrgs, calendarSyncOrg
                                             </span>
                                             <div className="flex-1 bg-surface-100 dark:bg-surface-700 rounded-full h-4 overflow-hidden">
                                                 <div
-                                                    className="h-full rounded-full bg-gradient-to-r from-blue-500 to-blue-400 flex items-center justify-end pr-1.5 transition-all duration-500"
+                                                    className="h-full rounded-full bg-gradient-to-r from-primary-500 to-primary-400 flex items-center justify-end pr-1.5 transition-all duration-500"
                                                     style={{ width: `${barWidth}%` }}
                                                 >
                                                     <span className="text-[10px] font-bold text-white">{org.count}대</span>

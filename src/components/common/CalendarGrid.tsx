@@ -80,7 +80,7 @@ export default function CalendarGrid({
                                             <div key={idx} className={`w-1 h-1 rounded-full ${
                                                 isSelected ? 'bg-white dark:bg-surface-800' :
                                                 isRecurring ? 'bg-purple-500' :
-                                                isGroup ? 'bg-blue-500' : 'bg-primary-500'
+                                                isGroup ? 'bg-primary-500' : 'bg-primary-500'
                                             }`} />
                                         );
                                     })}
