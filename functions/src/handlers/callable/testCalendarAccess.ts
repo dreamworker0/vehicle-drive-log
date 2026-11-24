@@ -28,7 +28,8 @@ export const testCalendarAccess = onCall(
     {
         region: "asia-northeast3",
         timeoutSeconds: 15,
-        memory: "256MiB",
+        // googleapis를 불러오면 256MiB를 넘어 500으로 죽는다(2026-11 이용 기관 신고) — cloud-functions.md §3.2
+        memory: "512MiB",
         enforceAppCheck: false,
         cors: true,
     },
