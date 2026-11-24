@@ -9,6 +9,7 @@
  * 재사용한다 → Gemini 호출은 신청 1건당 1회로 유지된다 (ocr-cost-security §1).
  */
 import { generateAiContent } from "../../core/gemini";
+import * as logger from "firebase-functions/logger";
 
 /**
  * documentType은 접수 차단과 자동 승인(aiVerified)을 모두 게이팅하므로 반드시 아래 enum으로만
@@ -160,7 +161,7 @@ export function parseScreenResponse(text: string): ScreenResult {
             result.nameMatch = parsed.nameMatch === true;
         }
     } catch (parseErr) {
-        console.warn("[DocumentScreen] JSON 파싱 실패:", parseErr);
+        logger.warn("[DocumentScreen] JSON 파싱 실패:", parseErr);
     }
 
     return applyBizScore(result);

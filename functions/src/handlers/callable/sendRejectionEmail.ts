@@ -10,6 +10,7 @@ import { requireSuperAdmin, escapeHtml } from "../../utils/helpers";
 import { createGmailTransporter, isGmailConfigured, systemMailFrom } from "../../core/mailer";
 import { maskEmail } from "../../utils/mask";
 import { GMAIL_APP_PASSWORD } from "../../core/params";
+import * as logger from "firebase-functions/logger";
 
 const SERVICE_URL = "https://drivelog.socialprism.co.kr";
 
@@ -34,7 +35,7 @@ export const sendRejectionEmail = onCall(
 
         // Gmail 환경변수 확인
         if (!isGmailConfigured()) {
-            console.error("GMAIL_USER 또는 GMAIL_APP_PASSWORD 환경변수가 설정되지 않았습니다.");
+            logger.error("GMAIL_USER 또는 GMAIL_APP_PASSWORD 환경변수가 설정되지 않았습니다.");
             throw new HttpsError("internal", "이메일 발송 설정이 완료되지 않았습니다.");
         }
 
@@ -80,10 +81,10 @@ export const sendRejectionEmail = onCall(
         try {
             const transporter = createGmailTransporter();
             await transporter.sendMail(mailOptions);
-            console.log(`반려 이메일 전송 완료: to=${maskEmail(recipientEmail)}, org=${orgName}`);
+            logger.info(`반려 이메일 전송 완료: to=${maskEmail(recipientEmail)}, org=${orgName}`);
             return { success: true };
         } catch (err: unknown) {
-            console.error("반려 이메일 전송 실패:", (err as Error).message);
+            logger.error("반려 이메일 전송 실패:", (err as Error).message);
             throw new HttpsError("internal", "이메일 발송에 실패했습니다.");
         }
     }

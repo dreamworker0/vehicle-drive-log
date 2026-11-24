@@ -14,6 +14,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { generateAiContent } from "../../core/gemini";
 import { sanitizePromptValue } from "../../utils/helpers";
 import { getSeoulNow, type AssistantVehicle } from "./parseIntent";
+import * as logger from "firebase-functions/logger";
 
 const db = getFirestore();
 
@@ -62,7 +63,7 @@ async function fetchReservationLines(organizationId: string, today: string): Pro
     if (items.length > MAX_ROWS) {
         // 상한 초과 시 최근(뒤쪽) 건 우선 유지 — 무음 절단 금지: 로그로 남긴다
         rows = items.slice(-MAX_ROWS);
-        console.log(`[answerDataQuestion] 예약 ${items.length}건 중 ${MAX_ROWS}건으로 절단 (org=${organizationId})`);
+        logger.info(`[answerDataQuestion] 예약 ${items.length}건 중 ${MAX_ROWS}건으로 절단 (org=${organizationId})`);
     }
 
     return rows.map((r) => {

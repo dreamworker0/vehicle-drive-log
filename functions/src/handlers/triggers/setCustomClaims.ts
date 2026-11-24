@@ -7,6 +7,7 @@
  */
 import { onDocumentWritten } from "firebase-functions/firestore";
 import { getAuth } from "firebase-admin/auth";
+import * as logger from "firebase-functions/logger";
 
 export const setCustomClaims = onDocumentWritten(
     {
@@ -23,7 +24,7 @@ export const setCustomClaims = onDocumentWritten(
             if (!after) {
                 // 문서 삭제 → Claims 초기화
                 await getAuth().setCustomUserClaims(uid, {});
-                console.log(`[CustomClaims] Claims 초기화: ${uid}`);
+                logger.info(`[CustomClaims] Claims 초기화: ${uid}`);
                 return;
             }
 
@@ -46,19 +47,19 @@ export const setCustomClaims = onDocumentWritten(
             }
 
             await getAuth().setCustomUserClaims(uid, newClaims);
-            console.log(
+            logger.info(
                 `[CustomClaims] Claims 설정 완료: ${uid} → role=${newClaims.role}, orgId=${newClaims.orgId}`
             );
         } catch (err: unknown) {
             // Auth에 존재하지 않는 UID인 경우 (문서만 있고 Auth 계정이 없는 경우)
             const authErr = err as { code?: string };
             if (authErr.code === "auth/user-not-found") {
-                console.warn(
+                logger.warn(
                     `[CustomClaims] Auth 계정 없음, Claims 설정 스킵: ${uid}`
                 );
                 return;
             }
-            console.error(`[CustomClaims] Claims 설정 실패: ${uid}`, err);
+            logger.error(`[CustomClaims] Claims 설정 실패: ${uid}`, err);
         }
     }
 );

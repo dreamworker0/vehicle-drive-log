@@ -1,5 +1,6 @@
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";
+import * as logger from "firebase-functions/logger";
 
 const db = getFirestore();
 
@@ -54,15 +55,15 @@ export async function sendPushToUser(uid: string, notification: Notification, da
             },
         });
 
-        console.log(`Push sent to ${uid}: ${notification.title}`);
+        logger.info(`Push sent to ${uid}: ${notification.title}`);
     } catch (err: unknown) {
         const error = err as { code?: string; message?: string };
         // 만료된 토큰이면 삭제
         if (error.code === "messaging/registration-token-not-registered") {
             await db.collection("users").doc(uid).update({ fcmToken: null });
-            console.log(`Expired token removed for ${uid}`);
+            logger.info(`Expired token removed for ${uid}`);
         } else {
-            console.error(`Push failed for ${uid}:`, error.message);
+            logger.error(`Push failed for ${uid}:`, error.message);
         }
     }
 }

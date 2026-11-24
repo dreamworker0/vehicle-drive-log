@@ -87,7 +87,10 @@
         },
         "transformIgnorePatterns": [
             "node_modules/(?!(jose)/)"
-        ]
+        ],
+        "moduleNameMapper": {
+            "^firebase-functions/logger$": "<rootDir>/test-support/consoleLogger.ts"
+        }
     },
     "private": true,
     "overrides": {

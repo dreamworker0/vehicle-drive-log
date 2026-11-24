@@ -29,6 +29,7 @@ import { driveLogRetentionCutoff } from "../../utils/constants";
 import { purgeOrganizationData, OrgNotRetiredError, type PurgeBucket } from "../../services/organization/purgeOrganizationData";
 import { gzip } from "node:zlib";
 import { promisify } from "node:util";
+import * as logger from "firebase-functions/logger";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const firestoreAdmin = require("@google-cloud/firestore");
@@ -204,7 +205,7 @@ export function describeBackupGap(state: Exclude<BackupState, "complete">, dateS
  * 보관 90일 · 매일 02:20 실행이므로 어제 폴더가 수명 주기로 지워질 일은 없다.
  */
 export async function verifyPreviousBackup() {
-    console.log("[Batch] Starting verifyPreviousBackup...");
+    logger.info("[Batch] Starting verifyPreviousBackup...");
     const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT;
     const bucketName = resolveBackupBucket(projectId);
     const backupBucket = getStorage().bucket(bucketName);
@@ -218,13 +219,13 @@ export async function verifyPreviousBackup() {
     } catch (e: unknown) {
         // 확인 실패는 백업 실패가 아니다. 목록 권한이 없다고 어제 백업이 없다고 단정하면
         // 헛경보가 된다 — 조용히 넘기되 로그에는 남긴다.
-        console.warn(`어제 백업 확인 실패 — 판정을 건너뛴다: ${(e as Error).message}`);
+        logger.warn(`어제 백업 확인 실패 — 판정을 건너뛴다: ${(e as Error).message}`);
         return;
     }
 
     const state = classifyBackupState(names, dateStr);
     if (state === "complete") {
-        console.log(`Previous backup verified: ${buildBackupUri(bucketName, dateStr)} (파일 ${names.length}건)`);
+        logger.info(`Previous backup verified: ${buildBackupUri(bucketName, dateStr)} (파일 ${names.length}건)`);
         return;
     }
 
@@ -234,7 +235,7 @@ export async function verifyPreviousBackup() {
         try {
             const [any] = await backupBucket.getFiles({ prefix: "backups/firestore/", maxResults: 1 });
             if (any.length === 0) {
-                console.log("백업 이력이 아직 없다 — 첫 배포 직후로 보고 어제 백업 확인을 건너뛴다.");
+                logger.info("백업 이력이 아직 없다 — 첫 배포 직후로 보고 어제 백업 확인을 건너뛴다.");
                 return;
             }
         } catch {
@@ -261,7 +262,7 @@ export async function verifyPreviousBackup() {
  * 만들어져도 비용만 두 배가 되는 중복 사본이다.
  */
 export async function backupFirestoreData() {
-    console.log("[Batch] Starting backupFirestore...");
+    logger.info("[Batch] Starting backupFirestore...");
     const projectId = process.env.GCLOUD_PROJECT || process.env.GCP_PROJECT;
     const bucketName = resolveBackupBucket(projectId);
     const backupBucket = getStorage().bucket(bucketName);
@@ -292,10 +293,10 @@ export async function backupFirestoreData() {
         const [existing] = await backupBucket.getFiles({ prefix: buildBackupPrefix(dateStr), maxResults: 1 });
         alreadyBackedUp = existing.length > 0;
     } catch (e: unknown) {
-        console.warn(`오늘 백업 존재 확인 실패 — 중복 검사 없이 export를 진행한다: ${(e as Error).message}`);
+        logger.warn(`오늘 백업 존재 확인 실패 — 중복 검사 없이 export를 진행한다: ${(e as Error).message}`);
     }
     if (alreadyBackedUp) {
-        console.log(`Firestore backup skipped: ${outputUri} 에 오늘 백업이 이미 있다 (중복 export 방지).`);
+        logger.info(`Firestore backup skipped: ${outputUri} 에 오늘 백업이 이미 있다 (중복 export 방지).`);
         warnDuplicateRun("오늘 백업이 이미 있어 export를 건너뜀", outputUri);
         return;
     }
@@ -310,13 +311,13 @@ export async function backupFirestoreData() {
             collectionIds: [],
         });
 
-        console.log(`Firestore backup started: ${outputUri}`);
-        console.log(`Operation: ${response.name}`);
+        logger.info(`Firestore backup started: ${outputUri}`);
+        logger.info(`Operation: ${response.name}`);
     } catch (e: unknown) {
         // 위 사전 확인과 이 호출 사이에 다른 실행이 먼저 export를 건 경우(동시 실행 경합).
         // 백업은 이미 있으므로 실패가 아니다 — 알림으로 올리지 않는다.
         if (isPathAlreadyExists(e)) {
-            console.log(`Firestore backup skipped: ${outputUri} 에 다른 실행이 이미 export를 걸었다.`);
+            logger.info(`Firestore backup skipped: ${outputUri} 에 다른 실행이 이미 export를 걸었다.`);
             warnDuplicateRun("다른 실행이 이미 export를 걸어 건너뜀", outputUri);
             return;
         }
@@ -334,7 +335,7 @@ export async function backupFirestoreData() {
  * 기관 하나가 중간에 실패해도 기관 문서가 남아 다음 주에 이어서 지운다.
  */
 export async function purgeOrgs(db: FirebaseFirestore.Firestore, bucket: PurgeBucket) {
-    console.log("[Batch] Starting purgeOrgs...");
+    logger.info("[Batch] Starting purgeOrgs...");
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -348,7 +349,7 @@ export async function purgeOrgs(db: FirebaseFirestore.Firestore, bucket: PurgeBu
         .get();
 
     if (deletedOrgsSnap.empty) {
-        console.log("No organizations to purge.");
+        logger.info("No organizations to purge.");
         return;
     }
 
@@ -360,14 +361,14 @@ export async function purgeOrgs(db: FirebaseFirestore.Firestore, bucket: PurgeBu
         try {
             const summary = await purgeOrganizationData(orgId, bucket, db);
             totalPurged++;
-            console.log(`Purged org "${orgName}" (${orgId}): ${JSON.stringify(summary.deleted)}`);
+            logger.info(`Purged org "${orgName}" (${orgId}): ${JSON.stringify(summary.deleted)}`);
         } catch (err: unknown) {
             // 대상 조회 뒤 처리 전에(또는 도중에) 복구된 기관 — 실패가 아니라 막아야 할 것을 막은 것이다.
             if (err instanceof OrgNotRetiredError) {
-                console.log(`Skipped org "${orgName}" (${orgId}): 파기 중 복구됨 — ${err.message}`);
+                logger.info(`Skipped org "${orgName}" (${orgId}): 파기 중 복구됨 — ${err.message}`);
                 continue;
             }
-            console.error(`Failed to purge org "${orgName}" (${orgId}):`, (err as Error).message);
+            logger.error(`Failed to purge org "${orgName}" (${orgId}):`, (err as Error).message);
             // 다른 루프(cleanupImages 등)와 달리 기관별로 올린다 — 파기는 처리방침이 약속한 법적
             // 의무라 실패를 사람이 알아야 하고, 대상이 주에 몇 곳뿐이라 알림이 쏟아질 일도 없다.
             // 기관 문서가 남아 있으므로 다음 주 배치가 이어서 지운다.
@@ -376,11 +377,11 @@ export async function purgeOrgs(db: FirebaseFirestore.Firestore, bucket: PurgeBu
             });
         }
     }
-    console.log(`Purge complete: ${totalPurged} organizations purged.`);
+    logger.info(`Purge complete: ${totalPurged} organizations purged.`);
 }
 
 export async function cleanupImages(db: FirebaseFirestore.Firestore, bucket: ReturnType<ReturnType<typeof getStorage>["bucket"]>) {
-    console.log("[Batch] Starting cleanupCertificateImages...");
+    logger.info("[Batch] Starting cleanupCertificateImages...");
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
@@ -398,7 +399,7 @@ export async function cleanupImages(db: FirebaseFirestore.Firestore, bucket: Ret
     const targetDocs = [...approvedSnap.docs, ...rejectedSnap.docs];
 
     if (targetDocs.length === 0) {
-        console.log("No certificate images to clean up.");
+        logger.info("No certificate images to clean up.");
         return;
     }
 
@@ -424,22 +425,22 @@ export async function cleanupImages(db: FirebaseFirestore.Firestore, bucket: Ret
                 const [exists] = await file.exists();
                 if (exists) {
                     await file.delete();
-                    console.log(`Deleted: ${filePath}`);
+                    logger.info(`Deleted: ${filePath}`);
                 }
             }
 
             await orgDoc.ref.update({ uniqueNumberImageUrl: "", uniqueNumberImagePath: "" });
             totalCleaned++;
-            console.log(`Cleaned certificate for "${orgName}" (${orgId})`);
+            logger.info(`Cleaned certificate for "${orgName}" (${orgId})`);
         } catch (err: unknown) {
-            console.error(`Failed to clean certificate for "${orgName}" (${orgId}):`, (err as Error).message);
+            logger.error(`Failed to clean certificate for "${orgName}" (${orgId}):`, (err as Error).message);
         }
     }
-    console.log(`Certificate cleanup complete: ${totalCleaned} images deleted.`);
+    logger.info(`Certificate cleanup complete: ${totalCleaned} images deleted.`);
 }
 
 export async function archiveLogs(db: FirebaseFirestore.Firestore, bucket: ReturnType<ReturnType<typeof getStorage>["bucket"]>) {
-    console.log("[Batch] Starting archiveDriveLogs...");
+    logger.info("[Batch] Starting archiveDriveLogs...");
     // 경계는 constants의 단일 원본을 쓴다 — onDriveLogDeleted의 하이패스 환불이 같은 값을
     // 보고 "이건 보존 기한 정리이지 사용자의 취소가 아니다"를 판정한다.
     const cutoff = driveLogRetentionCutoff();
@@ -499,10 +500,10 @@ function insuranceDaysLeft(expiry: string): number {
  *         만료일을 갱신해 값이 바뀌면 다시 알림된다.
  */
 export async function checkInsuranceExpiry(db: FirebaseFirestore.Firestore) {
-    console.log("[Batch] Starting checkInsuranceExpiry...");
+    logger.info("[Batch] Starting checkInsuranceExpiry...");
     const vehiclesSnap = await db.collection("vehicles").get();
     if (vehiclesSnap.empty) {
-        console.log("No vehicles to check.");
+        logger.info("No vehicles to check.");
         return;
     }
 
@@ -527,7 +528,7 @@ export async function checkInsuranceExpiry(db: FirebaseFirestore.Firestore) {
     }
 
     if (targets.length === 0) {
-        console.log("No insurance expiry notifications needed.");
+        logger.info("No insurance expiry notifications needed.");
         return;
     }
 
@@ -558,10 +559,10 @@ export async function checkInsuranceExpiry(db: FirebaseFirestore.Firestore) {
             await t.ref.update({ insuranceExpiryNotifiedFor: t.expiry });
             notified++;
         } catch (err: unknown) {
-            console.error(`Insurance expiry notify failed for vehicle ${t.ref.id}:`, (err as Error).message);
+            logger.error(`Insurance expiry notify failed for vehicle ${t.ref.id}:`, (err as Error).message);
         }
     }
-    console.log(`Insurance expiry check complete: ${notified} vehicles notified.`);
+    logger.info(`Insurance expiry check complete: ${notified} vehicles notified.`);
 }
 
 const CONTEXT = "dailyNightlyBatch";

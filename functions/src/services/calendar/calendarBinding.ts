@@ -29,6 +29,7 @@
 import { createHash } from "node:crypto";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { captureWarning } from "../../core/sentry";
+import * as logger from "firebase-functions/logger";
 
 /** 바인딩 문서 컬렉션 — 서버(Admin SDK) 전용. firestore.rules에서 클라이언트 접근을 막는다. */
 const COLLECTION = "calendarBindings";
@@ -116,7 +117,7 @@ export async function isCalendarBoundToOrg(
 
     // 서비스 계정 주소는 어느 기관의 캘린더도 아니다 — 바인딩 조회 없이 즉시 거절한다.
     if (isServiceAccountAddress(normalized)) {
-        console.error(JSON.stringify({
+        logger.error(JSON.stringify({
             severity: "ERROR",
             functionName: ctx.logName,
             message: "캘린더 ID 칸에 서비스 계정 주소가 들어와 있다 — 동기화 차단 (공유 대상 주소를 잘못 입력한 설정 오류)",
@@ -164,7 +165,7 @@ export async function isCalendarBoundToOrg(
         if (owner === organizationId) return decide(true);
 
         // 교차 테넌트 시도 — 캘린더 API를 부르기 전에 끊는다.
-        console.error(JSON.stringify({
+        logger.error(JSON.stringify({
             severity: "ERROR",
             functionName: ctx.logName,
             message: "다른 기관에 귀속된 캘린더 ID — 동기화 차단",
@@ -186,7 +187,7 @@ export async function isCalendarBoundToOrg(
         return decide(false);
     } catch (err) {
         // 조회 자체가 실패한 경우 — 캐시에 남기지 않는다(다음 실행에서 다시 판정).
-        console.error(JSON.stringify({
+        logger.error(JSON.stringify({
             severity: "ERROR",
             functionName: ctx.logName,
             message: "캘린더 바인딩 확인 실패 — 동기화 건너뜀",

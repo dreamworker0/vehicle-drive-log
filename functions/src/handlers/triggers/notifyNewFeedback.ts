@@ -13,6 +13,7 @@ import { sendDiscordAlert } from "../../core/discord";
 import { log } from "../../utils/helpers";
 import { checkRateLimitBySubject } from "../../utils/rateLimit";
 import { GLOBAL_BUDGETS } from "../../utils/constants";
+import * as logger from "firebase-functions/logger";
 const db = getFirestore();
 
 /**
@@ -61,7 +62,7 @@ export const notifyNewFeedback = onDocumentCreated(
         const message: string = data.message || data.content || "";
 
         if (!message.trim()) {
-            console.log("[notifyNewFeedback] 빈 의견 — 알림 생략");
+            logger.info("[notifyNewFeedback] 빈 의견 — 알림 생략");
             return;
         }
 
@@ -89,7 +90,7 @@ export const notifyNewFeedback = onDocumentCreated(
                     orgName = orgDoc.data()?.name || "";
                 }
             } catch (e) {
-                console.warn("[notifyNewFeedback] 기관명 조회 실패:", e);
+                logger.warn("[notifyNewFeedback] 기관명 조회 실패:", e);
             }
         }
 
@@ -104,6 +105,6 @@ export const notifyNewFeedback = onDocumentCreated(
                 { name: "분류", value: category, inline: true },
                 { name: "내용", value: message, inline: false },
             ],
-        }).catch(e => console.error("Discord alert error:", e));
+        }).catch(e => logger.error("Discord alert error:", e));
     }
 );

@@ -6,6 +6,7 @@ import { sendDiscordAlert } from "../../core/discord";
 import { createGmailTransporter, isGmailConfigured, systemMailFrom } from "../../core/mailer";
 import { escapeHtml } from "../../utils/helpers";
 import { GMAIL_APP_PASSWORD } from "../../core/params";
+import * as logger from "firebase-functions/logger";
 
 export const notifyNewApplication = onDocumentWritten(
     // cloud-functions.md §3.2의 기본값(256MiB). 문서 1건만 처리한다.
@@ -37,11 +38,11 @@ export const notifyNewApplication = onDocumentWritten(
                     { name: "신청자 연락처", value: orgPhone, inline: true },
                     { name: "기관 이메일", value: orgEmail, inline: true }
                 ]
-            }).catch(e => console.error("Discord alert error:", e));
+            }).catch(e => logger.error("Discord alert error:", e));
 
             // 기존 이메일 알림 로직
             if (!isGmailConfigured()) {
-                console.error("GMAIL_USER 또는 GMAIL_APP_PASSWORD 환경변수가 설정되지 않았습니다.");
+                logger.error("GMAIL_USER 또는 GMAIL_APP_PASSWORD 환경변수가 설정되지 않았습니다.");
                 return;
             }
 
@@ -101,9 +102,9 @@ export const notifyNewApplication = onDocumentWritten(
             try {
                 const transporter = createGmailTransporter();
                 await transporter.sendMail(mailOptions);
-                console.log(`신청 알림 이메일 전송 완료: org=${orgId}, name=${orgName}`);
+                logger.info(`신청 알림 이메일 전송 완료: org=${orgId}, name=${orgName}`);
             } catch (err: unknown) {
-                console.error("신청 알림 이메일 전송 실패:", (err as Error).message);
+                logger.error("신청 알림 이메일 전송 실패:", (err as Error).message);
             }
         } 
         
@@ -120,7 +121,7 @@ export const notifyNewApplication = onDocumentWritten(
                 fields: [
                     { name: "신청자", value: applicantName, inline: true }
                 ]
-            }).catch(e => console.error("Discord alert error:", e));
+            }).catch(e => logger.error("Discord alert error:", e));
         }
 
         // 3. 기관 승인 완료 알림
@@ -132,7 +133,7 @@ export const notifyNewApplication = onDocumentWritten(
                 fields: [
                     { name: "신청자", value: applicantName, inline: true }
                 ]
-            }).catch(e => console.error("Discord alert error:", e));
+            }).catch(e => logger.error("Discord alert error:", e));
         }
     }
 );

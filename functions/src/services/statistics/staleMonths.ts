@@ -1,5 +1,6 @@
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getKSTMonthKey } from "../../utils/kstDate";
+import * as logger from "firebase-functions/logger";
 
 /**
  * 소급 입력·수정·삭제로 **다시 집계해야 하는 지난달**을 표시한다.
@@ -56,6 +57,6 @@ export async function markStaleMonths(
         await getFirestore().collection("orgStats").doc(orgId)
             .set({ staleMonths: FieldValue.arrayUnion(...months) }, { merge: true });
     } catch (error) {
-        console.error(`[markStaleMonths] 재집계 표시 실패 (${orgId}: ${months.join(",")}):`, error);
+        logger.error(`[markStaleMonths] 재집계 표시 실패 (${orgId}: ${months.join(",")}):`, error);
     }
 }

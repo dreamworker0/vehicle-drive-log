@@ -9,6 +9,7 @@ import { getFirestore } from "firebase-admin/firestore";
 import { sendReminderAlimtalk } from "../../services/alimtalk/sendAlimtalk";
 import { requireSuperAdmin } from "../../utils/helpers";
 import { ALIMTALK_PROXY_TOKEN } from "../../core/params";
+import * as logger from "firebase-functions/logger";
 
 export const sendBulkReminder = onCall(
     { region: "asia-northeast3", timeoutSeconds: 120, enforceAppCheck: true, secrets: [ALIMTALK_PROXY_TOKEN] },
@@ -72,7 +73,7 @@ export const sendBulkReminder = onCall(
             });
         }
 
-        console.log(`[BulkReminder] 완료: 성공 ${sentCount}, 실패 ${failCount}, 번호없음 ${noPhoneCount}`);
+        logger.info(`[BulkReminder] 완료: 성공 ${sentCount}, 실패 ${failCount}, 번호없음 ${noPhoneCount}`);
 
         return { sentCount, failCount, noPhoneCount, results };
     }

@@ -6,6 +6,7 @@
  */
 import { onDocumentCreated } from "firebase-functions/firestore";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
+import * as logger from "firebase-functions/logger";
 
 const db = getFirestore();
 
@@ -31,7 +32,7 @@ export const trackFirstEmployee = onDocumentCreated(
             const orgSnap = await orgRef.get();
 
             if (!orgSnap.exists) {
-                console.warn(
+                logger.warn(
                     `[trackFirstEmployee] 기관 문서 없음: ${orgId}`
                 );
                 return;
@@ -73,11 +74,11 @@ export const trackFirstEmployee = onDocumentCreated(
 
             await orgRef.update(updateData);
 
-            console.log(
+            logger.info(
                 `[trackFirstEmployee] 기록 완료: orgId=${orgId}, days=${updateData.timeToFirstEmployeeDays ?? "N/A"}`
             );
         } catch (err) {
-            console.error(
+            logger.error(
                 `[trackFirstEmployee] 처리 실패: orgId=${orgId}`,
                 err
             );

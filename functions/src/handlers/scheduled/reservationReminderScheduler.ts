@@ -11,6 +11,7 @@ import { warmupOcrFunction } from "../../services/ocr/warmupOcr";
 import { recordHeartbeat } from "../../utils/helpers";
 import { SLACK_TOKEN_ENC_KEY } from "../../core/params";
 import { flushSentry } from "../../core/sentry";
+import * as logger from "firebase-functions/logger";
 
 export const reservationReminder = onSchedule(
     {
@@ -58,7 +59,7 @@ export const reservationReminder = onSchedule(
         try {
             await warmupOcrFunction();
         } catch (err) {
-            console.warn("[Warmup] OCR 워밍업 실패 (무시):", (err as Error).message);
+            logger.warn("[Warmup] OCR 워밍업 실패 (무시):", (err as Error).message);
         }
 
         await recordHeartbeat("reservationReminder");

@@ -30,6 +30,7 @@ import type { Auth, UserRecord } from "firebase-admin/auth";
 import type { Firestore } from "firebase-admin/firestore";
 import { FieldValue } from "firebase-admin/firestore";
 import type { PurgeBucket } from "../organization/purgeOrganizationData";
+import * as logger from "firebase-functions/logger";
 
 /** 소속 없이 이 기간 넘게 활동이 없으면 정리 대상이다 */
 export const INACTIVE_DAYS = 90;
@@ -147,7 +148,7 @@ export async function cleanupOrphanAuthAccounts(
                     await bucket.deleteFiles({ prefix: `feedbacks/ocr-report/${uid}/` });
                 } catch (error) {
                     // 계정은 이미 지워졌다 — 남은 조각은 로그로 남기고 다음 계정으로 간다
-                    console.error(`[cleanupOrphanAuthAccounts] uid 데이터 정리 실패: ${uid}`, (error as Error).message);
+                    logger.error(`[cleanupOrphanAuthAccounts] uid 데이터 정리 실패: ${uid}`, (error as Error).message);
                 }
             }
         }
@@ -157,6 +158,6 @@ export async function cleanupOrphanAuthAccounts(
         lastRunAt: FieldValue.serverTimestamp(),
         lastResult: { ...result, inactiveDays: INACTIVE_DAYS },
     }, { merge: true });
-    console.log(`[cleanupOrphanAuthAccounts] ${JSON.stringify(result)}`);
+    logger.info(`[cleanupOrphanAuthAccounts] ${JSON.stringify(result)}`);
     return result;
 }

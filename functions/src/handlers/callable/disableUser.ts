@@ -6,6 +6,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
+import * as logger from "firebase-functions/logger";
 
 export const disableUser = onCall(
     {
@@ -70,16 +71,16 @@ export const disableUser = onCall(
                 const code = (authErr as { code?: string }).code;
                 if (code === "auth/user-not-found") {
                     // Firestore 문서만 있고 Auth 계정이 없는 경우 — 문서 비활성화로 충분
-                    console.warn(`직원 비활성화: Auth 계정 없음, Firestore status만 적용 (${uid})`);
+                    logger.warn(`직원 비활성화: Auth 계정 없음, Firestore status만 적용 (${uid})`);
                 } else {
                     throw authErr;
                 }
             }
 
-            console.log(`직원 비활성화 완료: ${uid} (호출자: ${request.auth.uid})`);
+            logger.info(`직원 비활성화 완료: ${uid} (호출자: ${request.auth.uid})`);
             return { success: true };
         } catch (err: unknown) {
-            console.error("직원 비활성화 실패:", (err as Error).message);
+            logger.error("직원 비활성화 실패:", (err as Error).message);
             if (err instanceof HttpsError) throw err;
             throw new HttpsError("internal", "직원 비활성화 중 오류가 발생했습니다.");
         }

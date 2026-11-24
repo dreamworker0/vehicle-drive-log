@@ -19,6 +19,7 @@ import { HttpsError } from "firebase-functions/v2/https";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import type { DocumentData, DocumentReference } from "firebase-admin/firestore";
 import { isVehicleBlockedOn, isVehicleRetired, seoulTodayStr } from "../../utils/vehicleStatus";
+import * as logger from "firebase-functions/logger";
 
 const db = getFirestore();
 
@@ -297,7 +298,7 @@ export async function updateReservationTx(
         });
     } catch (err: unknown) {
         if (err instanceof HttpsError) throw err;
-        console.error("updateReservationTx 실패:", (err as Error).message);
+        logger.error("updateReservationTx 실패:", (err as Error).message);
         throw new HttpsError("internal", "예약 수정에 실패했습니다.");
     }
 }

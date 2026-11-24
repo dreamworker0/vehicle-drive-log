@@ -6,6 +6,7 @@
  */
 import { generateAiContent } from "../../core/gemini";
 import { sanitizePromptValue } from "../../utils/helpers";
+import * as logger from "firebase-functions/logger";
 
 export interface AssistantVehicle {
     id: string;
@@ -77,7 +78,7 @@ function extractJson(text: string): Record<string, unknown> | null {
         if (!jsonMatch) return null;
         return JSON.parse(jsonMatch[0]) as Record<string, unknown>;
     } catch {
-        console.error("[parseIntent] JSON 파싱 실패:", text.slice(0, 300));
+        logger.error("[parseIntent] JSON 파싱 실패:", text.slice(0, 300));
         return null;
     }
 }

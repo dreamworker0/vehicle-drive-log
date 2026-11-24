@@ -6,6 +6,7 @@ import { onCall } from "firebase-functions/https";
 import { defineString } from "firebase-functions/params";
 import { getFirestore } from "firebase-admin/firestore";
 import { requireSuperAdmin } from "../../utils/helpers";
+import * as logger from "firebase-functions/logger";
 
 const tmapApiKey = defineString("TMAP_API_KEY");
 
@@ -33,7 +34,7 @@ async function geocodeByTmapBackfill(address: string, apiKey: string): Promise<{
             if (lat && lng) return { lat, lng };
         }
     } catch (err: unknown) {
-        console.warn("[Backfill] Tmap geocoding 실패:", (err as Error).message);
+        logger.warn("[Backfill] Tmap geocoding 실패:", (err as Error).message);
     }
     return null;
 }
@@ -81,17 +82,17 @@ export const backfillOrgCoords = onCall(
                     ...(!data.address && data.aiVerifyDetail?.address ? { address: data.aiVerifyDetail.address } : {}),
                 });
                 updated++;
-                console.log(`[Backfill] ${data.name}: ${address} -> (${coords.lat}, ${coords.lng})`);
+                logger.info(`[Backfill] ${data.name}: ${address} -> (${coords.lat}, ${coords.lng})`);
             } else {
                 failed++;
-                console.warn(`[Backfill] ${data.name}: 좌표 변환 실패 (${address})`);
+                logger.warn(`[Backfill] ${data.name}: 좌표 변환 실패 (${address})`);
             }
 
             await new Promise(r => setTimeout(r, 100));
         }
 
         const result = { total: orgSnap.size, updated, skipped, failed };
-        console.log("[Backfill] 완료:", result);
+        logger.info("[Backfill] 완료:", result);
         return result;
     }
 );

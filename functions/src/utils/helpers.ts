@@ -9,6 +9,7 @@ import { HttpsError, CallableRequest } from "firebase-functions/v2/https";
 import { captureError, flushSentry } from "../core/sentry";
 import { checkRateLimitByUid, type RateLimitFailMode } from "../utils/rateLimit";
 import { getRateLimits, type RateLimitKey } from "../utils/constants";
+import * as logger from "firebase-functions/logger";
 
 type Severity = "DEBUG" | "INFO" | "WARNING" | "ERROR";
 
@@ -31,7 +32,12 @@ export async function verifyAuthToken(req: Request): Promise<string | null> {
 
 /**
  * 구조화 로깅 — Cloud Logging에서 severity 기반 필터링 가능
+ *
+ * 이 함수는 JSON 한 줄을 직접 console로 찍는다(Cloud Logging이 severity·필드를 파싱한다) —
+ * functions의 no-console 규칙에서 유일하게 허용하는 자리다. 다른 곳은 firebase-functions/logger를 쓴다.
+ * ERROR는 captureError로 Sentry·Discord 알림까지 보낸다 — 알림이 필요 없는 오류는 logger.error.
  */
+/* eslint-disable no-console -- 위 주석: 구조화 로그 한 줄을 직접 출력하는 로깅 본체 */
 export function log(severity: Severity, functionName: string, message: string, extra: Record<string, unknown> = {}): void {
     const entry = {
         severity,
@@ -52,6 +58,7 @@ export function log(severity: Severity, functionName: string, message: string, e
         console.log(JSON.stringify(entry));
     }
 }
+/* eslint-enable no-console */
 
 /**
  * onRequest 핸들러용 에러 래퍼
@@ -305,7 +312,7 @@ export async function recordHeartbeat(schedulerName: string): Promise<void> {
         }, { merge: true });
     } catch (err) {
         // heartbeat 실패가 스케줄러 자체를 중단시키면 안 됨
-        console.warn(`[Heartbeat] ${schedulerName} 기록 실패:`, (err as Error).message);
+        logger.warn(`[Heartbeat] ${schedulerName} 기록 실패:`, (err as Error).message);
     }
 }
 

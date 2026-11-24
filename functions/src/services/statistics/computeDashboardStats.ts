@@ -14,6 +14,7 @@ import {
     computeFuelHipassDaily, computeNotificationStats, KNOWN_NOTIF_TYPES,
 } from "./dashboardSections";
 import type { NightlySharedData } from "./nightlySharedData";
+import * as logger from "firebase-functions/logger";
 
 /**
  * SuperAdmin 대시보드 통계를 배치 계산하여 system/ 문서에 캐싱.
@@ -458,5 +459,5 @@ export async function computeAllDashboardStats(
     }
 
     const elapsed = Date.now() - startTime;
-    console.log(`[computeDashboardStats] 완료${shared ? "(선로딩)" : ""}: ${elapsed}ms, orgs=${allStats.dashboardStats.approvedOrgs}, logs=${allStats.dashboardStats.totalLogs}(count), recentLogs=${recentLogSnap.size}, users=${allStats.dashboardStats.totalUsers}, fuelDocs=${fuelRecentSnap.size}, hipassDocs=${hipassRecentSnap.size}, prevMonthlyDocs=${monthlySnaps.length}, dbWrites=${writeChunks.length}`);
+    logger.info(`[computeDashboardStats] 완료${shared ? "(선로딩)" : ""}: ${elapsed}ms, orgs=${allStats.dashboardStats.approvedOrgs}, logs=${allStats.dashboardStats.totalLogs}(count), recentLogs=${recentLogSnap.size}, users=${allStats.dashboardStats.totalUsers}, fuelDocs=${fuelRecentSnap.size}, hipassDocs=${hipassRecentSnap.size}, prevMonthlyDocs=${monthlySnaps.length}, dbWrites=${writeChunks.length}`);
 }

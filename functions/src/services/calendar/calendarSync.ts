@@ -10,6 +10,7 @@
 // 같은 API·타입에 +1.7MiB·~0.2초다(2026-11-24 실측, 함수 번들 위에서 RSS 비교).
 // 그래도 캘린더와 무관한 함수의 콜드스타트에 얹히지 않도록 런타임 객체는 호출 시점에 불러온다.
 import type { calendar_v3 } from "@googleapis/calendar";
+import * as logger from "firebase-functions/logger";
 
 interface ReservationData {
     date: string;
@@ -57,7 +58,7 @@ export async function createCalendarEvent(calendarId: string, reservation: Reser
         requestBody: event,
     });
 
-    console.log(`캘린더 이벤트 생성: ${res.data.id} (calendar: ${calendarId})`);
+    logger.info(`캘린더 이벤트 생성: ${res.data.id} (calendar: ${calendarId})`);
     return res.data.id!;
 }
 
@@ -74,7 +75,7 @@ export async function updateCalendarEvent(calendarId: string, eventId: string, r
         requestBody: event,
     });
 
-    console.log(`캘린더 이벤트 수정: ${eventId}`);
+    logger.info(`캘린더 이벤트 수정: ${eventId}`);
 }
 
 /**
@@ -88,12 +89,12 @@ export async function deleteCalendarEvent(calendarId: string, eventId: string): 
             calendarId,
             eventId,
         });
-        console.log(`캘린더 이벤트 삭제: ${eventId}`);
+        logger.info(`캘린더 이벤트 삭제: ${eventId}`);
     } catch (err: unknown) {
         const error = err as { code?: number };
         // 이미 삭제된 이벤트인 경우 무시 (410 Gone 또는 404 Not Found)
         if (error.code === 410 || error.code === 404) {
-            console.log(`캘린더 이벤트 이미 삭제됨: ${eventId}`);
+            logger.info(`캘린더 이벤트 이미 삭제됨: ${eventId}`);
         } else {
             throw err;
         }

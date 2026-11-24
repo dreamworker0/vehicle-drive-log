@@ -9,6 +9,7 @@ import { EMAILJS_PRIVATE_KEY } from "../../core/params";
 import { createGmailTransporter, systemMailFrom } from "../../core/mailer";
 import { maskEmail } from "../../utils/mask";
 import { escapeHtml } from "../../utils/helpers";
+import * as logger from "firebase-functions/logger";
 
 // ── 마스킹 유틸리티 ──
 // 구현은 utils/mask.ts로 승격됨 (알림톡·이메일 로그 마스킹과 공용).
@@ -126,7 +127,7 @@ export async function geocodeByTmap(address: string, apiKey: string): Promise<{ 
             if (lat && lng) return { lat, lng };
         }
     } catch (err: unknown) {
-        console.warn("[AutoVerify] Tmap geocoding 실패:", (err as Error).message);
+        logger.warn("[AutoVerify] Tmap geocoding 실패:", (err as Error).message);
     }
     return null;
 }
@@ -160,10 +161,10 @@ export async function sendApprovalEmailServer(recipientEmail: string, orgName: s
                 privateKey: EMAILJS_PRIVATE_KEY.value(),
             }
         );
-        console.log(`[AutoVerify] 📧 승인 이메일 발송 성공: ${maskEmail(recipientEmail)}`, response.status, response.text);
+        logger.info(`[AutoVerify] 📧 승인 이메일 발송 성공: ${maskEmail(recipientEmail)}`, response.status, response.text);
         return true;
     } catch (err: unknown) {
-        console.error(`[AutoVerify] ❌ 승인 이메일 발송 실패: ${maskEmail(recipientEmail)}`, err);
+        logger.error(`[AutoVerify] ❌ 승인 이메일 발송 실패: ${maskEmail(recipientEmail)}`, err);
         return false;
     }
 }
@@ -209,10 +210,10 @@ export async function sendRejectionEmail(recipientEmail: string, orgName: string
         };
 
         await transporter.sendMail(mailOptions);
-        console.log(`[AutoVerify] 📧 거부 이메일 발송 성공: ${maskEmail(recipientEmail)}`);
+        logger.info(`[AutoVerify] 📧 거부 이메일 발송 성공: ${maskEmail(recipientEmail)}`);
         return true;
     } catch (err: unknown) {
-        console.error(`[AutoVerify] ❌ 거부 이메일 발송 실패: ${maskEmail(recipientEmail)}`, (err as Error).message);
+        logger.error(`[AutoVerify] ❌ 거부 이메일 발송 실패: ${maskEmail(recipientEmail)}`, (err as Error).message);
         return false;
     }
 }

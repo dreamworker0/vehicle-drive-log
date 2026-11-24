@@ -10,6 +10,7 @@ import { sendPushToUser, createInAppNotification } from "../../services/alimtalk
 import { requireSuperAdmin, escapeHtml } from "../../utils/helpers";
 import { createGmailTransporter, isGmailConfigured, systemMailFrom } from "../../core/mailer";
 import { GMAIL_APP_PASSWORD } from "../../core/params";
+import * as logger from "firebase-functions/logger";
 
 const db = getFirestore();
 
@@ -85,16 +86,16 @@ export const sendFeedbackReply = onCall(
                 orgId
             );
 
-            console.log(`[sendFeedbackReply] 앱 내 알림 발송 완료: ${feedbackId} → ${targetUid}`);
+            logger.info(`[sendFeedbackReply] 앱 내 알림 발송 완료: ${feedbackId} → ${targetUid}`);
         } else {
-            console.warn(`[sendFeedbackReply] 앱 내 알림 대상 아님 (UID 없음 또는 비회원): ${feedbackId}`);
+            logger.warn(`[sendFeedbackReply] 앱 내 알림 대상 아님 (UID 없음 또는 비회원): ${feedbackId}`);
         }
 
         // 7. 이메일 알림 발송 (이메일 정보가 있는 경우)
         if (targetEmail) {
             try {
                 if (!isGmailConfigured()) {
-                    console.warn("[sendFeedbackReply] GMAIL 환경변수 누락으로 이메일 발송 생략");
+                    logger.warn("[sendFeedbackReply] GMAIL 환경변수 누락으로 이메일 발송 생략");
                 } else {
                     const transporter = createGmailTransporter();
                     const mailOptions = {
@@ -124,10 +125,10 @@ export const sendFeedbackReply = onCall(
                         `,
                     };
                     await transporter.sendMail(mailOptions);
-                    console.log(`[sendFeedbackReply] 이메일 발송 완료: ${feedbackId}`);
+                    logger.info(`[sendFeedbackReply] 이메일 발송 완료: ${feedbackId}`);
                 }
             } catch (err: unknown) {
-                console.error("[sendFeedbackReply] 이메일 발송 실패:", (err as Error).message);
+                logger.error("[sendFeedbackReply] 이메일 발송 실패:", (err as Error).message);
                 // 이메일 전송 실패가 전체 트랜잭션을 중단하지 않도록 에러만 로깅
             }
         }

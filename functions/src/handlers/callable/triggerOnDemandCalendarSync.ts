@@ -4,6 +4,7 @@ import { syncSingleVehicleCalendar } from "../scheduled/calendarSchedule";
 import { isCalendarAuthError, recordCalendarFailure, resetCalendarFailure, shouldSkipVehicleCalendar, MAX_FAIL_COUNT } from "../../services/calendar/calendarFailTracking";
 import { checkRateLimitBySubject } from "../../utils/rateLimit";
 import { getRateLimits } from "../../utils/constants";
+import * as logger from "firebase-functions/logger";
 
 const db = getFirestore();
 
@@ -54,7 +55,7 @@ export const triggerOnDemandCalendarSync = onCall(
                     callerOrgId = userDoc.data()?.organizationId;
                 }
             } catch (err: unknown) {
-                console.error("[OnDemandSync] User doc lookup failed:", (err as Error).message);
+                logger.error("[OnDemandSync] User doc lookup failed:", (err as Error).message);
                 throw new HttpsError("internal", "사용자 정보 조회 중 오류가 발생했습니다.");
             }
         }
@@ -77,7 +78,7 @@ export const triggerOnDemandCalendarSync = onCall(
             vehicleData = vehicleDoc.data();
         } catch (err: unknown) {
             if (err instanceof HttpsError) throw err;
-            console.error("[OnDemandSync] Vehicle lookup failed:", (err as Error).message);
+            logger.error("[OnDemandSync] Vehicle lookup failed:", (err as Error).message);
             throw new HttpsError("internal", "차량 정보 조회 중 오류가 발생했습니다.");
         }
 
@@ -104,7 +105,7 @@ export const triggerOnDemandCalendarSync = onCall(
         // errorType은 클라이언트가 30분 쿨다운을 적용하고 조용히 멈추도록 기존 값을 재사용한다.
         const failCount = (vehicleData.calendarSyncFailCount as number) || 0;
         if (shouldSkipVehicleCalendar(vehicleData)) {
-            console.log(`[OnDemandSync] Vehicle ${vehicleId}: calendar sync disabled (failCount=${failCount}), skip`);
+            logger.info(`[OnDemandSync] Vehicle ${vehicleId}: calendar sync disabled (failCount=${failCount}), skip`);
             return {
                 success: false,
                 errorType: "calendar-not-found",
@@ -148,7 +149,7 @@ export const triggerOnDemandCalendarSync = onCall(
 
         const limitedBy = await rateLimited();
         if (limitedBy) {
-            console.log(`[OnDemandSync] Vehicle ${vehicleId}: rate limited by ${limitedBy}, skip`);
+            logger.info(`[OnDemandSync] Vehicle ${vehicleId}: rate limited by ${limitedBy}, skip`);
             return {
                 success: false,
                 errorType: "rate-limited",
@@ -158,7 +159,7 @@ export const triggerOnDemandCalendarSync = onCall(
 
         // 4. 동기화 핵심 로직 수행
         try {
-            console.log(`[OnDemandSync] Triggering on-demand sync for vehicle ${vehicleId} in org ${organizationId}`);
+            logger.info(`[OnDemandSync] Triggering on-demand sync for vehicle ${vehicleId} in org ${organizationId}`);
 
             const result = await syncSingleVehicleCalendar(vehicleId, vehicleData);
 
@@ -174,7 +175,7 @@ export const triggerOnDemandCalendarSync = onCall(
             };
         } catch (err: unknown) {
             const errMsg = (err as Error).message;
-            console.error(`[OnDemandSync] Sync execution failed for vehicle ${vehicleId}:`, errMsg);
+            logger.error(`[OnDemandSync] Sync execution failed for vehicle ${vehicleId}:`, errMsg);
 
             // 캘린더 미존재/공유 권한 누락(404/403)은 "사용자 설정 오류"인 예상된 상태이다.
             // 500(internal)으로 던지면 콘솔·모니터링에 서버 장애처럼 노이즈가 쌓이므로,
@@ -184,7 +185,7 @@ export const triggerOnDemandCalendarSync = onCall(
                 try {
                     await recordCalendarFailure(vehicleId, (vehicleData.calendarSyncFailCount as number) || 0, err);
                 } catch (updateErr: unknown) {
-                    console.error(`[OnDemandSync] Failed to record sync failure for ${vehicleId}:`, (updateErr as Error).message);
+                    logger.error(`[OnDemandSync] Failed to record sync failure for ${vehicleId}:`, (updateErr as Error).message);
                 }
                 return {
                     success: false,

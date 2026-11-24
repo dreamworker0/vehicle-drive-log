@@ -8,6 +8,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
+import * as logger from "firebase-functions/logger";
 
 export const deleteUserPermanently = onCall(
     {
@@ -84,16 +85,16 @@ export const deleteUserPermanently = onCall(
                 const code = (authErr as { code?: string }).code;
                 if (code === "auth/user-not-found") {
                     // Firestore 문서만 있고 Auth 계정이 없는 경우 — 문서 삭제로 충분
-                    console.warn(`직원 완전 삭제: Auth 계정 없음, Firestore 문서만 삭제 (${uid})`);
+                    logger.warn(`직원 완전 삭제: Auth 계정 없음, Firestore 문서만 삭제 (${uid})`);
                 } else {
                     throw authErr;
                 }
             }
 
-            console.log(`직원 완전 삭제 완료: ${uid} (호출자: ${request.auth.uid}, 즐겨찾기 ${cleaned.favorites ?? 0}건·자주 쓰는 목적 ${cleaned.favoritePurposes ?? 0}건 정리)`);
+            logger.info(`직원 완전 삭제 완료: ${uid} (호출자: ${request.auth.uid}, 즐겨찾기 ${cleaned.favorites ?? 0}건·자주 쓰는 목적 ${cleaned.favoritePurposes ?? 0}건 정리)`);
             return { success: true };
         } catch (err: unknown) {
-            console.error("직원 완전 삭제 실패:", (err as Error).message);
+            logger.error("직원 완전 삭제 실패:", (err as Error).message);
             if (err instanceof HttpsError) throw err;
             throw new HttpsError("internal", "직원 완전 삭제 중 오류가 발생했습니다.");
         }

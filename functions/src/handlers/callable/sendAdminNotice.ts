@@ -5,6 +5,7 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore } from "firebase-admin/firestore";
 import { sendPushToOrg, createInAppNotificationForOrg } from "../../services/alimtalk/sendNotification";
 import { checkRateLimitByUid } from "../../utils/rateLimit";
+import * as logger from "firebase-functions/logger";
 
 const db = getFirestore();
 
@@ -74,10 +75,10 @@ export const sendAdminNotice = onCall(
                 uid
             );
 
-            console.log(`Admin notice sent: org=${orgId}, title="${title}", by=${senderName}`);
+            logger.info(`Admin notice sent: org=${orgId}, title="${title}", by=${senderName}`);
             return { success: true };
         } catch (err: unknown) {
-            console.error("Admin notice failed:", (err as Error).message);
+            logger.error("Admin notice failed:", (err as Error).message);
             throw new HttpsError("internal", "공지 전송에 실패했습니다.");
         }
     }

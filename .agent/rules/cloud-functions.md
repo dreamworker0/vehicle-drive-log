@@ -108,12 +108,18 @@ const db = getFirestore();
 
 ## 4. 에러 처리
 
+로그는 `import * as logger from "firebase-functions/logger"`로 남긴다 — `console.*`는 ESLint `no-console`이 막는다
+(2026-11-24 전수 이관). logger는 심각도(INFO·WARNING·ERROR)를 정확히 붙이고, **마지막 인자가 평범한 객체면
+Cloud Logging 검색 필드**(jsonPayload)가 된다: `logger.warn("동기화 건너뜀", { orgId, vehicleId })`.
+- `logger.error`는 **로그만** 남긴다. 운영자 알림(Sentry·Discord)까지 필요하면 `captureError` 또는 `log("ERROR", …)`(utils/helpers)를 쓴다 — 항목마다 실패하는 반복문에서 쓰면 알림이 폭주하니 요약 한 건만 올린다.
+- 테스트에서는 `jest.moduleNameMapper`가 logger를 `console` 전달 모듈(`functions/test-support/consoleLogger.ts`)로 바꾸므로 `jest.spyOn(console, …)` 검사가 그대로 동작한다.
+
 ```ts
 try {
     // 비즈니스 로직
-    console.log("성공 메시지:", docId);
+    logger.info("성공 메시지:", docId);
 } catch (err: unknown) {
-    console.error("실패 설명:", (err as Error).message);
+    logger.error("실패 설명:", (err as Error).message);
     // HTTP 함수: res.status(500).json({ error: (err as Error).message });
     // 트리거/스케줄: 에러를 로그만 남기고 throw 하지 않음 (재시도 방지)
 }

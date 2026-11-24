@@ -3,6 +3,7 @@ import { sendPushToUser, createInAppNotification } from "../../services/alimtalk
 import { resolveOrgSlackBotToken, sendSlackDMToUser } from "../../services/slack/notifySlackUser";
 import { toKSTDate, getKSTDateString } from "../../utils/kstDate";
 import { captureError } from "../../core/sentry";
+import * as logger from "firebase-functions/logger";
 
 const db = getFirestore();
 
@@ -63,7 +64,7 @@ export async function checkReservationReminders(): Promise<void> {
     const currentTime = `${currentHH}:${currentMM}`;
     const windowEndTime = addMinutes(currentTime, UPCOMING_WINDOW_MIN);
 
-    console.log(`[Reminder] Check at ${todayStr} ${currentTime} (KST), upcoming until ${windowEndTime}`);
+    logger.info(`[Reminder] Check at ${todayStr} ${currentTime} (KST), upcoming until ${windowEndTime}`);
 
     try {
         // === 1. 예약 시작 전 알림 (다음 실행 전까지 시작하는 예약) ===
@@ -283,9 +284,9 @@ export async function checkReservationReminders(): Promise<void> {
             noShowCount++;
         }
 
-        console.log(`[Reminder] Sent ${reminderCount} upcoming, ${missedCount} drive log, ${noShowCount} no-show reminders`);
+        logger.info(`[Reminder] Sent ${reminderCount} upcoming, ${missedCount} drive log, ${noShowCount} no-show reminders`);
     } catch (err: unknown) {
-        console.error("[Reminder] Failed:", (err as Error).message);
+        logger.error("[Reminder] Failed:", (err as Error).message);
         captureError(err, { context: "reservationReminder", currentTime });
         throw err;
     }

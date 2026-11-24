@@ -9,6 +9,7 @@ import { sendApprovalAlimtalk } from "../../services/alimtalk/sendAlimtalk";
 import { loadOrgForManualAlimtalk } from "../../services/alimtalk/manualSendHelpers";
 import { requireSuperAdmin } from "../../utils/helpers";
 import { ALIMTALK_PROXY_TOKEN } from "../../core/params";
+import * as logger from "firebase-functions/logger";
 
 export const sendManualApprovalAlimtalk = onCall(
     { region: "asia-northeast3", enforceAppCheck: true, secrets: [ALIMTALK_PROXY_TOKEN] },
@@ -20,16 +21,16 @@ export const sendManualApprovalAlimtalk = onCall(
         const inviteCode = org.inviteCode;
 
         if (!phone) {
-            console.warn(`[ManualApproval] 전화번호 없음: ${centerName} (${orgId})`);
+            logger.warn(`[ManualApproval] 전화번호 없음: ${centerName} (${orgId})`);
             return { success: false, message: "신청자 전화번호가 없습니다." };
         }
 
         if (!inviteCode) {
-            console.warn(`[ManualApproval] 초대코드 없음: ${centerName} (${orgId})`);
+            logger.warn(`[ManualApproval] 초대코드 없음: ${centerName} (${orgId})`);
             return { success: false, message: "초대코드가 없습니다." };
         }
 
-        console.log(`[ManualApproval] 알림톡 발송 시작: ${centerName} (${orgId})`);
+        logger.info(`[ManualApproval] 알림톡 발송 시작: ${centerName} (${orgId})`);
         const result = await sendApprovalAlimtalk(phone, name, centerName, inviteCode);
 
         return {

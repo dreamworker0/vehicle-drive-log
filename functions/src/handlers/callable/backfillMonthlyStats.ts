@@ -7,6 +7,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { requireSuperAdmin } from "../../utils/helpers";
 import { runDailyAggregation } from "../scheduled/dailyAggregation";
+import * as logger from "firebase-functions/logger";
 
 export const backfillMonthlyStats = onCall(
     {
@@ -22,17 +23,17 @@ export const backfillMonthlyStats = onCall(
         const raw = Number((request.data as { months?: number } | undefined)?.months);
         const months = Number.isFinite(raw) ? Math.min(24, Math.max(1, Math.floor(raw))) : 6;
 
-        console.log(`[backfillMonthlyStats] 최근 ${months}개월 소급 재집계 시작 (uid=${request.auth.uid})`);
+        logger.info(`[backfillMonthlyStats] 최근 ${months}개월 소급 재집계 시작 (uid=${request.auth.uid})`);
         const startedAt = Date.now();
         let summary;
         try {
             summary = await runDailyAggregation(months);
         } catch (err: unknown) {
-            console.error("[backfillMonthlyStats] 실패:", (err as Error).message);
+            logger.error("[backfillMonthlyStats] 실패:", (err as Error).message);
             throw new HttpsError("internal", "월별 집계 백필 중 오류가 발생했습니다.");
         }
         const durationMs = Date.now() - startedAt;
-        console.log(`[backfillMonthlyStats] 완료 — 기관 ${summary.orgs}, 성공 ${summary.processed}, 실패 ${summary.errors} (${durationMs}ms)`);
+        logger.info(`[backfillMonthlyStats] 완료 — 기관 ${summary.orgs}, 성공 ${summary.processed}, 실패 ${summary.errors} (${durationMs}ms)`);
 
         // 일부 기관이라도 집계에 실패하면 success=false로 알린다(조용한 실패 방지)
         return {

@@ -16,6 +16,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
+import * as logger from "firebase-functions/logger";
 
 export const enableUser = onCall(
     {
@@ -61,7 +62,7 @@ export const enableUser = onCall(
             } catch (authErr: unknown) {
                 const code = (authErr as { code?: string }).code;
                 if (code === "auth/user-not-found") {
-                    console.warn(`직원 활성화: Auth 계정 없음, Firestore status만 적용 (${uid})`);
+                    logger.warn(`직원 활성화: Auth 계정 없음, Firestore status만 적용 (${uid})`);
                 } else {
                     throw authErr;
                 }
@@ -75,10 +76,10 @@ export const enableUser = onCall(
                 lastEditedByUid: request.auth.uid,
             });
 
-            console.log(`직원 활성화 완료: ${uid} (호출자: ${request.auth.uid})`);
+            logger.info(`직원 활성화 완료: ${uid} (호출자: ${request.auth.uid})`);
             return { success: true };
         } catch (err: unknown) {
-            console.error("직원 활성화 실패:", (err as Error).message);
+            logger.error("직원 활성화 실패:", (err as Error).message);
             if (err instanceof HttpsError) throw err;
             throw new HttpsError("internal", "직원 활성화 중 오류가 발생했습니다.");
         }

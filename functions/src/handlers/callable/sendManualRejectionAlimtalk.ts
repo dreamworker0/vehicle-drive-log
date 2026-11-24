@@ -10,6 +10,7 @@ import { loadOrgForManualAlimtalk } from "../../services/alimtalk/manualSendHelp
 import { requireSuperAdmin } from "../../utils/helpers";
 import { getKSTDateString } from "../../utils/kstDate";
 import { ALIMTALK_PROXY_TOKEN } from "../../core/params";
+import * as logger from "firebase-functions/logger";
 
 export const sendManualRejectionAlimtalk = onCall(
     { region: "asia-northeast3", enforceAppCheck: true, secrets: [ALIMTALK_PROXY_TOKEN] },
@@ -20,7 +21,7 @@ export const sendManualRejectionAlimtalk = onCall(
         const { org, phone, name, orgName } = await loadOrgForManualAlimtalk(orgId);
 
         if (!phone) {
-            console.warn(`[ManualRejection] 전화번호 없음: ${orgName} (${orgId})`);
+            logger.warn(`[ManualRejection] 전화번호 없음: ${orgName} (${orgId})`);
             return { success: false, message: "신청자 전화번호가 없습니다." };
         }
 
@@ -28,7 +29,7 @@ export const sendManualRejectionAlimtalk = onCall(
         const createdAt = org.createdAt?.toDate ? org.createdAt.toDate() : new Date();
         const applicationDate = getKSTDateString(createdAt);
 
-        console.log(`[ManualRejection] 반려 알림톡 발송 시작: ${orgName} (${orgId})`);
+        logger.info(`[ManualRejection] 반려 알림톡 발송 시작: ${orgName} (${orgId})`);
         const result = await sendRejectionAlimtalk(
             phone,
             name,

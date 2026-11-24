@@ -50,7 +50,7 @@ export const myFunction = onCall(
             // 비즈니스 로직
             return { success: true };
         } catch (err: unknown) {
-            console.error("myFunction 실패:", (err as Error).message);
+            logger.error("myFunction 실패:", (err as Error).message);
             throw new HttpsError("internal", "처리에 실패했습니다.");
         }
     }
@@ -114,9 +114,9 @@ export const onItemCreated = onDocumentCreated(
 
         try {
             // 비즈니스 로직
-            console.log("처리 완료:", docId);
+            logger.info("처리 완료:", docId);
         } catch (err: unknown) {
-            console.error("처리 실패:", docId, (err as Error).message);
+            logger.error("처리 실패:", docId, (err as Error).message);
         }
     }
 );
@@ -141,7 +141,10 @@ export { myFunction } from "./handlers/callable/newFunction";
 ```ts
 import { log, wrapHttps, wrapHandler } from "../../utils/helpers";
 
-// 구조화 로깅 (Cloud Logging severity 기반 필터링)
+// 일반 로그는 firebase-functions/logger (console.*는 ESLint no-console로 금지 — cloud-functions.md §4)
+// import * as logger from "firebase-functions/logger";
+logger.info("처리 시작", { userId: "abc" });   // 마지막 객체는 Cloud Logging 검색 필드가 된다
+// log("ERROR", …)는 Sentry·Discord 알림까지 보낸다 — 운영자가 알아야 하는 실패에만
 log("INFO", "myFunction", "처리 시작", { userId: "abc" });
 log("ERROR", "myFunction", "실패", { stack: error.stack });
 

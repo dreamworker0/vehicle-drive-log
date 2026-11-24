@@ -15,6 +15,7 @@
  * 막는 쪽이 파기 중 알림 몇 건보다 나쁘다.
  */
 import { getFirestore } from "firebase-admin/firestore";
+import * as logger from "firebase-functions/logger";
 
 /** 같은 인스턴스에서 파기 중 트리거가 몰릴 때 기관 문서를 매번 읽지 않도록 잠깐 기억한다 */
 const CACHE_TTL_MS = 60 * 1000;
@@ -32,7 +33,7 @@ export async function isOrgRetired(orgId: unknown): Promise<boolean> {
         cache.set(orgId, { retired, at: Date.now() });
         return retired;
     } catch (err) {
-        console.warn(`[isOrgRetired] 기관 상태 확인 실패 — 해지 아님으로 진행 (${orgId}):`, (err as Error).message);
+        logger.warn(`[isOrgRetired] 기관 상태 확인 실패 — 해지 아님으로 진행 (${orgId}):`, (err as Error).message);
         return false;
     }
 }

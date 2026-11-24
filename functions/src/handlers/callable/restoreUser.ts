@@ -6,6 +6,7 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getAuth } from "firebase-admin/auth";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
 import { maskEmail } from "../../utils/mask";
+import * as logger from "firebase-functions/logger";
 
 export const restoreUser = onCall(
     {
@@ -92,7 +93,7 @@ export const restoreUser = onCall(
                 lastEditedByUid: request.auth.uid,
             });
 
-            console.log(`계정 복원 완료: ${maskEmail(email)} (uid: ${authUser.uid}, 호출자: ${request.auth.uid})`);
+            logger.info(`계정 복원 완료: ${maskEmail(email)} (uid: ${authUser.uid}, 호출자: ${request.auth.uid})`);
             return {
                 success: true,
                 uid: authUser.uid,
@@ -100,7 +101,7 @@ export const restoreUser = onCall(
                 email: email,
             };
         } catch (err: unknown) {
-            console.error("계정 복원 실패:", (err as Error).message);
+            logger.error("계정 복원 실패:", (err as Error).message);
             if (err instanceof HttpsError) throw err;
             throw new HttpsError("internal", "계정 복원 중 오류가 발생했습니다.");
         }
