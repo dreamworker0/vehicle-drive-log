@@ -12,17 +12,19 @@
  *   `calendarEventId`가 없는 것 → 캘린더에 일정을 만들고 ID를 저장한다. 같은 제목·시각의
  *   일정이 이미 있으면 새로 만들지 않고 연결만 한다.
  * - **잔존 삭제**: 같은 기간의 취소(cancelled) 예약 중 날짜가 오늘 이후이고 `calendarEventId`가
- *   남은 것 → 일정을 지운다. 이미 지워진 일정은 404/410으로 조용히 넘어간다(deleteCalendarEvent).
+ *   남은 것 → 일정을 지우고 예약의 `calendarEventId`를 비운다. 이미 지워진 일정은 404/410으로
+ *   조용히 넘어간다(deleteCalendarEvent). ID를 비우지 않으면 다음 미리 보기에 같은 예약이 또 잡힌다.
  *
- * 트리거와 같은 기준으로만 캘린더를 건드린다 — 기관 기능 꺼짐·바인딩 불일치·실패 누적(쿨다운)
- * 차량은 건너뛴다. 실패는 차량 실패 카운터에 세지 않는다(일회성 운영 작업이 기관 알림을
+ * 트리거와 같은 기준으로만 캘린더를 건드린다. 캘린더를 연결하지 않은 차량·기능을 끈 기관은 애초에
+ * 대상이 아니라 세지 않고, 캘린더가 연결됐는데 바인딩 불일치·실패 누적(쿨다운)으로 막힌 차량만
+ * "건너뜀"으로 센다(2026-11-24 첫 실행에서 214건이 전부 건너뜀으로 보여 무엇이 막혔는지 읽을 수 없었다). 실패는 차량 실패 카운터에 세지 않는다(일회성 운영 작업이 기관 알림을
  * 일으키지 않게). 지난 날짜는 손대지 않는다 — 이미 지나간 일정을 지금 만들면 기관 캘린더 기록만
  * 어지럽힌다.
  *
  * `dryRun: true`면 아무것도 쓰지 않고 할 일만 센다. 화면은 미리 보기 → 확인 → 실행 순서로 부른다.
  */
 import { onCall, HttpsError } from "firebase-functions/v2/https";
-import { getFirestore, Timestamp, type QueryDocumentSnapshot } from "firebase-admin/firestore";
+import { getFirestore, FieldValue, Timestamp, type QueryDocumentSnapshot } from "firebase-admin/firestore";
 import { log, requireSuperAdmin } from "../utils/helpers";
 import { getKSTDateString } from "../utils/kstDate";
 import { isGoogleCalendarEnabled, type OrgCalendarFlagCache } from "../services/calendar/calendarFeature";
@@ -61,7 +63,8 @@ export interface BackfillResult {
     message: string;
 }
 
-type VehicleCtx = { calendarId: string; orgId: string } | null;
+/** 캘린더를 쓸 수 있는 차량 / 캘린더와 무관한 차량 / 연결됐지만 막힌 차량 */
+type VehicleCtx = { calendarId: string; orgId: string } | "noCalendar" | "blocked";
 
 export const backfillCalendarEvents = onCall(
     {
@@ -106,22 +109,21 @@ export const backfillCalendarEvents = onCall(
             return s;
         }
 
-        /** 트리거의 getVehicleCalendar와 같은 기준. 건너뛸 차량이면 null. */
+        /** 트리거의 getVehicleCalendar와 같은 기준으로 차량을 가른다. */
         async function vehicleCalendar(vehicleId: string, orgId: string): Promise<VehicleCtx> {
             const key = `${vehicleId}:${orgId}`;
             if (vehicleCache.has(key)) return vehicleCache.get(key)!;
-            let ctx: VehicleCtx = null;
             const v = await db.collection("vehicles").doc(vehicleId).get();
             const data = v.data();
             const calendarId = (data?.googleCalendarId as string) || "";
-            if (
-                data
-                && data.organizationId === orgId
-                && calendarId.includes("@")
-                && !shouldSkipVehicleCalendar(data)
-                && await isGoogleCalendarEnabled(orgId, orgFlagCache)
-                && await isCalendarBoundToOrg(calendarId, orgId, { logName: "backfillCalendarEvents", cache: bindingCache })
-            ) {
+            let ctx: VehicleCtx;
+            if (!data || data.organizationId !== orgId || !calendarId.includes("@")
+                || !await isGoogleCalendarEnabled(orgId, orgFlagCache)) {
+                ctx = "noCalendar";
+            } else if (shouldSkipVehicleCalendar(data)
+                || !await isCalendarBoundToOrg(calendarId, orgId, { logName: "backfillCalendarEvents", cache: bindingCache })) {
+                ctx = "blocked";
+            } else {
                 ctx = { calendarId, orgId };
             }
             vehicleCache.set(key, ctx);
@@ -147,8 +149,9 @@ export const backfillCalendarEvents = onCall(
             const r = doc.data();
             const isCreate = r.status === "reserved";
             const vc = await vehicleCalendar(r.vehicleId as string, r.organizationId as string);
+            if (vc === "noCalendar") continue;
             const summary = await orgSummary(r.organizationId as string);
-            if (!vc) {
+            if (vc === "blocked") {
                 skippedVehicle++; summary.skippedVehicle++;
                 continue;
             }
@@ -167,6 +170,8 @@ export const backfillCalendarEvents = onCall(
                     if (existing) { linked++; summary.linked++; } else { created++; summary.created++; }
                 } else {
                     await deleteCalendarEvent(vc.calendarId, r.calendarEventId as string);
+                    // 지운 일정의 ID를 비운다. calendarEventId만 바뀌는 쓰기라 onReservationUpdated가 그냥 넘긴다.
+                    await doc.ref.update({ calendarEventId: FieldValue.delete() });
                     deleted++; summary.deleted++;
                 }
             } catch (err) {
@@ -185,7 +190,7 @@ export const backfillCalendarEvents = onCall(
             .sort((a, b) => (b.toCreate + b.toDelete) - (a.toCreate + a.toDelete));
 
         const message = dryRun
-            ? `보충 대상: 일정 생성 ${toCreate}건, 취소 일정 삭제 ${toDelete}건 (건너뛸 예약 ${skippedVehicle}건 — 연동 꺼짐·실패 누적 차량)`
+            ? `보충 대상: 일정 생성 ${toCreate}건, 취소 일정 삭제 ${toDelete}건 (건너뛸 예약 ${skippedVehicle}건 — 캘린더 실패가 쌓여 쉬는 중이거나 다른 기관 캘린더로 막힌 차량)`
             : `일정 생성 ${created}건, 기존 일정 연결 ${linked}건, 취소 일정 삭제 ${deleted}건, 실패 ${failed}건`
               + (remaining > 0 ? ` — 남은 ${remaining}건은 한 번 더 실행하세요` : "");
 
