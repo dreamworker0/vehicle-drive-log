@@ -94,7 +94,7 @@ export default function FeedbackItem({
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                         {isResolved ? (
-                            <span className="px-2.5 py-1 rounded-lg text-xs font-medium btn-soft-green">
+                            <span className="px-2.5 py-1 rounded-lg text-xs font-medium bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300">
                                 ✅ 처리완료
                             </span>
                         ) : null}

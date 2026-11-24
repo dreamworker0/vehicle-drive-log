@@ -181,7 +181,7 @@ export default function DashboardApiHealth() {
                     {summary && (
                         <div className="flex items-center gap-1.5 ml-2">
                             {summary.ok > 0 && (
-                                <span className="inline-flex items-center gap-0.5 text-xs font-medium btn-soft-emerald dark:bg-emerald-900/30 px-1.5 py-0.5 rounded-full">
+                                <span className="inline-flex items-center gap-0.5 text-xs font-medium bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300 px-1.5 py-0.5 rounded-full">
                                     🟢 {summary.ok}
                                 </span>
                             )}

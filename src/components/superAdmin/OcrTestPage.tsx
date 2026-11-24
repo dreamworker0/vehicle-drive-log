@@ -231,7 +231,7 @@ export default function OcrTestPage() {
                                     <div className="flex items-start justify-between gap-2 mb-2">
                                         <div className="flex items-center gap-2">
                                             {item.success ? (
-                                                <span className="inline-flex items-center gap-1 text-xs font-medium btn-soft-emerald dark:bg-emerald-900/30 px-2 py-0.5 rounded-full">
+                                                <span className="inline-flex items-center gap-1 text-xs font-medium bg-accent-50 text-accent-700 dark:bg-accent-900/30 dark:text-accent-300 px-2 py-0.5 rounded-full">
                                                     ✓ 성공
                                                 </span>
                                             ) : (
