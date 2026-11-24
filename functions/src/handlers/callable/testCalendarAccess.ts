@@ -28,8 +28,8 @@ export const testCalendarAccess = onCall(
     {
         region: "asia-northeast3",
         timeoutSeconds: 15,
-        // googleapis를 불러오면 256MiB를 넘어 500으로 죽는다(2026-11 이용 기관 신고) — cloud-functions.md §3.2
-        memory: "512MiB",
+        // memory는 전역 기본(256MiB). 예전 googleapis 전체 패키지일 때는 256MiB를 넘어 500으로 죽어
+        // 512MiB였다(2026-11 이용 기관 신고). 캘린더 전용 패키지로 바꿔 되돌렸다 — cloud-functions.md §3.2
         enforceAppCheck: false,
         cors: true,
     },
@@ -88,12 +88,12 @@ export const testCalendarAccess = onCall(
 
         try {
             // ADC(Application Default Credentials)로 인증
-            // googleapis는 콜드스타트 비용이 커서 호출 시점에만 불러온다 (calendarSync.ts 주석 참고)
-            const { google } = await import("googleapis");
-            const auth = new google.auth.GoogleAuth({
+            // 캘린더 전용 패키지를 호출 시점에만 불러온다 (calendarSync.ts 주석 참고)
+            const calendarApi = await import("@googleapis/calendar");
+            const auth = new calendarApi.auth.GoogleAuth({
                 scopes: ["https://www.googleapis.com/auth/calendar.readonly"],
             });
-            const calendar = google.calendar({ version: "v3", auth });
+            const calendar = calendarApi.calendar({ version: "v3", auth });
 
             // 이벤트 1건만 조회하여 접근 가능 여부 테스트
             const now = new Date();

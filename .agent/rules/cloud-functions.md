@@ -69,7 +69,7 @@ const db = getFirestore();
 
 기본값(`256MiB`, `60s`)으로 부족한 경우에만 명시한다:
 - OCR/AI 함수: `memory: "512MiB"`, `timeoutSeconds: 120`
-- **`googleapis`를 불러오는 함수(캘린더 동기화 경로 전부): `memory: "512MiB"` 이상.** 라이브러리 로드만으로 256MiB를 넘는다. 2026-10-25부터 예약 트리거·`testCalendarAccess`가 256MiB에서 메모리 초과로 죽어, 예약 상당수가 캘린더에 올라가지 않고 연결 테스트가 500을 냈다. 캘린더 서비스(`services/calendar/calendarSync`)를 부르는 함수를 새로 만들 때도 같다.
+- **Google API는 전체 패키지 `googleapis`를 쓰지 않고 API별 패키지(`@googleapis/calendar` 등)를 쓴다.** `googleapis`는 300여 개 API를 한꺼번에 올려 로드만으로 메모리 +118MiB·require ~1.8초가 든다(전용 패키지는 +1.7MiB·~0.2초, 2026-11-24 실측). 2026-10-25~11-24에 예약 트리거·`testCalendarAccess`가 이 때문에 256MiB에서 메모리 초과로 죽어, 예약 상당수가 캘린더에 올라가지 않고 연결 테스트가 500을 냈다(#614에서 512MiB로 막았다가, 전용 패키지로 바꾸며 256MiB로 되돌림). 전용 패키지도 호출 시점에 동적 import한다 — `calendarSync.ts` 참고.
 - 백업/아카이빙: `memory: "1GiB"`, `timeoutSeconds: 540`
 
 ### 3.3 Firestore 트리거 무한 루프 방지

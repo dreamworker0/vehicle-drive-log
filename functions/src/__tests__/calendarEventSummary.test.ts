@@ -6,11 +6,9 @@
  */
 const mockInsert = jest.fn().mockResolvedValue({ data: { id: 'evt1' } });
 
-jest.mock('googleapis', () => ({
-    google: {
-        auth: { GoogleAuth: jest.fn() },
-        calendar: () => ({ events: { insert: mockInsert } }),
-    },
+jest.mock('@googleapis/calendar', () => ({
+    auth: { GoogleAuth: jest.fn() },
+    calendar: () => ({ events: { insert: mockInsert } }),
 }));
 
 import { createCalendarEvent } from '../services/calendar/calendarSync';
