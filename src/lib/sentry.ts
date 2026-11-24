@@ -37,6 +37,38 @@ function isLoopbackProductionBuild(): boolean {
     return ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
 }
 
+/**
+ * 앱이 직접 보고한 Firebase 오류 중에서도 버릴 것 — 네트워크·오프라인 일시 장애.
+ *
+ * 지하 주차장·이동 중 사용이 많아 이 앱에서 가장 흔한 오류이고, SDK가 다시 시도하거나
+ * 오프라인 큐가 받아 준다. 결함이 아니므로 보내면 Sentry 한도만 먹는다.
+ */
+const TRANSIENT_FIREBASE_ERROR = /client is offline|network-request-failed|retry-limit-exceeded|deadline-exceeded|\bunavailable\b|Failed to fetch|NetworkError|Load failed/i;
+
+type SentryExceptionLike = {
+    value?: string;
+    mechanism?: { handled?: boolean };
+    stacktrace?: { frames?: Array<{ filename?: string }> };
+};
+
+/**
+ * Firebase SDK 번들 프레임이 섞인 오류 중 **보내지 않을 것**을 고른다.
+ *
+ * 예전에는 스택에 SDK 프레임이 하나라도 있으면 모두 버렸다. 그런데 Firestore·Auth·Storage
+ * 오류는 SDK 안에서 만들어지므로 **앱이 `captureError`로 직접 보고한 실제 장애**(인덱스 누락
+ * `failed-precondition`, 잘못된 쿼리 등)도 늘 SDK 프레임을 달고 있어 함께 사라졌다(2026-11-24 외부 리뷰 지적).
+ *
+ * 그래서 보고 경로로 가른다(IDB 백엔드 오류 억제와 같은 기준).
+ * - 전역 핸들러가 잡은 처리되지 않은 오류(handled=false): SDK 내부 비동기 노이즈 — 지금처럼 버린다.
+ * - 앱이 직접 보고한 오류(handled=true): 보낸다. 단 네트워크·오프라인 일시 장애는 버린다.
+ */
+function isFirebaseSdkNoise(exception: SentryExceptionLike | undefined): boolean {
+    const frames = exception?.stacktrace?.frames;
+    if (!frames?.some(f => f.filename?.includes('/firebase-'))) return false;
+    if (exception?.mechanism?.handled === false) return true;
+    return TRANSIENT_FIREBASE_ERROR.test(exception?.value ?? '');
+}
+
 export function initSentry() {
     if (!SENTRY_DSN || sentryLoading || isLoopbackProductionBuild()) return;
 
@@ -348,15 +380,9 @@ function initSentryWithModule(Sentry: SentryModule) {
             // 개발 환경에서는 전송하지 않음
             if (import.meta.env.DEV) return null;
 
-            // Firebase SDK 번들 내부 에러 필터링 (Vite 빌드: firebase-{hash}.js)
+            // Firebase SDK 번들(Vite 빌드: firebase-{auth,db,storage,messaging}-{hash}.js) 발 오류 필터링
+            if (isFirebaseSdkNoise(event.exception?.values?.[0])) return null;
             const frames = event.exception?.values?.[0]?.stacktrace?.frames;
-            if (frames?.some(f =>
-                f.filename?.includes('/firebase-')
-                // [임시 주석 처리] App Check 에러 추적을 위해 recaptcha 스택트레이스 포함 시 허용
-                // || f.filename?.includes('recaptcha')
-            )) {
-                return null;
-            }
 
             // 인앱 브라우저(WebView)에서 HTML 문서가 네트워크로 스트리밍되다 잘려
             // 인라인 스크립트 파싱이 EOF/구문 오류로 실패하는 환경 노이즈 확정 차단.
