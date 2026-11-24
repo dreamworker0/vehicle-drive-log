@@ -60,6 +60,7 @@ export default function DashboardApiHealth() {
     const [internalResults, setInternalResults] = useState<ApiHealthResult[] | null>(null);
     const [loading, setLoading] = useState(false);
     const [resetting, setResetting] = useState(false);
+    const [backfilling, setBackfilling] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [lastChecked, setLastChecked] = useState<string | null>(null);
 
@@ -106,6 +107,47 @@ export default function DashboardApiHealth() {
             setResetting(false);
         }
     }, [runHealthCheck, confirm, showToast]);
+
+    /**
+     * 캘린더에 빠진 예약 일정 보충 — 미리 보기(dryRun)로 건수를 보여 주고, 확인하면 실행한다.
+     * 2026-10-25부터 예약 트리거가 메모리 초과로 죽어 캘린더에 못 올라간 예약을 메우는 운영 도구다.
+     */
+    const backfillCalendar = useCallback(async () => {
+        type OrgRow = { orgName: string; toCreate: number; toDelete: number; skippedVehicle: number };
+        type Result = { toCreate: number; toDelete: number; remaining: number; message: string; orgs: OrgRow[] };
+        const functions = getFunctions(undefined, 'asia-northeast3');
+        // 캘린더 호출이 수백 건이라 기본 70초 제한을 넘을 수 있다 — 서버 제한(540초)에 맞춘다.
+        const fn = httpsCallable<{ dryRun: boolean }, Result>(functions, 'backfillCalendarEvents', { timeout: 540_000 });
+        setBackfilling(true);
+        try {
+            const preview = (await fn({ dryRun: true })).data;
+            if (preview.toCreate + preview.toDelete === 0) {
+                showToast('보충할 일정이 없습니다.', 'success');
+                return;
+            }
+            const lines = preview.orgs
+                .filter((o) => o.toCreate + o.toDelete > 0)
+                .slice(0, 12)
+                .map((o) => `· ${o.orgName}: 생성 ${o.toCreate} · 삭제 ${o.toDelete}`);
+            const confirmed = await confirm({
+                title: '캘린더 누락 일정 보충',
+                message: [
+                    preview.message,
+                    '앞으로의 날짜만 대상입니다. 같은 제목·시각의 일정이 이미 있으면 새로 만들지 않고 연결만 합니다.',
+                    lines.join('\n'),
+                ].join('\n\n'),
+                confirmText: '보충 실행',
+                cancelText: '취소',
+            });
+            if (!confirmed) return;
+            const result = (await fn({ dryRun: false })).data;
+            showToast(result.message, result.remaining > 0 ? 'warning' : 'success');
+        } catch (err: unknown) {
+            showToast('보충 실패: ' + ((err as Error).message || '알 수 없는 오류'), 'error');
+        } finally {
+            setBackfilling(false);
+        }
+    }, [confirm, showToast]);
 
     // 컴포넌트 마운트 시 자동 실행
     useEffect(() => {
@@ -279,11 +321,18 @@ export default function DashboardApiHealth() {
                         <span className="inline-flex items-center gap-0.5 text-xs font-medium text-surface-600 dark:text-surface-400 bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded-full">
                             {internalResults.length}
                         </span>
+                        <button
+                            onClick={backfillCalendar}
+                            disabled={backfilling}
+                            className="ml-auto btn-ghost text-xs text-primary-600 dark:text-primary-400 flex items-center gap-1 disabled:opacity-50 min-h-[48px]"
+                        >
+                            {backfilling ? '보충 중...' : '📅 누락 일정 보충'}
+                        </button>
                         {hasCalendarIssue && (
                             <button
                                 onClick={resetCalendarSync}
                                 disabled={resetting}
-                                className="ml-auto btn-ghost text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 disabled:opacity-50 min-h-[48px]"
+                                className="btn-ghost text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1 disabled:opacity-50 min-h-[48px]"
                             >
                                 {resetting ? '리셋 중...' : '🔄 동기화 리셋'}
                             </button>

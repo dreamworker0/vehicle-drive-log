@@ -141,6 +141,37 @@ function buildEvent(reservation: ReservationData): calendar_v3.Schema$Event {
 }
 
 /**
+ * 이 예약과 같은 일정(같은 제목·같은 시작/종료 시각)이 캘린더에 이미 있으면 그 ID를 돌려준다.
+ *
+ * 일정에는 예약 ID 표식이 없어서, 누락 보충(`backfillCalendarEvents`)이 중복을 만들지 않으려면
+ * 앱이 만들었을 모양(`buildEvent`) 그대로 대조하는 수밖에 없다. 트리거가 일정을 만든 직후
+ * ID 저장 전에 죽었거나, 관리자가 손으로 같은 일정을 넣어 둔 경우가 여기에 걸린다.
+ */
+export async function findMatchingCalendarEventId(calendarId: string, reservation: ReservationData): Promise<string | null> {
+    const calendar = await getCalendarClient();
+    const want = buildEvent(reservation);
+    const start = new Date(`${reservation.date}T${reservation.startTime}:00+09:00`);
+    const end = new Date(`${reservation.date}T${reservation.endTime}:00+09:00`);
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) return null;
+
+    const res = await calendar.events.list({
+        calendarId,
+        timeMin: start.toISOString(),
+        timeMax: end.toISOString(),
+        singleEvents: true,
+        maxResults: 50,
+    });
+    const same = (a?: string | null, b?: Date) => !!a && !!b && new Date(a).getTime() === b.getTime();
+    const hit = (res.data.items || []).find((e) =>
+        e.status !== "cancelled"
+        && e.summary === want.summary
+        && same(e.start?.dateTime, start)
+        && same(e.end?.dateTime, end),
+    );
+    return hit?.id ?? null;
+}
+
+/**
  * 서비스 계정이 캘린더를 **읽기만** 할 수 있는 권한인가.
  *
  * events.list 응답 최상위의 `accessRole`(none·freeBusyReader·reader·writer·owner)로 판정한다.
