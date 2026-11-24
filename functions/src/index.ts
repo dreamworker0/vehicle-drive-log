@@ -117,7 +117,6 @@ export { trackFirstEmployee } from "./handlers/triggers/trackFirstEmployee";
 export { backfillOrgCoords } from "./handlers/callable/backfillOrgCoords";
 
 // 월별 집계(orgStats/monthly) 소급 재집계 (일회성 백필, superAdmin 호출)
-export { backfillMonthlyStats } from "./handlers/callable/backfillMonthlyStats";
 
 // 해지된 기관 즉시 파기 (superAdmin [영구 삭제])
 export { purgeOrganization } from "./handlers/callable/purgeOrganization";

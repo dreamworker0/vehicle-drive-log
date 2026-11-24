@@ -355,7 +355,7 @@ const NON_OPERATING_STATUSES = new Set(["rejected", "deleted"]);
  * 이 날짜가 지난 뒤(또는 더 오래된 달에) 들어온 소급 입력·수정은 **재집계 표시**로 잡는다
  * (`collectStaleMonths` — 운행일지는 트리거가 표시하고, 주유·하이패스·정비는 하루 동안 생기거나
  * 고쳐진 기록을 훑는다). 표시가 닿지 않는 경우(1년보다 오래된 달, 비용 기록 삭제)는 예전처럼
- * `backfillMonthlyStats` 콜러블을 더 큰 recentMonths로 1회 호출한다.
+ * `scripts/backfillMonthlyStats.ts`를 더 큰 `--months`로 1회 실행한다(2026-11-25 콜러블에서 옮김).
  */
 const PREV_MONTH_GRACE_DAY = 10;
 
