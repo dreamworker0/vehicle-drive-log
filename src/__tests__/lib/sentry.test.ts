@@ -233,3 +233,67 @@ describe('initSentry — IDB 백엔드 오류 억제 범위', () => {
         expect((options.beforeSend as BeforeSend)(event)).toBe(event);
     });
 });
+
+/**
+ * beforeSend — Firebase SDK 프레임이 섞인 오류의 필터 범위(2026-11-24 외부 리뷰 지적).
+ *
+ * 예전에는 SDK 프레임이 하나라도 있으면 모두 버려, 앱이 captureError로 직접 보고한
+ * Firestore 인덱스 누락 같은 실제 장애까지 사라졌다. 처리되지 않은 SDK 내부 노이즈와
+ * 네트워크·오프라인 일시 장애만 버리고 나머지는 보낸다.
+ */
+describe('initSentry — Firebase SDK 프레임 필터 범위', () => {
+    beforeEach(() => {
+        vi.resetModules();
+        vi.stubEnv('VITE_SENTRY_DSN', DSN);
+        vi.stubEnv('DEV', false);
+    });
+
+    afterEach(() => {
+        vi.unstubAllEnvs();
+        vi.doUnmock('../../lib/sentryClient');
+    });
+
+    type BeforeSend = (event: unknown) => unknown;
+
+    const firebaseEvent = (value: string, handled: boolean | undefined, filenames = [
+        'https://vehicle-drive-log.web.app/assets/index-abc.js',
+        'https://vehicle-drive-log.web.app/assets/firebase-db-def.js',
+    ]) => ({
+        exception: {
+            values: [{
+                type: 'FirebaseError',
+                value,
+                ...(handled === undefined ? {} : { mechanism: { type: handled ? 'generic' : 'auto.browser.global_handlers.onunhandledrejection', handled } }),
+                stacktrace: { frames: filenames.map(filename => ({ filename })) },
+            }],
+        },
+    });
+
+    it('앱이 직접 보고한 인덱스 누락 오류는 보낸다', async () => {
+        const options = await loadSentry();
+        const event = firebaseEvent('The query requires an index. You can create it here: https://console.firebase.google.com/...', true);
+        expect((options.beforeSend as BeforeSend)(event)).toBe(event);
+    });
+
+    it('처리되지 않은 SDK 내부 오류(handled=no)는 지금처럼 버린다', async () => {
+        const options = await loadSentry();
+        expect((options.beforeSend as BeforeSend)(firebaseEvent('Some internal SDK failure', false))).toBeNull();
+    });
+
+    it.each([
+        'Failed to get document because the client is offline.',
+        'Firebase: Error (auth/network-request-failed).',
+        'Firebase Storage: Max retry time for operation exceeded, please try again. (storage/retry-limit-exceeded)',
+        'deadline-exceeded',
+        'Failed to fetch',
+    ])('직접 보고했어도 네트워크·오프라인 일시 장애는 버린다: %s', async (value) => {
+        const options = await loadSentry();
+        expect((options.beforeSend as BeforeSend)(firebaseEvent(value, true))).toBeNull();
+    });
+
+    it('SDK 프레임이 없는 오류는 이 필터와 무관하다', async () => {
+        const options = await loadSentry();
+        const event = firebaseEvent('client is offline', true, ['https://vehicle-drive-log.web.app/assets/index-abc.js']);
+        expect((options.beforeSend as BeforeSend)(event)).toBe(event);
+    });
+});
