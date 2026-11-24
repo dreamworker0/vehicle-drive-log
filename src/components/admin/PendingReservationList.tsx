@@ -215,14 +215,14 @@ export default function PendingReservationList() {
                                     <button
                                         onClick={() => handleReject(res.id)}
                                         disabled={processingId !== null}
-                                        className="btn-outline flex-1 sm:flex-none h-9 px-4 text-sm border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-300 dark:border-red-900/40 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300 dark:hover:border-red-800/50 transition-all duration-300"
+                                        className="btn-outline flex-1 sm:flex-none h-12 sm:h-9 px-4 text-sm border-red-200 text-red-600 hover:bg-red-50 hover:text-red-700 hover:border-red-300 dark:border-red-900/40 dark:text-red-400 dark:hover:bg-red-900/20 dark:hover:text-red-300 dark:hover:border-red-800/50 transition-all duration-300"
                                     >
                                         반려
                                     </button>
                                     <button
                                         onClick={() => handleApprove(res.id)}
                                         disabled={processingId !== null}
-                                        className="btn-primary flex-1 sm:flex-none h-9 px-5 text-sm shadow-sm hover:shadow-md transition-all duration-300"
+                                        className="btn-primary flex-1 sm:flex-none h-12 sm:h-9 px-5 text-sm shadow-sm hover:shadow-md transition-all duration-300"
                                     >
                                         승인
                                     </button>

@@ -158,7 +158,7 @@ const DriverSection = memo(function DriverSection({
                         <button
                             type="button"
                             onClick={() => setActiveTab('driver')}
-                            className={`flex-1 min-h-[44px] rounded-md text-sm font-medium transition-all ${activeTab === 'driver'
+                            className={`flex-1 min-h-[48px] rounded-md text-sm font-medium transition-all ${activeTab === 'driver'
                                 ? 'bg-white dark:bg-surface-700 text-primary-700 dark:text-primary-300 shadow-sm'
                                 : 'text-surface-500 dark:text-surface-400'
                                 }`}
@@ -168,7 +168,7 @@ const DriverSection = memo(function DriverSection({
                         <button
                             type="button"
                             onClick={() => setActiveTab('coDriver')}
-                            className={`flex-1 min-h-[44px] rounded-md text-sm font-medium transition-all ${activeTab === 'coDriver'
+                            className={`flex-1 min-h-[48px] rounded-md text-sm font-medium transition-all ${activeTab === 'coDriver'
                                 ? 'bg-white dark:bg-surface-700 text-primary-700 dark:text-primary-300 shadow-sm'
                                 : 'text-surface-500 dark:text-surface-400'
                                 }`}
