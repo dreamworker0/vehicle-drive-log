@@ -237,6 +237,15 @@ describe('reservationTriggers', () => {
             }
         );
 
+        it('취소 예약의 calendarEventId만 지워지면 차량 조회·알림 없이 끝낸다 (누락 보충 도구가 지운 일정의 ID를 비운다)', async () => {
+            const base = { status: 'cancelled', vehicleId: 'v1', organizationId: 'org1', date: '2026-12-01', startTime: '09:00', endTime: '10:00', reservedByUid: 'u1', lastEditedByUid: 'admin1' };
+            const event = makeUpdateEvent({ ...base, calendarEventId: 'ev-old' }, base);
+            await (onReservationUpdated as Function)(event);
+            expect(mockGet).not.toHaveBeenCalled();
+            expect(mockUpdateCalendarEvent).not.toHaveBeenCalled();
+            expect(mockCreateInAppNotification).not.toHaveBeenCalled();
+        });
+
         it('시간은 그대로 두고 차량만 바꿔도 겹침 검사를 돌린다 (2026-10-03 감사 발견 1)', async () => {
             // 차량 변경이 조건에서 빠져 있던 동안은 차량만 바꾸면 이중 예약이 검사 없이 남았다
             mockCheckConflict.mockResolvedValueOnce(true);

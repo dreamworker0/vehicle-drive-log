@@ -3,7 +3,8 @@
  * - 지키는 것: superAdmin만, 기본은 미리 보기(쓰기·캘린더 호출 없음),
  *   앞으로의 날짜·확정 예약·일정 ID 없음만 생성(지난 날짜·승인 대기·역동기화 예약 제외),
  *   같은 일정이 이미 있으면 생성 대신 연결, 취소 예약에 남은 일정은 삭제,
- *   트리거와 같은 차량 기준(다른 기관 차량·실패 누적·기능 꺼짐·바인딩 불일치는 건너뜀),
+ *   트리거와 같은 차량 기준 — 캘린더와 무관한 차량(미연결·기능 꺼짐·다른 기관 차량)은 세지 않고,
+ *   연결됐지만 막힌 차량(실패 누적·바인딩 불일치)만 건너뜀으로 센다, 지운 일정의 ID는 비운다,
  *   한 건 실패가 나머지를 멈추지 않음
  */
 
@@ -18,6 +19,7 @@ const mockBound = jest.fn();
 
 jest.mock('firebase-admin/firestore', () => ({
     Timestamp: { fromDate: (d: Date) => ({ d }) },
+    FieldValue: { delete: () => 'DELETE_SENTINEL' },
     getFirestore: () => ({
         collection: (name: string) => {
             if (name === 'reservations') {
@@ -137,14 +139,25 @@ describe('backfillCalendarEvents — 대상 고르기', () => {
     it.each([
         ['다른 기관 차량', () => { vehicles.v1 = { organizationId: 'org2', googleCalendarId: CAL }; }],
         ['캘린더 ID 없음', () => { vehicles.v1 = { organizationId: 'org1', googleCalendarId: '' }; }],
-        ['실패 누적(쿨다운)', () => { vehicles.v1 = { organizationId: 'org1', googleCalendarId: CAL, calendarSyncFailCount: 3, calendarSyncLastFailAt: { toDate: () => new Date() } }; }],
         ['기관 연동 꺼짐', () => { mockCalendarEnabled.mockResolvedValue(false); }],
+    ])('%s — 캘린더와 무관한 차량은 대상도 건너뜀도 아니다', async (_label, setup) => {
+        setup();
+        mockReservationsGet.mockResolvedValue({ docs: [resv('r1', { status: 'reserved' })] });
+        const res = await handler({ auth: superAdmin, data: { dryRun: false } });
+        expect(res).toMatchObject({ toCreate: 0, skippedVehicle: 0, created: 0 });
+        expect(res.orgs).toEqual([]);
+        expect(mockCreate).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ['실패 누적(쿨다운)', () => { vehicles.v1 = { organizationId: 'org1', googleCalendarId: CAL, calendarSyncFailCount: 3, calendarSyncLastFailAt: { toDate: () => new Date() } }; }],
         ['바인딩 불일치', () => { mockBound.mockResolvedValue(false); }],
-    ])('%s 차량은 캘린더를 부르지 않고 건너뜀으로 센다', async (_label, setup) => {
+    ])('%s — 연결됐지만 막힌 차량은 캘린더를 부르지 않고 건너뜀으로 센다', async (_label, setup) => {
         setup();
         mockReservationsGet.mockResolvedValue({ docs: [resv('r1', { status: 'reserved' })] });
         const res = await handler({ auth: superAdmin, data: { dryRun: false } });
         expect(res).toMatchObject({ toCreate: 0, skippedVehicle: 1, created: 0 });
+        expect(res.orgs[0]).toMatchObject({ orgName: '기관-org1', skippedVehicle: 1 });
         expect(mockCreate).not.toHaveBeenCalled();
     });
 });
@@ -174,11 +187,22 @@ describe('backfillCalendarEvents — 실행', () => {
         expect(res).toMatchObject({ created: 0, linked: 1 });
     });
 
-    it('취소 예약에 남은 일정은 지운다', async () => {
-        mockReservationsGet.mockResolvedValue({ docs: [resv('r2', { status: 'cancelled', calendarEventId: 'ev-old' })] });
+    it('취소 예약에 남은 일정은 지우고, 다음 미리 보기에 다시 잡히지 않게 일정 ID를 비운다', async () => {
+        const c = resv('r2', { status: 'cancelled', calendarEventId: 'ev-old' });
+        mockReservationsGet.mockResolvedValue({ docs: [c] });
         const res = await handler({ auth: superAdmin, data: { dryRun: false } });
         expect(mockDelete).toHaveBeenCalledWith(CAL, 'ev-old');
+        expect(c.ref.update).toHaveBeenCalledWith({ calendarEventId: 'DELETE_SENTINEL' });
         expect(res).toMatchObject({ deleted: 1 });
+    });
+
+    it('일정 삭제가 실패하면 일정 ID를 남겨 둔다 — 다음 실행에서 다시 지울 수 있게', async () => {
+        const c = resv('r2', { status: 'cancelled', calendarEventId: 'ev-old' });
+        mockReservationsGet.mockResolvedValue({ docs: [c] });
+        mockDelete.mockRejectedValueOnce(Object.assign(new Error('Forbidden'), { code: 403 }));
+        const res = await handler({ auth: superAdmin, data: { dryRun: false } });
+        expect(c.ref.update).not.toHaveBeenCalled();
+        expect(res).toMatchObject({ deleted: 0, failed: 1 });
     });
 
     it('한 건이 실패해도 나머지를 계속 처리하고 실패 수를 센다', async () => {
