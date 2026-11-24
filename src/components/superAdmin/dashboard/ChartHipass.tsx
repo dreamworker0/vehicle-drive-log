@@ -5,6 +5,7 @@ import {
     PieChart, Pie,
 } from 'recharts';
 import { tooltipStyle, tooltipFormatter } from './dashboardUtils';
+import { CHART_NEUTRAL, CHART_SERIES } from '../../../lib/chartPalette';
 
 interface Props {
     hipassRatio: { withHipass: number; withoutHipass: number };
@@ -34,8 +35,8 @@ function ChartHipass({ hipassRatio, hipassTopOrgs }: Props) {
         const total = hipassRatio.withHipass + hipassRatio.withoutHipass;
         const pct = total > 0 ? Math.round((hipassRatio.withHipass / total) * 100) : 0;
         const donutData = [
-            { name: '연결됨', value: hipassRatio.withHipass, color: '#14b8a6' },
-            { name: '미연결', value: hipassRatio.withoutHipass, color: '#374151' },
+            { name: '연결됨', value: hipassRatio.withHipass, color: CHART_SERIES.teal },
+            { name: '미연결', value: hipassRatio.withoutHipass, color: CHART_NEUTRAL[700] },
         ];
 
         return (
@@ -76,12 +77,12 @@ function ChartHipass({ hipassRatio, hipassTopOrgs }: Props) {
                         </div>
                         <div className="space-y-3">
                             <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#14b8a6' }} />
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_SERIES.teal }} />
                                 <span className="text-sm text-surface-600 dark:text-surface-300">연결됨</span>
                                 <span className="text-sm font-bold text-surface-800 dark:text-surface-100 ml-auto">{hipassRatio.withHipass}대</span>
                             </div>
                             <div className="flex items-center gap-2">
-                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: '#374151' }} />
+                                <div className="w-3 h-3 rounded-full" style={{ backgroundColor: CHART_NEUTRAL[700] }} />
                                 <span className="text-sm text-surface-600 dark:text-surface-300">미연결</span>
                                 <span className="text-sm font-bold text-surface-800 dark:text-surface-100 ml-auto">{hipassRatio.withoutHipass}대</span>
                             </div>
@@ -100,10 +101,10 @@ function ChartHipass({ hipassRatio, hipassTopOrgs }: Props) {
                     {hipassTopOrgs.length > 0 ? (
                         <ResponsiveContainer width="100%" height={220} minWidth={1}>
                             <BarChart data={hipassTopOrgs} layout="vertical" margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
-                                <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} horizontal={false} />
-                                <XAxis type="number" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false}
+                                <CartesianGrid strokeDasharray="3 3" stroke={CHART_NEUTRAL[700]} opacity={0.3} horizontal={false} />
+                                <XAxis type="number" tick={{ fontSize: 11, fill: CHART_NEUTRAL[400] }} tickLine={false}
                                     axisLine={false} allowDecimals={false} />
-                                <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: '#d1d5db' }} tickLine={false}
+                                <YAxis type="category" dataKey="name" tick={{ fontSize: 12, fill: CHART_NEUTRAL[300] }} tickLine={false}
                                     axisLine={false} width={100} />
                                 <Tooltip {...tooltipStyle} formatter={tooltipFormatter('대', '하이패스 차량')} />
                                 <Bar dataKey="count" radius={[0, 6, 6, 0]}>

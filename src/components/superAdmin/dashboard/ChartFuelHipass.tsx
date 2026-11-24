@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { tooltipStyle, tooltipLocaleFormatter } from './dashboardUtils';
 import type { FuelStatsData, HipassStatsData } from './dashboardUtils';
+import { CHART_NEUTRAL, CHART_SERIES } from '../../../lib/chartPalette';
 
 interface Props {
     fuelStats: FuelStatsData | null;
@@ -77,17 +78,17 @@ function ChartFuelHipass({ fuelStats, hipassStats, dailyFuelCost, dailyHipassAmo
                                     <AreaChart data={dailyFuelCost} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                                         <defs>
                                             <linearGradient id="colorFuelCost" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                                                <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
+                                                <stop offset="5%" stopColor={CHART_SERIES.blue} stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor={CHART_SERIES.blue} stopOpacity={0} />
                                             </linearGradient>
                                         </defs>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-                                        <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false}
-                                            axisLine={{ stroke: '#4b5563' }} interval={Math.ceil(dailyFuelCost.length / 8)} />
-                                        <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false}
+                                        <CartesianGrid strokeDasharray="3 3" stroke={CHART_NEUTRAL[700]} opacity={0.3} />
+                                        <XAxis dataKey="date" tick={{ fontSize: 10, fill: CHART_NEUTRAL[400] }} tickLine={false}
+                                            axisLine={{ stroke: CHART_NEUTRAL[600] }} interval={Math.ceil(dailyFuelCost.length / 8)} />
+                                        <YAxis tick={{ fontSize: 10, fill: CHART_NEUTRAL[400] }} tickLine={false} axisLine={false}
                                             tickFormatter={(v: number) => v >= 10000 ? `${Math.round(v / 10000)}만` : v.toLocaleString()} />
                                         <Tooltip {...tooltipStyle} formatter={tooltipLocaleFormatter('원', '주유 금액')} />
-                                        <Area type="monotone" dataKey="cost" stroke="#3b82f6" strokeWidth={2} fill="url(#colorFuelCost)" />
+                                        <Area type="monotone" dataKey="cost" stroke={CHART_SERIES.blue} strokeWidth={2} fill="url(#colorFuelCost)" />
                                     </AreaChart>
                                 </ResponsiveContainer>
                             </div>
@@ -108,17 +109,17 @@ function ChartFuelHipass({ fuelStats, hipassStats, dailyFuelCost, dailyHipassAmo
                                     <AreaChart data={dailyHipassAmount} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                                         <defs>
                                             <linearGradient id="colorHipassAmt" x1="0" y1="0" x2="0" y2="1">
-                                                <stop offset="5%" stopColor="#14b8a6" stopOpacity={0.3} />
-                                                <stop offset="95%" stopColor="#14b8a6" stopOpacity={0} />
+                                                <stop offset="5%" stopColor={CHART_SERIES.teal} stopOpacity={0.3} />
+                                                <stop offset="95%" stopColor={CHART_SERIES.teal} stopOpacity={0} />
                                             </linearGradient>
                                         </defs>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-                                        <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false}
-                                            axisLine={{ stroke: '#4b5563' }} interval={Math.ceil(dailyHipassAmount.length / 8)} />
-                                        <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false}
+                                        <CartesianGrid strokeDasharray="3 3" stroke={CHART_NEUTRAL[700]} opacity={0.3} />
+                                        <XAxis dataKey="date" tick={{ fontSize: 10, fill: CHART_NEUTRAL[400] }} tickLine={false}
+                                            axisLine={{ stroke: CHART_NEUTRAL[600] }} interval={Math.ceil(dailyHipassAmount.length / 8)} />
+                                        <YAxis tick={{ fontSize: 10, fill: CHART_NEUTRAL[400] }} tickLine={false} axisLine={false}
                                             tickFormatter={(v: number) => v >= 10000 ? `${Math.round(v / 10000)}만` : v.toLocaleString()} />
                                         <Tooltip {...tooltipStyle} formatter={tooltipLocaleFormatter('원', '충전 금액')} />
-                                        <Area type="monotone" dataKey="amount" stroke="#14b8a6" strokeWidth={2} fill="url(#colorHipassAmt)" />
+                                        <Area type="monotone" dataKey="amount" stroke={CHART_SERIES.teal} strokeWidth={2} fill="url(#colorHipassAmt)" />
                                     </AreaChart>
                                 </ResponsiveContainer>
                             </div>

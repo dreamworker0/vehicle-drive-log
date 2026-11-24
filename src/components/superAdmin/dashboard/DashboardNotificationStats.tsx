@@ -7,6 +7,7 @@ import { tooltipStyle } from './dashboardUtils';
 import type { ValueType, NameType } from 'recharts/types/component/DefaultTooltipContent';
 import type { TooltipContentProps } from 'recharts/types/component/Tooltip';
 import type { NotifSummaryData } from './dashboardUtils';
+import { CHART_NEUTRAL, CHART_SERIES } from '../../../lib/chartPalette';
 
 interface Props {
     notifSummary: NotifSummaryData;
@@ -61,18 +62,18 @@ function DashboardNotificationStats({ notifSummary, dailyNotifStats, notifTypeSt
                         <AreaChart data={dailyNotifStats} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                             <defs>
                                 <linearGradient id="colorNotifSent" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#818cf8" stopOpacity={0.4} />
-                                    <stop offset="95%" stopColor="#818cf8" stopOpacity={0.05} />
+                                    <stop offset="5%" stopColor={CHART_SERIES.indigoLight} stopOpacity={0.4} />
+                                    <stop offset="95%" stopColor={CHART_SERIES.indigoLight} stopOpacity={0.05} />
                                 </linearGradient>
                                 <linearGradient id="colorNotifRead" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#34d399" stopOpacity={0.4} />
-                                    <stop offset="95%" stopColor="#34d399" stopOpacity={0.05} />
+                                    <stop offset="5%" stopColor={CHART_SERIES.emeraldLight} stopOpacity={0.4} />
+                                    <stop offset="95%" stopColor={CHART_SERIES.emeraldLight} stopOpacity={0.05} />
                                 </linearGradient>
                             </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-                            <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false}
-                                axisLine={{ stroke: '#4b5563' }} interval={Math.ceil(dailyNotifStats.length / 8)} />
-                            <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} tickLine={false} axisLine={false} allowDecimals={false} />
+                            <CartesianGrid strokeDasharray="3 3" stroke={CHART_NEUTRAL[700]} opacity={0.3} />
+                            <XAxis dataKey="date" tick={{ fontSize: 10, fill: CHART_NEUTRAL[400] }} tickLine={false}
+                                axisLine={{ stroke: CHART_NEUTRAL[600] }} interval={Math.ceil(dailyNotifStats.length / 8)} />
+                            <YAxis tick={{ fontSize: 10, fill: CHART_NEUTRAL[400] }} tickLine={false} axisLine={false} allowDecimals={false} />
                             <Tooltip {...tooltipStyle}
                                 content={({ active, payload, label }: TooltipContentProps<ValueType, NameType>) => {
                                     if (!active || !payload?.length) return null;
@@ -80,18 +81,18 @@ function DashboardNotificationStats({ notifSummary, dailyNotifStats, notifTypeSt
                                     if (!data) return null;
                                     const rate = data.sent > 0 ? Math.round((data.read / data.sent) * 100) : 0;
                                     return (
-                                        <div style={{ background: '#1f2937', border: '1px solid #374151', borderRadius: 8, padding: '10px 14px', fontSize: 13 }}>
-                                            <p style={{ color: '#e5e7eb', fontWeight: 600, marginBottom: 6 }}>{label}</p>
-                                            <p style={{ color: '#818cf8', margin: '3px 0' }}>📨 발송: <b>{data.sent}건</b></p>
-                                            <p style={{ color: '#34d399', margin: '3px 0' }}>✅ 읽음: <b>{data.read}건</b></p>
-                                            <p style={{ color: '#9ca3af', margin: '3px 0' }}>읽음률: <b>{rate}%</b></p>
+                                        <div style={{ background: CHART_NEUTRAL[800], border: `1px solid ${CHART_NEUTRAL[700]}`, borderRadius: 8, padding: '10px 14px', fontSize: 13 }}>
+                                            <p style={{ color: CHART_NEUTRAL[200], fontWeight: 600, marginBottom: 6 }}>{label}</p>
+                                            <p style={{ color: CHART_SERIES.indigoLight, margin: '3px 0' }}>📨 발송: <b>{data.sent}건</b></p>
+                                            <p style={{ color: CHART_SERIES.emeraldLight, margin: '3px 0' }}>✅ 읽음: <b>{data.read}건</b></p>
+                                            <p style={{ color: CHART_NEUTRAL[400], margin: '3px 0' }}>읽음률: <b>{rate}%</b></p>
                                         </div>
                                     );
                                 }} />
                             <Legend formatter={(value: string) => value === 'sent' ? '📨 발송' : '✅ 읽음'}
-                                wrapperStyle={{ fontSize: '13px', color: '#9ca3af' }} />
-                            <Area type="monotone" dataKey="sent" stackId="notif" stroke="#818cf8" strokeWidth={2} fill="url(#colorNotifSent)" />
-                            <Area type="monotone" dataKey="read" stackId="notif" stroke="#34d399" strokeWidth={2} fill="url(#colorNotifRead)" />
+                                wrapperStyle={{ fontSize: '13px', color: CHART_NEUTRAL[400] }} />
+                            <Area type="monotone" dataKey="sent" stackId="notif" stroke={CHART_SERIES.indigoLight} strokeWidth={2} fill="url(#colorNotifSent)" />
+                            <Area type="monotone" dataKey="read" stackId="notif" stroke={CHART_SERIES.emeraldLight} strokeWidth={2} fill="url(#colorNotifRead)" />
                         </AreaChart>
                     </ResponsiveContainer>
                 </div>

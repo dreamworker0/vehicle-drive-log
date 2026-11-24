@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { CHART_SERIES } from '../../../lib/chartPalette';
 
 interface Props {
     orgSizeDistribution: { label: string; count: number; color: string }[];
@@ -136,7 +137,7 @@ function ChartDistribution({
                     <div className="space-y-2">
                         {displayModelStats.length > 0 ? displayModelStats.map((item, idx) => {
                             const maxCount = displayModelStats[0]?.count || 1;
-                            const colors = ['#8b5cf6', '#6366f1', '#3b82f6', '#06b6d4', '#14b8a6', '#22c55e', '#84cc16', '#eab308', '#f59e0b', '#f97316', '#ef4444', '#ec4899', '#d946ef', '#a855f7', '#6d28d9'];
+                            const colors = [CHART_SERIES.violet, CHART_SERIES.indigo, CHART_SERIES.blue, CHART_SERIES.cyan, CHART_SERIES.teal, CHART_SERIES.green, CHART_SERIES.lime, CHART_SERIES.yellow, CHART_SERIES.amber, CHART_SERIES.orange, CHART_SERIES.red, CHART_SERIES.pink, CHART_SERIES.fuchsia, CHART_SERIES.purple, CHART_SERIES.violetDark];
                             const color = colors[idx % colors.length];
                             return (
                                 <div key={item.model}>

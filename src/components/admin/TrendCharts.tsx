@@ -9,6 +9,7 @@ import {
 import HeatmapGrid from '../common/HeatmapGrid';
 import useChartTheme from '../../hooks/useChartTheme';
 import DriveOriginChart, { type DriveOriginPoint, type DriveOriginRow } from './DriveOriginChart';
+import { CHART_SERIES } from '../../lib/chartPalette';
 
 interface ChartPayloadEntry {
     value: number;
@@ -18,7 +19,7 @@ interface ChartPayloadEntry {
     payload?: Record<string, unknown>;
 }
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#f97316'];
+const COLORS = [CHART_SERIES.blue, CHART_SERIES.emerald, CHART_SERIES.amber, CHART_SERIES.red, CHART_SERIES.violet, CHART_SERIES.cyan, CHART_SERIES.pink, CHART_SERIES.orange];
 
 function SectionTitle({ title }: { title: string; icon?: string }) {
     return (
@@ -84,8 +85,8 @@ export default function TrendCharts({
                 {hasTrend ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {([
-                            { key: 'count', label: '운행 횟수', unit: '건', color: '#3b82f6' },
-                            { key: 'distance', label: '주행거리', unit: 'km', color: '#10b981' },
+                            { key: 'count', label: '운행 횟수', unit: '건', color: CHART_SERIES.blue },
+                            { key: 'distance', label: '주행거리', unit: 'km', color: CHART_SERIES.emerald },
                         ] as const).map(m => (
                             <div key={m.key}>
                                 <p className="text-xs font-medium text-surface-500 dark:text-surface-400 mb-1">{m.label} ({m.unit})</p>
@@ -140,10 +141,10 @@ export default function TrendCharts({
                             <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 11, fill: t.tick }} unit="%" />
                             <YAxis dataKey="name" type="category" width={80} tick={{ fontSize: 11, fill: t.tickStrong }} />
                             <Tooltip content={<UtilTooltip />} cursor={t.cursor} />
-                            <Bar dataKey="rate" name="가동률" fill="#8b5cf6" radius={[0, 6, 6, 0]} barSize={20}>
+                            <Bar dataKey="rate" name="가동률" fill={CHART_SERIES.violet} radius={[0, 6, 6, 0]} barSize={20}>
                                 {/* Recharts는 막대별 색을 <Cell>로만 받는다 — 예전 <rect>는 무시돼 전부 보라색이었다 */}
                                 {vehicleUtilization.map((v, i) => {
-                                    const color = v.rate >= 60 ? '#10b981' : v.rate >= 30 ? '#f59e0b' : '#ef4444';
+                                    const color = v.rate >= 60 ? CHART_SERIES.emerald : v.rate >= 30 ? CHART_SERIES.amber : CHART_SERIES.red;
                                     return <Cell key={i} fill={color} />;
                                 })}
                             </Bar>

@@ -17,8 +17,9 @@ import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell
 } from 'recharts';
+import { CHART_SERIES, CHART_SLATE } from '../../lib/chartPalette';
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#ec4899', '#f97316'];
+const COLORS = [CHART_SERIES.blue, CHART_SERIES.emerald, CHART_SERIES.amber, CHART_SERIES.red, CHART_SERIES.violet, CHART_SERIES.cyan, CHART_SERIES.pink, CHART_SERIES.orange];
 
 /** 목록 그리드 컬럼 — 마지막 칸은 수정·삭제 버튼 두 개가 들어간다 */
 const GRID_COLUMNS = '2fr 1fr 1.5fr 2fr 2fr 1.5fr 1.5fr 88px';
@@ -156,11 +157,11 @@ export default function HipassChargeLogManager() {
                             <div className="w-full">
                                 <ResponsiveContainer width="100%" height={220} minWidth={1} minHeight={1}>
                                     <BarChart data={monthlyTrend} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
-                                        <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
-                                        <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#64748b' }} />
-                                        <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`} />
+                                        <CartesianGrid strokeDasharray="3 3" stroke={CHART_SLATE[100]} />
+                                        <XAxis dataKey="month" tick={{ fontSize: 11, fill: CHART_SLATE[500] }} />
+                                        <YAxis tick={{ fontSize: 11, fill: CHART_SLATE[400] }} tickFormatter={(v) => `${(v / 10000).toFixed(0)}만`} />
                                         <Tooltip formatter={(value) => [`${(value as number).toLocaleString()}원`, '충전액']} />
-                                        <Bar dataKey="amount" fill="#8b5cf6" radius={[6, 6, 0, 0]} barSize={32} />
+                                        <Bar dataKey="amount" fill={CHART_SERIES.violet} radius={[6, 6, 0, 0]} barSize={32} />
                                     </BarChart>
                                 </ResponsiveContainer>
                             </div>

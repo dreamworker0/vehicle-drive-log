@@ -3,6 +3,7 @@ import {
     PieChart, Pie, Cell, ResponsiveContainer, Tooltip
 } from 'recharts';
 import { tooltipStyle, tooltipFormatter } from './dashboardUtils';
+import { CHART_NEUTRAL, CHART_SERIES } from '../../../lib/chartPalette';
 
 interface Props {
     calendarSyncRatio: { sync: number; notSync: number };
@@ -29,8 +30,8 @@ function ChartCalendarSync({ calendarSyncRatio, calendarTopOrgs, calendarSyncOrg
         const pct = total > 0 ? Math.round((calendarSyncRatio.sync / total) * 100) : 0;
 
         const donutData = [
-            { name: '연동됨', value: calendarSyncRatio.sync, color: '#3b82f6' },
-            { name: '미연동', value: calendarSyncRatio.notSync, color: '#374151' },
+            { name: '연동됨', value: calendarSyncRatio.sync, color: CHART_SERIES.blue },
+            { name: '미연동', value: calendarSyncRatio.notSync, color: CHART_NEUTRAL[700] },
         ];
 
         return (

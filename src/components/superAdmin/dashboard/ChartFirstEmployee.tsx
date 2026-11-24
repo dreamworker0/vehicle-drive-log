@@ -5,6 +5,7 @@ import {
 } from 'recharts';
 import { tooltipFormatter } from './dashboardUtils';
 import type { FirstEmployeeStatsData } from './dashboardUtils';
+import { CHART_NEUTRAL, CHART_SERIES } from '../../../lib/chartPalette';
 
 interface Props {
     firstEmployeeStats: FirstEmployeeStatsData | null;
@@ -66,14 +67,14 @@ function ChartFirstEmployee({ firstEmployeeStats, firstEmployeeDist, firstEmploy
                             <h3 className="text-sm font-medium text-surface-600 dark:text-surface-400 mb-3">📊 소요일 분포</h3>
                             <ResponsiveContainer width="100%" height={220} minWidth={1}>
                                 <BarChart data={firstEmployeeDist} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-                                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false}
-                                        axisLine={{ stroke: '#4b5563' }} />
-                                    <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false} allowDecimals={false} />
+                                    <CartesianGrid strokeDasharray="3 3" stroke={CHART_NEUTRAL[700]} opacity={0.3} />
+                                    <XAxis dataKey="label" tick={{ fontSize: 11, fill: CHART_NEUTRAL[400] }} tickLine={false}
+                                        axisLine={{ stroke: CHART_NEUTRAL[600] }} />
+                                    <YAxis tick={{ fontSize: 11, fill: CHART_NEUTRAL[400] }} tickLine={false} axisLine={false} allowDecimals={false} />
                                     <Tooltip
-                                        contentStyle={{ background: '#1f2937', border: '1px solid #374151', borderRadius: 8, fontSize: 13 }}
-                                        labelStyle={{ color: '#e5e7eb', fontWeight: 600 }}
-                                        itemStyle={{ color: '#e5e7eb' }}
+                                        contentStyle={{ background: CHART_NEUTRAL[800], border: `1px solid ${CHART_NEUTRAL[700]}`, borderRadius: 8, fontSize: 13 }}
+                                        labelStyle={{ color: CHART_NEUTRAL[200], fontWeight: 600 }}
+                                        itemStyle={{ color: CHART_NEUTRAL[200] }}
                                         formatter={tooltipFormatter('개 기관', '기관 수')}
                                     />
                                     <Bar dataKey="count" radius={[6, 6, 0, 0]}>
@@ -94,23 +95,23 @@ function ChartFirstEmployee({ firstEmployeeStats, firstEmployeeDist, firstEmploy
                                 <AreaChart data={firstEmployeeTrend} margin={{ top: 5, right: 10, left: -10, bottom: 5 }}>
                                     <defs>
                                         <linearGradient id="colorFirstEmpTrend" x1="0" y1="0" x2="0" y2="1">
-                                            <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4} />
-                                            <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.05} />
+                                            <stop offset="5%" stopColor={CHART_SERIES.violet} stopOpacity={0.4} />
+                                            <stop offset="95%" stopColor={CHART_SERIES.violet} stopOpacity={0.05} />
                                         </linearGradient>
                                     </defs>
-                                    <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.3} />
-                                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false}
-                                        axisLine={{ stroke: '#4b5563' }} />
-                                    <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} tickLine={false} axisLine={false}
-                                        label={{ value: '일', position: 'insideTopLeft', style: { fontSize: 11, fill: '#9ca3af' } }} />
+                                    <CartesianGrid strokeDasharray="3 3" stroke={CHART_NEUTRAL[700]} opacity={0.3} />
+                                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: CHART_NEUTRAL[400] }} tickLine={false}
+                                        axisLine={{ stroke: CHART_NEUTRAL[600] }} />
+                                    <YAxis tick={{ fontSize: 11, fill: CHART_NEUTRAL[400] }} tickLine={false} axisLine={false}
+                                        label={{ value: '일', position: 'insideTopLeft', style: { fontSize: 11, fill: CHART_NEUTRAL[400] } }} />
                                     <Tooltip
-                                        contentStyle={{ background: '#1f2937', border: '1px solid #374151', borderRadius: 8, fontSize: 13 }}
-                                        labelStyle={{ color: '#e5e7eb', fontWeight: 600 }}
-                                        itemStyle={{ color: '#e5e7eb' }}
+                                        contentStyle={{ background: CHART_NEUTRAL[800], border: `1px solid ${CHART_NEUTRAL[700]}`, borderRadius: 8, fontSize: 13 }}
+                                        labelStyle={{ color: CHART_NEUTRAL[200], fontWeight: 600 }}
+                                        itemStyle={{ color: CHART_NEUTRAL[200] }}
                                         formatter={tooltipFormatter('일', '평균 소요일')}
                                     />
-                                    <Area type="monotone" dataKey="avg" stroke="#8b5cf6" strokeWidth={2.5}
-                                        fill="url(#colorFirstEmpTrend)" dot={{ r: 3, fill: '#8b5cf6' }} />
+                                    <Area type="monotone" dataKey="avg" stroke={CHART_SERIES.violet} strokeWidth={2.5}
+                                        fill="url(#colorFirstEmpTrend)" dot={{ r: 3, fill: CHART_SERIES.violet }} />
                                 </AreaChart>
                             </ResponsiveContainer>
                         </div>
