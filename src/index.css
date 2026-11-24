@@ -185,8 +185,8 @@
 
   .btn-sm {
     @apply text-sm px-3 py-1.5 rounded-lg;
-    min-height: 44px;
-    /* 모바일 접근성: 최소 터치 타겟 */
+    min-height: 48px;
+    /* 모바일 접근성: 최소 터치 타겟(D16 — 48px) */
   }
 
   @media (min-width: 640px) {
@@ -203,6 +203,23 @@
     @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl font-medium transition-all duration-200 ease-out focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] dark:focus:ring-offset-surface-900 p-2.5 rounded-xl;
     min-height: 44px;
     min-width: 44px;
+  }
+
+  /*
+   * 모바일 터치 타겟 48px(D16). 공용 버튼은 px-4 py-2.5에 글자 줄 높이를 더해 44px이라
+   * 4px 모자랐다. (.btn-icon 정의보다 뒤에 둬야 같은 우선순위에서 이긴다) 운전 중·이동 중에 누르는 폭(< 640px)에서만 올리고 데스크톱 밀도는 그대로 둔다.
+   * h-9처럼 높이를 직접 준 버튼도 min-height가 이겨 48px이 된다.
+   */
+  @media (max-width: 639.98px) {
+    .btn, .btn-primary, .btn-secondary, .btn-danger, .btn-success, .btn-ghost,
+    .btn-soft-primary, .btn-soft-blue, .btn-soft-amber, .btn-soft-red {
+      min-height: 48px;
+    }
+
+    .btn-icon {
+      min-height: 48px;
+      min-width: 48px;
+    }
   }
 
   /* 입력 필드 */
