@@ -31,6 +31,11 @@ export async function handleCancel(id: string, deps: CancelDeps) {
     if (target?.recurringGroupId) {
         const rGroupId = target.recurringGroupId;
         const groupCount = reservations.filter(r => r.recurringGroupId === rGroupId && r.status !== 'cancelled' && r.status !== 'completed').length;
+        // 아래 다일 예약과 같은 이유로, 취소할 것이 없으면 "반복 예약 그룹(0건)" 확인창을 띄우지 않는다
+        if (groupCount === 0) {
+            showToast('취소할 예약이 없습니다. 이미 완료되었거나 취소된 예약입니다.', 'error');
+            return;
+        }
 
         const choice = await confirm({
             title: '반복 예약 취소',

@@ -16,7 +16,9 @@ import useBaseFuelLog from './base/useBaseFuelLog';
 import { validateNonNegativeFields, parseIntegerInput } from './utils/numberValidation';
 import { roundFuelAmount } from '../lib/fuelFormat';
 
-const INITIAL_FORM = {
+// 기본 날짜는 폼을 비울 때마다 새로 계산한다 — 상수로 두면 모듈을 불러온 날짜에 고정돼,
+// 앱을 켜 둔 채 자정을 넘기면 새 기록의 기본 날짜가 전날로 남았다.
+const initialForm = () => ({
     vehicleId: '',
     vehicleName: '',
     date: toLocalDateStr(),
@@ -24,7 +26,7 @@ const INITIAL_FORM = {
     fuelAmount: '',
     fuelCost: '',
     notes: '',
-};
+});
 
 export default function useFuelLog() {
     const { user, userData } = useAuth();
@@ -41,7 +43,7 @@ export default function useFuelLog() {
 
     const [showForm, setShowForm] = useState(false);
     const [saving, setSaving] = useState(false);
-    const [form, setForm] = useState(INITIAL_FORM);
+    const [form, setForm] = useState(initialForm);
 
     // 수정 모드
     const [editingId, setEditingId] = useState<string | null>(null);
@@ -129,7 +131,7 @@ export default function useFuelLog() {
     // 수정 취소
     const handleCancelEdit = () => {
         setEditingId(null);
-        setForm(INITIAL_FORM);
+        setForm(initialForm());
         setShowForm(false);
     };
 
@@ -248,7 +250,7 @@ export default function useFuelLog() {
             setRecords(updated as FuelLog[]);
             setShowForm(false);
             setEditingId(null);
-            setForm(INITIAL_FORM);
+            setForm(initialForm());
         } catch (err) {
             console.error('주유 기록 저장 실패:', err);
             showToast('저장에 실패했습니다.', 'error');

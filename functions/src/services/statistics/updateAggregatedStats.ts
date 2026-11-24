@@ -70,7 +70,9 @@ export async function handleStatsOnUpdate(orgId: string, beforeData: FirebaseFir
     const distanceChange = afterDist - beforeDist;
     const beforeMonth = getMonthKey(beforeData);
     const afterMonth = getMonthKey(afterData);
-    const monthChanged = beforeMonth && afterMonth && beforeMonth !== afterMonth;
+    // 한쪽에만 월이 있어도(timestamp가 생기거나 사라짐) 버킷 이동이다 — 예전에는 둘 다 있을 때만 이동으로 봐서
+    // 새로 월이 생긴 기록은 거리 차이만 더해지고 건수·기존 거리는 그 달에 들어가지 않았다(월별 합 ≠ 전체).
+    const monthChanged = beforeMonth !== afterMonth;
 
     // 거리가 그대로여도 운전자·시각·하이패스 등이 바뀌면 그 달 분석 숫자가 달라진다 — 아래 조기 반환보다 먼저
     await markStaleMonths(orgId, [beforeMonth, afterMonth]);
@@ -84,17 +86,22 @@ export async function handleStatsOnUpdate(orgId: string, beforeData: FirebaseFir
     };
 
     if (monthChanged) {
+        // 기관 전체 건수는 그대로다 — 월 버킷 사이에서만 옮긴다
         payload.count = FieldValue.increment(0);
-        payload.monthlyStats = {
-            [beforeMonth!]: {
+        const monthlyStats: Record<string, { count: FieldValue; totalDistance: FieldValue }> = {};
+        if (beforeMonth) {
+            monthlyStats[beforeMonth] = {
                 count: FieldValue.increment(-1),
                 totalDistance: FieldValue.increment(-beforeDist),
-            },
-            [afterMonth!]: {
+            };
+        }
+        if (afterMonth) {
+            monthlyStats[afterMonth] = {
                 count: FieldValue.increment(1),
                 totalDistance: FieldValue.increment(afterDist),
-            },
-        };
+            };
+        }
+        payload.monthlyStats = monthlyStats;
     } else if (distanceChange !== 0 && afterMonth) {
         payload.monthlyStats = {
             [afterMonth]: {

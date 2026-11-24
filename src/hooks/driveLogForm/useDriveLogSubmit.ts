@@ -141,14 +141,20 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
                 address: (form.destination || '').trim(),
                 organizationId: orgId || '',
             });
-            setFavorites(await getFavorites(user.uid));
-            setShowFavSave(false);
-            setFavName('');
-            showToast('즐겨찾기에 저장되었습니다.', 'success');
         } catch (err) {
             console.error('즐겨찾기 저장 실패:', err);
             captureError(err, { context: 'useDriveLogForm.saveFavorite', destination: form.destination, orgId });
             showToast('즐겨찾기 저장에 실패했습니다.', 'error');
+            return;
+        }
+        // 저장 뒤 목록 재조회 실패를 "저장 실패"로 알리면 창이 열린 채 남아 다시 눌러 중복 저장된다 — 따로 다룬다
+        setShowFavSave(false);
+        setFavName('');
+        showToast('즐겨찾기에 저장되었습니다.', 'success');
+        try {
+            setFavorites(await getFavorites(user.uid));
+        } catch {
+            // 목록은 다음에 다시 읽는다
         }
     }, [form.destination, user, favName, orgId, setFavorites, setShowFavSave, setFavName, showToast]);
 

@@ -238,13 +238,14 @@ describe('sendInactiveOrgAlimtalkScheduled', () => {
             expect(mockSendReminder).not.toHaveBeenCalled();
         });
 
-        it('월요일 발송은 holidaySkipped=false, 화요일 이후 발송은 true로 남긴다', async () => {
-            jest.setSystemTime(new Date('2026-11-23T05:00:00Z')); // 월요일
+        // 2026-11-24 수정: 예전에는 "화요일 이후 실행"이면 공휴일과 무관하게 true였다.
+        it('holidaySkipped는 이번 주 월요일이 공휴일이었는지를 남긴다', async () => {
+            jest.setSystemTime(new Date('2026-11-24T05:00:00Z')); // 화요일, 월요일은 평일
             await run();
             expect(mockLogSet.mock.calls[0][1].holidaySkipped).toBe(false);
 
             mockLogSet.mockClear();
-            jest.setSystemTime(new Date('2026-11-24T05:00:00Z')); // 화요일
+            state.holidays = { '2026': { '2026-11-23': '임시공휴일' } };
             await run();
             expect(mockLogSet.mock.calls[0][1].holidaySkipped).toBe(true);
         });
@@ -330,15 +331,60 @@ describe('sendInactiveOrgAlimtalkScheduled', () => {
             expect(summaryAlert()).toBeDefined();
         });
 
-        // 현재 동작 고정: 전부 실패해도 sent=true가 남아 그 주에는 재시도하지 않는다.
-        // (일시 장애로 전부 실패한 주는 다음 주까지 리마인드가 나가지 않는다 — 의도인지 확인 필요)
-        it('전부 실패해도 그 주는 발송 완료로 기록된다 (현재 동작)', async () => {
-            state.targetOrgs = [org('o1', {})];
-            mockSendReminder.mockResolvedValue({ success: false, message: '프록시 환경변수 미설정' });
+        // 2026-11-24 수정: 예전에는 전부 실패해도 sent=true만 남아 그 주 리마인드가 통째로 사라졌다.
+        it('일시 실패가 있으면 재시도를 남기고, 다음 평일에는 받지 못한 기관에만 다시 보낸다', async () => {
+            state.targetOrgs = [org('ok', {}), org('fail', {})];
+            mockSendReminder
+                .mockResolvedValueOnce({ success: true })
+                .mockResolvedValueOnce({ success: false, message: '프록시 장애' });
 
             await run();
 
-            expect(mockLogSet.mock.calls[0][1]).toMatchObject({ sent: true, sentCount: 0, failCount: 1 });
+            const first = mockLogSet.mock.calls[0][1];
+            expect(first).toMatchObject({ sent: true, pendingRetry: true, sentOrgIds: ['ok'], attempts: 1, sentCount: 1, failCount: 1 });
+            expect(summaryAlert().description).toContain('다시 보냅니다');
+
+            // 다음 날: 지난 기록을 이어받는다
+            state.sentLog = first;
+            mockSendReminder.mockReset().mockResolvedValue({ success: true });
+            mockLogSet.mockClear();
+            jest.setSystemTime(new Date('2026-11-25T05:00:00Z')); // 수요일
+
+            await run();
+
+            expect(mockSendReminder).toHaveBeenCalledTimes(1);
+            expect(mockSendReminder).toHaveBeenCalledWith('010-0000-0000', 'fail-기관', 'fail-기관', 'CODE-fail');
+            expect(mockLogSet.mock.calls[0][1]).toMatchObject({
+                sent: true, pendingRetry: false, sentOrgIds: ['ok', 'fail'], attempts: 2, sentCount: 1, failCount: 0,
+            });
+        });
+
+        it('재시도가 끝난 주(pendingRetry=false)는 다시 돌지 않는다', async () => {
+            state.sentLog = { sent: true, pendingRetry: false, sentOrgIds: ['ok'] };
+            state.targetOrgs = [org('ok', {})];
+
+            await run();
+
+            expect(mockSendReminder).not.toHaveBeenCalled();
+            expect(mockLogSet).not.toHaveBeenCalled();
+        });
+
+        it('금요일 실패는 재시도를 남기지 않는다 — 그 주 마지막 실행이다', async () => {
+            jest.setSystemTime(new Date('2026-11-27T05:00:00Z')); // 금요일
+            state.targetOrgs = [org('o1', {})];
+            mockSendReminder.mockResolvedValue({ success: false, message: '프록시 장애' });
+
+            await run();
+
+            expect(mockLogSet.mock.calls[0][1]).toMatchObject({ sent: true, pendingRetry: false, failCount: 1 });
+        });
+
+        it('번호·초대코드 없음은 재시도 사유가 아니다 — 다시 해도 같다', async () => {
+            state.targetOrgs = [org('nophone', { applicantPhone: undefined }), org('nocode', { inviteCode: '' })];
+
+            await run();
+
+            expect(mockLogSet.mock.calls[0][1]).toMatchObject({ pendingRetry: false });
         });
     });
 

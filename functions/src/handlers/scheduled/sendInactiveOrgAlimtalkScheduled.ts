@@ -126,9 +126,9 @@ export const sendInactiveOrgAlimtalkScheduled = onSchedule(
 
         // 1. 공휴일 체크
         const holidayDoc = await db.collection("system").doc("holidays").get();
-        if (holidayDoc.exists) {
-            const holidaysData = holidayDoc.data();
-            if (holidaysData && holidaysData[y] && holidaysData[y][todayStr]) {
+        const holidaysData = holidayDoc.exists ? holidayDoc.data() : undefined;
+        if (holidaysData) {
+            if (holidaysData[y] && holidaysData[y][todayStr]) {
                 const holidayName = holidaysData[y][todayStr];
                 logger.info(`[Scheduled Alimtalk] 오늘(${todayStr})은 공휴일(${holidayName})이므로 발송을 스킵합니다.`);
                 return;
@@ -151,10 +151,15 @@ export const sendInactiveOrgAlimtalkScheduled = onSchedule(
 
         const logRef = db.collection("system").doc("alimtalkLogs").collection("inactiveOrg").doc(thisMondayStr);
         const logDoc = await logRef.get();
-        if (logDoc.exists && logDoc.data()?.sent) {
+        const prevLog = logDoc.exists ? logDoc.data() : undefined;
+        // pendingRetry: 지난 실행에서 일시 실패한 기관이 남았다 — 같은 주 다음 평일에 그 기관에만 다시 보낸다.
+        // 예전에는 전부 실패해도(프록시 장애 등) sent만 남아 그 주 리마인드가 통째로 사라졌다.
+        if (prevLog?.sent && !prevLog?.pendingRetry) {
             logger.info(`[Scheduled Alimtalk] 이번 주(${thisMondayStr} 주간)는 이미 발송이 완료되었습니다.`);
             return;
         }
+        // 이미 받은 기관 — 재시도 때 중복 발송하지 않는다
+        const alreadySent = new Set<string>(Array.isArray(prevLog?.sentOrgIds) ? prevLog.sentOrgIds : []);
 
         // 3. 지난주 월~일 기간 계산
         const lastWeekMondayKstTime = thisMondayKstTime - 7 * 24 * 60 * 60 * 1000;
@@ -179,8 +184,12 @@ export const sendInactiveOrgAlimtalkScheduled = onSchedule(
         let sentCount = 0;
         let failCount = 0;
         let noPhoneCount = 0;
+        /** 다시 보내 볼 만한 실패(발송 API 실패·예외) — 번호·초대코드 없음은 다시 시도해도 같으므로 세지 않는다 */
+        let retryableFailCount = 0;
+        const sentOrgIds = [...alreadySent];
 
         for (const orgDoc of orgsSnap.docs) {
+            if (alreadySent.has(orgDoc.id)) continue;
             const org = orgDoc.data();
 
             const membersSnap = await db.collection("users")
@@ -210,33 +219,46 @@ export const sendInactiveOrgAlimtalkScheduled = onSchedule(
                 const result = await sendReminderAlimtalk(phone, name, org.name, inviteCode);
                 if (result.success) {
                     sentCount++;
+                    sentOrgIds.push(orgDoc.id);
                 } else {
                     failCount++;
+                    retryableFailCount++;
                 }
                 results.push({ orgName: org.name, phone, success: result.success, message: result.message });
             } catch (err: unknown) {
                 failCount++;
+                retryableFailCount++;
                 results.push({ orgName: org.name, phone, success: false, message: (err as Error).message });
             }
         }
 
         logger.info(`[Scheduled Alimtalk] 발송 완료: 성공 ${sentCount}, 실패 ${failCount}, 번호없음 ${noPhoneCount}`);
 
+        // 금요일이 이 주 마지막 실행이다(스케줄 월~금) — 그 뒤로는 재시도를 남기지 않는다
+        const pendingRetry = retryableFailCount > 0 && dayOfWeek >= 1 && dayOfWeek < 5;
+        // 이번 주 월요일이 공휴일이라 화요일 이후로 밀렸는지 — 예전에는 "화요일 이후 실행"이면 무조건 true였다
+        const mondayYear = thisMondayStr.slice(0, 4);
+        const holidaySkipped = Boolean(holidaysData?.[mondayYear]?.[thisMondayStr]);
+
         await logRef.set({
             sent: true,
+            pendingRetry,
+            sentOrgIds,
+            attempts: (Number(prevLog?.attempts) || 0) + 1,
             sentAt: new Date(),
             sentCount,
             failCount,
             noPhoneCount,
             results,
             targetWeek: `${lastWeekMondayStr} ~ ${lastWeekSundayStr}`,
-            holidaySkipped: dayOfWeek > 1 ? true : false,
+            holidaySkipped,
         });
 
         // 5. 디스코드 알림 발송
         await sendDiscordAlert({
             title: "📢 미활성 기관 알림톡 발송 완료",
-            description: `미신청 기관에 대한 리마인드 알림톡 발송이 완료되었습니다.\n대상 가입일: ${lastWeekMondayStr} ~ ${lastWeekSundayStr}`,
+            description: `미신청 기관에 대한 리마인드 알림톡 발송이 완료되었습니다.\n대상 가입일: ${lastWeekMondayStr} ~ ${lastWeekSundayStr}`
+                + (pendingRetry ? `\n⚠️ 실패 ${retryableFailCount}건은 다음 평일 같은 시각에 다시 보냅니다(이미 받은 기관 제외).` : ""),
             color: 3066993,
             fields: [
                 { name: "발송 성공", value: `${sentCount}건`, inline: true },

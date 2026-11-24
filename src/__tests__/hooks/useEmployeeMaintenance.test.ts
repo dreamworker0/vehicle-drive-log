@@ -22,7 +22,8 @@ const authState: { user: { uid: string; displayName?: string } | null; userData:
 };
 vi.mock('../../hooks/useAuth', () => ({ useAuth: () => authState }));
 
-vi.mock('../../lib/dateUtils', () => ({ toLocalDateStr: () => '2026-11-24' }));
+const mockToday = vi.hoisted(() => ({ value: '2026-11-24' }));
+vi.mock('../../lib/dateUtils', () => ({ toLocalDateStr: () => mockToday.value }));
 
 const mockGetVehicles = vi.fn();
 const mockGetRecords = vi.fn();
@@ -164,6 +165,19 @@ describe('useEmployeeMaintenance', () => {
             expect(result.current.editingId).toBeNull();
             expect(result.current.showForm).toBe(false);
             expect(result.current.form).toMatchObject({ vehicleId: '', date: '2026-11-24', type: 'repair', cost: '' });
+        });
+
+        // 2026-11-24 수정: 기본 날짜가 모듈 로드 시점에 고정돼, 앱을 켜 둔 채 자정을 넘기면 전날로 남았다.
+        it('자정을 넘긴 뒤 폼을 비우면 기본 날짜가 그날로 바뀐다', async () => {
+            const { result } = await renderReady();
+            act(() => { result.current.handleEdit(MINE); });
+            mockToday.value = '2026-11-25';
+            try {
+                act(() => { result.current.handleCancelEdit(); });
+                expect(result.current.form.date).toBe('2026-11-25');
+            } finally {
+                mockToday.value = '2026-11-24';
+            }
         });
     });
 

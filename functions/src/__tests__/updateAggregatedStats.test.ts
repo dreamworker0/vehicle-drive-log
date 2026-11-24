@@ -182,9 +182,9 @@ describe('updateAggregatedStats', () => {
             expect(Object.keys(payload.monthlyStats)).toEqual(['2026-10', '2026-11']);
         });
 
-        // 현재 동작 고정: 수정 전 기록에 timestamp가 없다가 생기면(또는 그 반대) "달이 바뀜"으로 보지 않는다.
-        // 새 달에는 거리 차이만 더해지고 건수(+1)·기존 거리는 옮겨지지 않는다 — 월별 합이 전체와 어긋날 수 있다.
-        it('수정 전 월을 모르면 이관하지 않고 새 달에 거리 차이만 더한다 (현재 동작)', async () => {
+        // 2026-11-24 수정: 한쪽에만 월이 있어도 버킷 이동으로 본다. 예전에는 둘 다 있을 때만 이동으로 봐서
+        // 새로 월이 생긴 기록은 거리 차이만 더해지고 건수(+1)·기존 거리는 들어가지 않았다(월별 합 ≠ 전체).
+        it('수정 전 월을 모르면 새 달에 건수·거리를 통째로 넣는다', async () => {
             await handleStatsOnUpdate('org1',
                 { startKm: 0, endKm: 10 },
                 { startKm: 0, endKm: 15, timestamp: nov });
@@ -192,16 +192,31 @@ describe('updateAggregatedStats', () => {
             expect(mockSet.mock.calls[0][0]).toEqual({
                 totalDistance: inc(5),
                 lastUpdatedAt: 'SERVER_TS',
-                monthlyStats: { '2026-11': { totalDistance: inc(5) } },
+                count: inc(0),
+                monthlyStats: { '2026-11': { count: inc(1), totalDistance: inc(15) } },
             });
         });
 
-        it('수정 후 월을 모르면 월별 값은 건드리지 않는다', async () => {
+        it('수정 후 월을 모르면 옛 달에서 건수·거리를 뺀다', async () => {
             await handleStatsOnUpdate('org1',
                 { startKm: 0, endKm: 10, timestamp: nov },
                 { startKm: 0, endKm: 15 });
 
+            expect(mockSet.mock.calls[0][0]).toEqual({
+                totalDistance: inc(5),
+                lastUpdatedAt: 'SERVER_TS',
+                count: inc(0),
+                monthlyStats: { '2026-11': { count: inc(-1), totalDistance: inc(-10) } },
+            });
+        });
+
+        it('양쪽 모두 월을 모르면 월별 값은 건드리지 않는다', async () => {
+            await handleStatsOnUpdate('org1',
+                { startKm: 0, endKm: 10 },
+                { startKm: 0, endKm: 15 });
+
             expect(mockSet.mock.calls[0][0]).not.toHaveProperty('monthlyStats');
+            expect(mockSet.mock.calls[0][0].totalDistance).toEqual(inc(5));
         });
 
         it('저장이 실패해도 던지지 않는다', async () => {
