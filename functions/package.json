@@ -51,10 +51,10 @@
         ],
         "coverageThreshold": {
             "global": {
-                "statements": 75,
-                "branches": 82,
-                "functions": 72,
-                "lines": 75
+                "statements": 85,
+                "branches": 86,
+                "functions": 79,
+                "lines": 85
             }
         },
         "maxWorkers": "50%",
