@@ -20,7 +20,11 @@
     content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="description" content="AI 계기판 인식, 예약, 길안내, 정비, 통계, 출력까지. 사회복지기관·비영리단체를 위한 무료 차량 관리 서비스." />
   <meta name="theme-color" content="#f8fafc" />
-  <link rel="canonical" href="https://drivelog.socialprism.co.kr/" />
+  <!--
+    canonical은 여기 두지 않는다 — 공개 페이지마다 SEOHead가 자기 주소로 붙인다. 정적으로 두면
+    모든 페이지에 홈(/) canonical이 하나 더 남아, 검색엔진이 이용약관·FAQ 등을 홈으로 합칠 수 있었다.
+    og:* 태그는 JS를 실행하지 않는 링크 미리보기(카카오톡 등)용이라 정적으로 유지한다.
+  -->
   <!-- theme-color 초기화 — 인라인이면 CSP에 'unsafe-inline'이 필요해 외부 파일로 둔다(defer 금지) -->
   <script src="/theme-init.js"></script>
   <meta name="mobile-web-app-capable" content="yes" />
