@@ -8,6 +8,7 @@
 import { onDocumentWritten } from "firebase-functions/firestore";
 import { getAuth } from "firebase-admin/auth";
 import * as logger from "firebase-functions/logger";
+import { isUserRole } from "../../utils/roles";
 
 export const setCustomClaims = onDocumentWritten(
     {
@@ -29,9 +30,9 @@ export const setCustomClaims = onDocumentWritten(
             }
 
             // 시스템에 정의된 역할만 Claims에 반영 — 예상 밖 값이 문서에 들어와도 권한 상승으로 이어지지 않도록 employee로 강등
-            const VALID_ROLES = ["superAdmin", "admin", "employee"];
+            // 역할 목록은 shared/roles.ts가 원본이다(프론트 스키마와 같은 목록)
             const newClaims = {
-                role: VALID_ROLES.includes(after.role) ? after.role : "employee",
+                role: isUserRole(after.role) ? after.role : "employee",
                 orgId: after.organizationId || null,
             };
 

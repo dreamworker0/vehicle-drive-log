@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { timestampSchema } from './common';
+import { USER_ROLES } from '../../shared/roles';
 
-export const userRoleSchema = z.enum(['employee', 'admin', 'superAdmin']);
+// 역할 목록의 단일 원본은 shared/roles.ts (서버 Claims 검증과 공유)
+export const userRoleSchema = z.enum(USER_ROLES);
 
 export const userSchema = z.object({
     uid: z.string().optional().catch(''),
