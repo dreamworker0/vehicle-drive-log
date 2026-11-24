@@ -5,11 +5,9 @@
  */
 
 const mockList = jest.fn();
-jest.mock('googleapis', () => ({
-    google: {
-        auth: { GoogleAuth: function GoogleAuth() { /* ADC */ } },
-        calendar: () => ({ events: { list: (...a: unknown[]) => mockList(...a) } }),
-    },
+jest.mock('@googleapis/calendar', () => ({
+    auth: { GoogleAuth: function GoogleAuth() { /* ADC */ } },
+    calendar: () => ({ events: { list: (...a: unknown[]) => mockList(...a) } }),
 }));
 
 import { findMatchingCalendarEventId } from '../services/calendar/calendarSync';

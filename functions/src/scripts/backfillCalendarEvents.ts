@@ -70,7 +70,8 @@ export const backfillCalendarEvents = onCall(
     {
         region: "asia-northeast3",
         timeoutSeconds: 540,
-        // googleapis를 불러온다 — cloud-functions.md §3.2
+        // 512MiB — 캘린더 라이브러리 때문이 아니라(전용 패키지라 +1.7MiB) `since` 이후 전 기관 예약을
+        // 한 번에 읽기 때문이다. 슈퍼관리자가 드물게 돌리는 도구라 비용 영향이 없어 여유를 둔다.
         memory: "512MiB",
         enforceAppCheck: false,
     },

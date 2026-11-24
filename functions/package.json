@@ -22,10 +22,10 @@
     "dependencies": {
         "@emailjs/nodejs": "^5.0.2",
         "@google/genai": "^2.32.0",
+        "@googleapis/calendar": "^20.2.0",
         "@sentry/node": "^11.12.0",
         "firebase-admin": "^14.5.0",
         "firebase-functions": "^7.4.0",
-        "googleapis": "^189.0.0",
         "nodemailer": "^10.5.0"
     },
     "devDependencies": {

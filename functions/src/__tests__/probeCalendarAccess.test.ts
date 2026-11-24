@@ -90,11 +90,9 @@ jest.mock('../services/calendar/calendarBinding', () => ({
 
 // ── Google Calendar mock ──
 const mockEventsList = jest.fn();
-jest.mock('googleapis', () => ({
-    google: {
-        auth: { GoogleAuth: class { } },
-        calendar: () => ({ events: { list: (...args: unknown[]) => mockEventsList(...args) } }),
-    },
+jest.mock('@googleapis/calendar', () => ({
+    auth: { GoogleAuth: class { } },
+    calendar: () => ({ events: { list: (...args: unknown[]) => mockEventsList(...args) } }),
 }));
 
 import { probeCalendarAccess } from '../handlers/callable/probeCalendarAccess';
@@ -118,7 +116,7 @@ const probe = probeCalendarAccess as unknown as Handler;
 /** 차량 문서 mock */
 const vehicle = (id: string, data: Record<string, unknown>) => ({ id, data: () => data });
 
-/** googleapis 오류 모양 */
+/** Google API 클라이언트 오류 모양 */
 const apiError = (code: number, message: string, reason?: string) =>
     Object.assign(new Error(message), { code, ...(reason ? { errors: [{ reason }] } : {}) });
 

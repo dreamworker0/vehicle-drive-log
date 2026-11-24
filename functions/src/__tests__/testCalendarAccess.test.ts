@@ -21,11 +21,9 @@ jest.mock('../utils/constants', () => ({
 jest.mock('../services/calendar/calendarBinding', () => ({
     getCalendarBindingOwner: (...args: unknown[]) => mockGetCalendarBindingOwner(...args),
 }));
-jest.mock('googleapis', () => ({
-    google: {
-        auth: { GoogleAuth: function GoogleAuth(this: unknown, opts: unknown) { mockGoogleAuth(opts); } },
-        calendar: () => ({ events: { list: (...args: unknown[]) => mockEventsList(...args) } }),
-    },
+jest.mock('@googleapis/calendar', () => ({
+    auth: { GoogleAuth: function GoogleAuth(this: unknown, opts: unknown) { mockGoogleAuth(opts); } },
+    calendar: () => ({ events: { list: (...args: unknown[]) => mockEventsList(...args) } }),
 }));
 jest.mock('firebase-functions/v2/https', () => ({
     onCall: (_opts: unknown, handler: (req: unknown) => unknown) => handler,

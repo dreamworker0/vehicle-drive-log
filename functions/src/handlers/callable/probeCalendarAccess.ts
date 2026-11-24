@@ -268,12 +268,12 @@ export const probeCalendarAccess = onCall<ProbeRequest>(
 
         const apiResult = new Map<string, { verdict: ProbeVerdict; detail?: string }>();
         if (needsApi.length > 0) {
-            // googleapis는 콜드스타트 비용이 커서 여기서 불러온다 (calendarSync.ts와 같은 이유).
-            const { google } = await import("googleapis");
-            const auth = new google.auth.GoogleAuth({
+            // 캘린더 전용 패키지를 호출 시점에 불러온다 (calendarSync.ts와 같은 이유).
+            const calendarApi = await import("@googleapis/calendar");
+            const auth = new calendarApi.auth.GoogleAuth({
                 scopes: ["https://www.googleapis.com/auth/calendar.readonly"],
             });
-            const calendar = google.calendar({ version: "v3", auth });
+            const calendar = calendarApi.calendar({ version: "v3", auth });
             const timeMin = new Date().toISOString();
 
             const results = await runPooled<{ verdict: ProbeVerdict; detail?: string }>(

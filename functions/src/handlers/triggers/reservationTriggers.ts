@@ -165,11 +165,11 @@ async function handleCalendarError(
 /**
  * 예약 생성 시 -> 캘린더 이벤트 생성
  */
-// 512MiB — 문서 1건만 처리하지만 캘린더 동기화가 googleapis를 불러오고, 그 순간 256MiB를 넘는다.
-// 2026-10-25부터 256MiB에서 메모리 초과로 매일 10~30회 죽어 예약이 캘린더에 올라가지 않았다(재시도 없음).
-// 비용 때문에 다시 낮추지 말 것 — cloud-functions.md §3.2.
+// memory는 전역 기본(256MiB). 2026-10-25~11-24에는 캘린더 동기화가 googleapis 전체 패키지(+118MiB)를
+// 불러와 256MiB에서 매일 10~30회 메모리 초과로 죽었고(예약이 캘린더에 안 올라감, 재시도 없음) 512MiB로
+// 올렸었다. 캘린더 전용 패키지(+1.7MiB)로 바꿔 되돌렸다 — googleapis 전체를 다시 들이지 말 것(§3.2).
 export const onReservationCreated = onDocumentCreated(
-    { document: "reservations/{reservationId}", memory: "512MiB" },
+    "reservations/{reservationId}",
     async (event) => {
     const reservation = event.data!.data();
     const reservationId = event.params.reservationId;
@@ -264,11 +264,11 @@ export const onReservationCreated = onDocumentCreated(
 /**
  * 예약 수정 시 -> 캘린더 이벤트 수정 또는 삭제 + 알림 전송
  */
-// 512MiB — 문서 1건만 처리하지만 캘린더 동기화가 googleapis를 불러오고, 그 순간 256MiB를 넘는다.
-// 2026-10-25부터 256MiB에서 메모리 초과로 매일 10~30회 죽어 예약이 캘린더에 올라가지 않았다(재시도 없음).
-// 비용 때문에 다시 낮추지 말 것 — cloud-functions.md §3.2.
+// memory는 전역 기본(256MiB). 2026-10-25~11-24에는 캘린더 동기화가 googleapis 전체 패키지(+118MiB)를
+// 불러와 256MiB에서 매일 10~30회 메모리 초과로 죽었고(예약이 캘린더에 안 올라감, 재시도 없음) 512MiB로
+// 올렸었다. 캘린더 전용 패키지(+1.7MiB)로 바꿔 되돌렸다 — googleapis 전체를 다시 들이지 말 것(§3.2).
 export const onReservationUpdated = onDocumentUpdated(
-    { document: "reservations/{reservationId}", memory: "512MiB" },
+    "reservations/{reservationId}",
     async (event) => {
     const before = event.data!.before.data();
     const after = event.data!.after.data();
@@ -465,11 +465,11 @@ export const onReservationUpdated = onDocumentUpdated(
 /**
  * 예약 삭제 시 -> 캘린더 이벤트 삭제
  */
-// 512MiB — 문서 1건만 처리하지만 캘린더 동기화가 googleapis를 불러오고, 그 순간 256MiB를 넘는다.
-// 2026-10-25부터 256MiB에서 메모리 초과로 매일 10~30회 죽어 예약이 캘린더에 올라가지 않았다(재시도 없음).
-// 비용 때문에 다시 낮추지 말 것 — cloud-functions.md §3.2.
+// memory는 전역 기본(256MiB). 2026-10-25~11-24에는 캘린더 동기화가 googleapis 전체 패키지(+118MiB)를
+// 불러와 256MiB에서 매일 10~30회 메모리 초과로 죽었고(예약이 캘린더에 안 올라감, 재시도 없음) 512MiB로
+// 올렸었다. 캘린더 전용 패키지(+1.7MiB)로 바꿔 되돌렸다 — googleapis 전체를 다시 들이지 말 것(§3.2).
 export const onReservationDeleted = onDocumentDeleted(
-    { document: "reservations/{reservationId}", memory: "512MiB" },
+    "reservations/{reservationId}",
     async (event) => {
     const reservation = event.data!.data();
     const reservationId = event.params.reservationId;

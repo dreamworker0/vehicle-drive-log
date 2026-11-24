@@ -4,11 +4,12 @@
  * Firebase 기본 서비스 계정(ADC)으로 인증합니다.
  */
 
-// googleapis는 require에만 ~0.9초가 드는 초대형 패키지다. index.ts가 모든 함수를 한 번들로
-// 묶으므로 최상단에서 import하면 캘린더와 무관한 함수까지 콜드스타트마다 그 비용을 낸다.
-// 타입은 컴파일 시 지워지는 `import type`으로, 런타임 객체는 실제 호출 시점에 동적 import로 가져온다.
-// (2026-08-28 Cloud Run 비용 점검)
-import type { calendar_v3 } from "googleapis";
+// 캘린더 클라이언트는 `googleapis` 전체 대신 캘린더 전용 패키지 `@googleapis/calendar`를 쓴다.
+// 전체 패키지는 300여 개 API를 한꺼번에 올려 require에 ~1.8초, 메모리 +118MiB가 들었고, 그 탓에
+// 캘린더 경로 함수가 256MiB에서 메모리 초과로 죽어 512MiB로 올려야 했다(#614). 전용 패키지는
+// 같은 API·타입에 +1.7MiB·~0.2초다(2026-11-24 실측, 함수 번들 위에서 RSS 비교).
+// 그래도 캘린더와 무관한 함수의 콜드스타트에 얹히지 않도록 런타임 객체는 호출 시점에 불러온다.
+import type { calendar_v3 } from "@googleapis/calendar";
 
 interface ReservationData {
     date: string;
@@ -35,13 +36,13 @@ interface CalendarEvent {
 }
 
 // ADC(Application Default Credentials)로 인증된 캘린더 클라이언트 생성
-// googleapis 로드는 Node 모듈 캐시가 받아 주므로 두 번째 호출부터는 비용이 없다.
+// 모듈 로드는 Node 모듈 캐시가 받아 주므로 두 번째 호출부터는 비용이 없다.
 async function getCalendarClient(): Promise<calendar_v3.Calendar> {
-    const { google } = await import("googleapis");
-    const auth = new google.auth.GoogleAuth({
+    const { calendar, auth } = await import("@googleapis/calendar");
+    const googleAuth = new auth.GoogleAuth({
         scopes: ["https://www.googleapis.com/auth/calendar"],
     });
-    return google.calendar({ version: "v3", auth });
+    return calendar({ version: "v3", auth: googleAuth });
 }
 
 /**
