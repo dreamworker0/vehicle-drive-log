@@ -153,8 +153,9 @@ export default defineConfig([
     },
     rules: {
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_', ignoreRestSiblings: true }],
-      // Firestore 문서 등 동적 데이터가 많아 any는 경고로만 둔다(점진적 제거 대상, 빌드는 막지 않음).
-      '@typescript-eslint/no-explicit-any': 'warn',
+      // any는 금지한다. 경고로 두고 점진적으로 걷어내 2026-11-24 기준 0건이 됐으므로 그 상태를 고정한다
+      // (lint:functions가 --max-warnings 0이라 사실상 막혀 있었지만, 규칙 수준에서 의도를 분명히 한다).
+      '@typescript-eslint/no-explicit-any': 'error',
       '@typescript-eslint/no-empty-object-type': 'off',
       'no-unused-vars': 'off',
       // 로그는 firebase-functions/logger로 남긴다(심각도·필드가 Cloud Logging에 구조화되어 실린다).

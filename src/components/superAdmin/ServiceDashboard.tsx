@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
 import { lazy, Suspense, useState } from 'react';
 import { useToast } from '../../hooks/useToast';
 import useServiceDashboard from '../../hooks/useServiceDashboard';
@@ -150,7 +149,7 @@ export default function ServiceDashboard() {
             ========================================= */}
             {activeTab === 'overview' && (
                 <div className="space-y-6 animate-fade-in">
-                    {summary.stats && <DashboardOverviewCards stats={summary.stats as any} />}
+                    {summary.stats && <DashboardOverviewCards stats={summary.stats} />}
 
                     {timeSeries.dailyActiveOrgStats && (
                         <Suspense fallback={
@@ -164,7 +163,7 @@ export default function ServiceDashboard() {
 
                     {summary.monthlyStats && (
                         <DashboardMonthlyMetrics
-                            monthlyStats={summary.monthlyStats as any}
+                            monthlyStats={summary.monthlyStats}
                             weeklyActiveRate={summary.weeklyActiveRate || { active: 0, total: 0 }}
                             onboardingStats={summary.onboardingStats || { total: 0, completed: 0, rate: 0 }}
                         />
@@ -177,7 +176,7 @@ export default function ServiceDashboard() {
                             </div>
                         }>
                             <ChartFirstEmployee
-                                firstEmployeeStats={summary.firstEmployeeStats as any}
+                                firstEmployeeStats={summary.firstEmployeeStats}
                                 firstEmployeeDist={summary.firstEmployeeDist || []}
                                 firstEmployeeTrend={summary.firstEmployeeTrend || []}
                             />
@@ -227,7 +226,7 @@ export default function ServiceDashboard() {
                     }>
                         <DashboardChartSection
                             dailyActiveUserStats={timeSeries.dailyActiveUserStats || []}
-                            firstEmployeeStats={summary.firstEmployeeStats as any || null}
+                            firstEmployeeStats={summary.firstEmployeeStats || null}
                             firstEmployeeDist={summary.firstEmployeeDist || []}
                             firstEmployeeTrend={summary.firstEmployeeTrend || []}
                             inputMethodStats={timeSeries.inputMethodStats || []}

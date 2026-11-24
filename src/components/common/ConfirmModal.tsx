@@ -5,7 +5,7 @@
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-interface Props {
+export interface ConfirmModalProps {
     open: boolean;
     title?: string;
     message?: string;
@@ -33,7 +33,7 @@ export default function ConfirmModal({
     confirmColor = 'primary',
     onConfirm,
     onCancel,
-}: Props) {
+}: ConfirmModalProps) {
     const [inputValue, setInputValue] = useState(inputDefault);
     const inputRef = useRef<HTMLInputElement>(null);
     const confirmBtnRef = useRef<HTMLButtonElement>(null);

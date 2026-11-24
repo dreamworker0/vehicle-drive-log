@@ -1,9 +1,10 @@
 import { useMemo } from 'react';
-import { toLocalDateStr } from '../../lib/dateUtils';
+import { toLocalDateStr, toDateOrNull, type TimestampLike } from '../../lib/dateUtils';
 
 interface DriveLogLike {
     date?: string;
-    timestamp?: { toDate?: () => Date };
+    // Firestore Timestamp 또는 Date(오프라인 큐가 심은 값) — 판정은 toDateOrNull 한 곳에서
+    timestamp?: TimestampLike;
     startKm: number;
     endKm: number;
     fuelAmount?: number;
@@ -29,7 +30,7 @@ function getMonthRange(offset = 0) {
 }
 
 function getLogDate(log: DriveLogLike): string {
-    const ts = log.timestamp?.toDate?.();
+    const ts = toDateOrNull(log.timestamp);
     return log.date || (ts ? toLocalDateStr(ts) : '');
 }
 

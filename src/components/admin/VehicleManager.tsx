@@ -7,6 +7,7 @@ import useVehicleManager from '../../hooks/useVehicleManager';
 import { useAuth } from '../../hooks/useAuth';
 import VehicleForm from './VehicleForm';
 import ConfirmModal from '../common/ConfirmModal';
+import type { ConfirmModalProps } from '../common/ConfirmModal';
 import CalendarSyncTroubleshootModal from './CalendarSyncTroubleshootModal';
 import { VEHICLE_TYPE_ICONS, getVehicleColor, isCalendarReadOnly } from '../../lib/constants';
 import { isVehicleBlocked } from '../../lib/vehicleUtils';
@@ -237,7 +238,7 @@ export default function VehicleManager() {
     };
 
     // 모달 props 결정
-    const getModalProps = () => {
+    const getModalProps = (): ConfirmModalProps => {
         if (!modal) return { open: false };
         const v = modal.vehicle;
         switch (modal.type) {
@@ -271,7 +272,7 @@ export default function VehicleManager() {
                     inputDefault: '노후화',
                     confirmText: '폐차 처리',
                     confirmColor: 'warning',
-                    onConfirm: confirmRetire,
+                    onConfirm: (reason) => { void confirmRetire(reason ?? ''); }, // 입력 모드라 항상 문자열이 온다
                     onCancel: closeModal,
                 };
             case 'restore':
@@ -351,8 +352,7 @@ export default function VehicleManager() {
             )}
 
             {/* 통합 확인/입력 모달 */}
-            {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-            <ConfirmModal {...getModalProps() as any} />
+            <ConfirmModal {...getModalProps()} />
 
             {/* 캘린더 동기화 문제 해결 모달 */}
             {calendarTroubleshootVehicle && (

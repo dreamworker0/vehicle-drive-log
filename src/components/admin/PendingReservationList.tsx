@@ -7,11 +7,11 @@ import { getPendingReservations, updateReservationStatus, rejectReservation, Res
 import { getVehicles } from '../../lib/firestore/vehicles';
 import type { Vehicle } from '../../types/vehicle';
 import { getOrganizationMembers } from '../../lib/firestore/users';
-import type { DocumentData } from 'firebase/firestore';
+import type { Reservation } from '../../types/reservation';
 
 export default function PendingReservationList() {
     const { userData } = useAuth();
-    const [pendingList, setPendingList] = useState<(DocumentData & { id: string })[]>([]);
+    const [pendingList, setPendingList] = useState<Reservation[]>([]);
     const [vehicles, setVehicles] = useState<Vehicle[]>([]);
     const [employees, setEmployees] = useState<Record<string, { displayName: string; department?: string }>>({});
     
@@ -206,7 +206,7 @@ export default function PendingReservationList() {
                                             </svg>
                                             <span className="flex-1 break-keep leading-tight mt-0.5">
                                                 <span className="font-medium">{res.destination}</span>
-                                                {res.reason && <span className="text-surface-500 dark:text-surface-400 font-normal"> - {res.reason}</span>}
+                                                {res.purpose && <span className="text-surface-500 dark:text-surface-400 font-normal"> - {res.purpose}</span>}
                                             </span>
                                         </div>
                                     </div>
