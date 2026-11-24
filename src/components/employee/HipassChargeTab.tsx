@@ -2,6 +2,7 @@
  * HipassChargeTab — 직원용 하이패스 충전 기록 탭
  * 카드 선택 → 충전금액 입력 → 잔액 자동 계산 → 충전 리스트
  */
+import { useId } from 'react';
 import useHipassCharge from '../../hooks/useHipassCharge';
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
 import { SkeletonBox, SkeletonList } from '../common/Skeleton';
@@ -19,6 +20,9 @@ export default function HipassChargeTab() {
         getVehicleById,
         currentUid,
     } = useHipassCharge();
+    const cardId = useId();
+    const dateId = useId();
+    const amountId = useId();
 
     if (loading) {
         return (
@@ -44,8 +48,9 @@ export default function HipassChargeTab() {
         <div className="animate-fade-in space-y-4">
             {/* 카드 선택 */}
             <div>
-                <label className="label text-xs">하이패스 카드 선택</label>
+                <label htmlFor={cardId} className="label text-xs">하이패스 카드 선택</label>
                 <select
+                    id={cardId}
                     value={selectedCardId}
                     onChange={e => handleCardSelect(e.target.value)}
                     className="input min-h-[48px]"
@@ -115,8 +120,9 @@ export default function HipassChargeTab() {
 
                             {/* 날짜 */}
                             <div>
-                                <label className="label text-xs">📅 날짜 <span className="text-red-500 dark:text-red-400">*</span></label>
+                                <label htmlFor={dateId} className="label text-xs">📅 날짜 <span className="text-red-500 dark:text-red-400">*</span></label>
                                 <input
+                                    id={dateId}
                                     type="date"
                                     value={form.date}
                                     onChange={e => setForm({ ...form, date: e.target.value })}
@@ -127,8 +133,9 @@ export default function HipassChargeTab() {
 
                             {/* 충전금액 */}
                             <div>
-                                <label className="label text-xs">💰 충전금액 (원) <span className="text-red-500 dark:text-red-400">*</span></label>
+                                <label htmlFor={amountId} className="label text-xs">💰 충전금액 (원) <span className="text-red-500 dark:text-red-400">*</span></label>
                                 <input
+                                    id={amountId}
                                     type="number"
                                     value={form.chargeAmount}
                                     onChange={e => setForm({ ...form, chargeAmount: stripNegative(e.target.value) })}

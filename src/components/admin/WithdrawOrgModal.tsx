@@ -2,7 +2,7 @@
  * WithdrawOrgModal — 기관 서비스 해지(자발적 탈퇴) 모달
  * 사유 선택 + (기타 시 상세) + 기관명 확인 입력 후 해지 진행
  */
-import { useState } from 'react';
+import { useState, useId } from 'react';
 import { WITHDRAW_REASON_LABELS } from '../../types/organization';
 import type { WithdrawReason } from '../../types/organization';
 
@@ -17,6 +17,7 @@ const REASON_ORDER: WithdrawReason[] = ['no_longer_needed', 'too_difficult', 'mi
 
 export default function WithdrawOrgModal({ orgName, submitting, onClose, onConfirm }: WithdrawOrgModalProps) {
     const [reason, setReason] = useState<WithdrawReason | null>(null);
+    const reasonLabelId = useId();
     const [detail, setDetail] = useState('');
     const [confirmName, setConfirmName] = useState('');
 
@@ -67,8 +68,8 @@ export default function WithdrawOrgModal({ orgName, submitting, onClose, onConfi
 
                     {/* 사유 선택 */}
                     <div>
-                        <label className="label">해지 사유 <span className="text-red-500 dark:text-red-400">*</span></label>
-                        <div className="space-y-2">
+                        <span className="label" id={reasonLabelId}>해지 사유 <span className="text-red-500 dark:text-red-400">*</span></span>
+                        <div className="space-y-2" role="radiogroup" aria-labelledby={reasonLabelId}>
                             {REASON_ORDER.map((r) => (
                                 <label
                                     key={r}

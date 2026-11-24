@@ -5,7 +5,7 @@
  * 새 기록을 만드는 폼이 아니라 **이미 있는 기록을 고치는 폼**이므로 수정 중일 때만 뜬다.
  * 주유원은 바꾸지 않는다(useFuelLogAdmin 주석 참고) — 그래서 읽기 전용으로만 보여 준다.
  */
-import { memo, useEffect, useRef } from 'react';
+import { memo, useEffect, useId, useRef } from 'react';
 import type { FuelLog } from '../../../types/fuelLog';
 import type { Vehicle } from '../../../types/vehicle';
 import type { FuelLogEditForm as FormData } from '../../../hooks/useFuelLogAdmin';
@@ -37,6 +37,13 @@ export default memo(function FuelLogEditForm({
         formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, [record.id]);
 
+    const vehicleSelectId = useId();
+    const dateId = useId();
+    const meterId = useId();
+    const amountId = useId();
+    const costId = useId();
+    const notesId = useId();
+
     return (
         <form ref={formRef} onSubmit={onSubmit} className="glass-card p-5 mb-6 space-y-4 animate-fade-in border-l-4 border-primary-400">
             <div>
@@ -49,8 +56,8 @@ export default memo(function FuelLogEditForm({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                    <label className="label">차량 <span className="text-red-500 dark:text-red-400">*</span></label>
-                    <select value={form.vehicleId} onChange={e => onVehicleSelect(e.target.value)} className="input min-h-[48px]" required>
+                    <label className="label" htmlFor={vehicleSelectId}>차량 <span className="text-red-500 dark:text-red-400">*</span></label>
+                    <select id={vehicleSelectId} value={form.vehicleId} onChange={e => onVehicleSelect(e.target.value)} className="input min-h-[48px]" required>
                         <option value="">선택</option>
                         {/* 차량이 삭제된 기록도 고칠 수 있어야 한다 — 목록에 없는 차량이면
                             기록에 남아 있는 이름으로 항목을 하나 만들어 준다. 없으면 select가
@@ -63,8 +70,9 @@ export default memo(function FuelLogEditForm({
                     </select>
                 </div>
                 <div>
-                    <label className="label">날짜 <span className="text-red-500 dark:text-red-400">*</span></label>
+                    <label className="label" htmlFor={dateId}>날짜 <span className="text-red-500 dark:text-red-400">*</span></label>
                     <input
+                        id={dateId}
                         type="date"
                         value={form.date}
                         onChange={e => setForm(prev => ({ ...prev, date: e.target.value }))}
@@ -76,8 +84,9 @@ export default memo(function FuelLogEditForm({
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
-                    <label className="label">주유미터 (km) <span className="text-red-500 dark:text-red-400">*</span></label>
+                    <label className="label" htmlFor={meterId}>주유미터 (km) <span className="text-red-500 dark:text-red-400">*</span></label>
                     <input
+                        id={meterId}
                         type="number"
                         min="0"
                         value={form.meterReading}
@@ -88,8 +97,9 @@ export default memo(function FuelLogEditForm({
                     />
                 </div>
                 <div>
-                    <label className="label">{isChargeable ? '충전량 (kWh/kg)' : '주유량 (L)'} <span className="text-red-500 dark:text-red-400">*</span></label>
+                    <label className="label" htmlFor={amountId}>{isChargeable ? '충전량 (kWh/kg)' : '주유량 (L)'} <span className="text-red-500 dark:text-red-400">*</span></label>
                     <input
+                        id={amountId}
                         type="number"
                         step="0.001"
                         min="0"
@@ -101,8 +111,9 @@ export default memo(function FuelLogEditForm({
                     />
                 </div>
                 <div>
-                    <label className="label">{isChargeable ? '충전금액 (원)' : '주유금액 (원)'} <span className="text-red-500 dark:text-red-400">*</span></label>
+                    <label className="label" htmlFor={costId}>{isChargeable ? '충전금액 (원)' : '주유금액 (원)'} <span className="text-red-500 dark:text-red-400">*</span></label>
                     <input
+                        id={costId}
                         type="number"
                         min="0"
                         value={form.fuelCost}
@@ -115,8 +126,9 @@ export default memo(function FuelLogEditForm({
             </div>
 
             <div>
-                <label className="label">비고</label>
+                <label className="label" htmlFor={notesId}>비고</label>
                 <textarea
+                    id={notesId}
                     value={form.notes}
                     onChange={e => setForm(prev => ({ ...prev, notes: e.target.value }))}
                     className="input min-h-[60px] resize-none"

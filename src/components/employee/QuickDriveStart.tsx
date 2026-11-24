@@ -6,7 +6,7 @@
  * RouteInfoPanel · 동승자). 두 화면이 갈라지면 같은 일을 하는 자리가 서로 다르게 보이고,
  * 목적지 여러 곳 입력처럼 한쪽에만 있는 기능이 생긴다.
  */
-import { useMemo, useRef, useState } from 'react';
+import { useId, useMemo, useRef, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { canUseQuickDrive } from '../../lib/orgFeatures';
@@ -37,6 +37,7 @@ export default function QuickDriveStart() {
     const { usageCounts } = useVehiclePriority();
     const { recentDestinations } = useReservationPattern();
     const destinationRef = useRef<HTMLInputElement>(null);
+    const purposeId = useId();
     // 목적지 입력창에 아직 칩으로 확정되지 않은 텍스트. 직원들이 Enter를 누르지 않고
     // 바로 "운행 시작"을 누르는 일이 잦아, 이 값도 목적지로 인정한다.
     const [pendingDestination, setPendingDestination] = useState('');
@@ -110,8 +111,9 @@ export default function QuickDriveStart() {
 
                     {/* 목적 */}
                     <div>
-                        <label className="label text-sm font-medium">📝 목적</label>
+                        <label htmlFor={purposeId} className="label text-sm font-medium">📝 목적</label>
                         <input
+                            id={purposeId}
                             type="text"
                             value={form.purpose}
                             onChange={e => setForm({ ...form, purpose: e.target.value })}

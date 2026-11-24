@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useId } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { getFavorites, createFavorite, deleteFavorite } from '../../lib/firestore';
 import { captureError } from '../../lib/sentry';
@@ -10,6 +10,8 @@ export default function FavoritesManager() {
     const { user, userData } = useAuth();
     const [favorites, setFavorites] = useState<Favorite[]>([]);
     const [loading, setLoading] = useState(true);
+    const nameId = useId();
+    const addressId = useId();
     const [newName, setNewName] = useState('');
     const [newAddress, setNewAddress] = useState('');
     const [adding, setAdding] = useState(false);
@@ -91,8 +93,9 @@ export default function FavoritesManager() {
             {showForm && (
                 <form onSubmit={handleAdd} className="glass-card p-4 mb-4 space-y-3 animate-fade-in">
                     <div>
-                        <label className="label">이름 (별칭) <span className="text-red-500 dark:text-red-400">*</span></label>
+                        <label htmlFor={nameId} className="label">이름 (별칭) <span className="text-red-500 dark:text-red-400">*</span></label>
                         <input
+                            id={nameId}
                             type="text"
                             value={newName}
                             onChange={e => setNewName(e.target.value)}
@@ -102,8 +105,9 @@ export default function FavoritesManager() {
                         />
                     </div>
                     <div>
-                        <label className="label">주소</label>
+                        <label htmlFor={addressId} className="label">주소</label>
                         <input
+                            id={addressId}
                             type="text"
                             value={newAddress}
                             onChange={e => setNewAddress(e.target.value)}

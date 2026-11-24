@@ -2,7 +2,7 @@
  * FeedbackForm — 건의하기 모달 컴포넌트
  * 텍스트 + 이미지(최대 3장) 첨부 가능
  */
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useId } from 'react';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import { storage } from '../../lib/firebase';
 import { createFeedback } from '../../lib/firestore/feedbacks';
@@ -36,6 +36,17 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
     const [success, setSuccess] = useState(false);
     const [error, setError] = useState('');
     const [showAskAI, setShowAskAI] = useState(false);
+    const fieldId = useId();
+
+    // ESC 키로 닫기 — 배경 클릭 닫기와 짝을 이루는 키보드 경로. AI 도우미 창이 위에 떠 있을 때는 그 창이 먼저다.
+    useEffect(() => {
+        if (showAskAI) return;
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose();
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [onClose, showAskAI]);
 
     const compressImage = async (file: File): Promise<File> => {
         try {
@@ -159,9 +170,8 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
 
     if (success) {
         return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose} role="presentation">
-                {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */}
-                <div className="bg-white dark:bg-surface-800 rounded-2xl p-8 max-w-sm mx-4 text-center animate-scale-in" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="feedback-success-title">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} role="presentation">
+                <div className="bg-white dark:bg-surface-800 rounded-2xl p-8 max-w-sm mx-4 text-center animate-scale-in" role="dialog" aria-modal="true" aria-labelledby="feedback-success-title">
                     <div className="w-16 h-16 mx-auto mb-4 bg-accent-100 dark:bg-accent-900/40 rounded-full flex items-center justify-center">
                         <svg aria-hidden="true" className="w-8 h-8 text-accent-600 dark:text-accent-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
@@ -175,11 +185,9 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose} role="presentation">
-            {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} role="presentation">
             <div
                 className="bg-white dark:bg-surface-800 rounded-2xl w-full max-w-lg mx-4 max-h-[90vh] overflow-y-auto animate-scale-in"
-                onClick={e => e.stopPropagation()}
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="feedback-form-title"
@@ -217,8 +225,9 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
                 {/* 폼 */}
                 <form onSubmit={handleSubmit} className="p-5 space-y-4">
                     <div>
-                        <label className="label">건의 내용 <span className="text-red-500 dark:text-red-400">*</span></label>
+                        <label htmlFor={`${fieldId}-message`} className="label">건의 내용 <span className="text-red-500 dark:text-red-400">*</span></label>
                         <textarea
+                            id={`${fieldId}-message`}
                             ref={textareaRef}
                             value={message}
                             onChange={e => setMessage(e.target.value)}
@@ -231,8 +240,8 @@ export default function FeedbackForm({ onClose }: FeedbackFormProps) {
 
                     {/* 이미지 첨부 */}
                     <div>
-                        <label className="label">이미지 첨부 (선택, 최대 3장)</label>
-                        <div className="flex gap-3 flex-wrap">
+                        <span id={`${fieldId}-images`} className="label">이미지 첨부 (선택, 최대 3장)</span>
+                        <div className="flex gap-3 flex-wrap" role="group" aria-labelledby={`${fieldId}-images`}>
                             {images.map((img, idx) => (
                                 <div key={idx} className="relative w-20 h-20 rounded-xl overflow-hidden border border-surface-200 dark:border-surface-600 group">
                                     <img src={img.preview} alt={`첨부 ${idx + 1}`} className="w-full h-full object-cover" />

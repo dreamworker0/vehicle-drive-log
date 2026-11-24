@@ -4,7 +4,7 @@
  * 폼 상태의 모양이 화면마다 달라 `form`/`setForm`을 통째로 받지 않고
  * 선택된 차량 id와 선택 콜백만 받는다.
  */
-import React, { useMemo } from 'react';
+import React, { useId, useMemo } from 'react';
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../../lib/constants';
 import { isVehicleBlocked, isVehicleRestrictedForUser } from '../../../lib/vehicleUtils';
 import { useAuth } from '../../../hooks/useAuth';
@@ -27,6 +27,7 @@ export default function VehicleSelector({
     destinationRef,
 }: VehicleSelectorProps) {
     const { user, orgFeatures } = useAuth();
+    const titleId = useId();
     // 사용 제한 차량은 맨 뒤로 (상위에서 정렬된 순서는 유지)
     const orderedVehicles = useMemo(() => [
         ...vehicles.filter(v => !isVehicleRestrictedForUser(v, user?.uid)),
@@ -34,8 +35,8 @@ export default function VehicleSelector({
     ], [vehicles, user?.uid]);
     return (
         <div>
-            <label className="label text-sm font-medium">🚘 차량 <span className="text-red-500 dark:text-red-400">*</span></label>
-            <div className="grid grid-cols-3 gap-2 mt-1.5">
+            <span id={titleId} className="label text-sm font-medium">🚘 차량 <span className="text-red-500 dark:text-red-400">*</span></span>
+            <div role="group" aria-labelledby={titleId} className="grid grid-cols-3 gap-2 mt-1.5">
                 {orderedVehicles.map(v => {
                     const isBlocked = isVehicleBlocked(v.maintenance);
                     const isRestricted = !isBlocked && isVehicleRestrictedForUser(v, user?.uid);

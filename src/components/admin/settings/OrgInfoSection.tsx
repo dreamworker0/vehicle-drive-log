@@ -2,6 +2,7 @@
  * OrgInfoSection — Settings의 기관 정보 입력 섹션(표시 전용)
  * 상태(form)와 저장 로직(handleSave)은 부모(useSettings)가 소유하고 props로 전달받는다.
  */
+import { useId } from 'react';
 import type { SettingsForm } from '../../../hooks/useSettings';
 
 interface OrgInfoSectionProps {
@@ -16,20 +17,26 @@ interface OrgInfoSectionProps {
 export default function OrgInfoSection({
     form, setForm, handlePhoneChange, handleSave, saving, onRequestFeedback,
 }: OrgInfoSectionProps) {
+    const nameId = useId();
+    const addressId = useId();
+    const adminEmailId = useId();
+    const phoneId = useId();
+
     return (
         <div className="glass-card p-6 mb-6">
             <h2 className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-4">기관 정보</h2>
             <form onSubmit={handleSave} className="space-y-4">
                 <div>
-                    <label className="label">기관명</label>
-                    <input type="text" value={form.name} className="input opacity-60 cursor-not-allowed min-h-[48px]" disabled />
+                    <label className="label" htmlFor={nameId}>기관명</label>
+                    <input id={nameId} type="text" value={form.name} className="input opacity-60 cursor-not-allowed min-h-[48px]" disabled />
                 </div>
                 <div>
-                    <label className="label">주소</label>
+                    <label className="label" htmlFor={addressId}>주소</label>
                     {form.address ? (
-                        <input type="text" value={form.address} className="input opacity-60 cursor-not-allowed min-h-[48px]" disabled />
+                        <input id={addressId} type="text" value={form.address} className="input opacity-60 cursor-not-allowed min-h-[48px]" disabled />
                     ) : (
                         <input
+                            id={addressId}
                             type="text"
                             value={form.address}
                             onChange={e => setForm({ ...form, address: e.target.value })}
@@ -42,12 +49,12 @@ export default function OrgInfoSection({
                     </p>
                 </div>
                 <div>
-                    <label className="label">관리자 이메일</label>
-                    <input type="email" value={form.adminEmail} onChange={e => setForm({ ...form, adminEmail: e.target.value })} className="input" />
+                    <label className="label" htmlFor={adminEmailId}>관리자 이메일</label>
+                    <input id={adminEmailId} type="email" value={form.adminEmail} onChange={e => setForm({ ...form, adminEmail: e.target.value })} className="input" />
                 </div>
                 <div>
-                    <label className="label">전화번호</label>
-                    <input type="tel" value={form.phone} onChange={handlePhoneChange} className="input min-h-[48px]" placeholder="010-0000-0000" />
+                    <label className="label" htmlFor={phoneId}>전화번호</label>
+                    <input id={phoneId} type="tel" value={form.phone} onChange={handlePhoneChange} className="input min-h-[48px]" placeholder="010-0000-0000" />
                 </div>
                 <button
                     type="button"

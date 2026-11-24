@@ -1,7 +1,7 @@
 /**
  * ReservationTypeSelector — 다일 예약 / 반복 예약 체크박스 + 다일 예약 날짜 선택
  */
-import { memo } from 'react';
+import { memo, useId } from 'react';
 import type { ReservationForm } from '../../../types/reservation';
 
 interface Props {
@@ -15,6 +15,7 @@ interface Props {
 }
 
 export default memo(function ReservationTypeSelector({ form, setForm, selectedDate, editingRecurringGroupId, hideRecurring = false }: Props) {
+    const endDateId = useId();
     // 반복 그룹 수정 중에는 두 체크박스가 **전환** 스위치가 된다 (handleSubmit이 같은 조건으로 판정).
     //  · 반복 체크를 끄면 → 수정을 누른 회차만 남기는 단건 전환
     //  · 다일을 체크하면 → 시작일~종료일 연속 예약으로 전환 (나머지 회차는 취소)
@@ -103,7 +104,7 @@ export default memo(function ReservationTypeSelector({ form, setForm, selectedDa
             {form.endDate && form.endDate > selectedDate && !form.isRecurring && (
                 <div className="grid grid-cols-2 gap-2 animate-fade-in">
                     <div>
-                        <label className="label text-xs text-surface-500 dark:text-surface-400">시작일</label>
+                        <span className="label text-xs text-surface-500 dark:text-surface-400">시작일</span>
                         <p className="text-sm text-surface-600 dark:text-surface-300 px-2 py-1.5 bg-surface-100 dark:bg-surface-700/50 rounded-lg h-[38px] flex items-center">
                             {selectedDate}
                             <span className="text-surface-500 dark:text-surface-400 ml-1 text-xs">
@@ -112,8 +113,9 @@ export default memo(function ReservationTypeSelector({ form, setForm, selectedDa
                         </p>
                     </div>
                     <div>
-                        <label className="label text-xs">종료일</label>
+                        <label htmlFor={endDateId} className="label text-xs">종료일</label>
                         <input
+                            id={endDateId}
                             type="date"
                             value={form.endDate}
                             min={selectedDate}

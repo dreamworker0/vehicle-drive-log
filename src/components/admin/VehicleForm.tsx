@@ -2,7 +2,7 @@
  * VehicleForm — 차량 등록/수정 모달 폼
  * VehicleManager에서 추출된 서브 컴포넌트
  */
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useId } from 'react';
 import { DEFAULT_FUEL } from '../../hooks/useVehicleManager';
 import type { Vehicle } from '../../types';
 import type { User } from '../../types/user';
@@ -114,6 +114,14 @@ export default function VehicleForm({
         }));
     };
     const [showSuggestions, setShowSuggestions] = useState(false);
+    const displayNameId = useId();
+    const modelNameId = useId();
+    const plateNumberId = useId();
+    const vehicleTypeLabelId = useId();
+    const fuelTypeLabelId = useId();
+    const siteLabelId = useId();
+    const currentSiteSelectId = useId();
+    const currentKmId = useId();
     const [activeIndex, setActiveIndex] = useState(-1);
     const modelInputRef = useRef<HTMLInputElement>(null);
     const suggestionsRef = useRef<HTMLUListElement>(null);
@@ -182,8 +190,9 @@ export default function VehicleForm({
                 </div>
                 <form onSubmit={onSubmit} className="space-y-4">
                     <div>
-                        <label className="label">표시 이름 <span className="text-red-500">*</span></label>
+                        <label className="label" htmlFor={displayNameId}>표시 이름 <span className="text-red-500">*</span></label>
                         <input
+                            id={displayNameId}
                             type="text" value={form.displayName}
                             onChange={e => setForm({ ...form, displayName: e.target.value })}
                             className="input" placeholder="예: 소나타2744" required
@@ -192,9 +201,10 @@ export default function VehicleForm({
                     </div>
                     <div className="grid grid-cols-2 gap-4">
                     <div>
-                            <label className="label">모델명 <span className="text-red-500">*</span></label>
+                            <label className="label" htmlFor={modelNameId}>모델명 <span className="text-red-500">*</span></label>
                             <div className="relative">
                                 <input
+                                    id={modelNameId}
                                     ref={modelInputRef}
                                     type="text"
                                     value={form.modelName}
@@ -245,8 +255,9 @@ export default function VehicleForm({
                             </div>
                         </div>
                         <div>
-                            <label className="label">차량번호 <span className="text-red-500">*</span></label>
+                            <label className="label" htmlFor={plateNumberId}>차량번호 <span className="text-red-500">*</span></label>
                             <input
+                                id={plateNumberId}
                                 type="text" value={form.plateNumber}
                                 onChange={e => setForm({ ...form, plateNumber: e.target.value })}
                                 className="input" placeholder="12가 3456" required
@@ -254,8 +265,8 @@ export default function VehicleForm({
                         </div>
                     </div>
                     <div>
-                        <label className="label">차종</label>
-                        <div className="grid grid-cols-5 gap-2">
+                        <span className="label" id={vehicleTypeLabelId}>차종</span>
+                        <div className="grid grid-cols-5 gap-2" role="group" aria-labelledby={vehicleTypeLabelId}>
                             {VEHICLE_TYPES.map(vt => (
                                 <button
                                     key={vt.value} type="button"
@@ -279,8 +290,8 @@ export default function VehicleForm({
                         </div>
                     </div>
                     <div>
-                        <label className="label">연료 유형</label>
-                        <div className="grid grid-cols-2 gap-2">
+                        <span className="label" id={fuelTypeLabelId}>연료 유형</span>
+                        <div className="grid grid-cols-2 gap-2" role="group" aria-labelledby={fuelTypeLabelId}>
                             {FUEL_TYPES.map(ft => (
                                 <button
                                     key={ft.id} type="button"
@@ -297,8 +308,8 @@ export default function VehicleForm({
                     </div>
                     {showSiteSelect && (
                     <div>
-                        <label className="label">기본 차고지</label>
-                        <div className="grid grid-cols-2 gap-2">
+                        <span className="label" id={siteLabelId}>기본 차고지</span>
+                        <div className="grid grid-cols-2 gap-2" role="group" aria-labelledby={siteLabelId}>
                             {orgSites.map(site => {
                                 const selected = (form.siteId || MAIN_SITE_ID) === site.id;
                                 return (
@@ -343,8 +354,9 @@ export default function VehicleForm({
                     )}
                     {showSiteSelect && form.siteVaries && (
                     <div data-testid="vehicle-current-site">
-                        <label className="label">현재 위치</label>
+                        <label className="label" htmlFor={currentSiteSelectId}>현재 위치</label>
                         <select
+                            id={currentSiteSelectId}
                             value={form.currentSiteId || MAIN_SITE_ID}
                             onChange={e => setForm({ ...form, currentSiteId: e.target.value })}
                             className="input"
@@ -362,7 +374,7 @@ export default function VehicleForm({
                     {orgFeatures.refuelFlag && editingVehicle && (
                     <div className="flex items-start justify-between gap-3" data-testid="vehicle-needs-refuel">
                         <div className="min-w-0">
-                            <label className="label mb-0">{refuelWord} 필요</label>
+                            <p className="label mb-0">{refuelWord} 필요</p>
                             <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">
                                 운전자가 운행일지에서 켜고 {refuelWord}일지를 쓰면 자동으로 꺼집니다 ·
                                 {refuelWord}일지를 쓰지 않는다면 여기서 직접 끄세요
@@ -380,8 +392,9 @@ export default function VehicleForm({
                     </div>
                     )}
                     <div>
-                        <label className="label">현재 누적 km</label>
+                        <label className="label" htmlFor={currentKmId}>현재 누적 km</label>
                         <input
+                            id={currentKmId}
                             type="number" min={0} value={form.currentKm}
                             onChange={e => setForm({ ...form, currentKm: stripNegative(e.target.value) })}
                             className="input" placeholder="0"

@@ -1,7 +1,7 @@
 /**
  * OrgEditForm — 기관명·주소 인라인 편집 폼
  */
-import { memo, useState } from 'react';
+import { memo, useId, useState } from 'react';
 
 interface Props {
     orgId: string;
@@ -14,6 +14,7 @@ interface Props {
 export default memo(function OrgEditForm({ orgId, initialName, initialAddress, onSave, onCancel }: Props) {
     const [form, setForm] = useState({ name: initialName, address: initialAddress });
     const [saving, setSaving] = useState(false);
+    const fieldId = useId();
 
     const handleSave = async (e: React.MouseEvent) => {
         e.stopPropagation();
@@ -39,8 +40,9 @@ export default memo(function OrgEditForm({ orgId, initialName, initialAddress, o
     return (
         <div role="presentation" className="space-y-3" onClick={e => e.stopPropagation()} onKeyDown={e => e.stopPropagation()}>
             <div>
-                <label className="text-xs font-medium text-surface-500 dark:text-surface-400 mb-1 block">기관명 <span className="text-red-500">*</span></label>
+                <label htmlFor={`${fieldId}-name`} className="text-xs font-medium text-surface-500 dark:text-surface-400 mb-1 block">기관명 <span className="text-red-500">*</span></label>
                 <input
+                    id={`${fieldId}-name`}
                     type="text"
                     value={form.name}
                     onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))}
@@ -49,8 +51,9 @@ export default memo(function OrgEditForm({ orgId, initialName, initialAddress, o
                 />
             </div>
             <div>
-                <label className="text-xs font-medium text-surface-500 dark:text-surface-400 mb-1 block">주소</label>
+                <label htmlFor={`${fieldId}-address`} className="text-xs font-medium text-surface-500 dark:text-surface-400 mb-1 block">주소</label>
                 <input
+                    id={`${fieldId}-address`}
                     type="text"
                     value={form.address}
                     onChange={e => setForm(prev => ({ ...prev, address: e.target.value }))}

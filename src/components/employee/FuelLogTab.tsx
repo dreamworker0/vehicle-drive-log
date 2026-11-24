@@ -2,7 +2,7 @@
  * FuelLogTab — 직원용 차량 관리 화면
  * 상단 탭 전환: 주유 | 충전 (하이패스) | 정비
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useId } from 'react';
 import useFuelLog from '../../hooks/useFuelLog';
 import { useAuth } from '../../hooks/useAuth';
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
@@ -43,6 +43,10 @@ export default function FuelLogTab() {
         ocrLoading, ocrError, ocrSuccess, ocrImageUrl, cameraInputRef, handleOcrCapture,
     } = useFuelLog();
     const { usageCounts } = useVehiclePriority();
+    const vehicleLabelId = useId();
+    const dateId = useId();
+    const meterId = useId();
+    const notesId = useId();
 
     if (loading) {
         return (
@@ -133,8 +137,8 @@ export default function FuelLogTab() {
                             </h2>
 
                             {/* 차량 선택 — VehicleSelector 재사용 */}
-                            <div>
-                                <label className="label text-xs">🚘 차량 <span className="text-red-500 dark:text-red-400">*</span></label>
+                            <div role="group" aria-labelledby={vehicleLabelId}>
+                                <span id={vehicleLabelId} className="label text-xs">🚘 차량 <span className="text-red-500 dark:text-red-400">*</span></span>
                                 <VehicleSelector
                                     vehicles={vehicles}
                                     selectedVehicleId={form.vehicleId}
@@ -145,8 +149,9 @@ export default function FuelLogTab() {
 
                             {/* 날짜 */}
                             <div>
-                                <label className="label text-xs">📅 날짜 <span className="text-red-500 dark:text-red-400">*</span></label>
+                                <label htmlFor={dateId} className="label text-xs">📅 날짜 <span className="text-red-500 dark:text-red-400">*</span></label>
                                 <input
+                                    id={dateId}
                                     type="date"
                                     value={form.date}
                                     onChange={e => setForm({ ...form, date: e.target.value })}
@@ -158,7 +163,7 @@ export default function FuelLogTab() {
                             {/* 주유미터 (현재 km) + 촬영 버튼 */}
                             <div>
                                 <div className="flex items-center justify-between mb-1">
-                                    <label className="label text-xs mb-0">🔢 주유미터 (현재 km) <span className="text-red-500 dark:text-red-400">*</span></label>
+                                    <label htmlFor={meterId} className="label text-xs mb-0">🔢 주유미터 (현재 km) <span className="text-red-500 dark:text-red-400">*</span></label>
                                     <button
                                         type="button"
                                         onClick={() => cameraInputRef.current?.click()}
@@ -186,6 +191,7 @@ export default function FuelLogTab() {
                                     />
                                 </div>
                                 <input
+                                    id={meterId}
                                     type="number"
                                     min="0"
                                     value={form.meterReading}
@@ -259,8 +265,9 @@ export default function FuelLogTab() {
 
                             {/* 비고 */}
                             <div>
-                                <label className="label text-xs">📝 비고</label>
+                                <label htmlFor={notesId} className="label text-xs">📝 비고</label>
                                 <textarea
+                                    id={notesId}
                                     value={form.notes}
                                     onChange={e => setForm({ ...form, notes: e.target.value })}
                                     className="input min-h-[60px] resize-none"

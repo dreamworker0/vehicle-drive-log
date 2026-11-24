@@ -4,6 +4,7 @@
  * 차량 차단(blockVehicle)은 관리자 전용이라 여기에는 노출하지 않는다.
  * 페이지 제목ㆍ탭 전환은 부모(FuelLogTab)가 소유하므로 여기서는 본문만 렌더한다.
  */
+import { useId } from 'react';
 import useEmployeeMaintenance from '../../hooks/useEmployeeMaintenance';
 import { MAINTENANCE_TYPES } from '../../hooks/useMaintenanceLog';
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
@@ -24,6 +25,13 @@ export default function MaintenanceTab() {
         currentUid,
     } = useEmployeeMaintenance();
     const { usageCounts } = useVehiclePriority();
+    const vehicleLabelId = useId();
+    const dateId = useId();
+    const typeLabelId = useId();
+    const descriptionId = useId();
+    const costId = useId();
+    const kmId = useId();
+    const shopId = useId();
 
     if (loading) {
         return (
@@ -61,8 +69,8 @@ export default function MaintenanceTab() {
                     </h2>
 
                     {/* 차량 선택 */}
-                    <div>
-                        <label className="label text-xs">🚘 차량 <span className="text-red-500 dark:text-red-400">*</span></label>
+                    <div role="group" aria-labelledby={vehicleLabelId}>
+                        <span id={vehicleLabelId} className="label text-xs">🚘 차량 <span className="text-red-500 dark:text-red-400">*</span></span>
                         <VehicleSelector
                             vehicles={vehicles}
                             selectedVehicleId={form.vehicleId}
@@ -73,8 +81,9 @@ export default function MaintenanceTab() {
 
                     {/* 날짜 */}
                     <div>
-                        <label className="label text-xs">📅 날짜 <span className="text-red-500 dark:text-red-400">*</span></label>
+                        <label htmlFor={dateId} className="label text-xs">📅 날짜 <span className="text-red-500 dark:text-red-400">*</span></label>
                         <input
+                            id={dateId}
                             type="date"
                             value={form.date}
                             onChange={e => setForm({ ...form, date: e.target.value })}
@@ -84,8 +93,8 @@ export default function MaintenanceTab() {
                     </div>
 
                     {/* 정비 유형 */}
-                    <div>
-                        <label className="label text-xs">🛠️ 유형 <span className="text-red-500 dark:text-red-400">*</span></label>
+                    <div role="group" aria-labelledby={typeLabelId}>
+                        <span id={typeLabelId} className="label text-xs">🛠️ 유형 <span className="text-red-500 dark:text-red-400">*</span></span>
                         <div className="grid grid-cols-3 gap-1.5">
                             {MAINTENANCE_TYPES.map(t => (
                                 <button
@@ -107,8 +116,9 @@ export default function MaintenanceTab() {
 
                     {/* 내용 */}
                     <div>
-                        <label className="label text-xs">📝 내용</label>
+                        <label htmlFor={descriptionId} className="label text-xs">📝 내용</label>
                         <textarea
+                            id={descriptionId}
                             value={form.description}
                             onChange={e => setForm({ ...form, description: e.target.value })}
                             className="input min-h-[60px] resize-none"
@@ -120,8 +130,9 @@ export default function MaintenanceTab() {
                     {/* 비용 + 주행거리 */}
                     <div className="grid grid-cols-2 gap-3">
                         <div>
-                            <label className="label text-xs">💰 비용 (원)</label>
+                            <label htmlFor={costId} className="label text-xs">💰 비용 (원)</label>
                             <input
+                                id={costId}
                                 type="number"
                                 min="0"
                                 value={form.cost}
@@ -131,8 +142,9 @@ export default function MaintenanceTab() {
                             />
                         </div>
                         <div>
-                            <label className="label text-xs">🔢 주행거리 (km)</label>
+                            <label htmlFor={kmId} className="label text-xs">🔢 주행거리 (km)</label>
                             <input
+                                id={kmId}
                                 type="number"
                                 min="0"
                                 value={form.km}
@@ -145,8 +157,9 @@ export default function MaintenanceTab() {
 
                     {/* 정비소 */}
                     <div>
-                        <label className="label text-xs">🏪 정비소</label>
+                        <label htmlFor={shopId} className="label text-xs">🏪 정비소</label>
                         <input
+                            id={shopId}
                             type="text"
                             value={form.shop}
                             onChange={e => setForm({ ...form, shop: e.target.value })}

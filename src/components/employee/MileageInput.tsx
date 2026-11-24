@@ -3,7 +3,7 @@
  * DriveLogForm에서 추출된 서브 컴포넌트
  */
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import React from 'react';
+import React, { useId } from 'react';
 import { stripNegative } from '../../hooks/utils/numberValidation';
 import type { DriveLog } from '../../types/driveLog';
 
@@ -49,6 +49,8 @@ export default function MileageInput({
     lastDriveLog,
     nextDriveLog,
 }: MileageInputProps) {
+    const startKmId = useId();
+    const endKmId = useId();
     return (
         <div className="glass-card p-4">
             <div className="flex items-center justify-between mb-3">
@@ -151,8 +153,9 @@ export default function MileageInput({
 
             <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <label className="label text-xs">출발 km <span className="text-red-500 dark:text-red-400">*</span></label>
+                    <label htmlFor={startKmId} className="label text-xs">출발 km <span className="text-red-500 dark:text-red-400">*</span></label>
                     <input
+                        id={startKmId}
                         type="number"
                         min={0}
                         value={form.startKm}
@@ -174,8 +177,9 @@ export default function MileageInput({
                     )}
                 </div>
                 <div>
-                    <label className="label text-xs">도착 km <span className="text-red-500 dark:text-red-400">*</span></label>
+                    <label htmlFor={endKmId} className="label text-xs">도착 km <span className="text-red-500 dark:text-red-400">*</span></label>
                     <input
+                        id={endKmId}
                         ref={endKmRef}
                         type="number"
                         min={0}

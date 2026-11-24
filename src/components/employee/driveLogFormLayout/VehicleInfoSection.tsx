@@ -1,4 +1,4 @@
-import { memo } from 'react';
+import { memo, useId } from 'react';
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../../lib/constants';
 import VehicleSelector from '../VehicleSelector';
 import type { Vehicle } from '../../../types/vehicle';
@@ -24,6 +24,7 @@ const VehicleInfoSection = memo(function VehicleInfoSection({
     usageCounts,
     handleVehicleSelect
 }: VehicleInfoSectionProps) {
+    const vehicleLabelId = useId();
     if (reservationData?.vehicleId || isEditMode) {
         return (
             <div className="glass-card p-4">
@@ -67,8 +68,8 @@ const VehicleInfoSection = memo(function VehicleInfoSection({
     }
 
     return (
-        <div>
-            <label className="label">차량 선택 <span className="text-red-500 dark:text-red-400">*</span></label>
+        <div role="group" aria-labelledby={vehicleLabelId}>
+            <span id={vehicleLabelId} className="label">차량 선택 <span className="text-red-500 dark:text-red-400">*</span></span>
             <VehicleSelector
                 vehicles={vehicles}
                 selectedVehicleId={form.vehicleId}

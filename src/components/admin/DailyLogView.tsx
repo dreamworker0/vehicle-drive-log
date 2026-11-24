@@ -2,7 +2,7 @@
  * DailyLogView — 일별일지 조회 컴포넌트
  * 날짜 + 차량 선택 → 운행/주유 데이터 조회 → 요약 + 테이블 표시 → PDF 다운로드
  */
-import React, { useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback, useId } from 'react';
 import useDailyLog from '../../hooks/useDailyLog';
 import { useToast } from '../../hooks/useToast';
 import { SkeletonBox } from '../common/Skeleton';
@@ -70,6 +70,8 @@ const DriveLogTableRow = React.memo(({ log }: { log: DriveLog }) => {
 });
 
 export default function DailyLogView() {
+    const dateId = useId();
+    const vehicleSelectId = useId();
     const { showToast } = useToast();
     const {
         selectedDate, setSelectedDate,
@@ -127,10 +129,11 @@ export default function DailyLogView() {
             <div className="glass-card p-4">
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
                     <div className="flex-1">
-                        <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1">
+                        <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1" htmlFor={dateId}>
                             날짜
                         </label>
                         <input
+                            id={dateId}
                             type="date"
                             value={selectedDate}
                             onChange={e => setSelectedDate(e.target.value)}
@@ -138,10 +141,11 @@ export default function DailyLogView() {
                         />
                     </div>
                     <div className="flex-1">
-                        <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1">
+                        <label className="block text-xs font-medium text-surface-500 dark:text-surface-400 mb-1" htmlFor={vehicleSelectId}>
                             차량
                         </label>
                         <select
+                            id={vehicleSelectId}
                             value={selectedVehicleId}
                             onChange={e => setSelectedVehicleId(e.target.value)}
                             className="input w-full min-h-[48px]"

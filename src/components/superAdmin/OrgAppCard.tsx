@@ -2,7 +2,7 @@
  * OrgAppCard — 기관 신청 카드 컴포넌트
  * OrgApplicationList에서 추출된 서브 컴포넌트
  */
-import { memo, useState } from 'react';
+import { memo, useId, useState } from 'react';
 import { formatTimestampFull } from '../../lib/dateUtils';
 import OrgDocumentViewer from './OrgDocumentViewer';
 import { hasOrgDocument } from '../../lib/orgDocument';
@@ -35,6 +35,7 @@ export default memo(function OrgAppCard({
 }: OrgAppCardProps) {
     const [isRejecting, setIsRejecting] = useState(false);
     const [rejectReason, setRejectReason] = useState('');
+    const rejectReasonId = useId();
 
     const handleRejectClick = () => {
         const defaultReason = app.aiVerifyDetail?.reason || '비영리 목적의 사업자등록증이 제출되지 않았거나 내용 식별이 어렵습니다.\n서류 보완 후 다시 신청해 주시기 바랍니다.';
@@ -261,10 +262,11 @@ export default memo(function OrgAppCard({
                             </>
                         ) : (
                             <div className="w-full p-3 rounded-lg bg-red-50 dark:bg-red-900/10 border border-red-100 dark:border-red-800/30">
-                                <label className="block text-xs font-semibold text-red-800 dark:text-red-300 mb-1.5 uppercase tracking-wide">
+                                <label htmlFor={rejectReasonId} className="block text-xs font-semibold text-red-800 dark:text-red-300 mb-1.5 uppercase tracking-wide">
                                     반려 사유 입력 (이메일 발송)
                                 </label>
                                 <textarea
+                                    id={rejectReasonId}
                                     value={rejectReason}
                                     onChange={(e) => setRejectReason(e.target.value)}
                                     className="w-full text-sm p-2 rounded-md border border-red-200 dark:border-red-800/50 bg-white dark:bg-surface-900 focus:ring-2 focus:ring-red-500/20 outline-none resize-none text-surface-900 dark:text-surface-100"
