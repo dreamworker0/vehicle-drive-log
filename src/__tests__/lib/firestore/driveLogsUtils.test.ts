@@ -221,7 +221,7 @@ describe('getAdjacentDriveLogs', () => {
 
     it('직후 기록은 오름차순으로 조회한다 — 뒤 기록이 많아도 끝에서 n번째가 아니라 바로 다음을 집는다', async () => {
         // 예전에는 내림차순 10건의 마지막을 써서, 뒤 기록이 10건을 넘으면 엉뚱한 최근 기록이
-        // '직후 기록'이 되고 수정 저장 때 그 출발 km가 덮어써졌다(2026-11-03 궁동 문의).
+        // '직후 기록'이 되고 수정 저장 때 그 출발 km가 덮어써졌다(2026-11-03 기관 문의).
         mockGetDocs.mockResolvedValue(snap([]));
         await getAdjacentDriveLogs('org1', 'v1', log());
 

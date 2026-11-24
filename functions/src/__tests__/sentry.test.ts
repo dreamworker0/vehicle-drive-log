@@ -209,6 +209,20 @@ describe('Sentry 수집 범위 — 요청에서 자동으로 거두는 것은 �
         }));
     });
 
+    it('init에 beforeSend로 이벤트 스크러버를 건다 — 예외 메시지 본체의 이메일까지 가린다', () => {
+        process.env.SENTRY_DSN_FUNCTIONS = 'https://examplePublicKey@o0.ingest.sentry.io/0';
+        const init = jest.fn();
+        jest.doMock('@sentry/node', () => ({ init, captureException: jest.fn(), captureMessage: jest.fn(), flush: jest.fn() }));
+        jest.doMock('../core/discord', () => ({ sendDiscordAlert: jest.fn().mockResolvedValue(undefined) }));
+
+        const { captureError } = require('../core/sentry');
+        captureError(new Error('boom'));
+
+        const { beforeSend } = init.mock.calls[0][0];
+        const out = beforeSend({ exception: { values: [{ value: 'denied hong@example.com' }] } });
+        expect(out.exception.values[0].value).toBe('denied ho***@example.com');
+    });
+
     it('진짜 SDK가 그 설정을 "모두 끔"으로 해석한다 — 키 이름이 틀리면 조용히 기본값(전부 수집)이 된다', async () => {
         // 목으로는 키 오타를 못 잡는다. 실제 SDK에 넣고 해석된 값을 본다(전송은 일어나지 않는다).
         const Sentry = jest.requireActual('@sentry/node');
@@ -227,5 +241,68 @@ describe('Sentry 수집 범위 — 요청에서 자동으로 거두는 것은 �
         } finally {
             await Sentry.close();
         }
+    });
+});
+
+/**
+ * 2026-11-24 — 백엔드 알림에도 프론트와 같은 개인정보 스크러빙을 건다(core/sentryScrub.ts).
+ * Discord 설명과 Sentry extra가 **같은 걸러진 문맥**을 받는지 본다.
+ */
+describe('captureError·captureWarning — 문맥의 개인정보를 걸러 보낸다', () => {
+    const OLD_ENV = process.env;
+
+    beforeEach(() => {
+        jest.resetModules();
+        process.env = { ...OLD_ENV, NODE_ENV: 'production', SENTRY_DSN_FUNCTIONS: 'https://examplePublicKey@o0.ingest.sentry.io/0' };
+    });
+
+    afterEach(() => {
+        process.env = OLD_ENV;
+        jest.restoreAllMocks();
+    });
+
+    function load() {
+        const sendDiscordAlert = jest.fn().mockResolvedValue(undefined);
+        const captureException = jest.fn();
+        const captureMessage = jest.fn();
+        jest.doMock('@sentry/node', () => ({ init: jest.fn(), captureException, captureMessage, flush: jest.fn() }));
+        jest.doMock('../core/discord', () => ({ sendDiscordAlert }));
+        const mod = require('../core/sentry');
+        return { sendDiscordAlert, captureException, captureMessage, mod };
+    }
+
+    it('captureError: 응답 본문·IP는 지우고 ID·보고 지점은 남긴다, 메시지 속 이메일은 가린다', () => {
+        const { sendDiscordAlert, captureException, mod } = load();
+
+        mod.captureError(new Error('lookup hong@example.com failed'), {
+            function: 'tmapProxy', status: 200, body: '서울시 ○○구 ○○로 12', ip: '203_0_113_7', orgId: 'org1',
+        });
+
+        const description: string = sendDiscordAlert.mock.calls[0][0].description;
+        expect(description).toContain('ho***@example.com');
+        expect(description).not.toContain('hong@example.com');
+        expect(description).not.toContain('○○로');
+        expect(description).not.toContain('203_0_113_7');
+        expect(description).toContain('tmapProxy');
+        expect(description).toContain('org1');
+
+        const extra = captureException.mock.calls[0][1].extra;
+        expect(extra).toEqual({
+            function: 'tmapProxy', status: 200, body: expect.stringMatching(/^\[redacted/), ip: expect.stringMatching(/^\[redacted/), orgId: 'org1',
+        });
+    });
+
+    it('captureWarning: 경고 문구와 문맥 모두 거른다', () => {
+        const { sendDiscordAlert, captureMessage, mod } = load();
+
+        mod.captureWarning('캘린더 hong@gmail.com 접근 실패', { calendarKey: 'hong@gmail.com', memo: '자유 입력' });
+
+        const description: string = sendDiscordAlert.mock.calls[0][0].description;
+        expect(description).not.toContain('hong@gmail.com');
+        expect(description).not.toContain('자유 입력');
+        expect(captureMessage).toHaveBeenCalledWith('캘린더 ho***@gmail.com 접근 실패', {
+            level: 'warning',
+            extra: { calendarKey: 'ho***@gmail.com', memo: '[redacted string(5)]' },
+        });
     });
 });
