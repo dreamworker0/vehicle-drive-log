@@ -12,12 +12,14 @@ import { getVehicles, getMaintenanceRecords, createMaintenanceRecord, updateMain
 import { toLocalDateStr } from '../lib/dateUtils';
 import { validateNonNegativeFields, parseIntegerInput } from './utils/numberValidation';
 
-const INITIAL_FORM = {
+// 기본 날짜는 폼을 비울 때마다 새로 계산한다 — 상수로 두면 모듈을 불러온 날짜에 고정돼,
+// 앱을 켜 둔 채 자정을 넘기면 새 기록의 기본 날짜가 전날로 남았다.
+const initialForm = () => ({
     vehicleId: '', vehicleName: '',
     date: toLocalDateStr(),
     type: 'repair', description: '', cost: '',
     shop: '', km: '',
-};
+});
 
 export default function useEmployeeMaintenance() {
     const { user, userData } = useAuth();
@@ -29,7 +31,7 @@ export default function useEmployeeMaintenance() {
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
-    const [form, setForm] = useState(INITIAL_FORM);
+    const [form, setForm] = useState(initialForm);
 
     const orgId = userData?.organizationId;
     const currentUid = user?.uid;
@@ -87,7 +89,7 @@ export default function useEmployeeMaintenance() {
     };
 
     const handleCancelEdit = () => {
-        setForm(INITIAL_FORM);
+        setForm(initialForm());
         setEditingId(null);
         setShowForm(false);
     };
@@ -137,7 +139,7 @@ export default function useEmployeeMaintenance() {
             setRecords(updated as MaintenanceRecord[]);
             setShowForm(false);
             setEditingId(null);
-            setForm(INITIAL_FORM);
+            setForm(initialForm());
         } catch (err) {
             console.error('정비 기록 저장 실패:', err);
             showToast('저장에 실패했습니다.', 'error');

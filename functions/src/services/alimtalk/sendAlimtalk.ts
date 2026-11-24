@@ -13,6 +13,9 @@ interface AlimtalkResult {
     message?: string;
 }
 
+// 알림톡 링크는 커스텀 도메인(drivelog.socialprism.co.kr)이 아니라 web.app을 쓴다 — 의도다.
+// 카카오 알림톡은 템플릿에 등록한 버튼 URL과 실제 URL이 같아야 발송되므로, 템플릿을 다시 심사받지 않고는
+// 바꿀 수 없다(승인 메일 등 이메일은 커스텀 도메인을 쓴다). 푸시 클릭·Slack 복귀 URL도 같은 이유로 web.app.
 const SERVICE_URL = "https://vehicle-drive-log.web.app";
 
 /**

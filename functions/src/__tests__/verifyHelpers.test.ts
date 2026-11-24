@@ -185,9 +185,10 @@ describe('verifyHelpers', () => {
             await expect(searchAddressByTmap('주소없음', 'k')).resolves.toBeNull();
         });
 
-        // 현재 동작 고정: 좌표가 숫자가 아니면 (0, 0)을 돌려준다 — 주소는 맞는데 좌표가 기니만이 된다.
-        // geocodeByTmap은 0 좌표를 실패로 보는데 이 함수는 성공으로 돌려준다(호출부 확인 필요).
-        it('좌표가 숫자가 아니면 0으로 채운다 (현재 동작)', async () => {
+        // 좌표가 숫자가 아니면 (0, 0)을 돌려준다 — 의도된 계약이다(2026-11-24 확인). 유일한 호출부
+        // autoVerifyDocument가 좌표 0(`!geoLat`)이면 이어서 geocodeByTmap으로 좌표를 다시 구하고,
+        // 이 함수의 네트워크 오류도 그 호출부가 try/catch로 받는다. 주소만이라도 살리는 쪽이 목적이다.
+        it('좌표가 숫자가 아니면 0으로 채운다 (호출부가 geocodeByTmap으로 다시 구한다)', async () => {
             mockFetch.mockResolvedValue(json({
                 searchPoiInfo: { pois: { poi: [{ noorLat: '', noorLon: 'abc', upperAddrName: '세종' }] } },
             }));

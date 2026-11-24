@@ -12,10 +12,12 @@ import useBaseHipassCharge from './base/useBaseHipassCharge';
 import { parseIntegerInput } from './utils/numberValidation';
 import { MAX_HIPASS_CHARGE_AMOUNT } from '../lib/constants';
 
-const INITIAL_FORM = {
+// 기본 날짜는 폼을 비울 때마다 새로 계산한다 — 상수로 두면 모듈을 불러온 날짜에 고정돼,
+// 앱을 켜 둔 채 자정을 넘기면 새 기록의 기본 날짜가 전날로 남았다.
+const initialForm = () => ({
     date: toLocalDateStr(),
     chargeAmount: '',
-};
+});
 
 export default function useHipassCharge() {
     const { user, userData } = useAuth();
@@ -35,7 +37,7 @@ export default function useHipassCharge() {
     const [selectedCardId, setSelectedCardId] = useState('');
     const [saving, setSaving] = useState(false);
     const [showForm, setShowForm] = useState(false);
-    const [form, setForm] = useState(INITIAL_FORM);
+    const [form, setForm] = useState(initialForm);
 
     // 하이패스 카드가 1개일 경우 자동 선택
     useEffect(() => {
@@ -78,7 +80,7 @@ export default function useHipassCharge() {
     // 카드 선택 핸들러
     const handleCardSelect = useCallback((cardId: string) => {
         setSelectedCardId(cardId);
-        setForm(INITIAL_FORM);
+        setForm(initialForm());
         setShowForm(false);
     }, []);
 
@@ -129,7 +131,7 @@ export default function useHipassCharge() {
             ));
             await loadRecordsForCard(selectedCardId);
 
-            setForm(INITIAL_FORM);
+            setForm(initialForm());
             setShowForm(false);
             showToast('충전 기록이 저장되었습니다.', 'success');
         } catch (err) {

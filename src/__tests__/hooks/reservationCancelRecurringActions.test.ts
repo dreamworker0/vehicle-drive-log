@@ -157,8 +157,19 @@ describe('handleCancel — 반복 예약', () => {
         expect(showToast).toHaveBeenCalledWith('취소에 실패했습니다.', 'error');
     });
 
-    // 다일 그룹과 달리 반복 그룹은 활성 회차가 0건이어도 "0건" 확인창을 띄운다(서버가 0건이면 그때 막는다).
-    it.todo('반복 그룹의 활성 회차가 0건이면 확인창 없이 안내한다 — 다일 그룹과 같은 동작으로 맞출지 결정 필요');
+    // 2026-11-24 수정: 다일 그룹과 같은 동작으로 맞췄다 — 예전에는 "반복 예약 그룹(0건)" 확인창을 띄웠다.
+    it('반복 그룹의 활성 회차가 0건이면 확인창 없이 안내하고 서버에 아무것도 보내지 않는다', async () => {
+        const done = [rec('d1', '2026-11-20', 'completed'), rec('d2', '2026-11-21', 'cancelled')];
+        const { deps, showToast, confirm, setReservations } = makeDeps(done);
+
+        await handleCancel('d1', deps);
+
+        expect(confirm).not.toHaveBeenCalled();
+        expect(mockCancelRecurringGroup).not.toHaveBeenCalled();
+        expect(mockCancelReservation).not.toHaveBeenCalled();
+        expect(setReservations).not.toHaveBeenCalled();
+        expect(showToast).toHaveBeenCalledWith('취소할 예약이 없습니다. 이미 완료되었거나 취소된 예약입니다.', 'error');
+    });
 });
 
 describe('handleCancel — 단건 예약', () => {

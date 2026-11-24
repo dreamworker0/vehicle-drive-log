@@ -95,15 +95,18 @@ describe('handleSaveFavorite', () => {
         expect(deps.setFavorites).not.toHaveBeenCalled();
     });
 
-    it('저장은 됐지만 목록 재조회가 실패해도 오류로 알린다 (창은 열린 채)', async () => {
+    // 2026-11-24 수정: 예전에는 재조회 실패에도 "저장 실패"를 띄우고 창을 열어 둬, 다시 누르면 중복 저장됐다.
+    it('저장은 됐는데 목록 재조회만 실패하면 저장 성공으로 끝내고 창을 닫는다 (중복 저장 방지)', async () => {
         mockGetFavorites.mockRejectedValue(new Error('offline'));
         const deps = makeDeps();
 
         await handleSaveFavorite(deps);
 
-        expect(mockCreateFavorite).toHaveBeenCalled();
+        expect(mockCreateFavorite).toHaveBeenCalledTimes(1);
+        expect(deps.showToast).toHaveBeenCalledTimes(1);
         expect(deps.showToast).toHaveBeenCalledWith('즐겨찾기에 저장되었습니다.');
-        expect(deps.showToast).toHaveBeenLastCalledWith('즐겨찾기 저장에 실패했습니다.', 'error');
-        expect(deps.setShowFavSave).not.toHaveBeenCalled();
+        expect(deps.setShowFavSave).toHaveBeenCalledWith(false);
+        expect(deps.setFavName).toHaveBeenCalledWith('');
+        expect(deps.setFavorites).not.toHaveBeenCalled();
     });
 });
