@@ -3,12 +3,15 @@
  * 로직은 useEmployeeManager 훅 사용
  * Phase 29: 활성/가입대기/비활성 직원을 하나의 통합 목록으로 표시
  */
+import { useId } from 'react';
 import useEmployeeManager from '../../hooks/useEmployeeManager';
 import { useAuth } from '../../hooks/useAuth';
 import { SkeletonList, SkeletonBox } from '../common/Skeleton';
 import EmployeeListItem from './EmployeeListItem';
 
 export default function EmployeeManager() {
+    const nameId = useId();
+    const emailId = useId();
     const {
         organization, loading,
         showAddForm, setShowAddForm,
@@ -138,12 +141,12 @@ export default function EmployeeManager() {
                         </p>
                         <form onSubmit={handleAddEmployee} className="space-y-4">
                             <div>
-                                <label className="label">이름 <span className="text-red-500">*</span></label>
-                                <input type="text" value={newEmployee.name} onChange={e => setNewEmployee({ ...newEmployee, name: e.target.value })} className="input" placeholder="홍길동" required />
+                                <label className="label" htmlFor={nameId}>이름 <span className="text-red-500">*</span></label>
+                                <input id={nameId} type="text" value={newEmployee.name} onChange={e => setNewEmployee({ ...newEmployee, name: e.target.value })} className="input" placeholder="홍길동" required />
                             </div>
                             <div>
-                                <label className="label">이메일 <span className="text-red-500">*</span></label>
-                                <input type="email" value={newEmployee.email} onChange={e => setNewEmployee({ ...newEmployee, email: e.target.value })} className="input" placeholder="example@gmail.com" required />
+                                <label className="label" htmlFor={emailId}>이메일 <span className="text-red-500">*</span></label>
+                                <input id={emailId} type="email" value={newEmployee.email} onChange={e => setNewEmployee({ ...newEmployee, email: e.target.value })} className="input" placeholder="example@gmail.com" required />
                             </div>
                             <div className="flex gap-3 pt-2">
                                 <button type="button" onClick={() => setShowAddForm(false)} className="btn-secondary flex-1 min-h-[48px]">취소</button>

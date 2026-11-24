@@ -126,7 +126,7 @@ const VehicleStatusSection = memo(function VehicleStatusSection({
                         <>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="label text-xs">사용전 금액</label>
+                                    <span className="label text-xs">사용전 금액</span>
                                     <div className="input bg-surface-100 dark:bg-surface-700 text-surface-600 dark:text-surface-300 cursor-not-allowed" aria-label="하이패스 사용전 금액">
                                         {hipassCard.balance.toLocaleString()}원
                                     </div>

@@ -2,7 +2,7 @@
  * ReservationSidePanel — 예약 사이드 패널 (예약 폼 + 예약 목록)
  * ReservationCalendar에서 추출된 서브 컴포넌트
  */
-import React, { useRef, useMemo, useCallback } from 'react';
+import React, { useRef, useMemo, useCallback, useId } from 'react';
 import { calcEndTime } from '../../hooks/utils/reservationUtils';
 import { generateRecurringDates } from '../../hooks/utils/recurringUtils';
 import VehicleSelector from './reservation/VehicleSelector';
@@ -136,6 +136,7 @@ export default function ReservationSidePanel({
     passengerAllowCount = true,
 }: Props) {
     const destinationRef = useRef<HTMLInputElement>(null);
+    const fieldId = useId();
 
     const handleDestinationChange = useCallback((destination: string) => {
         setForm(prev => ({ ...prev, destination }));
@@ -266,8 +267,9 @@ export default function ReservationSidePanel({
                         {/* 관리자 모드: 예약자 선택 드롭다운 — 외부 대여는 명의자가 없어 숨긴다 */}
                         {isAdmin && editingReservation && !form.externalLoan && members.length > 0 && (
                             <div>
-                                <label className="label text-xs">예약자</label>
+                                <label htmlFor={`${fieldId}-owner`} className="label text-xs">예약자</label>
                                 <select
+                                    id={`${fieldId}-owner`}
                                     value={form.reservedByUid || ''}
                                     onChange={e => {
                                         const selected = members.find(m => m.id === e.target.value);
@@ -319,8 +321,9 @@ export default function ReservationSidePanel({
                             />
                         </div>
                         <div>
-                            <label className="label text-sm font-medium">📝 목적</label>
+                            <label htmlFor={`${fieldId}-purpose`} className="label text-sm font-medium">📝 목적</label>
                             <input
+                                id={`${fieldId}-purpose`}
                                 type="text"
                                 value={form.purpose}
                                 onChange={e => setForm({ ...form, purpose: e.target.value })}
@@ -400,10 +403,11 @@ export default function ReservationSidePanel({
                             11:30을 오전으로 바꾸거나 이른 시간으로 옮기는 것 자체가 불가능했다.
                             유효성은 제출 시점(handleSubmit)에서 판정한다. */}
                         <div>
-                            <label className="label text-sm font-medium mb-1">⏰ 운행 시간</label>
-                            <div className="flex items-center gap-2 mt-1">
+                            <span id={`${fieldId}-time`} className="label text-sm font-medium mb-1">⏰ 운행 시간</span>
+                            <div role="group" aria-labelledby={`${fieldId}-time`} className="flex items-center gap-2 mt-1">
                                 <input
                                     type="time"
+                                    aria-label="시작 시간"
                                     value={form.startTime}
                                     min={effectiveMinTime}
                                     onChange={e => {
@@ -425,6 +429,7 @@ export default function ReservationSidePanel({
                                 <span className="text-surface-400 dark:text-surface-500 font-bold px-1 text-lg">~</span>
                                 <input
                                     type="time"
+                                    aria-label="종료 시간"
                                     value={form.endTime}
                                     onChange={e => {
                                         const val = e.target.value;

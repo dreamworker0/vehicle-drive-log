@@ -6,6 +6,20 @@ import tseslint from 'typescript-eslint'
 import { defineConfig, globalIgnores } from 'eslint/config'
 import jsxA11y from 'eslint-plugin-jsx-a11y'
 import requireOrganizationFilter from './eslint-rules/require-organization-filter.js'
+import { createRequire } from 'node:module'
+
+// eslint-plugin-jsx-a11y(6.10.2)는 minimatch를 `require('minimatch').default`로 부르는데, 보안 경고 때문에
+// overrides로 고정한 minimatch 11(#586)에는 default export가 없다. 그래서 label-has-associated-control이
+// 실행 중 `minimatch is not a function`으로 죽었고, 이 규칙을 꺼 둘 수밖에 없었다.
+// 플러그인이 받는 바로 그 모듈 객체에 default 별칭만 붙인다(동작은 같은 함수). 플러그인이
+// named import로 바뀌면(또는 minimatch가 default를 되살리면) 이 블록을 지운다.
+{
+  const requireFromA11y = createRequire(createRequire(import.meta.url).resolve('eslint-plugin-jsx-a11y'))
+  const minimatchModule = requireFromA11y('minimatch')
+  if (typeof minimatchModule.default !== 'function' && typeof minimatchModule.minimatch === 'function') {
+    minimatchModule.default = minimatchModule.minimatch
+  }
+}
 
 export default defineConfig([
   // '.claude/worktrees'는 백그라운드 작업이 만드는 저장소 사본이다. 무시하지 않으면 lint가
@@ -49,7 +63,7 @@ export default defineConfig([
       ],
       'react-hooks/set-state-in-effect': 'off',
       'react-hooks/preserve-manual-memoization': 'off',
-      'jsx-a11y/label-has-associated-control': 'off',
+      'jsx-a11y/label-has-associated-control': 'error',
     },
   },
   {
@@ -94,7 +108,7 @@ export default defineConfig([
       ],
       'react-hooks/set-state-in-effect': 'off',
       'react-hooks/preserve-manual-memoization': 'off',
-      'jsx-a11y/label-has-associated-control': 'off',
+      'jsx-a11y/label-has-associated-control': 'error',
     },
   },
   {

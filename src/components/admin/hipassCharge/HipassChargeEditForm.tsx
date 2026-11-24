@@ -6,7 +6,7 @@
  * 금액을 고치면 카드 잔액도 함께 조정되므로 그 사실을 폼에서 미리 알린다
  * (실제 차액은 저장 시 확인창이 숫자로 보여 준다).
  */
-import { memo, useEffect, useRef } from 'react';
+import { memo, useEffect, useId, useRef } from 'react';
 import type { HipassCharge } from '../../../types/hipassCharge';
 import type { HipassChargeEditForm as FormData } from '../../../hooks/useHipassChargeAdmin';
 import { stripNegative } from '../../../hooks/utils/numberValidation';
@@ -29,6 +29,9 @@ export default memo(function HipassChargeEditForm({
         formRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }, [record.id]);
 
+    const dateId = useId();
+    const chargeAmountId = useId();
+
     return (
         <form ref={formRef} onSubmit={onSubmit} className="glass-card p-5 mb-6 space-y-4 animate-fade-in border-l-4 border-primary-400">
             <div>
@@ -41,8 +44,9 @@ export default memo(function HipassChargeEditForm({
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                    <label className="label">날짜 <span className="text-red-500 dark:text-red-400">*</span></label>
+                    <label className="label" htmlFor={dateId}>날짜 <span className="text-red-500 dark:text-red-400">*</span></label>
                     <input
+                        id={dateId}
                         type="date"
                         value={form.date}
                         onChange={e => setForm(prev => ({ ...prev, date: e.target.value }))}
@@ -51,8 +55,9 @@ export default memo(function HipassChargeEditForm({
                     />
                 </div>
                 <div>
-                    <label className="label">충전금액 (원) <span className="text-red-500 dark:text-red-400">*</span></label>
+                    <label className="label" htmlFor={chargeAmountId}>충전금액 (원) <span className="text-red-500 dark:text-red-400">*</span></label>
                     <input
+                        id={chargeAmountId}
                         type="number"
                         min="0"
                         value={form.chargeAmount}

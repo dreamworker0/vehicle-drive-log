@@ -4,7 +4,7 @@
  * 예약 폼과 바로 운행이 함께 쓴다. 폼 상태의 모양이 화면마다 달라
  * `form`/`setForm` 대신 목적지 문자열과 변경 콜백만 주고받는다.
  */
-import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
+import React, { useState, useRef, useEffect, useImperativeHandle, forwardRef, useId } from 'react';
 import { parseDestinations, primeGeocodeCache } from '../../../lib/tmap';
 import { usePoiSearch } from '../../../hooks/usePoiSearch';
 import type { PoiResult } from '../../../hooks/usePoiSearch';
@@ -47,6 +47,7 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
         const dropdownRef = useRef<HTMLDivElement>(null);
         const boxRef = useRef<HTMLDivElement>(null);
         const internalInputRef = useRef<HTMLInputElement | null>(null);
+        const inputId = useId();
         const [inputValue, setInputValue] = useState('');
         const [inputError, setInputError] = useState('');
         const [isFocused, setIsFocused] = useState(false);
@@ -178,7 +179,7 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
 
         return (
             <>
-                <label className="label text-sm font-medium">📍 목적지 <span className="text-red-500 dark:text-red-400">*</span></label>
+                <label htmlFor={inputId} className="label text-sm font-medium">📍 목적지 <span className="text-red-500 dark:text-red-400">*</span></label>
                 <div className="relative mt-1">
                     {/* 태그 입력창 컨테이너 */}
                     <div
@@ -214,6 +215,7 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
                         {/* 실시간 입력 인풋 */}
                         {destinationList.length < 5 ? (
                             <input
+                                id={inputId}
                                 ref={internalInputRef}
                                 type="text"
                                 value={inputValue}

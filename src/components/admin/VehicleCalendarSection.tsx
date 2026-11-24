@@ -2,7 +2,7 @@
  * VehicleCalendarSection — 차량 폼 내 Google Calendar 연동 UI 섹션
  * VehicleForm에서 분리된 서브 컴포넌트
  */
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useId } from 'react';
 import type { Vehicle } from '../../types';
 import { firebaseFunctions } from '../../lib/firebase';
 import { httpsCallable } from 'firebase/functions';
@@ -32,6 +32,7 @@ export default function VehicleCalendarSection({
     initialCalendarError,
 }: Props) {
     const calendarInputRef = useRef<HTMLInputElement>(null);
+    const calendarInputId = useId();
     const [calTestLoading, setCalTestLoading] = useState(false);
     const [calTestResult, setCalTestResult] = useState<CalTestResult | null>(null);
 
@@ -96,9 +97,10 @@ export default function VehicleCalendarSection({
 
     return (
         <div>
-            <label className="label">Google 캘린더 ID (선택)</label>
+            <label className="label" htmlFor={calendarInputId}>Google 캘린더 ID (선택)</label>
             <div className="flex gap-2">
                 <input
+                    id={calendarInputId}
                     ref={calendarInputRef}
                     type="text"
                     value={calendarId}

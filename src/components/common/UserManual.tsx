@@ -25,7 +25,8 @@ interface ManualContent {
 }
 
 interface UserManualProps {
-    role?: 'admin' | 'employee';
+    /** 어느 화면용 설명서인지. `role`이라 부르면 ARIA role 속성과 이름이 겹쳐 jsx-a11y/aria-role에 걸린다. */
+    audience?: 'admin' | 'employee';
     onClose: () => void;
 }
 
@@ -111,7 +112,7 @@ function AccordionItem({ title, content, isOpen, onToggle }: AccordionItemProps)
     );
 }
 
-export default function UserManual({ role = 'employee', onClose }: UserManualProps) {
+export default function UserManual({ audience = 'employee', onClose }: UserManualProps) {
     const [sections, setSections] = useState<ManualSection[]>([]);
     const [loading, setLoading] = useState(true);
     const [openIndex, setOpenIndex] = useState(0);
@@ -119,10 +120,10 @@ export default function UserManual({ role = 'employee', onClose }: UserManualPro
     // 데이터 비동기 로드
     useEffect(() => {
         loadManualSections().then((data) => {
-            setSections(role === 'admin' ? data.adminSections : data.employeeSections);
+            setSections(audience === 'admin' ? data.adminSections : data.employeeSections);
             setLoading(false);
         });
-    }, [role]);
+    }, [audience]);
 
     // ESC 키로 닫기
     useEffect(() => {
@@ -134,11 +135,9 @@ export default function UserManual({ role = 'employee', onClose }: UserManualPro
     }, [onClose]);
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={onClose} role="presentation">
-            {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }} role="presentation">
             <div
                 className="bg-white dark:bg-surface-800 rounded-2xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col animate-fade-in"
-                onClick={e => e.stopPropagation()}
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="manual-title"
@@ -154,7 +153,7 @@ export default function UserManual({ role = 'employee', onClose }: UserManualPro
                         <div>
                             <h2 id="manual-title" className="text-lg font-bold text-surface-900 dark:text-surface-100">사용 설명서</h2>
                             <p className="text-xs text-surface-500 dark:text-surface-400">
-                                {role === 'admin' ? '관리자 기능 안내' : '직원 기능 안내'}
+                                {audience === 'admin' ? '관리자 기능 안내' : '직원 기능 안내'}
                             </p>
                         </div>
                     </div>

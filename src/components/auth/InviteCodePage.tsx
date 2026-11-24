@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useId } from 'react';
 import { useAuth } from '../../hooks/useAuth';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { useNavigate, Navigate } from 'react-router-dom';
@@ -25,6 +25,7 @@ export default function InviteCodePage() {
         return '';
     });
 
+    const codeInputId = useId();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [agreeTerms, setAgreeTerms] = useState(false);
@@ -159,8 +160,9 @@ export default function InviteCodePage() {
 
                     <form onSubmit={handleSubmit} className="space-y-4">
                         <div>
-                            <label className="label">초대 코드</label>
+                            <label htmlFor={codeInputId} className="label">초대 코드</label>
                             <input
+                                id={codeInputId}
                                 type="text"
                                 value={code}
                                 onChange={(e) => setCode(e.target.value.replace(/\s/g, '').toUpperCase().slice(0, 6))}

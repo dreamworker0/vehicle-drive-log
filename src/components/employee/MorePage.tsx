@@ -221,8 +221,7 @@ export default function MorePage() {
 
             {showReleaseNotes && <ReleaseNotesModal onClose={() => setShowReleaseNotes(false)} />}
             {showFeedback && <FeedbackForm onClose={() => setShowFeedback(false)} />}
-            {/* eslint-disable-next-line jsx-a11y/aria-role */}
-            {showManual && <UserManual role="employee" onClose={() => setShowManual(false)} />}
+            {showManual && <UserManual audience="employee" onClose={() => setShowManual(false)} />}
             <AskAIModal isOpen={showAskAI} onClose={() => setShowAskAI(false)} />
         </div>
     );

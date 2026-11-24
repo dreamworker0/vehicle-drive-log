@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import { firebaseFunctions } from '../../lib/firebase';
 import { useToast } from '../../hooks/useToast';
@@ -13,6 +13,7 @@ export default function PublicFeedbackModal({ isOpen, onClose }: PublicFeedbackM
     const [email, setEmail] = useState('');
     const [message, setMessage] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const fieldId = useId();
     const { showToast } = useToast(); // 조기 return보다 위에서 호출 (훅 규칙)
 
     if (!isOpen) return null;
@@ -72,10 +73,11 @@ export default function PublicFeedbackModal({ isOpen, onClose }: PublicFeedbackM
                     </p>
                     
                     <div className="space-y-1">
-                        <label className="block text-sm font-medium text-surface-700 dark:text-surface-300">
+                        <label htmlFor={`${fieldId}-name`} className="block text-sm font-medium text-surface-700 dark:text-surface-300">
                             이름 (또는 기관명) <span className="text-red-500 dark:text-red-400">*</span>
                         </label>
                         <input
+                            id={`${fieldId}-name`}
                             type="text"
                             placeholder="이름이나 기관명을 입력해주세요"
                             className="w-full px-4 py-2 border border-surface-300 dark:border-surface-600 rounded-xl bg-white dark:bg-surface-700/50 text-surface-900 dark:text-white focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all min-h-[48px]"
@@ -87,10 +89,11 @@ export default function PublicFeedbackModal({ isOpen, onClose }: PublicFeedbackM
                     </div>
                     
                     <div className="space-y-1">
-                        <label className="block text-sm font-medium text-surface-700 dark:text-surface-300">
+                        <label htmlFor={`${fieldId}-email`} className="block text-sm font-medium text-surface-700 dark:text-surface-300">
                             답변 받을 이메일 주소 <span className="text-red-500 dark:text-red-400">*</span>
                         </label>
                         <input
+                            id={`${fieldId}-email`}
                             type="email"
                             placeholder="example@email.com"
                             className="w-full px-4 py-2 border border-surface-300 dark:border-surface-600 rounded-xl bg-white dark:bg-surface-700/50 text-surface-900 dark:text-white focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all min-h-[48px]"
@@ -102,10 +105,11 @@ export default function PublicFeedbackModal({ isOpen, onClose }: PublicFeedbackM
                     </div>
 
                     <div className="space-y-1">
-                        <label className="block text-sm font-medium text-surface-700 dark:text-surface-300">
+                        <label htmlFor={`${fieldId}-message`} className="block text-sm font-medium text-surface-700 dark:text-surface-300">
                             문의 내용 <span className="text-red-500 dark:text-red-400">*</span>
                         </label>
                         <textarea
+                            id={`${fieldId}-message`}
                             className="w-full px-4 py-2 border border-surface-300 dark:border-surface-600 rounded-xl bg-white dark:bg-surface-700/50 text-surface-900 dark:text-white focus:ring-2 focus:ring-primary-500/50 focus:border-primary-500 transition-all resize-none min-h-[120px]"
                             placeholder="어떤 점이 불편하신가요? 구체적으로 적어주실수록 정확한 안내가 가능합니다."
                             value={message}

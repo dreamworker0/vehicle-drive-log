@@ -9,6 +9,8 @@ interface ToggleProps {
     onClassName?: string;
     /** 비활성화 */
     disabled?: boolean;
+    /** 버튼 id. 바깥 `<label htmlFor>`와 이어 글자를 눌러도 토글되게 할 때 쓴다. */
+    id?: string;
 }
 
 /**
@@ -24,9 +26,11 @@ export default function Toggle({
     label,
     onClassName = 'bg-primary-600',
     disabled = false,
+    id,
 }: ToggleProps) {
     return (
         <button
+            id={id}
             type="button"
             role="switch"
             aria-checked={checked}

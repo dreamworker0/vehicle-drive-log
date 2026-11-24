@@ -112,9 +112,8 @@ export default function ConfirmModal({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={onCancel} role="presentation">
-            {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */}
-            <div ref={dialogRef} className="glass-card p-6 w-full max-w-sm animate-scale-in" onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title" aria-describedby="confirm-modal-desc">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40" onClick={(e) => { if (e.target === e.currentTarget) onCancel?.(); }} role="presentation">
+            <div ref={dialogRef} className="glass-card p-6 w-full max-w-sm animate-scale-in" role="dialog" aria-modal="true" aria-labelledby="confirm-modal-title" aria-describedby="confirm-modal-desc">
                 {title && (
                     <h3 id="confirm-modal-title" className="text-lg font-semibold text-surface-900 dark:text-surface-100 mb-2">{title}</h3>
                 )}

@@ -2,7 +2,7 @@
  * AdminNotice — 관리자 공지사항 전송 컴포넌트
  * 기관 전체 직원에게 공지 알림을 전송합니다.
  */
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { useToast } from '../../hooks/useToast';
@@ -17,6 +17,8 @@ export default function AdminNotice() {
     const [message, setMessage] = useState('');
     const [sending, setSending] = useState(false);
     const titleRef = useRef<HTMLInputElement>(null);
+    const titleId = useId();
+    const messageId = useId();
 
     useEffect(() => {
         if (isOpen) setTimeout(() => titleRef.current?.focus(), 100);
@@ -92,8 +94,9 @@ export default function AdminNotice() {
 
                         <form onSubmit={handleSend} className="space-y-3">
                             <div>
-                                <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">제목</label>
+                                <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1" htmlFor={titleId}>제목</label>
                                 <input
+                                    id={titleId}
                                     ref={titleRef}
                                     type="text"
                                     value={title}
@@ -105,8 +108,9 @@ export default function AdminNotice() {
                                 />
                             </div>
                             <div>
-                                <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1">내용</label>
+                                <label className="block text-sm font-medium text-surface-700 dark:text-surface-300 mb-1" htmlFor={messageId}>내용</label>
                                 <textarea
+                                    id={messageId}
                                     value={message}
                                     onChange={(e) => setMessage(e.target.value)}
                                     placeholder="공지 내용을 입력하세요"

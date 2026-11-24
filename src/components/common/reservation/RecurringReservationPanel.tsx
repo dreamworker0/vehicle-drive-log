@@ -1,7 +1,7 @@
 /**
  * RecurringReservationPanel - 반복 예약 설정 패널
  */
-import React from 'react';
+import React, { useId } from 'react';
 import { generateRecurringDates, DAY_NAMES } from '../../../hooks/utils/recurringUtils';
 import type { Reservation, ReservationForm } from '../../../types/reservation';
 
@@ -22,6 +22,7 @@ export default function RecurringReservationPanel({
     allReservations,
     editingRecurringGroupId,
 }: RecurringReservationPanelProps) {
+    const fieldId = useId();
     const recurringStartDate = form.recurringStartDate || selectedDate;
     const recurringDates = generateRecurringDates({
         startDate: recurringStartDate,
@@ -55,8 +56,8 @@ export default function RecurringReservationPanel({
         <div className="space-y-3 p-3 rounded-xl bg-purple-50/50 border border-purple-100 dark:bg-purple-900/10 dark:border-purple-800/30 animate-fade-in">
             {/* 요일 선택 */}
             <div>
-                <label className="label text-xs text-purple-700 dark:text-purple-300 mb-1.5">반복 요일</label>
-                <div className="flex gap-1.5">
+                <span id={`${fieldId}-days`} className="label text-xs text-purple-700 dark:text-purple-300 mb-1.5">반복 요일</span>
+                <div role="group" aria-labelledby={`${fieldId}-days`} className="flex gap-1.5">
                     {DAY_NAMES.map((name, idx) => {
                         const isSelected = (form.recurringDays || []).includes(idx);
                         const isWeekend = idx === 0 || idx === 6;
@@ -90,8 +91,9 @@ export default function RecurringReservationPanel({
             {/* 기간 설정 */}
             <div className="grid grid-cols-2 gap-2">
                 <div>
-                    <label className="label text-xs text-surface-500 dark:text-surface-400">시작일</label>
+                    <label htmlFor={`${fieldId}-start`} className="label text-xs text-surface-500 dark:text-surface-400">시작일</label>
                     <input
+                        id={`${fieldId}-start`}
                         type="date"
                         value={form.recurringStartDate || selectedDate}
                         onChange={e => setForm({ ...form, recurringStartDate: e.target.value })}
@@ -99,8 +101,9 @@ export default function RecurringReservationPanel({
                     />
                 </div>
                 <div>
-                    <label className="label text-xs">종료일</label>
+                    <label htmlFor={`${fieldId}-end`} className="label text-xs">종료일</label>
                     <input
+                        id={`${fieldId}-end`}
                         type="date"
                         value={form.recurringEndDate || ''}
                         min={form.recurringStartDate || selectedDate}

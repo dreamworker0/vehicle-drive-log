@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useId } from 'react';
 import { ocrDashboard } from '../../lib/ocr';
 import Toggle from '../common/Toggle';
 
@@ -19,6 +19,7 @@ export default function OcrTestPage() {
     const [imageBase64, setImageBase64] = useState<string | null>(null);
     const [mimeType, setMimeType] = useState('image/jpeg');
     const [isElectric, setIsElectric] = useState(false);
+    const electricToggleId = useId();
     const [loading, setLoading] = useState(false);
     const [history, setHistory] = useState<OcrHistoryItem[]>([]);
     const [dragOver, setDragOver] = useState(false);
@@ -114,9 +115,9 @@ export default function OcrTestPage() {
             <div className="glass-card p-5 mb-6">
                 <div className="flex items-center justify-between mb-4">
                     <h2 className="text-sm font-semibold text-surface-700 dark:text-surface-300">이미지 업로드</h2>
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
+                    <label htmlFor={electricToggleId} className="flex items-center gap-2 cursor-pointer select-none">
                         <span className="text-xs text-surface-500 dark:text-surface-400">전기차</span>
-                        <Toggle label="전기차" checked={isElectric} onChange={setIsElectric} onClassName="bg-emerald-500" />
+                        <Toggle id={electricToggleId} label="전기차" checked={isElectric} onChange={setIsElectric} onClassName="bg-emerald-500" />
                     </label>
                 </div>
 

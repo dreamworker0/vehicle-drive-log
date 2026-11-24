@@ -2,6 +2,7 @@
  * HipassManager — 하이패스 관리 페이지
  * 로직은 useHipassManager 훅 사용
  */
+import { useId } from 'react';
 import useHipassManager from '../../hooks/useHipassManager';
 import ConfirmModal from '../common/ConfirmModal';
 import { SkeletonCard, SkeletonBox } from '../common/Skeleton';
@@ -9,6 +10,10 @@ import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
 import { stripNegative } from '../../hooks/utils/numberValidation';
 
 export default function HipassManager() {
+    const cardNumberId = useId();
+    const vehicleSelectId = useId();
+    const balanceId = useId();
+    const memoId = useId();
     const {
         cards, availableVehicles, loading,
         showForm, setShowForm,
@@ -70,8 +75,9 @@ export default function HipassManager() {
                         </div>
                         <form onSubmit={handleSubmit} className="space-y-4">
                             <div>
-                                <label className="label">카드번호 <span className="text-red-500">*</span></label>
+                                <label className="label" htmlFor={cardNumberId}>카드번호 <span className="text-red-500">*</span></label>
                                 <input
+                                    id={cardNumberId}
                                     type="text" value={form.cardNumber}
                                     onChange={e => handleCardNumberChange(e.target.value)}
                                     className="input font-mono tracking-wider min-h-[48px]"
@@ -83,8 +89,9 @@ export default function HipassManager() {
                                 <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">숫자 16자리 (자동으로 하이픈이 삽입됩니다)</p>
                             </div>
                             <div>
-                                <label className="label">연결 차량 <span className="text-red-500">*</span></label>
+                                <label className="label" htmlFor={vehicleSelectId}>연결 차량 <span className="text-red-500">*</span></label>
                                 <select
+                                    id={vehicleSelectId}
                                     value={form.vehicleId}
                                     onChange={e => setForm({ ...form, vehicleId: e.target.value })}
                                     className="input min-h-[48px]"
@@ -102,8 +109,9 @@ export default function HipassManager() {
                                 )}
                             </div>
                             <div>
-                                <label className="label">현재 잔액 (원)</label>
+                                <label className="label" htmlFor={balanceId}>현재 잔액 (원)</label>
                                 <input
+                                    id={balanceId}
                                     type="number" value={form.balance}
                                     onChange={e => setForm({ ...form, balance: stripNegative(e.target.value) })}
                                     className="input min-h-[48px]" placeholder="0" min="0"
@@ -111,8 +119,9 @@ export default function HipassManager() {
                                 <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">하이패스 카드의 현재 충전 잔액</p>
                             </div>
                             <div>
-                                <label className="label">메모 (선택)</label>
+                                <label className="label" htmlFor={memoId}>메모 (선택)</label>
                                 <input
+                                    id={memoId}
                                     type="text" value={form.memo}
                                     onChange={e => setForm({ ...form, memo: e.target.value })}
                                     className="input min-h-[48px]" placeholder="비고 사항"

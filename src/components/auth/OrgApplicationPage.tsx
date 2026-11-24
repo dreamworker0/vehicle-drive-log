@@ -1,3 +1,4 @@
+import { useId } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useOrgApplication from '../../hooks/useOrgApplication';
 import SEOHead from '../common/SEOHead';
@@ -6,6 +7,7 @@ import SEOHead from '../common/SEOHead';
 // dark: 변형이 온전히 갖춰져 있음) → useForceLightMode를 쓰지 않고 사용자 테마를 따른다.
 export default function OrgApplicationPage() {
     const navigate = useNavigate();
+    const fieldId = useId();
 
     const {
         form, imageFile, imagePreview, loading, ocrStatus,
@@ -83,8 +85,9 @@ export default function OrgApplicationPage() {
                     <div className="space-y-4">
                         <h3 className="text-sm font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-wider">신청자 정보</h3>
                         <div>
-                            <label className="label">이름 <span className="text-red-500 dark:text-red-400">*</span></label>
+                            <label htmlFor={`${fieldId}-name`} className="label">이름 <span className="text-red-500 dark:text-red-400">*</span></label>
                             <input
+                                id={`${fieldId}-name`}
                                 type="text" name="applicantName" value={form.applicantName}
                                 onChange={handleChange}
                                 className={`input ${currentUser?.displayName ? 'bg-surface-50 dark:bg-surface-800 text-surface-500 dark:text-surface-400' : ''} min-h-[48px]`}
@@ -93,16 +96,18 @@ export default function OrgApplicationPage() {
                             />
                         </div>
                         <div>
-                            <label className="label">이메일 <span className="text-red-500 dark:text-red-400">*</span></label>
+                            <label htmlFor={`${fieldId}-email`} className="label">이메일 <span className="text-red-500 dark:text-red-400">*</span></label>
                             <input
+                                id={`${fieldId}-email`}
                                 type="email" name="applicantEmail" value={form.applicantEmail}
                                 onChange={handleChange} className={`input ${currentUser?.email ? 'bg-surface-50 dark:bg-surface-800' : ''} min-h-[48px]`} readOnly={!!currentUser?.email}
                                 placeholder="example@email.com" required
                             />
                         </div>
                         <div>
-                            <label className="label">전화번호 <span className="text-red-500 dark:text-red-400">*</span></label>
+                            <label htmlFor={`${fieldId}-phone`} className="label">전화번호 <span className="text-red-500 dark:text-red-400">*</span></label>
                             <input
+                                id={`${fieldId}-phone`}
                                 type="tel" name="applicantPhone" value={form.applicantPhone}
                                 onChange={handlePhoneChange} className="input min-h-[48px]" placeholder="010-0000-0000" required
                             />
@@ -115,15 +120,16 @@ export default function OrgApplicationPage() {
                     <div className="space-y-4">
                         <h3 className="text-sm font-semibold text-surface-600 dark:text-surface-400 uppercase tracking-wider">기관 정보</h3>
                         <div>
-                            <label className="label">기관명 <span className="text-red-500 dark:text-red-400">*</span></label>
+                            <label htmlFor={`${fieldId}-org`} className="label">기관명 <span className="text-red-500 dark:text-red-400">*</span></label>
                             <input
+                                id={`${fieldId}-org`}
                                 type="text" name="orgName" value={form.orgName}
                                 onChange={handleChange} className="input min-h-[48px]" placeholder="○○복지관" required
                             />
                         </div>
 
                         <div>
-                            <label className="label">비영리 증빙서류 (고유번호증 또는 사업자등록증) <span className="text-red-500 dark:text-red-400">*</span></label>
+                            <label htmlFor="nonprofit-document-upload" className="label">비영리 증빙서류 (고유번호증 또는 사업자등록증) <span className="text-red-500 dark:text-red-400">*</span></label>
                             <div
                                 onClick={() => fileInputRef.current?.click()}
                                 role="button"
@@ -180,8 +186,9 @@ export default function OrgApplicationPage() {
                         </div>
 
                         <div>
-                            <label className="label">하고 싶은 말</label>
+                            <label htmlFor={`${fieldId}-message`} className="label">하고 싶은 말</label>
                             <textarea
+                                id={`${fieldId}-message`}
                                 name="message"
                                 value={form.message}
                                 onChange={handleChange}
