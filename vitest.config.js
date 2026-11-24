@@ -93,6 +93,10 @@ export default defineConfig({
             // 2026-08-22 커버리지 0%였던 훅 2종(useDriveLogList·useDailyLog)과 온디맨드 동기화
             //            (useCalendarSync)·건의 모달 접근성 테스트 추가로 재상향
             //            (실측 lines 49.56/stmts 48.46/funcs 40.57/branches 38.18).
+            // 2026-11-24 커버리지 0%이던 훅(정비·하이패스 관리·Slack 연동)과 주유·하이패스 기반 훅,
+            //            예약 취소·즐겨찾기 액션 테스트 추가로 재상향 — 그 사이 하한이 실측(59.8)보다
+            //            11pp 넘게 낮아져 있던 것을 함께 바로잡았다
+            //            (실측 lines 61.98/stmts 60.8/funcs 52/branches 49.89).
             //
             // ── 전역 임계치만으로는 부족하다 ──
             // 전역 평균만 보면 **커버리지 0%인 핵심 모듈이 있어도 통과한다.** 잘 덮인 순수 함수
@@ -103,10 +107,10 @@ export default defineConfig({
             // glob 하한은 실측보다 3~6pp 낮게 잡는다. 리팩토링으로 분기 몇 개가 오가는 정도로는
             // 깨지지 않되, 모듈 하나가 통째로 무방비가 되면 걸리는 선이다.
             thresholds: {
-                lines: 48,
-                statements: 47,
-                functions: 39,
-                branches: 37,
+                lines: 60,
+                statements: 59,
+                functions: 50,
+                branches: 48,
 
                 // 운행일지 폼 — 서비스의 본체. 여기가 틀리면 기록 자체가 틀어진다 (실측 88/86/84/75)
                 'src/hooks/driveLogForm/**': {
@@ -116,9 +120,9 @@ export default defineConfig({
                 'src/hooks/utils/**': {
                     lines: 92, statements: 90, functions: 92, branches: 76,
                 },
-                // 예약 캘린더 데이터 흐름 (실측 64/61/65/58)
+                // 예약 캘린더 데이터 흐름 (2026-11-24 실측 83/81/84/77 — 반복·단건 취소, 즐겨찾기 저장 추가)
                 'src/hooks/reservationCalendar/**': {
-                    lines: 60, statements: 57, functions: 60, branches: 54,
+                    lines: 78, statements: 77, functions: 80, branches: 72,
                 },
                 // 오프라인 큐 — 지하주차장에서 쓴 기록이 사라지지 않게 하는 유일한 장치 (실측 92/81/82/73)
                 'src/lib/offline/**': {
