@@ -25,7 +25,9 @@
  * `projectId`를 넘겨야 한다.** `scripts/__tests__/scriptAdminProject.test.ts`가 정적으로
  * 강제한다(맨손 `initializeApp()` 금지).
  */
-import { initializeApp, cert, applicationDefault, type App, type ServiceAccount } from 'firebase-admin/app';
+import * as rootAdminApp from 'firebase-admin/app';
+import type { App, ServiceAccount } from 'firebase-admin/app';
+import { createRequire } from 'module';
 import { existsSync, readFileSync } from 'fs';
 import { dirname, resolve } from 'path';
 import { fileURLToPath } from 'url';
@@ -79,6 +81,13 @@ export function initAdminApp(options: { quiet?: boolean } = {}): App {
         console.warn('    GOOGLE_CLOUD_PROJECT를 지정하고 다시 실행하세요 — 그대로 진행하면 다른 프로젝트를 조회할 수 있습니다.');
     }
 
+    return initWithCredential(rootAdminApp, projectId);
+}
+
+type AdminAppModule = typeof rootAdminApp;
+
+/** 서비스 계정 키 파일이 있으면 그것으로, 없으면 ADC로 초기화한다 — 프로젝트는 항상 고정한다 */
+function initWithCredential(mod: AdminAppModule, projectId: string | undefined): App {
     for (const candidate of [
         process.env.GOOGLE_APPLICATION_CREDENTIALS,
         fromRoot('functions', 'serviceAccountKey.json'),
@@ -86,8 +95,25 @@ export function initAdminApp(options: { quiet?: boolean } = {}): App {
     ]) {
         if (candidate && existsSync(candidate)) {
             const sa = JSON.parse(readFileSync(candidate, 'utf-8')) as ServiceAccount;
-            return initializeApp({ credential: cert(sa), ...(projectId ? { projectId } : {}) });
+            return mod.initializeApp({ credential: mod.cert(sa), ...(projectId ? { projectId } : {}) });
         }
     }
-    return initializeApp({ credential: applicationDefault(), ...(projectId ? { projectId } : {}) });
+    return mod.initializeApp({ credential: mod.applicationDefault(), ...(projectId ? { projectId } : {}) });
+}
+
+/**
+ * functions 코드를 불러 쓰는 스크립트용 — `functions/node_modules`의 firebase-admin 사본도 같은
+ * 프로젝트·자격증명으로 초기화한다. **initAdminApp() 뒤에 부른다.**
+ *
+ * 루트와 functions에 firebase-admin이 따로 설치돼 있어 모듈 인스턴스가 둘이다. 스크립트가 루트
+ * 사본으로 앱을 만들어도, functions 코드가 부르는 `getFirestore()`는 functions 사본을 보므로
+ * "The default Firebase app does not exist"로 실패한다. `db`를 인자로 받는 함수는 넘겨 주면 되지만
+ * (purge-orphan-org-data), 모듈 최상단에서 `getFirestore()`를 부르는 코드(dailyAggregation)는
+ * 이 함수로 그 사본에도 앱을 만들어 줘야 한다(2026-11-25 backfillMonthlyStats 이관 때 확인).
+ */
+export function initFunctionsAdminApp(): void {
+    const requireFromFunctions = createRequire(fromRoot('functions', 'package.json'));
+    const fnAdminApp = requireFromFunctions('firebase-admin/app') as AdminAppModule;
+    if (fnAdminApp === rootAdminApp || fnAdminApp.getApps().length > 0) return;
+    initWithCredential(fnAdminApp, resolveProjectId());
 }

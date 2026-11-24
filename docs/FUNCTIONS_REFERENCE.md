@@ -2,9 +2,9 @@
 
 > **자동 생성 문서** — `scripts/generate-functions-doc.ts`로 생성됨
 >
-> 마지막 업데이트: 2026. 11. 24. 오후 6:38:19
+> 마지막 업데이트: 2026. 11. 25. 오전 8:19:07
 >
-> 총 함수 수: **82개**
+> 총 함수 수: **81개**
 
 ---
 
@@ -23,7 +23,7 @@
 
 ## 📞 onCall (클라이언트 직접 호출)
 
-> 총 43개
+> 총 42개
 
 ### `ocrDashboard`
 
@@ -367,16 +367,6 @@
 | **파일** | `functions/src/handlers/callable/backfillOrgCoords.ts` |
 | **설명** | 기존 기관에 좌표(lat/lng) 추가 (일회성 마이그레이션) |
 | **인증** | superAdmin |
-
-### `backfillMonthlyStats`
-
-| 항목 | 내용 |
-|------|------|
-| **파일** | `functions/src/handlers/callable/backfillMonthlyStats.ts` |
-| **설명** | 월별 집계(orgStats/{orgId}/monthly) 소급 재집계. 야간 배치는 당월+전월만 갱신하므로 집계 로직 변경 후 과거 월을 교정할 때 1회 호출한다. |
-| **인증** | superAdmin |
-| **요청 파라미터** | `{ months?: number }` |
-| **비고** | set(merge)라 멱등 — 타임아웃 시 재호출해도 안전 |
 
 ### `getSlackInstallUrl`
 

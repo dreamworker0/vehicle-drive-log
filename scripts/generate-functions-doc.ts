@@ -357,15 +357,6 @@ const FUNCTIONS: FunctionEntry[] = [
     description: '기존 기관에 좌표(lat/lng) 추가 (일회성 마이그레이션)',
     auth: 'superAdmin',
   },
-  {
-    name: 'backfillMonthlyStats',
-    type: 'onCall',
-    file: 'handlers/callable/backfillMonthlyStats.ts',
-    description: '월별 집계(orgStats/{orgId}/monthly) 소급 재집계. 야간 배치는 당월+전월만 갱신하므로 집계 로직 변경 후 과거 월을 교정할 때 1회 호출한다.',
-    auth: 'superAdmin',
-    params: '{ months?: number }',
-    note: 'set(merge)라 멱등 — 타임아웃 시 재호출해도 안전',
-  },
 
   // ── Slack 연동 (멀티테넌트 셀프서비스) ──
   {
