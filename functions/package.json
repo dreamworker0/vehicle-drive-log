@@ -21,7 +21,7 @@
     "main": "lib/functions/src/index.js",
     "dependencies": {
         "@emailjs/nodejs": "^5.0.2",
-        "@google/genai": "^2.32.0",
+        "@google/genai": "^3.6.1",
         "@googleapis/calendar": "^20.2.0",
         "@sentry/node": "^11.12.0",
         "firebase-admin": "^14.5.0",
