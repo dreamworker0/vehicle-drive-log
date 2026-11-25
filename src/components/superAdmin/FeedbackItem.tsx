@@ -44,7 +44,7 @@ export default function FeedbackItem({
 
     return (
         <div
-            className={`border-b border-surface-50 dark:border-surface-700/50 last:border-b-0 ${isResolved ? 'border-l-4 border-l-green-400' : isUnread ? 'border-l-4 border-l-primary-400' : ''}`}
+            className={`border-b border-surface-50 dark:border-surface-700/50 last:border-b-0 ${isResolved ? 'border-l-4 border-l-accent-400' : isUnread ? 'border-l-4 border-l-primary-400' : ''}`}
         >
             <div
                 role="button"
@@ -117,7 +117,7 @@ export default function FeedbackItem({
                             title="본문 복사"
                         >
                             {copiedMessage === fb.id ? (
-                                <svg className="w-4 h-4 text-green-500 dark:text-green-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
+                                <svg className="w-4 h-4 text-accent-500 dark:text-accent-400" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="m4.5 12.75 6 6 9-13.5" />
                                 </svg>
                             ) : (
@@ -183,7 +183,7 @@ export default function FeedbackItem({
                             /* 답변 완료 — 발송된 답변 표시 */
                             <div>
                                 <div className="flex items-center gap-2 mb-2">
-                                    <span className="text-sm font-semibold text-green-600 dark:text-green-400">✅ 발송된 답변</span>
+                                    <span className="text-sm font-semibold text-accent-600 dark:text-accent-400">✅ 발송된 답변</span>
                                     {fb.repliedBy === 'superAdmin' && (
                                         <span className="text-xs px-1.5 py-0.5 rounded-full btn-soft-blue">
                                             관리자
@@ -195,7 +195,7 @@ export default function FeedbackItem({
                                         </span>
                                     )}
                                 </div>
-                                <div className="text-sm text-surface-700 dark:text-surface-300 whitespace-pre-wrap bg-green-50/50 dark:bg-green-900/10 rounded-xl p-3 border border-green-200/50 dark:border-green-800/30">
+                                <div className="text-sm text-surface-700 dark:text-surface-300 whitespace-pre-wrap bg-accent-50/50 dark:bg-accent-900/10 rounded-xl p-3 border border-accent-200/50 dark:border-accent-800/30">
                                     {fb.reply}
                                 </div>
                             </div>

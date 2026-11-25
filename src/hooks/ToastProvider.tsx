@@ -29,9 +29,9 @@ export function ToastProviderWrapper({ children }: { children: ReactNode }) {
                                 px-4 py-3 rounded-lg shadow-lg text-white text-sm font-medium
                                 animate-slide-in flex items-center gap-2
                                 ${toast.type === 'error' ? 'bg-red-500' :
-                                    toast.type === 'success' ? 'bg-green-500' :
-                                        toast.type === 'warning' ? 'bg-yellow-500 text-gray-900' :
-                                            'bg-blue-500'}
+                                    toast.type === 'success' ? 'bg-accent-500' :
+                                        toast.type === 'warning' ? 'bg-yellow-500 text-surface-900' :
+                                            'bg-primary-500'}
                             `}
                         >
                             <span className="shrink-0">
@@ -49,7 +49,7 @@ export function ToastProviderWrapper({ children }: { children: ReactNode }) {
                                         shrink-0 px-2 py-1 rounded text-xs font-bold
                                         transition-colors duration-150
                                         ${toast.type === 'warning'
-                                            ? 'bg-gray-800 text-white hover:bg-gray-700'
+                                            ? 'bg-surface-800 text-white hover:bg-surface-700'
                                             : 'bg-white/20 hover:bg-white/30'}
                                     `}
                                 >

@@ -78,7 +78,7 @@ export default memo(function ReservationTabContent({
                 >
                     운행완료
                     {completedRes.length > 0 && (
-                        <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] bg-green-100 text-green-600 dark:bg-green-900/50 dark:text-green-400 font-bold">
+                        <span className="ml-1.5 px-1.5 py-0.5 rounded-full text-[10px] bg-accent-100 text-accent-600 dark:bg-accent-900/50 dark:text-accent-400 font-bold">
                             {completedRes.length}
                         </span>
                     )}
@@ -125,7 +125,7 @@ export default memo(function ReservationTabContent({
                     ) : (
                         <div className="space-y-1.5">
                             {completedRes.map(res => (
-                                <div key={res.id} className="p-3 rounded-xl bg-green-50/50 dark:bg-green-900/20 border border-green-100 dark:border-green-800/40">
+                                <div key={res.id} className="p-3 rounded-xl bg-accent-50/50 dark:bg-accent-900/20 border border-accent-100 dark:border-accent-800/40">
                                     <div className="flex items-center justify-between">
                                         <div className="flex items-center gap-2 min-w-0 flex-1">
                                             <p className="font-medium text-sm text-surface-600 dark:text-surface-400">{res.vehicleName}</p>
@@ -151,7 +151,7 @@ export default memo(function ReservationTabContent({
                                     <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">
                                         예약 {res.startTime} ~ {res.endTime}
                                         {(res.actualStartTime || res.actualEndTime) && (
-                                            <span className="ml-2 text-green-600 dark:text-green-400 font-medium">
+                                            <span className="ml-2 text-accent-600 dark:text-accent-400 font-medium">
                                                 → 실제 {res.actualStartTime || '?'} ~ {res.actualEndTime || '?'}
                                             </span>
                                         )}

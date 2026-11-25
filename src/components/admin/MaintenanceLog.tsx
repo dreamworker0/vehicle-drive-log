@@ -105,7 +105,7 @@ export default function MaintenanceLog() {
                                     </span>
                                     <button
                                         onClick={() => handleClearBlock(v.id)}
-                                        className="text-amber-600 hover:text-green-600 dark:text-amber-400 dark:hover:text-green-400 font-bold transition-colors min-h-[48px] px-2 py-1"
+                                        className="text-amber-600 hover:text-accent-600 dark:text-amber-400 dark:hover:text-accent-400 font-bold transition-colors min-h-[48px] px-2 py-1"
                                         title="정비 완료 (차단 해제)"
                                     >
                                         ✓ 해제

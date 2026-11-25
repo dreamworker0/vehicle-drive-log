@@ -155,9 +155,9 @@ export default function PrivacyPage() {
                       본문은 이용약관 제9조(개인정보 처리의 위탁)와 짝을 이루므로 함께 개정해야 한다.
                     */}
                     <section className="space-y-3">
-                        <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 dark:bg-blue-900/20 dark:border-blue-800">
-                            <p className="font-medium text-blue-800 dark:text-blue-300 mb-2">개인정보처리자와 수탁자의 구분</p>
-                            <div className="text-blue-700 dark:text-blue-400 text-xs space-y-1.5">
+                        <div className="bg-primary-50 border border-primary-200 rounded-xl px-4 py-3 dark:bg-primary-900/20 dark:border-primary-800">
+                            <p className="font-medium text-primary-800 dark:text-primary-300 mb-2">개인정보처리자와 수탁자의 구분</p>
+                            <div className="text-primary-700 dark:text-primary-400 text-xs space-y-1.5">
                                 <p>
                                     서비스를 이용하는 <strong>각 기관이 소속 직원 개인정보의 개인정보처리자</strong>이며,
                                     서비스 제공자는 기관의 위탁을 받아 개인정보를 처리하는 <strong>수탁자</strong>입니다.
@@ -243,9 +243,9 @@ export default function PrivacyPage() {
                                 </p>
                             </div>
 
-                            <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 dark:bg-blue-900/20 dark:border-blue-800">
-                                <p className="font-medium text-blue-800 dark:text-blue-300 mb-1">🔒 비밀번호 미저장</p>
-                                <p className="text-blue-700 dark:text-blue-400 text-xs">
+                            <div className="bg-primary-50 border border-primary-200 rounded-xl px-4 py-3 dark:bg-primary-900/20 dark:border-primary-800">
+                                <p className="font-medium text-primary-800 dark:text-primary-300 mb-1">🔒 비밀번호 미저장</p>
+                                <p className="text-primary-700 dark:text-primary-400 text-xs">
                                     본 서비스는 Google OAuth 2.0을 통해 인증하며,
                                     비밀번호를 직접 저장하거나 관리하지 않습니다.
                                 </p>
@@ -312,9 +312,9 @@ export default function PrivacyPage() {
                     <section className="space-y-3">
                         <h2 className="text-lg font-semibold text-surface-800 dark:text-surface-200">제4조 (데이터 소유권 및 보존)</h2>
                         <div className="text-sm text-surface-600 dark:text-surface-400 leading-relaxed space-y-3">
-                            <div className="bg-green-50 border border-green-200 rounded-xl px-4 py-3 dark:bg-green-900/20 dark:border-green-800">
-                                <p className="font-medium text-green-800 dark:text-green-300 mb-2">🏢 데이터 소유</p>
-                                <p className="text-green-700 dark:text-green-400 text-xs">
+                            <div className="bg-accent-50 border border-accent-200 rounded-xl px-4 py-3 dark:bg-accent-900/20 dark:border-accent-800">
+                                <p className="font-medium text-accent-800 dark:text-accent-300 mb-2">🏢 데이터 소유</p>
+                                <p className="text-accent-700 dark:text-accent-400 text-xs">
                                     서비스 내 모든 운행일지, 차량 정보, 예약 데이터는 <strong>해당 기관의 소유</strong>입니다.
                                     기관을 삭제하면 해당 기관의 데이터는 <strong>제9조(개인정보의 파기)</strong>에 따라 파기됩니다.
                                 </p>
@@ -482,9 +482,9 @@ export default function PrivacyPage() {
                                 </ul>
                             </div>
 
-                            <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 dark:bg-blue-900/20 dark:border-blue-800">
-                                <p className="font-medium text-blue-800 dark:text-blue-300 mb-2">국외 이전 거부 방법 및 절차</p>
-                                <ul className="list-disc list-inside space-y-1 ml-2 text-blue-700 dark:text-blue-400 text-xs">
+                            <div className="bg-primary-50 border border-primary-200 rounded-xl px-4 py-3 dark:bg-primary-900/20 dark:border-primary-800">
+                                <p className="font-medium text-primary-800 dark:text-primary-300 mb-2">국외 이전 거부 방법 및 절차</p>
+                                <ul className="list-disc list-inside space-y-1 ml-2 text-primary-700 dark:text-primary-400 text-xs">
                                     <li>제12조의 개인정보 보호책임자 또는 서비스 내 피드백 기능으로 국외 이전 거부를 요청할 수 있습니다.</li>
                                     <li>
                                         <strong>이용하지 않으면 이전되지 않는 항목</strong> — Google Calendar·Slack 연동(기관관리자가 설정하지 않으면 발생하지 않음),

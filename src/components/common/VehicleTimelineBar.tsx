@@ -115,7 +115,7 @@ export default function VehicleTimelineBar({
                 {/* 범례 (상단 배치) */}
                 <div className="flex items-center gap-2">
                     <div className="flex items-center gap-1">
-                        <div className="w-2.5 h-2.5 rounded-sm bg-blue-200 dark:bg-blue-300/50 border border-white/30" />
+                        <div className="w-2.5 h-2.5 rounded-sm bg-primary-200 dark:bg-primary-300/50 border border-white/30" />
                         <span className="text-[10px] text-surface-500 dark:text-surface-400">예약됨</span>
                     </div>
                     <div className="flex items-center gap-1">

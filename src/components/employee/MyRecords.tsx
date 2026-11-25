@@ -143,7 +143,7 @@ export default function MyRecords() {
                                                     <p className="font-medium text-sm text-surface-900 dark:text-surface-100 truncate">{log.vehicleName || '차량'}</p>
                                                     <span className="text-xs text-surface-500 dark:text-surface-400">{formatTimestampShort(log.timestamp)}{(log.startTime || log.endTime) && ` ${log.startTime || '--:--'}~${log.endTime || '--:--'}`}</span>
                                                     {log.isRetroactive && <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-orange-100 text-orange-600 dark:bg-orange-900/40 dark:text-orange-400">소급</span>}
-                                                    {log.editedAt && <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-400">수정됨</span>}
+                                                    {log.editedAt && <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-400">수정됨</span>}
                                                 </div>
                                                 <div className="flex items-center gap-2 mt-0.5">
                                                     {log.destination && <span className="text-xs text-surface-500 dark:text-surface-400">{log.destination}</span>}

@@ -92,7 +92,7 @@ export default function VehicleManager() {
                 <div className="flex gap-1 opacity-100 pointer-fine:opacity-0 pointer-fine:group-hover:opacity-100 transition-opacity">
                     {isRetired ? (
                         <>
-                            <button onClick={() => openRestoreModal(vehicle)} className="btn-icon btn-sm text-green-500 hover:text-green-600 min-h-[48px] min-w-[48px]" title="복원">
+                            <button onClick={() => openRestoreModal(vehicle)} className="btn-icon btn-sm text-accent-500 hover:text-accent-600 min-h-[48px] min-w-[48px]" title="복원">
                                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182" />
                                 </svg>
@@ -201,7 +201,7 @@ export default function VehicleManager() {
                                 if (failCount >= 1) {
                                     return <span className="px-2 py-0.5 rounded-full bg-amber-100 dark:bg-amber-900/30 text-amber-600 dark:text-amber-400 font-medium">📅 재시도 중</span>;
                                 }
-                                return <span className="text-green-600 dark:text-green-400">📅 캘린더 동기화 정상</span>;
+                                return <span className="text-accent-600 dark:text-accent-400">📅 캘린더 동기화 정상</span>;
                             })()}
                         </div>
                     )}
@@ -225,7 +225,7 @@ export default function VehicleManager() {
                             </span>
                             <button
                                 onClick={(e) => { e.stopPropagation(); openClearMaintenanceModal(vehicle); }}
-                                className="px-3 py-1.5 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full font-medium hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors min-h-[48px]"
+                                className="px-3 py-1.5 bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-400 rounded-full font-medium hover:bg-accent-200 dark:hover:bg-accent-900/50 transition-colors min-h-[48px]"
                             >
                                 ✓ 정비 완료
                             </button>

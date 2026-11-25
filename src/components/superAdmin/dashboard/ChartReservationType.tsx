@@ -77,8 +77,8 @@ function ChartReservationType({ reservationTypeStats, reservationTypeRatio, futu
                         </div>
                         <div className="w-px h-8 bg-surface-200 dark:bg-surface-700"></div>
                         <div className="text-center">
-                            <div className="text-[11px] text-blue-500 dark:text-blue-400 mb-0.5">하루</div>
-                            <div className="text-sm font-bold text-blue-600 dark:text-blue-400">{currentRatio.singleRate}%</div>
+                            <div className="text-[11px] text-primary-500 dark:text-primary-400 mb-0.5">하루</div>
+                            <div className="text-sm font-bold text-primary-600 dark:text-primary-400">{currentRatio.singleRate}%</div>
                         </div>
                         <div className="w-px h-8 bg-surface-200 dark:bg-surface-700"></div>
                         <div className="text-center">

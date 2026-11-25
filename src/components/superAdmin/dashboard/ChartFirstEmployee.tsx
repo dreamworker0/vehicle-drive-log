@@ -40,7 +40,7 @@ function ChartFirstEmployee({ firstEmployeeStats, firstEmployeeDist, firstEmploy
                 {/* 요약 카드 */}
                 <div className="grid grid-cols-3 gap-4 mb-6">
                     <div className="text-center p-4 bg-surface-50 dark:bg-surface-800 rounded-xl">
-                        <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                        <p className="text-2xl font-bold text-primary-600 dark:text-primary-400">
                             {firstEmployeeStats.avg}<span className="text-sm font-normal ml-0.5">일</span>
                         </p>
                         <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">평균 소요일</p>

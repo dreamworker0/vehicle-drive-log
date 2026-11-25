@@ -299,7 +299,7 @@ export default function ServiceDashboard() {
                                             다크 모드 사용하는 인원: <span className="font-bold text-surface-900 dark:text-white">{s.themeStats.dark}명 ({darkRatio}%)</span>
                                         </p>
                                         <div className="w-full bg-surface-200 dark:bg-surface-700 h-2.5 rounded-full overflow-hidden">
-                                            <div className="bg-slate-700 dark:bg-slate-300 h-full rounded-full transition-all duration-500" style={{ width: `${darkRatio}%` }} />
+                                            <div className="bg-surface-700 dark:bg-surface-300 h-full rounded-full transition-all duration-500" style={{ width: `${darkRatio}%` }} />
                                         </div>
                                     </div>
                                     <div className="flex-1 w-full">

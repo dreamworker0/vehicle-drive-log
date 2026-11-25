@@ -13,7 +13,7 @@ interface ItemStyle {
 }
 
 const ITEM_STYLES: Record<string, ItemStyle> = {
-    tip: { badge: '💡 팁', badgeCls: 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800', dotCls: 'text-blue-400' },
+    tip: { badge: '💡 팁', badgeCls: 'bg-primary-50 text-primary-600 border-primary-200 dark:bg-primary-900/30 dark:text-primary-400 dark:border-primary-800', dotCls: 'text-primary-400' },
     warning: { badge: '⚠️ 주의', badgeCls: 'bg-amber-50 text-amber-600 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800', dotCls: 'text-amber-500' },
     step: { badge: '📌 단계', badgeCls: 'bg-primary-50 text-primary-600 border-primary-200 dark:bg-primary-900/30 dark:text-primary-400 dark:border-primary-800', dotCls: 'text-primary-500' },
 };
@@ -167,7 +167,7 @@ export default function UserManual({ audience = 'employee', onClose }: UserManua
                 {/* 범례 */}
                 <div className="px-5 pt-3 pb-1 flex flex-wrap gap-2 text-[10px]">
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border btn-soft-primary border-primary-200 dark:bg-primary-900/30 dark:text-primary-400 dark:border-primary-800 font-semibold">📌 단계</span>
-                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border btn-soft-blue border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800 font-semibold">💡 팁</span>
+                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border btn-soft-blue border-primary-200 dark:bg-primary-900/30 dark:text-primary-400 dark:border-primary-800 font-semibold">💡 팁</span>
                     <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded border btn-soft-amber border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800 font-semibold">⚠️ 주의</span>
                 </div>
 

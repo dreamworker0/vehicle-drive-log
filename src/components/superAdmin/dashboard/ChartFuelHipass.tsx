@@ -24,14 +24,14 @@ function ChartFuelHipass({ fuelStats, hipassStats, dailyFuelCost, dailyHipassAmo
                         {fuelStats && (
                             <>
                                 <div className="flex flex-col items-center justify-center p-4 bg-surface-50 dark:bg-surface-800 rounded-xl min-h-[100px]">
-                                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                                    <p className="text-2xl font-bold text-primary-600 dark:text-primary-400">
                                         {fuelStats.monthCount}<span className="text-sm font-normal ml-0.5">건</span>
                                     </p>
                                     <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">이번 달 주유</p>
                                     <p className="text-xs text-surface-500 dark:text-surface-400">{fuelStats.monthCost.toLocaleString()}원</p>
                                 </div>
                                 <div className="flex flex-col items-center justify-center p-4 bg-surface-50 dark:bg-surface-800 rounded-xl min-h-[100px]">
-                                    <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+                                    <p className="text-2xl font-bold text-primary-600 dark:text-primary-400">
                                         {fuelStats.totalCount}<span className="text-sm font-normal ml-0.5">건</span>
                                     </p>
                                     <p className="text-xs text-surface-500 dark:text-surface-400 mt-1">총 주유 건수</p>

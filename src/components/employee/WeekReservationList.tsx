@@ -38,7 +38,7 @@ const WeekReservationList = forwardRef<HTMLDivElement, WeekReservationListProps>
                                             {res.status === 'in_progress' ? '운행 중' : '예약됨'}
                                         </span>
                                         {res.groupId && (
-                                            <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300 rounded-full font-medium">
+                                            <span className="text-[10px] px-1.5 py-0.5 bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-300 rounded-full font-medium">
                                                 🔗
                                             </span>
                                         )}

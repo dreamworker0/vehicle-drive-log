@@ -24,13 +24,13 @@ export default function NewVersionScreen() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center p-6 bg-gray-50 dark:bg-surface-950">
+        <div className="min-h-screen flex items-center justify-center p-6 bg-surface-50 dark:bg-surface-950">
             <div className="text-center max-w-sm">
                 <div className="text-5xl mb-4" aria-hidden="true">✨</div>
-                <h2 className="text-lg font-bold text-gray-900 dark:text-surface-100 mb-2">
+                <h2 className="text-lg font-bold text-surface-900 dark:text-surface-100 mb-2">
                     새 버전이 나왔어요
                 </h2>
-                <p className="text-sm leading-relaxed text-gray-600 dark:text-surface-400 mb-6">
+                <p className="text-sm leading-relaxed text-surface-600 dark:text-surface-400 mb-6">
                     앱이 업데이트되어 화면을 새로 불러와야 해요.
                     <br />
                     아래 버튼을 누르면 새 버전으로 열려요.

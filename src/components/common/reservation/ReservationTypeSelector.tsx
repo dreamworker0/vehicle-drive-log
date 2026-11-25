@@ -54,7 +54,7 @@ export default memo(function ReservationTypeSelector({ form, setForm, selectedDa
                             const start = new Date(selectedDate + 'T00:00');
                             const end = new Date(form.endDate + 'T00:00');
                             const diffDays = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
-                            return <span className="text-blue-600 dark:text-blue-400 font-bold ml-1">· {diffDays}일간</span>;
+                            return <span className="text-primary-600 dark:text-primary-400 font-bold ml-1">· {diffDays}일간</span>;
                         })()}
                     </span>
                 </label>

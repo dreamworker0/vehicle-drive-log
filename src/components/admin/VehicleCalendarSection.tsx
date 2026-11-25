@@ -135,7 +135,7 @@ export default function VehicleCalendarSection({
                 <div
                     className={`mt-2 p-3 rounded-lg text-xs border ${
                         calTestResult.success
-                            ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-400'
+                            ? 'bg-accent-50 dark:bg-accent-900/20 border-accent-200 dark:border-accent-800 text-accent-700 dark:text-accent-400'
                             : 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-700 dark:text-red-400'
                     }`}
                 >
@@ -161,7 +161,7 @@ export default function VehicleCalendarSection({
 
             {/* 수정 모드: 정상 동기화 확인 */}
             {editingVehicle && calendarId.trim() && !calTestResult && !hasCalSyncError && calSyncFailCount === 0 && (
-                <p className="mt-1.5 text-xs text-green-600 dark:text-green-400">✅ 정상 동기화 중</p>
+                <p className="mt-1.5 text-xs text-accent-600 dark:text-accent-400">✅ 정상 동기화 중</p>
             )}
 
             {/* 설정 방법 안내 */}
@@ -220,8 +220,8 @@ export default function VehicleCalendarSection({
                     </ol>
 
                     {/* 캘린더 직접 등록 시 권장 제목 형식 안내 */}
-                    <div className="mt-3 p-2.5 rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800">
-                        <p className="font-medium text-blue-700 dark:text-blue-400 mb-1.5">
+                    <div className="mt-3 p-2.5 rounded-lg bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800">
+                        <p className="font-medium text-primary-700 dark:text-primary-400 mb-1.5">
                             💡 구글 캘린더에서 직접 일정을 등록할 때
                         </p>
                         <p className="text-surface-600 dark:text-surface-400">

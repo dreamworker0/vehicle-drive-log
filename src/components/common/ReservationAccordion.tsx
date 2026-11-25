@@ -47,11 +47,11 @@ export default function ReservationAccordion({
                                 {r.destination && <span className="mx-1 text-surface-300 dark:text-surface-600">|</span>}
                                 {r.destination && <span>{r.destination}</span>}
                                 {r.purpose && <span>, {r.purpose}</span>}
-                                {r.groupId && <span className="ml-1 text-blue-500 dark:text-blue-400" title="다일 예약">🔗</span>}
+                                {r.groupId && <span className="ml-1 text-primary-500 dark:text-primary-400" title="다일 예약">🔗</span>}
                             </div>
                             <div className="flex items-center gap-1.5 flex-shrink-0">
                                 {r.syncSource === 'calendar' && (
-                                    <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 text-blue-600 dark:bg-blue-900/40 dark:text-blue-300 rounded-full font-medium">
+                                    <span className="text-[10px] px-1.5 py-0.5 bg-primary-100 text-primary-600 dark:bg-primary-900/40 dark:text-primary-300 rounded-full font-medium">
                                         📅
                                     </span>
                                 )}
@@ -80,7 +80,7 @@ export default function ReservationAccordion({
                             </div>
                         </div>
                         {r.routeDistance && (
-                            <p className="text-[11px] text-blue-500 dark:text-blue-400 mt-0.5 flex items-center gap-2">
+                            <p className="text-[11px] text-primary-500 dark:text-primary-400 mt-0.5 flex items-center gap-2">
                                 <span>🗺️ {Math.floor(r.routeDistance)}km</span>
                                 <span>⏱ {r.routeDuration}분</span>
                                 {(r.routeTollFee ?? 0) > 0 && <span>₩{r.routeTollFee?.toLocaleString()}</span>}

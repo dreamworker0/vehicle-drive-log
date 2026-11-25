@@ -428,8 +428,8 @@ const DestinationInput = forwardRef<HTMLInputElement, DestinationInputProps>(
                                         }
                                     }}
                                     className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-all flex items-center gap-1 shrink-0 ${isSelected
-                                        ? 'bg-blue-100 border-blue-300 text-blue-700 dark:bg-blue-900/40 dark:border-blue-700 dark:text-blue-300'
-                                        : 'bg-surface-50 dark:bg-surface-800 border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400 hover:border-blue-300 hover:bg-blue-50 dark:hover:border-blue-700 dark:hover:bg-blue-900/20'
+                                        ? 'bg-primary-100 border-primary-300 text-primary-700 dark:bg-primary-900/40 dark:border-primary-700 dark:text-primary-300'
+                                        : 'bg-surface-50 dark:bg-surface-800 border-surface-200 dark:border-surface-600 text-surface-600 dark:text-surface-400 hover:border-primary-300 hover:bg-primary-50 dark:hover:border-primary-700 dark:hover:bg-primary-900/20'
                                         }`}
                                 >
                                     <span className="text-[10px] opacity-70">🕒</span>
