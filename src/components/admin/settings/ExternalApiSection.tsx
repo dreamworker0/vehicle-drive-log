@@ -72,7 +72,8 @@ export default function ExternalApiSection() {
     const apiUrl = `${window.location.origin}${API_PATH}`;
 
     const scriptExample = `function readVehicles() {
-  // 키는 코드에 적지 말고 [프로젝트 설정 › 스크립트 속성]에 DRIVELOG_API_KEY로 넣어 두세요
+  // 키는 코드에 적지 마세요. [프로젝트 설정 › 스크립트 속성]에
+  // 속성 이름 DRIVELOG_API_KEY, 값은 발급받은 API 키로 넣어 두면 아래 줄이 읽어 옵니다
   const key = PropertiesService.getScriptProperties().getProperty('DRIVELOG_API_KEY');
   const res = UrlFetchApp.fetch('${apiUrl}', {
     headers: { Authorization: 'Bearer ' + key },
@@ -126,7 +127,7 @@ export default function ExternalApiSection() {
                     <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 space-y-3">
                         <p className="text-sm font-semibold text-amber-800 dark:text-amber-300">⚠️ 이 키는 지금 한 번만 보입니다</p>
                         <p className="text-xs text-amber-700 dark:text-amber-300/90">
-                            화면을 벗어나면 다시 볼 수 없습니다. 지금 복사해서 프로그램의 안전한 곳(앱스 스크립트라면 스크립트 속성)에 넣어 두세요.
+                            화면을 벗어나면 다시 볼 수 없습니다. 지금 복사해서 프로그램의 안전한 곳(앱스 스크립트라면 스크립트 속성 <span className="font-mono">DRIVELOG_API_KEY</span>의 값)에 넣어 두세요.
                             잃어버리면 새로 발급하면 됩니다.
                         </p>
                         <CopyField label="API 키" value={issuedKey} />
@@ -195,6 +196,16 @@ export default function ExternalApiSection() {
                         </div>
                         <div>
                             <p className="font-medium text-surface-700 dark:text-surface-300 mb-1">구글 앱스 스크립트 예제</p>
+                            {/* 키를 어디에 어떤 이름으로 넣는지 몰라 막히는 일이 있어 단계로 적는다 (2026-11-28) */}
+                            <ol className="list-decimal pl-5 space-y-1 mb-2">
+                                <li>앱스 스크립트 왼쪽 톱니바퀴 <strong>[프로젝트 설정]</strong> → 맨 아래 <strong>[스크립트 속성 추가]</strong>를 누릅니다.</li>
+                                <li>
+                                    <strong>속성</strong>에 <code className="font-mono">DRIVELOG_API_KEY</code>를,
+                                    {' '}<strong>값</strong>에 발급받은 API 키를 넣고 <strong>[스크립트 속성 저장]</strong>을 누릅니다.
+                                    키를 새로 교체했다면 이 값만 새 키로 바꾸면 됩니다.
+                                </li>
+                                <li>아래 예제를 붙여 넣고 <strong>[실행]</strong>을 누르면 실행 로그에 차량별 주행거리와 잔액이 나옵니다.</li>
+                            </ol>
                             <pre className="p-3 rounded-lg bg-surface-50 dark:bg-surface-800 border border-surface-200 dark:border-surface-700 overflow-x-auto text-[11px] text-surface-800 dark:text-surface-200">{scriptExample}</pre>
                         </div>
                     </div>
