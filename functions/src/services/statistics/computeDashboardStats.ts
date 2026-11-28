@@ -1,6 +1,6 @@
 import { getFirestore, AggregateField } from "firebase-admin/firestore";
 import {
-    computeDistance, computeDuration, toDate, groupByOrg,
+    computeDistance, computeDuration, toDate, groupByOrg, sumCumulativeDistance,
 } from "./dashboardHelpers";
 import { toKSTDate, getKSTDateString, getKSTDayOfWeek } from "../../utils/kstDate";
 import {
@@ -146,7 +146,18 @@ export async function computeAllDashboardStats(
     // 전월은 마감된 달이라 캐시가 최종본이며, 문서가 없는 기관(신규·미집계)은 0으로 취급한다.
     const prevMonthKey = `${prevYear}-${String(prevMonth + 1).padStart(2, "0")}`;
     const monthlyRefs = orgSnap.docs.map(d => db.doc(`orgStats/${d.id}/monthly/${prevMonthKey}`));
-    const monthlySnaps = monthlyRefs.length > 0 ? await db.getAll(...monthlyRefs) : [];
+    // 1.3. 누적 주행거리 — 운행일지 트리거가 기관별로 증분 유지하는 stats/aggregate를 기관당 1 read로 읽는다.
+    // (예전 totalDistance는 당월+전월 합이라 '총 주행거리' 카드가 두 달치만 보여 줬다)
+    const aggregateRefs = orgSnap.docs.map(d => db.doc(`organizations/${d.id}/stats/aggregate`));
+    const [monthlySnaps, aggregateSnaps] = await Promise.all([
+        monthlyRefs.length > 0 ? db.getAll(...monthlyRefs) : Promise.resolve([]),
+        aggregateRefs.length > 0 ? db.getAll(...aggregateRefs) : Promise.resolve([]),
+    ]);
+    const cumulativeDistanceByOrg: Record<string, number> = {};
+    aggregateSnaps.forEach((snap, i) => {
+        const total = snap.exists ? snap.data()?.totalDistance : undefined;
+        if (typeof total === "number") cumulativeDistanceByOrg[orgSnap.docs[i].id] = total;
+    });
     const prevMonthByOrg: Record<string, { logs: number; distance: number; driverUids: string[] }> = {};
     monthlySnaps.forEach((snap, i) => {
         if (!snap.exists) return;
@@ -375,8 +386,8 @@ export async function computeAllDashboardStats(
         return {
             dashboardStats: {
                 approvedOrgs, totalUsers: userStats.totalUsers, adminCount: userStats.adminCount, employeeCount: userStats.employeeCount,
-                // totalDistance: 전월 1일 이후 주행거리(당월 스캔 합 + 전월 월간 캐시 합) — 종전 60일 스캔과 동일 범위
-                totalLogs: logCountSnap.data().count, totalDistance: Math.round(monthDistance + prevDistance),
+                // totalDistance: 서비스 시작 이후 누적 주행거리(기관별 stats/aggregate 합) — 당월·전월은 monthlyStats에 따로 있다
+                totalLogs: logCountSnap.data().count, totalDistance: sumCumulativeDistance(cumulativeDistanceByOrg, orgFilterId),
                 pendingApps: orgFilterId ? 0 : pendingAppSnap.data().count,
                 calendarSyncOrgs: vehicleResult.calendarSyncOrgSet.size, calendarSyncVehicles: vehicleResult.calendarSyncCount,
                 calendarNotSyncVehicles: vehicleResult.calendarNotSyncCount,
