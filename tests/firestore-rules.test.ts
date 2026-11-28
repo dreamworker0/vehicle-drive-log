@@ -1029,6 +1029,7 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
       await db.collection('slackOauthStates').doc('nonce1').set({ organizationId: 'org-A', expiresAt: new Date() });
       await db.collection('calendarBindings').doc('cal1').set({ organizationId: 'org-A', vehicleId: 'v_A' });
       await db.collection('hipassBalanceEvents').doc('evt1_delta').set({ organizationId: 'org-A', cardId: 'c1', delta: 5000, expiresAt: new Date() });
+      await db.collection('externalApiKeys').doc('keyhash1').set({ organizationId: 'org-A', hint: 'AbCd' });
     });
 
     // 슈퍼관리자조차 접근 불가 (전면 false)
@@ -1064,6 +1065,9 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
       ['calendarBindings', 'cal1'],
       // 하이패스 잔액 처리 표시 — 지우면 같은 반영을 되풀이시키고, 미리 만들면 반영을 막는다
       ['hipassBalanceEvents', 'evt1_delta'],
+      // 외부 연동 API 키(문서 ID = 키 해시) — 읽으면 어느 기관이 키를 쓰는지 드러나고,
+      // 쓸 수 있으면 자기가 고른 키를 다른 기관에 심을 수 있다. 관리는 manageExternalApiKey 콜러블만
+      ['externalApiKeys', 'keyhash1'],
     ] as const) {
       await assertFails(memberDb.collection(col).doc(id).get());
       await assertFails(adminDb.collection(col).doc(id).get());

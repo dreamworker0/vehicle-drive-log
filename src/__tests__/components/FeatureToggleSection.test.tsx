@@ -20,6 +20,7 @@ function baseValues(overrides: Partial<FeatureToggleValues> = {}): FeatureToggle
     reservationPassengerEnabled: false,
     refuelFlagEnabled: false,
     externalLoanEnabled: false,
+    externalApiEnabled: false,
         driverAllowList: true,
         driverAllowSearch: true,
         ...overrides,
@@ -44,6 +45,15 @@ describe('FeatureToggleSection', () => {
         expect(toggle).toHaveAttribute('aria-checked', 'false');
         fireEvent.click(toggle);
         expect(onChange).toHaveBeenCalledWith({ externalLoanEnabled: true });
+    });
+
+    it('외부 연동(API) 토글은 외부 연동 묶음에 있고, 켜면 externalApiEnabled: true로 저장한다', () => {
+        const { onChange } = setup({ externalApiEnabled: false });
+        expect(screen.getByText('🔌 외부 연동')).toBeInTheDocument();
+        const toggle = screen.getByRole('switch', { name: '외부 연동(API)' });
+        expect(toggle).toHaveAttribute('aria-checked', 'false');
+        fireEvent.click(toggle);
+        expect(onChange).toHaveBeenCalledWith({ externalApiEnabled: true });
     });
 
     it('바로 운행 허용 하위 토글은 예약 승인을 켰을 때만 표시', () => {

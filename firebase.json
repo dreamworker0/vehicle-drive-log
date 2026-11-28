@@ -95,6 +95,13 @@
         }
       },
       {
+        "regex": "^/api/v1/vehicles/?$",
+        "run": {
+          "serviceId": "vehiclestatusapi",
+          "region": "asia-northeast3"
+        }
+      },
+      {
         "source": "**",
         "destination": "/index.html"
       }

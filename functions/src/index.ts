@@ -197,3 +197,8 @@ export { diagnoseSlackConnection } from "./handlers/callable/diagnoseSlackConnec
 
 // Slack 전체 연결 기관 현황 (슈퍼관리자 대시보드)
 export { listSlackIntegrations } from "./handlers/callable/listSlackIntegrations";
+
+// 외부 연동(API) — 기관이 자체 도구에서 차량 누적 km·하이패스 잔액을 읽는 읽기 전용 API
+// (GET /api/v1/vehicles, firebase.json 재작성) + 설정 화면의 키 상태 조회·발급·폐기
+export { vehicleStatusApi } from "./handlers/https/vehicleStatusApi";
+export { manageExternalApiKey } from "./handlers/callable/manageExternalApiKey";

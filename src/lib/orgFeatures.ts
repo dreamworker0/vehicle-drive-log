@@ -44,6 +44,8 @@ export interface OrgFeatures {
     refuelFlag: boolean;
     /** 외부 대여 등록 (opt-in — 미설정이면 꺼짐). 이미 등록된 대여의 표시·반납은 이 값과 무관 */
     externalLoan: boolean;
+    /** 외부 연동(API) — 읽기 전용 조회 키 발급 (opt-in — 미설정이면 꺼짐) */
+    externalApi: boolean;
     /** 운전자(대표·공동): 목록 직접 선택 허용 */
     driverAllowList: boolean;
     /** 운전자(대표·공동): 검색 선택 허용. 둘 다 켜지면 후보 8명 기준 자동 전환 */
@@ -71,6 +73,7 @@ export const ALL_FEATURES_ON: OrgFeatures = {
     reservationPassenger: true,
     refuelFlag: true,
     externalLoan: true,
+    externalApi: true,
     driverAllowList: true,
     driverAllowSearch: true,
     quickDrive: true,
@@ -81,7 +84,7 @@ type OrgFeatureFields = Pick<
     'hipassEnabled' | 'maintenanceEnabled' | 'maintenanceEmployeeAccess' | 'allowedUsersEnabled' | 'googleCalendarEnabled'
     | 'driverSelectionEnabled' | 'coDriverEnabled' | 'passengerEnabled'
     | 'passengerAllowList' | 'passengerAllowSearch' | 'passengerAllowCount' | 'reservationPassengerEnabled'
-    | 'refuelFlagEnabled' | 'externalLoanEnabled'
+    | 'refuelFlagEnabled' | 'externalLoanEnabled' | 'externalApiEnabled'
     | 'driverAllowList' | 'driverAllowSearch'
     | 'requireReservationApproval' | 'quickDriveWithApproval'
 >;
@@ -114,6 +117,9 @@ export function resolveOrgFeatures(org?: Partial<OrgFeatureFields> | null): OrgF
         // 이 줄도 `=== true`다. 차를 빌려주는 기관은 드물다 — 켜짐 기본이면 모든 관리자의 예약
         // 화면에 쓰지 않는 '외부 대여' 줄이 생긴다(2026-10-17 운영 의견).
         externalLoan: org?.externalLoanEnabled === true,
+        // 이 줄도 `=== true`다. 자체 도구를 만드는 기관은 드물고, 켜면 키 발급 카드가 설정에 생긴다.
+        // 서버도 같은 기준으로 막는다(vehicleStatusApi·manageExternalApiKey).
+        externalApi: org?.externalApiEnabled === true,
         driverAllowList: org?.driverAllowList !== false,
         driverAllowSearch: org?.driverAllowSearch !== false,
         // 승인이 꺼진 기관은 바로 운행을 막을 이유가 없다 — 하위 설정이 남아 있어도 무시한다

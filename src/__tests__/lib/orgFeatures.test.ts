@@ -3,12 +3,12 @@ import { resolveOrgFeatures, ALL_FEATURES_ON } from '../../lib/orgFeatures';
 
 /**
  * 이 파일의 규칙은 "미설정(undefined)=켜짐, false만 꺼짐"이다.
- * **예외가 셋 있다** — `reservationPassenger`(예약 화면 동승자 입력)·`refuelFlag`(주유·충전
- * 필요 표시)·`externalLoan`(외부 대여)은 opt-in이라 명시적으로 켠 기관에서만 true다.
- * 앞의 둘은 전 직원이 매일 보는 화면에 새 입력란을 만들고, 외부 대여는 쓰는 기관이 드물다.
+ * **예외가 넷 있다** — `reservationPassenger`(예약 화면 동승자 입력)·`refuelFlag`(주유·충전
+ * 필요 표시)·`externalLoan`(외부 대여)·`externalApi`(외부 연동 API)는 opt-in이라 명시적으로 켠
+ * 기관에서만 true다. 앞의 둘은 전 직원이 매일 보는 화면에 새 입력란을 만들고, 뒤의 둘은 쓰는 기관이 드물다.
  * 아래 기대값에 그 예외가 반영돼 있다.
  */
-const DEFAULTS_FOR_UNSET_ORG = { ...ALL_FEATURES_ON, reservationPassenger: false, refuelFlag: false, externalLoan: false };
+const DEFAULTS_FOR_UNSET_ORG = { ...ALL_FEATURES_ON, reservationPassenger: false, refuelFlag: false, externalLoan: false, externalApi: false };
 
 describe('resolveOrgFeatures', () => {
     it('org가 없으면(undefined/null) opt-in 항목을 뺀 전부가 켜짐', () => {
@@ -24,6 +24,7 @@ describe('resolveOrgFeatures', () => {
             reservationPassenger: false,
             refuelFlag: false,
             externalLoan: false,
+            externalApi: false,
             driverAllowList: true, driverAllowSearch: true,
             maintenanceEmployeeAccess: true, allowedUsers: true, googleCalendar: true,
             quickDrive: true,
@@ -54,7 +55,7 @@ describe('resolveOrgFeatures', () => {
         const f = resolveOrgFeatures({
             hipassEnabled: true, maintenanceEnabled: true, driverSelectionEnabled: true,
             coDriverEnabled: true, passengerEnabled: true, reservationPassengerEnabled: true,
-            refuelFlagEnabled: true, externalLoanEnabled: true,
+            refuelFlagEnabled: true, externalLoanEnabled: true, externalApiEnabled: true,
         });
         expect(f).toEqual(ALL_FEATURES_ON);
     });
@@ -74,6 +75,14 @@ describe('resolveOrgFeatures', () => {
         expect(resolveOrgFeatures({ externalLoanEnabled: true }).externalLoan).toBe(true);
     });
 
+    it('외부 연동(API)은 opt-in — 명시적으로 켤 때만 true', () => {
+        // 서버(vehicleStatusApi·manageExternalApiKey)도 `=== true`로 본다. 화면과 기준이 어긋나면
+        // 켜지 않은 기관에 키 발급 카드가 보이거나, 켠 기관의 키가 막힌다.
+        expect(resolveOrgFeatures({}).externalApi).toBe(false);
+        expect(resolveOrgFeatures({ externalApiEnabled: false }).externalApi).toBe(false);
+        expect(resolveOrgFeatures({ externalApiEnabled: true }).externalApi).toBe(true);
+    });
+
     it('false인 플래그만 꺼지고 나머지는 켜짐', () => {
         expect(resolveOrgFeatures({ hipassEnabled: false })).toEqual({
             hipass: false, maintenance: true, driverSelection: true, coDriver: true, passenger: true,
@@ -81,6 +90,7 @@ describe('resolveOrgFeatures', () => {
             reservationPassenger: false,
             refuelFlag: false,
             externalLoan: false,
+            externalApi: false,
             driverAllowList: true, driverAllowSearch: true,
             maintenanceEmployeeAccess: true, allowedUsers: true, googleCalendar: true,
             quickDrive: true,
@@ -98,6 +108,7 @@ describe('resolveOrgFeatures', () => {
             reservationPassenger: false,
             refuelFlag: false,
             externalLoan: false,
+            externalApi: false,
             driverAllowList: true, driverAllowSearch: true,
             maintenanceEmployeeAccess: true, allowedUsers: true, googleCalendar: true,
             quickDrive: true,

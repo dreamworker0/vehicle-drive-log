@@ -40,6 +40,12 @@ export const DEFAULT_RATE_LIMITS = {
     // 초대 코드 재발급 — 정상 사용은 기관당 몇 달에 한 번. 상한은 코드를 계속 돌려
     // 직원 가입을 방해하는 남용만 막으면 된다 (2026-09-02, Rules에서 클라이언트 쓰기를 닫고 서버로 이관).
     regenerateInviteCode: { max: 5, windowSec: 3600 },        // uid당 시간당 5회
+    // 외부 연동 API 키 관리(상태 조회·발급·폐기) — 설정 화면을 열 때마다 상태 조회 1회가 돈다.
+    // 상한은 키를 계속 돌려 쓰는 남용만 막으면 된다.
+    manageExternalApiKey: { max: 30, windowSec: 3600 },       // uid당 시간당 30회
+    // 외부 연동 조회 API — 기관당. 앱스 스크립트 시간 트리거는 보통 1시간~1분 간격이다.
+    // 1분 간격(시간당 60회)까지는 받아 준다. 그보다 잦으면 값이 거의 바뀌지 않는 조회를 반복하는 것이다.
+    vehicleStatusApi: { max: 60, windowSec: 3600 },           // 기관당 시간당 60회
 } as const;
 
 export type RateLimitKey = keyof typeof DEFAULT_RATE_LIMITS;

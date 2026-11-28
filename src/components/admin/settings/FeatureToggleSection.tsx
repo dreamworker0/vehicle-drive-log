@@ -29,6 +29,8 @@ export interface FeatureToggleValues {
     refuelFlagEnabled: boolean;
     /** 외부 대여 등록(기본 꺼짐) */
     externalLoanEnabled: boolean;
+    /** 외부 연동(API)(기본 꺼짐) */
+    externalApiEnabled: boolean;
     driverAllowList: boolean;
     driverAllowSearch: boolean;
 }
@@ -38,7 +40,7 @@ interface FeatureToggleSectionProps {
     onChange: (patch: Partial<FeatureToggleValues>) => void;
 }
 
-type FeatureKey = 'requireReservationApproval' | 'externalLoanEnabled' | 'hipassEnabled' | 'maintenanceEnabled' | 'refuelFlagEnabled' | 'allowedUsersEnabled' | 'googleCalendarEnabled' | 'driverSelectionEnabled' | 'coDriverEnabled' | 'passengerEnabled';
+type FeatureKey = 'requireReservationApproval' | 'externalLoanEnabled' | 'externalApiEnabled' | 'hipassEnabled' | 'maintenanceEnabled' | 'refuelFlagEnabled' | 'allowedUsersEnabled' | 'googleCalendarEnabled' | 'driverSelectionEnabled' | 'coDriverEnabled' | 'passengerEnabled';
 
 const FEATURE_META: Record<FeatureKey, { label: string; desc: string }> = {
     requireReservationApproval: { label: '예약 관리자 승인', desc: '켜면 직원 차량 예약이 즉시 확정되지 않고 관리자 승인을 거칩니다.' },
@@ -51,6 +53,7 @@ const FEATURE_META: Record<FeatureKey, { label: string; desc: string }> = {
     driverSelectionEnabled: { label: '운전자 지정', desc: '끄면 운행일지에서 운전자를 바꿀 수 없고 항상 작성자로 기록됩니다.' },
     coDriverEnabled: { label: '공동 운전자', desc: '끄면 운행일지의 공동 운전자 입력이 숨겨집니다.' },
     passengerEnabled: { label: '동승자', desc: '끄면 운행일지의 동승자 입력이 숨겨집니다.' },
+    externalApiEnabled: { label: '외부 연동(API)', desc: '기관에서 직접 만든 프로그램(구글 앱스 스크립트 등)이 차량별 누적 주행거리와 하이패스 잔액을 읽어 갈 수 있게 합니다. 켜면 아래에 API 키 발급 카드가 생깁니다. 끄면 발급한 키도 바로 막힙니다. (기본 꺼짐)' },
 };
 
 /** 기능 on/off 한 줄(굵은 라벨) */
@@ -220,7 +223,7 @@ export default function FeatureToggleSection({ values, onChange }: FeatureToggle
             </div>
 
             {/* 동승자 */}
-            <div className="pt-5 border-t border-surface-100 dark:border-surface-700">
+            <div className="mb-5 pt-5 border-t border-surface-100 dark:border-surface-700">
                 <GroupTitle>🧑‍🤝‍🧑 동승자</GroupTitle>
                 <div className="divide-y divide-surface-100 dark:divide-surface-700">
                     {feature('passengerEnabled')}
@@ -261,6 +264,14 @@ export default function FeatureToggleSection({ values, onChange }: FeatureToggle
                         />
                     </MethodGroup>
                 )}
+            </div>
+
+            {/* 외부 연동 — 직원 화면과 무관한 관리자 전용 기능이라 맨 끝에 둔다 */}
+            <div className="pt-5 border-t border-surface-100 dark:border-surface-700">
+                <GroupTitle>🔌 외부 연동</GroupTitle>
+                <div className="divide-y divide-surface-100 dark:divide-surface-700">
+                    {feature('externalApiEnabled')}
+                </div>
             </div>
         </div>
     );
