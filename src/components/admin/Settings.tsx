@@ -110,6 +110,11 @@ export default function Settings() {
                 onChange={(patch) => handleSave(null, patch)}
             />
 
+            {/* 외부 연동(API) 키 — 기능 사용에서 켠 기관만. 토글(기능 사용 맨 끝 줄) 바로 아래에 둔다.
+                처음에는 Slack 카드 뒤에 두었는데, 켜고 나서 결재 라인·공휴일·Slack을 지나 한참
+                내려가야 카드가 보여 무엇이 생겼는지 알기 어려웠다(2026-11-28 운영자 지적). */}
+            {form.externalApiEnabled && <ExternalApiSection />}
+
             {/* 결재 라인 설정 */}
             <ApprovalLineSection
                 form={form}
@@ -133,9 +138,6 @@ export default function Settings() {
 
             {/* Slack 연결 (기관 셀프서비스) */}
             <SlackIntegrationSection />
-
-            {/* 외부 연동(API) 키 — 기능 사용에서 켠 기관만 */}
-            {form.externalApiEnabled && <ExternalApiSection />}
 
             {/* 접속기록 점검 — 고시 제16조 ②의 월 1회 점검 주체는 개인정보처리자인 기관이다 */}
             <div className="glass-card p-6 mb-6">
