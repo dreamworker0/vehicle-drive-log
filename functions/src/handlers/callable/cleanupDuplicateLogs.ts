@@ -18,6 +18,7 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getFirestore } from "firebase-admin/firestore";
 import { getKSTDateString } from "../../utils/kstDate";
+import { isDriveLogLockedOnServer } from "../../utils/driveLogLock";
 import * as logger from "firebase-functions/logger";
 
 /** 기본 조회 범위(개월). 중복은 생성 시점에 생기므로 최근 구간이면 충분하다. */
@@ -87,7 +88,11 @@ export const cleanupDuplicateLogs = onCall(
 
             logger.info(`[cleanupDuplicateLogs] 기관=${organizationId}, 최근 ${scanMonths}개월(${since.toISOString()}) ${logsSnap.size}건 조회`);
 
-            const logMap = new Map<string, Array<{ id: string; createdAt: unknown; dateStr: string }>>();
+            const logMap = new Map<string, Array<{ id: string; createdAt: unknown; dateStr: string; locked: boolean }>>();
+            // 수정 잠금: 운행일로부터 기한이 지난 기록은 기관 관리자도 지울 수 없다(firestore.rules와 같은 기준).
+            // Admin SDK 삭제는 Rules를 거치지 않으므로 여기서 직접 지킨다. 운영자만 예외다.
+            const canDeleteLocked = callerRole === "superAdmin";
+            let lockedSkipped = 0;
 
             logsSnap.forEach((doc) => {
                 const data = doc.data();
@@ -99,13 +104,18 @@ export const cleanupDuplicateLogs = onCall(
                 if (!logMap.has(key)) {
                     logMap.set(key, []);
                 }
-                logMap.get(key)!.push({ id: doc.id, createdAt: data.createdAt, dateStr });
+                logMap.get(key)!.push({ id: doc.id, createdAt: data.createdAt, dateStr, locked: isDriveLogLockedOnServer(ts) });
             });
 
             const duplicateGroups: Array<{ key: string; count: number; keepId: string; deleteIds: string[] }> = [];
             const deleteTargets: string[] = [];
 
             for (const [key, group] of logMap) {
+                // 같은 날짜끼리 묶이므로 한 묶음은 통째로 잠기거나 통째로 열려 있다
+                if (group.length > 1 && !canDeleteLocked && group.some((g) => g.locked)) {
+                    lockedSkipped += group.length - 1;
+                    continue;
+                }
                 if (group.length > 1) {
                     const toDelete = group.slice(1).map((g) => g.id);
                     duplicateGroups.push({
@@ -138,6 +148,8 @@ export const cleanupDuplicateLogs = onCall(
                 totalLogs: logsSnap.size,
                 duplicateGroups: duplicateGroups.length,
                 deleteCount: deleteTargets.length,
+                // 잠긴(운행일로부터 기한이 지난) 중복이라 지우지 않은 건수 — 운영자에게 요청해야 지울 수 있다
+                lockedSkipped,
                 dryRun,
                 // 검사 범위를 함께 돌려준다 — 화면이 "전량"이 아니라 "최근 N개월"임을 밝혀야
                 // 사용자가 0건을 전량 무결로 오해하지 않는다

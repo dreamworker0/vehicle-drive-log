@@ -152,6 +152,32 @@ describe('cleanupDuplicateLogs — 운행일지 중복 정리', () => {
         expect(mockBatchCommit).toHaveBeenCalledTimes(1);
     });
 
+    it('[수정 잠금] 운행일로부터 61일이 지난 중복은 기관 관리자가 지울 수 없다 — 건너뛴 수를 알린다', async () => {
+        const old = { toDate: () => new Date(Date.now() - 70 * 86400000) };
+        mockQueryGet.mockResolvedValueOnce(makeSnap(DUP_DOCS.map((d) => ({ ...d, timestamp: old }))));
+        const req = {
+            auth: { uid: 'u1', token: { role: 'admin', orgId: 'org1' } },
+            data: { organizationId: 'org1', dryRun: false },
+        };
+        const result = await handler(req);
+
+        expect(result).toMatchObject({ success: true, duplicateGroups: 0, deleteCount: 0, lockedSkipped: 1 });
+        expect(mockBatchDelete).not.toHaveBeenCalled();
+    });
+
+    it('[수정 잠금] 운영자(superAdmin)는 잠긴 중복도 지운다', async () => {
+        const old = { toDate: () => new Date(Date.now() - 70 * 86400000) };
+        mockQueryGet.mockResolvedValueOnce(makeSnap(DUP_DOCS.map((d) => ({ ...d, timestamp: old }))));
+        const req = {
+            auth: { uid: 'sa', token: { role: 'superAdmin' } },
+            data: { organizationId: 'org1', dryRun: false },
+        };
+        const result = await handler(req);
+
+        expect(result).toMatchObject({ deleteCount: 1, lockedSkipped: 0 });
+        expect(mockBatchDelete).toHaveBeenCalledWith({ _id: 'log-dup' });
+    });
+
     it('superAdmin은 타 기관 데이터도 정리할 수 있다', async () => {
         mockQueryGet.mockResolvedValueOnce(makeSnap(DUP_DOCS));
         const req = {

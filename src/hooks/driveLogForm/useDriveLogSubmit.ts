@@ -13,6 +13,7 @@ import { validateEditKmRange } from './editKmRange';
 import { validateDriveWindow } from './driveWindow';
 import { findVehicleNameAsDestination } from './destinationGuard';
 import { adjustAdjacentLogs } from './adjustAdjacentLogs';
+import { getDriveLogLockError, canBypassDriveLogLock } from '../../lib/driveLogLock';
 import { captureError } from '../../lib/sentry';
 import type { User } from 'firebase/auth';
 import type { User as UserDoc } from '../../types/user';
@@ -271,6 +272,19 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
             return;
         }
 
+        // ── 수정 잠금: 운행일로부터 60일이 지난 기록은 쓰기·고치기를 막는다(운영자 제외) ──
+        // 서버 규칙이 최종으로 막지만, 거기까지 가면 '알 수 없는 오류'로만 보인다 — 이유를 먼저 알린다.
+        const lockError = getDriveLogLockError({
+            role: userData?.role,
+            isEditMode,
+            editLog,
+            arrivalDate: form.endDate || form.driveDate,
+        });
+        if (lockError) {
+            showToast(lockError, 'warning');
+            return;
+        }
+
         // ── 목적지 칸 검사 (신규 작성에만) ──
         //
         // 수정 모드는 제외한다 — 과거 기록을 손보는 중이라 빈칸이 의도인 경우가 많고,
@@ -334,6 +348,7 @@ export function useDriveLogSubmit(deps: SubmitDeps) {
                         nextDriveLog,
                         startKm: Number(form.startKm || 0),
                         endKm: Number(form.endKm || 0),
+                        canEditLocked: canBypassDriveLogLock(userData?.role),
                     });
                     if (adjustMessages.length > 0) {
                         showToast(`인접 기록이 자동 조정되었습니다: ${adjustMessages.join(', ')}`, 'info');

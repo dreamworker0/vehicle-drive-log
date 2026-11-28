@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
+import { isDriveLogLockedFor, DRIVE_LOG_LOCK_DAYS } from '../../lib/driveLogLock';
 import { captureError } from '../../lib/sentry';
 import { getMyDriveLogs } from '../../lib/firestore';
 import { VEHICLE_TYPE_ICONS, getVehicleColor } from '../../lib/constants';
@@ -176,10 +177,17 @@ export default function MyRecords() {
                                                     {log.notes && (<div className="col-span-2"><span className="text-xs text-surface-500 dark:text-surface-400">비고</span><p className="text-surface-700 dark:text-surface-300">{log.notes}</p></div>)}
                                                 </div>
                                                 <div className="flex gap-2 mt-3">
+                                                    {isDriveLogLockedFor(log, userData?.role) ? (
+                                                        // 운행일로부터 60일이 지난 기록 — 서버가 수정을 거절하므로 버튼 대신 이유를 보인다
+                                                        <p className="flex-1 text-xs text-surface-500 dark:text-surface-400 bg-surface-100 dark:bg-surface-700 rounded-xl px-3 py-3 text-center">
+                                                            🔒 운행일로부터 {DRIVE_LOG_LOCK_DAYS}일이 지나 고칠 수 없는 기록입니다
+                                                        </p>
+                                                    ) : (
                                                     <button onClick={() => navigate('/employee/drive-log', { state: { editLog: log } })} className="btn-soft-blue flex-1 text-sm min-h-[48px] flex items-center justify-center gap-1">
                                                         <svg aria-hidden="true" className="w-4 h-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" /></svg>
                                                         수정
                                                     </button>
+                                                    )}
                                                 </div>
                                             </div>
                                         )}

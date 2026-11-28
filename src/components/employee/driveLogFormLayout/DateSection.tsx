@@ -1,13 +1,8 @@
 import { useMemo, memo } from 'react';
 import { todayStr } from '../../../hooks/utils/driveLogValidation';
 import type { DriveLogForm } from '../../../hooks/driveLogForm/types';
-
-/** 2달 전 날짜를 YYYY-MM-DD로 반환 */
-function getMinDateStr(): string {
-    const d = new Date();
-    d.setMonth(d.getMonth() - 2);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
+// 고를 수 있는 가장 이른 날짜 = 수정 잠금 기한(60일). 서버 규칙과 같은 기준을 쓴다(driveLogLock.ts).
+import { getEditableFromDateStr as getMinDateStr } from '../../../lib/driveLogLock';
 
 interface DateSectionProps {
     form: DriveLogForm;

@@ -14,7 +14,12 @@ const mocks = vi.hoisted(() => ({
     resolveStartKm: vi.fn(),
     showToast: vi.fn(),
     confirm: vi.fn(),
+    lockError: vi.fn(),
 }));
+vi.mock('@/hooks/useAuth', () => ({ useAuth: () => ({ userData: { role: 'admin' } }) }));
+// 수정 잠금 판정은 driveLogLock.test.ts가 다룬다. 여기 날짜는 고정값이라 실제 판정을 쓰면 시간이 지나
+// 잠금에 걸려 깨진다 — 반납 창이 그 판정을 **저장 전에 부르는지**만 본다.
+vi.mock('@/lib/driveLogLock', () => ({ getDriveLogLockError: mocks.lockError }));
 vi.mock('@/lib/firestore', () => ({
     createDriveLog: mocks.createDriveLog,
     updateReservationStatus: mocks.updateReservationStatus,
@@ -48,6 +53,7 @@ function setup() {
 
 beforeEach(() => {
     vi.clearAllMocks();
+    mocks.lockError.mockReturnValue(null);
     mocks.resolveStartKm.mockResolvedValue('50000');
     mocks.createDriveLog.mockResolvedValue({ id: 'x' });
     mocks.updateReservationStatus.mockResolvedValue(undefined);
@@ -55,6 +61,20 @@ beforeEach(() => {
 });
 
 describe('ExternalLoanReturnModal', () => {
+    it('[수정 잠금] 반납일이 기한(60일) 밖이면 저장하지 않고 이유를 알린다', async () => {
+        mocks.lockError.mockReturnValue('운행일로부터 60일이 지난 날짜로는 운행일지를 쓰거나 옮길 수 없습니다.');
+        const { onDone } = setup();
+        await waitFor(() => expect(screen.getByLabelText('출발 km (빌려줄 때)')).toHaveValue(50000));
+
+        fireEvent.change(screen.getByLabelText('도착 km (돌려받을 때) *'), { target: { value: '50120' } });
+        fireEvent.click(screen.getByRole('button', { name: '반납 처리' }));
+
+        await waitFor(() => expect(mocks.showToast).toHaveBeenCalledWith(expect.stringContaining('60일'), 'warning'));
+        expect(mocks.lockError).toHaveBeenCalledWith(expect.objectContaining({ role: 'admin', arrivalDate: '2026-10-01' }));
+        expect(mocks.createDriveLog).not.toHaveBeenCalled();
+        expect(onDone).not.toHaveBeenCalled();
+    });
+
     it('출발 km를 채우고, 저장하면 운행일지를 쓰고 예약을 완료로 닫는다', async () => {
         const { onDone } = setup();
         await waitFor(() => expect(screen.getByLabelText('출발 km (빌려줄 때)')).toHaveValue(50000));

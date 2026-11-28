@@ -48,6 +48,16 @@ import type { DriveLogForm } from '../../hooks/driveLogForm/types';
 import type { DriveLog } from '../../types/driveLog';
 import type { User as UserDoc } from '../../types/user';
 
+/**
+ * 오늘로부터 n일 전 'YYYY-MM-DD'. 운행일은 고정 날짜로 두지 않는다 — 수정 잠금(운행일로부터 60일)에
+ * 걸려 잠금과 무관한 테스트가 시간이 지나면 깨진다.
+ */
+function recentDate(n: number): string {
+    const d = new Date();
+    d.setDate(d.getDate() - n);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 /** 검증을 통과하는 최소 폼 */
 function validForm(over: Partial<DriveLogForm> = {}): DriveLogForm {
     return {
@@ -62,7 +72,7 @@ function validForm(over: Partial<DriveLogForm> = {}): DriveLogForm {
         endTime: '11:00',
         startKm: '51000',
         endKm: '51050',
-        driveDate: '2026-03-05',
+        driveDate: recentDate(3),
         ...over,
     };
 }
@@ -164,7 +174,37 @@ describe('입력 검증', () => {
 
     it('다음 날 도착이면 도착 시각이 일러도 저장한다', async () => {
         await submit(deps({
-            form: validForm({ startTime: '17:00', endTime: '10:00', driveDate: '2026-03-05', endDate: '2026-03-06' }),
+            form: validForm({ startTime: '17:00', endTime: '10:00', driveDate: recentDate(3), endDate: recentDate(2) }),
+        }));
+
+        expect(mockSubmitDriveLog).toHaveBeenCalled();
+    });
+
+    it('[수정 잠금] 운행일로부터 60일이 지난 기록은 기관 관리자도 고칠 수 없다', async () => {
+        await submit(deps({
+            userData: { role: 'admin', organizationId: 'org1' } as UserDoc,
+            isEditMode: true,
+            editLog: { id: 'old', timestamp: new Date(Date.now() - 70 * 86400000) } as unknown as DriveLog,
+            form: validForm({ driveDate: recentDate(70) }),
+        }));
+
+        expect(mockSubmitDriveLog).not.toHaveBeenCalled();
+        expect(showToast).toHaveBeenCalledWith(expect.stringContaining('60일이 지난 운행일지는 고치거나 지울 수 없습니다'), 'warning');
+    });
+
+    it('[수정 잠금] 60일이 지난 날짜로 소급 입력하는 것도 막는다', async () => {
+        await submit(deps({ form: validForm({ driveDate: recentDate(61) }) }));
+
+        expect(mockSubmitDriveLog).not.toHaveBeenCalled();
+        expect(showToast).toHaveBeenCalledWith(expect.stringContaining('지난 날짜로는'), 'warning');
+    });
+
+    it('[수정 잠금] 운영자는 잠긴 기록도 고칠 수 있다', async () => {
+        await submit(deps({
+            userData: { role: 'superAdmin' } as UserDoc,
+            isEditMode: true,
+            editLog: { id: 'old', timestamp: new Date(Date.now() - 70 * 86400000) } as unknown as DriveLog,
+            form: validForm({ driveDate: recentDate(70) }),
         }));
 
         expect(mockSubmitDriveLog).toHaveBeenCalled();

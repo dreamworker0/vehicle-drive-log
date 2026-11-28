@@ -35,6 +35,9 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
   // Mock Contexts
   const setupContext = (uid: string, token: Record<string, unknown>) => testEnv.authenticatedContext(uid, token);
   const _unauthContext = () => testEnv.unauthenticatedContext();
+  // 운행일지 시각은 '오늘 기준 며칠 전'으로 심는다 — 고정 날짜는 시간이 지나면 수정 잠금(61일)에 걸려
+  // 잠금과 무관한 테스트가 어느 날 갑자기 깨진다.
+  const daysAgo = (n: number) => new Date(Date.now() - n * 24 * 60 * 60 * 1000);
 
   // 기대 동작 표 #3(허용 대조군) · #4(거부) · #5
   it('1. 타 조직 데이터 접근 공격 (Tenant Isolation)', async () => {
@@ -1546,7 +1549,7 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
    */
   describe('기대 동작 표', () => {
     const ORGS = ['org-A', 'org-B'] as const;
-    const at = new Date('2026-10-01T09:00:00Z');
+    const at = daysAgo(1);
 
     const emp = (org: 'A' | 'B', n: 1 | 2) =>
       setupContext(`emp_${org}${n}`, { role: 'employee', orgId: `org-${org}` }).firestore();
@@ -1845,7 +1848,7 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
       const db = context.firestore();
       await db.collection('driveLogs').doc('typed_A').set({
         organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'user_A', createdByUid: 'user_A',
-        startKm: 100, endKm: 150, distance: 50, timestamp: new Date('2026-11-01T09:00:00Z'),
+        startKm: 100, endKm: 150, distance: 50, timestamp: daysAgo(2),
       });
       // 형식이 어긋난 옛 기록 — 시각·거리가 문자열로 남아 있다
       await db.collection('driveLogs').doc('legacy_string_km').set({
@@ -1858,7 +1861,7 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
 
     // 화면이 보내는 모양 — km 숫자, 시각 Date
     await assertSucceeds(memberA.collection('driveLogs').doc('ok_new').set({
-      ...base, startKm: 150, endKm: 180, distance: 30, timestamp: new Date('2026-11-02T09:00:00Z'),
+      ...base, startKm: 150, endKm: 180, distance: 30, timestamp: daysAgo(1),
     }));
 
     // km·거리 자리에 문자열 → 차단
@@ -1876,5 +1879,41 @@ describe('Firestore Security Rules for Multi-Tenant Isolation', () => {
 
     // 옛 기록의 다른 필드(목적지)를 고치는 길은 열어 둔다 — 남아 있는 문자열 시각·거리는 검사하지 않는다
     await assertSucceeds(memberA.collection('driveLogs').doc('legacy_string_km').update({ destination: '구청' }));
+  });
+  it('31. 운행일지 수정 잠금 — 운행일로부터 61일이 지나면 직원·관리자 모두 쓰기·고치기·지우기 불가, 운영자만 예외', async () => {
+    await testEnv.withSecurityRulesDisabled(async (context) => {
+      const db = context.firestore();
+      const owned = { organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'emp_A', createdByUid: 'emp_A', startKm: 100, endKm: 150 };
+      await db.collection('driveLogs').doc('old_log').set({ ...owned, timestamp: daysAgo(62), purpose: '가정방문' });
+      await db.collection('driveLogs').doc('old_log2').set({ ...owned, timestamp: daysAgo(62), purpose: '가정방문' });
+      await db.collection('driveLogs').doc('recent_log').set({ ...owned, timestamp: daysAgo(59), purpose: '가정방문' });
+      // 운행일을 알 수 없는 옛 기록(시각이 문자열·없음)은 잠그지 않는다
+      await db.collection('driveLogs').doc('no_ts_log').set({ ...owned, purpose: '가정방문' });
+    });
+    const emp = setupContext('emp_A', { role: 'employee', orgId: 'org-A' }).firestore();
+    const admin = setupContext('admin_A', { role: 'admin', orgId: 'org-A' }).firestore();
+    const superAdmin = setupContext('super_1', { role: 'superAdmin' }).firestore();
+    const base = { organizationId: 'org-A', vehicleId: 'v_A', driverUid: 'emp_A', createdByUid: 'emp_A', startKm: 1, endKm: 2 };
+
+    // 잠긴 기록: 작성자도, 기관 관리자도 고칠 수 없다
+    await assertFails(emp.collection('driveLogs').doc('old_log').update({ purpose: '변경' }));
+    await assertFails(admin.collection('driveLogs').doc('old_log').update({ purpose: '변경', lastEditedByUid: 'admin_A' }));
+    // 잠긴 기록: 기관 관리자도 지울 수 없다
+    await assertFails(admin.collection('driveLogs').doc('old_log').delete());
+    // 운영자는 고치고 지울 수 있다
+    await assertSucceeds(superAdmin.collection('driveLogs').doc('old_log').update({ purpose: '운영자 정정' }));
+    await assertSucceeds(superAdmin.collection('driveLogs').doc('old_log2').delete());
+
+    // 기한 안의 기록은 그대로 고칠 수 있다(경계: 59일 전)
+    await assertSucceeds(emp.collection('driveLogs').doc('recent_log').update({ purpose: '변경' }));
+    // 열린 기록을 잠긴 날짜로 옮겨 사실상 지난 기록을 바꾸는 길도 막는다
+    await assertFails(emp.collection('driveLogs').doc('recent_log').update({ timestamp: daysAgo(70) }));
+    // 운행일을 알 수 없는 옛 기록은 잠그지 않는다
+    await assertSucceeds(emp.collection('driveLogs').doc('no_ts_log').update({ purpose: '변경' }));
+
+    // 잠긴 날짜로 새로 쓰기(사후 끼워 넣기) 차단 — 화면이 허용하는 60일 전 날짜는 통과한다
+    await assertFails(emp.collection('driveLogs').doc('backdated').set({ ...base, timestamp: daysAgo(62) }));
+    await assertSucceeds(emp.collection('driveLogs').doc('edge_ok').set({ ...base, timestamp: daysAgo(60) }));
+    await assertSucceeds(admin.collection('driveLogs').doc('recent_log').delete());
   });
 });
