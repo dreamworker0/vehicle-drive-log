@@ -37,6 +37,8 @@ jest.mock('../services/driveLog/verifyHelpers', () => ({
     geocodeByTmap: (...a: unknown[]) => mockGeocode(...a),
     sendApprovalEmailServer: (...a: unknown[]) => mockApprovalEmail(...a),
     sendRejectionEmail: (...a: unknown[]) => mockRejectionEmail(...a),
+    DUPLICATE_APPROVED_EMAIL: { title: 'approved-guide' },
+    DUPLICATE_PENDING_EMAIL: { title: 'pending-guide' },
 }));
 jest.mock('../core/sentry', () => ({ captureError: jest.fn(), flushSentry: jest.fn() }));
 jest.mock('firebase-admin/auth', () => ({ getAuth: jest.fn() }));
@@ -179,6 +181,21 @@ describe('판독', () => {
         expect(reason).not.toContain('kim@old.or.kr');
         expect(update.inviteCode).toBeUndefined();
         expect(mockApprovalEmail).not.toHaveBeenCalled();
+        // 이미 승인된 기관이면 "초대 코드로 가입하라"는 안내를 붙여 보낸다
+        expect(mockRejectionEmail).toHaveBeenCalledWith(
+            'head@welfare.or.kr', '행복복지관', expect.stringContaining('이미 승인된 기관'), { title: 'approved-guide' });
+    });
+
+    it('같은 고유번호의 신청이 심사 중이면 기다리라는 안내를 붙여 거절 메일을 보낸다', async () => {
+        gemini({ documentType: '고유번호증', uniqueNumber: '123-82-00001' });
+        mockDuplicateGet.mockResolvedValueOnce({ docs: [
+            { id: 'org9', data: () => ({ status: 'pending', name: '기존', applicantName: '김철수', applicantEmail: 'kim@old.or.kr' }) },
+        ] });
+        await run(null, applied());
+
+        expect(lastUpdate()).toMatchObject({ status: 'rejected' });
+        expect(mockRejectionEmail).toHaveBeenCalledWith(
+            'head@welfare.or.kr', '행복복지관', expect.stringContaining('대기 중인 기관'), { title: 'pending-guide' });
     });
 
     it.each([['판독불가'], ['기타']])('%s면 승인도 거절도 하지 않고 수동 심사로 남긴다', async (documentType) => {

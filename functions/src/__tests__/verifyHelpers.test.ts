@@ -41,6 +41,7 @@ import {
     geocodeByTmap,
     sendApprovalEmailServer,
     sendRejectionEmail,
+    DUPLICATE_APPROVED_EMAIL,
 } from '../services/driveLog/verifyHelpers';
 
 const mockFetch = jest.fn();
@@ -316,6 +317,40 @@ describe('verifyHelpers', () => {
             expect(html).not.toContain('<b>기관</b>');
             expect(html).toContain('&lt;b&gt;기관&lt;/b&gt;');
             expect(html).toContain('&lt;script&gt;alert(1)&lt;/script&gt; &amp; &quot;x&quot;');
+        });
+
+        it('안내 없이 부르면 기본 머리글만 쓰고 안내 상자는 넣지 않는다', async () => {
+            mockSendMail.mockResolvedValue({});
+
+            await sendRejectionEmail('a@org.kr', '기관', '사유');
+
+            const html = mockSendMail.mock.calls[0][0].html as string;
+            expect(html).toContain('기관 신청이 승인되지 않았습니다');
+            expect(html).not.toContain('이렇게 해 주세요');
+        });
+
+        it('이미 승인된 기관 안내는 머리글을 바꾸고 초대 코드로 가입하는 방법을 적는다', async () => {
+            mockSendMail.mockResolvedValue({});
+
+            await sendRejectionEmail('a@org.kr', '기관', '중복', DUPLICATE_APPROVED_EMAIL);
+
+            const html = mockSendMail.mock.calls[0][0].html as string;
+            expect(html).toContain('이미 승인된 기관입니다');
+            expect(html).not.toContain('기관 신청이 승인되지 않았습니다');
+            expect(html).toContain('이렇게 해 주세요');
+            expect(html).toContain('초대 코드');
+            expect(html).toContain('https://drivelog.socialprism.co.kr');
+        });
+
+        it('안내 문구도 HTML 이스케이프한다', async () => {
+            mockSendMail.mockResolvedValue({});
+
+            await sendRejectionEmail('a@org.kr', '기관', '사유', { title: '<i>t</i>', guidance: ['<img src=x>'] });
+
+            const html = mockSendMail.mock.calls[0][0].html as string;
+            expect(html).not.toContain('<img src=x>');
+            expect(html).not.toContain('<i>t</i>');
+            expect(html).toContain('&lt;img src=x&gt;');
         });
 
         it('SMTP 전송 실패는 false다', async () => {

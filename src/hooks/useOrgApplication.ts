@@ -2,8 +2,9 @@
  * useOrgApplication — 기관 사용 신청 폼 로직 훅
  * 폼 상태, 파일 처리(검증/압축/드래그), 제출(익명로그인+업로드+OCR) 관리
  */
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo } from 'react';
 import { firebaseFunctions } from '../lib/firebase';
+import { suggestEmailFix } from '../lib/emailTypo';
 import { useAuth } from './useAuth';
 import { httpsCallable } from 'firebase/functions';
 import { TERMS_VERSION, PRIVACY_VERSION } from '../lib/constants';
@@ -81,6 +82,16 @@ export default function useOrgApplication() {
     const [success, setSuccess] = useState(false);
     const [agreeTerms, setAgreeTerms] = useState(false);
     const [agreePrivacy, setAgreePrivacy] = useState(false);
+    // 신청자가 "이 주소가 맞다"고 확인한 이메일 — 이 값과 같으면 오타 경고를 다시 띄우지 않는다
+    const [confirmedEmail, setConfirmedEmail] = useState('');
+
+    // 이메일 도메인 오타 추정. 승인 메일(초대 코드)이 가는 주소라 틀리면 가입을 못 한다.
+    // 구글 로그인으로 채워진(읽기 전용) 이메일은 실제 계정 주소이므로 검사하지 않는다.
+    const emailSuggestion = useMemo(() => {
+        if (currentUser?.email) return null;
+        if (confirmedEmail && confirmedEmail === form.applicantEmail.trim()) return null;
+        return suggestEmailFix(form.applicantEmail);
+    }, [form.applicantEmail, confirmedEmail, currentUser?.email]);
 
     // 로그인 정보 반응형 동기화 및 비로그인 클린업
     useEffect(() => {
@@ -105,6 +116,19 @@ export default function useOrgApplication() {
     const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         setForm(prev => ({ ...prev, [e.target.name]: e.target.value }));
     }, []);
+
+    // 오타 경고의 "고치기" — 추정한 주소로 바꾼다
+    const applyEmailSuggestion = useCallback(() => {
+        if (!emailSuggestion) return;
+        setForm(prev => ({ ...prev, applicantEmail: emailSuggestion }));
+        setError('');
+    }, [emailSuggestion]);
+
+    // 오타 경고의 "이 주소가 맞아요" — 지금 입력한 주소로 계속 진행한다
+    const keepEmailAsTyped = useCallback(() => {
+        setConfirmedEmail(form.applicantEmail.trim());
+        setError('');
+    }, [form.applicantEmail]);
 
     const handlePhoneChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const formatted = formatPhoneNumber(e.target.value);
@@ -158,6 +182,12 @@ export default function useOrgApplication() {
         // 전화번호는 서버(submitOrgApplication)도 필수로 검사한다 — 승인·반려 알림톡 수신 번호
         if (!form.orgName || !form.applicantName || !form.applicantEmail || !form.applicantPhone) {
             setError('필수 항목을 모두 입력해주세요.');
+            return;
+        }
+
+        // 이메일 오타 경고에 답하지 않았으면 제출하지 않는다 — 경고를 못 보고 넘어가는 것을 막는다
+        if (emailSuggestion) {
+            setError(`이메일 주소를 확인해주세요. 혹시 ${emailSuggestion} 아닌가요? 이메일 칸 아래에서 고치거나 "입력한 주소가 맞아요"를 눌러주세요.`);
             return;
         }
 
@@ -252,7 +282,7 @@ export default function useOrgApplication() {
             setLoading(false);
             setOcrStatus('');
         }
-    }, [form, imageFile, agreeTerms, agreePrivacy]);
+    }, [form, imageFile, agreeTerms, agreePrivacy, emailSuggestion]);
 
     const handleGoBack = useCallback(async (navigate: (path: string) => void) => {
         navigate('/');
@@ -262,11 +292,12 @@ export default function useOrgApplication() {
         // 상태
         form, imageFile, imagePreview, loading, ocrStatus,
         error, isDragging, success, agreeTerms, agreePrivacy,
-        fileInputRef, currentUser,
+        fileInputRef, currentUser, emailSuggestion,
         // 세터
         setAgreeTerms, setAgreePrivacy,
         // 핸들러
         handleChange, handlePhoneChange, handleImageChange,
+        applyEmailSuggestion, keepEmailAsTyped,
         handleDragOver, handleDragLeave, handleDrop,
         handleSubmit, handleGoBack,
     };
