@@ -275,7 +275,7 @@ npm run build           # 프로덕션 빌드 확인
 | 종류 | 대표 함수 |
 |------|-----------|
 | 호출형 (onCall) | `ocrDashboard`(계기판 OCR) · `createReservationSafe`(트랜잭션 예약 생성) · `joinOrganization`(초대 코드 가입) · `withdrawOrganization`(기관 해지) · `askAI`(FAQ 기반 답변) · `getSlackInstallUrl`·`diagnoseSlackConnection`(Slack 연결) |
-| HTTP (onRequest) | `tmapProxy`·`holidayProxy`(외부 API 프록시, 인증 + Rate Limit) · `slackEvents`(Slack 이벤트 수신) · `slackOauthCallback`(설치 콜백) |
+| HTTP (onRequest) | `tmapProxy`·`holidayProxy`(외부 API 프록시, 인증 + Rate Limit) · `slackEvents`(Slack 이벤트 수신) · `slackOauthCallback`(설치 콜백) · `vehicleStatusApi`(기관 외부 연동 읽기 전용 API, `manageExternalApiKey`로 키 관리) |
 | 스케줄 (onSchedule) | 아래 표 참고 |
 | Firestore 트리거 | `autoVerifyDocument`(증빙서류 AI 심사) · `setCustomClaims`(권한 동기화) · `onReservation*`(캘린더·푸시) · `onDriveLog*`(주행거리·하이패스 잔액·집계) · `onHipassCharge*`(카드 잔액 증분) · `onFuelLogCreated`(주유 필요 표시 해제) · `audit*`(접속기록) · `onSlackTaskCreated`(Slack 워커) |
 | Auth 트리거 | `onUserDelete`(탈퇴 시 개인정보 익명화) |

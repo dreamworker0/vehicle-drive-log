@@ -2,9 +2,9 @@
 
 > **자동 생성 문서** — `scripts/generate-functions-doc.ts`로 생성됨
 >
-> 마지막 업데이트: 2026. 11. 25. 오전 8:19:07
+> 마지막 업데이트: 2026. 11. 28. 오후 12:49:43
 >
-> 총 함수 수: **81개**
+> 총 함수 수: **83개**
 
 ---
 
@@ -23,7 +23,7 @@
 
 ## 📞 onCall (클라이언트 직접 호출)
 
-> 총 42개
+> 총 43개
 
 ### `ocrDashboard`
 
@@ -411,11 +411,21 @@
 | **인증** | superAdmin |
 | **비고** | 토큰·암호문 제외한 안전 필드만 반환 |
 
+### `manageExternalApiKey`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/callable/manageExternalApiKey.ts` |
+| **설명** | 외부 연동(API) 키 상태 조회·발급(교체)·폐기. 키는 기관당 하나, SHA-256 해시를 문서 ID로 `externalApiKeys`(Rules 전면 차단)에 저장하고 원래 키는 발급 응답에서 한 번만 돌려준다. 발급은 [외부 연동(API)]을 켠 승인 기관만, 폐기는 토글과 무관. |
+| **인증** | 기관 관리자(클레임 `role=admin`, 기관은 클레임 `orgId`) 또는 superAdmin · App Check |
+| **요청 파라미터** | `{ action: 'status' \| 'issue' \| 'revoke' }` |
+| **반환값** | `{ status: { hasKey, hint?, createdAt?, lastUsedAt? }, apiKey?: string }` |
+
 ---
 
 ## 🌐 onRequest (HTTP 요청)
 
-> 총 4개
+> 총 5개
 
 ### `tmapProxy`
 
@@ -434,6 +444,16 @@
 | **설명** | 공공데이터포털 공휴일 API 프록시. API 키를 서버에서 관리. |
 | **인증** | Firebase Auth 토큰 필수 + IP Rate Limit |
 | **요청 파라미터** | `query params: solYear, numOfRows` |
+
+### `vehicleStatusApi`
+
+| 항목 | 내용 |
+|------|------|
+| **파일** | `functions/src/handlers/https/vehicleStatusApi.ts` |
+| **설명** | 기관 외부 연동용 읽기 전용 API — `GET /api/v1/vehicles`(Hosting 재작성). 기관이 만든 프로그램(구글 앱스 스크립트 등)이 운행 중 차량의 이름·번호판·누적 km·하이패스 잔액·카드 끝 4자리를 읽는다. 개인정보는 내보내지 않는다. 기관이 [외부 연동(API)]을 켠 승인 기관일 때만 응답하고, CORS는 닫혀 있으며 `no-store`로 응답한다. |
+| **인증** | API 키(`Authorization: Bearer` 또는 `X-API-Key`, 해시로 기관 조회) + 인증 전 IP 상한 120/시간 + 기관당 60/시간 |
+| **요청 파라미터** | `없음 (GET)` |
+| **반환값** | `{ organizationName, generatedAt, vehicles: [{ id, name, plateNumber, currentKm, hipassBalance, hipassCardLast4 }] }` |
 
 ### `slackEvents`
 
