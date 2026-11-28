@@ -68,6 +68,13 @@ export const organizationSchema = z.object({
      * 꺼도 표시·수정·반납 처리가 그대로 된다.
      */
     externalLoanEnabled: z.boolean().optional().catch(undefined),
+    /**
+     * 외부 연동(API) — **opt-in**(미설정=꺼짐). 기관이 자체 도구(구글 앱스 스크립트 등)에서
+     * 차량 누적 주행거리·하이패스 잔액을 읽어 가는 읽기 전용 API(GET /api/v1/vehicles).
+     * 서버(vehicleStatusApi·manageExternalApiKey)도 이 값이 true일 때만 응답·발급한다.
+     * 끄면 발급한 키가 남아 있어도 바로 막힌다.
+     */
+    externalApiEnabled: z.boolean().optional().catch(undefined),
     /** 운전자(대표·공동): 직원 목록에서 직접 선택 */
     driverAllowList: z.boolean().optional().catch(undefined),
     /** 운전자(대표·공동): 검색으로 선택. 목록·검색 둘 다 켜지면 후보 8명 기준 자동 전환 */

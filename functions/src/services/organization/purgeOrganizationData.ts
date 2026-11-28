@@ -51,6 +51,8 @@ const ORG_SCOPED: ReadonlyArray<readonly [collection: string, field: string]> = 
     ["assistantConversations", "orgId"],
     // 캘린더 바인딩을 남기면 그 캘린더가 사라진 기관에 묶인 채로 남아 다른 기관이 연결할 수 없다.
     ["calendarBindings", "organizationId"],
+    // 외부 연동 키 — 해지 기관은 API가 status로 이미 막지만, 키 문서가 남을 이유는 없다.
+    ["externalApiKeys", "organizationId"],
     ["vehicles", "organizationId"],
     ["hipassCards", "organizationId"],
     // 해지 시점에 이미 지워졌지만, 그 뒤에 남은 문서가 있으면 함께 지운다.

@@ -17,6 +17,7 @@ import FeatureToggleSection from './settings/FeatureToggleSection';
 import ApprovalLineSection from './settings/ApprovalLineSection';
 import AccountSection from './settings/AccountSection';
 import SlackIntegrationSection from './settings/SlackIntegrationSection';
+import ExternalApiSection from './settings/ExternalApiSection';
 
 export default function Settings() {
     const navigate = useNavigate();
@@ -102,6 +103,7 @@ export default function Settings() {
                     reservationPassengerEnabled: form.reservationPassengerEnabled,
                     refuelFlagEnabled: form.refuelFlagEnabled,
                     externalLoanEnabled: form.externalLoanEnabled,
+                    externalApiEnabled: form.externalApiEnabled,
                     driverAllowList: form.driverAllowList,
                     driverAllowSearch: form.driverAllowSearch,
                 }}
@@ -131,6 +133,9 @@ export default function Settings() {
 
             {/* Slack 연결 (기관 셀프서비스) */}
             <SlackIntegrationSection />
+
+            {/* 외부 연동(API) 키 — 기능 사용에서 켠 기관만 */}
+            {form.externalApiEnabled && <ExternalApiSection />}
 
             {/* 접속기록 점검 — 고시 제16조 ②의 월 1회 점검 주체는 개인정보처리자인 기관이다 */}
             <div className="glass-card p-6 mb-6">

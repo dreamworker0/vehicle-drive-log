@@ -416,6 +416,26 @@ const FUNCTIONS: FunctionEntry[] = [
     params: 'query params: solYear, numOfRows',
   },
 
+  // ── 외부 연동(API) ──
+  {
+    name: 'vehicleStatusApi',
+    type: 'onRequest',
+    file: 'handlers/https/vehicleStatusApi.ts',
+    description: '기관 외부 연동용 읽기 전용 API — `GET /api/v1/vehicles`(Hosting 재작성). 기관이 만든 프로그램(구글 앱스 스크립트 등)이 운행 중 차량의 이름·번호판·누적 km·하이패스 잔액·카드 끝 4자리를 읽는다. 개인정보는 내보내지 않는다. 기관이 [외부 연동(API)]을 켠 승인 기관일 때만 응답하고, CORS는 닫혀 있으며 `no-store`로 응답한다.',
+    auth: 'API 키(`Authorization: Bearer` 또는 `X-API-Key`, 해시로 기관 조회) + 인증 전 IP 상한 120/시간 + 기관당 60/시간',
+    params: '없음 (GET)',
+    returns: '{ organizationName, generatedAt, vehicles: [{ id, name, plateNumber, currentKm, hipassBalance, hipassCardLast4 }] }',
+  },
+  {
+    name: 'manageExternalApiKey',
+    type: 'onCall',
+    file: 'handlers/callable/manageExternalApiKey.ts',
+    description: '외부 연동(API) 키 상태 조회·발급(교체)·폐기. 키는 기관당 하나, SHA-256 해시를 문서 ID로 `externalApiKeys`(Rules 전면 차단)에 저장하고 원래 키는 발급 응답에서 한 번만 돌려준다. 발급은 [외부 연동(API)]을 켠 승인 기관만, 폐기는 토글과 무관.',
+    auth: '기관 관리자(클레임 `role=admin`, 기관은 클레임 `orgId`) 또는 superAdmin · App Check',
+    params: "{ action: 'status' \\| 'issue' \\| 'revoke' }",
+    returns: '{ status: { hasKey, hint?, createdAt?, lastUsedAt? }, apiKey?: string }',
+  },
+
   // ── Slack 수신 엔드포인트 (onRequest) ──
   {
     name: 'slackEvents',

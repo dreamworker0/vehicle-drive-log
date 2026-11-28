@@ -35,7 +35,7 @@ async function seedOrg(orgId: string, status: string, teamId: string) {
     batch.set(orgRef.collection("stats").doc("aggregate"), { totalDistance: 10 });
 
     const byOrg = ["driveLogs", "reservations", "hipassCharges", "fuelLogs", "maintenanceRecords",
-        "notifications", "favorites", "favoritePurposes", "feedbacks", "slackOauthStates", "calendarBindings", "vehicles", "hipassCards", "users"];
+        "notifications", "favorites", "favoritePurposes", "feedbacks", "slackOauthStates", "calendarBindings", "externalApiKeys", "vehicles", "hipassCards", "users"];
     for (const collection of byOrg) {
         batch.set(db.collection(collection).doc(`${orgId}-${collection}-1`), { organizationId: orgId, name: "개인정보" });
         batch.set(db.collection(collection).doc(`${orgId}-${collection}-2`), { organizationId: orgId, name: "개인정보" });
@@ -60,7 +60,7 @@ async function countAll(orgId: string, teamId: string): Promise<Record<string, n
         ["driveLogs", "organizationId"], ["reservations", "organizationId"], ["hipassCharges", "organizationId"],
         ["fuelLogs", "organizationId"], ["maintenanceRecords", "organizationId"], ["notifications", "organizationId"],
         ["favorites", "organizationId"], ["favoritePurposes", "organizationId"], ["feedbacks", "organizationId"], ["slackOauthStates", "organizationId"],
-        ["calendarBindings", "organizationId"], ["vehicles", "organizationId"], ["hipassCards", "organizationId"],
+        ["calendarBindings", "organizationId"], ["externalApiKeys", "organizationId"], ["vehicles", "organizationId"], ["hipassCards", "organizationId"],
         ["users", "organizationId"], ["assistantConversations", "orgId"], ["integrations", "organizationId"],
         ["auditLogs", "organizationId"],
     ];

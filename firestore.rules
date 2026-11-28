@@ -784,5 +784,12 @@ service cloud.firestore {
     match /hipassBalanceEvents/{docId} {
       allow read, write: if false;
     }
+
+    // === 외부 연동(API) 키 — 서버 전용 ===
+    // 문서 ID가 키의 해시다. 클라이언트가 읽으면 어느 기관이 키를 쓰는지 드러나고, 쓸 수 있으면
+    // 자기가 고른 키를 다른 기관에 심을 수 있다. 상태 조회·발급·폐기는 manageExternalApiKey 콜러블만 한다.
+    match /externalApiKeys/{docId} {
+      allow read, write: if false;
+    }
   }
 }
