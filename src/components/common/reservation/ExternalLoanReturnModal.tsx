@@ -13,6 +13,8 @@ import { invalidateDashboardCache } from '../../../hooks/useTodayDashboard';
 import { useToast } from '../../../hooks/useToast';
 import { useConfirm } from '../../../hooks/useConfirm';
 import { captureError } from '../../../lib/sentry';
+import { getDriveLogLockError } from '../../../lib/driveLogLock';
+import { useAuth } from '../../../hooks/useAuth';
 import type { Reservation } from '../../../types/reservation';
 import type { Vehicle } from '../../../types/vehicle';
 
@@ -34,6 +36,7 @@ const timeOf = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
 export default function ExternalLoanReturnModal({ reservation, allReservations, vehicles, orgId, adminUid, onClose, onDone }: Props) {
     const { showToast } = useToast();
     const { confirm } = useConfirm();
+    const { userData } = useAuth();
     const vehicle = vehicles.find(v => v.id === reservation.vehicleId) ?? null;
     const loan = reservation.externalLoan;
 
@@ -89,6 +92,12 @@ export default function ExternalLoanReturnModal({ reservation, allReservations, 
         });
         if (!built.ok) {
             showToast(built.error, 'warning');
+            return;
+        }
+        // 반납일이 곧 운행일지의 운행일이다 — 수정 잠금 기한(60일) 밖이면 서버가 거절하므로 먼저 알린다
+        const lockError = getDriveLogLockError({ role: userData?.role, isEditMode: false, editLog: null, arrivalDate: returnDate });
+        if (lockError) {
+            showToast(lockError, 'warning');
             return;
         }
         setSaving(true);

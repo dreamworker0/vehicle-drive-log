@@ -2,6 +2,8 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import type { DriveLog } from '../../../types/driveLog';
 import { toDateOrNull } from '../../../lib/dateUtils';
 import { formatStartDatePrefix } from '../../../lib/driveLogExportFields';
+import { isDriveLogLockedFor, DRIVE_LOG_LOCKED_MESSAGE } from '../../../lib/driveLogLock';
+import { useAuth } from '../../../hooks/useAuth';
 
 export interface DriveLogTableRowProps {
     log: DriveLog;
@@ -20,6 +22,19 @@ function EditButton({ onClick }: { onClick: () => void }) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
             </svg>
         </button>
+    );
+}
+
+/** 운행일로부터 60일이 지난 기록 — 수정·삭제 자리에 잠김 표시만 둔다(서버 규칙이 거절한다) */
+function LockedMark() {
+    return (
+        <span
+            className="px-2 text-xs text-surface-500 dark:text-surface-400 whitespace-nowrap min-h-[48px] inline-flex items-center"
+            title={DRIVE_LOG_LOCKED_MESSAGE}
+            aria-label={DRIVE_LOG_LOCKED_MESSAGE}
+        >
+            🔒 잠김
+        </span>
     );
 }
 
@@ -83,6 +98,8 @@ const GRID_COLUMNS = '80px 60px 60px 70px 100px 1fr 100px 96px 80px 76px';
 export default function DriveLogTableRow({ log, deletingId, onDelete }: DriveLogTableRowProps) {
     const navigate = useNavigate();
     const location = useLocation();
+    const { userData } = useAuth();
+    const locked = isDriveLogLockedFor(log, userData?.role);
     const logDate = toDateOrNull(log.timestamp);
     const date = logDate
         ? logDate.toLocaleDateString('ko-KR', { month: 'short', day: 'numeric' })
@@ -106,8 +123,12 @@ export default function DriveLogTableRow({ log, deletingId, onDelete }: DriveLog
                     </div>
                     <div className="flex items-center gap-1">
                         <span className="font-bold text-primary-600 dark:text-primary-400">{distance.toLocaleString()} km</span>
-                        <EditButton onClick={handleEdit} />
-                        <DeleteButton onClick={() => onDelete(log.id, log.driverName || '')} disabled={isDeleting} />
+                        {locked ? <LockedMark /> : (
+                            <>
+                                <EditButton onClick={handleEdit} />
+                                <DeleteButton onClick={() => onDelete(log.id, log.driverName || '')} disabled={isDeleting} />
+                            </>
+                        )}
                     </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-surface-500 dark:text-surface-400">
@@ -169,8 +190,12 @@ export default function DriveLogTableRow({ log, deletingId, onDelete }: DriveLog
                     <span className="font-bold text-primary-600 dark:text-primary-400">{distance.toLocaleString()} km</span>
                 </div>
                 <div className="flex items-center justify-center gap-0.5">
-                    <EditButton onClick={handleEdit} />
-                    <DeleteButton onClick={() => onDelete(log.id, log.driverName || '')} disabled={isDeleting} />
+                    {locked ? <LockedMark /> : (
+                        <>
+                            <EditButton onClick={handleEdit} />
+                            <DeleteButton onClick={() => onDelete(log.id, log.driverName || '')} disabled={isDeleting} />
+                        </>
+                    )}
                 </div>
             </div>
         </div>

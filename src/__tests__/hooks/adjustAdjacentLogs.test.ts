@@ -58,6 +58,22 @@ describe('adjustAdjacentLogs', () => {
         expect(msgs[0]).toContain('구간이 겹쳐');
     });
 
+    it('직전 기록이 운행일로부터 60일이 지나 잠겼으면 덮지 않고 알리기만 한다', async () => {
+        const old = { id: 'a', startKm: 50, endKm: 90, timestamp: new Date(Date.now() - 70 * 86400000) } as unknown as DriveLog;
+        const msgs = await adjustAdjacentLogs({ lastDriveLog: old, nextDriveLog: null, startKm: 100, endKm: 200 });
+
+        expect(mockUpdateDoc).not.toHaveBeenCalled();
+        expect(msgs[0]).toContain('잠겨 있어');
+    });
+
+    it('운영자(canEditLocked)는 잠긴 직전 기록도 맞춘다', async () => {
+        const old = { id: 'a', startKm: 50, endKm: 90, timestamp: new Date(Date.now() - 70 * 86400000) } as unknown as DriveLog;
+        await adjustAdjacentLogs({ lastDriveLog: old, nextDriveLog: null, startKm: 100, endKm: 200, canEditLocked: true });
+
+        expect(mockUpdateDoc).toHaveBeenCalledTimes(1);
+        expect(mockUpdateDoc.mock.calls[0][1]).toMatchObject({ endKm: 100 });
+    });
+
     it('직후 기록은 출발 km만 맞추므로 사진 표시와 무관하게 조정한다', async () => {
         const photo = { id: 'b', startKm: 250, endKm: 300, endKmSource: 'ocr' } as unknown as DriveLog;
         await adjustAdjacentLogs({ lastDriveLog: null, nextDriveLog: photo, startKm: 100, endKm: 200 });

@@ -8,6 +8,7 @@ import { useToast } from './useToast';
 import { useConfirm } from './useConfirm';
 import { getDriveLogs, getVehicles, getOrganizationMembers, getOrganization, cleanupDuplicateLogs, deleteDriveLog } from '../lib/firestore';
 import { toLocalDateStr } from '../lib/dateUtils';
+import { isDriveLogLockedFor, DRIVE_LOG_LOCKED_MESSAGE } from '../lib/driveLogLock';
 import { matchesSearch } from './driveLogList/matchesSearch';
 import { useDriveLogExport } from './driveLogList/useDriveLogExport';
 import type { DocumentSnapshot } from 'firebase/firestore';
@@ -22,6 +23,8 @@ interface DupResult {
     totalLogs: number;
     /** 서버가 실제로 훑은 범위(개월). 전량이 아니므로 화면이 밝혀야 한다. */
     scanMonths: number;
+    /** 운행일로부터 60일이 지나 잠겨서 지우지 않은 중복 건수 — 운영자에게 요청해야 지울 수 있다 */
+    lockedSkipped?: number;
 }
 
 const PAGE_SIZE = 50;
@@ -158,6 +161,11 @@ export default function useDriveLogList() {
 
     // 삭제
     const handleDelete = async (logId: string, driverName: string) => {
+        // 버튼은 잠긴 기록에 보이지 않지만, 열어 둔 화면에서 기한이 지난 경우를 위해 한 번 더 본다
+        if (isDriveLogLockedFor(logs.find(l => l.id === logId), userData?.role)) {
+            showToast(DRIVE_LOG_LOCKED_MESSAGE, 'warning');
+            return;
+        }
         if (!await confirm({ message: `${driverName || '(이름 없음)'}님의 운행 기록을 삭제하시겠습니까?\n이 작업은 되돌릴 수 없습니다.`, confirmColor: 'danger' })) return;
         setDeletingId(logId);
         try {
@@ -183,6 +191,11 @@ export default function useDriveLogList() {
             if ((result as DupResult).deleteCount === 0) {
                 // 검사 범위를 함께 알린다 — "없습니다"만 띄우면 전량 무결로 오해한다
                 showToast(`최근 ${(result as DupResult).scanMonths}개월 기록에는 중복 데이터가 없습니다.`, 'success');
+            }
+            // 잠긴 기록의 중복은 목록에서 빠진다 — 말하지 않으면 중복이 남아 있는 것을 모른다
+            const lockedSkipped = (result as DupResult).lockedSkipped ?? 0;
+            if (lockedSkipped > 0) {
+                showToast(`운행일로부터 60일이 지난 기록의 중복 ${lockedSkipped}건은 잠겨 있어 지울 수 없습니다. 운영자에게 문의해 주세요.`, 'info');
             }
         } catch (err) {
             console.error('중복 검사 실패:', err);

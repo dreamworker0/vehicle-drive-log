@@ -9,12 +9,19 @@ import { doc, updateDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '../../lib/firebase';
 import type { DriveLog } from '../../types/driveLog';
 import { actorStamp } from '../../lib/firestore/actorStamp';
+import { isDriveLogLocked } from '../../lib/driveLogLock';
 
 interface AdjustParams {
     lastDriveLog: DriveLog | null;
     nextDriveLog: DriveLog | null;
     startKm: number;
     endKm: number;
+    /**
+     * 잠긴(운행일로부터 60일이 지난) 인접 기록도 맞출 수 있는가 — 운영자만 true.
+     * 아니면 잠긴 기록은 건드리지 않고 어긋난 사실만 알린다. 서버 규칙이 어차피 거절하고,
+     * 잠금의 뜻이 "지난 기록은 사후에 바뀌지 않는다"이기 때문이다.
+     */
+    canEditLocked?: boolean;
 }
 
 /**
@@ -26,8 +33,11 @@ export async function adjustAdjacentLogs({
     nextDriveLog,
     startKm,
     endKm,
+    canEditLocked = false,
 }: AdjustParams): Promise<string[]> {
     const adjustMessages: string[] = [];
+    const lastLocked = !canEditLocked && isDriveLogLocked(lastDriveLog);
+    const nextLocked = !canEditLocked && isDriveLogLocked(nextDriveLog);
 
     // 직전 기록의 endKm → 현재 기록의 startKm으로 자동 변경
     //
@@ -41,7 +51,11 @@ export async function adjustAdjacentLogs({
     const lastEndKm = lastDriveLog?.endKm;
     const photoAnchored = lastDriveLog?.endKmSource === 'ocr' && (lastEndKm ?? 0) < startKm;
 
-    if (lastDriveLog && lastEndKm !== startKm && photoAnchored) {
+    if (lastDriveLog && lastEndKm !== startKm && lastLocked) {
+        adjustMessages.push(
+            `직전 기록은 운행일로부터 60일이 지나 잠겨 있어 도착 km ${lastEndKm?.toLocaleString()}을 그대로 두었습니다 (이 기록 출발 ${startKm.toLocaleString()})`,
+        );
+    } else if (lastDriveLog && lastEndKm !== startKm && photoAnchored) {
         adjustMessages.push(
             `직전 기록의 도착 km ${lastEndKm?.toLocaleString()}은 사진으로 확인된 값이라 그대로 두었습니다 (이 기록 출발 ${startKm.toLocaleString()})`,
         );
@@ -70,7 +84,10 @@ export async function adjustAdjacentLogs({
     // 서버가 뒤 기록을 함께 밀도록 맡긴다.
     const nextEndKm = nextDriveLog?.endKm;
     const wouldGoNegative = typeof nextEndKm === 'number' && endKm > nextEndKm;
-    if (nextDriveLog && wouldGoNegative) {
+    // 직후 기록은 이 기록보다 나중이라 보통 잠기지 않는다. 운영자가 잠긴 기록을 고칠 때만 해당한다.
+    if (nextDriveLog && nextDriveLog.startKm !== endKm && nextLocked) {
+        adjustMessages.push(`직후 기록은 운행일로부터 60일이 지나 잠겨 있어 출발 km를 그대로 두었습니다`);
+    } else if (nextDriveLog && wouldGoNegative) {
         adjustMessages.push(`직후 기록부터 km가 ${endKm.toLocaleString()}에 이어지도록 함께 조정됩니다`);
     } else if (nextDriveLog && nextDriveLog.startKm !== endKm) {
         try {
