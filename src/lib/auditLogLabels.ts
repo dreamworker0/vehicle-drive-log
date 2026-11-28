@@ -28,6 +28,7 @@ export const TARGET_LABEL: Record<AuditTargetType, string> = {
     export: '내보내기',
     orgDocument: '기관 증빙서류',
     reservation: '예약',
+    externalApiKey: '외부 연동 API 키',
 };
 
 /** 반출 대상 — 서버(recordExport)의 DATASETS 화이트리스트와 1:1 */
@@ -64,6 +65,8 @@ export const FIELD_LABEL: Record<string, string> = {
     role: '권한',
     status: '계정 상태',
     consent: '약관 동의',
+    // 외부 연동 API 키 교체(update) — 키 값은 기록하지 않고 '교체됨'만 남긴다
+    apiKey: '키 교체',
 };
 
 /** 행위자를 어떻게 알아냈는지 — 기록의 신뢰 수준을 숨기지 않고 그대로 보여준다 */

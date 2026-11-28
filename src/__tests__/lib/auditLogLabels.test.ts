@@ -13,6 +13,12 @@ describe('auditLogLabels — 예약', () => {
         expect(describeEvent({ action: 'delete', targetType: 'reservation' })).toBe('예약 삭제');
     });
 
+    it('외부 연동 API 키 기록은 "생성·수정(키 교체)·삭제"로 읽힌다', () => {
+        expect(describeEvent({ action: 'create', targetType: 'externalApiKey' })).toBe('외부 연동 API 키 생성');
+        expect(describeEvent({ action: 'delete', targetType: 'externalApiKey' })).toBe('외부 연동 API 키 삭제');
+        expect(describeChangedFields(['apiKey'], 'externalApiKey')).toBe('키 교체');
+    });
+
     it('예약의 status는 예약 상태, 사용자의 status는 계정 상태로 옮긴다', () => {
         expect(describeChangedFields(['status', 'startTime', 'passengerUids'], 'reservation'))
             .toBe('예약 상태, 시작 시각, 동승자');

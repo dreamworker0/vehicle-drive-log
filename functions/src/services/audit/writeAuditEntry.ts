@@ -4,8 +4,13 @@
  * 근거: 고시 「개인정보의 안전성 확보조치 기준」 제16조.
  *
  * 문서 변경 로그는 Firestore 트리거(handlers/triggers/auditLog.ts)가 남기지만,
- * 트리거가 볼 수 없는 것이 둘 있다 — **접속지 IP**와 **읽기·반출 행위**다.
- * 둘 다 콜러블에서만 잡히므로 이 모듈이 그 경로의 공통 규약을 갖는다.
+ * 트리거가 볼 수 없는 것이 셋 있다 — **접속지 IP**, **읽기·반출 행위**, 그리고
+ * **삭제를 포함한 행위자**(트리거는 호출자를 모른다)다. 셋 다 콜러블에서만 잡히므로
+ * 이 모듈이 그 경로의 공통 규약을 갖는다.
+ *
+ * 외부 연동 API 키 발급·교체·폐기(manageExternalApiKey)가 세 번째 경우다. 키 문서는 서버만
+ * 쓰고 삭제가 곧 폐기라 트리거로는 "누가 폐기했는가"를 남길 수 없다. 그래서 콜러블이 키 변경과
+ * **같은 배치에** 기록을 넣는다(`buildAuditEntryDoc`) — 키만 바뀌고 기록이 빠지는 일이 없다.
  *
  * 트리거 쪽과 규약을 일부러 맞춰 둔다(컬렉션·보관기간·`__system__` 기관·필드 이름).
  * 어긋나면 Phase 3의 점검 화면이 두 벌의 해석 코드를 갖게 된다.
@@ -22,8 +27,8 @@ export interface AuditEntryInput {
     /** 문서 ID — 같은 행위의 재호출이 중복을 만들지 않도록 호출부가 결정론적으로 만든다 */
     docId: string;
     organizationId: string;
-    action: "login" | "export" | "read";
-    targetType: "session" | "export" | "orgDocument";
+    action: "login" | "export" | "read" | "create" | "update" | "delete";
+    targetType: "session" | "export" | "orgDocument" | "externalApiKey";
     targetId: string;
     /** 행위자. 콜러블은 인증 토큰에서 얻으므로 위조될 수 없다 */
     actorUid: string;
@@ -37,6 +42,8 @@ export interface AuditEntryInput {
     exportFormat?: string;
     exportDataset?: string;
     recordCount?: number;
+    /** 바뀐 항목 이름(값은 담지 않는다) — 키 교체처럼 update로 남길 때 */
+    changedFields?: string[];
 }
 
 /**
@@ -46,7 +53,14 @@ export interface AuditEntryInput {
  * null로 남으면 "확인했는데 없음"과 "해당 없음"이 구분되지 않는다.
  */
 export async function writeAuditEntry(entry: AuditEntryInput): Promise<void> {
-    const db = getFirestore();
+    await getFirestore().collection("auditLogs").doc(entry.docId).set(buildAuditEntryDoc(entry));
+}
+
+/**
+ * 접속기록 문서 본문을 만든다(문서 ID는 `entry.docId`). 다른 쓰기와 **한 배치로** 커밋해야
+ * 할 때 호출부가 `batch.set(auditLogs/<docId>, buildAuditEntryDoc(entry))`로 쓴다.
+ */
+export function buildAuditEntryDoc(entry: AuditEntryInput): Record<string, unknown> {
     const expiresAt = Timestamp.fromMillis(Date.now() + RETENTION_DAYS * 24 * 60 * 60 * 1000);
 
     const doc: Record<string, unknown> = {
@@ -67,8 +81,9 @@ export async function writeAuditEntry(entry: AuditEntryInput): Promise<void> {
     if (entry.exportFormat !== undefined) doc.exportFormat = entry.exportFormat;
     if (entry.exportDataset !== undefined) doc.exportDataset = entry.exportDataset;
     if (entry.recordCount !== undefined) doc.recordCount = entry.recordCount;
+    if (entry.changedFields !== undefined) doc.changedFields = entry.changedFields;
 
-    await db.collection("auditLogs").doc(entry.docId).set(doc);
+    return doc;
 }
 
 /**
