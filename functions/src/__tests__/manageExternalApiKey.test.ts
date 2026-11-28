@@ -7,6 +7,8 @@
  *   - 발급하면 기존 키를 지우고 새 키 하나만 남긴다(기관당 하나)
  *   - 저장되는 것은 해시(문서 ID)와 끝 4자리뿐 — 원래 키는 응답에서 한 번만 나간다
  *   - 폐기는 토글이 꺼져 있어도 된다
+ *   - 발급(create)·교체(update)·폐기(delete)는 키 변경과 같은 배치로 접속기록에 남는다.
+ *     행위자는 호출자 uid(auth), 키 값·해시·끝 4자리는 기록에 없다
  */
 class MockTimestamp {
     constructor(private readonly ms: number) {}
@@ -28,6 +30,7 @@ const mockKeysGet = jest.fn();
 const mockOrgGet = jest.fn();
 const mockBatchDelete = jest.fn();
 const mockBatchCreate = jest.fn();
+const mockBatchSet = jest.fn();
 const mockBatchCommit = jest.fn().mockResolvedValue(undefined);
 const mockWhere = jest.fn();
 
@@ -41,12 +44,13 @@ jest.mock('firebase-admin/firestore', () => ({
                 };
             }
             if (name === 'organizations') return { doc: () => ({ get: mockOrgGet }) };
+            if (name === 'auditLogs') return { doc: (id: string) => ({ id, path: `auditLogs/${id}` }) };
             throw new Error(`예상하지 못한 컬렉션: ${name}`);
         },
-        batch: () => ({ delete: mockBatchDelete, create: mockBatchCreate, commit: mockBatchCommit }),
+        batch: () => ({ delete: mockBatchDelete, create: mockBatchCreate, set: mockBatchSet, commit: mockBatchCommit }),
     }),
     FieldValue: { serverTimestamp: () => 'SERVER_TS' },
-    Timestamp: MockTimestamp,
+    Timestamp: Object.assign(MockTimestamp, { fromMillis: (ms: number) => new MockTimestamp(ms) }),
 }));
 
 jest.mock('firebase-functions/v2/https', () => ({
@@ -141,6 +145,70 @@ describe('manageExternalApiKey — 외부 연동 키 관리', () => {
         // 원래 키는 저장 문서 어디에도 없다
         expect(JSON.stringify(doc)).not.toContain(out.apiKey);
         expect(out.status).toMatchObject({ hasKey: true, hint: out.apiKey!.slice(-4), lastUsedAt: null });
+    });
+
+    /** 배치에 실린 접속기록 1건 */
+    const auditWrite = () => {
+        const calls = mockBatchSet.mock.calls.filter(([ref]) => String(ref.path).startsWith('auditLogs/'));
+        expect(calls).toHaveLength(1);
+        return calls[0] as [{ id: string }, Record<string, unknown>];
+    };
+
+    it('issue — 첫 발급은 "생성"으로, 키 변경과 같은 배치에 기록한다', async () => {
+        const out = await handler({ auth: admin, data: { action: 'issue' } });
+
+        const [ref, entry] = auditWrite();
+        expect(ref.id).toMatch(/^externalApiKey_org1_/);
+        expect(entry).toMatchObject({
+            organizationId: 'org1',
+            action: 'create',
+            targetType: 'externalApiKey',
+            targetId: 'org1',
+            actorUid: 'admin1',
+            actorSource: 'auth',
+            subjectUids: [],
+            at: 'SERVER_TS',
+        });
+        expect(entry).not.toHaveProperty('changedFields');
+        // 키 값·해시·끝 4자리는 기록하지 않는다
+        const text = JSON.stringify(entry);
+        expect(text).not.toContain(out.apiKey);
+        expect(text).not.toContain(hashApiKey(out.apiKey!));
+        expect(mockBatchCommit).toHaveBeenCalledTimes(1);
+    });
+
+    it('issue — 기존 키가 있으면 "수정(키 교체)"으로 기록한다', async () => {
+        mockKeysGet.mockResolvedValueOnce({ docs: [oldKeyDoc] });
+        await handler({ auth: admin, data: { action: 'issue' } });
+
+        const [, entry] = auditWrite();
+        expect(entry).toMatchObject({ action: 'update', targetType: 'externalApiKey', changedFields: ['apiKey'] });
+    });
+
+    it('issue — 거절되면 기록도 남지 않는다', async () => {
+        mockOrgGet.mockResolvedValueOnce({ exists: true, data: () => ({ status: 'approved' }) });
+        await expect(handler({ auth: admin, data: { action: 'issue' } })).rejects.toMatchObject({ code: 'failed-precondition' });
+        expect(mockBatchSet).not.toHaveBeenCalled();
+    });
+
+    it('revoke — 폐기는 "삭제"로, 폐기한 사람과 함께 기록한다', async () => {
+        mockKeysGet.mockResolvedValueOnce({ docs: [oldKeyDoc] });
+        await handler({ auth: admin, data: { action: 'revoke' } });
+
+        const [, entry] = auditWrite();
+        expect(entry).toMatchObject({ action: 'delete', targetType: 'externalApiKey', actorUid: 'admin1', actorSource: 'auth' });
+    });
+
+    it('revoke — 지울 키가 없으면 쓰지도 기록하지도 않는다', async () => {
+        const out = await handler({ auth: admin, data: { action: 'revoke' } });
+        expect(out).toEqual({ status: { hasKey: false } });
+        expect(mockBatchCommit).not.toHaveBeenCalled();
+        expect(mockBatchSet).not.toHaveBeenCalled();
+    });
+
+    it('status — 조회는 기록하지 않는다', async () => {
+        await handler({ auth: admin, data: { action: 'status' } });
+        expect(mockBatchSet).not.toHaveBeenCalled();
     });
 
     it('revoke — 토글이 꺼져 있어도 기관의 키를 모두 지운다', async () => {
