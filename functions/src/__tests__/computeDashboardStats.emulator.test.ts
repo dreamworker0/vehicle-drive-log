@@ -54,6 +54,12 @@ describe("computeAllDashboardStats — 주유/하이패스/알림 캐시 이관 
         await db.collection("users").doc("user1").set({
             email: "emp@test.com", role: "employee", organizationId: "org1",
         });
+        // 누적 주행거리: 운행일지 트리거가 유지하는 기관별 집계 (org2는 집계 문서만 있는 다른 기관)
+        await db.doc("organizations/org1/stats/aggregate").set({ count: 40, totalDistance: 1234.6 });
+        await db.collection("organizations").doc("org2").set({
+            name: "다른기관", status: "approved", createdAt: fortyDaysAgo, approvedAt: fortyDaysAgo,
+        });
+        await db.doc("organizations/org2/stats/aggregate").set({ count: 10, totalDistance: 500 });
 
         // 주유: 오늘 2건(50,000+30,000) + 전월 1건(10,000)
         await db.collection("fuelLogs").add({ organizationId: "org1", date: today, fuelCost: 50000 });
@@ -127,9 +133,13 @@ describe("computeAllDashboardStats — 주유/하이패스/알림 캐시 이관 
             ])
         );
 
+        // ── 총 주행거리: 당월+전월이 아니라 기관별 누적 집계의 합 (1234.6 + 500 → 1735) ──
+        expect(stats.totalDistance).toBe(1735);
+
         // ── 기관별 변형 문서에는 새 필드가 없어야 함 (ALL 스코프 전용) ──
         const orgStatsSnap = await db.doc("system/dashboardStats_org1").get();
         expect(orgStatsSnap.exists).toBe(true);
+        expect(orgStatsSnap.data()!.totalDistance).toBe(1235);
         expect(orgStatsSnap.data()!.fuelStats).toBeUndefined();
         expect(orgStatsSnap.data()!.notifSummary).toBeUndefined();
     });

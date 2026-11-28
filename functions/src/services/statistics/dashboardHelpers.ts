@@ -97,6 +97,16 @@ export interface BuildStatsContext {
 }
 
 /**
+ * 누적 주행거리 — 기관별 `organizations/{id}/stats/aggregate.totalDistance`의 합.
+ * 운행일지 트리거(updateAggregatedStats)가 증분으로 유지하는 값이라 운행일지 전체를 읽지 않아도 된다.
+ * 기관 필터가 있으면 그 기관 값만, 없으면 전 기관 합. 증분이 어긋나 음수가 된 기관은 0으로 본다.
+ */
+export function sumCumulativeDistance(byOrg: Record<string, number>, orgFilterId: string | null): number {
+    const values = orgFilterId ? [byOrg[orgFilterId] || 0] : Object.values(byOrg);
+    return Math.round(values.reduce((sum, v) => sum + Math.max(0, v), 0));
+}
+
+/**
  * 문서 배열을 organizationId 기준으로 그룹화
  */
 export function groupByOrg(docs: FirebaseFirestore.QueryDocumentSnapshot[]): Record<string, FirebaseFirestore.QueryDocumentSnapshot[]> {
