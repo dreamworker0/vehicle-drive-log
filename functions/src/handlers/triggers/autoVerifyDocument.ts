@@ -13,6 +13,7 @@ import {
     maskName, maskEmail,
     downloadFileAsBase64, searchAddressByTmap, geocodeByTmap,
     sendApprovalEmailServer, sendRejectionEmail,
+    DUPLICATE_APPROVED_EMAIL, DUPLICATE_PENDING_EMAIL,
 } from "../../services/driveLog/verifyHelpers";
 import {
     ScreenResult, isNonProfitDocument, normalizeStoredScreen, parseScreenResponse, buildOcrPrompt,
@@ -265,9 +266,12 @@ export const autoVerifyDocument = onDocumentWritten(
                     );
 
                     if (applicantEmail) {
+                        // 거절 사유만 보내면 신청자는 "떨어졌다"고만 안다. 이미 승인된 기관이면
+                        // 초대 코드로 가입하는 길을, 심사 중이면 기다리라는 안내를 함께 보낸다.
                         await sendRejectionEmail(
                             applicantEmail, orgName,
-                            (updateData.aiVerifyDetail as Record<string, unknown>).reason as string
+                            (updateData.aiVerifyDetail as Record<string, unknown>).reason as string,
+                            existingOrg.status === "approved" ? DUPLICATE_APPROVED_EMAIL : DUPLICATE_PENDING_EMAIL
                         );
                     }
                 }

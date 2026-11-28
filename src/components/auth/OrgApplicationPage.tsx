@@ -12,9 +12,10 @@ export default function OrgApplicationPage() {
     const {
         form, imageFile, imagePreview, loading, ocrStatus,
         error, isDragging, success, agreeTerms, agreePrivacy,
-        fileInputRef, currentUser,
+        fileInputRef, currentUser, emailSuggestion,
         setAgreeTerms, setAgreePrivacy,
         handleChange, handlePhoneChange, handleImageChange,
+        applyEmailSuggestion, keepEmailAsTyped,
         handleDragOver, handleDragLeave, handleDrop,
         handleSubmit, handleGoBack,
     } = useOrgApplication();
@@ -102,7 +103,36 @@ export default function OrgApplicationPage() {
                                 type="email" name="applicantEmail" value={form.applicantEmail}
                                 onChange={handleChange} className={`input ${currentUser?.email ? 'bg-surface-50 dark:bg-surface-800' : ''} min-h-[48px]`} readOnly={!!currentUser?.email}
                                 placeholder="example@email.com" required
+                                aria-describedby={`${fieldId}-email-help`}
                             />
+                            {emailSuggestion ? (
+                                // 흔한 도메인 오타(gmail.net 등) 경고 — 승인 메일·초대 코드가 이 주소로 가므로 제출 전에 답하게 한다
+                                <div
+                                    id={`${fieldId}-email-help`}
+                                    role="alert"
+                                    className="mt-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800 dark:bg-amber-900/20 dark:border-amber-700/40 dark:text-amber-200"
+                                >
+                                    <p>
+                                        혹시 <strong className="break-all">{emailSuggestion}</strong> 아닌가요?
+                                        <br />승인 메일과 초대 코드가 이 주소로 갑니다.
+                                    </p>
+                                    <div className="flex flex-wrap gap-2 mt-2">
+                                        {/* 고친 도메인은 모두 .com·.net으로 끝나 받침이 있다 → '으로' */}
+                                        <button type="button" onClick={applyEmailSuggestion} className="btn-primary min-h-[44px] px-4 text-sm">
+                                            {emailSuggestion.split('@')[1]}으로 고치기
+                                        </button>
+                                        <button type="button" onClick={keepEmailAsTyped} className="btn-secondary min-h-[44px] px-4 text-sm">
+                                            입력한 주소가 맞아요
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                !currentUser?.email && (
+                                    <p id={`${fieldId}-email-help`} className="text-xs text-surface-500 dark:text-surface-400 mt-1">
+                                        승인되면 이 주소로 초대 코드가 갑니다. 자주 확인하는 주소를 정확히 적어주세요.
+                                    </p>
+                                )
+                            )}
                         </div>
                         <div>
                             <label htmlFor={`${fieldId}-phone`} className="label">전화번호 <span className="text-red-500 dark:text-red-400">*</span></label>

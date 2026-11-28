@@ -169,12 +169,61 @@ export async function sendApprovalEmailServer(recipientEmail: string, orgName: s
     }
 }
 
+/** 거부 이메일의 상황별 안내 — 사유만으로는 신청자가 다음에 무엇을 할지 모를 때 붙인다 */
+export interface RejectionEmailOptions {
+    /** 머리글. 기본값 "기관 신청이 승인되지 않았습니다" */
+    title?: string;
+    /** "이렇게 해 주세요" 상자에 한 줄씩 보여줄 안내 */
+    guidance?: string[];
+}
+
+/**
+ * 같은 고유번호로 이미 **승인된** 기관이 있을 때의 안내.
+ *
+ * 2026-11-28: 첫 신청 이메일을 잘못 적어 승인 메일을 못 받은 기관이 다시 신청했다가
+ * "승인되지 않았습니다" 메일만 받았다. 기관은 이미 쓸 수 있는 상태이므로, 거절이 아니라
+ * "초대 코드로 가입하면 된다"는 길을 알려야 한다.
+ */
+export const DUPLICATE_APPROVED_EMAIL: RejectionEmailOptions = {
+    title: "이미 승인된 기관입니다",
+    guidance: [
+        "같은 고유번호로 승인된 기관이 이미 있어서 이번 신청은 새로 만들지 않았습니다. 기관은 지금 바로 쓸 수 있습니다.",
+        "기관이 승인될 때 처음 신청하신 분의 카카오톡(알림톡)과 이메일로 6자리 초대 코드가 발송되었습니다. 카카오톡 \"차량 운행일지\" 메시지를 먼저 확인해 주세요.",
+        `초대 코드를 받았다면 ${SERVICE_URL} 에 구글 계정으로 로그인한 뒤 코드를 입력하면 가입됩니다. 이 코드로 처음 가입하는 계정이 기관관리자가 됩니다.`,
+        "카카오톡 안에서 링크를 열면 구글 로그인이 막힙니다. 크롬이나 삼성 인터넷 같은 일반 브라우저에서 열어 주세요.",
+        "이미 기관관리자가 있다면 그분께 초대 코드를 받아 가입하시면 됩니다. 초대 코드를 받지 못하셨다면 관리자에게 연락해 주세요.",
+    ],
+};
+
+/** 같은 고유번호의 신청이 이미 **심사 중**일 때의 안내 */
+export const DUPLICATE_PENDING_EMAIL: RejectionEmailOptions = {
+    guidance: [
+        "같은 기관의 신청이 이미 접수되어 심사 중이라 이번 신청은 접수하지 않았습니다.",
+        "먼저 접수된 신청의 결과가 카카오톡(알림톡)과 이메일로 안내됩니다. 다시 신청하지 말고 결과를 기다려 주세요.",
+    ],
+};
+
 /**
  * 거부 이메일 발송 (Nodemailer — Gmail SMTP)
  */
-export async function sendRejectionEmail(recipientEmail: string, orgName: string, reason: string): Promise<boolean> {
+export async function sendRejectionEmail(
+    recipientEmail: string,
+    orgName: string,
+    reason: string,
+    options: RejectionEmailOptions = {},
+): Promise<boolean> {
     try {
         const transporter = createGmailTransporter();
+        const title = options.title || "기관 신청이 승인되지 않았습니다";
+        const guidanceHtml = options.guidance?.length
+            ? `
+                        <div style="margin-top: 20px; padding: 16px; background: #EFF6FF; border-radius: 8px; border: 1px solid #BFDBFE;">
+                            <p style="margin: 0 0 8px; color: #1E40AF; font-size: 14px; font-weight: 600;">이렇게 해 주세요</p>
+                            <ul style="margin: 0; padding-left: 20px; color: #1E3A8A; font-size: 14px; line-height: 1.6;">
+                                ${options.guidance.map((line) => `<li style="margin-bottom: 4px;">${escapeHtml(line)}</li>`).join("")}
+                            </ul>
+                        </div>`
+            : "";
 
         const mailOptions = {
             from: systemMailFrom(),
@@ -183,7 +232,7 @@ export async function sendRejectionEmail(recipientEmail: string, orgName: string
             html: `
                 <div style="font-family: 'Apple SD Gothic Neo', 'Malgun Gothic', sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
                     <div style="background: linear-gradient(135deg, #EF4444, #DC2626); color: white; padding: 24px; border-radius: 12px 12px 0 0;">
-                        <h2 style="margin: 0; font-size: 20px;">기관 신청이 승인되지 않았습니다</h2>
+                        <h2 style="margin: 0; font-size: 20px;">${escapeHtml(title)}</h2>
                     </div>
                     <div style="background: #F8FAFC; padding: 24px; border: 1px solid #E2E8F0; border-top: none; border-radius: 0 0 12px 12px;">
                         <table style="width: 100%; border-collapse: collapse;">
@@ -195,7 +244,7 @@ export async function sendRejectionEmail(recipientEmail: string, orgName: string
                                 <td style="padding: 12px 0; color: #64748B;">거부 사유</td>
                                 <td style="padding: 12px 0; color: #DC2626; font-weight: 600;">${escapeHtml(reason)}</td>
                             </tr>
-                        </table>
+                        </table>${guidanceHtml}
                         <div style="margin-top: 20px; padding: 16px; background: #FEF2F2; border-radius: 8px; border: 1px solid #FECACA;">
                             <p style="margin: 0; color: #991B1B; font-size: 14px;">
                                 문의사항이 있으시면 관리자에게 연락해 주세요.

@@ -198,6 +198,76 @@ describe('useOrgApplication 통합 테스트', () => {
         expect(mockSubmitOrgApplication).not.toHaveBeenCalled();
     });
 
+    // 승인 메일(초대 코드)이 가는 주소라, 흔한 도메인 오타는 제출 전에 답하게 한다 (2026-11-28 gmail.net 사례)
+    describe('이메일 도메인 오타 경고', () => {
+        const fillValid = (result: { current: ReturnType<typeof useOrgApplication> }, email: string) => {
+            act(() => {
+                result.current.handleChange({ target: { name: 'applicantName', value: '홍길동' } } as unknown as React.ChangeEvent<HTMLInputElement>);
+                result.current.handleChange({ target: { name: 'applicantEmail', value: email } } as unknown as React.ChangeEvent<HTMLInputElement>);
+                result.current.handleChange({ target: { name: 'applicantPhone', value: '010-1234-5678' } } as unknown as React.ChangeEvent<HTMLInputElement>);
+                result.current.handleChange({ target: { name: 'orgName', value: '우리복지재단' } } as unknown as React.ChangeEvent<HTMLInputElement>);
+                result.current.handleImageChange({ target: { files: [new File(['x'], 'cert.png', { type: 'image/png' })] } } as unknown as React.ChangeEvent<HTMLInputElement>);
+                result.current.setAgreeTerms(true);
+                result.current.setAgreePrivacy(true);
+            });
+        };
+        const submit = async (result: { current: ReturnType<typeof useOrgApplication> }) => {
+            await act(async () => {
+                await result.current.handleSubmit({ preventDefault: vi.fn() } as unknown as React.FormEvent<HTMLFormElement>);
+            });
+        };
+
+        it('gmail.net이면 gmail.com을 제안하고, 답하기 전에는 제출하지 않는다', async () => {
+            const { result } = renderHook(() => useOrgApplication());
+            fillValid(result, 'sjb733@gmail.net');
+
+            expect(result.current.emailSuggestion).toBe('sjb733@gmail.com');
+            await submit(result);
+            expect(mockSubmitOrgApplication).not.toHaveBeenCalled();
+            expect(result.current.error).toContain('sjb733@gmail.com');
+        });
+
+        it('"고치기"를 누르면 제안한 주소로 바뀌고 그 주소로 제출된다', async () => {
+            mockSubmitOrgApplication.mockResolvedValueOnce({ data: { success: true } });
+            const { result } = renderHook(() => useOrgApplication());
+            fillValid(result, 'sjb733@gmail.net');
+
+            act(() => { result.current.applyEmailSuggestion(); });
+            expect(result.current.form.applicantEmail).toBe('sjb733@gmail.com');
+            expect(result.current.emailSuggestion).toBeNull();
+
+            await submit(result);
+            expect(mockSubmitOrgApplication).toHaveBeenCalledWith(expect.objectContaining({ applicantEmail: 'sjb733@gmail.com' }));
+        });
+
+        it('"입력한 주소가 맞아요"를 누르면 그대로 제출하고, 주소를 다시 바꾸면 다시 묻는다', async () => {
+            mockSubmitOrgApplication.mockResolvedValueOnce({ data: { success: true } });
+            const { result } = renderHook(() => useOrgApplication());
+            fillValid(result, 'kim@naver.net');
+
+            act(() => { result.current.keepEmailAsTyped(); });
+            expect(result.current.emailSuggestion).toBeNull();
+
+            act(() => {
+                result.current.handleChange({ target: { name: 'applicantEmail', value: 'kim@gmial.com' } } as unknown as React.ChangeEvent<HTMLInputElement>);
+            });
+            expect(result.current.emailSuggestion).toBe('kim@gmail.com');
+
+            act(() => {
+                result.current.handleChange({ target: { name: 'applicantEmail', value: 'kim@naver.net' } } as unknown as React.ChangeEvent<HTMLInputElement>);
+            });
+            expect(result.current.emailSuggestion).toBeNull();
+            await submit(result);
+            expect(mockSubmitOrgApplication).toHaveBeenCalledWith(expect.objectContaining({ applicantEmail: 'kim@naver.net' }));
+        });
+
+        it('구글 로그인으로 채워진 이메일은 검사하지 않는다', () => {
+            mockUser = { displayName: '홍길동', email: 'someone@gmail.net' };
+            const { result } = renderHook(() => useOrgApplication());
+            expect(result.current.emailSuggestion).toBeNull();
+        });
+    });
+
     it('시나리오 7: 증빙 확장자 제한 - 허용되지 않은 파일 업로드 시 에러 검증', () => {
         const { result } = renderHook(() => useOrgApplication());
         const invalidFile = new File(['text'], 'test.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
